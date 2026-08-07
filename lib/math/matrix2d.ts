@@ -5,200 +5,181 @@ import { Matrix3, Vector3 } from 'three'
 import { Pool } from '../util/object-pool.js'
 import { Vertex3D } from './vertex3d.js'
 
-/** 3×3 rotation matrix (VP-compatible, three.js interoperable). */
-export class Matrix2D {
+/** 3×3 matrix (VP column-major, three.js based). @see https://github.com/vpinball/vpinball/blob/master/math/matrix.cpp */
+export class Matrix2D extends Matrix3 {
 	private static readonly POOL = new Pool(Matrix2D)
 
-	/** Column-major 3×3 matrix. */
-	readonly matrix: number[][] = [
-		[1, 0, 0],
-		[0, 1, 0],
-		[0, 0, 1],
-	]
-
-	/** Claims a pooled instance. */
 	static claim(): Matrix2D {
 		return Matrix2D.POOL.get()
 	}
 
-	/** Releases instances. */
 	static release(...ms: Matrix2D[]): void {
 		for (const m of ms) Matrix2D.POOL.release(m)
 	}
 
-	/** Resets pooled instance. */
 	static reset(m: Matrix2D): void {
-		m.setIdentity()
+		m.identity()
 	}
 
-	/** Sets to identity. */
-	setIdentity(): this {
-		this.matrix[0][0] = 1
-		this.matrix[0][1] = 0
-		this.matrix[0][2] = 0
-		this.matrix[1][0] = 0
-		this.matrix[1][1] = 1
-		this.matrix[1][2] = 0
-		this.matrix[2][0] = 0
-		this.matrix[2][1] = 0
-		this.matrix[2][2] = 1
+	/** Column-major 3×3 storage (`matrix[col][row]`). */
+	get matrix(): number[][] {
+		const e = this.elements
+		return [
+			[e[0], e[1], e[2]],
+			[e[3], e[4], e[5]],
+			[e[6], e[7], e[8]],
+		]
+	}
+
+	set matrix(m: number[][]) {
+		this.set(m[0][0], m[1][0], m[2][0], m[0][1], m[1][1], m[2][1], m[0][2], m[1][2], m[2][2])
+	}
+
+	override identity(): this {
+		super.identity()
 		return this
 	}
 
-	/** Multiplies vector (matrixᵀ·v). */
+	/** VP compat. */
+	setIdentity(): this {
+		return this.identity()
+	}
+
+	/** Multiplies vector by transposed matrix. */
 	multiplyVectorT(v: Vertex3D, recycle = false): Vertex3D {
-		const x = this.matrix[0][0] * v.x + this.matrix[1][0] * v.y + this.matrix[2][0] * v.z
-		const y = this.matrix[0][1] * v.x + this.matrix[1][1] * v.y + this.matrix[2][1] * v.z
-		const z = this.matrix[0][2] * v.x + this.matrix[1][2] * v.y + this.matrix[2][2] * v.z
+		const e = this.elements
+		const x = e[0] * v.x + e[3] * v.y + e[6] * v.z
+		const y = e[1] * v.x + e[4] * v.y + e[7] * v.z
+		const z = e[2] * v.x + e[5] * v.y + e[8] * v.z
 		return recycle ? Vertex3D.claim(x, y, z) : new Vertex3D(x, y, z)
 	}
 
-	/** Sets rotation around axis. */
+	/** Sets rotation around axis (s=sin, c=cos). */
 	rotationAroundAxis(axis: Vertex3D, s: number, c: number): void {
 		const { x, y, z } = axis
 		const oc = 1 - c
-		this.matrix[0][0] = x * x + c * (1 - x * x)
-		this.matrix[1][0] = x * y * oc - z * s
-		this.matrix[2][0] = z * x * oc + y * s
-		this.matrix[0][1] = x * y * oc + z * s
-		this.matrix[1][1] = y * y + c * (1 - y * y)
-		this.matrix[2][1] = y * z * oc - x * s
-		this.matrix[0][2] = z * x * oc - y * s
-		this.matrix[1][2] = y * z * oc + x * s
-		this.matrix[2][2] = z * z + c * (1 - z * z)
+		this.set(
+			x * x + c * (1 - x * x),
+			x * y * oc - z * s,
+			z * x * oc + y * s,
+			x * y * oc + z * s,
+			y * y + c * (1 - y * y),
+			y * z * oc - x * s,
+			z * x * oc - y * s,
+			y * z * oc + x * s,
+			z * z + c * (1 - z * z),
+		)
 	}
 
 	/** Sets skew-symmetric matrix of v. */
 	createSkewSymmetric(v: Vertex3D): this {
-		this.matrix[0][0] = 0
-		this.matrix[0][1] = -v.z
-		this.matrix[0][2] = v.y
-		this.matrix[1][0] = v.z
-		this.matrix[1][1] = 0
-		this.matrix[1][2] = -v.x
-		this.matrix[2][0] = -v.y
-		this.matrix[2][1] = v.x
-		this.matrix[2][2] = 0
+		this.set(0, v.z, -v.y, -v.z, 0, v.x, v.y, -v.x, 0)
 		return this
 	}
 
-	/** Clones, optionally pooled. */
-	clone(recycle = false): Matrix2D {
-		const m = recycle ? Matrix2D.claim() : new Matrix2D()
-		for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) m.matrix[i][j] = this.matrix[i][j]
-		return m
+	override clone(): this {
+		return super.clone() as unknown as this
+	}
+
+	clonePooled(recycle = false): Matrix2D {
+		if (recycle) {
+			const m = Matrix2D.claim()
+			m.copy(this)
+			return m
+		}
+		return this.clone() as unknown as Matrix2D
 	}
 
 	/** Copies from other. */
-	set(m: Matrix2D): void {
-		for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) this.matrix[i][j] = m.matrix[i][j]
+	copyMatrix(m: Matrix2D): void {
+		this.copy(m)
 	}
 
-	/** Sets to a·b via three.js. */
+	/** Legacy alias. */
+	setFromMatrix(m: Matrix2D): void {
+		this.copy(m)
+	}
+
+	setFrom(m: Matrix2D): this {
+		this.copy(m)
+		return this
+	}
+
+	override set(
+		n11: number,
+		n12: number,
+		n13: number,
+		n21: number,
+		n22: number,
+		n23: number,
+		n31: number,
+		n32: number,
+		n33: number,
+	): this
+	override set(m: Matrix2D): this
+	override set(...args: any[]): this {
+		if (args.length === 1 && args[0] instanceof Matrix3) {
+			this.copy(args[0])
+			return this
+		}
+		return super.set(args[0], args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8]) as unknown as this
+	}
+
+	/** Sets to a·b. */
 	multiplyMatrix(a: Matrix2D, b: Matrix2D): void {
-		const am = new Matrix3().set(
-			a.matrix[0][0],
-			a.matrix[1][0],
-			a.matrix[2][0],
-			a.matrix[0][1],
-			a.matrix[1][1],
-			a.matrix[2][1],
-			a.matrix[0][2],
-			a.matrix[1][2],
-			a.matrix[2][2],
-		)
-		const bm = new Matrix3().set(
-			b.matrix[0][0],
-			b.matrix[1][0],
-			b.matrix[2][0],
-			b.matrix[0][1],
-			b.matrix[1][1],
-			b.matrix[2][1],
-			b.matrix[0][2],
-			b.matrix[1][2],
-			b.matrix[2][2],
-		)
-		const out = new Matrix3().multiplyMatrices(am, bm)
-		const e = out.elements
-		this.matrix[0][0] = e[0]
-		this.matrix[1][0] = e[1]
-		this.matrix[2][0] = e[2]
-		this.matrix[0][1] = e[3]
-		this.matrix[1][1] = e[4]
-		this.matrix[2][1] = e[5]
-		this.matrix[0][2] = e[6]
-		this.matrix[1][2] = e[7]
-		this.matrix[2][2] = e[8]
+		this.multiplyMatrices(a, b)
 	}
 
-	/** Scales all elements. */
-	multiplyScalar(s: number): void {
-		for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) this.matrix[i][j] *= s
+	override multiplyScalar(s: number): this {
+		super.multiplyScalar(s)
+		return this
 	}
 
 	/** Sets to a+b. */
 	addMatrix(a: Matrix2D, b: Matrix2D): void {
-		for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) this.matrix[i][j] = a.matrix[i][j] + b.matrix[i][j]
+		const ae = a.elements,
+			be = b.elements,
+			e = this.elements
+		for (let i = 0; i < 9; i++) e[i] = ae[i] + be[i]
 	}
 
-	/** Orthonormalizes via three.js Vector3. */
+	/** Orthonormalizes. */
 	orthoNormalize(): void {
-		const vx = new Vector3(this.matrix[0][0], this.matrix[1][0], this.matrix[2][0])
-		const vy = new Vector3(this.matrix[0][1], this.matrix[1][1], this.matrix[2][1])
+		const e = this.elements
+		const vx = new Vector3(e[0], e[1], e[2])
+		const vy = new Vector3(e[3], e[4], e[5])
 		const vz = new Vector3().crossVectors(vx, vy)
 		vx.normalize()
 		vz.normalize()
 		const vyy = new Vector3().crossVectors(vz, vx)
-		this.matrix[0][0] = vx.x
-		this.matrix[0][1] = vyy.x
-		this.matrix[0][2] = vz.x
-		this.matrix[1][0] = vx.y
-		this.matrix[1][1] = vyy.y
-		this.matrix[1][2] = vz.y
-		this.matrix[2][0] = vx.z
-		this.matrix[2][1] = vyy.z
-		this.matrix[2][2] = vz.z
+		e[0] = vx.x
+		e[1] = vx.y
+		e[2] = vx.z
+		e[3] = vyy.x
+		e[4] = vyy.y
+		e[5] = vyy.z
+		e[6] = vz.x
+		e[7] = vz.y
+		e[8] = vz.z
 	}
 
-	/** Exact equality. */
-	equals(m: Matrix2D): boolean {
-		for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) if (this.matrix[i][j] !== m.matrix[i][j]) return false
-		return true
+	override equals(m: Matrix3): boolean {
+		return super.equals(m)
 	}
 
-	/** Converts to THREE.Matrix3. */
 	toThree(): Matrix3 {
-		return new Matrix3().set(
-			this.matrix[0][0],
-			this.matrix[1][0],
-			this.matrix[2][0],
-			this.matrix[0][1],
-			this.matrix[1][1],
-			this.matrix[2][1],
-			this.matrix[0][2],
-			this.matrix[1][2],
-			this.matrix[2][2],
-		)
+		return this.clone() as unknown as Matrix3
 	}
 
-	/** Creates from THREE.Matrix3. */
 	static fromThree(m: Matrix3): Matrix2D {
-		const e = m.elements,
-			out = new Matrix2D()
-		out.matrix[0][0] = e[0]
-		out.matrix[1][0] = e[1]
-		out.matrix[2][0] = e[2]
-		out.matrix[0][1] = e[3]
-		out.matrix[1][1] = e[4]
-		out.matrix[2][1] = e[5]
-		out.matrix[0][2] = e[6]
-		out.matrix[1][2] = e[7]
-		out.matrix[2][2] = e[8]
+		const out = new Matrix2D()
+		out.copy(m)
 		return out
 	}
 
-	toString(): string {
+	override toString(): string {
 		const r = (n: number) => Math.round(n * 1000) / 1000
-		return `[${r(this.matrix[0][0])}, ${r(this.matrix[0][1])}, ${r(this.matrix[0][2])}]\n[${r(this.matrix[1][0])}, ${r(this.matrix[1][1])}, ${r(this.matrix[1][2])}]\n[${r(this.matrix[2][0])}, ${r(this.matrix[2][1])}, ${r(this.matrix[2][2])}]`
+		const e = this.elements
+		return `[${r(e[0])}, ${r(e[3])}, ${r(e[6])}]\n[${r(e[1])}, ${r(e[4])}, ${r(e[7])}]\n[${r(e[2])}, ${r(e[5])}, ${r(e[8])}]`
 	}
 }
