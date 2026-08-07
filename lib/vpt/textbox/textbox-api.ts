@@ -4,7 +4,8 @@
 import { ItemApi } from '../item-api.js'
 import type { TextboxData } from './textbox-data.js'
 
-export class TextboxApi extends ItemApi<TextboxData> {
+export /** TextboxApi. */
+class TextboxApi extends ItemApi<TextboxData> {
 	get BackColor() {
 		return this.data.backColor
 	}
