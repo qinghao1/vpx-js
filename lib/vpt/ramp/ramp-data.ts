@@ -8,7 +8,9 @@ import { f4 } from '../../math/float.js'
 import { Enums } from '../enums.js'
 import { type IPhysicalData, ItemData } from '../item-data.js'
 
-/** Ramp data. */
+/** Ramp data.
+ *
+ * @see https://github.com/vpinball/vpinball/blob/master/ramp.cpp */
 export class RampData extends ItemData implements IPhysicalData {
 	public depthBias: number = 0
 	public dragPoints: DragPoint[] = []
