@@ -6,8 +6,8 @@ import { blockStatement, callExpression, identifier, memberExpression, thisExpre
 import type { ESIToken } from '../grammar/grammar.js'
 import { Transformer } from '../transformer/transformer.js'
 
-/** ppHelpers. */
-export function ppHelpers(node: ESIToken): any {
+/** Generic post-processors for shared grammar nodes. */
+export function ppHelpers(node: ESIToken): unknown {
 	switch (node.type) {
 		case 'Statements':
 		case 'StatementsInline':
@@ -15,7 +15,7 @@ export function ppHelpers(node: ESIToken): any {
 		case 'Block':
 			return ppBlock(node)
 		case 'ArrayTypeModifiers':
-			return ppArrayTypeModifiers(node)
+			return ppArrayTypeModifiers()
 		case 'ArraySizeInitializationModifier':
 			return ppArraySizeInitializationModifier(node)
 		case 'BoundList':
@@ -29,38 +29,26 @@ export function ppHelpers(node: ESIToken): any {
 	return null
 }
 
-function ppStatements(node: ESIToken): any {
+function ppStatements(node: ESIToken): Statement[] {
 	const stmts: Statement[] = []
-	for (const child of node.children) {
-		if (!Array.isArray(child.estree)) {
-			stmts.push(child.estree)
-		} else {
-			stmts.push(...child.estree)
-		}
-	}
+	for (const child of node.children) stmts.push(...(Array.isArray(child.estree) ? child.estree : [child.estree]))
 	return stmts
 }
 
-function ppBlock(node: ESIToken): any {
+function ppBlock(node: ESIToken): Statement {
 	const stmts: Statement[] = []
-	for (const child of node.children) {
-		if (!Array.isArray(child.estree)) {
-			stmts.push(child.estree)
-		} else {
-			stmts.push(...child.estree)
-		}
-	}
+	for (const child of node.children) stmts.push(...(Array.isArray(child.estree) ? child.estree : [child.estree]))
 	return blockStatement(stmts)
 }
 
-function ppIdentifier(node: ESIToken): any {
+function ppIdentifier(node: ESIToken): Expression {
 	return node.text === 'Me' ? thisExpression() : identifier(node.text)
 }
 
-function ppArgumentList(node: ESIToken): any {
-	const estree = []
+function ppArgumentList(node: ESIToken): Expression[] {
+	const estree: Expression[] = []
 	if (node.children.length > 0) {
-		let prevArgument: ESIToken | null = null
+		let prev: ESIToken | null = null
 		for (const child of node.children) {
 			switch (child.type) {
 				case 'Expression':
@@ -70,38 +58,31 @@ function ppArgumentList(node: ESIToken): any {
 					estree.push(...child.estree)
 					break
 				case 'Comma':
-					if (prevArgument === null || prevArgument.type === 'Comma') {
-						estree.push(identifier('undefined'))
-					}
+					if (prev === null || prev.type === 'Comma') estree.push(identifier('undefined'))
+					break
 			}
-			prevArgument = child
+			prev = child
 		}
-		if (node.children[node.children.length - 1].type === 'Comma') {
-			estree.push(identifier('undefined'))
-		}
+		if (node.children[node.children.length - 1].type === 'Comma') estree.push(identifier('undefined'))
 	}
 	return estree
 }
 
-function ppArrayTypeModifiers(node: ESIToken): any {
+function ppArrayTypeModifiers(): unknown[] {
 	return []
 }
 
-function ppArraySizeInitializationModifier(node: ESIToken): any {
+function ppArraySizeInitializationModifier(node: ESIToken): unknown {
 	return node.children[1].estree
 }
 
-function ppBoundList(node: ESIToken): any {
+function ppBoundList(node: ESIToken): Expression[] {
 	const exprs: Expression[] = []
-	for (const expr of node.children) {
-		if (expr.type === 'Bound') {
-			exprs.push(expr.estree)
-		}
-	}
+	for (const expr of node.children) if (expr.type === 'Bound') exprs.push(expr.estree)
 	return exprs
 }
 
-/** getOrCall. */
+/** Wraps a callee with `__vbs.getOrCall`. */
 export function getOrCall(callee: Expression, arg?: Expression): CallExpression {
 	return callExpression(
 		memberExpression(identifier(Transformer.VBSHELPER_NAME), identifier('getOrCall')),
