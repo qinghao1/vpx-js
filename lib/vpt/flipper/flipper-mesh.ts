@@ -10,111 +10,81 @@ import type { FlipperData } from './flipper-data.js'
 
 const flipperBaseMesh = loadMesh('flipper-base-mesh')
 
-/** Flipper mesh. */
+/** Flipper mesh. @see https://github.com/vpinball/vpinball/blob/master/flipper.cpp */
 export class FlipperMesh {
 	public generateMeshes(data: FlipperData, table: Table): { base: Mesh; rubber?: Mesh } {
-		const fullMatrix = new Matrix3D()
-		fullMatrix.rotateZMatrix(degToRad(180.0))
-
+		const m = new Matrix3D().rotateZMatrix(degToRad(180))
 		const height = table.getSurfaceHeight(data.szSurface, data.center.x, data.center.y)
-		const baseScale = f4(10.0)
-		const tipScale = f4(10.0)
 		const baseRadius = f4(data.baseRadius - data.rubberThickness)
 		const endRadius = f4(data.endRadius - data.rubberThickness)
+		const baseScale = 10
+		const base = flipperBaseMesh.clone(`flipper.base-${data.getName()}`)
+		this.applyScale(base, data, baseRadius, endRadius, baseScale)
+		base.transform(m, undefined, (z) => f4(f4(z * data.height) * table.getScaleZ()) + height)
+		if (data.rubberThickness <= 0) return { base }
+		const rubber = flipperBaseMesh.clone(`flipper.rubber-${data.getName()}`)
+		this.applyScale(rubber, data, data.baseRadius, data.endRadius, baseScale, true)
+		rubber.transform(
+			m,
+			undefined,
+			(z) => f4(f4(z * data.rubberWidth) * table.getScaleZ()) + f4(height + data.rubberHeight),
+		)
+		return { base, rubber }
+	}
 
-		// base and tip
-		const baseMesh = flipperBaseMesh.clone(`flipper.base-${data.getName()}`)
+	private applyScale(
+		mesh: Mesh,
+		data: FlipperData,
+		baseR: number,
+		endR: number,
+		scale: number,
+		isRubber = false,
+	): void {
 		for (let t = 0; t < 13; t++) {
-			for (const v of baseMesh.vertices) {
-				if (
-					v.x === FlipperMesh.vertsBaseBottom[t].x &&
-					v.y === FlipperMesh.vertsBaseBottom[t].y &&
-					v.z === FlipperMesh.vertsBaseBottom[t].z
-				) {
-					v.x *= f4(baseRadius * baseScale)
-					v.y *= f4(baseRadius * baseScale)
-				}
-				if (
-					v.x === FlipperMesh.vertsTipBottom[t].x &&
-					v.y === FlipperMesh.vertsTipBottom[t].y &&
-					v.z === FlipperMesh.vertsTipBottom[t].z
-				) {
-					v.x *= f4(endRadius * tipScale)
-					v.y *= f4(endRadius * tipScale)
-					v.y += data.flipperRadius - f4(endRadius * f4(7.9))
-				}
-				if (
-					v.x === FlipperMesh.vertsBaseTop[t].x &&
-					v.y === FlipperMesh.vertsBaseTop[t].y &&
-					v.z === FlipperMesh.vertsBaseTop[t].z
-				) {
-					v.x *= f4(baseRadius * baseScale)
-					v.y *= f4(baseRadius * baseScale)
-				}
-				if (
-					v.x === FlipperMesh.vertsTipTop[t].x &&
-					v.y === FlipperMesh.vertsTipTop[t].y &&
-					v.z === FlipperMesh.vertsTipTop[t].z
-				) {
-					v.x *= f4(endRadius * tipScale)
-					v.y *= f4(endRadius * tipScale)
-					v.y += data.flipperRadius - f4(endRadius * f4(7.9))
+			for (const v of mesh.vertices) {
+				if (this.match(v, FlipperMesh.vertsBaseBottom[t]!)) {
+					if (isRubber) {
+						v.x = f4(v.x * baseR) * scale
+						v.y = f4(v.y * baseR) * scale
+					} else {
+						v.x *= f4(baseR * scale)
+						v.y *= f4(baseR * scale)
+					}
+				} else if (this.match(v, FlipperMesh.vertsTipBottom[t]!)) {
+					if (isRubber) {
+						v.x = f4(v.x * endR) * scale
+						v.y = f4(v.y * endR) * scale
+						v.y = f4(v.y + data.flipperRadius) - f4(endR * 7.9)
+					} else {
+						v.x *= f4(endR * scale)
+						v.y *= f4(endR * scale)
+						v.y += data.flipperRadius - f4(endR * 7.9)
+					}
+				} else if (this.match(v, FlipperMesh.vertsBaseTop[t]!)) {
+					if (isRubber) {
+						v.x = f4(v.x * baseR) * scale
+						v.y = f4(v.y * baseR) * scale
+					} else {
+						v.x *= f4(baseR * scale)
+						v.y *= f4(baseR * scale)
+					}
+				} else if (this.match(v, FlipperMesh.vertsTipTop[t]!)) {
+					if (isRubber) {
+						v.x = f4(v.x * endR) * scale
+						v.y = f4(v.y * endR) * scale
+						v.y = f4(v.y + data.flipperRadius) - f4(endR * 7.9)
+					} else {
+						v.x *= f4(endR * scale)
+						v.y *= f4(endR * scale)
+						v.y += data.flipperRadius - f4(endR * 7.9)
+					}
 				}
 			}
 		}
-		baseMesh.transform(fullMatrix, undefined, (z: number) => f4(f4(z * data.height) * table.getScaleZ()) + height)
+	}
 
-		// rubber
-		if (data.rubberThickness > 0.0) {
-			const rubberBaseScale = f4(10.0)
-			const rubberTipScale = f4(10.0)
-			const rubberMesh = flipperBaseMesh.clone(`flipper.rubber-${data.getName()}`)
-			for (let t = 0; t < 13; t++) {
-				for (const v of rubberMesh.vertices) {
-					if (
-						v.x === FlipperMesh.vertsBaseBottom[t].x &&
-						v.y === FlipperMesh.vertsBaseBottom[t].y &&
-						v.z === FlipperMesh.vertsBaseBottom[t].z
-					) {
-						v.x = f4(v.x * data.baseRadius) * rubberBaseScale
-						v.y = f4(v.y * data.baseRadius) * rubberBaseScale
-					}
-					if (
-						v.x === FlipperMesh.vertsTipBottom[t].x &&
-						v.y === FlipperMesh.vertsTipBottom[t].y &&
-						v.z === FlipperMesh.vertsTipBottom[t].z
-					) {
-						v.x = f4(v.x * data.endRadius) * rubberTipScale
-						v.y = f4(v.y * data.endRadius) * rubberTipScale
-						v.y = f4(v.y + data.flipperRadius) - f4(data.endRadius * f4(7.9))
-					}
-					if (
-						v.x === FlipperMesh.vertsBaseTop[t].x &&
-						v.y === FlipperMesh.vertsBaseTop[t].y &&
-						v.z === FlipperMesh.vertsBaseTop[t].z
-					) {
-						v.x = f4(v.x * data.baseRadius) * rubberBaseScale
-						v.y = f4(v.y * data.baseRadius) * rubberBaseScale
-					}
-					if (
-						v.x === FlipperMesh.vertsTipTop[t].x &&
-						v.y === FlipperMesh.vertsTipTop[t].y &&
-						v.z === FlipperMesh.vertsTipTop[t].z
-					) {
-						v.x = f4(v.x * data.endRadius) * rubberTipScale
-						v.y = f4(v.y * data.endRadius) * rubberTipScale
-						v.y = f4(v.y + data.flipperRadius) - f4(data.endRadius * f4(7.9))
-					}
-				}
-			}
-			rubberMesh.transform(
-				fullMatrix,
-				undefined,
-				(z: number) => f4(f4(z * data.rubberWidth) * table.getScaleZ()) + f4(height + data.rubberHeight),
-			)
-			return { base: baseMesh, rubber: rubberMesh }
-		}
-		return { base: baseMesh }
+	private match(a: { x: number; y: number; z: number }, b: Vertex3D): boolean {
+		return a.x === b.x && a.y === b.y && a.z === b.z
 	}
 
 	private static vertsTipBottom = [
