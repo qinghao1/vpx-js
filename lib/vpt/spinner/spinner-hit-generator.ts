@@ -7,39 +7,30 @@ import { Vertex2D } from '../../util/math.js'
 import type { SpinnerData } from './spinner-data.js'
 import type { SpinnerState } from './spinner-state.js'
 
-/** Spinne hit generator. */
+/** Spinner hit generator. @see https://github.com/vpinball/vpinball/blob/master/spinner.cpp */
 export class SpinnerHitGenerator {
-	private readonly data: SpinnerData
+	constructor(private readonly data: SpinnerData) {}
 
-	constructor(data: SpinnerData) {
-		this.data = data
-	}
-
-	public getHitShapes(state: SpinnerState, height: number): HitCircle[] {
-		const h = this.data.height + 30.0
-
-		if (this.data.showBracket) {
-			/*add a hit shape for the bracket if shown, just in case if the bracket spinner height is low enough so the ball can hit it*/
-			const halfLength = this.data.length * 0.5 + this.data.length * 0.1875
-			const radAngle = degToRad(this.data.rotation)
-			const sn = Math.sin(radAngle)
-			const cs = Math.cos(radAngle)
-
-			return [
-				new HitCircle(
-					new Vertex2D(this.data.center.x + cs * halfLength, this.data.center.y + sn * halfLength),
-					this.data.length * 0.075,
-					height + this.data.height,
-					height + h,
-				),
-				new HitCircle(
-					new Vertex2D(this.data.center.x - cs * halfLength, this.data.center.y - sn * halfLength),
-					this.data.length * 0.075,
-					height + this.data.height,
-					height + h,
-				),
-			]
-		}
-		return []
+	public getHitShapes(_state: SpinnerState, height: number): HitCircle[] {
+		if (!this.data.showBracket) return []
+		const h = this.data.height + 30
+		const halfLength = this.data.length * 0.5 + this.data.length * 0.1875
+		const radAngle = degToRad(this.data.rotation)
+		const sn = Math.sin(radAngle)
+		const cs = Math.cos(radAngle)
+		return [
+			new HitCircle(
+				new Vertex2D(this.data.center.x + cs * halfLength, this.data.center.y + sn * halfLength),
+				this.data.length * 0.075,
+				height + this.data.height,
+				height + h,
+			),
+			new HitCircle(
+				new Vertex2D(this.data.center.x - cs * halfLength, this.data.center.y - sn * halfLength),
+				this.data.length * 0.075,
+				height + this.data.height,
+				height + h,
+			),
+		]
 	}
 }
