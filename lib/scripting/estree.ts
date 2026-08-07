@@ -229,10 +229,11 @@ export const whileStatement = (test: Expression, body: Statement): WhileStatemen
 	body,
 })
 
-function addScope<T extends object, U extends object & { __scope?: unknown } = any & { __scope?: unknown }>(
-	to: T,
-	from?: U,
-): T {
-	if (from && (from as any).__scope) (to as any).__scope = (from as any).__scope
+function addScope<
+	T extends object,
+	U extends object & { __scope?: unknown } = Record<string, unknown> & { __scope?: unknown },
+>(to: T, from?: U): T {
+	if (from && (from as { __scope?: unknown }).__scope)
+		(to as { __scope?: unknown }).__scope = (from as { __scope?: unknown }).__scope
 	return to
 }
