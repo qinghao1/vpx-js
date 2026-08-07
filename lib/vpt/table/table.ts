@@ -298,7 +298,7 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 		for (const p of Object.values<Primitive>(this.primitives)) p.clearMesh()
 	}
 
-	public runTableScript(player: Player, scope: any = {}): void {
+	public runTableScript(player: Player, scope: Record<string, unknown> = {}): void {
 		if (!this.tableScript) {
 			logger().warn('Table script not loaded!')
 			return
