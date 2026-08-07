@@ -3,7 +3,8 @@
 
 import { VbsApi } from '../scripting/vbs-api.js'
 
-export class ItemType {
+export /** ItemType. */
+class ItemType {
 	public static readonly Surface = 0
 	public static readonly Flipper = 1
 	public static readonly Timer = 2
