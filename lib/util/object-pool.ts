@@ -11,14 +11,11 @@ export interface IPoolable<T> {
 /** Tiny GC-reducing pool. */
 export class Pool<T> {
 	private static readonly MAX = 100
-	private readonly ctor: IPoolable<T>
 	private readonly items: T[] = []
 	private readonly pooled = new WeakSet<object>()
 	private warned = false
 
-	constructor(ctor: IPoolable<T>) {
-		this.ctor = ctor
-	}
+	constructor(private readonly ctor: IPoolable<T>) {}
 
 	/** Claims or creates an instance. */
 	get(): T {
