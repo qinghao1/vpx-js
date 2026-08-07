@@ -39,7 +39,7 @@ export class BiffParser {
 				chunk = data.subarray(8, 8 + len - 4)
 			}
 
-			if (!tag || tag === 'ENDB' || tag === 'FONT') {
+			if (!tag || tag === 'ENDB') {
 				if (nested) {
 					nested.onEnd(nestedItem)
 					nested = nestedItem = null
