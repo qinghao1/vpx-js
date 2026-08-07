@@ -17,7 +17,8 @@ export class BrowserBinaryReader implements IBinaryReader {
 		if (!this.data) throw new Error('BrowserBinaryReader not open')
 		const slice = this.data.subarray(position, position + length)
 		target.set(slice, offset)
-		const copy = typeof structuredClone !== 'undefined' ? structuredClone(slice as any) : new Uint8Array(slice)
+		const copy =
+			typeof structuredClone !== 'undefined' ? structuredClone(slice as unknown as Uint8Array) : new Uint8Array(slice)
 		return Promise.resolve([length, copy as Uint8Array])
 	}
 
@@ -28,8 +29,8 @@ export class BrowserBinaryReader implements IBinaryReader {
 
 	public release(): Promise<void> {
 		this._isOpen = false
-		;(this as any).data = undefined
-		this.blob = undefined as any
+		;(this as unknown as { data: Uint8Array | undefined }).data = undefined
+		this.blob = undefined
 		return Promise.resolve()
 	}
 
@@ -44,10 +45,10 @@ export class BrowserBinaryReader implements IBinaryReader {
 			return
 		}
 		if (!this.blob) throw new Error('BrowserBinaryReader: blob already consumed and data not available')
-		const b = this.blob as Blob
-		const ab = (await (b as any).arrayBuffer?.()) ?? (await new Response(b as Blob).arrayBuffer())
+		const b = this.blob as Blob & { arrayBuffer?: () => Promise<ArrayBuffer> }
+		const ab = (await b.arrayBuffer?.()) ?? (await new Response(b).arrayBuffer())
 		this.data = new Uint8Array(ab)
-		this.blob = undefined as any
+		this.blob = undefined
 		this._isOpen = true
 	}
 }
