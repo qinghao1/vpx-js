@@ -7,6 +7,7 @@ import type { CollisionEvent } from './collision-event.js'
 import { HitKDNode } from './hit-kd-node.js'
 import type { HitObject } from './hit-object.js'
 
+/** KD-tree for dynamic hit objects. */
 export class HitKD {
 	public orgIdx: number[] = []
 
