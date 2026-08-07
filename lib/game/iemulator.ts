@@ -4,50 +4,21 @@
 import type { Vertex2D } from '../math/vertex2d.js'
 
 export interface IEmulator {
-	/**
-	 * Executes an emulator cycle.
-	 *
-	 * This method is called *after* key presses and hit events have been
-	 * processed (so the ROM gets the latest state), and *before* the physics
-	 * cycle (so the physics cycle can react on changes from the emulator).
-	 *
-	 * Cycles get executed at around 1000 frames per second.
-	 *
-	 * @param dTime Time passed since last cycle in milliseconds (as double)
-	 */
+	/** Executes one emulator cycle (~1000Hz, after input, before physics). */
 	emuSimulateCycle(dTime: number): void
 
-	/**
-	 * Returns the frame buffer of the DMD.
-	 *
-	 * top-left to bottom-right array, one byte per pixel, with values from 0 to 3
-	 *
-	 * TODO will probably change to use bit planes and cut size by four.
-	 */
+	/** DMD frame buffer (top-left to bottom-right, 1 byte/pixel 0-3). */
 	getDmdFrame(): Uint8Array
 
-	/**
-	 * Returns the current DMD dimensions.
-	 *
-	 * @return Vector where `x` is the width and `y` the height.
-	 */
+	/** DMD dimensions (x=width, y=height). */
 	getDmdDimensions(): Vertex2D
 
-	/**
-	 * trigger a cabinet key (like ESC, -, +, ENTER)
-	 */
+	/** Cabinet key (ESC, -, +, ENTER …). */
 	setCabinetInput(keyNr: number): void
 
-	/**
-	 * Update Switch State
-	 * @param switchNr which switch number (11..88) to modifiy
-	 * @param optionalEnableSwitch if this parameter is missing, the switch will be toggled, else set to the defined state
-	 */
+	/** Updates a switch state. */
 	setSwitchInput(switchNr: number, optionalEnableSwitch?: boolean): void
 
-	/**
-	 * update emulator language setting
-	 * @param dipSwitch new uint8 byte value
-	 */
+	/** Updates emulator language DIP switch. */
 	setDipSwitchByte(dipSwitch: number): void
 }
