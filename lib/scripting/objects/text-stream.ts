@@ -1,18 +1,7 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-function concatUint8Arrays(bufs: Uint8Array[]): Uint8Array {
-	let total = 0
-	for (const b of bufs) total += b.length
-	const result = new Uint8Array(total)
-	let offset = 0
-	for (const b of bufs) {
-		result.set(b, offset)
-		offset += b.length
-	}
-	return result
-}
-
+import { concatUint8Arrays } from '../../io/binary-helpers.js'
 import { ERR } from '../stdlib/err.js'
 import { VbsNotImplementedError } from '../vbs-api.js'
 
@@ -172,7 +161,7 @@ export class TextStream {
 	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/write-method
 	 */
 	public Write(data: string): void {
-		this.buffer = concatUint8Arrays([this.buffer, new TextEncoder().encode(data)])
+		this.buffer = concatUint8Arrays(this.buffer, new TextEncoder().encode(data))
 		this.cursorToEnd()
 	}
 
