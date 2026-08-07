@@ -19,9 +19,11 @@ export class Collection extends Item<CollectionData> implements IPlayable, IScri
 	private api?: CollectionApi
 
 	// public props
+	/** Get fireEvents. */
 	get fireEvents() {
 		return this.data.fireEvents
 	}
+	/** Get stopSingleEvents. */
 	get stopSingleEvents() {
 		return this.data.stopSingleEvents
 	}
