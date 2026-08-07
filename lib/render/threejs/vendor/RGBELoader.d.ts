@@ -1,4 +1,4 @@
-import { DataTextureLoader, LoadingManager, PixelFormat, TextureDataType } from '../../../refs.node';
+import { DataTextureLoader, LoadingManager, PixelFormat, TextureDataType } from '../../../refs.node.js';
 
 export interface RGBE {
 	width: number;

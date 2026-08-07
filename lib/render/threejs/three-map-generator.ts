@@ -17,43 +17,48 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { Texture as ThreeTexture } from '../../refs.node';
-import { logger, progress } from '../../util/logger';
-import { Table } from '../../vpt/table/table';
-import { Texture } from '../../vpt/texture';
-import { ITextureLoader } from '../irender-api';
+import type { Texture as ThreeTexture } from '../../refs.node.js'
+import { logger, progress } from '../../util/logger'
+import type { Table } from '../../vpt/table/table'
+import type { Texture } from '../../vpt/texture'
+import type { ITextureLoader } from '../irender-api'
 
 export class ThreeMapGenerator {
-
-	private readonly textureLoader: ITextureLoader<ThreeTexture> | undefined;
-	private readonly textureCache: Map<string, ThreeTexture> = new Map();
+	private readonly textureLoader: ITextureLoader<ThreeTexture> | undefined
+	private readonly textureCache: Map<string, ThreeTexture> = new Map()
 
 	constructor(textureLoader: ITextureLoader<ThreeTexture> | undefined) {
-		this.textureLoader = textureLoader;
+		this.textureLoader = textureLoader
 	}
 
 	public async loadTextures(textures: Texture[], table: Table): Promise<void> {
 		if (!this.textureLoader) {
-			return Promise.resolve();
+			return Promise.resolve()
 		}
-		const now = Date.now();
-		logger().debug('[ThreeMapGenerator.loadTextures] Pre-loading textures..');
+		const now = Date.now()
+		logger().debug('[ThreeMapGenerator.loadTextures] Pre-loading textures..')
 		for (const texture of textures) {
 			try {
-				this.textureCache.set(texture.getName(), await texture.loadTexture(this.textureLoader, table));
-				progress().details(texture.getName());
+				this.textureCache.set(texture.getName(), await texture.loadTexture(this.textureLoader, table))
+				progress().details(texture.getName())
 			} catch (err) {
-				logger().warn('[ThreeMapGenerator.loadTextures] Error loading texture %s (%s/%s): %s', texture.getName(), texture.storageName, texture.getName(), err.message);
+				logger().warn(
+					'[ThreeMapGenerator.loadTextures] Error loading texture %s (%s/%s): %s',
+					texture.getName(),
+					texture.storageName,
+					texture.getName(),
+					err.message,
+				)
 			}
 		}
-		logger().debug('[ThreeMapGenerator.loadTextures] Loaded in %sms.', Date.now() - now);
+		logger().debug('[ThreeMapGenerator.loadTextures] Loaded in %sms.', Date.now() - now)
 	}
 
 	public getTexture(name: string): ThreeTexture {
-		return this.textureCache.get(name)!;
+		return this.textureCache.get(name)!
 	}
 
 	public hasTexture(name: string): boolean {
-		return this.textureCache.has(name);
+		return this.textureCache.has(name)
 	}
 }

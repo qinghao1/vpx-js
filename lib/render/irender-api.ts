@@ -17,25 +17,24 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { IRenderable, RenderInfo } from '../game/irenderable';
-import { Matrix3D } from '../math/matrix3d';
-import { ItemState } from '../vpt/item-state';
-import { LightData } from '../vpt/light/light-data';
-import { LightState } from '../vpt/light/light-state';
-import { Material } from '../vpt/material';
-import { Mesh } from '../vpt/mesh';
-import { Table, TableGenerateOptions } from '../vpt/table/table';
-import { Texture } from '../vpt/texture';
+import type { IRenderable, RenderInfo } from '../game/irenderable'
+import type { Matrix3D } from '../math/matrix3d'
+import type { ItemState } from '../vpt/item-state'
+import type { LightData } from '../vpt/light/light-data'
+import type { LightState } from '../vpt/light/light-state'
+import type { Material } from '../vpt/material'
+import type { Mesh } from '../vpt/mesh'
+import type { Table, TableGenerateOptions } from '../vpt/table/table'
+import type { Texture } from '../vpt/texture'
 
 export interface IRenderApi<NODE, GEOMETRY, POINT_LIGHT> {
-
 	/**
 	 * Pre-loads all the table's textures into the renderer's texture format
 	 * so they can be loaded and swapped synchronously later.
 	 * @param textures
 	 * @param table
 	 */
-	preloadTextures(textures: Texture[], table: Table): Promise<void>;
+	preloadTextures(textures: Texture[], table: Table): Promise<void>
 
 	/**
 	 * Applies global transformations to the scene.
@@ -45,14 +44,14 @@ export interface IRenderApi<NODE, GEOMETRY, POINT_LIGHT> {
 	 * @param scene Root table node
 	 * @param table Table
 	 */
-	transformScene(scene: NODE, table: Table): void;
+	transformScene(scene: NODE, table: Table): void
 
 	/**
 	 * Creates a new parent node.
 	 *
 	 * @param name Name of the node
 	 */
-	createParentNode(name: string): NODE;
+	createParentNode(name: string): NODE
 
 	/**
 	 * Adds a child to a parent node.
@@ -60,7 +59,7 @@ export interface IRenderApi<NODE, GEOMETRY, POINT_LIGHT> {
 	 * @param parent Parent node
 	 * @param child Child node
 	 */
-	addChildToParent(parent: NODE, child: NODE | POINT_LIGHT): void;
+	addChildToParent(parent: NODE, child: NODE | POINT_LIGHT): void
 
 	/**
 	 * Retrieves a child node from a parent node.
@@ -68,7 +67,7 @@ export interface IRenderApi<NODE, GEOMETRY, POINT_LIGHT> {
 	 * @param parent Parent node
 	 * @param name Name of the child node
 	 */
-	findInGroup(parent: NODE, name: string): NODE | undefined;
+	findInGroup(parent: NODE, name: string): NODE | undefined
 
 	/**
 	 * Removes a child from a parent node
@@ -76,13 +75,13 @@ export interface IRenderApi<NODE, GEOMETRY, POINT_LIGHT> {
 	 * @param parent The parent node
 	 * @param child The child node to remove
 	 */
-	removeFromParent(parent: NODE, child: NODE | undefined): void;
+	removeFromParent(parent: NODE, child: NODE | undefined): void
 
 	/**
 	 * Removes all children from a parent node
 	 * @param node Parent node
 	 */
-	removeChildren(node: NODE | undefined): void;
+	removeChildren(node: NODE | undefined): void
 
 	/**
 	 * Applies a matrix transformation to a node.
@@ -90,7 +89,7 @@ export interface IRenderApi<NODE, GEOMETRY, POINT_LIGHT> {
 	 * @param matrix The transformation matrix
 	 * @param node The node to transform. Does nothing if not set.
 	 */
-	applyMatrixToNode(matrix: Matrix3D, node: NODE | undefined): void;
+	applyMatrixToNode(matrix: Matrix3D, node: NODE | undefined): void
 
 	/**
 	 * Updates a node with a new mesh.
@@ -98,7 +97,7 @@ export interface IRenderApi<NODE, GEOMETRY, POINT_LIGHT> {
 	 * @param mesh New mesh. Must contain the same number of vertices as the node.
 	 * @param node The node to which the new mesh is applied to.
 	 */
-	applyMeshToNode(mesh: Mesh, node: NODE | undefined): void;
+	applyMeshToNode(mesh: Mesh, node: NODE | undefined): void
 
 	/**
 	 * Update's a light's parameters.
@@ -107,7 +106,7 @@ export interface IRenderApi<NODE, GEOMETRY, POINT_LIGHT> {
 	 * @param initialIntensity Intensity at 100% from data
 	 * @param node The light node
 	 */
-	applyLighting(state: LightState, initialIntensity: number, node: NODE | undefined): void;
+	applyLighting(state: LightState, initialIntensity: number, node: NODE | undefined): void
 
 	/**
 	 * Toggles visibility of an object.
@@ -115,7 +114,7 @@ export interface IRenderApi<NODE, GEOMETRY, POINT_LIGHT> {
 	 * @param isVisible True if visible, false otherwise
 	 * @param node Object to apply to
 	 */
-	applyVisibility(isVisible: boolean, node: NODE | undefined): void;
+	applyVisibility(isVisible: boolean, node: NODE | undefined): void
 
 	/**
 	 * Applies a material to a node.
@@ -130,7 +129,14 @@ export interface IRenderApi<NODE, GEOMETRY, POINT_LIGHT> {
 	 * @param envMap Name of the environment map, if any
 	 * @param emissiveMap Name of the emissive map, if any
 	 */
-	applyMaterial(node: NODE | undefined, material?: Material, map?: string, normalMap?: string, envMap?: string, emissiveMap?: string): void;
+	applyMaterial(
+		node: NODE | undefined,
+		material?: Material,
+		map?: string,
+		normalMap?: string,
+		envMap?: string,
+		emissiveMap?: string,
+	): void
 
 	/**
 	 * Creates a new node based on a renderable.
@@ -139,14 +145,14 @@ export interface IRenderApi<NODE, GEOMETRY, POINT_LIGHT> {
 	 * @param table The table object
 	 * @param opts Options, see {@link TableGenerateOptions}.
 	 */
-	createObjectFromRenderable(renderable: IRenderable<ItemState>, table: Table, opts: TableGenerateOptions): NODE;
+	createObjectFromRenderable(renderable: IRenderable<ItemState>, table: Table, opts: TableGenerateOptions): NODE
 
 	/**
 	 * Creates a new node based on a RenderInfo object.
 	 *
 	 * @param obj RenderInfo
 	 */
-	createMesh(obj: RenderInfo<GEOMETRY>): NODE;
+	createMesh(obj: RenderInfo<GEOMETRY>): NODE
 
 	/**
 	 * Creates a playfield light geometry.
@@ -154,7 +160,7 @@ export interface IRenderApi<NODE, GEOMETRY, POINT_LIGHT> {
 	 * @param lightData Light parameters from the VPX file
 	 * @param table The table object
 	 */
-	createLightGeometry(lightData: LightData, table: Table): GEOMETRY;
+	createLightGeometry(lightData: LightData, table: Table): GEOMETRY
 
 	/**
 	 * Creates the playfield geometry.
@@ -162,18 +168,17 @@ export interface IRenderApi<NODE, GEOMETRY, POINT_LIGHT> {
 	 * @param table The table object
 	 * @param opts Options, see {@link TableGenerateOptions}.
 	 */
-	createPlayfieldGeometry(table: Table, opts: TableGenerateOptions): GEOMETRY;
+	createPlayfieldGeometry(table: Table, opts: TableGenerateOptions): GEOMETRY
 
 	/**
 	 * Creates a new point light.
 	 *
 	 * @param lightData Light parameters from the VPX file.
 	 */
-	createPointLight(lightData: LightData): POINT_LIGHT;
+	createPointLight(lightData: LightData): POINT_LIGHT
 }
 
 export interface ITextureLoader<TEXTURE> {
-
 	/**
 	 * Loads a texture coming from an `Image{n}` stream.
 	 *
@@ -181,7 +186,7 @@ export interface ITextureLoader<TEXTURE> {
 	 * @param ext Original file extension of the texture, including the dot
 	 * @param data Binary data
 	 */
-	loadTexture(name: string, ext: string, data: Buffer): Promise<TEXTURE>;
+	loadTexture(name: string, ext: string, data: Buffer): Promise<TEXTURE>
 
 	/**
 	 * Loads a raw texture coming from the `BITS` tag (pdsBuffer)
@@ -191,7 +196,7 @@ export interface ITextureLoader<TEXTURE> {
 	 * @param width Image width
 	 * @param height Image height
 	 */
-	loadRawTexture(name: string, data: Buffer, width: number, height: number): Promise<TEXTURE>;
+	loadRawTexture(name: string, data: Buffer, width: number, height: number): Promise<TEXTURE>
 
 	/**
 	 * Loads a texture shipped by Visual Pinball
@@ -200,11 +205,11 @@ export interface ITextureLoader<TEXTURE> {
 	 * @param ext Original file extension of the texture, including the dot
 	 * @param fileName Filename without path
 	 */
-	loadDefaultTexture(name: string, ext: string, fileName: string): Promise<TEXTURE>;
+	loadDefaultTexture(name: string, ext: string, fileName: string): Promise<TEXTURE>
 }
 
 export interface MeshConvertOptions {
-	applyMaterials?: boolean;
-	applyTextures?: ITextureLoader<any>;
-	optimizeTextures?: boolean;
+	applyMaterials?: boolean
+	applyTextures?: ITextureLoader<any>
+	optimizeTextures?: boolean
 }

@@ -17,25 +17,79 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-export { BrowserBinaryReader as BinaryReader } from './io/binary-reader.browser';
-export { storage } from './io/storage.browser';
-export { exportGltf } from './gltf/export-gltf.browser';
-export { now } from './util/time.browser';
 export {
-	Object3D, Mesh, Box3, Scene, AnimationClip, KeyframeTrack, PropertyBinding, Camera, ClampToEdgeWrapping,
-	DoubleSide, InterpolateDiscrete, InterpolateLinear, LinearFilter, LinearMipMapLinearFilter, LinearMipMapNearestFilter,
-	MirroredRepeatWrapping, NearestFilter, NearestMipMapLinearFilter, NearestMipMapNearestFilter, PixelFormat,
-	RepeatWrapping, TriangleFanDrawMode, TriangleStripDrawMode, BufferAttribute, BufferGeometry, Geometry,
-	InterleavedBufferAttribute, Light, Material, Color, Matrix4, Vector3, Bone, Texture, Math,
-	PointLight, Group, MeshStandardMaterial, Face3, Matrix3, Vector2, Path, Shape, ExtrudeBufferGeometry,
-	Float32BufferAttribute, Line, RGBAFormat, UnsignedByteType, TextureLoader, DataTexture, FloatType, SpotLight,
-	LoadingManager, DataTextureLoader, TextureDataType, DefaultLoadingManager, HalfFloatType, LinearEncoding,
-	RGBEEncoding, RGBEFormat, RGBFormat, AdditiveBlending, PointLightHelper,
-} from 'three';
-export { getTextFile } from './scripting/vbs-scripts.browser';
-export { ThreeTextureLoaderBrowser as ThreeTextureLoader } from './render/threejs/three-texture-loader-browser';
+	AdditiveBlending,
+	AnimationClip,
+	Bone,
+	Box3,
+	BufferAttribute,
+	BufferGeometry,
+	Camera,
+	ClampToEdgeWrapping,
+	Color,
+	DataTexture,
+	DataTextureLoader,
+	DefaultLoadingManager,
+	DoubleSide,
+	ExtrudeGeometry,
+	ExtrudeGeometry as ExtrudeBufferGeometry,
+	Float32BufferAttribute,
+	FloatType,
+	Group,
+	HalfFloatType,
+	InterleavedBufferAttribute,
+	InterpolateDiscrete,
+	InterpolateLinear,
+	KeyframeTrack,
+	Light,
+	Line,
+	LinearFilter,
+	LinearMipMapLinearFilter,
+	LinearMipMapNearestFilter,
+	LinearSRGBColorSpace,
+	LoadingManager,
+	Material,
+	MathUtils as Math,
+	Matrix3,
+	Matrix4,
+	Mesh,
+	MeshStandardMaterial,
+	MirroredRepeatWrapping,
+	NearestFilter,
+	NearestMipMapLinearFilter,
+	NearestMipMapNearestFilter,
+	NoColorSpace,
+	Object3D,
+	Path,
+	PointLight,
+	PointLightHelper,
+	PropertyBinding,
+	RepeatWrapping,
+	RGBAFormat,
+	Scene,
+	Shape,
+	SpotLight,
+	SRGBColorSpace,
+	Texture,
+	TextureLoader,
+	TriangleFanDrawMode,
+	TriangleStripDrawMode,
+	UnsignedByteType,
+	Vector2,
+	Vector3,
+} from 'three'
+export { exportGltf } from './gltf/export-gltf.browser.js'
+export { BrowserBinaryReader as BinaryReader } from './io/binary-reader.browser.js'
+export { storage } from './io/storage.browser.js'
+export { now } from './util/time.browser.js'
+export const RGBFormat = 1022
+export const RGBEFormat = 1023
+export const RGBEEncoding = 3000
+export const LinearEncoding = 3000
+export const sRGBEncoding = 3001
+export const GammaEncoding = 3007
+export type { PixelFormat, TextureDataType } from 'three'
+export { ThreeTextureLoaderBrowser as ThreeTextureLoader } from './render/threejs/three-texture-loader-browser'
+export { getTextFile } from './scripting/vbs-scripts.browser.js'
 
-// polyfills
-if (typeof(window) !== 'undefined') {
-	(window as any).Buffer = require('buffer/').Buffer;
-}
+/* Buffer polyfill removed – use Uint8Array in browser */

@@ -17,27 +17,25 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { BufferGeometry, ExtrudeBufferGeometry, Shape, Vector2 } from '../../refs.node';
-import { Table, TableGenerateOptions } from '../../vpt/table/table';
+import { type BufferGeometry, ExtrudeBufferGeometry, Shape, Vector2 } from '../../refs.node.js'
+import { Table, type TableGenerateOptions } from '../../vpt/table/table'
 
 export class ThreePlayfieldMeshGenerator {
-
 	public createPlayfieldGeometry(table: Table, opts: TableGenerateOptions): BufferGeometry {
-
 		/* istanbul ignore if */
 		if (!table.data) {
-			throw new Error('Table data is not loaded. Load table with tableDataOnly = false.');
+			throw new Error('Table data is not loaded. Load table with tableDataOnly = false.')
 		}
 
-		let geometry: BufferGeometry;
-		const dim = table.getDimensions();
+		let geometry: BufferGeometry
+		const dim = table.getDimensions()
 
-		const pfShape = new Shape();
-		pfShape.moveTo(table.data.left, table.data.top);
-		pfShape.lineTo(table.data.right, table.data.top);
-		pfShape.lineTo(table.data.right, table.data.bottom);
-		pfShape.lineTo(table.data.left, table.data.bottom);
-		pfShape.lineTo(table.data.left, table.data.top);
+		const pfShape = new Shape()
+		pfShape.moveTo(table.data.left, table.data.top)
+		pfShape.lineTo(table.data.right, table.data.top)
+		pfShape.lineTo(table.data.right, table.data.bottom)
+		pfShape.lineTo(table.data.left, table.data.bottom)
+		pfShape.lineTo(table.data.left, table.data.top)
 
 		// drill holes if playfield lights are rendered separately.
 		// if (opts.exportPlayfieldLights) {
@@ -46,39 +44,47 @@ export class ThreePlayfieldMeshGenerator {
 		// 		.map(l => l.getPath(table));
 		// }
 
-		const invTableWidth = 1.0 / dim.width;
-		const invTableHeight = 1.0 / dim.height;
+		const invTableWidth = 1.0 / dim.width
+		const invTableHeight = 1.0 / dim.height
 
 		geometry = new ExtrudeBufferGeometry(pfShape, {
 			depth: Table.playfieldThickness,
 			bevelEnabled: false,
 			steps: 1,
 			UVGenerator: {
-				generateSideWallUV(g: ExtrudeBufferGeometry, vertices: number[], indexA: number, indexB: number, indexC: number, indexD: number): Vector2[] {
-					return [
-						new Vector2(0, 0),
-						new Vector2(0, 0),
-						new Vector2(0, 0),
-						new Vector2(0, 0),
-					];
+				generateSideWallUV(
+					g: ExtrudeBufferGeometry,
+					vertices: number[],
+					indexA: number,
+					indexB: number,
+					indexC: number,
+					indexD: number,
+				): Vector2[] {
+					return [new Vector2(0, 0), new Vector2(0, 0), new Vector2(0, 0), new Vector2(0, 0)]
 				},
-				generateTopUV(g: ExtrudeBufferGeometry, vertices: number[], indexA: number, indexB: number, indexC: number): Vector2[] {
-					const ax = vertices[indexA * 3];
-					const ay = vertices[indexA * 3 + 1];
-					const bx = vertices[indexB * 3];
-					const by = vertices[indexB * 3 + 1];
-					const cx = vertices[indexC * 3];
-					const cy = vertices[indexC * 3 + 1];
+				generateTopUV(
+					g: ExtrudeBufferGeometry,
+					vertices: number[],
+					indexA: number,
+					indexB: number,
+					indexC: number,
+				): Vector2[] {
+					const ax = vertices[indexA * 3]
+					const ay = vertices[indexA * 3 + 1]
+					const bx = vertices[indexB * 3]
+					const by = vertices[indexB * 3 + 1]
+					const cx = vertices[indexC * 3]
+					const cy = vertices[indexC * 3 + 1]
 					return [
 						new Vector2(ax * invTableWidth, 1 - ay * invTableHeight),
 						new Vector2(bx * invTableWidth, 1 - by * invTableHeight),
 						new Vector2(cx * invTableWidth, 1 - cy * invTableHeight),
-					];
+					]
 				},
 			},
-		});
+		})
 
-		return geometry;
+		return geometry
 	}
 
 	// private getPlayfield2DMesh(): Mesh {
