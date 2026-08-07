@@ -7,6 +7,7 @@ import type { CollisionEvent } from './collision-event.js'
 import { C_CONTACTVEL, PHYS_TOUCH } from './constants.js'
 import { HitObject } from './hit-object.js'
 
+/** Infinite plane hit shape (playfield / glass). */
 export class HitPlane extends HitObject {
 	private readonly normal: Vertex3D
 	private readonly d: number
@@ -17,66 +18,40 @@ export class HitPlane extends HitObject {
 		this.d = d
 	}
 
-	public calcHitBBox(): void {
-		// plane's not a box (i assume)
-	}
+	public calcHitBBox(): void {}
 
 	public hitTest(ball: Ball, dTime: number, coll: CollisionEvent): number {
-		if (!this.isEnabled) {
-			return -1.0
-		}
+		if (!this.isEnabled) return -1
+		const bnv = this.normal.dot(ball.hit.vel)
+		if (bnv > C_CONTACTVEL) return -1
 
-		const bnv = this.normal.dot(ball.hit.vel) // speed in normal direction
+		const bnd = this.normal.dot(ball.state.pos) - ball.data.radius - this.d
+		if (bnd < ball.data.radius * -2) return -1
 
-		if (bnv > C_CONTACTVEL) {
-			// return if clearly ball is receding from object
-			return -1.0
-		}
-
-		const bnd = this.normal.dot(ball.state.pos) - ball.data.radius - this.d // distance from plane to ball surface
-
-		//!! solely responsible for ball through playfield?? check other places, too (radius*2??)
-		if (bnd < ball.data.radius * -2.0) {
-			// excessive penetration of plane ... no collision HACK
-			return -1.0
-		}
-
-		let hitTime: number
 		if (Math.abs(bnv) <= C_CONTACTVEL) {
 			if (Math.abs(bnd) <= PHYS_TOUCH) {
 				coll.isContact = true
 				coll.hitNormal.set(this.normal)
-				coll.hitOrgNormalVelocity = bnv // remember original normal velocity
+				coll.hitOrgNormalVelocity = bnv
 				coll.hitDistance = bnd
-				return 0.0 // hit time is ignored for contacts
-			} else {
-				return -1.0 // large distance, small velocity -> no hit
+				return 0
 			}
+			return -1
 		}
 
-		hitTime = bnd / -bnv // rate ok for safe divide
-		if (hitTime < 0) {
-			hitTime = 0.0 // already penetrating? then collide immediately
-		}
-
-		if (!isFinite(hitTime) || hitTime < 0 || hitTime > dTime) {
-			// time is outside this frame ... no collision
-			return -1.0
-		}
+		let hitTime = bnd / -bnv
+		if (hitTime < 0) hitTime = 0
+		if (!isFinite(hitTime) || hitTime < 0 || hitTime > dTime) return -1
 
 		coll.hitNormal.set(this.normal)
-		coll.hitDistance = bnd // actual contact distance
-
+		coll.hitDistance = bnd
 		return hitTime
 	}
 
 	public collide(coll: CollisionEvent): void {
 		coll.ball.hit.collide3DWall(coll.hitNormal, this.elasticity, this.elasticityFalloff, this.friction, this.scatter)
-
-		// distance from plane to ball surface
 		const bnd = this.normal.dot(coll.ball.state.pos) - coll.ball.data.radius - this.d
 		if (bnd < 0) {
-			// if ball has penetrated, push it out of the plane
 			const v = this.normal.clone(true).multiplyScalar(bnd)
 			coll.ball.state.pos.add(v)
 			Vertex3D.release(v)
