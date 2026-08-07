@@ -9,7 +9,7 @@ import type { Table } from '../table/table.js'
 import type { PlungerData } from './plunger-data.js'
 import type { PlungerHit } from './plunger-hit.js'
 
-/** PlungerApi. */
+/** Plunger API. */
 export class PlungerApi extends ItemApi<PlungerData> {
 	private readonly hit: PlungerHit
 	private readonly ballCreator: IBallCreationPosition
