@@ -6,6 +6,7 @@ import type { Storage } from '../../io/ole-doc.js'
 import { Vertex2D } from '../../math/vertex2d.js'
 import { ItemData } from '../item-data.js'
 
+/** Bumper data. */
 export class BumperData extends ItemData {
 	public center!: Vertex2D
 	public radius: number = 45
