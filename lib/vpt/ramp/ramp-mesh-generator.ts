@@ -15,7 +15,8 @@ import type { Table } from '../table/table.js'
 import type { RampData } from './ramp-data.js'
 import type { RampState } from './ramp-state.js'
 
-export class RampMeshGenerator {
+export /** Ramp mesh generator. */
+class RampMeshGenerator {
 	private readonly data: RampData
 	private readonly state: RampState
 
