@@ -81,8 +81,22 @@ export class HitKDNode {
 		Vertex3D.release(d)
 		this.children = this.hitOct.allocTwoNodes()
 		if (!this.children.length) return
-		this.children[0].rectBounds = this.rectBounds
-		this.children[1].rectBounds = this.rectBounds
+		this.children[0].rectBounds = new FRect3D(
+			this.rectBounds.left,
+			this.rectBounds.right,
+			this.rectBounds.top,
+			this.rectBounds.bottom,
+			this.rectBounds.zlow,
+			this.rectBounds.zhigh,
+		)
+		this.children[1].rectBounds = new FRect3D(
+			this.rectBounds.left,
+			this.rectBounds.right,
+			this.rectBounds.top,
+			this.rectBounds.bottom,
+			this.rectBounds.zlow,
+			this.rectBounds.zhigh,
+		)
 		const vc = Vertex3D.claim(
 			(this.rectBounds.left + this.rectBounds.right) * 0.5,
 			(this.rectBounds.top + this.rectBounds.bottom) * 0.5,
@@ -124,32 +138,63 @@ export class HitKDNode {
 		}
 		const leftCount = this.children[0].items
 		const rightCount = this.children[1].items
-		if (leftCount === 0 && rightCount === 0) {
+		let levelEmptyLocal = levelEmpty
+		const middleCount = org - leftCount - rightCount
+		let countEmpty = 0
+		if (leftCount === 0) countEmpty++
+		if (rightCount === 0) countEmpty++
+		if (middleCount === 0) countEmpty++
+		if (countEmpty >= 2) levelEmptyLocal++
+		else levelEmptyLocal = 0
+		if (levelEmptyLocal > 8) {
+			this.hitOct.numNodes -= 2
+			this.children.length = 0
 			Vertex3D.release(vc)
 			return
 		}
-		this.items = (axis << 30) | org
-		const tmp = this.hitOct.tmp
-		let l = this.start
-		let r = this.start + org - 1
-		for (let i = this.start; i < this.start + org; i++) {
-			const idx = this.hitOct.orgIdx[i]
-			const h = this.hitOct.getItemAt(i).hitBBox
-			let side = -1
-			if (axis === 0) side = h.right < vc.x ? 0 : h.left > vc.x ? 1 : -1
-			else if (axis === 1) side = h.bottom < vc.y ? 0 : h.top > vc.y ? 1 : -1
-			else side = h.zhigh < vc.z ? 0 : h.zlow > vc.z ? 1 : -1
-			if (side === 0) tmp[l++] = idx
-			else if (side === 1) tmp[r--] = idx
+		this.children[0].start = this.start + middleCount
+		this.children[1].start = this.children[0].start + leftCount
+		let middle = 0
+		this.children[0].items = 0
+		this.children[1].items = 0
+		if (axis === 0) {
+			for (let i = this.start; i < this.start + org; i++) {
+				const idx = this.hitOct.orgIdx[i]
+				const h = this.hitOct.getItemAt(i).hitBBox
+				if (h.right < vc.x) this.hitOct.tmp[this.children[0].start + this.children[0].items++] = idx
+				else if (h.left > vc.x) this.hitOct.tmp[this.children[1].start + this.children[1].items++] = idx
+				else this.hitOct.orgIdx[this.start + middle++] = idx
+			}
+		} else if (axis === 1) {
+			for (let i = this.start; i < this.start + org; i++) {
+				const idx = this.hitOct.orgIdx[i]
+				const h = this.hitOct.getItemAt(i).hitBBox
+				if (h.bottom < vc.y) this.hitOct.tmp[this.children[0].start + this.children[0].items++] = idx
+				else if (h.top > vc.y) this.hitOct.tmp[this.children[1].start + this.children[1].items++] = idx
+				else this.hitOct.orgIdx[this.start + middle++] = idx
+			}
+		} else {
+			for (let i = this.start; i < this.start + org; i++) {
+				const idx = this.hitOct.orgIdx[i]
+				const h = this.hitOct.getItemAt(i).hitBBox
+				if (h.zhigh < vc.z) this.hitOct.tmp[this.children[0].start + this.children[0].items++] = idx
+				else if (h.zlow > vc.z) this.hitOct.tmp[this.children[1].start + this.children[1].items++] = idx
+				else this.hitOct.orgIdx[this.start + middle++] = idx
+			}
 		}
-		for (let i = this.start; i < l; i++) this.hitOct.orgIdx[i] = tmp[i]
-		for (let i = r + 1; i < this.start + org; i++) this.hitOct.orgIdx[i] = tmp[i]
-		this.children[0].start = this.start
-		this.children[0].items = leftCount
-		this.children[1].start = this.start + org - rightCount
-		this.children[1].items = rightCount
+		this.items = middle | (axis << 30)
+		if (this.children[0].items > 0) {
+			for (let i = 0; i < this.children[0].items; i++) {
+				this.hitOct.orgIdx[this.children[0].start + i] = this.hitOct.tmp[this.children[0].start + i]
+			}
+		}
+		if (this.children[1].items > 0) {
+			for (let i = 0; i < this.children[1].items; i++) {
+				this.hitOct.orgIdx[this.children[1].start + i] = this.hitOct.tmp[this.children[1].start + i]
+			}
+		}
 		Vertex3D.release(vc)
-		this.children[0].createNextLevel(level + 1, levelEmpty)
-		this.children[1].createNextLevel(level + 1, levelEmpty)
+		this.children[0].createNextLevel(level + 1, levelEmptyLocal)
+		this.children[1].createNextLevel(level + 1, levelEmptyLocal)
 	}
 }
