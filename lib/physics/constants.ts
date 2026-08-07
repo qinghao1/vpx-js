@@ -1,12 +1,14 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
+/** Physics timing — 1kHz inner loop, 10ms outer step. */
 export const PHYSICS_STEPTIME = 1000
 export const PHYSICS_STEPTIME_S = PHYSICS_STEPTIME * 1e-6
 export const DEFAULT_STEPTIME = 10000
 export const DEFAULT_STEPTIME_S = 0.01
 export const PHYS_FACTOR = PHYSICS_STEPTIME_S / DEFAULT_STEPTIME_S
 
+/** Table defaults when physics not overridden. */
 export const DEFAULT_TABLE_GRAVITY = 0.97
 export const DEFAULT_TABLE_CONTACTFRICTION = 0.075
 export const DEFAULT_TABLE_SCATTERANGLE = 0.5
@@ -22,6 +24,7 @@ export const MAX_REELS = 32
 /** VP units: 1U = 0.53975mm, 1T = 10ms, Earth g ≈ 1.81751 U/T². */
 export const GRAVITYCONST = 1.81751
 
+/** Collision tolerances. */
 export const C_PRECISION = 0.01
 export const C_TOL_ENDPNTS = 0.0
 export const C_TOL_RADIUS = 0.005
@@ -30,6 +33,7 @@ export const PHYS_TOUCH = 0.05
 export const C_LOWNORMVEL = 0.0001
 export const C_CONTACTVEL = 0.099
 
+/** Contact handling. */
 export const C_EMBEDVELLIMIT = 5
 export const C_EMBEDSHOT_PLANE = 0
 export const C_EMBEDDED = 0.0
