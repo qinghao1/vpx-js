@@ -6,32 +6,15 @@ import { Pool } from '../util/object-pool.js'
 import { f4 } from './float.js'
 import type { IRenderVertex, Vertex } from './vertex.js'
 
-/** 2D single-precision vector with pooling, three.js interoperable. */
-export class Vertex2D implements Vertex {
+/** 2D single-precision vector, three.js based with pooling. */
+export class Vertex2D extends Vector2 implements Vertex {
 	static readonly POOL = new Pool(Vertex2D)
 
 	readonly isVector2 = true as const
 	readonly isVector3 = false as const
 
-	private _x = 0
-	private _y = 0
-
-	get x(): number {
-		return this._x
-	}
-	set x(v: number) {
-		this._x = f4(v)
-	}
-	get y(): number {
-		return this._y
-	}
-	set y(v: number) {
-		this._y = f4(v)
-	}
-
 	constructor(x?: number, y?: number) {
-		this._x = f4(x ?? 0)
-		this._y = f4(y ?? 0)
+		super(f4(x ?? 0), f4(y ?? 0))
 	}
 
 	/** Reads a 2D position from buffer start. */
@@ -55,9 +38,8 @@ export class Vertex2D implements Vertex {
 		v.set(0, 0)
 	}
 
-	set(x: number, y: number): this {
-		this._x = f4(x)
-		this._y = f4(y)
+	override set(x: number, y: number): this {
+		super.set(f4(x), f4(y))
 		return this
 	}
 
@@ -66,13 +48,15 @@ export class Vertex2D implements Vertex {
 		return this.set(0, 0)
 	}
 
-	clone(recycle = false): Vertex2D {
-		return recycle ? Vertex2D.POOL.get().set(this._x, this._y) : new Vertex2D(this._x, this._y)
+	override clone(recycle = false): this {
+		const v = recycle ? Vertex2D.POOL.get().set(this.x, this.y) : new Vertex2D(this.x, this.y)
+		return v as this
 	}
 
-	add(v: Vertex2D): this {
-		this._x = f4(this._x + v._x)
-		this._y = f4(this._y + v._y)
+	override add(v: Vector2): this {
+		super.add(v)
+		this.x = f4(this.x)
+		this.y = f4(this.y)
 		return this
 	}
 
@@ -83,9 +67,10 @@ export class Vertex2D implements Vertex {
 		return this
 	}
 
-	sub(v: Vertex2D): this {
-		this._x = f4(this._x - v._x)
-		this._y = f4(this._y - v._y)
+	override sub(v: Vector2): this {
+		super.sub(v)
+		this.x = f4(this.x)
+		this.y = f4(this.y)
 		return this
 	}
 
@@ -96,41 +81,41 @@ export class Vertex2D implements Vertex {
 		return this
 	}
 
-	normalize(): this {
+	override normalize(): this {
 		const len = this.length()
 		return len ? this.divideScalar(len) : this
 	}
 
-	divideScalar(s: number): this {
+	override divideScalar(s: number): this {
 		return this.multiplyScalar(f4(1 / s))
 	}
 
-	multiplyScalar(s: number): this {
-		const f = f4(s)
-		this._x = f4(this._x * f)
-		this._y = f4(this._y * f)
+	override multiplyScalar(s: number): this {
+		super.multiplyScalar(f4(s))
+		this.x = f4(this.x)
+		this.y = f4(this.y)
 		return this
 	}
 
-	length(): number {
-		return f4(new Vector2(this._x, this._y).length())
+	override length(): number {
+		return f4(super.length())
 	}
 
-	lengthSq(): number {
-		return f4(new Vector2(this._x, this._y).lengthSq())
+	override lengthSq(): number {
+		return f4(super.lengthSq())
 	}
 
-	dot(v: Vertex2D): number {
-		return f4(new Vector2(this._x, this._y).dot(new Vector2(v._x, v._y)))
+	override dot(v: Vector2): number {
+		return f4(super.dot(v))
 	}
 
 	equals(v?: Vertex2D): boolean {
-		return !!v && this._x === v._x && this._y === v._y
+		return !!v && this.x === v.x && this.y === v.y
 	}
 
 	/** Converts to THREE.Vector2 (for rendering). */
 	toThree(): Vector2 {
-		return new Vector2(this._x, this._y)
+		return new Vector2(this.x, this.y)
 	}
 
 	/** Creates from THREE.Vector2. */

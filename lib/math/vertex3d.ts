@@ -10,47 +10,22 @@ import type { Matrix3D } from './matrix3d.js'
 import type { IRenderVertex, Vertex } from './vertex.js'
 import { Vertex2D } from './vertex2d.js'
 
-/** 3D single-precision vector with pooling, three.js interoperable. */
-export class Vertex3D implements Vertex {
+/** 3D single-precision vector, three.js based with pooling. */
+export class Vertex3D extends Vector3 implements Vertex {
 	static readonly POOL = new Pool(Vertex3D)
 
 	readonly isVector2 = false as const
 	readonly isVector3 = true as const
 
-	private _x = 0
-	private _y = 0
-	private _z = 0
-
-	get x(): number {
-		return this._x
-	}
-	set x(v: number) {
-		this._x = f4(v)
-	}
-	get y(): number {
-		return this._y
-	}
-	set y(v: number) {
-		this._y = f4(v)
-	}
-	get z(): number {
-		return this._z
-	}
-	set z(v: number) {
-		this._z = f4(v)
-	}
-
 	constructor(x?: number, y?: number, z?: number) {
-		this._x = f4(x ?? 0)
-		this._y = f4(y ?? 0)
-		this._z = f4(z ?? 0)
+		super(f4(x ?? 0), f4(y ?? 0), f4(z ?? 0))
 	}
 
 	/** Reads a 3D position from buffer (z optional). */
 	static get(buffer: Uint8Array): Vertex3D {
 		const view = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength)
 		const v = new Vertex3D(view.getFloat32(0, true), view.getFloat32(4, true))
-		if (buffer.length >= 12) v.z = view.getFloat32(8, true)
+		if (buffer.length >= 12) v.z = f4(view.getFloat32(8, true))
 		return v
 	}
 
@@ -74,17 +49,13 @@ export class Vertex3D implements Vertex {
 		v.set(0, 0, 0)
 	}
 
-	set(v: Vertex3D): this
-	set(x: number, y: number, z?: number): this
-	set(xOrV: number | Vertex3D, y?: number, z?: number): this {
+	override set(x: number, y: number, z?: number): this
+	override set(v: Vector3): this
+	override set(xOrV: number | Vector3, y?: number, z?: number): this {
 		if (typeof xOrV === 'number') {
-			this._x = f4(xOrV)
-			this._y = f4(y!)
-			this._z = f4(z ?? 0)
+			super.set(f4(xOrV), f4(y!), f4(z ?? 0))
 		} else {
-			this._x = f4(xOrV.x)
-			this._y = f4(xOrV.y)
-			this._z = f4(xOrV.z)
+			super.set(f4(xOrV.x), f4(xOrV.y), f4(xOrV.z))
 		}
 		return this
 	}
@@ -96,11 +67,12 @@ export class Vertex3D implements Vertex {
 		return this
 	}
 
-	clone(recycle = false): Vertex3D {
-		return recycle ? Vertex3D.POOL.get().set(this._x, this._y, this._z) : new Vertex3D(this._x, this._y, this._z)
+	override clone(recycle = false): this {
+		const v = recycle ? Vertex3D.POOL.get().set(this.x, this.y, this.z) : new Vertex3D(this.x, this.y, this.z)
+		return v as this
 	}
 
-	normalize(): this {
+	override normalize(): this {
 		const len = this.length() || 1
 		return this.divideScalar(len)
 	}
@@ -110,36 +82,36 @@ export class Vertex3D implements Vertex {
 		if (!this.isZero()) this.normalize()
 	}
 
-	length(): number {
-		return f4(new Vector3(this._x, this._y, this._z).length())
+	override length(): number {
+		return f4(super.length())
 	}
 
-	lengthSq(): number {
-		return f4(new Vector3(this._x, this._y, this._z).lengthSq())
+	override lengthSq(): number {
+		return f4(super.lengthSq())
 	}
 
-	divideScalar(s: number): this {
+	override divideScalar(s: number): this {
 		return this.multiplyScalar(f4(1 / s))
 	}
 
-	multiplyScalar(s: number): this {
-		const f = f4(s)
-		this._x = f4(this._x * f)
-		this._y = f4(this._y * f)
-		this._z = f4(this._z * f)
+	override multiplyScalar(s: number): this {
+		super.multiplyScalar(f4(s))
+		this.x = f4(this.x)
+		this.y = f4(this.y)
+		this.z = f4(this.z)
 		return this
 	}
 
 	/** Transforms by 3×3 matrix (VP convention). */
 	applyMatrix2D(m: Matrix2D): this {
-		const x = m.matrix[0][0] * this._x + m.matrix[0][1] * this._y + m.matrix[0][2] * this._z
-		const y = m.matrix[1][0] * this._x + m.matrix[1][1] * this._y + m.matrix[1][2] * this._z
-		const z = m.matrix[2][0] * this._x + m.matrix[2][1] * this._y + m.matrix[2][2] * this._z
+		const x = m.matrix[0][0] * this.x + m.matrix[0][1] * this.y + m.matrix[0][2] * this.z
+		const y = m.matrix[1][0] * this.x + m.matrix[1][1] * this.y + m.matrix[1][2] * this.z
+		const z = m.matrix[2][0] * this.x + m.matrix[2][1] * this.y + m.matrix[2][2] * this.z
 		return this.set(x, y, z)
 	}
 
-	dot(v: Vertex3D): number {
-		return f4(new Vector3(this._x, this._y, this._z).dot(new Vector3(v._x, v._y, v._z)))
+	override dot(v: Vector3): number {
+		return f4(super.dot(v))
 	}
 
 	/** Dot and releases source. */
@@ -149,10 +121,11 @@ export class Vertex3D implements Vertex {
 		return d
 	}
 
-	sub(v: Vertex3D): this {
-		this._x = f4(this._x - v._x)
-		this._y = f4(this._y - v._y)
-		this._z = f4(this._z - v._z)
+	override sub(v: Vector3): this {
+		super.sub(v)
+		this.x = f4(this.x)
+		this.y = f4(this.y)
+		this.z = f4(this.z)
 		return this
 	}
 
@@ -163,10 +136,11 @@ export class Vertex3D implements Vertex {
 		return this
 	}
 
-	add(v: Vertex3D): this {
-		this._x = f4(this._x + v._x)
-		this._y = f4(this._y + v._y)
-		this._z = f4(this._z + v._z)
+	override add(v: Vector3): this {
+		super.add(v)
+		this.x = f4(this.x)
+		this.y = f4(this.y)
+		this.z = f4(this.z)
 		return this
 	}
 
@@ -177,21 +151,21 @@ export class Vertex3D implements Vertex {
 		return this
 	}
 
-	cross(v: Vertex3D): this {
+	override cross(v: Vector3): this {
 		return this.crossVectors(this, v)
 	}
 
-	crossVectors(a: Vertex3D, b: Vertex3D): this {
-		const out = new Vector3().crossVectors(new Vector3(a._x, a._y, a._z), new Vector3(b._x, b._y, b._z))
-		this._x = f4(out.x)
-		this._y = f4(out.y)
-		this._z = f4(out.z)
+	override crossVectors(a: Vector3, b: Vector3): this {
+		super.crossVectors(a, b)
+		this.x = f4(this.x)
+		this.y = f4(this.y)
+		this.z = f4(this.z)
 		return this
 	}
 
 	/** Returns XY as Vertex2D. */
 	xy(): Vertex2D {
-		return new Vertex2D(this._x, this._y)
+		return new Vertex2D(this.x, this.y)
 	}
 
 	/** Sets to zero. */
@@ -201,23 +175,23 @@ export class Vertex3D implements Vertex {
 
 	/** Checks near-zero. */
 	isZero(): boolean {
-		return Math.abs(this._x) < FLT_MIN && Math.abs(this._y) < FLT_MIN && Math.abs(this._z) < FLT_MIN
+		return Math.abs(this.x) < FLT_MIN && Math.abs(this.y) < FLT_MIN && Math.abs(this.z) < FLT_MIN
 	}
 
 	/** Exact equality. */
-	equals(v: Vertex3D): boolean {
-		return v._x === this._x && v._y === this._y && v._z === this._z
+	equals(v: Vector3): boolean {
+		return v.x === this.x && v.y === this.y && v.z === this.z
 	}
 
 	/** Cross product, optionally pooled. */
 	static crossProduct(a: Vertex3D, b: Vertex3D, recycle = false): Vertex3D {
-		const out = new Vector3().crossVectors(new Vector3(a._x, a._y, a._z), new Vector3(b._x, b._y, b._z))
+		const out = new Vector3().crossVectors(a, b)
 		return recycle ? Vertex3D.claim(out.x, out.y, out.z) : new Vertex3D(out.x, out.y, out.z)
 	}
 
 	/** Cross of Z-axis scaled vector with v. */
 	static crossZ(rz: number, v: Vertex3D, recycle = false): Vertex3D {
-		return recycle ? Vertex3D.claim(-rz * v._y, rz * v._x, 0) : new Vertex3D(-rz * v._y, rz * v._x, 0)
+		return recycle ? Vertex3D.claim(-rz * v.y, rz * v.x, 0) : new Vertex3D(-rz * v.y, rz * v.x, 0)
 	}
 
 	/** Rotates temp around axis by angle degrees. */
@@ -228,19 +202,19 @@ export class Vertex3D implements Vertex {
 			c = f4(Math.cos(rad)),
 			omc = f4(1 - c)
 		const r0 = new Vertex3D(
-			f4(u._x * u._x + c * (1 - u._x * u._x)),
-			f4(u._x * u._y * omc - s * u._z),
-			f4(u._x * u._z * omc + s * u._y),
+			f4(u.x * u.x + c * (1 - u.x * u.x)),
+			f4(u.x * u.y * omc - s * u.z),
+			f4(u.x * u.z * omc + s * u.y),
 		)
 		const r1 = new Vertex3D(
-			f4(u._x * u._y * omc + s * u._z),
-			f4(u._y * u._y + c * (1 - u._y * u._y)),
-			f4(u._y * u._z * omc - s * u._x),
+			f4(u.x * u.y * omc + s * u.z),
+			f4(u.y * u.y + c * (1 - u.y * u.y)),
+			f4(u.y * u.z * omc - s * u.x),
 		)
 		const r2 = new Vertex3D(
-			f4(u._x * u._z * omc - s * u._y),
-			f4(u._y * u._z * omc + s * u._x),
-			f4(u._z * u._z + c * (1 - u._z * u._z)),
+			f4(u.x * u.z * omc - s * u.y),
+			f4(u.y * u.z * omc + s * u.x),
+			f4(u.z * u.z + c * (1 - u.z * u.z)),
 		)
 		Vertex3D.release(u)
 		return new Vertex3D(temp.dot(r0), temp.dot(r1), temp.dot(r2))
@@ -248,9 +222,9 @@ export class Vertex3D implements Vertex {
 
 	/** Transforms through 4×4 matrix with perspective divide. */
 	multiplyMatrix(m: Matrix3D): this {
-		const x = this._x,
-			y = this._y,
-			z = this._z
+		const x = this.x,
+			y = this.y,
+			z = this.z
 		const xp = f4(f4(f4(f4(m._11 * x) + f4(m._21 * y)) + f4(m._31 * z)) + m._41)
 		const yp = f4(f4(f4(f4(m._12 * x) + f4(m._22 * y)) + f4(m._32 * z)) + m._42)
 		const zp = f4(f4(f4(f4(m._13 * x) + f4(m._23 * y)) + f4(m._33 * z)) + m._43)
@@ -261,18 +235,15 @@ export class Vertex3D implements Vertex {
 
 	/** Transforms through 4×4 matrix without translation. */
 	multiplyMatrixNoTranslate(m: Matrix3D): this {
-		const x = this._x,
-			y = this._y,
-			z = this._z
-		const xp = f4(f4(m._11 * x) + f4(m._21 * y)) + f4(m._31 * z)
-		const yp = f4(f4(m._12 * x) + f4(m._22 * y)) + f4(m._32 * z)
-		const zp = f4(f4(m._13 * x) + f4(m._23 * y)) + f4(m._33 * z)
+		const xp = f4(f4(m._11 * this.x) + f4(m._21 * this.y)) + f4(m._31 * this.z)
+		const yp = f4(f4(m._12 * this.x) + f4(m._22 * this.y)) + f4(m._32 * this.z)
+		const zp = f4(f4(m._13 * this.x) + f4(m._23 * this.y)) + f4(m._33 * this.z)
 		return this.set(xp, yp, zp)
 	}
 
 	/** Converts to THREE.Vector3. */
 	toThree(): Vector3 {
-		return new Vector3(this._x, this._y, this._z)
+		return new Vector3(this.x, this.y, this.z)
 	}
 
 	/** Creates from THREE.Vector3. */
