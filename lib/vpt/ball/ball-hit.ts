@@ -93,16 +93,7 @@ export class BallHit extends HitObject {
 		const dv = this.vel.clone(true).sub(ball.hit.vel)
 
 		let bcddSq = d.lengthSq()
-		let bcdd = Math.sqrt(bcddSq)
-
-		if (bcdd < 1e-8) {
-			d.z = -1
-			ball.state.pos.z -= d.z
-			bcdd = 1
-			bcddSq = 1
-			dv.z = 0.1
-			ball.hit.vel.z -= dv.z
-		}
+		const bcdd = Math.sqrt(bcddSq)
 
 		const b = dv.dot(d)
 		const bnv = b / bcdd
