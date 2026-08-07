@@ -47,18 +47,20 @@ export class RubberUpdater extends ItemUpdater<RubberState> {
 		const dX = this.data.rotX - this.state.rotX
 		const dY = this.data.rotY - this.state.rotY
 		const dZ = -(this.data.rotZ - this.state.rotZ)
-		const rot = Matrix3D.claim().rotateZMatrix(degToRad(dZ))
+		const rot = Matrix3D.claim().rotateXMatrix(degToRad(dX))
 		const tmp = Matrix3D.claim()
 		tmp.rotateYMatrix(degToRad(dY))
 		rot.multiply(tmp)
-		tmp.rotateXMatrix(degToRad(dX))
+		tmp.rotateZMatrix(degToRad(dZ))
 		rot.multiply(tmp)
 		const m = Matrix3D.claim()
-		tmp.setTranslation(-this.middlePoint.x, -this.middlePoint.y, this.data.height + table.getTableHeight())
-		m.multiply(tmp, rot)
 		tmp.setTranslation(this.middlePoint.x, this.middlePoint.y, -this.state.height - table.getTableHeight())
 		m.multiply(tmp)
+		tmp.setTranslation(-this.middlePoint.x, -this.middlePoint.y, this.data.height + table.getTableHeight())
+		const rotTrans = Matrix3D.claim()
+		rotTrans.multiplyMatrices(rot, tmp)
+		m.multiply(rotTrans)
 		renderApi.applyMatrixToNode(m, obj)
-		Matrix3D.release(rot, tmp, m)
+		Matrix3D.release(rot, tmp, m, rotTrans)
 	}
 }

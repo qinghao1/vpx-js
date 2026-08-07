@@ -122,27 +122,23 @@ export class PrimitiveMeshGenerator {
 	private getMatrix(table: Table): Matrix3D {
 		const scale = new Matrix3D().setScaling(this.data.size.x, this.data.size.y, this.data.size.z)
 		const trans = new Matrix3D().setTranslation(this.data.position.x, this.data.position.y, this.data.position.z)
-		const rotTrans = new Matrix3D().setTranslation(
-			this.data.rotAndTra[3]!,
-			this.data.rotAndTra[4]!,
-			this.data.rotAndTra[5]!,
-		)
+		const sz = new Matrix3D().setScaling(1, 1, table.getScaleZ())
+		const rotTransCol = new Matrix3D()
+		rotTransCol.rotateXMatrix(degToRad(this.data.rotAndTra[6]!))
 		const tmp = new Matrix3D()
-		for (const [axis, idx] of [
-			['z', 2],
-			['y', 1],
-			['x', 0],
-			['z', 8],
-			['y', 7],
-			['x', 6],
-		] as const) {
-			if (axis === 'z') tmp.rotateZMatrix(degToRad(this.data.rotAndTra[idx]!))
-			else if (axis === 'y') tmp.rotateYMatrix(degToRad(this.data.rotAndTra[idx]!))
-			else tmp.rotateXMatrix(degToRad(this.data.rotAndTra[idx]!))
-			rotTrans.multiply(tmp)
-		}
-		const full = scale.clone().multiply(rotTrans).multiply(trans)
-		full.multiply(new Matrix3D().setScaling(1, 1, table.getScaleZ()))
+		tmp.rotateYMatrix(degToRad(this.data.rotAndTra[7]!))
+		rotTransCol.multiply(tmp)
+		tmp.rotateZMatrix(degToRad(this.data.rotAndTra[8]!))
+		rotTransCol.multiply(tmp)
+		tmp.rotateXMatrix(degToRad(this.data.rotAndTra[0]!))
+		rotTransCol.multiply(tmp)
+		tmp.rotateYMatrix(degToRad(this.data.rotAndTra[1]!))
+		rotTransCol.multiply(tmp)
+		tmp.rotateZMatrix(degToRad(this.data.rotAndTra[2]!))
+		rotTransCol.multiply(tmp)
+		tmp.setTranslation(this.data.rotAndTra[3]!, this.data.rotAndTra[4]!, this.data.rotAndTra[5]!)
+		rotTransCol.multiply(tmp)
+		const full = sz.clone().multiply(trans).multiply(rotTransCol).multiply(scale)
 		return full
 	}
 }
