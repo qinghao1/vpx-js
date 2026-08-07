@@ -27,7 +27,6 @@ import { BallMover } from './ball-mover.js'
 import type { BallState } from './ball-state.js'
 
 /** Ball collision shape — separated from ball.cpp.
- *
  * @see https://github.com/vpinball/vpinball/blob/master/ball.cpp */
 export class BallHit extends HitObject {
 	public readonly coll: CollisionEvent
@@ -66,7 +65,6 @@ export class BallHit extends HitObject {
 		this.vel = initialVelocity
 		this.mover = new BallMover(this.id, data, state, this)
 
-		// Only called by real balls, not temporary objects created for physics/rendering
 		this.invMass = 1.0 / data.mass
 		this.inertia = (2.0 / 5.0) * data.radius * data.radius * data.mass
 
