@@ -10,7 +10,8 @@ import type { Item } from './item.js'
 import type { ItemData } from './item-data.js'
 import type { Table } from './table/table.js'
 
-export class GlobalApi extends VbsApi {
+export /** GlobalApi. */
+class GlobalApi extends VbsApi {
 	private readonly table: Table
 	private readonly player: Player
 
