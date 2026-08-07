@@ -4,6 +4,7 @@
 import { Pool } from '../../util/object-pool.js'
 import { ItemState } from '../item-state.js'
 
+/** Table render state. */
 export class TableState extends ItemState {
 	public static readonly POOL = new Pool(TableState)
 
