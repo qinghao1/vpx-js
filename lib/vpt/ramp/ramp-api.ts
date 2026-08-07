@@ -9,7 +9,7 @@ import type { Table } from '../table/table.js'
 import type { RampData } from './ramp-data.js'
 import type { RampState } from './ramp-state.js'
 
-/** RampApi. */
+/** Ramp API. */
 export class RampApi extends ItemApi<RampData> {
 	private readonly hits: HitObject[]
 	private readonly state: RampState
