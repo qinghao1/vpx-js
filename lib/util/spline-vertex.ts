@@ -7,8 +7,7 @@ import { f4 } from './float.js'
 import { Vertex2D } from './math.js'
 import { RenderVertex } from './render-vertex.js'
 
-/** Thickened spline for wall/rubber.
- * @see https://github.com/vpinball/vpinball/blob/master/spline.cpp */
+/** Thickened spline for wall/rubber. @see https://github.com/vpinball/vpinball/blob/master/spline.cpp */
 export class SplineVertex {
 	pcvertex!: number
 	ppfCross: boolean[] = []
