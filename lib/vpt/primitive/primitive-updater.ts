@@ -9,7 +9,7 @@ import type { Table } from '../table/table.js'
 import type { PrimitiveData } from './primitive-data.js'
 import type { PrimitiveState } from './primitive-state.js'
 
-/** PrimitiveUpdater. */
+/** Primitive updater — syncs state to render node. */
 export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 	private readonly data: PrimitiveData
 
@@ -25,9 +25,8 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 		table: Table,
 	): void {
 		Object.assign(this.state, state)
-
 		this.applyVisibility(obj, state, renderApi)
-		this.applyMaterial(obj, state.material, state.map, renderApi, table) // TODO normal map
+		this.applyMaterial(obj, state.material, state.map, renderApi, table)
 
 		if (state.position || state.size || state.rotation || state.translation || state.objectRotation) {
 			this.applyTransformation(obj, renderApi, table)
@@ -49,43 +48,37 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 			this.data.position.y,
 			-this.data.position.z,
 		)
-
-		// scale matrix
 		const scaleMatrix = Matrix3D.claim().setScaling(
-			(this.state.size as any)._x / this.data.size.x,
-			(this.state.size as any)._y / this.data.size.y,
-			(this.state.size as any)._z / this.data.size.z,
+			(this.state.size?.x ?? this.data.size.x) / this.data.size.x,
+			(this.state.size?.y ?? this.data.size.y) / this.data.size.y,
+			(this.state.size?.z ?? this.data.size.z) / this.data.size.z,
 		)
-		const scaleMatrixTable = Matrix3D.claim().setScaling(1.0, 1.0, table.getScaleZ())
-
-		// translation matrix
+		const scaleMatrixTable = Matrix3D.claim().setScaling(1, 1, table.getScaleZ())
 		const transMatrix = Matrix3D.claim().setTranslation(
-			-(this.data.position.x - (this.state.position as any)._x),
-			-(this.data.position.y - (this.state.position as any)._y),
-			this.data.position.z - (this.state.position as any)._z,
+			-(this.data.position.x - (this.state.position?.x ?? this.data.position.x)),
+			-(this.data.position.y - (this.state.position?.y ?? this.data.position.y)),
+			this.data.position.z - (this.state.position?.z ?? this.data.position.z),
 		)
-
-		// translation + rotation matrix
 		const rotTransMatrix = Matrix3D.claim().setTranslation(
-			-(this.data.rotAndTra[3] - (this.state.translation as any)._x), // t
-			-(this.data.rotAndTra[4] - (this.state.translation as any)._y), // z
-			this.data.rotAndTra[5] - (this.state.translation as any)._z, // u
+			-(this.data.rotAndTra[3] - (this.state.translation?.x ?? this.data.rotAndTra[3])),
+			-(this.data.rotAndTra[4] - (this.state.translation?.y ?? this.data.rotAndTra[4])),
+			this.data.rotAndTra[5] - (this.state.translation?.z ?? this.data.rotAndTra[5]),
 		)
 
-		const tempMatrix = Matrix3D.claim()
-		tempMatrix.rotateZMatrix(degToRad(-(this.data.rotAndTra[2] - (this.state.rotation as any)._z))) // r
-		rotTransMatrix.multiply(tempMatrix)
-		tempMatrix.rotateYMatrix(degToRad(this.data.rotAndTra[1] - (this.state.rotation as any)._y)) // e
-		rotTransMatrix.multiply(tempMatrix)
-		tempMatrix.rotateXMatrix(degToRad(this.data.rotAndTra[0] - (this.state.rotation as any)._x)) // w
-		rotTransMatrix.multiply(tempMatrix)
+		const tmp = Matrix3D.claim()
+		tmp.rotateZMatrix(degToRad(-(this.data.rotAndTra[2] - (this.state.rotation?.z ?? this.data.rotAndTra[2]))))
+		rotTransMatrix.multiply(tmp)
+		tmp.rotateYMatrix(degToRad(this.data.rotAndTra[1] - (this.state.rotation?.y ?? this.data.rotAndTra[1])))
+		rotTransMatrix.multiply(tmp)
+		tmp.rotateXMatrix(degToRad(this.data.rotAndTra[0] - (this.state.rotation?.x ?? this.data.rotAndTra[0])))
+		rotTransMatrix.multiply(tmp)
 
-		tempMatrix.rotateZMatrix(degToRad(-(this.data.rotAndTra[8] - (this.state.objectRotation as any)._z))) // i
-		rotTransMatrix.multiply(tempMatrix)
-		tempMatrix.rotateYMatrix(degToRad(this.data.rotAndTra[7] - (this.state.objectRotation as any)._y)) // o
-		rotTransMatrix.multiply(tempMatrix)
-		tempMatrix.rotateXMatrix(degToRad(this.data.rotAndTra[6] - (this.state.objectRotation as any)._x)) // p
-		rotTransMatrix.multiply(tempMatrix)
+		tmp.rotateZMatrix(degToRad(-(this.data.rotAndTra[8] - (this.state.objectRotation?.z ?? this.data.rotAndTra[8]))))
+		rotTransMatrix.multiply(tmp)
+		tmp.rotateYMatrix(degToRad(this.data.rotAndTra[7] - (this.state.objectRotation?.y ?? this.data.rotAndTra[7])))
+		rotTransMatrix.multiply(tmp)
+		tmp.rotateXMatrix(degToRad(this.data.rotAndTra[6] - (this.state.objectRotation?.x ?? this.data.rotAndTra[6])))
+		rotTransMatrix.multiply(tmp)
 
 		const matrix = matToOrigin
 			.multiply(scaleMatrix)
@@ -95,6 +88,6 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 			.multiply(matFromOrigin)
 
 		renderApi.applyMatrixToNode(matrix, obj)
-		Matrix3D.release(matToOrigin, matFromOrigin, scaleMatrix, transMatrix, rotTransMatrix, tempMatrix) // matrix and matToOrigin are the same instance
+		Matrix3D.release(matToOrigin, matFromOrigin, scaleMatrix, transMatrix, rotTransMatrix, tmp)
 	}
 }
