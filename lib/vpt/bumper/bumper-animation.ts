@@ -8,8 +8,8 @@ import type { Table } from '../table/table.js'
 import type { BumperData } from './bumper-data.js'
 import type { BumperState } from './bumper-state.js'
 
-export /** BumperAnimation. */
-class BumperAnimation implements IAnimation {
+/** BumperAnimation. */
+export class BumperAnimation implements IAnimation {
 	private readonly data: BumperData
 	private readonly state: BumperState
 
