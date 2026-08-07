@@ -10,40 +10,28 @@ import type { SurfaceData } from './surface-data.js'
 import type { SurfaceHitGenerator } from './surface-hit-generator.js'
 import type { SurfaceState } from './surface-state.js'
 
-/** Surface API.
- *
- * @see https://github.com/vpinball/vpinball/blob/master/surface.cpp */
+/** Surface API — VBS surface for `Surface`/`Wall`. @see https://github.com/vpinball/vpinball/blob/master/surface.cpp */
 export class SurfaceApi extends ItemApi<SurfaceData> {
-	private readonly hitGenerator: SurfaceHitGenerator
-	private readonly state: SurfaceState
-	private readonly hits: HitObject[]
-	private readonly isDynamic: boolean = false
+	private isDynamic = false
 
 	constructor(
-		state: SurfaceState,
+		private readonly state: SurfaceState,
 		data: SurfaceData,
-		hits: HitObject[],
-		hitGenerator: SurfaceHitGenerator,
+		private readonly hits: HitObject[],
+		private readonly hitGenerator: SurfaceHitGenerator,
 		events: EventProxy,
 		player: Player,
 		table: Table,
 	) {
 		super(data, events, player, table)
-		this.state = state
-		this.hits = hits
-		this.hitGenerator = hitGenerator
 		this.isDynamic = this.data.isDroppable
 		if (!this.isDynamic && this.data.isSideVisible) {
-			const sideMaterial = table.getMaterial(this.data.szSideMaterial)
-			if (sideMaterial && sideMaterial.isOpacityActive) {
-				this.isDynamic = true
-			}
+			const m = table.getMaterial(this.data.szSideMaterial)
+			if (m?.isOpacityActive) this.isDynamic = true
 		}
 		if (!this.isDynamic && this.data.isTopBottomVisible) {
-			const topMaterial = table.getMaterial(this.data.szTopMaterial)
-			if (topMaterial && topMaterial.isOpacityActive) {
-				this.isDynamic = true
-			}
+			const m = table.getMaterial(this.data.szTopMaterial)
+			if (m?.isOpacityActive) this.isDynamic = true
 		}
 	}
 
@@ -63,18 +51,14 @@ export class SurfaceApi extends ItemApi<SurfaceData> {
 		return this.data.szImage
 	}
 	set Image(v) {
-		if (this.isDynamic) {
-			this.state.topTexture = v
-		}
+		if (this.isDynamic) this.state.topTexture = v
 		this.data.szImage = v
 	}
 	get SideMaterial() {
 		return this.data.szSideMaterial
 	}
 	set SideMaterial(v) {
-		if (this.isDynamic) {
-			this.state.sideMaterial = v
-		}
+		if (this.isDynamic) this.state.sideMaterial = v
 		this.data.szSideMaterial = v
 	}
 	get SlingshotMaterial() {
@@ -84,7 +68,7 @@ export class SurfaceApi extends ItemApi<SurfaceData> {
 		this.data.szSlingShotMaterial = v
 	}
 	/** @deprecated */
-	public ImageAlignment: any = null
+	public ImageAlignment: unknown = null
 	get HeightBottom() {
 		return this.data.heightBottom
 	}
@@ -101,9 +85,7 @@ export class SurfaceApi extends ItemApi<SurfaceData> {
 		return this.data.szTopMaterial
 	}
 	set TopMaterial(v) {
-		if (this.isDynamic) {
-			this.state.topMaterial = v
-		}
+		if (this.isDynamic) this.state.topMaterial = v
 		this.data.szTopMaterial = v
 	}
 	get PhysicsMaterial() {
@@ -176,9 +158,7 @@ export class SurfaceApi extends ItemApi<SurfaceData> {
 		return this.data.isTopBottomVisible
 	}
 	set Visible(v) {
-		if (this.isDynamic) {
-			this.state.isTopVisible = v
-		}
+		if (this.isDynamic) this.state.isTopVisible = v
 		this.data.isTopBottomVisible = v
 	}
 	get SideImage() {
@@ -186,9 +166,7 @@ export class SurfaceApi extends ItemApi<SurfaceData> {
 	}
 	set SideImage(v) {
 		this._assertNonHdrImage(v)
-		if (this.isDynamic) {
-			this.state.sideTexture = v
-		}
+		if (this.isDynamic) this.state.sideTexture = v
 		this.data.szSideImage = v
 	}
 	get Disabled() {
@@ -201,9 +179,7 @@ export class SurfaceApi extends ItemApi<SurfaceData> {
 		return this.data.isSideVisible
 	}
 	set SideVisible(v) {
-		if (this.isDynamic) {
-			this.state.isSideVisible = v
-		}
+		if (this.isDynamic) this.state.isSideVisible = v
 		this.data.isSideVisible = v
 	}
 	get Collidable() {
@@ -249,36 +225,22 @@ export class SurfaceApi extends ItemApi<SurfaceData> {
 		this.data.isReflectionEnabled = v
 	}
 
-	public PlaySlingshotHit() {
-		for (const slingLine of this.hitGenerator.lineSling) {
-			slingLine.doHitEvent = true
-		}
+	public PlaySlingshotHit(): void {
+		for (const slingLine of this.hitGenerator.lineSling) slingLine.doHitEvent = true
 	}
 
 	private _setDropped(isDropped: boolean): void {
-		if (!this.data.isDroppable) {
-			throw new Error(`Surface "${this.Name}" is not droppable.`)
-		}
+		if (!this.data.isDroppable) throw new Error(`Surface "${this.Name}" is not droppable.`)
 		if (this.state.isDropped !== isDropped) {
 			this.state.isDropped = isDropped
 			const b = !this.state.isDropped && this.data.isCollidable
-			if (this.hits.length > 0 && this.hits[0].isEnabled !== b) {
-				for (const drop of this.hits) {
-					// !! costly
-					drop.setEnabled(b) // disable hit on entities composing the object
-				}
-			}
+			if (this.hits.length > 0 && this.hits[0].isEnabled !== b) for (const drop of this.hits) drop.setEnabled(b)
 		}
 	}
 
-	private _setCollidable(isCollidable: boolean) {
+	private _setCollidable(isCollidable: boolean): void {
 		const b = this.data.isDroppable ? isCollidable && !this.state.isDropped : isCollidable
-		if (this.hits.length > 0 && this.hits[0].isEnabled !== b) {
-			for (const hit of this.hits) {
-				// !! costly
-				hit.isEnabled = b // copy to hit checking on enities composing the object
-			}
-		}
+		if (this.hits.length > 0 && this.hits[0].isEnabled !== b) for (const hit of this.hits) hit.isEnabled = b
 	}
 
 	protected _getPropertyNames(): string[] {
