@@ -402,70 +402,27 @@ class PrimitiveApi extends ItemApi<PrimitiveData> {
 
 	/* istanbul ignore next: remove ignore when implemented */
 	public PlayAnim(startFrame: number, speed: number): void {
-		// fixme anim
-		// if (this.data.mesh.animationFrames.length > 0) {
-		// 	if (startFrame >= this.data.mesh.animationFrames.length) {
-		// 		startFrame = 0.0;
-		// 	}
-		// 	if (startFrame < 0.0) {
-		// 		startFrame *= 1.0;
-		// 	}
-		// 	m_currentFrame = startFrame;
-		// 	if (speed < 0.0) {
-		// 		speed *= -1.0;
-		// 	}
-		// 	m_speed = speed;
-		// 	m_DoAnimation = true;
-		// 	m_Endless = false;
-		// 	vertexBufferRegenerate = true;
-		// }
+		// TODO: primitive animation
 	}
 
 	/* istanbul ignore next: remove ignore when implemented */
 	public PlayAnimEndless(speed: number): void {
-		// fixme anim
-		// if (this.data.mesh.animationFrames.length > 0) {
-		// 	m_currentFrame = 0.0;
-		// 	if (speed < 0.0) {
-		// 		speed *= -1.0;
-		// 	}
-		// 	m_speed = speed;
-		// 	m_DoAnimation = true;
-		// 	m_Endless = true;
-		// 	vertexBufferRegenerate = true;
-		// }
+		// TODO: primitive animation
 	}
 
 	/* istanbul ignore next: remove ignore when implemented */
 	public StopAnim(): void {
-		// fixme anim
-		// m_DoAnimation = false;
-		// vertexBufferRegenerate = false;
+		// TODO: primitive animation
 	}
 
 	/* istanbul ignore next: remove ignore when implemented */
 	public ContinueAnim(speed: number): void {
-		// fixme anim
-		// if (m_currentFrame > 0.0) {
-		// 	if (speed < 0.0) {
-		// 		speed *= -1.0;
-		// 	}
-		// 	m_speed = speed;
-		// 	m_DoAnimation = true;
-		// 	vertexBufferRegenerate = true;
-		// }
+		// TODO: primitive animation
 	}
 
 	/* istanbul ignore next: remove ignore when implemented */
 	public ShowFrame(frame: number): void {
-		// fixme anim
-		// const iFrame = frame;
-		// m_DoAnimation = false;
-		// if (iFrame >= this.data.mesh.animationFrames.length) {
-		// 	frame = this.data.mesh.animationFrames.length - 1;
-		// }
-		// m_currentFrame = frame;
-		// vertexBufferRegenerate = true;
+		// TODO: primitive animation
 	}
 
 	public _getTimers(): TimerHit[] {
