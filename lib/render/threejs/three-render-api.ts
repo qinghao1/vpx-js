@@ -71,6 +71,10 @@ export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, Poin
 		await this.mapGenerator.loadTextures(textures, table)
 	}
 
+	public getMapGenerator(): ThreeMapGenerator {
+		return this.mapGenerator
+	}
+
 	public transformScene(scene: Group, table: Table): void {
 		const dim = table.getDimensions()
 		scene.rotateX(Math.PI / 2)
