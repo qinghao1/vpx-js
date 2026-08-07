@@ -30,12 +30,12 @@ export class TriggerHitCircle extends HitCircle {
 		this.obj = events
 	}
 
-	public hitTest(ball: Ball, dTime: number, coll: CollisionEvent): number {
+	public override hitTest(ball: Ball, dTime: number, coll: CollisionEvent, _physics?: PlayerPhysics): number {
 		// any face, not-lateral, non-rigid
 		return super.hitTestBasicRadius(ball, dTime, coll, false, false, false)
 	}
 
-	public collide(coll: CollisionEvent, physics: PlayerPhysics): void {
+	public override collide(coll: CollisionEvent, physics: PlayerPhysics): void {
 		const ball = coll.ball
 
 		if ((this.objType !== CollisionType.Trigger && this.objType !== CollisionType.Kicker) || !ball.hit.isRealBall()) {

@@ -45,12 +45,12 @@ export class KickerHit extends HitCircle {
 		this.obj = events
 	}
 
-	public hitTest(ball: Ball, dTime: number, coll: CollisionEvent): number {
+	public override hitTest(ball: Ball, dTime: number, coll: CollisionEvent, _physics?: PlayerPhysics): number {
 		// any face, not-lateral, non-rigid
 		return this.hitTestBasicRadius(ball, dTime, coll, false, false, false)
 	}
 
-	public collide(coll: CollisionEvent, physics: PlayerPhysics): void {
+	public override collide(coll: CollisionEvent, physics: PlayerPhysics): void {
 		this.doCollide(physics, coll.ball, coll.hitNormal, coll.hitFlag, false)
 	}
 
