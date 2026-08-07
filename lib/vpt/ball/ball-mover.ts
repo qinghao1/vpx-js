@@ -10,6 +10,7 @@ import type { BallData } from './ball-data.js'
 import type { BallHit } from './ball-hit.js'
 import type { BallState } from './ball-state.js'
 
+/** Ball mover (physics). */
 export class BallMover implements MoverObject {
 	private readonly id: number
 	private readonly data: BallData
