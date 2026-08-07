@@ -4,12 +4,16 @@
 /** OLE compound document magic header. */
 export const OLE_ID = new Uint8Array([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1])
 
-/** Concatenates two Uint8Arrays. */
-export function concatUint8Arrays(a: Uint8Array, b: Uint8Array): Uint8Array {
-	const c = new Uint8Array(a.length + b.length)
-	c.set(a, 0)
-	c.set(b, a.length)
-	return c
+/** Concatenates Uint8Arrays. */
+export function concatUint8Arrays(...arrays: Uint8Array[]): Uint8Array {
+	const len = arrays.reduce((n, a) => n + a.length, 0)
+	const out = new Uint8Array(len)
+	let off = 0
+	for (const a of arrays) {
+		out.set(a, off)
+		off += a.length
+	}
+	return out
 }
 
 /** Creates a DataView for the given Uint8Array. */
