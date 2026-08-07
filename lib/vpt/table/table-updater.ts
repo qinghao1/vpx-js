@@ -13,11 +13,9 @@ export class TableUpdater extends ItemUpdater<TableState> {
 	}
 
 	public applyState<NODE, GEOMETRY, POINT_LIGHT>(
-		obj: NODE,
-		state: TableState,
-		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
-		table: Table,
-	): void {
-		// TODO
-	}
+		_obj: NODE,
+		_state: TableState,
+		_renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
+		_table: Table,
+	): void {}
 }
