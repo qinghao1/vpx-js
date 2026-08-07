@@ -1,29 +1,13 @@
-/*
- * VPDB - Virtual Pinball Database
- * Copyright (C) 2019 freezy <freezy@vpdb.io>
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- */
+// Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import type { Player } from '../../game/player'
-import { ERR } from '../stdlib/err'
-import { VbsProxyHandler } from '../vbs-proxy-handler'
-import { Dictionary } from './dictionary'
-import { FileSystemObject } from './file-system-object'
-import { VpmController } from './vpm-controller'
-import { WshShell } from './wsh-shell'
+import type { Player } from '../../game/player.js'
+import { ERR } from '../stdlib/err.js'
+import { VbsProxyHandler } from '../vbs-proxy-handler.js'
+import { Dictionary } from './dictionary.js'
+import { FileSystemObject } from './file-system-object.js'
+import { VpmController } from './vpm-controller.js'
+import { WshShell } from './wsh-shell.js'
 
 export function getObject<T>(name: string, player: Player): T | void {
 	switch (name.toLowerCase()) {
