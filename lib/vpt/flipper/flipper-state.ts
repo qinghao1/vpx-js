@@ -5,6 +5,7 @@ import { Vertex2D } from '../../math/vertex2d.js'
 import { Pool } from '../../util/object-pool.js'
 import { ItemState } from '../item-state.js'
 
+/** Flipper state. */
 export class FlipperState extends ItemState {
 	public static readonly POOL = new Pool(FlipperState)
 
