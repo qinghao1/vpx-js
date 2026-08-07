@@ -4,7 +4,9 @@
 import { Pool } from '../../util/object-pool.js'
 import { ItemState } from '../item-state.js'
 
-/** Surface state. */
+/** Surface state.
+ *
+ * @see https://github.com/vpinball/vpinball/blob/master/surface.cpp */
 export class SurfaceState extends ItemState {
 	public static readonly POOL = new Pool(SurfaceState)
 
