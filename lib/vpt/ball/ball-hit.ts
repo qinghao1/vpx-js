@@ -124,7 +124,7 @@ export class BallHit extends HitObject {
 				return -1
 			}
 			if (Math.abs(bnv) > C_CONTACTVEL || bnd <= -PHYS_TOUCH) hitTime = 0
-			else hitTime = bnd * (1 / (2 * PHYS_TOUCH)) + 0.5 // hitball.cpp:166 — non-NEW_PHYSICS; don't compete with fast zero-time events
+			else hitTime = bnd * (1 / (2 * PHYS_TOUCH)) + 0.5 // hitball.cpp:166 (non-NEW_PHYSICS)
 			if (Math.abs(bnv) <= C_CONTACTVEL) isContact = true
 		} else {
 			const a = dv.lengthSq()
@@ -175,7 +175,7 @@ export class BallHit extends HitObject {
 		}
 
 		const vRel = ball.hit.vel.clone(true).sub(this.vel)
-		const vNormal = coll.hitNormal.clone(true) // copy — do not alias pooled hitNormal (hitball.cpp:245 vnormal = coll.m_hitnormal by value)
+		const vNormal = coll.hitNormal.clone(true) // hitball.cpp:245 — by value, don't alias pooled hitNormal
 		let dot = vRel.dot(vNormal)
 		Vertex3D.release(vRel)
 
@@ -191,7 +191,7 @@ export class BallHit extends HitObject {
 			if (!this.state.isFrozen) eDist *= 0.5
 			ball.state.pos.addAndRelease(vNormal.clone(true).multiplyScalar(eDist))
 		}
-		eDist = -C_DISP_GAIN * this.coll.hitDistance // m_coll is noisy — recompute per hitball.cpp:259
+		eDist = -C_DISP_GAIN * this.coll.hitDistance // hitball.cpp:259 — m_coll is noisy, recompute
 		if (!this.state.isFrozen && eDist > 1e-4) {
 			if (eDist > C_DISP_LIMIT) eDist = C_DISP_LIMIT
 			eDist *= 0.5
