@@ -17,7 +17,6 @@ import { ThreeRenderApi } from './three-render-api.js'
 export class ThreeLightGenerator {
 	public static readonly EMISSIVE_MAP_FACTOR = 0.1
 	public static readonly BULB_FACTOR = 10
-	private readonly hsl: { h: number; s: number; l: number } = { h: 0, s: 0, l: 0 }
 
 	public createPointLight(d: LightData): PointLight {
 		const intensity = d.state !== Enums.LightStatus.LightStateOff ? d.intensity * ThreeLightGenerator.BULB_FACTOR : 0
@@ -51,8 +50,6 @@ export class ThreeLightGenerator {
 				const m = (child as ThreeMesh).material as MeshStandardMaterial
 				m.emissiveIntensity = state.intensity * ThreeLightGenerator.EMISSIVE_MAP_FACTOR
 				m.emissive.set(state.color)
-				m.emissive.getHSL(this.hsl)
-				m.emissive.setHSL(this.hsl.h, this.hsl.s, this.hsl.l * 1.25)
 			}
 		}
 	}
