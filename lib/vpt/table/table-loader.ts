@@ -13,8 +13,8 @@ import { Texture } from '../texture.js'
 import type { TableLoadOptions } from './table.js'
 import { TableData } from './table-data.js'
 
-export /** TableLoader. */
-class TableLoader {
+/** TableLoader. */
+export class TableLoader {
 	private doc!: OleCompoundDoc
 
 	async load(reader: IBinaryReader, opts: TableLoadOptions = {}): Promise<LoadedTable> {
