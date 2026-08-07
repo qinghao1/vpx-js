@@ -17,61 +17,56 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import * as chai from 'chai';
-import { expect } from 'chai';
-import { spy } from 'sinon';
-import { TableBuilder } from '../../../test/table-builder';
-import { TestRenderApi } from '../../../test/test-render-api';
-import { Player } from '../../game/player';
-import { Table } from '../table/table';
-import { FlipperState } from './flipper-state';
+import * as chai from 'chai'
+import { expect } from 'chai'
+import { spy } from 'sinon'
+import sinonChai from 'sinon-chai'
+import { TableBuilder } from '../../../test/table-builder'
+import { TestRenderApi } from '../../../test/test-render-api'
+import { Player } from '../../game/player'
+import type { Table } from '../table/table'
+import type { FlipperState } from './flipper-state'
 
 /* tslint:disable:no-unused-expression */
-chai.use(require('sinon-chai'));
+chai.use((sinonChai as any).default ?? sinonChai)
 
 describe('The VPinball flipper updater', () => {
-
-	let table: Table;
-	let player: Player;
+	let table: Table
+	let player: Player
 
 	beforeEach(() => {
-
-		table = new TableBuilder()
-			.addMaterial('opaque', { isOpacityActive: false })
-			.addFlipper('flipper')
-			.build();
+		table = new TableBuilder().addMaterial('opaque', { isOpacityActive: false }).addFlipper('flipper').build()
 
 		// init player
-		player = new Player(table).init();
-	});
+		player = new Player(table).init()
+	})
 
 	it('should update visibility', async () => {
-		table.flippers.flipper.getApi().Visible = false;
-		const states = player.popStates();
+		table.flippers.flipper.getApi().Visible = false
+		const states = player.popStates()
 
-		expect(states.getState<FlipperState>('flipper').isVisible).to.equal(false);
-		states.getState<FlipperState>('flipper').release();
-	});
+		expect(states.getState<FlipperState>('flipper').isVisible).to.equal(false)
+		states.getState<FlipperState>('flipper').release()
+	})
 
 	it('should apply visibility', async () => {
-		const renderApi = new TestRenderApi();
-		spy(renderApi, 'applyVisibility');
-		table.flippers.flipper.getUpdater().applyState(null, { isVisible: true } as FlipperState, renderApi, table);
-		expect(renderApi.applyVisibility).to.have.been.calledOnceWith(true);
-	});
+		const renderApi = new TestRenderApi()
+		spy(renderApi, 'applyVisibility')
+		table.flippers.flipper.getUpdater().applyState(null, { isVisible: true } as FlipperState, renderApi, table)
+		expect(renderApi.applyVisibility).to.have.been.calledOnceWith(true)
+	})
 
 	it('should apply the material', async () => {
-		const renderApi = new TestRenderApi();
-		spy(renderApi, 'applyMaterial');
-		table.flippers.flipper.getUpdater().applyState(null, { material: 'opaque' } as FlipperState, renderApi, table);
-		expect(renderApi.applyMaterial).to.have.been.calledOnce;
-	});
+		const renderApi = new TestRenderApi()
+		spy(renderApi, 'applyMaterial')
+		table.flippers.flipper.getUpdater().applyState(null, { material: 'opaque' } as FlipperState, renderApi, table)
+		expect(renderApi.applyMaterial).to.have.been.calledOnce
+	})
 
 	it('should apply the transformation', async () => {
-		const renderApi = new TestRenderApi();
-		spy(renderApi, 'applyMatrixToNode');
-		table.flippers.flipper.getUpdater().applyState(null, { angle: 1 } as FlipperState, renderApi, table);
-		expect(renderApi.applyMatrixToNode).to.have.been.calledOnce;
-	});
-
-});
+		const renderApi = new TestRenderApi()
+		spy(renderApi, 'applyMatrixToNode')
+		table.flippers.flipper.getUpdater().applyState(null, { angle: 1 } as FlipperState, renderApi, table)
+		expect(renderApi.applyMatrixToNode).to.have.been.calledOnce
+	})
+})

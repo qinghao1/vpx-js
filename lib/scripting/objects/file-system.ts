@@ -17,58 +17,57 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { getTextFile } from '../../refs.node';
-import { TextStream } from './text-stream';
+import { getTextFile } from '../../refs.node.js'
+import { TextStream } from './text-stream'
 
 export class FileSystem {
-
-	private readonly files = new Map<string, TextStream>();
+	private readonly files = new Map<string, TextStream>()
 
 	public addStream(fileName: string, stream: TextStream): TextStream {
-		this.files.set(this.normalizePath(fileName), stream);
-		return stream;
+		this.files.set(this.normalizePath(fileName), stream)
+		return stream
 	}
 
 	public getStream(fileName: string, iomode: number = 1): TextStream {
 		if (!this.files.has(this.normalizePath(fileName))) {
-			return new TextStream(fileName, true, iomode).setContent(getTextFile(fileName));
+			return new TextStream(fileName, true, iomode).setContent(getTextFile(fileName))
 		}
-		return this.files.get(this.normalizePath(fileName))!.setMode(iomode);
+		return this.files.get(this.normalizePath(fileName))!.setMode(iomode)
 	}
 
 	public deleteFile(fileName: string) {
-		this.files.delete(this.normalizePath(fileName));
+		this.files.delete(this.normalizePath(fileName))
 	}
 
 	public fileExists(fileName: string) {
 		if (this.files.has(this.normalizePath(fileName))) {
-			return true;
+			return true
 		}
 		try {
-			getTextFile(fileName);
-			return true;
+			getTextFile(fileName)
+			return true
 		} catch (err) {
-			return false;
+			return false
 		}
 	}
 
 	public folderExists(folderName: string) {
-		const f = this.normalizePath(folderName);
+		const f = this.normalizePath(folderName)
 		for (const fileName of this.files.keys()) {
 			if (fileName.startsWith(f)) {
-				return true;
+				return true
 			}
 		}
-		return false;
+		return false
 	}
 
 	public clearAll() {
-		this.files.clear();
+		this.files.clear()
 	}
 
 	private normalizePath(path: string): string {
-		return path.replace(/\\+/g, '/').toLowerCase();
+		return path.replace(/\\+/g, '/').toLowerCase()
 	}
 }
 
-export const FS = new FileSystem();
+export const FS = new FileSystem()

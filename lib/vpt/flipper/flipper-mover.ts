@@ -17,213 +17,218 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { Event } from '../../game/event';
-import { EventProxy } from '../../game/event-proxy';
-import { PlayerPhysics } from '../../game/player-physics';
-import { degToRad, radToDeg } from '../../math/float';
-import { Vertex2D } from '../../math/vertex2d';
-import { Vertex3D } from '../../math/vertex3d';
-import { PHYS_FACTOR } from '../../physics/constants';
-import { HitCircle } from '../../physics/hit-circle';
-import { MoverObject } from '../../physics/mover-object';
-import { logger } from '../../util/logger';
-import { TableData } from '../table/table-data';
-import { FlipperConfig } from './flipper';
-import { FlipperData } from './flipper-data';
-import { FlipperState } from './flipper-state';
+import { Event } from '../../game/event'
+import type { EventProxy } from '../../game/event-proxy'
+import type { PlayerPhysics } from '../../game/player-physics'
+import { degToRad, radToDeg } from '../../math/float'
+import { Vertex2D } from '../../math/vertex2d'
+import { Vertex3D } from '../../math/vertex3d'
+import { PHYS_FACTOR } from '../../physics/constants'
+import { HitCircle } from '../../physics/hit-circle'
+import type { MoverObject } from '../../physics/mover-object'
+import { logger } from '../../util/logger'
+import type { TableData } from '../table/table-data'
+import type { FlipperConfig } from './flipper'
+import type { FlipperData } from './flipper-data'
+import type { FlipperState } from './flipper-state'
 
 export class FlipperMover implements MoverObject {
+	private readonly data: FlipperData
+	private readonly state: FlipperState
+	private readonly events: EventProxy
+	private readonly physics: PlayerPhysics
+	private readonly tableData: TableData
 
-	private readonly data: FlipperData;
-	private readonly state: FlipperState;
-	private readonly events: EventProxy;
-	private readonly physics: PlayerPhysics;
-	private readonly tableData: TableData;
-
-	public hitCircleBase: HitCircle;
-	public endRadius: number;
-	public readonly flipperRadius: number;
+	public hitCircleBase: HitCircle
+	public endRadius: number
+	public readonly flipperRadius: number
 
 	// kinematic state
-	private angularMomentum: number;
-	private angularAcceleration: number;
-	public angleSpeed: number;
+	private angularMomentum: number
+	private angularAcceleration: number
+	public angleSpeed: number
 
-	private curTorque: number;
-	public contactTorque: number = 0;
+	private curTorque: number
+	public contactTorque: number = 0
 
-	public angleStart: number;
-	public angleEnd: number;
+	public angleStart: number
+	public angleEnd: number
 
-	public inertia: number; // moment of inertia
+	public inertia: number // moment of inertia
 
-	public zeroAngNorm: Vertex2D = new Vertex2D(); // base norms at zero degrees
+	public zeroAngNorm: Vertex2D = new Vertex2D() // base norms at zero degrees
 
-	public enableRotateEvent: number; // -1,0,1
+	public enableRotateEvent: number // -1,0,1
 
-	private readonly direction: boolean;
+	private readonly direction: boolean
 
-	private solState: boolean; // is solenoid enabled?
-	public isInContact: boolean;
+	private solState: boolean // is solenoid enabled?
+	public isInContact: boolean
 
-	public lastHitFace: boolean;
+	public lastHitFace: boolean
 
-	constructor(config: FlipperConfig, flipperData: FlipperData, state: FlipperState, events: EventProxy, physics: PlayerPhysics, tableData: TableData) {
+	constructor(
+		config: FlipperConfig,
+		flipperData: FlipperData,
+		state: FlipperState,
+		events: EventProxy,
+		physics: PlayerPhysics,
+		tableData: TableData,
+	) {
+		this.events = events
+		this.hitCircleBase = new HitCircle(config.center, config.baseRadius, config.zLow, config.zHigh)
+		this.data = flipperData
+		this.state = state
+		this.physics = physics
+		this.tableData = tableData
 
-		this.events = events;
-		this.hitCircleBase = new HitCircle(config.center, config.baseRadius, config.zLow, config.zHigh);
-		this.data = flipperData;
-		this.state = state;
-		this.physics = physics;
-		this.tableData = tableData;
+		this.endRadius = config.endRadius // radius of flipper end
+		this.flipperRadius = config.flipperRadius // radius of flipper arc, center-to-center radius
 
-		this.endRadius = config.endRadius;                 // radius of flipper end
-		this.flipperRadius = config.flipperRadius;         // radius of flipper arc, center-to-center radius
-
-		if (config.angleEnd === config.angleStart) {       // otherwise hangs forever in collisions/updates
-			config.angleEnd += 0.0001;
+		if (config.angleEnd === config.angleStart) {
+			// otherwise hangs forever in collisions/updates
+			config.angleEnd += 0.0001
 		}
 
-		this.direction = config.angleEnd >= config.angleStart;
-		this.solState = false;
-		this.isInContact = false;
-		this.curTorque = 0.0;
-		this.enableRotateEvent = 0;
+		this.direction = config.angleEnd >= config.angleStart
+		this.solState = false
+		this.isInContact = false
+		this.curTorque = 0.0
+		this.enableRotateEvent = 0
 
-		this.angleStart = config.angleStart;
-		this.angleEnd = config.angleEnd;
-		this.state.angle = config.angleStart;
+		this.angleStart = config.angleStart
+		this.angleEnd = config.angleEnd
+		this.state.angle = config.angleStart
 
-		this.angularMomentum = 0;
-		this.angularAcceleration = 0;
-		this.angleSpeed = 0;
+		this.angularMomentum = 0
+		this.angularAcceleration = 0
+		this.angleSpeed = 0
 
-		const ratio = (config.baseRadius - config.endRadius) / config.flipperRadius;
+		const ratio = (config.baseRadius - config.endRadius) / config.flipperRadius
 
 		// model inertia of flipper as that of rod of length flipr around its end
-		const mass = this.getFlipperMass();
-		this.inertia = (1.0 / 3.0) * mass * (config.flipperRadius * config.flipperRadius);
+		const mass = this.getFlipperMass()
+		this.inertia = (1.0 / 3.0) * mass * (config.flipperRadius * config.flipperRadius)
 
-		this.lastHitFace = false;                          // used to optimize hit face search order
+		this.lastHitFace = false // used to optimize hit face search order
 
-		this.zeroAngNorm.x =  Math.sqrt(1.0 - ratio * ratio);     // F2 Norm, used in Green's transform, in FPM time search  // =  sinf(faceNormOffset)
-		this.zeroAngNorm.y = -ratio;                                 // F1 norm, change sign of x component, i.e -zeroAngNorm.x // = -cosf(faceNormOffset)
+		this.zeroAngNorm.x = Math.sqrt(1.0 - ratio * ratio) // F2 Norm, used in Green's transform, in FPM time search  // =  sinf(faceNormOffset)
+		this.zeroAngNorm.y = -ratio // F1 norm, change sign of x component, i.e -zeroAngNorm.x // = -cosf(faceNormOffset)
 	}
 
 	public updateDisplacements(dtime: number): void {
+		this.state.angle += this.angleSpeed * dtime // move flipper angle
 
-		this.state.angle += this.angleSpeed * dtime;       // move flipper angle
-
-		const angleMin = Math.min(this.angleStart, this.angleEnd);
-		const angleMax = Math.max(this.angleStart, this.angleEnd);
+		const angleMin = Math.min(this.angleStart, this.angleEnd)
+		const angleMax = Math.max(this.angleStart, this.angleEnd)
 
 		if (this.state.angle > angleMax) {
-			this.state.angle = angleMax;
+			this.state.angle = angleMax
 		}
 		if (this.state.angle < angleMin) {
-			this.state.angle = angleMin;
+			this.state.angle = angleMin
 		}
 
-		if (Math.abs(this.angleSpeed) < 0.0005) {          // avoids 'jumping balls' when two or more balls held on flipper (and more other balls are in play) //!! make dependent on physics update rate
-			return;
+		if (Math.abs(this.angleSpeed) < 0.0005) {
+			// avoids 'jumping balls' when two or more balls held on flipper (and more other balls are in play) //!! make dependent on physics update rate
+			return
 		}
 
-		let handleEvent = false;
+		let handleEvent = false
 
-		if (this.state.angle === angleMax) {               // hit stop?
+		if (this.state.angle === angleMax) {
+			// hit stop?
 			if (this.angleSpeed > 0) {
-				handleEvent = true;
+				handleEvent = true
 			}
 		} else if (this.state.angle === angleMin) {
 			if (this.angleSpeed < 0) {
-				handleEvent = true;
+				handleEvent = true
 			}
 		}
 
 		if (handleEvent) {
-			const anglespd = Math.abs(radToDeg(this.angleSpeed));
-			this.angularMomentum *= -0.3;                            // make configurable?
-			this.angleSpeed = this.angularMomentum / this.inertia;
+			const anglespd = Math.abs(radToDeg(this.angleSpeed))
+			this.angularMomentum *= -0.3 // make configurable?
+			this.angleSpeed = this.angularMomentum / this.inertia
 
 			if (this.enableRotateEvent > 0) {
-				logger().info('[%s] Flipper is up', this.data.getName());
-				this.events.fireVoidEventParm(Event.LimitEventsEOS, anglespd); // send EOS event
+				logger().info('[%s] Flipper is up', this.data.getName())
+				this.events.fireVoidEventParm(Event.LimitEventsEOS, anglespd) // send EOS event
 
 				// g_pplayer->this.m_pininput.this.m_leftkey_down_usec_EOS = usec(); // debug only
 				// g_pplayer->this.m_pininput.this.m_leftkey_down_frame_EOS = g_pplayer->this.m_overall_frames;
-
 			} else if (this.enableRotateEvent < 0) {
-				logger().info('[%s] Flipper is down', this.data.getName());
-				this.events.fireVoidEventParm(Event.LimitEventsBOS, anglespd); // send Beginning of Stroke/Park event
+				logger().info('[%s] Flipper is down', this.data.getName())
+				this.events.fireVoidEventParm(Event.LimitEventsBOS, anglespd) // send Beginning of Stroke/Park event
 			}
-			this.enableRotateEvent = 0;
+			this.enableRotateEvent = 0
 		}
 	}
 
 	public updateVelocities(): void {
-
-		let desiredTorque = this.getStrength();
-		if (!this.solState) {                              // this.solState: true = button pressed, false = released
-			desiredTorque *= -this.getReturnRatio();
+		let desiredTorque = this.getStrength()
+		if (!this.solState) {
+			// this.solState: true = button pressed, false = released
+			desiredTorque *= -this.getReturnRatio()
 		}
 
 		// hold coil is weaker
-		const eosAngle = degToRad(this.getTorqueDampingAngle());
+		const eosAngle = degToRad(this.getTorqueDampingAngle())
 		if (Math.abs(this.state.angle - this.angleEnd) < eosAngle) {
 			// fade in/out damping, depending on angle to end
-			const lerp = Math.sqrt(Math.sqrt(Math.abs(this.state.angle - this.angleEnd) / eosAngle));
-			desiredTorque *= lerp + this.getTorqueDamping() * (1 - lerp);
+			const lerp = Math.sqrt(Math.sqrt(Math.abs(this.state.angle - this.angleEnd) / eosAngle))
+			desiredTorque *= lerp + this.getTorqueDamping() * (1 - lerp)
 		}
 
 		if (!this.direction) {
-			desiredTorque = -desiredTorque;
+			desiredTorque = -desiredTorque
 		}
 
-		let torqueRampupSpeed = this.getRampUpSpeed();
+		let torqueRampupSpeed = this.getRampUpSpeed()
 		if (torqueRampupSpeed <= 0) {
-			torqueRampupSpeed = 1e6;                       // set very high for instant coil response
+			torqueRampupSpeed = 1e6 // set very high for instant coil response
 		} else {
-			torqueRampupSpeed = Math.min(this.getStrength() / torqueRampupSpeed, 1e6);
+			torqueRampupSpeed = Math.min(this.getStrength() / torqueRampupSpeed, 1e6)
 		}
 
 		// update current torque linearly towards desired torque
 		// (simple model for coil hysteresis)
 		if (desiredTorque >= this.curTorque) {
-			this.curTorque = Math.min(this.curTorque + torqueRampupSpeed * PHYS_FACTOR, desiredTorque);
+			this.curTorque = Math.min(this.curTorque + torqueRampupSpeed * PHYS_FACTOR, desiredTorque)
 		} else {
-			this.curTorque = Math.max(this.curTorque - torqueRampupSpeed * PHYS_FACTOR, desiredTorque);
+			this.curTorque = Math.max(this.curTorque - torqueRampupSpeed * PHYS_FACTOR, desiredTorque)
 		}
 
 		// resolve contacts with stoppers
-		let torque = this.curTorque;
-		this.isInContact = false;
+		let torque = this.curTorque
+		this.isInContact = false
 		if (Math.abs(this.angleSpeed) <= 1e-2) {
-			const angleMin = Math.min(this.angleStart, this.angleEnd);
-			const angleMax = Math.max(this.angleStart, this.angleEnd);
+			const angleMin = Math.min(this.angleStart, this.angleEnd)
+			const angleMax = Math.max(this.angleStart, this.angleEnd)
 
 			if (this.state.angle >= angleMax - 1e-2 && torque > 0) {
-				this.state.angle = angleMax;
-				this.isInContact = true;
-				this.contactTorque = torque;
-				this.angularMomentum = 0;
-				torque = 0;
-
+				this.state.angle = angleMax
+				this.isInContact = true
+				this.contactTorque = torque
+				this.angularMomentum = 0
+				torque = 0
 			} else if (this.state.angle <= angleMin + 1e-2 && torque < 0) {
-				this.state.angle = angleMin;
-				this.isInContact = true;
-				this.contactTorque = torque;
-				this.angularMomentum = 0;
-				torque = 0;
+				this.state.angle = angleMin
+				this.isInContact = true
+				this.contactTorque = torque
+				this.angularMomentum = 0
+				torque = 0
 			}
 		}
 
-		this.angularMomentum += PHYS_FACTOR * torque;
-		this.angleSpeed = this.angularMomentum / this.inertia;
-		this.angularAcceleration = torque / this.inertia;
+		this.angularMomentum += PHYS_FACTOR * torque
+		this.angleSpeed = this.angularMomentum / this.inertia
+		this.angularAcceleration = torque / this.inertia
 	}
 
 	public setSolenoidState(s: boolean): void {
-		this.solState = s;
+		this.solState = s
 	}
 
 	// public getStrokeRatio(): number {
@@ -231,122 +236,110 @@ export class FlipperMover implements MoverObject {
 	// }
 
 	public getReturnRatio(): number {
-		return this.doOverridePhysics()
-			? this.data.overrideReturnStrength!
-			: this.data.return!;
+		return this.doOverridePhysics() ? this.data.overrideReturnStrength! : this.data.return!
 	}
 
 	public getStrength(): number {
-		return this.doOverridePhysics()
-			? this.data.overrideStrength!
-			: this.data.strength!;
+		return this.doOverridePhysics() ? this.data.overrideStrength! : this.data.strength!
 	}
 
 	private getTorqueDampingAngle(): number {
-		return this.doOverridePhysics()
-			? this.data.overrideTorqueDampingAngle!
-			: this.data.torqueDampingAngle!;
+		return this.doOverridePhysics() ? this.data.overrideTorqueDampingAngle! : this.data.torqueDampingAngle!
 	}
 	private getFlipperMass(): number {
-		return this.doOverridePhysics()
-			? this.data.overrideMass!
-			: this.data.mass;
+		return this.doOverridePhysics() ? this.data.overrideMass! : this.data.mass
 	}
 
 	private getTorqueDamping(): number {
-		return this.doOverridePhysics()
-			? this.data.overrideTorqueDamping!
-			: this.data.torqueDamping!;
+		return this.doOverridePhysics() ? this.data.overrideTorqueDamping! : this.data.torqueDamping!
 	}
 
 	private getRampUpSpeed(): number {
-		return this.doOverridePhysics()
-			? this.data.overrideCoilRampUp!
-			: this.data.rampUp!;
+		return this.doOverridePhysics() ? this.data.overrideCoilRampUp! : this.data.rampUp!
 	}
 
 	private doOverridePhysics(): boolean {
-		return !!this.data.overridePhysics
-			|| (this.tableData.overridePhysicsFlipper && !!this.tableData.overridePhysics);
+		return !!this.data.overridePhysics || (this.tableData.overridePhysicsFlipper && !!this.tableData.overridePhysics)
 	}
 
 	// rigid body functions
 	public surfaceVelocity(surfP: Vertex3D, recycle = false): Vertex3D {
-		return Vertex3D.crossZ(this.angleSpeed, surfP, recycle);
+		return Vertex3D.crossZ(this.angleSpeed, surfP, recycle)
 	}
 
 	public getHitTime(): number {
 		if (this.angleSpeed === 0) {
-			return -1.0;
+			return -1.0
 		}
 
-		const angleMin = Math.min(this.angleStart, this.angleEnd);
-		const angleMax = Math.max(this.angleStart, this.angleEnd);
-		const dist = this.angleSpeed > 0
-			? angleMax - this.state.angle       // >= 0
-			: angleMin - this.state.angle;      // <= 0
+		const angleMin = Math.min(this.angleStart, this.angleEnd)
+		const angleMax = Math.max(this.angleStart, this.angleEnd)
+		const dist =
+			this.angleSpeed > 0
+				? angleMax - this.state.angle // >= 0
+				: angleMin - this.state.angle // <= 0
 
-		const hitTime = dist / this.angleSpeed;
+		const hitTime = dist / this.angleSpeed
 
 		if (!isFinite(hitTime) || hitTime < 0) {
-			return -1.0;
+			return -1.0
 		} else {
-			return hitTime;
+			return hitTime
 		}
 	}
 
 	/** @deprecated Use {@link #applyImpulseAndRelease()} */
 	public applyImpulse(rotI: Vertex3D): void {
-		this.angularMomentum += rotI.z;            // only rotation about z axis
-		this.angleSpeed = this.angularMomentum / this.inertia;    // TODO: figure out moment of inertia
+		this.angularMomentum += rotI.z // only rotation about z axis
+		this.angleSpeed = this.angularMomentum / this.inertia // TODO: figure out moment of inertia
 	}
 
 	public applyImpulseAndRelease(rotI: Vertex3D): void {
-		this.angularMomentum += rotI.z;            // only rotation about z axis
-		this.angleSpeed = this.angularMomentum / this.inertia;    // TODO: figure out moment of inertia
-		Vertex3D.release(rotI);
+		this.angularMomentum += rotI.z // only rotation about z axis
+		this.angleSpeed = this.angularMomentum / this.inertia // TODO: figure out moment of inertia
+		Vertex3D.release(rotI)
 	}
 
 	public surfaceAcceleration(surfP: Vertex3D, recycle = false): Vertex3D {
 		// tangential acceleration = (0, 0, omega) x surfP
-		const tangAcc = Vertex3D.crossZ(this.angularAcceleration, surfP, recycle);
+		const tangAcc = Vertex3D.crossZ(this.angularAcceleration, surfP, recycle)
 
 		// centripetal acceleration = (0,0,omega) x ( (0,0,omega) x surfP )
-		const av2 = this.angleSpeed * this.angleSpeed;
-		const centrAcc = Vertex3D.claim(-av2 * surfP.x, -av2 * surfP.y, 0);
+		const av2 = this.angleSpeed * this.angleSpeed
+		const centrAcc = Vertex3D.claim(-av2 * surfP.x, -av2 * surfP.y, 0)
 
-		return tangAcc.addAndRelease(centrAcc);
+		return tangAcc.addAndRelease(centrAcc)
 	}
 
 	public setStartAngle(r: number): void {
-		this.angleStart = r;
-		const angleMin = Math.min(this.angleStart, this.angleEnd);
-		const angleMax = Math.max(this.angleStart, this.angleEnd);
+		this.angleStart = r
+		const angleMin = Math.min(this.angleStart, this.angleEnd)
+		const angleMax = Math.max(this.angleStart, this.angleEnd)
 		if (this.state.angle > angleMax) {
-			this.state.angle = angleMax;
+			this.state.angle = angleMax
 		}
 		if (this.state.angle < angleMin) {
-			this.state.angle = angleMin;
+			this.state.angle = angleMin
 		}
 	}
 
 	public setEndAngle(r: number): void {
-		this.angleEnd = r;
-		const angleMin = Math.min(this.angleStart, this.angleEnd);
-		const angleMax = Math.max(this.angleStart, this.angleEnd);
+		this.angleEnd = r
+		const angleMin = Math.min(this.angleStart, this.angleEnd)
+		const angleMax = Math.max(this.angleStart, this.angleEnd)
 		if (this.state.angle > angleMax) {
-			this.state.angle = angleMax;
+			this.state.angle = angleMax
 		}
 		if (this.state.angle < angleMin) {
-			this.state.angle = angleMin;
+			this.state.angle = angleMin
 		}
 	}
 
 	public getMass() {
-		return 3.0 * this.inertia / (this.flipperRadius * this.flipperRadius); //!! also change if wiring of moment of inertia happens (see ctor)
+		return (3.0 * this.inertia) / (this.flipperRadius * this.flipperRadius) //!! also change if wiring of moment of inertia happens (see ctor)
 	}
 
 	public setMass(m: number) {
-		this.inertia = (1.0 / 3.0) * m * (this.flipperRadius * this.flipperRadius); //!! also change if wiring of moment of inertia happens (see ctor)
+		this.inertia = (1.0 / 3.0) * m * (this.flipperRadius * this.flipperRadius) //!! also change if wiring of moment of inertia happens (see ctor)
 	}
 }

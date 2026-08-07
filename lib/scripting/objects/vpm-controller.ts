@@ -17,11 +17,11 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { downloadGameEntry } from '../../emu/rom-fetcher';
-import { Emulator } from '../../emu/wpc-emu';
-import { Player } from '../../game/player';
-import { logger } from '../../util/logger';
-import { VbsArray } from '../vbs-array';
+import { downloadGameEntry } from '../../emu/rom-fetcher'
+import { Emulator } from '../../emu/wpc-emu'
+import type { Player } from '../../game/player'
+import { logger } from '../../util/logger'
+import type { VbsArray } from '../vbs-array'
 
 /**
  * Implementation of the VISUAL PINMAME COM OBJECT PROPERTY/METHOD
@@ -29,95 +29,92 @@ import { VbsArray } from '../vbs-array';
  * converted VBS will call this functions using bracket notation, like `Controller.Dip[0]` or `Controller.GameName`
  */
 export class VpmController {
-
-	private emulator: Emulator;
-	private gameName: string = '';
-	private splashInfoLine: string = '';
-	private readonly player: Player;
-	public readonly Dip: { [index: number]: number };
-	public readonly Switch: { [index: number]: number };
-	public readonly Lamp: { [index: number]: number };
-	public readonly Solenoid: { [index: number]: number };
-	public readonly GIString: { [index: number]: number };
+	private emulator: Emulator
+	private gameName: string = ''
+	private splashInfoLine: string = ''
+	private readonly player: Player
+	public readonly Dip: { [index: number]: number }
+	public readonly Switch: { [index: number]: number }
+	public readonly Lamp: { [index: number]: number }
+	public readonly Solenoid: { [index: number]: number }
+	public readonly GIString: { [index: number]: number }
 
 	constructor(player: Player) {
-		this.player = player;
-		this.emulator = new Emulator();
+		this.player = player
+		this.emulator = new Emulator()
 
-		this.Switch = this.createGetSetBooleanProxy('SWITCH',
+		this.Switch = this.createGetSetBooleanProxy(
+			'SWITCH',
 			(index) => this.emulator.getSwitchInput(index),
 			(switchNr: number, value?: boolean) => {
 				if (switchNr < 89) {
-					return this.emulator.setSwitchInput(switchNr, value);
+					return this.emulator.setSwitchInput(switchNr, value)
 				}
 				switch (switchNr) {
 					case 112:
-						this.emulator.setFliptronicsInput('F2', value);
-						return true;
+						this.emulator.setFliptronicsInput('F2', value)
+						return true
 					case 114:
-						this.emulator.setFliptronicsInput('F4', value);
-						return true;
+						this.emulator.setFliptronicsInput('F4', value)
+						return true
 					case 116:
-						this.emulator.setFliptronicsInput('F6', value);
-						return true;
+						this.emulator.setFliptronicsInput('F6', value)
+						return true
 					case 118:
-						this.emulator.setFliptronicsInput('F8', value);
-						return true;
+						this.emulator.setFliptronicsInput('F8', value)
+						return true
 				}
-				logger().error('INVALID_SWITCH_ID:', switchNr);
-				return false;
+				logger().error('INVALID_SWITCH_ID:', switchNr)
+				return false
 			},
-		);
+		)
 
-		this.Dip = this.createGetSetNumberProxy('DIP',
+		this.Dip = this.createGetSetNumberProxy(
+			'DIP',
 			() => this.emulator.getDipSwitchByte(),
 			(unusedDipIndex: number, value: number) => {
-				this.emulator.setDipSwitchByte(value);
-				return true;
+				this.emulator.setDipSwitchByte(value)
+				return true
 			},
-		);
-		this.Lamp = this.createGetSetNumberProxy('LAMP',
-			(index) => this.emulator.getLampState(index), SET_NOP);
-		this.Solenoid = this.createGetSetNumberProxy('SOLENOID',
-			(index) => this.emulator.getSolenoidState(index), SET_NOP);
-		this.GIString = this.createGetSetNumberProxy('GI',
-			(index) => this.emulator.getGIState(index), SET_NOP);
+		)
+		this.Lamp = this.createGetSetNumberProxy('LAMP', (index) => this.emulator.getLampState(index), SET_NOP)
+		this.Solenoid = this.createGetSetNumberProxy('SOLENOID', (index) => this.emulator.getSolenoidState(index), SET_NOP)
+		this.GIString = this.createGetSetNumberProxy('GI', (index) => this.emulator.getGIState(index), SET_NOP)
 
 		// those function get called by the vbs-helper.ts script (getOrCall). To make sure
 		// their scope is correct, we bind them here!
-		this.Run = this.Run.bind(this);
-		this.Stop = this.Stop.bind(this);
+		this.Run = this.Run.bind(this)
+		this.Stop = this.Stop.bind(this)
 	}
 
 	// Control
 	get GameName(): string {
-		return this.gameName;
+		return this.gameName
 	}
 	set GameName(gameName: string) {
-		logger().debug('SET GAMENAME:', gameName);
-		this.gameName = gameName;
+		logger().debug('SET GAMENAME:', gameName)
+		this.gameName = gameName
 		// the VPX interface is sync while this call is async - download the game
-		this._loadGame(this.gameName)
-			.catch((error) => {
-				logger().error('DOWNLOAD_FAILED:', error.messages);
-			});
+		this._loadGame(this.gameName).catch((error) => {
+			logger().error('DOWNLOAD_FAILED:', error.messages)
+		})
 	}
 
 	private async _loadGame(gameName: string) {
-		const answer = await downloadGameEntry(gameName);
-		logger().info('LOADED', answer.wpcDbEntry);
-		await this.emulator.loadGame(answer.wpcDbEntry, answer.romFile);
-		this.player.setEmulator(this.emulator);
+		const answer = await downloadGameEntry(gameName)
+		logger().info('LOADED', answer.wpcDbEntry)
+		await this.emulator.loadGame(answer.wpcDbEntry, answer.romFile)
+		this.player.setEmulator(this.emulator)
 	}
 
 	get Running(): boolean {
-		return this.emulator.getPaused() && this.emulator.isInitialized();
+		return this.emulator.getPaused() && this.emulator.isInitialized()
 	}
 	get Pause(): boolean {
-		return this.emulator.getPaused();
+		return this.emulator.getPaused()
 	}
 	set Pause(paused: boolean) {
-		this.emulator.setPaused(paused);
+		this.emulator.setPaused(paused)
 	}
 	/**
 	 * Returns the version number of Visual PinMAME as an 8-digit string "vvmmbbrr":
@@ -125,17 +122,17 @@ export class VpmController {
 	 *
 	 */
 	get Version(): string {
-		return '00990201';
+		return '00990201'
 	}
 	public Run() {
-		logger().debug('RUN', this.gameName);
+		logger().debug('RUN', this.gameName)
 		if (this.gameName) {
 			// TODO: fetch rom from vpdb.io here
 			//return this.emulator.loadGame(this.gameName);
 		}
 	}
 	public Stop(): void {
-		logger().debug('STOP');
+		logger().debug('STOP')
 		//TODO unclear what to do
 	}
 
@@ -143,10 +140,10 @@ export class VpmController {
 	// NOTE: Dip - implemented using Proxy
 
 	get HandleMechanics(): number {
-		return 0;
+		return 0
 	}
 	set HandleMechanics(mechanicNr: number) {
-		logger().debug('TODO HandleMechanics', mechanicNr);
+		logger().debug('TODO HandleMechanics', mechanicNr)
 	}
 	/**
 	 * Determine if game uses WPC Numbering of Switches and Lamps
@@ -154,86 +151,86 @@ export class VpmController {
 	 * non WPCnumbering = 1,2,3,4,...
 	 */
 	get WPCNumbering(): number {
-		logger().debug('WPCNumbering');
-		return 1;
+		logger().debug('WPCNumbering')
+		return 1
 	}
 	get SampleRate(): number {
-		logger().debug('SampleRate');
-		return 22050;
+		logger().debug('SampleRate')
+		return 22050
 	}
 
 	//Customization
 	get SplashInfoLine(): string {
-		return this.splashInfoLine;
+		return this.splashInfoLine
 	}
 	set SplashInfoLine(gameCredits) {
-		this.splashInfoLine = gameCredits;
+		this.splashInfoLine = gameCredits
 	}
 	get ShowFrame(): boolean {
-		return false;
+		return false
 	}
 	set ShowFrame(showFrame: boolean) {
-		logger().debug('ShowFrame', showFrame);
+		logger().debug('ShowFrame', showFrame)
 	}
 	get DoubleSize(): boolean {
-		return false;
+		return false
 	}
 	set DoubleSize(doubleSize: boolean) {
-		logger().debug('DoubleSize', doubleSize);
+		logger().debug('DoubleSize', doubleSize)
 	}
 	get Antialias(): boolean {
-		return false;
+		return false
 	}
 	set Antialias(enabled: boolean) {
-		logger().debug('Antialias', enabled);
+		logger().debug('Antialias', enabled)
 	}
 	get BorderSizeX(): number {
-		return 0;
+		return 0
 	}
 	set BorderSizeX(size: number) {
-		logger().debug('BorderSizeX', size);
+		logger().debug('BorderSizeX', size)
 	}
 	get BorderSizeY(): number {
-		return 0;
+		return 0
 	}
 	set BorderSizeY(size: number) {
-		logger().debug('BorderSizeY', size);
+		logger().debug('BorderSizeY', size)
 	}
 	get WindowPosX(): number {
-		return 0;
+		return 0
 	}
 	set WindowPosX(position: number) {
-		logger().debug('WindowPosX', position);
+		logger().debug('WindowPosX', position)
 	}
 	get WindowPosY(): number {
-		return 0;
+		return 0
 	}
 	set WindowPosY(position: number) {
-		logger().debug('WindowPosY', position);
+		logger().debug('WindowPosY', position)
 	}
 	get LockDisplay(): boolean {
-		return false;
+		return false
 	}
 	set LockDisplay(locked: boolean) {
-		logger().debug('LockDisplay', locked);
+		logger().debug('LockDisplay', locked)
 	}
 	get Hidden(): boolean {
-		return false;
+		return false
 	}
 	set Hidden(hidden: boolean) {
-		logger().debug('Hidden', hidden);
+		logger().debug('Hidden', hidden)
 	}
 	public SetDisplayPosition(x: number, y: number, hWnd: any): void {
-		logger().debug('SetDisplayPosition', { x, y, hWnd });
+		logger().debug('SetDisplayPosition', { x, y, hWnd })
 	}
 	public ShowOptsDialog(hWnd: any): void {
-		logger().debug('ShowOptsDialog', hWnd);
+		logger().debug('ShowOptsDialog', hWnd)
 	}
 	public ShowPathesDialog(hWnd: any): void {
-		logger().debug('ShowPathesDialog', hWnd);
+		logger().debug('ShowPathesDialog', hWnd)
 	}
 	public ShowAboutDialog(hWnd: any): void {
-		logger().debug('ShowAboutDialog', hWnd);
+		logger().debug('ShowAboutDialog', hWnd)
 	}
 	/**
 	 * Checks the rom set for the current game and displays the results.
@@ -241,89 +238,95 @@ export class VpmController {
 	 * @returns true if the roms are good.
 	 */
 	public CheckROMS(nShowOptions: number): boolean {
-		logger().debug('CheckROMS', nShowOptions);
-		return true;
+		logger().debug('CheckROMS', nShowOptions)
+		return true
 	}
 
 	// AggregatePollingFunctions
 	get ChangedLamps(): VbsArray<number[]> {
-		const changedLamps: VbsArray<number[]> = this.emulator.emulatorState.getChangedLamps();
-		return changedLamps;
+		const changedLamps: VbsArray<number[]> = this.emulator.emulatorState.getChangedLamps()
+		return changedLamps
 	}
 	get ChangedSolenoids(): number[][] {
-		return this.emulator.emulatorState.getChangedSolenoids();
+		return this.emulator.emulatorState.getChangedSolenoids()
 	}
 	get ChangedGI(): number[][] {
-		return this.emulator.emulatorState.getChangedGI();
+		return this.emulator.emulatorState.getChangedGI()
 	}
 	get ChangedLEDs(): number[][] {
-		return this.emulator.emulatorState.getChangedLEDs();
+		return this.emulator.emulatorState.getChangedLEDs()
 	}
 
 	// Debugging
 	get ShowDMDOnly(): boolean {
-		return false;
+		return false
 	}
 	set ShowDMDOnly(show: boolean) {
-		logger().debug('ShowDMDOnly', show);
+		logger().debug('ShowDMDOnly', show)
 	}
 	get HandleKeyboard(): boolean {
-		return false;
+		return false
 	}
 	set HandleKeyboard(handle: boolean) {
-		logger().debug('HandleKeyboard', handle);
+		logger().debug('HandleKeyboard', handle)
 	}
 	get ShowTitle(): boolean {
-		return false;
+		return false
 	}
 	set ShowTitle(show: boolean) {
-		logger().debug('ShowTitle', show);
+		logger().debug('ShowTitle', show)
 	}
 
-	private createGetSetNumberProxy(name: string,
-			getFunction: (prop: number) => number,
-			setFunction: (prop: number, value: number) => boolean,
-		): { [index: number]: number } {
+	private createGetSetNumberProxy(
+		name: string,
+		getFunction: (prop: number) => number,
+		setFunction: (prop: number, value: number) => boolean,
+	): { [index: number]: number } {
 		const handler = {
-			get: (target: {[ index: number ]: number}, prop: number | string): number => {
-				logger().debug('GET', name, {target, prop});
-				return getFunction(parseInt(prop.toString(), 10));
+			get: (target: { [index: number]: number }, prop: string | symbol, receiver?: any): number => {
+				logger().debug('GET', name, { target, prop })
+				const key = typeof prop === 'symbol' ? NaN : parseInt(prop as string, 10)
+				return getFunction(key)
 			},
 
-			set: (target: {[ index: number ]: number}, prop: number | string, value: number): boolean => {
-				logger().debug('SET', name, {target, prop, value});
-				return setFunction(parseInt(prop.toString(), 10), value);
+			set: (target: { [index: number]: number }, prop: string | symbol, value: number): boolean => {
+				logger().debug('SET', name, { target, prop, value })
+				const key = typeof prop === 'symbol' ? NaN : parseInt(prop as string, 10)
+				return setFunction(key, value)
 			},
-		};
-		return new Proxy<{ [index: number ]: number; }>({}, handler);
+		}
+		return new Proxy<{ [index: number]: number }>({}, handler)
 	}
 
-	private createGetSetBooleanProxy(name: string,
+	private createGetSetBooleanProxy(
+		name: string,
 		getFunction: (switchNr: number) => number,
 		setFunction: (switchNr: number, value?: boolean) => boolean,
 	): { [index: number]: number } {
 		const handler = {
-			get: (target: {[ index: number ]: number}, switchNr: number): number => {
-				logger().debug('GET', name, {target, switchNr});
-				return getFunction(switchNr);
+			get: (target: { [index: number]: number }, switchNr: string | symbol, receiver?: any): number => {
+				logger().debug('GET', name, { target, switchNr })
+				const key = typeof switchNr === 'symbol' ? NaN : parseInt(switchNr as string, 10)
+				return getFunction(key)
 			},
 
-			set: (target: {[ index: number ]: number}, switchNr: number | string, value?: number | boolean): boolean => {
-				logger().debug('SET', name, {target, switchNr, value});
+			set: (target: { [index: number]: number }, switchNr: string | symbol, value?: number | boolean): boolean => {
+				logger().debug('SET', name, { target, switchNr, value })
+				const key = typeof switchNr === 'symbol' ? NaN : parseInt((switchNr as string).toString(), 10)
 				if (value === 1 || value === true) {
-					return setFunction(parseInt(switchNr.toString(), 10), true);
+					return setFunction(key, true)
 				}
 				if (value === 0 || value === false) {
-					return setFunction(parseInt(switchNr.toString(), 10), false);
+					return setFunction(key, false)
 				}
-				return setFunction(parseInt(switchNr.toString(), 10));
+				return setFunction(key)
 			},
-		};
-		return new Proxy<{ [index: number ]: number; }>({}, handler);
 		}
+		return new Proxy<{ [index: number]: number }>({}, handler)
+	}
 }
 
 function SET_NOP(index: number, value: number): boolean {
-	logger().warn('UNEXPECTED SET CALL', {index, value});
-	return true;
+	logger().warn('UNEXPECTED SET CALL', { index, value })
+	return true
 }

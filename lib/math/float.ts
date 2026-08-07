@@ -40,11 +40,11 @@
  */
 export function fr(f8: number): number {
 	if (f8 === 0) {
-		return 0;
+		return 0
 	}
-	const exp = Math.floor(Math.log10(Math.abs(f8)));
-	const f = Math.pow(10, 9 - exp);
-	return Math.round(f8 * f) / f;
+	const exp = Math.floor(Math.log10(Math.abs(f8)))
+	const f = 10 ** (9 - exp)
+	return Math.round(f8 * f) / f
 }
 
 /**
@@ -53,7 +53,7 @@ export function fr(f8: number): number {
  * @param f8
  */
 export function f4(f8: number): number {
-	return Math.fround(f8);
+	return Math.fround(f8)
 }
 
 /**
@@ -62,9 +62,9 @@ export function f4(f8: number): number {
  * @return Radian angle
  */
 export function degToRad(deg: number): number {
-	return f4(f4(deg) * f4(Math.PI / 180.0));
+	return f4(f4(deg) * f4(Math.PI / 180.0))
 }
 
 export function radToDeg(deg: number): number {
-	return (f4(f4(deg) * f4(180.0 / Math.PI)));
+	return f4(f4(deg) * f4(180.0 / Math.PI))
 }

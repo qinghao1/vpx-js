@@ -17,33 +17,34 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import * as chai from 'chai';
-import { expect } from 'chai';
-import { ScriptHelper } from '../../../test/script.helper';
-import { ErrorTransformer } from './error-transformer';
+import * as chai from 'chai'
+import { expect } from 'chai'
+import sinonChai from 'sinon-chai'
+import { ScriptHelper } from '../../../test/script.helper'
+import { ErrorTransformer } from './error-transformer'
 
-chai.use(require('sinon-chai'));
+chai.use((sinonChai as any).default ?? sinonChai)
 
 /* tslint:disable:no-unused-expression */
 describe('The scripting error transformer', () => {
-
 	it('should update Err when used in an "If" statement', () => {
-		const vbs = `If Err Then MsgBox "Can't start Game" & cGameName & vbNewLine & Err.Description:Exit Sub`;
-		const js = transform(vbs);
-		expect(js).to.equal(`if (Err.Number) {\n    MsgBox('Can\\'t start Game' + cGameName + vbNewLine + Err.Description);\n    return;\n}`);
-	});
+		const vbs = `If Err Then MsgBox "Can't start Game" & cGameName & vbNewLine & Err.Description:Exit Sub`
+		const js = transform(vbs)
+		expect(js).to.equal(
+			`if (Err.Number) {\n    MsgBox('Can\\'t start Game' + cGameName + vbNewLine + Err.Description);\n    return;\n}`,
+		)
+	})
 
 	it('should update Err when used in a logical expression', () => {
-		const vbs = `If aSw = 0 Or Err Then x = 5 End If`;
-		const js = transform(vbs);
-		expect(js).to.equal(`if (__vbs.equals(aSw, 0) || Err.Number) {\n    x = 5;\n}`);
-	});
-
-});
+		const vbs = `If aSw = 0 Or Err Then x = 5 End If`
+		const js = transform(vbs)
+		expect(js).to.equal(`if (__vbs.equals(aSw, 0) || Err.Number) {\n    x = 5;\n}`)
+	})
+})
 
 function transform(vbs: string): string {
-	const scriptHelper = new ScriptHelper();
-	let ast = scriptHelper.vbsToAst(vbs);
-	ast = new ErrorTransformer(ast).transform();
-	return scriptHelper.astToVbs(ast);
+	const scriptHelper = new ScriptHelper()
+	let ast = scriptHelper.vbsToAst(vbs)
+	ast = new ErrorTransformer(ast).transform()
+	return scriptHelper.astToVbs(ast)
 }

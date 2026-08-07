@@ -17,14 +17,14 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { TimerHit } from './timer-hit';
+import type { TimerHit } from './timer-hit'
 
 export class TimerOnOff {
-	public enabled: boolean;
-	public timer: TimerHit;
+	public enabled: boolean
+	public timer: TimerHit
 
 	constructor(enabled: boolean, timer: TimerHit) {
-		this.enabled = enabled;
-		this.timer = timer;
+		this.enabled = enabled
+		this.timer = timer
 	}
 }

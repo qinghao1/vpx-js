@@ -17,18 +17,20 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import {
+import type {
 	ArrayExpression,
 	ArrowFunctionExpression,
 	AssignmentExpression,
-	AssignmentOperator, BaseNode,
+	AssignmentOperator,
+	BaseNode,
 	BinaryExpression,
 	BinaryOperator,
 	BlockStatement,
 	BreakStatement,
 	CallExpression,
 	ClassBody,
-	ClassDeclaration, ClassExpression,
+	ClassDeclaration,
+	ClassExpression,
 	ConditionalExpression,
 	DoWhileStatement,
 	Expression,
@@ -44,9 +46,11 @@ import {
 	LogicalOperator,
 	MemberExpression,
 	MethodDefinition,
-	NewExpression, ObjectExpression,
+	NewExpression,
+	ObjectExpression,
 	Pattern,
-	Program, Property,
+	Program,
+	Property,
 	ReturnStatement,
 	SpreadElement,
 	Statement,
@@ -59,36 +63,42 @@ import {
 	VariableDeclaration,
 	VariableDeclarator,
 	WhileStatement,
-} from 'estree';
+} from 'estree'
 
 export function program(data: Statement[]): Program {
 	return {
 		type: 'Program',
 		sourceType: 'script',
 		body: data,
-	};
+	}
 }
 
 export function identifier(name: string, node?: BaseNode): Identifier {
-	return addScope({
-		type: 'Identifier',
-		name,
-	}, node);
+	return addScope(
+		{
+			type: 'Identifier',
+			name,
+		},
+		node,
+	)
 }
 
 export function literal(value: string | boolean | number | null, raw?: string | undefined, node?: BaseNode): Literal {
-	return addScope({
-		type: 'Literal',
-		value,
-		raw,
-	}, node);
+	return addScope(
+		{
+			type: 'Literal',
+			value,
+			raw,
+		},
+		node,
+	)
 }
 
 export function classBody(body: MethodDefinition[]): ClassBody {
 	return {
 		type: 'ClassBody',
 		body,
-	};
+	}
 }
 
 export function variableDeclarator(id: Identifier, init: Expression | null): VariableDeclarator {
@@ -96,7 +106,7 @@ export function variableDeclarator(id: Identifier, init: Expression | null): Var
 		type: 'VariableDeclarator',
 		id,
 		init,
-	};
+	}
 }
 
 export function classDeclaration(id: Identifier, body: ClassBody): ClassDeclaration {
@@ -104,14 +114,17 @@ export function classDeclaration(id: Identifier, body: ClassBody): ClassDeclarat
 		type: 'ClassDeclaration',
 		id,
 		body,
-	};
+	}
 }
 
 export function classExpression(body: ClassBody, node?: BaseNode): ClassExpression {
-	return addScope({
-		type: 'ClassExpression',
-		body,
-	}, node);
+	return addScope(
+		{
+			type: 'ClassExpression',
+			body,
+		},
+		node,
+	)
 }
 
 export function functionDeclaration(id: Identifier, params: Identifier[], body: BlockStatement): FunctionDeclaration {
@@ -121,7 +134,7 @@ export function functionDeclaration(id: Identifier, params: Identifier[], body: 
 		generator: false,
 		params,
 		body,
-	};
+	}
 }
 
 export function variableDeclaration(
@@ -132,7 +145,7 @@ export function variableDeclaration(
 		type: 'VariableDeclaration',
 		kind,
 		declarations,
-	};
+	}
 }
 
 export function methodDefinition(
@@ -147,14 +160,14 @@ export function methodDefinition(
 		value,
 		static: false,
 		computed: false,
-	};
+	}
 }
 
 export function arrayExpression(elements: Expression[] | SpreadElement[]): ArrayExpression {
 	return {
 		type: 'ArrayExpression',
 		elements,
-	};
+	}
 }
 
 export function arrowFunctionExpression(
@@ -167,7 +180,7 @@ export function arrowFunctionExpression(
 		expression,
 		body,
 		params,
-	};
+	}
 }
 
 export function assignmentExpression(
@@ -176,12 +189,15 @@ export function assignmentExpression(
 	right: Expression,
 	node?: BaseNode,
 ): AssignmentExpression {
-	return addScope({
-		type: 'AssignmentExpression',
-		left,
-		operator,
-		right,
-	}, node);
+	return addScope(
+		{
+			type: 'AssignmentExpression',
+			left,
+			operator,
+			right,
+		},
+		node,
+	)
 }
 
 export function binaryExpression(operator: BinaryOperator, left: Expression, right: Expression): BinaryExpression {
@@ -190,7 +206,7 @@ export function binaryExpression(operator: BinaryOperator, left: Expression, rig
 		operator,
 		left,
 		right,
-	};
+	}
 }
 
 export function callExpression(callee: Expression, args: Expression[] | SpreadElement[]): CallExpression {
@@ -198,7 +214,8 @@ export function callExpression(callee: Expression, args: Expression[] | SpreadEl
 		type: 'CallExpression',
 		callee,
 		arguments: args,
-	};
+		optional: false,
+	} as CallExpression
 }
 
 export function conditionalExpression(
@@ -211,15 +228,18 @@ export function conditionalExpression(
 		test,
 		alternate,
 		consequent,
-	};
+	}
 }
 
 export function functionExpression(body: BlockStatement, params: Pattern[], node?: BaseNode): FunctionExpression {
-	return addScope({
-		type: 'FunctionExpression',
-		body,
-		params,
-	}, node);
+	return addScope(
+		{
+			type: 'FunctionExpression',
+			body,
+			params,
+		},
+		node,
+	)
 }
 
 export function logicalExpression(operator: LogicalOperator, left: Expression, right: Expression): LogicalExpression {
@@ -228,23 +248,32 @@ export function logicalExpression(operator: LogicalOperator, left: Expression, r
 		operator,
 		left,
 		right,
-	};
+	}
 }
 
-export function memberExpression(object: Expression | Super, prop: Expression, computed = false, node?: BaseNode): MemberExpression {
-	return addScope({
-		type: 'MemberExpression',
-		object,
-		property: prop,
-		computed,
-	}, node);
+export function memberExpression(
+	object: Expression | Super,
+	prop: Expression,
+	computed = false,
+	node?: BaseNode,
+): MemberExpression {
+	return addScope(
+		{
+			type: 'MemberExpression',
+			object,
+			property: prop,
+			computed,
+			optional: false,
+		},
+		node,
+	) as MemberExpression
 }
 
 export function objectExpression(properties: Property[]): ObjectExpression {
 	return {
 		type: 'ObjectExpression',
 		properties,
-	};
+	}
 }
 
 export function property(kind: 'init' | 'get' | 'set', key: Expression, value: Expression | Pattern): Property {
@@ -256,7 +285,7 @@ export function property(kind: 'init' | 'get' | 'set', key: Expression, value: E
 		method: false,
 		shorthand: false,
 		computed: false,
-	};
+	}
 }
 
 export function newExpression(callee: Expression | Super, args: Expression[] | SpreadElement[]): NewExpression {
@@ -264,13 +293,13 @@ export function newExpression(callee: Expression | Super, args: Expression[] | S
 		type: 'NewExpression',
 		callee,
 		arguments: args,
-	};
+	}
 }
 
 export function thisExpression(): ThisExpression {
 	return {
 		type: 'ThisExpression',
-	};
+	}
 }
 
 export function unaryExpression(operator: UnaryOperator, argument: Expression): UnaryExpression {
@@ -279,20 +308,20 @@ export function unaryExpression(operator: UnaryOperator, argument: Expression): 
 		operator,
 		prefix: true,
 		argument,
-	};
+	}
 }
 
 export function blockStatement(body: Statement[]): BlockStatement {
 	return {
 		type: 'BlockStatement',
 		body,
-	};
+	}
 }
 
 export function breakStatement(): BreakStatement {
 	return {
 		type: 'BreakStatement',
-	};
+	}
 }
 
 export function doWhileStatement(body: Statement, test: Expression): DoWhileStatement {
@@ -300,14 +329,17 @@ export function doWhileStatement(body: Statement, test: Expression): DoWhileStat
 		type: 'DoWhileStatement',
 		body,
 		test,
-	};
+	}
 }
 
 export function expressionStatement(expression: Expression, node?: BaseNode): ExpressionStatement {
-	return addScope({
-		type: 'ExpressionStatement',
-		expression,
-	}, node);
+	return addScope(
+		{
+			type: 'ExpressionStatement',
+			expression,
+		},
+		node,
+	)
 }
 
 export function forOfStatement(
@@ -320,7 +352,8 @@ export function forOfStatement(
 		left,
 		right,
 		body,
-	};
+		await: false,
+	} as ForOfStatement
 }
 
 export function forStatement(
@@ -335,7 +368,7 @@ export function forStatement(
 		test,
 		update,
 		body,
-	};
+	}
 }
 
 export function ifStatement(test: Expression, consequent: Statement, alternate: Statement | null): IfStatement {
@@ -344,14 +377,14 @@ export function ifStatement(test: Expression, consequent: Statement, alternate: 
 		test,
 		consequent,
 		alternate,
-	};
+	}
 }
 
 export function returnStatement(argument: Expression | null): ReturnStatement {
 	return {
 		type: 'ReturnStatement',
 		argument,
-	};
+	}
 }
 
 export function switchStatement(discriminant: Expression, cases: SwitchCase[]): SwitchStatement {
@@ -359,7 +392,7 @@ export function switchStatement(discriminant: Expression, cases: SwitchCase[]): 
 		type: 'SwitchStatement',
 		discriminant,
 		cases,
-	};
+	}
 }
 
 export function switchCase(test: Expression | null, consequent: Statement[]): SwitchCase {
@@ -367,7 +400,7 @@ export function switchCase(test: Expression | null, consequent: Statement[]): Sw
 		type: 'SwitchCase',
 		test,
 		consequent,
-	};
+	}
 }
 
 export function whileStatement(test: Expression, body: Statement): WhileStatement {
@@ -375,12 +408,12 @@ export function whileStatement(test: Expression, body: Statement): WhileStatemen
 		type: 'WhileStatement',
 		test,
 		body,
-	};
+	}
 }
 
 function addScope<T>(toNode: T, fromNode: any): T {
 	if (fromNode && fromNode.__scope) {
-		(toNode as any).__scope = fromNode.__scope;
+		;(toNode as any).__scope = fromNode.__scope
 	}
-	return toNode;
+	return toNode
 }

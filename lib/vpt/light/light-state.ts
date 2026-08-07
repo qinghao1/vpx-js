@@ -17,62 +17,59 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { Pool } from '../../util/object-pool';
-import { ItemState } from '../item-state';
+import { Pool } from '../../util/object-pool'
+import { ItemState } from '../item-state'
 
 export class LightState extends ItemState {
-
-	public static readonly POOL = new Pool(LightState);
+	public static readonly POOL = new Pool(LightState)
 
 	/**
 	 * Intensity, from 0 to 1 (probably)
 	 */
-	public intensity: number = 0;
-	public color: number = 0;
-	public colorFull: number = 0;
+	public intensity: number = 0
+	public color: number = 0
+	public colorFull: number = 0
 
 	public constructor() {
-		super();
+		super()
 	}
 
 	public static claim(name: string, intensity: number, color: number, colorFull: number): LightState {
-		const state = LightState.POOL.get();
-		state.name = name;
-		state.intensity = intensity;
-		state.color = color;
-		state.colorFull = colorFull;
-		return state;
+		const state = LightState.POOL.get()
+		state.name = name
+		state.intensity = intensity
+		state.color = color
+		state.colorFull = colorFull
+		return state
 	}
 
 	public clone(): LightState {
-		return LightState.claim(this.name, this.intensity, this.color, this.colorFull);
+		return LightState.claim(this.name, this.intensity, this.color, this.colorFull)
 	}
 
 	public diff(state: LightState): LightState {
-		const diff = this.clone();
+		const diff = this.clone()
 		if (diff.intensity === state.intensity) {
-			delete diff.intensity;
+			delete diff.intensity
 		}
 		if (diff.color === state.color) {
-			delete diff.color;
+			delete diff.color
 		}
 		if (diff.colorFull === state.colorFull) {
-			delete diff.colorFull;
+			delete diff.colorFull
 		}
-		return diff;
+		return diff
 	}
 
 	public release(): void {
-		LightState.POOL.release(this);
+		LightState.POOL.release(this)
 	}
 
 	public equals(state: LightState): boolean {
 		/* istanbul ignore if: we don't actually pass empty states. */
 		if (!state) {
-			return false;
+			return false
 		}
-		return state.intensity === this.intensity
-			&& state.color === this.color
-			&& state.colorFull === this.colorFull;
+		return state.intensity === this.intensity && state.color === this.color && state.colorFull === this.colorFull
 	}
 }

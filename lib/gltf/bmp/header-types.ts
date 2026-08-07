@@ -6,4 +6,4 @@ enum HeaderTypes {
 	BITMAP_V5_HEADER = 124,
 }
 
-export default HeaderTypes;
+export default HeaderTypes

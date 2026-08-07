@@ -17,31 +17,30 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import * as chai from 'chai';
-import { expect } from 'chai';
-import { WshEnvironment } from './wsh-environment';
+import * as chai from 'chai'
+import { expect } from 'chai'
+import sinonChai from 'sinon-chai'
+import { WshEnvironment } from './wsh-environment'
 
 /* tslint:disable:no-unused-expression no-string-literal */
-chai.use(require('sinon-chai'));
+chai.use((sinonChai as any).default ?? sinonChai)
 describe('The VBScript windows environment object', () => {
-
 	it('should write and read values', () => {
-		const env = new WshEnvironment();
-		env.Item['key'] = 'Value';
-		expect(env.Item['key']).to.equal('Value');
-	});
+		const env = new WshEnvironment()
+		env.Item['key'] = 'Value'
+		expect(env.Item['key']).to.equal('Value')
+	})
 
 	it('should count the values', () => {
-		const env = new WshEnvironment();
-		env.Item['key'] = 'Value';
-		expect(env.Count()).to.equal(1);
-	});
+		const env = new WshEnvironment()
+		env.Item['key'] = 'Value'
+		expect(env.Count()).to.equal(1)
+	})
 
 	it('should remove a value', () => {
-		const env = new WshEnvironment();
-		env.Item['key'] = 'Value';
-		env.Remove('key');
-		expect(env.Count()).to.equal(0);
-	});
-
-});
+		const env = new WshEnvironment()
+		env.Item['key'] = 'Value'
+		env.Remove('key')
+		expect(env.Count()).to.equal(0)
+	})
+})

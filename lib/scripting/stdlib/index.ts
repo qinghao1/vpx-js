@@ -17,44 +17,71 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { Player } from '../../game/player';
-import { f4 } from '../../math/float';
-import { logger } from '../../util/logger';
-import { getObject } from '../objects';
-import { VbsApi } from '../vbs-api';
-import { ERR } from './err';
-import { VbsMath } from './math';
+import type { Player } from '../../game/player'
+import { f4 } from '../../math/float'
+import { logger } from '../../util/logger'
+import { getObject } from '../objects'
+import { VbsApi } from '../vbs-api'
+import { ERR } from './err'
+import { VbsMath } from './math'
 
 export class Stdlib extends VbsApi {
+	private readonly math = new VbsMath()
 
-	private readonly math = new VbsMath();
+	get Empty() {
+		return undefined
+	}
+	get Nothing() {
+		return undefined
+	}
+	get Null() {
+		return null
+	}
 
-	get Empty() { return undefined; }
-	get Nothing() { return undefined; }
-	get Null() { return null; }
-
-	get Err() { return ERR; }
-	get Math() { return this.math; }
+	get Err() {
+		return ERR
+	}
+	get Math() {
+		return this.math
+	}
 
 	/**
 	 * String Constants
 	 */
-	get vbCr() { return '\x0d'; }
-	get vbCrLf() { return '\x0d\x0a'; }
-	get vbFormFeed() { return '\x0c'; }
-	get vbLf() { return '\x0a'; }
-	get vbNewLine() { return '\n'; }
-	get vbNullChar() { return '\x00'; }
-	get vbNullString() { return null; }
-	get vbTab() { return '\x09'; }
-	get vbVerticalTab() { return '\x0b'; }
+	get vbCr() {
+		return '\x0d'
+	}
+	get vbCrLf() {
+		return '\x0d\x0a'
+	}
+	get vbFormFeed() {
+		return '\x0c'
+	}
+	get vbLf() {
+		return '\x0a'
+	}
+	get vbNewLine() {
+		return '\n'
+	}
+	get vbNullChar() {
+		return '\x00'
+	}
+	get vbNullString() {
+		return null
+	}
+	get vbTab() {
+		return '\x09'
+	}
+	get vbVerticalTab() {
+		return '\x0b'
+	}
 
 	public Abs(n: number): number {
-		return Math.abs(n);
+		return Math.abs(n)
 	}
 
 	public Cos(n: number): number {
-		return Math.cos(n);
+		return Math.cos(n)
 	}
 
 	/**
@@ -67,35 +94,36 @@ export class Stdlib extends VbsApi {
 	 * @see https://docs.microsoft.com/en-us/dotnet/visual-basic/language-reference/functions/type-conversion-functions
 	 */
 	public Csng(n: number): number {
-		return f4(n);
+		return f4(n)
 	}
 
 	public Int(n: number): number {
-		return Math.floor(n);
+		return Math.floor(n)
 	}
 
 	public Sin(n: number): number {
-		return Math.sin(n);
+		return Math.sin(n)
 	}
 
 	public Sqr(n: number): number {
-		return Math.sqrt(n);
+		return Math.sqrt(n)
 	}
 
-	public UBound(a: [], dimension?: number): number { // TODO handle dimension
-		return a.length - 1;
+	public UBound(a: [], dimension?: number): number {
+		// TODO handle dimension
+		return a.length - 1
 	}
 
 	public IsArray(obj: any): boolean {
-		return Array.isArray(obj);
+		return Array.isArray(obj)
 	}
 
 	public IsEmpty(v: any): boolean {
-		return (typeof v === 'undefined') || v === null;
+		return typeof v === 'undefined' || v === null
 	}
 
 	public IsObject(v: any): boolean {
-		return (typeof v === 'object');
+		return typeof v === 'object'
 	}
 
 	public Randomize(): void {
@@ -103,46 +131,46 @@ export class Stdlib extends VbsApi {
 	}
 
 	public GetRef(proc: string, scope: any): any {
-		return scope[proc];
+		return scope[proc]
 	}
 
 	public TypeName(obj: any): string {
 		if (typeof obj === 'string') {
-			return 'String';
+			return 'String'
 		}
 		if (obj === null) {
-			return 'Null';
+			return 'Null'
 		}
 		if (typeof obj === 'undefined') {
-			return 'Nothing';
+			return 'Nothing'
 		}
 		if (Number.isInteger(obj)) {
-			return 'Integer';
+			return 'Integer'
 		}
 		if (typeof obj === 'number') {
-			return 'Double';
+			return 'Double'
 		}
 		if (typeof obj === 'boolean') {
-			return 'Boolean';
+			return 'Boolean'
 		}
 		if (obj.constructor && obj.constructor.name) {
 			if (obj.constructor.name.endsWith('Api')) {
-				return obj.constructor.name.substr(0, obj.constructor.name.length - 3);
+				return obj.constructor.name.substr(0, obj.constructor.name.length - 3)
 			}
 			if (obj.constructor.name === 'VbsUndefined') {
-				return 'Nothing';
+				return 'Nothing'
 			}
-			return obj.constructor.name;
+			return obj.constructor.name
 		}
 		if (typeof obj === 'object') {
-			return 'Object';
+			return 'Object'
 		}
-		return 'Unknown';
+		return 'Unknown'
 	}
 
 	public RGB(r: number, g: number, b: number) {
 		// tslint:disable-next-line:no-bitwise
-		return (r << 16) + (g << 8) + (b);
+		return (r << 16) + (g << 8) + b
 	}
 
 	/**
@@ -164,21 +192,21 @@ export class Stdlib extends VbsApi {
 	 */
 	public InStrRev(string1: string, string2: string, start: number = -1): any {
 		if (string1 === '') {
-			return 0;
+			return 0
 		}
 		if (string1 === null) {
-			return null;
+			return null
 		}
 		if (string2 === '') {
-			return start;
+			return start
 		}
 		if (string2 === null) {
-			return null;
+			return null
 		}
 		if (start > string1.length) {
-			return 0;
+			return 0
 		}
-		return string1.indexOf(string2, start + 1) + 1;
+		return string1.indexOf(string2, start + 1) + 1
 	}
 
 	/**
@@ -189,20 +217,20 @@ export class Stdlib extends VbsApi {
 	 */
 	public Left(str: string, length: number): string {
 		if (length > str.length) {
-			return str;
+			return str
 		}
-		return str.substr(0, length);
+		return str.substr(0, length)
 	}
 
 	public CreateObject(name: string, player: Player): any {
-		return getObject(name, player);
+		return getObject(name, player)
 	}
 
 	public MsgBox(msg: string): void {
-		logger().warn(`[MsgBox] ${msg}`);
+		logger().warn(`[MsgBox] ${msg}`)
 	}
 
 	protected _getPropertyNames(): string[] {
-		return Object.getOwnPropertyNames(Stdlib.prototype);
+		return Object.getOwnPropertyNames(Stdlib.prototype)
 	}
 }

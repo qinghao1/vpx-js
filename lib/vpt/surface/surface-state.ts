@@ -17,44 +17,54 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { Pool } from '../../util/object-pool';
-import { ItemState } from '../item-state';
+import { Pool } from '../../util/object-pool'
+import { ItemState } from '../item-state'
 
 export class SurfaceState extends ItemState {
+	public static readonly POOL = new Pool(SurfaceState)
 
-	public static readonly POOL = new Pool(SurfaceState);
+	public isDropped: boolean = false
 
-	public isDropped: boolean = false;
+	public isTopVisible: boolean = true
+	public topMaterial?: string
+	public topTexture?: string
 
-	public isTopVisible: boolean = true;
-	public topMaterial?: string;
-	public topTexture?: string;
+	public isSideVisible: boolean = true
+	public sideMaterial?: string
+	public sideTexture?: string
 
-	public isSideVisible: boolean = true;
-	public sideMaterial?: string;
-	public sideTexture?: string;
-
-	get isVisible() { return this.isTopVisible || this.isSideVisible; }
-	set isVisible(v) { /* not used in abstract */ }
-
-	public constructor() {
-		super();
+	// @ts-expect-error
+	get isVisible(): boolean {
+		return this.isTopVisible || this.isSideVisible
+	}
+	set isVisible(v) {
+		/* not used in abstract */
 	}
 
-	public static claim(name: string, isDropped: boolean,
-						isTopVisible: boolean, topMaterial: string | undefined, topTexture: string | undefined,
-						isSideVisible: boolean, sideMaterial: string | undefined, sideTexture: string | undefined): SurfaceState {
+	public constructor() {
+		super()
+	}
 
-		const state = SurfaceState.POOL.get();
-		state.name = name;
-		state.isDropped = isDropped;
-		state.isTopVisible = isTopVisible;
-		state.topMaterial = topMaterial;
-		state.topTexture = topTexture;
-		state.isSideVisible = isSideVisible;
-		state.sideMaterial = sideMaterial;
-		state.sideTexture = sideTexture;
-		return state;
+	public static claim(
+		name: string,
+		isDropped: boolean,
+		isTopVisible: boolean,
+		topMaterial: string | undefined,
+		topTexture: string | undefined,
+		isSideVisible: boolean,
+		sideMaterial: string | undefined,
+		sideTexture: string | undefined,
+	): SurfaceState {
+		const state = SurfaceState.POOL.get()
+		state.name = name
+		state.isDropped = isDropped
+		state.isTopVisible = isTopVisible
+		state.topMaterial = topMaterial
+		state.topTexture = topTexture
+		state.isSideVisible = isSideVisible
+		state.sideMaterial = sideMaterial
+		state.sideTexture = sideTexture
+		return state
 	}
 
 	public clone(): SurfaceState {
@@ -67,50 +77,52 @@ export class SurfaceState extends ItemState {
 			this.isSideVisible,
 			this.sideMaterial,
 			this.sideTexture,
-		);
+		)
 	}
 
 	public diff(state: SurfaceState): SurfaceState {
-		const diff = this.clone();
+		const diff = this.clone()
 		if (diff.isDropped === state.isDropped) {
-			delete diff.isDropped;
+			delete diff.isDropped
 		}
 		if (diff.isTopVisible === state.isTopVisible) {
-			delete diff.isTopVisible;
+			delete diff.isTopVisible
 		}
 		if (diff.topMaterial === state.topMaterial) {
-			delete diff.topMaterial;
+			delete diff.topMaterial
 		}
 		if (diff.topTexture === state.topTexture) {
-			delete diff.topTexture;
+			delete diff.topTexture
 		}
 		if (diff.isSideVisible === state.isSideVisible) {
-			delete diff.isSideVisible;
+			delete diff.isSideVisible
 		}
 		if (diff.sideMaterial === state.sideMaterial) {
-			delete diff.sideMaterial;
+			delete diff.sideMaterial
 		}
 		if (diff.sideTexture === state.sideTexture) {
-			delete diff.sideTexture;
+			delete diff.sideTexture
 		}
-		return diff;
+		return diff
 	}
 
 	public release(): void {
-		SurfaceState.POOL.release(this);
+		SurfaceState.POOL.release(this)
 	}
 
 	public equals(state: SurfaceState): boolean {
 		/* istanbul ignore if: we don't actually pass empty states. */
 		if (!state) {
-			return false;
+			return false
 		}
-		return state.isDropped === this.isDropped
-			&& state.isTopVisible === this.isTopVisible
-			&& state.topMaterial === this.topMaterial
-			&& state.topTexture === this.topTexture
-			&& state.isSideVisible === this.isSideVisible
-			&& state.sideMaterial === this.sideMaterial
-			&& state.sideTexture === this.sideTexture;
+		return (
+			state.isDropped === this.isDropped &&
+			state.isTopVisible === this.isTopVisible &&
+			state.topMaterial === this.topMaterial &&
+			state.topTexture === this.topTexture &&
+			state.isSideVisible === this.isSideVisible &&
+			state.sideMaterial === this.sideMaterial &&
+			state.sideTexture === this.sideTexture
+		)
 	}
 }

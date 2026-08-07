@@ -17,218 +17,403 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { EventProxy } from '../../game/event-proxy';
-import { Player } from '../../game/player';
-import { HitObject } from '../../physics/hit-object';
-import { ItemApi } from '../item-api';
-import { Table } from '../table/table';
-import { TimerHit } from '../timer/timer-hit';
-import { Primitive } from './primitive';
-import { PrimitiveData } from './primitive-data';
-import { PrimitiveState } from './primitive-state';
+import type { EventProxy } from '../../game/event-proxy'
+import type { Player } from '../../game/player'
+import type { HitObject } from '../../physics/hit-object'
+import { ItemApi } from '../item-api'
+import type { Table } from '../table/table'
+import type { TimerHit } from '../timer/timer-hit'
+import type { Primitive } from './primitive'
+import type { PrimitiveData } from './primitive-data'
+import type { PrimitiveState } from './primitive-state'
 
 export class PrimitiveApi extends ItemApi<PrimitiveData> {
+	private readonly primitive: Primitive
+	private readonly state: PrimitiveState
+	private readonly hits: HitObject[]
+	private readonly isDynamic: boolean
 
-	private readonly primitive: Primitive;
-	private readonly state: PrimitiveState;
-	private readonly hits: HitObject[];
-	private readonly isDynamic: boolean;
-
-	constructor(primitive: Primitive, state: PrimitiveState, data: PrimitiveData, hits: HitObject[], events: EventProxy, player: Player, table: Table) {
-		super(data, events, player, table);
-		this.primitive = primitive;
-		this.state = state;
-		this.hits = hits;
-		this.isDynamic = !data.staticRendering;
+	constructor(
+		primitive: Primitive,
+		state: PrimitiveState,
+		data: PrimitiveData,
+		hits: HitObject[],
+		events: EventProxy,
+		player: Player,
+		table: Table,
+	) {
+		super(data, events, player, table)
+		this.primitive = primitive
+		this.state = state
+		this.hits = hits
+		this.isDynamic = !data.staticRendering
 	}
 
-	get Image() { return this.data.szImage; }
+	get Image() {
+		return this.data.szImage
+	}
 	set Image(v) {
-		this._assertNonHdrImage(v);
+		this._assertNonHdrImage(v)
 		if (this.isDynamic) {
-			this.state.map = v;
+			this.state.map = v
 		}
-		this.data.szImage = v;
+		this.data.szImage = v
 	}
-	get NormalMap() { return this.data.szNormalMap; }
+	get NormalMap() {
+		return this.data.szNormalMap
+	}
 	set NormalMap(v) {
-		this._assertNonHdrImage(v);
+		this._assertNonHdrImage(v)
 		if (this.isDynamic) {
-			this.state.normalMap = v;
+			this.state.normalMap = v
 		}
-		this.data.szNormalMap = v;
+		this.data.szNormalMap = v
 	}
-	get Material() { return this.data.szMaterial; }
+	get Material() {
+		return this.data.szMaterial
+	}
 	set Material(v) {
 		if (this.isDynamic) {
-			this.state.material = v;
+			this.state.material = v
 		}
-		this.data.szMaterial = v;
+		this.data.szMaterial = v
 	}
-	get MeshFileName() { return this.data.meshFileName; }
-	set MeshFileName(v) { this.data.meshFileName = v; }
-	get Sides() { return this.data.sides; }
-	set Sides(v) { this.primitive.setSides(v); }
-	get SideColor() { return this.data.sideColor; }
-	set SideColor(v) { this.data.sideColor = v; }
-	get Visible() { return this.data.isVisible; }
+	get MeshFileName() {
+		return this.data.meshFileName
+	}
+	set MeshFileName(v) {
+		this.data.meshFileName = v
+	}
+	get Sides() {
+		return this.data.sides
+	}
+	set Sides(v) {
+		this.primitive.setSides(v)
+	}
+	get SideColor() {
+		return this.data.sideColor
+	}
+	set SideColor(v) {
+		this.data.sideColor = v
+	}
+	get Visible() {
+		return this.data.isVisible
+	}
 	set Visible(v) {
 		if (this.isDynamic) {
-			this.state.isVisible = v;
+			this.state.isVisible = v
 		}
-		this.data.isVisible = v;
+		this.data.isVisible = v
 	}
-	get DrawTexturesInside() { return this.data.drawTexturesInside; } // TODO test
-	set DrawTexturesInside(v) { this.data.drawTexturesInside = v; }
-	get X() { return this.state.position.x; }
-	set X(v) { this.state.position.x = v; }
-	get Y() { return this.state.position.y; }
-	set Y(v) { this.state.position.y = v; }
-	get Z() { return this.state.position.z; }
-	set Z(v) { this.state.position.z = v; }
-	get Size_X() { return this.data.size.x; } // TODO make sure it doesn't conflict with event callbacks
+	get DrawTexturesInside() {
+		return this.data.drawTexturesInside
+	} // TODO test
+	set DrawTexturesInside(v) {
+		this.data.drawTexturesInside = v
+	}
+	get X() {
+		return this.state.position.x
+	}
+	set X(v) {
+		this.state.position.x = v
+	}
+	get Y() {
+		return this.state.position.y
+	}
+	set Y(v) {
+		this.state.position.y = v
+	}
+	get Z() {
+		return this.state.position.z
+	}
+	set Z(v) {
+		this.state.position.z = v
+	}
+	get Size_X() {
+		return this.data.size.x
+	} // TODO make sure it doesn't conflict with event callbacks
 	set Size_X(v) {
 		if (this.isDynamic) {
-			this.state.size.x = v;
+			this.state.size.x = v
 		}
-		this.data.size.x = v;
+		this.data.size.x = v
 	}
-	get Size_Y() { return this.data.size.y; }
+	get Size_Y() {
+		return this.data.size.y
+	}
 	set Size_Y(v) {
 		if (this.isDynamic) {
-			this.state.size.y = v;
+			this.state.size.y = v
 		}
-		this.data.size.y = v;
+		this.data.size.y = v
 	}
-	get Size_Z() { return this.data.size.z; }
+	get Size_Z() {
+		return this.data.size.z
+	}
 	set Size_Z(v) {
 		if (this.isDynamic) {
-			this.state.size.z = v;
+			this.state.size.z = v
 		}
-		this.data.size.z = v;
+		this.data.size.z = v
 	}
-	get RotAndTra0() { return this.RotX; }
-	set RotAndTra0(v) { this.RotX = v; }
-	get RotX() { return this.data.rotAndTra[0]; }
+	get RotAndTra0() {
+		return this.RotX
+	}
+	set RotAndTra0(v) {
+		this.RotX = v
+	}
+	get RotX() {
+		return this.data.rotAndTra[0]
+	}
 	set RotX(v) {
 		if (this.isDynamic) {
-			this.state.rotation.x = v;
+			this.state.rotation.x = v
 		}
-		this.data.rotAndTra[0] = v;
+		this.data.rotAndTra[0] = v
 	}
-	get RotAndTra1() { return this.RotY; }
-	set RotAndTra1(v) { this.RotY = v; }
-	get RotY() { return this.data.rotAndTra[1]; }
+	get RotAndTra1() {
+		return this.RotY
+	}
+	set RotAndTra1(v) {
+		this.RotY = v
+	}
+	get RotY() {
+		return this.data.rotAndTra[1]
+	}
 	set RotY(v) {
 		if (this.isDynamic) {
-			this.state.rotation.y = v;
+			this.state.rotation.y = v
 		}
-		this.data.rotAndTra[1] = v;
+		this.data.rotAndTra[1] = v
 	}
-	get RotAndTra2() { return this.RotZ; }
-	set RotAndTra2(v) { this.RotZ = v; }
-	get RotZ() { return this.data.rotAndTra[2]; }
+	get RotAndTra2() {
+		return this.RotZ
+	}
+	set RotAndTra2(v) {
+		this.RotZ = v
+	}
+	get RotZ() {
+		return this.data.rotAndTra[2]
+	}
 	set RotZ(v) {
 		if (this.isDynamic) {
-			this.state.rotation.z = v;
+			this.state.rotation.z = v
 		}
-		this.data.rotAndTra[2] = v;
+		this.data.rotAndTra[2] = v
 	}
-	get RotAndTra3() { return this.TransX; }
-	set RotAndTra3(v) { this.TransX = v; }
-	get TransX() { return this.data.rotAndTra[3]; }
+	get RotAndTra3() {
+		return this.TransX
+	}
+	set RotAndTra3(v) {
+		this.TransX = v
+	}
+	get TransX() {
+		return this.data.rotAndTra[3]
+	}
 	set TransX(v) {
 		if (this.isDynamic) {
-			this.state.translation.x = v;
+			this.state.translation.x = v
 		}
-		this.data.rotAndTra[3] = v;
+		this.data.rotAndTra[3] = v
 	}
-	get RotAndTra4() { return this.TransY; }
-	set RotAndTra4(v) { this.TransY = v; }
-	get TransY() { return this.data.rotAndTra[4]; }
+	get RotAndTra4() {
+		return this.TransY
+	}
+	set RotAndTra4(v) {
+		this.TransY = v
+	}
+	get TransY() {
+		return this.data.rotAndTra[4]
+	}
 	set TransY(v) {
 		if (this.isDynamic) {
-			this.state.translation.y = v;
+			this.state.translation.y = v
 		}
-		this.data.rotAndTra[4] = v;
+		this.data.rotAndTra[4] = v
 	}
-	get RotAndTra5() { return this.TransZ; }
-	set RotAndTra5(v) { this.TransZ = v; }
-	get TransZ() { return this.data.rotAndTra[5]; }
+	get RotAndTra5() {
+		return this.TransZ
+	}
+	set RotAndTra5(v) {
+		this.TransZ = v
+	}
+	get TransZ() {
+		return this.data.rotAndTra[5]
+	}
 	set TransZ(v) {
 		if (this.isDynamic) {
-			this.state.translation.z = v;
+			this.state.translation.z = v
 		}
-		this.data.rotAndTra[5] = v;
+		this.data.rotAndTra[5] = v
 	}
-	get RotAndTra6() { return this.ObjRotX; }
-	set RotAndTra6(v) { this.ObjRotX = v; }
-	get ObjRotX() { return this.data.rotAndTra[6]; }
+	get RotAndTra6() {
+		return this.ObjRotX
+	}
+	set RotAndTra6(v) {
+		this.ObjRotX = v
+	}
+	get ObjRotX() {
+		return this.data.rotAndTra[6]
+	}
 	set ObjRotX(v) {
 		if (this.isDynamic) {
-			this.state.objectRotation.x = v;
+			this.state.objectRotation.x = v
 		}
-		this.data.rotAndTra[6] = v;
+		this.data.rotAndTra[6] = v
 	}
-	get RotAndTra7() { return this.ObjRotY; }
-	set RotAndTra7(v) { this.ObjRotY = v; }
-	get ObjRotY() { return this.data.rotAndTra[7]; }
+	get RotAndTra7() {
+		return this.ObjRotY
+	}
+	set RotAndTra7(v) {
+		this.ObjRotY = v
+	}
+	get ObjRotY() {
+		return this.data.rotAndTra[7]
+	}
 	set ObjRotY(v) {
 		if (this.isDynamic) {
-			this.state.objectRotation.y = v;
+			this.state.objectRotation.y = v
 		}
-		this.data.rotAndTra[7] = v;
+		this.data.rotAndTra[7] = v
 	}
-	get RotAndTra8() { return this.ObjRotZ; }
-	set RotAndTra8(v) { this.ObjRotZ = v; }
-	get ObjRotZ() { return this.data.rotAndTra[8]; }
+	get RotAndTra8() {
+		return this.ObjRotZ
+	}
+	set RotAndTra8(v) {
+		this.ObjRotZ = v
+	}
+	get ObjRotZ() {
+		return this.data.rotAndTra[8]
+	}
 	set ObjRotZ(v) {
 		if (this.isDynamic) {
-			this.state.objectRotation.z = v;
+			this.state.objectRotation.z = v
 		}
-		this.data.rotAndTra[8] = v;
+		this.data.rotAndTra[8] = v
 	}
-	get EdgeFactorUI() { return this.data.edgeFactorUI; }
-	set EdgeFactorUI(v) { this.data.edgeFactorUI = v; }
-	get CollisionReductionFactor() { return this.data.collisionReductionFactor; }
-	set CollisionReductionFactor(v) { this.data.collisionReductionFactor = v; }
-	get EnableStaticRendering() { return this.data.staticRendering; }
-	set EnableStaticRendering(v) { this.data.staticRendering = v; }
-	get HasHitEvent() { return this.data.hitEvent; }
-	set HasHitEvent(v) { this.data.hitEvent = v; }
-	get Threshold() { return this.data.threshold; }
-	set Threshold(v) { this.data.threshold = v; }
-	get Elasticity() { return this.data.elasticity; }
-	set Elasticity(v) { this.data.elasticity = v; }
-	get ElasticityFalloff() { return this.data.elasticityFalloff; }
-	set ElasticityFalloff(v) { this.data.elasticityFalloff = v; }
-	get Friction() { return this.data.friction; }
-	set Friction(v) { this.data.friction = v; }
-	get Scatter() { return this.data.scatter; }
-	set Scatter(v) { this.data.scatter = v; }
-	get Collidable() { return this.hits.length === 0 ? this.data.isCollidable : this.hits[0].isEnabled; }
-	set Collidable(v) { this.primitive.setCollidable(v); }
-	get IsToy() { return this.data.isToy; }
-	set IsToy(v) { this.data.isToy = v; }
-	get BackfacesEnabled() { return this.data.backfacesEnabled; }
-	set BackfacesEnabled(v) { this.data.backfacesEnabled = v; }
-	get DisableLighting() { return this.data.disableLightingTop !== 0; }
-	set DisableLighting(v) { this.data.disableLightingTop = v ? 1 : 0; }
-	get BlendDisableLighting() { return this.data.disableLightingTop; }
-	set BlendDisableLighting(v) { this.data.disableLightingTop = v; }
-	get BlendDisableLightingFromBelow() { return this.data.disableLightingBelow; }
-	set BlendDisableLightingFromBelow(v) { this.data.disableLightingBelow = v; }
-	get ReflectionEnabled() { return this.data.isReflectionEnabled; }
-	set ReflectionEnabled(v) { this.data.isReflectionEnabled = v; }
-	get PhysicsMaterial() { return this.data.szPhysicsMaterial; }
-	set PhysicsMaterial(v) { this.data.szPhysicsMaterial = v; }
-	get OverwritePhysics() { return this.data.overwritePhysics; }
-	set OverwritePhysics(v) { this.data.overwritePhysics = v; }
-	get HitThreshold() { return this.events.currentHitThreshold; }
-	get DisplayTexture() { return this.data.displayTexture; }
-	set DisplayTexture(v) { this.data.displayTexture = v; }
-	get DepthBias() { return this.data.depthBias; }
-	set DepthBias(v) { this.data.depthBias = v; }
+	get EdgeFactorUI() {
+		return this.data.edgeFactorUI
+	}
+	set EdgeFactorUI(v) {
+		this.data.edgeFactorUI = v
+	}
+	get CollisionReductionFactor() {
+		return this.data.collisionReductionFactor
+	}
+	set CollisionReductionFactor(v) {
+		this.data.collisionReductionFactor = v
+	}
+	get EnableStaticRendering() {
+		return this.data.staticRendering
+	}
+	set EnableStaticRendering(v) {
+		this.data.staticRendering = v
+	}
+	get HasHitEvent() {
+		return this.data.hitEvent
+	}
+	set HasHitEvent(v) {
+		this.data.hitEvent = v
+	}
+	get Threshold() {
+		return this.data.threshold
+	}
+	set Threshold(v) {
+		this.data.threshold = v
+	}
+	get Elasticity() {
+		return this.data.elasticity
+	}
+	set Elasticity(v) {
+		this.data.elasticity = v
+	}
+	get ElasticityFalloff() {
+		return this.data.elasticityFalloff
+	}
+	set ElasticityFalloff(v) {
+		this.data.elasticityFalloff = v
+	}
+	get Friction() {
+		return this.data.friction
+	}
+	set Friction(v) {
+		this.data.friction = v
+	}
+	get Scatter() {
+		return this.data.scatter
+	}
+	set Scatter(v) {
+		this.data.scatter = v
+	}
+	get Collidable() {
+		return this.hits.length === 0 ? this.data.isCollidable : this.hits[0].isEnabled
+	}
+	set Collidable(v) {
+		this.primitive.setCollidable(v)
+	}
+	get IsToy() {
+		return this.data.isToy
+	}
+	set IsToy(v) {
+		this.data.isToy = v
+	}
+	get BackfacesEnabled() {
+		return this.data.backfacesEnabled
+	}
+	set BackfacesEnabled(v) {
+		this.data.backfacesEnabled = v
+	}
+	get DisableLighting() {
+		return this.data.disableLightingTop !== 0
+	}
+	set DisableLighting(v) {
+		this.data.disableLightingTop = v ? 1 : 0
+	}
+	get BlendDisableLighting() {
+		return this.data.disableLightingTop
+	}
+	set BlendDisableLighting(v) {
+		this.data.disableLightingTop = v
+	}
+	get BlendDisableLightingFromBelow() {
+		return this.data.disableLightingBelow
+	}
+	set BlendDisableLightingFromBelow(v) {
+		this.data.disableLightingBelow = v
+	}
+	get ReflectionEnabled() {
+		return this.data.isReflectionEnabled
+	}
+	set ReflectionEnabled(v) {
+		this.data.isReflectionEnabled = v
+	}
+	get PhysicsMaterial() {
+		return this.data.szPhysicsMaterial
+	}
+	set PhysicsMaterial(v) {
+		this.data.szPhysicsMaterial = v
+	}
+	get OverwritePhysics() {
+		return this.data.overwritePhysics
+	}
+	set OverwritePhysics(v) {
+		this.data.overwritePhysics = v
+	}
+	get HitThreshold() {
+		return this.events.currentHitThreshold
+	}
+	get DisplayTexture() {
+		return this.data.displayTexture
+	}
+	set DisplayTexture(v) {
+		this.data.displayTexture = v
+	}
+	get DepthBias() {
+		return this.data.depthBias
+	}
+	set DepthBias(v) {
+		this.data.depthBias = v
+	}
 
 	/* istanbul ignore next: remove ignore when implemented */
 	public PlayAnim(startFrame: number, speed: number): void {
@@ -299,11 +484,11 @@ export class PrimitiveApi extends ItemApi<PrimitiveData> {
 	}
 
 	public _getTimers(): TimerHit[] {
-		this._beginPlay();
-		return [];
+		this._beginPlay()
+		return []
 	}
 
 	protected _getPropertyNames(): string[] {
-		return Object.getOwnPropertyNames(PrimitiveApi.prototype);
+		return Object.getOwnPropertyNames(PrimitiveApi.prototype)
 	}
 }

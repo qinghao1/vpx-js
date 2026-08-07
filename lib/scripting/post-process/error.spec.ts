@@ -17,28 +17,28 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { expect } from 'chai';
-import { Grammar } from '../grammar/grammar';
-import { Transformer } from '../transformer/transformer';
+import { expect } from 'chai'
+import { Grammar } from '../grammar/grammar'
+import { Transformer } from '../transformer/transformer'
 
-let grammar: Grammar;
+let grammar: Grammar
 
 before(async () => {
-	grammar = new Grammar();
-});
+	grammar = new Grammar()
+})
 
 describe('The VBScript transpiler - Error', () => {
 	it('should transpile an On Error Resume Next statement', () => {
-		const vbs = `On Error Resume Next`;
-		const js = grammar.vbsToJs(vbs);
-		expect(js).to.equal(`${Transformer.VBSHELPER_NAME}.onErrorResumeNext();`);
-	});
-});
+		const vbs = `On Error Resume Next`
+		const js = grammar.vbsToJs(vbs)
+		expect(js).to.equal(`${Transformer.VBSHELPER_NAME}.onErrorResumeNext();`)
+	})
+})
 
 describe('The VBScript transpiler - Error', () => {
 	it('should transpile an On Error GoTo statement', () => {
-		const vbs = `On Error Goto 0`;
-		const js = grammar.vbsToJs(vbs);
-		expect(js).to.equal(`${Transformer.VBSHELPER_NAME}.onErrorGoto(0);`);
-	});
-});
+		const vbs = `On Error Goto 0`
+		const js = grammar.vbsToJs(vbs)
+		expect(js).to.equal(`${Transformer.VBSHELPER_NAME}.onErrorGoto(0);`)
+	})
+})

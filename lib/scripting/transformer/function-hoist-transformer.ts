@@ -17,8 +17,8 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { Program } from 'estree';
-import { Transformer } from './transformer';
+import type { Program } from 'estree'
+import { Transformer } from './transformer'
 
 /**
  * Since function declarations are converted to expressions, we need to declare
@@ -27,22 +27,21 @@ import { Transformer } from './transformer';
  * This hoists all function declarations of the root body to the top.
  */
 export class FunctionHoistTransformer extends Transformer {
-
 	constructor(ast: Program) {
-		super(ast);
+		super(ast)
 	}
 
 	public transform(): Program {
-		const functions: any[] = [];
-		const others: any[] = [];
+		const functions: any[] = []
+		const others: any[] = []
 		for (const node of this.ast.body) {
 			if (['FunctionDeclaration', 'ClassDeclaration'].includes(node.type)) {
-				functions.push(node);
+				functions.push(node)
 			} else {
-				others.push(node);
+				others.push(node)
 			}
 		}
-		this.ast.body = functions.concat(...others);
-		return this.ast;
+		this.ast.body = functions.concat(...others)
+		return this.ast
 	}
 }

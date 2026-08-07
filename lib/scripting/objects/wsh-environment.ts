@@ -23,25 +23,26 @@
  * @see https://docs.microsoft.com/en-us/previous-versions/windows/internet-explorer/ie-developer/windows-scripting/6s7w15a0%28v%3dvs.84%29
  */
 export class WshEnvironment {
-
 	/**
 	 * Exposes a specified item from a collection.
 	 * @see https://docs.microsoft.com/en-us/previous-versions/windows/internet-explorer/ie-developer/windows-scripting/yzefkb42%28v%3dvs.84%29
 	 */
-	public Item: { [key: string ]: string } = {};
+	public Item: { [key: string]: string } = {}
 
 	/**
 	 * Returns the number of Windows environment variables on the local computer system (the number of items in an Environment collection).
 	 * @see https://docs.microsoft.com/en-us/previous-versions/windows/internet-explorer/ie-developer/windows-scripting/6kz722cz%28v%3dvs.84%29
 	 */
-	get length() { return Object.keys(this.Item).length; }
+	get length() {
+		return Object.keys(this.Item).length
+	}
 
 	/**
 	 * Returns the number of members in an object.
 	 * @see https://docs.microsoft.com/en-us/previous-versions/windows/internet-explorer/ie-developer/windows-scripting/6x47fysb%28v%3dvs.84%29
 	 */
 	public Count(): number {
-		return this.length;
+		return this.length
 	}
 
 	/**
@@ -50,9 +51,8 @@ export class WshEnvironment {
 	 * @see https://docs.microsoft.com/en-us/previous-versions/windows/internet-explorer/ie-developer/windows-scripting/218yba97%28v%3dvs.84%29
 	 */
 	public Remove(strName: string): void {
-		delete this.Item[strName];
+		delete this.Item[strName]
 	}
-
 }
 
-export const globalEnvironment = new WshEnvironment();
+export const globalEnvironment = new WshEnvironment()

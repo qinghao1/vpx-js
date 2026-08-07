@@ -17,54 +17,52 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import * as chai from 'chai';
-import { expect } from 'chai';
-import { spy } from 'sinon';
-import { TableBuilder } from '../../../test/table-builder';
-import { TestRenderApi } from '../../../test/test-render-api';
-import { Player } from '../../game/player';
-import { Enums } from '../enums';
-import { Table } from '../table/table';
-import { KickerState } from './kicker-state';
+import * as chai from 'chai'
+import { expect } from 'chai'
+import { spy } from 'sinon'
+import sinonChai from 'sinon-chai'
+import { TableBuilder } from '../../../test/table-builder'
+import { TestRenderApi } from '../../../test/test-render-api'
+import { Player } from '../../game/player'
+import { Enums } from '../enums'
+import type { Table } from '../table/table'
+import type { KickerState } from './kicker-state'
 
 /* tslint:disable:no-unused-expression */
-chai.use(require('sinon-chai'));
+chai.use((sinonChai as any).default ?? sinonChai)
 
 describe('The VPinball kicker updater', () => {
-
-	let table: Table;
-	let player: Player;
+	let table: Table
+	let player: Player
 
 	beforeEach(() => {
-		table = new TableBuilder()
-			.addMaterial('opaque', { isOpacityActive: false })
-			.addKicker('kicker')
-			.build();
+		table = new TableBuilder().addMaterial('opaque', { isOpacityActive: false }).addKicker('kicker').build()
 
 		// init player
-		player = new Player(table).init();
-	});
+		player = new Player(table).init()
+	})
 
 	it('should update visibility', async () => {
-		table.kickers.kicker.getApi().DrawStyle = Enums.KickerType.KickerInvisible;
-		const states = player.popStates();
+		table.kickers.kicker.getApi().DrawStyle = Enums.KickerType.KickerInvisible
+		const states = player.popStates()
 
-		expect(states.getState<KickerState>('kicker').isVisible).to.equal(false);
-		states.getState<KickerState>('kicker').release();
-	});
+		expect(states.getState<KickerState>('kicker').isVisible).to.equal(false)
+		states.getState<KickerState>('kicker').release()
+	})
 
 	it('should apply visibility', async () => {
-		const renderApi = new TestRenderApi();
-		spy(renderApi, 'applyVisibility');
-		table.kickers.kicker.getUpdater().applyState(null, { type: Enums.KickerType.KickerInvisible } as KickerState, renderApi, table);
-		expect(renderApi.applyVisibility).to.have.been.calledOnceWith(false);
-	});
+		const renderApi = new TestRenderApi()
+		spy(renderApi, 'applyVisibility')
+		table.kickers.kicker
+			.getUpdater()
+			.applyState(null, { type: Enums.KickerType.KickerInvisible } as KickerState, renderApi, table)
+		expect(renderApi.applyVisibility).to.have.been.calledOnceWith(false)
+	})
 
 	it('should apply the material', async () => {
-		const renderApi = new TestRenderApi();
-		spy(renderApi, 'applyMaterial');
-		table.kickers.kicker.getUpdater().applyState(null, { material: 'opaque' } as KickerState, renderApi, table);
-		expect(renderApi.applyMaterial).to.have.been.calledOnce;
-	});
-
-});
+		const renderApi = new TestRenderApi()
+		spy(renderApi, 'applyMaterial')
+		table.kickers.kicker.getUpdater().applyState(null, { material: 'opaque' } as KickerState, renderApi, table)
+		expect(renderApi.applyMaterial).to.have.been.calledOnce
+	})
+})

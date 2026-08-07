@@ -17,43 +17,58 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { BiffParser } from '../../io/biff-parser';
-import { Storage } from '../../io/ole-doc';
-import { Vertex2D } from '../../math/vertex2d';
-import { ItemData } from '../item-data';
+import { BiffParser } from '../../io/biff-parser'
+import type { Storage } from '../../io/ole-doc'
+import { Vertex2D } from '../../math/vertex2d'
+import { ItemData } from '../item-data'
 
 export class LightSeqData extends ItemData {
-
-	private v!: Vertex2D;
-	public collection?: string;
-	public center: Vertex2D = new Vertex2D();
-	public updateInterval: number = 25;
-	private backglass: boolean = false;
+	private v!: Vertex2D
+	public collection?: string
+	public center: Vertex2D = new Vertex2D()
+	public updateInterval: number = 25
+	private backglass: boolean = false
 
 	public static async fromStorage(storage: Storage, itemName: string): Promise<LightSeqData> {
-		const lightSeqData = new LightSeqData(itemName);
-		await storage.streamFiltered(itemName, 4, BiffParser.stream(lightSeqData.fromTag.bind(lightSeqData), {
-			streamedTags: [ 'FONT' ],
-		}));
-		return lightSeqData;
+		const lightSeqData = new LightSeqData(itemName)
+		await storage.streamFiltered(
+			itemName,
+			4,
+			BiffParser.stream(lightSeqData.fromTag.bind(lightSeqData), {
+				streamedTags: ['FONT'],
+			}),
+		)
+		return lightSeqData
 	}
 
 	private constructor(itemName: string) {
-		super(itemName);
+		super(itemName)
 	}
 
 	private async fromTag(buffer: Buffer, tag: string, offset: number, len: number): Promise<number> {
 		switch (tag) {
-			case 'VCEN': this.v = Vertex2D.get(buffer); break;
-			case 'COLC': this.collection = this.getWideString(buffer, len); break;
-			case 'CTRX': this.center.x = this.getFloat(buffer); break;
-			case 'CTRY': this.center.y = this.getFloat(buffer); break;
-			case 'UPTM': this.updateInterval = this.getInt(buffer); break;
-			case 'BGLS': this.backglass = this.getBool(buffer); break;
+			case 'VCEN':
+				this.v = Vertex2D.get(buffer)
+				break
+			case 'COLC':
+				this.collection = this.getWideString(buffer, len)
+				break
+			case 'CTRX':
+				this.center.x = this.getFloat(buffer)
+				break
+			case 'CTRY':
+				this.center.y = this.getFloat(buffer)
+				break
+			case 'UPTM':
+				this.updateInterval = this.getInt(buffer)
+				break
+			case 'BGLS':
+				this.backglass = this.getBool(buffer)
+				break
 			default:
-				this.getCommonBlock(buffer, tag, len);
-				break;
+				this.getCommonBlock(buffer, tag, len)
+				break
 		}
-		return 0;
+		return 0
 	}
 }

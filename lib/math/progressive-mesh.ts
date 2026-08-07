@@ -18,105 +18,110 @@
  */
 
 /* tslint:disable:no-bitwise */
-import { FLT_MAX, FLT_MIN } from '../vpt/mesh';
-import { f4 } from './float';
+import { FLT_MAX, FLT_MIN } from '../vpt/mesh'
+import { f4 } from './float'
 
-const vertices: ProgMeshVertex[] = [];
-const triangles: ProgMeshTriangle[] = [];
+const vertices: ProgMeshVertex[] = []
+const triangles: ProgMeshTriangle[] = []
 
 export class ProgMeshTriangle {
 	/** the 3 points that make this tri */
-	private vertex: ProgMeshVertex[] = [];
+	private vertex: ProgMeshVertex[] = []
 	/** unit vector othogonal to this face */
-	public normal!: ProgMeshFloat3;
+	public normal!: ProgMeshFloat3
 
 	constructor(v0: ProgMeshVertex, v1: ProgMeshVertex, v2: ProgMeshVertex) {
+		assert(v0 !== v1 && v1 !== v2 && v2 !== v0, '[ProgMeshTriangle] Vertices must be different.')
 
-		assert(v0 !== v1 && v1 !== v2 && v2 !== v0, '[ProgMeshTriangle] Vertices must be different.');
-
-		this.vertex[0] = v0;
-		this.vertex[1] = v1;
-		this.vertex[2] = v2;
-		this.computeNormal();
-		triangles.push(this);
+		this.vertex[0] = v0
+		this.vertex[1] = v1
+		this.vertex[2] = v2
+		this.computeNormal()
+		triangles.push(this)
 
 		for (let i = 0; i < 3; i++) {
-			this.vertex[i].face.push(this);
+			this.vertex[i].face.push(this)
 			for (let j = 0; j < 3; j++) {
 				if (i !== j) {
-					addUnique(this.vertex[i].neighbor, this.vertex[j]);
+					addUnique(this.vertex[i].neighbor, this.vertex[j])
 				}
 			}
 		}
 	}
 
 	private computeNormal() {
-		const v0 = this.vertex[0].position;
-		const v1 = this.vertex[1].position;
-		const v2 = this.vertex[2].position;
-		this.normal = cross(v1.sub(v0), v2.sub(v1));
-		const l = magnitude(this.normal);
+		const v0 = this.vertex[0].position
+		const v1 = this.vertex[1].position
+		const v2 = this.vertex[2].position
+		this.normal = cross(v1.sub(v0), v2.sub(v1))
+		const l = magnitude(this.normal)
 		if (l > FLT_MIN) {
-			this.normal = this.normal.divideScalar(l);
+			this.normal = this.normal.divideScalar(l)
 		}
 	}
 
 	public hasVertex(v: ProgMeshVertex) {
-		return v === this.vertex[0] || v === this.vertex[1] || v === this.vertex[2];
+		return v === this.vertex[0] || v === this.vertex[1] || v === this.vertex[2]
 	}
 
 	public destroy() {
-		removeFillWithBack(triangles, this);
+		removeFillWithBack(triangles, this)
 		for (let i = 0; i < 3; i++) {
 			if (this.vertex[i]) {
-				removeFillWithBack(this.vertex[i].face, this);
+				removeFillWithBack(this.vertex[i].face, this)
 			}
 		}
 
 		for (let i = 0; i < 3; i++) {
-			const i2 = (i + 1) % 3;
+			const i2 = (i + 1) % 3
 			if (this.vertex[i] && this.vertex[i2]) {
-				this.vertex[i].removeIfNonNeighbor(this.vertex[i2]);
-				this.vertex[i2].removeIfNonNeighbor(this.vertex[i]);
+				this.vertex[i].removeIfNonNeighbor(this.vertex[i2])
+				this.vertex[i2].removeIfNonNeighbor(this.vertex[i])
 			}
 		}
 	}
 
 	public replaceVertex(vold: ProgMeshVertex, vnew: ProgMeshVertex): void {
-
-		assert(!!vold && !!vnew, '[ProgMeshTriangle.replaceVertex] Arguments must not be null.');
-		assert(vold === this.vertex[0] || vold === this.vertex[1] || vold === this.vertex[2], '[ProgMeshTriangle.replaceVertex] vold must not be included in this.vertex.');
-		assert(vnew !== this.vertex[0] && vnew !== this.vertex[1] && vnew !== this.vertex[2], '[ProgMeshTriangle.replaceVertex] vnew must not be included in this.vertex.');
+		assert(!!vold && !!vnew, '[ProgMeshTriangle.replaceVertex] Arguments must not be null.')
+		assert(
+			vold === this.vertex[0] || vold === this.vertex[1] || vold === this.vertex[2],
+			'[ProgMeshTriangle.replaceVertex] vold must not be included in this.vertex.',
+		)
+		assert(
+			vnew !== this.vertex[0] && vnew !== this.vertex[1] && vnew !== this.vertex[2],
+			'[ProgMeshTriangle.replaceVertex] vnew must not be included in this.vertex.',
+		)
 
 		if (vold === this.vertex[0]) {
-			this.vertex[0] = vnew;
-
+			this.vertex[0] = vnew
 		} else if (vold === this.vertex[1]) {
-			this.vertex[1] = vnew;
-
+			this.vertex[1] = vnew
 		} else {
-			assert(vold === this.vertex[2], '[ProgMeshTriangle.replaceVertex] vold == vertex[2]');
-			this.vertex[2] = vnew;
+			assert(vold === this.vertex[2], '[ProgMeshTriangle.replaceVertex] vold == vertex[2]')
+			this.vertex[2] = vnew
 		}
-		removeFillWithBack(vold.face, this);
+		removeFillWithBack(vold.face, this)
 
-		assert(!vnew.face.includes(this), '[ProgMeshTriangle.replaceVertex] !Contains(vnew->face, this)');
-		vnew.face.push(this);
+		assert(!vnew.face.includes(this), '[ProgMeshTriangle.replaceVertex] !Contains(vnew->face, this)')
+		vnew.face.push(this)
 
 		for (let i = 0; i < 3; i++) {
-			vold.removeIfNonNeighbor(this.vertex[i]);
-			this.vertex[i].removeIfNonNeighbor(vold);
+			vold.removeIfNonNeighbor(this.vertex[i])
+			this.vertex[i].removeIfNonNeighbor(vold)
 		}
 
 		for (let i = 0; i < 3; i++) {
-			assert(this.vertex[i].face.filter(f => f === this).length  === 1, '[ProgMeshTriangle.replaceVertex] Contains(vertex[i]->face, this) == 1');
+			assert(
+				this.vertex[i].face.filter((f) => f === this).length === 1,
+				'[ProgMeshTriangle.replaceVertex] Contains(vertex[i]->face, this) == 1',
+			)
 			for (let j = 0; j < 3; j++) {
 				if (i !== j) {
-					addUnique(this.vertex[i].neighbor, this.vertex[j]);
+					addUnique(this.vertex[i].neighbor, this.vertex[j])
 				}
 			}
 		}
-		this.computeNormal();
+		this.computeNormal()
 	}
 }
 
@@ -128,167 +133,168 @@ export class ProgMeshTriangle {
  *  neighboring faces and vertices.
  */
 export class ProgMeshVertex {
-
 	/** location of point in euclidean space */
-	public position: ProgMeshFloat3;
+	public position: ProgMeshFloat3
 	/** place of vertex in original Array */
-	public id: number;
+	public id: number
 	/** adjacent vertices */
-	public neighbor: ProgMeshVertex[] = [];
+	public neighbor: ProgMeshVertex[] = []
 	/** adjacent triangles */
-	public face: ProgMeshTriangle[] = [];
+	public face: ProgMeshTriangle[] = []
 	/** cached cost of collapsing edge */
-	public objdist?: number;
+	public objdist?: number
 	/** candidate vertex for collapse */
-	public collapse?: ProgMeshVertex;
+	public collapse?: ProgMeshVertex
 
 	constructor(v: ProgMeshFloat3, id: number) {
-		this.position = v;
-		this.id = id;
-		vertices.push(this);
+		this.position = v
+		this.id = id
+		vertices.push(this)
 	}
 
 	public destroy(): void {
-		assert(this.face.length === 0, '[ProgMeshVertex.destroy] face.size() == 0');
+		assert(this.face.length === 0, '[ProgMeshVertex.destroy] face.size() == 0')
 		while (this.neighbor.length > 0) {
-			removeFillWithBack(this.neighbor[0].neighbor, this);
-			removeFillWithBack(this.neighbor, this.neighbor[0]);
+			removeFillWithBack(this.neighbor[0].neighbor, this)
+			removeFillWithBack(this.neighbor, this.neighbor[0])
 		}
-		removeFillWithBack(vertices, this);
+		removeFillWithBack(vertices, this)
 	}
 
 	public removeIfNonNeighbor(n: ProgMeshVertex): void {
 		// removes n from neighbor Array if n isn't a neighbor.
 		if (!this.neighbor.includes(n)) {
-			return;
+			return
 		}
 		for (const face of this.face) {
 			if (face.hasVertex(n)) {
-				return;
+				return
 			}
 		}
-		removeFillWithBack(this.neighbor, n);
+		removeFillWithBack(this.neighbor, n)
 	}
 }
 
 export class ProgMeshFloat3 {
-	public x: number;
-	public y: number;
-	public z: number;
+	public x: number
+	public y: number
+	public z: number
 
 	constructor(x: number, y: number, z: number) {
-		this.x = x;
-		this.y = y;
-		this.z = z;
+		this.x = x
+		this.y = y
+		this.z = z
 	}
 
 	public sub(b: ProgMeshFloat3): ProgMeshFloat3 {
-		return new ProgMeshFloat3(f4(this.x - b.x), f4(this.y - b.y), f4(this.z - b.z));
+		return new ProgMeshFloat3(f4(this.x - b.x), f4(this.y - b.y), f4(this.z - b.z))
 	}
 
 	public multiplyScalar(s: number) {
-		return new ProgMeshFloat3(f4(this.x * s), f4(this.y * s), f4(this.z * s));
+		return new ProgMeshFloat3(f4(this.x * s), f4(this.y * s), f4(this.z * s))
 	}
 
 	public divideScalar(s: number) {
-		return this.multiplyScalar(f4(1 / s));
+		return this.multiplyScalar(f4(1 / s))
 	}
 }
 
 export class ProgMeshTriData {
-	public readonly v: number[];
+	public readonly v: number[]
 
 	constructor(v: number[]) {
-		this.v = v;
+		this.v = v
 	}
 }
 function removeFillWithBack<T>(c: T[], t: T) {
-	const idxOf = c.indexOf(t);
-	const val = c.pop();
+	const idxOf = c.indexOf(t)
+	const val = c.pop()
 	if (idxOf === c.length) {
-		return;
+		return
 	}
-	c[idxOf] = val!;
-	assert(!c.includes(t), '[removeFillWithBack] List must not include value anymore.');
+	c[idxOf] = val!
+	assert(!c.includes(t), '[removeFillWithBack] List must not include value anymore.')
 }
 
 export function progressiveMesh(vert: ProgMeshFloat3[], tri: ProgMeshTriData[]): [number[], number[]] {
-
 	if (vert.length === 0 || tri.length === 0) {
-		return [[], []];
+		return [[], []]
 	}
 
-	addVertex(vert);  // put input data into our data structures
-	addFaces(tri);
-	computeAllEdgeCollapseCosts(); // cache all edge collapse costs
+	addVertex(vert) // put input data into our data structures
+	addFaces(tri)
+	computeAllEdgeCollapseCosts() // cache all edge collapse costs
 
-	const permutation: number[] = [];
-	const map: number[] = [];
+	const permutation: number[] = []
+	const map: number[] = []
 
 	// reduce the object down to nothing:
 	while (vertices.length > 0) {
 		// get the next vertex to collapse
-		const mn = minimumCostEdge();
+		const mn = minimumCostEdge()
 		// keep track of this vertex, i.e. the collapse ordering
-		permutation[mn.id] = vertices.length - 1;
+		permutation[mn.id] = vertices.length - 1
 		// keep track of vertex to which we collapse to
-		map[vertices.length - 1] = mn.collapse ? mn.collapse.id : 4294967295;
+		map[vertices.length - 1] = mn.collapse ? mn.collapse.id : 4294967295
 		// Collapse this edge
-		collapse(mn, mn.collapse);
+		collapse(mn, mn.collapse)
 	}
 
 	// reorder the map Array based on the collapse ordering
 	for (let i = 0; i < map.length; i++) {
-		map[i] = map[i] === 4294967295 ? 0 : permutation[map[i]];
+		map[i] = map[i] === 4294967295 ? 0 : permutation[map[i]]
 	}
 
 	// The caller of this function should reorder their vertices
 	// according to the returned "permutation".
 
-	assert(vertices.length === 0, '[progressiveMesh] vertices.size() == 0');
-	assert(triangles.length === 0, '[progressiveMesh] triangles.size() == 0');
+	assert(vertices.length === 0, '[progressiveMesh] vertices.size() == 0')
+	assert(triangles.length === 0, '[progressiveMesh] triangles.size() == 0')
 
-	return [map, permutation];
+	return [map, permutation]
 }
 
 export function permuteVertices<T>(permutation: number[], vert: T[], tri: ProgMeshTriData[]): void {
-
 	// rearrange the vertex Array
-	const tmp: T[] = [];
+	const tmp: T[] = []
 	for (let i = 0; i < vert.length; i++) {
-		tmp[i] = vert[i];
+		tmp[i] = vert[i]
 	}
 	for (let i = 0; i < vert.length; i++) {
-		vert[permutation[i]] = tmp[i];
+		vert[permutation[i]] = tmp[i]
 	}
 
 	// update the changes in the entries in the triangle Array
 	for (const t of tri) {
 		for (let j = 0; j < 3; j++) {
-			t.v[j] = permutation[t.v[j]];
+			t.v[j] = permutation[t.v[j]]
 		}
 	}
 }
 
-export function remapIndices(numVertices: number, triDatas: ProgMeshTriData[], newTri: ProgMeshTriData[], map: number[]) {
-
-	assert(newTri.length === 0, '[remapIndices] new_tri.size() == 0');
-	assert(map.length !== 0, '[remapIndices] map.size() != 0');
-	assert(numVertices !== 0, '[remapIndices] num_vertices != 0');
+export function remapIndices(
+	numVertices: number,
+	triDatas: ProgMeshTriData[],
+	newTri: ProgMeshTriData[],
+	map: number[],
+) {
+	assert(newTri.length === 0, '[remapIndices] new_tri.size() == 0')
+	assert(map.length !== 0, '[remapIndices] map.size() != 0')
+	assert(numVertices !== 0, '[remapIndices] num_vertices != 0')
 
 	for (const tri of triDatas) {
 		const t = new ProgMeshTriData([
 			mapVertex(tri.v[0], numVertices, map),
 			mapVertex(tri.v[1], numVertices, map),
 			mapVertex(tri.v[2], numVertices, map),
-		]);
+		])
 		//!! note:  serious optimization opportunity here,
 		//  by sorting the triangles the following "continue"
 		//  could have been made into a "break" statement.
 		if (t.v[0] === t.v[1] || t.v[1] === t.v[2] || t.v[2] === t.v[0]) {
-			continue;
+			continue
 		}
-		newTri.push(t);
+		newTri.push(t)
 	}
 }
 
@@ -297,7 +303,7 @@ function computeAllEdgeCollapseCosts(): void {
 	// to the model if it was collapsed.  The least of these
 	// per vertex is cached in each vertex object.
 	for (const vertex of vertices) {
-		computeEdgeCostAtVertex(vertex);
+		computeEdgeCostAtVertex(vertex)
 	}
 }
 
@@ -310,19 +316,19 @@ function computeEdgeCostAtVertex(v: ProgMeshVertex): void {
 	// cost (in member variable objdist).
 	if (v.neighbor.length === 0) {
 		// v doesn't have neighbors so it costs nothing to collapse
-		v.collapse = undefined;
-		v.objdist = f4(-0.01);
-		return;
+		v.collapse = undefined
+		v.objdist = f4(-0.01)
+		return
 	}
-	v.objdist = FLT_MAX;
-	v.collapse = undefined;
+	v.objdist = FLT_MAX
+	v.collapse = undefined
 
 	// search all neighboring edges for "least cost" edge
 	for (const neighbor of v.neighbor) {
-		const dist = computeEdgeCollapseCost(v, neighbor);
+		const dist = computeEdgeCollapseCost(v, neighbor)
 		if (dist < v.objdist) {
-			v.collapse = neighbor;     // candidate for edge collapse
-			v.objdist = dist;          // cost of the collapse
+			v.collapse = neighbor // candidate for edge collapse
+			v.objdist = dist // cost of the collapse
 		}
 	}
 }
@@ -341,28 +347,28 @@ function computeEdgeCollapseCost(u: ProgMeshVertex, v: ProgMeshVertex): number {
 	// therefore never added code to detect this case.
 
 	// find the "sides" triangles that are on the edge uv
-	const sides: ProgMeshTriangle[] = [];
+	const sides: ProgMeshTriangle[] = []
 	for (const face of u.face) {
 		if (face.hasVertex(v)) {
-			sides.push(face);
+			sides.push(face)
 		}
 	}
 
 	// use the triangle facing most away from the sides
 	// to determine our curvature term
-	let curvature = 0;
+	let curvature = 0
 	for (const face of u.face) {
-		let minCurve = 1; // curve for face i and closer side to it
+		let minCurve = 1 // curve for face i and closer side to it
 		for (const side of sides) {
-			const dotProd = dot(face.normal, side.normal); // use dot product of face normals.
-			minCurve = Math.min(f4(minCurve), f4(f4(1 - dotProd) * 0.5));
+			const dotProd = dot(face.normal, side.normal) // use dot product of face normals.
+			minCurve = Math.min(f4(minCurve), f4(f4(1 - dotProd) * 0.5))
 		}
-		curvature = Math.max(curvature, minCurve);
+		curvature = Math.max(curvature, minCurve)
 	}
 
 	// the more coplanar the lower the curvature term
-	const edgeLength = magnitude(v.position.sub(u.position));
-	return f4(edgeLength * curvature);
+	const edgeLength = magnitude(v.position.sub(u.position))
+	return f4(edgeLength * curvature)
 }
 
 function minimumCostEdge() {
@@ -372,56 +378,55 @@ function minimumCostEdge() {
 	// Serious optimization opportunity here: this function currently
 	// does a sequential search through an unsorted Array :-(
 	// Our algorithm could be O(n*lg(n)) instead of O(n*n)
-	let mn = vertices[0];
+	let mn = vertices[0]
 	for (const vertex of vertices) {
 		if (vertex.objdist! < mn.objdist!) {
-			mn = vertex;
+			mn = vertex
 		}
 	}
-	return mn;
+	return mn
 }
 
 function collapse(u: ProgMeshVertex, v?: ProgMeshVertex): void {
-
-	let i: number;
+	let i: number
 	// Collapse the edge uv by moving vertex u onto v
 	// Actually remove tris on uv, then update tris that
 	// have u to have v, and then remove u.
 	if (!v) {
 		// u is a vertex all by itself so just delete it
-		u.destroy();
-		return;
+		u.destroy()
+		return
 	}
-	const tmp: ProgMeshVertex[] = [];
+	const tmp: ProgMeshVertex[] = []
 	// make tmp a Array of all the neighbors of u
 	for (i = 0; i < u.neighbor.length; i++) {
-		tmp[i] = u.neighbor[i];
+		tmp[i] = u.neighbor[i]
 	}
 
 	// delete triangles on edge uv:
-	i = u.face.length;
+	i = u.face.length
 	while (i--) {
 		if (u.face[i].hasVertex(v)) {
-			u.face[i].destroy();
+			u.face[i].destroy()
 		}
 	}
 	// update remaining triangles to have v instead of u
-	i = u.face.length;
+	i = u.face.length
 	while (i--) {
-		u.face[i].replaceVertex(u, v);
+		u.face[i].replaceVertex(u, v)
 	}
-	u.destroy();
+	u.destroy()
 
 	// recompute the edge collapse costs for neighboring vertices
 	for (const t of tmp) {
-		computeEdgeCostAtVertex(t);
+		computeEdgeCostAtVertex(t)
 	}
 }
 
 function addVertex(vert: ProgMeshFloat3[]): void {
 	for (let i = 0; i < vert.length; i++) {
 		// tslint:disable-next-line:no-unused-expression
-		new ProgMeshVertex(vert[i], i); //!! braindead design, actually fills up "vertices"
+		new ProgMeshVertex(vert[i], i) //!! braindead design, actually fills up "vertices"
 	}
 }
 
@@ -432,18 +437,18 @@ function addFaces(tri: ProgMeshTriData[]): void {
 			vertices[t.v[0]], //!! braindead design, actually fills up "triangles"
 			vertices[t.v[1]],
 			vertices[t.v[2]],
-		);
+		)
 	}
 }
 
 function addUnique<T>(c: T[], t: T) {
 	if (!contains(c, t)) {
-		c.push(t);
+		c.push(t)
 	}
 }
 
 function contains<T>(c: T[], t: T): number {
-	return c.filter(i => i === t).length;
+	return c.filter((i) => i === t).length
 }
 
 function cross(a: ProgMeshFloat3, b: ProgMeshFloat3): ProgMeshFloat3 {
@@ -451,26 +456,26 @@ function cross(a: ProgMeshFloat3, b: ProgMeshFloat3): ProgMeshFloat3 {
 		f4(f4(a.y * b.z) - f4(a.z * b.y)),
 		f4(f4(a.z * b.x) - f4(a.x * b.z)),
 		f4(f4(a.x * b.y) - f4(a.y * b.x)),
-	);
+	)
 }
 
 function magnitude(v: ProgMeshFloat3): number {
-	return f4(Math.sqrt(dot(v, v)));
+	return f4(Math.sqrt(dot(v, v)))
 }
 
 function dot(a: ProgMeshFloat3, b: ProgMeshFloat3): number {
-	return f4(f4(a.x * b.x) + f4(a.y * b.y) + f4(a.z * b.z));
+	return f4(f4(a.x * b.x) + f4(a.y * b.y) + f4(a.z * b.z))
 }
 
 function mapVertex(a: number, mx: number, map: number[]): number {
 	while (a >= mx) {
-		a = map[a];
+		a = map[a]
 	}
-	return a;
+	return a
 }
 
 function assert(success: boolean, message: string) {
 	if (!success) {
-		throw new Error(message);
+		throw new Error(message)
 	}
 }

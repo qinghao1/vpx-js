@@ -17,38 +17,40 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import * as chai from 'chai';
-import { expect } from 'chai';
-import { ScriptHelper } from '../../../test/script.helper';
-import { ThreeHelper } from '../../../test/three.helper';
-import { NodeBinaryReader } from '../../io/binary-reader.node';
-import { Table } from '../../vpt/table/table';
-import { ReferenceTransformer } from './reference-transformer';
-import { WrapTransformer } from './wrap-transformer';
+import * as chai from 'chai'
+import { expect } from 'chai'
+import sinonChai from 'sinon-chai'
+import { ScriptHelper } from '../../../test/script.helper'
+import { ThreeHelper } from '../../../test/three.helper'
+import { NodeBinaryReader } from '../../io/binary-reader.node.js'
+import { Table } from '../../vpt/table/table'
+import { ReferenceTransformer } from './reference-transformer'
+import { WrapTransformer } from './wrap-transformer'
 
-chai.use(require('sinon-chai'));
+chai.use((sinonChai as any).default ?? sinonChai)
 
 /* tslint:disable:no-unused-expression */
 describe('The scripting wrap transformer', () => {
-
-	const three = new ThreeHelper();
-	let table: Table;
+	const three = new ThreeHelper()
+	let table: Table
 
 	before(async () => {
-		table = await Table.load(new NodeBinaryReader(three.fixturePath('table-gate.vpx')));
-	});
+		table = await Table.load(new NodeBinaryReader(three.fixturePath('table-gate.vpx')))
+	})
 
 	it('should wrap everything into a function', () => {
-		const vbs = `Dim test\n`;
-		const js = transform(vbs, 'tableScript', table);
-		expect(js).to.equal(`window.tableScript = (${ReferenceTransformer.SCOPE_NAME}, ${ReferenceTransformer.ITEMS_NAME}, ${ReferenceTransformer.ENUMS_NAME}, ${ReferenceTransformer.GLOBAL_NAME}, ${ReferenceTransformer.STDLIB_NAME}, ${ReferenceTransformer.VBSHELPER_NAME}, ${ReferenceTransformer.PLAYER_NAME}) => {\n    let test;\n};`);
-	});
-});
+		const vbs = `Dim test\n`
+		const js = transform(vbs, 'tableScript', table)
+		expect(js).to.equal(
+			`window.tableScript = (${ReferenceTransformer.SCOPE_NAME}, ${ReferenceTransformer.ITEMS_NAME}, ${ReferenceTransformer.ENUMS_NAME}, ${ReferenceTransformer.GLOBAL_NAME}, ${ReferenceTransformer.STDLIB_NAME}, ${ReferenceTransformer.VBSHELPER_NAME}, ${ReferenceTransformer.PLAYER_NAME}) => {\n    let test;\n};`,
+		)
+	})
+})
 
 function transform(vbs: string, fctName: string, table: Table): string {
-	const scriptHelper = new ScriptHelper();
-	const ast = scriptHelper.vbsToAst(vbs);
-	const scriptTransformer = new WrapTransformer(ast);
-	const eventAst = scriptTransformer.transform(fctName, 'window');
-	return scriptHelper.astToVbs(eventAst);
+	const scriptHelper = new ScriptHelper()
+	const ast = scriptHelper.vbsToAst(vbs)
+	const scriptTransformer = new WrapTransformer(ast)
+	const eventAst = scriptTransformer.transform(fctName, 'window')
+	return scriptHelper.astToVbs(eventAst)
 }

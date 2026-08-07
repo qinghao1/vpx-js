@@ -17,12 +17,12 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { ERR } from '../stdlib/err';
-import { VbsNotImplementedError } from '../vbs-api';
-import { Drive } from './drive';
-import { File } from './file';
-import { FS } from './file-system';
-import { TextStream } from './text-stream';
+import { ERR } from '../stdlib/err'
+import { VbsNotImplementedError } from '../vbs-api'
+import type { Drive } from './drive'
+import { File } from './file'
+import { FS } from './file-system'
+import { TextStream } from './text-stream'
 
 /**
  * Provides access to a computer's file system.
@@ -32,14 +32,15 @@ import { TextStream } from './text-stream';
  * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/filesystemobject-object
  */
 export class FileSystemObject {
-
-	private readonly SEP = `\\`;
+	private readonly SEP = `\\`
 
 	/**
 	 * Returns a Drives collection consisting of all Drive objects available on the local machine.
 	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/drives-property
 	 */
-	public get Drives(): Drive[] { throw new VbsNotImplementedError(); }
+	public get Drives(): Drive[] {
+		throw new VbsNotImplementedError()
+	}
 
 	/**
 	 * Appends a name to an existing path.
@@ -48,7 +49,7 @@ export class FileSystemObject {
 	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/buildpath-method
 	 */
 	public BuildPath(path: string, name: string): string {
-		return `${path}${(path.endsWith(this.SEP) ? '' : this.SEP)}${name}`;
+		return `${path}${path.endsWith(this.SEP) ? '' : this.SEP}${name}`
 	}
 
 	/**
@@ -60,7 +61,7 @@ export class FileSystemObject {
 	 */
 	public CopyFile(source: string, destination: string, overwrite = true): void {
 		// only used in NVOffset(), which doesn't seem to be used very often.
-		throw new VbsNotImplementedError();
+		throw new VbsNotImplementedError()
 	}
 
 	/**
@@ -72,7 +73,7 @@ export class FileSystemObject {
 	 */
 	public CopyFolder(source: string, destination: string, overwrite = true): void {
 		// no usages found
-		throw new VbsNotImplementedError();
+		throw new VbsNotImplementedError()
 	}
 
 	/**
@@ -82,7 +83,7 @@ export class FileSystemObject {
 	 */
 	public CreateFolder(foldername: string): void {
 		// no usages found
-		throw new VbsNotImplementedError();
+		throw new VbsNotImplementedError()
 	}
 
 	/**
@@ -95,11 +96,11 @@ export class FileSystemObject {
 	 */
 	public CreateTextFile(filename: string, overwrite = true, unicode = false): TextStream | void {
 		if (FS.fileExists(filename) && !overwrite) {
-			return ERR.Raise(58, undefined, 'File already exists');
+			return ERR.Raise(58, undefined, 'File already exists')
 		}
-		const textStream = new TextStream(filename, unicode, TextStream.MODE_APPEND);
-		FS.addStream(filename, textStream);
-		return textStream;
+		const textStream = new TextStream(filename, unicode, TextStream.MODE_APPEND)
+		FS.addStream(filename, textStream)
+		return textStream
 	}
 
 	/**
@@ -110,9 +111,9 @@ export class FileSystemObject {
 	 */
 	public DeleteFile(filespec: string, force = false): void {
 		if (!FS.fileExists(filespec)) {
-			return ERR.Raise(53, undefined, 'File not found');
+			return ERR.Raise(53, undefined, 'File not found')
 		}
-		FS.deleteFile(filespec);
+		FS.deleteFile(filespec)
 	}
 
 	/**
@@ -123,7 +124,7 @@ export class FileSystemObject {
 	 */
 	public DeleteFolder(folderspec: string, force = false): void {
 		// no usages found
-		throw new VbsNotImplementedError();
+		throw new VbsNotImplementedError()
 	}
 
 	/**
@@ -133,7 +134,7 @@ export class FileSystemObject {
 	 */
 	public DriveExists(drivespec: string): boolean {
 		// no usages found
-		throw new VbsNotImplementedError();
+		throw new VbsNotImplementedError()
 	}
 
 	/**
@@ -142,7 +143,7 @@ export class FileSystemObject {
 	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/fileexists-method
 	 */
 	public FileExists(filespec: string): boolean {
-		return FS.fileExists(filespec);
+		return FS.fileExists(filespec)
 	}
 
 	/**
@@ -151,7 +152,7 @@ export class FileSystemObject {
 	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/folderexists-method
 	 */
 	public FolderExists(folderspec: string): boolean {
-		return FS.folderExists(folderspec);
+		return FS.folderExists(folderspec)
 	}
 
 	/**
@@ -161,7 +162,7 @@ export class FileSystemObject {
 	 */
 	public GetAbsolutePathName(pathspec: string): string {
 		// unless we want to read real files like for ultradmd, we don't care about absolute paths.
-		return pathspec;
+		return pathspec
 	}
 
 	/**
@@ -173,12 +174,12 @@ export class FileSystemObject {
 		const last = path
 			.replace(/\\+/g, '/')
 			.split('/')
-			.filter(p => !!p)
-			.reverse()[0];
+			.filter((p) => !!p)
+			.reverse()[0]
 		if (last.indexOf('.') >= 0) {
-			return last.substr(0, last.lastIndexOf('.'));
+			return last.substr(0, last.lastIndexOf('.'))
 		}
-		return last;
+		return last
 	}
 
 	/**
@@ -188,7 +189,7 @@ export class FileSystemObject {
 	 */
 	public GetDrive(drivespec: string): Drive {
 		// no usages found
-		throw new VbsNotImplementedError();
+		throw new VbsNotImplementedError()
 	}
 
 	/**
@@ -198,7 +199,7 @@ export class FileSystemObject {
 	 */
 	public GetDriveName(path: string): string {
 		// no usages found
-		throw new VbsNotImplementedError();
+		throw new VbsNotImplementedError()
 	}
 
 	/**
@@ -210,12 +211,12 @@ export class FileSystemObject {
 		const last = path
 			.replace(/\\+/g, '/')
 			.split('/')
-			.filter(p => !!p)
-			.reverse()[0];
+			.filter((p) => !!p)
+			.reverse()[0]
 		if (last.indexOf('.') >= 0) {
-			return last.substr(last.lastIndexOf('.') + 1);
+			return last.substr(last.lastIndexOf('.') + 1)
 		}
-		return '';
+		return ''
 	}
 
 	/**
@@ -225,9 +226,9 @@ export class FileSystemObject {
 	 */
 	public GetFile(filespec: string): File | void {
 		if (!FS.fileExists(filespec)) {
-			return ERR.Raise(53, undefined, 'File not found');
+			return ERR.Raise(53, undefined, 'File not found')
 		}
-		return new File(filespec);
+		return new File(filespec)
 	}
 
 	/**
@@ -239,9 +240,9 @@ export class FileSystemObject {
 		const last = pathspec
 			.replace(/\\+/g, '/')
 			.split('/')
-			.filter(p => !!p)
-			.reverse()[0];
-		return last;
+			.filter((p) => !!p)
+			.reverse()[0]
+		return last
 	}
 
 	/**
@@ -251,7 +252,7 @@ export class FileSystemObject {
 	 */
 	public GetFolder(folderspec: string): string {
 		// no usages found
-		throw new VbsNotImplementedError();
+		throw new VbsNotImplementedError()
 	}
 
 	/**
@@ -261,7 +262,7 @@ export class FileSystemObject {
 	 */
 	public GetParentFolderName(path: string): string {
 		// no usages found
-		throw new VbsNotImplementedError();
+		throw new VbsNotImplementedError()
 	}
 
 	/**
@@ -271,7 +272,7 @@ export class FileSystemObject {
 	 */
 	public GetSpecialFolder(folderspec: number): {} {
 		// no usages found
-		throw new VbsNotImplementedError();
+		throw new VbsNotImplementedError()
 	}
 
 	/**
@@ -280,7 +281,7 @@ export class FileSystemObject {
 	 */
 	public GetTempName(): string {
 		// no usages found
-		throw new VbsNotImplementedError();
+		throw new VbsNotImplementedError()
 	}
 
 	/**
@@ -291,7 +292,7 @@ export class FileSystemObject {
 	 */
 	public MoveFile(source: string, destination: string): void {
 		// only used in NVOffset(), which doesn't seem to be used very often.
-		throw new VbsNotImplementedError();
+		throw new VbsNotImplementedError()
 	}
 
 	/**
@@ -302,7 +303,7 @@ export class FileSystemObject {
 	 */
 	public MoveFolder(source: string, destination: string): void {
 		// no usages found
-		throw new VbsNotImplementedError();
+		throw new VbsNotImplementedError()
 	}
 
 	/**
@@ -315,8 +316,10 @@ export class FileSystemObject {
 	 */
 	public OpenTextFile(filename: string, mode: number = 1, create = false, format = 0): TextStream | void {
 		if (!FS.fileExists(filename) && !create) {
-			return ERR.Raise(53, undefined, 'File not found');
+			return ERR.Raise(53, undefined, 'File not found')
 		}
-		return FS.fileExists(filename) ? FS.getStream(filename) : FS.addStream(filename, new TextStream(filename, false, mode));
+		return FS.fileExists(filename)
+			? FS.getStream(filename)
+			: FS.addStream(filename, new TextStream(filename, false, mode))
 	}
 }

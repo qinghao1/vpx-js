@@ -17,42 +17,62 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { Matrix3D } from '../../math/matrix3d';
-import { IRenderApi } from '../../render/irender-api';
-import { ItemUpdater } from '../item-updater';
-import { Table } from '../table/table';
-import { BallData } from './ball-data';
-import { BallState } from './ball-state';
+import { Matrix3D } from '../../math/matrix3d'
+import type { IRenderApi } from '../../render/irender-api'
+import { ItemUpdater } from '../item-updater'
+import type { Table } from '../table/table'
+import type { BallData } from './ball-data'
+import type { BallState } from './ball-state'
 
 export class BallUpdater extends ItemUpdater<BallState> {
-
-	private readonly data: BallData;
+	private readonly data: BallData
 
 	constructor(state: BallState, data: BallData) {
-		super(state);
-		this.data = data;
+		super(state)
+		this.data = data
 	}
 
-	public applyState<NODE, GEOMETRY, POINT_LIGHT>(obj: NODE, state: BallState, renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>, table: Table): void {
+	public applyState<NODE, GEOMETRY, POINT_LIGHT>(
+		obj: NODE,
+		state: BallState,
+		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
+		table: Table,
+	): void {
 		// update local state
-		Object.assign(this.state, state);
+		Object.assign(this.state, state)
 
-		const pos: { _x: number, _y: number, _z: number} = this.state.pos as any;
-		const zHeight = !this.state.isFrozen ? pos._z : pos._z - this.data.radius;
+		const pos: { _x: number; _y: number; _z: number } = this.state.pos as any
+		const zHeight = !this.state.isFrozen ? pos._z : pos._z - this.data.radius
 		const orientation = Matrix3D.claim().setEach(
-			this.state.orientation.matrix[0][0], this.state.orientation.matrix[1][0], this.state.orientation.matrix[2][0], 0.0,
-			this.state.orientation.matrix[0][1], this.state.orientation.matrix[1][1], this.state.orientation.matrix[2][1], 0.0,
-			this.state.orientation.matrix[0][2], this.state.orientation.matrix[1][2], this.state.orientation.matrix[2][2], 0.0,
-			0, 0, 0, 1,
-		);
-		const trans = Matrix3D.claim().setTranslation(pos._x, pos._y, zHeight);
+			this.state.orientation.matrix[0][0],
+			this.state.orientation.matrix[1][0],
+			this.state.orientation.matrix[2][0],
+			0.0,
+			this.state.orientation.matrix[0][1],
+			this.state.orientation.matrix[1][1],
+			this.state.orientation.matrix[2][1],
+			0.0,
+			this.state.orientation.matrix[0][2],
+			this.state.orientation.matrix[1][2],
+			this.state.orientation.matrix[2][2],
+			0.0,
+			0,
+			0,
+			0,
+			1,
+		)
+		const trans = Matrix3D.claim().setTranslation(pos._x, pos._y, zHeight)
 		const matrix = Matrix3D.claim()
 			.setScaling(this.data.radius, this.data.radius, this.data.radius)
 			.preMultiply(orientation)
 			.multiply(trans)
-			.toRightHanded();
+			.toRightHanded()
 
-		renderApi.applyMatrixToNode(matrix, obj);
-		Matrix3D.release(orientation, trans, matrix);
+		renderApi.applyMatrixToNode(matrix, obj)
+		Matrix3D.release(orientation, trans, matrix)
+		const anyObj = obj as any
+		if (anyObj && typeof anyObj.updateMatrixWorld === 'function') {
+			anyObj.updateMatrixWorld(true)
+		}
 	}
 }

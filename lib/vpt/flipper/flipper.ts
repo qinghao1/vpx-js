@@ -17,84 +17,94 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { EventProxy } from '../../game/event-proxy';
-import { IHittable } from '../../game/ihittable';
-import { IMovable } from '../../game/imovable';
-import { IPlayable } from '../../game/iplayable';
-import { IRenderable, Meshes } from '../../game/irenderable';
-import { IScriptable } from '../../game/iscriptable';
-import { Player } from '../../game/player';
-import { Storage } from '../../io/ole-doc';
-import { degToRad } from '../../math/float';
-import { Matrix3D } from '../../math/matrix3d';
-import { Vertex2D } from '../../math/vertex2d';
-import { HitObject } from '../../physics/hit-object';
-import { Item } from '../item';
-import { Table } from '../table/table';
-import { FlipperApi } from './flipper-api';
-import { FlipperData } from './flipper-data';
-import { FlipperHit } from './flipper-hit';
-import { FlipperMesh } from './flipper-mesh';
-import { FlipperMover } from './flipper-mover';
-import { FlipperState } from './flipper-state';
-import { FlipperUpdater } from './flipper-updater';
+import { EventProxy } from '../../game/event-proxy'
+import type { IHittable } from '../../game/ihittable'
+import type { IMovable } from '../../game/imovable'
+import type { IPlayable } from '../../game/iplayable'
+import type { IRenderable, Meshes } from '../../game/irenderable'
+import type { IScriptable } from '../../game/iscriptable'
+import type { Player } from '../../game/player'
+import type { Storage } from '../../io/ole-doc'
+import { degToRad } from '../../math/float'
+import { Matrix3D } from '../../math/matrix3d'
+import type { Vertex2D } from '../../math/vertex2d'
+import type { HitObject } from '../../physics/hit-object'
+import { Item } from '../item'
+import type { Table } from '../table/table'
+import { FlipperApi } from './flipper-api'
+import { FlipperData } from './flipper-data'
+import { FlipperHit } from './flipper-hit'
+import { FlipperMesh } from './flipper-mesh'
+import type { FlipperMover } from './flipper-mover'
+import { FlipperState } from './flipper-state'
+import { FlipperUpdater } from './flipper-updater'
 
 /**
  * VPinball's flippers
  *
  * @see https://github.com/vpinball/vpinball/blob/master/flipper.cpp
  */
-export class Flipper extends Item<FlipperData> implements IRenderable<FlipperState>, IPlayable, IMovable, IHittable, IScriptable<FlipperApi> {
-
-	private readonly mesh: FlipperMesh;
-	private readonly state: FlipperState;
-	private readonly updater: FlipperUpdater;
-	private hit?: FlipperHit;
-	private api?: FlipperApi;
+export class Flipper
+	extends Item<FlipperData>
+	implements IRenderable<FlipperState>, IPlayable, IMovable, IHittable, IScriptable<FlipperApi>
+{
+	private readonly mesh: FlipperMesh
+	private readonly state: FlipperState
+	private readonly updater: FlipperUpdater
+	private hit?: FlipperHit
+	private api?: FlipperApi
 
 	public static async fromStorage(storage: Storage, itemName: string): Promise<Flipper> {
-		const data = await FlipperData.fromStorage(storage, itemName);
-		return new Flipper(data);
+		const data = await FlipperData.fromStorage(storage, itemName)
+		return new Flipper(data)
 	}
 
 	public constructor(data: FlipperData) {
-		super(data);
-		this.mesh = new FlipperMesh();
-		this.state = FlipperState.claim(this.getName(), this.data.startAngle, this.data.center.clone(), this.data.isVisible, this.data.szMaterial!, this.data.szImage!, this.data.szRubberMaterial!);
-		this.updater = new FlipperUpdater(this.data, this.state);
+		super(data)
+		this.mesh = new FlipperMesh()
+		this.state = FlipperState.claim(
+			this.getName(),
+			this.data.startAngle,
+			this.data.center.clone(),
+			this.data.isVisible,
+			this.data.szMaterial!,
+			this.data.szImage!,
+			this.data.szRubberMaterial!,
+		)
+		this.updater = new FlipperUpdater(this.data, this.state)
 	}
 
 	public isCollidable(): boolean {
-		return true;
+		return true
 	}
 
 	public getMover(): FlipperMover {
-		return this.hit!.getMoverObject();
+		return this.hit!.getMoverObject()
 	}
 
 	public getState(): FlipperState {
-		return this.state;
+		return this.state
 	}
 
 	public setupPlayer(player: Player, table: Table): void {
-		this.events = new EventProxy(this);
-		this.hit = FlipperHit.getInstance(this.data, this.state, this.events, player.getPhysics(), table);
-		this.api = new FlipperApi(this.data, this.state, this.hit, this.getMover(), this.events, player, table);
+		this.events = new EventProxy(this)
+		this.hit = FlipperHit.getInstance(this.data, this.state, this.events, player.getPhysics(), table)
+		this.api = new FlipperApi(this.data, this.state, this.hit, this.getMover(), this.events, player, table)
 	}
 
 	public getApi(): FlipperApi {
-		return this.api!;
+		return this.api!
 	}
 
 	public getHitShapes(): HitObject[] {
-		return [ this.hit! ];
+		return [this.hit!]
 	}
 
 	public getMeshes<GEOMETRY>(table: Table): Meshes<GEOMETRY> {
-		const meshes: Meshes<GEOMETRY> = {};
+		const meshes: Meshes<GEOMETRY> = {}
 
-		const matrix = this.getMatrix().toRightHanded();
-		const flipper = this.mesh.generateMeshes(this.data, table);
+		const matrix = this.getMatrix().toRightHanded()
+		const flipper = this.mesh.generateMeshes(this.data, table)
 
 		// base mesh
 		meshes.base = {
@@ -102,7 +112,7 @@ export class Flipper extends Item<FlipperData> implements IRenderable<FlipperSta
 			mesh: flipper.base.transform(matrix),
 			material: table.getMaterial(this.data.szMaterial),
 			map: table.getTexture(this.data.szImage),
-		};
+		}
 
 		// rubber mesh
 		if (flipper.rubber) {
@@ -110,42 +120,42 @@ export class Flipper extends Item<FlipperData> implements IRenderable<FlipperSta
 				isVisible: this.data.isVisible,
 				mesh: flipper.rubber.transform(matrix),
 				material: table.getMaterial(this.data.szRubberMaterial),
-			};
+			}
 		}
-		return meshes;
+		return meshes
 	}
 
 	public getFlipperData(): FlipperData {
-		return this.data;
+		return this.data
 	}
 
 	private getMatrix(rotation: number = this.data.startAngle): Matrix3D {
-		const trafoMatrix = new Matrix3D();
-		const tempMatrix = Matrix3D.claim();
-		trafoMatrix.setTranslation(this.data.center.x, this.data.center.y, 0);
-		tempMatrix.rotateZMatrix(degToRad(rotation));
-		trafoMatrix.preMultiply(tempMatrix);
+		const trafoMatrix = new Matrix3D()
+		const tempMatrix = Matrix3D.claim()
+		trafoMatrix.setTranslation(this.data.center.x, this.data.center.y, 0)
+		tempMatrix.rotateZMatrix(degToRad(rotation))
+		trafoMatrix.preMultiply(tempMatrix)
 
-		Matrix3D.release(tempMatrix);
-		return trafoMatrix;
+		Matrix3D.release(tempMatrix)
+		return trafoMatrix
 	}
 
 	public getEventNames(): string[] {
-		return [ 'Init', 'Timer', 'LimitEOS', 'LimitBOS', 'Hit', 'Collide' ];
+		return ['Init', 'Timer', 'LimitEOS', 'LimitBOS', 'Hit', 'Collide']
 	}
 
 	public getUpdater(): FlipperUpdater {
-		return this.updater;
+		return this.updater
 	}
 }
 
 export interface FlipperConfig {
-	center: Vertex2D;
-	baseRadius: number;
-	endRadius: number;
-	flipperRadius: number;
-	angleStart: number;
-	angleEnd: number;
-	zLow: number;
-	zHigh: number;
+	center: Vertex2D
+	baseRadius: number
+	endRadius: number
+	flipperRadius: number
+	angleStart: number
+	angleEnd: number
+	zLow: number
+	zHigh: number
 }

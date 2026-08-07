@@ -17,52 +17,51 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import * as chai from 'chai';
-import { expect } from 'chai';
-import { TableBuilder } from '../../test/table-builder';
-import { Table } from '../vpt/table/table';
-import { AssignKey } from './key-code';
-import { Player } from './player';
+import * as chai from 'chai'
+import { expect } from 'chai'
+import sinonChai from 'sinon-chai'
+import { TableBuilder } from '../../test/table-builder'
+import type { Table } from '../vpt/table/table'
+import { AssignKey } from './key-code'
+import { Player } from './player'
 
-chai.use(require('sinon-chai'));
+chai.use((sinonChai as any).default ?? sinonChai)
 
 /* tslint:disable:no-unused-expression */
 describe('The VPinball input handler', () => {
-
-	let table: Table;
-	let player: Player;
-	let scope: any;
+	let table: Table
+	let player: Player
+	let scope: any
 
 	beforeEach(() => {
-		scope = {};
+		scope = {}
 		// this just writes the key code to the scope so we can assert it later
-		const vbs = `Sub Table1_KeyDown(ByVal keycode)\nkeyDown = keycode\nEnd Sub\nSub Table1_KeyUp(ByVal keycode)\nkeyUp = keycode\nEnd Sub\n`;
-		table = new TableBuilder().withTableScript(vbs).build('Table1');
-		player = new Player(table).init(scope);
-	});
+		const vbs = `Sub Table1_KeyDown(ByVal keycode)\nkeyDown = keycode\nEnd Sub\nSub Table1_KeyUp(ByVal keycode)\nkeyUp = keycode\nEnd Sub\n`
+		table = new TableBuilder().withTableScript(vbs).build('Table1')
+		player = new Player(table).init(scope)
+	})
 
 	it('should react on left flipper key down', () => {
-		player.onKeyDown({code: 'ControlLeft', key: 'Control', ts: Date.now()});
-		player.updatePhysics(20);
-		expect(scope.keyDown).to.be.equal(player.getKey(AssignKey.LeftFlipperKey));
-	});
+		player.onKeyDown({ code: 'ControlLeft', key: 'Control', ts: Date.now() })
+		player.updatePhysics(20)
+		expect(scope.keyDown).to.be.equal(player.getKey(AssignKey.LeftFlipperKey))
+	})
 
 	it('should react on plunger key down', () => {
-		player.onKeyDown({code: 'Enter', key: 'Enter', ts: Date.now()});
-		player.updatePhysics(20);
-		expect(scope.keyDown).to.be.equal(player.getKey(AssignKey.PlungerKey));
-	});
+		player.onKeyDown({ code: 'Enter', key: 'Enter', ts: Date.now() })
+		player.updatePhysics(20)
+		expect(scope.keyDown).to.be.equal(player.getKey(AssignKey.PlungerKey))
+	})
 
 	it('should react on some other key down', () => {
-		player.onKeyDown({code: 'KeyG', key: 'g', ts: Date.now()});
-		player.updatePhysics(20);
-		expect(scope.keyDown).to.be.equal(0x22);
-	});
+		player.onKeyDown({ code: 'KeyG', key: 'g', ts: Date.now() })
+		player.updatePhysics(20)
+		expect(scope.keyDown).to.be.equal(0x22)
+	})
 
 	it('should react on a key up', () => {
-		player.onKeyUp({code: 'ControlRight', key: 'Control', ts: Date.now()});
-		player.updatePhysics(20);
-		expect(scope.keyUp).to.be.equal(player.getKey(AssignKey.RightFlipperKey));
-	});
-
-});
+		player.onKeyUp({ code: 'ControlRight', key: 'Control', ts: Date.now() })
+		player.updatePhysics(20)
+		expect(scope.keyUp).to.be.equal(player.getKey(AssignKey.RightFlipperKey))
+	})
+})

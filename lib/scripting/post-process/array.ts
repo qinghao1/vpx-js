@@ -17,7 +17,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { AssignmentExpression, CallExpression, Expression, Statement } from 'estree';
+import type { AssignmentExpression, CallExpression, Expression, Statement } from 'estree'
 import {
 	arrayExpression,
 	assignmentExpression,
@@ -26,53 +26,53 @@ import {
 	identifier,
 	literal,
 	memberExpression,
-} from '../estree';
-import { ESIToken } from '../grammar/grammar';
-import { Transformer } from '../transformer/transformer';
+} from '../estree'
+import type { ESIToken } from '../grammar/grammar'
+import { Transformer } from '../transformer/transformer'
 
 export function ppArray(node: ESIToken): any {
 	switch (node.type) {
 		case 'RedimStatement':
 		case 'RedimStatementInline':
-			return ppRedimStatement(node);
+			return ppRedimStatement(node)
 		case 'RedimClauses':
-			return ppRedimClauses(node);
+			return ppRedimClauses(node)
 		case 'RedimClause':
-			return ppRedimClause(node);
+			return ppRedimClause(node)
 		case 'EraseStatement':
 		case 'EraseStatementInline':
-			return ppEraseStatement(node);
+			return ppEraseStatement(node)
 		case 'EraseExpressions':
-			return ppEraseExpressions(node);
+			return ppEraseExpressions(node)
 	}
-	return null;
+	return null
 }
 
 function ppRedimStatement(node: ESIToken): any {
-	const stmts: Statement[] = [];
-	const exprs: AssignmentExpression[] = node.children[0].estree;
+	const stmts: Statement[] = []
+	const exprs: AssignmentExpression[] = node.children[0].estree
 	for (const expr of exprs) {
 		if (node.text.startsWith('ReDim Preserve ')) {
-			(expr.right as CallExpression).arguments.push(literal(true));
+			;(expr.right as CallExpression).arguments.push(literal(true))
 		}
-		stmts.push(expressionStatement(expr));
+		stmts.push(expressionStatement(expr))
 	}
-	return stmts;
+	return stmts
 }
 
 function ppRedimClauses(node: ESIToken): any {
-	const estree = [];
+	const estree = []
 	for (const child of node.children) {
 		if (child.type === 'RedimClause') {
-			estree.push(child.estree);
+			estree.push(child.estree)
 		}
 	}
-	return estree;
+	return estree
 }
 
 function ppRedimClause(node: ESIToken): any {
-	const id = node.children[0].estree;
-	const args = node.children[1].estree;
+	const id = node.children[0].estree
+	const args = node.children[1].estree
 	return assignmentExpression(
 		id,
 		'=',
@@ -80,32 +80,30 @@ function ppRedimClause(node: ESIToken): any {
 			id,
 			arrayExpression(args),
 		]),
-	);
+	)
 }
 
 function ppEraseStatement(node: ESIToken): any {
-	const estree = [];
-	const exprs = node.children[0].estree as Expression[];
+	const estree = []
+	const exprs = node.children[0].estree as Expression[]
 	for (const expr of exprs) {
-		estree.push(expressionStatement(expr));
+		estree.push(expressionStatement(expr))
 	}
-	return estree;
+	return estree
 }
 
 function ppEraseExpressions(node: ESIToken): any {
-	const estree = [];
+	const estree = []
 	for (const child of node.children) {
 		if (child.type === 'Expression') {
 			estree.push(
 				assignmentExpression(
 					child.estree,
 					'=',
-					callExpression(memberExpression(identifier(Transformer.VBSHELPER_NAME), identifier('erase')), [
-						child.estree,
-					]),
+					callExpression(memberExpression(identifier(Transformer.VBSHELPER_NAME), identifier('erase')), [child.estree]),
 				),
-			);
+			)
 		}
 	}
-	return estree;
+	return estree
 }

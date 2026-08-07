@@ -17,40 +17,39 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { variableDeclaration, variableDeclarator } from '../estree';
-import { ESIToken } from '../grammar/grammar';
+import { variableDeclaration, variableDeclarator } from '../estree'
+import type { ESIToken } from '../grammar/grammar'
 
 export function ppConst(node: ESIToken): any {
 	switch (node.type) {
 		case 'ConstantMemberDeclaration':
 		case 'ConstantMemberDeclarationInline':
-			return ppConstantMemberDeclaration(node);
+			return ppConstantMemberDeclaration(node)
 		case 'ConstantDeclarators':
-			return ppConstantDeclarators(node);
+			return ppConstantDeclarators(node)
 		case 'ConstantDeclarator':
-			return ppConstantDeclarator(node);
+			return ppConstantDeclarator(node)
 	}
-	return null;
+	return null
 }
 
 function ppConstantMemberDeclaration(node: ESIToken): any {
-	const constDecls =
-		node.children[0].type === 'ConstantDeclarators' ? node.children[0].estree : node.children[1].estree;
-	return variableDeclaration('const', constDecls);
+	const constDecls = node.children[0].type === 'ConstantDeclarators' ? node.children[0].estree : node.children[1].estree
+	return variableDeclaration('const', constDecls)
 }
 
 function ppConstantDeclarators(node: ESIToken): any {
-	const estree = [];
+	const estree = []
 	for (const child of node.children) {
 		if (child.type === 'ConstantDeclarator') {
-			estree.push(child.estree);
+			estree.push(child.estree)
 		}
 	}
-	return estree;
+	return estree
 }
 
 function ppConstantDeclarator(node: ESIToken): any {
-	const id = node.children[0].estree;
-	const expr = node.children[2].estree;
-	return variableDeclarator(id, expr);
+	const id = node.children[0].estree
+	const expr = node.children[2].estree
+	return variableDeclarator(id, expr)
 }

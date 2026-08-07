@@ -17,41 +17,97 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { ItemApi } from '../item-api';
-import { DecalData } from './decal-data';
+import { ItemApi } from '../item-api'
+import type { DecalData } from './decal-data'
 
 export class DecalApi extends ItemApi<DecalData> {
-
-	get Rotation() { return this.data.rotation; }
-	set Rotation(v) { this.data.rotation = v; }
-	get Image() { return this.data.szImage; }
-	set Image(v) { this._assertNonHdrImage(v); this.data.szImage = v; }
-	get Width() { return this.data.width; }
-	set Width(v) { this.data.width = v; }
-	get Height() { return this.data.height; }
-	set Height(v) { this.data.height = v; }
-	get X() { return this.data.center.x; }
-	set X(v) { this.data.center.x = v; }
-	get Y() { return this.data.center.y; }
-	set Y(v) { this.data.center.y = v; }
-	get Surface() { return this.data.szSurface; }
-	set Surface(v) { this.data.szSurface = v; }
-	get Type() { return this.data.decalType; }
-	set Type(v) { this.data.decalType = v; }
-	get Text() { return this.data.text; }
-	set Text(v) { this.data.text = v; }
-	get SizingType() { return this.data.sizingType; }
-	set SizingType(v) { this.data.sizingType = v; }
-	get FontColor() { return this.data.color; }
-	set FontColor(v) { this.data.color = v; }
-	get Material() { return this.data.szMaterial; }
-	set Material(v) { this.data.szMaterial = v; }
-	get Font() { return this.data.font; }
-	set Font(v) { this.data.font = v; }
-	get HasVerticalText() { return this.data.verticalText; }
-	set HasVerticalText(v) { this.data.verticalText = v; }
+	get Rotation() {
+		return this.data.rotation
+	}
+	set Rotation(v) {
+		this.data.rotation = v
+	}
+	get Image() {
+		return this.data.szImage
+	}
+	set Image(v) {
+		this._assertNonHdrImage(v)
+		this.data.szImage = v
+	}
+	get Width() {
+		return this.data.width
+	}
+	set Width(v) {
+		this.data.width = v
+	}
+	get Height() {
+		return this.data.height
+	}
+	set Height(v) {
+		this.data.height = v
+	}
+	get X() {
+		return this.data.center.x
+	}
+	set X(v) {
+		this.data.center.x = v
+	}
+	get Y() {
+		return this.data.center.y
+	}
+	set Y(v) {
+		this.data.center.y = v
+	}
+	get Surface() {
+		return this.data.szSurface
+	}
+	set Surface(v) {
+		this.data.szSurface = v
+	}
+	get Type() {
+		return this.data.decalType
+	}
+	set Type(v) {
+		this.data.decalType = v
+	}
+	get Text() {
+		return this.data.text
+	}
+	set Text(v) {
+		this.data.text = v
+	}
+	get SizingType() {
+		return this.data.sizingType
+	}
+	set SizingType(v) {
+		this.data.sizingType = v
+	}
+	get FontColor() {
+		return this.data.color
+	}
+	set FontColor(v) {
+		this.data.color = v
+	}
+	get Material() {
+		return this.data.szMaterial
+	}
+	set Material(v) {
+		this.data.szMaterial = v
+	}
+	get Font() {
+		return this.data.font
+	}
+	set Font(v) {
+		this.data.font = v
+	}
+	get HasVerticalText() {
+		return this.data.verticalText
+	}
+	set HasVerticalText(v) {
+		this.data.verticalText = v
+	}
 
 	protected _getPropertyNames(): string[] {
-		return Object.getOwnPropertyNames(DecalApi.prototype);
+		return Object.getOwnPropertyNames(DecalApi.prototype)
 	}
 }

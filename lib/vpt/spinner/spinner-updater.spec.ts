@@ -17,60 +17,58 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import * as chai from 'chai';
-import { expect } from 'chai';
-import { spy } from 'sinon';
-import { TableBuilder } from '../../../test/table-builder';
-import { TestRenderApi } from '../../../test/test-render-api';
-import { Player } from '../../game/player';
-import { Table } from '../table/table';
-import { SpinnerState } from './spinner-state';
+import * as chai from 'chai'
+import { expect } from 'chai'
+import { spy } from 'sinon'
+import sinonChai from 'sinon-chai'
+import { TableBuilder } from '../../../test/table-builder'
+import { TestRenderApi } from '../../../test/test-render-api'
+import { Player } from '../../game/player'
+import type { Table } from '../table/table'
+import type { SpinnerState } from './spinner-state'
 
 /* tslint:disable:no-unused-expression */
-chai.use(require('sinon-chai'));
+chai.use((sinonChai as any).default ?? sinonChai)
 
 describe('The VPinball spinner updater', () => {
-
-	let table: Table;
-	let player: Player;
+	let table: Table
+	let player: Player
 
 	beforeEach(() => {
-		table = new TableBuilder()
-			.addMaterial('opaque', { isOpacityActive: false })
-			.addSpinner('spinner')
-			.build();
+		table = new TableBuilder().addMaterial('opaque', { isOpacityActive: false }).addSpinner('spinner').build()
 
 		// init player
-		player = new Player(table).init();
-	});
+		player = new Player(table).init()
+	})
 
 	it('should update visibility', async () => {
-		table.spinners.spinner.getApi().Visible = false;
-		const states = player.popStates();
+		table.spinners.spinner.getApi().Visible = false
+		const states = player.popStates()
 
-		expect(states.getState<SpinnerState>('spinner').isVisible).to.equal(false);
-		states.getState<SpinnerState>('spinner').release();
-	});
+		expect(states.getState<SpinnerState>('spinner').isVisible).to.equal(false)
+		states.getState<SpinnerState>('spinner').release()
+	})
 
 	it('should apply visibility', async () => {
-		const renderApi = new TestRenderApi();
-		spy(renderApi, 'applyVisibility');
-		table.spinners.spinner.getUpdater().applyState(null, { isVisible: true, showBracket: false } as SpinnerState, renderApi, table);
-		expect(renderApi.applyVisibility).to.have.been.calledTwice;
-	});
+		const renderApi = new TestRenderApi()
+		spy(renderApi, 'applyVisibility')
+		table.spinners.spinner
+			.getUpdater()
+			.applyState(null, { isVisible: true, showBracket: false } as SpinnerState, renderApi, table)
+		expect(renderApi.applyVisibility).to.have.been.calledTwice
+	})
 
 	it('should apply the material', async () => {
-		const renderApi = new TestRenderApi();
-		spy(renderApi, 'applyMaterial');
-		table.spinners.spinner.getUpdater().applyState(null, { material: 'opaque' } as SpinnerState, renderApi, table);
-		expect(renderApi.applyMaterial).to.have.been.calledOnce;
-	});
+		const renderApi = new TestRenderApi()
+		spy(renderApi, 'applyMaterial')
+		table.spinners.spinner.getUpdater().applyState(null, { material: 'opaque' } as SpinnerState, renderApi, table)
+		expect(renderApi.applyMaterial).to.have.been.calledOnce
+	})
 
 	it('should apply the transformation', async () => {
-		const renderApi = new TestRenderApi();
-		spy(renderApi, 'applyMatrixToNode');
-		table.spinners.spinner.getUpdater().applyState(null, { angle: 15 } as SpinnerState, renderApi, table);
-		expect(renderApi.applyMatrixToNode).to.have.been.calledOnce;
-	});
-
-});
+		const renderApi = new TestRenderApi()
+		spy(renderApi, 'applyMatrixToNode')
+		table.spinners.spinner.getUpdater().applyState(null, { angle: 15 } as SpinnerState, renderApi, table)
+		expect(renderApi.applyMatrixToNode).to.have.been.calledOnce
+	})
+})

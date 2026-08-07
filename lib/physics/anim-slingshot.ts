@@ -17,8 +17,8 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { PlayerPhysics } from '../game/player-physics';
-import { AnimObject } from './anim-object';
+import type { PlayerPhysics } from '../game/player-physics'
+import type { AnimObject } from './anim-object'
 
 /**
  * Slingshot animations are only visible when the ball hit the slingshot
@@ -29,17 +29,16 @@ export class SlingshotAnimObject implements AnimObject {
 	/**
 	 * Time at which to pull in slingshot, Zero means the slingshot is currently reset
 	 */
-	public timeReset: number = 0;
-	public animations: boolean = false;
-	public iframe: boolean = false;
+	public timeReset: number = 0
+	public animations: boolean = false
+	public iframe: boolean = false
 
 	public animate(physics: PlayerPhysics) {
 		if (!this.iframe && this.timeReset !== 0 && this.animations) {
-			this.iframe = true;
-
+			this.iframe = true
 		} else if (this.iframe && this.timeReset < physics.timeMsec) {
-			this.iframe = false;
-			this.timeReset = 0;
+			this.iframe = false
+			this.timeReset = 0
 		}
 	}
 }

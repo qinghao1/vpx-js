@@ -17,30 +17,28 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { degToRad } from '../../math/float';
-import { Vertex2D } from '../../math/vertex2d';
-import { HitCircle } from '../../physics/hit-circle';
-import { SpinnerData } from './spinner-data';
-import { SpinnerState } from './spinner-state';
+import { degToRad } from '../../math/float'
+import { Vertex2D } from '../../math/vertex2d'
+import { HitCircle } from '../../physics/hit-circle'
+import type { SpinnerData } from './spinner-data'
+import type { SpinnerState } from './spinner-state'
 
 export class SpinnerHitGenerator {
-
-	private readonly data: SpinnerData;
+	private readonly data: SpinnerData
 
 	constructor(data: SpinnerData) {
-		this.data = data;
+		this.data = data
 	}
 
 	public getHitShapes(state: SpinnerState, height: number): HitCircle[] {
-
-		const h = this.data.height + 30.0;
+		const h = this.data.height + 30.0
 
 		if (this.data.showBracket) {
 			/*add a hit shape for the bracket if shown, just in case if the bracket spinner height is low enough so the ball can hit it*/
-			const halfLength = this.data.length * 0.5 + (this.data.length * 0.1875);
-			const radAngle = degToRad(this.data.rotation);
-			const sn = Math.sin(radAngle);
-			const cs = Math.cos(radAngle);
+			const halfLength = this.data.length * 0.5 + this.data.length * 0.1875
+			const radAngle = degToRad(this.data.rotation)
+			const sn = Math.sin(radAngle)
+			const cs = Math.cos(radAngle)
 
 			return [
 				new HitCircle(
@@ -55,8 +53,8 @@ export class SpinnerHitGenerator {
 					height + this.data.height,
 					height + h,
 				),
-			];
+			]
 		}
-		return [];
+		return []
 	}
 }

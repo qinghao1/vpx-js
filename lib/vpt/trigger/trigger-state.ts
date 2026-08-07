@@ -17,58 +17,62 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { Pool } from '../../util/object-pool';
-import { ItemState } from '../item-state';
+import { Pool } from '../../util/object-pool'
+import { ItemState } from '../item-state'
 
 export class TriggerState extends ItemState {
+	public static readonly POOL = new Pool(TriggerState)
 
-	public static readonly POOL = new Pool(TriggerState);
-
-	public heightOffset: number = 0;
-	public material?: string;
+	public heightOffset: number = 0
+	public material?: string
 
 	public constructor() {
-		super();
+		super()
 	}
 
-	public static claim(name: string, heightOffset: number, material: string | undefined, isVisible: boolean): TriggerState {
-		const state = TriggerState.POOL.get();
-		state.name = name;
-		state.heightOffset = heightOffset;
-		state.material = material;
-		state.isVisible = isVisible;
-		return state;
+	public static claim(
+		name: string,
+		heightOffset: number,
+		material: string | undefined,
+		isVisible: boolean,
+	): TriggerState {
+		const state = TriggerState.POOL.get()
+		state.name = name
+		state.heightOffset = heightOffset
+		state.material = material
+		state.isVisible = isVisible
+		return state
 	}
 
 	public clone(): TriggerState {
-		return TriggerState.claim(this.name, this.heightOffset, this.material, this.isVisible);
+		return TriggerState.claim(this.name, this.heightOffset, this.material, this.isVisible)
 	}
 
 	public diff(state: TriggerState): TriggerState {
-		const diff = this.clone();
+		const diff = this.clone()
 		if (diff.heightOffset === state.heightOffset) {
-			delete diff.heightOffset;
+			delete diff.heightOffset
 		}
 		if (diff.material === state.material) {
-			delete diff.material;
+			delete diff.material
 		}
 		if (diff.isVisible === state.isVisible) {
-			delete diff.isVisible;
+			delete diff.isVisible
 		}
-		return diff;
+		return diff
 	}
 
 	public release(): void {
-		TriggerState.POOL.release(this);
+		TriggerState.POOL.release(this)
 	}
 
 	public equals(state: TriggerState): boolean {
 		/* istanbul ignore if: we don't actually pass empty states. */
 		if (!state) {
-			return false;
+			return false
 		}
-		return state.heightOffset === this.heightOffset
-			&& state.material === this.material
-			&& state.isVisible === this.isVisible;
+		return (
+			state.heightOffset === this.heightOffset && state.material === this.material && state.isVisible === this.isVisible
+		)
 	}
 }

@@ -21,9 +21,9 @@
  * Amount of msecs to wait (at least) until same timer can be triggered again
  * (e.g. they can fall behind, if set to > 1, as update cycle is 1000Hz)
  */
-export const MAX_TIMER_MSEC_INTERVAL = 1;
+export const MAX_TIMER_MSEC_INTERVAL = 1
 /**
  * Amount of msecs that all timers combined can take per frame (e.g. they can
  * fall behind, if set to < somelargevalue)
  */
-export const MAX_TIMERS_MSEC_OVERALL = 5;
+export const MAX_TIMERS_MSEC_OVERALL = 5

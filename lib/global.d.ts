@@ -1,2 +1,2 @@
-declare module '*.vbs';
-declare module '*.bnf';
+declare module '*.vbs'
+declare module '*.bnf'

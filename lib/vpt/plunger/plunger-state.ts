@@ -17,50 +17,49 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { Pool } from '../../util/object-pool';
-import { ItemState } from '../item-state';
+import { Pool } from '../../util/object-pool'
+import { ItemState } from '../item-state'
 
 export class PlungerState extends ItemState {
-
-	public static readonly POOL = new Pool(PlungerState);
+	public static readonly POOL = new Pool(PlungerState)
 
 	/**
 	 * Which frame to render
 	 */
-	public frame: number = 0;
+	public frame: number = 0
 
 	public constructor() {
-		super();
+		super()
 	}
 
 	public static claim(name: string, frame: number): PlungerState {
-		const state = PlungerState.POOL.get();
-		state.name = name;
-		state.frame = frame;
-		return state;
+		const state = PlungerState.POOL.get()
+		state.name = name
+		state.frame = frame
+		return state
 	}
 
 	public clone(): PlungerState {
-		return PlungerState.claim(this.name, this.frame);
+		return PlungerState.claim(this.name, this.frame)
 	}
 
 	public diff(state: PlungerState): PlungerState {
-		const diff = this.clone();
+		const diff = this.clone()
 		if (diff.frame === state.frame) {
-			delete diff.frame;
+			delete diff.frame
 		}
-		return diff;
+		return diff
 	}
 
 	public release(): void {
-		PlungerState.POOL.release(this);
+		PlungerState.POOL.release(this)
 	}
 
 	public equals(state: PlungerState): boolean {
 		/* istanbul ignore if: we don't actually pass empty states. */
 		if (!state) {
-			return false;
+			return false
 		}
-		return state.frame === this.frame;
+		return state.frame === this.frame
 	}
 }

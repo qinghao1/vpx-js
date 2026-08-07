@@ -17,55 +17,59 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { Event } from '../../game/event';
-import { EventProxy } from '../../game/event-proxy';
-import { PlayerPhysics } from '../../game/player-physics';
-import { CollisionEvent } from '../../physics/collision-event';
-import { CollisionType } from '../../physics/collision-type';
-import { STATICTIME } from '../../physics/constants';
-import { HitCircle } from '../../physics/hit-circle';
-import { Ball } from '../ball/ball';
-import { Table } from '../table/table';
-import { TriggerAnimation } from './trigger-animation';
-import { TriggerData } from './trigger-data';
+import { Event } from '../../game/event'
+import type { EventProxy } from '../../game/event-proxy'
+import type { PlayerPhysics } from '../../game/player-physics'
+import type { CollisionEvent } from '../../physics/collision-event'
+import { CollisionType } from '../../physics/collision-type'
+import { STATICTIME } from '../../physics/constants'
+import { HitCircle } from '../../physics/hit-circle'
+import type { Ball } from '../ball/ball'
+import type { Table } from '../table/table'
+import type { TriggerAnimation } from './trigger-animation'
+import type { TriggerData } from './trigger-data'
 
 export class TriggerHitCircle extends HitCircle {
-
-	private readonly animation: TriggerAnimation;
+	private readonly animation: TriggerAnimation
 
 	constructor(data: TriggerData, animation: TriggerAnimation, events: EventProxy, table: Table) {
-		super(data.center, data.radius, table.getSurfaceHeight(data.szSurface, data.center.x, data.center.y), table.getSurfaceHeight(data.szSurface, data.center.x, data.center.y) + data.hitHeight);
-		this.animation = animation;
-		this.isEnabled = data.isEnabled;
-		this.objType = CollisionType.Trigger;
-		this.obj = events;
+		super(
+			data.center,
+			data.radius,
+			table.getSurfaceHeight(data.szSurface, data.center.x, data.center.y),
+			table.getSurfaceHeight(data.szSurface, data.center.x, data.center.y) + data.hitHeight,
+		)
+		this.animation = animation
+		this.isEnabled = data.isEnabled
+		this.objType = CollisionType.Trigger
+		this.obj = events
 	}
 
 	public hitTest(ball: Ball, dTime: number, coll: CollisionEvent): number {
 		// any face, not-lateral, non-rigid
-		return super.hitTestBasicRadius(ball, dTime, coll, false, false, false);
+		return super.hitTestBasicRadius(ball, dTime, coll, false, false, false)
 	}
 
 	public collide(coll: CollisionEvent, physics: PlayerPhysics): void {
-		const ball = coll.ball;
+		const ball = coll.ball
 
 		if ((this.objType !== CollisionType.Trigger && this.objType !== CollisionType.Kicker) || !ball.hit.isRealBall()) {
-			return;
+			return
 		}
 
-		const i = ball.hit.vpVolObjs.indexOf(this.obj!);                         // if -1 then not in objects volume set (i.e not already hit)
-		if (coll.hitFlag !== i < 0) {                                            // Hit == NotAlreadyHit
-			ball.state.pos.addAndRelease(ball.hit.vel.clone(true).multiplyScalar(STATICTIME)); // move ball slightly forward
+		const i = ball.hit.vpVolObjs.indexOf(this.obj!) // if -1 then not in objects volume set (i.e not already hit)
+		if (coll.hitFlag !== i < 0) {
+			// Hit == NotAlreadyHit
+			ball.state.pos.addAndRelease(ball.hit.vel.clone(true).multiplyScalar(STATICTIME)) // move ball slightly forward
 
 			if (i < 0) {
-				ball.hit.vpVolObjs.push(this.obj!);
-				this.animation.triggerAnimationHit();
-				this.obj!.fireGroupEvent(Event.HitEventsHit);
-
+				ball.hit.vpVolObjs.push(this.obj!)
+				this.animation.triggerAnimationHit()
+				this.obj!.fireGroupEvent(Event.HitEventsHit)
 			} else {
-				ball.hit.vpVolObjs.splice(i, 1);
-				this.animation.triggerAnimationUnhit();
-				this.obj!.fireGroupEvent(Event.HitEventsUnhit);
+				ball.hit.vpVolObjs.splice(i, 1)
+				this.animation.triggerAnimationUnhit()
+				this.obj!.fireGroupEvent(Event.HitEventsUnhit)
 			}
 		}
 	}

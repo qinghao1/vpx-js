@@ -17,8 +17,8 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { replace } from 'estraverse';
-import {
+import { replace } from 'estraverse'
+import type {
 	BlockStatement,
 	ClassBody,
 	FunctionDeclaration,
@@ -26,7 +26,7 @@ import {
 	MethodDefinition,
 	Statement,
 	VariableDeclaration,
-} from 'estree';
+} from 'estree'
 import {
 	assignmentExpression,
 	blockStatement,
@@ -41,63 +41,60 @@ import {
 	thisExpression,
 	variableDeclaration,
 	variableDeclarator,
-} from '../estree';
-import { ESIToken } from '../grammar/grammar';
+} from '../estree'
+import type { ESIToken } from '../grammar/grammar'
 
 export function ppClass(node: ESIToken): any {
 	switch (node.type) {
 		case 'ClassDeclaration':
-			return ppClassDeclaration(node);
+			return ppClassDeclaration(node)
 		case 'ConstructorMemberDeclaration':
-			return ppConstructorMemberDeclaration(node);
+			return ppConstructorMemberDeclaration(node)
 		case 'RegularPropertyMemberDeclaration':
-			return ppRegularPropertyMemberDeclaration(node);
+			return ppRegularPropertyMemberDeclaration(node)
 		case 'PropertyGetDeclaration':
-			return ppPropertyGetDeclaration(node);
+			return ppPropertyGetDeclaration(node)
 		case 'PropertyLetDeclaration':
-			return ppPropertyLetDeclaration(node);
+			return ppPropertyLetDeclaration(node)
 		case 'PropertySetDeclaration':
-			return ppPropertySetDeclaration(node);
+			return ppPropertySetDeclaration(node)
 	}
-	return null;
+	return null
 }
 
 function ppClassDeclaration(node: ESIToken): any {
-	let id = identifier('undefined');
-	let constructor: MethodDefinition | undefined;
-	const methodDefinitions: MethodDefinition[] = [];
-	const varStmts: Statement[] = [];
-	const ids: string[] = [];
+	let id = identifier('undefined')
+	let constructor: MethodDefinition | undefined
+	const methodDefinitions: MethodDefinition[] = []
+	const varStmts: Statement[] = []
+	const ids: string[] = []
 	for (const child of node.children) {
 		switch (child.type) {
 			case 'Identifier':
-				id = child.estree;
-				break;
-			case 'ClassMemberDeclaration':
-				const memberDecl = child.children[0];
+				id = child.estree
+				break
+			case 'ClassMemberDeclaration': {
+				const memberDecl = child.children[0]
 				switch (memberDecl.type) {
 					case 'ConstructorMemberDeclaration':
-						constructor = memberDecl.estree;
-						break;
-					case 'MethodMemberDeclaration':
-						const functionDecl = memberDecl.estree as FunctionDeclaration;
-						const functionId = functionDecl.id as Identifier;
+						constructor = memberDecl.estree
+						break
+					case 'MethodMemberDeclaration': {
+						const functionDecl = memberDecl.estree as FunctionDeclaration
+						const functionId = functionDecl.id as Identifier
 						methodDefinitions.push(
-							methodDefinition(
-								functionId,
-								'method',
-								functionExpression(functionDecl.body, functionDecl.params),
-							),
-						);
+							methodDefinition(functionId, 'method', functionExpression(functionDecl.body, functionDecl.params)),
+						)
 
-						break;
+						break
+					}
 					case 'PropertyMemberDeclaration':
-						methodDefinitions.push(memberDecl.estree);
-						break;
+						methodDefinitions.push(memberDecl.estree)
+						break
 					case 'VariableMemberDeclaration':
 					case 'ConstantMemberDeclaration':
 						for (const varDecl of (memberDecl.estree as VariableDeclaration).declarations) {
-							const varId = varDecl.id as Identifier;
+							const varId = varDecl.id as Identifier
 							varStmts.push(
 								expressionStatement(
 									assignmentExpression(
@@ -106,22 +103,19 @@ function ppClassDeclaration(node: ESIToken): any {
 										varDecl.init ? varDecl.init : identifier('undefined'),
 									),
 								),
-							);
-							ids.push(varId.name);
+							)
+							ids.push(varId.name)
 						}
-						break;
+						break
 				}
-				break;
+				break
+			}
 		}
 	}
 	if (!constructor) {
-		constructor = methodDefinition(
-			identifier('constructor'),
-			'constructor',
-			functionExpression(blockStatement([]), []),
-		);
+		constructor = methodDefinition(identifier('constructor'), 'constructor', functionExpression(blockStatement([]), []))
 	}
-	let body: ClassBody = classBody([constructor, ...methodDefinitions]);
+	let body: ClassBody = classBody([constructor, ...methodDefinitions])
 	body = replace(body, {
 		leave: (bodyNode, parentNode) => {
 			if (bodyNode.type === 'Identifier') {
@@ -130,111 +124,113 @@ function ppClassDeclaration(node: ESIToken): any {
 						if (parentNode.type === 'MemberExpression') {
 							if (parentNode.object.type === 'Identifier') {
 								if (parentNode.object.name === bodyNode.name) {
-									return memberExpression(thisExpression(), bodyNode);
+									return memberExpression(thisExpression(), bodyNode)
 								}
 							}
 						} else {
-							return memberExpression(thisExpression(), bodyNode);
+							return memberExpression(thisExpression(), bodyNode)
 						}
 					}
 				}
 			}
 		},
-	}) as ClassBody;
-	body.body[0].value.body.body.unshift(...varStmts);
-	return classDeclaration(id, body);
+	}) as ClassBody
+	if ('value' in body.body[0]) {
+		;(body.body[0] as any).value.body.body.unshift(...varStmts)
+	}
+	return classDeclaration(id, body)
 }
 
 function ppConstructorMemberDeclaration(node: ESIToken): any {
-	let block: BlockStatement | undefined;
+	let block: BlockStatement | undefined
 	for (const child of node.children) {
 		if (child.type === 'Block') {
-			block = child.estree;
+			block = child.estree
 		}
 	}
 	return methodDefinition(
 		identifier('constructor'),
 		'constructor',
 		functionExpression(block ? block : blockStatement([]), []),
-	);
+	)
 }
 
 function ppRegularPropertyMemberDeclaration(node: ESIToken): any {
-	return node.children[1].estree;
+	return node.children[1].estree
 }
 
 function ppPropertyGetDeclaration(node: ESIToken): any {
-	let id: Identifier = identifier('undefined');
-	let params: Identifier[] = [];
-	let block: BlockStatement | undefined;
+	let id: Identifier = identifier('undefined')
+	let params: Identifier[] = []
+	let block: BlockStatement | undefined
 	for (const child of node.children) {
 		switch (child.type) {
 			case 'Identifier':
-				id = child.estree;
-				break;
+				id = child.estree
+				break
 			case 'ParameterList':
-				params = child.estree;
-				break;
+				params = child.estree
+				break
 			case 'Block':
-				block = child.estree;
-				break;
+				block = child.estree
+				break
 		}
 	}
 	if (block) {
 		block = replace(block, {
-			enter: blockNode => {
+			enter: (blockNode) => {
 				if (blockNode.type === 'ReturnStatement') {
-					blockNode.argument = id;
-					return blockNode;
+					blockNode.argument = id
+					return blockNode
 				}
 			},
-		}) as BlockStatement;
+		}) as BlockStatement
 	} else {
-		block = blockStatement([]);
+		block = blockStatement([])
 	}
-	block.body.unshift(variableDeclaration('let', [variableDeclarator(id, identifier('undefined'))]));
+	block.body.unshift(variableDeclaration('let', [variableDeclarator(id, identifier('undefined'))]))
 	if (block.body[block.body.length - 1].type !== 'ReturnStatement') {
-		block.body.push(returnStatement(id));
+		block.body.push(returnStatement(id))
 	}
-	return methodDefinition(id, 'method', functionExpression(block, params));
+	return methodDefinition(id, 'method', functionExpression(block, params))
 }
 
 function ppPropertyLetDeclaration(node: ESIToken): any {
-	let id: Identifier = identifier('undefined');
-	let params: Identifier[] = [];
-	let block: BlockStatement | undefined;
+	let id: Identifier = identifier('undefined')
+	let params: Identifier[] = []
+	let block: BlockStatement | undefined
 	for (const child of node.children) {
 		switch (child.type) {
 			case 'Identifier':
-				id = child.estree;
-				break;
+				id = child.estree
+				break
 			case 'ParameterList':
-				params = child.estree;
-				break;
+				params = child.estree
+				break
 			case 'Block':
-				block = child.estree;
-				break;
+				block = child.estree
+				break
 		}
 	}
-	return methodDefinition(id, 'method', functionExpression(block ? block : blockStatement([]), params));
+	return methodDefinition(id, 'method', functionExpression(block ? block : blockStatement([]), params))
 }
 
 function ppPropertySetDeclaration(node: ESIToken): any {
-	let id: Identifier = identifier('undefined');
-	let params: Identifier[] = [];
-	let block: BlockStatement | undefined;
+	let id: Identifier = identifier('undefined')
+	let params: Identifier[] = []
+	let block: BlockStatement | undefined
 	for (const child of node.children) {
 		switch (child.type) {
 			case 'Identifier':
-				id = child.estree;
-				break;
+				id = child.estree
+				break
 			case 'ParameterList':
-				params = child.estree;
-				break;
+				params = child.estree
+				break
 			case 'Block':
-				block = child.estree;
-				break;
+				block = child.estree
+				break
 		}
 	}
-	return methodDefinition(id, 'method', functionExpression(block ? block : blockStatement([]), params));
+	return methodDefinition(id, 'method', functionExpression(block ? block : blockStatement([]), params))
 }

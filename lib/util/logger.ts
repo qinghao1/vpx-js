@@ -19,54 +19,53 @@
 
 /* tslint:disable:no-empty no-console */
 export class Logger implements ILogger {
-
-	private static instance: ILogger = new Logger();
+	private static instance: ILogger = new Logger()
 
 	public static logger(): ILogger {
-		return Logger.instance;
+		return Logger.instance
 	}
 
 	public static setLogger(l: ILogger) {
-		Logger.instance = l;
+		Logger.instance = l
 	}
 
 	public debug(format: any, ...param: any[]): void {
-		console.debug.apply(console.log, [ format, ...param ]);
+		console.debug.apply(console.log, [format, ...param])
 	}
 
 	public error(format: any, ...param: any[]): void {
-		console.error.apply(console.log, [ format, ...param ]);
+		console.error.apply(console.log, [format, ...param])
 	}
 
 	public info(format: any, ...param: any[]): void {
-		console.log.apply(console.log, [ format, ...param ]);
+		console.log.apply(console.log, [format, ...param])
 	}
 
 	public verbose(format: any, ...param: any[]): void {
-		console.debug.apply(console.log, [ format, ...param ]);
+		console.debug.apply(console.log, [format, ...param])
 	}
 
 	public warn(format: any, ...param: any[]): void {
-		console.warn.apply(console.log, [ format, ...param ]);
+		console.warn.apply(console.log, [format, ...param])
 	}
 
 	public wtf(format: any, ...param: any[]): void {
-		console.error.apply(console.log, [ format, ...param ]);
+		console.error.apply(console.log, [format, ...param])
 	}
 }
 
 export interface ILogger {
-	wtf(format: any, ...param: any[]): void;
+	wtf(format: any, ...param: any[]): void
 
-	error(format: any, ...param: any[]): void;
+	error(format: any, ...param: any[]): void
 
-	warn(format: any, ...param: any[]): void;
+	warn(format: any, ...param: any[]): void
 
-	info(format: any, ...param: any[]): void;
+	info(format: any, ...param: any[]): void
 
-	verbose(format: any, ...param: any[]): void;
+	verbose(format: any, ...param: any[]): void
 
-	debug(format: any, ...param: any[]): void;
+	debug(format: any, ...param: any[]): void
 }
 
 /**
@@ -78,17 +77,16 @@ export interface ILogger {
  * show what's going on.
  */
 export class Progress implements IProgress {
+	private currentTitle?: string
+	private currentAction?: string
 
-	private currentTitle?: string;
-	private currentAction?: string;
-
-	private static instance: IProgress = new Progress();
+	private static instance: IProgress = new Progress()
 
 	/**
 	 * Get the global instance.
 	 */
 	public static progress(): IProgress {
-		return Progress.instance;
+		return Progress.instance
 	}
 
 	/**
@@ -97,7 +95,7 @@ export class Progress implements IProgress {
 	 * @param p
 	 */
 	public static setProgress(p: IProgress) {
-		Progress.instance = p;
+		Progress.instance = p
 	}
 
 	/**
@@ -107,7 +105,7 @@ export class Progress implements IProgress {
 	 * @param title Displayed text
 	 */
 	public start(id: string, title: string): void {
-		this.currentTitle = title;
+		this.currentTitle = title
 	}
 
 	/**
@@ -115,8 +113,7 @@ export class Progress implements IProgress {
 	 * the progress dialog won't hide!
 	 * @param id ID of the operation
 	 */
-	public end(id: string): void {
-	}
+	public end(id: string): void {}
 
 	/**
 	 * Show what's currently going on. This is usually displayed on one line,
@@ -127,8 +124,8 @@ export class Progress implements IProgress {
 	 * @param details Details on the right
 	 */
 	public show(action: string, details?: string): void {
-		this.currentAction = action;
-		this.print(details);
+		this.currentAction = action
+		this.print(details)
 	}
 
 	/**
@@ -137,20 +134,24 @@ export class Progress implements IProgress {
 	 * @param details Details on the right
 	 */
 	public details(details: string): void {
-		this.print(details);
+		this.print(details)
 	}
 
+	private _lastPrint = 0
 	private print(details?: string) {
-		logger().error('%s: %s%s', this.currentTitle, this.currentAction, details ? ' (' + details + ')' : '');
+		const now = Date.now()
+		if (now - this._lastPrint < 300) return
+		this._lastPrint = now
+		logger().error('%s: %s%s', this.currentTitle, this.currentAction, details ? ' (' + details + ')' : '')
 	}
 }
 
 export interface IProgress {
-	start(id: string, title: string): void;
-	end(id: string): void;
-	show(action: string, details?: string): void;
-	details(details: string): void;
+	start(id: string, title: string): void
+	end(id: string): void
+	show(action: string, details?: string): void
+	details(details: string): void
 }
 
-export const logger = Logger.logger;
-export const progress = Progress.progress;
+export const logger = Logger.logger
+export const progress = Progress.progress

@@ -17,67 +17,65 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import * as chai from 'chai';
-import { expect } from 'chai';
-import { spy } from 'sinon';
-import { TableBuilder } from '../../../test/table-builder';
-import { TestRenderApi } from '../../../test/test-render-api';
-import { Player } from '../../game/player';
-import { Table } from '../table/table';
-import { RubberState } from './rubber-state';
+import * as chai from 'chai'
+import { expect } from 'chai'
+import { spy } from 'sinon'
+import sinonChai from 'sinon-chai'
+import { TableBuilder } from '../../../test/table-builder'
+import { TestRenderApi } from '../../../test/test-render-api'
+import { Player } from '../../game/player'
+import type { Table } from '../table/table'
+import type { RubberState } from './rubber-state'
 
 /* tslint:disable:no-unused-expression */
-chai.use(require('sinon-chai'));
+chai.use((sinonChai as any).default ?? sinonChai)
 
 describe('The VPinball rubber updater', () => {
-
-	let table: Table;
-	let player: Player;
+	let table: Table
+	let player: Player
 
 	beforeEach(() => {
-
 		table = new TableBuilder()
 			.addMaterial('opaque', { isOpacityActive: false })
 			.addRubber('r1', { staticRendering: false })
 			.addRubber('r2', { staticRendering: true })
-			.build();
+			.build()
 
 		// init player
-		player = new Player(table).init();
-	});
+		player = new Player(table).init()
+	})
 
 	it('should not update visibility when rendering is static', async () => {
-		table.rubbers.r2.getApi().Visible = false;
-		const states = player.popStates();
-		expect(states.getState<RubberState>('r2')).not.to.be.ok;
-	});
+		table.rubbers.r2.getApi().Visible = false
+		const states = player.popStates()
+		expect(states.getState<RubberState>('r2')).not.to.be.ok
+	})
 
 	it('should update visibility when rendering is dynamic', async () => {
-		table.rubbers.r1.getApi().Visible = false;
-		const states = player.popStates();
-		expect(states.getState<RubberState>('r1').isVisible).to.equal(false);
-		states.getState<RubberState>('r1').release();
-	});
+		table.rubbers.r1.getApi().Visible = false
+		const states = player.popStates()
+		expect(states.getState<RubberState>('r1').isVisible).to.equal(false)
+		states.getState<RubberState>('r1').release()
+	})
 
 	it('should apply visibility', async () => {
-		const renderApi = new TestRenderApi();
-		spy(renderApi, 'applyVisibility');
-		table.rubbers.r1.getUpdater().applyState(null, { isVisible: true } as RubberState, renderApi, table);
-		expect(renderApi.applyVisibility).to.have.been.calledOnceWith(true);
-	});
+		const renderApi = new TestRenderApi()
+		spy(renderApi, 'applyVisibility')
+		table.rubbers.r1.getUpdater().applyState(null, { isVisible: true } as RubberState, renderApi, table)
+		expect(renderApi.applyVisibility).to.have.been.calledOnceWith(true)
+	})
 
 	it('should apply the material', async () => {
-		const renderApi = new TestRenderApi();
-		spy(renderApi, 'applyMaterial');
-		table.rubbers.r1.getUpdater().applyState(null, { material: 'opaque' } as RubberState, renderApi, table);
-		expect(renderApi.applyMaterial).to.have.been.calledOnce;
-	});
+		const renderApi = new TestRenderApi()
+		spy(renderApi, 'applyMaterial')
+		table.rubbers.r1.getUpdater().applyState(null, { material: 'opaque' } as RubberState, renderApi, table)
+		expect(renderApi.applyMaterial).to.have.been.calledOnce
+	})
 
 	it('should apply the transformation', async () => {
-		const renderApi = new TestRenderApi();
-		spy(renderApi, 'applyMatrixToNode');
-		table.rubbers.r1.getUpdater().applyState(null, { rotX: 30 } as RubberState, renderApi, table);
-		expect(renderApi.applyMatrixToNode).to.have.been.calledOnce;
-	});
-
-});
+		const renderApi = new TestRenderApi()
+		spy(renderApi, 'applyMatrixToNode')
+		table.rubbers.r1.getUpdater().applyState(null, { rotX: 30 } as RubberState, renderApi, table)
+		expect(renderApi.applyMatrixToNode).to.have.been.calledOnce
+	})
+})

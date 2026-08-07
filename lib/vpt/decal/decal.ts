@@ -17,38 +17,37 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { EventProxy } from '../../game/event-proxy';
-import { IScriptable } from '../../game/iscriptable';
-import { Player } from '../../game/player';
-import { Storage } from '../../io/ole-doc';
-import { Item } from '../item';
-import { Table } from '../table/table';
-import { DecalApi } from './decal-api';
-import { DecalData } from './decal-data';
+import { EventProxy } from '../../game/event-proxy'
+import type { IScriptable } from '../../game/iscriptable'
+import type { Player } from '../../game/player'
+import type { Storage } from '../../io/ole-doc'
+import { Item } from '../item'
+import type { Table } from '../table/table'
+import { DecalApi } from './decal-api'
+import { DecalData } from './decal-data'
 
 export class Decal extends Item<DecalData> implements IScriptable<DecalApi> {
-
-	private api?: DecalApi;
+	private api?: DecalApi
 
 	public static async fromStorage(storage: Storage, itemName: string): Promise<Decal> {
-		const data = await DecalData.fromStorage(storage, itemName);
-		return new Decal(data);
+		const data = await DecalData.fromStorage(storage, itemName)
+		return new Decal(data)
 	}
 
 	private constructor(data: DecalData) {
-		super(data);
+		super(data)
 	}
 
 	public setupPlayer(player: Player, table: Table): void {
-		this.events = new EventProxy(this);
-		this.api = new DecalApi(this.data, this.events, player, table);
+		this.events = new EventProxy(this)
+		this.api = new DecalApi(this.data, this.events, player, table)
 	}
 
 	public getApi(): DecalApi {
-		return this.api!;
+		return this.api!
 	}
 
 	public getEventNames(): string[] {
-		return [];
+		return []
 	}
 }

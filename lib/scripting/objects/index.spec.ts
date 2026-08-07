@@ -17,72 +17,71 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import * as chai from 'chai';
-import { expect } from 'chai';
-import { TableBuilder } from '../../../test/table-builder';
-import { Player } from '../../game/player';
-import { Table } from '../../vpt/table/table';
-import { ERR } from '../stdlib/err';
-import { Transpiler } from '../transpiler';
+import * as chai from 'chai'
+import { expect } from 'chai'
+import sinonChai from 'sinon-chai'
+import { TableBuilder } from '../../../test/table-builder'
+import { Player } from '../../game/player'
+import type { Table } from '../../vpt/table/table'
+import { ERR } from '../stdlib/err'
+import { Transpiler } from '../transpiler'
 
-chai.use(require('sinon-chai'));
+chai.use((sinonChai as any).default ?? sinonChai)
 
 /* tslint:disable:no-unused-expression */
 describe('The VBScript objects implementations', () => {
-
-	let table: Table;
-	let player: Player;
-	let transpiler: Transpiler;
+	let table: Table
+	let player: Player
+	let transpiler: Transpiler
 
 	before(() => {
-		ERR.OnErrorResumeNext();
-		table = new TableBuilder().build('Table1');
-		player = new Player(table);
-		transpiler = new Transpiler(table, player);
-	});
+		ERR.OnErrorResumeNext()
+		table = new TableBuilder().build('Table1')
+		player = new Player(table)
+		transpiler = new Transpiler(table, player)
+	})
 
 	after(() => {
-		ERR.OnErrorGoto0();
-	});
+		ERR.OnErrorGoto0()
+	})
 
 	it('should provide the "Scripting.Dictionary" object', () => {
-		const scope = {} as any;
-		const vbs = `Dim d\nSet d = CreateObject("Scripting.Dictionary")\nd.Add "a", "Athens"`;
+		const scope = {} as any
+		const vbs = `Dim d\nSet d = CreateObject("Scripting.Dictionary")\nd.Add "a", "Athens"`
 
-		transpiler.execute(vbs, scope, 'global');
-		expect(scope.d.Count).to.equal(1);
-	});
+		transpiler.execute(vbs, scope, 'global')
+		expect(scope.d.Count).to.equal(1)
+	})
 
 	it('should provide the "VPinMAME.Controller" object', () => {
-		const scope = {} as any;
-		const vbs = `Dim vpm\nSet vpm = CreateObject("VPinMAME.Controller")`;
+		const scope = {} as any
+		const vbs = `Dim vpm\nSet vpm = CreateObject("VPinMAME.Controller")`
 
-		transpiler.execute(vbs, scope, 'global');
-		expect(scope.vpm).to.be.ok;
-	});
+		transpiler.execute(vbs, scope, 'global')
+		expect(scope.vpm).to.be.ok
+	})
 
 	it('should provide the "Scripting.FileSystemObject" object', () => {
-		const scope = {} as any;
-		const vbs = `Dim fso\nSet fso = CreateObject("Scripting.FileSystemObject")`;
+		const scope = {} as any
+		const vbs = `Dim fso\nSet fso = CreateObject("Scripting.FileSystemObject")`
 
-		transpiler.execute(vbs, scope, 'global');
-		expect(scope.fso).to.be.ok;
-	});
+		transpiler.execute(vbs, scope, 'global')
+		expect(scope.fso).to.be.ok
+	})
 
 	it('should provide the "WScript.Shell" object', () => {
-		const scope = {} as any;
-		const vbs = `Dim wss\nSet wss = CreateObject("WScript.Shell")`;
+		const scope = {} as any
+		const vbs = `Dim wss\nSet wss = CreateObject("WScript.Shell")`
 
-		transpiler.execute(vbs, scope, 'global');
-		expect(scope.wss).to.be.ok;
-	});
+		transpiler.execute(vbs, scope, 'global')
+		expect(scope.wss).to.be.ok
+	})
 
 	it('should fail when providing an unknown object', () => {
-		const scope = {} as any;
-		const vbs = `Dim x\nSet x = CreateObject("DontExist")\n`;
+		const scope = {} as any
+		const vbs = `Dim x\nSet x = CreateObject("DontExist")\n`
 
-		transpiler.execute(vbs, scope, 'global');
-		expect(ERR.Number).to.equal(429);
-	});
-
-});
+		transpiler.execute(vbs, scope, 'global')
+		expect(ERR.Number).to.equal(429)
+	})
+})

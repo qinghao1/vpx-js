@@ -17,9 +17,9 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { Table } from '../vpt/table/table';
-import { IPlayable } from './iplayable';
-import { PlayerPhysics } from './player-physics';
+import type { Table } from '../vpt/table/table'
+import type { IPlayable } from './iplayable'
+import { PlayerPhysics } from './player-physics'
 
 /**
  * Animatables are like movables but their position is only updated
@@ -30,17 +30,15 @@ import { PlayerPhysics } from './player-physics';
  * Visual Pinball's `RenderDynamic()` method.
  */
 export interface IAnimatable extends IPlayable {
-
-	getAnimation(): IAnimation;
+	getAnimation(): IAnimation
 }
 
 export interface IAnimation {
+	init(timeMsec: number): void
 
-	init(timeMsec: number): void;
-
-	updateAnimation(timeMsec: number, table: Table): void;
+	updateAnimation(timeMsec: number, table: Table): void
 }
 
 export function isAnimatable(arg: any): arg is IAnimatable {
-	return arg.getAnimation !== undefined;
+	return arg.getAnimation !== undefined
 }

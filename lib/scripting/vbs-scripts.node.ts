@@ -17,23 +17,28 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { readFileSync } from 'fs';
-import { resolve } from 'path';
+import { readFileSync } from 'fs'
+import { resolve } from 'path'
 
 /* istanbul ignore next: We don't test VB's core library. */
 export function getTextFile(fileName: string): string {
-	const filePath = getLocalPath(fileName);
-	return readFileSync(filePath).toString('utf8');
+	const filePath = getLocalPath(fileName)
+	return readFileSync(filePath).toString('utf8')
 }
 
 /* istanbul ignore next: We don't test VB's core library. */
 function getLocalPath(fileName: string): string {
 	switch (fileName.toLowerCase()) {
-		case 'controller.vbs': return resolve(__dirname, '../../res/scripts/controller.vbs');
-		case 'core.vbs': return resolve(__dirname, '../../res/scripts/core.vbs');
-		case 'vpmkeys.vbs': return resolve(__dirname, '../../res/scripts/VPMKeys.vbs');
-		case 'wpc.vbs': return resolve(__dirname, '../../res/scripts/WPC.vbs');
-		case 'grammar.bnf': return resolve(__dirname, './grammar/grammar.bnf');
+		case 'controller.vbs':
+			return resolve(__dirname, '../../res/scripts/controller.vbs')
+		case 'core.vbs':
+			return resolve(__dirname, '../../res/scripts/core.vbs')
+		case 'vpmkeys.vbs':
+			return resolve(__dirname, '../../res/scripts/VPMKeys.vbs')
+		case 'wpc.vbs':
+			return resolve(__dirname, '../../res/scripts/WPC.vbs')
+		case 'grammar.bnf':
+			return resolve(__dirname, './grammar/grammar.bnf')
 	}
-	throw new Error(`Cannot find text file ${fileName}`);
+	throw new Error(`Cannot find text file ${fileName}`)
 }

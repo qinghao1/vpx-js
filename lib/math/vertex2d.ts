@@ -18,134 +18,141 @@
  */
 
 /* tslint:disable:variable-name adjacent-overload-signatures */
-import { Pool } from '../util/object-pool';
-import { f4 } from './float';
-import { IRenderVertex, Vertex } from './vertex';
+import { Pool } from '../util/object-pool'
+import { f4 } from './float'
+import type { IRenderVertex, Vertex } from './vertex'
 
 export class Vertex2D implements Vertex {
+	public static readonly POOL = new Pool(Vertex2D)
 
-	public static readonly POOL = new Pool(Vertex2D);
+	public readonly isVector2 = true
+	public readonly isVector3 = false
 
-	public readonly isVector2 = true;
-	public readonly isVector3 = false;
+	set x(_x: number) {
+		this._x = f4(_x)
+	}
+	set y(_y: number) {
+		this._y = f4(_y)
+	}
 
-	set x(_x: number) { this._x = f4(_x); }
-	set y(_y: number) { this._y = f4(_y); }
+	get x() {
+		return this._x
+	}
+	get y() {
+		return this._y
+	}
 
-	get x() { return this._x; }
-	get y() { return this._y; }
-
-	private _x!: number;
-	private _y!: number;
+	private _x!: number
+	private _y!: number
 
 	constructor(x?: number, y?: number) {
-		this.x = x || 0;
-		this.y = y || 0;
+		this.x = x || 0
+		this.y = y || 0
 	}
 
 	public static get(buffer: Buffer) {
-		const v2 = new Vertex2D();
-		v2.x = buffer.readFloatLE(0);
-		v2.y = buffer.readFloatLE(4);
-		return v2;
+		const v2 = new Vertex2D()
+		v2.x = buffer.readFloatLE(0)
+		v2.y = buffer.readFloatLE(4)
+		return v2
 	}
 
 	public static claim(x?: number, y?: number): Vertex2D {
-		return Vertex2D.POOL.get().set(x || 0, y || 0);
+		return Vertex2D.POOL.get().set(x || 0, y || 0)
 	}
 
 	public static release(...vertices: Vertex2D[]) {
 		for (const vertex of vertices) {
-			Vertex2D.POOL.release(vertex);
+			Vertex2D.POOL.release(vertex)
 		}
 	}
 
 	public static reset(v: Vertex2D): void {
-		v.set(0, 0);
+		v.set(0, 0)
 	}
 
 	public set(x: number, y: number): this {
-		this.x = x;
-		this.y = y;
-		return this;
+		this.x = x
+		this.y = y
+		return this
 	}
 
 	public setZero(): this {
-		return this.set(0, 0);
+		return this.set(0, 0)
 	}
 
 	public clone(recycle = false): Vertex2D {
 		if (recycle) {
-			return Vertex2D.POOL.get().set(this._x, this._y);
+			return Vertex2D.POOL.get().set(this._x, this._y)
 		}
-		return new Vertex2D(this._x, this._y);
+		return new Vertex2D(this._x, this._y)
 	}
 
 	public add(v: Vertex2D): this {
-		this.x += v.x;
-		this.y += v.y;
-		return this;
+		this.x += v.x
+		this.y += v.y
+		return this
 	}
 
 	public addAndRelease(v: Vertex2D): this {
-		this.add(v);
-		Vertex2D.release(v);
-		return this;
+		this.add(v)
+		Vertex2D.release(v)
+		return this
 	}
 
 	public sub(v: Vertex2D): this {
-		this.x -= v.x;
-		this.y -= v.y;
-		return this;
+		this.x -= v.x
+		this.y -= v.y
+		return this
 	}
 
 	public subAndRelease(v: Vertex2D): this {
-		this.sub(v);
-		Vertex2D.release(v);
-		return this;
+		this.sub(v)
+		Vertex2D.release(v)
+		return this
 	}
 
 	public normalize(): this {
-		return this.divideScalar(this.length() || 1 );
+		return this.divideScalar(this.length() || 1)
 	}
 
 	public divideScalar(scalar: number): this {
-		return this.multiplyScalar(f4(1 / scalar));
+		return this.multiplyScalar(f4(1 / scalar))
 	}
 
 	public multiplyScalar(scalar: number): this {
-		this.x *= f4(scalar);
-		this.y *= f4(scalar);
-		return this;
+		this.x *= f4(scalar)
+		this.y *= f4(scalar)
+		return this
 	}
 
 	public length(): number {
-		return f4(Math.sqrt( f4(f4(this.x * this.x) + f4(this.y * this.y))));
+		return f4(Math.sqrt(f4(f4(this.x * this.x) + f4(this.y * this.y))))
 	}
 
 	public lengthSq() {
-		return this.x * this.x + this.y * this.y;
+		return this.x * this.x + this.y * this.y
 	}
 
 	public dot(pv: Vertex2D) {
-		return this.x * pv.x + this.y * pv.y;
+		return this.x * pv.x + this.y * pv.y
 	}
 
 	public equals(v?: Vertex2D): boolean {
 		if (!v) {
-			return false;
+			return false
 		}
-		return this.x === v.x && this.y === v.y;
+		return this.x === v.x && this.y === v.y
 	}
 }
 
 export class RenderVertex extends Vertex2D implements IRenderVertex {
-	public fSmooth: boolean = false;
-	public fSlingshot: boolean = false;
-	public fControlPoint: boolean = false; // Whether this point was a control point on the curve
+	public fSmooth: boolean = false
+	public fSlingshot: boolean = false
+	public fControlPoint: boolean = false // Whether this point was a control point on the curve
 
 	constructor(x?: number, y?: number) {
-		super(x, y);
+		super(x, y)
 	}
 }
 

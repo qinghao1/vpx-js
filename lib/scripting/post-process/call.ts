@@ -17,19 +17,19 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { callExpression, expressionStatement } from '../estree';
-import { ESIToken } from '../grammar/grammar';
+import { callExpression, expressionStatement } from '../estree'
+import type { ESIToken } from '../grammar/grammar'
 
 export function ppCall(node: ESIToken): any {
 	switch (node.type) {
 		case 'InvocationStatement':
 		case 'InvocationStatementInline':
-			return ppInvocationStatement(node);
+			return ppInvocationStatement(node)
 	}
-	return null;
+	return null
 }
 
 function ppInvocationStatement(node: ESIToken): any {
-	const expr = node.children[0].estree;
-	return expressionStatement(expr.type === 'CallExpression' ? expr : callExpression(expr, []));
+	const expr = node.children[0].estree
+	return expressionStatement(expr.type === 'CallExpression' ? expr : callExpression(expr, []))
 }

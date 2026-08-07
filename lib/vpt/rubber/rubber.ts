@@ -17,22 +17,22 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { EventProxy } from '../../game/event-proxy';
-import { IHittable } from '../../game/ihittable';
-import { IRenderable, Meshes } from '../../game/irenderable';
-import { IScriptable } from '../../game/iscriptable';
-import { Player } from '../../game/player';
-import { Storage } from '../../io/ole-doc';
-import { Matrix3D } from '../../math/matrix3d';
-import { HitObject } from '../../physics/hit-object';
-import { Item } from '../item';
-import { Table } from '../table/table';
-import { RubberApi } from './rubber-api';
-import { RubberData } from './rubber-data';
-import { RubberHitGenerator } from './rubber-hit-generator';
-import { RubberMeshGenerator } from './rubber-mesh-generator';
-import { RubberState } from './rubber-state';
-import { RubberUpdater } from './rubber-updater';
+import { EventProxy } from '../../game/event-proxy'
+import type { IHittable } from '../../game/ihittable'
+import type { IRenderable, Meshes } from '../../game/irenderable'
+import type { IScriptable } from '../../game/iscriptable'
+import type { Player } from '../../game/player'
+import type { Storage } from '../../io/ole-doc'
+import { Matrix3D } from '../../math/matrix3d'
+import type { HitObject } from '../../physics/hit-object'
+import { Item } from '../item'
+import type { Table } from '../table/table'
+import { RubberApi } from './rubber-api'
+import { RubberData } from './rubber-data'
+import { RubberHitGenerator } from './rubber-hit-generator'
+import { RubberMeshGenerator } from './rubber-mesh-generator'
+import { RubberState } from './rubber-state'
+import { RubberUpdater } from './rubber-updater'
 
 /**
  * VPinball's rubber item.
@@ -40,33 +40,41 @@ import { RubberUpdater } from './rubber-updater';
  * @see https://github.com/vpinball/vpinball/blob/master/rubber.cpp
  */
 export class Rubber extends Item<RubberData> implements IRenderable<RubberState>, IHittable, IScriptable<RubberApi> {
-
-	private readonly state: RubberState;
-	private readonly meshGenerator: RubberMeshGenerator;
-	private readonly updater: RubberUpdater;
-	private hitGenerator: RubberHitGenerator;
-	private hits: HitObject[] = [];
-	private api!: RubberApi;
+	private readonly state: RubberState
+	private readonly meshGenerator: RubberMeshGenerator
+	private readonly updater: RubberUpdater
+	private hitGenerator: RubberHitGenerator
+	private hits: HitObject[] = []
+	private api!: RubberApi
 
 	public static async fromStorage(storage: Storage, itemName: string): Promise<Rubber> {
-		const data = await RubberData.fromStorage(storage, itemName);
-		return new Rubber(data);
+		const data = await RubberData.fromStorage(storage, itemName)
+		return new Rubber(data)
 	}
 
 	public constructor(data: RubberData) {
-		super(data);
-		this.state = RubberState.claim(data.getName(), data.height, data.rotX,  data.rotY, data.rotZ, data.szMaterial!, data.szImage!, data.isVisible);
-		this.meshGenerator = new RubberMeshGenerator(data);
-		this.hitGenerator = new RubberHitGenerator(data, this.meshGenerator);
-		this.updater = new RubberUpdater(this.data, this.state, this.meshGenerator.middlePoint);
+		super(data)
+		this.state = RubberState.claim(
+			data.getName(),
+			data.height,
+			data.rotX,
+			data.rotY,
+			data.rotZ,
+			data.szMaterial!,
+			data.szImage!,
+			data.isVisible,
+		)
+		this.meshGenerator = new RubberMeshGenerator(data)
+		this.hitGenerator = new RubberHitGenerator(data, this.meshGenerator)
+		this.updater = new RubberUpdater(this.data, this.state, this.meshGenerator.middlePoint)
 	}
 
 	public isCollidable(): boolean {
-		return this.data.isCollidable;
+		return this.data.isCollidable
 	}
 
 	public getMeshes<GEOMETRY>(table: Table): Meshes<GEOMETRY> {
-		const mesh = this.meshGenerator.getMeshes(table);
+		const mesh = this.meshGenerator.getMeshes(table)
 		return {
 			rubber: {
 				isVisible: this.data.isVisible,
@@ -74,32 +82,32 @@ export class Rubber extends Item<RubberData> implements IRenderable<RubberState>
 				map: table.getTexture(this.data.szImage),
 				material: table.getMaterial(this.data.szMaterial),
 			},
-		};
+		}
 	}
 
 	public setupPlayer(player: Player, table: Table): void {
-		this.events = new EventProxy(this);
-		this.hits = this.hitGenerator.generateHitObjects(this.events, table);
-		this.api = new RubberApi(this.state, this.hits, this.data, this.events, player, table);
+		this.events = new EventProxy(this)
+		this.hits = this.hitGenerator.generateHitObjects(this.events, table)
+		this.api = new RubberApi(this.state, this.hits, this.data, this.events, player, table)
 	}
 
 	public getApi(): RubberApi {
-		return this.api!;
+		return this.api!
 	}
 
 	public getHitShapes(): HitObject[] {
-		return this.hits;
+		return this.hits
 	}
 
 	public getEventNames(): string[] {
-		return [ 'Hit', 'Init', 'Timer' ];
+		return ['Hit', 'Init', 'Timer']
 	}
 
 	public getState(): RubberState {
-		return this.state;
+		return this.state
 	}
 
 	public getUpdater(): RubberUpdater {
-		return this.updater;
+		return this.updater
 	}
 }

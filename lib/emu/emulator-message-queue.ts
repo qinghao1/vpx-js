@@ -17,8 +17,8 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { IEmulator } from '../game/iemulator';
-import { logger } from '../util/logger';
+import type { IEmulator } from '../game/iemulator'
+import { logger } from '../util/logger'
 
 /**
  * The VPX interface is sync, while our implementation is not when initializing.
@@ -27,9 +27,8 @@ import { logger } from '../util/logger';
  * allows to apply the changes once the emu is ready
  */
 export class EmulatorMessageQueue {
-
-	private readonly queue: QueueItem[] = [];
-	private clearedQueue: boolean = false;
+	private readonly queue: QueueItem[] = []
+	private clearedQueue: boolean = false
 
 	/**
 	 * adds new cache entry
@@ -37,38 +36,38 @@ export class EmulatorMessageQueue {
 	 */
 	public addMessage(cacheType: MessageType, value: number): boolean {
 		if (this.clearedQueue) {
-			logger().warn('ADD STATE TO CLEARED CACHE! ENTRY WILL BE IGNORED!');
-			return false;
+			logger().warn('ADD STATE TO CLEARED CACHE! ENTRY WILL BE IGNORED!')
+			return false
 		}
-		this.queue.push({ cacheType, value });
-		return true;
+		this.queue.push({ cacheType, value })
+		return true
 	}
 
 	public replayMessages(emulator: IEmulator): void {
-		this.clearedQueue = true;
-		logger().debug('Replaying %d messages to emu', this.queue.length);
+		this.clearedQueue = true
+		logger().debug('Replaying %d messages to emu', this.queue.length)
 		for (const item of this.queue) {
 			switch (item.cacheType) {
 				case MessageType.SetSwitchInput:
-					emulator.setSwitchInput(item.value, true);
-					break;
+					emulator.setSwitchInput(item.value, true)
+					break
 				case MessageType.ClearSwitchInput:
-					emulator.setSwitchInput(item.value, false);
-					break;
+					emulator.setSwitchInput(item.value, false)
+					break
 				case MessageType.ToggleSwitchInput:
-					emulator.setSwitchInput(item.value);
-					break;
+					emulator.setSwitchInput(item.value)
+					break
 				case MessageType.CabinetInput:
-					emulator.setCabinetInput(item.value);
-					break;
+					emulator.setCabinetInput(item.value)
+					break
 				case MessageType.ExecuteTicks:
-					emulator.emuSimulateCycle(item.value);
-					break;
+					emulator.emuSimulateCycle(item.value)
+					break
 				case MessageType.SetDipByte:
-					emulator.setDipSwitchByte(item.value);
-					break;
+					emulator.setDipSwitchByte(item.value)
+					break
 				default:
-					logger().warn('UNKNOWN CACHE TYPE', item.cacheType);
+					logger().warn('UNKNOWN CACHE TYPE', item.cacheType)
 			}
 		}
 	}
@@ -84,6 +83,6 @@ export enum MessageType {
 }
 
 interface QueueItem {
-	cacheType: MessageType;
-	value: number;
+	cacheType: MessageType
+	value: number
 }

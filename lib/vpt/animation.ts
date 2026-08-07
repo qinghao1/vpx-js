@@ -18,41 +18,39 @@
  */
 
 export class FrameData {
-
-	public frameVerts: VertData[] = [];
+	public frameVerts: VertData[] = []
 
 	public static get(buffer: Buffer, numVertices: number): FrameData {
-		const frameData = new FrameData();
+		const frameData = new FrameData()
 		for (let i = 0; i < numVertices; i++) {
-			frameData.frameVerts.push(VertData.load(buffer, i * 24));
+			frameData.frameVerts.push(VertData.load(buffer, i * 24))
 		}
-		return frameData;
+		return frameData
 	}
 
 	public clone(): FrameData {
-		const frameData = new FrameData();
-		frameData.frameVerts = this.frameVerts.map(v => v.clone());
-		return frameData;
+		const frameData = new FrameData()
+		frameData.frameVerts = this.frameVerts.map((v) => v.clone())
+		return frameData
 	}
 }
 
 export class VertData {
+	public readonly x: number
+	public readonly y: number
+	public readonly z: number
 
-	public readonly x: number;
-	public readonly y: number;
-	public readonly z: number;
-
-	public readonly nx: number;
-	public readonly ny: number;
-	public readonly nz: number;
+	public readonly nx: number
+	public readonly ny: number
+	public readonly nz: number
 
 	constructor(x: number, y: number, z: number, nx: number, ny: number, nz: number) {
-		this.x = x;
-		this.y = y;
-		this.z = z;
-		this.nx = nx;
-		this.ny = ny;
-		this.nz = nz;
+		this.x = x
+		this.y = y
+		this.z = z
+		this.nx = nx
+		this.ny = ny
+		this.nz = nz
 	}
 
 	public static load(buffer: Buffer, offset: number = 0): VertData {
@@ -63,10 +61,10 @@ export class VertData {
 			buffer.readFloatLE(offset + 12),
 			buffer.readFloatLE(offset + 16),
 			buffer.readFloatLE(offset + 20),
-		);
+		)
 	}
 
 	public clone(): VertData {
-		return new VertData(this.x, this.y, this.z, this.nx, this.ny, this.nz);
+		return new VertData(this.x, this.y, this.z, this.nx, this.ny, this.nz)
 	}
 }

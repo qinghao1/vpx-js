@@ -17,28 +17,30 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { IRenderApi } from '../../render/irender-api';
-import { ItemUpdater } from '../item-updater';
-import { Table } from '../table/table';
-import { KickerState } from './kicker-state';
+import type { IRenderApi } from '../../render/irender-api'
+import { ItemUpdater } from '../item-updater'
+import type { Table } from '../table/table'
+import type { KickerState } from './kicker-state'
 
 export class KickerUpdater extends ItemUpdater<KickerState> {
-
 	constructor(state: KickerState) {
-		super(state);
+		super(state)
 	}
 
-	public applyState<NODE, GEOMETRY, POINT_LIGHT>(obj: NODE, state: KickerState, renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>, table: Table): void {
-
+	public applyState<NODE, GEOMETRY, POINT_LIGHT>(
+		obj: NODE,
+		state: KickerState,
+		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
+		table: Table,
+	): void {
 		// update local state
-		Object.assign(this.state, state);
+		Object.assign(this.state, state)
 
 		// visibility
 		if (state.type !== undefined) {
-			renderApi.applyVisibility(this.state.isVisible, obj);
+			renderApi.applyVisibility(this.state.isVisible, obj)
 		}
 
-		this.applyMaterial(obj, state.material, undefined, renderApi, table);
+		this.applyMaterial(obj, state.material, undefined, renderApi, table)
 	}
-
 }

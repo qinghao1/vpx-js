@@ -17,16 +17,14 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { VbsApi } from '../vbs-api';
+import { VbsApi } from '../vbs-api'
 
 export class VbsMath extends VbsApi {
-
 	public pow(x: number, y: number) {
-		return Math.pow(x, y);
+		return x ** y
 	}
 
 	protected _getPropertyNames(): string[] {
-		return Object.getOwnPropertyNames(VbsMath.prototype);
+		return Object.getOwnPropertyNames(VbsMath.prototype)
 	}
-
 }

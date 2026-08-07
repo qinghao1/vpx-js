@@ -17,19 +17,34 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { ItemApi } from '../item-api';
-import { LightSeqData } from './lightseq-data';
+import { ItemApi } from '../item-api'
+import type { LightSeqData } from './lightseq-data'
 
 export class LightSeqApi extends ItemApi<LightSeqData> {
-
-	get Collection() { return this.data.collection; }
-	set Collection(v) { this.data.collection = v; }
-	get CenterX() { return this.data.center.x; }
-	set CenterX(v) { this.data.center.x = v; }
-	get CenterY() { return this.data.center.y; }
-	set CenterY(v) { this.data.center.y = v; }
-	get UpdateInterval() { return this.data.updateInterval; }
-	set UpdateInterval(v) { this.data.updateInterval = v; }
+	get Collection() {
+		return this.data.collection
+	}
+	set Collection(v) {
+		this.data.collection = v
+	}
+	get CenterX() {
+		return this.data.center.x
+	}
+	set CenterX(v) {
+		this.data.center.x = v
+	}
+	get CenterY() {
+		return this.data.center.y
+	}
+	set CenterY(v) {
+		this.data.center.y = v
+	}
+	get UpdateInterval() {
+		return this.data.updateInterval
+	}
+	set UpdateInterval(v) {
+		this.data.updateInterval = v
+	}
 
 	public Play(animation: number, tailLength: number, repeat: number, pause: number): void {
 		// TODO implement
@@ -40,6 +55,6 @@ export class LightSeqApi extends ItemApi<LightSeqData> {
 	}
 
 	protected _getPropertyNames(): string[] {
-		return Object.getOwnPropertyNames(LightSeqApi.prototype);
+		return Object.getOwnPropertyNames(LightSeqApi.prototype)
 	}
 }

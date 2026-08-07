@@ -17,18 +17,17 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { EventProxy } from '../../game/event-proxy';
-import { Player } from '../../game/player';
-import { ItemApi } from '../item-api';
-import { ItemData } from '../item-data';
-import { Table } from '../table/table';
-import { TimerHit } from '../timer/timer-hit';
-import { CollectionData } from './collection-data';
+import type { EventProxy } from '../../game/event-proxy'
+import type { Player } from '../../game/player'
+import { ItemApi } from '../item-api'
+import type { ItemData } from '../item-data'
+import type { Table } from '../table/table'
+import type { TimerHit } from '../timer/timer-hit'
+import type { CollectionData } from './collection-data'
 
 export class CollectionApi extends ItemApi<CollectionData> implements IterableIterator<ItemApi<ItemData>> {
-
-	private readonly items: Array<ItemApi<ItemData>>;
-	private pointer = 0;
+	private readonly items: Array<ItemApi<ItemData>>
+	private pointer = 0
 
 	/**
 	 * The goal of the proxy is to mimic an array. Small note, the array
@@ -39,37 +38,49 @@ export class CollectionApi extends ItemApi<CollectionData> implements IterableIt
 	 * @param player
 	 * @param table
 	 */
-	public static getInstance(data: CollectionData, items: Array<ItemApi<ItemData>>, events: EventProxy, player: Player, table: Table): CollectionApi {
+	public static getInstance(
+		data: CollectionData,
+		items: Array<ItemApi<ItemData>>,
+		events: EventProxy,
+		player: Player,
+		table: Table,
+	): CollectionApi {
 		return new Proxy<CollectionApi>(new CollectionApi(data, items, events, player, table), {
 			get: (api, prop) => {
 				if (prop === 'length') {
-					return api.items[prop];
+					return api.items[prop]
 				}
 				try {
-					const intProp = parseInt(prop as string, 10);
+					const intProp = parseInt(prop as string, 10)
 					if (!isNaN(intProp)) {
-						return api.items[intProp];
+						return api.items[intProp]
 					}
 				} catch (err) {
 					// do nothing but return prop below.
 				}
-				return Reflect.get(api, prop);
+				return Reflect.get(api, prop)
 			},
 			set: (api, prop, value) => {
-				const intProp = parseInt(prop as string, 10);
+				const intProp = parseInt(prop as string, 10)
 				/* istanbul ignore next */
 				if (!isNaN(intProp)) {
-					throw new Error('Setting a new child of a collection by property is not supported.');
+					throw new Error('Setting a new child of a collection by property is not supported.')
 				}
-				Reflect.set(api, prop, value);
-				return true;
+				Reflect.set(api, prop, value)
+				return true
 			},
-		});
+		})
 	}
 
-	private constructor(data: CollectionData, items: Array<ItemApi<ItemData>>, events: EventProxy, player: Player, table: Table) {
-		super(data, events, player, table);
-		this.items = items;
+	private constructor(
+		data: CollectionData,
+		items: Array<ItemApi<ItemData>>,
+		events: EventProxy,
+		player: Player,
+		table: Table,
+	) {
+		super(data, events, player, table)
+		this.items = items
 	}
 
 	public next(): IteratorResult<ItemApi<ItemData>> {
@@ -77,25 +88,25 @@ export class CollectionApi extends ItemApi<CollectionData> implements IterableIt
 			return {
 				done: false,
 				value: this.items[this.pointer++],
-			};
+			}
 		} else {
 			return {
 				done: true,
 				value: null,
-			};
+			}
 		}
 	}
 
 	public _getTimers(): TimerHit[] {
 		// collections don't have timers (though they can receive from their children, but that's not what we're doing here)
-		return [];
+		return []
 	}
 
 	public [Symbol.iterator](): IterableIterator<ItemApi<ItemData>> {
-		return this;
+		return this
 	}
 
 	protected _getPropertyNames(): string[] {
-		return Object.getOwnPropertyNames(CollectionApi.prototype);
+		return Object.getOwnPropertyNames(CollectionApi.prototype)
 	}
 }

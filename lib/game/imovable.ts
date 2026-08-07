@@ -17,14 +17,13 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { MoverObject } from '../physics/mover-object';
-import { IPlayable } from './iplayable';
+import type { MoverObject } from '../physics/mover-object'
+import type { IPlayable } from './iplayable'
 
 export interface IMovable extends IPlayable {
-
-	getMover(): MoverObject;
+	getMover(): MoverObject
 }
 
 export function isMovable(arg: any): arg is IMovable {
-	return arg.getMover !== undefined;
+	return arg.getMover !== undefined
 }

@@ -17,8 +17,8 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { FS } from './file-system';
-import { TextStream } from './text-stream';
+import { FS } from './file-system'
+import type { TextStream } from './text-stream'
 
 /**
  * Provides access to all the properties of a file.
@@ -26,11 +26,10 @@ import { TextStream } from './text-stream';
  * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/file-object
  */
 export class File {
-
-	private readonly path: string;
+	private readonly path: string
 
 	constructor(path: string) {
-		this.path = path;
+		this.path = path
 	}
 
 	/**
@@ -40,6 +39,6 @@ export class File {
 	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/openastextstream-method
 	 */
 	public OpenAsTextStream(mode: number, tristate?: number): TextStream {
-		return FS.getStream(this.path, mode).cursorToStart();
+		return FS.getStream(this.path, mode).cursorToStart()
 	}
 }

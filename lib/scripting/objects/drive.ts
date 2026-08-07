@@ -22,6 +22,4 @@
  *
  * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/drive-object
  */
-export class Drive {
-
-}
+export class Drive {}

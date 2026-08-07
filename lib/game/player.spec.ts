@@ -17,37 +17,36 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { expect } from 'chai';
-import { ThreeHelper } from '../../test/three.helper';
-import { Player } from '../game/player';
-import { NodeBinaryReader } from '../io/binary-reader.node';
-import { Table } from '../vpt/table/table';
+import { expect } from 'chai'
+import { ThreeHelper } from '../../test/three.helper'
+import { Player } from '../game/player'
+import { NodeBinaryReader } from '../io/binary-reader.node.js'
+import { Table } from '../vpt/table/table'
 
 /* tslint:disable:no-unused-expression */
 describe('The VPinball player', () => {
-
-	const three = new ThreeHelper();
+	const three = new ThreeHelper()
 
 	it('should pause and resume the game', async () => {
-		const table = await Table.load(new NodeBinaryReader(three.fixturePath('table-kicker.vpx')));
-		const player = new Player(table).init();
-		const kicker = table.kickers.BallRelease.getApi();
+		const table = await Table.load(new NodeBinaryReader(three.fixturePath('table-kicker.vpx')))
+		const player = new Player(table).init()
+		const kicker = table.kickers.BallRelease.getApi()
 
-		const ball = kicker.CreateBall();
-		kicker.Kick(0, 10);
+		const ball = kicker.CreateBall()
+		kicker.Kick(0, 10)
 
-		player.simulateTime(0);
-		expect(ball.getState().pos.y).to.equal(1200);
+		player.simulateTime(0)
+		expect(ball.getState().pos.y).to.equal(1200)
 
-		player.simulateTime(120);
-		expect(ball.getState().pos.y).to.be.below(1100);
+		player.simulateTime(120)
+		expect(ball.getState().pos.y).to.be.below(1100)
 
-		player.pause();
-		player.simulateTime(700);
-		expect(ball.getState().pos.y).to.be.above(1090);
+		player.pause()
+		player.simulateTime(700)
+		expect(ball.getState().pos.y).to.be.above(1090)
 
-		player.resume();
-		player.simulateTime(1400);
-		expect(ball.getState().pos.y).to.be.below(650);
-	});
-});
+		player.resume()
+		player.simulateTime(1400)
+		expect(ball.getState().pos.y).to.be.below(650)
+	})
+})
