@@ -32,8 +32,9 @@ import type { IEmulator } from './iemulator.js'
 import type { PinInput } from './pin-input.js'
 import type { IBallCreationPosition, Player } from './player.js'
 
-const SLOW_MO = 1 // the lower, the slower
+const SLOW_MO = 1
 
+/** Core physics engine (1000Hz loop, collision, timers). */
 export class PlayerPhysics {
 	public readonly balls: Ball[] = []
 	public gravity = new Vertex3D()
