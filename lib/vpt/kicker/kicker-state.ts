@@ -5,7 +5,9 @@ import { Pool } from '../../util/object-pool.js'
 import { Enums } from '../enums.js'
 import { ItemState } from '../item-state.js'
 
-/** Kicker state. */
+/** Kicker state.
+ *
+ * @see https://github.com/vpinball/vpinball/blob/master/kicker.cpp */
 export class KickerState extends ItemState {
 	public static readonly POOL = new Pool(KickerState)
 
