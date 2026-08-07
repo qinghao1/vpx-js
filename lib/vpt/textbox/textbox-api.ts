@@ -4,9 +4,7 @@
 import { ItemApi } from '../item-api.js'
 import type { TextboxData } from './textbox-data.js'
 
-/** Textbox API.
- *
- * @see https://github.com/vpinball/vpinball/blob/master/textbox.cpp */
+/** Textbox API — VBS surface for `Textbox`. @see https://github.com/vpinball/vpinball/blob/master/textbox.cpp */
 export class TextboxApi extends ItemApi<TextboxData> {
 	get BackColor() {
 		return this.data.backColor
@@ -85,10 +83,7 @@ export class TextboxApi extends ItemApi<TextboxData> {
 		this.data.isVisible = v
 	}
 
-	/**
-	 * No idea wtf this is supposed to do.
-	 */
-	public InterfaceSupportsErrorInfo(riid: any): boolean {
+	public InterfaceSupportsErrorInfo(_riid: unknown): boolean {
 		return false
 	}
 
