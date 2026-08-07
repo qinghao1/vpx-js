@@ -9,7 +9,9 @@ import type { Table } from '../table/table.js'
 import type { RampData } from './ramp-data.js'
 import type { RampState } from './ramp-state.js'
 
-/** Ramp API. */
+/** Ramp API.
+ *
+ * @see https://github.com/vpinball/vpinball/blob/master/ramp.cpp */
 export class RampApi extends ItemApi<RampData> {
 	private readonly hits: HitObject[]
 	private readonly state: RampState
