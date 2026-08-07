@@ -4,7 +4,9 @@
 import { Pool } from '../../util/object-pool.js'
 import { ItemState } from '../item-state.js'
 
-/** Ramp state. */
+/** Ramp state.
+ *
+ * @see https://github.com/vpinball/vpinball/blob/master/ramp.cpp */
 export class RampState extends ItemState {
 	public static readonly POOL = new Pool(RampState)
 
