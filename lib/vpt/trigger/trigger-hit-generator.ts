@@ -15,61 +15,45 @@ import type { TriggerAnimation } from './trigger-animation.js'
 import type { TriggerData } from './trigger-data.js'
 import { TriggerLineSeg } from './trigger-line-seg.js'
 
-/** Trigge hit generator. */
+/** Generates trigger hit shapes. @see https://github.com/vpinball/vpinball/blob/master/trigger.cpp */
 export class TriggerHitGenerator {
-	private readonly data: TriggerData
-
-	constructor(data: TriggerData) {
-		this.data = data
-	}
-
+	constructor(private readonly data: TriggerData) {}
 	public generateHitObjects(animation: TriggerAnimation, events: EventProxy, table: Table): HitObject[] {
-		const hitObjects: HitObject[] = []
-		const height = table.getSurfaceHeight(this.data.szSurface, this.data.center.x, this.data.center.y)
-		const vVertex: RenderVertex[] = DragPoint.getRgVertex<RenderVertex>(
+		const h = table.getSurfaceHeight(this.data.szSurface, this.data.center.x, this.data.center.y)
+		const vVertex = DragPoint.getRgVertex<RenderVertex>(
 			this.data.dragPoints,
 			() => new RenderVertex(),
 			CatmullCurve2D.fromVertex2D,
 		)
-
-		const count = vVertex.length
-		const rgv: RenderVertex[] = new Array<RenderVertex>(count)
-		const rgv3D: Vertex3D[] = new Array<Vertex3D>(count)
-
-		for (let i = 0; i < count; i++) {
-			rgv[i] = vVertex[i]
-			rgv3D[i] = new Vertex3D(rgv[i].x, rgv[i].y, height + PHYS_SKIN * 2.0)
+		const n = vVertex.length
+		const rgv3D = vVertex.map((v) => new Vertex3D(v.x, v.y, h + PHYS_SKIN * 2))
+		const hits: HitObject[] = []
+		for (let i = 0; i < n; i++) {
+			const pv2 = vVertex[i < n - 1 ? i + 1 : 0]!,
+				pv3 = vVertex[i < n - 2 ? i + 2 : i + 2 - n]!
+			hits.push(this.lineSeg(pv2, pv3, animation, events, h))
 		}
-
-		for (let i = 0; i < count; i++) {
-			const pv2 = rgv[i < count - 1 ? i + 1 : 0]
-			const pv3 = rgv[i < count - 2 ? i + 2 : i + 2 - count]
-			hitObjects.push(this.getLineSeg(pv2, pv3, animation, events, height))
-		}
-
-		const ph3dpoly = new Hit3DPoly(rgv3D, CollisionType.Trigger)
-		ph3dpoly.obj = events
-		hitObjects.push(ph3dpoly)
-
-		return hitObjects
+		const poly = new Hit3DPoly(rgv3D, CollisionType.Trigger)
+		poly.obj = events
+		hits.push(poly)
+		return hits
 	}
-
-	private getLineSeg(
+	private lineSeg(
 		pv1: RenderVertex,
 		pv2: RenderVertex,
 		animation: TriggerAnimation,
 		events: EventProxy,
 		height: number,
 	): TriggerLineSeg {
-		const lineSeg = new TriggerLineSeg(
+		const seg = new TriggerLineSeg(
 			new Vertex2D(pv1.x, pv1.y),
 			new Vertex2D(pv2.x, pv2.y),
 			height,
-			height + Math.max(this.data.hitHeight - 8.0, 0), //adjust for same hit height as circular
+			height + Math.max(this.data.hitHeight - 8, 0),
 			this.data,
 			animation,
 		)
-		lineSeg.obj = events
-		return lineSeg
+		seg.obj = events
+		return seg
 	}
 }
