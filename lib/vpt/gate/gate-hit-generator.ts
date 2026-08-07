@@ -10,8 +10,8 @@ import type { GateData } from './gate-data.js'
 import { GateHit } from './gate-hit.js'
 import type { GateState } from './gate-state.js'
 
-export /** GateHitGenerator. */
-class GateHitGenerator {
+/** GateHitGenerator. */
+export class GateHitGenerator {
 	private readonly data: GateData
 
 	constructor(data: GateData) {
