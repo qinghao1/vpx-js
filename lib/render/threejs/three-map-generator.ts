@@ -77,4 +77,33 @@ export class ThreeMapGenerator {
 	public hasTexture(name: string): boolean {
 		return this.textureCache.has(name)
 	}
+
+	public disposeUnused(usedNames: Set<string>): number {
+		let disposed = 0
+		for (const [name, tex] of this.textureCache.entries()) {
+			if (!usedNames.has(name.toLowerCase()) && !usedNames.has(name)) {
+				try {
+					;(tex as any).dispose?.()
+				} catch {}
+				try {
+					const img = (tex as any).image
+					if (img && img.data) {
+						;(tex as any).image.data = null
+					}
+				} catch {}
+				this.textureCache.delete(name)
+				disposed++
+			}
+		}
+		return disposed
+	}
+
+	public clear(): void {
+		for (const tex of this.textureCache.values()) {
+			try {
+				;(tex as any).dispose?.()
+			} catch {}
+		}
+		this.textureCache.clear()
+	}
 }
