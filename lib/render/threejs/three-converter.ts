@@ -11,24 +11,14 @@ import type { ThreeMaterialGenerator } from './three-material-generator.js'
 import type { ThreeMeshGenerator } from './three-mesh-generator.js'
 import { ThreeRenderApi } from './three-render-api.js'
 
-/** Three.js converter helpers. */
+/** Converts renderables to Three.js groups/meshes. */
 export class ThreeConverter {
-	private readonly meshGenerator: ThreeMeshGenerator
-	private readonly mapGenerator: ThreeMapGenerator
-	private readonly materialGenerator: ThreeMaterialGenerator
-	private readonly meshConvertOpts: MeshConvertOptions
-
 	constructor(
-		meshGenerator: ThreeMeshGenerator,
-		mapGenerator: ThreeMapGenerator,
-		materialGenerator: ThreeMaterialGenerator,
-		opts: MeshConvertOptions,
-	) {
-		this.meshGenerator = meshGenerator
-		this.mapGenerator = mapGenerator
-		this.materialGenerator = materialGenerator
-		this.meshConvertOpts = opts
-	}
+		private readonly meshGenerator: ThreeMeshGenerator,
+		private readonly mapGenerator: ThreeMapGenerator,
+		private readonly materialGenerator: ThreeMaterialGenerator,
+		private readonly meshConvertOpts: MeshConvertOptions,
+	) {}
 
 	public createObject(
 		renderable: IRenderable<ItemState>,
@@ -37,42 +27,26 @@ export class ThreeConverter {
 		opts: TableGenerateOptions,
 	): Group {
 		const objects = renderable.getMeshes(table, renderApi, opts)
-		const itemGroup = new Group()
-		itemGroup.matrixAutoUpdate = false
-		itemGroup.name = renderable.getName()
-		itemGroup.visible = renderable.getState().isVisible
-		let obj: RenderInfo<BufferGeometry>
-		for (obj of Object.values<RenderInfo<BufferGeometry>>(objects)) {
-			const mesh = this.createMesh(obj)
-			itemGroup.add(mesh)
+		const group = new Group()
+		group.matrixAutoUpdate = false
+		group.name = renderable.getName()
+		group.visible = renderable.getState().isVisible
+		for (const obj of Object.values<RenderInfo<BufferGeometry>>(objects)) {
+			group.add(this.createMesh(obj))
 		}
-		return itemGroup
+		return group
 	}
 
 	public createMesh(obj: RenderInfo<BufferGeometry>): ThreeMesh {
-		/* istanbul ignore if */
-		if (!obj.geometry && !obj.mesh) {
-			throw new Error('Mesh export must either provide mesh or geometry.')
-		}
-		let geometry: BufferGeometry
-		if (obj.geometry) {
-			geometry = obj.geometry
-		} else if (obj.mesh) {
-			geometry = this.meshGenerator.convertToBufferGeometry(obj.mesh)
-
-			/* istanbul ignore next: Should not happen. */
-		} else {
-			throw new Error('Either `geometry` or `mesh` must be defined!')
-		}
-
+		if (!obj.geometry && !obj.mesh) throw new Error('Mesh export must either provide mesh or geometry.')
+		const geometry = obj.geometry ?? this.meshGenerator.convertToBufferGeometry(obj.mesh!)
 		const material = this.materialGenerator.getInitialMaterial(obj, this.meshConvertOpts)
 		const mesh = new ThreeMesh(geometry, material)
-		mesh.name = (obj.geometry || obj.mesh!).name
+		mesh.name = (obj.geometry ?? obj.mesh!)!.name
 		mesh.matrixAutoUpdate = false
 		mesh.visible = obj.isVisible
 		if (ThreeRenderApi.SHADOWS) {
-			mesh.castShadow = true
-			mesh.receiveShadow = true
+			mesh.castShadow = mesh.receiveShadow = true
 		}
 		return mesh
 	}
