@@ -3,7 +3,9 @@
 
 import { ItemData } from '../item-data.js'
 
-/** Ball data. */
+/** Ball data.
+ *
+ * @see https://github.com/vpinball/vpinball/blob/master/ball.cpp */
 export class BallData extends ItemData {
 	public radius: number
 	public mass: number
