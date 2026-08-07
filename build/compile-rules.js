@@ -17,17 +17,17 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-const { readFileSync, writeFileSync } = require('fs');
-const { resolve } = require('path');
-const { Grammars } = require('ebnf');
-const { inspect } = require('util');
+const { readFileSync, writeFileSync } = require('fs')
+const { resolve } = require('path')
+const { Grammars } = require('ebnf')
+const { inspect } = require('util')
 
-const bnfGrammar = readFileSync(resolve(__dirname, '../lib/scripting/grammar/grammar.bnf')).toString();
-const fileDest = resolve(__dirname, '../lib/scripting/grammar/rules.ts');
-const rules = Grammars.Custom.getRules(bnfGrammar);
+const bnfGrammar = readFileSync(resolve(__dirname, '../lib/scripting/grammar/grammar.bnf')).toString()
+const fileDest = resolve(__dirname, '../lib/scripting/grammar/rules.ts')
+const rules = Grammars.Custom.getRules(bnfGrammar)
 const rulesExport = `import { IRule } from 'ebnf';
 /* tslint:disable */
 export const RULES: IRule[] = ${inspect(rules, { depth: 20, maxArrayLength: null })} as IRule[];
-`;
+`
 
-writeFileSync(fileDest, rulesExport);
+writeFileSync(fileDest, rulesExport)

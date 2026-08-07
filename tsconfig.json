@@ -1,19 +1,27 @@
 {
 	"compilerOptions": {
-		"target": "esnext",
-		"module": "commonjs",
-		"outDir": "./dist/cjs",
-		"strict": true,
+		"target": "ES2024",
+		"module": "ESNext",
 		"moduleResolution": "node",
-		"allowJs": true
+		"lib": ["ES2024", "DOM"],
+		"strict": false,
+		"noImplicitAny": false,
+		"skipLibCheck": true,
+		"noImplicitOverride": false,
+		"verbatimModuleSyntax": false,
+		"esModuleInterop": true,
+		"allowSyntheticDefaultImports": true,
+		"resolveJsonModule": true,
+		"declaration": true,
+		"declarationMap": true,
+		"sourceMap": true,
+		"outDir": "./dist",
+		"rootDir": ".",
+		"allowJs": true,
+		"forceConsistentCasingInFileNames": true,
+		"allowUnusedLabels": true,
+		"useDefineForClassFields": false
 	},
-	"exclude": [
-		".nyc_output",
-		"node_modules",
-		"build",
-		"dist",
-		"coverage",
-		"res",
-		"test/fixtures"
-	]
+	"include": ["lib/**/*", "bin/**/*", "build/**/*"],
+	"exclude": [".nyc_output", "node_modules", "dist", "coverage", "res", "test/fixtures", "demo-browser", "demo-static"]
 }
