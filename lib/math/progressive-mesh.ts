@@ -259,6 +259,7 @@ export function permuteVertices<T>(permutation: number[], vert: T[], tri: ProgMe
 	}
 }
 
+/** remapIndices. */
 export function remapIndices(
 	numVertices: number,
 	triDatas: ProgMeshTriData[],
