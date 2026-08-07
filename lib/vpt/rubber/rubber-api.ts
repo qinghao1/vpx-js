@@ -9,25 +9,19 @@ import type { Table } from '../table/table.js'
 import type { RubberData } from './rubber-data.js'
 import type { RubberState } from './rubber-state.js'
 
-/** Rubber API.
- *
- * @see https://github.com/vpinball/vpinball/blob/master/rubber.cpp */
+/** Rubber API — VBS surface for `Rubber`. @see https://github.com/vpinball/vpinball/blob/master/rubber.cpp */
 export class RubberApi extends ItemApi<RubberData> {
-	private readonly state: RubberState
-	private readonly hits: HitObject[]
 	private readonly isDynamic: boolean
 
 	constructor(
-		state: RubberState,
-		hits: HitObject[],
+		private readonly state: RubberState,
+		private readonly hits: HitObject[],
 		data: RubberData,
 		events: EventProxy,
 		player: Player,
 		table: Table,
 	) {
 		super(data, events, player, table)
-		this.state = state
-		this.hits = hits
 		this.isDynamic = !data.staticRendering
 	}
 
@@ -35,9 +29,7 @@ export class RubberApi extends ItemApi<RubberData> {
 		return this.data.height
 	}
 	set Height(v) {
-		if (this.isDynamic) {
-			this.state.height = v
-		}
+		if (this.isDynamic) this.state.height = v
 		this.data.height = v
 	}
 	get HitHeight() {
@@ -56,9 +48,7 @@ export class RubberApi extends ItemApi<RubberData> {
 		return this.data.szMaterial
 	}
 	set Material(v) {
-		if (this.isDynamic) {
-			this.state.material = v
-		}
+		if (this.isDynamic) this.state.material = v
 		this.data.szMaterial = v
 	}
 	get Image() {
@@ -66,9 +56,7 @@ export class RubberApi extends ItemApi<RubberData> {
 	}
 	set Image(v) {
 		this._assertNonHdrImage(v)
-		if (this.isDynamic) {
-			this.state.texture = v
-		}
+		if (this.isDynamic) this.state.texture = v
 		this.data.szImage = v
 	}
 	get HasHitEvent() {
@@ -105,19 +93,13 @@ export class RubberApi extends ItemApi<RubberData> {
 		return this.hits[0].isEnabled
 	}
 	set Collidable(v) {
-		if (v !== this.Collidable) {
-			for (const hit of this.hits) {
-				hit.isEnabled = v
-			}
-		}
+		if (v !== this.Collidable) for (const hit of this.hits) hit.isEnabled = v
 	}
 	get Visible() {
 		return this.data.isVisible
 	}
 	set Visible(v) {
-		if (this.isDynamic) {
-			this.state.isVisible = v
-		}
+		if (this.isDynamic) this.state.isVisible = v
 		this.data.isVisible = v
 	}
 	get EnableStaticRendering() {
@@ -142,27 +124,21 @@ export class RubberApi extends ItemApi<RubberData> {
 		return this.data.rotX
 	}
 	set RotX(v) {
-		if (this.isDynamic) {
-			this.state.rotX = v
-		}
+		if (this.isDynamic) this.state.rotX = v
 		this.data.rotX = v
 	}
 	get RotY() {
 		return this.data.rotY
 	}
 	set RotY(v) {
-		if (this.isDynamic) {
-			this.state.rotY = v
-		}
+		if (this.isDynamic) this.state.rotY = v
 		this.data.rotY = v
 	}
 	get RotZ() {
 		return this.data.rotZ
 	}
 	set RotZ(v) {
-		if (this.isDynamic) {
-			this.state.rotZ = v
-		}
+		if (this.isDynamic) this.state.rotZ = v
 		this.data.rotZ = v
 	}
 	get PhysicsMaterial() {
@@ -178,10 +154,7 @@ export class RubberApi extends ItemApi<RubberData> {
 		this.data.overwritePhysics = v
 	}
 
-	/**
-	 * No idea wtf this is supposed to do.
-	 */
-	public InterfaceSupportsErrorInfo(riid: any): boolean {
+	public InterfaceSupportsErrorInfo(_riid: unknown): boolean {
 		return false
 	}
 
