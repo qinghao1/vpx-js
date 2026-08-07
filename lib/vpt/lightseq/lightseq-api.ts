@@ -4,9 +4,7 @@
 import { ItemApi } from '../item-api.js'
 import type { LightSeqData } from './lightseq-data.js'
 
-/** LightSeq API.
- *
- * @see https://github.com/vpinball/vpinball/blob/master/lightseq.cpp */
+/** LightSeq API — VBS surface for `LightSeq`. @see https://github.com/vpinball/vpinball/blob/master/lightseq.cpp */
 export class LightSeqApi extends ItemApi<LightSeqData> {
 	get Collection() {
 		return this.data.collection
