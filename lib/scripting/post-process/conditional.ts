@@ -8,38 +8,38 @@ import type { ESIToken } from '../grammar/grammar.js'
 export function ppConditional(node: ESIToken): unknown {
 	switch (node.type) {
 		case 'BlockIfStatement':
-			return ppBlockIfStatement(node as ESIToken)
+			return ppBlockIfStatement(node)
 		case 'ElseIfStatement':
 		case 'ElseIfStatementInline':
-			return ppElseIfStatement(node as ESIToken)
+			return ppElseIfStatement(node)
 		case 'ElseStatement':
-			return ppElseStatement(node as ESIToken)
+			return ppElseStatement(node)
 		case 'LineIfThenStatement':
-			return ppLineIfThenStatement(node as ESIToken)
+			return ppLineIfThenStatement(node)
 		case 'SelectStatement':
-			return ppSelectStatement(node as ESIToken)
+			return ppSelectStatement(node)
 		case 'CaseStatement':
-			return ppCaseStatement(node as ESIToken)
+			return ppCaseStatement(node)
 		case 'CaseClauses':
-			return ppCaseClauses(node as ESIToken)
+			return ppCaseClauses(node)
 		case 'CaseElseStatement':
-			return ppCaseElseStatement(node as ESIToken)
+			return ppCaseElseStatement(node)
 	}
 	return null
 }
 
 function ppBlockIfStatement(node: ESIToken): unknown {
-	const expr = (node.children[0] as any).estree
-	let block: any = null,
-		alternate: any = null
+	const expr = node.children[0].estree
+	let block: any = null
+	let alternate: any = null
 	for (const child of node.children) {
-		if (child.type === 'Block') block = (child as any).estree
+		if (child.type === 'Block') block = child.estree
 		else if (['ElseIfStatement', 'ElseIfStatementInline', 'ElseStatement'].includes(child.type)) {
-			if (alternate === null) alternate = (child as any).estree
+			if (alternate === null) alternate = child.estree
 			else {
 				let tmp = alternate
 				while (tmp.alternate !== null) tmp = tmp.alternate
-				tmp.alternate = (child as any).estree
+				tmp.alternate = child.estree
 			}
 		}
 	}
@@ -47,43 +47,43 @@ function ppBlockIfStatement(node: ESIToken): unknown {
 }
 
 function ppElseIfStatement(node: ESIToken): unknown {
-	const expr = (node.children[0] as any).estree
+	const expr = node.children[0].estree
 	let block: any = null
 	for (const child of node.children) {
-		if (child.type === 'Block') block = (child as any).estree
-		else if (child.type === 'StatementsInline') block = blockStatement((child as any).estree)
+		if (child.type === 'Block') block = child.estree
+		else if (child.type === 'StatementsInline') block = blockStatement(child.estree)
 	}
 	return ifStatement(expr, block ? block : blockStatement([]), null)
 }
 
 function ppElseStatement(node: ESIToken): unknown {
 	let block: any = null
-	for (const child of node.children) if (child.type === 'Block') block = (child as any).estree
+	for (const child of node.children) if (child.type === 'Block') block = child.estree
 	return block ? block : blockStatement([])
 }
 
 function ppLineIfThenStatement(node: ESIToken): unknown {
-	const expr = (node.children[0] as any).estree
-	const stmts = (node.children[1] as any).estree
-	const elseStmts = node.children.length > 2 ? (node.children[2] as any).estree : null
+	const expr = node.children[0].estree
+	const stmts = node.children[1].estree
+	const elseStmts = node.children.length > 2 ? node.children[2].estree : null
 	return ifStatement(expr, blockStatement(stmts), elseStmts ? blockStatement(elseStmts) : null)
 }
 
 function ppSelectStatement(node: ESIToken): unknown {
-	const expr = (node.children[0] as any).estree
+	const expr = node.children[0].estree
 	const cases: unknown[] = []
 	for (const child of node.children) {
-		if (child.type === 'CaseStatement') cases.push(...((child as any).estree as unknown[]))
-		else if (child.type === 'CaseElseStatement') cases.push((child as any).estree)
+		if (child.type === 'CaseStatement') cases.push(...(child.estree as unknown[]))
+		else if (child.type === 'CaseElseStatement') cases.push(child.estree)
 	}
 	return switchStatement(expr, cases as any)
 }
 
 function ppCaseStatement(node: ESIToken): unknown {
 	const estree: any[] = []
-	const exprs = (node.children[0] as any).estree
+	const exprs = node.children[0].estree
 	let block: any = null
-	for (const child of node.children) if (child.type === 'Block') block = (child as any).estree
+	for (const child of node.children) if (child.type === 'Block') block = child.estree
 	for (let i = 0; i < exprs.length; i++) {
 		if (i < exprs.length - 1) estree.push(switchCase(exprs[i], []))
 		else {
@@ -97,12 +97,12 @@ function ppCaseStatement(node: ESIToken): unknown {
 
 function ppCaseClauses(node: ESIToken): unknown {
 	const estree: unknown[] = []
-	for (const child of node.children) if (child.type === 'CaseClause') estree.push((child as any).estree)
+	for (const child of node.children) if (child.type === 'CaseClause') estree.push(child.estree)
 	return estree
 }
 
 function ppCaseElseStatement(node: ESIToken): unknown {
 	let block: any = null
-	for (const child of node.children) if (child.type === 'Block') block = (child as any).estree
+	for (const child of node.children) if (child.type === 'Block') block = child.estree
 	return switchCase(null, block ? block.body : [])
 }
