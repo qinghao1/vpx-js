@@ -110,7 +110,6 @@ export class VBSHelper {
 	 */
 
 	public equals(value1: any, value2: any): boolean {
-		// tslint:disable-next-line:triple-equals
 		if (value1 == value2) {
 			return true
 		}
