@@ -5,6 +5,7 @@ import { BiffParser } from '../../io/biff-parser.js'
 import type { Storage } from '../../io/ole-doc.js'
 import { f4 } from '../../util/float.js'
 import { Vertex3D } from '../../util/math.js'
+import { handleBiffTag } from '../biff-helper.js'
 import { Enums } from '../enums.js'
 import { type IPhysicalData, ItemData } from '../item-data.js'
 import type { Table } from '../table/table.js'
@@ -79,7 +80,7 @@ export class HitTargetData extends ItemData implements IPhysicalData {
 		)
 	}
 
-	private async fromTag(buffer: Uint8Array, tag: string, offset: number, len: number): Promise<number> {
+	private async fromTag(buffer: Uint8Array, tag: string, _offset: number, len: number): Promise<number> {
 		if (tag === 'VPOS') {
 			this.position = Vertex3D.get(buffer)
 			return 0
@@ -88,22 +89,15 @@ export class HitTargetData extends ItemData implements IPhysicalData {
 			this.vSize = Vertex3D.get(buffer)
 			return 0
 		}
-		if (tag in FLOAT_MAP) {
-			;(this as unknown as Record<string, unknown>)[FLOAT_MAP[tag]] = this.getFloat(buffer)
+		if (
+			handleBiffTag(this as unknown as Record<string, unknown>, this, tag, buffer, len, {
+				float: FLOAT_MAP,
+				int: INT_MAP,
+				bool: BOOL_MAP,
+				string: STRING_MAP,
+			})
+		)
 			return 0
-		}
-		if (tag in INT_MAP) {
-			;(this as unknown as Record<string, unknown>)[INT_MAP[tag]] = this.getInt(buffer)
-			return 0
-		}
-		if (tag in BOOL_MAP) {
-			;(this as unknown as Record<string, unknown>)[BOOL_MAP[tag]] = this.getBool(buffer)
-			return 0
-		}
-		if (tag in STRING_MAP) {
-			;(this as unknown as Record<string, unknown>)[STRING_MAP[tag]] = this.getString(buffer, len)
-			return 0
-		}
 		this.getCommonBlock(buffer, tag, len)
 		return 0
 	}
