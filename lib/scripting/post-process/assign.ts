@@ -5,7 +5,7 @@ import { assignmentExpression, expressionStatement } from '../estree.js'
 import type { ESIToken } from '../grammar/grammar.js'
 
 /** ppAssign. */
-export function ppAssign(node: ESIToken): any {
+export function ppAssign(node: ESIToken): unknown {
 	switch (node.type) {
 		case 'RegularAssignmentStatement':
 		case 'RegularAssignmentStatementInline':
@@ -17,13 +17,13 @@ export function ppAssign(node: ESIToken): any {
 	return null
 }
 
-function ppRegularAssignmentStatement(node: ESIToken): any {
+function ppRegularAssignmentStatement(node: ESIToken): unknown {
 	const expr = node.children[0].estree
 	const rightExpr = node.children[2].estree
 	return expressionStatement(assignmentExpression(expr, '=', rightExpr))
 }
 
-function ppSetAssignmentStatement(node: ESIToken): any {
+function ppSetAssignmentStatement(node: ESIToken): unknown {
 	const stmts = []
 	const expr = node.children[0].estree
 	const rightExpr = node.children[2].estree
