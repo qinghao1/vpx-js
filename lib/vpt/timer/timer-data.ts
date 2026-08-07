@@ -7,8 +7,7 @@ import { Vertex2D } from '../../util/math.js'
 import { handleBiffTag } from '../biff-helper.js'
 import { ItemData } from '../item-data.js'
 
-/** VPinball timer.
- * @see https://github.com/vpinball/vpinball/blob/master/timer.cpp */
+/** VPinball timer data. @see https://github.com/vpinball/vpinball/blob/master/timer.cpp */
 export class TimerData extends ItemData {
 	public vCenter!: Vertex2D
 	private isBackglass!: boolean
