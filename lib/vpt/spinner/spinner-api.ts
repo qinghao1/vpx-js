@@ -12,7 +12,8 @@ import type { SpinnerData } from './spinner-data.js'
 import type { SpinnerMover } from './spinner-mover.js'
 import type { SpinnerState } from './spinner-state.js'
 
-export class SpinnerApi extends ItemApi<SpinnerData> {
+export /** SpinnerApi. */
+class SpinnerApi extends ItemApi<SpinnerData> {
 	private readonly state: SpinnerState
 	private readonly mover: SpinnerMover
 
