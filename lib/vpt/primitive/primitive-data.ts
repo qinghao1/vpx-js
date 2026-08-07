@@ -9,6 +9,7 @@ import { FrameData } from '../animation.js'
 import { type IPhysicalData, ItemData } from '../item-data.js'
 import { Mesh } from '../mesh.js'
 
+/** Primitive data. */
 export class PrimitiveData extends ItemData implements IPhysicalData {
 	public numVertices!: number
 	public compressedAnimationVertices?: number
