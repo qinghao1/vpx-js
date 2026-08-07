@@ -14,7 +14,7 @@ import type { ESIToken } from '../grammar/grammar.js'
 import { Transformer } from '../transformer/transformer.js'
 
 /** ppVarDecl. */
-export function ppVarDecl(node: ESIToken): any {
+export function ppVarDecl(node: ESIToken): unknown {
 	switch (node.type) {
 		case 'VariableMemberDeclaration':
 		case 'VariableMemberDeclarationInline':
@@ -27,12 +27,12 @@ export function ppVarDecl(node: ESIToken): any {
 	return null
 }
 
-function ppVariableMemberDeclaration(node: ESIToken): any {
+function ppVariableMemberDeclaration(node: ESIToken): unknown {
 	const varDecls = node.children[1].estree
 	return variableDeclaration('let', varDecls)
 }
 
-function ppVariableIdentifiers(node: ESIToken): any {
+function ppVariableIdentifiers(node: ESIToken): unknown {
 	const estree = []
 	for (const child of node.children) {
 		if (child.type === 'VariableIdentifier') {
@@ -42,7 +42,7 @@ function ppVariableIdentifiers(node: ESIToken): any {
 	return estree
 }
 
-function ppVariableIdentifier(node: ESIToken): any {
+function ppVariableIdentifier(node: ESIToken): unknown {
 	const id = node.children[0].estree
 	let expr: CallExpression | null = null
 	if (node.children.length > 1) {
