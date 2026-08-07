@@ -14,6 +14,7 @@ import { Material, SaveMaterial, SavePhysicsMaterial } from '../material.js'
  *
  * @see https://github.com/vpinball/vpinball/blob/master/pintable.cpp
  */
+/** Table global data. */
 export class TableData extends ItemData {
 	public static BGI_DESKTOP = 110
 	public static BGI_FULLSCREEN = 111
