@@ -22,17 +22,7 @@ export class ThreeMapGenerator {
 		}
 		const now = Date.now()
 		logger().debug('[ThreeMapGenerator.loadTextures] Pre-loading %s textures..', textures.length)
-		const concurrency = Math.min(
-			16,
-			Math.max(
-				6,
-				Math.floor(
-					(typeof navigator !== 'undefined' && (navigator as any).hardwareConcurrency
-						? (navigator as any).hardwareConcurrency
-						: 6) * 1.5,
-				),
-			),
-		)
+		const concurrency = 4
 		let index = 0
 		const loadOne = async (): Promise<void> => {
 			while (true) {
