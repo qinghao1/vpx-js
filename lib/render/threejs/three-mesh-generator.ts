@@ -30,15 +30,10 @@ export class ThreeMeshGenerator {
 			if (v.hasTextureCoordinates()) s.uvs.push(v.tu, 1 - v.tv)
 		}
 		for (let i = 0; i < mesh.indices.length; i += 3) {
-			// Winding reversal: VPX is LH (Direct3D), Three is RH.
-			// Mesh.transform(RIGHT_HANDED) already applied before this
-			// conversion (all getMeshes do `mesh.transform(RIGHT_HANDED)`),
-			// so we flip indices i+2,i+1,i here to keep normals consistent
-			// with the OBJLoader n-gon fan that this code was copied from.
+			// VPX is LH, Three is RH; mesh already transformed via RIGHT_HANDED
 			const a = mesh.indices[i + 2] + 1,
 				b = mesh.indices[i + 1] + 1,
 				c = mesh.indices[i] + 1
-			// Single triangle — n-gon fan collapses to one addFace call
 			s.addFace(a, b, c, a, b, c, a, b, c)
 		}
 		const g = s.object.geometry,
