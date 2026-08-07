@@ -10,15 +10,14 @@ import { CollisionType } from '../../physics/collision-type.js'
 import { STATICTIME } from '../../physics/constants.js'
 import { HARD_SCATTER } from '../../physics/functions.js'
 import { HitCircle } from '../../physics/hit-circle.js'
-import { degToRad } from '../../util/float.js'
+import { degToRad, FLT_MAX } from '../../util/float.js'
 import { clamp } from '../../util/functions.js'
 import { Vertex3D } from '../../util/math.js'
 import type { Ball } from '../ball/ball.js'
-import { FLT_MAX } from '../mesh.js'
 import type { Table } from '../table/table.js'
 import type { KickerData } from './kicker-data.js'
 
-/** Kicker hit. */
+/** Kicker hit — captures and ejects balls. */
 export class KickerHit extends HitCircle {
 	private data: KickerData
 	public ball?: Ball // The ball inside this kicker
@@ -33,7 +32,6 @@ export class KickerHit extends HitCircle {
 		if (!this.data.legacyMode) {
 			const rad = this.radius * 0.8
 			for (let t = 0; t < kickerHitVertices.length; t++) {
-				// find the right normal by calculating the distance from current ball position to vertex of the kicker mesh
 				const vPos = new Vertex3D(kickerHitVertices[t].x, kickerHitVertices[t].y, kickerHitVertices[t].z)
 				vPos.x = vPos.x * rad + this.data.center.x
 				vPos.y = vPos.y * rad + this.data.center.y
