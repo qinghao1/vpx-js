@@ -4,41 +4,32 @@
 import { getDataView } from './binary-helpers.js'
 import type { OleCompoundDoc } from './ole-doc.js'
 
-/** Sector allocation table (SAT/SSAT). */
+/** Sector allocation table (SAT/SSAT).
+ * @see https://github.com/vpinball/vpinball/blob/master/ole-doc.cpp */
 export class AllocationTable {
 	private static SecIdEndOfChain = -2
 
-	private readonly doc: OleCompoundDoc
-	private readonly table: number[] = []
+	private constructor(
+		private readonly doc: OleCompoundDoc,
+		private readonly table: number[],
+	) {}
 
-	private constructor(doc: OleCompoundDoc, table: number[]) {
-		this.doc = doc
-		this.table = table
-	}
-
-	/** Load the allocation table from raw sector chain. */
 	public static async load(doc: OleCompoundDoc, secIds: number[]): Promise<AllocationTable> {
-		const header = doc.header
-		const table = new Array(secIds.length * (header.secSize / 4))
-		const buffer = await doc.readSectors(secIds)
-		const view = getDataView(buffer)
-		for (let i = 0; i < buffer.length / 4; i++) {
-			table[i] = view.getInt32(i * 4, true)
-		}
+		const buf = await doc.readSectors(secIds)
+		const view = getDataView(buf)
+		const table = Array.from({ length: buf.length / 4 }, (_, i) => view.getInt32(i * 4, true))
 		return new AllocationTable(doc, table)
 	}
 
-	/** Follow a chain starting at `startSecId` until end-of-chain. */
-	public getSecIdChain(startSecId: number): number[] {
-		let secId = startSecId
-		const secIds: number[] = []
-		while (secId !== AllocationTable.SecIdEndOfChain) {
-			secIds.push(secId)
-			secId = this.table[secId]
-			if (secId === undefined) {
-				throw new Error(`Corrupt file: secId ${secIds[secIds.length - 1]} missing in allocation table.`)
-			}
+	public getSecIdChain(start: number): number[] {
+		const ids: number[] = []
+		let id = start
+		while (id !== AllocationTable.SecIdEndOfChain) {
+			ids.push(id)
+			const next = this.table[id]
+			if (next === undefined) throw new Error(`Corrupt file: secId ${id} missing in allocation table.`)
+			id = next
 		}
-		return secIds
+		return ids
 	}
 }
