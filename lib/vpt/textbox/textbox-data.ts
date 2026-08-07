@@ -13,8 +13,7 @@ const INT_MAP: Record<string, string> = { ALGN: 'align' }
 const BOOL_MAP: Record<string, string> = { TRNS: 'isTransparent', IDMD: 'isDMD' }
 const STRING_MAP: Record<string, string> = { TEXT: 'text' }
 
-/** Textbox data.
- * @see https://github.com/vpinball/vpinball/blob/master/textbox.cpp */
+/** Textbox data. @see https://github.com/vpinball/vpinball/blob/master/textbox.cpp */
 export class TextboxData extends ItemData {
 	public v1!: Vertex2D
 	public v2!: Vertex2D
