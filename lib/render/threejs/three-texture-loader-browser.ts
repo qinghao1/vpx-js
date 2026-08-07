@@ -3,7 +3,9 @@
 
 import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js'
 import {
+	CanvasTexture,
 	DataTexture,
+	LinearSRGBColorSpace,
 	RGBAFormat,
 	SRGBColorSpace,
 	TextureLoader,
@@ -53,10 +55,13 @@ export class ThreeTextureLoaderBrowser implements ITextureLoader<ThreeTexture> {
 				const loader = isExr ? new EXRLoader() : new HDRLoader()
 				const texture = (loader as any).createDataTexture(buffer) as ThreeTexture
 				texture.name = `texture:${name}`
-				;(texture as any).colorSpace = SRGBColorSpace
 				texture.needsUpdate = true
+				// HDR/EXR are linear float textures, must stay Linear, not sRGB (prevents WebGL sRGB warning)
+				if ((texture as any).colorSpace === SRGBColorSpace) (texture as any).colorSpace = LinearSRGBColorSpace
 				;(texture as any).anisotropy = 4
-				return downsampleIfNeeded(texture, 2048) as ThreeTexture
+				// downsample float textures if huge (handle DataTexture case)
+				const ds = downsampleIfNeeded(texture, 2048)
+				return (ds || texture) as ThreeTexture
 			} catch (e: any) {
 				throw new Error(`HDR/EXR parse failed for "${name}" (${ext} ${mimeType}): ${e.message}`)
 			}
@@ -133,8 +138,43 @@ function downsampleIfNeeded(texture: any, maxSize: number): any {
 	try {
 		const img = texture.image
 		if (!img) return texture
-		const w = img.width || img.naturalWidth || texture.image?.width
-		const h = img.height || img.naturalHeight || texture.image?.height
+		// handle DataTexture (HDR/EXR) with raw data buffer
+		if (img.data && img.width && img.height) {
+			const w = img.width as number
+			const h = img.height as number
+			if (w <= maxSize && h <= maxSize) return texture
+			// DataTexture downsample: nearest-neighbor on float/byte data
+			try {
+				const scale = Math.min(maxSize / w, maxSize / h)
+				const nw = Math.max(1, Math.floor(w * scale))
+				const nh = Math.max(1, Math.floor(h * scale))
+				const src = img.data as any
+				const isFloat = src instanceof Float32Array || src instanceof Uint16Array
+				// infer channels: data length / (w*h)
+				const channels = Math.round(src.length / (w * h)) || 4
+				const dst = new (src.constructor as any)(nw * nh * channels)
+				for (let y = 0; y < nh; y++) {
+					const sy = Math.min(h - 1, Math.floor((y / nh) * h))
+					for (let x = 0; x < nw; x++) {
+						const sx = Math.min(w - 1, Math.floor((x / nw) * w))
+						const sIdx = (sy * w + sx) * channels
+						const dIdx = (y * nw + x) * channels
+						for (let c = 0; c < channels; c++) dst[dIdx + c] = src[sIdx + c]
+					}
+				}
+				const newTex = new DataTexture(dst as any, nw, nh, (texture as any).format || RGBAFormat)
+				newTex.needsUpdate = true
+				newTex.colorSpace = (texture as any).colorSpace || LinearSRGBColorSpace
+				newTex.flipY = (texture as any).flipY ?? true
+				newTex.minFilter = (texture as any).minFilter
+				newTex.magFilter = (texture as any).magFilter
+				newTex.type = (texture as any).type || (isFloat ? (texture as any).type : UnsignedByteType)
+				newTex.name = (texture as any).name
+				return newTex
+			} catch { return texture }
+		}
+		const w = img.width || (img as any).naturalWidth || texture.image?.width
+		const h = img.height || (img as any).naturalHeight || texture.image?.height
 		if (!w || !h) return texture
 		if (w <= maxSize && h <= maxSize) return texture
 		const scale = Math.min(maxSize / w, maxSize / h)
@@ -152,14 +192,14 @@ function downsampleIfNeeded(texture: any, maxSize: number): any {
 					(typeof ImageBitmap !== 'undefined' && img instanceof ImageBitmap)
 				) {
 					ctx.drawImage(img as any, 0, 0, nw, nh)
-					const newTex = new (texture as any).constructor(canvas) as any
-					if (newTex) {
-						newTex.needsUpdate = true
-						return newTex
-					}
-				} else if (img.data && w && h) {
-					// DataTexture - can't trivially downsample without resampling; return original but mark for GPU
-					return texture
+					// use CanvasTexture to preserve correct filtering/colorSpace
+					const newTex = new CanvasTexture(canvas) as any
+					newTex.colorSpace = (texture as any).colorSpace || SRGBColorSpace
+					newTex.needsUpdate = true
+					newTex.name = (texture as any).name
+					newTex.anisotropy = (texture as any).anisotropy ?? 4
+					newTex.flipY = (texture as any).flipY ?? true
+					return newTex
 				}
 			}
 		}

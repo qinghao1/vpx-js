@@ -13,6 +13,7 @@ export {
 	Camera,
 	ClampToEdgeWrapping,
 	Color,
+	CanvasTexture,
 	DataTexture,
 	DataTextureLoader,
 	DefaultLoadingManager,
