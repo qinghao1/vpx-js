@@ -18,8 +18,8 @@ export abstract class VbsApi {
 	}
 }
 
-export /** VbsNotImplementedError. */
-class VbsNotImplementedError extends Error {
+/** VbsNotImplementedError. */
+export class VbsNotImplementedError extends Error {
 	constructor() {
 		super('This method of the VBScript API has not been implemented.')
 	}
