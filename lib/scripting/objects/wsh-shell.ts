@@ -113,7 +113,7 @@ export class WshShell {
 	 * @return Read value
 	 * @see https://docs.microsoft.com/en-us/previous-versions/windows/internet-explorer/ie-developer/windows-scripting/x05fawxd%28v%3dvs.84%29
 	 */
-	public RegRead(strName: string): any {
+	public RegRead(strName: string): unknown {
 		return registry.regRead(strName)
 	}
 
@@ -124,8 +124,8 @@ export class WshShell {
 	 * @param strType String value indicating the value's data type.
 	 * @see https://docs.microsoft.com/en-us/previous-versions/windows/internet-explorer/ie-developer/windows-scripting/yfdfhz1b%28v%3dvs.84%29
 	 */
-	public RegWrite(strName: string, anyValue: any, strType?: string): void {
-		registry.regWrite(strName, anyValue)
+	public RegWrite(strName: string, anyValue: unknown, strType?: string): void {
+		registry.regWrite(strName, anyValue as string | number)
 	}
 
 	/**
