@@ -24,9 +24,6 @@ import { VbsProxyHandler } from './vbs-proxy-handler.js'
 
 const require = createRequire(import.meta.url)
 
-//self.escodegen = require('escodegen');
-
-// the table script function
 declare function play(
 	scope: any,
 	table: { [key: string]: any },
@@ -37,33 +34,29 @@ declare function play(
 	player: Player,
 ): void
 
-/** Transpiles VBS to JS and executes. */
+/** Transpiles VBS to JS and executes.
+ * @see https://github.com/vpinball/vpinball/blob/master/codeview.cpp */
 export class Transpiler {
 	private readonly table: Table
 	private readonly player: Player
 	private readonly itemApis: { [p: string]: any }
-	private readonly enumApis: EnumsApi
+	private readonly enumApis: EnumsApi = Enums
 	private readonly globalApi: GlobalApi
-	private readonly stdlib: Stdlib
-	private readonly grammar: Grammar
+	private readonly stdlib = new Stdlib()
+	private readonly grammar = new Grammar()
 
 	constructor(table: Table, player: Player) {
 		this.table = table
 		this.player = player
-		this.itemApis = this.table.getElementApis()
-		this.enumApis = Enums
-		this.globalApi = new GlobalApi(this.table, player)
-		this.stdlib = new Stdlib()
-		this.grammar = new Grammar()
+		this.itemApis = table.getElementApis()
+		this.globalApi = new GlobalApi(table, player)
 	}
 
-	public transpile(vbs: string, globalFunction?: string, globalObject?: string) {
-		//logger().debug(vbs);
-		const then = Date.now()
-		let ast = this.parse(vbs)
-		logger().info('[Transpiler.transpile]: Parsed in %sms', Date.now() - then)
-
-		let now = Date.now()
+	public transpile(vbs: string, globalFunction?: string, globalObject?: string): string {
+		const t0 = Date.now()
+		let ast = this.grammar.transpile(vbs)
+		logger().info('[Transpiler] Parsed in %sms', Date.now() - t0)
+		const t1 = Date.now()
 		ast = new FunctionHoistTransformer(ast).transform()
 		ast = new EventTransformer(ast, this.table.getElements()).transform()
 		ast = new ErrorTransformer(ast).transform()
@@ -80,32 +73,23 @@ export class Transpiler {
 		ast = new AmbiguityTransformer(ast, this.itemApis, this.enumApis, this.globalApi, this.stdlib).transform()
 		ast = new ClassTransformer(ast).transform()
 		ast = new WrapTransformer(ast).transform(globalFunction, globalObject)
-		logger().info('[Transpiler.transpile]: Transformed in %sms', Date.now() - now)
-		//logger().debug('AST:', ast);
-
-		now = Date.now()
-		const js = this.generate(ast)
-		logger().info(
-			'[Transpiler.transpile]: Generated in %sms (total transpilation time: %sms)',
-			Date.now() - now,
-			Date.now() - then,
-		)
+		logger().info('[Transpiler] Transformed in %sms', Date.now() - t1)
+		const t2 = Date.now(),
+			js = generate(ast)
+		logger().info('[Transpiler] Generated in %sms (total %sms)', Date.now() - t2, Date.now() - t0)
 		logger().debug(js)
-
 		return js
 	}
 
-	public execute(vbs: string, globalScope: any, globalObject?: string) {
-		globalObject =
-			globalObject || (typeof window !== 'undefined' ? 'window' : typeof self !== 'undefined' ? 'self' : 'global')
+	public execute(vbs: string, globalScope: any, globalObject?: string): void {
+		globalObject ||= typeof window !== 'undefined' ? 'window' : typeof self !== 'undefined' ? 'self' : 'global'
 		const js = this.transpile(vbs, 'play', globalObject)
-
-		let now = Date.now()
+		let t = Date.now()
 		progress().details('evaluating')
 		eval('//@ sourceURL=game:///tablescript.vbs.js\n' + js)
-		logger().info('[Transpiler.execute] Evaluated in %sms', Date.now() - now)
+		logger().info('[Transpiler] Evaluated in %sms', Date.now() - t)
 		progress().details('executing')
-		now = Date.now()
+		t = Date.now()
 		play(
 			new Proxy(globalScope, new VbsProxyHandler()),
 			this.itemApis,
@@ -115,13 +99,12 @@ export class Transpiler {
 			new VBSHelper(this),
 			this.player,
 		)
-		logger().info('[Transpiler.execute] Executed in %sms', Date.now() - now)
+		logger().info('[Transpiler] Executed in %sms', Date.now() - t)
 	}
 
 	private parse(vbs: string): Program {
 		return this.grammar.transpile(vbs)
 	}
-
 	private generate(ast: Program): string {
 		return generate(ast)
 	}
