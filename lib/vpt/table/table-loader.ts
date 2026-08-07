@@ -5,52 +5,48 @@ import { type IBinaryReader, OleCompoundDoc, type Storage } from '../../io/ole-d
 import { logger, progress } from '../../util/logger.js'
 import { Collection } from '../collection/collection.js'
 import type { Item } from '../item.js'
-import { ItemData } from '../item-data.js'
+import type { ItemData } from '../item-data.js'
 import { ITEM_KEYS, ITEM_REGISTRY, loadItemByType } from '../item-registry.js'
 import { Texture } from '../texture.js'
 import type { TableLoadOptions } from './table.js'
 import { TableData } from './table-data.js'
 
-const textDecoder = new TextDecoder()
+const decoder = new TextDecoder()
 
-/** TableLoader. */
+/** Loads VPX OLE storage into table model. */
 export class TableLoader {
 	private doc!: OleCompoundDoc
 
-	async load(reader: IBinaryReader, opts: TableLoadOptions = {}): Promise<LoadedTable> {
+	public async load(reader: IBinaryReader, opts: TableLoadOptions = {}): Promise<LoadedTable> {
 		progress().start('table.load', 'Loading VPX file')
-		const then = Date.now()
+		const t0 = Date.now()
 		this.doc = await OleCompoundDoc.load(reader)
 		try {
-			const loadedTable: LoadedTable = { items: {} }
+			const out: LoadedTable = { items: {} }
 			if (opts.loadTableScript || opts.tableDataOnly || !opts.tableInfoOnly) {
-				const gameStorage = this.doc.storage('GameStg')
-				loadedTable.data = await TableData.fromStorage(gameStorage, 'GameData')
+				const gameStg = this.doc.storage('GameStg')
+				out.data = await TableData.fromStorage(gameStg, 'GameData')
 				if (!opts.tableDataOnly) {
-					await this.loadGameItems(loadedTable, gameStorage, loadedTable.data.numGameItems, opts)
-					await this.loadTextures(loadedTable, gameStorage, loadedTable.data.numTextures)
-					await this.loadCollections(loadedTable, gameStorage, loadedTable.data.numCollections)
+					await this.loadGameItems(out, gameStg, out.data.numGameItems, opts)
+					await this.loadTextures(out, gameStg, out.data.numTextures)
+					await this.loadCollections(out, gameStg, out.data.numCollections)
 				}
 				if (opts.loadTableScript) {
-					const script = await gameStorage.read('GameData', loadedTable.data.scriptPos, loadedTable.data.scriptLen)
-					loadedTable.tableScript = textDecoder.decode(script)
-					if (loadedTable.tableScript.endsWith('ENDB')) {
-						loadedTable.tableScript = loadedTable.tableScript.slice(0, -8)
-					}
+					const script = await gameStg.read('GameData', out.data.scriptPos, out.data.scriptLen)
+					out.tableScript = decoder.decode(script)
+					if (out.tableScript.endsWith('ENDB')) out.tableScript = out.tableScript.slice(0, -8)
 				}
 			}
-			if (opts.tableInfoOnly || !opts.tableDataOnly) {
-				await this.loadTableInfo(loadedTable)
-			}
-			logger().info('[Table.load] Table loaded in %sms.', Date.now() - then)
-			return loadedTable
+			if (opts.tableInfoOnly || !opts.tableDataOnly) await this.loadTableInfo(out)
+			logger().info('[Table.load] Table loaded in %sms.', Date.now() - t0)
+			return out
 		} finally {
 			await this.doc.close()
 			progress().end('table.load')
 		}
 	}
 
-	async streamStorage<T>(name: string, streamer: (stg: Storage) => Promise<T>): Promise<T> {
+	public async streamStorage<T>(name: string, streamer: (stg: Storage) => Promise<T>): Promise<T> {
 		try {
 			await this.doc.reopen()
 			return await streamer(this.doc.storage(name))
@@ -60,77 +56,66 @@ export class TableLoader {
 	}
 
 	private async loadGameItems(
-		loadedTable: LoadedTable,
+		out: LoadedTable,
 		storage: Storage,
 		numItems: number,
 		opts: TableLoadOptions,
-	): Promise<Record<string, number>> {
-		const stats: Record<string, number> = {}
-
-		for (const key of ITEM_KEYS) (loadedTable as unknown as Record<string, unknown>)[key] = []
-
+	): Promise<void> {
+		for (const key of ITEM_KEYS) (out as unknown as Record<string, unknown>)[key] = []
 		progress().show('Loading game items')
 		for (let i = 0; i < numItems; i++) {
-			const itemName = `GameItem${i}`
-			const itemData = await storage.read(itemName, 0, 4)
-			const itemType = new DataView(itemData.buffer, itemData.byteOffset, itemData.byteLength).getInt32(0, true)
-			const item = await this.loadItem(loadedTable, storage, itemName, itemType, opts)
+			const name = `GameItem${i}`
+			const data = await storage.read(name, 0, 4)
+			const type = new DataView(data.buffer, data.byteOffset, data.byteLength).getInt32(0, true)
+			const item = await this.loadItem(out, storage, name, type, opts)
 			if (item) {
 				progress().details(item.getName())
-				loadedTable.items[item.getName()] = item
+				out.items[item.getName()] = item
 			}
-			const typeName = ItemData.getType(itemType)
-			stats[typeName] = (stats[typeName] ?? 0) + 1
 		}
-		return stats
 	}
 
 	private async loadItem(
-		loadedTable: LoadedTable,
+		out: LoadedTable,
 		storage: Storage,
-		itemName: string,
-		itemType: number,
+		name: string,
+		type: number,
 		opts: TableLoadOptions,
 	): Promise<Item<ItemData> | null> {
-		const item = await loadItemByType(storage, itemName, itemType, opts)
+		const item = await loadItemByType(storage, name, type, opts)
 		if (!item) return null
-
-		const key = ITEM_REGISTRY[itemType]?.key
+		const key = ITEM_REGISTRY[type]?.key
 		if (!key) return item
-
-		// Textbox/Timer are invisible by default; respect loadInvisibleItems
-		if ((key === 'textBoxes' || key === 'timers') && !opts.loadInvisibleItems) {
-			return item
-		}
-		;((loadedTable as unknown as Record<string, Item<ItemData>[] | undefined>)[key] ??= []).push(item)
+		if ((key === 'textBoxes' || key === 'timers') && !opts.loadInvisibleItems) return item
+		;((out as unknown as Record<string, Item<ItemData>[] | undefined>)[key] ??= []).push(item)
 		return item
 	}
 
-	private async loadTextures(loadedTable: LoadedTable, storage: Storage, numItems: number): Promise<void> {
+	private async loadTextures(out: LoadedTable, storage: Storage, numItems: number): Promise<void> {
 		progress().show('Loading textures')
-		loadedTable.textures = []
+		out.textures = []
 		for (let i = 0; i < numItems; i++) {
-			const texture = await Texture.fromStorage(storage, `Image${i}`)
-			loadedTable.textures.push(texture)
-			progress().details(texture.getName())
+			const tex = await Texture.fromStorage(storage, `Image${i}`)
+			out.textures.push(tex)
+			progress().details(tex.getName())
 		}
 	}
 
-	private async loadTableInfo(loadedTable: LoadedTable): Promise<void> {
-		const tableInfoStorage = this.doc.storage('TableInfo')
-		loadedTable.info = {}
-		for (const key of tableInfoStorage.getStreams()) {
-			const data = await tableInfoStorage.read(key)
-			if (data) loadedTable.info[key] = textDecoder.decode(data).replace(/\0/g, '')
+	private async loadTableInfo(out: LoadedTable): Promise<void> {
+		const stg = this.doc.storage('TableInfo')
+		out.info = {}
+		for (const key of stg.getStreams()) {
+			const data = await stg.read(key)
+			if (data) out.info[key] = decoder.decode(data).replace(/\0/g, '')
 		}
 	}
 
-	private async loadCollections(loadedTable: LoadedTable, storage: Storage, numItems: number): Promise<void> {
-		loadedTable.collections = []
+	private async loadCollections(out: LoadedTable, storage: Storage, numItems: number): Promise<void> {
+		out.collections = []
 		for (let i = 0; i < numItems; i++) {
-			const collection = await Collection.fromStorage(storage, `Collection${i}`)
-			loadedTable.collections.push(collection)
-			loadedTable.items[collection.getName()] = collection
+			const col = await Collection.fromStorage(storage, `Collection${i}`)
+			out.collections.push(col)
+			out.items[col.getName()] = col
 		}
 	}
 }
