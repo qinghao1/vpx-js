@@ -52,7 +52,7 @@ export abstract class CatmullCurve {
 export class CatmullCurve2D extends CatmullCurve {
 	private readonly c: { x: number[]; y: number[] }
 
-	static fromVertex2D(v0: Vertex2D, v1: Vertex2D, v2: Vertex2D, v3: Vertex2D): CatmullCurve2D {
+	static fromVertex2D(v0: Vertex, v1: Vertex, v2: Vertex, v3: Vertex): CatmullCurve2D {
 		const [dt0, dt1, dt2] = CatmullCurve.dt(v0, v1, v2, v3)
 		return new CatmullCurve2D(v0, v1, v2, v3, dt0, dt1, dt2)
 	}
@@ -61,7 +61,7 @@ export class CatmullCurve2D extends CatmullCurve {
 		return CatmullCurve2D.fromVertex2D(v0.xy(), v1.xy(), v2.xy(), v3.xy())
 	}
 
-	private constructor(v0: Vertex2D, v1: Vertex2D, v2: Vertex2D, v3: Vertex2D, dt0: number, dt1: number, dt2: number) {
+	private constructor(v0: Vertex, v1: Vertex, v2: Vertex, v3: Vertex, dt0: number, dt1: number, dt2: number) {
 		super()
 		this.c = {
 			x: CatmullCurve.initNonuniformCatmullCoeffs(v0.x, v1.x, v2.x, v3.x, dt0, dt1, dt2),
@@ -78,17 +78,33 @@ export class CatmullCurve2D extends CatmullCurve {
 export class CatmullCurve3D extends CatmullCurve {
 	private readonly c: { x: number[]; y: number[]; z: number[] }
 
-	static fromVertex3D(v0: Vertex3D, v1: Vertex3D, v2: Vertex3D, v3: Vertex3D): CatmullCurve3D {
+	static fromVertex3D(v0: Vertex, v1: Vertex, v2: Vertex, v3: Vertex): CatmullCurve3D {
 		const [dt0, dt1, dt2] = CatmullCurve.dt(v0, v1, v2, v3)
-		return new CatmullCurve3D(v0, v1, v2, v3, dt0, dt1, dt2)
+		const z0 = (v0 as Vertex3D).z ?? 0
+		const z1 = (v1 as Vertex3D).z ?? 0
+		const z2 = (v2 as Vertex3D).z ?? 0
+		const z3 = (v3 as Vertex3D).z ?? 0
+		return new CatmullCurve3D(v0, v1, v2, v3, z0, z1, z2, z3, dt0, dt1, dt2)
 	}
 
-	private constructor(v0: Vertex3D, v1: Vertex3D, v2: Vertex3D, v3: Vertex3D, dt0: number, dt1: number, dt2: number) {
+	private constructor(
+		v0: Vertex,
+		v1: Vertex,
+		v2: Vertex,
+		v3: Vertex,
+		z0: number,
+		z1: number,
+		z2: number,
+		z3: number,
+		dt0: number,
+		dt1: number,
+		dt2: number,
+	) {
 		super()
 		this.c = {
 			x: CatmullCurve.initNonuniformCatmullCoeffs(v0.x, v1.x, v2.x, v3.x, dt0, dt1, dt2),
 			y: CatmullCurve.initNonuniformCatmullCoeffs(v0.y, v1.y, v2.y, v3.y, dt0, dt1, dt2),
-			z: CatmullCurve.initNonuniformCatmullCoeffs(v0.z, v1.z, v2.z, v3.z, dt0, dt1, dt2),
+			z: CatmullCurve.initNonuniformCatmullCoeffs(z0, z1, z2, z3, dt0, dt1, dt2),
 		}
 	}
 
