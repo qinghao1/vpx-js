@@ -452,7 +452,6 @@ export class BmpDecoder implements IImage {
 			for (let x = 0; x < width; x++) {
 				const result = processPixel.call(this, x, line)
 
-				// @ts-expect-error
 				if (result === false) {
 					return
 				}
