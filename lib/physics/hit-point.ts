@@ -10,6 +10,7 @@ import type { CollisionEvent } from './collision-event.js'
 import { C_CONTACTVEL, PHYS_TOUCH } from './constants.js'
 import { HitObject } from './hit-object.js'
 
+/** Point hit shape. */
 export class HitPoint extends HitObject {
 	private readonly p: Vertex3D
 
