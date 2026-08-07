@@ -5,8 +5,7 @@ import { Pool } from '../../util/object-pool.js'
 import { ItemState } from '../item-state.js'
 import { omitEqual } from '../state-helpers.js'
 
-/** Light state.
- * @see https://github.com/vpinball/vpinball/blob/master/light.cpp */
+/** Light state. @see https://github.com/vpinball/vpinball/blob/master/light.cpp */
 export class LightState extends ItemState {
 	public static readonly POOL = new Pool(LightState)
 
@@ -44,9 +43,7 @@ export class LightState extends ItemState {
 	}
 
 	public equals(state: LightState): boolean {
-		if (!state) {
-			return false
-		}
+		if (!state) return false
 		return state.intensity === this.intensity && state.color === this.color && state.colorFull === this.colorFull
 	}
 }
