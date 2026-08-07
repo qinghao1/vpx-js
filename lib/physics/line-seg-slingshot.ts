@@ -17,9 +17,9 @@ export class LineSegSlingshot extends LineSeg {
 	private readonly surface: Surface
 	private readonly surfaceData: SurfaceData
 	private slingshotAnim = new SlingshotAnimObject()
-	public force: number = 0
-	private eventTimeReset: number = 0
-	public doHitEvent: boolean = false
+	public force = 0
+	private eventTimeReset = 0
+	public doHitEvent = false
 
 	constructor(
 		surface: Surface,
@@ -36,48 +36,31 @@ export class LineSegSlingshot extends LineSeg {
 		this.physics = physics
 	}
 
-	public collide(coll: CollisionEvent): void {
+	public override collide(coll: CollisionEvent): void {
 		const ball = coll.ball
-		const hitNormal = coll.hitNormal
+		const n = coll.hitNormal
+		const dot = n.dot(ball.hit.vel)
 
-		const dot = coll.hitNormal.dot(coll.ball.hit.vel) // normal velocity to slingshot
-		const threshold = dot <= -this.surfaceData.slingshotThreshold // normal greater than threshold?
-
-		if (!this.surfaceData.isDisabled && threshold) {
-			// enabled and if velocity greater than threshold level
-			const len = (this.v2.x - this.v1.x) * hitNormal.y - (this.v2.y - this.v1.y) * hitNormal.x // length of segment, Unit TAN points from V1 to V2
-
-			const vHitPoint = Vertex2D.claim(
-				ball.state.pos.x - hitNormal.x * ball.data.radius, // project ball radius along norm
-				ball.state.pos.y - hitNormal.y * ball.data.radius,
-			)
-
-			// vHitPoint will now be the point where the ball hits the line
-			// Calculate this distance from the center of the slingshot to get force
-			const btd = (vHitPoint.x - this.v1.x) * hitNormal.y - (vHitPoint.y - this.v1.y) * hitNormal.x // distance to vhit from V1
-			Vertex2D.release(vHitPoint)
-			let force = Math.abs(len) > 1.0e-6 ? (btd + btd) / len - 1.0 : -1.0 // -1..+1
-			force = 0.5 * (1.0 - force * force) // !! maximum value 0.5 ...I think this should have been 1.0...oh well
-			// will match the previous physics
-			force *= this.force //-80;
-
-			// boost velocity, drive into slingshot (counter normal), allow CollideWall to handle the remainder
-			const normForce = hitNormal.clone(true).multiplyScalar(force)
-			ball.hit.vel.sub(normForce)
-			Vertex3D.release(normForce)
+		if (!this.surfaceData.isDisabled && dot <= -this.surfaceData.slingshotThreshold) {
+			const len = (this.v2.x - this.v1.x) * n.y - (this.v2.y - this.v1.y) * n.x
+			const hp = Vertex2D.claim(ball.state.pos.x - n.x * ball.data.radius, ball.state.pos.y - n.y * ball.data.radius)
+			const btd = (hp.x - this.v1.x) * n.y - (hp.y - this.v1.y) * n.x
+			Vertex2D.release(hp)
+			let force = Math.abs(len) > 1e-6 ? (btd + btd) / len - 1 : -1
+			force = 0.5 * (1 - force * force) * this.force
+			const f = n.clone(true).multiplyScalar(force)
+			ball.hit.vel.sub(f)
+			Vertex3D.release(f)
 		}
 
-		ball.hit.collide3DWall(hitNormal, this.elasticity, this.elasticityFalloff, this.friction, this.scatter)
+		ball.hit.collide3DWall(n, this.elasticity, this.elasticityFalloff, this.friction, this.scatter)
 
 		if (this.obj && this.fe && !this.surfaceData.isDisabled && this.threshold) {
-			// is this the same place as last event? if same then ignore it
-			const eventPos = ball.hit.eventPos.clone(true)
-			const distLs = eventPos.sub(ball.state.pos).lengthSq()
-			Vertex3D.release(eventPos)
-			ball.hit.eventPos.set(ball.state.pos) //remember last collide position
-
-			if (distLs > 0.25) {
-				// must be a new place if only by a little
+			const posDiff = ball.hit.eventPos.clone(true).sub(ball.state.pos)
+			const distSq = posDiff.lengthSq()
+			Vertex3D.release(posDiff)
+			ball.hit.eventPos.set(ball.state.pos)
+			if (distSq > 0.25) {
 				this.obj.fireGroupEvent(Event.SurfaceEventsSlingshot)
 				this.slingshotAnim.timeReset = this.physics.timeMsec + 100
 			}
