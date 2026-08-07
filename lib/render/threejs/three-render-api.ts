@@ -29,30 +29,24 @@ import { ThreeMaterialGenerator } from './three-material-generator.js'
 import { releaseGeometry, ThreeMeshGenerator } from './three-mesh-generator.js'
 import { ThreePlayfieldMeshGenerator } from './three-playfield-mesh-generator.js'
 
-/** Three.js render API. */
+/** Three.js render backend.
+ * @see https://github.com/vpinball/vpinball/blob/master/RenderDevice.cpp */
 export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, PointLight> {
 	public static readonly SCALE = 0.05
 	public static readonly SHADOWS = true
-
-	public static POOL = {
-		Matrix4: new Pool<Matrix4>(Matrix4),
-		BufferGeometry: new Pool<BufferGeometry>(BufferGeometry),
-	}
+	public static POOL = { Matrix4: new Pool(Matrix4), BufferGeometry: new Pool(BufferGeometry) }
 
 	private readonly converter: ThreeConverter
 	private readonly meshConvertOpts: MeshConvertOptions
-	private readonly playfieldGenerator: ThreePlayfieldMeshGenerator
-	private readonly lightMeshGenerator: ThreeLightMeshGenerator
+	private readonly playfieldGenerator = new ThreePlayfieldMeshGenerator()
+	private readonly lightMeshGenerator = new ThreeLightMeshGenerator()
 	private readonly meshGenerator = new ThreeMeshGenerator()
 	private readonly mapGenerator: ThreeMapGenerator
 	private readonly materialGenerator: ThreeMaterialGenerator
-	private readonly lightGenerator: ThreeLightGenerator
+	private readonly lightGenerator = new ThreeLightGenerator()
 
 	constructor(opts?: MeshConvertOptions) {
-		this.meshConvertOpts = opts || {
-			applyMaterials: false,
-			optimizeTextures: false,
-		}
+		this.meshConvertOpts = opts ?? { applyMaterials: false, optimizeTextures: false }
 		this.mapGenerator = new ThreeMapGenerator(this.meshConvertOpts.applyTextures)
 		this.materialGenerator = new ThreeMaterialGenerator(this.mapGenerator)
 		this.converter = new ThreeConverter(
@@ -61,9 +55,6 @@ export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, Poin
 			this.materialGenerator,
 			this.meshConvertOpts,
 		)
-		this.playfieldGenerator = new ThreePlayfieldMeshGenerator()
-		this.lightMeshGenerator = new ThreeLightMeshGenerator()
-		this.lightGenerator = new ThreeLightGenerator()
 	}
 
 	public async preloadTextures(textures: Texture[], table: Table): Promise<void> {
@@ -84,9 +75,9 @@ export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, Poin
 	}
 
 	public createParentNode(name: string): Group {
-		const group = new Group()
-		group.name = name
-		return group
+		const g = new Group()
+		g.name = name
+		return g
 	}
 
 	public createPointLight(lightData: LightData): PointLight {
@@ -102,28 +93,17 @@ export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, Poin
 	}
 
 	public removeFromParent(group: Group, obj: Object3D | Group): void {
-		/* istanbul ignore next */
-		if (!obj) {
-			return
-		}
+		if (!obj) return
 		group.remove(obj)
 	}
 
 	public removeChildren(node: Object3D | undefined): void {
-		/* istanbul ignore next */
-		if (!node) {
-			return
-		}
-		if (node.children) {
-			node.remove(...node.children)
-		}
+		if (!node?.children) return
+		node.remove(...node.children)
 	}
 
 	public applyMatrixToNode(matrix: Matrix3D, obj: Object3D): void {
-		/* istanbul ignore next */
-		if (!obj) {
-			return
-		}
+		if (!obj) return
 		const m4 = ThreeRenderApi.POOL.Matrix4.get()
 		m4.set(
 			matrix._11,
@@ -151,34 +131,21 @@ export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, Poin
 	}
 
 	public applyVisibility(isVisible: boolean | number, obj: Object3D): void {
-		/* istanbul ignore next */
-		if (!obj) {
-			return
-		}
+		if (!obj) return
 		obj.visible = !!isVisible
-		if (obj.children && obj.children.length > 0) {
-			for (const child of obj.children) {
-				child.visible = !!isVisible
-			}
-		}
+		for (const child of obj.children ?? []) child.visible = !!isVisible
 	}
 
 	public applyMeshToNode(mesh: Mesh, obj: Object3D): void {
-		/* istanbul ignore next */
-		if (!obj) {
-			return
-		}
+		if (!obj) return
 		const destGeo = (obj as any).geometry
 		const srcGeo = this.meshGenerator.convertToBufferGeometry(mesh)
-
-		if (srcGeo.attributes.position.array.length !== destGeo.attributes.position.array.length) {
+		if (srcGeo.attributes.position.array.length !== destGeo.attributes.position.array.length)
 			throw new Error(
 				`Trying to apply geometry of ${srcGeo.attributes.position.array.length} positions to ${destGeo.attributes.position.array.length} positions.`,
 			)
-		}
-		for (let i = 0; i < destGeo.attributes.position.array.length; i++) {
+		for (let i = 0; i < destGeo.attributes.position.array.length; i++)
 			destGeo.attributes.position.array[i] = srcGeo.attributes.position.array[i]
-		}
 		destGeo.attributes.position.needsUpdate = true
 		releaseGeometry(srcGeo)
 	}
@@ -195,26 +162,15 @@ export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, Poin
 		envMap?: string,
 		emissiveMap?: string,
 	): void {
-		/* istanbul ignore next */
-		if (!obj) {
-			return
-		}
-		if (obj.children && obj.children.length > 0) {
-			for (const child of obj.children) {
-				const threeMaterial: MeshStandardMaterial = (child as any).material
-				this.materialGenerator.applyMaterial(threeMaterial, material)
-				this.materialGenerator.applyMap(threeMaterial, map)
-				this.materialGenerator.applyNormalMap(threeMaterial, normalMap)
-				this.materialGenerator.applyEnvMap(threeMaterial, envMap)
-				this.materialGenerator.applyEmissiveMap(threeMaterial, material, emissiveMap)
-			}
-		} else {
-			const threeMaterial: MeshStandardMaterial = (obj as any).material
-			this.materialGenerator.applyMaterial(threeMaterial, material)
-			this.materialGenerator.applyMap(threeMaterial, map)
-			this.materialGenerator.applyNormalMap(threeMaterial, normalMap)
-			this.materialGenerator.applyEnvMap(threeMaterial, envMap)
-			this.materialGenerator.applyEmissiveMap(threeMaterial, material, emissiveMap)
+		if (!obj) return
+		const targets = obj.children?.length ? (obj.children as Object3D[]) : [obj]
+		for (const child of targets) {
+			const mat = (child as any).material as MeshStandardMaterial
+			this.materialGenerator.applyMaterial(mat, material)
+			this.materialGenerator.applyMap(mat, map)
+			this.materialGenerator.applyNormalMap(mat, normalMap)
+			this.materialGenerator.applyEnvMap(mat, envMap)
+			this.materialGenerator.applyEmissiveMap(mat, material, emissiveMap)
 		}
 	}
 
@@ -225,15 +181,12 @@ export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, Poin
 	): Group {
 		return this.converter.createObject(renderable, table, this, opts)
 	}
-
 	public createMesh(obj: RenderInfo<BufferGeometry>): Object3D {
 		return this.converter.createMesh(obj)
 	}
-
 	public createLightGeometry(lightData: LightData, table: Table): BufferGeometry {
 		return this.lightMeshGenerator.createLight(lightData, table)
 	}
-
 	public createPlayfieldGeometry(table: Table, opts: TableGenerateOptions): BufferGeometry {
 		return this.playfieldGenerator.createPlayfieldGeometry(table, opts)
 	}
