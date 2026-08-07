@@ -9,8 +9,132 @@ import { Enums } from '../enums.js'
 import { ItemData } from '../item-data.js'
 import { Material, SaveMaterial, SavePhysicsMaterial } from '../material.js'
 
+const BG = Enums.BackglassIndex
+
+const BG_FLOAT_MAP: Record<string, [string, number]> = {
+	ROTA: ['bgRotation', BG.DESKTOP],
+	LAYB: ['bgLayback', BG.DESKTOP],
+	INCL: ['bgInclination', BG.DESKTOP],
+	FOVX: ['bgFov', BG.DESKTOP],
+	SCLX: ['bgScaleX', BG.DESKTOP],
+	SCLY: ['bgScaleY', BG.DESKTOP],
+	SCLZ: ['bgScaleZ', BG.DESKTOP],
+	XLTX: ['bgXlateX', BG.DESKTOP],
+	XLTY: ['bgXlateY', BG.DESKTOP],
+	XLTZ: ['bgXlateZ', BG.DESKTOP],
+	ROTF: ['bgRotation', BG.FULLSCREEN],
+	LAYF: ['bgLayback', BG.FULLSCREEN],
+	INCF: ['bgInclination', BG.FULLSCREEN],
+	FOVF: ['bgFov', BG.FULLSCREEN],
+	SCFX: ['bgScaleX', BG.FULLSCREEN],
+	SCFY: ['bgScaleY', BG.FULLSCREEN],
+	SCFZ: ['bgScaleZ', BG.FULLSCREEN],
+	XLFX: ['bgXlateX', BG.FULLSCREEN],
+	XLFY: ['bgXlateY', BG.FULLSCREEN],
+	XLFZ: ['bgXlateZ', BG.FULLSCREEN],
+	ROFS: ['bgRotation', BG.FULL_SINGLE_SCREEN],
+	LAFS: ['bgLayback', BG.FULL_SINGLE_SCREEN],
+	INFS: ['bgInclination', BG.FULL_SINGLE_SCREEN],
+	FOFS: ['bgFov', BG.FULL_SINGLE_SCREEN],
+	SCXS: ['bgScaleX', BG.FULL_SINGLE_SCREEN],
+	SCYS: ['bgScaleY', BG.FULL_SINGLE_SCREEN],
+	SCZS: ['bgScaleZ', BG.FULL_SINGLE_SCREEN],
+	XLXS: ['bgXlateX', BG.FULL_SINGLE_SCREEN],
+	XLYS: ['bgXlateY', BG.FULL_SINGLE_SCREEN],
+	XLZS: ['bgXlateZ', BG.FULL_SINGLE_SCREEN],
+}
+
+const BG_IMAGE_MAP: Record<string, number> = {
+	BIMG: BG.DESKTOP,
+	BIMF: BG.FULLSCREEN,
+	BIMS: BG.FULL_SINGLE_SCREEN,
+}
+
+const FLOAT_MAP: Record<string, string> = {
+	LEFT: 'left',
+	TOPX: 'top',
+	RGHT: 'right',
+	BOTM: 'bottom',
+	GAVT: 'gravity',
+	FRCT: 'friction',
+	ELAS: 'elasticity',
+	ELFA: 'elasticityFalloff',
+	PFSC: 'scatter',
+	SCAT: 'defaultScatter',
+	NDGT: 'nudgeTime',
+	ZOOM: 'zoom',
+	MAXSEP: '_3DmaxSeparation',
+	ZPD: '_3DZPD',
+	STO: '_3DOffset',
+	SLPX: 'angleTiltMax',
+	SLOP: 'angletiltMin',
+	GLAS: 'glassHeight',
+	TBLH: 'tableHeight',
+	LZHI: 'lightHeight',
+	LZRA: 'lightRange',
+	LIES: 'lightEmissionScale',
+	ENES: 'envEmissionScale',
+	GLES: 'globalEmissionScale',
+	AOSC: 'aoScale',
+	SSSC: 'ssrScale',
+	BPRS: 'ballPlayfieldReflectionStrength',
+	DBIS: 'defaultBulbIntensityScaleOnBall',
+	UFXA: 'useFXAA',
+	BLST: 'bloomStrength',
+	TDFT: 'globalDifficulty',
+	SVOL: 'tableSoundVolume',
+	MVOL: 'tableMusicVolume',
+}
+
+const INT_MAP: Record<string, string> = {
+	ORRP: 'overridePhysics',
+	MPGC: 'plungerNormalize',
+	PHML: 'physicsMaxLoops',
+	SEDT: 'numGameItems',
+	SSND: 'numSounds',
+	SIMG: 'numTextures',
+	SFNT: 'numFonts',
+	SCOL: 'numCollections',
+	LZAM: 'lightAmbient',
+	BREF: 'useReflectionForBalls',
+	PLST: 'playfieldReflectionStrength',
+	BTRA: 'useTrailForBalls',
+	BTST: 'ballTrailStrength',
+	UAAL: 'useAA',
+	UAOC: 'useAO',
+	USSR: 'useSSR',
+	BCLR: 'colorBackdrop',
+	AVSY: 'tableAdaptiveVSync',
+	ARAC: 'userDetailLevel',
+	MASI: 'numMaterials',
+}
+
+const BOOL_MAP: Record<string, string> = {
+	ORPF: 'overridePhysicsFlipper',
+	MPDF: 'plungerFilter',
+	DECL: 'renderDecals',
+	REEL: 'renderEMReels',
+	OGST: 'overwriteGlobalStereo3D',
+	FBCK: 'displayBackdrop',
+	BIMN: 'imageBackdropNightDay',
+	BDMO: 'ballDecalMode',
+	OGAC: 'overwriteGlobalDetailLevel',
+	OGDN: 'overwriteGlobalDayNight',
+	GDAC: 'showGrid',
+	REOP: 'reflectElementsOnPlayfield',
+}
+
+const STRING_MAP: Record<string, string> = {
+	IMAG: 'szImage',
+	BLIM: 'szBallImage',
+	BLIF: 'szBallImageFront',
+	SSHT: 'szScreenShot',
+	IMCG: 'szImageColorGrade',
+	EIMG: 'szEnvImage',
+	PLMA: 'szPlayfieldMaterial',
+}
+
 /** Table global data.
- *
  * @see https://github.com/vpinball/vpinball/blob/master/pintable.cpp */
 export class TableData extends ItemData {
 	public static BGI_DESKTOP = 110
@@ -21,6 +145,7 @@ export class TableData extends ItemData {
 	public top!: number
 	public right!: number
 	public bottom!: number
+
 	public bgRotation: number[] = []
 	public bgLayback: number[] = []
 	public bgInclination: number[] = []
@@ -31,10 +156,13 @@ export class TableData extends ItemData {
 	public bgXlateX: number[] = []
 	public bgXlateY: number[] = []
 	public bgXlateZ: number[] = []
-	public bgEnableFss: boolean = false
-	public bgCurrentSet: number = 0
+	public bgEnableFss = false
+	public bgCurrentSet = 0
+	public bgImage: string[] = []
+	public imageBackdropNightDay = false
+
 	public overridePhysics?: number
-	public overridePhysicsFlipper: boolean = false
+	public overridePhysicsFlipper = false
 	public gravity!: number
 	public friction!: number
 	public elasticity!: number
@@ -43,25 +171,29 @@ export class TableData extends ItemData {
 	public defaultScatter?: number
 	public nudgeTime?: number
 	public plungerNormalize!: number
-	public plungerFilter: boolean = false
-	public physicsMaxLoops: number = 0xffffffff
-	public renderDecals: boolean = false
-	public renderEMReels: boolean = false
-	public offset: Vertex2D = new Vertex2D()
+	public plungerFilter = false
+	public physicsMaxLoops = 0xffffffff
+	public renderDecals = false
+	public renderEMReels = false
+
+	public offset = new Vertex2D()
 	public _3DmaxSeparation?: number
 	public _3DZPD?: number
 	public zoom?: number
 	public _3DOffset?: number
-	public overwriteGlobalStereo3D: boolean = false
+	public overwriteGlobalStereo3D = false
+
 	public angleTiltMax!: number
 	public angletiltMin!: number
 	public glassHeight!: number
 	public tableHeight!: number
+
 	public szImage?: string
-	public szBallImage!: string
-	public szBallImageFront!: string
+	public szBallImage?: string
+	public szBallImageFront?: string
 	public szScreenShot?: string
-	public displayBackdrop: boolean = false
+	public displayBackdrop = false
+
 	public numGameItems!: number
 	public numSounds!: number
 	public numTextures!: number
@@ -70,9 +202,8 @@ export class TableData extends ItemData {
 	public scriptPos!: number
 	public scriptLen!: number
 	public declare name: string
+
 	public Light: LightSource[] = [new LightSource()]
-	public bgImage: string[] = []
-	public imageBackdropNightDay: boolean = false
 	public szImageColorGrade?: string
 	public szEnvImage?: string
 	public szPlayfieldMaterial?: string
@@ -104,11 +235,12 @@ export class TableData extends ItemData {
 	public ballDecalMode?: boolean
 	public tableMusicVolume!: number
 	public tableAdaptiveVSync?: number
-	public overwriteGlobalDetailLevel: boolean = false
-	public overwriteGlobalDayNight: boolean = false
-	public showGrid: boolean = false
-	public reflectElementsOnPlayfield: boolean = false
+	public overwriteGlobalDetailLevel = false
+	public overwriteGlobalDayNight = false
+	public showGrid = false
+	public reflectElementsOnPlayfield = false
 	public userDetailLevel?: number
+
 	public numMaterials!: number
 	public materials: Material[] = []
 
@@ -118,15 +250,9 @@ export class TableData extends ItemData {
 	public readonly overrideScatterAngle = 0
 
 	public static async fromStorage(storage: Storage, itemName: string): Promise<TableData> {
-		const tableData = new TableData(itemName)
-		await storage.streamFiltered(
-			itemName,
-			0,
-			BiffParser.stream(tableData.fromTag.bind(tableData), {
-				streamedTags: ['CODE'],
-			}),
-		)
-		return tableData
+		const d = new TableData(itemName)
+		await storage.streamFiltered(itemName, 0, BiffParser.stream(d.fromTag.bind(d), { streamedTags: ['CODE'] }))
+		return d
 	}
 
 	public constructor(itemName: string) {
@@ -140,234 +266,53 @@ export class TableData extends ItemData {
 	public getFriction(): number {
 		return this.overridePhysics ? this.overrideContactFriction : this.friction!
 	}
-
 	public getElasticity(): number {
 		return this.overridePhysics ? this.overrideElasticity : this.elasticity!
 	}
-
 	public getElasticityFalloff(): number {
 		return this.overridePhysics ? this.overrideElasticityFalloff : this.elasticityFalloff!
 	}
-
 	public getScatter(): number {
 		return this.overridePhysics ? this.overrideScatterAngle : this.scatter!
 	}
 
 	private async fromTag(buffer: Uint8Array, tag: string, offset: number, len: number): Promise<number> {
+		const bg = BG_FLOAT_MAP[tag]
+		if (bg) {
+			;(this as any)[bg[0]][bg[1]] = this.getFloat(buffer)
+			return 0
+		}
+		const bgImg = BG_IMAGE_MAP[tag]
+		if (bgImg !== undefined) {
+			this.bgImage[bgImg] = this.getString(buffer, len)
+			return 0
+		}
+		if (tag in FLOAT_MAP) {
+			;(this as any)[FLOAT_MAP[tag]] = this.getFloat(buffer)
+			return 0
+		}
+		if (tag in INT_MAP) {
+			;(this as any)[INT_MAP[tag]] = this.getInt(buffer)
+			return 0
+		}
+		if (tag in BOOL_MAP) {
+			;(this as any)[BOOL_MAP[tag]] = this.getBool(buffer)
+			return 0
+		}
+		if (tag in STRING_MAP) {
+			;(this as any)[STRING_MAP[tag]] = this.getString(buffer, len)
+			return 0
+		}
 		switch (tag) {
-			case 'LEFT':
-				this.left = this.getFloat(buffer)
-				break
-			case 'TOPX':
-				this.top = this.getFloat(buffer)
-				break
-			case 'RGHT':
-				this.right = this.getFloat(buffer)
-				break
-			case 'BOTM':
-				this.bottom = this.getFloat(buffer)
-				break
-			case 'ROTA':
-				this.bgRotation[Enums.BackglassIndex.DESKTOP] = this.getFloat(buffer)
-				break
-			case 'LAYB':
-				this.bgLayback[Enums.BackglassIndex.DESKTOP] = this.getFloat(buffer)
-				break
-			case 'INCL':
-				this.bgInclination[Enums.BackglassIndex.DESKTOP] = this.getFloat(buffer)
-				break
-			case 'FOVX':
-				this.bgFov[Enums.BackglassIndex.DESKTOP] = this.getFloat(buffer)
-				break
-			case 'SCLX':
-				this.bgScaleX[Enums.BackglassIndex.DESKTOP] = this.getFloat(buffer)
-				break
-			case 'SCLY':
-				this.bgScaleY[Enums.BackglassIndex.DESKTOP] = this.getFloat(buffer)
-				break
-			case 'SCLZ':
-				this.bgScaleZ[Enums.BackglassIndex.DESKTOP] = this.getFloat(buffer)
-				break
-			case 'XLTX':
-				this.bgXlateX[Enums.BackglassIndex.DESKTOP] = this.getFloat(buffer)
-				break
-			case 'XLTY':
-				this.bgXlateY[Enums.BackglassIndex.DESKTOP] = this.getFloat(buffer)
-				break
-			case 'XLTZ':
-				this.bgXlateZ[Enums.BackglassIndex.DESKTOP] = this.getFloat(buffer)
-				break
-			case 'ROTF':
-				this.bgRotation[Enums.BackglassIndex.FULLSCREEN] = this.getFloat(buffer)
-				break
-			case 'LAYF':
-				this.bgLayback[Enums.BackglassIndex.FULLSCREEN] = this.getFloat(buffer)
-				break
-			case 'INCF':
-				this.bgInclination[Enums.BackglassIndex.FULLSCREEN] = this.getFloat(buffer)
-				break
-			case 'FOVF':
-				this.bgFov[Enums.BackglassIndex.FULLSCREEN] = this.getFloat(buffer)
-				break
-			case 'SCFX':
-				this.bgScaleX[Enums.BackglassIndex.FULLSCREEN] = this.getFloat(buffer)
-				break
-			case 'SCFY':
-				this.bgScaleY[Enums.BackglassIndex.FULLSCREEN] = this.getFloat(buffer)
-				break
-			case 'SCFZ':
-				this.bgScaleZ[Enums.BackglassIndex.FULLSCREEN] = this.getFloat(buffer)
-				break
-			case 'XLFX':
-				this.bgXlateX[Enums.BackglassIndex.FULLSCREEN] = this.getFloat(buffer)
-				break
-			case 'XLFY':
-				this.bgXlateY[Enums.BackglassIndex.FULLSCREEN] = this.getFloat(buffer)
-				break
-			case 'XLFZ':
-				this.bgXlateZ[Enums.BackglassIndex.FULLSCREEN] = this.getFloat(buffer)
-				break
-			case 'ROFS':
-				this.bgRotation[Enums.BackglassIndex.FULL_SINGLE_SCREEN] = this.getFloat(buffer)
-				break
-			case 'LAFS':
-				this.bgLayback[Enums.BackglassIndex.FULL_SINGLE_SCREEN] = this.getFloat(buffer)
-				break
-			case 'INFS':
-				this.bgInclination[Enums.BackglassIndex.FULL_SINGLE_SCREEN] = this.getFloat(buffer)
-				break
-			case 'FOFS':
-				this.bgFov[Enums.BackglassIndex.FULL_SINGLE_SCREEN] = this.getFloat(buffer)
-				break
-			case 'SCXS':
-				this.bgScaleX[Enums.BackglassIndex.FULL_SINGLE_SCREEN] = this.getFloat(buffer)
-				break
-			case 'SCYS':
-				this.bgScaleY[Enums.BackglassIndex.FULL_SINGLE_SCREEN] = this.getFloat(buffer)
-				break
-			case 'SCZS':
-				this.bgScaleZ[Enums.BackglassIndex.FULL_SINGLE_SCREEN] = this.getFloat(buffer)
-				break
-			case 'XLXS':
-				this.bgXlateX[Enums.BackglassIndex.FULL_SINGLE_SCREEN] = this.getFloat(buffer)
-				break
-			case 'XLYS':
-				this.bgXlateY[Enums.BackglassIndex.FULL_SINGLE_SCREEN] = this.getFloat(buffer)
-				break
-			case 'XLZS':
-				this.bgXlateZ[Enums.BackglassIndex.FULL_SINGLE_SCREEN] = this.getFloat(buffer)
-				break
 			case 'EFSS':
 				this.bgEnableFss = this.getBool(buffer)
-				/* istanbul ignore if: legacy */
-				if (this.bgEnableFss) {
-					this.bgCurrentSet = Enums.BackglassIndex.FULL_SINGLE_SCREEN
-				}
-				break
-			case 'ORRP':
-				this.overridePhysics = this.getInt(buffer)
-				break
-			case 'ORPF':
-				this.overridePhysicsFlipper = this.getBool(buffer)
-				break
-			case 'GAVT':
-				this.gravity = this.getFloat(buffer)
-				break
-			case 'FRCT':
-				this.friction = this.getFloat(buffer)
-				break
-			case 'ELAS':
-				this.elasticity = this.getFloat(buffer)
-				break
-			case 'ELFA':
-				this.elasticityFalloff = this.getFloat(buffer)
-				break
-			case 'PFSC':
-				this.scatter = this.getFloat(buffer)
-				break
-			case 'SCAT':
-				this.defaultScatter = this.getFloat(buffer)
-				break
-			case 'NDGT':
-				this.nudgeTime = this.getFloat(buffer)
-				break
-			case 'MPGC':
-				this.plungerNormalize = this.getInt(buffer)
-				break
-			case 'MPDF':
-				this.plungerFilter = this.getBool(buffer)
-				break
-			case 'PHML':
-				this.physicsMaxLoops = this.getInt(buffer)
-				break
-			case 'DECL':
-				this.renderDecals = this.getBool(buffer)
-				break
-			case 'REEL':
-				this.renderEMReels = this.getBool(buffer)
+				if (this.bgEnableFss) this.bgCurrentSet = BG.FULL_SINGLE_SCREEN
 				break
 			case 'OFFX':
 				this.offset.x = this.getFloat(buffer)
 				break
 			case 'OFFY':
 				this.offset.y = this.getFloat(buffer)
-				break
-			case 'ZOOM':
-				this.zoom = this.getFloat(buffer)
-				break
-			case 'MAXSEP':
-				this._3DmaxSeparation = this.getFloat(buffer)
-				break
-			case 'ZPD':
-				this._3DZPD = this.getFloat(buffer)
-				break
-			case 'STO':
-				this._3DOffset = this.getFloat(buffer)
-				break
-			case 'OGST':
-				this.overwriteGlobalStereo3D = this.getBool(buffer)
-				break
-			case 'SLPX':
-				this.angleTiltMax = this.getFloat(buffer)
-				break
-			case 'SLOP':
-				this.angletiltMin = this.getFloat(buffer)
-				break
-			case 'GLAS':
-				this.glassHeight = this.getFloat(buffer)
-				break
-			case 'TBLH':
-				this.tableHeight = this.getFloat(buffer)
-				break
-			case 'IMAG':
-				this.szImage = this.getString(buffer, len)
-				break
-			case 'BLIM':
-				this.szBallImage = this.getString(buffer, len)
-				break
-			case 'BLIF':
-				this.szBallImageFront = this.getString(buffer, len)
-				break
-			case 'SSHT':
-				this.szScreenShot = this.getString(buffer, len)
-				break
-			case 'FBCK':
-				this.displayBackdrop = this.getBool(buffer)
-				break
-			case 'SEDT':
-				this.numGameItems = this.getInt(buffer)
-				break
-			case 'SSND':
-				this.numSounds = this.getInt(buffer)
-				break
-			case 'SIMG':
-				this.numTextures = this.getInt(buffer)
-				break
-			case 'SFNT':
-				this.numFonts = this.getInt(buffer)
-				break
-			case 'SCOL':
-				this.numCollections = this.getInt(buffer)
 				break
 			case 'CODE':
 				this.scriptPos = offset
@@ -376,182 +321,43 @@ export class TableData extends ItemData {
 			case 'NAME':
 				this.name = this.getWideString(buffer, len)
 				break
-			case 'BIMG':
-				this.bgImage[Enums.BackglassIndex.DESKTOP] = this.getString(buffer, len)
-				break
-			case 'BIMF':
-				this.bgImage[Enums.BackglassIndex.FULLSCREEN] = this.getString(buffer, len)
-				break
-			case 'BIMS':
-				this.bgImage[Enums.BackglassIndex.FULL_SINGLE_SCREEN] = this.getString(buffer, len)
-				break
-			case 'BIMN':
-				this.imageBackdropNightDay = this.getBool(buffer)
-				break
-			case 'IMCG':
-				this.szImageColorGrade = this.getString(buffer, len)
-				break
-			case 'EIMG':
-				this.szEnvImage = this.getString(buffer, len)
-				break
-			case 'PLMA':
-				this.szPlayfieldMaterial = this.getString(buffer, len)
-				break
-			case 'LZAM':
-				this.lightAmbient = this.getInt(buffer)
-				break
 			case 'LZDI':
 				this.Light[0].emission = this.getInt(buffer)
 				break
-			case 'LZHI':
-				this.lightHeight = this.getFloat(buffer)
-				break
-			case 'LZRA':
-				this.lightRange = this.getFloat(buffer)
-				break
-			case 'LIES':
-				this.lightEmissionScale = this.getFloat(buffer)
-				break
-			case 'ENES':
-				this.envEmissionScale = this.getFloat(buffer)
-				break
-			case 'GLES':
-				this.globalEmissionScale = this.getFloat(buffer)
-				break
-			case 'AOSC':
-				this.aoScale = this.getFloat(buffer)
-				break
-			case 'SSSC':
-				this.ssrScale = this.getFloat(buffer)
-				break
-			case 'BREF':
-				this.useReflectionForBalls = this.getInt(buffer)
-				break
-			case 'PLST':
-				this.playfieldReflectionStrength = this.getInt(buffer)
-				break
-			case 'BTRA':
-				this.useTrailForBalls = this.getInt(buffer)
-				break
-			case 'BTST':
-				this.ballTrailStrength = this.getInt(buffer)
-				break
-			case 'BPRS':
-				this.ballPlayfieldReflectionStrength = this.getFloat(buffer)
-				break
-			case 'DBIS':
-				this.defaultBulbIntensityScaleOnBall = this.getFloat(buffer)
-				break
-			case 'UAAL':
-				this.useAA = this.getInt(buffer)
-				break
-			case 'UAOC':
-				this.useAO = this.getInt(buffer)
-				break
-			case 'USSR':
-				this.useSSR = this.getInt(buffer)
-				break
-			case 'UFXA':
-				this.useFXAA = this.getFloat(buffer)
-				break
-			case 'BLST':
-				this.bloomStrength = this.getFloat(buffer)
-				break
-			case 'BCLR':
-				this.colorBackdrop = this.getInt(buffer)
-				break
 			case 'CCUS':
 				this.rgcolorcustom = this.getUnsignedInt4s(buffer, 16)
-				break
-			case 'TDFT':
-				this.globalDifficulty = this.getFloat(buffer)
 				break
 			case 'CUST':
 				this.szT = this.getString(buffer, len)
 				this.vCustomInfoTag.push(this.szT)
 				break
-			case 'SVOL':
-				this.tableSoundVolume = this.getFloat(buffer)
-				break
-			case 'BDMO':
-				this.ballDecalMode = this.getBool(buffer)
-				break
-			case 'MVOL':
-				this.tableMusicVolume = this.getFloat(buffer)
-				break
-			case 'AVSY':
-				this.tableAdaptiveVSync = this.getInt(buffer)
-				break
-			case 'OGAC':
-				this.overwriteGlobalDetailLevel = this.getBool(buffer)
-				break
-			case 'OGDN':
-				this.overwriteGlobalDayNight = this.getBool(buffer)
-				break
-			case 'GDAC':
-				this.showGrid = this.getBool(buffer)
-				break
-			case 'REOP':
-				this.reflectElementsOnPlayfield = this.getBool(buffer)
-				break
-			case 'ARAC':
-				this.userDetailLevel = this.getInt(buffer)
-				break
-			case 'MASI':
-				this.numMaterials = this.getInt(buffer)
-				break
 			case 'MATE':
-				this.materials = this._getMaterials(buffer, len, this.numMaterials)
+				this.materials = this.getMaterials(buffer, len, this.numMaterials)
 				break
 			case 'PHMA':
-				this._getPhysicsMaterials(buffer, len, this.numMaterials)
+				this.applyPhysicsMaterials(buffer, len, this.numMaterials)
 				break
 		}
 		return 0
 	}
 
-	private _getMaterials(buffer: Uint8Array, len: number, num: number): Material[] {
-		/* istanbul ignore if */
-		if (len < num * SaveMaterial.size) {
-			throw new Error(
-				'Cannot parse ' + num + ' materials of ' + num * SaveMaterial.size + ' bytes from a ' + len + ' bytes buffer.',
-			)
-		}
-		const materials: Material[] = []
-		for (let i = 0; i < num; i++) {
-			const saveMat = new SaveMaterial(buffer, i)
-			materials.push(Material.fromSaved(saveMat))
-		}
-		return materials
+	private getMaterials(buffer: Uint8Array, len: number, num: number): Material[] {
+		if (len < num * SaveMaterial.size)
+			throw new Error(`Cannot parse ${num} materials of ${num * SaveMaterial.size} bytes from a ${len} bytes buffer.`)
+		return Array.from({ length: num }, (_, i) => Material.fromSaved(new SaveMaterial(buffer, i)))
 	}
 
-	private _getPhysicsMaterials(buffer: Uint8Array, len: number, num: number): void {
-		/* istanbul ignore if */
-		if (len < num * SavePhysicsMaterial.size) {
+	private applyPhysicsMaterials(buffer: Uint8Array, len: number, num: number): void {
+		if (len < num * SavePhysicsMaterial.size)
 			throw new Error(
-				'Cannot parse ' +
-					num +
-					' physical materials of ' +
-					num * SavePhysicsMaterial.size +
-					' bytes from a ' +
-					len +
-					' bytes buffer.',
+				`Cannot parse ${num} physical materials of ${num * SavePhysicsMaterial.size} bytes from a ${len} bytes buffer.`,
 			)
-		}
 		for (let i = 0; i < num; i++) {
-			const savePhysMat = new SavePhysicsMaterial(buffer, i)
-			const material = this.materials.find((m) => m.name === savePhysMat.name)
-			/* istanbul ignore if */
-			if (!material) {
-				throw new Error(
-					'Cannot find material "' +
-						savePhysMat.name +
-						'" in [' +
-						this.materials.map((m) => m.name).join(', ') +
-						'] for updating physics.',
-				)
-			}
-			material.physUpdate(savePhysMat)
+			const pm = new SavePhysicsMaterial(buffer, i)
+			const mat = this.materials.find((m) => m.name === pm.name)
+			if (!mat)
+				throw new Error(`Cannot find material "${pm.name}" in [${this.materials.map((m) => m.name).join(', ')}]`)
+			mat.physUpdate(pm)
 		}
 	}
 }
