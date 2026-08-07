@@ -161,116 +161,100 @@ export class Matrix3D {
 		]
 	}
 
-	/** Get _11. */
-	get _11() {
+	get _11(): number {
 		return this.matrix[0][0]
 	}
-	set _11(v) {
+	set _11(v: number) {
 		this.matrix[0][0] = f4(v)
 	}
-	/** Get _12. */
-	get _12() {
+	get _12(): number {
 		return this.matrix[1][0]
 	}
-	set _12(v) {
+	set _12(v: number) {
 		this.matrix[1][0] = f4(v)
 	}
-	/** Get _13. */
-	get _13() {
+	get _13(): number {
 		return this.matrix[2][0]
 	}
-	set _13(v) {
+	set _13(v: number) {
 		this.matrix[2][0] = f4(v)
 	}
-	/** Get _14. */
-	get _14() {
+	get _14(): number {
 		return this.matrix[3][0]
 	}
-	set _14(v) {
+	set _14(v: number) {
 		this.matrix[3][0] = f4(v)
 	}
-	/** Get _21. */
-	get _21() {
+	get _21(): number {
 		return this.matrix[0][1]
 	}
-	set _21(v) {
+	set _21(v: number) {
 		this.matrix[0][1] = f4(v)
 	}
-	/** Get _22. */
-	get _22() {
+	get _22(): number {
 		return this.matrix[1][1]
 	}
-	set _22(v) {
+	set _22(v: number) {
 		this.matrix[1][1] = f4(v)
 	}
-	/** Get _23. */
-	get _23() {
+	get _23(): number {
 		return this.matrix[2][1]
 	}
-	set _23(v) {
+	set _23(v: number) {
 		this.matrix[2][1] = f4(v)
 	}
-	/** Get _24. */
-	get _24() {
+	get _24(): number {
 		return this.matrix[3][1]
 	}
-	set _24(v) {
+	set _24(v: number) {
 		this.matrix[3][1] = f4(v)
 	}
-	/** Get _31. */
-	get _31() {
+	get _31(): number {
 		return this.matrix[0][2]
 	}
-	set _31(v) {
+	set _31(v: number) {
 		this.matrix[0][2] = f4(v)
 	}
-	/** Get _32. */
-	get _32() {
+	get _32(): number {
 		return this.matrix[1][2]
 	}
-	set _32(v) {
+	set _32(v: number) {
 		this.matrix[1][2] = f4(v)
 	}
-	/** Get _33. */
-	get _33() {
+	get _33(): number {
 		return this.matrix[2][2]
 	}
-	set _33(v) {
+	set _33(v: number) {
 		this.matrix[2][2] = f4(v)
 	}
-	/** Get _34. */
-	get _34() {
+	get _34(): number {
 		return this.matrix[3][2]
 	}
-	set _34(v) {
+	set _34(v: number) {
 		this.matrix[3][2] = f4(v)
 	}
-	/** Get _41. */
-	get _41() {
+	get _41(): number {
 		return this.matrix[0][3]
 	}
-	set _41(v) {
+	set _41(v: number) {
 		this.matrix[0][3] = f4(v)
 	}
-	/** Get _42. */
-	get _42() {
+	get _42(): number {
 		return this.matrix[1][3]
 	}
-	set _42(v) {
+	set _42(v: number) {
 		this.matrix[1][3] = f4(v)
 	}
-	/** Get _43. */
-	get _43() {
+	get _43(): number {
 		return this.matrix[2][3]
 	}
-	set _43(v) {
+	set _43(v: number) {
 		this.matrix[2][3] = f4(v)
 	}
-	/** Get _44. */
-	get _44() {
+	get _44(): number {
 		return this.matrix[3][3]
 	}
-	set _44(v) {
+	set _44(v: number) {
 		this.matrix[3][3] = f4(v)
 	}
 
