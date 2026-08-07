@@ -18,8 +18,8 @@ import type { Table } from '../table/table.js'
 import type { Surface } from './surface.js'
 import type { SurfaceData } from './surface-data.js'
 
-export /** Surface hit generator. */
-class SurfaceHitGenerator {
+/** Surface hit generator. */
+export class SurfaceHitGenerator {
 	private readonly surface: Surface
 	private readonly data: SurfaceData
 	public lineSling: LineSegSlingshot[] = []
