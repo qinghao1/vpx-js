@@ -3,101 +3,52 @@
 
 import { FileLoader } from 'three'
 
-export {
-	AdditiveBlending,
-	AnimationClip,
-	Bone,
-	Box3,
-	BufferAttribute,
-	BufferGeometry,
-	Camera,
-	ClampToEdgeWrapping,
-	Color,
-	CanvasTexture,
-	DataTexture,
-	DataTextureLoader,
-	DefaultLoadingManager,
-	DoubleSide,
-	ExtrudeGeometry,
-	ExtrudeGeometry as ExtrudeBufferGeometry,
-	Float32BufferAttribute,
-	FloatType,
-	Group,
-	HalfFloatType,
-	InterleavedBufferAttribute,
-	InterpolateDiscrete,
-	InterpolateLinear,
-	KeyframeTrack,
-	Light,
-	Line,
-	LinearFilter,
-	LinearMipMapLinearFilter,
-	LinearMipMapNearestFilter,
-	LinearSRGBColorSpace,
-	LoadingManager,
-	Material,
-	MathUtils as Math,
-	Matrix3,
-	Matrix4,
-	Mesh,
-	MeshStandardMaterial,
-	MirroredRepeatWrapping,
-	NearestFilter,
-	NearestMipMapLinearFilter,
-	NearestMipMapNearestFilter,
-	NoColorSpace,
-	Object3D,
-	Path,
-	PointLight,
-	PointLightHelper,
-	PropertyBinding,
-	RepeatWrapping,
-	RGBAFormat,
-	Scene,
-	Shape,
-	SpotLight,
-	SRGBColorSpace,
-	Texture,
-	TextureLoader,
-	TriangleFanDrawMode,
-	TriangleStripDrawMode,
-	UnsignedByteType,
-	Vector2,
-	Vector3,
-} from 'three'
 export { exportGltf } from './gltf/export-gltf.node.js'
 export { NodeBinaryReader as BinaryReader } from './io/binary-reader.node.js'
 export { storage } from './io/storage.node.js'
+export * from './refs-three.js'
+export { ThreeTextureLoaderNode as ThreeTextureLoader } from './render/threejs/three-texture-loader-node.js'
 export { getTextFile } from './scripting/vbs-scripts.node.js'
 export { now } from './util/time.node.js'
-export const RGBFormat = 1022
-export const RGBEFormat = 1023
-export const RGBEEncoding = 3000
-export const LinearEncoding = 3000
-export const sRGBEncoding = 3001
-export const GammaEncoding = 3007
-export type { PixelFormat, TextureDataType } from 'three'
 
-export { ThreeTextureLoaderNode as ThreeTextureLoader } from './render/threejs/three-texture-loader-node.js'
-
-/*
- * Here we patch three.js' file loader to accept buffers directly.
+/**
+ * Patch `FileLoader` to accept raw buffers as URLs.
+ *
+ * Three's loader normally expects a URL string; this lets callers pass a
+ * pre-loaded `ArrayBuffer`/`Uint8Array` directly (useful for in-memory GLTF).
+ *
+ * The patch is applied lazily and idempotently — call once at startup.
+ *
+ * @returns restore function that reverts the patch
  */
-const originalFileLoaderLoad = FileLoader.prototype.load
-// tslint:disable-next-line:only-arrow-functions
-FileLoader.prototype.load = (
-	urlOrBuffer: any,
-	onLoad?: (response: string | ArrayBuffer) => void,
-	onProgress?: (request: ProgressEvent) => void,
-	onError?: (event: ErrorEvent) => void,
-) => {
-	/* istanbul ignore if: we don't it by url, but this should still work. */
-	if (typeof urlOrBuffer === 'string') {
-		return originalFileLoaderLoad(urlOrBuffer, onLoad, onProgress, onError)
+export function patchFileLoader(): () => void {
+	const proto = FileLoader.prototype as unknown as Record<string, unknown>
+	if ((proto as { __vpxPatched?: boolean }).__vpxPatched) {
+		return () => {}
 	}
-	if (onLoad) {
-		onLoad(urlOrBuffer)
+	const originalLoad = FileLoader.prototype.load as unknown as (
+		url: unknown,
+		onLoad?: (r: string | ArrayBuffer) => void,
+		onProgress?: (e: ProgressEvent) => void,
+		onError?: (e: ErrorEvent) => void,
+	) => unknown
+	FileLoader.prototype.load = function (
+		urlOrBuffer: unknown,
+		onLoad?: (r: string | ArrayBuffer) => void,
+		onProgress?: (e: ProgressEvent) => void,
+		onError?: (e: ErrorEvent) => void,
+	) {
+		if (typeof urlOrBuffer === 'string') {
+			return (originalLoad as Function).call(this, urlOrBuffer, onLoad, onProgress, onError)
+		}
+		if (onLoad) onLoad(urlOrBuffer as string | ArrayBuffer)
+	} as unknown as typeof FileLoader.prototype.load
+	;(proto as { __vpxPatched?: boolean }).__vpxPatched = true
+	return () => {
+		FileLoader.prototype.load = originalLoad as typeof FileLoader.prototype.load
+		;(proto as { __vpxPatched?: boolean }).__vpxPatched = false
 	}
 }
 
-/* TextDecoder is natively available in Node >=22 */
+// Auto-patch on import for backward compatibility.
+patchFileLoader()
