@@ -5,69 +5,55 @@ import { Matrix2D, Vertex3D } from '../../util/math.js'
 import { Pool } from '../../util/object-pool.js'
 import { ItemState } from '../item-state.js'
 
-/**
- * The dynamic ball state.
- *
- * This is the data we need to properly position the ball on the playfield.
- */
+/** Dynamic ball state — position, orientation, frozen flag. */
 export class BallState extends ItemState {
 	public static readonly POOL = new Pool(BallState)
 
 	public pos: Vertex3D = Vertex3D.claim()
 	public orientation = Matrix2D.claim()
-	public isFrozen: boolean = false
+	public isFrozen = false
 
 	public constructor() {
 		super()
 	}
 
 	public static claim(name: string, pos: Vertex3D): BallState {
-		const state = BallState.POOL.get()
-		state.name = name
-		state.pos.set(pos)
-		state.isFrozen = false
-		return state
+		const s = BallState.POOL.get()
+		s.name = name
+		s.pos.set(pos)
+		s.isFrozen = false
+		return s
 	}
 
 	public clone(): BallState {
-		const state = BallState.claim(this.name, this.pos)
-		state.orientation.set(this.orientation)
-		return state
+		const s = BallState.claim(this.name, this.pos)
+		s.orientation.set(this.orientation)
+		return s
 	}
 
 	public diff(state: BallState): BallState {
-		const diff = this.clone()
-		if (diff.pos.equals(state.pos)) {
-			Vertex3D.release(diff.pos)
-			delete diff.pos
+		const d = this.clone()
+		if (d.pos.equals(state.pos)) {
+			Vertex3D.release(d.pos)
+			delete (d as unknown as Record<string, unknown>).pos
 		}
-		if (diff.orientation.equals(state.orientation)) {
-			Matrix2D.release(diff.orientation)
-			delete diff.orientation
+		if (d.orientation.equals(state.orientation)) {
+			Matrix2D.release(d.orientation)
+			delete (d as unknown as Record<string, unknown>).orientation
 		}
-		if (diff.isFrozen === state.isFrozen) {
-			delete diff.isFrozen
-		}
-		return diff
+		if (d.isFrozen === state.isFrozen) delete (d as unknown as Record<string, unknown>).isFrozen
+		return d
 	}
 
 	public release(): void {
-		if (!this.pos) {
-			this.pos = Vertex3D.claim()
-		}
-		if (!this.orientation) {
-			this.orientation = Matrix2D.claim()
-		} else {
-			this.orientation.setIdentity()
-		}
+		if (!this.pos) this.pos = Vertex3D.claim()
+		if (!this.orientation) this.orientation = Matrix2D.claim()
+		else this.orientation.setIdentity()
 		BallState.POOL.release(this)
 	}
 
 	public equals(state: BallState): boolean {
-		/* istanbul ignore if: we don't actually pass empty states. */
-		if (!state) {
-			return false
-		}
+		if (!state) return false
 		return this.pos.equals(state.pos) && this.orientation.equals(state.orientation) && this.isFrozen === state.isFrozen
 	}
 }
