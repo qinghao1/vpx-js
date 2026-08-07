@@ -3,10 +3,10 @@
 
 /** Browser-backed key-value storage (localStorage). */
 class StorageBrowser {
-	public setItem(name: string, value: any): void {
+	public setItem(name: string, value: unknown): void {
 		localStorage.setItem(name, JSON.stringify(value))
 	}
-	public getItem(name: string): any {
+	public getItem(name: string): unknown {
 		return JSON.parse(localStorage.getItem(name) || '""')
 	}
 }
