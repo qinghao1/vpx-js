@@ -4,7 +4,9 @@
 import { Pool } from '../../util/object-pool.js'
 import { ItemState } from '../item-state.js'
 
-/** Light state. */
+/** Light state.
+ *
+ * @see https://github.com/vpinball/vpinball/blob/master/light.cpp */
 export class LightState extends ItemState {
 	public static readonly POOL = new Pool(LightState)
 
