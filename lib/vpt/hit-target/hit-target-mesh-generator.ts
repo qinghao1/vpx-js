@@ -1,57 +1,25 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { readFileSync } from 'node:fs'
-import { createRequire } from 'node:module'
-import { resolve } from 'node:path'
 import { degToRad, f4 } from '../../math/float.js'
 import { Matrix3D } from '../../math/matrix3d.js'
 import { Vertex3D } from '../../math/vertex3d.js'
 import { Enums } from '../enums.js'
-import { Mesh } from '../mesh.js'
+import type { Mesh } from '../mesh.js'
+import { loadMesh } from '../mesh-loader.js'
 import type { Table } from '../table/table.js'
 import { HitTarget } from './hit-target.js'
 import type { HitTargetData } from './hit-target-data.js'
 
-const require = createRequire(import.meta.url)
-
-const hitTargetT2MeshJson = JSON.parse(
-	readFileSync(resolve(process.cwd(), 'res/meshes/drop-target-t2-mesh.json'), 'utf-8'),
-)
-const hitTargetT3MeshJson = JSON.parse(
-	readFileSync(resolve(process.cwd(), 'res/meshes/drop-target-t3-mesh.json'), 'utf-8'),
-)
-const hitTargetT4MeshJson = JSON.parse(
-	readFileSync(resolve(process.cwd(), 'res/meshes/drop-target-t4-mesh.json'), 'utf-8'),
-)
-const hitFatTargetRectangleMeshJson = JSON.parse(
-	readFileSync(resolve(process.cwd(), 'res/meshes/hit-target-fat-rectangle-mesh.json'), 'utf-8'),
-)
-const hitFatTargetSquareMeshJson = JSON.parse(
-	readFileSync(resolve(process.cwd(), 'res/meshes/hit-target-fat-square-mesh.json'), 'utf-8'),
-)
-const hitTargetRectangleMeshJson = JSON.parse(
-	readFileSync(resolve(process.cwd(), 'res/meshes/hit-target-rectangle-mesh.json'), 'utf-8'),
-)
-const hitTargetRoundMeshJson = JSON.parse(
-	readFileSync(resolve(process.cwd(), 'res/meshes/hit-target-round-mesh.json'), 'utf-8'),
-)
-const hitTargetT1SlimMeshJson = JSON.parse(
-	readFileSync(resolve(process.cwd(), 'res/meshes/hit-target-t1-slim-mesh.json'), 'utf-8'),
-)
-const hitTargetT2SlimMeshJson = JSON.parse(
-	readFileSync(resolve(process.cwd(), 'res/meshes/hit-target-t2-slim-mesh.json'), 'utf-8'),
-)
-
-const hitTargetT2Mesh = Mesh.fromJson(hitTargetT2MeshJson)
-const hitTargetT3Mesh = Mesh.fromJson(hitTargetT3MeshJson)
-const hitTargetT4Mesh = Mesh.fromJson(hitTargetT4MeshJson)
-const hitFatTargetRectangleMesh = Mesh.fromJson(hitFatTargetRectangleMeshJson)
-const hitFatTargetSquareMesh = Mesh.fromJson(hitFatTargetSquareMeshJson)
-const hitTargetRectangleMesh = Mesh.fromJson(hitTargetRectangleMeshJson)
-const hitTargetRoundMesh = Mesh.fromJson(hitTargetRoundMeshJson)
-const hitTargetT1SlimMesh = Mesh.fromJson(hitTargetT1SlimMeshJson)
-const hitTargetT2SlimMesh = Mesh.fromJson(hitTargetT2SlimMeshJson)
+const hitTargetT2Mesh = loadMesh('drop-target-t2-mesh')
+const hitTargetT3Mesh = loadMesh('drop-target-t3-mesh')
+const hitTargetT4Mesh = loadMesh('drop-target-t4-mesh')
+const hitFatTargetRectangleMesh = loadMesh('hit-target-fat-rectangle-mesh')
+const hitFatTargetSquareMesh = loadMesh('hit-target-fat-square-mesh')
+const hitTargetRectangleMesh = loadMesh('hit-target-rectangle-mesh')
+const hitTargetRoundMesh = loadMesh('hit-target-round-mesh')
+const hitTargetT1SlimMesh = loadMesh('hit-target-t1-slim-mesh')
+const hitTargetT2SlimMesh = loadMesh('hit-target-t2-slim-mesh')
 
 /** HitTargetMeshGenerator. */
 export class HitTargetMeshGenerator {
