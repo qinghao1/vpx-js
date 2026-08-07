@@ -8,7 +8,8 @@ import { FLT_MAX, Mesh } from '../mesh.js'
 import type { Table } from '../table/table.js'
 import type { PrimitiveData } from './primitive-data.js'
 
-export class PrimitiveMeshGenerator {
+export /** Primitive mesh generator. */
+class PrimitiveMeshGenerator {
 	private readonly data: PrimitiveData
 
 	constructor(data: PrimitiveData) {
