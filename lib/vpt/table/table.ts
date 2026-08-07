@@ -188,22 +188,26 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 	}
 
 	public getPlayables(): IPlayable[] {
-		return [this, ...(this.getItems().filter(isPlayable) as unknown as IPlayable[])]
+		return [this, ...this.filterItems(isPlayable)]
 	}
 	public getMovables(): IMovable[] {
-		return this.getItems().filter(isMovable) as unknown as IMovable[]
+		return this.filterItems(isMovable)
 	}
 	public getRenderables(): Array<IRenderable<ItemState>> {
-		return this.getItems().filter(isRenderable) as unknown as Array<IRenderable<ItemState>>
+		return this.filterItems(isRenderable)
 	}
 	public getAnimatables(): IAnimatable[] {
-		return this.getItems().filter(isAnimatable) as unknown as IAnimatable[]
+		return this.filterItems(isAnimatable)
 	}
 	public getScriptables(): Array<IScriptable<ItemApi<ItemData>>> {
-		return [this, ...(this.getItems().filter(isScriptable) as unknown as Array<IScriptable<ItemApi<ItemData>>>)]
+		return [this, ...this.filterItems(isScriptable)]
 	}
 	public getHittables(): IHittable[] {
-		return this.getItems().filter(isHittable) as unknown as IHittable[]
+		return this.filterItems(isHittable)
+	}
+
+	private filterItems<T>(guard: (x: unknown) => x is T): T[] {
+		return this.getItems().filter(guard) as unknown as T[]
 	}
 	public getHitShapes(): HitObject[] {
 		return this.hitGenerator!.generateHitObjects()
