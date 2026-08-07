@@ -1,30 +1,14 @@
-/*
- * VPDB - Virtual Pinball Database
- * Copyright (C) 2019 freezy <freezy@vpdb.io>
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- */
+// Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import type { EventProxy } from '../../game/event-proxy'
-import type { Vertex2D } from '../../math/vertex2d'
-import { PHYS_SKIN } from '../../physics/constants'
-import { HitCircle } from '../../physics/hit-circle'
-import { LineSeg } from '../../physics/line-seg'
-import type { GateData } from './gate-data'
-import { GateHit } from './gate-hit'
-import type { GateState } from './gate-state'
+import type { EventProxy } from '../../game/event-proxy.js'
+import type { Vertex2D } from '../../math/vertex2d.js'
+import { PHYS_SKIN } from '../../physics/constants.js'
+import { HitCircle } from '../../physics/hit-circle.js'
+import { LineSeg } from '../../physics/line-seg.js'
+import type { GateData } from './gate-data.js'
+import { GateHit } from './gate-hit.js'
+import type { GateState } from './gate-state.js'
 
 export class GateHitGenerator {
 	private readonly data: GateData
