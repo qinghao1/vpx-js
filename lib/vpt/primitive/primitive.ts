@@ -117,13 +117,6 @@ export class Primitive
 
 	public setSides(num: number): void {
 		this.data.sides = num
-		if (!this.data.use3DMesh) {
-			// TODO
-			// vertexBufferRegenerate = true;
-			// CalculateBuiltinOriginal();
-			// RecalculateMatrices();
-			// TransformVertices();
-		}
 	}
 
 	public setCollidable(isCollidable: boolean) {
