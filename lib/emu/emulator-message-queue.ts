@@ -4,54 +4,46 @@
 import type { IEmulator } from '../game/iemulator.js'
 import { logger } from '../util/logger.js'
 
-/**
- * The VPX interface is sync, while our implementation is not when initializing.
- *
- * This Caching Service caches all calls to the EMU while its initializing and
- * allows to apply the changes once the emu is ready
- */
+/** Caches emu calls while initializing — sync VPX vs async emu. */
 export class EmulatorMessageQueue {
 	private readonly queue: QueueItem[] = []
-	private clearedQueue: boolean = false
+	private cleared = false
 
-	/**
-	 * adds new cache entry
-	 * @returns true if entry was added to the cache, false if cache has already been consumed!
-	 */
-	public addMessage(cacheType: MessageType, value: number): boolean {
-		if (this.clearedQueue) {
+	/** Queues a message; returns false if already replayed. */
+	public addMessage(type: MessageType, value: number): boolean {
+		if (this.cleared) {
 			logger().warn('ADD STATE TO CLEARED CACHE! ENTRY WILL BE IGNORED!')
 			return false
 		}
-		this.queue.push({ cacheType, value })
+		this.queue.push({ cacheType: type, value })
 		return true
 	}
 
-	public replayMessages(emulator: IEmulator): void {
-		this.clearedQueue = true
+	public replayMessages(emu: IEmulator): void {
+		this.cleared = true
 		logger().debug('Replaying %d messages to emu', this.queue.length)
-		for (const item of this.queue) {
-			switch (item.cacheType) {
+		for (const { cacheType, value } of this.queue) {
+			switch (cacheType) {
 				case MessageType.SetSwitchInput:
-					emulator.setSwitchInput(item.value, true)
+					emu.setSwitchInput(value, true)
 					break
 				case MessageType.ClearSwitchInput:
-					emulator.setSwitchInput(item.value, false)
+					emu.setSwitchInput(value, false)
 					break
 				case MessageType.ToggleSwitchInput:
-					emulator.setSwitchInput(item.value)
+					emu.setSwitchInput(value)
 					break
 				case MessageType.CabinetInput:
-					emulator.setCabinetInput(item.value)
+					emu.setCabinetInput(value)
 					break
 				case MessageType.ExecuteTicks:
-					emulator.emuSimulateCycle(item.value)
+					emu.emuSimulateCycle(value)
 					break
 				case MessageType.SetDipByte:
-					emulator.setDipSwitchByte(item.value)
+					emu.setDipSwitchByte(value)
 					break
 				default:
-					logger().warn('UNKNOWN CACHE TYPE', item.cacheType)
+					logger().warn('UNKNOWN CACHE TYPE', cacheType)
 			}
 		}
 	}
