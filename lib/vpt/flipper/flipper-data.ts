@@ -9,31 +9,25 @@ import { ItemData } from '../item-data.js'
 import type { Table } from '../table/table.js'
 
 /** Flipper data.
- *
  * @see https://github.com/vpinball/vpinball/blob/master/flipper.cpp */
 export class FlipperData extends ItemData {
-	public baseRadius: number = 21.5
-	public endRadius: number = 13.0
+	public baseRadius = 21.5
+	public endRadius = 13.0
 	public flipperRadiusMin!: number
-	public flipperRadiusMax: number = 130.0
-	public flipperRadius: number = 130.0
-
-	public startAngle: number = 121.0
-	public endAngle: number = 70.0
-	public height: number = 50.0
-
+	public flipperRadiusMax = 130.0
+	public flipperRadius = 130.0
+	public startAngle = 121.0
+	public endAngle = 70.0
+	public height = 50.0
 	public center!: Vertex2D
 	public color = 0xffffff
-
 	public szImage?: string
 	public szSurface?: string
 	public szMaterial?: string
-
 	public szRubberMaterial?: string
-	public rubberThickness: number = 7.0
-	public rubberHeight: number = 19.0
-	public rubberWidth: number = 24.0
-
+	public rubberThickness = 7.0
+	public rubberHeight = 19.0
+	public rubberWidth = 24.0
 	public mass!: number
 	public strength?: number
 	public elasticity?: number
@@ -43,9 +37,7 @@ export class FlipperData extends ItemData {
 	public rampUp?: number
 	public torqueDamping?: number
 	public torqueDampingAngle?: number
-
 	public scatter?: number
-
 	public overrideMass?: number
 	public overrideStrength?: number
 	public overrideElasticity?: number
@@ -57,93 +49,37 @@ export class FlipperData extends ItemData {
 	public overrideTorqueDampingAngle?: number
 	public overrideScatterAngle?: number
 	public overridePhysics?: number
-
-	public isVisible: boolean = true
-	public isEnabled: boolean = true
-	public isReflectionEnabled: boolean = true
+	public isVisible = true
+	public isEnabled = true
+	public isReflectionEnabled = true
 
 	public static async fromStorage(storage: Storage, itemName: string): Promise<FlipperData> {
-		const flipperItem = new FlipperData(itemName)
-		await storage.streamFiltered(itemName, 4, BiffParser.stream(flipperItem.fromTag.bind(flipperItem)))
-		return flipperItem
+		const d = new FlipperData(itemName)
+		await storage.streamFiltered(itemName, 4, BiffParser.stream(d.fromTag.bind(d)))
+		return d
 	}
 
-	public updatePhysicsSettings(table: Table) {
-		if (this.doOverridePhysics(table)) {
-			const idx = this.overridePhysics ? this.overridePhysics - 1 : table.data!.overridePhysics! - 1
-
-			this.overrideMass = registry.getRegStringAsFloat('Player', `FlipperPhysicsMass${idx}`, 1)
-			/* istanbul ignore if: return values are currently hardcoded to fallback */
-			if (this.overrideMass < 0.0) {
-				this.overrideMass = this.mass
-			}
-
-			this.overrideStrength = registry.getRegStringAsFloat('Player', `FlipperPhysicsStrength${idx}`, 2200)
-			/* istanbul ignore if: return values are currently hardcoded to fallback */
-			if (this.overrideStrength < 0.0) {
-				this.overrideStrength = this.strength
-			}
-
-			this.overrideElasticity = registry.getRegStringAsFloat('Player', `FlipperPhysicsElasticity${idx}`, 0.8)
-			/* istanbul ignore if: return values are currently hardcoded to fallback */
-			if (this.overrideElasticity < 0.0) {
-				this.overrideElasticity = this.elasticity
-			}
-
-			this.overrideScatterAngle = registry.getRegStringAsFloat('Player', `FlipperPhysicsScatter${idx}`, 0)
-			/* istanbul ignore if: return values are currently hardcoded to fallback */
-			if (this.overrideScatterAngle < 0.0) {
-				this.overrideScatterAngle = this.scatter
-			}
-
-			this.overrideReturnStrength = registry.getRegStringAsFloat('Player', `FlipperPhysicsReturnStrength${idx}`, 0.058)
-			/* istanbul ignore if: return values are currently hardcoded to fallback */
-			if (this.overrideReturnStrength < 0.0) {
-				this.overrideReturnStrength = this.return
-			}
-
-			this.overrideElasticityFalloff = registry.getRegStringAsFloat(
-				'Player',
-				`FlipperPhysicsElasticityFalloff${idx}`,
-				0.43,
-			)
-			/* istanbul ignore if: return values are currently hardcoded to fallback */
-			if (this.overrideElasticityFalloff < 0.0) {
-				this.overrideElasticityFalloff = this.elasticityFalloff
-			}
-
-			this.overrideFriction = registry.getRegStringAsFloat('Player', `FlipperPhysicsFriction${idx}`, 0.6)
-			/* istanbul ignore if: return values are currently hardcoded to fallback */
-			if (this.overrideFriction < 0.0) {
-				this.overrideFriction = this.friction
-			}
-
-			this.overrideCoilRampUp = registry.getRegStringAsFloat('Player', `FlipperPhysicsCoilRampUp${idx}`, 3.0)
-			/* istanbul ignore if: return values are currently hardcoded to fallback */
-			if (this.overrideCoilRampUp < 0.0) {
-				this.overrideCoilRampUp = this.rampUp
-			}
-
-			this.overrideTorqueDamping = registry.getRegStringAsFloat('Player', `FlipperPhysicsEOSTorque${idx}`, 0.75)
-			/* istanbul ignore if: return values are currently hardcoded to fallback */
-			if (this.overrideTorqueDamping < 0.0) {
-				this.overrideTorqueDamping = this.torqueDamping
-			}
-
-			this.overrideTorqueDampingAngle = registry.getRegStringAsFloat(
-				'Player',
-				`FlipperPhysicsEOSTorqueAngle${idx}`,
-				6.0,
-			)
-			/* istanbul ignore if: return values are currently hardcoded to fallback */
-			if (this.overrideTorqueDampingAngle < 0.0) {
-				this.overrideTorqueDampingAngle = this.torqueDampingAngle
-			}
+	public updatePhysicsSettings(table: Table): void {
+		if (!this.doOverridePhysics(table)) return
+		const idx = this.overridePhysics ? this.overridePhysics - 1 : table.data!.overridePhysics! - 1
+		const get = (key: string, fallback: number, def: number): number => {
+			const v = registry.getRegStringAsFloat('Player', `${key}${idx}`, def)
+			return v < 0 ? fallback : v
 		}
+		this.overrideMass = get('FlipperPhysicsMass', this.mass, 1)
+		this.overrideStrength = get('FlipperPhysicsStrength', this.strength!, 2200)
+		this.overrideElasticity = get('FlipperPhysicsElasticity', this.elasticity!, 0.8)
+		this.overrideScatterAngle = get('FlipperPhysicsScatter', this.scatter!, 0)
+		this.overrideReturnStrength = get('FlipperPhysicsReturnStrength', this.return!, 0.058)
+		this.overrideElasticityFalloff = get('FlipperPhysicsElasticityFalloff', this.elasticityFalloff!, 0.43)
+		this.overrideFriction = get('FlipperPhysicsFriction', this.friction!, 0.6)
+		this.overrideCoilRampUp = get('FlipperPhysicsCoilRampUp', this.rampUp!, 3.0)
+		this.overrideTorqueDamping = get('FlipperPhysicsEOSTorque', this.torqueDamping!, 0.75)
+		this.overrideTorqueDampingAngle = get('FlipperPhysicsEOSTorqueAngle', this.torqueDampingAngle!, 6.0)
 	}
 
-	public doOverridePhysics(table: Table) {
-		return this.overridePhysics || (table.data!.overridePhysicsFlipper && table.data!.overridePhysics)
+	public doOverridePhysics(table: Table): boolean {
+		return !!this.overridePhysics || !!(table.data!.overridePhysicsFlipper && table.data!.overridePhysics)
 	}
 
 	private async fromTag(buffer: Uint8Array, tag: string, offset: number, len: number): Promise<number> {
@@ -186,20 +122,14 @@ export class FlipperData extends ItemData {
 				this.szRubberMaterial = this.getString(buffer, len)
 				break
 			case 'RTHK':
-				this.rubberThickness = this.getInt(buffer)
-				break
 			case 'RTHF':
 				this.rubberThickness = this.getFloat(buffer)
 				break
 			case 'RHGT':
-				this.rubberHeight = this.getInt(buffer)
-				break
 			case 'RHGF':
 				this.rubberHeight = this.getFloat(buffer)
 				break
 			case 'RWDT':
-				this.rubberWidth = this.getInt(buffer)
-				break
 			case 'RWDF':
 				this.rubberWidth = this.getFloat(buffer)
 				break
