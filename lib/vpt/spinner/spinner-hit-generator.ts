@@ -7,7 +7,7 @@ import { HitCircle } from '../../physics/hit-circle.js'
 import type { SpinnerData } from './spinner-data.js'
 import type { SpinnerState } from './spinner-state.js'
 
-/** SpinnerHitGenerator. */
+/** Spinne hit generator. */
 export class SpinnerHitGenerator {
 	private readonly data: SpinnerData
 
