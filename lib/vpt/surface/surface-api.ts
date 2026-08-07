@@ -10,8 +10,8 @@ import type { SurfaceData } from './surface-data.js'
 import type { SurfaceHitGenerator } from './surface-hit-generator.js'
 import type { SurfaceState } from './surface-state.js'
 
-export /** SurfaceApi. */
-class SurfaceApi extends ItemApi<SurfaceData> {
+/** SurfaceApi. */
+export class SurfaceApi extends ItemApi<SurfaceData> {
 	private readonly hitGenerator: SurfaceHitGenerator
 	private readonly state: SurfaceState
 	private readonly hits: HitObject[]
