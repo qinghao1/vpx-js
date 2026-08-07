@@ -309,7 +309,7 @@ export class TableData extends ItemData {
 				this.offset.y = this.getFloat(buffer)
 				break
 			case 'CODE':
-				this.scriptPos = offset
+				this.scriptPos = _offset
 				this.scriptLen = len
 				break
 			case 'NAME':
