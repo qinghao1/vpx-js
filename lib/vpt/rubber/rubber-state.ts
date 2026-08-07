@@ -5,7 +5,6 @@ import { Pool } from '../../util/object-pool.js'
 import { ItemState } from '../item-state.js'
 
 /** Rubber state.
- *
  * @see https://github.com/vpinball/vpinball/blob/master/rubber.cpp */
 export class RubberState extends ItemState {
 	public static readonly POOL = new Pool(RubberState)
@@ -87,7 +86,6 @@ export class RubberState extends ItemState {
 	}
 
 	public equals(state: RubberState): boolean {
-		/* istanbul ignore if: we don't actually pass empty states. */
 		if (!state) {
 			return false
 		}
