@@ -1,34 +1,18 @@
-/*
- * VPDB - Virtual Pinball Database
- * Copyright (C) 2019 freezy <freezy@vpdb.io>
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- */
+// Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import type { EventProxy } from '../../game/event-proxy'
-import type { Player } from '../../game/player'
-import type { PlayerPhysics } from '../../game/player-physics'
-import { CollisionEvent } from '../../physics/collision-event'
-import { C_DISP_GAIN, C_DISP_LIMIT, C_EMBEDDED, C_EMBEDSHOT, C_LOWNORMVEL } from '../../physics/constants'
-import { HitObject } from '../../physics/hit-object'
-import type { Ball } from '../ball/ball'
-import type { Table } from '../table/table'
-import { Plunger, type PlungerConfig } from './plunger'
-import type { PlungerData } from './plunger-data'
-import { PlungerMover } from './plunger-mover'
-import type { PlungerState } from './plunger-state'
+import type { EventProxy } from '../../game/event-proxy.js'
+import type { Player } from '../../game/player.js'
+import type { PlayerPhysics } from '../../game/player-physics.js'
+import { CollisionEvent } from '../../physics/collision-event.js'
+import { C_DISP_GAIN, C_DISP_LIMIT, C_EMBEDDED, C_EMBEDSHOT, C_LOWNORMVEL } from '../../physics/constants.js'
+import { HitObject } from '../../physics/hit-object.js'
+import type { Ball } from '../ball/ball.js'
+import type { Table } from '../table/table.js'
+import { Plunger, type PlungerConfig } from './plunger.js'
+import type { PlungerData } from './plunger-data.js'
+import { PlungerMover } from './plunger-mover.js'
+import type { PlungerState } from './plunger-state.js'
 
 export class PlungerHit extends HitObject {
 	private readonly mover: PlungerMover
