@@ -33,78 +33,91 @@ export class KickerApi extends ItemApi<KickerData> {
 		this.ballCreator = ballCreator
 	}
 
+	/** Get X. */
 	get X() {
 		return this.data.center.x
 	}
 	set X(v) {
 		this.data.center.x = v
 	}
+	/** Get Y. */
 	get Y() {
 		return this.data.center.y
 	}
 	set Y(v) {
 		this.data.center.y = v
 	}
+	/** Get Surface. */
 	get Surface() {
 		return this.data.szSurface
 	}
 	set Surface(v) {
 		this.data.szSurface = v
 	}
+	/** Get Enabled. */
 	get Enabled() {
 		return this.hit.isEnabled
 	}
 	set Enabled(v) {
 		this.hit.isEnabled = v
 	}
+	/** Get Scatter. */
 	get Scatter() {
 		return this.data.scatter
 	}
 	set Scatter(v) {
 		this.data.scatter = v
 	}
+	/** Get HitAccuracy. */
 	get HitAccuracy() {
 		return this.data.hitAccuracy
 	}
 	set HitAccuracy(v) {
 		this.data.hitAccuracy = v
 	}
+	/** Get HitHeight. */
 	get HitHeight() {
 		return this.data.hitHeight
 	}
 	set HitHeight(v) {
 		this.data.hitHeight = v
 	}
+	/** Get Orientation. */
 	get Orientation() {
 		return this.data.orientation
 	}
 	set Orientation(v) {
 		this.data.orientation = v
 	}
+	/** Get Radius. */
 	get Radius() {
 		return this.data.radius
 	}
 	set Radius(v) {
 		this.data.radius = v
 	}
+	/** Get FallThrough. */
 	get FallThrough() {
 		return this.data.fallThrough
 	}
 	set FallThrough(v) {
 		this.data.fallThrough = v
 	}
+	/** Get Legacy. */
 	get Legacy() {
 		return this.data.legacyMode
 	}
 	set Legacy(v) {
 		this.data.legacyMode = v
 	}
+	/** Get DrawStyle. */
 	get DrawStyle() {
 		return this.state.type
 	}
 	set DrawStyle(v) {
 		this.state.type = v
 	}
+	/** Get Material. */
 	get Material() {
 		return this.state.material
 	}
