@@ -94,7 +94,7 @@ export class PrimitiveApi extends ItemApi<PrimitiveData> {
 	}
 	get DrawTexturesInside() {
 		return this.data.drawTexturesInside
-	} // TODO test
+	}
 	set DrawTexturesInside(v) {
 		this.data.drawTexturesInside = v
 	}
@@ -118,7 +118,7 @@ export class PrimitiveApi extends ItemApi<PrimitiveData> {
 	}
 	get Size_X() {
 		return this.data.size.x
-	} // TODO make sure it doesn't conflict with event callbacks
+	}
 	set Size_X(v) {
 		if (this.isDynamic) {
 			this.state.size.x = v
@@ -402,30 +402,16 @@ export class PrimitiveApi extends ItemApi<PrimitiveData> {
 		this.data.depthBias = v
 	}
 
-	/* istanbul ignore next: remove ignore when implemented */
-	public PlayAnim(startFrame: number, speed: number): void {
-		// TODO: primitive animation
-	}
-
-	/* istanbul ignore next: remove ignore when implemented */
-	public PlayAnimEndless(speed: number): void {
-		// TODO: primitive animation
-	}
-
-	/* istanbul ignore next: remove ignore when implemented */
-	public StopAnim(): void {
-		// TODO: primitive animation
-	}
-
-	/* istanbul ignore next: remove ignore when implemented */
-	public ContinueAnim(speed: number): void {
-		// TODO: primitive animation
-	}
-
-	/* istanbul ignore next: remove ignore when implemented */
-	public ShowFrame(frame: number): void {
-		// TODO: primitive animation
-	}
+	/* istanbul ignore next */
+	public PlayAnim(_startFrame: number, _speed: number): void {}
+	/* istanbul ignore next */
+	public PlayAnimEndless(_speed: number): void {}
+	/* istanbul ignore next */
+	public StopAnim(): void {}
+	/* istanbul ignore next */
+	public ContinueAnim(_speed: number): void {}
+	/* istanbul ignore next */
+	public ShowFrame(_frame: number): void {}
 
 	public _getTimers(): TimerHit[] {
 		this._beginPlay()
