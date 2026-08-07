@@ -18,11 +18,7 @@ import { RubberMeshGenerator } from './rubber-mesh-generator.js'
 import { RubberState } from './rubber-state.js'
 import { RubberUpdater } from './rubber-updater.js'
 
-/**
- * VPinball's rubber item.
- *
- * @see https://github.com/vpinball/vpinball/blob/master/rubber.cpp
- */
+/** Rubber item. @see https://github.com/vpinball/vpinball/blob/master/rubber.cpp */
 export class Rubber extends Item<RubberData> implements IRenderable<RubberState>, IHittable, IScriptable<RubberApi> {
 	private readonly state: RubberState
 	private readonly meshGenerator: RubberMeshGenerator
