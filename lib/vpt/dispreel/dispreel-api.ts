@@ -5,9 +5,7 @@ import { MAX_REELS } from '../../physics/constants.js'
 import { ItemApi } from '../item-api.js'
 import type { DispReelData } from './dispreel-data.js'
 
-/** DispReelApi API.
- *
- * @see https://github.com/vpinball/vpinball/blob/master/dispreel.cpp */
+/** DispReel API — VBS surface for `Reel`. @see https://github.com/vpinball/vpinball/blob/master/dispreel.cpp */
 export class DispReelApi extends ItemApi<DispReelData> {
 	get BackColor() {
 		return this.data.backColor
@@ -19,7 +17,7 @@ export class DispReelApi extends ItemApi<DispReelData> {
 		return this.data.reelCount
 	}
 	set Reels(v) {
-		this.data.reelCount = Math.min(Math.max(1, v), MAX_REELS) // must have at least 1 reel and a max of MAX_REELS
+		this.data.reelCount = Math.min(Math.max(1, v), MAX_REELS)
 		this.data.v2.x = this.data.v1.x + this.data.getBoxWidth()
 		this.data.v2.y = this.data.v1.y + this.data.getBoxHeight()
 	}
@@ -27,14 +25,14 @@ export class DispReelApi extends ItemApi<DispReelData> {
 		return this.data.width
 	}
 	set Width(v) {
-		this.data.width = Math.max(0.0, v)
+		this.data.width = Math.max(0, v)
 		this.data.v2.x = this.data.v1.x + this.data.getBoxWidth()
 	}
 	get Height() {
 		return this.data.height
 	}
 	set Height(v) {
-		this.data.height = Math.max(0.0, v)
+		this.data.height = Math.max(0, v)
 		this.data.v2.y = this.data.v1.y + this.data.getBoxHeight()
 	}
 	get X() {
@@ -88,10 +86,8 @@ export class DispReelApi extends ItemApi<DispReelData> {
 		return this.data.digitRange
 	}
 	set Range(v) {
-		this.data.digitRange = Math.max(0, v) // must have at least 1 digit (0 is a digit)
-		if (this.data.digitRange > 512 - 1) {
-			this.data.digitRange = 512 - 1 // and a max of 512 (0->511) //!! 512 requested by highrise
-		}
+		this.data.digitRange = Math.max(0, v)
+		if (this.data.digitRange > 511) this.data.digitRange = 511
 	}
 	get UpdateInterval() {
 		return this.data.updateInterval
