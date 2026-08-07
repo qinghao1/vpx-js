@@ -9,13 +9,13 @@ import type { Table } from '../table/table.js'
 import type { HitTargetData } from './hit-target-data.js'
 import type { HitTargetState } from './hit-target-state.js'
 
-/** HitTargetUpdater. */
+/** Hit target updater — drop and rotation. */
 export class HitTargetUpdater extends ItemUpdater<HitTargetState> {
-	private readonly data: HitTargetData
-
-	constructor(data: HitTargetData, state: HitTargetState) {
+	constructor(
+		private readonly data: HitTargetData,
+		state: HitTargetState,
+	) {
 		super(state)
-		this.data = data
 	}
 
 	public applyState<NODE, GEOMETRY, POINT_LIGHT>(
@@ -24,16 +24,10 @@ export class HitTargetUpdater extends ItemUpdater<HitTargetState> {
 		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
 		table: Table,
 	): void {
-		// update local state
 		Object.assign(this.state, state)
-
 		this.applyVisibility(obj, state, renderApi)
 		this.applyMaterial(obj, state.material, state.texture, renderApi, table)
-
-		// animation
-		if (state.zOffset !== undefined || state.xRotation !== undefined) {
-			this.applyAnimation(obj, state, renderApi)
-		}
+		if (state.zOffset !== undefined || state.xRotation !== undefined) this.applyAnimation(obj, state, renderApi)
 	}
 
 	private applyAnimation<NODE, GEOMETRY, POINT_LIGHT>(
@@ -41,35 +35,20 @@ export class HitTargetUpdater extends ItemUpdater<HitTargetState> {
 		state: HitTargetState,
 		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
 	): void {
-		const matTransToOrigin = Matrix3D.claim().setTranslation(
-			-this.data.position.x,
-			-this.data.position.y,
-			-this.data.position.z,
-		)
-		const matRotateToOrigin = Matrix3D.claim().rotateZMatrix(degToRad(-this.data.rotZ))
-		const matTransFromOrigin = Matrix3D.claim().setTranslation(
-			this.data.position.x,
-			this.data.position.y,
-			this.data.position.z,
-		)
-		const matRotateFromOrigin = Matrix3D.claim().rotateZMatrix(degToRad(this.data.rotZ))
-		const matRotateX = Matrix3D.claim().rotateXMatrix(degToRad(state.xRotation))
-		const matTranslateZ = Matrix3D.claim().setTranslation(0, 0, -state.zOffset)
-		const matrix = matTransToOrigin
-			.multiply(matRotateToOrigin)
-			.multiply(matRotateX)
-			.multiply(matTranslateZ)
-			.multiply(matRotateFromOrigin)
-			.multiply(matTransFromOrigin)
-
-		renderApi.applyMatrixToNode(matrix, obj)
-		Matrix3D.release(
-			matTransToOrigin,
-			matRotateToOrigin,
-			matTransFromOrigin,
-			matRotateFromOrigin,
-			matRotateX,
-			matTranslateZ,
-		)
+		const p = this.data.position
+		const toOrigin = Matrix3D.claim().setTranslation(-p.x, -p.y, -p.z)
+		const rotToOrigin = Matrix3D.claim().rotateZMatrix(degToRad(-this.data.rotZ))
+		const fromOrigin = Matrix3D.claim().setTranslation(p.x, p.y, p.z)
+		const rotFromOrigin = Matrix3D.claim().rotateZMatrix(degToRad(this.data.rotZ))
+		const rotX = Matrix3D.claim().rotateXMatrix(degToRad(state.xRotation))
+		const transZ = Matrix3D.claim().setTranslation(0, 0, -state.zOffset)
+		const m = toOrigin
+			.multiply(rotToOrigin)
+			.multiply(rotX)
+			.multiply(transZ)
+			.multiply(rotFromOrigin)
+			.multiply(fromOrigin)
+		renderApi.applyMatrixToNode(m, obj)
+		Matrix3D.release(toOrigin, rotToOrigin, fromOrigin, rotFromOrigin, rotX, transZ)
 	}
 }
