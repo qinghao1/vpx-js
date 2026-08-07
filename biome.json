@@ -16,7 +16,10 @@
 			"!lib/scripting/grammar/rules.ts",
 			"!lib/render/threejs/vendor",
 			"!demo-browser/dist",
-			"!demo-browser/node_modules"
+			"!demo-browser/node_modules",
+			"!lib/**/bench*.spec.ts",
+			"!**/bench*.spec.ts",
+			"!**/*.vpx"
 		]
 	},
 	"formatter": {
