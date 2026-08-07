@@ -16,6 +16,7 @@ export class KickerState extends ItemState {
 	get isVisible(): boolean {
 		return this.type !== Enums.KickerType.KickerInvisible
 	}
+	/** Set isVisible. */
 	set isVisible(v) {
 		/* not used in abstract */
 	}
