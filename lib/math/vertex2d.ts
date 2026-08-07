@@ -18,12 +18,14 @@ export class Vertex2D implements Vertex {
 	get x(): number {
 		return this._x
 	}
+	/** Set x. */
 	set x(v: number) {
 		this._x = f4(v)
 	}
 	get y(): number {
 		return this._y
 	}
+	/** Set y. */
 	set y(v: number) {
 		this._y = f4(v)
 	}
