@@ -1,73 +1,57 @@
-/*
- * VPDB - Virtual Pinball Database
- * Copyright (C) 2019 freezy <freezy@vpdb.io>
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- */
+// Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { Event } from '../../game/event'
-import { EventProxy } from '../../game/event-proxy'
-import { type IAnimatable, isAnimatable } from '../../game/ianimatable'
-import { type IHittable, isHittable } from '../../game/ihittable'
-import { type IMovable, isMovable } from '../../game/imovable'
-import { type IPlayable, isPlayable } from '../../game/iplayable'
-import { type IRenderable, isRenderable, type Meshes } from '../../game/irenderable'
-import { type IScriptable, isScriptable } from '../../game/iscriptable'
-import type { Player } from '../../game/player'
-import type { IBinaryReader, Storage } from '../../io/ole-doc'
-import { degToRad, f4 } from '../../math/float'
-import { FRect3D } from '../../math/frect3d'
-import { Vertex3D } from '../../math/vertex3d'
-import type { HitObject } from '../../physics/hit-object'
-import { HitPlane } from '../../physics/hit-plane'
-import type { IRenderApi } from '../../render/irender-api'
-import { Transpiler } from '../../scripting/transpiler'
-import { logger, progress } from '../../util/logger'
-import type { Bumper } from '../bumper/bumper'
-import type { Collection } from '../collection/collection'
-import type { Decal } from '../decal/decal'
-import type { DispReel } from '../dispreel/dispreel'
-import type { Flasher } from '../flasher/flasher'
-import type { Flipper } from '../flipper/flipper'
-import type { Gate } from '../gate/gate'
-import type { HitTarget } from '../hit-target/hit-target'
-import type { Item } from '../item'
-import type { ItemData } from '../item-data'
-import type { ItemState } from '../item-state'
-import type { Kicker } from '../kicker/kicker'
-import type { Light } from '../light/light'
-import type { LightSeq } from '../lightseq/lightseq'
-import type { Material } from '../material'
-import type { Plunger } from '../plunger/plunger'
-import type { Primitive } from '../primitive/primitive'
-import type { Ramp } from '../ramp/ramp'
-import type { Rubber } from '../rubber/rubber'
-import type { Spinner } from '../spinner/spinner'
-import type { Surface } from '../surface/surface'
-import type { Textbox } from '../textbox/textbox'
-import type { Texture } from '../texture'
-import type { Timer } from '../timer/timer'
-import type { Trigger } from '../trigger/trigger'
-import { TableApi } from './table-api'
-import type { TableData } from './table-data'
-import type { TableExportOptions } from './table-exporter'
-import { TableHitGenerator } from './table-hit-generator'
-import { type LoadedTable, TableLoader } from './table-loader'
-import { TableMeshGenerator } from './table-mesh-generator'
-import { TableState } from './table-state'
-import { TableUpdater } from './table-updater'
+import { Event } from '../../game/event.js'
+import { EventProxy } from '../../game/event-proxy.js'
+import { type IAnimatable, isAnimatable } from '../../game/ianimatable.js'
+import { type IHittable, isHittable } from '../../game/ihittable.js'
+import { type IMovable, isMovable } from '../../game/imovable.js'
+import { type IPlayable, isPlayable } from '../../game/iplayable.js'
+import { type IRenderable, isRenderable, type Meshes } from '../../game/irenderable.js'
+import { type IScriptable, isScriptable } from '../../game/iscriptable.js'
+import type { Player } from '../../game/player.js'
+import type { IBinaryReader, Storage } from '../../io/ole-doc.js'
+import { degToRad, f4 } from '../../math/float.js'
+import { FRect3D } from '../../math/frect3d.js'
+import { Vertex3D } from '../../math/vertex3d.js'
+import type { HitObject } from '../../physics/hit-object.js'
+import { HitPlane } from '../../physics/hit-plane.js'
+import type { IRenderApi } from '../../render/irender-api.js'
+import { Transpiler } from '../../scripting/transpiler.js'
+import { logger, progress } from '../../util/logger.js'
+import type { Bumper } from '../bumper/bumper.js'
+import type { Collection } from '../collection/collection.js'
+import type { Decal } from '../decal/decal.js'
+import type { DispReel } from '../dispreel/dispreel.js'
+import type { Flasher } from '../flasher/flasher.js'
+import type { Flipper } from '../flipper/flipper.js'
+import type { Gate } from '../gate/gate.js'
+import type { HitTarget } from '../hit-target/hit-target.js'
+import type { Item } from '../item.js'
+import type { ItemData } from '../item-data.js'
+import type { ItemState } from '../item-state.js'
+import type { Kicker } from '../kicker/kicker.js'
+import type { Light } from '../light/light.js'
+import type { LightSeq } from '../lightseq/lightseq.js'
+import type { Material } from '../material.js'
+import type { Plunger } from '../plunger/plunger.js'
+import type { Primitive } from '../primitive/primitive.js'
+import type { Ramp } from '../ramp/ramp.js'
+import type { Rubber } from '../rubber/rubber.js'
+import type { Spinner } from '../spinner/spinner.js'
+import type { Surface } from '../surface/surface.js'
+import type { Textbox } from '../textbox/textbox.js'
+import type { Texture } from '../texture.js'
+import type { Timer } from '../timer/timer.js'
+import type { Trigger } from '../trigger/trigger.js'
+import { TableApi } from './table-api.js'
+import type { TableData } from './table-data.js'
+import type { TableExportOptions } from './table-exporter.js'
+import { TableHitGenerator } from './table-hit-generator.js'
+import { type LoadedTable, TableLoader } from './table-loader.js'
+import { TableMeshGenerator } from './table-mesh-generator.js'
+import { TableState } from './table-state.js'
+import { TableUpdater } from './table-updater.js'
 
 /**
  * A Visual Pinball table.
