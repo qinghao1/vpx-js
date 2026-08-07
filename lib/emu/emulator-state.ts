@@ -5,128 +5,68 @@ import type { WpcEmuWebWorkerApi } from 'wpc-emu'
 import { VbsArray } from '../scripting/vbs-array.js'
 import { OffsetIndex } from './offset-index.js'
 
-function getEmptyUint8Array(size: number = 64) {
-	return new Uint8Array(size).fill(0)
-}
-/**
- * This class encapsulates the WPC-EMU state and transform state object
- */
+const empty = (n = 64): Uint8Array => new Uint8Array(n).fill(0)
+
+/** WPC-EMU state transform. */
 export class EmulatorState {
-	private currentLampState: Uint8Array = getEmptyUint8Array()
-	private currentSolenoidState: Uint8Array = getEmptyUint8Array()
-	private currentGIState: Uint8Array = getEmptyUint8Array()
-	private lastSentLampState: Uint8Array = getEmptyUint8Array()
-	private lastSentSolenoidState: Uint8Array = getEmptyUint8Array()
-	private lastSentGIState: Uint8Array = getEmptyUint8Array()
-	private dmdScreen: Uint8Array = new Uint8Array()
-	private switchState: Uint8Array = new Uint8Array()
+	private currentLampState: Uint8Array = empty()
+	private currentSolenoidState: Uint8Array = empty()
+	private currentGIState: Uint8Array = empty()
+	private lastSentLampState: Uint8Array = empty()
+	private lastSentSolenoidState: Uint8Array = empty()
+	private lastSentGIState: Uint8Array = empty()
+	private dmdScreen = new Uint8Array()
+	private switchState = new Uint8Array()
 
-	public updateState(state: WpcEmuWebWorkerApi.EmuStateAsic) {
-		if (state.wpc.lampState) {
-			this.currentLampState = this.normalizeValue(state.wpc.lampState)
-		}
-		if (state.wpc.solenoidState) {
-			//TODO unclear if we need to normalize
-			this.currentSolenoidState = state.wpc.solenoidState
-		}
-		if (state.wpc.generalIlluminationState) {
-			//TODO unclear if we need to normalize
-			this.currentGIState = state.wpc.generalIlluminationState
-		}
-		if (state.dmd.dmdShadedBuffer) {
-			this.dmdScreen = state.dmd.dmdShadedBuffer
-		}
-		if (state.wpc.inputSwitchMatrixActiveColumn) {
-			this.switchState = state.wpc.inputSwitchMatrixActiveColumn
-		}
+	public updateState(s: WpcEmuWebWorkerApi.EmuStateAsic): void {
+		if (s.wpc.lampState) this.currentLampState = this.normalize(s.wpc.lampState as any) as any
+		if (s.wpc.solenoidState) this.currentSolenoidState = s.wpc.solenoidState as any
+		if (s.wpc.generalIlluminationState) this.currentGIState = s.wpc.generalIlluminationState as any
+		if (s.dmd.dmdShadedBuffer) this.dmdScreen = s.dmd.dmdShadedBuffer as any
+		if (s.wpc.inputSwitchMatrixActiveColumn) this.switchState = s.wpc.inputSwitchMatrixActiveColumn as any
 	}
 
-	public getSwitchState(offset: OffsetIndex): number {
-		return this.switchState[offset.zeroBasedIndex] || 0
+	public getSwitchState(o: OffsetIndex): number {
+		return this.switchState[o.zeroBasedIndex] ?? 0
+	}
+	public getLampState(o: OffsetIndex): number {
+		return this.currentLampState[o.zeroBasedIndex] ?? 0
+	}
+	public getSolenoidState(i: number): number {
+		return this.currentSolenoidState[i + 1] ?? 0
+	}
+	public getGIState(i: number): number {
+		return this.currentGIState[i + 1] ?? 0
 	}
 
-	public getLampState(offset: OffsetIndex): number {
-		return this.currentLampState[offset.zeroBasedIndex] || 0
-	}
-
-	public getSolenoidState(index: number): number {
-		const matrixIndex: number = index++
-		return this.currentSolenoidState[matrixIndex] || 0
-	}
-
-	public getGIState(index: number): number {
-		const matrixIndex: number = index++
-		return this.currentGIState[matrixIndex] || 0
-	}
-
-	/**
-	 * return changed lamps, index starts at 11..18, 21..28.. up to index 88
-	 */
 	public getChangedLamps(): VbsArray<number[]> {
-		const result: number[][] = this.getArrayDiff(
-			this.lastSentLampState,
-			this.currentLampState,
-			OffsetIndex.mapIndexToMatrixIndex,
-		)
+		const diff = this.diff(this.lastSentLampState, this.currentLampState, OffsetIndex.mapIndexToMatrixIndex)
 		this.lastSentLampState = this.currentLampState
-		return new VbsArray(result)
+		return new VbsArray(diff)
 	}
-
-	/**
-	 * return changed solenoids, index starts at
-	 */
 	public getChangedSolenoids(): number[][] {
-		const result: number[][] = this.getArrayDiff(
-			this.lastSentSolenoidState,
-			this.currentSolenoidState,
-			mapIndexToOneBasedIndex,
-		)
+		const diff = this.diff(this.lastSentSolenoidState, this.currentSolenoidState, (i) => i + 1)
 		this.lastSentSolenoidState = this.currentSolenoidState
-		return result
+		return diff
 	}
-
 	public getChangedGI(): number[][] {
-		const result: number[][] = this.getArrayDiff(this.lastSentGIState, this.currentGIState, mapIndexToOneBasedIndex)
+		const diff = this.diff(this.lastSentGIState, this.currentGIState, (i) => i + 1)
 		this.lastSentGIState = this.currentGIState
-		return result
+		return diff
 	}
-
-	// NOT IMPLEMENTED YET - needed for alphanumeric games only!
 	public getChangedLEDs(): number[][] {
 		return []
 	}
-
 	public getDmdScreen(): Uint8Array {
 		return this.dmdScreen
 	}
 
-	/**
-	 * map uint8 values to 0 or 1 (VisualPinball engine)
-	 */
-	private normalizeValue(input: Uint8Array): Uint8Array {
-		return input.map((value) => (value > 127 ? 1 : 0))
+	private normalize(v: Uint8Array): Uint8Array {
+		return v.map((x) => (x > 127 ? 1 : 0)) as any
 	}
-
-	/**
-	 * diff between two arrays equally sized arrays
-	 * returns 2 dimensional array with the result, eg [0, 5], [4, 44] -> means entry at offset 0 changed to 5, entry at offset 4 changed to 44
-	 */
-	private getArrayDiff(
-		lastState: Uint8Array,
-		newState: Uint8Array,
-		offsetMapperFunction: (index: number) => number,
-	): number[][] {
-		const result: number[][] = []
-		for (let n: number = 0; n < newState.length; n++) {
-			if (lastState[n] !== newState[n]) {
-				const index = offsetMapperFunction(n)
-				result.push([index, newState[n]])
-			}
-		}
-		return result
+	private diff(last: Uint8Array, cur: Uint8Array, map: (i: number) => number): number[][] {
+		const out: number[][] = []
+		for (let i = 0; i < cur.length; i++) if (last[i] !== cur[i]) out.push([map(i), cur[i]])
+		return out
 	}
-}
-
-function mapIndexToOneBasedIndex(index: number): number {
-	return index + 1
 }
