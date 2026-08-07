@@ -42,7 +42,6 @@ export class TableState extends ItemState {
 	}
 
 	public equals(state: TableState): boolean {
-		/* istanbul ignore if: we don't actually pass empty states. */
 		if (!state) {
 			return false
 		}
