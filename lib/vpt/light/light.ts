@@ -20,11 +20,7 @@ import { LightMeshGenerator } from './light-mesh-generator.js'
 import { LightState } from './light-state.js'
 import { LightUpdater } from './light-updater.js'
 
-/**
- * VPinball's lights.
- *
- * @see https://github.com/vpinball/vpinball/blob/master/light.cpp
- */
+/** Light item. @see https://github.com/vpinball/vpinball/blob/master/light.cpp */
 export class Light extends Item<LightData> implements IRenderable<LightState>, IAnimatable, IScriptable<LightApi> {
 	// public getters
 	/** Get color. */
