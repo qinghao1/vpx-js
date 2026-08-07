@@ -1,26 +1,7 @@
-/*
- * VPDB - Virtual Pinball Database
- * Copyright (C) 2019 freezy <freezy@vpdb.io>
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- */
+import { f4 } from './float.js'
+import { Vertex3D } from './vertex3d.js'
 
-/* tslint:disable:variable-name adjacent-overload-signatures */
-import { f4 } from './float'
-import { Vertex3D } from './vertex3d'
-
+/** Minimal 2D vector contract. */
 export interface Vertex {
 	x: number
 	y: number
@@ -29,6 +10,7 @@ export interface Vertex {
 	length(): number
 }
 
+/** Vertex with editor flags (smooth/slingshot/control-point). */
 export interface IRenderVertex {
 	x: number
 	y: number
@@ -36,141 +18,141 @@ export interface IRenderVertex {
 	fSlingshot: boolean
 	fControlPoint: boolean
 	isVector3: boolean
-
 	set(x: number, y: number, z?: number): this
 }
 
+/**
+ * Untextured vertex with position, normal and tex-coords.
+ * Stored as 8 little-endian floats (32 bytes).
+ */
 export class Vertex3DNoTex2 {
-	public static size = 32
+	static readonly size = 32
 
-	set x(x: number) {
-		this._x = f4(x)
-	}
-	set y(y: number) {
-		this._y = f4(y)
-	}
-	set z(z: number) {
-		this._z = f4(z)
-	}
+	_x = 0
+	_y = 0
+	_z = 0
+	_nx = 0
+	_ny = 0
+	_nz = 0
+	_tu = 0
+	_tv = 0
 
-	set nx(nx: number) {
-		this._nx = f4(nx)
-	}
-	set ny(ny: number) {
-		this._ny = f4(ny)
-	}
-	set nz(nz: number) {
-		this._nz = f4(nz)
-	}
-
-	set tu(tu: number) {
-		this._tu = f4(tu)
-	}
-	set tv(tv: number) {
-		this._tv = f4(tv)
-	}
-
-	get x() {
+	get x(): number {
 		return this._x
 	}
-	get y() {
+	set x(v: number) {
+		this._x = f4(v)
+	}
+	get y(): number {
 		return this._y
 	}
-	get z() {
+	set y(v: number) {
+		this._y = f4(v)
+	}
+	get z(): number {
 		return this._z
 	}
+	set z(v: number) {
+		this._z = f4(v)
+	}
 
-	get nx() {
+	get nx(): number {
 		return this._nx
 	}
-	get ny() {
+	set nx(v: number) {
+		this._nx = f4(v)
+	}
+	get ny(): number {
 		return this._ny
 	}
-	get nz() {
+	set ny(v: number) {
+		this._ny = f4(v)
+	}
+	get nz(): number {
 		return this._nz
 	}
+	set nz(v: number) {
+		this._nz = f4(v)
+	}
 
-	get tu() {
+	get tu(): number {
 		return this._tu
 	}
-	get tv() {
+	set tu(v: number) {
+		this._tu = f4(v)
+	}
+	get tv(): number {
 		return this._tv
 	}
-
-	public _x: number = 0
-	public _y: number = 0
-	public _z: number = 0
-
-	public _nx: number = 0
-	public _ny: number = 0
-	public _nz: number = 0
-
-	public _tu: number = 0
-	public _tv: number = 0
-
-	public static get(buffer: Uint8Array, pos: number): Vertex3DNoTex2 {
-		const offset = pos * Vertex3DNoTex2.size
-		const vertex = new Vertex3DNoTex2()
-		if ((buffer as any).buffer) {
-			try {
-				const f32 = new Float32Array((buffer as any).buffer, (buffer as any).byteOffset + offset, 8)
-				vertex._x = f32[0]
-				vertex._y = f32[1]
-				vertex._z = f32[2]
-				vertex._nx = f32[3]
-				vertex._ny = f32[4]
-				vertex._nz = f32[5]
-				vertex._tu = f32[6]
-				vertex._tv = f32[7]
-				return vertex
-			} catch {}
-		}
-		vertex.x = f4(new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength).getFloat32(offset, true))
-		vertex.y = f4(new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength).getFloat32(offset + 4, true))
-		vertex.z = f4(new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength).getFloat32(offset + 8, true))
-		vertex.nx = f4(new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength).getFloat32(offset + 12, true))
-		vertex.ny = f4(new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength).getFloat32(offset + 16, true))
-		vertex.nz = f4(new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength).getFloat32(offset + 20, true))
-		vertex.tu = f4(new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength).getFloat32(offset + 24, true))
-		vertex.tv = f4(new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength).getFloat32(offset + 28, true))
-		return vertex
+	set tv(v: number) {
+		this._tv = f4(v)
 	}
 
-	public getVertex(): Vertex3D {
+	/** Reads a vertex at `pos` index from `buffer`. */
+	static get(buffer: Uint8Array, pos: number): Vertex3DNoTex2 {
+		const offset = pos * Vertex3DNoTex2.size
+		const v = new Vertex3DNoTex2()
+		try {
+			const f32 = new Float32Array(buffer.buffer, buffer.byteOffset + offset, 8)
+			v._x = f32[0]
+			v._y = f32[1]
+			v._z = f32[2]
+			v._nx = f32[3]
+			v._ny = f32[4]
+			v._nz = f32[5]
+			v._tu = f32[6]
+			v._tv = f32[7]
+			return v
+		} catch {}
+		const view = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength)
+		v._x = f4(view.getFloat32(offset, true))
+		v._y = f4(view.getFloat32(offset + 4, true))
+		v._z = f4(view.getFloat32(offset + 8, true))
+		v._nx = f4(view.getFloat32(offset + 12, true))
+		v._ny = f4(view.getFloat32(offset + 16, true))
+		v._nz = f4(view.getFloat32(offset + 20, true))
+		v._tu = f4(view.getFloat32(offset + 24, true))
+		v._tv = f4(view.getFloat32(offset + 28, true))
+		return v
+	}
+
+	/** Returns the position as a `Vertex3D`. */
+	getVertex(): Vertex3D {
 		return new Vertex3D(this._x, this._y, this._z)
 	}
 
-	public clone(): Vertex3DNoTex2 {
-		const vertex = new Vertex3DNoTex2()
-		vertex.x = this.x
-		vertex.y = this.y
-		vertex.z = this.z
-		vertex.nx = this.nx
-		vertex.ny = this.ny
-		vertex.nz = this.nz
-		vertex.tu = this.tu
-		vertex.tv = this.tv
-		return vertex
+	clone(): Vertex3DNoTex2 {
+		const v = new Vertex3DNoTex2()
+		v._x = this._x
+		v._y = this._y
+		v._z = this._z
+		v._nx = this._nx
+		v._ny = this._ny
+		v._nz = this._nz
+		v._tu = this._tu
+		v._tv = this._tv
+		return v
 	}
 
-	public hasTextureCoordinates(): boolean {
-		return this.tu !== undefined && this.tv !== undefined
+	/** Whether texture coordinates are present. */
+	hasTextureCoordinates(): boolean {
+		return this._tu !== undefined && this._tv !== undefined
 	}
 
-	public static from(data: any): Vertex3DNoTex2 {
+	static from(data: any): Vertex3DNoTex2 {
 		return Object.assign(new Vertex3DNoTex2(), data)
 	}
 
-	public static fromArray(arr: number[]): Vertex3DNoTex2 {
-		const vertex = new Vertex3DNoTex2()
-		vertex.x = arr[0]
-		vertex.y = arr[1]
-		vertex.z = arr[2]
-		vertex.nx = arr[3]
-		vertex.ny = arr[4]
-		vertex.nz = arr[5]
-		vertex.tu = arr[6]
-		vertex.tv = arr[7]
-		return vertex
+	static fromArray(arr: number[]): Vertex3DNoTex2 {
+		const v = new Vertex3DNoTex2()
+		v._x = f4(arr[0])
+		v._y = f4(arr[1])
+		v._z = f4(arr[2])
+		v._nx = f4(arr[3])
+		v._ny = f4(arr[4])
+		v._nz = f4(arr[5])
+		v._tu = f4(arr[6])
+		v._tv = f4(arr[7])
+		return v
 	}
 }
