@@ -10,15 +10,12 @@ import type { HitKD } from './hit-kd.js'
 
 /** KD-tree node. @see https://github.com/vpinball/vpinball/blob/master/hitoctree.cpp */
 export class HitKDNode {
-	private hitOct: HitKD
 	public rectBounds = new FRect3D()
 	public start = 0
 	public items = 0
 	private children: HitKDNode[] = []
 
-	constructor(hitOct: HitKD) {
-		this.hitOct = hitOct
-	}
+	constructor(private hitOct: HitKD) {}
 
 	public reset(hitOct: HitKD): void {
 		this.children.length = 0
