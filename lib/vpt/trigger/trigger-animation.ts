@@ -8,8 +8,8 @@ import type { Table } from '../table/table.js'
 import type { TriggerData } from './trigger-data.js'
 import type { TriggerState } from './trigger-state.js'
 
-export /** TriggerAnimation. */
-class TriggerAnimation implements IAnimation {
+/** TriggerAnimation. */
+export class TriggerAnimation implements IAnimation {
 	private readonly data: TriggerData
 	private readonly state: TriggerState
 
