@@ -20,8 +20,8 @@ export class ThreeMapGenerator {
 			return Promise.resolve()
 		}
 		const now = Date.now()
-		logger().debug('[ThreeMapGenerator.loadTextures] Pre-loading textures..')
-		const concurrency = 6
+		logger().debug('[ThreeMapGenerator.loadTextures] Pre-loading %s textures..', textures.length)
+		const concurrency = Math.min(16, Math.max(6, Math.floor((typeof navigator !== 'undefined' && (navigator as any).hardwareConcurrency ? (navigator as any).hardwareConcurrency : 6) * 1.5)))
 		let index = 0
 		const loadOne = async (): Promise<void> => {
 			while (true) {
@@ -54,7 +54,10 @@ export class ThreeMapGenerator {
 			}
 		}
 		await Promise.all(Array.from({ length: Math.min(concurrency, textures.length) }, () => loadOne()))
-		logger().debug('[ThreeMapGenerator.loadTextures] Loaded in %sms.', Date.now() - now)
+		logger().debug('[ThreeMapGenerator.loadTextures] Loaded %s/%s textures in %sms (concurrency %s).', this.textureCache.size, textures.length, Date.now() - now, concurrency)
+		if (this.textureCache.size < textures.length) {
+			logger().warn('[ThreeMapGenerator.loadTextures] %s textures failed to load (check harness log for details)', textures.length - this.textureCache.size)
+		}
 	}
 
 	public getTexture(name: string): ThreeTexture {

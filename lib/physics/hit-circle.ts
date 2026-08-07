@@ -11,6 +11,7 @@ import { CollisionType } from './collision-type.js'
 import { C_CONTACTVEL, C_LOWNORMVEL, PHYS_TOUCH } from './constants.js'
 import { HitObject } from './hit-object.js'
 
+/** Circular hit shape (vertical cylinder). */
 export class HitCircle extends HitObject {
 	public center: Vertex2D
 	public readonly radius: number
@@ -27,8 +28,8 @@ export class HitCircle extends HitObject {
 		coll.ball.hit.collide3DWall(coll.hitNormal, this.elasticity, this.elasticityFalloff, this.friction, this.scatter)
 	}
 
+	/** Calculates the axis-aligned bounding box. */
 	public calcHitBBox(): void {
-		// Allow roundoff
 		this.hitBBox.left = this.center.x - this.radius
 		this.hitBBox.right = this.center.x + this.radius
 		this.hitBBox.top = this.center.y - this.radius
