@@ -39,11 +39,7 @@ export class SurfaceHitGenerator {
 	 */
 	private generate3DPolys(events: EventProxy, physics: PlayerPhysics, table: Table): HitObject[] {
 		const hitObjects: HitObject[] = []
-		const vVertex: RenderVertex[] = DragPoint.getRgVertex<RenderVertex>(
-			this.data.dragPoints,
-			() => new RenderVertex(),
-			CatmullCurve2D.fromVertex2D as any,
-		)
+		const vVertex = DragPoint.getRgVertex(this.data.dragPoints, () => new RenderVertex(), CatmullCurve2D.fromVertex2D)
 
 		const count = vVertex.length
 		const rgv3Dt: Vertex3D[] = []
