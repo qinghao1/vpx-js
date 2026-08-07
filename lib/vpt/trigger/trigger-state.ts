@@ -4,7 +4,7 @@
 import { Pool } from '../../util/object-pool.js'
 import { ItemState } from '../item-state.js'
 
-/** TriggerState. */
+/** Trigger state. */
 export class TriggerState extends ItemState {
 	public static readonly POOL = new Pool(TriggerState)
 
