@@ -1,134 +1,89 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
+/** Console logger with global singleton. */
 export class Logger implements ILogger {
 	private static instance: ILogger = new Logger()
 
-	public static logger(): ILogger {
+	static logger(): ILogger {
 		return Logger.instance
 	}
-
-	public static setLogger(l: ILogger) {
+	static setLogger(l: ILogger): void {
 		Logger.instance = l
 	}
 
-	public debug(format: any, ...param: any[]): void {
-		console.debug.apply(console.log, [format, ...param])
+	debug(format: any, ...param: any[]): void {
+		console.debug(format, ...param)
 	}
-
-	public error(format: any, ...param: any[]): void {
-		console.error.apply(console.log, [format, ...param])
+	error(format: any, ...param: any[]): void {
+		console.error(format, ...param)
 	}
-
-	public info(format: any, ...param: any[]): void {
-		console.log.apply(console.log, [format, ...param])
+	info(format: any, ...param: any[]): void {
+		console.log(format, ...param)
 	}
-
-	public verbose(format: any, ...param: any[]): void {
-		console.debug.apply(console.log, [format, ...param])
+	verbose(format: any, ...param: any[]): void {
+		console.debug(format, ...param)
 	}
-
-	public warn(format: any, ...param: any[]): void {
-		console.warn.apply(console.log, [format, ...param])
+	warn(format: any, ...param: any[]): void {
+		console.warn(format, ...param)
 	}
-
-	public wtf(format: any, ...param: any[]): void {
-		console.error.apply(console.log, [format, ...param])
+	wtf(format: any, ...param: any[]): void {
+		console.error(format, ...param)
 	}
 }
 
+/** Logger interface used throughout the engine. */
 export interface ILogger {
 	wtf(format: any, ...param: any[]): void
-
 	error(format: any, ...param: any[]): void
-
 	warn(format: any, ...param: any[]): void
-
 	info(format: any, ...param: any[]): void
-
 	verbose(format: any, ...param: any[]): void
-
 	debug(format: any, ...param: any[]): void
 }
 
-/**
- * The main purpose of this is to indicate in the UI that stuff is being
- * processed.
- *
- * This is currently only used for loading the table, but could be used
- * anywhere. Typically, calling `start` will pop up a progress dialog and
- * show what's going on.
- */
+/** Throttled console progress reporter. */
 export class Progress implements IProgress {
 	private currentTitle?: string
 	private currentAction?: string
-
+	private _lastPrint = 0
 	private static instance: IProgress = new Progress()
 
-	/**
-	 * Get the global instance.
-	 */
-	public static progress(): IProgress {
+	static progress(): IProgress {
 		return Progress.instance
 	}
-
-	/**
-	 * Set a new global instance. The default instance, this class,
-	 * just dumps it to the console.
-	 * @param p
-	 */
-	public static setProgress(p: IProgress) {
+	static setProgress(p: IProgress): void {
 		Progress.instance = p
 	}
 
-	/**
-	 * Indicate the beginning of a new major operation. This is typically the
-	 * title of the progress dialog.
-	 * @param id ID of the operation.
-	 * @param title Displayed text
-	 */
-	public start(id: string, title: string): void {
+	/** Starts a major operation. */
+	start(_id: string, title: string): void {
 		this.currentTitle = title
 	}
 
-	/**
-	 * Ends a previously started operation. All operation must end, otherwise
-	 * the progress dialog won't hide!
-	 * @param id ID of the operation
-	 */
-	public end(id: string): void {}
+	/** Ends a major operation. */
+	end(_id: string): void {}
 
-	/**
-	 * Show what's currently going on. This is usually displayed on one line,
-	 * where the action is left-aligned, and the details, if given, on the
-	 * right.
-	 *
-	 * @param action Text to display on the left
-	 * @param details Details on the right
-	 */
-	public show(action: string, details?: string): void {
+	/** Shows current action and optional details. */
+	show(action: string, details?: string): void {
 		this.currentAction = action
 		this.print(details)
 	}
 
-	/**
-	 * Show a new detail for the current action. This only updates the text
-	 * on the "right" side.
-	 * @param details Details on the right
-	 */
-	public details(details: string): void {
+	/** Updates details for the current action. */
+	details(details: string): void {
 		this.print(details)
 	}
 
-	private _lastPrint = 0
-	private print(details?: string) {
+	private print(details?: string): void {
 		const now = Date.now()
 		if (now - this._lastPrint < 300) return
 		this._lastPrint = now
-		logger().error('%s: %s%s', this.currentTitle, this.currentAction, details ? ' (' + details + ')' : '')
+		logger().error('%s: %s%s', this.currentTitle, this.currentAction, details ? ` (${details})` : '')
 	}
 }
 
+/** Progress reporter contract. */
 export interface IProgress {
 	start(id: string, title: string): void
 	end(id: string): void
