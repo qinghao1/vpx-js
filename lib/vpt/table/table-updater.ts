@@ -6,6 +6,7 @@ import { ItemUpdater } from '../item-updater.js'
 import type { Table } from '../table/table.js'
 import type { TableState } from './table-state.js'
 
+/** Updates table render state. */
 export class TableUpdater extends ItemUpdater<TableState> {
 	constructor(state: TableState) {
 		super(state)
