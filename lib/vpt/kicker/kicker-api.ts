@@ -12,7 +12,8 @@ import type { KickerData } from './kicker-data.js'
 import type { KickerHit } from './kicker-hit.js'
 import type { KickerState } from './kicker-state.js'
 
-export class KickerApi extends ItemApi<KickerData> {
+export /** KickerApi. */
+class KickerApi extends ItemApi<KickerData> {
 	private readonly state: KickerState
 	private readonly hit: KickerHit
 	private readonly ballCreator: IBallCreationPosition
