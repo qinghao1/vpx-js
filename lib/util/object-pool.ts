@@ -3,16 +3,15 @@
 
 import { logger } from './logger.js'
 
-/** Poolable constructor with optional reset hook. */
+/** Poolable ctor with optional reset. */
 export interface IPoolable<T> {
 	new (): T
 	reset?(obj: T): void
 }
 
-/** Simple object pool to reduce GC pressure in hot paths. */
+/** Simple GC-reducing object pool. */
 export class Pool<T> {
 	private static readonly MAX_SIZE = 100
-
 	private readonly ctor: IPoolable<T>
 	private readonly items: T[] = []
 	private warned = false
@@ -21,7 +20,7 @@ export class Pool<T> {
 		this.ctor = ctor
 	}
 
-	/** Claims an instance from the pool or creates a new one. */
+	/** Claims an instance or creates a new one. */
 	get(): T {
 		const obj = this.items.pop() ?? new this.ctor()
 		;(obj as Record<string, unknown>).__pool = true
@@ -37,7 +36,7 @@ export class Pool<T> {
 		}
 		if (this.items.length >= Pool.MAX_SIZE) {
 			if (!this.warned) {
-				logger().warn('Pool %s exhausted (%s items), excess will be GC’d.', this.ctor.name, Pool.MAX_SIZE)
+				logger().warn('Pool %s exhausted (%s items), excess will be GC\u2019d.', this.ctor.name, Pool.MAX_SIZE)
 				this.warned = true
 			}
 			return
