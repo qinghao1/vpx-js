@@ -9,40 +9,31 @@ import type { ITextureLoader } from '../irender-api.js'
 
 /** Caches and preloads Three.js textures. */
 export class ThreeMapGenerator {
-	private readonly textureLoader: ITextureLoader<ThreeTexture> | undefined
-	private readonly textureCache: Map<string, ThreeTexture> = new Map()
+	private readonly textureCache = new Map<string, ThreeTexture>()
 
-	constructor(textureLoader: ITextureLoader<ThreeTexture> | undefined) {
-		this.textureLoader = textureLoader
-	}
+	constructor(private readonly textureLoader?: ITextureLoader<ThreeTexture>) {}
 
 	public async loadTextures(textures: Texture[], table: Table): Promise<void> {
-		if (!this.textureLoader) {
-			return Promise.resolve()
-		}
+		if (!this.textureLoader) return
 		const now = Date.now()
 		logger().debug('[ThreeMapGenerator.loadTextures] Pre-loading %s textures..', textures.length)
 		const concurrency = 4
 		let index = 0
-		const loadOne = async (): Promise<void> => {
+		const worker = async (): Promise<void> => {
 			while (true) {
 				const i = index++
 				if (i >= textures.length) break
-				const texture = textures[i]
+				const texture = textures[i]!
 				try {
 					const tex = await texture.loadTexture(this.textureLoader!, table)
 					this.textureCache.set(texture.getName(), tex)
 					progress().details(texture.getName())
 				} catch (err) {
 					const msg = (err as Error).message || ''
-					if (msg.includes('too large')) {
-						logger().debug(
-							'[ThreeMapGenerator.loadTextures] Skipping large texture %s (%s): %s',
-							texture.getName(),
-							texture.storageName,
-							msg,
-						)
-					} else {
+					const args = [texture.getName(), texture.storageName, msg] as const
+					if (msg.includes('too large'))
+						logger().debug('[ThreeMapGenerator.loadTextures] Skipping large texture %s (%s): %s', ...args)
+					else
 						logger().warn(
 							'[ThreeMapGenerator.loadTextures] Error loading texture %s (%s/%s): %s',
 							texture.getName(),
@@ -50,11 +41,10 @@ export class ThreeMapGenerator {
 							texture.getName(),
 							msg,
 						)
-					}
 				}
 			}
 		}
-		await Promise.all(Array.from({ length: Math.min(concurrency, textures.length) }, () => loadOne()))
+		await Promise.all(Array.from({ length: Math.min(concurrency, textures.length) }, () => worker()))
 		logger().debug(
 			'[ThreeMapGenerator.loadTextures] Loaded %s/%s textures in %sms (concurrency %s).',
 			this.textureCache.size,
@@ -81,27 +71,26 @@ export class ThreeMapGenerator {
 	public disposeUnused(usedNames: Set<string>): number {
 		let disposed = 0
 		for (const [name, tex] of this.textureCache.entries()) {
-			if (!usedNames.has(name.toLowerCase()) && !usedNames.has(name)) {
-				try {
-					;(tex as unknown as { dispose?: () => void }).dispose?.()
-				} catch {}
-				try {
-					const img = (tex as unknown as { image?: { data?: unknown } }).image
-					if (img?.data) (tex as unknown as { image: { data: unknown | null } }).image.data = null
-				} catch {}
-				this.textureCache.delete(name)
-				disposed++
-			}
+			if (usedNames.has(name) || usedNames.has(name.toLowerCase())) continue
+			this.disposeTexture(tex)
+			this.textureCache.delete(name)
+			disposed++
 		}
 		return disposed
 	}
 
 	public clear(): void {
-		for (const tex of this.textureCache.values()) {
-			try {
-				;(tex as unknown as { dispose?: () => void }).dispose?.()
-			} catch {}
-		}
+		for (const tex of this.textureCache.values()) this.disposeTexture(tex)
 		this.textureCache.clear()
+	}
+
+	private disposeTexture(tex: ThreeTexture): void {
+		try {
+			;(tex as unknown as { dispose?: () => void }).dispose?.()
+		} catch {}
+		try {
+			const img = (tex as unknown as { image?: { data?: unknown } }).image
+			if (img?.data) (tex as unknown as { image: { data: unknown | null } }).image.data = null
+		} catch {}
 	}
 }
