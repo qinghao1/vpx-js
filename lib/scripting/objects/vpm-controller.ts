@@ -217,16 +217,16 @@ export class VpmController {
 	set Hidden(hidden: boolean) {
 		logger().debug('Hidden', hidden)
 	}
-	public SetDisplayPosition(x: number, y: number, hWnd: any): void {
+	public SetDisplayPosition(x: number, y: number, hWnd: unknown): void {
 		logger().debug('SetDisplayPosition', { x, y, hWnd })
 	}
-	public ShowOptsDialog(hWnd: any): void {
+	public ShowOptsDialog(hWnd: unknown): void {
 		logger().debug('ShowOptsDialog', hWnd)
 	}
-	public ShowPathesDialog(hWnd: any): void {
+	public ShowPathesDialog(hWnd: unknown): void {
 		logger().debug('ShowPathesDialog', hWnd)
 	}
-	public ShowAboutDialog(hWnd: any): void {
+	public ShowAboutDialog(hWnd: unknown): void {
 		logger().debug('ShowAboutDialog', hWnd)
 	}
 	/**
@@ -283,7 +283,7 @@ export class VpmController {
 		setFunction: (prop: number, value: number) => boolean,
 	): { [index: number]: number } {
 		const handler = {
-			get: (target: { [index: number]: number }, prop: string | symbol, receiver?: any): number => {
+			get: (target: { [index: number]: number }, prop: string | symbol, receiver?: unknown): number => {
 				logger().debug('GET', name, { target, prop })
 				const key = typeof prop === 'symbol' ? NaN : parseInt(prop as string, 10)
 				return getFunction(key)
@@ -304,7 +304,7 @@ export class VpmController {
 		setFunction: (switchNr: number, value?: boolean) => boolean,
 	): { [index: number]: number } {
 		const handler = {
-			get: (target: { [index: number]: number }, switchNr: string | symbol, receiver?: any): number => {
+			get: (target: { [index: number]: number }, switchNr: string | symbol, receiver?: unknown): number => {
 				logger().debug('GET', name, { target, switchNr })
 				const key = typeof switchNr === 'symbol' ? NaN : parseInt(switchNr as string, 10)
 				return getFunction(key)
