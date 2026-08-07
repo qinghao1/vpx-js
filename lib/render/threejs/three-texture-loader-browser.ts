@@ -207,10 +207,12 @@ function downsampleIfNeeded(texture: any, maxSize: number): any {
 				newTex.needsUpdate = true
 				newTex.colorSpace = (texture as any).colorSpace || LinearSRGBColorSpace
 				newTex.flipY = (texture as any).flipY ?? true
-				newTex.minFilter = (texture as any).minFilter
+				newTex.generateMipmaps = false
+				newTex.minFilter = LinearFilter as any
 				newTex.magFilter = (texture as any).magFilter
 				newTex.type = (texture as any).type || (isFloat ? (texture as any).type : UnsignedByteType)
 				newTex.name = (texture as any).name
+				try { texture.dispose?.(); } catch {}
 				return newTex
 			} catch {
 				return texture
@@ -240,8 +242,12 @@ function downsampleIfNeeded(texture: any, maxSize: number): any {
 					newTex.colorSpace = (texture as any).colorSpace || SRGBColorSpace
 					newTex.needsUpdate = true
 					newTex.name = (texture as any).name
-					newTex.anisotropy = (texture as any).anisotropy ?? 4
+					newTex.anisotropy = 1
+					newTex.generateMipmaps = false
+					newTex.minFilter = LinearFilter as any
 					newTex.flipY = (texture as any).flipY ?? true
+					try { texture.dispose?.(); } catch {}
+					try { URL.revokeObjectURL((img as any).src); } catch {}
 					return newTex
 				}
 			}
@@ -263,7 +269,10 @@ function load(mimeType: string, url: string, ext?: string, data?: Uint8Array): P
 				url,
 				(texture) => {
 					URL.revokeObjectURL(url)
-					resolve(downsampleIfNeeded(texture, 2048) as any)
+					texture.generateMipmaps = false
+					texture.minFilter = LinearFilter as any
+					const ds = downsampleIfNeeded(texture, MAX_REGULAR) as any
+					if (ds && ds !== texture) { try { texture.dispose(); } catch {} resolve(ds); } else resolve(texture as any)
 				},
 				undefined,
 				(err) => {
@@ -280,7 +289,7 @@ function load(mimeType: string, url: string, ext?: string, data?: Uint8Array): P
 					const loader = new EXRLoader()
 					const tex = (loader as any).createDataTexture(buffer) as ThreeTexture
 					URL.revokeObjectURL(url)
-					resolve(downsampleIfNeeded(tex, 2048) as any)
+					resolve(downsampleIfNeeded(tex, MAX_FLOAT) as any)
 					return
 				}
 			} catch (e) {}
@@ -288,7 +297,10 @@ function load(mimeType: string, url: string, ext?: string, data?: Uint8Array): P
 				url,
 				(texture) => {
 					URL.revokeObjectURL(url)
-					resolve(downsampleIfNeeded(texture, 2048) as any)
+					texture.generateMipmaps = false
+					texture.minFilter = LinearFilter as any
+					const ds = downsampleIfNeeded(texture, MAX_FLOAT) as any
+					if (ds && ds !== texture) { try { texture.dispose(); } catch {} resolve(ds); } else resolve(texture as any)
 				},
 				undefined,
 				(err) => {
@@ -305,7 +317,7 @@ function load(mimeType: string, url: string, ext?: string, data?: Uint8Array): P
 					const loader = new HDRLoader()
 					const tex = (loader as any).createDataTexture(buffer) as ThreeTexture
 					URL.revokeObjectURL(url)
-					resolve(downsampleIfNeeded(tex, 2048) as any)
+					resolve(downsampleIfNeeded(tex, MAX_FLOAT) as any)
 					return
 				}
 			} catch (e) {}
@@ -313,7 +325,10 @@ function load(mimeType: string, url: string, ext?: string, data?: Uint8Array): P
 				url,
 				(texture) => {
 					URL.revokeObjectURL(url)
-					resolve(downsampleIfNeeded(texture, 2048) as any)
+					texture.generateMipmaps = false
+					texture.minFilter = LinearFilter as any
+					const ds = downsampleIfNeeded(texture, MAX_FLOAT) as any
+					if (ds && ds !== texture) { try { texture.dispose(); } catch {} resolve(ds); } else resolve(texture as any)
 				},
 				undefined,
 				(err) => {
