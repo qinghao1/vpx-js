@@ -2,20 +2,11 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 /**
- * Rubber has a coefficient of restitution which decreases with the impact velocity.
- * We use a heuristic model which decreases the COR according to a falloff parameter:
- * 0 = no falloff, 1 = half the COR at 1 m/s (18.53 speed units)
- *
- * @param elasticity
- * @param falloff
- * @param vel
+ * Rubber elasticity with velocity falloff.
+ * @param falloff 0 = no falloff, 1 = half COR at 1 m/s (18.53 units)
  */
 export function elasticityWithFalloff(elasticity: number, falloff: number, vel: number): number {
-	if (falloff > 0) {
-		return elasticity / (1.0 + falloff * Math.abs(vel) * (1.0 / 18.53))
-	} else {
-		return elasticity
-	}
+	return falloff > 0 ? elasticity / (1 + falloff * Math.abs(vel) * (1 / 18.53)) : elasticity
 }
 
 export const HARD_SCATTER = 0.0
