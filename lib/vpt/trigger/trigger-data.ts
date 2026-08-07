@@ -3,8 +3,8 @@
 
 import { BiffParser } from '../../io/biff-parser.js'
 import type { Storage } from '../../io/ole-doc.js'
-import { DragPoint } from '../../math/dragpoint.js'
-import { Vertex2D } from '../../math/vertex2d.js'
+import { DragPoint } from '../../util/dragpoint.js'
+import { Vertex2D } from '../../util/math.js'
 import { handleBiffTag } from '../biff-helper.js'
 import { Enums } from '../enums.js'
 import { ItemData } from '../item-data.js'

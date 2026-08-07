@@ -3,9 +3,9 @@
 
 import type { EventProxy } from '../../game/event-proxy.js'
 import type { Player } from '../../game/player.js'
-import { degToRad, radToDeg } from '../../math/float.js'
-import { clamp } from '../../math/functions.js'
 import { PHYS_FACTOR } from '../../physics/constants.js'
+import { degToRad, radToDeg } from '../../util/float.js'
+import { clamp } from '../../util/functions.js'
 import { ItemApi } from '../item-api.js'
 import type { Table } from '../table/table.js'
 import type { SpinnerData } from './spinner-data.js'

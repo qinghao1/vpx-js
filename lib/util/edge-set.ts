@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { HitLine3D } from '../physics/hit-line-3d.js'
-import type { Vertex3D } from './vertex3d.js'
+import type { Vertex3D } from './math.js'
 
 /** Unordered pair set for mesh edges. */
 export class EdgeSet {

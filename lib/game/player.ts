@@ -2,8 +2,7 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { EventEmitter } from 'events'
-import type { Vertex2D } from '../math/vertex2d.js'
-import type { Vertex3D } from '../math/vertex3d.js'
+import type { Vertex2D, Vertex3D } from '../util/math.js'
 import { Pool } from '../util/object-pool.js'
 import type { Ball } from '../vpt/ball/ball.js'
 import type { ItemState } from '../vpt/item-state.js'

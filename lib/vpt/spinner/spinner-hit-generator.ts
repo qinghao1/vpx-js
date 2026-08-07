@@ -1,9 +1,9 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { degToRad } from '../../math/float.js'
-import { Vertex2D } from '../../math/vertex2d.js'
 import { HitCircle } from '../../physics/hit-circle.js'
+import { degToRad } from '../../util/float.js'
+import { Vertex2D } from '../../util/math.js'
 import type { SpinnerData } from './spinner-data.js'
 import type { SpinnerState } from './spinner-state.js'
 

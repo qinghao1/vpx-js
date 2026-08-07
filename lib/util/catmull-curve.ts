@@ -2,9 +2,9 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { f4 } from './float.js'
+import type { Vertex2D, Vertex3D } from './math.js'
+import { RenderVertex, RenderVertex3D } from './render-vertex.js'
 import type { IRenderVertex, Vertex } from './vertex.js'
-import { RenderVertex, type Vertex2D } from './vertex2d.js'
-import { RenderVertex3D, type Vertex3D } from './vertex3d.js'
 
 /** Non-uniform centripetal Catmull-Rom spline. @see https://github.com/vpinball/vpinball/blob/master/mesh.h */
 export abstract class CatmullCurve {

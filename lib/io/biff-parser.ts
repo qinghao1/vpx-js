@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { inflate } from 'zlib'
-import { f4 } from '../math/float.js'
+import { f4 } from '../util/float.js'
 import { decodeUtf8, getDataView, readInt32LE } from './binary-helpers.js'
 import type { ReadResult } from './ole-doc.js'
 
@@ -86,28 +86,28 @@ export class BiffParser {
 	}
 
 	/** Reads string at offset 4. */
-	protected getString(buf: Uint8Array, len: number, dropIfNotAscii = false): string {
+	public getString(buf: Uint8Array, len: number, dropIfNotAscii = false): string {
 		const s = decodeUtf8(buf.subarray(4, len))
 		return !dropIfNotAscii || this.isAscii(s) ? s : ''
 	}
 
 	/** Reads UTF-16LE string at offset 4. */
-	protected getWideString(buf: Uint8Array, len: number): string {
+	public getWideString(buf: Uint8Array, len: number): string {
 		return new TextDecoder('utf-16le').decode(buf.subarray(4, len))
 	}
 
 	/** Reads int32 at 0. */
-	protected getInt(buf: Uint8Array): number {
+	public getInt(buf: Uint8Array): number {
 		return getDataView(buf).getInt32(0, true)
 	}
 
 	/** Reads float32 at 0 (single precision). */
-	protected getFloat(buf: Uint8Array): number {
+	public getFloat(buf: Uint8Array): number {
 		return f4(getDataView(buf).getFloat32(0, true))
 	}
 
 	/** Reads bool (int32 > 0). */
-	protected getBool(buf: Uint8Array): boolean {
+	public getBool(buf: Uint8Array): boolean {
 		return getDataView(buf).getInt32(0, true) > 0
 	}
 

@@ -8,7 +8,7 @@ import sinonChai from 'sinon-chai'
 import { TableBuilder } from '../../../test/table-builder.js'
 import { TestRenderApi } from '../../../test/test-render-api.js'
 import { Player } from '../../game/player.js'
-import { Vertex3D } from '../../math/vertex3d.js'
+import { Vertex3D } from '../../util/math.js'
 import type { Table } from '../table/table.js'
 import type { PrimitiveState } from './primitive-state.js'
 

@@ -1,10 +1,11 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { CatmullCurve2D } from '../../math/catmull-curve.js'
-import { DragPoint } from '../../math/dragpoint.js'
-import { Vertex3DNoTex2 } from '../../math/vertex.js'
-import { RenderVertex, Vertex2D } from '../../math/vertex2d.js'
+import { CatmullCurve2D } from '../../util/catmull-curve.js'
+import { DragPoint } from '../../util/dragpoint.js'
+import { Vertex2D } from '../../util/math.js'
+import { RenderVertex } from '../../util/render-vertex.js'
+import { Vertex3DNoTex2 } from '../../util/vertex.js'
 import { Mesh } from '../mesh.js'
 import type { Table } from '../table/table.js'
 import type { SurfaceData } from './surface-data.js'

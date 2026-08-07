@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import type { Player } from '../../game/player.js'
-import { f4 } from '../../math/float.js'
+import { f4 } from '../../util/float.js'
 import { logger } from '../../util/logger.js'
 import { getObject } from '../objects/index.js'
 import { VbsApi } from '../vbs-api.js'

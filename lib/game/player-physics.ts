@@ -1,8 +1,6 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { degToRad } from '../math/float.js'
-import { Vertex3D } from '../math/vertex3d.js'
 import { CollisionEvent } from '../physics/collision-event.js'
 import {
 	DEFAULT_STEPTIME,
@@ -19,6 +17,8 @@ import type { HitPlane } from '../physics/hit-plane.js'
 import { HitQuadtree } from '../physics/hit-quadtree.js'
 import type { MoverObject } from '../physics/mover-object.js'
 import { now } from '../refs.node.js'
+import { degToRad } from '../util/float.js'
+import { Vertex3D } from '../util/math.js'
 import { Ball } from '../vpt/ball/ball.js'
 import { BallData } from '../vpt/ball/ball-data.js'
 import { BallState } from '../vpt/ball/ball-state.js'

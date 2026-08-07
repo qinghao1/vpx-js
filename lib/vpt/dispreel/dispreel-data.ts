@@ -3,7 +3,7 @@
 
 import { BiffParser } from '../../io/biff-parser.js'
 import type { Storage } from '../../io/ole-doc.js'
-import { Vertex2D } from '../../math/vertex2d.js'
+import { Vertex2D } from '../../util/math.js'
 import { ItemData } from '../item-data.js'
 
 const FLOAT_MAP: Record<string, string> = { WDTH: 'width', HIGH: 'height', RSPC: 'reelSpacing' }

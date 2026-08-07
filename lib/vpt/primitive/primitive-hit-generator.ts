@@ -2,22 +2,22 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import type { EventProxy } from '../../game/event-proxy.js'
-import { EdgeSet } from '../../math/edge-set.js'
-import { degToRad } from '../../math/float.js'
-import { clamp } from '../../math/functions.js'
+import { CollisionType } from '../../physics/collision-type.js'
+import type { HitObject } from '../../physics/hit-object.js'
+import { HitPoint } from '../../physics/hit-point.js'
+import { HitTriangle } from '../../physics/hit-triangle.js'
+import { EdgeSet } from '../../util/edge-set.js'
+import { degToRad } from '../../util/float.js'
+import { clamp } from '../../util/functions.js'
+import type { Vertex3D } from '../../util/math.js'
 import {
 	ProgMeshFloat3,
 	ProgMeshTriData,
 	permuteVertices,
 	progressiveMesh,
 	remapIndices,
-} from '../../math/progressive-mesh.js'
-import { Vertex3DNoTex2 } from '../../math/vertex.js'
-import type { Vertex3D } from '../../math/vertex3d.js'
-import { CollisionType } from '../../physics/collision-type.js'
-import type { HitObject } from '../../physics/hit-object.js'
-import { HitPoint } from '../../physics/hit-point.js'
-import { HitTriangle } from '../../physics/hit-triangle.js'
+} from '../../util/progressive-mesh.js'
+import { Vertex3DNoTex2 } from '../../util/vertex.js'
 import { Mesh } from '../mesh.js'
 import type { Table } from '../table/table.js'
 import type { PrimitiveData } from './primitive-data.js'

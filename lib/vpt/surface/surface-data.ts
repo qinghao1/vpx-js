@@ -3,7 +3,7 @@
 
 import { BiffParser } from '../../io/biff-parser.js'
 import type { Storage } from '../../io/ole-doc.js'
-import { DragPoint } from '../../math/dragpoint.js'
+import { DragPoint } from '../../util/dragpoint.js'
 import { handleBiffTag } from '../biff-helper.js'
 import { type IPhysicalData, ItemData } from '../item-data.js'
 

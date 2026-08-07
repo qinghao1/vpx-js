@@ -25,23 +25,28 @@ export function handleBiffTag(
 	maps: BiffMaps,
 ): boolean {
 	if (maps.float && tag in maps.float) {
-		obj[maps.float[tag]] = parser.getFloat(buffer)
+		obj[maps.float[tag]] = (parser as unknown as { getFloat: (b: Uint8Array) => number }).getFloat(buffer)
 		return true
 	}
 	if (maps.int && tag in maps.int) {
-		obj[maps.int[tag]] = parser.getInt(buffer)
+		obj[maps.int[tag]] = (parser as unknown as { getInt: (b: Uint8Array) => number }).getInt(buffer)
 		return true
 	}
 	if (maps.bool && tag in maps.bool) {
-		obj[maps.bool[tag]] = parser.getBool(buffer)
+		obj[maps.bool[tag]] = (parser as unknown as { getBool: (b: Uint8Array) => boolean }).getBool(buffer)
 		return true
 	}
 	if (maps.string && tag in maps.string) {
-		obj[maps.string[tag]] = parser.getString(buffer, len)
+		obj[maps.string[tag]] = (parser as unknown as { getString: (b: Uint8Array, l: number) => string }).getString(
+			buffer,
+			len,
+		)
 		return true
 	}
 	if (maps.wideString && tag in maps.wideString) {
-		obj[maps.wideString[tag]] = parser.getWideString(buffer, len)
+		obj[maps.wideString[tag]] = (
+			parser as unknown as { getWideString: (b: Uint8Array, l: number) => string }
+		).getWideString(buffer, len)
 		return true
 	}
 	return false

@@ -3,9 +3,9 @@
 
 import { Event } from '../../game/event.js'
 import type { EventProxy } from '../../game/event-proxy.js'
-import { degToRad, radToDeg } from '../../math/float.js'
 import { PHYS_FACTOR } from '../../physics/constants.js'
 import type { MoverObject } from '../../physics/mover-object.js'
+import { degToRad, radToDeg } from '../../util/float.js'
 import type { SpinnerData } from './spinner-data.js'
 import type { SpinnerState } from './spinner-state.js'
 

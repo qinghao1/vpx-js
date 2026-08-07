@@ -18,7 +18,7 @@
  */
 
 import type { IRenderable, RenderInfo } from '../lib/game/irenderable'
-import type { Matrix3D } from '../lib/math/matrix3d'
+import type { Matrix3D } from '../lib/util/math.js'
 import type { IRenderApi } from '../lib/render/irender-api'
 import type { ItemState } from '../lib/vpt/item-state'
 import type { LightData } from '../lib/vpt/light/light-data'

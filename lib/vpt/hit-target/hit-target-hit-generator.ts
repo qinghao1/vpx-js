@@ -2,14 +2,13 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import type { EventProxy } from '../../game/event-proxy.js'
-import { EdgeSet } from '../../math/edge-set.js'
-import { degToRad } from '../../math/float.js'
-import { Matrix3D } from '../../math/matrix3d.js'
-import { Vertex3D } from '../../math/vertex3d.js'
 import { CollisionType } from '../../physics/collision-type.js'
 import type { HitObject } from '../../physics/hit-object.js'
 import { HitPoint } from '../../physics/hit-point.js'
 import { HitTriangle } from '../../physics/hit-triangle.js'
+import { EdgeSet } from '../../util/edge-set.js'
+import { degToRad } from '../../util/float.js'
+import { Matrix3D, Vertex3D } from '../../util/math.js'
 import { Enums } from '../enums.js'
 import type { Mesh } from '../mesh.js'
 import type { Table } from '../table/table.js'

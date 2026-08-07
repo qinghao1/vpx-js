@@ -3,8 +3,8 @@
 
 import { BiffParser } from '../../io/biff-parser.js'
 import type { Storage } from '../../io/ole-doc.js'
-import { f4 } from '../../math/float.js'
-import { Vertex3D } from '../../math/vertex3d.js'
+import { f4 } from '../../util/float.js'
+import { Vertex3D } from '../../util/math.js'
 import { Enums } from '../enums.js'
 import { type IPhysicalData, ItemData } from '../item-data.js'
 import type { Table } from '../table/table.js'

@@ -1,12 +1,11 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { HIT_SHAPE_DETAIL_LEVEL } from '../../math/dragpoint.js'
-import { degToRad, f4 } from '../../math/float.js'
-import { Matrix3D } from '../../math/matrix3d.js'
-import { SplineVertex } from '../../math/spline-vertex.js'
-import { Vertex3DNoTex2 } from '../../math/vertex.js'
-import { Vertex3D } from '../../math/vertex3d.js'
+import { HIT_SHAPE_DETAIL_LEVEL } from '../../util/dragpoint.js'
+import { degToRad, f4 } from '../../util/float.js'
+import { Matrix3D, Vertex3D } from '../../util/math.js'
+import { SplineVertex } from '../../util/spline-vertex.js'
+import { Vertex3DNoTex2 } from '../../util/vertex.js'
 import { FLT_MAX, FLT_MIN, Mesh } from '../mesh.js'
 import type { Table } from '../table/table.js'
 import type { RubberData } from './rubber-data.js'

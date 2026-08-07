@@ -1,9 +1,9 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { degToRad } from '../../math/float.js'
-import { Matrix3D } from '../../math/matrix3d.js'
-import { Vertex3DNoTex2 } from '../../math/vertex.js'
+import { degToRad } from '../../util/float.js'
+import { Matrix3D } from '../../util/math.js'
+import { Vertex3DNoTex2 } from '../../util/vertex.js'
 import { FLT_MAX, Mesh } from '../mesh.js'
 import type { Table } from '../table/table.js'
 import type { PrimitiveData } from './primitive-data.js'

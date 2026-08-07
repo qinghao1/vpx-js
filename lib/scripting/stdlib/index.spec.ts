@@ -6,7 +6,7 @@ import { expect } from 'chai'
 import sinonChai from 'sinon-chai'
 import { TableBuilder } from '../../../test/table-builder.js'
 import { Player } from '../../game/player.js'
-import { f4 } from '../../math/float.js'
+import { f4 } from '../../util/float.js'
 import type { Table } from '../../vpt/table/table.js'
 import { Transpiler } from '../transpiler.js'
 

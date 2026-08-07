@@ -3,8 +3,6 @@
 
 import type { EventProxy } from '../../game/event-proxy.js'
 import type { PlayerPhysics } from '../../game/player-physics.js'
-import { clamp, solveQuadraticEq } from '../../math/functions.js'
-import { Vertex3D } from '../../math/vertex3d.js'
 import { CollisionEvent } from '../../physics/collision-event.js'
 import {
 	C_CONTACTVEL,
@@ -19,6 +17,8 @@ import {
 } from '../../physics/constants.js'
 import { elasticityWithFalloff, HARD_SCATTER } from '../../physics/functions.js'
 import { HitObject } from '../../physics/hit-object.js'
+import { clamp, solveQuadraticEq } from '../../util/functions.js'
+import { Vertex3D } from '../../util/math.js'
 import { FLT_MIN } from '../mesh.js'
 import type { TableData } from '../table/table-data.js'
 import type { Ball } from './ball.js'

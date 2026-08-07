@@ -4,11 +4,6 @@
 import { Event } from '../../game/event.js'
 import type { EventProxy } from '../../game/event-proxy.js'
 import type { PlayerPhysics } from '../../game/player-physics.js'
-import { degToRad } from '../../math/float.js'
-import { FRect3D } from '../../math/frect3d.js'
-import { clamp } from '../../math/functions.js'
-import { Vertex2D } from '../../math/vertex2d.js'
-import { Vertex3D } from '../../math/vertex3d.js'
 import type { CollisionEvent } from '../../physics/collision-event.js'
 import {
 	C_CONTACTVEL,
@@ -24,6 +19,10 @@ import {
 } from '../../physics/constants.js'
 import { elasticityWithFalloff } from '../../physics/functions.js'
 import { HitObject } from '../../physics/hit-object.js'
+import { degToRad } from '../../util/float.js'
+import { FRect3D } from '../../util/frect3d.js'
+import { clamp } from '../../util/functions.js'
+import { Vertex2D, Vertex3D } from '../../util/math.js'
 import type { Ball } from '../ball/ball.js'
 import type { Table } from '../table/table.js'
 import type { TableData } from '../table/table-data.js'

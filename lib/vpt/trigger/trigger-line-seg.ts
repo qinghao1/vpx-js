@@ -2,11 +2,11 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { Event } from '../../game/event.js'
-import type { Vertex2D } from '../../math/vertex2d.js'
 import type { CollisionEvent } from '../../physics/collision-event.js'
 import { CollisionType } from '../../physics/collision-type.js'
 import { STATICTIME } from '../../physics/constants.js'
 import { LineSeg } from '../../physics/line-seg.js'
+import type { Vertex2D } from '../../util/math.js'
 import type { Ball } from '../ball/ball.js'
 import type { TriggerAnimation } from './trigger-animation.js'
 import type { TriggerData } from './trigger-data.js'
