@@ -14,6 +14,7 @@ import {
 import type { ESIToken } from '../grammar/grammar.js'
 import { Transformer } from '../transformer/transformer.js'
 
+/** ppArray. */
 export function ppArray(node: ESIToken): any {
 	switch (node.type) {
 		case 'RedimStatement':
