@@ -17,6 +17,7 @@ export {
 	DataTextureLoader,
 	DefaultLoadingManager,
 	DoubleSide,
+	FrontSide,
 	ExtrudeGeometry,
 	ExtrudeGeometry as ExtrudeBufferGeometry,
 	Float32BufferAttribute,
