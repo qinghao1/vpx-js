@@ -13,27 +13,18 @@ import type { HitTargetAnimation } from './hit-target-animation.js'
 import type { HitTargetData } from './hit-target-data.js'
 import type { HitTargetState } from './hit-target-state.js'
 
-/** Hit target API.
- *
- * @see https://github.com/vpinball/vpinball/blob/master/hittarget.cpp */
+/** Hit target API — VBS surface for `HitTarget`. @see https://github.com/vpinball/vpinball/blob/master/hittarget.cpp */
 export class HitTargetApi extends ItemApi<HitTargetData> {
-	private readonly state: HitTargetState
-	private readonly hits: HitObject[]
-	private readonly animation: HitTargetAnimation
-
 	constructor(
-		state: HitTargetState,
+		private readonly state: HitTargetState,
 		data: HitTargetData,
-		hits: HitObject[],
-		animation: HitTargetAnimation,
+		private readonly hits: HitObject[],
+		private readonly animation: HitTargetAnimation,
 		events: EventProxy,
 		player: Player,
 		table: Table,
 	) {
 		super(data, events, player, table)
-		this.state = state
-		this.hits = hits
-		this.animation = animation
 	}
 
 	get Image() {
@@ -215,21 +206,17 @@ export class HitTargetApi extends ItemApi<HitTargetData> {
 		this.data.raiseDelay = v
 	}
 
-	private _setCollidable(isCollidable: boolean) {
-		if (this.hits && this.hits.length > 0 && this.hits[0].isEnabled !== isCollidable) {
-			for (const hit of this.hits) {
-				// !! costly
-				hit.isEnabled = isCollidable // copy to hit checking on enities composing the object
-			}
-		}
+	private _setCollidable(isCollidable: boolean): void {
+		if (this.hits?.length && this.hits[0].isEnabled !== isCollidable)
+			for (const hit of this.hits) hit.isEnabled = isCollidable
 		this.data.isCollidable = isCollidable
 	}
 
-	private _setDropped(val: boolean, table: Table, physics: PlayerPhysics) {
+	private _setDropped(val: boolean, table: Table, physics: PlayerPhysics): void {
 		if (this.data.isDropped !== val && this.animation) {
 			if (val) {
 				this.animation.moveAnimation = true
-				this.state.zOffset = 0.0
+				this.state.zOffset = 0
 				this.animation.moveDown = true
 			} else {
 				this.animation.moveAnimation = true
@@ -237,9 +224,7 @@ export class HitTargetApi extends ItemApi<HitTargetData> {
 				this.animation.moveDown = false
 				this.animation.timeStamp = physics.timeMsec
 			}
-		} else {
-			this.data.isDropped = val
-		}
+		} else this.data.isDropped = val
 	}
 
 	protected _getPropertyNames(): string[] {
