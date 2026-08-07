@@ -11,12 +11,10 @@ import { HitObject } from './hit-object.js'
 /** Triangular hit face.
  * @see https://github.com/vpinball/vpinball/blob/master/collide.cpp */
 export class HitTriangle extends HitObject {
-	public readonly rgv: Vertex3D[]
 	public readonly normal: Vertex3D
 
-	constructor(rgv: Vertex3D[]) {
+	constructor(public readonly rgv: Vertex3D[]) {
 		super()
-		this.rgv = rgv
 		const e0 = this.rgv[2].clone(true).sub(this.rgv[0])
 		const e1 = this.rgv[1].clone(true).sub(this.rgv[0])
 		this.normal = Vertex3D.crossProduct(e0, e1)
@@ -27,7 +25,7 @@ export class HitTriangle extends HitObject {
 		this.scatter = 0
 	}
 
-	public calcHitBBox(): void {
+	public override calcHitBBox(): void {
 		const b = this.hitBBox
 		b.left = Math.min(this.rgv[0].x, this.rgv[1].x, this.rgv[2].x)
 		b.right = Math.max(this.rgv[0].x, this.rgv[1].x, this.rgv[2].x)
@@ -37,7 +35,7 @@ export class HitTriangle extends HitObject {
 		b.zhigh = Math.max(this.rgv[0].z, this.rgv[1].z, this.rgv[2].z)
 	}
 
-	public hitTest(ball: Ball, dTime: number, coll: CollisionEvent, physics: PlayerPhysics): number {
+	public override hitTest(ball: Ball, dTime: number, coll: CollisionEvent, _physics?: PlayerPhysics): number {
 		if (!this.isEnabled) return -1
 		const bnv = this.normal.dot(ball.hit.vel)
 		if (bnv > C_CONTACTVEL) return -1
@@ -94,7 +92,7 @@ export class HitTriangle extends HitObject {
 		return hitTime
 	}
 
-	public collide(coll: CollisionEvent, physics: PlayerPhysics): void {
+	public override collide(coll: CollisionEvent, _physics?: PlayerPhysics): void {
 		const ball = coll.ball
 		const dot = -coll.hitNormal.dot(ball.hit.vel)
 		ball.hit.collide3DWall(this.normal, this.elasticity, this.elasticityFalloff, this.friction, this.scatter)
