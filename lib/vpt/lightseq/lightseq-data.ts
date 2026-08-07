@@ -6,7 +6,8 @@ import type { Storage } from '../../io/ole-doc.js'
 import { Vertex2D } from '../../math/vertex2d.js'
 import { ItemData } from '../item-data.js'
 
-export class LightSeqData extends ItemData {
+export /** LightSeq data. */
+class LightSeqData extends ItemData {
 	private v!: Vertex2D
 	public collection?: string
 	public center: Vertex2D = new Vertex2D()
