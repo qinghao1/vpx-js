@@ -6,11 +6,8 @@ import type { ItemData } from './item-data.js'
 
 /** Base for all table items. */
 export abstract class Item<DATA extends ItemData> {
-	protected readonly data: DATA
 	protected events?: EventProxy
-	protected constructor(data: DATA) {
-		this.data = data
-	}
+	protected constructor(protected readonly data: DATA) {}
 	public getName(): string {
 		return this.data.getName()
 	}
