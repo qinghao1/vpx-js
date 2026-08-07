@@ -9,33 +9,24 @@ import type { LightAnimation } from './light-animation.js'
 import type { LightData } from './light-data.js'
 import type { LightState } from './light-state.js'
 
-/** Light API.
- *
- * @see https://github.com/vpinball/vpinball/blob/master/light.cpp */
+/** Light API — VBS surface for `Light`. @see https://github.com/vpinball/vpinball/blob/master/light.cpp */
 export class LightApi extends ItemApi<LightData> {
-	private readonly state: LightState
-	private readonly animation: LightAnimation
-
 	constructor(
-		state: LightState,
-		animation: LightAnimation,
+		private readonly state: LightState,
+		private readonly animation: LightAnimation,
 		data: LightData,
 		events: EventProxy,
 		player: Player,
 		table: Table,
 	) {
 		super(data, events, player, table)
-		this.state = state
-		this.animation = animation
 	}
 
 	get Falloff() {
 		return this.data.falloff
 	}
 	set Falloff(v) {
-		if (v > 0) {
-			this.data.falloff = v
-		}
+		if (v > 0) this.data.falloff = v
 	}
 	get FalloffPower() {
 		return this.data.falloffPower
@@ -48,9 +39,7 @@ export class LightApi extends ItemApi<LightData> {
 	}
 	set State(v) {
 		/* istanbul ignore next: No light sequences yet */
-		if (!this.animation.lockedByLS) {
-			this.animation.setState(v, this.player.getPhysics())
-		}
+		if (!this.animation.lockedByLS) this.animation.setState(v, this.player.getPhysics())
 		this.data.state = v
 	}
 	get Color() {
@@ -196,7 +185,7 @@ export class LightApi extends ItemApi<LightData> {
 		this.data.isVisible = v
 	}
 
-	public Duration(startState: number, duration: number, endState: number) {
+	public Duration(startState: number, duration: number, endState: number): void {
 		this.animation.setDuration(startState, duration, endState, this.player.getPhysics().timeMsec)
 	}
 
