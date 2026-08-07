@@ -3,7 +3,8 @@
 
 import { VbsApi } from '../vbs-api.js'
 
-export class VbsMath extends VbsApi {
+export /** VbsMath. */
+class VbsMath extends VbsApi {
 	public pow(x: number, y: number) {
 		return x ** y
 	}
