@@ -15,7 +15,8 @@ import type { GateData } from './gate-data.js'
 import { GateMover } from './gate-mover.js'
 import type { GateState } from './gate-state.js'
 
-export class GateHit extends HitObject {
+export /** Gate hit. */
+class GateHit extends HitObject {
 	public readonly mover: GateMover
 	public readonly lineSeg: LineSeg[] = []
 	private readonly data: GateData
