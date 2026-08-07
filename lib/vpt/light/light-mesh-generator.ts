@@ -17,7 +17,7 @@ const bulbSocketMeshJson = JSON.parse(readFileSync(resolve(process.cwd(), 'res/m
 const bulbLightMesh = Mesh.fromJson(bulbLightMeshJson)
 const bulbSocketMesh = Mesh.fromJson(bulbSocketMeshJson)
 
-/** LightMeshGenerator. */
+/** Ligh mesh generator. */
 export class LightMeshGenerator {
 	private readonly data: LightData
 
