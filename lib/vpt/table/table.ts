@@ -60,39 +60,38 @@ import { TableUpdater } from './table-updater.js'
 export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 	public readonly data?: TableData
 	public readonly info?: { [key: string]: string }
-	public readonly items: { [key: string]: Item<ItemData> }
+	public readonly items: Record<string, Item<ItemData>>
 	public readonly tableScript?: string
 	private readonly state?: TableState
 	private readonly updater?: TableUpdater
 	private events?: EventProxy
 	private api?: TableApi
-	private itemIndex?: { [key: string]: string }
+	private itemIndex?: Record<string, string>
 
-	public readonly textures: { [key: string]: Texture } = {}
-	public readonly collections: { [key: string]: Collection } = {}
-	public readonly bumpers: { [key: string]: Bumper } = {}
-	public readonly flippers: { [key: string]: Flipper } = {}
-	public readonly flashers: { [key: string]: Flasher } = {}
-	public readonly gates: { [key: string]: Gate } = {}
-	public readonly hitTargets: { [key: string]: HitTarget } = {}
-	public readonly kickers: { [key: string]: Kicker } = {}
-	public readonly lights: { [key: string]: Light } = {}
-	public readonly plungers: { [key: string]: Plunger } = {}
-	public readonly primitives: { [key: string]: Primitive } = {}
-	public readonly ramps: { [key: string]: Ramp } = {}
-	public readonly rubbers: { [key: string]: Rubber } = {}
-	public readonly spinners: { [key: string]: Spinner } = {}
-	public readonly surfaces: { [key: string]: Surface } = {}
-	public readonly textboxes: { [key: string]: Textbox } = {}
-	public readonly timers: { [key: string]: Timer } = {}
-	public readonly triggers: { [key: string]: Trigger } = {}
-	public readonly decals: { [key: string]: Decal } = {}
-	public readonly lightSeqs: { [key: string]: LightSeq } = {}
-	public readonly dispReels: { [key: string]: DispReel } = {}
+	public readonly textures: Record<string, Texture> = {}
+	public readonly collections: Record<string, Collection> = {}
+	public readonly bumpers: Record<string, Bumper> = {}
+	public readonly flippers: Record<string, Flipper> = {}
+	public readonly flashers: Record<string, Flasher> = {}
+	public readonly gates: Record<string, Gate> = {}
+	public readonly hitTargets: Record<string, HitTarget> = {}
+	public readonly kickers: Record<string, Kicker> = {}
+	public readonly lights: Record<string, Light> = {}
+	public readonly plungers: Record<string, Plunger> = {}
+	public readonly primitives: Record<string, Primitive> = {}
+	public readonly ramps: Record<string, Ramp> = {}
+	public readonly rubbers: Record<string, Rubber> = {}
+	public readonly spinners: Record<string, Spinner> = {}
+	public readonly surfaces: Record<string, Surface> = {}
+	public readonly textboxes: Record<string, Textbox> = {}
+	public readonly timers: Record<string, Timer> = {}
+	public readonly triggers: Record<string, Trigger> = {}
+	public readonly decals: Record<string, Decal> = {}
+	public readonly lightSeqs: Record<string, LightSeq> = {}
+	public readonly dispReels: Record<string, DispReel> = {}
 
 	private readonly meshGenerator?: TableMeshGenerator
 	private readonly hitGenerator?: TableHitGenerator
-	private readonly loader: TableLoader
 
 	public static playfieldThickness = 20.0
 
@@ -101,8 +100,10 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 		return new Table(l, await l.load(reader, opts))
 	}
 
-	public constructor(loader: TableLoader, loaded: LoadedTable) {
-		this.loader = loader
+	constructor(
+		private readonly loader: TableLoader,
+		loaded: LoadedTable,
+	) {
 		this.items = loaded.items
 		if (loaded.data) {
 			this.data = loaded.data
@@ -147,8 +148,7 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 		return name ? this.textures[name.toLowerCase()] : undefined
 	}
 	public getMaterial(name?: string): Material | undefined {
-		if (!name) return undefined
-		if (!this.data) throw new Error('Table data not loaded')
+		if (!name || !this.data) return undefined
 		const mats = this.data.materials
 		const lc = name.toLowerCase()
 		return (
@@ -234,7 +234,7 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 			this.itemIndex = {}
 			for (const el of this.getScriptables()) this.itemIndex[el.getName().toLowerCase()] = el.getName()
 		}
-		return this.itemIndex[vbsName.toLowerCase()]
+		return this.itemIndex[vbsName.toLowerCase()]!
 	}
 
 	public getElements(): Record<string, IScriptable<ItemApi<ItemData>>> {
@@ -245,7 +245,7 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 
 	public getScaleZ(): number {
 		if (!this.data) throw new Error('Table data not loaded')
-		return f4(this.data.bgScaleZ[this.data.bgCurrentSet]) || 1.0
+		return f4(this.data.bgScaleZ[this.data.bgCurrentSet]!) || 1.0
 	}
 	public getDetailLevel(): number {
 		return 10
@@ -268,8 +268,8 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 	public getSurfaceHeight(surface: string | undefined, x: number, y: number): number {
 		if (!this.data) throw new Error('Table data not loaded')
 		if (!surface) return this.data.tableHeight
-		if (this.surfaces[surface]) return f4(this.data.tableHeight + this.surfaces[surface].heightTop)
-		if (this.ramps[surface]) return f4(this.data.tableHeight + this.ramps[surface].getSurfaceHeight(x, y, this))
+		if (this.surfaces[surface]) return f4(this.data.tableHeight + this.surfaces[surface]!.heightTop)
+		if (this.ramps[surface]) return f4(this.data.tableHeight + this.ramps[surface]!.getSurfaceHeight(x, y, this))
 		logger().warn('[Table.getSurfaceHeight] Unknown surface %s.', surface)
 		return this.data.tableHeight
 	}
