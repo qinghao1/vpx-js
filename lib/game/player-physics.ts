@@ -1,25 +1,9 @@
-/*
- * VPDB - Virtual Pinball Database
- * Copyright (C) 2019 freezy <freezy@vpdb.io>
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- */
+// Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { degToRad } from '../math/float'
-import { Vertex3D } from '../math/vertex3d'
-import { CollisionEvent } from '../physics/collision-event'
+import { degToRad } from '../math/float.js'
+import { Vertex3D } from '../math/vertex3d.js'
+import { CollisionEvent } from '../physics/collision-event.js'
 import {
 	DEFAULT_STEPTIME,
 	DEFAULT_TABLE_GRAVITY,
@@ -28,25 +12,25 @@ import {
 	PHYSICS_STEPTIME,
 	STATICCNTS,
 	STATICTIME,
-} from '../physics/constants'
-import { HitKD } from '../physics/hit-kd'
-import type { HitObject } from '../physics/hit-object'
-import type { HitPlane } from '../physics/hit-plane'
-import { HitQuadtree } from '../physics/hit-quadtree'
-import type { MoverObject } from '../physics/mover-object'
+} from '../physics/constants.js'
+import { HitKD } from '../physics/hit-kd.js'
+import type { HitObject } from '../physics/hit-object.js'
+import type { HitPlane } from '../physics/hit-plane.js'
+import { HitQuadtree } from '../physics/hit-quadtree.js'
+import type { MoverObject } from '../physics/mover-object.js'
 import { now } from '../refs.node.js'
-import { Ball } from '../vpt/ball/ball'
-import { BallData } from '../vpt/ball/ball-data'
-import { BallState } from '../vpt/ball/ball-state'
-import type { FlipperMover } from '../vpt/flipper/flipper-mover'
-import type { Table } from '../vpt/table/table'
-import { MAX_TIMERS_MSEC_OVERALL } from '../vpt/timer/timer-const'
-import type { TimerHit } from '../vpt/timer/timer-hit'
-import type { TimerOnOff } from '../vpt/timer/timer-on-off'
-import { Event } from './event'
-import type { IEmulator } from './iemulator'
-import type { PinInput } from './pin-input'
-import type { IBallCreationPosition, Player } from './player'
+import { Ball } from '../vpt/ball/ball.js'
+import { BallData } from '../vpt/ball/ball-data.js'
+import { BallState } from '../vpt/ball/ball-state.js'
+import type { FlipperMover } from '../vpt/flipper/flipper-mover.js'
+import type { Table } from '../vpt/table/table.js'
+import { MAX_TIMERS_MSEC_OVERALL } from '../vpt/timer/timer-const.js'
+import type { TimerHit } from '../vpt/timer/timer-hit.js'
+import type { TimerOnOff } from '../vpt/timer/timer-on-off.js'
+import { Event } from './event.js'
+import type { IEmulator } from './iemulator.js'
+import type { PinInput } from './pin-input.js'
+import type { IBallCreationPosition, Player } from './player.js'
 
 const SLOW_MO = 1 // the lower, the slower
 
