@@ -57,11 +57,9 @@ export class Flipper
 	public isCollidable(): boolean {
 		return true
 	}
-
 	public getMover(): FlipperMover {
 		return this.hit!.getMoverObject()
 	}
-
 	public getState(): FlipperState {
 		return this.state
 	}
@@ -75,7 +73,6 @@ export class Flipper
 	public getApi(): FlipperApi {
 		return this.api!
 	}
-
 	public getHitShapes(): HitObject[] {
 		return [this.hit!]
 	}
@@ -110,11 +107,9 @@ export class Flipper
 	}
 
 	private getMatrix(rotation: number = this.data.startAngle): Matrix3D {
-		const trafoMatrix = new Matrix3D()
-		const tempMatrix = Matrix3D.claim()
-		trafoMatrix.setTranslation(this.data.center.x, this.data.center.y, 0)
-		tempMatrix.rotateZMatrix(degToRad(rotation))
-		trafoMatrix.preMultiply(tempMatrix)
+		const trafoMatrix = new Matrix3D().setTranslation(this.data.center.x, this.data.center.y, 0)
+		const tempMatrix = Matrix3D.claim().rotateZMatrix(degToRad(rotation))
+		trafoMatrix.multiply(tempMatrix)
 
 		Matrix3D.release(tempMatrix)
 		return trafoMatrix
