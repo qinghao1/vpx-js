@@ -37,6 +37,7 @@ export class FlipperApi extends ItemApi<FlipperData> {
 	get BaseRadius() {
 		return this.data.baseRadius
 	}
+	/** Set BaseRadius. */
 	set BaseRadius(v) {
 		this.data.baseRadius = v
 	}
@@ -44,6 +45,7 @@ export class FlipperApi extends ItemApi<FlipperData> {
 	get EndRadius() {
 		return this.data.endRadius
 	}
+	/** Set EndRadius. */
 	set EndRadius(v) {
 		this.data.endRadius = v
 	}
@@ -51,6 +53,7 @@ export class FlipperApi extends ItemApi<FlipperData> {
 	get Length() {
 		return this.data.flipperRadiusMax
 	}
+	/** Set Length. */
 	set Length(v) {
 		this.data.flipperRadiusMax = v
 	}
@@ -58,6 +61,7 @@ export class FlipperApi extends ItemApi<FlipperData> {
 	get EOSTorque() {
 		return this.data.doOverridePhysics(this.table) ? this.data.overrideTorqueDamping : this.data.torqueDamping
 	}
+	/** Set EOSTorque. */
 	set EOSTorque(v) {
 		if (!this.data.doOverridePhysics(this.table)) {
 			this.data.torqueDamping = v
@@ -67,6 +71,7 @@ export class FlipperApi extends ItemApi<FlipperData> {
 	get EOSTorqueAngle() {
 		return this.data.doOverridePhysics(this.table) ? this.data.overrideTorqueDampingAngle : this.data.torqueDampingAngle
 	}
+	/** Set EOSTorqueAngle. */
 	set EOSTorqueAngle(v) {
 		if (!this.data.doOverridePhysics(this.table)) {
 			this.data.torqueDampingAngle = v
@@ -76,6 +81,7 @@ export class FlipperApi extends ItemApi<FlipperData> {
 	get X() {
 		return this.state.center.x
 	}
+	/** Set X. */
 	set X(v) {
 		this.state.center.x = v
 	}
@@ -83,6 +89,7 @@ export class FlipperApi extends ItemApi<FlipperData> {
 	get Y() {
 		return this.state.center.y
 	}
+	/** Set Y. */
 	set Y(v) {
 		this.state.center.y = v
 	}
@@ -90,9 +97,11 @@ export class FlipperApi extends ItemApi<FlipperData> {
 	get Surface() {
 		return this.data.szSurface
 	}
+	/** Set Surface. */
 	set Surface(v) {
 		this.data.szSurface = v
 	}
+	/** Set StartAngle. */
 	set StartAngle(v) {
 		this.data.startAngle = v
 		this.mover.setStartAngle(degToRad(v))
@@ -101,6 +110,7 @@ export class FlipperApi extends ItemApi<FlipperData> {
 	get StartAngle() {
 		return this.data.startAngle
 	}
+	/** Set EndAngle. */
 	set EndAngle(v) {
 		this.data.endAngle = v
 		this.mover.setEndAngle(degToRad(v))
@@ -117,6 +127,7 @@ export class FlipperApi extends ItemApi<FlipperData> {
 	get Material() {
 		return this.state.material
 	}
+	/** Set Material. */
 	set Material(v) {
 		this.state.material = v
 	}
@@ -124,6 +135,7 @@ export class FlipperApi extends ItemApi<FlipperData> {
 	get Mass() {
 		return this.mover.getMass()
 	}
+	/** Set Mass. */
 	set Mass(v) {
 		if (!this.data.doOverridePhysics(this.table)) {
 			this.mover.setMass(v)
@@ -133,6 +145,7 @@ export class FlipperApi extends ItemApi<FlipperData> {
 	get OverridePhysics() {
 		return this.data.overridePhysics
 	}
+	/** Set OverridePhysics. */
 	set OverridePhysics(v) {
 		this.data.overridePhysics = v
 		this.data.updatePhysicsSettings(this.table)
@@ -142,6 +155,7 @@ export class FlipperApi extends ItemApi<FlipperData> {
 	get RubberMaterial() {
 		return this.state.rubberMaterial
 	}
+	/** Set RubberMaterial. */
 	set RubberMaterial(v) {
 		this.state.rubberMaterial = v
 	}
@@ -149,6 +163,7 @@ export class FlipperApi extends ItemApi<FlipperData> {
 	get RubberThickness() {
 		return this.data.rubberThickness
 	}
+	/** Set RubberThickness. */
 	set RubberThickness(v) {
 		this.data.rubberThickness = v
 	}
@@ -156,6 +171,7 @@ export class FlipperApi extends ItemApi<FlipperData> {
 	get RubberWidth() {
 		return this.data.rubberWidth
 	}
+	/** Set RubberWidth. */
 	set RubberWidth(v) {
 		this.data.rubberWidth = v
 	}
@@ -163,6 +179,7 @@ export class FlipperApi extends ItemApi<FlipperData> {
 	get RubberHeight() {
 		return this.data.rubberHeight
 	}
+	/** Set RubberHeight. */
 	set RubberHeight(v) {
 		this.data.rubberHeight = v
 	}
@@ -170,6 +187,7 @@ export class FlipperApi extends ItemApi<FlipperData> {
 	get Strength() {
 		return this.data.strength
 	}
+	/** Set Strength. */
 	set Strength(v) {
 		if (!this.data.doOverridePhysics(this.table)) {
 			this.data.strength = v
@@ -179,6 +197,7 @@ export class FlipperApi extends ItemApi<FlipperData> {
 	get Visible() {
 		return this.state.isVisible
 	}
+	/** Set Visible. */
 	set Visible(v) {
 		this.state.isVisible = v
 	}
@@ -186,6 +205,7 @@ export class FlipperApi extends ItemApi<FlipperData> {
 	get Enabled() {
 		return this.data.isEnabled
 	}
+	/** Set Enabled. */
 	set Enabled(v) {
 		this.data.isEnabled = v
 	}
@@ -193,6 +213,7 @@ export class FlipperApi extends ItemApi<FlipperData> {
 	get Elasticity() {
 		return this.hit.elasticity
 	}
+	/** Set Elasticity. */
 	set Elasticity(v) {
 		if (!this.data.doOverridePhysics(this.table)) {
 			this.hit.elasticity = v
@@ -202,6 +223,7 @@ export class FlipperApi extends ItemApi<FlipperData> {
 	get ElasticityFalloff() {
 		return this.hit.elasticityFalloff
 	}
+	/** Set ElasticityFalloff. */
 	set ElasticityFalloff(v) {
 		if (!this.data.doOverridePhysics(this.table)) {
 			this.hit.elasticityFalloff = v
@@ -211,6 +233,7 @@ export class FlipperApi extends ItemApi<FlipperData> {
 	get Scatter() {
 		return this.hit.scatter
 	}
+	/** Set Scatter. */
 	set Scatter(v) {
 		if (!this.data.doOverridePhysics(this.table)) {
 			this.hit.scatter = v
@@ -220,6 +243,7 @@ export class FlipperApi extends ItemApi<FlipperData> {
 	get Friction() {
 		return this.hit.friction
 	}
+	/** Set Friction. */
 	set Friction(v) {
 		this.hit.setFriction(v)
 	}
@@ -227,6 +251,7 @@ export class FlipperApi extends ItemApi<FlipperData> {
 	get RampUp() {
 		return this.data.doOverridePhysics(this.table) ? this.data.overrideCoilRampUp : this.data.rampUp
 	}
+	/** Set RampUp. */
 	set RampUp(v) {
 		if (!this.data.doOverridePhysics(this.table)) {
 			this.data.rampUp = v
@@ -236,6 +261,7 @@ export class FlipperApi extends ItemApi<FlipperData> {
 	get Height() {
 		return this.data.height
 	}
+	/** Set Height. */
 	set Height(v) {
 		this.data.height = v
 	}
@@ -243,6 +269,7 @@ export class FlipperApi extends ItemApi<FlipperData> {
 	get Return() {
 		return this.mover.getReturnRatio()
 	}
+	/** Set Return. */
 	set Return(v) {
 		if (!this.data.doOverridePhysics(this.table)) {
 			this.data.return = clamp(v, 0.0, 1.0)
@@ -252,6 +279,7 @@ export class FlipperApi extends ItemApi<FlipperData> {
 	get FlipperRadiusMin() {
 		return this.data.flipperRadiusMin
 	}
+	/** Set FlipperRadiusMin. */
 	set FlipperRadiusMin(v) {
 		if (v < 0) {
 			v = 0
@@ -262,6 +290,7 @@ export class FlipperApi extends ItemApi<FlipperData> {
 	get Image() {
 		return this.state.texture
 	}
+	/** Set Image. */
 	set Image(v) {
 		this._assertNonHdrImage(v)
 		this.state.texture = v
@@ -270,6 +299,7 @@ export class FlipperApi extends ItemApi<FlipperData> {
 	get ReflectionEnabled() {
 		return this.data.isReflectionEnabled
 	}
+	/** Set ReflectionEnabled. */
 	set ReflectionEnabled(v) {
 		this.data.isReflectionEnabled = v
 	}
