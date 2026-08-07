@@ -13,62 +13,42 @@ const bumperCapMesh = loadMesh('bumper-cap-mesh')
 const bumperRingMesh = loadMesh('bumper-ring-mesh')
 const bumperSocketMesh = loadMesh('bumper-socket-mesh')
 
-/** Bumper mesh generator. */
+/** Generates bumper meshes. @see https://github.com/vpinball/vpinball/blob/master/bumper.cpp */
 export class BumperMeshGenerator {
-	private readonly data: BumperData
-
-	private readonly scaledBashMesh: Mesh
+	private readonly scaledBaseMesh: Mesh
 	private readonly scaledCapMesh: Mesh
 	private readonly scaledRingMesh: Mesh
 	private readonly scaledSocketMesh: Mesh
 
-	constructor(data: BumperData) {
-		this.data = data
-		this.scaledBashMesh = bumperBaseMesh.clone().makeScale(this.data.radius, this.data.radius, this.data.heightScale)
-		this.scaledCapMesh = bumperCapMesh
-			.clone()
-			.makeScale(this.data.radius * 2, this.data.radius * 2, this.data.heightScale)
-		this.scaledRingMesh = bumperRingMesh.clone().makeScale(this.data.radius, this.data.radius, this.data.heightScale)
-		this.scaledSocketMesh = bumperSocketMesh
-			.clone()
-			.makeScale(this.data.radius, this.data.radius, this.data.heightScale)
+	constructor(private readonly data: BumperData) {
+		const r = data.radius
+		const h = data.heightScale
+		this.scaledBaseMesh = bumperBaseMesh.clone().makeScale(r, r, h)
+		this.scaledCapMesh = bumperCapMesh.clone().makeScale(r * 2, r * 2, h)
+		this.scaledRingMesh = bumperRingMesh.clone().makeScale(r, r, h)
+		this.scaledSocketMesh = bumperSocketMesh.clone().makeScale(r, r, h)
 	}
 
 	public getMeshes(table: Table): BumperMesh {
-		/* istanbul ignore if */
-		if (!this.data.center) throw new Error(`Cannot export bumper ${this.data.getName()} without vCenter.`)
-		const matrix = new Matrix3D().rotateZMatrix(degToRad(this.data.orientation))
+		if (!this.data.center) throw new Error(`Cannot export bumper ${this.data.getName()} without center.`)
+		const m = new Matrix3D().rotateZMatrix(degToRad(this.data.orientation))
 		const height =
 			table.getSurfaceHeight(this.data.szSurface, this.data.center.x, this.data.center.y) * table.getScaleZ()
+		const z = (v: number) => f4(v * table.getScaleZ()) + height
 		return {
-			base: this.generateMesh(
-				`bumper-base-${this.data.getName()}`,
-				this.scaledBashMesh,
-				matrix,
-				(z) => f4(z * table.getScaleZ()) + height,
-			),
-			ring: this.generateMesh(
-				`bumper-ring-${this.data.getName()}`,
-				this.scaledRingMesh,
-				matrix,
-				(z) => f4(z * table.getScaleZ()) + height,
-			),
-			skirt: this.generateMesh(
-				`bumper-socket-${this.data.getName()}`,
-				this.scaledSocketMesh,
-				matrix,
-				(z) => f4(z * table.getScaleZ()) + (height + 5),
-			),
-			cap: this.generateMesh(
+			base: this.transform(`bumper-base-${this.data.getName()}`, this.scaledBaseMesh, m, z),
+			ring: this.transform(`bumper-ring-${this.data.getName()}`, this.scaledRingMesh, m, z),
+			skirt: this.transform(`bumper-socket-${this.data.getName()}`, this.scaledSocketMesh, m, (v) => z(v) + 5),
+			cap: this.transform(
 				`bumper-cap-${this.data.getName()}`,
 				this.scaledCapMesh,
-				matrix,
-				(z) => f4(f4(z + this.data.heightScale) * table.getScaleZ()) + height,
+				m,
+				(v) => f4(f4(v + this.data.heightScale) * table.getScaleZ()) + height,
 			),
 		}
 	}
 
-	private generateMesh(name: string, mesh: Mesh, matrix: Matrix3D, zPos: (z: number) => number): Mesh {
+	private transform(name: string, mesh: Mesh, matrix: Matrix3D, zPos: (z: number) => number): Mesh {
 		const out = mesh.clone(name)
 		for (const v of out.vertices) {
 			const vert = Vertex3D.claim(v.x, v.y, v.z).multiplyMatrix(matrix)
