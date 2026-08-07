@@ -20,53 +20,39 @@ const hitTargetRoundMesh = loadMesh('hit-target-round-mesh')
 const hitTargetT1SlimMesh = loadMesh('hit-target-t1-slim-mesh')
 const hitTargetT2SlimMesh = loadMesh('hit-target-t2-slim-mesh')
 
-/** HitTargetMeshGenerator. */
+/** Generates hit-target mesh. @see https://github.com/vpinball/vpinball/blob/master/hittarget.cpp */
 export class HitTargetMeshGenerator {
-	private readonly data: HitTargetData
-
-	constructor(data: HitTargetData) {
-		this.data = data
-	}
-
+	constructor(private readonly data: HitTargetData) {}
 	public getMesh(table: Table): Mesh {
-		let dropOffset = 0
-		if (this.data.isDropTarget() && this.data.isDropped) {
-			dropOffset = -f4(HitTarget.DROP_TARGET_LIMIT * table.getScaleZ())
-		}
-		return this.generateMesh(table, dropOffset)
+		const drop =
+			this.data.isDropTarget() && this.data.isDropped ? -f4(HitTarget.DROP_TARGET_LIMIT * table.getScaleZ()) : 0
+		return this.generateMesh(table, drop)
 	}
-
-	public generateMesh(table: Table, dropOffset: number = 0): Mesh {
-		const hitTargetMesh = this.getBaseMesh()
-		hitTargetMesh.name = `hit.target-${this.data.getName()}`
-
-		const fullMatrix = new Matrix3D()
-		const tempMatrix = new Matrix3D()
-		tempMatrix.rotateZMatrix(degToRad(this.data.rotZ))
-		fullMatrix.multiply(tempMatrix)
-
-		for (const vertex of hitTargetMesh.vertices) {
-			const vert = Vertex3D.claim(vertex.x, vertex.y, vertex.z)
-			vert.x *= this.data.vSize.x
-			vert.y *= this.data.vSize.y
-			vert.z *= this.data.vSize.z
-			vert.multiplyMatrix(fullMatrix)
-
-			vertex.x = f4(vert.x + this.data.position.x)
-			vertex.y = f4(vert.y + this.data.position.y)
-			vertex.z = f4(f4(f4(vert.z * table.getScaleZ()) + this.data.position.z) + table.getTableHeight()) + dropOffset
-
-			const normal = Vertex3D.claim(vertex.nx, vertex.ny, vertex.nz).multiplyMatrixNoTranslate(fullMatrix)
-			vertex.nx = normal.x
-			vertex.ny = normal.y
-			vertex.nz = normal.z
-
-			Vertex3D.release(vert, normal)
+	public generateMesh(table: Table, dropOffset = 0): Mesh {
+		const mesh = this.getBaseMesh()
+		mesh.name = `hit.target-${this.data.getName()}`
+		const m = new Matrix3D().rotateZMatrix(degToRad(this.data.rotZ))
+		const sx = this.data.vSize.x,
+			sy = this.data.vSize.y,
+			sz = this.data.vSize.z
+		const px = this.data.position.x,
+			py = this.data.position.y,
+			pz = this.data.position.z
+		const scaleZ = table.getScaleZ(),
+			tableH = table.getTableHeight()
+		for (const v of mesh.vertices) {
+			const vert = Vertex3D.claim(v.x * sx, v.y * sy, v.z * sz).multiplyMatrix(m)
+			v.x = f4(vert.x + px)
+			v.y = f4(vert.y + py)
+			v.z = f4(vert.z * scaleZ + pz + tableH) + dropOffset
+			const n = Vertex3D.claim(v.nx, v.ny, v.nz).multiplyMatrixNoTranslate(m)
+			v.nx = n.x
+			v.ny = n.y
+			v.nz = n.z
+			Vertex3D.release(vert, n)
 		}
-
-		return hitTargetMesh
+		return mesh
 	}
-
 	private getBaseMesh(): Mesh {
 		switch (this.data.targetType) {
 			case Enums.TargetType.DropTargetBeveled:
@@ -87,7 +73,6 @@ export class HitTargetMeshGenerator {
 				return hitTargetT1SlimMesh.clone()
 			case Enums.TargetType.HitFatTargetSlim:
 				return hitTargetT2SlimMesh.clone()
-			/* istanbul ignore next: currently all implemented */
 			default:
 				return hitTargetT3Mesh.clone()
 		}
