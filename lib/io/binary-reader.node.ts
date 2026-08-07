@@ -17,8 +17,8 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { close, open, read } from 'fs'
-import type { IBinaryReader } from './ole-doc'
+import { close, open, read } from 'node:fs'
+import type { IBinaryReader } from './ole-doc.js'
 
 export class NodeBinaryReader implements IBinaryReader {
 	private readonly filename: string
@@ -28,15 +28,27 @@ export class NodeBinaryReader implements IBinaryReader {
 		this.filename = filename
 	}
 
-	public read(buffer: Buffer, offset: number, length: number, position: number): Promise<[number, Buffer]> {
+	public read(target: Uint8Array, offset: number, length: number, position: number): Promise<[number, Uint8Array]> {
 		return new Promise((resolve, reject) => {
-			read(this.fd, buffer, offset, length, position, (err, bytesRead, data) => {
+			read(this.fd, target as any, offset, length, position, (err: any, bytesRead: number, data: any) => {
 				/* istanbul ignore if */
 				if (err) {
 					reject(err)
 					return
 				}
-				resolve([bytesRead, data])
+				// data may be Buffer or Uint8Array; ensure Uint8Array
+				let result: Uint8Array
+				if (data instanceof Uint8Array) {
+					result = data as Uint8Array
+				} else {
+					result = new Uint8Array(data.buffer, data.byteOffset, data.byteLength)
+				}
+				// structuredClone to detach if caller expects isolated copy
+				const cloned =
+					typeof structuredClone !== 'undefined'
+						? structuredClone(result.subarray(0, bytesRead) as any)
+						: result.slice(0, bytesRead)
+				resolve([bytesRead, cloned as Uint8Array])
 			})
 		})
 	}

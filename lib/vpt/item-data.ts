@@ -20,7 +20,7 @@
 import { BiffParser } from '../io/biff-parser'
 import type { Storage } from '../io/ole-doc'
 import { ItemType } from './enums'
-import { Table } from './table/table'
+import type { Table } from './table/table'
 
 /**
  * Parent class for game items parsed from the VPX file.
@@ -101,11 +101,11 @@ export abstract class ItemData extends BiffParser {
 		return this.name
 	}
 
-	protected async getData(storage: Storage, itemName: string, offset: number, len: number): Promise<Buffer> {
+	protected async getData(storage: Storage, itemName: string, offset: number, len: number): Promise<Uint8Array> {
 		return storage.read(itemName, offset, len)
 	}
 
-	protected getCommonBlock(buffer: Buffer, tag: string, len: number) {
+	protected getCommonBlock(buffer: Uint8Array, tag: string, len: number) {
 		switch (tag) {
 			case 'NAME':
 				this.name = this.getWideString(buffer, len)

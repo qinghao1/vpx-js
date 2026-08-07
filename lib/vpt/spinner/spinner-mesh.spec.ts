@@ -17,7 +17,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader'
+import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { ThreeHelper } from '../../../test/three.helper'
 import { NodeBinaryReader } from '../../io/binary-reader.node.js'
 import type { Mesh } from '../../refs.node.js'

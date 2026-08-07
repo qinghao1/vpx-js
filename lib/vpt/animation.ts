@@ -20,7 +20,7 @@
 export class FrameData {
 	public frameVerts: VertData[] = []
 
-	public static get(buffer: Buffer, numVertices: number): FrameData {
+	public static get(buffer: Uint8Array, numVertices: number): FrameData {
 		const frameData = new FrameData()
 		for (let i = 0; i < numVertices; i++) {
 			frameData.frameVerts.push(VertData.load(buffer, i * 24))
@@ -53,14 +53,14 @@ export class VertData {
 		this.nz = nz
 	}
 
-	public static load(buffer: Buffer, offset: number = 0): VertData {
+	public static load(buffer: Uint8Array, offset: number = 0): VertData {
 		return new VertData(
-			buffer.readFloatLE(offset),
-			buffer.readFloatLE(offset + 4),
-			buffer.readFloatLE(offset + 8),
-			buffer.readFloatLE(offset + 12),
-			buffer.readFloatLE(offset + 16),
-			buffer.readFloatLE(offset + 20),
+			new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength).getFloat32(offset, true),
+			new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength).getFloat32(offset + 4, true),
+			new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength).getFloat32(offset + 8, true),
+			new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength).getFloat32(offset + 12, true),
+			new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength).getFloat32(offset + 16, true),
+			new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength).getFloat32(offset + 20, true),
 		)
 	}
 

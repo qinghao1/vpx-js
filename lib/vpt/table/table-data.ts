@@ -88,7 +88,7 @@ export class TableData extends ItemData {
 	public numCollections!: number
 	public scriptPos!: number
 	public scriptLen!: number
-	public name!: string
+	public declare name: string
 	public Light: LightSource[] = [new LightSource()]
 	public bgImage: string[] = []
 	public imageBackdropNightDay: boolean = false
@@ -172,7 +172,7 @@ export class TableData extends ItemData {
 		return this.overridePhysics ? this.overrideScatterAngle : this.scatter!
 	}
 
-	private async fromTag(buffer: Buffer, tag: string, offset: number, len: number): Promise<number> {
+	private async fromTag(buffer: Uint8Array, tag: string, offset: number, len: number): Promise<number> {
 		switch (tag) {
 			case 'LEFT':
 				this.left = this.getFloat(buffer)
@@ -529,7 +529,7 @@ export class TableData extends ItemData {
 		return 0
 	}
 
-	private _getMaterials(buffer: Buffer, len: number, num: number): Material[] {
+	private _getMaterials(buffer: Uint8Array, len: number, num: number): Material[] {
 		/* istanbul ignore if */
 		if (len < num * SaveMaterial.size) {
 			throw new Error(
@@ -544,7 +544,7 @@ export class TableData extends ItemData {
 		return materials
 	}
 
-	private _getPhysicsMaterials(buffer: Buffer, len: number, num: number): void {
+	private _getPhysicsMaterials(buffer: Uint8Array, len: number, num: number): void {
 		/* istanbul ignore if */
 		if (len < num * SavePhysicsMaterial.size) {
 			throw new Error(

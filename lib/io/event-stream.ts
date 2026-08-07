@@ -17,8 +17,19 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-const Stream = require('stream').Stream
-const immediately = global.setImmediate || process.nextTick
+import { createRequire } from 'node:module'
+import { EventEmitter } from 'events'
+
+const require = createRequire(import.meta.url)
+
+export class Stream extends EventEmitter {}
+
+const immediately: (cb: () => void) => void =
+	typeof queueMicrotask !== 'undefined'
+		? queueMicrotask.bind(globalThis)
+		: (global as any).setImmediate
+			? (global as any).setImmediate.bind(global)
+			: process.nextTick.bind(process)
 
 export function readableStream<T>(
 	func: (stream: any, i: number) => Promise<T | null>,
@@ -30,8 +41,8 @@ export function readableStream<T>(
 	let ended = false
 	let reading = false
 
-	stream.readable = true
-	stream.writable = false
+	;(stream as any).readable = true
+	;(stream as any).writable = false
 
 	stream.on('end', () => (ended = true))
 
@@ -68,13 +79,17 @@ export function readableStream<T>(
 		})
 	}
 
-	stream.resume = () => {
+	;(stream as any).resume = () => {
 		paused = false
 		get()
 	}
-	process.nextTick(get)
-	stream.pause = () => (paused = true)
-	stream.destroy = () => {
+	if (typeof queueMicrotask !== 'undefined') {
+		queueMicrotask(get as any)
+	} else {
+		process.nextTick(get as any)
+	}
+	;(stream as any).pause = () => (paused = true)
+	;(stream as any).destroy = () => {
 		stream.emit('end')
 		stream.emit('close')
 		ended = true

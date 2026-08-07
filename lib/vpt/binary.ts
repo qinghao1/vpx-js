@@ -33,7 +33,7 @@ export class Binary extends BiffParser {
 	public pos!: number
 	public len!: number
 
-	public async fromTag(buffer: Buffer, tag: string, offset: number, len: number): Promise<number> {
+	public async fromTag(buffer: Uint8Array, tag: string, offset: number, len: number): Promise<number> {
 		switch (tag) {
 			case 'NAME':
 				this.szName = this.getString(buffer, len)

@@ -40,7 +40,7 @@ export class KickerHit extends HitCircle {
 	public ball?: Ball // The ball inside this kicker
 	public lastCapturedBall?: Ball
 	private hitMesh: Vertex3D[] = []
-	public obj: EventProxy
+	public declare obj: EventProxy
 
 	constructor(data: KickerData, events: EventProxy, table: Table, radius: number, height: number) {
 		super(data.center.clone(), radius, height, height + data.hitHeight)

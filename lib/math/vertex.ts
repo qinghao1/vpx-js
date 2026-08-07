@@ -108,7 +108,7 @@ export class Vertex3DNoTex2 {
 	public _tu: number = 0
 	public _tv: number = 0
 
-	public static get(buffer: Buffer, pos: number): Vertex3DNoTex2 {
+	public static get(buffer: Uint8Array, pos: number): Vertex3DNoTex2 {
 		const offset = pos * Vertex3DNoTex2.size
 		const vertex = new Vertex3DNoTex2()
 		if ((buffer as any).buffer) {
@@ -125,14 +125,14 @@ export class Vertex3DNoTex2 {
 				return vertex
 			} catch {}
 		}
-		vertex.x = f4(buffer.readFloatLE(offset))
-		vertex.y = f4(buffer.readFloatLE(offset + 4))
-		vertex.z = f4(buffer.readFloatLE(offset + 8))
-		vertex.nx = f4(buffer.readFloatLE(offset + 12))
-		vertex.ny = f4(buffer.readFloatLE(offset + 16))
-		vertex.nz = f4(buffer.readFloatLE(offset + 20))
-		vertex.tu = f4(buffer.readFloatLE(offset + 24))
-		vertex.tv = f4(buffer.readFloatLE(offset + 28))
+		vertex.x = f4(new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength).getFloat32(offset, true))
+		vertex.y = f4(new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength).getFloat32(offset + 4, true))
+		vertex.z = f4(new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength).getFloat32(offset + 8, true))
+		vertex.nx = f4(new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength).getFloat32(offset + 12, true))
+		vertex.ny = f4(new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength).getFloat32(offset + 16, true))
+		vertex.nz = f4(new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength).getFloat32(offset + 20, true))
+		vertex.tu = f4(new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength).getFloat32(offset + 24, true))
+		vertex.tv = f4(new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength).getFloat32(offset + 28, true))
 		return vertex
 	}
 

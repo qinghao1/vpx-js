@@ -101,7 +101,7 @@ export class PrimitiveData extends ItemData implements IPhysicalData {
 	}
 
 	private async fromTag(
-		buffer: Buffer,
+		buffer: Uint8Array,
 		tag: string,
 		offset: number,
 		len: number,
@@ -294,7 +294,7 @@ export class PrimitiveData extends ItemData implements IPhysicalData {
 		return 0
 	}
 
-	private getVertices(decompressedBuffer: Buffer, num: number): Vertex3DNoTex2[] {
+	private getVertices(decompressedBuffer: Uint8Array, num: number): Vertex3DNoTex2[] {
 		const vertices: Vertex3DNoTex2[] = []
 		/* istanbul ignore next */
 		if (decompressedBuffer.length < num * Vertex3DNoTex2.size) {
@@ -308,7 +308,7 @@ export class PrimitiveData extends ItemData implements IPhysicalData {
 		return vertices
 	}
 
-	private async getAnimatedVertices(buffer: Buffer, num: number): Promise<FrameData> {
+	private async getAnimatedVertices(buffer: Uint8Array, num: number): Promise<FrameData> {
 		return FrameData.get(buffer, num)
 	}
 }

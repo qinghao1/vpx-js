@@ -18,7 +18,7 @@
  */
 
 import { expect } from 'chai'
-import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader'
+import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { ThreeHelper } from '../../../test/three.helper'
 import { NodeBinaryReader } from '../../io/binary-reader.node.js'
 import type { SpotLight } from '../../refs.node.js'

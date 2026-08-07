@@ -43,7 +43,7 @@
 	},
 	"scripts": {
 		"build": "npm run build:pre && tsup && npm run build:cp",
-		"build:pre": "node build/compile-rules.cjs && node build/write-info.cjs",
+		"build:pre": "tsx build/compile-rules.ts && tsx build/write-info.ts",
 		"build:cp": "cp -r res dist/ && mkdir -p dist/lib/scripting/grammar && cp lib/scripting/grammar/grammar.bnf dist/lib/scripting/grammar/",
 		"typecheck": "tsc --noEmit",
 		"lint": "biome check .",
@@ -94,8 +94,7 @@
 		"tsx": "^4.23.9",
 		"typescript": "^5.9.2",
 		"vite": "^7.0.0",
-		"vitest": "^4.1.10",
-		"node-fetch": "^2.6.7"
+		"vitest": "^4.1.10"
 	},
 	"bugs": {
 		"url": "https://github.com/vpdb/vpx-js/issues"

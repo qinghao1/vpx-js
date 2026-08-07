@@ -1,3 +1,15 @@
+function concatUint8Arrays(bufs: Uint8Array[]): Uint8Array {
+	let total = 0
+	for (const b of bufs) total += b.length
+	const result = new Uint8Array(total)
+	let offset = 0
+	for (const b of bufs) {
+		result.set(b, offset)
+		offset += b.length
+	}
+	return result
+}
+
 /*
  * VPDB - Virtual Pinball Database
  * Copyright (C) 2019 freezy <freezy@vpdb.io>
@@ -33,7 +45,7 @@ export class TextStream {
 	private readonly filename: string
 	private readonly unicode: boolean
 
-	private buffer: Buffer = Buffer.alloc(0)
+	private buffer: Uint8Array = new Uint8Array(0)
 	private cursor: number = -1
 	private mode: number
 
@@ -96,7 +108,9 @@ export class TextStream {
 		if (this.mode !== TextStream.MODE_READ) {
 			return ERR.Raise(54, undefined, 'Bad file mode')
 		}
-		return this.buffer.slice(this.cursor, this.cursor + characters).toString(this.unicode ? 'utf8' : 'ascii')
+		return new TextDecoder(this.unicode ? 'utf-8' : 'ascii').decode(
+			this.buffer.subarray(this.cursor, this.cursor + characters),
+		)
 	}
 
 	/**
@@ -107,7 +121,7 @@ export class TextStream {
 		if (this.mode !== TextStream.MODE_READ) {
 			return ERR.Raise(54, undefined, 'Bad file mode')
 		}
-		return this.buffer.toString(this.unicode ? 'utf8' : 'ascii')
+		return new TextDecoder(this.unicode ? 'utf-8' : 'ascii').decode(this.buffer)
 	}
 
 	/**
@@ -132,7 +146,7 @@ export class TextStream {
 				break
 			}
 		} while (this.cursor < this.buffer.length - 1)
-		return this.buffer.slice(start, end + 1).toString(this.unicode ? 'utf8' : 'ascii')
+		return new TextDecoder(this.unicode ? 'utf-8' : 'ascii').decode(this.buffer.subarray(start, end + 1))
 	}
 
 	/**
@@ -174,7 +188,7 @@ export class TextStream {
 	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/write-method
 	 */
 	public Write(data: string): void {
-		this.buffer = Buffer.concat([this.buffer, Buffer.from(data)])
+		this.buffer = concatUint8Arrays([this.buffer, new TextEncoder().encode(data)])
 		this.cursorToEnd()
 	}
 
@@ -198,7 +212,7 @@ export class TextStream {
 	}
 
 	public setContent(data: string): this {
-		this.buffer = Buffer.from(data)
+		this.buffer = new TextEncoder().encode(data)
 		this.cursorToEnd()
 		return this
 	}

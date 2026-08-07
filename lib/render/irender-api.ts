@@ -186,17 +186,17 @@ export interface ITextureLoader<TEXTURE> {
 	 * @param ext Original file extension of the texture, including the dot
 	 * @param data Binary data
 	 */
-	loadTexture(name: string, ext: string, data: Buffer): Promise<TEXTURE>
+	loadTexture(name: string, ext: string, data: Uint8Array): Promise<TEXTURE>
 
 	/**
-	 * Loads a raw texture coming from the `BITS` tag (pdsBuffer)
+	 * Loads a raw texture coming from the `BITS` tag (pdsUint8Array)
 	 *
 	 * @param name Name of the texture
 	 * @param data Binary data
 	 * @param width Image width
 	 * @param height Image height
 	 */
-	loadRawTexture(name: string, data: Buffer, width: number, height: number): Promise<TEXTURE>
+	loadRawTexture(name: string, data: Uint8Array, width: number, height: number): Promise<TEXTURE>
 
 	/**
 	 * Loads a texture shipped by Visual Pinball

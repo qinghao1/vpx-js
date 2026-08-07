@@ -248,7 +248,7 @@ export class DragPoint extends BiffParser {
 		return dblareasq < accuracy
 	}
 
-	public async fromTag(buffer: Buffer, tag: string): Promise<number> {
+	public async fromTag(buffer: Uint8Array, tag: string): Promise<number> {
 		switch (tag) {
 			case 'VCEN':
 				this.vertex = Vertex3D.get(buffer)
