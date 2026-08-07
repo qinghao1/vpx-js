@@ -6,7 +6,9 @@ import type { Storage } from '../../io/ole-doc.js'
 import { DragPoint } from '../../math/dragpoint.js'
 import { type IPhysicalData, ItemData } from '../item-data.js'
 
-/** Surface data. */
+/** Surface data.
+ *
+ * @see https://github.com/vpinball/vpinball/blob/master/surface.cpp */
 export class SurfaceData extends ItemData implements IPhysicalData {
 	public hitEvent: boolean = false
 	public isDroppable: boolean = false
