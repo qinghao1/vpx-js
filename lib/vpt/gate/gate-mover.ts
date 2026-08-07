@@ -10,105 +10,77 @@ import { radToDeg } from '../../util/float.js'
 import type { GateData } from './gate-data.js'
 import type { GateState } from './gate-state.js'
 
-/** Gate mover. */
+/** Gate mover — swings open/closed with damping and gravity. */
 export class GateMover implements MoverObject {
-	private readonly data: GateData
-	private readonly state: GateState
-	private readonly events: EventProxy
-
-	public angleSpeed: number
+	public angleSpeed = 0
 	public angleMin: number
 	public angleMax: number
 	public friction: number
 	public damping: number
 	public gravityFactor: number
-	public open: boolean // True if the table logic is opening the gate, not just the ball passing through
-	public forcedMove: boolean // True if the table logic is opening/closing the gate
+	public open = false
+	public forcedMove = false
 
-	constructor(data: GateData, state: GateState, events: EventProxy) {
-		this.data = data
-		this.state = state
-		this.events = events
-
-		this.angleMin = this.data.angleMin
-		this.angleMax = this.data.angleMax
-
-		this.friction = this.data.friction
-
+	constructor(
+		private readonly data: GateData,
+		private readonly state: GateState,
+		private readonly events: EventProxy,
+	) {
+		this.angleMin = data.angleMin
+		this.angleMax = data.angleMax
+		this.friction = data.friction
 		this.state.angle = this.angleMin
-		this.angleSpeed = 0.0
-		this.damping = this.data.damping ** PHYS_FACTOR //0.996f;
-		this.gravityFactor = this.data.gravityFactor
-
-		this.open = false
-		this.forcedMove = false
+		this.damping = data.damping ** PHYS_FACTOR
+		this.gravityFactor = data.gravityFactor
 	}
 
 	public updateDisplacements(dtime: number): void {
+		const spd = Math.abs(radToDeg(this.angleSpeed))
+		const reflect = () => {
+			if (!this.forcedMove) this.angleSpeed = -this.angleSpeed * this.damping * 0.8
+			else if (
+				(this.state.angle === this.angleMax && this.angleSpeed > 0) ||
+				(this.state.angle === this.angleMin && this.angleSpeed < 0)
+			)
+				this.angleSpeed = 0
+		}
+
 		if (this.data.twoWay) {
 			if (Math.abs(this.state.angle) > this.angleMax) {
-				if (this.state.angle < 0.0) {
-					this.state.angle = -this.angleMax
-				} else {
-					this.state.angle = this.angleMax
-				}
-				this.events.fireVoidEventParm(Event.LimitEventsEOS, Math.abs(radToDeg(this.angleSpeed))) // send EOS event
-				if (!this.forcedMove) {
-					this.angleSpeed = -this.angleSpeed
-					this.angleSpeed *= this.damping * 0.8 // just some extra damping to reduce the angleSpeed a bit faster
-				} else if (this.angleSpeed > 0.0) {
-					this.angleSpeed = 0.0
-				}
+				this.state.angle = Math.sign(this.state.angle) * this.angleMax
+				this.events.fireVoidEventParm(Event.LimitEventsEOS, spd)
+				reflect()
 			}
 			if (Math.abs(this.state.angle) < this.angleMin) {
-				if (this.state.angle < 0.0) {
-					this.state.angle = -this.angleMin
-				} else {
-					this.state.angle = this.angleMin
-				}
-				if (!this.forcedMove) {
-					this.angleSpeed = -this.angleSpeed
-					this.angleSpeed *= this.damping * 0.8 // just some extra damping to reduce the angleSpeed a bit faster
-				} else if (this.angleSpeed < 0.0) {
-					this.angleSpeed = 0.0
-				}
+				this.state.angle = Math.sign(this.state.angle || 1) * this.angleMin
+				reflect()
 			}
 		} else {
 			if (this.state.angle > this.angleMax) {
 				this.state.angle = this.angleMax
-				this.events.fireVoidEventParm(Event.LimitEventsEOS, Math.abs(radToDeg(this.angleSpeed))) // send EOS event
-				if (!this.forcedMove) {
-					this.angleSpeed = -this.angleSpeed
-					this.angleSpeed *= this.damping * 0.8 // just some extra damping to reduce the angleSpeed a bit faster
-				} else if (this.angleSpeed > 0.0) {
-					this.angleSpeed = 0.0
-				}
+				this.events.fireVoidEventParm(Event.LimitEventsEOS, spd)
+				reflect()
 			}
 			if (this.state.angle < this.angleMin) {
 				this.state.angle = this.angleMin
-				this.events.fireVoidEventParm(Event.LimitEventsBOS, Math.abs(radToDeg(this.angleSpeed))) // send Park event
-				if (!this.forcedMove) {
-					this.angleSpeed = -this.angleSpeed
-					this.angleSpeed *= this.damping * 0.8 // just some extra damping to reduce the angleSpeed a bit faster
-				} else if (this.angleSpeed < 0.0) {
-					this.angleSpeed = 0.0
-				}
+				this.events.fireVoidEventParm(Event.LimitEventsBOS, spd)
+				if (!this.forcedMove) this.angleSpeed = -this.angleSpeed * this.damping * 0.8
+				else if (this.angleSpeed < 0) this.angleSpeed = 0
 			}
 		}
 		this.state.angle += this.angleSpeed * dtime
 	}
 
-	public updateVelocities(physics: PlayerPhysics): void {
-		if (!this.open) {
-			if (Math.abs(this.state.angle) < this.angleMin + 0.01 && Math.abs(this.angleSpeed) < 0.01) {
-				// stop a bit earlier to prevent a nearly endless animation (especially for slow balls)
-				this.state.angle = this.angleMin
-				this.angleSpeed = 0.0
-			}
-			if (Math.abs(this.angleSpeed) !== 0.0 && this.state.angle !== this.angleMin) {
-				this.angleSpeed -= Math.sin(this.state.angle) * this.gravityFactor * (PHYS_FACTOR / 100.0) // Center of gravity towards bottom of object, makes it stop vertical
-				this.angleSpeed *= this.damping
-			}
+	public updateVelocities(_physics: PlayerPhysics): void {
+		if (this.open) return
+		if (Math.abs(this.state.angle) < this.angleMin + 0.01 && Math.abs(this.angleSpeed) < 0.01) {
+			this.state.angle = this.angleMin
+			this.angleSpeed = 0
+			return
+		}
+		if (this.angleSpeed !== 0 && this.state.angle !== this.angleMin) {
+			this.angleSpeed -= Math.sin(this.state.angle) * this.gravityFactor * (PHYS_FACTOR / 100)
+			this.angleSpeed *= this.damping
 		}
 	}
 }
