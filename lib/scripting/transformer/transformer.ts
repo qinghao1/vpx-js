@@ -18,7 +18,7 @@ const require = createRequire(import.meta.url)
 
 const { analyze } = require('escope')
 
-/** Transformer. */
+/** Base AST transformer with scope analysis. */
 export class Transformer {
 	public static SCOPE_NAME = '__scope'
 	public static ITEMS_NAME = '__items'
