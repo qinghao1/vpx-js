@@ -8,28 +8,24 @@ import type { LightSeqData } from './lightseq-data.js'
  *
  * @see https://github.com/vpinball/vpinball/blob/master/lightseq.cpp */
 export class LightSeqApi extends ItemApi<LightSeqData> {
-	/** Get Collection. */
 	get Collection() {
 		return this.data.collection
 	}
 	set Collection(v) {
 		this.data.collection = v
 	}
-	/** Get CenterX. */
 	get CenterX() {
 		return this.data.center.x
 	}
 	set CenterX(v) {
 		this.data.center.x = v
 	}
-	/** Get CenterY. */
 	get CenterY() {
 		return this.data.center.y
 	}
 	set CenterY(v) {
 		this.data.center.y = v
 	}
-	/** Get UpdateInterval. */
 	get UpdateInterval() {
 		return this.data.updateInterval
 	}
