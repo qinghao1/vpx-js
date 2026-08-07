@@ -152,25 +152,15 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 	}
 
 	public getMaterial(name?: string): Material | undefined {
-		if (!name) {
-			return undefined
-		}
-		/* istanbul ignore if */
-		if (!this.data) {
-			throw new Error('Table data is not loaded. Load table with tableDataOnly = false.')
-		}
-		const exact = this.data.materials.find((m) => m.name === name)
-		if (exact) return exact
-		const lower = name.toLowerCase()
-		const byLower = this.data.materials.find((m) => m.name.toLowerCase() === lower)
-		if (byLower) return byLower
-		const withUnderscore = this.data.materials.find((m) => m.name.toLowerCase() === '_' + lower)
-		if (withUnderscore) return withUnderscore
-		const withoutUnderscore = lower.startsWith('_')
-			? this.data.materials.find((m) => m.name.toLowerCase() === lower.slice(1))
-			: undefined
-		if (withoutUnderscore) return withoutUnderscore
-		return undefined
+		if (!name) return undefined
+		if (!this.data) throw new Error('Table data is not loaded. Load table with tableDataOnly = false.')
+		const mats = this.data.materials
+		return (
+			mats.find((m) => m.name === name) ??
+			mats.find((m) => m.name.toLowerCase() === name.toLowerCase()) ??
+			mats.find((m) => m.name.toLowerCase() === `_${name.toLowerCase()}`) ??
+			(name.startsWith('_') ? mats.find((m) => m.name.toLowerCase() === name.toLowerCase().slice(1)) : undefined)
+		)
 	}
 
 	public getApi(): TableApi {
@@ -339,16 +329,6 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 		return this.data.tableHeight
 	}
 
-	// public async exportGltf(opts?: TableExportOptions): Promise<string> {
-	// 	const exporter = new TableExporter(this, opts || {});
-	// 	return await exporter.exportGltf();
-	// }
-
-	// public async exportGlb(opts?: TableExportOptions): Promise<Buffer> {
-	// 	const exporter = new TableExporter(new ThreeRenderApi(), this, opts || {});
-	// 	return await exporter.exportGlb();
-	// }
-
 	public async streamStorage<T>(name: string, streamer: (stg: Storage) => Promise<T>): Promise<T> {
 		return this.loader.streamStorage(name, streamer)
 	}
@@ -465,6 +445,7 @@ const defaultTableLoadOptions: TableLoadOptions = {
 	loadTableScript: true,
 }
 
+/** Options for loading a table. */
 export interface TableLoadOptions {
 	/**
 	 * If set, don't parse game items but only game data (faster).
@@ -492,6 +473,7 @@ export interface TableLoadOptions {
 	skipMeshes?: boolean
 }
 
+/** Options for generating meshes. */
 export interface TableGenerateOptions {
 	exportPlayfield?: boolean
 	exportPrimitives?: boolean
@@ -512,6 +494,7 @@ export interface TableGenerateOptions {
 	gltfOptions?: TableGenerateGltfOptions
 }
 
+/** Options for GLTF generation. */
 export interface TableGenerateGltfOptions {
 	binary?: boolean
 	optimizeImages?: boolean
