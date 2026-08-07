@@ -11,8 +11,8 @@ import type { Ball } from '../ball/ball.js'
 import type { TriggerAnimation } from './trigger-animation.js'
 import type { TriggerData } from './trigger-data.js'
 
-export /** TriggerLineSeg. */
-class TriggerLineSeg extends LineSeg {
+/** TriggerLineSeg. */
+export class TriggerLineSeg extends LineSeg {
 	private readonly data: TriggerData
 	private readonly animation: TriggerAnimation
 
