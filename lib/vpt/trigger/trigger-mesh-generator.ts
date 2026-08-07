@@ -15,10 +15,9 @@ const triggerSimpleMesh = loadMesh('trigger-simple-mesh')
 const triggerStarMesh = loadMesh('trigger-star-mesh')
 const triggerDWireMesh = loadMesh('trigger-wire-d-mesh')
 
-/** Generates trigger meshes. */
+/** Generates trigger mesh. @see https://github.com/vpinball/vpinball/blob/master/trigger.cpp */
 export class TriggerMeshGenerator {
 	private readonly data: TriggerData
-
 	constructor(data: TriggerData) {
 		this.data = data
 	}
@@ -26,50 +25,51 @@ export class TriggerMeshGenerator {
 	public getMesh(table: Table): Mesh {
 		const baseHeight =
 			table.getSurfaceHeight(this.data.szSurface, this.data.center.x, this.data.center.y) * table.getScaleZ()
-
-		let zOffset = this.data.shape === Enums.TriggerShape.TriggerButton ? 5.0 : 0.0
-		if (this.data.shape === Enums.TriggerShape.TriggerWireC) {
-			zOffset = -19.0
-		}
-
-		const fullMatrix = new Matrix3D()
-		if (this.data.shape === Enums.TriggerShape.TriggerWireB) {
-			const tempMatrix = new Matrix3D()
-			fullMatrix.rotateXMatrix(degToRad(-23.0))
-			tempMatrix.rotateZMatrix(degToRad(this.data.rotation))
-			fullMatrix.multiply(tempMatrix)
-		} else if (this.data.shape === Enums.TriggerShape.TriggerWireC) {
-			const tempMatrix = new Matrix3D()
-			fullMatrix.rotateXMatrix(degToRad(140.0))
-			tempMatrix.rotateZMatrix(degToRad(this.data.rotation))
-			fullMatrix.multiply(tempMatrix)
-		} else {
-			fullMatrix.rotateZMatrix(degToRad(this.data.rotation))
-		}
-
+		const zOffset = this.getZOffset()
+		const fullMatrix = this.getFullMatrix()
 		const mesh = this.getBaseMesh()
-		for (const vertex of mesh.vertices) {
-			const vert = Vertex3D.claim(vertex.x, vertex.y, vertex.z).multiplyMatrix(fullMatrix)
-			//fullMatrix.multiplyVector(vert);
-
-			if (this.data.shape === Enums.TriggerShape.TriggerButton || this.data.shape === Enums.TriggerShape.TriggerStar) {
-				vertex.x = f4(vert.x * this.data.radius) + this.data.center.x
-				vertex.y = f4(vert.y * this.data.radius) + this.data.center.y
-				vertex.z = f4(f4(f4(vert.z * this.data.radius) * table.getScaleZ()) + baseHeight) + zOffset
+		const isRound =
+			this.data.shape === Enums.TriggerShape.TriggerButton || this.data.shape === Enums.TriggerShape.TriggerStar
+		for (const v of mesh.vertices) {
+			const vert = Vertex3D.claim(v.x, v.y, v.z).multiplyMatrix(fullMatrix)
+			if (isRound) {
+				v.x = f4(vert.x * this.data.radius) + this.data.center.x
+				v.y = f4(vert.y * this.data.radius) + this.data.center.y
+				v.z = f4(f4(vert.z * this.data.radius) * table.getScaleZ() + baseHeight) + zOffset
 			} else {
-				vertex.x = f4(vert.x * this.data.scaleX) + this.data.center.x
-				vertex.y = f4(vert.y * this.data.scaleY) + this.data.center.y
-				vertex.z = f4(f4(vert.z * table.getScaleZ()) + baseHeight) + zOffset
+				v.x = f4(vert.x * this.data.scaleX) + this.data.center.x
+				v.y = f4(vert.y * this.data.scaleY) + this.data.center.y
+				v.z = f4(vert.z * table.getScaleZ() + baseHeight) + zOffset
 			}
-
-			const normal = Vertex3D.claim(vertex.nx, vertex.ny, vertex.nz).multiplyMatrixNoTranslate(fullMatrix)
-			vertex.nx = normal.x
-			vertex.ny = normal.y
-			vertex.nz = normal.z
-
-			Vertex3D.release(vert, normal)
+			const n = Vertex3D.claim(v.nx, v.ny, v.nz).multiplyMatrixNoTranslate(fullMatrix)
+			v.nx = n.x
+			v.ny = n.y
+			v.nz = n.z
+			Vertex3D.release(vert, n)
 		}
 		return mesh
+	}
+
+	private getZOffset(): number {
+		if (this.data.shape === Enums.TriggerShape.TriggerWireC) return -19
+		if (this.data.shape === Enums.TriggerShape.TriggerButton) return 5
+		return 0
+	}
+
+	private getFullMatrix(): Matrix3D {
+		const m = new Matrix3D()
+		if (this.data.shape === Enums.TriggerShape.TriggerWireB) {
+			m.rotateXMatrix(degToRad(-23))
+			const tmp = new Matrix3D().rotateZMatrix(degToRad(this.data.rotation))
+			m.multiply(tmp)
+		} else if (this.data.shape === Enums.TriggerShape.TriggerWireC) {
+			m.rotateXMatrix(degToRad(140))
+			const tmp = new Matrix3D().rotateZMatrix(degToRad(this.data.rotation))
+			m.multiply(tmp)
+		} else {
+			m.rotateZMatrix(degToRad(this.data.rotation))
+		}
+		return m
 	}
 
 	private getBaseMesh(): Mesh {
@@ -87,9 +87,8 @@ export class TriggerMeshGenerator {
 				return triggerStarMesh.clone(name)
 			case Enums.TriggerShape.TriggerNone:
 				return triggerSimpleMesh.clone(name)
-			/* istanbul ignore next */
 			default:
-				logger().warn('[TriggerItem.getBaseMesh] Unknown shape "%s".', this.data.shape)
+				logger().warn('[TriggerMeshGenerator] Unknown shape "%s".', this.data.shape)
 				return triggerSimpleMesh.clone(name)
 		}
 	}
