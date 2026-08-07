@@ -4,9 +4,10 @@
 import { close, open, read } from 'node:fs'
 import type { IBinaryReader } from './ole-doc.js'
 
+/** Node file reader for VPX. */
 export class NodeBinaryReader implements IBinaryReader {
 	private readonly filename: string
-	private fd: number = 0
+	private fd = 0
 
 	constructor(filename: string) {
 		this.filename = filename
@@ -15,19 +16,11 @@ export class NodeBinaryReader implements IBinaryReader {
 	public read(target: Uint8Array, offset: number, length: number, position: number): Promise<[number, Uint8Array]> {
 		return new Promise((resolve, reject) => {
 			read(this.fd, target as any, offset, length, position, (err: any, bytesRead: number, data: any) => {
-				/* istanbul ignore if */
-				if (err) {
-					reject(err)
-					return
-				}
-				// data may be Buffer or Uint8Array; ensure Uint8Array
-				let result: Uint8Array
-				if (data instanceof Uint8Array) {
-					result = data as Uint8Array
-				} else {
-					result = new Uint8Array(data.buffer, data.byteOffset, data.byteLength)
-				}
-				// structuredClone to detach if caller expects isolated copy
+				if (err) return reject(err)
+				let result: Uint8Array =
+					data instanceof Uint8Array
+						? (data as Uint8Array)
+						: new Uint8Array(data.buffer, data.byteOffset, data.byteLength)
 				const cloned =
 					typeof structuredClone !== 'undefined'
 						? structuredClone(result.subarray(0, bytesRead) as any)
@@ -38,30 +31,14 @@ export class NodeBinaryReader implements IBinaryReader {
 	}
 
 	public async close(): Promise<void> {
-		if (this.fd) {
-			await new Promise<void>((resolve, reject) => {
-				close(this.fd, (err) => {
-					if (err) {
-						reject(err)
-						return
-					}
-					resolve()
-				})
-			})
-		}
+		if (this.fd) await new Promise<void>((resolve, reject) => close(this.fd, (err) => (err ? reject(err) : resolve())))
 		this.fd = 0
 	}
 
 	public async open(): Promise<void> {
-		this.fd = await new Promise<number>((resolve, reject) => {
-			open(this.filename, 'r', 0o666, (err, fd) => {
-				if (err) {
-					reject(err)
-					return
-				}
-				resolve(fd)
-			})
-		})
+		this.fd = await new Promise<number>((resolve, reject) =>
+			open(this.filename, 'r', 0o666, (err, fd) => (err ? reject(err) : resolve(fd))),
+		)
 	}
 
 	public isOpen(): boolean {
