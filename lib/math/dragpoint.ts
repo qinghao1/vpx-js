@@ -21,163 +21,136 @@ export class DragPoint extends BiffParser {
 
 	/** Generates render vertices from drag points. */
 	public static getRgVertex<T extends IRenderVertex>(
-		vdpoint: DragPoint[],
+		dragPoints: DragPoint[],
 		instantiateT: () => T,
 		instantiateCatmullCurve: (pdp0: Vertex, pdp1: Vertex, pdp2: Vertex, pdp3: Vertex) => CatmullCurve,
 		loop = true,
 		accuracy = 4.0,
 	): T[] {
-		let vv: T[] = []
-		const cpoint = vdpoint.length
-		const endpoint = loop ? cpoint : cpoint - 1
-		const rendv2 = instantiateT()
+		let out: T[] = []
+		const n = dragPoints.length
+		const end = loop ? n : n - 1
+		const tail = instantiateT()
 
-		for (let i = 0; i < endpoint; i++) {
-			const pdp1 = vdpoint[i]
-			const pdp2 = vdpoint[i < cpoint - 1 ? i + 1 : 0]
-			if (pdp1.vertex.x === pdp2.vertex.x && pdp1.vertex.y === pdp2.vertex.y && pdp1.vertex.z === pdp2.vertex.z)
-				continue
+		for (let i = 0; i < end; i++) {
+			const p1 = dragPoints[i]
+			const p2 = dragPoints[i < n - 1 ? i + 1 : 0]
+			if (p1.vertex.x === p2.vertex.x && p1.vertex.y === p2.vertex.y && p1.vertex.z === p2.vertex.z) continue
 
-			let iprev = pdp1.fSmooth ? i - 1 : i
-			if (iprev < 0) iprev = loop ? cpoint - 1 : 0
-			let inext = pdp2.fSmooth ? i + 2 : i + 1
-			if (inext >= cpoint) inext = loop ? inext - cpoint : cpoint - 1
+			let iPrev = p1.fSmooth ? i - 1 : i
+			if (iPrev < 0) iPrev = loop ? n - 1 : 0
+			let iNext = p2.fSmooth ? i + 2 : i + 1
+			if (iNext >= n) iNext = loop ? iNext - n : n - 1
 
-			const pdp0 = vdpoint[iprev]
-			const pdp3 = vdpoint[inext]
-			const cc = instantiateCatmullCurve(pdp0.vertex, pdp1.vertex, pdp2.vertex, pdp3.vertex)
-
-			const rendv1 = instantiateT()
-			rendv1.set(pdp1.vertex.x, pdp1.vertex.y, pdp1.vertex.z)
-			rendv1.fSmooth = pdp1.fSmooth
-			rendv1.fSlingshot = pdp1.fSlingshot
-			rendv1.fControlPoint = true
-			rendv2.set(pdp2.vertex.x, pdp2.vertex.y, pdp2.vertex.z)
-
-			vv = DragPoint.recurseSmoothLine(vv, cc, 0, 1, rendv1, rendv2, accuracy)
+			const cc = instantiateCatmullCurve(dragPoints[iPrev].vertex, p1.vertex, p2.vertex, dragPoints[iNext].vertex)
+			const v1 = instantiateT()
+			v1.set(p1.vertex.x, p1.vertex.y, p1.vertex.z)
+			v1.fSmooth = p1.fSmooth
+			v1.fSlingshot = p1.fSlingshot
+			v1.fControlPoint = true
+			tail.set(p2.vertex.x, p2.vertex.y, p2.vertex.z)
+			out = DragPoint.recurseSmoothLine(out, cc, 0, 1, v1, tail, accuracy)
 		}
-
 		if (!loop) {
-			rendv2.fSmooth = true
-			rendv2.fSlingshot = false
-			rendv2.fControlPoint = false
-			vv.push(rendv2)
+			tail.fSmooth = true
+			tail.fSlingshot = false
+			tail.fControlPoint = false
+			out.push(tail)
 		}
-		return vv
+		return out
 	}
 
-	public static getTextureCoords(dragPoints: DragPoint[], vv: RenderVertex[]): number[] {
-		const vitexpoints: number[] = []
-		const virenderpoints: number[] = []
-		let fNoCoords = false
-		const cpoints = vv.length
-		let icontrolpoint = 0
-		const ppcoords: number[] = []
+	/** Computes texture coordinates along a drag-point path. */
+	public static getTextureCoords(dragPoints: DragPoint[], verts: RenderVertex[]): number[] {
+		const texIdx: number[] = []
+		const renderIdx: number[] = []
+		let autoOnly = false
+		const n = verts.length
+		let ctrl = 0
+		const coords: number[] = []
 
-		for (let i = 0; i < cpoints; i++) {
-			const prv = vv[i]
-			if (prv.fControlPoint) {
-				if (!dragPoints[icontrolpoint].fAutoTexture) {
-					vitexpoints.push(icontrolpoint)
-					virenderpoints.push(i)
-				}
-				icontrolpoint++
+		for (let i = 0; i < n; i++) {
+			if (!verts[i].fControlPoint) continue
+			if (!dragPoints[ctrl].fAutoTexture) {
+				texIdx.push(ctrl)
+				renderIdx.push(i)
+			}
+			ctrl++
+		}
+		if (texIdx.length === 0) {
+			texIdx.push(0)
+			renderIdx.push(0)
+			autoOnly = true
+		}
+		texIdx.push(texIdx[0] + dragPoints.length)
+		renderIdx.push(renderIdx[0] + n)
+
+		for (let i = 0; i < texIdx.length - 1; i++) {
+			const start = renderIdx[i] % n
+			let end = renderIdx[i < n - 1 ? i + 1 : 0] % n
+			const t0 = autoOnly ? 0 : dragPoints[texIdx[i] % dragPoints.length].texturecoord
+			const t1 = autoOnly ? 1 : dragPoints[texIdx[i + 1] % dragPoints.length].texturecoord
+			const delta = t1 - t0
+			if (end <= start) end += n
+
+			let total = 0
+			for (let l = start; l < end; l++) {
+				const a = verts[l % n],
+					b = verts[(l + 1) % n]
+				const dx = f4(a.x - b.x),
+					dy = f4(a.y - b.y)
+				total = f4(total + f4(Math.sqrt(f4(dx * dx) + f4(dy * dy))))
+			}
+			let partial = 0
+			for (let l = start; l < end; l++) {
+				const a = verts[l % n],
+					b = verts[(l + 1) % n]
+				const dx = f4(a.x - b.x),
+					dy = f4(a.y - b.y)
+				const len = f4(Math.sqrt(f4(dx * dx) + f4(dy * dy)))
+				if (total === 0) total = 1
+				coords[l % n] = f4(partial / total) * delta + t0
+				partial = f4(partial + len)
 			}
 		}
-
-		if (vitexpoints.length === 0) {
-			vitexpoints.push(0)
-			virenderpoints.push(0)
-			fNoCoords = true
-		}
-
-		vitexpoints.push(vitexpoints[0] + dragPoints.length)
-		virenderpoints.push(virenderpoints[0] + cpoints)
-
-		for (let i = 0; i < vitexpoints.length - 1; i++) {
-			const startrenderpoint = virenderpoints[i] % cpoints
-			let endrenderpoint = virenderpoints[i < cpoints - 1 ? i + 1 : 0] % cpoints
-			let startTexCoord: number, endtexcoord: number
-			if (fNoCoords) {
-				startTexCoord = 0
-				endtexcoord = 1
-			} else {
-				startTexCoord = dragPoints[vitexpoints[i] % dragPoints.length].texturecoord
-				endtexcoord = dragPoints[vitexpoints[i + 1] % dragPoints.length].texturecoord
-			}
-			const deltacoord = endtexcoord - startTexCoord
-			if (endrenderpoint <= startrenderpoint) endrenderpoint += cpoints
-
-			let totalLength = 0
-			for (let l = startrenderpoint; l < endrenderpoint; l++) {
-				const pv1 = vv[l % cpoints],
-					pv2 = vv[(l + 1) % cpoints]
-				const dx = f4(pv1.x - pv2.x),
-					dy = f4(pv1.y - pv2.y)
-				totalLength = f4(totalLength + f4(Math.sqrt(f4(dx * dx) + f4(dy * dy))))
-			}
-			let partialLength = 0
-			for (let l = startrenderpoint; l < endrenderpoint; l++) {
-				const pv1 = vv[l % cpoints],
-					pv2 = vv[(l + 1) % cpoints]
-				const dx = f4(pv1.x - pv2.x),
-					dy = f4(pv1.y - pv2.y)
-				const length = f4(Math.sqrt(f4(dx * dx) + f4(dy * dy)))
-				if (totalLength === 0) totalLength = 1
-				const texCoord = f4(partialLength / totalLength)
-				ppcoords[l % cpoints] = texCoord * deltacoord + startTexCoord
-				partialLength = f4(partialLength + length)
-			}
-		}
-		return ppcoords
+		return coords
 	}
 
 	private static recurseSmoothLine<T extends IRenderVertex>(
-		vv: T[] = [],
+		out: T[] = [],
 		cc: CatmullCurve,
 		t1: number,
 		t2: number,
-		vt1: T,
-		vt2: T,
+		v1: T,
+		v2: T,
 		accuracy: number,
 	): T[] {
-		const tMid = f4(f4(t1 + t2) * 0.5)
-		const vmid = cc.getPointAt(tMid) as T
-		vmid.fSmooth = true
-		vmid.fSlingshot = false
-		vmid.fControlPoint = false
-		if (DragPoint.flatWithAccuracy(vt1, vt2, vmid, accuracy)) vv.push(vt1)
+		const tMid = f4((t1 + t2) * 0.5)
+		const mid = cc.getPointAt(tMid) as T
+		mid.fSmooth = true
+		mid.fSlingshot = false
+		mid.fControlPoint = false
+		if (DragPoint.flatWithAccuracy(v1, v2, mid, accuracy)) out.push(v1)
 		else {
-			vv = DragPoint.recurseSmoothLine<T>(vv, cc, t1, tMid, vt1, vmid, accuracy)
-			vv = DragPoint.recurseSmoothLine<T>(vv, cc, tMid, t2, vmid, vt2, accuracy)
+			out = DragPoint.recurseSmoothLine(out, cc, t1, tMid, v1, mid, accuracy)
+			out = DragPoint.recurseSmoothLine(out, cc, tMid, t2, mid, v2, accuracy)
 		}
-		return vv
+		return out
 	}
 
-	private static flatWithAccuracy(
-		v1: IRenderVertex,
-		v2: IRenderVertex,
-		vMid: IRenderVertex,
-		accuracy: number,
-	): boolean {
-		return v1.isVector3 && v2.isVector3 && vMid.isVector3
-			? DragPoint.flatWithAccuracy3(v1 as any, v2 as any, vMid as any, accuracy)
-			: DragPoint.flatWithAccuracy2(v1, v2, vMid, accuracy)
+	private static flatWithAccuracy(v1: IRenderVertex, v2: IRenderVertex, mid: IRenderVertex, acc: number): boolean {
+		return v1.isVector3 && v2.isVector3 && mid.isVector3
+			? DragPoint.flatWithAccuracy3(v1 as any, v2 as any, mid as any, acc)
+			: DragPoint.flatWithAccuracy2(v1, v2, mid, acc)
 	}
 
-	private static flatWithAccuracy2(
-		v1: IRenderVertex,
-		v2: IRenderVertex,
-		vMid: IRenderVertex,
-		accuracy: number,
-	): boolean {
-		const dblArea = f4(f4(vMid.x - v1.x) * f4(v2.y - v1.y)) - f4(f4(v2.x - v1.x) * f4(vMid.y - v1.y))
-		return f4(dblArea * dblArea) < accuracy
+	private static flatWithAccuracy2(v1: IRenderVertex, v2: IRenderVertex, mid: IRenderVertex, acc: number): boolean {
+		const area = f4(f4(mid.x - v1.x) * f4(v2.y - v1.y)) - f4(f4(v2.x - v1.x) * f4(mid.y - v1.y))
+		return f4(area * area) < acc
 	}
 
-	private static flatWithAccuracy3(v1: Vertex3D, v2: Vertex3D, vMid: Vertex3D, accuracy: number): boolean {
-		const cross = vMid.clone().sub(v1).cross(v2.clone().sub(v1))
-		return cross.lengthSq() < accuracy
+	private static flatWithAccuracy3(v1: Vertex3D, v2: Vertex3D, mid: Vertex3D, acc: number): boolean {
+		return mid.clone().sub(v1).cross(v2.clone().sub(v1)).lengthSq() < acc
 	}
 
 	public async fromTag(buffer: Uint8Array, tag: string): Promise<number> {
