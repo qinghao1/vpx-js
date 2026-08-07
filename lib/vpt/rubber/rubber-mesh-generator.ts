@@ -11,7 +11,8 @@ import { FLT_MAX, FLT_MIN, Mesh } from '../mesh.js'
 import type { Table } from '../table/table.js'
 import type { RubberData } from './rubber-data.js'
 
-export class RubberMeshGenerator {
+export /** Rubber mesh generator. */
+class RubberMeshGenerator {
 	public readonly middlePoint: Vertex3D = new Vertex3D()
 	private readonly data: RubberData
 
