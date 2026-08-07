@@ -6,7 +6,9 @@ import type { Storage } from '../../io/ole-doc.js'
 import { Vertex2D } from '../../math/vertex2d.js'
 import { ItemData } from '../item-data.js'
 
-/** DispReel data. */
+/** DispReel data.
+ *
+ * @see https://github.com/vpinball/vpinball/blob/master/dispreel.cpp */
 export class DispReelData extends ItemData {
 	public v1!: Vertex2D
 	public v2!: Vertex2D
