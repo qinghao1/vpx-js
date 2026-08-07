@@ -6,7 +6,8 @@ import type { IRenderVertex, Vertex } from './vertex.js'
 import { RenderVertex, type Vertex2D } from './vertex2d.js'
 import { RenderVertex3D, type Vertex3D } from './vertex3d.js'
 
-/** VPinball Catmull-Rom curve (see vpinball/mesh.h). */
+/** Catmull-Rom curve — non-uniform centripetal.
+ * @see https://github.com/vpinball/vpinball/blob/master/mesh.h */
 export abstract class CatmullCurve {
 	public abstract getPointAt(t: number): IRenderVertex
 
@@ -33,10 +34,10 @@ export abstract class CatmullCurve {
 		let t2 = f4(f4(f4(f4(x2 - x1) / dt1) - f4(f4(x3 - x1) / f4(dt1 + dt2))) + f4(f4(x3 - x2) / dt2))
 		t1 = f4(t1 * dt1)
 		t2 = f4(t2 * dt1)
-		return CatmullCurve.initCubicSplineCoeffs(x1, x2, f4(t1), f4(t2))
+		return CatmullCurve.coeffs(x1, x2, f4(t1), f4(t2))
 	}
 
-	private static initCubicSplineCoeffs(x0: number, x1: number, t0: number, t1: number): number[] {
+	private static coeffs(x0: number, x1: number, t0: number, t1: number): number[] {
 		return [
 			f4(x0),
 			f4(t0),
@@ -44,11 +45,16 @@ export abstract class CatmullCurve {
 			f4(f4(f4(f4(2 * x0) - f4(2 * x1)) + t0) + t1),
 		]
 	}
+
+	protected static evalCubic(c: number[], t: number): number {
+		const t2 = f4(t * t),
+			t3 = f4(t2 * t)
+		return f4(f4(f4(c[3] * t3) + f4(c[2] * t2)) + f4(c[1] * t)) + c[0]
+	}
 }
 
-/** CatmullCurve2D. */
 export class CatmullCurve2D extends CatmullCurve {
-	private c: { x: number[]; y: number[]; z?: number[] } = { x: [0, 0, 0, 0], y: [0, 0, 0, 0] }
+	private c: { x: number[]; y: number[] } = { x: [0, 0, 0, 0], y: [0, 0, 0, 0] }
 
 	public static fromVertex2D(v0: Vertex2D, v1: Vertex2D, v2: Vertex2D, v3: Vertex2D): CatmullCurve2D {
 		const [dt0, dt1, dt2] = CatmullCurve.dt(v0, v1, v2, v3)
@@ -66,16 +72,10 @@ export class CatmullCurve2D extends CatmullCurve {
 	}
 
 	public getPointAt(t: number): IRenderVertex {
-		const t2 = f4(t * t),
-			t3 = f4(t2 * t)
-		return new RenderVertex(
-			f4(f4(f4(this.c.x[3] * t3) + f4(this.c.x[2] * t2)) + f4(this.c.x[1] * t)) + this.c.x[0],
-			f4(f4(f4(this.c.y[3] * t3) + f4(this.c.y[2] * t2)) + f4(this.c.y[1] * t)) + this.c.y[0],
-		)
+		return new RenderVertex(CatmullCurve.evalCubic(this.c.x, t), CatmullCurve.evalCubic(this.c.y, t))
 	}
 }
 
-/** CatmullCurve3D. */
 export class CatmullCurve3D extends CatmullCurve {
 	private c: { x: number[]; y: number[]; z: number[] } = { x: [0, 0, 0, 0], y: [0, 0, 0, 0], z: [0, 0, 0, 0] }
 
@@ -92,12 +92,10 @@ export class CatmullCurve3D extends CatmullCurve {
 	}
 
 	public getPointAt(t: number): IRenderVertex {
-		const t2 = f4(t * t),
-			t3 = f4(t2 * t)
 		return new RenderVertex3D(
-			f4(f4(f4(this.c.x[3] * t3) + f4(this.c.x[2] * t2)) + f4(this.c.x[1] * t)) + this.c.x[0],
-			f4(f4(f4(this.c.y[3] * t3) + f4(this.c.y[2] * t2)) + f4(this.c.y[1] * t)) + this.c.y[0],
-			f4(f4(f4(this.c.z[3] * t3) + f4(this.c.z[2] * t2)) + f4(this.c.z[1] * t)) + this.c.z[0],
+			CatmullCurve.evalCubic(this.c.x, t),
+			CatmullCurve.evalCubic(this.c.y, t),
+			CatmullCurve.evalCubic(this.c.z, t),
 		)
 	}
 }
