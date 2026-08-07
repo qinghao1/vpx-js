@@ -15,28 +15,24 @@ export class TimerApi extends ItemApi<TimerData> {
 		super(data, events, player, table)
 	}
 
-	/** Get X. */
 	get X() {
 		return this.data.vCenter.x
 	}
 	set X(v) {
 		this.data.vCenter.x = v
 	}
-	/** Get Y. */
 	get Y() {
 		return this.data.vCenter.y
 	}
 	set Y(v) {
 		this.data.vCenter.y = v
 	}
-	/** Get Interval. */
 	get Interval() {
 		return this.data.timer.interval
 	}
 	set Interval(v) {
 		this._setTimerInterval(v)
 	}
-	/** Get Enabled. */
 	get Enabled() {
 		return this.data.timer.enabled
 	}
