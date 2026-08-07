@@ -36,6 +36,7 @@ export class Surface
 	private api?: SurfaceApi
 
 	// public getters
+	/** Top height. */
 	get heightTop() {
 		return this.data.heightTop
 	}
