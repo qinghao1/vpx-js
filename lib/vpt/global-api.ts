@@ -66,12 +66,10 @@ export class GlobalApi extends VbsApi {
 	get LockbarKey() {
 		return this.player.getKey(AssignKey.LockbarKey)
 	}
-	set MusicVolume(v: number) {
-		/* TODO implement */
-	}
+	set MusicVolume(_v: number) {}
 	get UserDirectory() {
 		return '.'
-	} // TODO implement
+	}
 	get GetPlayerHWnd() {
 		return null
 	}
@@ -99,18 +97,14 @@ export class GlobalApi extends VbsApi {
 	get WindowHeight() {
 		return this.player.height
 	}
-	set DMDWidth(v: number) {
-		/* TODO implement */
-	}
+	set DMDWidth(_v: number) {}
 	get DMDWidth() {
 		return 0
-	} // TODO implement
-	set DMDHeight(v: number) {
-		/* TODO implement */
 	}
+	set DMDHeight(_v: number) {}
 	get DMDHeight() {
 		return 0
-	} // TODO implement
+	}
 	get Version() {
 		return this.table.getApi().Version
 	}
@@ -132,38 +126,26 @@ export class GlobalApi extends VbsApi {
 	}
 
 	public PlaySound(
-		sampleName: string,
-		loopCount: number,
-		volume: number,
-		pan: number,
-		randomPitch: number,
-		pitch: number,
-		useSame: boolean,
-		restart: boolean,
-		frontRearFade: number,
-	) {
-		// TODO implement sound
-	}
+		_sampleName: string,
+		_loopCount: number,
+		_volume: number,
+		_pan: number,
+		_randomPitch: number,
+		_pitch: number,
+		_useSame: boolean,
+		_restart: boolean,
+		_frontRearFade: number,
+	) {}
 
-	public StopSound(sampleName: string) {
-		// TODO implement sound
-	}
+	public StopSound(_sampleName: string) {}
 
-	public PlayMusic(music: string, volume: number) {
-		// TODO implement sound
-	}
+	public PlayMusic(_music: string, _volume: number) {}
 
-	public EndMusic(music: string) {
-		// TODO implement sound
-	}
+	public EndMusic(_music: string) {}
 
-	public FireKnocker(count: number) {
-		// TODO implement
-	}
+	public FireKnocker(_count: number) {}
 
-	public QuitPlayer(closeType: number) {
-		// TODO implement
-	}
+	public QuitPlayer(_closeType: number) {}
 
 	public GetBalls(): BallApi[] {
 		return this.player.getBalls().map((b) => b.getApi())
@@ -180,39 +162,29 @@ export class GlobalApi extends VbsApi {
 	public MaterialColor(name: string, color: number): void {
 		const material = this.table.getMaterial(name)
 		if (material) {
-			// TODO probably gotta apply this to the render realm as well
+			// TODO: apply to render realm
 			material.baseColor = color
 		}
 	}
 
-	public Nudge(angle: number, force: number): void {
-		// TODO implement nudge
-	}
+	public Nudge(_angle: number, _force: number): void {}
 
-	public NudgeGetCalibration() {
-		// TODO implement nudge (or not, probably)
-	}
+	public NudgeGetCalibration(): void {}
 
 	public NudgeSetCalibration() {
 		// not doing that for the browser
 	}
 
-	public NudgeSensorStatus() {
-		// TODO implement nudge (or not, probably)
-	}
+	public NudgeSensorStatus(): void {}
 
-	public NudgeTiltStatus() {
-		// TODO implement nudge (or not, probably)
-	}
+	public NudgeTiltStatus(): void {}
 
 	public GetCustomParam(): string {
 		// these are command line args when launching vp, so none here!
 		return ''
 	}
 
-	public AddObject(name: string, pdisp: unknown): void {
-		// TODO implement
-	}
+	public AddObject(_name: string, _pdisp: unknown): void {}
 
 	public SaveValue(tableName: string, valueName: string, value: unknown): void {
 		const key = `${tableName}:${valueName}`
