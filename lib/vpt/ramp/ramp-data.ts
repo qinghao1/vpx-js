@@ -8,59 +8,82 @@ import { f4 } from '../../math/float.js'
 import { Enums } from '../enums.js'
 import { type IPhysicalData, ItemData } from '../item-data.js'
 
+const FLOAT_MAP: Record<string, string> = {
+	HTBT: 'heightBottom',
+	HTTP: 'heightTop',
+	WDBT: 'widthBottom',
+	WDTP: 'widthTop',
+	WLHL: 'leftWallHeight',
+	WLHR: 'rightWallHeight',
+	WVHL: 'leftWallHeightVisible',
+	WVHR: 'rightWallHeightVisible',
+	THRS: 'threshold',
+	ELAS: 'elasticity',
+	RFCT: 'friction',
+	RSCT: 'scatter',
+	RADB: 'depthBias',
+	RADI: 'wireDiameter',
+	RADX: 'wireDistanceX',
+	RADY: 'wireDistanceY',
+}
+const BOOL_MAP: Record<string, string> = {
+	IMGW: 'imageWalls',
+	HTEV: 'hitEvent',
+	CLDR: 'isCollidable',
+	RVIS: 'isVisible',
+	REEN: 'isReflectionEnabled',
+	OVPH: 'overwritePhysics',
+}
+const STRING_MAP: Record<string, string> = { MATR: 'szMaterial', IMAG: 'szImage', MAPH: 'szPhysicsMaterial' }
+
 /** Ramp data.
- *
  * @see https://github.com/vpinball/vpinball/blob/master/ramp.cpp */
 export class RampData extends ItemData implements IPhysicalData {
-	public depthBias: number = 0
+	public depthBias = 0
 	public dragPoints: DragPoint[] = []
 	public elasticity!: number
 	public friction!: number
-	public hitEvent: boolean = false
-	public heightBottom: number = 0
-	public heightTop: number = f4(50)
+	public hitEvent = false
+	public heightBottom = 0
+	public heightTop = f4(50)
 	public imageAlignment: number = Enums.RampImageAlignment.ImageModeWorld
-	public imageWalls: boolean = true
-	public isCollidable: boolean = true
-	public isReflectionEnabled: boolean = true
-	public isVisible: boolean = true
-	public leftWallHeight: number = f4(62)
-	public leftWallHeightVisible: number = f4(30)
-	public overwritePhysics: boolean = true
+	public imageWalls = true
+	public isCollidable = true
+	public isReflectionEnabled = true
+	public isVisible = true
+	public leftWallHeight = f4(62)
+	public leftWallHeightVisible = f4(30)
+	public overwritePhysics = true
 	public rampType: number = Enums.RampType.RampTypeFlat
-	public rightWallHeight: number = f4(62)
-	public rightWallHeightVisible: number = f4(30)
+	public rightWallHeight = f4(62)
+	public rightWallHeightVisible = f4(30)
 	public scatter!: number
 	public szImage?: string
 	public szMaterial?: string
 	public szPhysicsMaterial?: string
 	public threshold?: number
-	public widthBottom: number = f4(75)
-	public widthTop: number = f4(60)
-	public wireDiameter: number = f4(8)
-	public wireDistanceX: number = f4(38)
-	public wireDistanceY: number = f4(88)
+	public widthBottom = f4(75)
+	public widthTop = f4(60)
+	public wireDiameter = f4(8)
+	public wireDistanceX = f4(38)
+	public wireDistanceY = f4(88)
 
 	public static async fromStorage(storage: Storage, itemName: string): Promise<RampData> {
-		const rampData = new RampData(itemName)
-		await storage.streamFiltered(itemName, 4, RampData.createStreamHandler(rampData))
-		if (rampData.widthTop === 0 && rampData.widthBottom > 0) {
-			rampData.widthTop = 0.1
-		}
-		if (rampData.widthBottom === 0 && rampData.widthTop > 0) {
-			rampData.widthBottom = 0.1
-		}
-		return rampData
+		const d = new RampData(itemName)
+		await storage.streamFiltered(itemName, 4, RampData.createStreamHandler(d))
+		if (d.widthTop === 0 && d.widthBottom > 0) d.widthTop = 0.1
+		if (d.widthBottom === 0 && d.widthTop > 0) d.widthBottom = 0.1
+		return d
 	}
 
-	private static createStreamHandler(rampData: RampData) {
-		rampData.dragPoints = []
-		return BiffParser.stream(rampData.fromTag.bind(rampData), {
+	private static createStreamHandler(d: RampData) {
+		d.dragPoints = []
+		return BiffParser.stream(d.fromTag.bind(d), {
 			nestedTags: {
 				DPNT: {
 					onStart: () => new DragPoint(),
-					onTag: (dragPoint) => dragPoint.fromTag.bind(dragPoint),
-					onEnd: (dragPoint) => rampData.dragPoints.push(dragPoint),
+					onTag: (dp) => dp.fromTag.bind(dp),
+					onEnd: (dp) => d.dragPoints.push(dp),
 				},
 			},
 		})
@@ -71,94 +94,27 @@ export class RampData extends ItemData implements IPhysicalData {
 	}
 
 	private async fromTag(buffer: Uint8Array, tag: string, offset: number, len: number): Promise<number> {
-		switch (tag) {
-			case 'HTBT':
-				this.heightBottom = this.getFloat(buffer)
-				break
-			case 'HTTP':
-				this.heightTop = this.getFloat(buffer)
-				break
-			case 'WDBT':
-				this.widthBottom = this.getFloat(buffer)
-				break
-			case 'WDTP':
-				this.widthTop = this.getFloat(buffer)
-				break
-			case 'MATR':
-				this.szMaterial = this.getString(buffer, len)
-				break
-			case 'TYPE':
-				this.rampType = this.getInt(buffer)
-				break
-			case 'IMAG':
-				this.szImage = this.getString(buffer, len)
-				break
-			case 'ALGN':
-				this.imageAlignment = this.getInt(buffer)
-				break
-			case 'IMGW':
-				this.imageWalls = this.getBool(buffer)
-				break
-			case 'WLHL':
-				this.leftWallHeight = this.getFloat(buffer)
-				break
-			case 'WLHR':
-				this.rightWallHeight = this.getFloat(buffer)
-				break
-			case 'WVHL':
-				this.leftWallHeightVisible = this.getFloat(buffer)
-				break
-			case 'WVHR':
-				this.rightWallHeightVisible = this.getFloat(buffer)
-				break
-			case 'HTEV':
-				this.hitEvent = this.getBool(buffer)
-				break
-			case 'THRS':
-				this.threshold = this.getFloat(buffer)
-				break
-			case 'ELAS':
-				this.elasticity = this.getFloat(buffer)
-				break
-			case 'RFCT':
-				this.friction = this.getFloat(buffer)
-				break
-			case 'RSCT':
-				this.scatter = this.getFloat(buffer)
-				break
-			case 'CLDR':
-				this.isCollidable = this.getBool(buffer)
-				break
-			case 'RVIS':
-				this.isVisible = this.getBool(buffer)
-				break
-			case 'REEN':
-				this.isReflectionEnabled = this.getBool(buffer)
-				break
-			case 'RADB':
-				this.depthBias = this.getFloat(buffer)
-				break
-			case 'RADI':
-				this.wireDiameter = this.getFloat(buffer)
-				break
-			case 'RADX':
-				this.wireDistanceX = this.getFloat(buffer)
-				break
-			case 'RADY':
-				this.wireDistanceY = this.getFloat(buffer)
-				break
-			case 'MAPH':
-				this.szPhysicsMaterial = this.getString(buffer, len)
-				break
-			case 'OVPH':
-				this.overwritePhysics = this.getBool(buffer)
-				break
-			case 'PNTS':
-				break
-			default:
-				this.getCommonBlock(buffer, tag, len)
-				break
+		if (tag === 'TYPE') {
+			this.rampType = this.getInt(buffer)
+			return 0
 		}
+		if (tag === 'ALGN') {
+			this.imageAlignment = this.getInt(buffer)
+			return 0
+		}
+		if (tag in FLOAT_MAP) {
+			;(this as any)[FLOAT_MAP[tag]] = this.getFloat(buffer)
+			return 0
+		}
+		if (tag in BOOL_MAP) {
+			;(this as any)[BOOL_MAP[tag]] = this.getBool(buffer)
+			return 0
+		}
+		if (tag in STRING_MAP) {
+			;(this as any)[STRING_MAP[tag]] = this.getString(buffer, len)
+			return 0
+		}
+		this.getCommonBlock(buffer, tag, len)
 		return 0
 	}
 }
