@@ -12,27 +12,18 @@ import type { KickerData } from './kicker-data.js'
 import type { KickerHit } from './kicker-hit.js'
 import type { KickerState } from './kicker-state.js'
 
-/** Kicker API.
- *
- * @see https://github.com/vpinball/vpinball/blob/master/kicker.cpp */
+/** Kicker API — VBS surface for `Kicker`. @see https://github.com/vpinball/vpinball/blob/master/kicker.cpp */
 export class KickerApi extends ItemApi<KickerData> {
-	private readonly state: KickerState
-	private readonly hit: KickerHit
-	private readonly ballCreator: IBallCreationPosition
-
 	constructor(
-		state: KickerState,
+		private readonly state: KickerState,
 		data: KickerData,
-		hit: KickerHit,
+		private readonly hit: KickerHit,
 		events: EventProxy,
-		ballCreator: IBallCreationPosition,
+		private readonly ballCreator: IBallCreationPosition,
 		player: Player,
 		table: Table,
 	) {
 		super(data, events, player, table)
-		this.state = state
-		this.hit = hit
-		this.ballCreator = ballCreator
 	}
 
 	get X() {
@@ -119,7 +110,6 @@ export class KickerApi extends ItemApi<KickerData> {
 			logger().error('LastCapturedBall was called but no ball was captured!')
 			return null
 		}
-
 		let ballFound = false
 		for (const ball of this.player.balls) {
 			if (ball === this.hit.lastCapturedBall) {
@@ -127,13 +117,11 @@ export class KickerApi extends ItemApi<KickerData> {
 				break
 			}
 		}
-
 		if (!ballFound) {
 			logger().error('LastCapturedBall was called but ball is already destroyed!')
 			return null
 		}
-
-		return this.hit.lastCapturedBall // todo need to return the *api* of the ball (currently non-existent)
+		return this.hit.lastCapturedBall
 	}
 
 	public CreateSizedBallWithMass(radius: number, mass: number): Ball {
@@ -150,7 +138,6 @@ export class KickerApi extends ItemApi<KickerData> {
 
 	public DestroyBall(): number {
 		let cnt = 0
-
 		if (this.hit.ball) {
 			++cnt
 			const b = this.hit.ball
@@ -160,15 +147,15 @@ export class KickerApi extends ItemApi<KickerData> {
 		return cnt
 	}
 
-	public KickXYZ(angle: number, speed: number, inclination: number, x: number, y: number, z: number) {
+	public KickXYZ(angle: number, speed: number, inclination: number, x: number, y: number, z: number): void {
 		this.hit.kickXyz(this.table, this.player.getPhysics(), angle, speed, inclination, new Vertex3D(x, y, z))
 	}
 
-	public KickZ(angle: number, speed: number, inclination: number, heightZ: number) {
+	public KickZ(angle: number, speed: number, inclination: number, heightZ: number): void {
 		this.hit.kickXyz(this.table, this.player.getPhysics(), angle, speed, inclination, new Vertex3D(0, 0, heightZ))
 	}
 
-	public Kick(angle: number, speed: number, inclination: number = 0): void {
+	public Kick(angle: number, speed: number, inclination = 0): void {
 		this.hit.kickXyz(this.table, this.player.getPhysics(), angle, speed, inclination, new Vertex3D(0, 0, 0))
 	}
 
