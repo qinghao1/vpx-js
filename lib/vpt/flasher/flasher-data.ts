@@ -35,7 +35,7 @@ export class FlasherData extends ItemData {
 	public rotX = 0
 	public rotY = 0
 	public rotZ = 0
-	public color = 0xffffff
+	public color = 0x32c832
 	public szImageA?: string
 	public szImageB?: string
 	public alpha = 100
