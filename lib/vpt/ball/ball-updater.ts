@@ -23,11 +23,10 @@ export class BallUpdater extends ItemUpdater<BallState> {
 		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
 		table: Table,
 	): void {
-		// update local state
 		Object.assign(this.state, state)
 
-		const pos: { _x: number; _y: number; _z: number } = this.state.pos as any
-		const zHeight = !this.state.isFrozen ? pos._z : pos._z - this.data.radius
+		const pos = this.state.pos
+		const zHeight = !this.state.isFrozen ? pos.z : pos.z - this.data.radius
 		const orientation = Matrix3D.claim().setEach(
 			this.state.orientation.matrix[0][0],
 			this.state.orientation.matrix[1][0],
@@ -46,7 +45,7 @@ export class BallUpdater extends ItemUpdater<BallState> {
 			0,
 			1,
 		)
-		const trans = Matrix3D.claim().setTranslation(pos._x, pos._y, zHeight)
+		const trans = Matrix3D.claim().setTranslation(pos.x, pos.y, zHeight)
 		const matrix = Matrix3D.claim()
 			.setScaling(this.data.radius, this.data.radius, this.data.radius)
 			.preMultiply(orientation)
@@ -55,9 +54,7 @@ export class BallUpdater extends ItemUpdater<BallState> {
 
 		renderApi.applyMatrixToNode(matrix, obj)
 		Matrix3D.release(orientation, trans, matrix)
-		const anyObj = obj as any
-		if (anyObj && typeof anyObj.updateMatrixWorld === 'function') {
-			anyObj.updateMatrixWorld(true)
-		}
+		const maybeObj = obj as unknown as { updateMatrixWorld?: (force: boolean) => void }
+		maybeObj.updateMatrixWorld?.(true)
 	}
 }
