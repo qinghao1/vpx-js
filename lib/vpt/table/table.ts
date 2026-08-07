@@ -28,6 +28,7 @@ import type { Flipper } from '../flipper/flipper.js'
 import type { Gate } from '../gate/gate.js'
 import type { HitTarget } from '../hit-target/hit-target.js'
 import type { Item } from '../item.js'
+import type { ItemApi } from '../item-api.js'
 import type { ItemData } from '../item-data.js'
 import { ITEM_REGISTRY } from '../item-registry.js'
 import type { ItemState } from '../item-state.js'
@@ -198,8 +199,8 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 	public getAnimatables(): IAnimatable[] {
 		return this.getItems().filter(isAnimatable) as unknown as IAnimatable[]
 	}
-	public getScriptables(): Array<IScriptable<any>> {
-		return [this, ...(this.getItems().filter(isScriptable) as unknown as Array<IScriptable<any>>)]
+	public getScriptables(): Array<IScriptable<ItemApi<ItemData>>> {
+		return [this, ...(this.getItems().filter(isScriptable) as unknown as Array<IScriptable<ItemApi<ItemData>>>)]
 	}
 	public getHittables(): IHittable[] {
 		return this.getItems().filter(isHittable) as unknown as IHittable[]
@@ -218,8 +219,8 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 		return new HitPlane(new Vertex3D(0, 0, -1), this.data!.glassHeight).setElasticity(0.2)
 	}
 
-	public getElementApis(): { [key: string]: any } {
-		const apis: { [key: string]: any } = {}
+	public getElementApis(): Record<string, ItemApi<ItemData>> {
+		const apis: Record<string, ItemApi<ItemData>> = {}
 		for (const el of this.getScriptables()) apis[el.getName()] = el.getApi()
 		return apis
 	}
@@ -232,8 +233,8 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 		return this.itemIndex[vbsName.toLowerCase()]
 	}
 
-	public getElements(): { [key: string]: IScriptable<any> } {
-		const els: { [key: string]: any } = {}
+	public getElements(): Record<string, IScriptable<ItemApi<ItemData>>> {
+		const els: Record<string, IScriptable<ItemApi<ItemData>>> = {}
 		for (const el of this.getScriptables()) els[el.getName()] = el
 		return els
 	}
@@ -331,7 +332,8 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 
 	public setupCollections(): void {
 		for (const item of Object.values(this.items))
-			if (isScriptable(item as any)) (item as unknown as IScriptable<any>).getApi()._resetCollections()
+			if (isScriptable(item as unknown))
+				(item as unknown as IScriptable<ItemApi<ItemData>>).getApi()._resetCollections()
 		for (const col of Object.values(this.collections))
 			for (const name of col.getItemNames()) {
 				const item = this.items[name]
@@ -339,9 +341,9 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 					logger().warn('Non-existent item "%s" in collection "%s", skipping.', name, col.getName())
 					break
 				}
-				if (isScriptable(item as any)) {
-					;(item as unknown as IScriptable<any>).getApi()._addCollection(col, col.items.length)
-					col.items.push((item as unknown as IScriptable<any>).getApi())
+				if (isScriptable(item as unknown)) {
+					;(item as unknown as IScriptable<ItemApi<ItemData>>).getApi()._addCollection(col, col.items.length)
+					col.items.push((item as unknown as IScriptable<ItemApi<ItemData>>).getApi())
 				}
 			}
 	}
