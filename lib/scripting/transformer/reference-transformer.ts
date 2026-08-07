@@ -11,6 +11,14 @@ import { callExpression, identifier, memberExpression } from '../estree.js'
 import type { Stdlib } from '../stdlib/index.js'
 import { Transformer } from './transformer.js'
 
+interface HasPropName {
+	_getPropertyName(name: string): string | undefined
+}
+
+function getPropName(obj: unknown, name: string): string | undefined {
+	return (obj as HasPropName)?._getPropertyName?.(name)
+}
+
 /**
  * In the Visual Pinball table script, everything is global. In JavaScript we
  * decided to properly manage the scope in order not to pollute the global
@@ -42,7 +50,7 @@ import { Transformer } from './transformer.js'
 /** ReferenceTransformer. */
 export class ReferenceTransformer extends Transformer {
 	private readonly table: Table
-	private readonly itemApis: { [p: string]: any }
+	private readonly itemApis: Record<string, unknown>
 	private readonly enumApis: EnumsApi
 	private readonly globalApi: GlobalApi
 	private readonly stdlib: Stdlib
@@ -50,7 +58,7 @@ export class ReferenceTransformer extends Transformer {
 	constructor(
 		ast: Program,
 		table: Table,
-		itemApis: { [p: string]: any },
+		itemApis: Record<string, unknown>,
 		enumApis: EnumsApi,
 		globalApi: GlobalApi,
 		stdlib: Stdlib,
@@ -121,7 +129,7 @@ export class ReferenceTransformer extends Transformer {
 
 				// patch property
 				if (parent.property && parent.property.name) {
-					const propName = this.itemApis[elementName]._getPropertyName(parent.property.name)
+					const propName = getPropName(this.itemApis[elementName], parent.property.name)
 					if (propName) {
 						parent.property.name = propName
 					}
@@ -144,7 +152,7 @@ export class ReferenceTransformer extends Transformer {
 					const enumName = this.enumApis._getPropertyName(enumObject.name)
 					let propName: string | undefined
 					if (enumName) {
-						propName = (this.enumApis as any)[enumName]._getPropertyName(enumProperty.name)
+						propName = getPropName((this.enumApis as unknown as Record<string, unknown>)[enumName], enumProperty.name)
 						if (propName) {
 							enumNode.object = memberExpression(identifier(Transformer.ENUMS_NAME), identifier(enumName))
 							enumProperty.name = propName
@@ -189,8 +197,8 @@ export class ReferenceTransformer extends Transformer {
 					return node
 				}
 				// patch property
-				if (parent.property && parent.property.name && (this.stdlib as any)[name]) {
-					const propName = (this.stdlib as any)[name]._getPropertyName(parent.property.name)
+				if (parent.property && parent.property.name && (this.stdlib as unknown as Record<string, unknown>)[name]) {
+					const propName = getPropName((this.stdlib as unknown as Record<string, unknown>)[name], parent.property.name)
 					if (propName) {
 						parent.property.name = propName
 					}
