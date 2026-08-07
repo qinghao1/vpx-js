@@ -10,8 +10,8 @@ import type { Table } from '../table/table.js'
 import type { BumperData } from './bumper-data.js'
 import type { BumperState } from './bumper-state.js'
 
-export /** BumperUpdater. */
-class BumperUpdater extends ItemUpdater<BumperState> {
+/** BumperUpdater. */
+export class BumperUpdater extends ItemUpdater<BumperState> {
 	private readonly data: BumperData
 
 	constructor(state: BumperState, data: BumperData) {
