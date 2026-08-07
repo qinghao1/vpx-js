@@ -1,53 +1,28 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
+/** Visual Pinball event DISPIDs. */
 export enum Event {
-	// Table
-	GameEventsKeyDown = 1000, // DISPID_GameEvents_KeyDown
-	GameEventsKeyUp = 1001, // DISPID_GameEvents_KeyUp
-	GameEventsInit = 1002, // DISPID_GameEvents_Init
-	GameEventsMusicDone = 1003, // DISPID_GameEvents_MusicDone
-	GameEventsExit = 1004, // DISPID_GameEvents_Exit
-	GameEventsPaused = 1005, // DISPID_GameEvents_Paused
-	GameEventsUnPaused = 1006, // DISPID_GameEvents_UnPaused
+	GameEventsKeyDown = 1000,
+	GameEventsKeyUp = 1001,
+	GameEventsInit = 1002,
+	GameEventsMusicDone = 1003,
+	GameEventsExit = 1004,
+	GameEventsPaused = 1005,
+	GameEventsUnPaused = 1006,
 
-	// Surface
-	SurfaceEventsSlingshot = 1101, // DISPID_SurfaceEvents_Slingshot
+	SurfaceEventsSlingshot = 1101,
 
-	// Flipper
-	FlipperEventsCollide = 1200, // DISPID_FlipperEvents_Collide
+	FlipperEventsCollide = 1200,
 
-	// Timer
-	TimerEventsTimer = 1300, // DISPID_TimerEvents_Timer
-
-	// Spinner
-	SpinnerEventsSpin = 1301, // DISPID_SpinnerEvents_Spin
-
-	// HitTarget
-	TargetEventsDropped = 1302, // DISPID_TargetEvents_Dropped
-	TargetEventsRaised = 1303, // DISPID_TargetEvents_Raised
-
-	// Light Sequencer
+	TimerEventsTimer = 1300,
+	SpinnerEventsSpin = 1301,
+	TargetEventsDropped = 1302,
+	TargetEventsRaised = 1303,
 	LightSeqEventsPlayDone = 1320,
 
-	// Plunger
-	// PluFrames = 464,
-	// Width = 465,
-	// ZAdjust = 466,
-	//
-	// RodDiam = 467,
-	// RingDiam = 468,
-	// RingThickness = 469,
-	// SpringDiam = 470,
-	// TipShape = 471,
-	// SpringGauge = 472,
-	// SpringLoops = 473,
-	// RingGap = 474,
-	// SpringEndLoops = 475,
-
-	// Generic
-	HitEventsHit = 1400, // DISPID_HitEvents_Hit
-	HitEventsUnhit = 1401, // DISPID_HitEvents_Unhit
-	LimitEventsEOS = 1402, // DISPID_LimitEvents_EOS
-	LimitEventsBOS = 1403, // DISPID_LimitEvents_BOS
+	HitEventsHit = 1400,
+	HitEventsUnhit = 1401,
+	LimitEventsEOS = 1402,
+	LimitEventsBOS = 1403,
 }
