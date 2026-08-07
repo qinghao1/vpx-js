@@ -5,15 +5,11 @@ import { Pool } from '../../util/object-pool.js'
 import { ItemState } from '../item-state.js'
 import { omitEqual } from '../state-helpers.js'
 
-/** Plunger state.
- * @see https://github.com/vpinball/vpinball/blob/master/plunger.cpp */
+/** Plunger state. @see https://github.com/vpinball/vpinball/blob/master/plunger.cpp */
 export class PlungerState extends ItemState {
 	public static readonly POOL = new Pool(PlungerState)
 
-	/**
-	 * Which frame to render
-	 */
-	public frame: number = 0
+	public frame = 0
 
 	public constructor() {
 		super()
@@ -41,9 +37,7 @@ export class PlungerState extends ItemState {
 	}
 
 	public equals(state: PlungerState): boolean {
-		if (!state) {
-			return false
-		}
+		if (!state) return false
 		return state.frame === this.frame
 	}
 }
