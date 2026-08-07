@@ -85,8 +85,8 @@ export class Material {
 	}
 }
 
-export /** SaveMaterial. */
-class SaveMaterial {
+/** SaveMaterial. */
+export class SaveMaterial {
 	public static size = 76
 
 	public szName: string
@@ -122,8 +122,8 @@ class SaveMaterial {
 	}
 }
 
-export /** SavePhysicsMaterial. */
-class SavePhysicsMaterial {
+/** SavePhysicsMaterial. */
+export class SavePhysicsMaterial {
 	public static size = 48
 
 	public name: string
