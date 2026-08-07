@@ -22,11 +22,7 @@ import { HitTargetMeshGenerator } from './hit-target-mesh-generator.js'
 import { HitTargetState } from './hit-target-state.js'
 import { HitTargetUpdater } from './hit-target-updater.js'
 
-/**
- * VPinball's hit- and drop targets.
- *
- * @see https://github.com/vpinball/vpinball/blob/master/hittarget.cpp
- */
+/** HitTarget item. @see https://github.com/vpinball/vpinball/blob/master/hittarget.cpp */
 export class HitTarget
 	extends Item<HitTargetData>
 	implements IRenderable<HitTargetState>, IHittable, IAnimatable, IScriptable<HitTargetApi>
