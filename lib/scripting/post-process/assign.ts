@@ -4,6 +4,7 @@
 import { assignmentExpression, expressionStatement } from '../estree.js'
 import type { ESIToken } from '../grammar/grammar.js'
 
+/** ppAssign. */
 export function ppAssign(node: ESIToken): any {
 	switch (node.type) {
 		case 'RegularAssignmentStatement':
