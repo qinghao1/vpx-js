@@ -102,7 +102,6 @@ export class Transpiler {
 
 		let now = Date.now()
 		progress().details('evaluating')
-		// tslint:disable-next-line:no-eval
 		eval('//@ sourceURL=game:///tablescript.vbs.js\n' + js)
 		logger().info('[Transpiler.execute] Evaluated in %sms', Date.now() - now)
 		progress().details('executing')
