@@ -14,7 +14,7 @@ import {
 import type { ESIToken } from '../grammar/grammar.js'
 
 /** ppMethod. */
-export function ppMethod(node: ESIToken): any {
+export function ppMethod(node: ESIToken): unknown {
 	switch (node.type) {
 		case 'SubDeclaration':
 			return ppSubDeclaration(node)
@@ -26,7 +26,7 @@ export function ppMethod(node: ESIToken): any {
 	return null
 }
 
-function ppSubDeclaration(node: ESIToken): any {
+function ppSubDeclaration(node: ESIToken): unknown {
 	let id: Identifier = identifier('undefined')
 	let params: Identifier[] = []
 	let block: BlockStatement | undefined
@@ -49,7 +49,7 @@ function ppSubDeclaration(node: ESIToken): any {
 	return functionDeclaration(id, params, block ? block : blockStatement([]))
 }
 
-function ppFunctionDeclaration(node: ESIToken): any {
+function ppFunctionDeclaration(node: ESIToken): unknown {
 	let id: Identifier = identifier('undefined')
 	let params: Identifier[] = []
 	let block: BlockStatement | undefined
@@ -88,7 +88,7 @@ function ppFunctionDeclaration(node: ESIToken): any {
 	return functionDeclaration(id, params, block)
 }
 
-function ppParameterList(node: ESIToken): any {
+function ppParameterList(node: ESIToken): unknown {
 	const params: Identifier[] = []
 	for (const param of node.children) {
 		if (param.type === 'Parameter') {
