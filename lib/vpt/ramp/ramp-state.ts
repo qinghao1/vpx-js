@@ -5,8 +5,7 @@ import { Pool } from '../../util/object-pool.js'
 import { ItemState } from '../item-state.js'
 import { omitEqual } from '../state-helpers.js'
 
-/** Ramp state.
- * @see https://github.com/vpinball/vpinball/blob/master/ramp.cpp */
+/** Ramp state. @see https://github.com/vpinball/vpinball/blob/master/ramp.cpp */
 export class RampState extends ItemState {
 	public static readonly POOL = new Pool(RampState)
 
@@ -115,9 +114,7 @@ export class RampState extends ItemState {
 	}
 
 	public equals(state: RampState): boolean {
-		if (!state) {
-			return false
-		}
+		if (!state) return false
 		return (
 			state.heightBottom === this.heightBottom &&
 			state.heightTop === this.heightTop &&
