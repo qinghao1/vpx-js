@@ -27,114 +27,133 @@ export class PlungerApi extends ItemApi<PlungerData> {
 		this.ballCreator = ballCreator
 	}
 
+	/** Get X. */
 	get X() {
 		return this.data.center.x
 	}
 	set X(v) {
 		this.data.center.x = v
 	}
+	/** Get Y. */
 	get Y() {
 		return this.data.center.y
 	}
 	set Y(v) {
 		this.data.center.y = v
 	}
+	/** Get Width. */
 	get Width() {
 		return this.data.width
 	}
 	set Width(v) {
 		this.data.width = v
 	}
+	/** Get ZAdjust. */
 	get ZAdjust() {
 		return this.data.zAdjust
 	}
 	set ZAdjust(v) {
 		this.data.zAdjust = v
 	}
+	/** Get Surface. */
 	get Surface() {
 		return this.data.szSurface
 	}
 	set Surface(v) {
 		this.data.szSurface = v
 	}
+	/** Get MechStrength. */
 	get MechStrength() {
 		return this.data.mechStrength
 	}
 	set MechStrength(v) {
 		this.data.mechStrength = v
 	}
+	/** Get MechPlunger. */
 	get MechPlunger() {
 		return this.data.mechPlunger
 	}
 	set MechPlunger(v) {
 		this.data.mechPlunger = v
 	}
+	/** Get AutoPlunger. */
 	get AutoPlunger() {
 		return this.data.autoPlunger
 	}
 	set AutoPlunger(v) {
 		this.data.autoPlunger = v
 	}
+	/** Get Visible. */
 	get Visible() {
 		return this.data.isVisible
 	}
 	set Visible(v) {
 		this.data.isVisible = v
 	}
+	/** Get ParkPosition. */
 	get ParkPosition() {
 		return this.data.parkPosition
 	}
 	set ParkPosition(v) {
 		this.data.parkPosition = v
 	}
+	/** Get Stroke. */
 	get Stroke() {
 		return this.data.stroke
 	}
 	set Stroke(v) {
 		this.data.stroke = v
 	}
+	/** Get ScatterVelocity. */
 	get ScatterVelocity() {
 		return this.data.scatterVelocity
 	}
 	set ScatterVelocity(v) {
 		this.data.scatterVelocity = v
 	}
+	/** Get MomentumXfer. */
 	get MomentumXfer() {
 		return this.data.momentumXfer
 	}
 	set MomentumXfer(v) {
 		this.data.momentumXfer = v
 	}
+	/** Get ReflectionEnabled. */
 	get ReflectionEnabled() {
 		return this.data.isReflectionEnabled
 	}
 	set ReflectionEnabled(v) {
 		this.data.isReflectionEnabled = v
 	}
+	/** Get PullSpeed. */
 	get PullSpeed() {
 		return this.data.speedPull
 	}
 	set PullSpeed(v) {
 		this.data.speedPull = v
 	}
+	/** Get FireSpeed. */
 	get FireSpeed() {
 		return this.data.speedFire
 	}
 	set FireSpeed(v) {
 		this.data.speedFire = v
 	}
+	/** Get Type. */
 	get Type() {
 		return this.data.type
 	}
 	set Type(v) {
 		this.data.type = v
 	}
+	/** Get Material. */
 	get Material() {
 		return this.data.szMaterial
 	}
 	set Material(v) {
 		this.data.szMaterial = v
 	}
+	/** Get Image. */
 	get Image() {
 		return this.data.szImage
 	}
@@ -142,60 +161,70 @@ export class PlungerApi extends ItemApi<PlungerData> {
 		this._assertNonHdrImage(v)
 		this.data.szImage = v
 	}
+	/** Get AnimFrames. */
 	get AnimFrames() {
 		return this.data.animFrames
 	}
 	set AnimFrames(v) {
 		this.data.animFrames = v
 	}
+	/** Get TipShape. */
 	get TipShape() {
 		return this.data.szTipShape
 	}
 	set TipShape(v) {
 		this.data.szTipShape = v
 	}
+	/** Get RodDiam. */
 	get RodDiam() {
 		return this.data.rodDiam
 	}
 	set RodDiam(v) {
 		this.data.rodDiam = v
 	}
+	/** Get RingGap. */
 	get RingGap() {
 		return this.data.ringGap
 	}
 	set RingGap(v) {
 		this.data.ringGap = v
 	}
+	/** Get RingDiam. */
 	get RingDiam() {
 		return this.data.ringDiam
 	}
 	set RingDiam(v) {
 		this.data.ringDiam = v
 	}
+	/** Get RingWidth. */
 	get RingWidth() {
 		return this.data.ringWidth
 	}
 	set RingWidth(v) {
 		this.data.ringWidth = v
 	}
+	/** Get SpringDiam. */
 	get SpringDiam() {
 		return this.data.springDiam
 	}
 	set SpringDiam(v) {
 		this.data.springDiam = v
 	}
+	/** Get SpringGauge. */
 	get SpringGauge() {
 		return this.data.springGauge
 	}
 	set SpringGauge(v) {
 		this.data.springGauge = v
 	}
+	/** Get SpringLoops. */
 	get SpringLoops() {
 		return this.data.springLoops
 	}
 	set SpringLoops(v) {
 		this.data.springLoops = v
 	}
+	/** Get SpringEndLoops. */
 	get SpringEndLoops() {
 		return this.data.springEndLoops
 	}
