@@ -1,31 +1,15 @@
-/*
- * VPDB - Virtual Pinball Database
- * Copyright (C) 2019 freezy <freezy@vpdb.io>
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- */
+// Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { Event } from '../../game/event'
-import type { EventProxy } from '../../game/event-proxy'
-import type { PlayerPhysics } from '../../game/player-physics'
-import { degToRad } from '../../math/float'
-import { FRect3D } from '../../math/frect3d'
-import { clamp } from '../../math/functions'
-import { Vertex2D } from '../../math/vertex2d'
-import { Vertex3D } from '../../math/vertex3d'
-import type { CollisionEvent } from '../../physics/collision-event'
+import { Event } from '../../game/event.js'
+import type { EventProxy } from '../../game/event-proxy.js'
+import type { PlayerPhysics } from '../../game/player-physics.js'
+import { degToRad } from '../../math/float.js'
+import { FRect3D } from '../../math/frect3d.js'
+import { clamp } from '../../math/functions.js'
+import { Vertex2D } from '../../math/vertex2d.js'
+import { Vertex3D } from '../../math/vertex3d.js'
+import type { CollisionEvent } from '../../physics/collision-event.js'
 import {
 	C_CONTACTVEL,
 	C_DISP_GAIN,
@@ -37,16 +21,16 @@ import {
 	C_PRECISION,
 	C_TOL_ENDPNTS,
 	PHYS_TOUCH,
-} from '../../physics/constants'
-import { elasticityWithFalloff } from '../../physics/functions'
-import { HitObject } from '../../physics/hit-object'
-import type { Ball } from '../ball/ball'
-import type { Table } from '../table/table'
-import type { TableData } from '../table/table-data'
-import type { FlipperConfig } from './flipper'
-import type { FlipperData } from './flipper-data'
-import { FlipperMover } from './flipper-mover'
-import type { FlipperState } from './flipper-state'
+} from '../../physics/constants.js'
+import { elasticityWithFalloff } from '../../physics/functions.js'
+import { HitObject } from '../../physics/hit-object.js'
+import type { Ball } from '../ball/ball.js'
+import type { Table } from '../table/table.js'
+import type { TableData } from '../table/table-data.js'
+import type { FlipperConfig } from './flipper.js'
+import type { FlipperData } from './flipper-data.js'
+import { FlipperMover } from './flipper-mover.js'
+import type { FlipperState } from './flipper-state.js'
 
 export class FlipperHit extends HitObject {
 	private readonly mover: FlipperMover
