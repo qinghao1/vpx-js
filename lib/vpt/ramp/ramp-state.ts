@@ -5,7 +5,6 @@ import { Pool } from '../../util/object-pool.js'
 import { ItemState } from '../item-state.js'
 
 /** Ramp state.
- *
  * @see https://github.com/vpinball/vpinball/blob/master/ramp.cpp */
 export class RampState extends ItemState {
 	public static readonly POOL = new Pool(RampState)
@@ -145,7 +144,6 @@ export class RampState extends ItemState {
 	}
 
 	public equals(state: RampState): boolean {
-		/* istanbul ignore if: we don't actually pass empty states. */
 		if (!state) {
 			return false
 		}
