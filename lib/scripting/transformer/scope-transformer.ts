@@ -29,8 +29,8 @@ import { Transformer } from './transformer.js'
  * A nice side-effect of this is that in tests, we can supply an existing scope
  * and assert against it afterwards.
  */
-export /** Adjusts VBS scopes. */
-class ScopeTransformer extends Transformer {
+/** Adjusts VBS scopes. */
+export class ScopeTransformer extends Transformer {
 	constructor(ast: Program) {
 		super(ast, true)
 	}
