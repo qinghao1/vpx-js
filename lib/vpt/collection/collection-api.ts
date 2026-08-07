@@ -9,7 +9,7 @@ import type { Table } from '../table/table.js'
 import type { TimerHit } from '../timer/timer-hit.js'
 import type { CollectionData } from './collection-data.js'
 
-/** CollectionApi. */
+/** Collection API. */
 export class CollectionApi extends ItemApi<CollectionData> implements IterableIterator<ItemApi<ItemData>> {
 	private readonly items: Array<ItemApi<ItemData>>
 	private pointer = 0
