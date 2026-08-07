@@ -10,15 +10,14 @@ import type { Table, TableGenerateOptions } from '../vpt/table/table.js'
 import type { Texture } from '../vpt/texture.js'
 import type { IItem } from './iitem.js'
 
+/** Renderable table element. */
 export interface IRenderable<STATE extends ItemState> extends IItem {
 	getMeshes<NODE, GEOMETRY, POINT_LIGHT>(
 		table: Table,
 		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
 		opts: TableGenerateOptions,
 	): Meshes<GEOMETRY>
-
 	getState(): STATE
-
 	getUpdater(): ItemUpdater<STATE>
 }
 
