@@ -4,3 +4,11 @@ coverage
 dist
 node_modules
 lib/scripting/grammar/rules.ts
+# local bench profiling artifacts
+lib/**/bench*.spec.ts
+lib/*.bench*.ts
+bench*.spec.ts
+*.vpx
+!test/fixtures/*.vpx
+walking_dead.vpx
+
