@@ -8,7 +8,8 @@ import type { Table } from '../table/table.js'
 import type { SurfaceData } from './surface-data.js'
 import type { SurfaceState } from './surface-state.js'
 
-export class SurfaceUpdater extends ItemUpdater<SurfaceState> {
+export /** SurfaceUpdater. */
+class SurfaceUpdater extends ItemUpdater<SurfaceState> {
 	private readonly data: SurfaceData
 
 	constructor(state: SurfaceState, data: SurfaceData) {
