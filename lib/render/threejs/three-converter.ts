@@ -1,31 +1,15 @@
-/*
- * VPDB - Virtual Pinball Database
- * Copyright (C) 2019 freezy <freezy@vpdb.io>
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- */
+// Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import type { IRenderable, RenderInfo } from '../../game/irenderable'
+import type { IRenderable, RenderInfo } from '../../game/irenderable.js'
 import { type BufferGeometry, Group, type Object3D, type PointLight, Mesh as ThreeMesh } from '../../refs.node.js'
-import type { ItemState } from '../../vpt/item-state'
-import type { Table, TableGenerateOptions } from '../../vpt/table/table'
-import type { IRenderApi, MeshConvertOptions } from '../irender-api'
-import type { ThreeMapGenerator } from './three-map-generator'
-import type { ThreeMaterialGenerator } from './three-material-generator'
-import type { ThreeMeshGenerator } from './three-mesh-generator'
-import { ThreeRenderApi } from './three-render-api'
+import type { ItemState } from '../../vpt/item-state.js'
+import type { Table, TableGenerateOptions } from '../../vpt/table/table.js'
+import type { IRenderApi, MeshConvertOptions } from '../irender-api.js'
+import type { ThreeMapGenerator } from './three-map-generator.js'
+import type { ThreeMaterialGenerator } from './three-material-generator.js'
+import type { ThreeMeshGenerator } from './three-mesh-generator.js'
+import { ThreeRenderApi } from './three-render-api.js'
 
 export class ThreeConverter {
 	private readonly meshGenerator: ThreeMeshGenerator
