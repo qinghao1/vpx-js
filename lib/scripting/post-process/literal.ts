@@ -4,6 +4,7 @@
 import { identifier, literal, newExpression } from '../estree.js'
 import type { ESIToken } from '../grammar/grammar.js'
 
+/** ppLiteral. */
 export function ppLiteral(node: ESIToken): any {
 	switch (node.type) {
 		case 'BooleanLiteral':
