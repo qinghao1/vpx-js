@@ -137,7 +137,7 @@ export class Vertex3DNoTex2 {
 		return this._tu !== undefined && this._tv !== undefined
 	}
 
-	static from(data: any): Vertex3DNoTex2 {
+	static from(data: Record<string, unknown> | Vertex3DNoTex2): Vertex3DNoTex2 {
 		return Object.assign(new Vertex3DNoTex2(), data)
 	}
 
