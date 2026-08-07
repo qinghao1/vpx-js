@@ -17,12 +17,6 @@ import type { PlungerState } from './plunger-state.js'
 
 /** Plunger mover — simulates rod physics, mech tracking, and firing. */
 export class PlungerMover implements MoverObject {
-	private readonly data: PlungerData
-	private readonly state: PlungerState
-	private readonly events: EventProxy
-	private readonly player: Player
-	private readonly tableApi: TableApi
-
 	/** Left/right/bottom position of on-screen plunger. */
 	public readonly x: number
 	public readonly x2: number
@@ -95,17 +89,12 @@ export class PlungerMover implements MoverObject {
 
 	constructor(
 		config: PlungerConfig,
-		data: PlungerData,
-		state: PlungerState,
-		events: EventProxy,
-		player: Player,
-		tableApi: TableApi,
+		private readonly data: PlungerData,
+		private readonly state: PlungerState,
+		private readonly events: EventProxy,
+		private readonly player: Player,
+		private readonly tableApi: TableApi,
 	) {
-		this.data = data
-		this.state = state
-		this.events = events
-		this.player = player
-		this.tableApi = tableApi
 		this.x = config.x
 		this.x2 = config.x2
 		this.y = config.y
