@@ -1,38 +1,21 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { readFileSync } from 'node:fs'
-import { createRequire } from 'node:module'
-import { resolve } from 'node:path'
 import { degToRad, f4 } from '../../math/float.js'
 import { Matrix3D } from '../../math/matrix3d.js'
 import { Vertex3D } from '../../math/vertex3d.js'
 import { Enums } from '../enums.js'
-import { Mesh } from '../mesh.js'
+import type { Mesh } from '../mesh.js'
+import { loadMesh } from '../mesh-loader.js'
 import type { Table } from '../table/table.js'
 import type { KickerData } from './kicker-data.js'
 
-const require = createRequire(import.meta.url)
-
-const kickerCupMeshJson = JSON.parse(readFileSync(resolve(process.cwd(), 'res/meshes/kicker-cup-mesh.json'), 'utf-8'))
-const kickerGottliebMeshJson = JSON.parse(
-	readFileSync(resolve(process.cwd(), 'res/meshes/kicker-gottlieb-mesh.json'), 'utf-8'),
-)
-const kickerHoleMeshJson = JSON.parse(readFileSync(resolve(process.cwd(), 'res/meshes/kicker-hole-mesh.json'), 'utf-8'))
-const kickerSimpleHoleMeshJson = JSON.parse(
-	readFileSync(resolve(process.cwd(), 'res/meshes/kicker-simple-hole-mesh.json'), 'utf-8'),
-)
-const kickerT1MeshJson = JSON.parse(readFileSync(resolve(process.cwd(), 'res/meshes/kicker-t1-mesh.json'), 'utf-8'))
-const kickerWilliamsMeshJson = JSON.parse(
-	readFileSync(resolve(process.cwd(), 'res/meshes/kicker-williams-mesh.json'), 'utf-8'),
-)
-
-const kickerCupMesh = Mesh.fromJson(kickerCupMeshJson)
-const kickerGottliebMesh = Mesh.fromJson(kickerGottliebMeshJson)
-const kickerHoleMesh = Mesh.fromJson(kickerHoleMeshJson)
-const kickerSimpleHoleMesh = Mesh.fromJson(kickerSimpleHoleMeshJson)
-const kickerT1Mesh = Mesh.fromJson(kickerT1MeshJson)
-const kickerWilliamsMesh = Mesh.fromJson(kickerWilliamsMeshJson)
+const kickerCupMesh = loadMesh('kicker-cup-mesh')
+const kickerGottliebMesh = loadMesh('kicker-gottlieb-mesh')
+const kickerHoleMesh = loadMesh('kicker-hole-mesh')
+const kickerSimpleHoleMesh = loadMesh('kicker-simple-hole-mesh')
+const kickerT1Mesh = loadMesh('kicker-t1-mesh')
+const kickerWilliamsMesh = loadMesh('kicker-williams-mesh')
 
 /** Kicke mesh generator. */
 export class KickerMeshGenerator {

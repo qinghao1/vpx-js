@@ -1,37 +1,20 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { readFileSync } from 'node:fs'
-import { createRequire } from 'node:module'
-import { resolve } from 'node:path'
 import { degToRad, f4 } from '../../math/float.js'
 import { Matrix3D } from '../../math/matrix3d.js'
 import { Vertex3D } from '../../math/vertex3d.js'
 import { logger } from '../../util/logger.js'
 import { Enums } from '../enums.js'
-import { Mesh } from '../mesh.js'
+import type { Mesh } from '../mesh.js'
+import { loadMesh } from '../mesh-loader.js'
 import type { Table } from '../table/table.js'
 import type { TriggerData } from './trigger-data.js'
 
-const require = createRequire(import.meta.url)
-
-const triggerButtonMeshJson = JSON.parse(
-	readFileSync(resolve(process.cwd(), 'res/meshes/trigger-button-mesh.json'), 'utf-8'),
-)
-const triggerSimpleMeshJson = JSON.parse(
-	readFileSync(resolve(process.cwd(), 'res/meshes/trigger-simple-mesh.json'), 'utf-8'),
-)
-const triggerStarMeshJson = JSON.parse(
-	readFileSync(resolve(process.cwd(), 'res/meshes/trigger-star-mesh.json'), 'utf-8'),
-)
-const triggerDWireMeshJson = JSON.parse(
-	readFileSync(resolve(process.cwd(), 'res/meshes/trigger-wire-d-mesh.json'), 'utf-8'),
-)
-
-const triggerButtonMesh = Mesh.fromJson(triggerButtonMeshJson)
-const triggerSimpleMesh = Mesh.fromJson(triggerSimpleMeshJson)
-const triggerStarMesh = Mesh.fromJson(triggerStarMeshJson)
-const triggerDWireMesh = Mesh.fromJson(triggerDWireMeshJson)
+const triggerButtonMesh = loadMesh('trigger-button-mesh')
+const triggerSimpleMesh = loadMesh('trigger-simple-mesh')
+const triggerStarMesh = loadMesh('trigger-star-mesh')
+const triggerDWireMesh = loadMesh('trigger-wire-d-mesh')
 
 /** Generates trigger meshes. */
 export class TriggerMeshGenerator {

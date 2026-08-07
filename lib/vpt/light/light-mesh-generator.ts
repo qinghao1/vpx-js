@@ -1,23 +1,16 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { readFileSync } from 'node:fs'
-import { createRequire } from 'node:module'
-import { resolve } from 'node:path'
 import type { IRenderApi } from '../../render/irender-api.js'
-import { Mesh } from '../mesh.js'
+import type { Mesh } from '../mesh.js'
+import { loadMesh } from '../mesh-loader.js'
 import type { Table } from '../table/table.js'
 import type { LightData } from './light-data.js'
 
-const require = createRequire(import.meta.url)
+const bulbLightMesh = loadMesh('bulb-light-mesh')
+const bulbSocketMesh = loadMesh('bulb-socket-mesh')
 
-const bulbLightMeshJson = JSON.parse(readFileSync(resolve(process.cwd(), 'res/meshes/bulb-light-mesh.json'), 'utf-8'))
-const bulbSocketMeshJson = JSON.parse(readFileSync(resolve(process.cwd(), 'res/meshes/bulb-socket-mesh.json'), 'utf-8'))
-
-const bulbLightMesh = Mesh.fromJson(bulbLightMeshJson)
-const bulbSocketMesh = Mesh.fromJson(bulbSocketMeshJson)
-
-/** Ligh mesh generator. */
+/** Light mesh generator. */
 export class LightMeshGenerator {
 	private readonly data: LightData
 
@@ -29,76 +22,32 @@ export class LightMeshGenerator {
 		table: Table,
 		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
 	): LightMeshes<GEOMETRY> {
-		if (this.data.isBulbLight()) {
-			return this.getBulbMeshes(table)
-		}
-		return {
-			surfaceLight: renderApi.createLightGeometry(this.data, table),
-		}
+		if (this.data.isBulbLight()) return this.getBulbMeshes(table)
+		return { surfaceLight: renderApi.createLightGeometry(this.data, table) }
 	}
 
-	// public getPath(table: Table): Path {
-	// 	const vvertex = SplineVertex.getCentralCurve(this.data.dragPoints, table.getDetailLevel(), -1);
-	// 	return this.getPathFromPoints<Path>(vvertex.map(v => new Vector2(v.x, v.y)), new Path());
-	// }
-
-	// public getExtendedPath(table: Table, distance: number): Path {
-	// 	const path = this.getPath(table);
-	// 	let len = 0;
-	// 	const points: Vector2[] = [];
-	// 	const totalLen = path.getLength();
-	// 	let i = 0;
-	// 	for (const curveLength of path.getCurveLengths()) {
-	// 		const tangent = path.getTangent(i);
-	// 		const point = path.getPoint(i);
-	// 		const direction = tangent.rotateAround(point, M.degToRad(90));
-	// 		point.add(direction.multiplyScalar(distance));
-	// 		len += curveLength;
-	// 		i++;
-	// 		points.push(point);
-	// 	}
-	// 	return this.getPathFromPoints(points);
-	// }
-
-	// private getPathFromPoints<T extends Path>(points: Vector2[], path: T): T {
-	// 	/* istanbul ignore if */
-	// 	if (points.length === 0) {
-	// 		throw new Error('Cannot get path from no points.');
-	// 	}
-	// 	path.moveTo(points[0].x, points[0].y);
-	// 	for (const v of points.slice(1)) {
-	// 		path.lineTo(v.x, v.y);
-	// 	}
-	// 	//path.moveTo(points[0].x, points[0].y);
-	// 	return path;
-	// }
-
 	private getBulbMeshes<GEOMETRY>(table: Table): LightMeshes<GEOMETRY> {
-		const lightMesh = bulbLightMesh.clone(`bulb.light`)
-		const height =
-			table.getSurfaceHeight(this.data.szSurface, this.data.center.x, this.data.center.y) * table.getScaleZ()
-		for (const vertex of lightMesh.vertices) {
-			vertex.x = vertex.x * this.data.meshRadius + this.data.center.x
-			vertex.y = vertex.y * this.data.meshRadius + this.data.center.y
-			vertex.z = vertex.z * this.data.meshRadius * table.getScaleZ() + height
+		const h = table.getSurfaceHeight(this.data.szSurface, this.data.center.x, this.data.center.y) * table.getScaleZ()
+		const scale = this.data.meshRadius
+		const scaleZ = (v: number) => v * scale * table.getScaleZ() + h
+		const light = bulbLightMesh.clone('bulb.light')
+		for (const v of light.vertices) {
+			v.x = v.x * scale + this.data.center.x
+			v.y = v.y * scale + this.data.center.y
+			v.z = scaleZ(v.z)
 		}
-
-		const socketMesh = bulbSocketMesh.clone(`bulb.socket`)
-		for (const vertex of socketMesh.vertices) {
-			vertex.x = vertex.x * this.data.meshRadius + this.data.center.x
-			vertex.y = vertex.y * this.data.meshRadius + this.data.center.y
-			vertex.z = vertex.z * this.data.meshRadius * table.getScaleZ() + height
+		const socket = bulbSocketMesh.clone('bulb.socket')
+		for (const v of socket.vertices) {
+			v.x = v.x * scale + this.data.center.x
+			v.y = v.y * scale + this.data.center.y
+			v.z = scaleZ(v.z)
 		}
-
-		return {
-			light: lightMesh,
-			socket: socketMesh,
-		}
+		return { light, socket }
 	}
 }
 
 export interface LightMeshes<GEOMETRY> {
+	surfaceLight?: GEOMETRY
 	light?: Mesh
 	socket?: Mesh
-	surfaceLight?: GEOMETRY
 }
