@@ -1863,7 +1863,6 @@ interface MeshInternal extends Mesh {
 	isPoints: boolean
 }
 
-// @ts-expect-error
 interface GeometryInternal extends BufferGeometry {
 	isBufferGeometry: true
 }
