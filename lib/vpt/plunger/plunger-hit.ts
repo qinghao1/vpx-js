@@ -14,14 +14,12 @@ import type { PlungerData } from './plunger-data.js'
 import { PlungerMover } from './plunger-mover.js'
 import type { PlungerState } from './plunger-state.js'
 
-/** Plunger collision — static walls + moving tip.
- * @see https://github.com/vpinball/vpinball/blob/master/plunger.cpp */
+/** Plunger collision — static walls + moving tip. @see https://github.com/vpinball/vpinball/blob/master/plunger.cpp */
 export class PlungerHit extends HitObject {
 	private readonly mover: PlungerMover
-	private readonly data: PlungerData
 
 	constructor(
-		data: PlungerData,
+		private readonly data: PlungerData,
 		state: PlungerState,
 		events: EventProxy,
 		cFrames: number,
@@ -41,7 +39,6 @@ export class PlungerHit extends HitObject {
 		}
 		this.hitBBox.zlow = cfg.zHeight
 		this.hitBBox.zhigh = cfg.zHeight + Plunger.PLUNGER_HEIGHT
-		this.data = data
 		this.mover = new PlungerMover(cfg, data, state, events, player, table.getApi())
 	}
 
@@ -57,11 +54,14 @@ export class PlungerHit extends HitObject {
 	}
 
 	public override hitTest(ball: Ball, dTime: number, coll: CollisionEvent, physics: PlayerPhysics): number {
-		let hitTime = dTime,
-			isHit = false
+		let hitTime = dTime
+		let isHit = false
 		physics.lastPlungerHit = physics.timeMsec
 		const hit = CollisionEvent.claim(ball)
-		const test = (seg: any, vel: { x: number; y: number }) => {
+		const test = (
+			seg: { hitTest(ball: Ball, hitTime: number, hit: CollisionEvent): number },
+			vel: { x: number; y: number },
+		) => {
 			const t = seg.hitTest(ball, hitTime, hit)
 			if (t >= 0 && t <= hitTime) {
 				isHit = true
@@ -72,17 +72,16 @@ export class PlungerHit extends HitObject {
 		}
 		test(this.mover.lineSegBase, { x: 0, y: 0 })
 		for (let i = 0; i < 2; i++) {
-			test(this.mover.lineSegSide[i], { x: 0, y: 0 })
-			test(this.mover.jointBase[i], { x: 0, y: 0 })
+			test(this.mover.lineSegSide[i]!, { x: 0, y: 0 })
+			test(this.mover.jointBase[i]!, { x: 0, y: 0 })
 		}
-
 		const oldVy = ball.hit.vel.y
 		ball.hit.vel.y -= this.mover.speed
-		const ballMass = Math.max(ball.data.mass, 0.05),
-			xfer = this.data.momentumXfer / ballMass,
-			deltaY = this.mover.speed * xfer
+		const ballMass = Math.max(ball.data.mass, 0.05)
+		const xfer = this.data.momentumXfer / ballMass
+		const deltaY = this.mover.speed * xfer
 		test(this.mover.lineSegEnd, { x: 0, y: deltaY })
-		for (let i = 0; i < 2; i++) test(this.mover.jointEnd[i], { x: 0, y: deltaY })
+		for (let i = 0; i < 2; i++) test(this.mover.jointEnd[i]!, { x: 0, y: deltaY })
 		ball.hit.vel.y = oldVy
 		CollisionEvent.release(hit)
 		if (!isHit) return -1
