@@ -3,11 +3,11 @@
 
 /** In-memory storage for Node. */
 class StorageNode {
-	private readonly map = new Map<string, any>()
-	public setItem(name: string, value: any): void {
+	private readonly map = new Map<string, unknown>()
+	public setItem(name: string, value: unknown): void {
 		this.map.set(name, value)
 	}
-	public getItem(name: string): any {
+	public getItem(name: string): unknown {
 		return this.map.get(name)
 	}
 }
