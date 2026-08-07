@@ -5,18 +5,17 @@ import { Pool } from '../../util/object-pool.js'
 import { ItemState } from '../item-state.js'
 import { omitEqual } from '../state-helpers.js'
 
-/** Surface state.
- * @see https://github.com/vpinball/vpinball/blob/master/surface.cpp */
+/** Surface state. @see https://github.com/vpinball/vpinball/blob/master/surface.cpp */
 export class SurfaceState extends ItemState {
 	public static readonly POOL = new Pool(SurfaceState)
 
-	public isDropped: boolean = false
+	public isDropped = false
 
-	public isTopVisible: boolean = true
+	public isTopVisible = true
 	public topMaterial?: string
 	public topTexture?: string
 
-	public isSideVisible: boolean = true
+	public isSideVisible = true
 	public sideMaterial?: string
 	public sideTexture?: string
 
@@ -85,9 +84,7 @@ export class SurfaceState extends ItemState {
 	}
 
 	public equals(state: SurfaceState): boolean {
-		if (!state) {
-			return false
-		}
+		if (!state) return false
 		return (
 			state.isDropped === this.isDropped &&
 			state.isTopVisible === this.isTopVisible &&
