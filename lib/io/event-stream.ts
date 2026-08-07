@@ -17,66 +17,67 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-const Stream = require('stream').Stream;
-const immediately = global.setImmediate || process.nextTick;
+const Stream = require('stream').Stream
+const immediately = global.setImmediate || process.nextTick
 
-export function readableStream<T>(func: (stream: any, i: number) => Promise<T | null>, continueOnError: boolean = false) {
+export function readableStream<T>(
+	func: (stream: any, i: number) => Promise<T | null>,
+	continueOnError: boolean = false,
+) {
+	const stream = new Stream()
+	let i = 0
+	let paused = false
+	let ended = false
+	let reading = false
 
-	const stream = new Stream();
-	let i = 0;
-	let paused = false;
-	let ended = false;
-	let reading = false;
+	stream.readable = true
+	stream.writable = false
 
-	stream.readable = true;
-	stream.writable = false;
-
-	stream.on('end', () => ended = true);
+	stream.on('end', () => (ended = true))
 
 	function get(err?: Error, data: T | null = null) {
-
 		/* istanbul ignore if */
 		if (err) {
-			stream.emit('error', err);
+			stream.emit('error', err)
 			if (!continueOnError) {
-				stream.emit('end');
+				stream.emit('end')
 			}
 		} else if (arguments.length > 1) {
-			stream.emit('data', data);
+			stream.emit('data', data)
 		}
 
 		immediately(() => {
 			if (ended || paused || reading) {
-				return;
+				return
 			}
 			try {
-				reading = true;
-				func(stream, i++).then(buffer => {
-					reading = false;
-					get(undefined, buffer);
-
-				}).catch(e => {
-					stream.emit('error', e);
-					stream.emit('end');
-				});
-
+				reading = true
+				func(stream, i++)
+					.then((buffer) => {
+						reading = false
+						get(undefined, buffer)
+					})
+					.catch((e) => {
+						stream.emit('error', e)
+						stream.emit('end')
+					})
 			} catch (err) {
-				stream.emit('error', err);
-				stream.emit('end');
+				stream.emit('error', err)
+				stream.emit('end')
 			}
-		});
+		})
 	}
 
 	stream.resume = () => {
-		paused = false;
-		get();
-	};
-	process.nextTick(get);
-	stream.pause = () => paused = true;
+		paused = false
+		get()
+	}
+	process.nextTick(get)
+	stream.pause = () => (paused = true)
 	stream.destroy = () => {
-		stream.emit('end');
-		stream.emit('close');
-		ended = true;
-	};
-	return stream;
+		stream.emit('end')
+		stream.emit('close')
+		ended = true
+	}
+	return stream
 }

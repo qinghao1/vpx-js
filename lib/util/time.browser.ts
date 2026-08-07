@@ -22,5 +22,5 @@
  */
 export function now() {
 	// performance.now() returns milliseconds as a float
-	return performance.now();
+	return performance.now()
 }

@@ -18,14 +18,13 @@
  */
 
 class StorageBrowser {
-
 	public setItem(name: string, value: any): void {
-		localStorage.setItem(name, JSON.stringify(value));
+		localStorage.setItem(name, JSON.stringify(value))
 	}
 
 	public getItem(name: string): any {
-		return JSON.parse(localStorage.getItem(name) || '');
+		return JSON.parse(localStorage.getItem(name) || '')
 	}
 }
 
-export const storage = new StorageBrowser();
+export const storage = new StorageBrowser()
