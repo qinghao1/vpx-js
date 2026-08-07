@@ -31,11 +31,11 @@ export function readableStream<T>(fn: (s: Stream, i: number) => Promise<T | null
 	;(stream as any).writable = false
 	stream.on('end', () => (ended = true))
 
-	const get = (err?: Error, data?: T) => {
+	function get(err?: Error, data?: T | null) {
 		if (err) {
 			stream.emit('error', err)
 			if (!continueOnError) stream.emit('end')
-		} else if (arguments.length > 1) stream.emit('data', data)
+		} else if (arguments.length > 1 && data !== null && data !== undefined) stream.emit('data', data as T)
 		nextTick(() => {
 			if (ended || paused || reading) return
 			try {
