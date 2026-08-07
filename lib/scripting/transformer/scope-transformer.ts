@@ -55,8 +55,6 @@ export class ScopeTransformer extends Transformer {
 			enter: (node, parent) => {
 				i++
 
-				//console.log(`%s %s [%s]`, new Array(i).map(v => '').join('  '), node.type,  (node as any).name || '', (node as any).__scope.constructor.name);
-
 				// class declarations
 				if (node.type === 'ClassDeclaration') {
 					return this.wrapAssignment(node.id!, classExpression(node.body, node), node)
@@ -68,7 +66,11 @@ export class ScopeTransformer extends Transformer {
 					if (node.type === 'VariableDeclaration' && !isLoopVarDecl) {
 						const declarationNode = node as VariableDeclaration
 						const nodes = []
-						for (const declaration of declarationNode.declarations as any[]) {
+						for (const declaration of declarationNode.declarations as unknown as {
+							id?: { name: string }
+							name?: string
+							init?: import('estree').Expression
+						}[]) {
 							nodes.push(
 								this.wrapAssignment(
 									identifier(declaration.id ? declaration.id.name : declaration.name, node), // fixme
