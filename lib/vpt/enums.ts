@@ -108,7 +108,8 @@ export class TriggerShape extends VbsApi {
 	}
 }
 
-export class RampType extends VbsApi {
+export /** RampType. */
+class RampType extends VbsApi {
 	public readonly RampTypeFlat = 0
 	public readonly RampType4Wire = 1
 	public readonly RampType2Wire = 2
