@@ -8,47 +8,9 @@ import { Header } from './ole-header.js'
 
 export { Header } from './ole-header.js'
 
-/** Sector allocation table. */
-export class AllocationTable {
-	private static SecIdFree = -1
-	private static SecIdEndOfChain = -2
-	private static SecIdSAT = -3
-	private static SecIdMSAT = -4
+import { AllocationTable } from './ole-allocation-table.js'
 
-	private readonly doc: OleCompoundDoc
-	private readonly table: number[] = []
-
-	private constructor(doc: OleCompoundDoc, table: number[]) {
-		this.doc = doc
-		this.table = table
-	}
-
-	public static async load(doc: OleCompoundDoc, secIds: number[]): Promise<AllocationTable> {
-		const header = doc.header
-		const table = new Array(secIds.length * (header.secSize / 4))
-		const buffer = await doc.readSectors(secIds)
-		const view = getDataView(buffer)
-		for (let i = 0; i < buffer.length / 4; i++) {
-			table[i] = view.getInt32(i * 4, true)
-		}
-		return new AllocationTable(doc, table)
-	}
-
-	public getSecIdChain(startSecId: number): number[] {
-		let secId = startSecId
-		const secIds: number[] = []
-		while (secId !== AllocationTable.SecIdEndOfChain) {
-			secIds.push(secId)
-			secId = this.table[secId]
-			if (secId === undefined) {
-				throw new Error(
-					'Possibly corrupt file (cannot find secId ' + secIds[secIds.length - 1] + ' in allocation table).',
-				)
-			}
-		}
-		return secIds
-	}
-}
+export { AllocationTable } from './ole-allocation-table.js'
 
 export interface StorageEntry {
 	name: string
