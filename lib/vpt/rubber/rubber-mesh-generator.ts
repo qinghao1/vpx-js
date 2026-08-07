@@ -2,15 +2,15 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { HIT_SHAPE_DETAIL_LEVEL } from '../../util/dragpoint.js'
-import { degToRad, f4 } from '../../util/float.js'
+import { degToRad, FLT_MAX, FLT_MIN, f4 } from '../../util/float.js'
 import { Matrix3D, Vertex3D } from '../../util/math.js'
 import { SplineVertex } from '../../util/spline-vertex.js'
 import { Vertex3DNoTex2 } from '../../util/vertex.js'
-import { FLT_MAX, FLT_MIN, Mesh } from '../mesh.js'
+import { Mesh } from '../mesh.js'
 import type { Table } from '../table/table.js'
 import type { RubberData } from './rubber-data.js'
 
-/** Rubber mesh generator. */
+/** Generates rubber mesh and keeps its center. @see https://github.com/vpinball/vpinball/blob/master/rubber.cpp */
 export class RubberMeshGenerator {
 	public readonly middlePoint = new Vertex3D()
 	private readonly data: RubberData
@@ -37,14 +37,14 @@ export class RubberMeshGenerator {
 			table.getDetailLevel(),
 			acc !== -1 ? 4 * 10 ** ((10 - HIT_SHAPE_DETAIL_LEVEL) * (1 / 1.5)) : -1,
 		)
-		const numRings = sv.pcvertex - 1,
-			numSegments = accuracy
+		const numRings = sv.pcvertex - 1
+		const numSegments = accuracy
 		const numVertices = numRings * numSegments
 		const height = this.data.hitHeight + table.getTableHeight()
 
 		let prevB = new Vertex3D()
-		const invR = f4(1 / numRings),
-			invS = f4(1 / numSegments)
+		const invR = f4(1 / numRings)
+		const invS = f4(1 / numSegments)
 		let idx = 0
 		for (let i = 0; i < numRings; i++) {
 			const i2 = i === numRings - 1 ? 0 : i + 1
@@ -53,7 +53,8 @@ export class RubberMeshGenerator {
 				sv.pMiddlePoints[i2].y - sv.pMiddlePoints[i].y,
 				0,
 			)
-			let binorm: Vertex3D, normal: Vertex3D
+			let binorm: Vertex3D
+			let normal: Vertex3D
 			if (i === 0) {
 				const up = new Vertex3D(
 					sv.pMiddlePoints[i2].x + sv.pMiddlePoints[i].x,
@@ -74,8 +75,8 @@ export class RubberMeshGenerator {
 			normal.normalize()
 			prevB = binorm
 			for (let j = 0; j < numSegments; j++) {
-				const u = i * invR,
-					v = f4(j + u) * invS
+				const u = i * invR
+				const v = f4(j + u) * invS
 				const tmp = Vertex3D.getRotatedAxis(j * (360 * invS), tangent, normal).multiplyScalar(this.data.thickness * 0.5)
 				const vtx = new Vertex3DNoTex2()
 				vtx.x = f4(sv.pMiddlePoints[i].x + tmp.x)
@@ -119,7 +120,7 @@ export class RubberMeshGenerator {
 			maxz = FLT_MIN,
 			minz = FLT_MAX
 		for (let i = 0; i < numVertices; i++) {
-			const v = mesh.vertices[i]
+			const v = mesh.vertices[i]!
 			if (v.x > maxx) maxx = v.x
 			if (v.x < minx) minx = v.x
 			if (v.y > maxy) maxy = v.y
