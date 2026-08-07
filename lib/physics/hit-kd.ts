@@ -7,7 +7,8 @@ import type { CollisionEvent } from './collision-event.js'
 import { HitKDNode } from './hit-kd-node.js'
 import type { HitObject } from './hit-object.js'
 
-/** KD-tree for dynamic hit objects. */
+/** KD-tree for dynamic hit objects.
+ * @see https://github.com/vpinball/vpinball/blob/master/kdtree.cpp */
 export class HitKD {
 	public orgIdx: number[] = []
 	private rootNode: HitKDNode
