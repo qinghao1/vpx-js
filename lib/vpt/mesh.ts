@@ -41,7 +41,6 @@ export class Mesh {
 	}
 
 	/** Serializes mesh to OBJ. */
-	/* istanbul ignore next: debug */
 	public serializeToObj(description?: string): string {
 		const lines: string[] = []
 		this._writeObjectName(lines, description || this.name || '<name not set>')
@@ -137,7 +136,6 @@ export class Mesh {
 	}
 
 	/** Sets flat normal for polygon. */
-	/* istanbul ignore next */
 	public static setNormal(rgv: Vertex3DNoTex2[], rgi: number[], count: number, applyCount = 0): void {
 		if (applyCount === 0) applyCount = count
 		const n = new Vertex3D()
@@ -301,12 +299,10 @@ export class Mesh {
 		return d341 * d342 < 0
 	}
 
-	/* istanbul ignore next: debug */
 	private _writeObjectName(out: string[], name: string): void {
 		out.push(`o ${name}`)
 	}
 
-	/* istanbul ignore next: debug */
 	private _writeVertexInfo(out: string[]): void {
 		for (const v of this.vertices)
 			out.push(
@@ -321,7 +317,6 @@ export class Mesh {
 			)
 	}
 
-	/* istanbul ignore next: debug */
 	private _writeFaceInfoLong(out: string[]): void {
 		for (let i = 0; i < this.indices.length; i += 3) {
 			const f = this.indices
