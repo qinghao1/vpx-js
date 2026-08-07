@@ -7,7 +7,9 @@ import { Vertex2D } from '../../math/vertex2d.js'
 import { Enums } from '../enums.js'
 import { ItemData } from '../item-data.js'
 
-/** Textbox data. */
+/** Textbox data.
+ *
+ * @see https://github.com/vpinball/vpinball/blob/master/textbox.cpp */
 export class TextboxData extends ItemData {
 	public v1!: Vertex2D
 	public v2!: Vertex2D
