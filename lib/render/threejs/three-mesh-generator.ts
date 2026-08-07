@@ -50,7 +50,7 @@ export class ThreeMeshGenerator {
 			}
 		}
 		const g = s.object.geometry,
-			bg = ThreeRenderApi.POOL.BufferGeometry.get()
+			bg = ThreeRenderApi.POOL.BufferGeometry.get() as BufferGeometry
 		bg.name = mesh.name
 		bg.setAttribute('position', RecyclableFloat32BufferAttribute.claim(g.vertices, 3))
 		if (g.normals.length) bg.setAttribute('normal', RecyclableFloat32BufferAttribute.claim(g.normals, 3))
