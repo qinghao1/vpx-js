@@ -35,273 +35,212 @@ export class FlipperApi extends ItemApi<FlipperData> {
 		this.mover = mover
 	}
 
-	/** Get BaseRadius. */
 	get BaseRadius() {
 		return this.data.baseRadius
 	}
-	/** Set BaseRadius. */
 	set BaseRadius(v) {
 		this.data.baseRadius = v
 	}
-	/** Get EndRadius. */
 	get EndRadius() {
 		return this.data.endRadius
 	}
-	/** Set EndRadius. */
 	set EndRadius(v) {
 		this.data.endRadius = v
 	}
-	/** Get Length. */
 	get Length() {
 		return this.data.flipperRadiusMax
 	}
-	/** Set Length. */
 	set Length(v) {
 		this.data.flipperRadiusMax = v
 	}
-	/** Get EOSTorque. */
 	get EOSTorque() {
 		return this.data.doOverridePhysics(this.table) ? this.data.overrideTorqueDamping : this.data.torqueDamping
 	}
-	/** Set EOSTorque. */
 	set EOSTorque(v) {
 		if (!this.data.doOverridePhysics(this.table)) {
 			this.data.torqueDamping = v
 		}
 	}
-	/** Get EOSTorqueAngle. */
 	get EOSTorqueAngle() {
 		return this.data.doOverridePhysics(this.table) ? this.data.overrideTorqueDampingAngle : this.data.torqueDampingAngle
 	}
-	/** Set EOSTorqueAngle. */
 	set EOSTorqueAngle(v) {
 		if (!this.data.doOverridePhysics(this.table)) {
 			this.data.torqueDampingAngle = v
 		}
 	}
-	/** Get X. */
 	get X() {
 		return this.state.center.x
 	}
-	/** Set X. */
 	set X(v) {
 		this.state.center.x = v
 	}
-	/** Get Y. */
 	get Y() {
 		return this.state.center.y
 	}
-	/** Set Y. */
 	set Y(v) {
 		this.state.center.y = v
 	}
-	/** Get Surface. */
 	get Surface() {
 		return this.data.szSurface
 	}
-	/** Set Surface. */
 	set Surface(v) {
 		this.data.szSurface = v
 	}
-	/** Set StartAngle. */
 	set StartAngle(v) {
 		this.data.startAngle = v
 		this.mover.setStartAngle(degToRad(v))
 	}
-	/** Get StartAngle. */
 	get StartAngle() {
 		return this.data.startAngle
 	}
-	/** Set EndAngle. */
 	set EndAngle(v) {
 		this.data.endAngle = v
 		this.mover.setEndAngle(degToRad(v))
 	}
-	/** Get EndAngle. */
 	get EndAngle() {
 		return this.data.endAngle
 	}
-	/** Get CurrentAngle. */
 	get CurrentAngle() {
 		return radToDeg(this.state.angle)
 	}
-	/** Get Material. */
 	get Material() {
 		return this.state.material
 	}
-	/** Set Material. */
 	set Material(v) {
 		this.state.material = v
 	}
-	/** Get Mass. */
 	get Mass() {
 		return this.mover.getMass()
 	}
-	/** Set Mass. */
 	set Mass(v) {
 		if (!this.data.doOverridePhysics(this.table)) {
 			this.mover.setMass(v)
 		}
 	}
-	/** Get OverridePhysics. */
 	get OverridePhysics() {
 		return this.data.overridePhysics
 	}
-	/** Set OverridePhysics. */
 	set OverridePhysics(v) {
 		this.data.overridePhysics = v
 		this.data.updatePhysicsSettings(this.table)
 		this.hit.updatePhysicsFromFlipper()
 	}
-	/** Get RubberMaterial. */
 	get RubberMaterial() {
 		return this.state.rubberMaterial
 	}
-	/** Set RubberMaterial. */
 	set RubberMaterial(v) {
 		this.state.rubberMaterial = v
 	}
-	/** Get RubberThickness. */
 	get RubberThickness() {
 		return this.data.rubberThickness
 	}
-	/** Set RubberThickness. */
 	set RubberThickness(v) {
 		this.data.rubberThickness = v
 	}
-	/** Get RubberWidth. */
 	get RubberWidth() {
 		return this.data.rubberWidth
 	}
-	/** Set RubberWidth. */
 	set RubberWidth(v) {
 		this.data.rubberWidth = v
 	}
-	/** Get RubberHeight. */
 	get RubberHeight() {
 		return this.data.rubberHeight
 	}
-	/** Set RubberHeight. */
 	set RubberHeight(v) {
 		this.data.rubberHeight = v
 	}
-	/** Get Strength. */
 	get Strength() {
 		return this.data.strength
 	}
-	/** Set Strength. */
 	set Strength(v) {
 		if (!this.data.doOverridePhysics(this.table)) {
 			this.data.strength = v
 		}
 	}
-	/** Get Visible. */
 	get Visible() {
 		return this.state.isVisible
 	}
-	/** Set Visible. */
 	set Visible(v) {
 		this.state.isVisible = v
 	}
-	/** Get Enabled. */
 	get Enabled() {
 		return this.data.isEnabled
 	}
-	/** Set Enabled. */
 	set Enabled(v) {
 		this.data.isEnabled = v
 	}
-	/** Get Elasticity. */
 	get Elasticity() {
 		return this.hit.elasticity
 	}
-	/** Set Elasticity. */
 	set Elasticity(v) {
 		if (!this.data.doOverridePhysics(this.table)) {
 			this.hit.elasticity = v
 		}
 	}
-	/** Get ElasticityFalloff. */
 	get ElasticityFalloff() {
 		return this.hit.elasticityFalloff
 	}
-	/** Set ElasticityFalloff. */
 	set ElasticityFalloff(v) {
 		if (!this.data.doOverridePhysics(this.table)) {
 			this.hit.elasticityFalloff = v
 		}
 	}
-	/** Get Scatter. */
 	get Scatter() {
 		return this.hit.scatter
 	}
-	/** Set Scatter. */
 	set Scatter(v) {
 		if (!this.data.doOverridePhysics(this.table)) {
 			this.hit.scatter = v
 		}
 	}
-	/** Get Friction. */
 	get Friction() {
 		return this.hit.friction
 	}
-	/** Set Friction. */
 	set Friction(v) {
 		this.hit.setFriction(v)
 	}
-	/** Get RampUp. */
 	get RampUp() {
 		return this.data.doOverridePhysics(this.table) ? this.data.overrideCoilRampUp : this.data.rampUp
 	}
-	/** Set RampUp. */
 	set RampUp(v) {
 		if (!this.data.doOverridePhysics(this.table)) {
 			this.data.rampUp = v
 		}
 	}
-	/** Get Height. */
 	get Height() {
 		return this.data.height
 	}
-	/** Set Height. */
 	set Height(v) {
 		this.data.height = v
 	}
-	/** Get Return. */
 	get Return() {
 		return this.mover.getReturnRatio()
 	}
-	/** Set Return. */
 	set Return(v) {
 		if (!this.data.doOverridePhysics(this.table)) {
 			this.data.return = clamp(v, 0.0, 1.0)
 		}
 	}
-	/** Get FlipperRadiusMin. */
 	get FlipperRadiusMin() {
 		return this.data.flipperRadiusMin
 	}
-	/** Set FlipperRadiusMin. */
 	set FlipperRadiusMin(v) {
 		if (v < 0) {
 			v = 0
 		}
 		this.data.flipperRadiusMin = v
 	}
-	/** Get Image. */
 	get Image() {
 		return this.state.texture
 	}
-	/** Set Image. */
 	set Image(v) {
 		this._assertNonHdrImage(v)
 		this.state.texture = v
 	}
-	/** Get ReflectionEnabled. */
 	get ReflectionEnabled() {
 		return this.data.isReflectionEnabled
 	}
-	/** Set ReflectionEnabled. */
 	set ReflectionEnabled(v) {
 		this.data.isReflectionEnabled = v
 	}
