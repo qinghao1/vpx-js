@@ -1,14 +1,16 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-/** Frame data for animated meshes. */
+/** Frame data for animated meshes. @see https://github.com/vpinball/vpinball/blob/master/mesh.cpp */
 export class FrameData {
 	public frameVerts: VertData[] = []
+	/** Reads frame from buffer. */
 	public static get(buffer: Uint8Array, numVertices: number): FrameData {
 		const fd = new FrameData()
 		for (let i = 0; i < numVertices; i++) fd.frameVerts.push(VertData.load(buffer, i * 24))
 		return fd
 	}
+	/** Clones frame. */
 	public clone(): FrameData {
 		const f = new FrameData()
 		f.frameVerts = this.frameVerts.map((v) => v.clone())
@@ -16,7 +18,7 @@ export class FrameData {
 	}
 }
 
-/** Vert data. */
+/** Animated vertex (pos+normal). */
 export class VertData {
 	public constructor(
 		public readonly x: number,
@@ -26,6 +28,7 @@ export class VertData {
 		public readonly ny: number,
 		public readonly nz: number,
 	) {}
+	/** Reads at offset. */
 	public static load(buf: Uint8Array, off = 0): VertData {
 		const v = new DataView(buf.buffer, buf.byteOffset, buf.byteLength)
 		return new VertData(
@@ -37,6 +40,7 @@ export class VertData {
 			v.getFloat32(off + 20, true),
 		)
 	}
+	/** Clones. */
 	public clone(): VertData {
 		return new VertData(this.x, this.y, this.z, this.nx, this.ny, this.nz)
 	}
