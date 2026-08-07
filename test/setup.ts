@@ -1,42 +1,11 @@
-/*
- * VPDB - Virtual Pinball Database
- * Copyright (C) 2019 freezy <freezy@vpdb.io>
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- */
+import { afterAll, afterEach, beforeAll, beforeEach } from 'vitest'
 
-import { Logger, Progress } from '../lib/util/logger';
-
-// tslint:disable:no-empty
-before(() => {
-
-	// disable logging
-	Logger.setLogger({
-		debug(format: any, ...param: any[]): void {},
-		error(format: any, ...param: any[]): void {},
-		info(format: any, ...param: any[]): void {},
-		verbose(format: any, ...param: any[]): void {},
-		warn(format: any, ...param: any[]): void {},
-		wtf(format: any, ...param: any[]): void {},
-	});
-
-	// disable progress
-	Progress.setProgress({
-		details(details: string): void {},
-		end(id: string): void {},
-		show(action: string, details?: string): void {},
-		start(id: string, title: string): void {},
-	});
-});
+// Alias mocha globals to vitest
+// @ts-expect-error
+globalThis.before = beforeAll
+// @ts-expect-error
+globalThis.after = afterAll
+// @ts-expect-error
+globalThis.beforeEach = beforeEach
+// @ts-expect-error
+globalThis.afterEach = afterEach

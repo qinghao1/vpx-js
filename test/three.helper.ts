@@ -17,198 +17,278 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { resolve } from 'path';
-import { GLTF, GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
-import { Box3, Mesh, Object3D } from '../lib/refs.node';
+import { resolve } from 'path'
+import { type GLTF, GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'
+import { Box3, type Mesh, type Object3D } from '../lib/refs.node'
 
 // tslint:disable:no-shadowed-variable
 export class ThreeHelper {
-
-	private readonly loader: any;
+	private readonly loader: any
 
 	constructor() {
-		this.loader = new GLTFLoader();
+		this.loader = new GLTFLoader()
 	}
 
 	public async loadGlb(glb: Buffer): Promise<GLTF> {
-		return new Promise((resolve, reject) => this.loader.parse(toArrayBuffer(glb), '', resolve, reject));
+		return new Promise((resolve, reject) => this.loader.parse(toArrayBuffer(glb), '', resolve, reject))
 	}
 
 	public first<T extends Object3D>(gltf: GLTF, groupName: string): T {
-		const table = this.getTable(gltf);
+		const table = this.getTable(gltf)
 		if (!table.children || !table.children.length) {
-			throw new Error('GLTF table has no children!');
+			throw new Error('GLTF table has no children!')
 		}
-		const objects = table.children.find((c: Object3D) => c.name === groupName);
+		const objects = table.children.find((c: Object3D) => c.name === groupName || c.name.startsWith(groupName + '_'))
 		if (!objects) {
-			throw new Error('GLTF table has no "' + groupName + '" group!');
+			throw new Error('GLTF table has no "' + groupName + '" group!')
 		}
 		if (!objects.children || !objects.children.length) {
-			throw new Error('The "' + groupName + '" group of the GLTF table has no children.');
+			throw new Error('The "' + groupName + '" group of the GLTF table has no children.')
 		}
 		if (!objects.children[0].children || !objects.children[0].children.length) {
-			throw new Error('The first child of the group "' + groupName + '" of the GLTF table has no children.');
+			throw new Error('The first child of the group "' + groupName + '" of the GLTF table has no children.')
 		}
-		return objects.children[0].children[0] as T;
+		return objects.children[0].children[0] as T
 	}
 
 	public find<T extends Object3D>(gltf: GLTF, groupName: string, itemName: string, objectName?: string): T {
-		const table = this.getTable(gltf);
+		const table = this.getTable(gltf)
 		if (!table.children || !table.children.length) {
-			throw new Error('GLTF table has no children!');
+			throw new Error('GLTF table has no children!')
 		}
-		const objects = table.children.find(c => c.name === groupName);
+		const objects = table.children.find((c) => c.name === groupName || c.name.startsWith(groupName + '_'))
 		if (!objects) {
-			throw new Error('GLTF table has no "' + groupName + '" group! (available: [' + table.children.map(c => c.name).join(', ') + '])');
+			throw new Error(
+				'GLTF table has no "' +
+					groupName +
+					'" group! (available: [' +
+					table.children.map((c) => c.name).join(', ') +
+					'])',
+			)
 		}
 		if (!objects.children || !objects.children.length) {
-			throw new Error('The "' + groupName + '" group of the GLTF table has no children.');
+			throw new Error('The "' + groupName + '" group of the GLTF table has no children.')
 		}
-		const item = objects.children.find(c => c.name === itemName);
+		const item = objects.children.find((c) => c.name === itemName || c.name.startsWith(itemName + '_'))
 		if (!item) {
-			throw new Error('The "' + groupName + '" group of the GLTF table has no child named "' + itemName + '". (available: [' + objects.children.map(c => c.name).join(', ') + '])');
+			throw new Error(
+				'The "' +
+					groupName +
+					'" group of the GLTF table has no child named "' +
+					itemName +
+					'". (available: [' +
+					objects.children.map((c) => c.name).join(', ') +
+					'])',
+			)
 		}
 
 		if (!objectName) {
-			return item as T;
+			return item as T
 		}
-		const object = item.children.find(c => c.name === objectName);
+		const object = item.children.find(
+			(c) => c.name === objectName || (c.name && objectName && c.name.startsWith(objectName + '_')),
+		)
 		if (!object) {
-			throw new Error('Item "' + itemName + '" of group "' + groupName + '" of the GLTF table has no child named "' + objectName + '". (available: [' + item.children.map(c => c.name).join(', ') + '])');
+			throw new Error(
+				'Item "' +
+					itemName +
+					'" of group "' +
+					groupName +
+					'" of the GLTF table has no child named "' +
+					objectName +
+					'". (available: [' +
+					item.children.map((c) => c.name).join(', ') +
+					'])',
+			)
 		}
-		return object as T;
+		return object as T
 	}
 
 	public vertices(mesh: Mesh): number[] {
-		return (mesh.geometry as any).attributes.position.array;
+		return (mesh.geometry as any).attributes.position.array
 	}
 
 	public getTable(gltf: GLTF): Object3D {
 		if (!gltf || !gltf.scene || !gltf.scene.children || !gltf.scene.children.length) {
-			throw new Error('Cannot find scene in GLTF.');
+			throw new Error('Cannot find scene in GLTF.')
 		}
-		const table = gltf.scene.children.find(c => c.name === 'playfield');
+		const table = gltf.scene.children.find((c) => c.name === 'playfield' || c.name.startsWith('playfield'))
 		if (!table) {
-			throw new Error('Cannot find table in GLTF.');
+			throw new Error('Cannot find table in GLTF.')
 		}
-		return table;
+		return table
 	}
 
 	public expectNoObject(gltf: GLTF, groupName: string, itemName: string, objectName?: string): void {
-		const table = this.getTable(gltf);
+		const table = this.getTable(gltf)
 		if (!table.children || !table.children.length) {
-			throw new Error('GLTF table has no children!');
+			throw new Error('GLTF table has no children!')
 		}
-		const objects = table.children.find(c => c.name === groupName);
+		const objects = table.children.find((c) => c.name === groupName || c.name.startsWith(groupName + '_'))
 		if (!objects) {
-			throw new Error('GLTF table has no "' + groupName + '" group! (available: [' + table.children.map(c => c.name).join(', ') + '])');
+			throw new Error(
+				'GLTF table has no "' +
+					groupName +
+					'" group! (available: [' +
+					table.children.map((c) => c.name).join(', ') +
+					'])',
+			)
 		}
 		if (!objects.children) {
-			throw new Error('The "' + groupName + '" group of the GLTF table has no children.');
+			throw new Error('The "' + groupName + '" group of the GLTF table has no children.')
 		}
-		const item = objects.children.find(c => c.name === itemName);
+		const item = objects.children.find((c) => c.name === itemName || c.name.startsWith(itemName + '_'))
 
 		if (objectName) {
 			if (!item) {
-				throw new Error('The "' + groupName + '" group of the GLTF table has no child named "' + objectName + '". (available: [' + objects.children.map(c => c.name).join(', ') + '])');
+				throw new Error(
+					'The "' +
+						groupName +
+						'" group of the GLTF table has no child named "' +
+						objectName +
+						'". (available: [' +
+						objects.children.map((c) => c.name).join(', ') +
+						'])',
+				)
 			}
-			const object = item.children.find(c => c.name === objectName);
+			const object = item.children.find(
+				(c) => c.name === objectName || (c.name && objectName && c.name.startsWith(objectName + '_')),
+			)
 			if (object) {
-				throw new Error('The "' + itemName + '" item of the "' + groupName + '" group of the GLTF table has a child named "' + objectName + '" but none was expected.');
+				throw new Error(
+					'The "' +
+						itemName +
+						'" item of the "' +
+						groupName +
+						'" group of the GLTF table has a child named "' +
+						objectName +
+						'" but none was expected.',
+				)
 			}
 		} else {
 			if (item) {
-				throw new Error('The "' + groupName + '" group of the GLTF table has a child named "' + objectName + '" but none was expected.');
+				throw new Error(
+					'The "' +
+						groupName +
+						'" group of the GLTF table has a child named "' +
+						objectName +
+						'" but none was expected.',
+				)
 			}
 		}
-
 	}
 
 	public expectObject(gltf: GLTF, groupName: string, itemName: string, objectName?: string) {
-		const table = this.getTable(gltf);
+		const table = this.getTable(gltf)
 		if (!table.children || !table.children.length) {
-			throw new Error('GLTF table has no children!');
+			throw new Error('GLTF table has no children!')
 		}
-		const objects = table.children.find(c => c.name === groupName);
+		const objects = table.children.find((c) => c.name === groupName || c.name.startsWith(groupName + '_'))
 		if (!objects) {
-			throw new Error('GLTF table has no "' + groupName + '" group! (available: [' + table.children.map(c => c.name).join(', ') + '])');
+			throw new Error(
+				'GLTF table has no "' +
+					groupName +
+					'" group! (available: [' +
+					table.children.map((c) => c.name).join(', ') +
+					'])',
+			)
 		}
 		if (!objects.children || !objects.children.length) {
-			throw new Error('The "' + groupName + '" group of the GLTF table has no children.');
+			throw new Error('The "' + groupName + '" group of the GLTF table has no children.')
 		}
-		const item = objects.children.find(c => c.name === itemName);
+		const item = objects.children.find((c) => c.name === itemName || c.name.startsWith(itemName + '_'))
 		if (!item) {
-			throw new Error('The "' + groupName + '" group of the GLTF table has no child named "' + objectName + '". (available: [' + objects.children.map(c => c.name).join(', ') + '])');
+			throw new Error(
+				'The "' +
+					groupName +
+					'" group of the GLTF table has no child named "' +
+					objectName +
+					'". (available: [' +
+					objects.children.map((c) => c.name).join(', ') +
+					'])',
+			)
 		}
 		if (objectName) {
-			const object = item.children.find(c => c.name === objectName);
+			const object = item.children.find(
+				(c) => c.name === objectName || (c.name && objectName && c.name.startsWith(objectName + '_')),
+			)
 			if (!object) {
-				throw new Error('The "' + itemName + '" item in the "' + groupName + '" group of the GLTF table has no child named "' + objectName + '". (available: [' + item.children.map(c => c.name).join(', ') + '])');
+				throw new Error(
+					'The "' +
+						itemName +
+						'" item in the "' +
+						groupName +
+						'" group of the GLTF table has no child named "' +
+						objectName +
+						'". (available: [' +
+						item.children.map((c) => c.name).join(', ') +
+						'])',
+				)
 			}
 		}
 	}
 
 	public expectVerticesInArray(vertices: number[][], array: number[], accuracy?: number): void {
-		accuracy = accuracy || 3;
+		accuracy = accuracy || 3
 		// create hash map of vertices
-		const vertexHashes: { [key: string]: boolean } = {};
+		const vertexHashes: { [key: string]: boolean } = {}
 		for (let i = 0; i < array.length; i += 3) {
-			vertexHashes[this.hashVertex(array.slice(i, i + 3), accuracy)] = true;
+			vertexHashes[this.hashVertex(array.slice(i, i + 3), accuracy)] = true
 		}
 		for (const expectedVertex of vertices) {
-			const vertexHash = this.hashVertex(expectedVertex, accuracy);
+			const vertexHash = this.hashVertex(expectedVertex, accuracy)
 			if (!vertexHashes[vertexHash]) {
-				throw new Error('Vertex { ' + expectedVertex.join(', ') + ' } not found in array.');
+				throw new Error('Vertex { ' + expectedVertex.join(', ') + ' } not found in array.')
 			}
 		}
 	}
 
 	public concatMeshes(gltf: GLTF, groupName: string, itemName: string, objectNames: string[]) {
-		const arr = [];
+		const arr = []
 		for (const objName of objectNames) {
-			const mesh = this.find(gltf, groupName, itemName, objName) as Mesh;
-			const geometry = mesh.geometry as any;
-			arr.push(...geometry.attributes.position.array);
+			const mesh = this.find(gltf, groupName, itemName, objName) as Mesh
+			const geometry = mesh.geometry as any
+			arr.push(...geometry.attributes.position.array)
 		}
-		return arr;
+		return arr
 	}
 
 	private hashVertex(vertex: number[], accuracy: number): string {
-		const trim = Math.pow(10, accuracy);
-		return `${Math.round(vertex[0] * trim)},${Math.round(vertex[1] * trim)},${Math.round(vertex[2] * trim)}`;
+		const trim = 10 ** accuracy
+		return `${Math.round(vertex[0] * trim)},${Math.round(vertex[1] * trim)},${Math.round(vertex[2] * trim)}`
 	}
 
 	public fixturePath(filename: string): string {
-		return resolve('test', 'fixtures', filename);
+		return resolve('test', 'fixtures', filename)
 	}
 
 	public resPath(filename: string): string {
-		return resolve('res', 'maps', filename);
+		return resolve('res', 'maps', filename)
 	}
 
 	public getBoundingBox(object3D: Object3D): Box3 {
-		let box: Box3 | null = null;
-		object3D.traverse(obj3D => {
-			const geometry = (obj3D as Mesh).geometry;
+		let box: Box3 | null = null
+		object3D.traverse((obj3D) => {
+			const geometry = (obj3D as Mesh).geometry
 			if (geometry === undefined) {
-				return;
+				return
 			}
-			geometry.computeBoundingBox();
+			geometry.computeBoundingBox()
 			if (box === null) {
-				box = geometry.boundingBox;
+				box = geometry.boundingBox
 			} else {
-				box.union(geometry.boundingBox);
+				box.union(geometry.boundingBox)
 			}
-		});
-		return box || new Box3();
+		})
+		return box || new Box3()
 	}
 }
 
 function toArrayBuffer(buf: Buffer): ArrayBuffer {
-	const ab = new ArrayBuffer(buf.length);
-	const view = new Uint8Array(ab);
+	const ab = new ArrayBuffer(buf.length)
+	const view = new Uint8Array(ab)
 	for (let i = 0; i < buf.length; ++i) {
-		view[i] = buf[i];
+		view[i] = buf[i]
 	}
-	return ab;
+	return ab
 }

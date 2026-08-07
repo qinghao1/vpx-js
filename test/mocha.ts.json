@@ -1,9 +1,7 @@
 {
-	"require": [ "esm", "ts-node/register" ],
+	"require": ["esm", "ts-node/register"],
 	"bail": true,
 	"color": true,
 	"timeout": 10000,
-	"file": [
-		"test/setup.ts"
-	]
+	"file": ["test/setup.ts"]
 }
