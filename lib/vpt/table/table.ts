@@ -112,8 +112,16 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 		}
 		if (loaded.info) this.info = loaded.info
 		if (loaded.tableScript) this.tableScript = loaded.tableScript
-		this.populateFromLoaded(loaded as unknown as Record<string, unknown>, 'textures', this.textures as unknown as Record<string, unknown>)
-		this.populateFromLoaded(loaded as unknown as Record<string, unknown>, 'collections', this.collections as unknown as Record<string, unknown>)
+		this.populateFromLoaded(
+			loaded as unknown as Record<string, unknown>,
+			'textures',
+			this.textures as unknown as Record<string, unknown>,
+		)
+		this.populateFromLoaded(
+			loaded as unknown as Record<string, unknown>,
+			'collections',
+			this.collections as unknown as Record<string, unknown>,
+		)
 		for (const [type, entry] of Object.entries(ITEM_REGISTRY)) {
 			const loadedKey = entry.key as keyof typeof loaded
 			const tableKey = loadedKey === 'textBoxes' ? 'textboxes' : loadedKey
