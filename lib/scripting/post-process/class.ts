@@ -28,6 +28,7 @@ import {
 } from '../estree.js'
 import type { ESIToken } from '../grammar/grammar.js'
 
+/** ppClass. */
 export function ppClass(node: ESIToken): any {
 	switch (node.type) {
 		case 'ClassDeclaration':
