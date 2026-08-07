@@ -21,11 +21,7 @@ import { BumperMeshGenerator } from './bumper-mesh-generator.js'
 import { BumperState } from './bumper-state.js'
 import { BumperUpdater } from './bumper-updater.js'
 
-/**
- * VPinball's bumper item.
- *
- * @see https://github.com/vpinball/vpinball/blob/master/bumper.cpp
- */
+/** Bumper item. @see https://github.com/vpinball/vpinball/blob/master/bumper.cpp */
 export class Bumper
 	extends Item<BumperData>
 	implements IRenderable<BumperState>, IHittable, IAnimatable, IScriptable<BumperApi>
