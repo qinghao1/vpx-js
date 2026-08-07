@@ -3,7 +3,6 @@
 
 import { EventEmitter } from 'events'
 
-/** Stream. */
 export class Stream extends EventEmitter {}
 
 const nextTick: (cb: () => void) => void =
@@ -13,18 +12,19 @@ const nextTick: (cb: () => void) => void =
 			? (global as any).setImmediate.bind(global)
 			: process.nextTick.bind(process)
 
-/**
- * Creates a lazy readable stream that pulls chunks via `func`.
- * @param func provider returning next chunk or null for EOM
- * @param continueOnError if true, don't emit 'end' on error
- */
-export function readableStream<T>(func: (stream: Stream, i: number) => Promise<T | null>, continueOnError = false) {
-	const stream = new Stream()
+/** Lazy readable stream pulling chunks via `fn`. */
+export function readableStream<T>(fn: (s: Stream, i: number) => Promise<T | null>, continueOnError = false) {
+	const stream = new Stream() as Stream & {
+		readable: boolean
+		writable: boolean
+		resume(): void
+		pause(): void
+		destroy(): void
+	}
 	let i = 0
 	let paused = false
 	let ended = false
 	let reading = false
-
 	;(stream as any).readable = true
 	;(stream as any).writable = false
 	stream.on('end', () => (ended = true))
@@ -33,24 +33,22 @@ export function readableStream<T>(func: (stream: Stream, i: number) => Promise<T
 		if (err) {
 			stream.emit('error', err)
 			if (!continueOnError) stream.emit('end')
-		} else if (arguments.length > 1) {
-			stream.emit('data', data)
-		}
+		} else if (arguments.length > 1) stream.emit('data', data)
 		nextTick(() => {
 			if (ended || paused || reading) return
 			try {
 				reading = true
-				func(stream, i++)
-					.then((buffer) => {
+				fn(stream, i++)
+					.then((buf) => {
 						reading = false
-						get(undefined, buffer)
+						get(undefined, buf)
 					})
 					.catch((e) => {
 						stream.emit('error', e)
 						stream.emit('end')
 					})
-			} catch (err) {
-				stream.emit('error', err as Error)
+			} catch (e) {
+				stream.emit('error', e as Error)
 				stream.emit('end')
 			}
 		})
@@ -67,5 +65,5 @@ export function readableStream<T>(func: (stream: Stream, i: number) => Promise<T
 		stream.emit('close')
 		ended = true
 	}
-	return stream as Stream & { readable: boolean; writable: boolean; resume(): void; pause(): void; destroy(): void }
+	return stream
 }
