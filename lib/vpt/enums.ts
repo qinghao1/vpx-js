@@ -175,6 +175,7 @@ export class FXAASettings extends VbsApi {
 	}
 }
 
+/** Physics set. */
 export class PhysicsSet extends VbsApi {
 	public readonly Disable = 0
 	public readonly Set1 = 1
