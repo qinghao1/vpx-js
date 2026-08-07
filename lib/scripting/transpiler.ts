@@ -37,6 +37,7 @@ declare function play(
 	player: Player,
 ): void
 
+/** Transpiles VBS to JS and executes. */
 export class Transpiler {
 	private readonly table: Table
 	private readonly player: Player
