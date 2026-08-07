@@ -13,17 +13,14 @@ import type { Table } from '../table/table.js'
 import { CollectionApi } from './collection-api.js'
 import { CollectionData } from './collection-data.js'
 
-/** Collection item. */
+/** Collection item. @see https://github.com/vpinball/vpinball/blob/master/collection.cpp */
 export class Collection extends Item<CollectionData> implements IPlayable, IScriptable<CollectionApi> {
-	public readonly items: Array<ItemApi<ItemData>> = [] // m_visel
+	public readonly items: Array<ItemApi<ItemData>> = []
 	private api?: CollectionApi
 
-	// public props
-	/** Get fireEvents. */
 	get fireEvents() {
 		return this.data.fireEvents
 	}
-	/** Get stopSingleEvents. */
 	get stopSingleEvents() {
 		return this.data.stopSingleEvents
 	}
