@@ -3,7 +3,8 @@
 
 import { EventEmitter } from 'events'
 
-export class Stream extends EventEmitter {}
+export /** Stream. */
+class Stream extends EventEmitter {}
 
 const nextTick: (cb: () => void) => void =
 	typeof queueMicrotask !== 'undefined'
