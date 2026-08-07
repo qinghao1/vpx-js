@@ -7,25 +7,18 @@ import { Vertex2D } from '../../math/vertex2d.js'
 import { ItemData } from '../item-data.js'
 
 /** LightSeq data.
- *
  * @see https://github.com/vpinball/vpinball/blob/master/lightseq.cpp */
 export class LightSeqData extends ItemData {
 	private v!: Vertex2D
 	public collection?: string
 	public center: Vertex2D = new Vertex2D()
-	public updateInterval: number = 25
-	private backglass: boolean = false
+	public updateInterval = 25
+	private backglass = false
 
 	public static async fromStorage(storage: Storage, itemName: string): Promise<LightSeqData> {
-		const lightSeqData = new LightSeqData(itemName)
-		await storage.streamFiltered(
-			itemName,
-			4,
-			BiffParser.stream(lightSeqData.fromTag.bind(lightSeqData), {
-				streamedTags: ['FONT'],
-			}),
-		)
-		return lightSeqData
+		const d = new LightSeqData(itemName)
+		await storage.streamFiltered(itemName, 4, BiffParser.stream(d.fromTag.bind(d), { streamedTags: ['FONT'] }))
+		return d
 	}
 
 	private constructor(itemName: string) {
@@ -33,29 +26,31 @@ export class LightSeqData extends ItemData {
 	}
 
 	private async fromTag(buffer: Uint8Array, tag: string, offset: number, len: number): Promise<number> {
-		switch (tag) {
-			case 'VCEN':
-				this.v = Vertex2D.get(buffer)
-				break
-			case 'COLC':
-				this.collection = this.getWideString(buffer, len)
-				break
-			case 'CTRX':
-				this.center.x = this.getFloat(buffer)
-				break
-			case 'CTRY':
-				this.center.y = this.getFloat(buffer)
-				break
-			case 'UPTM':
-				this.updateInterval = this.getInt(buffer)
-				break
-			case 'BGLS':
-				this.backglass = this.getBool(buffer)
-				break
-			default:
-				this.getCommonBlock(buffer, tag, len)
-				break
+		if (tag === 'VCEN') {
+			this.v = Vertex2D.get(buffer)
+			return 0
 		}
+		if (tag === 'COLC') {
+			this.collection = this.getWideString(buffer, len)
+			return 0
+		}
+		if (tag === 'UPTM') {
+			this.updateInterval = this.getInt(buffer)
+			return 0
+		}
+		if (tag === 'BGLS') {
+			this.backglass = this.getBool(buffer)
+			return 0
+		}
+		if (tag === 'CTRX') {
+			this.center.x = this.getFloat(buffer)
+			return 0
+		}
+		if (tag === 'CTRY') {
+			this.center.y = this.getFloat(buffer)
+			return 0
+		}
+		this.getCommonBlock(buffer, tag, len)
 		return 0
 	}
 }
