@@ -8,7 +8,6 @@ import {
 	BufferAttribute,
 	type BufferGeometry,
 	type Camera,
-	ClampToEdgeWrapping,
 	type Color,
 	DoubleSide,
 	type InterleavedBufferAttribute,
@@ -16,21 +15,13 @@ import {
 	InterpolateLinear,
 	type KeyframeTrack,
 	type Light,
-	LinearFilter,
-	LinearMipMapLinearFilter,
-	LinearMipMapNearestFilter,
 	Math as M,
 	type Material,
 	type Matrix4,
 	type Mesh,
-	MirroredRepeatWrapping,
-	NearestFilter,
-	NearestMipMapLinearFilter,
-	NearestMipMapNearestFilter,
 	type Object3D,
 	type PixelFormat,
 	PropertyBinding,
-	RepeatWrapping,
 	Scene,
 	type Texture,
 	TriangleFanDrawMode,
@@ -59,53 +50,7 @@ const require = createRequire(import.meta.url)
 const gltfPipeline = require('gltf-pipeline')
 const PromisePool = require('es6-promise-pool')
 
-const WEBGL_CONSTANTS: { [key: string]: number } = {
-	POINTS: 0x0000,
-	LINES: 0x0001,
-	LINE_LOOP: 0x0002,
-	LINE_STRIP: 0x0003,
-	TRIANGLES: 0x0004,
-	TRIANGLE_STRIP: 0x0005,
-	TRIANGLE_FAN: 0x0006,
-
-	UNSIGNED_BYTE: 0x1401,
-	UNSIGNED_SHORT: 0x1403,
-	FLOAT: 0x1406,
-	UNSIGNED_INT: 0x1405,
-	ARRAY_BUFFER: 0x8892,
-	ELEMENT_ARRAY_BUFFER: 0x8893,
-
-	NEAREST: 0x2600,
-	LINEAR: 0x2601,
-	NEAREST_MIPMAP_NEAREST: 0x2700,
-	LINEAR_MIPMAP_NEAREST: 0x2701,
-	NEAREST_MIPMAP_LINEAR: 0x2702,
-	LINEAR_MIPMAP_LINEAR: 0x2703,
-
-	CLAMP_TO_EDGE: 33071,
-	MIRRORED_REPEAT: 33648,
-	REPEAT: 10497,
-}
-
-const THREE_TO_WEBGL: { [key: string]: number } = {}
-
-THREE_TO_WEBGL[NearestFilter] = WEBGL_CONSTANTS.NEAREST
-THREE_TO_WEBGL[NearestMipMapNearestFilter] = WEBGL_CONSTANTS.NEAREST_MIPMAP_NEAREST
-THREE_TO_WEBGL[NearestMipMapLinearFilter] = WEBGL_CONSTANTS.NEAREST_MIPMAP_LINEAR
-THREE_TO_WEBGL[LinearFilter] = WEBGL_CONSTANTS.LINEAR
-THREE_TO_WEBGL[LinearMipMapNearestFilter] = WEBGL_CONSTANTS.LINEAR_MIPMAP_NEAREST
-THREE_TO_WEBGL[LinearMipMapLinearFilter] = WEBGL_CONSTANTS.LINEAR_MIPMAP_LINEAR
-
-THREE_TO_WEBGL[ClampToEdgeWrapping] = WEBGL_CONSTANTS.CLAMP_TO_EDGE
-THREE_TO_WEBGL[RepeatWrapping] = WEBGL_CONSTANTS.REPEAT
-THREE_TO_WEBGL[MirroredRepeatWrapping] = WEBGL_CONSTANTS.MIRRORED_REPEAT
-
-const PATH_PROPERTIES: { [key: string]: string } = {
-	scale: 'scale',
-	position: 'translation',
-	quaternion: 'rotation',
-	morphTargetInfluences: 'weights',
-}
+import { PATH_PROPERTIES, THREE_TO_WEBGL, WEBGL_CONSTANTS } from './gltf-constants.js'
 
 /**
  * This is a modified version of Three's GLTF exporter that runs better
