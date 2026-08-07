@@ -3,7 +3,7 @@
 
 /** Stub registry — backs VBS `RegRead/Write` with in-memory fallback values. */
 export class GlobalRegistry {
-	private readonly registry = new Map<string, any>()
+	private readonly registry = new Map<string, string | number>()
 
 	public getRegStringAsFloat(_key: string, _value: string, fallback: number): number {
 		return fallback
@@ -42,7 +42,7 @@ export class GlobalRegistry {
 		}
 	}
 
-	public regWrite(key: string, value: any): void {
+	public regWrite(key: string, value: string | number): void {
 		this.registry.set(this.normalize(key), value)
 	}
 
