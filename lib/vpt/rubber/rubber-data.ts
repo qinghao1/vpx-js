@@ -9,6 +9,7 @@ import { type IPhysicalData, ItemData } from '../item-data.js'
 
 /** Rubber data. */
 export class RubberData extends ItemData implements IPhysicalData {
+	// appearance, physics, and behavior
 	public height: number = f4(25)
 	public hitHeight: number = f4(-1.0)
 	public thickness: number = f4(8)
