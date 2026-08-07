@@ -12,27 +12,21 @@ import { LineSeg } from './line-seg.js'
 
 /** Slingshot line segment. */
 export class LineSegSlingshot extends LineSeg {
-	private readonly physics: PlayerPhysics
-	private readonly surface: Surface
-	private readonly surfaceData: SurfaceData
 	private slingshotAnim = new SlingshotAnimObject()
 	public force = 0
 	private eventTimeReset = 0
 	public doHitEvent = false
 
 	constructor(
-		surface: Surface,
-		surfaceData: SurfaceData,
+		private readonly surface: Surface,
+		private readonly surfaceData: SurfaceData,
 		p1: Vertex2D,
 		p2: Vertex2D,
 		zLow: number,
 		zHigh: number,
-		physics: PlayerPhysics,
+		private readonly physics: PlayerPhysics,
 	) {
 		super(p1, p2, zLow, zHigh)
-		this.surface = surface
-		this.surfaceData = surfaceData
-		this.physics = physics
 	}
 
 	public override collide(coll: CollisionEvent): void {
