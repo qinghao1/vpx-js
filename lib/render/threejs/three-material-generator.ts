@@ -13,6 +13,7 @@ import type { Material } from '../../vpt/material.js'
 import type { MeshConvertOptions } from '../irender-api.js'
 import type { ThreeMapGenerator } from './three-map-generator.js'
 
+/** Generates/caches Three.js materials. */
 export class ThreeMaterialGenerator {
 	private readonly cachedMaterials: { [key: string]: ThreeMaterial } = {}
 
