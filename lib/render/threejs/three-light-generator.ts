@@ -13,7 +13,8 @@ import type { LightData } from '../../vpt/light/light-data.js'
 import type { LightState } from '../../vpt/light/light-state.js'
 import { ThreeRenderApi } from './three-render-api.js'
 
-export class ThreeLightGenerator {
+export /** Generates Three.js lights. */
+class ThreeLightGenerator {
 	public static readonly EMISSIVE_MAP_FACTOR = 0.1
 	public static readonly BULB_FACTOR = 10
 
