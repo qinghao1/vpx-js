@@ -8,6 +8,7 @@ import type { Table } from '../table/table.js'
 import type { BallData } from './ball-data.js'
 import type { BallState } from './ball-state.js'
 
+/** Updates ball render state. */
 export class BallUpdater extends ItemUpdater<BallState> {
 	private readonly data: BallData
 
