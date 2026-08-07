@@ -1,14 +1,14 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { degToRad } from '../../util/float.js'
+import { degToRad, FLT_MAX } from '../../util/float.js'
 import { Matrix3D } from '../../util/math.js'
 import { Vertex3DNoTex2 } from '../../util/vertex.js'
-import { FLT_MAX, Mesh } from '../mesh.js'
+import { Mesh } from '../mesh.js'
 import type { Table } from '../table/table.js'
 import type { PrimitiveData } from './primitive-data.js'
 
-/** Primitive mesh generator. */
+/** Generates primitive built-in mesh. @see https://github.com/vpinball/vpinball/blob/master/primitive.cpp */
 export class PrimitiveMeshGenerator {
 	private readonly data: PrimitiveData
 	constructor(data: PrimitiveData) {
@@ -34,14 +34,13 @@ export class PrimitiveMeshGenerator {
 			maxX = -FLT_MAX,
 			maxY = -FLT_MAX
 		mesh.vertices = []
-
 		mesh.vertices.push(Object.assign(new Vertex3DNoTex2(), { x: 0, y: 0, z: 0.5 }))
 		mesh.vertices[sides + 1] = Object.assign(new Vertex3DNoTex2(), { x: 0, y: 0, z: -0.5 })
 
 		for (let i = 0; i < sides; i++) {
 			const angle = addAngle * i + offsAngle
-			const x = Math.sin(angle) * outerRadius,
-				y = Math.cos(angle) * outerRadius
+			const x = Math.sin(angle) * outerRadius
+			const y = Math.cos(angle) * outerRadius
 			const top = Object.assign(new Vertex3DNoTex2(), { x, y, z: 0.5 })
 			const bot = Object.assign(new Vertex3DNoTex2(), { x, y, z: -0.5 })
 			mesh.vertices[i + 1] = top
@@ -54,22 +53,22 @@ export class PrimitiveMeshGenerator {
 			if (y > maxY) maxY = y
 		}
 
-		mesh.vertices[0].tu = 0.25
-		mesh.vertices[0].tv = 0.25
-		mesh.vertices[sides + 1].tu = 0.75
-		mesh.vertices[sides + 1].tv = 0.25
-		const invX = 0.5 / (maxX - minX),
-			invY = 0.5 / (maxY - minY),
-			invS = 1 / sides
+		mesh.vertices[0]!.tu = 0.25
+		mesh.vertices[0]!.tv = 0.25
+		mesh.vertices[sides + 1]!.tu = 0.75
+		mesh.vertices[sides + 1]!.tv = 0.25
+		const invX = 0.5 / (maxX - minX)
+		const invY = 0.5 / (maxY - minY)
+		const invS = 1 / sides
 		for (let i = 0; i < sides; i++) {
-			const top = mesh.vertices[i + 1]
+			const top = mesh.vertices[i + 1]!
 			top.tu = (top.x - minX) * invX
 			top.tv = (top.y - minY) * invY
-			const bot = mesh.vertices[i + 1 + sides + 1]
+			const bot = mesh.vertices[i + 1 + sides + 1]!
 			bot.tu = top.tu + 0.5
 			bot.tv = top.tv
-			const sTop = mesh.vertices[sides * 2 + 2 + i],
-				sBot = mesh.vertices[sides * 3 + 2 + i]
+			const sTop = mesh.vertices[sides * 2 + 2 + i]!
+			const sBot = mesh.vertices[sides * 3 + 2 + i]!
 			sTop.tu = i * invS
 			sTop.tv = 0.5
 			sBot.tu = sTop.tu
@@ -79,8 +78,8 @@ export class PrimitiveMeshGenerator {
 		mesh.indices = []
 		if (this.data.drawTexturesInside) {
 			for (let i = 0; i < sides; i++) {
-				const nxt = i === sides - 1 ? 1 : i + 2,
-					nxt2 = nxt + 1
+				const nxt = i === sides - 1 ? 1 : i + 2
+				const nxt2 = nxt + 1
 				mesh.indices.push(0, i + 1, nxt, 0, nxt, i + 1)
 				mesh.indices.push(sides + 1, sides + nxt2, sides + 2 + i, sides + 1, sides + 2 + i, sides + nxt2)
 				mesh.indices.push(
@@ -102,8 +101,8 @@ export class PrimitiveMeshGenerator {
 			}
 		} else {
 			for (let i = 0; i < sides; i++) {
-				const nxt = i === sides - 1 ? 1 : i + 2,
-					nxt2 = nxt + 1
+				const nxt = i === sides - 1 ? 1 : i + 2
+				const nxt2 = nxt + 1
 				mesh.indices.push(0, nxt, i + 1)
 				mesh.indices.push(sides + 1, sides + 2 + i, sides + nxt2)
 				mesh.indices.push(
@@ -124,9 +123,9 @@ export class PrimitiveMeshGenerator {
 		const scale = new Matrix3D().setScaling(this.data.size.x, this.data.size.y, this.data.size.z)
 		const trans = new Matrix3D().setTranslation(this.data.position.x, this.data.position.y, this.data.position.z)
 		const rotTrans = new Matrix3D().setTranslation(
-			this.data.rotAndTra[3],
-			this.data.rotAndTra[4],
-			this.data.rotAndTra[5],
+			this.data.rotAndTra[3]!,
+			this.data.rotAndTra[4]!,
+			this.data.rotAndTra[5]!,
 		)
 		const tmp = new Matrix3D()
 		for (const [axis, idx] of [
@@ -137,9 +136,9 @@ export class PrimitiveMeshGenerator {
 			['y', 7],
 			['x', 6],
 		] as const) {
-			if (axis === 'z') tmp.rotateZMatrix(degToRad(this.data.rotAndTra[idx]))
-			else if (axis === 'y') tmp.rotateYMatrix(degToRad(this.data.rotAndTra[idx]))
-			else tmp.rotateXMatrix(degToRad(this.data.rotAndTra[idx]))
+			if (axis === 'z') tmp.rotateZMatrix(degToRad(this.data.rotAndTra[idx]!))
+			else if (axis === 'y') tmp.rotateYMatrix(degToRad(this.data.rotAndTra[idx]!))
+			else tmp.rotateXMatrix(degToRad(this.data.rotAndTra[idx]!))
 			rotTrans.multiply(tmp)
 		}
 		const full = scale.clone().multiply(rotTrans).multiply(trans)
