@@ -41,19 +41,19 @@ export class HitTargetData extends ItemData implements IPhysicalData {
 	public depthBias?: number
 	public disableLightingBelow?: number
 	public disableLightingTop?: number
-	public dropSpeed = 0.5
+	public dropSpeed = 0.2
 	public isReflectionEnabled = true
 	public raiseDelay = 100
-	public elasticity!: number
-	public elasticityFalloff!: number
-	public friction!: number
+	public elasticity = 0.35
+	public elasticityFalloff = 0.5
+	public friction = 0.2
 	public isCollidable = true
 	public isDropped = false
 	public isVisible = true
 	public legacy = false
 	public overwritePhysics = false
 	public rotZ = 0
-	public scatter!: number
+	public scatter = 5
 	public szImage?: string
 	public szMaterial?: string
 	public szPhysicsMaterial?: string
