@@ -4,7 +4,9 @@
 import { ItemApi } from '../item-api.js'
 import type { DecalData } from './decal-data.js'
 
-/** Decal API. */
+/** Decal API.
+ *
+ * @see https://github.com/vpinball/vpinball/blob/master/decal.cpp */
 export class DecalApi extends ItemApi<DecalData> {
 	/** Get Rotation. */
 	get Rotation() {
