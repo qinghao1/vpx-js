@@ -7,119 +7,92 @@ import { DragPoint } from '../../math/dragpoint.js'
 import { f4 } from '../../math/float.js'
 import { type IPhysicalData, ItemData } from '../item-data.js'
 
+const FLOAT_MAP: Record<string, string> = {
+	HTTP: 'height',
+	HTHI: 'hitHeight',
+	ELAS: 'elasticity',
+	ELFO: 'elasticityFalloff',
+	RFCT: 'friction',
+	RSCT: 'scatter',
+	ROTX: 'rotX',
+	ROTY: 'rotY',
+	ROTZ: 'rotZ',
+}
+const INT_MAP: Record<string, string> = { WDTP: 'thickness' }
+const BOOL_MAP: Record<string, string> = {
+	HTEV: 'hitEvent',
+	CLDR: 'isCollidable',
+	RVIS: 'isVisible',
+	REEN: 'isReflectionEnabled',
+	ESTR: 'staticRendering',
+	ESIE: 'showInEditor',
+	OVPH: 'overwritePhysics',
+}
+const STRING_MAP: Record<string, string> = { MATR: 'szMaterial', IMAG: 'szImage', MAPH: 'szPhysicsMaterial' }
+
 /** Rubber data.
- *
  * @see https://github.com/vpinball/vpinball/blob/master/rubber.cpp */
 export class RubberData extends ItemData implements IPhysicalData {
 	public height: number = f4(25)
 	public hitHeight: number = f4(-1.0)
 	public thickness: number = f4(8)
-	public hitEvent: boolean = false
+	public hitEvent = false
 	public szMaterial?: string
 	public szImage?: string
 	public elasticity!: number
 	public elasticityFalloff!: number
 	public friction!: number
 	public scatter!: number
-	public isCollidable: boolean = true
-	public isVisible: boolean = true
-	public isReflectionEnabled: boolean = true
-	public staticRendering: boolean = true
-	public showInEditor: boolean = true
-	public rotX: number = 0
-	public rotY: number = 0
-	public rotZ: number = 0
+	public isCollidable = true
+	public isVisible = true
+	public isReflectionEnabled = true
+	public staticRendering = true
+	public showInEditor = true
+	public rotX = 0
+	public rotY = 0
+	public rotZ = 0
 	public szPhysicsMaterial?: string
-	public overwritePhysics: boolean = false
+	public overwritePhysics = false
 	public dragPoints: DragPoint[] = []
 
 	public static async fromStorage(storage: Storage, itemName: string): Promise<RubberData> {
-		const rubberItem = new RubberData(itemName)
-		await storage.streamFiltered(itemName, 4, RubberData.createStreamHandler(rubberItem))
-		return rubberItem
+		const d = new RubberData(itemName)
+		await storage.streamFiltered(itemName, 4, RubberData.createStreamHandler(d))
+		return d
 	}
 
-	private static createStreamHandler(rubberItem: RubberData) {
-		rubberItem.dragPoints = []
-		return BiffParser.stream(rubberItem.fromTag.bind(rubberItem), {
+	private static createStreamHandler(d: RubberData) {
+		d.dragPoints = []
+		return BiffParser.stream(d.fromTag.bind(d), {
 			nestedTags: {
 				DPNT: {
 					onStart: () => new DragPoint(),
-					onTag: (dragPoint) => dragPoint.fromTag.bind(dragPoint),
-					onEnd: (dragPoint) => rubberItem.dragPoints.push(dragPoint),
+					onTag: (dp) => dp.fromTag.bind(dp),
+					onEnd: (dp) => d.dragPoints.push(dp),
 				},
 			},
 		})
 	}
 
 	private async fromTag(buffer: Uint8Array, tag: string, offset: number, len: number): Promise<number> {
-		switch (tag) {
-			case 'HTTP':
-				this.height = this.getFloat(buffer)
-				break
-			case 'HTHI':
-				this.hitHeight = this.getFloat(buffer)
-				break
-			case 'WDTP':
-				this.thickness = this.getInt(buffer)
-				break
-			case 'HTEV':
-				this.hitEvent = this.getBool(buffer)
-				break
-			case 'MATR':
-				this.szMaterial = this.getString(buffer, len)
-				break
-			case 'IMAG':
-				this.szImage = this.getString(buffer, len)
-				break
-			case 'ELAS':
-				this.elasticity = this.getFloat(buffer)
-				break
-			case 'ELFO':
-				this.elasticityFalloff = this.getFloat(buffer)
-				break
-			case 'RFCT':
-				this.friction = this.getFloat(buffer)
-				break
-			case 'RSCT':
-				this.scatter = this.getFloat(buffer)
-				break
-			case 'CLDR':
-				this.isCollidable = this.getBool(buffer)
-				break
-			case 'RVIS':
-				this.isVisible = this.getBool(buffer)
-				break
-			case 'REEN':
-				this.isReflectionEnabled = this.getBool(buffer)
-				break
-			case 'ESTR':
-				this.staticRendering = this.getBool(buffer)
-				break
-			case 'ESIE':
-				this.showInEditor = this.getBool(buffer)
-				break
-			case 'ROTX':
-				this.rotX = this.getFloat(buffer)
-				break
-			case 'ROTY':
-				this.rotY = this.getFloat(buffer)
-				break
-			case 'ROTZ':
-				this.rotZ = this.getFloat(buffer)
-				break
-			case 'MAPH':
-				this.szPhysicsMaterial = this.getString(buffer, len)
-				break
-			case 'OVPH':
-				this.overwritePhysics = this.getBool(buffer)
-				break
-			case 'PNTS':
-				break // never read in vpinball
-			default:
-				this.getCommonBlock(buffer, tag, len)
-				break
+		if (tag === 'PNTS') return 0
+		if (tag in FLOAT_MAP) {
+			;(this as any)[FLOAT_MAP[tag]] = this.getFloat(buffer)
+			return 0
 		}
+		if (tag in INT_MAP) {
+			;(this as any)[INT_MAP[tag]] = this.getInt(buffer)
+			return 0
+		}
+		if (tag in BOOL_MAP) {
+			;(this as any)[BOOL_MAP[tag]] = this.getBool(buffer)
+			return 0
+		}
+		if (tag in STRING_MAP) {
+			;(this as any)[STRING_MAP[tag]] = this.getString(buffer, len)
+			return 0
+		}
+		this.getCommonBlock(buffer, tag, len)
 		return 0
 	}
 }
