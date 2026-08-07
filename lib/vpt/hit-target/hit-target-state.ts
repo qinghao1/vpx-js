@@ -4,8 +4,8 @@
 import { Pool } from '../../util/object-pool.js'
 import { ItemState } from '../item-state.js'
 
-export /** HitTargetState. */
-class HitTargetState extends ItemState {
+/** HitTargetState. */
+export class HitTargetState extends ItemState {
 	public static readonly POOL = new Pool(HitTargetState)
 
 	public zOffset: number = 0
