@@ -34,7 +34,7 @@ const kickerSimpleHoleMesh = Mesh.fromJson(kickerSimpleHoleMeshJson)
 const kickerT1Mesh = Mesh.fromJson(kickerT1MeshJson)
 const kickerWilliamsMesh = Mesh.fromJson(kickerWilliamsMeshJson)
 
-/** KickerMeshGenerator. */
+/** Kicke mesh generator. */
 export class KickerMeshGenerator {
 	private readonly data: KickerData
 
