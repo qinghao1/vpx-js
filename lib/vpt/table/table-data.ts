@@ -277,7 +277,7 @@ export class TableData extends ItemData {
 		return this.overridePhysics ? this.overrideScatterAngle : this.scatter!
 	}
 
-	private async fromTag(buffer: Uint8Array, tag: string, _offset: number, len: number): Promise<number> {
+	private async fromTag(buffer: Uint8Array, tag: string, offset: number, len: number): Promise<number> {
 		const bg = BG_FLOAT_MAP[tag]
 		if (bg) {
 			;(this as unknown as Record<string, Record<string, unknown>>)[bg[0]][bg[1]] = this.getFloat(buffer)
@@ -309,7 +309,7 @@ export class TableData extends ItemData {
 				this.offset.y = this.getFloat(buffer)
 				break
 			case 'CODE':
-				this.scriptPos = _offset
+				this.scriptPos = offset
 				this.scriptLen = len
 				break
 			case 'NAME':
