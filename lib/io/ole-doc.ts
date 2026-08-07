@@ -2,53 +2,11 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { EventEmitter } from 'events'
-import { concatUint8Arrays, getDataView, OLE_ID } from './binary-helpers.js'
+import { concatUint8Arrays, getDataView } from './binary-helpers.js'
 import { readableStream } from './event-stream.js'
+import { Header } from './ole-header.js'
 
-/** OLE compound document header. */
-export class Header {
-	public secSize!: number
-	public SATSize!: number
-	public MSATSize!: number
-	public MSATSecId!: number
-	public shortSecSize!: number
-	public shortStreamMax!: number
-	public SSATSize!: number
-	public SSATSecId!: number
-	public dirSecId!: number
-	public partialMSAT: number[] = []
-
-	private readonly oleId: Uint8Array = OLE_ID
-
-	private constructor() {}
-
-	public static load(buffer: Uint8Array): Header {
-		const header = new Header()
-		for (let i = 0; i < 8; i++) {
-			/* istanbul ignore if */
-			if (header.oleId[i] !== buffer[i]) {
-				throw new Error(
-					`Doesn't look like a valid compound document (wrong ID, 0x${header.oleId[i].toString(16)} must be equal to 0x${buffer[i].toString(16)}).`,
-				)
-			}
-		}
-		const view = getDataView(buffer)
-		header.secSize = 1 << view.getInt16(30, true)
-		header.shortSecSize = 1 << view.getInt16(32, true)
-		header.SATSize = view.getInt32(44, true)
-		header.dirSecId = view.getInt32(48, true)
-		header.shortStreamMax = view.getInt32(56, true)
-		header.SSATSecId = view.getInt32(60, true)
-		header.SSATSize = view.getInt32(64, true)
-		header.MSATSecId = view.getInt32(68, true)
-		header.MSATSize = view.getInt32(72, true)
-		header.partialMSAT = new Array(109)
-		for (let i = 0; i < 109; i++) {
-			header.partialMSAT[i] = view.getInt32(76 + i * 4, true)
-		}
-		return header
-	}
-}
+export { Header } from './ole-header.js'
 
 /** Sector allocation table. */
 export class AllocationTable {
