@@ -26,11 +26,7 @@ export class ThreeLightGenerator {
 		light.color.set(d.color)
 		light.position.set(d.center.x, d.center.y, -10)
 		light.updateMatrixWorld()
-		const isSlingshot =
-			((d.center.x > 150 && d.center.x < 250) || (d.center.x > 600 && d.center.x < 750)) &&
-			d.center.y > 1400 &&
-			d.center.y < 1650
-		if (ThreeRenderApi.SHADOWS && isSlingshot) {
+		if (ThreeRenderApi.SHADOWS && this.isSlingshot(d)) {
 			light.castShadow = true
 			light.shadow.bias = -0.001
 			light.shadow.radius = 12
@@ -59,5 +55,13 @@ export class ThreeLightGenerator {
 				m.emissive.setHSL(this.hsl.h, this.hsl.s, this.hsl.l * 1.25)
 			}
 		}
+	}
+
+	private isSlingshot(d: LightData): boolean {
+		return (
+			((d.center.x > 150 && d.center.x < 250) || (d.center.x > 600 && d.center.x < 750)) &&
+			d.center.y > 1400 &&
+			d.center.y < 1650
+		)
 	}
 }
