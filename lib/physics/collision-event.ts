@@ -7,7 +7,10 @@ import { Pool } from '../util/object-pool.js'
 import type { Ball } from '../vpt/ball/ball.js'
 import type { HitObject } from './hit-object.js'
 
-/** Collision contact between ball and hit object. */
+/**
+ * Collision contact — narrowphase result for ball vs hit shape.
+ * @see https://github.com/vpinball/vpinball/blob/master/collide.h
+ */
 export class CollisionEvent {
 	private static readonly POOL = new Pool(CollisionEvent)
 
@@ -23,7 +26,7 @@ export class CollisionEvent {
 	public hitFlag = false
 
 	constructor(ball?: Ball) {
-		this.ball = ball!
+		if (ball) this.ball = ball
 	}
 
 	public static claim(ball: Ball): CollisionEvent {
@@ -37,7 +40,7 @@ export class CollisionEvent {
 	}
 
 	public static reset(e: CollisionEvent): void {
-		delete (e as any).ball
+		Reflect.deleteProperty(e as unknown as Record<string, unknown>, 'ball')
 		delete e.obj
 		e.isContact = false
 		e.hitTime = 0
