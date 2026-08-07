@@ -224,6 +224,7 @@ class ParserObject {
 	}
 }
 
+/** releaseGeometry. */
 export function releaseGeometry(geometry: BufferGeometry) {
 	for (const attrName of Object.keys(geometry.attributes)) {
 		RecyclableFloat32BufferAttribute.release(geometry.attributes[attrName] as any)
