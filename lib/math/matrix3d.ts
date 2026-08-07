@@ -4,15 +4,9 @@
 import { Pool } from '../util/object-pool.js'
 import { f4, fr } from './float.js'
 
-/**
- * Three's Matrix4.multiply() gives different results than VPinball's. Duh.
- * Here's an implementation that does the same thing.
- *
- * @see https://github.com/vpinball/vpinball/blob/master/math/matrix.h#L160
- */
+/** VPinball-compatible 4×4 matrix (differs from Three's multiply). */
 export class Matrix3D {
 	private static readonly POOL = new Pool(Matrix3D)
-
 	private readonly matrix = [
 		[1, 0, 0, 0],
 		[0, 1, 0, 0],
@@ -27,37 +21,25 @@ export class Matrix3D {
 	public static claim(): Matrix3D {
 		return Matrix3D.POOL.get()
 	}
-
-	public static release(...matrices: Matrix3D[]) {
-		for (const matrix of matrices) {
-			Matrix3D.POOL.release(matrix)
-		}
+	public static release(...m: Matrix3D[]): void {
+		for (const x of m) Matrix3D.POOL.release(x)
 	}
-
 	public static reset(m: Matrix3D): void {
 		m.setIdentity()
 	}
 
-	public set(matrix: number[][]): this {
-		for (let i = 0; i < 4; i++) {
-			for (let j = 0; j < 4; j++) {
-				this.matrix[i][j] = matrix[i][j]
-			}
-		}
+	public set(m: number[][]): this {
+		for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) this.matrix[i][j] = m[i][j]
 		return this
 	}
 
 	public setEach(...m: number[]): this {
-		for (let i = 0; i < 4; i++) {
-			for (let j = 0; j < 4; j++) {
-				this.matrix[i][j] = m[i * 4 + j]
-			}
-		}
+		for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) this.matrix[i][j] = m[i * 4 + j]
 		return this
 	}
 
 	public setIdentity(): this {
-		this._11 = this._22 = this._33 = this._44 = 1.0
+		this._11 = this._22 = this._33 = this._44 = 1
 		this._12 =
 			this._13 =
 			this._14 =
@@ -70,7 +52,7 @@ export class Matrix3D {
 			this._32 =
 			this._34 =
 			this._43 =
-				0.0
+				0
 		return this
 	}
 
@@ -114,82 +96,68 @@ export class Matrix3D {
 		return this
 	}
 
-	/* multiplyVector() has moved to {@link Vertex3D.multiplyMatrix()} */
-	/* multiplyVectorNoTranslate() has moved to {@link Vertex3D.multiplyMatrixNoTranslate()} */
-
 	public multiply(a: Matrix3D, b?: Matrix3D): this {
-		const product = b ? Matrix3D.multiplyMatrices(a, b, true) : Matrix3D.multiplyMatrices(this, a, true)
-
-		this.set(product.matrix)
-		Matrix3D.release(product)
+		const prod = b ? Matrix3D.mul(a, b, true) : Matrix3D.mul(this, a, true)
+		this.set(prod.matrix)
+		Matrix3D.release(prod)
 		return this
 	}
 
 	public preMultiply(a: Matrix3D): this {
-		const product = Matrix3D.multiplyMatrices(a, this, true)
-		this.set(product.matrix)
-		Matrix3D.release(product)
+		const prod = Matrix3D.mul(a, this, true)
+		this.set(prod.matrix)
+		Matrix3D.release(prod)
 		return this
 	}
 
 	public toRightHanded(): this {
-		const tempMat = Matrix3D.claim().setScaling(1, 1, -1)
-		this.multiply(tempMat)
-		Matrix3D.release(tempMat)
+		const m = Matrix3D.claim().setScaling(1, 1, -1)
+		this.multiply(m)
+		Matrix3D.release(m)
 		return this
 	}
 
-	private static multiplyMatrices(a: Matrix3D, b: Matrix3D, recycle = false): Matrix3D {
-		/* istanbul ignore else: we always recycle now */
-		const result = recycle ? Matrix3D.claim() : new Matrix3D()
-		for (let i = 0; i < 4; ++i) {
-			for (let l = 0; l < 4; ++l) {
-				result.matrix[i][l] = f4(
+	private static mul(a: Matrix3D, b: Matrix3D, recycle = false): Matrix3D {
+		const r = recycle ? Matrix3D.claim() : new Matrix3D()
+		for (let i = 0; i < 4; i++)
+			for (let l = 0; l < 4; l++) {
+				r.matrix[i][l] = f4(
 					f4(
 						f4(f4(a.matrix[0][l] * b.matrix[i][0]) + f4(a.matrix[1][l] * b.matrix[i][1])) +
 							f4(a.matrix[2][l] * b.matrix[i][2]),
 					) + f4(a.matrix[3][l] * b.matrix[i][3]),
 				)
 			}
-		}
-		return result
+		return r
 	}
 
 	public clone(recycle = false): Matrix3D {
 		return recycle ? Matrix3D.claim().set(this.matrix) : new Matrix3D().set(this.matrix)
 	}
 
-	/* istanbul ignore next: for debugging */
-	public equals(matrix: Matrix3D): boolean {
-		for (let i = 0; i < 4; i++) {
-			for (let j = 0; j < 4; j++) {
-				if (this.matrix[i][j] !== matrix.matrix[i][j]) {
-					return false
-				}
-			}
-		}
+	public equals(m: Matrix3D): boolean {
+		for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) if (this.matrix[i][j] !== m.matrix[i][j]) return false
 		return true
 	}
 
-	/* istanbul ignore next */
 	public debug(): string[] {
 		return [
-			`_11: ${fr(this._11)}`,
-			`_12: ${fr(this._12)}`,
-			`_13: ${fr(this._13)}`,
-			`_14: ${fr(this._14)}`,
-			`_21: ${fr(this._21)}`,
-			`_22: ${fr(this._22)}`,
-			`_23: ${fr(this._23)}`,
-			`_24: ${fr(this._24)}`,
-			`_31: ${fr(this._31)}`,
-			`_32: ${fr(this._32)}`,
-			`_33: ${fr(this._33)}`,
-			`_34: ${fr(this._34)}`,
-			`_41: ${fr(this._41)}`,
-			`_42: ${fr(this._42)}`,
-			`_43: ${fr(this._43)}`,
-			`_44: ${fr(this._44)}`,
+			`_11: $fr(this._11)`,
+			`_12: $fr(this._12)`,
+			`_13: $fr(this._13)`,
+			`_14: $fr(this._14)`,
+			`_21: $fr(this._21)`,
+			`_22: $fr(this._22)`,
+			`_23: $fr(this._23)`,
+			`_24: $fr(this._24)`,
+			`_31: $fr(this._31)`,
+			`_32: $fr(this._32)`,
+			`_33: $fr(this._33)`,
+			`_34: $fr(this._34)`,
+			`_41: $fr(this._41)`,
+			`_42: $fr(this._42)`,
+			`_43: $fr(this._43)`,
+			`_44: $fr(this._44)`,
 		]
 	}
 
