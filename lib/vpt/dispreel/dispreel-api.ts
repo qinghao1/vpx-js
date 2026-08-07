@@ -9,14 +9,12 @@ import type { DispReelData } from './dispreel-data.js'
  *
  * @see https://github.com/vpinball/vpinball/blob/master/dispreel.cpp */
 export class DispReelApi extends ItemApi<DispReelData> {
-	/** Get BackColor. */
 	get BackColor() {
 		return this.data.backColor
 	}
 	set BackColor(v) {
 		this.data.backColor = v
 	}
-	/** Get Reels. */
 	get Reels() {
 		return this.data.reelCount
 	}
@@ -25,7 +23,6 @@ export class DispReelApi extends ItemApi<DispReelData> {
 		this.data.v2.x = this.data.v1.x + this.data.getBoxWidth()
 		this.data.v2.y = this.data.v1.y + this.data.getBoxHeight()
 	}
-	/** Get Width. */
 	get Width() {
 		return this.data.width
 	}
@@ -33,7 +30,6 @@ export class DispReelApi extends ItemApi<DispReelData> {
 		this.data.width = Math.max(0.0, v)
 		this.data.v2.x = this.data.v1.x + this.data.getBoxWidth()
 	}
-	/** Get Height. */
 	get Height() {
 		return this.data.height
 	}
@@ -41,7 +37,6 @@ export class DispReelApi extends ItemApi<DispReelData> {
 		this.data.height = Math.max(0.0, v)
 		this.data.v2.y = this.data.v1.y + this.data.getBoxHeight()
 	}
-	/** Get X. */
 	get X() {
 		return this.data.v1.x
 	}
@@ -50,7 +45,6 @@ export class DispReelApi extends ItemApi<DispReelData> {
 		this.data.v1.x += delta
 		this.data.v2.x = this.data.v1.x + this.data.getBoxWidth()
 	}
-	/** Get Y. */
 	get Y() {
 		return this.data.v1.y
 	}
@@ -59,14 +53,12 @@ export class DispReelApi extends ItemApi<DispReelData> {
 		this.data.v1.y += delta
 		this.data.v2.y = this.data.v1.y + this.data.getBoxHeight()
 	}
-	/** Get IsTransparent. */
 	get IsTransparent() {
 		return this.data.isTransparent
 	}
 	set IsTransparent(v) {
 		this.data.isTransparent = v
 	}
-	/** Get Image. */
 	get Image() {
 		return this.data.szImage
 	}
@@ -74,28 +66,24 @@ export class DispReelApi extends ItemApi<DispReelData> {
 		this._assertNonHdrImage(v)
 		this.data.szImage = v
 	}
-	/** Get Spacing. */
 	get Spacing() {
 		return this.data.reelSpacing
 	}
 	set Spacing(v) {
 		this.data.reelSpacing = v
 	}
-	/** Get Sound. */
 	get Sound() {
 		return this.data.szSound
 	}
 	set Sound(v) {
 		this.data.szSound = v
 	}
-	/** Get Steps. */
 	get Steps() {
 		return this.data.motorSteps
 	}
 	set Steps(v) {
 		this.data.motorSteps = Math.max(1, v)
 	}
-	/** Get Range. */
 	get Range() {
 		return this.data.digitRange
 	}
@@ -105,28 +93,24 @@ export class DispReelApi extends ItemApi<DispReelData> {
 			this.data.digitRange = 512 - 1 // and a max of 512 (0->511) //!! 512 requested by highrise
 		}
 	}
-	/** Get UpdateInterval. */
 	get UpdateInterval() {
 		return this.data.updateInterval
 	}
 	set UpdateInterval(v) {
 		this.data.updateInterval = Math.max(5, v)
 	}
-	/** Get UseImageGrid. */
 	get UseImageGrid() {
 		return this.data.useImageGrid
 	}
 	set UseImageGrid(v) {
 		this.data.useImageGrid = v
 	}
-	/** Get Visible. */
 	get Visible() {
 		return this.data.isVisible
 	}
 	set Visible(v) {
 		this.data.isVisible = v
 	}
-	/** Get ImagesPerGridRow. */
 	get ImagesPerGridRow() {
 		return this.data.imagesPerGridRow
 	}
