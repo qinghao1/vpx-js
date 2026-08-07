@@ -9,8 +9,8 @@ export class Stream extends EventEmitter {}
 const nextTick: (cb: () => void) => void =
 	typeof queueMicrotask !== 'undefined'
 		? queueMicrotask.bind(globalThis)
-		: (global as any).setImmediate
-			? (global as any).setImmediate.bind(global)
+		: (globalThis as unknown as { setImmediate?: (cb: () => void) => void }).setImmediate
+			? (globalThis as unknown as { setImmediate: (cb: () => void) => void }).setImmediate.bind(globalThis)
 			: process.nextTick.bind(process)
 
 /** Lazy readable stream pulling chunks via fn. */
@@ -27,8 +27,8 @@ export function readableStream<T>(fn: (s: Stream, i: number) => Promise<T | null
 		ended = false,
 		reading = false
 
-	;(stream as any).readable = true
-	;(stream as any).writable = false
+	;(stream as unknown as { readable: boolean }).readable = true
+	;(stream as unknown as { writable: boolean }).writable = false
 	stream.on('end', () => (ended = true))
 
 	function get(err?: Error, data?: T | null) {
