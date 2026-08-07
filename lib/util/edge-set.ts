@@ -4,7 +4,8 @@
 import { HitLine3D } from '../physics/hit-line-3d.js'
 import type { Vertex3D } from './math.js'
 
-/** Unordered pair set for mesh edges. */
+/** Unordered pair set for mesh edges.
+ * @see https://github.com/vpinball/vpinball/blob/master/mesh.h */
 export class EdgeSet {
 	private readonly edges = new Set<string>()
 
