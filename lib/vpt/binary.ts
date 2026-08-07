@@ -4,11 +4,7 @@
 import { BiffParser } from '../io/biff-parser.js'
 import { logger } from '../util/logger.js'
 
-/**
- * A binary usually contains image data for a texture.
- *
- * @see https://github.com/vpinball/vpinball/blob/master/pinbinary.cpp
- */
+/** Embedded binary (image data). */
 export class Binary extends BiffParser {
 	public szName!: string
 	public szInternalName!: string
@@ -16,7 +12,6 @@ export class Binary extends BiffParser {
 	public cdata!: number
 	public pos!: number
 	public len!: number
-
 	public async fromTag(buffer: Uint8Array, tag: string, offset: number, len: number): Promise<number> {
 		switch (tag) {
 			case 'NAME':
@@ -35,7 +30,6 @@ export class Binary extends BiffParser {
 				this.pos = offset
 				this.len = len
 				break
-			/* istanbul ignore next */
 			default:
 				logger().warn('[Binary.fromTag] Unknown tag "%s".', tag)
 		}
