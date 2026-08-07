@@ -10,7 +10,7 @@ import type { Table } from '../table/table.js'
 import type { BumperData } from './bumper-data.js'
 import type { BumperState } from './bumper-state.js'
 
-/** BumperUpdater. */
+/** Bumper updater — ring, skirt and material. */
 export class BumperUpdater extends ItemUpdater<BumperState> {
 	private readonly data: BumperData
 
@@ -25,7 +25,6 @@ export class BumperUpdater extends ItemUpdater<BumperState> {
 		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
 		table: Table,
 	): void {
-		// update local state
 		Object.assign(this.state, state)
 
 		this.applyAnimationState(obj, state, renderApi, table)
@@ -59,7 +58,6 @@ export class BumperUpdater extends ItemUpdater<BumperState> {
 		}
 	}
 
-	/* istanbul ignore next: this looks weird. test when sure it's the correct "animation" */
 	private applySkirtState<NODE, GEOMETRY, POINT_LIGHT>(
 		obj: NODE,
 		state: BumperState,
@@ -112,12 +110,10 @@ export class BumperUpdater extends ItemUpdater<BumperState> {
 		material: Material | undefined,
 		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
 	): void {
-		// visibility
 		if (isVisible !== undefined) {
 			renderApi.applyVisibility(isVisible, child)
 		}
 
-		// material
 		renderApi.applyMaterial(child, material)
 	}
 }
