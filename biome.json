@@ -1,0 +1,95 @@
+{
+	"$schema": "https://biomejs.dev/schemas/2.5.7/schema.json",
+	"vcs": {
+		"enabled": false,
+		"clientKind": "git",
+		"useIgnoreFile": true
+	},
+	"files": {
+		"ignoreUnknown": false,
+		"includes": [
+			"**",
+			"!node_modules",
+			"!dist",
+			"!coverage",
+			"!test/fixtures",
+			"!lib/scripting/grammar/rules.ts",
+			"!lib/render/threejs/vendor",
+			"!demo-browser/dist",
+			"!demo-browser/node_modules"
+		]
+	},
+	"formatter": {
+		"enabled": true,
+		"indentStyle": "tab",
+		"lineWidth": 120
+	},
+	"linter": {
+		"enabled": true,
+		"rules": {
+			"preset": "recommended",
+			"correctness": {
+				"noUnusedVariables": "off",
+				"noUnusedImports": "off",
+				"noUnusedFunctionParameters": "off",
+				"noConstructorReturn": "off",
+				"noPrecisionLoss": "off",
+				"noVoidTypeReturn": "off",
+				"noUnusedPrivateClassMembers": "off",
+				"noConstantCondition": "off"
+			},
+			"style": {
+				"useNodejsImportProtocol": "off",
+				"useConst": "off",
+				"useTemplate": "off",
+				"noNonNullAssertion": "off"
+			},
+			"suspicious": {
+				"noExplicitAny": "off",
+				"noAssignInExpressions": "off",
+				"noDoubleEquals": "off",
+				"noGlobalIsNan": "off",
+				"noGlobalIsFinite": "off",
+				"noImplicitAnyLet": "off",
+				"noConfusingVoidType": "off",
+				"noControlCharactersInRegex": "off",
+				"noApproximativeNumericConstant": "off",
+				"noSelfCompare": "off",
+				"noShadowRestrictedNames": "off",
+				"useIsArray": "off",
+				"useIterableCallbackReturn": "off",
+				"noExportsInTest": "off"
+			},
+			"complexity": {
+				"noBannedTypes": "off",
+				"noUselessConstructor": "off",
+				"useLiteralKeys": "off",
+				"useOptionalChain": "off",
+				"noArguments": "off",
+				"noStaticOnlyClass": "off",
+				"noUselessSwitchCase": "off",
+				"noCommaOperator": "off"
+			},
+			"security": {
+				"noGlobalEval": "off"
+			},
+			"a11y": {
+				"useButtonType": "off"
+			}
+		}
+	},
+	"javascript": {
+		"formatter": {
+			"quoteStyle": "single",
+			"semicolons": "asNeeded"
+		}
+	},
+	"overrides": [
+		{
+			"includes": ["**/*.js"],
+			"linter": {
+				"enabled": false
+			}
+		}
+	]
+}
