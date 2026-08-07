@@ -13,19 +13,24 @@ import { VbsMath } from './math.js'
 export class Stdlib extends VbsApi {
 	private readonly math = new VbsMath()
 
+	/** Get Empty. */
 	get Empty() {
 		return undefined
 	}
+	/** Get Nothing. */
 	get Nothing() {
 		return undefined
 	}
+	/** Get Null. */
 	get Null() {
 		return null
 	}
 
+	/** Get Err. */
 	get Err() {
 		return ERR
 	}
+	/** Get Math. */
 	get Math() {
 		return this.math
 	}
@@ -33,30 +38,39 @@ export class Stdlib extends VbsApi {
 	/**
 	 * String Constants
 	 */
+	/** Get vbCr. */
 	get vbCr() {
 		return '\x0d'
 	}
+	/** Get vbCrLf. */
 	get vbCrLf() {
 		return '\x0d\x0a'
 	}
+	/** Get vbFormFeed. */
 	get vbFormFeed() {
 		return '\x0c'
 	}
+	/** Get vbLf. */
 	get vbLf() {
 		return '\x0a'
 	}
+	/** Get vbNewLine. */
 	get vbNewLine() {
 		return '\n'
 	}
+	/** Get vbNullChar. */
 	get vbNullChar() {
 		return '\x00'
 	}
+	/** Get vbNullString. */
 	get vbNullString() {
 		return null
 	}
+	/** Get vbTab. */
 	get vbTab() {
 		return '\x09'
 	}
+	/** Get vbVerticalTab. */
 	get vbVerticalTab() {
 		return '\x0b'
 	}
