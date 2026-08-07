@@ -53,7 +53,6 @@ export class PlungerMover implements MoverObject {
 	 *
 	 * This represents the location of the tip of the plunger.
 	 */
-	// tslint:disable-next-line:variable-name
 	private _pos: number = 0
 
 	get pos() {
