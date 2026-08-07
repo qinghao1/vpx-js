@@ -3,6 +3,7 @@
 
 /**
  * Rubber elasticity with velocity falloff.
+ * @see https://github.com/vpinball/vpinball/blob/master/physics.cpp
  * @param falloff 0 = no falloff, 1 = half COR at 1 m/s (18.53 units)
  */
 export function elasticityWithFalloff(elasticity: number, falloff: number, vel: number): number {
