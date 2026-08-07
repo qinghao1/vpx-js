@@ -13,8 +13,8 @@ import type { HitTargetAnimation } from './hit-target-animation.js'
 import type { HitTargetData } from './hit-target-data.js'
 import type { HitTargetState } from './hit-target-state.js'
 
-export /** HitTargetApi. */
-class HitTargetApi extends ItemApi<HitTargetData> {
+/** HitTargetApi. */
+export class HitTargetApi extends ItemApi<HitTargetData> {
 	private readonly state: HitTargetState
 	private readonly hits: HitObject[]
 	private readonly animation: HitTargetAnimation
