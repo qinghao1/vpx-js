@@ -6,6 +6,7 @@ import type { BlockStatement } from 'estree'
 import { identifier, memberExpression } from '../estree.js'
 import type { ESIToken } from '../grammar/grammar.js'
 
+/** ppWith. */
 export function ppWith(node: ESIToken): any {
 	switch (node.type) {
 		case 'WithStatement':
