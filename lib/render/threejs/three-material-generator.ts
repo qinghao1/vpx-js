@@ -15,24 +15,20 @@ import type { ThreeMapGenerator } from './three-map-generator.js'
 
 /** Generates/caches Three.js materials. */
 export class ThreeMaterialGenerator {
-	private readonly cachedMaterials: { [key: string]: ThreeMaterial } = {}
+	private readonly cachedMaterials: Record<string, ThreeMaterial> = {}
 
-	private readonly mapGenerator: ThreeMapGenerator
-
-	constructor(mapGenerator: ThreeMapGenerator) {
-		this.mapGenerator = mapGenerator
-	}
+	constructor(private readonly mapGenerator: ThreeMapGenerator) {}
 
 	public getInitialMaterial(obj: RenderInfo<BufferGeometry>, opts: MeshConvertOptions): ThreeMaterial {
-		const threeMaterial = this.getMaterial(
+		const mat = this.getMaterial(
 			opts.applyMaterials && obj.material ? obj.material : undefined,
 			opts.applyTextures && obj.map ? obj.map.getName() : undefined,
 			opts.applyTextures && obj.normalMap ? obj.normalMap.getName() : undefined,
 			opts.applyTextures && obj.envMap ? obj.envMap.getName() : undefined,
-			opts.applyTextures && obj.material && obj.material.emissiveMap ? obj.material.emissiveMap.getName() : undefined,
+			opts.applyTextures && obj.material?.emissiveMap ? obj.material.emissiveMap.getName() : undefined,
 		)
-		threeMaterial.transparent = !!obj.isTransparent
-		return threeMaterial
+		mat.transparent = !!obj.isTransparent
+		return mat
 	}
 
 	public getMaterial(
@@ -43,47 +39,36 @@ export class ThreeMaterialGenerator {
 		emissiveMap?: string,
 	): ThreeMaterial {
 		const key = this.getKey(material, map, normalMap, envMap, emissiveMap)
-		if (this.cachedMaterials[key]) {
-			return this.cachedMaterials[key]
-		}
-
-		const threeMaterial = new MeshStandardMaterial()
-		this.applyMaterial(threeMaterial, material)
-		this.applyMap(threeMaterial, map)
-		this.applyNormalMap(threeMaterial, normalMap)
-		this.applyEnvMap(threeMaterial, envMap)
-		this.applyEmissiveMap(threeMaterial, material, emissiveMap)
-
-		this.cachedMaterials[key] = threeMaterial
-		return threeMaterial
+		if (this.cachedMaterials[key]) return this.cachedMaterials[key]!
+		const m = new MeshStandardMaterial()
+		this.applyMaterial(m, material)
+		this.applyMap(m, map)
+		this.applyNormalMap(m, normalMap)
+		this.applyEnvMap(m, envMap)
+		this.applyEmissiveMap(m, material, emissiveMap)
+		this.cachedMaterials[key] = m
+		return m
 	}
 
 	public applyMaterial(threeMaterial: MeshStandardMaterial, material?: Material): void {
-		if (!material) {
-			return
-		}
-		threeMaterial.name = `material:${material!.name}`
-		threeMaterial.metalness = material.isMetal ? 1.0 : 0.0
+		if (!material) return
+		threeMaterial.name = `material:${material.name}`
+		threeMaterial.metalness = material.isMetal ? 1 : 0
 		threeMaterial.roughness = Math.max(0, 1 - material.roughness / 1.5)
 		threeMaterial.color = new Color(material.baseColor)
 		threeMaterial.opacity = material.isOpacityActive ? Math.min(1, Math.max(0, material.opacity)) : 1
 		threeMaterial.side = DoubleSide
-
 		if (material.emissiveIntensity > 0) {
 			threeMaterial.emissive = new Color(material.emissiveColor)
 			threeMaterial.emissiveIntensity = material.emissiveIntensity
 		}
 	}
 
-	public applyMap(threeMaterial: MeshStandardMaterial, map?: string) {
-		if (map && this.mapGenerator.hasTexture(map)) {
-			threeMaterial.map = this.mapGenerator.getTexture(map)
-			threeMaterial.map.name = map
-			threeMaterial.needsUpdate = true
-		}
+	public applyMap(threeMaterial: MeshStandardMaterial, map?: string): void {
+		this.applyTexture(threeMaterial, 'map', map)
 	}
 
-	public applyNormalMap(threeMaterial: MeshStandardMaterial, normalMap?: string) {
+	public applyNormalMap(threeMaterial: MeshStandardMaterial, normalMap?: string): void {
 		if (normalMap && this.mapGenerator.hasTexture(normalMap)) {
 			threeMaterial.normalMap = this.mapGenerator.getTexture(normalMap)
 			threeMaterial.normalMap.name = normalMap
@@ -92,37 +77,32 @@ export class ThreeMaterialGenerator {
 		}
 	}
 
-	public applyEnvMap(threeMaterial: MeshStandardMaterial, envMap?: string) {
-		if (envMap && this.mapGenerator.hasTexture(envMap)) {
-			threeMaterial.envMap = this.mapGenerator.getTexture(envMap)
-			threeMaterial.envMap.name = envMap
-			threeMaterial.envMapIntensity = 1
-			threeMaterial.needsUpdate = true
-		}
+	public applyEnvMap(threeMaterial: MeshStandardMaterial, envMap?: string): void {
+		this.applyTexture(threeMaterial, 'envMap', envMap, (m) => {
+			m.envMapIntensity = 1
+		})
 	}
 
-	public applyEmissiveMap(threeMaterial: MeshStandardMaterial, material?: Material, emissiveMap?: string) {
-		if (emissiveMap && this.mapGenerator.hasTexture(emissiveMap)) {
-			threeMaterial.emissiveMap = this.mapGenerator.getTexture(emissiveMap)
-			threeMaterial.emissiveMap.name = emissiveMap
-			if (material) {
-				threeMaterial.emissive.set(material.emissiveColor || 0x0)
-			}
-			threeMaterial.needsUpdate = true
-		}
+	public applyEmissiveMap(threeMaterial: MeshStandardMaterial, material?: Material, emissiveMap?: string): void {
+		this.applyTexture(threeMaterial, 'emissiveMap', emissiveMap, () => {
+			if (material) threeMaterial.emissive.set(material.emissiveColor || 0)
+		})
+	}
+
+	private applyTexture(
+		mat: MeshStandardMaterial,
+		key: 'map' | 'envMap' | 'emissiveMap',
+		name?: string,
+		init?: (m: MeshStandardMaterial) => void,
+	): void {
+		if (!name || !this.mapGenerator.hasTexture(name)) return
+		;(mat as unknown as Record<string, unknown>)[key] = this.mapGenerator.getTexture(name)
+		;((mat as unknown as Record<string, { name: string }>)[key] as { name: string }).name = name
+		init?.(mat)
+		mat.needsUpdate = true
 	}
 
 	private getKey(material?: Material, map?: string, normalMap?: string, envMap?: string, emissiveMap?: string): string {
-		return (
-			(material ? material.name : 'none') +
-			':' +
-			(map || 'none') +
-			':' +
-			(normalMap || 'none') +
-			':' +
-			(envMap || 'none') +
-			':' +
-			(emissiveMap || 'none')
-		)
+		return `${material?.name ?? 'none'}:${map ?? 'none'}:${normalMap ?? 'none'}:${envMap ?? 'none'}:${emissiveMap ?? 'none'}`
 	}
 }
