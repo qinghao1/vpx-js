@@ -43,18 +43,21 @@ export class Vertex3DNoTex2 {
 	get x(): number {
 		return this._x
 	}
+	/** Set x. */
 	set x(v: number) {
 		this._x = f4(v)
 	}
 	get y(): number {
 		return this._y
 	}
+	/** Set y. */
 	set y(v: number) {
 		this._y = f4(v)
 	}
 	get z(): number {
 		return this._z
 	}
+	/** Set z. */
 	set z(v: number) {
 		this._z = f4(v)
 	}
@@ -62,18 +65,21 @@ export class Vertex3DNoTex2 {
 	get nx(): number {
 		return this._nx
 	}
+	/** Set nx. */
 	set nx(v: number) {
 		this._nx = f4(v)
 	}
 	get ny(): number {
 		return this._ny
 	}
+	/** Set ny. */
 	set ny(v: number) {
 		this._ny = f4(v)
 	}
 	get nz(): number {
 		return this._nz
 	}
+	/** Set nz. */
 	set nz(v: number) {
 		this._nz = f4(v)
 	}
@@ -81,12 +87,14 @@ export class Vertex3DNoTex2 {
 	get tu(): number {
 		return this._tu
 	}
+	/** Set tu. */
 	set tu(v: number) {
 		this._tu = f4(v)
 	}
 	get tv(): number {
 		return this._tv
 	}
+	/** Set tv. */
 	set tv(v: number) {
 		this._tv = f4(v)
 	}
