@@ -5,9 +5,7 @@ import { Enums } from '../enums.js'
 import { ItemApi } from '../item-api.js'
 import type { FlasherData } from './flasher-data.js'
 
-/** Flasher API.
- *
- * @see https://github.com/vpinball/vpinball/blob/master/flasher.cpp */
+/** Flasher API — VBS surface for `Flasher`. @see https://github.com/vpinball/vpinball/blob/master/flasher.cpp */
 export class FlasherApi extends ItemApi<FlasherData> {
 	get X() {
 		return this.data.center.x
@@ -130,10 +128,7 @@ export class FlasherApi extends ItemApi<FlasherData> {
 		this.data.imageAlignment = v
 	}
 
-	/**
-	 * No idea wtf this is supposed to do.
-	 */
-	public InterfaceSupportsErrorInfo(riid: any): boolean {
+	public InterfaceSupportsErrorInfo(_riid: unknown): boolean {
 		return false
 	}
 
