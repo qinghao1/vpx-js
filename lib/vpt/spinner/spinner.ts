@@ -41,9 +41,11 @@ export class Spinner
 	private api?: SpinnerApi
 
 	// public props
+	/** Get angleMin. */
 	get angleMin() {
 		return this.data.angleMin
 	}
+	/** Get angleMax. */
 	get angleMax() {
 		return this.data.angleMax
 	}
