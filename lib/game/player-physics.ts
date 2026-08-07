@@ -32,7 +32,7 @@ import type { IEmulator } from './iemulator.js'
 import type { PinInput } from './pin-input.js'
 import type { IBallCreationPosition, Player } from './player.js'
 
-const SLOW_MO = 1
+const SLOW_MO = 1 // slow-motion factor for debugging
 
 /** Core physics loop — 1kHz collision, timers and movers.
  * @see https://github.com/vpinball/vpinball/blob/master/player.cpp */
