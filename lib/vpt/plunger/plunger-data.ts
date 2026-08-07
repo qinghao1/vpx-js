@@ -48,10 +48,10 @@ export class PlungerData extends ItemData {
 	public center!: Vertex2D
 	public width = 25
 	public height = 20
-	public zAdjust = this.height * 4
+	public zAdjust = 0
 	public color = 0x4c4c4c
-	public stroke?: number
-	public speedPull = 0.5
+	public stroke = 80
+	public speedPull = 5
 	public speedFire = 80
 	public mechStrength = 85
 	public parkPosition = 0.5 / 3.0
@@ -59,7 +59,7 @@ export class PlungerData extends ItemData {
 	public momentumXfer = 1
 	public mechPlunger = false
 	public autoPlunger = false
-	public animFrames?: number
+	public animFrames = 1
 	public szMaterial?: string
 	public szImage?: string
 	public isVisible = true
@@ -99,7 +99,7 @@ export class PlungerData extends ItemData {
 			return 0
 		}
 		if (
-			handleBiffTag(this as unknown as Record<string, unknown>, this, tag, buffer, len, {
+			handleBiffTag(this, tag, buffer, len, {
 				float: FLOAT_MAP,
 				bool: BOOL_MAP,
 				string: STRING_MAP,

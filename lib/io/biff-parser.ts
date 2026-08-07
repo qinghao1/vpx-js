@@ -106,9 +106,9 @@ export class BiffParser {
 		return f4(getDataView(buf).getFloat32(0, true))
 	}
 
-	/** Reads bool (int32 > 0). */
+	/** Reads bool (int32 !== 0). */
 	public getBool(buf: Uint8Array): boolean {
-		return getDataView(buf).getInt32(0, true) > 0
+		return getDataView(buf).getInt32(0, true) !== 0
 	}
 
 	/** Reads n uint16. */

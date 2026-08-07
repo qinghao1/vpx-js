@@ -42,7 +42,7 @@ export class DirectoryTree {
 				right: view.getInt32(off + 72, true),
 				storageDirId: view.getInt32(off + 76, true),
 				secId: view.getInt32(off + 116, true),
-				size: view.getInt32(off + 120, true),
+				size: view.getUint32(off + 120, true) + view.getUint32(off + 124, true) * 2 ** 32,
 				storages: {},
 				streams: {},
 			})

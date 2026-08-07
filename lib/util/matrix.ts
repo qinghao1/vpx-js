@@ -3,16 +3,16 @@
 
 import { Matrix3, Matrix4, Vector3 } from 'three'
 import { f4 } from './float.js'
-import { Pool } from './object-pool.js'
+import { pooled } from './object-pool.js'
 import { Vertex3D } from './vector.js'
 
 export class Matrix2D extends Matrix3 {
-	private static readonly POOL = new Pool(Matrix2D)
+	private static readonly _pooled = pooled(Matrix2D)
 	static claim(): Matrix2D {
-		return Matrix2D.POOL.get()
+		return Matrix2D._pooled.claim()
 	}
 	static release(...ms: Matrix2D[]): void {
-		for (const m of ms) Matrix2D.POOL.release(m)
+		Matrix2D._pooled.release(...ms)
 	}
 	static reset(m: Matrix2D): void {
 		m.identity()
@@ -153,12 +153,12 @@ export class Matrix2D extends Matrix3 {
 /** 4×4 matrix, three.js based. */
 
 export class Matrix3D extends Matrix4 {
-	private static readonly POOL = new Pool(Matrix3D)
+	private static readonly _pooled = pooled(Matrix3D)
 	static claim(): Matrix3D {
-		return Matrix3D.POOL.get()
+		return Matrix3D._pooled.claim()
 	}
 	static release(...ms: Matrix3D[]): void {
-		for (const m of ms) Matrix3D.POOL.release(m)
+		Matrix3D._pooled.release(...ms)
 	}
 	static reset(m: Matrix3D): void {
 		m.identity()

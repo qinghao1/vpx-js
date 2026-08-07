@@ -47,7 +47,7 @@ export class GateData extends ItemData {
 	public showBracket = true
 	public szMaterial?: string
 	public szSurface?: string
-	public twoWay = false
+	public twoWay = true
 	public center!: Vertex2D
 
 	public static async fromStorage(storage: Storage, itemName: string): Promise<GateData> {
@@ -72,7 +72,7 @@ export class GateData extends ItemData {
 			return 0
 		}
 		if (
-			handleBiffTag(this as unknown as Record<string, unknown>, this, tag, buffer, len, {
+			handleBiffTag(this, tag, buffer, len, {
 				float: FLOAT_MAP,
 				bool: BOOL_MAP,
 				string: STRING_MAP,

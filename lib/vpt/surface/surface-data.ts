@@ -101,7 +101,7 @@ export class SurfaceData extends ItemData implements IPhysicalData {
 
 	private async fromTag(buffer: Uint8Array, tag: string, _offset: number, len: number): Promise<number> {
 		if (
-			handleBiffTag(this as unknown as Record<string, unknown>, this, tag, buffer, len, {
+			handleBiffTag(this, tag, buffer, len, {
 				bool: BOOL_MAP,
 				float: FLOAT_MAP,
 				string: STRING_MAP,

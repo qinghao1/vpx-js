@@ -15,10 +15,10 @@ const FLOAT_MAP: Record<string, string> = {
 	WITI: 'wireThickness',
 	SCAX: 'scaleX',
 	SCAY: 'scaleY',
-	HITH: 'hitHeight',
+	THOT: 'hitHeight',
 	ANSP: 'animSpeed',
 }
-const BOOL_MAP: Record<string, string> = { VSBL: 'isVisible', ENBL: 'isEnabled', REEN: 'isReflectionEnabled' }
+const BOOL_MAP: Record<string, string> = { VSBL: 'isVisible', EBLD: 'isEnabled', REEN: 'isReflectionEnabled' }
 const STRING_MAP: Record<string, string> = { MATR: 'szMaterial', SURF: 'szSurface' }
 
 /** Trigger data.
@@ -73,7 +73,7 @@ export class TriggerData extends ItemData {
 			return 0
 		}
 		if (
-			handleBiffTag(this as unknown as Record<string, unknown>, this, tag, buffer, len, {
+			handleBiffTag(this, tag, buffer, len, {
 				float: FLOAT_MAP,
 				bool: BOOL_MAP,
 				string: STRING_MAP,

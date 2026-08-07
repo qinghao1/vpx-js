@@ -8,7 +8,7 @@ export class BrowserBinaryReader implements IBinaryReader {
 	private data?: Uint8Array
 	private _isOpen = false
 
-	constructor(private blob?: Blob) {}
+	constructor(private blob?: Blob | Uint8Array | ArrayBuffer) {}
 
 	public read(target: Uint8Array, offset: number, length: number, position: number): Promise<[number, Uint8Array]> {
 		if (!this.data) throw new Error('BrowserBinaryReader not open')
@@ -42,10 +42,27 @@ export class BrowserBinaryReader implements IBinaryReader {
 			return
 		}
 		if (!this.blob) throw new Error('BrowserBinaryReader: blob already consumed and data not available')
-		const b = this.blob as Blob & { arrayBuffer?: () => Promise<ArrayBuffer> }
-		const ab = (await b.arrayBuffer?.()) ?? (await new Response(b).arrayBuffer())
-		this.data = new Uint8Array(ab)
-		this.blob = undefined
-		this._isOpen = true
+		const src: any = this.blob
+		if (src instanceof Uint8Array) {
+			this.data = src
+			this.blob = undefined
+			this._isOpen = true
+			return
+		}
+		if (src instanceof ArrayBuffer) {
+			this.data = new Uint8Array(src)
+			this.blob = undefined
+			this._isOpen = true
+			return
+		}
+		if (src instanceof Blob) {
+			const b = src as Blob & { arrayBuffer?: () => Promise<ArrayBuffer> }
+			const ab = (await b.arrayBuffer?.()) ?? (await new Response(b).arrayBuffer())
+			this.data = new Uint8Array(ab)
+			this.blob = undefined
+			this._isOpen = true
+			return
+		}
+		throw new Error('BrowserBinaryReader: unsupported blob type')
 	}
 }
