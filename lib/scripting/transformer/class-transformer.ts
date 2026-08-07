@@ -16,8 +16,8 @@ import {
 } from '../estree.js'
 import { Transformer } from './transformer.js'
 
-export /** Injects VBS class proxy. */
-class ClassTransformer extends Transformer {
+/** Injects VBS class proxy. */
+export class ClassTransformer extends Transformer {
 	constructor(ast: Program) {
 		super(ast)
 	}
