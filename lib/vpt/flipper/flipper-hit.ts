@@ -279,15 +279,14 @@ export class FlipperHit extends HitObject {
 	}
 
 	public updatePhysicsFromFlipper(): void {
-		const o = (f: string) => (this.data as any)[f],
-			td = this.tableData,
-			useOverride = this.data.overridePhysics || (td.overridePhysicsFlipper && td.overridePhysics)
+		const td = this.tableData
+		const useOverride = !!(this.data.overridePhysics || (td.overridePhysicsFlipper && td.overridePhysics))
 		this.elasticityFalloff = useOverride
-			? (o('overrideElasticityFalloff') ?? o('elasticityFalloff'))
+			? (this.data.overrideElasticityFalloff ?? this.data.elasticityFalloff!)
 			: this.data.elasticityFalloff!
-		this.elasticity = useOverride ? (o('overrideElasticity') ?? o('elasticity')) : this.data.elasticity!
-		this.setFriction(useOverride ? (o('overrideFriction') ?? o('friction')) : this.data.friction!)
-		this.scatter = degToRad(useOverride ? (o('overrideScatterAngle') ?? o('scatter')) : this.data.scatter!)
+		this.elasticity = useOverride ? (this.data.overrideElasticity ?? this.data.elasticity!) : this.data.elasticity!
+		this.setFriction(useOverride ? (this.data.overrideFriction ?? this.data.friction!) : this.data.friction!)
+		this.scatter = degToRad(useOverride ? (this.data.overrideScatterAngle ?? this.data.scatter!) : this.data.scatter!)
 	}
 
 	public hitTestFlipperFace(ball: Ball, dTime: number, coll: CollisionEvent, face1: boolean): number {
