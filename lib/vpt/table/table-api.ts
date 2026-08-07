@@ -41,6 +41,7 @@ export class TableApi extends ItemApi<TableData> {
 	get MaxSeparation() {
 		return this.data.overwriteGlobalStereo3D ? this.data._3DmaxSeparation : this.global3DMaxSeparation
 	}
+	/** Set MaxSeparation. */
 	set MaxSeparation(v) {
 		if (this.data.overwriteGlobalStereo3D) {
 			this.data._3DmaxSeparation = v
@@ -50,6 +51,7 @@ export class TableApi extends ItemApi<TableData> {
 	get ZPD() {
 		return this.data.overwriteGlobalStereo3D ? this.data._3DZPD : this.global3DZPD
 	}
+	/** Set ZPD. */
 	set ZPD(v) {
 		if (this.data.overwriteGlobalStereo3D) {
 			this.data._3DZPD = v
@@ -59,6 +61,7 @@ export class TableApi extends ItemApi<TableData> {
 	get Offset() {
 		return this.data.overwriteGlobalStereo3D ? this.data._3DOffset : this.global3DOffset
 	}
+	/** Set Offset. */
 	set Offset(v) {
 		if (this.data.overwriteGlobalStereo3D) {
 			this.data._3DOffset = v
@@ -68,6 +71,7 @@ export class TableApi extends ItemApi<TableData> {
 	get Image() {
 		return this.data.szImage
 	}
+	/** Set Image. */
 	set Image(v) {
 		this._assertNonHdrImage(v)
 		this.data.szImage = v
@@ -76,6 +80,7 @@ export class TableApi extends ItemApi<TableData> {
 	get DisplayGrid() {
 		return this.data.showGrid
 	}
+	/** Set DisplayGrid. */
 	set DisplayGrid(v) {
 		this.data.showGrid = v
 	}
@@ -83,6 +88,7 @@ export class TableApi extends ItemApi<TableData> {
 	get DisplayBackdrop() {
 		return this.data.displayBackdrop
 	}
+	/** Set DisplayBackdrop. */
 	set DisplayBackdrop(v) {
 		this.data.displayBackdrop = v
 	}
@@ -90,6 +96,7 @@ export class TableApi extends ItemApi<TableData> {
 	get GlassHeight() {
 		return this.data.glassHeight
 	}
+	/** Set GlassHeight. */
 	set GlassHeight(v) {
 		this.data.glassHeight = v
 	}
@@ -97,6 +104,7 @@ export class TableApi extends ItemApi<TableData> {
 	get TableHeight() {
 		return this.data.tableHeight
 	}
+	/** Set TableHeight. */
 	set TableHeight(v) {
 		this.data.tableHeight = v
 	}
@@ -104,6 +112,7 @@ export class TableApi extends ItemApi<TableData> {
 	get Width() {
 		return this.data.right - this.data.left
 	}
+	/** Set Width. */
 	set Width(v) {
 		this.data.right = v
 	}
@@ -111,6 +120,7 @@ export class TableApi extends ItemApi<TableData> {
 	get Height() {
 		return this.data.bottom - this.data.top
 	}
+	/** Set Height. */
 	set Height(v) {
 		this.data.bottom = v
 	}
@@ -118,6 +128,7 @@ export class TableApi extends ItemApi<TableData> {
 	get PlayfieldMaterial() {
 		return this.data.szPlayfieldMaterial
 	}
+	/** Set PlayfieldMaterial. */
 	set PlayfieldMaterial(v) {
 		this.data.szPlayfieldMaterial = v
 	}
@@ -125,6 +136,7 @@ export class TableApi extends ItemApi<TableData> {
 	get LightAmbient() {
 		return this.data.lightAmbient
 	}
+	/** Set LightAmbient. */
 	set LightAmbient(v) {
 		this.data.lightAmbient = v
 	}
@@ -132,6 +144,7 @@ export class TableApi extends ItemApi<TableData> {
 	get Light0Emission() {
 		return 1
 	} // TODO https://github.com/vpdb/vpx-js/issues/75
+	/** Set Light0Emission. */
 	set Light0Emission(v) {
 		/* TODO https://github.com/vpdb/vpx-js/issues/75 */
 	}
@@ -139,6 +152,7 @@ export class TableApi extends ItemApi<TableData> {
 	get LightHeight() {
 		return this.data.lightHeight
 	}
+	/** Set LightHeight. */
 	set LightHeight(v) {
 		this.data.lightHeight = v
 	}
@@ -146,6 +160,7 @@ export class TableApi extends ItemApi<TableData> {
 	get LightRange() {
 		return this.data.lightRange
 	}
+	/** Set LightRange. */
 	set LightRange(v) {
 		this.data.lightRange = v
 	}
@@ -153,6 +168,7 @@ export class TableApi extends ItemApi<TableData> {
 	get LightEmissionScale() {
 		return this.data.lightEmissionScale
 	}
+	/** Set LightEmissionScale. */
 	set LightEmissionScale(v) {
 		this.data.lightEmissionScale = v
 	}
@@ -160,6 +176,7 @@ export class TableApi extends ItemApi<TableData> {
 	get NightDay() {
 		return quantizeUnsignedPercent(this.data.globalEmissionScale!)
 	}
+	/** Set NightDay. */
 	set NightDay(v) {
 		this.data.globalEmissionScale = dequantizeUnsignedPercent(v)
 	}
@@ -167,6 +184,7 @@ export class TableApi extends ItemApi<TableData> {
 	get AOScale() {
 		return this.data.aoScale
 	}
+	/** Set AOScale. */
 	set AOScale(v) {
 		this.data.aoScale = v
 	}
@@ -174,6 +192,7 @@ export class TableApi extends ItemApi<TableData> {
 	get SSRScale() {
 		return this.data.ssrScale
 	}
+	/** Set SSRScale. */
 	set SSRScale(v) {
 		this.data.ssrScale = v
 	}
@@ -181,6 +200,7 @@ export class TableApi extends ItemApi<TableData> {
 	get EnvironmentEmissionScale() {
 		return this.data.envEmissionScale
 	}
+	/** Set EnvironmentEmissionScale. */
 	set EnvironmentEmissionScale(v) {
 		this.data.envEmissionScale = v
 	}
@@ -188,6 +208,7 @@ export class TableApi extends ItemApi<TableData> {
 	get BallReflection() {
 		return this.data.useReflectionForBalls
 	}
+	/** Set BallReflection. */
 	set BallReflection(v) {
 		this.data.useReflectionForBalls = v
 	}
@@ -195,6 +216,7 @@ export class TableApi extends ItemApi<TableData> {
 	get PlayfieldReflectionStrength() {
 		return quantizeUnsignedPercent(this.data.playfieldReflectionStrength)
 	}
+	/** Set PlayfieldReflectionStrength. */
 	set PlayfieldReflectionStrength(v) {
 		this.data.playfieldReflectionStrength = dequantizeUnsignedPercent(v)
 	}
@@ -202,6 +224,7 @@ export class TableApi extends ItemApi<TableData> {
 	get BallTrail() {
 		return this.data.useTrailForBalls
 	}
+	/** Set BallTrail. */
 	set BallTrail(v) {
 		this.data.useTrailForBalls = v
 	}
@@ -209,6 +232,7 @@ export class TableApi extends ItemApi<TableData> {
 	get TrailStrength() {
 		return quantizeUnsignedPercent(this.data.ballTrailStrength)
 	}
+	/** Set TrailStrength. */
 	set TrailStrength(v) {
 		this.data.ballTrailStrength = dequantizeUnsignedPercent(v)
 	}
@@ -216,6 +240,7 @@ export class TableApi extends ItemApi<TableData> {
 	get BallPlayfieldReflectionScale() {
 		return this.data.ballPlayfieldReflectionStrength
 	}
+	/** Set BallPlayfieldReflectionScale. */
 	set BallPlayfieldReflectionScale(v) {
 		this.data.ballPlayfieldReflectionStrength = v
 	}
@@ -223,6 +248,7 @@ export class TableApi extends ItemApi<TableData> {
 	get DefaultBulbIntensityScale() {
 		return this.data.defaultBulbIntensityScaleOnBall
 	}
+	/** Set DefaultBulbIntensityScale. */
 	set DefaultBulbIntensityScale(v) {
 		this.data.defaultBulbIntensityScaleOnBall = v
 	}
@@ -230,6 +256,7 @@ export class TableApi extends ItemApi<TableData> {
 	get BloomStrength() {
 		return this.data.bloomStrength
 	}
+	/** Set BloomStrength. */
 	set BloomStrength(v) {
 		this.data.bloomStrength = v
 	}
@@ -237,6 +264,7 @@ export class TableApi extends ItemApi<TableData> {
 	get TableSoundVolume() {
 		return quantizeUnsignedPercent(this.data.tableSoundVolume)
 	}
+	/** Set TableSoundVolume. */
 	set TableSoundVolume(v) {
 		this.data.tableSoundVolume = dequantizeUnsignedPercent(v)
 	}
@@ -244,6 +272,7 @@ export class TableApi extends ItemApi<TableData> {
 	get DetailLevel() {
 		return this.data.overwriteGlobalDetailLevel ? this.data.userDetailLevel : this.globalDetailLevel
 	}
+	/** Set DetailLevel. */
 	set DetailLevel(v) {
 		if (this.data.overwriteGlobalDetailLevel) {
 			this.data.userDetailLevel = v
@@ -253,6 +282,7 @@ export class TableApi extends ItemApi<TableData> {
 	get GlobalAlphaAcc() {
 		return this.data.overwriteGlobalDetailLevel
 	}
+	/** Set GlobalAlphaAcc. */
 	set GlobalAlphaAcc(v) {
 		this.data.overwriteGlobalDetailLevel = v
 		if (!this.data.overwriteGlobalDetailLevel) {
@@ -263,6 +293,7 @@ export class TableApi extends ItemApi<TableData> {
 	get GlobalDayNight() {
 		return this.data.overwriteGlobalDayNight
 	}
+	/** Set GlobalDayNight. */
 	set GlobalDayNight(v) {
 		this.data.overwriteGlobalDayNight = v
 	}
@@ -270,6 +301,7 @@ export class TableApi extends ItemApi<TableData> {
 	get GlobalStereo3D() {
 		return this.data.overwriteGlobalStereo3D
 	}
+	/** Set GlobalStereo3D. */
 	set GlobalStereo3D(v) {
 		this.data.overwriteGlobalStereo3D = v
 		if (!this.data.overwriteGlobalStereo3D) {
@@ -283,6 +315,7 @@ export class TableApi extends ItemApi<TableData> {
 	get BallDecalMode() {
 		return this.data.ballDecalMode
 	}
+	/** Set BallDecalMode. */
 	set BallDecalMode(v) {
 		this.data.ballDecalMode = v
 	}
@@ -290,6 +323,7 @@ export class TableApi extends ItemApi<TableData> {
 	get TableMusicVolume() {
 		return quantizeUnsignedPercent(this.data.tableMusicVolume)
 	}
+	/** Set TableMusicVolume. */
 	set TableMusicVolume(v) {
 		this.data.tableMusicVolume = dequantizeUnsignedPercent(v)
 	}
@@ -297,6 +331,7 @@ export class TableApi extends ItemApi<TableData> {
 	get TableAdaptiveVSync() {
 		return this.data.tableAdaptiveVSync
 	}
+	/** Set TableAdaptiveVSync. */
 	set TableAdaptiveVSync(v) {
 		this.data.tableAdaptiveVSync = v
 	}
@@ -304,6 +339,7 @@ export class TableApi extends ItemApi<TableData> {
 	get BackdropColor() {
 		return this.data.colorBackdrop
 	}
+	/** Set BackdropColor. */
 	set BackdropColor(v) {
 		this.data.colorBackdrop = v
 	}
@@ -311,6 +347,7 @@ export class TableApi extends ItemApi<TableData> {
 	get BackdropImageApplyNightDay() {
 		return this.data.imageBackdropNightDay
 	}
+	/** Set BackdropImageApplyNightDay. */
 	set BackdropImageApplyNightDay(v) {
 		this.data.imageBackdropNightDay = v
 	}
@@ -318,6 +355,7 @@ export class TableApi extends ItemApi<TableData> {
 	get ShowFSS() {
 		return this.data.bgEnableFss
 	}
+	/** Set ShowFSS. */
 	set ShowFSS(v) {
 		this.data.bgEnableFss = v
 	}
@@ -325,6 +363,7 @@ export class TableApi extends ItemApi<TableData> {
 	get BackdropImage_DT() {
 		return this.data.bgImage[Enums.BackglassIndex.DESKTOP]
 	}
+	/** Set BackdropImage_DT. */
 	set BackdropImage_DT(v) {
 		this.data.bgImage[Enums.BackglassIndex.DESKTOP] = v
 	}
@@ -332,6 +371,7 @@ export class TableApi extends ItemApi<TableData> {
 	get BackdropImage_FS() {
 		return this.data.bgImage[Enums.BackglassIndex.FULLSCREEN]
 	}
+	/** Set BackdropImage_FS. */
 	set BackdropImage_FS(v) {
 		this.data.bgImage[Enums.BackglassIndex.FULLSCREEN] = v
 	}
@@ -339,6 +379,7 @@ export class TableApi extends ItemApi<TableData> {
 	get BackdropImage_FSS() {
 		return this.data.bgImage[Enums.BackglassIndex.FULL_SINGLE_SCREEN]
 	}
+	/** Set BackdropImage_FSS. */
 	set BackdropImage_FSS(v) {
 		this.data.bgImage[Enums.BackglassIndex.FULL_SINGLE_SCREEN] = v
 	}
@@ -346,6 +387,7 @@ export class TableApi extends ItemApi<TableData> {
 	get ColorGradeImage() {
 		return this.data.szImageColorGrade
 	}
+	/** Set ColorGradeImage. */
 	set ColorGradeImage(v) {
 		const tex = this.table.getTexture(v)
 		if (tex && (tex.width !== 256 || tex.height !== 16)) {
@@ -357,6 +399,7 @@ export class TableApi extends ItemApi<TableData> {
 	get Gravity() {
 		return this.data.gravity / GRAVITYCONST
 	}
+	/** Set Gravity. */
 	set Gravity(v) {
 		this.data.gravity = v * GRAVITYCONST
 		const minSlope = this.data.overridePhysics ? this.overrideMinSlope : this.data.angletiltMin
@@ -368,6 +411,7 @@ export class TableApi extends ItemApi<TableData> {
 	get Friction() {
 		return this.data.friction
 	}
+	/** Set Friction. */
 	set Friction(v) {
 		this.data.friction = clamp(v, 0, 1)
 	}
@@ -375,6 +419,7 @@ export class TableApi extends ItemApi<TableData> {
 	get Elasticity() {
 		return this.data.elasticity
 	}
+	/** Set Elasticity. */
 	set Elasticity(v) {
 		this.data.elasticity = v
 	}
@@ -382,6 +427,7 @@ export class TableApi extends ItemApi<TableData> {
 	get ElasticityFalloff() {
 		return this.data.elasticityFalloff
 	}
+	/** Set ElasticityFalloff. */
 	set ElasticityFalloff(v) {
 		this.data.elasticityFalloff = v
 	}
@@ -389,6 +435,7 @@ export class TableApi extends ItemApi<TableData> {
 	get Scatter() {
 		return this.data.scatter
 	}
+	/** Set Scatter. */
 	set Scatter(v) {
 		this.data.scatter = v
 	}
@@ -396,6 +443,7 @@ export class TableApi extends ItemApi<TableData> {
 	get DefaultScatter() {
 		return this.data.defaultScatter
 	}
+	/** Set DefaultScatter. */
 	set DefaultScatter(v) {
 		this.data.defaultScatter = v
 	}
@@ -403,6 +451,7 @@ export class TableApi extends ItemApi<TableData> {
 	get NudgeTime() {
 		return this.data.nudgeTime
 	}
+	/** Set NudgeTime. */
 	set NudgeTime(v) {
 		this.data.nudgeTime = v
 	}
@@ -410,6 +459,7 @@ export class TableApi extends ItemApi<TableData> {
 	get PlungerNormalize() {
 		return this.data.plungerNormalize
 	}
+	/** Set PlungerNormalize. */
 	set PlungerNormalize(v) {
 		this.data.plungerNormalize = v
 	}
@@ -417,6 +467,7 @@ export class TableApi extends ItemApi<TableData> {
 	get PlungerFilter() {
 		return this.data.plungerFilter
 	}
+	/** Set PlungerFilter. */
 	set PlungerFilter(v) {
 		this.data.plungerFilter = v
 	}
@@ -424,6 +475,7 @@ export class TableApi extends ItemApi<TableData> {
 	get PhysicsLoopTime() {
 		return this.data.physicsMaxLoops
 	}
+	/** Set PhysicsLoopTime. */
 	set PhysicsLoopTime(v) {
 		this.data.physicsMaxLoops = v
 	}
@@ -431,6 +483,7 @@ export class TableApi extends ItemApi<TableData> {
 	get BackglassMode() {
 		return this.currentBackglassMode + TableData.BGI_DESKTOP
 	}
+	/** Set BackglassMode. */
 	set BackglassMode(v) {
 		this.currentBackglassMode = v - TableData.BGI_DESKTOP
 	}
@@ -438,6 +491,7 @@ export class TableApi extends ItemApi<TableData> {
 	get FieldOfView() {
 		return this.data.bgFov[this.currentBackglassMode]
 	}
+	/** Set FieldOfView. */
 	set FieldOfView(v) {
 		this.data.bgFov[this.currentBackglassMode] = v
 	}
@@ -445,6 +499,7 @@ export class TableApi extends ItemApi<TableData> {
 	get Inclination() {
 		return this.data.bgInclination[this.currentBackglassMode]
 	}
+	/** Set Inclination. */
 	set Inclination(v) {
 		this.data.bgInclination[this.currentBackglassMode] = v
 	}
@@ -452,6 +507,7 @@ export class TableApi extends ItemApi<TableData> {
 	get Layback() {
 		return this.data.bgLayback[this.currentBackglassMode]
 	}
+	/** Set Layback. */
 	set Layback(v) {
 		this.data.bgLayback[this.currentBackglassMode] = v
 	}
@@ -459,6 +515,7 @@ export class TableApi extends ItemApi<TableData> {
 	get Rotation() {
 		return this.data.bgRotation[this.currentBackglassMode]
 	}
+	/** Set Rotation. */
 	set Rotation(v) {
 		this.data.bgRotation[this.currentBackglassMode] = v
 	}
@@ -466,6 +523,7 @@ export class TableApi extends ItemApi<TableData> {
 	get Scalex() {
 		return this.data.bgScaleX[this.currentBackglassMode]
 	}
+	/** Set Scalex. */
 	set Scalex(v) {
 		this.data.bgScaleX[this.currentBackglassMode] = v
 	}
@@ -473,6 +531,7 @@ export class TableApi extends ItemApi<TableData> {
 	get Scaley() {
 		return this.data.bgScaleY[this.currentBackglassMode]
 	}
+	/** Set Scaley. */
 	set Scaley(v) {
 		this.data.bgScaleY[this.currentBackglassMode] = v
 	}
@@ -480,6 +539,7 @@ export class TableApi extends ItemApi<TableData> {
 	get Scalez() {
 		return this.data.bgScaleZ[this.currentBackglassMode]
 	}
+	/** Set Scalez. */
 	set Scalez(v) {
 		this.data.bgScaleZ[this.currentBackglassMode] = v
 	}
@@ -487,6 +547,7 @@ export class TableApi extends ItemApi<TableData> {
 	get Xlatex() {
 		return this.data.bgXlateX[this.currentBackglassMode]
 	}
+	/** Set Xlatex. */
 	set Xlatex(v) {
 		this.data.bgXlateX[this.currentBackglassMode] = v
 	}
@@ -494,6 +555,7 @@ export class TableApi extends ItemApi<TableData> {
 	get Xlatey() {
 		return this.data.bgXlateY[this.currentBackglassMode]
 	}
+	/** Set Xlatey. */
 	set Xlatey(v) {
 		this.data.bgXlateY[this.currentBackglassMode] = v
 	}
@@ -501,6 +563,7 @@ export class TableApi extends ItemApi<TableData> {
 	get Xlatez() {
 		return this.data.bgXlateZ[this.currentBackglassMode]
 	}
+	/** Set Xlatez. */
 	set Xlatez(v) {
 		this.data.bgXlateZ[this.currentBackglassMode] = v
 	}
@@ -508,6 +571,7 @@ export class TableApi extends ItemApi<TableData> {
 	get SlopeMax() {
 		return this.data.angleTiltMax
 	}
+	/** Set SlopeMax. */
 	set SlopeMax(v) {
 		this.data.angleTiltMax = v
 		const slope =
@@ -518,6 +582,7 @@ export class TableApi extends ItemApi<TableData> {
 	get SlopeMin() {
 		return this.data.angletiltMin
 	}
+	/** Set SlopeMin. */
 	set SlopeMin(v) {
 		this.data.angletiltMin = v
 		const slope =
@@ -528,6 +593,7 @@ export class TableApi extends ItemApi<TableData> {
 	get BallImage() {
 		return this.data.szBallImage
 	}
+	/** Set BallImage. */
 	set BallImage(v) {
 		this.data.szBallImage = v
 	}
@@ -535,6 +601,7 @@ export class TableApi extends ItemApi<TableData> {
 	get EnvironmentImage() {
 		return this.data.szEnvImage
 	}
+	/** Set EnvironmentImage. */
 	set EnvironmentImage(v) {
 		const tex = this.table.getTexture(v)
 		if (tex && tex.width !== tex.height * 2) {
@@ -545,6 +612,7 @@ export class TableApi extends ItemApi<TableData> {
 	get YieldTime(): any {
 		throw new Error('Not supported in play.')
 	}
+	/** Set YieldTime. */
 	set YieldTime(v: any) {
 		throw new Error('Not supported in play.')
 	}
@@ -552,6 +620,7 @@ export class TableApi extends ItemApi<TableData> {
 	get EnableAntialiasing() {
 		return this.data.useAA
 	}
+	/** Set EnableAntialiasing. */
 	set EnableAntialiasing(v) {
 		this.data.useAA = v
 	}
@@ -559,6 +628,7 @@ export class TableApi extends ItemApi<TableData> {
 	get EnableSSR() {
 		return this.data.useSSR
 	}
+	/** Set EnableSSR. */
 	set EnableSSR(v) {
 		this.data.useSSR = v
 	}
@@ -566,6 +636,7 @@ export class TableApi extends ItemApi<TableData> {
 	get EnableAO() {
 		return this.data.useAO
 	}
+	/** Set EnableAO. */
 	set EnableAO(v) {
 		this.data.useAO = v
 	}
@@ -573,6 +644,7 @@ export class TableApi extends ItemApi<TableData> {
 	get EnableFXAA() {
 		return this.data.useFXAA
 	}
+	/** Set EnableFXAA. */
 	set EnableFXAA(v) {
 		this.data.useFXAA = v
 	}
@@ -580,6 +652,7 @@ export class TableApi extends ItemApi<TableData> {
 	get OverridePhysics() {
 		return this.data.overridePhysics
 	}
+	/** Set OverridePhysics. */
 	set OverridePhysics(v) {
 		this.data.overridePhysics = v
 	}
@@ -587,6 +660,7 @@ export class TableApi extends ItemApi<TableData> {
 	get OverridePhysicsFlippers() {
 		return this.data.overridePhysicsFlipper
 	}
+	/** Set OverridePhysicsFlippers. */
 	set OverridePhysicsFlippers(v) {
 		this.data.overridePhysicsFlipper = v
 	}
@@ -594,6 +668,7 @@ export class TableApi extends ItemApi<TableData> {
 	get EnableDecals() {
 		return this.data.renderDecals
 	}
+	/** Set EnableDecals. */
 	set EnableDecals(v) {
 		this.data.renderDecals = v
 	}
@@ -604,6 +679,7 @@ export class TableApi extends ItemApi<TableData> {
 			this.data.bgCurrentSet === Enums.BackglassIndex.FULL_SINGLE_SCREEN
 		)
 	}
+	/** Set ShowDT. */
 	set ShowDT(v) {
 		this.data.bgCurrentSet = v
 			? this.data.bgEnableFss
@@ -615,6 +691,7 @@ export class TableApi extends ItemApi<TableData> {
 	get ReflectElementsOnPlayfield() {
 		return this.data.reflectElementsOnPlayfield
 	}
+	/** Set ReflectElementsOnPlayfield. */
 	set ReflectElementsOnPlayfield(v) {
 		this.data.reflectElementsOnPlayfield = v
 	}
@@ -622,6 +699,7 @@ export class TableApi extends ItemApi<TableData> {
 	get EnableEMReels() {
 		return this.data.renderEMReels
 	}
+	/** Set EnableEMReels. */
 	set EnableEMReels(v) {
 		this.data.renderEMReels = v
 	}
@@ -629,6 +707,7 @@ export class TableApi extends ItemApi<TableData> {
 	get GlobalDifficulty() {
 		return this.data.globalDifficulty * 100
 	}
+	/** Set GlobalDifficulty. */
 	set GlobalDifficulty(v) {
 		this.data.globalDifficulty = clamp(v, 0, 100) / 100.0
 	}
@@ -636,6 +715,7 @@ export class TableApi extends ItemApi<TableData> {
 	get Accelerometer() {
 		return false
 	}
+	/** Set Accelerometer. */
 	set Accelerometer(v) {
 		/* do nothing, we don't have accelerometers on the web. */
 	}
@@ -643,6 +723,7 @@ export class TableApi extends ItemApi<TableData> {
 	get AccelNormalMount() {
 		return false
 	}
+	/** Set AccelNormalMount. */
 	set AccelNormalMount(v) {
 		/* do nothing, we don't have accelerometers on the web. */
 	}
@@ -650,6 +731,7 @@ export class TableApi extends ItemApi<TableData> {
 	get AccelerometerAngle() {
 		return 0.0
 	}
+	/** Set AccelerometerAngle. */
 	set AccelerometerAngle(v) {
 		/* do nothing, we don't have accelerometers on the web. */
 	}
@@ -657,6 +739,7 @@ export class TableApi extends ItemApi<TableData> {
 	get DeadZone() {
 		return 0
 	}
+	/** Set DeadZone. */
 	set DeadZone(v) {
 		/* do nothing, we don't have accelerometers on the web. */
 	}
@@ -664,6 +747,7 @@ export class TableApi extends ItemApi<TableData> {
 	get BallFrontDecal() {
 		return this.data.szBallImageFront
 	}
+	/** Set BallFrontDecal. */
 	set BallFrontDecal(v) {
 		this._assertNonHdrImage(v)
 		this.data.szBallImageFront = v
