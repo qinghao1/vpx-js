@@ -5,7 +5,7 @@ import type { RenderInfo } from '../../game/irenderable.js'
 import {
 	type BufferGeometry,
 	Color,
-	DoubleSide,
+	FrontSide,
 	MeshStandardMaterial,
 	type Material as ThreeMaterial,
 } from '../../refs.node.js'
@@ -57,7 +57,7 @@ export class ThreeMaterialGenerator {
 		threeMaterial.roughness = Math.max(0, Math.min(1, 1 - material.roughness))
 		threeMaterial.color = new Color(material.baseColor)
 		threeMaterial.opacity = material.isOpacityActive ? Math.min(1, Math.max(0, material.opacity)) : 1
-		threeMaterial.side = DoubleSide
+		threeMaterial.side = FrontSide
 		if (material.emissiveIntensity > 0) {
 			threeMaterial.emissive = new Color(material.emissiveColor)
 			threeMaterial.emissiveIntensity = material.emissiveIntensity
