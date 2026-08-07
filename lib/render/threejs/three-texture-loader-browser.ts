@@ -36,18 +36,17 @@ function getMaxSizeForTexture(name: string, w: number, h: number, isFloat: boole
 	try {
 		const n = (name || '').toLowerCase()
 		if (isFloat) {
-			if (n.includes('vlm.nestmap')) return n.includes('vlm.nestmap0') || n.includes('vlm.nestmap4') ? 1024 : 512
+			if (n.includes('vlm.nestmap')) return n.includes('vlm.nestmap0') || n.includes('vlm.nestmap4') ? 2048 : 512
 			return MAX_FLOAT
 		}
-		if (n.includes('vlm.nestmap0') || n.includes('vlm.nestmap4')) return 1024
+		if (n.includes('vlm.nestmap0') || n.includes('vlm.nestmap4')) return 2048
 		if (n.includes('vlm.nestmap')) return 512
-		if (n.startsWith('vrcab') || n.includes('vr_cab') || n === 'vr_backboxnew_1' || n === 'vr_cabinetnew_1' || n === 'vr_cabcrossbar' || n === 'vr_cabinsertcoin' || n === 'vr_plungerhead_1' || n.startsWith('vrcab_')) return 256
-		if (n.startsWith('vr_') && (n.includes('mega') || n.includes('mini'))) return 512
-		if (n.startsWith('vr_') || n.startsWith('vrcab')) return 256
 		if (w > 2048 || h > 2048) return 1024
 		if (w <= 512 && h <= 512) return Math.max(w, h)
 		return MAX_REGULAR
-	} catch { return isFloat ? MAX_FLOAT : MAX_REGULAR }
+	} catch {
+		return isFloat ? MAX_FLOAT : MAX_REGULAR
+	}
 }
 
 /** ThreeTextureLoaderBrowser. */
@@ -241,7 +240,9 @@ function downsampleIfNeeded(texture: any, maxSize: number, nameHint?: string): a
 				try {
 					texture.dispose?.()
 				} catch {}
-				try { (texture as any).image = null } catch {}
+				try {
+					;(texture as any).image = null
+				} catch {}
 				return newTex
 			} catch {
 				return texture
@@ -265,7 +266,10 @@ function downsampleIfNeeded(texture: any, maxSize: number, nameHint?: string): a
 					img instanceof HTMLCanvasElement ||
 					(typeof ImageBitmap !== 'undefined' && img instanceof ImageBitmap)
 				) {
-					try { ctx.imageSmoothingEnabled = true; (ctx as any).imageSmoothingQuality = 'high' } catch {}
+					try {
+						ctx.imageSmoothingEnabled = true
+						;(ctx as any).imageSmoothingQuality = 'high'
+					} catch {}
 					ctx.drawImage(img as any, 0, 0, nw, nh)
 					// use CanvasTexture to preserve correct filtering/colorSpace
 					const newTex = new CanvasTexture(canvas) as any
@@ -282,7 +286,9 @@ function downsampleIfNeeded(texture: any, maxSize: number, nameHint?: string): a
 					try {
 						URL.revokeObjectURL((img as any).src)
 					} catch {}
-					try { (texture as any).image = null } catch {}
+					try {
+						;(texture as any).image = null
+					} catch {}
 					return newTex
 				}
 			}
@@ -291,7 +297,13 @@ function downsampleIfNeeded(texture: any, maxSize: number, nameHint?: string): a
 	return texture
 }
 
-function load(mimeType: string, url: string, ext?: string, data?: Uint8Array, nameHint?: string): Promise<ThreeTexture> {
+function load(
+	mimeType: string,
+	url: string,
+	ext?: string,
+	data?: Uint8Array,
+	nameHint?: string,
+): Promise<ThreeTexture> {
 	return new Promise((resolve, reject) => {
 		if (
 			mimeType === 'image/png' ||
@@ -314,7 +326,9 @@ function load(mimeType: string, url: string, ext?: string, data?: Uint8Array, na
 						try {
 							texture.dispose()
 						} catch {}
-						try { (texture as any).image = null } catch {}
+						try {
+							;(texture as any).image = null
+						} catch {}
 						resolve(ds)
 					} else resolve(texture as any)
 				},

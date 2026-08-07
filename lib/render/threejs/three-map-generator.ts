@@ -17,10 +17,7 @@ export class ThreeMapGenerator {
 		if (!this.textureLoader) return
 		const now = Date.now()
 		logger().debug('[ThreeMapGenerator.loadTextures] Pre-loading %s textures..', textures.length)
-		const isLarge = (t: Texture) => {
-			const n = (t.getName() || '').toLowerCase()
-			return n.includes('vlm.nestmap') || n.startsWith('vr_') || n.startsWith('vrcab') || (t.width * t.height > 4 * 1024 * 1024)
-		}
+		const isLarge = (t: Texture) => t.width * t.height > 4 * 1024 * 1024
 		const hasLarge = textures.some(isLarge)
 		const concurrency = hasLarge ? 2 : 4
 		let index = 0
