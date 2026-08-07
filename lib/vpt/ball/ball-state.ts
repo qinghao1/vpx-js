@@ -5,7 +5,7 @@ import { Matrix2D, Vertex3D } from '../../util/math.js'
 import { Pool } from '../../util/object-pool.js'
 import { ItemState } from '../item-state.js'
 
-/** Dynamic ball state — position, orientation, frozen flag. */
+/** Ball state — pos/orientation/frozen. @see https://github.com/vpinball/vpinball/blob/master/ball.cpp */
 export class BallState extends ItemState {
 	public static readonly POOL = new Pool(BallState)
 
