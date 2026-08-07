@@ -279,7 +279,7 @@ export class TableData extends ItemData {
 	private async fromTag(buffer: Uint8Array, tag: string, offset: number, len: number): Promise<number> {
 		const bg = BG_FLOAT_MAP[tag]
 		if (bg) {
-			;(this as any)[bg[0]][bg[1]] = this.getFloat(buffer)
+			;(this as unknown as Record<string, Record<string, unknown>>)[bg[0]][bg[1]] = this.getFloat(buffer)
 			return 0
 		}
 		const bgImg = BG_IMAGE_MAP[tag]
@@ -288,19 +288,19 @@ export class TableData extends ItemData {
 			return 0
 		}
 		if (tag in FLOAT_MAP) {
-			;(this as any)[FLOAT_MAP[tag]] = this.getFloat(buffer)
+			;(this as unknown as Record<string, unknown>)[FLOAT_MAP[tag]] = this.getFloat(buffer)
 			return 0
 		}
 		if (tag in INT_MAP) {
-			;(this as any)[INT_MAP[tag]] = this.getInt(buffer)
+			;(this as unknown as Record<string, unknown>)[INT_MAP[tag]] = this.getInt(buffer)
 			return 0
 		}
 		if (tag in BOOL_MAP) {
-			;(this as any)[BOOL_MAP[tag]] = this.getBool(buffer)
+			;(this as unknown as Record<string, unknown>)[BOOL_MAP[tag]] = this.getBool(buffer)
 			return 0
 		}
 		if (tag in STRING_MAP) {
-			;(this as any)[STRING_MAP[tag]] = this.getString(buffer, len)
+			;(this as unknown as Record<string, unknown>)[STRING_MAP[tag]] = this.getString(buffer, len)
 			return 0
 		}
 		switch (tag) {
