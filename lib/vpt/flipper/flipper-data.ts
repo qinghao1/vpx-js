@@ -92,15 +92,13 @@ export class FlipperData extends ItemData {
 
 	public constructor(itemName: string) {
 		super(itemName)
-		// Flipper default TimerEnabled is false (Settings_properties.inl:1009, flipper.cpp:130)
-		// ItemData default is true for generic items — override for flipper
-		this.timer.enabled = false
+		this.timer.enabled = false // flipper.cpp:130 — overrides ItemData true default
 	}
 
 	public static async fromStorage(storage: Storage, itemName: string): Promise<FlipperData> {
 		const d = new FlipperData(itemName)
 		await storage.streamFiltered(itemName, 4, BiffParser.stream(d.fromTag.bind(d)))
-		// Post-load sanitization per flipper.cpp:942-950 (after Load)
+		// flipper.cpp:942-950
 		if (d.height > 1000) d.height = 50
 		if (d.rubberHeight > 1000) d.rubberHeight = 8
 		if (d.rubberThickness > 0 && d.height > 16 && d.rubberWidth === 0) d.rubberWidth = d.height - 16
