@@ -35,6 +35,7 @@ export interface ESIToken extends IToken {
 	children: ESIToken[]
 }
 
+/** VBS grammar parser. */
 export class Grammar {
 	private readonly GRAMMAR_KEYWORDS: string[] = [
 		'And',
