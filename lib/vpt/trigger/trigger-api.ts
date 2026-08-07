@@ -9,7 +9,7 @@ import type { Table } from '../table/table.js'
 import type { TriggerData } from './trigger-data.js'
 import type { TriggerState } from './trigger-state.js'
 
-/** TriggerApi. */
+/** Trigger API. */
 export class TriggerApi extends ItemApi<TriggerData> {
 	private readonly state: TriggerState
 
