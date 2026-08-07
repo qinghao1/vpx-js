@@ -13,12 +13,10 @@ const CODE_MASK = [0, 0x0001, 0x0003, 0x0007, 0x000f, 0x001f, 0x003f, 0x007f, 0x
 export class LzwReader {
 	private pstm: BufferPtr
 
-	/* output */
 	private readonly pbBitsOutCur: BufferPtr
 	private readonly cbStride: number
 	private badCodeCount: number
 
-	/* Static variables */
 	private currSize: number = 0 /* The current code size */
 	private clear: number = 0 /* Value for a clear code */
 	private ending: number = 0 /* Value for a ending code */
