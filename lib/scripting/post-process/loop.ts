@@ -18,6 +18,7 @@ import {
 } from '../estree.js'
 import type { ESIToken } from '../grammar/grammar.js'
 
+/** ppLoop. */
 export function ppLoop(node: ESIToken): any {
 	switch (node.type) {
 		case 'WhileStatement':
