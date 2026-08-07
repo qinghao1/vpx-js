@@ -15,20 +15,9 @@ import { PlayerPhysics } from './player-physics.js'
 
 /** Host-facing game controller: input, physics, animations and state diffing. */
 export class Player extends EventEmitter {
-	private readonly table: Table
 	private readonly pinInput: PinInput
 	private readonly physics: PlayerPhysics
 	private isInitialized = false
-
-	get balls(): Ball[] {
-		return this.physics.balls
-	}
-
-	/** Active ball if any. */
-	get activeBall(): Ball | undefined {
-		return this.physics.activeBall
-	}
-
 	private previousStates: Record<string, ItemState> = {}
 	private currentStates: Record<string, ItemState> = {}
 	private simulatedTimeMs = 0
@@ -36,9 +25,16 @@ export class Player extends EventEmitter {
 	public width = 0
 	public height = 0
 
-	constructor(table: Table) {
+	get balls(): Ball[] {
+		return this.physics.balls
+	}
+	/** Active ball if any. */
+	get activeBall(): Ball | undefined {
+		return this.physics.activeBall
+	}
+
+	constructor(private readonly table: Table) {
 		super()
-		this.table = table
 		this.pinInput = new PinInput(table, this)
 		this.physics = new PlayerPhysics(table, this.pinInput)
 		this.setupTableElements()
@@ -68,7 +64,7 @@ export class Player extends EventEmitter {
 		}
 	}
 
-	/** Test helper: steps 60Hz until dTime. */
+	/** Test helper: steps 60 Hz until `dTime`. */
 	public simulateTime(dTime: number): void {
 		if (!this.isInitialized) throw new Error('Player must be initialized before simulating time!')
 		for (const dt = 1000 / 60; this.simulatedTimeMs <= dTime; this.simulatedTimeMs += dt) {
@@ -97,11 +93,11 @@ export class Player extends EventEmitter {
 	public popStates(): ChangedStates<ItemState> {
 		const changed = ChangedStates.claim()
 		for (const name of Object.keys(this.currentStates)) {
-			const next = this.currentStates[name],
-				prev = this.previousStates[name]
+			const next = this.currentStates[name]!
+			const prev = this.previousStates[name]!
 			if (!next.equals(prev)) {
 				changed.setState(name, next.diff(prev))
-				this.previousStates[name].release()
+				prev.release()
 				this.previousStates[name] = next.clone()
 			}
 		}
@@ -171,7 +167,6 @@ export class Player extends EventEmitter {
 		this.physics.emu?.setSwitchInput(nr, enable)
 	}
 
-	/** Sets render frame size (exposed to script). */
 	public setDimensions(w: number, h: number): void {
 		this.width = w
 		this.height = h
@@ -216,10 +211,9 @@ export class ChangedStates<STATE extends ItemState = ItemState> {
 	public getState<S extends STATE>(name: string): S {
 		return this.changedStates[name] as S
 	}
-
 	public release(): void {
 		for (const k of this.keys) {
-			this.changedStates[k].release()
+			this.changedStates[k]!.release()
 			delete this.changedStates[k]
 		}
 		ChangedStates.POOL.release(this)
