@@ -2,9 +2,10 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { Matrix3, Matrix4, Vector2, Vector3 } from 'three'
-import { FLT_MIN } from '../vpt/mesh.js'
 import { f4 } from './float.js'
 import { Pool } from './object-pool.js'
+
+export const FLT_MIN = 1.175494350822287507968736537222245677819e-38
 
 // Minimal VPX math shim — three-backed with f4 + Pool for compat
 // This file replaces lib/math shims deleted per migration.
