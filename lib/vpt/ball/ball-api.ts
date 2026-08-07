@@ -10,27 +10,18 @@ import type { BallData } from './ball-data.js'
 import type { BallHit } from './ball-hit.js'
 import type { BallState } from './ball-state.js'
 
-/** VBS API for Ball.
- *
- * @see https://github.com/vpinball/vpinball/blob/master/ball.cpp */
+/** VBS API for Ball. @see https://github.com/vpinball/vpinball/blob/master/ball.cpp */
 export class BallApi extends ItemApi<BallData> {
-	private readonly ball: Ball
-	private readonly state: BallState
-	private readonly hit: BallHit
-
 	constructor(
-		ball: Ball,
-		state: BallState,
-		hit: BallHit,
+		private readonly ball: Ball,
+		private readonly state: BallState,
+		private readonly hit: BallHit,
 		data: BallData,
 		events: EventProxy,
 		player: Player,
 		table: Table,
 	) {
 		super(data, events, player, table)
-		this.ball = ball
-		this.state = state
-		this.hit = hit
 	}
 
 	get X() {
