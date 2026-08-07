@@ -5,7 +5,7 @@ import type { IBinaryReader } from './ole-doc.js'
 
 /** Reads a VPX blob in the browser. */
 export class BrowserBinaryReader implements IBinaryReader {
-	private readonly blob: Blob
+	private blob: Blob | undefined
 	private data!: Uint8Array
 
 	constructor(blob: Blob) {
@@ -21,6 +21,7 @@ export class BrowserBinaryReader implements IBinaryReader {
 
 	public close(): Promise<void> {
 		;(this as any).data = undefined
+		this.blob = undefined as any
 		return Promise.resolve()
 	}
 	public isOpen(): boolean {
@@ -28,7 +29,9 @@ export class BrowserBinaryReader implements IBinaryReader {
 	}
 
 	public async open(): Promise<void> {
-		const ab = (await (this.blob as any).arrayBuffer?.()) ?? (await new Response(this.blob as Blob).arrayBuffer())
+		const b = this.blob as Blob
+		const ab = (await (b as any).arrayBuffer?.()) ?? (await new Response(b as Blob).arrayBuffer())
 		this.data = new Uint8Array(ab)
+		this.blob = undefined as any
 	}
 }
