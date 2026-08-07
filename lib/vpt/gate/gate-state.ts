@@ -3,6 +3,7 @@
 
 import { Pool } from '../../util/object-pool.js'
 import { ItemState } from '../item-state.js'
+import { omitEqual } from '../state-helpers.js'
 
 /** Gate state — angle, material, bracket visibility.
  * @see https://github.com/vpinball/vpinball/blob/master/gate.cpp */
@@ -39,10 +40,10 @@ export class GateState extends ItemState {
 
 	public diff(state: GateState): GateState {
 		const d = this.clone()
-		if (d.angle === state.angle) delete (d as unknown as Record<string, unknown>).angle
-		if (d.material === state.material) delete (d as unknown as Record<string, unknown>).material
-		if (d.showBracket === state.showBracket) delete (d as unknown as Record<string, unknown>).showBracket
-		if (d.isVisible === state.isVisible) delete (d as unknown as Record<string, unknown>).isVisible
+		omitEqual(d, state, 'angle')
+		omitEqual(d, state, 'material')
+		omitEqual(d, state, 'showBracket')
+		omitEqual(d, state, 'isVisible')
 		return d
 	}
 
