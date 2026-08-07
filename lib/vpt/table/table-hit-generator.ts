@@ -9,6 +9,7 @@ import { LineSeg } from '../../physics/line-seg.js'
 import { logger } from '../../util/logger.js'
 import type { TableData } from './table-data.js'
 
+/** Generates table hit shapes. */
 export class TableHitGenerator {
 	private readonly data: TableData
 
