@@ -4,7 +4,8 @@
 import { Pool } from '../../util/object-pool.js'
 import { ItemState } from '../item-state.js'
 
-export class SurfaceState extends ItemState {
+export /** SurfaceState. */
+class SurfaceState extends ItemState {
 	public static readonly POOL = new Pool(SurfaceState)
 
 	public isDropped: boolean = false
