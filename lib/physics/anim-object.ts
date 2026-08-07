@@ -3,7 +3,7 @@
 
 import type { PlayerPhysics } from '../game/player-physics.js'
 
-/** Per-frame animation object (dispReel, lightSeq, slingshot). */
+/** Per-frame animation (dispReel, lightSeq, slingshot). */
 export interface AnimObject {
 	animate(physics: PlayerPhysics): void
 }

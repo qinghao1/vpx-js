@@ -3,7 +3,7 @@
 
 import type { PlayerPhysics } from '../game/player-physics.js'
 
-/** Physics-moved object (flipper, gate, plunger, ball, spinner). */
+/** Physics mover — 1kHz displacement + velocity update. */
 export interface MoverObject {
 	updateDisplacements(dTime: number): void
 	updateVelocities(physics: PlayerPhysics): void
