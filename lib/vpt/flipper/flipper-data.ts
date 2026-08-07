@@ -10,6 +10,7 @@ import type { Table } from '../table/table.js'
 
 /** Flipper data. */
 export class FlipperData extends ItemData {
+	// appearance, physics, and behavior
 	public baseRadius: number = 21.5
 	public endRadius: number = 13.0
 	public flipperRadiusMin!: number
