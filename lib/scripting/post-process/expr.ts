@@ -90,6 +90,7 @@ function ppIntegerDivisionExpression(node: ESIToken): any {
 	return expr
 }
 
+/** ppModuloExpression. */
 export function ppModuloExpression(node: ESIToken): any {
 	let expr = node.children[0].estree
 	for (const child of node.children.slice(1)) {
