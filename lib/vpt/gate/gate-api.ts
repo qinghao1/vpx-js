@@ -14,7 +14,7 @@ import type { GateHit } from './gate-hit.js'
 import type { GateMover } from './gate-mover.js'
 import type { GateState } from './gate-state.js'
 
-/** GateApi. */
+/** Gate API. */
 export class GateApi extends ItemApi<GateData> {
 	private readonly state: GateState
 	private readonly mover: GateMover
