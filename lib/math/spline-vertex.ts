@@ -6,6 +6,7 @@ import { DragPoint } from './dragpoint.js'
 import { f4 } from './float.js'
 import { RenderVertex, Vertex2D } from './vertex2d.js'
 
+/** Helper for rubber/wall splines. */
 export class SplineVertex {
 	/** number of vertices for the central curve */
 	public pcvertex!: number
