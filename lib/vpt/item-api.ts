@@ -158,6 +158,7 @@ export abstract class ItemApi<DATA extends ItemData> extends EventEmitter {
 	}
 }
 
+/** dequantizeUnsignedPercent. */
 export function dequantizeUnsignedPercent(i: number) {
 	/* originally:
 	 *
