@@ -5,12 +5,11 @@ import { Pool } from '../../util/object-pool.js'
 import { ItemState } from '../item-state.js'
 import { omitEqual } from '../state-helpers.js'
 
-/** Trigger state.
- * @see https://github.com/vpinball/vpinball/blob/master/trigger.cpp */
+/** Trigger state. @see https://github.com/vpinball/vpinball/blob/master/trigger.cpp */
 export class TriggerState extends ItemState {
 	public static readonly POOL = new Pool(TriggerState)
 
-	public heightOffset: number = 0
+	public heightOffset = 0
 	public material?: string
 
 	public constructor() {
@@ -48,9 +47,7 @@ export class TriggerState extends ItemState {
 	}
 
 	public equals(state: TriggerState): boolean {
-		if (!state) {
-			return false
-		}
+		if (!state) return false
 		return (
 			state.heightOffset === this.heightOffset && state.material === this.material && state.isVisible === this.isVisible
 		)
