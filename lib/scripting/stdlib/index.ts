@@ -154,7 +154,6 @@ export class Stdlib extends VbsApi {
 	}
 
 	public RGB(r: number, g: number, b: number) {
-		// tslint:disable-next-line:no-bitwise
 		return (r << 16) + (g << 8) + b
 	}
 
