@@ -86,7 +86,6 @@ const FLOAT_MAP: Record<string, string> = {
 	SSSC: 'ssrScale',
 	BPRS: 'ballPlayfieldReflectionStrength',
 	DBIS: 'defaultBulbIntensityScaleOnBall',
-	UFXA: 'useFXAA',
 	BLST: 'bloomStrength',
 	TDFT: 'globalDifficulty',
 	SVOL: 'tableSoundVolume',
@@ -97,8 +96,6 @@ const FLOAT_MAP: Record<string, string> = {
 
 const INT_MAP: Record<string, string> = {
 	ORRP: 'overridePhysics',
-	MPGC: 'plungerNormalize',
-	PHML: 'physicsMaxLoops',
 	SEDT: 'numGameItems',
 	SSND: 'numSounds',
 	SIMG: 'numTextures',
@@ -106,23 +103,19 @@ const INT_MAP: Record<string, string> = {
 	SCOL: 'numCollections',
 	LZAM: 'lightAmbient',
 	BREF: 'useReflectionForBalls',
-	PLST: 'playfieldReflectionStrength',
 	BTRA: 'useTrailForBalls',
-	BTST: 'ballTrailStrength',
 	UAAL: 'useAA',
-	UAOC: 'useAO',
-	USSR: 'useSSR',
 	BCLR: 'colorBackdrop',
 	AVSY: 'tableAdaptiveVSync',
 	ARAC: 'userDetailLevel',
 	MASI: 'numMaterials',
 	TMAP: 'toneMapper',
 	TLCK: 'tablelocked',
+	UFXA: 'useFXAA',
 }
 
 const BOOL_MAP: Record<string, string> = {
 	ORPF: 'overridePhysicsFlipper',
-	MPDF: 'plungerFilter',
 	DECL: 'renderDecals',
 	REEL: 'renderEMReels',
 	OGST: 'overwriteGlobalStereo3D',
@@ -134,6 +127,8 @@ const BOOL_MAP: Record<string, string> = {
 	GDAC: 'showGrid',
 	REOP: 'reflectElementsOnPlayfield',
 	BLSM: 'ballSphericalMapping',
+	UAOC: 'useAO',
+	USSR: 'useSSR',
 }
 
 const STRING_MAP: Record<string, string> = {
@@ -194,11 +189,9 @@ export class TableData extends ItemData {
 	public scatter!: number
 	public defaultScatter?: number
 	public nudgeTime?: number
-	public plungerNormalize!: number
-	public plungerFilter = false
 	public physicsMaxLoops = 0xffffffff
-	public renderDecals = false
-	public renderEMReels = false
+	public renderDecals = true
+	public renderEMReels = true
 
 	public offset = new Vertex2D()
 	public _3DmaxSeparation?: number
@@ -217,7 +210,7 @@ export class TableData extends ItemData {
 	public szBallImage?: string
 	public szBallImageFront?: string
 	public szScreenShot?: string
-	public displayBackdrop = false
+	public displayBackdrop = true
 
 	public numGameItems!: number
 	public numSounds!: number
@@ -262,12 +255,15 @@ export class TableData extends ItemData {
 	public tableAdaptiveVSync?: number
 	public overwriteGlobalDetailLevel = false
 	public overwriteGlobalDayNight = false
-	public showGrid = false
+	public showGrid = true
 	public reflectElementsOnPlayfield = false
 	public userDetailLevel?: number
 
 	public numMaterials!: number
 	public materials: Material[] = []
+
+	public plungerNormalize?: number
+	public plungerFilter?: boolean
 
 	public readonly overrideContactFriction = 0.075
 	public readonly overrideElasticity = 0.25
@@ -320,6 +316,25 @@ export class TableData extends ItemData {
 		if (handleBiffTag(this, tag, buffer, len, { float: FLOAT_MAP, int: INT_MAP, bool: BOOL_MAP, string: STRING_MAP }))
 			return 0
 		switch (tag) {
+			case 'PHML': {
+				const v = this.getInt(buffer)
+				this.physicsMaxLoops = v === 0xffffffff ? 0 : v
+				break
+			}
+			case 'PLST':
+				this.playfieldReflectionStrength = this.getInt(buffer) / 255
+				break
+			case 'BTST':
+				this.ballTrailStrength = this.getInt(buffer) / 255
+				break
+			case 'MPGC':
+			case 'MPDF':
+				this.getFloat(buffer)
+				break
+			case 'PIID':
+			case 'VERS':
+				this.getInt(buffer)
+				break
 			case 'EFSS':
 				this.bgEnableFss = this.getBool(buffer)
 				if (this.bgEnableFss) this.bgCurrentSet = BG.FULL_SINGLE_SCREEN
