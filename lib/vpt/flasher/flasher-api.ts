@@ -9,140 +9,120 @@ import type { FlasherData } from './flasher-data.js'
  *
  * @see https://github.com/vpinball/vpinball/blob/master/flasher.cpp */
 export class FlasherApi extends ItemApi<FlasherData> {
-	/** Get X. */
 	get X() {
 		return this.data.center.x
 	}
 	set X(v) {
 		this.data.center.x = v
 	}
-	/** Get Y. */
 	get Y() {
 		return this.data.center.y
 	}
 	set Y(v) {
 		this.data.center.y = v
 	}
-	/** Get RotX. */
 	get RotX() {
 		return this.data.rotX
 	}
 	set RotX(v) {
 		this.data.rotX = v
 	}
-	/** Get RotY. */
 	get RotY() {
 		return this.data.rotY
 	}
 	set RotY(v) {
 		this.data.rotY = v
 	}
-	/** Get RotZ. */
 	get RotZ() {
 		return this.data.rotZ
 	}
 	set RotZ(v) {
 		this.data.rotZ = v
 	}
-	/** Get Height. */
 	get Height() {
 		return this.data.height
 	}
 	set Height(v) {
 		this.data.height = v
 	}
-	/** Get Color. */
 	get Color() {
 		return this.data.color
 	}
 	set Color(v) {
 		this.data.color = v
 	}
-	/** Get ImageA. */
 	get ImageA() {
 		return this.data.szImageA
 	}
 	set ImageA(v) {
 		this.data.szImageA = v
 	}
-	/** Get ImageB. */
 	get ImageB() {
 		return this.data.szImageB
 	}
 	set ImageB(v) {
 		this.data.szImageB = v
 	}
-	/** Get Filter. */
 	get Filter() {
 		return filterToName(this.data.filter)
 	}
 	set Filter(v) {
 		this.data.filter = nameToFilter(v)
 	}
-	/** Get Opacity. */
 	get Opacity() {
 		return this.data.alpha
 	}
 	set Opacity(v) {
 		this.data.alpha = Math.max(0, v)
 	}
-	/** Get IntensityScale. */
 	get IntensityScale() {
 		return this.data.intensityScale
 	}
 	set IntensityScale(v) {
 		this.data.intensityScale = v
 	}
-	/** Get ModulateVsAdd. */
 	get ModulateVsAdd() {
 		return this.data.modulateVsAdd
 	}
 	set ModulateVsAdd(v) {
 		this.data.modulateVsAdd = v
 	}
-	/** Get Amount. */
 	get Amount() {
 		return this.data.filterAmount
 	}
 	set Amount(v) {
 		this.data.filterAmount = Math.max(0, v)
 	}
-	/** Get Visible. */
 	get Visible() {
 		return this.data.isVisible
 	}
 	set Visible(v) {
 		this.data.isVisible = v
 	}
-	/** Get DisplayTexture. */
 	get DisplayTexture() {
 		return this.data.displayTexture
 	}
 	set DisplayTexture(v) {
 		this.data.displayTexture = v
 	}
-	/** Get AddBlend. */
 	get AddBlend() {
 		return this.data.addBlend
 	}
 	set AddBlend(v) {
 		this.data.addBlend = v
 	}
-	/** Get DMD. */
 	get DMD() {
 		return this.data.isDMD
 	}
 	set DMD(v) {
 		this.data.isDMD = v
 	}
-	/** Get DepthBias. */
 	get DepthBias() {
 		return this.data.depthBias
 	}
 	set DepthBias(v) {
 		this.data.depthBias = v
 	}
-	/** Get ImageAlignment. */
 	get ImageAlignment() {
 		return this.data.imageAlignment
 	}
