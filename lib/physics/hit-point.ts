@@ -16,11 +16,11 @@ export class HitPoint extends HitObject {
 		super()
 	}
 
-	public calcHitBBox(): void {
+	public override calcHitBBox(): void {
 		this.hitBBox = new FRect3D(this.p.x, this.p.x, this.p.y, this.p.y, this.p.z, this.p.z)
 	}
 
-	public hitTest(ball: Ball, dTime: number, coll: CollisionEvent): number {
+	public override hitTest(ball: Ball, dTime: number, coll: CollisionEvent): number {
 		if (!this.isEnabled) return -1
 		const dist = ball.state.pos.clone(true).sub(this.p)
 		const bcddsq = dist.lengthSq()
@@ -46,7 +46,7 @@ export class HitPoint extends HitObject {
 			if (a < 1e-8) return -1
 			const sol = solveQuadraticEq(a, 2 * b, bcddsq - ball.data.radius * ball.data.radius)
 			if (!sol) return -1
-			hitTime = sol[0] * sol[1] < 0 ? Math.max(sol[0], sol[1]) : Math.min(sol[0], sol[1])
+			hitTime = sol[0]! * sol[1]! < 0 ? Math.max(sol[0]!, sol[1]!) : Math.min(sol[0]!, sol[1]!)
 		}
 		if (!isFinite(hitTime) || hitTime < 0 || hitTime > dTime) return -1
 		const hitVel = ball.hit.vel.clone(true).multiplyScalar(hitTime)
@@ -59,7 +59,7 @@ export class HitPoint extends HitObject {
 		return hitTime
 	}
 
-	public collide(coll: CollisionEvent): void {
+	public override collide(coll: CollisionEvent): void {
 		const dot = coll.hitNormal.dot(coll.ball.hit.vel)
 		coll.ball.hit.collide3DWall(coll.hitNormal, this.elasticity, this.elasticityFalloff, this.friction, this.scatter)
 		if (dot <= -this.threshold) this.fireHitEvent(coll.ball)
