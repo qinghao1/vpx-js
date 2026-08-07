@@ -24,11 +24,7 @@ import { KickerMeshGenerator } from './kicker-mesh-generator.js'
 import { KickerState } from './kicker-state.js'
 import { KickerUpdater } from './kicker-updater.js'
 
-/**
- * VPinball's kickers.
- *
- * @see https://github.com/vpinball/vpinball/blob/master/kicker.cpp
- */
+/** Kicker item. @see https://github.com/vpinball/vpinball/blob/master/kicker.cpp */
 export class Kicker
 	extends Item<KickerData>
 	implements IRenderable<KickerState>, IHittable, IBallCreationPosition, IScriptable<KickerApi>
