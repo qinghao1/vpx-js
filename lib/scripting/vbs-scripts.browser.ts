@@ -7,6 +7,7 @@ import VPMKeys from '../../res/scripts/VPMKeys.vbs'
 import WPC from '../../res/scripts/WPC.vbs'
 import grammar from './grammar/grammar.bnf'
 
+/** getTextFile. */
 export function getTextFile(fileName: string): string {
 	switch (fileName.toLowerCase()) {
 		case 'controller.vbs':
