@@ -18,36 +18,42 @@ export class TriggerApi extends ItemApi<TriggerData> {
 		this.state = state
 	}
 
+	/** Get X. */
 	get X() {
 		return this.data.center.x
 	}
 	set X(v) {
 		this.data.center.x = v
 	}
+	/** Get Y. */
 	get Y() {
 		return this.data.center.y
 	}
 	set Y(v) {
 		this.data.center.y = v
 	}
+	/** Get Radius. */
 	get Radius() {
 		return this.data.radius
 	}
 	set Radius(v) {
 		this.data.radius = v
 	}
+	/** Get Surface. */
 	get Surface() {
 		return this.data.szSurface
 	}
 	set Surface(v) {
 		this.data.szSurface = v
 	}
+	/** Get Enabled. */
 	get Enabled() {
 		return this.data.isEnabled
 	}
 	set Enabled(v) {
 		this.data.isEnabled = v
 	}
+	/** Get Visible. */
 	get Visible() {
 		return this.state.isVisible
 	}
@@ -55,36 +61,42 @@ export class TriggerApi extends ItemApi<TriggerData> {
 		this.data.isVisible = v
 		this.state.isVisible = v && this.data.shape !== Enums.TriggerShape.TriggerNone
 	}
+	/** Get HitHeight. */
 	get HitHeight() {
 		return this.data.hitHeight
 	}
 	set HitHeight(v) {
 		this.data.hitHeight = v
 	}
+	/** Get Rotation. */
 	get Rotation() {
 		return this.data.rotation
 	}
 	set Rotation(v) {
 		this.data.rotation = v
 	}
+	/** Get WireThickness. */
 	get WireThickness() {
 		return this.data.wireThickness
 	}
 	set WireThickness(v) {
 		this.data.wireThickness = v
 	}
+	/** Get AnimSpeed. */
 	get AnimSpeed() {
 		return this.data.animSpeed
 	}
 	set AnimSpeed(v) {
 		this.data.animSpeed = v
 	}
+	/** Get Material. */
 	get Material() {
 		return this.state.material
 	}
 	set Material(v) {
 		this.state.material = v
 	}
+	/** Get TriggerShape. */
 	get TriggerShape() {
 		return this.data.shape
 	}
@@ -92,6 +104,7 @@ export class TriggerApi extends ItemApi<TriggerData> {
 		this.data.shape = v
 		this.state.isVisible = this.data.isVisible && v !== Enums.TriggerShape.TriggerNone
 	}
+	/** Get ReflectionEnabled. */
 	get ReflectionEnabled() {
 		return this.data.isReflectionEnabled
 	}
