@@ -37,8 +37,8 @@ const gatePlateMesh = Mesh.fromJson(gatePlateMeshJson)
 const gateWireMesh = Mesh.fromJson(gateWireMeshJson)
 const gateWireRectangleMesh = Mesh.fromJson(gateWireRectangleMeshJson)
 
-export /** Gate mesh generator. */
-class GateMeshGenerator {
+/** Gate mesh generator. */
+export class GateMeshGenerator {
 	private readonly data: GateData
 
 	constructor(data: GateData) {
