@@ -9,7 +9,6 @@ import { ItemData } from '../item-data.js'
 
 /** Kicker data. */
 export class KickerData extends ItemData {
-	// appearance, physics, and behavior
 	public kickerType: number = Enums.KickerType.KickerHole
 	public center!: Vertex2D
 	public radius: number = 25
