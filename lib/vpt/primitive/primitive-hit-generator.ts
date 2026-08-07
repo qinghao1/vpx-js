@@ -43,15 +43,8 @@ export class PrimitiveHitGenerator {
 			return []
 		}
 
-		// FIXME wtf is this
-		// RecalculateMatrices();
-		// TransformVertices(); //!! could also only do this for the optional reduced variant!
-
 		const reducedVertices = Math.floor(
-			Math.max(
-				mesh.vertices.length ** (clamp(1 - this.data.collisionReductionFactor, 0, 1) * 0.25 + 0.75),
-				420, // 420 = magic
-			),
+			Math.max(mesh.vertices.length ** (clamp(1 - this.data.collisionReductionFactor, 0, 1) * 0.25 + 0.75), 420),
 		)
 
 		if (reducedVertices < mesh.vertices.length) {
@@ -59,13 +52,11 @@ export class PrimitiveHitGenerator {
 		}
 		const addedEdges = new EdgeSet()
 
-		// add collision triangles and edges
 		for (let i = 0; i < mesh.indices.length; i += 3) {
 			const i0 = mesh.indices[i]
 			const i1 = mesh.indices[i + 1]
 			const i2 = mesh.indices[i + 2]
 
-			// NB: HitTriangle wants CCW vertices, but for rendering we have them in CW order
 			const rgv3D: Vertex3D[] = [
 				mesh.vertices[i0].getVertex(),
 				mesh.vertices[i2].getVertex(),
@@ -79,7 +70,6 @@ export class PrimitiveHitGenerator {
 			hitObjects.push(...addedEdges.addHitEdge(i2, i0, rgv3D[1], rgv3D[0]))
 		}
 
-		// add collision vertices
 		for (const vertex of mesh.vertices) {
 			hitObjects.push(new HitPoint(vertex.getVertex()))
 		}
@@ -87,11 +77,7 @@ export class PrimitiveHitGenerator {
 	}
 
 	public getReducedMesh(mesh: Mesh, reducedVertices: number): Mesh {
-		const progVertices: ProgMeshFloat3[] = []
-		for (let i = 0; i < mesh.vertices.length; ++i) {
-			// opt. use original data directly!
-			progVertices[i] = new ProgMeshFloat3(mesh.vertices[i].x, mesh.vertices[i].y, mesh.vertices[i].z)
-		}
+		const progVertices = mesh.vertices.map((v) => new ProgMeshFloat3(v.x, v.y, v.z))
 		const progIndices: ProgMeshTriData[] = []
 		let i2 = 0
 		for (let i = 0; i < mesh.indices.length; i += 3) {
@@ -106,12 +92,7 @@ export class PrimitiveHitGenerator {
 		const progNewIndices: ProgMeshTriData[] = []
 		remapIndices(reducedVertices, progIndices, progNewIndices, progMap)
 
-		const reducedIndices: number[] = []
-		for (const index of progNewIndices) {
-			reducedIndices.push(index.v[0])
-			reducedIndices.push(index.v[1])
-			reducedIndices.push(index.v[2])
-		}
+		const reducedIndices = progNewIndices.flatMap((tri) => tri.v)
 		return new Mesh(
 			progVertices.map((pv) => Vertex3DNoTex2.fromArray([pv.x, pv.y, pv.z, 0, 0, 0, 0, 0])),
 			reducedIndices,
