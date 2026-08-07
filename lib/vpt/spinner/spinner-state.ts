@@ -5,18 +5,14 @@ import { Pool } from '../../util/object-pool.js'
 import { ItemState } from '../item-state.js'
 import { omitEqual } from '../state-helpers.js'
 
-/** Spinner state.
- * @see https://github.com/vpinball/vpinball/blob/master/spinner.cpp */
+/** Spinner state. @see https://github.com/vpinball/vpinball/blob/master/spinner.cpp */
 export class SpinnerState extends ItemState {
 	public static readonly POOL = new Pool(SpinnerState)
 
-	/**
-	 * Angle in rad
-	 */
-	public angle: number = 0
+	public angle = 0
 	public texture?: string
 	public material?: string
-	public showBracket: boolean = true
+	public showBracket = true
 
 	public constructor() {
 		super()
@@ -59,9 +55,7 @@ export class SpinnerState extends ItemState {
 	}
 
 	public equals(state: SpinnerState): boolean {
-		if (!state) {
-			return false
-		}
+		if (!state) return false
 		return (
 			state.angle === this.angle &&
 			state.texture === this.texture &&
