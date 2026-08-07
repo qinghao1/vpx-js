@@ -5,136 +5,168 @@ import { Matrix4 } from 'three'
 import { Pool } from '../util/object-pool.js'
 import { f4 } from './float.js'
 
-/** 4×4 matrix (VP-compatible, three.js interoperable). */
-export class Matrix3D {
+/** 4×4 matrix (VP column-major, three.js based). @see https://github.com/vpinball/vpinball/blob/master/math/matrix.cpp */
+export class Matrix3D extends Matrix4 {
 	private static readonly POOL = new Pool(Matrix3D)
 
-	/** Row-major 4×4 storage. */
-	private readonly matrix: number[][] = [
-		[1, 0, 0, 0],
-		[0, 1, 0, 0],
-		[0, 0, 1, 0],
-		[0, 0, 0, 1],
-	]
-
-	constructor() {
-		this.setIdentity()
-	}
-
-	/** Claims a pooled instance. */
 	static claim(): Matrix3D {
 		return Matrix3D.POOL.get()
 	}
 
-	/** Releases instances. */
 	static release(...ms: Matrix3D[]): void {
 		for (const m of ms) Matrix3D.POOL.release(m)
 	}
 
-	/** Resets pooled instance. */
 	static reset(m: Matrix3D): void {
-		m.setIdentity()
+		m.identity()
 	}
 
-	/** Copies from 2D array. */
-	set(m: number[][]): this {
-		for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) this.matrix[i][j] = m[i][j]
+	override identity(): this {
+		super.identity()
 		return this
+	}
+
+	/** VP compat. */
+	setIdentity(): this {
+		return this.identity()
+	}
+
+	/** Copies from column-major 2D array. */
+	setFromArray(m: number[][]): this {
+		this.set(
+			m[0][0],
+			m[1][0],
+			m[2][0],
+			m[3][0],
+			m[0][1],
+			m[1][1],
+			m[2][1],
+			m[3][1],
+			m[0][2],
+			m[1][2],
+			m[2][2],
+			m[3][2],
+			m[0][3],
+			m[1][3],
+			m[2][3],
+			m[3][3],
+		)
+		return this
+	}
+
+	override set(
+		n11: number,
+		n12: number,
+		n13: number,
+		n14: number,
+		n21: number,
+		n22: number,
+		n23: number,
+		n24: number,
+		n31: number,
+		n32: number,
+		n33: number,
+		n34: number,
+		n41: number,
+		n42: number,
+		n43: number,
+		n44: number,
+	): this
+	override set(m: number[][]): this
+	override set(...args: any[]): this {
+		if (args.length === 1 && Array.isArray(args[0])) {
+			return this.setFromArray(args[0])
+		}
+		return super.set(
+			args[0],
+			args[1],
+			args[2],
+			args[3],
+			args[4],
+			args[5],
+			args[6],
+			args[7],
+			args[8],
+			args[9],
+			args[10],
+			args[11],
+			args[12],
+			args[13],
+			args[14],
+			args[15],
+		) as unknown as this
 	}
 
 	/** Sets from 16 values (row-major). */
 	setEach(...m: number[]): this {
-		for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) this.matrix[i][j] = m[i * 4 + j]
+		this.set(m[0], m[4], m[8], m[12], m[1], m[5], m[9], m[13], m[2], m[6], m[10], m[14], m[3], m[7], m[11], m[15])
 		return this
 	}
 
-	/** Sets to identity. */
-	setIdentity(): this {
-		this._11 = this._22 = this._33 = this._44 = 1
-		this._12 =
-			this._13 =
-			this._14 =
-			this._21 =
-			this._23 =
-			this._24 =
-			this._31 =
-			this._32 =
-			this._34 =
-			this._41 =
-			this._42 =
-			this._43 =
-				0
-		return this
-	}
-
-	/** Sets translation. */
 	setTranslation(tx: number, ty: number, tz: number): this {
-		this.setIdentity()
-		this._41 = tx
-		this._42 = ty
-		this._43 = tz
+		this.identity()
+		this.elements[12] = f4(tx)
+		this.elements[13] = f4(ty)
+		this.elements[14] = f4(tz)
 		return this
 	}
 
-	/** Sets scaling. */
 	setScaling(sx: number, sy: number, sz: number): this {
-		this.setIdentity()
-		this._11 = sx
-		this._22 = sy
-		this._33 = sz
+		this.identity()
+		this.elements[0] = f4(sx)
+		this.elements[5] = f4(sy)
+		this.elements[10] = f4(sz)
 		return this
 	}
 
-	/** Sets X rotation. */
 	rotateXMatrix(rad: number): this {
-		this.setIdentity()
-		const c = Math.cos(f4(rad)),
-			s = Math.sin(f4(rad))
-		this._22 = this._33 = c
-		this._23 = s
-		this._32 = -s
+		this.makeRotationX(f4(rad))
+		for (let i = 0; i < 16; i++) this.elements[i] = f4(this.elements[i])
 		return this
 	}
 
-	/** Sets Y rotation. */
 	rotateYMatrix(rad: number): this {
-		this.setIdentity()
-		const c = Math.cos(f4(rad)),
-			s = Math.sin(f4(rad))
-		this._11 = this._33 = c
-		this._31 = s
-		this._13 = -s
+		this.makeRotationY(f4(rad))
+		for (let i = 0; i < 16; i++) this.elements[i] = f4(this.elements[i])
 		return this
 	}
 
-	/** Sets Z rotation. */
 	rotateZMatrix(rad: number): this {
-		this.setIdentity()
-		const c = Math.cos(f4(rad)),
-			s = Math.sin(f4(rad))
-		this._11 = this._22 = c
-		this._12 = s
-		this._21 = -s
+		this.makeRotationZ(f4(rad))
+		for (let i = 0; i < 16; i++) this.elements[i] = f4(this.elements[i])
 		return this
 	}
 
-	/** Multiplies by matrix (VP order). */
-	multiply(a: Matrix3D, b?: Matrix3D): this {
-		const prod = b ? Matrix3D.mul(a, b, true) : Matrix3D.mul(this, a, true)
-		this.set(prod.matrix)
-		Matrix3D.release(prod)
+	override multiply(m: Matrix4): this
+	override multiply(a: Matrix4, b: Matrix4): this
+	override multiply(a: any, b?: any): this {
+		if (b !== undefined) {
+			super.multiplyMatrices(a, b)
+			for (let i = 0; i < 16; i++) this.elements[i] = f4(this.elements[i])
+			return this
+		}
+		const clone = this.clone() as unknown as Matrix4
+		super.multiplyMatrices(clone, a)
+		for (let i = 0; i < 16; i++) this.elements[i] = f4(this.elements[i])
 		return this
 	}
 
-	/** Pre-multiplies by matrix. */
+	multiplyVP(a: Matrix3D, b?: Matrix3D): this {
+		if (b) {
+			super.multiplyMatrices(a, b)
+			for (let i = 0; i < 16; i++) this.elements[i] = f4(this.elements[i])
+			return this
+		}
+		return this.multiply(a)
+	}
+
 	preMultiply(a: Matrix3D): this {
-		const prod = Matrix3D.mul(a, this, true)
-		this.set(prod.matrix)
-		Matrix3D.release(prod)
+		const cur = this.clone() as unknown as Matrix4
+		super.multiplyMatrices(a, cur)
+		for (let i = 0; i < 16; i++) this.elements[i] = f4(this.elements[i])
 		return this
 	}
 
-	/** Flips Z for right-handed conversion. */
 	toRightHanded(): this {
 		const m = Matrix3D.claim().setScaling(1, 1, -1)
 		this.multiply(m)
@@ -142,74 +174,32 @@ export class Matrix3D {
 		return this
 	}
 
-	private static toThree(a: Matrix3D): Matrix4 {
-		return new Matrix4().set(
-			a.matrix[0][0],
-			a.matrix[1][0],
-			a.matrix[2][0],
-			a.matrix[3][0],
-			a.matrix[0][1],
-			a.matrix[1][1],
-			a.matrix[2][1],
-			a.matrix[3][1],
-			a.matrix[0][2],
-			a.matrix[1][2],
-			a.matrix[2][2],
-			a.matrix[3][2],
-			a.matrix[0][3],
-			a.matrix[1][3],
-			a.matrix[2][3],
-			a.matrix[3][3],
-		)
+	override clone(): this {
+		return super.clone() as unknown as this
 	}
 
-	private static fromThree(out: Matrix3D, m: Matrix4): Matrix3D {
-		const e = m.elements
-		out.matrix[0][0] = f4(e[0])
-		out.matrix[0][1] = f4(e[1])
-		out.matrix[0][2] = f4(e[2])
-		out.matrix[0][3] = f4(e[3])
-		out.matrix[1][0] = f4(e[4])
-		out.matrix[1][1] = f4(e[5])
-		out.matrix[1][2] = f4(e[6])
-		out.matrix[1][3] = f4(e[7])
-		out.matrix[2][0] = f4(e[8])
-		out.matrix[2][1] = f4(e[9])
-		out.matrix[2][2] = f4(e[10])
-		out.matrix[2][3] = f4(e[11])
-		out.matrix[3][0] = f4(e[12])
-		out.matrix[3][1] = f4(e[13])
-		out.matrix[3][2] = f4(e[14])
-		out.matrix[3][3] = f4(e[15])
-		return out
+	clonePooled(recycle = false): Matrix3D {
+		if (recycle) {
+			const m = Matrix3D.claim()
+			m.copy(this)
+			return m
+		}
+		return this.clone() as unknown as Matrix3D
 	}
 
-	private static mul(a: Matrix3D, b: Matrix3D, recycle = false): Matrix3D {
-		const out = new Matrix4().multiplyMatrices(Matrix3D.toThree(a), Matrix3D.toThree(b))
-		const r = recycle ? Matrix3D.claim() : new Matrix3D()
-		return Matrix3D.fromThree(r, out)
+	override equals(m: Matrix4): boolean {
+		return super.equals(m)
 	}
 
-	/** Clones, optionally pooled. */
-	clone(recycle = false): Matrix3D {
-		return recycle ? Matrix3D.claim().set(this.matrix) : new Matrix3D().set(this.matrix)
-	}
-
-	/** Exact equality. */
-	equals(m: Matrix3D): boolean {
-		for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) if (this.matrix[i][j] !== m.matrix[i][j]) return false
-		return true
-	}
-
-	/** Converts to THREE.Matrix4. */
 	toThree(): Matrix4 {
-		return Matrix3D.toThree(this)
+		return this.clone() as unknown as Matrix4
 	}
 
-	/** Creates from THREE.Matrix4. */
 	static fromThreeMatrix(m: Matrix4): Matrix3D {
 		const out = new Matrix3D()
-		return Matrix3D.fromThree(out, m)
+		out.copy(m)
+		for (let i = 0; i < 16; i++) out.elements[i] = f4(out.elements[i])
+		return out
 	}
 
 	debug(): string[] {
@@ -234,100 +224,132 @@ export class Matrix3D {
 	}
 
 	get _11(): number {
-		return this.matrix[0][0]
+		return this.elements[0]
 	}
 	set _11(v: number) {
-		this.matrix[0][0] = f4(v)
+		this.elements[0] = f4(v)
 	}
 	get _12(): number {
-		return this.matrix[1][0]
+		return this.elements[4]
 	}
 	set _12(v: number) {
-		this.matrix[1][0] = f4(v)
+		this.elements[4] = f4(v)
 	}
 	get _13(): number {
-		return this.matrix[2][0]
+		return this.elements[8]
 	}
 	set _13(v: number) {
-		this.matrix[2][0] = f4(v)
+		this.elements[8] = f4(v)
 	}
 	get _14(): number {
-		return this.matrix[3][0]
+		return this.elements[12]
 	}
 	set _14(v: number) {
-		this.matrix[3][0] = f4(v)
+		this.elements[12] = f4(v)
 	}
 	get _21(): number {
-		return this.matrix[0][1]
+		return this.elements[1]
 	}
 	set _21(v: number) {
-		this.matrix[0][1] = f4(v)
+		this.elements[1] = f4(v)
 	}
 	get _22(): number {
-		return this.matrix[1][1]
+		return this.elements[5]
 	}
 	set _22(v: number) {
-		this.matrix[1][1] = f4(v)
+		this.elements[5] = f4(v)
 	}
 	get _23(): number {
-		return this.matrix[2][1]
+		return this.elements[9]
 	}
 	set _23(v: number) {
-		this.matrix[2][1] = f4(v)
+		this.elements[9] = f4(v)
 	}
 	get _24(): number {
-		return this.matrix[3][1]
+		return this.elements[13]
 	}
 	set _24(v: number) {
-		this.matrix[3][1] = f4(v)
+		this.elements[13] = f4(v)
 	}
 	get _31(): number {
-		return this.matrix[0][2]
+		return this.elements[2]
 	}
 	set _31(v: number) {
-		this.matrix[0][2] = f4(v)
+		this.elements[2] = f4(v)
 	}
 	get _32(): number {
-		return this.matrix[1][2]
+		return this.elements[6]
 	}
 	set _32(v: number) {
-		this.matrix[1][2] = f4(v)
+		this.elements[6] = f4(v)
 	}
 	get _33(): number {
-		return this.matrix[2][2]
+		return this.elements[10]
 	}
 	set _33(v: number) {
-		this.matrix[2][2] = f4(v)
+		this.elements[10] = f4(v)
 	}
 	get _34(): number {
-		return this.matrix[3][2]
+		return this.elements[14]
 	}
 	set _34(v: number) {
-		this.matrix[3][2] = f4(v)
+		this.elements[14] = f4(v)
 	}
 	get _41(): number {
-		return this.matrix[0][3]
+		return this.elements[3]
 	}
 	set _41(v: number) {
-		this.matrix[0][3] = f4(v)
+		this.elements[3] = f4(v)
 	}
 	get _42(): number {
-		return this.matrix[1][3]
+		return this.elements[7]
 	}
 	set _42(v: number) {
-		this.matrix[1][3] = f4(v)
+		this.elements[7] = f4(v)
 	}
 	get _43(): number {
-		return this.matrix[2][3]
+		return this.elements[11]
 	}
 	set _43(v: number) {
-		this.matrix[2][3] = f4(v)
+		this.elements[11] = f4(v)
 	}
 	get _44(): number {
-		return this.matrix[3][3]
+		return this.elements[15]
 	}
 	set _44(v: number) {
-		this.matrix[3][3] = f4(v)
+		this.elements[15] = f4(v)
+	}
+
+	/** Column-major 4×4 (`matrix[col][row]`). */
+	get matrix(): number[][] {
+		const e = this.elements
+		return [
+			[e[0], e[1], e[2], e[3]],
+			[e[4], e[5], e[6], e[7]],
+			[e[8], e[9], e[10], e[11]],
+			[e[12], e[13], e[14], e[15]],
+		]
+	}
+
+	set matrix(m: number[][]) {
+		this.set(
+			m[0][0],
+			m[1][0],
+			m[2][0],
+			m[3][0],
+			m[0][1],
+			m[1][1],
+			m[2][1],
+			m[3][1],
+			m[0][2],
+			m[1][2],
+			m[2][2],
+			m[3][2],
+			m[0][3],
+			m[1][3],
+			m[2][3],
+			m[3][3],
+		)
 	}
 
 	static readonly RIGHT_HANDED = new Matrix3D().setEach(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, -1, 0, 0, 0, 0, 1)
