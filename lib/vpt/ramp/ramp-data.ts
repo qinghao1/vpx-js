@@ -8,6 +8,7 @@ import { f4 } from '../../math/float.js'
 import { Enums } from '../enums.js'
 import { type IPhysicalData, ItemData } from '../item-data.js'
 
+/** Ramp data. */
 export class RampData extends ItemData implements IPhysicalData {
 	public depthBias: number = 0
 	public dragPoints: DragPoint[] = []
