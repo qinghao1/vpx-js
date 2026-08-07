@@ -3,12 +3,8 @@
 
 import { ItemData } from '../item-data.js'
 
-/** Ball data.
- * @see https://github.com/vpinball/vpinball/blob/master/ball.cpp */
+/** Ball data. @see https://github.com/vpinball/vpinball/blob/master/ball.cpp */
 export class BallData extends ItemData {
-	public radius: number
-	public mass: number
-	public bulbIntensityScale: number
 	public color = 0xffffff
 	public environmentMap = ''
 	public frontDecal = ''
@@ -17,10 +13,11 @@ export class BallData extends ItemData {
 	public playfieldReflectionStrength = 1.0
 	public forceReflection = false
 
-	constructor(radius = 25, mass = 1, bulbIntensityScale = 1) {
+	constructor(
+		public radius = 25,
+		public mass = 1,
+		public bulbIntensityScale = 1,
+	) {
 		super('Ball')
-		this.radius = radius
-		this.mass = mass
-		this.bulbIntensityScale = bulbIntensityScale
 	}
 }
