@@ -57,10 +57,7 @@ export class Gate
 	}
 
 	public getMeshes<GEOMETRY>(table: Table): Meshes<GEOMETRY> {
-		const meshes: Meshes<GEOMETRY> = {}
 		const gate = this.meshGenerator.getMeshes(table)
-
-		// wire mesh
 		return {
 			wire: {
 				isVisible: this.data.isVisible,
@@ -79,7 +76,6 @@ export class Gate
 		const height = table.getSurfaceHeight(this.data.szSurface, this.data.center.x, this.data.center.y)
 		const radAngle = degToRad(this.data.rotation)
 		const tangent = new Vertex2D(Math.cos(radAngle), Math.sin(radAngle))
-
 		this.events = new EventProxy(this)
 		this.hitGate = this.hitGenerator.generateGateHit(this.state, this.events, height)
 		this.hitLines = this.hitGenerator.generateLineSegs(this.events, height, tangent)
@@ -90,7 +86,7 @@ export class Gate
 			this.state,
 			this.getMover(),
 			this.hitGate,
-			this.hitLines.length ? this.hitLines[0] : null,
+			this.hitLines.length ? this.hitLines[0]! : null,
 			player,
 			table,
 		)
