@@ -1,43 +1,27 @@
-/*
- * VPDB - Virtual Pinball Database
- * Copyright (C) 2019 freezy <freezy@vpdb.io>
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- */
+// Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { EventProxy } from '../../game/event-proxy'
-import type { IHittable } from '../../game/ihittable'
-import type { IMovable } from '../../game/imovable'
-import type { IPlayable } from '../../game/iplayable'
-import type { IRenderable, Meshes } from '../../game/irenderable'
-import type { IScriptable } from '../../game/iscriptable'
-import type { Player } from '../../game/player'
-import type { Storage } from '../../io/ole-doc'
-import { degToRad } from '../../math/float'
-import { Matrix3D } from '../../math/matrix3d'
-import type { Vertex2D } from '../../math/vertex2d'
-import type { HitObject } from '../../physics/hit-object'
-import { Item } from '../item'
-import type { Table } from '../table/table'
-import { FlipperApi } from './flipper-api'
-import { FlipperData } from './flipper-data'
-import { FlipperHit } from './flipper-hit'
-import { FlipperMesh } from './flipper-mesh'
-import type { FlipperMover } from './flipper-mover'
-import { FlipperState } from './flipper-state'
-import { FlipperUpdater } from './flipper-updater'
+import { EventProxy } from '../../game/event-proxy.js'
+import type { IHittable } from '../../game/ihittable.js'
+import type { IMovable } from '../../game/imovable.js'
+import type { IPlayable } from '../../game/iplayable.js'
+import type { IRenderable, Meshes } from '../../game/irenderable.js'
+import type { IScriptable } from '../../game/iscriptable.js'
+import type { Player } from '../../game/player.js'
+import type { Storage } from '../../io/ole-doc.js'
+import { degToRad } from '../../math/float.js'
+import { Matrix3D } from '../../math/matrix3d.js'
+import type { Vertex2D } from '../../math/vertex2d.js'
+import type { HitObject } from '../../physics/hit-object.js'
+import { Item } from '../item.js'
+import type { Table } from '../table/table.js'
+import { FlipperApi } from './flipper-api.js'
+import { FlipperData } from './flipper-data.js'
+import { FlipperHit } from './flipper-hit.js'
+import { FlipperMesh } from './flipper-mesh.js'
+import type { FlipperMover } from './flipper-mover.js'
+import { FlipperState } from './flipper-state.js'
+import { FlipperUpdater } from './flipper-updater.js'
 
 /**
  * VPinball's flippers
