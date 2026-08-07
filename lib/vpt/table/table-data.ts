@@ -5,6 +5,7 @@ import { BiffParser } from '../../io/biff-parser.js'
 import type { Storage } from '../../io/ole-doc.js'
 import type { Vertex3D } from '../../util/math.js'
 import { Vertex2D } from '../../util/math.js'
+import { handleBiffTag } from '../biff-helper.js'
 import { Enums } from '../enums.js'
 import { ItemData } from '../item-data.js'
 import { Material, SaveMaterial, SavePhysicsMaterial } from '../material.js'
@@ -276,7 +277,7 @@ export class TableData extends ItemData {
 		return this.overridePhysics ? this.overrideScatterAngle : this.scatter!
 	}
 
-	private async fromTag(buffer: Uint8Array, tag: string, offset: number, len: number): Promise<number> {
+	private async fromTag(buffer: Uint8Array, tag: string, _offset: number, len: number): Promise<number> {
 		const bg = BG_FLOAT_MAP[tag]
 		if (bg) {
 			;(this as unknown as Record<string, Record<string, unknown>>)[bg[0]][bg[1]] = this.getFloat(buffer)
@@ -287,22 +288,15 @@ export class TableData extends ItemData {
 			this.bgImage[bgImg] = this.getString(buffer, len)
 			return 0
 		}
-		if (tag in FLOAT_MAP) {
-			;(this as unknown as Record<string, unknown>)[FLOAT_MAP[tag]] = this.getFloat(buffer)
+		if (
+			handleBiffTag(this as unknown as Record<string, unknown>, this, tag, buffer, len, {
+				float: FLOAT_MAP,
+				int: INT_MAP,
+				bool: BOOL_MAP,
+				string: STRING_MAP,
+			})
+		)
 			return 0
-		}
-		if (tag in INT_MAP) {
-			;(this as unknown as Record<string, unknown>)[INT_MAP[tag]] = this.getInt(buffer)
-			return 0
-		}
-		if (tag in BOOL_MAP) {
-			;(this as unknown as Record<string, unknown>)[BOOL_MAP[tag]] = this.getBool(buffer)
-			return 0
-		}
-		if (tag in STRING_MAP) {
-			;(this as unknown as Record<string, unknown>)[STRING_MAP[tag]] = this.getString(buffer, len)
-			return 0
-		}
 		switch (tag) {
 			case 'EFSS':
 				this.bgEnableFss = this.getBool(buffer)
