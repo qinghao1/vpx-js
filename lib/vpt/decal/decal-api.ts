@@ -4,7 +4,8 @@
 import { ItemApi } from '../item-api.js'
 import type { DecalData } from './decal-data.js'
 
-export class DecalApi extends ItemApi<DecalData> {
+export /** DecalApi. */
+class DecalApi extends ItemApi<DecalData> {
 	get Rotation() {
 		return this.data.rotation
 	}
