@@ -1,21 +1,5 @@
-/*
- * VPDB - Virtual Pinball Database
- * Copyright (C) 2019 freezy <freezy@vpdb.io>
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- */
+// Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js'
 import {
@@ -26,8 +10,8 @@ import {
 	type Texture as ThreeTexture,
 	UnsignedByteType,
 } from '../../refs.browser.js'
-import type { ITextureLoader } from '../irender-api'
-import { EXRLoader } from './vendor/EXRLoader'
+import type { ITextureLoader } from '../irender-api.js'
+import { EXRLoader } from './vendor/EXRLoader.js'
 
 const imageMap: { [key: string]: string } = {
 	bumperbase: new URL('../../../res/maps/bumperbase.png', import.meta.url).href,
@@ -60,28 +44,41 @@ export class ThreeTextureLoaderBrowser implements ITextureLoader<ThreeTexture> {
 	}
 
 	public async loadTexture(name: string, ext: string, data: Uint8Array): Promise<ThreeTexture> {
-		const MAX_TEXTURE_SIZE = 50 * 1024 * 1024
-		if (data.length > MAX_TEXTURE_SIZE) {
-			throw new Error(
-				`Texture "${name}" too large (${(data.length / 1024 / 1024).toFixed(1)} MB > ${MAX_TEXTURE_SIZE / 1024 / 1024} MB), skipping to avoid OOM`,
-			)
-		}
-		const mimeType = getMimeType(data, ext)
-		if (!mimeType) {
-			throw new Error('Unknown image format for texture "' + name + '".')
+		const mimeType = getMimeType(data, ext) || 'image/png'
+		const isHdr = mimeType === 'image/hdr' || ext === '.hdr'
+		const isExr = mimeType === 'image/exr' || ext === '.exr'
+		if (isHdr || isExr) {
+			try {
+				const buffer = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer
+				const loader = isExr ? new EXRLoader() : new HDRLoader()
+				const texture = (loader as any).createDataTexture(buffer) as ThreeTexture
+				texture.name = `texture:${name}`
+				;(texture as any).colorSpace = SRGBColorSpace
+				texture.needsUpdate = true
+				;(texture as any).anisotropy = 4
+				return downsampleIfNeeded(texture, 2048) as ThreeTexture
+			} catch (e: any) {
+				throw new Error(`HDR/EXR parse failed for "${name}" (${ext} ${mimeType}): ${e.message}`)
+			}
 		}
 		const objectUrl = URL.createObjectURL(
 			new Blob([data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as any], {
 				type: mimeType as any,
 			}),
 		)
-		// revoke after load to avoid leaks handled in load()
-		const texture = await load(mimeType, objectUrl, ext)
-		texture.name = `texture:${name}`
-		texture.colorSpace = SRGBColorSpace
-		texture.needsUpdate = true
-		texture.anisotropy = 4
-		return texture
+		try {
+			const texture = await load(mimeType, objectUrl, ext, data)
+			texture.name = `texture:${name}`
+			texture.colorSpace = SRGBColorSpace
+			texture.needsUpdate = true
+			texture.anisotropy = 4
+			return downsampleIfNeeded(texture, 2048) as ThreeTexture
+		} catch (e: any) {
+			try {
+				URL.revokeObjectURL(objectUrl)
+			} catch {}
+			throw e
+		}
 	}
 }
 
@@ -132,7 +129,45 @@ function getMimeType(data: Uint8Array, ext: string): string | null {
 	return 'image/png'
 }
 
-function load(mimeType: string, url: string, ext?: string): Promise<ThreeTexture> {
+function downsampleIfNeeded(texture: any, maxSize: number): any {
+	try {
+		const img = texture.image
+		if (!img) return texture
+		const w = img.width || img.naturalWidth || texture.image?.width
+		const h = img.height || img.naturalHeight || texture.image?.height
+		if (!w || !h) return texture
+		if (w <= maxSize && h <= maxSize) return texture
+		const scale = Math.min(maxSize / w, maxSize / h)
+		const nw = Math.max(1, Math.floor(w * scale))
+		const nh = Math.max(1, Math.floor(h * scale))
+		if (typeof document !== 'undefined' && typeof document.createElement === 'function') {
+			const canvas = document.createElement('canvas')
+			canvas.width = nw
+			canvas.height = nh
+			const ctx = canvas.getContext('2d')
+			if (ctx && img) {
+				if (
+					img instanceof HTMLImageElement ||
+					img instanceof HTMLCanvasElement ||
+					(typeof ImageBitmap !== 'undefined' && img instanceof ImageBitmap)
+				) {
+					ctx.drawImage(img as any, 0, 0, nw, nh)
+					const newTex = new (texture as any).constructor(canvas) as any
+					if (newTex) {
+						newTex.needsUpdate = true
+						return newTex
+					}
+				} else if (img.data && w && h) {
+					// DataTexture - can't trivially downsample without resampling; return original but mark for GPU
+					return texture
+				}
+			}
+		}
+	} catch {}
+	return texture
+}
+
+function load(mimeType: string, url: string, ext?: string, data?: Uint8Array): Promise<ThreeTexture> {
 	return new Promise((resolve, reject) => {
 		if (
 			mimeType === 'image/png' ||
@@ -145,7 +180,7 @@ function load(mimeType: string, url: string, ext?: string): Promise<ThreeTexture
 				url,
 				(texture) => {
 					URL.revokeObjectURL(url)
-					resolve(texture as any)
+					resolve(downsampleIfNeeded(texture, 2048) as any)
 				},
 				undefined,
 				(err) => {
@@ -154,11 +189,23 @@ function load(mimeType: string, url: string, ext?: string): Promise<ThreeTexture
 				},
 			)
 		} else if (mimeType === 'image/exr' || ext === '.exr') {
+			try {
+				const buffer = data
+					? (data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer)
+					: null
+				if (buffer) {
+					const loader = new EXRLoader()
+					const tex = (loader as any).createDataTexture(buffer) as ThreeTexture
+					URL.revokeObjectURL(url)
+					resolve(downsampleIfNeeded(tex, 2048) as any)
+					return
+				}
+			} catch (e) {}
 			new EXRLoader().load(
 				url,
 				(texture) => {
 					URL.revokeObjectURL(url)
-					resolve(texture as any)
+					resolve(downsampleIfNeeded(texture, 2048) as any)
 				},
 				undefined,
 				(err) => {
@@ -167,11 +214,23 @@ function load(mimeType: string, url: string, ext?: string): Promise<ThreeTexture
 				},
 			)
 		} else {
+			try {
+				const buffer = data
+					? (data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer)
+					: null
+				if (buffer) {
+					const loader = new HDRLoader()
+					const tex = (loader as any).createDataTexture(buffer) as ThreeTexture
+					URL.revokeObjectURL(url)
+					resolve(downsampleIfNeeded(tex, 2048) as any)
+					return
+				}
+			} catch (e) {}
 			new HDRLoader().load(
 				url,
 				(texture) => {
 					URL.revokeObjectURL(url)
-					resolve(texture as any)
+					resolve(downsampleIfNeeded(texture, 2048) as any)
 				},
 				undefined,
 				(err) => {
