@@ -6,31 +6,40 @@ import type { Storage } from '../../io/ole-doc.js'
 import { Vertex2D } from '../../math/vertex2d.js'
 import { ItemData } from '../item-data.js'
 
+const FLOAT_MAP: Record<string, string> = {
+	ROTA: 'rotation',
+	HIGH: 'height',
+	LGTH: 'length',
+	AFRC: 'damping',
+	SMAX: 'angleMax',
+	SMIN: 'angleMin',
+	SELA: 'elasticity',
+}
+const BOOL_MAP: Record<string, string> = { SSUP: 'showBracket', SVIS: 'isVisible' }
+const STRING_MAP: Record<string, string> = { MATR: 'szMaterial', IMGF: 'szImage', SURF: 'szSurface' }
+
 /** Spinner data.
- *
  * @see https://github.com/vpinball/vpinball/blob/master/spinner.cpp */
 export class SpinnerData extends ItemData {
 	public center!: Vertex2D
-	public rotation: number = 0
+	public rotation = 0
 	public szMaterial?: string
-	public showBracket: boolean = true
-	public height: number = 60
-	public length: number = 80
+	public showBracket = true
+	public height = 60
+	public length = 80
 	public damping!: number
-	public angleMax: number = 0
-	public angleMin: number = 0
+	public angleMax = 0
+	public angleMin = 0
 	public elasticity!: number
-	public isVisible: boolean = true
+	public isVisible = true
 	public szImage?: string
 	public szSurface?: string
-
-	// not persisted but settable via API
-	public isReflectionEnabled: boolean = true
+	public isReflectionEnabled = true
 
 	public static async fromStorage(storage: Storage, itemName: string): Promise<SpinnerData> {
-		const spinnerData = new SpinnerData(itemName)
-		await storage.streamFiltered(itemName, 4, BiffParser.stream(spinnerData.fromTag.bind(spinnerData), {}))
-		return spinnerData.correctAngles()
+		const d = new SpinnerData(itemName)
+		await storage.streamFiltered(itemName, 4, BiffParser.stream(d.fromTag.bind(d)))
+		return d.correctAngles()
 	}
 
 	public constructor(itemName: string) {
@@ -38,59 +47,31 @@ export class SpinnerData extends ItemData {
 	}
 
 	private correctAngles(): this {
-		// correct angle inversions
-		const angleMin = Math.min(this.angleMin, this.angleMax)
-		const angleMax = Math.max(this.angleMin, this.angleMax)
-		this.angleMin = angleMin
-		this.angleMax = angleMax
+		const lo = Math.min(this.angleMin, this.angleMax)
+		const hi = Math.max(this.angleMin, this.angleMax)
+		this.angleMin = lo
+		this.angleMax = hi
 		return this
 	}
 
 	private async fromTag(buffer: Uint8Array, tag: string, offset: number, len: number): Promise<number> {
-		switch (tag) {
-			case 'VCEN':
-				this.center = Vertex2D.get(buffer)
-				break
-			case 'ROTA':
-				this.rotation = this.getFloat(buffer)
-				break
-			case 'MATR':
-				this.szMaterial = this.getString(buffer, len)
-				break
-			case 'SSUP':
-				this.showBracket = this.getBool(buffer)
-				break
-			case 'HIGH':
-				this.height = this.getFloat(buffer)
-				break
-			case 'LGTH':
-				this.length = this.getFloat(buffer)
-				break
-			case 'AFRC':
-				this.damping = this.getFloat(buffer)
-				break
-			case 'SMAX':
-				this.angleMax = this.getFloat(buffer)
-				break
-			case 'SMIN':
-				this.angleMin = this.getFloat(buffer)
-				break
-			case 'SELA':
-				this.elasticity = this.getFloat(buffer)
-				break
-			case 'SVIS':
-				this.isVisible = this.getBool(buffer)
-				break
-			case 'IMGF':
-				this.szImage = this.getString(buffer, len)
-				break
-			case 'SURF':
-				this.szSurface = this.getString(buffer, len)
-				break
-			default:
-				this.getCommonBlock(buffer, tag, len)
-				break
+		if (tag === 'VCEN') {
+			this.center = Vertex2D.get(buffer)
+			return 0
 		}
+		if (tag in FLOAT_MAP) {
+			;(this as any)[FLOAT_MAP[tag]] = this.getFloat(buffer)
+			return 0
+		}
+		if (tag in BOOL_MAP) {
+			;(this as any)[BOOL_MAP[tag]] = this.getBool(buffer)
+			return 0
+		}
+		if (tag in STRING_MAP) {
+			;(this as any)[STRING_MAP[tag]] = this.getString(buffer, len)
+			return 0
+		}
+		this.getCommonBlock(buffer, tag, len)
 		return 0
 	}
 }
