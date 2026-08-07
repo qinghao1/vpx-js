@@ -4,7 +4,9 @@
 import { Pool } from '../../util/object-pool.js'
 import { ItemState } from '../item-state.js'
 
-/** Plunger state. */
+/** Plunger state.
+ *
+ * @see https://github.com/vpinball/vpinball/blob/master/plunger.cpp */
 export class PlungerState extends ItemState {
 	public static readonly POOL = new Pool(PlungerState)
 
