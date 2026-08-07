@@ -5,7 +5,6 @@ import { Pool } from '../../util/object-pool.js'
 import { ItemState } from '../item-state.js'
 
 /** Surface state.
- *
  * @see https://github.com/vpinball/vpinball/blob/master/surface.cpp */
 export class SurfaceState extends ItemState {
 	public static readonly POOL = new Pool(SurfaceState)
@@ -99,7 +98,6 @@ export class SurfaceState extends ItemState {
 	}
 
 	public equals(state: SurfaceState): boolean {
-		/* istanbul ignore if: we don't actually pass empty states. */
 		if (!state) {
 			return false
 		}
