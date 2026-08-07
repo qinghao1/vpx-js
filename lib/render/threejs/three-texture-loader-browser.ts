@@ -28,7 +28,8 @@ const imageMap: { [key: string]: string } = {
 	ball: new URL('../../../res/maps/ball.png', import.meta.url).href,
 }
 
-export class ThreeTextureLoaderBrowser implements ITextureLoader<ThreeTexture> {
+export /** ThreeTextureLoaderBrowser. */
+class ThreeTextureLoaderBrowser implements ITextureLoader<ThreeTexture> {
 	public async loadDefaultTexture(name: string, ext: string, fileName: string): Promise<ThreeTexture> {
 		const key = fileName.substr(0, fileName.lastIndexOf('.'))
 		if (!imageMap[key]) {
@@ -171,7 +172,9 @@ function downsampleIfNeeded(texture: any, maxSize: number): any {
 				newTex.type = (texture as any).type || (isFloat ? (texture as any).type : UnsignedByteType)
 				newTex.name = (texture as any).name
 				return newTex
-			} catch { return texture }
+			} catch {
+				return texture
+			}
 		}
 		const w = img.width || (img as any).naturalWidth || texture.image?.width
 		const h = img.height || (img as any).naturalHeight || texture.image?.height
