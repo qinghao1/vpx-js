@@ -57,9 +57,17 @@ export class BiffParser {
 	/** Decompresses a BIFF chunk. */
 	static async decompress(buf: Uint8Array): Promise<Uint8Array> {
 		return new Promise((resolve, reject) => {
-			inflate(buf as any, (err: any, res: any) => {
-				if (err) return reject(err)
-				resolve(res instanceof Uint8Array ? res : new Uint8Array(res.buffer, res.byteOffset, res.byteLength))
+			inflate(buf as unknown as Parameters<typeof inflate>[0], (err: unknown, res: unknown) => {
+				if (err) return reject(err as Error)
+				resolve(
+					res instanceof Uint8Array
+						? res
+						: new Uint8Array(
+								(res as Uint8Array).buffer,
+								(res as Uint8Array).byteOffset,
+								(res as Uint8Array).byteLength,
+							),
+				)
 			})
 		})
 	}
