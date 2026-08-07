@@ -12,11 +12,11 @@ import type { BumperState } from './bumper-state.js'
 
 /** Bumper updater — ring, skirt and material. */
 export class BumperUpdater extends ItemUpdater<BumperState> {
-	private readonly data: BumperData
-
-	constructor(state: BumperState, data: BumperData) {
+	constructor(
+		state: BumperState,
+		private readonly data: BumperData,
+	) {
 		super(state)
-		this.data = data
 	}
 
 	public applyState<NODE, GEOMETRY, POINT_LIGHT>(
