@@ -9,7 +9,8 @@ import type { Table } from '../table/table.js'
 import type { PrimitiveData } from './primitive-data.js'
 import type { PrimitiveState } from './primitive-state.js'
 
-export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
+export /** PrimitiveUpdater. */
+class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 	private readonly data: PrimitiveData
 
 	constructor(data: PrimitiveData, state: PrimitiveState) {
