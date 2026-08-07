@@ -21,26 +21,24 @@ import type { BallMover } from './ball-mover.js'
 import type { BallState } from './ball-state.js'
 import { BallUpdater } from './ball-updater.js'
 
-/** Runtime ball (playable, movable, renderable). */
+/** Runtime ball — playable, movable, and renderable. */
 export class Ball implements IPlayable, IMovable, IRenderable<BallState>, IScriptable<BallApi> {
+	public static idCounter = 0
+
 	public readonly state: BallState
 	public readonly data: BallData
 	public readonly hit: BallHit
+	public id: number
+	public oldVel = new Vertex3D()
+
 	private readonly meshGenerator: BallMeshGenerator
 	private readonly events: EventProxy
 	private readonly api: BallApi
 	private readonly updater: BallUpdater
 
-	public id: number
-
-	/** Ball collision container. */
 	get coll() {
 		return this.hit.coll
 	}
-
-	public static idCounter = 0
-
-	public oldVel: Vertex3D = new Vertex3D()
 
 	constructor(id: number, data: BallData, state: BallState, initialVelocity: Vertex3D, player: Player, table: Table) {
 		this.id = id
@@ -57,32 +55,6 @@ export class Ball implements IPlayable, IMovable, IRenderable<BallState>, IScrip
 		return `Ball${this.id}`
 	}
 
-	public getUpdater(): BallUpdater {
-		return this.updater
-	}
-
-	public async addToScene<NODE, GEOMETRY, POINT_LIGHT>(
-		scene: NODE,
-		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
-		table: Table,
-	): Promise<NODE> {
-		const ballMesh = renderApi.createObjectFromRenderable(this, table, {})
-		const playfield = renderApi.findInGroup(scene, 'playfield')!
-		const ballGroup = renderApi.findInGroup(playfield, 'balls')!
-		renderApi.addChildToParent(ballGroup, ballMesh)
-		return ballMesh
-	}
-
-	public removeFromScene<NODE, GEOMETRY, POINT_LIGHT>(
-		scene: NODE,
-		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
-	): void {
-		const playfield = renderApi.findInGroup(scene, 'playfield')!
-		const ballGroup = renderApi.findInGroup(playfield, 'balls')!
-		const ball = renderApi.findInGroup(ballGroup, this.getName())
-		renderApi.removeFromParent(ballGroup, ball)
-	}
-
 	public getState(): BallState {
 		return this.state
 	}
@@ -91,18 +63,48 @@ export class Ball implements IPlayable, IMovable, IRenderable<BallState>, IScrip
 		return this.hit.getMoverObject()
 	}
 
-	/* istanbul ignore next: never called since there is no ball at player setup */
-	public setupPlayer(): void {
-		// there is no ball yet on player setup
-	}
-
-	/* istanbul ignore next: never called since balls have their own hit collection */
-	public getHitShapes(): HitObject[] {
-		return [this.hit]
+	public getUpdater(): BallUpdater {
+		return this.updater
 	}
 
 	public getApi(): BallApi {
 		return this.api
+	}
+
+	public getHitShapes(): HitObject[] {
+		return [this.hit]
+	}
+
+	public isCollidable(): boolean {
+		return true
+	}
+
+	public setupPlayer(): void {}
+
+	public getEventNames(): string[] {
+		return []
+	}
+
+	public async addToScene<NODE, GEOMETRY, POINT_LIGHT>(
+		scene: NODE,
+		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
+		table: Table,
+	): Promise<NODE> {
+		const mesh = renderApi.createObjectFromRenderable(this, table, {})
+		const playfield = renderApi.findInGroup(scene, 'playfield')!
+		const ballGroup = renderApi.findInGroup(playfield, 'balls')!
+		renderApi.addChildToParent(ballGroup, mesh)
+		return mesh
+	}
+
+	public removeFromScene<NODE, GEOMETRY, POINT_LIGHT>(
+		scene: NODE,
+		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
+	): void {
+		const playfield = renderApi.findInGroup(scene, 'playfield')!
+		const group = renderApi.findInGroup(playfield, 'balls')!
+		const ball = renderApi.findInGroup(group, this.getName())
+		renderApi.removeFromParent(group, ball)
 	}
 
 	public getMeshes<GEOMETRY>(table: Table): Meshes<GEOMETRY> {
@@ -116,21 +118,12 @@ export class Ball implements IPlayable, IMovable, IRenderable<BallState>, IScrip
 		}
 	}
 
-	/* istanbul ignore next: balls have their own collidable treatment */
-	public isCollidable(): boolean {
-		return true
-	}
-
 	private getMaterial(): Material {
-		const material = new Material()
-		material.name = 'ball'
-		material.isMetal = true
-		material.baseColor = 0xffffff
-		material.roughness = 0.8
-		return material
-	}
-
-	public getEventNames(): string[] {
-		return []
+		const m = new Material()
+		m.name = 'ball'
+		m.isMetal = true
+		m.baseColor = 0xffffff
+		m.roughness = 0.8
+		return m
 	}
 }
