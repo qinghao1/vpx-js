@@ -131,7 +131,7 @@ export class SpinnerApi extends ItemApi<SpinnerData> {
 	}
 	get Visible() {
 		return this.state.isVisible
-	} // TODO check if isOpacticyActivated must be true as well
+	}
 	set Visible(v) {
 		this.state.isVisible = v
 	}
@@ -150,11 +150,6 @@ export class SpinnerApi extends ItemApi<SpinnerData> {
 	}
 }
 
-function clampAngleToRad(angle: number, angleMin: number, angleMax: number): number {
-	if (angle > angleMax) {
-		angle = angleMax
-	} else if (angle < angleMin) {
-		angle = angleMin
-	}
-	return degToRad(angle)
+function clampAngleToRad(angle: number, min: number, max: number): number {
+	return degToRad(clamp(angle, min, max))
 }
