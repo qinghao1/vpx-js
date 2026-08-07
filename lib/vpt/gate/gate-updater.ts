@@ -8,13 +8,13 @@ import type { Table } from '../table/table.js'
 import type { GateData } from './gate-data.js'
 import type { GateState } from './gate-state.js'
 
-/** GateUpdater. */
+/** Gate updater — bracket, wire rotation and material. */
 export class GateUpdater extends ItemUpdater<GateState> {
-	private readonly data: GateData
-
-	constructor(data: GateData, state: GateState) {
+	constructor(
+		private readonly data: GateData,
+		state: GateState,
+	) {
 		super(state)
-		this.data = data
 	}
 
 	public applyState<NODE, GEOMETRY, POINT_LIGHT>(
@@ -23,16 +23,11 @@ export class GateUpdater extends ItemUpdater<GateState> {
 		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
 		table: Table,
 	): void {
-		// update local state
 		Object.assign(this.state, state)
-
 		this.applyVisibility(obj, state, renderApi)
 		this.applyMaterial(obj, state.material, undefined, renderApi, table)
-
-		if (state.showBracket !== undefined) {
+		if (state.showBracket !== undefined)
 			renderApi.applyVisibility(state.showBracket, renderApi.findInGroup(obj, `gate.bracket-${state.name}`))
-		}
-
 		if (state.angle !== undefined) {
 			this.applyXRotation(
 				obj,
