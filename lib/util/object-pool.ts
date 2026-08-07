@@ -3,40 +3,39 @@
 
 import { logger } from './logger.js'
 
-/** Poolable ctor with optional reset. */
 export interface IPoolable<T> {
 	new (): T
 	reset?(obj: T): void
 }
 
-/** Simple GC-reducing object pool. */
+/** Tiny GC-reducing pool. */
 export class Pool<T> {
-	private static readonly MAX_SIZE = 100
+	private static readonly MAX = 100
 	private readonly ctor: IPoolable<T>
 	private readonly items: T[] = []
+	private readonly pooled = new WeakSet<object>()
 	private warned = false
 
 	constructor(ctor: IPoolable<T>) {
 		this.ctor = ctor
 	}
 
-	/** Claims an instance or creates a new one. */
+	/** Claims or creates an instance. */
 	get(): T {
 		const obj = this.items.pop() ?? new this.ctor()
-		;(obj as Record<string, unknown>).__pool = true
+		this.pooled.add(obj as object)
 		return obj
 	}
 
-	/** Returns an instance to the pool. */
+	/** Returns an instance. */
 	release(obj: T): void {
-		const o = obj as Record<string, unknown>
-		if (!o.__pool) {
+		if (!this.pooled.has(obj as object)) {
 			logger().warn('Trying to recycle non-pooled %s, aborting.', this.ctor.name)
 			return
 		}
-		if (this.items.length >= Pool.MAX_SIZE) {
+		if (this.items.length >= Pool.MAX) {
 			if (!this.warned) {
-				logger().warn('Pool %s exhausted (%s items), excess will be GC\u2019d.', this.ctor.name, Pool.MAX_SIZE)
+				logger().warn('Pool %s exhausted (%s items), excess will be GC’d.', this.ctor.name, Pool.MAX)
 				this.warned = true
 			}
 			return
