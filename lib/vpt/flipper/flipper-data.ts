@@ -5,8 +5,42 @@ import { BiffParser } from '../../io/biff-parser.js'
 import { registry } from '../../io/global-registry.js'
 import type { Storage } from '../../io/ole-doc.js'
 import { Vertex2D } from '../../util/math.js'
+import { handleBiffTag } from '../biff-helper.js'
 import { ItemData } from '../item-data.js'
 import type { Table } from '../table/table.js'
+
+const FLOAT_MAP: Record<string, string> = {
+	BASR: 'baseRadius',
+	ENDR: 'endRadius',
+	FRTN: 'return',
+	ANGS: 'startAngle',
+	ANGE: 'endAngle',
+	FORC: 'mass',
+	FHGT: 'height',
+	STRG: 'strength',
+	ELAS: 'elasticity',
+	ELFO: 'elasticityFalloff',
+	FRIC: 'friction',
+	RPUP: 'rampUp',
+	SCTR: 'scatter',
+	TODA: 'torqueDamping',
+	TDAA: 'torqueDampingAngle',
+	FRMN: 'flipperRadiusMin',
+	RTHK: 'rubberThickness',
+	RTHF: 'rubberThickness',
+	RHGT: 'rubberHeight',
+	RHGF: 'rubberHeight',
+	RWDT: 'rubberWidth',
+	RWDF: 'rubberWidth',
+}
+const INT_MAP: Record<string, string> = { OVRP: 'overridePhysics' }
+const BOOL_MAP: Record<string, string> = { VSBL: 'isVisible', ENBL: 'isEnabled', REEN: 'isReflectionEnabled' }
+const STRING_MAP: Record<string, string> = {
+	SURF: 'szSurface',
+	MATR: 'szMaterial',
+	RUMA: 'szRubberMaterial',
+	IMAG: 'szImage',
+}
 
 /** Flipper data.
  * @see https://github.com/vpinball/vpinball/blob/master/flipper.cpp */
@@ -82,103 +116,26 @@ export class FlipperData extends ItemData {
 		return !!this.overridePhysics || !!(table.data!.overridePhysicsFlipper && table.data!.overridePhysics)
 	}
 
-	private async fromTag(buffer: Uint8Array, tag: string, offset: number, len: number): Promise<number> {
-		switch (tag) {
-			case 'VCEN':
-				this.center = Vertex2D.get(buffer)
-				break
-			case 'BASR':
-				this.baseRadius = this.getFloat(buffer)
-				break
-			case 'ENDR':
-				this.endRadius = this.getFloat(buffer)
-				break
-			case 'FLPR':
-				this.flipperRadiusMax = this.getFloat(buffer)
-				this.flipperRadius = this.flipperRadiusMax
-				break
-			case 'FRTN':
-				this.return = this.getFloat(buffer)
-				break
-			case 'ANGS':
-				this.startAngle = this.getFloat(buffer)
-				break
-			case 'ANGE':
-				this.endAngle = this.getFloat(buffer)
-				break
-			case 'OVRP':
-				this.overridePhysics = this.getInt(buffer)
-				break
-			case 'FORC':
-				this.mass = this.getFloat(buffer)
-				break
-			case 'SURF':
-				this.szSurface = this.getString(buffer, len)
-				break
-			case 'MATR':
-				this.szMaterial = this.getString(buffer, len)
-				break
-			case 'RUMA':
-				this.szRubberMaterial = this.getString(buffer, len)
-				break
-			case 'RTHK':
-			case 'RTHF':
-				this.rubberThickness = this.getFloat(buffer)
-				break
-			case 'RHGT':
-			case 'RHGF':
-				this.rubberHeight = this.getFloat(buffer)
-				break
-			case 'RWDT':
-			case 'RWDF':
-				this.rubberWidth = this.getFloat(buffer)
-				break
-			case 'FHGT':
-				this.height = this.getFloat(buffer)
-				break
-			case 'STRG':
-				this.strength = this.getFloat(buffer)
-				break
-			case 'ELAS':
-				this.elasticity = this.getFloat(buffer)
-				break
-			case 'ELFO':
-				this.elasticityFalloff = this.getFloat(buffer)
-				break
-			case 'FRIC':
-				this.friction = this.getFloat(buffer)
-				break
-			case 'RPUP':
-				this.rampUp = this.getFloat(buffer)
-				break
-			case 'SCTR':
-				this.scatter = this.getFloat(buffer)
-				break
-			case 'TODA':
-				this.torqueDamping = this.getFloat(buffer)
-				break
-			case 'TDAA':
-				this.torqueDampingAngle = this.getFloat(buffer)
-				break
-			case 'FRMN':
-				this.flipperRadiusMin = this.getFloat(buffer)
-				break
-			case 'VSBL':
-				this.isVisible = this.getBool(buffer)
-				break
-			case 'ENBL':
-				this.isEnabled = this.getBool(buffer)
-				break
-			case 'REEN':
-				this.isReflectionEnabled = this.getBool(buffer)
-				break
-			case 'IMAG':
-				this.szImage = this.getString(buffer, len)
-				break
-			default:
-				this.getCommonBlock(buffer, tag, len)
-				break
+	private async fromTag(buffer: Uint8Array, tag: string, _offset: number, len: number): Promise<number> {
+		if (tag === 'VCEN') {
+			this.center = Vertex2D.get(buffer)
+			return 0
 		}
+		if (tag === 'FLPR') {
+			this.flipperRadiusMax = this.getFloat(buffer)
+			this.flipperRadius = this.flipperRadiusMax
+			return 0
+		}
+		if (
+			handleBiffTag(this as unknown as Record<string, unknown>, this, tag, buffer, len, {
+				float: FLOAT_MAP,
+				int: INT_MAP,
+				bool: BOOL_MAP,
+				string: STRING_MAP,
+			})
+		)
+			return 0
+		this.getCommonBlock(buffer, tag, len)
 		return 0
 	}
 }
