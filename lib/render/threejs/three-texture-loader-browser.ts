@@ -30,7 +30,7 @@ const imageMap: { [key: string]: string } = {
 }
 
 const MAX_REGULAR = 1024
-const MAX_FLOAT = 1024
+const MAX_FLOAT = 512
 
 /** ThreeTextureLoaderBrowser. */
 export class ThreeTextureLoaderBrowser implements ITextureLoader<ThreeTexture> {
