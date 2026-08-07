@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { logger } from '../util/logger.js'
-import { ERR, VbsError } from './stdlib/err.js'
+import { ERR } from './stdlib/err.js'
 import type { Transpiler } from './transpiler.js'
 import { VbsArray } from './vbs-array.js'
 import { VbsUndefined } from './vbs-undefined.js'
@@ -17,172 +17,90 @@ export class VBSHelper {
 		this.transpiler = transpiler
 	}
 
-	/**
-	 * Recursive function to create a multi-dimension array.
-	 */
-	public dim(dimensions: number[], position: number = 0): any[] {
-		const dimension = dimensions && dimensions.length ? dimensions[position] + 1 : 0
-		const array = new VbsArray(new Array(dimension).fill(VBSHelper.UNDEFINED))
-		if (++position < dimensions.length) {
-			for (let index = 0; index < dimension; index++) {
-				array[index] = this.dim(dimensions, position)
-			}
-		}
-		return array as unknown as any[]
+	public dim(dimensions: number[], pos = 0): any[] {
+		const n = dimensions?.length ? dimensions[pos] + 1 : 0
+		const arr = new VbsArray(new Array(n).fill(VBSHelper.UNDEFINED))
+		if (++pos < dimensions.length)
+			for (let i = 0; i < n; i++) (arr as unknown as unknown[])[i] = this.dim(dimensions, pos)
+		return arr as unknown as any[]
 	}
 
-	/**
-	 * Function to re-dimension an array and preserve values if requested.
-	 */
-	public redim(array: any[], dimensions: number[], preserve: boolean = false): any[] {
-		let tmpArray = array
-		for (let index = 0; index < dimensions.length - 1; index++) {
-			const dimension = dimensions[index] + 1
-			if (tmpArray.length !== dimension) {
-				throw new Error('Only last dimension can be changed')
-			}
-			tmpArray = tmpArray[0]
+	public redim(array: any[], dimensions: number[], preserve = false): any[] {
+		let tmp: any = array
+		for (let i = 0; i < dimensions.length - 1; i++) {
+			if (tmp.length !== dimensions[i] + 1) throw new Error('Only last dimension can be changed')
+			tmp = tmp[0]
 		}
-		if (!preserve) {
-			return this.dim(dimensions)
-		}
-		return this.redimResize(array, dimensions)
+		return preserve ? this.redimResize(array as any, dimensions) : (this.dim(dimensions) as any)
 	}
 
-	public transpileInline(vbs: string, filename?: string) {
-		// don't show oneliners in devtools
-		let firstLine = ''
-		if (filename) {
-			firstLine = `//@ sourceURL=game:///${filename}.js\n`
-		} else if (vbs.length > 150) {
-			firstLine = `//@ sourceURL=game:///inline${this.transpileCount++}.js\n`
-		}
-		return firstLine + this.transpiler.transpile(vbs)
+	public transpileInline(vbs: string, filename?: string): string {
+		let prefix = ''
+		if (filename) prefix = `//@ sourceURL=game:///${filename}.js\n`
+		else if (vbs.length > 150) prefix = `//@ sourceURL=game:///inline${this.transpileCount++}.js\n`
+		return prefix + this.transpiler.transpile(vbs)
 	}
 
-	/**
-	 * Recursive helper function to resize a multi-dimension array.
-	 */
-	private redimResize(array: any[], dimensions: number[], position: number = 0): any[] {
-		const dimension = dimensions[position] + 1
-		if (position === dimensions.length - 1) {
-			array.length = dimension
-		}
-		if (++position < dimensions.length) {
-			for (let index = 0; index < dimension; index++) {
-				array[index] = this.redimResize(array[index], dimensions, position)
-			}
-		}
+	private redimResize(array: any[], dimensions: number[], pos = 0): any[] {
+		const n = dimensions[pos] + 1
+		if (pos === dimensions.length - 1) (array as unknown[]).length = n
+		if (++pos < dimensions.length)
+			for (let i = 0; i < n; i++) (array as any)[i] = this.redimResize((array as any)[i], dimensions, pos)
 		return array
 	}
 
-	/**
-	 * Erase helper function to erase a multi-dimension array.
-	 */
 	public erase(array: any[]): any[] {
-		const dimensions = []
+		const dims: number[] = []
+		let cur: any = array
 		for (;;) {
-			dimensions.push(array.length - 1)
-			if (!Array.isArray(array[0])) {
-				break
-			}
-			array = array[0]
+			dims.push(cur.length - 1)
+			if (!Array.isArray(cur[0])) break
+			cur = cur[0]
 		}
-		return this.dim(dimensions)
+		return this.dim(dims)
 	}
 
-	/**
-	 * Integer Division
-	 */
-	public intDiv(value1: number, value2: number): number {
-		return Math.floor(Math.floor(value1) / Math.floor(value2))
+	public intDiv(a: number, b: number): number {
+		return Math.floor(Math.floor(a) / Math.floor(b))
+	}
+	public exponent(b: number, e: number): number {
+		return b ** e
 	}
 
-	/**
-	 * Exponent
-	 */
-	public exponent(base: number, exponent: number): number {
-		return base ** exponent
-	}
-
-	/**
-	 * equals
-	 */
-
-	public equals(value1: any, value2: any): boolean {
-		if (value1 == value2) {
-			return true
-		}
-
-		const undef1 = typeof value1 === 'object' && value1.__isUndefined
-		const undef2 = typeof value2 === 'object' && value2.__isUndefined
-
-		// VbsUndefined == undefined
-		if (undef1 && typeof value2 === 'undefined') {
-			return true
-		}
-
-		// undefined == VbsUndefined
-		if (typeof value1 === 'undefined' && undef2) {
-			return true
-		}
-
-		// VbsUndefined == VbsUndefined
-		if (undef1 && undef2) {
-			return true
-		}
-
-		// '' == VbsUndefined
-		if (undef1 && value2 === '') {
-			return true
-		}
-
-		// VbsUndefined == ''
-		if (value1 === '' && undef2) {
-			return true
-		}
-
+	public equals(a: unknown, b: unknown): boolean {
+		if (a == b) return true
+		const u1 = typeof a === 'object' && (a as any).__isUndefined,
+			u2 = typeof b === 'object' && (b as any).__isUndefined
+		if (u1 && typeof b === 'undefined') return true
+		if (typeof a === 'undefined' && u2) return true
+		if (u1 && u2) return true
+		if (u1 && b === '') return true
+		if (a === '' && u2) return true
 		return false
 	}
 
-	/**
-	 * is
-	 */
-
-	public is(value1: any, value2: any): boolean {
-		return value1 === value2
+	public is(a: unknown, b: unknown): boolean {
+		return a === b
 	}
 
 	public getOrCall(obj: any, ...params: number[]) {
-		if (typeof obj === 'function') {
-			return obj.bind(obj)(...params)
-		}
-		for (const param of params) {
-			obj = obj[param]
-		}
+		if (typeof obj === 'function') return obj.bind(obj)(...params)
+		for (const p of params) obj = obj[p]
 		return obj
 	}
 
 	public getOrCallBound(parent: any, prop: string, ...params: number[]) {
-		let obj = parent[prop]
-		if (typeof obj === 'function') {
-			return obj.bind(parent)(...params)
-		}
-		for (const param of params) {
-			obj = obj[param]
-		}
-		return obj
+		let o: any = parent[prop]
+		if (typeof o === 'function') return o.bind(parent)(...params)
+		for (const p of params) o = o[p]
+		return o
 	}
 
-	public onErrorResumeNext() {
+	public onErrorResumeNext(): void {
 		ERR.OnErrorResumeNext()
 	}
-
-	public onErrorGoto(n: number) {
-		if (n === 0) {
-			ERR.OnErrorGoto0()
-		} else {
-			logger().warn('Cannot go to %s on error...', n)
-		}
+	public onErrorGoto(n: number): void {
+		if (n === 0) ERR.OnErrorGoto0()
+		else logger().warn('Cannot go to %s on error...', n)
 	}
 }
