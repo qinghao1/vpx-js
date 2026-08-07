@@ -29,7 +29,7 @@ import {
 import type { ESIToken } from '../grammar/grammar.js'
 
 /** ppClass. */
-export function ppClass(node: ESIToken): any {
+export function ppClass(node: ESIToken): unknown {
 	switch (node.type) {
 		case 'ClassDeclaration':
 			return ppClassDeclaration(node)
@@ -47,7 +47,7 @@ export function ppClass(node: ESIToken): any {
 	return null
 }
 
-function ppClassDeclaration(node: ESIToken): any {
+function ppClassDeclaration(node: ESIToken): unknown {
 	let id = identifier('undefined')
 	let constructor: MethodDefinition | undefined
 	const methodDefinitions: MethodDefinition[] = []
@@ -121,12 +121,12 @@ function ppClassDeclaration(node: ESIToken): any {
 		},
 	}) as ClassBody
 	if ('value' in body.body[0]) {
-		;(body.body[0] as any).value.body.body.unshift(...varStmts)
+		;(body.body[0] as unknown as { value: { body: { body: unknown[] } } }).value.body.body.unshift(...varStmts)
 	}
 	return classDeclaration(id, body)
 }
 
-function ppConstructorMemberDeclaration(node: ESIToken): any {
+function ppConstructorMemberDeclaration(node: ESIToken): unknown {
 	let block: BlockStatement | undefined
 	for (const child of node.children) {
 		if (child.type === 'Block') {
@@ -140,11 +140,11 @@ function ppConstructorMemberDeclaration(node: ESIToken): any {
 	)
 }
 
-function ppRegularPropertyMemberDeclaration(node: ESIToken): any {
+function ppRegularPropertyMemberDeclaration(node: ESIToken): unknown {
 	return node.children[1].estree
 }
 
-function ppPropertyGetDeclaration(node: ESIToken): any {
+function ppPropertyGetDeclaration(node: ESIToken): unknown {
 	let id: Identifier = identifier('undefined')
 	let params: Identifier[] = []
 	let block: BlockStatement | undefined
@@ -180,7 +180,7 @@ function ppPropertyGetDeclaration(node: ESIToken): any {
 	return methodDefinition(id, 'method', functionExpression(block, params))
 }
 
-function ppPropertyLetDeclaration(node: ESIToken): any {
+function ppPropertyLetDeclaration(node: ESIToken): unknown {
 	let id: Identifier = identifier('undefined')
 	let params: Identifier[] = []
 	let block: BlockStatement | undefined
@@ -200,7 +200,7 @@ function ppPropertyLetDeclaration(node: ESIToken): any {
 	return methodDefinition(id, 'method', functionExpression(block ? block : blockStatement([]), params))
 }
 
-function ppPropertySetDeclaration(node: ESIToken): any {
+function ppPropertySetDeclaration(node: ESIToken): unknown {
 	let id: Identifier = identifier('undefined')
 	let params: Identifier[] = []
 	let block: BlockStatement | undefined
