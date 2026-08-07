@@ -240,6 +240,7 @@ export function progressiveMesh(vert: ProgMeshFloat3[], tri: ProgMeshTriData[]):
 	return [map, permutation]
 }
 
+/** permuteVertices. */
 export function permuteVertices<T>(permutation: number[], vert: T[], tri: ProgMeshTriData[]): void {
 	// rearrange the vertex Array
 	const tmp: T[] = []
