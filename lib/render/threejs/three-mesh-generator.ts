@@ -205,7 +205,7 @@ class ParserObject {
 /** releaseGeometry. */
 export function releaseGeometry(geometry: BufferGeometry) {
 	for (const attrName of Object.keys(geometry.attributes)) {
-		RecyclableFloat32BufferAttribute.release(geometry.attributes[attrName] as any)
+		RecyclableFloat32BufferAttribute.release(geometry.attributes[attrName] as RecyclableFloat32BufferAttribute)
 		delete geometry.attributes[attrName]
 	}
 	ThreeRenderApi.POOL.BufferGeometry.release(geometry)
@@ -227,12 +227,12 @@ class RecyclableFloat32BufferAttribute extends Float32BufferAttribute {
 
 	public set(array: number[], itemSize: number, normalized?: boolean): this {
 		if (this.array.length === array.length) {
-			;(this.array as any).set(array)
+			;(this.array as Float32Array).set(array)
 		} else {
 			this.array = new Float32Array(array)
 		}
 		this.itemSize = itemSize
-		;(this as any).count = array.length / itemSize
+		;(this as unknown as { count: number }).count = array.length / itemSize
 		this.normalized = normalized === true
 
 		this.clearUpdateRanges()
@@ -261,9 +261,7 @@ export class MeshExporter {
 
 	public parse(object: Object3D): Mesh {
 		object.traverse((child) => {
-			if (child instanceof ThreeMesh) {
-				this.parseMesh(child as any)
-			}
+			if (child instanceof ThreeMesh) this.parseMesh(child as ThreeMesh)
 
 			if (child instanceof Line) {
 				//this.parseLine(child);
