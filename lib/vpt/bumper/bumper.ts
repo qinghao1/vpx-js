@@ -61,9 +61,23 @@ export class Bumper
 	public getState(): BumperState {
 		return this.state
 	}
-
 	public isCollidable(): boolean {
 		return this.data.isCollidable
+	}
+	public getApi(): BumperApi {
+		return this.api!
+	}
+	public getEventNames(): string[] {
+		return ['Init', 'Timer', 'Hit']
+	}
+	public getUpdater(): BumperUpdater {
+		return this.updater
+	}
+	public getHitShapes(): HitObject[] {
+		return [this.hit!]
+	}
+	public getAnimation(): BumperAnimation {
+		return this.animation!
 	}
 
 	public setupPlayer(player: Player, table: Table): void {
@@ -74,51 +88,32 @@ export class Bumper
 		this.api = new BumperApi(this.state, this.animation, this.data, this.events, player, table)
 	}
 
-	public getApi(): BumperApi {
-		return this.api!
-	}
-
-	public getEventNames(): string[] {
-		return ['Init', 'Timer', 'Hit']
-	}
-
-	public getUpdater(): BumperUpdater {
-		return this.updater
-	}
-
-	public getHitShapes(): HitObject[] {
-		return [this.hit!]
-	}
-
-	public getAnimation(): BumperAnimation {
-		return this.animation!
-	}
-
 	public getMeshes<GEOMETRY>(table: Table): Meshes<GEOMETRY> {
-		const bumper = this.meshGenerator.getMeshes(table)
+		const m = this.meshGenerator.getMeshes(table)
+		const mat = (name?: string) => table.getMaterial(name)
 		return {
 			base: {
 				isVisible: this.data.isBaseVisible,
-				mesh: bumper.base.transform(Matrix3D.RIGHT_HANDED),
-				material: table.getMaterial(this.data.szBaseMaterial),
+				mesh: m.base.transform(Matrix3D.RIGHT_HANDED),
+				material: mat(this.data.szBaseMaterial),
 				map: Texture.fromFilesystem('bumperbase.png'),
 			},
 			ring: {
 				isVisible: this.data.isRingVisible,
-				mesh: bumper.ring.transform(Matrix3D.RIGHT_HANDED),
-				material: table.getMaterial(this.data.szRingMaterial),
+				mesh: m.ring.transform(Matrix3D.RIGHT_HANDED),
+				material: mat(this.data.szRingMaterial),
 				map: Texture.fromFilesystem('bumperring.png'),
 			},
 			skirt: {
 				isVisible: this.data.isSkirtVisible,
-				mesh: bumper.skirt.transform(Matrix3D.RIGHT_HANDED),
-				material: table.getMaterial(this.data.szSkirtMaterial),
+				mesh: m.skirt.transform(Matrix3D.RIGHT_HANDED),
+				material: mat(this.data.szSkirtMaterial),
 				map: Texture.fromFilesystem('bumperskirt.png'),
 			},
 			cap: {
 				isVisible: this.data.isCapVisible,
-				mesh: bumper.cap.transform(Matrix3D.RIGHT_HANDED),
-				material: table.getMaterial(this.data.szCapMaterial),
+				mesh: m.cap.transform(Matrix3D.RIGHT_HANDED),
+				material: mat(this.data.szCapMaterial),
 				map: Texture.fromFilesystem('bumperCap.png'),
 			},
 		}
