@@ -13,6 +13,7 @@ import {
 import type { ESIToken } from '../grammar/grammar.js'
 import { Transformer } from '../transformer/transformer.js'
 
+/** ppVarDecl. */
 export function ppVarDecl(node: ESIToken): any {
 	switch (node.type) {
 		case 'VariableMemberDeclaration':
