@@ -71,7 +71,7 @@ export class BallHit extends HitObject {
 		return !!this.vpVolObjs
 	}
 
-	public calcHitBBox(): void {
+	public override calcHitBBox(): void {
 		const vl = this.vel.length() + this.data.radius + 0.05
 		const p = this.state.pos
 		this.hitBBox.left = p.x - vl
@@ -88,7 +88,7 @@ export class BallHit extends HitObject {
 		return this.mover
 	}
 
-	public hitTest(ball: Ball, dTime: number, coll: CollisionEvent): number {
+	public override hitTest(ball: Ball, dTime: number, coll: CollisionEvent, _physics?: PlayerPhysics): number {
 		const d = this.state.pos.clone(true).sub(ball.state.pos)
 		const dv = this.vel.clone(true).sub(ball.hit.vel)
 
@@ -164,7 +164,7 @@ export class BallHit extends HitObject {
 		return hitTime
 	}
 
-	public collide(coll: CollisionEvent, physics: PlayerPhysics): void {
+	public override collide(coll: CollisionEvent, physics: PlayerPhysics): void {
 		const ball = coll.ball
 		if (
 			((physics.swapBallCollisionHandling && ball.id >= this.id) ||
