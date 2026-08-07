@@ -103,6 +103,7 @@ export function classDeclaration(id: Identifier, body: ClassBody): ClassDeclarat
 	}
 }
 
+/** classExpression. */
 export function classExpression(body: ClassBody, node?: BaseNode): ClassExpression {
 	return addScope(
 		{
