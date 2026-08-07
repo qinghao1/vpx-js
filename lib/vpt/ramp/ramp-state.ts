@@ -1,14 +1,11 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { Pool } from '../../util/object-pool.js'
 import { ItemState } from '../item-state.js'
 import { omitEqual } from '../state-helpers.js'
 
 /** Ramp state. @see https://github.com/vpinball/vpinball/blob/master/ramp.cpp */
 export class RampState extends ItemState {
-	public static readonly POOL = new Pool(RampState)
-
 	public type?: number
 
 	public heightBottom!: number
@@ -48,7 +45,7 @@ export class RampState extends ItemState {
 		depthBias: number | undefined,
 		isVisible: boolean,
 	): RampState {
-		const state = RampState.POOL.get()
+		const state = new RampState()
 		state.name = name
 		state.heightBottom = heightBottom
 		state.heightTop = heightTop
@@ -109,9 +106,7 @@ export class RampState extends ItemState {
 		return diff
 	}
 
-	public release(): void {
-		RampState.POOL.release(this)
-	}
+	public release(): void {}
 
 	public equals(state: RampState): boolean {
 		if (!state) return false

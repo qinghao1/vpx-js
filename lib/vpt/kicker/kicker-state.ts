@@ -1,7 +1,6 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { Pool } from '../../util/object-pool.js'
 import { Enums } from '../enums.js'
 import { ItemState } from '../item-state.js'
 import { omitEqual } from '../state-helpers.js'
@@ -9,8 +8,6 @@ import { omitEqual } from '../state-helpers.js'
 /** Kicker state — type and material.
  * @see https://github.com/vpinball/vpinball/blob/master/kicker.cpp */
 export class KickerState extends ItemState {
-	public static readonly POOL = new Pool(KickerState)
-
 	public type!: number
 	public material?: string
 
@@ -25,7 +22,7 @@ export class KickerState extends ItemState {
 	}
 
 	public static claim(name: string, type: number, material: string | undefined): KickerState {
-		const s = KickerState.POOL.get()
+		const s = new KickerState()
 		s.name = name
 		s.type = type
 		s.material = material
@@ -43,9 +40,7 @@ export class KickerState extends ItemState {
 		return d
 	}
 
-	public release(): void {
-		KickerState.POOL.release(this)
-	}
+	public release(): void {}
 
 	public equals(state: KickerState): boolean {
 		if (!state) return false

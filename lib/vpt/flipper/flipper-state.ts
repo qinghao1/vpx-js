@@ -2,14 +2,11 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { Vertex2D } from '../../util/math.js'
-import { Pool } from '../../util/object-pool.js'
 import { ItemState } from '../item-state.js'
 
 /** Flipper state — angle and appearance.
  * @see https://github.com/vpinball/vpinball/blob/master/flipper.cpp */
 export class FlipperState extends ItemState {
-	public static readonly POOL = new Pool(FlipperState)
-
 	public angle = 0
 	public center!: Vertex2D
 	public material?: string
@@ -29,7 +26,7 @@ export class FlipperState extends ItemState {
 		texture: string | undefined,
 		rubberMaterial: string | undefined,
 	): FlipperState {
-		const s = FlipperState.POOL.get()
+		const s = new FlipperState()
 		s.name = name
 		s.angle = angle
 		s.center = center
@@ -68,7 +65,6 @@ export class FlipperState extends ItemState {
 
 	public release(): void {
 		if (!this.center) this.center = Vertex2D.claim()
-		FlipperState.POOL.release(this)
 	}
 
 	public equals(state: FlipperState): boolean {

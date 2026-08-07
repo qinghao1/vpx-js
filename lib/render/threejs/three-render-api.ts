@@ -3,7 +3,7 @@
 
 import type { IRenderable, RenderInfo } from '../../game/irenderable.js'
 import {
-	BufferGeometry,
+	type BufferGeometry,
 	Group,
 	Matrix4,
 	type MeshStandardMaterial,
@@ -13,7 +13,6 @@ import {
 } from '../../refs.node.js'
 import { progress } from '../../util/logger.js'
 import type { Matrix3D } from '../../util/math.js'
-import { Pool } from '../../util/object-pool.js'
 import type { ItemState } from '../../vpt/item-state.js'
 import type { LightData } from '../../vpt/light/light-data.js'
 import type { LightState } from '../../vpt/light/light-state.js'
@@ -35,7 +34,6 @@ import { ThreePlayfieldMeshGenerator } from './three-playfield-mesh-generator.js
 export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, PointLight> {
 	public static readonly SCALE = 0.05
 	public static readonly SHADOWS = true
-	public static POOL = { Matrix4: new Pool(Matrix4), BufferGeometry: new Pool(BufferGeometry) }
 
 	private readonly converter: ThreeConverter
 	private readonly meshConvertOpts: MeshConvertOptions
@@ -105,7 +103,7 @@ export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, Poin
 
 	public applyMatrixToNode(matrix: Matrix3D, obj: Object3D): void {
 		if (!obj) return
-		const m4 = ThreeRenderApi.POOL.Matrix4.get()
+		const m4 = new Matrix4()
 		const e = (matrix as unknown as { elements?: number[] }).elements
 		if (e && e.length === 16) {
 			m4.fromArray(e)
@@ -133,7 +131,6 @@ export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, Poin
 		obj.matrix.decompose(obj.position, obj.quaternion, obj.scale)
 		obj.updateMatrix()
 		obj.updateMatrixWorld(true)
-		ThreeRenderApi.POOL.Matrix4.release(m4)
 	}
 
 	public applyVisibility(isVisible: boolean | number, obj: Object3D): void {

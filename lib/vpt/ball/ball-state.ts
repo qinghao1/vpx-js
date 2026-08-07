@@ -2,13 +2,10 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { Matrix2D, Vertex3D } from '../../util/math.js'
-import { Pool } from '../../util/object-pool.js'
 import { ItemState } from '../item-state.js'
 
 /** Ball state — pos/orientation/frozen. @see https://github.com/vpinball/vpinball/blob/master/ball.cpp */
 export class BallState extends ItemState {
-	public static readonly POOL = new Pool(BallState)
-
 	public pos: Vertex3D = Vertex3D.claim()
 	public orientation = Matrix2D.claim()
 	public isFrozen = false
@@ -18,7 +15,7 @@ export class BallState extends ItemState {
 	}
 
 	public static claim(name: string, pos: Vertex3D): BallState {
-		const s = BallState.POOL.get()
+		const s = new BallState()
 		s.name = name
 		s.pos.set(pos)
 		s.isFrozen = false
@@ -49,7 +46,6 @@ export class BallState extends ItemState {
 		if (!this.pos) this.pos = Vertex3D.claim()
 		if (!this.orientation) this.orientation = Matrix2D.claim()
 		else this.orientation.setIdentity()
-		BallState.POOL.release(this)
 	}
 
 	public equals(state: BallState): boolean {

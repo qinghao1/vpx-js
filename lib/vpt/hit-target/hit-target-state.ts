@@ -1,15 +1,12 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { Pool } from '../../util/object-pool.js'
 import { ItemState } from '../item-state.js'
 import { omitEqual } from '../state-helpers.js'
 
 /** Hit target state — drop offset, rotation and appearance.
  * @see https://github.com/vpinball/vpinball/blob/master/hittarget.cpp */
 export class HitTargetState extends ItemState {
-	public static readonly POOL = new Pool(HitTargetState)
-
 	public zOffset = 0
 	public xRotation = 0
 	public material?: string
@@ -27,7 +24,7 @@ export class HitTargetState extends ItemState {
 		texture: string | undefined,
 		isVisible: boolean,
 	): HitTargetState {
-		const s = HitTargetState.POOL.get()
+		const s = new HitTargetState()
 		s.name = name
 		s.zOffset = zOffset
 		s.xRotation = xRotation
@@ -51,9 +48,7 @@ export class HitTargetState extends ItemState {
 		return d
 	}
 
-	public release(): void {
-		HitTargetState.POOL.release(this)
-	}
+	public release(): void {}
 
 	public equals(state: HitTargetState): boolean {
 		if (!state) return false

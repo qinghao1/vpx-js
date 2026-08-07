@@ -3,7 +3,6 @@
 
 import { EventEmitter } from 'events'
 import type { Vertex2D, Vertex3D } from '../util/math.js'
-import { Pool } from '../util/object-pool.js'
 import type { Ball } from '../vpt/ball/ball.js'
 import type { ItemState } from '../vpt/item-state.js'
 import type { Table } from '../vpt/table/table.js'
@@ -190,9 +189,8 @@ export interface IBallCreationPosition {
 	onBallCreated(physics: PlayerPhysics, ball: Ball): void
 }
 
-/** Pooled map of changed item states. */
+/** Map of changed item states. */
 export class ChangedStates<STATE extends ItemState = ItemState> {
-	public static readonly POOL = new Pool(ChangedStates)
 	public changedStates: Record<string, STATE> = {}
 
 	get keys(): string[] {
@@ -203,7 +201,7 @@ export class ChangedStates<STATE extends ItemState = ItemState> {
 	}
 
 	public static claim(): ChangedStates {
-		return ChangedStates.POOL.get()
+		return new ChangedStates()
 	}
 	public setState(name: string, state: STATE): void {
 		this.changedStates[name] = state
@@ -216,6 +214,5 @@ export class ChangedStates<STATE extends ItemState = ItemState> {
 			this.changedStates[k]!.release()
 			delete this.changedStates[k]
 		}
-		ChangedStates.POOL.release(this)
 	}
 }

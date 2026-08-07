@@ -1,7 +1,6 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { Pool } from '../util/object-pool.js'
 import type { Table } from '../vpt/table/table.js'
 import { Event } from './event.js'
 import {
@@ -96,7 +95,6 @@ export class PinInput {
 }
 
 class DirectInputDeviceObjectData {
-	public static readonly POOL = new Pool(DirectInputDeviceObjectData)
 	public dwOfs = 0
 	public dwData = 0
 	public dwTimeStamp = 0
@@ -110,10 +108,8 @@ class DirectInputDeviceObjectData {
 	}
 
 	public static claim(dwOfs: number, dwData: number, dwTimeStamp: number): DirectInputDeviceObjectData {
-		return DirectInputDeviceObjectData.POOL.get().set(dwOfs, dwData, dwTimeStamp)
+		return new DirectInputDeviceObjectData().set(dwOfs, dwData, dwTimeStamp)
 	}
 
-	public static release(...items: DirectInputDeviceObjectData[]): void {
-		for (const item of items) DirectInputDeviceObjectData.POOL.release(item)
-	}
+	public static release(..._items: DirectInputDeviceObjectData[]): void {}
 }
