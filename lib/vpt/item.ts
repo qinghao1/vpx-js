@@ -4,25 +4,19 @@
 import type { EventProxy } from '../game/event-proxy.js'
 import type { ItemData } from './item-data.js'
 
-/**
- * This is the base class of all table items.
- */
+/** Base for all table items. */
 export abstract class Item<DATA extends ItemData> {
 	protected readonly data: DATA
 	protected events?: EventProxy
-
 	protected constructor(data: DATA) {
 		this.data = data
 	}
-
 	public getName(): string {
 		return this.data.getName()
 	}
-
 	public getEventProxy(): EventProxy {
 		return this.events!
 	}
-
 	protected getData(): DATA {
 		return this.data
 	}
