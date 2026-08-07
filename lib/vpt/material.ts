@@ -122,7 +122,8 @@ class SaveMaterial {
 	}
 }
 
-export class SavePhysicsMaterial {
+export /** SavePhysicsMaterial. */
+class SavePhysicsMaterial {
 	public static size = 48
 
 	public name: string
