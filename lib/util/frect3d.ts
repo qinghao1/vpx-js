@@ -4,8 +4,7 @@
 import { FLT_MAX } from './float.js'
 import type { Vertex3D } from './math.js'
 
-/** Axis-aligned 3D bounding box.
- * @see https://github.com/vpinball/vpinball/blob/master/kd.h */
+/** Axis-aligned 3D bounding box. @see https://github.com/vpinball/vpinball/blob/master/kd.h */
 export class FRect3D {
 	left = FLT_MAX
 	top = FLT_MAX
