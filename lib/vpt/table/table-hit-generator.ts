@@ -8,18 +8,12 @@ import { logger } from '../../util/logger.js'
 import { Vertex2D, Vertex3D } from '../../util/math.js'
 import type { TableData } from './table-data.js'
 
-/** Generates table hit shapes. */
+/** Generates table hit shapes. @see https://github.com/vpinball/vpinball/blob/master/table.cpp */
 export class TableHitGenerator {
-	private readonly data: TableData
-
-	constructor(data: TableData) {
-		this.data = data
-	}
+	constructor(private readonly data: TableData) {}
 
 	public generateHitObjects(): HitObject[] {
 		const hitObjects: HitObject[] = []
-
-		// simple outer borders:
 		hitObjects.push(
 			new LineSeg(
 				new Vertex2D(this.data.right, this.data.top),
@@ -28,7 +22,6 @@ export class TableHitGenerator {
 				this.data.glassHeight,
 			),
 		)
-
 		hitObjects.push(
 			new LineSeg(
 				new Vertex2D(this.data.left, this.data.bottom),
@@ -37,7 +30,6 @@ export class TableHitGenerator {
 				this.data.glassHeight,
 			),
 		)
-
 		hitObjects.push(
 			new LineSeg(
 				new Vertex2D(this.data.right, this.data.bottom),
@@ -46,7 +38,6 @@ export class TableHitGenerator {
 				this.data.glassHeight,
 			),
 		)
-
 		hitObjects.push(
 			new LineSeg(
 				new Vertex2D(this.data.left, this.data.top),
@@ -55,8 +46,6 @@ export class TableHitGenerator {
 				this.data.glassHeight,
 			),
 		)
-
-		// glass
 		const rgv3D: Vertex3D[] = [
 			new Vertex3D(this.data.left, this.data.top, this.data.glassHeight),
 			new Vertex3D(this.data.right, this.data.top, this.data.glassHeight),
@@ -66,7 +55,6 @@ export class TableHitGenerator {
 		const ph3dpoly = new Hit3DPoly(rgv3D)
 		ph3dpoly.calcHitBBox()
 		hitObjects.push(ph3dpoly)
-
 		logger().debug('[Player] Playfield hit objects set.', hitObjects)
 		return hitObjects
 	}
