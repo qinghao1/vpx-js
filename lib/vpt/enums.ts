@@ -150,6 +150,7 @@ export class UserDefaultOnOff extends VbsApi {
 	}
 }
 
+/** FXAA settings. */
 export class FXAASettings extends VbsApi {
 	public readonly Defaults = -1
 	public readonly Disabled = 0
