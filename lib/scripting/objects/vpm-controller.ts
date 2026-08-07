@@ -75,6 +75,7 @@ export class VpmController {
 	get GameName(): string {
 		return this.gameName
 	}
+	/** Set GameName. */
 	set GameName(gameName: string) {
 		logger().debug('SET GAMENAME:', gameName)
 		this.gameName = gameName
@@ -97,6 +98,7 @@ export class VpmController {
 	get Pause(): boolean {
 		return this.emulator.getPaused()
 	}
+	/** Set Pause. */
 	set Pause(paused: boolean) {
 		this.emulator.setPaused(paused)
 	}
@@ -126,6 +128,7 @@ export class VpmController {
 	get HandleMechanics(): number {
 		return 0
 	}
+	/** Set HandleMechanics. */
 	set HandleMechanics(mechanicNr: number) {
 		logger().debug('TODO HandleMechanics', mechanicNr)
 	}
@@ -147,60 +150,70 @@ export class VpmController {
 	get SplashInfoLine(): string {
 		return this.splashInfoLine
 	}
+	/** Set SplashInfoLine. */
 	set SplashInfoLine(gameCredits) {
 		this.splashInfoLine = gameCredits
 	}
 	get ShowFrame(): boolean {
 		return false
 	}
+	/** Set ShowFrame. */
 	set ShowFrame(showFrame: boolean) {
 		logger().debug('ShowFrame', showFrame)
 	}
 	get DoubleSize(): boolean {
 		return false
 	}
+	/** Set DoubleSize. */
 	set DoubleSize(doubleSize: boolean) {
 		logger().debug('DoubleSize', doubleSize)
 	}
 	get Antialias(): boolean {
 		return false
 	}
+	/** Set Antialias. */
 	set Antialias(enabled: boolean) {
 		logger().debug('Antialias', enabled)
 	}
 	get BorderSizeX(): number {
 		return 0
 	}
+	/** Set BorderSizeX. */
 	set BorderSizeX(size: number) {
 		logger().debug('BorderSizeX', size)
 	}
 	get BorderSizeY(): number {
 		return 0
 	}
+	/** Set BorderSizeY. */
 	set BorderSizeY(size: number) {
 		logger().debug('BorderSizeY', size)
 	}
 	get WindowPosX(): number {
 		return 0
 	}
+	/** Set WindowPosX. */
 	set WindowPosX(position: number) {
 		logger().debug('WindowPosX', position)
 	}
 	get WindowPosY(): number {
 		return 0
 	}
+	/** Set WindowPosY. */
 	set WindowPosY(position: number) {
 		logger().debug('WindowPosY', position)
 	}
 	get LockDisplay(): boolean {
 		return false
 	}
+	/** Set LockDisplay. */
 	set LockDisplay(locked: boolean) {
 		logger().debug('LockDisplay', locked)
 	}
 	get Hidden(): boolean {
 		return false
 	}
+	/** Set Hidden. */
 	set Hidden(hidden: boolean) {
 		logger().debug('Hidden', hidden)
 	}
@@ -245,18 +258,21 @@ export class VpmController {
 	get ShowDMDOnly(): boolean {
 		return false
 	}
+	/** Set ShowDMDOnly. */
 	set ShowDMDOnly(show: boolean) {
 		logger().debug('ShowDMDOnly', show)
 	}
 	get HandleKeyboard(): boolean {
 		return false
 	}
+	/** Set HandleKeyboard. */
 	set HandleKeyboard(handle: boolean) {
 		logger().debug('HandleKeyboard', handle)
 	}
 	get ShowTitle(): boolean {
 		return false
 	}
+	/** Set ShowTitle. */
 	set ShowTitle(show: boolean) {
 		logger().debug('ShowTitle', show)
 	}
