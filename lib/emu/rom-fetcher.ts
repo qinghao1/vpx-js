@@ -4,86 +4,62 @@
 import { GamelistDB } from 'wpc-emu'
 import { logger } from '../util/logger.js'
 
-/**
- * Functions to fetch a WPC ROM file from VPDB.io
- */
+/** Fetches a WPC ROM from VPDB.io. */
 export async function downloadGameEntry(pinmameGameName: string): Promise<LoadedGameEntry> {
 	const gameEntry = GamelistDB.getByPinmameName(pinmameGameName)
-	if (!gameEntry) {
-		throw new Error('GAME_ENTRY_NOT_FOUND_' + pinmameGameName)
-	}
+	if (!gameEntry) throw new Error('GAME_ENTRY_NOT_FOUND_' + pinmameGameName)
+
 	const url = buildVpdbGameEntryUrl(gameEntry.pinmame.vpdbId || gameEntry.pinmame.id)
 	const jsonData = await downloadFileAsJson(url)
 	if (!Array.isArray(jsonData)) {
 		logger().error('VPDB Fetch failed for url', url)
 		throw new Error('VPDB_INVALID_ANSWER_FOR_' + pinmameGameName)
 	}
-	const result = jsonData.find((vpdbEntry: VpdbGameEntry) => vpdbEntry.id === pinmameGameName)
-	if (!result) {
+	if (!jsonData.find((e: VpdbGameEntry) => e.id === pinmameGameName)) {
 		throw new Error('VPDB_GAME_ENTRY_NOT_FOUND_' + pinmameGameName)
 	}
-	logger().debug(pinmameGameName, 'VPDB RESULT:', jsonData)
-
 	const romSet = findRomSet(jsonData, pinmameGameName)
-	if (!romSet) {
-		throw new Error('VPDB_ROMSET_ENTRY_NOT_FOUND_' + pinmameGameName)
-	}
-	logger().debug(pinmameGameName, 'VPDB romSet:', romSet)
-
+	if (!romSet) throw new Error('VPDB_ROMSET_ENTRY_NOT_FOUND_' + pinmameGameName)
 	const romName = findMainRomFilename(romSet)
-	if (!romName) {
-		throw new Error('VPDB_ROM_TYPE_NOT_FOUND_' + pinmameGameName)
-	}
-	logger().debug(pinmameGameName, 'VPDB romName:', romName)
+	if (!romName) throw new Error('VPDB_ROM_TYPE_NOT_FOUND_' + pinmameGameName)
 
 	const romUrl = buildVpdbGameRomUrl(romSet.file.url, romName)
 	logger().debug('load rom from', romUrl, ', # downloads', romSet.file.counter.downloads)
 	const romFile = await downloadFileAsUint8Array(romUrl)
-	return {
-		wpcDbEntry: gameEntry,
-		romFile,
-	}
+	return { wpcDbEntry: gameEntry, romFile }
 }
 
 function findMainRomFilename(romSet: VpdbGameEntry): string {
-	const vpdbGameRomEntry: VpdbGameRomEntry | undefined = romSet.rom_files.find(
-		(entry: VpdbGameRomEntry) => entry.type === 'main',
-	)
-	if (!vpdbGameRomEntry) {
-		return ''
-	}
-	return vpdbGameRomEntry.filename
+	return romSet.rom_files.find((e: VpdbGameRomEntry) => e.type === 'main')?.filename ?? ''
 }
 
-function findRomSet(availableRomSets: VpdbGameEntry[], pinmameGameName: string): VpdbGameEntry | undefined {
-	return availableRomSets.find((entry: VpdbGameEntry) => entry.id === pinmameGameName)
+function findRomSet(sets: VpdbGameEntry[], name: string): VpdbGameEntry | undefined {
+	return sets.find((e: VpdbGameEntry) => e.id === name)
 }
 
-function buildVpdbGameRomUrl(parentFileUrl: string, romFilename: string): string {
-	return `${parentFileUrl}/${romFilename}`
+function buildVpdbGameRomUrl(parent: string, file: string): string {
+	return `${parent}/${file}`
 }
-
 function buildVpdbGameEntryUrl(id: string): string {
 	return `https://api.vpdb.io/v1/games/${id}/roms/`
 }
 
 async function downloadFileAsJson(url: string): Promise<VpdbGameEntry[]> {
-	const response: Response = await fetch(url)
-	if (!response.ok) {
+	const r = await fetch(url)
+	if (!r.ok) {
 		logger().error('VPDB Fetch JSON failed for url', url)
-		throw new Error('VPDB_FETCH_FAILED_WITH_ERROR_' + response.status)
+		throw new Error('VPDB_FETCH_FAILED_WITH_ERROR_' + r.status)
 	}
-	return response.json()
+	return r.json()
 }
 
 async function downloadFileAsUint8Array(url: string): Promise<Uint8Array> {
-	const response: Response = await fetch(url)
-	if (!response.ok) {
+	const r = await fetch(url)
+	if (!r.ok) {
 		logger().error('VPDB Fetch ROM failed for url', url)
-		throw new Error('VPDB_FETCH_FAILED_WITH_ERROR_' + response.status)
+		throw new Error('VPDB_FETCH_FAILED_WITH_ERROR_' + r.status)
 	}
-	const arrayBuffer = await response.arrayBuffer()
-	return new Uint8Array(arrayBuffer)
+	return new Uint8Array(await r.arrayBuffer())
 }
 
 export interface LoadedGameEntry {
@@ -98,7 +74,6 @@ interface VpdbGameEntry {
 	file: VpdbFileEntry
 	rom_files: VpdbGameRomEntry[]
 }
-
 interface VpdbFileEntry {
 	id: string
 	bytes: number
@@ -108,7 +83,6 @@ interface VpdbFileEntry {
 	name: string
 	url: string
 }
-
 interface VpdbGameRomEntry {
 	bytes: number
 	crc: number
@@ -116,7 +90,6 @@ interface VpdbGameRomEntry {
 	system: string
 	type: string
 }
-
 interface VpdbCounter {
 	downloads: number
 }
