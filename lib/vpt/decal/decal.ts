@@ -10,7 +10,7 @@ import type { Table } from '../table/table.js'
 import { DecalApi } from './decal-api.js'
 import { DecalData } from './decal-data.js'
 
-/** Decal. */
+/** Decal item. */
 export class Decal extends Item<DecalData> implements IScriptable<DecalApi> {
 	private api?: DecalApi
 
