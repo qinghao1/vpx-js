@@ -11,11 +11,11 @@ import type { PrimitiveState } from './primitive-state.js'
 
 /** Primitive updater — syncs state to render node. */
 export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
-	private readonly data: PrimitiveData
-
-	constructor(data: PrimitiveData, state: PrimitiveState) {
+	constructor(
+		private readonly data: PrimitiveData,
+		state: PrimitiveState,
+	) {
 		super(state)
-		this.data = data
 	}
 
 	public applyState<NODE, GEOMETRY, POINT_LIGHT>(
@@ -27,7 +27,6 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 		Object.assign(this.state, state)
 		this.applyVisibility(obj, state, renderApi)
 		this.applyMaterial(obj, state.material, state.map, renderApi, table)
-
 		if (state.position || state.size || state.rotation || state.translation || state.objectRotation) {
 			this.applyTransformation(obj, renderApi, table)
 		}
@@ -38,56 +37,41 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
 		table: Table,
 	): void {
-		const matToOrigin = Matrix3D.claim().setTranslation(
-			-this.data.position.x,
-			-this.data.position.y,
-			this.data.position.z,
+		const d = this.data
+		const s = this.state
+		const toOrigin = Matrix3D.claim().setTranslation(-d.position.x, -d.position.y, d.position.z)
+		const fromOrigin = Matrix3D.claim().setTranslation(d.position.x, d.position.y, -d.position.z)
+		const scale = Matrix3D.claim().setScaling(
+			(s.size?.x ?? d.size.x) / d.size.x,
+			(s.size?.y ?? d.size.y) / d.size.y,
+			(s.size?.z ?? d.size.z) / d.size.z,
 		)
-		const matFromOrigin = Matrix3D.claim().setTranslation(
-			this.data.position.x,
-			this.data.position.y,
-			-this.data.position.z,
+		const scaleZ = Matrix3D.claim().setScaling(1, 1, table.getScaleZ())
+		const trans = Matrix3D.claim().setTranslation(
+			-(d.position.x - (s.position?.x ?? d.position.x)),
+			-(d.position.y - (s.position?.y ?? d.position.y)),
+			d.position.z - (s.position?.z ?? d.position.z),
 		)
-		const scaleMatrix = Matrix3D.claim().setScaling(
-			(this.state.size?.x ?? this.data.size.x) / this.data.size.x,
-			(this.state.size?.y ?? this.data.size.y) / this.data.size.y,
-			(this.state.size?.z ?? this.data.size.z) / this.data.size.z,
+		const rotTrans = Matrix3D.claim().setTranslation(
+			-(d.rotAndTra[3] - (s.translation?.x ?? d.rotAndTra[3])),
+			-(d.rotAndTra[4] - (s.translation?.y ?? d.rotAndTra[4])),
+			d.rotAndTra[5] - (s.translation?.z ?? d.rotAndTra[5]),
 		)
-		const scaleMatrixTable = Matrix3D.claim().setScaling(1, 1, table.getScaleZ())
-		const transMatrix = Matrix3D.claim().setTranslation(
-			-(this.data.position.x - (this.state.position?.x ?? this.data.position.x)),
-			-(this.data.position.y - (this.state.position?.y ?? this.data.position.y)),
-			this.data.position.z - (this.state.position?.z ?? this.data.position.z),
-		)
-		const rotTransMatrix = Matrix3D.claim().setTranslation(
-			-(this.data.rotAndTra[3] - (this.state.translation?.x ?? this.data.rotAndTra[3])),
-			-(this.data.rotAndTra[4] - (this.state.translation?.y ?? this.data.rotAndTra[4])),
-			this.data.rotAndTra[5] - (this.state.translation?.z ?? this.data.rotAndTra[5]),
-		)
-
 		const tmp = Matrix3D.claim()
-		tmp.rotateZMatrix(degToRad(-(this.data.rotAndTra[2] - (this.state.rotation?.z ?? this.data.rotAndTra[2]))))
-		rotTransMatrix.multiply(tmp)
-		tmp.rotateYMatrix(degToRad(this.data.rotAndTra[1] - (this.state.rotation?.y ?? this.data.rotAndTra[1])))
-		rotTransMatrix.multiply(tmp)
-		tmp.rotateXMatrix(degToRad(this.data.rotAndTra[0] - (this.state.rotation?.x ?? this.data.rotAndTra[0])))
-		rotTransMatrix.multiply(tmp)
-
-		tmp.rotateZMatrix(degToRad(-(this.data.rotAndTra[8] - (this.state.objectRotation?.z ?? this.data.rotAndTra[8]))))
-		rotTransMatrix.multiply(tmp)
-		tmp.rotateYMatrix(degToRad(this.data.rotAndTra[7] - (this.state.objectRotation?.y ?? this.data.rotAndTra[7])))
-		rotTransMatrix.multiply(tmp)
-		tmp.rotateXMatrix(degToRad(this.data.rotAndTra[6] - (this.state.objectRotation?.x ?? this.data.rotAndTra[6])))
-		rotTransMatrix.multiply(tmp)
-
-		const matrix = matToOrigin
-			.multiply(scaleMatrix)
-			.multiply(rotTransMatrix)
-			.multiply(transMatrix)
-			.multiply(scaleMatrixTable)
-			.multiply(matFromOrigin)
-
-		renderApi.applyMatrixToNode(matrix, obj)
-		Matrix3D.release(matToOrigin, matFromOrigin, scaleMatrix, transMatrix, rotTransMatrix, tmp)
+		tmp.rotateZMatrix(degToRad(-(d.rotAndTra[2] - (s.rotation?.z ?? d.rotAndTra[2]))))
+		rotTrans.multiply(tmp)
+		tmp.rotateYMatrix(degToRad(d.rotAndTra[1] - (s.rotation?.y ?? d.rotAndTra[1])))
+		rotTrans.multiply(tmp)
+		tmp.rotateXMatrix(degToRad(d.rotAndTra[0] - (s.rotation?.x ?? d.rotAndTra[0])))
+		rotTrans.multiply(tmp)
+		tmp.rotateZMatrix(degToRad(-(d.rotAndTra[8] - (s.objectRotation?.z ?? d.rotAndTra[8]))))
+		rotTrans.multiply(tmp)
+		tmp.rotateYMatrix(degToRad(d.rotAndTra[7] - (s.objectRotation?.y ?? d.rotAndTra[7])))
+		rotTrans.multiply(tmp)
+		tmp.rotateXMatrix(degToRad(d.rotAndTra[6] - (s.objectRotation?.x ?? d.rotAndTra[6])))
+		rotTrans.multiply(tmp)
+		const m = toOrigin.multiply(scale).multiply(rotTrans).multiply(trans).multiply(scaleZ).multiply(fromOrigin)
+		renderApi.applyMatrixToNode(m, obj)
+		Matrix3D.release(toOrigin, fromOrigin, scale, trans, rotTrans, tmp)
 	}
 }
