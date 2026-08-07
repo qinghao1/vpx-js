@@ -1,36 +1,20 @@
-/*
- * VPDB - Virtual Pinball Database
- * Copyright (C) 2019 freezy <freezy@vpdb.io>
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- */
+// Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import type { EventProxy } from '../../game/event-proxy'
-import type { Player } from '../../game/player'
-import { VP_VERSION_MAJOR, VP_VERSION_MINOR, VP_VERSION_REV } from '../../index'
-import { clamp } from '../../math/functions'
+import type { EventProxy } from '../../game/event-proxy.js'
+import type { Player } from '../../game/player.js'
+import { VP_VERSION_MAJOR, VP_VERSION_MINOR, VP_VERSION_REV } from '../../index.js'
+import { clamp } from '../../math/functions.js'
 import {
 	DEFAULT_TABLE_GRAVITY,
 	DEFAULT_TABLE_MAX_SLOPE,
 	DEFAULT_TABLE_MIN_SLOPE,
 	GRAVITYCONST,
-} from '../../physics/constants'
-import { Enums } from '../enums'
-import { dequantizeUnsignedPercent, ItemApi, quantizeUnsignedPercent } from '../item-api'
-import type { Table } from './table'
-import { TableData } from './table-data'
+} from '../../physics/constants.js'
+import { Enums } from '../enums.js'
+import { dequantizeUnsignedPercent, ItemApi, quantizeUnsignedPercent } from '../item-api.js'
+import type { Table } from './table.js'
+import { TableData } from './table-data.js'
 
 export class TableApi extends ItemApi<TableData> {
 	private readonly global3DMaxSeparation = 0.3
