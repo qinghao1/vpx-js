@@ -4,6 +4,7 @@
 import type { MoverObject } from '../physics/mover-object.js'
 import type { IPlayable } from './iplayable.js'
 
+/** Physics mover (1000Hz update). */
 export interface IMovable extends IPlayable {
 	getMover(): MoverObject
 }
