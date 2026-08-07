@@ -28,7 +28,7 @@ export class SpinnerData extends ItemData {
 	public showBracket = true
 	public height = 60
 	public length = 80
-	public damping = 0.987
+	public damping = 0.9879
 	public angleMax = 0
 	public angleMin = 0.3
 	public elasticity = 0.3
