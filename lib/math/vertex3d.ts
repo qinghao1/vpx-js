@@ -55,7 +55,7 @@ export class Vertex3D implements Vertex {
 	}
 
 	/** Creates from plain object. */
-	static from(data: any): Vertex3D {
+	static from(data: Record<string, unknown>): Vertex3D {
 		return Object.assign(new Vertex3D(), data)
 	}
 
