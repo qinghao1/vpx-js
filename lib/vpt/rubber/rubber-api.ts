@@ -9,7 +9,7 @@ import type { Table } from '../table/table.js'
 import type { RubberData } from './rubber-data.js'
 import type { RubberState } from './rubber-state.js'
 
-/** RubberApi. */
+/** Rubber API. */
 export class RubberApi extends ItemApi<RubberData> {
 	private readonly state: RubberState
 	private readonly hits: HitObject[]
