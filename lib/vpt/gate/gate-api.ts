@@ -38,123 +38,144 @@ export class GateApi extends ItemApi<GateData> {
 		this.hitLine = hitLine
 	}
 
+	/** Get Length. */
 	get Length() {
 		return this.data.length
 	}
 	set Length(v) {
 		this.data.length = v
 	}
+	/** Get Height. */
 	get Height() {
 		return this.data.height
 	}
 	set Height(v) {
 		this.data.height = v
 	}
+	/** Get Rotation. */
 	get Rotation() {
 		return this.data.rotation
 	}
 	set Rotation(v) {
 		this.data.rotation = v
 	}
+	/** Get X. */
 	get X() {
 		return this.data.center.x
 	}
 	set X(v) {
 		this.data.center.x = v
 	}
+	/** Get Y. */
 	get Y() {
 		return this.data.center.y
 	}
 	set Y(v) {
 		this.data.center.y = v
 	}
+	/** Get Surface. */
 	get Surface() {
 		return this.data.szSurface
 	}
 	set Surface(v) {
 		this.data.szSurface = v
 	}
+	/** Get Material. */
 	get Material() {
 		return this.state.material
 	}
 	set Material(v) {
 		this.state.material = v
 	}
+	/** Get Open. */
 	get Open() {
 		return this.mover.open
 	}
 	set Open(v) {
 		this.openGate(v)
 	}
+	/** Get Elasticity. */
 	get Elasticity() {
 		return this.data.elasticity
 	}
 	set Elasticity(v) {
 		this.data.elasticity = v
 	}
+	/** Get ShowBracket. */
 	get ShowBracket() {
 		return this.state.showBracket
 	}
 	set ShowBracket(v) {
 		this.state.showBracket = v
 	}
+	/** Get CloseAngle. */
 	get CloseAngle() {
 		return radToDeg(this.mover.angleMin)
 	}
 	set CloseAngle(v) {
 		this.setCloseAngle(v)
 	}
+	/** Get OpenAngle. */
 	get OpenAngle() {
 		return radToDeg(this.mover.angleMax)
 	}
 	set OpenAngle(v) {
 		this.setOpenAngle(v)
 	}
+	/** Get Collidable. */
 	get Collidable() {
 		return this.hitGate.isEnabled
 	}
 	set Collidable(v) {
 		this.setCollidable(v)
 	}
+	/** Get Friction. */
 	get Friction() {
 		return this.mover.friction
 	}
 	set Friction(v) {
 		this.mover.friction = clamp(v, 0.0, 1.0)
 	}
+	/** Get Damping. */
 	get Damping() {
 		return this.mover.damping ** (1.0 / PHYS_FACTOR)
 	}
 	set Damping(v) {
 		this.mover.damping = this.mover.damping = clamp(v, 0, 1) ** PHYS_FACTOR
 	}
+	/** Get GravityFactor. */
 	get GravityFactor() {
 		return this.mover.gravityFactor
 	}
 	set GravityFactor(v) {
 		this.mover.gravityFactor = clamp(v, 0, 1)
 	}
+	/** Get Visible. */
 	get Visible() {
 		return this.state.isVisible
 	}
 	set Visible(v) {
 		this.state.isVisible = v
 	}
+	/** Get TwoWay. */
 	get TwoWay() {
 		return this.data.twoWay
 	}
 	set TwoWay(v) {
 		this.data.twoWay = v
 	}
+	/** Get ReflectionEnabled. */
 	get ReflectionEnabled() {
 		return this.data.isReflectionEnabled
 	}
 	set ReflectionEnabled(v) {
 		this.data.isReflectionEnabled = v
 	}
+	/** Get CurrentAngle. */
 	get CurrentAngle() {
 		return this.state.angle
 	}
+	/** Get DrawStyle. */
 	get DrawStyle() {
 		return this.data.gateType
 	}
