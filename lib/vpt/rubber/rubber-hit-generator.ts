@@ -13,8 +13,8 @@ import type { Table } from '../table/table.js'
 import type { RubberData } from './rubber-data.js'
 import type { RubberMeshGenerator } from './rubber-mesh-generator.js'
 
-export /** Rubber hit generator. */
-class RubberHitGenerator {
+/** Rubber hit generator. */
+export class RubberHitGenerator {
 	private readonly data: RubberData
 	private readonly meshGenerator: RubberMeshGenerator
 
