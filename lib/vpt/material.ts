@@ -16,54 +16,23 @@ export class Material {
 	 */
 	public wrapLighting?: number
 
-	/**
-	 * Roughness seems to be mapped to the "specular" exponent.
-	 *
-	 * Comment when importing:
-	 *
-	 * > normally a wavefront material specular exponent ranges from 0..1000.
-	 * > but our shininess calculation differs from the way how e.g. Blender is calculating the specular exponent
-	 * > starting from 0.5 and use only half of the exponent resolution to get a similar look
-	 *
-	 * Then the roughness is converted like this:
-	 * > mat->m_fRoughness = 0.5f + (tmp / 2000.0f);
-	 *
-	 * When sending to the render device, the roughness is defined like that:
-	 * > fRoughness = exp2f(10.0f * mat->m_fRoughness + 1.0f); // map from 0..1 to 2..2048
-	 *
-	 */
+	/** Roughness (0..1, maps to 2..2048 exponent). */
 	public roughness: number = 0.0
-	/**
-	 * Use image also for the glossy layer (0(no tinting at all)..1(use image)),
-	 * stupid quantization because of legacy loading/saving
-	 */
+	/** Glossy image lerp (0..1). */
 	public glossyImageLerp: number = 1.0
-	/**
-	 * Thickness for transparent materials (0(paper thin)..1(maximum)),
-	 * stupid quantization because of legacy loading/saving
-	 */
+	/** Thickness (0..1). */
 	public thickness: number = 0.05
-	/**
-	 * Edge weight/brightness for glossy and clearcoat (0(dark edges)..1(full fresnel))
-	 */
+	/** Edge weight (0..1). */
 	public edge: number = 1.0
 	public edgeAlpha: number = 1.0
 	public opacity: number = 1.0
-	/**
-	 * Can be overridden by texture on object itself
-	 */
+	/** Base color (overridable by texture). */
 	public baseColor: number = 0xb469ff
-	/**
-	 * Specular of glossy layer
-	 */
+	/** Glossiness. */
 	public glossiness: number = 0.0
-	/**
-	 * Specular of clearcoat layer
-	 */
+	/** Clearcoat. */
 	public clearCoat: number = 0.0
-	/**
-	 * Is a metal material or not
-	 */
+	/** Is metal. */
 	public isMetal: boolean = false
 	public isOpacityActive: boolean = false
 
