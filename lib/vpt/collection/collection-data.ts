@@ -5,19 +5,20 @@ import { BiffParser } from '../../io/biff-parser.js'
 import type { Storage } from '../../io/ole-doc.js'
 import { ItemData } from '../item-data.js'
 
+const BOOL_MAP: Record<string, string> = { EVNT: 'fireEvents', SSNG: 'stopSingleEvents', GREL: 'groupElements' }
+
 /** Collection data.
- *
  * @see https://github.com/vpinball/vpinball/blob/master/collection.cpp */
 export class CollectionData extends ItemData {
 	public itemNames: string[] = []
-	public fireEvents: boolean = false
-	public groupElements: boolean = true
-	public stopSingleEvents: boolean = false
+	public fireEvents = false
+	public groupElements = true
+	public stopSingleEvents = false
 
 	public static async fromStorage(storage: Storage, itemName: string): Promise<CollectionData> {
-		const collectionData = new CollectionData(itemName)
-		await storage.streamFiltered(itemName, 0, BiffParser.stream(collectionData.fromTag.bind(collectionData), {}))
-		return collectionData
+		const d = new CollectionData(itemName)
+		await storage.streamFiltered(itemName, 0, BiffParser.stream(d.fromTag.bind(d)))
+		return d
 	}
 
 	private constructor(itemName: string) {
@@ -25,23 +26,15 @@ export class CollectionData extends ItemData {
 	}
 
 	private async fromTag(buffer: Uint8Array, tag: string, offset: number, len: number): Promise<number> {
-		switch (tag) {
-			case 'EVNT':
-				this.fireEvents = this.getBool(buffer)
-				break
-			case 'SSNG':
-				this.stopSingleEvents = this.getBool(buffer)
-				break
-			case 'GREL':
-				this.groupElements = this.getBool(buffer)
-				break
-			case 'ITEM':
-				this.itemNames.push(this.getWideString(buffer, len))
-				break
-			default:
-				this.getCommonBlock(buffer, tag, len)
-				break
+		if (tag === 'ITEM') {
+			this.itemNames.push(this.getWideString(buffer, len))
+			return 0
 		}
+		if (tag in BOOL_MAP) {
+			;(this as any)[BOOL_MAP[tag]] = this.getBool(buffer)
+			return 0
+		}
+		this.getCommonBlock(buffer, tag, len)
 		return 0
 	}
 }
