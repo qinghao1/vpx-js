@@ -6,6 +6,7 @@ import type { Storage } from '../../io/ole-doc.js'
 import { Vertex3D } from '../../util/math.js'
 import { Vertex3DNoTex2 } from '../../util/vertex.js'
 import { FrameData } from '../animation.js'
+import { handleBiffTag } from '../biff-helper.js'
 import { type IPhysicalData, ItemData } from '../item-data.js'
 import { Mesh } from '../mesh.js'
 
@@ -111,18 +112,14 @@ export class PrimitiveData extends ItemData implements IPhysicalData {
 			this.rotAndTra[idx] = this.getFloat(buffer)
 			return 0
 		}
-		if (tag in FLOAT_MAP) {
-			;(this as unknown as Record<string, unknown>)[FLOAT_MAP[tag]] = this.getFloat(buffer)
+		if (
+			handleBiffTag(this as unknown as Record<string, unknown>, this, tag, buffer, len, {
+				float: FLOAT_MAP,
+				bool: BOOL_MAP,
+				string: STRING_MAP,
+			})
+		)
 			return 0
-		}
-		if (tag in BOOL_MAP) {
-			;(this as unknown as Record<string, unknown>)[BOOL_MAP[tag]] = this.getBool(buffer)
-			return 0
-		}
-		if (tag in STRING_MAP) {
-			;(this as unknown as Record<string, unknown>)[STRING_MAP[tag]] = this.getString(buffer, len)
-			return 0
-		}
 		switch (tag) {
 			case 'VPOS':
 				this.position = Vertex3D.get(buffer)
