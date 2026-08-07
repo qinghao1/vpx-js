@@ -6,19 +6,16 @@ import type { Storage } from '../../io/ole-doc.js'
 import { Vertex2D } from '../../math/vertex2d.js'
 import { ItemData } from '../item-data.js'
 
-/**
- * VPinball's timers.
- *
- * @see https://github.com/vpinball/vpinball/blob/master/timer.cpp
- */
+/** VPinball timer.
+ * @see https://github.com/vpinball/vpinball/blob/master/timer.cpp */
 export class TimerData extends ItemData {
 	public vCenter!: Vertex2D
 	private isBackglass!: boolean
 
 	public static async fromStorage(storage: Storage, itemName: string): Promise<TimerData> {
-		const timerItem = new TimerData(itemName)
-		await storage.streamFiltered(itemName, 4, BiffParser.stream(timerItem.fromTag.bind(timerItem), {}))
-		return timerItem
+		const d = new TimerData(itemName)
+		await storage.streamFiltered(itemName, 4, BiffParser.stream(d.fromTag.bind(d)))
+		return d
 	}
 
 	private constructor(itemName: string) {
@@ -30,17 +27,15 @@ export class TimerData extends ItemData {
 	}
 
 	private async fromTag(buffer: Uint8Array, tag: string, offset: number, len: number): Promise<number> {
-		switch (tag) {
-			case 'VCEN':
-				this.vCenter = Vertex2D.get(buffer)
-				break
-			case 'BGLS':
-				this.isBackglass = this.getBool(buffer)
-				break
-			default:
-				this.getCommonBlock(buffer, tag, len)
-				break
+		if (tag === 'VCEN') {
+			this.vCenter = Vertex2D.get(buffer)
+			return 0
 		}
+		if (tag === 'BGLS') {
+			this.isBackglass = this.getBool(buffer)
+			return 0
+		}
+		this.getCommonBlock(buffer, tag, len)
 		return 0
 	}
 }
