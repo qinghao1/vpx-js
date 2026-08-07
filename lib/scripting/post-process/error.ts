@@ -6,6 +6,7 @@ import { callExpression, expressionStatement, identifier, literal, memberExpress
 import type { ESIToken } from '../grammar/grammar.js'
 import { Transformer } from '../transformer/transformer.js'
 
+/** ppError. */
 export function ppError(node: ESIToken): any {
 	switch (node.type) {
 		case 'OnErrorStatement':
