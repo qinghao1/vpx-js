@@ -7,9 +7,7 @@ import { ItemApi } from '../item-api.js'
 import type { Table } from '../table/table.js'
 import type { TimerData } from './timer-data.js'
 
-/** Timer API.
- *
- * @see https://github.com/vpinball/vpinball/blob/master/timer.cpp */
+/** Timer API — VBS surface for `Timer`. @see https://github.com/vpinball/vpinball/blob/master/timer.cpp */
 export class TimerApi extends ItemApi<TimerData> {
 	constructor(data: TimerData, events: EventProxy, player: Player, table: Table) {
 		super(data, events, player, table)
