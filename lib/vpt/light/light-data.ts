@@ -114,10 +114,8 @@ export class LightData extends ItemData {
 
 	public isSurfaceLight(table: Table): boolean {
 		if (!this.szOffImage || this.bulbLight) return false
-		if (table.getPlayfieldMap()?.toLowerCase() === this.szOffImage.toLowerCase() && this.dragPoints.length > 2)
-			return true
-		if (Object.values(table.surfaces).some((s) => s.image === this.szOffImage)) return true
-		return Object.values(table.lights).filter((l) => l.offImage === this.szOffImage).length > 3
+		if (table.getPlayfieldMap()?.toLowerCase() === this.szOffImage.toLowerCase()) return true
+		return Object.values(table.surfaces).some((s) => s.image?.toLowerCase() === this.szOffImage.toLowerCase())
 	}
 
 	private async fromTag(buffer: Uint8Array, tag: string, _offset: number, len: number): Promise<number> {
