@@ -3,84 +3,67 @@
 
 import { logger } from './logger.js'
 
+/** Simple object pool to reduce GC in hot paths. */
 export class Pool<T> {
-	private static DEBUG = 0 // globally enable debug prints
+	private static DEBUG = 0
 	private static TRACE = false
 	private static MAX_POOL_SIZE = 100
 
-	private readonly pool: T[]
+	private readonly pool: T[] = []
 	private readonly poolable: IPoolable<T>
 	private warned = false
 
-	private debugging?: any
+	private debugging?: ReturnType<typeof setInterval>
 	private recycled = 0
 	private created = 0
 	private released = 0
 	private skipped = 0
-	private claimed: { [key: string]: number } = {}
-	private unclaimed: { [key: string]: number } = {}
+	private claimed: Record<string, number> = {}
+	private unclaimed: Record<string, number> = {}
 
 	constructor(poolable: IPoolable<T>) {
-		this.pool = []
 		this.poolable = poolable
-		/* istanbul ignore next: only needed for debugging */
-		if (Pool.DEBUG > 0) {
-			this.setupDebug(Pool.DEBUG)
-		}
+		/* istanbul ignore next */
+		if (Pool.DEBUG > 0) this.setupDebug(Pool.DEBUG)
 	}
 
-	public get(): T {
+	/** Gets an instance from the pool or creates a new one. */
+	get(): T {
 		let caller = ''
-		let obj: any
-		/* istanbul ignore next: only needed for debugging */
+		/* istanbul ignore next */
 		if (this.debugging && Pool.TRACE) {
 			caller = new Error().stack!.split('\n')[3].trim()
-			if (!this.claimed[caller]) {
-				this.claimed[caller] = 0
-			}
-			this.claimed[caller]++
+			this.claimed[caller] = (this.claimed[caller] ?? 0) + 1
 		}
 
+		let obj: any
 		if (this.pool.length) {
-			// something left in pool?
 			this.recycled++
-			obj = this.pool.splice(0, 1)[0]
+			obj = this.pool.shift()!
 		} else {
-			// if not, instantiate.
-			if (this.pool.length < Pool.MAX_POOL_SIZE) {
-				this.warned = false
-			}
+			if (this.pool.length < Pool.MAX_POOL_SIZE) this.warned = false
 			this.created++
-			obj = new this.poolable() as any
+			obj = new (this.poolable as any)()
 		}
 
-		/* istanbul ignore next: only set when debugging */
-		if (caller) {
-			// update meta props
-			obj.__caller = caller
-		} else if (obj._caller) {
-			delete obj._caller
-		}
+		/* istanbul ignore next */
+		if (caller) obj.__caller = caller
+		else if (obj._caller) delete obj._caller
 		obj.__pool = true
 		return obj
 	}
 
-	public release(o: T): void {
+	/** Returns an object to the pool. */
+	release(o: T): void {
 		const obj = o as any
-		/* istanbul ignore next: only needed for debugging */
+		/* istanbul ignore next */
 		if (obj.__caller) {
-			const caller = obj.__caller
+			const caller: string = obj.__caller
 			delete obj.__caller
-			if (!this.claimed[caller]) {
-				if (!this.unclaimed[caller]) {
-					this.unclaimed[caller] = 0
-				}
-				this.unclaimed[caller]++
-			} else {
+			if (!this.claimed[caller]) this.unclaimed[caller] = (this.unclaimed[caller] ?? 0) + 1
+			else {
 				this.claimed[caller]--
-				if (this.claimed[caller] === 0) {
-					delete this.claimed[caller]
-				}
+				if (this.claimed[caller] === 0) delete this.claimed[caller]
 			}
 		}
 		if (!obj.__pool) {
@@ -88,7 +71,7 @@ export class Pool<T> {
 			logger().warn('Trying to recycle non-claimed %s, aborting.', this.poolable.name)
 			return
 		}
-		/* istanbul ignore next: not supposed to happen! */
+		/* istanbul ignore next */
 		if (this.pool.length >= Pool.MAX_POOL_SIZE) {
 			if (!this.warned) {
 				logger().warn(
@@ -101,15 +84,13 @@ export class Pool<T> {
 			this.skipped++
 			return
 		}
-		if (this.poolable.reset) {
-			this.poolable.reset(o)
-		}
+		this.poolable.reset?.(o)
 		this.released++
 		this.pool.push(o)
 	}
 
-	/* istanbul ignore next: only needed for debugging */
-	public enableDebug(interval = 10000): this {
+	/* istanbul ignore next */
+	enableDebug(interval = 10_000): this {
 		if (Pool.DEBUG <= 0 && interval > 0 && !this.debugging) {
 			logger().debug('[Pool] %s: Debug enabled.', this.poolable.name)
 			this.setupDebug(interval)
@@ -117,8 +98,8 @@ export class Pool<T> {
 		return this
 	}
 
-	/* istanbul ignore next: only needed for debugging */
-	private setupDebug(interval: number) {
+	/* istanbul ignore next */
+	private setupDebug(interval: number): void {
 		this.debugging = setInterval(() => {
 			logger().debug(
 				'[Pool] %s: %s recycled, %s created, %s released, %s skipped (%s%)',
@@ -129,35 +110,21 @@ export class Pool<T> {
 				this.skipped,
 				Math.floor((this.recycled / (this.recycled + this.created)) * 100000) / 1000,
 			)
-
 			if (Pool.TRACE) {
-				for (const caller of Object.keys(this.claimed)) {
-					logger().debug('[Pool] %s: Unreleased: %d %s', this.poolable.name, this.claimed[caller], caller)
-				}
-				for (const caller of Object.keys(this.unclaimed)) {
-					logger().debug(
-						'[Pool] %s: Released without claimed: %d %s',
-						this.poolable.name,
-						this.unclaimed[caller],
-						caller,
-					)
-				}
+				for (const [caller, count] of Object.entries(this.claimed))
+					logger().debug('[Pool] %s: Unreleased: %d %s', this.poolable.name, count, caller)
+				for (const [caller, count] of Object.entries(this.unclaimed))
+					logger().debug('[Pool] %s: Released without claimed: %d %s', this.poolable.name, count, caller)
 			}
-
-			this.recycled = 0
-			this.created = 0
-			this.released = 0
-			this.skipped = 0
+			this.recycled = this.created = this.released = this.skipped = 0
 			this.claimed = {}
 			this.unclaimed = {}
 		}, interval)
 	}
 }
 
+/** Poolable constructor with optional reset hook. */
 export interface IPoolable<T> {
-	// constructor
 	new (): T
-
-	// static
 	reset?(obj: T): void
 }
