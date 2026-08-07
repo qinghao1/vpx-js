@@ -8,15 +8,9 @@ import { RenderVertex, Vertex2D } from './vertex2d.js'
 
 /** Helper for rubber/wall splines. */
 export class SplineVertex {
-	/** number of vertices for the central curve */
 	public pcvertex!: number
-
-	/** true if i-th vertex corresponds to a control point */
 	public ppfCross: boolean[] = []
-
-	/** vertices forming the 2D outline of the ramp */
 	public pMiddlePoints: Vertex2D[] = []
-
 	public rgvLocal: Vertex2D[] = []
 
 	public static getInstance(
@@ -28,87 +22,55 @@ export class SplineVertex {
 	): SplineVertex {
 		const v = new SplineVertex()
 		const vvertex = SplineVertex.getCentralCurve(dragPoints, tableDetailLevel, accuracy, staticRendering)
+		const n = vvertex.length
 
-		const cvertex = vvertex.length
+		for (let i = 0; i < n; i++) {
+			const prev = vvertex[i > 0 ? i - 1 : n - 1]
+			const next = vvertex[i < n - 1 ? i + 1 : 0]
+			const mid = vvertex[i]
+			v.ppfCross[i] = mid.fControlPoint
 
-		for (let i = 0; i < cvertex; i++) {
-			// prev and next wrap around as rubbers always loop
-			const vprev = vvertex[i > 0 ? i - 1 : cvertex - 1]
-			const vnext = vvertex[i < cvertex - 1 ? i + 1 : 0]
-			const vmiddle = vvertex[i]
+			let normal: Vertex2D
+			const n1 = new Vertex2D(prev.y - mid.y, mid.x - prev.x)
+			const n2 = new Vertex2D(mid.y - next.y, next.x - mid.x)
 
-			v.ppfCross[i] = vmiddle.fControlPoint
-
-			let vNormal: Vertex2D
-
-			// Get normal at this point
-			// Notice that these values equal the ones in the line
-			// equation and could probably be substituted by them.
-			const v1Normal = new Vertex2D(vprev.y - vmiddle.y, vmiddle.x - vprev.x) // vector vmiddle-vprev rotated RIGHT
-			const v2Normal = new Vertex2D(vmiddle.y - vnext.y, vnext.x - vmiddle.x) // vector vnext-vmiddle rotated RIGHT
-
-			// not needed special start/end handling as rubbers always loop, except for the case where there are only 2 control points
-			if (cvertex === 2 && i === cvertex - 1) {
-				v1Normal.normalize()
-				vNormal = v1Normal
-			} else if (cvertex === 2 && i === 0) {
-				v2Normal.normalize()
-				vNormal = v2Normal
+			if (n === 2 && i === n - 1) {
+				n1.normalize()
+				normal = n1
+			} else if (n === 2 && i === 0) {
+				n2.normalize()
+				normal = n2
 			} else {
-				v1Normal.normalize()
-				v2Normal.normalize()
-
-				if (Math.abs(v1Normal.x - v2Normal.x) < 0.0001 && Math.abs(v1Normal.y - v2Normal.y) < 0.0001) {
-					// Two parallel segments
-					vNormal = v1Normal
-				} else {
-					// Find intersection of the two edges meeting this points, but
-					// shift those lines outwards along their normals
-
-					// First line
-					const A = f4(vprev.y - vmiddle.y)
-					const B = f4(vmiddle.x - vprev.x)
-
-					// Shift line along the normal
-					const C = f4(f4(A * f4(v1Normal.x - vprev.x)) + f4(B * f4(v1Normal.y - vprev.y)))
-
-					// Second line
-					const D = f4(vnext.y - vmiddle.y)
-					const E = f4(vmiddle.x - vnext.x)
-
-					// Shift line along the normal
-					const F = f4(f4(D * f4(v2Normal.x - vnext.x)) + f4(E * f4(v2Normal.y - vnext.y)))
-
+				n1.normalize()
+				n2.normalize()
+				if (Math.abs(n1.x - n2.x) < 0.0001 && Math.abs(n1.y - n2.y) < 0.0001) normal = n1
+				else {
+					const A = f4(prev.y - mid.y),
+						B = f4(mid.x - prev.x)
+					const C = f4(f4(A * f4(n1.x - prev.x)) + f4(B * f4(n1.y - prev.y)))
+					const D = f4(next.y - mid.y),
+						E = f4(mid.x - next.x)
+					const F = f4(f4(D * f4(n2.x - next.x)) + f4(E * f4(n2.y - next.y)))
 					const det = f4(f4(A * E) - f4(B * D))
-					const invDet = det !== 0.0 ? f4(1.0 / det) : 0.0
-
-					const intersectX = f4(f4(f4(B * F) - f4(E * C)) * invDet)
-					const intersectY = f4(f4(f4(C * D) - f4(A * F)) * invDet)
-
-					vNormal = new Vertex2D(vmiddle.x - intersectX, vmiddle.y - intersectY)
+					const invDet = det !== 0 ? f4(1 / det) : 0
+					const ix = f4(f4(f4(B * F) - f4(E * C)) * invDet)
+					const iy = f4(f4(f4(C * D) - f4(A * F)) * invDet)
+					normal = new Vertex2D(mid.x - ix, mid.y - iy)
 				}
 			}
 
-			const widthcur = thickness
-
-			v.pMiddlePoints[i] = vmiddle
-
-			// vmiddle + (widthcur * 0.5) * vnormal;
-			v.rgvLocal[i] = vmiddle.clone().add(vNormal.clone().multiplyScalar(widthcur * 0.5))
-
-			//vmiddle - (widthcur*0.5f) * vnormal;
-			v.rgvLocal[(cvertex + 1) * 2 - i - 1] = vmiddle.clone().sub(vNormal.clone().multiplyScalar(widthcur * 0.5))
-
+			v.pMiddlePoints[i] = mid
+			const half = normal.clone().multiplyScalar(thickness * 0.5)
+			v.rgvLocal[i] = mid.clone().add(half)
+			v.rgvLocal[(n + 1) * 2 - i - 1] = mid.clone().sub(half)
 			if (i === 0) {
-				v.rgvLocal[cvertex] = v.rgvLocal[0]
-				v.rgvLocal[(cvertex + 1) * 2 - cvertex - 1] = v.rgvLocal[(cvertex + 1) * 2 - 1]
+				v.rgvLocal[n] = v.rgvLocal[0]
+				v.rgvLocal[(n + 1) * 2 - n - 1] = v.rgvLocal[(n + 1) * 2 - 1]
 			}
 		}
-
-		v.ppfCross[cvertex] = vvertex[0].fControlPoint
-		v.pMiddlePoints[cvertex] = v.pMiddlePoints[0]
-		v.pcvertex = cvertex + 1
-
+		v.ppfCross[n] = vvertex[0].fControlPoint
+		v.pMiddlePoints[n] = v.pMiddlePoints[0]
+		v.pcvertex = n + 1
 		return v
 	}
 
@@ -119,19 +81,11 @@ export class SplineVertex {
 		staticRendering = true,
 	): RenderVertex[] {
 		let accuracy: number
-
-		// as solid rubbers are rendered into the static buffer, always use maximum precision
-		if (acc !== -1.0) {
-			accuracy = acc // used for hit shape calculation, always!
-		} else {
-			if (staticRendering) {
-				accuracy = 10.0
-			} else {
-				accuracy = tableDetailLevel
-			}
-			accuracy = 4.0 * 10.0 ** ((10.0 - accuracy) * (1.0 / 1.5)) // min = 4 (highest accuracy/detail level), max = 4 * 10^(10/1.5) = ~18.000.000 (lowest accuracy/detail level)
+		if (acc !== -1) accuracy = acc
+		else {
+			accuracy = staticRendering ? 10 : tableDetailLevel
+			accuracy = 4 * 10 ** ((10 - accuracy) * (1 / 1.5))
 		}
-		// FIXME as any
 		return DragPoint.getRgVertex<RenderVertex>(
 			dragPoints,
 			() => new RenderVertex(),
