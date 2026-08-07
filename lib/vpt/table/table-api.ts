@@ -16,7 +16,7 @@ import { dequantizeUnsignedPercent, ItemApi, quantizeUnsignedPercent } from '../
 import type { Table } from './table.js'
 import { TableData } from './table-data.js'
 
-/** TableApi. */
+/** Table API. */
 export class TableApi extends ItemApi<TableData> {
 	private readonly global3DMaxSeparation = 0.3
 	private readonly global3DZPD = 0.5
