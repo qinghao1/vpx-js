@@ -6,9 +6,10 @@ import type { Vertex2D, Vertex3D } from './math.js'
 import { RenderVertex, RenderVertex3D } from './render-vertex.js'
 import type { IRenderVertex, Vertex } from './vertex.js'
 
-/** Non-uniform centripetal Catmull-Rom spline. @see https://github.com/vpinball/vpinball/blob/master/mesh.h */
+/** Non-uniform centripetal Catmull-Rom spline.
+ * @see https://github.com/vpinball/vpinball/blob/master/mesh.h */
 export abstract class CatmullCurve {
-	/** Evaluate at t ∈ [0,1]. */
+	/** Evaluate at `t` ∈ [0,1]. */
 	abstract getPointAt(t: number): IRenderVertex
 
 	protected static dt(v0: Vertex, v1: Vertex, v2: Vertex, v3: Vertex): [number, number, number] {
@@ -42,9 +43,9 @@ export abstract class CatmullCurve {
 	}
 
 	protected static evalCubic(c: number[], t: number): number {
-		const t2 = f4(t * t),
-			t3 = f4(t2 * t)
-		return f4(c[3] * t3 + c[2] * t2 + c[1] * t) + c[0]
+		const t2 = f4(t * t)
+		const t3 = f4(t2 * t)
+		return f4(c[3]! * t3 + c[2]! * t2 + c[1]! * t) + c[0]!
 	}
 }
 
