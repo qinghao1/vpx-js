@@ -7,7 +7,9 @@ import { Vertex2D } from '../../math/vertex2d.js'
 import { Enums } from '../enums.js'
 import { ItemData } from '../item-data.js'
 
-/** Kicker data. */
+/** Kicker data.
+ *
+ * @see https://github.com/vpinball/vpinball/blob/master/kicker.cpp */
 export class KickerData extends ItemData {
 	public kickerType: number = Enums.KickerType.KickerHole
 	public center!: Vertex2D
