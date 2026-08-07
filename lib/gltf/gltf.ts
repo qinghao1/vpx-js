@@ -624,6 +624,7 @@ export interface GltfTexture extends GltfNamedElement {
 /**
  * The root object for a glTF asset.
  */
+/** glTF type definitions. */
 export interface GltfFile extends GltfElement {
 	/**
 	 * Names of glTF extensions used somewhere in this asset.
