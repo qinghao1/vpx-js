@@ -1,21 +1,5 @@
-/*
- * VPDB - Virtual Pinball Database
- * Copyright (C) 2019 freezy <freezy@vpdb.io>
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- */
+// Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { Buffer } from 'node:buffer'
 import { createReadStream } from 'node:fs'
@@ -32,10 +16,10 @@ import {
 	Texture as ThreeTexture,
 	UnsignedByteType,
 } from '../../refs.node.js'
-import { logger } from '../../util/logger'
-import type { ITextureLoader } from '../irender-api'
-import { EXRLoader } from './vendor/EXRLoader'
-import { RGBELoader } from './vendor/RGBELoader'
+import { logger } from '../../util/logger.js'
+import type { ITextureLoader } from '../irender-api.js'
+import { EXRLoader } from './vendor/EXRLoader.js'
+import { RGBELoader } from './vendor/RGBELoader.js'
 
 export class ThreeTextureLoaderNode implements ITextureLoader<ThreeTexture> {
 	public async loadTexture(name: string, ext: string, data: Uint8Array): Promise<ThreeTexture> {
