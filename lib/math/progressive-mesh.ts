@@ -413,14 +413,12 @@ function collapse(u: ProgMeshVertex, v?: ProgMeshVertex): void {
 
 function addVertex(vert: ProgMeshFloat3[]): void {
 	for (let i = 0; i < vert.length; i++) {
-		// tslint:disable-next-line:no-unused-expression
 		new ProgMeshVertex(vert[i], i) //!! braindead design, actually fills up "vertices"
 	}
 }
 
 function addFaces(tri: ProgMeshTriData[]): void {
 	for (const t of tri) {
-		// tslint:disable-next-line:no-unused-expression
 		new ProgMeshTriangle(
 			vertices[t.v[0]], //!! braindead design, actually fills up "triangles"
 			vertices[t.v[1]],
