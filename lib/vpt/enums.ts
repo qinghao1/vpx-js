@@ -3,8 +3,8 @@
 
 import { VbsApi } from '../scripting/vbs-api.js'
 
-export /** ItemType. */
-class ItemType {
+/** ItemType. */
+export class ItemType {
 	public static readonly Surface = 0
 	public static readonly Flipper = 1
 	public static readonly Timer = 2
@@ -32,8 +32,8 @@ class ItemType {
 	public static readonly Invalid = 0xffffffff
 }
 
-export /** LightStatus. */
-class LightStatus extends VbsApi {
+/** LightStatus. */
+export class LightStatus extends VbsApi {
 	public readonly LightStateOff = 0
 	public readonly LightStateOn = 1
 	public readonly LightStateBlinking = 2
@@ -43,6 +43,7 @@ class LightStatus extends VbsApi {
 	}
 }
 
+/** Backglass view index. */
 export class BackglassIndex extends VbsApi {
 	public readonly DESKTOP = 0
 	public readonly FULLSCREEN = 1
@@ -53,8 +54,8 @@ export class BackglassIndex extends VbsApi {
 	}
 }
 
-export /** Filters. */
-class Filters extends VbsApi {
+/** Filters. */
+export class Filters extends VbsApi {
 	public readonly Filter_None = 0
 	public readonly Filter_Additive = 1
 	public readonly Filter_Overlay = 2
@@ -66,6 +67,7 @@ class Filters extends VbsApi {
 	}
 }
 
+/** Image alignment mode. */
 export class ImageAlignment extends VbsApi {
 	public readonly ImageAlignWorld = 0
 	public readonly ImageAlignTopLeft = 1
@@ -76,8 +78,8 @@ export class ImageAlignment extends VbsApi {
 	}
 }
 
-export /** Shape. */
-class Shape extends VbsApi {
+/** Shape. */
+export class Shape extends VbsApi {
 	public readonly ShapeCircle = 0
 	public readonly ShapeCustom = 1
 
@@ -86,6 +88,7 @@ class Shape extends VbsApi {
 	}
 }
 
+/** Trigger shape type. */
 export class TriggerShape extends VbsApi {
 	public readonly TriggerNone = 0
 	public readonly TriggerWireA = 1
@@ -108,8 +111,8 @@ export class TriggerShape extends VbsApi {
 	}
 }
 
-export /** RampType. */
-class RampType extends VbsApi {
+/** RampType. */
+export class RampType extends VbsApi {
 	public readonly RampTypeFlat = 0
 	public readonly RampType4Wire = 1
 	public readonly RampType2Wire = 2
@@ -129,8 +132,8 @@ class RampType extends VbsApi {
 	}
 }
 
-export /** PlungerType. */
-class PlungerType extends VbsApi {
+/** PlungerType. */
+export class PlungerType extends VbsApi {
 	public readonly PlungerTypeModern = 1
 	public readonly PlungerTypeFlat = 2
 	public readonly PlungerTypeCustom = 3
@@ -140,6 +143,7 @@ class PlungerType extends VbsApi {
 	}
 }
 
+/** Tri-state with default. */
 export class UserDefaultOnOff extends VbsApi {
 	public readonly Default = -1
 	public readonly Off = 0
@@ -192,6 +196,7 @@ export class PhysicsSet extends VbsApi {
 	}
 }
 
+/** Hit target type. */
 export class TargetType extends VbsApi {
 	public readonly DropTargetBeveled = 1
 	public readonly DropTargetSimple = 2
@@ -218,6 +223,7 @@ export class TargetType extends VbsApi {
 	}
 }
 
+/** Gate type. */
 export class GateType extends VbsApi {
 	public readonly GateWireW = 1
 	public readonly GateWireRectangle = 2
@@ -229,6 +235,7 @@ export class GateType extends VbsApi {
 	}
 }
 
+/** Text alignment. */
 export class TextAlignment extends VbsApi {
 	public readonly TextAlignLeft = 0
 	public readonly TextAlignCenter = 1
@@ -239,6 +246,7 @@ export class TextAlignment extends VbsApi {
 	}
 }
 
+/** Decal type. */
 export class DecalType extends VbsApi {
 	public readonly DecalText = 0
 	public readonly DecalImage = 1
@@ -248,6 +256,7 @@ export class DecalType extends VbsApi {
 	}
 }
 
+/** Light sequencer state. */
 export class SequencerState extends VbsApi {
 	public readonly SeqUpOn = 1
 	public readonly SeqUpOff = 2
@@ -434,6 +443,7 @@ export class SequencerState extends VbsApi {
 	}
 }
 
+/** Sizing type. */
 export class SizingType extends VbsApi {
 	public readonly AutoSize = 0
 	public readonly AutoWidth = 1
@@ -444,6 +454,7 @@ export class SizingType extends VbsApi {
 	}
 }
 
+/** Kicker type. */
 export class KickerType extends VbsApi {
 	public readonly KickerInvisible = 0
 	public readonly KickerHole = 1
@@ -466,6 +477,7 @@ export class KickerType extends VbsApi {
 	}
 }
 
+/** Ramp image alignment. */
 export class RampImageAlignment extends VbsApi {
 	public readonly ImageModeWorld = 0
 	public readonly ImageModeWrap = 1
@@ -475,6 +487,7 @@ export class RampImageAlignment extends VbsApi {
 	}
 }
 
+/** VBScript color constants. */
 export class VBColors extends VbsApi {
 	public readonly vbBlack = 0x00
 	public readonly vbRed = 0xff
@@ -490,6 +503,7 @@ export class VBColors extends VbsApi {
 	}
 }
 
+/** VBScript comparison method. */
 export class VBComparison extends VbsApi {
 	public readonly vbBinaryCompare = 0
 	public readonly vbTextCompare = 1
@@ -499,6 +513,7 @@ export class VBComparison extends VbsApi {
 	}
 }
 
+/** VBScript date/time constants. */
 export class VBDateTime extends VbsApi {
 	public readonly vbSunday = 1
 	public readonly vbMonday = 2
@@ -531,6 +546,7 @@ export class VBDateTime extends VbsApi {
 	}
 }
 
+/** VBScript MsgBox style. */
 export class VBMsgBox extends VbsApi {
 	public readonly vbGeneralDate = 0
 	public readonly vbLongDate = 1
@@ -543,6 +559,7 @@ export class VBMsgBox extends VbsApi {
 	}
 }
 
+/** VBScript date format. */
 export class VBDateFormat extends VbsApi {
 	public readonly vbOKOnly = 0
 	public readonly vbOKCancel = 1
@@ -583,6 +600,7 @@ export class VBDateFormat extends VbsApi {
 	}
 }
 
+/** VBScript MsgBox return value. */
 export class VBMsgBoxReturn extends VbsApi {
 	public readonly vbOK = 1
 	public readonly vbCancel = 2
@@ -597,6 +615,7 @@ export class VBMsgBoxReturn extends VbsApi {
 	}
 }
 
+/** VBScript tri-state value. */
 export class VBTriState extends VbsApi {
 	public readonly vbUseDefault = -2
 	public readonly vbTrue = -1
@@ -607,6 +626,7 @@ export class VBTriState extends VbsApi {
 	}
 }
 
+/** VBScript variable type. */
 export class VBVarType extends VbsApi {
 	public readonly vbEmpty = 0
 	public readonly vbNull = 1
@@ -649,6 +669,7 @@ export class VBVarType extends VbsApi {
 	}
 }
 
+/** Aggregated VBS enums exposed to scripts. */
 export class EnumsApi extends VbsApi {
 	public LightStatus = new LightStatus()
 	public BackglassIndex = new BackglassIndex()
