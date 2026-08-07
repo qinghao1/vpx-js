@@ -7,36 +7,33 @@ import { Vertex2D } from '../../math/vertex2d.js'
 import { Enums } from '../enums.js'
 import { ItemData } from '../item-data.js'
 
+const FLOAT_MAP: Record<string, string> = { WDTH: 'width', HIGH: 'height', ROTA: 'rotation' }
+const INT_MAP: Record<string, string> = { TYPE: 'decalType', SIZE: 'sizingType' }
+const BOOL_MAP: Record<string, string> = { VERT: 'verticalText', BGLS: 'backglass' }
+const STRING_MAP: Record<string, string> = { IMAG: 'szImage', SURF: 'szSurface', TEXT: 'text', MATR: 'szMaterial' }
+
 /** Decal data.
- *
  * @see https://github.com/vpinball/vpinball/blob/master/decal.cpp */
 export class DecalData extends ItemData {
 	public center!: Vertex2D
-	public width: number = 100.0
-	public height: number = 100.0
-	public rotation: number = 0.0
+	public width = 100
+	public height = 100
+	public rotation = 0
 	public szImage?: string
 	public szSurface?: string
 	public text?: string
 	public decalType: number = Enums.DecalType.DecalImage
 	public sizingType: number = Enums.SizingType.ManualSize
-	public color: number = 0x000000
+	public color = 0x000000
 	public szMaterial?: string
-	public verticalText: boolean = false
-	private backglass: boolean = false
-
-	public font: string = ''
+	public verticalText = false
+	private backglass = false
+	public font = ''
 
 	public static async fromStorage(storage: Storage, itemName: string): Promise<DecalData> {
-		const decalData = new DecalData(itemName)
-		await storage.streamFiltered(
-			itemName,
-			4,
-			BiffParser.stream(decalData.fromTag.bind(decalData), {
-				streamedTags: ['FONT'],
-			}),
-		)
-		return decalData
+		const d = new DecalData(itemName)
+		await storage.streamFiltered(itemName, 4, BiffParser.stream(d.fromTag.bind(d), { streamedTags: ['FONT'] }))
+		return d
 	}
 
 	private constructor(itemName: string) {
@@ -44,52 +41,32 @@ export class DecalData extends ItemData {
 	}
 
 	private async fromTag(buffer: Uint8Array, tag: string, offset: number, len: number): Promise<number> {
-		switch (tag) {
-			case 'VCEN':
-				this.center = Vertex2D.get(buffer)
-				break
-			case 'WDTH':
-				this.width = this.getFloat(buffer)
-				break
-			case 'HIGH':
-				this.height = this.getFloat(buffer)
-				break
-			case 'ROTA':
-				this.rotation = this.getFloat(buffer)
-				break
-			case 'IMAG':
-				this.szImage = this.getString(buffer, len)
-				break
-			case 'SURF':
-				this.szSurface = this.getString(buffer, len)
-				break
-			case 'TEXT':
-				this.text = this.getString(buffer, len)
-				break
-			case 'TYPE':
-				this.decalType = this.getInt(buffer)
-				break
-			case 'SIZE':
-				this.sizingType = this.getInt(buffer)
-				break
-			case 'COLR':
-				this.color = BiffParser.bgrToRgb(this.getInt(buffer))
-				break
-			case 'MATR':
-				this.szMaterial = this.getString(buffer, len)
-				break
-			case 'VERT':
-				this.verticalText = this.getBool(buffer)
-				break
-			case 'BGLS':
-				this.backglass = this.getBool(buffer)
-				break
-			case 'FONT':
-				break // don't care for now
-			default:
-				this.getCommonBlock(buffer, tag, len)
-				break
+		if (tag === 'VCEN') {
+			this.center = Vertex2D.get(buffer)
+			return 0
 		}
+		if (tag === 'COLR') {
+			this.color = BiffParser.bgrToRgb(this.getInt(buffer))
+			return 0
+		}
+		if (tag === 'FONT') return 0
+		if (tag in FLOAT_MAP) {
+			;(this as any)[FLOAT_MAP[tag]] = this.getFloat(buffer)
+			return 0
+		}
+		if (tag in INT_MAP) {
+			;(this as any)[INT_MAP[tag]] = this.getInt(buffer)
+			return 0
+		}
+		if (tag in BOOL_MAP) {
+			;(this as any)[BOOL_MAP[tag]] = this.getBool(buffer)
+			return 0
+		}
+		if (tag in STRING_MAP) {
+			;(this as any)[STRING_MAP[tag]] = this.getString(buffer, len)
+			return 0
+		}
+		this.getCommonBlock(buffer, tag, len)
 		return 0
 	}
 }
