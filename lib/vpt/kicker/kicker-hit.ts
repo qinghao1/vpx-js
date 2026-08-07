@@ -1,40 +1,23 @@
-/*
- * VPDB - Virtual Pinball Database
- * Copyright (C) 2019 freezy <freezy@vpdb.io>
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- */
+// Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { kickerHitVertices } from '../../../res/meshes/kicker-hit-mesh'
-import { Event } from '../../game/event'
-import type { EventProxy } from '../../game/event-proxy'
-import type { PlayerPhysics } from '../../game/player-physics'
-import { degToRad } from '../../math/float'
-import { clamp } from '../../math/functions'
-import { Vertex3D } from '../../math/vertex3d'
-import type { CollisionEvent } from '../../physics/collision-event'
-import { CollisionType } from '../../physics/collision-type'
-import { STATICTIME } from '../../physics/constants'
-import { HARD_SCATTER } from '../../physics/functions'
-import { HitCircle } from '../../physics/hit-circle'
-import type { Ball } from '../ball/ball'
-import { FLT_MAX } from '../mesh'
-import type { Table } from '../table/table'
-import type { KickerData } from './kicker-data'
+import { kickerHitVertices } from '../../../res/meshes/kicker-hit-mesh.js'
+import { Event } from '../../game/event.js'
+import type { EventProxy } from '../../game/event-proxy.js'
+import type { PlayerPhysics } from '../../game/player-physics.js'
+import { degToRad } from '../../math/float.js'
+import { clamp } from '../../math/functions.js'
+import { Vertex3D } from '../../math/vertex3d.js'
+import type { CollisionEvent } from '../../physics/collision-event.js'
+import { CollisionType } from '../../physics/collision-type.js'
+import { STATICTIME } from '../../physics/constants.js'
+import { HARD_SCATTER } from '../../physics/functions.js'
+import { HitCircle } from '../../physics/hit-circle.js'
+import type { Ball } from '../ball/ball.js'
+import { FLT_MAX } from '../mesh.js'
+import type { Table } from '../table/table.js'
+import type { KickerData } from './kicker-data.js'
 
-/* tslint:disable:no-bitwise */
 export class KickerHit extends HitCircle {
 	private data: KickerData
 	public ball?: Ball // The ball inside this kicker
