@@ -23,11 +23,7 @@ import type { FlipperMover } from './flipper-mover.js'
 import { FlipperState } from './flipper-state.js'
 import { FlipperUpdater } from './flipper-updater.js'
 
-/**
- * VPinball's flippers
- *
- * @see https://github.com/vpinball/vpinball/blob/master/flipper.cpp
- */
+/** Flipper item. @see https://github.com/vpinball/vpinball/blob/master/flipper.cpp */
 export class Flipper
 	extends Item<FlipperData>
 	implements IRenderable<FlipperState>, IPlayable, IMovable, IHittable, IScriptable<FlipperApi>
