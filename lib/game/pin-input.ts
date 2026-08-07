@@ -32,10 +32,9 @@ import type { Player } from './player.js'
 
 const APP_KEYBOARD = 0
 
-/** DirectInput key queue. @see https://github.com/vpinball/vpinball/blob/master/pininput.cpp */
+/** DirectInput key queue.
+ * @see https://github.com/vpinball/vpinball/blob/master/pininput.cpp */
 export class PinInput {
-	private readonly table: Table
-	private readonly player: Player
 	private readonly diq: DirectInputDeviceObjectData[] = []
 
 	public readonly rgKeys: Record<number, number> = {
@@ -62,10 +61,10 @@ export class PinInput {
 		[AssignKey.Escape]: DIK_ESCAPE,
 	}
 
-	constructor(table: Table, player: Player) {
-		this.table = table
-		this.player = player
-	}
+	constructor(
+		private readonly table: Table,
+		private readonly player: Player,
+	) {}
 
 	public onKeyDown(dkCode: number, timestamp: number): void {
 		this.diq.push(DirectInputDeviceObjectData.claim(dkCode, 0x80, timestamp))
@@ -77,8 +76,8 @@ export class PinInput {
 
 	/** Drains queue and forwards key events. */
 	public processKeys(): void {
-		let input = this.diq.pop()
-		while (input) {
+		let input: DirectInputDeviceObjectData | undefined
+		while ((input = this.diq.pop())) {
 			if (input.dwSequence === APP_KEYBOARD) {
 				const special =
 					input.dwOfs === this.rgKeys[AssignKey.FrameCount] ||
@@ -88,7 +87,6 @@ export class PinInput {
 					this.fireKeyEvent(input.dwData & 0x80 ? Event.GameEventsKeyDown : Event.GameEventsKeyUp, input.dwOfs)
 			}
 			DirectInputDeviceObjectData.release(input)
-			input = this.diq.pop()
 		}
 	}
 
