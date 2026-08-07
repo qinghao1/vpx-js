@@ -5,8 +5,7 @@ import { Pool } from '../../util/object-pool.js'
 import { Enums } from '../enums.js'
 import { ItemState } from '../item-state.js'
 
-/** Kicker state.
- *
+/** Kicker state — type and material.
  * @see https://github.com/vpinball/vpinball/blob/master/kicker.cpp */
 export class KickerState extends ItemState {
 	public static readonly POOL = new Pool(KickerState)
@@ -14,25 +13,22 @@ export class KickerState extends ItemState {
 	public type!: number
 	public material?: string
 
-	// @ts-expect-error
+	// @ts-expect-error — derived visibility from type
 	get isVisible(): boolean {
 		return this.type !== Enums.KickerType.KickerInvisible
 	}
-	/** Set isVisible. */
-	set isVisible(v) {
-		/* not used in abstract */
-	}
+	set isVisible(_v: boolean) {}
 
 	public constructor() {
 		super()
 	}
 
 	public static claim(name: string, type: number, material: string | undefined): KickerState {
-		const state = KickerState.POOL.get()
-		state.name = name
-		state.type = type
-		state.material = material
-		return state
+		const s = KickerState.POOL.get()
+		s.name = name
+		s.type = type
+		s.material = material
+		return s
 	}
 
 	public clone(): KickerState {
@@ -40,14 +36,10 @@ export class KickerState extends ItemState {
 	}
 
 	public diff(state: KickerState): KickerState {
-		const diff = this.clone()
-		if (diff.type === state.type) {
-			delete diff.type
-		}
-		if (diff.material === state.material) {
-			delete diff.material
-		}
-		return diff
+		const d = this.clone()
+		if (d.type === state.type) delete (d as unknown as Record<string, unknown>).type
+		if (d.material === state.material) delete (d as unknown as Record<string, unknown>).material
+		return d
 	}
 
 	public release(): void {
@@ -55,10 +47,7 @@ export class KickerState extends ItemState {
 	}
 
 	public equals(state: KickerState): boolean {
-		/* istanbul ignore if: we don't actually pass empty states. */
-		if (!state) {
-			return false
-		}
+		if (!state) return false
 		return state.type === this.type && state.material === this.material
 	}
 }
