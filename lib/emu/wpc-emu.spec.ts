@@ -17,143 +17,142 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import * as chai from 'chai';
-import { expect } from 'chai';
-import * as sinon from 'sinon';
-import { GamelistDB, WpcEmuApi, WpcEmuWebWorkerApi } from 'wpc-emu';
-import { Vertex2D } from '../math/vertex2d';
-import { Emulator } from './wpc-emu';
+import * as chai from 'chai'
+import { expect } from 'chai'
+import * as sinon from 'sinon'
+import sinonChai from 'sinon-chai'
+import { type GamelistDB, WpcEmuApi, type WpcEmuWebWorkerApi } from 'wpc-emu'
+import type { Vertex2D } from '../math/vertex2d'
+import { Emulator } from './wpc-emu'
 
 const mockGameEntry: GamelistDB.GameEntry = {
 	name: 'foo',
 	rom: {
 		u06: 'lala',
 	},
-};
+}
 
 /* tslint:disable:no-unused-expression no-string-literal */
-chai.use(require('sinon-chai'));
+chai.use((sinonChai as any).default ?? sinonChai)
 describe('WPC-EMU', () => {
-
-	const sandbox = sinon.createSandbox();
-	let emulator: Emulator;
-	let mockEmu: MockWpcEmulator;
+	const sandbox = sinon.createSandbox()
+	let emulator: Emulator
+	let mockEmu: MockWpcEmulator
 
 	beforeEach(() => {
-		mockEmu = new MockWpcEmulator();
-		sandbox.stub(WpcEmuApi, 'initVMwithRom').resolves(mockEmu);
-		emulator = new Emulator();
-	});
+		mockEmu = new MockWpcEmulator()
+		sandbox.stub(WpcEmuApi, 'initVMwithRom').resolves(mockEmu)
+		emulator = new Emulator()
+	})
 
 	afterEach(() => {
-		sandbox.restore();
-	});
+		sandbox.restore()
+	})
 
 	it('should getVersion', () => {
-		const result: string = emulator.getVersion();
-		expect(result.length > 4).to.equal(true);
-	});
+		const result: string = emulator.getVersion()
+		expect(result.length > 4).to.equal(true)
+	})
 
 	it('should not be initialized by default', () => {
-		const result: boolean = emulator.isInitialized();
-		expect(result).to.equal(false);
-	});
+		const result: boolean = emulator.isInitialized()
+		expect(result).to.equal(false)
+	})
 
 	it('should get getDmdFrame', () => {
-		const result: Uint8Array = emulator.getDmdFrame();
-		expect(result.length).to.equal(0);
-	});
+		const result: Uint8Array = emulator.getDmdFrame()
+		expect(result.length).to.equal(0)
+	})
 
 	it('should ignore registerAudioConsumer when emu is not initialized', () => {
 		emulator.registerAudioConsumer((audioJSON: WpcEmuApi.AudioMessage) => {
 			// do nothing
-		});
-	});
+		})
+	})
 
 	it('should return correct sized DmdDimensions', () => {
-		const result: Vertex2D = emulator.getDmdDimensions();
-		expect(result.x).to.equal(128);
-		expect(result.y).to.equal(32);
-	});
+		const result: Vertex2D = emulator.getDmdDimensions()
+		expect(result.x).to.equal(128)
+		expect(result.y).to.equal(32)
+	})
 
 	it('should ignore calls as long as the emu is not initialized', () => {
-		emulator.setSwitchInput(4);
-		emulator.setSwitchInput(4, true);
-		emulator.setSwitchInput(4, false);
-		emulator.setCabinetInput(4);
-		emulator.setDipSwitchByte(44);
-		emulator.setFliptronicsInput('FOO');
-		const executedSteps = emulator.emuSimulateCycle(200);
-		expect(executedSteps).to.equal(0);
-	});
+		emulator.setSwitchInput(4)
+		emulator.setSwitchInput(4, true)
+		emulator.setSwitchInput(4, false)
+		emulator.setCabinetInput(4)
+		emulator.setDipSwitchByte(44)
+		emulator.setFliptronicsInput('FOO')
+		const executedSteps = emulator.emuSimulateCycle(200)
+		expect(executedSteps).to.equal(0)
+	})
 
 	it('should load the emulator', async () => {
-		await emulator.loadGame(mockGameEntry, new Uint8Array());
-		expect(mockEmu.executedCyclesMs).to.equal(1000);
-		expect(mockEmu.cabinetInput).to.deep.equal([ 16 ]);
-	});
+		await emulator.loadGame(mockGameEntry, new Uint8Array())
+		expect(mockEmu.executedCyclesMs).to.equal(1000)
+		expect(mockEmu.cabinetInput).to.deep.equal([16])
+	})
 
 	it('should call WPC-Emu emuSimulateCycle when initialized', async () => {
-		await emulator.loadGame(mockGameEntry, new Uint8Array());
-		emulator.emuSimulateCycle(20);
-		expect(mockEmu.executedCyclesMs).to.equal(1020);
-	});
+		await emulator.loadGame(mockGameEntry, new Uint8Array())
+		emulator.emuSimulateCycle(20)
+		expect(mockEmu.executedCyclesMs).to.equal(1020)
+	})
 
 	it('should call WPC-Emu setSwitchInput when initialized', async () => {
-		await emulator.loadGame(mockGameEntry, new Uint8Array());
-		emulator.setSwitchInput(20);
-		expect(mockEmu.switchInput).to.deep.equal([ 20 ]);
-	});
+		await emulator.loadGame(mockGameEntry, new Uint8Array())
+		emulator.setSwitchInput(20)
+		expect(mockEmu.switchInput).to.deep.equal([20])
+	})
 
 	it('should call WPC-Emu fliptronicsInput when initialized', async () => {
-		await emulator.loadGame(mockGameEntry, new Uint8Array());
-		emulator.setFliptronicsInput('A123');
-		expect(mockEmu.fliptronicsInput).to.deep.equal([ 'A123' ]);
-	});
+		await emulator.loadGame(mockGameEntry, new Uint8Array())
+		emulator.setFliptronicsInput('A123')
+		expect(mockEmu.fliptronicsInput).to.deep.equal(['A123'])
+	})
 
 	it('should call WPC-Emu set DipSwitchByte when initialized', async () => {
-		await emulator.loadGame(mockGameEntry, new Uint8Array());
-		emulator.setDipSwitchByte(44);
-		expect(mockEmu.dipSwitchInput).to.deep.equal([ 44 ]);
-	});
+		await emulator.loadGame(mockGameEntry, new Uint8Array())
+		emulator.setDipSwitchByte(44)
+		expect(mockEmu.dipSwitchInput).to.deep.equal([44])
+	})
 
 	it('should get DipSwitchByte when emu is not initialized', async () => {
-		const result = emulator.getDipSwitchByte();
-		expect(result).to.equal(0);
-	});
+		const result = emulator.getDipSwitchByte()
+		expect(result).to.equal(0)
+	})
 
 	it('should call WPC-Emu registerAudioConsumer when initialized', async () => {
-		await emulator.loadGame(mockGameEntry, new Uint8Array());
-		let playSampleId = -1;
+		await emulator.loadGame(mockGameEntry, new Uint8Array())
+		let playSampleId = -1
 		emulator.registerAudioConsumer((audioJSON: WpcEmuApi.AudioMessage) => {
 			if (audioJSON.id) {
-				playSampleId = audioJSON.id;
+				playSampleId = audioJSON.id
 			}
-		});
-		expect(playSampleId).to.equal(123);
-	});
+		})
+		expect(playSampleId).to.equal(123)
+	})
 
 	it('should update WPC-Emu state after emuSimulateCycle is run', async () => {
-		await emulator.loadGame(mockGameEntry, new Uint8Array());
-		emulator.emuSimulateCycle(20);
-		expect(emulator.getSwitchInput(11)).to.equal(0);
-		expect(emulator.getLampState(11)).to.equal(1);
-		expect(emulator.getLampState(12)).to.equal(0);
-		expect(emulator.getSolenoidState(0)).to.equal(11);
-		expect(emulator.getGIState(0)).to.equal(8);
-		expect(emulator.getDipSwitchByte()).to.equal(23);
-	});
-
-});
+		await emulator.loadGame(mockGameEntry, new Uint8Array())
+		emulator.emuSimulateCycle(20)
+		expect(emulator.getSwitchInput(11)).to.equal(0)
+		expect(emulator.getLampState(11)).to.equal(1)
+		expect(emulator.getLampState(12)).to.equal(0)
+		expect(emulator.getSolenoidState(0)).to.equal(11)
+		expect(emulator.getGIState(0)).to.equal(8)
+		expect(emulator.getDipSwitchByte()).to.equal(23)
+	})
+})
 
 class MockWpcEmulator implements WpcEmuApi.Emulator {
-	public executedCyclesMs: number = 0;
-	public cabinetInput: number[] = [];
-	public fliptronicsInput: string[] = [];
-	public switchInput: number[] = [];
-	public dipSwitchInput: number[] = [];
+	public executedCyclesMs: number = 0
+	public cabinetInput: number[] = []
+	public fliptronicsInput: string[] = []
+	public switchInput: number[] = []
+	public dipSwitchInput: number[] = []
 	public start(): void {
-		throw new Error('Method not implemented.');
+		throw new Error('Method not implemented.')
 	}
 	public getUiState(includeExpensiveData?: boolean): WpcEmuWebWorkerApi.EmuState {
 		return {
@@ -167,11 +166,11 @@ class MockWpcEmulator implements WpcEmuApi.Emulator {
 				},
 				wpc: {
 					diagnosticLed: 6,
-					generalIlluminationState: new Uint8Array([ 8, 2, 3, 4]),
+					generalIlluminationState: new Uint8Array([8, 2, 3, 4]),
 					diagnosticLedToggleCount: 7,
-					lampState: new Uint8Array([ 255, 0 ]),
-					solenoidState: new Uint8Array([ 11, 2, 3, 4]),
-					inputState: new Uint8Array([ 1, 2, 3, 4]),
+					lampState: new Uint8Array([255, 0]),
+					solenoidState: new Uint8Array([11, 2, 3, 4]),
+					inputState: new Uint8Array([1, 2, 3, 4]),
 					midnightModeEnabled: true,
 					irqEnabled: true,
 					activeRomBank: 8,
@@ -212,46 +211,46 @@ class MockWpcEmulator implements WpcEmuApi.Emulator {
 			runtime: 102,
 			ticksIrq: 103,
 			version: 104,
-		};
+		}
 	}
 	public getState(): WpcEmuWebWorkerApi.EmuState {
-		throw new Error('Method not implemented.');
+		throw new Error('Method not implemented.')
 	}
 	public setState(stateObject: WpcEmuWebWorkerApi.EmuState): void {
-		throw new Error('Method not implemented.');
+		throw new Error('Method not implemented.')
 	}
 	public registerAudioConsumer(callbackFunction: (audioJSON: WpcEmuApi.AudioMessage) => void): void {
-		callbackFunction({ command: 'FOO', id: 123 });
+		callbackFunction({ command: 'FOO', id: 123 })
 	}
 	public executeCycle(ticksToRun: number, tickSteps: number): number {
-		throw new Error('Method not implemented.');
+		throw new Error('Method not implemented.')
 	}
 	public executeCycleForTime(advanceByMs: number, tickSteps: number): number {
-		this.executedCyclesMs += advanceByMs;
-		return 0;
+		this.executedCyclesMs += advanceByMs
+		return 0
 	}
 	public setCabinetInput(value: number): void {
-		this.cabinetInput.push(value);
+		this.cabinetInput.push(value)
 	}
 	public setSwitchInput(switchNr: number, optionalValue?: boolean): void {
-		this.switchInput.push(switchNr);
+		this.switchInput.push(switchNr)
 	}
 	public setFliptronicsInput(value: string): void {
-		this.fliptronicsInput.push(value);
+		this.fliptronicsInput.push(value)
 	}
 	public toggleMidnightMadnessMode(): void {
-		throw new Error('Method not implemented.');
+		throw new Error('Method not implemented.')
 	}
 	public reset(): void {
 		// ignored
 	}
 	public version(): string {
-		throw new Error('Method not implemented.');
+		throw new Error('Method not implemented.')
 	}
 	public setDipSwitchByte(dipSwitch: number): void {
-		this.dipSwitchInput.push(dipSwitch);
+		this.dipSwitchInput.push(dipSwitch)
 	}
 	public getDipSwitchByte(): number {
-		return 23;
+		return 23
 	}
 }

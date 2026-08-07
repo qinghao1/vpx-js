@@ -17,67 +17,66 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import * as chai from 'chai';
-import { expect } from 'chai';
-import { Player, Table } from '..';
-import { TableBuilder } from '../../test/table-builder';
-import { getObject } from './objects';
+import * as chai from 'chai'
+import { expect } from 'chai'
+import sinonChai from 'sinon-chai'
+import { TableBuilder } from '../../test/table-builder'
+import { Player, type Table } from '..'
+import { getObject } from './objects'
 
 /* tslint:disable:no-unused-expression no-string-literal */
-chai.use(require('sinon-chai'));
+chai.use((sinonChai as any).default ?? sinonChai)
 describe('The VBScript proxy handler', () => {
-
-	const table: Table = new TableBuilder().build();
-	const player: Player = new Player(table);
+	const table: Table = new TableBuilder().build()
+	const player: Player = new Player(table)
 
 	it('should execute a case-insensitive function', () => {
-		const d = getObject<any>('Scripting.Dictionary', player);
-		d.Add('myKey1', 'myValue1');
-		d.add('myKey2', 'myValue2');
-		d.ADD('myKey3', 'myValue3');
+		const d = getObject<any>('Scripting.Dictionary', player)
+		d.Add('myKey1', 'myValue1')
+		d.add('myKey2', 'myValue2')
+		d.ADD('myKey3', 'myValue3')
 
-		expect(d.Item['myKey1']).to.equal('myValue1');
-		expect(d.Item['myKey2']).to.equal('myValue2');
-		expect(d.Item['myKey3']).to.equal('myValue3');
-	});
+		expect(d.Item['myKey1']).to.equal('myValue1')
+		expect(d.Item['myKey2']).to.equal('myValue2')
+		expect(d.Item['myKey3']).to.equal('myValue3')
+	})
 
 	it('should get a case insensitive property', () => {
-		const wss = getObject<any>('WScript.Shell', player);
-		expect(wss.CurrentDirectory).to.equal('.');
-		expect(wss.CURRENTdirectory).to.equal('.');
-		expect(wss.cuRRenTdIreCtoRY).to.equal('.');
-	});
+		const wss = getObject<any>('WScript.Shell', player)
+		expect(wss.CurrentDirectory).to.equal('.')
+		expect(wss.CURRENTdirectory).to.equal('.')
+		expect(wss.cuRRenTdIreCtoRY).to.equal('.')
+	})
 
 	it('should set a case insensitive property', () => {
-		const wss = getObject<any>('WScript.Shell', player);
+		const wss = getObject<any>('WScript.Shell', player)
 
-		wss.CurrentDirectory = '/';
-		expect(wss.CurrentDirectory).to.equal('/');
+		wss.CurrentDirectory = '/'
+		expect(wss.CurrentDirectory).to.equal('/')
 
-		wss.currentDIRECTORY = '/foo';
-		expect(wss.CurrentDirectory).to.equal('/foo');
+		wss.currentDIRECTORY = '/foo'
+		expect(wss.CurrentDirectory).to.equal('/foo')
 
-		wss.cuRRenTdIreCtoRY = '/bar';
-		expect(wss.CurrentDirectory).to.equal('/bar');
-	});
+		wss.cuRRenTdIreCtoRY = '/bar'
+		expect(wss.CurrentDirectory).to.equal('/bar')
+	})
 
 	it('should get a case insensitive getter', () => {
-		const vpm = getObject<any>('VPinMAME.Controller', player);
-		expect(vpm.Pause).to.equal(false);
-		expect(vpm.PAUSE).to.equal(false);
-		expect(vpm.paUsE).to.equal(false);
-	});
+		const vpm = getObject<any>('VPinMAME.Controller', player)
+		expect(vpm.Pause).to.equal(false)
+		expect(vpm.PAUSE).to.equal(false)
+		expect(vpm.paUsE).to.equal(false)
+	})
 
 	it('should set a case insensitive setter', () => {
-		const vpm = getObject<any>('VPinMAME.Controller', player);
-		vpm.Pause = true;
-		expect(vpm.Pause).to.equal(true);
+		const vpm = getObject<any>('VPinMAME.Controller', player)
+		vpm.Pause = true
+		expect(vpm.Pause).to.equal(true)
 
-		vpm.PAUSE = false;
-		expect(vpm.Pause).to.equal(false);
+		vpm.PAUSE = false
+		expect(vpm.Pause).to.equal(false)
 
-		vpm['paUsE'] = true;
-		expect(vpm.Pause).to.equal(true);
-	});
-
-});
+		vpm['paUsE'] = true
+		expect(vpm.Pause).to.equal(true)
+	})
+})

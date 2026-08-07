@@ -17,16 +17,16 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { HitObject } from '../physics/hit-object';
-import { EventProxy } from './event-proxy';
-import { IPlayable } from './iplayable';
+import type { HitObject } from '../physics/hit-object'
+import type { EventProxy } from './event-proxy'
+import type { IPlayable } from './iplayable'
 
 export interface IHittable extends IPlayable {
-	isCollidable(): boolean;
-	getHitShapes(): HitObject[];
-	getEventProxy(): EventProxy;
+	isCollidable(): boolean
+	getHitShapes(): HitObject[]
+	getEventProxy(): EventProxy
 }
 
 export function isHittable(arg: any): arg is IHittable {
-	return arg.getHitShapes !== undefined;
+	return arg.getHitShapes !== undefined
 }

@@ -17,17 +17,16 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { ItemApi } from '../vpt/item-api';
-import { ItemData } from '../vpt/item-data';
-import { IPlayable } from './iplayable';
+import type { ItemApi } from '../vpt/item-api'
+import type { ItemData } from '../vpt/item-data'
+import type { IPlayable } from './iplayable'
 
 export interface IScriptable<T extends ItemApi<ItemData>> extends IPlayable {
+	getApi(): T
 
-	getApi(): T;
-
-	getEventNames(): string[];
+	getEventNames(): string[]
 }
 
 export function isScriptable<T extends ItemApi<ItemData>>(arg: any): arg is IScriptable<T> {
-	return arg.getApi !== undefined;
+	return arg.getApi !== undefined
 }

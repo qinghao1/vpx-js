@@ -17,35 +17,35 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { replace } from 'estraverse';
-import { BlockStatement } from 'estree';
-import { identifier, memberExpression } from '../estree';
-import { ESIToken } from '../grammar/grammar';
+import { replace } from 'estraverse'
+import type { BlockStatement } from 'estree'
+import { identifier, memberExpression } from '../estree'
+import type { ESIToken } from '../grammar/grammar'
 
 export function ppWith(node: ESIToken): any {
 	switch (node.type) {
 		case 'WithStatement':
-			return ppWithStatement(node);
+			return ppWithStatement(node)
 	}
-	return null;
+	return null
 }
 
 function ppWithStatement(node: ESIToken): any {
-	let estree: any = [];
-	const expr = node.children[0].estree;
+	let estree: any = []
+	const expr = node.children[0].estree
 	for (const child of node.children) {
 		if (child.type === 'Block') {
 			const block = replace(child.estree, {
-				leave: blockNode => {
+				leave: (blockNode) => {
 					if (blockNode.type === 'Identifier') {
 						if (blockNode.name.startsWith('.')) {
-							return memberExpression(expr, identifier(blockNode.name.substr(1)));
+							return memberExpression(expr, identifier(blockNode.name.substr(1)))
 						}
 					}
 				},
-			});
-			estree = (block as BlockStatement).body;
+			})
+			estree = (block as BlockStatement).body
 		}
 	}
-	return estree;
+	return estree
 }

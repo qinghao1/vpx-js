@@ -17,24 +17,23 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import * as chai from 'chai';
-import { expect } from 'chai';
-import { VbsUndefined } from './vbs-undefined';
+import * as chai from 'chai'
+import { expect } from 'chai'
+import sinonChai from 'sinon-chai'
+import { VbsUndefined } from './vbs-undefined'
 
 /* tslint:disable:no-unused-expression no-string-literal */
-chai.use(require('sinon-chai'));
+chai.use((sinonChai as any).default ?? sinonChai)
 describe('The VBScript undefined handler', () => {
-
 	it('should be comparable', () => {
-		const undef = new VbsUndefined() as unknown;
+		const undef = new VbsUndefined() as unknown
 		// tslint:disable-next-line:triple-equals
-		expect(() => undef == 1).not.to.throw();
-	});
+		expect(() => undef == 1).not.to.throw()
+	})
 
 	it('should return "undefined" as string', () => {
-		const undef = new VbsUndefined() as unknown;
+		const undef = new VbsUndefined() as unknown
 		// tslint:disable-next-line:triple-equals
-		expect('' + undef).to.equal('undefined');
-	});
-
-});
+		expect('' + undef).to.equal('undefined')
+	})
+})

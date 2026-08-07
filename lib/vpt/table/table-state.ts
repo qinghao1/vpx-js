@@ -17,56 +17,50 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { Pool } from '../../util/object-pool';
-import { ItemState } from '../item-state';
+import { Pool } from '../../util/object-pool'
+import { ItemState } from '../item-state'
 
 export class TableState extends ItemState {
+	public static readonly POOL = new Pool(TableState)
 
-	public static readonly POOL = new Pool(TableState);
-
-	public material?: string;
+	public material?: string
 
 	public constructor() {
-		super();
+		super()
 	}
 
 	public static claim(name: string, material: string | undefined, isVisible: boolean): TableState {
-		const state = TableState.POOL.get();
-		state.name = name;
-		state.material = material;
-		state.isVisible = isVisible;
-		return state;
+		const state = TableState.POOL.get()
+		state.name = name
+		state.material = material
+		state.isVisible = isVisible
+		return state
 	}
 
 	public clone(): TableState {
-		return TableState.claim(
-			this.name,
-			this.material,
-			this.isVisible,
-		);
+		return TableState.claim(this.name, this.material, this.isVisible)
 	}
 
 	public diff(state: TableState): TableState {
-		const diff = this.clone();
+		const diff = this.clone()
 		if (diff.material === state.material) {
-			delete diff.material;
+			delete diff.material
 		}
 		if (diff.isVisible === state.isVisible) {
-			delete diff.isVisible;
+			delete diff.isVisible
 		}
-		return diff;
+		return diff
 	}
 
 	public release(): void {
-		TableState.POOL.release(this);
+		TableState.POOL.release(this)
 	}
 
 	public equals(state: TableState): boolean {
 		/* istanbul ignore if: we don't actually pass empty states. */
 		if (!state) {
-			return false;
+			return false
 		}
-		return state.material === this.material
-			&& state.isVisible === this.isVisible;
+		return state.material === this.material && state.isVisible === this.isVisible
 	}
 }

@@ -32,41 +32,40 @@
  * the circle.
  */
 export class PlungerCoord {
-
 	/**
 	 * radius at this point, as a fraction of nominal plunger width
 	 */
-	public r: number;
+	public r: number
 
 	/**
 	 * y position, in table distance units, with the tip at 0.0
 	 */
-	public y: number;
+	public y: number
 
 	/**
 	 * texture v coordinate of the vertices on this circle
 	 */
-	public tv: number;
+	public tv: number
 
 	/**
 	 * normal of the top vertex along this circle
 	 */
-	public nx: number;
-	public ny: number;
+	public nx: number
+	public ny: number
 
 	constructor(r: number, y: number, tv: number, nx: number, ny: number) {
-		this.r  = r;
-		this.y  = y;
-		this.tv = tv;
-		this.nx = nx;
-		this.ny = ny;
+		this.r = r
+		this.y = y
+		this.tv = tv
+		this.nx = nx
+		this.ny = ny
 	}
 
 	public set(r: number, y: number, tv: number, nx: number, ny: number) {
-		this.r  = r;
-		this.y  = y;
-		this.tv = tv;
-		this.nx = nx;
-		this.ny = ny;
+		this.r = r
+		this.y = y
+		this.tv = tv
+		this.nx = nx
+		this.ny = ny
 	}
 }

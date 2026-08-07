@@ -17,37 +17,44 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { BiffParser } from '../../io/biff-parser';
-import { Storage } from '../../io/ole-doc';
-import { ItemData } from '../item-data';
+import { BiffParser } from '../../io/biff-parser'
+import type { Storage } from '../../io/ole-doc'
+import { ItemData } from '../item-data'
 
 export class CollectionData extends ItemData {
-
-	public itemNames: string[] = [];
-	public fireEvents: boolean = false;
-	public groupElements: boolean = true;
-	public stopSingleEvents: boolean = false;
+	public itemNames: string[] = []
+	public fireEvents: boolean = false
+	public groupElements: boolean = true
+	public stopSingleEvents: boolean = false
 
 	public static async fromStorage(storage: Storage, itemName: string): Promise<CollectionData> {
-		const collectionData = new CollectionData(itemName);
-		await storage.streamFiltered(itemName, 0, BiffParser.stream(collectionData.fromTag.bind(collectionData), {}));
-		return collectionData;
+		const collectionData = new CollectionData(itemName)
+		await storage.streamFiltered(itemName, 0, BiffParser.stream(collectionData.fromTag.bind(collectionData), {}))
+		return collectionData
 	}
 
 	private constructor(itemName: string) {
-		super(itemName);
+		super(itemName)
 	}
 
 	private async fromTag(buffer: Buffer, tag: string, offset: number, len: number): Promise<number> {
 		switch (tag) {
-			case 'EVNT': this.fireEvents = this.getBool(buffer); break;
-			case 'SSNG': this.stopSingleEvents = this.getBool(buffer); break;
-			case 'GREL': this.groupElements = this.getBool(buffer); break;
-			case 'ITEM': this.itemNames.push(this.getWideString(buffer, len)); break;
+			case 'EVNT':
+				this.fireEvents = this.getBool(buffer)
+				break
+			case 'SSNG':
+				this.stopSingleEvents = this.getBool(buffer)
+				break
+			case 'GREL':
+				this.groupElements = this.getBool(buffer)
+				break
+			case 'ITEM':
+				this.itemNames.push(this.getWideString(buffer, len))
+				break
 			default:
-				this.getCommonBlock(buffer, tag, len);
-				break;
+				this.getCommonBlock(buffer, tag, len)
+				break
 		}
-		return 0;
+		return 0
 	}
 }

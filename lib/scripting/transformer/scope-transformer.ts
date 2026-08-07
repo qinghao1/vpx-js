@@ -17,8 +17,8 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { replace } from 'estraverse';
-import { BaseNode, Expression, ExpressionStatement, Identifier, Program, VariableDeclaration } from 'estree';
+import { replace } from 'estraverse'
+import type { BaseNode, Expression, ExpressionStatement, Identifier, Program, VariableDeclaration } from 'estree'
 import {
 	assignmentExpression,
 	classExpression,
@@ -27,8 +27,8 @@ import {
 	identifier,
 	literal,
 	memberExpression,
-} from '../estree';
-import { Transformer } from './transformer';
+} from '../estree'
+import { Transformer } from './transformer'
 
 /**
  * In VBScript, running `ExecuteGlobal()` is like including code directly where
@@ -46,16 +46,15 @@ import { Transformer } from './transformer';
  * and assert against it afterwards.
  */
 export class ScopeTransformer extends Transformer {
-
 	constructor(ast: Program) {
-		super(ast, true);
+		super(ast, true)
 	}
 
 	public transform(): Program {
-		this.addScope();
-		this.replaceDeclarations();
-		this.replaceUsages();
-		return this.ast;
+		this.addScope()
+		this.replaceDeclarations()
+		this.replaceUsages()
+		return this.ast
 	}
 
 	/**
@@ -66,55 +65,47 @@ export class ScopeTransformer extends Transformer {
 	 * case.
 	 */
 	private replaceDeclarations(): void {
-		let i = 0;
+		let i = 0
 		replace(this.ast, {
 			enter: (node, parent) => {
-				i++;
+				i++
 
 				//console.log(`%s %s [%s]`, new Array(i).map(v => '').join('  '), node.type,  (node as any).name || '', (node as any).__scope.constructor.name);
 
 				// class declarations
 				if (node.type === 'ClassDeclaration') {
-					return this.wrapAssignment(
-						node.id!,
-						classExpression(node.body, node),
-						node,
-					);
+					return this.wrapAssignment(node.id!, classExpression(node.body, node), node)
 				}
 
 				if (this.isRootScope(node)) {
 					// variable declarations
-					const isLoopVarDecl = parent && /^For.*Statement$/.test(parent.type);
+					const isLoopVarDecl = parent && /^For.*Statement$/.test(parent.type)
 					if (node.type === 'VariableDeclaration' && !isLoopVarDecl) {
-						const declarationNode = node as VariableDeclaration;
-						const nodes = [];
+						const declarationNode = node as VariableDeclaration
+						const nodes = []
 						for (const declaration of declarationNode.declarations as any[]) {
-							nodes.push(this.wrapAssignment(
-								identifier(declaration.id ? declaration.id.name : declaration.name, node), // fixme
-								declaration.init || literal(null, undefined, node),
-								node,
-							));
+							nodes.push(
+								this.wrapAssignment(
+									identifier(declaration.id ? declaration.id.name : declaration.name, node), // fixme
+									declaration.init || literal(null, undefined, node),
+									node,
+								),
+							)
 						}
-						return this.replaceMany(nodes, node);
+						return this.replaceMany(nodes, node)
 					}
 
 					// function declarations
 					if (node.type === 'FunctionDeclaration') {
-						return this.wrapAssignment(
-							node.id!,
-							functionExpression(
-								node.body,
-								node.params,
-								node,
-							),
-							node,
-						);
+						return this.wrapAssignment(node.id!, functionExpression(node.body, node.params, node), node)
 					}
 				}
-				return node;
+				return node
 			},
-			leave: () => { i--; },
-		});
+			leave: () => {
+				i--
+			},
+		})
 	}
 
 	/**
@@ -143,65 +134,73 @@ export class ScopeTransformer extends Transformer {
 		replace(this.ast, {
 			enter: (node, parent: any) => {
 				if (node.type === 'Identifier' && node.name !== 'undefined') {
-
 					// ignore identifiers we added ourselves
-					if ([Transformer.STDLIB_NAME, Transformer.SCOPE_NAME, Transformer.ENUMS_NAME, Transformer.GLOBAL_NAME, Transformer.ITEMS_NAME, Transformer.PLAYER_NAME, Transformer.VBSHELPER_NAME].includes(node.name)) {
-						return node;
+					if (
+						[
+							Transformer.STDLIB_NAME,
+							Transformer.SCOPE_NAME,
+							Transformer.ENUMS_NAME,
+							Transformer.GLOBAL_NAME,
+							Transformer.ITEMS_NAME,
+							Transformer.PLAYER_NAME,
+							Transformer.VBSHELPER_NAME,
+						].includes(node.name)
+					) {
+						return node
 					}
 
 					// ignore "this"
-					const topParent = this.getTopParentNode(parent);
+					const topParent = this.getTopParentNode(parent)
 					if (topParent && topParent.type === 'ThisExpression') {
-						return node;
+						return node
 					}
 
-					const varScope = this.findScope(this.getVarName(node, parent), (node as any).__scope);
-					const inRootScope = !varScope || varScope === this.rootScope; // !varScope because we can't find the declaration, in which case it's part of an external file, where we assume it was declared in the root scope.
+					const varScope = this.findScope(this.getVarName(node, parent), (node as any).__scope)
+					const inRootScope = !varScope || varScope === this.rootScope // !varScope because we can't find the declaration, in which case it's part of an external file, where we assume it was declared in the root scope.
 					if (!this.isKnown(node, parent) && inRootScope) {
-						if (parent && !['FunctionDeclaration', 'FunctionExpression', 'ClassDeclaration', 'MethodDefinition', 'VariableDeclarator'].includes(parent.type)) {
-							return memberExpression(
-								identifier(Transformer.SCOPE_NAME, node),
-								node,
-								false,
-								node,
-							);
+						if (
+							parent &&
+							![
+								'FunctionDeclaration',
+								'FunctionExpression',
+								'ClassDeclaration',
+								'MethodDefinition',
+								'VariableDeclarator',
+							].includes(parent.type)
+						) {
+							return memberExpression(identifier(Transformer.SCOPE_NAME, node), node, false, node)
 						}
 					}
 				}
-				return node;
+				return node
 			},
-		});
+		})
 	}
 
 	private wrapAssignment(left: Identifier, right: Expression, node?: BaseNode): ExpressionStatement {
 		return expressionStatement(
 			assignmentExpression(
-				memberExpression(
-					identifier(Transformer.SCOPE_NAME, node),
-					left,
-					false,
-					node,
-				),
+				memberExpression(identifier(Transformer.SCOPE_NAME, node), left, false, node),
 				'=',
 				right,
 				node,
 			),
 			node,
-		);
+		)
 	}
 
 	private getVarName(node: any, parent: any): string {
 		if (parent && parent.type === 'MemberExpression') {
-			return this.getTopMemberName(parent);
+			return this.getTopMemberName(parent)
 		}
-		return node.name;
+		return node.name
 	}
 
 	private findScope(name: string, currentScope: any): any {
 		if (!currentScope) {
-			return null;
+			return null
 		}
-		const variable = currentScope.variables.find((v: any) => v.name === name);
-		return variable ? currentScope : this.findScope(name, currentScope.upper);
+		const variable = currentScope.variables.find((v: any) => v.name === name)
+		return variable ? currentScope : this.findScope(name, currentScope.upper)
 	}
 }

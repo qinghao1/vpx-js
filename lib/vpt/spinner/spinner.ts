@@ -17,67 +17,80 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { EventProxy } from '../../game/event-proxy';
-import { IHittable } from '../../game/ihittable';
-import { IMovable } from '../../game/imovable';
-import { IPlayable } from '../../game/iplayable';
-import { IRenderable, Meshes } from '../../game/irenderable';
-import { IScriptable } from '../../game/iscriptable';
-import { Player } from '../../game/player';
-import { Storage } from '../../io/ole-doc';
-import { Matrix3D } from '../../math/matrix3d';
-import { HitCircle } from '../../physics/hit-circle';
-import { HitObject } from '../../physics/hit-object';
-import { MoverObject } from '../../physics/mover-object';
-import { Item } from '../item';
-import { Table } from '../table/table';
-import { SpinnerApi } from './spinner-api';
-import { SpinnerData } from './spinner-data';
-import { SpinnerHit } from './spinner-hit';
-import { SpinnerHitGenerator } from './spinner-hit-generator';
-import { SpinnerMeshGenerator } from './spinner-mesh-generator';
-import { SpinnerState } from './spinner-state';
-import { SpinnerUpdater } from './spinner-updater';
+import { EventProxy } from '../../game/event-proxy'
+import type { IHittable } from '../../game/ihittable'
+import type { IMovable } from '../../game/imovable'
+import type { IPlayable } from '../../game/iplayable'
+import type { IRenderable, Meshes } from '../../game/irenderable'
+import type { IScriptable } from '../../game/iscriptable'
+import type { Player } from '../../game/player'
+import type { Storage } from '../../io/ole-doc'
+import { Matrix3D } from '../../math/matrix3d'
+import type { HitCircle } from '../../physics/hit-circle'
+import type { HitObject } from '../../physics/hit-object'
+import type { MoverObject } from '../../physics/mover-object'
+import { Item } from '../item'
+import type { Table } from '../table/table'
+import { SpinnerApi } from './spinner-api'
+import { SpinnerData } from './spinner-data'
+import { SpinnerHit } from './spinner-hit'
+import { SpinnerHitGenerator } from './spinner-hit-generator'
+import { SpinnerMeshGenerator } from './spinner-mesh-generator'
+import { SpinnerState } from './spinner-state'
+import { SpinnerUpdater } from './spinner-updater'
 
 /**
  * VPinball's spinners.
  *
  * @see https://github.com/vpinball/vpinball/blob/master/spinner.cpp
  */
-export class Spinner extends Item<SpinnerData> implements IRenderable<SpinnerState>, IPlayable, IMovable, IHittable, IScriptable<SpinnerApi> {
-
-	private readonly meshGenerator: SpinnerMeshGenerator;
-	private readonly state: SpinnerState;
-	private readonly hitGenerator: SpinnerHitGenerator;
-	private readonly updater: SpinnerUpdater;
-	private hit?: SpinnerHit;
-	private hitCircles: HitCircle[] = [];
-	private api?: SpinnerApi;
+export class Spinner
+	extends Item<SpinnerData>
+	implements IRenderable<SpinnerState>, IPlayable, IMovable, IHittable, IScriptable<SpinnerApi>
+{
+	private readonly meshGenerator: SpinnerMeshGenerator
+	private readonly state: SpinnerState
+	private readonly hitGenerator: SpinnerHitGenerator
+	private readonly updater: SpinnerUpdater
+	private hit?: SpinnerHit
+	private hitCircles: HitCircle[] = []
+	private api?: SpinnerApi
 
 	// public props
-	get angleMin() { return this.data.angleMin; }
-	get angleMax() { return this.data.angleMax; }
+	get angleMin() {
+		return this.data.angleMin
+	}
+	get angleMax() {
+		return this.data.angleMax
+	}
 
 	public static async fromStorage(storage: Storage, itemName: string): Promise<Spinner> {
-		const data = await SpinnerData.fromStorage(storage, itemName);
-		return new Spinner(data);
+		const data = await SpinnerData.fromStorage(storage, itemName)
+		return new Spinner(data)
 	}
 
 	public constructor(data: SpinnerData) {
-		super(data);
-		this.state = SpinnerState.claim(this.data.getName(), 0, data.szImage, data.szMaterial, data.showBracket, data.isVisible);
-		this.meshGenerator = new SpinnerMeshGenerator(data);
-		this.hitGenerator = new SpinnerHitGenerator(data);
-		this.updater = new SpinnerUpdater(this.state, this.data, this.meshGenerator);
+		super(data)
+		this.state = SpinnerState.claim(
+			this.data.getName(),
+			0,
+			data.szImage,
+			data.szMaterial,
+			data.showBracket,
+			data.isVisible,
+		)
+		this.meshGenerator = new SpinnerMeshGenerator(data)
+		this.hitGenerator = new SpinnerHitGenerator(data)
+		this.updater = new SpinnerUpdater(this.state, this.data, this.meshGenerator)
 	}
 
 	public isCollidable(): boolean {
-		return true;
+		return true
 	}
 
 	public getMeshes<GEOMETRY>(table: Table): Meshes<GEOMETRY> {
-		const spinner = this.meshGenerator.generateMeshes(table);
-		const meshes: Meshes<GEOMETRY> = {};
+		const spinner = this.meshGenerator.generateMeshes(table)
+		const meshes: Meshes<GEOMETRY> = {}
 
 		return {
 			plate: {
@@ -92,38 +105,38 @@ export class Spinner extends Item<SpinnerData> implements IRenderable<SpinnerSta
 				map: table.getTexture(this.data.szImage),
 				material: table.getMaterial(this.data.szMaterial),
 			},
-		};
+		}
 	}
 
 	public setupPlayer(player: Player, table: Table): void {
-		const height = table.getSurfaceHeight(this.data.szSurface, this.data.center.x, this.data.center.y);
-		this.events = new EventProxy(this);
-		this.hit = new SpinnerHit(this.data, this.state, this.events, height);
-		this.hitCircles = this.hitGenerator.getHitShapes(this.state, height);
-		this.api = new SpinnerApi(this.state, this.hit.getMoverObject(), this.data, this.events, player, table);
+		const height = table.getSurfaceHeight(this.data.szSurface, this.data.center.x, this.data.center.y)
+		this.events = new EventProxy(this)
+		this.hit = new SpinnerHit(this.data, this.state, this.events, height)
+		this.hitCircles = this.hitGenerator.getHitShapes(this.state, height)
+		this.api = new SpinnerApi(this.state, this.hit.getMoverObject(), this.data, this.events, player, table)
 	}
 
 	public getApi(): SpinnerApi {
-		return this.api!;
+		return this.api!
 	}
 
 	public getEventNames(): string[] {
-		return [ 'Init', 'LimitBOS', 'LimitEOS', 'Spin', 'Timer' ];
+		return ['Init', 'LimitBOS', 'LimitEOS', 'Spin', 'Timer']
 	}
 
 	public getHitShapes(): HitObject[] {
-		return [ this.hit!, ...this.hitCircles ];
+		return [this.hit!, ...this.hitCircles]
 	}
 
 	public getMover(): MoverObject {
-		return this.hit!.getMoverObject();
+		return this.hit!.getMoverObject()
 	}
 
 	public getState(): SpinnerState {
-		return this.state;
+		return this.state
 	}
 
 	public getUpdater(): SpinnerUpdater {
-		return this.updater;
+		return this.updater
 	}
 }

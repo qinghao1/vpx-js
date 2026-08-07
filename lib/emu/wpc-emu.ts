@@ -17,93 +17,92 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { GamelistDB, WpcEmuApi, WpcEmuWebWorkerApi } from 'wpc-emu';
-import { IEmulator } from '../game/iemulator';
-import { Vertex2D } from '../math/vertex2d';
-import { logger } from '../util/logger';
-import { EmulatorMessageQueue, MessageType } from './emulator-message-queue';
-import { EmulatorState } from './emulator-state';
-import { OffsetIndex } from './offset-index';
+import { type GamelistDB, WpcEmuApi, type WpcEmuWebWorkerApi } from 'wpc-emu'
+import type { IEmulator } from '../game/iemulator'
+import { Vertex2D } from '../math/vertex2d'
+import { logger } from '../util/logger'
+import { EmulatorMessageQueue, MessageType } from './emulator-message-queue'
+import { EmulatorState } from './emulator-state'
+import { OffsetIndex } from './offset-index'
 
-const WPC_EMU_INCLUDE_RAM_AND_VIDEORAM_DATA = false;
+const WPC_EMU_INCLUDE_RAM_AND_VIDEORAM_DATA = false
 
 /**
  * Provides an interface to WPC-EMU
  */
 export class Emulator implements IEmulator {
-
-	public readonly emulatorState: EmulatorState = new EmulatorState();
-	private readonly emulatorMessageQueue = new EmulatorMessageQueue();
-	private readonly dmdSize = new Vertex2D(128, 32);
-	private paused: boolean = false;
-	private emulator?: WpcEmuApi.Emulator;
+	public readonly emulatorState: EmulatorState = new EmulatorState()
+	private readonly emulatorMessageQueue = new EmulatorMessageQueue()
+	private readonly dmdSize = new Vertex2D(128, 32)
+	private paused: boolean = false
+	private emulator?: WpcEmuApi.Emulator
 
 	constructor() {
-		this.emulator = undefined;
+		this.emulator = undefined
 	}
 
 	public async loadGame(gameEntry: GamelistDB.GameEntry, romContent: Uint8Array) {
-		const romData: GamelistDB.RomData = { u06: romContent };
-		this.emulator = await WpcEmuApi.initVMwithRom(romData, gameEntry);
-		this.emulator.reset();
+		const romData: GamelistDB.RomData = { u06: romContent }
+		this.emulator = await WpcEmuApi.initVMwithRom(romData, gameEntry)
+		this.emulator.reset()
 
 		// Let the ROM boot, run for 1000ms
-		this.emulator.executeCycleForTime(1000, 4);
+		this.emulator.executeCycleForTime(1000, 4)
 
 		// Set initial state for emulator and press ESC to remove the initial
 		// message that the RAM was cleared
-		this.emulatorMessageQueue.addMessage(MessageType.CabinetInput, 16);
-		this.emulatorMessageQueue.replayMessages(this);
+		this.emulatorMessageQueue.addMessage(MessageType.CabinetInput, 16)
+		this.emulatorMessageQueue.replayMessages(this)
 
 		this.registerAudioConsumer((audioCallback) => {
-			logger().debug('audioCallback', audioCallback);
-		});
+			logger().debug('audioCallback', audioCallback)
+		})
 	}
 
 	public isInitialized(): boolean {
-		return this.emulator !== undefined;
+		return this.emulator !== undefined
 	}
 
 	public getVersion(): string {
-		return WpcEmuApi.getVersion();
+		return WpcEmuApi.getVersion()
 	}
 
 	public setPaused(paused: boolean) {
-		this.paused = paused;
+		this.paused = paused
 	}
 
 	public getPaused(): boolean {
-		return this.paused;
+		return this.paused
 	}
 
 	public registerAudioConsumer(callbackFunction: (audioCallback: WpcEmuApi.AudioMessage) => void): void {
 		if (!this.emulator) {
-			return;
+			return
 		}
-		this.emulator.registerAudioConsumer(callbackFunction);
+		this.emulator.registerAudioConsumer(callbackFunction)
 	}
 
 	public emuSimulateCycle(advanceByMs: number): number {
 		if (!this.emulator) {
-			this.emulatorMessageQueue.addMessage(MessageType.ExecuteTicks, advanceByMs);
-			return 0;
+			this.emulatorMessageQueue.addMessage(MessageType.ExecuteTicks, advanceByMs)
+			return 0
 		}
 		if (this.paused) {
-			logger().debug('PAUSED');
-			return 0;
+			logger().debug('PAUSED')
+			return 0
 		}
-		const executedCycles: number = this.emulator.executeCycleForTime(advanceByMs, 16);
-		const emuState: WpcEmuWebWorkerApi.EmuState = this.emulator.getUiState(WPC_EMU_INCLUDE_RAM_AND_VIDEORAM_DATA);
+		const executedCycles: number = this.emulator.executeCycleForTime(advanceByMs, 16)
+		const emuState: WpcEmuWebWorkerApi.EmuState = this.emulator.getUiState(WPC_EMU_INCLUDE_RAM_AND_VIDEORAM_DATA)
 		//logger().debug('TICKS', emuState.cpuState.tickCount);
 
 		// TODO - we need to stay in sync with VPX as the expected ticks to run and the actual ticks that did run will not match
-		this.emulatorState.updateState(emuState.asic);
-		return executedCycles;
+		this.emulatorState.updateState(emuState.asic)
+		return executedCycles
 	}
 
 	public getSwitchInput(switchNr: number): number {
-		const index = OffsetIndex.fromWpcMatrix(switchNr);
-		return this.emulatorState.getSwitchState(index);
+		const index = OffsetIndex.fromWpcMatrix(switchNr)
+		return this.emulatorState.getSwitchState(index)
 	}
 
 	/**
@@ -111,16 +110,16 @@ export class Emulator implements IEmulator {
 	 * @param lampNr WPC-Numbering (11..88)
 	 */
 	public getLampState(lampNr: number): number {
-		const index = OffsetIndex.fromWpcMatrix(lampNr);
-		return this.emulatorState.getLampState(index);
+		const index = OffsetIndex.fromWpcMatrix(lampNr)
+		return this.emulatorState.getLampState(index)
 	}
 
 	public getSolenoidState(SolenoidNr: number): number {
-		return this.emulatorState.getSolenoidState(SolenoidNr);
+		return this.emulatorState.getSolenoidState(SolenoidNr)
 	}
 
 	public getGIState(giNr: number): number {
-		return this.emulatorState.getGIState(giNr);
+		return this.emulatorState.getGIState(giNr)
 	}
 
 	/**
@@ -131,35 +130,35 @@ export class Emulator implements IEmulator {
 	public setSwitchInput(switchNr: number, optionalEnableSwitch?: boolean): boolean {
 		if (!this.emulator) {
 			if (optionalEnableSwitch === true) {
-				this.emulatorMessageQueue.addMessage(MessageType.SetSwitchInput, switchNr);
+				this.emulatorMessageQueue.addMessage(MessageType.SetSwitchInput, switchNr)
 			} else if (optionalEnableSwitch === false) {
-				this.emulatorMessageQueue.addMessage(MessageType.ClearSwitchInput, switchNr);
+				this.emulatorMessageQueue.addMessage(MessageType.ClearSwitchInput, switchNr)
 			} else {
-				this.emulatorMessageQueue.addMessage(MessageType.ToggleSwitchInput, switchNr);
+				this.emulatorMessageQueue.addMessage(MessageType.ToggleSwitchInput, switchNr)
 			}
-			return true;
+			return true
 		}
-		this.emulator.setSwitchInput(switchNr, optionalEnableSwitch);
-		return true;
+		this.emulator.setSwitchInput(switchNr, optionalEnableSwitch)
+		return true
 	}
 
 	public setCabinetInput(value: number): void {
 		if (!this.emulator) {
-			this.emulatorMessageQueue.addMessage(MessageType.CabinetInput, value);
-			return;
+			this.emulatorMessageQueue.addMessage(MessageType.CabinetInput, value)
+			return
 		}
-		this.emulator.setCabinetInput(value);
+		this.emulator.setCabinetInput(value)
 	}
 
 	public setFliptronicsInput(value: string, optionalEnableSwitch?: boolean): void {
 		if (!this.emulator) {
-			return;
+			return
 		}
-		this.emulator.setFliptronicsInput(value, optionalEnableSwitch);
+		this.emulator.setFliptronicsInput(value, optionalEnableSwitch)
 	}
 
 	public getDmdDimensions(): Vertex2D {
-		return this.dmdSize;
+		return this.dmdSize
 	}
 
 	/**
@@ -167,22 +166,21 @@ export class Emulator implements IEmulator {
 	 * values range from 0 (dark) to 3 (bright) - this means the Uint8Array needs to be postprocessed
 	 */
 	public getDmdFrame(): Uint8Array {
-		return this.emulatorState.getDmdScreen();
+		return this.emulatorState.getDmdScreen()
 	}
 
 	public getDipSwitchByte(): number {
 		if (!this.emulator) {
-			return 0;
+			return 0
 		}
-		return this.emulator.getDipSwitchByte();
+		return this.emulator.getDipSwitchByte()
 	}
 
 	public setDipSwitchByte(dipSwitch: number): void {
 		if (!this.emulator) {
-			this.emulatorMessageQueue.addMessage(MessageType.SetDipByte, dipSwitch);
-			return;
+			this.emulatorMessageQueue.addMessage(MessageType.SetDipByte, dipSwitch)
+			return
 		}
-		this.emulator.setDipSwitchByte(dipSwitch);
+		this.emulator.setDipSwitchByte(dipSwitch)
 	}
-
 }

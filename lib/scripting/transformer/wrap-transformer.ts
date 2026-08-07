@@ -17,7 +17,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { Program, Statement } from 'estree';
+import type { Program, Statement } from 'estree'
 import {
 	arrowFunctionExpression,
 	assignmentExpression,
@@ -26,8 +26,8 @@ import {
 	identifier,
 	memberExpression,
 	program,
-} from '../estree';
-import { Transformer } from './transformer';
+} from '../estree'
+import { Transformer } from './transformer'
 
 /**
  * This transformer wraps the program into a function that provides the
@@ -37,14 +37,13 @@ import { Transformer } from './transformer';
  * @see ScopeTransformer
  */
 export class WrapTransformer extends Transformer {
-
 	constructor(ast: Program) {
-		super(ast);
+		super(ast)
 	}
 
 	public transform(mainFunctionName?: string, globalObjectName?: string): Program {
 		if (!mainFunctionName) {
-			return this.ast;
+			return this.ast
 		}
 		return program([
 			expressionStatement(
@@ -53,19 +52,17 @@ export class WrapTransformer extends Transformer {
 						? memberExpression(identifier(globalObjectName), identifier(mainFunctionName))
 						: identifier(mainFunctionName),
 					'=',
-					arrowFunctionExpression(false,
-						blockStatement(this.ast.body as Statement[]),
-						[
-							identifier(Transformer.SCOPE_NAME),
-							identifier(Transformer.ITEMS_NAME),
-							identifier(Transformer.ENUMS_NAME),
-							identifier(Transformer.GLOBAL_NAME),
-							identifier(Transformer.STDLIB_NAME),
-							identifier(Transformer.VBSHELPER_NAME),
-							identifier(Transformer.PLAYER_NAME),
-						],
-					),
-				)),
-		]);
+					arrowFunctionExpression(false, blockStatement(this.ast.body as Statement[]), [
+						identifier(Transformer.SCOPE_NAME),
+						identifier(Transformer.ITEMS_NAME),
+						identifier(Transformer.ENUMS_NAME),
+						identifier(Transformer.GLOBAL_NAME),
+						identifier(Transformer.STDLIB_NAME),
+						identifier(Transformer.VBSHELPER_NAME),
+						identifier(Transformer.PLAYER_NAME),
+					]),
+				),
+			),
+		])
 	}
 }

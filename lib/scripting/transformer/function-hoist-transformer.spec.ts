@@ -17,38 +17,37 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import * as chai from 'chai';
-import { expect } from 'chai';
-import { ScriptHelper } from '../../../test/script.helper';
-import { TableBuilder } from '../../../test/table-builder';
-import { Player } from '../../game/player';
-import { Table } from '../../vpt/table/table';
-import { FunctionHoistTransformer } from './function-hoist-transformer';
+import * as chai from 'chai'
+import { expect } from 'chai'
+import sinonChai from 'sinon-chai'
+import { ScriptHelper } from '../../../test/script.helper'
+import { TableBuilder } from '../../../test/table-builder'
+import { Player } from '../../game/player'
+import type { Table } from '../../vpt/table/table'
+import { FunctionHoistTransformer } from './function-hoist-transformer'
 
-chai.use(require('sinon-chai'));
+chai.use((sinonChai as any).default ?? sinonChai)
 
 /* tslint:disable:no-unused-expression */
 describe('The scripting function hoist transformer', () => {
-
-	let table: Table;
-	let player: Player;
+	let table: Table
+	let player: Player
 
 	beforeEach(() => {
-		table = new TableBuilder().build();
-		player = new Player(table);
-	});
+		table = new TableBuilder().build()
+		player = new Player(table)
+	})
 
 	it('should move a function to the top', () => {
-		const vbs = `test\nsub test\nend sub`;
-		const js = transform(vbs);
-		expect(js).to.equal(`function test() {\n}\ntest();`);
-	});
-
-});
+		const vbs = `test\nsub test\nend sub`
+		const js = transform(vbs)
+		expect(js).to.equal(`function test() {\n}\ntest();`)
+	})
+})
 
 function transform(vbs: string): string {
-	const scriptHelper = new ScriptHelper();
-	const ast = scriptHelper.vbsToAst(vbs);
-	const eventAst = new FunctionHoistTransformer(ast).transform();
-	return scriptHelper.astToVbs(eventAst);
+	const scriptHelper = new ScriptHelper()
+	const ast = scriptHelper.vbsToAst(vbs)
+	const eventAst = new FunctionHoistTransformer(ast).transform()
+	return scriptHelper.astToVbs(eventAst)
 }

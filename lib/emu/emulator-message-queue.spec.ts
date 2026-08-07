@@ -17,108 +17,119 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import * as chai from 'chai';
-import { expect } from 'chai';
-import { IEmulator } from '../game/iemulator';
-import { Vertex2D } from '../math/vertex2d';
-import { EmulatorMessageQueue, MessageType } from './emulator-message-queue';
+import * as chai from 'chai'
+import { expect } from 'chai'
+import sinonChai from 'sinon-chai'
+import type { IEmulator } from '../game/iemulator'
+import type { Vertex2D } from '../math/vertex2d'
+import { EmulatorMessageQueue, MessageType } from './emulator-message-queue'
 
 /* tslint:disable:no-unused-expression no-string-literal */
-chai.use(require('sinon-chai'));
+chai.use((sinonChai as any).default ?? sinonChai)
 describe('The WPC-EMU message queue', () => {
-
-	let messageQueue: EmulatorMessageQueue;
-	let mockEmulator: IEmulator;
-	let queue: object[];
+	let messageQueue: EmulatorMessageQueue
+	let mockEmulator: IEmulator
+	let queue: object[]
 
 	beforeEach(() => {
-		messageQueue = new EmulatorMessageQueue();
-		queue = [];
-		mockEmulator = new MockEmulator(queue);
-	});
+		messageQueue = new EmulatorMessageQueue()
+		queue = []
+		mockEmulator = new MockEmulator(queue)
+	})
 
 	it('should add switch toggle to queue and replay it', () => {
-		const addedToQueue = messageQueue.addMessage(MessageType.ToggleSwitchInput, 42);
-		messageQueue.replayMessages(mockEmulator);
-		expect(addedToQueue).to.equal(true);
-		expect(queue).to.deep.equal([{
-			optionalEnableSwitch: undefined,
-			switchNr: 42,
-		}]);
-	});
+		const addedToQueue = messageQueue.addMessage(MessageType.ToggleSwitchInput, 42)
+		messageQueue.replayMessages(mockEmulator)
+		expect(addedToQueue).to.equal(true)
+		expect(queue).to.deep.equal([
+			{
+				optionalEnableSwitch: undefined,
+				switchNr: 42,
+			},
+		])
+	})
 
 	it('should add switch set to queue and apply it', () => {
-		messageQueue.addMessage(MessageType.SetSwitchInput, 42);
-		messageQueue.replayMessages(mockEmulator);
-		expect(queue).to.deep.equal([{
-			optionalEnableSwitch: true,
-			switchNr: 42,
-		}]);
-	});
+		messageQueue.addMessage(MessageType.SetSwitchInput, 42)
+		messageQueue.replayMessages(mockEmulator)
+		expect(queue).to.deep.equal([
+			{
+				optionalEnableSwitch: true,
+				switchNr: 42,
+			},
+		])
+	})
 
 	it('should add switch clear to queue and replay it', () => {
-		messageQueue.addMessage(MessageType.ClearSwitchInput, 42);
-		messageQueue.replayMessages(mockEmulator);
-		expect(queue).to.deep.equal([{
-			optionalEnableSwitch: false,
-			switchNr: 42,
-		}]);
-	});
+		messageQueue.addMessage(MessageType.ClearSwitchInput, 42)
+		messageQueue.replayMessages(mockEmulator)
+		expect(queue).to.deep.equal([
+			{
+				optionalEnableSwitch: false,
+				switchNr: 42,
+			},
+		])
+	})
 
 	it('should add cabinet input to queue and replay it', () => {
-		messageQueue.addMessage(MessageType.CabinetInput, 4);
-		messageQueue.replayMessages(mockEmulator);
-		expect(queue).to.deep.equal([{
-			keyNr: 4,
-		}]);
-	});
+		messageQueue.addMessage(MessageType.CabinetInput, 4)
+		messageQueue.replayMessages(mockEmulator)
+		expect(queue).to.deep.equal([
+			{
+				keyNr: 4,
+			},
+		])
+	})
 
 	it('should add execute ticks to queue and replay it', () => {
-		messageQueue.addMessage(MessageType.ExecuteTicks, 4);
-		messageQueue.replayMessages(mockEmulator);
-		expect(queue).to.deep.equal([{
-			dTime: 4,
-		}]);
-	});
+		messageQueue.addMessage(MessageType.ExecuteTicks, 4)
+		messageQueue.replayMessages(mockEmulator)
+		expect(queue).to.deep.equal([
+			{
+				dTime: 4,
+			},
+		])
+	})
 
 	it('should should warn when add entries to queue if already consumed', () => {
-		messageQueue.replayMessages(mockEmulator);
-		const addedToQueue = messageQueue.addMessage(MessageType.SetSwitchInput, 42);
-		expect(addedToQueue).to.equal(false);
-	});
+		messageQueue.replayMessages(mockEmulator)
+		const addedToQueue = messageQueue.addMessage(MessageType.SetSwitchInput, 42)
+		expect(addedToQueue).to.equal(false)
+	})
 
 	it('should add dipswitch to queue and replay it', () => {
-		const addedToQueue = messageQueue.addMessage(MessageType.SetDipByte, 21);
-		messageQueue.replayMessages(mockEmulator);
-		expect(addedToQueue).to.equal(true);
-		expect(queue).to.deep.equal([{
-			dipSwitch: 21,
-		}]);
-	});
-
-});
+		const addedToQueue = messageQueue.addMessage(MessageType.SetDipByte, 21)
+		messageQueue.replayMessages(mockEmulator)
+		expect(addedToQueue).to.equal(true)
+		expect(queue).to.deep.equal([
+			{
+				dipSwitch: 21,
+			},
+		])
+	})
+})
 
 class MockEmulator implements IEmulator {
-	private messages: object[];
+	private messages: object[]
 	constructor(cache: object[]) {
-		this.messages = cache;
+		this.messages = cache
 	}
 	public emuSimulateCycle(dTime: number): void {
-		this.messages.push({dTime});
+		this.messages.push({ dTime })
 	}
 	public getDmdFrame(): Uint8Array {
-		throw new Error('Method not implemented.');
+		throw new Error('Method not implemented.')
 	}
 	public getDmdDimensions(): Vertex2D {
-		throw new Error('Method not implemented.');
+		throw new Error('Method not implemented.')
 	}
 	public setCabinetInput(keyNr: number): void {
-		this.messages.push({keyNr});
+		this.messages.push({ keyNr })
 	}
 	public setSwitchInput(switchNr: number, optionalEnableSwitch?: boolean): void {
-		this.messages.push({switchNr, optionalEnableSwitch});
+		this.messages.push({ switchNr, optionalEnableSwitch })
 	}
 	public setDipSwitchByte(dipSwitch: number): void {
-		this.messages.push({dipSwitch});
+		this.messages.push({ dipSwitch })
 	}
 }

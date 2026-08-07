@@ -17,32 +17,35 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { degToRad } from '../../math/float';
-import { IRenderApi } from '../../render/irender-api';
-import { ItemUpdater } from '../item-updater';
-import { Table } from '../table/table';
-import { GateData } from './gate-data';
-import { GateState } from './gate-state';
+import { degToRad } from '../../math/float'
+import type { IRenderApi } from '../../render/irender-api'
+import { ItemUpdater } from '../item-updater'
+import type { Table } from '../table/table'
+import type { GateData } from './gate-data'
+import type { GateState } from './gate-state'
 
 export class GateUpdater extends ItemUpdater<GateState> {
-
-	private readonly data: GateData;
+	private readonly data: GateData
 
 	constructor(data: GateData, state: GateState) {
-		super(state);
-		this.data = data;
+		super(state)
+		this.data = data
 	}
 
-	public applyState<NODE, GEOMETRY, POINT_LIGHT>(obj: NODE, state: GateState, renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>, table: Table): void {
-
+	public applyState<NODE, GEOMETRY, POINT_LIGHT>(
+		obj: NODE,
+		state: GateState,
+		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
+		table: Table,
+	): void {
 		// update local state
-		Object.assign(this.state, state);
+		Object.assign(this.state, state)
 
-		this.applyVisibility(obj, state, renderApi);
-		this.applyMaterial(obj, state.material, undefined, renderApi, table);
+		this.applyVisibility(obj, state, renderApi)
+		this.applyMaterial(obj, state.material, undefined, renderApi, table)
 
 		if (state.showBracket !== undefined) {
-			renderApi.applyVisibility(state.showBracket, renderApi.findInGroup(obj, `gate.bracket-${state.name}`));
+			renderApi.applyVisibility(state.showBracket, renderApi.findInGroup(obj, `gate.bracket-${state.name}`))
 		}
 
 		if (state.angle !== undefined) {
@@ -54,7 +57,7 @@ export class GateUpdater extends ItemUpdater<GateState> {
 				this.data.rotation,
 				state.angle - degToRad(this.data.angleMin),
 				`gate.wire-${this.state.getName()}`,
-			);
+			)
 		}
 	}
 }

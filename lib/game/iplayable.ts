@@ -17,19 +17,18 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { Table } from '../vpt/table/table';
-import { IItem } from './iitem';
-import { Player } from './player';
+import type { Table } from '../vpt/table/table'
+import type { IItem } from './iitem'
+import type { Player } from './player'
 
 /**
  * A table element that can interact with the game. This corresponds roughly
  * to IEditable in VPinball.
  */
 export interface IPlayable extends IItem {
-
-	setupPlayer(player: Player, table: Table): void;
+	setupPlayer(player: Player, table: Table): void
 }
 
 export function isPlayable(arg: any): arg is IPlayable {
-	return arg.setupPlayer !== undefined;
+	return arg.setupPlayer !== undefined
 }

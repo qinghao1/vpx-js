@@ -17,26 +17,29 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { IRenderApi } from '../../render/irender-api';
-import { ItemUpdater } from '../item-updater';
-import { Table } from '../table/table';
-import { LightData } from './light-data';
-import { LightState } from './light-state';
+import type { IRenderApi } from '../../render/irender-api'
+import { ItemUpdater } from '../item-updater'
+import type { Table } from '../table/table'
+import type { LightData } from './light-data'
+import type { LightState } from './light-state'
 
 export class LightUpdater extends ItemUpdater<LightState> {
-
-	private readonly data: LightData;
+	private readonly data: LightData
 
 	constructor(data: LightData, state: LightState) {
-		super(state);
-		this.data = data;
+		super(state)
+		this.data = data
 	}
 
-	public applyState<NODE, GEOMETRY, POINT_LIGHT>(obj: NODE, state: LightState, renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>, table: Table): void {
-
+	public applyState<NODE, GEOMETRY, POINT_LIGHT>(
+		obj: NODE,
+		state: LightState,
+		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
+		table: Table,
+	): void {
 		// update local state
-		Object.assign(this.state, state);
+		Object.assign(this.state, state)
 
-		renderApi.applyLighting(this.state, this.data.intensity, obj);
+		renderApi.applyLighting(this.state, this.data.intensity, obj)
 	}
 }

@@ -39,34 +39,22 @@
 // Voila, we have extracted a sample and "stretched" it to 8 bits. For samples
 // which are already 8-bit, h === 1 and g === i.
 
-export default function maskColor(
-	maskRed: number,
-	maskGreen: number,
-	maskBlue: number,
-	maskAlpha: number,
-) {
+export default function maskColor(maskRed: number, maskGreen: number, maskBlue: number, maskAlpha: number) {
+	const maskRedR = (~maskRed + 1) & maskRed
+	const maskGreenR = (~maskGreen + 1) & maskGreen
+	const maskBlueR = (~maskBlue + 1) & maskBlue
+	const maskAlphaR = (~maskAlpha + 1) & maskAlpha
 
-	const maskRedR = (~maskRed + 1) & maskRed;
-	const maskGreenR = (~maskGreen + 1) & maskGreen;
-	const maskBlueR = (~maskBlue + 1) & maskBlue;
-	const maskAlphaR = (~maskAlpha + 1) & maskAlpha;
-
-	const shiftedMaskRedL = maskRed / maskRedR + 1;
-	const shiftedMaskGreenL = maskGreen / maskGreenR + 1;
-	const shiftedMaskBlueL = maskBlue / maskBlueR + 1;
-	const shiftedMaskAlphaL = maskAlpha / maskAlphaR + 1;
+	const shiftedMaskRedL = maskRed / maskRedR + 1
+	const shiftedMaskGreenL = maskGreen / maskGreenR + 1
+	const shiftedMaskBlueL = maskBlue / maskBlueR + 1
+	const shiftedMaskAlphaL = maskAlpha / maskAlphaR + 1
 
 	return {
-		shiftRed: (x: number) =>
-			(((x & maskRed) / maskRedR) * 0x100) / shiftedMaskRedL,
-		shiftGreen: (x: number) =>
-			(((x & maskGreen) / maskGreenR) * 0x100) / shiftedMaskGreenL,
-		shiftBlue: (x: number) =>
-			(((x & maskBlue) / maskBlueR) * 0x100) / shiftedMaskBlueL,
+		shiftRed: (x: number) => (((x & maskRed) / maskRedR) * 0x100) / shiftedMaskRedL,
+		shiftGreen: (x: number) => (((x & maskGreen) / maskGreenR) * 0x100) / shiftedMaskGreenL,
+		shiftBlue: (x: number) => (((x & maskBlue) / maskBlueR) * 0x100) / shiftedMaskBlueL,
 		shiftAlpha:
-			maskAlpha !== 0
-				? (x: number) =>
-				(((x & maskAlpha) / maskAlphaR) * 0x100) / shiftedMaskAlphaL
-				: () => 255,
-	};
+			maskAlpha !== 0 ? (x: number) => (((x & maskAlpha) / maskAlphaR) * 0x100) / shiftedMaskAlphaL : () => 255,
+	}
 }

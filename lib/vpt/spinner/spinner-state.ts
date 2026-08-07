@@ -17,73 +17,81 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { Pool } from '../../util/object-pool';
-import { ItemState } from '../item-state';
+import { Pool } from '../../util/object-pool'
+import { ItemState } from '../item-state'
 
 export class SpinnerState extends ItemState {
-
-	public static readonly POOL = new Pool(SpinnerState);
+	public static readonly POOL = new Pool(SpinnerState)
 
 	/**
 	 * Angle in rad
 	 */
-	public angle: number = 0;
-	public texture?: string;
-	public material?: string;
-	public showBracket: boolean = true;
+	public angle: number = 0
+	public texture?: string
+	public material?: string
+	public showBracket: boolean = true
 
 	public constructor() {
-		super();
+		super()
 	}
 
-	public static claim(name: string, angle: number, texture: string | undefined,  material: string | undefined, showBracket: boolean, isVisible: boolean): SpinnerState {
-		const state = SpinnerState.POOL.get();
-		state.name = name;
-		state.angle = angle;
-		state.texture = texture;
-		state.material = material;
-		state.showBracket = showBracket;
-		state.isVisible = isVisible;
-		return state;
+	public static claim(
+		name: string,
+		angle: number,
+		texture: string | undefined,
+		material: string | undefined,
+		showBracket: boolean,
+		isVisible: boolean,
+	): SpinnerState {
+		const state = SpinnerState.POOL.get()
+		state.name = name
+		state.angle = angle
+		state.texture = texture
+		state.material = material
+		state.showBracket = showBracket
+		state.isVisible = isVisible
+		return state
 	}
 
 	public clone(): SpinnerState {
-		return SpinnerState.claim(this.name, this.angle, this.texture, this.material, this.showBracket, this.isVisible);
+		return SpinnerState.claim(this.name, this.angle, this.texture, this.material, this.showBracket, this.isVisible)
 	}
 
 	public diff(state: SpinnerState): SpinnerState {
-		const diff = this.clone();
+		const diff = this.clone()
 		if (diff.angle === state.angle) {
-			delete diff.angle;
+			delete diff.angle
 		}
 		if (diff.texture === state.texture) {
-			delete diff.texture;
+			delete diff.texture
 		}
 		if (diff.material === state.material) {
-			delete diff.material;
+			delete diff.material
 		}
 		if (diff.showBracket === state.showBracket) {
-			delete diff.showBracket;
+			delete diff.showBracket
 		}
 		if (diff.isVisible === state.isVisible) {
-			delete diff.isVisible;
+			delete diff.isVisible
 		}
-		return diff;
+		return diff
 	}
 
 	public release(): void {
-		SpinnerState.POOL.release(this);
+		SpinnerState.POOL.release(this)
 	}
 
 	public equals(state: SpinnerState): boolean {
 		/* istanbul ignore if: we don't actually pass empty states. */
 		if (!state) {
-			return false;
+			return false
 		}
-		return state.angle === this.angle
-			&& state.texture === this.texture
-			&& state.material === this.material
-			&& state.showBracket === this.showBracket
-			&& state.isVisible === this.isVisible;
+		return (
+			state.angle === this.angle &&
+			state.texture === this.texture &&
+			state.material === this.material &&
+			state.showBracket === this.showBracket &&
+			state.isVisible === this.isVisible
+		)
 	}
 }

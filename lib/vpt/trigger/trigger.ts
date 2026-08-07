@@ -17,62 +17,69 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { EventProxy } from '../../game/event-proxy';
-import { IAnimatable, IAnimation } from '../../game/ianimatable';
-import { IHittable } from '../../game/ihittable';
-import { IRenderable, Meshes } from '../../game/irenderable';
-import { IScriptable } from '../../game/iscriptable';
-import { Player } from '../../game/player';
-import { Storage } from '../../io/ole-doc';
-import { Matrix3D } from '../../math/matrix3d';
-import { HitObject } from '../../physics/hit-object';
-import { Enums } from '../enums';
-import { Item } from '../item';
-import { Table } from '../table/table';
-import { TriggerAnimation } from './trigger-animation';
-import { TriggerApi } from './trigger-api';
-import { TriggerData } from './trigger-data';
-import { TriggerHitCircle } from './trigger-hit-circle';
-import { TriggerHitGenerator } from './trigger-hit-generator';
-import { TriggerMeshGenerator } from './trigger-mesh-generator';
-import { TriggerState } from './trigger-state';
-import { TriggerUpdater } from './trigger-updater';
+import { EventProxy } from '../../game/event-proxy'
+import type { IAnimatable, IAnimation } from '../../game/ianimatable'
+import type { IHittable } from '../../game/ihittable'
+import type { IRenderable, Meshes } from '../../game/irenderable'
+import type { IScriptable } from '../../game/iscriptable'
+import type { Player } from '../../game/player'
+import type { Storage } from '../../io/ole-doc'
+import { Matrix3D } from '../../math/matrix3d'
+import type { HitObject } from '../../physics/hit-object'
+import { Enums } from '../enums'
+import { Item } from '../item'
+import type { Table } from '../table/table'
+import { TriggerAnimation } from './trigger-animation'
+import { TriggerApi } from './trigger-api'
+import { TriggerData } from './trigger-data'
+import { TriggerHitCircle } from './trigger-hit-circle'
+import { TriggerHitGenerator } from './trigger-hit-generator'
+import { TriggerMeshGenerator } from './trigger-mesh-generator'
+import { TriggerState } from './trigger-state'
+import { TriggerUpdater } from './trigger-updater'
 
 /**
  * VPinball's triggers.
  *
  * @see https://github.com/vpinball/vpinball/blob/master/trigger.cpp
  */
-export class Trigger extends Item<TriggerData> implements IRenderable<TriggerState>, IHittable, IAnimatable, IScriptable<TriggerApi> {
+export class Trigger
+	extends Item<TriggerData>
+	implements IRenderable<TriggerState>, IHittable, IAnimatable, IScriptable<TriggerApi>
+{
+	private readonly state: TriggerState
+	private readonly meshGenerator: TriggerMeshGenerator
+	private readonly hitGenerator: TriggerHitGenerator
+	private readonly updater: TriggerUpdater
 
-	private readonly state: TriggerState;
-	private readonly meshGenerator: TriggerMeshGenerator;
-	private readonly hitGenerator: TriggerHitGenerator;
-	private readonly updater: TriggerUpdater;
-
-	private api?: TriggerApi;
-	private hits?: HitObject[];
-	private animation?: TriggerAnimation;
+	private api?: TriggerApi
+	private hits?: HitObject[]
+	private animation?: TriggerAnimation
 
 	public static async fromStorage(storage: Storage, itemName: string): Promise<Trigger> {
-		const data = await TriggerData.fromStorage(storage, itemName);
-		return new Trigger(data);
+		const data = await TriggerData.fromStorage(storage, itemName)
+		return new Trigger(data)
 	}
 
 	public constructor(data: TriggerData) {
-		super(data);
-		this.state = TriggerState.claim(data.getName(), 0, data.szMaterial, data.isVisible && data.shape !== Enums.TriggerShape.TriggerNone);
-		this.meshGenerator = new TriggerMeshGenerator(data);
-		this.hitGenerator = new TriggerHitGenerator(data);
-		this.updater = new TriggerUpdater(this.state);
+		super(data)
+		this.state = TriggerState.claim(
+			data.getName(),
+			0,
+			data.szMaterial,
+			data.isVisible && data.shape !== Enums.TriggerShape.TriggerNone,
+		)
+		this.meshGenerator = new TriggerMeshGenerator(data)
+		this.hitGenerator = new TriggerHitGenerator(data)
+		this.updater = new TriggerUpdater(this.state)
 	}
 
 	public getState(): TriggerState {
-		return this.state;
+		return this.state
 	}
 
 	public isCollidable(): boolean {
-		return true;
+		return true
 	}
 
 	public getMeshes<GEOMETRY>(table: Table): Meshes<GEOMETRY> {
@@ -82,38 +89,37 @@ export class Trigger extends Item<TriggerData> implements IRenderable<TriggerSta
 				mesh: this.meshGenerator.getMesh(table).transform(Matrix3D.RIGHT_HANDED),
 				material: table.getMaterial(this.data.szMaterial),
 			},
-		};
+		}
 	}
 
 	public setupPlayer(player: Player, table: Table): void {
-		this.events = new EventProxy(this);
-		this.animation = new TriggerAnimation(this.data, this.state);
+		this.events = new EventProxy(this)
+		this.animation = new TriggerAnimation(this.data, this.state)
 		if (this.data.shape === Enums.TriggerShape.TriggerStar || this.data.shape === Enums.TriggerShape.TriggerButton) {
-			this.hits = [ new TriggerHitCircle(this.data, this.animation, this.events, table) ];
-
+			this.hits = [new TriggerHitCircle(this.data, this.animation, this.events, table)]
 		} else {
-			this.hits = this.hitGenerator.generateHitObjects(this.animation, this.events, table);
+			this.hits = this.hitGenerator.generateHitObjects(this.animation, this.events, table)
 		}
-		this.api = new TriggerApi(this.state, this.data, this.events, player, table);
+		this.api = new TriggerApi(this.state, this.data, this.events, player, table)
 	}
 
 	public getApi(): TriggerApi {
-		return this.api!;
+		return this.api!
 	}
 
 	public getHitShapes(): HitObject[] {
-		return this.hits!;
+		return this.hits!
 	}
 
 	public getAnimation(): IAnimation {
-		return this.animation!;
+		return this.animation!
 	}
 
 	public getUpdater(): TriggerUpdater {
-		return this.updater;
+		return this.updater
 	}
 
 	public getEventNames(): string[] {
-		return [ 'Init', 'Hit', 'Unhit', 'Timer' ];
+		return ['Init', 'Hit', 'Unhit', 'Timer']
 	}
 }

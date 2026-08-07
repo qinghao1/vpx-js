@@ -17,8 +17,8 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { ERR } from '../stdlib/err';
-import { VbsNotImplementedError } from '../vbs-api';
+import { ERR } from '../stdlib/err'
+import { VbsNotImplementedError } from '../vbs-api'
 
 /**
  * Facilitates sequential access to file.
@@ -26,22 +26,21 @@ import { VbsNotImplementedError } from '../vbs-api';
  * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/textstream-object
  */
 export class TextStream {
+	public static readonly MODE_READ = 1
+	public static readonly MODE_WRITE = 2
+	public static readonly MODE_APPEND = 8
 
-	public static readonly MODE_READ = 1;
-	public static readonly MODE_WRITE = 2;
-	public static readonly MODE_APPEND = 8;
+	private readonly filename: string
+	private readonly unicode: boolean
 
-	private readonly filename: string;
-	private readonly unicode: boolean;
-
-	private buffer: Buffer = Buffer.alloc(0);
-	private cursor: number = -1;
-	private mode: number;
+	private buffer: Buffer = Buffer.alloc(0)
+	private cursor: number = -1
+	private mode: number
 
 	constructor(filename: string, unicode: boolean, mode: number) {
-		this.filename = filename;
-		this.unicode = unicode;
-		this.mode = mode;
+		this.filename = filename
+		this.unicode = unicode
+		this.mode = mode
 	}
 
 	/**
@@ -50,7 +49,7 @@ export class TextStream {
 	 */
 	public get AtEndOfLine() {
 		// no usages found
-		throw new VbsNotImplementedError();
+		throw new VbsNotImplementedError()
 	}
 
 	/**
@@ -58,7 +57,7 @@ export class TextStream {
 	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/atendofstream-property
 	 */
 	public get AtEndOfStream(): boolean {
-		return this.cursor === this.buffer.length - 1;
+		return this.cursor === this.buffer.length - 1
 	}
 
 	/**
@@ -67,7 +66,7 @@ export class TextStream {
 	 */
 	public get Column() {
 		// no usages found
-		throw new VbsNotImplementedError();
+		throw new VbsNotImplementedError()
 	}
 
 	/**
@@ -76,7 +75,7 @@ export class TextStream {
 	 */
 	public get Line() {
 		// no usages found
-		throw new VbsNotImplementedError();
+		throw new VbsNotImplementedError()
 	}
 
 	/**
@@ -84,7 +83,7 @@ export class TextStream {
 	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/close-method-textstream-object
 	 */
 	public Close(): void {
-		this.cursor = 0;
+		this.cursor = 0
 		// no file, nothing to close
 	}
 
@@ -95,9 +94,9 @@ export class TextStream {
 	 */
 	public Read(characters: number): string | void {
 		if (this.mode !== TextStream.MODE_READ) {
-			return ERR.Raise(54, undefined, 'Bad file mode');
+			return ERR.Raise(54, undefined, 'Bad file mode')
 		}
-		return this.buffer.slice(this.cursor, this.cursor + characters).toString(this.unicode ? 'utf8' : 'ascii');
+		return this.buffer.slice(this.cursor, this.cursor + characters).toString(this.unicode ? 'utf8' : 'ascii')
 	}
 
 	/**
@@ -106,9 +105,9 @@ export class TextStream {
 	 */
 	public ReadAll(): string | void {
 		if (this.mode !== TextStream.MODE_READ) {
-			return ERR.Raise(54, undefined, 'Bad file mode');
+			return ERR.Raise(54, undefined, 'Bad file mode')
 		}
-		return this.buffer.toString(this.unicode ? 'utf8' : 'ascii');
+		return this.buffer.toString(this.unicode ? 'utf8' : 'ascii')
 	}
 
 	/**
@@ -117,23 +116,23 @@ export class TextStream {
 	 */
 	public ReadLine(): string | void {
 		if (this.mode !== TextStream.MODE_READ) {
-			return ERR.Raise(54, undefined, 'Bad file mode');
+			return ERR.Raise(54, undefined, 'Bad file mode')
 		}
-		const start = this.cursor;
-		let end = this.cursor;
+		const start = this.cursor
+		let end = this.cursor
 		do {
-			this.cursor++;
-			end++;
+			this.cursor++
+			end++
 			if (this.buffer[this.cursor] === 0x0d) {
 				if (this.cursor < this.buffer.length - 2 && this.buffer[this.cursor + 1] === 0x0a) {
-					this.cursor++;
+					this.cursor++
 				}
-				this.cursor++;
-				end--;
-				break;
+				this.cursor++
+				end--
+				break
 			}
-		} while (this.cursor < this.buffer.length - 1);
-		return this.buffer.slice(start, end + 1).toString(this.unicode ? 'utf8' : 'ascii');
+		} while (this.cursor < this.buffer.length - 1)
+		return this.buffer.slice(start, end + 1).toString(this.unicode ? 'utf8' : 'ascii')
 	}
 
 	/**
@@ -143,10 +142,10 @@ export class TextStream {
 	 */
 	public Skip(characters: number): void {
 		if (this.mode !== TextStream.MODE_READ) {
-			return ERR.Raise(54, undefined, 'Bad file mode');
+			return ERR.Raise(54, undefined, 'Bad file mode')
 		}
-		this.cursor += characters;
-		this.clampCursor();
+		this.cursor += characters
+		this.clampCursor()
 	}
 
 	/**
@@ -155,18 +154,18 @@ export class TextStream {
 	 */
 	public SkipLine(): void {
 		if (this.mode !== TextStream.MODE_READ) {
-			return ERR.Raise(54, undefined, 'Bad file mode');
+			return ERR.Raise(54, undefined, 'Bad file mode')
 		}
 		do {
-			this.cursor++;
+			this.cursor++
 			if (this.buffer[this.cursor] === 0x0d) {
 				if (this.cursor < this.buffer.length - 2 && this.buffer[this.cursor + 1] === 0x0a) {
-					this.cursor++;
+					this.cursor++
 				}
-				this.cursor++;
-				return;
+				this.cursor++
+				return
 			}
-		} while (this.cursor < this.buffer.length - 1);
+		} while (this.cursor < this.buffer.length - 1)
 	}
 
 	/**
@@ -175,8 +174,8 @@ export class TextStream {
 	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/write-method
 	 */
 	public Write(data: string): void {
-		this.buffer = Buffer.concat([this.buffer, Buffer.from(data) ]);
-		this.cursorToEnd();
+		this.buffer = Buffer.concat([this.buffer, Buffer.from(data)])
+		this.cursorToEnd()
 	}
 
 	/**
@@ -186,7 +185,7 @@ export class TextStream {
 	 */
 	public WriteBlankLines(lines: number): void {
 		// no usages found
-		throw new VbsNotImplementedError();
+		throw new VbsNotImplementedError()
 	}
 
 	/**
@@ -195,30 +194,30 @@ export class TextStream {
 	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/writeline-method
 	 */
 	public WriteLine(data: string): void {
-		this.Write(data + '\r\n');
+		this.Write(data + '\r\n')
 	}
 
 	public setContent(data: string): this {
-		this.buffer = Buffer.from(data);
-		this.cursorToEnd();
-		return this;
+		this.buffer = Buffer.from(data)
+		this.cursorToEnd()
+		return this
 	}
 
 	public setMode(mode: number): this {
-		this.mode = mode;
-		return this;
+		this.mode = mode
+		return this
 	}
 
 	private clampCursor() {
-		this.cursor = Math.min(Math.max(-1, this.cursor), this.buffer.length - 1);
+		this.cursor = Math.min(Math.max(-1, this.cursor), this.buffer.length - 1)
 	}
 
 	private cursorToEnd() {
-		this.cursor = this.buffer.length - 1;
+		this.cursor = this.buffer.length - 1
 	}
 
 	public cursorToStart(): this {
-		this.cursor = 0;
-		return this;
+		this.cursor = 0
+		return this
 	}
 }

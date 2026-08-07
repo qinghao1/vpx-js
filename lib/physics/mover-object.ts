@@ -1,11 +1,10 @@
 /**
  * Spinner, Gate, Flipper, Plunger and Ball
  */
-import { PlayerPhysics } from '../game/player-physics';
+import type { PlayerPhysics } from '../game/player-physics'
 
 export interface MoverObject {
+	updateDisplacements(dTime: number): void
 
-	updateDisplacements(dTime: number): void;
-
-	updateVelocities(physics: PlayerPhysics): void;
+	updateVelocities(physics: PlayerPhysics): void
 }

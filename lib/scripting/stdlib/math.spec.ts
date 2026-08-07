@@ -17,33 +17,32 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import * as chai from 'chai';
-import { expect } from 'chai';
-import { TableBuilder } from '../../../test/table-builder';
-import { Player } from '../../game/player';
-import { Table } from '../../vpt/table/table';
-import { Transpiler } from '../transpiler';
+import * as chai from 'chai'
+import { expect } from 'chai'
+import sinonChai from 'sinon-chai'
+import { TableBuilder } from '../../../test/table-builder'
+import { Player } from '../../game/player'
+import type { Table } from '../../vpt/table/table'
+import { Transpiler } from '../transpiler'
 
-chai.use(require('sinon-chai'));
+chai.use((sinonChai as any).default ?? sinonChai)
 
 /* tslint:disable:no-unused-expression */
 describe('The VBScript math stdlib', () => {
-
-	let table: Table;
-	let player: Player;
+	let table: Table
+	let player: Player
 
 	before(async () => {
-		table = new TableBuilder().addFlipper('Flipper').build();
-		player = new Player(table);
-	});
+		table = new TableBuilder().addFlipper('Flipper').build()
+		player = new Player(table)
+	})
 
 	it('should provide the Pow function', () => {
-		const scope = {} as any;
-		const vbs = `result = math.pow(2, 10)`;
-		const transpiler = new Transpiler(table, player);
-		transpiler.execute(vbs, scope, 'global');
+		const scope = {} as any
+		const vbs = `result = math.pow(2, 10)`
+		const transpiler = new Transpiler(table, player)
+		transpiler.execute(vbs, scope, 'global')
 
-		expect(scope.result).to.equal(1024);
-	});
-
-});
+		expect(scope.result).to.equal(1024)
+	})
+})

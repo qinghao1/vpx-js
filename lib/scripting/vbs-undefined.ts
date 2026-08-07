@@ -17,37 +17,42 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { ERR, VbsError } from './stdlib/err';
+import { ERR, VbsError } from './stdlib/err'
 
 export class VbsUndefined implements ProxyHandler<any> {
-
 	// tslint:disable-next-line:variable-name
-	private readonly __errSet?: VbsError;
+	private readonly __errSet?: VbsError
 	// tslint:disable-next-line:variable-name
-	private readonly __errGet?: VbsError;
+	private readonly __errGet?: VbsError
 
 	constructor(errSet?: VbsError, errGet?: VbsError) {
-		this.__errSet = errSet;
-		this.__errGet = errGet;
-		return new Proxy(this, this);
+		this.__errSet = errSet
+		this.__errGet = errGet
+		return new Proxy(this, this)
 	}
 
 	public get(target: any, p: string | number | symbol, receiver: any): any {
 		if (p === 'toString') {
-			return () => undefined;
+			return () => undefined
 		}
 		if (typeof p === 'symbol' || ['valueOf', 'toString', 'inspect', '__errGet', '__errSet'].includes(p as string)) {
-			return Reflect.get(target, p);
+			return Reflect.get(target, p)
 		}
 		if (p === '__isUndefined') {
-			return true;
+			return true
 		}
-		ERR.Raise(this.__errGet || new VbsError(`ReferenceError: Cannot get property "${String(p)}" of undefined array element.`, 9));
-		return this;
+		ERR.Raise(
+			this.__errGet ||
+				new VbsError(`ReferenceError: Cannot get property "${String(p)}" of undefined array element.`, 9),
+		)
+		return this
 	}
 
 	public set(target: any, p: string | number | symbol, value: any, receiver: any): boolean {
-		ERR.Raise(this.__errSet || new VbsError(`ReferenceError: Cannot set property "${String(p)}" of undefined array element.`, 9));
-		return true;
+		ERR.Raise(
+			this.__errSet ||
+				new VbsError(`ReferenceError: Cannot set property "${String(p)}" of undefined array element.`, 9),
+		)
+		return true
 	}
 }

@@ -17,7 +17,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { CallExpression, Expression } from 'estree';
+import type { CallExpression, Expression } from 'estree'
 import {
 	arrayExpression,
 	callExpression,
@@ -25,46 +25,46 @@ import {
 	memberExpression,
 	variableDeclaration,
 	variableDeclarator,
-} from '../estree';
-import { ESIToken } from '../grammar/grammar';
-import { Transformer } from '../transformer/transformer';
+} from '../estree'
+import type { ESIToken } from '../grammar/grammar'
+import { Transformer } from '../transformer/transformer'
 
 export function ppVarDecl(node: ESIToken): any {
 	switch (node.type) {
 		case 'VariableMemberDeclaration':
 		case 'VariableMemberDeclarationInline':
-			return ppVariableMemberDeclaration(node);
+			return ppVariableMemberDeclaration(node)
 		case 'VariableIdentifiers':
-			return ppVariableIdentifiers(node);
+			return ppVariableIdentifiers(node)
 		case 'VariableIdentifier':
-			return ppVariableIdentifier(node);
+			return ppVariableIdentifier(node)
 	}
-	return null;
+	return null
 }
 
 function ppVariableMemberDeclaration(node: ESIToken): any {
-	const varDecls = node.children[1].estree;
-	return variableDeclaration('let', varDecls);
+	const varDecls = node.children[1].estree
+	return variableDeclaration('let', varDecls)
 }
 
 function ppVariableIdentifiers(node: ESIToken): any {
-	const estree = [];
+	const estree = []
 	for (const child of node.children) {
 		if (child.type === 'VariableIdentifier') {
-			estree.push(child.estree);
+			estree.push(child.estree)
 		}
 	}
-	return estree;
+	return estree
 }
 
 function ppVariableIdentifier(node: ESIToken): any {
-	const id = node.children[0].estree;
-	let expr: CallExpression | null = null;
+	const id = node.children[0].estree
+	let expr: CallExpression | null = null
 	if (node.children.length > 1) {
-		const args: Expression[] = node.children[1].estree;
+		const args: Expression[] = node.children[1].estree
 		expr = callExpression(memberExpression(identifier(Transformer.VBSHELPER_NAME), identifier('dim')), [
 			arrayExpression(args),
-		]);
+		])
 	}
-	return variableDeclarator(id, expr);
+	return variableDeclarator(id, expr)
 }

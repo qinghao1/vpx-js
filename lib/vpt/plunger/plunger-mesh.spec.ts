@@ -17,37 +17,35 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { GLTF } from 'three/examples/jsm/loaders/GLTFLoader';
+import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader'
 
-import { ThreeHelper } from '../../../test/three.helper';
-import { NodeBinaryReader } from '../../io/binary-reader.node';
-import { Table } from '../table/table';
-import { TableExporter } from '../table/table-exporter';
+import { ThreeHelper } from '../../../test/three.helper'
+import { NodeBinaryReader } from '../../io/binary-reader.node.js'
+import { Table } from '../table/table'
+import { TableExporter } from '../table/table-exporter'
 
-const three = new ThreeHelper();
+const three = new ThreeHelper()
 
 describe('The VPinball plunger generator', () => {
-
-	let gltf: GLTF;
+	let gltf: GLTF
 
 	before(async () => {
-		const table = await Table.load(new NodeBinaryReader(three.fixturePath('table-plunger.vpx')));
-		const exporter = new TableExporter(table);
-		gltf = await three.loadGlb(await exporter.exportGlb({ exportPlayfieldLights: true }));
-	});
+		const table = await Table.load(new NodeBinaryReader(three.fixturePath('table-plunger.vpx')))
+		const exporter = new TableExporter(table)
+		gltf = await three.loadGlb(await exporter.exportGlb({ exportPlayfieldLights: true }))
+	})
 
 	it('should generate a flat plunger', async () => {
-		three.expectObject(gltf, 'plungers', 'FlatPlunger', 'flat');
-	});
+		three.expectObject(gltf, 'plungers', 'FlatPlunger', 'flat')
+	})
 
 	it('should generate a modern plunger', async () => {
-		three.expectObject(gltf, 'plungers', 'ModernPlunger', 'spring');
-		three.expectObject(gltf, 'plungers', 'ModernPlunger', 'rod');
-	});
+		three.expectObject(gltf, 'plungers', 'ModernPlunger', 'spring')
+		three.expectObject(gltf, 'plungers', 'ModernPlunger', 'rod')
+	})
 
 	it('should generate a custom plunger', async () => {
-		three.expectObject(gltf, 'plungers', 'CustomPlunger', 'spring');
-		three.expectObject(gltf, 'plungers', 'CustomPlunger', 'rod');
-	});
-
-});
+		three.expectObject(gltf, 'plungers', 'CustomPlunger', 'spring')
+		three.expectObject(gltf, 'plungers', 'CustomPlunger', 'rod')
+	})
+})

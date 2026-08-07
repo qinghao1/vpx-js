@@ -17,10 +17,10 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { BiffParser } from '../../io/biff-parser';
-import { Storage } from '../../io/ole-doc';
-import { Vertex2D } from '../../math/vertex2d';
-import { ItemData } from '../item-data';
+import { BiffParser } from '../../io/biff-parser'
+import type { Storage } from '../../io/ole-doc'
+import { Vertex2D } from '../../math/vertex2d'
+import { ItemData } from '../item-data'
 
 /**
  * VPinball's timers.
@@ -28,32 +28,35 @@ import { ItemData } from '../item-data';
  * @see https://github.com/vpinball/vpinball/blob/master/timer.cpp
  */
 export class TimerData extends ItemData {
-
-	public vCenter!: Vertex2D;
-	private isBackglass!: boolean;
+	public vCenter!: Vertex2D
+	private isBackglass!: boolean
 
 	public static async fromStorage(storage: Storage, itemName: string): Promise<TimerData> {
-		const timerItem = new TimerData(itemName);
-		await storage.streamFiltered(itemName, 4, BiffParser.stream(timerItem.fromTag.bind(timerItem), {}));
-		return timerItem;
+		const timerItem = new TimerData(itemName)
+		await storage.streamFiltered(itemName, 4, BiffParser.stream(timerItem.fromTag.bind(timerItem), {}))
+		return timerItem
 	}
 
 	private constructor(itemName: string) {
-		super(itemName);
+		super(itemName)
 	}
 
 	public isVisible(): boolean {
-		return false;
+		return false
 	}
 
 	private async fromTag(buffer: Buffer, tag: string, offset: number, len: number): Promise<number> {
 		switch (tag) {
-			case 'VCEN': this.vCenter = Vertex2D.get(buffer); break;
-			case 'BGLS': this.isBackglass = this.getBool(buffer); break;
+			case 'VCEN':
+				this.vCenter = Vertex2D.get(buffer)
+				break
+			case 'BGLS':
+				this.isBackglass = this.getBool(buffer)
+				break
 			default:
-				this.getCommonBlock(buffer, tag, len);
-				break;
+				this.getCommonBlock(buffer, tag, len)
+				break
 		}
-		return 0;
+		return 0
 	}
 }

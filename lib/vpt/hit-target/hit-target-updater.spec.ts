@@ -17,60 +17,56 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import * as chai from 'chai';
-import { expect } from 'chai';
-import { spy } from 'sinon';
-import { TableBuilder } from '../../../test/table-builder';
-import { TestRenderApi } from '../../../test/test-render-api';
-import { Player } from '../../game/player';
-import { Table } from '../table/table';
-import { HitTargetState } from './hit-target-state';
+import * as chai from 'chai'
+import { expect } from 'chai'
+import { spy } from 'sinon'
+import sinonChai from 'sinon-chai'
+import { TableBuilder } from '../../../test/table-builder'
+import { TestRenderApi } from '../../../test/test-render-api'
+import { Player } from '../../game/player'
+import type { Table } from '../table/table'
+import type { HitTargetState } from './hit-target-state'
 
 /* tslint:disable:no-unused-expression */
-chai.use(require('sinon-chai'));
+chai.use((sinonChai as any).default ?? sinonChai)
 
 describe('The VPinball hit target updater', () => {
-
-	let table: Table;
-	let player: Player;
+	let table: Table
+	let player: Player
 
 	beforeEach(() => {
-		table = new TableBuilder()
-			.addMaterial('opaque', { isOpacityActive: false })
-			.addHitTarget('target')
-			.build();
+		table = new TableBuilder().addMaterial('opaque', { isOpacityActive: false }).addHitTarget('target').build()
 
 		// init player
-		player = new Player(table).init();
-	});
+		player = new Player(table).init()
+	})
 
 	it('should update visibility', async () => {
-		table.hitTargets.target.getApi().Visible = false;
-		const states = player.popStates();
+		table.hitTargets.target.getApi().Visible = false
+		const states = player.popStates()
 
-		expect(states.getState<HitTargetState>('target').isVisible).to.equal(false);
-		states.getState<HitTargetState>('target').release();
-	});
+		expect(states.getState<HitTargetState>('target').isVisible).to.equal(false)
+		states.getState<HitTargetState>('target').release()
+	})
 
 	it('should apply visibility', async () => {
-		const renderApi = new TestRenderApi();
-		spy(renderApi, 'applyVisibility');
-		table.hitTargets.target.getUpdater().applyState(null, { isVisible: true } as HitTargetState, renderApi, table);
-		expect(renderApi.applyVisibility).to.have.been.calledOnce;
-	});
+		const renderApi = new TestRenderApi()
+		spy(renderApi, 'applyVisibility')
+		table.hitTargets.target.getUpdater().applyState(null, { isVisible: true } as HitTargetState, renderApi, table)
+		expect(renderApi.applyVisibility).to.have.been.calledOnce
+	})
 
 	it('should apply the material', async () => {
-		const renderApi = new TestRenderApi();
-		spy(renderApi, 'applyMaterial');
-		table.hitTargets.target.getUpdater().applyState(null, { material: 'opaque' } as HitTargetState, renderApi, table);
-		expect(renderApi.applyMaterial).to.have.been.calledOnce;
-	});
+		const renderApi = new TestRenderApi()
+		spy(renderApi, 'applyMaterial')
+		table.hitTargets.target.getUpdater().applyState(null, { material: 'opaque' } as HitTargetState, renderApi, table)
+		expect(renderApi.applyMaterial).to.have.been.calledOnce
+	})
 
 	it('should apply the transformation', async () => {
-		const renderApi = new TestRenderApi();
-		spy(renderApi, 'applyMatrixToNode');
-		table.hitTargets.target.getUpdater().applyState(null, { zOffset: 10 } as HitTargetState, renderApi, table);
-		expect(renderApi.applyMatrixToNode).to.have.been.calledOnce;
-	});
-
-});
+		const renderApi = new TestRenderApi()
+		spy(renderApi, 'applyMatrixToNode')
+		table.hitTargets.target.getUpdater().applyState(null, { zOffset: 10 } as HitTargetState, renderApi, table)
+		expect(renderApi.applyMatrixToNode).to.have.been.calledOnce
+	})
+})

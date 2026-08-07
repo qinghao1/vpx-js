@@ -17,23 +17,26 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { Mesh } from '../mesh';
-import { BallData } from './ball-data';
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { Mesh } from '../mesh'
+import type { BallData } from './ball-data'
 
-const ballMesh = require('../../../res/meshes/ball-mesh.json');
+const ballMeshJson = JSON.parse(readFileSync(resolve(process.cwd(), 'res/meshes/ball-mesh.json'), 'utf-8'))
+
+const ballMesh = ballMeshJson
 
 /**
  * This class creates a ball mesh.
  */
 export class BallMeshGenerator {
-
-	private readonly data: BallData;
+	private readonly data: BallData
 
 	constructor(data: BallData) {
-		this.data = data;
+		this.data = data
 	}
 
 	public getMesh(): Mesh {
-		return Mesh.fromJson(ballMesh);
+		return Mesh.fromJson(ballMesh)
 	}
 }

@@ -17,28 +17,27 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { IAnimation } from '../../game/ianimatable';
-import { PlayerPhysics } from '../../game/player-physics';
-import { Enums } from '../enums';
-import { Table } from '../table/table';
-import { TriggerData } from './trigger-data';
-import { TriggerState } from './trigger-state';
+import type { IAnimation } from '../../game/ianimatable'
+import { PlayerPhysics } from '../../game/player-physics'
+import { Enums } from '../enums'
+import type { Table } from '../table/table'
+import type { TriggerData } from './trigger-data'
+import type { TriggerState } from './trigger-state'
 
 export class TriggerAnimation implements IAnimation {
+	private readonly data: TriggerData
+	private readonly state: TriggerState
 
-	private readonly data: TriggerData;
-	private readonly state: TriggerState;
+	public hitEvent = false
+	public unhitEvent = false
 
-	public hitEvent = false;
-	public unhitEvent = false;
-
-	private timeMsec = 0;
-	private doAnimation: boolean = false;
-	private moveDown: boolean = false;
+	private timeMsec = 0
+	private doAnimation: boolean = false
+	private moveDown: boolean = false
 
 	constructor(data: TriggerData, state: TriggerState) {
-		this.data = data;
-		this.state = state;
+		this.data = data
+		this.state = state
 	}
 
 	public init(): void {
@@ -46,65 +45,64 @@ export class TriggerAnimation implements IAnimation {
 	}
 
 	public triggerAnimationHit(): void {
-		this.hitEvent = true;
+		this.hitEvent = true
 	}
 
 	public triggerAnimationUnhit(): void {
-		this.unhitEvent = true;
+		this.unhitEvent = true
 	}
 
 	public updateAnimation(newTimeMsec: number, table: Table) {
-		const oldTimeMsec = (this.timeMsec < newTimeMsec) ? this.timeMsec : newTimeMsec;
-		this.timeMsec = newTimeMsec;
-		const diffTimeMsec = newTimeMsec - oldTimeMsec;
+		const oldTimeMsec = this.timeMsec < newTimeMsec ? this.timeMsec : newTimeMsec
+		this.timeMsec = newTimeMsec
+		const diffTimeMsec = newTimeMsec - oldTimeMsec
 
-		let animLimit = this.data.shape === Enums.TriggerShape.TriggerStar ? this.data.radius * (1.0 / 5.0) : 32.0;
+		let animLimit = this.data.shape === Enums.TriggerShape.TriggerStar ? this.data.radius * (1.0 / 5.0) : 32.0
 		if (this.data.shape === Enums.TriggerShape.TriggerButton) {
-			animLimit = this.data.radius * (1.0 / 10.0);
+			animLimit = this.data.radius * (1.0 / 10.0)
 		}
 		if (this.data.shape === Enums.TriggerShape.TriggerWireC) {
-			animLimit = 60.0;
+			animLimit = 60.0
 		}
 		if (this.data.shape === Enums.TriggerShape.TriggerWireD) {
-			animLimit = 25.0;
+			animLimit = 25.0
 		}
 
-		const limit = animLimit * table.getScaleZ();
+		const limit = animLimit * table.getScaleZ()
 
 		if (this.hitEvent) {
-			this.doAnimation = true;
-			this.hitEvent = false;
+			this.doAnimation = true
+			this.hitEvent = false
 			// unhitEvent = false;   // Bugfix: If HitEvent and unhitEvent happen at the same time, you want to favor the unhit, otherwise the switch gets stuck down.
-			this.state.heightOffset = 0.0;
-			this.moveDown = true;
+			this.state.heightOffset = 0.0
+			this.moveDown = true
 		}
 		if (this.unhitEvent) {
-			this.doAnimation = true;
-			this.unhitEvent = false;
-			this.hitEvent = false;
-			this.state.heightOffset = limit;
-			this.moveDown = false;
+			this.doAnimation = true
+			this.unhitEvent = false
+			this.hitEvent = false
+			this.state.heightOffset = limit
+			this.moveDown = false
 		}
 
 		if (this.doAnimation) {
-			let step = diffTimeMsec * this.data.animSpeed * table.getScaleZ();
+			let step = diffTimeMsec * this.data.animSpeed * table.getScaleZ()
 			if (this.moveDown) {
-				step = -step;
+				step = -step
 			}
-			this.state.heightOffset += step;
+			this.state.heightOffset += step
 
 			if (this.moveDown) {
 				if (this.state.heightOffset <= -limit) {
-					this.state.heightOffset = -limit;
-					this.doAnimation = false;
-					this.moveDown = false;
+					this.state.heightOffset = -limit
+					this.doAnimation = false
+					this.moveDown = false
 				}
-
 			} else {
 				if (this.state.heightOffset >= 0.0) {
-					this.state.heightOffset = 0.0;
-					this.doAnimation = false;
-					this.moveDown = true;
+					this.state.heightOffset = 0.0
+					this.doAnimation = false
+					this.moveDown = true
 				}
 			}
 		}

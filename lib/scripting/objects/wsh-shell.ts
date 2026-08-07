@@ -17,9 +17,9 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { registry } from '../../io/global-registry';
-import { VbsNotImplementedError } from '../vbs-api';
-import { globalEnvironment, WshEnvironment } from './wsh-environment';
+import { registry } from '../../io/global-registry'
+import { VbsNotImplementedError } from '../vbs-api'
+import { globalEnvironment, type WshEnvironment } from './wsh-environment'
 
 /**
  * Provides access to the native Windows shell.
@@ -27,25 +27,24 @@ import { globalEnvironment, WshEnvironment } from './wsh-environment';
  * @see https://docs.microsoft.com/en-us/previous-versions/windows/internet-explorer/ie-developer/windows-scripting/aew9yb99(v=vs.84)?redirectedfrom=MSDN
  */
 export class WshShell {
-
 	/**
 	 * Retrieves or changes the current active directory.
 	 * @see https://docs.microsoft.com/en-us/previous-versions/windows/internet-explorer/ie-developer/windows-scripting/3cc5edzd%28v%3dvs.84%29
 	 */
-	public CurrentDirectory: string = '.';
+	public CurrentDirectory: string = '.'
 
 	/**
 	 * Returns the WshEnvironment object (a collection of environment variables).
 	 * @see https://docs.microsoft.com/en-us/previous-versions/windows/internet-explorer/ie-developer/windows-scripting/fd7hxfdd%28v%3dvs.84%29
 	 */
-	public Environment: WshEnvironment = globalEnvironment;
+	public Environment: WshEnvironment = globalEnvironment
 
 	/**
 	 * Returns a SpecialFolders object (a collection of special folders).
 	 * @see https://docs.microsoft.com/en-us/previous-versions/windows/internet-explorer/ie-developer/windows-scripting/0ea7b5xe%28v%3dvs.84%29
 	 * @ignore
 	 */
-	public SpecialFolders: {} = {};
+	public SpecialFolders: {} = {}
 
 	/**
 	 * Activates an application window.
@@ -55,7 +54,7 @@ export class WshShell {
 	 */
 	public AppActivate(id: string | number): void {
 		// only used in ultradmd which we currently ignore
-		throw new VbsNotImplementedError();
+		throw new VbsNotImplementedError()
 	}
 
 	/**
@@ -65,7 +64,7 @@ export class WshShell {
 	 */
 	public CreateShortcut(strPathname: string): void {
 		// no usages found
-		throw new VbsNotImplementedError();
+		throw new VbsNotImplementedError()
 	}
 
 	/**
@@ -75,7 +74,7 @@ export class WshShell {
 	 */
 	public Exec(strCommand: string): void {
 		// no usages found (fortunately!)
-		throw new VbsNotImplementedError();
+		throw new VbsNotImplementedError()
 	}
 
 	/**
@@ -85,7 +84,7 @@ export class WshShell {
 	 */
 	public ExpandEnvironmentStrings(strString: string): void {
 		// no usages found
-		throw new VbsNotImplementedError();
+		throw new VbsNotImplementedError()
 	}
 
 	/**
@@ -97,7 +96,7 @@ export class WshShell {
 	 */
 	public LogEvent(intType: number, strMessage: string, strTarget?: string): void {
 		// no usages found
-		throw new VbsNotImplementedError();
+		throw new VbsNotImplementedError()
 	}
 
 	/**
@@ -111,7 +110,7 @@ export class WshShell {
 	 */
 	public Popup(strText: string, nSecondsToWait?: number, strTitle?: string, nType?: number, intButton?: number): void {
 		// no usages found
-		throw new VbsNotImplementedError();
+		throw new VbsNotImplementedError()
 	}
 
 	/**
@@ -121,7 +120,7 @@ export class WshShell {
 	 */
 	public RegDelete(strName: string): void {
 		// no usages found
-		throw new VbsNotImplementedError();
+		throw new VbsNotImplementedError()
 	}
 
 	/**
@@ -131,7 +130,7 @@ export class WshShell {
 	 * @see https://docs.microsoft.com/en-us/previous-versions/windows/internet-explorer/ie-developer/windows-scripting/x05fawxd%28v%3dvs.84%29
 	 */
 	public RegRead(strName: string): any {
-		return registry.regRead(strName);
+		return registry.regRead(strName)
 	}
 
 	/**
@@ -142,7 +141,7 @@ export class WshShell {
 	 * @see https://docs.microsoft.com/en-us/previous-versions/windows/internet-explorer/ie-developer/windows-scripting/yfdfhz1b%28v%3dvs.84%29
 	 */
 	public RegWrite(strName: string, anyValue: any, strType?: string): void {
-		registry.regWrite(strName, anyValue);
+		registry.regWrite(strName, anyValue)
 	}
 
 	/**
@@ -154,7 +153,7 @@ export class WshShell {
 	 */
 	public Run(strCommand: string, intWindowStyle?: number, bWaitOnReturn?: boolean): void {
 		// no usages found
-		throw new VbsNotImplementedError();
+		throw new VbsNotImplementedError()
 	}
 
 	/**
@@ -164,6 +163,6 @@ export class WshShell {
 	 */
 	public SendKeys(s: string): void {
 		// no usages found
-		throw new VbsNotImplementedError();
+		throw new VbsNotImplementedError()
 	}
 }

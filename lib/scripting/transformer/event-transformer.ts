@@ -17,19 +17,21 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { replace } from 'estraverse';
-import { FunctionDeclaration, Program } from 'estree';
-import { IScriptable } from '../../game/iscriptable';
-import { Table } from '../../vpt/table/table';
+import { replace } from 'estraverse'
+import type { FunctionDeclaration, Program } from 'estree'
+import type { IScriptable } from '../../game/iscriptable'
+import { Table } from '../../vpt/table/table'
 import {
 	arrowFunctionExpression,
 	callExpression,
-	expressionStatement, functionDeclaration, functionExpression,
+	expressionStatement,
+	functionDeclaration,
+	functionExpression,
 	identifier,
 	literal,
 	memberExpression,
-} from '../estree';
-import { Transformer } from './transformer';
+} from '../estree'
+import { Transformer } from './transformer'
 
 /**
  * This transforms event subs into proper JavaScript event listeners.
@@ -37,68 +39,62 @@ import { Transformer } from './transformer';
  * Example: `function Plunger_Init() {}` would become: `Plunger.on('Init', () => {})`.
  */
 export class EventTransformer extends Transformer {
-
-	private readonly items: { [p: string]: IScriptable<any> };
+	private readonly items: { [p: string]: IScriptable<any> }
 
 	constructor(ast: Program, items: { [p: string]: IScriptable<any> }) {
-		super(ast);
-		this.items = items;
+		super(ast)
+		this.items = items
 	}
 
 	public transform(): Program {
 		return replace(this.ast, {
 			enter: (node, parent: any) => {
-
 				// must be a function
 				if (node.type !== 'FunctionDeclaration') {
-					return node;
+					return node
 				}
-				const functionNode = (node as FunctionDeclaration);
+				const functionNode = node as FunctionDeclaration
 
 				// must have an id (duh.)
 				if (!functionNode.id) {
-					return node;
+					return node
 				}
 
 				// must have a _Event suffix
 				if (!functionNode.id.name.includes('_')) {
-					return node;
+					return node
 				}
 
 				// split on last index
-				const objName = functionNode.id.name.substr(0, functionNode.id.name.lastIndexOf('_'));
-				const eventName = functionNode.id.name.substr(functionNode.id.name.lastIndexOf('_') + 1);
+				const objName = functionNode.id.name.substr(0, functionNode.id.name.lastIndexOf('_'))
+				const eventName = functionNode.id.name.substr(functionNode.id.name.lastIndexOf('_') + 1)
 
 				// table item must exist
 				if (!this.items[objName]) {
-					return node;
+					return node
 				}
 
 				// table item must support given event
-				const existingEventName = matchEventName(this.items[objName].getEventNames(), eventName);
+				const existingEventName = matchEventName(this.items[objName].getEventNames(), eventName)
 				if (!existingEventName) {
-					return node;
+					return node
 				}
 
-				return expressionStatement(callExpression(
-					memberExpression(
-						identifier(objName),
-						identifier('on'),
-					),
-					[
+				return expressionStatement(
+					callExpression(memberExpression(identifier(objName), identifier('on')), [
 						literal(existingEventName),
 						functionExpression(functionNode.body, functionNode.params),
-					],
-				));
+					]),
+				)
 			},
-		}) as Program;
+		}) as Program
 	}
 }
 
 function matchEventName(eventNames: string[], nameToMatch: string): string | undefined {
 	for (const eventName of eventNames) {
 		if (eventName.toLowerCase() === nameToMatch.toLowerCase()) {
-			return eventName;
+			return eventName
 		}
 	}
 }

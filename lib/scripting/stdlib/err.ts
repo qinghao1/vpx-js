@@ -17,7 +17,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { VbsApi } from '../vbs-api';
+import { VbsApi } from '../vbs-api'
 
 /**
  * The global error object.
@@ -25,44 +25,43 @@ import { VbsApi } from '../vbs-api';
  * @see https://docs.microsoft.com/en-us/dotnet/visual-basic/language-reference/statements/on-error-statement
  */
 export class Err extends VbsApi {
-
 	/**
 	 * Returns or sets a numeric value specifying an error. Number is the Err object's default property. Read/write.
 	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/number-property-visual-basic-for-applications
 	 */
-	public Number: number = 0;
+	public Number: number = 0
 
 	/**
 	 * Returns or sets a string expression containing a descriptive string associated with an object. Read/write.
 	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/description-property-visual-basic-for-applications
 	 */
-	public Description = '';
+	public Description = ''
 
 	/**
 	 * Returns or sets a string expression specifying the name of the object or application that originally generated the error. Read/write.
 	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/source-property-visual-basic-for-applications
 	 */
-	public Source = '';
+	public Source = ''
 
 	/**
 	 * Returns or sets a string expression containing the context ID for a topic in a Help file. Read/write.
 	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/helpcontext-property-visual-basic-for-applications
 	 */
-	public HelpContext = '';
+	public HelpContext = ''
 
 	/**
 	 * Returns or sets a string expression with the fully qualified path to a Help file. Read/write.
 	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/helpfile-property
 	 */
-	public HelpFile = '';
+	public HelpFile = ''
 
-	private doThrow = true;
+	private doThrow = true
 
 	/**
 	 * Generates a run-time error.
 	 * @param codeOrError Error to be thrown
 	 */
-	public Raise(codeOrError: VbsError): void;
+	public Raise(codeOrError: VbsError): void
 	/**
 	 * Generates a run-time error.
 	 * @param code Long integer that identifies the nature of the error. Visual Basic errors (both Visual Basic-defined and user-defined errors) are in the range 0–65535. The range 0–512 is reserved for system errors; the range 513–65535 is available for user-defined errors.
@@ -72,19 +71,25 @@ export class Err extends VbsApi {
 	 * @param helpcontext The context ID identifying a topic within helpfile that provides help for the error. If omitted, the Visual Basic Help file context ID for the error corresponding to the Number property is used, if it exists
 	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/raise-method
 	 */
-	public Raise(code: number, source?: string, description?: string, helpfile?: string, helpcontext?: string): void;
-	public Raise(codeOrError: number | VbsError, source: string = '', description: string = '', helpfile: string = '', helpcontext: string = ''): void {
+	public Raise(code: number, source?: string, description?: string, helpfile?: string, helpcontext?: string): void
+	public Raise(
+		codeOrError: number | VbsError,
+		source: string = '',
+		description: string = '',
+		helpfile: string = '',
+		helpcontext: string = '',
+	): void {
 		if (this.doThrow) {
 			if (typeof codeOrError === 'number') {
-				throw new Error(`Error ${codeOrError}: ${description}`);
+				throw new Error(`Error ${codeOrError}: ${description}`)
 			}
-			throw codeOrError;
+			throw codeOrError
 		}
-		this.Number = typeof codeOrError === 'number' ? codeOrError : codeOrError.code;
-		this.Source = source;
-		this.Description = description;
-		this.HelpFile = helpfile;
-		this.HelpContext = helpcontext;
+		this.Number = typeof codeOrError === 'number' ? codeOrError : codeOrError.code
+		this.Source = source
+		this.Description = description
+		this.HelpFile = helpfile
+		this.HelpContext = helpcontext
 	}
 
 	/**
@@ -92,37 +97,37 @@ export class Err extends VbsApi {
 	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/clear-method-visual-basic-for-applications
 	 */
 	public Clear() {
-		this.Number = 0;
-		this.Description = '';
-		this.Source = '';
-		this.Description = '';
-		this.HelpFile = '';
-		this.HelpContext = '';
+		this.Number = 0
+		this.Description = ''
+		this.Source = ''
+		this.Description = ''
+		this.HelpFile = ''
+		this.HelpContext = ''
 	}
 
 	public OnErrorGoto0(): void {
-		this.doThrow = true;
+		this.doThrow = true
 	}
 
 	public OnErrorResumeNext(): void {
-		this.doThrow = false;
+		this.doThrow = false
 	}
 
 	public valueOf() {
-		return this.Number;
+		return this.Number
 	}
 
 	protected _getPropertyNames(): string[] {
-		return Object.getOwnPropertyNames(Err.prototype);
+		return Object.getOwnPropertyNames(Err.prototype)
 	}
 }
 
-export const ERR = new Err();
+export const ERR = new Err()
 
 export class VbsError extends Error {
-	public readonly code: number;
+	public readonly code: number
 	constructor(message: string, code: number) {
-		super(message);
-		this.code = code;
+		super(message)
+		this.code = code
 	}
 }

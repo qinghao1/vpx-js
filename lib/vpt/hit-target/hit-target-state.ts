@@ -17,70 +17,78 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { Pool } from '../../util/object-pool';
-import { ItemState } from '../item-state';
+import { Pool } from '../../util/object-pool'
+import { ItemState } from '../item-state'
 
 export class HitTargetState extends ItemState {
+	public static readonly POOL = new Pool(HitTargetState)
 
-	public static readonly POOL = new Pool(HitTargetState);
-
-	public zOffset: number = 0;
-	public xRotation: number = 0;
-	public material?: string;
-	public texture?: string;
+	public zOffset: number = 0
+	public xRotation: number = 0
+	public material?: string
+	public texture?: string
 
 	public constructor() {
-		super();
+		super()
 	}
 
-	public static claim(name: string, zOffset: number, xRotation: number, material: string | undefined, texture: string | undefined, isVisible: boolean): HitTargetState {
-		const state = HitTargetState.POOL.get();
-		state.name = name;
-		state.zOffset = zOffset;
-		state.xRotation = xRotation;
-		state.material = material;
-		state.texture = texture;
-		state.isVisible = isVisible;
-		return state;
+	public static claim(
+		name: string,
+		zOffset: number,
+		xRotation: number,
+		material: string | undefined,
+		texture: string | undefined,
+		isVisible: boolean,
+	): HitTargetState {
+		const state = HitTargetState.POOL.get()
+		state.name = name
+		state.zOffset = zOffset
+		state.xRotation = xRotation
+		state.material = material
+		state.texture = texture
+		state.isVisible = isVisible
+		return state
 	}
 
 	public clone(): HitTargetState {
-		return HitTargetState.claim(this.name, this.zOffset, this.xRotation, this.material, this.texture, this.isVisible);
+		return HitTargetState.claim(this.name, this.zOffset, this.xRotation, this.material, this.texture, this.isVisible)
 	}
 
 	public diff(state: HitTargetState): HitTargetState {
-		const diff = this.clone();
+		const diff = this.clone()
 		if (diff.zOffset === state.zOffset) {
-			delete diff.zOffset;
+			delete diff.zOffset
 		}
 		if (diff.xRotation === state.xRotation) {
-			delete diff.xRotation;
+			delete diff.xRotation
 		}
 		if (diff.material === state.material) {
-			delete diff.material;
+			delete diff.material
 		}
 		if (diff.texture === state.texture) {
-			delete diff.texture;
+			delete diff.texture
 		}
 		if (diff.isVisible === state.isVisible) {
-			delete diff.isVisible;
+			delete diff.isVisible
 		}
-		return diff;
+		return diff
 	}
 
 	public release(): void {
-		HitTargetState.POOL.release(this);
+		HitTargetState.POOL.release(this)
 	}
 
 	public equals(state: HitTargetState): boolean {
 		/* istanbul ignore if: we don't actually pass empty states. */
 		if (!state) {
-			return false;
+			return false
 		}
-		return state.zOffset === this.zOffset
-			&& state.xRotation === this.xRotation
-			&& state.material === this.material
-			&& state.texture === this.texture
-			&& state.isVisible === this.isVisible;
+		return (
+			state.zOffset === this.zOffset &&
+			state.xRotation === this.xRotation &&
+			state.material === this.material &&
+			state.texture === this.texture &&
+			state.isVisible === this.isVisible
+		)
 	}
 }

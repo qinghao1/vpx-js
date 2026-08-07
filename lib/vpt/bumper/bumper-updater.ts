@@ -17,96 +17,122 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { degToRad } from '../../math/float';
-import { Matrix3D } from '../../math/matrix3d';
-import { IRenderApi } from '../../render/irender-api';
-import { ItemUpdater } from '../item-updater';
-import { Material } from '../material';
-import { Table } from '../table/table';
-import { BumperData } from './bumper-data';
-import { BumperState } from './bumper-state';
+import { degToRad } from '../../math/float'
+import { Matrix3D } from '../../math/matrix3d'
+import type { IRenderApi } from '../../render/irender-api'
+import { ItemUpdater } from '../item-updater'
+import type { Material } from '../material'
+import type { Table } from '../table/table'
+import type { BumperData } from './bumper-data'
+import type { BumperState } from './bumper-state'
 
 export class BumperUpdater extends ItemUpdater<BumperState> {
-
-	private readonly data: BumperData;
+	private readonly data: BumperData
 
 	constructor(state: BumperState, data: BumperData) {
-		super(state);
-		this.data = data;
+		super(state)
+		this.data = data
 	}
 
-	public applyState<NODE, GEOMETRY, POINT_LIGHT>(obj: NODE, state: BumperState, renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>, table: Table): void {
-
+	public applyState<NODE, GEOMETRY, POINT_LIGHT>(
+		obj: NODE,
+		state: BumperState,
+		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
+		table: Table,
+	): void {
 		// update local state
-		Object.assign(this.state, state);
+		Object.assign(this.state, state)
 
-		this.applyAnimationState(obj, state, renderApi, table);
-		this.applyChildren(obj, state, renderApi, table);
+		this.applyAnimationState(obj, state, renderApi, table)
+		this.applyChildren(obj, state, renderApi, table)
 	}
 
-	private applyAnimationState<NODE, GEOMETRY, POINT_LIGHT>(obj: NODE, state: BumperState, renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>, table: Table) {
-
+	private applyAnimationState<NODE, GEOMETRY, POINT_LIGHT>(
+		obj: NODE,
+		state: BumperState,
+		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
+		table: Table,
+	) {
 		if (state.ringOffset !== undefined) {
-			this.applyRingState(obj, state, renderApi);
+			this.applyRingState(obj, state, renderApi)
 		}
 		if (state.skirtRotX !== undefined || state.skirtRotY !== undefined) {
-			this.applySkirtState(obj, state, renderApi, table);
+			this.applySkirtState(obj, state, renderApi, table)
 		}
 	}
 
-	private applyRingState<NODE, GEOMETRY, POINT_LIGHT>(obj: NODE, state: BumperState, renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>) {
-		const ringObj = renderApi.findInGroup(obj, `bumper-ring-${this.state.getName()}`);
+	private applyRingState<NODE, GEOMETRY, POINT_LIGHT>(
+		obj: NODE,
+		state: BumperState,
+		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
+	) {
+		const ringObj = renderApi.findInGroup(obj, `bumper-ring-${this.state.getName()}`)
 		if (ringObj) {
-			const matrix = Matrix3D.claim().setTranslation(0, 0, -state.ringOffset);
-			renderApi.applyMatrixToNode(matrix, ringObj);
-			Matrix3D.release(matrix);
+			const matrix = Matrix3D.claim().setTranslation(0, 0, -state.ringOffset)
+			renderApi.applyMatrixToNode(matrix, ringObj)
+			Matrix3D.release(matrix)
 		}
 	}
 
 	/* istanbul ignore next: this looks weird. test when sure it's the correct "animation" */
-	private applySkirtState<NODE, GEOMETRY, POINT_LIGHT>(obj: NODE, state: BumperState, renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>, table: Table) {
-		const skirtObj = renderApi.findInGroup(obj, `bumper-socket-${this.state.getName()}`);
+	private applySkirtState<NODE, GEOMETRY, POINT_LIGHT>(
+		obj: NODE,
+		state: BumperState,
+		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
+		table: Table,
+	) {
+		const skirtObj = renderApi.findInGroup(obj, `bumper-socket-${this.state.getName()}`)
 		if (skirtObj) {
-			const height = table.getSurfaceHeight(this.data.szSurface, this.data.center.x, this.data.center.y) * table.getScaleZ();
-			const matToOrigin = Matrix3D.claim().setTranslation(-this.data.center.x, -this.data.center.y, height);
-			const matFromOrigin = Matrix3D.claim().setTranslation(this.data.center.x, this.data.center.y, -height);
-			const matRotX = Matrix3D.claim().rotateXMatrix(degToRad(this.state.skirtRotX));
-			const matRotY = Matrix3D.claim().rotateYMatrix(degToRad(this.state.skirtRotY));
+			const height =
+				table.getSurfaceHeight(this.data.szSurface, this.data.center.x, this.data.center.y) * table.getScaleZ()
+			const matToOrigin = Matrix3D.claim().setTranslation(-this.data.center.x, -this.data.center.y, height)
+			const matFromOrigin = Matrix3D.claim().setTranslation(this.data.center.x, this.data.center.y, -height)
+			const matRotX = Matrix3D.claim().rotateXMatrix(degToRad(this.state.skirtRotX))
+			const matRotY = Matrix3D.claim().rotateYMatrix(degToRad(this.state.skirtRotY))
 
-			const matrix = matToOrigin.multiply(matRotY).multiply(matRotX).multiply(matFromOrigin);
+			const matrix = matToOrigin.multiply(matRotY).multiply(matRotX).multiply(matFromOrigin)
 
-			renderApi.applyMatrixToNode(matrix, skirtObj);
-			Matrix3D.release(matToOrigin, matFromOrigin, matRotX, matRotY);
+			renderApi.applyMatrixToNode(matrix, skirtObj)
+			Matrix3D.release(matToOrigin, matFromOrigin, matRotX, matRotY)
 		}
 	}
 
-	private applyChildren<NODE, GEOMETRY, POINT_LIGHT>(obj: NODE, state: BumperState, renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>, table: Table): void {
+	private applyChildren<NODE, GEOMETRY, POINT_LIGHT>(
+		obj: NODE,
+		state: BumperState,
+		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
+		table: Table,
+	): void {
 		if (state.baseMaterial || state.isBaseVisible !== undefined) {
-			const child = renderApi.findInGroup(obj, `bumper-base-${state.name}`)!;
-			this.applyChild(child, state.isBaseVisible, table.getMaterial(this.state.baseMaterial), renderApi);
+			const child = renderApi.findInGroup(obj, `bumper-base-${state.name}`)!
+			this.applyChild(child, state.isBaseVisible, table.getMaterial(this.state.baseMaterial), renderApi)
 		}
 		if (state.capMaterial || state.isCapVisible !== undefined) {
-			const child = renderApi.findInGroup(obj, `bumper-cap-${state.name}`)!;
-			this.applyChild(child, state.isCapVisible, table.getMaterial(this.state.capMaterial), renderApi);
+			const child = renderApi.findInGroup(obj, `bumper-cap-${state.name}`)!
+			this.applyChild(child, state.isCapVisible, table.getMaterial(this.state.capMaterial), renderApi)
 		}
 		if (state.ringMaterial || state.isRingVisible !== undefined) {
-			const child = renderApi.findInGroup(obj, `bumper-ring-${state.name}`)!;
-			this.applyChild(child, state.isRingVisible, table.getMaterial(this.state.ringMaterial), renderApi);
+			const child = renderApi.findInGroup(obj, `bumper-ring-${state.name}`)!
+			this.applyChild(child, state.isRingVisible, table.getMaterial(this.state.ringMaterial), renderApi)
 		}
 		if (state.skirtMaterial || state.isSkirtVisible !== undefined) {
-			const child = renderApi.findInGroup(obj, `bumper-socket-${state.name}`)!;
-			this.applyChild(child, state.isSkirtVisible, table.getMaterial(this.state.skirtMaterial), renderApi);
+			const child = renderApi.findInGroup(obj, `bumper-socket-${state.name}`)!
+			this.applyChild(child, state.isSkirtVisible, table.getMaterial(this.state.skirtMaterial), renderApi)
 		}
 	}
 
-	private applyChild<NODE, GEOMETRY, POINT_LIGHT>(child: NODE, isVisible: boolean | undefined, material: Material | undefined, renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>): void {
-
+	private applyChild<NODE, GEOMETRY, POINT_LIGHT>(
+		child: NODE,
+		isVisible: boolean | undefined,
+		material: Material | undefined,
+		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
+	): void {
 		// visibility
 		if (isVisible !== undefined) {
-			renderApi.applyVisibility(isVisible, child);
+			renderApi.applyVisibility(isVisible, child)
 		}
 
 		// material
-		renderApi.applyMaterial(child, material);
+		renderApi.applyMaterial(child, material)
 	}
 }

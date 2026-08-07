@@ -18,25 +18,23 @@
  */
 
 export abstract class VbsApi {
+	private propertyMap?: { [key: string]: string }
 
-	private propertyMap?: { [key: string]: string };
-
-	protected abstract _getPropertyNames(): string[];
+	protected abstract _getPropertyNames(): string[]
 
 	public _getPropertyName(vbScriptName: string): string {
 		if (!this.propertyMap) {
-			this.propertyMap = {};
+			this.propertyMap = {}
 			for (const name of this._getPropertyNames()) {
-				this.propertyMap[name.toLowerCase()] = name;
+				this.propertyMap[name.toLowerCase()] = name
 			}
 		}
-		return this.propertyMap[vbScriptName.toLowerCase()];
+		return this.propertyMap[vbScriptName.toLowerCase()]
 	}
 }
 
 export class VbsNotImplementedError extends Error {
-
 	constructor() {
-		super('This method of the VBScript API has not been implemented.');
+		super('This method of the VBScript API has not been implemented.')
 	}
 }

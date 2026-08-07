@@ -17,34 +17,38 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { degToRad } from '../../math/float';
-import { IRenderApi } from '../../render/irender-api';
-import { ItemUpdater } from '../item-updater';
-import { Table } from '../table/table';
-import { SpinnerData } from './spinner-data';
-import { SpinnerMeshGenerator } from './spinner-mesh-generator';
-import { SpinnerState } from './spinner-state';
+import { degToRad } from '../../math/float'
+import type { IRenderApi } from '../../render/irender-api'
+import { ItemUpdater } from '../item-updater'
+import type { Table } from '../table/table'
+import type { SpinnerData } from './spinner-data'
+import type { SpinnerMeshGenerator } from './spinner-mesh-generator'
+import type { SpinnerState } from './spinner-state'
 
 export class SpinnerUpdater extends ItemUpdater<SpinnerState> {
-
-	private readonly data: SpinnerData;
-	private readonly meshGenerator: SpinnerMeshGenerator;
+	private readonly data: SpinnerData
+	private readonly meshGenerator: SpinnerMeshGenerator
 
 	constructor(state: SpinnerState, data: SpinnerData, meshGenerator: SpinnerMeshGenerator) {
-		super(state);
-		this.data = data;
-		this.meshGenerator = meshGenerator;
+		super(state)
+		this.data = data
+		this.meshGenerator = meshGenerator
 	}
 
-	public applyState<NODE, GEOMETRY, POINT_LIGHT>(obj: NODE, state: SpinnerState, renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>, table: Table): void {
+	public applyState<NODE, GEOMETRY, POINT_LIGHT>(
+		obj: NODE,
+		state: SpinnerState,
+		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
+		table: Table,
+	): void {
 		// update local state
-		Object.assign(this.state, state);
+		Object.assign(this.state, state)
 
-		this.applyVisibility(obj, state, renderApi);
-		this.applyMaterial(obj, state.material, state.texture, renderApi, table);
+		this.applyVisibility(obj, state, renderApi)
+		this.applyMaterial(obj, state.material, state.texture, renderApi, table)
 
 		if (state.showBracket !== undefined) {
-			renderApi.applyVisibility(state.showBracket, renderApi.findInGroup(obj, `spinner.bracket-${state.name}`));
+			renderApi.applyVisibility(state.showBracket, renderApi.findInGroup(obj, `spinner.bracket-${state.name}`))
 		}
 
 		if (state.angle !== undefined) {
@@ -56,7 +60,7 @@ export class SpinnerUpdater extends ItemUpdater<SpinnerState> {
 				this.data.rotation,
 				state.angle - degToRad(this.data.angleMin),
 				`spinner.plate-${this.state.getName()}`,
-			);
+			)
 		}
 	}
 }

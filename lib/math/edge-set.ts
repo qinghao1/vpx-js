@@ -17,8 +17,8 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { HitLine3D } from '../physics/hit-line-3d';
-import { Vertex3D } from './vertex3d';
+import { HitLine3D } from '../physics/hit-line-3d'
+import type { Vertex3D } from './vertex3d'
 
 /**
  * This implements a set based on a number pair.
@@ -26,26 +26,26 @@ import { Vertex3D } from './vertex3d';
  * are sorted prior to checking the index.
  */
 export class EdgeSet {
-
-	private readonly edges = new Set<string>();
+	private readonly edges = new Set<string>()
 
 	public add(i: number, j: number) {
-		this.edges.add(this.getKey(i, j));
+		this.edges.add(this.getKey(i, j))
 	}
 
 	public has(i: number, j: number): boolean {
-		return this.edges.has(this.getKey(i, j));
+		return this.edges.has(this.getKey(i, j))
 	}
 
 	public addHitEdge(i: number, j: number, vi: Vertex3D, vj: Vertex3D): HitLine3D[] {
-		if (!this.has(i, j)) {   // edge not yet added?
-			this.add(i, j);
-			return [new HitLine3D(vi, vj)];
+		if (!this.has(i, j)) {
+			// edge not yet added?
+			this.add(i, j)
+			return [new HitLine3D(vi, vj)]
 		}
-		return [];
+		return []
 	}
 
 	private getKey(i: number, j: number): string {
-		return `${Math.min(i, j)},${Math.max(i, j)}`;
+		return `${Math.min(i, j)},${Math.max(i, j)}`
 	}
 }

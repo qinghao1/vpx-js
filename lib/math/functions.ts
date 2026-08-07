@@ -17,7 +17,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-const solution: [number, number] = [0, 0];
+const solution: [number, number] = [0, 0]
 
 /**
  * Solves an quadratic equation.
@@ -27,27 +27,27 @@ const solution: [number, number] = [0, 0];
  * second time in a row!
  */
 export function solveQuadraticEq(a: number, b: number, c: number): [number, number] | undefined {
-	let discr = b * b - 4.0 * a * c;
+	let discr = b * b - 4.0 * a * c
 
 	if (discr < 0) {
-		return undefined;
+		return undefined
 	}
 
-	discr = Math.sqrt(discr);
+	discr = Math.sqrt(discr)
 
-	const invA = (-0.5) / a;
-	solution[0] = (b + discr) * invA;
-	solution[1] = (b - discr) * invA;
+	const invA = -0.5 / a
+	solution[0] = (b + discr) * invA
+	solution[1] = (b - discr) * invA
 
-	return solution;
+	return solution
 }
 
 export function clamp(x: number, min: number, max: number) {
 	if (x < min) {
-		return min;
+		return min
 	} else if (x > max) {
-		return max;
+		return max
 	} else {
-		return x;
+		return x
 	}
 }

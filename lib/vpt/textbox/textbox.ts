@@ -17,38 +17,37 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { EventProxy } from '../../game/event-proxy';
-import { IScriptable } from '../../game/iscriptable';
-import { Player } from '../../game/player';
-import { Storage } from '../../io/ole-doc';
-import { Item } from '../item';
-import { Table } from '../table/table';
-import { TextboxApi } from './textbox-api';
-import { TextboxData } from './textbox-data';
+import { EventProxy } from '../../game/event-proxy'
+import type { IScriptable } from '../../game/iscriptable'
+import type { Player } from '../../game/player'
+import type { Storage } from '../../io/ole-doc'
+import { Item } from '../item'
+import type { Table } from '../table/table'
+import { TextboxApi } from './textbox-api'
+import { TextboxData } from './textbox-data'
 
 export class Textbox extends Item<TextboxData> implements IScriptable<TextboxApi> {
-
-	private api?: TextboxApi;
+	private api?: TextboxApi
 
 	public static async fromStorage(storage: Storage, itemName: string): Promise<Textbox> {
-		const data = await TextboxData.fromStorage(storage, itemName);
-		return new Textbox(data);
+		const data = await TextboxData.fromStorage(storage, itemName)
+		return new Textbox(data)
 	}
 
 	private constructor(data: TextboxData) {
-		super(data);
+		super(data)
 	}
 
 	public setupPlayer(player: Player, table: Table): void {
-		this.events = new EventProxy(this);
-		this.api = new TextboxApi(this.data, this.events, player, table);
+		this.events = new EventProxy(this)
+		this.api = new TextboxApi(this.data, this.events, player, table)
 	}
 
 	public getApi(): TextboxApi {
-		return this.api!;
+		return this.api!
 	}
 
 	public getEventNames(): string[] {
-		return [ 'Init', 'Timer' ];
+		return ['Init', 'Timer']
 	}
 }

@@ -17,7 +17,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { ERR } from '../stdlib/err';
+import { ERR } from '../stdlib/err'
 
 /**
  * Object that stores data key/item pairs.
@@ -25,14 +25,15 @@ import { ERR } from '../stdlib/err';
  * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/dictionary-object
  */
 export class Dictionary<V> {
-
-	private readonly d = new Map<string | number | symbol, V | null>();
+	private readonly d = new Map<string | number | symbol, V | null>()
 
 	/**
 	 * Returns the number of key/item pairs in a Dictionary object.
 	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/count-property-dictionary-object
 	 */
-	public get Count() { return this.d.size; }
+	public get Count() {
+		return this.d.size
+	}
 
 	/**
 	 * Sets or returns an item for a specified key in a Dictionary object.
@@ -40,39 +41,39 @@ export class Dictionary<V> {
 	 *
 	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/item-property-dictionary-object
 	 */
-	public Item: { [key: string]: V | null} = new Proxy(this, {
+	public Item: { [key: string]: V | null } = new Proxy(this, {
 		get: (target: {}, key: string | number | symbol) => {
 			if (this.d.has(key)) {
-				return this.d.get(key);
+				return this.d.get(key)
 			} else {
 				// If key is not found when attempting to return an existing item, a new key is created and its
 				// corresponding item is left empty.
-				this.d.set(key, null);
-				return null;
+				this.d.set(key, null)
+				return null
 			}
 		},
 		set: (target: Dictionary<V>, key: string | number | symbol, value: V) => {
-			this.d.set(key, value);
-			return true;
+			this.d.set(key, value)
+			return true
 		},
-	});
+	})
 
 	/**
 	 * Sets a key in a Dictionary object.
 	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/key-property
 	 */
-	public Key: { [key: string]: V | null} = new Proxy(this, {
+	public Key: { [key: string]: V | null } = new Proxy(this, {
 		set: (target: {}, oldKey: string | number | symbol, newKey: string | number | symbol) => {
 			if (!this.d.has(oldKey)) {
-				ERR.Raise(32811, undefined, 'Element not found');
-				return true;
+				ERR.Raise(32811, undefined, 'Element not found')
+				return true
 			}
-			const value = this.d.get(oldKey) as V | null;
-			this.d.delete(oldKey);
-			this.d.set(newKey, value);
-			return true;
+			const value = this.d.get(oldKey) as V | null
+			this.d.delete(oldKey)
+			this.d.set(newKey, value)
+			return true
 		},
-	});
+	})
 
 	/**
 	 * Adds a key and item pair to a Dictionary object.
@@ -83,9 +84,9 @@ export class Dictionary<V> {
 	 */
 	public Add(key: string | number | symbol, item: V): void {
 		if (this.d.has(key)) {
-			ERR.Raise(457, undefined, 'This key is already associated with an element of this collection');
+			ERR.Raise(457, undefined, 'This key is already associated with an element of this collection')
 		}
-		this.d.set(key, item);
+		this.d.set(key, item)
 	}
 
 	/**
@@ -95,7 +96,7 @@ export class Dictionary<V> {
 	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/exists-method
 	 */
 	public Exists(key: string | number | symbol): boolean {
-		return this.d.has(key);
+		return this.d.has(key)
 	}
 
 	/**
@@ -103,7 +104,7 @@ export class Dictionary<V> {
 	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/items-method
 	 */
 	public Items(): Array<V | null> {
-		return Array.from(this.d.values());
+		return Array.from(this.d.values())
 	}
 
 	/**
@@ -111,7 +112,7 @@ export class Dictionary<V> {
 	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/keys-method
 	 */
 	public Keys(): Array<string | number | symbol> {
-		return Array.from(this.d.keys());
+		return Array.from(this.d.keys())
 	}
 
 	/**
@@ -121,9 +122,9 @@ export class Dictionary<V> {
 	 */
 	public Remove(key: string | number | symbol) {
 		if (!this.d.has(key)) {
-			ERR.Raise(32811, undefined, 'Element not found');
+			ERR.Raise(32811, undefined, 'Element not found')
 		}
-		this.d.delete(key);
+		this.d.delete(key)
 	}
 
 	/**
@@ -131,7 +132,6 @@ export class Dictionary<V> {
 	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/removeall-method
 	 */
 	public RemoveAll() {
-		this.d.clear();
+		this.d.clear()
 	}
-
 }

@@ -17,71 +17,67 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import * as chai from 'chai';
-import { expect } from 'chai';
-import { ScriptHelper } from '../../../test/script.helper';
-import { TableBuilder } from '../../../test/table-builder';
-import { ThreeHelper } from '../../../test/three.helper';
-import { Table } from '../../vpt/table/table';
-import { EventTransformer } from './event-transformer';
+import * as chai from 'chai'
+import { expect } from 'chai'
+import sinonChai from 'sinon-chai'
+import { ScriptHelper } from '../../../test/script.helper'
+import { TableBuilder } from '../../../test/table-builder'
+import { ThreeHelper } from '../../../test/three.helper'
+import type { Table } from '../../vpt/table/table'
+import { EventTransformer } from './event-transformer'
 
-chai.use(require('sinon-chai'));
+chai.use((sinonChai as any).default ?? sinonChai)
 
 /* tslint:disable:no-unused-expression */
 describe('The scripting event transformer', () => {
-
-	const three = new ThreeHelper();
-	let table: Table;
+	const three = new ThreeHelper()
+	let table: Table
 
 	before(() => {
-		table = new TableBuilder()
-			.addGate('WireRectangle')
-			.addGate('Wire_Rectangle')
-			.build();
-	});
+		table = new TableBuilder().addGate('WireRectangle').addGate('Wire_Rectangle').build()
+	})
 
 	it('should transform a valid event on a valid item', () => {
-		const vbs = `Sub WireRectangle_Init()\nBallRelease.CreateBall\nEnd Sub\n`;
-		const js = transform(vbs, table);
-		expect(js).to.equal(`WireRectangle.on('Init', function () {\n    BallRelease.CreateBall();\n});`);
-	});
+		const vbs = `Sub WireRectangle_Init()\nBallRelease.CreateBall\nEnd Sub\n`
+		const js = transform(vbs, table)
+		expect(js).to.equal(`WireRectangle.on('Init', function () {\n    BallRelease.CreateBall();\n});`)
+	})
 
 	it('should transform a an item with an underscore in its name', () => {
-		const vbs = `Sub Wire_Rectangle_Init()\nBallRelease.CreateBall\nEnd Sub\n`;
-		const js = transform(vbs, table);
-		expect(js).to.equal(`Wire_Rectangle.on('Init', function () {\n    BallRelease.CreateBall();\n});`);
-	});
+		const vbs = `Sub Wire_Rectangle_Init()\nBallRelease.CreateBall\nEnd Sub\n`
+		const js = transform(vbs, table)
+		expect(js).to.equal(`Wire_Rectangle.on('Init', function () {\n    BallRelease.CreateBall();\n});`)
+	})
 
 	it('should transform when the event name has a different case', () => {
-		const vbs = `Sub WireRectangle_init()\nBallRelease.CreateBall\nEnd Sub\n`;
-		const js = transform(vbs, table);
-		expect(js).to.equal(`WireRectangle.on('Init', function () {\n    BallRelease.CreateBall();\n});`);
-	});
+		const vbs = `Sub WireRectangle_init()\nBallRelease.CreateBall\nEnd Sub\n`
+		const js = transform(vbs, table)
+		expect(js).to.equal(`WireRectangle.on('Init', function () {\n    BallRelease.CreateBall();\n});`)
+	})
 
 	it('should not transform an invalid event on a valid item', () => {
-		const vbs = `Sub WireRectangle_DuhDah()\nBallRelease.CreateBall\nEnd Sub\n`;
-		const js = transform(vbs, table);
-		expect(js).to.equal(`function WireRectangle_DuhDah() {\n    BallRelease.CreateBall();\n}`);
-	});
+		const vbs = `Sub WireRectangle_DuhDah()\nBallRelease.CreateBall\nEnd Sub\n`
+		const js = transform(vbs, table)
+		expect(js).to.equal(`function WireRectangle_DuhDah() {\n    BallRelease.CreateBall();\n}`)
+	})
 
 	it('should not transform a valid event on an invalid item', () => {
-		const vbs = `Sub DoesntExist_Init()\nBallRelease.CreateBall\nEnd Sub\n`;
-		const js = transform(vbs, table);
-		expect(js).to.equal(`function DoesntExist_Init() {\n    BallRelease.CreateBall();\n}`);
-	});
+		const vbs = `Sub DoesntExist_Init()\nBallRelease.CreateBall\nEnd Sub\n`
+		const js = transform(vbs, table)
+		expect(js).to.equal(`function DoesntExist_Init() {\n    BallRelease.CreateBall();\n}`)
+	})
 
 	it('should not transform a non-event sub', () => {
-		const vbs = `Sub MySub()\nBallRelease.CreateBall\nEnd Sub\n`;
-		const js = transform(vbs, table);
-		expect(js).to.equal(`function MySub() {\n    BallRelease.CreateBall();\n}`);
-	});
-
-});
+		const vbs = `Sub MySub()\nBallRelease.CreateBall\nEnd Sub\n`
+		const js = transform(vbs, table)
+		expect(js).to.equal(`function MySub() {\n    BallRelease.CreateBall();\n}`)
+	})
+})
 
 function transform(vbs: string, table: Table): string {
-	const scriptHelper = new ScriptHelper();
-	const ast = scriptHelper.vbsToAst(vbs);
-	const eventTransformer = new EventTransformer(ast, table.getElements());
-	const eventAst = eventTransformer.transform();
-	return scriptHelper.astToVbs(eventAst);
+	const scriptHelper = new ScriptHelper()
+	const ast = scriptHelper.vbsToAst(vbs)
+	const eventTransformer = new EventTransformer(ast, table.getElements())
+	const eventAst = eventTransformer.transform()
+	return scriptHelper.astToVbs(eventAst)
 }

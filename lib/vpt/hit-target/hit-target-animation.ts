@@ -17,79 +17,76 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { Event } from '../../game/event';
-import { EventProxy } from '../../game/event-proxy';
-import { IAnimation } from '../../game/ianimatable';
-import { PlayerPhysics } from '../../game/player-physics';
-import { Table } from '../table/table';
-import { HitTarget } from './hit-target';
-import { HitTargetData } from './hit-target-data';
-import { HitTargetState } from './hit-target-state';
+import { Event } from '../../game/event'
+import type { EventProxy } from '../../game/event-proxy'
+import type { IAnimation } from '../../game/ianimatable'
+import { PlayerPhysics } from '../../game/player-physics'
+import type { Table } from '../table/table'
+import { HitTarget } from './hit-target'
+import type { HitTargetData } from './hit-target-data'
+import type { HitTargetState } from './hit-target-state'
 
 export class HitTargetAnimation implements IAnimation {
+	private readonly data: HitTargetData
+	private readonly state: HitTargetState
+	private readonly events: EventProxy
 
-	private readonly data: HitTargetData;
-	private readonly state: HitTargetState;
-	private readonly events: EventProxy;
-
-	public timeStamp = 0;
-	public hitEvent = false;
-	public moveDown = true;
-	public moveAnimation = false;
-	private timeMsec = 0;
+	public timeStamp = 0
+	public hitEvent = false
+	public moveDown = true
+	public moveAnimation = false
+	private timeMsec = 0
 
 	constructor(data: HitTargetData, state: HitTargetState, events: EventProxy) {
-		this.data = data;
-		this.state = state;
-		this.events = events;
+		this.data = data
+		this.state = state
+		this.events = events
 	}
 
 	public init(timeMsec: number): void {
-		this.timeMsec = timeMsec;
+		this.timeMsec = timeMsec
 	}
 
 	public updateAnimation(newTimeMsec: number, table: Table): void {
-		const oldTimeMsec = (this.timeMsec < newTimeMsec) ? this.timeMsec : newTimeMsec;
-		this.timeMsec = newTimeMsec;
-		const diffTimeMsec = newTimeMsec - oldTimeMsec;
+		const oldTimeMsec = this.timeMsec < newTimeMsec ? this.timeMsec : newTimeMsec
+		this.timeMsec = newTimeMsec
+		const diffTimeMsec = newTimeMsec - oldTimeMsec
 
 		if (this.hitEvent) {
 			if (!this.data.isDropped) {
-				this.moveDown = true;
+				this.moveDown = true
 			}
-			this.moveAnimation = true;
-			this.hitEvent = false;
+			this.moveAnimation = true
+			this.hitEvent = false
 		}
 		if (this.data.isDropTarget()) {
 			if (this.moveAnimation) {
-				let step = this.data.dropSpeed * table.getScaleZ();
-				const limit = HitTarget.DROP_TARGET_LIMIT * table.getScaleZ();
+				let step = this.data.dropSpeed * table.getScaleZ()
+				const limit = HitTarget.DROP_TARGET_LIMIT * table.getScaleZ()
 				if (this.moveDown) {
-					step = -step;
-
+					step = -step
 				} else if (this.timeMsec - this.timeStamp < this.data.raiseDelay) {
-					step = 0.0;
+					step = 0.0
 				}
-				this.state.zOffset += step * diffTimeMsec;
+				this.state.zOffset += step * diffTimeMsec
 				if (this.moveDown) {
 					if (this.state.zOffset <= -limit) {
-						this.state.zOffset = -limit;
-						this.moveDown = false;
-						this.data.isDropped = true;
-						this.moveAnimation = false;
-						this.timeStamp = 0;
+						this.state.zOffset = -limit
+						this.moveDown = false
+						this.data.isDropped = true
+						this.moveAnimation = false
+						this.timeStamp = 0
 						if (this.data.useHitEvent) {
-							this.events.fireGroupEvent(Event.TargetEventsDropped);
+							this.events.fireGroupEvent(Event.TargetEventsDropped)
 						}
 					}
-
 				} else {
 					if (this.state.zOffset >= 0.0) {
-						this.state.zOffset = 0.0;
-						this.moveAnimation = false;
-						this.data.isDropped = false;
+						this.state.zOffset = 0.0
+						this.moveAnimation = false
+						this.data.isDropped = false
 						if (this.data.useHitEvent) {
-							this.events.fireGroupEvent(Event.TargetEventsRaised);
+							this.events.fireGroupEvent(Event.TargetEventsRaised)
 						}
 					}
 				}
@@ -97,22 +94,21 @@ export class HitTargetAnimation implements IAnimation {
 			}
 		} else {
 			if (this.moveAnimation) {
-				let step = this.data.dropSpeed * table.getScaleZ();
-				const limit = 13.0 * table.getScaleZ();
+				let step = this.data.dropSpeed * table.getScaleZ()
+				const limit = 13.0 * table.getScaleZ()
 				if (!this.moveDown) {
-					step = -step;
+					step = -step
 				}
-				this.state.xRotation += step * diffTimeMsec;
+				this.state.xRotation += step * diffTimeMsec
 				if (this.moveDown) {
 					if (this.state.xRotation >= limit) {
-						this.state.xRotation = limit;
-						this.moveDown = false;
+						this.state.xRotation = limit
+						this.moveDown = false
 					}
-
 				} else {
 					if (this.state.xRotation <= 0.0) {
-						this.state.xRotation = 0.0;
-						this.moveAnimation = false;
+						this.state.xRotation = 0.0
+						this.moveAnimation = false
 					}
 				}
 				//UpdateTarget();

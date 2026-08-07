@@ -17,31 +17,34 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { IRenderApi } from '../../render/irender-api';
-import { ItemUpdater } from '../item-updater';
-import { Table } from '../table/table';
-import { PlungerMeshGenerator } from './plunger-mesh-generator';
-import { PlungerState } from './plunger-state';
+import type { IRenderApi } from '../../render/irender-api'
+import { ItemUpdater } from '../item-updater'
+import type { Table } from '../table/table'
+import type { PlungerMeshGenerator } from './plunger-mesh-generator'
+import type { PlungerState } from './plunger-state'
 
 export class PlungerUpdater extends ItemUpdater<PlungerState> {
-
-	private readonly meshGenerator: PlungerMeshGenerator;
+	private readonly meshGenerator: PlungerMeshGenerator
 
 	constructor(state: PlungerState, meshGenerator: PlungerMeshGenerator) {
-		super(state);
-		this.meshGenerator = meshGenerator;
+		super(state)
+		this.meshGenerator = meshGenerator
 	}
 
-	public applyState<NODE, GEOMETRY, POINT_LIGHT>(obj: NODE, state: PlungerState, renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>, table: Table): void {
-
-		const mesh = this.meshGenerator.generateMeshes(state.frame, table);
-		const rodObj = renderApi.findInGroup(obj, 'rod');
+	public applyState<NODE, GEOMETRY, POINT_LIGHT>(
+		obj: NODE,
+		state: PlungerState,
+		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
+		table: Table,
+	): void {
+		const mesh = this.meshGenerator.generateMeshes(state.frame, table)
+		const rodObj = renderApi.findInGroup(obj, 'rod')
 		if (rodObj) {
-			renderApi.applyMeshToNode(mesh.rod!, rodObj);
+			renderApi.applyMeshToNode(mesh.rod!, rodObj)
 		}
-		const springObj = renderApi.findInGroup(obj, 'spring');
+		const springObj = renderApi.findInGroup(obj, 'spring')
 		if (springObj) {
-			renderApi.applyMeshToNode(mesh.spring!, springObj);
+			renderApi.applyMeshToNode(mesh.spring!, springObj)
 		}
 	}
 }

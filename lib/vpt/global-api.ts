@@ -17,67 +17,146 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { AssignKey } from '../game/key-code';
-import { Player } from '../game/player';
-import { getTextFile, now, storage } from '../refs.node';
-import { VbsApi } from '../scripting/vbs-api';
-import { BallApi } from './ball/ball-api';
-import { Item } from './item';
-import { ItemData } from './item-data';
-import { Table } from './table/table';
+import { AssignKey } from '../game/key-code'
+import type { Player } from '../game/player'
+import { getTextFile, now, storage } from '../refs.node.js'
+import { VbsApi } from '../scripting/vbs-api'
+import type { BallApi } from './ball/ball-api'
+import type { Item } from './item'
+import type { ItemData } from './item-data'
+import type { Table } from './table/table'
 
 export class GlobalApi extends VbsApi {
-
-	private readonly table: Table;
-	private readonly player: Player;
+	private readonly table: Table
+	private readonly player: Player
 
 	constructor(table: Table, player: Player) {
-		super();
-		this.table = table;
-		this.player = player;
+		super()
+		this.table = table
+		this.player = player
 	}
 
-	get Name() { return 'Global'; }
-	get LeftFlipperKey() { return this.player.getKey(AssignKey.LeftFlipperKey); }
-	get RightFlipperKey() { return this.player.getKey(AssignKey.RightFlipperKey); }
-	get LeftTiltKey() { return this.player.getKey(AssignKey.LeftTiltKey); }
-	get RightTiltKey() { return this.player.getKey(AssignKey.RightTiltKey); }
-	get CenterTiltKey() { return this.player.getKey(AssignKey.CenterTiltKey); }
-	get PlungerKey() { return this.player.getKey(AssignKey.PlungerKey); }
-	get StartGameKey() { return this.player.getKey(AssignKey.StartGameKey); }
-	get AddCreditKey() { return this.player.getKey(AssignKey.AddCreditKey); }
-	get AddCreditKey2() { return this.player.getKey(AssignKey.AddCreditKey2); }
-	get MechanicalTilt() { return this.player.getKey(AssignKey.MechanicalTilt); }
-	get LeftMagnaSave() { return this.player.getKey(AssignKey.LeftMagnaSave); }
-	get RightMagnaSave() { return this.player.getKey(AssignKey.RightMagnaSave); }
-	get ExitGame() { return this.player.getKey(AssignKey.ExitGame); }
-	get LockbarKey() { return this.player.getKey(AssignKey.LockbarKey); }
-	set MusicVolume(v: number) { /* TODO implement */ }
-	get UserDirectory() { return '.'; } // TODO implement
-	get GetPlayerHWnd() { return null; }
-	get ActiveBall() { return this.player.getActiveBall(); }
-	get GameTime() { return this.player.getGameTime(); }
-	get SystemTime() { return now(); }
-	get NightDay() { return this.table.getApi().NightDay; }
-	get ShowDT() { return this.table.getApi().ShowDT; }
-	get ShowFSS() { return this.table.getApi().ShowFSS; }
-	get WindowWidth() { return this.player.width; }
-	get WindowHeight() { return this.player.height; }
-	set DMDWidth(v: number) { /* TODO implement */ }
-	get DMDWidth() { return 0; } // TODO implement
-	set DMDHeight(v: number) { /* TODO implement */ }
-	get DMDHeight() { return 0; } // TODO implement
-	get Version() { return this.table.getApi().Version; }
-	get VPBuildVersion() { return this.table.getApi().VPBuildVersion; }
-	get VersionMajor() { return this.table.getApi().VersionMajor; }
-	get VersionMinor() { return this.table.getApi().VersionMinor; }
-	get VersionRevision() { return this.table.getApi().VersionRevision; }
+	get Name() {
+		return 'Global'
+	}
+	get LeftFlipperKey() {
+		return this.player.getKey(AssignKey.LeftFlipperKey)
+	}
+	get RightFlipperKey() {
+		return this.player.getKey(AssignKey.RightFlipperKey)
+	}
+	get LeftTiltKey() {
+		return this.player.getKey(AssignKey.LeftTiltKey)
+	}
+	get RightTiltKey() {
+		return this.player.getKey(AssignKey.RightTiltKey)
+	}
+	get CenterTiltKey() {
+		return this.player.getKey(AssignKey.CenterTiltKey)
+	}
+	get PlungerKey() {
+		return this.player.getKey(AssignKey.PlungerKey)
+	}
+	get StartGameKey() {
+		return this.player.getKey(AssignKey.StartGameKey)
+	}
+	get AddCreditKey() {
+		return this.player.getKey(AssignKey.AddCreditKey)
+	}
+	get AddCreditKey2() {
+		return this.player.getKey(AssignKey.AddCreditKey2)
+	}
+	get MechanicalTilt() {
+		return this.player.getKey(AssignKey.MechanicalTilt)
+	}
+	get LeftMagnaSave() {
+		return this.player.getKey(AssignKey.LeftMagnaSave)
+	}
+	get RightMagnaSave() {
+		return this.player.getKey(AssignKey.RightMagnaSave)
+	}
+	get ExitGame() {
+		return this.player.getKey(AssignKey.ExitGame)
+	}
+	get LockbarKey() {
+		return this.player.getKey(AssignKey.LockbarKey)
+	}
+	set MusicVolume(v: number) {
+		/* TODO implement */
+	}
+	get UserDirectory() {
+		return '.'
+	} // TODO implement
+	get GetPlayerHWnd() {
+		return null
+	}
+	get ActiveBall() {
+		return this.player.getActiveBall()
+	}
+	get GameTime() {
+		return this.player.getGameTime()
+	}
+	get SystemTime() {
+		return now()
+	}
+	get NightDay() {
+		return this.table.getApi().NightDay
+	}
+	get ShowDT() {
+		return this.table.getApi().ShowDT
+	}
+	get ShowFSS() {
+		return this.table.getApi().ShowFSS
+	}
+	get WindowWidth() {
+		return this.player.width
+	}
+	get WindowHeight() {
+		return this.player.height
+	}
+	set DMDWidth(v: number) {
+		/* TODO implement */
+	}
+	get DMDWidth() {
+		return 0
+	} // TODO implement
+	set DMDHeight(v: number) {
+		/* TODO implement */
+	}
+	get DMDHeight() {
+		return 0
+	} // TODO implement
+	get Version() {
+		return this.table.getApi().Version
+	}
+	get VPBuildVersion() {
+		return this.table.getApi().VPBuildVersion
+	}
+	get VersionMajor() {
+		return this.table.getApi().VersionMajor
+	}
+	get VersionMinor() {
+		return this.table.getApi().VersionMinor
+	}
+	get VersionRevision() {
+		return this.table.getApi().VersionRevision
+	}
 
 	public GetTextFile(fileName: string): string {
-		return getTextFile(fileName);
+		return getTextFile(fileName)
 	}
 
-	public PlaySound(sampleName: string, loopCount: number, volume: number, pan: number, randomPitch: number, pitch: number, useSame: boolean, restart: boolean, frontRearFade: number) {
+	public PlaySound(
+		sampleName: string,
+		loopCount: number,
+		volume: number,
+		pan: number,
+		randomPitch: number,
+		pitch: number,
+		useSame: boolean,
+		restart: boolean,
+		frontRearFade: number,
+	) {
 		// TODO implement sound
 	}
 
@@ -102,22 +181,22 @@ export class GlobalApi extends VbsApi {
 	}
 
 	public GetBalls(): BallApi[] {
-		return this.player.getBalls().map(b => b.getApi());
+		return this.player.getBalls().map((b) => b.getApi())
 	}
 
 	public GetElements(): Array<Item<ItemData>> {
-		return this.table.getItems();
+		return this.table.getItems()
 	}
 
 	public GetElementByName(name: string): Item<ItemData> | undefined {
-		return this.table.items[name];
+		return this.table.items[name]
 	}
 
 	public MaterialColor(name: string, color: number): void {
-		const material = this.table.getMaterial(name);
+		const material = this.table.getMaterial(name)
 		if (material) {
 			// TODO probably gotta apply this to the render realm as well
-			material.baseColor = color;
+			material.baseColor = color
 		}
 	}
 
@@ -143,7 +222,7 @@ export class GlobalApi extends VbsApi {
 
 	public GetCustomParam(): string {
 		// these are command line args when launching vp, so none here!
-		return '';
+		return ''
 	}
 
 	public AddObject(name: string, pdisp: any): void {
@@ -151,13 +230,13 @@ export class GlobalApi extends VbsApi {
 	}
 
 	public SaveValue(tableName: string, valueName: string, value: any): void {
-		const key = `${tableName}:${valueName}`;
-		storage.setItem(key, value);
+		const key = `${tableName}:${valueName}`
+		storage.setItem(key, value)
 	}
 
 	public LoadValue(tableName: string, valueName: string): void {
-		const key = `${tableName}:${valueName}`;
-		return storage.getItem(key);
+		const key = `${tableName}:${valueName}`
+		return storage.getItem(key)
 	}
 
 	public BeginModal(): void {
@@ -169,6 +248,6 @@ export class GlobalApi extends VbsApi {
 	}
 
 	protected _getPropertyNames(): string[] {
-		return Object.getOwnPropertyNames(GlobalApi.prototype);
+		return Object.getOwnPropertyNames(GlobalApi.prototype)
 	}
 }

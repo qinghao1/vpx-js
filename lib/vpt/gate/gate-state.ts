@@ -17,70 +17,77 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { Pool } from '../../util/object-pool';
-import { ItemState } from '../item-state';
+import { Pool } from '../../util/object-pool'
+import { ItemState } from '../item-state'
 
 export class GateState extends ItemState {
-
-	public static readonly POOL = new Pool(GateState);
+	public static readonly POOL = new Pool(GateState)
 
 	/**
 	 * Angle in rad
 	 */
-	public angle: number = 0;
-	public material?: string;
-	public showBracket: boolean = true;
+	public angle: number = 0
+	public material?: string
+	public showBracket: boolean = true
 
 	public constructor() {
-		super();
+		super()
 	}
 
-	public static claim(name: string, angle: number, material: string | undefined, showBracket: boolean, isVisible: boolean): GateState {
-		const state = GateState.POOL.get();
-		state.name = name;
-		state.angle = angle;
-		state.material = material;
-		state.showBracket = showBracket;
-		state.isVisible = isVisible;
-		return state;
+	public static claim(
+		name: string,
+		angle: number,
+		material: string | undefined,
+		showBracket: boolean,
+		isVisible: boolean,
+	): GateState {
+		const state = GateState.POOL.get()
+		state.name = name
+		state.angle = angle
+		state.material = material
+		state.showBracket = showBracket
+		state.isVisible = isVisible
+		return state
 	}
 
 	public clone(): GateState {
-		return GateState.claim(this.name, this.angle, this.material, this.showBracket, this.isVisible);
+		return GateState.claim(this.name, this.angle, this.material, this.showBracket, this.isVisible)
 	}
 
 	public diff(state: GateState): GateState {
-		const diff = this.clone();
+		const diff = this.clone()
 		if (diff.angle === state.angle) {
-			delete diff.angle;
+			delete diff.angle
 		}
 		if (diff.isVisible === state.isVisible) {
-			delete diff.isVisible;
+			delete diff.isVisible
 		}
 		if (diff.material === state.material) {
-			delete diff.material;
+			delete diff.material
 		}
 		if (diff.showBracket === state.showBracket) {
-			delete diff.showBracket;
+			delete diff.showBracket
 		}
 		if (diff.isVisible === state.isVisible) {
-			delete diff.isVisible;
+			delete diff.isVisible
 		}
-		return diff;
+		return diff
 	}
 
 	public release(): void {
-		GateState.POOL.release(this);
+		GateState.POOL.release(this)
 	}
 
 	public equals(state: GateState): boolean {
 		/* istanbul ignore if: we don't actually pass empty states. */
 		if (!state) {
-			return false;
+			return false
 		}
-		return state.angle === this.angle
-			&& state.material === this.material
-			&& state.showBracket === this.showBracket
-			&& state.isVisible === this.isVisible;
+		return (
+			state.angle === this.angle &&
+			state.material === this.material &&
+			state.showBracket === this.showBracket &&
+			state.isVisible === this.isVisible
+		)
 	}
 }

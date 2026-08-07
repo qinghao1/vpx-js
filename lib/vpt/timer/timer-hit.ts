@@ -17,17 +17,16 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { EventProxy } from '../../game/event-proxy';
+import type { EventProxy } from '../../game/event-proxy'
 
 export class TimerHit {
-
-	public readonly pfe: EventProxy;
-	public nextFire: number;
-	public interval: number;
+	public readonly pfe: EventProxy
+	public nextFire: number
+	public interval: number
 
 	constructor(pfe: EventProxy, nextFire: number, interval: number) {
-		this.pfe = pfe;
-		this.nextFire = nextFire;
-		this.interval = interval;
+		this.pfe = pfe
+		this.nextFire = nextFire
+		this.interval = interval
 	}
 }

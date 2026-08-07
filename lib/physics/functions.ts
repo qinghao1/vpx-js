@@ -9,10 +9,10 @@
  */
 export function elasticityWithFalloff(elasticity: number, falloff: number, vel: number): number {
 	if (falloff > 0) {
-		return elasticity / (1.0 + falloff * Math.abs(vel) * (1.0 / 18.53));
+		return elasticity / (1.0 + falloff * Math.abs(vel) * (1.0 / 18.53))
 	} else {
-		return elasticity;
+		return elasticity
 	}
 }
 
-export const HARD_SCATTER = 0.0;
+export const HARD_SCATTER = 0.0

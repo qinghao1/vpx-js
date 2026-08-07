@@ -17,20 +17,19 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { exportGltf, Scene } from '../../refs.node';
-import { MeshConvertOptions } from '../../render/irender-api';
-import { ThreeRenderApi } from '../../render/threejs/three-render-api';
-import { Table, TableGenerateOptions } from './table';
-import { TableMeshGenerator } from './table-mesh-generator';
+import { exportGltf, Scene } from '../../refs.node.js'
+import type { MeshConvertOptions } from '../../render/irender-api'
+import { ThreeRenderApi } from '../../render/threejs/three-render-api'
+import type { Table, TableGenerateOptions } from './table'
+import { TableMeshGenerator } from './table-mesh-generator'
 
 export class TableExporter {
-
-	private readonly table: Table;
-	private readonly meshGenerator: TableMeshGenerator;
+	private readonly table: Table
+	private readonly meshGenerator: TableMeshGenerator
 
 	constructor(table: Table) {
-		this.table = table;
-		this.meshGenerator = new TableMeshGenerator(table);
+		this.table = table
+		this.meshGenerator = new TableMeshGenerator(table)
 	}
 
 	// public async exportGltf(): Promise<string> {
@@ -39,26 +38,26 @@ export class TableExporter {
 	// }
 
 	public async exportGlb(opts: TableExportOptions = {}): Promise<Buffer> {
-		opts = Object.assign({}, defaultOptions, opts);
-		opts.gltfOptions!.binary = true;
-		return await this.export<Buffer>(opts);
+		opts = Object.assign({}, defaultOptions, opts)
+		opts.gltfOptions!.binary = true
+		return await this.export<Buffer>(opts)
 	}
 
 	private async export<T>(opts: TableExportOptions): Promise<T> {
 		// we always use Three.js for GLTF generation
-		const renderApi = new ThreeRenderApi(opts);
-		const playfieldGroup = this.meshGenerator.generateTableNode(renderApi, opts);
+		const renderApi = new ThreeRenderApi(opts)
+		const playfieldGroup = this.meshGenerator.generateTableNode(renderApi, opts)
 
-		const scene = new Scene();
-		scene.name = 'table';
-		scene.add(playfieldGroup);
+		const scene = new Scene()
+		scene.name = 'table'
+		scene.add(playfieldGroup)
 
 		// now, export to GLTF
-		return exportGltf(scene, opts, opts.gltfOptions);
+		return exportGltf(scene, opts, opts.gltfOptions)
 	}
 }
 
-export interface TableExportOptions extends TableGenerateOptions, MeshConvertOptions { }
+export interface TableExportOptions extends TableGenerateOptions, MeshConvertOptions {}
 
 const defaultOptions: TableExportOptions = {
 	applyMaterials: true,
@@ -80,4 +79,4 @@ const defaultOptions: TableExportOptions = {
 	exportSpinners: true,
 	exportPlungers: true,
 	gltfOptions: {},
-};
+}

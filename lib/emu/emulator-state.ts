@@ -17,121 +17,132 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { WpcEmuWebWorkerApi } from 'wpc-emu';
-import { VbsArray } from '../scripting/vbs-array';
-import { OffsetIndex } from './offset-index';
+import type { WpcEmuWebWorkerApi } from 'wpc-emu'
+import { VbsArray } from '../scripting/vbs-array'
+import { OffsetIndex } from './offset-index'
 
 function getEmptyUint8Array(size: number = 64) {
-	return new Uint8Array(size).fill(0);
+	return new Uint8Array(size).fill(0)
 }
 /**
  * This class encapsulates the WPC-EMU state and transform state object
  */
 export class EmulatorState {
-
-	private currentLampState: Uint8Array = getEmptyUint8Array();
-	private currentSolenoidState: Uint8Array = getEmptyUint8Array();
-	private currentGIState: Uint8Array = getEmptyUint8Array();
-	private lastSentLampState: Uint8Array = getEmptyUint8Array();
-	private lastSentSolenoidState: Uint8Array = getEmptyUint8Array();
-	private lastSentGIState: Uint8Array = getEmptyUint8Array();
-	private dmdScreen: Uint8Array = new Uint8Array();
-	private switchState: Uint8Array = new Uint8Array();
+	private currentLampState: Uint8Array = getEmptyUint8Array()
+	private currentSolenoidState: Uint8Array = getEmptyUint8Array()
+	private currentGIState: Uint8Array = getEmptyUint8Array()
+	private lastSentLampState: Uint8Array = getEmptyUint8Array()
+	private lastSentSolenoidState: Uint8Array = getEmptyUint8Array()
+	private lastSentGIState: Uint8Array = getEmptyUint8Array()
+	private dmdScreen: Uint8Array = new Uint8Array()
+	private switchState: Uint8Array = new Uint8Array()
 
 	public updateState(state: WpcEmuWebWorkerApi.EmuStateAsic) {
 		if (state.wpc.lampState) {
-			this.currentLampState = this.normalizeValue(state.wpc.lampState);
+			this.currentLampState = this.normalizeValue(state.wpc.lampState)
 		}
 		if (state.wpc.solenoidState) {
 			//TODO unclear if we need to normalize
-			this.currentSolenoidState = state.wpc.solenoidState;
+			this.currentSolenoidState = state.wpc.solenoidState
 		}
 		if (state.wpc.generalIlluminationState) {
 			//TODO unclear if we need to normalize
-			this.currentGIState = state.wpc.generalIlluminationState;
+			this.currentGIState = state.wpc.generalIlluminationState
 		}
 		if (state.dmd.dmdShadedBuffer) {
-			this.dmdScreen = state.dmd.dmdShadedBuffer;
+			this.dmdScreen = state.dmd.dmdShadedBuffer
 		}
 		if (state.wpc.inputSwitchMatrixActiveColumn) {
-			this.switchState = state.wpc.inputSwitchMatrixActiveColumn;
+			this.switchState = state.wpc.inputSwitchMatrixActiveColumn
 		}
 	}
 
 	public getSwitchState(offset: OffsetIndex): number {
-		return this.switchState[offset.zeroBasedIndex] || 0;
+		return this.switchState[offset.zeroBasedIndex] || 0
 	}
 
 	public getLampState(offset: OffsetIndex): number {
-		return this.currentLampState[offset.zeroBasedIndex] || 0;
+		return this.currentLampState[offset.zeroBasedIndex] || 0
 	}
 
 	public getSolenoidState(index: number): number {
-		const matrixIndex: number = index++;
-		return this.currentSolenoidState[matrixIndex] || 0;
+		const matrixIndex: number = index++
+		return this.currentSolenoidState[matrixIndex] || 0
 	}
 
 	public getGIState(index: number): number {
-		const matrixIndex: number = index++;
-		return this.currentGIState[matrixIndex] || 0;
+		const matrixIndex: number = index++
+		return this.currentGIState[matrixIndex] || 0
 	}
 
 	/**
 	 * return changed lamps, index starts at 11..18, 21..28.. up to index 88
 	 */
 	public getChangedLamps(): VbsArray<number[]> {
-		const result: number[][] = this.getArrayDiff(this.lastSentLampState, this.currentLampState, OffsetIndex.mapIndexToMatrixIndex);
-		this.lastSentLampState = this.currentLampState;
-		return new VbsArray(result);
+		const result: number[][] = this.getArrayDiff(
+			this.lastSentLampState,
+			this.currentLampState,
+			OffsetIndex.mapIndexToMatrixIndex,
+		)
+		this.lastSentLampState = this.currentLampState
+		return new VbsArray(result)
 	}
 
 	/**
 	 * return changed solenoids, index starts at
 	 */
 	public getChangedSolenoids(): number[][] {
-		const result: number[][] = this.getArrayDiff(this.lastSentSolenoidState, this.currentSolenoidState, mapIndexToOneBasedIndex);
-		this.lastSentSolenoidState = this.currentSolenoidState;
-		return result;
+		const result: number[][] = this.getArrayDiff(
+			this.lastSentSolenoidState,
+			this.currentSolenoidState,
+			mapIndexToOneBasedIndex,
+		)
+		this.lastSentSolenoidState = this.currentSolenoidState
+		return result
 	}
 
 	public getChangedGI(): number[][] {
-		const result: number[][] = this.getArrayDiff(this.lastSentGIState, this.currentGIState, mapIndexToOneBasedIndex);
-		this.lastSentGIState = this.currentGIState;
-		return result;
+		const result: number[][] = this.getArrayDiff(this.lastSentGIState, this.currentGIState, mapIndexToOneBasedIndex)
+		this.lastSentGIState = this.currentGIState
+		return result
 	}
 
 	// NOT IMPLEMENTED YET - needed for alphanumeric games only!
 	public getChangedLEDs(): number[][] {
-		return [];
+		return []
 	}
 
 	public getDmdScreen(): Uint8Array {
-		return this.dmdScreen;
+		return this.dmdScreen
 	}
 
 	/**
 	 * map uint8 values to 0 or 1 (VisualPinball engine)
 	 */
 	private normalizeValue(input: Uint8Array): Uint8Array {
-		return input.map((value) => value > 127 ? 1 : 0);
+		return input.map((value) => (value > 127 ? 1 : 0))
 	}
 
 	/**
 	 * diff between two arrays equally sized arrays
 	 * returns 2 dimensional array with the result, eg [0, 5], [4, 44] -> means entry at offset 0 changed to 5, entry at offset 4 changed to 44
 	 */
-	private getArrayDiff(lastState: Uint8Array, newState: Uint8Array, offsetMapperFunction: (index: number) => number): number[][] {
-		const result: number[][] = [];
+	private getArrayDiff(
+		lastState: Uint8Array,
+		newState: Uint8Array,
+		offsetMapperFunction: (index: number) => number,
+	): number[][] {
+		const result: number[][] = []
 		for (let n: number = 0; n < newState.length; n++) {
 			if (lastState[n] !== newState[n]) {
-				const index = offsetMapperFunction(n);
-				result.push([index, newState[n]]);
+				const index = offsetMapperFunction(n)
+				result.push([index, newState[n]])
 			}
 		}
-		return result;
+		return result
 	}
 }
 
 function mapIndexToOneBasedIndex(index: number): number {
-	return index + 1;
+	return index + 1
 }

@@ -17,33 +17,40 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { Matrix3D } from '../../math/matrix3d';
-import { IRenderApi } from '../../render/irender-api';
-import { ItemUpdater } from '../item-updater';
-import { Table } from '../table/table';
-import { TriggerState } from './trigger-state';
+import { Matrix3D } from '../../math/matrix3d'
+import type { IRenderApi } from '../../render/irender-api'
+import { ItemUpdater } from '../item-updater'
+import type { Table } from '../table/table'
+import type { TriggerState } from './trigger-state'
 
 export class TriggerUpdater extends ItemUpdater<TriggerState> {
-
 	constructor(state: TriggerState) {
-		super(state);
+		super(state)
 	}
 
-	public applyState<NODE, GEOMETRY, POINT_LIGHT>(obj: NODE, state: TriggerState, renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>, table: Table): void {
-
+	public applyState<NODE, GEOMETRY, POINT_LIGHT>(
+		obj: NODE,
+		state: TriggerState,
+		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
+		table: Table,
+	): void {
 		// update local state
-		Object.assign(this.state, state);
+		Object.assign(this.state, state)
 
-		this.applyVisibility(obj, state, renderApi);
-		this.applyMaterial(obj, state.material, undefined, renderApi, table);
-		this.applyAnimation(obj, state, renderApi);
+		this.applyVisibility(obj, state, renderApi)
+		this.applyMaterial(obj, state.material, undefined, renderApi, table)
+		this.applyAnimation(obj, state, renderApi)
 	}
 
-	private applyAnimation<NODE, GEOMETRY, POINT_LIGHT>(obj: NODE, state: TriggerState, renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>): void {
+	private applyAnimation<NODE, GEOMETRY, POINT_LIGHT>(
+		obj: NODE,
+		state: TriggerState,
+		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
+	): void {
 		if (state.heightOffset !== undefined) {
-			const matrix = Matrix3D.claim().setTranslation(0, 0, -state.heightOffset);
-			renderApi.applyMatrixToNode(matrix, obj);
-			Matrix3D.release(matrix);
+			const matrix = Matrix3D.claim().setTranslation(0, 0, -state.heightOffset)
+			renderApi.applyMatrixToNode(matrix, obj)
+			Matrix3D.release(matrix)
 		}
 	}
 }

@@ -18,8 +18,8 @@
  */
 
 /* tslint:disable:variable-name no-bitwise */
-import { VbsError } from './stdlib/err';
-import { VbsUndefined } from './vbs-undefined';
+import { VbsError } from './stdlib/err'
+import { VbsUndefined } from './vbs-undefined'
 
 /**
  * An array that always returns something.
@@ -29,17 +29,18 @@ import { VbsUndefined } from './vbs-undefined';
  * enabled.
  */
 export class VbsArray<T> implements ProxyHandler<VbsArray<T>> {
-
-	[key: number]: T;
+	[key: number]: T
 
 	constructor(items?: T[]) {
-		return new Proxy<VbsArray<T>>(items || [] as any, this);
+		return new Proxy<VbsArray<T>>(items || ([] as any), this)
 	}
 
 	public get(target: any, key: any): T | VbsUndefined {
-		return target[key] !== undefined ? target[key] : new VbsUndefined(
-			new VbsError(`ReferenceError: Cannot set ${String(key)} from undefined.`, 9),
-			new VbsError(`ReferenceError: Cannot get ${String(key)} from undefined.`, 9),
-		);
+		return target[key] !== undefined
+			? target[key]
+			: new VbsUndefined(
+					new VbsError(`ReferenceError: Cannot set ${String(key)} from undefined.`, 9),
+					new VbsError(`ReferenceError: Cannot get ${String(key)} from undefined.`, 9),
+				)
 	}
 }

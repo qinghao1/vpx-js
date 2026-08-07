@@ -17,30 +17,27 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { Expression } from 'estree';
-import { callExpression, expressionStatement, identifier, literal, memberExpression } from '../estree';
-import { ESIToken } from '../grammar/grammar';
-import { Transformer } from '../transformer/transformer';
+import type { Expression } from 'estree'
+import { callExpression, expressionStatement, identifier, literal, memberExpression } from '../estree'
+import type { ESIToken } from '../grammar/grammar'
+import { Transformer } from '../transformer/transformer'
 
 export function ppError(node: ESIToken): any {
 	switch (node.type) {
 		case 'OnErrorStatement':
-			return ppOnErrorStatement(node);
+			return ppOnErrorStatement(node)
 	}
-	return null;
+	return null
 }
 
 function ppOnErrorStatement(node: ESIToken): any {
-	let expr: Expression;
+	let expr: Expression
 	if (node.text.indexOf('GoTo') !== -1) {
 		expr = callExpression(memberExpression(identifier(Transformer.VBSHELPER_NAME), identifier('onErrorGoto')), [
 			literal(0),
-		]);
+		])
 	} else {
-		expr = callExpression(
-			memberExpression(identifier(Transformer.VBSHELPER_NAME), identifier('onErrorResumeNext')),
-			[],
-		);
+		expr = callExpression(memberExpression(identifier(Transformer.VBSHELPER_NAME), identifier('onErrorResumeNext')), [])
 	}
-	return expressionStatement(expr);
+	return expressionStatement(expr)
 }

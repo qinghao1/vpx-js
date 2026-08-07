@@ -17,52 +17,51 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { Event } from '../../game/event';
-import { EventProxy } from '../../game/event-proxy';
-import { PlayerPhysics } from '../../game/player-physics';
-import { CollisionEvent } from '../../physics/collision-event';
-import { HitCircle } from '../../physics/hit-circle';
-import { BumperAnimation } from './bumper-animation';
-import { BumperData } from './bumper-data';
-import { BumperState } from './bumper-state';
+import { Event } from '../../game/event'
+import type { EventProxy } from '../../game/event-proxy'
+import type { PlayerPhysics } from '../../game/player-physics'
+import type { CollisionEvent } from '../../physics/collision-event'
+import { HitCircle } from '../../physics/hit-circle'
+import type { BumperAnimation } from './bumper-animation'
+import type { BumperData } from './bumper-data'
+import type { BumperState } from './bumper-state'
 
 export class BumperHit extends HitCircle {
-
-	private readonly data: BumperData;
-	private readonly state: BumperState;
-	private readonly animation: BumperAnimation;
-	private readonly events: EventProxy;
+	private readonly data: BumperData
+	private readonly state: BumperState
+	private readonly animation: BumperAnimation
+	private readonly events: EventProxy
 
 	constructor(data: BumperData, state: BumperState, animation: BumperAnimation, events: EventProxy, height: number) {
-		super(data.center, data.radius, height, height + data.heightScale);
-		this.data = data;
-		this.state = state;
-		this.animation = animation;
+		super(data.center, data.radius, height, height + data.heightScale)
+		this.data = data
+		this.state = state
+		this.animation = animation
 
-		this.events = events;
-		this.isEnabled = this.data.isCollidable;
-		this.scatter = this.data.scatter!;
+		this.events = events
+		this.isEnabled = this.data.isCollidable
+		this.scatter = this.data.scatter!
 	}
 
 	public collide(coll: CollisionEvent, physics: PlayerPhysics): void {
 		if (!this.isEnabled) {
-			return;
+			return
 		}
 
 		// needs to be computed before Collide3DWall()
-		const dot = coll.hitNormal.dot(coll.ball.hit.vel);
+		const dot = coll.hitNormal.dot(coll.ball.hit.vel)
 
 		// reflect ball from wall
-		coll.ball.hit.collide3DWall(coll.hitNormal, this.elasticity, this.elasticityFalloff, this.friction, this.scatter);
+		coll.ball.hit.collide3DWall(coll.hitNormal, this.elasticity, this.elasticityFalloff, this.friction, this.scatter)
 
 		// if velocity greater than threshold level
-		if (this.data.hitEvent && (dot <= -this.data.threshold)) {
+		if (this.data.hitEvent && dot <= -this.data.threshold) {
 			// add a chunk of velocity to drive ball away
-			coll.ball.hit.vel.addAndRelease(coll.hitNormal.clone(true).multiplyScalar(this.data.force));
+			coll.ball.hit.vel.addAndRelease(coll.hitNormal.clone(true).multiplyScalar(this.data.force))
 
-			this.animation.hitEvent = true;
-			this.animation.ballHitPosition.setAndRelease(coll.ball.state.pos.clone(true));
-			this.events.fireGroupEvent(Event.HitEventsHit);
+			this.animation.hitEvent = true
+			this.animation.ballHitPosition.setAndRelease(coll.ball.state.pos.clone(true))
+			this.events.fireGroupEvent(Event.HitEventsHit)
 		}
 	}
 }

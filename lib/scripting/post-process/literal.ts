@@ -17,84 +17,80 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { identifier, literal, newExpression } from '../estree';
-import { ESIToken } from '../grammar/grammar';
+import { identifier, literal, newExpression } from '../estree'
+import type { ESIToken } from '../grammar/grammar'
 
 export function ppLiteral(node: ESIToken): any {
 	switch (node.type) {
 		case 'BooleanLiteral':
-			return ppBooleanLiteral(node);
+			return ppBooleanLiteral(node)
 		case 'FloatingPointLiteral':
-			return ppFloatingPointLiteral(node);
+			return ppFloatingPointLiteral(node)
 		case 'IntLiteral':
-			return ppIntLiteral(node);
+			return ppIntLiteral(node)
 		case 'HexLiteral':
-			return ppHexLiteral(node);
+			return ppHexLiteral(node)
 		case 'OctalLiteral':
-			return ppOctalLiteral(node);
+			return ppOctalLiteral(node)
 		case 'StringLiteral':
-			return ppStringLiteral(node);
+			return ppStringLiteral(node)
 		case 'DateLiteral':
-			return ppDateLiteral(node);
+			return ppDateLiteral(node)
 		case 'NothingLiteral':
-			return ppNothingLiteral(node);
+			return ppNothingLiteral(node)
 		case 'EmptyLiteral':
-			return ppEmptyLiteral(node);
+			return ppEmptyLiteral(node)
 		case 'NullLiteral':
-			return ppNullLiteral(node);
+			return ppNullLiteral(node)
 	}
-	return null;
+	return null
 }
 
 function ppBooleanLiteral(node: ESIToken): any {
-	const value = node.text;
-	return literal(value === 'True');
+	const value = node.text
+	return literal(value === 'True')
 }
 
 function ppFloatingPointLiteral(node: ESIToken): any {
-	const value = node.text;
-	return literal(parseFloat(value));
+	const value = node.text
+	return literal(parseFloat(value))
 }
 
 function ppIntLiteral(node: ESIToken): any {
-	const value = node.text;
-	return literal(parseInt(value, 10));
+	const value = node.text
+	return literal(parseInt(value, 10))
 }
 
 function ppHexLiteral(node: ESIToken): any {
-	let value = node.text;
-	value = '0x' + value.substr(2);
-	return literal(parseInt(value, 16), value);
+	let value = node.text
+	value = '0x' + value.substr(2)
+	return literal(parseInt(value, 16), value)
 }
 
 function ppOctalLiteral(node: ESIToken): any {
-	let value = node.text;
-	value = '0' + value.substr(2);
-	return literal(parseInt(value, 8), value);
+	let value = node.text
+	value = '0' + value.substr(2)
+	return literal(parseInt(value, 8), value)
 }
 
 function ppStringLiteral(node: ESIToken): any {
-	const value = node.text
-		.slice(1, -1)
-		.replace(/""/g, '"')
-		.replace(/\\/g, '\\\\')
-		.replace(/\t/g, '\\t');
-	return literal(value);
+	const value = node.text.slice(1, -1).replace(/""/g, '"').replace(/\\/g, '\\\\').replace(/\t/g, '\\t')
+	return literal(value)
 }
 
 function ppDateLiteral(node: ESIToken): any {
-	const value = node.text.slice(1, -1);
-	return newExpression(identifier('Date'), [literal(value)]);
+	const value = node.text.slice(1, -1)
+	return newExpression(identifier('Date'), [literal(value)])
 }
 
 function ppNothingLiteral(node: ESIToken): any {
-	return identifier('Nothing');
+	return identifier('Nothing')
 }
 
 function ppEmptyLiteral(node: ESIToken): any {
-	return identifier('Empty');
+	return identifier('Empty')
 }
 
 function ppNullLiteral(node: ESIToken): any {
-	return identifier('Null');
+	return identifier('Null')
 }

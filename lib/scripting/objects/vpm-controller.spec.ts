@@ -17,276 +17,275 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import * as chai from 'chai';
-import { expect } from 'chai';
-import * as sinon from 'sinon';
-import { SinonStub } from 'sinon';
-import { TableBuilder } from '../../../test/table-builder';
-import { Emulator } from '../../emu/wpc-emu';
-import { Player } from '../../game/player';
-import { Table } from '../../vpt/table/table';
-import { VpmController } from './vpm-controller';
+import * as chai from 'chai'
+import { expect } from 'chai'
+import type { SinonStub } from 'sinon'
+import * as sinon from 'sinon'
+import sinonChai from 'sinon-chai'
+import { TableBuilder } from '../../../test/table-builder'
+import { Emulator } from '../../emu/wpc-emu'
+import { Player } from '../../game/player'
+import type { Table } from '../../vpt/table/table'
+import { VpmController } from './vpm-controller'
 
 /* tslint:disable:no-unused-expression no-string-literal */
-chai.use(require('sinon-chai'));
+chai.use((sinonChai as any).default ?? sinonChai)
 describe('The VpmController - VISUAL PINMAME COM OBJECT', () => {
-
-	const sandbox = sinon.createSandbox();
-	let vpmController: VpmController;
-	let setSwitchInputSpy: SinonStub<[number, boolean?]>;
-	let setFliptronicsInputSpy: SinonStub<[string, boolean?]>;
-	let setDipSwitchByteSpy: SinonStub<[number]>;
-	let getDipSwitchByteSpy: SinonStub<any>;
+	const sandbox = sinon.createSandbox()
+	let vpmController: VpmController
+	let setSwitchInputSpy: SinonStub<[number, boolean?]>
+	let setFliptronicsInputSpy: SinonStub<[string, boolean?]>
+	let setDipSwitchByteSpy: SinonStub<[number]>
+	let getDipSwitchByteSpy: SinonStub<any>
 
 	beforeEach(() => {
-		setSwitchInputSpy = sandbox.stub(Emulator.prototype, 'setSwitchInput').returns(true);
-		setFliptronicsInputSpy = sandbox.stub(Emulator.prototype, 'setFliptronicsInput');
-		setDipSwitchByteSpy = sandbox.stub(Emulator.prototype, 'setDipSwitchByte');
-		getDipSwitchByteSpy = sandbox.stub(Emulator.prototype, 'getDipSwitchByte').returns(123);
+		setSwitchInputSpy = sandbox.stub(Emulator.prototype, 'setSwitchInput').returns(true)
+		setFliptronicsInputSpy = sandbox.stub(Emulator.prototype, 'setFliptronicsInput')
+		setDipSwitchByteSpy = sandbox.stub(Emulator.prototype, 'setDipSwitchByte')
+		getDipSwitchByteSpy = sandbox.stub(Emulator.prototype, 'getDipSwitchByte').returns(123)
 
-		const table: Table = new TableBuilder().build();
-		const player: Player = new Player(table);
-		vpmController = new VpmController(player);
-	});
+		const table: Table = new TableBuilder().build()
+		const player: Player = new Player(table)
+		vpmController = new VpmController(player)
+	})
 
 	afterEach(() => {
-		sandbox.restore();
-	});
+		sandbox.restore()
+	})
 
 	//TODO this fails due wpc-emu module loader
 	it('should set and get GameName', () => {
-		const NAME: string = 'foo';
-		vpmController.GameName = NAME;
-		expect(vpmController.GameName).to.equal(NAME);
-	});
+		const NAME: string = 'foo'
+		vpmController.GameName = NAME
+		expect(vpmController.GameName).to.equal(NAME)
+	})
 
 	it('should set and get pause state', () => {
-		vpmController.Pause = true;
-		expect(vpmController.Pause).to.equal(true);
-	});
+		vpmController.Pause = true
+		expect(vpmController.Pause).to.equal(true)
+	})
 
 	it('should not run when paused', () => {
-		vpmController.Pause = true;
-		expect(vpmController.Running).to.equal(false);
-	});
+		vpmController.Pause = true
+		expect(vpmController.Running).to.equal(false)
+	})
 
 	it('should not run when emu is not initialized', () => {
-		vpmController.Pause = false;
-		expect(vpmController.Running).to.equal(false);
-	});
+		vpmController.Pause = false
+		expect(vpmController.Running).to.equal(false)
+	})
 
 	it('should Stop', () => {
-		vpmController.Stop();
-		expect(vpmController.Running).to.equal(false);
-	});
+		vpmController.Stop()
+		expect(vpmController.Running).to.equal(false)
+	})
 
 	it('should set and get Dip[0] - note the Dip index is ignored, as WPC has only one!', () => {
-		const VALUE: number = 0x55;
-		vpmController.Dip[0] = VALUE;
-		expect(setDipSwitchByteSpy.args[0]).to.deep.equal([ VALUE ]);
-		expect(vpmController.Dip[0]).to.equal(123);
-	});
+		const VALUE: number = 0x55
+		vpmController.Dip[0] = VALUE
+		expect(setDipSwitchByteSpy.args[0]).to.deep.equal([VALUE])
+		expect(vpmController.Dip[0]).to.equal(123)
+	})
 
 	it('no changed lamps detected', () => {
-		const result = vpmController.ChangedLamps;
-		expect(result).to.deep.equal([]);
-	});
+		const result = vpmController.ChangedLamps
+		expect(result).to.deep.equal([])
+	})
 
 	it('no changed solenoid detected', () => {
-		const result = vpmController.ChangedSolenoids;
-		expect(result).to.deep.equal([]);
-	});
+		const result = vpmController.ChangedSolenoids
+		expect(result).to.deep.equal([])
+	})
 
 	it('no changed GI detected', () => {
-		const result = vpmController.ChangedGI;
-		expect(result).to.deep.equal([]);
-	});
+		const result = vpmController.ChangedGI
+		expect(result).to.deep.equal([])
+	})
 
 	it('no changed LEDs detected', () => {
-		const result = vpmController.ChangedLEDs;
-		expect(result).to.deep.equal([]);
-	});
+		const result = vpmController.ChangedLEDs
+		expect(result).to.deep.equal([])
+	})
 
 	it('should ignore writes to RO settings', () => {
-		vpmController.Solenoid[0] = 1;
-		vpmController.Lamp[0] = 1;
-		vpmController.GIString[0] = 1;
-		vpmController.Switch[0] = 1;
-		expect(vpmController.Solenoid[0]).to.equal(0);
-	});
+		vpmController.Solenoid[0] = 1
+		vpmController.Lamp[0] = 1
+		vpmController.GIString[0] = 1
+		vpmController.Switch[0] = 1
+		expect(vpmController.Solenoid[0]).to.equal(0)
+	})
 
 	it('should ignore calls to Customization functions', () => {
-		vpmController.SetDisplayPosition(1, 2, 3);
-		vpmController.ShowOptsDialog(3);
-		vpmController.ShowPathesDialog(3);
-		const foo = vpmController.ShowAboutDialog(3);
-		expect(foo).to.equal(undefined);
-	});
+		vpmController.SetDisplayPosition(1, 2, 3)
+		vpmController.ShowOptsDialog(3)
+		vpmController.ShowPathesDialog(3)
+		const foo = vpmController.ShowAboutDialog(3)
+		expect(foo).to.equal(undefined)
+	})
 
 	it('get Switch 0 (offset 11)', () => {
-		const result = vpmController.Switch[11];
-		expect(result).to.deep.equal(0);
-	});
+		const result = vpmController.Switch[11]
+		expect(result).to.deep.equal(0)
+	})
 
 	it('validate setSwitchInput is called with the correct settings, using 1 as input', () => {
-		vpmController.Switch[11] = 1;
-		expect(setSwitchInputSpy.args[0]).to.deep.equal([ 11, true ]);
-	});
+		vpmController.Switch[11] = 1
+		expect(setSwitchInputSpy.args[0]).to.deep.equal([11, true])
+	})
 
 	it('validate setSwitchInput is called with the correct settings, using 0 as input', () => {
-		vpmController.Switch[11] = 0;
-		expect(setSwitchInputSpy.args[0]).to.deep.equal([ 11, false ]);
-	});
+		vpmController.Switch[11] = 0
+		expect(setSwitchInputSpy.args[0]).to.deep.equal([11, false])
+	})
 
 	it('validate setFliptronicsInput is called (F2), using 0 as input', () => {
-		vpmController.Switch[112] = 0;
-		expect(setFliptronicsInputSpy.args[0]).to.deep.equal([ 'F2', false ]);
-	});
+		vpmController.Switch[112] = 0
+		expect(setFliptronicsInputSpy.args[0]).to.deep.equal(['F2', false])
+	})
 
 	it('validate setFliptronicsInput is called (F6), using 1 as input', () => {
-		vpmController.Switch[116] = 1;
-		expect(setFliptronicsInputSpy.args[0]).to.deep.equal([ 'F6', true ]);
-	});
+		vpmController.Switch[116] = 1
+		expect(setFliptronicsInputSpy.args[0]).to.deep.equal(['F6', true])
+	})
 
 	it('validate setFliptronicsInput is called (F8), using false as input', () => {
-		// @ts-ignore
-		vpmController.Switch[118] = false;
-		expect(setFliptronicsInputSpy.args[0]).to.deep.equal([ 'F8', false ]);
-	});
+		// @ts-expect-error
+		vpmController.Switch[118] = false
+		expect(setFliptronicsInputSpy.args[0]).to.deep.equal(['F8', false])
+	})
 
 	it('validate setSwitchInput is called with the correct settings, using true as input', () => {
-		// @ts-ignore
-		vpmController.Switch[11] = true;
-		expect(setSwitchInputSpy.args[0]).to.deep.equal([ 11, true ]);
-	});
+		// @ts-expect-error
+		vpmController.Switch[11] = true
+		expect(setSwitchInputSpy.args[0]).to.deep.equal([11, true])
+	})
 
 	it('validate setSwitchInput is called with the correct settings, using false as input', () => {
-		// @ts-ignore
-		vpmController.Switch[11] = false;
-		expect(setSwitchInputSpy.args[0]).to.deep.equal([ 11, false ]);
-	});
+		// @ts-expect-error
+		vpmController.Switch[11] = false
+		expect(setSwitchInputSpy.args[0]).to.deep.equal([11, false])
+	})
 
 	it('get Lamp 0 (offset 11)', () => {
-		const result = vpmController.Lamp[11];
-		expect(result).to.deep.equal(0);
-	});
+		const result = vpmController.Lamp[11]
+		expect(result).to.deep.equal(0)
+	})
 
 	it('get Solenoid 0', () => {
-		const result = vpmController.Solenoid[0];
-		expect(result).to.deep.equal(0);
-	});
+		const result = vpmController.Solenoid[0]
+		expect(result).to.deep.equal(0)
+	})
 
 	it('get GIString 0', () => {
-		const result = vpmController.GIString[0];
-		expect(result).to.deep.equal(0);
-	});
+		const result = vpmController.GIString[0]
+		expect(result).to.deep.equal(0)
+	})
 
 	it('is WPCNumbering?', () => {
-		const result: number = vpmController.WPCNumbering;
-		expect(result).to.equal(1);
-	});
+		const result: number = vpmController.WPCNumbering
+		expect(result).to.equal(1)
+	})
 
 	it('get SampleRate', () => {
-		const result: number = vpmController.SampleRate;
-		expect(result).to.equal(22050);
-	});
+		const result: number = vpmController.SampleRate
+		expect(result).to.equal(22050)
+	})
 
 	it('CheckROMS()', () => {
-		const result: boolean = vpmController.CheckROMS(1);
-		expect(result).to.equal(true);
-	});
+		const result: boolean = vpmController.CheckROMS(1)
+		expect(result).to.equal(true)
+	})
 
 	it('get Version', () => {
-		const result: string = vpmController.Version;
-		expect(result).to.equal('00990201');
-	});
+		const result: string = vpmController.Version
+		expect(result).to.equal('00990201')
+	})
 
 	it('set and get SplashInfoLine', () => {
-		vpmController.SplashInfoLine = 'SPLASH!';
-		const result: string = vpmController.SplashInfoLine;
-		expect(result).to.equal('SPLASH!');
-	});
+		vpmController.SplashInfoLine = 'SPLASH!'
+		const result: string = vpmController.SplashInfoLine
+		expect(result).to.equal('SPLASH!')
+	})
 
 	it('dummy Debugging function (GET): ShowDMDOnly', () => {
-		const result: boolean = vpmController.ShowDMDOnly;
-		expect(result).to.equal(false);
-	});
+		const result: boolean = vpmController.ShowDMDOnly
+		expect(result).to.equal(false)
+	})
 
 	it('dummy Debugging function (GET): HandleKeyboard', () => {
-		const result: boolean = vpmController.HandleKeyboard;
-		expect(result).to.equal(false);
-	});
+		const result: boolean = vpmController.HandleKeyboard
+		expect(result).to.equal(false)
+	})
 
 	it('dummy Debugging function (GET): ShowTitle', () => {
-		const result: boolean = vpmController.ShowTitle;
-		expect(result).to.equal(false);
-	});
+		const result: boolean = vpmController.ShowTitle
+		expect(result).to.equal(false)
+	})
 
 	it('set dummy Debugging functions', () => {
-		vpmController.ShowDMDOnly = true;
-		vpmController.HandleKeyboard = true;
-		vpmController.ShowTitle = true;
-		expect(vpmController.ShowTitle).to.equal(false);
-	});
+		vpmController.ShowDMDOnly = true
+		vpmController.HandleKeyboard = true
+		vpmController.ShowTitle = true
+		expect(vpmController.ShowTitle).to.equal(false)
+	})
 
 	it('dummy Customization function (GET): LockDisplay', () => {
-		vpmController.LockDisplay = true;
-		const result: boolean = vpmController.LockDisplay;
-		expect(result).to.equal(false);
-	});
+		vpmController.LockDisplay = true
+		const result: boolean = vpmController.LockDisplay
+		expect(result).to.equal(false)
+	})
 
 	it('dummy Customization function: Hidden', () => {
-		vpmController.Hidden = true;
-		const result: boolean = vpmController.Hidden;
-		expect(result).to.equal(false);
-	});
+		vpmController.Hidden = true
+		const result: boolean = vpmController.Hidden
+		expect(result).to.equal(false)
+	})
 
 	it('dummy Customization function: DoubleSize', () => {
-		vpmController.DoubleSize = true;
-		const result: boolean = vpmController.DoubleSize;
-		expect(result).to.equal(false);
-	});
+		vpmController.DoubleSize = true
+		const result: boolean = vpmController.DoubleSize
+		expect(result).to.equal(false)
+	})
 
 	it('dummy Customization function: Antialias', () => {
-		vpmController.Antialias = true;
-		const result: boolean = vpmController.Antialias;
-		expect(result).to.equal(false);
-	});
+		vpmController.Antialias = true
+		const result: boolean = vpmController.Antialias
+		expect(result).to.equal(false)
+	})
 
 	it('dummy Customization function: ShowFrame', () => {
-		vpmController.ShowFrame = true;
-		const result: boolean = vpmController.ShowFrame;
-		expect(result).to.equal(false);
-	});
+		vpmController.ShowFrame = true
+		const result: boolean = vpmController.ShowFrame
+		expect(result).to.equal(false)
+	})
 
 	it('dummy Customization function: DoubleSize', () => {
-		vpmController.BorderSizeX = 5;
-		const result: number = vpmController.BorderSizeX;
-		expect(result).to.equal(0);
-	});
+		vpmController.BorderSizeX = 5
+		const result: number = vpmController.BorderSizeX
+		expect(result).to.equal(0)
+	})
 
 	it('dummy Customization function: BorderSizeY', () => {
-		vpmController.BorderSizeY = 5;
-		const result: number = vpmController.BorderSizeY;
-		expect(result).to.equal(0);
-	});
+		vpmController.BorderSizeY = 5
+		const result: number = vpmController.BorderSizeY
+		expect(result).to.equal(0)
+	})
 
 	it('dummy Customization function: WindowPosX', () => {
-		vpmController.WindowPosX = 5;
-		const result: number = vpmController.WindowPosX;
-		expect(result).to.equal(0);
-	});
+		vpmController.WindowPosX = 5
+		const result: number = vpmController.WindowPosX
+		expect(result).to.equal(0)
+	})
 
 	it('dummy Customization function: WindowPosY', () => {
-		vpmController.WindowPosY = 5;
-		const result: number = vpmController.WindowPosY;
-		expect(result).to.equal(0);
-	});
+		vpmController.WindowPosY = 5
+		const result: number = vpmController.WindowPosY
+		expect(result).to.equal(0)
+	})
 
 	it('dummy GameSetting function: HandleMechanics', () => {
-		vpmController.HandleMechanics = 1;
-		const result: number = vpmController.HandleMechanics;
-		expect(result).to.equal(0);
-	});
-
-});
+		vpmController.HandleMechanics = 1
+		const result: number = vpmController.HandleMechanics
+		expect(result).to.equal(0)
+	})
+})

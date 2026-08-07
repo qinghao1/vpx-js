@@ -17,29 +17,36 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { IRenderApi } from '../../render/irender-api';
-import { Mesh } from '../mesh';
-import { Table } from '../table/table';
-import { LightData } from './light-data';
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+import type { IRenderApi } from '../../render/irender-api'
+import { Mesh } from '../mesh'
+import type { Table } from '../table/table'
+import type { LightData } from './light-data'
 
-const bulbLightMesh = Mesh.fromJson(require('../../../res/meshes/bulb-light-mesh'));
-const bulbSocketMesh = Mesh.fromJson(require('../../../res/meshes/bulb-socket-mesh'));
+const bulbLightMeshJson = JSON.parse(readFileSync(resolve(process.cwd(), 'res/meshes/bulb-light-mesh.json'), 'utf-8'))
+const bulbSocketMeshJson = JSON.parse(readFileSync(resolve(process.cwd(), 'res/meshes/bulb-socket-mesh.json'), 'utf-8'))
+
+const bulbLightMesh = Mesh.fromJson(bulbLightMeshJson)
+const bulbSocketMesh = Mesh.fromJson(bulbSocketMeshJson)
 
 export class LightMeshGenerator {
-
-	private readonly data: LightData;
+	private readonly data: LightData
 
 	constructor(data: LightData) {
-		this.data = data;
+		this.data = data
 	}
 
-	public getMeshes<NODE, GEOMETRY, POINT_LIGHT>(table: Table, renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>): LightMeshes<GEOMETRY> {
+	public getMeshes<NODE, GEOMETRY, POINT_LIGHT>(
+		table: Table,
+		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
+	): LightMeshes<GEOMETRY> {
 		if (this.data.isBulbLight()) {
-			return this.getBulbMeshes(table);
+			return this.getBulbMeshes(table)
 		}
 		return {
 			surfaceLight: renderApi.createLightGeometry(this.data, table),
-		};
+		}
 	}
 
 	// public getPath(table: Table): Path {
@@ -79,30 +86,31 @@ export class LightMeshGenerator {
 	// }
 
 	private getBulbMeshes<GEOMETRY>(table: Table): LightMeshes<GEOMETRY> {
-		const lightMesh = bulbLightMesh.clone(`bulb.light`);
-		const height = table.getSurfaceHeight(this.data.szSurface, this.data.center.x, this.data.center.y) * table.getScaleZ();
+		const lightMesh = bulbLightMesh.clone(`bulb.light`)
+		const height =
+			table.getSurfaceHeight(this.data.szSurface, this.data.center.x, this.data.center.y) * table.getScaleZ()
 		for (const vertex of lightMesh.vertices) {
-			vertex.x = vertex.x * this.data.meshRadius + this.data.center.x;
-			vertex.y = vertex.y * this.data.meshRadius + this.data.center.y;
-			vertex.z = vertex.z * this.data.meshRadius * table.getScaleZ() + height;
+			vertex.x = vertex.x * this.data.meshRadius + this.data.center.x
+			vertex.y = vertex.y * this.data.meshRadius + this.data.center.y
+			vertex.z = vertex.z * this.data.meshRadius * table.getScaleZ() + height
 		}
 
-		const socketMesh = bulbSocketMesh.clone(`bulb.socket`);
+		const socketMesh = bulbSocketMesh.clone(`bulb.socket`)
 		for (const vertex of socketMesh.vertices) {
-			vertex.x = vertex.x * this.data.meshRadius + this.data.center.x;
-			vertex.y = vertex.y * this.data.meshRadius + this.data.center.y;
-			vertex.z = vertex.z * this.data.meshRadius * table.getScaleZ() + height;
+			vertex.x = vertex.x * this.data.meshRadius + this.data.center.x
+			vertex.y = vertex.y * this.data.meshRadius + this.data.center.y
+			vertex.z = vertex.z * this.data.meshRadius * table.getScaleZ() + height
 		}
 
 		return {
 			light: lightMesh,
 			socket: socketMesh,
-		};
+		}
 	}
 }
 
 export interface LightMeshes<GEOMETRY> {
-	light?: Mesh;
-	socket?: Mesh;
-	surfaceLight?: GEOMETRY;
+	light?: Mesh
+	socket?: Mesh
+	surfaceLight?: GEOMETRY
 }

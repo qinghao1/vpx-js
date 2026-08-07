@@ -17,38 +17,37 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { EventProxy } from '../../game/event-proxy';
-import { IScriptable } from '../../game/iscriptable';
-import { Player } from '../../game/player';
-import { Storage } from '../../io/ole-doc';
-import { Item } from '../item';
-import { Table } from '../table/table';
-import { LightSeqApi } from './lightseq-api';
-import { LightSeqData } from './lightseq-data';
+import { EventProxy } from '../../game/event-proxy'
+import type { IScriptable } from '../../game/iscriptable'
+import type { Player } from '../../game/player'
+import type { Storage } from '../../io/ole-doc'
+import { Item } from '../item'
+import type { Table } from '../table/table'
+import { LightSeqApi } from './lightseq-api'
+import { LightSeqData } from './lightseq-data'
 
 export class LightSeq extends Item<LightSeqData> implements IScriptable<LightSeqApi> {
-
-	private api?: LightSeqApi;
+	private api?: LightSeqApi
 
 	public static async fromStorage(storage: Storage, itemName: string): Promise<LightSeq> {
-		const data = await LightSeqData.fromStorage(storage, itemName);
-		return new LightSeq(data);
+		const data = await LightSeqData.fromStorage(storage, itemName)
+		return new LightSeq(data)
 	}
 
 	private constructor(data: LightSeqData) {
-		super(data);
+		super(data)
 	}
 
 	public setupPlayer(player: Player, table: Table): void {
-		this.events = new EventProxy(this);
-		this.api = new LightSeqApi(this.data, this.events, player, table);
+		this.events = new EventProxy(this)
+		this.api = new LightSeqApi(this.data, this.events, player, table)
 	}
 
 	public getApi(): LightSeqApi {
-		return this.api!;
+		return this.api!
 	}
 
 	public getEventNames(): string[] {
-		return [ 'Init', 'PlayDone', 'Timer' ];
+		return ['Init', 'PlayDone', 'Timer']
 	}
 }
