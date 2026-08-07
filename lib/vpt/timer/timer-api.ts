@@ -7,7 +7,7 @@ import { ItemApi } from '../item-api.js'
 import type { Table } from '../table/table.js'
 import type { TimerData } from './timer-data.js'
 
-/** TimerApi. */
+/** Timer API. */
 export class TimerApi extends ItemApi<TimerData> {
 	constructor(data: TimerData, events: EventProxy, player: Player, table: Table) {
 		super(data, events, player, table)
