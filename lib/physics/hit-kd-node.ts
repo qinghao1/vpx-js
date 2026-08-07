@@ -8,22 +8,20 @@ import type { Ball } from '../vpt/ball/ball.js'
 import type { CollisionEvent } from './collision-event.js'
 import type { HitKD } from './hit-kd.js'
 
-/** KD-tree for dynamic hit objects. */
-/** KD-tree node. */
+/** KD-tree node for dynamic hit objects.
+ * @see https://github.com/vpinball/vpinball/blob/master/hitoctree.cpp */
 export class HitKDNode {
-	private hitOct: HitKD //!! meh, stupid
-
-	public rectBounds: FRect3D = new FRect3D()
-	public start: number = 0
-	public items: number = 0 // contains the 2 bits for axis (bits 30/31)
-
-	private children: HitKDNode[] = [] // if NULL, is a leaf; otherwise keeps the 2 children
+	private hitOct: HitKD
+	public rectBounds = new FRect3D()
+	public start = 0
+	public items = 0
+	private children: HitKDNode[] = []
 
 	constructor(hitOct: HitKD) {
 		this.hitOct = hitOct
 	}
 
-	public reset(hitOct: HitKD) {
+	public reset(hitOct: HitKD): void {
 		this.children.length = 0
 		this.hitOct = hitOct
 		this.start = 0
@@ -31,292 +29,155 @@ export class HitKDNode {
 	}
 
 	public hitTestBall(ball: Ball, coll: CollisionEvent, physics: PlayerPhysics): void {
-		const orgItems = this.items & 0x3fffffff
-		const axis = this.items >> 30
-
-		for (let i = this.start; i < this.start + orgItems; i++) {
-			const pho = this.hitOct.getItemAt(i)
-			if (ball.hit !== pho && pho.hitBBox.intersectSphere(ball.state.pos, ball.hit.rcHitRadiusSqr)) {
-				pho.doHitTest(ball, coll, physics)
-			}
+		const n = this.items & 0x3fffffff,
+			axis = this.items >> 30
+		for (let i = this.start; i < this.start + n; i++) {
+			const o = this.hitOct.getItemAt(i)
+			if (ball.hit !== o && o.hitBBox.intersectSphere(ball.state.pos, ball.hit.rcHitRadiusSqr))
+				o.doHitTest(ball, coll, physics)
 		}
-
-		/* istanbul ignore if: never executed (https://www.vpforums.org/index.php?showtopic=42690) */
-		if (this.children && this.children.length) {
-			// not a leaf
-			if (axis === 0) {
-				const vCenter = (this.rectBounds.left + this.rectBounds.right) * 0.5
-				if (ball.hit.hitBBox.left <= vCenter) {
-					this.children[0].hitTestBall(ball, coll, physics)
-				}
-				if (ball.hit.hitBBox.right >= vCenter) {
-					this.children[1].hitTestBall(ball, coll, physics)
-				}
-			} else if (axis === 1) {
-				const vCenter = (this.rectBounds.top + this.rectBounds.bottom) * 0.5
-				if (ball.hit.hitBBox.top <= vCenter) {
-					this.children[0].hitTestBall(ball, coll, physics)
-				}
-				if (ball.hit.hitBBox.bottom >= vCenter) {
-					this.children[1].hitTestBall(ball, coll, physics)
-				}
-			} else {
-				const vCenter = (this.rectBounds.zlow + this.rectBounds.zhigh) * 0.5
-				if (ball.hit.hitBBox.zlow <= vCenter) {
-					this.children[0].hitTestBall(ball, coll, physics)
-				}
-				if (ball.hit.hitBBox.zhigh >= vCenter) {
-					this.children[1].hitTestBall(ball, coll, physics)
-				}
-			}
+		if (!this.children.length) return
+		const r = this.rectBounds,
+			b = ball.hit.hitBBox
+		if (axis === 0) {
+			const c = (r.left + r.right) * 0.5
+			if (b.left <= c) this.children[0].hitTestBall(ball, coll, physics)
+			if (b.right >= c) this.children[1].hitTestBall(ball, coll, physics)
+		} else if (axis === 1) {
+			const c = (r.top + r.bottom) * 0.5
+			if (b.top <= c) this.children[0].hitTestBall(ball, coll, physics)
+			if (b.bottom >= c) this.children[1].hitTestBall(ball, coll, physics)
+		} else {
+			const c = (r.zlow + r.zhigh) * 0.5
+			if (b.zlow <= c) this.children[0].hitTestBall(ball, coll, physics)
+			if (b.zhigh >= c) this.children[1].hitTestBall(ball, coll, physics)
 		}
 	}
 
-	/* istanbul ignore next: never executed below the "magic" check (https://www.vpforums.org/index.php?showtopic=42690) */
 	public createNextLevel(level: number, levelEmpty: number): void {
-		const orgItems = this.items & 0x3fffffff
-
-		// !! magic
-		if (orgItems <= 4 || level >= 128 / 2) {
-			return
-		}
-
-		const vDiag = Vertex3D.claim(
+		const org = this.items & 0x3fffffff
+		if (org <= 4 || level >= 64) return
+		const d = Vertex3D.claim(
 			this.rectBounds.right - this.rectBounds.left,
 			this.rectBounds.bottom - this.rectBounds.top,
 			this.rectBounds.zhigh - this.rectBounds.zlow,
 		)
-
 		let axis: number
-		if (vDiag.x > vDiag.y && vDiag.x > vDiag.z) {
-			if (vDiag.x < 0.0001) {
-				//!! magic
-				Vertex3D.release(vDiag)
+		if (d.x > d.y && d.x > d.z) {
+			if (d.x < 1e-4) {
+				Vertex3D.release(d)
 				return
 			}
 			axis = 0
-		} else if (vDiag.y > vDiag.z) {
-			if (vDiag.y < 0.0001) {
-				//!!
-				Vertex3D.release(vDiag)
+		} else if (d.y > d.z) {
+			if (d.y < 1e-4) {
+				Vertex3D.release(d)
 				return
 			}
 			axis = 1
 		} else {
-			if (vDiag.z < 0.0001) {
-				//!!
-				Vertex3D.release(vDiag)
+			if (d.z < 1e-4) {
+				Vertex3D.release(d)
 				return
 			}
 			axis = 2
 		}
-		Vertex3D.release(vDiag)
+		Vertex3D.release(d)
 
-		//!! weight this with ratio of elements going to middle vs left&right! (avoids volume split that goes directly through object)
-
-		// create children, calc bboxes
 		this.children = this.hitOct.allocTwoNodes()
-		if (this.children.length === 0) {
-			// ran out of nodes - abort
-			return
-		}
+		if (!this.children.length) return
 		this.children[0].rectBounds = this.rectBounds
 		this.children[1].rectBounds = this.rectBounds
-
-		const vCenter = Vertex3D.claim(
+		const vc = Vertex3D.claim(
 			(this.rectBounds.left + this.rectBounds.right) * 0.5,
 			(this.rectBounds.top + this.rectBounds.bottom) * 0.5,
 			(this.rectBounds.zlow + this.rectBounds.zhigh) * 0.5,
 		)
 		if (axis === 0) {
-			this.children[0].rectBounds.right = vCenter.x
-			this.children[1].rectBounds.left = vCenter.x
+			this.children[0].rectBounds.right = vc.x
+			this.children[1].rectBounds.left = vc.x
 		} else if (axis === 1) {
-			this.children[0].rectBounds.bottom = vCenter.y
-			this.children[1].rectBounds.top = vCenter.y
+			this.children[0].rectBounds.bottom = vc.y
+			this.children[1].rectBounds.top = vc.y
 		} else {
-			this.children[0].rectBounds.zhigh = vCenter.z
-			this.children[1].rectBounds.zlow = vCenter.z
+			this.children[0].rectBounds.zhigh = vc.z
+			this.children[1].rectBounds.zlow = vc.z
+		}
+		for (const c of this.children) {
+			c.hitOct = this.hitOct
+			c.items = 0
+			c.children.length = 0
 		}
 
-		this.children[0].hitOct = this.hitOct //!! meh
-		this.children[0].items = 0
-		this.children[0].children.length = 0
-		this.children[1].hitOct = this.hitOct //!! meh
-		this.children[1].items = 0
-		this.children[1].children.length = 0
-
-		// determine amount of items that cross splitplane, or are passed on to the children
-		if (axis === 0) {
-			for (let i = this.start; i < this.start + orgItems; ++i) {
-				const pho = this.hitOct.getItemAt(i)
-
-				if (pho.hitBBox.right < vCenter.x) {
-					this.children[0].items++
-				} else if (pho.hitBBox.left > vCenter.x) {
-					this.children[1].items++
-				}
+		if (axis === 0)
+			for (let i = this.start; i < this.start + org; i++) {
+				const h = this.hitOct.getItemAt(i).hitBBox
+				if (h.right < vc.x) this.children[0].items++
+				else if (h.left > vc.x) this.children[1].items++
 			}
-		} else if (axis === 1) {
-			for (let i = this.start; i < this.start + orgItems; ++i) {
-				const pho = this.hitOct.getItemAt(i)
-
-				if (pho.hitBBox.bottom < vCenter.y) {
-					this.children[0].items++
-				} else if (pho.hitBBox.top > vCenter.y) {
-					this.children[1].items++
-				}
+		else if (axis === 1)
+			for (let i = this.start; i < this.start + org; i++) {
+				const h = this.hitOct.getItemAt(i).hitBBox
+				if (h.bottom < vc.y) this.children[0].items++
+				else if (h.top > vc.y) this.children[1].items++
 			}
-		} else {
-			// axis == 2
-			for (let i = this.start; i < this.start + orgItems; ++i) {
-				const pho = this.hitOct.getItemAt(i)
-
-				if (pho.hitBBox.zhigh < vCenter.z) {
-					this.children[0].items++
-				} else if (pho.hitBBox.zlow > vCenter.z) {
-					this.children[1].items++
-				}
+		else
+			for (let i = this.start; i < this.start + org; i++) {
+				const h = this.hitOct.getItemAt(i).hitBBox
+				if (h.zhigh < vc.z) this.children[0].items++
+				else if (h.zlow > vc.z) this.children[1].items++
 			}
-		}
 
-		// check if at least two nodes feature objects, otherwise don't bother subdividing further
-		let countEmpty = 0
-		if (this.children[0].items === 0) {
-			countEmpty = 1
-		}
-		if (this.children[1].items === 0) {
-			++countEmpty
-		}
-		if (orgItems - this.children[0].items - this.children[1].items === 0) {
-			++countEmpty
-		}
-
-		if (countEmpty >= 2) {
-			++levelEmpty
-		} else {
-			levelEmpty = 0
-		}
-
+		let empty = 0
+		if (!this.children[0].items) empty++
+		if (!this.children[1].items) empty++
+		if (org - this.children[0].items - this.children[1].items === 0) empty++
+		if (empty >= 2) levelEmpty++
+		else levelEmpty = 0
 		if (levelEmpty > 8) {
-			// If 8 levels were all just subdividing the same objects without luck, exit & Free the nodes again (but at least empty space was cut off)
 			this.hitOct.numNodes -= 2
 			this.children.length = 0
-			Vertex3D.release(vCenter)
+			Vertex3D.release(vc)
 			return
 		}
 
-		this.children[0].start = this.start + orgItems - this.children[0].items - this.children[1].items
+		this.children[0].start = this.start + org - this.children[0].items - this.children[1].items
 		this.children[1].start = this.children[0].start + this.children[0].items
-
-		let items = 0
+		let kept = 0
 		this.children[0].items = 0
 		this.children[1].items = 0
 
-		// sort items that cross splitplane in-place, the others are sorted into a temporary
-		if (axis === 0) {
-			for (let i = this.start; i < this.start + orgItems; ++i) {
-				const pho = this.hitOct.getItemAt(i)
-
-				if (pho.hitBBox.right < vCenter.x) {
-					this.hitOct.tmp[this.children[0].start + this.children[0].items++] = this.hitOct.orgIdx[i]
-				} else if (pho.hitBBox.left > vCenter.x) {
-					this.hitOct.tmp[this.children[1].start + this.children[1].items++] = this.hitOct.orgIdx[i]
-				} else {
-					this.hitOct.orgIdx[this.start + items++] = this.hitOct.orgIdx[i]
-				}
+		if (axis === 0)
+			for (let i = this.start; i < this.start + org; i++) {
+				const idx = this.hitOct.orgIdx[i],
+					h = this.hitOct.getItemAt(i).hitBBox
+				if (h.right < vc.x) this.hitOct.tmp[this.children[0].start + this.children[0].items++] = idx
+				else if (h.left > vc.x) this.hitOct.tmp[this.children[1].start + this.children[1].items++] = idx
+				else this.hitOct.orgIdx[this.start + kept++] = idx
 			}
-		} else if (axis === 1) {
-			for (let i = this.start; i < this.start + orgItems; ++i) {
-				const pho = this.hitOct.getItemAt(i)
-
-				if (pho.hitBBox.bottom < vCenter.y) {
-					this.hitOct.tmp[this.children[0].start + this.children[0].items++] = this.hitOct.orgIdx[i]
-				} else if (pho.hitBBox.top > vCenter.y) {
-					this.hitOct.tmp[this.children[1].start + this.children[1].items++] = this.hitOct.orgIdx[i]
-				} else {
-					this.hitOct.orgIdx[this.start + items++] = this.hitOct.orgIdx[i]
-				}
+		else if (axis === 1)
+			for (let i = this.start; i < this.start + org; i++) {
+				const idx = this.hitOct.orgIdx[i],
+					h = this.hitOct.getItemAt(i).hitBBox
+				if (h.bottom < vc.y) this.hitOct.tmp[this.children[0].start + this.children[0].items++] = idx
+				else if (h.top > vc.y) this.hitOct.tmp[this.children[1].start + this.children[1].items++] = idx
+				else this.hitOct.orgIdx[this.start + kept++] = idx
 			}
-		} else {
-			// axis == 2
-			for (let i = this.start; i < this.start + orgItems; ++i) {
-				const pho = this.hitOct.getItemAt(i)
-
-				if (pho.hitBBox.zhigh < vCenter.z) {
-					this.hitOct.tmp[this.children[0].start + this.children[0].items++] = this.hitOct.orgIdx[i]
-				} else if (pho.hitBBox.zlow > vCenter.z) {
-					this.hitOct.tmp[this.children[1].start + this.children[1].items++] = this.hitOct.orgIdx[i]
-				} else {
-					this.hitOct.orgIdx[this.start + items++] = this.hitOct.orgIdx[i]
-				}
+		else
+			for (let i = this.start; i < this.start + org; i++) {
+				const idx = this.hitOct.orgIdx[i],
+					h = this.hitOct.getItemAt(i).hitBBox
+				if (h.zhigh < vc.z) this.hitOct.tmp[this.children[0].start + this.children[0].items++] = idx
+				else if (h.zlow > vc.z) this.hitOct.tmp[this.children[1].start + this.children[1].items++] = idx
+				else this.hitOct.orgIdx[this.start + kept++] = idx
 			}
-		}
-		Vertex3D.release(vCenter)
-		// The following assertions hold after this step:
-		//assert( this.start + items == this.children[0].this.start );
-		//assert( this.children[0].this.start + this.children[0].this.items == this.children[1].this.start );
-		//assert( this.children[1].this.start + this.children[1].this.items == this.start + org_items );
-		//assert( this.start + org_items <= this.hitOct->tmp.size() );
-
-		this.items = items | (axis << 30)
-
-		// copy temporary back //!! could omit this by doing everything inplace
-		for (let i = 0; i < this.children[0].items; i++) {
+		Vertex3D.release(vc)
+		this.items = kept | (axis << 30)
+		for (let i = 0; i < this.children[0].items; i++)
 			this.hitOct.orgIdx[this.children[0].start + i] = this.hitOct.tmp[this.children[0].start + i]
-		}
-		for (let i = 0; i < this.children[1].items; i++) {
+		for (let i = 0; i < this.children[1].items; i++)
 			this.hitOct.orgIdx[this.children[1].start + i] = this.hitOct.tmp[this.children[1].start + i]
-		}
-		//memcpy(&this.hitOct->m_org_idx[this.children[0].start], &this.hitOct->tmp[this.children[0].start], this.children[0].items*sizeof(unsigned int));
-		//memcpy(&this.hitOct->m_org_idx[this.children[1].start], &this.hitOct->tmp[this.children[1].start], this.children[1].this.items*sizeof(unsigned int));
-
 		this.children[0].createNextLevel(level + 1, levelEmpty)
 		this.children[1].createNextLevel(level + 1, levelEmpty)
 	}
-
-	// public hitTestXRay(ball: Ball, vhoHit: HitObject[], coll: CollisionEvent, player: Player): void {
-	// 	const orgItems = this.items & 0x3FFFFFFF;
-	// 	const axis = this.items >> 30;
-	//
-	// 	for (let i = this.start; i < this.start + orgItems; i++) {
-	// 		const pho = this.hitOct.getItemAt(i);
-	// 		if ((ball.hit !== pho) && pho.hitBBox.intersectSphere(ball.state.pos, ball.hit.rcHitRadiusSqr)) {
-	// 			const newTime = pho.hitTest(ball, coll.hitTime, coll, player);
-	// 			if (newTime >= 0) {
-	// 				vhoHit.push(pho);
-	// 			}
-	// 		}
-	// 	}
-	//
-	// 	if (this.children && this.children.length) {// not a leaf
-	// 		if (axis === 0) {
-	// 			const vCenter = (this.rectBounds.left + this.rectBounds.right) * 0.5;
-	// 			if (ball.hit.hitBBox.left <= vCenter) {
-	// 				this.children[0].hitTestXRay(ball, vhoHit, coll, player);
-	// 			}
-	// 			if (ball.hit.hitBBox.right >= vCenter) {
-	// 				this.children[1].hitTestXRay(ball, vhoHit, coll, player);
-	// 			}
-	//
-	// 		} else if (axis === 1) {
-	// 			const vCenter = (this.rectBounds.top + this.rectBounds.bottom) * 0.5;
-	// 			if (ball.hit.hitBBox.top <= vCenter) {
-	// 				this.children[0].hitTestXRay(ball, vhoHit, coll, player);
-	// 			}
-	// 			if (ball.hit.hitBBox.bottom >= vCenter) {
-	// 				this.children[1].hitTestXRay(ball, vhoHit, coll, player);
-	// 			}
-	//
-	// 		} else {
-	// 			const vCenter = (this.rectBounds.zlow + this.rectBounds.zhigh) * 0.5;
-	// 			if (ball.hit.hitBBox.zlow <= vCenter) {
-	// 				this.children[0].hitTestXRay(ball, vhoHit, coll, player);
-	// 			}
-	// 			if (ball.hit.hitBBox.zhigh >= vCenter) {
-	// 				this.children[1].hitTestXRay(ball, vhoHit, coll, player);
-	// 			}
-	// 		}
-	// 	}
-	// }
 }
