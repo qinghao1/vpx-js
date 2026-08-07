@@ -4,7 +4,8 @@
 import { getTextFile } from '../../refs.node.js'
 import { TextStream } from './text-stream.js'
 
-export class FileSystem {
+export /** FileSystem. */
+class FileSystem {
 	private readonly files = new Map<string, TextStream>()
 
 	public addStream(fileName: string, stream: TextStream): TextStream {
