@@ -282,11 +282,11 @@ describe('The VPinball table API', () => {
 		expect(api.DeadZone).to.equal(0) // no acc/ support
 		api.BallFrontDecal = 'test_pattern_xrgb'
 		expect(api.BallFrontDecal).to.equal('test_pattern_xrgb')
-		expect(api.Version).to.equal(10600)
-		expect(api.VPBuildVersion).to.equal(10600)
+		expect(api.Version).to.equal(10801)
+		expect(api.VPBuildVersion).to.equal(10801)
 		expect(api.VersionMajor).to.equal(10)
-		expect(api.VersionMinor).to.equal(6)
-		expect(api.VersionRevision).to.equal(0)
+		expect(api.VersionMinor).to.equal(8)
+		expect(api.VersionRevision).to.equal(1)
 	})
 
 	it('should not crash when executing unused APIs', () => {
