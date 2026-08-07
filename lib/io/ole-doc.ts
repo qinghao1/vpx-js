@@ -83,7 +83,7 @@ export class OleCompoundDoc extends EventEmitter {
 		const secSize = this.header.secSize
 		bytesToRead = Math.min(secIds.length * secSize, bytesToRead || secIds.length * secSize)
 		this.assertLoaded()
-		const browserData = (this.reader as any).data as Uint8Array | undefined
+		const browserData = (this.reader as unknown as { data?: Uint8Array }).data
 		if (browserData)
 			return this.copyFromBrowser(browserData, secIds, secSize, offset, bytesToRead, (id) =>
 				this.getFileOffsetForSec(id),
@@ -132,7 +132,7 @@ export class OleCompoundDoc extends EventEmitter {
 		const secSize = this.header.shortSecSize
 		bytesToRead = Math.min(secIds.length * secSize, bytesToRead || secIds.length * secSize)
 		this.assertLoaded()
-		const browserData = (this.reader as any).data as Uint8Array | undefined
+		const browserData = (this.reader as unknown as { data?: Uint8Array }).data
 		if (browserData)
 			return this.copyFromBrowser(browserData, secIds, secSize, offset, bytesToRead, (id) =>
 				this.getFileOffsetForShortSec(id),
