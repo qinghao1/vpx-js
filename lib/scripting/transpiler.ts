@@ -25,8 +25,8 @@ import { VbsProxyHandler } from './vbs-proxy-handler.js'
 const require = createRequire(import.meta.url)
 
 declare function play(
-	scope: any,
-	table: { [key: string]: any },
+	scope: unknown,
+	table: Record<string, unknown>,
 	enums: EnumsApi,
 	globalApi: GlobalApi,
 	stdlib: Stdlib,
@@ -39,7 +39,7 @@ declare function play(
 export class Transpiler {
 	private readonly table: Table
 	private readonly player: Player
-	private readonly itemApis: { [p: string]: any }
+	private readonly itemApis: Record<string, unknown>
 	private readonly enumApis: EnumsApi = Enums
 	private readonly globalApi: GlobalApi
 	private readonly stdlib = new Stdlib()
@@ -81,7 +81,7 @@ export class Transpiler {
 		return js
 	}
 
-	public execute(vbs: string, globalScope: any, globalObject?: string): void {
+	public execute(vbs: string, globalScope: Record<string, unknown>, globalObject?: string): void {
 		globalObject ||= typeof window !== 'undefined' ? 'window' : typeof self !== 'undefined' ? 'self' : 'global'
 		const js = this.transpile(vbs, 'play', globalObject)
 		let t = Date.now()
