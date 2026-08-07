@@ -12,7 +12,7 @@ export class TableUpdater extends ItemUpdater<TableState> {
 		super(state)
 	}
 
-	public applyState<NODE, GEOMETRY, POINT_LIGHT>(
+	public override applyState<NODE, GEOMETRY, POINT_LIGHT>(
 		_obj: NODE,
 		_state: TableState,
 		_renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
