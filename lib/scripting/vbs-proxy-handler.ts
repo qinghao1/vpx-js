@@ -7,7 +7,6 @@
  */
 /** Proxy handler for VBS late binding. */
 export class VbsProxyHandler implements ProxyHandler<any> {
-	// tslint:disable-next-line:variable-name
 	private readonly __names: { [key: string]: string | number | symbol } = {}
 
 	/**
