@@ -1,52 +1,36 @@
+// Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
+
 const textDecoder = new TextDecoder()
 
-/*
- * VPDB - Virtual Pinball Database
- * Copyright (C) 2019 freezy <freezy@vpdb.io>
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- */
-
-import { type IBinaryReader, OleCompoundDoc, type Storage } from '../../io/ole-doc'
-import { logger, progress } from '../../util/logger'
-import { Bumper } from '../bumper/bumper'
-import { Collection } from '../collection/collection'
-import { Decal } from '../decal/decal'
-import { DispReel } from '../dispreel/dispreel'
-import { ItemType } from '../enums'
-import { Flasher } from '../flasher/flasher'
-import { Flipper } from '../flipper/flipper'
-import { Gate } from '../gate/gate'
-import { HitTarget } from '../hit-target/hit-target'
-import type { Item } from '../item'
-import { ItemData } from '../item-data'
-import { Kicker } from '../kicker/kicker'
-import { Light } from '../light/light'
-import { LightSeq } from '../lightseq/lightseq'
-import { Plunger } from '../plunger/plunger'
-import { Primitive } from '../primitive/primitive'
-import { Ramp } from '../ramp/ramp'
-import { Rubber } from '../rubber/rubber'
-import { Spinner } from '../spinner/spinner'
-import { Surface } from '../surface/surface'
-import { Textbox } from '../textbox/textbox'
-import { Texture } from '../texture'
-import { Timer } from '../timer/timer'
-import { Trigger } from '../trigger/trigger'
-import type { TableLoadOptions } from './table'
-import { TableData } from './table-data'
+import { type IBinaryReader, OleCompoundDoc, type Storage } from '../../io/ole-doc.js'
+import { logger, progress } from '../../util/logger.js'
+import { Bumper } from '../bumper/bumper.js'
+import { Collection } from '../collection/collection.js'
+import { Decal } from '../decal/decal.js'
+import { DispReel } from '../dispreel/dispreel.js'
+import { ItemType } from '../enums.js'
+import { Flasher } from '../flasher/flasher.js'
+import { Flipper } from '../flipper/flipper.js'
+import { Gate } from '../gate/gate.js'
+import { HitTarget } from '../hit-target/hit-target.js'
+import type { Item } from '../item.js'
+import { ItemData } from '../item-data.js'
+import { Kicker } from '../kicker/kicker.js'
+import { Light } from '../light/light.js'
+import { LightSeq } from '../lightseq/lightseq.js'
+import { Plunger } from '../plunger/plunger.js'
+import { Primitive } from '../primitive/primitive.js'
+import { Ramp } from '../ramp/ramp.js'
+import { Rubber } from '../rubber/rubber.js'
+import { Spinner } from '../spinner/spinner.js'
+import { Surface } from '../surface/surface.js'
+import { Textbox } from '../textbox/textbox.js'
+import { Texture } from '../texture.js'
+import { Timer } from '../timer/timer.js'
+import { Trigger } from '../trigger/trigger.js'
+import type { TableLoadOptions } from './table.js'
+import { TableData } from './table-data.js'
 
 export class TableLoader {
 	private doc!: OleCompoundDoc
