@@ -139,7 +139,6 @@ async function comparePngs(
 				return reject(error)
 			}
 			if (debugPrint) {
-				// tslint:disable-next-line:no-console
 				console.log(JSON.stringify(result, null, '  '))
 			}
 			resolve(result.equal)
