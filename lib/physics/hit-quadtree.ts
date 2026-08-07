@@ -9,7 +9,7 @@ import type { Ball } from '../vpt/ball/ball.js'
 import type { CollisionEvent } from './collision-event.js'
 import type { HitObject } from './hit-object.js'
 
-/** Quad-tree for broadphase hit testing. */
+/** Quad-tree for broadphase. */
 export class HitQuadtree {
 	private unique?: EventProxy
 	private vho: HitObject[] = []
@@ -17,13 +17,11 @@ export class HitQuadtree {
 	private vCenter = new Vertex3D()
 	private isLeaf = true
 
-	/** Adds a hit object to this node. */
-	addElement(pho: HitObject): void {
+	public addElement(pho: HitObject): void {
 		this.vho.push(pho)
 	}
 
-	/** Builds the tree from the current objects. */
-	initialize(bounds?: FRect3D): void {
+	public initialize(bounds?: FRect3D): void {
 		if (!bounds) {
 			bounds = new FRect3D()
 			for (const h of this.vho) bounds.extend(h.hitBBox)
@@ -31,8 +29,7 @@ export class HitQuadtree {
 		this.createNextLevel(bounds, 0, 0)
 	}
 
-	/** Tests the ball against objects in this tree. */
-	hitTestBall(ball: Ball, coll: CollisionEvent, physics: PlayerPhysics): void {
+	public hitTestBall(ball: Ball, coll: CollisionEvent, physics: PlayerPhysics): void {
 		for (const h of this.vho) {
 			if (
 				ball.hit !== h &&
@@ -57,51 +54,40 @@ export class HitQuadtree {
 
 	private createNextLevel(bounds: FRect3D, level: number, levelEmpty: number): void {
 		if (this.vho.length <= 4) return
-
 		this.isLeaf = false
 		this.vCenter.x = (bounds.left + bounds.right) * 0.5
 		this.vCenter.y = (bounds.top + bounds.bottom) * 0.5
 		this.vCenter.z = (bounds.zlow + bounds.zhigh) * 0.5
-
 		for (let i = 0; i < 4; i++) this.children[i] = new HitQuadtree()
-
-		const vRemain: HitObject[] = []
+		const remain: HitObject[] = []
 		this.unique = this.vho[0].isPrimitive ? this.vho[0].eventProxy : undefined
-
 		for (const pho of this.vho) {
 			if ((pho.isPrimitive ? pho.eventProxy : undefined) !== this.unique) this.unique = undefined
-
-			let oct: number
+			let oct = 0
 			if (pho.hitBBox.right < this.vCenter.x) oct = 0
 			else if (pho.hitBBox.left > this.vCenter.x) oct = 1
 			else oct = 128
-
 			if (pho.hitBBox.bottom < this.vCenter.y) oct |= 0
 			else if (pho.hitBBox.top > this.vCenter.y) oct |= 2
 			else oct |= 128
-
 			if ((oct & 128) === 0) this.children[oct].vho.push(pho)
-			else vRemain.push(pho)
+			else remain.push(pho)
 		}
-
-		this.vho = vRemain
-
-		let countEmpty = this.vho.length === 0 ? 1 : 0
-		for (let i = 0; i < 4; i++) if (this.children[i].vho.length === 0) countEmpty++
-
-		if (countEmpty >= 4) levelEmpty++
+		this.vho = remain
+		let empty = this.vho.length === 0 ? 1 : 0
+		for (let i = 0; i < 4; i++) if (!this.children[i].vho.length) empty++
+		if (empty >= 4) levelEmpty++
 		else levelEmpty = 0
-
 		if (this.vCenter.x - bounds.left > 0.0001 && levelEmpty <= 8 && level + 1 < 128 / 3) {
 			for (let i = 0; i < 4; i++) {
-				const childBounds = new FRect3D()
-				childBounds.left = i & 1 ? this.vCenter.x : bounds.left
-				childBounds.top = i & 2 ? this.vCenter.y : bounds.top
-				childBounds.zlow = bounds.zlow
-				childBounds.right = i & 1 ? bounds.right : this.vCenter.x
-				childBounds.bottom = i & 2 ? bounds.bottom : this.vCenter.y
-				childBounds.zhigh = bounds.zhigh
-				this.children[i].createNextLevel(childBounds, level + 1, levelEmpty)
+				const b = new FRect3D()
+				b.left = i & 1 ? this.vCenter.x : bounds.left
+				b.top = i & 2 ? this.vCenter.y : bounds.top
+				b.zlow = bounds.zlow
+				b.right = i & 1 ? bounds.right : this.vCenter.x
+				b.bottom = i & 2 ? bounds.bottom : this.vCenter.y
+				b.zhigh = bounds.zhigh
+				this.children[i].createNextLevel(b, level + 1, levelEmpty)
 			}
 		}
 	}
