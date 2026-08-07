@@ -28,7 +28,7 @@ export class Plunger
 	extends Item<PlungerData>
 	implements IRenderable<PlungerState>, IPlayable, IMovable, IHittable, IBallCreationPosition, IScriptable<PlungerApi>
 {
-	public static PLUNGER_HEIGHT = 50.0
+	public static PLUNGER_HEIGHT = 50
 
 	private readonly meshGenerator: PlungerMeshGenerator
 	private readonly state: PlungerState
@@ -57,16 +57,9 @@ export class Plunger
 		const meshes: Meshes<GEOMETRY> = {}
 		const material = table.getMaterial(this.data.szMaterial)
 		const map = table.getTexture(this.data.szImage)
-
-		if (plunger.rod) {
-			meshes.rod = { isVisible: this.data.isVisible, mesh: plunger.rod, material, map }
-		}
-		if (plunger.spring) {
-			meshes.spring = { isVisible: this.data.isVisible, mesh: plunger.spring, material, map }
-		}
-		if (plunger.flat) {
-			meshes.flat = { isVisible: this.data.isVisible, mesh: plunger.flat, material, map }
-		}
+		if (plunger.rod) meshes.rod = { isVisible: this.data.isVisible, mesh: plunger.rod, material, map }
+		if (plunger.spring) meshes.spring = { isVisible: this.data.isVisible, mesh: plunger.spring, material, map }
+		if (plunger.flat) meshes.flat = { isVisible: this.data.isVisible, mesh: plunger.flat, material, map }
 		return meshes
 	}
 
@@ -101,21 +94,8 @@ export class Plunger
 	}
 
 	public fire(): void {
-		// check for an auto plunger
-		if (this.data.autoPlunger) {
-			// Auto Plunger - this models a "Launch Ball" button or a
-			// ROM-controlled launcher, rather than a player-operated
-			// spring plunger.  In a physical machine, this would be
-			// implemented as a solenoid kicker, so the amount of force
-			// is constant (modulo some mechanical randomness).  Simulate
-			// this by triggering a release from the maximum retracted
-			// position.
-			this.getMover().fire(1.0)
-		} else {
-			// Regular plunger - trigger a release from the current
-			// position, using the keyboard firing strength.
-			this.getMover().fire()
-		}
+		if (this.data.autoPlunger) this.getMover().fire(1)
+		else this.getMover().fire()
 	}
 
 	public getUpdater(): PlungerUpdater {
@@ -124,7 +104,7 @@ export class Plunger
 
 	public getBallCreationPosition(table: Table): Vertex3D {
 		const x = (this.getMover().x + this.getMover().x2) * 0.5
-		const y = this.getMover().pos - (25.0 + 0.01) //!! assumes ball radius 25
+		const y = this.getMover().pos - 25.01
 		const height = table.getSurfaceHeight(this.data.szSurface, x, y)
 		return new Vertex3D(x, y, height)
 	}
@@ -133,9 +113,7 @@ export class Plunger
 		return new Vertex3D(0, 0, 0)
 	}
 
-	public onBallCreated(physics: PlayerPhysics, ball: Ball): void {
-		// nothing to be done
-	}
+	public onBallCreated(physics: PlayerPhysics, ball: Ball): void {}
 
 	public getEventNames(): string[] {
 		return ['Init', 'Timer', 'LimitEOS', 'LimitBOS']
