@@ -6,6 +6,7 @@ import type { Storage } from '../../io/ole-doc.js'
 import { Vertex2D } from '../../math/vertex2d.js'
 import { ItemData } from '../item-data.js'
 
+/** Spinner data. */
 export class SpinnerData extends ItemData {
 	public center!: Vertex2D
 	public rotation: number = 0
