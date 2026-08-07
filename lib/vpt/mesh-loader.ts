@@ -16,7 +16,8 @@ export function loadMesh(name: string): Mesh {
 			raw = readFileSync(`res/meshes/${name}.json`, 'utf-8') as unknown as string
 			if (!raw) throw new Error('empty')
 		} catch {
-			const cwd = (globalThis as any).process?.cwd?.() || (typeof process !== 'undefined' && (process as any).cwd?.()) || '/'
+			const cwd =
+				(globalThis as any).process?.cwd?.() || (typeof process !== 'undefined' && (process as any).cwd?.()) || '/'
 			raw = readFileSync(resolve(cwd, `res/meshes/${name}.json`), 'utf-8') as unknown as string
 		}
 		const json = JSON.parse(raw as string)
