@@ -9,7 +9,9 @@ import { Enums } from '../enums.js'
 import { type IPhysicalData, ItemData } from '../item-data.js'
 import type { Table } from '../table/table.js'
 
-/** HitTarget data. */
+/** HitTarget data.
+ *
+ * @see https://github.com/vpinball/vpinball/blob/master/hittarget.cpp */
 export class HitTargetData extends ItemData implements IPhysicalData {
 	public depthBias?: number
 	public disableLightingBelow?: number
