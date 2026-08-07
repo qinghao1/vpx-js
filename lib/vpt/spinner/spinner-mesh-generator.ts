@@ -11,39 +11,34 @@ import type { SpinnerData } from './spinner-data.js'
 const spinnerBracketMesh = loadMesh('spinner-bracket-mesh')
 const spinnerPlateMesh = loadMesh('spinner-plate-mesh')
 
-/** Spinner mesh generator. */
+/** Generates spinner meshes. @see https://github.com/vpinball/vpinball/blob/master/spinner.cpp */
 export class SpinnerMeshGenerator {
-	private readonly data: SpinnerData
-
-	constructor(data: SpinnerData) {
-		this.data = data
-	}
-
+	constructor(private readonly data: SpinnerData) {}
 	public generateMeshes(table: Table): { plate: Mesh; bracket: Mesh } {
-		const posZ = this.getZ(table)
-		return { plate: this.getPlateMesh(table, posZ), bracket: this.getBracketMesh(table, posZ) }
+		const z = this.getZ(table)
+		return {
+			plate: this.getMesh(table, z, spinnerPlateMesh, 'plate'),
+			bracket: this.getMesh(table, z, spinnerBracketMesh, 'bracket'),
+		}
 	}
-
 	public getZ(table: Table): number {
 		const h = table.getSurfaceHeight(this.data.szSurface, this.data.center.x, this.data.center.y) * table.getScaleZ()
 		return f4(h + this.data.height)
 	}
-
-	private getPlateMesh(table: Table, posZ: number): Mesh {
-		return this.updateVertices(table, posZ, spinnerPlateMesh.clone(`spinner.plate-${this.data.getName()}`))
+	private getMesh(table: Table, posZ: number, src: Mesh, name: string): Mesh {
+		return this.transform(table, posZ, src.clone(`spinner.${name}-${this.data.getName()}`))
 	}
-
-	private getBracketMesh(table: Table, posZ: number): Mesh {
-		return this.updateVertices(table, posZ, spinnerBracketMesh.clone(`spinner.bracket-${this.data.getName()}`))
-	}
-
-	private updateVertices(table: Table, posZ: number, mesh: Mesh): Mesh {
+	private transform(table: Table, posZ: number, mesh: Mesh): Mesh {
 		const m = new Matrix3D().rotateZMatrix(degToRad(this.data.rotation))
+		const len = this.data.length,
+			cx = this.data.center.x,
+			cy = this.data.center.y,
+			zs = table.getScaleZ()
 		for (const v of mesh.vertices) {
 			const vert = Vertex3D.claim(v.x, v.y, v.z).multiplyMatrix(m)
-			v.x = f4(vert.x * this.data.length) + this.data.center.x
-			v.y = f4(vert.y * this.data.length) + this.data.center.y
-			v.z = f4(f4(vert.z * this.data.length) * table.getScaleZ()) + posZ
+			v.x = f4(vert.x * len) + cx
+			v.y = f4(vert.y * len) + cy
+			v.z = f4(vert.z * len * zs) + posZ
 			const n = Vertex3D.claim(v.nx, v.ny, v.nz).multiplyMatrixNoTranslate(m)
 			v.nx = n.x
 			v.ny = n.y
