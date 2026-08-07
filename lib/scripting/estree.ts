@@ -79,6 +79,7 @@ export function literal(value: string | boolean | number | null, raw?: string | 
 	)
 }
 
+/** classBody. */
 export function classBody(body: MethodDefinition[]): ClassBody {
 	return {
 		type: 'ClassBody',
