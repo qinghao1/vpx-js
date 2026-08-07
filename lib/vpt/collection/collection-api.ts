@@ -9,7 +9,9 @@ import type { Table } from '../table/table.js'
 import type { TimerHit } from '../timer/timer-hit.js'
 import type { CollectionData } from './collection-data.js'
 
-/** Collection API. */
+/** Collection API.
+ *
+ * @see https://github.com/vpinball/vpinball/blob/master/collection.cpp */
 export class CollectionApi extends ItemApi<CollectionData> implements IterableIterator<ItemApi<ItemData>> {
 	private readonly items: Array<ItemApi<ItemData>>
 	private pointer = 0
