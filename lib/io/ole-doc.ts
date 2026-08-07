@@ -12,105 +12,10 @@ import { AllocationTable } from './ole-allocation-table.js'
 
 export { AllocationTable } from './ole-allocation-table.js'
 
-export interface StorageEntry {
-	name: string
-	type: number
-	nodeColor: number
-	left: number
-	right: number
-	storageDirId: number
-	secId: number
-	size: number
-	storages: { [key: string]: StorageEntry }
-	streams: { [key: string]: StorageEntry }
-}
+import { DirectoryTree, type StorageEntry } from './ole-directory-tree.js'
 
-/** OLE directory tree. */
-export class DirectoryTree {
-	private static EntryTypeEmpty = 0
-	private static EntryTypeStorage = 1
-	private static EntryTypeStream = 2
-	private static EntryTypeRoot = 5
-	private static NodeColorRed = 0
-	private static NodeColorBlack = 1
-	private static Leaf = -1
-	public readonly root: StorageEntry
-	private readonly doc: OleCompoundDoc
-	private readonly entries: StorageEntry[]
-	public static async load(doc: OleCompoundDoc, secIds: number[]): Promise<DirectoryTree> {
-		const buffer = await doc.readSectors(secIds)
-		const count = buffer.length / 128
-		const entries = new Array(count)
-		const view = getDataView(buffer)
-		const decoder = new TextDecoder('utf-16le')
-		for (let i = 0; i < count; i++) {
-			const offset = i * 128
-			const nameLength = Math.max(view.getInt16(64 + offset, true) - 2, 0)
-			const nameBytes = buffer.subarray(offset, offset + nameLength)
-			entries[i] = {
-				name: decoder.decode(nameBytes),
-				type: view.getInt8(66 + offset),
-				nodeColor: view.getInt8(67 + offset),
-				left: view.getInt32(68 + offset, true),
-				right: view.getInt32(72 + offset, true),
-				storageDirId: view.getInt32(76 + offset, true),
-				secId: view.getInt32(116 + offset, true),
-				size: view.getInt32(120 + offset, true),
-				storages: {},
-				streams: {},
-			}
-		}
-		const root = entries.find((entry) => entry.type === DirectoryTree.EntryTypeRoot)
-		if (!root) {
-			throw new Error('No root entry found in directory tree.')
-		}
-		return new DirectoryTree(doc, root!, entries)
-	}
-	private constructor(doc: OleCompoundDoc, root: StorageEntry, entries: StorageEntry[]) {
-		this.doc = doc
-		this.root = root
-		this.entries = entries
-		this.buildHierarchy(this.root)
-	}
-	private buildHierarchy(storageEntry: StorageEntry) {
-		const childIds = this.getChildIds(storageEntry)
-		storageEntry.storages = {}
-		storageEntry.streams = {}
-		for (const childId of childIds) {
-			const childEntry = this.entries[childId]
-			const name = childEntry.name
-			if (childEntry.type === DirectoryTree.EntryTypeStorage) {
-				storageEntry.storages[name] = childEntry
-			}
-			if (childEntry.type === DirectoryTree.EntryTypeStream) {
-				storageEntry.streams[name] = childEntry
-			}
-		}
-		for (const childStorageEntry of Object.values(storageEntry.storages)) {
-			this.buildHierarchy(childStorageEntry)
-		}
-	}
-	private getChildIds(storageEntry: StorageEntry) {
-		const childIds = []
-		if (storageEntry.storageDirId > -1) {
-			childIds.push(storageEntry.storageDirId)
-			const rootChildEntry = this.entries[storageEntry.storageDirId]
-			return this.visit(rootChildEntry, childIds)
-		}
-		return []
-	}
-	private visit(visitEntry: StorageEntry, childIds: number[] = []): number[] {
-		if (visitEntry.left !== DirectoryTree.Leaf) {
-			childIds.push(visitEntry.left)
-			childIds = this.visit(this.entries[visitEntry.left], childIds)
-		}
-		if (visitEntry.right !== DirectoryTree.Leaf) {
-			childIds.push(visitEntry.right)
-			childIds = this.visit(this.entries[visitEntry.right], childIds)
-		}
-		return childIds
-	}
-}
+export type { StorageEntry } from './ole-directory-tree.js'
+export { DirectoryTree } from './ole-directory-tree.js'
 
 /** OLE storage/stream accessor. */
 export class Storage {
