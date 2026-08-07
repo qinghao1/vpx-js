@@ -5,7 +5,9 @@ import { MAX_REELS } from '../../physics/constants.js'
 import { ItemApi } from '../item-api.js'
 import type { DispReelData } from './dispreel-data.js'
 
-/** DispReelApi. */
+/** DispReelApi API.
+ *
+ * @see https://github.com/vpinball/vpinball/blob/master/dispreel.cpp */
 export class DispReelApi extends ItemApi<DispReelData> {
 	/** Get BackColor. */
 	get BackColor() {
