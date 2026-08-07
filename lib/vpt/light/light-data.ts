@@ -55,8 +55,8 @@ export class LightData extends ItemData {
 	public szSurface?: string
 	public isBackglass = false
 	public depthBias?: number
-	public fadeSpeedUp = 0.05 // 200ms
-	public fadeSpeedDown = 0.02 // 500ms
+	public fadeSpeedUp = 0.05
+	public fadeSpeedDown = 0.02
 	public bulbLight = false
 	public imageMode = false
 	public showBulbMesh = false
