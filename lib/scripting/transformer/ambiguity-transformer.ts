@@ -30,8 +30,8 @@ import { Transformer } from './transformer.js'
  *   The {@link #transformProperty()} method replaces ambiguous occurrences with
  *   a function call that determines this at runtime.
  */
-export /** Resolves VBScript call vs array ambiguity. */
-class AmbiguityTransformer extends Transformer {
+/** Resolves VBScript call vs array ambiguity. */
+export class AmbiguityTransformer extends Transformer {
 	private readonly itemApis: { [p: string]: any }
 	private readonly enumApis: EnumsApi
 	private readonly globalApi: GlobalApi
