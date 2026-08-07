@@ -32,6 +32,24 @@ const imageMap: { [key: string]: string } = {
 const MAX_REGULAR = 1024
 const MAX_FLOAT = 512
 
+function getMaxSizeForTexture(name: string, w: number, h: number, isFloat: boolean): number {
+	try {
+		const n = (name || '').toLowerCase()
+		if (isFloat) {
+			if (n.includes('vlm.nestmap')) return n.includes('vlm.nestmap0') || n.includes('vlm.nestmap4') ? 1024 : 512
+			return MAX_FLOAT
+		}
+		if (n.includes('vlm.nestmap0') || n.includes('vlm.nestmap4')) return 1024
+		if (n.includes('vlm.nestmap')) return 512
+		if (n.startsWith('vrcab') || n.includes('vr_cab') || n === 'vr_backboxnew_1' || n === 'vr_cabinetnew_1' || n === 'vr_cabcrossbar' || n === 'vr_cabinsertcoin' || n === 'vr_plungerhead_1' || n.startsWith('vrcab_')) return 256
+		if (n.startsWith('vr_') && (n.includes('mega') || n.includes('mini'))) return 512
+		if (n.startsWith('vr_') || n.startsWith('vrcab')) return 256
+		if (w > 2048 || h > 2048) return 1024
+		if (w <= 512 && h <= 512) return Math.max(w, h)
+		return MAX_REGULAR
+	} catch { return isFloat ? MAX_FLOAT : MAX_REGULAR }
+}
+
 /** ThreeTextureLoaderBrowser. */
 export class ThreeTextureLoaderBrowser implements ITextureLoader<ThreeTexture> {
 	public async loadDefaultTexture(name: string, ext: string, fileName: string): Promise<ThreeTexture> {
@@ -50,7 +68,8 @@ export class ThreeTextureLoaderBrowser implements ITextureLoader<ThreeTexture> {
 		texture.generateMipmaps = false
 		texture.minFilter = LinearFilter as any
 		texture.anisotropy = 1
-		const ds = downsampleIfNeeded(texture, MAX_REGULAR)
+		const max = getMaxSizeForTexture(name, width, height, false)
+		const ds = downsampleIfNeeded(texture, max, name)
 		if (ds && ds !== texture) {
 			try {
 				;(texture as any).dispose?.()
@@ -77,7 +96,10 @@ export class ThreeTextureLoaderBrowser implements ITextureLoader<ThreeTexture> {
 				;(texture as any).anisotropy = 1
 				texture.generateMipmaps = false
 				texture.minFilter = LinearFilter as any
-				const ds = downsampleIfNeeded(texture, MAX_FLOAT)
+				const w = (texture.image as any)?.width || 0
+				const h = (texture.image as any)?.height || 0
+				const max = getMaxSizeForTexture(name, w, h, true)
+				const ds = downsampleIfNeeded(texture, max, name)
 				if (ds && ds !== texture) {
 					try {
 						;(texture as any).dispose?.()
@@ -97,14 +119,17 @@ export class ThreeTextureLoaderBrowser implements ITextureLoader<ThreeTexture> {
 		const blobPart: any = canUseZeroCopy ? data : data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength)
 		const objectUrl = URL.createObjectURL(new Blob([blobPart as any], { type: mimeType as any }))
 		try {
-			const texture = await load(mimeType, objectUrl, ext, data)
+			const texture = await load(mimeType, objectUrl, ext, data, name)
 			texture.name = `texture:${name}`
 			texture.colorSpace = SRGBColorSpace
 			texture.needsUpdate = true
 			texture.anisotropy = 1
 			texture.generateMipmaps = false
 			texture.minFilter = LinearFilter as any
-			const ds = downsampleIfNeeded(texture, MAX_REGULAR) as any
+			const w = (texture.image as any)?.width || (texture.image as any)?.naturalWidth || 0
+			const h = (texture.image as any)?.height || (texture.image as any)?.naturalHeight || 0
+			const max = getMaxSizeForTexture(name, w, h, false)
+			const ds = downsampleIfNeeded(texture, max, name) as any
 			if (ds && ds !== texture) {
 				try {
 					texture.dispose()
@@ -176,7 +201,7 @@ function getMimeType(data: Uint8Array, ext: string): string | null {
 	return 'image/png'
 }
 
-function downsampleIfNeeded(texture: any, maxSize: number): any {
+function downsampleIfNeeded(texture: any, maxSize: number, nameHint?: string): any {
 	try {
 		const img = texture.image
 		if (!img) return texture
@@ -216,6 +241,7 @@ function downsampleIfNeeded(texture: any, maxSize: number): any {
 				try {
 					texture.dispose?.()
 				} catch {}
+				try { (texture as any).image = null } catch {}
 				return newTex
 			} catch {
 				return texture
@@ -239,6 +265,7 @@ function downsampleIfNeeded(texture: any, maxSize: number): any {
 					img instanceof HTMLCanvasElement ||
 					(typeof ImageBitmap !== 'undefined' && img instanceof ImageBitmap)
 				) {
+					try { ctx.imageSmoothingEnabled = true; (ctx as any).imageSmoothingQuality = 'high' } catch {}
 					ctx.drawImage(img as any, 0, 0, nw, nh)
 					// use CanvasTexture to preserve correct filtering/colorSpace
 					const newTex = new CanvasTexture(canvas) as any
@@ -255,6 +282,7 @@ function downsampleIfNeeded(texture: any, maxSize: number): any {
 					try {
 						URL.revokeObjectURL((img as any).src)
 					} catch {}
+					try { (texture as any).image = null } catch {}
 					return newTex
 				}
 			}
@@ -263,7 +291,7 @@ function downsampleIfNeeded(texture: any, maxSize: number): any {
 	return texture
 }
 
-function load(mimeType: string, url: string, ext?: string, data?: Uint8Array): Promise<ThreeTexture> {
+function load(mimeType: string, url: string, ext?: string, data?: Uint8Array, nameHint?: string): Promise<ThreeTexture> {
 	return new Promise((resolve, reject) => {
 		if (
 			mimeType === 'image/png' ||
@@ -278,11 +306,15 @@ function load(mimeType: string, url: string, ext?: string, data?: Uint8Array): P
 					URL.revokeObjectURL(url)
 					texture.generateMipmaps = false
 					texture.minFilter = LinearFilter as any
-					const ds = downsampleIfNeeded(texture, MAX_REGULAR) as any
+					const w = (texture.image as any)?.width || (texture.image as any)?.naturalWidth || 0
+					const h = (texture.image as any)?.height || (texture.image as any)?.naturalHeight || 0
+					const max = nameHint ? getMaxSizeForTexture(nameHint, w, h, false) : MAX_REGULAR
+					const ds = downsampleIfNeeded(texture, max, nameHint) as any
 					if (ds && ds !== texture) {
 						try {
 							texture.dispose()
 						} catch {}
+						try { (texture as any).image = null } catch {}
 						resolve(ds)
 					} else resolve(texture as any)
 				},
@@ -301,7 +333,10 @@ function load(mimeType: string, url: string, ext?: string, data?: Uint8Array): P
 					const loader = new EXRLoader()
 					const tex = (loader as any).createDataTexture(buffer) as ThreeTexture
 					URL.revokeObjectURL(url)
-					resolve(downsampleIfNeeded(tex, MAX_FLOAT) as any)
+					const w = (tex.image as any)?.width || 0
+					const h = (tex.image as any)?.height || 0
+					const max = nameHint ? getMaxSizeForTexture(nameHint, w, h, true) : MAX_FLOAT
+					resolve(downsampleIfNeeded(tex, max, nameHint) as any)
 					return
 				}
 			} catch (e) {}
@@ -311,7 +346,10 @@ function load(mimeType: string, url: string, ext?: string, data?: Uint8Array): P
 					URL.revokeObjectURL(url)
 					texture.generateMipmaps = false
 					texture.minFilter = LinearFilter as any
-					const ds = downsampleIfNeeded(texture, MAX_FLOAT) as any
+					const w = (texture.image as any)?.width || 0
+					const h = (texture.image as any)?.height || 0
+					const max = nameHint ? getMaxSizeForTexture(nameHint, w, h, true) : MAX_FLOAT
+					const ds = downsampleIfNeeded(texture, max, nameHint) as any
 					if (ds && ds !== texture) {
 						try {
 							texture.dispose()
@@ -334,7 +372,10 @@ function load(mimeType: string, url: string, ext?: string, data?: Uint8Array): P
 					const loader = new HDRLoader()
 					const tex = (loader as any).createDataTexture(buffer) as ThreeTexture
 					URL.revokeObjectURL(url)
-					resolve(downsampleIfNeeded(tex, MAX_FLOAT) as any)
+					const w = (tex.image as any)?.width || 0
+					const h = (tex.image as any)?.height || 0
+					const max = nameHint ? getMaxSizeForTexture(nameHint, w, h, true) : MAX_FLOAT
+					resolve(downsampleIfNeeded(tex, max, nameHint) as any)
 					return
 				}
 			} catch (e) {}
@@ -344,7 +385,10 @@ function load(mimeType: string, url: string, ext?: string, data?: Uint8Array): P
 					URL.revokeObjectURL(url)
 					texture.generateMipmaps = false
 					texture.minFilter = LinearFilter as any
-					const ds = downsampleIfNeeded(texture, MAX_FLOAT) as any
+					const w = (texture.image as any)?.width || 0
+					const h = (texture.image as any)?.height || 0
+					const max = nameHint ? getMaxSizeForTexture(nameHint, w, h, true) : MAX_FLOAT
+					const ds = downsampleIfNeeded(texture, max, nameHint) as any
 					if (ds && ds !== texture) {
 						try {
 							texture.dispose()

@@ -47,7 +47,7 @@ export class HitPlane extends HitObject {
 		const bnd = this.normal.dot(coll.ball.state.pos) - coll.ball.data.radius - this.d
 		if (bnd >= 0) return
 		const v = this.normal.clone(true).multiplyScalar(bnd)
-		coll.ball.state.pos.add(v)
+		coll.ball.state.pos.sub(v)
 		Vertex3D.release(v)
 	}
 }

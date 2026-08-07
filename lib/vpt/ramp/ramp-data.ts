@@ -104,7 +104,7 @@ export class RampData extends ItemData implements IPhysicalData {
 			return 0
 		}
 		if (
-			handleBiffTag(this as unknown as Record<string, unknown>, this, tag, buffer, len, {
+			handleBiffTag(this, tag, buffer, len, {
 				float: FLOAT_MAP,
 				bool: BOOL_MAP,
 				string: STRING_MAP,

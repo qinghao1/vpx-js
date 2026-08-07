@@ -44,7 +44,7 @@ export class LightSeqData extends ItemData {
 			return 0
 		}
 		if (
-			handleBiffTag(this as unknown as Record<string, unknown>, this, tag, buffer, len, {
+			handleBiffTag(this, tag, buffer, len, {
 				int: { UPTM: 'updateInterval' },
 				bool: { BGLS: 'backglass' },
 			})

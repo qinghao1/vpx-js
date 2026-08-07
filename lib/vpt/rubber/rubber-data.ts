@@ -78,7 +78,7 @@ export class RubberData extends ItemData implements IPhysicalData {
 	private async fromTag(buffer: Uint8Array, tag: string, _offset: number, len: number): Promise<number> {
 		if (tag === 'PNTS') return 0
 		if (
-			handleBiffTag(this as unknown as Record<string, unknown>, this, tag, buffer, len, {
+			handleBiffTag(this, tag, buffer, len, {
 				float: FLOAT_MAP,
 				int: INT_MAP,
 				bool: BOOL_MAP,

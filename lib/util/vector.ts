@@ -4,20 +4,21 @@
 import { type Matrix3, Vector2, Vector3 } from 'three'
 import { FLT_MIN, f4 } from './float.js'
 import type { Matrix2D, Matrix3D } from './matrix.js'
-import { Pool } from './object-pool.js'
+import { pooled } from './object-pool.js'
 
 export class Vertex2D extends Vector2 {
-	static readonly POOL = new Pool(Vertex2D)
+	static readonly _pooled = pooled(Vertex2D)
+	static readonly POOL = Vertex2D._pooled.pool
 	readonly isVector2 = true as const
 	readonly isVector3 = false as const
 	constructor(x?: number, y?: number) {
 		super(f4(x ?? 0), f4(y ?? 0))
 	}
 	static claim(x?: number, y?: number): Vertex2D {
-		return Vertex2D.POOL.get().set(x ?? 0, y ?? 0)
+		return Vertex2D._pooled.claim().set(x ?? 0, y ?? 0)
 	}
 	static release(...vs: Vertex2D[]): void {
-		for (const v of vs) Vertex2D.POOL.release(v)
+		Vertex2D._pooled.release(...vs)
 	}
 	static reset(v: Vertex2D): void {
 		v.set(0, 0)
@@ -30,7 +31,7 @@ export class Vertex2D extends Vector2 {
 		return this.set(0, 0)
 	}
 	override clone(recycle = false): this {
-		const v = recycle ? Vertex2D.POOL.get().set(this.x, this.y) : new Vertex2D(this.x, this.y)
+		const v = recycle ? Vertex2D._pooled.claim().set(this.x, this.y) : new Vertex2D(this.x, this.y)
 		return v as this
 	}
 	override add(v: Vector2): this {
@@ -95,17 +96,18 @@ export class Vertex2D extends Vector2 {
 /** 3D single-precision vector, three.js based with pooling. */
 
 export class Vertex3D extends Vector3 {
-	static readonly POOL = new Pool(Vertex3D)
+	static readonly _pooled = pooled(Vertex3D)
+	static readonly POOL = Vertex3D._pooled.pool
 	readonly isVector2 = false as const
 	readonly isVector3 = true as const
 	constructor(x?: number, y?: number, z?: number) {
 		super(f4(x ?? 0), f4(y ?? 0), f4(z ?? 0))
 	}
 	static claim(x?: number, y?: number, z?: number): Vertex3D {
-		return Vertex3D.POOL.get().set(x ?? 0, y ?? 0, z ?? 0)
+		return Vertex3D._pooled.claim().set(x ?? 0, y ?? 0, z ?? 0)
 	}
 	static release(...vs: Vertex3D[]): void {
-		for (const v of vs) Vertex3D.POOL.release(v)
+		Vertex3D._pooled.release(...vs)
 	}
 	static reset(v: Vertex3D): void {
 		v.set(0, 0, 0)
@@ -126,7 +128,7 @@ export class Vertex3D extends Vector3 {
 		return this
 	}
 	override clone(recycle = false): this {
-		const v = recycle ? Vertex3D.POOL.get().set(this.x, this.y, this.z) : new Vertex3D(this.x, this.y, this.z)
+		const v = recycle ? Vertex3D._pooled.claim().set(this.x, this.y, this.z) : new Vertex3D(this.x, this.y, this.z)
 		return v as this
 	}
 	override normalize(): this {

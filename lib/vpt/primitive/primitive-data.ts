@@ -113,7 +113,7 @@ export class PrimitiveData extends ItemData implements IPhysicalData {
 			return 0
 		}
 		if (
-			handleBiffTag(this as unknown as Record<string, unknown>, this, tag, buffer, len, {
+			handleBiffTag(this, tag, buffer, len, {
 				float: FLOAT_MAP,
 				bool: BOOL_MAP,
 				string: STRING_MAP,
@@ -127,10 +127,13 @@ export class PrimitiveData extends ItemData implements IPhysicalData {
 			case 'VSIZ':
 				this.size = Vertex3D.get(buffer)
 				break
-			case 'SESD':
+			case 'SIDS':
 				this.sides = this.getInt(buffer)
 				break
-			case 'VISB':
+			case 'SCOL':
+				this.sideColor = this.getInt(buffer)
+				break
+			case 'TVIS':
 				this.isVisible = this.getBool(buffer)
 				break
 			case 'REEN':

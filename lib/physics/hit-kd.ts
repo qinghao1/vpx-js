@@ -28,10 +28,12 @@ export class HitKD {
 		this.numItems = vho.length
 		if (this.numItems > this.maxItems) {
 			this.maxItems = this.numItems
-			this.orgIdx = []
-			this.tmp = []
-			this.nodes = []
+			this.orgIdx = new Array(this.numItems)
+			this.tmp = new Array(this.numItems)
+			this.nodes = new Array((this.numItems * 2 + 1) & ~1 || 2)
+			for (let i = 0; i < this.nodes.length; i++) this.nodes[i] = new HitKDNode(this)
 		}
+		if (!this.tmp.length && this.maxItems) this.tmp = new Array(this.maxItems)
 		this.numNodes = 0
 		this.rootNode.reset(this)
 	}

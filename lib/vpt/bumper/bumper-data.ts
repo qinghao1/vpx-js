@@ -74,7 +74,7 @@ export class BumperData extends ItemData {
 			return 0
 		}
 		if (
-			handleBiffTag(this as unknown as Record<string, unknown>, this, tag, buffer, len, {
+			handleBiffTag(this, tag, buffer, len, {
 				float: FLOAT_TAGS,
 				string: STRING_TAGS,
 				bool: BOOL_TAGS,

@@ -16,7 +16,7 @@ const FLOAT_MAP: Record<string, string> = {
 	SMIN: 'angleMin',
 	SELA: 'elasticity',
 }
-const BOOL_MAP: Record<string, string> = { SSUP: 'showBracket', SVIS: 'isVisible' }
+const BOOL_MAP: Record<string, string> = { SSUP: 'showBracket', SVIS: 'isVisible', REEN: 'isReflectionEnabled' }
 const STRING_MAP: Record<string, string> = { MATR: 'szMaterial', IMGF: 'szImage', SURF: 'szSurface' }
 
 /** Spinner data.
@@ -61,7 +61,7 @@ export class SpinnerData extends ItemData {
 			return 0
 		}
 		if (
-			handleBiffTag(this as unknown as Record<string, unknown>, this, tag, buffer, len, {
+			handleBiffTag(this, tag, buffer, len, {
 				float: FLOAT_MAP,
 				bool: BOOL_MAP,
 				string: STRING_MAP,

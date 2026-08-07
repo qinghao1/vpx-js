@@ -40,3 +40,20 @@ export class Pool<T> {
 		this.items.push(obj)
 	}
 }
+
+/** Helper to create idiomatic pooled statics without repeating boilerplate. */
+export function pooled<T>(ctor: IPoolable<T>) {
+	const pool = new Pool<T>(ctor)
+	return {
+		pool,
+		claim(): T {
+			return pool.get()
+		},
+		release(...items: T[]): void {
+			for (const m of items) pool.release(m)
+		},
+		reset(item: T): void {
+			ctor.reset?.(item)
+		},
+	}
+}

@@ -24,14 +24,14 @@ export class KickerData extends ItemData {
 	public center!: Vertex2D
 	public radius = 25
 	public scatter = 0
-	public hitAccuracy = 0.7
-	public hitHeight = 40
+	public hitAccuracy = 0.5
+	public hitHeight = 35
 	public orientation = 0
 	public szMaterial?: string
 	public szSurface?: string
 	public fallThrough = false
 	public isEnabled = true
-	public legacyMode = false
+	public legacyMode = true
 
 	public static async fromStorage(storage: Storage, itemName: string): Promise<KickerData> {
 		const d = new KickerData(itemName)
@@ -54,7 +54,7 @@ export class KickerData extends ItemData {
 			return 0
 		}
 		if (
-			handleBiffTag(this as unknown as Record<string, unknown>, this, tag, buffer, len, {
+			handleBiffTag(this, tag, buffer, len, {
 				float: FLOAT_MAP,
 				bool: BOOL_MAP,
 				string: STRING_MAP,

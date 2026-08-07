@@ -1,7 +1,6 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { createRequire } from 'node:module'
 import { generate } from 'escodegen'
 import type { Program } from 'estree'
 import type { Player } from '../game/player.js'
@@ -21,8 +20,6 @@ import { ScopeTransformer } from './transformer/scope-transformer.js'
 import { WrapTransformer } from './transformer/wrap-transformer.js'
 import { VBSHelper } from './vbs-helper.js'
 import { VbsProxyHandler } from './vbs-proxy-handler.js'
-
-const require = createRequire(import.meta.url)
 
 declare function play(
 	scope: unknown,
@@ -55,24 +52,23 @@ export class Transpiler {
 		const t0 = Date.now()
 		let ast = this.grammar.transpile(vbs)
 		logger().info('[Transpiler] Parsed in %sms', Date.now() - t0)
+
 		const t1 = Date.now()
-		ast = new FunctionHoistTransformer(ast).transform()
-		ast = new EventTransformer(ast, this.table.getElements()).transform()
-		ast = new ErrorTransformer(ast).transform()
-		ast = new ReferenceTransformer(
-			ast,
-			this.table,
-			this.itemApis,
-			this.enumApis,
-			this.globalApi,
-			this.stdlib,
-		).transform()
-		ast = new ScopeTransformer(ast).transform()
-		ast = new ClassTransformer(ast).transformThisIdentifiers()
-		ast = new AmbiguityTransformer(ast, this.itemApis, this.enumApis, this.globalApi, this.stdlib).transform()
-		ast = new ClassTransformer(ast).transform()
-		ast = new WrapTransformer(ast).transform(globalFunction, globalObject)
+		const pipeline: Array<(ast: Program) => Program> = [
+			(a) => new FunctionHoistTransformer(a).transform(),
+			(a) => new EventTransformer(a, this.table.getElements()).transform(),
+			(a) => new ErrorTransformer(a).transform(),
+			(a) =>
+				new ReferenceTransformer(a, this.table, this.itemApis, this.enumApis, this.globalApi, this.stdlib).transform(),
+			(a) => new ScopeTransformer(a).transform(),
+			(a) => new ClassTransformer(a).transformThisIdentifiers(),
+			(a) => new AmbiguityTransformer(a, this.itemApis, this.enumApis, this.globalApi, this.stdlib).transform(),
+			(a) => new ClassTransformer(a).transform(),
+			(a) => new WrapTransformer(a).transform(globalFunction, globalObject),
+		]
+		ast = pipeline.reduce((a, fn) => fn(a), ast)
 		logger().info('[Transpiler] Transformed in %sms', Date.now() - t1)
+
 		const t2 = Date.now()
 		const js = generate(ast)
 		logger().info('[Transpiler] Generated in %sms (total %sms)', Date.now() - t2, Date.now() - t0)

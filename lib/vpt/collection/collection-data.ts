@@ -31,7 +31,7 @@ export class CollectionData extends ItemData {
 			this.itemNames.push(this.getWideString(buffer, len))
 			return 0
 		}
-		if (handleBiffTag(this as unknown as Record<string, unknown>, this, tag, buffer, len, { bool: BOOL_MAP })) return 0
+		if (handleBiffTag(this, tag, buffer, len, { bool: BOOL_MAP })) return 0
 		this.getCommonBlock(buffer, tag, len)
 		return 0
 	}

@@ -12,62 +12,48 @@ import { Material, SaveMaterial, SavePhysicsMaterial } from '../material.js'
 
 const BG = Enums.BackglassIndex
 
-const BG_FLOAT_MAP: Record<string, [string, number]> = {
-	ROTA: ['bgRotation', BG.DESKTOP],
-	LAYB: ['bgLayback', BG.DESKTOP],
-	INCL: ['bgInclination', BG.DESKTOP],
-	FOVX: ['bgFov', BG.DESKTOP],
-	SCLX: ['bgScaleX', BG.DESKTOP],
-	SCLY: ['bgScaleY', BG.DESKTOP],
-	SCLZ: ['bgScaleZ', BG.DESKTOP],
-	XLTX: ['bgXlateX', BG.DESKTOP],
-	XLTY: ['bgXlateY', BG.DESKTOP],
-	XLTZ: ['bgXlateZ', BG.DESKTOP],
-	HOF0: ['bgViewHOfs', BG.DESKTOP],
-	VOF0: ['bgViewVOfs', BG.DESKTOP],
-	WTZ0: ['bgWindowTopZOfs', BG.DESKTOP],
-	WBZ0: ['bgWindowBottomZOfs', BG.DESKTOP],
-	ROTF: ['bgRotation', BG.FULLSCREEN],
-	LAYF: ['bgLayback', BG.FULLSCREEN],
-	INCF: ['bgInclination', BG.FULLSCREEN],
-	FOVF: ['bgFov', BG.FULLSCREEN],
-	SCFX: ['bgScaleX', BG.FULLSCREEN],
-	SCFY: ['bgScaleY', BG.FULLSCREEN],
-	SCFZ: ['bgScaleZ', BG.FULLSCREEN],
-	XLFX: ['bgXlateX', BG.FULLSCREEN],
-	XLFY: ['bgXlateY', BG.FULLSCREEN],
-	XLFZ: ['bgXlateZ', BG.FULLSCREEN],
-	HOF1: ['bgViewHOfs', BG.FULLSCREEN],
-	VOF1: ['bgViewVOfs', BG.FULLSCREEN],
-	WTZ1: ['bgWindowTopZOfs', BG.FULLSCREEN],
-	WBZ1: ['bgWindowBottomZOfs', BG.FULLSCREEN],
-	ROFS: ['bgRotation', BG.FULL_SINGLE_SCREEN],
-	LAFS: ['bgLayback', BG.FULL_SINGLE_SCREEN],
-	INFS: ['bgInclination', BG.FULL_SINGLE_SCREEN],
-	FOFS: ['bgFov', BG.FULL_SINGLE_SCREEN],
-	SCXS: ['bgScaleX', BG.FULL_SINGLE_SCREEN],
-	SCYS: ['bgScaleY', BG.FULL_SINGLE_SCREEN],
-	SCZS: ['bgScaleZ', BG.FULL_SINGLE_SCREEN],
-	XLXS: ['bgXlateX', BG.FULL_SINGLE_SCREEN],
-	XLYS: ['bgXlateY', BG.FULL_SINGLE_SCREEN],
-	XLZS: ['bgXlateZ', BG.FULL_SINGLE_SCREEN],
-	HOF2: ['bgViewHOfs', BG.FULL_SINGLE_SCREEN],
-	VOF2: ['bgViewVOfs', BG.FULL_SINGLE_SCREEN],
-	WTZ2: ['bgWindowTopZOfs', BG.FULL_SINGLE_SCREEN],
-	WBZ2: ['bgWindowBottomZOfs', BG.FULL_SINGLE_SCREEN],
+function bgMaps(): {
+	BG_FLOAT_MAP: Record<string, [string, number]>
+	BG_INT_MAP: Record<string, [string, number]>
+	BG_IMAGE_MAP: Record<string, number>
+} {
+	const views = [BG.DESKTOP, BG.FULLSCREEN, BG.FULL_SINGLE_SCREEN] as const
+	const floatDefs: [string[], string][] = [
+		[['ROTA', 'ROTF', 'ROFS'], 'bgRotation'],
+		[['LAYB', 'LAYF', 'LAFS'], 'bgLayback'],
+		[['INCL', 'INCF', 'INFS'], 'bgInclination'],
+		[['FOVX', 'FOVF', 'FOFS'], 'bgFov'],
+		[['SCLX', 'SCFX', 'SCXS'], 'bgScaleX'],
+		[['SCLY', 'SCFY', 'SCYS'], 'bgScaleY'],
+		[['SCLZ', 'SCFZ', 'SCZS'], 'bgScaleZ'],
+		[['XLTX', 'XLFX', 'XLXS'], 'bgXlateX'],
+		[['XLTY', 'XLFY', 'XLYS'], 'bgXlateY'],
+		[['XLTZ', 'XLFZ', 'XLZS'], 'bgXlateZ'],
+		[['HOF0', 'HOF1', 'HOF2'], 'bgViewHOfs'],
+		[['VOF0', 'VOF1', 'VOF2'], 'bgViewVOfs'],
+		[['WTZ0', 'WTZ1', 'WTZ2'], 'bgWindowTopZOfs'],
+		[['WBZ0', 'WBZ1', 'WBZ2'], 'bgWindowBottomZOfs'],
+	]
+	const BG_FLOAT_MAP: Record<string, [string, number]> = {}
+	for (const [tags, field] of floatDefs) {
+		tags.forEach((tag, i) => {
+			BG_FLOAT_MAP[tag] = [field, views[i]!]
+		})
+	}
+	const BG_INT_MAP: Record<string, [string, number]> = {
+		VSM0: ['bgViewMode', BG.DESKTOP],
+		VSM1: ['bgViewMode', BG.FULLSCREEN],
+		VSM2: ['bgViewMode', BG.FULL_SINGLE_SCREEN],
+	}
+	const BG_IMAGE_MAP: Record<string, number> = {
+		BIMG: BG.DESKTOP,
+		BIMF: BG.FULLSCREEN,
+		BIMS: BG.FULL_SINGLE_SCREEN,
+	}
+	return { BG_FLOAT_MAP, BG_INT_MAP, BG_IMAGE_MAP }
 }
 
-const BG_INT_MAP: Record<string, [string, number]> = {
-	VSM0: ['bgViewMode', BG.DESKTOP],
-	VSM1: ['bgViewMode', BG.FULLSCREEN],
-	VSM2: ['bgViewMode', BG.FULL_SINGLE_SCREEN],
-}
-
-const BG_IMAGE_MAP: Record<string, number> = {
-	BIMG: BG.DESKTOP,
-	BIMF: BG.FULLSCREEN,
-	BIMS: BG.FULL_SINGLE_SCREEN,
-}
+const { BG_FLOAT_MAP, BG_INT_MAP, BG_IMAGE_MAP } = bgMaps()
 
 const FLOAT_MAP: Record<string, string> = {
 	LEFT: 'left',
@@ -82,12 +68,14 @@ const FLOAT_MAP: Record<string, string> = {
 	SCAT: 'defaultScatter',
 	NDGT: 'nudgeTime',
 	ZOOM: 'zoom',
+	MAXS: '_3DmaxSeparation',
 	MAXSEP: '_3DmaxSeparation',
 	ZPD: '_3DZPD',
 	STO: '_3DOffset',
 	SLPX: 'angleTiltMax',
 	SLOP: 'angletiltMin',
 	GLAS: 'glassHeight',
+	GLAB: 'glassBottomHeight',
 	TBLH: 'tableHeight',
 	LZHI: 'lightHeight',
 	LZRA: 'lightRange',
@@ -190,7 +178,7 @@ export class TableData extends ItemData {
 	public bgCurrentSet = 0
 	public bgImage: string[] = []
 	public imageBackdropNightDay = false
-	public ballSphericalMapping = false
+	public ballSphericalMapping = true
 	public notesText?: string
 	public groundToLockbarHeight?: number
 	public toneMapper?: number
@@ -222,6 +210,7 @@ export class TableData extends ItemData {
 	public angleTiltMax!: number
 	public angletiltMin!: number
 	public glassHeight!: number
+	public glassBottomHeight!: number
 	public tableHeight!: number
 
 	public szImage?: string
@@ -315,12 +304,12 @@ export class TableData extends ItemData {
 	private async fromTag(buffer: Uint8Array, tag: string, offset: number, len: number): Promise<number> {
 		const bg = BG_FLOAT_MAP[tag]
 		if (bg) {
-			;(this as unknown as Record<string, Record<string, unknown>>)[bg[0]][bg[1]] = this.getFloat(buffer)
+			;(this as unknown as Record<string, number[]>)[bg[0]][bg[1]] = this.getFloat(buffer)
 			return 0
 		}
 		const bgInt = BG_INT_MAP[tag]
 		if (bgInt) {
-			;(this as unknown as Record<string, Record<string, unknown>>)[bgInt[0]][bgInt[1]] = this.getInt(buffer)
+			;(this as unknown as Record<string, number[]>)[bgInt[0]][bgInt[1]] = this.getInt(buffer)
 			return 0
 		}
 		const bgImg = BG_IMAGE_MAP[tag]
@@ -328,14 +317,7 @@ export class TableData extends ItemData {
 			this.bgImage[bgImg] = this.getString(buffer, len)
 			return 0
 		}
-		if (
-			handleBiffTag(this as unknown as Record<string, unknown>, this, tag, buffer, len, {
-				float: FLOAT_MAP,
-				int: INT_MAP,
-				bool: BOOL_MAP,
-				string: STRING_MAP,
-			})
-		)
+		if (handleBiffTag(this, tag, buffer, len, { float: FLOAT_MAP, int: INT_MAP, bool: BOOL_MAP, string: STRING_MAP }))
 			return 0
 		switch (tag) {
 			case 'EFSS':

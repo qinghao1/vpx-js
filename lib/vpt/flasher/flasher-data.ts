@@ -14,11 +14,16 @@ const FLOAT_MAP: Record<string, string> = {
 	FROX: 'rotX',
 	FROY: 'rotY',
 	FROZ: 'rotZ',
-	COLR: 'color',
 	MOVA: 'modulateVsAdd',
 	FLDB: 'depthBias',
 }
-const INT_MAP: Record<string, string> = { ALGN: 'imageAlignment', FILT: 'filter', FIAM: 'filterAmount' }
+const INT_MAP: Record<string, string> = {
+	ALGN: 'imageAlignment',
+	FILT: 'filter',
+	FIAM: 'filterAmount',
+	COLR: 'color',
+	FALP: 'alpha',
+}
 const BOOL_MAP: Record<string, string> = { FVIS: 'isVisible', ADDB: 'addBlend', IDMD: 'isDMD', DSPT: 'displayTexture' }
 const STRING_MAP: Record<string, string> = { IMAG: 'szImageA', IMAB: 'szImageB' }
 
@@ -82,7 +87,7 @@ export class FlasherData extends ItemData {
 			return 0
 		}
 		if (
-			handleBiffTag(this as unknown as Record<string, unknown>, this, tag, buffer, len, {
+			handleBiffTag(this, tag, buffer, len, {
 				float: FLOAT_MAP,
 				int: INT_MAP,
 				bool: BOOL_MAP,
