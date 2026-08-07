@@ -159,8 +159,8 @@ export class ProgMeshVertex {
 	}
 }
 
-export /** ProgMeshFloat3. */
-class ProgMeshFloat3 {
+/** ProgMeshFloat3. */
+export class ProgMeshFloat3 {
 	public x: number
 	public y: number
 	public z: number
@@ -184,8 +184,8 @@ class ProgMeshFloat3 {
 	}
 }
 
-export /** ProgMeshTriData. */
-class ProgMeshTriData {
+/** ProgMeshTriData. */
+export class ProgMeshTriData {
 	public readonly v: number[]
 
 	constructor(v: number[]) {
