@@ -5,7 +5,7 @@ import { variableDeclaration, variableDeclarator } from '../estree.js'
 import type { ESIToken } from '../grammar/grammar.js'
 
 /** ppConst. */
-export function ppConst(node: ESIToken): any {
+export function ppConst(node: ESIToken): unknown {
 	switch (node.type) {
 		case 'ConstantMemberDeclaration':
 		case 'ConstantMemberDeclarationInline':
@@ -18,12 +18,12 @@ export function ppConst(node: ESIToken): any {
 	return null
 }
 
-function ppConstantMemberDeclaration(node: ESIToken): any {
+function ppConstantMemberDeclaration(node: ESIToken): unknown {
 	const constDecls = node.children[0].type === 'ConstantDeclarators' ? node.children[0].estree : node.children[1].estree
 	return variableDeclaration('const', constDecls)
 }
 
-function ppConstantDeclarators(node: ESIToken): any {
+function ppConstantDeclarators(node: ESIToken): unknown {
 	const estree = []
 	for (const child of node.children) {
 		if (child.type === 'ConstantDeclarator') {
@@ -33,7 +33,7 @@ function ppConstantDeclarators(node: ESIToken): any {
 	return estree
 }
 
-function ppConstantDeclarator(node: ESIToken): any {
+function ppConstantDeclarator(node: ESIToken): unknown {
 	const id = node.children[0].estree
 	const expr = node.children[2].estree
 	return variableDeclarator(id, expr)
