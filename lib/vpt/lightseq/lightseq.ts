@@ -10,7 +10,8 @@ import type { Table } from '../table/table.js'
 import { LightSeqApi } from './lightseq-api.js'
 import { LightSeqData } from './lightseq-data.js'
 
-export class LightSeq extends Item<LightSeqData> implements IScriptable<LightSeqApi> {
+export /** Runtime light sequencer. */
+class LightSeq extends Item<LightSeqData> implements IScriptable<LightSeqApi> {
 	private api?: LightSeqApi
 
 	public static async fromStorage(storage: Storage, itemName: string): Promise<LightSeq> {
