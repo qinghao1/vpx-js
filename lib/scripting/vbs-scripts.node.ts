@@ -5,6 +5,7 @@ import { readFileSync } from 'fs'
 import { resolve } from 'path'
 
 /* istanbul ignore next: We don't test VB's core library. */
+/** getTextFile. */
 export function getTextFile(fileName: string): string {
 	const filePath = getLocalPath(fileName)
 	return readFileSync(filePath).toString('utf8')
