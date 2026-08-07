@@ -5,6 +5,7 @@ import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js'
 import {
 	CanvasTexture,
 	DataTexture,
+	LinearFilter,
 	LinearSRGBColorSpace,
 	RGBAFormat,
 	SRGBColorSpace,
@@ -28,6 +29,9 @@ const imageMap: { [key: string]: string } = {
 	ball: new URL('../../../res/maps/ball.png', import.meta.url).href,
 }
 
+const MAX_REGULAR = 1024
+const MAX_FLOAT = 512
+
 export /** ThreeTextureLoaderBrowser. */
 class ThreeTextureLoaderBrowser implements ITextureLoader<ThreeTexture> {
 	public async loadDefaultTexture(name: string, ext: string, fileName: string): Promise<ThreeTexture> {
@@ -43,6 +47,8 @@ class ThreeTextureLoaderBrowser implements ITextureLoader<ThreeTexture> {
 		texture.flipY = true
 		texture.colorSpace = SRGBColorSpace
 		texture.needsUpdate = true
+		texture.generateMipmaps = false
+		texture.minFilter = LinearFilter as any
 		return texture
 	}
 
@@ -52,33 +58,67 @@ class ThreeTextureLoaderBrowser implements ITextureLoader<ThreeTexture> {
 		const isExr = mimeType === 'image/exr' || ext === '.exr'
 		if (isHdr || isExr) {
 			try {
+				if (name.toLowerCase().includes('vlm.nestmap')) {
+					const approxPixels = data.length / 14
+					if (approxPixels > 4 * 1024 * 1024) {
+						const w = 512
+						const h = 512
+						const placeholder = new DataTexture(new Uint8Array(w * h * 4), w, h, RGBAFormat as any)
+						placeholder.flipY = true
+						placeholder.colorSpace = LinearSRGBColorSpace
+						placeholder.needsUpdate = true
+						placeholder.generateMipmaps = false
+						placeholder.minFilter = LinearFilter as any
+						placeholder.name = `texture:${name}:placeholder`
+						return placeholder as unknown as ThreeTexture
+					}
+				}
 				const buffer = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer
 				const loader = isExr ? new EXRLoader() : new HDRLoader()
 				const texture = (loader as any).createDataTexture(buffer) as ThreeTexture
 				texture.name = `texture:${name}`
 				texture.needsUpdate = true
-				// HDR/EXR are linear float textures, must stay Linear, not sRGB (prevents WebGL sRGB warning)
 				if ((texture as any).colorSpace === SRGBColorSpace) (texture as any).colorSpace = LinearSRGBColorSpace
-				;(texture as any).anisotropy = 4
-				// downsample float textures if huge (handle DataTexture case)
-				const ds = downsampleIfNeeded(texture, 2048)
-				return (ds || texture) as ThreeTexture
+				;(texture as any).anisotropy = 1
+				texture.generateMipmaps = false
+				texture.minFilter = LinearFilter as any
+				const ds = downsampleIfNeeded(texture, MAX_FLOAT)
+				if (ds && ds !== texture) {
+					try { (texture as any).dispose?.(); } catch {}
+					if ((ds as any).image && (ds as any).image.data) {
+						;(ds as any).generateMipmaps = false
+						;(ds as any).minFilter = LinearFilter as any
+					}
+					return ds as ThreeTexture
+				}
+				return texture as ThreeTexture
 			} catch (e: any) {
 				throw new Error(`HDR/EXR parse failed for "${name}" (${ext} ${mimeType}): ${e.message}`)
 			}
 		}
-		const objectUrl = URL.createObjectURL(
-			new Blob([data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as any], {
-				type: mimeType as any,
-			}),
-		)
+		const canUseZeroCopy = data.byteOffset === 0 && data.byteLength === data.buffer.byteLength
+		const blobPart: any = canUseZeroCopy ? data : data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength)
+		const objectUrl = URL.createObjectURL(new Blob([blobPart as any], { type: mimeType as any }))
 		try {
 			const texture = await load(mimeType, objectUrl, ext, data)
 			texture.name = `texture:${name}`
 			texture.colorSpace = SRGBColorSpace
 			texture.needsUpdate = true
-			texture.anisotropy = 4
-			return downsampleIfNeeded(texture, 2048) as ThreeTexture
+			texture.anisotropy = 1
+			texture.generateMipmaps = false
+			texture.minFilter = LinearFilter as any
+			const ds = downsampleIfNeeded(texture, MAX_REGULAR) as any
+			if (ds && ds !== texture) {
+				try { texture.dispose(); } catch {}
+				try { (texture as any).image = null; } catch {}
+				ds.name = `texture:${name}`
+				ds.needsUpdate = true
+				ds.generateMipmaps = false
+				ds.minFilter = LinearFilter as any
+				ds.anisotropy = 1
+				return ds as ThreeTexture
+			}
+			return texture as ThreeTexture
 		} catch (e: any) {
 			try {
 				URL.revokeObjectURL(objectUrl)
