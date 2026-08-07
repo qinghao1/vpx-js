@@ -18,7 +18,8 @@ import { FLT_MAX } from '../mesh.js'
 import type { Table } from '../table/table.js'
 import type { KickerData } from './kicker-data.js'
 
-export class KickerHit extends HitCircle {
+export /** Kicker hit. */
+class KickerHit extends HitCircle {
 	private data: KickerData
 	public ball?: Ball // The ball inside this kicker
 	public lastCapturedBall?: Ball
