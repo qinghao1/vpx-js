@@ -11,7 +11,9 @@ import type { Primitive } from './primitive.js'
 import type { PrimitiveData } from './primitive-data.js'
 import type { PrimitiveState } from './primitive-state.js'
 
-/** Primitive API. */
+/** Primitive API.
+ *
+ * @see https://github.com/vpinball/vpinball/blob/master/primitive.cpp */
 export class PrimitiveApi extends ItemApi<PrimitiveData> {
 	private readonly primitive: Primitive
 	private readonly state: PrimitiveState
