@@ -36,6 +36,7 @@ export class Ball implements IPlayable, IMovable, IRenderable<BallState>, IScrip
 	public id: number
 
 	// public props
+	/** Get coll. */
 	get coll() {
 		return this.hit.coll
 	}
