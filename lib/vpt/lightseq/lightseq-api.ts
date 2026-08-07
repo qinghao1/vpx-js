@@ -4,8 +4,8 @@
 import { ItemApi } from '../item-api.js'
 import type { LightSeqData } from './lightseq-data.js'
 
-export /** LightSeqApi. */
-class LightSeqApi extends ItemApi<LightSeqData> {
+/** LightSeqApi. */
+export class LightSeqApi extends ItemApi<LightSeqData> {
 	get Collection() {
 		return this.data.collection
 	}
