@@ -8,7 +8,8 @@ import { CollisionType } from './collision-type.js'
 import { C_CONTACTVEL, C_LOWNORMVEL, C_TOL_ENDPNTS, C_TOL_RADIUS, PHYS_TOUCH } from './constants.js'
 import { HitObject } from './hit-object.js'
 
-/** 2D line segment hit shape. */
+/** 2D line segment hit shape.
+ * @see https://github.com/vpinball/vpinball/blob/master/collide.cpp */
 export class LineSeg extends HitObject {
 	public readonly v1: Vertex2D
 	public readonly v2: Vertex2D
@@ -34,7 +35,7 @@ export class LineSeg extends HitObject {
 		return this.calcNormal().calcHitBBox()
 	}
 
-	public calcHitBBox(): this {
+	public override calcHitBBox(): this {
 		this.hitBBox.left = Math.min(this.v1.x, this.v2.x)
 		this.hitBBox.right = Math.max(this.v1.x, this.v2.x)
 		this.hitBBox.top = Math.min(this.v1.y, this.v2.y)
@@ -42,7 +43,7 @@ export class LineSeg extends HitObject {
 		return this
 	}
 
-	public hitTest(ball: Ball, dTime: number, coll: CollisionEvent): number {
+	public override hitTest(ball: Ball, dTime: number, coll: CollisionEvent): number {
 		return this.hitTestBasic(ball, dTime, coll, true, true, true)
 	}
 
@@ -55,27 +56,22 @@ export class LineSeg extends HitObject {
 		rigid: boolean,
 	): number {
 		if (!this.isEnabled || ball.state.isFrozen) return -1
-
 		const bnv = ball.hit.vel.x * this.normal.x + ball.hit.vel.y * this.normal.y
 		let isUnHit = bnv > C_LOWNORMVEL
 		if (direction && bnv > C_LOWNORMVEL) return -1
-
 		const rollingRadius = lateral ? ball.data.radius : C_TOL_RADIUS
 		const bcpd = (ball.state.pos.x - this.v1.x) * this.normal.x + (ball.state.pos.y - this.v1.y) * this.normal.y
 		let bnd = bcpd - rollingRadius
 		if (this.objType === CollisionType.Spinner || this.objType === CollisionType.Gate) bnd = bcpd + rollingRadius
-
 		const inside = bnd <= 0
-		let hitTime: number
-
+		let hitTime: number | undefined
 		if (rigid) {
 			if (bnd < -ball.data.radius || (lateral && bcpd < 0)) return -1
 			if (lateral && bnd <= PHYS_TOUCH) {
 				if (inside || Math.abs(bnv) > C_CONTACTVEL || bnd <= -PHYS_TOUCH) hitTime = 0
 				else hitTime = bnd * (1 / (2 * PHYS_TOUCH)) + 0.5
-			} else if (Math.abs(bnv) > C_LOWNORMVEL) {
-				hitTime = bnd / -bnv
-			} else return -1
+			} else if (Math.abs(bnv) > C_LOWNORMVEL) hitTime = bnd / -bnv
+			else return -1
 		} else {
 			if (bnv * bnd >= 0) {
 				if (
@@ -89,20 +85,15 @@ export class LineSeg extends HitObject {
 				isUnHit = !inside
 			} else hitTime = bnd / -bnv
 		}
-
 		if (!isFinite(hitTime!) || hitTime! < 0 || hitTime! > dTime) return -1
-
 		const btv = ball.hit.vel.x * this.normal.y - ball.hit.vel.y * this.normal.x
 		const btd =
 			(ball.state.pos.x - this.v1.x) * this.normal.y - (ball.state.pos.y - this.v1.y) * this.normal.x + btv * hitTime!
-
 		if (btd < -C_TOL_ENDPNTS || btd > this.length + C_TOL_ENDPNTS) return -1
 		if (!rigid) coll.hitFlag = isUnHit
-
 		const hitZ = ball.state.pos.z + ball.hit.vel.z * hitTime!
 		if (hitZ + ball.data.radius * 0.5 < this.hitBBox.zlow || hitZ - ball.data.radius * 0.5 > this.hitBBox.zhigh)
 			return -1
-
 		coll.hitNormal.set(this.normal.x, this.normal.y, 0)
 		coll.hitDistance = bnd
 		if (Math.abs(bnv) <= C_CONTACTVEL && Math.abs(bnd) <= PHYS_TOUCH) {
@@ -112,7 +103,7 @@ export class LineSeg extends HitObject {
 		return hitTime!
 	}
 
-	public collide(coll: CollisionEvent): void {
+	public override collide(coll: CollisionEvent): void {
 		const dot = coll.hitNormal.dot(coll.ball.hit.vel)
 		coll.ball.hit.collide3DWall(coll.hitNormal, this.elasticity, this.elasticityFalloff, this.friction, this.scatter)
 		if (dot <= -this.threshold) this.fireHitEvent(coll.ball)
