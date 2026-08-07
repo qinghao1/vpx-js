@@ -12,7 +12,8 @@ export interface EXR {
 	type: TextureDataType;
 }
 
-export class EXRLoader extends DataTextureLoader {
+export /** EXRLoader. */
+class EXRLoader extends DataTextureLoader {
 
 	constructor( manager?: LoadingManager );
 	type: TextureDataType;
