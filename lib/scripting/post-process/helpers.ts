@@ -6,6 +6,7 @@ import { blockStatement, callExpression, identifier, memberExpression, thisExpre
 import type { ESIToken } from '../grammar/grammar.js'
 import { Transformer } from '../transformer/transformer.js'
 
+/** ppHelpers. */
 export function ppHelpers(node: ESIToken): any {
 	switch (node.type) {
 		case 'Statements':
