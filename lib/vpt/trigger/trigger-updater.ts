@@ -7,7 +7,7 @@ import { ItemUpdater } from '../item-updater.js'
 import type { Table } from '../table/table.js'
 import type { TriggerState } from './trigger-state.js'
 
-/** TriggerUpdater. */
+/** Trigger updater — visibility, material and height offset. */
 export class TriggerUpdater extends ItemUpdater<TriggerState> {
 	constructor(state: TriggerState) {
 		super(state)
@@ -19,9 +19,7 @@ export class TriggerUpdater extends ItemUpdater<TriggerState> {
 		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
 		table: Table,
 	): void {
-		// update local state
 		Object.assign(this.state, state)
-
 		this.applyVisibility(obj, state, renderApi)
 		this.applyMaterial(obj, state.material, undefined, renderApi, table)
 		this.applyAnimation(obj, state, renderApi)
@@ -32,10 +30,9 @@ export class TriggerUpdater extends ItemUpdater<TriggerState> {
 		state: TriggerState,
 		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
 	): void {
-		if (state.heightOffset !== undefined) {
-			const matrix = Matrix3D.claim().setTranslation(0, 0, -state.heightOffset)
-			renderApi.applyMatrixToNode(matrix, obj)
-			Matrix3D.release(matrix)
-		}
+		if (state.heightOffset === undefined) return
+		const m = Matrix3D.claim().setTranslation(0, 0, -state.heightOffset)
+		renderApi.applyMatrixToNode(m, obj)
+		Matrix3D.release(m)
 	}
 }
