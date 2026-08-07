@@ -21,8 +21,8 @@ import type { ITextureLoader } from '../irender-api.js'
 import { EXRLoader } from './vendor/EXRLoader.js'
 import { RGBELoader } from './vendor/RGBELoader.js'
 
-export /** ThreeTextureLoaderNode. */
-class ThreeTextureLoaderNode implements ITextureLoader<ThreeTexture> {
+/** ThreeTextureLoaderNode. */
+export class ThreeTextureLoaderNode implements ITextureLoader<ThreeTexture> {
 	public async loadTexture(name: string, ext: string, data: Uint8Array): Promise<ThreeTexture> {
 		try {
 			return await loadSharpImage(
