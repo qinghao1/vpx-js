@@ -132,125 +132,63 @@ export class GLTFExporter {
 	 * @param input Scene or array of Scenes
 	 */
 	public async parse(input: Scene | Scene[]): Promise<any> {
-		if (this.started) {
-			throw new Error('Can only process one scene at the time. Re-instantiate GLTFExporter for parallel processing.')
-		}
+		if (this.started) throw new Error('GLTFExporter: already started — create a new instance.')
 		this.started = true
-
-		if (this.options.animations && this.options.animations.length > 0) {
-			// Only TRS properties, and not matrices, may be targeted by animation.
-			this.options.trs = true
-		}
-
+		if (this.options.animations?.length) this.options.trs = true
 		this.processInput(input)
-
-		// do all the async shit
-		const numConcurrent = 1 //Math.max(1, Math.floor(cpus().length / 2));
-		const pendingProducer = () => (this.pending.length ? this.pending.shift()!() : null)
-		logger().info('[GLTFExporter.parse] Processing images with %s threads..', numConcurrent)
-		const pool = new PromisePool(pendingProducer, numConcurrent)
+		const pool = new PromisePool(() => (this.pending.length ? this.pending.shift()!() : null), 1)
+		logger().info('[GLTFExporter.parse] Processing images..')
 		await pool.start()
-
-		// Merge buffers.
 		const blob = Buffer.concat(this.buffers)
-
-		// Declare extensions.
-		const extensionsUsedList = Object.keys(this.extensionsUsed)
-		if (extensionsUsedList.length > 0) {
-			this.outputJSON.extensionsUsed = extensionsUsedList
+		const used = Object.keys(this.extensionsUsed)
+		if (used.length) this.outputJSON.extensionsUsed = used
+		if (!this.outputJSON.buffers?.length) return this.outputJSON
+		this.outputJSON.buffers[0].byteLength = blob.byteLength
+		if (!this.options.binary) {
+			this.outputJSON.buffers[0].uri = blob as any
+			return this.options.compressVertices ? (await this.compressGltf(this.outputJSON)).gltf : this.outputJSON
 		}
-
-		if (this.outputJSON.buffers && this.outputJSON.buffers.length > 0) {
-			// Update bytelength of the single buffer.
-			this.outputJSON.buffers[0].byteLength = blob.byteLength
-
-			if (this.options.binary) {
-				// https://github.com/KhronosGroup/glTF/blob/master/specification/2.0/README.md#glb-file-format-specification
-				const GLB_HEADER_BYTES = 12
-				const GLB_HEADER_MAGIC = 0x46546c67
-				const GLB_VERSION = 2
-
-				const GLB_CHUNK_PREFIX_BYTES = 8
-				const GLB_CHUNK_TYPE_JSON = 0x4e4f534a
-				const GLB_CHUNK_TYPE_BIN = 0x004e4942
-
-				// Binary chunk.
-				const binaryChunk = blob
-				const binaryChunkPrefix = Buffer.alloc(GLB_CHUNK_PREFIX_BYTES)
-				binaryChunkPrefix.writeUInt32LE(binaryChunk.byteLength, 0)
-				binaryChunkPrefix.writeUInt32LE(GLB_CHUNK_TYPE_BIN, 4)
-
-				// JSON chunk.
-				const jsonChunk = getPaddedArrayBuffer(stringToBuffer(JSON.stringify(this.outputJSON)), 0x20)
-				const jsonChunkPrefix = Buffer.alloc(GLB_CHUNK_PREFIX_BYTES)
-				jsonChunkPrefix.writeUInt32LE(jsonChunk.byteLength, 0)
-				jsonChunkPrefix.writeUInt32LE(GLB_CHUNK_TYPE_JSON, 4)
-
-				// GLB header.
-				const header = Buffer.alloc(GLB_HEADER_BYTES)
-				header.writeUInt32LE(GLB_HEADER_MAGIC, 0)
-				header.writeUInt32LE(GLB_VERSION, 4)
-				const totalByteLength =
-					GLB_HEADER_BYTES +
-					jsonChunkPrefix.byteLength +
-					jsonChunk.byteLength +
-					binaryChunkPrefix.byteLength +
-					binaryChunk.byteLength
-				header.writeUInt32LE(totalByteLength, 8)
-
-				const glb = Buffer.concat([header, jsonChunkPrefix, jsonChunk, binaryChunkPrefix, binaryChunk])
-
-				if (this.options.compressVertices) {
-					logger().info('[GLTFExporter.parse] Compressing vertices...')
-					const result = await gltfPipeline.processGlb(glb, {
-						dracoOptions: {
-							compressionLevel: this.options.dracoOptions!.compressionLevel,
-							quantizePositionBits: this.options.dracoOptions!.quantizePosition,
-							quantizeNormalBits: this.options.dracoOptions!.quantizeNormal,
-							quantizeTexcoordBits: this.options.dracoOptions!.quantizeTexcoord,
-							quantizeColorBits: this.options.dracoOptions!.quantizeColor,
-							unifiedQuantization: this.options.dracoOptions!.unifiedQuantization,
-						},
-					})
-					return result.glb
-				} else {
-					return glb
-				}
-			} else {
-				this.outputJSON.buffers[0].uri = blob
-				if (this.options.compressVertices) {
-					logger().info('[GLTFExporter.parse] Compressing vertices...')
-					const result = await gltfPipeline.processGltf(this.outputJSON, {
-						dracoOptions: {
-							compressionLevel: this.options.dracoOptions!.compressionLevel,
-							quantizePositionBits: this.options.dracoOptions!.quantizePosition,
-							quantizeNormalBits: this.options.dracoOptions!.quantizeNormal,
-							quantizeTexcoordBits: this.options.dracoOptions!.quantizeTexcoord,
-							quantizeColorBits: this.options.dracoOptions!.quantizeColor,
-							unifiedQuantization: this.options.dracoOptions!.unifiedQuantization,
-						},
-					})
-					return result.gltf
-				} else {
-					return this.outputJSON
-				}
-			}
-		} else {
-			return this.outputJSON
-		}
+		const glb = this.buildGlb(this.outputJSON, blob)
+		return this.options.compressVertices ? (await this.compressGlb(glb)).glb : glb
 	}
 
-	/**
-	 * Compares two arrays
-	 * @param  {Array} array1 Array 1 to compare
-	 * @param  {Array} array2 Array 2 to compare
-	 * @return {Boolean}        Returns true if both arrays are equal
-	 */
-	/**
-	 * Converts a string to an ArrayBuffer.
-	 * @param  {string} text
-	 * @return {ArrayBuffer}
-	 */
+	private buildGlb(json: GltfFile, bin: Buffer): Buffer {
+		const GLB_MAGIC = 0x46546c67,
+			GLB_VERSION = 2
+		const binPrefix = Buffer.alloc(8)
+		binPrefix.writeUInt32LE(bin.byteLength, 0)
+		binPrefix.writeUInt32LE(0x004e4942, 4)
+		const jsonChunk = getPaddedArrayBuffer(stringToBuffer(JSON.stringify(json)), 0x20)
+		const jsonPrefix = Buffer.alloc(8)
+		jsonPrefix.writeUInt32LE(jsonChunk.byteLength, 0)
+		jsonPrefix.writeUInt32LE(0x4e4f534a, 4)
+		const header = Buffer.alloc(12)
+		header.writeUInt32LE(GLB_MAGIC, 0)
+		header.writeUInt32LE(GLB_VERSION, 4)
+		header.writeUInt32LE(12 + jsonPrefix.byteLength + jsonChunk.byteLength + binPrefix.byteLength + bin.byteLength, 8)
+		return Buffer.concat([header, jsonPrefix, jsonChunk, binPrefix, bin])
+	}
+
+	private get dracoOpts() {
+		const o = this.options.dracoOptions!
+		return {
+			compressionLevel: o.compressionLevel,
+			quantizePositionBits: o.quantizePosition,
+			quantizeNormalBits: o.quantizeNormal,
+			quantizeTexcoordBits: o.quantizeTexcoord,
+			quantizeColorBits: o.quantizeColor,
+			unifiedQuantization: o.unifiedQuantization,
+		}
+	}
+	private compressGlb(glb: Buffer) {
+		logger().info('[GLTFExporter] Compressing vertices..')
+		return gltfPipeline.processGlb(glb, { dracoOptions: this.dracoOpts })
+	}
+	private compressGltf(json: GltfFile) {
+		logger().info('[GLTFExporter] Compressing vertices..')
+		return gltfPipeline.processGltf(json, { dracoOptions: this.dracoOpts })
+	}
+
 	/**
 	 * Get the min and max vectors from the given attribute
 	 * @param  {BufferAttribute} attribute Attribute to find the min/max in range from start to start + count
@@ -274,24 +212,12 @@ export class GLTFExporter {
 		return output
 	}
 
-	/**
-	 * Checks if image size is POT.
-	 *
-	 * @param {Image} image The image to be checked.
-	 * @returns {Boolean} Returns true if image size is POT.
-	 *
-	 */
+	/** Whether image dimensions are power-of-two. */
 	private isPowerOfTwo(image: NodeImage) {
 		return M.isPowerOfTwo(image.width) && M.isPowerOfTwo(image.height)
 	}
 
-	/**
-	 * Checks if normal attribute values are normalized.
-	 *
-	 * @param {BufferAttribute} normal
-	 * @returns {Boolean}
-	 *
-	 */
+	/** Whether normals are normalized. */
 	private isNormalizedNormalAttribute(normal: BufferAttribute | InterleavedBufferAttribute) {
 		if (this.cachedData.attributesNormalized.has(normal)) {
 			return false
@@ -309,13 +235,7 @@ export class GLTFExporter {
 		return true
 	}
 
-	/**
-	 * Creates normalized normal buffer attribute.
-	 *
-	 * @param {BufferAttribute} normal
-	 * @returns {BufferAttribute}
-	 *
-	 */
+	/** Creates normalized copy of normals. */
 	private createNormalizedNormalAttribute(normal: BufferAttribute): BufferAttribute {
 		if (this.cachedData.attributesNormalized.has(normal)) {
 			return this.cachedData.attributesNormalized.get(normal)!
@@ -341,31 +261,7 @@ export class GLTFExporter {
 		return attribute
 	}
 
-	/**
-	 * Get the required size + padding for a buffer, rounded to the next 4-byte boundary.
-	 * https://github.com/KhronosGroup/glTF/tree/master/specification/2.0#data-alignment
-	 *
-	 * @param {Integer} bufferSize The size the original buffer.
-	 * @returns {Integer} new buffer size with required padding.
-	 *
-	 */
-	/**
-	 * Returns a buffer aligned to 4-byte boundary.
-	 *
-	 * @param {ArrayBuffer} arrayBuffer Buffer to pad
-	 * @param {Integer} paddingByte (Optional)
-	 * @returns {ArrayBuffer} The same buffer if it's already aligned to 4-byte boundary or a new buffer
-	 */
-	/**
-	 * Serializes a userData.
-	 *
-	 * @param {Object3D|Material} object
-	 * @returns {Object}
-	 */
-	/**
-	 * Applies a texture transform, if present, to the map definition. Requires
-	 * the KHR_texture_transform extension.
-	 */
+	/** Applies KHR_texture_transform if needed. */
 	private applyTextureTransform(mapDef: MapDefinition, texture: Texture) {
 		let didTransform = false
 		const transformDef: TransformDefinition = {}
@@ -392,11 +288,7 @@ export class GLTFExporter {
 		}
 	}
 
-	/**
-	 * Process a buffer to append to the default one.
-	 * @param  buffer
-	 * @return 0
-	 */
+	/** Appends buffer to default. */
 	private processBuffer(buffer: Buffer): number {
 		if (!this.outputJSON.buffers) {
 			this.outputJSON.buffers = [{ byteLength: 0 }]
@@ -408,15 +300,7 @@ export class GLTFExporter {
 		return 0
 	}
 
-	/**
-	 * Process and generate a BufferView
-	 * @param  {BufferAttribute} attribute
-	 * @param  {number} componentType
-	 * @param  {number} start
-	 * @param  {number} count
-	 * @param  {number} target (Optional) Target usage of the BufferView
-	 * @return {Object}
-	 */
+	/** Creates/returns a bufferView for an attribute. */
 	private processBufferView(
 		attribute: BufferAttribute | InterleavedBufferAttribute,
 		componentType: number,
