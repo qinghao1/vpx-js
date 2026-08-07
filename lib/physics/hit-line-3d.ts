@@ -8,6 +8,7 @@ import type { Ball } from '../vpt/ball/ball.js'
 import type { CollisionEvent } from './collision-event.js'
 import { HitLineZ } from './hit-line-z.js'
 
+/** 3D line hit shape (cylinder). */
 export class HitLine3D extends HitLineZ {
 	private readonly matrix: Matrix2D = new Matrix2D()
 	private readonly zLow: number = 0
