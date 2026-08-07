@@ -8,7 +8,8 @@ import type { Table } from '../table/table.js'
 import type { GateData } from './gate-data.js'
 import type { GateState } from './gate-state.js'
 
-export class GateUpdater extends ItemUpdater<GateState> {
+export /** GateUpdater. */
+class GateUpdater extends ItemUpdater<GateState> {
 	private readonly data: GateData
 
 	constructor(data: GateData, state: GateState) {
