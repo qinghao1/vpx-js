@@ -55,6 +55,7 @@ export class PlungerMover implements MoverObject {
 	 */
 	private _pos: number = 0
 
+	/** Get pos. */
 	get pos() {
 		return this._pos
 	}
