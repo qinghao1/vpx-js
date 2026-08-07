@@ -18,11 +18,7 @@ import { SurfaceMeshGenerator } from './surface-mesh-generator.js'
 import { SurfaceState } from './surface-state.js'
 import { SurfaceUpdater } from './surface-updater.js'
 
-/**
- * VPinball's surfaces, a.k.a as "walls".
- *
- * @see https://github.com/vpinball/vpinball/blob/master/surface.cpp
- */
+/** Surface item. @see https://github.com/vpinball/vpinball/blob/master/surface.cpp */
 export class Surface
 	extends Item<SurfaceData>
 	implements IRenderable<SurfaceState>, IHittable, IScriptable<SurfaceApi>
