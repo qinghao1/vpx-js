@@ -127,7 +127,8 @@ export interface IPhysicalData {
 	szPhysicsMaterial?: string
 }
 
-export class TimerDataRoot {
+export /** TimerDataRoot. */
+class TimerDataRoot {
 	public interval: number = 100
 	public enabled: boolean = true
 }
