@@ -10,8 +10,8 @@ import type { Table } from '../table/table.js'
 import { DecalApi } from './decal-api.js'
 import { DecalData } from './decal-data.js'
 
-export /** Decal. */
-class Decal extends Item<DecalData> implements IScriptable<DecalApi> {
+/** Decal. */
+export class Decal extends Item<DecalData> implements IScriptable<DecalApi> {
 	private api?: DecalApi
 
 	public static async fromStorage(storage: Storage, itemName: string): Promise<Decal> {
