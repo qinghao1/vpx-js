@@ -9,24 +9,17 @@ import type { Table } from '../table/table.js'
 import type { PlungerData } from './plunger-data.js'
 import type { PlungerHit } from './plunger-hit.js'
 
-/** Plunger API.
- *
- * @see https://github.com/vpinball/vpinball/blob/master/plunger.cpp */
+/** Plunger API — VBS surface for `Plunger`. @see https://github.com/vpinball/vpinball/blob/master/plunger.cpp */
 export class PlungerApi extends ItemApi<PlungerData> {
-	private readonly hit: PlungerHit
-	private readonly ballCreator: IBallCreationPosition
-
 	constructor(
 		data: PlungerData,
-		hit: PlungerHit,
+		private readonly hit: PlungerHit,
 		events: EventProxy,
-		ballCreator: IBallCreationPosition,
+		private readonly ballCreator: IBallCreationPosition,
 		player: Player,
 		table: Table,
 	) {
 		super(data, events, player, table)
-		this.hit = hit
-		this.ballCreator = ballCreator
 	}
 
 	get X() {
@@ -205,65 +198,31 @@ export class PlungerApi extends ItemApi<PlungerData> {
 		this.data.springEndLoops = v
 	}
 
-	/**
-	 * Initiate a pull; the speed is set by our pull speed property.
-	 */
 	public PullBack(): void {
 		this.hit.getMoverObject().pullBack(this.data.speedPull)
 	}
 
-	/**
-	 * Fires the plunger.
-	 */
 	public Fire(): void {
-		// check for an auto plunger
-		if (this.data.autoPlunger) {
-			// Auto Plunger - this models a "Launch Ball" button or a
-			// ROM-controlled launcher, rather than a player-operated
-			// spring plunger.  In a physical machine, this would be
-			// implemented as a solenoid kicker, so the amount of force
-			// is constant (modulo some mechanical randomness).  Simulate
-			// this by triggering a release from the maximum retracted
-			// position.
-			this.hit.getMoverObject().fire(1.0)
-		} else {
-			// Regular plunger - trigger a release from the current
-			// position, using the keyboard firing strength.
-			this.hit.getMoverObject().fire()
-		}
+		if (this.data.autoPlunger) this.hit.getMoverObject().fire(1)
+		else this.hit.getMoverObject().fire()
 	}
 
-	/**
-	 * Creates a new ball on the plunger's tip.
-	 */
 	public CreateBall(): Ball {
 		return this.player.createBall(this.ballCreator)
 	}
 
-	/**
-	 * Returns the plunger position.
-	 * @return Position between 0 and 25.
-	 */
 	public Position(): number {
 		const frame =
 			(this.hit.getMoverObject().pos - this.hit.getMoverObject().frameStart) /
 			(this.hit.getMoverObject().frameEnd - this.hit.getMoverObject().frameStart)
-
-		return 25.0 - saturate(frame) * 25
+		return 25 - saturate(frame) * 25
 	}
 
-	/**
-	 * Returns the type of physical plunger, but on the web this is always 0.
-	 */
 	public MotionDevice(): number {
-		// there is no motion device support here.
 		return 0
 	}
 
-	/**
-	 * No idea wtf this is supposed to do.
-	 */
-	public InterfaceSupportsErrorInfo(riid: any): boolean {
+	public InterfaceSupportsErrorInfo(_riid: unknown): boolean {
 		return false
 	}
 
@@ -273,11 +232,5 @@ export class PlungerApi extends ItemApi<PlungerData> {
 }
 
 function saturate(n: number) {
-	if (n < 0) {
-		return 0
-	} else if (n > 1) {
-		return 1
-	} else {
-		return n
-	}
+	return Math.min(Math.max(n, 0), 1)
 }
