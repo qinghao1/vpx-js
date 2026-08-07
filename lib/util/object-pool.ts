@@ -36,20 +36,19 @@ export class Pool<T> {
 			this.claimed[caller] = (this.claimed[caller] ?? 0) + 1
 		}
 
-		let obj: any
+		let obj: T
 		if (this.pool.length) {
 			this.recycled++
 			obj = this.pool.shift()!
 		} else {
 			if (this.pool.length < Pool.MAX_POOL_SIZE) this.warned = false
 			this.created++
-			obj = new (this.poolable as any)()
+			obj = new this.poolable()
 		}
 
-		/* istanbul ignore next */
-		if (caller) obj.__caller = caller
-		else if (obj._caller) delete obj._caller
-		obj.__pool = true
+		if (caller) (obj as Record<string, unknown>).__caller = caller
+		else delete (obj as Record<string, unknown>)._caller
+		;(obj as Record<string, unknown>).__pool = true
 		return obj
 	}
 
@@ -57,16 +56,16 @@ export class Pool<T> {
 	release(o: T): void {
 		const obj = o as any
 		/* istanbul ignore next */
-		if (obj.__caller) {
-			const caller: string = obj.__caller
-			delete obj.__caller
+		if ((obj as Record<string, unknown>).__caller) {
+			const caller = (obj as Record<string, unknown>).__caller as string
+			delete (obj as Record<string, unknown>).__caller
 			if (!this.claimed[caller]) this.unclaimed[caller] = (this.unclaimed[caller] ?? 0) + 1
 			else {
 				this.claimed[caller]--
 				if (this.claimed[caller] === 0) delete this.claimed[caller]
 			}
 		}
-		if (!obj.__pool) {
+		if (!(obj as Record<string, unknown>).__pool) {
 			this.skipped++
 			logger().warn('Trying to recycle non-claimed %s, aborting.', this.poolable.name)
 			return
