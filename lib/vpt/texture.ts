@@ -1,3 +1,6 @@
+// Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
+
 function concatUint8Arrays(bufs: Uint8Array[]): Uint8Array {
 	let total = 0
 	for (const b of bufs) total += b.length
@@ -10,33 +13,14 @@ function concatUint8Arrays(bufs: Uint8Array[]): Uint8Array {
 	return result
 }
 
-/*
- * VPDB - Virtual Pinball Database
- * Copyright (C) 2019 freezy <freezy@vpdb.io>
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- */
-
 import { basename } from 'path'
-import { LzwReader } from '../gltf/lzw-reader'
-import { BiffParser } from '../io/biff-parser'
-import type { Storage } from '../io/ole-doc'
-import type { ITextureLoader } from '../render/irender-api'
-import { logger } from '../util/logger'
-import { Binary } from './binary'
-import type { Table } from './table/table'
+import { LzwReader } from '../gltf/lzw-reader.js'
+import { BiffParser } from '../io/biff-parser.js'
+import type { Storage } from '../io/ole-doc.js'
+import type { ITextureLoader } from '../render/irender-api.js'
+import { logger } from '../util/logger.js'
+import { Binary } from './binary.js'
+import type { Table } from './table/table.js'
 
 /**
  * VPinball's texture.
