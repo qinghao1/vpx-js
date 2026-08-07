@@ -74,11 +74,12 @@ export class LineSeg extends HitObject {
 			else return -1
 		} else {
 			if (bnv * bnd >= 0) {
+				const notInVol = ball.hit.vpVolObjs.indexOf(this.obj!) < 0
 				if (
 					this.objType !== CollisionType.Trigger ||
 					!ball.hit.isRealBall() ||
 					Math.abs(bnd) >= ball.data.radius * 0.5 ||
-					inside !== ball.hit.vpVolObjs.indexOf(this.obj!) < 0
+					inside !== notInVol
 				)
 					return -1
 				hitTime = 0
