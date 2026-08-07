@@ -11,4 +11,4 @@ bench*.spec.ts
 *.vpx
 !test/fixtures/*.vpx
 walking_dead.vpx
-
+*.bak
