@@ -31,7 +31,7 @@ export class CollectionData extends ItemData {
 			return 0
 		}
 		if (tag in BOOL_MAP) {
-			;(this as any)[BOOL_MAP[tag]] = this.getBool(buffer)
+			;(this as unknown as Record<string, unknown>)[BOOL_MAP[tag]] = this.getBool(buffer)
 			return 0
 		}
 		this.getCommonBlock(buffer, tag, len)
