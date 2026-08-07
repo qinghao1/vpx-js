@@ -16,18 +16,15 @@ import { dequantizeUnsignedPercent, ItemApi, quantizeUnsignedPercent } from '../
 import type { Table } from './table.js'
 import { TableData } from './table-data.js'
 
-/** Table API.
- *
- * @see https://github.com/vpinball/vpinball/blob/master/pintable.cpp */
+/** Table API — VBS surface for `Table`. @see https://github.com/vpinball/vpinball/blob/master/pintable.cpp */
 export class TableApi extends ItemApi<TableData> {
 	private readonly global3DMaxSeparation = 0.3
 	private readonly global3DZPD = 0.5
-	private readonly global3DOffset = 0.0
+	private readonly global3DOffset = 0
 	private readonly globalDetailLevel = 10
 	private readonly overrideMinSlope = DEFAULT_TABLE_MIN_SLOPE
 	private readonly overrideMaxSlope = DEFAULT_TABLE_MAX_SLOPE
 	private readonly overrideGravityConstant = DEFAULT_TABLE_GRAVITY
-
 	private currentBackglassMode: number
 
 	constructor(data: TableData, events: EventProxy, player: Player, table: Table) {
@@ -42,25 +39,19 @@ export class TableApi extends ItemApi<TableData> {
 		return this.data.overwriteGlobalStereo3D ? this.data._3DmaxSeparation : this.global3DMaxSeparation
 	}
 	set MaxSeparation(v) {
-		if (this.data.overwriteGlobalStereo3D) {
-			this.data._3DmaxSeparation = v
-		}
+		if (this.data.overwriteGlobalStereo3D) this.data._3DmaxSeparation = v
 	}
 	get ZPD() {
 		return this.data.overwriteGlobalStereo3D ? this.data._3DZPD : this.global3DZPD
 	}
 	set ZPD(v) {
-		if (this.data.overwriteGlobalStereo3D) {
-			this.data._3DZPD = v
-		}
+		if (this.data.overwriteGlobalStereo3D) this.data._3DZPD = v
 	}
 	get Offset() {
 		return this.data.overwriteGlobalStereo3D ? this.data._3DOffset : this.global3DOffset
 	}
 	set Offset(v) {
-		if (this.data.overwriteGlobalStereo3D) {
-			this.data._3DOffset = v
-		}
+		if (this.data.overwriteGlobalStereo3D) this.data._3DOffset = v
 	}
 	get Image() {
 		return this.data.szImage
@@ -215,18 +206,14 @@ export class TableApi extends ItemApi<TableData> {
 		return this.data.overwriteGlobalDetailLevel ? this.data.userDetailLevel : this.globalDetailLevel
 	}
 	set DetailLevel(v) {
-		if (this.data.overwriteGlobalDetailLevel) {
-			this.data.userDetailLevel = v
-		}
+		if (this.data.overwriteGlobalDetailLevel) this.data.userDetailLevel = v
 	}
 	get GlobalAlphaAcc() {
 		return this.data.overwriteGlobalDetailLevel
 	}
 	set GlobalAlphaAcc(v) {
 		this.data.overwriteGlobalDetailLevel = v
-		if (!this.data.overwriteGlobalDetailLevel) {
-			this.data.userDetailLevel = this.globalDetailLevel
-		}
+		if (!this.data.overwriteGlobalDetailLevel) this.data.userDetailLevel = this.globalDetailLevel
 	}
 	get GlobalDayNight() {
 		return this.data.overwriteGlobalDayNight
@@ -305,9 +292,8 @@ export class TableApi extends ItemApi<TableData> {
 	}
 	set ColorGradeImage(v) {
 		const tex = this.table.getTexture(v)
-		if (tex && (tex.width !== 256 || tex.height !== 16)) {
+		if (tex && (tex.width !== 256 || tex.height !== 16))
 			throw new Error('Wrong image size, needs to be 256x16 resolution')
-		}
 		this.data.szImageColorGrade = v
 	}
 	get Gravity() {
@@ -469,15 +455,14 @@ export class TableApi extends ItemApi<TableData> {
 	}
 	set EnvironmentImage(v) {
 		const tex = this.table.getTexture(v)
-		if (tex && tex.width !== tex.height * 2) {
+		if (tex && tex.width !== tex.height * 2)
 			throw new Error('Wrong image size, needs to be 2x width in comparison to height')
-		}
 		this.data.szEnvImage = v
 	}
 	get YieldTime(): unknown {
 		throw new Error('Not supported in play.')
 	}
-	set YieldTime(v: unknown) {
+	set YieldTime(_v: unknown) {
 		throw new Error('Not supported in play.')
 	}
 	get EnableAntialiasing() {
@@ -551,32 +536,24 @@ export class TableApi extends ItemApi<TableData> {
 		return this.data.globalDifficulty * 100
 	}
 	set GlobalDifficulty(v) {
-		this.data.globalDifficulty = clamp(v, 0, 100) / 100.0
+		this.data.globalDifficulty = clamp(v, 0, 100) / 100
 	}
 	get Accelerometer() {
 		return false
 	}
-	set Accelerometer(v) {
-		/* do nothing, we don't have accelerometers on the web. */
-	}
+	set Accelerometer(_v: unknown) {}
 	get AccelNormalMount() {
 		return false
 	}
-	set AccelNormalMount(v) {
-		/* do nothing, we don't have accelerometers on the web. */
-	}
+	set AccelNormalMount(_v: unknown) {}
 	get AccelerometerAngle() {
-		return 0.0
+		return 0
 	}
-	set AccelerometerAngle(v) {
-		/* do nothing, we don't have accelerometers on the web. */
-	}
+	set AccelerometerAngle(_v: unknown) {}
 	get DeadZone() {
 		return 0
 	}
-	set DeadZone(v) {
-		/* do nothing, we don't have accelerometers on the web. */
-	}
+	set DeadZone(_v: unknown) {}
 	get BallFrontDecal() {
 		return this.data.szBallImageFront
 	}
@@ -611,25 +588,15 @@ export class TableApi extends ItemApi<TableData> {
 		_restart: boolean,
 		_frontRearFade: number,
 	): void {}
-
 	public GetPredefinedStrings(_dispID: number): string[] {
 		return []
 	}
-
 	public GetPredefinedValue(_dispID: number): unknown {
 		return undefined
 	}
-
-	public ImportPhysics(): void {
-		// to implement, or probably not.
-	}
-
-	public ExportPhysics(): void {
-		// to implement, or probably not.
-	}
-
+	public ImportPhysics(): void {}
+	public ExportPhysics(): void {}
 	public FireKnocker(_count: number): void {}
-
 	public QuitPlayer(_closeType: number): void {}
 
 	protected _getPropertyNames(): string[] {
