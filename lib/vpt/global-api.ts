@@ -21,140 +21,108 @@ export class GlobalApi extends VbsApi {
 		this.player = player
 	}
 
-	/** Get Name. */
 	get Name() {
 		return 'Global'
 	}
-	/** Get LeftFlipperKey. */
 	get LeftFlipperKey() {
 		return this.player.getKey(AssignKey.LeftFlipperKey)
 	}
-	/** Get RightFlipperKey. */
 	get RightFlipperKey() {
 		return this.player.getKey(AssignKey.RightFlipperKey)
 	}
-	/** Get LeftTiltKey. */
 	get LeftTiltKey() {
 		return this.player.getKey(AssignKey.LeftTiltKey)
 	}
-	/** Get RightTiltKey. */
 	get RightTiltKey() {
 		return this.player.getKey(AssignKey.RightTiltKey)
 	}
-	/** Get CenterTiltKey. */
 	get CenterTiltKey() {
 		return this.player.getKey(AssignKey.CenterTiltKey)
 	}
-	/** Get PlungerKey. */
 	get PlungerKey() {
 		return this.player.getKey(AssignKey.PlungerKey)
 	}
-	/** Get StartGameKey. */
 	get StartGameKey() {
 		return this.player.getKey(AssignKey.StartGameKey)
 	}
-	/** Get AddCreditKey. */
 	get AddCreditKey() {
 		return this.player.getKey(AssignKey.AddCreditKey)
 	}
-	/** Get AddCreditKey2. */
 	get AddCreditKey2() {
 		return this.player.getKey(AssignKey.AddCreditKey2)
 	}
-	/** Get MechanicalTilt. */
 	get MechanicalTilt() {
 		return this.player.getKey(AssignKey.MechanicalTilt)
 	}
-	/** Get LeftMagnaSave. */
 	get LeftMagnaSave() {
 		return this.player.getKey(AssignKey.LeftMagnaSave)
 	}
-	/** Get RightMagnaSave. */
 	get RightMagnaSave() {
 		return this.player.getKey(AssignKey.RightMagnaSave)
 	}
-	/** Get ExitGame. */
 	get ExitGame() {
 		return this.player.getKey(AssignKey.ExitGame)
 	}
-	/** Get LockbarKey. */
 	get LockbarKey() {
 		return this.player.getKey(AssignKey.LockbarKey)
 	}
 	set MusicVolume(v: number) {
 		/* TODO implement */
 	}
-	/** Get UserDirectory. */
 	get UserDirectory() {
 		return '.'
 	} // TODO implement
-	/** Get GetPlayerHWnd. */
 	get GetPlayerHWnd() {
 		return null
 	}
-	/** Get ActiveBall. */
 	get ActiveBall() {
 		return this.player.getActiveBall()
 	}
-	/** Get GameTime. */
 	get GameTime() {
 		return this.player.getGameTime()
 	}
-	/** Get SystemTime. */
 	get SystemTime() {
 		return now()
 	}
-	/** Get NightDay. */
 	get NightDay() {
 		return this.table.getApi().NightDay
 	}
-	/** Get ShowDT. */
 	get ShowDT() {
 		return this.table.getApi().ShowDT
 	}
-	/** Get ShowFSS. */
 	get ShowFSS() {
 		return this.table.getApi().ShowFSS
 	}
-	/** Get WindowWidth. */
 	get WindowWidth() {
 		return this.player.width
 	}
-	/** Get WindowHeight. */
 	get WindowHeight() {
 		return this.player.height
 	}
 	set DMDWidth(v: number) {
 		/* TODO implement */
 	}
-	/** Get DMDWidth. */
 	get DMDWidth() {
 		return 0
 	} // TODO implement
 	set DMDHeight(v: number) {
 		/* TODO implement */
 	}
-	/** Get DMDHeight. */
 	get DMDHeight() {
 		return 0
 	} // TODO implement
-	/** Get Version. */
 	get Version() {
 		return this.table.getApi().Version
 	}
-	/** Get VPBuildVersion. */
 	get VPBuildVersion() {
 		return this.table.getApi().VPBuildVersion
 	}
-	/** Get VersionMajor. */
 	get VersionMajor() {
 		return this.table.getApi().VersionMajor
 	}
-	/** Get VersionMinor. */
 	get VersionMinor() {
 		return this.table.getApi().VersionMinor
 	}
-	/** Get VersionRevision. */
 	get VersionRevision() {
 		return this.table.getApi().VersionRevision
 	}
