@@ -1,8 +1,7 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { FLT_MAX, FLT_MIN } from '../vpt/mesh.js'
-import { f4 } from './float.js'
+import { FLT_MAX, FLT_MIN, f4 } from './float.js'
 
 /** Progressive mesh decimation (Stan Melax). @see https://github.com/vpinball/vpinball/blob/master/progressive.h */
 const vertices: ProgMeshVertex[] = []
