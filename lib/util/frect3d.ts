@@ -4,7 +4,8 @@
 import { FLT_MAX } from './float.js'
 import type { Vertex3D } from './math.js'
 
-/** Axis-aligned 3D bounding box. */
+/** Axis-aligned 3D bounding box.
+ * @see https://github.com/vpinball/vpinball/blob/master/kd.h */
 export class FRect3D {
 	left = FLT_MAX
 	top = FLT_MAX
@@ -13,22 +14,16 @@ export class FRect3D {
 	zlow = FLT_MAX
 	zhigh = -FLT_MAX
 
-	/** Width (right - left). */
 	get width(): number {
 		return Math.abs(this.left - this.right)
 	}
-
-	/** Height (bottom - top). */
 	get height(): number {
 		return Math.abs(this.top - this.bottom)
 	}
-
-	/** Depth (zhigh - zlow). */
 	get depth(): number {
 		return Math.abs(this.zlow - this.zhigh)
 	}
 
-	/** Creates bounds or an empty (inverted) box. */
 	constructor(left?: number, right?: number, top?: number, bottom?: number, zLow?: number, zHigh?: number) {
 		if (
 			left !== undefined &&
@@ -47,7 +42,7 @@ export class FRect3D {
 		}
 	}
 
-	/** Resets to inverted bounds. */
+	/** Resets to inverted (empty) bounds. */
 	clear(): void {
 		this.left = FLT_MAX
 		this.right = -FLT_MAX
@@ -57,12 +52,12 @@ export class FRect3D {
 		this.zhigh = -FLT_MAX
 	}
 
-	/** Legacy alias for clear(). */
+	/** Legacy alias for {@link clear}. */
 	Clear(): void {
 		this.clear()
 	}
 
-	/** Expands to include other. */
+	/** Expands to include `o`. */
 	extend(o: FRect3D): void {
 		this.left = Math.min(this.left, o.left)
 		this.right = Math.max(this.right, o.right)
@@ -72,7 +67,7 @@ export class FRect3D {
 		this.zhigh = Math.max(this.zhigh, o.zhigh)
 	}
 
-	/** Tests sphere intersection (rSq = radius²). */
+	/** Tests sphere intersection (`rSq` = radius²). */
 	intersectSphere(p: Vertex3D, rSq: number): boolean {
 		const ex = Math.max(this.left - p.x, 0) + Math.max(p.x - this.right, 0)
 		const ey = Math.max(this.top - p.y, 0) + Math.max(p.y - this.bottom, 0)
