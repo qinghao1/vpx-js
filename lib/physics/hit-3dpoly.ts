@@ -9,6 +9,7 @@ import { CollisionType } from './collision-type.js'
 import { C_CONTACTVEL, C_LOWNORMVEL, PHYS_TOUCH, STATICTIME } from './constants.js'
 import { HitObject } from './hit-object.js'
 
+/** 3D polygon hit shape. */
 export class Hit3DPoly extends HitObject {
 	private readonly rgv: Vertex3D[]
 	private readonly normal: Vertex3D = new Vertex3D()
