@@ -33,13 +33,8 @@ export class LightSeqApi extends ItemApi<LightSeqData> {
 		this.data.updateInterval = v
 	}
 
-	public Play(animation: number, tailLength: number, repeat: number, pause: number): void {
-		// TODO implement
-	}
-
-	public StopPlay(): void {
-		// TODO implement
-	}
+	public Play(_animation: number, _tailLength: number, _repeat: number, _pause: number): void {}
+	public StopPlay(): void {}
 
 	protected _getPropertyNames(): string[] {
 		return Object.getOwnPropertyNames(LightSeqApi.prototype)
