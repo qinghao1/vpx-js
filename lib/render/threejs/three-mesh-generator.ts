@@ -21,7 +21,8 @@ import { ThreeRenderApi } from './three-render-api.js'
  * A class that converts the meshes we read from VPinball to Three.js meshes.
  *
  * It takes a similar approach as Three's OBJLoader, e.g. first read data into
- * a "state" and then convert it into BufferGeometries.
+ * a "state" and then convert it into `BufferGeometry`s.
+ * @see https://github.com/vpinball/vpinball/blob/master/mesh.cpp
  */
 export class ThreeMeshGenerator {
 	private readonly face = [new Array(3), new Array(3), new Array(3)]
