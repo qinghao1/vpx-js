@@ -10,10 +10,7 @@ import { omitEqual } from '../state-helpers.js'
 export class LightState extends ItemState {
 	public static readonly POOL = new Pool(LightState)
 
-	/**
-	 * Intensity, from 0 to 1 (probably)
-	 */
-	public intensity: number = 0
+	public intensity = 0
 	public color: number = 0
 	public colorFull: number = 0
 
