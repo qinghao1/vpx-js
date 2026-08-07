@@ -68,28 +68,6 @@ export class ThreeTextureLoaderBrowser implements ITextureLoader<ThreeTexture> {
 		const isExr = mimeType === 'image/exr' || ext === '.exr'
 		if (isHdr || isExr) {
 			try {
-				if (name.toLowerCase().includes('vlm.nestmap')) {
-					const approxPixels = data.length / 14
-					if (approxPixels > 2 * 1024 * 1024) {
-						const w = 256
-						const h = 256
-						const arr = new Uint8Array(w * h * 4)
-						for (let i = 0; i < arr.length; i += 4) {
-							arr[i] = 128
-							arr[i + 1] = 128
-							arr[i + 2] = 128
-							arr[i + 3] = 255
-						}
-						const placeholder = new DataTexture(arr as any, w, h, RGBAFormat as any)
-						placeholder.flipY = true
-						placeholder.colorSpace = SRGBColorSpace
-						placeholder.needsUpdate = true
-						placeholder.generateMipmaps = false
-						placeholder.minFilter = LinearFilter as any
-						placeholder.name = `texture:${name}:placeholder`
-						return placeholder as unknown as ThreeTexture
-					}
-				}
 				const buffer = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer
 				const loader = isExr ? new EXRLoader() : new HDRLoader()
 				const texture = (loader as any).createDataTexture(buffer) as ThreeTexture
