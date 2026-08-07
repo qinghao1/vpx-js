@@ -5,7 +5,7 @@ import { callExpression, expressionStatement } from '../estree.js'
 import type { ESIToken } from '../grammar/grammar.js'
 
 /** ppCall. */
-export function ppCall(node: ESIToken): any {
+export function ppCall(node: ESIToken): unknown {
 	switch (node.type) {
 		case 'InvocationStatement':
 		case 'InvocationStatementInline':
@@ -14,7 +14,7 @@ export function ppCall(node: ESIToken): any {
 	return null
 }
 
-function ppInvocationStatement(node: ESIToken): any {
+function ppInvocationStatement(node: ESIToken): unknown {
 	const expr = node.children[0].estree
 	return expressionStatement(expr.type === 'CallExpression' ? expr : callExpression(expr, []))
 }
