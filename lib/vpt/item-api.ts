@@ -14,16 +14,11 @@ import { TimerOnOff } from './timer/timer-on-off.js'
 
 /** Base for VBS-exposed item APIs. */
 export abstract class ItemApi<DATA extends ItemData> extends EventEmitter {
-	protected readonly table: Table
-	protected readonly player: Player
-
-	protected readonly data: DATA
-	protected readonly events: EventProxy
 	protected readonly collections: Collection[] = []
 	protected readonly collectionsItemPos: number[] = []
-	private propertyMap?: { [key: string]: string }
-
+	private propertyMap?: Record<string, string>
 	private hitTimer?: TimerHit
+	public UserValue: unknown
 
 	protected abstract _getPropertyNames(): string[]
 
@@ -45,17 +40,17 @@ export abstract class ItemApi<DATA extends ItemData> extends EventEmitter {
 	set TimerEnabled(v) {
 		this._setTimerEnabled(v)
 	}
-	public UserValue: unknown
 
-	public constructor(data: DATA, events: EventProxy, player: Player, table: Table) {
+	constructor(
+		protected readonly data: DATA,
+		protected readonly events: EventProxy,
+		protected readonly player: Player,
+		protected readonly table: Table,
+	) {
 		super()
-		this.data = data
-		this.events = events
-		this.player = player
-		this.table = table
 	}
 
-	public fireKeyEvent(event: Event, ...args: unknown[]) {
+	public fireKeyEvent(event: Event, ...args: unknown[]): void {
 		this.events.fireVoidEventParm(event, ...args)
 	}
 
@@ -66,22 +61,20 @@ export abstract class ItemApi<DATA extends ItemData> extends EventEmitter {
 		return this.data.timer.enabled ? [this.hitTimer] : []
 	}
 
-	public _resetCollections() {
+	public _resetCollections(): void {
 		this.collections.length = 0
 		this.collectionsItemPos.length = 0
 	}
 
-	public _addCollection(collection: Collection, pos: number) {
+	public _addCollection(collection: Collection, pos: number): void {
 		this.collections.push(collection)
 		this.collectionsItemPos.push(pos)
 	}
 
-	public _getPropertyName(vbScriptName: string): string {
+	public _getPropertyName(vbScriptName: string): string | undefined {
 		if (!this.propertyMap) {
 			this.propertyMap = {}
-			for (const name of this._getPropertyNames()) {
-				this.propertyMap[name.toLowerCase()] = name
-			}
+			for (const name of this._getPropertyNames()) this.propertyMap[name.toLowerCase()] = name
 		}
 		return this.propertyMap[vbScriptName.toLowerCase()]
 	}
@@ -91,33 +84,27 @@ export abstract class ItemApi<DATA extends ItemData> extends EventEmitter {
 		this.events.eventCollectionItemPos.length = 0
 		this.events.singleEvents = true
 		for (let i = 0; i < this.collections.length; i++) {
-			const col = this.collections[i]
+			const col = this.collections[i]!
 			if (col.fireEvents) {
 				this.events.eventCollection.push(col.getEvents())
-				this.events.eventCollectionItemPos.push(this.collectionsItemPos[i])
+				this.events.eventCollectionItemPos.push(this.collectionsItemPos[i]!)
 			}
-			if (col.stopSingleEvents) {
-				this.events.singleEvents = false
-			}
+			if (col.stopSingleEvents) this.events.singleEvents = false
 		}
 	}
 
-	protected _assertNonHdrImage(imageName?: string) {
+	protected _assertNonHdrImage(imageName?: string): void {
 		const tex = this.table.getTexture(imageName)
-		if (!tex) {
-			throw new Error(`Texture "${imageName}" not found.`)
-		}
-		if (tex.isHdr()) {
-			throw new Error(`Cannot use a HDR image (.exr/.hdr) here`)
-		}
+		if (!tex) throw new Error(`Texture "${imageName}" not found.`)
+		if (tex.isHdr()) throw new Error('Cannot use a HDR image (.exr/.hdr) here')
 	}
 
 	protected _ballCountOver(events: EventProxy): number {
 		let cnt = 0
 		for (const ball of this.player.balls) {
-			if (ball.hit.isRealBall() && ball.hit.vpVolObjs.indexOf(events) >= 0) {
-				++cnt
-				this.player.getPhysics().activeBall = ball // set active ball for scriptor
+			if (ball.hit.isRealBall() && ball.hit.vpVolObjs.includes(events)) {
+				cnt++
+				this.player.getPhysics().activeBall = ball
 			}
 		}
 		return cnt
@@ -125,26 +112,16 @@ export abstract class ItemApi<DATA extends ItemData> extends EventEmitter {
 
 	protected _setTimerEnabled(isEnabled: boolean): void {
 		if (isEnabled !== this.data.timer.enabled && this.hitTimer) {
-			// to avoid problems with timers dis/enabling themselves, store all the changes in a list
 			let found = false
-			for (const changedHitTimer of this.player.getPhysics().changedHitTimers) {
-				if (changedHitTimer.timer === this.hitTimer) {
-					changedHitTimer.enabled = isEnabled
+			for (const c of this.player.getPhysics().changedHitTimers) {
+				if (c.timer === this.hitTimer) {
+					c.enabled = isEnabled
 					found = true
 					break
 				}
 			}
-
-			if (!found) {
-				const too = new TimerOnOff(isEnabled, this.hitTimer)
-				this.player.getPhysics().changedHitTimers.push(too)
-			}
-
-			if (isEnabled) {
-				this.hitTimer.nextFire = this.player.getPhysics().timeMsec + this.hitTimer.interval
-			} else {
-				this.hitTimer.nextFire = 0xffffffff
-			} // fakes the disabling of the timer, until it will be catched by the cleanup via m_changed_vht
+			if (!found) this.player.getPhysics().changedHitTimers.push(new TimerOnOff(isEnabled, this.hitTimer))
+			this.hitTimer.nextFire = isEnabled ? this.player.getPhysics().timeMsec + this.hitTimer.interval : 0xffffffff
 		}
 		this.data.timer.enabled = isEnabled
 	}
@@ -158,22 +135,11 @@ export abstract class ItemApi<DATA extends ItemData> extends EventEmitter {
 	}
 }
 
-/** dequantizeUnsignedPercent. */
-export function dequantizeUnsignedPercent(i: number) {
-	/* originally:
-	 *
-	 * enum { N = 100 };
-	 * return precise_divide((float)i, (float)N);
-	 */
+/** Dequantizes 0..100 → 0..1. */
+export function dequantizeUnsignedPercent(i: number): number {
 	return Math.min(i / 100, 1)
 }
 
-export function quantizeUnsignedPercent(x: number) {
-	/* originally:
-	 *
-	 * enum { N = 100, Np1 = 101 };
-	 * assert(x >= 0.f);
-	 * return min((unsigned int)(x * (float)Np1), (unsigned int)N);
-	 */
+export function quantizeUnsignedPercent(x: number): number {
 	return Math.min(Math.max(0, x) * 100, 100)
 }
