@@ -10,8 +10,8 @@ import type { Table } from '../table/table.js'
 import { TextboxApi } from './textbox-api.js'
 import { TextboxData } from './textbox-data.js'
 
-export /** Runtime textbox. */
-class Textbox extends Item<TextboxData> implements IScriptable<TextboxApi> {
+/** Runtime textbox. */
+export class Textbox extends Item<TextboxData> implements IScriptable<TextboxApi> {
 	private api?: TextboxApi
 
 	public static async fromStorage(storage: Storage, itemName: string): Promise<Textbox> {
