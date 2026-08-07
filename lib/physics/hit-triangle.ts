@@ -8,6 +8,7 @@ import type { CollisionEvent } from './collision-event.js'
 import { C_CONTACTVEL, C_LOWNORMVEL, PHYS_TOUCH } from './constants.js'
 import { HitObject } from './hit-object.js'
 
+/** Triangular hit shape. */
 export class HitTriangle extends HitObject {
 	public readonly rgv: Vertex3D[]
 	public readonly normal: Vertex3D
