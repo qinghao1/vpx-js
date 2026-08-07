@@ -15,7 +15,7 @@ import type { ESIToken } from '../grammar/grammar.js'
 import { Transformer } from '../transformer/transformer.js'
 
 /** ppArray. */
-export function ppArray(node: ESIToken): any {
+export function ppArray(node: ESIToken): unknown {
 	switch (node.type) {
 		case 'RedimStatement':
 		case 'RedimStatementInline':
@@ -33,7 +33,7 @@ export function ppArray(node: ESIToken): any {
 	return null
 }
 
-function ppRedimStatement(node: ESIToken): any {
+function ppRedimStatement(node: ESIToken): unknown {
 	const stmts: Statement[] = []
 	const exprs: AssignmentExpression[] = node.children[0].estree
 	for (const expr of exprs) {
@@ -45,7 +45,7 @@ function ppRedimStatement(node: ESIToken): any {
 	return stmts
 }
 
-function ppRedimClauses(node: ESIToken): any {
+function ppRedimClauses(node: ESIToken): unknown {
 	const estree = []
 	for (const child of node.children) {
 		if (child.type === 'RedimClause') {
@@ -55,7 +55,7 @@ function ppRedimClauses(node: ESIToken): any {
 	return estree
 }
 
-function ppRedimClause(node: ESIToken): any {
+function ppRedimClause(node: ESIToken): unknown {
 	const id = node.children[0].estree
 	const args = node.children[1].estree
 	return assignmentExpression(
@@ -68,7 +68,7 @@ function ppRedimClause(node: ESIToken): any {
 	)
 }
 
-function ppEraseStatement(node: ESIToken): any {
+function ppEraseStatement(node: ESIToken): unknown {
 	const estree = []
 	const exprs = node.children[0].estree as Expression[]
 	for (const expr of exprs) {
@@ -77,7 +77,7 @@ function ppEraseStatement(node: ESIToken): any {
 	return estree
 }
 
-function ppEraseExpressions(node: ESIToken): any {
+function ppEraseExpressions(node: ESIToken): unknown {
 	const estree = []
 	for (const child of node.children) {
 		if (child.type === 'Expression') {
