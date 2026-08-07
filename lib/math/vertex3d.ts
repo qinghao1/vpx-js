@@ -23,18 +23,21 @@ export class Vertex3D implements Vertex {
 	get x(): number {
 		return this._x
 	}
+	/** Set x. */
 	set x(v: number) {
 		this._x = f4(v)
 	}
 	get y(): number {
 		return this._y
 	}
+	/** Set y. */
 	set y(v: number) {
 		this._y = f4(v)
 	}
 	get z(): number {
 		return this._z
 	}
+	/** Set z. */
 	set z(v: number) {
 		this._z = f4(v)
 	}
