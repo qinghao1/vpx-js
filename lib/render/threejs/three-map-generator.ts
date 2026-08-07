@@ -7,6 +7,7 @@ import type { Table } from '../../vpt/table/table.js'
 import type { Texture } from '../../vpt/texture.js'
 import type { ITextureLoader } from '../irender-api.js'
 
+/** Caches and preloads Three.js textures. */
 export class ThreeMapGenerator {
 	private readonly textureLoader: ITextureLoader<ThreeTexture> | undefined
 	private readonly textureCache: Map<string, ThreeTexture> = new Map()
@@ -21,7 +22,17 @@ export class ThreeMapGenerator {
 		}
 		const now = Date.now()
 		logger().debug('[ThreeMapGenerator.loadTextures] Pre-loading %s textures..', textures.length)
-		const concurrency = Math.min(16, Math.max(6, Math.floor((typeof navigator !== 'undefined' && (navigator as any).hardwareConcurrency ? (navigator as any).hardwareConcurrency : 6) * 1.5)))
+		const concurrency = Math.min(
+			16,
+			Math.max(
+				6,
+				Math.floor(
+					(typeof navigator !== 'undefined' && (navigator as any).hardwareConcurrency
+						? (navigator as any).hardwareConcurrency
+						: 6) * 1.5,
+				),
+			),
+		)
 		let index = 0
 		const loadOne = async (): Promise<void> => {
 			while (true) {
@@ -54,9 +65,18 @@ export class ThreeMapGenerator {
 			}
 		}
 		await Promise.all(Array.from({ length: Math.min(concurrency, textures.length) }, () => loadOne()))
-		logger().debug('[ThreeMapGenerator.loadTextures] Loaded %s/%s textures in %sms (concurrency %s).', this.textureCache.size, textures.length, Date.now() - now, concurrency)
+		logger().debug(
+			'[ThreeMapGenerator.loadTextures] Loaded %s/%s textures in %sms (concurrency %s).',
+			this.textureCache.size,
+			textures.length,
+			Date.now() - now,
+			concurrency,
+		)
 		if (this.textureCache.size < textures.length) {
-			logger().warn('[ThreeMapGenerator.loadTextures] %s textures failed to load (check harness log for details)', textures.length - this.textureCache.size)
+			logger().warn(
+				'[ThreeMapGenerator.loadTextures] %s textures failed to load (check harness log for details)',
+				textures.length - this.textureCache.size,
+			)
 		}
 	}
 
