@@ -1,42 +1,26 @@
-/*
- * VPDB - Virtual Pinball Database
- * Copyright (C) 2019 freezy <freezy@vpdb.io>
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- */
+// Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { createRequire } from 'node:module'
 import { generate } from 'escodegen'
 import type { Program } from 'estree'
-import type { Player } from '../game/player'
-import { logger, progress } from '../util/logger'
-import { Enums, type EnumsApi } from '../vpt/enums'
-import { GlobalApi } from '../vpt/global-api'
-import type { Table } from '../vpt/table/table'
-import { Grammar } from './grammar/grammar'
-import { Stdlib } from './stdlib'
-import { AmbiguityTransformer } from './transformer/ambiguity-transformer'
-import { ClassTransformer } from './transformer/class-transformer'
-import { ErrorTransformer } from './transformer/error-transformer'
-import { EventTransformer } from './transformer/event-transformer'
-import { FunctionHoistTransformer } from './transformer/function-hoist-transformer'
-import { ReferenceTransformer } from './transformer/reference-transformer'
-import { ScopeTransformer } from './transformer/scope-transformer'
-import { WrapTransformer } from './transformer/wrap-transformer'
-import { VBSHelper } from './vbs-helper'
-import { VbsProxyHandler } from './vbs-proxy-handler'
+import type { Player } from '../game/player.js'
+import { logger, progress } from '../util/logger.js'
+import { Enums, type EnumsApi } from '../vpt/enums.js'
+import { GlobalApi } from '../vpt/global-api.js'
+import type { Table } from '../vpt/table/table.js'
+import { Grammar } from './grammar/grammar.js'
+import { Stdlib } from './stdlib/index.js'
+import { AmbiguityTransformer } from './transformer/ambiguity-transformer.js'
+import { ClassTransformer } from './transformer/class-transformer.js'
+import { ErrorTransformer } from './transformer/error-transformer.js'
+import { EventTransformer } from './transformer/event-transformer.js'
+import { FunctionHoistTransformer } from './transformer/function-hoist-transformer.js'
+import { ReferenceTransformer } from './transformer/reference-transformer.js'
+import { ScopeTransformer } from './transformer/scope-transformer.js'
+import { WrapTransformer } from './transformer/wrap-transformer.js'
+import { VBSHelper } from './vbs-helper.js'
+import { VbsProxyHandler } from './vbs-proxy-handler.js'
 
 const require = createRequire(import.meta.url)
 
