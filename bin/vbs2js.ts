@@ -18,46 +18,51 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { existsSync, readFileSync } from 'fs';
-import { Progress } from '../lib';
-import { Grammar } from '../lib/scripting/grammar/grammar';
+import { existsSync, readFileSync } from 'fs'
+import { Progress } from '../lib'
+import { Grammar } from '../lib/scripting/grammar/grammar'
 
 /* tslint:disable: no-console */
-(() => {
-
+;(() => {
 	try {
-		const grammar = new Grammar();
-		const argVbs = process.argv[2];
-		const formatOnly = (process.argv[3] === '--format-only');
+		const grammar = new Grammar()
+		const argVbs = process.argv[2]
+		const formatOnly = process.argv[3] === '--format-only'
 
 		// mute progress logs
 		Progress.setProgress({
-			details(details: string): void { /* do nothing */ },
-			end(id: string): void { /* do nothing */ },
-			show(action: string, details?: string): void { /* do nothing */ },
-			start(id: string, title: string): void { /* do nothing */ },
-		});
+			details(details: string): void {
+				/* do nothing */
+			},
+			end(id: string): void {
+				/* do nothing */
+			},
+			show(action: string, details?: string): void {
+				/* do nothing */
+			},
+			start(id: string, title: string): void {
+				/* do nothing */
+			},
+		})
 
 		if (!argVbs) {
-			throw new Error('USAGE: vbs2js <script.vbs> --format-only');
+			throw new Error('USAGE: vbs2js <script.vbs> --format-only')
 		}
 
 		if (!existsSync(argVbs)) {
-			throw new Error(`Cannot find "${argVbs}".`);
+			throw new Error(`Cannot find "${argVbs}".`)
 		}
 
-		const vbs = readFileSync(argVbs).toString();
+		const vbs = readFileSync(argVbs).toString()
 
 		if (!formatOnly) {
-			console.log(grammar.vbsToJs(vbs));
+			console.log(grammar.vbsToJs(vbs))
 		} else {
-			console.log(grammar.format(vbs));
+			console.log(grammar.format(vbs))
 		}
 	} catch (err) {
-		console.error(err);
-
+		console.error(err)
 	} finally {
-		process.exit();
+		process.exit()
 	}
-
-})();
+})()

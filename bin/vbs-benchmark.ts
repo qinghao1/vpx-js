@@ -18,47 +18,53 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { existsSync, readFileSync } from 'fs';
-import { Player, Progress } from '../lib';
-import { Transpiler } from '../lib/scripting/transpiler';
-import { logger } from '../lib/util/logger';
-import { TableBuilder } from '../test/table-builder';
+import { existsSync, readFileSync } from 'fs'
+import { Player, Progress } from '../lib'
+import { Transpiler } from '../lib/scripting/transpiler'
+import { logger } from '../lib/util/logger'
+import { TableBuilder } from '../test/table-builder'
 
 /* tslint:disable: no-console */
-(() => {
-
+;(() => {
 	try {
-		const argVbs = process.argv[2];
+		const argVbs = process.argv[2]
 
 		// mute progress logs
 		Progress.setProgress({
-			details(details: string): void { /* do nothing */ },
-			end(id: string): void { /* do nothing */ },
-			show(action: string, details?: string): void { /* do nothing */ },
-			start(id: string, title: string): void { /* do nothing */ },
-		});
-		logger().debug = () => { /* do nothing */ };
+			details(details: string): void {
+				/* do nothing */
+			},
+			end(id: string): void {
+				/* do nothing */
+			},
+			show(action: string, details?: string): void {
+				/* do nothing */
+			},
+			start(id: string, title: string): void {
+				/* do nothing */
+			},
+		})
+		logger().debug = () => {
+			/* do nothing */
+		}
 
 		if (!argVbs) {
-			throw new Error('USAGE: vbs-benchmark <script.vbs>');
+			throw new Error('USAGE: vbs-benchmark <script.vbs>')
 		}
 
 		if (!existsSync(argVbs)) {
-			throw new Error(`Cannot find "${argVbs}".`);
+			throw new Error(`Cannot find "${argVbs}".`)
 		}
 
-		const vbs = readFileSync(argVbs).toString();
-		const table = new TableBuilder().addFlipper('F1').build();
-		const player = new Player(table).init();
+		const vbs = readFileSync(argVbs).toString()
+		const table = new TableBuilder().addFlipper('F1').build()
+		const player = new Player(table).init()
 
-		const transpiler = new Transpiler(table, player);
-		console.log(transpiler.transpile(vbs));
-
+		const transpiler = new Transpiler(table, player)
+		console.log(transpiler.transpile(vbs))
 	} catch (err) {
-		console.error(err);
-
+		console.error(err)
 	} finally {
-		process.exit();
+		process.exit()
 	}
-
-})();
+})()
