@@ -1,21 +1,10 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-function concatUint8Arrays(bufs: Uint8Array[]): Uint8Array {
-	let total = 0
-	for (const b of bufs) total += b.length
-	const result = new Uint8Array(total)
-	let offset = 0
-	for (const b of bufs) {
-		result.set(b, offset)
-		offset += b.length
-	}
-	return result
-}
-
 import { basename } from 'path'
 import { LzwReader } from '../gltf/lzw-reader.js'
 import { BiffParser } from '../io/biff-parser.js'
+import { concatUint8Arrays } from '../io/binary-helpers.js'
 import type { Storage } from '../io/ole-doc.js'
 import type { ITextureLoader } from '../render/irender-api.js'
 import { logger } from '../util/logger.js'
@@ -23,10 +12,7 @@ import { Binary } from './binary.js'
 import type { Table } from './table/table.js'
 
 /**
- * VPinball's texture.
- *
- * These are read from the "Image*" storage items.
- *
+ * VPinball texture — `Image*` storage entry.
  * @see https://github.com/vpinball/vpinball/blob/master/Texture.cpp
  */
 export class Texture extends BiffParser {
@@ -81,11 +67,7 @@ export class Texture extends BiffParser {
 		return (this.szInternalName || this.szName || '').toLowerCase()
 	}
 
-	/**
-	 * Loads the texture for the given renderer.
-	 * @param table
-	 * @param loader
-	 */
+	/** Loads texture via renderer loader. */
 	public async loadTexture<TEXTURE>(loader: ITextureLoader<TEXTURE>, table: Table): Promise<TEXTURE> {
 		let texture: TEXTURE
 		const fileName = (this.szPath || this.localFileName)!
@@ -127,7 +109,7 @@ export class Texture extends BiffParser {
 			}
 			strm.on('error', reject)
 			strm.on('data', (buf: Uint8Array) => bufs.push(buf))
-			strm.on('end', () => resolve(concatUint8Arrays(bufs)))
+			strm.on('end', () => resolve(concatUint8Arrays(...bufs)))
 		})
 	}
 
