@@ -4,8 +4,8 @@
 import { Pool } from '../../util/object-pool.js'
 import { ItemState } from '../item-state.js'
 
-export /** TriggerState. */
-class TriggerState extends ItemState {
+/** TriggerState. */
+export class TriggerState extends ItemState {
 	public static readonly POOL = new Pool(TriggerState)
 
 	public heightOffset: number = 0
