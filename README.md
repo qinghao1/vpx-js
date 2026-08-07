@@ -57,6 +57,20 @@ VPM, there isn't a JavaScript implementation of PinMAME yet. However, @neophob
 wrote a [WPC emulator](https://github.com/neophob/wpc-emu) from scratch that will
 cover many games already.
 
+## Changes since v1.3.4 (e8a6d6fa522)
+
+~1527 commits ahead of upstream `v1.3.4`. High-level intent:
+
+- **Stay current** — modern ESM build and current Node/browser targets so the library no longer relies on legacy polyfills and is trivial to publish/consume.
+- **Simpler toolchain** — single fast formatter/linter and test runner to reduce setup cost and make CI reliable.
+- **Ecosystem alignment** — track current three.js and related deps to avoid bit-rot, security gaps, and API drift.
+- **Portability** — use standard `Uint8Array`/`DataView` I/O so the same code runs in browsers without Node shims.
+- **VPX compatibility** — follow VPX 10.8.1 defaults/parsing so recent tables load as the desktop player intends.
+- **Gameplay parity** — fix physics divergences so simulation matches VPX.
+- **Look correct** — recalibrate lighting/material handling after the rendering upgrade to fix visual regressions.
+- **Maintainability** — tighten types and consolidate module structure so future changes are safer and easier to audit.
+- **Repo scope** — keep the library lean; `demo-static/` removed and `demo-browser/`/`/.github/`/`/.agents/` are local-only (ignored) rather than published.
+
 ## Development Setup
 
 Given this is a lib, you'll need an actual web application to test. There is a
