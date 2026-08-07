@@ -15,7 +15,8 @@ import { Plunger, type PlungerConfig } from './plunger.js'
 import type { PlungerData } from './plunger-data.js'
 import type { PlungerState } from './plunger-state.js'
 
-export class PlungerMover implements MoverObject {
+export /** Plunger mover. */
+class PlungerMover implements MoverObject {
 	private readonly data: PlungerData
 	private readonly state: PlungerState
 	private readonly events: EventProxy
