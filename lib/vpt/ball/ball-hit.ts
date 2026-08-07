@@ -1,27 +1,11 @@
-/*
- * VPDB - Virtual Pinball Database
- * Copyright (C) 2019 freezy <freezy@vpdb.io>
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- */
+// Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import type { EventProxy } from '../../game/event-proxy'
-import type { PlayerPhysics } from '../../game/player-physics'
-import { clamp, solveQuadraticEq } from '../../math/functions'
-import { Vertex3D } from '../../math/vertex3d'
-import { CollisionEvent } from '../../physics/collision-event'
+import type { EventProxy } from '../../game/event-proxy.js'
+import type { PlayerPhysics } from '../../game/player-physics.js'
+import { clamp, solveQuadraticEq } from '../../math/functions.js'
+import { Vertex3D } from '../../math/vertex3d.js'
+import { CollisionEvent } from '../../physics/collision-event.js'
 import {
 	C_CONTACTVEL,
 	C_DISP_GAIN,
@@ -32,15 +16,15 @@ import {
 	C_LOWNORMVEL,
 	C_PRECISION,
 	PHYS_TOUCH,
-} from '../../physics/constants'
-import { elasticityWithFalloff, HARD_SCATTER } from '../../physics/functions'
-import { HitObject } from '../../physics/hit-object'
-import { FLT_MIN } from '../mesh'
-import type { TableData } from '../table/table-data'
-import type { Ball } from './ball'
-import type { BallData } from './ball-data'
-import { BallMover } from './ball-mover'
-import type { BallState } from './ball-state'
+} from '../../physics/constants.js'
+import { elasticityWithFalloff, HARD_SCATTER } from '../../physics/functions.js'
+import { HitObject } from '../../physics/hit-object.js'
+import { FLT_MIN } from '../mesh.js'
+import type { TableData } from '../table/table-data.js'
+import type { Ball } from './ball.js'
+import type { BallData } from './ball-data.js'
+import { BallMover } from './ball-mover.js'
+import type { BallState } from './ball-state.js'
 
 /**
  * In the VP source code this is all part of ball.cpp. We'll try
