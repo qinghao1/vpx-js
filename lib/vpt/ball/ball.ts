@@ -22,7 +22,7 @@ import type { BallMover } from './ball-mover.js'
 import type { BallState } from './ball-state.js'
 import { BallUpdater } from './ball-updater.js'
 
-/** Runtime ball. */
+/** Runtime ball (playable, movable, renderable). */
 export class Ball implements IPlayable, IMovable, IRenderable<BallState>, IScriptable<BallApi> {
 	public readonly state: BallState
 	public readonly data: BallData
@@ -32,18 +32,15 @@ export class Ball implements IPlayable, IMovable, IRenderable<BallState>, IScrip
 	private readonly api: BallApi
 	private readonly updater: BallUpdater
 
-	// unique ID for each ball
 	public id: number
 
-	// public props
-	/** Get coll. */
+	/** Ball collision container. */
 	get coll() {
 		return this.hit.coll
 	}
 
 	public static idCounter = 0
 
-	// ugly hacks
 	public oldVel: Vertex3D = new Vertex3D()
 
 	constructor(id: number, data: BallData, state: BallState, initialVelocity: Vertex3D, player: Player, table: Table) {
