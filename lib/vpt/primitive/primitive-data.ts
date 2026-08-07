@@ -64,7 +64,7 @@ export class PrimitiveData extends ItemData implements IPhysicalData {
 	public szMaterial?: string
 	public szPhysicsMaterial?: string
 	public szLightmap?: string
-	public sides!: number
+	public sides = 4
 	public isVisible = true
 	public drawTexturesInside = false
 	public hitEvent = false
