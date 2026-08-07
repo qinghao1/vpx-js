@@ -41,63 +41,54 @@ export class BumperApi extends ItemApi<BumperData> {
 		this.isSkirtDynamic = !!skirtMaterial && skirtMaterial.isOpacityActive
 	}
 
-	/** Get Radius. */
 	get Radius() {
 		return this.data.radius
 	}
 	set Radius(v) {
 		this.data.radius = v
 	}
-	/** Get Force. */
 	get Force() {
 		return this.data.force
 	}
 	set Force(v) {
 		this.data.force = v
 	}
-	/** Get Scatter. */
 	get Scatter() {
 		return this.data.scatter
 	}
 	set Scatter(v) {
 		this.data.scatter = v
 	}
-	/** Get HeightScale. */
 	get HeightScale() {
 		return this.data.heightScale
 	}
 	set HeightScale(v) {
 		this.data.heightScale = v
 	}
-	/** Get RingSpeed. */
 	get RingSpeed() {
 		return this.data.ringSpeed
 	}
 	set RingSpeed(v) {
 		this.data.ringSpeed = v
 	}
-	/** Get RingDropOffset. */
 	get RingDropOffset() {
 		return this.data.ringDropOffset
 	}
 	set RingDropOffset(v) {
 		this.data.ringDropOffset = v
 	}
-	/** Get Orientation. */
 	get Orientation() {
 		return this.data.orientation
 	}
 	set Orientation(v) {
 		this.data.orientation = v
 	}
-	/** Get Threshold. */
 	get Threshold() {
 		return this.data.threshold
 	}
 	set Threshold(v) {
 		this.data.threshold = v
 	}
-	/** Get CapMaterial. */
 	get CapMaterial() {
 		return this.data.szCapMaterial
 	}
@@ -107,7 +98,6 @@ export class BumperApi extends ItemApi<BumperData> {
 		}
 		this.data.szCapMaterial = v
 	}
-	/** Get RingMaterial. */
 	get RingMaterial() {
 		return this.data.szRingMaterial
 	}
@@ -117,7 +107,6 @@ export class BumperApi extends ItemApi<BumperData> {
 		}
 		this.data.szRingMaterial = v
 	}
-	/** Get BaseMaterial. */
 	get BaseMaterial() {
 		return this.data.szBaseMaterial
 	}
@@ -127,7 +116,6 @@ export class BumperApi extends ItemApi<BumperData> {
 		}
 		this.data.szBaseMaterial = v
 	}
-	/** Get SkirtMaterial. */
 	get SkirtMaterial() {
 		return this.data.szSkirtMaterial
 	}
@@ -137,42 +125,36 @@ export class BumperApi extends ItemApi<BumperData> {
 		}
 		this.data.szSkirtMaterial = v
 	}
-	/** Get X. */
 	get X() {
 		return this.data.center.x
 	}
 	set X(v) {
 		this.data.center.x = v
 	}
-	/** Get Y. */
 	get Y() {
 		return this.data.center.y
 	}
 	set Y(v) {
 		this.data.center.y = v
 	}
-	/** Get Surface. */
 	get Surface() {
 		return this.data.szSurface
 	}
 	set Surface(v) {
 		this.data.szSurface = v
 	}
-	/** Get HasHitEvent. */
 	get HasHitEvent() {
 		return this.data.hitEvent
 	}
 	set HasHitEvent(v) {
 		this.data.hitEvent = v
 	}
-	/** Get Collidable. */
 	get Collidable() {
 		return this.data.isCollidable
 	}
 	set Collidable(v) {
 		this.data.isCollidable = v
 	}
-	/** Get CapVisible. */
 	get CapVisible() {
 		return this.data.isCapVisible
 	}
@@ -182,7 +164,6 @@ export class BumperApi extends ItemApi<BumperData> {
 		}
 		this.data.isCapVisible = v
 	}
-	/** Get BaseVisible. */
 	get BaseVisible() {
 		return this.data.isBaseVisible
 	}
@@ -192,7 +173,6 @@ export class BumperApi extends ItemApi<BumperData> {
 		}
 		this.data.isBaseVisible = v
 	}
-	/** Get RingVisible. */
 	get RingVisible() {
 		return this.data.isRingVisible
 	}
@@ -202,7 +182,6 @@ export class BumperApi extends ItemApi<BumperData> {
 		}
 		this.data.isRingVisible = v
 	}
-	/** Get SkirtVisible. */
 	get SkirtVisible() {
 		return this.data.isSkirtVisible
 	}
@@ -212,14 +191,12 @@ export class BumperApi extends ItemApi<BumperData> {
 		}
 		this.data.isSkirtVisible = v
 	}
-	/** Get ReflectionEnabled. */
 	get ReflectionEnabled() {
 		return this.data.isReflectionEnabled
 	}
 	set ReflectionEnabled(v) {
 		this.data.isReflectionEnabled = v
 	}
-	/** Get EnableSkirtAnimation. */
 	get EnableSkirtAnimation() {
 		return this.animation.enableSkirtAnimation
 	}
