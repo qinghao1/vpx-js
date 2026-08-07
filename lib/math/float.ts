@@ -14,22 +14,20 @@ export function f4(v: number): number {
 	return Math.fround(v)
 }
 
-/** Scalar quantization — mirrors src/math/math.h quantizeUnsigned<Bits>. */
+/** Quantizes [0,1] to unsigned bits — mirrors math.h `quantizeUnsigned<Bits>`. */
 export function quantizeUnsigned(bits: number, x: number): number {
-	const N = (1 << bits) - 1
-	const Np1 = 1 << bits
-	return Math.min((x * Np1) | 0, N)
+	const n = (1 << bits) - 1
+	return Math.min((x * (1 << bits)) | 0, n)
 }
+
+/** Dequantizes unsigned bits to [0,1]. */
 export function dequantizeUnsigned(bits: number, i: number): number {
-	const N = (1 << bits) - 1
-	return Math.min(i / N, 1)
+	const n = (1 << bits) - 1
+	return Math.min(i / n, 1)
 }
-export function quantizeUnsignedPercent(x: number): number {
-	return quantizeUnsigned(7, x) // 0..100 → 0..127 in VPX, clamped
-}
-export function dequantizeUnsignedPercent(i: number): number {
-	return dequantizeUnsigned(7, i)
-}
+
+export const quantizeUnsignedPercent = (x: number): number => quantizeUnsigned(7, x)
+export const dequantizeUnsignedPercent = (i: number): number => dequantizeUnsigned(7, i)
 
 /** Degrees → radians (single precision). */
 export function degToRad(deg: number): number {
