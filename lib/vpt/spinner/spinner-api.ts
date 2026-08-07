@@ -12,7 +12,9 @@ import type { SpinnerData } from './spinner-data.js'
 import type { SpinnerMover } from './spinner-mover.js'
 import type { SpinnerState } from './spinner-state.js'
 
-/** Spinner API. */
+/** Spinner API.
+ *
+ * @see https://github.com/vpinball/vpinball/blob/master/spinner.cpp */
 export class SpinnerApi extends ItemApi<SpinnerData> {
 	private readonly state: SpinnerState
 	private readonly mover: SpinnerMover
