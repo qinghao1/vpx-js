@@ -13,7 +13,7 @@ const nextTick: (cb: () => void) => void =
 			? (globalThis as unknown as { setImmediate: (cb: () => void) => void }).setImmediate.bind(globalThis)
 			: process.nextTick.bind(process)
 
-/** Lazy readable stream pulling chunks via fn. */
+/** Lazy readable streaming `fn` until it returns null. */
 export function readableStream<T>(fn: (s: Stream, i: number) => Promise<T | null>, continueOnError = false) {
 	const stream = new Stream() as Stream & {
 		readable: boolean
@@ -22,20 +22,20 @@ export function readableStream<T>(fn: (s: Stream, i: number) => Promise<T | null
 		pause(): void
 		destroy(): void
 	}
-	let i = 0,
-		paused = false,
-		ended = false,
-		reading = false
+	let i = 0
+	let paused = false
+	let ended = false
+	let reading = false
 
 	;(stream as unknown as { readable: boolean }).readable = true
 	;(stream as unknown as { writable: boolean }).writable = false
 	stream.on('end', () => (ended = true))
 
-	function get(err?: Error, data?: T | null) {
+	function get(data?: T | null, err?: Error): void {
 		if (err) {
 			stream.emit('error', err)
 			if (!continueOnError) stream.emit('end')
-		} else if (arguments.length > 1 && data !== null && data !== undefined) stream.emit('data', data as T)
+		} else if (data !== null && data !== undefined) stream.emit('data', data)
 		nextTick(() => {
 			if (ended || paused || reading) return
 			try {
@@ -43,14 +43,14 @@ export function readableStream<T>(fn: (s: Stream, i: number) => Promise<T | null
 				fn(stream, i++)
 					.then((buf) => {
 						reading = false
-						get(undefined, buf as T)
+						get(buf as T)
 					})
 					.catch((e) => {
 						stream.emit('error', e)
 						stream.emit('end')
 					})
 			} catch (e) {
-				get(e as Error)
+				get(undefined, e as Error)
 			}
 		})
 	}
