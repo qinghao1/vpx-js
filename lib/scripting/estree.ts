@@ -49,6 +49,7 @@ import type {
 	WhileStatement,
 } from 'estree'
 
+/** program. */
 export function program(data: Statement[]): Program {
 	return {
 		type: 'Program',
