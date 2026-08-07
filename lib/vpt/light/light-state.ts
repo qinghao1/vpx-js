@@ -5,7 +5,6 @@ import { Pool } from '../../util/object-pool.js'
 import { ItemState } from '../item-state.js'
 
 /** Light state.
- *
  * @see https://github.com/vpinball/vpinball/blob/master/light.cpp */
 export class LightState extends ItemState {
 	public static readonly POOL = new Pool(LightState)
@@ -53,7 +52,6 @@ export class LightState extends ItemState {
 	}
 
 	public equals(state: LightState): boolean {
-		/* istanbul ignore if: we don't actually pass empty states. */
 		if (!state) {
 			return false
 		}
