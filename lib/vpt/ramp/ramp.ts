@@ -20,11 +20,7 @@ import { RampMeshGenerator } from './ramp-mesh-generator.js'
 import { RampState } from './ramp-state.js'
 import { RampUpdater } from './ramp-updater.js'
 
-/**
- * VPinball's ramps.
- *
- * @see https://github.com/vpinball/vpinball/blob/master/ramp.cpp
- */
+/** Ramp item. @see https://github.com/vpinball/vpinball/blob/master/ramp.cpp */
 export class Ramp extends Item<RampData> implements IRenderable<RampState>, IHittable, IScriptable<RampApi> {
 	private readonly meshGenerator: RampMeshGenerator
 	private readonly hitGenerator: RampHitGenerator
