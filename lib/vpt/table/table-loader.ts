@@ -1,8 +1,6 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-const textDecoder = new TextDecoder()
-
 import { type IBinaryReader, OleCompoundDoc, type Storage } from '../../io/ole-doc.js'
 import { logger, progress } from '../../util/logger.js'
 import { Collection } from '../collection/collection.js'
@@ -12,6 +10,8 @@ import { ITEM_KEYS, ITEM_REGISTRY, loadItemByType } from '../item-registry.js'
 import { Texture } from '../texture.js'
 import type { TableLoadOptions } from './table.js'
 import { TableData } from './table-data.js'
+
+const textDecoder = new TextDecoder()
 
 /** TableLoader. */
 export class TableLoader {
