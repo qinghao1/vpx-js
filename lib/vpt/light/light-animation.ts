@@ -8,8 +8,8 @@ import type { Table } from '../table/table.js'
 import type { LightData } from './light-data.js'
 import type { LightState } from './light-state.js'
 
-export /** LightAnimation. */
-class LightAnimation implements IAnimation {
+/** LightAnimation. */
+export class LightAnimation implements IAnimation {
 	private readonly data: LightData
 	private readonly state: LightState
 
