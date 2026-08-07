@@ -10,97 +10,98 @@ import { Mesh } from '../mesh.js'
 import type { Table } from '../table/table.js'
 import type { SurfaceData } from './surface-data.js'
 
-/** Surface mesh generator. */
+/** Generates surface top/side meshes. @see https://github.com/vpinball/vpinball/blob/master/surface.cpp */
 export class SurfaceMeshGenerator {
-	/** Returns mesh of surface. @see Surface::GenerateMesh */
 	public generateMeshes(data: SurfaceData, table: Table): { top?: Mesh; side?: Mesh } {
 		const topMesh = new Mesh(`surface.top-${data.getName()}`)
 		const sideMesh = new Mesh(`surface.side-${data.getName()}`)
-
 		const verts = DragPoint.getRgVertex(data.dragPoints, () => new RenderVertex(), CatmullCurve2D.fromVertex2D)
 		const texCoords = DragPoint.getTextureCoords(data.dragPoints, verts)
 		const n = verts.length
-		const normals: Vertex2D[] = []
-		for (let i = 0; i < n; i++) {
-			const a = verts[i],
-				b = verts[i < n - 1 ? i + 1 : 0]
-			const dx = a.x - b.x,
-				dy = a.y - b.y,
-				inv = 1 / Math.sqrt(dx * dx + dy * dy)
-			normals[i] = new Vertex2D(dy * inv, dx * inv)
-		}
-
+		if (!n) return {}
+		const normals = this.computeNormals(verts)
 		const bottom = data.heightBottom * table.getScaleZ() + table.getTableHeight()
 		const top = data.heightTop * table.getScaleZ() + table.getTableHeight()
 
-		let offset = 0
+		this.buildSide(sideMesh, verts, texCoords, normals, bottom, top, !!data.szSideImage)
+		this.buildTop(topMesh, verts, table, top)
+		const meshes: { top?: Mesh; side?: Mesh } = {}
+		if (topMesh.vertices.length) meshes.top = topMesh
+		if (top !== bottom) meshes.side = sideMesh
+		return meshes
+	}
+
+	private computeNormals(verts: RenderVertex[]): Vertex2D[] {
+		const n = verts.length
+		const out: Vertex2D[] = []
 		for (let i = 0; i < n; i++) {
-			const p1 = verts[i],
-				p2 = verts[i < n - 1 ? i + 1 : 0]
-			const a = i === 0 ? n - 1 : i - 1,
-				c = i < n - 1 ? i + 1 : 0
-			const n0 = new Vertex2D(),
-				n1 = new Vertex2D()
-			if (p1.fSmooth) {
-				n0.x = (normals[a].x + normals[i].x) * 0.5
-				n0.y = (normals[a].y + normals[i].y) * 0.5
-			} else {
-				n0.x = normals[i].x
-				n0.y = normals[i].y
-			}
-			if (p2.fSmooth) {
-				n1.x = (normals[i].x + normals[c].x) * 0.5
-				n1.y = (normals[i].y + normals[c].y) * 0.5
-			} else {
-				n1.x = normals[i].x
-				n1.y = normals[i].y
-			}
-			n0.normalize()
-			n1.normalize()
-
-			sideMesh.vertices[offset] = Object.assign(new Vertex3DNoTex2(), { x: p1.x, y: p1.y, z: bottom })
-			sideMesh.vertices[offset + 1] = Object.assign(new Vertex3DNoTex2(), { x: p1.x, y: p1.y, z: top })
-			sideMesh.vertices[offset + 2] = Object.assign(new Vertex3DNoTex2(), { x: p2.x, y: p2.y, z: top })
-			sideMesh.vertices[offset + 3] = Object.assign(new Vertex3DNoTex2(), { x: p2.x, y: p2.y, z: bottom })
-
-			if (data.szSideImage) {
-				sideMesh.vertices[offset].tu = texCoords[i]
-				sideMesh.vertices[offset].tv = 1
-				sideMesh.vertices[offset + 1].tu = texCoords[i]
-				sideMesh.vertices[offset + 1].tv = 0
-				sideMesh.vertices[offset + 2].tu = texCoords[c] ?? texCoords[0]
-				sideMesh.vertices[offset + 2].tv = 0
-				sideMesh.vertices[offset + 3].tu = texCoords[c] ?? texCoords[0]
-				sideMesh.vertices[offset + 3].tv = 1
-			}
-			offset += 4
+			const a = verts[i]!
+			const b = verts[i < n - 1 ? i + 1 : 0]!
+			const dx = a.x - b.x
+			const dy = a.y - b.y
+			const inv = 1 / Math.hypot(dx, dy)
+			out[i] = new Vertex2D(dy * inv, dx * inv)
 		}
+		return out
+	}
 
+	private buildSide(
+		mesh: Mesh,
+		verts: RenderVertex[],
+		texCoords: number[],
+		normals: Vertex2D[],
+		bottom: number,
+		top: number,
+		textured: boolean,
+	): void {
+		const n = verts.length
+		let off = 0
 		for (let i = 0; i < n; i++) {
-			const off = i * 6
-			const base = i * 4
-			sideMesh.indices[off] = base
-			sideMesh.indices[off + 1] = base + 1
-			sideMesh.indices[off + 2] = base + 2
-			sideMesh.indices[off + 3] = base
-			sideMesh.indices[off + 4] = base + 2
-			sideMesh.indices[off + 5] = base + 3
+			const p1 = verts[i]!
+			const p2 = verts[i < n - 1 ? i + 1 : 0]!
+			mesh.vertices[off] = Object.assign(new Vertex3DNoTex2(), { x: p1.x, y: p1.y, z: bottom })
+			mesh.vertices[off + 1] = Object.assign(new Vertex3DNoTex2(), { x: p1.x, y: p1.y, z: top })
+			mesh.vertices[off + 2] = Object.assign(new Vertex3DNoTex2(), { x: p2.x, y: p2.y, z: top })
+			mesh.vertices[off + 3] = Object.assign(new Vertex3DNoTex2(), { x: p2.x, y: p2.y, z: bottom })
+			if (textured) {
+				const c = i < n - 1 ? i + 1 : 0
+				mesh.vertices[off]!.tu = texCoords[i]!
+				mesh.vertices[off]!.tv = 1
+				mesh.vertices[off + 1]!.tu = texCoords[i]!
+				mesh.vertices[off + 1]!.tv = 0
+				mesh.vertices[off + 2]!.tu = texCoords[c] ?? texCoords[0]!
+				mesh.vertices[off + 2]!.tv = 0
+				mesh.vertices[off + 3]!.tu = texCoords[c] ?? texCoords[0]!
+				mesh.vertices[off + 3]!.tv = 1
+			}
+			off += 4
 		}
+		for (let i = 0; i < n; i++) {
+			const o = i * 6,
+				b = i * 4
+			mesh.indices[o] = b
+			mesh.indices[o + 1] = b + 1
+			mesh.indices[o + 2] = b + 2
+			mesh.indices[o + 3] = b
+			mesh.indices[o + 4] = b + 2
+			mesh.indices[o + 5] = b + 3
+		}
+	}
 
+	private buildTop(mesh: Mesh, verts: RenderVertex[], table: Table, zTop: number): void {
+		const n = verts.length
 		const indices = Mesh.polygonToTriangles(
 			verts,
 			verts.map((_, i) => i),
 		)
-		if (indices.length === 0) return {}
-		topMesh.indices = indices
-
-		const dim = table.getDimensions(),
-			invW = 1 / dim.width,
+		if (!indices.length) return
+		mesh.indices = indices
+		const dim = table.getDimensions()
+		const invW = 1 / dim.width,
 			invH = 1 / dim.height
-		const zTop = data.heightTop * table.getScaleZ() + table.getTableHeight()
 		for (let i = 0; i < n; i++) {
-			const p = verts[i]
-			topMesh.vertices[i] = Object.assign(new Vertex3DNoTex2(), {
+			const p = verts[i]!
+			mesh.vertices[i] = Object.assign(new Vertex3DNoTex2(), {
 				x: p.x,
 				y: p.y,
 				z: zTop,
@@ -111,10 +112,5 @@ export class SurfaceMeshGenerator {
 				nz: 1,
 			})
 		}
-
-		const meshes: { top?: Mesh; side?: Mesh } = {}
-		if (topMesh.vertices.length) meshes.top = topMesh
-		if (top !== bottom) meshes.side = sideMesh
-		return meshes
 	}
 }
