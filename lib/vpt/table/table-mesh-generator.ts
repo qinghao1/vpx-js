@@ -13,6 +13,7 @@ import type { Rubber } from '../rubber/rubber.js'
 import type { Surface } from '../surface/surface.js'
 import type { Table, TableGenerateOptions } from './table.js'
 
+/** Generates table meshes. */
 export class TableMeshGenerator {
 	private readonly table: Table
 
