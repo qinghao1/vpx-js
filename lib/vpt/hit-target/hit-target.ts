@@ -1,42 +1,26 @@
-/*
- * VPDB - Virtual Pinball Database
- * Copyright (C) 2019 freezy <freezy@vpdb.io>
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- */
+// Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { EventProxy } from '../../game/event-proxy'
-import type { IAnimatable, IAnimation } from '../../game/ianimatable'
-import type { IHittable } from '../../game/ihittable'
-import type { IRenderable, Meshes } from '../../game/irenderable'
-import type { IScriptable } from '../../game/iscriptable'
-import type { Player } from '../../game/player'
-import type { Storage } from '../../io/ole-doc'
-import { f4 } from '../../math/float'
-import { Matrix3D } from '../../math/matrix3d'
-import type { HitObject } from '../../physics/hit-object'
-import type { Ball } from '../ball/ball'
-import { Item } from '../item'
-import type { Table } from '../table/table'
-import { HitTargetAnimation } from './hit-target-animation'
-import { HitTargetApi } from './hit-target-api'
-import { HitTargetData } from './hit-target-data'
-import { HitTargetHitGenerator } from './hit-target-hit-generator'
-import { HitTargetMeshGenerator } from './hit-target-mesh-generator'
-import { HitTargetState } from './hit-target-state'
-import { HitTargetUpdater } from './hit-target-updater'
+import { EventProxy } from '../../game/event-proxy.js'
+import type { IAnimatable, IAnimation } from '../../game/ianimatable.js'
+import type { IHittable } from '../../game/ihittable.js'
+import type { IRenderable, Meshes } from '../../game/irenderable.js'
+import type { IScriptable } from '../../game/iscriptable.js'
+import type { Player } from '../../game/player.js'
+import type { Storage } from '../../io/ole-doc.js'
+import { f4 } from '../../math/float.js'
+import { Matrix3D } from '../../math/matrix3d.js'
+import type { HitObject } from '../../physics/hit-object.js'
+import type { Ball } from '../ball/ball.js'
+import { Item } from '../item.js'
+import type { Table } from '../table/table.js'
+import { HitTargetAnimation } from './hit-target-animation.js'
+import { HitTargetApi } from './hit-target-api.js'
+import { HitTargetData } from './hit-target-data.js'
+import { HitTargetHitGenerator } from './hit-target-hit-generator.js'
+import { HitTargetMeshGenerator } from './hit-target-mesh-generator.js'
+import { HitTargetState } from './hit-target-state.js'
+import { HitTargetUpdater } from './hit-target-updater.js'
 
 /**
  * VPinball's hit- and drop targets.
