@@ -57,14 +57,7 @@ export class BallMover implements MoverObject {
 						-2.0,
 					),
 				)
-			} else {
-				this.hit.vel.addAndRelease(physics.gravity.clone(true).multiplyScalar(PHYS_FACTOR))
-			}
-
-			// todo nudge
-			// this.hit.vel.x += player.nudgeX; // TODO: depends on STEPTIME
-			// this.hit.vel.y += player.nudgeY;
-			// this.hit.vel.sub(player.tableVelDelta);
+			} else this.hit.vel.addAndRelease(physics.gravity.clone(true).multiplyScalar(PHYS_FACTOR))
 		}
 
 		this.hit.calcHitBBox()
