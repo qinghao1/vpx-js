@@ -6,7 +6,8 @@ import type { Storage } from '../../io/ole-doc.js'
 import { Vertex2D } from '../../math/vertex2d.js'
 import { ItemData } from '../item-data.js'
 
-export class DispReelData extends ItemData {
+export /** DispReel data. */
+class DispReelData extends ItemData {
 	public v1!: Vertex2D
 	public v2!: Vertex2D
 	public width: number = 30.0
