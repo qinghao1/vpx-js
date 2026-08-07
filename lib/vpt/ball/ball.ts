@@ -21,29 +21,27 @@ import type { BallMover } from './ball-mover.js'
 import type { BallState } from './ball-state.js'
 import { BallUpdater } from './ball-updater.js'
 
-/** Runtime ball — playable, movable, and renderable. */
+/** Runtime ball — playable, movable and renderable. @see https://github.com/vpinball/vpinball/blob/master/ball.cpp */
 export class Ball implements IPlayable, IMovable, IRenderable<BallState>, IScriptable<BallApi> {
 	public static idCounter = 0
-
-	public readonly state: BallState
-	public readonly data: BallData
-	public readonly hit: BallHit
-	public id: number
 	public oldVel = new Vertex3D()
-
+	public readonly hit: BallHit
 	private readonly meshGenerator: BallMeshGenerator
 	private readonly events: EventProxy
 	private readonly api: BallApi
 	private readonly updater: BallUpdater
-
 	get coll() {
 		return this.hit.coll
 	}
 
-	constructor(id: number, data: BallData, state: BallState, initialVelocity: Vertex3D, player: Player, table: Table) {
-		this.id = id
-		this.data = data
-		this.state = state
+	constructor(
+		public id: number,
+		public readonly data: BallData,
+		public readonly state: BallState,
+		initialVelocity: Vertex3D,
+		player: Player,
+		table: Table,
+	) {
 		this.meshGenerator = new BallMeshGenerator(data)
 		this.events = new EventProxy(this)
 		this.hit = new BallHit(this, this.data, this.state, initialVelocity, table.data!)
@@ -54,33 +52,25 @@ export class Ball implements IPlayable, IMovable, IRenderable<BallState>, IScrip
 	public getName(): string {
 		return `Ball${this.id}`
 	}
-
 	public getState(): BallState {
 		return this.state
 	}
-
 	public getMover(): BallMover {
 		return this.hit.getMoverObject()
 	}
-
 	public getUpdater(): BallUpdater {
 		return this.updater
 	}
-
 	public getApi(): BallApi {
 		return this.api
 	}
-
 	public getHitShapes(): HitObject[] {
 		return [this.hit]
 	}
-
 	public isCollidable(): boolean {
 		return true
 	}
-
 	public setupPlayer(): void {}
-
 	public getEventNames(): string[] {
 		return []
 	}
@@ -92,8 +82,8 @@ export class Ball implements IPlayable, IMovable, IRenderable<BallState>, IScrip
 	): Promise<NODE> {
 		const mesh = renderApi.createObjectFromRenderable(this, table, {})
 		const playfield = renderApi.findInGroup(scene, 'playfield')!
-		const ballGroup = renderApi.findInGroup(playfield, 'balls')!
-		renderApi.addChildToParent(ballGroup, mesh)
+		const balls = renderApi.findInGroup(playfield, 'balls')!
+		renderApi.addChildToParent(balls, mesh)
 		return mesh
 	}
 
@@ -107,7 +97,7 @@ export class Ball implements IPlayable, IMovable, IRenderable<BallState>, IScrip
 		renderApi.removeFromParent(group, ball)
 	}
 
-	public getMeshes<GEOMETRY>(table: Table): Meshes<GEOMETRY> {
+	public getMeshes<GEOMETRY>(_table: Table): Meshes<GEOMETRY> {
 		return {
 			ball: {
 				isVisible: true,
