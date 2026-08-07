@@ -6,23 +6,29 @@ import type { Vertex3D } from './vertex3d.js'
 
 /** Axis-aligned 3D bounding box. */
 export class FRect3D {
-	public left = 0
-	public top = 0
-	public right = 0
-	public bottom = 0
-	public zlow = 0
-	public zhigh = 0
+	left = FLT_MAX
+	top = FLT_MAX
+	right = -FLT_MAX
+	bottom = -FLT_MAX
+	zlow = FLT_MAX
+	zhigh = -FLT_MAX
 
+	/** Width (right - left). */
 	get width(): number {
 		return Math.abs(this.left - this.right)
 	}
+
+	/** Height (bottom - top). */
 	get height(): number {
 		return Math.abs(this.top - this.bottom)
 	}
+
+	/** Depth (zhigh - zlow). */
 	get depth(): number {
 		return Math.abs(this.zlow - this.zhigh)
 	}
 
+	/** Creates bounds or an empty (inverted) box. */
 	constructor(left?: number, right?: number, top?: number, bottom?: number, zLow?: number, zHigh?: number) {
 		if (
 			left !== undefined &&
@@ -38,12 +44,11 @@ export class FRect3D {
 			this.bottom = bottom
 			this.zlow = zLow
 			this.zhigh = zHigh
-		} else {
-			this.clear()
 		}
 	}
 
-	public clear(): void {
+	/** Resets to inverted bounds. */
+	clear(): void {
 		this.left = FLT_MAX
 		this.right = -FLT_MAX
 		this.top = FLT_MAX
@@ -52,12 +57,13 @@ export class FRect3D {
 		this.zhigh = -FLT_MAX
 	}
 
-	/** Alias for `clear()` (keeps legacy call sites working). */
-	public Clear(): void {
+	/** Legacy alias for clear(). */
+	Clear(): void {
 		this.clear()
 	}
 
-	public extend(o: FRect3D): void {
+	/** Expands to include other. */
+	extend(o: FRect3D): void {
 		this.left = Math.min(this.left, o.left)
 		this.right = Math.max(this.right, o.right)
 		this.top = Math.min(this.top, o.top)
@@ -66,24 +72,23 @@ export class FRect3D {
 		this.zhigh = Math.max(this.zhigh, o.zhigh)
 	}
 
-	public intersectSphere(p: Vertex3D, rSq: number): boolean {
-		let ex = Math.max(this.left - p.x, 0) + Math.max(p.x - this.right, 0)
-		let ey = Math.max(this.top - p.y, 0) + Math.max(p.y - this.bottom, 0)
-		let ez = Math.max(this.zlow - p.z, 0) + Math.max(p.z - this.zhigh, 0)
-		ex *= ex
-		ey *= ey
-		ez *= ez
-		return ex + ey + ez <= rSq
+	/** Tests sphere intersection (rSq = radius²). */
+	intersectSphere(p: Vertex3D, rSq: number): boolean {
+		const ex = Math.max(this.left - p.x, 0) + Math.max(p.x - this.right, 0)
+		const ey = Math.max(this.top - p.y, 0) + Math.max(p.y - this.bottom, 0)
+		const ez = Math.max(this.zlow - p.z, 0) + Math.max(p.z - this.zhigh, 0)
+		return ex * ex + ey * ey + ez * ez <= rSq
 	}
 
-	public intersectRect(rc: FRect3D): boolean {
+	/** Tests AABB overlap. */
+	intersectRect(o: FRect3D): boolean {
 		return (
-			this.right >= rc.left &&
-			this.bottom >= rc.top &&
-			this.left <= rc.right &&
-			this.top <= rc.bottom &&
-			this.zlow <= rc.zhigh &&
-			this.zhigh >= rc.zlow
+			this.right >= o.left &&
+			this.bottom >= o.top &&
+			this.left <= o.right &&
+			this.top <= o.bottom &&
+			this.zlow <= o.zhigh &&
+			this.zhigh >= o.zlow
 		)
 	}
 }
