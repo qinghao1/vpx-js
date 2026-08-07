@@ -20,6 +20,7 @@ export class GateHit extends HitObject {
 	public readonly mover: GateMover
 	public readonly lineSeg: LineSeg[] = []
 	public twoWay = false
+
 	constructor(
 		private readonly data: GateData,
 		state: GateState,
@@ -27,27 +28,30 @@ export class GateHit extends HitObject {
 		height: number,
 	) {
 		super()
-		const hl = data.length * 0.5,
-			rad = degToRad(data.rotation),
-			sn = Math.sin(rad),
-			cs = Math.cos(rad)
+		const hl = data.length * 0.5
+		const rad = degToRad(data.rotation)
+		const sn = Math.sin(rad)
+		const cs = Math.cos(rad)
 		const v1 = new Vertex2D(data.center.x - cs * (hl + PHYS_SKIN), data.center.y - sn * (hl + PHYS_SKIN))
 		const v2 = new Vertex2D(data.center.x + cs * (hl + PHYS_SKIN), data.center.y + sn * (hl + PHYS_SKIN))
-		const z0 = height,
-			z1 = height + 2 * PHYS_SKIN
+		const z0 = height
+		const z1 = height + 2 * PHYS_SKIN
 		this.lineSeg.push(
 			new LineSeg(v1, v2, z0, z1, CollisionType.Gate),
 			new LineSeg(v2.clone(), v1.clone(), z0, z1, CollisionType.Gate),
 		)
 		this.mover = new GateMover(data, state, events)
 	}
+
 	public getMoverObject(): GateMover {
 		return this.mover
 	}
+
 	public override calcHitBBox(): void {
 		this.lineSeg[0]!.calcHitBBox()
 		this.hitBBox = this.lineSeg[0]!.hitBBox
 	}
+
 	public override hitTest(ball: Ball, dTime: number, coll: CollisionEvent, _physics: PlayerPhysics): number {
 		if (!this.isEnabled) return -1
 		for (let i = 0; i < 2; i++) {
@@ -59,9 +63,10 @@ export class GateHit extends HitObject {
 		}
 		return -1
 	}
+
 	public override collide(coll: CollisionEvent, _physics: PlayerPhysics): void {
-		const ball = coll.ball,
-			h = this.data.height * 0.5
+		const ball = coll.ball
+		const h = this.data.height * 0.5
 		let speed = Math.abs(coll.hitNormal.dot(ball.hit.vel))
 		if (Math.abs(h) > 1) speed /= h
 		this.mover.angleSpeed = speed
