@@ -280,7 +280,6 @@ export class PlayerPhysics {
 			 */
 			if (Math.random() < 0.5) {
 				// swap order of contact handling randomly
-				// tslint:disable-next-line:prefer-for-of
 				for (let i = 0; i < this.contacts.length; ++i) {
 					this.contacts[i].obj!.contact(this.contacts[i], hitTime, this)
 				}
