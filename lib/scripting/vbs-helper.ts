@@ -22,16 +22,17 @@ export class VBSHelper {
 		const arr = new VbsArray(new Array(n).fill(VBSHelper.UNDEFINED))
 		if (++pos < dimensions.length)
 			for (let i = 0; i < n; i++) (arr as unknown as unknown[])[i] = this.dim(dimensions, pos)
-		return arr as unknown as any[]
+		return arr as any
 	}
 
 	public redim(array: any[], dimensions: number[], preserve = false): any[] {
-		let tmp: any = array
+		let tmp: unknown = array
 		for (let i = 0; i < dimensions.length - 1; i++) {
-			if (tmp.length !== dimensions[i] + 1) throw new Error('Only last dimension can be changed')
-			tmp = tmp[0]
+			if ((tmp as unknown as unknown[]).length !== dimensions[i] + 1)
+				throw new Error('Only last dimension can be changed')
+			tmp = (tmp as unknown as unknown[])[0]
 		}
-		return preserve ? this.redimResize(array as any, dimensions) : (this.dim(dimensions) as any)
+		return preserve ? this.redimResize(array as any, dimensions) : this.dim(dimensions)
 	}
 
 	public transpileInline(vbs: string, filename?: string): string {
@@ -43,19 +44,24 @@ export class VBSHelper {
 
 	private redimResize(array: any[], dimensions: number[], pos = 0): any[] {
 		const n = dimensions[pos] + 1
-		if (pos === dimensions.length - 1) (array as unknown[]).length = n
+		if (pos === dimensions.length - 1) (array as unknown as unknown[]).length = n
 		if (++pos < dimensions.length)
-			for (let i = 0; i < n; i++) (array as any)[i] = this.redimResize((array as any)[i], dimensions, pos)
+			for (let i = 0; i < n; i++)
+				(array as any[])[i] = this.redimResize(
+					(array as any[])[i],
+					dimensions,
+					pos,
+				)
 		return array
 	}
 
 	public erase(array: any[]): any[] {
 		const dims: number[] = []
-		let cur: any = array
+		let cur: unknown = array
 		for (;;) {
-			dims.push(cur.length - 1)
-			if (!Array.isArray(cur[0])) break
-			cur = cur[0]
+			dims.push((cur as unknown as unknown[]).length - 1)
+			if (!Array.isArray((cur as unknown as unknown[])[0])) break
+			cur = (cur as unknown as unknown[])[0]
 		}
 		return this.dim(dims)
 	}
@@ -83,16 +89,16 @@ export class VBSHelper {
 		return a === b
 	}
 
-	public getOrCall(obj: any, ...params: number[]) {
-		if (typeof obj === 'function') return obj.bind(obj)(...params)
-		for (const p of params) obj = obj[p]
+	public getOrCall(obj: unknown, ...params: number[]): unknown {
+		if (typeof obj === 'function') return (obj as (...a: unknown[]) => unknown).bind(obj)(...params)
+		for (const p of params) obj = (obj as Record<number, unknown>)[p] as unknown
 		return obj
 	}
 
-	public getOrCallBound(parent: any, prop: string, ...params: number[]) {
-		let o: any = parent[prop]
-		if (typeof o === 'function') return o.bind(parent)(...params)
-		for (const p of params) o = o[p]
+	public getOrCallBound(parent: Record<string, unknown>, prop: string, ...params: number[]): unknown {
+		let o: unknown = parent[prop]
+		if (typeof o === 'function') return (o as (...a: unknown[]) => unknown).bind(parent)(...params)
+		for (const p of params) o = (o as Record<number, unknown>)[p] as unknown
 		return o
 	}
 
