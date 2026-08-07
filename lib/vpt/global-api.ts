@@ -210,16 +210,16 @@ export class GlobalApi extends VbsApi {
 		return ''
 	}
 
-	public AddObject(name: string, pdisp: any): void {
+	public AddObject(name: string, pdisp: unknown): void {
 		// TODO implement
 	}
 
-	public SaveValue(tableName: string, valueName: string, value: any): void {
+	public SaveValue(tableName: string, valueName: string, value: unknown): void {
 		const key = `${tableName}:${valueName}`
 		storage.setItem(key, value)
 	}
 
-	public LoadValue(tableName: string, valueName: string): void {
+	public LoadValue(tableName: string, valueName: string): unknown {
 		const key = `${tableName}:${valueName}`
 		return storage.getItem(key)
 	}
