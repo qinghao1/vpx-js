@@ -6,8 +6,7 @@ import { Pool } from '../../util/object-pool.js'
 import { ItemState } from '../item-state.js'
 import { omitEqual } from '../state-helpers.js'
 
-/** Primitive state.
- * @see https://github.com/vpinball/vpinball/blob/master/primitive.cpp */
+/** Primitive state. @see https://github.com/vpinball/vpinball/blob/master/primitive.cpp */
 export class PrimitiveState extends ItemState {
 	public static readonly POOL = new Pool(PrimitiveState)
 
@@ -119,28 +118,16 @@ export class PrimitiveState extends ItemState {
 	}
 
 	public release(): void {
-		if (!this.position) {
-			this.position = Vertex3D.claim()
-		}
-		if (!this.size) {
-			this.size = Vertex3D.claim()
-		}
-		if (!this.rotation) {
-			this.rotation = Vertex3D.claim()
-		}
-		if (!this.translation) {
-			this.translation = Vertex3D.claim()
-		}
-		if (!this.objectRotation) {
-			this.objectRotation = Vertex3D.claim()
-		}
+		if (!this.position) this.position = Vertex3D.claim()
+		if (!this.size) this.size = Vertex3D.claim()
+		if (!this.rotation) this.rotation = Vertex3D.claim()
+		if (!this.translation) this.translation = Vertex3D.claim()
+		if (!this.objectRotation) this.objectRotation = Vertex3D.claim()
 		PrimitiveState.POOL.release(this)
 	}
 
 	public equals(state: PrimitiveState): boolean {
-		if (!state) {
-			return false
-		}
+		if (!state) return false
 		return (
 			state.position.equals(this.position) &&
 			state.size.equals(this.size) &&
