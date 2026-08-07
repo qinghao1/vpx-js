@@ -7,37 +7,46 @@ import { Event } from './event.js'
 import type { IPlayable } from './iplayable.js'
 import { isScriptable } from './iscriptable.js'
 
+const EVENT_NAMES: Record<Event, string> = {
+	[Event.FlipperEventsCollide]: 'Collide',
+	[Event.GameEventsExit]: 'Exit',
+	[Event.GameEventsInit]: 'Init',
+	[Event.GameEventsKeyDown]: 'KeyDown',
+	[Event.GameEventsKeyUp]: 'KeyUp',
+	[Event.GameEventsMusicDone]: 'MusicDone',
+	[Event.GameEventsPaused]: 'Paused',
+	[Event.GameEventsUnPaused]: 'UnPaused',
+	[Event.HitEventsHit]: 'Hit',
+	[Event.HitEventsUnhit]: 'Unhit',
+	[Event.LightSeqEventsPlayDone]: 'PlayDone',
+	[Event.LimitEventsBOS]: 'LimitBOS',
+	[Event.LimitEventsEOS]: 'LimitEOS',
+	[Event.SpinnerEventsSpin]: 'Spin',
+	[Event.SurfaceEventsSlingshot]: 'Slingshot',
+	[Event.TargetEventsDropped]: 'Dropped',
+	[Event.TargetEventsRaised]: 'Raised',
+	[Event.TimerEventsTimer]: 'Timer',
+}
+
 /** Bridges gameplay events to script APIs. */
 export class EventProxy {
-	/** Current hit threshold updated during play. */
 	public currentHitThreshold = 0
 	public singleEvents = true
 	public readonly eventCollection: EventProxy[] = []
 	public readonly eventCollectionItemPos: number[] = []
-
-	private readonly playable: IPlayable
-
-	/** Custom collision logic replacing VP object casts. */
 	public onCollision?: (obj: HitObject, ball: Ball, dot: number) => void
-
-	/** Return false to skip the hit test. */
 	public abortHitTest?: () => boolean
 
-	constructor(playable: IPlayable) {
-		this.playable = playable
-	}
+	constructor(private readonly playable: IPlayable) {}
 
-	/** Fires an event without parameters. */
 	public fireVoidEvent(e: Event): void {
 		this.fireDispID(e)
 	}
 
-	/** Fires an event with parameters. */
-	public fireVoidEventParm(e: Event, ...params: any[]): void {
+	public fireVoidEventParm(e: Event, ...params: unknown[]): void {
 		this.fireDispID(e, ...params)
 	}
 
-	/** Fires the event on grouped proxies and self. */
 	public fireGroupEvent(e: Event): void {
 		for (let i = 0; i < this.eventCollection.length; i++) {
 			this.eventCollection[i].fireVoidEventParm(e, this.eventCollectionItemPos[i])
@@ -45,52 +54,8 @@ export class EventProxy {
 		if (this.singleEvents) this.fireDispID(e)
 	}
 
-	private fireDispID(e: Event, ...params: any[]): void {
-		if (isScriptable(this.playable)) {
-			this.playable.getApi().emit.call(this.playable.getApi(), getEventName(e), ...params)
-		}
-	}
-}
-
-function getEventName(event: Event): string {
-	switch (event) {
-		case Event.FlipperEventsCollide:
-			return 'Collide'
-		case Event.GameEventsExit:
-			return 'Exit'
-		case Event.GameEventsInit:
-			return 'Init'
-		case Event.GameEventsKeyDown:
-			return 'KeyDown'
-		case Event.GameEventsKeyUp:
-			return 'KeyUp'
-		case Event.GameEventsMusicDone:
-			return 'MusicDone'
-		case Event.GameEventsPaused:
-			return 'Paused'
-		case Event.GameEventsUnPaused:
-			return 'UnPaused'
-		case Event.HitEventsHit:
-			return 'Hit'
-		case Event.HitEventsUnhit:
-			return 'Unhit'
-		case Event.LightSeqEventsPlayDone:
-			return 'PlayDone'
-		case Event.LimitEventsBOS:
-			return 'LimitBOS'
-		case Event.LimitEventsEOS:
-			return 'LimitEOS'
-		case Event.SpinnerEventsSpin:
-			return 'Spin'
-		case Event.SurfaceEventsSlingshot:
-			return 'Slingshot'
-		case Event.TargetEventsDropped:
-			return 'Dropped'
-		case Event.TargetEventsRaised:
-			return 'Raised'
-		case Event.TimerEventsTimer:
-			return 'Timer'
-		default:
-			return 'UnknownEvent' + event
+	private fireDispID(e: Event, ...params: unknown[]): void {
+		if (!isScriptable(this.playable)) return
+		this.playable.getApi().emit.call(this.playable.getApi(), EVENT_NAMES[e] ?? `UnknownEvent${e}`, ...params)
 	}
 }
