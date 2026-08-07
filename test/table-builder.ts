@@ -17,9 +17,9 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { DragPoint } from '../lib/math/dragpoint'
-import { Vertex2D } from '../lib/math/vertex2d'
-import { Vertex3D } from '../lib/math/vertex3d'
+import { DragPoint } from '../lib/util/dragpoint.js'
+import { Vertex2D } from '../lib/util/math.js'
+import { Vertex3D } from '../lib/util/math.js'
 import { Bumper } from '../lib/vpt/bumper/bumper'
 import { BumperData } from '../lib/vpt/bumper/bumper-data'
 import { Flipper } from '../lib/vpt/flipper/flipper'

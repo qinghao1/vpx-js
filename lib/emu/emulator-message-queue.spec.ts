@@ -5,7 +5,7 @@ import * as chai from 'chai'
 import { expect } from 'chai'
 import sinonChai from 'sinon-chai'
 import type { IEmulator } from '../game/iemulator.js'
-import type { Vertex2D } from '../math/vertex2d.js'
+import type { Vertex2D } from '../util/math.js'
 import { EmulatorMessageQueue, MessageType } from './emulator-message-queue.js'
 
 chai.use((sinonChai as any).default ?? sinonChai)

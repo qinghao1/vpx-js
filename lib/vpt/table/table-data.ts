@@ -3,8 +3,8 @@
 
 import { BiffParser } from '../../io/biff-parser.js'
 import type { Storage } from '../../io/ole-doc.js'
-import { Vertex2D } from '../../math/vertex2d.js'
-import type { Vertex3D } from '../../math/vertex3d.js'
+import type { Vertex3D } from '../../util/math.js'
+import { Vertex2D } from '../../util/math.js'
 import { Enums } from '../enums.js'
 import { ItemData } from '../item-data.js'
 import { Material, SaveMaterial, SavePhysicsMaterial } from '../material.js'

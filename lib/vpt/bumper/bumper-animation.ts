@@ -3,7 +3,7 @@
 
 import type { IAnimation } from '../../game/ianimatable.js'
 import { PlayerPhysics } from '../../game/player-physics.js'
-import { Vertex3D } from '../../math/vertex3d.js'
+import { Vertex3D } from '../../util/math.js'
 import type { Table } from '../table/table.js'
 import type { BumperData } from './bumper-data.js'
 import type { BumperState } from './bumper-state.js'

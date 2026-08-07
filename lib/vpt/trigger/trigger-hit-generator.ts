@@ -2,14 +2,14 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import type { EventProxy } from '../../game/event-proxy.js'
-import { CatmullCurve2D } from '../../math/catmull-curve.js'
-import { DragPoint } from '../../math/dragpoint.js'
-import { RenderVertex, Vertex2D } from '../../math/vertex2d.js'
-import { Vertex3D } from '../../math/vertex3d.js'
 import { CollisionType } from '../../physics/collision-type.js'
 import { PHYS_SKIN } from '../../physics/constants.js'
 import { Hit3DPoly } from '../../physics/hit-3dpoly.js'
 import type { HitObject } from '../../physics/hit-object.js'
+import { CatmullCurve2D } from '../../util/catmull-curve.js'
+import { DragPoint } from '../../util/dragpoint.js'
+import { Vertex2D, Vertex3D } from '../../util/math.js'
+import { RenderVertex } from '../../util/render-vertex.js'
 import type { Table } from '../table/table.js'
 import type { TriggerAnimation } from './trigger-animation.js'
 import type { TriggerData } from './trigger-data.js'

@@ -7,7 +7,7 @@ import sinonChai from 'sinon-chai'
 import { ThreeHelper } from '../../../test/three.helper'
 import { Player } from '../../game/player.js'
 import { NodeBinaryReader } from '../../io/binary-reader.node.js'
-import { degToRad } from '../../math/float.js'
+import { degToRad } from '../../util/float.js'
 import { Table } from '../table/table.js'
 import type { FlipperState } from './flipper-state.js'
 

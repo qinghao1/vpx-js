@@ -1,11 +1,11 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { f4, fr } from '../math/float.js'
-import type { Matrix3D } from '../math/matrix3d.js'
-import { Vertex3DNoTex2 } from '../math/vertex.js'
-import { type RenderVertex, Vertex2D } from '../math/vertex2d.js'
-import { RenderVertex3D, Vertex3D } from '../math/vertex3d.js'
+import { f4, fr } from '../util/float.js'
+import type { Matrix3D } from '../util/math.js'
+import { Vertex2D, Vertex3D } from '../util/math.js'
+import { type RenderVertex, RenderVertex3D } from '../util/render-vertex.js'
+import { Vertex3DNoTex2 } from '../util/vertex.js'
 import type { FrameData } from './animation.js'
 
 export const FLT_MIN = 1.175494350822287507968736537222245677819e-38

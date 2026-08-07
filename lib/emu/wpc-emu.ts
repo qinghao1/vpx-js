@@ -3,8 +3,8 @@
 
 import { type GamelistDB, WpcEmuApi, type WpcEmuWebWorkerApi } from 'wpc-emu'
 import type { IEmulator } from '../game/iemulator.js'
-import { Vertex2D } from '../math/vertex2d.js'
 import { logger } from '../util/logger.js'
+import { Vertex2D } from '../util/math.js'
 import { EmulatorMessageQueue, MessageType } from './emulator-message-queue.js'
 import { EmulatorState } from './emulator-state.js'
 import { OffsetIndex } from './offset-index.js'

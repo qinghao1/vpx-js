@@ -4,13 +4,13 @@
 import type { EventProxy } from '../../game/event-proxy.js'
 import type { Player } from '../../game/player.js'
 import { VP_VERSION_MAJOR, VP_VERSION_MINOR, VP_VERSION_REV } from '../../index.js'
-import { clamp } from '../../math/functions.js'
 import {
 	DEFAULT_TABLE_GRAVITY,
 	DEFAULT_TABLE_MAX_SLOPE,
 	DEFAULT_TABLE_MIN_SLOPE,
 	GRAVITYCONST,
 } from '../../physics/constants.js'
+import { clamp } from '../../util/functions.js'
 import { Enums } from '../enums.js'
 import { dequantizeUnsignedPercent, ItemApi, quantizeUnsignedPercent } from '../item-api.js'
 import type { Table } from './table.js'

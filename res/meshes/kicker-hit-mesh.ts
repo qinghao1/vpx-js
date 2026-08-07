@@ -17,7 +17,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { Vertex3DNoTex2 } from '../../lib/math/vertex'
+import { Vertex3DNoTex2 } from '../../lib/util/vertex.js'
 
 export const kickerHitVertices = [
 	Vertex3DNoTex2.fromArray([-0.736232, -0.407777, -0.070769, 0.3888, 0.2984, 0.8717, 0.083212, 0.041577]),

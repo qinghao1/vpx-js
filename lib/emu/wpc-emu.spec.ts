@@ -6,7 +6,7 @@ import { expect } from 'chai'
 import * as sinon from 'sinon'
 import sinonChai from 'sinon-chai'
 import { type GamelistDB, WpcEmuApi, type WpcEmuWebWorkerApi } from 'wpc-emu'
-import type { Vertex2D } from '../math/vertex2d.js'
+import type { Vertex2D } from '../util/math.js'
 import { Emulator } from './wpc-emu.js'
 
 const mockGameEntry: GamelistDB.GameEntry = {

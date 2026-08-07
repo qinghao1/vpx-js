@@ -46,12 +46,7 @@ export class VBSHelper {
 		const n = dimensions[pos] + 1
 		if (pos === dimensions.length - 1) (array as unknown as unknown[]).length = n
 		if (++pos < dimensions.length)
-			for (let i = 0; i < n; i++)
-				(array as any[])[i] = this.redimResize(
-					(array as any[])[i],
-					dimensions,
-					pos,
-				)
+			for (let i = 0; i < n; i++) (array as any[])[i] = this.redimResize((array as any[])[i], dimensions, pos)
 		return array
 	}
 

@@ -4,7 +4,8 @@
 import { CatmullCurve2D } from './catmull-curve.js'
 import { DragPoint } from './dragpoint.js'
 import { f4 } from './float.js'
-import { RenderVertex, Vertex2D } from './vertex2d.js'
+import { Vertex2D } from './math.js'
+import { RenderVertex } from './render-vertex.js'
 
 /** Helper for wall/rubber thickened spline. */
 export class SplineVertex {

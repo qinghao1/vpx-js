@@ -2,10 +2,9 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import type { PlayerPhysics } from '../../game/player-physics.js'
-import { Matrix2D } from '../../math/matrix2d.js'
-import { Vertex3D } from '../../math/vertex3d.js'
 import { PHYS_FACTOR } from '../../physics/constants.js'
 import type { MoverObject } from '../../physics/mover-object.js'
+import { Matrix2D, Vertex3D } from '../../util/math.js'
 import type { BallData } from './ball-data.js'
 import type { BallHit } from './ball-hit.js'
 import type { BallState } from './ball-state.js'

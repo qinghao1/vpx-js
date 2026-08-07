@@ -2,8 +2,8 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import type { PlayerPhysics } from '../game/player-physics.js'
-import { FRect3D } from '../math/frect3d.js'
-import { Vertex3D } from '../math/vertex3d.js'
+import { FRect3D } from '../util/frect3d.js'
+import { Vertex3D } from '../util/math.js'
 import type { Ball } from '../vpt/ball/ball.js'
 import type { CollisionEvent } from './collision-event.js'
 import type { HitKD } from './hit-kd.js'

@@ -4,9 +4,9 @@
 import { Event } from '../../game/event.js'
 import type { EventProxy } from '../../game/event-proxy.js'
 import type { PlayerPhysics } from '../../game/player-physics.js'
-import { radToDeg } from '../../math/float.js'
 import { PHYS_FACTOR } from '../../physics/constants.js'
 import type { MoverObject } from '../../physics/mover-object.js'
+import { radToDeg } from '../../util/float.js'
 import type { GateData } from './gate-data.js'
 import type { GateState } from './gate-state.js'
 

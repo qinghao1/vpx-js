@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import type { IRenderable, RenderInfo } from '../game/irenderable.js'
-import type { Matrix3D } from '../math/matrix3d.js'
+import type { Matrix3D } from '../util/math.js'
 import type { ItemState } from '../vpt/item-state.js'
 import type { LightData } from '../vpt/light/light-data.js'
 import type { LightState } from '../vpt/light/light-state.js'
