@@ -9,7 +9,9 @@ import type { BumperAnimation } from './bumper-animation.js'
 import type { BumperData } from './bumper-data.js'
 import type { BumperState } from './bumper-state.js'
 
-/** Bumper API. */
+/** Bumper API.
+ *
+ * @see https://github.com/vpinball/vpinball/blob/master/bumper.cpp */
 export class BumperApi extends ItemApi<BumperData> {
 	private readonly state: BumperState
 	private readonly animation: BumperAnimation
