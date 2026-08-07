@@ -9,7 +9,9 @@ import type { Table } from '../table/table.js'
 import type { TriggerData } from './trigger-data.js'
 import type { TriggerState } from './trigger-state.js'
 
-/** Trigger API. */
+/** Trigger API.
+ *
+ * @see https://github.com/vpinball/vpinball/blob/master/trigger.cpp */
 export class TriggerApi extends ItemApi<TriggerData> {
 	private readonly state: TriggerState
 
