@@ -9,7 +9,9 @@ import type { Table } from '../table/table.js'
 import type { PlungerData } from './plunger-data.js'
 import type { PlungerHit } from './plunger-hit.js'
 
-/** Plunger API. */
+/** Plunger API.
+ *
+ * @see https://github.com/vpinball/vpinball/blob/master/plunger.cpp */
 export class PlungerApi extends ItemApi<PlungerData> {
 	private readonly hit: PlungerHit
 	private readonly ballCreator: IBallCreationPosition
