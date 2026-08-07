@@ -9,7 +9,8 @@ import { Mesh } from '../mesh.js'
 import type { Table } from '../table/table.js'
 import type { SurfaceData } from './surface-data.js'
 
-export class SurfaceMeshGenerator {
+export /** Surface mesh generator. */
+class SurfaceMeshGenerator {
 	/**
 	 * Returns the mesh of the surface.
 	 * @see Surface::GenerateMesh
