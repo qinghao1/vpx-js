@@ -55,11 +55,7 @@ export class TableMeshGenerator {
 			{ name: 'plungers', meshes: Object.values(this.table.plungers), enabled: !!opts.exportPlungers },
 		]
 
-		// meshes
-		for (const group of renderGroups) {
-			if (!group.enabled) {
-				continue
-			}
+		for (const group of renderGroups.filter((g) => g.enabled)) {
 			progress().details(group.name)
 			const itemTypeGroup = renderApi.createParentNode(group.name)
 			for (const renderable of group.meshes) {
@@ -82,16 +78,11 @@ export class TableMeshGenerator {
 					itemGroup = renderApi.createParentNode(lightInfo.getName())
 					renderApi.addChildToParent(lightGroup, itemGroup)
 				}
-
 				const pointLight = renderApi.createPointLight(lightInfo.data)
 				renderApi.addChildToParent(itemGroup, pointLight)
-
-				// FIXME dunno why TF this is necessary to get any light at all
-				//renderApi.addChildToParent(lightGroup, new PointLightHelper(pointLight as any, 10, 0xffffff) as any);
 			}
 		}
 
-		// ball group
 		renderApi.addChildToParent(tableNode, renderApi.createParentNode('balls'))
 
 		return tableNode
