@@ -1,3 +1,6 @@
+// Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
+
 /**
  * Rubber has a coefficient of restitution which decreases with the impact velocity.
  * We use a heuristic model which decreases the COR according to a falloff parameter:
