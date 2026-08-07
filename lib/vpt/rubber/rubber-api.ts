@@ -31,7 +31,6 @@ export class RubberApi extends ItemApi<RubberData> {
 		this.isDynamic = !data.staticRendering
 	}
 
-	/** Get Height. */
 	get Height() {
 		return this.data.height
 	}
@@ -41,21 +40,18 @@ export class RubberApi extends ItemApi<RubberData> {
 		}
 		this.data.height = v
 	}
-	/** Get HitHeight. */
 	get HitHeight() {
 		return this.data.hitHeight
 	}
 	set HitHeight(v) {
 		this.data.hitHeight = v
 	}
-	/** Get Thickness. */
 	get Thickness() {
 		return this.data.thickness
 	}
 	set Thickness(v) {
 		this.data.thickness = v
 	}
-	/** Get Material. */
 	get Material() {
 		return this.data.szMaterial
 	}
@@ -65,7 +61,6 @@ export class RubberApi extends ItemApi<RubberData> {
 		}
 		this.data.szMaterial = v
 	}
-	/** Get Image. */
 	get Image() {
 		return this.data.szImage
 	}
@@ -76,42 +71,36 @@ export class RubberApi extends ItemApi<RubberData> {
 		}
 		this.data.szImage = v
 	}
-	/** Get HasHitEvent. */
 	get HasHitEvent() {
 		return this.data.hitEvent
 	}
 	set HasHitEvent(v) {
 		this.data.hitEvent = v
 	}
-	/** Get Elasticity. */
 	get Elasticity() {
 		return this.data.elasticity
 	}
 	set Elasticity(v) {
 		this.data.elasticity = v
 	}
-	/** Get ElasticityFalloff. */
 	get ElasticityFalloff() {
 		return this.data.elasticityFalloff
 	}
 	set ElasticityFalloff(v) {
 		this.data.elasticityFalloff = v
 	}
-	/** Get Friction. */
 	get Friction() {
 		return this.data.friction
 	}
 	set Friction(v) {
 		this.data.friction = v
 	}
-	/** Get Scatter. */
 	get Scatter() {
 		return this.data.scatter
 	}
 	set Scatter(v) {
 		this.data.scatter = v
 	}
-	/** Get Collidable. */
 	get Collidable() {
 		return this.hits[0].isEnabled
 	}
@@ -122,7 +111,6 @@ export class RubberApi extends ItemApi<RubberData> {
 			}
 		}
 	}
-	/** Get Visible. */
 	get Visible() {
 		return this.data.isVisible
 	}
@@ -132,28 +120,24 @@ export class RubberApi extends ItemApi<RubberData> {
 		}
 		this.data.isVisible = v
 	}
-	/** Get EnableStaticRendering. */
 	get EnableStaticRendering() {
 		return this.data.staticRendering
 	}
 	set EnableStaticRendering(v) {
 		this.data.staticRendering = v
 	}
-	/** Get EnableShowInEditor. */
 	get EnableShowInEditor() {
 		return this.data.showInEditor
 	}
 	set EnableShowInEditor(v) {
 		this.data.showInEditor = v
 	}
-	/** Get ReflectionEnabled. */
 	get ReflectionEnabled() {
 		return this.data.isReflectionEnabled
 	}
 	set ReflectionEnabled(v) {
 		this.data.isReflectionEnabled = v
 	}
-	/** Get RotX. */
 	get RotX() {
 		return this.data.rotX
 	}
@@ -163,7 +147,6 @@ export class RubberApi extends ItemApi<RubberData> {
 		}
 		this.data.rotX = v
 	}
-	/** Get RotY. */
 	get RotY() {
 		return this.data.rotY
 	}
@@ -173,7 +156,6 @@ export class RubberApi extends ItemApi<RubberData> {
 		}
 		this.data.rotY = v
 	}
-	/** Get RotZ. */
 	get RotZ() {
 		return this.data.rotZ
 	}
@@ -183,14 +165,12 @@ export class RubberApi extends ItemApi<RubberData> {
 		}
 		this.data.rotZ = v
 	}
-	/** Get PhysicsMaterial. */
 	get PhysicsMaterial() {
 		return this.data.szPhysicsMaterial
 	}
 	set PhysicsMaterial(v) {
 		this.data.szPhysicsMaterial = v
 	}
-	/** Get OverwritePhysics. */
 	get OverwritePhysics() {
 		return this.data.overwritePhysics
 	}
