@@ -79,19 +79,14 @@ export class Flipper
 
 	public getMeshes<GEOMETRY>(table: Table): Meshes<GEOMETRY> {
 		const meshes: Meshes<GEOMETRY> = {}
-
 		const matrix = this.getMatrix().toRightHanded()
 		const flipper = this.mesh.generateMeshes(this.data, table)
-
-		// base mesh
 		meshes.base = {
 			isVisible: this.data.isVisible,
 			mesh: flipper.base.transform(matrix),
 			material: table.getMaterial(this.data.szMaterial),
 			map: table.getTexture(this.data.szImage),
 		}
-
-		// rubber mesh
 		if (flipper.rubber) {
 			meshes.rubber = {
 				isVisible: this.data.isVisible,
@@ -110,7 +105,6 @@ export class Flipper
 		const trafoMatrix = new Matrix3D().setTranslation(this.data.center.x, this.data.center.y, 0)
 		const tempMatrix = Matrix3D.claim().rotateZMatrix(degToRad(rotation))
 		trafoMatrix.multiply(tempMatrix)
-
 		Matrix3D.release(tempMatrix)
 		return trafoMatrix
 	}
