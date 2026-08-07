@@ -5,8 +5,8 @@ import { BiffParser } from '../../io/biff-parser.js'
 import type { Storage } from '../../io/ole-doc.js'
 import { ItemData } from '../item-data.js'
 
-export /** Collection data. */
-class CollectionData extends ItemData {
+/** Collection data. */
+export class CollectionData extends ItemData {
 	public itemNames: string[] = []
 	public fireEvents: boolean = false
 	public groupElements: boolean = true
