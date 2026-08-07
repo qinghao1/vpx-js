@@ -9,7 +9,8 @@ import type { SpinnerData } from './spinner-data.js'
 import type { SpinnerMeshGenerator } from './spinner-mesh-generator.js'
 import type { SpinnerState } from './spinner-state.js'
 
-export class SpinnerUpdater extends ItemUpdater<SpinnerState> {
+export /** SpinnerUpdater. */
+class SpinnerUpdater extends ItemUpdater<SpinnerState> {
 	private readonly data: SpinnerData
 	private readonly meshGenerator: SpinnerMeshGenerator
 
