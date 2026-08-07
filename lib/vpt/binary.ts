@@ -12,7 +12,8 @@ export class Binary extends BiffParser {
 	public cdata!: number
 	public pos!: number
 	public len!: number
-	public async fromTag(buffer: Uint8Array, tag: string, offset: number, len: number): Promise<number> {
+
+	public async fromTag(buffer: Uint8Array, tag: string, _offset: number, len: number): Promise<number> {
 		switch (tag) {
 			case 'NAME':
 				this.szName = this.getString(buffer, len)
@@ -27,7 +28,7 @@ export class Binary extends BiffParser {
 				this.cdata = this.getInt(buffer)
 				break
 			case 'DATA':
-				this.pos = offset
+				this.pos = _offset
 				this.len = len
 				break
 			default:
