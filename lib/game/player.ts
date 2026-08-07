@@ -42,7 +42,7 @@ export class Player extends EventEmitter {
 	}
 
 	/** Initializes physics and runs table script. */
-	public init(scope: Record<string, any> = {}): this {
+	public init(scope: Record<string, unknown> = {}): this {
 		this.table.setupCollections()
 		this.physics.init()
 		this.table.prepareToPlay()
