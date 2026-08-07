@@ -22,8 +22,6 @@ import { Mesh } from '../../vpt/mesh.js'
  * @see https://github.com/vpinball/vpinball/blob/master/mesh.cpp
  */
 export class ThreeMeshGenerator {
-	private readonly face = [new Array(3), new Array(3), new Array(3)]
-
 	public convertToBufferGeometry(mesh: Mesh): BufferGeometry {
 		const s = ParserState.claim(mesh.name)
 		for (const v of mesh.vertices) {
@@ -32,20 +30,16 @@ export class ThreeMeshGenerator {
 			if (v.hasTextureCoordinates()) s.uvs.push(v.tu, 1 - v.tv)
 		}
 		for (let i = 0; i < mesh.indices.length; i += 3) {
+			// Winding reversal: VPX is LH (Direct3D), Three is RH.
+			// Mesh.transform(RIGHT_HANDED) already applied before this
+			// conversion (all getMeshes do `mesh.transform(RIGHT_HANDED)`),
+			// so we flip indices i+2,i+1,i here to keep normals consistent
+			// with the OBJLoader n-gon fan that this code was copied from.
 			const a = mesh.indices[i + 2] + 1,
 				b = mesh.indices[i + 1] + 1,
 				c = mesh.indices[i] + 1
-			for (let k = 0; k < 3; k++) {
-				this.face[0][k] = a
-				this.face[1][k] = b
-				this.face[2][k] = c
-			}
-			const v1 = this.face[0]
-			for (let j = 1; j < 2; j++) {
-				const v2 = this.face[j],
-					v3 = this.face[j + 1]
-				s.addFace(v1[0], v2[0], v3[0], v1[1], v2[1], v3[1], v1[2], v2[2], v3[2])
-			}
+			// Single triangle — n-gon fan collapses to one addFace call
+			s.addFace(a, b, c, a, b, c, a, b, c)
 		}
 		const g = s.object.geometry,
 			bg = new BufferGeometry() as BufferGeometry
