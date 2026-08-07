@@ -5,10 +5,7 @@ import type { Table } from '../vpt/table/table.js'
 import type { IItem } from './iitem.js'
 import type { Player } from './player.js'
 
-/**
- * A table element that can interact with the game. This corresponds roughly
- * to IEditable in VPinball.
- */
+/** Table element that participates in gameplay (≈ IEditable in VPinball). */
 export interface IPlayable extends IItem {
 	setupPlayer(player: Player, table: Table): void
 }
