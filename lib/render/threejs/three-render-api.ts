@@ -1,24 +1,8 @@
-/*
- * VPDB - Virtual Pinball Database
- * Copyright (C) 2019 freezy <freezy@vpdb.io>
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- */
+// Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import type { IRenderable, RenderInfo } from '../../game/irenderable'
-import type { Matrix3D } from '../../math/matrix3d'
+import type { IRenderable, RenderInfo } from '../../game/irenderable.js'
+import type { Matrix3D } from '../../math/matrix3d.js'
 import {
 	BufferGeometry,
 	Group,
@@ -27,23 +11,23 @@ import {
 	type Object3D,
 	type PointLight,
 } from '../../refs.node.js'
-import { progress } from '../../util/logger'
-import { Pool } from '../../util/object-pool'
-import type { ItemState } from '../../vpt/item-state'
-import type { LightData } from '../../vpt/light/light-data'
-import type { LightState } from '../../vpt/light/light-state'
-import type { Material } from '../../vpt/material'
-import type { Mesh } from '../../vpt/mesh'
-import type { Table, TableGenerateOptions } from '../../vpt/table/table'
-import type { Texture } from '../../vpt/texture'
-import type { IRenderApi, MeshConvertOptions } from '../irender-api'
-import { ThreeConverter } from './three-converter'
-import { ThreeLightGenerator } from './three-light-generator'
-import { ThreeLightMeshGenerator } from './three-light-mesh-generator'
-import { ThreeMapGenerator } from './three-map-generator'
-import { ThreeMaterialGenerator } from './three-material-generator'
-import { releaseGeometry, ThreeMeshGenerator } from './three-mesh-generator'
-import { ThreePlayfieldMeshGenerator } from './three-playfield-mesh-generator'
+import { progress } from '../../util/logger.js'
+import { Pool } from '../../util/object-pool.js'
+import type { ItemState } from '../../vpt/item-state.js'
+import type { LightData } from '../../vpt/light/light-data.js'
+import type { LightState } from '../../vpt/light/light-state.js'
+import type { Material } from '../../vpt/material.js'
+import type { Mesh } from '../../vpt/mesh.js'
+import type { Table, TableGenerateOptions } from '../../vpt/table/table.js'
+import type { Texture } from '../../vpt/texture.js'
+import type { IRenderApi, MeshConvertOptions } from '../irender-api.js'
+import { ThreeConverter } from './three-converter.js'
+import { ThreeLightGenerator } from './three-light-generator.js'
+import { ThreeLightMeshGenerator } from './three-light-mesh-generator.js'
+import { ThreeMapGenerator } from './three-map-generator.js'
+import { ThreeMaterialGenerator } from './three-material-generator.js'
+import { releaseGeometry, ThreeMeshGenerator } from './three-mesh-generator.js'
+import { ThreePlayfieldMeshGenerator } from './three-playfield-mesh-generator.js'
 
 export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, PointLight> {
 	public static readonly SCALE = 0.05
