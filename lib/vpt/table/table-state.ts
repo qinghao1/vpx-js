@@ -5,7 +5,7 @@ import { Pool } from '../../util/object-pool.js'
 import { ItemState } from '../item-state.js'
 import { omitEqual } from '../state-helpers.js'
 
-/** Table render state. */
+/** Table render state. @see https://github.com/vpinball/vpinball/blob/master/table.cpp */
 export class TableState extends ItemState {
 	public static readonly POOL = new Pool(TableState)
 
@@ -39,9 +39,7 @@ export class TableState extends ItemState {
 	}
 
 	public equals(state: TableState): boolean {
-		if (!state) {
-			return false
-		}
+		if (!state) return false
 		return state.material === this.material && state.isVisible === this.isVisible
 	}
 }
