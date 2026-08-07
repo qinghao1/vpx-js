@@ -90,7 +90,7 @@ export class FlipperHit extends HitObject {
 		this.updatePhysicsFromFlipper()
 	}
 
-	public calcHitBBox(): void {
+	public override calcHitBBox(): void {
 		const c = this.mover.hitCircleBase.center,
 			r = this.mover.flipperRadius + this.mover.endRadius + 0.1
 		this.hitBBox = new FRect3D(
@@ -103,7 +103,7 @@ export class FlipperHit extends HitObject {
 		)
 	}
 
-	public hitTest(ball: Ball, dTime: number, coll: CollisionEvent): number {
+	public override hitTest(ball: Ball, dTime: number, coll: CollisionEvent, _physics?: PlayerPhysics): number {
 		if (!this.data.isEnabled) return -1
 		const last = this.mover.lastHitFace
 		let t = this.hitTestFlipperFace(ball, dTime, coll, last)
@@ -194,7 +194,7 @@ export class FlipperHit extends HitObject {
 		Vertex3D.release(vRel, rB, rF)
 	}
 
-	public collide(coll: CollisionEvent, physics: PlayerPhysics): void {
+	public override collide(coll: CollisionEvent, physics: PlayerPhysics): void {
 		const ball = coll.ball,
 			n = coll.hitNormal
 		const vRel = Vertex3D.claim(),
