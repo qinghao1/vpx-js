@@ -22,6 +22,7 @@ import type { BallMover } from './ball-mover.js'
 import type { BallState } from './ball-state.js'
 import { BallUpdater } from './ball-updater.js'
 
+/** Runtime ball. */
 export class Ball implements IPlayable, IMovable, IRenderable<BallState>, IScriptable<BallApi> {
 	public readonly state: BallState
 	public readonly data: BallData
