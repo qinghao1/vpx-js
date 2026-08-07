@@ -3,6 +3,7 @@
 
 import { ERR, VbsError } from './stdlib/err.js'
 
+/** VBS undefined sentinel. */
 export class VbsUndefined implements ProxyHandler<any> {
 	// tslint:disable-next-line:variable-name
 	private readonly __errSet?: VbsError
