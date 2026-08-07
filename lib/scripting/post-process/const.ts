@@ -4,6 +4,7 @@
 import { variableDeclaration, variableDeclarator } from '../estree.js'
 import type { ESIToken } from '../grammar/grammar.js'
 
+/** ppConst. */
 export function ppConst(node: ESIToken): any {
 	switch (node.type) {
 		case 'ConstantMemberDeclaration':
