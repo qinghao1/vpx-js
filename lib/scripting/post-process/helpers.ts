@@ -101,6 +101,7 @@ function ppBoundList(node: ESIToken): any {
 	return exprs
 }
 
+/** getOrCall. */
 export function getOrCall(callee: Expression, arg?: Expression): CallExpression {
 	return callExpression(
 		memberExpression(identifier(Transformer.VBSHELPER_NAME), identifier('getOrCall')),
