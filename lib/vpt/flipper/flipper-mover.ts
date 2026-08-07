@@ -17,12 +17,6 @@ import type { FlipperState } from './flipper-state.js'
 
 /** Flipper mover — solenoid physics, contact, and EOS/BOS events. */
 export class FlipperMover implements MoverObject {
-	private readonly data: FlipperData
-	private readonly state: FlipperState
-	private readonly events: EventProxy
-	private readonly physics: PlayerPhysics
-	private readonly tableData: TableData
-
 	public hitCircleBase: HitCircle
 	public endRadius: number
 	public readonly flipperRadius: number
@@ -46,18 +40,13 @@ export class FlipperMover implements MoverObject {
 
 	constructor(
 		config: FlipperConfig,
-		flipperData: FlipperData,
-		state: FlipperState,
-		events: EventProxy,
-		physics: PlayerPhysics,
-		tableData: TableData,
+		private readonly data: FlipperData,
+		private readonly state: FlipperState,
+		private readonly events: EventProxy,
+		private readonly physics: PlayerPhysics,
+		private readonly tableData: TableData,
 	) {
-		this.events = events
 		this.hitCircleBase = new HitCircle(config.center, config.baseRadius, config.zLow, config.zHigh)
-		this.data = flipperData
-		this.state = state
-		this.physics = physics
-		this.tableData = tableData
 		this.endRadius = config.endRadius
 		this.flipperRadius = config.flipperRadius
 		if (config.angleEnd === config.angleStart) config.angleEnd += 0.0001
@@ -194,16 +183,18 @@ export class FlipperMover implements MoverObject {
 
 	public setStartAngle(r: number): void {
 		this.angleStart = r
-		const angleMin = Math.min(this.angleStart, this.angleEnd),
-			angleMax = Math.max(this.angleStart, this.angleEnd)
-		this.state.angle = Math.max(angleMin, Math.min(angleMax, this.state.angle))
+		this.clampStateAngle()
 	}
 
 	public setEndAngle(r: number): void {
 		this.angleEnd = r
-		const angleMin = Math.min(this.angleStart, this.angleEnd),
-			angleMax = Math.max(this.angleStart, this.angleEnd)
-		this.state.angle = Math.max(angleMin, Math.min(angleMax, this.state.angle))
+		this.clampStateAngle()
+	}
+
+	private clampStateAngle(): void {
+		const lo = Math.min(this.angleStart, this.angleEnd)
+		const hi = Math.max(this.angleStart, this.angleEnd)
+		this.state.angle = Math.max(lo, Math.min(hi, this.state.angle))
 	}
 
 	public getMass(): number {
