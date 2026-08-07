@@ -26,14 +26,16 @@ const FLOAT_MAP: Record<string, string> = {
 	TODA: 'torqueDamping',
 	TDAA: 'torqueDampingAngle',
 	FRMN: 'flipperRadiusMin',
-	RTHK: 'rubberThickness',
 	RTHF: 'rubberThickness',
-	RHGT: 'rubberHeight',
 	RHGF: 'rubberHeight',
-	RWDT: 'rubberWidth',
 	RWDF: 'rubberWidth',
 }
-const INT_MAP: Record<string, string> = { OVRP: 'overridePhysics' }
+const INT_MAP: Record<string, string> = {
+	OVRP: 'overridePhysics',
+	RTHK: 'rubberThickness',
+	RHGT: 'rubberHeight',
+	RWDT: 'rubberWidth',
+}
 const BOOL_MAP: Record<string, string> = { VSBL: 'isVisible', ENBL: 'isEnabled', REEN: 'isReflectionEnabled' }
 const STRING_MAP: Record<string, string> = {
 	SURF: 'szSurface',
@@ -83,14 +85,26 @@ export class FlipperData extends ItemData {
 	public overrideTorqueDamping?: number
 	public overrideTorqueDampingAngle?: number
 	public overrideScatterAngle?: number
-	public overridePhysics?: number
+	public overridePhysics = 0
 	public isVisible = true
 	public isEnabled = true
 	public isReflectionEnabled = true
 
+	public constructor(itemName: string) {
+		super(itemName)
+		// Flipper default TimerEnabled is false (Settings_properties.inl:1009, flipper.cpp:130)
+		// ItemData default is true for generic items — override for flipper
+		this.timer.enabled = false
+	}
+
 	public static async fromStorage(storage: Storage, itemName: string): Promise<FlipperData> {
 		const d = new FlipperData(itemName)
 		await storage.streamFiltered(itemName, 4, BiffParser.stream(d.fromTag.bind(d)))
+		// Post-load sanitization per flipper.cpp:942-950 (after Load)
+		if (d.height > 1000) d.height = 50
+		if (d.rubberHeight > 1000) d.rubberHeight = 8
+		if (d.rubberThickness > 0 && d.height > 16 && d.rubberWidth === 0) d.rubberWidth = d.height - 16
+		if (d.rubberWidth > 1000) d.rubberWidth = d.height - 16
 		return d
 	}
 
