@@ -29,6 +29,7 @@ import type { Gate } from '../gate/gate.js'
 import type { HitTarget } from '../hit-target/hit-target.js'
 import type { Item } from '../item.js'
 import type { ItemData } from '../item-data.js'
+import { ITEM_REGISTRY } from '../item-registry.js'
 import type { ItemState } from '../item-state.js'
 import type { Kicker } from '../kicker/kicker.js'
 import type { Light } from '../light/light.js'
@@ -122,36 +123,21 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 		if (loadedTable.tableScript) {
 			this.tableScript = loadedTable.tableScript
 		}
-		const mapping: Array<[any, any]> = [
-			[loadedTable.textures, this.textures],
-			[loadedTable.collections, this.collections],
-			[loadedTable.bumpers, this.bumpers],
-			[loadedTable.flippers, this.flippers],
-			[loadedTable.flashers, this.flashers],
-			[loadedTable.gates, this.gates],
-			[loadedTable.hitTargets, this.hitTargets],
-			[loadedTable.kickers, this.kickers],
-			[loadedTable.lights, this.lights],
-			[loadedTable.plungers, this.plungers],
-			[loadedTable.primitives, this.primitives],
-			[loadedTable.ramps, this.ramps],
-			[loadedTable.rubbers, this.rubbers],
-			[loadedTable.spinners, this.spinners],
-			[loadedTable.surfaces, this.surfaces],
-			[loadedTable.textBoxes, this.textboxes],
-			[loadedTable.timers, this.timers],
-			[loadedTable.triggers, this.triggers],
-			[loadedTable.decals, this.decals],
-			[loadedTable.lightSeqs, this.lightSeqs],
-			[loadedTable.dispReels, this.dispReels],
-		]
-		for (const m of mapping) {
-			if (isLoaded(m[0])) {
-				for (const item of m[0]) {
-					m[1][item.getName()] = item
-				}
-			}
+		// Populate item dictionaries via registry to avoid manual mapping boilerplate
+		this.populateFromLoaded(loadedTable, 'textures', this.textures)
+		this.populateFromLoaded(loadedTable, 'collections', this.collections)
+		for (const [itemType, entry] of Object.entries(ITEM_REGISTRY)) {
+			const loadedKey = entry.key as keyof typeof loadedTable
+			// Table property for textBoxes is camelCase textboxes
+			const tableKey = loadedKey === 'textBoxes' ? 'textboxes' : loadedKey
+			this.populateFromLoaded(loadedTable, loadedKey as any, (this as any)[tableKey])
 		}
+	}
+
+	private populateFromLoaded(loadedTable: any, key: string, dict: Record<string, any>): void {
+		const items = loadedTable[key] as any[] | undefined
+		if (!items?.length) return
+		for (const item of items) dict[item.getName()] = item
 	}
 
 	public getName(): string {

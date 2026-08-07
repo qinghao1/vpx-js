@@ -5,76 +5,43 @@ const textDecoder = new TextDecoder()
 
 import { type IBinaryReader, OleCompoundDoc, type Storage } from '../../io/ole-doc.js'
 import { logger, progress } from '../../util/logger.js'
-import { Bumper } from '../bumper/bumper.js'
 import { Collection } from '../collection/collection.js'
-import { Decal } from '../decal/decal.js'
-import { DispReel } from '../dispreel/dispreel.js'
-import { ItemType } from '../enums.js'
-import { Flasher } from '../flasher/flasher.js'
-import { Flipper } from '../flipper/flipper.js'
-import { Gate } from '../gate/gate.js'
-import { HitTarget } from '../hit-target/hit-target.js'
 import type { Item } from '../item.js'
 import { ItemData } from '../item-data.js'
-import { Kicker } from '../kicker/kicker.js'
-import { Light } from '../light/light.js'
-import { LightSeq } from '../lightseq/lightseq.js'
-import { Plunger } from '../plunger/plunger.js'
-import { Primitive } from '../primitive/primitive.js'
-import { Ramp } from '../ramp/ramp.js'
-import { Rubber } from '../rubber/rubber.js'
-import { Spinner } from '../spinner/spinner.js'
-import { Surface } from '../surface/surface.js'
-import { Textbox } from '../textbox/textbox.js'
+import { ITEM_KEYS, ITEM_REGISTRY, loadItemByType } from '../item-registry.js'
 import { Texture } from '../texture.js'
-import { Timer } from '../timer/timer.js'
-import { Trigger } from '../trigger/trigger.js'
 import type { TableLoadOptions } from './table.js'
 import { TableData } from './table-data.js'
 
 export class TableLoader {
 	private doc!: OleCompoundDoc
 
-	public async load(reader: IBinaryReader, opts: TableLoadOptions = {}): Promise<LoadedTable> {
+	async load(reader: IBinaryReader, opts: TableLoadOptions = {}): Promise<LoadedTable> {
 		progress().start('table.load', 'Loading VPX file')
 		const then = Date.now()
 		this.doc = await OleCompoundDoc.load(reader)
 		try {
 			const loadedTable: LoadedTable = { items: {} }
 			if (opts.loadTableScript || opts.tableDataOnly || !opts.tableInfoOnly) {
-				// open game storage
 				const gameStorage = this.doc.storage('GameStg')
-
-				// load table data
 				loadedTable.data = await TableData.fromStorage(gameStorage, 'GameData')
-
 				if (!opts.tableDataOnly) {
-					// load items
 					await this.loadGameItems(loadedTable, gameStorage, loadedTable.data.numGameItems, opts)
-
-					// load images
 					await this.loadTextures(loadedTable, gameStorage, loadedTable.data.numTextures)
-
-					// load collections
 					await this.loadCollections(loadedTable, gameStorage, loadedTable.data.numCollections)
 				}
-
 				if (opts.loadTableScript) {
 					const script = await gameStorage.read('GameData', loadedTable.data.scriptPos, loadedTable.data.scriptLen)
 					loadedTable.tableScript = textDecoder.decode(script)
 					if (loadedTable.tableScript.endsWith('ENDB')) {
-						// when the script is empty, the counter seems to be wrong, so cut.
-						loadedTable.tableScript = loadedTable.tableScript.substr(0, loadedTable.tableScript.length - 8)
+						loadedTable.tableScript = loadedTable.tableScript.slice(0, -8)
 					}
 				}
 			}
-
 			if (opts.tableInfoOnly || !opts.tableDataOnly) {
 				await this.loadTableInfo(loadedTable)
 			}
-
 			logger().info('[Table.load] Table loaded in %sms.', Date.now() - then)
-
 			return loadedTable
 		} finally {
 			await this.doc.close()
@@ -82,7 +49,7 @@ export class TableLoader {
 		}
 	}
 
-	public async streamStorage<T>(name: string, streamer: (stg: Storage) => Promise<T>): Promise<T> {
+	async streamStorage<T>(name: string, streamer: (stg: Storage) => Promise<T>): Promise<T> {
 		try {
 			await this.doc.reopen()
 			return await streamer(this.doc.storage(name))
@@ -96,31 +63,11 @@ export class TableLoader {
 		storage: Storage,
 		numItems: number,
 		opts: TableLoadOptions,
-	): Promise<{ [key: string]: number }> {
-		const stats: { [key: string]: number } = {}
+	): Promise<Record<string, number>> {
+		const stats: Record<string, number> = {}
 
-		// init arrays
-		loadedTable.surfaces = []
-		loadedTable.primitives = []
-		loadedTable.lights = []
-		loadedTable.rubbers = []
-		loadedTable.flippers = []
-		loadedTable.flashers = []
-		loadedTable.bumpers = []
-		loadedTable.ramps = []
-		loadedTable.hitTargets = []
-		loadedTable.gates = []
-		loadedTable.kickers = []
-		loadedTable.triggers = []
-		loadedTable.spinners = []
-		loadedTable.timers = []
-		loadedTable.plungers = []
-		loadedTable.textBoxes = []
-		loadedTable.decals = []
-		loadedTable.lightSeqs = []
-		loadedTable.dispReels = []
+		for (const key of ITEM_KEYS) (loadedTable as any)[key] = []
 
-		// go through all game items
 		progress().show('Loading game items')
 		for (let i = 0; i < numItems; i++) {
 			const itemName = `GameItem${i}`
@@ -131,11 +78,8 @@ export class TableLoader {
 				progress().details(item.getName())
 				loadedTable.items[item.getName()] = item
 			}
-			if (!stats[ItemData.getType(itemType)]) {
-				stats[ItemData.getType(itemType)] = 1
-			} else {
-				stats[ItemData.getType(itemType)]++
-			}
+			const typeName = ItemData.getType(itemType)
+			stats[typeName] = (stats[typeName] ?? 0) + 1
 		}
 		return stats
 	}
@@ -147,158 +91,43 @@ export class TableLoader {
 		itemType: number,
 		opts: TableLoadOptions,
 	): Promise<Item<ItemData> | null> {
-		switch (itemType) {
-			case ItemType.Surface: {
-				const item = await Surface.fromStorage(storage, itemName)
-				loadedTable.surfaces!.push(item)
-				return item
-			}
+		const item = await loadItemByType(storage, itemName, itemType, opts)
+		if (!item) return null
 
-			case ItemType.Primitive: {
-				const item = await Primitive.fromStorage(storage, itemName, opts.skipMeshes === true)
-				loadedTable.primitives!.push(item)
-				return item
-			}
+		const key = ITEM_REGISTRY[itemType]?.key
+		if (!key) return item
 
-			case ItemType.Light: {
-				const item = await Light.fromStorage(storage, itemName)
-				loadedTable.lights!.push(item)
-				return item
-			}
-
-			case ItemType.Rubber: {
-				const item = await Rubber.fromStorage(storage, itemName)
-				loadedTable.rubbers!.push(item)
-				return item
-			}
-
-			case ItemType.Flasher: {
-				const item = await Flasher.fromStorage(storage, itemName)
-				loadedTable.flashers!.push(item)
-				return item
-			}
-
-			case ItemType.Flipper: {
-				const item = await Flipper.fromStorage(storage, itemName)
-				loadedTable.flippers!.push(item)
-				return item
-			}
-
-			case ItemType.Bumper: {
-				const item = await Bumper.fromStorage(storage, itemName)
-				loadedTable.bumpers!.push(item)
-				return item
-			}
-
-			case ItemType.Ramp: {
-				const item = await Ramp.fromStorage(storage, itemName)
-				loadedTable.ramps!.push(item)
-				return item
-			}
-
-			case ItemType.HitTarget: {
-				const item = await HitTarget.fromStorage(storage, itemName)
-				loadedTable.hitTargets!.push(item)
-				return item
-			}
-
-			case ItemType.Gate: {
-				const item = await Gate.fromStorage(storage, itemName)
-				loadedTable.gates!.push(item)
-				return item
-			}
-
-			case ItemType.Kicker: {
-				const item = await Kicker.fromStorage(storage, itemName)
-				loadedTable.kickers!.push(item)
-				return item
-			}
-
-			case ItemType.Trigger: {
-				const item = await Trigger.fromStorage(storage, itemName)
-				loadedTable.triggers!.push(item)
-				return item
-			}
-
-			case ItemType.Spinner: {
-				const item = await Spinner.fromStorage(storage, itemName)
-				loadedTable.spinners!.push(item)
-				return item
-			}
-
-			case ItemType.Timer: {
-				const item = await Timer.fromStorage(storage, itemName)
-				if (opts.loadInvisibleItems) {
-					loadedTable.timers!.push(item)
-				}
-				return item
-			}
-
-			case ItemType.Plunger: {
-				const item = await Plunger.fromStorage(storage, itemName)
-				loadedTable.plungers!.push(item)
-				return item
-			}
-
-			case ItemType.Textbox: {
-				const item = await Textbox.fromStorage(storage, itemName)
-				if (opts.loadInvisibleItems) {
-					loadedTable.textBoxes!.push(item)
-				}
-				return item
-			}
-
-			case ItemType.Decal: {
-				const item = await Decal.fromStorage(storage, itemName)
-				loadedTable.decals!.push(item)
-				return item
-			}
-
-			case ItemType.LightSeq: {
-				const item = await LightSeq.fromStorage(storage, itemName)
-				loadedTable.lightSeqs!.push(item)
-				return item
-			}
-
-			case ItemType.DispReel: {
-				const item = await DispReel.fromStorage(storage, itemName)
-				loadedTable.dispReels!.push(item)
-				return item
-			}
-
-			default:
-				// ignore the rest for now
-				return null
+		// Textbox/Timer are invisible by default; respect loadInvisibleItems
+		if ((key === 'textBoxes' || key === 'timers') && !opts.loadInvisibleItems) {
+			return item
 		}
+		;(loadedTable as any)[key].push(item)
+		return item
 	}
 
 	private async loadTextures(loadedTable: LoadedTable, storage: Storage, numItems: number): Promise<void> {
 		progress().show('Loading textures')
 		loadedTable.textures = []
 		for (let i = 0; i < numItems; i++) {
-			const itemName = `Image${i}`
-			const texture = await Texture.fromStorage(storage, itemName)
+			const texture = await Texture.fromStorage(storage, `Image${i}`)
 			loadedTable.textures.push(texture)
 			progress().details(texture.getName())
 		}
 	}
 
-	private async loadTableInfo(loadedTable: LoadedTable) {
+	private async loadTableInfo(loadedTable: LoadedTable): Promise<void> {
 		const tableInfoStorage = this.doc.storage('TableInfo')
 		loadedTable.info = {}
 		for (const key of tableInfoStorage.getStreams()) {
 			const data = await tableInfoStorage.read(key)
-			if (data) {
-				loadedTable.info[key] = textDecoder.decode(data).replace(/\0/g, '')
-			}
+			if (data) loadedTable.info[key] = textDecoder.decode(data).replace(/\0/g, '')
 		}
 	}
 
-	private async loadCollections(loadedTable: LoadedTable, storage: Storage, numItems: number) {
+	private async loadCollections(loadedTable: LoadedTable, storage: Storage, numItems: number): Promise<void> {
 		loadedTable.collections = []
 		for (let i = 0; i < numItems; i++) {
-			const itemName = `Collection${i}`
-			const collection = await Collection.fromStorage(storage, itemName)
+			const collection = await Collection.fromStorage(storage, `Collection${i}`)
 			loadedTable.collections.push(collection)
 			loadedTable.items[collection.getName()] = collection
 		}
@@ -307,30 +136,28 @@ export class TableLoader {
 
 export interface LoadedTable {
 	data?: TableData
-	info?: { [key: string]: string }
-	items: { [key: string]: Item<ItemData> }
-
+	info?: Record<string, string>
+	items: Record<string, Item<ItemData>>
 	tableScript?: string
 	textures?: Texture[]
 	collections?: Collection[]
-
-	surfaces?: Surface[]
-	primitives?: Primitive[]
-	rubbers?: Rubber[]
-	flippers?: Flipper[]
-	flashers?: Flasher[]
-	bumpers?: Bumper[]
-	ramps?: Ramp[]
-	lights?: Light[]
-	hitTargets?: HitTarget[]
-	gates?: Gate[]
-	kickers?: Kicker[]
-	triggers?: Trigger[]
-	spinners?: Spinner[]
-	plungers?: Plunger[]
-	textBoxes?: Textbox[]
-	decals?: Decal[]
-	lightSeqs?: LightSeq[]
-	dispReels?: DispReel[]
-	timers?: Timer[]
+	surfaces?: import('../surface/surface.js').Surface[]
+	primitives?: import('../primitive/primitive.js').Primitive[]
+	rubbers?: import('../rubber/rubber.js').Rubber[]
+	flippers?: import('../flipper/flipper.js').Flipper[]
+	flashers?: import('../flasher/flasher.js').Flasher[]
+	bumpers?: import('../bumper/bumper.js').Bumper[]
+	ramps?: import('../ramp/ramp.js').Ramp[]
+	lights?: import('../light/light.js').Light[]
+	hitTargets?: import('../hit-target/hit-target.js').HitTarget[]
+	gates?: import('../gate/gate.js').Gate[]
+	kickers?: import('../kicker/kicker.js').Kicker[]
+	triggers?: import('../trigger/trigger.js').Trigger[]
+	spinners?: import('../spinner/spinner.js').Spinner[]
+	plungers?: import('../plunger/plunger.js').Plunger[]
+	textBoxes?: import('../textbox/textbox.js').Textbox[]
+	decals?: import('../decal/decal.js').Decal[]
+	lightSeqs?: import('../lightseq/lightseq.js').LightSeq[]
+	dispReels?: import('../dispreel/dispreel.js').DispReel[]
+	timers?: import('../timer/timer.js').Timer[]
 }
