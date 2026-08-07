@@ -1,13 +1,16 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
+import * as mat4 from 'gl-matrix/esm/mat4.js'
 import { Pool } from '../util/object-pool.js'
-import { f4, fr } from './float.js'
+import { f4 } from './float.js'
 
-/** VPinball-compatible 4×4 matrix (differs from Three's multiply). */
+/** 4×4 matrix (VP-compatible, row-major API over gl-matrix column-major). */
 export class Matrix3D {
 	private static readonly POOL = new Pool(Matrix3D)
-	private readonly matrix = [
+
+	/** Row-major 4×4 storage. */
+	private readonly matrix: number[][] = [
 		[1, 0, 0, 0],
 		[0, 1, 0, 0],
 		[0, 0, 1, 0],
@@ -18,45 +21,54 @@ export class Matrix3D {
 		this.setIdentity()
 	}
 
-	public static claim(): Matrix3D {
+	/** Claims a pooled instance. */
+	static claim(): Matrix3D {
 		return Matrix3D.POOL.get()
 	}
-	public static release(...m: Matrix3D[]): void {
-		for (const x of m) Matrix3D.POOL.release(x)
+
+	/** Releases instances. */
+	static release(...ms: Matrix3D[]): void {
+		for (const m of ms) Matrix3D.POOL.release(m)
 	}
-	public static reset(m: Matrix3D): void {
+
+	/** Resets pooled instance. */
+	static reset(m: Matrix3D): void {
 		m.setIdentity()
 	}
 
-	public set(m: number[][]): this {
+	/** Copies from 2D array. */
+	set(m: number[][]): this {
 		for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) this.matrix[i][j] = m[i][j]
 		return this
 	}
 
-	public setEach(...m: number[]): this {
+	/** Sets from 16 values (row-major). */
+	setEach(...m: number[]): this {
 		for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) this.matrix[i][j] = m[i * 4 + j]
 		return this
 	}
 
-	public setIdentity(): this {
+	/** Sets to identity. */
+	setIdentity(): this {
 		this._11 = this._22 = this._33 = this._44 = 1
 		this._12 =
 			this._13 =
 			this._14 =
-			this._41 =
 			this._21 =
 			this._23 =
 			this._24 =
-			this._42 =
 			this._31 =
 			this._32 =
 			this._34 =
+			this._41 =
+			this._42 =
 			this._43 =
 				0
 		return this
 	}
 
-	public setTranslation(tx: number, ty: number, tz: number): this {
+	/** Sets translation. */
+	setTranslation(tx: number, ty: number, tz: number): this {
 		this.setIdentity()
 		this._41 = tx
 		this._42 = ty
@@ -64,7 +76,8 @@ export class Matrix3D {
 		return this
 	}
 
-	public setScaling(sx: number, sy: number, sz: number): this {
+	/** Sets scaling. */
+	setScaling(sx: number, sy: number, sz: number): this {
 		this.setIdentity()
 		this._11 = sx
 		this._22 = sy
@@ -72,92 +85,142 @@ export class Matrix3D {
 		return this
 	}
 
-	public rotateXMatrix(x: number): this {
+	/** Sets X rotation. */
+	rotateXMatrix(rad: number): this {
 		this.setIdentity()
-		this._22 = this._33 = Math.cos(f4(x))
-		this._23 = Math.sin(f4(x))
-		this._32 = -this._23
+		const c = Math.cos(f4(rad)),
+			s = Math.sin(f4(rad))
+		this._22 = this._33 = c
+		this._23 = s
+		this._32 = -s
 		return this
 	}
 
-	public rotateYMatrix(y: number): this {
+	/** Sets Y rotation. */
+	rotateYMatrix(rad: number): this {
 		this.setIdentity()
-		this._11 = this._33 = Math.cos(f4(y))
-		this._31 = Math.sin(f4(y))
-		this._13 = -this._31
+		const c = Math.cos(f4(rad)),
+			s = Math.sin(f4(rad))
+		this._11 = this._33 = c
+		this._31 = s
+		this._13 = -s
 		return this
 	}
 
-	public rotateZMatrix(z: number): this {
+	/** Sets Z rotation. */
+	rotateZMatrix(rad: number): this {
 		this.setIdentity()
-		this._11 = this._22 = Math.cos(f4(z))
-		this._12 = Math.sin(f4(z))
-		this._21 = -this._12
+		const c = Math.cos(f4(rad)),
+			s = Math.sin(f4(rad))
+		this._11 = this._22 = c
+		this._12 = s
+		this._21 = -s
 		return this
 	}
 
-	public multiply(a: Matrix3D, b?: Matrix3D): this {
+	/** Multiplies by matrix (VP order). */
+	multiply(a: Matrix3D, b?: Matrix3D): this {
 		const prod = b ? Matrix3D.mul(a, b, true) : Matrix3D.mul(this, a, true)
 		this.set(prod.matrix)
 		Matrix3D.release(prod)
 		return this
 	}
 
-	public preMultiply(a: Matrix3D): this {
+	/** Pre-multiplies by matrix. */
+	preMultiply(a: Matrix3D): this {
 		const prod = Matrix3D.mul(a, this, true)
 		this.set(prod.matrix)
 		Matrix3D.release(prod)
 		return this
 	}
 
-	public toRightHanded(): this {
+	/** Flips Z for right-handed conversion. */
+	toRightHanded(): this {
 		const m = Matrix3D.claim().setScaling(1, 1, -1)
 		this.multiply(m)
 		Matrix3D.release(m)
 		return this
 	}
 
-	private static mul(a: Matrix3D, b: Matrix3D, recycle = false): Matrix3D {
-		const r = recycle ? Matrix3D.claim() : new Matrix3D()
-		for (let i = 0; i < 4; i++)
-			for (let l = 0; l < 4; l++) {
-				r.matrix[i][l] = f4(
-					f4(
-						f4(f4(a.matrix[0][l] * b.matrix[i][0]) + f4(a.matrix[1][l] * b.matrix[i][1])) +
-							f4(a.matrix[2][l] * b.matrix[i][2]),
-					) + f4(a.matrix[3][l] * b.matrix[i][3]),
-				)
-			}
-		return r
+	private static toGl(a: Matrix3D): mat4.mat4 {
+		// VP is row-major: matrix[row][col]; gl-matrix is column-major
+		return mat4.fromValues(
+			a.matrix[0][0],
+			a.matrix[0][1],
+			a.matrix[0][2],
+			a.matrix[0][3],
+			a.matrix[1][0],
+			a.matrix[1][1],
+			a.matrix[1][2],
+			a.matrix[1][3],
+			a.matrix[2][0],
+			a.matrix[2][1],
+			a.matrix[2][2],
+			a.matrix[2][3],
+			a.matrix[3][0],
+			a.matrix[3][1],
+			a.matrix[3][2],
+			a.matrix[3][3],
+		) as unknown as mat4.mat4
 	}
 
-	public clone(recycle = false): Matrix3D {
+	private static fromGl(out: Matrix3D, m: mat4.mat4): Matrix3D {
+		out.matrix[0][0] = f4(m[0])
+		out.matrix[0][1] = f4(m[1])
+		out.matrix[0][2] = f4(m[2])
+		out.matrix[0][3] = f4(m[3])
+		out.matrix[1][0] = f4(m[4])
+		out.matrix[1][1] = f4(m[5])
+		out.matrix[1][2] = f4(m[6])
+		out.matrix[1][3] = f4(m[7])
+		out.matrix[2][0] = f4(m[8])
+		out.matrix[2][1] = f4(m[9])
+		out.matrix[2][2] = f4(m[10])
+		out.matrix[2][3] = f4(m[11])
+		out.matrix[3][0] = f4(m[12])
+		out.matrix[3][1] = f4(m[13])
+		out.matrix[3][2] = f4(m[14])
+		out.matrix[3][3] = f4(m[15])
+		return out
+	}
+
+	private static mul(a: Matrix3D, b: Matrix3D, recycle = false): Matrix3D {
+		const out = mat4.create() as unknown as mat4.mat4
+		mat4.multiply(out, Matrix3D.toGl(a), Matrix3D.toGl(b))
+		const r = recycle ? Matrix3D.claim() : new Matrix3D()
+		return Matrix3D.fromGl(r, out)
+	}
+
+	/** Clones, optionally pooled. */
+	clone(recycle = false): Matrix3D {
 		return recycle ? Matrix3D.claim().set(this.matrix) : new Matrix3D().set(this.matrix)
 	}
 
-	public equals(m: Matrix3D): boolean {
+	/** Exact equality. */
+	equals(m: Matrix3D): boolean {
 		for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) if (this.matrix[i][j] !== m.matrix[i][j]) return false
 		return true
 	}
 
-	public debug(): string[] {
+	/** Debug view (rounded). */
+	debug(): string[] {
 		return [
-			`_11: $fr(this._11)`,
-			`_12: $fr(this._12)`,
-			`_13: $fr(this._13)`,
-			`_14: $fr(this._14)`,
-			`_21: $fr(this._21)`,
-			`_22: $fr(this._22)`,
-			`_23: $fr(this._23)`,
-			`_24: $fr(this._24)`,
-			`_31: $fr(this._31)`,
-			`_32: $fr(this._32)`,
-			`_33: $fr(this._33)`,
-			`_34: $fr(this._34)`,
-			`_41: $fr(this._41)`,
-			`_42: $fr(this._42)`,
-			`_43: $fr(this._43)`,
-			`_44: $fr(this._44)`,
+			`_11: ${this._11}`,
+			`_12: ${this._12}`,
+			`_13: ${this._13}`,
+			`_14: ${this._14}`,
+			`_21: ${this._21}`,
+			`_22: ${this._22}`,
+			`_23: ${this._23}`,
+			`_24: ${this._24}`,
+			`_31: ${this._31}`,
+			`_32: ${this._32}`,
+			`_33: ${this._33}`,
+			`_34: ${this._34}`,
+			`_41: ${this._41}`,
+			`_42: ${this._42}`,
+			`_43: ${this._43}`,
+			`_44: ${this._44}`,
 		]
 	}
 
@@ -258,5 +321,5 @@ export class Matrix3D {
 		this.matrix[3][3] = f4(v)
 	}
 
-	public static readonly RIGHT_HANDED = new Matrix3D().setEach(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, -1, 0, 0, 0, 0, 1)
+	static readonly RIGHT_HANDED = new Matrix3D().setEach(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, -1, 0, 0, 0, 0, 1)
 }
