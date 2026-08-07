@@ -36,7 +36,6 @@ const TYPE_NAMES: Record<number, string> = {
 
 /** Base for VPX item data parsed from OLE storage. */
 export abstract class ItemData extends BiffParser {
-	/* istanbul ignore next */
 	public static getType(type: number): string {
 		return TYPE_NAMES[type] ?? `Unknown type "${type}"`
 	}
@@ -61,10 +60,10 @@ export abstract class ItemData extends BiffParser {
 		return storage.read(itemName, offset, len)
 	}
 
-	protected getCommonBlock(buffer: Uint8Array, tag: string, len: number): void {
+	protected getCommonBlock(buffer: Uint8Array, tag: string, _len: number): void {
 		switch (tag) {
 			case 'NAME':
-				this.name = this.getWideString(buffer, len)
+				this.name = this.getWideString(buffer, _len)
 				break
 			case 'PIID':
 				this.pdata = this.getInt(buffer)
