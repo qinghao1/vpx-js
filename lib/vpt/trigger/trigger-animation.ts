@@ -8,26 +8,21 @@ import type { Table } from '../table/table.js'
 import type { TriggerData } from './trigger-data.js'
 import type { TriggerState } from './trigger-state.js'
 
-/** TriggerAnimation. */
+/** Trigger animation. @see https://github.com/vpinball/vpinball/blob/master/trigger.cpp */
 export class TriggerAnimation implements IAnimation {
-	private readonly data: TriggerData
-	private readonly state: TriggerState
-
 	public hitEvent = false
 	public unhitEvent = false
 
 	private timeMsec = 0
-	private doAnimation: boolean = false
-	private moveDown: boolean = false
+	private doAnimation = false
+	private moveDown = false
 
-	constructor(data: TriggerData, state: TriggerState) {
-		this.data = data
-		this.state = state
-	}
+	constructor(
+		private readonly data: TriggerData,
+		private readonly state: TriggerState,
+	) {}
 
-	public init(): void {
-		// nothing to init.
-	}
+	public init(): void {}
 
 	public triggerAnimationHit(): void {
 		this.hitEvent = true
@@ -41,25 +36,15 @@ export class TriggerAnimation implements IAnimation {
 		const oldTimeMsec = this.timeMsec < newTimeMsec ? this.timeMsec : newTimeMsec
 		this.timeMsec = newTimeMsec
 		const diffTimeMsec = newTimeMsec - oldTimeMsec
-
-		let animLimit = this.data.shape === Enums.TriggerShape.TriggerStar ? this.data.radius * (1.0 / 5.0) : 32.0
-		if (this.data.shape === Enums.TriggerShape.TriggerButton) {
-			animLimit = this.data.radius * (1.0 / 10.0)
-		}
-		if (this.data.shape === Enums.TriggerShape.TriggerWireC) {
-			animLimit = 60.0
-		}
-		if (this.data.shape === Enums.TriggerShape.TriggerWireD) {
-			animLimit = 25.0
-		}
-
+		let animLimit = this.data.shape === Enums.TriggerShape.TriggerStar ? this.data.radius * (1 / 5) : 32
+		if (this.data.shape === Enums.TriggerShape.TriggerButton) animLimit = this.data.radius * (1 / 10)
+		if (this.data.shape === Enums.TriggerShape.TriggerWireC) animLimit = 60
+		if (this.data.shape === Enums.TriggerShape.TriggerWireD) animLimit = 25
 		const limit = animLimit * table.getScaleZ()
-
 		if (this.hitEvent) {
 			this.doAnimation = true
 			this.hitEvent = false
-			// unhitEvent = false;   // Bugfix: If HitEvent and unhitEvent happen at the same time, you want to favor the unhit, otherwise the switch gets stuck down.
-			this.state.heightOffset = 0.0
+			this.state.heightOffset = 0
 			this.moveDown = true
 		}
 		if (this.unhitEvent) {
@@ -69,14 +54,10 @@ export class TriggerAnimation implements IAnimation {
 			this.state.heightOffset = limit
 			this.moveDown = false
 		}
-
 		if (this.doAnimation) {
 			let step = diffTimeMsec * this.data.animSpeed * table.getScaleZ()
-			if (this.moveDown) {
-				step = -step
-			}
+			if (this.moveDown) step = -step
 			this.state.heightOffset += step
-
 			if (this.moveDown) {
 				if (this.state.heightOffset <= -limit) {
 					this.state.heightOffset = -limit
@@ -84,8 +65,8 @@ export class TriggerAnimation implements IAnimation {
 					this.moveDown = false
 				}
 			} else {
-				if (this.state.heightOffset >= 0.0) {
-					this.state.heightOffset = 0.0
+				if (this.state.heightOffset >= 0) {
+					this.state.heightOffset = 0
 					this.doAnimation = false
 					this.moveDown = true
 				}
