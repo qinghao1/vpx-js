@@ -19,8 +19,8 @@ const flipperBaseMeshJson = JSON.parse(
 
 const flipperBaseMesh = Mesh.fromJson(flipperBaseMeshJson)
 
-export /** Flipper mesh. */
-class FlipperMesh {
+/** Flipper mesh. */
+export class FlipperMesh {
 	public generateMeshes(data: FlipperData, table: Table): { base: Mesh; rubber?: Mesh } {
 		const fullMatrix = new Matrix3D()
 		fullMatrix.rotateZMatrix(degToRad(180.0))
