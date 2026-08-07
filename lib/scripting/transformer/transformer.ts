@@ -18,7 +18,8 @@ const require = createRequire(import.meta.url)
 
 const { analyze } = require('escope')
 
-export class Transformer {
+export /** Transformer. */
+class Transformer {
 	public static SCOPE_NAME = '__scope'
 	public static ITEMS_NAME = '__items'
 	public static ENUMS_NAME = '__enums'
