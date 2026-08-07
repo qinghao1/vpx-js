@@ -14,7 +14,8 @@ export interface RGBE {
 	type: TextureDataType;
 }
 
-export class RGBELoader extends DataTextureLoader {
+export /** RGBELoader. */
+class RGBELoader extends DataTextureLoader {
 
 	constructor( manager?: LoadingManager );
 	type: TextureDataType;
