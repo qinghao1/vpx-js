@@ -10,6 +10,6 @@ export interface IPlayable extends IItem {
 	setupPlayer(player: Player, table: Table): void
 }
 
-export function isPlayable(arg: any): arg is IPlayable {
-	return arg.setupPlayer !== undefined
+export function isPlayable(arg: unknown): arg is IPlayable {
+	return typeof arg === 'object' && arg !== null && 'setupPlayer' in arg
 }
