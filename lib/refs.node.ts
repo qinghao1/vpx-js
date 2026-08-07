@@ -16,45 +16,102 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
-import { FileLoader } from 'three';
+import { FileLoader } from 'three'
 
-export { NodeBinaryReader as BinaryReader } from './io/binary-reader.node';
-export { storage } from './io/storage.node';
-export { exportGltf } from './gltf/export-gltf.node';
-export { now } from './util/time.node';
-export { getTextFile } from './scripting/vbs-scripts.node';
 export {
-	Object3D, Mesh, Box3, Scene, AnimationClip, KeyframeTrack, PropertyBinding, Camera, ClampToEdgeWrapping,
-	DoubleSide, InterpolateDiscrete, InterpolateLinear, LinearFilter, LinearMipMapLinearFilter, LinearMipMapNearestFilter,
-	MirroredRepeatWrapping, NearestFilter, NearestMipMapLinearFilter, NearestMipMapNearestFilter, PixelFormat,
-	RepeatWrapping, TriangleFanDrawMode, TriangleStripDrawMode, BufferAttribute, BufferGeometry, Geometry,
-	InterleavedBufferAttribute, Light, Material, Color, Matrix4, Vector3, Bone, Texture, Math,
-	PointLight, Group, MeshStandardMaterial, Face3, Matrix3, Vector2, Path, Shape, ExtrudeBufferGeometry,
-	Float32BufferAttribute, Line, RGBAFormat, UnsignedByteType, TextureLoader, DataTexture, FloatType, SpotLight,
-	LoadingManager, DataTextureLoader, TextureDataType, DefaultLoadingManager, HalfFloatType, LinearEncoding,
-	RGBEEncoding, RGBEFormat, RGBFormat, AdditiveBlending, PointLightHelper,
-} from 'three';
-export { ThreeTextureLoaderNode as ThreeTextureLoader } from './render/threejs/three-texture-loader-node';
+	AdditiveBlending,
+	AnimationClip,
+	Bone,
+	Box3,
+	BufferAttribute,
+	BufferGeometry,
+	Camera,
+	ClampToEdgeWrapping,
+	Color,
+	DataTexture,
+	DataTextureLoader,
+	DefaultLoadingManager,
+	DoubleSide,
+	ExtrudeGeometry,
+	ExtrudeGeometry as ExtrudeBufferGeometry,
+	Float32BufferAttribute,
+	FloatType,
+	Group,
+	HalfFloatType,
+	InterleavedBufferAttribute,
+	InterpolateDiscrete,
+	InterpolateLinear,
+	KeyframeTrack,
+	Light,
+	Line,
+	LinearFilter,
+	LinearMipMapLinearFilter,
+	LinearMipMapNearestFilter,
+	LinearSRGBColorSpace,
+	LoadingManager,
+	Material,
+	MathUtils as Math,
+	Matrix3,
+	Matrix4,
+	Mesh,
+	MeshStandardMaterial,
+	MirroredRepeatWrapping,
+	NearestFilter,
+	NearestMipMapLinearFilter,
+	NearestMipMapNearestFilter,
+	NoColorSpace,
+	Object3D,
+	Path,
+	PointLight,
+	PointLightHelper,
+	PropertyBinding,
+	RepeatWrapping,
+	RGBAFormat,
+	Scene,
+	Shape,
+	SpotLight,
+	SRGBColorSpace,
+	Texture,
+	TextureLoader,
+	TriangleFanDrawMode,
+	TriangleStripDrawMode,
+	UnsignedByteType,
+	Vector2,
+	Vector3,
+} from 'three'
+export { exportGltf } from './gltf/export-gltf.node.js'
+export { NodeBinaryReader as BinaryReader } from './io/binary-reader.node.js'
+export { storage } from './io/storage.node.js'
+export { getTextFile } from './scripting/vbs-scripts.node.js'
+export { now } from './util/time.node.js'
+export const RGBFormat = 1022
+export const RGBEFormat = 1023
+export const RGBEEncoding = 3000
+export const LinearEncoding = 3000
+export const sRGBEncoding = 3001
+export const GammaEncoding = 3007
+export type { PixelFormat, TextureDataType } from 'three'
+
+export { ThreeTextureLoaderNode as ThreeTextureLoader } from './render/threejs/three-texture-loader-node'
 
 /*
  * Here we patch three.js' file loader to accept buffers directly.
  */
-const originalFileLoaderLoad = FileLoader.prototype.load;
+const originalFileLoaderLoad = FileLoader.prototype.load
 // tslint:disable-next-line:only-arrow-functions
-FileLoader.prototype.load = function(urlOrBuffer: any, onLoad?: (response: string | ArrayBuffer) => void, onProgress?: (request: ProgressEvent) => void, onError?: (event: ErrorEvent) => void) {
+FileLoader.prototype.load = (
+	urlOrBuffer: any,
+	onLoad?: (response: string | ArrayBuffer) => void,
+	onProgress?: (request: ProgressEvent) => void,
+	onError?: (event: ErrorEvent) => void,
+) => {
 	/* istanbul ignore if: we don't it by url, but this should still work. */
 	if (typeof urlOrBuffer === 'string') {
-		return originalFileLoaderLoad(urlOrBuffer, onLoad, onProgress, onError);
+		return originalFileLoaderLoad(urlOrBuffer, onLoad, onProgress, onError)
 	}
 	if (onLoad) {
-		onLoad(urlOrBuffer);
+		onLoad(urlOrBuffer)
 	}
-};
-
-/*
- * Node.js TextDecoder polyfills for Node.js v12
- * istanbul ignore if
- */
-if (!('TextDecoder' in global)) {
-	(global as any).TextDecoder = require('text-encoding').TextDecoder;
 }
+
+/* TextDecoder is natively available in Node >=22 */
