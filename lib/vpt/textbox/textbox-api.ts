@@ -4,7 +4,9 @@
 import { ItemApi } from '../item-api.js'
 import type { TextboxData } from './textbox-data.js'
 
-/** Textbox API. */
+/** Textbox API.
+ *
+ * @see https://github.com/vpinball/vpinball/blob/master/textbox.cpp */
 export class TextboxApi extends ItemApi<TextboxData> {
 	/** Get BackColor. */
 	get BackColor() {
