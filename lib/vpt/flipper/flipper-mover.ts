@@ -16,8 +16,8 @@ import type { FlipperConfig } from './flipper.js'
 import type { FlipperData } from './flipper-data.js'
 import type { FlipperState } from './flipper-state.js'
 
-export /** Flipper mover. */
-class FlipperMover implements MoverObject {
+/** Flipper mover. */
+export class FlipperMover implements MoverObject {
 	private readonly data: FlipperData
 	private readonly state: FlipperState
 	private readonly events: EventProxy
