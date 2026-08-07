@@ -63,8 +63,7 @@ export class Texture extends BiffParser {
 	}
 
 	public getName(): string {
-		if (this.localFileName) return basename(this.localFileName)
-		return (this.szInternalName || this.szName || '').toLowerCase()
+		return this.localFileName ? basename(this.localFileName) : (this.szInternalName || this.szName || '').toLowerCase()
 	}
 
 	/** Loads texture via renderer loader. */
