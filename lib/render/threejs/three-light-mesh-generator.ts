@@ -6,15 +6,14 @@ import { SplineVertex } from '../../util/spline-vertex.js'
 import type { LightData } from '../../vpt/light/light-data.js'
 import type { Table } from '../../vpt/table/table.js'
 
-/** ThreeLightMeshGenerator. */
+/** Generates light insert meshes. */
 export class ThreeLightMeshGenerator {
 	public createLight(lightData: LightData, table: Table, depth = 5, bevel = 0.5): ExtrudeGeometry {
 		const shape = this.getShape(lightData, table)
 		const dim = table.getDimensions()
-		const invTableWidth = 1.0 / dim.width
-		const invTableHeight = 1.0 / dim.height
-
-		const geometry = new ExtrudeGeometry(shape, {
+		const invW = 1 / dim.width
+		const invH = 1 / dim.height
+		const geo = new ExtrudeGeometry(shape, {
 			depth,
 			bevelEnabled: bevel > 0,
 			bevelSegments: 1,
@@ -22,62 +21,41 @@ export class ThreeLightMeshGenerator {
 			bevelSize: bevel,
 			bevelThickness: bevel,
 			UVGenerator: {
-				generateSideWallUV(
-					g: ExtrudeGeometry,
-					vertices: number[],
-					indexA: number,
-					indexB: number,
-					indexC: number,
-					indexD: number,
-				): Vector2[] {
+				generateSideWallUV(): Vector2[] {
 					return [new Vector2(0, 0), new Vector2(0, 0), new Vector2(0, 0), new Vector2(0, 0)]
 				},
-				generateTopUV(
-					g: ExtrudeGeometry,
-					vertices: number[],
-					indexA: number,
-					indexB: number,
-					indexC: number,
-				): Vector2[] {
-					const ax = vertices[indexA * 3]
-					const ay = vertices[indexA * 3 + 1]
-					const bx = vertices[indexB * 3]
-					const by = vertices[indexB * 3 + 1]
-					const cx = vertices[indexC * 3]
-					const cy = vertices[indexC * 3 + 1]
+				generateTopUV(_g: ExtrudeGeometry, vertices: number[], a: number, b: number, c: number): Vector2[] {
+					const ax = vertices[a * 3]!,
+						ay = vertices[a * 3 + 1]!
+					const bx = vertices[b * 3]!,
+						by = vertices[b * 3 + 1]!
+					const cx = vertices[c * 3]!,
+						cy = vertices[c * 3 + 1]!
 					return [
-						new Vector2(ax * invTableWidth, 1 - ay * invTableHeight),
-						new Vector2(bx * invTableWidth, 1 - by * invTableHeight),
-						new Vector2(cx * invTableWidth, 1 - cy * invTableHeight),
+						new Vector2(ax * invW, 1 - ay * invH),
+						new Vector2(bx * invW, 1 - by * invH),
+						new Vector2(cx * invW, 1 - cy * invH),
 					]
 				},
 			},
 		})
-		if (lightData.szSurface) {
-			geometry.translate(0, 0, -table.getSurfaceHeight(lightData.szSurface, 0, 0))
-		}
-		geometry.name = `surface.light`
-		return geometry
+		if (lightData.szSurface) geo.translate(0, 0, -table.getSurfaceHeight(lightData.szSurface, 0, 0))
+		geo.name = 'surface.light'
+		return geo
 	}
 
 	public getShape(lightData: LightData, table: Table): Shape {
-		const vVertex = SplineVertex.getCentralCurve(lightData.dragPoints, table.getDetailLevel(), -1)
-		return this.getPathFromPoints<Shape>(
-			vVertex.map((v) => new Vector2(v.x, v.y)),
+		const verts = SplineVertex.getCentralCurve(lightData.dragPoints, table.getDetailLevel(), -1)
+		return this.getPathFromPoints(
+			verts.map((v) => new Vector2(v.x, v.y)),
 			new Shape(),
 		)
 	}
 
 	private getPathFromPoints<T extends Path>(points: Vector2[], path: T): T {
-		/* istanbul ignore if */
-		if (points.length === 0) {
-			throw new Error('Cannot get path from no points.')
-		}
-		path.moveTo(points[0].x, points[0].y)
-		for (const v of points.slice(1)) {
-			path.lineTo(v.x, v.y)
-		}
-		//path.moveTo(points[0].x, points[0].y);
+		if (points.length === 0) throw new Error('Cannot get path from no points.')
+		path.moveTo(points[0]!.x, points[0]!.y)
+		for (const v of points.slice(1)) path.lineTo(v.x, v.y)
 		return path
 	}
 }
