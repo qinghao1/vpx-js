@@ -4,18 +4,14 @@
 import { Pool } from '../../util/object-pool.js'
 import { ItemState } from '../item-state.js'
 
-/** Gate state.
- *
+/** Gate state — angle, material, bracket visibility.
  * @see https://github.com/vpinball/vpinball/blob/master/gate.cpp */
 export class GateState extends ItemState {
 	public static readonly POOL = new Pool(GateState)
 
-	/**
-	 * Angle in rad
-	 */
-	public angle: number = 0
+	public angle = 0
 	public material?: string
-	public showBracket: boolean = true
+	public showBracket = true
 
 	public constructor() {
 		super()
@@ -28,13 +24,13 @@ export class GateState extends ItemState {
 		showBracket: boolean,
 		isVisible: boolean,
 	): GateState {
-		const state = GateState.POOL.get()
-		state.name = name
-		state.angle = angle
-		state.material = material
-		state.showBracket = showBracket
-		state.isVisible = isVisible
-		return state
+		const s = GateState.POOL.get()
+		s.name = name
+		s.angle = angle
+		s.material = material
+		s.showBracket = showBracket
+		s.isVisible = isVisible
+		return s
 	}
 
 	public clone(): GateState {
@@ -42,23 +38,12 @@ export class GateState extends ItemState {
 	}
 
 	public diff(state: GateState): GateState {
-		const diff = this.clone()
-		if (diff.angle === state.angle) {
-			delete diff.angle
-		}
-		if (diff.isVisible === state.isVisible) {
-			delete diff.isVisible
-		}
-		if (diff.material === state.material) {
-			delete diff.material
-		}
-		if (diff.showBracket === state.showBracket) {
-			delete diff.showBracket
-		}
-		if (diff.isVisible === state.isVisible) {
-			delete diff.isVisible
-		}
-		return diff
+		const d = this.clone()
+		if (d.angle === state.angle) delete (d as unknown as Record<string, unknown>).angle
+		if (d.material === state.material) delete (d as unknown as Record<string, unknown>).material
+		if (d.showBracket === state.showBracket) delete (d as unknown as Record<string, unknown>).showBracket
+		if (d.isVisible === state.isVisible) delete (d as unknown as Record<string, unknown>).isVisible
+		return d
 	}
 
 	public release(): void {
@@ -66,10 +51,7 @@ export class GateState extends ItemState {
 	}
 
 	public equals(state: GateState): boolean {
-		/* istanbul ignore if: we don't actually pass empty states. */
-		if (!state) {
-			return false
-		}
+		if (!state) return false
 		return (
 			state.angle === this.angle &&
 			state.material === this.material &&
