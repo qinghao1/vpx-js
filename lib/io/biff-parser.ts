@@ -10,55 +10,43 @@ const textDecoder = new TextDecoder('utf-8')
 function getDataView(buf: Uint8Array): DataView {
 	return new DataView(buf.buffer, buf.byteOffset, buf.byteLength)
 }
-
-function readInt32LE(buf: Uint8Array, offset: number): number {
-	return getDataView(buf).getInt32(offset, true)
+function readInt32LE(buf: Uint8Array, off: number): number {
+	return getDataView(buf).getInt32(off, true)
 }
-
-function readUInt16LE(buf: Uint8Array, offset: number): number {
-	return getDataView(buf).getUint16(offset, true)
-}
-
-function readUInt32LE(buf: Uint8Array, offset: number): number {
-	return getDataView(buf).getUint32(offset, true)
-}
-
-function readFloatLE(buf: Uint8Array, offset: number): number {
-	return getDataView(buf).getFloat32(offset, true)
-}
-
 function decodeUtf8(buf: Uint8Array): string {
 	return textDecoder.decode(buf)
 }
 
+/** Parser for BIFF records used in VPX files. */
 export class BiffParser {
-	public static stream(
-		callback: OnBiffResult,
-		opts: BiffStreamOptions = {},
-	): (result: ReadResult) => Promise<number | null> {
+	/**
+	 * Creates a streaming BIFF handler.
+	 * @param callback called for each tag
+	 * @param opts optional streamed/nested tag handling
+	 * @returns handler that consumes `ReadResult` chunks
+	 */
+	static stream(callback: OnBiffResult, opts: BiffStreamOptions = {}): (result: ReadResult) => Promise<number | null> {
 		let nested: OnBiffResultStream<any> | null = null
 		let nestedItem: any = null
 		return async (result: ReadResult): Promise<number | null> => {
 			const data = result.data
-			if (data.length < 4) {
-				return null
-			}
+			if (data.length < 4) return null
+
 			let len = readInt32LE(data, 0)
-			if (len > data.length - 4) {
-				return -(len + 4)
-			}
-			let dataResult: Uint8Array
+			if (len > data.length - 4) return -(len + 4)
+
 			const tag = decodeUtf8(data.subarray(4, 8))
 			let relStartPos = 8
 			let relEndPos = -4
+			let dataResult: Uint8Array
 
-			if (opts.nestedTags && opts.nestedTags[tag]) {
+			if (opts.nestedTags?.[tag]) {
 				nested = opts.nestedTags[tag]
 				nestedItem = nested.onStart()
 				return len + 4
 			}
 
-			if (opts.streamedTags && opts.streamedTags.includes(tag)) {
+			if (opts.streamedTags?.includes(tag)) {
 				len += readInt32LE(data, 8) + 4
 				dataResult = new Uint8Array(0)
 				relStartPos += 4
@@ -77,43 +65,34 @@ export class BiffParser {
 				return null
 			}
 			const cb = nested ? nested.onTag(nestedItem) : callback
-			const skip = await cb(dataResult, tag, result.storageOffset + relStartPos, len + relEndPos)
+			const skip = await cb(dataResult!, tag, result.storageOffset + relStartPos, len + relEndPos)
 			return (skip || len) + 4
 		}
 	}
 
-	public static async decompress(buffer: Uint8Array): Promise<Uint8Array> {
+	/** Decompresses a BIFF chunk via zlib. */
+	static async decompress(buffer: Uint8Array): Promise<Uint8Array> {
 		return new Promise((resolve, reject) => {
-			// zlib expects Buffer, convert via Uint8Array -> Buffer for Node, but keep Uint8Array in browser fallback
-			const input = buffer
-			inflate(input as any, (err: any, result: any) => {
+			inflate(buffer as any, (err: any, result: any) => {
 				/* istanbul ignore if */
-				if (err) {
-					return reject(err)
-				}
-				if (result instanceof Uint8Array) {
-					resolve(result)
-				} else {
-					// result is Buffer
-					resolve(new Uint8Array(result.buffer, result.byteOffset, result.byteLength))
-				}
+				if (err) return reject(err)
+				resolve(
+					result instanceof Uint8Array ? result : new Uint8Array(result.buffer, result.byteOffset, result.byteLength),
+				)
 			})
 		})
 	}
 
-	public static parseNullTerminatedString(buffer: Uint8Array, maxLength: number = 0): string {
-		let slice = buffer
-		if (maxLength) {
-			slice = buffer.subarray(0, maxLength)
-		}
+	/** Reads a null-terminated string, optionally limited to `maxLength`. */
+	static parseNullTerminatedString(buffer: Uint8Array, maxLength = 0): string {
+		let slice = maxLength ? buffer.subarray(0, maxLength) : buffer
 		const nullIdx = slice.indexOf(0x00)
-		if (nullIdx >= 0) {
-			slice = slice.subarray(0, nullIdx)
-		}
+		if (nullIdx >= 0) slice = slice.subarray(0, nullIdx)
 		return decodeUtf8(slice)
 	}
 
-	public static bgrToRgb(bgr: number) {
+	/** Converts BGR to RGB. */
+	static bgrToRgb(bgr: number): number {
 		const r = (bgr & 0xff) << 16
 		const g = bgr & 0xff00
 		const b = (bgr & 0xff0000) >> 16
@@ -122,46 +101,31 @@ export class BiffParser {
 
 	protected getString(buffer: Uint8Array, len: number, dropIfNotAscii = false): string {
 		const str = decodeUtf8(buffer.subarray(4, len))
-		if (!dropIfNotAscii || this.isAscii(str)) {
-			return str
-		}
-		/* istanbul ignore next */
-		return ''
+		return !dropIfNotAscii || this.isAscii(str) ? str : ''
 	}
 
 	protected getWideString(buffer: Uint8Array, len: number): string {
-		const slice = buffer.subarray(4, len)
-		return new TextDecoder('utf-16le').decode(slice)
+		return new TextDecoder('utf-16le').decode(buffer.subarray(4, len))
 	}
 
 	protected getInt(buffer: Uint8Array): number {
 		return getDataView(buffer).getInt32(0, true)
 	}
-
 	protected getFloat(buffer: Uint8Array): number {
 		return f4(getDataView(buffer).getFloat32(0, true))
 	}
-
 	protected getBool(buffer: Uint8Array): boolean {
 		return getDataView(buffer).getInt32(0, true) > 0
 	}
 
 	protected getUnsignedInt2s(buffer: Uint8Array, num: number): number[] {
 		const view = getDataView(buffer)
-		const ints: number[] = []
-		for (let i = 0; i < num; i++) {
-			ints.push(view.getUint16(i * 2, true))
-		}
-		return ints
+		return Array.from({ length: num }, (_, i) => view.getUint16(i * 2, true))
 	}
 
 	protected getUnsignedInt4s(buffer: Uint8Array, num: number): number[] {
 		const view = getDataView(buffer)
-		const ints: number[] = []
-		for (let i = 0; i < num; i++) {
-			ints.push(view.getUint32(i * 4, true))
-		}
-		return ints
+		return Array.from({ length: num }, (_, i) => view.getUint32(i * 4, true))
 	}
 
 	private isAscii(str: string): boolean {
@@ -179,5 +143,5 @@ export interface OnBiffResultStream<T> {
 
 export interface BiffStreamOptions {
 	streamedTags?: string[]
-	nestedTags?: { [key: string]: OnBiffResultStream<any> }
+	nestedTags?: Record<string, OnBiffResultStream<any>>
 }
