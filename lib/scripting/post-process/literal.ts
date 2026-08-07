@@ -5,7 +5,7 @@ import { identifier, literal, newExpression } from '../estree.js'
 import type { ESIToken } from '../grammar/grammar.js'
 
 /** ppLiteral. */
-export function ppLiteral(node: ESIToken): any {
+export function ppLiteral(node: ESIToken): unknown {
 	switch (node.type) {
 		case 'BooleanLiteral':
 			return ppBooleanLiteral(node)
@@ -31,51 +31,51 @@ export function ppLiteral(node: ESIToken): any {
 	return null
 }
 
-function ppBooleanLiteral(node: ESIToken): any {
+function ppBooleanLiteral(node: ESIToken): unknown {
 	const value = node.text
 	return literal(value === 'True')
 }
 
-function ppFloatingPointLiteral(node: ESIToken): any {
+function ppFloatingPointLiteral(node: ESIToken): unknown {
 	const value = node.text
 	return literal(parseFloat(value))
 }
 
-function ppIntLiteral(node: ESIToken): any {
+function ppIntLiteral(node: ESIToken): unknown {
 	const value = node.text
 	return literal(parseInt(value, 10))
 }
 
-function ppHexLiteral(node: ESIToken): any {
+function ppHexLiteral(node: ESIToken): unknown {
 	let value = node.text
 	value = '0x' + value.substr(2)
 	return literal(parseInt(value, 16), value)
 }
 
-function ppOctalLiteral(node: ESIToken): any {
+function ppOctalLiteral(node: ESIToken): unknown {
 	let value = node.text
 	value = '0' + value.substr(2)
 	return literal(parseInt(value, 8), value)
 }
 
-function ppStringLiteral(node: ESIToken): any {
+function ppStringLiteral(node: ESIToken): unknown {
 	const value = node.text.slice(1, -1).replace(/""/g, '"').replace(/\\/g, '\\\\').replace(/\t/g, '\\t')
 	return literal(value)
 }
 
-function ppDateLiteral(node: ESIToken): any {
+function ppDateLiteral(node: ESIToken): unknown {
 	const value = node.text.slice(1, -1)
 	return newExpression(identifier('Date'), [literal(value)])
 }
 
-function ppNothingLiteral(node: ESIToken): any {
+function ppNothingLiteral(node: ESIToken): unknown {
 	return identifier('Nothing')
 }
 
-function ppEmptyLiteral(node: ESIToken): any {
+function ppEmptyLiteral(node: ESIToken): unknown {
 	return identifier('Empty')
 }
 
-function ppNullLiteral(node: ESIToken): any {
+function ppNullLiteral(node: ESIToken): unknown {
 	return identifier('Null')
 }
