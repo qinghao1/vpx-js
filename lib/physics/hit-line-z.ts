@@ -27,12 +27,12 @@ export class HitLineZ extends HitObject {
 		return this
 	}
 
-	public calcHitBBox(): void {
+	public override calcHitBBox(): void {
 		this.hitBBox.left = this.hitBBox.right = this.xy.x
 		this.hitBBox.top = this.hitBBox.bottom = this.xy.y
 	}
 
-	public hitTest(ball: Ball, dTime: number, coll: CollisionEvent): number {
+	public override hitTest(ball: Ball, dTime: number, coll: CollisionEvent): number {
 		if (!this.isEnabled) return -1
 		const bp = Vertex2D.claim(ball.state.pos.x, ball.state.pos.y)
 		const dist = bp.clone(true).sub(this.xy)
@@ -65,7 +65,7 @@ export class HitLineZ extends HitObject {
 			if (a < 1e-8) return -1
 			const sol = solveQuadraticEq(a, 2 * b, bcddsq - ball.data.radius * ball.data.radius)
 			if (!sol) return -1
-			hitTime = sol[0] * sol[1] < 0 ? Math.max(sol[0], sol[1]) : Math.min(sol[0], sol[1])
+			hitTime = sol[0]! * sol[1]! < 0 ? Math.max(sol[0]!, sol[1]!) : Math.min(sol[0]!, sol[1]!)
 		}
 		if (!isFinite(hitTime) || hitTime < 0 || hitTime > dTime) return -1
 		const hitZ = ball.state.pos.z + hitTime * ball.hit.vel.z
@@ -81,7 +81,7 @@ export class HitLineZ extends HitObject {
 		return hitTime
 	}
 
-	public collide(coll: CollisionEvent): void {
+	public override collide(coll: CollisionEvent): void {
 		const dot = coll.hitNormal.dot(coll.ball.hit.vel)
 		coll.ball.hit.collide3DWall(coll.hitNormal, this.elasticity, this.elasticityFalloff, this.friction, this.scatter)
 		if (dot <= -this.threshold) this.fireHitEvent(coll.ball)
