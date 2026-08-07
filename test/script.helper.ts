@@ -17,26 +17,26 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { generate } from 'escodegen';
-import { Program } from 'estree';
-import { Grammar } from '../lib/scripting/grammar/grammar';
+import { generate } from 'escodegen'
+import type { Program } from 'estree'
+import { Grammar } from '../lib/scripting/grammar/grammar'
 
 export class ScriptHelper {
-	private readonly grammar: Grammar;
+	private readonly grammar: Grammar
 
 	public constructor() {
-		this.grammar = new Grammar();
+		this.grammar = new Grammar()
 	}
 
 	public vbsToJs(vbs: string): string {
-		return this.grammar.vbsToJs(vbs);
+		return this.grammar.vbsToJs(vbs)
 	}
 
 	public vbsToAst(vbs: string): Program {
-		return this.grammar.transpile(vbs);
+		return this.grammar.transpile(vbs)
 	}
 
 	public astToVbs(ast: Program): string {
-		return generate(ast);
+		return generate(ast)
 	}
 }

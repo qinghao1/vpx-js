@@ -17,11 +17,11 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { Player } from '../lib/game/player';
-import { PlayerPhysics } from '../lib/game/player-physics';
-import { Vertex3D } from '../lib/math/vertex3d';
-import { Ball } from '../lib/vpt/ball/ball';
-import { Table } from '../lib/vpt/table/table';
+import type { Player } from '../lib/game/player'
+import type { PlayerPhysics } from '../lib/game/player-physics'
+import { Vertex3D } from '../lib/math/vertex3d'
+import type { Ball } from '../lib/vpt/ball/ball'
+import type { Table } from '../lib/vpt/table/table'
 
 /**
  * Creates a ball at the given position
@@ -37,15 +37,15 @@ import { Table } from '../lib/vpt/table/table';
 export function createBall(player: Player, x: number, y: number, z: number, vx = 0, vy = 0, vz = 0): Ball {
 	return player.createBall({
 		getBallCreationPosition(t: Table): Vertex3D {
-			return new Vertex3D(x, y, z);
+			return new Vertex3D(x, y, z)
 		},
 		getBallCreationVelocity(t: Table): Vertex3D {
-			return new Vertex3D(vx, vy, vz);
+			return new Vertex3D(vx, vy, vz)
 		},
 		onBallCreated(p: PlayerPhysics, b: Ball): void {
 			// do nothing
 		},
-	});
+	})
 }
 
 /**
@@ -58,8 +58,14 @@ export function createBall(player: Player, x: number, y: number, z: number, vx =
  */
 export function debugBall(player: PlayerPhysics, ball: Ball, numCycles = 300, cycleLength = 5, t = 0) {
 	for (let i = 0; i <= numCycles; i++) {
-		player.updatePhysics(t + i * cycleLength);
+		player.updatePhysics(t + i * cycleLength)
 		// tslint:disable-next-line:no-console
-		console.log('[%sms] (%s, %s, %s)', t + i * cycleLength, ball.getState().pos.x, ball.getState().pos.y, ball.getState().pos.z);
+		console.log(
+			'[%sms] (%s, %s, %s)',
+			t + i * cycleLength,
+			ball.getState().pos.x,
+			ball.getState().pos.y,
+			ball.getState().pos.z,
+		)
 	}
 }

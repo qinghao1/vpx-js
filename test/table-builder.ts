@@ -17,251 +17,250 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { DragPoint } from '../lib/math/dragpoint';
-import { Vertex2D } from '../lib/math/vertex2d';
-import { Vertex3D } from '../lib/math/vertex3d';
-import { Bumper } from '../lib/vpt/bumper/bumper';
-import { BumperData } from '../lib/vpt/bumper/bumper-data';
-import { Flipper } from '../lib/vpt/flipper/flipper';
-import { FlipperData } from '../lib/vpt/flipper/flipper-data';
-import { Gate } from '../lib/vpt/gate/gate';
-import { GateData } from '../lib/vpt/gate/gate-data';
-import { HitTarget } from '../lib/vpt/hit-target/hit-target';
-import { HitTargetData } from '../lib/vpt/hit-target/hit-target-data';
-import { Kicker } from '../lib/vpt/kicker/kicker';
-import { KickerData } from '../lib/vpt/kicker/kicker-data';
-import { Material } from '../lib/vpt/material';
-import { Primitive } from '../lib/vpt/primitive/primitive';
-import { PrimitiveData } from '../lib/vpt/primitive/primitive-data';
-import { Ramp } from '../lib/vpt/ramp/ramp';
-import { RampData } from '../lib/vpt/ramp/ramp-data';
-import { Rubber } from '../lib/vpt/rubber/rubber';
-import { RubberData } from '../lib/vpt/rubber/rubber-data';
-import { Spinner } from '../lib/vpt/spinner/spinner';
-import { SpinnerData } from '../lib/vpt/spinner/spinner-data';
-import { Surface } from '../lib/vpt/surface/surface';
-import { SurfaceData } from '../lib/vpt/surface/surface-data';
-import { Table } from '../lib/vpt/table/table';
-import { TableData } from '../lib/vpt/table/table-data';
-import { LoadedTable, TableLoader } from '../lib/vpt/table/table-loader';
-import { Trigger } from '../lib/vpt/trigger/trigger';
-import { TriggerData } from '../lib/vpt/trigger/trigger-data';
+import { DragPoint } from '../lib/math/dragpoint'
+import { Vertex2D } from '../lib/math/vertex2d'
+import { Vertex3D } from '../lib/math/vertex3d'
+import { Bumper } from '../lib/vpt/bumper/bumper'
+import { BumperData } from '../lib/vpt/bumper/bumper-data'
+import { Flipper } from '../lib/vpt/flipper/flipper'
+import { FlipperData } from '../lib/vpt/flipper/flipper-data'
+import { Gate } from '../lib/vpt/gate/gate'
+import { GateData } from '../lib/vpt/gate/gate-data'
+import { HitTarget } from '../lib/vpt/hit-target/hit-target'
+import { HitTargetData } from '../lib/vpt/hit-target/hit-target-data'
+import { Kicker } from '../lib/vpt/kicker/kicker'
+import { KickerData } from '../lib/vpt/kicker/kicker-data'
+import { Material } from '../lib/vpt/material'
+import { Primitive } from '../lib/vpt/primitive/primitive'
+import { PrimitiveData } from '../lib/vpt/primitive/primitive-data'
+import { Ramp } from '../lib/vpt/ramp/ramp'
+import { RampData } from '../lib/vpt/ramp/ramp-data'
+import { Rubber } from '../lib/vpt/rubber/rubber'
+import { RubberData } from '../lib/vpt/rubber/rubber-data'
+import { Spinner } from '../lib/vpt/spinner/spinner'
+import { SpinnerData } from '../lib/vpt/spinner/spinner-data'
+import { Surface } from '../lib/vpt/surface/surface'
+import { SurfaceData } from '../lib/vpt/surface/surface-data'
+import { Table } from '../lib/vpt/table/table'
+import { TableData } from '../lib/vpt/table/table-data'
+import { type LoadedTable, TableLoader } from '../lib/vpt/table/table-loader'
+import { Trigger } from '../lib/vpt/trigger/trigger'
+import { TriggerData } from '../lib/vpt/trigger/trigger-data'
 
 export class TableBuilder {
+	private readonly table: LoadedTable = { items: {} }
 
-	private readonly table: LoadedTable = { items: {} };
-
-	private gameItem = 0;
-	private static tableItem = 0;
+	private gameItem = 0
+	private static tableItem = 0
 
 	public constructor() {
-		this.table.data = new TableData(`GameItem${this.gameItem++}`);
-		this.table.data.name = `Table${TableBuilder.tableItem++}`;
+		this.table.data = new TableData(`GameItem${this.gameItem++}`)
+		this.table.data.name = `Table${TableBuilder.tableItem++}`
 	}
 
 	public withTableScript(vbs: string): this {
-		this.table.tableScript = vbs;
-		return this;
+		this.table.tableScript = vbs
+		return this
 	}
 
 	public addBumper(name: string, attrs: any = {}): this {
-		const data = new BumperData(`GameItem${this.gameItem++}`);
-		data.name = name;
-		data.center = new Vertex2D(500, 500);
-		Object.assign(data, attrs);
+		const data = new BumperData(`GameItem${this.gameItem++}`)
+		data.name = name
+		data.center = new Vertex2D(500, 500)
+		Object.assign(data, attrs)
 
-		const bumper = new Bumper(data);
-		this.table.items[name] = bumper;
+		const bumper = new Bumper(data)
+		this.table.items[name] = bumper
 		if (!this.table.bumpers) {
-			this.table.bumpers = [];
+			this.table.bumpers = []
 		}
-		this.table.bumpers.push(bumper);
-		return this;
+		this.table.bumpers.push(bumper)
+		return this
 	}
 
 	public addFlipper(name: string, attrs: any = {}): this {
-		const data = new FlipperData(`GameItem${this.gameItem++}`);
-		data.name = name;
-		data.center = new Vertex2D(500, 500);
-		Object.assign(data, attrs);
+		const data = new FlipperData(`GameItem${this.gameItem++}`)
+		data.name = name
+		data.center = new Vertex2D(500, 500)
+		Object.assign(data, attrs)
 
-		const flipper = new Flipper(data);
-		this.table.items[name] = flipper;
+		const flipper = new Flipper(data)
+		this.table.items[name] = flipper
 		if (!this.table.flippers) {
-			this.table.flippers = [];
+			this.table.flippers = []
 		}
-		this.table.flippers.push(flipper);
-		return this;
+		this.table.flippers.push(flipper)
+		return this
 	}
 
 	public addGate(name: string, attrs: any = {}): this {
-		const data = new GateData(`GameItem${this.gameItem++}`);
-		data.name = name;
-		data.center = new Vertex2D(500, 500);
-		Object.assign(data, attrs);
+		const data = new GateData(`GameItem${this.gameItem++}`)
+		data.name = name
+		data.center = new Vertex2D(500, 500)
+		Object.assign(data, attrs)
 
-		const gate = new Gate(data);
-		this.table.items[name] = gate;
+		const gate = new Gate(data)
+		this.table.items[name] = gate
 		if (!this.table.gates) {
-			this.table.gates = [];
+			this.table.gates = []
 		}
-		this.table.gates.push(gate);
-		return this;
+		this.table.gates.push(gate)
+		return this
 	}
 
 	public addHitTarget(name: string, attrs: any = {}): this {
-		const data = new HitTargetData(`GameItem${this.gameItem++}`);
-		data.name = name;
-		data.position = new Vertex3D(500, 500, 0);
-		Object.assign(data, attrs);
+		const data = new HitTargetData(`GameItem${this.gameItem++}`)
+		data.name = name
+		data.position = new Vertex3D(500, 500, 0)
+		Object.assign(data, attrs)
 
-		const hitTarget = new HitTarget(data);
-		this.table.items[name] = hitTarget;
+		const hitTarget = new HitTarget(data)
+		this.table.items[name] = hitTarget
 		if (!this.table.hitTargets) {
-			this.table.hitTargets = [];
+			this.table.hitTargets = []
 		}
-		this.table.hitTargets.push(hitTarget);
-		return this;
+		this.table.hitTargets.push(hitTarget)
+		return this
 	}
 
 	public addKicker(name: string, attrs: any = {}): this {
-		const data = new KickerData(`GameItem${this.gameItem++}`);
-		data.name = name;
-		data.center = new Vertex2D(500, 500);
-		Object.assign(data, attrs);
+		const data = new KickerData(`GameItem${this.gameItem++}`)
+		data.name = name
+		data.center = new Vertex2D(500, 500)
+		Object.assign(data, attrs)
 
-		const kicker = new Kicker(data);
-		this.table.items[name] = kicker;
+		const kicker = new Kicker(data)
+		this.table.items[name] = kicker
 		if (!this.table.kickers) {
-			this.table.kickers = [];
+			this.table.kickers = []
 		}
-		this.table.kickers.push(kicker);
-		return this;
+		this.table.kickers.push(kicker)
+		return this
 	}
 
 	public addMaterial(name: string, attrs: any = {}): this {
-		const mat = new Material();
-		mat.name = name;
-		Object.assign(mat, attrs);
-		this.table.data!.materials.push(mat);
-		return this;
+		const mat = new Material()
+		mat.name = name
+		Object.assign(mat, attrs)
+		this.table.data!.materials.push(mat)
+		return this
 	}
 
 	public addPrimitive(name: string, attrs: any = {}): this {
-		const data = new PrimitiveData(`GameItem${this.gameItem++}`, true);
-		data.name = name;
-		data.position = new Vertex3D(500, 500);
-		Object.assign(data, attrs);
+		const data = new PrimitiveData(`GameItem${this.gameItem++}`, true)
+		data.name = name
+		data.position = new Vertex3D(500, 500)
+		Object.assign(data, attrs)
 
-		const primitive = new Primitive(data);
-		this.table.items[name] = primitive;
+		const primitive = new Primitive(data)
+		this.table.items[name] = primitive
 		if (!this.table.primitives) {
-			this.table.primitives = [];
+			this.table.primitives = []
 		}
-		this.table.primitives.push(primitive);
-		return this;
+		this.table.primitives.push(primitive)
+		return this
 	}
 
 	public addRamp(name: string, attrs: any = {}): this {
-		const data = new RampData(`GameItem${this.gameItem++}`);
-		data.name = name;
-		const dp1 = new DragPoint();
-		const dp2 = new DragPoint();
-		dp1.vertex = new Vertex3D(500, 500, 50);
-		dp2.vertex = new Vertex3D(700, 700, 50);
-		data.dragPoints = [ dp1, dp2 ];
-		Object.assign(data, attrs);
-		const ramp = new Ramp(data);
+		const data = new RampData(`GameItem${this.gameItem++}`)
+		data.name = name
+		const dp1 = new DragPoint()
+		const dp2 = new DragPoint()
+		dp1.vertex = new Vertex3D(500, 500, 50)
+		dp2.vertex = new Vertex3D(700, 700, 50)
+		data.dragPoints = [dp1, dp2]
+		Object.assign(data, attrs)
+		const ramp = new Ramp(data)
 
-		this.table.items[name] = ramp;
+		this.table.items[name] = ramp
 		if (!this.table.ramps) {
-			this.table.ramps = [];
+			this.table.ramps = []
 		}
-		this.table.ramps.push(ramp);
-		return this;
+		this.table.ramps.push(ramp)
+		return this
 	}
 
 	public addRubber(name: string, attrs: any = {}): this {
-		const data = new RubberData(`GameItem${this.gameItem++}`);
-		data.name = name;
-		const dp1 = new DragPoint();
-		const dp2 = new DragPoint();
-		dp1.vertex = new Vertex3D(500, 500, 50);
-		dp2.vertex = new Vertex3D(700, 700, 50);
-		data.dragPoints = [ dp1, dp2 ];
-		Object.assign(data, attrs);
+		const data = new RubberData(`GameItem${this.gameItem++}`)
+		data.name = name
+		const dp1 = new DragPoint()
+		const dp2 = new DragPoint()
+		dp1.vertex = new Vertex3D(500, 500, 50)
+		dp2.vertex = new Vertex3D(700, 700, 50)
+		data.dragPoints = [dp1, dp2]
+		Object.assign(data, attrs)
 
-		const rubber = new Rubber(data);
-		this.table.items[name] = rubber;
+		const rubber = new Rubber(data)
+		this.table.items[name] = rubber
 		if (!this.table.rubbers) {
-			this.table.rubbers = [];
+			this.table.rubbers = []
 		}
-		this.table.rubbers.push(rubber);
-		return this;
+		this.table.rubbers.push(rubber)
+		return this
 	}
 
 	public addSpinner(name: string, attrs: any = {}): this {
-		const data = new SpinnerData(`GameItem${this.gameItem++}`);
-		data.name = name;
-		data.center = new Vertex2D(500, 500);
-		Object.assign(data, attrs);
+		const data = new SpinnerData(`GameItem${this.gameItem++}`)
+		data.name = name
+		data.center = new Vertex2D(500, 500)
+		Object.assign(data, attrs)
 
-		const spinner = new Spinner(data);
-		this.table.items[name] = spinner;
+		const spinner = new Spinner(data)
+		this.table.items[name] = spinner
 		if (!this.table.spinners) {
-			this.table.spinners = [];
+			this.table.spinners = []
 		}
-		this.table.spinners.push(spinner);
-		return this;
+		this.table.spinners.push(spinner)
+		return this
 	}
 
 	public addSurface(name: string, attrs: any = {}): this {
-		const data = new SurfaceData(`GameItem${this.gameItem++}`);
-		data.name = name;
-		const dp1 = new DragPoint();
-		const dp2 = new DragPoint();
-		const dp3 = new DragPoint();
-		dp1.vertex = new Vertex3D(500, 500, 50);
-		dp2.vertex = new Vertex3D(700, 700, 50);
-		dp3.vertex = new Vertex3D(400, 600, 50);
-		data.dragPoints = [ dp1, dp2, dp3 ];
-		Object.assign(data, attrs);
-		const surface = new Surface(data);
+		const data = new SurfaceData(`GameItem${this.gameItem++}`)
+		data.name = name
+		const dp1 = new DragPoint()
+		const dp2 = new DragPoint()
+		const dp3 = new DragPoint()
+		dp1.vertex = new Vertex3D(500, 500, 50)
+		dp2.vertex = new Vertex3D(700, 700, 50)
+		dp3.vertex = new Vertex3D(400, 600, 50)
+		data.dragPoints = [dp1, dp2, dp3]
+		Object.assign(data, attrs)
+		const surface = new Surface(data)
 
-		this.table.items[name] = surface;
+		this.table.items[name] = surface
 		if (!this.table.surfaces) {
-			this.table.surfaces = [];
+			this.table.surfaces = []
 		}
-		this.table.surfaces.push(surface);
-		return this;
+		this.table.surfaces.push(surface)
+		return this
 	}
 
 	public addTrigger(name: string, attrs: any = {}): this {
-		const data = new TriggerData(`GameItem${this.gameItem++}`);
-		data.name = name;
-		data.center = new Vertex2D(500, 500);
-		const dp1 = new DragPoint();
-		const dp2 = new DragPoint();
-		const dp3 = new DragPoint();
-		dp1.vertex = new Vertex3D(500, 500, 50);
-		dp2.vertex = new Vertex3D(700, 700, 50);
-		dp3.vertex = new Vertex3D(400, 600, 50);
-		data.dragPoints = [ dp1, dp2, dp3 ];
-		Object.assign(data, attrs);
+		const data = new TriggerData(`GameItem${this.gameItem++}`)
+		data.name = name
+		data.center = new Vertex2D(500, 500)
+		const dp1 = new DragPoint()
+		const dp2 = new DragPoint()
+		const dp3 = new DragPoint()
+		dp1.vertex = new Vertex3D(500, 500, 50)
+		dp2.vertex = new Vertex3D(700, 700, 50)
+		dp3.vertex = new Vertex3D(400, 600, 50)
+		data.dragPoints = [dp1, dp2, dp3]
+		Object.assign(data, attrs)
 
-		const trigger = new Trigger(data);
-		this.table.items[name] = trigger;
+		const trigger = new Trigger(data)
+		this.table.items[name] = trigger
 		if (!this.table.triggers) {
-			this.table.triggers = [];
+			this.table.triggers = []
 		}
-		this.table.triggers.push(trigger);
-		return this;
+		this.table.triggers.push(trigger)
+		return this
 	}
 
 	public build(name?: string): Table {
 		if (name) {
-			this.table.data!.name = name;
+			this.table.data!.name = name
 		}
-		return new Table(new TableLoader(), this.table);
+		return new Table(new TableLoader(), this.table)
 	}
 }
