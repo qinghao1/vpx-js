@@ -22,7 +22,9 @@ const FLOAT_MAP: Record<string, string> = {
 	CORF: 'collisionReductionFactor',
 	DILI: 'disableLightingTop',
 	DILB: 'disableLightingBelow',
+	FALP: 'alpha',
 }
+const INT_MAP: Record<string, string> = { COLR: 'color' }
 const BOOL_MAP: Record<string, string> = {
 	DTXI: 'drawTexturesInside',
 	HTEV: 'hitEvent',
@@ -33,12 +35,16 @@ const BOOL_MAP: Record<string, string> = {
 	U3DM: 'use3DMesh',
 	EBFC: 'backfacesEnabled',
 	DIPT: 'displayTexture',
+	OSNM: 'objectSpaceNormalMap',
+	ADDB: 'addBlend',
+	ZMSK: 'useDepthMask',
 }
 const STRING_MAP: Record<string, string> = {
 	IMAG: 'szImage',
 	NRMA: 'szNormalMap',
 	MATR: 'szMaterial',
 	MAPH: 'szPhysicsMaterial',
+	LMAP: 'szLightmap',
 }
 
 /** Primitive data.
@@ -57,6 +63,7 @@ export class PrimitiveData extends ItemData implements IPhysicalData {
 	public szNormalMap?: string
 	public szMaterial?: string
 	public szPhysicsMaterial?: string
+	public szLightmap?: string
 	public sides!: number
 	public isVisible = true
 	public drawTexturesInside = false
@@ -83,6 +90,11 @@ export class PrimitiveData extends ItemData implements IPhysicalData {
 	public displayTexture = false
 	public meshFileName?: string
 	public depthBias = 0
+	public objectSpaceNormalMap = false
+	public addBlend = false
+	public useDepthMask = true
+	public alpha = 1
+	public color = 0xffffff
 
 	public static async fromStorage(storage: Storage, itemName: string, skipMeshes: boolean): Promise<PrimitiveData> {
 		const d = new PrimitiveData(itemName, skipMeshes)
@@ -115,6 +127,7 @@ export class PrimitiveData extends ItemData implements IPhysicalData {
 		if (
 			handleBiffTag(this, tag, buffer, len, {
 				float: FLOAT_MAP,
+				int: INT_MAP,
 				bool: BOOL_MAP,
 				string: STRING_MAP,
 			})

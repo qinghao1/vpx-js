@@ -11,6 +11,7 @@ import { ItemData } from '../item-data.js'
 import type { Table } from '../table/table.js'
 
 const FLOAT_MAP: Record<string, string> = {
+	HGHT: 'height',
 	RADI: 'falloff',
 	FAPO: 'falloffPower',
 	BWTH: 'intensity',
@@ -21,8 +22,9 @@ const FLOAT_MAP: Record<string, string> = {
 	BMSC: 'meshRadius',
 	BMVA: 'bulbModulateVsAdd',
 	BHHI: 'bulbHaloHeight',
+	STTF: 'state',
 }
-const INT_MAP: Record<string, string> = { STAT: 'state', BINT: 'blinkInterval' }
+const INT_MAP: Record<string, string> = { STAT: 'state', BINT: 'blinkInterval', SHDW: 'shadows', FADE: 'fader' }
 const BOOL_MAP: Record<string, string> = {
 	SHAP: 'roundLight',
 	BGLS: 'isBackglass',
@@ -31,6 +33,7 @@ const BOOL_MAP: Record<string, string> = {
 	SHBM: 'showBulbMesh',
 	STBM: 'staticBulbMesh',
 	SHRB: 'showReflectionOnBall',
+	VSBL: 'isVisible',
 }
 const STRING_MAP: Record<string, string> = { IMG1: 'szOffImage', BPAT: 'rgBlinkPattern', SURF: 'szSurface' }
 
@@ -62,6 +65,9 @@ export class LightData extends ItemData {
 	public meshRadius = 20
 	public bulbModulateVsAdd = 0.9
 	public bulbHaloHeight = 28
+	public height = 0
+	public shadows = 0 // ShadowMode::NONE
+	public fader = 0 // Fader::LINEAR
 	public dragPoints: DragPoint[] = []
 	public isVisible = true
 
