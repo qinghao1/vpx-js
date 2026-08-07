@@ -4,6 +4,7 @@
 import { blockStatement, breakStatement, ifStatement, switchCase, switchStatement } from '../estree.js'
 import type { ESIToken } from '../grammar/grammar.js'
 
+/** ppConditional. */
 export function ppConditional(node: ESIToken): any {
 	switch (node.type) {
 		case 'BlockIfStatement':
