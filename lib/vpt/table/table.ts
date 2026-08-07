@@ -112,17 +112,21 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 		}
 		if (loaded.info) this.info = loaded.info
 		if (loaded.tableScript) this.tableScript = loaded.tableScript
-		this.populateFromLoaded(loaded, 'textures', this.textures)
-		this.populateFromLoaded(loaded, 'collections', this.collections)
+		this.populateFromLoaded(loaded as unknown as Record<string, unknown>, 'textures', this.textures as unknown as Record<string, unknown>)
+		this.populateFromLoaded(loaded as unknown as Record<string, unknown>, 'collections', this.collections as unknown as Record<string, unknown>)
 		for (const [type, entry] of Object.entries(ITEM_REGISTRY)) {
 			const loadedKey = entry.key as keyof typeof loaded
 			const tableKey = loadedKey === 'textBoxes' ? 'textboxes' : loadedKey
-			this.populateFromLoaded(loaded, loadedKey as any, (this as any)[tableKey])
+			this.populateFromLoaded(
+				loaded as unknown as Record<string, unknown>,
+				loadedKey as unknown as string,
+				(this as unknown as Record<string, unknown>)[tableKey] as Record<string, unknown>,
+			)
 		}
 	}
 
-	private populateFromLoaded(loaded: any, key: string, dict: Record<string, any>): void {
-		const items = loaded[key] as any[] | undefined
+	private populateFromLoaded(loaded: Record<string, unknown>, key: string, dict: Record<string, unknown>): void {
+		const items = loaded[key] as unknown as { getName(): string }[] | undefined
 		if (!items?.length) return
 		for (const it of items) dict[it.getName()] = it
 	}
