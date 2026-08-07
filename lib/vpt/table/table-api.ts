@@ -16,7 +16,9 @@ import { dequantizeUnsignedPercent, ItemApi, quantizeUnsignedPercent } from '../
 import type { Table } from './table.js'
 import { TableData } from './table-data.js'
 
-/** Table API. */
+/** Table API.
+ *
+ * @see https://github.com/vpinball/vpinball/blob/master/pintable.cpp */
 export class TableApi extends ItemApi<TableData> {
 	private readonly global3DMaxSeparation = 0.3
 	private readonly global3DZPD = 0.5
