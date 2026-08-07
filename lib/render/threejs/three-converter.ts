@@ -11,7 +11,8 @@ import type { ThreeMaterialGenerator } from './three-material-generator.js'
 import type { ThreeMeshGenerator } from './three-mesh-generator.js'
 import { ThreeRenderApi } from './three-render-api.js'
 
-export class ThreeConverter {
+export /** Three.js converter helpers. */
+class ThreeConverter {
 	private readonly meshGenerator: ThreeMeshGenerator
 	private readonly mapGenerator: ThreeMapGenerator
 	private readonly materialGenerator: ThreeMaterialGenerator
