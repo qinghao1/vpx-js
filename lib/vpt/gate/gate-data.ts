@@ -7,6 +7,7 @@ import { Vertex2D } from '../../math/vertex2d.js'
 import { Enums } from '../enums.js'
 import { ItemData } from '../item-data.js'
 
+/** Gate data. */
 export class GateData extends ItemData {
 	public angleMax: number = Math.PI / 2.0
 	public angleMin: number = 0
