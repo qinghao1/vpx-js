@@ -8,16 +8,16 @@ import type { ESIToken } from '../grammar/grammar.js'
 
 /** Transforms `With` blocks into explicit member expressions. */
 export function ppWith(node: ESIToken): unknown {
-	if (node.type === 'WithStatement') return ppWithStatement(node as ESIToken)
+	if (node.type === 'WithStatement') return ppWithStatement(node)
 	return null
 }
 
 function ppWithStatement(node: ESIToken): unknown {
 	let estree: unknown[] = []
-	const expr = (node.children[0] as any).estree
+	const expr = node.children[0].estree
 	for (const child of node.children) {
 		if (child.type !== 'Block') continue
-		const block = replace((child as any).estree, {
+		const block = replace(child.estree, {
 			leave: (blockNode: any) => {
 				if (blockNode.type === 'Identifier' && blockNode.name.startsWith('.')) {
 					return memberExpression(expr, identifier(blockNode.name.substring(1)))
