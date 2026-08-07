@@ -27,18 +27,23 @@ import { LightUpdater } from './light-updater.js'
  */
 export class Light extends Item<LightData> implements IRenderable<LightState>, IAnimatable, IScriptable<LightApi> {
 	// public getters
+	/** Get color. */
 	get color() {
 		return this.data.color
 	}
+	/** Get intensity. */
 	get intensity() {
 		return this.data.intensity
 	}
+	/** Get falloff. */
 	get falloff() {
 		return this.data.falloff
 	}
+	/** Get vCenter. */
 	get vCenter() {
 		return this.data.center
 	}
+	/** Get offImage. */
 	get offImage() {
 		return this.data.szOffImage
 	}
