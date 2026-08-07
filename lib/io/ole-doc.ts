@@ -2,20 +2,8 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { EventEmitter } from 'events'
+import { concatUint8Arrays, getDataView, OLE_ID } from './binary-helpers.js'
 import { readableStream } from './event-stream.js'
-
-const OLE_ID = new Uint8Array([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1])
-
-function concatUint8Arrays(a: Uint8Array, b: Uint8Array): Uint8Array {
-	const c = new Uint8Array(a.length + b.length)
-	c.set(a, 0)
-	c.set(b, a.length)
-	return c
-}
-
-function getDataView(buf: Uint8Array): DataView {
-	return new DataView(buf.buffer, buf.byteOffset, buf.byteLength)
-}
 
 export class Header {
 	public secSize!: number

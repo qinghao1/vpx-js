@@ -3,19 +3,8 @@
 
 import { inflate } from 'zlib'
 import { f4 } from '../math/float.js'
+import { decodeUtf8, getDataView, readInt32LE } from './binary-helpers.js'
 import type { ReadResult } from './ole-doc.js'
-
-const textDecoder = new TextDecoder('utf-8')
-
-function getDataView(buf: Uint8Array): DataView {
-	return new DataView(buf.buffer, buf.byteOffset, buf.byteLength)
-}
-function readInt32LE(buf: Uint8Array, off: number): number {
-	return getDataView(buf).getInt32(off, true)
-}
-function decodeUtf8(buf: Uint8Array): string {
-	return textDecoder.decode(buf)
-}
 
 /** Parser for BIFF records used in VPX files. */
 export class BiffParser {
