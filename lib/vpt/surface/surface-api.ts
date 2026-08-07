@@ -45,18 +45,21 @@ export class SurfaceApi extends ItemApi<SurfaceData> {
 		}
 	}
 
+	/** Get HasHitEvent. */
 	get HasHitEvent() {
 		return this.data.hitEvent
 	}
 	set HasHitEvent(v) {
 		this.data.hitEvent = v
 	}
+	/** Get Threshold. */
 	get Threshold() {
 		return this.data.threshold
 	}
 	set Threshold(v) {
 		this.data.threshold = v
 	}
+	/** Get Image. */
 	get Image() {
 		return this.data.szImage
 	}
@@ -66,6 +69,7 @@ export class SurfaceApi extends ItemApi<SurfaceData> {
 		}
 		this.data.szImage = v
 	}
+	/** Get SideMaterial. */
 	get SideMaterial() {
 		return this.data.szSideMaterial
 	}
@@ -75,6 +79,7 @@ export class SurfaceApi extends ItemApi<SurfaceData> {
 		}
 		this.data.szSideMaterial = v
 	}
+	/** Get SlingshotMaterial. */
 	get SlingshotMaterial() {
 		return this.data.szSlingShotMaterial
 	}
@@ -83,18 +88,21 @@ export class SurfaceApi extends ItemApi<SurfaceData> {
 	}
 	/** @deprecated */
 	public ImageAlignment: any = null
+	/** Get HeightBottom. */
 	get HeightBottom() {
 		return this.data.heightBottom
 	}
 	set HeightBottom(v) {
 		this.data.heightBottom = v
 	}
+	/** Get HeightTop. */
 	get HeightTop() {
 		return this.data.heightTop
 	}
 	set HeightTop(v) {
 		this.data.heightTop = v
 	}
+	/** Get TopMaterial. */
 	get TopMaterial() {
 		return this.data.szTopMaterial
 	}
@@ -104,72 +112,84 @@ export class SurfaceApi extends ItemApi<SurfaceData> {
 		}
 		this.data.szTopMaterial = v
 	}
+	/** Get PhysicsMaterial. */
 	get PhysicsMaterial() {
 		return this.data.szPhysicsMaterial
 	}
 	set PhysicsMaterial(v) {
 		this.data.szPhysicsMaterial = v
 	}
+	/** Get OverwritePhysics. */
 	get OverwritePhysics() {
 		return this.data.overwritePhysics
 	}
 	set OverwritePhysics(v) {
 		this.data.overwritePhysics = v
 	}
+	/** Get CanDrop. */
 	get CanDrop() {
 		return this.data.isDroppable
 	}
 	set CanDrop(v) {
 		this.data.isDroppable = v
 	}
+	/** Get FlipbookAnimation. */
 	get FlipbookAnimation() {
 		return this.data.isFlipbook
 	}
 	set FlipbookAnimation(v) {
 		this.data.isFlipbook = v
 	}
+	/** Get IsBottomSolid. */
 	get IsBottomSolid() {
 		return this.data.isBottomSolid
 	}
 	set IsBottomSolid(v) {
 		this.data.isBottomSolid = v
 	}
+	/** Get IsDropped. */
 	get IsDropped() {
 		return this.state.isDropped
 	}
 	set IsDropped(v) {
 		this._setDropped(v)
 	}
+	/** Get DisplayTexture. */
 	get DisplayTexture() {
 		return this.data.displayTexture
 	}
 	set DisplayTexture(v) {
 		this.data.displayTexture = v
 	}
+	/** Get SlingshotStrength. */
 	get SlingshotStrength() {
 		return this.data.slingshotForce
 	}
 	set SlingshotStrength(v) {
 		this.data.slingshotForce = v
 	}
+	/** Get Elasticity. */
 	get Elasticity() {
 		return this.data.elasticity
 	}
 	set Elasticity(v) {
 		this.data.elasticity = v
 	}
+	/** Get Friction. */
 	get Friction() {
 		return this.data.friction
 	}
 	set Friction(v) {
 		this.data.friction = v
 	}
+	/** Get Scatter. */
 	get Scatter() {
 		return this.data.scatter
 	}
 	set Scatter(v) {
 		this.data.scatter = v
 	}
+	/** Get Visible. */
 	get Visible() {
 		return this.data.isTopBottomVisible
 	}
@@ -179,6 +199,7 @@ export class SurfaceApi extends ItemApi<SurfaceData> {
 		}
 		this.data.isTopBottomVisible = v
 	}
+	/** Get SideImage. */
 	get SideImage() {
 		return this.data.szSideImage
 	}
@@ -189,12 +210,14 @@ export class SurfaceApi extends ItemApi<SurfaceData> {
 		}
 		this.data.szSideImage = v
 	}
+	/** Get Disabled. */
 	get Disabled() {
 		return this.data.isDisabled
 	}
 	set Disabled(v) {
 		this.data.isDisabled = v
 	}
+	/** Get SideVisible. */
 	get SideVisible() {
 		return this.data.isSideVisible
 	}
@@ -204,42 +227,49 @@ export class SurfaceApi extends ItemApi<SurfaceData> {
 		}
 		this.data.isSideVisible = v
 	}
+	/** Get Collidable. */
 	get Collidable() {
 		return this.data.isCollidable
 	}
 	set Collidable(v) {
 		this._setCollidable(v)
 	}
+	/** Get SlingshotThreshold. */
 	get SlingshotThreshold() {
 		return this.data.slingshotThreshold
 	}
 	set SlingshotThreshold(v) {
 		this.data.slingshotThreshold = v
 	}
+	/** Get SlingshotAnimation. */
 	get SlingshotAnimation() {
 		return this.data.slingshotAnimation
 	}
 	set SlingshotAnimation(v) {
 		this.data.slingshotAnimation = v
 	}
+	/** Get DisableLighting. */
 	get DisableLighting() {
 		return !!this.data.disableLightingTop
 	}
 	set DisableLighting(v) {
 		this.data.disableLightingTop = v ? 1 : 0
 	}
+	/** Get BlendDisableLighting. */
 	get BlendDisableLighting() {
 		return this.data.disableLightingTop
 	}
 	set BlendDisableLighting(v) {
 		this.data.disableLightingTop = v
 	}
+	/** Get BlendDisableLightingFromBelow. */
 	get BlendDisableLightingFromBelow() {
 		return this.data.disableLightingBelow
 	}
 	set BlendDisableLightingFromBelow(v) {
 		this.data.disableLightingBelow = v
 	}
+	/** Get ReflectionEnabled. */
 	get ReflectionEnabled() {
 		return this.data.isReflectionEnabled
 	}
