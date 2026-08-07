@@ -7,13 +7,13 @@ import type { Table } from '../table/table.js'
 import type { LightData } from './light-data.js'
 import type { LightState } from './light-state.js'
 
-/** Light updater. */
+/** Light updater — intensity and color. */
 export class LightUpdater extends ItemUpdater<LightState> {
-	private readonly data: LightData
-
-	constructor(data: LightData, state: LightState) {
+	constructor(
+		private readonly data: LightData,
+		state: LightState,
+	) {
 		super(state)
-		this.data = data
 	}
 
 	public applyState<NODE, GEOMETRY, POINT_LIGHT>(
@@ -22,9 +22,7 @@ export class LightUpdater extends ItemUpdater<LightState> {
 		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
 		table: Table,
 	): void {
-		// update local state
 		Object.assign(this.state, state)
-
 		renderApi.applyLighting(this.state, this.data.intensity, obj)
 	}
 }
