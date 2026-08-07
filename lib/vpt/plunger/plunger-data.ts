@@ -7,6 +7,7 @@ import { Vertex2D } from '../../math/vertex2d.js'
 import { Enums } from '../enums.js'
 import { ItemData } from '../item-data.js'
 
+/** Plunger data. */
 export class PlungerData extends ItemData {
 	public type: number = Enums.PlungerType.PlungerTypeModern
 	public center!: Vertex2D
