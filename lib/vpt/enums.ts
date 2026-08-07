@@ -76,7 +76,8 @@ export class ImageAlignment extends VbsApi {
 	}
 }
 
-export class Shape extends VbsApi {
+export /** Shape. */
+class Shape extends VbsApi {
 	public readonly ShapeCircle = 0
 	public readonly ShapeCustom = 1
 
