@@ -59,12 +59,12 @@ export class TriggerMeshGenerator {
 	private getFullMatrix(): Matrix3D {
 		const m = new Matrix3D()
 		if (this.data.shape === Enums.TriggerShape.TriggerWireB) {
-			m.rotateXMatrix(degToRad(-23))
-			const tmp = new Matrix3D().rotateZMatrix(degToRad(this.data.rotation))
+			m.rotateZMatrix(degToRad(this.data.rotation))
+			const tmp = new Matrix3D().rotateXMatrix(degToRad(-23))
 			m.multiply(tmp)
 		} else if (this.data.shape === Enums.TriggerShape.TriggerWireC) {
-			m.rotateXMatrix(degToRad(140))
-			const tmp = new Matrix3D().rotateZMatrix(degToRad(this.data.rotation))
+			m.rotateZMatrix(degToRad(this.data.rotation))
+			const tmp = new Matrix3D().rotateXMatrix(degToRad(140))
 			m.multiply(tmp)
 		} else {
 			m.rotateZMatrix(degToRad(this.data.rotation))

@@ -139,17 +139,12 @@ export class RubberMeshGenerator {
 	private getMatrices(table: Table): [Matrix3D, Matrix3D] {
 		const full = new Matrix3D()
 		const tmp = new Matrix3D()
-		full.rotateZMatrix(degToRad(this.data.rotZ))
+		full.rotateXMatrix(degToRad(this.data.rotX))
 		tmp.rotateYMatrix(degToRad(this.data.rotY))
 		full.multiply(tmp)
-		tmp.rotateXMatrix(degToRad(this.data.rotX))
+		tmp.rotateZMatrix(degToRad(this.data.rotZ))
 		full.multiply(tmp)
-
 		const vert = new Matrix3D()
-		tmp.setTranslation(-this.middlePoint.x, -this.middlePoint.y, -this.middlePoint.z)
-		vert.multiply(tmp, full)
-		tmp.setScaling(1, 1, table.getScaleZ())
-		vert.multiply(tmp)
 		if (this.data.height === this.data.hitHeight)
 			tmp.setTranslation(this.middlePoint.x, this.middlePoint.y, this.data.height + table.getTableHeight())
 		else
@@ -159,6 +154,12 @@ export class RubberMeshGenerator {
 				f4(this.data.height * table.getScaleZ()) + table.getTableHeight(),
 			)
 		vert.multiply(tmp)
+		tmp.setScaling(1, 1, table.getScaleZ())
+		vert.multiply(tmp)
+		tmp.setTranslation(-this.middlePoint.x, -this.middlePoint.y, -this.middlePoint.z)
+		const tmp2 = new Matrix3D()
+		tmp2.multiplyMatrices(full, tmp)
+		vert.multiply(tmp2)
 		return [vert, full]
 	}
 }

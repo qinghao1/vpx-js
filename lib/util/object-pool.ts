@@ -27,7 +27,6 @@ export class Pool<T> {
 	/** Returns an instance. */
 	release(obj: T): void {
 		if (!this.pooled.has(obj as object)) {
-			logger().warn('Trying to recycle non-pooled %s, aborting.', this.ctor.name)
 			return
 		}
 		if (this.items.length >= Pool.MAX) {
