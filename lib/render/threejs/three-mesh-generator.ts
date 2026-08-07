@@ -269,8 +269,8 @@ class RecyclableFloat32BufferAttribute extends Float32BufferAttribute {
 }
 
 /* istanbul ignore next: used for debugging */
-export /** MeshExporter. */
-class MeshExporter {
+/** MeshExporter. */
+export class MeshExporter {
 	private output = new Mesh()
 
 	private indexVertex = 0
