@@ -9,15 +9,16 @@ import type { Table } from '../table/table.js'
 import type { TriggerData } from './trigger-data.js'
 import type { TriggerState } from './trigger-state.js'
 
-/** Trigger API.
- *
- * @see https://github.com/vpinball/vpinball/blob/master/trigger.cpp */
+/** Trigger API — VBS surface for `Trigger`. @see https://github.com/vpinball/vpinball/blob/master/trigger.cpp */
 export class TriggerApi extends ItemApi<TriggerData> {
-	private readonly state: TriggerState
-
-	constructor(state: TriggerState, data: TriggerData, events: EventProxy, player: Player, table: Table) {
+	constructor(
+		private readonly state: TriggerState,
+		data: TriggerData,
+		events: EventProxy,
+		player: Player,
+		table: Table,
+	) {
 		super(data, events, player, table)
-		this.state = state
 	}
 
 	get X() {
@@ -108,7 +109,7 @@ export class TriggerApi extends ItemApi<TriggerData> {
 			if (j >= 0) {
 				++cnt
 				ball.hit.vpVolObjs.splice(j, 1)
-				this.player.destroyBall(ball) // inside trigger volume?
+				this.player.destroyBall(ball)
 			}
 		}
 		return cnt
@@ -118,10 +119,7 @@ export class TriggerApi extends ItemApi<TriggerData> {
 		return super._ballCountOver(this.events)
 	}
 
-	/**
-	 * No idea wtf this is supposed to do.
-	 */
-	public InterfaceSupportsErrorInfo(riid: any): boolean {
+	public InterfaceSupportsErrorInfo(_riid: unknown): boolean {
 		return false
 	}
 
