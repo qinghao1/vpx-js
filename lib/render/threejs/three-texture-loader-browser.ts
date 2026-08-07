@@ -49,6 +49,16 @@ export class ThreeTextureLoaderBrowser implements ITextureLoader<ThreeTexture> {
 		texture.needsUpdate = true
 		texture.generateMipmaps = false
 		texture.minFilter = LinearFilter as any
+		texture.anisotropy = 1
+		const ds = downsampleIfNeeded(texture, MAX_REGULAR)
+		if (ds && ds !== texture) {
+			try {
+				;(texture as any).dispose?.()
+			} catch {}
+			;(ds as any).name = `texture:${name}`
+			;(ds as any).needsUpdate = true
+			return ds as ThreeTexture
+		}
 		return texture
 	}
 
