@@ -9,7 +9,8 @@ import type { Table } from '../table/table.js'
 import type { RampData } from './ramp-data.js'
 import type { RampState } from './ramp-state.js'
 
-export class RampApi extends ItemApi<RampData> {
+export /** RampApi. */
+class RampApi extends ItemApi<RampData> {
 	private readonly hits: HitObject[]
 	private readonly state: RampState
 	private readonly isDynamic: boolean
