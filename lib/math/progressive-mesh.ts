@@ -159,7 +159,8 @@ export class ProgMeshVertex {
 	}
 }
 
-export class ProgMeshFloat3 {
+export /** ProgMeshFloat3. */
+class ProgMeshFloat3 {
 	public x: number
 	public y: number
 	public z: number
