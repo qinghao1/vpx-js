@@ -4,6 +4,7 @@
 import { FLT_MAX, FLT_MIN } from '../vpt/mesh.js'
 import { f4 } from './float.js'
 
+/** Progressive mesh decimation (Stan Melax). */
 const vertices: ProgMeshVertex[] = []
 const triangles: ProgMeshTriangle[] = []
 
