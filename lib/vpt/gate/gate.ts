@@ -26,11 +26,7 @@ import type { GateMover } from './gate-mover.js'
 import { GateState } from './gate-state.js'
 import { GateUpdater } from './gate-updater.js'
 
-/**
- * VPinball's gates.
- *
- * @see https://github.com/vpinball/vpinball/blob/master/gate.cpp
- */
+/** Gate item. @see https://github.com/vpinball/vpinball/blob/master/gate.cpp */
 export class Gate
 	extends Item<GateData>
 	implements IRenderable<GateState>, IPlayable, IMovable, IHittable, IScriptable<GateApi>
