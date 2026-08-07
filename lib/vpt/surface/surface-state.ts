@@ -22,6 +22,7 @@ export class SurfaceState extends ItemState {
 	get isVisible(): boolean {
 		return this.isTopVisible || this.isSideVisible
 	}
+	/** Set isVisible. */
 	set isVisible(v) {
 		/* not used in abstract */
 	}
