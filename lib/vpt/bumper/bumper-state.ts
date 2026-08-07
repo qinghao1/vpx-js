@@ -4,7 +4,9 @@
 import { Pool } from '../../util/object-pool.js'
 import { ItemState } from '../item-state.js'
 
-/** Bumper state. */
+/** Bumper state.
+ *
+ * @see https://github.com/vpinball/vpinball/blob/master/bumper.cpp */
 export class BumperState extends ItemState {
 	public static readonly POOL = new Pool(BumperState)
 
