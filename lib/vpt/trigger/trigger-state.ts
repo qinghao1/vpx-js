@@ -4,7 +4,9 @@
 import { Pool } from '../../util/object-pool.js'
 import { ItemState } from '../item-state.js'
 
-/** Trigger state. */
+/** Trigger state.
+ *
+ * @see https://github.com/vpinball/vpinball/blob/master/trigger.cpp */
 export class TriggerState extends ItemState {
 	public static readonly POOL = new Pool(TriggerState)
 
