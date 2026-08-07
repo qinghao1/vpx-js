@@ -129,7 +129,8 @@ class RampType extends VbsApi {
 	}
 }
 
-export class PlungerType extends VbsApi {
+export /** PlungerType. */
+class PlungerType extends VbsApi {
 	public readonly PlungerTypeModern = 1
 	public readonly PlungerTypeFlat = 2
 	public readonly PlungerTypeCustom = 3
