@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { replace } from 'estraverse'
-import type { BinaryOperator, Expression, Identifier, UnaryOperator } from 'estree'
+import type { BinaryOperator, Expression, Identifier, LogicalOperator, UnaryOperator } from 'estree'
 import {
 	binaryExpression,
 	callExpression,
@@ -15,8 +15,8 @@ import {
 import type { ESIToken } from '../grammar/grammar.js'
 import { Transformer } from '../transformer/transformer.js'
 
-/** ppExpr. */
-export function ppExpr(node: ESIToken): any {
+/** Transforms VBS expressions into ESTree. */
+export function ppExpr(node: ESIToken): unknown {
 	if (node.children.length > 1) {
 		switch (node.type) {
 			case 'LogicalOperatorExpression':
@@ -68,7 +68,7 @@ export function ppExpr(node: ESIToken): any {
 	return null
 }
 
-function ppBinaryExpression(node: ESIToken): any {
+function ppBinaryExpression(node: ESIToken): Expression {
 	let expr = node.children[0].estree
 	let index = node.children[0].text.length
 	for (const child of node.children.slice(1)) {
@@ -79,7 +79,7 @@ function ppBinaryExpression(node: ESIToken): any {
 	return expr
 }
 
-function ppIntegerDivisionExpression(node: ESIToken): any {
+function ppIntegerDivisionExpression(node: ESIToken): Expression {
 	let expr = node.children[0].estree
 	for (const child of node.children.slice(1)) {
 		expr = callExpression(memberExpression(identifier(Transformer.VBSHELPER_NAME), identifier('intDiv')), [
@@ -91,7 +91,7 @@ function ppIntegerDivisionExpression(node: ESIToken): any {
 }
 
 /** ppModuloExpression. */
-export function ppModuloExpression(node: ESIToken): any {
+export function ppModuloExpression(node: ESIToken): Expression {
 	let expr = node.children[0].estree
 	for (const child of node.children.slice(1)) {
 		expr = binaryExpression('%', expr, child.estree)
@@ -99,7 +99,7 @@ export function ppModuloExpression(node: ESIToken): any {
 	return expr
 }
 
-export function ppExponentExpression(node: ESIToken): any {
+export function ppExponentExpression(node: ESIToken): Expression {
 	let expr = node.children[0].estree
 	for (const child of node.children.slice(1)) {
 		expr = callExpression(memberExpression(identifier(Transformer.VBSHELPER_NAME), identifier('exponent')), [
@@ -111,7 +111,7 @@ export function ppExponentExpression(node: ESIToken): any {
 }
 
 /** ppConcatExpression. */
-export function ppConcatExpression(node: ESIToken): any {
+export function ppConcatExpression(node: ESIToken): Expression {
 	let expr = node.children[0].estree
 	for (const child of node.children.slice(1)) {
 		expr = binaryExpression('+', expr, child.estree)
@@ -119,14 +119,14 @@ export function ppConcatExpression(node: ESIToken): any {
 	return expr
 }
 
-const LOGICAL_OPERATORS: any = {
+const LOGICAL_OPERATORS: Record<string, string> = {
 	And: '&&',
 	Or: '||',
 	Eqv: 'Eqv',
 	Xor: 'Xor',
 }
 
-function ppLogicalExpression(node: ESIToken): any {
+function ppLogicalExpression(node: ESIToken): Expression {
 	let expr = node.children[0].estree
 	let index = node.children[0].text.length
 	for (const child of node.children.slice(1)) {
@@ -145,7 +145,7 @@ function ppLogicalExpression(node: ESIToken): any {
 						)
 						break
 					default:
-						expr = logicalExpression(LOGICAL_OPERATORS[key], expr, child.estree)
+						expr = logicalExpression(LOGICAL_OPERATORS[key] as LogicalOperator, expr, child.estree)
 						break
 				}
 				index += child.text.length + key.length + 2
@@ -156,7 +156,7 @@ function ppLogicalExpression(node: ESIToken): any {
 	return expr
 }
 
-const RELATIONAL_OPERATORS: any = {
+const RELATIONAL_OPERATORS: Record<string, string> = {
 	'<>': '!=',
 	'><': '!=',
 	'<=': '<=',
@@ -168,7 +168,7 @@ const RELATIONAL_OPERATORS: any = {
 	'=': '==',
 }
 
-function ppRelationalExpression(node: ESIToken): any {
+function ppRelationalExpression(node: ESIToken): Expression {
 	let expr = node.children[0].estree
 	let index = node.children[0].text.length
 	for (const child of node.children.slice(1)) {
@@ -187,7 +187,7 @@ function ppRelationalExpression(node: ESIToken): any {
 						}
 						break
 					default:
-						expr = binaryExpression(RELATIONAL_OPERATORS[key], expr, child.estree)
+						expr = binaryExpression(RELATIONAL_OPERATORS[key] as BinaryOperator, expr, child.estree)
 						break
 				}
 				index += child.text.length + key.length
@@ -198,7 +198,7 @@ function ppRelationalExpression(node: ESIToken): any {
 	return expr
 }
 
-function ppTypeExpression(node: ESIToken): any {
+function ppTypeExpression(node: ESIToken): Expression {
 	let expr = node.children[0].estree
 	let index = node.children[0].text.length
 	for (const child of node.children.slice(1)) {
@@ -213,19 +213,19 @@ function ppTypeExpression(node: ESIToken): any {
 	return expr
 }
 
-function ppUnaryExpression(node: ESIToken): any {
+function ppUnaryExpression(node: ESIToken): Expression {
 	return unaryExpression(node.text.charAt(0) as UnaryOperator, node.children[0].estree)
 }
 
-function ppLogicalNotExpression(node: ESIToken): any {
+function ppLogicalNotExpression(node: ESIToken): Expression {
 	return unaryExpression('!', node.children[0].estree)
 }
 
-function ppParenthesizedExpression(node: ESIToken): any {
+function ppParenthesizedExpression(node: ESIToken): unknown {
 	return node.children[1].estree
 }
 
-function ppMemberAccessExpression(node: ESIToken) {
+function ppMemberAccessExpression(node: ESIToken): Identifier {
 	let name = '.'
 	switch (node.children[1].estree.type) {
 		case 'Identifier':
@@ -238,11 +238,11 @@ function ppMemberAccessExpression(node: ESIToken) {
 	return identifier(name)
 }
 
-function ppSubExpression(node: ESIToken): any {
-	let id: any = null
-	const argLists = []
-	let expr = null
-	let args
+function ppSubExpression(node: ESIToken): unknown {
+	let id: Expression | null = null
+	const argLists: Expression[][] = []
+	let expr: unknown = null
+	let args: Expression[] | undefined
 	for (const child of node.children) {
 		switch (child.type) {
 			case 'MemberAccessExpression':
@@ -256,43 +256,38 @@ function ppSubExpression(node: ESIToken): any {
 				args = child.estree
 				break
 			case 'CloseParenthesis':
-				argLists.push(args)
+				argLists.push(args!)
 				break
 			case 'SubExpression':
 				expr = child.estree
 				break
 		}
 	}
-	let estree: any
+	let estree: Expression | undefined
 	if (argLists.length > 0) {
 		for (const argList of argLists) {
-			estree = callExpression(estree ? estree : id, argList)
+			estree = callExpression((estree ? estree : id) as Expression, argList)
 		}
 	} else {
-		estree = id
+		estree = id as Expression
 	}
-	/**
-	 * As additional subexpressions are added, only wrap the first found
-	 * identifier in a memberExpression. Also, strip the dot from the
-	 * identifier, so we don't get a..b .
-	 */
 	if (expr != null) {
 		let found = false
-		estree = replace(expr, {
+		estree = replace(expr as Expression, {
 			enter: (astNode) => {
 				if (!found) {
 					if (astNode.type === 'Identifier') {
 						found = true
-						return memberExpression(estree, identifier(astNode.name.substr(1)))
+						return memberExpression(estree as Expression, identifier((astNode as Identifier).name.substring(1)))
 					}
 				}
 			},
-		})
+		}) as Expression
 	}
 	return estree
 }
 
-function ppInvocationExpression(node: ESIToken): any {
+function ppInvocationExpression(node: ESIToken): Expression {
 	let expr: Expression | undefined
 	for (const child of node.children) {
 		switch (child.type) {
@@ -313,7 +308,7 @@ function ppInvocationExpression(node: ESIToken): any {
 	return ppReplaceDots(expr as Expression)
 }
 
-function ppInvocationMemberAccessExpression(node: ESIToken): any {
+function ppInvocationMemberAccessExpression(node: ESIToken): Expression {
 	let expr: Expression | undefined
 	let currentExpr: Expression | undefined
 	for (const child of node.children) {
@@ -335,15 +330,12 @@ function ppInvocationMemberAccessExpression(node: ESIToken): any {
 	return ppAppend(expr, currentExpr as Expression)
 }
 
-function ppNewExpression(node: ESIToken): any {
+function ppNewExpression(node: ESIToken): Expression {
 	return newExpression(node.children[0].estree, [])
 }
 
-/**
- * Prepend an expression with an expression.
- * Example: `b(1,2)` prepended with `a` would become `a.b(1,2)`
- */
-function ppPrepend(source: Expression, node: Expression): any {
+/** Prepends `a` to `b(1,2)` → `a.b(1,2)`. */
+function ppPrepend(source: Expression, node: Expression): Expression {
 	let found = false
 	return replace(source, {
 		leave: (astNode) => {
@@ -352,14 +344,11 @@ function ppPrepend(source: Expression, node: Expression): any {
 				return memberExpression(node, astNode as Identifier)
 			}
 		},
-	})
+	}) as Expression
 }
 
-/**
- * Append an expression with an expression.
- * Example: `b(1,2)` appended with `c(3,4)` would become `b(1,2).c(3,4)`
- */
-function ppAppend(source: Expression | undefined, node: Expression): any {
+/** Appends `c(3,4)` to `b(1,2)` → `b(1,2).c(3,4)`. */
+function ppAppend(source: Expression | undefined, node: Expression): Expression {
 	if (source) {
 		if (node.type === 'Identifier') {
 			source = memberExpression(source, node)
@@ -372,24 +361,20 @@ function ppAppend(source: Expression | undefined, node: Expression): any {
 	return source
 }
 
-/**
- * Remove any identifiers that begin with a period except for the first one.
- * If an invocation statement is inside a with statement, it can begin with
- * a period.
- */
-function ppReplaceDots(source: Expression): any {
+/** Strips leading dots from identifiers except the first (for `With`). */
+function ppReplaceDots(source: Expression): Expression {
 	let first = true
 	return replace(source, {
 		enter: (node) => {
 			if (node.type === 'Identifier') {
 				if (!first) {
-					if (node.name.startsWith('.')) {
-						return identifier(node.name.substr(1))
+					if ((node as Identifier).name.startsWith('.')) {
+						return identifier((node as Identifier).name.substring(1))
 					}
 				} else {
 					first = false
 				}
 			}
 		},
-	})
+	}) as Expression
 }
