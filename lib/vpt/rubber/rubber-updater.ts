@@ -10,16 +10,14 @@ import type { Table } from '../table/table.js'
 import type { RubberData } from './rubber-data.js'
 import type { RubberState } from './rubber-state.js'
 
-/** RubberUpdater. */
+/** Rubber updater — height and rotation. */
 export class RubberUpdater extends ItemUpdater<RubberState> {
-	private readonly data: RubberData
-
-	private readonly middlePoint: Vertex3D
-
-	constructor(data: RubberData, state: RubberState, middlePoint: Vertex3D) {
+	constructor(
+		private readonly data: RubberData,
+		state: RubberState,
+		private readonly middlePoint: Vertex3D,
+	) {
 		super(state)
-		this.data = data
-		this.middlePoint = middlePoint
 	}
 
 	public applyState<NODE, GEOMETRY, POINT_LIGHT>(
@@ -28,12 +26,9 @@ export class RubberUpdater extends ItemUpdater<RubberState> {
 		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
 		table: Table,
 	): void {
-		// update local state
 		Object.assign(this.state, state)
-
 		this.applyVisibility(obj, state, renderApi)
 		this.applyMaterial(obj, state.material, state.texture, renderApi, table)
-
 		if (
 			state.rotX !== undefined ||
 			state.rotY !== undefined ||
@@ -49,25 +44,21 @@ export class RubberUpdater extends ItemUpdater<RubberState> {
 		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
 		table: Table,
 	): void {
-		const diffRotX = this.data.rotX - this.state.rotX
-		const diffRotY = this.data.rotY - this.state.rotY
-		const diffRotZ = -(this.data.rotZ - this.state.rotZ)
-
-		const rotMatrix = Matrix3D.claim()
-		const tempMat = Matrix3D.claim()
-		rotMatrix.rotateZMatrix(degToRad(diffRotZ))
-		tempMat.rotateYMatrix(degToRad(diffRotY))
-		rotMatrix.multiply(tempMat)
-		tempMat.rotateXMatrix(degToRad(diffRotX))
-		rotMatrix.multiply(tempMat)
-
-		const matrix = Matrix3D.claim()
-		tempMat.setTranslation(-this.middlePoint.x, -this.middlePoint.y, this.data.height + table.getTableHeight())
-		matrix.multiply(tempMat, rotMatrix)
-		tempMat.setTranslation(this.middlePoint.x, this.middlePoint.y, -this.state.height - table.getTableHeight())
-		matrix.multiply(tempMat)
-
-		renderApi.applyMatrixToNode(matrix, obj)
-		Matrix3D.release(rotMatrix, tempMat, matrix)
+		const dX = this.data.rotX - this.state.rotX
+		const dY = this.data.rotY - this.state.rotY
+		const dZ = -(this.data.rotZ - this.state.rotZ)
+		const rot = Matrix3D.claim().rotateZMatrix(degToRad(dZ))
+		const tmp = Matrix3D.claim()
+		tmp.rotateYMatrix(degToRad(dY))
+		rot.multiply(tmp)
+		tmp.rotateXMatrix(degToRad(dX))
+		rot.multiply(tmp)
+		const m = Matrix3D.claim()
+		tmp.setTranslation(-this.middlePoint.x, -this.middlePoint.y, this.data.height + table.getTableHeight())
+		m.multiply(tmp, rot)
+		tmp.setTranslation(this.middlePoint.x, this.middlePoint.y, -this.state.height - table.getTableHeight())
+		m.multiply(tmp)
+		renderApi.applyMatrixToNode(m, obj)
+		Matrix3D.release(rot, tmp, m)
 	}
 }
