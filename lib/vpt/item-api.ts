@@ -27,21 +27,18 @@ export abstract class ItemApi<DATA extends ItemData> extends EventEmitter {
 
 	protected abstract _getPropertyNames(): string[]
 
-	/** Get Name. */
 	get Name() {
 		return this.data.getName()
 	}
 	set Name(v) {
 		this.data.name = v
 	}
-	/** Get TimerInterval. */
 	get TimerInterval() {
 		return this.data.timer.interval
 	}
 	set TimerInterval(v) {
 		this._setTimerInterval(v)
 	}
-	/** Get TimerEnabled. */
 	get TimerEnabled() {
 		return this.data.timer.enabled
 	}
