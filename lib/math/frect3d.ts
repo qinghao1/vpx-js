@@ -1,5 +1,5 @@
-import { FLT_MAX } from '../vpt/mesh'
-import type { Vertex3D } from './vertex3d'
+import { FLT_MAX } from '../vpt/mesh.js'
+import type { Vertex3D } from './vertex3d.js'
 
 export class FRect3D {
 	public left: number = 0
