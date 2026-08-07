@@ -10,7 +10,7 @@ import { radToDeg } from '../../util/float.js'
 import type { GateData } from './gate-data.js'
 import type { GateState } from './gate-state.js'
 
-/** Gate mover — swings open/closed with damping and gravity. */
+/** Gate mover — swings open/closed with damping and gravity. @see https://github.com/vpinball/vpinball/blob/master/gate.cpp */
 export class GateMover implements MoverObject {
 	public angleSpeed = 0
 	public angleMin: number
@@ -44,7 +44,6 @@ export class GateMover implements MoverObject {
 			)
 				this.angleSpeed = 0
 		}
-
 		if (this.data.twoWay) {
 			if (Math.abs(this.state.angle) > this.angleMax) {
 				this.state.angle = Math.sign(this.state.angle) * this.angleMax
