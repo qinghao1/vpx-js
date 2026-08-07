@@ -3,7 +3,8 @@
 
 import type { TimerHit } from './timer-hit.js'
 
-export class TimerOnOff {
+export /** Timer on/off toggle. */
+class TimerOnOff {
 	public enabled: boolean
 	public timer: TimerHit
 
