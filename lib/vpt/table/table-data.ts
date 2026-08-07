@@ -9,12 +9,7 @@ import { Enums } from '../enums.js'
 import { ItemData } from '../item-data.js'
 import { Material, SaveMaterial, SavePhysicsMaterial } from '../material.js'
 
-/**
- * Global data about the table.
- *
- * @see https://github.com/vpinball/vpinball/blob/master/pintable.cpp
- */
-/** Table global data. */
+/** Table global data — mirrors pintable.cpp. */
 export class TableData extends ItemData {
 	public static BGI_DESKTOP = 110
 	public static BGI_FULLSCREEN = 111
