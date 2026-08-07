@@ -184,7 +184,8 @@ class ProgMeshFloat3 {
 	}
 }
 
-export class ProgMeshTriData {
+export /** ProgMeshTriData. */
+class ProgMeshTriData {
 	public readonly v: number[]
 
 	constructor(v: number[]) {
