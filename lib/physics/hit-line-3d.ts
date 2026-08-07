@@ -37,9 +37,9 @@ export class HitLine3D extends HitLineZ {
 		Vertex3D.release(t1, t2, axis, vLine)
 	}
 
-	public calcHitBBox(): void {}
+	public override calcHitBBox(): void {}
 
-	public hitTest(ball: Ball, dTime: number, coll: CollisionEvent): number {
+	public override hitTest(ball: Ball, dTime: number, coll: CollisionEvent): number {
 		if (!this.isEnabled) return -1
 		const oldPos = ball.state.pos.clone(true)
 		const oldVel = ball.hit.vel.clone(true)
@@ -59,7 +59,7 @@ export class HitLine3D extends HitLineZ {
 		return hitTime
 	}
 
-	public collide(coll: CollisionEvent): void {
+	public override collide(coll: CollisionEvent): void {
 		const dot = -coll.hitNormal.dot(coll.ball.hit.vel)
 		coll.ball.hit.collide3DWall(coll.hitNormal, this.elasticity, this.elasticityFalloff, this.friction, this.scatter)
 		if (this.obj && this.fe && dot >= this.threshold && this.obj.onCollision) this.obj.onCollision(this, coll.ball, dot)
