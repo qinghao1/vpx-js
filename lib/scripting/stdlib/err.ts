@@ -108,7 +108,8 @@ export class Err extends VbsApi {
 
 export const ERR = new Err()
 
-export class VbsError extends Error {
+export /** VbsError. */
+class VbsError extends Error {
 	public readonly code: number
 	constructor(message: string, code: number) {
 		super(message)
