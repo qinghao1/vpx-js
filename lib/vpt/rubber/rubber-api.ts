@@ -9,7 +9,9 @@ import type { Table } from '../table/table.js'
 import type { RubberData } from './rubber-data.js'
 import type { RubberState } from './rubber-state.js'
 
-/** Rubber API. */
+/** Rubber API.
+ *
+ * @see https://github.com/vpinball/vpinball/blob/master/rubber.cpp */
 export class RubberApi extends ItemApi<RubberData> {
 	private readonly state: RubberState
 	private readonly hits: HitObject[]
