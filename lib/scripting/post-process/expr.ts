@@ -110,6 +110,7 @@ export function ppExponentExpression(node: ESIToken): any {
 	return expr
 }
 
+/** ppConcatExpression. */
 export function ppConcatExpression(node: ESIToken): any {
 	let expr = node.children[0].estree
 	for (const child of node.children.slice(1)) {
