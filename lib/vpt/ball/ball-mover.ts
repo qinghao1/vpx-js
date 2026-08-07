@@ -9,56 +9,49 @@ import type { BallData } from './ball-data.js'
 import type { BallHit } from './ball-hit.js'
 import type { BallState } from './ball-state.js'
 
-/** Ball mover (physics). */
+/** Moves a ball each tick — integrates position, orientation, and velocity. */
 export class BallMover implements MoverObject {
-	private readonly id: number
-	private readonly data: BallData
-	private readonly state: BallState
-	private readonly hit: BallHit
-
-	constructor(id: number, data: BallData, state: BallState, hit: BallHit) {
-		this.id = id
-		this.data = data
-		this.state = state
-		this.hit = hit
-	}
+	constructor(
+		private readonly id: number,
+		private readonly data: BallData,
+		private readonly state: BallState,
+		private readonly hit: BallHit,
+	) {}
 
 	public updateDisplacements(dtime: number): void {
-		if (!this.state.isFrozen) {
-			this.state.pos.addAndRelease(this.hit.vel.clone(true).multiplyScalar(dtime))
-			this.hit.calcHitBBox()
+		if (this.state.isFrozen) return
+		this.state.pos.addAndRelease(this.hit.vel.clone(true).multiplyScalar(dtime))
+		this.hit.calcHitBBox()
 
-			const mat3 = Matrix2D.claim().createSkewSymmetric(this.hit.angularVelocity)
+		const skew = Matrix2D.claim().createSkewSymmetric(this.hit.angularVelocity)
+		const delta = Matrix2D.claim()
+		delta.multiplyMatrix(skew, this.state.orientation)
+		delta.multiplyScalar(dtime)
 
-			const addedOrientation = Matrix2D.claim()
-			addedOrientation.multiplyMatrix(mat3, this.state.orientation)
-			addedOrientation.multiplyScalar(dtime)
+		this.state.orientation.addMatrix(delta, this.state.orientation)
+		this.state.orientation.orthoNormalize()
+		this.hit.angularVelocity.setAndRelease(this.hit.angularMomentum.clone(true).divideScalar(this.hit.inertia))
 
-			this.state.orientation.addMatrix(addedOrientation, this.state.orientation)
-			this.state.orientation.orthoNormalize()
-
-			this.hit.angularVelocity.setAndRelease(this.hit.angularMomentum.clone(true).divideScalar(this.hit.inertia))
-
-			Matrix2D.release(mat3, addedOrientation)
-		}
+		Matrix2D.release(skew, delta)
 	}
 
 	public updateVelocities(physics: PlayerPhysics): void {
 		if (!this.state.isFrozen) {
 			if (physics.ballControl && this.id === physics.activeBallBC!.id && physics.bcTarget) {
-				this.hit.vel.x *= 0.5 // Null out most of the X/Y velocity, want a little bit so the ball can sort of find its way out of obstacles.
+				this.hit.vel.x *= 0.5
 				this.hit.vel.y *= 0.5
-
+				const clamp = (v: number) => Math.max(-10, Math.min(10, v / 10))
 				this.hit.vel.addAndRelease(
 					Vertex3D.claim(
-						Math.max(-10.0, Math.min(10.0, (physics.bcTarget.x - this.state.pos.x) / 10.0)),
-						Math.max(-10.0, Math.min(10.0, (physics.bcTarget.y - this.state.pos.y) / 10.0)),
-						-2.0,
+						clamp(physics.bcTarget.x - this.state.pos.x),
+						clamp(physics.bcTarget.y - this.state.pos.y),
+						-2,
 					),
 				)
-			} else this.hit.vel.addAndRelease(physics.gravity.clone(true).multiplyScalar(PHYS_FACTOR))
+			} else {
+				this.hit.vel.addAndRelease(physics.gravity.clone(true).multiplyScalar(PHYS_FACTOR))
+			}
 		}
-
 		this.hit.calcHitBBox()
 	}
 }
