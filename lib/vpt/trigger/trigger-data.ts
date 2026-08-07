@@ -8,41 +8,51 @@ import { Vertex2D } from '../../math/vertex2d.js'
 import { Enums } from '../enums.js'
 import { ItemData } from '../item-data.js'
 
+const FLOAT_MAP: Record<string, string> = {
+	RADI: 'radius',
+	ROTA: 'rotation',
+	WITI: 'wireThickness',
+	SCAX: 'scaleX',
+	SCAY: 'scaleY',
+	HITH: 'hitHeight',
+	ANSP: 'animSpeed',
+}
+const BOOL_MAP: Record<string, string> = { VSBL: 'isVisible', ENBL: 'isEnabled', REEN: 'isReflectionEnabled' }
+const STRING_MAP: Record<string, string> = { MATR: 'szMaterial', SURF: 'szSurface' }
+
 /** Trigger data.
- *
  * @see https://github.com/vpinball/vpinball/blob/master/trigger.cpp */
 export class TriggerData extends ItemData {
 	public dragPoints: DragPoint[] = []
 	public center!: Vertex2D
-	public radius: number = 25
-	public rotation: number = 0
-	public scaleX: number = 1
-	public scaleY: number = 1
+	public radius = 25
+	public rotation = 0
+	public scaleX = 1
+	public scaleY = 1
 	public szMaterial?: string
 	public szSurface?: string
-	public isVisible: boolean = true
-	public isEnabled: boolean = true
-	public hitHeight: number = 50
+	public isVisible = true
+	public isEnabled = true
+	public hitHeight = 50
 	public shape: number = Enums.TriggerShape.TriggerWireA
-	public animSpeed: number = 1
-
-	public wireThickness: number = 0
-	public isReflectionEnabled: boolean = true
+	public animSpeed = 1
+	public wireThickness = 0
+	public isReflectionEnabled = true
 
 	public static async fromStorage(storage: Storage, itemName: string): Promise<TriggerData> {
-		const triggerData = new TriggerData(itemName)
-		await storage.streamFiltered(itemName, 4, TriggerData.createStreamHandler(triggerData))
-		return triggerData
+		const d = new TriggerData(itemName)
+		await storage.streamFiltered(itemName, 4, TriggerData.createStreamHandler(d))
+		return d
 	}
 
-	private static createStreamHandler(triggerItem: TriggerData) {
-		triggerItem.dragPoints = []
-		return BiffParser.stream(triggerItem.fromTag.bind(triggerItem), {
+	private static createStreamHandler(d: TriggerData) {
+		d.dragPoints = []
+		return BiffParser.stream(d.fromTag.bind(d), {
 			nestedTags: {
 				DPNT: {
 					onStart: () => new DragPoint(),
-					onTag: (dragPoint) => dragPoint.fromTag.bind(dragPoint),
-					onEnd: (dragPoint) => triggerItem.dragPoints.push(dragPoint),
+					onTag: (dp) => dp.fromTag.bind(dp),
+					onEnd: (dp) => d.dragPoints.push(dp),
 				},
 			},
 		})
@@ -53,53 +63,27 @@ export class TriggerData extends ItemData {
 	}
 
 	private async fromTag(buffer: Uint8Array, tag: string, offset: number, len: number): Promise<number> {
-		switch (tag) {
-			case 'VCEN':
-				this.center = Vertex2D.get(buffer)
-				break
-			case 'RADI':
-				this.radius = this.getFloat(buffer)
-				break
-			case 'ROTA':
-				this.rotation = this.getFloat(buffer)
-				break
-			case 'WITI':
-				this.wireThickness = this.getFloat(buffer)
-				break
-			case 'SCAX':
-				this.scaleX = this.getFloat(buffer)
-				break
-			case 'SCAY':
-				this.scaleY = this.getFloat(buffer)
-				break
-			case 'MATR':
-				this.szMaterial = this.getString(buffer, len)
-				break
-			case 'SURF':
-				this.szSurface = this.getString(buffer, len)
-				break
-			case 'EBLD':
-				this.isEnabled = this.getBool(buffer)
-				break
-			case 'THOT':
-				this.hitHeight = this.getFloat(buffer)
-				break
-			case 'VSBL':
-				this.isVisible = this.getBool(buffer)
-				break
-			case 'REEN':
-				this.isReflectionEnabled = this.getBool(buffer)
-				break
-			case 'SHAP':
-				this.shape = this.getInt(buffer)
-				break
-			case 'ANSP':
-				this.animSpeed = this.getFloat(buffer)
-				break
-			default:
-				this.getCommonBlock(buffer, tag, len)
-				break
+		if (tag === 'VCEN') {
+			this.center = Vertex2D.get(buffer)
+			return 0
 		}
+		if (tag === 'SHAP') {
+			this.shape = this.getInt(buffer)
+			return 0
+		}
+		if (tag in FLOAT_MAP) {
+			;(this as any)[FLOAT_MAP[tag]] = this.getFloat(buffer)
+			return 0
+		}
+		if (tag in BOOL_MAP) {
+			;(this as any)[BOOL_MAP[tag]] = this.getBool(buffer)
+			return 0
+		}
+		if (tag in STRING_MAP) {
+			;(this as any)[STRING_MAP[tag]] = this.getString(buffer, len)
+			return 0
+		}
+		this.getCommonBlock(buffer, tag, len)
 		return 0
 	}
 }
