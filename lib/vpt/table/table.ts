@@ -54,12 +54,8 @@ import { TableMeshGenerator } from './table-mesh-generator.js'
 import { TableState } from './table-state.js'
 import { TableUpdater } from './table-updater.js'
 
-/**
- * A Visual Pinball table.
- *
- * This holds together all table elements of a .vpt/.vpx file. It's also
- * the entry point for parsing the file.
- */
+/** Visual Pinball table — holds all elements of a .vpx file.
+ * @see https://github.com/vpinball/vpinball/blob/master/pintable.cpp */
 export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 	public readonly data?: TableData
 	public readonly info?: { [key: string]: string }
@@ -73,7 +69,6 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 
 	public readonly textures: { [key: string]: Texture } = {}
 	public readonly collections: { [key: string]: Collection } = {}
-
 	public readonly bumpers: { [key: string]: Bumper } = {}
 	public readonly flippers: { [key: string]: Flipper } = {}
 	public readonly flashers: { [key: string]: Flasher } = {}
@@ -96,85 +91,69 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 
 	private readonly meshGenerator?: TableMeshGenerator
 	private readonly hitGenerator?: TableHitGenerator
-
 	private readonly loader: TableLoader
 
 	public static playfieldThickness = 20.0
 
-	public static async load(reader: IBinaryReader, opts?: TableLoadOptions): Promise<Table> {
-		opts = opts || defaultTableLoadOptions
-		const tableLoader = new TableLoader()
-		return new Table(tableLoader, await tableLoader.load(reader, opts))
+	public static async load(reader: IBinaryReader, opts: TableLoadOptions = defaultTableLoadOptions): Promise<Table> {
+		const l = new TableLoader()
+		return new Table(l, await l.load(reader, opts))
 	}
 
-	public constructor(loader: TableLoader, loadedTable: LoadedTable) {
+	public constructor(loader: TableLoader, loaded: LoadedTable) {
 		this.loader = loader
-		this.items = loadedTable.items
-		if (loadedTable.data) {
-			this.data = loadedTable.data
+		this.items = loaded.items
+		if (loaded.data) {
+			this.data = loaded.data
 			this.meshGenerator = new TableMeshGenerator(this)
-			this.hitGenerator = new TableHitGenerator(loadedTable.data)
+			this.hitGenerator = new TableHitGenerator(loaded.data)
 			this.state = TableState.claim(this.data.getName(), this.data.szPlayfieldMaterial, true)
 			this.updater = new TableUpdater(this.state)
 		}
-		if (loadedTable.info) {
-			this.info = loadedTable.info
-		}
-		if (loadedTable.tableScript) {
-			this.tableScript = loadedTable.tableScript
-		}
-		// Populate item dictionaries via registry to avoid manual mapping boilerplate
-		this.populateFromLoaded(loadedTable, 'textures', this.textures)
-		this.populateFromLoaded(loadedTable, 'collections', this.collections)
-		for (const [itemType, entry] of Object.entries(ITEM_REGISTRY)) {
-			const loadedKey = entry.key as keyof typeof loadedTable
-			// Table property for textBoxes is camelCase textboxes
+		if (loaded.info) this.info = loaded.info
+		if (loaded.tableScript) this.tableScript = loaded.tableScript
+		this.populateFromLoaded(loaded, 'textures', this.textures)
+		this.populateFromLoaded(loaded, 'collections', this.collections)
+		for (const [type, entry] of Object.entries(ITEM_REGISTRY)) {
+			const loadedKey = entry.key as keyof typeof loaded
 			const tableKey = loadedKey === 'textBoxes' ? 'textboxes' : loadedKey
-			this.populateFromLoaded(loadedTable, loadedKey as any, (this as any)[tableKey])
+			this.populateFromLoaded(loaded, loadedKey as any, (this as any)[tableKey])
 		}
 	}
 
-	private populateFromLoaded(loadedTable: any, key: string, dict: Record<string, any>): void {
-		const items = loadedTable[key] as any[] | undefined
+	private populateFromLoaded(loaded: any, key: string, dict: Record<string, any>): void {
+		const items = loaded[key] as any[] | undefined
 		if (!items?.length) return
-		for (const item of items) dict[item.getName()] = item
+		for (const it of items) dict[it.getName()] = it
 	}
 
 	public getName(): string {
 		return this.data!.getName()
 	}
-
 	public getTexture(name?: string): Texture | undefined {
-		if (!name) {
-			return undefined
-		}
-		return this.textures[name.toLowerCase()]
+		return name ? this.textures[name.toLowerCase()] : undefined
 	}
-
 	public getMaterial(name?: string): Material | undefined {
 		if (!name) return undefined
-		if (!this.data) throw new Error('Table data is not loaded. Load table with tableDataOnly = false.')
+		if (!this.data) throw new Error('Table data not loaded')
 		const mats = this.data.materials
+		const lc = name.toLowerCase()
 		return (
 			mats.find((m) => m.name === name) ??
-			mats.find((m) => m.name.toLowerCase() === name.toLowerCase()) ??
-			mats.find((m) => m.name.toLowerCase() === `_${name.toLowerCase()}`) ??
-			(name.startsWith('_') ? mats.find((m) => m.name.toLowerCase() === name.toLowerCase().slice(1)) : undefined)
+			mats.find((m) => m.name.toLowerCase() === lc) ??
+			mats.find((m) => m.name.toLowerCase() === `_${lc}`) ??
+			(name.startsWith('_') ? mats.find((m) => m.name.toLowerCase() === lc.slice(1)) : undefined)
 		)
 	}
-
 	public getApi(): TableApi {
 		return this.api!
 	}
-
 	public getState(): TableState {
 		return this.state!
 	}
-
 	public getUpdater(): TableUpdater {
 		return this.updater!
 	}
-
 	public getEventNames(): string[] {
 		return ['Exit', 'Init', 'KeyDown', 'KeyUp', 'MusicDone', 'Paused', 'UnPaused']
 	}
@@ -196,135 +175,84 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 	}
 
 	public getPlayables(): IPlayable[] {
-		const playableItems = this.getItems().filter(isPlayable) as unknown as IPlayable[]
-		return [this, ...playableItems]
+		return [this, ...(this.getItems().filter(isPlayable) as unknown as IPlayable[])]
 	}
-
 	public getMovables(): IMovable[] {
 		return this.getItems().filter(isMovable) as unknown as IMovable[]
 	}
-
 	public getRenderables(): Array<IRenderable<ItemState>> {
 		return this.getItems().filter(isRenderable) as unknown as Array<IRenderable<ItemState>>
 	}
-
 	public getAnimatables(): IAnimatable[] {
 		return this.getItems().filter(isAnimatable) as unknown as IAnimatable[]
 	}
-
 	public getScriptables(): Array<IScriptable<any>> {
-		const scriptableItems = this.getItems().filter(isScriptable) as unknown as Array<IScriptable<any>>
-		return [this, ...scriptableItems]
+		return [this, ...(this.getItems().filter(isScriptable) as unknown as Array<IScriptable<any>>)]
 	}
-
 	public getHittables(): IHittable[] {
 		return this.getItems().filter(isHittable) as unknown as IHittable[]
 	}
-
 	public getHitShapes(): HitObject[] {
 		return this.hitGenerator!.generateHitObjects()
 	}
 
-	public generatePlayfieldHit() {
+	public generatePlayfieldHit(): HitPlane {
 		return new HitPlane(new Vertex3D(0, 0, 1), this.data!.tableHeight)
 			.setFriction(this.data!.getFriction())
 			.setElasticity(this.data!.getElasticity(), this.data!.getElasticityFalloff())
 			.setScatter(degToRad(this.data!.getScatter()))
 	}
-
-	public generateGlassHit() {
+	public generateGlassHit(): HitPlane {
 		return new HitPlane(new Vertex3D(0, 0, -1), this.data!.glassHeight).setElasticity(0.2)
 	}
 
 	public getElementApis(): { [key: string]: any } {
 		const apis: { [key: string]: any } = {}
-		const elements = this.getScriptables()
-		for (const element of elements) {
-			apis[element.getName()] = element.getApi()
-		}
+		for (const el of this.getScriptables()) apis[el.getName()] = el.getApi()
 		return apis
 	}
 
 	public getElementApiName(vbsName: string): string {
 		if (!this.itemIndex) {
 			this.itemIndex = {}
-			for (const element of this.getScriptables()) {
-				this.itemIndex[element.getName().toLowerCase()] = element.getName()
-			}
+			for (const el of this.getScriptables()) this.itemIndex[el.getName().toLowerCase()] = el.getName()
 		}
 		return this.itemIndex[vbsName.toLowerCase()]
 	}
 
 	public getElements(): { [key: string]: IScriptable<any> } {
-		const elements: { [key: string]: any } = {}
-		const elementList = this.getScriptables()
-		for (const element of elementList) {
-			elements[element.getName()] = element
-		}
-		return elements
+		const els: { [key: string]: any } = {}
+		for (const el of this.getScriptables()) els[el.getName()] = el
+		return els
 	}
 
 	public getScaleZ(): number {
-		/* istanbul ignore if */
-		if (!this.data) {
-			throw new Error('Table data is not loaded. Load table with tableDataOnly = false.')
-		}
+		if (!this.data) throw new Error('Table data not loaded')
 		return f4(this.data.bgScaleZ[this.data.bgCurrentSet]) || 1.0
 	}
-
-	public getDetailLevel() {
-		return 10 // todo check if true
+	public getDetailLevel(): number {
+		return 10
 	}
-
 	public getGlobalDifficulty(): number {
 		return this.data!.globalDifficulty!
 	}
-
-	public getTableHeight() {
-		/* istanbul ignore if */
-		if (!this.data) {
-			throw new Error('Table data is not loaded. Load table with tableDataOnly = false.')
-		}
+	public getTableHeight(): number {
+		if (!this.data) throw new Error('Table data not loaded')
 		return this.data.tableHeight
 	}
-
 	public getDimensions(): { width: number; height: number } {
-		/* istanbul ignore if */
-		if (!this.data) {
-			throw new Error('Table data is not loaded. Load table with tableDataOnly = false.')
-		}
-		return {
-			width: this.data.right - this.data.left,
-			height: this.data.bottom - this.data.top,
-		}
+		if (!this.data) throw new Error('Table data not loaded')
+		return { width: this.data.right - this.data.left, height: this.data.bottom - this.data.top }
 	}
-
 	public getPlayfieldMap(): string {
-		/* istanbul ignore if */
-		if (!this.data) {
-			throw new Error('Table data is not loaded. Load table with tableDataOnly = false.')
-		}
+		if (!this.data) throw new Error('Table data not loaded')
 		return this.data.szImage || ''
 	}
-
-	public getSurfaceHeight(surface: string | undefined, x: number, y: number) {
-		/* istanbul ignore if */
-		if (!this.data) {
-			throw new Error('Table data is not loaded. Load table with tableDataOnly = false.')
-		}
-		if (!surface) {
-			return this.data.tableHeight
-		}
-
-		if (this.surfaces[surface]) {
-			return f4(this.data.tableHeight + this.surfaces[surface].heightTop)
-		}
-
-		if (this.ramps[surface]) {
-			return f4(this.data.tableHeight + this.ramps[surface].getSurfaceHeight(x, y, this))
-		}
-
-		/* istanbul ignore next */
+	public getSurfaceHeight(surface: string | undefined, x: number, y: number): number {
+		if (!this.data) throw new Error('Table data not loaded')
+		if (!surface) return this.data.tableHeight
+		if (this.surfaces[surface]) return f4(this.data.tableHeight + this.surfaces[surface].heightTop)
+		if (this.ramps[surface]) return f4(this.data.tableHeight + this.ramps[surface].getSurfaceHeight(x, y, this))
 		logger().warn('[Table.getSurfaceHeight] Unknown surface %s.', surface)
 		return this.data.tableHeight
 	}
@@ -334,13 +262,9 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 	}
 
 	public getTableScript(): string {
-		/* istanbul ignore if */
-		if (!this.tableScript) {
-			throw new Error('Table script is not loaded. Load table with loadTableScript = true.')
-		}
+		if (!this.tableScript) throw new Error('Table script not loaded')
 		return this.tableScript
 	}
-
 	public isVisible(): boolean {
 		return true
 	}
@@ -350,27 +274,18 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
 		opts: TableExportOptions,
 	): Meshes<GEOMETRY> {
-		/* istanbul ignore if */
-		if (!this.data) {
-			throw new Error('Table data is not loaded. Load table with tableDataOnly = false.')
-		}
-		const geometry = this.meshGenerator!.getPlayfieldMesh(renderApi, opts)
+		if (!this.data) throw new Error('Table data not loaded')
 		return {
 			playfield: {
 				isVisible: true,
-				geometry,
+				geometry: this.meshGenerator!.getPlayfieldMesh(renderApi, opts),
 				material: this.getMaterial(this.data.szPlayfieldMaterial),
 				map: this.getTexture(this.data.szImage),
 			},
 		}
 	}
 
-	/**
-	 * Generates the top-most node for the render engine that contains the entire table.
-	 *
-	 * @param renderApi Render API
-	 * @param opts Which elements to generate
-	 */
+	/** Generates top-most scene node containing the entire table. */
 	public async generateTableNode<NODE, GEOMETRY, POINT_LIGHT>(
 		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
 		opts: TableExportOptions = {},
@@ -379,63 +294,49 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 		return this.meshGenerator!.generateTableNode(renderApi, opts)
 	}
 
-	public prepareToPlay() {
-		for (const primitive of Object.values<Primitive>(this.primitives)) {
-			primitive.clearMesh()
-		}
+	public prepareToPlay(): void {
+		for (const p of Object.values<Primitive>(this.primitives)) p.clearMesh()
 	}
 
-	public runTableScript(player: Player, scope = {}): void {
+	public runTableScript(player: Player, scope: any = {}): void {
 		if (!this.tableScript) {
-			logger().warn('Table script is not loaded!')
+			logger().warn('Table script not loaded!')
 			return
 		}
 		progress().show('Transpiling and executing table script')
-		const transpiler = new Transpiler(this, player)
-		transpiler.execute(this.tableScript, scope)
+		new Transpiler(this, player).execute(this.tableScript, scope)
 		logger().info('Table script loaded, transpiled and executed.')
 	}
 
-	public broadcastInit() {
+	public broadcastInit(): void {
 		this.events!.fireVoidEvent(Event.GameEventsInit)
-		for (const hittable of this.getHittables()) {
-			hittable.getEventProxy().fireVoidEvent(Event.GameEventsInit)
-		}
+		for (const h of this.getHittables()) h.getEventProxy().fireVoidEvent(Event.GameEventsInit)
 	}
-
 	public fireVoidEvent(event: Event): this {
 		this.events!.fireVoidEvent(event)
 		return this
 	}
 
-	public setupCollections() {
-		for (const tableItem of Object.keys(this.items)) {
-			if (isScriptable(tableItem)) {
-				tableItem.getApi()._resetCollections()
-			}
-		}
-		for (const collection of Object.values(this.collections)) {
-			for (const itemName of collection.getItemNames()) {
-				const tableItem = this.items[itemName]
-				if (!tableItem) {
-					logger().warn('Non-existent item "%s" in collection "%s", skipping.', itemName, collection.getName())
+	public setupCollections(): void {
+		for (const item of Object.values(this.items))
+			if (isScriptable(item as any)) (item as unknown as IScriptable<any>).getApi()._resetCollections()
+		for (const col of Object.values(this.collections))
+			for (const name of col.getItemNames()) {
+				const item = this.items[name]
+				if (!item) {
+					logger().warn('Non-existent item "%s" in collection "%s", skipping.', name, col.getName())
 					break
 				}
-				if (isScriptable(tableItem)) {
-					tableItem.getApi()._addCollection(collection, collection.items.length)
-					collection.items.push(tableItem.getApi())
+				if (isScriptable(item as any)) {
+					;(item as unknown as IScriptable<any>).getApi()._addCollection(col, col.items.length)
+					col.items.push((item as unknown as IScriptable<any>).getApi())
 				}
 			}
-		}
 	}
 
 	public getItems(): Array<Item<ItemData>> {
 		return Object.values(this.items)
 	}
-}
-
-function isLoaded(items: any[] | undefined) {
-	return items && items.length > 0
 }
 
 const defaultTableLoadOptions: TableLoadOptions = {
@@ -447,33 +348,19 @@ const defaultTableLoadOptions: TableLoadOptions = {
 
 /** Options for loading a table. */
 export interface TableLoadOptions {
-	/**
-	 * If set, don't parse game items but only game data (faster).
-	 */
+	/** Only parse game data, skip items (faster). */
 	tableDataOnly?: boolean
-
-	/**
-	 * If set, ignore game storage and only parse table info.
-	 */
+	/** Only parse table info, skip storage. */
 	tableInfoOnly?: boolean
-
-	/**
-	 * If set, also parse items like timers, i.e. non-visible items.
-	 */
+	/** Also parse invisible items (timers, etc.). */
 	loadInvisibleItems?: boolean
-
-	/**
-	 * If set, table script is read
-	 */
+	/** Read table script. */
 	loadTableScript?: boolean
-
-	/**
-	 * If set, skips reading primitive mesh data.
-	 */
+	/** Skip primitive mesh data. */
 	skipMeshes?: boolean
 }
 
-/** Options for generating meshes. */
+/** Mesh generation options. */
 export interface TableGenerateOptions {
 	exportPlayfield?: boolean
 	exportPrimitives?: boolean
@@ -494,7 +381,6 @@ export interface TableGenerateOptions {
 	gltfOptions?: TableGenerateGltfOptions
 }
 
-/** Options for GLTF generation. */
 export interface TableGenerateGltfOptions {
 	binary?: boolean
 	optimizeImages?: boolean
