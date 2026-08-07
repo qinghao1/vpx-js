@@ -69,8 +69,8 @@ export class VBSHelper {
 
 	public equals(a: unknown, b: unknown): boolean {
 		if (a == b) return true
-		const u1 = typeof a === 'object' && (a as any).__isUndefined,
-			u2 = typeof b === 'object' && (b as any).__isUndefined
+		const u1 = typeof a === 'object' && (a as unknown as Record<string, unknown>).__isUndefined,
+			u2 = typeof b === 'object' && (b as unknown as Record<string, unknown>).__isUndefined
 		if (u1 && typeof b === 'undefined') return true
 		if (typeof a === 'undefined' && u2) return true
 		if (u1 && u2) return true
