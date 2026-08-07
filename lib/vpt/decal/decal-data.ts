@@ -7,7 +7,9 @@ import { Vertex2D } from '../../math/vertex2d.js'
 import { Enums } from '../enums.js'
 import { ItemData } from '../item-data.js'
 
-/** Decal data. */
+/** Decal data.
+ *
+ * @see https://github.com/vpinball/vpinball/blob/master/decal.cpp */
 export class DecalData extends ItemData {
 	public center!: Vertex2D
 	public width: number = 100.0
