@@ -46,8 +46,8 @@ export abstract class CatmullCurve {
 	}
 }
 
-export /** CatmullCurve2D. */
-class CatmullCurve2D extends CatmullCurve {
+/** CatmullCurve2D. */
+export class CatmullCurve2D extends CatmullCurve {
 	private c: { x: number[]; y: number[]; z?: number[] } = { x: [0, 0, 0, 0], y: [0, 0, 0, 0] }
 
 	public static fromVertex2D(v0: Vertex2D, v1: Vertex2D, v2: Vertex2D, v3: Vertex2D): CatmullCurve2D {
@@ -75,8 +75,8 @@ class CatmullCurve2D extends CatmullCurve {
 	}
 }
 
-export /** CatmullCurve3D. */
-class CatmullCurve3D extends CatmullCurve {
+/** CatmullCurve3D. */
+export class CatmullCurve3D extends CatmullCurve {
 	private c: { x: number[]; y: number[]; z: number[] } = { x: [0, 0, 0, 0], y: [0, 0, 0, 0], z: [0, 0, 0, 0] }
 
 	public static fromVertex3D(v0: Vertex3D, v1: Vertex3D, v2: Vertex3D, v3: Vertex3D): CatmullCurve3D {
