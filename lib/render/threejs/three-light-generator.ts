@@ -13,31 +13,24 @@ import type { LightData } from '../../vpt/light/light-data.js'
 import type { LightState } from '../../vpt/light/light-state.js'
 import { ThreeRenderApi } from './three-render-api.js'
 
-/** Generates Three.js lights. */
+/** Generates and updates Three.js lights. */
 export class ThreeLightGenerator {
 	public static readonly EMISSIVE_MAP_FACTOR = 0.1
 	public static readonly BULB_FACTOR = 10
+	private readonly hsl: { h: number; s: number; l: number } = { h: 0, s: 0, l: 0 }
 
-	private readonly hsl: any = {}
-
-	public createPointLight(lightData: LightData): PointLight {
-		// r155 physical lights: intensity in lumens, scaled from VPX legacy values
-		const light = new PointLight(
-			lightData.color,
-			lightData.state !== Enums.LightStatus.LightStateOff ? lightData.intensity * ThreeLightGenerator.BULB_FACTOR : 0,
-			lightData.falloff * ThreeRenderApi.SCALE,
-			2,
-		)
-		light.name = `light`
-		light.color.set(lightData.color)
+	public createPointLight(d: LightData): PointLight {
+		const intensity = d.state !== Enums.LightStatus.LightStateOff ? d.intensity * ThreeLightGenerator.BULB_FACTOR : 0
+		const light = new PointLight(d.color, intensity, d.falloff * ThreeRenderApi.SCALE, 2)
+		light.name = 'light'
+		light.color.set(d.color)
+		light.position.set(d.center.x, d.center.y, -10)
 		light.updateMatrixWorld()
-		light.position.set(lightData.center.x, lightData.center.y, -10)
-		const isSlingshotLight =
-			((lightData.center.x > 150 && lightData.center.x < 250) ||
-				(lightData.center.x > 600 && lightData.center.x < 750)) &&
-			lightData.center.y > 1400 &&
-			lightData.center.y < 1650
-		if (ThreeRenderApi.SHADOWS && isSlingshotLight) {
+		const isSlingshot =
+			((d.center.x > 150 && d.center.x < 250) || (d.center.x > 600 && d.center.x < 750)) &&
+			d.center.y > 1400 &&
+			d.center.y < 1650
+		if (ThreeRenderApi.SHADOWS && isSlingshot) {
 			light.castShadow = true
 			light.shadow.bias = -0.001
 			light.shadow.radius = 12
@@ -46,30 +39,24 @@ export class ThreeLightGenerator {
 		return light
 	}
 
-	public applyLighting(state: LightState, initialIntensity: number, obj: Object3D | undefined): void {
-		/* istanbul ignore next */
-		if (!obj) {
-			return
-		}
-		for (const lightObj of obj.children) {
-			if (lightObj.name === 'light') {
-				const pointLight = lightObj as PointLight
-				pointLight.intensity = state.intensity * ThreeLightGenerator.BULB_FACTOR
-				pointLight.color.set(state.color)
-			}
-			if (lightObj.name === 'bulb.light') {
-				const bulb = lightObj as ThreeMesh
-				const bulbMat = bulb.material as MeshStandardMaterial
-				bulbMat.emissiveIntensity = state.intensity / initialIntensity
-				bulbMat.color.set(state.color)
-				bulbMat.emissive.set(state.color)
-			}
-			if (lightObj.name === 'surface.light') {
-				const mat = (lightObj as ThreeMesh).material as MeshStandardMaterial
-				mat.emissiveIntensity = state.intensity * ThreeLightGenerator.EMISSIVE_MAP_FACTOR
-				mat.emissive.set(state.color)
-				mat.emissive.getHSL(this.hsl)
-				mat.emissive.setHSL(this.hsl.h, this.hsl.s, this.hsl.l * 1.25)
+	public applyLighting(state: LightState, initial: number, obj?: Object3D): void {
+		if (!obj) return
+		for (const child of obj.children) {
+			if (child.name === 'light') {
+				const pl = child as PointLight
+				pl.intensity = state.intensity * ThreeLightGenerator.BULB_FACTOR
+				pl.color.set(state.color)
+			} else if (child.name === 'bulb.light') {
+				const m = (child as ThreeMesh).material as MeshStandardMaterial
+				m.emissiveIntensity = state.intensity / initial
+				m.color.set(state.color)
+				m.emissive.set(state.color)
+			} else if (child.name === 'surface.light') {
+				const m = (child as ThreeMesh).material as MeshStandardMaterial
+				m.emissiveIntensity = state.intensity * ThreeLightGenerator.EMISSIVE_MAP_FACTOR
+				m.emissive.set(state.color)
+				m.emissive.getHSL(this.hsl)
+				m.emissive.setHSL(this.hsl.h, this.hsl.s, this.hsl.l * 1.25)
 			}
 		}
 	}
