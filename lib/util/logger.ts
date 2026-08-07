@@ -12,34 +12,34 @@ export class Logger implements ILogger {
 		Logger.instance = l
 	}
 
-	debug(format: any, ...param: any[]): void {
+	debug(format: string, ...param: unknown[]): void {
 		console.debug(format, ...param)
 	}
-	error(format: any, ...param: any[]): void {
+	error(format: string, ...param: unknown[]): void {
 		console.error(format, ...param)
 	}
-	info(format: any, ...param: any[]): void {
+	info(format: string, ...param: unknown[]): void {
 		console.log(format, ...param)
 	}
-	verbose(format: any, ...param: any[]): void {
+	verbose(format: string, ...param: unknown[]): void {
 		console.debug(format, ...param)
 	}
-	warn(format: any, ...param: any[]): void {
+	warn(format: string, ...param: unknown[]): void {
 		console.warn(format, ...param)
 	}
-	wtf(format: any, ...param: any[]): void {
+	wtf(format: string, ...param: unknown[]): void {
 		console.error(format, ...param)
 	}
 }
 
 /** Logger interface used throughout the engine. */
 export interface ILogger {
-	wtf(format: any, ...param: any[]): void
-	error(format: any, ...param: any[]): void
-	warn(format: any, ...param: any[]): void
-	info(format: any, ...param: any[]): void
-	verbose(format: any, ...param: any[]): void
-	debug(format: any, ...param: any[]): void
+	wtf(format: string, ...param: unknown[]): void
+	error(format: string, ...param: unknown[]): void
+	warn(format: string, ...param: unknown[]): void
+	info(format: string, ...param: unknown[]): void
+	verbose(format: string, ...param: unknown[]): void
+	debug(format: string, ...param: unknown[]): void
 }
 
 /** Throttled console progress reporter. */
