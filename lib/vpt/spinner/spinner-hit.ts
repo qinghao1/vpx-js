@@ -16,8 +16,8 @@ import type { SpinnerData } from './spinner-data.js'
 import { SpinnerMover } from './spinner-mover.js'
 import type { SpinnerState } from './spinner-state.js'
 
-export /** Spinner hit. */
-class SpinnerHit extends HitObject {
+/** Spinner hit. */
+export class SpinnerHit extends HitObject {
 	private readonly data: SpinnerData
 	private readonly state: SpinnerState
 	private readonly mover: SpinnerMover
