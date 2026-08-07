@@ -9,8 +9,8 @@ import type { Table } from '../table/table.js'
 import type { FlipperData } from './flipper-data.js'
 import type { FlipperState } from './flipper-state.js'
 
-export /** FlipperUpdater. */
-class FlipperUpdater extends ItemUpdater<FlipperState> {
+/** FlipperUpdater. */
+export class FlipperUpdater extends ItemUpdater<FlipperState> {
 	private readonly data: FlipperData
 
 	constructor(data: FlipperData, state: FlipperState) {
