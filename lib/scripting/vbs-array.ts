@@ -4,24 +4,18 @@
 import { VbsError } from './stdlib/err.js'
 import { VbsUndefined } from './vbs-undefined.js'
 
-/**
- * An array that always returns something.
- *
- * It's iterable and typed, and if the value at a given index doesn't exist, it
- * returns {@link VbsUndefined}, which will only throw when error handling is
- * enabled.
- */
-/** VBS array emulation. */
+/** VBS array — returns VbsUndefined for missing indices. */
 export class VbsArray<T> implements ProxyHandler<VbsArray<T>> {
 	[key: number]: T
 
 	constructor(items?: T[]) {
-		return new Proxy<VbsArray<T>>(items || ([] as any), this)
+		return new Proxy<VbsArray<T>>((items ?? []) as unknown as VbsArray<T>, this)
 	}
 
-	public get(target: any, key: any): T | VbsUndefined {
-		return target[key] !== undefined
-			? target[key]
+	public get(target: unknown, key: string | symbol): T | VbsUndefined {
+		const t = target as Record<string | symbol, unknown>
+		return t[key] !== undefined
+			? (t[key] as T)
 			: new VbsUndefined(
 					new VbsError(`ReferenceError: Cannot set ${String(key)} from undefined.`, 9),
 					new VbsError(`ReferenceError: Cannot get ${String(key)} from undefined.`, 9),
