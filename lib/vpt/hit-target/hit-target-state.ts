@@ -4,14 +4,13 @@
 import { Pool } from '../../util/object-pool.js'
 import { ItemState } from '../item-state.js'
 
-/** Hit target state.
- *
+/** Hit target state — drop offset, rotation and appearance.
  * @see https://github.com/vpinball/vpinball/blob/master/hittarget.cpp */
 export class HitTargetState extends ItemState {
 	public static readonly POOL = new Pool(HitTargetState)
 
-	public zOffset: number = 0
-	public xRotation: number = 0
+	public zOffset = 0
+	public xRotation = 0
 	public material?: string
 	public texture?: string
 
@@ -27,14 +26,14 @@ export class HitTargetState extends ItemState {
 		texture: string | undefined,
 		isVisible: boolean,
 	): HitTargetState {
-		const state = HitTargetState.POOL.get()
-		state.name = name
-		state.zOffset = zOffset
-		state.xRotation = xRotation
-		state.material = material
-		state.texture = texture
-		state.isVisible = isVisible
-		return state
+		const s = HitTargetState.POOL.get()
+		s.name = name
+		s.zOffset = zOffset
+		s.xRotation = xRotation
+		s.material = material
+		s.texture = texture
+		s.isVisible = isVisible
+		return s
 	}
 
 	public clone(): HitTargetState {
@@ -42,23 +41,13 @@ export class HitTargetState extends ItemState {
 	}
 
 	public diff(state: HitTargetState): HitTargetState {
-		const diff = this.clone()
-		if (diff.zOffset === state.zOffset) {
-			delete diff.zOffset
-		}
-		if (diff.xRotation === state.xRotation) {
-			delete diff.xRotation
-		}
-		if (diff.material === state.material) {
-			delete diff.material
-		}
-		if (diff.texture === state.texture) {
-			delete diff.texture
-		}
-		if (diff.isVisible === state.isVisible) {
-			delete diff.isVisible
-		}
-		return diff
+		const d = this.clone()
+		if (d.zOffset === state.zOffset) delete (d as unknown as Record<string, unknown>).zOffset
+		if (d.xRotation === state.xRotation) delete (d as unknown as Record<string, unknown>).xRotation
+		if (d.material === state.material) delete (d as unknown as Record<string, unknown>).material
+		if (d.texture === state.texture) delete (d as unknown as Record<string, unknown>).texture
+		if (d.isVisible === state.isVisible) delete (d as unknown as Record<string, unknown>).isVisible
+		return d
 	}
 
 	public release(): void {
@@ -66,10 +55,7 @@ export class HitTargetState extends ItemState {
 	}
 
 	public equals(state: HitTargetState): boolean {
-		/* istanbul ignore if: we don't actually pass empty states. */
-		if (!state) {
-			return false
-		}
+		if (!state) return false
 		return (
 			state.zOffset === this.zOffset &&
 			state.xRotation === this.xRotation &&
