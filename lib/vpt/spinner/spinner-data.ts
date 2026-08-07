@@ -8,6 +8,7 @@ import { ItemData } from '../item-data.js'
 
 /** Spinner data. */
 export class SpinnerData extends ItemData {
+	// appearance, physics, and behavior
 	public center!: Vertex2D
 	public rotation: number = 0
 	public szMaterial?: string
