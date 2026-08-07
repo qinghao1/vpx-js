@@ -42,7 +42,7 @@ export const C_DISP_GAIN = 0.9875
 export const C_DISP_LIMIT = 5.0
 export const C_BALL_SPIN_HACK = 0
 
-export const STATICTIME = 0.005
+export const STATICTIME = 0.02
 export const STATICCNTS = 10
 
 export const C_INTERATIONS = 20
