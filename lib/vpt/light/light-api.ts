@@ -1,29 +1,13 @@
-/*
- * VPDB - Virtual Pinball Database
- * Copyright (C) 2019 freezy <freezy@vpdb.io>
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- */
+// Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import type { EventProxy } from '../../game/event-proxy'
-import type { Player } from '../../game/player'
-import { ItemApi } from '../item-api'
-import type { Table } from '../table/table'
-import type { LightAnimation } from './light-animation'
-import type { LightData } from './light-data'
-import type { LightState } from './light-state'
+import type { EventProxy } from '../../game/event-proxy.js'
+import type { Player } from '../../game/player.js'
+import { ItemApi } from '../item-api.js'
+import type { Table } from '../table/table.js'
+import type { LightAnimation } from './light-animation.js'
+import type { LightData } from './light-data.js'
+import type { LightState } from './light-state.js'
 
 export class LightApi extends ItemApi<LightData> {
 	private readonly state: LightState
