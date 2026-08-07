@@ -29,7 +29,7 @@ export class TriggerHitGenerator {
 		const vVertex: RenderVertex[] = DragPoint.getRgVertex<RenderVertex>(
 			this.data.dragPoints,
 			() => new RenderVertex(),
-			CatmullCurve2D.fromVertex2D as any,
+			CatmullCurve2D.fromVertex2D,
 		)
 
 		const count = vVertex.length
