@@ -32,12 +32,18 @@ import { Transformer } from './transformer.js'
  */
 /** Resolves VBScript call vs array ambiguity. */
 export class AmbiguityTransformer extends Transformer {
-	private readonly itemApis: { [p: string]: any }
+	private readonly itemApis: Record<string, unknown>
 	private readonly enumApis: EnumsApi
 	private readonly globalApi: GlobalApi
 	private readonly stdlib: Stdlib
 
-	constructor(ast: Program, itemApis: { [p: string]: any }, enumApis: EnumsApi, globalApi: GlobalApi, stdlib: Stdlib) {
+	constructor(
+		ast: Program,
+		itemApis: Record<string, unknown>,
+		enumApis: EnumsApi,
+		globalApi: GlobalApi,
+		stdlib: Stdlib,
+	) {
 		super(ast)
 		this.itemApis = itemApis
 		this.enumApis = enumApis
@@ -70,7 +76,7 @@ export class AmbiguityTransformer extends Transformer {
 
 					// if it's an assignment where its left is the node, it's definitely not a function call
 					if (parent && parent.type === 'AssignmentExpression' && node === parent.left) {
-						let arrayNode: any = null
+						let arrayNode: (MemberExpression & { __isProperty?: boolean }) | null = null
 						for (const argument of node.arguments) {
 							arrayNode = memberExpression(
 								arrayNode !== null ? arrayNode : node.callee,
@@ -100,7 +106,7 @@ export class AmbiguityTransformer extends Transformer {
 						}
 					}
 					// otherwise, we don't know, so use getOrCall
-					;(node.callee as any).__isProperty = true // need to eval that on runtime, not compile time
+					;(node.callee as unknown as { __isProperty?: boolean }).__isProperty = true // need to eval that on runtime, not compile time
 					return getOrCall(node.callee as Expression, ...(node.arguments as Expression[]))
 				}
 				return node
@@ -123,7 +129,7 @@ export class AmbiguityTransformer extends Transformer {
 					}
 
 					// if we previously determined that this isn't a function, return.
-					if ((parent as any).__isProperty) {
+					if ((parent as unknown as { __isProperty?: boolean }).__isProperty) {
 						return node
 					}
 
@@ -152,7 +158,7 @@ export class AmbiguityTransformer extends Transformer {
 
 					// now, if it's a prop of something we already know, check if it's a function.
 					const topMemberName = this.getTopMemberName(node)
-					let api: any
+					let api: unknown
 					switch (topMemberName) {
 						case Transformer.GLOBAL_NAME:
 							api = this.globalApi
@@ -169,7 +175,7 @@ export class AmbiguityTransformer extends Transformer {
 
 					const obj = getValue(api, node)
 					// if it's a function, render it as such
-					if (typeof obj === 'function' && (node as any).__isProperty !== true) {
+					if (typeof obj === 'function' && (node as unknown as { __isProperty?: boolean }).__isProperty !== true) {
 						return callExpression(node, [])
 					}
 					// otherwise, if we got something, that means it's a property
@@ -204,7 +210,7 @@ export class AmbiguityTransformer extends Transformer {
  * @param ast AST
  * @param path Recursively populated path
  */
-function getValue(obj: any, ast: MemberExpression, path: string[] = []): any {
+function getValue(obj: unknown, ast: MemberExpression, path: string[] = []): unknown {
 	if (typeof obj === 'undefined') {
 		return undefined
 	}
@@ -215,7 +221,7 @@ function getValue(obj: any, ast: MemberExpression, path: string[] = []): any {
 		return getValue(obj, ast.object, [ast.property.name, ...path])
 	}
 	if (ast.object.type === 'Identifier') {
-		let o = obj
+		let o: any = obj
 		path = [ast.property.name, ...path]
 		for (const name of path) {
 			if (!o) {
