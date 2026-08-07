@@ -7,7 +7,7 @@ import { ThreeRenderApi } from '../../render/threejs/three-render-api.js'
 import type { Table, TableGenerateOptions } from './table.js'
 import { TableMeshGenerator } from './table-mesh-generator.js'
 
-/** TableExporter. */
+/** Exports a table to GLTF/GLB. */
 export class TableExporter {
 	private readonly table: Table
 	private readonly meshGenerator: TableMeshGenerator
@@ -16,11 +16,6 @@ export class TableExporter {
 		this.table = table
 		this.meshGenerator = new TableMeshGenerator(table)
 	}
-
-	// public async exportGltf(): Promise<string> {
-	// 	this.opts.gltfOptions!.binary = false;
-	// 	return JSON.stringify(await this.export<any>());
-	// }
 
 	public async exportGlb(opts: TableExportOptions = {}): Promise<Buffer> {
 		opts = Object.assign({}, defaultOptions, opts)
