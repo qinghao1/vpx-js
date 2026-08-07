@@ -1,31 +1,15 @@
-/*
- * VPDB - Virtual Pinball Database
- * Copyright (C) 2019 freezy <freezy@vpdb.io>
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- */
+// Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { Event } from '../../game/event'
-import type { Vertex2D } from '../../math/vertex2d'
-import type { CollisionEvent } from '../../physics/collision-event'
-import { CollisionType } from '../../physics/collision-type'
-import { STATICTIME } from '../../physics/constants'
-import { LineSeg } from '../../physics/line-seg'
-import type { Ball } from '../ball/ball'
-import type { TriggerAnimation } from './trigger-animation'
-import type { TriggerData } from './trigger-data'
+import { Event } from '../../game/event.js'
+import type { Vertex2D } from '../../math/vertex2d.js'
+import type { CollisionEvent } from '../../physics/collision-event.js'
+import { CollisionType } from '../../physics/collision-type.js'
+import { STATICTIME } from '../../physics/constants.js'
+import { LineSeg } from '../../physics/line-seg.js'
+import type { Ball } from '../ball/ball.js'
+import type { TriggerAnimation } from './trigger-animation.js'
+import type { TriggerData } from './trigger-data.js'
 
 export class TriggerLineSeg extends LineSeg {
 	private readonly data: TriggerData
