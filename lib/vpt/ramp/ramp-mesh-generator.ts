@@ -15,8 +15,8 @@ import type { Table } from '../table/table.js'
 import type { RampData } from './ramp-data.js'
 import type { RampState } from './ramp-state.js'
 
-export /** Ramp mesh generator. */
-class RampMeshGenerator {
+/** Ramp mesh generator. */
+export class RampMeshGenerator {
 	private readonly data: RampData
 	private readonly state: RampState
 
@@ -350,7 +350,7 @@ class RampMeshGenerator {
 			accuracy = Math.floor(table.getDetailLevel() * f4(1.3)) // see below
 		}
 
-		// as solid ramps are rendered into the static buffer, always use maximum precision
+		// Solid ramps use maximum precision; transparent use detail level.
 		const mat = table.getMaterial(this.state.material)
 		if (!mat || !mat.isOpacityActive) {
 			accuracy = f4(12.0) // see above
@@ -630,7 +630,7 @@ class RampMeshGenerator {
 	public getCentralCurve(table: Table, acc: number = -1.0): RenderVertex3D[] {
 		let accuracy: number
 
-		// as solid ramps are rendered into the static buffer, always use maximum precision
+		// Solid ramps use maximum precision; transparent use detail level.
 		if (acc !== -1.0) {
 			accuracy = acc // used for hit shape calculation, always!
 		} else {
@@ -652,13 +652,13 @@ class RampMeshGenerator {
 	}
 
 	private isHabitrail(): boolean {
-		return (
-			this.state.type === Enums.RampType.RampType4Wire ||
-			this.state.type === Enums.RampType.RampType1Wire ||
-			this.state.type === Enums.RampType.RampType2Wire ||
-			this.state.type === Enums.RampType.RampType3WireLeft ||
-			this.state.type === Enums.RampType.RampType3WireRight
-		)
+		return [
+			Enums.RampType.RampType4Wire,
+			Enums.RampType.RampType1Wire,
+			Enums.RampType.RampType2Wire,
+			Enums.RampType.RampType3WireLeft,
+			Enums.RampType.RampType3WireRight,
+		].includes(this.state.type)
 	}
 
 	private assignHeightToControlPoint(v: RenderVertex3D, height: number) {
