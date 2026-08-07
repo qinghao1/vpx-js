@@ -15,6 +15,7 @@ import {
 import type { ESIToken } from '../grammar/grammar.js'
 import { Transformer } from '../transformer/transformer.js'
 
+/** ppExpr. */
 export function ppExpr(node: ESIToken): any {
 	if (node.children.length > 1) {
 		switch (node.type) {
