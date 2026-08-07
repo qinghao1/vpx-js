@@ -5,6 +5,7 @@ import type { HitObject } from '../physics/hit-object.js'
 import type { EventProxy } from './event-proxy.js'
 import type { IPlayable } from './iplayable.js'
 
+/** Collidable table element. */
 export interface IHittable extends IPlayable {
 	isCollidable(): boolean
 	getHitShapes(): HitObject[]
