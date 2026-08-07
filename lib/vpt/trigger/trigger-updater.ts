@@ -7,8 +7,8 @@ import { ItemUpdater } from '../item-updater.js'
 import type { Table } from '../table/table.js'
 import type { TriggerState } from './trigger-state.js'
 
-export /** TriggerUpdater. */
-class TriggerUpdater extends ItemUpdater<TriggerState> {
+/** TriggerUpdater. */
+export class TriggerUpdater extends ItemUpdater<TriggerState> {
 	constructor(state: TriggerState) {
 		super(state)
 	}
