@@ -5,7 +5,7 @@ import { Enums } from '../enums.js'
 import { ItemApi } from '../item-api.js'
 import type { FlasherData } from './flasher-data.js'
 
-/** FlasherApi. */
+/** Flasher API. */
 export class FlasherApi extends ItemApi<FlasherData> {
 	get X() {
 		return this.data.center.x
