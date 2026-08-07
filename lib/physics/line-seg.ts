@@ -8,6 +8,7 @@ import { CollisionType } from './collision-type.js'
 import { C_CONTACTVEL, C_LOWNORMVEL, C_TOL_ENDPNTS, C_TOL_RADIUS, PHYS_TOUCH } from './constants.js'
 import { HitObject } from './hit-object.js'
 
+/** 2D line segment hit shape. */
 export class LineSeg extends HitObject {
 	public readonly v1: Vertex2D
 	public readonly v2: Vertex2D
@@ -37,7 +38,6 @@ export class LineSeg extends HitObject {
 	}
 
 	public calcHitBBox(): this {
-		// Allow roundoff
 		this.hitBBox.left = Math.min(this.v1.x, this.v2.x)
 		this.hitBBox.right = Math.max(this.v1.x, this.v2.x)
 		this.hitBBox.top = Math.min(this.v1.y, this.v2.y)
