@@ -25,16 +25,18 @@ export class HitCircle extends HitObject {
 		this.hitBBox.zhigh = zHigh
 	}
 
-	public collide(coll: CollisionEvent, physics: PlayerPhysics): void {
+	public override collide(coll: CollisionEvent, _physics?: PlayerPhysics): void {
 		coll.ball.hit.collide3DWall(coll.hitNormal, this.elasticity, this.elasticityFalloff, this.friction, this.scatter)
 	}
-	public calcHitBBox(): void {
+
+	public override calcHitBBox(): void {
 		this.hitBBox.left = this.center.x - this.radius
 		this.hitBBox.right = this.center.x + this.radius
 		this.hitBBox.top = this.center.y - this.radius
 		this.hitBBox.bottom = this.center.y + this.radius
 	}
-	public hitTest(ball: Ball, dTime: number, coll: CollisionEvent): number {
+
+	public override hitTest(ball: Ball, dTime: number, coll: CollisionEvent): number {
 		return this.hitTestBasicRadius(ball, dTime, coll, true, true, true)
 	}
 
@@ -48,11 +50,11 @@ export class HitCircle extends HitObject {
 	): number {
 		if (!this.isEnabled || ball.state.isFrozen) return -1
 		const c = Vertex3D.claim(this.center.x, this.center.y, 0)
-		const dist = ball.state.pos.clone(true).sub(c),
-			dv = ball.hit.vel.clone(true)
+		const dist = ball.state.pos.clone(true).sub(c)
+		const dv = ball.hit.vel.clone(true)
 		const capsule3D = !lateral && ball.state.pos.z > this.hitBBox.zhigh
-		const isKicker = this.objType === CollisionType.Kicker,
-			isKickerOrTrigger = this.objType === CollisionType.Trigger || isKicker
+		const isKicker = this.objType === CollisionType.Kicker
+		const isKickerOrTrigger = this.objType === CollisionType.Trigger || isKicker
 		let targetR: number
 		if (capsule3D) {
 			targetR = this.radius * (13 / 5)
@@ -63,25 +65,25 @@ export class HitCircle extends HitObject {
 			dist.z = 0
 			dv.z = 0
 		}
-		const bcddsq = dist.lengthSq(),
-			bcdd = Math.sqrt(bcddsq)
+		const bcddsq = dist.lengthSq()
+		const bcdd = Math.sqrt(bcddsq)
 		if (bcdd <= 1e-6) {
 			Vertex3D.release(dist, dv, c)
 			return -1
 		}
-		const b = dist.dot(dv),
-			bnv = b / bcdd
+		const b = dist.dot(dv)
+		const bnv = b / bcdd
 		Vertex3D.release(dist)
 		if (direction && bnv > C_LOWNORMVEL) {
 			Vertex3D.release(dv, c)
 			return -1
 		}
-		const bnd = bcdd - targetR,
-			a = dv.lengthSq()
+		const bnd = bcdd - targetR
+		const a = dv.lengthSq()
 		Vertex3D.release(dv)
-		let hitTime = 0,
-			isUnhit = false,
-			isContact = false
+		let hitTime = 0
+		let isUnhit = false
+		let isContact = false
 		if (isKicker && bnd <= 0 && bnd >= -this.radius && a < C_CONTACTVEL * C_CONTACTVEL && ball.hit.isRealBall()) {
 			if (ball.hit.vpVolObjs.includes(this.obj!)) ball.hit.vpVolObjs.splice(ball.hit.vpVolObjs.indexOf(this.obj!), 1)
 		}
@@ -122,9 +124,9 @@ export class HitCircle extends HitObject {
 			Vertex3D.release(c)
 			return -1
 		}
-		const hx = ball.state.pos.x + ball.hit.vel.x * hitTime,
-			hy = ball.state.pos.y + ball.hit.vel.y * hitTime,
-			sqr = (hx - c.x) ** 2 + (hy - c.y) ** 2
+		const hx = ball.state.pos.x + ball.hit.vel.x * hitTime
+		const hy = ball.state.pos.y + ball.hit.vel.y * hitTime
+		const sqr = (hx - c.x) ** 2 + (hy - c.y) ** 2
 		coll.hitNormal.setZero()
 		if (sqr > 1e-8) {
 			const inv = 1 / Math.sqrt(sqr)
