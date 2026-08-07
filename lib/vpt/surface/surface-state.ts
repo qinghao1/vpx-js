@@ -4,7 +4,7 @@
 import { Pool } from '../../util/object-pool.js'
 import { ItemState } from '../item-state.js'
 
-/** SurfaceState. */
+/** Surface state. */
 export class SurfaceState extends ItemState {
 	public static readonly POOL = new Pool(SurfaceState)
 
