@@ -3,8 +3,8 @@
 
 import type { EventProxy } from '../../game/event-proxy.js'
 
-export /** Timer hit. */
-class TimerHit {
+/** Timer hit. */
+export class TimerHit {
 	public readonly pfe: EventProxy
 	public nextFire: number
 	public interval: number
