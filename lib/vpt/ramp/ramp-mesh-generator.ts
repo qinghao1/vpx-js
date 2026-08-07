@@ -26,65 +26,18 @@ export class RampMeshGenerator {
 	}
 
 	public getMeshes<GEOMETRY>(isTransparent: boolean, table: Table): Meshes<GEOMETRY> {
-		const meshes: Meshes<GEOMETRY> = {}
 		const ramp = this.generateMeshes(table)
-
-		if (ramp.wire1) {
-			meshes.wire1 = {
+		const material = table.getMaterial(this.data.szMaterial)
+		const map = table.getTexture(this.data.szImage)
+		const meshes: Meshes<GEOMETRY> = {}
+		for (const key of ['wire1', 'wire2', 'wire3', 'wire4', 'floor', 'left', 'right'] as const) {
+			const mesh = ramp[key]
+			if (!mesh) continue
+			meshes[key] = {
 				isVisible: this.data.isVisible,
-				mesh: ramp.wire1.transform(Matrix3D.RIGHT_HANDED),
-				material: table.getMaterial(this.data.szMaterial),
-				isTransparent,
-			}
-		}
-		if (ramp.wire2) {
-			meshes.wire2 = {
-				isVisible: this.data.isVisible,
-				mesh: ramp.wire2.transform(Matrix3D.RIGHT_HANDED),
-				material: table.getMaterial(this.data.szMaterial),
-				isTransparent,
-			}
-		}
-		if (ramp.wire3) {
-			meshes.wire3 = {
-				isVisible: this.data.isVisible,
-				mesh: ramp.wire3.transform(Matrix3D.RIGHT_HANDED),
-				material: table.getMaterial(this.data.szMaterial),
-				isTransparent,
-			}
-		}
-		if (ramp.wire4) {
-			meshes.wire4 = {
-				isVisible: this.data.isVisible,
-				mesh: ramp.wire4.transform(Matrix3D.RIGHT_HANDED),
-				material: table.getMaterial(this.data.szMaterial),
-				isTransparent,
-			}
-		}
-		if (ramp.floor) {
-			meshes.floor = {
-				isVisible: this.data.isVisible,
-				mesh: ramp.floor.transform(Matrix3D.RIGHT_HANDED),
-				material: table.getMaterial(this.data.szMaterial),
-				map: table.getTexture(this.data.szImage),
-				isTransparent,
-			}
-		}
-		if (ramp.left) {
-			meshes.left = {
-				isVisible: this.data.isVisible,
-				mesh: ramp.left.transform(Matrix3D.RIGHT_HANDED),
-				material: table.getMaterial(this.data.szMaterial),
-				map: table.getTexture(this.data.szImage),
-				isTransparent,
-			}
-		}
-		if (ramp.right) {
-			meshes.right = {
-				isVisible: this.data.isVisible,
-				mesh: ramp.right.transform(Matrix3D.RIGHT_HANDED),
-				material: table.getMaterial(this.data.szMaterial),
-				map: table.getTexture(this.data.szImage),
+				mesh: mesh.transform(Matrix3D.RIGHT_HANDED),
+				material,
+				...(key === 'floor' || key === 'left' || key === 'right' ? { map } : {}),
 				isTransparent,
 			}
 		}
@@ -92,339 +45,187 @@ export class RampMeshGenerator {
 	}
 
 	public generateMeshes(table: Table): RampMeshes {
+		if (!this.isHabitrail()) return this.generateFlatMesh(table)
+		const [a, b] = this.generateWireMeshes(table)
+		const name = this.data.getName()
 		const meshes: RampMeshes = {}
-		if (!this.isHabitrail()) {
-			return this.generateFlatMesh(table)
-		} else {
-			const [wireMeshA, wireMeshB] = this.generateWireMeshes(table)
-			switch (this.state.type) {
-				case Enums.RampType.RampType1Wire: {
-					wireMeshA.name = `ramp.wire1-${this.data.getName()}`
-					meshes.wire1 = wireMeshA
-					break
-				}
-				case Enums.RampType.RampType2Wire: {
-					const wire1Mesh = wireMeshA.makeTranslation(0, 0, 3.0)
-					const wire2Mesh = wireMeshB.makeTranslation(0, 0, 3.0)
-					wire1Mesh.name = `ramp.wire1-${this.data.getName()}`
-					wire2Mesh.name = `ramp.wire2-${this.data.getName()}`
-					meshes.wire1 = wire1Mesh
-					meshes.wire2 = wire2Mesh
-					break
-				}
-				case Enums.RampType.RampType4Wire: {
-					meshes.wire1 = wireMeshA
-						.clone(`ramp.wire1-${this.data.getName()}`)
-						.makeTranslation(0, 0, this.data.wireDistanceY * 0.5)
-					meshes.wire2 = wireMeshB
-						.clone(`ramp.wire2-${this.data.getName()}`)
-						.makeTranslation(0, 0, this.data.wireDistanceY * 0.5)
-					meshes.wire3 = wireMeshA.makeTranslation(0, 0, 3.0)
-					meshes.wire3.name = `ramp.wire3-${this.data.getName()}`
-					meshes.wire4 = wireMeshB.makeTranslation(0, 0, 3.0)
-					meshes.wire4.name = `ramp.wire4-${this.data.getName()}`
-					break
-				}
-				case Enums.RampType.RampType3WireLeft: {
-					meshes.wire2 = wireMeshB
-						.clone(`ramp.wire2-${this.data.getName()}`)
-						.makeTranslation(0, 0, this.data.wireDistanceY * 0.5)
-					meshes.wire3 = wireMeshA.makeTranslation(0, 0, 3.0)
-					meshes.wire3.name = `ramp.wire3-${this.data.getName()}`
-					meshes.wire4 = wireMeshB.makeTranslation(0, 0, 3.0)
-					meshes.wire4.name = `ramp.wire4-${this.data.getName()}`
-					break
-				}
-				case Enums.RampType.RampType3WireRight: {
-					meshes.wire1 = wireMeshA
-						.clone(`ramp.wire1-${this.data.getName()}`)
-						.makeTranslation(0, 0, this.data.wireDistanceY * 0.5)
-					meshes.wire3 = wireMeshA.makeTranslation(0, 0, 3.0)
-					meshes.wire3.name = `ramp.wire3-${this.data.getName()}`
-					meshes.wire4 = wireMeshB.makeTranslation(0, 0, 3.0)
-					meshes.wire4.name = `ramp.wire4-${this.data.getName()}`
-					break
-				}
-			}
+		switch (this.state.type) {
+			case Enums.RampType.RampType1Wire:
+				a.name = `ramp.wire1-${name}`
+				meshes.wire1 = a
+				break
+			case Enums.RampType.RampType2Wire:
+				meshes.wire1 = a.makeTranslation(0, 0, 3.0)
+				meshes.wire2 = b.makeTranslation(0, 0, 3.0)
+				meshes.wire1.name = `ramp.wire1-${name}`
+				meshes.wire2.name = `ramp.wire2-${name}`
+				break
+			case Enums.RampType.RampType4Wire:
+				meshes.wire1 = a.clone(`ramp.wire1-${name}`).makeTranslation(0, 0, this.data.wireDistanceY * 0.5)
+				meshes.wire2 = b.clone(`ramp.wire2-${name}`).makeTranslation(0, 0, this.data.wireDistanceY * 0.5)
+				meshes.wire3 = a.makeTranslation(0, 0, 3.0)
+				meshes.wire3.name = `ramp.wire3-${name}`
+				meshes.wire4 = b.makeTranslation(0, 0, 3.0)
+				meshes.wire4.name = `ramp.wire4-${name}`
+				break
+			case Enums.RampType.RampType3WireLeft:
+				meshes.wire2 = b.clone(`ramp.wire2-${name}`).makeTranslation(0, 0, this.data.wireDistanceY * 0.5)
+				meshes.wire3 = a.makeTranslation(0, 0, 3.0)
+				meshes.wire3.name = `ramp.wire3-${name}`
+				meshes.wire4 = b.makeTranslation(0, 0, 3.0)
+				meshes.wire4.name = `ramp.wire4-${name}`
+				break
+			case Enums.RampType.RampType3WireRight:
+				meshes.wire1 = a.clone(`ramp.wire1-${name}`).makeTranslation(0, 0, this.data.wireDistanceY * 0.5)
+				meshes.wire3 = a.makeTranslation(0, 0, 3.0)
+				meshes.wire3.name = `ramp.wire3-${name}`
+				meshes.wire4 = b.makeTranslation(0, 0, 3.0)
+				meshes.wire4.name = `ramp.wire4-${name}`
+				break
 		}
 		return meshes
 	}
 
 	private generateFlatMesh(table: Table): RampMeshes {
 		const rv = this.getRampVertex(table, -1, true)
-		const meshes: RampMeshes = {
-			floor: this.generateFlatFloorMesh(table, rv),
-		}
-		if (this.state.leftWallHeightVisible > 0.0) {
-			meshes.left = this.generateFlatLeftWall(table, rv)
-		}
-		if (this.state.rightWallHeightVisible > 0.0) {
-			meshes.right = this.generateFlatRightWall(table, rv)
-		}
+		const meshes: RampMeshes = { floor: this.generateFlatFloorMesh(table, rv) }
+		if (this.state.leftWallHeightVisible > 0) meshes.left = this.generateFlatWall(table, rv, 'left')
+		if (this.state.rightWallHeightVisible > 0) meshes.right = this.generateFlatWall(table, rv, 'right')
 		return meshes
 	}
 
 	private generateFlatFloorMesh(table: Table, rv: RampVertexResult): Mesh {
-		const rampVertex = rv.pcvertex
-		const rgHeight = rv.ppheight
-		const rgRatio = rv.ppratio
+		const n = rv.pcvertex
 		const dim = table.getDimensions()
-		const invTableWidth = f4(1.0 / f4(dim.width))
-		const invTableHeight = f4(1.0 / f4(dim.height))
-		const numVertices = rv.pcvertex * 2
-
+		const invW = f4(1 / f4(dim.width))
+		const invH = f4(1 / f4(dim.height))
 		const mesh = new Mesh(`ramp.floor-${this.data.getName()}`)
-		for (let i = 0; i < rampVertex; i++) {
-			const rgv3d1 = new Vertex3DNoTex2()
-			const rgv3d2 = new Vertex3DNoTex2()
-
-			rgv3d1.x = rv.rgvLocal[i].x
-			rgv3d1.y = rv.rgvLocal[i].y
-			rgv3d1.z = rgHeight[i] * table.getScaleZ()
-
-			rgv3d2.x = rv.rgvLocal[rampVertex * 2 - i - 1].x
-			rgv3d2.y = rv.rgvLocal[rampVertex * 2 - i - 1].y
-			rgv3d2.z = rgv3d1.z
-
+		for (let i = 0; i < n; i++) {
+			const v1 = new Vertex3DNoTex2()
+			const v2 = new Vertex3DNoTex2()
+			v1.x = rv.rgvLocal[i].x
+			v1.y = rv.rgvLocal[i].y
+			v1.z = rv.ppheight[i] * table.getScaleZ()
+			v2.x = rv.rgvLocal[n * 2 - i - 1].x
+			v2.y = rv.rgvLocal[n * 2 - i - 1].y
+			v2.z = v1.z
 			if (this.state.texture) {
 				if (this.state.textureAlignment === Enums.RampImageAlignment.ImageModeWorld) {
-					rgv3d1.tu = rgv3d1.x * invTableWidth
-					rgv3d1.tv = rgv3d1.y * invTableHeight
-					rgv3d2.tu = rgv3d2.x * invTableWidth
-					rgv3d2.tv = rgv3d2.y * invTableHeight
+					v1.tu = v1.x * invW
+					v1.tv = v1.y * invH
+					v2.tu = v2.x * invW
+					v2.tv = v2.y * invH
 				} else {
-					rgv3d1.tu = 1.0
-					rgv3d1.tv = rgRatio[i]
-					rgv3d2.tu = 0.0
-					rgv3d2.tv = rgRatio[i]
+					v1.tu = 1
+					v1.tv = rv.ppratio[i]
+					v2.tu = 0
+					v2.tv = rv.ppratio[i]
 				}
-			} else {
-				rgv3d1.tu = 0.0
-				rgv3d1.tv = 0.0
-				rgv3d2.tu = 0.0
-				rgv3d2.tv = 0.0
 			}
-
-			mesh.vertices.push(rgv3d1)
-			mesh.vertices.push(rgv3d2)
-
-			if (i === rampVertex - 1) {
-				break
-			}
-
-			mesh.indices.push(i * 2)
-			mesh.indices.push(i * 2 + 1)
-			mesh.indices.push(i * 2 + 3)
-			mesh.indices.push(i * 2)
-			mesh.indices.push(i * 2 + 3)
-			mesh.indices.push(i * 2 + 2)
+			mesh.vertices.push(v1, v2)
+			if (i < n - 1) mesh.indices.push(i * 2, i * 2 + 1, i * 2 + 3, i * 2, i * 2 + 3, i * 2 + 2)
 		}
+		Mesh.computeNormals(mesh.vertices, n * 2, mesh.indices, (n - 1) * 6)
+		return mesh
+	}
 
-		Mesh.computeNormals(mesh.vertices, numVertices, mesh.indices, (rampVertex - 1) * 6)
+	private generateFlatWall(table: Table, rv: RampVertexResult, side: 'left' | 'right'): Mesh {
+		const n = rv.pcvertex
+		const dim = table.getDimensions()
+		const invW = f4(1 / f4(dim.width))
+		const invH = f4(1 / f4(dim.height))
+		const wallH = side === 'left' ? this.state.leftWallHeightVisible : this.state.rightWallHeightVisible
+		const mesh = new Mesh(`ramp.${side}-${this.data.getName()}`)
+		for (let i = 0; i < n; i++) {
+			const v1 = new Vertex3DNoTex2()
+			const v2 = new Vertex3DNoTex2()
+			const idx = side === 'left' ? n * 2 - i - 1 : i
+			v1.x = rv.rgvLocal[idx].x
+			v1.y = rv.rgvLocal[idx].y
+			v1.z = rv.ppheight[i] * table.getScaleZ()
+			v2.x = v1.x
+			v2.y = v1.y
+			v2.z = f4(rv.ppheight[i] + wallH) * table.getScaleZ()
+			if (this.state.texture && this.state.hasWallImage) {
+				if (this.state.textureAlignment === Enums.RampImageAlignment.ImageModeWorld) {
+					v1.tu = v1.x * invW
+					v1.tv = v1.y * invH
+				} else {
+					v1.tu = 0
+					v1.tv = rv.ppratio[i]
+				}
+				v2.tu = v1.tu
+				v2.tv = v1.tv
+			}
+			mesh.vertices.push(v1, v2)
+			if (i < n - 1) mesh.indices.push(i * 2, i * 2 + 1, i * 2 + 3, i * 2, i * 2 + 3, i * 2 + 2)
+		}
+		Mesh.computeNormals(mesh.vertices, n * 2, mesh.indices, (n - 1) * 6)
 		return mesh
 	}
 
 	private generateFlatLeftWall(table: Table, rv: RampVertexResult): Mesh {
-		const rampVertex = rv.pcvertex
-		const rgHeight = rv.ppheight
-		const rgRatio = rv.ppratio
-		const dim = table.getDimensions()
-		const invTableWidth = f4(1.0 / f4(dim.width))
-		const invTableHeight = f4(1.0 / f4(dim.height))
-		const numVertices = rampVertex * 2
-
-		const mesh = new Mesh(`ramp.left-${this.data.getName()}`)
-		for (let i = 0; i < rampVertex; i++) {
-			const rgv3d1 = new Vertex3DNoTex2()
-			const rgv3d2 = new Vertex3DNoTex2()
-
-			rgv3d1.x = rv.rgvLocal[rampVertex * 2 - i - 1].x
-			rgv3d1.y = rv.rgvLocal[rampVertex * 2 - i - 1].y
-			rgv3d1.z = rgHeight[i] * table.getScaleZ()
-
-			rgv3d2.x = rgv3d1.x
-			rgv3d2.y = rgv3d1.y
-			rgv3d2.z = f4(rgHeight[i] + this.state.leftWallHeightVisible) * table.getScaleZ()
-
-			if (this.state.texture && this.state.hasWallImage) {
-				if (this.state.textureAlignment === Enums.RampImageAlignment.ImageModeWorld) {
-					rgv3d1.tu = rgv3d1.x * invTableWidth
-					rgv3d1.tv = rgv3d1.y * invTableHeight
-				} else {
-					rgv3d1.tu = 0
-					rgv3d1.tv = rgRatio[i]
-				}
-				rgv3d2.tu = rgv3d1.tu
-				rgv3d2.tv = rgv3d1.tv
-			} else {
-				rgv3d1.tu = 0.0
-				rgv3d1.tv = 0.0
-				rgv3d2.tu = 0.0
-				rgv3d2.tv = 0.0
-			}
-
-			mesh.vertices.push(rgv3d1)
-			mesh.vertices.push(rgv3d2)
-
-			if (i === rampVertex - 1) {
-				break
-			}
-
-			mesh.indices.push(i * 2)
-			mesh.indices.push(i * 2 + 1)
-			mesh.indices.push(i * 2 + 3)
-			mesh.indices.push(i * 2)
-			mesh.indices.push(i * 2 + 3)
-			mesh.indices.push(i * 2 + 2)
-		}
-		Mesh.computeNormals(mesh.vertices, numVertices, mesh.indices, (rampVertex - 1) * 6)
-		return mesh
+		return this.generateFlatWall(table, rv, 'left')
 	}
 
 	private generateFlatRightWall(table: Table, rv: RampVertexResult): Mesh {
-		const rampVertex = rv.pcvertex
-		const rgHeight = rv.ppheight
-		const rgRatio = rv.ppratio
-		const dim = table.getDimensions()
-		const invTableWidth = f4(1.0 / f4(dim.width))
-		const invTableHeight = f4(1.0 / f4(dim.height))
-		const numVertices = rampVertex * 2
-
-		const mesh = new Mesh(`ramp.right-${this.data.getName()}`)
-		for (let i = 0; i < rampVertex; i++) {
-			const rgv3d1 = new Vertex3DNoTex2()
-			const rgv3d2 = new Vertex3DNoTex2()
-
-			rgv3d1.x = rv.rgvLocal[i].x
-			rgv3d1.y = rv.rgvLocal[i].y
-			rgv3d1.z = rgHeight[i] * table.getScaleZ()
-
-			rgv3d2.x = rv.rgvLocal[i].x
-			rgv3d2.y = rv.rgvLocal[i].y
-			rgv3d2.z = f4(rgHeight[i] + this.state.rightWallHeightVisible) * table.getScaleZ()
-
-			if (this.state.texture && this.state.hasWallImage) {
-				if (this.state.textureAlignment === Enums.RampImageAlignment.ImageModeWorld) {
-					rgv3d1.tu = rgv3d1.x * invTableWidth
-					rgv3d1.tv = rgv3d1.y * invTableHeight
-				} else {
-					rgv3d1.tu = 0
-					rgv3d1.tv = rgRatio[i]
-				}
-				rgv3d2.tu = rgv3d1.tu
-				rgv3d2.tv = rgv3d1.tv
-			} else {
-				rgv3d1.tu = 0.0
-				rgv3d1.tv = 0.0
-				rgv3d2.tu = 0.0
-				rgv3d2.tv = 0.0
-			}
-
-			mesh.vertices.push(rgv3d1)
-			mesh.vertices.push(rgv3d2)
-
-			if (i === rampVertex - 1) {
-				break
-			}
-
-			mesh.indices.push(i * 2)
-			mesh.indices.push(i * 2 + 1)
-			mesh.indices.push(i * 2 + 3)
-			mesh.indices.push(i * 2)
-			mesh.indices.push(i * 2 + 3)
-			mesh.indices.push(i * 2 + 2)
-		}
-		Mesh.computeNormals(mesh.vertices, numVertices, mesh.indices, (rampVertex - 1) * 6)
-		return mesh
+		return this.generateFlatWall(table, rv, 'right')
 	}
 
 	private generateWireMeshes(table: Table): Mesh[] {
-		const meshes: Mesh[] = []
-
-		let accuracy
-		if (table.getDetailLevel() < 5) {
-			accuracy = 6
-		} else if (table.getDetailLevel() >= 5 && table.getDetailLevel() < 8) {
-			accuracy = 8
-		} else {
-			accuracy = Math.floor(table.getDetailLevel() * f4(1.3)) // see below
-		}
-
-		// Solid ramps use maximum precision; transparent use detail level.
+		let accuracy: number
+		if (table.getDetailLevel() < 5) accuracy = 6
+		else if (table.getDetailLevel() < 8) accuracy = 8
+		else accuracy = Math.floor(table.getDetailLevel() * f4(1.3))
 		const mat = table.getMaterial(this.state.material)
-		if (!mat || !mat.isOpacityActive) {
-			accuracy = f4(12.0) // see above
-		}
+		if (!mat || !mat.isOpacityActive) accuracy = f4(12)
 
 		const rv = this.getRampVertex(table, -1, false)
-		const splinePoints = rv.pcvertex
-		const rgheightInit = rv.ppheight
+		const n = rv.pcvertex
+		const heights = rv.ppheight
 		const middlePoints = rv.pMiddlePoints
-
-		const numRings = splinePoints
+		const numRings = n
 		const numSegments = accuracy
 
 		const tmpPoints: Vertex2D[] = []
+		for (let i = 0; i < n; i++) tmpPoints[i] = rv.rgvLocal[n * 2 - i - 1]
 
-		for (let i = 0; i < splinePoints; i++) {
-			tmpPoints[i] = rv.rgvLocal[splinePoints * 2 - i - 1]
-		}
-
-		let vertBuffer: Vertex3DNoTex2[] = []
-		let vertBuffer2: Vertex3DNoTex2[] = []
-
+		let vertBuffer: Vertex3DNoTex2[]
+		let vertBuffer2: Vertex3DNoTex2[] | undefined
 		if (this.state.type !== Enums.RampType.RampType1Wire) {
-			vertBuffer = this.createWire(numRings, numSegments, rv.rgvLocal, rgheightInit)
-			vertBuffer2 = this.createWire(numRings, numSegments, tmpPoints, rgheightInit)
+			vertBuffer = this.createWire(numRings, numSegments, rv.rgvLocal, heights)
+			vertBuffer2 = this.createWire(numRings, numSegments, tmpPoints, heights)
 		} else {
-			vertBuffer = this.createWire(numRings, numSegments, middlePoints, rgheightInit)
+			vertBuffer = this.createWire(numRings, numSegments, middlePoints, heights)
 		}
 
-		// calculate faces
 		const indices: number[] = []
 		for (let i = 0; i < numRings - 1; i++) {
 			for (let j = 0; j < numSegments; j++) {
-				const quad: number[] = []
-				quad[0] = i * numSegments + j
-
-				if (j !== numSegments - 1) {
-					quad[1] = i * numSegments + j + 1
-				} else {
-					quad[1] = i * numSegments
-				}
-
-				if (i !== numRings - 1) {
-					quad[2] = (i + 1) * numSegments + j
-					if (j !== numSegments - 1) {
-						quad[3] = (i + 1) * numSegments + j + 1
-					} else {
-						quad[3] = (i + 1) * numSegments
-					}
-				} else {
-					quad[2] = j
-					if (j !== numSegments - 1) {
-						quad[3] = j + 1
-					} else {
-						quad[3] = 0
-					}
-				}
-
+				const quad = [
+					i * numSegments + j,
+					j !== numSegments - 1 ? i * numSegments + j + 1 : i * numSegments,
+					i !== numRings - 1
+						? j !== numSegments - 1
+							? (i + 1) * numSegments + j + 1
+							: (i + 1) * numSegments
+						: j !== numSegments - 1
+							? j + 1
+							: 0,
+					i !== numRings - 1 ? (i + 1) * numSegments + j : j,
+				]
+				// winding: 0-1-2 and 3-2-1
 				const offs = (i * numSegments + j) * 6
 				indices[offs] = quad[0]
 				indices[offs + 1] = quad[1]
-				indices[offs + 2] = quad[2]
-				indices[offs + 3] = quad[3]
-				indices[offs + 4] = quad[2]
+				indices[offs + 2] = quad[3]
+				indices[offs + 3] = quad[2]
+				indices[offs + 4] = quad[3]
 				indices[offs + 5] = quad[1]
 			}
 		}
-
-		meshes.push(new Mesh(vertBuffer, indices))
-
-		if (this.state.type !== Enums.RampType.RampType1Wire) {
-			meshes.push(new Mesh(vertBuffer2, indices))
-		}
-
+		const meshes = [new Mesh(vertBuffer, indices)]
+		if (vertBuffer2) meshes.push(new Mesh(vertBuffer2, indices))
 		return meshes
 	}
 
@@ -432,22 +233,20 @@ export class RampMeshGenerator {
 		numRings: number,
 		numSegments: number,
 		midPoints: Vertex2D[],
-		rgheightInit: number[],
+		heights: number[],
 	): Vertex3DNoTex2[] {
 		const rgvbuf: Vertex3DNoTex2[] = []
-		let prevB: Vertex3D = new Vertex3D()
+		let prevB = new Vertex3D()
 		let index = 0
 		for (let i = 0; i < numRings; i++) {
 			const i2 = i === numRings - 1 ? i : i + 1
-			const height = rgheightInit[i]
-
+			const height = heights[i]
 			const tangent = new Vertex3D(
 				midPoints[i2].x - midPoints[i].x,
 				midPoints[i2].y - midPoints[i].y,
-				rgheightInit[i2] - rgheightInit[i],
+				heights[i2] - heights[i],
 			)
 			if (i === numRings - 1) {
-				// for the last spline point use the previous tangent again, otherwise we won't see the complete wire (it stops one control point too early)
 				tangent.x = midPoints[i].x - midPoints[i - 1].x
 				tangent.y = midPoints[i].y - midPoints[i - 1].y
 			}
@@ -457,9 +256,9 @@ export class RampMeshGenerator {
 				const up = new Vertex3D(
 					midPoints[i2].x + midPoints[i].x,
 					midPoints[i2].y + midPoints[i].y,
-					rgheightInit[i2] - height,
+					heights[i2] - height,
 				)
-				normal = tangent.clone().cross(up) //normal
+				normal = tangent.clone().cross(up)
 				binorm = tangent.clone().cross(normal)
 			} else {
 				normal = prevB.clone().cross(tangent)
@@ -469,32 +268,26 @@ export class RampMeshGenerator {
 			normal.normalize()
 			prevB = binorm
 
-			const invNumRings = f4(1.0 / f4(numRings))
-			const invNumSegments = f4(1.0 / f4(numSegments))
+			const invNumRings = f4(1 / f4(numRings))
+			const invNumSegments = f4(1 / f4(numSegments))
 			const u = f4(i * invNumRings)
 			for (let j = 0; j < numSegments; j++, index++) {
 				const v = f4(f4(j + u) * invNumSegments)
-				const tmp: Vertex3D = Vertex3D.getRotatedAxis(
-					f4(j * f4(360.0 * invNumSegments)),
-					tangent,
-					normal,
-				).multiplyScalar(this.data.wireDiameter * f4(0.5))
-				rgvbuf[index] = new Vertex3DNoTex2()
-				rgvbuf[index].x = midPoints[i].x + tmp.x
-				rgvbuf[index].y = midPoints[i].y + tmp.y
-				rgvbuf[index].z = height + tmp.z
-				//texel
-				rgvbuf[index].tu = u
-				rgvbuf[index].tv = v
-				const n = new Vertex3D(
-					rgvbuf[index].x - midPoints[i].x,
-					rgvbuf[index].y - midPoints[i].y,
-					rgvbuf[index].z - height,
+				const tmp = Vertex3D.getRotatedAxis(f4(j * f4(360 * invNumSegments)), tangent, normal).multiplyScalar(
+					this.data.wireDiameter * f4(0.5),
 				)
-				const len = f4(1.0 / f4(Math.sqrt(f4(f4(f4(n.x * n.x) + f4(n.y * n.y)) + f4(n.z * n.z)))))
-				rgvbuf[index].nx = n.x * len
-				rgvbuf[index].ny = n.y * len
-				rgvbuf[index].nz = n.z * len
+				const vtx = new Vertex3DNoTex2()
+				vtx.x = midPoints[i].x + tmp.x
+				vtx.y = midPoints[i].y + tmp.y
+				vtx.z = height + tmp.z
+				vtx.tu = u
+				vtx.tv = v
+				const n = new Vertex3D(vtx.x - midPoints[i].x, vtx.y - midPoints[i].y, vtx.z - height)
+				const len = f4(1 / f4(Math.sqrt(f4(f4(f4(n.x * n.x) + f4(n.y * n.y)) + f4(n.z * n.z)))))
+				vtx.nx = n.x * len
+				vtx.ny = n.y * len
+				vtx.nz = n.z * len
+				rgvbuf[index] = vtx
 			}
 		}
 		return rgvbuf
@@ -505,114 +298,40 @@ export class RampMeshGenerator {
 		const ppfCross: boolean[] = []
 		const ppratio: number[] = []
 		const pMiddlePoints: Vertex2D[] = []
-
-		// vvertex are the 2D vertices forming the central curve of the ramp as seen from above
 		const vvertex = this.getCentralCurve(table, accuracy)
-
 		const cvertex = vvertex.length
-		const pcvertex = cvertex
 		const rgvLocal: Vertex2D[] = []
-
-		// Compute an approximation to the length of the central curve
-		// by adding up the lengths of the line segments.
-		let totalLength = 0
 		const bottomHeight = f4(this.state.heightBottom + table.getTableHeight())
 		const topHeight = f4(this.state.heightTop + table.getTableHeight())
 
+		let totalLength = 0
 		for (let i = 0; i < cvertex - 1; i++) {
-			const v1 = vvertex[i]
-			const v2 = vvertex[i + 1]
-
-			const dx = f4(v1.x - v2.x)
-			const dy = f4(v1.y - v2.y)
-			const length = f4(Math.sqrt(f4(dx * dx) + f4(dy * dy)))
-
-			totalLength = f4(totalLength + length)
+			const dx = f4(vvertex[i].x - vvertex[i + 1].x)
+			const dy = f4(vvertex[i].y - vvertex[i + 1].y)
+			totalLength = f4(totalLength + f4(Math.sqrt(f4(dx * dx) + f4(dy * dy))))
 		}
 
 		let currentLength = 0
 		for (let i = 0; i < cvertex; i++) {
-			// clamp next and prev as ramps do not loop
 			const vprev = vvertex[i > 0 ? i - 1 : i]
 			const vnext = vvertex[i < cvertex - 1 ? i + 1 : i]
 			const vmiddle = vvertex[i]
-
 			ppfCross[i] = vmiddle.fControlPoint
 
-			let vnormal = new Vertex2D()
-			// Get normal at this point
-			// Notice that these values equal the ones in the line
-			// equation and could probably be substituted by them.
-			const v1normal = new Vertex2D(vprev.y - vmiddle.y, vmiddle.x - vprev.x) // vector vmiddle-vprev rotated RIGHT
-			const v2normal = new Vertex2D(vmiddle.y - vnext.y, vnext.x - vmiddle.x) // vector vnext-vmiddle rotated RIGHT
-
-			// special handling for beginning and end of the ramp, as ramps do not loop
-			if (i === cvertex - 1) {
-				v1normal.normalize()
-				vnormal = v1normal
-			} else if (i === 0) {
-				v2normal.normalize()
-				vnormal = v2normal
-			} else {
-				v1normal.normalize()
-				v2normal.normalize()
-
-				if (Math.abs(f4(v1normal.x - v2normal.x)) < 0.0001 && Math.abs(f4(v1normal.y - v2normal.y)) < 0.0001) {
-					// Two parallel segments
-					vnormal = v1normal
-				} else {
-					// Find intersection of the two edges meeting this points, but
-					// shift those lines outwards along their normals
-
-					// First line
-					const A = f4(vprev.y - vmiddle.y)
-					const B = f4(vmiddle.x - vprev.x)
-
-					// Shift line along the normal
-					const C = -f4(f4(A * f4(vprev.x - v1normal.x)) + f4(B * f4(vprev.y - v1normal.y)))
-
-					// Second line
-					const D = f4(vnext.y - vmiddle.y)
-					const E = f4(vmiddle.x - vnext.x)
-
-					// Shift line along the normal
-					const F = -f4(f4(D * f4(vnext.x - v2normal.x)) + f4(E * f4(vnext.y - v2normal.y)))
-
-					const det = f4(f4(A * E) - f4(B * D))
-					const invDet = det !== 0.0 ? f4(1.0 / det) : 0.0
-
-					const intersectX = f4(f4(f4(B * F) - f4(E * C)) * invDet)
-					const intersectY = f4(f4(f4(C * D) - f4(A * F)) * invDet)
-
-					vnormal.x = vmiddle.x - intersectX
-					vnormal.y = vmiddle.y - intersectY
-				}
-			}
-
-			// Update current length along the ramp.
+			const vnormal = this.computeNormal(vprev, vmiddle, vnext, i, cvertex)
 			const dx = f4(vprev.x - vmiddle.x)
 			const dy = f4(vprev.y - vmiddle.y)
-			const length = f4(Math.sqrt(f4(dx * dx) + f4(dy * dy)))
-
-			currentLength = f4(currentLength + length)
+			currentLength = f4(currentLength + f4(Math.sqrt(f4(dx * dx) + f4(dy * dy))))
 
 			const percentage = f4(currentLength / totalLength)
 			let currentWidth = f4(f4(percentage * f4(this.state.widthTop - this.state.widthBottom)) + this.state.widthBottom)
-			ppheight[i] = f4(f4(vmiddle.z + f4(percentage * f4(topHeight - bottomHeight))) + bottomHeight)
+			const height = f4(f4(vmiddle.z + f4(percentage * f4(topHeight - bottomHeight))) + bottomHeight)
+			ppheight[i] = height
+			this.assignHeightToControlPoint(vvertex[i], height)
+			ppratio[i] = f4(1 - percentage)
 
-			this.assignHeightToControlPoint(
-				vvertex[i],
-				f4(f4(vmiddle.z + f4(percentage * f4(topHeight - bottomHeight))) + bottomHeight),
-			)
-			ppratio[i] = f4(1.0 - percentage)
-
-			// only change the width if we want to create vertices for rendering or for the editor
-			// the collision engine uses flat type ramps
 			if (this.isHabitrail() && this.state.type !== Enums.RampType.RampType1Wire) {
-				currentWidth = this.data.wireDistanceX
-				if (incWidth) {
-					currentWidth = f4(currentWidth + 20.0)
-				}
+				currentWidth = this.data.wireDistanceX + (incWidth ? 20 : 0)
 			} else if (this.state.type === Enums.RampType.RampType1Wire) {
 				currentWidth = this.data.wireDiameter
 			}
@@ -623,25 +342,54 @@ export class RampMeshGenerator {
 				vnormal.clone().multiplyScalar(currentWidth * f4(0.5)),
 			)
 		}
-
-		return { rgvLocal, pcvertex, ppheight, ppfCross, ppratio, pMiddlePoints }
+		return { rgvLocal, pcvertex: cvertex, ppheight, ppfCross, ppratio, pMiddlePoints }
 	}
 
-	public getCentralCurve(table: Table, acc: number = -1.0): RenderVertex3D[] {
-		let accuracy: number
+	private computeNormal(
+		vprev: RenderVertex3D,
+		vmiddle: RenderVertex3D,
+		vnext: RenderVertex3D,
+		i: number,
+		cvertex: number,
+	): Vertex2D {
+		const v1normal = new Vertex2D(vprev.y - vmiddle.y, vmiddle.x - vprev.x)
+		const v2normal = new Vertex2D(vmiddle.y - vnext.y, vnext.x - vmiddle.x)
+		if (i === cvertex - 1) {
+			v1normal.normalize()
+			return v1normal
+		}
+		if (i === 0) {
+			v2normal.normalize()
+			return v2normal
+		}
+		v1normal.normalize()
+		v2normal.normalize()
+		if (Math.abs(f4(v1normal.x - v2normal.x)) < 0.0001 && Math.abs(f4(v1normal.y - v2normal.y)) < 0.0001)
+			return v1normal
 
-		// Solid ramps use maximum precision; transparent use detail level.
-		if (acc !== -1.0) {
-			accuracy = acc // used for hit shape calculation, always!
+		const A = f4(vprev.y - vmiddle.y)
+		const B = f4(vmiddle.x - vprev.x)
+		const C = -f4(f4(A * f4(vprev.x - v1normal.x)) + f4(B * f4(vprev.y - v1normal.y)))
+		const D = f4(vnext.y - vmiddle.y)
+		const E = f4(vmiddle.x - vnext.x)
+		const F = -f4(f4(D * f4(vnext.x - v2normal.x)) + f4(E * f4(vnext.y - v2normal.y)))
+		const det = f4(f4(A * E) - f4(B * D))
+		const invDet = det !== 0 ? f4(1 / det) : 0
+		const ix = f4(f4(f4(B * F) - f4(E * C)) * invDet)
+		const iy = f4(f4(f4(C * D) - f4(A * F)) * invDet)
+		// vnormal = vmiddle - intersection
+		return new Vertex2D(f4(vmiddle.x - ix), f4(vmiddle.y - iy))
+	}
+
+	public getCentralCurve(table: Table, acc = -1): RenderVertex3D[] {
+		let accuracy: number
+		if (acc !== -1) {
+			accuracy = acc
 		} else {
 			const mat = table.getMaterial(this.state.material)
-			if (!mat || !mat.isOpacityActive) {
-				accuracy = 10.0
-			} else {
-				accuracy = table.getDetailLevel()
-			}
+			accuracy = !mat || !mat.isOpacityActive ? 10 : table.getDetailLevel()
 		}
-		accuracy = f4(f4(4.0) * f4(10.0 ** f4(f4(10.0 - accuracy) * f4(f4(1.0) / f4(1.5))))) // min = 4 (highest accuracy/detail level), max = 4 * 10^(10/1.5) = ~18.000.000 (lowest accuracy/detail level)
+		accuracy = f4(f4(4) * f4(10 ** f4(f4(10 - accuracy) * f4(f4(1) / f4(1.5)))))
 		return DragPoint.getRgVertex<RenderVertex3D>(
 			this.data.dragPoints,
 			() => new RenderVertex3D(),
@@ -661,11 +409,9 @@ export class RampMeshGenerator {
 		].includes(this.state.type)
 	}
 
-	private assignHeightToControlPoint(v: RenderVertex3D, height: number) {
-		for (const dragPoint of this.data.dragPoints) {
-			if (dragPoint.vertex.x === v.x && dragPoint.vertex.y === v.y) {
-				dragPoint.calcHeight = height
-			}
+	private assignHeightToControlPoint(v: RenderVertex3D, height: number): void {
+		for (const dp of this.data.dragPoints) {
+			if (dp.vertex.x === v.x && dp.vertex.y === v.y) dp.calcHeight = height
 		}
 	}
 }
