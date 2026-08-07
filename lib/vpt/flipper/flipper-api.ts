@@ -12,8 +12,8 @@ import type { FlipperHit } from './flipper-hit.js'
 import type { FlipperMover } from './flipper-mover.js'
 import type { FlipperState } from './flipper-state.js'
 
-export /** FlipperApi. */
-class FlipperApi extends ItemApi<FlipperData> {
+/** FlipperApi. */
+export class FlipperApi extends ItemApi<FlipperData> {
 	private readonly state: FlipperState
 	private readonly hit: FlipperHit
 	private readonly mover: FlipperMover
