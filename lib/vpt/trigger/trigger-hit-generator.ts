@@ -15,7 +15,8 @@ import type { TriggerAnimation } from './trigger-animation.js'
 import type { TriggerData } from './trigger-data.js'
 import { TriggerLineSeg } from './trigger-line-seg.js'
 
-export class TriggerHitGenerator {
+export /** TriggerHitGenerator. */
+class TriggerHitGenerator {
 	private readonly data: TriggerData
 
 	constructor(data: TriggerData) {
