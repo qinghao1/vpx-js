@@ -161,96 +161,112 @@ export class Matrix3D {
 		]
 	}
 
+	/** Get _11. */
 	get _11() {
 		return this.matrix[0][0]
 	}
 	set _11(v) {
 		this.matrix[0][0] = f4(v)
 	}
+	/** Get _12. */
 	get _12() {
 		return this.matrix[1][0]
 	}
 	set _12(v) {
 		this.matrix[1][0] = f4(v)
 	}
+	/** Get _13. */
 	get _13() {
 		return this.matrix[2][0]
 	}
 	set _13(v) {
 		this.matrix[2][0] = f4(v)
 	}
+	/** Get _14. */
 	get _14() {
 		return this.matrix[3][0]
 	}
 	set _14(v) {
 		this.matrix[3][0] = f4(v)
 	}
+	/** Get _21. */
 	get _21() {
 		return this.matrix[0][1]
 	}
 	set _21(v) {
 		this.matrix[0][1] = f4(v)
 	}
+	/** Get _22. */
 	get _22() {
 		return this.matrix[1][1]
 	}
 	set _22(v) {
 		this.matrix[1][1] = f4(v)
 	}
+	/** Get _23. */
 	get _23() {
 		return this.matrix[2][1]
 	}
 	set _23(v) {
 		this.matrix[2][1] = f4(v)
 	}
+	/** Get _24. */
 	get _24() {
 		return this.matrix[3][1]
 	}
 	set _24(v) {
 		this.matrix[3][1] = f4(v)
 	}
+	/** Get _31. */
 	get _31() {
 		return this.matrix[0][2]
 	}
 	set _31(v) {
 		this.matrix[0][2] = f4(v)
 	}
+	/** Get _32. */
 	get _32() {
 		return this.matrix[1][2]
 	}
 	set _32(v) {
 		this.matrix[1][2] = f4(v)
 	}
+	/** Get _33. */
 	get _33() {
 		return this.matrix[2][2]
 	}
 	set _33(v) {
 		this.matrix[2][2] = f4(v)
 	}
+	/** Get _34. */
 	get _34() {
 		return this.matrix[3][2]
 	}
 	set _34(v) {
 		this.matrix[3][2] = f4(v)
 	}
+	/** Get _41. */
 	get _41() {
 		return this.matrix[0][3]
 	}
 	set _41(v) {
 		this.matrix[0][3] = f4(v)
 	}
+	/** Get _42. */
 	get _42() {
 		return this.matrix[1][3]
 	}
 	set _42(v) {
 		this.matrix[1][3] = f4(v)
 	}
+	/** Get _43. */
 	get _43() {
 		return this.matrix[2][3]
 	}
 	set _43(v) {
 		this.matrix[2][3] = f4(v)
 	}
+	/** Get _44. */
 	get _44() {
 		return this.matrix[3][3]
 	}
