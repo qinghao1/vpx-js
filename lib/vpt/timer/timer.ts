@@ -11,7 +11,8 @@ import type { Table } from '../table/table.js'
 import { TimerApi } from './timer-api.js'
 import { TimerData } from './timer-data.js'
 
-export class Timer extends Item<TimerData> implements IPlayable, IScriptable<TimerApi> {
+export /** Runtime timer. */
+class Timer extends Item<TimerData> implements IPlayable, IScriptable<TimerApi> {
 	private api?: TimerApi
 
 	public static async fromStorage(storage: Storage, itemName: string): Promise<Timer> {
