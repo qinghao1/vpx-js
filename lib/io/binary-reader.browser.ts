@@ -3,15 +3,12 @@
 
 import type { IBinaryReader } from './ole-doc.js'
 
-/** Reads a VPX blob in the browser. High-memory optimized: keeps single Uint8Array, supports reopen without blob. */
+/** Reads a VPX blob in the browser — keeps single Uint8Array, supports reopen. */
 export class BrowserBinaryReader implements IBinaryReader {
-	private blob: Blob | undefined
-	private data: Uint8Array | undefined
+	private data?: Uint8Array
 	private _isOpen = false
 
-	constructor(blob: Blob) {
-		this.blob = blob
-	}
+	constructor(private blob?: Blob) {}
 
 	public read(target: Uint8Array, offset: number, length: number, position: number): Promise<[number, Uint8Array]> {
 		if (!this.data) throw new Error('BrowserBinaryReader not open')
