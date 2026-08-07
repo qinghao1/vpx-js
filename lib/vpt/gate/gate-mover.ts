@@ -10,7 +10,8 @@ import type { MoverObject } from '../../physics/mover-object.js'
 import type { GateData } from './gate-data.js'
 import type { GateState } from './gate-state.js'
 
-export class GateMover implements MoverObject {
+export /** Gate mover. */
+class GateMover implements MoverObject {
 	private readonly data: GateData
 	private readonly state: GateState
 	private readonly events: EventProxy
