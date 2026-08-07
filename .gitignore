@@ -13,3 +13,5 @@ bench*.spec.ts
 !test/fixtures/*.vpx
 walking_dead.vpx
 *.bak
+
+.agents/
