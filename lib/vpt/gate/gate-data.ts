@@ -44,8 +44,7 @@ export class GateData extends ItemData {
 				this.gateType = this.getInt(buffer)
 				/* istanbul ignore if: Legacy format */
 				if (this.gateType < Enums.GateType.GateWireW || this.gateType > Enums.GateType.GateLongPlate) {
-					// for tables that were saved in the phase where m_type could've been undefined
-					this.gateType = Enums.GateType.GateWireW
+					this.gateType = Enums.GateType.GateWireW // legacy fallback
 				}
 				break
 			case 'VCEN':
