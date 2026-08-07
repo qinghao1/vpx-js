@@ -9,7 +9,8 @@ import type { BumperAnimation } from './bumper-animation.js'
 import type { BumperData } from './bumper-data.js'
 import type { BumperState } from './bumper-state.js'
 
-export class BumperApi extends ItemApi<BumperData> {
+export /** BumperApi. */
+class BumperApi extends ItemApi<BumperData> {
 	private readonly state: BumperState
 	private readonly animation: BumperAnimation
 	private readonly isBaseDynamic: boolean
