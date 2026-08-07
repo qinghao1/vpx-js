@@ -72,7 +72,6 @@ export class ThreeMaterialGenerator {
 		if (normalMap && this.mapGenerator.hasTexture(normalMap)) {
 			threeMaterial.normalMap = this.mapGenerator.getTexture(normalMap)
 			threeMaterial.normalMap.name = normalMap
-			threeMaterial.normalMap.anisotropy = 16
 			threeMaterial.needsUpdate = true
 		}
 	}
