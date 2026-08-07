@@ -8,6 +8,8 @@ import type { Ball } from '../vpt/ball/ball.js'
 import type { CollisionEvent } from './collision-event.js'
 import type { HitKD } from './hit-kd.js'
 
+/** KD-tree for dynamic hit objects. */
+/** KD-tree node. */
 export class HitKDNode {
 	private hitOct: HitKD //!! meh, stupid
 
