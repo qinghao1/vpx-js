@@ -7,13 +7,13 @@ import type { Table } from '../table/table.js'
 import type { PlungerMeshGenerator } from './plunger-mesh-generator.js'
 import type { PlungerState } from './plunger-state.js'
 
-/** PlungerUpdater. */
+/** Plunger updater — rod & spring meshes. */
 export class PlungerUpdater extends ItemUpdater<PlungerState> {
-	private readonly meshGenerator: PlungerMeshGenerator
-
-	constructor(state: PlungerState, meshGenerator: PlungerMeshGenerator) {
+	constructor(
+		state: PlungerState,
+		private readonly meshGenerator: PlungerMeshGenerator,
+	) {
 		super(state)
-		this.meshGenerator = meshGenerator
 	}
 
 	public applyState<NODE, GEOMETRY, POINT_LIGHT>(
@@ -23,13 +23,9 @@ export class PlungerUpdater extends ItemUpdater<PlungerState> {
 		table: Table,
 	): void {
 		const mesh = this.meshGenerator.generateMeshes(state.frame, table)
-		const rodObj = renderApi.findInGroup(obj, 'rod')
-		if (rodObj) {
-			renderApi.applyMeshToNode(mesh.rod!, rodObj)
-		}
-		const springObj = renderApi.findInGroup(obj, 'spring')
-		if (springObj) {
-			renderApi.applyMeshToNode(mesh.spring!, springObj)
-		}
+		const rod = renderApi.findInGroup(obj, 'rod')
+		if (rod) renderApi.applyMeshToNode(mesh.rod!, rod)
+		const spring = renderApi.findInGroup(obj, 'spring')
+		if (spring) renderApi.applyMeshToNode(mesh.spring!, spring)
 	}
 }
