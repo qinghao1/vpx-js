@@ -9,7 +9,8 @@ import type { LightAnimation } from './light-animation.js'
 import type { LightData } from './light-data.js'
 import type { LightState } from './light-state.js'
 
-export class LightApi extends ItemApi<LightData> {
+export /** LightApi. */
+class LightApi extends ItemApi<LightData> {
 	private readonly state: LightState
 	private readonly animation: LightAnimation
 
