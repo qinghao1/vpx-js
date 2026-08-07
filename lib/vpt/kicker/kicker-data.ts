@@ -7,27 +7,36 @@ import { Vertex2D } from '../../math/vertex2d.js'
 import { Enums } from '../enums.js'
 import { ItemData } from '../item-data.js'
 
+const FLOAT_MAP: Record<string, string> = {
+	RADI: 'radius',
+	KSCT: 'scatter',
+	KHAC: 'hitAccuracy',
+	KHHI: 'hitHeight',
+	KORI: 'orientation',
+}
+const BOOL_MAP: Record<string, string> = { EBLD: 'isEnabled', FATH: 'fallThrough', LEMO: 'legacyMode' }
+const STRING_MAP: Record<string, string> = { MATR: 'szMaterial', SURF: 'szSurface' }
+
 /** Kicker data.
- *
  * @see https://github.com/vpinball/vpinball/blob/master/kicker.cpp */
 export class KickerData extends ItemData {
 	public kickerType: number = Enums.KickerType.KickerHole
 	public center!: Vertex2D
-	public radius: number = 25
-	public scatter: number = 0.0
-	public hitAccuracy: number = 0.7
-	public hitHeight: number = 40.0
-	public orientation: number = 0.0
+	public radius = 25
+	public scatter = 0
+	public hitAccuracy = 0.7
+	public hitHeight = 40
+	public orientation = 0
 	public szMaterial?: string
 	public szSurface?: string
-	public fallThrough: boolean = false
-	public isEnabled: boolean = true
-	public legacyMode: boolean = false
+	public fallThrough = false
+	public isEnabled = true
+	public legacyMode = false
 
 	public static async fromStorage(storage: Storage, itemName: string): Promise<KickerData> {
-		const kickerData = new KickerData(itemName)
-		await storage.streamFiltered(itemName, 4, BiffParser.stream(kickerData.fromTag.bind(kickerData), {}))
-		return kickerData
+		const d = new KickerData(itemName)
+		await storage.streamFiltered(itemName, 4, BiffParser.stream(d.fromTag.bind(d)))
+		return d
 	}
 
 	public constructor(itemName: string) {
@@ -35,51 +44,28 @@ export class KickerData extends ItemData {
 	}
 
 	private async fromTag(buffer: Uint8Array, tag: string, offset: number, len: number): Promise<number> {
-		switch (tag) {
-			case 'VCEN':
-				this.center = Vertex2D.get(buffer)
-				break
-			case 'RADI':
-				this.radius = this.getFloat(buffer)
-				break
-			case 'KSCT':
-				this.scatter = this.getFloat(buffer)
-				break
-			case 'KHAC':
-				this.hitAccuracy = this.getFloat(buffer)
-				break
-			case 'KHHI':
-				this.hitHeight = this.getFloat(buffer)
-				break
-			case 'KORI':
-				this.orientation = this.getFloat(buffer)
-				break
-			case 'MATR':
-				this.szMaterial = this.getString(buffer, len)
-				break
-			case 'EBLD':
-				this.isEnabled = this.getBool(buffer)
-				break
-			case 'TYPE':
-				this.kickerType = this.getInt(buffer)
-				/* istanbul ignore if: legacy handling */
-				if (this.kickerType > Enums.KickerType.KickerCup2) {
-					this.kickerType = Enums.KickerType.KickerInvisible
-				}
-				break
-			case 'SURF':
-				this.szSurface = this.getString(buffer, len)
-				break
-			case 'FATH':
-				this.fallThrough = this.getBool(buffer)
-				break
-			case 'LEMO':
-				this.legacyMode = this.getBool(buffer)
-				break
-			default:
-				this.getCommonBlock(buffer, tag, len)
-				break
+		if (tag === 'VCEN') {
+			this.center = Vertex2D.get(buffer)
+			return 0
 		}
+		if (tag === 'TYPE') {
+			this.kickerType = this.getInt(buffer)
+			if (this.kickerType > Enums.KickerType.KickerCup2) this.kickerType = Enums.KickerType.KickerInvisible
+			return 0
+		}
+		if (tag in FLOAT_MAP) {
+			;(this as any)[FLOAT_MAP[tag]] = this.getFloat(buffer)
+			return 0
+		}
+		if (tag in BOOL_MAP) {
+			;(this as any)[BOOL_MAP[tag]] = this.getBool(buffer)
+			return 0
+		}
+		if (tag in STRING_MAP) {
+			;(this as any)[STRING_MAP[tag]] = this.getString(buffer, len)
+			return 0
+		}
+		this.getCommonBlock(buffer, tag, len)
 		return 0
 	}
 }
