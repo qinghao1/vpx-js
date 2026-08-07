@@ -9,8 +9,38 @@ import { FrameData } from '../animation.js'
 import { type IPhysicalData, ItemData } from '../item-data.js'
 import { Mesh } from '../mesh.js'
 
+const RTV_TAGS = ['RTV0', 'RTV1', 'RTV2', 'RTV3', 'RTV4', 'RTV5', 'RTV6', 'RTV7', 'RTV8']
+const FLOAT_MAP: Record<string, string> = {
+	PIDB: 'depthBias',
+	THRS: 'threshold',
+	ELAS: 'elasticity',
+	ELFO: 'elasticityFalloff',
+	RFCT: 'friction',
+	RSCT: 'scatter',
+	EFUI: 'edgeFactorUI',
+	CORF: 'collisionReductionFactor',
+	DILI: 'disableLightingTop',
+	DILB: 'disableLightingBelow',
+}
+const BOOL_MAP: Record<string, string> = {
+	DTXI: 'drawTexturesInside',
+	HTEV: 'hitEvent',
+	CLDR: 'isCollidable',
+	ISTO: 'isToy',
+	OVPH: 'overwritePhysics',
+	STRE: 'staticRendering',
+	U3DM: 'use3DMesh',
+	EBFC: 'backfacesEnabled',
+	DIPT: 'displayTexture',
+}
+const STRING_MAP: Record<string, string> = {
+	IMAG: 'szImage',
+	NRMA: 'szNormalMap',
+	MATR: 'szMaterial',
+	MAPH: 'szPhysicsMaterial',
+}
+
 /** Primitive data.
- *
  * @see https://github.com/vpinball/vpinball/blob/master/primitive.cpp */
 export class PrimitiveData extends ItemData implements IPhysicalData {
 	public numVertices!: number
@@ -18,68 +48,49 @@ export class PrimitiveData extends ItemData implements IPhysicalData {
 	public compressedVertices?: number
 	public compressedIndices?: number
 	private readonly skipMeshes: boolean
-
-	/**
-	 * The primitive mesh. This is empty if {@link PrimitiveData.use3DMesh}
-	 * is `false`.
-	 *
-	 * Note that contrarily to VP, we don't overwrite this member when
-	 * generating the mesh, so pay attention when accessing this variable, you
-	 * might need to retrieve it from {@link PrimitiveMeshGenerator.calculateBuiltinOriginal}.
-	 */
 	public mesh: Mesh = new Mesh()
-
 	public position!: Vertex3D
 	public size: Vertex3D = new Vertex3D(100, 100, 100)
 	public rotAndTra: number[] = [0, 0, 0, 0, 0, 0, 0, 0, 0]
-
 	public szImage?: string
 	public szNormalMap?: string
 	public szMaterial?: string
 	public szPhysicsMaterial?: string
-
 	public sides!: number
-	public isVisible: boolean = true
-	public drawTexturesInside: boolean = false
-	public hitEvent: boolean = false
+	public isVisible = true
+	public drawTexturesInside = false
+	public hitEvent = false
 	public threshold!: number
 	public elasticity!: number
 	public elasticityFalloff!: number
 	public friction!: number
 	public scatter!: number
-	public collisionReductionFactor: number = 0
-	public isCollidable: boolean = true
-	public isToy: boolean = false
-	public overwritePhysics: boolean = false
-	/**
-	 * If false, generate the mesh based on {@link PrimitiveData.sides} and ignore whatever
-	 * vertices are stored in the object (there shouldn't be any).
-	 */
-	public use3DMesh: boolean = false
-	public useAsPlayfield: boolean = false
-
-	public sideColor: number = 0x969696
+	public collisionReductionFactor = 0
+	public isCollidable = true
+	public isToy = false
+	public overwritePhysics = false
+	public use3DMesh = false
+	public useAsPlayfield = false
+	public sideColor = 0x969696
 	private numIndices!: number
-	public isReflectionEnabled: boolean = true
-	public edgeFactorUI: number = 0.25
-	public staticRendering: boolean = true
+	public isReflectionEnabled = true
+	public edgeFactorUI = 0.25
+	public staticRendering = true
 	public disableLightingTop?: number
 	public disableLightingBelow?: number
-	public backfacesEnabled: boolean = false
-	public displayTexture: boolean = false
+	public backfacesEnabled = false
+	public displayTexture = false
 	public meshFileName?: string
-	public depthBias: number = 0
+	public depthBias = 0
 
 	public static async fromStorage(storage: Storage, itemName: string, skipMeshes: boolean): Promise<PrimitiveData> {
-		const primitiveItem = new PrimitiveData(itemName, skipMeshes)
+		const d = new PrimitiveData(itemName, skipMeshes)
 		await storage.streamFiltered(
 			itemName,
 			4,
-			BiffParser.stream((buffer, tag, offset, len) =>
-				primitiveItem.fromTag(buffer, tag, offset, len, storage, itemName),
-			),
+			BiffParser.stream((b, t, o, l) => d.fromTag(b, t, o, l, storage, itemName)),
 		)
-		return primitiveItem
+		return d
 	}
 
 	public constructor(itemName: string, skipMeshes: boolean) {
@@ -95,6 +106,23 @@ export class PrimitiveData extends ItemData implements IPhysicalData {
 		storage: Storage,
 		itemName: string,
 	): Promise<number> {
+		if (RTV_TAGS.includes(tag)) {
+			const idx = RTV_TAGS.indexOf(tag)
+			this.rotAndTra[idx] = this.getFloat(buffer)
+			return 0
+		}
+		if (tag in FLOAT_MAP) {
+			;(this as any)[FLOAT_MAP[tag]] = this.getFloat(buffer)
+			return 0
+		}
+		if (tag in BOOL_MAP) {
+			;(this as any)[BOOL_MAP[tag]] = this.getBool(buffer)
+			return 0
+		}
+		if (tag in STRING_MAP) {
+			;(this as any)[STRING_MAP[tag]] = this.getString(buffer, len)
+			return 0
+		}
 		switch (tag) {
 			case 'VPOS':
 				this.position = Vertex3D.get(buffer)
@@ -102,110 +130,14 @@ export class PrimitiveData extends ItemData implements IPhysicalData {
 			case 'VSIZ':
 				this.size = Vertex3D.get(buffer)
 				break
-			case 'RTV0':
-				this.rotAndTra[0] = this.getFloat(buffer)
-				break
-			case 'RTV1':
-				this.rotAndTra[1] = this.getFloat(buffer)
-				break
-			case 'RTV2':
-				this.rotAndTra[2] = this.getFloat(buffer)
-				break
-			case 'RTV3':
-				this.rotAndTra[3] = this.getFloat(buffer)
-				break
-			case 'RTV4':
-				this.rotAndTra[4] = this.getFloat(buffer)
-				break
-			case 'RTV5':
-				this.rotAndTra[5] = this.getFloat(buffer)
-				break
-			case 'RTV6':
-				this.rotAndTra[6] = this.getFloat(buffer)
-				break
-			case 'RTV7':
-				this.rotAndTra[7] = this.getFloat(buffer)
-				break
-			case 'RTV8':
-				this.rotAndTra[8] = this.getFloat(buffer)
-				break
-			case 'IMAG':
-				this.szImage = this.getString(buffer, len)
-				break
-			case 'NRMA':
-				this.szNormalMap = this.getString(buffer, len)
-				break
-			case 'SIDS':
+			case 'SESD':
 				this.sides = this.getInt(buffer)
 				break
-			case 'MATR':
-				this.szMaterial = this.getString(buffer, len)
-				break
-			case 'SCOL':
-				this.sideColor = this.getInt(buffer)
-				break
-			case 'TVIS':
+			case 'VISB':
 				this.isVisible = this.getBool(buffer)
 				break
 			case 'REEN':
 				this.isReflectionEnabled = this.getBool(buffer)
-				break
-			case 'DTXI':
-				this.drawTexturesInside = this.getBool(buffer)
-				break
-			case 'HTEV':
-				this.hitEvent = this.getBool(buffer)
-				break
-			case 'THRS':
-				this.threshold = this.getFloat(buffer)
-				break
-			case 'ELAS':
-				this.elasticity = this.getFloat(buffer)
-				break
-			case 'ELFO':
-				this.elasticityFalloff = this.getFloat(buffer)
-				break
-			case 'RFCT':
-				this.friction = this.getFloat(buffer)
-				break
-			case 'RSCT':
-				this.scatter = this.getFloat(buffer)
-				break
-			case 'EFUI':
-				this.edgeFactorUI = this.getFloat(buffer)
-				break
-			case 'CORF':
-				this.collisionReductionFactor = this.getFloat(buffer)
-				break
-			case 'CLDR':
-				this.isCollidable = this.getBool(buffer)
-				break // originally "CLDRP"
-			case 'ISTO':
-				this.isToy = this.getBool(buffer)
-				break
-			case 'MAPH':
-				this.szPhysicsMaterial = this.getString(buffer, len)
-				break
-			case 'OVPH':
-				this.overwritePhysics = this.getBool(buffer)
-				break
-			case 'STRE':
-				this.staticRendering = this.getBool(buffer)
-				break
-			case 'DILI':
-				this.disableLightingTop = this.getFloat(buffer)
-				break // m_d.m_fDisableLightingTop = (tmp == 1) ? 1.f : dequantizeUnsigned<8>(tmp); // backwards compatible hacky loading!
-			case 'DILB':
-				this.disableLightingBelow = this.getFloat(buffer)
-				break
-			case 'U3DM':
-				this.use3DMesh = this.getBool(buffer)
-				break
-			case 'EBFC':
-				this.backfacesEnabled = this.getBool(buffer)
-				break
-			case 'DIPT':
-				this.displayTexture = this.getBool(buffer)
 				break
 			case 'M3DN':
 				this.meshFileName = this.getWideString(buffer, len)
@@ -221,58 +153,45 @@ export class PrimitiveData extends ItemData implements IPhysicalData {
 				this.compressedAnimationVertices = this.getInt(buffer)
 				break
 			case 'M3AX':
-				if (!this.skipMeshes) {
+				if (!this.skipMeshes)
 					this.mesh.animationFrames.push(
 						await this.getAnimatedVertices(
 							await BiffParser.decompress(await this.getData(storage, itemName, offset, len)),
 							this.numVertices,
 						),
 					)
-				}
 				break
 			case 'M3CY':
 				this.compressedVertices = this.getInt(buffer)
 				break
 			case 'M3CX':
-				if (!this.skipMeshes) {
+				if (!this.skipMeshes)
 					this.mesh.vertices = this.getVertices(
 						await BiffParser.decompress(await this.getData(storage, itemName, offset, len)),
 						this.numVertices,
 					)
-				}
 				break
 			case 'M3FN':
 				this.numIndices = this.getInt(buffer)
 				break
 			case 'M3DI':
-				if (!this.skipMeshes) {
-					if (this.numVertices > 65535) {
-						this.mesh.indices = this.getUnsignedInt4s(buffer, this.numIndices)
-					} else {
-						this.mesh.indices = this.getUnsignedInt2s(buffer, this.numIndices)
-					}
-				}
+				if (!this.skipMeshes)
+					this.mesh.indices =
+						this.numVertices > 65535
+							? this.getUnsignedInt4s(buffer, this.numIndices)
+							: this.getUnsignedInt2s(buffer, this.numIndices)
 				break
 			case 'M3CJ':
 				this.compressedIndices = this.getInt(buffer)
 				break
 			case 'M3CI':
 				if (!this.skipMeshes) {
-					if (this.numVertices > 65535) {
-						this.mesh.indices = this.getUnsignedInt4s(
-							await BiffParser.decompress(await this.getData(storage, itemName, offset, len)),
-							this.numIndices,
-						)
-					} else {
-						this.mesh.indices = this.getUnsignedInt2s(
-							await BiffParser.decompress(await this.getData(storage, itemName, offset, len)),
-							this.numIndices,
-						)
-					}
+					const decomp = await BiffParser.decompress(await this.getData(storage, itemName, offset, len))
+					this.mesh.indices =
+						this.numVertices > 65535
+							? this.getUnsignedInt4s(decomp, this.numIndices)
+							: this.getUnsignedInt2s(decomp, this.numIndices)
 				}
-				break
-			case 'PIDB':
-				this.depthBias = this.getFloat(buffer)
 				break
 			default:
 				this.getCommonBlock(buffer, tag, len)
@@ -281,21 +200,15 @@ export class PrimitiveData extends ItemData implements IPhysicalData {
 		return 0
 	}
 
-	private getVertices(decompressedBuffer: Uint8Array, num: number): Vertex3DNoTex2[] {
-		const vertices: Vertex3DNoTex2[] = []
-		/* istanbul ignore next */
-		if (decompressedBuffer.length < num * Vertex3DNoTex2.size) {
+	private getVertices(buf: Uint8Array, num: number): Vertex3DNoTex2[] {
+		if (buf.length < num * Vertex3DNoTex2.size)
 			throw new Error(
-				`Tried to read ${num} vertices for primitive item "${this.getName()}" (${this.itemName}), but only ${decompressedBuffer.length} bytes available.`,
+				`Tried to read ${num} vertices for primitive "${this.getName()}" (${this.itemName}), but only ${buf.length} bytes available.`,
 			)
-		}
-		for (let i = 0; i < num; i++) {
-			vertices.push(Vertex3DNoTex2.get(decompressedBuffer, i))
-		}
-		return vertices
+		return Array.from({ length: num }, (_, i) => Vertex3DNoTex2.get(buf, i))
 	}
 
-	private async getAnimatedVertices(buffer: Uint8Array, num: number): Promise<FrameData> {
-		return FrameData.get(buffer, num)
+	private async getAnimatedVertices(buf: Uint8Array, num: number): Promise<FrameData> {
+		return FrameData.get(buf, num)
 	}
 }
