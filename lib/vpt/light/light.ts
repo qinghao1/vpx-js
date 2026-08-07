@@ -22,24 +22,18 @@ import { LightUpdater } from './light-updater.js'
 
 /** Light item. @see https://github.com/vpinball/vpinball/blob/master/light.cpp */
 export class Light extends Item<LightData> implements IRenderable<LightState>, IAnimatable, IScriptable<LightApi> {
-	// public getters
-	/** Get color. */
 	get color() {
 		return this.data.color
 	}
-	/** Get intensity. */
 	get intensity() {
 		return this.data.intensity
 	}
-	/** Get falloff. */
 	get falloff() {
 		return this.data.falloff
 	}
-	/** Get vCenter. */
 	get vCenter() {
 		return this.data.center
 	}
-	/** Get offImage. */
 	get offImage() {
 		return this.data.szOffImage
 	}
@@ -65,7 +59,7 @@ export class Light extends Item<LightData> implements IRenderable<LightState>, I
 	}
 
 	public isVisible(table: Table): boolean {
-		return this.data.isVisible // we filter by bulb/playfield light
+		return this.data.isVisible
 	}
 
 	public setupPlayer(player: Player, table: Table): void {
@@ -127,14 +121,12 @@ export class Light extends Item<LightData> implements IRenderable<LightState>, I
 			lightMaterial.clearCoat = 0xffffff
 			lightMaterial.emissiveColor = this.data.color
 			lightMaterial.emissiveIntensity = this.data.isOn() ? 1 : 0.1
-
 			meshes.light = {
 				isVisible: this.data.isVisible,
 				mesh: light.light.transform(Matrix3D.RIGHT_HANDED),
 				material: lightMaterial,
 			}
 		}
-
 		if (light.socket) {
 			const socketMaterial = new Material()
 			socketMaterial.baseColor = 0x181818
@@ -149,7 +141,6 @@ export class Light extends Item<LightData> implements IRenderable<LightState>, I
 			socketMaterial.glossyImageLerp = 1.0
 			socketMaterial.thickness = 0.05
 			socketMaterial.clearCoat = 0
-
 			meshes.socket = {
 				isVisible: this.data.isVisible,
 				mesh: light.socket.transform(Matrix3D.RIGHT_HANDED),
