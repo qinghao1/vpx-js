@@ -124,7 +124,8 @@ const PATH_PROPERTIES: { [key: string]: string } = {
  * @author Don McCurdy / https://www.donmccurdy.com
  * @author Takahiro / https://github.com/takahirox
  */
-export class GLTFExporter {
+export /** GLTFExporter. */
+class GLTFExporter {
 	private started = false
 	private options: TableGenerateGltfOptions
 	private byteOffset: number = 0
