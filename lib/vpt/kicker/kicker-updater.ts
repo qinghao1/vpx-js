@@ -6,7 +6,7 @@ import { ItemUpdater } from '../item-updater.js'
 import type { Table } from '../table/table.js'
 import type { KickerState } from './kicker-state.js'
 
-/** KickerUpdater. */
+/** Kicker updater — visibility and material. */
 export class KickerUpdater extends ItemUpdater<KickerState> {
 	constructor(state: KickerState) {
 		super(state)
@@ -18,14 +18,8 @@ export class KickerUpdater extends ItemUpdater<KickerState> {
 		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
 		table: Table,
 	): void {
-		// update local state
 		Object.assign(this.state, state)
-
-		// visibility
-		if (state.type !== undefined) {
-			renderApi.applyVisibility(this.state.isVisible, obj)
-		}
-
+		if (state.type !== undefined) renderApi.applyVisibility(this.state.isVisible, obj)
 		this.applyMaterial(obj, state.material, undefined, renderApi, table)
 	}
 }
