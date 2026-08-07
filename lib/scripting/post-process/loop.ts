@@ -19,7 +19,7 @@ import {
 import type { ESIToken } from '../grammar/grammar.js'
 
 /** ppLoop. */
-export function ppLoop(node: ESIToken): any {
+export function ppLoop(node: ESIToken): unknown {
 	switch (node.type) {
 		case 'WhileStatement':
 			return ppWhileStatement(node)
@@ -37,13 +37,13 @@ export function ppLoop(node: ESIToken): any {
 	return null
 }
 
-function ppWhileStatement(node: ESIToken): any {
+function ppWhileStatement(node: ESIToken): unknown {
 	const expr = node.children[0].estree
 	const block = node.children[2].type === 'Block' ? node.children[2].estree : null
 	return whileStatement(expr, block ? block : blockStatement([]))
 }
 
-function ppDoTopLoopStatement(node: ESIToken): any {
+function ppDoTopLoopStatement(node: ESIToken): unknown {
 	let block: BlockStatement | undefined
 	for (const child of node.children) {
 		if (child.type === 'Block') {
@@ -67,7 +67,7 @@ function ppDoTopLoopStatement(node: ESIToken): any {
 	}
 }
 
-function ppDoBottomLoopStatement(node: ESIToken): any {
+function ppDoBottomLoopStatement(node: ESIToken): unknown {
 	let block = node.children[1].type === 'Block' ? node.children[1].estree : null
 	let whileOrUntil
 	let expr
@@ -89,7 +89,7 @@ function ppDoBottomLoopStatement(node: ESIToken): any {
 	}
 }
 
-function ppForStatement(node: ESIToken): any {
+function ppForStatement(node: ESIToken): unknown {
 	const id = node.children[0].estree
 	const expr = node.children[2].estree
 	const expr2 = node.children[3].estree
@@ -122,7 +122,7 @@ function ppForStatement(node: ESIToken): any {
 	)
 }
 
-function ppForEachStatement(node: ESIToken): any {
+function ppForEachStatement(node: ESIToken): unknown {
 	let id: Identifier = identifier('undefined')
 	let expr: Expression = identifier('undefined')
 	let block: BlockStatement | undefined
