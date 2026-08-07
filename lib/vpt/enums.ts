@@ -256,6 +256,27 @@ export class DecalType extends VbsApi {
 	}
 }
 
+/** Light shadow mode. */
+export class ShadowMode extends VbsApi {
+	public readonly None = 0
+	public readonly RaytracedBallShadows = 1
+
+	protected _getPropertyNames(): string[] {
+		return ['None', 'RaytracedBallShadows']
+	}
+}
+
+/** Light fader. */
+export class Fader extends VbsApi {
+	public readonly None = 0
+	public readonly Linear = 1
+	public readonly Incandescent = 2
+
+	protected _getPropertyNames(): string[] {
+		return ['None', 'Linear', 'Incandescent']
+	}
+}
+
 /** Light sequencer state. */
 export class SequencerState extends VbsApi {
 	public readonly SeqUpOn = 1
@@ -686,6 +707,8 @@ export class EnumsApi extends VbsApi {
 	public GateType = new GateType()
 	public TextAlignment = new TextAlignment()
 	public DecalType = new DecalType()
+	public ShadowMode = new ShadowMode()
+	public Fader = new Fader()
 	public SequencerState = new SequencerState()
 	public SizingType = new SizingType()
 	public KickerType = new KickerType()
@@ -715,6 +738,9 @@ export class EnumsApi extends VbsApi {
 			'TargetType',
 			'GateType',
 			'TextAlignment',
+			'DecalType',
+			'ShadowMode',
+			'Fader',
 			'SequencerState',
 			'SizingType',
 			'KickerType',
