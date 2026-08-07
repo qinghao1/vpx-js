@@ -11,7 +11,15 @@ const cache = new Map<string, Mesh>()
 export function loadMesh(name: string): Mesh {
 	let mesh = cache.get(name)
 	if (!mesh) {
-		const json = JSON.parse(readFileSync(resolve(process.cwd(), `res/meshes/${name}.json`), 'utf-8'))
+		let raw: string
+		try {
+			raw = readFileSync(`res/meshes/${name}.json`, 'utf-8') as unknown as string
+			if (!raw) throw new Error('empty')
+		} catch {
+			const cwd = (globalThis as any).process?.cwd?.() || (typeof process !== 'undefined' && (process as any).cwd?.()) || '/'
+			raw = readFileSync(resolve(cwd, `res/meshes/${name}.json`), 'utf-8') as unknown as string
+		}
+		const json = JSON.parse(raw as string)
 		mesh = Mesh.fromJson(json)
 		cache.set(name, mesh)
 	}
