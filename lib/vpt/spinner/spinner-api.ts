@@ -12,24 +12,17 @@ import type { SpinnerData } from './spinner-data.js'
 import type { SpinnerMover } from './spinner-mover.js'
 import type { SpinnerState } from './spinner-state.js'
 
-/** Spinner API.
- *
- * @see https://github.com/vpinball/vpinball/blob/master/spinner.cpp */
+/** Spinner API — VBS surface for `Spinner`. @see https://github.com/vpinball/vpinball/blob/master/spinner.cpp */
 export class SpinnerApi extends ItemApi<SpinnerData> {
-	private readonly state: SpinnerState
-	private readonly mover: SpinnerMover
-
 	constructor(
-		state: SpinnerState,
-		mover: SpinnerMover,
+		private readonly state: SpinnerState,
+		private readonly mover: SpinnerMover,
 		data: SpinnerData,
 		events: EventProxy,
 		player: Player,
 		table: Table,
 	) {
 		super(data, events, player, table)
-		this.state = state
-		this.mover = mover
 	}
 
 	get Length() {
@@ -51,10 +44,10 @@ export class SpinnerApi extends ItemApi<SpinnerData> {
 		this.data.height = v
 	}
 	get Damping() {
-		return this.mover.damping ** (1.0 / PHYS_FACTOR)
+		return this.mover.damping ** (1 / PHYS_FACTOR)
 	}
 	set Damping(v) {
-		this.mover.damping = clamp(v, 0.0, 1.0) ** PHYS_FACTOR
+		this.mover.damping = clamp(v, 0, 1) ** PHYS_FACTOR
 	}
 	get Material() {
 		return this.state.material
@@ -98,14 +91,9 @@ export class SpinnerApi extends ItemApi<SpinnerData> {
 	}
 	set AngleMax(v) {
 		if (this.data.angleMin !== this.data.angleMax) {
-			// allow only if in limited angle mode
 			v = clampAngleToRad(v, this.data.angleMin, this.data.angleMax)
-			if (this.mover.angleMin < v) {
-				// Min is smaller???
-				this.mover.angleMax = v // yes set new max
-			} else {
-				this.mover.angleMin = v // no set new minumum
-			}
+			if (this.mover.angleMin < v) this.mover.angleMax = v
+			else this.mover.angleMin = v
 		}
 	}
 	get AngleMin() {
@@ -113,14 +101,9 @@ export class SpinnerApi extends ItemApi<SpinnerData> {
 	}
 	set AngleMin(v) {
 		if (this.data.angleMin !== this.data.angleMax) {
-			// allow only if in limited angle mode
 			v = clampAngleToRad(v, this.data.angleMin, this.data.angleMax)
-			if (this.mover.angleMax > v) {
-				// max is bigger
-				this.mover.angleMin = v // then set new minumum
-			} else {
-				this.mover.angleMax = v // else set new max
-			}
+			if (this.mover.angleMax > v) this.mover.angleMin = v
+			else this.mover.angleMax = v
 		}
 	}
 	get Elasticity() {
