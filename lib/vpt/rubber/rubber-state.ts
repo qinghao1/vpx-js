@@ -5,8 +5,7 @@ import { Pool } from '../../util/object-pool.js'
 import { ItemState } from '../item-state.js'
 import { omitEqual } from '../state-helpers.js'
 
-/** Rubber state.
- * @see https://github.com/vpinball/vpinball/blob/master/rubber.cpp */
+/** Rubber state. @see https://github.com/vpinball/vpinball/blob/master/rubber.cpp */
 export class RubberState extends ItemState {
 	public static readonly POOL = new Pool(RubberState)
 
@@ -73,9 +72,7 @@ export class RubberState extends ItemState {
 	}
 
 	public equals(state: RubberState): boolean {
-		if (!state) {
-			return false
-		}
+		if (!state) return false
 		return (
 			state.height === this.height &&
 			state.rotX === this.rotX &&
