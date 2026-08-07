@@ -6,67 +6,39 @@ import type { Storage } from '../io/ole-doc.js'
 import { ItemType } from './enums.js'
 import type { Table } from './table/table.js'
 
-/**
- * Parent class for game items parsed from the VPX file.
- *
- * It contains helper functions for parsing the data.
- */
+const TYPE_NAMES: Record<number, string> = {
+	[ItemType.Surface]: 'Surface',
+	[ItemType.Flipper]: 'Flipper',
+	[ItemType.Timer]: 'Timer',
+	[ItemType.Plunger]: 'Plunger',
+	[ItemType.Textbox]: 'Textbox',
+	[ItemType.Bumper]: 'Bumper',
+	[ItemType.Trigger]: 'Trigger',
+	[ItemType.Light]: 'Light',
+	[ItemType.Kicker]: 'Kicker',
+	[ItemType.Decal]: 'Decal',
+	[ItemType.Gate]: 'Gate',
+	[ItemType.Spinner]: 'Spinner',
+	[ItemType.Ramp]: 'Ramp',
+	[ItemType.Table]: 'Table',
+	[ItemType.LightCenter]: 'Light Center',
+	[ItemType.DragPoint]: 'Drag Point',
+	[ItemType.Collection]: 'Collection',
+	[ItemType.DispReel]: 'Reel',
+	[ItemType.LightSeq]: 'Light Sequence',
+	[ItemType.Primitive]: 'Primitive',
+	[ItemType.Flasher]: 'Flasher',
+	[ItemType.Rubber]: 'Rubber',
+	[ItemType.HitTarget]: 'Hit Target',
+	[ItemType.Count]: 'Count',
+	[ItemType.Invalid]: 'Invalid',
+}
+
+/** Base for VPX item data parsed from OLE storage. */
 export abstract class ItemData extends BiffParser {
-	/* istanbul ignore next: this is mainly for debugging stuff. */
+	/* istanbul ignore next */
 	public static getType(type: number): string {
-		switch (type) {
-			case ItemType.Surface:
-				return 'Surface'
-			case ItemType.Flipper:
-				return 'Flipper'
-			case ItemType.Timer:
-				return 'Timer'
-			case ItemType.Plunger:
-				return 'Plunger'
-			case ItemType.Textbox:
-				return 'Textbox'
-			case ItemType.Bumper:
-				return 'Bumper'
-			case ItemType.Trigger:
-				return 'Trigger'
-			case ItemType.Light:
-				return 'Light'
-			case ItemType.Kicker:
-				return 'Kicker'
-			case ItemType.Decal:
-				return 'Decal'
-			case ItemType.Gate:
-				return 'Gate'
-			case ItemType.Spinner:
-				return 'Spinner'
-			case ItemType.Ramp:
-				return 'Ramp'
-			case ItemType.Table:
-				return 'Table'
-			case ItemType.LightCenter:
-				return 'Light Center'
-			case ItemType.DragPoint:
-				return 'Drag Point'
-			case ItemType.Collection:
-				return 'Collection'
-			case ItemType.DispReel:
-				return 'Reel'
-			case ItemType.LightSeq:
-				return 'Light Sequence'
-			case ItemType.Primitive:
-				return 'Primitive'
-			case ItemType.Flasher:
-				return 'Flasher'
-			case ItemType.Rubber:
-				return 'Rubber'
-			case ItemType.HitTarget:
-				return 'Hit Target'
-			case ItemType.Count:
-				return 'Count'
-			case ItemType.Invalid:
-				return 'Invalid'
-		}
-		return `Unknown type "${type}"`
+		return TYPE_NAMES[type] ?? `Unknown type "${type}"`
 	}
 
 	public timer = new TimerDataRoot()
@@ -89,7 +61,7 @@ export abstract class ItemData extends BiffParser {
 		return storage.read(itemName, offset, len)
 	}
 
-	protected getCommonBlock(buffer: Uint8Array, tag: string, len: number) {
+	protected getCommonBlock(buffer: Uint8Array, tag: string, len: number): void {
 		switch (tag) {
 			case 'NAME':
 				this.name = this.getWideString(buffer, len)
@@ -109,9 +81,7 @@ export abstract class ItemData extends BiffParser {
 			case 'TMIN':
 				this.timer.interval = this.getInt(buffer)
 				break
-
 			default:
-				//logger().warn('[GameItem.parseUnknownBlock]: Unknown block "%s".', tag);
 				break
 		}
 	}
@@ -127,8 +97,7 @@ export interface IPhysicalData {
 	szPhysicsMaterial?: string
 }
 
-/** TimerDataRoot. */
 export class TimerDataRoot {
-	public interval: number = 100
-	public enabled: boolean = true
+	public interval = 100
+	public enabled = true
 }
