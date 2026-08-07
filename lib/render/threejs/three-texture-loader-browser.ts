@@ -29,8 +29,8 @@ const imageMap: { [key: string]: string } = {
 	ball: new URL('../../../res/maps/ball.png', import.meta.url).href,
 }
 
-const MAX_REGULAR = 1024
-const MAX_FLOAT = 512
+const MAX_REGULAR = 512
+const MAX_FLOAT = 256
 
 /** ThreeTextureLoaderBrowser. */
 export class ThreeTextureLoaderBrowser implements ITextureLoader<ThreeTexture> {
@@ -70,12 +70,19 @@ export class ThreeTextureLoaderBrowser implements ITextureLoader<ThreeTexture> {
 			try {
 				if (name.toLowerCase().includes('vlm.nestmap')) {
 					const approxPixels = data.length / 14
-					if (approxPixels > 4 * 1024 * 1024) {
-						const w = 512
-						const h = 512
-						const placeholder = new DataTexture(new Uint8Array(w * h * 4), w, h, RGBAFormat as any)
+					if (approxPixels > 2 * 1024 * 1024) {
+						const w = 256
+						const h = 256
+						const arr = new Uint8Array(w * h * 4)
+						for (let i = 0; i < arr.length; i += 4) {
+							arr[i] = 128
+							arr[i + 1] = 128
+							arr[i + 2] = 128
+							arr[i + 3] = 255
+						}
+						const placeholder = new DataTexture(arr as any, w, h, RGBAFormat as any)
 						placeholder.flipY = true
-						placeholder.colorSpace = LinearSRGBColorSpace
+						placeholder.colorSpace = SRGBColorSpace
 						placeholder.needsUpdate = true
 						placeholder.generateMipmaps = false
 						placeholder.minFilter = LinearFilter as any
