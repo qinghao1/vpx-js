@@ -7,6 +7,7 @@ import type { Transpiler } from './transpiler.js'
 import { VbsArray } from './vbs-array.js'
 import { VbsUndefined } from './vbs-undefined.js'
 
+/** VBS runtime helpers. */
 export class VBSHelper {
 	private static readonly UNDEFINED = new VbsUndefined()
 	private readonly transpiler: Transpiler
