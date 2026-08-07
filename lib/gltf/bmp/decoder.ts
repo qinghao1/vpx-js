@@ -6,7 +6,8 @@ import maskColor from './mask-color.js'
 
 type IColorProcessor = (x: number, line: number) => void
 
-export class BmpDecoder implements IImage {
+export /** BmpDecoder. */
+class BmpDecoder implements IImage {
 	// Header
 	public flag: string
 	public fileSize!: number
