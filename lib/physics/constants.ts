@@ -29,6 +29,7 @@ export const C_PRECISION = 0.01
 export const C_TOL_ENDPNTS = 0.0
 export const C_TOL_RADIUS = 0.005
 export const PHYS_SKIN = 25.0
+export const DEFAULT_BALL_SIZE = 25
 export const PHYS_TOUCH = 0.05
 export const C_LOWNORMVEL = 0.0001
 export const C_CONTACTVEL = 0.099
