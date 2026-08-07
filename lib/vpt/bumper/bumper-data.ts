@@ -73,15 +73,15 @@ export class BumperData extends ItemData {
 			return 0
 		}
 		if (tag in FLOAT_TAGS) {
-			;(this as any)[FLOAT_TAGS[tag]] = this.getFloat(buffer)
+			;(this as unknown as Record<string, unknown>)[FLOAT_TAGS[tag]] = this.getFloat(buffer)
 			return 0
 		}
 		if (tag in STRING_TAGS) {
-			;(this as any)[STRING_TAGS[tag]] = this.getString(buffer, len)
+			;(this as unknown as Record<string, unknown>)[STRING_TAGS[tag]] = this.getString(buffer, len)
 			return 0
 		}
 		if (tag in BOOL_TAGS) {
-			;(this as any)[BOOL_TAGS[tag]] = this.getBool(buffer)
+			;(this as unknown as Record<string, unknown>)[BOOL_TAGS[tag]] = this.getBool(buffer)
 			return 0
 		}
 		switch (tag) {

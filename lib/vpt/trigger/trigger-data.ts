@@ -72,15 +72,15 @@ export class TriggerData extends ItemData {
 			return 0
 		}
 		if (tag in FLOAT_MAP) {
-			;(this as any)[FLOAT_MAP[tag]] = this.getFloat(buffer)
+			;(this as unknown as Record<string, unknown>)[FLOAT_MAP[tag]] = this.getFloat(buffer)
 			return 0
 		}
 		if (tag in BOOL_MAP) {
-			;(this as any)[BOOL_MAP[tag]] = this.getBool(buffer)
+			;(this as unknown as Record<string, unknown>)[BOOL_MAP[tag]] = this.getBool(buffer)
 			return 0
 		}
 		if (tag in STRING_MAP) {
-			;(this as any)[STRING_MAP[tag]] = this.getString(buffer, len)
+			;(this as unknown as Record<string, unknown>)[STRING_MAP[tag]] = this.getString(buffer, len)
 			return 0
 		}
 		this.getCommonBlock(buffer, tag, len)
