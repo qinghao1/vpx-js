@@ -390,10 +390,10 @@ export class RampMeshGenerator {
 			accuracy = !mat || !mat.isOpacityActive ? 10 : table.getDetailLevel()
 		}
 		accuracy = f4(f4(4) * f4(10 ** f4(f4(10 - accuracy) * f4(f4(1) / f4(1.5)))))
-		return DragPoint.getRgVertex<RenderVertex3D>(
+		return DragPoint.getRgVertex(
 			this.data.dragPoints,
 			() => new RenderVertex3D(),
-			CatmullCurve3D.fromVertex3D as any,
+			CatmullCurve3D.fromVertex3D,
 			false,
 			accuracy,
 		)

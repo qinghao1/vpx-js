@@ -16,11 +16,7 @@ export class SurfaceMeshGenerator {
 		const topMesh = new Mesh(`surface.top-${data.getName()}`)
 		const sideMesh = new Mesh(`surface.side-${data.getName()}`)
 
-		const verts = DragPoint.getRgVertex<RenderVertex>(
-			data.dragPoints,
-			() => new RenderVertex(),
-			CatmullCurve2D.fromVertex2D as any,
-		)
+		const verts = DragPoint.getRgVertex(data.dragPoints, () => new RenderVertex(), CatmullCurve2D.fromVertex2D)
 		const texCoords = DragPoint.getTextureCoords(data.dragPoints, verts)
 		const n = verts.length
 		const normals: Vertex2D[] = []
