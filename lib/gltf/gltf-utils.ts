@@ -37,7 +37,7 @@ export function serializeUserData(object: Object3D | Material | BufferGeometry):
 		return JSON.parse(JSON.stringify(object.userData))
 	} catch (err) {
 		logger().warn(
-			`[GLTFExporter.serializeUserData] userData of '${(object as any).name}' won't be serialized: ${(err as Error).message}`,
+			`[GLTFExporter.serializeUserData] userData of '${object.name}' won't be serialized: ${(err as Error).message}`,
 		)
 		return {}
 	}
