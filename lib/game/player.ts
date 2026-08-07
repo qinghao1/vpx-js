@@ -14,23 +14,23 @@ import { type AssignKey, keyEventToDirectInputKey } from './key-code.js'
 import { PinInput } from './pin-input.js'
 import { PlayerPhysics } from './player-physics.js'
 
+/** Host-facing game controller: input, physics, animations and state diffing. */
 export class Player extends EventEmitter {
 	private readonly table: Table
 	private readonly pinInput: PinInput
 	private readonly physics: PlayerPhysics
 	private isInitialized = false
 
-	get balls() {
+	get balls(): Ball[] {
 		return this.physics.balls
 	}
 
-	private previousStates: { [key: string]: ItemState } = {}
-	private currentStates: { [key: string]: ItemState } = {}
-
+	private previousStates: Record<string, ItemState> = {}
+	private currentStates: Record<string, ItemState> = {}
 	private simulatedTimeMs = 0
 
-	public width: number = 0
-	public height: number = 0
+	public width = 0
+	public height = 0
 
 	constructor(table: Table) {
 		super()
@@ -41,7 +41,8 @@ export class Player extends EventEmitter {
 		this.setupStates()
 	}
 
-	public init(scope = {}): this {
+	/** Initializes physics and runs table script. */
+	public init(scope: Record<string, any> = {}): this {
 		this.table.setupCollections()
 		this.physics.init()
 		this.table.prepareToPlay()
@@ -51,110 +52,69 @@ export class Player extends EventEmitter {
 		return this
 	}
 
-	private setupTableElements() {
-		for (const playable of this.table.getPlayables()) {
-			playable.setupPlayer(this, this.table)
+	private setupTableElements(): void {
+		for (const p of this.table.getPlayables()) p.setupPlayer(this, this.table)
+	}
+
+	private setupStates(): void {
+		for (const r of this.table.getRenderables()) {
+			const s = r.getState() as ItemState
+			this.currentStates[s.getName()] = s
+			this.previousStates[s.getName()] = s.clone()
 		}
 	}
 
-	private setupStates() {
-		// save states
-		for (const renderable of this.table.getRenderables()) {
-			const state = renderable.getState() as ItemState
-			this.currentStates[state.getName()] = state
-			this.previousStates[state.getName()] = state.clone()
-		}
-	}
-
-	/**
-	 * This is only used for tests, and simulates time by running the physics
-	 * loop as well as the animations every frame.
-	 * @param dTime Time to simulate in ms
-	 */
-	public simulateTime(dTime: number) {
-		/* istanbul ignore next: This is for my future self when writing tests! */
-		if (!this.isInitialized) {
-			throw new Error('Player must be initialized before simulating time!')
-		}
-		const FPS = 60
-		const timePerFrameMs = 1000 / FPS
+	/** Test helper: simulates time at 60Hz. */
+	public simulateTime(dTime: number): void {
+		if (!this.isInitialized) throw new Error('Player must be initialized before simulating time!')
+		const dt = 1000 / 60
 		while (this.simulatedTimeMs <= dTime) {
 			this.updatePhysics(this.simulatedTimeMs)
 			this.updateAnimations(this.simulatedTimeMs)
-			this.simulatedTimeMs += timePerFrameMs
+			this.simulatedTimeMs += dt
 		}
 	}
 
-	/**
-	 * Runs the physics calculation since last time called.
-	 *
-	 * This is the method the host app should run in its physics loop.
-	 *
-	 * @param dTime Optionally override current time
-	 */
+	/** Runs physics step; host should call in its physics loop. */
 	public updatePhysics(dTime?: number): number {
 		return this.physics.updatePhysics(dTime)
 	}
 
-	/**
-	 * Updates animations and returns the changed state since last frame.
-	 *
-	 * This is the method the host app should be calling on each frame before
-	 * updating the scene.
-	 */
+	/** Runs animations and returns changed states since last frame. */
 	public onFrame(): ChangedStates<ItemState> {
-		// first, animate. we do this here to make sure no frames are skipped.
 		this.updateAnimations(this.physics.timeMsec)
-
-		// now, get the states
 		return this.popStates()
 	}
 
-	/**
-	 * Runs one animation cycle for the given time. If more than one cycle has
-	 * to be run over a longer period, this method needs to be called multiple
-	 * times.
-	 *
-	 * @param timeMs Absolute current time
-	 */
-	public updateAnimations(timeMs: number) {
-		for (const animatable of this.table.getAnimatables()) {
-			animatable.getAnimation().updateAnimation(timeMs, this.table)
-		}
+	/** Runs one animation cycle. */
+	public updateAnimations(timeMs: number): void {
+		for (const a of this.table.getAnimatables()) a.getAnimation().updateAnimation(timeMs, this.table)
 	}
 
-	/**
-	 * Returns the changed states and clears them.
-	 *
-	 * Note that the returned object is recycled and should be released after
-	 * usage.
-	 */
+	/** Returns diffed states and resets tracking. Caller must release. */
 	public popStates(): ChangedStates<ItemState> {
-		const changedStates = ChangedStates.claim()
+		const changed = ChangedStates.claim()
 		for (const name of Object.keys(this.currentStates)) {
-			const newState = this.currentStates[name]
-			const oldState = this.previousStates[name]
-			if (!newState.equals(oldState)) {
-				changedStates.setState(name, newState.diff(oldState))
+			const next = this.currentStates[name],
+				prev = this.previousStates[name]
+			if (!next.equals(prev)) {
+				changed.setState(name, next.diff(prev))
 				this.previousStates[name].release()
-				this.previousStates[name] = newState.clone()
+				this.previousStates[name] = next.clone()
 			}
 		}
-		return changedStates
+		return changed
 	}
 
-	public onKeyUp(event: { code: string; key: string; ts: number }) {
-		const dkCode = keyEventToDirectInputKey(event)
-		this.pinInput.onKeyUp(dkCode, event.ts)
+	public onKeyUp(e: { code: string; key: string; ts: number }): void {
+		this.pinInput.onKeyUp(keyEventToDirectInputKey(e), e.ts)
+	}
+	public onKeyDown(e: { code: string; key: string; ts: number }): void {
+		this.pinInput.onKeyDown(keyEventToDirectInputKey(e), e.ts)
 	}
 
-	public onKeyDown(event: { code: string; key: string; ts: number }) {
-		const dkCode = keyEventToDirectInputKey(event)
-		this.pinInput.onKeyDown(dkCode, event.ts)
-	}
-
-	public createBall(ballCreator: IBallCreationPosition, radius = 25, mass = 1): Ball {
-		const ball = this.physics.createBall(ballCreator, this, radius, mass)
+	public createBall(creator: IBallCreationPosition, radius = 25, mass = 1): Ball {
+		const ball = this.physics.createBall(creator, this, radius, mass)
 		this.currentStates[ball.getName()] = ball.getState()
 		this.previousStates[ball.getName()] = ball.getState().clone()
 		this.emit('ballCreated', ball)
@@ -162,9 +122,7 @@ export class Player extends EventEmitter {
 	}
 
 	public destroyBall(ball: Ball): void {
-		if (!ball) {
-			return
-		}
+		if (!ball) return
 		this.physics.destroyBall(ball)
 		this.currentStates[ball.getName()].release()
 		this.previousStates[ball.getName()].release()
@@ -176,69 +134,45 @@ export class Player extends EventEmitter {
 	public getActiveBall(): Ball | undefined {
 		return this.physics.activeBall
 	}
-
 	public getGameTime(): number {
 		return this.physics.timeMsec
 	}
-
 	public getBalls(): Ball[] {
 		return this.physics.balls
 	}
-
 	public getKey(key: AssignKey): number {
 		return this.pinInput.rgKeys[key]
 	}
-
 	public getPhysics(): PlayerPhysics {
 		return this.physics
 	}
-
 	public setGravity(slopeDeg: number, strength: number): void {
 		this.physics.setGravity(slopeDeg, strength)
 	}
-
-	public setEmulator(emu: IEmulator) {
+	public setEmulator(emu: IEmulator): void {
 		this.physics.emu = emu
 		this.emit('emuStarted')
 	}
-
 	public hasDmd(): boolean {
-		return !!this.physics.emu && !!this.physics.emu.getDmdDimensions()
+		return !!this.physics.emu?.getDmdDimensions()
 	}
-
 	public getDmdDimensions(): Vertex2D {
 		return this.physics.emu!.getDmdDimensions()
 	}
-
 	public getDmdFrame(): Uint8Array {
 		return this.physics.emu!.getDmdFrame()
 	}
-
-	public setCabinetInput(keyNr: number) {
-		if (this.physics.emu) {
-			this.physics.emu.setCabinetInput(keyNr)
-		}
+	public setCabinetInput(keyNr: number): void {
+		this.physics.emu?.setCabinetInput(keyNr)
+	}
+	public setSwitchInput(nr: number, enable?: boolean): void {
+		this.physics.emu?.setSwitchInput(nr, enable)
 	}
 
-	public setSwitchInput(switchNr: number, optionalEnableSwitch?: boolean) {
-		if (this.physics.emu) {
-			this.physics.emu.setSwitchInput(switchNr, optionalEnableSwitch)
-		}
-	}
-
-	/**
-	 * Sets the dimensions of the render frame.
-	 *
-	 * The host app should call this whenever resizing happens. If you're
-	 * wondering why we would care about render dimensions in the lib, well,
-	 * the script API exposes it!
-	 *
-	 * @param width Width of the render frame in pixels
-	 * @param height Height of the render frame in pixels
-	 */
-	public setDimensions(width: number, height: number): void {
-		this.width = width
-		this.height = height
+	/** Sets render frame size (exposed to script). */
+	public setDimensions(w: number, h: number): void {
+		this.width = w
+		this.height = h
 	}
 
 	public pause(): void {
@@ -246,7 +180,6 @@ export class Player extends EventEmitter {
 		this.table.fireVoidEvent(Event.GameEventsPaused)
 		this.emit('paused')
 	}
-
 	public resume(): void {
 		this.physics.isPaused = false
 		this.table.fireVoidEvent(Event.GameEventsUnPaused)
@@ -256,40 +189,36 @@ export class Player extends EventEmitter {
 
 export interface IBallCreationPosition {
 	getBallCreationPosition(table: Table): Vertex3D
-
 	getBallCreationVelocity(table: Table): Vertex3D
-
 	onBallCreated(physics: PlayerPhysics, ball: Ball): void
 }
 
+/** Pooled map of changed item states. */
 export class ChangedStates<STATE extends ItemState = ItemState> {
 	public static readonly POOL = new Pool(ChangedStates)
+	public changedStates: Record<string, STATE> = {}
 
-	public changedStates: { [key: string]: STATE } = {}
-
-	get keys() {
+	get keys(): string[] {
 		return Object.keys(this.changedStates)
 	}
-	get states() {
+	get states(): STATE[] {
 		return Object.values(this.changedStates)
 	}
 
 	public static claim(): ChangedStates {
 		return ChangedStates.POOL.get()
 	}
-
 	public setState(name: string, state: STATE): void {
 		this.changedStates[name] = state
 	}
-
 	public getState<S extends STATE>(name: string): S {
 		return this.changedStates[name] as S
 	}
 
 	public release(): void {
-		for (const name of this.keys) {
-			this.changedStates[name].release()
-			delete this.changedStates[name]
+		for (const k of this.keys) {
+			this.changedStates[k].release()
+			delete this.changedStates[k]
 		}
 		ChangedStates.POOL.release(this)
 	}
