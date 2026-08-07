@@ -15,7 +15,7 @@ export const FLT_MAX = 340282346638528859811704183484516925440
 export class Mesh {
 	private static exportPrecision = 6
 
-	public name!: string
+	public name = ''
 	public vertices: Vertex3DNoTex2[] = []
 	public animationFrames: FrameData[] = []
 	public indices: number[] = []
