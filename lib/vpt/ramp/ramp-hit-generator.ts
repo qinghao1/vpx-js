@@ -15,15 +15,12 @@ import type { Table } from '../table/table.js'
 import type { RampData } from './ramp-data.js'
 import type { RampMeshGenerator } from './ramp-mesh-generator.js'
 
-/** Ramp hit generator. */
+/** Ramp hit generator. @see https://github.com/vpinball/vpinball/blob/master/ramp.cpp */
 export class RampHitGenerator {
-	private readonly data: RampData
-	private readonly meshGenerator: RampMeshGenerator
-
-	constructor(data: RampData, meshGenerator: RampMeshGenerator) {
-		this.data = data
-		this.meshGenerator = meshGenerator
-	}
+	constructor(
+		private readonly data: RampData,
+		private readonly meshGenerator: RampMeshGenerator,
+	) {}
 
 	public generateHitObjects(table: Table, events: EventProxy): HitObject[] {
 		const hitObjects: HitObject[] = []
@@ -31,83 +28,37 @@ export class RampHitGenerator {
 		const rgvLocal = rv.rgvLocal
 		const rgHeight1 = rv.ppheight
 		const cVertex = rv.pcvertex
-
-		let wallHeightRight: number
-		let wallHeightLeft: number
-
-		switch (this.data.rampType) {
-			case Enums.RampType.RampTypeFlat:
-				wallHeightRight = this.data.rightWallHeight
-				wallHeightLeft = this.data.leftWallHeight
-				break
-			case Enums.RampType.RampType1Wire:
-				// backwards compatible physics
-				wallHeightRight = 31.0
-				wallHeightLeft = 31.0
-				break
-			case Enums.RampType.RampType2Wire:
-				// backwards compatible physics
-				wallHeightRight = 31.0
-				wallHeightLeft = 31.0
-				break
-			case Enums.RampType.RampType4Wire:
-				wallHeightRight = 62.0
-				wallHeightLeft = 62.0
-				break
-			case Enums.RampType.RampType3WireRight:
-				wallHeightRight = 62.0
-				wallHeightLeft = 6 + 12.5
-				break
-			case Enums.RampType.RampType3WireLeft:
-				wallHeightRight = 6 + 12.5
-				wallHeightLeft = 62.0
-				break
-			/* istanbul ignore next: let's assume this doesn't happen! */
-			default:
-				throw new Error(`Unknown ramp type "${this.data.rampType}".`)
-		}
-
+		const { wallHeightRight, wallHeightLeft } = this.getWallHeights()
 		let pv1: Vertex2D
 		let pv2: Vertex2D
 		let pv3: Vertex2D = new Vertex2D()
 		let pv4: Vertex2D = new Vertex2D()
 		let rgv3D: Vertex3D[]
 		let ph3dpoly: HitTriangle
-
-		// Add line segments for right ramp wall.
 		if (wallHeightRight > 0) {
 			for (let i = 0; i < cVertex - 1; i++) {
-				pv2 = rgvLocal[i]
-				pv3 = rgvLocal[i + 1]
-
-				hitObjects.push(...this.generateWallLineSeg(pv2, pv3, i > 0, rgHeight1[i], rgHeight1[i + 1], wallHeightRight))
+				pv2 = rgvLocal[i]!
+				pv3 = rgvLocal[i + 1]!
+				hitObjects.push(...this.generateWallLineSeg(pv2, pv3, i > 0, rgHeight1[i]!, rgHeight1[i + 1]!, wallHeightRight))
 				hitObjects.push(
-					...this.generateWallLineSeg(pv3, pv2, i < cVertex - 2, rgHeight1[i], rgHeight1[i + 1], wallHeightRight),
+					...this.generateWallLineSeg(pv3, pv2, i < cVertex - 2, rgHeight1[i]!, rgHeight1[i + 1]!, wallHeightRight),
 				)
-
-				// add joints at start and end of right wall
-				if (i === 0) {
-					hitObjects.push(this.generateJoint2D(pv2, rgHeight1[0], rgHeight1[0] + wallHeightRight))
-				}
-				if (i === cVertex - 2) {
-					hitObjects.push(this.generateJoint2D(pv3, rgHeight1[cVertex - 1], rgHeight1[cVertex - 1] + wallHeightRight))
-				}
+				if (i === 0) hitObjects.push(this.generateJoint2D(pv2, rgHeight1[0]!, rgHeight1[0]! + wallHeightRight))
+				if (i === cVertex - 2)
+					hitObjects.push(this.generateJoint2D(pv3, rgHeight1[cVertex - 1]!, rgHeight1[cVertex - 1]! + wallHeightRight))
 			}
 		}
-
-		// Add line segments for left ramp wall.
 		if (wallHeightLeft > 0) {
 			for (let i = 0; i < cVertex - 1; i++) {
-				pv2 = rgvLocal[cVertex + i]
-				pv3 = rgvLocal[cVertex + i + 1]
-
+				pv2 = rgvLocal[cVertex + i]!
+				pv3 = rgvLocal[cVertex + i + 1]!
 				hitObjects.push(
 					...this.generateWallLineSeg(
 						pv2,
 						pv3,
 						i > 0,
-						rgHeight1[cVertex - i - 2],
-						rgHeight1[cVertex - i - 1],
+						rgHeight1[cVertex - i - 2]!,
+						rgHeight1[cVertex - i - 1]!,
 						wallHeightLeft,
 					),
 				)
@@ -116,127 +67,92 @@ export class RampHitGenerator {
 						pv3,
 						pv2,
 						i < cVertex - 2,
-						rgHeight1[cVertex - i - 2],
-						rgHeight1[cVertex - i - 1],
+						rgHeight1[cVertex - i - 2]!,
+						rgHeight1[cVertex - i - 1]!,
 						wallHeightLeft,
 					),
 				)
-
-				// add joints at start and end of left wall
-				if (i === 0) {
-					hitObjects.push(this.generateJoint2D(pv2, rgHeight1[cVertex - 1], rgHeight1[cVertex - 1] + wallHeightLeft))
-				}
-				if (i === cVertex - 2) {
-					hitObjects.push(this.generateJoint2D(pv3, rgHeight1[0], rgHeight1[0] + wallHeightLeft))
-				}
+				if (i === 0)
+					hitObjects.push(this.generateJoint2D(pv2, rgHeight1[cVertex - 1]!, rgHeight1[cVertex - 1]! + wallHeightLeft))
+				if (i === cVertex - 2) hitObjects.push(this.generateJoint2D(pv3, rgHeight1[0]!, rgHeight1[0]! + wallHeightLeft))
 			}
 		}
-
-		// Add hit triangles for the ramp floor.
 		let ph3dpolyOld!: HitTriangle
-
 		for (let i = 0; i < cVertex - 1; i++) {
-			/*
-			 * Layout of one ramp quad seen from above, ramp direction is bottom to top:
-			 *
-			 *    3 - - 4
-			 *    | \   |
-			 *    |   \ |
-			 *    2 - - 1
-			 */
-			pv1 = rgvLocal[i] // i-th right
-			pv2 = rgvLocal[cVertex * 2 - i - 1] // i-th left
-			pv3 = rgvLocal[cVertex * 2 - i - 2] // (i+1)-th left
-			pv4 = rgvLocal[i + 1] // (i+1)-th right
-
-			// left ramp floor triangle, CCW order
+			pv1 = rgvLocal[i]!
+			pv2 = rgvLocal[cVertex * 2 - i - 1]!
+			pv3 = rgvLocal[cVertex * 2 - i - 2]!
+			pv4 = rgvLocal[i + 1]!
 			rgv3D = [
-				new Vertex3D(pv2.x, pv2.y, rgHeight1[i]),
-				new Vertex3D(pv1.x, pv1.y, rgHeight1[i]),
-				new Vertex3D(pv3.x, pv3.y, rgHeight1[i + 1]),
+				new Vertex3D(pv2.x, pv2.y, rgHeight1[i]!),
+				new Vertex3D(pv1.x, pv1.y, rgHeight1[i]!),
+				new Vertex3D(pv3.x, pv3.y, rgHeight1[i + 1]!),
 			]
-
-			// add joint for starting edge of ramp
-			if (i === 0) {
-				hitObjects.push(this.generateJoint(rgv3D[0], rgv3D[1]))
-			}
-
-			// add joint for left edge
-			hitObjects.push(this.generateJoint(rgv3D[0], rgv3D[2]))
-
-			ph3dpoly = new HitTriangle(rgv3D) //!! this is not efficient at all, use native triangle-soup directly somehow
-
-			if (!ph3dpoly.isDegenerate()) {
-				// degenerate triangles happen if width is 0 at some point
-				hitObjects.push(ph3dpoly)
-
-				hitObjects.push(...this.checkJoint(ph3dpolyOld, ph3dpoly))
-				ph3dpolyOld = ph3dpoly
-			}
-
-			// right ramp floor triangle, CCW order
-			rgv3D = [
-				new Vertex3D(pv3.x, pv3.y, rgHeight1[i + 1]),
-				new Vertex3D(pv1.x, pv1.y, rgHeight1[i]),
-				new Vertex3D(pv4.x, pv4.y, rgHeight1[i + 1]),
-			]
-
-			// add joint for right edge
-			hitObjects.push(this.generateJoint(rgv3D[1], rgv3D[2]))
-
+			if (i === 0) hitObjects.push(this.generateJoint(rgv3D[0]!, rgv3D[1]!))
+			hitObjects.push(this.generateJoint(rgv3D[0]!, rgv3D[2]!))
 			ph3dpoly = new HitTriangle(rgv3D)
 			if (!ph3dpoly.isDegenerate()) {
 				hitObjects.push(ph3dpoly)
-
+				hitObjects.push(...this.checkJoint(ph3dpolyOld, ph3dpoly))
+				ph3dpolyOld = ph3dpoly
+			}
+			rgv3D = [
+				new Vertex3D(pv3.x, pv3.y, rgHeight1[i + 1]!),
+				new Vertex3D(pv1.x, pv1.y, rgHeight1[i]!),
+				new Vertex3D(pv4.x, pv4.y, rgHeight1[i + 1]!),
+			]
+			hitObjects.push(this.generateJoint(rgv3D[1]!, rgv3D[2]!))
+			ph3dpoly = new HitTriangle(rgv3D)
+			if (!ph3dpoly.isDegenerate()) {
+				hitObjects.push(ph3dpoly)
 				hitObjects.push(...this.checkJoint(ph3dpolyOld, ph3dpoly))
 				ph3dpolyOld = ph3dpoly
 			}
 		}
-
 		if (cVertex >= 2) {
-			// add joint for final edge of ramp
-			const v1 = new Vertex3D(pv4.x, pv4.y, rgHeight1[cVertex - 1])
-			const v2 = new Vertex3D(pv3.x, pv3.y, rgHeight1[cVertex - 1])
+			const v1 = new Vertex3D(pv4!.x, pv4!.y, rgHeight1[cVertex - 1]!)
+			const v2 = new Vertex3D(pv3!.x, pv3!.y, rgHeight1[cVertex - 1]!)
 			hitObjects.push(this.generateJoint(v1, v2))
 		}
-
-		// add outside bottom,
-		// joints at the intersections are not needed since the inner surface has them
-		// this surface is identical... except for the direction of the normal face.
-		// hence the joints protect both surface edges from having a fall through
 		for (let i = 0; i < cVertex - 1; i++) {
-			// see sketch above
-			pv1 = rgvLocal[i]
-			pv2 = rgvLocal[cVertex * 2 - i - 1]
-			pv3 = rgvLocal[cVertex * 2 - i - 2]
-			pv4 = rgvLocal[i + 1]
-
-			// left ramp triangle, order CW
+			pv1 = rgvLocal[i]!
+			pv2 = rgvLocal[cVertex * 2 - i - 1]!
+			pv3 = rgvLocal[cVertex * 2 - i - 2]!
+			pv4 = rgvLocal[i + 1]!
 			rgv3D = [
-				new Vertex3D(pv1.x, pv1.y, rgHeight1[i]),
-				new Vertex3D(pv2.x, pv2.y, rgHeight1[i]),
-				new Vertex3D(pv3.x, pv3.y, rgHeight1[i + 1]),
+				new Vertex3D(pv1.x, pv1.y, rgHeight1[i]!),
+				new Vertex3D(pv2.x, pv2.y, rgHeight1[i]!),
+				new Vertex3D(pv3.x, pv3.y, rgHeight1[i + 1]!),
 			]
-
 			ph3dpoly = new HitTriangle(rgv3D)
-			if (!ph3dpoly.isDegenerate()) {
-				hitObjects.push(ph3dpoly)
-			}
-
-			// right ramp triangle, order CW
+			if (!ph3dpoly.isDegenerate()) hitObjects.push(ph3dpoly)
 			rgv3D = [
-				new Vertex3D(pv3.x, pv3.y, rgHeight1[i + 1]),
-				new Vertex3D(pv4.x, pv4.y, rgHeight1[i + 1]),
-				new Vertex3D(pv1.x, pv1.y, rgHeight1[i]),
+				new Vertex3D(pv3.x, pv3.y, rgHeight1[i + 1]!),
+				new Vertex3D(pv4.x, pv4.y, rgHeight1[i + 1]!),
+				new Vertex3D(pv1.x, pv1.y, rgHeight1[i]!),
 			]
-
 			ph3dpoly = new HitTriangle(rgv3D)
-			if (!ph3dpoly.isDegenerate()) {
-				hitObjects.push(ph3dpoly)
-			}
+			if (!ph3dpoly.isDegenerate()) hitObjects.push(ph3dpoly)
 		}
-
 		return hitObjects.map((obj) => this.setupHitObject(obj, events, table))
+	}
+
+	private getWallHeights(): { wallHeightRight: number; wallHeightLeft: number } {
+		switch (this.data.rampType) {
+			case Enums.RampType.RampTypeFlat:
+				return { wallHeightRight: this.data.rightWallHeight, wallHeightLeft: this.data.leftWallHeight }
+			case Enums.RampType.RampType1Wire:
+			case Enums.RampType.RampType2Wire:
+				return { wallHeightRight: 31, wallHeightLeft: 31 }
+			case Enums.RampType.RampType4Wire:
+				return { wallHeightRight: 62, wallHeightLeft: 62 }
+			case Enums.RampType.RampType3WireRight:
+				return { wallHeightRight: 62, wallHeightLeft: 6 + 12.5 }
+			case Enums.RampType.RampType3WireLeft:
+				return { wallHeightRight: 6 + 12.5, wallHeightLeft: 62 }
+			default:
+				throw new Error(`Unknown ramp type "${this.data.rampType}".`)
+		}
 	}
 
 	private generateWallLineSeg(
@@ -248,11 +164,7 @@ export class RampHitGenerator {
 		wallHeight: number,
 	): HitObject[] {
 		const hitObjects: HitObject[] = []
-
-		//!! Hit-walls are still done via 2D line segments with only a single lower and upper border, so the wall will always reach below and above the actual ramp -between- two points of the ramp
-		// Thus, subdivide until at some point the approximation error is 'subtle' enough so that one will usually not notice (i.e. dependent on ball size)
-		if (height2 - height1 > 2.0 * PHYS_SKIN) {
-			//!! use ballsize
+		if (height2 - height1 > 2 * PHYS_SKIN) {
 			hitObjects.push(
 				...this.generateWallLineSeg(
 					pv1,
@@ -275,9 +187,7 @@ export class RampHitGenerator {
 			)
 		} else {
 			hitObjects.push(new LineSeg(pv1, pv2, height1, height2 + wallHeight))
-			if (pv3Exists) {
-				hitObjects.push(this.generateJoint2D(pv1, height1, height2 + wallHeight))
-			}
+			if (pv3Exists) hitObjects.push(this.generateJoint2D(pv1, height1, height2 + wallHeight))
 		}
 		return hitObjects
 	}
@@ -292,23 +202,15 @@ export class RampHitGenerator {
 
 	private checkJoint(ph3d1: HitTriangle, ph3d2: HitTriangle): HitObject[] {
 		if (ph3d1) {
-			// may be null in case of degenerate triangles
 			const jointNormal = Vertex3D.crossProduct(ph3d1.normal, ph3d2.normal)
-			if (jointNormal.lengthSq() < 1e-8) {
-				// coplanar triangles need no joints
-				return []
-			}
+			if (jointNormal.lengthSq() < 1e-8) return []
 		}
-		// By convention of the calling function, points 1 [0] and 2 [1] of the second polygon will
-		// be the common-edge points
-		return [this.generateJoint(ph3d2.rgv[0], ph3d2.rgv[1])]
+		return [this.generateJoint(ph3d2.rgv[0]!, ph3d2.rgv[1]!)]
 	}
 
 	private setupHitObject(obj: HitObject, events: EventProxy, table: Table): HitObject {
 		obj.applyPhysics(this.data, table)
-
 		obj.threshold = this.data.threshold!
-		// the ramp is of type ePrimitive for triggering the event in HitTriangle::Collide()
 		obj.setType(CollisionType.Primitive)
 		obj.obj = events
 		obj.fe = this.data.hitEvent
