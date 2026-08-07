@@ -23,7 +23,7 @@ export class ThreeLightGenerator {
 		const light = new PointLight(d.color, intensity, d.falloff * ThreeRenderApi.SCALE, 2)
 		light.name = 'light'
 		light.color.set(d.color)
-		light.position.set(d.center.x, d.center.y, -10)
+		light.position.set(d.center.x, d.center.y, 0)
 		light.updateMatrixWorld()
 		if (ThreeRenderApi.SHADOWS && d.shadows === Enums.ShadowMode.RaytracedBallShadows) {
 			light.castShadow = true
