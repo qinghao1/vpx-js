@@ -427,13 +427,13 @@ export class TableData extends ItemData {
 				break
 			case 'PLST':
 				this.playfieldReflectionStrength = this.getInt(buffer)
-				break // m_playfieldReflectionStrength = dequantizeUnsigned<8>(tmp);
+				break
 			case 'BTRA':
 				this.useTrailForBalls = this.getInt(buffer)
 				break
 			case 'BTST':
 				this.ballTrailStrength = this.getInt(buffer)
-				break // m_ballTrailStrength = dequantizeUnsigned<8>(tmp);
+				break
 			case 'BPRS':
 				this.ballPlayfieldReflectionStrength = this.getFloat(buffer)
 				break
@@ -451,7 +451,7 @@ export class TableData extends ItemData {
 				break
 			case 'UFXA':
 				this.useFXAA = this.getFloat(buffer)
-				break // TODO getting NaN here
+				break
 			case 'BLST':
 				this.bloomStrength = this.getFloat(buffer)
 				break
