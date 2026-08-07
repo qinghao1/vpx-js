@@ -1,14 +1,11 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { Pool } from '../../util/object-pool.js'
 import { ItemState } from '../item-state.js'
 import { omitEqual } from '../state-helpers.js'
 
 /** Spinner state. @see https://github.com/vpinball/vpinball/blob/master/spinner.cpp */
 export class SpinnerState extends ItemState {
-	public static readonly POOL = new Pool(SpinnerState)
-
 	public angle = 0
 	public texture?: string
 	public material?: string
@@ -26,7 +23,7 @@ export class SpinnerState extends ItemState {
 		showBracket: boolean,
 		isVisible: boolean,
 	): SpinnerState {
-		const state = SpinnerState.POOL.get()
+		const state = new SpinnerState()
 		state.name = name
 		state.angle = angle
 		state.texture = texture
@@ -50,9 +47,7 @@ export class SpinnerState extends ItemState {
 		return diff
 	}
 
-	public release(): void {
-		SpinnerState.POOL.release(this)
-	}
+	public release(): void {}
 
 	public equals(state: SpinnerState): boolean {
 		if (!state) return false

@@ -1,14 +1,11 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { Pool } from '../../util/object-pool.js'
 import { ItemState } from '../item-state.js'
 import { omitEqual } from '../state-helpers.js'
 
 /** Trigger state. @see https://github.com/vpinball/vpinball/blob/master/trigger.cpp */
 export class TriggerState extends ItemState {
-	public static readonly POOL = new Pool(TriggerState)
-
 	public heightOffset = 0
 	public material?: string
 
@@ -22,7 +19,7 @@ export class TriggerState extends ItemState {
 		material: string | undefined,
 		isVisible: boolean,
 	): TriggerState {
-		const state = TriggerState.POOL.get()
+		const state = new TriggerState()
 		state.name = name
 		state.heightOffset = heightOffset
 		state.material = material
@@ -42,9 +39,7 @@ export class TriggerState extends ItemState {
 		return diff
 	}
 
-	public release(): void {
-		TriggerState.POOL.release(this)
-	}
+	public release(): void {}
 
 	public equals(state: TriggerState): boolean {
 		if (!state) return false

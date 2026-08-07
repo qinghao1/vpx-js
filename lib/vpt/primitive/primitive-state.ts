@@ -2,14 +2,11 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { Vertex3D } from '../../util/math.js'
-import { Pool } from '../../util/object-pool.js'
 import { ItemState } from '../item-state.js'
 import { omitEqual } from '../state-helpers.js'
 
 /** Primitive state. @see https://github.com/vpinball/vpinball/blob/master/primitive.cpp */
 export class PrimitiveState extends ItemState {
-	public static readonly POOL = new Pool(PrimitiveState)
-
 	public position: Vertex3D = Vertex3D.claim()
 	public size: Vertex3D = Vertex3D.claim()
 	public rotation: Vertex3D = Vertex3D.claim() // rotAndTra[0,1,2]
@@ -59,7 +56,7 @@ export class PrimitiveState extends ItemState {
 		normalMap: string | undefined,
 		isVisible: boolean,
 	): PrimitiveState {
-		const state = PrimitiveState.POOL.get()
+		const state = new PrimitiveState()
 		state.name = name
 		state.position = position
 		state.size = size
@@ -123,7 +120,6 @@ export class PrimitiveState extends ItemState {
 		if (!this.rotation) this.rotation = Vertex3D.claim()
 		if (!this.translation) this.translation = Vertex3D.claim()
 		if (!this.objectRotation) this.objectRotation = Vertex3D.claim()
-		PrimitiveState.POOL.release(this)
 	}
 
 	public equals(state: PrimitiveState): boolean {

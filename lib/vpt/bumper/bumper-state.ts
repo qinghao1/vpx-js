@@ -1,15 +1,12 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { Pool } from '../../util/object-pool.js'
 import { ItemState } from '../item-state.js'
 import { omitEqual } from '../state-helpers.js'
 
 /** Bumper state — ring offset, skirt rotation and material visibility.
  * @see https://github.com/vpinball/vpinball/blob/master/bumper.cpp */
 export class BumperState extends ItemState {
-	public static readonly POOL = new Pool(BumperState)
-
 	public ringOffset = 0
 	public skirtRotX = 0
 	public skirtRotY = 0
@@ -40,7 +37,7 @@ export class BumperState extends ItemState {
 		baseMaterial: string | undefined,
 		skirtMaterial: string | undefined,
 	): BumperState {
-		const s = BumperState.POOL.get()
+		const s = new BumperState()
 		s.name = name
 		s.ringOffset = ringOffset
 		s.skirtRotX = skirtRotX
@@ -89,9 +86,7 @@ export class BumperState extends ItemState {
 		return d
 	}
 
-	public release(): void {
-		BumperState.POOL.release(this)
-	}
+	public release(): void {}
 
 	public equals(state: BumperState): boolean {
 		if (!state) return false

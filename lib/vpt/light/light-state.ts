@@ -1,14 +1,11 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { Pool } from '../../util/object-pool.js'
 import { ItemState } from '../item-state.js'
 import { omitEqual } from '../state-helpers.js'
 
 /** Light state. @see https://github.com/vpinball/vpinball/blob/master/light.cpp */
 export class LightState extends ItemState {
-	public static readonly POOL = new Pool(LightState)
-
 	public intensity = 0
 	public color: number = 0
 	public colorFull: number = 0
@@ -18,7 +15,7 @@ export class LightState extends ItemState {
 	}
 
 	public static claim(name: string, intensity: number, color: number, colorFull: number): LightState {
-		const state = LightState.POOL.get()
+		const state = new LightState()
 		state.name = name
 		state.intensity = intensity
 		state.color = color
@@ -38,9 +35,7 @@ export class LightState extends ItemState {
 		return diff
 	}
 
-	public release(): void {
-		LightState.POOL.release(this)
-	}
+	public release(): void {}
 
 	public equals(state: LightState): boolean {
 		if (!state) return false

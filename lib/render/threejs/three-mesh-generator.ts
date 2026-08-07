@@ -11,11 +11,8 @@ import {
 	Vector2,
 	Vector3,
 } from '../../refs.node.js'
-import { logger } from '../../util/logger.js'
-import { Pool } from '../../util/object-pool.js'
 import { Vertex3DNoTex2 } from '../../util/vertex.js'
 import { Mesh } from '../../vpt/mesh.js'
-import { ThreeRenderApi } from './three-render-api.js'
 
 /**
  * A class that converts the meshes we read from VPinball to Three.js meshes.
@@ -51,21 +48,18 @@ export class ThreeMeshGenerator {
 			}
 		}
 		const g = s.object.geometry,
-			bg = ThreeRenderApi.POOL.BufferGeometry.get() as BufferGeometry
+			bg = new BufferGeometry() as BufferGeometry
 		bg.name = mesh.name
 		bg.setAttribute('position', RecyclableFloat32BufferAttribute.claim(g.vertices, 3))
 		if (g.normals.length) bg.setAttribute('normal', RecyclableFloat32BufferAttribute.claim(g.normals, 3))
 		else bg.computeVertexNormals()
 		if (g.uvs.length) bg.setAttribute('uv', RecyclableFloat32BufferAttribute.claim(g.uvs, 2))
 
-		ParserState.release(s)
 		return bg
 	}
 }
 
 class ParserState {
-	public static readonly POOL = new Pool(ParserState)
-
 	public object!: ParserObject
 
 	public readonly vertices: number[] = []
@@ -73,17 +67,13 @@ class ParserState {
 	public readonly uvs: number[] = []
 
 	public static claim(name: string): ParserState {
-		return ParserState.POOL.get().set(name)
+		return new ParserState().set(name)
 	}
 
-	public static release(...states: ParserState[]) {
-		for (const state of states) {
-			ParserState.POOL.release(state)
-		}
-	}
+	public static release(..._states: ParserState[]) {}
 
 	public set(name: string): this {
-		this.object = ParserObject.claim(name)
+		this.object = new ParserObject().set(name)
 		return this
 	}
 
@@ -91,7 +81,6 @@ class ParserState {
 		state.vertices.length = 0
 		state.normals.length = 0
 		state.uvs.length = 0
-		ParserObject.release(state.object)
 	}
 
 	public addFace(
@@ -171,7 +160,6 @@ class ParserState {
 }
 
 class ParserObject {
-	public static readonly POOL = new Pool(ParserObject)
 	public name!: string
 	public geometry: { [key: string]: number[] } = {
 		vertices: [],
@@ -181,14 +169,10 @@ class ParserObject {
 	public smooth: boolean = false
 
 	public static claim(name: string): ParserObject {
-		return ParserObject.POOL.get().set(name)
+		return new ParserObject().set(name)
 	}
 
-	public static release(...states: ParserObject[]) {
-		for (const state of states) {
-			ParserObject.POOL.release(state)
-		}
-	}
+	public static release(..._states: ParserObject[]) {}
 
 	public static reset(po: ParserObject): void {
 		po.geometry.vertices.length = 0
@@ -206,25 +190,19 @@ class ParserObject {
 /** releaseGeometry. */
 export function releaseGeometry(geometry: BufferGeometry) {
 	for (const attrName of Object.keys(geometry.attributes)) {
-		RecyclableFloat32BufferAttribute.release(geometry.attributes[attrName] as RecyclableFloat32BufferAttribute)
 		delete geometry.attributes[attrName]
 	}
-	ThreeRenderApi.POOL.BufferGeometry.release(geometry)
+	geometry.dispose()
 }
 
 class RecyclableFloat32BufferAttribute extends Float32BufferAttribute {
-	public static readonly POOL = new Pool(RecyclableFloat32BufferAttribute)
 	private static readonly ARR = new Float32Array()
 
 	public static claim(array: number[], itemSize: number, normalized?: boolean): RecyclableFloat32BufferAttribute {
-		return RecyclableFloat32BufferAttribute.POOL.get().set(array, itemSize, normalized)
+		return new RecyclableFloat32BufferAttribute().set(array, itemSize, normalized)
 	}
 
-	public static release(...bas: RecyclableFloat32BufferAttribute[]) {
-		for (const ba of bas) {
-			RecyclableFloat32BufferAttribute.POOL.release(ba)
-		}
-	}
+	public static release(..._bas: RecyclableFloat32BufferAttribute[]) {}
 
 	public set(array: number[], itemSize: number, normalized?: boolean): this {
 		if (this.array.length === array.length) {
