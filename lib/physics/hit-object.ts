@@ -13,121 +13,115 @@ import type { Table } from '../vpt/table/table.js'
 import { CollisionEvent } from './collision-event.js'
 import { CollisionType } from './collision-type.js'
 
+/**
+ * Base for all collidable shapes.
+ * Handles elasticity, friction, scatter, and event firing.
+ */
 export abstract class HitObject {
-	/**
-	 * Base object pointer.
-	 *
-	 * Mainly used as IFireEvents, but also as HitTarget or Primitive or Trigger or Kicker or Gate.
-	 */
+	/** @deprecated use eventProxy */
 	public obj?: EventProxy
 
-	public threshold: number = 0 // threshold for firing an event (usually (always??) normal dot ball-velocity)
+	/** Velocity threshold for firing hit events. */
+	public threshold = 0
+
+	/** Axis-aligned bounding box for broadphase. */
 	public hitBBox: FRect3D = new FRect3D()
 
-	public elasticity: number = 0.3
-	public elasticityFalloff: number = 0
-	public friction: number = 0.3
-	public scatter: number = 0 // in radians
+	public elasticity = 0.3
+	public elasticityFalloff = 0
+	public friction = 0.3
+	/** Scatter angle in radians. */
+	public scatter = 0
 
 	protected objType: CollisionType = CollisionType.Null
-	public isEnabled: boolean = true
+	public isEnabled = true
 
-	/**
-	 * FireEvents for m_obj?
-	 */
-	public fe: boolean = false
+	/** @deprecated use fireEvents */
+	public fe = false
 
-	/**
-	 * currently only used to determine which HitTriangles/HitLines/HitPoints
-	 * are being part of the same Primitive element m_obj, to be able to early
-	 * out intersection traversal if primitive is flagged as not collidable
-	 */
-	public e: boolean = false
+	/** @deprecated use isPrimitive */
+	public e = false
 
-	public abstract calcHitBBox(): void
+	/** Event proxy for the owning item. */
+	public get eventProxy(): EventProxy | undefined {
+		return this.obj
+	}
+	public set eventProxy(v: EventProxy | undefined) {
+		this.obj = v
+	}
 
-	public abstract hitTest(ball: Ball, dTime: number, coll: CollisionEvent, physics: PlayerPhysics): number
+	/** Whether to fire hit events for this shape. */
+	public get fireEvents(): boolean {
+		return this.fe
+	}
+	public set fireEvents(v: boolean) {
+		this.fe = v
+	}
 
-	public abstract collide(coll: CollisionEvent, physics: PlayerPhysics): void
+	/** Whether this shape belongs to a primitive group (for early-out). */
+	public get isPrimitive(): boolean {
+		return this.e
+	}
+	public set isPrimitive(v: boolean) {
+		this.e = v
+	}
 
-	/**
-	 * apply contact forces for the given time interval. Ball, Spinner and Gate do nothing here, Flipper has a specialized handling
-	 * @param coll
-	 * @param dTime
-	 * @param physics
-	 * @constructor
-	 */
-	public contact(coll: CollisionEvent, dTime: number, physics: PlayerPhysics): void {
+	abstract calcHitBBox(): void
+	abstract hitTest(ball: Ball, dTime: number, coll: CollisionEvent, physics: PlayerPhysics): number
+	abstract collide(coll: CollisionEvent, physics: PlayerPhysics): void
+
+	/** Apply contact forces for the interval. */
+	contact(coll: CollisionEvent, dTime: number, physics: PlayerPhysics): void {
 		coll.ball.hit.handleStaticContact(coll, this.friction, dTime, physics)
 	}
 
-	public setFriction(friction: number): this {
+	setFriction(friction: number): this {
 		this.friction = friction
 		return this
 	}
-
-	public setScatter(scatter: number): this {
+	setScatter(scatter: number): this {
 		this.scatter = scatter
 		return this
 	}
 
-	public fireHitEvent(ball: Ball): void {
+	fireHitEvent(ball: Ball): void {
 		if (this.obj && this.fe && this.isEnabled) {
-			// is this the same place as last event? if same then ignore it
 			const posDiff = ball.hit.eventPos.clone(true).sub(ball.state.pos)
 			const distLs = posDiff.lengthSq()
 			Vertex3D.release(posDiff)
-
-			// remember last collide position
 			ball.hit.eventPos.set(ball.state.pos.x, ball.state.pos.y, ball.state.pos.z)
-
-			// hit targets when used with a captured ball have always a too small distance
-			const normalDist = this.objType === CollisionType.HitTarget ? 0.0 : 0.25 // magic distance
-
-			if (distLs > normalDist) {
-				// must be a new place if only by a little
-				this.obj!.fireGroupEvent(Event.HitEventsHit)
-			}
+			const normalDist = this.objType === CollisionType.HitTarget ? 0 : 0.25
+			if (distLs > normalDist) this.obj!.fireGroupEvent(Event.HitEventsHit)
 		}
 	}
 
-	public setElasticity(elasticity: number, elasticityFalloff?: number): this {
+	setElasticity(elasticity: number, elasticityFalloff?: number): this {
 		this.elasticity = elasticity
-		if (elasticityFalloff !== undefined) {
-			this.elasticityFalloff = elasticityFalloff
-		}
+		if (elasticityFalloff !== undefined) this.elasticityFalloff = elasticityFalloff
 		return this
 	}
 
-	public setZ(zLow: number, zHigh: number): this {
+	setZ(zLow: number, zHigh: number): this {
 		this.hitBBox.zlow = zLow
 		this.hitBBox.zhigh = zHigh
 		return this
 	}
-
-	public setEnabled(isEnabled: boolean) {
+	setEnabled(isEnabled: boolean): void {
 		this.isEnabled = isEnabled
 	}
-
-	public setType(type: CollisionType) {
+	setType(type: CollisionType): void {
 		this.objType = type
 	}
 
-	public doHitTest(ball: Ball, coll: CollisionEvent, physics: PlayerPhysics): void {
-		if (!ball) {
-			return
-		}
-
-		if (this.obj && this.obj.abortHitTest && this.obj.abortHitTest()) {
-			return
-		}
+	doHitTest(ball: Ball, coll: CollisionEvent, physics: PlayerPhysics): void {
+		if (!ball) return
+		if (this.obj?.abortHitTest?.()) return
 
 		const newColl = CollisionEvent.claim(ball)
 		const newTime = this.hitTest(ball, coll.hitTime, !physics.recordContacts ? coll : newColl, physics)
 		const validHit = newTime >= 0 && newTime <= coll.hitTime
 
 		if (!physics.recordContacts) {
-			// simply find first event
 			if (validHit) {
 				coll.ball = ball
 				coll.obj = this
@@ -135,15 +129,11 @@ export abstract class HitObject {
 			}
 			CollisionEvent.release(newColl)
 		} else {
-			// find first collision, but also remember all contacts
 			if (newColl.isContact || validHit) {
 				newColl.ball = ball
 				newColl.obj = this
-
-				if (newColl.isContact) {
-					physics.contacts.push(newColl)
-				} else {
-					// if (validhit)
+				if (newColl.isContact) physics.contacts.push(newColl)
+				else {
 					coll.set(newColl)
 					coll.hitTime = newTime
 					CollisionEvent.release(newColl)
@@ -154,7 +144,7 @@ export abstract class HitObject {
 		}
 	}
 
-	public applyPhysics(data: IPhysicalData, table: Table) {
+	applyPhysics(data: IPhysicalData, table: Table): void {
 		const mat = table.getMaterial(data.szPhysicsMaterial)
 		if (mat && !data.overwritePhysics) {
 			this.setElasticity(mat.elasticity, mat.elasticityFalloff)
@@ -165,7 +155,6 @@ export abstract class HitObject {
 			this.setFriction(data.friction)
 			this.setScatter(degToRad(data.scatter))
 		}
-
 		this.setEnabled(data.isCollidable)
 	}
 }
