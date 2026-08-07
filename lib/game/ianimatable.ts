@@ -3,23 +3,14 @@
 
 import type { Table } from '../vpt/table/table.js'
 import type { IPlayable } from './iplayable.js'
-import { PlayerPhysics } from './player-physics.js'
 
-/**
- * Animatables are like movables but their position is only updated
- * once per frame, whereas movables get updated every tick (usually
- * at 1000fps).
- *
- * Classes that implement this interface usually take their code from
- * Visual Pinball's `RenderDynamic()` method.
- */
+/** Updated once per frame (vs movables at 1000Hz). Mirrors VPinball's `RenderDynamic`. */
 export interface IAnimatable extends IPlayable {
 	getAnimation(): IAnimation
 }
 
 export interface IAnimation {
 	init(timeMsec: number): void
-
 	updateAnimation(timeMsec: number, table: Table): void
 }
 
