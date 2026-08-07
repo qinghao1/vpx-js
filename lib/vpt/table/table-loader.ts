@@ -67,7 +67,7 @@ export class TableLoader {
 	): Promise<Record<string, number>> {
 		const stats: Record<string, number> = {}
 
-		for (const key of ITEM_KEYS) (loadedTable as any)[key] = []
+		for (const key of ITEM_KEYS) (loadedTable as unknown as Record<string, unknown>)[key] = []
 
 		progress().show('Loading game items')
 		for (let i = 0; i < numItems; i++) {
@@ -102,7 +102,7 @@ export class TableLoader {
 		if ((key === 'textBoxes' || key === 'timers') && !opts.loadInvisibleItems) {
 			return item
 		}
-		;(loadedTable as any)[key].push(item)
+		;((loadedTable as unknown as Record<string, Item<ItemData>[] | undefined>)[key] ??= []).push(item)
 		return item
 	}
 
