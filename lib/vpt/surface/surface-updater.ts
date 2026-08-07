@@ -8,13 +8,13 @@ import type { Table } from '../table/table.js'
 import type { SurfaceData } from './surface-data.js'
 import type { SurfaceState } from './surface-state.js'
 
-/** SurfaceUpdater. */
+/** Surface updater — drop, top and side. */
 export class SurfaceUpdater extends ItemUpdater<SurfaceState> {
-	private readonly data: SurfaceData
-
-	constructor(state: SurfaceState, data: SurfaceData) {
+	constructor(
+		state: SurfaceState,
+		private readonly data: SurfaceData,
+	) {
 		super(state)
-		this.data = data
 	}
 
 	public applyState<NODE, GEOMETRY, POINT_LIGHT>(
@@ -33,14 +33,11 @@ export class SurfaceUpdater extends ItemUpdater<SurfaceState> {
 		state: SurfaceState,
 		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
 	): void {
-		if (state.isDropped !== undefined) {
-			const matrix = Matrix3D.claim()
-			if (state.isDropped) {
-				matrix.setTranslation(0, 0, this.data.heightTop - 0.01)
-			}
-			renderApi.applyMatrixToNode(matrix, obj)
-			Matrix3D.release(matrix)
-		}
+		if (state.isDropped === undefined) return
+		const m = Matrix3D.claim()
+		if (state.isDropped) m.setTranslation(0, 0, this.data.heightTop - 0.01)
+		renderApi.applyMatrixToNode(m, obj)
+		Matrix3D.release(m)
 	}
 
 	private applyTopState<NODE, GEOMETRY, POINT_LIGHT>(
@@ -49,11 +46,9 @@ export class SurfaceUpdater extends ItemUpdater<SurfaceState> {
 		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
 		table: Table,
 	): void {
-		const topObj = renderApi.findInGroup(obj, `surface.top-${this.state.getName()}`)
-		if (state.isTopVisible !== undefined) {
-			renderApi.applyVisibility(state.isTopVisible, topObj)
-		}
-		this.applyMaterial(topObj, state.topMaterial, state.topTexture, renderApi, table)
+		const top = renderApi.findInGroup(obj, `surface.top-${this.state.getName()}`)
+		if (state.isTopVisible !== undefined) renderApi.applyVisibility(state.isTopVisible, top)
+		this.applyMaterial(top, state.topMaterial, state.topTexture, renderApi, table)
 	}
 
 	private applySideState<NODE, GEOMETRY, POINT_LIGHT>(
@@ -62,10 +57,8 @@ export class SurfaceUpdater extends ItemUpdater<SurfaceState> {
 		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
 		table: Table,
 	): void {
-		const sideObj = renderApi.findInGroup(obj, `surface.side-${this.state.getName()}`)
-		if (state.isSideVisible !== undefined) {
-			renderApi.applyVisibility(state.isSideVisible, sideObj)
-		}
-		this.applyMaterial(sideObj, state.sideMaterial, state.sideTexture, renderApi, table)
+		const side = renderApi.findInGroup(obj, `surface.side-${this.state.getName()}`)
+		if (state.isSideVisible !== undefined) renderApi.applyVisibility(state.isSideVisible, side)
+		this.applyMaterial(side, state.sideMaterial, state.sideTexture, renderApi, table)
 	}
 }
