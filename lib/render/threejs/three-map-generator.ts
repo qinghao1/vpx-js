@@ -83,13 +83,11 @@ export class ThreeMapGenerator {
 		for (const [name, tex] of this.textureCache.entries()) {
 			if (!usedNames.has(name.toLowerCase()) && !usedNames.has(name)) {
 				try {
-					;(tex as any).dispose?.()
+					;(tex as unknown as { dispose?: () => void }).dispose?.()
 				} catch {}
 				try {
-					const img = (tex as any).image
-					if (img && img.data) {
-						;(tex as any).image.data = null
-					}
+					const img = (tex as unknown as { image?: { data?: unknown } }).image
+					if (img?.data) (tex as unknown as { image: { data: unknown | null } }).image.data = null
 				} catch {}
 				this.textureCache.delete(name)
 				disposed++
@@ -101,7 +99,7 @@ export class ThreeMapGenerator {
 	public clear(): void {
 		for (const tex of this.textureCache.values()) {
 			try {
-				;(tex as any).dispose?.()
+				;(tex as unknown as { dispose?: () => void }).dispose?.()
 			} catch {}
 		}
 		this.textureCache.clear()
