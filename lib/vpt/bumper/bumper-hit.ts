@@ -10,6 +10,7 @@ import type { BumperAnimation } from './bumper-animation.js'
 import type { BumperData } from './bumper-data.js'
 import type { BumperState } from './bumper-state.js'
 
+/** Bumper hit shape. */
 export class BumperHit extends HitCircle {
 	private readonly data: BumperData
 	private readonly state: BumperState
