@@ -33,7 +33,7 @@ export class Hit3DPoly extends HitObject {
 		this.scatter = 0
 	}
 
-	public calcHitBBox(): void {
+	public override calcHitBBox(): void {
 		let l = this.rgv[0].x,
 			r = l,
 			t = this.rgv[0].y,
@@ -57,7 +57,7 @@ export class Hit3DPoly extends HitObject {
 		this.hitBBox.zhigh = zh
 	}
 
-	public collide(coll: CollisionEvent): void {
+	public override collide(coll: CollisionEvent): void {
 		const ball = coll.ball,
 			n = coll.hitNormal
 		if (this.objType !== CollisionType.Trigger) {
@@ -80,7 +80,7 @@ export class Hit3DPoly extends HitObject {
 		}
 	}
 
-	public hitTest(ball: Ball, dTime: number, coll: CollisionEvent): number {
+	public override hitTest(ball: Ball, dTime: number, coll: CollisionEvent): number {
 		if (!this.isEnabled) return -1
 		const bnv = this.normal.dot(ball.hit.vel)
 		if (this.objType !== CollisionType.Trigger && bnv > C_LOWNORMVEL) return -1
