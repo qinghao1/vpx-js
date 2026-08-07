@@ -118,21 +118,10 @@ export class DispReelApi extends ItemApi<DispReelData> {
 		this.data.imagesPerGridRow = v
 	}
 
-	public AddValue(value: number): void {
-		// TODO implement
-	}
-
-	public SetValue(value: number): void {
-		// TODO implement
-	}
-
-	public ResetToZero(): void {
-		// TODO implement
-	}
-
-	public SpinReel(reelNumber: number, pulseCount: number): void {
-		// TODO implement
-	}
+	public AddValue(_value: number): void {}
+	public SetValue(_value: number): void {}
+	public ResetToZero(): void {}
+	public SpinReel(_reelNumber: number, _pulseCount: number): void {}
 
 	protected _getPropertyNames(): string[] {
 		return Object.getOwnPropertyNames(DispReelApi.prototype)
