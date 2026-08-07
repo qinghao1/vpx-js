@@ -32,7 +32,9 @@ import type { FlipperData } from './flipper-data.js'
 import { FlipperMover } from './flipper-mover.js'
 import type { FlipperState } from './flipper-state.js'
 
-/** Flipper hit. */
+/** Flipper collision shape.
+ *
+ * @see https://github.com/vpinball/vpinball/blob/master/flipper.cpp */
 export class FlipperHit extends HitObject {
 	private readonly mover: FlipperMover
 	private readonly data: FlipperData
