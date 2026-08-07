@@ -2,144 +2,115 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { BiffParser } from '../io/biff-parser.js'
+import { getDataView } from '../io/binary-helpers.js'
 import type { Texture } from './texture.js'
 
-/**
- * VPinball's material definition.
- *
- * @see https://github.com/vpinball/vpinball/blob/master/Material.h
- */
+/** VPinball material.
+ * @see https://github.com/vpinball/vpinball/blob/master/Material.h */
 export class Material {
 	public name!: string
-	/**
-	 *  Wrap/rim lighting factor (0(off)..1(full))
-	 */
 	public wrapLighting?: number
+	public roughness = 0.0
+	public glossyImageLerp = 1.0
+	public thickness = 0.05
+	public edge = 1.0
+	public edgeAlpha = 1.0
+	public opacity = 1.0
+	public baseColor = 0xb469ff
+	public glossiness = 0.0
+	public clearCoat = 0.0
+	public isMetal = false
+	public isOpacityActive = false
 
-	/** Roughness (0..1, maps to 2..2048 exponent). */
-	public roughness: number = 0.0
-	/** Glossy image lerp (0..1). */
-	public glossyImageLerp: number = 1.0
-	/** Thickness (0..1). */
-	public thickness: number = 0.05
-	/** Edge weight (0..1). */
-	public edge: number = 1.0
-	public edgeAlpha: number = 1.0
-	public opacity: number = 1.0
-	/** Base color (overridable by texture). */
-	public baseColor: number = 0xb469ff
-	/** Glossiness. */
-	public glossiness: number = 0.0
-	/** Clearcoat. */
-	public clearCoat: number = 0.0
-	/** Is metal. */
-	public isMetal: boolean = false
-	public isOpacityActive: boolean = false
-
-	// these are a additional props
 	public emissiveColor?: number
-	public emissiveIntensity: number = 0
+	public emissiveIntensity = 0
 	public emissiveMap?: Texture
 
-	// physics
-	public elasticity: number = 0.0
-	public elasticityFalloff: number = 0.0
-	public friction: number = 0.0
-	public scatterAngle: number = 0.0
+	public elasticity = 0.0
+	public elasticityFalloff = 0.0
+	public friction = 0.0
+	public scatterAngle = 0.0
 
-	public static fromSaved(saveMaterial: SaveMaterial): Material {
-		const material = new Material()
-		material.name = saveMaterial.szName
-		material.baseColor = BiffParser.bgrToRgb(saveMaterial.baseColor)
-		material.glossiness = BiffParser.bgrToRgb(saveMaterial.glossiness)
-		material.clearCoat = BiffParser.bgrToRgb(saveMaterial.clearCoat)
-		material.wrapLighting = saveMaterial.wrapLighting
-		material.roughness = saveMaterial.roughness
-		material.glossyImageLerp = 0 //1.0f - dequantizeUnsigned<8>(mats[i].fGlossyImageLerp); //!! '1.0f -' to be compatible with previous table versions
-		material.thickness = 0 //(mats[i].fThickness == 0) ? 0.05f : dequantizeUnsigned<8>(mats[i].fThickness); //!! 0 -> 0.05f to be compatible with previous table versions
-		material.edge = saveMaterial.edge
-		material.opacity = saveMaterial.opacity
-		material.isMetal = saveMaterial.isMetal
-		material.isOpacityActive = !!(saveMaterial.opacityActiveEdgeAlpha & 1)
-		material.edgeAlpha = 0 //dequantizeUnsigned<7>(mats[i].bOpacityActiveEdgeAlpha >> 1);
-		return material
+	public static fromSaved(s: SaveMaterial): Material {
+		const m = new Material()
+		m.name = s.szName
+		m.baseColor = BiffParser.bgrToRgb(s.baseColor)
+		m.glossiness = BiffParser.bgrToRgb(s.glossiness)
+		m.clearCoat = BiffParser.bgrToRgb(s.clearCoat)
+		m.wrapLighting = s.wrapLighting
+		m.roughness = s.roughness
+		m.glossyImageLerp = 0
+		m.thickness = 0
+		m.edge = s.edge
+		m.opacity = s.opacity
+		m.isMetal = s.isMetal
+		m.isOpacityActive = !!(s.opacityActiveEdgeAlpha & 1)
+		m.edgeAlpha = 0
+		return m
 	}
 
 	public static fromSerialized(blob: { [key: string]: any }): Material {
-		const material = new Material()
-
-		// primitives
-		for (const key of Object.keys(blob)) {
-			;(material as any)[key] = blob[key]
-		}
-
-		return material
+		const m = new Material()
+		for (const k of Object.keys(blob)) (m as any)[k] = blob[k]
+		return m
 	}
 
-	public physUpdate(savePhysMat: SavePhysicsMaterial) {
-		this.elasticity = savePhysMat.elasticity
-		this.elasticityFalloff = savePhysMat.elasticityFallOff
-		this.friction = savePhysMat.friction
-		this.scatterAngle = savePhysMat.scatterAngle
+	public physUpdate(p: SavePhysicsMaterial): void {
+		this.elasticity = p.elasticity
+		this.elasticityFalloff = p.elasticityFallOff
+		this.friction = p.friction
+		this.scatterAngle = p.scatterAngle
 	}
 }
 
-/** SaveMaterial. */
 export class SaveMaterial {
 	public static size = 76
-
 	public szName: string
-	public baseColor: number // can be overriden by texture on object itself
-	public glossiness: number // specular of glossy layer
-	public clearCoat: number // specular of clearcoat layer
-	public wrapLighting: number // wrap/rim lighting factor (0(off)..1(full))
-	public isMetal: boolean // is a metal material or not
-	public roughness: number // roughness of glossy layer (0(diffuse)..1(specular))
-	public glossyImageLerp: number // use image also for the glossy layer (0(no tinting at all)..1(use image)), stupid quantization because of legacy loading/saving
-	public edge: number // edge weight/brightness for glossy and clearcoat (0(dark edges)..1(full fresnel))
-	public thickness: number // thickness for transparent materials (0(paper thin)..1(maximum)), stupid quantization because of legacy loading/saving
-	public opacity: number // opacity (0..1)
+	public baseColor: number
+	public glossiness: number
+	public clearCoat: number
+	public wrapLighting: number
+	public isMetal: boolean
+	public roughness: number
+	public glossyImageLerp: number
+	public edge: number
+	public thickness: number
+	public opacity: number
 	public opacityActiveEdgeAlpha: number
 
-	constructor(buffer: Uint8Array, i = 0) {
-		const offset = i * SaveMaterial.size
-		this.szName = BiffParser.parseNullTerminatedString(buffer.subarray(offset, offset + 32))
-		this.baseColor = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength).getInt32(offset + 32, true)
-		this.glossiness = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength).getInt32(offset + 36, true)
-		this.clearCoat = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength).getInt32(offset + 40, true)
-		this.wrapLighting = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength).getFloat32(offset + 44, true)
-		this.isMetal = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength).getInt8(offset + 48) > 0
-		this.roughness = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength).getFloat32(offset + 52, true)
-		this.glossyImageLerp = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength).getInt32(offset + 56, true)
-		this.edge = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength).getFloat32(offset + 60, true)
-		this.thickness = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength).getInt32(offset + 64, true)
-		this.opacity = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength).getFloat32(offset + 68, true)
-		this.opacityActiveEdgeAlpha = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength).getInt32(
-			offset + 72,
-			true,
-		)
+	constructor(buf: Uint8Array, i = 0) {
+		const off = i * SaveMaterial.size
+		const dv = getDataView(buf)
+		this.szName = BiffParser.parseNullTerminatedString(buf.subarray(off, off + 32))
+		this.baseColor = dv.getInt32(off + 32, true)
+		this.glossiness = dv.getInt32(off + 36, true)
+		this.clearCoat = dv.getInt32(off + 40, true)
+		this.wrapLighting = dv.getFloat32(off + 44, true)
+		this.isMetal = dv.getInt8(off + 48) > 0
+		this.roughness = dv.getFloat32(off + 52, true)
+		this.glossyImageLerp = dv.getInt32(off + 56, true)
+		this.edge = dv.getFloat32(off + 60, true)
+		this.thickness = dv.getInt32(off + 64, true)
+		this.opacity = dv.getFloat32(off + 68, true)
+		this.opacityActiveEdgeAlpha = dv.getInt32(off + 72, true)
 	}
 }
 
-/** SavePhysicsMaterial. */
 export class SavePhysicsMaterial {
 	public static size = 48
-
 	public name: string
 	public elasticity: number
 	public elasticityFallOff: number
 	public friction: number
 	public scatterAngle: number
 
-	constructor(buffer: Uint8Array, i = 0) {
-		const offset = i * SavePhysicsMaterial.size
-		this.name = BiffParser.parseNullTerminatedString(buffer.subarray(offset, offset + 32))
-		this.elasticity = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength).getFloat32(offset + 32, true)
-		this.elasticityFallOff = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength).getFloat32(
-			offset + 36,
-			true,
-		)
-		this.friction = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength).getFloat32(offset + 40, true)
-		this.scatterAngle = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength).getFloat32(offset + 44, true)
+	constructor(buf: Uint8Array, i = 0) {
+		const off = i * SavePhysicsMaterial.size
+		const dv = getDataView(buf)
+		this.name = BiffParser.parseNullTerminatedString(buf.subarray(off, off + 32))
+		this.elasticity = dv.getFloat32(off + 32, true)
+		this.elasticityFallOff = dv.getFloat32(off + 36, true)
+		this.friction = dv.getFloat32(off + 40, true)
+		this.scatterAngle = dv.getFloat32(off + 44, true)
 	}
 }
