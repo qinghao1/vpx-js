@@ -15,7 +15,8 @@
  * top center of each circle, and the texture is wrapped around the sides of
  * the circle.
  */
-export class PlungerCoord {
+export /** PlungerCoord. */
+class PlungerCoord {
 	/**
 	 * radius at this point, as a fraction of nominal plunger width
 	 */
