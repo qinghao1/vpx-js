@@ -9,89 +9,58 @@ import { degToRad, radToDeg } from '../../util/float.js'
 import type { SpinnerData } from './spinner-data.js'
 import type { SpinnerState } from './spinner-state.js'
 
-/** Spinner mover. */
+/** Spinner mover — 360° or limited swing with gravity. */
 export class SpinnerMover implements MoverObject {
-	private readonly data: SpinnerData
-	private readonly state: SpinnerState
-	private readonly events: EventProxy
-
-	public angleSpeed: number = 0
+	public angleSpeed = 0
 	public angleMax: number
 	public angleMin: number
 	public elasticity: number
 	public damping: number
 
-	constructor(data: SpinnerData, state: SpinnerState, events: EventProxy) {
-		this.data = data
-		this.state = state
-		this.events = events
-
+	constructor(
+		private readonly data: SpinnerData,
+		private readonly state: SpinnerState,
+		private readonly events: EventProxy,
+	) {
 		this.angleMax = degToRad(data.angleMax)
 		this.angleMin = degToRad(data.angleMin)
-
-		// compute proper damping factor for physics framerate
 		this.damping = data.damping ** PHYS_FACTOR
-
 		this.elasticity = data.elasticity
 	}
 
 	public updateDisplacements(dTime: number): void {
 		if (this.data.angleMin !== this.data.angleMax) {
-			// blocked spinner, limited motion spinner
-
 			this.state.angle += this.angleSpeed * dTime
-
 			if (this.state.angle > this.angleMax) {
 				this.state.angle = this.angleMax
-				this.events.fireVoidEventParm(Event.LimitEventsEOS, Math.abs(radToDeg(this.angleSpeed))) // send EOS event
-
-				if (this.angleSpeed > 0) {
-					this.angleSpeed *= -0.005 - this.elasticity
-				}
+				this.events.fireVoidEventParm(Event.LimitEventsEOS, Math.abs(radToDeg(this.angleSpeed)))
+				if (this.angleSpeed > 0) this.angleSpeed *= -0.005 - this.elasticity
 			}
 			if (this.state.angle < this.angleMin) {
 				this.state.angle = this.angleMin
-				this.events.fireVoidEventParm(Event.LimitEventsBOS, Math.abs(radToDeg(this.angleSpeed))) // send Park event
-
-				if (this.angleSpeed < 0) {
-					this.angleSpeed *= -0.005 - this.elasticity
-				}
+				this.events.fireVoidEventParm(Event.LimitEventsBOS, Math.abs(radToDeg(this.angleSpeed)))
+				if (this.angleSpeed < 0) this.angleSpeed *= -0.005 - this.elasticity
 			}
 		} else {
-			// "normal" 360° spinner
 			const target =
 				this.angleSpeed > 0
 					? this.state.angle < Math.PI
 						? Math.PI
-						: 3.0 * Math.PI
+						: 3 * Math.PI
 					: this.state.angle < Math.PI
 						? -Math.PI
 						: Math.PI
-
 			this.state.angle += this.angleSpeed * dTime
-
-			if (this.angleSpeed > 0) {
-				if (this.state.angle > target) {
-					this.events.fireGroupEvent(Event.SpinnerEventsSpin)
-				}
-			} else {
-				if (this.state.angle < target) {
-					this.events.fireGroupEvent(Event.SpinnerEventsSpin)
-				}
+			if ((this.angleSpeed > 0 && this.state.angle > target) || (this.angleSpeed < 0 && this.state.angle < target)) {
+				this.events.fireGroupEvent(Event.SpinnerEventsSpin)
 			}
-
-			// clamp angle between 0 and 2π
-			while (this.state.angle > 2.0 * Math.PI) {
-				this.state.angle -= 2.0 * Math.PI
-			}
-			while (this.state.angle < 0.0) {
-				this.state.angle += 2.0 * Math.PI
-			}
+			while (this.state.angle > 2 * Math.PI) this.state.angle -= 2 * Math.PI
+			while (this.state.angle < 0) this.state.angle += 2 * Math.PI
 		}
 	}
 
 	public updateVelocities(): void {
-		this.angleSpeed -= Math.sin(this.state.angle) * (0.0025 * PHYS_FACTOR) // Center of gravity towards bottom of object, makes it stop vertical
+		this.angleSpeed -= Math.sin(this.state.angle) * (0.0025 * PHYS_FACTOR)
 		this.angleSpeed *= this.damping
 	}
 }
