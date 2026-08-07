@@ -11,6 +11,7 @@ import { SlingshotAnimObject } from './anim-slingshot.js'
 import type { CollisionEvent } from './collision-event.js'
 import { LineSeg } from './line-seg.js'
 
+/** Slingshot line segment. */
 export class LineSegSlingshot extends LineSeg {
 	private readonly physics: PlayerPhysics
 	private readonly surface: Surface
