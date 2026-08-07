@@ -9,36 +9,26 @@ import type { BumperAnimation } from './bumper-animation.js'
 import type { BumperData } from './bumper-data.js'
 import type { BumperState } from './bumper-state.js'
 
-/** Bumper API.
- *
- * @see https://github.com/vpinball/vpinball/blob/master/bumper.cpp */
+/** Bumper API. @see https://github.com/vpinball/vpinball/blob/master/bumper.cpp */
 export class BumperApi extends ItemApi<BumperData> {
-	private readonly state: BumperState
-	private readonly animation: BumperAnimation
 	private readonly isBaseDynamic: boolean
 	private readonly isCapDynamic: boolean
 	private readonly isRingDynamic: boolean
 	private readonly isSkirtDynamic: boolean
 
 	constructor(
-		state: BumperState,
-		animation: BumperAnimation,
+		private readonly state: BumperState,
+		private readonly animation: BumperAnimation,
 		data: BumperData,
 		events: EventProxy,
 		player: Player,
 		table: Table,
 	) {
 		super(data, events, player, table)
-		this.state = state
-		this.animation = animation
-		const baseMaterial = table.getMaterial(data.szBaseMaterial)
-		const capMaterial = table.getMaterial(data.szCapMaterial)
-		const ringMaterial = table.getMaterial(data.szRingMaterial)
-		const skirtMaterial = table.getMaterial(data.szSkirtMaterial)
-		this.isBaseDynamic = !!baseMaterial && baseMaterial.isOpacityActive
-		this.isCapDynamic = !!capMaterial && capMaterial.isOpacityActive
-		this.isRingDynamic = !!ringMaterial && ringMaterial.isOpacityActive
-		this.isSkirtDynamic = !!skirtMaterial && skirtMaterial.isOpacityActive
+		this.isBaseDynamic = !!table.getMaterial(data.szBaseMaterial)?.isOpacityActive
+		this.isCapDynamic = !!table.getMaterial(data.szCapMaterial)?.isOpacityActive
+		this.isRingDynamic = !!table.getMaterial(data.szRingMaterial)?.isOpacityActive
+		this.isSkirtDynamic = !!table.getMaterial(data.szSkirtMaterial)?.isOpacityActive
 	}
 
 	get Radius() {
@@ -93,36 +83,28 @@ export class BumperApi extends ItemApi<BumperData> {
 		return this.data.szCapMaterial
 	}
 	set CapMaterial(v) {
-		if (this.isCapDynamic) {
-			this.state.capMaterial = v
-		}
+		if (this.isCapDynamic) this.state.capMaterial = v
 		this.data.szCapMaterial = v
 	}
 	get RingMaterial() {
 		return this.data.szRingMaterial
 	}
 	set RingMaterial(v) {
-		if (this.isRingDynamic) {
-			this.state.ringMaterial = v
-		}
+		if (this.isRingDynamic) this.state.ringMaterial = v
 		this.data.szRingMaterial = v
 	}
 	get BaseMaterial() {
 		return this.data.szBaseMaterial
 	}
 	set BaseMaterial(v) {
-		if (this.isBaseDynamic) {
-			this.state.baseMaterial = v
-		}
+		if (this.isBaseDynamic) this.state.baseMaterial = v
 		this.data.szBaseMaterial = v
 	}
 	get SkirtMaterial() {
 		return this.data.szSkirtMaterial
 	}
 	set SkirtMaterial(v) {
-		if (this.isSkirtDynamic) {
-			this.state.skirtMaterial = v
-		}
+		if (this.isSkirtDynamic) this.state.skirtMaterial = v
 		this.data.szSkirtMaterial = v
 	}
 	get X() {
@@ -159,36 +141,28 @@ export class BumperApi extends ItemApi<BumperData> {
 		return this.data.isCapVisible
 	}
 	set CapVisible(v) {
-		if (this.isCapDynamic) {
-			this.state.isCapVisible = v
-		}
+		if (this.isCapDynamic) this.state.isCapVisible = v
 		this.data.isCapVisible = v
 	}
 	get BaseVisible() {
 		return this.data.isBaseVisible
 	}
 	set BaseVisible(v) {
-		if (this.isBaseDynamic) {
-			this.state.isBaseVisible = v
-		}
+		if (this.isBaseDynamic) this.state.isBaseVisible = v
 		this.data.isBaseVisible = v
 	}
 	get RingVisible() {
 		return this.data.isRingVisible
 	}
 	set RingVisible(v) {
-		if (this.isRingDynamic) {
-			this.state.isRingVisible = v
-		}
+		if (this.isRingDynamic) this.state.isRingVisible = v
 		this.data.isRingVisible = v
 	}
 	get SkirtVisible() {
 		return this.data.isSkirtVisible
 	}
 	set SkirtVisible(v) {
-		if (this.isSkirtDynamic) {
-			this.state.isSkirtVisible = v
-		}
+		if (this.isSkirtDynamic) this.state.isSkirtVisible = v
 		this.data.isSkirtVisible = v
 	}
 	get ReflectionEnabled() {
@@ -204,14 +178,10 @@ export class BumperApi extends ItemApi<BumperData> {
 		this.animation.enableSkirtAnimation = v
 	}
 
-	public PlayHit() {
+	public PlayHit(): void {
 		this.animation.hitEvent = true
 	}
-
-	/**
-	 * No idea wtf this is supposed to do.
-	 */
-	public InterfaceSupportsErrorInfo(riid: any): boolean {
+	public InterfaceSupportsErrorInfo(_riid: unknown): boolean {
 		return false
 	}
 
