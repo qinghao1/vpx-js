@@ -12,6 +12,7 @@ import { MAX_TIMER_MSEC_INTERVAL } from './timer/timer-const.js'
 import { TimerHit } from './timer/timer-hit.js'
 import { TimerOnOff } from './timer/timer-on-off.js'
 
+/** Base for VBS-exposed item APIs. */
 export abstract class ItemApi<DATA extends ItemData> extends EventEmitter {
 	protected readonly table: Table
 	protected readonly player: Player
