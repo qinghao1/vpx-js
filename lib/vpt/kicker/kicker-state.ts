@@ -4,6 +4,7 @@
 import { Pool } from '../../util/object-pool.js'
 import { Enums } from '../enums.js'
 import { ItemState } from '../item-state.js'
+import { omitEqual } from '../state-helpers.js'
 
 /** Kicker state — type and material.
  * @see https://github.com/vpinball/vpinball/blob/master/kicker.cpp */
@@ -37,8 +38,8 @@ export class KickerState extends ItemState {
 
 	public diff(state: KickerState): KickerState {
 		const d = this.clone()
-		if (d.type === state.type) delete (d as unknown as Record<string, unknown>).type
-		if (d.material === state.material) delete (d as unknown as Record<string, unknown>).material
+		omitEqual(d, state, 'type')
+		omitEqual(d, state, 'material')
 		return d
 	}
 

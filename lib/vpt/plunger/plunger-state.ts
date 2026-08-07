@@ -3,6 +3,7 @@
 
 import { Pool } from '../../util/object-pool.js'
 import { ItemState } from '../item-state.js'
+import { omitEqual } from '../state-helpers.js'
 
 /** Plunger state.
  * @see https://github.com/vpinball/vpinball/blob/master/plunger.cpp */
@@ -31,9 +32,7 @@ export class PlungerState extends ItemState {
 
 	public diff(state: PlungerState): PlungerState {
 		const diff = this.clone()
-		if (diff.frame === state.frame) {
-			delete diff.frame
-		}
+		omitEqual(diff, state, 'frame')
 		return diff
 	}
 

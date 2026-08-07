@@ -3,6 +3,7 @@
 
 import { Pool } from '../../util/object-pool.js'
 import { ItemState } from '../item-state.js'
+import { omitEqual } from '../state-helpers.js'
 
 /** Trigger state.
  * @see https://github.com/vpinball/vpinball/blob/master/trigger.cpp */
@@ -36,15 +37,9 @@ export class TriggerState extends ItemState {
 
 	public diff(state: TriggerState): TriggerState {
 		const diff = this.clone()
-		if (diff.heightOffset === state.heightOffset) {
-			delete diff.heightOffset
-		}
-		if (diff.material === state.material) {
-			delete diff.material
-		}
-		if (diff.isVisible === state.isVisible) {
-			delete diff.isVisible
-		}
+		omitEqual(diff, state, 'heightOffset')
+		omitEqual(diff, state, 'material')
+		omitEqual(diff, state, 'isVisible')
 		return diff
 	}
 

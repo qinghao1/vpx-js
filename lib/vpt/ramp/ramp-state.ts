@@ -3,6 +3,7 @@
 
 import { Pool } from '../../util/object-pool.js'
 import { ItemState } from '../item-state.js'
+import { omitEqual } from '../state-helpers.js'
 
 /** Ramp state.
  * @see https://github.com/vpinball/vpinball/blob/master/ramp.cpp */
@@ -91,51 +92,21 @@ export class RampState extends ItemState {
 
 	public diff(state: RampState): RampState {
 		const diff = this.clone()
-		if (diff.heightBottom === state.heightBottom) {
-			delete diff.heightBottom
-		}
-		if (diff.heightTop === state.heightTop) {
-			delete diff.heightTop
-		}
-		if (diff.widthBottom === state.widthBottom) {
-			delete diff.widthBottom
-		}
-		if (diff.widthTop === state.widthTop) {
-			delete diff.widthTop
-		}
-		if (diff.leftWallHeight === state.leftWallHeight) {
-			delete diff.leftWallHeight
-		}
-		if (diff.rightWallHeight === state.rightWallHeight) {
-			delete diff.rightWallHeight
-		}
-		if (diff.leftWallHeightVisible === state.leftWallHeightVisible) {
-			delete diff.leftWallHeightVisible
-		}
-		if (diff.rightWallHeightVisible === state.rightWallHeightVisible) {
-			delete diff.rightWallHeightVisible
-		}
-		if (diff.type === state.type) {
-			delete diff.type
-		}
-		if (diff.material === state.material) {
-			delete diff.material
-		}
-		if (diff.texture === state.texture) {
-			delete diff.texture
-		}
-		if (diff.textureAlignment === state.textureAlignment) {
-			delete diff.textureAlignment
-		}
-		if (diff.hasWallImage === state.hasWallImage) {
-			delete diff.hasWallImage
-		}
-		if (diff.depthBias === state.depthBias) {
-			delete diff.depthBias
-		}
-		if (diff.isVisible === state.isVisible) {
-			delete diff.isVisible
-		}
+		omitEqual(diff, state, 'heightBottom')
+		omitEqual(diff, state, 'heightTop')
+		omitEqual(diff, state, 'widthBottom')
+		omitEqual(diff, state, 'widthTop')
+		omitEqual(diff, state, 'leftWallHeight')
+		omitEqual(diff, state, 'rightWallHeight')
+		omitEqual(diff, state, 'leftWallHeightVisible')
+		omitEqual(diff, state, 'rightWallHeightVisible')
+		omitEqual(diff, state, 'type')
+		omitEqual(diff, state, 'material')
+		omitEqual(diff, state, 'texture')
+		omitEqual(diff, state, 'textureAlignment')
+		omitEqual(diff, state, 'hasWallImage')
+		omitEqual(diff, state, 'depthBias')
+		omitEqual(diff, state, 'isVisible')
 		return diff
 	}
 

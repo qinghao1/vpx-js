@@ -3,6 +3,7 @@
 
 import { Pool } from '../../util/object-pool.js'
 import { ItemState } from '../item-state.js'
+import { omitEqual } from '../state-helpers.js'
 
 /** Table render state. */
 export class TableState extends ItemState {
@@ -28,12 +29,8 @@ export class TableState extends ItemState {
 
 	public diff(state: TableState): TableState {
 		const diff = this.clone()
-		if (diff.material === state.material) {
-			delete diff.material
-		}
-		if (diff.isVisible === state.isVisible) {
-			delete diff.isVisible
-		}
+		omitEqual(diff, state, 'material')
+		omitEqual(diff, state, 'isVisible')
 		return diff
 	}
 

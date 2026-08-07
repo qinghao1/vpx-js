@@ -3,6 +3,7 @@
 
 import { Pool } from '../../util/object-pool.js'
 import { ItemState } from '../item-state.js'
+import { omitEqual } from '../state-helpers.js'
 
 /** Bumper state — ring offset, skirt rotation and material visibility.
  * @see https://github.com/vpinball/vpinball/blob/master/bumper.cpp */
@@ -74,17 +75,17 @@ export class BumperState extends ItemState {
 
 	public diff(state: BumperState): BumperState {
 		const d = this.clone()
-		if (d.ringOffset === state.ringOffset) delete (d as unknown as Record<string, unknown>).ringOffset
-		if (d.skirtRotX === state.skirtRotX) delete (d as unknown as Record<string, unknown>).skirtRotX
-		if (d.skirtRotY === state.skirtRotY) delete (d as unknown as Record<string, unknown>).skirtRotY
-		if (d.isCapVisible === state.isCapVisible) delete (d as unknown as Record<string, unknown>).isCapVisible
-		if (d.isRingVisible === state.isRingVisible) delete (d as unknown as Record<string, unknown>).isRingVisible
-		if (d.isBaseVisible === state.isBaseVisible) delete (d as unknown as Record<string, unknown>).isBaseVisible
-		if (d.isSkirtVisible === state.isSkirtVisible) delete (d as unknown as Record<string, unknown>).isSkirtVisible
-		if (d.capMaterial === state.capMaterial) delete (d as unknown as Record<string, unknown>).capMaterial
-		if (d.ringMaterial === state.ringMaterial) delete (d as unknown as Record<string, unknown>).ringMaterial
-		if (d.baseMaterial === state.baseMaterial) delete (d as unknown as Record<string, unknown>).baseMaterial
-		if (d.skirtMaterial === state.skirtMaterial) delete (d as unknown as Record<string, unknown>).skirtMaterial
+		omitEqual(d, state, 'ringOffset')
+		omitEqual(d, state, 'skirtRotX')
+		omitEqual(d, state, 'skirtRotY')
+		omitEqual(d, state, 'isCapVisible')
+		omitEqual(d, state, 'isRingVisible')
+		omitEqual(d, state, 'isBaseVisible')
+		omitEqual(d, state, 'isSkirtVisible')
+		omitEqual(d, state, 'capMaterial')
+		omitEqual(d, state, 'ringMaterial')
+		omitEqual(d, state, 'baseMaterial')
+		omitEqual(d, state, 'skirtMaterial')
 		return d
 	}
 
