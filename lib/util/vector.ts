@@ -253,20 +253,39 @@ export class Vertex3D extends Vector3 {
 		return new Vertex3D(temp.dot(r0), temp.dot(r1), temp.dot(r2))
 	}
 	multiplyMatrix(m: Matrix3D): this {
+		const e = (m as unknown as { elements: number[] }).elements
+		if (!e) {
+			const x = this.x,
+				y = this.y,
+				z = this.z
+			const xp = f4(f4(f4(f4(m._11 * x) + f4(m._21 * y)) + f4(m._31 * z)) + m._41)
+			const yp = f4(f4(f4(f4(m._12 * x) + f4(m._22 * y)) + f4(m._32 * z)) + m._42)
+			const zp = f4(f4(f4(f4(m._13 * x) + f4(m._23 * y)) + f4(m._33 * z)) + m._43)
+			const wp = f4(f4(f4(f4(m._14 * x) + f4(m._24 * y)) + f4(m._34 * z)) + m._44)
+			const inv = f4(1 / wp)
+			return this.set(xp * inv, yp * inv, zp * inv)
+		}
 		const x = this.x,
 			y = this.y,
 			z = this.z
-		const xp = f4(f4(f4(f4(m._11 * x) + f4(m._21 * y)) + f4(m._31 * z)) + m._41)
-		const yp = f4(f4(f4(f4(m._12 * x) + f4(m._22 * y)) + f4(m._32 * z)) + m._42)
-		const zp = f4(f4(f4(f4(m._13 * x) + f4(m._23 * y)) + f4(m._33 * z)) + m._43)
-		const wp = f4(f4(f4(f4(m._14 * x) + f4(m._24 * y)) + f4(m._34 * z)) + m._44)
+		const xp = f4(f4(f4(f4(e[0] * x) + f4(e[4] * y)) + f4(e[8] * z)) + e[12])
+		const yp = f4(f4(f4(f4(e[1] * x) + f4(e[5] * y)) + f4(e[9] * z)) + e[13])
+		const zp = f4(f4(f4(f4(e[2] * x) + f4(e[6] * y)) + f4(e[10] * z)) + e[14])
+		const wp = f4(f4(f4(f4(e[3] * x) + f4(e[7] * y)) + f4(e[11] * z)) + e[15])
 		const inv = f4(1 / wp)
 		return this.set(xp * inv, yp * inv, zp * inv)
 	}
 	multiplyMatrixNoTranslate(m: Matrix3D): this {
-		const xp = f4(f4(m._11 * this.x) + f4(m._21 * this.y)) + f4(m._31 * this.z)
-		const yp = f4(f4(m._12 * this.x) + f4(m._22 * this.y)) + f4(m._32 * this.z)
-		const zp = f4(f4(m._13 * this.x) + f4(m._23 * this.y)) + f4(m._33 * this.z)
+		const e = (m as unknown as { elements: number[] }).elements
+		if (!e) {
+			const xp = f4(f4(m._11 * this.x) + f4(m._21 * this.y)) + f4(m._31 * this.z)
+			const yp = f4(f4(m._12 * this.x) + f4(m._22 * this.y)) + f4(m._32 * this.z)
+			const zp = f4(f4(m._13 * this.x) + f4(m._23 * this.y)) + f4(m._33 * this.z)
+			return this.set(xp, yp, zp)
+		}
+		const xp = f4(f4(e[0] * this.x) + f4(e[4] * this.y)) + f4(e[8] * this.z)
+		const yp = f4(f4(e[1] * this.x) + f4(e[5] * this.y)) + f4(e[9] * this.z)
+		const zp = f4(f4(e[2] * this.x) + f4(e[6] * this.y)) + f4(e[10] * this.z)
 		return this.set(xp, yp, zp)
 	}
 	toThree(): Vector3 {

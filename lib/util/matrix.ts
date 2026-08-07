@@ -62,7 +62,7 @@ export class Matrix2D extends Matrix3 {
 		return this
 	}
 	override clone(): this {
-		return super.clone() as this
+		return new Matrix2D().copy(this) as unknown as this
 	}
 	clonePooled(recycle = false): Matrix2D {
 		if (recycle) {
@@ -303,7 +303,7 @@ export class Matrix3D extends Matrix4 {
 		return this
 	}
 	override clone(): this {
-		return super.clone() as this
+		return new Matrix3D().copy(this) as unknown as this
 	}
 	clonePooled(recycle = false): Matrix3D {
 		if (recycle) {
