@@ -41,23 +41,23 @@ export class LightData extends ItemData {
 	public falloff = 50
 	public falloffPower = 2
 	public state: number = Enums.LightStatus.LightStateOff
-	public color = 0xffff00
-	public color2 = 0xffffff
+	public color = 0x57a9ff // RGB(255,169,87) 2700K
+	public color2 = 0x57a9ff
 	public szOffImage?: string
 	public roundLight = false
-	public rgBlinkPattern = '0'
+	public rgBlinkPattern = '10'
 	public blinkInterval = 125
-	public intensity = 1
+	public intensity = 10
 	public transmissionScale = 0
 	public szSurface?: string
 	public isBackglass = false
 	public depthBias?: number
-	public fadeSpeedUp = 0.2
-	public fadeSpeedDown = 0.2
+	public fadeSpeedUp = 0.05 // 200ms
+	public fadeSpeedDown = 0.02 // 500ms
 	public bulbLight = false
 	public imageMode = false
 	public showBulbMesh = false
-	public staticBulbMesh = false
+	public staticBulbMesh = true
 	public showReflectionOnBall = true
 	public meshRadius = 20
 	public bulbModulateVsAdd = 0.9

@@ -61,11 +61,11 @@ export class PrimitiveData extends ItemData implements IPhysicalData {
 	public isVisible = true
 	public drawTexturesInside = false
 	public hitEvent = false
-	public threshold!: number
-	public elasticity!: number
-	public elasticityFalloff!: number
-	public friction!: number
-	public scatter!: number
+	public threshold = 2
+	public elasticity = 0.3
+	public elasticityFalloff = 0.5
+	public friction = 0.3
+	public scatter = 0
 	public collisionReductionFactor = 0
 	public isCollidable = true
 	public isToy = false
@@ -77,8 +77,8 @@ export class PrimitiveData extends ItemData implements IPhysicalData {
 	public isReflectionEnabled = true
 	public edgeFactorUI = 0.25
 	public staticRendering = true
-	public disableLightingTop?: number
-	public disableLightingBelow?: number
+	public disableLightingTop = 0
+	public disableLightingBelow = 1
 	public backfacesEnabled = false
 	public displayTexture = false
 	public meshFileName?: string

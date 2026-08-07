@@ -28,10 +28,10 @@ export class SpinnerData extends ItemData {
 	public showBracket = true
 	public height = 60
 	public length = 80
-	public damping!: number
+	public damping = 0.987
 	public angleMax = 0
-	public angleMin = 0
-	public elasticity!: number
+	public angleMin = 0.3
+	public elasticity = 0.3
 	public isVisible = true
 	public szImage?: string
 	public szSurface?: string

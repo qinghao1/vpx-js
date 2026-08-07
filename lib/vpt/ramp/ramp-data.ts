@@ -58,11 +58,11 @@ export class RampData extends ItemData implements IPhysicalData {
 	public rampType: number = Enums.RampType.RampTypeFlat
 	public rightWallHeight = f4(62)
 	public rightWallHeightVisible = f4(30)
-	public scatter!: number
+	public scatter = 0
 	public szImage?: string
 	public szMaterial?: string
 	public szPhysicsMaterial?: string
-	public threshold?: number
+	public threshold = 2
 	public widthBottom = f4(75)
 	public widthTop = f4(60)
 	public wireDiameter = f4(8)

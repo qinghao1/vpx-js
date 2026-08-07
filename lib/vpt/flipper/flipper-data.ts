@@ -47,7 +47,7 @@ const STRING_MAP: Record<string, string> = {
 export class FlipperData extends ItemData {
 	public baseRadius = 21.5
 	public endRadius = 13.0
-	public flipperRadiusMin!: number
+	public flipperRadiusMin = 0
 	public flipperRadiusMax = 130.0
 	public flipperRadius = 130.0
 	public startAngle = 121.0
@@ -55,6 +55,7 @@ export class FlipperData extends ItemData {
 	public height = 50.0
 	public center!: Vertex2D
 	public color = 0xffffff
+	public rubberColor = 0x323280 // RGB(128,50,50) as COLORREF 0x00BBGGRR
 	public szImage?: string
 	public szSurface?: string
 	public szMaterial?: string
@@ -62,16 +63,16 @@ export class FlipperData extends ItemData {
 	public rubberThickness = 7.0
 	public rubberHeight = 19.0
 	public rubberWidth = 24.0
-	public mass!: number
-	public strength?: number
-	public elasticity?: number
-	public elasticityFalloff?: number
-	public friction?: number
-	public return?: number
-	public rampUp?: number
-	public torqueDamping?: number
-	public torqueDampingAngle?: number
-	public scatter?: number
+	public mass = 1.0
+	public strength = 2200.0
+	public elasticity = 0.8
+	public elasticityFalloff = 0.43
+	public friction = 0.6
+	public return = 0.058
+	public rampUp = 3.0
+	public torqueDamping = 0.75
+	public torqueDampingAngle = 6.0
+	public scatter = 0
 	public overrideMass?: number
 	public overrideStrength?: number
 	public overrideElasticity?: number

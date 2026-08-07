@@ -23,6 +23,10 @@ const BG_FLOAT_MAP: Record<string, [string, number]> = {
 	XLTX: ['bgXlateX', BG.DESKTOP],
 	XLTY: ['bgXlateY', BG.DESKTOP],
 	XLTZ: ['bgXlateZ', BG.DESKTOP],
+	HOF0: ['bgViewHOfs', BG.DESKTOP],
+	VOF0: ['bgViewVOfs', BG.DESKTOP],
+	WTZ0: ['bgWindowTopZOfs', BG.DESKTOP],
+	WBZ0: ['bgWindowBottomZOfs', BG.DESKTOP],
 	ROTF: ['bgRotation', BG.FULLSCREEN],
 	LAYF: ['bgLayback', BG.FULLSCREEN],
 	INCF: ['bgInclination', BG.FULLSCREEN],
@@ -33,6 +37,10 @@ const BG_FLOAT_MAP: Record<string, [string, number]> = {
 	XLFX: ['bgXlateX', BG.FULLSCREEN],
 	XLFY: ['bgXlateY', BG.FULLSCREEN],
 	XLFZ: ['bgXlateZ', BG.FULLSCREEN],
+	HOF1: ['bgViewHOfs', BG.FULLSCREEN],
+	VOF1: ['bgViewVOfs', BG.FULLSCREEN],
+	WTZ1: ['bgWindowTopZOfs', BG.FULLSCREEN],
+	WBZ1: ['bgWindowBottomZOfs', BG.FULLSCREEN],
 	ROFS: ['bgRotation', BG.FULL_SINGLE_SCREEN],
 	LAFS: ['bgLayback', BG.FULL_SINGLE_SCREEN],
 	INFS: ['bgInclination', BG.FULL_SINGLE_SCREEN],
@@ -43,6 +51,16 @@ const BG_FLOAT_MAP: Record<string, [string, number]> = {
 	XLXS: ['bgXlateX', BG.FULL_SINGLE_SCREEN],
 	XLYS: ['bgXlateY', BG.FULL_SINGLE_SCREEN],
 	XLZS: ['bgXlateZ', BG.FULL_SINGLE_SCREEN],
+	HOF2: ['bgViewHOfs', BG.FULL_SINGLE_SCREEN],
+	VOF2: ['bgViewVOfs', BG.FULL_SINGLE_SCREEN],
+	WTZ2: ['bgWindowTopZOfs', BG.FULL_SINGLE_SCREEN],
+	WBZ2: ['bgWindowBottomZOfs', BG.FULL_SINGLE_SCREEN],
+}
+
+const BG_INT_MAP: Record<string, [string, number]> = {
+	VSM0: ['bgViewMode', BG.DESKTOP],
+	VSM1: ['bgViewMode', BG.FULLSCREEN],
+	VSM2: ['bgViewMode', BG.FULL_SINGLE_SCREEN],
 }
 
 const BG_IMAGE_MAP: Record<string, number> = {
@@ -85,6 +103,8 @@ const FLOAT_MAP: Record<string, string> = {
 	TDFT: 'globalDifficulty',
 	SVOL: 'tableSoundVolume',
 	MVOL: 'tableMusicVolume',
+	CLBH: 'groundToLockbarHeight',
+	EXPO: 'exposure',
 }
 
 const INT_MAP: Record<string, string> = {
@@ -108,6 +128,8 @@ const INT_MAP: Record<string, string> = {
 	AVSY: 'tableAdaptiveVSync',
 	ARAC: 'userDetailLevel',
 	MASI: 'numMaterials',
+	TMAP: 'toneMapper',
+	TLCK: 'tablelocked',
 }
 
 const BOOL_MAP: Record<string, string> = {
@@ -123,6 +145,7 @@ const BOOL_MAP: Record<string, string> = {
 	OGDN: 'overwriteGlobalDayNight',
 	GDAC: 'showGrid',
 	REOP: 'reflectElementsOnPlayfield',
+	BLSM: 'ballSphericalMapping',
 }
 
 const STRING_MAP: Record<string, string> = {
@@ -133,6 +156,7 @@ const STRING_MAP: Record<string, string> = {
 	IMCG: 'szImageColorGrade',
 	EIMG: 'szEnvImage',
 	PLMA: 'szPlayfieldMaterial',
+	NOTX: 'notesText',
 }
 
 /** Table global data.
@@ -157,10 +181,21 @@ export class TableData extends ItemData {
 	public bgXlateX: number[] = []
 	public bgXlateY: number[] = []
 	public bgXlateZ: number[] = []
+	public bgViewHOfs: number[] = []
+	public bgViewVOfs: number[] = []
+	public bgWindowTopZOfs: number[] = []
+	public bgWindowBottomZOfs: number[] = []
+	public bgViewMode: number[] = []
 	public bgEnableFss = false
 	public bgCurrentSet = 0
 	public bgImage: string[] = []
 	public imageBackdropNightDay = false
+	public ballSphericalMapping = false
+	public notesText?: string
+	public groundToLockbarHeight?: number
+	public toneMapper?: number
+	public exposure?: number
+	public tablelocked?: number
 
 	public overridePhysics?: number
 	public overridePhysicsFlipper = false
@@ -283,6 +318,11 @@ export class TableData extends ItemData {
 			;(this as unknown as Record<string, Record<string, unknown>>)[bg[0]][bg[1]] = this.getFloat(buffer)
 			return 0
 		}
+		const bgInt = BG_INT_MAP[tag]
+		if (bgInt) {
+			;(this as unknown as Record<string, Record<string, unknown>>)[bgInt[0]][bgInt[1]] = this.getInt(buffer)
+			return 0
+		}
 		const bgImg = BG_IMAGE_MAP[tag]
 		if (bgImg !== undefined) {
 			this.bgImage[bgImg] = this.getString(buffer, len)
@@ -330,6 +370,12 @@ export class TableData extends ItemData {
 				break
 			case 'PHMA':
 				this.applyPhysicsMaterials(buffer, len, this.numMaterials)
+				break
+			case 'SECB':
+			case 'MATR':
+			case 'RPRB':
+				// deprecated/10.8+ tags: 10.8+ materials and render probes are stored as separate streams;
+				// MATE/PHMA cover legacy path; SECB is protection data (ignored)
 				break
 		}
 		return 0
