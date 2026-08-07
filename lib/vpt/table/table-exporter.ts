@@ -7,7 +7,8 @@ import { ThreeRenderApi } from '../../render/threejs/three-render-api.js'
 import type { Table, TableGenerateOptions } from './table.js'
 import { TableMeshGenerator } from './table-mesh-generator.js'
 
-export class TableExporter {
+export /** TableExporter. */
+class TableExporter {
 	private readonly table: Table
 	private readonly meshGenerator: TableMeshGenerator
 
