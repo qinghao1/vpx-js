@@ -1,23 +1,17 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-/**
- * This is a stub class for the registry. Maybe at some point we
- * can actually store user values here, but for now it just
- * returns the provided fallbacks.
- */
+/** Stub registry — backs VBS `RegRead/Write` with in-memory fallback values. */
 export class GlobalRegistry {
 	private readonly registry = new Map<string, any>()
 
-	public getRegStringAsFloat(key: string, value: string, fallback: number): number {
+	public getRegStringAsFloat(_key: string, _value: string, fallback: number): number {
 		return fallback
 	}
 
 	public regRead(path: string): string | number | undefined {
 		path = this.normalize(path)
-		if (this.registry.has(path)) {
-			return this.registry.get(path)
-		}
+		if (this.registry.has(path)) return this.registry.get(path)
 		switch (path) {
 			case 'hklm\\system\\controlset001\\control\\session manager\\environment\\processor_architecture':
 				return 'AMD64'
@@ -48,17 +42,18 @@ export class GlobalRegistry {
 		}
 	}
 
-	public regWrite(key: string, value: any) {
+	public regWrite(key: string, value: any): void {
 		this.registry.set(this.normalize(key), value)
 	}
 
 	private normalize(path: string): string {
-		path = path.replace('HKEY_CURRENT_USER\\', 'HKCU\\')
-		path = path.replace('HKEY_CLASSES_ROOT\\', 'HKCR\\')
-		path = path.replace('HKEY_LOCAL_MACHINE\\', 'HKLM\\')
-		path = path.replace('HKEY_USERS\\', 'HKU\\')
-		path = path.replace('HKEY_CURRENT_CONFIG\\', 'HKCC\\')
-		return path.toLowerCase()
+		return path
+			.replace('HKEY_CURRENT_USER\\', 'HKCU\\')
+			.replace('HKEY_CLASSES_ROOT\\', 'HKCR\\')
+			.replace('HKEY_LOCAL_MACHINE\\', 'HKLM\\')
+			.replace('HKEY_USERS\\', 'HKU\\')
+			.replace('HKEY_CURRENT_CONFIG\\', 'HKCC\\')
+			.toLowerCase()
 	}
 }
 
