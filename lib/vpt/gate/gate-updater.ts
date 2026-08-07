@@ -8,7 +8,7 @@ import type { Table } from '../table/table.js'
 import type { GateData } from './gate-data.js'
 import type { GateState } from './gate-state.js'
 
-/** Gate updater — bracket, wire rotation and material. */
+/** Gate updater — bracket, wire rotation and material. @see https://github.com/vpinball/vpinball/blob/master/gate.cpp */
 export class GateUpdater extends ItemUpdater<GateState> {
 	constructor(
 		private readonly data: GateData,
