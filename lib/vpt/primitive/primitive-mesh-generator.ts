@@ -11,7 +11,6 @@ import type { PrimitiveData } from './primitive-data.js'
 /** Primitive mesh generator. */
 export class PrimitiveMeshGenerator {
 	private readonly data: PrimitiveData
-
 	constructor(data: PrimitiveData) {
 		this.data = data
 	}
@@ -20,220 +19,131 @@ export class PrimitiveMeshGenerator {
 		const mesh = this.data.use3DMesh
 			? this.data.mesh.clone(`primitive-${this.data.getName()}`)
 			: this.calculateBuiltinOriginal()
-
-		const matrix = this.getMatrix(vpTable)
-		return mesh.transform(matrix)
+		return mesh.transform(this.getMatrix(vpTable))
 	}
 
 	private calculateBuiltinOriginal(): Mesh {
 		const mesh = new Mesh(`primitive-${this.data.getName()}`)
+		const sides = this.data.sides
+		const outerRadius = -0.5 / Math.cos(Math.PI / sides)
+		const addAngle = (2 * Math.PI) / sides
+		const offsAngle = Math.PI / sides
 
-		// this recalculates the Original Vertices -> should be only called, when sides are altered.
-		const outerRadius = -0.5 / Math.cos(Math.PI / this.data.sides)
-		const addAngle = (2.0 * Math.PI) / this.data.sides
-		const offsAngle = Math.PI / this.data.sides
-		let minX = FLT_MAX
-		let minY = FLT_MAX
-		let maxX = -FLT_MAX
-		let maxY = -FLT_MAX
-
+		let minX = FLT_MAX,
+			minY = FLT_MAX,
+			maxX = -FLT_MAX,
+			maxY = -FLT_MAX
 		mesh.vertices = []
 
-		let middle = new Vertex3DNoTex2()
-		mesh.vertices.push(middle)
-		middle.x = 0.0
-		middle.y = 0.0
-		middle.z = 0.5
+		mesh.vertices.push(Object.assign(new Vertex3DNoTex2(), { x: 0, y: 0, z: 0.5 }))
+		mesh.vertices[sides + 1] = Object.assign(new Vertex3DNoTex2(), { x: 0, y: 0, z: -0.5 })
 
-		middle = new Vertex3DNoTex2()
-		mesh.vertices[this.data.sides + 1] = middle
-		middle.x = 0.0
-		middle.y = 0.0
-		middle.z = -0.5
-		for (let i = 0; i < this.data.sides; ++i) {
-			// calculate Top
-			const topVert = new Vertex3DNoTex2() // top point at side
-			mesh.vertices[i + 1] = topVert
-
-			const currentAngle = addAngle * i + offsAngle
-			topVert.x = Math.sin(currentAngle) * outerRadius
-			topVert.y = Math.cos(currentAngle) * outerRadius
-			topVert.z = 0.5
-
-			// calculate bottom
-			const bottomVert = new Vertex3DNoTex2() // bottompoint at side
-			mesh.vertices[i + 1 + this.data.sides + 1] = bottomVert
-			bottomVert.x = topVert.x
-			bottomVert.y = topVert.y
-			bottomVert.z = -0.5
-
-			// calculate sides
-			mesh.vertices[this.data.sides * 2 + 2 + i] = topVert.clone() // sideTopVert
-			mesh.vertices[this.data.sides * 3 + 2 + i] = bottomVert.clone() // sideBottomVert
-
-			// calculate bounds for X and Y
-			if (topVert.x < minX) {
-				minX = topVert.x
-			}
-			if (topVert.x > maxX) {
-				maxX = topVert.x
-			}
-			if (topVert.y < minY) {
-				minY = topVert.y
-			}
-			if (topVert.y > maxY) {
-				maxY = topVert.y
-			}
+		for (let i = 0; i < sides; i++) {
+			const angle = addAngle * i + offsAngle
+			const x = Math.sin(angle) * outerRadius,
+				y = Math.cos(angle) * outerRadius
+			const top = Object.assign(new Vertex3DNoTex2(), { x, y, z: 0.5 })
+			const bot = Object.assign(new Vertex3DNoTex2(), { x, y, z: -0.5 })
+			mesh.vertices[i + 1] = top
+			mesh.vertices[i + 1 + sides + 1] = bot
+			mesh.vertices[sides * 2 + 2 + i] = top.clone()
+			mesh.vertices[sides * 3 + 2 + i] = bot.clone()
+			if (x < minX) minX = x
+			if (x > maxX) maxX = x
+			if (y < minY) minY = y
+			if (y > maxY) maxY = y
 		}
 
-		// these have to be replaced for image mapping
-		middle = mesh.vertices[0] // middle point top
-		middle.tu = 0.25 // /4
-		middle.tv = 0.25 // /4
-		middle = mesh.vertices[this.data.sides + 1] // middle point bottom
-		middle.tu = 0.25 * 3.0 // /4*3
-		middle.tv = 0.25 // /4
-		const invx = 0.5 / (maxX - minX)
-		const invy = 0.5 / (maxY - minY)
-		const invs = 1.0 / this.data.sides
-
-		for (let i = 0; i < this.data.sides; i++) {
-			const topVert = mesh.vertices[i + 1] // top point at side
-			topVert.tu = (topVert.x - minX) * invx
-			topVert.tv = (topVert.y - minY) * invy
-
-			const bottomVert = mesh.vertices[i + 1 + this.data.sides + 1] // bottompoint at side
-			bottomVert.tu = topVert.tu + 0.5
-			bottomVert.tv = topVert.tv
-
-			const sideTopVert = mesh.vertices[this.data.sides * 2 + 2 + i]
-			const sideBottomVert = mesh.vertices[this.data.sides * 3 + 2 + i]
-
-			sideTopVert.tu = i * invs
-			sideTopVert.tv = 0.5
-			sideBottomVert.tu = sideTopVert.tu
-			sideBottomVert.tv = 1.0
+		mesh.vertices[0].tu = 0.25
+		mesh.vertices[0].tv = 0.25
+		mesh.vertices[sides + 1].tu = 0.75
+		mesh.vertices[sides + 1].tv = 0.25
+		const invX = 0.5 / (maxX - minX),
+			invY = 0.5 / (maxY - minY),
+			invS = 1 / sides
+		for (let i = 0; i < sides; i++) {
+			const top = mesh.vertices[i + 1]
+			top.tu = (top.x - minX) * invX
+			top.tv = (top.y - minY) * invY
+			const bot = mesh.vertices[i + 1 + sides + 1]
+			bot.tu = top.tu + 0.5
+			bot.tv = top.tv
+			const sTop = mesh.vertices[sides * 2 + 2 + i],
+				sBot = mesh.vertices[sides * 3 + 2 + i]
+			sTop.tu = i * invS
+			sTop.tv = 0.5
+			sBot.tu = sTop.tu
+			sBot.tv = 1
 		}
 
-		// So how many indices are needed?
-		// 3 per Triangle top - we have m_sides triangles -> 0, 1, 2, 0, 2, 3, 0, 3, 4, ...
-		// 3 per Triangle bottom - we have m_sides triangles
-		// 6 per Side at the side (two triangles form a rectangle) - we have m_sides sides
-		// == 12 * m_sides
-		// * 2 for both cullings (m_DrawTexturesInside == true)
-		// == 24 * m_sides
-		// this will also be the initial sorting, when depths, Vertices and Indices are recreated, because calculateRealTimeOriginal is called.
-
-		// 2 restore indices
-		//   check if anti culling is enabled:
+		mesh.indices = []
 		if (this.data.drawTexturesInside) {
-			mesh.indices = []
-			// yes: draw everything twice
-			// restore indices
-			for (let i = 0; i < this.data.sides; i++) {
-				const tmp = i === this.data.sides - 1 ? 1 : i + 2 // wrapping around
-				// top
-				mesh.indices[i * 6] = 0
-				mesh.indices[i * 6 + 1] = i + 1
-				mesh.indices[i * 6 + 2] = tmp
-				mesh.indices[i * 6 + 3] = 0
-				mesh.indices[i * 6 + 4] = tmp
-				mesh.indices[i * 6 + 5] = i + 1
-
-				const tmp2 = tmp + 1
-				// bottom
-				mesh.indices[6 * (i + this.data.sides)] = this.data.sides + 1
-				mesh.indices[6 * (i + this.data.sides) + 1] = this.data.sides + tmp2
-				mesh.indices[6 * (i + this.data.sides) + 2] = this.data.sides + 2 + i
-				mesh.indices[6 * (i + this.data.sides) + 3] = this.data.sides + 1
-				mesh.indices[6 * (i + this.data.sides) + 4] = this.data.sides + 2 + i
-				mesh.indices[6 * (i + this.data.sides) + 5] = this.data.sides + tmp2
-
-				// sides
-				mesh.indices[12 * (i + this.data.sides)] = this.data.sides * 2 + tmp2
-				mesh.indices[12 * (i + this.data.sides) + 1] = this.data.sides * 2 + 2 + i
-				mesh.indices[12 * (i + this.data.sides) + 2] = this.data.sides * 3 + 2 + i
-				mesh.indices[12 * (i + this.data.sides) + 3] = this.data.sides * 2 + tmp2
-				mesh.indices[12 * (i + this.data.sides) + 4] = this.data.sides * 3 + 2 + i
-				mesh.indices[12 * (i + this.data.sides) + 5] = this.data.sides * 3 + tmp2
-				mesh.indices[12 * (i + this.data.sides) + 6] = this.data.sides * 2 + tmp2
-				mesh.indices[12 * (i + this.data.sides) + 7] = this.data.sides * 3 + 2 + i
-				mesh.indices[12 * (i + this.data.sides) + 8] = this.data.sides * 2 + 2 + i
-				mesh.indices[12 * (i + this.data.sides) + 9] = this.data.sides * 2 + tmp2
-				mesh.indices[12 * (i + this.data.sides) + 10] = this.data.sides * 3 + tmp2
-				mesh.indices[12 * (i + this.data.sides) + 11] = this.data.sides * 3 + 2 + i
+			for (let i = 0; i < sides; i++) {
+				const nxt = i === sides - 1 ? 1 : i + 2,
+					nxt2 = nxt + 1
+				mesh.indices.push(0, i + 1, nxt, 0, nxt, i + 1)
+				mesh.indices.push(sides + 1, sides + nxt2, sides + 2 + i, sides + 1, sides + 2 + i, sides + nxt2)
+				mesh.indices.push(
+					sides * 2 + nxt2,
+					sides * 2 + 2 + i,
+					sides * 3 + 2 + i,
+					sides * 2 + nxt2,
+					sides * 3 + 2 + i,
+					sides * 3 + nxt2,
+				)
+				mesh.indices.push(
+					sides * 2 + nxt2,
+					sides * 3 + 2 + i,
+					sides * 2 + 2 + i,
+					sides * 2 + nxt2,
+					sides * 3 + nxt2,
+					sides * 3 + 2 + i,
+				)
 			}
 		} else {
-			// no: only out-facing polygons
-			// restore indices
-			mesh.indices = []
-			for (let i = 0; i < this.data.sides; i++) {
-				const tmp = i === this.data.sides - 1 ? 1 : i + 2 // wrapping around
-				// top
-				mesh.indices[i * 3] = 0
-				mesh.indices[i * 3 + 2] = i + 1
-				mesh.indices[i * 3 + 1] = tmp
-
-				//SetNormal(mesh.vertices[0], &mesh.indices[i+3], 3); // see below
-
-				const tmp2 = tmp + 1
-				// bottom
-				mesh.indices[3 * (i + this.data.sides)] = this.data.sides + 1
-				mesh.indices[3 * (i + this.data.sides) + 1] = this.data.sides + 2 + i
-				mesh.indices[3 * (i + this.data.sides) + 2] = this.data.sides + tmp2
-
-				//SetNormal(mesh.vertices[0], &mesh.indices[3*(i+this.data.Sides)], 3); // see below
-
-				// sides
-				mesh.indices[6 * (i + this.data.sides)] = this.data.sides * 2 + tmp2
-				mesh.indices[6 * (i + this.data.sides) + 1] = this.data.sides * 3 + 2 + i
-				mesh.indices[6 * (i + this.data.sides) + 2] = this.data.sides * 2 + 2 + i
-				mesh.indices[6 * (i + this.data.sides) + 3] = this.data.sides * 2 + tmp2
-				mesh.indices[6 * (i + this.data.sides) + 4] = this.data.sides * 3 + tmp2
-				mesh.indices[6 * (i + this.data.sides) + 5] = this.data.sides * 3 + 2 + i
+			for (let i = 0; i < sides; i++) {
+				const nxt = i === sides - 1 ? 1 : i + 2,
+					nxt2 = nxt + 1
+				mesh.indices.push(0, nxt, i + 1)
+				mesh.indices.push(sides + 1, sides + 2 + i, sides + nxt2)
+				mesh.indices.push(
+					sides * 2 + nxt2,
+					sides * 3 + 2 + i,
+					sides * 2 + 2 + i,
+					sides * 2 + nxt2,
+					sides * 3 + nxt2,
+					sides * 3 + 2 + i,
+				)
 			}
 		}
-
-		//SetNormal(mesh.vertices[0], &mesh.indices[0], m_mesh.NumIndices()); // SetNormal only works for plane polygons
 		Mesh.computeNormals(mesh.vertices, mesh.vertices.length, mesh.indices, mesh.indices.length)
-
 		return mesh
 	}
 
 	private getMatrix(table: Table): Matrix3D {
-		// scale matrix
-		const scaleMatrix = new Matrix3D()
-		scaleMatrix.setScaling(this.data.size.x, this.data.size.y, this.data.size.z)
-
-		// translation matrix
-		const transMatrix = new Matrix3D()
-		transMatrix.setTranslation(this.data.position.x, this.data.position.y, this.data.position.z)
-
-		// translation + rotation matrix
-		const rotTransMatrix = new Matrix3D()
-		rotTransMatrix.setTranslation(this.data.rotAndTra[3], this.data.rotAndTra[4], this.data.rotAndTra[5])
-
-		const tempMatrix = new Matrix3D()
-		tempMatrix.rotateZMatrix(degToRad(this.data.rotAndTra[2]))
-		rotTransMatrix.multiply(tempMatrix)
-		tempMatrix.rotateYMatrix(degToRad(this.data.rotAndTra[1]))
-		rotTransMatrix.multiply(tempMatrix)
-		tempMatrix.rotateXMatrix(degToRad(this.data.rotAndTra[0]))
-		rotTransMatrix.multiply(tempMatrix)
-
-		tempMatrix.rotateZMatrix(degToRad(this.data.rotAndTra[8]))
-		rotTransMatrix.multiply(tempMatrix)
-		tempMatrix.rotateYMatrix(degToRad(this.data.rotAndTra[7]))
-		rotTransMatrix.multiply(tempMatrix)
-		tempMatrix.rotateXMatrix(degToRad(this.data.rotAndTra[6]))
-		rotTransMatrix.multiply(tempMatrix)
-
-		const fullMatrix = scaleMatrix.clone()
-		fullMatrix.multiply(rotTransMatrix)
-		fullMatrix.multiply(transMatrix) // fullMatrix = Smatrix * RTmatrix * Tmatrix
-		scaleMatrix.setScaling(1.0, 1.0, table.getScaleZ())
-		fullMatrix.multiply(scaleMatrix)
-
-		return fullMatrix
+		const scale = new Matrix3D().setScaling(this.data.size.x, this.data.size.y, this.data.size.z)
+		const trans = new Matrix3D().setTranslation(this.data.position.x, this.data.position.y, this.data.position.z)
+		const rotTrans = new Matrix3D().setTranslation(
+			this.data.rotAndTra[3],
+			this.data.rotAndTra[4],
+			this.data.rotAndTra[5],
+		)
+		const tmp = new Matrix3D()
+		for (const [axis, idx] of [
+			['z', 2],
+			['y', 1],
+			['x', 0],
+			['z', 8],
+			['y', 7],
+			['x', 6],
+		] as const) {
+			if (axis === 'z') tmp.rotateZMatrix(degToRad(this.data.rotAndTra[idx]))
+			else if (axis === 'y') tmp.rotateYMatrix(degToRad(this.data.rotAndTra[idx]))
+			else tmp.rotateXMatrix(degToRad(this.data.rotAndTra[idx]))
+			rotTrans.multiply(tmp)
+		}
+		const full = scale.clone().multiply(rotTrans).multiply(trans)
+		full.multiply(new Matrix3D().setScaling(1, 1, table.getScaleZ()))
+		return full
 	}
 }
