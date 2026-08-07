@@ -4,7 +4,7 @@
 import { Pool } from '../../util/object-pool.js'
 import { ItemState } from '../item-state.js'
 
-/** GateState. */
+/** Gate state. */
 export class GateState extends ItemState {
 	public static readonly POOL = new Pool(GateState)
 
