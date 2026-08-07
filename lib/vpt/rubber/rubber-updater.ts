@@ -10,8 +10,8 @@ import type { Table } from '../table/table.js'
 import type { RubberData } from './rubber-data.js'
 import type { RubberState } from './rubber-state.js'
 
-export /** RubberUpdater. */
-class RubberUpdater extends ItemUpdater<RubberState> {
+/** RubberUpdater. */
+export class RubberUpdater extends ItemUpdater<RubberState> {
 	private readonly data: RubberData
 
 	private readonly middlePoint: Vertex3D
