@@ -9,53 +9,75 @@ import { Enums } from '../enums.js'
 import { ItemData } from '../item-data.js'
 import type { Table } from '../table/table.js'
 
+const FLOAT_MAP: Record<string, string> = {
+	RADI: 'falloff',
+	FAPO: 'falloffPower',
+	BWTH: 'intensity',
+	TRMS: 'transmissionScale',
+	LIDB: 'depthBias',
+	FASP: 'fadeSpeedUp',
+	FASD: 'fadeSpeedDown',
+	BMSC: 'meshRadius',
+	BMVA: 'bulbModulateVsAdd',
+	BHHI: 'bulbHaloHeight',
+}
+const INT_MAP: Record<string, string> = { STAT: 'state', BINT: 'blinkInterval' }
+const BOOL_MAP: Record<string, string> = {
+	SHAP: 'roundLight',
+	BGLS: 'isBackglass',
+	BULT: 'bulbLight',
+	IMMO: 'imageMode',
+	SHBM: 'showBulbMesh',
+	STBM: 'staticBulbMesh',
+	SHRB: 'showReflectionOnBall',
+}
+const STRING_MAP: Record<string, string> = { IMG1: 'szOffImage', BPAT: 'rgBlinkPattern', SURF: 'szSurface' }
+
 /** Light data.
- *
  * @see https://github.com/vpinball/vpinball/blob/master/light.cpp */
 export class LightData extends ItemData {
 	public center!: Vertex2D
-	public falloff: number = 50
-	public falloffPower: number = 2
+	public falloff = 50
+	public falloffPower = 2
 	public state: number = Enums.LightStatus.LightStateOff
-	public color: number = 0xffff00
-	public color2: number = 0xffffff
+	public color = 0xffff00
+	public color2 = 0xffffff
 	public szOffImage?: string
-	public roundLight: boolean = false
-	public rgBlinkPattern: string = '0'
-	public blinkInterval: number = 125
-	public intensity: number = 1
-	public transmissionScale: number = 0
+	public roundLight = false
+	public rgBlinkPattern = '0'
+	public blinkInterval = 125
+	public intensity = 1
+	public transmissionScale = 0
 	public szSurface?: string
-	public isBackglass: boolean = false
+	public isBackglass = false
 	public depthBias?: number
-	public fadeSpeedUp: number = 0.2
-	public fadeSpeedDown: number = 0.2
-	public bulbLight: boolean = false
-	public imageMode: boolean = false
-	public showBulbMesh: boolean = false
-	public staticBulbMesh: boolean = false
-	public showReflectionOnBall: boolean = true
-	public meshRadius: number = 20
-	public bulbModulateVsAdd: number = 0.9
-	public bulbHaloHeight: number = 28
+	public fadeSpeedUp = 0.2
+	public fadeSpeedDown = 0.2
+	public bulbLight = false
+	public imageMode = false
+	public showBulbMesh = false
+	public staticBulbMesh = false
+	public showReflectionOnBall = true
+	public meshRadius = 20
+	public bulbModulateVsAdd = 0.9
+	public bulbHaloHeight = 28
 	public dragPoints: DragPoint[] = []
-
-	public isVisible: boolean = true // not in file, but let's still keep in in here.
+	public isVisible = true
 
 	public static async fromStorage(storage: Storage, itemName: string): Promise<LightData> {
-		const lightData = new LightData(itemName)
-		await storage.streamFiltered(itemName, 4, LightData.createStreamHandler(lightData))
-		return lightData
+		const d = new LightData(itemName)
+		await storage.streamFiltered(itemName, 4, LightData.createStreamHandler(d))
+		return d
 	}
 
-	private static createStreamHandler(lightItem: LightData) {
-		lightItem.dragPoints = []
-		return BiffParser.stream(lightItem.fromTag.bind(lightItem), {
+	private static createStreamHandler(d: LightData) {
+		d.dragPoints = []
+		return BiffParser.stream(d.fromTag.bind(d), {
 			nestedTags: {
 				DPNT: {
 					onStart: () => new DragPoint(),
-					onTag: (dragPoint) => dragPoint.fromTag.bind(dragPoint),
-					onEnd: (dragPoint) => lightItem.dragPoints.push(dragPoint),
+					onTag: (dp) => dp.fromTag.bind(dp),
+					onEnd: (dp) => d.dragPoints.push(dp),
 				},
 			},
 		})
@@ -65,155 +87,62 @@ export class LightData extends ItemData {
 		super(itemName)
 	}
 
-	public isOn() {
-		if (this.state === Enums.LightStatus.LightStateOff) {
-			return false
-		}
-		if (this.state === Enums.LightStatus.LightStateBlinking) {
-			return this.rgBlinkPattern && this.rgBlinkPattern[0] === '1'
-		}
+	public isOn(): boolean {
+		if (this.state === Enums.LightStatus.LightStateOff) return false
+		if (this.state === Enums.LightStatus.LightStateBlinking) return this.rgBlinkPattern?.[0] === '1'
 		return this.state === Enums.LightStatus.LightStateOn
 	}
 
-	/**
-	 * Returns whether this light comes with a bulb mesh.
-	 */
-	public isBulbLight() {
+	public isBulbLight(): boolean {
 		return this.showBulbMesh && this.meshRadius > 0
 	}
 
-	/**
-	 * Returns whether this light is set inside the playfield (but not
-	 * a surface)
-	 * @param table
-	 */
-	public isPlayfieldLight(table: Table) {
+	public isPlayfieldLight(table: Table): boolean {
 		return this.isSurfaceLight(table) && !this.isOnSurface(table)
 	}
 
-	private isOnSurface(table: Table) {
-		return this.szSurface && table.surfaces[this.szSurface]
+	private isOnSurface(table: Table): boolean {
+		return !!this.szSurface && !!table.surfaces[this.szSurface]
 	}
 
-	/**
-	 * Returns whether this light is either set inside the playfield or another
-	 * surface.
-	 * @param table
-	 */
-	public isSurfaceLight(table: Table) {
-		if (!this.szOffImage || this.bulbLight) {
-			// in dark knight, we have BulbLight overlays with same texture
-			return false
-		}
-		if (
-			table.getPlayfieldMap() &&
-			this.szOffImage.toLowerCase() === table.getPlayfieldMap().toLowerCase() &&
-			this.dragPoints &&
-			this.dragPoints.length > 2
-		) {
+	public isSurfaceLight(table: Table): boolean {
+		if (!this.szOffImage || this.bulbLight) return false
+		if (table.getPlayfieldMap()?.toLowerCase() === this.szOffImage.toLowerCase() && this.dragPoints.length > 2)
 			return true
-		}
-
-		// go through surfaces and check the same
-		for (const surface of Object.values(table.surfaces)) {
-			if (surface.image === this.szOffImage) {
-				return true
-			}
-		}
-
-		/*
-		 * Sometimes, the texture used for playfield lights is not the same as the
-		 * playfield texture, so we need another way to determine whether a light
-		 * is inside the playfield or a surface. The rule is currently the
-		 * following:
-		 *   - First, it needs a texture.
-		 *   - If at least three other lights have the same texture, we assume
-		 *     it's a surface light.
-		 */
+		if (Object.values(table.surfaces).some((s) => s.image === this.szOffImage)) return true
 		return Object.values(table.lights).filter((l) => l.offImage === this.szOffImage).length > 3
 	}
 
 	private async fromTag(buffer: Uint8Array, tag: string, offset: number, len: number): Promise<number> {
-		switch (tag) {
-			case 'VCEN':
-				this.center = Vertex2D.get(buffer)
-				break
-			case 'RADI':
-				this.falloff = this.getFloat(buffer)
-				break
-			case 'FAPO':
-				this.falloffPower = this.getFloat(buffer)
-				break
-			case 'STAT':
-				this.state = this.getInt(buffer)
-				break
-			case 'COLR':
-				this.color = BiffParser.bgrToRgb(this.getInt(buffer))
-				break
-			case 'COL2':
-				this.color2 = BiffParser.bgrToRgb(this.getInt(buffer))
-				break
-			case 'IMG1':
-				this.szOffImage = this.getString(buffer, len)
-				break
-			case 'SHAP':
-				this.roundLight = this.getBool(buffer)
-				break
-			case 'BPAT':
-				this.rgBlinkPattern = this.getString(buffer, len)
-				break
-			case 'BINT':
-				this.blinkInterval = this.getInt(buffer)
-				break
-			case 'BWTH':
-				this.intensity = this.getFloat(buffer)
-				break
-			case 'TRMS':
-				this.transmissionScale = this.getFloat(buffer)
-				break
-			case 'SURF':
-				this.szSurface = this.getString(buffer, len)
-				break
-			case 'BGLS':
-				this.isBackglass = this.getBool(buffer)
-				break
-			case 'LIDB':
-				this.depthBias = this.getFloat(buffer)
-				break
-			case 'FASP':
-				this.fadeSpeedUp = this.getFloat(buffer)
-				break
-			case 'FASD':
-				this.fadeSpeedDown = this.getFloat(buffer)
-				break
-			case 'BULT':
-				this.bulbLight = this.getBool(buffer)
-				break
-			case 'IMMO':
-				this.imageMode = this.getBool(buffer)
-				break
-			case 'SHBM':
-				this.showBulbMesh = this.getBool(buffer)
-				break
-			case 'STBM':
-				this.staticBulbMesh = this.getBool(buffer)
-				break
-			case 'SHRB':
-				this.showReflectionOnBall = this.getBool(buffer)
-				break
-			case 'BMSC':
-				this.meshRadius = this.getFloat(buffer)
-				break
-			case 'BMVA':
-				this.bulbModulateVsAdd = this.getFloat(buffer)
-				break
-			case 'BHHI':
-				this.bulbHaloHeight = this.getFloat(buffer)
-				break
-			default:
-				this.getCommonBlock(buffer, tag, len)
-				break
+		if (tag === 'VCEN') {
+			this.center = Vertex2D.get(buffer)
+			return 0
 		}
+		if (tag === 'COLR') {
+			this.color = BiffParser.bgrToRgb(this.getInt(buffer))
+			return 0
+		}
+		if (tag === 'COL2') {
+			this.color2 = BiffParser.bgrToRgb(this.getInt(buffer))
+			return 0
+		}
+		if (tag in FLOAT_MAP) {
+			;(this as any)[FLOAT_MAP[tag]] = this.getFloat(buffer)
+			return 0
+		}
+		if (tag in INT_MAP) {
+			;(this as any)[INT_MAP[tag]] = this.getInt(buffer)
+			return 0
+		}
+		if (tag in BOOL_MAP) {
+			;(this as any)[BOOL_MAP[tag]] = this.getBool(buffer)
+			return 0
+		}
+		if (tag in STRING_MAP) {
+			;(this as any)[STRING_MAP[tag]] = this.getString(buffer, len)
+			return 0
+		}
+		this.getCommonBlock(buffer, tag, len)
 		return 0
 	}
 }
