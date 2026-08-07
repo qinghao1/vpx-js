@@ -7,6 +7,7 @@ import { DragPoint } from '../../math/dragpoint.js'
 import { f4 } from '../../math/float.js'
 import { type IPhysicalData, ItemData } from '../item-data.js'
 
+/** Rubber data. */
 export class RubberData extends ItemData implements IPhysicalData {
 	public height: number = f4(25)
 	public hitHeight: number = f4(-1.0)
