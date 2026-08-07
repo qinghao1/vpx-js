@@ -24,10 +24,7 @@ export interface IRenderVertex {
 	set(x: number, y: number, z?: number): this
 }
 
-/**
- * Untextured vertex with position, normal and tex-coords.
- * Stored as 8 little-endian floats (32 bytes).
- */
+/** Untextured vertex — position, normal, tex-coords (8 floats, 32 bytes). */
 export class Vertex3DNoTex2 {
 	static readonly size = 32
 
@@ -43,63 +40,53 @@ export class Vertex3DNoTex2 {
 	get x(): number {
 		return this._x
 	}
-	/** Set x. */
 	set x(v: number) {
 		this._x = f4(v)
 	}
 	get y(): number {
 		return this._y
 	}
-	/** Set y. */
 	set y(v: number) {
 		this._y = f4(v)
 	}
 	get z(): number {
 		return this._z
 	}
-	/** Set z. */
 	set z(v: number) {
 		this._z = f4(v)
 	}
-
 	get nx(): number {
 		return this._nx
 	}
-	/** Set nx. */
 	set nx(v: number) {
 		this._nx = f4(v)
 	}
 	get ny(): number {
 		return this._ny
 	}
-	/** Set ny. */
 	set ny(v: number) {
 		this._ny = f4(v)
 	}
 	get nz(): number {
 		return this._nz
 	}
-	/** Set nz. */
 	set nz(v: number) {
 		this._nz = f4(v)
 	}
-
 	get tu(): number {
 		return this._tu
 	}
-	/** Set tu. */
 	set tu(v: number) {
 		this._tu = f4(v)
 	}
 	get tv(): number {
 		return this._tv
 	}
-	/** Set tv. */
 	set tv(v: number) {
 		this._tv = f4(v)
 	}
 
-	/** Reads a vertex at `pos` index from `buffer`. */
+	/** Reads vertex at `pos` from `buffer`. */
 	static get(buffer: Uint8Array, pos: number): Vertex3DNoTex2 {
 		const offset = pos * Vertex3DNoTex2.size
 		const v = new Vertex3DNoTex2()
@@ -127,7 +114,7 @@ export class Vertex3DNoTex2 {
 		return v
 	}
 
-	/** Returns the position as a `Vertex3D`. */
+	/** Returns position as `Vertex3D`. */
 	getVertex(): Vertex3D {
 		return new Vertex3D(this._x, this._y, this._z)
 	}
