@@ -609,11 +609,11 @@ export class TableApi extends ItemApi<TableData> {
 		}
 		this.data.szEnvImage = v
 	}
-	get YieldTime(): any {
+	get YieldTime(): unknown {
 		throw new Error('Not supported in play.')
 	}
 	/** Set YieldTime. */
-	set YieldTime(v: any) {
+	set YieldTime(v: unknown) {
 		throw new Error('Not supported in play.')
 	}
 	/** Get EnableAntialiasing. */
