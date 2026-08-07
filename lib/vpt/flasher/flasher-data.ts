@@ -8,7 +8,8 @@ import { Vertex2D } from '../../math/vertex2d.js'
 import { Enums } from '../enums.js'
 import { ItemData } from '../item-data.js'
 
-export class FlasherData extends ItemData {
+export /** Flasher data. */
+class FlasherData extends ItemData {
 	public height: number = 50.0
 	public center: Vertex2D = new Vertex2D()
 	public rotX: number = 0.0
