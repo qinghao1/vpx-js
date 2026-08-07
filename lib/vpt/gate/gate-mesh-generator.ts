@@ -17,10 +17,9 @@ const gatePlateMesh = loadMesh('gate-plate-mesh')
 const gateWireMesh = loadMesh('gate-wire-mesh')
 const gateWireRectangleMesh = loadMesh('gate-wire-rectangle-mesh')
 
-/** Gate mesh generator. */
+/** Generates gate meshes. @see https://github.com/vpinball/vpinball/blob/master/gate.cpp */
 export class GateMeshGenerator {
 	private readonly data: GateData
-
 	constructor(data: GateData) {
 		this.data = data
 	}
@@ -35,30 +34,32 @@ export class GateMeshGenerator {
 	}
 
 	private getBaseMesh(): Mesh {
+		const n = `gate.wire-${this.data.getName()}`
 		switch (this.data.gateType) {
 			case Enums.GateType.GateWireW:
-				return gateWireMesh.clone(`gate.wire-${this.data.getName()}`)
+				return gateWireMesh.clone(n)
 			case Enums.GateType.GateWireRectangle:
-				return gateWireRectangleMesh.clone(`gate.wire-${this.data.getName()}`)
+				return gateWireRectangleMesh.clone(n)
 			case Enums.GateType.GatePlate:
-				return gatePlateMesh.clone(`gate.wire-${this.data.getName()}`)
+				return gatePlateMesh.clone(n)
 			case Enums.GateType.GateLongPlate:
-				return gateLongPlateMesh.clone(`gate.wire-${this.data.getName()}`)
+				return gateLongPlateMesh.clone(n)
 			default:
-				logger().warn('[GateItem.getBaseMesh] Unknown gate type "%s".', this.data.gateType)
+				logger().warn('[GateMeshGenerator] Unknown gate type "%s".', this.data.gateType)
 				return hitTargetT3Mesh.clone()
 		}
 	}
 
 	private positionMesh(mesh: Mesh, table: Table, baseHeight: number): Mesh {
 		const m = new Matrix3D().rotateZMatrix(degToRad(this.data.rotation))
+		const len = this.data.length
+		const zScale = table.getScaleZ()
+		const height = f4(this.data.height * zScale)
 		for (const v of mesh.vertices) {
 			const vert = Vertex3D.claim(v.x, v.y, v.z).multiplyMatrix(m)
-			v.x = f4(vert.x * this.data.length) + this.data.center.x
-			v.y = f4(vert.y * this.data.length) + this.data.center.y
-			v.z =
-				f4(f4(f4(vert.z * this.data.length) * table.getScaleZ()) + f4(this.data.height * table.getScaleZ())) +
-				baseHeight
+			v.x = f4(vert.x * len) + this.data.center.x
+			v.y = f4(vert.y * len) + this.data.center.y
+			v.z = f4(vert.z * len * zScale + height) + baseHeight
 			const n = Vertex3D.claim(v.nx, v.ny, v.nz).multiplyMatrixNoTranslate(m)
 			v.nx = n.x
 			v.ny = n.y
