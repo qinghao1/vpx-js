@@ -14,7 +14,8 @@ import type { PlungerData } from './plunger-data.js'
 import { PlungerMover } from './plunger-mover.js'
 import type { PlungerState } from './plunger-state.js'
 
-export class PlungerHit extends HitObject {
+export /** PlungerHit. */
+class PlungerHit extends HitObject {
 	private readonly mover: PlungerMover
 	private readonly data: PlungerData
 
