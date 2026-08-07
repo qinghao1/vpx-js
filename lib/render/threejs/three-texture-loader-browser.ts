@@ -29,8 +29,8 @@ const imageMap: { [key: string]: string } = {
 	ball: new URL('../../../res/maps/ball.png', import.meta.url).href,
 }
 
-const MAX_REGULAR = 512
-const MAX_FLOAT = 256
+const MAX_REGULAR = 1024
+const MAX_FLOAT = 1024
 
 /** ThreeTextureLoaderBrowser. */
 export class ThreeTextureLoaderBrowser implements ITextureLoader<ThreeTexture> {
@@ -210,7 +210,7 @@ function downsampleIfNeeded(texture: any, maxSize: number): any {
 				newTex.flipY = (texture as any).flipY ?? true
 				newTex.generateMipmaps = false
 				newTex.minFilter = LinearFilter as any
-				newTex.magFilter = (texture as any).magFilter
+				newTex.magFilter = LinearFilter as any
 				newTex.type = (texture as any).type || (isFloat ? (texture as any).type : UnsignedByteType)
 				newTex.name = (texture as any).name
 				try {
