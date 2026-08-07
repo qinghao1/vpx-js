@@ -92,14 +92,14 @@ export class Vertex3DNoTex2 {
 		const v = new Vertex3DNoTex2()
 		try {
 			const f32 = new Float32Array(buffer.buffer, buffer.byteOffset + off, 8)
-			v._x = f32[0]
-			v._y = f32[1]
-			v._z = f32[2]
-			v._nx = f32[3]
-			v._ny = f32[4]
-			v._nz = f32[5]
-			v._tu = f32[6]
-			v._tv = f32[7]
+			v._x = f32[0]!
+			v._y = f32[1]!
+			v._z = f32[2]!
+			v._nx = f32[3]!
+			v._ny = f32[4]!
+			v._nz = f32[5]!
+			v._tu = f32[6]!
+			v._tv = f32[7]!
 			return v
 		} catch {}
 		const d = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength)
@@ -143,14 +143,14 @@ export class Vertex3DNoTex2 {
 
 	static fromArray(a: number[]): Vertex3DNoTex2 {
 		const v = new Vertex3DNoTex2()
-		v._x = f4(a[0])
-		v._y = f4(a[1])
-		v._z = f4(a[2])
-		v._nx = f4(a[3])
-		v._ny = f4(a[4])
-		v._nz = f4(a[5])
-		v._tu = f4(a[6])
-		v._tv = f4(a[7])
+		v._x = f4(a[0]!)
+		v._y = f4(a[1]!)
+		v._z = f4(a[2]!)
+		v._nx = f4(a[3]!)
+		v._ny = f4(a[4]!)
+		v._nz = f4(a[5]!)
+		v._tu = f4(a[6]!)
+		v._tv = f4(a[7]!)
 		return v
 	}
 }
