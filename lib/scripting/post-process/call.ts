@@ -4,6 +4,7 @@
 import { callExpression, expressionStatement } from '../estree.js'
 import type { ESIToken } from '../grammar/grammar.js'
 
+/** ppCall. */
 export function ppCall(node: ESIToken): any {
 	switch (node.type) {
 		case 'InvocationStatement':
