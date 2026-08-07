@@ -3,6 +3,7 @@
 
 import { ItemData } from '../item-data.js'
 
+/** Ball data. */
 export class BallData extends ItemData {
 	public radius: number
 	public mass: number
