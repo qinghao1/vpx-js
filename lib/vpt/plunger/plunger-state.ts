@@ -4,7 +4,8 @@
 import { Pool } from '../../util/object-pool.js'
 import { ItemState } from '../item-state.js'
 
-export class PlungerState extends ItemState {
+export /** PlungerState. */
+class PlungerState extends ItemState {
 	public static readonly POOL = new Pool(PlungerState)
 
 	/**
