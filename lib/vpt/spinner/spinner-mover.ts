@@ -9,8 +9,8 @@ import type { MoverObject } from '../../physics/mover-object.js'
 import type { SpinnerData } from './spinner-data.js'
 import type { SpinnerState } from './spinner-state.js'
 
-export /** Spinner mover. */
-class SpinnerMover implements MoverObject {
+/** Spinner mover. */
+export class SpinnerMover implements MoverObject {
 	private readonly data: SpinnerData
 	private readonly state: SpinnerState
 	private readonly events: EventProxy
