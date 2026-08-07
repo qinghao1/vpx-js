@@ -4,22 +4,20 @@
 import { ItemData } from '../item-data.js'
 
 /** Ball data.
- *
  * @see https://github.com/vpinball/vpinball/blob/master/ball.cpp */
 export class BallData extends ItemData {
 	public radius: number
 	public mass: number
 	public bulbIntensityScale: number
-	public color: number = 0xffffff
+	public color = 0xffffff
+	public environmentMap = ''
+	public frontDecal = ''
+	public decalMode = false
+	public isReflectionEnabled = true
+	public playfieldReflectionStrength = 1.0
+	public forceReflection = false
 
-	public environmentMap: string = ''
-	public frontDecal: string = ''
-	public decalMode: boolean = false
-	public isReflectionEnabled: boolean = true
-	public playfieldReflectionStrength: number = 1.0
-	public forceReflection: boolean = false
-
-	constructor(radius: number = 25, mass: number = 1, bulbIntensityScale = 1) {
+	constructor(radius = 25, mass = 1, bulbIntensityScale = 1) {
 		super('Ball')
 		this.radius = radius
 		this.mass = mass
