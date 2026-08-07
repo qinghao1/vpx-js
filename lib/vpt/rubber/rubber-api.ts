@@ -9,7 +9,8 @@ import type { Table } from '../table/table.js'
 import type { RubberData } from './rubber-data.js'
 import type { RubberState } from './rubber-state.js'
 
-export class RubberApi extends ItemApi<RubberData> {
+export /** RubberApi. */
+class RubberApi extends ItemApi<RubberData> {
 	private readonly state: RubberState
 	private readonly hits: HitObject[]
 	private readonly isDynamic: boolean
