@@ -7,26 +7,25 @@ import { OffsetIndex } from './offset-index.js'
 
 const empty = (n = 64): Uint8Array => new Uint8Array(n).fill(0)
 
-/** WPC-EMU state transform. */
+/** Mirrors WPC emu RAM to VBS-visible lamp/solenoid/GI/DMD state. */
 export class EmulatorState {
-	private currentLampState: Uint8Array<ArrayBufferLike> = empty() as Uint8Array<ArrayBufferLike>
-	private currentSolenoidState: Uint8Array<ArrayBufferLike> = empty() as Uint8Array<ArrayBufferLike>
-	private currentGIState: Uint8Array<ArrayBufferLike> = empty() as Uint8Array<ArrayBufferLike>
-	private lastSentLampState: Uint8Array<ArrayBufferLike> = empty() as Uint8Array<ArrayBufferLike>
-	private lastSentSolenoidState: Uint8Array<ArrayBufferLike> = empty() as Uint8Array<ArrayBufferLike>
-	private lastSentGIState: Uint8Array<ArrayBufferLike> = empty() as Uint8Array<ArrayBufferLike>
-	private dmdScreen: Uint8Array<ArrayBufferLike> = new Uint8Array() as Uint8Array<ArrayBufferLike>
-	private switchState: Uint8Array<ArrayBufferLike> = new Uint8Array() as Uint8Array<ArrayBufferLike>
+	private currentLampState: Uint8Array = empty()
+	private currentSolenoidState: Uint8Array = empty()
+	private currentGIState: Uint8Array = empty()
+	private lastSentLampState: Uint8Array = empty()
+	private lastSentSolenoidState: Uint8Array = empty()
+	private lastSentGIState: Uint8Array = empty()
+	private dmdScreen: Uint8Array = new Uint8Array()
+	private switchState: Uint8Array = new Uint8Array()
 
+	/** Updates from emu UI state. */
 	public updateState(s: WpcEmuWebWorkerApi.EmuStateAsic): void {
-		if (s.wpc.lampState)
-			this.currentLampState = this.normalize(s.wpc.lampState as unknown as Uint8Array<ArrayBufferLike>)
-		if (s.wpc.solenoidState) this.currentSolenoidState = s.wpc.solenoidState as unknown as Uint8Array<ArrayBufferLike>
-		if (s.wpc.generalIlluminationState)
-			this.currentGIState = s.wpc.generalIlluminationState as unknown as Uint8Array<ArrayBufferLike>
-		if (s.dmd.dmdShadedBuffer) this.dmdScreen = s.dmd.dmdShadedBuffer as unknown as Uint8Array<ArrayBufferLike>
+		if (s.wpc.lampState) this.currentLampState = this.normalize(s.wpc.lampState as unknown as Uint8Array)
+		if (s.wpc.solenoidState) this.currentSolenoidState = s.wpc.solenoidState as unknown as Uint8Array
+		if (s.wpc.generalIlluminationState) this.currentGIState = s.wpc.generalIlluminationState as unknown as Uint8Array
+		if (s.dmd.dmdShadedBuffer) this.dmdScreen = s.dmd.dmdShadedBuffer as unknown as Uint8Array
 		if (s.wpc.inputSwitchMatrixActiveColumn)
-			this.switchState = s.wpc.inputSwitchMatrixActiveColumn as unknown as Uint8Array<ArrayBufferLike>
+			this.switchState = s.wpc.inputSwitchMatrixActiveColumn as unknown as Uint8Array
 	}
 
 	public getSwitchState(o: OffsetIndex): number {
@@ -64,16 +63,12 @@ export class EmulatorState {
 		return this.dmdScreen
 	}
 
-	private normalize(v: Uint8Array<ArrayBufferLike>): Uint8Array<ArrayBufferLike> {
-		return Uint8Array.from(v, (x) => (x > 127 ? 1 : 0)) as Uint8Array<ArrayBufferLike>
+	private normalize(v: Uint8Array): Uint8Array {
+		return Uint8Array.from(v, (x) => (x > 127 ? 1 : 0))
 	}
-	private diff(
-		last: Uint8Array<ArrayBufferLike>,
-		cur: Uint8Array<ArrayBufferLike>,
-		map: (i: number) => number,
-	): number[][] {
+	private diff(last: Uint8Array, cur: Uint8Array, map: (i: number) => number): number[][] {
 		const out: number[][] = []
-		for (let i = 0; i < cur.length; i++) if (last[i] !== cur[i]) out.push([map(i), cur[i]])
+		for (let i = 0; i < cur.length; i++) if (last[i] !== cur[i]) out.push([map(i), cur[i]!])
 		return out
 	}
 }
