@@ -30,7 +30,9 @@ import {
 } from './key-code.js'
 import type { Player } from './player.js'
 
-/** Handles DirectInput-style key queue and forwards to the table. */
+const APP_KEYBOARD = 0
+
+/** DirectInput-style key queue for the table. */
 export class PinInput {
 	private readonly table: Table
 	private readonly player: Player
@@ -73,25 +75,20 @@ export class PinInput {
 		this.diq.push(DirectInputDeviceObjectData.claim(dkCode, 0x0, timestamp))
 	}
 
-	private getTail(): DirectInputDeviceObjectData | undefined {
-		return this.diq.pop()
-	}
-
-	/** Drains the input queue and fires key events. */
+	/** Drains queue and forwards key events. */
 	public processKeys(): void {
-		let input = this.getTail()
+		let input = this.diq.pop()
 		while (input) {
 			if (input.dwSequence === APP_KEYBOARD) {
-				const isSpecial =
+				const special =
 					input.dwOfs === this.rgKeys[AssignKey.FrameCount] ||
 					input.dwOfs === this.rgKeys[AssignKey.Enable3D] ||
 					input.dwOfs === this.rgKeys[AssignKey.DBGBalls]
-				if (!isSpecial) {
+				if (!special)
 					this.fireKeyEvent(input.dwData & 0x80 ? Event.GameEventsKeyDown : Event.GameEventsKeyUp, input.dwOfs)
-				}
 			}
 			DirectInputDeviceObjectData.release(input)
-			input = this.getTail()
+			input = this.diq.pop()
 		}
 	}
 
@@ -100,11 +97,8 @@ export class PinInput {
 	}
 }
 
-const APP_KEYBOARD = 0
-
 class DirectInputDeviceObjectData {
 	public static readonly POOL = new Pool(DirectInputDeviceObjectData)
-
 	public dwOfs = 0
 	public dwData = 0
 	public dwTimeStamp = 0
