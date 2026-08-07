@@ -5,7 +5,7 @@ import { Vertex3D } from '../../math/vertex3d.js'
 import { Pool } from '../../util/object-pool.js'
 import { ItemState } from '../item-state.js'
 
-/** PrimitiveState. */
+/** Primitive state. */
 export class PrimitiveState extends ItemState {
 	public static readonly POOL = new Pool(PrimitiveState)
 
