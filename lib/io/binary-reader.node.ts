@@ -15,18 +15,21 @@ export class NodeBinaryReader implements IBinaryReader {
 
 	public read(target: Uint8Array, offset: number, length: number, position: number): Promise<[number, Uint8Array]> {
 		return new Promise((resolve, reject) => {
-			read(this.fd, target as any, offset, length, position, (err: any, bytesRead: number, data: any) => {
-				if (err) return reject(err)
-				let result: Uint8Array =
-					data instanceof Uint8Array
-						? (data as Uint8Array)
-						: new Uint8Array(data.buffer, data.byteOffset, data.byteLength)
-				const cloned =
-					typeof structuredClone !== 'undefined'
-						? structuredClone(result.subarray(0, bytesRead) as any)
-						: result.slice(0, bytesRead)
-				resolve([bytesRead, cloned as Uint8Array])
-			})
+			read(
+				this.fd,
+				target as unknown as Buffer,
+				offset,
+				length,
+				position,
+				(err: NodeJS.ErrnoException | null, bytesRead: number, buffer: Uint8Array) => {
+					if (err) return reject(err)
+					const cloned =
+						typeof structuredClone !== 'undefined'
+							? structuredClone(buffer.subarray(0, bytesRead))
+							: buffer.slice(0, bytesRead)
+					resolve([bytesRead, cloned as Uint8Array])
+				},
+			)
 		})
 	}
 
