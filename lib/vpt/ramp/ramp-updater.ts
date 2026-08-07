@@ -9,8 +9,8 @@ import type { Table } from '../table/table.js'
 import type { RampMeshGenerator } from './ramp-mesh-generator.js'
 import type { RampState } from './ramp-state.js'
 
-export /** RampUpdater. */
-class RampUpdater extends ItemUpdater<RampState> {
+/** RampUpdater. */
+export class RampUpdater extends ItemUpdater<RampState> {
 	private meshGenerator: RampMeshGenerator
 
 	constructor(state: RampState, meshGenerator: RampMeshGenerator) {
