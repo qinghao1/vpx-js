@@ -10,36 +10,24 @@ import type { GateData } from './gate-data.js'
 import { GateHit } from './gate-hit.js'
 import type { GateState } from './gate-state.js'
 
-/** Gat hit generator. */
+/** Gate hit generator. @see https://github.com/vpinball/vpinball/blob/master/gate.cpp */
 export class GateHitGenerator {
-	private readonly data: GateData
+	constructor(private readonly data: GateData) {}
 
-	constructor(data: GateData) {
-		this.data = data
-	}
-
-	public generateLineSegs(events: EventProxy, height: number, tangent: Vertex2D): LineSeg[] {
-		if (this.data.twoWay) {
-			return []
-		}
+	public generateLineSegs(_events: EventProxy, height: number, tangent: Vertex2D): LineSeg[] {
+		if (this.data.twoWay) return []
 		const halfLength = this.data.length * 0.5
-		const angleMin = Math.min(this.data.angleMin, this.data.angleMax) // correct angle inversions
+		const angleMin = Math.min(this.data.angleMin, this.data.angleMax)
 		const angleMax = Math.max(this.data.angleMin, this.data.angleMax)
-
 		this.data.angleMin = angleMin
 		this.data.angleMax = angleMax
-
 		const rgv: Vertex2D[] = [
-			//oversize by the ball's radius to prevent the ball from clipping through
 			this.data.center.clone().addAndRelease(tangent.clone(true).multiplyScalar(halfLength + PHYS_SKIN)),
 			this.data.center.clone().subAndRelease(tangent.clone(true).multiplyScalar(halfLength + PHYS_SKIN)),
 		]
-		const lineSeg = new LineSeg(rgv[0], rgv[1], height, height + 2.0 * PHYS_SKIN) //!! = ball diameter
-
+		const lineSeg = new LineSeg(rgv[0]!, rgv[1]!, height, height + 2 * PHYS_SKIN)
 		lineSeg.setElasticity(this.data.elasticity)
 		lineSeg.setFriction(this.data.friction)
-		//lineSeg.setScatter(degToRad(this.data.scatter); // data doesn't contain scatter, at least not from the .vpx.
-
 		return [lineSeg]
 	}
 
@@ -52,25 +40,22 @@ export class GateHitGenerator {
 		return hit
 	}
 
-	public generateBracketHits(state: GateState, events: EventProxy, height: number, tangent: Vertex2D): HitCircle[] {
+	public generateBracketHits(_state: GateState, _events: EventProxy, height: number, tangent: Vertex2D): HitCircle[] {
+		if (!this.data.showBracket) return []
 		const halfLength = this.data.length * 0.5
-		if (this.data.showBracket) {
-			return [
-				new HitCircle(
-					this.data.center.clone().addAndRelease(tangent.clone(true).multiplyScalar(halfLength)),
-					0.01,
-					height,
-					height + this.data.height,
-				),
-				new HitCircle(
-					this.data.center.clone().subAndRelease(tangent.clone(true).multiplyScalar(halfLength)),
-					0.01,
-					height,
-					height + this.data.height,
-				),
-			]
-		} else {
-			return []
-		}
+		return [
+			new HitCircle(
+				this.data.center.clone().addAndRelease(tangent.clone(true).multiplyScalar(halfLength)),
+				0.01,
+				height,
+				height + this.data.height,
+			),
+			new HitCircle(
+				this.data.center.clone().subAndRelease(tangent.clone(true).multiplyScalar(halfLength)),
+				0.01,
+				height,
+				height + this.data.height,
+			),
+		]
 	}
 }
