@@ -8,43 +8,36 @@ import type { Table } from '../table/table.js'
 import type { LightData } from './light-data.js'
 import type { LightState } from './light-state.js'
 
-/** LightAnimation. */
+/** Light animation. @see https://github.com/vpinball/vpinball/blob/master/light.cpp */
 export class LightAnimation implements IAnimation {
-	private readonly data: LightData
-	private readonly state: LightState
-
 	public realState: number = Enums.LightStatus.LightStateOff
 	public finalState: number = Enums.LightStatus.LightStateOff
 	public lockedByLS = false
-	public timeNextBlink: number = 0
-	public intensityScale: number = 1
+	public timeNextBlink = 0
+	public intensityScale = 1
 
-	private timeMsec: number = 0
-	private timerDurationEndTime: number = 0
-	private duration: number = 0
-	private iBlinkFrame: number = 0
+	private timeMsec = 0
+	private timerDurationEndTime = 0
+	private duration = 0
+	private iBlinkFrame = 0
 
-	constructor(data: LightData, state: LightState) {
-		this.data = data
-		this.state = state
+	constructor(
+		private readonly data: LightData,
+		private readonly state: LightState,
+	) {
 		this.realState = this.data.state
 	}
 
-	public init(): void {
-		// nothing to init here
-	}
+	public init(): void {}
 
 	public setState(newVal: number, physics: PlayerPhysics) {
 		if (newVal !== this.realState) {
 			this.realState = newVal
-
 			if (this.realState === Enums.LightStatus.LightStateBlinking) {
-				this.timeNextBlink = physics.timeMsec // Start pattern right away // + m_d.m_blinkinterval;
-				this.iBlinkFrame = 0 // reset pattern
+				this.timeNextBlink = physics.timeMsec
+				this.iBlinkFrame = 0
 			}
-			if (this.duration > 0) {
-				this.duration = 0 // disable duration if a state was set this way
-			}
+			if (this.duration > 0) this.duration = 0
 		}
 	}
 
@@ -55,38 +48,26 @@ export class LightAnimation implements IAnimation {
 	}
 
 	public updateAnimation(newTimeMsec: number, table: Table): void {
-		if (!this.data.isVisible) {
-			return
-		}
-
+		if (!this.data.isVisible) return
 		const oldTimeMsec = this.timeMsec < newTimeMsec ? this.timeMsec : newTimeMsec
 		this.timeMsec = newTimeMsec
 		const diffTimeMsec = newTimeMsec - oldTimeMsec
-
 		if (this.duration > 0 && this.timerDurationEndTime < this.timeMsec) {
 			this.realState = this.finalState
 			this.duration = 0
-			if (this.realState === Enums.LightStatus.LightStateBlinking) {
-				this.restartBlinker(newTimeMsec)
-			}
+			if (this.realState === Enums.LightStatus.LightStateBlinking) this.restartBlinker(newTimeMsec)
 		}
-		if (this.realState === Enums.LightStatus.LightStateBlinking) {
-			this.updateBlinker(newTimeMsec)
-		}
-
+		if (this.realState === Enums.LightStatus.LightStateBlinking) this.updateBlinker(newTimeMsec)
 		if (this.isOn()) {
 			if (this.state.intensity < this.data.intensity * this.intensityScale) {
 				this.state.intensity += this.data.fadeSpeedUp * diffTimeMsec
-				if (this.state.intensity > this.data.intensity * this.intensityScale) {
+				if (this.state.intensity > this.data.intensity * this.intensityScale)
 					this.state.intensity = this.data.intensity * this.intensityScale
-				}
 			}
 		} else {
-			if (this.state.intensity > 0.0) {
+			if (this.state.intensity > 0) {
 				this.state.intensity -= this.data.fadeSpeedDown * diffTimeMsec
-				if (this.state.intensity < 0.0) {
-					this.state.intensity = 0.0
-				}
+				if (this.state.intensity < 0) this.state.intensity = 0
 			}
 		}
 	}
@@ -94,9 +75,7 @@ export class LightAnimation implements IAnimation {
 	private updateBlinker(timeMsec: number) {
 		if (this.timeNextBlink <= timeMsec) {
 			this.iBlinkFrame++
-			if (this.iBlinkFrame >= this.data.rgBlinkPattern.length) {
-				this.iBlinkFrame = 0
-			}
+			if (this.iBlinkFrame >= this.data.rgBlinkPattern.length) this.iBlinkFrame = 0
 			this.timeNextBlink += this.data.blinkInterval
 		}
 	}
@@ -113,9 +92,7 @@ export class LightAnimation implements IAnimation {
 	}
 
 	public updateIntensity() {
-		if (this.isOn()) {
-			this.state.intensity = this.data.intensity * this.intensityScale
-		}
+		if (this.isOn()) this.state.intensity = this.data.intensity * this.intensityScale
 	}
 
 	private isOn(): boolean {
