@@ -17,23 +17,22 @@ import {
 } from '../../physics/constants.js'
 import { elasticityWithFalloff, HARD_SCATTER } from '../../physics/functions.js'
 import { HitObject } from '../../physics/hit-object.js'
+import { FLT_MIN } from '../../util/float.js'
 import { clamp, solveQuadraticEq } from '../../util/functions.js'
 import { Vertex3D } from '../../util/math.js'
-import { FLT_MIN } from '../mesh.js'
 import type { TableData } from '../table/table-data.js'
 import type { Ball } from './ball.js'
 import type { BallData } from './ball-data.js'
 import { BallMover } from './ball-mover.js'
 import type { BallState } from './ball-state.js'
 
-/** Ball collision shape — separated from ball.cpp.
- * @see https://github.com/vpinball/vpinball/blob/master/ball.cpp */
+/** Ball collision shape — separated from {@code ball.cpp}. @see https://github.com/vpinball/vpinball/blob/master/ball.cpp */
 export class BallHit extends HitObject {
 	public readonly coll: CollisionEvent
-	public rcHitRadiusSqr: number = 0
+	public rcHitRadiusSqr = 0
 	public vpVolObjs: EventProxy[] = []
 
-	private readonly id: number // same as ball id
+	private readonly id: number
 	private readonly data: BallData
 	private readonly state: BallState
 	private readonly mover: BallMover
@@ -44,60 +43,45 @@ export class BallHit extends HitObject {
 	public invMass: number
 	public inertia: number
 	public eventPos = new Vertex3D(-1, -1, -1)
-
 	public angularVelocity = new Vertex3D()
 
-	private playfieldReflectionStrength: number
-	private reflectionEnabled: boolean
-	private forceReflection: boolean
-	public isVisible: boolean
+	private playfieldReflectionStrength = 1
+	private reflectionEnabled = true
+	private forceReflection = false
+	public isVisible = true
+	private defaultZ = 25
 
-	private defaultZ: number = 25.0
-
-	/** @see Ball::Init */
 	constructor(ball: Ball, data: BallData, state: BallState, initialVelocity: Vertex3D, tableData: TableData) {
 		super()
-
 		this.id = ball.id
 		this.data = data
 		this.state = state
 		this.tableData = tableData
 		this.vel = initialVelocity
 		this.mover = new BallMover(this.id, data, state, this)
-
-		this.invMass = 1.0 / data.mass
-		this.inertia = (2.0 / 5.0) * data.radius * data.radius * data.mass
-
+		this.invMass = 1 / data.mass
+		this.inertia = (2 / 5) * data.radius * data.radius * data.mass
 		this.state.isFrozen = false
-
-		this.playfieldReflectionStrength = 1.0
-		this.reflectionEnabled = true
-		this.forceReflection = false
-		this.isVisible = true
-
 		this.coll = new CollisionEvent(ball)
-
-		if (initialVelocity) {
-			this.calcHitBBox()
-		}
-
+		if (initialVelocity) this.calcHitBBox()
 		this.defaultZ = this.state.pos.z
 	}
 
-	public isRealBall() {
+	public isRealBall(): boolean {
 		return !!this.vpVolObjs
 	}
 
 	public calcHitBBox(): void {
 		const vl = this.vel.length() + this.data.radius + 0.05
-		this.hitBBox.left = this.state.pos.x - vl
-		this.hitBBox.right = this.state.pos.x + vl
-		this.hitBBox.top = this.state.pos.y - vl
-		this.hitBBox.bottom = this.state.pos.y + vl
-		this.hitBBox.zlow = this.state.pos.z - vl
-		this.hitBBox.zhigh = this.state.pos.z + vl
+		const p = this.state.pos
+		this.hitBBox.left = p.x - vl
+		this.hitBBox.right = p.x + vl
+		this.hitBBox.top = p.y - vl
+		this.hitBBox.bottom = p.y + vl
+		this.hitBBox.zlow = p.z - vl
+		this.hitBBox.zhigh = p.z + vl
 		this.rcHitRadiusSqr = vl * vl
-		if (this.state.pos.z === this.data.radius + this.tableData.tableHeight) this.defaultZ = this.state.pos.z
+		if (p.z === this.data.radius + this.tableData.tableHeight) this.defaultZ = p.z
 	}
 
 	public getMoverObject(): BallMover {
@@ -105,103 +89,83 @@ export class BallHit extends HitObject {
 	}
 
 	public hitTest(ball: Ball, dTime: number, coll: CollisionEvent): number {
-		const d = this.state.pos.clone(true).sub(ball.state.pos) // delta position
-		const dv = this.vel.clone(true).sub(ball.hit.vel) // delta velocity
+		const d = this.state.pos.clone(true).sub(ball.state.pos)
+		const dv = this.vel.clone(true).sub(ball.hit.vel)
 
-		let bcddSq = d.lengthSq() // square of ball center's delta distance
-		let bcdd = Math.sqrt(bcddSq) // length of delta
+		let bcddSq = d.lengthSq()
+		let bcdd = Math.sqrt(bcddSq)
 
-		if (bcdd < 1.0e-8) {
-			// two balls center-over-center embedded
-			d.z = -1.0 // patch up
-			ball.state.pos.z -= d.z // lift up
-
-			bcdd = 1.0 // patch up
-			bcddSq = 1.0 // patch up
-			dv.z = 0.1 // small speed difference
+		if (bcdd < 1e-8) {
+			d.z = -1
+			ball.state.pos.z -= d.z
+			bcdd = 1
+			bcddSq = 1
+			dv.z = 0.1
 			ball.hit.vel.z -= dv.z
 		}
 
-		const b = dv.dot(d) // inner product
-		const bnv = b / bcdd // normal speed of balls toward each other
+		const b = dv.dot(d)
+		const bnv = b / bcdd
 		Vertex3D.release(d)
 
 		if (bnv > C_LOWNORMVEL) {
-			// dot of delta velocity and delta displacement, positive if receding no collison
 			Vertex3D.release(dv)
-			return -1.0
+			return -1
 		}
 
 		const totalRadius = ball.data.radius + this.data.radius
-		const bnd = bcdd - totalRadius // distance between ball surfaces
+		const bnd = bcdd - totalRadius
 
-		let hitTime: number,
-			isContact = false
+		let hitTime: number
+		let isContact = false
 		if (bnd <= PHYS_TOUCH) {
-			// in contact?
-			if (bnd < ball.data.radius * -2.0) {
+			if (bnd < ball.data.radius * -2) {
 				Vertex3D.release(dv)
-				return -1.0 // embedded too deep?
+				return -1
 			}
-
-			if (
-				Math.abs(bnv) > C_CONTACTVEL || // >fast velocity, return zero time
-				bnd <= -PHYS_TOUCH
-			) {
-				// zero time for rigid fast bodies
-				hitTime = 0 // slow moving but embedded
-			} else {
-				hitTime = bnd / -bnv
-			}
-
+			if (Math.abs(bnv) > C_CONTACTVEL || bnd <= -PHYS_TOUCH) hitTime = 0
+			else hitTime = bnd / -bnv
 			if (Math.abs(bnv) <= C_CONTACTVEL) isContact = true
 		} else {
-			const a = dv.lengthSq() // square of differential velocity
-			if (a < 1.0e-8) {
+			const a = dv.lengthSq()
+			if (a < 1e-8) {
 				Vertex3D.release(dv)
-				return -1.0 // ball moving really slow, then wait for contact
+				return -1
 			}
-
-			const sol = solveQuadraticEq(a, 2.0 * b, bcddSq - totalRadius * totalRadius)
+			const sol = solveQuadraticEq(a, 2 * b, bcddSq - totalRadius * totalRadius)
 			if (!sol) {
 				Vertex3D.release(dv)
-				return -1.0
+				return -1
 			}
-			const [time1, time2] = sol
-			hitTime = time1 * time2 < 0 ? Math.max(time1, time2) : Math.min(time1, time2) // find smallest nonnegative solution
+			const [t1, t2] = sol
+			hitTime = t1 * t2 < 0 ? Math.max(t1, t2) : Math.min(t1, t2)
 		}
 
 		if (!isFinite(hitTime) || hitTime < 0 || hitTime > dTime) {
 			Vertex3D.release(dv)
-			return -1.0 // .. was some time previous || beyond the next physics tick
+			return -1
 		}
 
-		const hitPos = ball.state.pos.clone(true).add(dv.multiplyScalar(hitTime)) // new ball position
+		const hitPos = ball.state.pos.clone(true).add(dv.multiplyScalar(hitTime))
 		Vertex3D.release(dv)
 
-		// calc unit normal of collision
 		const hitNormal = hitPos.clone(true).sub(this.state.pos)
 		Vertex3D.release(hitPos)
 		if (Math.abs(hitNormal.x) <= FLT_MIN && Math.abs(hitNormal.y) <= FLT_MIN && Math.abs(hitNormal.z) <= FLT_MIN) {
 			Vertex3D.release(hitNormal)
-			return -1.0
+			return -1
 		}
 		coll.hitNormal.set(hitNormal).normalize()
 		Vertex3D.release(hitNormal)
 
-		coll.hitDistance = bnd // actual contact distance
-
+		coll.hitDistance = bnd
 		coll.isContact = isContact
 		if (isContact) coll.hitOrgNormalVelocity = bnv
-
 		return hitTime
 	}
 
 	public collide(coll: CollisionEvent, physics: PlayerPhysics): void {
 		const ball = coll.ball
-
-		// make sure we process each ball/ball collision only once
-		// (but if we are frozen, there won't be a second collision event, so deal with it now!)
 		if (
 			((physics.swapBallCollisionHandling && ball.id >= this.id) ||
 				(!physics.swapBallCollisionHandling && ball.id <= this.id)) &&
@@ -210,28 +174,16 @@ export class BallHit extends HitObject {
 			return
 		}
 
-		// target ball to object ball delta velocity
 		const vRel = ball.hit.vel.clone(true).sub(this.vel)
 		const vNormal = coll.hitNormal
 		let dot = vRel.dot(vNormal)
 		Vertex3D.release(vRel)
 
-		// correct displacements, mostly from low velocity, alternative to true acceleration processing
 		if (dot >= -C_LOWNORMVEL) {
-			// nearly receding ... make sure of conditions
-			if (dot > C_LOWNORMVEL) {
-				// otherwise if clearly approaching .. process the collision
-				return // is this velocity clearly receding (i.e must > a minimum)
-			}
+			if (dot > C_LOWNORMVEL) return
 			if (coll.hitDistance < -C_EMBEDDED) dot = -C_EMBEDSHOT
 			else return
 		}
-
-		// fixme script
-		// send ball/ball collision event to script function
-		// if (dot < -0.25f) {   // only collisions with at least some small true impact velocity (no contacts)
-		// 	g_pplayer->m_ptable->InvokeBallBallCollisionCallback(this, pball, -dot);
-		// }
 
 		let eDist = -C_DISP_GAIN * coll.hitDistance
 		const normalDist = vNormal.clone(true).multiplyScalar(eDist)
@@ -248,12 +200,10 @@ export class BallHit extends HitObject {
 		}
 		Vertex3D.release(normalDist)
 
-		const myInvMass = this.state.isFrozen ? 0.0 : this.invMass // frozen ball has infinite mass
-		const impulse = (-(1.0 + 0.8) * dot) / (myInvMass + ball.hit.invMass) // resitution = 0.8
+		const myInvMass = this.state.isFrozen ? 0 : this.invMass
+		const impulse = (-(1 + 0.8) * dot) / (myInvMass + ball.hit.invMass)
 
-		if (!this.state.isFrozen) {
-			this.vel.subAndRelease(vNormal.clone(true).multiplyScalar(impulse * myInvMass))
-		}
+		if (!this.state.isFrozen) this.vel.subAndRelease(vNormal.clone(true).multiplyScalar(impulse * myInvMass))
 		ball.hit.vel.addAndRelease(vNormal.clone(true).multiplyScalar(impulse * ball.hit.invMass))
 		Vertex3D.release(vNormal)
 	}
@@ -265,15 +215,9 @@ export class BallHit extends HitObject {
 		friction: number,
 		scatterAngle: number,
 	): void {
-		// speed normal to wall
 		let dot = this.vel.dot(hitNormal)
-
 		if (dot >= -C_LOWNORMVEL) {
-			// nearly receding ... make sure of conditions
-			if (dot > C_LOWNORMVEL) {
-				// otherwise if clearly approaching .. process the collision
-				return // is this velocity clearly receding (i.e must > a minimum)
-			}
+			if (dot > C_LOWNORMVEL) return
 			if (this.coll.hitDistance < -C_EMBEDDED) dot = -C_EMBEDSHOT
 			else return
 		}
@@ -284,34 +228,25 @@ export class BallHit extends HitObject {
 			this.state.pos.addAndRelease(hitNormal.clone(true).multiplyScalar(hDist))
 		}
 
-		// magnitude of the impulse which is just sufficient to keep the ball from
-		// penetrating the wall (needed for friction computations)
 		const reactionImpulse = this.data.mass * Math.abs(dot)
-
 		elasticity = elasticityWithFalloff(elasticity, elasticityFalloff, dot)
-		dot *= -(1.0 + elasticity)
-		this.vel.addAndRelease(hitNormal.clone(true).multiplyScalar(dot)) // apply collision impulse (along normal, so no torque)
+		dot *= -(1 + elasticity)
+		this.vel.addAndRelease(hitNormal.clone(true).multiplyScalar(dot))
 
-		// compute friction impulse
-		const surfP = hitNormal.clone(true).multiplyScalar(-this.data.radius) // surface contact point relative to center of mass
-		const surfVel = this.surfaceVelocity(surfP, true) // velocity at impact point
-		const tangent = surfVel.clone(true).subAndRelease(hitNormal.clone(true).multiplyScalar(surfVel.dot(hitNormal))) // calc the tangential velocity
+		const surfP = hitNormal.clone(true).multiplyScalar(-this.data.radius)
+		const surfVel = this.surfaceVelocity(surfP, true)
+		const tangent = surfVel.clone(true).subAndRelease(hitNormal.clone(true).multiplyScalar(surfVel.dot(hitNormal)))
 
 		const tangentSpSq = tangent.lengthSq()
 		if (tangentSpSq > 1e-6) {
-			tangent.divideScalar(Math.sqrt(tangentSpSq)) // normalize to get tangent direction
-			const vt = surfVel.dot(tangent) // get speed in tangential direction
-
-			// compute friction impulse
+			tangent.divideScalar(Math.sqrt(tangentSpSq))
+			const vt = surfVel.dot(tangent)
 			const cross = Vertex3D.crossProduct(surfP, tangent, true)
 			const crossInertia = cross.clone(true).divideScalar(this.inertia)
 			const kt = this.invMass + tangent.dotAndRelease(Vertex3D.crossProduct(crossInertia, surfP, true))
 			Vertex3D.release(crossInertia)
-
-			// friction impulse can't be greather than coefficient of friction times collision impulse (Coulomb friction cone)
 			const maxFric = friction * reactionImpulse
 			const jt = clamp(-vt / kt, -maxFric, maxFric)
-
 			if (isFinite(jt)) {
 				this.applySurfaceImpulseAndRelease(cross.clone(true).multiplyScalar(jt), tangent.clone(true).multiplyScalar(jt))
 			}
@@ -319,94 +254,79 @@ export class BallHit extends HitObject {
 		}
 		Vertex3D.release(surfP, surfVel, tangent)
 
-		if (scatterAngle < 0.0) {
-			scatterAngle = HARD_SCATTER
-		} // if < 0 use global value
-		scatterAngle *= this.tableData.globalDifficulty! // apply difficulty weighting
+		if (scatterAngle < 0) scatterAngle = HARD_SCATTER
+		scatterAngle *= this.tableData.globalDifficulty!
 
-		if (dot > 1.0 && scatterAngle > 1.0e-5) {
-			// no scatter at low velocity
-			let scatter = Math.random() * 2 - 1 // -1.0f..1.0f
-			scatter *= (1.0 - scatter * scatter) * 2.59808 * scatterAngle // shape quadratic distribution and scale
-			const radsin = Math.sin(scatter) // Green's transform matrix... rotate angle delta
-			const radcos = Math.cos(scatter) // rotational transform from current position to position at time t
+		if (dot > 1 && scatterAngle > 1e-5) {
+			let scatter = Math.random() * 2 - 1
+			scatter *= (1 - scatter * scatter) * 2.59808 * scatterAngle
+			const radsin = Math.sin(scatter)
+			const radcos = Math.cos(scatter)
 			const vxt = this.vel.x
 			const vyt = this.vel.y
-			this.vel.x = vxt * radcos - vyt * radsin // rotate to random scatter angle
+			this.vel.x = vxt * radcos - vyt * radsin
 			this.vel.y = vyt * radcos + vxt * radsin
 		}
 	}
 
 	public surfaceVelocity(surfP: Vertex3D, recycle = false): Vertex3D {
-		return this.vel.clone(recycle).addAndRelease(Vertex3D.crossProduct(this.angularVelocity, surfP, true)) // linear velocity plus tangential velocity due to rotation
+		return this.vel.clone(recycle).addAndRelease(Vertex3D.crossProduct(this.angularVelocity, surfP, true))
 	}
 
-	/** @deprecated */
+	/** @deprecated prefer applySurfaceImpulseAndRelease */
 	public applySurfaceImpulse(rotI: Vertex3D, impulse: Vertex3D, recycle = false): void {
 		this.vel.addAndRelease(impulse.clone(true).multiplyScalar(this.invMass))
 		this.angularMomentum.add(rotI)
-		const angularMomentum = this.angularMomentum.clone(true)
-		this.angularVelocity.set(angularMomentum.divideScalar(this.inertia))
-		if (recycle) {
-			Vertex3D.release(rotI, impulse)
-		}
-		Vertex3D.release(angularMomentum)
+		const am = this.angularMomentum.clone(true)
+		this.angularVelocity.set(am.divideScalar(this.inertia))
+		if (recycle) Vertex3D.release(rotI, impulse)
+		Vertex3D.release(am)
 	}
 
 	public applySurfaceImpulseAndRelease(rotI: Vertex3D, impulse: Vertex3D): void {
 		this.vel.addAndRelease(impulse.clone(true).multiplyScalar(this.invMass))
 		this.angularMomentum.add(rotI)
-		const angularMomentum = this.angularMomentum.clone(true)
-		this.angularVelocity.set(angularMomentum.divideScalar(this.inertia))
-		Vertex3D.release(rotI, impulse, angularMomentum)
+		const am = this.angularMomentum.clone(true)
+		this.angularVelocity.set(am.divideScalar(this.inertia))
+		Vertex3D.release(rotI, impulse, am)
 	}
 
 	public handleStaticContact(coll: CollisionEvent, friction: number, dTime: number, physics: PlayerPhysics): void {
-		const normVel = this.vel.dot(coll.hitNormal) // this should be zero, but only up to +/- C_CONTACTVEL
+		const normVel = this.vel.dot(coll.hitNormal)
+		if (normVel > C_CONTACTVEL) return
 
-		if (normVel <= C_CONTACTVEL) {
-			const fe = physics.gravity.clone(true).multiplyScalar(this.data.mass) // external forces (only gravity for now)
-			const dot = fe.dot(coll.hitNormal)
-			const normalForce = Math.max(0.0, -(dot * dTime + coll.hitOrgNormalVelocity!)) // normal force is always nonnegative
-			Vertex3D.release(fe)
+		const fe = physics.gravity.clone(true).multiplyScalar(this.data.mass)
+		const dot = fe.dot(coll.hitNormal)
+		const normalForce = Math.max(0, -(dot * dTime + coll.hitOrgNormalVelocity!))
+		Vertex3D.release(fe)
 
-			this.vel.addAndRelease(coll.hitNormal.clone(true).multiplyScalar(normalForce))
-
-			if (coll.hitDistance <= PHYS_TOUCH)
-				this.vel.addAndRelease(
-					coll.hitNormal.clone(true).multiplyScalar(Math.max(Math.min(C_EMBEDVELLIMIT, -coll.hitDistance), PHYS_TOUCH)),
-				)
-
-			this.applyFriction(coll.hitNormal, dTime, friction, physics)
+		this.vel.addAndRelease(coll.hitNormal.clone(true).multiplyScalar(normalForce))
+		if (coll.hitDistance <= PHYS_TOUCH) {
+			this.vel.addAndRelease(
+				coll.hitNormal.clone(true).multiplyScalar(Math.max(Math.min(C_EMBEDVELLIMIT, -coll.hitDistance), PHYS_TOUCH)),
+			)
 		}
+		this.applyFriction(coll.hitNormal, dTime, friction, physics)
 	}
 
 	public applyFriction(hitNormal: Vertex3D, dtime: number, fricCoeff: number, physics: PlayerPhysics): void {
-		const surfP = hitNormal.clone(true).multiplyScalar(-this.data.radius) // surface contact point relative to center of mass
+		const surfP = hitNormal.clone(true).multiplyScalar(-this.data.radius)
 		const surfVel = this.surfaceVelocity(surfP, true)
-		const slip = surfVel.clone(true).subAndRelease(hitNormal.clone(true).multiplyScalar(surfVel.dot(hitNormal))) // calc the tangential slip velocity
+		const slip = surfVel.clone(true).subAndRelease(hitNormal.clone(true).multiplyScalar(surfVel.dot(hitNormal)))
 
 		const maxFric = fricCoeff * this.data.mass * -physics.gravity.dot(hitNormal)
-
 		const slipspeed = slip.length()
 		let slipDir: Vertex3D
 		let numer: number
 
-		//#ifdef C_BALL_SPIN_HACK
 		const normVel = this.vel.dot(hitNormal)
 		if (normVel <= 0.025 || slipspeed < C_PRECISION) {
-			// check for <=0.025 originated from ball<->rubber collisions pushing the ball upwards, but this is still not enough, some could even use <=0.2
-			// slip speed zero - static friction case
-
 			const surfAcc = this.surfaceAcceleration(surfP, physics, true)
-
 			const slipAcc = surfAcc.clone(true).subAndRelease(hitNormal.clone(true).multiplyScalar(surfAcc.dot(hitNormal)))
-
 			if (slipAcc.lengthSq() < 1e-6) {
 				Vertex3D.release(surfVel, surfP, slip, slipAcc, surfAcc)
 				return
 			}
-
 			slipDir = slipAcc.clone(true).normalize()
 			numer = -slipDir.dot(surfAcc)
 			Vertex3D.release(surfAcc, slipAcc)
@@ -430,25 +350,24 @@ export class BallHit extends HitObject {
 	}
 
 	public surfaceAcceleration(surfP: Vertex3D, physics: PlayerPhysics, recycle = false): Vertex3D {
-		// if we had any external torque, we would have to add "(deriv. of ang.vel.) x surfP" here
 		const p2 = Vertex3D.crossProduct(this.angularVelocity, surfP, true)
-		const acceleration = physics.gravity
+		const acc = physics.gravity
 			.clone(recycle)
-			.multiplyScalar(this.invMass) // linear acceleration
-			.addAndRelease(Vertex3D.crossProduct(this.angularVelocity, p2, true)) // centripetal acceleration
+			.multiplyScalar(this.invMass)
+			.addAndRelease(Vertex3D.crossProduct(this.angularVelocity, p2, true))
 		Vertex3D.release(p2)
-		return acceleration
+		return acc
 	}
 
-	public setMass(mass: number) {
+	public setMass(mass: number): void {
 		this.data.mass = mass
-		this.invMass = 1.0 / mass
-		this.inertia = (2.0 / 5.0) * this.data.radius * this.data.radius * this.data.mass
+		this.invMass = 1 / mass
+		this.inertia = (2 / 5) * this.data.radius * this.data.radius * this.data.mass
 	}
 
-	public setRadius(radius: number) {
+	public setRadius(radius: number): void {
 		this.data.radius = radius
-		this.inertia = (2.0 / 5.0) * this.data.radius * this.data.radius * this.data.mass
+		this.inertia = (2 / 5) * this.data.radius * this.data.radius * this.data.mass
 		this.calcHitBBox()
 	}
 }
