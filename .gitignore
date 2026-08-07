@@ -15,3 +15,5 @@ walking_dead.vpx
 *.bak
 
 .agents/
+.github/
+demo-browser/
