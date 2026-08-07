@@ -37,17 +37,16 @@ declare function play(
 /** Transpiles VBS to JS and executes.
  * @see https://github.com/vpinball/vpinball/blob/master/codeview.cpp */
 export class Transpiler {
-	private readonly table: Table
-	private readonly player: Player
 	private readonly itemApis: Record<string, unknown>
 	private readonly enumApis: EnumsApi = Enums
 	private readonly globalApi: GlobalApi
 	private readonly stdlib = new Stdlib()
 	private readonly grammar = new Grammar()
 
-	constructor(table: Table, player: Player) {
-		this.table = table
-		this.player = player
+	constructor(
+		private readonly table: Table,
+		private readonly player: Player,
+	) {
 		this.itemApis = table.getElementApis()
 		this.globalApi = new GlobalApi(table, player)
 	}
@@ -74,8 +73,8 @@ export class Transpiler {
 		ast = new ClassTransformer(ast).transform()
 		ast = new WrapTransformer(ast).transform(globalFunction, globalObject)
 		logger().info('[Transpiler] Transformed in %sms', Date.now() - t1)
-		const t2 = Date.now(),
-			js = generate(ast)
+		const t2 = Date.now()
+		const js = generate(ast)
 		logger().info('[Transpiler] Generated in %sms (total %sms)', Date.now() - t2, Date.now() - t0)
 		logger().debug(js)
 		return js
