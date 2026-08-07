@@ -13,8 +13,8 @@ import type { Table } from '../table/table.js'
 import type { TriggerAnimation } from './trigger-animation.js'
 import type { TriggerData } from './trigger-data.js'
 
-export /** TriggerHitCircle. */
-class TriggerHitCircle extends HitCircle {
+/** TriggerHitCircle. */
+export class TriggerHitCircle extends HitCircle {
 	private readonly animation: TriggerAnimation
 
 	constructor(data: TriggerData, animation: TriggerAnimation, events: EventProxy, table: Table) {
