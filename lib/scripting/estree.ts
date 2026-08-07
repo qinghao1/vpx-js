@@ -58,6 +58,7 @@ export function program(data: Statement[]): Program {
 	}
 }
 
+/** identifier. */
 export function identifier(name: string, node?: BaseNode): Identifier {
 	return addScope(
 		{
@@ -68,6 +69,7 @@ export function identifier(name: string, node?: BaseNode): Identifier {
 	)
 }
 
+/** literal. */
 export function literal(value: string | boolean | number | null, raw?: string | undefined, node?: BaseNode): Literal {
 	return addScope(
 		{
@@ -87,6 +89,7 @@ export function classBody(body: MethodDefinition[]): ClassBody {
 	}
 }
 
+/** variableDeclarator. */
 export function variableDeclarator(id: Identifier, init: Expression | null): VariableDeclarator {
 	return {
 		type: 'VariableDeclarator',
@@ -95,6 +98,7 @@ export function variableDeclarator(id: Identifier, init: Expression | null): Var
 	}
 }
 
+/** classDeclaration. */
 export function classDeclaration(id: Identifier, body: ClassBody): ClassDeclaration {
 	return {
 		type: 'ClassDeclaration',
@@ -114,6 +118,7 @@ export function classExpression(body: ClassBody, node?: BaseNode): ClassExpressi
 	)
 }
 
+/** functionDeclaration. */
 export function functionDeclaration(id: Identifier, params: Identifier[], body: BlockStatement): FunctionDeclaration {
 	return {
 		type: 'FunctionDeclaration',
@@ -136,6 +141,7 @@ export function variableDeclaration(
 	}
 }
 
+/** methodDefinition. */
 export function methodDefinition(
 	key: Expression,
 	kind: 'constructor' | 'method' | 'get' | 'set',
@@ -151,6 +157,7 @@ export function methodDefinition(
 	}
 }
 
+/** arrayExpression. */
 export function arrayExpression(elements: Expression[] | SpreadElement[]): ArrayExpression {
 	return {
 		type: 'ArrayExpression',
@@ -158,6 +165,7 @@ export function arrayExpression(elements: Expression[] | SpreadElement[]): Array
 	}
 }
 
+/** arrowFunctionExpression. */
 export function arrowFunctionExpression(
 	expression: boolean,
 	body: BlockStatement | Expression,
@@ -171,6 +179,7 @@ export function arrowFunctionExpression(
 	}
 }
 
+/** assignmentExpression. */
 export function assignmentExpression(
 	left: Pattern | MemberExpression,
 	operator: AssignmentOperator,
@@ -188,6 +197,7 @@ export function assignmentExpression(
 	)
 }
 
+/** binaryExpression. */
 export function binaryExpression(operator: BinaryOperator, left: Expression, right: Expression): BinaryExpression {
 	return {
 		type: 'BinaryExpression',
@@ -197,6 +207,7 @@ export function binaryExpression(operator: BinaryOperator, left: Expression, rig
 	}
 }
 
+/** callExpression. */
 export function callExpression(callee: Expression, args: Expression[] | SpreadElement[]): CallExpression {
 	return {
 		type: 'CallExpression',
@@ -206,6 +217,7 @@ export function callExpression(callee: Expression, args: Expression[] | SpreadEl
 	} as CallExpression
 }
 
+/** conditionalExpression. */
 export function conditionalExpression(
 	test: Expression,
 	consequent: Expression,
@@ -219,6 +231,7 @@ export function conditionalExpression(
 	}
 }
 
+/** functionExpression. */
 export function functionExpression(body: BlockStatement, params: Pattern[], node?: BaseNode): FunctionExpression {
 	return addScope(
 		{
@@ -230,6 +243,7 @@ export function functionExpression(body: BlockStatement, params: Pattern[], node
 	)
 }
 
+/** logicalExpression. */
 export function logicalExpression(operator: LogicalOperator, left: Expression, right: Expression): LogicalExpression {
 	return {
 		type: 'LogicalExpression',
@@ -239,6 +253,7 @@ export function logicalExpression(operator: LogicalOperator, left: Expression, r
 	}
 }
 
+/** memberExpression. */
 export function memberExpression(
 	object: Expression | Super,
 	prop: Expression,
@@ -257,6 +272,7 @@ export function memberExpression(
 	) as MemberExpression
 }
 
+/** objectExpression. */
 export function objectExpression(properties: Property[]): ObjectExpression {
 	return {
 		type: 'ObjectExpression',
@@ -264,6 +280,7 @@ export function objectExpression(properties: Property[]): ObjectExpression {
 	}
 }
 
+/** property. */
 export function property(kind: 'init' | 'get' | 'set', key: Expression, value: Expression | Pattern): Property {
 	return {
 		type: 'Property',
@@ -276,6 +293,7 @@ export function property(kind: 'init' | 'get' | 'set', key: Expression, value: E
 	}
 }
 
+/** newExpression. */
 export function newExpression(callee: Expression | Super, args: Expression[] | SpreadElement[]): NewExpression {
 	return {
 		type: 'NewExpression',
@@ -284,12 +302,14 @@ export function newExpression(callee: Expression | Super, args: Expression[] | S
 	}
 }
 
+/** thisExpression. */
 export function thisExpression(): ThisExpression {
 	return {
 		type: 'ThisExpression',
 	}
 }
 
+/** unaryExpression. */
 export function unaryExpression(operator: UnaryOperator, argument: Expression): UnaryExpression {
 	return {
 		type: 'UnaryExpression',
@@ -299,6 +319,7 @@ export function unaryExpression(operator: UnaryOperator, argument: Expression): 
 	}
 }
 
+/** blockStatement. */
 export function blockStatement(body: Statement[]): BlockStatement {
 	return {
 		type: 'BlockStatement',
@@ -306,12 +327,14 @@ export function blockStatement(body: Statement[]): BlockStatement {
 	}
 }
 
+/** breakStatement. */
 export function breakStatement(): BreakStatement {
 	return {
 		type: 'BreakStatement',
 	}
 }
 
+/** doWhileStatement. */
 export function doWhileStatement(body: Statement, test: Expression): DoWhileStatement {
 	return {
 		type: 'DoWhileStatement',
@@ -320,6 +343,7 @@ export function doWhileStatement(body: Statement, test: Expression): DoWhileStat
 	}
 }
 
+/** expressionStatement. */
 export function expressionStatement(expression: Expression, node?: BaseNode): ExpressionStatement {
 	return addScope(
 		{
@@ -330,6 +354,7 @@ export function expressionStatement(expression: Expression, node?: BaseNode): Ex
 	)
 }
 
+/** forOfStatement. */
 export function forOfStatement(
 	left: VariableDeclaration | Pattern,
 	right: Expression,
@@ -344,6 +369,7 @@ export function forOfStatement(
 	} as ForOfStatement
 }
 
+/** forStatement. */
 export function forStatement(
 	init: Expression | null,
 	test: Expression | null,
@@ -359,6 +385,7 @@ export function forStatement(
 	}
 }
 
+/** ifStatement. */
 export function ifStatement(test: Expression, consequent: Statement, alternate: Statement | null): IfStatement {
 	return {
 		type: 'IfStatement',
@@ -368,6 +395,7 @@ export function ifStatement(test: Expression, consequent: Statement, alternate: 
 	}
 }
 
+/** returnStatement. */
 export function returnStatement(argument: Expression | null): ReturnStatement {
 	return {
 		type: 'ReturnStatement',
@@ -375,6 +403,7 @@ export function returnStatement(argument: Expression | null): ReturnStatement {
 	}
 }
 
+/** switchStatement. */
 export function switchStatement(discriminant: Expression, cases: SwitchCase[]): SwitchStatement {
 	return {
 		type: 'SwitchStatement',
@@ -383,6 +412,7 @@ export function switchStatement(discriminant: Expression, cases: SwitchCase[]): 
 	}
 }
 
+/** switchCase. */
 export function switchCase(test: Expression | null, consequent: Statement[]): SwitchCase {
 	return {
 		type: 'SwitchCase',
@@ -391,6 +421,7 @@ export function switchCase(test: Expression | null, consequent: Statement[]): Sw
 	}
 }
 
+/** whileStatement. */
 export function whileStatement(test: Expression, body: Statement): WhileStatement {
 	return {
 		type: 'WhileStatement',
