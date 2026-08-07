@@ -4,6 +4,7 @@
 import { BiffParser } from '../../io/biff-parser.js'
 import type { Storage } from '../../io/ole-doc.js'
 import { Vertex2D } from '../../util/math.js'
+import { handleBiffTag } from '../biff-helper.js'
 import { ItemData } from '../item-data.js'
 
 /** LightSeq data.
@@ -25,21 +26,13 @@ export class LightSeqData extends ItemData {
 		super(itemName)
 	}
 
-	private async fromTag(buffer: Uint8Array, tag: string, offset: number, len: number): Promise<number> {
+	private async fromTag(buffer: Uint8Array, tag: string, _offset: number, len: number): Promise<number> {
 		if (tag === 'VCEN') {
 			this.v = Vertex2D.get(buffer)
 			return 0
 		}
 		if (tag === 'COLC') {
 			this.collection = this.getWideString(buffer, len)
-			return 0
-		}
-		if (tag === 'UPTM') {
-			this.updateInterval = this.getInt(buffer)
-			return 0
-		}
-		if (tag === 'BGLS') {
-			this.backglass = this.getBool(buffer)
 			return 0
 		}
 		if (tag === 'CTRX') {
@@ -50,6 +43,13 @@ export class LightSeqData extends ItemData {
 			this.center.y = this.getFloat(buffer)
 			return 0
 		}
+		if (
+			handleBiffTag(this as unknown as Record<string, unknown>, this, tag, buffer, len, {
+				int: { UPTM: 'updateInterval' },
+				bool: { BGLS: 'backglass' },
+			})
+		)
+			return 0
 		this.getCommonBlock(buffer, tag, len)
 		return 0
 	}
