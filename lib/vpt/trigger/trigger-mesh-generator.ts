@@ -33,7 +33,7 @@ const triggerSimpleMesh = Mesh.fromJson(triggerSimpleMeshJson)
 const triggerStarMesh = Mesh.fromJson(triggerStarMeshJson)
 const triggerDWireMesh = Mesh.fromJson(triggerDWireMeshJson)
 
-/** TriggerMeshGenerator. */
+/** Generates trigger meshes. */
 export class TriggerMeshGenerator {
 	private readonly data: TriggerData
 
