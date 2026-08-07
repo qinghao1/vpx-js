@@ -7,7 +7,8 @@ import { Vertex2D } from '../../math/vertex2d.js'
 import { Enums } from '../enums.js'
 import { ItemData } from '../item-data.js'
 
-export class DecalData extends ItemData {
+export /** Decal data. */
+class DecalData extends ItemData {
 	public center!: Vertex2D
 	public width: number = 100.0
 	public height: number = 100.0
