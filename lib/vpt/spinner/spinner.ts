@@ -23,11 +23,7 @@ import { SpinnerMeshGenerator } from './spinner-mesh-generator.js'
 import { SpinnerState } from './spinner-state.js'
 import { SpinnerUpdater } from './spinner-updater.js'
 
-/**
- * VPinball's spinners.
- *
- * @see https://github.com/vpinball/vpinball/blob/master/spinner.cpp
- */
+/** Spinner item. @see https://github.com/vpinball/vpinball/blob/master/spinner.cpp */
 export class Spinner
 	extends Item<SpinnerData>
 	implements IRenderable<SpinnerState>, IPlayable, IMovable, IHittable, IScriptable<SpinnerApi>
