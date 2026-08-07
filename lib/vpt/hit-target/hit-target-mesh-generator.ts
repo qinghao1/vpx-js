@@ -18,6 +18,7 @@
  */
 
 import { readFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import { resolve } from 'node:path'
 import { degToRad, f4 } from '../../math/float'
 import { Matrix3D } from '../../math/matrix3d'
@@ -27,6 +28,8 @@ import { Mesh } from '../mesh'
 import type { Table } from '../table/table'
 import { HitTarget } from './hit-target'
 import type { HitTargetData } from './hit-target-data'
+
+const require = createRequire(import.meta.url)
 
 const hitTargetT2MeshJson = JSON.parse(
 	readFileSync(resolve(process.cwd(), 'res/meshes/drop-target-t2-mesh.json'), 'utf-8'),

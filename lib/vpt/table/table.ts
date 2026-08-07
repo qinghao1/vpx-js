@@ -189,7 +189,18 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 		if (!this.data) {
 			throw new Error('Table data is not loaded. Load table with tableDataOnly = false.')
 		}
-		return this.data.materials.find((m) => m.name === name)
+		const exact = this.data.materials.find((m) => m.name === name)
+		if (exact) return exact
+		const lower = name.toLowerCase()
+		const byLower = this.data.materials.find((m) => m.name.toLowerCase() === lower)
+		if (byLower) return byLower
+		const withUnderscore = this.data.materials.find((m) => m.name.toLowerCase() === '_' + lower)
+		if (withUnderscore) return withUnderscore
+		const withoutUnderscore = lower.startsWith('_')
+			? this.data.materials.find((m) => m.name.toLowerCase() === lower.slice(1))
+			: undefined
+		if (withoutUnderscore) return withoutUnderscore
+		return undefined
 	}
 
 	public getApi(): TableApi {

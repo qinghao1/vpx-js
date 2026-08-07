@@ -65,7 +65,7 @@ export class RubberData extends ItemData implements IPhysicalData {
 		})
 	}
 
-	private async fromTag(buffer: Buffer, tag: string, offset: number, len: number): Promise<number> {
+	private async fromTag(buffer: Uint8Array, tag: string, offset: number, len: number): Promise<number> {
 		switch (tag) {
 			case 'HTTP':
 				this.height = this.getFloat(buffer)

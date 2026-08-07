@@ -83,7 +83,7 @@ export class RampData extends ItemData implements IPhysicalData {
 		super(itemName)
 	}
 
-	private async fromTag(buffer: Buffer, tag: string, offset: number, len: number): Promise<number> {
+	private async fromTag(buffer: Uint8Array, tag: string, offset: number, len: number): Promise<number> {
 		switch (tag) {
 			case 'HTBT':
 				this.heightBottom = this.getFloat(buffer)

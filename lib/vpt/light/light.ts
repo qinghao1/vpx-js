@@ -59,7 +59,7 @@ export class Light extends Item<LightData> implements IRenderable<LightState>, I
 		return this.data.szOffImage
 	}
 
-	public readonly data: LightData
+	public declare readonly data: LightData
 	private readonly state: LightState
 	private readonly meshGenerator: LightMeshGenerator
 	private readonly updater: LightUpdater

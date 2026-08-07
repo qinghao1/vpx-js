@@ -18,12 +18,35 @@
  */
 
 import { inflate } from 'zlib'
-import { f4 } from '../math/float'
-import type { ReadResult } from './ole-doc'
+import { f4 } from '../math/float.js'
+import type { ReadResult } from './ole-doc.js'
 
-/**
- * A class that comes with set of utilities for parsing the BIFF structure.
- */
+const textDecoder = new TextDecoder('utf-8')
+
+function getDataView(buf: Uint8Array): DataView {
+	return new DataView(buf.buffer, buf.byteOffset, buf.byteLength)
+}
+
+function readInt32LE(buf: Uint8Array, offset: number): number {
+	return getDataView(buf).getInt32(offset, true)
+}
+
+function readUInt16LE(buf: Uint8Array, offset: number): number {
+	return getDataView(buf).getUint16(offset, true)
+}
+
+function readUInt32LE(buf: Uint8Array, offset: number): number {
+	return getDataView(buf).getUint32(offset, true)
+}
+
+function readFloatLE(buf: Uint8Array, offset: number): number {
+	return getDataView(buf).getFloat32(offset, true)
+}
+
+function decodeUtf8(buf: Uint8Array): string {
+	return textDecoder.decode(buf)
+}
+
 export class BiffParser {
 	public static stream(
 		callback: OnBiffResult,
@@ -34,15 +57,14 @@ export class BiffParser {
 		return async (result: ReadResult): Promise<number | null> => {
 			const data = result.data
 			if (data.length < 4) {
-				// todo why does this happen with example table?
 				return null
 			}
-			let len = data.readInt32LE(0)
+			let len = readInt32LE(data, 0)
 			if (len > data.length - 4) {
 				return -(len + 4)
 			}
-			let dataResult: Buffer
-			const tag = data.slice(4, 8).toString()
+			let dataResult: Uint8Array
+			const tag = decodeUtf8(data.subarray(4, 8))
 			let relStartPos = 8
 			let relEndPos = -4
 
@@ -53,16 +75,15 @@ export class BiffParser {
 			}
 
 			if (opts.streamedTags && opts.streamedTags.includes(tag)) {
-				len += data.readInt32LE(8) + 4
-				dataResult = Buffer.alloc(0)
+				len += readInt32LE(data, 8) + 4
+				dataResult = new Uint8Array(0)
 				relStartPos += 4
 				relEndPos -= 4
 			} else {
-				dataResult = data.slice(8, 8 + len - 4)
+				dataResult = data.subarray(8, 8 + len - 4)
 			}
 
 			if (!tag || tag === 'ENDB' || tag === 'FONT') {
-				// FIXME font screws up parsing currently.
 				if (nested) {
 					nested.onEnd(nestedItem)
 					nestedItem = null
@@ -77,27 +98,35 @@ export class BiffParser {
 		}
 	}
 
-	public static async decompress(buffer: Buffer): Promise<Buffer> {
+	public static async decompress(buffer: Uint8Array): Promise<Uint8Array> {
 		return new Promise((resolve, reject) => {
-			inflate(buffer, (err, result) => {
+			// zlib expects Buffer, convert via Uint8Array -> Buffer for Node, but keep Uint8Array in browser fallback
+			const input = buffer
+			inflate(input as any, (err: any, result: any) => {
 				/* istanbul ignore if */
 				if (err) {
 					return reject(err)
 				}
-				resolve(result)
+				if (result instanceof Uint8Array) {
+					resolve(result)
+				} else {
+					// result is Buffer
+					resolve(new Uint8Array(result.buffer, result.byteOffset, result.byteLength))
+				}
 			})
 		})
 	}
 
-	public static parseNullTerminatedString(buffer: Buffer, maxLength: number = 0) {
+	public static parseNullTerminatedString(buffer: Uint8Array, maxLength: number = 0): string {
+		let slice = buffer
 		if (maxLength) {
-			buffer = buffer.slice(0, maxLength)
+			slice = buffer.subarray(0, maxLength)
 		}
-		const nullBuffer = Buffer.from([0x0])
-		if (buffer.indexOf(nullBuffer) >= 0) {
-			return buffer.slice(0, buffer.indexOf(nullBuffer)).toString('utf8')
+		const nullIdx = slice.indexOf(0x00)
+		if (nullIdx >= 0) {
+			slice = slice.subarray(0, nullIdx)
 		}
-		return buffer.toString('utf8')
+		return decodeUtf8(slice)
 	}
 
 	public static bgrToRgb(bgr: number) {
@@ -109,8 +138,8 @@ export class BiffParser {
 		return r + g + b
 	}
 
-	protected getString(buffer: Buffer, len: number, dropIfNotAscii = false): string {
-		const str = buffer.slice(4, len).toString('utf8')
+	protected getString(buffer: Uint8Array, len: number, dropIfNotAscii = false): string {
+		const str = decodeUtf8(buffer.subarray(4, len))
 		if (!dropIfNotAscii || this.isAscii(str)) {
 			return str
 		}
@@ -118,42 +147,37 @@ export class BiffParser {
 		return ''
 	}
 
-	protected getWideString(buffer: Buffer, len: number): string {
-		const chars: number[] = []
-		buffer.slice(4, len).forEach((v, i) => {
-			if (i % 2 === 0) {
-				chars.push(v)
-			}
-		})
-		return Buffer.from(chars).toString('utf8')
+	protected getWideString(buffer: Uint8Array, len: number): string {
+		const slice = buffer.subarray(4, len)
+		return new TextDecoder('utf-16le').decode(slice)
 	}
 
-	protected getInt(buffer: Buffer): number {
-		return buffer.readInt32LE(0)
+	protected getInt(buffer: Uint8Array): number {
+		return getDataView(buffer).getInt32(0, true)
 	}
 
-	protected getFloat(buffer: Buffer): number {
-		return f4(buffer.readFloatLE(0))
+	protected getFloat(buffer: Uint8Array): number {
+		return f4(getDataView(buffer).getFloat32(0, true))
 	}
 
-	protected getBool(buffer: Buffer): boolean {
-		return buffer.readInt32LE(0) > 0
+	protected getBool(buffer: Uint8Array): boolean {
+		return getDataView(buffer).getInt32(0, true) > 0
 	}
 
-	protected getUnsignedInt2s(buffer: Buffer, num: number): number[] {
-		const intSize = 2
+	protected getUnsignedInt2s(buffer: Uint8Array, num: number): number[] {
+		const view = getDataView(buffer)
 		const ints: number[] = []
 		for (let i = 0; i < num; i++) {
-			ints.push(buffer.readUInt16LE(i * intSize))
+			ints.push(view.getUint16(i * 2, true))
 		}
 		return ints
 	}
 
-	protected getUnsignedInt4s(buffer: Buffer, num: number): number[] {
-		const intSize = 4
+	protected getUnsignedInt4s(buffer: Uint8Array, num: number): number[] {
+		const view = getDataView(buffer)
 		const ints: number[] = []
 		for (let i = 0; i < num; i++) {
-			ints.push(buffer.readUInt32LE(i * intSize))
+			ints.push(view.getUint32(i * 4, true))
 		}
 		return ints
 	}
@@ -163,39 +187,14 @@ export class BiffParser {
 	}
 }
 
-/**
- * A function executed when a BIFF tag is read from the stream.
- */
-export type OnBiffResult = (buffer: Buffer, tag: string, offset: number, len: number) => Promise<number>
+export type OnBiffResult = (buffer: Uint8Array, tag: string, offset: number, len: number) => Promise<number>
 
-/**
- * Callbacks to provide to a nested BIFF stream.
- */
 export interface OnBiffResultStream<T> {
-	/**
-	 * Run before the first tag is sent. What's returned is passed to [[onTag]]
-	 * and [[onEnd]].
-	 *
-	 * This is used to instantiate the nested object that is going to be read.
-	 */
 	onStart: () => T
-
-	/**
-	 * A tag was read.
-	 * @param item The object created in [[onStart]].
-	 */
 	onTag: (item: T) => OnBiffResult
-
-	/**
-	 * The nested tag has finished reading (and ENDV tag came along).
-	 * @param item
-	 */
 	onEnd: (item: T) => void
 }
 
-/**
- * Options to provide to a BIFF stream.
- */
 export interface BiffStreamOptions {
 	streamedTags?: string[]
 	nestedTags?: { [key: string]: OnBiffResultStream<any> }

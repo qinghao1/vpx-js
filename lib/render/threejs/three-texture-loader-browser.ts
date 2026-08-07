@@ -17,6 +17,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
+import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js'
 import {
 	DataTexture,
 	RGBAFormat,
@@ -26,7 +27,7 @@ import {
 	UnsignedByteType,
 } from '../../refs.browser.js'
 import type { ITextureLoader } from '../irender-api'
-import { RGBELoader } from './vendor/RGBELoader'
+import { EXRLoader } from './vendor/EXRLoader'
 
 const imageMap: { [key: string]: string } = {
 	bumperbase: new URL('../../../res/maps/bumperbase.png', import.meta.url).href,
@@ -59,12 +60,23 @@ export class ThreeTextureLoaderBrowser implements ITextureLoader<ThreeTexture> {
 	}
 
 	public async loadTexture(name: string, ext: string, data: Uint8Array): Promise<ThreeTexture> {
+		const MAX_TEXTURE_SIZE = 50 * 1024 * 1024
+		if (data.length > MAX_TEXTURE_SIZE) {
+			throw new Error(
+				`Texture "${name}" too large (${(data.length / 1024 / 1024).toFixed(1)} MB > ${MAX_TEXTURE_SIZE / 1024 / 1024} MB), skipping to avoid OOM`,
+			)
+		}
 		const mimeType = getMimeType(data, ext)
 		if (!mimeType) {
 			throw new Error('Unknown image format for texture "' + name + '".')
 		}
-		const objectUrl = URL.createObjectURL(new Blob([data.buffer as any], { type: mimeType as any }))
-		const texture = await load(mimeType, objectUrl)
+		const objectUrl = URL.createObjectURL(
+			new Blob([data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as any], {
+				type: mimeType as any,
+			}),
+		)
+		// revoke after load to avoid leaks handled in load()
+		const texture = await load(mimeType, objectUrl, ext)
 		texture.name = `texture:${name}`
 		texture.colorSpace = SRGBColorSpace
 		texture.needsUpdate = true
@@ -74,8 +86,11 @@ export class ThreeTextureLoaderBrowser implements ITextureLoader<ThreeTexture> {
 }
 
 function getMimeType(data: Uint8Array, ext: string): string | null {
-	const header = new DataView(data.buffer as ArrayBuffer, data.byteOffset, data.byteLength).getUint16(0)
-	switch (header) {
+	if (data.length < 4) return null
+	const view = new DataView(data.buffer as ArrayBuffer, data.byteOffset, data.byteLength)
+	const header16 = view.getUint16(0, false)
+	const header32 = data.length >= 4 ? view.getUint32(0, false) : 0
+	switch (header16) {
 		case 0x8950:
 			return 'image/png'
 		case 0xffd8:
@@ -84,20 +99,86 @@ function getMimeType(data: Uint8Array, ext: string): string | null {
 			return 'image/gif'
 		case 0x424d:
 			return 'image/bmp'
-		default:
-			if (ext === '.hdr' || ext === '.exr') return 'application/octet-stream'
-			if (ext === '.png') return 'image/png'
-			if (ext === '.jpg' || ext === '.jpeg') return 'image/jpeg'
-			return null
 	}
+	if (header32 === 0x89504e47) return 'image/png'
+	if (
+		data.length >= 12 &&
+		data[0] === 0x52 &&
+		data[1] === 0x49 &&
+		data[2] === 0x46 &&
+		data[3] === 0x46 &&
+		data[8] === 0x57 &&
+		data[9] === 0x45 &&
+		data[10] === 0x42 &&
+		data[11] === 0x50
+	) {
+		return 'image/webp'
+	}
+	if (data[0] === 0x23 && data[1] === 0x3f) return 'image/hdr'
+	if (data[0] === 0x76 && data[1] === 0x2f) return 'image/exr'
+	if (ext === '.hdr') return 'image/hdr'
+	if (ext === '.exr') return 'image/exr'
+	if (ext === '.png') return 'image/png'
+	if (ext === '.jpg' || ext === '.jpeg') return 'image/jpeg'
+	if (ext === '.bmp') return 'image/bmp'
+	if (ext === '.gif') return 'image/gif'
+	if (ext === '.webp') return 'image/webp'
+	if (data.length > 100) {
+		const head = String.fromCharCode(...data.slice(0, 10))
+		if (head.includes('JFIF') || head.includes('Exif')) return 'image/jpeg'
+		if (head.includes('PNG')) return 'image/png'
+		if (head.includes('WEBP')) return 'image/webp'
+	}
+	return 'image/png'
 }
 
-function load(mimeType: string, url: string): Promise<ThreeTexture> {
+function load(mimeType: string, url: string, ext?: string): Promise<ThreeTexture> {
 	return new Promise((resolve, reject) => {
-		if (mimeType === 'image/png' || mimeType === 'image/jpeg' || mimeType === 'image/bmp' || mimeType === 'image/gif') {
-			new TextureLoader().load(url, resolve as any, undefined, reject)
+		if (
+			mimeType === 'image/png' ||
+			mimeType === 'image/jpeg' ||
+			mimeType === 'image/bmp' ||
+			mimeType === 'image/gif' ||
+			mimeType === 'image/webp'
+		) {
+			new TextureLoader().load(
+				url,
+				(texture) => {
+					URL.revokeObjectURL(url)
+					resolve(texture as any)
+				},
+				undefined,
+				(err) => {
+					URL.revokeObjectURL(url)
+					reject(err)
+				},
+			)
+		} else if (mimeType === 'image/exr' || ext === '.exr') {
+			new EXRLoader().load(
+				url,
+				(texture) => {
+					URL.revokeObjectURL(url)
+					resolve(texture as any)
+				},
+				undefined,
+				(err) => {
+					URL.revokeObjectURL(url)
+					reject(err)
+				},
+			)
 		} else {
-			new RGBELoader().load(url, resolve as any, undefined, reject)
+			new HDRLoader().load(
+				url,
+				(texture) => {
+					URL.revokeObjectURL(url)
+					resolve(texture as any)
+				},
+				undefined,
+				(err) => {
+					URL.revokeObjectURL(url)
+					reject(err)
+				},
+			)
 		}
 	})
 }

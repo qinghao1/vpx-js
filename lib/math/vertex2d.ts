@@ -50,10 +50,10 @@ export class Vertex2D implements Vertex {
 		this.y = y || 0
 	}
 
-	public static get(buffer: Buffer) {
+	public static get(buffer: Uint8Array) {
 		const v2 = new Vertex2D()
-		v2.x = buffer.readFloatLE(0)
-		v2.y = buffer.readFloatLE(4)
+		v2.x = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength).getFloat32(0, true)
+		v2.y = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength).getFloat32(4, true)
 		return v2
 	}
 

@@ -1,3 +1,15 @@
+function concatUint8Arrays(bufs: Uint8Array[]): Uint8Array {
+	let total = 0
+	for (const b of bufs) total += b.length
+	const result = new Uint8Array(total)
+	let offset = 0
+	for (const b of bufs) {
+		result.set(b, offset)
+		offset += b.length
+	}
+	return result
+}
+
 /*
  * VPDB - Virtual Pinball Database
  * Copyright (C) 2019 freezy <freezy@vpdb.io>
@@ -99,7 +111,7 @@ export class Texture extends BiffParser {
 		} else if (this.localFileName) {
 			texture = await loader.loadDefaultTexture(this.getName(), ext, this.localFileName)
 		} else {
-			const data = await table.streamStorage<Buffer>('GameStg', (storage) =>
+			const data = await table.streamStorage<Uint8Array>('GameStg', (storage) =>
 				this.streamImage(storage, this.storageName, this.binary),
 			)
 			if (!data || !data.length) {
@@ -118,22 +130,22 @@ export class Texture extends BiffParser {
 		return this.pdsBuffer && this.pdsBuffer.format === BaseTexture.RGB_FP
 	}
 
-	private async streamImage(storage: Storage, storageName?: string, binary?: Binary): Promise<Buffer> {
+	private async streamImage(storage: Storage, storageName?: string, binary?: Binary): Promise<Uint8Array> {
 		const strm = storage.stream(storageName!, binary!.pos, binary!.len)
-		return new Promise<Buffer>((resolve, reject) => {
-			const bufs: Buffer[] = []
+		return new Promise<Uint8Array>((resolve, reject) => {
+			const bufs: Uint8Array[] = []
 			/* istanbul ignore if */
 			if (!strm) {
 				return reject(new Error('No such stream "' + storageName + '".'))
 			}
 			strm.on('error', reject)
-			strm.on('data', (buf: Buffer) => bufs.push(buf))
-			strm.on('end', () => resolve(Buffer.concat(bufs)))
+			strm.on('data', (buf: Uint8Array) => bufs.push(buf))
+			strm.on('end', () => resolve(concatUint8Arrays(bufs)))
 		})
 	}
 
 	private async fromTag(
-		buffer: Buffer,
+		buffer: Uint8Array,
 		tag: string,
 		offset: number,
 		len: number,
@@ -178,7 +190,12 @@ export class Texture extends BiffParser {
 			case 'TRNS':
 				this.rgbTransparent = this.getInt(buffer)
 				break
-
+			case 'SIGN':
+				this.getInt(buffer)
+				break
+			case 'OPAQ':
+				this.getInt(buffer)
+				break
 			/* istanbul ignore next */
 			default:
 				logger().warn('[Texture.fromTag] Unknown tag "%s".', tag)
@@ -194,14 +211,14 @@ class BaseTexture {
 	private width: number
 	private height: number
 	public format: number = BaseTexture.RGBA
-	private data!: Buffer
+	private data!: Uint8Array
 
 	constructor(width: number, height: number) {
 		this.width = width
 		this.height = height
 	}
 
-	public getData(): Buffer {
+	public getData(): Uint8Array {
 		return this.data
 	}
 
@@ -246,10 +263,10 @@ class BaseTexture {
 		return [pdsBuffer, compressedLen]
 	}
 
-	private rgbToBgr(width: number, height: number): Buffer {
+	private rgbToBgr(width: number, height: number): Uint8Array {
 		const pitch = this.pitch()
 		const from = this.data
-		const to = Buffer.alloc(pitch * height)
+		const to = new Uint8Array(pitch * height)
 		for (let i = 0; i < height; i++) {
 			for (let l = 0; l < width; l++) {
 				if (this.format === BaseTexture.RGBA) {

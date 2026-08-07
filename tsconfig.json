@@ -2,12 +2,13 @@
 	"compilerOptions": {
 		"target": "ES2024",
 		"module": "ESNext",
-		"moduleResolution": "node",
-		"lib": ["ES2024", "DOM"],
-		"strict": false,
-		"noImplicitAny": false,
+		"moduleResolution": "bundler",
+		"lib": [
+			"ES2024",
+			"DOM"
+		],
+		"strict": true,
 		"skipLibCheck": true,
-		"noImplicitOverride": false,
 		"verbatimModuleSyntax": false,
 		"esModuleInterop": true,
 		"allowSyntheticDefaultImports": true,
@@ -17,11 +18,30 @@
 		"sourceMap": true,
 		"outDir": "./dist",
 		"rootDir": ".",
-		"allowJs": true,
 		"forceConsistentCasingInFileNames": true,
-		"allowUnusedLabels": true,
+		"strictNullChecks": false,
+		"strictBindCallApply": false,
+		"strictFunctionTypes": false,
+		"strictPropertyInitialization": false,
+		"useUnknownInCatchVariables": false,
+		"noImplicitThis": false,
+		"noImplicitAny": false,
+		"noImplicitOverride": false,
 		"useDefineForClassFields": false
 	},
-	"include": ["lib/**/*", "bin/**/*", "build/**/*"],
-	"exclude": [".nyc_output", "node_modules", "dist", "coverage", "res", "test/fixtures", "demo-browser", "demo-static"]
+	"include": [
+		"lib/**/*",
+		"bin/**/*",
+		"build/**/*"
+	],
+	"exclude": [
+		".nyc_output",
+		"node_modules",
+		"dist",
+		"coverage",
+		"res",
+		"test/fixtures",
+		"demo-browser",
+		"demo-static"
+	]
 }

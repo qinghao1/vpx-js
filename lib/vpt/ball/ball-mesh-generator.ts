@@ -18,9 +18,12 @@
  */
 
 import { readFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import { resolve } from 'node:path'
 import { Mesh } from '../mesh'
 import type { BallData } from './ball-data'
+
+const require = createRequire(import.meta.url)
 
 const ballMeshJson = JSON.parse(readFileSync(resolve(process.cwd(), 'res/meshes/ball-mesh.json'), 'utf-8'))
 

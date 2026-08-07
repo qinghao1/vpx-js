@@ -1,13 +1,13 @@
 import { createRequire } from 'node:module'
 import { traverse } from 'estraverse'
-import {
-	type BaseNode,
+import type {
+	BaseNode,
 	BaseNodeWithoutComments,
 	Comment,
-	type Identifier,
-	type MemberExpression,
-	type Program,
-	type Statement,
+	Identifier,
+	MemberExpression,
+	Program,
+	Statement,
 } from 'estree'
 import { inspect } from 'util'
 

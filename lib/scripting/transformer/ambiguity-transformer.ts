@@ -18,7 +18,7 @@
  */
 
 import { replace } from 'estraverse'
-import { type CallExpression, type Expression, Identifier, type MemberExpression, type Program } from 'estree'
+import type { CallExpression, Expression, Identifier, MemberExpression, Program } from 'estree'
 import type { EnumsApi } from '../../vpt/enums'
 import type { GlobalApi } from '../../vpt/global-api'
 import { callExpression, identifier, literal, memberExpression } from '../estree'

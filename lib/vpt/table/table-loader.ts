@@ -1,3 +1,5 @@
+const textDecoder = new TextDecoder()
+
 /*
  * VPDB - Virtual Pinball Database
  * Copyright (C) 2019 freezy <freezy@vpdb.io>
@@ -75,7 +77,7 @@ export class TableLoader {
 
 				if (opts.loadTableScript) {
 					const script = await gameStorage.read('GameData', loadedTable.data.scriptPos, loadedTable.data.scriptLen)
-					loadedTable.tableScript = script.toString()
+					loadedTable.tableScript = textDecoder.decode(script)
 					if (loadedTable.tableScript.endsWith('ENDB')) {
 						// when the script is empty, the counter seems to be wrong, so cut.
 						loadedTable.tableScript = loadedTable.tableScript.substr(0, loadedTable.tableScript.length - 8)
@@ -139,7 +141,7 @@ export class TableLoader {
 		for (let i = 0; i < numItems; i++) {
 			const itemName = `GameItem${i}`
 			const itemData = await storage.read(itemName, 0, 4)
-			const itemType = itemData.readInt32LE(0)
+			const itemType = new DataView(itemData.buffer, itemData.byteOffset, itemData.byteLength).getInt32(0, true)
 			const item = await this.loadItem(loadedTable, storage, itemName, itemType, opts)
 			if (item) {
 				progress().details(item.getName())
@@ -303,7 +305,7 @@ export class TableLoader {
 		for (const key of tableInfoStorage.getStreams()) {
 			const data = await tableInfoStorage.read(key)
 			if (data) {
-				loadedTable.info[key] = data.toString().replace(/\0/g, '')
+				loadedTable.info[key] = textDecoder.decode(data).replace(/\0/g, '')
 			}
 		}
 	}

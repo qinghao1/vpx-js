@@ -69,7 +69,7 @@ export class HitTargetData extends ItemData implements IPhysicalData {
 		)
 	}
 
-	private async fromTag(buffer: Buffer, tag: string, offset: number, len: number): Promise<number> {
+	private async fromTag(buffer: Uint8Array, tag: string, offset: number, len: number): Promise<number> {
 		switch (tag) {
 			case 'VPOS':
 				this.position = Vertex3D.get(buffer)

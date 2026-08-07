@@ -49,23 +49,23 @@ export class LzwReader {
 	private numAvailBytes: number = 0 /* # bytes left in block */
 	private numBitsLeft: number = 0 /* # bits left in current byte */
 	private b1: number = 0 /* Current byte */
-	private byteBuff = Buffer.alloc(257) /* Current block */
+	private byteBuff = new Uint8Array(257) /* Current block */
 	private pBytes!: BufferPtr /* points to byte_buff - Pointer to next byte in block */
 
-	private stack = Buffer.alloc(MAX_CODES + 1) /* Stack for storing pixels */
-	private suffix = Buffer.alloc(MAX_CODES + 1) /* Suffix table */
+	private stack = new Uint8Array(MAX_CODES + 1) /* Stack for storing pixels */
+	private suffix = new Uint8Array(MAX_CODES + 1) /* Suffix table */
 	private prefix: number[] = [] /* Prefix linked list */
 
 	private readonly width: number
 	private readonly height: number
 	private linesLeft: number
 
-	constructor(pstm: Buffer, width: number, height: number, pitch: number) {
+	constructor(pstm: Uint8Array, width: number, height: number, pitch: number) {
 		for (let i = 0; i < MAX_CODES + 1; i++) {
 			this.prefix[i] = 0
 		}
 		this.cbStride = pitch
-		this.pbBitsOutCur = new BufferPtr(Buffer.alloc(pitch * height))
+		this.pbBitsOutCur = new BufferPtr(new Uint8Array(pitch * height))
 
 		this.badCodeCount = 0
 
@@ -76,7 +76,7 @@ export class LzwReader {
 		this.linesLeft = height + 1 // +1 because 1 gets taken o
 	}
 
-	public decompress(): [Buffer, number] {
+	public decompress(): [Uint8Array, number] {
 		let sp: BufferPtr // points to this.stack
 		let bufPtr: BufferPtr // points to this.buf
 		let buf: BufferPtr
@@ -326,10 +326,10 @@ export class LzwReader {
  * only the pointer is updated.
  */
 class BufferPtr {
-	private readonly buf: Buffer
+	private readonly buf: Uint8Array
 	private pos: number
 
-	constructor(buf: Buffer, pos: number = 0) {
+	constructor(buf: Uint8Array, pos: number = 0) {
 		this.buf = buf
 		this.pos = pos
 	}
@@ -362,7 +362,7 @@ class BufferPtr {
 		return this.pos
 	}
 
-	public getBuffer(): Buffer {
+	public getBuffer(): Uint8Array {
 		return this.buf
 	}
 

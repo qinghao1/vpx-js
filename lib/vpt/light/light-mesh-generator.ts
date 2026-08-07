@@ -18,11 +18,14 @@
  */
 
 import { readFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import { resolve } from 'node:path'
 import type { IRenderApi } from '../../render/irender-api'
 import { Mesh } from '../mesh'
 import type { Table } from '../table/table'
 import type { LightData } from './light-data'
+
+const require = createRequire(import.meta.url)
 
 const bulbLightMeshJson = JSON.parse(readFileSync(resolve(process.cwd(), 'res/meshes/bulb-light-mesh.json'), 'utf-8'))
 const bulbSocketMeshJson = JSON.parse(readFileSync(resolve(process.cwd(), 'res/meshes/bulb-socket-mesh.json'), 'utf-8'))

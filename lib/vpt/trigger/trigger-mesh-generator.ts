@@ -18,6 +18,7 @@
  */
 
 import { readFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import { resolve } from 'node:path'
 import { degToRad, f4 } from '../../math/float'
 import { Matrix3D } from '../../math/matrix3d'
@@ -27,6 +28,8 @@ import { Enums } from '../enums'
 import { Mesh } from '../mesh'
 import type { Table } from '../table/table'
 import type { TriggerData } from './trigger-data'
+
+const require = createRequire(import.meta.url)
 
 const triggerButtonMeshJson = JSON.parse(
 	readFileSync(resolve(process.cwd(), 'res/meshes/trigger-button-mesh.json'), 'utf-8'),
@@ -115,6 +118,8 @@ export class TriggerMeshGenerator {
 				return triggerButtonMesh.clone(name)
 			case Enums.TriggerShape.TriggerStar:
 				return triggerStarMesh.clone(name)
+			case Enums.TriggerShape.TriggerNone:
+				return triggerSimpleMesh.clone(name)
 			/* istanbul ignore next */
 			default:
 				logger().warn('[TriggerItem.getBaseMesh] Unknown shape "%s".', this.data.shape)

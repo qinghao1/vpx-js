@@ -20,45 +20,38 @@
 /* tslint:disable:no-bitwise */
 
 import { EventEmitter } from 'events'
-import { readableStream } from './event-stream'
+import { readableStream } from './event-stream.js'
+
+const OLE_ID = new Uint8Array([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1])
+
+function concatUint8Arrays(a: Uint8Array, b: Uint8Array): Uint8Array {
+	const c = new Uint8Array(a.length + b.length)
+	c.set(a, 0)
+	c.set(b, a.length)
+	return c
+}
+
+function getDataView(buf: Uint8Array): DataView {
+	return new DataView(buf.buffer, buf.byteOffset, buf.byteLength)
+}
 
 export class Header {
-	/** Size of sectors */
 	public secSize!: number
-
-	/** Number of sectors used for the Sector Allocation Table */
 	public SATSize!: number
-
-	/** Number of sectors used for the Master Sector Allocation Table */
 	public MSATSize!: number
-
-	/** Starting Sec ID of the Master Sector Allocation Table */
 	public MSATSecId!: number
-
-	/** Size of short sectors */
 	public shortSecSize!: number
-
-	/** Maximum size of a short stream */
 	public shortStreamMax!: number
-
-	/** Number of sectors used for the Short Sector Allocation Table */
 	public SSATSize!: number
-
-	/** Starting Sec ID of the Short Sector Allocation Table */
 	public SSATSecId!: number
-
-	/** Starting Sec ID of the directory stream */
 	public dirSecId!: number
-
 	public partialMSAT: number[] = []
 
-	private readonly oleId: Buffer
+	private readonly oleId: Uint8Array = OLE_ID
 
-	private constructor() {
-		this.oleId = Buffer.from('D0CF11E0A1B11AE1', 'hex')
-	}
+	private constructor() {}
 
-	public static load(buffer: Buffer): Header {
+	public static load(buffer: Uint8Array): Header {
 		const header = new Header()
 		for (let i = 0; i < 8; i++) {
 			/* istanbul ignore if */
@@ -68,20 +61,19 @@ export class Header {
 				)
 			}
 		}
-		header.secSize = 1 << buffer.readInt16LE(30)
-		header.shortSecSize = 1 << buffer.readInt16LE(32)
-		header.SATSize = buffer.readInt32LE(44)
-		header.dirSecId = buffer.readInt32LE(48)
-		header.shortStreamMax = buffer.readInt32LE(56)
-		header.SSATSecId = buffer.readInt32LE(60)
-		header.SSATSize = buffer.readInt32LE(64)
-		header.MSATSecId = buffer.readInt32LE(68)
-		header.MSATSize = buffer.readInt32LE(72)
-
-		// The first 109 sectors of the MSAT
+		const view = getDataView(buffer)
+		header.secSize = 1 << view.getInt16(30, true)
+		header.shortSecSize = 1 << view.getInt16(32, true)
+		header.SATSize = view.getInt32(44, true)
+		header.dirSecId = view.getInt32(48, true)
+		header.shortStreamMax = view.getInt32(56, true)
+		header.SSATSecId = view.getInt32(60, true)
+		header.SSATSize = view.getInt32(64, true)
+		header.MSATSecId = view.getInt32(68, true)
+		header.MSATSize = view.getInt32(72, true)
 		header.partialMSAT = new Array(109)
 		for (let i = 0; i < 109; i++) {
-			header.partialMSAT[i] = buffer.readInt32LE(76 + i * 4)
+			header.partialMSAT[i] = view.getInt32(76 + i * 4, true)
 		}
 		return header
 	}
@@ -105,8 +97,9 @@ export class AllocationTable {
 		const header = doc.header
 		const table = new Array(secIds.length * (header.secSize / 4))
 		const buffer = await doc.readSectors(secIds)
+		const view = getDataView(buffer)
 		for (let i = 0; i < buffer.length / 4; i++) {
-			table[i] = buffer.readInt32LE(i * 4)
+			table[i] = view.getInt32(i * 4, true)
 		}
 		return new AllocationTable(doc, table)
 	}
@@ -117,7 +110,7 @@ export class AllocationTable {
 		while (secId !== AllocationTable.SecIdEndOfChain) {
 			secIds.push(secId)
 			secId = this.table[secId]
-			if (!secId) {
+			if (secId === undefined) {
 				throw new Error(
 					'Possibly corrupt file (cannot find secId ' + secIds[secIds.length - 1] + ' in allocation table).',
 				)
@@ -145,51 +138,51 @@ export class DirectoryTree {
 	private static EntryTypeStorage = 1
 	private static EntryTypeStream = 2
 	private static EntryTypeRoot = 5
-
 	private static NodeColorRed = 0
 	private static NodeColorBlack = 1
-
 	private static Leaf = -1
-
 	public readonly root: StorageEntry
 	private readonly doc: OleCompoundDoc
 	private readonly entries: StorageEntry[]
-
 	public static async load(doc: OleCompoundDoc, secIds: number[]): Promise<DirectoryTree> {
 		const buffer = await doc.readSectors(secIds)
 		const count = buffer.length / 128
 		const entries = new Array(count)
+		const view = getDataView(buffer)
+		const decoder = new TextDecoder('utf-16le')
 		for (let i = 0; i < count; i++) {
 			const offset = i * 128
-			const nameLength = Math.max(buffer.readInt16LE(64 + offset) - 2, 0)
+			const nameLength = Math.max(view.getInt16(64 + offset, true) - 2, 0)
+			const nameBytes = buffer.subarray(offset, offset + nameLength)
 			entries[i] = {
-				name: buffer.toString('utf16le', offset, nameLength + offset),
-				type: buffer.readInt8(66 + offset),
-				nodeColor: buffer.readInt8(67 + offset),
-				left: buffer.readInt32LE(68 + offset),
-				right: buffer.readInt32LE(72 + offset),
-				storageDirId: buffer.readInt32LE(76 + offset),
-				secId: buffer.readInt32LE(116 + offset),
-				size: buffer.readInt32LE(120 + offset),
+				name: decoder.decode(nameBytes),
+				type: view.getInt8(66 + offset),
+				nodeColor: view.getInt8(67 + offset),
+				left: view.getInt32(68 + offset, true),
+				right: view.getInt32(72 + offset, true),
+				storageDirId: view.getInt32(76 + offset, true),
+				secId: view.getInt32(116 + offset, true),
+				size: view.getInt32(120 + offset, true),
+				storages: {},
+				streams: {},
 			}
 		}
 		const root = entries.find((entry) => entry.type === DirectoryTree.EntryTypeRoot)
-		return new DirectoryTree(doc, root, entries)
+		if (!root) {
+			throw new Error('No root entry found in directory tree.')
+		}
+		return new DirectoryTree(doc, root!, entries)
 	}
-
-	private constructor(doc: OleCompoundDoc, rootEntry: StorageEntry, entries: StorageEntry[]) {
+	private constructor(doc: OleCompoundDoc, root: StorageEntry, entries: StorageEntry[]) {
 		this.doc = doc
-		this.root = rootEntry
+		this.root = root
 		this.entries = entries
 		this.buildHierarchy(this.root)
 	}
-
 	private buildHierarchy(storageEntry: StorageEntry) {
 		const childIds = this.getChildIds(storageEntry)
-
 		storageEntry.storages = {}
 		storageEntry.streams = {}
-
 		for (const childId of childIds) {
 			const childEntry = this.entries[childId]
 			const name = childEntry.name
@@ -200,12 +193,10 @@ export class DirectoryTree {
 				storageEntry.streams[name] = childEntry
 			}
 		}
-
 		for (const childStorageEntry of Object.values(storageEntry.storages)) {
 			this.buildHierarchy(childStorageEntry)
 		}
 	}
-
 	private getChildIds(storageEntry: StorageEntry) {
 		const childIds = []
 		if (storageEntry.storageDirId > -1) {
@@ -215,7 +206,6 @@ export class DirectoryTree {
 		}
 		return []
 	}
-
 	private visit(visitEntry: StorageEntry, childIds: number[] = []): number[] {
 		if (visitEntry.left !== DirectoryTree.Leaf) {
 			childIds.push(visitEntry.left)
@@ -231,7 +221,7 @@ export class DirectoryTree {
 
 export class Storage {
 	private readonly doc: OleCompoundDoc
-	private dirEntry: StorageEntry
+	private readonly dirEntry: StorageEntry
 
 	constructor(doc: OleCompoundDoc, dirEntry: StorageEntry) {
 		this.doc = doc
@@ -255,70 +245,50 @@ export class Storage {
 		if (!streamEntry) {
 			return null
 		}
-
 		bytesToRead = bytesToRead || streamEntry.size - offset
+		if (bytesToRead <= 0) {
+			return readableStream(async (stream): Promise<Uint8Array | null> => {
+				stream.emit('end')
+				return Promise.resolve(null)
+			})
+		}
 		const shortStream = streamEntry.size < this.doc.header.shortStreamMax
 		const secSize = shortStream ? this.doc.header.shortSecSize : this.doc.header.secSize
 		const allocationTable = shortStream ? this.doc.SSAT : this.doc.SAT
 		const secIds = allocationTable.getSecIdChain(streamEntry.secId)
 		const secOffset = Math.floor(offset / secSize)
-		offset -= secOffset * secSize
-
-		return readableStream(async (stream, i): Promise<Buffer | null> => {
+		const innerOffset = offset - secOffset * secSize
+		const numSecs = Math.ceil((innerOffset + bytesToRead) / secSize)
+		const neededIds = secIds.slice(secOffset, secOffset + numSecs)
+		let cached: Uint8Array | null = null
+		let pos = 0
+		return readableStream(async (stream, _i): Promise<Uint8Array | null> => {
 			try {
-				if (bytesToRead <= 0) {
+				if (!cached) {
+					if (shortStream) {
+						cached = await this.doc.readShortSectors(neededIds, innerOffset, bytesToRead)
+					} else {
+						cached = await this.doc.readSectors(neededIds, innerOffset, bytesToRead)
+					}
+				}
+				if (pos >= cached.length) {
 					stream.emit('end')
 					return Promise.resolve(null)
 				}
-
-				const currentSec = i + secOffset
-				const currentBytesToRead = Math.min(bytesToRead, secSize - offset)
-
-				let buffer: Buffer
-				if (shortStream) {
-					buffer = await this.doc.readShortSector(secIds[currentSec], offset, currentBytesToRead)
-				} else {
-					buffer = await this.doc.readSector(secIds[currentSec], offset, currentBytesToRead)
-				}
-				bytesToRead -= currentBytesToRead
-				offset = 0
-				return buffer
-
-				/* istanbul ignore next */
+				const chunk = cached.subarray(pos, pos + secSize)
+				// structuredClone to detach from underlying buffer if needed; use slice copy for safety
+				const copy = new Uint8Array(chunk.length)
+				copy.set(chunk)
+				pos += chunk.length
+				return copy
 			} catch (err) {
-				stream.emit('error', err)
+				stream.emit('error', err as Error)
 				stream.emit('end')
 				return null
 			}
 		})
 	}
 
-	/**
-	 * This streams a storage blob to a callback function but skips bytes
-	 * depending on the function's result.
-	 *
-	 * The goal is not to read large streams but only get the position of the
-	 * data.
-	 *
-	 * It works like this: The callback function returns the number of bytes to
-	 * skip. There is a sliding buffer that contains two consequent sectors.
-	 * As soon as the skipped bytes go into the second sector, the sliding
-	 * buffer is shifted, i.e. the next sector is read and the first sector is
-	 * discarded. If the number of skipped bytes is greater than what's
-	 * currently in the sliding buffer, the sliding buffer is discarded and
-	 * re-read from the position of the skipped bytes.
-	 *
-	 * That means:
-	 *
-	 *   - Disk reads are only done when necessary
-	 *   - Read data is cached for further chunks
-	 *   - Disk reads are quite efficient in size, usually 4k which is usually
-	 *     a disk sector
-	 *
-	 * @param streamName Name to stream
-	 * @param offset Where to start reading in the stream
-	 * @param next Callback taking in the data and returning the next position
-	 */
 	public async streamFiltered<T>(
 		streamName: string,
 		offset: number,
@@ -329,113 +299,86 @@ export class Storage {
 		if (!streamEntry) {
 			throw new Error('No such stream "' + streamName + '" in document.')
 		}
-
 		const bytes = streamEntry.size
+		if (offset >= bytes) {
+			return
+		}
 		const shortStream = bytes < this.doc.header.shortStreamMax
 		const secSize = shortStream ? this.doc.header.shortSecSize : this.doc.header.secSize
 		const allocationTable = shortStream ? this.doc.SSAT : this.doc.SAT
 		const secIds = allocationTable.getSecIdChain(streamEntry.secId)
-
+		const totalRemaining = bytes - offset
+		const secOffset = Math.floor(offset / secSize)
+		const innerOffset = offset % secSize
+		const numSecs = Math.ceil((innerOffset + totalRemaining) / secSize)
+		const neededIds = secIds.slice(secOffset, secOffset + numSecs)
+		let buffer: Uint8Array
+		if (shortStream) {
+			buffer = await this.doc.readShortSectors(neededIds, innerOffset, totalRemaining)
+		} else {
+			buffer = await this.doc.readSectors(neededIds, innerOffset, totalRemaining)
+		}
+		let pos = 0
 		let storageOffset = offset
-		let secOffset = Math.floor(offset / secSize)
-		let slidingBuffer: Buffer
-		offset -= secOffset * secSize
-
-		const str = readableStream<ReadResult>(async (stream): Promise<ReadResult | null> => {
-			const nextSec = Math.floor(offset / secSize)
-
-			if (!slidingBuffer || nextSec > 1) {
-				// if no buffer can be reused, fetch both
-				secOffset += nextSec
-				if (shortStream) {
-					slidingBuffer = await this.doc.readShortSectors(secIds.slice(secOffset, secOffset + 2))
-				} else {
-					slidingBuffer = await this.doc.readSectors(secIds.slice(secOffset, secOffset + 2))
-				}
-			} else if (nextSec === 1) {
-				// if last buffer can be reused as first buffer, fetch second and shift
-				secOffset++
-				if (shortStream) {
-					slidingBuffer = Buffer.concat(
-						[
-							slidingBuffer.slice(slidingBuffer.length - secSize),
-							await this.doc.readShortSectors(secIds.slice(secOffset + 1, secOffset + 2)),
-						],
-						secSize * 2,
-					)
-				} else {
-					slidingBuffer = Buffer.concat(
-						[
-							slidingBuffer.slice(slidingBuffer.length - secSize),
-							await this.doc.readSectors(secIds.slice(secOffset + 1, secOffset + 2)),
-						],
-						secSize * 2,
-					)
-				}
+		while (pos < buffer.length) {
+			const resultBuffer = buffer.subarray(pos)
+			if (resultBuffer.length < 4) {
+				break
 			}
-			offset -= nextSec * secSize
-			const resultBuffer = slidingBuffer.slice(offset)
-			const result = {
-				data: resultBuffer,
-				storageOffset,
-			}
+			const view = getDataView(resultBuffer)
+			const lenField = view.getInt32(0, true)
+			const result: ReadResult = { data: resultBuffer, storageOffset: storageOffset + pos }
 			let len = await next(result)
-
-			// if len is negative, we need to read more!
 			if (len !== null && len < 0) {
-				// read missing sectors
 				const remainingLen = -len - resultBuffer.length
-				const numSecs = Math.ceil(remainingLen / secSize)
-				/* istanbul ignore if */
-				if (remainingLen > bytes - storageOffset) {
-					throw new Error(`Cannot read ${remainingLen} bytes when only ${bytes - storageOffset} remain in stream.`)
+				const need = Math.ceil(remainingLen / secSize)
+				if (remainingLen > bytes - (storageOffset + pos)) {
+					throw new Error(
+						`Cannot read ${remainingLen} bytes when only ${bytes - (storageOffset + pos)} remain in stream.`,
+					)
 				}
-				//console.log('need %s bytes, reading remaining %s in %s sectors...', -len, remainingLen, numSecs);
-				let missingBuffer: Buffer
+				const missOffset = secOffset + Math.floor((innerOffset + pos + resultBuffer.length) / secSize)
+				const missIds = secIds.slice(missOffset, missOffset + need)
+				let missing: Uint8Array
 				if (shortStream) {
-					missingBuffer = await this.doc.readShortSectors(secIds.slice(secOffset + 2, secOffset + 2 + numSecs))
+					missing = await this.doc.readShortSectors(missIds, 0, remainingLen)
 				} else {
-					missingBuffer = await this.doc.readSectors(secIds.slice(secOffset + 2, secOffset + 2 + numSecs))
+					missing = await this.doc.readSectors(missIds, 0, remainingLen)
 				}
-				result.data = Buffer.concat([result.data, missingBuffer])
+				result.data = concatUint8Arrays(result.data, missing)
 				len = await next(result)
 			}
 			if (len === null) {
-				stream.emit('end')
-				return Promise.resolve(null)
+				break
 			}
-			offset += len
-			storageOffset += len
-
-			return Promise.resolve(result)
-		})
-
-		await new Promise((resolve, reject) => {
-			str.on('end', resolve)
-			str.on('error', reject)
-		})
+			if (len < 0) {
+				throw new Error('Second negative len not supported with full buffer')
+			}
+			pos += len
+		}
 	}
 
-	/**
-	 * Reads a given stream from a given storage.
-	 *
-	 * @param key Key within the storage
-	 * @param offset Offset within the storage
-	 * @param bytesToRead Number of bytes to read, 0 for entire storage
-	 * @return {Promise<Buffer>} Read data
-	 */
-	public async read(key: string, offset: number = 0, bytesToRead: number = 0): Promise<Buffer> {
-		return new Promise<Buffer>((resolve, reject) => {
-			const strm = this.stream(key, offset, bytesToRead)
-			const bufs: Buffer[] = []
-			/* istanbul ignore if */
-			if (!strm) {
-				return reject(new Error('No such stream "' + key + '".'))
-			}
-			strm.on('error', reject)
-			strm.on('data', (buf: Buffer) => bufs.push(buf))
-			strm.on('end', () => resolve(Buffer.concat(bufs)))
-		})
+	public async read(key: string, offset: number = 0, bytesToRead: number = 0): Promise<Uint8Array> {
+		const streamEntry = this.dirEntry.streams[key]
+		if (!streamEntry) {
+			throw new Error('No such stream "' + key + '".')
+		}
+		bytesToRead = bytesToRead || streamEntry.size - offset
+		if (bytesToRead <= 0) {
+			return new Uint8Array(0)
+		}
+		const shortStream = streamEntry.size < this.doc.header.shortStreamMax
+		const secSize = shortStream ? this.doc.header.shortSecSize : this.doc.header.secSize
+		const allocationTable = shortStream ? this.doc.SSAT : this.doc.SAT
+		const secIds = allocationTable.getSecIdChain(streamEntry.secId)
+		const secOffset = Math.floor(offset / secSize)
+		const innerOffset = offset % secSize
+		const numSecs = Math.ceil((innerOffset + bytesToRead) / secSize)
+		const neededIds = secIds.slice(secOffset, secOffset + numSecs)
+		if (shortStream) {
+			return this.doc.readShortSectors(neededIds, innerOffset, bytesToRead)
+		}
+		return this.doc.readSectors(neededIds, innerOffset, bytesToRead)
 	}
 }
 
@@ -473,8 +416,7 @@ export class OleCompoundDoc extends EventEmitter {
 		return doc
 	}
 
-	/* istanbul ignore next: Don't currently need this (at all) */
-	public async readWithCustomHeader(size: number): Promise<Buffer> {
+	public async readWithCustomHeader(size: number): Promise<Uint8Array> {
 		this.skipBytes = size
 		await this.openFile()
 		const buffer = await this.readCustomHeader()
@@ -483,7 +425,6 @@ export class OleCompoundDoc extends EventEmitter {
 		await this.readSAT()
 		await this.readSSAT()
 		await this.readDirectoryTree()
-
 		return buffer
 	}
 
@@ -496,22 +437,17 @@ export class OleCompoundDoc extends EventEmitter {
 		return this.rootStorage.storage(storageName)
 	}
 
-	// public stream(streamName: string, offset: number = 0, len: number = -1) {
-	// 	this.assertLoaded();
-	// 	return this.rootStorage.stream(streamName, offset, len);
-	// }
-
-	public async readSector(secId: number, offset: number = 0, bytesToRead: number = 0) {
+	public async readSector(secId: number, offset: number = 0, bytesToRead: number = 0): Promise<Uint8Array> {
 		this.assertLoaded()
 		return this.readSectors([secId], offset, bytesToRead)
 	}
 
-	public async readSectors(secIds: number[], offset: number = 0, bytesToRead: number = 0): Promise<Buffer> {
+	public async readSectors(secIds: number[], offset: number = 0, bytesToRead: number = 0): Promise<Uint8Array> {
 		bytesToRead = Math.min(secIds.length * this.header.secSize, bytesToRead || secIds.length * this.header.secSize)
 		this.assertLoaded()
 		const browserData = (this.reader as any).data as Uint8Array | undefined
 		if (browserData) {
-			const buffer = Buffer.allocUnsafe(bytesToRead)
+			const buffer = new Uint8Array(bytesToRead)
 			let i = 0
 			let bufferOffset = 0
 			let off = offset
@@ -524,7 +460,7 @@ export class OleCompoundDoc extends EventEmitter {
 				}
 				const fileLen = Math.min(this.header.secSize - off, remaining)
 				const fileOffset = off + this.getFileOffsetForSec(secIds[i])
-				;(buffer as unknown as Uint8Array).set(browserData.subarray(fileOffset, fileOffset + fileLen), bufferOffset)
+				buffer.set(browserData.subarray(fileOffset, fileOffset + fileLen), bufferOffset)
 				remaining -= fileLen
 				bufferOffset += fileLen
 				off = 0
@@ -532,32 +468,46 @@ export class OleCompoundDoc extends EventEmitter {
 			}
 			return buffer
 		}
-		const buffer = Buffer.alloc(bytesToRead)
+		const buffer = new Uint8Array(bytesToRead)
 		let i = 0
 		let bufferOffset = 0
-		while (i < secIds.length && bytesToRead > 0) {
-			if (offset >= this.header.secSize) {
-				offset -= this.header.secSize
+		let off = offset
+		let remaining = bytesToRead
+		while (i < secIds.length && remaining > 0) {
+			if (off >= this.header.secSize) {
+				off -= this.header.secSize
 				i++
 				continue
 			}
-			const fileLen = Math.min(this.header.secSize - offset, bytesToRead)
-			const fileOffset = offset + this.getFileOffsetForSec(secIds[i])
-			await this.reader.read(buffer, bufferOffset, fileLen, fileOffset)
-			bytesToRead -= fileLen
-			bufferOffset += fileLen
-			offset = 0
-			i++
+			const fileLenFirst = Math.min(this.header.secSize - off, remaining)
+			let runLen = 1
+			let runBytes = fileLenFirst
+			while (i + runLen < secIds.length && remaining - runBytes > 0) {
+				const expected = this.getFileOffsetForSec(secIds[i + runLen - 1]) + this.header.secSize
+				const actual = this.getFileOffsetForSec(secIds[i + runLen])
+				if (expected !== actual) break
+				const nextLen = Math.min(this.header.secSize, remaining - runBytes)
+				runBytes += nextLen
+				runLen++
+				if (nextLen < this.header.secSize) break
+			}
+			const fileOffset = off + this.getFileOffsetForSec(secIds[i])
+			const toRead = Math.min(runBytes, remaining)
+			await this.reader.read(buffer, bufferOffset, toRead, fileOffset)
+			bufferOffset += toRead
+			remaining -= toRead
+			off = 0
+			i += runLen
 		}
 		return buffer
 	}
 
-	public async readShortSector(secId: number, offset: number = 0, bytesToRead: number = 0): Promise<Buffer> {
+	public async readShortSector(secId: number, offset: number = 0, bytesToRead: number = 0): Promise<Uint8Array> {
 		this.assertLoaded()
 		return this.readShortSectors([secId], offset, bytesToRead)
 	}
 
-	public async readShortSectors(secIds: number[], offset: number = 0, bytesToRead: number = 0): Promise<Buffer> {
+	public async readShortSectors(secIds: number[], offset: number = 0, bytesToRead: number = 0): Promise<Uint8Array> {
 		bytesToRead = Math.min(
 			secIds.length * this.header.shortSecSize,
 			bytesToRead || secIds.length * this.header.shortSecSize,
@@ -565,7 +515,7 @@ export class OleCompoundDoc extends EventEmitter {
 		this.assertLoaded()
 		const browserData = (this.reader as any).data as Uint8Array | undefined
 		if (browserData) {
-			const buffer = Buffer.allocUnsafe(bytesToRead)
+			const buffer = new Uint8Array(bytesToRead)
 			let i = 0
 			let bufferOffset = 0
 			let off = offset
@@ -578,7 +528,7 @@ export class OleCompoundDoc extends EventEmitter {
 				}
 				const fileOffset = off + this.getFileOffsetForShortSec(secIds[i])
 				const fileLen = Math.min(this.header.shortSecSize - off, remaining)
-				;(buffer as unknown as Uint8Array).set(browserData.subarray(fileOffset, fileOffset + fileLen), bufferOffset)
+				buffer.set(browserData.subarray(fileOffset, fileOffset + fileLen), bufferOffset)
 				remaining -= fileLen
 				bufferOffset += fileLen
 				off = 0
@@ -586,22 +536,36 @@ export class OleCompoundDoc extends EventEmitter {
 			}
 			return buffer
 		}
-		const buffer = Buffer.alloc(bytesToRead)
+		const buffer = new Uint8Array(bytesToRead)
 		let i = 0
 		let bufferOffset = 0
-		while (i < secIds.length && bytesToRead > 0) {
-			if (offset >= this.header.shortSecSize) {
-				offset -= this.header.shortSecSize
+		let off = offset
+		let remaining = bytesToRead
+		while (i < secIds.length && remaining > 0) {
+			if (off >= this.header.shortSecSize) {
+				off -= this.header.shortSecSize
 				i++
 				continue
 			}
-			const fileOffset = offset + this.getFileOffsetForShortSec(secIds[i])
-			const fileLen = Math.min(this.header.shortSecSize - offset, bytesToRead)
-			await this.reader.read(buffer, bufferOffset, fileLen, fileOffset)
-			bytesToRead -= fileLen
-			bufferOffset += fileLen
-			offset = 0
-			i++
+			const fileLenFirst = Math.min(this.header.shortSecSize - off, remaining)
+			let runLen = 1
+			let runBytes = fileLenFirst
+			while (i + runLen < secIds.length && remaining - runBytes > 0) {
+				const expected = this.getFileOffsetForShortSec(secIds[i + runLen - 1]) + this.header.shortSecSize
+				const actual = this.getFileOffsetForShortSec(secIds[i + runLen])
+				if (expected !== actual) break
+				const nextLen = Math.min(this.header.shortSecSize, remaining - runBytes)
+				runBytes += nextLen
+				runLen++
+				if (nextLen < this.header.shortSecSize) break
+			}
+			const fileOffset = off + this.getFileOffsetForShortSec(secIds[i])
+			const toRead = Math.min(runBytes, remaining)
+			await this.reader.read(buffer, bufferOffset, toRead, fileOffset)
+			bufferOffset += toRead
+			remaining -= toRead
+			off = 0
+			i += runLen
 		}
 		return buffer
 	}
@@ -621,40 +585,48 @@ export class OleCompoundDoc extends EventEmitter {
 		await this.reader.open()
 	}
 
-	private async readCustomHeader(): Promise<Buffer> {
-		const buffer = Buffer.alloc(this.skipBytes)
+	private async readCustomHeader(): Promise<Uint8Array> {
+		const buffer = new Uint8Array(this.skipBytes)
 		const [bytesRead, data] = await this.reader.read(buffer, 0, this.skipBytes, 0)
-		return data
+		// structuredClone to detach if needed, or just return data slice
+		const result = (
+			typeof structuredClone !== 'undefined'
+				? structuredClone(data.subarray(0, bytesRead) as any)
+				: data.slice(0, bytesRead)
+		) as Uint8Array
+		return result
 	}
 
 	private async readHeader(): Promise<void> {
-		const buffer = Buffer.alloc(512)
+		const buffer = new Uint8Array(512)
 		const [bytesRead, data] = await this.reader.read(buffer, 0, 512, this.skipBytes)
-		this.header = Header.load(data)
+		const slice = data.subarray(0, bytesRead)
+		const copy = new Uint8Array(slice.length)
+		copy.set(slice)
+		this.header = Header.load(copy)
 	}
 
 	private async readMSAT(): Promise<void> {
 		this.MSAT = this.header.partialMSAT.slice(0)
 		this.MSAT.length = this.header.SATSize
-
 		if (this.header.SATSize <= 109 || this.header.MSATSize === 0) {
 			return
 		}
-
 		let secId = this.header.MSATSecId
 		let currMSATIndex = 109
 		let i = 0
 		while (i < this.header.MSATSize) {
 			const sectorBuffer = await this.readSector(secId)
+			const view = getDataView(sectorBuffer)
 			for (let s = 0; s < this.header.secSize - 4; s += 4) {
 				if (currMSATIndex >= this.header.SATSize) {
 					break
 				} else {
-					this.MSAT[currMSATIndex] = sectorBuffer.readInt32LE(s)
+					this.MSAT[currMSATIndex] = view.getInt32(s, true)
 				}
 				currMSATIndex++
 			}
-			secId = sectorBuffer.readInt32LE(this.header.secSize - 4)
+			secId = view.getInt32(this.header.secSize - 4, true)
 			i++
 		}
 	}
@@ -675,7 +647,6 @@ export class OleCompoundDoc extends EventEmitter {
 	private async readDirectoryTree(): Promise<void> {
 		const secIds = this.SAT.getSecIdChain(this.header.dirSecId)
 		this.directoryTree = await DirectoryTree.load(this, secIds)
-
 		const rootEntry = this.directoryTree.root
 		this.rootStorage = new Storage(this, rootEntry)
 		this.shortStreamSecIds = this.SAT.getSecIdChain(rootEntry.secId)
@@ -683,7 +654,7 @@ export class OleCompoundDoc extends EventEmitter {
 
 	private getFileOffsetForSec(secId: number): number {
 		const secSize = this.header.secSize
-		return this.skipBytes + (secId + 1) * secSize // Skip past the header sector
+		return this.skipBytes + (secId + 1) * secSize
 	}
 
 	private getFileOffsetForShortSec(shortSecId: number): number {
@@ -698,35 +669,14 @@ export class OleCompoundDoc extends EventEmitter {
 }
 
 export interface ReadResult {
-	data: Buffer
+	data: Uint8Array
 	storageOffset: number
 }
 
 export interface IBinaryReader {
-	/**
-	 * Reads data into a buffer.
-	 *
-	 * @param buffer Buffer that the data will be written to.
-	 * @param offset Offset in the buffer to start writing at.
-	 * @param length Integer specifying the number of bytes to read.
-	 * @param position At which offset to start reading
-	 * @returns [ number of bytes read, data read ]
-	 */
-	read(buffer: Buffer, offset: number, length: number, position: number): Promise<[number, Buffer]>
-
-	/**
-	 * Opens the data source.
-	 */
+	read(target: Uint8Array, offset: number, length: number, position: number): Promise<[number, Uint8Array]>
 	open(): Promise<void>
-
-	/**
-	 * Closes the data source.
-	 */
 	close(): Promise<void>
-
-	/**
-	 * Returns whether the data source is opened.
-	 */
 	isOpen(): boolean
 }
 

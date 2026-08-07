@@ -56,12 +56,12 @@ export class Vertex3D implements Vertex {
 	private _y!: number
 	private _z!: number
 
-	public static get(buffer: Buffer) {
+	public static get(buffer: Uint8Array) {
 		const v3 = new Vertex3D()
-		v3.x = buffer.readFloatLE(0)
-		v3.y = buffer.readFloatLE(4)
+		v3.x = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength).getFloat32(0, true)
+		v3.y = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength).getFloat32(4, true)
 		if (buffer.length >= 12) {
-			v3.z = buffer.readFloatLE(8)
+			v3.z = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength).getFloat32(8, true)
 		}
 		return v3
 	}

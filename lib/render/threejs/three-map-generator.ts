@@ -37,20 +37,39 @@ export class ThreeMapGenerator {
 		}
 		const now = Date.now()
 		logger().debug('[ThreeMapGenerator.loadTextures] Pre-loading textures..')
-		for (const texture of textures) {
-			try {
-				this.textureCache.set(texture.getName(), await texture.loadTexture(this.textureLoader, table))
-				progress().details(texture.getName())
-			} catch (err) {
-				logger().warn(
-					'[ThreeMapGenerator.loadTextures] Error loading texture %s (%s/%s): %s',
-					texture.getName(),
-					texture.storageName,
-					texture.getName(),
-					err.message,
-				)
+		const concurrency = 6
+		let index = 0
+		const loadOne = async (): Promise<void> => {
+			while (true) {
+				const i = index++
+				if (i >= textures.length) break
+				const texture = textures[i]
+				try {
+					const tex = await texture.loadTexture(this.textureLoader!, table)
+					this.textureCache.set(texture.getName(), tex)
+					progress().details(texture.getName())
+				} catch (err) {
+					const msg = (err as Error).message || ''
+					if (msg.includes('too large')) {
+						logger().debug(
+							'[ThreeMapGenerator.loadTextures] Skipping large texture %s (%s): %s',
+							texture.getName(),
+							texture.storageName,
+							msg,
+						)
+					} else {
+						logger().warn(
+							'[ThreeMapGenerator.loadTextures] Error loading texture %s (%s/%s): %s',
+							texture.getName(),
+							texture.storageName,
+							texture.getName(),
+							msg,
+						)
+					}
+				}
 			}
 		}
+		await Promise.all(Array.from({ length: Math.min(concurrency, textures.length) }, () => loadOne()))
 		logger().debug('[ThreeMapGenerator.loadTextures] Loaded in %sms.', Date.now() - now)
 	}
 

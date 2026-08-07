@@ -148,20 +148,23 @@ export class SaveMaterial {
 	public opacity: number // opacity (0..1)
 	public opacityActiveEdgeAlpha: number
 
-	constructor(buffer: Buffer, i = 0) {
+	constructor(buffer: Uint8Array, i = 0) {
 		const offset = i * SaveMaterial.size
-		this.szName = BiffParser.parseNullTerminatedString(buffer.slice(offset, offset + 32))
-		this.baseColor = buffer.readInt32LE(offset + 32)
-		this.glossiness = buffer.readInt32LE(offset + 36)
-		this.clearCoat = buffer.readInt32LE(offset + 40)
-		this.wrapLighting = buffer.readFloatLE(offset + 44)
-		this.isMetal = buffer.readInt8(offset + 48) > 0
-		this.roughness = buffer.readFloatLE(offset + 52)
-		this.glossyImageLerp = buffer.readInt32LE(offset + 56)
-		this.edge = buffer.readFloatLE(offset + 60)
-		this.thickness = buffer.readInt32LE(offset + 64)
-		this.opacity = buffer.readFloatLE(offset + 68)
-		this.opacityActiveEdgeAlpha = buffer.readInt32LE(offset + 72)
+		this.szName = BiffParser.parseNullTerminatedString(buffer.subarray(offset, offset + 32))
+		this.baseColor = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength).getInt32(offset + 32, true)
+		this.glossiness = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength).getInt32(offset + 36, true)
+		this.clearCoat = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength).getInt32(offset + 40, true)
+		this.wrapLighting = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength).getFloat32(offset + 44, true)
+		this.isMetal = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength).getInt8(offset + 48) > 0
+		this.roughness = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength).getFloat32(offset + 52, true)
+		this.glossyImageLerp = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength).getInt32(offset + 56, true)
+		this.edge = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength).getFloat32(offset + 60, true)
+		this.thickness = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength).getInt32(offset + 64, true)
+		this.opacity = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength).getFloat32(offset + 68, true)
+		this.opacityActiveEdgeAlpha = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength).getInt32(
+			offset + 72,
+			true,
+		)
 	}
 }
 
@@ -174,12 +177,15 @@ export class SavePhysicsMaterial {
 	public friction: number
 	public scatterAngle: number
 
-	constructor(buffer: Buffer, i = 0) {
+	constructor(buffer: Uint8Array, i = 0) {
 		const offset = i * SavePhysicsMaterial.size
-		this.name = BiffParser.parseNullTerminatedString(buffer.slice(offset, offset + 32))
-		this.elasticity = buffer.readFloatLE(offset + 32)
-		this.elasticityFallOff = buffer.readFloatLE(offset + 36)
-		this.friction = buffer.readFloatLE(offset + 40)
-		this.scatterAngle = buffer.readFloatLE(offset + 44)
+		this.name = BiffParser.parseNullTerminatedString(buffer.subarray(offset, offset + 32))
+		this.elasticity = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength).getFloat32(offset + 32, true)
+		this.elasticityFallOff = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength).getFloat32(
+			offset + 36,
+			true,
+		)
+		this.friction = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength).getFloat32(offset + 40, true)
+		this.scatterAngle = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength).getFloat32(offset + 44, true)
 	}
 }

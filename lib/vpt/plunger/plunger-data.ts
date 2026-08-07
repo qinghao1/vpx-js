@@ -65,7 +65,7 @@ export class PlungerData extends ItemData {
 		super(itemName)
 	}
 
-	private async fromTag(buffer: Buffer, tag: string, offset: number, len: number): Promise<number> {
+	private async fromTag(buffer: Uint8Array, tag: string, offset: number, len: number): Promise<number> {
 		switch (tag) {
 			case 'VCEN':
 				this.center = Vertex2D.get(buffer)

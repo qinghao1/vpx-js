@@ -56,7 +56,7 @@ export class DispReelData extends ItemData {
 		super(itemName)
 	}
 
-	private async fromTag(buffer: Buffer, tag: string, offset: number, len: number): Promise<number> {
+	private async fromTag(buffer: Uint8Array, tag: string, offset: number, len: number): Promise<number> {
 		switch (tag) {
 			case 'VER1':
 				this.v1 = Vertex2D.get(buffer)

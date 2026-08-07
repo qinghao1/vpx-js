@@ -18,7 +18,7 @@
  */
 
 import { resolve } from 'path'
-import { type GLTF, GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'
+import { type GLTF, GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { Box3, type Mesh, type Object3D } from '../lib/refs.node'
 
 // tslint:disable:no-shadowed-variable

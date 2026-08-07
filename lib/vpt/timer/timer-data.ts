@@ -45,7 +45,7 @@ export class TimerData extends ItemData {
 		return false
 	}
 
-	private async fromTag(buffer: Buffer, tag: string, offset: number, len: number): Promise<number> {
+	private async fromTag(buffer: Uint8Array, tag: string, offset: number, len: number): Promise<number> {
 		switch (tag) {
 			case 'VCEN':
 				this.vCenter = Vertex2D.get(buffer)
