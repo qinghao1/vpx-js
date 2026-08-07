@@ -69,8 +69,8 @@ import { PATH_PROPERTIES, THREE_TO_WEBGL, WEBGL_CONSTANTS } from './gltf-constan
  * @author Don McCurdy / https://www.donmccurdy.com
  * @author Takahiro / https://github.com/takahirox
  */
-export /** GLTFExporter. */
-class GLTFExporter {
+/** GLTFExporter. */
+export class GLTFExporter {
 	private started = false
 	private options: TableGenerateGltfOptions
 	private byteOffset: number = 0
