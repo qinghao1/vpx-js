@@ -22,7 +22,8 @@ import { Mesh } from '../mesh.js'
 import type { Table } from '../table/table.js'
 import type { PrimitiveData } from './primitive-data.js'
 
-export class PrimitiveHitGenerator {
+export /** PrimitiveHitGenerator. */
+class PrimitiveHitGenerator {
 	private readonly data: PrimitiveData
 
 	constructor(data: PrimitiveData) {
