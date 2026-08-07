@@ -39,7 +39,8 @@ import { Transformer } from './transformer.js'
  *   - `ImageAlignment.ImageAlignWorld` would become `__enums.ImageAlignment.ImageAlignWorld`.
  *   - `PlaySound()` would become `__global.PlaySound()`.
  */
-export class ReferenceTransformer extends Transformer {
+export /** ReferenceTransformer. */
+class ReferenceTransformer extends Transformer {
 	private readonly table: Table
 	private readonly itemApis: { [p: string]: any }
 	private readonly enumApis: EnumsApi
