@@ -6,8 +6,8 @@ import { ItemUpdater } from '../item-updater.js'
 import type { Table } from '../table/table.js'
 import type { KickerState } from './kicker-state.js'
 
-export /** KickerUpdater. */
-class KickerUpdater extends ItemUpdater<KickerState> {
+/** KickerUpdater. */
+export class KickerUpdater extends ItemUpdater<KickerState> {
 	constructor(state: KickerState) {
 		super(state)
 	}
