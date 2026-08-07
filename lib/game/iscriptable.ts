@@ -5,9 +5,9 @@ import type { ItemApi } from '../vpt/item-api.js'
 import type { ItemData } from '../vpt/item-data.js'
 import type { IPlayable } from './iplayable.js'
 
+/** Script-exposed table element. */
 export interface IScriptable<T extends ItemApi<ItemData>> extends IPlayable {
 	getApi(): T
-
 	getEventNames(): string[]
 }
 
