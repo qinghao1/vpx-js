@@ -32,9 +32,9 @@ import type { IEmulator } from './iemulator.js'
 import type { PinInput } from './pin-input.js'
 import type { IBallCreationPosition, Player } from './player.js'
 
-const SLOW_MO = 1 // slow-motion factor for debugging
+const SLOW_MO = 1
 
-/** Core physics loop — 1kHz collision, timers and movers.
+/** Core physics loop — 1 kHz collision, timers, movers.
  * @see https://github.com/vpinball/vpinball/blob/master/player.cpp */
 export class PlayerPhysics {
 	public readonly balls: Ball[] = []
@@ -52,8 +52,6 @@ export class PlayerPhysics {
 	public readonly changedHitTimers: TimerOnOff[] = []
 	public emu?: IEmulator
 
-	private readonly table: Table
-	private readonly pinInput: PinInput
 	private readonly movers: MoverObject[] = []
 	private readonly flipperMovers: FlipperMover[] = []
 	private readonly hitObjects: HitObject[] = []
@@ -80,10 +78,10 @@ export class PlayerPhysics {
 	private activeBallDebug?: Ball
 	private scriptPeriod = 0
 
-	constructor(table: Table, pinInput: PinInput) {
-		this.table = table
-		this.pinInput = pinInput
-	}
+	constructor(
+		private readonly table: Table,
+		private readonly pinInput: PinInput,
+	) {}
 
 	public init(): void {
 		const d = this.table.data!
@@ -129,7 +127,6 @@ export class PlayerPhysics {
 			this.recordContacts = true
 			CollisionEvent.release(...this.contacts)
 			this.contacts.length = 0
-
 			for (const ball of this.balls) {
 				if (ball.state.isFrozen) continue
 				ball.hit.coll.hitTime = hitTime
@@ -153,13 +150,11 @@ export class PlayerPhysics {
 					}
 				}
 			}
-
 			this.recordContacts = false
 			if (hitTime > STATICTIME) staticCnts = STATICCNTS
 			for (const m of this.movers) m.updateDisplacements(hitTime)
-
 			for (let i = 0; i < this.balls.length; i++) {
-				const ball = this.balls[i]
+				const ball = this.balls[i]!
 				const pho = ball.coll.obj
 				if (pho && ball.coll.hitTime <= hitTime) {
 					this.activeBall = ball
@@ -169,11 +164,10 @@ export class PlayerPhysics {
 					else ball.hit.calcHitBBox()
 				}
 			}
-
 			if (Math.random() < 0.5) for (const c of this.contacts) c.obj!.contact(c, hitTime, this)
 			else
 				for (let i = this.contacts.length - 1; i >= 0; --i)
-					this.contacts[i].obj!.contact(this.contacts[i], hitTime, this)
+					this.contacts[i]!.obj!.contact(this.contacts[i]!, hitTime, this)
 			CollisionEvent.release(...this.contacts)
 			this.contacts.length = 0
 			dTime -= hitTime
@@ -250,7 +244,7 @@ export class PlayerPhysics {
 	public createBall(ballCreator: IBallCreationPosition, player: Player, radius = 25, mass = 1): Ball {
 		const data = new BallData(radius, mass, this.table.data!.defaultBulbIntensityScaleOnBall)
 		const id = Ball.idCounter++
-		const state = BallState.claim(`Ball${id}`, ballCreator.getBallCreationPosition(this.table))
+		const state = BallState.claim(`Ball\${id}`, ballCreator.getBallCreationPosition(this.table))
 		state.pos.z += data.radius
 		const ball = new Ball(id, data, state, ballCreator.getBallCreationVelocity(this.table), player, this.table)
 		ballCreator.onBallCreated(this, ball)
