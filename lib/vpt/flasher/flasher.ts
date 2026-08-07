@@ -10,7 +10,8 @@ import type { Table } from '../table/table.js'
 import { FlasherApi } from './flasher-api.js'
 import { FlasherData } from './flasher-data.js'
 
-export class Flasher extends Item<FlasherData> implements IScriptable<FlasherApi> {
+export /** Runtime flasher. */
+class Flasher extends Item<FlasherData> implements IScriptable<FlasherApi> {
 	private api?: FlasherApi
 
 	public static async fromStorage(storage: Storage, itemName: string): Promise<Flasher> {
