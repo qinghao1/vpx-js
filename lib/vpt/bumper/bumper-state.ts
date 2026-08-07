@@ -4,23 +4,18 @@
 import { Pool } from '../../util/object-pool.js'
 import { ItemState } from '../item-state.js'
 
-/** Bumper state.
- *
+/** Bumper state — ring offset, skirt rotation and material visibility.
  * @see https://github.com/vpinball/vpinball/blob/master/bumper.cpp */
 export class BumperState extends ItemState {
 	public static readonly POOL = new Pool(BumperState)
 
-	/**
-	 * Z-offset of the bumper ring
-	 */
-	public ringOffset: number = 0
-	public skirtRotX: number = 0
-	public skirtRotY: number = 0
-
-	public isCapVisible: boolean = true
-	public isRingVisible: boolean = true
-	public isBaseVisible: boolean = true
-	public isSkirtVisible: boolean = true
+	public ringOffset = 0
+	public skirtRotX = 0
+	public skirtRotY = 0
+	public isCapVisible = true
+	public isRingVisible = true
+	public isBaseVisible = true
+	public isSkirtVisible = true
 	public capMaterial?: string
 	public ringMaterial?: string
 	public baseMaterial?: string
@@ -44,20 +39,20 @@ export class BumperState extends ItemState {
 		baseMaterial: string | undefined,
 		skirtMaterial: string | undefined,
 	): BumperState {
-		const state = BumperState.POOL.get()
-		state.name = name
-		state.ringOffset = ringOffset
-		state.skirtRotX = skirtRotX
-		state.skirtRotY = skirtRotY
-		state.isCapVisible = isCapVisible
-		state.isRingVisible = isRingVisible
-		state.isBaseVisible = isBaseVisible
-		state.isSkirtVisible = isSkirtVisible
-		state.capMaterial = capMaterial
-		state.ringMaterial = ringMaterial
-		state.baseMaterial = baseMaterial
-		state.skirtMaterial = skirtMaterial
-		return state
+		const s = BumperState.POOL.get()
+		s.name = name
+		s.ringOffset = ringOffset
+		s.skirtRotX = skirtRotX
+		s.skirtRotY = skirtRotY
+		s.isCapVisible = isCapVisible
+		s.isRingVisible = isRingVisible
+		s.isBaseVisible = isBaseVisible
+		s.isSkirtVisible = isSkirtVisible
+		s.capMaterial = capMaterial
+		s.ringMaterial = ringMaterial
+		s.baseMaterial = baseMaterial
+		s.skirtMaterial = skirtMaterial
+		return s
 	}
 
 	public clone(): BumperState {
@@ -78,41 +73,19 @@ export class BumperState extends ItemState {
 	}
 
 	public diff(state: BumperState): BumperState {
-		const diff = this.clone()
-		if (diff.ringOffset === state.ringOffset) {
-			delete diff.ringOffset
-		}
-		if (diff.skirtRotX === state.skirtRotX) {
-			delete diff.skirtRotX
-		}
-		if (diff.skirtRotY === state.skirtRotY) {
-			delete diff.skirtRotY
-		}
-		if (diff.isCapVisible === state.isCapVisible) {
-			delete diff.isCapVisible
-		}
-		if (diff.isRingVisible === state.isRingVisible) {
-			delete diff.isRingVisible
-		}
-		if (diff.isBaseVisible === state.isBaseVisible) {
-			delete diff.isBaseVisible
-		}
-		if (diff.isSkirtVisible === state.isSkirtVisible) {
-			delete diff.isSkirtVisible
-		}
-		if (diff.capMaterial === state.capMaterial) {
-			delete diff.capMaterial
-		}
-		if (diff.ringMaterial === state.ringMaterial) {
-			delete diff.ringMaterial
-		}
-		if (diff.baseMaterial === state.baseMaterial) {
-			delete diff.baseMaterial
-		}
-		if (diff.skirtMaterial === state.skirtMaterial) {
-			delete diff.skirtMaterial
-		}
-		return diff
+		const d = this.clone()
+		if (d.ringOffset === state.ringOffset) delete (d as unknown as Record<string, unknown>).ringOffset
+		if (d.skirtRotX === state.skirtRotX) delete (d as unknown as Record<string, unknown>).skirtRotX
+		if (d.skirtRotY === state.skirtRotY) delete (d as unknown as Record<string, unknown>).skirtRotY
+		if (d.isCapVisible === state.isCapVisible) delete (d as unknown as Record<string, unknown>).isCapVisible
+		if (d.isRingVisible === state.isRingVisible) delete (d as unknown as Record<string, unknown>).isRingVisible
+		if (d.isBaseVisible === state.isBaseVisible) delete (d as unknown as Record<string, unknown>).isBaseVisible
+		if (d.isSkirtVisible === state.isSkirtVisible) delete (d as unknown as Record<string, unknown>).isSkirtVisible
+		if (d.capMaterial === state.capMaterial) delete (d as unknown as Record<string, unknown>).capMaterial
+		if (d.ringMaterial === state.ringMaterial) delete (d as unknown as Record<string, unknown>).ringMaterial
+		if (d.baseMaterial === state.baseMaterial) delete (d as unknown as Record<string, unknown>).baseMaterial
+		if (d.skirtMaterial === state.skirtMaterial) delete (d as unknown as Record<string, unknown>).skirtMaterial
+		return d
 	}
 
 	public release(): void {
@@ -120,13 +93,11 @@ export class BumperState extends ItemState {
 	}
 
 	public equals(state: BumperState): boolean {
-		/* istanbul ignore if: we don't actually pass empty states. */
-		if (!state) {
-			return false
-		}
+		if (!state) return false
 		return (
 			state.ringOffset === this.ringOffset &&
 			state.skirtRotX === this.skirtRotX &&
+			state.skirtRotY === this.skirtRotY &&
 			state.isCapVisible === this.isCapVisible &&
 			state.isRingVisible === this.isRingVisible &&
 			state.isBaseVisible === this.isBaseVisible &&
