@@ -25,7 +25,8 @@ const bumperCapMesh = Mesh.fromJson(bumperCapMeshJson)
 const bumperRingMesh = Mesh.fromJson(bumperRingMeshJson)
 const bumperSocketMesh = Mesh.fromJson(bumperSocketMeshJson)
 
-export class BumperMeshGenerator {
+export /** Bumper mesh generator. */
+class BumperMeshGenerator {
 	private readonly data: BumperData
 
 	private readonly scaledBashMesh: Mesh
