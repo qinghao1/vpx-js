@@ -22,11 +22,7 @@ import { TriggerMeshGenerator } from './trigger-mesh-generator.js'
 import { TriggerState } from './trigger-state.js'
 import { TriggerUpdater } from './trigger-updater.js'
 
-/**
- * VPinball's triggers.
- *
- * @see https://github.com/vpinball/vpinball/blob/master/trigger.cpp
- */
+/** Trigger item. @see https://github.com/vpinball/vpinball/blob/master/trigger.cpp */
 export class Trigger
 	extends Item<TriggerData>
 	implements IRenderable<TriggerState>, IHittable, IAnimatable, IScriptable<TriggerApi>
