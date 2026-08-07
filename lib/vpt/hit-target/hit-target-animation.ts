@@ -10,7 +10,8 @@ import { HitTarget } from './hit-target.js'
 import type { HitTargetData } from './hit-target-data.js'
 import type { HitTargetState } from './hit-target-state.js'
 
-export class HitTargetAnimation implements IAnimation {
+export /** HitTargetAnimation. */
+class HitTargetAnimation implements IAnimation {
 	private readonly data: HitTargetData
 	private readonly state: HitTargetState
 	private readonly events: EventProxy
