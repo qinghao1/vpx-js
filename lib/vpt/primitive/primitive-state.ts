@@ -5,7 +5,9 @@ import { Vertex3D } from '../../math/vertex3d.js'
 import { Pool } from '../../util/object-pool.js'
 import { ItemState } from '../item-state.js'
 
-/** Primitive state. */
+/** Primitive state.
+ *
+ * @see https://github.com/vpinball/vpinball/blob/master/primitive.cpp */
 export class PrimitiveState extends ItemState {
 	public static readonly POOL = new Pool(PrimitiveState)
 
