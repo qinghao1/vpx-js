@@ -9,7 +9,8 @@ import type { Ball } from '../vpt/ball/ball.js'
 import type { CollisionEvent } from './collision-event.js'
 import type { HitObject } from './hit-object.js'
 
-/** Quad-tree for broadphase. */
+/** Quad-tree for broadphase.
+ * @see https://github.com/vpinball/vpinball/blob/master/quadtree.cpp */
 export class HitQuadtree {
 	private unique?: EventProxy
 	private vho: HitObject[] = []
