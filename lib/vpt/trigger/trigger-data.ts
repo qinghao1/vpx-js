@@ -8,6 +8,7 @@ import { Vertex2D } from '../../math/vertex2d.js'
 import { Enums } from '../enums.js'
 import { ItemData } from '../item-data.js'
 
+/** Trigger data. */
 export class TriggerData extends ItemData {
 	public dragPoints: DragPoint[] = []
 	public center!: Vertex2D
