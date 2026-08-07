@@ -29,7 +29,7 @@ export class Storage {
 		if (!e) return null
 		bytesToRead ||= e.size - offset
 		if (bytesToRead <= 0) return readableStream(async (s): Promise<Uint8Array | null> => (s.emit('end'), null))
-		const { shortStream, secSize, table, secIds, secOffset, innerOffset } = this.sectorInfo(e, offset, bytesToRead)
+		const { shortStream, secSize, secIds, secOffset, innerOffset } = this.sectorInfo(e, offset, bytesToRead)
 		const needed = secIds.slice(secOffset, secOffset + Math.ceil((innerOffset + bytesToRead) / secSize))
 		let cached: Uint8Array | null = null
 		let pos = 0
@@ -59,7 +59,7 @@ export class Storage {
 		if (!e) throw new Error(`No such stream "${name}" in document.`)
 		if (offset >= e.size) return
 		const total = e.size - offset
-		const { shortStream, secSize, table, secIds, secOffset, innerOffset } = this.sectorInfo(e, offset, total)
+		const { shortStream, secSize, secIds, secOffset, innerOffset } = this.sectorInfo(e, offset, total)
 		const needed = secIds.slice(secOffset, secOffset + Math.ceil((innerOffset + total) / secSize))
 		let buf = shortStream
 			? await this.doc.readShortSectors(needed, innerOffset, total)
@@ -94,7 +94,7 @@ export class Storage {
 		if (!e) throw new Error(`No such stream "${key}".`)
 		bytesToRead ||= e.size - offset
 		if (bytesToRead <= 0) return new Uint8Array(0)
-		const { shortStream, secSize, table, secIds, secOffset, innerOffset } = this.sectorInfo(e, offset, bytesToRead)
+		const { shortStream, secSize, secIds, secOffset, innerOffset } = this.sectorInfo(e, offset, bytesToRead)
 		const needed = secIds.slice(secOffset, secOffset + Math.ceil((innerOffset + bytesToRead) / secSize))
 		return shortStream
 			? this.doc.readShortSectors(needed, innerOffset, bytesToRead)
@@ -104,10 +104,9 @@ export class Storage {
 	private sectorInfo(e: StorageEntry, offset: number, bytes: number) {
 		const shortStream = e.size < this.doc.header.shortStreamMax
 		const secSize = shortStream ? this.doc.header.shortSecSize : this.doc.header.secSize
-		const table = shortStream ? this.doc.SSAT : this.doc.SAT
-		const secIds = table.getSecIdChain(e.secId)
+		const secIds = (shortStream ? this.doc.SSAT : this.doc.SAT).getSecIdChain(e.secId)
 		const secOffset = Math.floor(offset / secSize)
 		const innerOffset = offset % secSize
-		return { shortStream, secSize, table, secIds, secOffset, innerOffset }
+		return { shortStream, secSize, secIds, secOffset, innerOffset }
 	}
 }
