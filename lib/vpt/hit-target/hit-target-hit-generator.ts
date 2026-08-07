@@ -16,8 +16,8 @@ import type { Table } from '../table/table.js'
 import type { HitTargetData } from './hit-target-data.js'
 import type { HitTargetMeshGenerator } from './hit-target-mesh-generator.js'
 
-export /** HitTarget hit generator. */
-class HitTargetHitGenerator {
+/** HitTarget hit generator. */
+export class HitTargetHitGenerator {
 	private readonly data: HitTargetData
 	private readonly meshGenerator: HitTargetMeshGenerator
 
