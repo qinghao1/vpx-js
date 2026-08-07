@@ -4,8 +4,8 @@
 import { Pool } from '../../util/object-pool.js'
 import { ItemState } from '../item-state.js'
 
-export /** RubberState. */
-class RubberState extends ItemState {
+/** RubberState. */
+export class RubberState extends ItemState {
 	public static readonly POOL = new Pool(RubberState)
 
 	public height!: number
