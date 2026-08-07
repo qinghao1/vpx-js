@@ -25,6 +25,11 @@ export class Player extends EventEmitter {
 		return this.physics.balls
 	}
 
+	/** Active ball if any. */
+	get activeBall(): Ball | undefined {
+		return this.physics.activeBall
+	}
+
 	private previousStates: Record<string, ItemState> = {}
 	private currentStates: Record<string, ItemState> = {}
 	private simulatedTimeMs = 0
@@ -64,14 +69,12 @@ export class Player extends EventEmitter {
 		}
 	}
 
-	/** Test helper: simulates time at 60Hz. */
+	/** Test helper: steps 60Hz until dTime. */
 	public simulateTime(dTime: number): void {
 		if (!this.isInitialized) throw new Error('Player must be initialized before simulating time!')
-		const dt = 1000 / 60
-		while (this.simulatedTimeMs <= dTime) {
+		for (const dt = 1000 / 60; this.simulatedTimeMs <= dTime; this.simulatedTimeMs += dt) {
 			this.updatePhysics(this.simulatedTimeMs)
 			this.updateAnimations(this.simulatedTimeMs)
-			this.simulatedTimeMs += dt
 		}
 	}
 
