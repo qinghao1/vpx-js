@@ -32,7 +32,7 @@ import type { Player } from './player.js'
 
 const APP_KEYBOARD = 0
 
-/** DirectInput-style key queue for the table. */
+/** DirectInput key queue. @see https://github.com/vpinball/vpinball/blob/master/pininput.cpp */
 export class PinInput {
 	private readonly table: Table
 	private readonly player: Player
