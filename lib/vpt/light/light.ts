@@ -17,24 +17,24 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { EventProxy } from '../../game/event-proxy';
-import { IAnimatable, IAnimation } from '../../game/ianimatable';
-import { IRenderable, Meshes } from '../../game/irenderable';
-import { IScriptable } from '../../game/iscriptable';
-import { Player } from '../../game/player';
-import { Storage } from '../../io/ole-doc';
-import { Matrix3D } from '../../math/matrix3d';
-import { IRenderApi } from '../../render/irender-api';
-import { Enums } from '../enums';
-import { Item } from '../item';
-import { Material } from '../material';
-import { Table } from '../table/table';
-import { LightAnimation } from './light-animation';
-import { LightApi } from './light-api';
-import { LightData } from './light-data';
-import { LightMeshGenerator } from './light-mesh-generator';
-import { LightState } from './light-state';
-import { LightUpdater } from './light-updater';
+import { EventProxy } from '../../game/event-proxy'
+import type { IAnimatable, IAnimation } from '../../game/ianimatable'
+import type { IRenderable, Meshes } from '../../game/irenderable'
+import type { IScriptable } from '../../game/iscriptable'
+import type { Player } from '../../game/player'
+import type { Storage } from '../../io/ole-doc'
+import { Matrix3D } from '../../math/matrix3d'
+import type { IRenderApi } from '../../render/irender-api'
+import { Enums } from '../enums'
+import { Item } from '../item'
+import { Material } from '../material'
+import type { Table } from '../table/table'
+import { LightAnimation } from './light-animation'
+import { LightApi } from './light-api'
+import { LightData } from './light-data'
+import { LightMeshGenerator } from './light-mesh-generator'
+import { LightState } from './light-state'
+import { LightUpdater } from './light-updater'
 
 /**
  * VPinball's lights.
@@ -42,66 +42,78 @@ import { LightUpdater } from './light-updater';
  * @see https://github.com/vpinball/vpinball/blob/master/light.cpp
  */
 export class Light extends Item<LightData> implements IRenderable<LightState>, IAnimatable, IScriptable<LightApi> {
-
 	// public getters
-	get color() { return this.data.color; }
-	get intensity() { return this.data.intensity; }
-	get falloff() { return this.data.falloff; }
-	get vCenter() { return this.data.center; }
-	get offImage() { return this.data.szOffImage; }
+	get color() {
+		return this.data.color
+	}
+	get intensity() {
+		return this.data.intensity
+	}
+	get falloff() {
+		return this.data.falloff
+	}
+	get vCenter() {
+		return this.data.center
+	}
+	get offImage() {
+		return this.data.szOffImage
+	}
 
-	public readonly data: LightData;
-	private readonly state: LightState;
-	private readonly meshGenerator: LightMeshGenerator;
-	private readonly updater: LightUpdater;
-	private api?: LightApi;
-	private animation?: LightAnimation;
+	public readonly data: LightData
+	private readonly state: LightState
+	private readonly meshGenerator: LightMeshGenerator
+	private readonly updater: LightUpdater
+	private api?: LightApi
+	private animation?: LightAnimation
 
 	public static async fromStorage(storage: Storage, itemName: string): Promise<Light> {
-		const data = await LightData.fromStorage(storage, itemName);
-		return new Light(data);
+		const data = await LightData.fromStorage(storage, itemName)
+		return new Light(data)
 	}
 
 	private constructor(data: LightData) {
-		super(data);
-		this.state = LightState.claim(this.getName(), 0, data.color, data.color2);
-		this.data = data;
-		this.meshGenerator = new LightMeshGenerator(data);
-		this.updater = new LightUpdater(this.data, this.state);
+		super(data)
+		this.state = LightState.claim(this.getName(), 0, data.color, data.color2)
+		this.data = data
+		this.meshGenerator = new LightMeshGenerator(data)
+		this.updater = new LightUpdater(this.data, this.state)
 	}
 
 	public isVisible(table: Table): boolean {
-		return this.data.isVisible; // we filter by bulb/playfield light
+		return this.data.isVisible // we filter by bulb/playfield light
 	}
 
 	public setupPlayer(player: Player, table: Table): void {
-		this.events = new EventProxy(this);
-		this.animation = new LightAnimation(this.data, this.state);
-		this.api = new LightApi(this.state, this.animation, this.data, this.events, player, table);
+		this.events = new EventProxy(this)
+		this.animation = new LightAnimation(this.data, this.state)
+		this.api = new LightApi(this.state, this.animation, this.data, this.events, player, table)
 	}
 
 	public getApi(): LightApi {
-		return this.api!;
+		return this.api!
 	}
 
 	public getAnimation(): IAnimation {
-		return this.animation!;
+		return this.animation!
 	}
 
 	public getState(): LightState {
-		return this.state!;
+		return this.state!
 	}
 
 	public getUpdater(): LightUpdater {
-		return this.updater;
+		return this.updater
 	}
 
 	public getEventNames(): string[] {
-		return [ 'Init', 'Timer' ];
+		return ['Init', 'Timer']
 	}
 
-	public getMeshes<NODE, GEOMETRY, POINT_LIGHT>(table: Table, renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>): Meshes<GEOMETRY> {
-		const light = this.meshGenerator.getMeshes(table, renderApi);
+	public getMeshes<NODE, GEOMETRY, POINT_LIGHT>(
+		table: Table,
+		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
+	): Meshes<GEOMETRY> {
+		const light = this.meshGenerator.getMeshes(table, renderApi)
 		if (light.surfaceLight) {
 			return {
 				surfaceLight: {
@@ -110,77 +122,77 @@ export class Light extends Item<LightData> implements IRenderable<LightState>, I
 					map: table.getTexture(this.data.szOffImage),
 					material: this.getSurfaceMaterial(table),
 				},
-			};
+			}
 		}
-		const meshes: Meshes<GEOMETRY> = {};
+		const meshes: Meshes<GEOMETRY> = {}
 		if (light.light) {
-			const lightMaterial = new Material();
-			lightMaterial.name = `bulb.light:${this.getName()}`;
-			lightMaterial.baseColor = 0;
-			lightMaterial.wrapLighting = 0.5;
-			lightMaterial.isOpacityActive = true;
-			lightMaterial.opacity = 0.2;
-			lightMaterial.glossiness = 0xFFFFFF;
-			lightMaterial.isMetal = false;
-			lightMaterial.edge = 1.0;
-			lightMaterial.edgeAlpha = 1.0;
-			lightMaterial.roughness = 0.9;
-			lightMaterial.glossyImageLerp = 1.0;
-			lightMaterial.thickness = 0.05;
-			lightMaterial.clearCoat = 0xFFFFFF;
-			lightMaterial.emissiveColor = this.data.color;
-			lightMaterial.emissiveIntensity = this.data.isOn() ? 1 : 0.1;
+			const lightMaterial = new Material()
+			lightMaterial.name = `bulb.light:${this.getName()}`
+			lightMaterial.baseColor = 0
+			lightMaterial.wrapLighting = 0.5
+			lightMaterial.isOpacityActive = true
+			lightMaterial.opacity = 0.2
+			lightMaterial.glossiness = 0xffffff
+			lightMaterial.isMetal = false
+			lightMaterial.edge = 1.0
+			lightMaterial.edgeAlpha = 1.0
+			lightMaterial.roughness = 0.9
+			lightMaterial.glossyImageLerp = 1.0
+			lightMaterial.thickness = 0.05
+			lightMaterial.clearCoat = 0xffffff
+			lightMaterial.emissiveColor = this.data.color
+			lightMaterial.emissiveIntensity = this.data.isOn() ? 1 : 0.1
 
 			meshes.light = {
 				isVisible: this.data.isVisible,
 				mesh: light.light.transform(Matrix3D.RIGHT_HANDED),
 				material: lightMaterial,
-			};
+			}
 		}
 
 		if (light.socket) {
-			const socketMaterial = new Material();
-			socketMaterial.baseColor = 0x181818;
-			socketMaterial.wrapLighting = 0.5;
-			socketMaterial.isOpacityActive = false;
-			socketMaterial.opacity = 1.0;
-			socketMaterial.glossiness = 0xB4B4B4;
-			socketMaterial.isMetal = false;
-			socketMaterial.edge = 1.0;
-			socketMaterial.edgeAlpha = 1.0;
-			socketMaterial.roughness = 0.9;
-			socketMaterial.glossyImageLerp = 1.0;
-			socketMaterial.thickness = 0.05;
-			socketMaterial.clearCoat = 0;
+			const socketMaterial = new Material()
+			socketMaterial.baseColor = 0x181818
+			socketMaterial.wrapLighting = 0.5
+			socketMaterial.isOpacityActive = false
+			socketMaterial.opacity = 1.0
+			socketMaterial.glossiness = 0xb4b4b4
+			socketMaterial.isMetal = false
+			socketMaterial.edge = 1.0
+			socketMaterial.edgeAlpha = 1.0
+			socketMaterial.roughness = 0.9
+			socketMaterial.glossyImageLerp = 1.0
+			socketMaterial.thickness = 0.05
+			socketMaterial.clearCoat = 0
 
 			meshes.socket = {
 				isVisible: this.data.isVisible,
 				mesh: light.socket.transform(Matrix3D.RIGHT_HANDED),
 				material: socketMaterial,
-			};
+			}
 		}
-		return meshes;
+		return meshes
 	}
 
 	public getSurfaceMaterial(table: Table): Material {
-		const material = new Material();
-		material.name = `surface-${this.getName()}`;
-		material.emissiveMap = table.getTexture(this.data.szOffImage);
-		material.emissiveIntensity = 0;
-		material.emissiveColor = 0x0;
-		material.opacity = 1;
-		return material;
+		const material = new Material()
+		material.name = `surface-${this.getName()}`
+		material.emissiveMap = table.getTexture(this.data.szOffImage)
+		material.emissiveIntensity = 0
+		material.emissiveColor = 0x0
+		material.opacity = 1
+		return material
 	}
 
 	public isBulbLight() {
-		return this.data.isBulbLight();
+		return this.data.isBulbLight()
 	}
 
 	public isSurfaceLight(table: Table) {
-		return this.data.isSurfaceLight(table);
+		return this.data.isSurfaceLight(table)
 	}
 
 	public isPlayfieldLight(table: Table) {
-		return this.data.isPlayfieldLight(table);
+		return this.data.isPlayfieldLight(table)
 	}
 }
