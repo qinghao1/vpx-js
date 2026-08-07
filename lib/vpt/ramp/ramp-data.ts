@@ -42,8 +42,8 @@ const STRING_MAP: Record<string, string> = { MATR: 'szMaterial', IMAG: 'szImage'
 export class RampData extends ItemData implements IPhysicalData {
 	public depthBias = 0
 	public dragPoints: DragPoint[] = []
-	public elasticity!: number
-	public friction!: number
+	public elasticity = 0.3
+	public friction = 0.3
 	public hitEvent = false
 	public heightBottom = 0
 	public heightTop = f4(50)
