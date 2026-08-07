@@ -9,7 +9,9 @@ import type { LightAnimation } from './light-animation.js'
 import type { LightData } from './light-data.js'
 import type { LightState } from './light-state.js'
 
-/** Light API. */
+/** Light API.
+ *
+ * @see https://github.com/vpinball/vpinball/blob/master/light.cpp */
 export class LightApi extends ItemApi<LightData> {
 	private readonly state: LightState
 	private readonly animation: LightAnimation
