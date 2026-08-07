@@ -11,7 +11,7 @@ import { PlungerDesc } from './plunger-desc.js'
 
 const PLUNGER_FRAME_COUNT = 25
 
-/** PlungerMeshGenerator. */
+/** Plunge mesh generator. */
 export class PlungerMeshGenerator {
 	private readonly data: PlungerData
 	private readonly cache: { [key: number]: { rod?: Mesh; spring?: Mesh; flat?: Mesh } } = {}
