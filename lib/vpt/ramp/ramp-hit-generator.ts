@@ -1,36 +1,20 @@
-/*
- * VPDB - Virtual Pinball Database
- * Copyright (C) 2019 freezy <freezy@vpdb.io>
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- */
+// Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import type { EventProxy } from '../../game/event-proxy'
-import { Vertex2D } from '../../math/vertex2d'
-import { Vertex3D } from '../../math/vertex3d'
-import { CollisionType } from '../../physics/collision-type'
-import { HIT_SHAPE_DETAIL_LEVEL, PHYS_SKIN } from '../../physics/constants'
-import { HitLine3D } from '../../physics/hit-line-3d'
-import { HitLineZ } from '../../physics/hit-line-z'
-import type { HitObject } from '../../physics/hit-object'
-import { HitTriangle } from '../../physics/hit-triangle'
-import { LineSeg } from '../../physics/line-seg'
-import { Enums } from '../enums'
-import type { Table } from '../table/table'
-import type { RampData } from './ramp-data'
-import type { RampMeshGenerator } from './ramp-mesh-generator'
+import type { EventProxy } from '../../game/event-proxy.js'
+import { Vertex2D } from '../../math/vertex2d.js'
+import { Vertex3D } from '../../math/vertex3d.js'
+import { CollisionType } from '../../physics/collision-type.js'
+import { HIT_SHAPE_DETAIL_LEVEL, PHYS_SKIN } from '../../physics/constants.js'
+import { HitLine3D } from '../../physics/hit-line-3d.js'
+import { HitLineZ } from '../../physics/hit-line-z.js'
+import type { HitObject } from '../../physics/hit-object.js'
+import { HitTriangle } from '../../physics/hit-triangle.js'
+import { LineSeg } from '../../physics/line-seg.js'
+import { Enums } from '../enums.js'
+import type { Table } from '../table/table.js'
+import type { RampData } from './ramp-data.js'
+import type { RampMeshGenerator } from './ramp-mesh-generator.js'
 
 export class RampHitGenerator {
 	private readonly data: RampData
