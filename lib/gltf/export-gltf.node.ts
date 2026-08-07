@@ -6,6 +6,7 @@ import type { TableGenerateGltfOptions } from '../vpt/table/table.js'
 import type { TableExportOptions } from '../vpt/table/table-exporter.js'
 import { GLTFExporter } from './gltf-exporter.js'
 
+/** exportGltf. */
 export function exportGltf(scene: Scene, opts: TableExportOptions, gltfOpts?: TableGenerateGltfOptions) {
 	const gltfExporter = new GLTFExporter(
 		Object.assign({}, { embedImages: true, optimizeImages: opts.optimizeTextures }, gltfOpts),
