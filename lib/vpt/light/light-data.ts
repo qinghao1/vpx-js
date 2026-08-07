@@ -11,6 +11,7 @@ import type { Table } from '../table/table.js'
 
 /** Light data. */
 export class LightData extends ItemData {
+	// appearance, physics, and behavior
 	public center!: Vertex2D
 	public falloff: number = 50
 	public falloffPower: number = 2
