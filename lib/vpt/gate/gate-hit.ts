@@ -15,103 +15,61 @@ import type { GateData } from './gate-data.js'
 import { GateMover } from './gate-mover.js'
 import type { GateState } from './gate-state.js'
 
-/** Gate hit. */
+/** Gate hit — two-sided line segments. @see https://github.com/vpinball/vpinball/blob/master/gate.cpp */
 export class GateHit extends HitObject {
 	public readonly mover: GateMover
 	public readonly lineSeg: LineSeg[] = []
-	private readonly data: GateData
-
-	public twoWay: boolean = false
-
-	constructor(data: GateData, state: GateState, events: EventProxy, height: number) {
+	public twoWay = false
+	constructor(
+		private readonly data: GateData,
+		state: GateState,
+		events: EventProxy,
+		height: number,
+	) {
 		super()
-		this.data = data
-
-		const halfLength = this.data.length * 0.5
-		const radAngle = degToRad(this.data.rotation)
-		const sn = Math.sin(radAngle)
-		const cs = Math.cos(radAngle)
-
-		const lineSeg0 = new LineSeg(
-			new Vertex2D(
-				this.data.center.x - cs * (halfLength + PHYS_SKIN),
-				this.data.center.y - sn * (halfLength + PHYS_SKIN),
-			),
-			new Vertex2D(
-				this.data.center.x + cs * (halfLength + PHYS_SKIN),
-				this.data.center.y + sn * (halfLength + PHYS_SKIN),
-			),
-			height,
-			height + 2.0 * PHYS_SKIN,
-			CollisionType.Gate,
+		const hl = data.length * 0.5,
+			rad = degToRad(data.rotation),
+			sn = Math.sin(rad),
+			cs = Math.cos(rad)
+		const v1 = new Vertex2D(data.center.x - cs * (hl + PHYS_SKIN), data.center.y - sn * (hl + PHYS_SKIN))
+		const v2 = new Vertex2D(data.center.x + cs * (hl + PHYS_SKIN), data.center.y + sn * (hl + PHYS_SKIN))
+		const z0 = height,
+			z1 = height + 2 * PHYS_SKIN
+		this.lineSeg.push(
+			new LineSeg(v1, v2, z0, z1, CollisionType.Gate),
+			new LineSeg(v2.clone(), v1.clone(), z0, z1, CollisionType.Gate),
 		)
-		const lineSeg1 = new LineSeg(
-			new Vertex2D(lineSeg0.v2.x, lineSeg0.v2.y),
-			new Vertex2D(lineSeg0.v1.x, lineSeg0.v1.y),
-			height,
-			height + 2.0 * PHYS_SKIN,
-			CollisionType.Gate,
-		)
-		this.lineSeg.push(lineSeg0)
-		this.lineSeg.push(lineSeg1)
-
-		this.mover = new GateMover(this.data, state, events)
-		this.twoWay = false
+		this.mover = new GateMover(data, state, events)
 	}
-
 	public getMoverObject(): GateMover {
 		return this.mover
 	}
-
 	public calcHitBBox(): void {
-		// Bounding rect for both lines will be the same
-		this.lineSeg[0].calcHitBBox()
-		this.hitBBox = this.lineSeg[0].hitBBox
+		this.lineSeg[0]!.calcHitBBox()
+		this.hitBBox = this.lineSeg[0]!.hitBBox
 	}
-
-	public hitTest(ball: Ball, dTime: number, coll: CollisionEvent, physics: PlayerPhysics): number {
-		if (!this.isEnabled) {
-			return -1.0
-		}
-
-		for (let i = 0; i < 2; ++i) {
-			const hitTime = this.lineSeg[i].hitTestBasic(ball, dTime, coll, false, true, false) // any face, lateral, non-rigid
-			if (hitTime >= 0) {
-				// signal the Collide() function that the hit is on the front or back side
+	public hitTest(ball: Ball, dTime: number, coll: CollisionEvent, _physics: PlayerPhysics): number {
+		if (!this.isEnabled) return -1
+		for (let i = 0; i < 2; i++) {
+			const t = this.lineSeg[i]!.hitTestBasic(ball, dTime, coll, false, true, false)
+			if (t >= 0) {
 				coll.hitFlag = !!i
-				return hitTime
+				return t
 			}
 		}
-		return -1.0
+		return -1
 	}
-
-	public collide(coll: CollisionEvent, physics: PlayerPhysics): void {
-		const ball = coll.ball
-		const hitNormal = coll.hitNormal
-
-		const dot = hitNormal.dot(coll.ball.hit.vel)
-		const h = this.data.height * 0.5
-
-		// linear speed = ball speed
-		// angular speed = linear/radius (height of hit)
-		let speed = Math.abs(dot)
-		// h is the height of the gate axis.
-		if (Math.abs(h) > 1.0) {
-			// avoid divide by zero
-			speed /= h
-		}
-
+	public collide(coll: CollisionEvent, _physics: PlayerPhysics): void {
+		const ball = coll.ball,
+			h = this.data.height * 0.5
+		let speed = Math.abs(coll.hitNormal.dot(ball.hit.vel))
+		if (Math.abs(h) > 1) speed /= h
 		this.mover.angleSpeed = speed
 		if (!coll.hitFlag && !this.twoWay) {
-			this.mover.angleSpeed *= 1.0 / 8.0 // Give a little bounce-back.
-			return // hit from back doesn't count if not two-way
+			this.mover.angleSpeed /= 8
+			return
 		}
-
-		// We encoded which side of the spinner the ball hit
-		if (coll.hitFlag && this.twoWay) {
-			this.mover.angleSpeed = -this.mover.angleSpeed
-		}
-
+		if (coll.hitFlag && this.twoWay) this.mover.angleSpeed = -this.mover.angleSpeed
 		this.fireHitEvent(ball)
 	}
 }
