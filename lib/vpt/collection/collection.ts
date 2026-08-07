@@ -13,7 +13,7 @@ import type { Table } from '../table/table.js'
 import { CollectionApi } from './collection-api.js'
 import { CollectionData } from './collection-data.js'
 
-/** Collection. */
+/** Collection item. */
 export class Collection extends Item<CollectionData> implements IPlayable, IScriptable<CollectionApi> {
 	public readonly items: Array<ItemApi<ItemData>> = [] // m_visel
 	private api?: CollectionApi
