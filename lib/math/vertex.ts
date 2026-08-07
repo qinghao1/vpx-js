@@ -4,7 +4,7 @@
 import { f4 } from './float.js'
 import { Vertex3D } from './vertex3d.js'
 
-/** Minimal 2D vector contract. */
+/** Minimal vector contract. */
 export interface Vertex {
 	x: number
 	y: number
@@ -13,7 +13,7 @@ export interface Vertex {
 	length(): number
 }
 
-/** Vertex with editor flags (smooth/slingshot/control-point). */
+/** Vertex with editor flags. */
 export interface IRenderVertex {
 	x: number
 	y: number
@@ -24,7 +24,7 @@ export interface IRenderVertex {
 	set(x: number, y: number, z?: number): this
 }
 
-/** Untextured vertex — position, normal, tex-coords (8 floats, 32 bytes). */
+/** Untextured mesh vertex (pos + normal + uv, 32 bytes). */
 export class Vertex3DNoTex2 {
 	static readonly size = 32
 
@@ -86,12 +86,12 @@ export class Vertex3DNoTex2 {
 		this._tv = f4(v)
 	}
 
-	/** Reads vertex at `pos` from `buffer`. */
+	/** Reads vertex at index pos from buffer. */
 	static get(buffer: Uint8Array, pos: number): Vertex3DNoTex2 {
-		const offset = pos * Vertex3DNoTex2.size
+		const off = pos * Vertex3DNoTex2.size
 		const v = new Vertex3DNoTex2()
 		try {
-			const f32 = new Float32Array(buffer.buffer, buffer.byteOffset + offset, 8)
+			const f32 = new Float32Array(buffer.buffer, buffer.byteOffset + off, 8)
 			v._x = f32[0]
 			v._y = f32[1]
 			v._z = f32[2]
@@ -102,19 +102,19 @@ export class Vertex3DNoTex2 {
 			v._tv = f32[7]
 			return v
 		} catch {}
-		const view = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength)
-		v._x = f4(view.getFloat32(offset, true))
-		v._y = f4(view.getFloat32(offset + 4, true))
-		v._z = f4(view.getFloat32(offset + 8, true))
-		v._nx = f4(view.getFloat32(offset + 12, true))
-		v._ny = f4(view.getFloat32(offset + 16, true))
-		v._nz = f4(view.getFloat32(offset + 20, true))
-		v._tu = f4(view.getFloat32(offset + 24, true))
-		v._tv = f4(view.getFloat32(offset + 28, true))
+		const d = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength)
+		v._x = f4(d.getFloat32(off, true))
+		v._y = f4(d.getFloat32(off + 4, true))
+		v._z = f4(d.getFloat32(off + 8, true))
+		v._nx = f4(d.getFloat32(off + 12, true))
+		v._ny = f4(d.getFloat32(off + 16, true))
+		v._nz = f4(d.getFloat32(off + 20, true))
+		v._tu = f4(d.getFloat32(off + 24, true))
+		v._tv = f4(d.getFloat32(off + 28, true))
 		return v
 	}
 
-	/** Returns position as `Vertex3D`. */
+	/** Position as Vertex3D. */
 	getVertex(): Vertex3D {
 		return new Vertex3D(this._x, this._y, this._z)
 	}
@@ -132,7 +132,7 @@ export class Vertex3DNoTex2 {
 		return v
 	}
 
-	/** Whether texture coordinates are present. */
+	/** Whether UVs are present. */
 	hasTextureCoordinates(): boolean {
 		return this._tu !== undefined && this._tv !== undefined
 	}
@@ -141,16 +141,16 @@ export class Vertex3DNoTex2 {
 		return Object.assign(new Vertex3DNoTex2(), data)
 	}
 
-	static fromArray(arr: number[]): Vertex3DNoTex2 {
+	static fromArray(a: number[]): Vertex3DNoTex2 {
 		const v = new Vertex3DNoTex2()
-		v._x = f4(arr[0])
-		v._y = f4(arr[1])
-		v._z = f4(arr[2])
-		v._nx = f4(arr[3])
-		v._ny = f4(arr[4])
-		v._nz = f4(arr[5])
-		v._tu = f4(arr[6])
-		v._tv = f4(arr[7])
+		v._x = f4(a[0])
+		v._y = f4(a[1])
+		v._z = f4(a[2])
+		v._nx = f4(a[3])
+		v._ny = f4(a[4])
+		v._nz = f4(a[5])
+		v._tu = f4(a[6])
+		v._tv = f4(a[7])
 		return v
 	}
 }
