@@ -13,61 +13,44 @@ import type { Table } from '../table/table.js'
 import type { RubberData } from './rubber-data.js'
 import type { RubberMeshGenerator } from './rubber-mesh-generator.js'
 
-/** Rubber hit generator. */
+/** Generates rubber hit shapes. @see https://github.com/vpinball/vpinball/blob/master/rubber.cpp */
 export class RubberHitGenerator {
-	private readonly data: RubberData
-	private readonly meshGenerator: RubberMeshGenerator
-
-	constructor(data: RubberData, meshGenerator: RubberMeshGenerator) {
-		this.data = data
-		this.meshGenerator = meshGenerator
-	}
+	constructor(
+		private readonly data: RubberData,
+		private readonly meshGenerator: RubberMeshGenerator,
+	) {}
 
 	public generateHitObjects(events: EventProxy, table: Table): HitObject[] {
-		const hitObjects: HitObject[] = []
-		const addedEdges: EdgeSet = new EdgeSet()
-		const mesh = this.meshGenerator.getMeshes(table, 6, true) //!! adapt hacky code in the function if changing the "6" here
-
-		// add collision triangles and edges
+		const addedEdges = new EdgeSet()
+		const mesh = this.meshGenerator.getMeshes(table, 6, true)
+		const hits: HitObject[] = []
 		for (let i = 0; i < mesh.indices.length; i += 3) {
-			const rgv3D: Vertex3D[] = []
-			// NB: HitTriangle wants CCW vertices, but for rendering we have them in CW order
-			let v = mesh.vertices[mesh.indices[i]]
-			rgv3D[0] = new Vertex3D(v.x, v.y, v.z)
-			v = mesh.vertices[mesh.indices[i + 2]]
-			rgv3D[1] = new Vertex3D(v.x, v.y, v.z)
-			v = mesh.vertices[mesh.indices[i + 1]]
-			rgv3D[2] = new Vertex3D(v.x, v.y, v.z)
-			hitObjects.push(new HitTriangle(rgv3D))
-
-			hitObjects.push(...RubberHitGenerator.generateHitEdge(mesh, addedEdges, mesh.indices[i], mesh.indices[i + 2]))
-			hitObjects.push(...RubberHitGenerator.generateHitEdge(mesh, addedEdges, mesh.indices[i + 2], mesh.indices[i + 1]))
-			hitObjects.push(...RubberHitGenerator.generateHitEdge(mesh, addedEdges, mesh.indices[i + 1], mesh.indices[i]))
+			const a = mesh.vertices[mesh.indices[i]!]!,
+				b = mesh.vertices[mesh.indices[i + 2]!]!,
+				c = mesh.vertices[mesh.indices[i + 1]!]!
+			hits.push(
+				new HitTriangle([new Vertex3D(a.x, a.y, a.z), new Vertex3D(b.x, b.y, b.z), new Vertex3D(c.x, c.y, c.z)]),
+			)
+			hits.push(...RubberHitGenerator.edge(mesh, addedEdges, mesh.indices[i]!, mesh.indices[i + 2]!))
+			hits.push(...RubberHitGenerator.edge(mesh, addedEdges, mesh.indices[i + 2]!, mesh.indices[i + 1]!))
+			hits.push(...RubberHitGenerator.edge(mesh, addedEdges, mesh.indices[i + 1]!, mesh.indices[i]!))
 		}
-
-		// add collision vertices
-		for (const mv of mesh.vertices) {
-			const v = new Vertex3D(mv.x, mv.y, mv.z)
-			hitObjects.push(new HitPoint(v))
-		}
-		return hitObjects.map((obj) => this.setupHitObject(obj, events, table))
+		for (const mv of mesh.vertices) hits.push(new HitPoint(new Vertex3D(mv.x, mv.y, mv.z)))
+		return hits.map((o) => this.setup(o, events, table))
 	}
 
-	private setupHitObject(obj: HitObject, events: EventProxy, table: Table): HitObject {
+	private setup(obj: HitObject, events: EventProxy, table: Table): HitObject {
 		obj.applyPhysics(this.data, table)
-
-		// the rubber is of type ePrimitive for triggering the event in HitTriangle::Collide()
 		obj.setType(CollisionType.Primitive)
-		// hard coded threshold for now
-		obj.threshold = 2.0
+		obj.threshold = 2
 		obj.obj = events
 		obj.fe = this.data.hitEvent
 		return obj
 	}
 
-	private static generateHitEdge(mesh: Mesh, addedEdges: EdgeSet, i: number, j: number): HitObject[] {
-		const v1 = new Vertex3D(mesh.vertices[i].x, mesh.vertices[i].y, mesh.vertices[i].z)
-		const v2 = new Vertex3D(mesh.vertices[j].x, mesh.vertices[j].y, mesh.vertices[j].z)
-		return addedEdges.addHitEdge(i, j, v1, v2)
+	private static edge(mesh: Mesh, edges: EdgeSet, i: number, j: number): HitObject[] {
+		const a = mesh.vertices[i]!,
+			b = mesh.vertices[j]!
+		return edges.addHitEdge(i, j, new Vertex3D(a.x, a.y, a.z), new Vertex3D(b.x, b.y, b.z))
 	}
 }
