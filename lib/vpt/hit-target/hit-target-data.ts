@@ -9,8 +9,8 @@ import { Enums } from '../enums.js'
 import { type IPhysicalData, ItemData } from '../item-data.js'
 import type { Table } from '../table/table.js'
 
-export /** HitTarget data. */
-class HitTargetData extends ItemData implements IPhysicalData {
+/** HitTarget data. */
+export class HitTargetData extends ItemData implements IPhysicalData {
 	public depthBias?: number
 	public disableLightingBelow?: number
 	public disableLightingTop?: number
