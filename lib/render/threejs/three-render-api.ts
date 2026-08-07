@@ -29,8 +29,8 @@ import { ThreeMaterialGenerator } from './three-material-generator.js'
 import { releaseGeometry, ThreeMeshGenerator } from './three-mesh-generator.js'
 import { ThreePlayfieldMeshGenerator } from './three-playfield-mesh-generator.js'
 
-export /** Three.js render API. */
-class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, PointLight> {
+/** Three.js render API. */
+export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, PointLight> {
 	public static readonly SCALE = 0.05
 	public static readonly SHADOWS = true
 
