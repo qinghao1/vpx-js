@@ -10,7 +10,8 @@ import type { Table } from '../table/table.js'
 import { DispReelApi } from './dispreel-api.js'
 import { DispReelData } from './dispreel-data.js'
 
-export class DispReel extends Item<DispReelData> implements IScriptable<DispReelApi> {
+export /** Runtime disp reel. */
+class DispReel extends Item<DispReelData> implements IScriptable<DispReelApi> {
 	private api?: DispReelApi
 
 	public static async fromStorage(storage: Storage, itemName: string): Promise<DispReel> {
