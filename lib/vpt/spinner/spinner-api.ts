@@ -30,36 +30,42 @@ export class SpinnerApi extends ItemApi<SpinnerData> {
 		this.mover = mover
 	}
 
+	/** Get Length. */
 	get Length() {
 		return this.data.length
 	}
 	set Length(v) {
 		this.data.length = v
 	}
+	/** Get Rotation. */
 	get Rotation() {
 		return this.data.rotation
 	}
 	set Rotation(v) {
 		this.data.rotation = v
 	}
+	/** Get Height. */
 	get Height() {
 		return this.data.height
 	}
 	set Height(v) {
 		this.data.height = v
 	}
+	/** Get Damping. */
 	get Damping() {
 		return this.mover.damping ** (1.0 / PHYS_FACTOR)
 	}
 	set Damping(v) {
 		this.mover.damping = clamp(v, 0.0, 1.0) ** PHYS_FACTOR
 	}
+	/** Get Material. */
 	get Material() {
 		return this.state.material
 	}
 	set Material(v) {
 		this.state.material = v
 	}
+	/** Get Image. */
 	get Image() {
 		return this.state.texture
 	}
@@ -67,30 +73,35 @@ export class SpinnerApi extends ItemApi<SpinnerData> {
 		this._assertNonHdrImage(v)
 		this.state.texture = v
 	}
+	/** Get X. */
 	get X() {
 		return this.data.center.x
 	}
 	set X(v) {
 		this.data.center.x = v
 	}
+	/** Get Y. */
 	get Y() {
 		return this.data.center.y
 	}
 	set Y(v) {
 		this.data.center.y = v
 	}
+	/** Get Surface. */
 	get Surface() {
 		return this.data.szSurface
 	}
 	set Surface(v) {
 		this.data.szSurface = v
 	}
+	/** Get ShowBracket. */
 	get ShowBracket() {
 		return this.state.showBracket
 	}
 	set ShowBracket(v) {
 		this.state.showBracket = v
 	}
+	/** Get AngleMax. */
 	get AngleMax() {
 		return radToDeg(this.mover.angleMax)
 	}
@@ -106,6 +117,7 @@ export class SpinnerApi extends ItemApi<SpinnerData> {
 			}
 		}
 	}
+	/** Get AngleMin. */
 	get AngleMin() {
 		return radToDeg(this.mover.angleMin)
 	}
@@ -121,24 +133,28 @@ export class SpinnerApi extends ItemApi<SpinnerData> {
 			}
 		}
 	}
+	/** Get Elasticity. */
 	get Elasticity() {
 		return this.mover.elasticity
 	}
 	set Elasticity(v) {
 		this.mover.elasticity = v
 	}
+	/** Get Visible. */
 	get Visible() {
 		return this.state.isVisible
 	} // TODO check if isOpacticyActivated must be true as well
 	set Visible(v) {
 		this.state.isVisible = v
 	}
+	/** Get ReflectionEnabled. */
 	get ReflectionEnabled() {
 		return this.data.isReflectionEnabled
 	}
 	set ReflectionEnabled(v) {
 		this.data.isReflectionEnabled = v
 	}
+	/** Get CurrentAngle. */
 	get CurrentAngle() {
 		return this.state.angle
 	}
