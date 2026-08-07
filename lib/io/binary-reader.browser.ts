@@ -3,6 +3,7 @@
 
 import type { IBinaryReader } from './ole-doc.js'
 
+/** Reads a VPX blob in the browser. */
 export class BrowserBinaryReader implements IBinaryReader {
 	private readonly blob: Blob
 	private data!: Uint8Array
@@ -22,7 +23,6 @@ export class BrowserBinaryReader implements IBinaryReader {
 		;(this as any).data = undefined
 		return Promise.resolve()
 	}
-
 	public isOpen(): boolean {
 		return !!(this as any).data
 	}
