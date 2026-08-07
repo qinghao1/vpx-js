@@ -9,15 +9,14 @@ import type { SpinnerData } from './spinner-data.js'
 import type { SpinnerMeshGenerator } from './spinner-mesh-generator.js'
 import type { SpinnerState } from './spinner-state.js'
 
-/** SpinnerUpdater. */
+/** Spinner updater — bracket, plate rotation and material. */
 export class SpinnerUpdater extends ItemUpdater<SpinnerState> {
-	private readonly data: SpinnerData
-	private readonly meshGenerator: SpinnerMeshGenerator
-
-	constructor(state: SpinnerState, data: SpinnerData, meshGenerator: SpinnerMeshGenerator) {
+	constructor(
+		state: SpinnerState,
+		private readonly data: SpinnerData,
+		private readonly meshGenerator: SpinnerMeshGenerator,
+	) {
 		super(state)
-		this.data = data
-		this.meshGenerator = meshGenerator
 	}
 
 	public applyState<NODE, GEOMETRY, POINT_LIGHT>(
@@ -26,16 +25,12 @@ export class SpinnerUpdater extends ItemUpdater<SpinnerState> {
 		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
 		table: Table,
 	): void {
-		// update local state
 		Object.assign(this.state, state)
-
 		this.applyVisibility(obj, state, renderApi)
 		this.applyMaterial(obj, state.material, state.texture, renderApi, table)
-
 		if (state.showBracket !== undefined) {
 			renderApi.applyVisibility(state.showBracket, renderApi.findInGroup(obj, `spinner.bracket-${state.name}`))
 		}
-
 		if (state.angle !== undefined) {
 			this.applyXRotation(
 				obj,
