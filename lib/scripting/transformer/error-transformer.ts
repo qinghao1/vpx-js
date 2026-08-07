@@ -6,8 +6,8 @@ import type { Program } from 'estree'
 import { identifier, memberExpression } from '../estree.js'
 import { Transformer } from './transformer.js'
 
-export /** Transforms On Error. */
-class ErrorTransformer extends Transformer {
+/** Transforms On Error. */
+export class ErrorTransformer extends Transformer {
 	constructor(ast: Program) {
 		super(ast)
 	}
