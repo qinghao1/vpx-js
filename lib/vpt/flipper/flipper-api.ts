@@ -12,27 +12,18 @@ import type { FlipperHit } from './flipper-hit.js'
 import type { FlipperMover } from './flipper-mover.js'
 import type { FlipperState } from './flipper-state.js'
 
-/** Flipper API.
- *
- * @see https://github.com/vpinball/vpinball/blob/master/flipper.cpp */
+/** Flipper API — VBS surface for `Flipper`. @see https://github.com/vpinball/vpinball/blob/master/flipper.cpp */
 export class FlipperApi extends ItemApi<FlipperData> {
-	private readonly state: FlipperState
-	private readonly hit: FlipperHit
-	private readonly mover: FlipperMover
-
 	constructor(
 		data: FlipperData,
-		state: FlipperState,
-		hit: FlipperHit,
-		mover: FlipperMover,
+		private readonly state: FlipperState,
+		private readonly hit: FlipperHit,
+		private readonly mover: FlipperMover,
 		events: EventProxy,
 		player: Player,
 		table: Table,
 	) {
 		super(data, events, player, table)
-		this.state = state
-		this.hit = hit
-		this.mover = mover
 	}
 
 	get BaseRadius() {
@@ -57,17 +48,13 @@ export class FlipperApi extends ItemApi<FlipperData> {
 		return this.data.doOverridePhysics(this.table) ? this.data.overrideTorqueDamping : this.data.torqueDamping
 	}
 	set EOSTorque(v) {
-		if (!this.data.doOverridePhysics(this.table)) {
-			this.data.torqueDamping = v
-		}
+		if (!this.data.doOverridePhysics(this.table)) this.data.torqueDamping = v
 	}
 	get EOSTorqueAngle() {
 		return this.data.doOverridePhysics(this.table) ? this.data.overrideTorqueDampingAngle : this.data.torqueDampingAngle
 	}
 	set EOSTorqueAngle(v) {
-		if (!this.data.doOverridePhysics(this.table)) {
-			this.data.torqueDampingAngle = v
-		}
+		if (!this.data.doOverridePhysics(this.table)) this.data.torqueDampingAngle = v
 	}
 	get X() {
 		return this.state.center.x
@@ -114,9 +101,7 @@ export class FlipperApi extends ItemApi<FlipperData> {
 		return this.mover.getMass()
 	}
 	set Mass(v) {
-		if (!this.data.doOverridePhysics(this.table)) {
-			this.mover.setMass(v)
-		}
+		if (!this.data.doOverridePhysics(this.table)) this.mover.setMass(v)
 	}
 	get OverridePhysics() {
 		return this.data.overridePhysics
@@ -154,9 +139,7 @@ export class FlipperApi extends ItemApi<FlipperData> {
 		return this.data.strength
 	}
 	set Strength(v) {
-		if (!this.data.doOverridePhysics(this.table)) {
-			this.data.strength = v
-		}
+		if (!this.data.doOverridePhysics(this.table)) this.data.strength = v
 	}
 	get Visible() {
 		return this.state.isVisible
@@ -174,25 +157,19 @@ export class FlipperApi extends ItemApi<FlipperData> {
 		return this.hit.elasticity
 	}
 	set Elasticity(v) {
-		if (!this.data.doOverridePhysics(this.table)) {
-			this.hit.elasticity = v
-		}
+		if (!this.data.doOverridePhysics(this.table)) this.hit.elasticity = v
 	}
 	get ElasticityFalloff() {
 		return this.hit.elasticityFalloff
 	}
 	set ElasticityFalloff(v) {
-		if (!this.data.doOverridePhysics(this.table)) {
-			this.hit.elasticityFalloff = v
-		}
+		if (!this.data.doOverridePhysics(this.table)) this.hit.elasticityFalloff = v
 	}
 	get Scatter() {
 		return this.hit.scatter
 	}
 	set Scatter(v) {
-		if (!this.data.doOverridePhysics(this.table)) {
-			this.hit.scatter = v
-		}
+		if (!this.data.doOverridePhysics(this.table)) this.hit.scatter = v
 	}
 	get Friction() {
 		return this.hit.friction
@@ -204,9 +181,7 @@ export class FlipperApi extends ItemApi<FlipperData> {
 		return this.data.doOverridePhysics(this.table) ? this.data.overrideCoilRampUp : this.data.rampUp
 	}
 	set RampUp(v) {
-		if (!this.data.doOverridePhysics(this.table)) {
-			this.data.rampUp = v
-		}
+		if (!this.data.doOverridePhysics(this.table)) this.data.rampUp = v
 	}
 	get Height() {
 		return this.data.height
@@ -218,17 +193,13 @@ export class FlipperApi extends ItemApi<FlipperData> {
 		return this.mover.getReturnRatio()
 	}
 	set Return(v) {
-		if (!this.data.doOverridePhysics(this.table)) {
-			this.data.return = clamp(v, 0.0, 1.0)
-		}
+		if (!this.data.doOverridePhysics(this.table)) this.data.return = clamp(v, 0, 1)
 	}
 	get FlipperRadiusMin() {
 		return this.data.flipperRadiusMin
 	}
 	set FlipperRadiusMin(v) {
-		if (v < 0) {
-			v = 0
-		}
+		if (v < 0) v = 0
 		this.data.flipperRadiusMin = v
 	}
 	get Image() {
@@ -245,26 +216,17 @@ export class FlipperApi extends ItemApi<FlipperData> {
 		this.data.isReflectionEnabled = v
 	}
 
-	/**
-	 * Power stroke to hit ball, key/button down/pressed
-	 */
 	public RotateToEnd(): void {
 		this.mover.enableRotateEvent = 1
 		this.mover.setSolenoidState(true)
 	}
 
-	/**
-	 * Return to park, key/button up/released
-	 */
-	public RotateToStart() {
+	public RotateToStart(): void {
 		this.mover.enableRotateEvent = -1
 		this.mover.setSolenoidState(false)
 	}
 
-	/**
-	 * No idea wtf this is supposed to do.
-	 */
-	public InterfaceSupportsErrorInfo(riid: any): boolean {
+	public InterfaceSupportsErrorInfo(_riid: unknown): boolean {
 		return false
 	}
 
