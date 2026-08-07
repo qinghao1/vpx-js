@@ -10,37 +10,32 @@ import type { LightData } from './light-data.js'
 const bulbLightMesh = loadMesh('bulb-light-mesh')
 const bulbSocketMesh = loadMesh('bulb-socket-mesh')
 
-/** Light mesh generator. */
+/** Generates light meshes. @see https://github.com/vpinball/vpinball/blob/master/light.cpp */
 export class LightMeshGenerator {
-	private readonly data: LightData
-
-	constructor(data: LightData) {
-		this.data = data
-	}
-
+	constructor(private readonly data: LightData) {}
 	public getMeshes<NODE, GEOMETRY, POINT_LIGHT>(
 		table: Table,
 		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
 	): LightMeshes<GEOMETRY> {
-		if (this.data.isBulbLight()) return this.getBulbMeshes(table)
-		return { surfaceLight: renderApi.createLightGeometry(this.data, table) }
+		return this.data.isBulbLight()
+			? this.getBulbMeshes(table)
+			: { surfaceLight: renderApi.createLightGeometry(this.data, table) }
 	}
-
 	private getBulbMeshes<GEOMETRY>(table: Table): LightMeshes<GEOMETRY> {
 		const h = table.getSurfaceHeight(this.data.szSurface, this.data.center.x, this.data.center.y) * table.getScaleZ()
-		const scale = this.data.meshRadius
-		const scaleZ = (v: number) => v * scale * table.getScaleZ() + h
-		const light = bulbLightMesh.clone('bulb.light')
+		const s = this.data.meshRadius,
+			scZ = (v: number) => v * s * table.getScaleZ() + h
+		const light = bulbLightMesh.clone('bulb.light'),
+			socket = bulbSocketMesh.clone('bulb.socket')
 		for (const v of light.vertices) {
-			v.x = v.x * scale + this.data.center.x
-			v.y = v.y * scale + this.data.center.y
-			v.z = scaleZ(v.z)
+			v.x = v.x * s + this.data.center.x
+			v.y = v.y * s + this.data.center.y
+			v.z = scZ(v.z)
 		}
-		const socket = bulbSocketMesh.clone('bulb.socket')
 		for (const v of socket.vertices) {
-			v.x = v.x * scale + this.data.center.x
-			v.y = v.y * scale + this.data.center.y
-			v.z = scaleZ(v.z)
+			v.x = v.x * s + this.data.center.x
+			v.y = v.y * s + this.data.center.y
+			v.z = scZ(v.z)
 		}
 		return { light, socket }
 	}
