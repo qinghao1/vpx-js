@@ -27,6 +27,7 @@ export class Mesh {
 		this.indices = indices
 	}
 
+	/** Creates mesh from raw arrays. */
 	public static fromArray(vertices: number[][], indices: number[]): Mesh {
 		const mesh = new Mesh()
 		for (const v of vertices) mesh.vertices.push(Vertex3DNoTex2.fromArray(v))
@@ -34,10 +35,12 @@ export class Mesh {
 		return mesh
 	}
 
+	/** Creates mesh from JSON. */
 	public static fromJson(data: { vertices: number[][]; indices: number[] }): Mesh {
 		return Mesh.fromArray(data.vertices, data.indices)
 	}
 
+	/** Serializes mesh to OBJ. */
 	/* istanbul ignore next: debug */
 	public serializeToObj(description?: string): string {
 		const lines: string[] = []
@@ -47,6 +50,7 @@ export class Mesh {
 		return lines.join('\n')
 	}
 
+	/** Transforms vertices and normals. */
 	public transform(matrix: Matrix3D, normalMatrix?: Matrix3D, getZ?: (x: number) => number): this {
 		for (const v of this.vertices) {
 			const vert = Vertex3D.claim(v.x, v.y, v.z).multiplyMatrix(matrix)
@@ -62,6 +66,7 @@ export class Mesh {
 		return this
 	}
 
+	/** Translates mesh. */
 	public makeTranslation(x: number, y: number, z: number): this {
 		for (const v of this.vertices) {
 			v.x += f4(x)
@@ -71,6 +76,7 @@ export class Mesh {
 		return this
 	}
 
+	/** Scales mesh. */
 	public makeScale(x: number, y: number, z: number): this {
 		for (const v of this.vertices) {
 			v.x *= f4(x)
@@ -80,6 +86,7 @@ export class Mesh {
 		return this
 	}
 
+	/** Clones mesh. */
 	public clone(name?: string): Mesh {
 		const m = new Mesh()
 		m.name = name || this.name
@@ -90,6 +97,7 @@ export class Mesh {
 		return m
 	}
 
+	/** Computes vertex normals. */
 	public static computeNormals(
 		vertices: Vertex3DNoTex2[],
 		numVertices: number,
@@ -128,6 +136,7 @@ export class Mesh {
 		}
 	}
 
+	/** Sets flat normal for polygon. */
 	/* istanbul ignore next */
 	public static setNormal(rgv: Vertex3DNoTex2[], rgi: number[], count: number, applyCount = 0): void {
 		if (applyCount === 0) applyCount = count
@@ -148,6 +157,7 @@ export class Mesh {
 		}
 	}
 
+	/** Finds closest point on polygon to pvin. */
 	public static closestPointOnPolygon(rgv: RenderVertex3D[], pvin: Vertex2D, fClosed: boolean): [Vertex2D, number] {
 		const count = rgv.length
 		let mindist = FLT_MAX
@@ -158,8 +168,6 @@ export class Mesh {
 			--cloop // Don't check segment running from the end point to the beginning point
 		}
 
-		// Go through line segment, calculate distance from point to the line
-		// then pick the shortest distance
 		for (let i = 0; i < cloop; ++i) {
 			const p2 = i < count - 1 ? i + 1 : 0
 
@@ -176,9 +184,6 @@ export class Mesh {
 			)
 
 			if (dist < mindist) {
-				// Assuming we got a segment that we are closet to, calculate the intersection
-				// of the line with the perpenticular line projected from the point,
-				// to find the closest point on the line
 				const D = -B
 				const F = -f4(f4(D * pvin.x) + f4(A * pvin.y))
 
@@ -187,8 +192,6 @@ export class Mesh {
 				const intersectX = f4(f4(f4(B * F) - f4(A * C)) * invDet)
 				const intersectY = f4(f4(f4(C * D) - f4(A * F)) * invDet)
 
-				// If the intersect point lies on the polygon segment
-				// (not out in space), then make this the closest known point
 				if (
 					intersectX >= f4(Math.min(rgvi.x, rgvp2.x) - f4(0.1)) &&
 					intersectX <= f4(Math.max(rgvi.x, rgvp2.x) + f4(0.1)) &&
@@ -207,6 +210,7 @@ export class Mesh {
 		return [pvOut, piSeg]
 	}
 
+	/** Triangulates polygon via ear clipping. */
 	public static polygonToTriangles(rgv: RenderVertex[], pvpoly: number[]): number[] {
 		const pvtri: number[] = []
 		if (pvpoly.length < 3) return pvtri
