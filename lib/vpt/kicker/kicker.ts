@@ -9,11 +9,11 @@ import type { IBallCreationPosition, Player } from '../../game/player.js'
 import type { PlayerPhysics } from '../../game/player-physics.js'
 import type { Storage } from '../../io/ole-doc.js'
 import type { HitObject } from '../../physics/hit-object.js'
+import { FLT_MAX } from '../../util/float.js'
 import { Matrix3D, Vertex3D } from '../../util/math.js'
 import type { Ball } from '../ball/ball.js'
 import { Enums } from '../enums.js'
 import { Item } from '../item.js'
-import { FLT_MAX } from '../mesh.js'
 import type { Table } from '../table/table.js'
 import { Texture } from '../texture.js'
 import { KickerApi } from './kicker-api.js'
@@ -64,12 +64,9 @@ export class Kicker
 	public setupPlayer(player: Player, table: Table): void {
 		const height =
 			table.getSurfaceHeight(this.data.szSurface, this.data.center.x, this.data.center.y) * table.getScaleZ()
-
-		// reduce the hit circle radius because only the inner circle of the kicker should start a hit event
 		const radius = this.data.radius * (this.data.legacyMode ? (this.data.fallThrough ? 0.75 : 0.6) : 1)
-
 		this.events = new EventProxy(this)
-		this.hit = new KickerHit(this.data, this.events, table, radius, height) // height of kicker hit cylinder
+		this.hit = new KickerHit(this.data, this.events, table, radius, height)
 		this.api = new KickerApi(this.state, this.data, this.hit, this.events, this, player, table)
 	}
 
@@ -94,13 +91,13 @@ export class Kicker
 		return new Vertex3D(this.hit!.center.x, this.hit!.center.y, height)
 	}
 
-	public getBallCreationVelocity(table: Table): Vertex3D {
+	public getBallCreationVelocity(_table: Table): Vertex3D {
 		return new Vertex3D(0.1, 0, 0)
 	}
 
 	public onBallCreated(physics: PlayerPhysics, ball: Ball): void {
-		ball.coll.hitFlag = true // HACK: avoid capture leaving kicker
-		const hitNormal = new Vertex3D(FLT_MAX, FLT_MAX, FLT_MAX) // unused due to newBall being true
+		ball.coll.hitFlag = true
+		const hitNormal = new Vertex3D(FLT_MAX, FLT_MAX, FLT_MAX)
 		this.hit!.doCollide(physics, ball, hitNormal, false, true)
 	}
 
