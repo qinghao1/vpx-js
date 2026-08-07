@@ -7,7 +7,7 @@ import type { ESIToken } from '../grammar/grammar.js'
 import { Transformer } from '../transformer/transformer.js'
 
 /** ppError. */
-export function ppError(node: ESIToken): any {
+export function ppError(node: ESIToken): unknown {
 	switch (node.type) {
 		case 'OnErrorStatement':
 			return ppOnErrorStatement(node)
@@ -15,7 +15,7 @@ export function ppError(node: ESIToken): any {
 	return null
 }
 
-function ppOnErrorStatement(node: ESIToken): any {
+function ppOnErrorStatement(node: ESIToken): unknown {
 	let expr: Expression
 	if (node.text.indexOf('GoTo') !== -1) {
 		expr = callExpression(memberExpression(identifier(Transformer.VBSHELPER_NAME), identifier('onErrorGoto')), [
