@@ -32,8 +32,8 @@ const imageMap: { [key: string]: string } = {
 const MAX_REGULAR = 1024
 const MAX_FLOAT = 512
 
-export /** ThreeTextureLoaderBrowser. */
-class ThreeTextureLoaderBrowser implements ITextureLoader<ThreeTexture> {
+/** ThreeTextureLoaderBrowser. */
+export class ThreeTextureLoaderBrowser implements ITextureLoader<ThreeTexture> {
 	public async loadDefaultTexture(name: string, ext: string, fileName: string): Promise<ThreeTexture> {
 		const key = fileName.substr(0, fileName.lastIndexOf('.'))
 		if (!imageMap[key]) {
@@ -84,7 +84,9 @@ class ThreeTextureLoaderBrowser implements ITextureLoader<ThreeTexture> {
 				texture.minFilter = LinearFilter as any
 				const ds = downsampleIfNeeded(texture, MAX_FLOAT)
 				if (ds && ds !== texture) {
-					try { (texture as any).dispose?.(); } catch {}
+					try {
+						;(texture as any).dispose?.()
+					} catch {}
 					if ((ds as any).image && (ds as any).image.data) {
 						;(ds as any).generateMipmaps = false
 						;(ds as any).minFilter = LinearFilter as any
@@ -109,8 +111,12 @@ class ThreeTextureLoaderBrowser implements ITextureLoader<ThreeTexture> {
 			texture.minFilter = LinearFilter as any
 			const ds = downsampleIfNeeded(texture, MAX_REGULAR) as any
 			if (ds && ds !== texture) {
-				try { texture.dispose(); } catch {}
-				try { (texture as any).image = null; } catch {}
+				try {
+					texture.dispose()
+				} catch {}
+				try {
+					;(texture as any).image = null
+				} catch {}
 				ds.name = `texture:${name}`
 				ds.needsUpdate = true
 				ds.generateMipmaps = false
@@ -212,7 +218,9 @@ function downsampleIfNeeded(texture: any, maxSize: number): any {
 				newTex.magFilter = (texture as any).magFilter
 				newTex.type = (texture as any).type || (isFloat ? (texture as any).type : UnsignedByteType)
 				newTex.name = (texture as any).name
-				try { texture.dispose?.(); } catch {}
+				try {
+					texture.dispose?.()
+				} catch {}
 				return newTex
 			} catch {
 				return texture
@@ -246,8 +254,12 @@ function downsampleIfNeeded(texture: any, maxSize: number): any {
 					newTex.generateMipmaps = false
 					newTex.minFilter = LinearFilter as any
 					newTex.flipY = (texture as any).flipY ?? true
-					try { texture.dispose?.(); } catch {}
-					try { URL.revokeObjectURL((img as any).src); } catch {}
+					try {
+						texture.dispose?.()
+					} catch {}
+					try {
+						URL.revokeObjectURL((img as any).src)
+					} catch {}
 					return newTex
 				}
 			}
@@ -272,7 +284,12 @@ function load(mimeType: string, url: string, ext?: string, data?: Uint8Array): P
 					texture.generateMipmaps = false
 					texture.minFilter = LinearFilter as any
 					const ds = downsampleIfNeeded(texture, MAX_REGULAR) as any
-					if (ds && ds !== texture) { try { texture.dispose(); } catch {} resolve(ds); } else resolve(texture as any)
+					if (ds && ds !== texture) {
+						try {
+							texture.dispose()
+						} catch {}
+						resolve(ds)
+					} else resolve(texture as any)
 				},
 				undefined,
 				(err) => {
@@ -300,7 +317,12 @@ function load(mimeType: string, url: string, ext?: string, data?: Uint8Array): P
 					texture.generateMipmaps = false
 					texture.minFilter = LinearFilter as any
 					const ds = downsampleIfNeeded(texture, MAX_FLOAT) as any
-					if (ds && ds !== texture) { try { texture.dispose(); } catch {} resolve(ds); } else resolve(texture as any)
+					if (ds && ds !== texture) {
+						try {
+							texture.dispose()
+						} catch {}
+						resolve(ds)
+					} else resolve(texture as any)
 				},
 				undefined,
 				(err) => {
@@ -328,7 +350,12 @@ function load(mimeType: string, url: string, ext?: string, data?: Uint8Array): P
 					texture.generateMipmaps = false
 					texture.minFilter = LinearFilter as any
 					const ds = downsampleIfNeeded(texture, MAX_FLOAT) as any
-					if (ds && ds !== texture) { try { texture.dispose(); } catch {} resolve(ds); } else resolve(texture as any)
+					if (ds && ds !== texture) {
+						try {
+							texture.dispose()
+						} catch {}
+						resolve(ds)
+					} else resolve(texture as any)
 				},
 				undefined,
 				(err) => {
