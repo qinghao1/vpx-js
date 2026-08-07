@@ -8,6 +8,7 @@ import { Vertex2D } from '../../math/vertex2d.js'
 import { ItemData } from '../item-data.js'
 import type { Table } from '../table/table.js'
 
+/** Flipper data. */
 export class FlipperData extends ItemData {
 	public baseRadius: number = 21.5
 	public endRadius: number = 13.0
