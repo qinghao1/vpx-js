@@ -7,8 +7,8 @@ import type { Table } from '../table/table.js'
 import type { LightData } from './light-data.js'
 import type { LightState } from './light-state.js'
 
-export /** Light updater. */
-class LightUpdater extends ItemUpdater<LightState> {
+/** Light updater. */
+export class LightUpdater extends ItemUpdater<LightState> {
 	private readonly data: LightData
 
 	constructor(data: LightData, state: LightState) {
