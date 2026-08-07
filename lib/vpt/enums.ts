@@ -53,7 +53,8 @@ export class BackglassIndex extends VbsApi {
 	}
 }
 
-export class Filters extends VbsApi {
+export /** Filters. */
+class Filters extends VbsApi {
 	public readonly Filter_None = 0
 	public readonly Filter_Additive = 1
 	public readonly Filter_Overlay = 2
