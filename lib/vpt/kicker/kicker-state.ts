@@ -5,7 +5,7 @@ import { Pool } from '../../util/object-pool.js'
 import { Enums } from '../enums.js'
 import { ItemState } from '../item-state.js'
 
-/** KickerState. */
+/** Kicker state. */
 export class KickerState extends ItemState {
 	public static readonly POOL = new Pool(KickerState)
 
