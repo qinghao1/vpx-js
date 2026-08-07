@@ -1,27 +1,11 @@
-/*
- * VPDB - Virtual Pinball Database
- * Copyright (C) 2019 freezy <freezy@vpdb.io>
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- */
+// Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { Vertex2D } from '../math/vertex2d'
-import { Vertex3D } from '../math/vertex3d'
-import { Pool } from '../util/object-pool'
-import type { Ball } from '../vpt/ball/ball'
-import type { HitObject } from './hit-object'
+import { Vertex2D } from '../math/vertex2d.js'
+import { Vertex3D } from '../math/vertex3d.js'
+import { Pool } from '../util/object-pool.js'
+import type { Ball } from '../vpt/ball/ball.js'
+import type { HitObject } from './hit-object.js'
 
 export class CollisionEvent {
 	private static readonly POOL = new Pool(CollisionEvent)
