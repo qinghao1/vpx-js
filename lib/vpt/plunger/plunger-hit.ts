@@ -49,14 +49,14 @@ export class PlungerHit extends HitObject {
 		return this.mover
 	}
 
-	public calcHitBBox(): void {
+	public override calcHitBBox(): void {
 		this.hitBBox.left = this.mover.x - 0.1
 		this.hitBBox.right = this.mover.x2 + 0.1
 		this.hitBBox.top = this.mover.frameEnd - 0.1
 		this.hitBBox.bottom = this.mover.y + 0.1
 	}
 
-	public hitTest(ball: Ball, dTime: number, coll: CollisionEvent, physics: PlayerPhysics): number {
+	public override hitTest(ball: Ball, dTime: number, coll: CollisionEvent, physics: PlayerPhysics): number {
 		let hitTime = dTime,
 			isHit = false
 		physics.lastPlungerHit = physics.timeMsec
@@ -92,7 +92,7 @@ export class PlungerHit extends HitObject {
 		return hitTime
 	}
 
-	public collide(coll: CollisionEvent, physics: PlayerPhysics): void {
+	public override collide(coll: CollisionEvent, physics: PlayerPhysics): void {
 		const ball = coll.ball
 		let dot =
 			(ball.hit.vel.x - coll.hitVel!.x) * coll.hitNormal.x + (ball.hit.vel.y - coll.hitVel!.y) * coll.hitNormal.y

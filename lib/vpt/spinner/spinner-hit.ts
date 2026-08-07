@@ -53,13 +53,13 @@ export class SpinnerHit extends HitObject {
 		return this.mover
 	}
 
-	public calcHitBBox(): void {
+	public override calcHitBBox(): void {
 		// Bounding rect for both lines will be the same
 		this.lineSegs[0].calcHitBBox()
 		this.hitBBox = this.lineSegs[0].hitBBox
 	}
 
-	public hitTest(ball: Ball, dTime: number, coll: CollisionEvent, physics: PlayerPhysics): number {
+	public override hitTest(ball: Ball, dTime: number, coll: CollisionEvent, physics: PlayerPhysics): number {
 		if (!this.isEnabled) {
 			return -1.0
 		}
@@ -74,7 +74,7 @@ export class SpinnerHit extends HitObject {
 		return -1.0
 	}
 
-	public collide(coll: CollisionEvent, physics: PlayerPhysics): void {
+	public override collide(coll: CollisionEvent, physics: PlayerPhysics): void {
 		const dot = coll.hitNormal.dot(coll.ball.hit.vel)
 		if (dot < 0) {
 			// hit from back doesn't count

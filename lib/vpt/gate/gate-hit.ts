@@ -44,11 +44,11 @@ export class GateHit extends HitObject {
 	public getMoverObject(): GateMover {
 		return this.mover
 	}
-	public calcHitBBox(): void {
+	public override calcHitBBox(): void {
 		this.lineSeg[0]!.calcHitBBox()
 		this.hitBBox = this.lineSeg[0]!.hitBBox
 	}
-	public hitTest(ball: Ball, dTime: number, coll: CollisionEvent, _physics: PlayerPhysics): number {
+	public override hitTest(ball: Ball, dTime: number, coll: CollisionEvent, _physics: PlayerPhysics): number {
 		if (!this.isEnabled) return -1
 		for (let i = 0; i < 2; i++) {
 			const t = this.lineSeg[i]!.hitTestBasic(ball, dTime, coll, false, true, false)
@@ -59,7 +59,7 @@ export class GateHit extends HitObject {
 		}
 		return -1
 	}
-	public collide(coll: CollisionEvent, _physics: PlayerPhysics): void {
+	public override collide(coll: CollisionEvent, _physics: PlayerPhysics): void {
 		const ball = coll.ball,
 			h = this.data.height * 0.5
 		let speed = Math.abs(coll.hitNormal.dot(ball.hit.vel))
