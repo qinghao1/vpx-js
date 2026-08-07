@@ -17,12 +17,6 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { nowDouble } from 'microtime';
-
-/**
- * Returns milliseconds as a float
- */
 export function now(): number {
-	// nowDouble() returns seconds as a float.
-	return nowDouble() * 1000;
+	return Number(process.hrtime.bigint()) / 1e6
 }

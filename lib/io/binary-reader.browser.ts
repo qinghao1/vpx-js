@@ -17,37 +17,33 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { IBinaryReader } from './ole-doc';
+import type { IBinaryReader } from './ole-doc'
 
 export class BrowserBinaryReader implements IBinaryReader {
-
-	private readonly blob: Blob;
-	private data!: Uint8Array;
+	private readonly blob: Blob
+	private data!: Uint8Array
 
 	constructor(blob: Blob) {
-		this.blob = blob;
+		this.blob = blob
 	}
 
 	public read(buffer: Buffer, offset: number, length: number, position: number): Promise<[number, Buffer]> {
-		const result = Buffer.alloc(length);
-		for (let i = 0; i < length; i++) {
-			buffer.writeUInt8(this.data[position + i], offset + i);
-			result.writeUInt8(this.data[position + i], i);
-		}
-		return Promise.resolve([length, result]);
+		const slice = this.data.subarray(position, position + length)
+		;(buffer as unknown as Uint8Array).set(slice, offset)
+		return Promise.resolve([length, Buffer.from(slice)])
 	}
 
 	public close(): Promise<void> {
-		delete this.data;
-		return Promise.resolve();
+		delete this.data
+		return Promise.resolve()
 	}
 
 	public isOpen(): boolean {
-		return true;
+		return true
 	}
 
 	public async open(): Promise<void> {
-		const blob = await new Response(this.blob).arrayBuffer();
-		this.data = new Uint8Array(blob);
+		const ab = (await (this.blob as any).arrayBuffer?.()) ?? (await new Response(this.blob).arrayBuffer())
+		this.data = new Uint8Array(ab)
 	}
 }

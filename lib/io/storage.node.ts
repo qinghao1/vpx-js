@@ -18,16 +18,15 @@
  */
 
 class StorageNode {
-
-	private readonly storage: Map<string, any> = new Map<string, any>();
+	private readonly storage: Map<string, any> = new Map<string, any>()
 
 	public setItem(name: string, value: any): void {
-		this.storage.set(name, value);
+		this.storage.set(name, value)
 	}
 
 	public getItem(name: string): any {
-		return this.storage.get(name);
+		return this.storage.get(name)
 	}
 }
 
-export const storage = new StorageNode();
+export const storage = new StorageNode()

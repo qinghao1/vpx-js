@@ -17,16 +17,15 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { close, open, read } from 'fs';
-import { IBinaryReader } from './ole-doc';
+import { close, open, read } from 'fs'
+import type { IBinaryReader } from './ole-doc'
 
 export class NodeBinaryReader implements IBinaryReader {
-
-	private readonly filename: string;
-	private fd: number = 0;
+	private readonly filename: string
+	private fd: number = 0
 
 	constructor(filename: string) {
-		this.filename = filename;
+		this.filename = filename
 	}
 
 	public read(buffer: Buffer, offset: number, length: number, position: number): Promise<[number, Buffer]> {
@@ -34,42 +33,42 @@ export class NodeBinaryReader implements IBinaryReader {
 			read(this.fd, buffer, offset, length, position, (err, bytesRead, data) => {
 				/* istanbul ignore if */
 				if (err) {
-					reject(err);
-					return;
+					reject(err)
+					return
 				}
-				resolve([bytesRead, data]);
-			});
-		});
+				resolve([bytesRead, data])
+			})
+		})
 	}
 
 	public async close(): Promise<void> {
 		if (this.fd) {
-			await new Promise((resolve, reject) => {
-				close(this.fd, err => {
+			await new Promise<void>((resolve, reject) => {
+				close(this.fd, (err) => {
 					if (err) {
-						reject(err);
-						return;
+						reject(err)
+						return
 					}
-					resolve();
-				});
-			});
+					resolve()
+				})
+			})
 		}
-		this.fd = 0;
+		this.fd = 0
 	}
 
 	public async open(): Promise<void> {
-		this.fd = await new Promise((resolve, reject) => {
+		this.fd = await new Promise<number>((resolve, reject) => {
 			open(this.filename, 'r', 0o666, (err, fd) => {
 				if (err) {
-					reject(err);
-					return;
+					reject(err)
+					return
 				}
-				resolve(fd);
-			});
-		});
+				resolve(fd)
+			})
+		})
 	}
 
 	public isOpen(): boolean {
-		return !!this.fd;
+		return !!this.fd
 	}
 }
