@@ -25,7 +25,6 @@ export class RampApi extends ItemApi<RampData> {
 		this.isDynamic = !!material && material.isOpacityActive
 	}
 
-	/** Get HeightBottom. */
 	get HeightBottom() {
 		return this.data.heightBottom
 	}
@@ -35,7 +34,6 @@ export class RampApi extends ItemApi<RampData> {
 		}
 		this.data.heightBottom = v
 	}
-	/** Get HeightTop. */
 	get HeightTop() {
 		return this.data.heightTop
 	}
@@ -45,7 +43,6 @@ export class RampApi extends ItemApi<RampData> {
 		}
 		this.data.heightTop = v
 	}
-	/** Get WidthBottom. */
 	get WidthBottom() {
 		return this.data.widthBottom
 	}
@@ -55,7 +52,6 @@ export class RampApi extends ItemApi<RampData> {
 		}
 		this.data.widthBottom = v
 	}
-	/** Get WidthTop. */
 	get WidthTop() {
 		return this.data.widthTop
 	}
@@ -65,7 +61,6 @@ export class RampApi extends ItemApi<RampData> {
 		}
 		this.data.widthTop = v
 	}
-	/** Get Material. */
 	get Material() {
 		return this.data.szMaterial
 	}
@@ -75,7 +70,6 @@ export class RampApi extends ItemApi<RampData> {
 		}
 		this.data.szMaterial = v
 	}
-	/** Get Type. */
 	get Type() {
 		return this.data.rampType
 	}
@@ -85,7 +79,6 @@ export class RampApi extends ItemApi<RampData> {
 		}
 		this.data.rampType = v
 	}
-	/** Get Image. */
 	get Image() {
 		return this.data.szImage
 	}
@@ -96,7 +89,6 @@ export class RampApi extends ItemApi<RampData> {
 		}
 		this.data.szImage = v
 	}
-	/** Get ImageAlignment. */
 	get ImageAlignment() {
 		return this.data.imageAlignment
 	}
@@ -106,7 +98,6 @@ export class RampApi extends ItemApi<RampData> {
 		}
 		this.data.imageAlignment = v
 	}
-	/** Get HasWallImage. */
 	get HasWallImage() {
 		return this.data.imageWalls
 	}
@@ -116,7 +107,6 @@ export class RampApi extends ItemApi<RampData> {
 		}
 		this.data.imageWalls = v
 	}
-	/** Get LeftWallHeight. */
 	get LeftWallHeight() {
 		return this.data.leftWallHeight
 	}
@@ -126,7 +116,6 @@ export class RampApi extends ItemApi<RampData> {
 		}
 		this.data.leftWallHeight = v
 	}
-	/** Get RightWallHeight. */
 	get RightWallHeight() {
 		return this.data.rightWallHeight
 	}
@@ -136,7 +125,6 @@ export class RampApi extends ItemApi<RampData> {
 		}
 		this.data.rightWallHeight = v
 	}
-	/** Get VisibleLeftWallHeight. */
 	get VisibleLeftWallHeight() {
 		return this.data.leftWallHeightVisible
 	}
@@ -146,7 +134,6 @@ export class RampApi extends ItemApi<RampData> {
 		}
 		this.data.leftWallHeightVisible = v
 	}
-	/** Get VisibleRightWallHeight. */
 	get VisibleRightWallHeight() {
 		return this.data.rightWallHeightVisible
 	}
@@ -156,28 +143,24 @@ export class RampApi extends ItemApi<RampData> {
 		}
 		this.data.rightWallHeightVisible = v
 	}
-	/** Get Elasticity. */
 	get Elasticity() {
 		return this.data.elasticity
 	}
 	set Elasticity(v) {
 		this.data.elasticity = v
 	}
-	/** Get Friction. */
 	get Friction() {
 		return this.data.friction
 	}
 	set Friction(v) {
 		this.data.friction = v
 	}
-	/** Get Scatter. */
 	get Scatter() {
 		return this.data.scatter
 	}
 	set Scatter(v) {
 		this.data.scatter = v
 	}
-	/** Get Collidable. */
 	get Collidable() {
 		return this.hits[0].isEnabled
 	}
@@ -188,21 +171,18 @@ export class RampApi extends ItemApi<RampData> {
 			}
 		}
 	}
-	/** Get HasHitEvent. */
 	get HasHitEvent() {
 		return this.data.hitEvent
 	}
 	set HasHitEvent(v) {
 		this.data.hitEvent = v
 	}
-	/** Get Threshold. */
 	get Threshold() {
 		return this.data.threshold
 	}
 	set Threshold(v) {
 		this.data.threshold = v
 	}
-	/** Get Visible. */
 	get Visible() {
 		return this.data.isVisible
 	}
@@ -212,14 +192,12 @@ export class RampApi extends ItemApi<RampData> {
 		}
 		this.data.isVisible = v
 	}
-	/** Get ReflectionEnabled. */
 	get ReflectionEnabled() {
 		return this.data.isReflectionEnabled
 	}
 	set ReflectionEnabled(v) {
 		this.data.isReflectionEnabled = v
 	}
-	/** Get DepthBias. */
 	get DepthBias() {
 		return this.data.depthBias
 	}
@@ -229,35 +207,30 @@ export class RampApi extends ItemApi<RampData> {
 		}
 		this.data.depthBias = v
 	}
-	/** Get WireDiameter. */
 	get WireDiameter() {
 		return this.data.wireDiameter
 	}
 	set WireDiameter(v) {
 		this.data.wireDiameter = v
 	}
-	/** Get WireDistanceX. */
 	get WireDistanceX() {
 		return this.data.wireDistanceX
 	}
 	set WireDistanceX(v) {
 		this.data.wireDistanceX = v
 	}
-	/** Get WireDistanceY. */
 	get WireDistanceY() {
 		return this.data.wireDistanceY
 	}
 	set WireDistanceY(v) {
 		this.data.wireDistanceY = v
 	}
-	/** Get PhysicsMaterial. */
 	get PhysicsMaterial() {
 		return this.data.szPhysicsMaterial
 	}
 	set PhysicsMaterial(v) {
 		this.data.szPhysicsMaterial = v
 	}
-	/** Get OverwritePhysics. */
 	get OverwritePhysics() {
 		return this.data.overwritePhysics
 	}
