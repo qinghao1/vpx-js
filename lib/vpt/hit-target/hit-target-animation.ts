@@ -10,23 +10,19 @@ import { HitTarget } from './hit-target.js'
 import type { HitTargetData } from './hit-target-data.js'
 import type { HitTargetState } from './hit-target-state.js'
 
-/** HitTargetAnimation. */
+/** HitTarget animation. @see https://github.com/vpinball/vpinball/blob/master/hittarget.cpp */
 export class HitTargetAnimation implements IAnimation {
-	private readonly data: HitTargetData
-	private readonly state: HitTargetState
-	private readonly events: EventProxy
-
 	public timeStamp = 0
 	public hitEvent = false
 	public moveDown = true
 	public moveAnimation = false
 	private timeMsec = 0
 
-	constructor(data: HitTargetData, state: HitTargetState, events: EventProxy) {
-		this.data = data
-		this.state = state
-		this.events = events
-	}
+	constructor(
+		private readonly data: HitTargetData,
+		private readonly state: HitTargetState,
+		private readonly events: EventProxy,
+	) {}
 
 	public init(timeMsec: number): void {
 		this.timeMsec = timeMsec
@@ -36,11 +32,8 @@ export class HitTargetAnimation implements IAnimation {
 		const oldTimeMsec = this.timeMsec < newTimeMsec ? this.timeMsec : newTimeMsec
 		this.timeMsec = newTimeMsec
 		const diffTimeMsec = newTimeMsec - oldTimeMsec
-
 		if (this.hitEvent) {
-			if (!this.data.isDropped) {
-				this.moveDown = true
-			}
+			if (!this.data.isDropped) this.moveDown = true
 			this.moveAnimation = true
 			this.hitEvent = false
 		}
@@ -48,11 +41,8 @@ export class HitTargetAnimation implements IAnimation {
 			if (this.moveAnimation) {
 				let step = this.data.dropSpeed * table.getScaleZ()
 				const limit = HitTarget.DROP_TARGET_LIMIT * table.getScaleZ()
-				if (this.moveDown) {
-					step = -step
-				} else if (this.timeMsec - this.timeStamp < this.data.raiseDelay) {
-					step = 0.0
-				}
+				if (this.moveDown) step = -step
+				else if (this.timeMsec - this.timeStamp < this.data.raiseDelay) step = 0
 				this.state.zOffset += step * diffTimeMsec
 				if (this.moveDown) {
 					if (this.state.zOffset <= -limit) {
@@ -61,29 +51,22 @@ export class HitTargetAnimation implements IAnimation {
 						this.data.isDropped = true
 						this.moveAnimation = false
 						this.timeStamp = 0
-						if (this.data.useHitEvent) {
-							this.events.fireGroupEvent(Event.TargetEventsDropped)
-						}
+						if (this.data.useHitEvent) this.events.fireGroupEvent(Event.TargetEventsDropped)
 					}
 				} else {
-					if (this.state.zOffset >= 0.0) {
-						this.state.zOffset = 0.0
+					if (this.state.zOffset >= 0) {
+						this.state.zOffset = 0
 						this.moveAnimation = false
 						this.data.isDropped = false
-						if (this.data.useHitEvent) {
-							this.events.fireGroupEvent(Event.TargetEventsRaised)
-						}
+						if (this.data.useHitEvent) this.events.fireGroupEvent(Event.TargetEventsRaised)
 					}
 				}
-				//UpdateTarget();
 			}
 		} else {
 			if (this.moveAnimation) {
 				let step = this.data.dropSpeed * table.getScaleZ()
-				const limit = 13.0 * table.getScaleZ()
-				if (!this.moveDown) {
-					step = -step
-				}
+				const limit = 13 * table.getScaleZ()
+				if (!this.moveDown) step = -step
 				this.state.xRotation += step * diffTimeMsec
 				if (this.moveDown) {
 					if (this.state.xRotation >= limit) {
@@ -91,12 +74,11 @@ export class HitTargetAnimation implements IAnimation {
 						this.moveDown = false
 					}
 				} else {
-					if (this.state.xRotation <= 0.0) {
-						this.state.xRotation = 0.0
+					if (this.state.xRotation <= 0) {
+						this.state.xRotation = 0
 						this.moveAnimation = false
 					}
 				}
-				//UpdateTarget();
 			}
 		}
 	}
