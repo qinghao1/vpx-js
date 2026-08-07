@@ -5,7 +5,7 @@ import { breakStatement, returnStatement } from '../estree.js'
 import type { ESIToken } from '../grammar/grammar.js'
 
 /** ppBranch. */
-export function ppBranch(node: ESIToken): any {
+export function ppBranch(node: ESIToken): unknown {
 	switch (node.type) {
 		case 'ExitStatement':
 		case 'ExitStatementInline':
@@ -14,7 +14,7 @@ export function ppBranch(node: ESIToken): any {
 	return null
 }
 
-function ppExitStatement(node: ESIToken): any {
+function ppExitStatement(node: ESIToken): unknown {
 	const kind = node.children[0].text
 	return kind === 'Do' || kind === 'For' ? breakStatement() : returnStatement(null)
 }
