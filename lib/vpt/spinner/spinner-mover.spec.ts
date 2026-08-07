@@ -99,7 +99,6 @@ describe('The VPinball spinner collision', () => {
 export function debugSpinner(physics: PlayerPhysics, spinner: Spinner, numCycles = 300, cycleLength = 5) {
 	for (let i = 0; i <= numCycles; i++) {
 		physics.updatePhysics(i * cycleLength)
-		// tslint:disable-next-line:no-console
 		console.log('[%sms] %s (%s°)', i * cycleLength, spinner.getState().angle, radToDeg(spinner.getState().angle))
 	}
 }
