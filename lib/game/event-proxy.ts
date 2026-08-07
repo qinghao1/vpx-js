@@ -7,58 +7,47 @@ import { Event } from './event.js'
 import type { IPlayable } from './iplayable.js'
 import { isScriptable } from './iscriptable.js'
 
+/** Bridges gameplay events to script APIs. */
 export class EventProxy {
-	/**
-	 * while playing and the ball hits the mesh the hit threshold is updated here
-	 */
-	public currentHitThreshold: number = 0
-	public singleEvents: boolean = true
+	/** Current hit threshold updated during play. */
+	public currentHitThreshold = 0
+	public singleEvents = true
 	public readonly eventCollection: EventProxy[] = []
 	public readonly eventCollectionItemPos: number[] = []
 
 	private readonly playable: IPlayable
 
-	/**
-	 * Logic executed on collision.
-	 *
-	 * This replaces the dreaded object casts in VP where the hit logic must
-	 * be aware of the underlying object.
-	 */
+	/** Custom collision logic replacing VP object casts. */
 	public onCollision?: (obj: HitObject, ball: Ball, dot: number) => void
 
-	/**
-	 * If implemented and false is returned, the hit test is skipped.
-	 */
+	/** Return false to skip the hit test. */
 	public abortHitTest?: () => boolean
 
 	constructor(playable: IPlayable) {
 		this.playable = playable
 	}
 
-	public fireVoidEvent(e: Event) {
+	/** Fires an event without parameters. */
+	public fireVoidEvent(e: Event): void {
 		this.fireDispID(e)
 	}
 
+	/** Fires an event with parameters. */
 	public fireVoidEventParm(e: Event, ...params: any[]): void {
 		this.fireDispID(e, ...params)
-		//logger().info('[%s] fireGroupEvent(%s, %s)', this.playable.getName(), e, data);
 	}
 
+	/** Fires the event on grouped proxies and self. */
 	public fireGroupEvent(e: Event): void {
 		for (let i = 0; i < this.eventCollection.length; i++) {
 			this.eventCollection[i].fireVoidEventParm(e, this.eventCollectionItemPos[i])
 		}
-
-		if (this.singleEvents) {
-			this.fireDispID(e)
-		}
-		//logger().info('[%s] fireGroupEvent(%s)', this.playable.getName(), e);
+		if (this.singleEvents) this.fireDispID(e)
 	}
 
-	private fireDispID(e: Event, ...params: any[]) {
+	private fireDispID(e: Event, ...params: any[]): void {
 		if (isScriptable(this.playable)) {
 			this.playable.getApi().emit.call(this.playable.getApi(), getEventName(e), ...params)
-			//logger().info('[%s] fireDispID(%s)', this.playable.getName(), e);
 		}
 	}
 }
