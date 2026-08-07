@@ -4,8 +4,8 @@
 import { type BufferGeometry, ExtrudeBufferGeometry, Shape, Vector2 } from '../../refs.node.js'
 import { Table, type TableGenerateOptions } from '../../vpt/table/table.js'
 
-export /** ThreePlayfieldMeshGenerator. */
-class ThreePlayfieldMeshGenerator {
+/** ThreePlayfieldMeshGenerator. */
+export class ThreePlayfieldMeshGenerator {
 	public createPlayfieldGeometry(table: Table, opts: TableGenerateOptions): BufferGeometry {
 		/* istanbul ignore if */
 		if (!table.data) {
