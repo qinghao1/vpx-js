@@ -6,8 +6,7 @@ import type { Vertex2D, Vertex3D } from './math.js'
 import { RenderVertex, RenderVertex3D } from './render-vertex.js'
 import type { IRenderVertex, Vertex } from './vertex.js'
 
-/** Non-uniform centripetal Catmull-Rom spline.
- * @see https://github.com/vpinball/vpinball/blob/master/mesh.h */
+/** Non-uniform centripetal Catmull-Rom spline. @see https://github.com/vpinball/vpinball/blob/master/mesh.h */
 export abstract class CatmullCurve {
 	/** Evaluate at `t` ∈ [0,1]. */
 	abstract getPointAt(t: number): IRenderVertex
