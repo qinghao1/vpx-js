@@ -9,6 +9,7 @@ import { FileSystemObject } from './file-system-object.js'
 import { VpmController } from './vpm-controller.js'
 import { WshShell } from './wsh-shell.js'
 
+/** getObject. */
 export function getObject<T>(name: string, player: Player): T | void {
 	switch (name.toLowerCase()) {
 		case 'scripting.dictionary': {
