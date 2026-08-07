@@ -1,29 +1,13 @@
-/*
- * VPDB - Virtual Pinball Database
- * Copyright (C) 2019 freezy <freezy@vpdb.io>
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- */
+// Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { replace } from 'estraverse'
 import type { CallExpression, Expression, Identifier, MemberExpression, Program } from 'estree'
-import type { EnumsApi } from '../../vpt/enums'
-import type { GlobalApi } from '../../vpt/global-api'
-import { callExpression, identifier, literal, memberExpression } from '../estree'
-import type { Stdlib } from '../stdlib'
-import { Transformer } from './transformer'
+import type { EnumsApi } from '../../vpt/enums.js'
+import type { GlobalApi } from '../../vpt/global-api.js'
+import { callExpression, identifier, literal, memberExpression } from '../estree.js'
+import type { Stdlib } from '../stdlib/index.js'
+import { Transformer } from './transformer.js'
 
 /**
  * This transformer handles two cases where VBScript's syntax is ambiguous
