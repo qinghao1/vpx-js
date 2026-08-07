@@ -11,6 +11,7 @@ import { VbsUndefined } from './vbs-undefined.js'
  * returns {@link VbsUndefined}, which will only throw when error handling is
  * enabled.
  */
+/** VBS array emulation. */
 export class VbsArray<T> implements ProxyHandler<VbsArray<T>> {
 	[key: number]: T
 
