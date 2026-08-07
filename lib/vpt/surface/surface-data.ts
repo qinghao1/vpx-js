@@ -6,7 +6,8 @@ import type { Storage } from '../../io/ole-doc.js'
 import { DragPoint } from '../../math/dragpoint.js'
 import { type IPhysicalData, ItemData } from '../item-data.js'
 
-export class SurfaceData extends ItemData implements IPhysicalData {
+export /** Surface data. */
+class SurfaceData extends ItemData implements IPhysicalData {
 	public hitEvent: boolean = false
 	public isDroppable: boolean = false
 	public isFlipbook: boolean = false
