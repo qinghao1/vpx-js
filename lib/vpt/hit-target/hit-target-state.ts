@@ -4,7 +4,9 @@
 import { Pool } from '../../util/object-pool.js'
 import { ItemState } from '../item-state.js'
 
-/** HitTargetState. */
+/** Hit target state.
+ *
+ * @see https://github.com/vpinball/vpinball/blob/master/hittarget.cpp */
 export class HitTargetState extends ItemState {
 	public static readonly POOL = new Pool(HitTargetState)
 
