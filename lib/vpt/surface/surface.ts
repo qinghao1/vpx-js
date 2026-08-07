@@ -31,8 +31,6 @@ export class Surface
 	private drops: HitObject[] = []
 	private api?: SurfaceApi
 
-	// public getters
-	/** Top height. */
 	get heightTop() {
 		return this.data.heightTop
 	}
@@ -92,7 +90,6 @@ export class Surface
 				isTransparent,
 			}
 		}
-
 		if (surface.side) {
 			meshes.side = {
 				isVisible: this.data.isSideVisible,
