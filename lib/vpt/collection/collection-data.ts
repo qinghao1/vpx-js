@@ -3,6 +3,7 @@
 
 import { BiffParser } from '../../io/biff-parser.js'
 import type { Storage } from '../../io/ole-doc.js'
+import { handleBiffTag } from '../biff-helper.js'
 import { ItemData } from '../item-data.js'
 
 const BOOL_MAP: Record<string, string> = { EVNT: 'fireEvents', SSNG: 'stopSingleEvents', GREL: 'groupElements' }
@@ -25,15 +26,12 @@ export class CollectionData extends ItemData {
 		super(itemName)
 	}
 
-	private async fromTag(buffer: Uint8Array, tag: string, offset: number, len: number): Promise<number> {
+	private async fromTag(buffer: Uint8Array, tag: string, _offset: number, len: number): Promise<number> {
 		if (tag === 'ITEM') {
 			this.itemNames.push(this.getWideString(buffer, len))
 			return 0
 		}
-		if (tag in BOOL_MAP) {
-			;(this as unknown as Record<string, unknown>)[BOOL_MAP[tag]] = this.getBool(buffer)
-			return 0
-		}
+		if (handleBiffTag(this as unknown as Record<string, unknown>, this, tag, buffer, len, { bool: BOOL_MAP })) return 0
 		this.getCommonBlock(buffer, tag, len)
 		return 0
 	}
