@@ -162,9 +162,9 @@ export class DragPoint extends BiffParser {
 	): boolean {
 		return v1.isVector3 && v2.isVector3 && vMid.isVector3
 			? DragPoint.flatWithAccuracy3(
-					v1 as unknown as import('./vertex3d.js').Vertex3D,
-					v2 as unknown as import('./vertex3d.js').Vertex3D,
-					vMid as unknown as import('./vertex3d.js').Vertex3D,
+					v1 as unknown as Vertex3D,
+					v2 as unknown as Vertex3D,
+					vMid as unknown as Vertex3D,
 					accuracy,
 				)
 			: DragPoint.flatWithAccuracy2(v1, v2, vMid, accuracy)
