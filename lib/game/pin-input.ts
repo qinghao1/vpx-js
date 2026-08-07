@@ -30,12 +30,13 @@ import {
 } from './key-code.js'
 import type { Player } from './player.js'
 
+/** Handles DirectInput-style key queue and forwards to the table. */
 export class PinInput {
 	private readonly table: Table
 	private readonly player: Player
-	private readonly diq: DirectInputDeviceObjectData[] = [] // direct input queue
+	private readonly diq: DirectInputDeviceObjectData[] = []
 
-	public readonly rgKeys: { [key: number]: number } = {
+	public readonly rgKeys: Record<number, number> = {
 		[AssignKey.LeftFlipperKey]: DIK_LCONTROL,
 		[AssignKey.RightFlipperKey]: DIK_RCONTROL,
 		[AssignKey.LeftTiltKey]: DIK_Z,
@@ -64,11 +65,11 @@ export class PinInput {
 		this.player = player
 	}
 
-	public onKeyDown(dkCode: number, timestamp: number) {
+	public onKeyDown(dkCode: number, timestamp: number): void {
 		this.diq.push(DirectInputDeviceObjectData.claim(dkCode, 0x80, timestamp))
 	}
 
-	public onKeyUp(dkCode: number, timestamp: number) {
+	public onKeyUp(dkCode: number, timestamp: number): void {
 		this.diq.push(DirectInputDeviceObjectData.claim(dkCode, 0x0, timestamp))
 	}
 
@@ -76,16 +77,16 @@ export class PinInput {
 		return this.diq.pop()
 	}
 
+	/** Drains the input queue and fires key events. */
 	public processKeys(): void {
 		let input = this.getTail()
 		while (input) {
 			if (input.dwSequence === APP_KEYBOARD) {
-				// Normal game keys:
-				if (
-					input.dwOfs !== this.rgKeys[AssignKey.FrameCount] &&
-					input.dwOfs !== this.rgKeys[AssignKey.Enable3D] &&
-					input.dwOfs !== this.rgKeys[AssignKey.DBGBalls]
-				) {
+				const isSpecial =
+					input.dwOfs === this.rgKeys[AssignKey.FrameCount] ||
+					input.dwOfs === this.rgKeys[AssignKey.Enable3D] ||
+					input.dwOfs === this.rgKeys[AssignKey.DBGBalls]
+				if (!isSpecial) {
 					this.fireKeyEvent(input.dwData & 0x80 ? Event.GameEventsKeyDown : Event.GameEventsKeyUp, input.dwOfs)
 				}
 			}
@@ -94,22 +95,20 @@ export class PinInput {
 		}
 	}
 
-	private fireKeyEvent(dispid: Event, keycode: number) {
+	private fireKeyEvent(dispid: Event, keycode: number): void {
 		this.table.getApi().fireKeyEvent(dispid, keycode)
 	}
 }
 
 const APP_KEYBOARD = 0
-const APP_JOYSTICKMN = 1
-const APP_MOUSE = 2
 
 class DirectInputDeviceObjectData {
 	public static readonly POOL = new Pool(DirectInputDeviceObjectData)
 
-	public dwOfs: number = 0
-	public dwData: number = 0
-	public dwTimeStamp: number = 0
-	public dwSequence: number = APP_KEYBOARD
+	public dwOfs = 0
+	public dwData = 0
+	public dwTimeStamp = 0
+	public dwSequence = APP_KEYBOARD
 
 	public set(dwOfs: number, dwData: number, dwTimeStamp: number): this {
 		this.dwOfs = dwOfs
@@ -122,9 +121,7 @@ class DirectInputDeviceObjectData {
 		return DirectInputDeviceObjectData.POOL.get().set(dwOfs, dwData, dwTimeStamp)
 	}
 
-	public static release(...vertices: DirectInputDeviceObjectData[]) {
-		for (const vertex of vertices) {
-			DirectInputDeviceObjectData.POOL.release(vertex)
-		}
+	public static release(...items: DirectInputDeviceObjectData[]): void {
+		for (const item of items) DirectInputDeviceObjectData.POOL.release(item)
 	}
 }
