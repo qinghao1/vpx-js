@@ -8,6 +8,7 @@ import type { CollisionEvent } from './collision-event.js'
 import { C_CONTACTVEL, PHYS_TOUCH } from './constants.js'
 import { HitObject } from './hit-object.js'
 
+/** Vertical line hit shape (Z). */
 export class HitLineZ extends HitObject {
 	protected xy: Vertex2D
 
