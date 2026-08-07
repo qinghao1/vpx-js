@@ -32,7 +32,8 @@ class ItemType {
 	public static readonly Invalid = 0xffffffff
 }
 
-export class LightStatus extends VbsApi {
+export /** LightStatus. */
+class LightStatus extends VbsApi {
 	public readonly LightStateOff = 0
 	public readonly LightStateOn = 1
 	public readonly LightStateBlinking = 2
