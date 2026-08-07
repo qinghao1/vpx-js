@@ -1,36 +1,20 @@
-/*
- * VPDB - Virtual Pinball Database
- * Copyright (C) 2019 freezy <freezy@vpdb.io>
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- */
+// Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { Event } from '../../game/event'
-import type { EventProxy } from '../../game/event-proxy'
-import type { PlayerPhysics } from '../../game/player-physics'
-import { degToRad, radToDeg } from '../../math/float'
-import { Vertex2D } from '../../math/vertex2d'
-import { Vertex3D } from '../../math/vertex3d'
-import { PHYS_FACTOR } from '../../physics/constants'
-import { HitCircle } from '../../physics/hit-circle'
-import type { MoverObject } from '../../physics/mover-object'
-import { logger } from '../../util/logger'
-import type { TableData } from '../table/table-data'
-import type { FlipperConfig } from './flipper'
-import type { FlipperData } from './flipper-data'
-import type { FlipperState } from './flipper-state'
+import { Event } from '../../game/event.js'
+import type { EventProxy } from '../../game/event-proxy.js'
+import type { PlayerPhysics } from '../../game/player-physics.js'
+import { degToRad, radToDeg } from '../../math/float.js'
+import { Vertex2D } from '../../math/vertex2d.js'
+import { Vertex3D } from '../../math/vertex3d.js'
+import { PHYS_FACTOR } from '../../physics/constants.js'
+import { HitCircle } from '../../physics/hit-circle.js'
+import type { MoverObject } from '../../physics/mover-object.js'
+import { logger } from '../../util/logger.js'
+import type { TableData } from '../table/table-data.js'
+import type { FlipperConfig } from './flipper.js'
+import type { FlipperData } from './flipper-data.js'
+import type { FlipperState } from './flipper-state.js'
 
 export class FlipperMover implements MoverObject {
 	private readonly data: FlipperData
