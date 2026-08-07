@@ -43,8 +43,8 @@ export class BumperData extends ItemData {
 	public szBaseMaterial?: string
 	public szSkirtMaterial?: string
 	public threshold = 1.0
-	public force!: number
-	public scatter?: number
+	public force = 15.0
+	public scatter = 0
 	public heightScale = 90.0
 	public ringSpeed = 0.5
 	public orientation = 0.0

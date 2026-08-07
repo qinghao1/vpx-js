@@ -28,9 +28,11 @@ const FLOAT_MAP: Record<string, string> = {
 	SLGF: 'slingshotForce',
 	SLTH: 'slingshotThreshold',
 	ELAS: 'elasticity',
+	ELFO: 'elasticityFalloff',
 	WFCT: 'friction',
 	WSCT: 'scatter',
 	DILI: 'disableLightingTop',
+	DILT: 'disableLightingTop',
 	DILB: 'disableLightingBelow',
 }
 const STRING_MAP: Record<string, string> = {
@@ -57,17 +59,18 @@ export class SurfaceData extends ItemData implements IPhysicalData {
 	public heightBottom = 0
 	public heightTop = 50
 	public inner = true
-	public displayTexture = false
+	public displayTexture = true
 	public slingshotForce = 80
 	public slingshotThreshold = 0
 	public slingshotAnimation = true
-	public elasticity!: number
-	public friction!: number
-	public scatter!: number
+	public elasticity = 0.3
+	public elasticityFalloff = 0
+	public friction = 0.3
+	public scatter = 0
 	public isTopBottomVisible = true
 	public overwritePhysics = true
-	public disableLightingTop?: number
-	public disableLightingBelow?: number
+	public disableLightingTop = 0
+	public disableLightingBelow = 1
 	public isSideVisible = true
 	public isReflectionEnabled = true
 	public dragPoints: DragPoint[] = []

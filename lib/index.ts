@@ -3,8 +3,8 @@
 
 /** index.ts — Visual Pinball lib module. */
 export const VP_VERSION_MAJOR = 10 // X Digits
-export const VP_VERSION_MINOR = 6 // Max 2 Digits
-export const VP_VERSION_REV = 0 // Max 1 Digit
+export const VP_VERSION_MINOR = 8 // Max 2 Digits
+export const VP_VERSION_REV = 1 // Max 1 Digit
 
 export { Player } from './game/player.js'
 export { BrowserBinaryReader } from './io/binary-reader.browser.js'
