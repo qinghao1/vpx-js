@@ -5,6 +5,7 @@ import { EventEmitter } from 'events'
 import { concatUint8Arrays, getDataView, OLE_ID } from './binary-helpers.js'
 import { readableStream } from './event-stream.js'
 
+/** OLE compound document header. */
 export class Header {
 	public secSize!: number
 	public SATSize!: number
@@ -49,6 +50,7 @@ export class Header {
 	}
 }
 
+/** Sector allocation table. */
 export class AllocationTable {
 	private static SecIdFree = -1
 	private static SecIdEndOfChain = -2
@@ -103,6 +105,7 @@ export interface StorageEntry {
 	streams: { [key: string]: StorageEntry }
 }
 
+/** OLE directory tree. */
 export class DirectoryTree {
 	private static EntryTypeEmpty = 0
 	private static EntryTypeStorage = 1
@@ -189,6 +192,7 @@ export class DirectoryTree {
 	}
 }
 
+/** OLE storage/stream accessor. */
 export class Storage {
 	private readonly doc: OleCompoundDoc
 	private readonly dirEntry: StorageEntry
@@ -352,6 +356,7 @@ export class Storage {
 	}
 }
 
+/** OLE compound document. */
 export class OleCompoundDoc extends EventEmitter {
 	public header!: Header
 	public SAT!: AllocationTable
