@@ -10,6 +10,7 @@ import {
 	type MeshStandardMaterial,
 	type Object3D,
 	type PointLight,
+	type Mesh as ThreeMesh,
 } from '../../refs.node.js'
 import { progress } from '../../util/logger.js'
 import { Pool } from '../../util/object-pool.js'
@@ -138,7 +139,7 @@ export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, Poin
 
 	public applyMeshToNode(mesh: Mesh, obj: Object3D): void {
 		if (!obj) return
-		const destGeo = (obj as any).geometry
+		const destGeo = (obj as ThreeMesh).geometry as BufferGeometry
 		const srcGeo = this.meshGenerator.convertToBufferGeometry(mesh)
 		if (srcGeo.attributes.position.array.length !== destGeo.attributes.position.array.length)
 			throw new Error(
@@ -165,7 +166,7 @@ export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, Poin
 		if (!obj) return
 		const targets = obj.children?.length ? (obj.children as Object3D[]) : [obj]
 		for (const child of targets) {
-			const mat = (child as any).material as MeshStandardMaterial
+			const mat = (child as ThreeMesh).material as MeshStandardMaterial
 			this.materialGenerator.applyMaterial(mat, material)
 			this.materialGenerator.applyMap(mat, map)
 			this.materialGenerator.applyNormalMap(mat, normalMap)
