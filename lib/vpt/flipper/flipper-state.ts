@@ -5,16 +5,12 @@ import { Vertex2D } from '../../util/math.js'
 import { Pool } from '../../util/object-pool.js'
 import { ItemState } from '../item-state.js'
 
-/** Flipper state.
- *
+/** Flipper state — angle and appearance.
  * @see https://github.com/vpinball/vpinball/blob/master/flipper.cpp */
 export class FlipperState extends ItemState {
 	public static readonly POOL = new Pool(FlipperState)
 
-	/**
-	 * Angle in rad
-	 */
-	public angle: number = 0
+	public angle = 0
 	public center!: Vertex2D
 	public material?: string
 	public texture?: string
@@ -33,15 +29,15 @@ export class FlipperState extends ItemState {
 		texture: string | undefined,
 		rubberMaterial: string | undefined,
 	): FlipperState {
-		const state = FlipperState.POOL.get()
-		state.name = name
-		state.angle = angle
-		state.center = center
-		state.material = material
-		state.texture = texture
-		state.rubberMaterial = rubberMaterial
-		state.isVisible = isVisible
-		return state
+		const s = FlipperState.POOL.get()
+		s.name = name
+		s.angle = angle
+		s.center = center
+		s.material = material
+		s.texture = texture
+		s.rubberMaterial = rubberMaterial
+		s.isVisible = isVisible
+		return s
 	}
 
 	public clone(): FlipperState {
@@ -57,41 +53,26 @@ export class FlipperState extends ItemState {
 	}
 
 	public diff(state: FlipperState): FlipperState {
-		const diff = this.clone()
-		if (diff.angle === state.angle) {
-			delete diff.angle
+		const d = this.clone()
+		if (d.angle === state.angle) delete (d as unknown as Record<string, unknown>).angle
+		if (d.center?.equals(state.center)) {
+			Vertex2D.release(d.center)
+			delete (d as unknown as Record<string, unknown>).center
 		}
-		if (diff.center && diff.center.equals(state.center)) {
-			Vertex2D.release(diff.center)
-			delete diff.center
-		}
-		if (diff.material === state.material) {
-			delete diff.material
-		}
-		if (diff.texture === state.texture) {
-			delete diff.texture
-		}
-		if (diff.rubberMaterial === state.rubberMaterial) {
-			delete diff.rubberMaterial
-		}
-		if (diff.isVisible === state.isVisible) {
-			delete diff.isVisible
-		}
-		return diff
+		if (d.material === state.material) delete (d as unknown as Record<string, unknown>).material
+		if (d.texture === state.texture) delete (d as unknown as Record<string, unknown>).texture
+		if (d.rubberMaterial === state.rubberMaterial) delete (d as unknown as Record<string, unknown>).rubberMaterial
+		if (d.isVisible === state.isVisible) delete (d as unknown as Record<string, unknown>).isVisible
+		return d
 	}
 
 	public release(): void {
-		if (!this.center) {
-			this.center = Vertex2D.claim()
-		}
+		if (!this.center) this.center = Vertex2D.claim()
 		FlipperState.POOL.release(this)
 	}
 
 	public equals(state: FlipperState): boolean {
-		/* istanbul ignore if: we don't actually pass empty states. */
-		if (!state) {
-			return false
-		}
+		if (!state) return false
 		return (
 			state.angle === this.angle &&
 			state.center.equals(this.center) &&
