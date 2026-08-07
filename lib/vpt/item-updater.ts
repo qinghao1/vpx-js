@@ -8,6 +8,7 @@ import type { IRenderApi } from '../render/irender-api.js'
 import type { ItemState } from './item-state.js'
 import type { Table } from './table/table.js'
 
+/** Base for item updaters (applies state to render node). */
 export abstract class ItemUpdater<STATE extends ItemState> {
 	protected readonly state: STATE
 
@@ -27,7 +28,6 @@ export abstract class ItemUpdater<STATE extends ItemState> {
 		state: STATE,
 		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
 	) {
-		// visibility
 		if (state.isVisible !== undefined) {
 			renderApi.applyVisibility(this.state.isVisible, obj)
 		}
