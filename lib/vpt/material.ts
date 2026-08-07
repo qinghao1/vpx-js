@@ -60,7 +60,6 @@ export class Material {
 		material.edge = saveMaterial.edge
 		material.opacity = saveMaterial.opacity
 		material.isMetal = saveMaterial.isMetal
-		// tslint:disable-next-line:no-bitwise
 		material.isOpacityActive = !!(saveMaterial.opacityActiveEdgeAlpha & 1)
 		material.edgeAlpha = 0 //dequantizeUnsigned<7>(mats[i].bOpacityActiveEdgeAlpha >> 1);
 		return material
