@@ -9,7 +9,9 @@ import { Enums } from '../enums.js'
 import { ItemData } from '../item-data.js'
 import type { Table } from '../table/table.js'
 
-/** Light data. */
+/** Light data.
+ *
+ * @see https://github.com/vpinball/vpinball/blob/master/light.cpp */
 export class LightData extends ItemData {
 	public center!: Vertex2D
 	public falloff: number = 50
