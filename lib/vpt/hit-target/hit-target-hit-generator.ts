@@ -15,43 +15,30 @@ import type { Table } from '../table/table.js'
 import type { HitTargetData } from './hit-target-data.js'
 import type { HitTargetMeshGenerator } from './hit-target-mesh-generator.js'
 
-/** HitTarget hit generator. */
+/** HitTarget hit generator. @see https://github.com/vpinball/vpinball/blob/master/hittarget.cpp */
 export class HitTargetHitGenerator {
-	private readonly data: HitTargetData
-	private readonly meshGenerator: HitTargetMeshGenerator
-
-	constructor(data: HitTargetData, meshGenerator: HitTargetMeshGenerator) {
-		this.data = data
-		this.meshGenerator = meshGenerator
-	}
+	constructor(
+		private readonly data: HitTargetData,
+		private readonly meshGenerator: HitTargetMeshGenerator,
+	) {}
 
 	public generateHitObjects(events: EventProxy, table: Table): HitObject[] {
-		if (this.data.isDropTarget()) {
-			return this.generateDropTargetHits(events, table)
-		} else {
-			return this.generateHitTargetHits(events, table)
-		}
+		return this.data.isDropTarget()
+			? this.generateDropTargetHits(events, table)
+			: this.generateHitTargetHits(events, table)
 	}
 
 	private generateDropTargetHits(events: EventProxy, table: Table): HitObject[] {
 		const addedEdges = new EdgeSet()
 		const hitMesh = this.meshGenerator.generateMesh(table)
 		const hitObjects = this.generateCollidables(hitMesh, addedEdges, this.data.legacy, events, table)
-
 		const tempMatrix = new Matrix3D().rotateZMatrix(degToRad(this.data.rotZ))
 		const fullMatrix = new Matrix3D().multiply(tempMatrix)
-
 		if (!this.data.legacy) {
 			const rgv3D: Vertex3D[] = []
 			let hitShapeOffset = 0.18
-			if (this.data.targetType === Enums.TargetType.DropTargetBeveled) {
-				hitShapeOffset = 0.25
-			}
-			if (this.data.targetType === Enums.TargetType.DropTargetFlatSimple) {
-				hitShapeOffset = 0.13
-			}
-
-			// now create a special hit shape with hit event enabled to prevent a hit event when hit from behind
+			if (this.data.targetType === Enums.TargetType.DropTargetBeveled) hitShapeOffset = 0.25
+			if (this.data.targetType === Enums.TargetType.DropTargetFlatSimple) hitShapeOffset = 0.13
 			for (const dropTargetHitPlaneVertex of dropTargetHitPlaneVertices) {
 				const vert = new Vertex3D(
 					dropTargetHitPlaneVertex.x,
@@ -70,36 +57,30 @@ export class HitTargetHitGenerator {
 					),
 				)
 			}
-
 			for (let i = 0; i < dropTargetHitPlaneIndices.length; i += 3) {
-				const i0 = dropTargetHitPlaneIndices[i]
-				const i1 = dropTargetHitPlaneIndices[i + 1]
-				const i2 = dropTargetHitPlaneIndices[i + 2]
-
-				// NB: HitTriangle wants CCW vertices, but for rendering we have them in CW order
-				const rgv3D2: Vertex3D[] = [rgv3D[i0], rgv3D[i2], rgv3D[i1]]
-
+				const i0 = dropTargetHitPlaneIndices[i]!
+				const i1 = dropTargetHitPlaneIndices[i + 1]!
+				const i2 = dropTargetHitPlaneIndices[i + 2]!
+				const rgv3D2: Vertex3D[] = [rgv3D[i0]!, rgv3D[i2]!, rgv3D[i1]!]
 				hitObjects.push(this.setupHitObject(new HitTriangle(rgv3D2), events, true, table))
 				hitObjects.push(
 					...addedEdges
-						.addHitEdge(i0, i1, rgv3D2[0], rgv3D2[2])
+						.addHitEdge(i0, i1, rgv3D2[0]!, rgv3D2[2]!)
 						.map((obj) => this.setupHitObject(obj, events, true, table)),
 				)
 				hitObjects.push(
 					...addedEdges
-						.addHitEdge(i1, i2, rgv3D2[2], rgv3D2[1])
+						.addHitEdge(i1, i2, rgv3D2[2]!, rgv3D2[1]!)
 						.map((obj) => this.setupHitObject(obj, events, true, table)),
 				)
 				hitObjects.push(
 					...addedEdges
-						.addHitEdge(i2, i0, rgv3D2[1], rgv3D2[0])
+						.addHitEdge(i2, i0, rgv3D2[1]!, rgv3D2[0]!)
 						.map((obj) => this.setupHitObject(obj, events, true, table)),
 				)
 			}
-
-			// add collision vertices
 			for (let i = 0; i < dropTargetHitPlaneVertices.length; ++i) {
-				hitObjects.push(this.setupHitObject(new HitPoint(rgv3D[i]), events, true, table))
+				hitObjects.push(this.setupHitObject(new HitPoint(rgv3D[i]!), events, true, table))
 			}
 		}
 		return hitObjects
@@ -119,39 +100,32 @@ export class HitTargetHitGenerator {
 		table: Table,
 	): HitObject[] {
 		const hitObjects: HitObject[] = []
-
-		// add the normal drop target as collidable but without hit event
 		for (let i = 0; i < hitMesh.indices.length; i += 3) {
-			const i0 = hitMesh.indices[i]
-			const i1 = hitMesh.indices[i + 1]
-			const i2 = hitMesh.indices[i + 2]
-
-			// NB: HitTriangle wants CCW vertices, but for rendering we have them in CW order
+			const i0 = hitMesh.indices[i]!
+			const i1 = hitMesh.indices[i + 1]!
+			const i2 = hitMesh.indices[i + 2]!
 			const rgv3D: Vertex3D[] = [
-				new Vertex3D(hitMesh.vertices[i0].x, hitMesh.vertices[i0].y, hitMesh.vertices[i0].z),
-				new Vertex3D(hitMesh.vertices[i2].x, hitMesh.vertices[i2].y, hitMesh.vertices[i2].z),
-				new Vertex3D(hitMesh.vertices[i1].x, hitMesh.vertices[i1].y, hitMesh.vertices[i1].z),
+				new Vertex3D(hitMesh.vertices[i0]!.x, hitMesh.vertices[i0]!.y, hitMesh.vertices[i0]!.z),
+				new Vertex3D(hitMesh.vertices[i2]!.x, hitMesh.vertices[i2]!.y, hitMesh.vertices[i2]!.z),
+				new Vertex3D(hitMesh.vertices[i1]!.x, hitMesh.vertices[i1]!.y, hitMesh.vertices[i1]!.z),
 			]
-
 			hitObjects.push(this.setupHitObject(new HitTriangle(rgv3D), events, setHitObject, table))
 			hitObjects.push(
 				...addedEdges
-					.addHitEdge(i0, i1, rgv3D[0], rgv3D[2])
+					.addHitEdge(i0, i1, rgv3D[0]!, rgv3D[2]!)
 					.map((obj) => this.setupHitObject(obj, events, setHitObject, table)),
 			)
 			hitObjects.push(
 				...addedEdges
-					.addHitEdge(i1, i2, rgv3D[2], rgv3D[1])
+					.addHitEdge(i1, i2, rgv3D[2]!, rgv3D[1]!)
 					.map((obj) => this.setupHitObject(obj, events, setHitObject, table)),
 			)
 			hitObjects.push(
 				...addedEdges
-					.addHitEdge(i2, i0, rgv3D[1], rgv3D[0])
+					.addHitEdge(i2, i0, rgv3D[1]!, rgv3D[0]!)
 					.map((obj) => this.setupHitObject(obj, events, setHitObject, table)),
 			)
 		}
-
-		// add collision vertices
 		for (const vertex of hitMesh.vertices) {
 			hitObjects.push(this.setupHitObject(new HitPoint(vertex.getVertex()), events, setHitObject, table))
 		}
