@@ -5,8 +5,7 @@ import { BiffParser } from '../io/biff-parser.js'
 import { getDataView } from '../io/binary-helpers.js'
 import type { Texture } from './texture.js'
 
-/** VPinball material.
- * @see https://github.com/vpinball/vpinball/blob/master/Material.h */
+/** VPinball material. @see https://github.com/vpinball/vpinball/blob/master/Material.h */
 export class Material {
 	public name!: string
 	public wrapLighting?: number
@@ -49,9 +48,9 @@ export class Material {
 		return m
 	}
 
-	public static fromSerialized(blob: { [key: string]: any }): Material {
+	public static fromSerialized(blob: Record<string, unknown>): Material {
 		const m = new Material()
-		for (const k of Object.keys(blob)) (m as any)[k] = blob[k]
+		for (const k of Object.keys(blob)) (m as unknown as Record<string, unknown>)[k] = blob[k]
 		return m
 	}
 
