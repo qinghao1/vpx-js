@@ -5,7 +5,7 @@
 export type GltfId = number
 
 interface GltfNamedElement extends GltfElement {
-	name?: any
+	name?: string
 }
 
 interface GltfElement {
@@ -390,8 +390,8 @@ export interface GltfMaterialPbrMetallicRoughness extends GltfElement {
 }
 
 export interface GltfMaterialNormalTextureInfo extends GltfElement {
-	index?: any
-	texCoord?: any
+	index?: unknown
+	texCoord?: unknown
 
 	/**
 	 * The scalar multiplier applied to each normal vector of the normal texture.
@@ -400,8 +400,8 @@ export interface GltfMaterialNormalTextureInfo extends GltfElement {
 }
 
 export interface GltfMaterialOcclusionTextureInfo extends GltfElement {
-	index?: any
-	texCoord?: any
+	index?: unknown
+	texCoord?: unknown
 
 	/**
 	 * A scalar multiplier controlling the amount of occlusion applied.
