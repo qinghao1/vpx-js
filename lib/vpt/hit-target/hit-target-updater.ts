@@ -9,8 +9,8 @@ import type { Table } from '../table/table.js'
 import type { HitTargetData } from './hit-target-data.js'
 import type { HitTargetState } from './hit-target-state.js'
 
-export /** HitTargetUpdater. */
-class HitTargetUpdater extends ItemUpdater<HitTargetState> {
+/** HitTargetUpdater. */
+export class HitTargetUpdater extends ItemUpdater<HitTargetState> {
 	private readonly data: HitTargetData
 
 	constructor(data: HitTargetData, state: HitTargetState) {
