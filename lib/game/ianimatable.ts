@@ -14,6 +14,6 @@ export interface IAnimation {
 	updateAnimation(timeMsec: number, table: Table): void
 }
 
-export function isAnimatable(arg: any): arg is IAnimatable {
-	return arg.getAnimation !== undefined
+export function isAnimatable(arg: unknown): arg is IAnimatable {
+	return typeof arg === 'object' && arg !== null && 'getAnimation' in arg
 }

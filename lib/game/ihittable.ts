@@ -12,6 +12,6 @@ export interface IHittable extends IPlayable {
 	getEventProxy(): EventProxy
 }
 
-export function isHittable(arg: any): arg is IHittable {
-	return arg.getHitShapes !== undefined
+export function isHittable(arg: unknown): arg is IHittable {
+	return typeof arg === 'object' && arg !== null && 'getHitShapes' in arg
 }

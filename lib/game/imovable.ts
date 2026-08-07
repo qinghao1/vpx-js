@@ -9,6 +9,6 @@ export interface IMovable extends IPlayable {
 	getMover(): MoverObject
 }
 
-export function isMovable(arg: any): arg is IMovable {
-	return arg.getMover !== undefined
+export function isMovable(arg: unknown): arg is IMovable {
+	return typeof arg === 'object' && arg !== null && 'getMover' in arg
 }

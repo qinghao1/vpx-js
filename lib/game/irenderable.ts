@@ -21,8 +21,8 @@ export interface IRenderable<STATE extends ItemState> extends IItem {
 	getUpdater(): ItemUpdater<STATE>
 }
 
-export function isRenderable(arg: any): arg is IRenderable<ItemState> {
-	return arg.getMeshes !== undefined
+export function isRenderable(arg: unknown): arg is IRenderable<ItemState> {
+	return typeof arg === 'object' && arg !== null && 'getMeshes' in arg
 }
 
 export interface Meshes<GEOMETRY> {

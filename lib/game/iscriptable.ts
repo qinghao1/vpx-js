@@ -11,6 +11,6 @@ export interface IScriptable<T extends ItemApi<ItemData>> extends IPlayable {
 	getEventNames(): string[]
 }
 
-export function isScriptable<T extends ItemApi<ItemData>>(arg: any): arg is IScriptable<T> {
-	return arg.getApi !== undefined
+export function isScriptable<T extends ItemApi<ItemData>>(arg: unknown): arg is IScriptable<T> {
+	return typeof arg === 'object' && arg !== null && 'getApi' in arg
 }
