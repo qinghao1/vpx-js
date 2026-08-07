@@ -54,7 +54,7 @@ export class ThreeMaterialGenerator {
 		if (!material) return
 		threeMaterial.name = `material:${material.name}`
 		threeMaterial.metalness = material.isMetal ? 1 : 0
-		threeMaterial.roughness = Math.max(0, 1 - material.roughness / 1.5)
+		threeMaterial.roughness = Math.max(0, Math.min(1, 1 - material.roughness))
 		threeMaterial.color = new Color(material.baseColor)
 		threeMaterial.opacity = material.isOpacityActive ? Math.min(1, Math.max(0, material.opacity)) : 1
 		threeMaterial.side = DoubleSide
