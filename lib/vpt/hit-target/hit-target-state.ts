@@ -3,6 +3,7 @@
 
 import { Pool } from '../../util/object-pool.js'
 import { ItemState } from '../item-state.js'
+import { omitEqual } from '../state-helpers.js'
 
 /** Hit target state — drop offset, rotation and appearance.
  * @see https://github.com/vpinball/vpinball/blob/master/hittarget.cpp */
@@ -42,11 +43,11 @@ export class HitTargetState extends ItemState {
 
 	public diff(state: HitTargetState): HitTargetState {
 		const d = this.clone()
-		if (d.zOffset === state.zOffset) delete (d as unknown as Record<string, unknown>).zOffset
-		if (d.xRotation === state.xRotation) delete (d as unknown as Record<string, unknown>).xRotation
-		if (d.material === state.material) delete (d as unknown as Record<string, unknown>).material
-		if (d.texture === state.texture) delete (d as unknown as Record<string, unknown>).texture
-		if (d.isVisible === state.isVisible) delete (d as unknown as Record<string, unknown>).isVisible
+		omitEqual(d, state, 'zOffset')
+		omitEqual(d, state, 'xRotation')
+		omitEqual(d, state, 'material')
+		omitEqual(d, state, 'texture')
+		omitEqual(d, state, 'isVisible')
 		return d
 	}
 

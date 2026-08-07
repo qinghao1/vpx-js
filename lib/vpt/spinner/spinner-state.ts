@@ -3,6 +3,7 @@
 
 import { Pool } from '../../util/object-pool.js'
 import { ItemState } from '../item-state.js'
+import { omitEqual } from '../state-helpers.js'
 
 /** Spinner state.
  * @see https://github.com/vpinball/vpinball/blob/master/spinner.cpp */
@@ -45,21 +46,11 @@ export class SpinnerState extends ItemState {
 
 	public diff(state: SpinnerState): SpinnerState {
 		const diff = this.clone()
-		if (diff.angle === state.angle) {
-			delete diff.angle
-		}
-		if (diff.texture === state.texture) {
-			delete diff.texture
-		}
-		if (diff.material === state.material) {
-			delete diff.material
-		}
-		if (diff.showBracket === state.showBracket) {
-			delete diff.showBracket
-		}
-		if (diff.isVisible === state.isVisible) {
-			delete diff.isVisible
-		}
+		omitEqual(diff, state, 'angle')
+		omitEqual(diff, state, 'texture')
+		omitEqual(diff, state, 'material')
+		omitEqual(diff, state, 'showBracket')
+		omitEqual(diff, state, 'isVisible')
 		return diff
 	}
 

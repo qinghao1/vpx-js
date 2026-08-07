@@ -4,6 +4,7 @@
 import { Vertex3D } from '../../util/math.js'
 import { Pool } from '../../util/object-pool.js'
 import { ItemState } from '../item-state.js'
+import { omitEqual } from '../state-helpers.js'
 
 /** Primitive state.
  * @see https://github.com/vpinball/vpinball/blob/master/primitive.cpp */
@@ -110,18 +111,10 @@ export class PrimitiveState extends ItemState {
 			Vertex3D.release(diff.objectRotation)
 			delete diff.objectRotation
 		}
-		if (diff.material === state.material) {
-			delete diff.material
-		}
-		if (diff.map === state.map) {
-			delete diff.map
-		}
-		if (diff.normalMap === state.normalMap) {
-			delete diff.normalMap
-		}
-		if (diff.isVisible === state.isVisible) {
-			delete diff.isVisible
-		}
+		omitEqual(diff, state, 'material')
+		omitEqual(diff, state, 'map')
+		omitEqual(diff, state, 'normalMap')
+		omitEqual(diff, state, 'isVisible')
 		return diff
 	}
 

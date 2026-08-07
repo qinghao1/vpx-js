@@ -3,6 +3,7 @@
 
 import { Pool } from '../../util/object-pool.js'
 import { ItemState } from '../item-state.js'
+import { omitEqual } from '../state-helpers.js'
 
 /** Rubber state.
  * @see https://github.com/vpinball/vpinball/blob/master/rubber.cpp */
@@ -57,27 +58,13 @@ export class RubberState extends ItemState {
 
 	public diff(state: RubberState): RubberState {
 		const diff = this.clone()
-		if (diff.height === state.height) {
-			delete diff.height
-		}
-		if (diff.rotX === state.rotX) {
-			delete diff.rotX
-		}
-		if (diff.rotY === state.rotY) {
-			delete diff.rotY
-		}
-		if (diff.rotZ === state.rotZ) {
-			delete diff.rotZ
-		}
-		if (diff.material === state.material) {
-			delete diff.material
-		}
-		if (diff.texture === state.texture) {
-			delete diff.texture
-		}
-		if (diff.isVisible === state.isVisible) {
-			delete diff.isVisible
-		}
+		omitEqual(diff, state, 'height')
+		omitEqual(diff, state, 'rotX')
+		omitEqual(diff, state, 'rotY')
+		omitEqual(diff, state, 'rotZ')
+		omitEqual(diff, state, 'material')
+		omitEqual(diff, state, 'texture')
+		omitEqual(diff, state, 'isVisible')
 		return diff
 	}
 

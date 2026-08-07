@@ -3,6 +3,7 @@
 
 import { Pool } from '../../util/object-pool.js'
 import { ItemState } from '../item-state.js'
+import { omitEqual } from '../state-helpers.js'
 
 /** Surface state.
  * @see https://github.com/vpinball/vpinball/blob/master/surface.cpp */
@@ -69,27 +70,13 @@ export class SurfaceState extends ItemState {
 
 	public diff(state: SurfaceState): SurfaceState {
 		const diff = this.clone()
-		if (diff.isDropped === state.isDropped) {
-			delete diff.isDropped
-		}
-		if (diff.isTopVisible === state.isTopVisible) {
-			delete diff.isTopVisible
-		}
-		if (diff.topMaterial === state.topMaterial) {
-			delete diff.topMaterial
-		}
-		if (diff.topTexture === state.topTexture) {
-			delete diff.topTexture
-		}
-		if (diff.isSideVisible === state.isSideVisible) {
-			delete diff.isSideVisible
-		}
-		if (diff.sideMaterial === state.sideMaterial) {
-			delete diff.sideMaterial
-		}
-		if (diff.sideTexture === state.sideTexture) {
-			delete diff.sideTexture
-		}
+		omitEqual(diff, state, 'isDropped')
+		omitEqual(diff, state, 'isTopVisible')
+		omitEqual(diff, state, 'topMaterial')
+		omitEqual(diff, state, 'topTexture')
+		omitEqual(diff, state, 'isSideVisible')
+		omitEqual(diff, state, 'sideMaterial')
+		omitEqual(diff, state, 'sideTexture')
 		return diff
 	}
 

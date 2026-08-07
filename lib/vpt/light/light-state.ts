@@ -3,6 +3,7 @@
 
 import { Pool } from '../../util/object-pool.js'
 import { ItemState } from '../item-state.js'
+import { omitEqual } from '../state-helpers.js'
 
 /** Light state.
  * @see https://github.com/vpinball/vpinball/blob/master/light.cpp */
@@ -35,15 +36,9 @@ export class LightState extends ItemState {
 
 	public diff(state: LightState): LightState {
 		const diff = this.clone()
-		if (diff.intensity === state.intensity) {
-			delete diff.intensity
-		}
-		if (diff.color === state.color) {
-			delete diff.color
-		}
-		if (diff.colorFull === state.colorFull) {
-			delete diff.colorFull
-		}
+		omitEqual(diff, state, 'intensity')
+		omitEqual(diff, state, 'color')
+		omitEqual(diff, state, 'colorFull')
 		return diff
 	}
 
