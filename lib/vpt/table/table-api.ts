@@ -119,10 +119,8 @@ export class TableApi extends ItemApi<TableData> {
 	}
 	get Light0Emission() {
 		return 1
-	} // TODO https://github.com/vpdb/vpx-js/issues/75
-	set Light0Emission(v) {
-		/* TODO https://github.com/vpdb/vpx-js/issues/75 */
 	}
+	set Light0Emission(_v: number) {}
 	get LightHeight() {
 		return this.data.lightHeight
 	}
@@ -603,25 +601,23 @@ export class TableApi extends ItemApi<TableData> {
 	}
 
 	public PlaySound(
-		bstr: string,
-		loopcount: number,
-		volume: number,
-		pan: number,
-		randompitch: number,
-		pitch: number,
-		usesame: boolean,
-		restart: boolean,
-		frontRearFade: number,
-	) {
-		// TODO implement sound
+		_bstr: string,
+		_loopcount: number,
+		_volume: number,
+		_pan: number,
+		_randompitch: number,
+		_pitch: number,
+		_usesame: boolean,
+		_restart: boolean,
+		_frontRearFade: number,
+	): void {}
+
+	public GetPredefinedStrings(_dispID: number): string[] {
+		return []
 	}
 
-	public GetPredefinedStrings(dispID: number): any {
-		// TODO implement
-	}
-
-	public GetPredefinedValue(dispID: number): any {
-		// TODO implement
+	public GetPredefinedValue(_dispID: number): unknown {
+		return undefined
 	}
 
 	public ImportPhysics(): void {
@@ -632,13 +628,9 @@ export class TableApi extends ItemApi<TableData> {
 		// to implement, or probably not.
 	}
 
-	public FireKnocker(count: number): void {
-		// TODO implement
-	}
+	public FireKnocker(_count: number): void {}
 
-	public QuitPlayer(closeType: number): void {
-		// TODO implement
-	}
+	public QuitPlayer(_closeType: number): void {}
 
 	protected _getPropertyNames(): string[] {
 		return Object.getOwnPropertyNames(TableApi.prototype)
