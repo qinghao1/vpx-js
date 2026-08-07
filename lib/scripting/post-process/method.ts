@@ -13,6 +13,7 @@ import {
 } from '../estree.js'
 import type { ESIToken } from '../grammar/grammar.js'
 
+/** ppMethod. */
 export function ppMethod(node: ESIToken): any {
 	switch (node.type) {
 		case 'SubDeclaration':
