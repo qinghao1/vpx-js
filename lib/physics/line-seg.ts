@@ -23,10 +23,7 @@ export class LineSeg extends HitObject {
 		this.hitBBox.zhigh = zHigh
 		this.calcNormal()
 		this.calcHitBBox()
-
-		if (objType) {
-			this.objType = objType
-		}
+		if (objType) this.objType = objType
 	}
 
 	public setSeg(x1: number, y1: number, x2: number, y2: number): this {
@@ -42,13 +39,11 @@ export class LineSeg extends HitObject {
 		this.hitBBox.right = Math.max(this.v1.x, this.v2.x)
 		this.hitBBox.top = Math.min(this.v1.y, this.v2.y)
 		this.hitBBox.bottom = Math.max(this.v1.y, this.v2.y)
-
-		// zlow and zhigh were already set in constructor
 		return this
 	}
 
 	public hitTest(ball: Ball, dTime: number, coll: CollisionEvent): number {
-		return this.hitTestBasic(ball, dTime, coll, true, true, true) // normal face, lateral, rigid
+		return this.hitTestBasic(ball, dTime, coll, true, true, true)
 	}
 
 	public hitTestBasic(
@@ -59,138 +54,75 @@ export class LineSeg extends HitObject {
 		lateral: boolean,
 		rigid: boolean,
 	): number {
-		if (!this.isEnabled || ball.state.isFrozen) {
-			return -1.0
-		}
+		if (!this.isEnabled || ball.state.isFrozen) return -1
 
-		// ball velocity
-		const ballVx = ball.hit.vel.x
-		const ballVy = ball.hit.vel.y
-
-		// ball velocity normal to segment, positive if receding, zero=parallel
-		const bnv = ballVx * this.normal.x + ballVy * this.normal.y
+		const bnv = ball.hit.vel.x * this.normal.x + ball.hit.vel.y * this.normal.y
 		let isUnHit = bnv > C_LOWNORMVEL
+		if (direction && bnv > C_LOWNORMVEL) return -1
 
-		// direction true and clearly receding from normal face
-		if (direction && bnv > C_LOWNORMVEL) {
-			return -1.0
-		}
-
-		// ball position
-		const ballX = ball.state.pos.x
-		const ballY = ball.state.pos.y
-
-		// ball normal distance: contact distance normal to segment. lateral contact subtract the ball radius
-		const rollingRadius = lateral ? ball.data.radius : C_TOL_RADIUS // lateral or rolling point
-		const bcpd = (ballX - this.v1.x) * this.normal.x + (ballY - this.v1.y) * this.normal.y // ball center to plane distance
+		const rollingRadius = lateral ? ball.data.radius : C_TOL_RADIUS
+		const bcpd = (ball.state.pos.x - this.v1.x) * this.normal.x + (ball.state.pos.y - this.v1.y) * this.normal.y
 		let bnd = bcpd - rollingRadius
+		if (this.objType === CollisionType.Spinner || this.objType === CollisionType.Gate) bnd = bcpd + rollingRadius
 
-		// for a spinner add the ball radius otherwise the ball goes half through the spinner until it moves
-		if (this.objType === CollisionType.Spinner || this.objType === CollisionType.Gate) {
-			bnd = bcpd + rollingRadius
-		}
+		const inside = bnd <= 0
+		let hitTime: number
 
-		const inside = bnd <= 0 // in ball inside object volume
-		let hitTime
 		if (rigid) {
-			if (bnd < -ball.data.radius || (lateral && bcpd < 0)) {
-				// (ball normal distance) excessive penetration of object skin ... no collision HACK
-				return -1.0
-			}
+			if (bnd < -ball.data.radius || (lateral && bcpd < 0)) return -1
 			if (lateral && bnd <= PHYS_TOUCH) {
-				if (
-					inside ||
-					Math.abs(bnv) > C_CONTACTVEL || // fast velocity, return zero time
-					bnd <= -PHYS_TOUCH
-				) {
-					// zero time for rigid fast bodies
-					hitTime = 0 // slow moving but embedded
-				} else {
-					hitTime = bnd * (1.0 / (2.0 * PHYS_TOUCH)) + 0.5 // don't compete for fast zero time events
-				}
+				if (inside || Math.abs(bnv) > C_CONTACTVEL || bnd <= -PHYS_TOUCH) hitTime = 0
+				else hitTime = bnd * (1 / (2 * PHYS_TOUCH)) + 0.5
 			} else if (Math.abs(bnv) > C_LOWNORMVEL) {
-				// not velocity low ????
-				hitTime = bnd / -bnv // rate ok for safe divide
-			} else {
-				return -1.0 // wait for touching
-			}
-		} else {
-			//non-rigid ... target hits
-			if (bnv * bnd >= 0) {
-				// outside-receding || inside-approaching
-				if (
-					this.objType !== CollisionType.Trigger || // not a trigger
-					!ball.hit.isRealBall() || // is a trigger, so test:
-					Math.abs(bnd) >= ball.data.radius * 0.5 || // not too close ... nor too far away
-					inside !== ball.hit.vpVolObjs.indexOf(this.obj!) < 0
-				) {
-					// ...ball outside and hit set or ball inside and no hit set
-					return -1.0
-				}
-				hitTime = 0
-				isUnHit = !inside // ball on outside is UnHit, otherwise it's a Hit
-			} else {
 				hitTime = bnd / -bnv
-			}
+			} else return -1
+		} else {
+			if (bnv * bnd >= 0) {
+				if (
+					this.objType !== CollisionType.Trigger ||
+					!ball.hit.isRealBall() ||
+					Math.abs(bnd) >= ball.data.radius * 0.5 ||
+					inside !== ball.hit.vpVolObjs.indexOf(this.obj!) < 0
+				)
+					return -1
+				hitTime = 0
+				isUnHit = !inside
+			} else hitTime = bnd / -bnv
 		}
 
-		if (!isFinite(hitTime) || hitTime < 0 || hitTime > dTime) {
-			return -1.0 // time is outside this frame ... no collision
-		}
-		const btv = ballVx * this.normal.y - ballVy * this.normal.x // ball velocity tangent to segment with respect to direction from V1 to V2
+		if (!isFinite(hitTime!) || hitTime! < 0 || hitTime! > dTime) return -1
+
+		const btv = ball.hit.vel.x * this.normal.y - ball.hit.vel.y * this.normal.x
 		const btd =
-			(ballX - this.v1.x) * this.normal.y -
-			(ballY - this.v1.y) * this.normal.x + // ball tangent distance
-			btv * hitTime // ball tangent distance (projection) (initial position + velocity * hitime)
+			(ball.state.pos.x - this.v1.x) * this.normal.y - (ball.state.pos.y - this.v1.y) * this.normal.x + btv * hitTime!
 
-		if (btd < -C_TOL_ENDPNTS || btd > this.length + C_TOL_ENDPNTS) {
-			// is the contact off the line segment???
-			return -1.0
-		}
-		if (!rigid) {
-			// non rigid body collision? return direction
-			coll.hitFlag = isUnHit // UnHit signal is receding from outside target
-		}
+		if (btd < -C_TOL_ENDPNTS || btd > this.length + C_TOL_ENDPNTS) return -1
+		if (!rigid) coll.hitFlag = isUnHit
 
-		const ballRadius = ball.data.radius
-		const hitZ = ball.state.pos.z + ball.hit.vel.z * hitTime // check too high or low relative to ball rolling point at hittime
+		const hitZ = ball.state.pos.z + ball.hit.vel.z * hitTime!
+		if (hitZ + ball.data.radius * 0.5 < this.hitBBox.zlow || hitZ - ball.data.radius * 0.5 > this.hitBBox.zhigh)
+			return -1
 
-		if (
-			hitZ + ballRadius * 0.5 < this.hitBBox.zlow || // check limits of object's height and depth
-			hitZ - ballRadius * 0.5 > this.hitBBox.zhigh
-		) {
-			return -1.0
-		}
-
-		// hit normal is same as line segment normal
-		coll.hitNormal.set(this.normal.x, this.normal.y, 0.0)
-		coll.hitDistance = bnd // actual contact distance ...
-		//coll.m_hitRigid = rigid;     // collision type
-
-		// check for contact
+		coll.hitNormal.set(this.normal.x, this.normal.y, 0)
+		coll.hitDistance = bnd
 		if (Math.abs(bnv) <= C_CONTACTVEL && Math.abs(bnd) <= PHYS_TOUCH) {
 			coll.isContact = true
 			coll.hitOrgNormalVelocity = bnv
 		}
-		return hitTime
+		return hitTime!
 	}
 
 	public collide(coll: CollisionEvent): void {
 		const dot = coll.hitNormal.dot(coll.ball.hit.vel)
 		coll.ball.hit.collide3DWall(coll.hitNormal, this.elasticity, this.elasticityFalloff, this.friction, this.scatter)
-
-		if (dot <= -this.threshold) {
-			this.fireHitEvent(coll.ball)
-		}
+		if (dot <= -this.threshold) this.fireHitEvent(coll.ball)
 	}
 
 	private calcNormal(): this {
 		const vT = Vertex2D.claim(this.v1.x - this.v2.x, this.v1.y - this.v2.y)
-
-		// Set up line normal
 		this.length = vT.length()
-		const invLength = 1.0 / this.length
-		this.normal.set(vT.y * invLength, -vT.x * invLength)
+		const inv = 1 / this.length
+		this.normal.set(vT.y * inv, -vT.x * inv)
 		Vertex2D.release(vT)
 		return this
 	}
