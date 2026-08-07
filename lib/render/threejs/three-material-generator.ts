@@ -1,23 +1,7 @@
-/*
- * VPDB - Virtual Pinball Database
- * Copyright (C) 2019 freezy <freezy@vpdb.io>
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- */
+// Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import type { RenderInfo } from '../../game/irenderable'
+import type { RenderInfo } from '../../game/irenderable.js'
 import {
 	type BufferGeometry,
 	Color,
@@ -25,9 +9,9 @@ import {
 	MeshStandardMaterial,
 	type Material as ThreeMaterial,
 } from '../../refs.node.js'
-import type { Material } from '../../vpt/material'
-import type { MeshConvertOptions } from '../irender-api'
-import type { ThreeMapGenerator } from './three-map-generator'
+import type { Material } from '../../vpt/material.js'
+import type { MeshConvertOptions } from '../irender-api.js'
+import type { ThreeMapGenerator } from './three-map-generator.js'
 
 export class ThreeMaterialGenerator {
 	private readonly cachedMaterials: { [key: string]: ThreeMaterial } = {}
