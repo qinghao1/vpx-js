@@ -5,7 +5,9 @@ import { Enums } from '../enums.js'
 import { ItemApi } from '../item-api.js'
 import type { FlasherData } from './flasher-data.js'
 
-/** Flasher API. */
+/** Flasher API.
+ *
+ * @see https://github.com/vpinball/vpinball/blob/master/flasher.cpp */
 export class FlasherApi extends ItemApi<FlasherData> {
 	/** Get X. */
 	get X() {
