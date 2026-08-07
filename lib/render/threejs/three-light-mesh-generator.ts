@@ -6,7 +6,8 @@ import { ExtrudeGeometry, type Path, Shape, Vector2 } from '../../refs.node.js'
 import type { LightData } from '../../vpt/light/light-data.js'
 import type { Table } from '../../vpt/table/table.js'
 
-export class ThreeLightMeshGenerator {
+export /** ThreeLightMeshGenerator. */
+class ThreeLightMeshGenerator {
 	public createLight(lightData: LightData, table: Table, depth = 5, bevel = 0.5): ExtrudeGeometry {
 		const shape = this.getShape(lightData, table)
 		const dim = table.getDimensions()
