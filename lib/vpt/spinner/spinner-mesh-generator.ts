@@ -23,8 +23,8 @@ const spinnerPlateMeshJson = JSON.parse(
 const spinnerBracketMesh = Mesh.fromJson(spinnerBracketMeshJson)
 const spinnerPlateMesh = Mesh.fromJson(spinnerPlateMeshJson)
 
-export /** SpinnerMeshGenerator. */
-class SpinnerMeshGenerator {
+/** SpinnerMeshGenerator. */
+export class SpinnerMeshGenerator {
 	private readonly data: SpinnerData
 
 	constructor(data: SpinnerData) {
