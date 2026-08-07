@@ -3,7 +3,7 @@
 
 import { VbsApi } from '../vbs-api.js'
 
-/** VbsMath. */
+/** VBScript `Math` helpers. */
 export class VbsMath extends VbsApi {
 	public pow(x: number, y: number) {
 		return x ** y
