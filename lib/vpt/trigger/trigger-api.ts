@@ -9,7 +9,8 @@ import type { Table } from '../table/table.js'
 import type { TriggerData } from './trigger-data.js'
 import type { TriggerState } from './trigger-state.js'
 
-export class TriggerApi extends ItemApi<TriggerData> {
+export /** TriggerApi. */
+class TriggerApi extends ItemApi<TriggerData> {
 	private readonly state: TriggerState
 
 	constructor(state: TriggerState, data: TriggerData, events: EventProxy, player: Player, table: Table) {
