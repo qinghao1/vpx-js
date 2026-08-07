@@ -53,7 +53,8 @@ const hitTargetRoundMesh = Mesh.fromJson(hitTargetRoundMeshJson)
 const hitTargetT1SlimMesh = Mesh.fromJson(hitTargetT1SlimMeshJson)
 const hitTargetT2SlimMesh = Mesh.fromJson(hitTargetT2SlimMeshJson)
 
-export class HitTargetMeshGenerator {
+export /** HitTargetMeshGenerator. */
+class HitTargetMeshGenerator {
 	private readonly data: HitTargetData
 
 	constructor(data: HitTargetData) {
