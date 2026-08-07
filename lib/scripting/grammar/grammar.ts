@@ -1,45 +1,29 @@
-/*
- * VPDB - Virtual Pinball Database
- * Copyright (C) 2019 freezy <freezy@vpdb.io>
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- */
+// Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { createRequire } from 'node:module'
 import { Grammars, type IToken, Parser } from 'ebnf'
 import { generate } from 'escodegen'
 import type { Program, Statement } from 'estree'
 import { getTextFile } from '../../refs.node.js'
-import { logger, progress } from '../../util/logger'
-import { program } from '../estree'
-import { ppArray } from '../post-process/array'
-import { ppAssign } from '../post-process/assign'
-import { ppBranch } from '../post-process/branch'
-import { ppCall } from '../post-process/call'
-import { ppClass } from '../post-process/class'
-import { ppConditional } from '../post-process/conditional'
-import { ppConst } from '../post-process/const'
-import { ppError } from '../post-process/error'
-import { ppExpr } from '../post-process/expr'
-import { ppHelpers } from '../post-process/helpers'
-import { ppLiteral } from '../post-process/literal'
-import { ppLoop } from '../post-process/loop'
-import { ppMethod } from '../post-process/method'
-import { ppVarDecl } from '../post-process/vardecl'
-import { ppWith } from '../post-process/with'
-import { RULES } from './rules'
+import { logger, progress } from '../../util/logger.js'
+import { program } from '../estree.js'
+import { ppArray } from '../post-process/array.js'
+import { ppAssign } from '../post-process/assign.js'
+import { ppBranch } from '../post-process/branch.js'
+import { ppCall } from '../post-process/call.js'
+import { ppClass } from '../post-process/class.js'
+import { ppConditional } from '../post-process/conditional.js'
+import { ppConst } from '../post-process/const.js'
+import { ppError } from '../post-process/error.js'
+import { ppExpr } from '../post-process/expr.js'
+import { ppHelpers } from '../post-process/helpers.js'
+import { ppLiteral } from '../post-process/literal.js'
+import { ppLoop } from '../post-process/loop.js'
+import { ppMethod } from '../post-process/method.js'
+import { ppVarDecl } from '../post-process/vardecl.js'
+import { ppWith } from '../post-process/with.js'
+import { RULES } from './rules.js'
 
 const require = createRequire(import.meta.url)
 
