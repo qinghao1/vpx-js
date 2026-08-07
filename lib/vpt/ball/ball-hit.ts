@@ -26,10 +26,9 @@ import type { BallData } from './ball-data.js'
 import { BallMover } from './ball-mover.js'
 import type { BallState } from './ball-state.js'
 
-/**
- * In the VP source code this is all part of ball.cpp. We'll try
- * to separate this more and see how far we get.
- */
+/** Ball collision shape — separated from ball.cpp.
+ *
+ * @see https://github.com/vpinball/vpinball/blob/master/ball.cpp */
 export class BallHit extends HitObject {
 	public readonly coll: CollisionEvent
 	public rcHitRadiusSqr: number = 0
