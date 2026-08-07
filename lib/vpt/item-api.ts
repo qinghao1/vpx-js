@@ -48,7 +48,7 @@ export abstract class ItemApi<DATA extends ItemData> extends EventEmitter {
 	set TimerEnabled(v) {
 		this._setTimerEnabled(v)
 	}
-	public UserValue: any
+	public UserValue: unknown
 
 	public constructor(data: DATA, events: EventProxy, player: Player, table: Table) {
 		super()
@@ -58,7 +58,7 @@ export abstract class ItemApi<DATA extends ItemData> extends EventEmitter {
 		this.table = table
 	}
 
-	public fireKeyEvent(event: Event, ...args: any[]) {
+	public fireKeyEvent(event: Event, ...args: unknown[]) {
 		this.events.fireVoidEventParm(event, ...args)
 	}
 
