@@ -7,7 +7,8 @@ import type { Table } from '../table/table.js'
 import type { PlungerMeshGenerator } from './plunger-mesh-generator.js'
 import type { PlungerState } from './plunger-state.js'
 
-export class PlungerUpdater extends ItemUpdater<PlungerState> {
+export /** PlungerUpdater. */
+class PlungerUpdater extends ItemUpdater<PlungerState> {
 	private readonly meshGenerator: PlungerMeshGenerator
 
 	constructor(state: PlungerState, meshGenerator: PlungerMeshGenerator) {
