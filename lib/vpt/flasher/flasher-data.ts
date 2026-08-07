@@ -5,6 +5,7 @@ import { BiffParser } from '../../io/biff-parser.js'
 import type { Storage } from '../../io/ole-doc.js'
 import { DragPoint } from '../../math/dragpoint.js'
 import { Vertex2D } from '../../math/vertex2d.js'
+import { handleBiffTag } from '../biff-helper.js'
 import { Enums } from '../enums.js'
 import { ItemData } from '../item-data.js'
 
@@ -67,7 +68,7 @@ export class FlasherData extends ItemData {
 		super(itemName)
 	}
 
-	private async fromTag(buffer: Uint8Array, tag: string, offset: number, len: number): Promise<number> {
+	private async fromTag(buffer: Uint8Array, tag: string, _offset: number, len: number): Promise<number> {
 		if (tag === 'FLAX') {
 			this.center.x = this.getFloat(buffer)
 			return 0
@@ -80,22 +81,15 @@ export class FlasherData extends ItemData {
 			this.alpha = Math.max(0, this.getInt(buffer))
 			return 0
 		}
-		if (tag in FLOAT_MAP) {
-			;(this as unknown as Record<string, unknown>)[FLOAT_MAP[tag]] = this.getFloat(buffer)
+		if (
+			handleBiffTag(this as unknown as Record<string, unknown>, this, tag, buffer, len, {
+				float: FLOAT_MAP,
+				int: INT_MAP,
+				bool: BOOL_MAP,
+				string: STRING_MAP,
+			})
+		)
 			return 0
-		}
-		if (tag in INT_MAP) {
-			;(this as unknown as Record<string, unknown>)[INT_MAP[tag]] = this.getInt(buffer)
-			return 0
-		}
-		if (tag in BOOL_MAP) {
-			;(this as unknown as Record<string, unknown>)[BOOL_MAP[tag]] = this.getBool(buffer)
-			return 0
-		}
-		if (tag in STRING_MAP) {
-			;(this as unknown as Record<string, unknown>)[STRING_MAP[tag]] = this.getString(buffer, len)
-			return 0
-		}
 		this.getCommonBlock(buffer, tag, len)
 		return 0
 	}
