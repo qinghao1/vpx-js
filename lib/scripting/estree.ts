@@ -124,6 +124,7 @@ export function functionDeclaration(id: Identifier, params: Identifier[], body: 
 	}
 }
 
+/** variableDeclaration. */
 export function variableDeclaration(
 	kind: 'var' | 'let' | 'const',
 	declarations: VariableDeclarator[],
