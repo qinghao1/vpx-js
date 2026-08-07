@@ -8,7 +8,9 @@ import { Vertex2D } from '../../math/vertex2d.js'
 import { Enums } from '../enums.js'
 import { ItemData } from '../item-data.js'
 
-/** Flasher data. */
+/** Flasher data.
+ *
+ * @see https://github.com/vpinball/vpinball/blob/master/flasher.cpp */
 export class FlasherData extends ItemData {
 	public height: number = 50.0
 	public center: Vertex2D = new Vertex2D()
