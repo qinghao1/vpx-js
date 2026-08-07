@@ -16,8 +16,8 @@ export class FrameData {
 	}
 }
 
-export /** VertData. */
-class VertData {
+/** VertData. */
+export class VertData {
 	public constructor(
 		public readonly x: number,
 		public readonly y: number,
