@@ -51,6 +51,13 @@ const gltfPipeline = require('gltf-pipeline')
 const PromisePool = require('es6-promise-pool')
 
 import { PATH_PROPERTIES, THREE_TO_WEBGL, WEBGL_CONSTANTS } from './gltf-constants.js'
+import {
+	equalArray,
+	getPaddedArrayBuffer,
+	getPaddedBufferSize,
+	serializeUserData,
+	stringToBuffer,
+} from './gltf-utils.js'
 
 /**
  * This is a modified version of Three's GLTF exporter that runs better
@@ -174,7 +181,7 @@ export class GLTFExporter {
 				binaryChunkPrefix.writeUInt32LE(GLB_CHUNK_TYPE_BIN, 4)
 
 				// JSON chunk.
-				const jsonChunk = this.getPaddedArrayBuffer(this.stringToBuffer(JSON.stringify(this.outputJSON)), 0x20)
+				const jsonChunk = getPaddedArrayBuffer(stringToBuffer(JSON.stringify(this.outputJSON)), 0x20)
 				const jsonChunkPrefix = Buffer.alloc(GLB_CHUNK_PREFIX_BYTES)
 				jsonChunkPrefix.writeUInt32LE(jsonChunk.byteLength, 0)
 				jsonChunkPrefix.writeUInt32LE(GLB_CHUNK_TYPE_JSON, 4)
@@ -239,27 +246,11 @@ export class GLTFExporter {
 	 * @param  {Array} array2 Array 2 to compare
 	 * @return {Boolean}        Returns true if both arrays are equal
 	 */
-	private equalArray(array1: any[], array2: any[]) {
-		return array1.length === array2.length && array1.every((element, index) => element === array2[index])
-	}
-
 	/**
 	 * Converts a string to an ArrayBuffer.
 	 * @param  {string} text
 	 * @return {ArrayBuffer}
 	 */
-	private stringToBuffer(text: string): Buffer {
-		const array = Buffer.alloc(text.length)
-		let i = 0
-		const il = text.length
-		for (; i < il; i++) {
-			const value = text.charCodeAt(i)
-			// Replacing multi-byte character with space(0x20).
-			array[i] = value > 0xff ? 0x20 : value
-		}
-		return array
-	}
-
 	/**
 	 * Get the min and max vectors from the given attribute
 	 * @param  {BufferAttribute} attribute Attribute to find the min/max in range from start to start + count
@@ -358,10 +349,6 @@ export class GLTFExporter {
 	 * @returns {Integer} new buffer size with required padding.
 	 *
 	 */
-	private getPaddedBufferSize(bufferSize: number) {
-		return Math.ceil(bufferSize / 4) * 4
-	}
-
 	/**
 	 * Returns a buffer aligned to 4-byte boundary.
 	 *
@@ -369,32 +356,12 @@ export class GLTFExporter {
 	 * @param {Integer} paddingByte (Optional)
 	 * @returns {ArrayBuffer} The same buffer if it's already aligned to 4-byte boundary or a new buffer
 	 */
-	private getPaddedArrayBuffer(arrayBuffer: Buffer, paddingByte: number = 0x0): Buffer {
-		const paddedLength = this.getPaddedBufferSize(arrayBuffer.byteLength)
-		if (paddedLength === arrayBuffer.byteLength) {
-			return arrayBuffer
-		}
-		const fillBuffer = Buffer.alloc(paddedLength - arrayBuffer.byteLength, paddingByte)
-		return Buffer.concat([arrayBuffer, fillBuffer])
-	}
-
 	/**
 	 * Serializes a userData.
 	 *
 	 * @param {Object3D|Material} object
 	 * @returns {Object}
 	 */
-	private serializeUserData(object: Object3D | Material | BufferGeometry) {
-		try {
-			return JSON.parse(JSON.stringify(object.userData))
-		} catch (error) {
-			logger().warn(
-				`[GLTFExporter.serializeUserData]: userData of '${object.name}' won't be serialized because of JSON.stringify error - ${error.message}`,
-			)
-			return {}
-		}
-	}
-
 	/**
 	 * Applies a texture transform, if present, to the map definition. Requires
 	 * the KHR_texture_transform extension.
@@ -472,7 +439,7 @@ export class GLTFExporter {
 			componentSize = 4
 		}
 
-		const byteLength = this.getPaddedBufferSize(count * attribute.itemSize * componentSize)
+		const byteLength = getPaddedBufferSize(count * attribute.itemSize * componentSize)
 		const dataView = Buffer.alloc(byteLength)
 		let offset = 0
 
@@ -541,7 +508,7 @@ export class GLTFExporter {
 			// maybe a parallel process resolved this now, so check again
 			return this.images.get(uri)!
 		}
-		const buffer = this.getPaddedArrayBuffer(blob)
+		const buffer = getPaddedArrayBuffer(blob)
 		const bufferView = {
 			buffer: this.processBuffer(buffer),
 			byteOffset: this.byteOffset,
@@ -792,7 +759,7 @@ export class GLTFExporter {
 		// pbrMetallicRoughness.baseColorFactor
 		const color = material.color.toArray().concat([material.opacity])
 
-		if (!this.equalArray(color, [1, 1, 1, 1])) {
+		if (!equalArray(color, [1, 1, 1, 1])) {
 			gltfMaterial.pbrMetallicRoughness!.baseColorFactor = color
 		}
 
@@ -831,7 +798,7 @@ export class GLTFExporter {
 			// emissiveFactor
 			const emissive = material.emissive.clone().multiplyScalar(material.emissiveIntensity).toArray()
 
-			if (!this.equalArray(emissive, [0, 0, 0])) {
+			if (!equalArray(emissive, [0, 0, 0])) {
 				gltfMaterial.emissiveFactor = emissive
 			}
 
@@ -894,7 +861,7 @@ export class GLTFExporter {
 		}
 
 		if (Object.keys(material.userData).length > 0) {
-			gltfMaterial.extras = this.serializeUserData(material)
+			gltfMaterial.extras = serializeUserData(material)
 		}
 
 		this.outputJSON.materials.push(gltfMaterial)
@@ -1074,7 +1041,7 @@ export class GLTFExporter {
 
 		const extras =
 			Object.keys((geometry as BufferGeometry).userData).length > 0
-				? this.serializeUserData(geometry as BufferGeometry)
+				? serializeUserData(geometry as BufferGeometry)
 				: undefined
 
 		let forceIndices = this.options.forceIndices
@@ -1396,20 +1363,20 @@ export class GLTFExporter {
 			const position = object.position.toArray()
 			const scale = object.scale.toArray()
 
-			if (!this.equalArray(rotation, [0, 0, 0, 1])) {
+			if (!equalArray(rotation, [0, 0, 0, 1])) {
 				gltfNode.rotation = rotation
 			}
 
-			if (!this.equalArray(position, [0, 0, 0])) {
+			if (!equalArray(position, [0, 0, 0])) {
 				gltfNode.translation = position
 			}
 
-			if (!this.equalArray(scale, [1, 1, 1])) {
+			if (!equalArray(scale, [1, 1, 1])) {
 				gltfNode.scale = scale
 			}
 		} else {
 			object.updateMatrix()
-			if (!this.equalArray(object.matrix.elements as any, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1])) {
+			if (!equalArray(object.matrix.elements as any, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1])) {
 				gltfNode.matrix = object.matrix.elements
 			}
 		}
@@ -1420,7 +1387,7 @@ export class GLTFExporter {
 		}
 
 		if (object.userData && Object.keys(object.userData).length > 0) {
-			gltfNode.extras = this.serializeUserData(object)
+			gltfNode.extras = serializeUserData(object)
 		}
 
 		if (object.isMesh || object.isLine || object.isPoints) {
@@ -1502,7 +1469,7 @@ export class GLTFExporter {
 		}
 
 		if (scene.userData && Object.keys(scene.userData).length > 0) {
-			gltfScene.extras = this.serializeUserData(scene)
+			gltfScene.extras = serializeUserData(scene)
 		}
 
 		this.outputJSON.scenes.push(gltfScene)
