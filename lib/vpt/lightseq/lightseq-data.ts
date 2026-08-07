@@ -6,7 +6,9 @@ import type { Storage } from '../../io/ole-doc.js'
 import { Vertex2D } from '../../math/vertex2d.js'
 import { ItemData } from '../item-data.js'
 
-/** LightSeq data. */
+/** LightSeq data.
+ *
+ * @see https://github.com/vpinball/vpinball/blob/master/lightseq.cpp */
 export class LightSeqData extends ItemData {
 	private v!: Vertex2D
 	public collection?: string
