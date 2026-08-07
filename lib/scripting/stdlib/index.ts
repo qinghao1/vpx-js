@@ -9,7 +9,8 @@ import { VbsApi } from '../vbs-api.js'
 import { ERR } from './err.js'
 import { VbsMath } from './math.js'
 
-export class Stdlib extends VbsApi {
+export /** VBS stdlib. */
+class Stdlib extends VbsApi {
 	private readonly math = new VbsMath()
 
 	get Empty() {
