@@ -6,31 +6,25 @@ import type { BlockStatement } from 'estree'
 import { identifier, memberExpression } from '../estree.js'
 import type { ESIToken } from '../grammar/grammar.js'
 
-/** ppWith. */
-export function ppWith(node: ESIToken): any {
-	switch (node.type) {
-		case 'WithStatement':
-			return ppWithStatement(node)
-	}
+/** Transforms `With` blocks into explicit member expressions. */
+export function ppWith(node: ESIToken): unknown {
+	if (node.type === 'WithStatement') return ppWithStatement(node as ESIToken)
 	return null
 }
 
-function ppWithStatement(node: ESIToken): any {
-	let estree: any = []
-	const expr = node.children[0].estree
+function ppWithStatement(node: ESIToken): unknown {
+	let estree: unknown[] = []
+	const expr = (node.children[0] as any).estree
 	for (const child of node.children) {
-		if (child.type === 'Block') {
-			const block = replace(child.estree, {
-				leave: (blockNode) => {
-					if (blockNode.type === 'Identifier') {
-						if (blockNode.name.startsWith('.')) {
-							return memberExpression(expr, identifier(blockNode.name.substr(1)))
-						}
-					}
-				},
-			})
-			estree = (block as BlockStatement).body
-		}
+		if (child.type !== 'Block') continue
+		const block = replace((child as any).estree, {
+			leave: (blockNode: any) => {
+				if (blockNode.type === 'Identifier' && blockNode.name.startsWith('.')) {
+					return memberExpression(expr, identifier(blockNode.name.substring(1)))
+				}
+			},
+		})
+		estree = (block as BlockStatement).body as unknown[]
 	}
 	return estree
 }
