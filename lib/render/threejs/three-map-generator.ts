@@ -7,9 +7,6 @@ import type { Table } from '../../vpt/table/table.js'
 import type { Texture } from '../../vpt/texture.js'
 import type { ITextureLoader } from '../irender-api.js'
 
-// Yield back to the event loop every N textures so 100+ texture loads don't freeze the UI.
-const YIELD_EVERY_TEXTURES = 2
-
 /** Caches and preloads Three.js textures. */
 export class ThreeMapGenerator {
 	private readonly textureCache = new Map<string, ThreeTexture>()
@@ -49,19 +46,21 @@ export class ThreeMapGenerator {
 		const hasLarge = textures.some(t => t.width * t.height > 4 * 1024 * 1024)
 		const hasFloat = textures.some(t => (t as any).isHdr?.() || /\.(exr|hdr)$/i.test((t as any).szPath ?? ''))
 		const cores = (typeof navigator !== 'undefined' && (navigator as any).hardwareConcurrency) || 4
-		if (hasFloat) return Math.min(4, cores)
-		if (hasLarge) return Math.min(3, cores)
-		return Math.min(6, cores)
+		if ((globalThis as unknown as { __vpxCameraAnimating?: boolean }).__vpxCameraAnimating) return 1
+		if (hasFloat) return Math.min(2, cores)
+		if (hasLarge) return Math.min(2, cores)
+		return Math.min(3, cores)
 	}
 
 	private async loadConcurrently(textures: Texture[], table: Table, concurrency: number): Promise<void> {
 		let next = 0
 		const workers = Array.from({ length: Math.min(concurrency, textures.length) }, async () => {
 			while (true) {
+				await this.waitIfAnimating()
 				const i = next++
 				if (i >= textures.length) break
 				await this.loadOne(textures[i]!, table)
-				if ((i + 1) % YIELD_EVERY_TEXTURES === 0) await this.yieldMain()
+				await this.yieldMain()
 			}
 		})
 		await Promise.all(workers)
@@ -93,9 +92,30 @@ export class ThreeMapGenerator {
 		}
 	}
 
+	private async waitIfAnimating(): Promise<void> {
+		const g = globalThis as unknown as { __vpxCameraAnimating?: boolean; __vpxAnimPromise?: Promise<void> }
+		if (g.__vpxCameraAnimating && g.__vpxAnimPromise) {
+			try {
+				await g.__vpxAnimPromise
+			} catch {}
+		} else if ((globalThis as unknown as { __vpxCameraAnimating?: boolean }).__vpxCameraAnimating) {
+			await new Promise<void>(r =>
+				setTimeout(function check() {
+					if (!(globalThis as unknown as { __vpxCameraAnimating?: boolean }).__vpxCameraAnimating) r()
+					else setTimeout(check, 16)
+				}, 16),
+			)
+		}
+	}
+
 	private async yieldMain(): Promise<void> {
+		await this.waitIfAnimating()
 		const g = globalThis as unknown as { scheduler?: { yield?: () => Promise<void> } }
-		if (g.scheduler?.yield) await g.scheduler.yield()
+		if (typeof requestAnimationFrame === 'function') {
+			await new Promise<void>(r => requestAnimationFrame(() => r()))
+			if (g.scheduler?.yield) await g.scheduler.yield()
+			else await new Promise<void>(rr => setTimeout(rr, 0))
+		} else if (g.scheduler?.yield) await g.scheduler.yield()
 		else await new Promise<void>(r => setTimeout(r, 0))
 	}
 

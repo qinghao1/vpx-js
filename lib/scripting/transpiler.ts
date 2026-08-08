@@ -57,8 +57,33 @@ export class Transpiler {
 		this.globalApi = new GlobalApi(table, player)
 	}
 
-	private yield(): Promise<void> {
-		return new Promise(r => setTimeout(r, 0))
+	private async waitIfAnimating(): Promise<void> {
+		const g = globalThis as unknown as { __vpxCameraAnimating?: boolean; __vpxAnimPromise?: Promise<void> }
+		if (g.__vpxCameraAnimating && g.__vpxAnimPromise) {
+			try {
+				await g.__vpxAnimPromise
+			} catch {}
+		} else if (g.__vpxCameraAnimating) {
+			await new Promise<void>(r => {
+				const check = () => {
+					const gg = globalThis as unknown as { __vpxCameraAnimating?: boolean }
+					if (!gg.__vpxCameraAnimating) r()
+					else setTimeout(check, 16)
+				}
+				setTimeout(check, 16)
+			})
+		}
+	}
+
+	private async yield(): Promise<void> {
+		await this.waitIfAnimating()
+		const g = globalThis as unknown as { scheduler?: { yield?: () => Promise<void> } }
+		if (typeof requestAnimationFrame === 'function') {
+			await new Promise<void>(r => requestAnimationFrame(() => r()))
+			if (g.scheduler?.yield) await g.scheduler.yield()
+			else await new Promise<void>(rr => setTimeout(rr, 0))
+		} else if (g.scheduler?.yield) await g.scheduler.yield()
+		else await new Promise<void>(r => setTimeout(r, 0))
 	}
 
 	private pipeline(globalFunction?: string, globalObject?: string): Array<(ast: Program) => Program> {
@@ -128,13 +153,20 @@ export class Transpiler {
 
 	public async transpileAsync(vbs: string, globalFunction?: string, globalObject?: string): Promise<string> {
 		const src = normalizeNewCall(vbs)
+		await this.waitIfAnimating()
 		const t0 = Date.now()
 		await this.yield()
-		let ast = this.grammar.transpile(src)
+		let ast: Program
+		{
+			const g = globalThis as unknown as { __vpxCameraAnimating?: boolean }
+			if (g.__vpxCameraAnimating) await this.waitIfAnimating()
+			ast = this.grammar.transpile(src)
+		}
 		logger().info('[Transpiler] Parsed in %sms', Date.now() - t0)
 		await this.yield()
 		const t1 = Date.now()
 		for (const fn of this.pipeline(globalFunction, globalObject)) {
+			await this.waitIfAnimating()
 			ast = fn(ast)
 			await this.yield()
 		}
