@@ -5,6 +5,7 @@ import type { MethodDefinition, Program, ReturnStatement } from 'estree'
 import { arrowFunctionExpression, binaryExpression, callExpression, conditionalExpression, identifier, literal, memberExpression, newExpression, objectExpression, property, returnStatement, thisExpression, unaryExpression } from '../estree.js'
 import { Transformer } from './transformer.js'
 
+// VBS is case-insensitive; guard Symbol keys (engine probes Symbol.iterator) before toLowerCase
 export class ClassTransformer extends Transformer {
 	transform(): Program {
 		return replace(this.ast, {

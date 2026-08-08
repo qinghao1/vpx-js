@@ -7,6 +7,7 @@ import type { Table } from '../table/table.js'
 import type { BallData } from './ball-data.js'
 import type { BallState } from './ball-state.js'
 
+// Ball pose: row-major R*S*T in D3D (ball.cpp:483) → col-major T*R*S*Flip in Three (matrix.ts:299)
 export class BallUpdater extends ItemUpdater<BallState> {
 	private readonly data: BallData
 	constructor(state: BallState, data: BallData) {
