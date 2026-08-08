@@ -84,17 +84,42 @@ export class VBSHelper {
 		return a === b
 	}
 
-	public getOrCall(obj: unknown, ...params: number[]): unknown {
-		if (typeof obj === 'function') return (obj as (...a: unknown[]) => unknown).bind(obj)(...params)
-		for (const p of params) obj = (obj as Record<number, unknown>)[p] as unknown
-		return obj
+	public getOrCall(obj: unknown, ...params: unknown[]): unknown {
+		if (obj == null) return VBSHelper.UNDEFINED
+		if (typeof obj === 'function') {
+			try {
+				return (obj as (...a: unknown[]) => unknown).bind(obj as object)(...params)
+			} catch {
+				return VBSHelper.UNDEFINED
+			}
+		}
+		for (const p of params) {
+			if (obj == null) return VBSHelper.UNDEFINED
+			obj = (obj as Record<string | number, unknown>)[p as string] as unknown
+		}
+		return obj ?? VBSHelper.UNDEFINED
 	}
 
-	public getOrCallBound(parent: Record<string, unknown>, prop: string, ...params: number[]): unknown {
-		let o: unknown = parent[prop]
-		if (typeof o === 'function') return (o as (...a: unknown[]) => unknown).bind(parent)(...params)
-		for (const p of params) o = (o as Record<number, unknown>)[p] as unknown
-		return o
+	public getOrCallBound(
+		parent: Record<string, unknown> | null | undefined,
+		prop: string,
+		...params: unknown[]
+	): unknown {
+		if (parent == null) return VBSHelper.UNDEFINED
+		let o: unknown = (parent as Record<string, unknown>)[prop]
+		if (o == null) return VBSHelper.UNDEFINED
+		if (typeof o === 'function') {
+			try {
+				return (o as (...a: unknown[]) => unknown).bind(parent as object)(...params)
+			} catch {
+				return VBSHelper.UNDEFINED
+			}
+		}
+		for (const p of params) {
+			if (o == null) return VBSHelper.UNDEFINED
+			o = (o as Record<string | number, unknown>)[p as string] as unknown
+		}
+		return o ?? VBSHelper.UNDEFINED
 	}
 
 	public onErrorResumeNext(): void {
