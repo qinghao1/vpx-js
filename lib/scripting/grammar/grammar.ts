@@ -28,6 +28,7 @@ import { RULES } from './rules.js'
 const require = createRequire(import.meta.url)
 
 import dashAstImport from 'dash-ast'
+
 // dash-ast is CJS, handle both default and direct export
 const dashAst: (ast: any, opts: any) => void = (dashAstImport as any)?.default ?? (dashAstImport as any)
 

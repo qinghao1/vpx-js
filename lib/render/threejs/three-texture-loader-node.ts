@@ -11,6 +11,8 @@ import { NodeImage } from '../../gltf/image.node.js'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 
+import { EXRLoader } from 'three/examples/jsm/loaders/EXRLoader.js'
+import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js'
 import {
 	DataTexture,
 	FloatType,
@@ -23,8 +25,6 @@ import {
 } from '../../refs.node.js'
 import { logger } from '../../util/logger.js'
 import type { ITextureLoader } from '../irender-api.js'
-import { EXRLoader } from 'three/examples/jsm/loaders/EXRLoader.js'
-import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js'
 
 /** ThreeTextureLoaderNode. */
 export class ThreeTextureLoaderNode implements ITextureLoader<ThreeTexture> {

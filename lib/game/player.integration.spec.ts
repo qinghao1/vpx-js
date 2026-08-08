@@ -20,8 +20,14 @@ async function waitFor(fn: () => boolean, ms = 500): Promise<void> {
 describe('Player integration', () => {
 	const sandbox = sinon.createSandbox()
 	let origFetch: typeof globalThis.fetch
-	beforeEach(() => { resetPinmameModuleCache(); origFetch = globalThis.fetch })
-	afterEach(() => { sandbox.restore(); globalThis.fetch = origFetch })
+	beforeEach(() => {
+		resetPinmameModuleCache()
+		origFetch = globalThis.fetch
+	})
+	afterEach(() => {
+		sandbox.restore()
+		globalThis.fetch = origFetch
+	})
 
 	it('inits empty TableBuilder and simulates physics', () => {
 		const player = new Player(new TableBuilder().build()).init()
@@ -91,7 +97,10 @@ describe('Player integration', () => {
 	it('Player physics steps emu after Vpm load', async () => {
 		const player = new Player(new TableBuilder().build()).init()
 		const vpm = new VpmController(player)
-		sandbox.stub(PinMameEmulator.prototype, 'loadGame').callsFake(async function (this: PinMameEmulator) { (this as any).ready = true; return })
+		sandbox.stub(PinMameEmulator.prototype, 'loadGame').callsFake(async function (this: PinMameEmulator) {
+			;(this as any).ready = true
+			return
+		})
 		globalThis.fetch = async () => ({ ok: true, arrayBuffer: async () => new Uint8Array([0]).buffer }) as any
 		vpm.GameName = 'generic_test_game'
 		await vpm.whenReady()

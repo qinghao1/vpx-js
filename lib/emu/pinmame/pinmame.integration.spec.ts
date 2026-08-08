@@ -16,7 +16,9 @@ const ROM_CANDIDATES = [
 
 function findRom(): string | null {
 	for (const p of ROM_CANDIDATES) {
-		try { if (fs.existsSync(p) && fs.statSync(p).size > 1024) return p } catch {}
+		try {
+			if (fs.existsSync(p) && fs.statSync(p).size > 1024) return p
+		} catch {}
 	}
 	return null
 }
@@ -60,7 +62,30 @@ describe('PinMAME integration', () => {
 
 	it('EmulatorState pinmame mode is direct indexed, wpc mode uses matrix', () => {
 		const wpc = new EmulatorState()
-		wpc.updateState({ wpc: { lampState: new Uint8Array([0, 0, 0, 0, 0, 255, 0, 128]), solenoidState: new Uint8Array([0, 1, 0]), generalIlluminationState: new Uint8Array([1, 0]), inputSwitchMatrixActiveColumn: new Uint8Array([0]), diagnosticLed: 0, lampRow: 0, lampColumn: 0, diagnosticLedToggleCount: 0, midnightModeEnabled: false, irqEnabled: false, activeRomBank: 0, time: '', blankSignalHigh: false, watchdogExpiredCounter: 0, watchdogTicks: 0, zeroCrossFlag: 0, wpcSecureScrambler: 0 }, dmd: { scanline: 0, dmdShadedBuffer: new Uint8Array(), dmdPageMapping: [] }, sound: { volume: 0, readDataBytes: 0, writeDataBytes: 0, readControlBytes: 0, writeControlBytes: 0 }, ram: new Uint8Array() })
+		wpc.updateState({
+			wpc: {
+				lampState: new Uint8Array([0, 0, 0, 0, 0, 255, 0, 128]),
+				solenoidState: new Uint8Array([0, 1, 0]),
+				generalIlluminationState: new Uint8Array([1, 0]),
+				inputSwitchMatrixActiveColumn: new Uint8Array([0]),
+				diagnosticLed: 0,
+				lampRow: 0,
+				lampColumn: 0,
+				diagnosticLedToggleCount: 0,
+				midnightModeEnabled: false,
+				irqEnabled: false,
+				activeRomBank: 0,
+				time: '',
+				blankSignalHigh: false,
+				watchdogExpiredCounter: 0,
+				watchdogTicks: 0,
+				zeroCrossFlag: 0,
+				wpcSecureScrambler: 0,
+			},
+			dmd: { scanline: 0, dmdShadedBuffer: new Uint8Array(), dmdPageMapping: [] },
+			sound: { volume: 0, readDataBytes: 0, writeDataBytes: 0, readControlBytes: 0, writeControlBytes: 0 },
+			ram: new Uint8Array(),
+		})
 		const lamps = wpc.getChangedLamps() as unknown as number[][]
 		expect(lamps.some(([n]) => n === 16)).toBe(true)
 
@@ -92,7 +117,9 @@ describe('PinMAME integration', () => {
 	it('diff handles size mismatch without spurious changes', () => {
 		const s = new EmulatorState()
 		s.applyPinmame(new Uint8Array([0, 0, 0]), new Uint8Array([0]), new Uint8Array([0]))
-		s.getChangedLamps(); s.getChangedSolenoids(); s.getChangedGI()
+		s.getChangedLamps()
+		s.getChangedSolenoids()
+		s.getChangedGI()
 		s.applyPinmame(new Uint8Array([0, 0, 0]), new Uint8Array([0]), new Uint8Array([0]))
 		expect((s.getChangedLamps() as unknown as number[][]).length).toBe(0)
 		expect(s.getChangedSolenoids().length).toBe(0)

@@ -15,7 +15,9 @@ import { NodeBinaryReader } from '../../lib/io/binary-reader.node.js'
 import { VpmController } from '../../lib/scripting/objects/vpm-controller.js'
 import { TableBuilder } from '../table-builder.js'
 
-const ROM_CANDIDATES = ['twd_160h', 'mm_109', 'afm_113b', 'totan_14', 'example'].map((n) => path.join(os.homedir(), `.pinmame/roms/${n}.zip`)).concat([path.join(os.homedir(), 'Downloads/twd_160h.zip')])
+const ROM_CANDIDATES = ['twd_160h', 'mm_109', 'afm_113b', 'totan_14', 'example']
+	.map((n) => path.join(os.homedir(), `.pinmame/roms/${n}.zip`))
+	.concat([path.join(os.homedir(), 'Downloads/twd_160h.zip')])
 const ROMS = ROM_CANDIDATES
 const VPX = path.resolve('walking_dead.vpx')
 

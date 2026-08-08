@@ -63,7 +63,9 @@ function finalize(tex: any, name: string, isFloat: boolean, playfieldMap?: strin
 	const max = maxFor(name, w, h, isFloat, playfieldMap)
 	const ds = downsample(tex, max)
 	if (ds !== tex) {
-		try { tex.dispose?.() } catch {}
+		try {
+			tex.dispose?.()
+		} catch {}
 		nameAndTune(ds, name)
 		return ds
 	}
@@ -97,7 +99,9 @@ function getPool(): Worker[] | null {
 			}
 			return w
 		})
-	} catch { return null }
+	} catch {
+		return null
+	}
 	return pool
 }
 
@@ -108,8 +112,18 @@ function parseWorker(buffer: ArrayBuffer, kind: 'exr' | 'hdr'): Promise<any> {
 	const id = ++seq
 	return new Promise((resolve, reject) => {
 		pending.set(id, { resolve, reject })
-		try { w.postMessage({ id, buffer, type: kind }, [buffer] as any) } catch (e) { pending.delete(id); reject(e) }
-		setTimeout(() => { if (pending.has(id)) { pending.delete(id); reject(new Error('exr worker timeout')) } }, 30000)
+		try {
+			w.postMessage({ id, buffer, type: kind }, [buffer] as any)
+		} catch (e) {
+			pending.delete(id)
+			reject(e)
+		}
+		setTimeout(() => {
+			if (pending.has(id)) {
+				pending.delete(id)
+				reject(new Error('exr worker timeout'))
+			}
+		}, 30000)
 	})
 }
 
@@ -131,7 +145,13 @@ export class ThreeTextureLoaderBrowser implements ITextureLoader<ThreeTexture> {
 		tune(tex)
 		const max = maxFor(name, width, height, false, this.playfieldMap)
 		const ds = downsample(tex, max)
-		if (ds !== tex) { try { tex.dispose?.() } catch {}; nameAndTune(ds, name); return ds }
+		if (ds !== tex) {
+			try {
+				tex.dispose?.()
+			} catch {}
+			nameAndTune(ds, name)
+			return ds
+		}
 		nameAndTune(tex, name)
 		return tex
 	}
@@ -147,7 +167,7 @@ export class ThreeTextureLoaderBrowser implements ITextureLoader<ThreeTexture> {
 		}
 
 		if (isHdr || isExr) {
-			const kind = isExr ? 'exr' as const : 'hdr' as const
+			const kind = isExr ? ('exr' as const) : ('hdr' as const)
 			const cached = await tryLoadCached(name, kind, this.playfieldMap)
 			if (cached) return cached
 			const viaWorker = await tryLoadViaWorker(name, kind, data, this.playfieldMap)
@@ -159,9 +179,21 @@ export class ThreeTextureLoaderBrowser implements ITextureLoader<ThreeTexture> {
 	}
 }
 
-async function tryCreateBitmap(data: Uint8Array, mime: string, name: string, playfieldMap?: string): Promise<ThreeTexture | null> {
+async function tryCreateBitmap(
+	data: Uint8Array,
+	mime: string,
+	name: string,
+	playfieldMap?: string,
+): Promise<ThreeTexture | null> {
 	try {
-		const blob = new Blob([data.byteOffset === 0 && data.byteLength === data.buffer.byteLength ? data as any : data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as any], { type: mime as any })
+		const blob = new Blob(
+			[
+				data.byteOffset === 0 && data.byteLength === data.buffer.byteLength
+					? (data as any)
+					: (data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as any),
+			],
+			{ type: mime as any },
+		)
 		let bitmap: any = await createImageBitmap(blob as any, { imageOrientation: 'flipY' } as any)
 		const max = maxFor(name, bitmap.width, bitmap.height, false, playfieldMap)
 		if (bitmap.width > max || bitmap.height > max) {
@@ -169,29 +201,47 @@ async function tryCreateBitmap(data: Uint8Array, mime: string, name: string, pla
 			const nw = Math.max(1, Math.floor(bitmap.width * scale))
 			const nh = Math.max(1, Math.floor(bitmap.height * scale))
 			try {
-				const resized: any = await (createImageBitmap as any)(bitmap, { resizeWidth: nw, resizeHeight: nh, resizeQuality: 'high' } as any)
-				try { bitmap.close?.() } catch {}
+				const resized: any = await (createImageBitmap as any)(bitmap, {
+					resizeWidth: nw,
+					resizeHeight: nh,
+					resizeQuality: 'high',
+				} as any)
+				try {
+					bitmap.close?.()
+				} catch {}
 				bitmap = resized
 			} catch {
 				try {
 					const canvas = document.createElement('canvas')
-					canvas.width = nw; canvas.height = nh
+					canvas.width = nw
+					canvas.height = nh
 					const ctx = canvas.getContext('2d')!
-					ctx.imageSmoothingEnabled = true; (ctx as any).imageSmoothingQuality = 'high'
+					ctx.imageSmoothingEnabled = true
+					;(ctx as any).imageSmoothingQuality = 'high'
 					ctx.drawImage(bitmap as any, 0, 0, nw, nh)
-					try { bitmap.close?.() } catch {}
+					try {
+						bitmap.close?.()
+					} catch {}
 					const tex: any = new CanvasTexture(canvas as any)
-					tex.colorSpace = SRGBColorSpace; tex.flipY = false; tex.needsUpdate = true
-					tune(tex); tex.name = `texture:${name}`
+					tex.colorSpace = SRGBColorSpace
+					tex.flipY = false
+					tex.needsUpdate = true
+					tune(tex)
+					tex.name = `texture:${name}`
 					return tex
 				} catch {}
 			}
 		}
 		const tex: any = new CanvasTexture(bitmap as any)
-		tex.colorSpace = SRGBColorSpace; tex.flipY = false; tex.needsUpdate = true
-		tune(tex); tex.name = `texture:${name}`
+		tex.colorSpace = SRGBColorSpace
+		tex.flipY = false
+		tex.needsUpdate = true
+		tune(tex)
+		tex.name = `texture:${name}`
 		return tex
-	} catch { return null }
+	} catch {
+		return null
+	}
 }
 
 async function tryLoadCached(name: string, kind: 'exr' | 'hdr', playfieldMap?: string): Promise<ThreeTexture | null> {
@@ -200,16 +250,31 @@ async function tryLoadCached(name: string, kind: 'exr' | 'hdr', playfieldMap?: s
 		// Instead attempt to load via idb with known key pattern: we store with byteLength, so we need to probe via data length later.
 		// Caller will pass data, so this helper is only used when we don't have data length; we handle cache inside tryLoadViaWorker.
 		return null
-	} catch { return null }
+	} catch {
+		return null
+	}
 }
 
-async function tryLoadViaWorker(name: string, kind: 'exr' | 'hdr', data: Uint8Array, playfieldMap?: string): Promise<ThreeTexture | null> {
+async function tryLoadViaWorker(
+	name: string,
+	kind: 'exr' | 'hdr',
+	data: Uint8Array,
+	playfieldMap?: string,
+): Promise<ThreeTexture | null> {
 	const key = exrCacheKey(name, data.byteLength, kind)
 	try {
 		const cached: any = await idbGet(key)
 		if (cached?.width && cached?.data) {
-			const tex: any = new DataTexture(cached.data as any, cached.width, cached.height, cached.format ?? (RGBAFormat as any), cached.type ?? (HalfFloatType as any))
-			tex.flipY = false; tex.colorSpace = cached.colorSpace ?? LinearSRGBColorSpace; tex.needsUpdate = true
+			const tex: any = new DataTexture(
+				cached.data as any,
+				cached.width,
+				cached.height,
+				cached.format ?? (RGBAFormat as any),
+				cached.type ?? (HalfFloatType as any),
+			)
+			tex.flipY = false
+			tex.colorSpace = cached.colorSpace ?? LinearSRGBColorSpace
+			tex.needsUpdate = true
 			return finalize(tex, name, true, playfieldMap)
 		}
 	} catch {}
@@ -217,16 +282,39 @@ async function tryLoadViaWorker(name: string, kind: 'exr' | 'hdr', data: Uint8Ar
 		const buf = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer
 		const parsed: any = await parseWorker(buf.slice(0) as ArrayBuffer, kind)
 		if (parsed?.width && parsed?.data) {
-			try { idbSet(key, { width: parsed.width, height: parsed.height, data: parsed.data, type: parsed.type, format: parsed.format, colorSpace: parsed.colorSpace }).catch(() => {}) } catch {}
-			const tex: any = new DataTexture(parsed.data as any, parsed.width, parsed.height, parsed.format ?? (RGBAFormat as any), parsed.type ?? (HalfFloatType as any))
-			tex.flipY = false; tex.colorSpace = parsed.colorSpace ?? LinearSRGBColorSpace; tex.needsUpdate = true
+			try {
+				idbSet(key, {
+					width: parsed.width,
+					height: parsed.height,
+					data: parsed.data,
+					type: parsed.type,
+					format: parsed.format,
+					colorSpace: parsed.colorSpace,
+				}).catch(() => {})
+			} catch {}
+			const tex: any = new DataTexture(
+				parsed.data as any,
+				parsed.width,
+				parsed.height,
+				parsed.format ?? (RGBAFormat as any),
+				parsed.type ?? (HalfFloatType as any),
+			)
+			tex.flipY = false
+			tex.colorSpace = parsed.colorSpace ?? LinearSRGBColorSpace
+			tex.needsUpdate = true
 			return finalize(tex, name, true, playfieldMap)
 		}
 	} catch {}
 	return null
 }
 
-function loadFloatFallback(name: string, ext: string, mime: string, data: Uint8Array, playfieldMap?: string): ThreeTexture {
+function loadFloatFallback(
+	name: string,
+	ext: string,
+	mime: string,
+	data: Uint8Array,
+	playfieldMap?: string,
+): ThreeTexture {
 	try {
 		const buf = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer
 		const Loader = mime === 'image/exr' || ext === '.exr' ? EXRLoader : HDRLoader
@@ -239,25 +327,52 @@ function loadFloatFallback(name: string, ext: string, mime: string, data: Uint8A
 }
 
 async function loadRegular(name: string, mime: string, data: Uint8Array, playfieldMap?: string): Promise<ThreeTexture> {
-	const blobPart: any = data.byteOffset === 0 && data.byteLength === data.buffer.byteLength ? data : data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength)
+	const blobPart: any =
+		data.byteOffset === 0 && data.byteLength === data.buffer.byteLength
+			? data
+			: data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength)
 	const url = URL.createObjectURL(new Blob([blobPart as any], { type: mime as any }))
 	try {
 		const tex: any = await loadViaUrl(url, name, playfieldMap)
-		tex.name = `texture:${name}`; tex.colorSpace = SRGBColorSpace; tex.needsUpdate = true
+		tex.name = `texture:${name}`
+		tex.colorSpace = SRGBColorSpace
+		tex.needsUpdate = true
 		return finalize(tex, name, false, playfieldMap)
-	} catch (e) { try { URL.revokeObjectURL(url) } catch {}; throw e }
+	} catch (e) {
+		try {
+			URL.revokeObjectURL(url)
+		} catch {}
+		throw e
+	}
 }
 
 function loadViaUrl(url: string, nameHint: string, playfieldMap?: string): Promise<ThreeTexture> {
 	return new Promise((resolve, reject) => {
-		new TextureLoader().load(url, (tex: any) => {
-			URL.revokeObjectURL(url); tune(tex)
-			const w = tex.image?.width ?? tex.image?.naturalWidth ?? 0
-			const h = tex.image?.height ?? tex.image?.naturalHeight ?? 0
-			const max = maxFor(nameHint, w, h, false, playfieldMap)
-			const ds = downsample(tex, max)
-			if (ds !== tex) { try { tex.dispose() } catch {}; try { tex.image = null } catch {} ; resolve(ds) } else resolve(tex)
-		}, undefined, (err) => { URL.revokeObjectURL(url); reject(err) })
+		new TextureLoader().load(
+			url,
+			(tex: any) => {
+				URL.revokeObjectURL(url)
+				tune(tex)
+				const w = tex.image?.width ?? tex.image?.naturalWidth ?? 0
+				const h = tex.image?.height ?? tex.image?.naturalHeight ?? 0
+				const max = maxFor(nameHint, w, h, false, playfieldMap)
+				const ds = downsample(tex, max)
+				if (ds !== tex) {
+					try {
+						tex.dispose()
+					} catch {}
+					try {
+						tex.image = null
+					} catch {}
+					resolve(ds)
+				} else resolve(tex)
+			},
+			undefined,
+			(err) => {
+				URL.revokeObjectURL(url)
+				reject(err)
+			},
+		)
 	})
 }
 
@@ -269,7 +384,18 @@ function getMimeType(data: Uint8Array, ext: string): string | null {
 	if (h16 === 0xffd8) return 'image/jpeg'
 	if (h16 === 0x4749) return 'image/gif'
 	if (h16 === 0x424d) return 'image/bmp'
-	if (data.length >= 12 && data[0] === 0x52 && data[1] === 0x49 && data[2] === 0x46 && data[3] === 0x46 && data[8] === 0x57 && data[9] === 0x45 && data[10] === 0x42 && data[11] === 0x50) return 'image/webp'
+	if (
+		data.length >= 12 &&
+		data[0] === 0x52 &&
+		data[1] === 0x49 &&
+		data[2] === 0x46 &&
+		data[3] === 0x46 &&
+		data[8] === 0x57 &&
+		data[9] === 0x45 &&
+		data[10] === 0x42 &&
+		data[11] === 0x50
+	)
+		return 'image/webp'
 	if (data[0] === 0x23 && data[1] === 0x3f) return 'image/hdr'
 	if (data[0] === 0x76 && data[1] === 0x2f) return 'image/exr'
 	if (ext === '.hdr') return 'image/hdr'
@@ -291,49 +417,81 @@ function downsample(texture: any, maxSize: number): any {
 		const h = img.height ?? img.naturalHeight ?? 0
 		if (!w || !h || (w <= maxSize && h <= maxSize)) return texture
 		return downsampleImage(texture, maxSize, w, h)
-	} catch { return texture }
+	} catch {
+		return texture
+	}
 }
 
 function downsampleData(texture: any, maxSize: number): any {
 	const { width: w, height: h, data: src } = texture.image
 	if (w <= maxSize && h <= maxSize) return texture
 	const scale = Math.min(maxSize / w, maxSize / h)
-	const nw = Math.max(1, Math.floor(w * scale)), nh = Math.max(1, Math.floor(h * scale))
+	const nw = Math.max(1, Math.floor(w * scale)),
+		nh = Math.max(1, Math.floor(h * scale))
 	const channels = Math.round(src.length / (w * h)) || 4
 	const dst = new (src.constructor as any)(nw * nh * channels)
 	for (let y = 0; y < nh; y++) {
 		const sy = Math.min(h - 1, Math.floor((y / nh) * h))
 		for (let x = 0; x < nw; x++) {
 			const sx = Math.min(w - 1, Math.floor((x / nw) * w))
-			const sIdx = (sy * w + sx) * channels, dIdx = (y * nw + x) * channels
+			const sIdx = (sy * w + sx) * channels,
+				dIdx = (y * nw + x) * channels
 			for (let c = 0; c < channels; c++) dst[dIdx + c] = src[sIdx + c]
 		}
 	}
 	const tex: any = new DataTexture(dst as any, nw, nh, texture.format ?? RGBAFormat)
-	tex.colorSpace = texture.colorSpace ?? SRGBColorSpace; tex.needsUpdate = true; tex.name = texture.name
-	tune(tex); tex.flipY = texture.flipY ?? true
-	try { texture.dispose?.() } catch {}
-	try { texture.image.data = null } catch {}
+	tex.colorSpace = texture.colorSpace ?? SRGBColorSpace
+	tex.needsUpdate = true
+	tex.name = texture.name
+	tune(tex)
+	tex.flipY = texture.flipY ?? true
+	try {
+		texture.dispose?.()
+	} catch {}
+	try {
+		texture.image.data = null
+	} catch {}
 	return tex
 }
 
 function downsampleImage(texture: any, maxSize: number, w: number, h: number): any {
 	const scale = Math.min(maxSize / w, maxSize / h)
-	const nw = Math.max(1, Math.floor(w * scale)), nh = Math.max(1, Math.floor(h * scale))
+	const nw = Math.max(1, Math.floor(w * scale)),
+		nh = Math.max(1, Math.floor(h * scale))
 	if (typeof document === 'undefined' || typeof document.createElement !== 'function') return texture
 	const canvas = document.createElement('canvas')
-	canvas.width = nw; canvas.height = nh
+	canvas.width = nw
+	canvas.height = nh
 	const ctx = canvas.getContext('2d')
 	if (!ctx || !texture.image) return texture
 	const img = texture.image
-	if (!(img instanceof HTMLImageElement || img instanceof HTMLCanvasElement || (typeof ImageBitmap !== 'undefined' && img instanceof ImageBitmap))) return texture
-	try { ctx.imageSmoothingEnabled = true; (ctx as any).imageSmoothingQuality = 'high' } catch {}
+	if (
+		!(
+			img instanceof HTMLImageElement ||
+			img instanceof HTMLCanvasElement ||
+			(typeof ImageBitmap !== 'undefined' && img instanceof ImageBitmap)
+		)
+	)
+		return texture
+	try {
+		ctx.imageSmoothingEnabled = true
+		;(ctx as any).imageSmoothingQuality = 'high'
+	} catch {}
 	ctx.drawImage(img as any, 0, 0, nw, nh)
 	const tex: any = new CanvasTexture(canvas)
-	tex.colorSpace = texture.colorSpace ?? SRGBColorSpace; tex.needsUpdate = true; tex.name = texture.name
-	tune(tex); tex.flipY = texture.flipY ?? true
-	try { texture.dispose?.() } catch {}
-	try { URL.revokeObjectURL((img as any).src) } catch {}
-	try { texture.image = null } catch {}
+	tex.colorSpace = texture.colorSpace ?? SRGBColorSpace
+	tex.needsUpdate = true
+	tex.name = texture.name
+	tune(tex)
+	tex.flipY = texture.flipY ?? true
+	try {
+		texture.dispose?.()
+	} catch {}
+	try {
+		URL.revokeObjectURL((img as any).src)
+	} catch {}
+	try {
+		texture.image = null
+	} catch {}
 	return tex
 }

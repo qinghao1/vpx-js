@@ -23,8 +23,14 @@ async function waitFor(fn: () => boolean, ms = 500): Promise<void> {
 describe('VpmController integration', () => {
 	const sandbox = sinon.createSandbox()
 	let origFetch: typeof globalThis.fetch
-	beforeEach(() => { resetPinmameModuleCache(); origFetch = globalThis.fetch })
-	afterEach(() => { sandbox.restore(); globalThis.fetch = origFetch })
+	beforeEach(() => {
+		resetPinmameModuleCache()
+		origFetch = globalThis.fetch
+	})
+	afterEach(() => {
+		sandbox.restore()
+		globalThis.fetch = origFetch
+	})
 
 	it('routes WPC to wpc-emu, SAM/generic to pinmame', async () => {
 		expect(GamelistDB.getByPinmameName('mm_109')).toBeTruthy()

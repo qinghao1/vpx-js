@@ -79,9 +79,9 @@ export class Utils {
 		const mergedTracks: any = {}
 		const sourceTracks = clip.tracks as any
 
-	for (let sourceTrack of sourceTracks) {
-				const sourceTrackBinding = PropertyBinding.parseTrackName(sourceTrack.name)
-				const sourceTrackNode = PropertyBinding.findNode(root, sourceTrackBinding.nodeName) as any
+		for (let sourceTrack of sourceTracks) {
+			const sourceTrackBinding = PropertyBinding.parseTrackName(sourceTrack.name)
+			const sourceTrackNode = PropertyBinding.findNode(root, sourceTrackBinding.nodeName) as any
 
 			if (
 				sourceTrackBinding.propertyName !== 'morphTargetInfluences' ||
