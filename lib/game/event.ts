@@ -25,4 +25,5 @@ export enum Event {
 	HitEventsUnhit = 1401,
 	LimitEventsEOS = 1402,
 	LimitEventsBOS = 1403,
+	AnimateEventsAnimate = 1404,
 }

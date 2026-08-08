@@ -49,7 +49,14 @@ export class Transformer {
 		if (node.type !== 'Identifier') {
 			return false
 		}
-		return ['eval', 'constructor', 'Array', Transformer.PLAYER_NAME].includes((node as Identifier).name)
+		const n = (node as Identifier).name
+		const low = n.toLowerCase()
+		if (['eval', 'constructor', 'array', Transformer.PLAYER_NAME.toLowerCase()].includes(low)) {
+			if (low === 'array') (node as Identifier).name = 'Array'
+			else if (low === 'eval') (node as Identifier).name = 'eval'
+			return true
+		}
+		return false
 	}
 
 	protected isKnownParent(parent: BaseNode) {

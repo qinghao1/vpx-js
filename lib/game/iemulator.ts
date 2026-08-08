@@ -6,6 +6,7 @@ import type { Vertex2D } from '../util/math.js'
 
 export interface IEmulator {
 	readonly emulatorState: EmulatorState
+	readonly isMock?: boolean
 
 	isInitialized(): boolean
 	getVersion(): string

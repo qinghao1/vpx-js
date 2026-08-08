@@ -213,7 +213,11 @@ export class PlayerPhysics {
 				for (const t of this.hitTimers)
 					if ((t.interval >= 0 && t.nextFire <= cur) || t.interval < 0) {
 						const prev = t.nextFire
-						t.pfe.fireGroupEvent(Event.TimerEventsTimer)
+						try {
+							t.pfe.fireGroupEvent(Event.TimerEventsTimer)
+						} catch (e) {
+							try { console.warn('timer error', (e as Error).message) } catch {}
+						}
 						if (prev === t.nextFire) t.nextFire += t.interval
 					}
 				this.scriptPeriod += Math.floor(this.now() - curUsec)

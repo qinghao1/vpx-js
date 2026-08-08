@@ -101,19 +101,20 @@ function ppClassDeclaration(node: ESIToken): unknown {
 		constructor = methodDefinition(identifier('constructor'), 'constructor', functionExpression(blockStatement([]), []))
 	}
 	let body: ClassBody = classBody([constructor, ...methodDefinitions])
+	const idSet = new Set(ids.map((s) => s.toLowerCase()))
 	body = replace(body, {
 		leave: (bodyNode, parentNode) => {
 			if (bodyNode.type === 'Identifier') {
 				if (parentNode !== null && parentNode.type !== 'MethodDefinition') {
-					if (ids.includes(bodyNode.name)) {
+					if (idSet.has(bodyNode.name.toLowerCase())) {
 						if (parentNode.type === 'MemberExpression') {
 							if (parentNode.object.type === 'Identifier') {
-								if (parentNode.object.name === bodyNode.name) {
-									return memberExpression(thisExpression(), bodyNode)
+								if (parentNode.object.name.toLowerCase() === bodyNode.name.toLowerCase()) {
+									return memberExpression(thisExpression(), identifier(bodyNode.name.toLowerCase()))
 								}
 							}
 						} else {
-							return memberExpression(thisExpression(), bodyNode)
+							return memberExpression(thisExpression(), identifier(bodyNode.name.toLowerCase()))
 						}
 					}
 				}

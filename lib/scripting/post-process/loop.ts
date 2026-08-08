@@ -7,6 +7,7 @@ import {
 	binaryExpression,
 	blockStatement,
 	breakStatement,
+	callExpression,
 	conditionalExpression,
 	doWhileStatement,
 	forOfStatement,
@@ -14,9 +15,11 @@ import {
 	identifier,
 	ifStatement,
 	literal,
+	memberExpression,
 	whileStatement,
 } from '../estree.js'
 import type { ESIToken } from '../grammar/grammar.js'
+import { Transformer } from '../transformer/transformer.js'
 
 /** ppLoop. */
 export function ppLoop(node: ESIToken): unknown {
@@ -142,5 +145,9 @@ function ppForEachStatement(node: ESIToken): unknown {
 				break
 		}
 	}
-	return forOfStatement(id, expr, block ? block : blockStatement([]))
+	const safeExpr = callExpression(
+		memberExpression(identifier(Transformer.VBSHELPER_NAME), identifier('toIterable')),
+		[expr],
+	)
+	return forOfStatement(id, safeExpr, block ? block : blockStatement([]))
 }

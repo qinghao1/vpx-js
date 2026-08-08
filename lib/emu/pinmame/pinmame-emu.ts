@@ -38,7 +38,7 @@ export class PinMameEmulator implements IEmulator {
 
 	private mod: PinmameModule | null = null
 	private api: Api | null = null
-	private isMock = false
+	public isMock = false
 	private ready = false
 	private paused = false
 

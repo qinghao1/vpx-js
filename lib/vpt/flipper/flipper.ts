@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { EventProxy } from '../../game/event-proxy.js'
+import type { IAnimatable, IAnimation } from '../../game/ianimatable.js'
 import type { IHittable } from '../../game/ihittable.js'
 import type { IMovable } from '../../game/imovable.js'
 import type { IPlayable } from '../../game/iplayable.js'
@@ -15,6 +16,7 @@ import type { Vertex2D } from '../../util/math.js'
 import { Matrix3D } from '../../util/math.js'
 import { Item } from '../item.js'
 import type { Table } from '../table/table.js'
+import { FlipperAnimation } from './flipper-animation.js'
 import { FlipperApi } from './flipper-api.js'
 import { FlipperData } from './flipper-data.js'
 import { FlipperHit } from './flipper-hit.js'
@@ -26,11 +28,12 @@ import { FlipperUpdater } from './flipper-updater.js'
 /** Flipper item. @see https://github.com/vpinball/vpinball/blob/master/flipper.cpp */
 export class Flipper
 	extends Item<FlipperData>
-	implements IRenderable<FlipperState>, IPlayable, IMovable, IHittable, IScriptable<FlipperApi>
+	implements IRenderable<FlipperState>, IPlayable, IMovable, IHittable, IScriptable<FlipperApi>, IAnimatable
 {
 	private readonly mesh: FlipperMesh
 	private readonly state: FlipperState
 	private readonly updater: FlipperUpdater
+	private readonly animation: FlipperAnimation
 	private hit?: FlipperHit
 	private api?: FlipperApi
 
@@ -52,6 +55,7 @@ export class Flipper
 			this.data.szRubberMaterial!,
 		)
 		this.updater = new FlipperUpdater(this.data, this.state)
+		this.animation = new FlipperAnimation(this.data, this.state)
 	}
 
 	public isCollidable(): boolean {
@@ -68,6 +72,8 @@ export class Flipper
 		this.events = new EventProxy(this)
 		this.hit = FlipperHit.getInstance(this.data, this.state, this.events, player.getPhysics(), table)
 		this.api = new FlipperApi(this.data, this.state, this.hit, this.getMover(), this.events, player, table)
+		this.animation.setEvents(this.events)
+		this.animation.setMover(this.getMover() as unknown as { angle: number })
 	}
 
 	public getApi(): FlipperApi {
@@ -110,7 +116,11 @@ export class Flipper
 	}
 
 	public getEventNames(): string[] {
-		return ['Init', 'Timer', 'LimitEOS', 'LimitBOS', 'Hit', 'Collide']
+		return ['Init', 'Timer', 'LimitEOS', 'LimitBOS', 'Hit', 'Collide', 'Animate']
+	}
+
+	public getAnimation(): IAnimation {
+		return this.animation
 	}
 
 	public getUpdater(): FlipperUpdater {

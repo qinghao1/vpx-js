@@ -15,14 +15,23 @@ export class VbsUndefined implements ProxyHandler<any> {
 	}
 
 	public get(target: any, p: string | number | symbol, receiver: any): any {
-		if (p === 'toString') {
-			return () => undefined
-		}
-		if (typeof p === 'symbol' || ['valueOf', 'toString', 'inspect', '__errGet', '__errSet'].includes(p as string)) {
-			return Reflect.get(target, p)
-		}
 		if (p === '__isUndefined') {
 			return true
+		}
+		if (p === Symbol.iterator) {
+			return () => [][Symbol.iterator]()
+		}
+		if (p === 'toString') {
+			return () => ''
+		}
+		if (p === 'valueOf' || p === Symbol.toPrimitive) {
+			return () => 0
+		}
+		if (p === 'constructor' || p === 'prototype' || p === '__proto__') {
+			return undefined
+		}
+		if (typeof p === 'symbol' || ['inspect', '__errGet', '__errSet'].includes(p as string)) {
+			return Reflect.get(target, p)
 		}
 		ERR.Raise(
 			this.__errGet ||
@@ -37,5 +46,10 @@ export class VbsUndefined implements ProxyHandler<any> {
 				new VbsError(`ReferenceError: Cannot set property "${String(p)}" of undefined array element.`, 9),
 		)
 		return true
+	}
+
+	public has(target: any, p: string | number | symbol): boolean {
+		if (p === Symbol.iterator || p === '__isUndefined') return true
+		return false
 	}
 }

@@ -96,8 +96,9 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 	public static playfieldThickness = 20.0
 
 	public static async load(reader: IBinaryReader, opts: TableLoadOptions = defaultTableLoadOptions): Promise<Table> {
+		const merged = { ...defaultTableLoadOptions, ...opts }
 		const l = new TableLoader()
-		return new Table(l, await l.load(reader, opts))
+		return new Table(l, await l.load(reader, merged))
 	}
 
 	constructor(
@@ -337,6 +338,16 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 		logger().info('Table script loaded, transpiled and executed.')
 	}
 
+	public async runTableScriptAsync(player: Player, scope: Record<string, unknown> = {}): Promise<void> {
+		if (!this.tableScript) {
+			logger().warn('Table script not loaded!')
+			return
+		}
+		progress().show('Transpiling and executing table script')
+		await new Transpiler(this, player).executeAsync(this.tableScript, scope)
+		logger().info('Table script loaded, transpiled and executed.')
+	}
+
 	public broadcastInit(): void {
 		this.events!.fireVoidEvent(Event.GameEventsInit)
 		for (const item of Object.values(this.items)) {
@@ -393,6 +404,8 @@ export interface TableLoadOptions {
 	loadTableScript?: boolean
 	/** Skip primitive mesh data. */
 	skipMeshes?: boolean
+	/** Skip texture images (faster, for play without textures). */
+	skipTextures?: boolean
 }
 
 /** Mesh generation options. */

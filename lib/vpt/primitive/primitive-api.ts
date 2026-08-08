@@ -11,6 +11,10 @@ import type { Primitive } from './primitive.js'
 import type { PrimitiveData } from './primitive-data.js'
 import type { PrimitiveState } from './primitive-state.js'
 
+function num(v: unknown): number {
+	return (v as any)?.__isUndefined ? 0 : Number(v as number) || 0
+}
+
 /** Primitive API — VBS surface for `Primitive`. @see https://github.com/vpinball/vpinball/blob/master/primitive.cpp */
 export class PrimitiveApi extends ItemApi<PrimitiveData> {
 	private readonly isDynamic: boolean
@@ -29,27 +33,27 @@ export class PrimitiveApi extends ItemApi<PrimitiveData> {
 	}
 
 	get Image() {
-		return this.data.szImage
+		return this.isDynamic ? this.state.map! : this.data.szImage
 	}
 	set Image(v) {
 		this._assertNonHdrImage(v)
 		if (this.isDynamic) this.state.map = v
-		this.data.szImage = v
+		else this.data.szImage = v
 	}
 	get NormalMap() {
-		return this.data.szNormalMap
+		return this.isDynamic ? this.state.normalMap! : this.data.szNormalMap
 	}
 	set NormalMap(v) {
 		this._assertNonHdrImage(v)
 		if (this.isDynamic) this.state.normalMap = v
-		this.data.szNormalMap = v
+		else this.data.szNormalMap = v
 	}
 	get Material() {
-		return this.data.szMaterial
+		return this.isDynamic ? this.state.material! : this.data.szMaterial
 	}
 	set Material(v) {
 		if (this.isDynamic) this.state.material = v
-		this.data.szMaterial = v
+		else this.data.szMaterial = v
 	}
 	get MeshFileName() {
 		return this.data.meshFileName
@@ -70,11 +74,11 @@ export class PrimitiveApi extends ItemApi<PrimitiveData> {
 		this.data.sideColor = v
 	}
 	get Visible() {
-		return this.data.isVisible
+		return this.isDynamic ? this.state.isVisible : this.data.isVisible
 	}
 	set Visible(v) {
 		if (this.isDynamic) this.state.isVisible = v
-		this.data.isVisible = v
+		else this.data.isVisible = v
 	}
 	get DrawTexturesInside() {
 		return this.data.drawTexturesInside
@@ -83,43 +87,52 @@ export class PrimitiveApi extends ItemApi<PrimitiveData> {
 		this.data.drawTexturesInside = v
 	}
 	get X() {
-		return this.state.position.x
+		return this.isDynamic ? this.state.position.x : this.data.position.x
 	}
 	set X(v) {
-		this.state.position.x = v
+		v = num(v)
+		if (this.isDynamic) this.state.position.x = v
+		else this.data.position.x = v
 	}
 	get Y() {
-		return this.state.position.y
+		return this.isDynamic ? this.state.position.y : this.data.position.y
 	}
 	set Y(v) {
-		this.state.position.y = v
+		v = num(v)
+		if (this.isDynamic) this.state.position.y = v
+		else this.data.position.y = v
 	}
 	get Z() {
-		return this.state.position.z
+		return this.isDynamic ? this.state.position.z : this.data.position.z
 	}
 	set Z(v) {
-		this.state.position.z = v
+		v = num(v)
+		if (this.isDynamic) this.state.position.z = v
+		else this.data.position.z = v
 	}
 	get Size_X() {
-		return this.data.size.x
+		return this.isDynamic ? this.state.size.x : this.data.size.x
 	}
 	set Size_X(v) {
+		v = num(v)
 		if (this.isDynamic) this.state.size.x = v
-		this.data.size.x = v
+		else this.data.size.x = v
 	}
 	get Size_Y() {
-		return this.data.size.y
+		return this.isDynamic ? this.state.size.y : this.data.size.y
 	}
 	set Size_Y(v) {
+		v = num(v)
 		if (this.isDynamic) this.state.size.y = v
-		this.data.size.y = v
+		else this.data.size.y = v
 	}
 	get Size_Z() {
-		return this.data.size.z
+		return this.isDynamic ? this.state.size.z : this.data.size.z
 	}
 	set Size_Z(v) {
+		v = num(v)
 		if (this.isDynamic) this.state.size.z = v
-		this.data.size.z = v
+		else this.data.size.z = v
 	}
 	get RotAndTra0() {
 		return this.RotX
@@ -128,11 +141,12 @@ export class PrimitiveApi extends ItemApi<PrimitiveData> {
 		this.RotX = v
 	}
 	get RotX() {
-		return this.data.rotAndTra[0]
+		return this.isDynamic ? this.state.rotation.x : this.data.rotAndTra[0]
 	}
 	set RotX(v) {
+		v = num(v)
 		if (this.isDynamic) this.state.rotation.x = v
-		this.data.rotAndTra[0] = v
+		else this.data.rotAndTra[0] = v
 	}
 	get RotAndTra1() {
 		return this.RotY
@@ -141,11 +155,12 @@ export class PrimitiveApi extends ItemApi<PrimitiveData> {
 		this.RotY = v
 	}
 	get RotY() {
-		return this.data.rotAndTra[1]
+		return this.isDynamic ? this.state.rotation.y : this.data.rotAndTra[1]
 	}
 	set RotY(v) {
+		v = num(v)
 		if (this.isDynamic) this.state.rotation.y = v
-		this.data.rotAndTra[1] = v
+		else this.data.rotAndTra[1] = v
 	}
 	get RotAndTra2() {
 		return this.RotZ
@@ -154,11 +169,12 @@ export class PrimitiveApi extends ItemApi<PrimitiveData> {
 		this.RotZ = v
 	}
 	get RotZ() {
-		return this.data.rotAndTra[2]
+		return this.isDynamic ? this.state.rotation.z : this.data.rotAndTra[2]
 	}
 	set RotZ(v) {
+		v = num(v)
 		if (this.isDynamic) this.state.rotation.z = v
-		this.data.rotAndTra[2] = v
+		else this.data.rotAndTra[2] = v
 	}
 	get RotAndTra3() {
 		return this.TransX
@@ -167,11 +183,12 @@ export class PrimitiveApi extends ItemApi<PrimitiveData> {
 		this.TransX = v
 	}
 	get TransX() {
-		return this.data.rotAndTra[3]
+		return this.isDynamic ? this.state.translation.x : this.data.rotAndTra[3]
 	}
 	set TransX(v) {
+		v = num(v)
 		if (this.isDynamic) this.state.translation.x = v
-		this.data.rotAndTra[3] = v
+		else this.data.rotAndTra[3] = v
 	}
 	get RotAndTra4() {
 		return this.TransY
@@ -180,11 +197,12 @@ export class PrimitiveApi extends ItemApi<PrimitiveData> {
 		this.TransY = v
 	}
 	get TransY() {
-		return this.data.rotAndTra[4]
+		return this.isDynamic ? this.state.translation.y : this.data.rotAndTra[4]
 	}
 	set TransY(v) {
+		v = num(v)
 		if (this.isDynamic) this.state.translation.y = v
-		this.data.rotAndTra[4] = v
+		else this.data.rotAndTra[4] = v
 	}
 	get RotAndTra5() {
 		return this.TransZ
@@ -193,11 +211,12 @@ export class PrimitiveApi extends ItemApi<PrimitiveData> {
 		this.TransZ = v
 	}
 	get TransZ() {
-		return this.data.rotAndTra[5]
+		return this.isDynamic ? this.state.translation.z : this.data.rotAndTra[5]
 	}
 	set TransZ(v) {
+		v = num(v)
 		if (this.isDynamic) this.state.translation.z = v
-		this.data.rotAndTra[5] = v
+		else this.data.rotAndTra[5] = v
 	}
 	get RotAndTra6() {
 		return this.ObjRotX
@@ -206,11 +225,12 @@ export class PrimitiveApi extends ItemApi<PrimitiveData> {
 		this.ObjRotX = v
 	}
 	get ObjRotX() {
-		return this.data.rotAndTra[6]
+		return this.isDynamic ? this.state.objectRotation.x : this.data.rotAndTra[6]
 	}
 	set ObjRotX(v) {
+		v = num(v)
 		if (this.isDynamic) this.state.objectRotation.x = v
-		this.data.rotAndTra[6] = v
+		else this.data.rotAndTra[6] = v
 	}
 	get RotAndTra7() {
 		return this.ObjRotY
@@ -219,11 +239,12 @@ export class PrimitiveApi extends ItemApi<PrimitiveData> {
 		this.ObjRotY = v
 	}
 	get ObjRotY() {
-		return this.data.rotAndTra[7]
+		return this.isDynamic ? this.state.objectRotation.y : this.data.rotAndTra[7]
 	}
 	set ObjRotY(v) {
+		v = num(v)
 		if (this.isDynamic) this.state.objectRotation.y = v
-		this.data.rotAndTra[7] = v
+		else this.data.rotAndTra[7] = v
 	}
 	get RotAndTra8() {
 		return this.ObjRotZ
@@ -232,11 +253,12 @@ export class PrimitiveApi extends ItemApi<PrimitiveData> {
 		this.ObjRotZ = v
 	}
 	get ObjRotZ() {
-		return this.data.rotAndTra[8]
+		return this.isDynamic ? this.state.objectRotation.z : this.data.rotAndTra[8]
 	}
 	set ObjRotZ(v) {
+		v = num(v)
 		if (this.isDynamic) this.state.objectRotation.z = v
-		this.data.rotAndTra[8] = v
+		else this.data.rotAndTra[8] = v
 	}
 	get EdgeFactorUI() {
 		return this.data.edgeFactorUI
