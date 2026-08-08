@@ -7,6 +7,9 @@ import type { Table } from '../../vpt/table/table.js'
 import type { Texture } from '../../vpt/texture.js'
 import type { ITextureLoader } from '../irender-api.js'
 
+// Yield back to the event loop every N textures so 100+ texture loads don't freeze the UI.
+const YIELD_EVERY_TEXTURES = 8
+
 /** Caches and preloads Three.js textures. */
 export class ThreeMapGenerator {
 	private readonly textureCache = new Map<string, ThreeTexture>()
@@ -58,7 +61,7 @@ export class ThreeMapGenerator {
 				const i = next++
 				if (i >= textures.length) break
 				await this.loadOne(textures[i]!, table)
-				if (i % 8 === 0) await this.yieldMain()
+				if ((i + 1) % YIELD_EVERY_TEXTURES === 0) await this.yieldMain()
 			}
 		})
 		await Promise.all(workers)
