@@ -9,11 +9,13 @@ const DEFAULT_DURATION = 5000
 const puppeteer = await loadPuppeteer()
 
 const url =
-	process.argv.find((a) => a.startsWith('--url='))?.split('=')[1] ||
+	process.argv.find((a) => a.startsWith('--url='))?.slice('--url='.length) ||
 	process.argv.find((a) => a.startsWith('http')) ||
 	DEFAULT_URL
-const out = process.argv.find((a) => a.startsWith('--out='))?.split('=')[1] || DEFAULT_OUT
-const duration = Number(process.argv.find((a) => a.startsWith('--duration='))?.split('=')[1] || DEFAULT_DURATION)
+const out = process.argv.find((a) => a.startsWith('--out='))?.slice('--out='.length) || DEFAULT_OUT
+const duration = Number(
+	process.argv.find((a) => a.startsWith('--duration='))?.slice('--duration='.length) || DEFAULT_DURATION,
+)
 
 const viteProc = await ensureVite(url, { cwd: import.meta.dirname, label: 'profile' })
 
@@ -251,7 +253,7 @@ const initial = await page.evaluate(() => {
 	}
 })
 console.log('[profile] initial', initial)
-const ballsArg = process.argv.find((a) => a.startsWith('--balls='))?.split('=')[1]
+const ballsArg = process.argv.find((a) => a.startsWith('--balls='))?.slice('--balls='.length)
 const desiredBalls = ballsArg !== undefined ? Number(ballsArg) : initial.balls === 0 ? 10 : 0
 if (desiredBalls > 0) {
 	const created = await page.evaluate(async (n) => {
@@ -261,8 +263,9 @@ if (desiredBalls > 0) {
 		const height = p.table?.gameData?.height ?? 2000
 		const THREE = window.THREE
 		if (!THREE?.Vector3) return 'no THREE'
-		if (!THREE.Vector3.prototype.subAndRelease) {
-			THREE.Vector3.prototype.subAndRelease = function (o) {
+		const proto = THREE.Vector3.prototype
+		if (!proto.subAndRelease) {
+			proto.subAndRelease = function (o) {
 				this.sub(o)
 				try {
 					o.release?.()
@@ -270,8 +273,8 @@ if (desiredBalls > 0) {
 				return this
 			}
 		}
-		if (!THREE.Vector3.prototype.addAndRelease) {
-			THREE.Vector3.prototype.addAndRelease = function (o) {
+		if (!proto.addAndRelease) {
+			proto.addAndRelease = function (o) {
 				this.add(o)
 				try {
 					o.release?.()
@@ -279,6 +282,30 @@ if (desiredBalls > 0) {
 				return this
 			}
 		}
+		if (!proto.dotAndRelease) {
+			proto.dotAndRelease = function (o) {
+				const d = this.dot(o)
+				try {
+					o.release?.()
+				} catch {}
+				return d
+			}
+		}
+		if (!proto.setAndRelease) {
+			proto.setAndRelease = function (o) {
+				this.set(o.x, o.y, o.z)
+				try {
+					o.release?.()
+				} catch {}
+				return this
+			}
+		}
+		if (!proto.normalizeSafe) {
+			proto.normalizeSafe = function () {
+				return this.lengthSq() > 0 ? this.normalize() : this
+			}
+		}
+		if (!proto.release) proto.release = () => {}
 		let ok = 0
 		for (let i = 0; i < n; i++) {
 			const x = width / 2 + (Math.random() - 0.5) * 60
