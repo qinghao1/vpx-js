@@ -1,27 +1,12 @@
-// Profiling harness — full gamut: load app, parse vpx, build scene, mount, play, physics + render.
-// Modern profiling: CDP Tracing, page.metrics(), User Timing (mark/measure), PerformanceObserver.
-// Usage: node harness-profile.mjs [--url=...] [--out=/tmp/profile.json] [--duration=5000] [--trace]
-
-import { spawn } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
+import { ensureVite, launchBrowser, loadPuppeteer, newPage } from '../test/harness/utils.mjs'
 
 const DEFAULT_URL = 'http://localhost:3000/?vpx=/test/fixtures/table-empty.vpx'
 const DEFAULT_OUT = '/tmp/profile.json'
 const DEFAULT_DURATION = 5000
 
-function pickPuppeteer() {
-	const cands = [
-		'/home/qinghao1/projects/vpx-js/demo-browser/node_modules/puppeteer-core/lib/esm/puppeteer/puppeteer-core.js',
-		'/home/qinghao1/projects/vpx-js/node_modules/puppeteer-core/lib/esm/puppeteer/puppeteer-core.js',
-		'/home/qinghao1/projects/qinghao1.com/node_modules/puppeteer-core/lib/esm/puppeteer/puppeteer-core.js',
-		'/home/qinghao1/.npm/_npx/7d92d9a2d2ccc630/node_modules/puppeteer-core/lib/esm/puppeteer/puppeteer-core.js',
-		'/home/qinghao1/.npm/_npx/7d92d9a2d2ccc630/node_modules/puppeteer-core/lib/puppeteer/puppeteer-core.js',
-	]
-	for (const p of cands) if (fs.existsSync(p)) return p
-	throw new Error('puppeteer-core not found')
-}
-const puppeteer = (await import(pickPuppeteer())).default
+const puppeteer = await loadPuppeteer()
 
 const url =
 	process.argv.find((a) => a.startsWith('--url='))?.split('=')[1] ||
@@ -30,48 +15,10 @@ const url =
 const out = process.argv.find((a) => a.startsWith('--out='))?.split('=')[1] || DEFAULT_OUT
 const duration = Number(process.argv.find((a) => a.startsWith('--duration='))?.split('=')[1] || DEFAULT_DURATION)
 
-let viteProc = null
-async function ensureVite() {
-	try {
-		const r = await fetch(url.replace(/\?.*$/, ''), { method: 'HEAD' })
-		if (r.ok) return
-	} catch {}
-	console.log('[profile] starting vite...')
-	viteProc = spawn('npx', ['vite', '--host', '--port', '3000'], {
-		cwd: '/home/qinghao1/projects/vpx-js/demo-browser',
-		stdio: ['ignore', 'pipe', 'pipe'],
-	})
-	viteProc.stdout.on('data', (d) => process.stdout.write('[vite] ' + d))
-	viteProc.stderr.on('data', (d) => process.stderr.write('[vite] ' + d))
-	for (let i = 0; i < 30; i++) {
-		await new Promise((r) => setTimeout(r, 1000))
-		try {
-			const r = await fetch('http://localhost:3000/', { method: 'HEAD' })
-			if (r.ok) {
-				console.log('[profile] vite ready')
-				return
-			}
-		} catch {}
-	}
-	throw new Error('vite not ready')
-}
-await ensureVite()
+const viteProc = await ensureVite(url, { cwd: import.meta.dirname, label: 'profile' })
 
-const browser = await puppeteer.launch({
-	executablePath: '/usr/bin/google-chrome',
-	headless: 'new',
-	args: [
-		'--no-sandbox',
-		'--disable-dev-shm-usage',
-		'--enable-unsafe-swiftshader',
-		'--use-gl=angle',
-		'--use-angle=swiftshader',
-		'--window-size=1280,900',
-		'--disable-gpu-sandbox',
-	],
-})
-const page = await browser.newPage()
-await page.setViewport({ width: 1280, height: 900 })
+const browser = await launchBrowser(puppeteer)
+const page = await newPage(browser)
 
 await page.evaluateOnNewDocument(() => {
 	window.__profile = { marks: {}, measures: [] }
