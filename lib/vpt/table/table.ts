@@ -253,25 +253,35 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 	public getGlobalDifficulty(): number {
 		return this.data!.globalDifficulty!
 	}
-	public getTableHeight(): number {
+	private get baseHeight(): number {
 		if (!this.data) throw new Error('Table data not loaded')
 		return this.data.tableHeight ?? 0
 	}
+
+	public getTableHeight(): number {
+		return this.baseHeight
+	}
+
 	public getDimensions(): { width: number; height: number } {
 		if (!this.data) throw new Error('Table data not loaded')
 		return { width: this.data.right - this.data.left, height: this.data.bottom - this.data.top }
 	}
+
 	public getPlayfieldMap(): string {
 		if (!this.data) throw new Error('Table data not loaded')
 		return this.data.szImage || ''
 	}
+
 	public getSurfaceHeight(surface: string | undefined, x: number, y: number): number {
 		if (!this.data) throw new Error('Table data not loaded')
-		if (!surface) return this.data.tableHeight ?? 0
-		if (this.surfaces[surface]) return f4((this.data.tableHeight ?? 0) + this.surfaces[surface]!.heightTop)
-		if (this.ramps[surface]) return f4((this.data.tableHeight ?? 0) + this.ramps[surface]!.getSurfaceHeight(x, y, this))
+		const base = this.baseHeight
+		if (!surface) return base
+		const s = this.surfaces[surface]
+		if (s) return f4(base + s.heightTop)
+		const r = this.ramps[surface]
+		if (r) return f4(base + r.getSurfaceHeight(x, y, this))
 		logger().warn('[Table.getSurfaceHeight] Unknown surface %s.', surface)
-		return this.data.tableHeight ?? 0
+		return base
 	}
 
 	public async streamStorage<T>(name: string, streamer: (stg: Storage) => Promise<T>): Promise<T> {
