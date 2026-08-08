@@ -58,24 +58,32 @@ export class AnimationGate {
 	}
 }
 
-export const animationGate = new AnimationGate()
+function getSharedGate(): AnimationGate {
+	// Vite serves lib/dist-esm and demo-browser as separate ESM graphs;
+	// module-local singleton would split, so share via globalThis.
+	const g = globalThis as unknown as { __vpxAnimGate?: AnimationGate }
+	if (!g.__vpxAnimGate) g.__vpxAnimGate = new AnimationGate()
+	return g.__vpxAnimGate
+}
+
+export const animationGate: AnimationGate = getSharedGate()
 
 export function isAnimating(): boolean {
-	return animationGate.isAnimating()
+	return getSharedGate().isAnimating()
 }
 
 export function beginAnimation(): void {
-	animationGate.beginAnimation()
+	getSharedGate().beginAnimation()
 }
 
 export function endAnimation(): void {
-	animationGate.endAnimation()
+	getSharedGate().endAnimation()
 }
 
 export function waitIfAnimating(): Promise<void> {
-	return animationGate.waitIfAnimating()
+	return getSharedGate().waitIfAnimating()
 }
 
 export function yieldToMain(): Promise<void> {
-	return animationGate.yieldToMain()
+	return getSharedGate().yieldToMain()
 }
