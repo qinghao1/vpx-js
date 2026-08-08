@@ -23,7 +23,7 @@ export class BallUpdater extends ItemUpdater<BallState> {
 	): void {
 		Object.assign(this.state, state)
 		const pos = this.state.pos,
-			z = this.state.isFrozen ? pos.z - this.data.radius : pos.z
+			z = (this.state.isFrozen ? pos.z - this.data.radius : pos.z) * -1
 		const o = this.state.orientation.matrix
 		const orient = Matrix3D.claim().setEach(
 			o[0]![0]!,
@@ -48,7 +48,6 @@ export class BallUpdater extends ItemUpdater<BallState> {
 			.setScaling(this.data.radius, this.data.radius, this.data.radius)
 			.preMultiply(orient)
 			.preMultiply(trans)
-			.toRightHanded()
 		renderApi.applyMatrixToNode(m, obj)
 		Matrix3D.release(orient, trans, m)
 		const maybe = obj as unknown as { updateMatrixWorld?: (f: boolean) => void }

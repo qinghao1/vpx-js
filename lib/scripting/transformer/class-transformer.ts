@@ -5,14 +5,18 @@ import { replace } from 'estraverse'
 import type { MethodDefinition, Program, ReturnStatement } from 'estree'
 import {
 	arrowFunctionExpression,
+	binaryExpression,
 	callExpression,
+	conditionalExpression,
 	identifier,
+	literal,
 	memberExpression,
 	newExpression,
 	objectExpression,
 	property,
 	returnStatement,
 	thisExpression,
+	unaryExpression,
 } from '../estree.js'
 import { Transformer } from './transformer.js'
 
@@ -66,6 +70,14 @@ export class ClassTransformer extends Transformer {
 	}
 }
 
+function lowerProp(prop: string): import('estree').Expression {
+	return conditionalExpression(
+		binaryExpression('===', unaryExpression('typeof', identifier(prop)), literal('string')),
+		callExpression(memberExpression(identifier(prop), identifier('toLowerCase')), []),
+		identifier(prop),
+	) as unknown as import('estree').Expression
+}
+
 function proxyReturnStatement(): ReturnStatement {
 	return returnStatement(
 		newExpression(identifier('Proxy'), [
@@ -78,7 +90,7 @@ function proxyReturnStatement(): ReturnStatement {
 						true,
 						callExpression(memberExpression(identifier('Reflect'), identifier('get')), [
 							identifier('t'),
-							callExpression(memberExpression(identifier('p'), identifier('toLowerCase')), []),
+							lowerProp('p'),
 							identifier('r'),
 						]),
 						[identifier('t'), identifier('p'), identifier('r')],
@@ -91,7 +103,7 @@ function proxyReturnStatement(): ReturnStatement {
 						true,
 						callExpression(memberExpression(identifier('Reflect'), identifier('set')), [
 							identifier('t'),
-							callExpression(memberExpression(identifier('p'), identifier('toLowerCase')), []),
+							lowerProp('p'),
 							identifier('v'),
 							identifier('r'),
 						]),
@@ -105,7 +117,7 @@ function proxyReturnStatement(): ReturnStatement {
 						true,
 						callExpression(memberExpression(identifier('Reflect'), identifier('has')), [
 							identifier('t'),
-							callExpression(memberExpression(identifier('p'), identifier('toLowerCase')), []),
+							lowerProp('p'),
 						]),
 						[identifier('t'), identifier('p')],
 					),

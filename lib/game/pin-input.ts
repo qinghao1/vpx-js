@@ -205,11 +205,19 @@ export class PinInput {
 		ball.getState().isFrozen = false
 		ball.hit.angularVelocity.setZero()
 		ball.hit.angularMomentum.setZero()
-		const lane = this.table.plungers['Plunger'] ?? Object.values(this.table.plungers)[0]
-		const c = (lane as unknown as { data?: { center?: { x: number; y: number } } })?.data?.center
-		if (c) {
-			ball.getState().pos.set(c.x, c.y - 80, 30)
-			ball.hit.vel.set((Math.random() - 0.5) * 20, -950 - Math.random() * 100, 0)
+		const plungers = Object.values(this.table.plungers)
+		const lane =
+			plungers.find((p) => (p as unknown as { data: { mechPlunger: boolean } }).data.mechPlunger) ??
+			plungers.find((p) => !(p as unknown as { data: { autoPlunger: boolean } }).data.autoPlunger) ??
+			plungers[0]
+		if (lane) {
+			const mover = (lane as unknown as { getMover: () => { pos: number; x: number; x2: number } }).getMover()
+			const x = (mover.x + mover.x2) * 0.5
+			const y = mover.pos - 25
+			const laneCenter = (lane as unknown as { data: { center: { x: number } } }).data.center
+			const lx = Number.isFinite(x) ? x : laneCenter.x
+			ball.getState().pos.set(lx, y, 30)
+			ball.hit.vel.set((Math.random() - 0.5) * 12, -900 - Math.random() * 120, 0)
 		} else {
 			ball.getState().pos.set(460, 1100, 30)
 			ball.hit.vel.set(0, -750, 0)
