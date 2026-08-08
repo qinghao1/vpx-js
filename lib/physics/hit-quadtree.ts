@@ -31,25 +31,29 @@ export class HitQuadtree {
 	}
 
 	public hitTestBall(ball: Ball, coll: CollisionEvent, physics: PlayerPhysics): void {
-		for (const h of this.vho) {
-			if (
-				ball.hit !== h &&
-				h.hitBBox.intersectRect(ball.hit.hitBBox) &&
-				h.hitBBox.intersectSphere(ball.state.pos, ball.hit.rcHitRadiusSqr)
-			) {
+		const vho = this.vho
+		const ballHit = ball.hit
+		const bBox = ballHit.hitBBox
+		const pos = ball.state.pos
+		const radSq = ballHit.rcHitRadiusSqr
+		for (let i = 0; i < vho.length; i++) {
+			const h = vho[i]!
+			if (ballHit !== h && h.hitBBox.intersectRect(bBox) && h.hitBBox.intersectSphere(pos, radSq)) {
 				h.doHitTest(ball, coll, physics)
 			}
 		}
 		if (this.isLeaf) return
-		const isLeft = ball.hit.hitBBox.left <= this.vCenter.x
-		const isRight = ball.hit.hitBBox.right >= this.vCenter.x
-		if (ball.hit.hitBBox.top <= this.vCenter.y) {
-			if (isLeft) this.children[0].hitTestBall(ball, coll, physics)
-			if (isRight) this.children[1].hitTestBall(ball, coll, physics)
+		const vcX = this.vCenter.x
+		const vcY = this.vCenter.y
+		const isLeft = bBox.left <= vcX
+		const isRight = bBox.right >= vcX
+		if (bBox.top <= vcY) {
+			if (isLeft) this.children[0]!.hitTestBall(ball, coll, physics)
+			if (isRight) this.children[1]!.hitTestBall(ball, coll, physics)
 		}
-		if (ball.hit.hitBBox.bottom >= this.vCenter.y) {
-			if (isLeft) this.children[2].hitTestBall(ball, coll, physics)
-			if (isRight) this.children[3].hitTestBall(ball, coll, physics)
+		if (bBox.bottom >= vcY) {
+			if (isLeft) this.children[2]!.hitTestBall(ball, coll, physics)
+			if (isRight) this.children[3]!.hitTestBall(ball, coll, physics)
 		}
 	}
 

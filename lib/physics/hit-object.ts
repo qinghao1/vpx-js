@@ -106,7 +106,7 @@ export abstract class HitObject {
 				coll.obj = this
 				coll.hitTime = newTime
 			}
-			CollisionEvent.release(newColl)
+			CollisionEvent.releaseOne(newColl)
 		} else if (newColl.isContact || validHit) {
 			newColl.ball = ball
 			newColl.obj = this
@@ -114,10 +114,10 @@ export abstract class HitObject {
 			else {
 				coll.set(newColl)
 				coll.hitTime = newTime
-				CollisionEvent.release(newColl)
+				CollisionEvent.releaseOne(newColl)
 			}
 		} else {
-			CollisionEvent.release(newColl)
+			CollisionEvent.releaseOne(newColl)
 		}
 	}
 	applyPhysics(data: IPhysicalData, table: Table): void {
