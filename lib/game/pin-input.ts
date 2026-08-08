@@ -29,14 +29,14 @@ import {
 } from './key-code.js'
 import type { Player } from './player.js'
 
-const APP_KEYBOARD = 0
 const LEFT_KEYS = new Set([DIK_LSHIFT, DIK_LCONTROL])
 const RIGHT_KEYS = new Set([DIK_RSHIFT, DIK_RCONTROL])
 
-/** DirectInput key queue.
- * @see https://github.com/vpinball/vpinball/blob/master/pininput.cpp */
+type KeyEvent = { code: number; down: boolean; ts: number }
+
+/** DirectInput key queue — mirrors pininput.cpp. */
 export class PinInput {
-	private readonly diq: DirectInputDeviceObjectData[] = []
+	private readonly queue: KeyEvent[] = []
 
 	public readonly rgKeys: Record<number, number> = {
 		[AssignKey.LeftFlipperKey]: DIK_LCONTROL,
@@ -68,72 +68,48 @@ export class PinInput {
 	) {}
 
 	onKeyDown(code: number, ts: number): void {
-		this.diq.push(DirectInputDeviceObjectData.claim(code, 0x80, ts))
+		this.queue.push({ code, down: true, ts })
 	}
 
 	onKeyUp(code: number, ts: number): void {
-		this.diq.push(DirectInputDeviceObjectData.claim(code, 0x0, ts))
+		this.queue.push({ code, down: false, ts })
 	}
 
-	/** Drains queue and forwards key events. */
 	processKeys(): void {
-		let input: DirectInputDeviceObjectData | undefined
-		while ((input = this.diq.pop())) {
-			if (input.dwSequence === APP_KEYBOARD) {
-				const special =
-					input.dwOfs === this.rgKeys[AssignKey.FrameCount] ||
-					input.dwOfs === this.rgKeys[AssignKey.Enable3D] ||
-					input.dwOfs === this.rgKeys[AssignKey.DBGBalls]
-				if (!special) {
-					const down = (input.dwData & 0x80) !== 0
-					this.fireKeyEvent(down ? Event.GameEventsKeyDown : Event.GameEventsKeyUp, input.dwOfs)
-				}
-			}
-			DirectInputDeviceObjectData.release(input)
+		while (this.queue.length) {
+			const ev = this.queue.pop()!
+			if (
+				ev.code === this.rgKeys[AssignKey.FrameCount] ||
+				ev.code === this.rgKeys[AssignKey.Enable3D] ||
+				ev.code === this.rgKeys[AssignKey.DBGBalls]
+			)
+				continue
+			this.fire(ev.down ? Event.GameEventsKeyDown : Event.GameEventsKeyUp, ev.code)
 		}
 	}
 
-	private fireKeyEvent(dispid: Event, keycode: number): void {
-		this.table.getApi().fireKeyEvent(dispid, keycode)
-		this.syncFlippers(dispid === Event.GameEventsKeyDown, keycode)
+	private fire(dispid: Event, code: number): void {
+		this.table.getApi().fireKeyEvent(dispid, code)
+		this.syncFlippers(dispid === Event.GameEventsKeyDown, code)
 	}
 
-	private syncFlippers(isDown: boolean, keycode: number): void {
-		const left = keycode === this.rgKeys[AssignKey.LeftFlipperKey] || LEFT_KEYS.has(keycode)
-		const right = keycode === this.rgKeys[AssignKey.RightFlipperKey] || RIGHT_KEYS.has(keycode)
+	private syncFlippers(isDown: boolean, code: number): void {
+		const left = code === this.rgKeys[AssignKey.LeftFlipperKey] || LEFT_KEYS.has(code)
+		const right = code === this.rgKeys[AssignKey.RightFlipperKey] || RIGHT_KEYS.has(code)
 		if (!left && !right) return
 		const flippers = Object.values(this.table.flippers)
 		if (!flippers.length) return
-		for (const flipper of flippers) {
-			const isRightFlipper = flipper.getName().toLowerCase().includes('right')
+		for (const f of flippers) {
+			const n = f.getName().toLowerCase()
+			const isRight = n.includes('right') || n === 'flipperr'
 			if (flippers.length > 1) {
-				if (left && isRightFlipper) continue
-				if (right && !isRightFlipper) continue
+				if (left && isRight) continue
+				if (right && !isRight) continue
 			}
 			try {
-				const api = flipper.getApi()
+				const api = f.getApi()
 				isDown ? api.RotateToEnd() : api.RotateToStart()
 			} catch {}
 		}
 	}
-}
-
-class DirectInputDeviceObjectData {
-	dwOfs = 0
-	dwData = 0
-	dwTimeStamp = 0
-	dwSequence = APP_KEYBOARD
-
-	set(dwOfs: number, dwData: number, dwTimeStamp: number): this {
-		this.dwOfs = dwOfs
-		this.dwData = dwData
-		this.dwTimeStamp = dwTimeStamp
-		return this
-	}
-
-	static claim(dwOfs: number, dwData: number, dwTimeStamp: number): DirectInputDeviceObjectData {
-		return new DirectInputDeviceObjectData().set(dwOfs, dwData, dwTimeStamp)
-	}
-
-	static release(..._items: DirectInputDeviceObjectData[]): void {}
 }
