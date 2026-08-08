@@ -199,7 +199,7 @@ export class PlungerMover implements MoverObject {
 		const target = autoPlunger ? this.restPos : mech
 		const error = target - pos
 		const plungerFriction = 0.95
-		const normalize = this.tableApi.PlungerNormalize / 13 / 100
+		const normalize = (this.tableApi.PlungerNormalize ?? 100) / 13 / 100
 		const dt = 0.1
 		this.speed *= plungerFriction
 		this.speed += ((error * this.frameLen * this.data.mechStrength) / this.mass) * normalize * dt
@@ -218,7 +218,7 @@ export class PlungerMover implements MoverObject {
 		this.pos = this.frameEnd + startPos * this.frameLen
 
 		const dx = startPos - this.restPos
-		const normalize = this.tableApi.PlungerNormalize / 13 / 100
+		const normalize = (this.tableApi.PlungerNormalize ?? 100) / 13 / 100
 		this.fireSpeed = ((-this.data.speedFire * dx * this.frameLen) / this.mass) * normalize
 
 		const maxPull = 0.5

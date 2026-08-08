@@ -339,7 +339,12 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 
 	public broadcastInit(): void {
 		this.events!.fireVoidEvent(Event.GameEventsInit)
-		for (const h of this.getHittables()) h.getEventProxy().fireVoidEvent(Event.GameEventsInit)
+		for (const item of Object.values(this.items)) {
+			try {
+				const proxy = (item as unknown as { getEventProxy?: () => EventProxy })?.getEventProxy?.()
+				proxy?.fireVoidEvent(Event.GameEventsInit)
+			} catch {}
+		}
 	}
 	public fireVoidEvent(event: Event): this {
 		this.events!.fireVoidEvent(event)
