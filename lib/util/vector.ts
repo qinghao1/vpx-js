@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { type Matrix3, Vector2, Vector3 } from 'three'
+import { UNDEF } from '../scripting/vbs-undefined.js'
 import { FLT_MIN, f4 } from './float.js'
 import type { Matrix2D, Matrix3D } from './matrix.js'
 import { pooled } from './object-pool.js'
@@ -115,10 +116,10 @@ export class Vertex3D extends Vector3 {
 	override set(x: number, y: number, z?: number): this
 	override set(v: Vector3): this
 	override set(xOrV: number | Vector3, y?: number, z?: number): this {
-		if ((xOrV as any)?.__isUndefined === true) return super.set(0, 0, 0) as this
+		if ((xOrV as any)?.[UNDEF] === true) return super.set(0, 0, 0) as this
 		if (typeof xOrV === 'number') {
-			if ((y as any)?.__isUndefined === true) y = 0 as any
-			if ((z as any)?.__isUndefined === true) z = 0 as any
+			if ((y as any)?.[UNDEF] === true) y = 0 as any
+			if ((z as any)?.[UNDEF] === true) z = 0 as any
 			super.set(f4(xOrV), f4(y!), f4(z ?? 0))
 		} else {
 			super.set(f4((xOrV as any)?.x ?? 0), f4((xOrV as any)?.y ?? 0), f4((xOrV as any)?.z ?? 0))

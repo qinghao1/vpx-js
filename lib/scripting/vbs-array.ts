@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { VbsError } from './stdlib/err.js'
-import { VbsUndefined } from './vbs-undefined.js'
+import { UNDEF, VbsUndefined } from './vbs-undefined.js'
 
 /** VBS array — returns VbsUndefined for missing indices. */
 export class VbsArray<T> implements ProxyHandler<VbsArray<T>> {
@@ -13,7 +13,7 @@ export class VbsArray<T> implements ProxyHandler<VbsArray<T>> {
 	}
 
 	public get(target: unknown, key: string | symbol): T | VbsUndefined {
-		if (key === '__isUndefined' || typeof key === 'symbol') {
+		if (key === UNDEF || typeof key === 'symbol') {
 			return (target as Record<string | symbol, unknown>)[key] as T
 		}
 		const t = target as Record<string | symbol, unknown>

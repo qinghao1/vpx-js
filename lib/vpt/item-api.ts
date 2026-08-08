@@ -12,22 +12,31 @@ import { MAX_TIMER_MSEC_INTERVAL } from './timer/timer-const.js'
 import { TimerHit } from './timer/timer-hit.js'
 import { TimerOnOff } from './timer/timer-on-off.js'
 
-const INTERNAL = new Set([
-	'data',
-	'events',
-	'player',
-	'table',
-	'collections',
-	'collectionsItemPos',
-	'propertyMap',
-	'hitTimer',
-	'UserValue',
-	'state',
-	'animation',
-	'constructor',
-	'prototype',
-	'__proto__',
-])
+const INTERNAL: Record<string, boolean> = {
+	data: true,
+	events: true,
+	player: true,
+	table: true,
+	collections: true,
+	collectionsItemPos: true,
+	propertyMap: true,
+	hitTimer: true,
+	UserValue: true,
+	state: true,
+	animation: true,
+	constructor: true,
+	prototype: true,
+	__proto__: true,
+}
+
+const lowerCache = new Map<string, string>()
+function lc(s: string): string {
+	let r = lowerCache.get(s)
+	if (r !== undefined) return r
+	r = s.toLowerCase()
+	if (lowerCache.size < 4096) lowerCache.set(s, r)
+	return r
+}
 
 /** Base for VBS-exposed item APIs. */
 export abstract class ItemApi<DATA extends ItemData> extends EventEmitter {
@@ -67,7 +76,7 @@ export abstract class ItemApi<DATA extends ItemData> extends EventEmitter {
 		super()
 		return new Proxy(this, {
 			get(target: unknown, prop: string | symbol, receiver: unknown) {
-				if (typeof prop === 'string' && !INTERNAL.has(prop)) {
+				if (typeof prop === 'string' && !INTERNAL[prop]) {
 					const mapped = (target as ItemApi<DATA>)._getPropertyName(prop)
 					if (mapped) {
 						const v = Reflect.get(target as object, mapped, receiver)
@@ -76,17 +85,17 @@ export abstract class ItemApi<DATA extends ItemData> extends EventEmitter {
 					}
 				}
 				const v = Reflect.get(target as object, prop, receiver)
-				return typeof v === 'function' && typeof prop === 'string' && !INTERNAL.has(prop) ? v.bind(target) : v
+				return typeof v === 'function' && typeof prop === 'string' && !INTERNAL[prop] ? v.bind(target) : v
 			},
 			set(target: unknown, prop: string | symbol, value: unknown, receiver: unknown) {
-				if (typeof prop === 'string' && !INTERNAL.has(prop)) {
+				if (typeof prop === 'string' && !INTERNAL[prop]) {
 					const mapped = (target as ItemApi<DATA>)._getPropertyName(prop)
 					if (mapped) return Reflect.set(target as object, mapped, value, receiver)
 				}
 				return Reflect.set(target as object, prop as string, value, receiver)
 			},
 			has(target: unknown, prop: string | symbol) {
-				if (typeof prop === 'string' && !INTERNAL.has(prop)) {
+				if (typeof prop === 'string' && !INTERNAL[prop]) {
 					const mapped = (target as ItemApi<DATA>)._getPropertyName(prop)
 					if (mapped) return mapped in (target as object)
 				}
@@ -119,9 +128,9 @@ export abstract class ItemApi<DATA extends ItemData> extends EventEmitter {
 	public _getPropertyName(vbScriptName: string): string | undefined {
 		if (!this.propertyMap) {
 			this.propertyMap = {}
-			for (const name of this._getPropertyNames()) this.propertyMap[name.toLowerCase()] = name
+			for (const name of this._getPropertyNames()) this.propertyMap[lc(name)] = name
 		}
-		return this.propertyMap[vbScriptName.toLowerCase()]
+		return this.propertyMap[lc(vbScriptName)]
 	}
 
 	protected _beginPlay(): void {

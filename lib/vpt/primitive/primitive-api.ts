@@ -4,6 +4,7 @@
 import type { EventProxy } from '../../game/event-proxy.js'
 import type { Player } from '../../game/player.js'
 import type { HitObject } from '../../physics/hit-object.js'
+import { UNDEF } from '../../scripting/vbs-undefined.js'
 import { ItemApi } from '../item-api.js'
 import type { Table } from '../table/table.js'
 import type { TimerHit } from '../timer/timer-hit.js'
@@ -12,7 +13,7 @@ import type { PrimitiveData } from './primitive-data.js'
 import type { PrimitiveState } from './primitive-state.js'
 
 function num(v: unknown): number {
-	return (v as any)?.__isUndefined === true ? 0 : Number(v as number) || 0
+	return (v as any)?.[UNDEF] === true ? 0 : Number(v as number) || 0
 }
 
 /** Primitive API — VBS surface for `Primitive`. @see https://github.com/vpinball/vpinball/blob/master/primitive.cpp */

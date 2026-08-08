@@ -3,6 +3,8 @@
 
 import { ERR, VbsError } from './stdlib/err.js'
 
+export const UNDEF = Symbol('undef')
+
 /** VBS undefined sentinel. */
 export class VbsUndefined implements ProxyHandler<any> {
 	private readonly __errSet?: VbsError
@@ -15,7 +17,7 @@ export class VbsUndefined implements ProxyHandler<any> {
 	}
 
 	public get(target: any, p: string | number | symbol, receiver: any): any {
-		if (p === '__isUndefined') {
+		if (p === UNDEF) {
 			return true
 		}
 		if (p === Symbol.iterator) {
@@ -49,7 +51,7 @@ export class VbsUndefined implements ProxyHandler<any> {
 	}
 
 	public has(target: any, p: string | number | symbol): boolean {
-		if (p === Symbol.iterator || p === '__isUndefined') return true
+		if (p === Symbol.iterator || p === UNDEF) return true
 		return false
 	}
 }
