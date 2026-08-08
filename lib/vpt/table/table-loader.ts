@@ -19,6 +19,14 @@ const YIELD_EVERY_GAME_ITEMS = 32
 const YIELD_EVERY_TEXTURES = 16
 const YIELD_EVERY_COLLECTIONS = 16
 
+const MAX_CONCURRENCY_GAME_ITEMS = 4
+const MAX_CONCURRENCY_TEXTURES = 6
+const MAX_CONCURRENCY_COLLECTIONS = 4
+
+function hardwareConcurrency(): number {
+	return (globalThis as unknown as { navigator?: { hardwareConcurrency?: number } }).navigator?.hardwareConcurrency ?? 4
+}
+
 /** Loads VPX OLE storage into table model. */
 export class TableLoader {
 	private doc!: OleCompoundDoc
@@ -75,43 +83,57 @@ export class TableLoader {
 	): Promise<void> {
 		for (const key of ITEM_KEYS) (out as unknown as Record<string, unknown>)[key] = []
 		progress().show('Loading game items')
-		for (let i = 0; i < numItems; i++) {
-			const name = `GameItem${i}`
-			const data = await storage.read(name, 0, 4)
-			const type = new DataView(data.buffer, data.byteOffset, data.byteLength).getInt32(0, true)
-			const item = await this.loadItem(out, storage, name, type, opts)
-			if (item) {
-				progress().details(item.getName())
-				out.items[item.getName()] = item
+		if (numItems === 0) return
+		const concurrency = Math.min(MAX_CONCURRENCY_GAME_ITEMS, hardwareConcurrency())
+		const results: Array<Item<ItemData> | null> = new Array(numItems)
+		const types = new Int32Array(numItems)
+		let next = 0
+		const workers = Array.from({ length: Math.min(concurrency, numItems) }, async () => {
+			while (true) {
+				const i = next++
+				if (i >= numItems) break
+				const name = `GameItem${i}`
+				const data = await storage.read(name, 0, 4)
+				const type = new DataView(data.buffer, data.byteOffset, data.byteLength).getInt32(0, true)
+				types[i] = type
+				results[i] = await loadItemByType(storage, name, type, opts)
+				if ((i + 1) % YIELD_EVERY_GAME_ITEMS === 0) await this.yield()
 			}
-			if ((i + 1) % YIELD_EVERY_GAME_ITEMS === 0) await this.yield()
+		})
+		await Promise.all(workers)
+		for (let i = 0; i < numItems; i++) {
+			const item = results[i]
+			if (!item) continue
+			const type = types[i]!
+			const key = ITEM_REGISTRY[type]?.key
+			if (key && ((key !== 'textBoxes' && key !== 'timers') || opts.loadInvisibleItems)) {
+				;((out as unknown as Record<string, Item<ItemData>[] | undefined>)[key] ??= []).push(item)
+			}
+			out.items[item.getName()] = item
+			progress().details(item.getName())
 		}
-	}
-
-	private async loadItem(
-		out: LoadedTable,
-		storage: Storage,
-		name: string,
-		type: number,
-		opts: TableLoadOptions,
-	): Promise<Item<ItemData> | null> {
-		const item = await loadItemByType(storage, name, type, opts)
-		if (!item) return null
-		const key = ITEM_REGISTRY[type]?.key
-		if (!key) return item
-		if ((key === 'textBoxes' || key === 'timers') && !opts.loadInvisibleItems) return item
-		;((out as unknown as Record<string, Item<ItemData>[] | undefined>)[key] ??= []).push(item)
-		return item
 	}
 
 	private async loadTextures(out: LoadedTable, storage: Storage, numItems: number): Promise<void> {
 		progress().show('Loading textures')
 		out.textures = []
+		if (numItems === 0) return
+		const concurrency = Math.min(MAX_CONCURRENCY_TEXTURES, hardwareConcurrency())
+		const results: Texture[] = new Array(numItems)
+		let next = 0
+		const workers = Array.from({ length: Math.min(concurrency, numItems) }, async () => {
+			while (true) {
+				const i = next++
+				if (i >= numItems) break
+				results[i] = await Texture.fromStorage(storage, `Image${i}`)
+				if ((i + 1) % YIELD_EVERY_TEXTURES === 0) await this.yield()
+			}
+		})
+		await Promise.all(workers)
 		for (let i = 0; i < numItems; i++) {
-			const tex = await Texture.fromStorage(storage, `Image${i}`)
+			const tex = results[i]!
 			out.textures.push(tex)
 			progress().details(tex.getName())
-			if ((i + 1) % YIELD_EVERY_TEXTURES === 0) await this.yield()
 		}
 	}
 
@@ -126,11 +148,23 @@ export class TableLoader {
 
 	private async loadCollections(out: LoadedTable, storage: Storage, numItems: number): Promise<void> {
 		out.collections = []
+		if (numItems === 0) return
+		const concurrency = Math.min(MAX_CONCURRENCY_COLLECTIONS, hardwareConcurrency())
+		const results: Collection[] = new Array(numItems)
+		let next = 0
+		const workers = Array.from({ length: Math.min(concurrency, numItems) }, async () => {
+			while (true) {
+				const i = next++
+				if (i >= numItems) break
+				results[i] = await Collection.fromStorage(storage, `Collection${i}`)
+				if ((i + 1) % YIELD_EVERY_COLLECTIONS === 0) await this.yield()
+			}
+		})
+		await Promise.all(workers)
 		for (let i = 0; i < numItems; i++) {
-			const col = await Collection.fromStorage(storage, `Collection${i}`)
+			const col = results[i]!
 			out.collections.push(col)
 			out.items[col.getName()] = col
-			if ((i + 1) % YIELD_EVERY_COLLECTIONS === 0) await this.yield()
 		}
 	}
 
