@@ -122,7 +122,11 @@ export class AmbiguityTransformer extends Transformer {
 					}
 
 					// if it's an assignment where its left is the node, it's definitely not a function call
-					if (parent && ['AssignmentExpression', 'ForOfStatement'].includes(parent.type) && node === parent.left) {
+					if (
+						parent &&
+						['AssignmentExpression', 'ForOfStatement'].includes(parent.type) &&
+						node === parent.left
+					) {
 						return node
 					}
 
@@ -173,7 +177,10 @@ export class AmbiguityTransformer extends Transformer {
 
 					const obj = getValue(api, node)
 					// if it's a function, render it as such
-					if (typeof obj === 'function' && (node as unknown as { __isProperty?: boolean }).__isProperty !== true) {
+					if (
+						typeof obj === 'function' &&
+						(node as unknown as { __isProperty?: boolean }).__isProperty !== true
+					) {
 						return callExpression(node, [])
 					}
 					// otherwise, if we got something, that means it's a property
@@ -188,7 +195,8 @@ export class AmbiguityTransformer extends Transformer {
 						parent.callee.type === 'MemberExpression' &&
 						parent.callee.object.name === Transformer.VBSHELPER_NAME &&
 						parent.callee.property.type === 'Identifier' &&
-						(parent.callee.property.name === 'getOrCall' || parent.callee.property.name === 'getOrCallBound')
+						(parent.callee.property.name === 'getOrCall' ||
+							parent.callee.property.name === 'getOrCallBound')
 					) {
 						return node
 					}

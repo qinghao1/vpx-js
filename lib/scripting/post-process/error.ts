@@ -22,7 +22,10 @@ function ppOnErrorStatement(node: ESIToken): unknown {
 			literal(0),
 		])
 	} else {
-		expr = callExpression(memberExpression(identifier(Transformer.VBSHELPER_NAME), identifier('onErrorResumeNext')), [])
+		expr = callExpression(
+			memberExpression(identifier(Transformer.VBSHELPER_NAME), identifier('onErrorResumeNext')),
+			[],
+		)
 	}
 	return expressionStatement(expr)
 }

@@ -161,7 +161,7 @@ async function _debug(img1: Buffer, img2: Buffer, tolerance = imgDiffTolerance, 
 				ignoreAntialiasing,
 				ignoreCaret: false,
 			},
-			(error) => (error ? reject(error) : resolve()),
+			error => (error ? reject(error) : resolve()),
 		)
 	})
 	writeFileSync('texture.png', img1)

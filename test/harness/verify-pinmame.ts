@@ -16,7 +16,7 @@ import { VpmController } from '../../lib/scripting/objects/vpm-controller.js'
 import { TableBuilder } from '../table-builder.js'
 
 const ROM_CANDIDATES = ['twd_160h', 'mm_109', 'afm_113b', 'totan_14', 'example']
-	.map((n) => path.join(os.homedir(), `.pinmame/roms/${n}.zip`))
+	.map(n => path.join(os.homedir(), `.pinmame/roms/${n}.zip`))
 	.concat([path.join(os.homedir(), 'Downloads/twd_160h.zip')])
 const ROMS = ROM_CANDIDATES
 const VPX = path.resolve('walking_dead.vpx')
@@ -107,7 +107,7 @@ async function verifyVpmController(gameName: string) {
 		return { ok: false, status: 404, arrayBuffer: async () => new ArrayBuffer(0) } as any
 	}
 	vpm.GameName = gameName
-	await new Promise((r) => setTimeout(r, 200))
+	await new Promise(r => setTimeout(r, 200))
 	console.log(`  GameName=${vpm.GameName}, emulator=${player.getPhysics().emu?.constructor.name ?? 'none'}`)
 	console.log(`  Switch[11]=${vpm.Switch[11]}, Lamp[0]=${vpm.Lamp[0]}, Dip[0]=${vpm.Dip[0]}`)
 	// test fliptronics
@@ -126,10 +126,12 @@ async function main() {
 	await verifyVpmController(gameName)
 	console.log('\n=== Done ===')
 	if (!romPath)
-		console.log('Tip: place twd_160h.zip at ~/.pinmame/roms/ for full test, or run npm run build:wasm for real wasm')
+		console.log(
+			'Tip: place twd_160h.zip at ~/.pinmame/roms/ for full test, or run npm run build:wasm for real wasm',
+		)
 }
 
-main().catch((e) => {
+main().catch(e => {
 	console.error(e)
 	process.exit(1)
 })

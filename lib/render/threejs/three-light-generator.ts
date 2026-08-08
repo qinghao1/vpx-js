@@ -19,7 +19,8 @@ export class ThreeLightGenerator {
 	public static readonly BULB_FACTOR = 10
 
 	public createPointLight(d: LightData): PointLight {
-		const intensity = d.state !== Enums.LightStatus.LightStateOff ? d.intensity * ThreeLightGenerator.BULB_FACTOR : 0
+		const intensity =
+			d.state !== Enums.LightStatus.LightStateOff ? d.intensity * ThreeLightGenerator.BULB_FACTOR : 0
 		const light = new PointLight(d.color, intensity, d.falloff * ThreeRenderApi.SCALE, 2)
 		light.name = 'light'
 		light.color.set(d.color)

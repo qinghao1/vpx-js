@@ -79,7 +79,7 @@ describe('The VPinball bumper collision', () => {
 		createBall(player, 450, 750, 50, 0, 1)
 		const bumper = table.bumpers.Bumper2
 		const bumperObj = three.find<Mesh>(gltf, 'bumpers', 'Bumper2')
-		const ringObj = bumperObj.children.find((o) => o.name === `bumper-ring-Bumper2`)!
+		const ringObj = bumperObj.children.find(o => o.name === `bumper-ring-Bumper2`)!
 
 		player.simulateTime(710)
 		let states = player.popStates()

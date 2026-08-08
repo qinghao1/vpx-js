@@ -46,8 +46,8 @@ export class ThreeMapGenerator {
 	}
 
 	private pickConcurrency(textures: Texture[]): number {
-		const hasLarge = textures.some((t) => t.width * t.height > 4 * 1024 * 1024)
-		const hasFloat = textures.some((t) => (t as any).isHdr?.() || /\.(exr|hdr)$/i.test((t as any).szPath ?? ''))
+		const hasLarge = textures.some(t => t.width * t.height > 4 * 1024 * 1024)
+		const hasFloat = textures.some(t => (t as any).isHdr?.() || /\.(exr|hdr)$/i.test((t as any).szPath ?? ''))
 		const cores = (typeof navigator !== 'undefined' && (navigator as any).hardwareConcurrency) || 4
 		if (hasFloat) return Math.min(4, cores)
 		if (hasLarge) return Math.min(3, cores)
@@ -96,7 +96,7 @@ export class ThreeMapGenerator {
 	private async yieldMain(): Promise<void> {
 		const g = globalThis as unknown as { scheduler?: { yield?: () => Promise<void> } }
 		if (g.scheduler?.yield) await g.scheduler.yield()
-		else await new Promise<void>((r) => setTimeout(r, 0))
+		else await new Promise<void>(r => setTimeout(r, 0))
 	}
 
 	public getTexture(name: string): ThreeTexture {

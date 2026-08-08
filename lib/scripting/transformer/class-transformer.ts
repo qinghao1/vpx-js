@@ -73,7 +73,7 @@ function proxyReturn(): ReturnStatement {
 			arrowFunctionExpression(
 				true,
 				callExpression(memberExpression(identifier('Reflect'), identifier(name)), exprs),
-				args.map((v) => identifier(v)),
+				args.map(v => identifier(v)),
 			),
 		)
 	return returnStatement(

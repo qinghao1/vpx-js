@@ -71,7 +71,7 @@ function ppFunctionDeclaration(node: ESIToken): unknown {
 	}
 	if (block) {
 		block = replace(block, {
-			enter: (blockNode) => {
+			enter: blockNode => {
 				if (blockNode.type === 'ReturnStatement') {
 					blockNode.argument = id
 					return blockNode

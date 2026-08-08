@@ -100,7 +100,8 @@ export class Hit3DPoly extends HitObject {
 				return -1
 			}
 			if (bnd <= PHYS_TOUCH)
-				hitTime = inside || Math.abs(bnv) > C_CONTACTVEL || bnd <= -PHYS_TOUCH ? 0 : bnd * (0.5 / PHYS_TOUCH) + 0.5
+				hitTime =
+					inside || Math.abs(bnv) > C_CONTACTVEL || bnd <= -PHYS_TOUCH ? 0 : bnd * (0.5 / PHYS_TOUCH) + 0.5
 			else if (Math.abs(bnv) > C_LOWNORMVEL) hitTime = bnd / -bnv
 			else {
 				Vertex3D.release(hitPos)
@@ -108,7 +109,11 @@ export class Hit3DPoly extends HitObject {
 			}
 		} else {
 			if (bnv * bnd >= 0) {
-				if (!ball.hit.isRealBall() || Math.abs(bnd) >= r * 0.5 || inside !== ball.hit.vpVolObjs.includes(this.obj!)) {
+				if (
+					!ball.hit.isRealBall() ||
+					Math.abs(bnd) >= r * 0.5 ||
+					inside !== ball.hit.vpVolObjs.includes(this.obj!)
+				) {
 					Vertex3D.release(hitPos)
 					return -1
 				}

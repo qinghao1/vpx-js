@@ -40,7 +40,9 @@ export class TriggerState extends ItemState {
 	public equals(state: TriggerState): boolean {
 		if (!state) return false
 		return (
-			state.heightOffset === this.heightOffset && state.material === this.material && state.isVisible === this.isVisible
+			state.heightOffset === this.heightOffset &&
+			state.material === this.material &&
+			state.isVisible === this.isVisible
 		)
 	}
 }

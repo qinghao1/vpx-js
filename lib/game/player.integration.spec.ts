@@ -13,7 +13,7 @@ async function waitFor(fn: () => boolean, ms = 500): Promise<void> {
 	const start = Date.now()
 	while (!fn()) {
 		if (Date.now() - start > ms) throw new Error('waitFor timeout')
-		await new Promise((r) => setTimeout(r, 10))
+		await new Promise(r => setTimeout(r, 10))
 	}
 }
 

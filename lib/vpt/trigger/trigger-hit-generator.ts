@@ -26,7 +26,7 @@ export class TriggerHitGenerator {
 			CatmullCurve2D.fromVertex2D,
 		)
 		const n = vVertex.length
-		const rgv3D = vVertex.map((v) => new Vertex3D(v.x, v.y, h + PHYS_SKIN * 2))
+		const rgv3D = vVertex.map(v => new Vertex3D(v.x, v.y, h + PHYS_SKIN * 2))
 		const hits: HitObject[] = []
 		for (let i = 0; i < n; i++) {
 			const pv2 = vVertex[i < n - 1 ? i + 1 : 0]!,

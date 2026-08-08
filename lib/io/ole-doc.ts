@@ -85,7 +85,7 @@ export class OleCompoundDoc extends EventEmitter {
 		this.assertLoaded()
 		const browserData = (this.reader as unknown as { data?: Uint8Array }).data
 		if (browserData)
-			return this.copyFromBrowser(browserData, secIds, secSize, offset, bytesToRead, (id) =>
+			return this.copyFromBrowser(browserData, secIds, secSize, offset, bytesToRead, id =>
 				this.getFileOffsetForSec(id),
 			)
 
@@ -104,7 +104,10 @@ export class OleCompoundDoc extends EventEmitter {
 			let runLen = 1,
 				runBytes = firstLen
 			while (i + runLen < secIds.length && remaining - runBytes > 0) {
-				if (this.getFileOffsetForSec(secIds[i + runLen - 1]) + secSize !== this.getFileOffsetForSec(secIds[i + runLen]))
+				if (
+					this.getFileOffsetForSec(secIds[i + runLen - 1]) + secSize !==
+					this.getFileOffsetForSec(secIds[i + runLen])
+				)
 					break
 				const next = Math.min(secSize, remaining - runBytes)
 				runBytes += next
@@ -134,7 +137,7 @@ export class OleCompoundDoc extends EventEmitter {
 		this.assertLoaded()
 		const browserData = (this.reader as unknown as { data?: Uint8Array }).data
 		if (browserData)
-			return this.copyFromBrowser(browserData, secIds, secSize, offset, bytesToRead, (id) =>
+			return this.copyFromBrowser(browserData, secIds, secSize, offset, bytesToRead, id =>
 				this.getFileOffsetForShortSec(id),
 			)
 

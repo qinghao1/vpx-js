@@ -25,7 +25,7 @@ export class Emulator implements IEmulator {
 		this.emulator.executeCycleForTime(1000, 4)
 		this.queue.addMessage(MessageType.CabinetInput, 16)
 		this.queue.replayMessages(this)
-		this.registerAudioConsumer((m) => logger().debug('audioCallback', m))
+		this.registerAudioConsumer(m => logger().debug('audioCallback', m))
 	}
 
 	isInitialized(): boolean {

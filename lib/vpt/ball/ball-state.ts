@@ -46,6 +46,8 @@ export class BallState extends ItemState {
 
 	public equals(state: BallState): boolean {
 		if (!state) return false
-		return this.pos.equals(state.pos) && this.orientation.equals(state.orientation) && this.isFrozen === state.isFrozen
+		return (
+			this.pos.equals(state.pos) && this.orientation.equals(state.orientation) && this.isFrozen === state.isFrozen
+		)
 	}
 }

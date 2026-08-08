@@ -22,7 +22,8 @@ export class SpinnerMeshGenerator {
 		}
 	}
 	public getZ(table: Table): number {
-		const h = table.getSurfaceHeight(this.data.szSurface, this.data.center.x, this.data.center.y) * table.getScaleZ()
+		const h =
+			table.getSurfaceHeight(this.data.szSurface, this.data.center.x, this.data.center.y) * table.getScaleZ()
 		return f4(h + this.data.height)
 	}
 	private getMesh(table: Table, posZ: number, src: Mesh, name: string): Mesh {

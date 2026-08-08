@@ -26,7 +26,13 @@ export class HitCircle extends HitObject {
 	}
 
 	public override collide(coll: CollisionEvent, _physics?: PlayerPhysics): void {
-		coll.ball.hit.collide3DWall(coll.hitNormal, this.elasticity, this.elasticityFalloff, this.friction, this.scatter)
+		coll.ball.hit.collide3DWall(
+			coll.hitNormal,
+			this.elasticity,
+			this.elasticityFalloff,
+			this.friction,
+			this.scatter,
+		)
 	}
 
 	public override calcHitBBox(): void {
@@ -85,7 +91,8 @@ export class HitCircle extends HitObject {
 		let isUnhit = false
 		let isContact = false
 		if (isKicker && bnd <= 0 && bnd >= -this.radius && a < C_CONTACTVEL * C_CONTACTVEL && ball.hit.isRealBall()) {
-			if (ball.hit.vpVolObjs.includes(this.obj!)) ball.hit.vpVolObjs.splice(ball.hit.vpVolObjs.indexOf(this.obj!), 1)
+			if (ball.hit.vpVolObjs.includes(this.obj!))
+				ball.hit.vpVolObjs.splice(ball.hit.vpVolObjs.indexOf(this.obj!), 1)
 		}
 		if (rigid && bnd < PHYS_TOUCH) {
 			if (bnd < -ball.data.radius) {

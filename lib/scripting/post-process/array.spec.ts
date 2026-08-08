@@ -33,7 +33,9 @@ describe('The VBScript transpiler - Array', () => {
 	it('should transpile a multi-dimension redim with preserve', () => {
 		const vbs = `Redim Preserve myarray(2,4,3)`
 		const js = grammar.vbsToJs(vbs)
-		expect(js).to.equal(`myarray = ${Transformer.VBSHELPER_NAME}.redim(myarray, [\n    2,\n    4,\n    3\n], true);`)
+		expect(js).to.equal(
+			`myarray = ${Transformer.VBSHELPER_NAME}.redim(myarray, [\n    2,\n    4,\n    3\n], true);`,
+		)
 	})
 
 	it('should transpile a redim with multiple arrays', () => {

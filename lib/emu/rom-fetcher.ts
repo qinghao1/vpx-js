@@ -14,10 +14,10 @@ export async function downloadGameEntry(pinmameGameName: string): Promise<Loaded
 		logger().error('VPDB Fetch failed for url', url)
 		throw new Error(`VPDB_INVALID_ANSWER_FOR_${pinmameGameName}`)
 	}
-	if (!sets.find((e) => e.id === pinmameGameName)) throw new Error(`VPDB_GAME_ENTRY_NOT_FOUND_${pinmameGameName}`)
-	const romSet = sets.find((e) => e.id === pinmameGameName)
+	if (!sets.find(e => e.id === pinmameGameName)) throw new Error(`VPDB_GAME_ENTRY_NOT_FOUND_${pinmameGameName}`)
+	const romSet = sets.find(e => e.id === pinmameGameName)
 	if (!romSet) throw new Error(`VPDB_ROMSET_ENTRY_NOT_FOUND_${pinmameGameName}`)
-	const romName = romSet.rom_files.find((e) => e.type === 'main')?.filename ?? ''
+	const romName = romSet.rom_files.find(e => e.type === 'main')?.filename ?? ''
 	if (!romName) throw new Error(`VPDB_ROM_TYPE_NOT_FOUND_${pinmameGameName}`)
 	const romUrl = `${romSet.file.url}/${romName}`
 	logger().debug('load rom from', romUrl, ', # downloads', romSet.file.counter.downloads)

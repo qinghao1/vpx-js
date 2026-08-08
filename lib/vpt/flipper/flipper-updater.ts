@@ -35,7 +35,8 @@ export class FlipperUpdater extends ItemUpdater<FlipperState> {
 		const center = this.state.center ?? this.data.center
 		const dx = center.x - this.data.center.x,
 			dy = center.y - this.data.center.y
-		const h = table.getSurfaceHeight(this.data.szSurface, this.data.center.x, this.data.center.y) * table.getScaleZ()
+		const h =
+			table.getSurfaceHeight(this.data.szSurface, this.data.center.x, this.data.center.y) * table.getScaleZ()
 		const m0 = Matrix3D.claim().setTranslation(-this.data.center.x, -this.data.center.y, h)
 		const m1 = Matrix3D.claim().setTranslation(this.data.center.x, this.data.center.y, -h)
 		const angle = this.state.angle ?? 0

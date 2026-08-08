@@ -41,11 +41,11 @@ export function readableStream<T>(fn: (s: Stream, i: number) => Promise<T | null
 			try {
 				reading = true
 				fn(stream, i++)
-					.then((buf) => {
+					.then(buf => {
 						reading = false
 						get(buf as T)
 					})
-					.catch((e) => {
+					.catch(e => {
 						stream.emit('error', e)
 						stream.emit('end')
 					})

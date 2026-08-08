@@ -22,7 +22,8 @@ export class LightMeshGenerator {
 			: { surfaceLight: renderApi.createLightGeometry(this.data, table) }
 	}
 	private getBulbMeshes<GEOMETRY>(table: Table): LightMeshes<GEOMETRY> {
-		const h = table.getSurfaceHeight(this.data.szSurface, this.data.center.x, this.data.center.y) * table.getScaleZ()
+		const h =
+			table.getSurfaceHeight(this.data.szSurface, this.data.center.x, this.data.center.y) * table.getScaleZ()
 		const s = this.data.meshRadius,
 			scZ = (v: number) => v * s * table.getScaleZ() + h
 		const light = bulbLightMesh.clone('bulb.light'),

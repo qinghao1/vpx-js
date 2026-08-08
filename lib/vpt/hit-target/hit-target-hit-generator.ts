@@ -66,17 +66,17 @@ export class HitTargetHitGenerator {
 				hitObjects.push(
 					...addedEdges
 						.addHitEdge(i0, i1, rgv3D2[0]!, rgv3D2[2]!)
-						.map((obj) => this.setupHitObject(obj, events, true, table)),
+						.map(obj => this.setupHitObject(obj, events, true, table)),
 				)
 				hitObjects.push(
 					...addedEdges
 						.addHitEdge(i1, i2, rgv3D2[2]!, rgv3D2[1]!)
-						.map((obj) => this.setupHitObject(obj, events, true, table)),
+						.map(obj => this.setupHitObject(obj, events, true, table)),
 				)
 				hitObjects.push(
 					...addedEdges
 						.addHitEdge(i2, i0, rgv3D2[1]!, rgv3D2[0]!)
-						.map((obj) => this.setupHitObject(obj, events, true, table)),
+						.map(obj => this.setupHitObject(obj, events, true, table)),
 				)
 			}
 			for (let i = 0; i < dropTargetHitPlaneVertices.length; ++i) {
@@ -113,17 +113,17 @@ export class HitTargetHitGenerator {
 			hitObjects.push(
 				...addedEdges
 					.addHitEdge(i0, i1, rgv3D[0]!, rgv3D[2]!)
-					.map((obj) => this.setupHitObject(obj, events, setHitObject, table)),
+					.map(obj => this.setupHitObject(obj, events, setHitObject, table)),
 			)
 			hitObjects.push(
 				...addedEdges
 					.addHitEdge(i1, i2, rgv3D[2]!, rgv3D[1]!)
-					.map((obj) => this.setupHitObject(obj, events, setHitObject, table)),
+					.map(obj => this.setupHitObject(obj, events, setHitObject, table)),
 			)
 			hitObjects.push(
 				...addedEdges
 					.addHitEdge(i2, i0, rgv3D[1]!, rgv3D[0]!)
-					.map((obj) => this.setupHitObject(obj, events, setHitObject, table)),
+					.map(obj => this.setupHitObject(obj, events, setHitObject, table)),
 			)
 		}
 		for (const vertex of hitMesh.vertices) {
@@ -162,6 +162,6 @@ const dropTargetHitPlaneVertices: Vertex3D[] = [
 ]
 
 const dropTargetHitPlaneIndices: number[] = [
-	0, 1, 2, 2, 3, 0, 1, 4, 5, 6, 7, 2, 5, 6, 1, 2, 1, 6, 4, 8, 9, 9, 5, 4, 8, 10, 11, 11, 9, 8, 6, 12, 7, 12, 6, 13, 12,
-	13, 14, 13, 15, 14,
+	0, 1, 2, 2, 3, 0, 1, 4, 5, 6, 7, 2, 5, 6, 1, 2, 1, 6, 4, 8, 9, 9, 5, 4, 8, 10, 11, 11, 9, 8, 6, 12, 7, 12, 6, 13,
+	12, 13, 14, 13, 15, 14,
 ]

@@ -35,12 +35,12 @@ export async function newPage(browser) {
 
 export function attachLogging(page, { filter = /./, prefix = '[c]' } = {}) {
 	const logs = []
-	page.on('console', (m) => {
+	page.on('console', m => {
 		const t = m.text()
 		logs.push(t)
 		if (filter.test(t)) console.log(`${prefix} ${t.slice(0, 500)}`)
 	})
-	page.on('pageerror', (e) => console.log('[pageerror]', e.message.slice(0, 1000)))
+	page.on('pageerror', e => console.log('[pageerror]', e.message.slice(0, 1000)))
 	return logs
 }
 
@@ -57,7 +57,7 @@ export async function ensureVite(url, { cwd = import.meta.dirname, label = 'vite
 		}
 		if (attempt < 2) {
 			console.log(`[${label}] vite not ready, retry ${attempt + 1}/3…`)
-			await new Promise((r) => setTimeout(r, 800))
+			await new Promise(r => setTimeout(r, 800))
 		}
 	}
 	console.log(`[${label}] starting vite in ${cwd}…`)
@@ -65,10 +65,10 @@ export async function ensureVite(url, { cwd = import.meta.dirname, label = 'vite
 		cwd,
 		stdio: ['ignore', 'pipe', 'pipe'],
 	})
-	proc.stdout.on('data', (d) => process.stdout.write(`[${label}] ${d}`))
-	proc.stderr.on('data', (d) => process.stderr.write(`[${label}] ${d}`))
+	proc.stdout.on('data', d => process.stdout.write(`[${label}] ${d}`))
+	proc.stderr.on('data', d => process.stderr.write(`[${label}] ${d}`))
 	for (let i = 0; i < 30; i++) {
-		await new Promise((r) => setTimeout(r, 1000))
+		await new Promise(r => setTimeout(r, 1000))
 		try {
 			if ((await fetch('http://localhost:3000/', { method: 'HEAD' })).ok) {
 				console.log(`[${label}] vite ready`)

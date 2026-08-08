@@ -29,14 +29,18 @@ export class RubberHitGenerator {
 				b = mesh.vertices[mesh.indices[i + 2]!]!,
 				c = mesh.vertices[mesh.indices[i + 1]!]!
 			hits.push(
-				new HitTriangle([new Vertex3D(a.x, a.y, a.z), new Vertex3D(b.x, b.y, b.z), new Vertex3D(c.x, c.y, c.z)]),
+				new HitTriangle([
+					new Vertex3D(a.x, a.y, a.z),
+					new Vertex3D(b.x, b.y, b.z),
+					new Vertex3D(c.x, c.y, c.z),
+				]),
 			)
 			hits.push(...RubberHitGenerator.edge(mesh, addedEdges, mesh.indices[i]!, mesh.indices[i + 2]!))
 			hits.push(...RubberHitGenerator.edge(mesh, addedEdges, mesh.indices[i + 2]!, mesh.indices[i + 1]!))
 			hits.push(...RubberHitGenerator.edge(mesh, addedEdges, mesh.indices[i + 1]!, mesh.indices[i]!))
 		}
 		for (const mv of mesh.vertices) hits.push(new HitPoint(new Vertex3D(mv.x, mv.y, mv.z)))
-		return hits.map((o) => this.setup(o, events, table))
+		return hits.map(o => this.setup(o, events, table))
 	}
 
 	private setup(obj: HitObject, events: EventProxy, table: Table): HitObject {

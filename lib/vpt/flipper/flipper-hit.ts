@@ -285,7 +285,9 @@ export class FlipperHit extends HitObject {
 			: this.data.elasticityFalloff!
 		this.elasticity = useOverride ? (this.data.overrideElasticity ?? this.data.elasticity!) : this.data.elasticity!
 		this.setFriction(useOverride ? (this.data.overrideFriction ?? this.data.friction!) : this.data.friction!)
-		this.scatter = degToRad(useOverride ? (this.data.overrideScatterAngle ?? this.data.scatter!) : this.data.scatter!)
+		this.scatter = degToRad(
+			useOverride ? (this.data.overrideScatterAngle ?? this.data.scatter!) : this.data.scatter!,
+		)
 	}
 
 	public hitTestFlipperFace(ball: Ball, dTime: number, coll: CollisionEvent, face1: boolean): number {
@@ -412,7 +414,11 @@ export class FlipperHit extends HitObject {
 	private getRelativeVelocity(n: Vertex3D, ball: Ball, vRel: Vertex3D, rB: Vertex3D, rF: Vertex3D): void {
 		rB.setAndRelease(n.clone(true).multiplyScalar(-ball.data.radius))
 		const hp = ball.state.pos.clone(true).add(rB)
-		const cF = Vertex3D.claim(this.mover.hitCircleBase.center.x, this.mover.hitCircleBase.center.y, ball.state.pos.z)
+		const cF = Vertex3D.claim(
+			this.mover.hitCircleBase.center.x,
+			this.mover.hitCircleBase.center.y,
+			ball.state.pos.z,
+		)
 		rF.setAndRelease(hp.clone(true).sub(cF))
 		const vB = ball.hit.surfaceVelocity(rB, true),
 			vF = this.mover.surfaceVelocity(rF, true)
@@ -492,7 +498,8 @@ export class FlipperHit extends HitObject {
 			dp = bFend
 		}
 		Vertex2D.release(vp)
-		if (!Number.isFinite(t) || t < 0 || t > dTime || (k > C_INTERATIONS && Math.abs(bFend) > ballR * 0.25)) return -1
+		if (!Number.isFinite(t) || t < 0 || t > dTime || (k > C_INTERATIONS && Math.abs(bFend) > ballR * 0.25))
+			return -1
 		const hitz = ball.state.pos.z + ball.hit.vel.z * t
 		if (hitz + ballR * 0.5 < this.hitBBox.zlow || hitz - ballR * 0.5 > this.hitBBox.zhigh) return -1
 		const inv = 1 / cbce

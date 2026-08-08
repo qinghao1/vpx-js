@@ -24,7 +24,11 @@ describe('The VPinball ramp generator', () => {
 	})
 
 	it('should generate a flat ramp mesh', async () => {
-		const vertices = three.concatMeshes(gltf, 'ramps', 'Flat', ['rampfloor-Flat', 'rampleft-Flat', 'rampright-Flat'])
+		const vertices = three.concatMeshes(gltf, 'ramps', 'Flat', [
+			'rampfloor-Flat',
+			'rampleft-Flat',
+			'rampright-Flat',
+		])
 		const expectedVertices = [
 			[217.559097, 1201.483398, -0.0],
 			[125.305038, 1240.588623, -0.0],
@@ -7315,7 +7319,12 @@ describe('The VPinball ramp generator', () => {
 	})
 
 	it('should generate a flipper on a flat ramp', async () => {
-		const flipperBaseMesh = three.find<Mesh>(gltfOnSurface, 'flippers', 'FlipperOnFlat', 'flipperbase-FlipperOnFlat')
+		const flipperBaseMesh = three.find<Mesh>(
+			gltfOnSurface,
+			'flippers',
+			'FlipperOnFlat',
+			'flipperbase-FlipperOnFlat',
+		)
 		const flipperBaseMeshVertices = three.vertices(flipperBaseMesh)
 		const expectedVertices = [
 			[293.108154, 1515.057495, -100.187653],

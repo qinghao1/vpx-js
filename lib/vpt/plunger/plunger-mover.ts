@@ -189,7 +189,9 @@ export class PlungerMover implements MoverObject {
 	}
 
 	getFrame(): number {
-		const f = Math.floor(((this.pos - this.frameStart) / (this.frameEnd - this.frameStart)) * (this.cFrames - 1) + 0.5)
+		const f = Math.floor(
+			((this.pos - this.frameStart) / (this.frameEnd - this.frameStart)) * (this.cFrames - 1) + 0.5,
+		)
 		return f < 0 ? 0 : f >= this.cFrames ? this.cFrames - 1 : f
 	}
 }

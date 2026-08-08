@@ -93,7 +93,7 @@ export class Transformer {
 		let currentScope = this.rootScope
 
 		traverse(this.ast, {
-			enter: (node) => {
+			enter: node => {
 				const n = node as any
 				const scope = this.scopeManager.acquire(node)
 
@@ -101,7 +101,7 @@ export class Transformer {
 				n.__nextScope = !!scope
 				currentScope = scope || currentScope
 			},
-			leave: (node) => {
+			leave: node => {
 				const n = node as any
 				if (n.__nextScope) {
 					currentScope = currentScope.upper

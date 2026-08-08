@@ -796,7 +796,12 @@ describe('The VPinball flipper generator', () => {
 		]
 		three.expectVerticesInArray(expectedVertices, flipperBaseMeshVertices)
 
-		const flipperRubberMesh = three.find<Mesh>(gltf, 'flippers', 'FatRubberFlipper', 'flipperrubber-FatRubberFlipper')
+		const flipperRubberMesh = three.find<Mesh>(
+			gltf,
+			'flippers',
+			'FatRubberFlipper',
+			'flipperrubber-FatRubberFlipper',
+		)
 		const flipperRubberMeshVertices = three.vertices(flipperRubberMesh)
 		expectedVertices = [
 			[581.1875, 1340.406494, -5.15012],

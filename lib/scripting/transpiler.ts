@@ -58,21 +58,28 @@ export class Transpiler {
 	}
 
 	private yield(): Promise<void> {
-		return new Promise((r) => setTimeout(r, 0))
+		return new Promise(r => setTimeout(r, 0))
 	}
 
 	private pipeline(globalFunction?: string, globalObject?: string): Array<(ast: Program) => Program> {
 		return [
-			(a) => new FunctionHoistTransformer(a).transform(),
-			(a) => new EventTransformer(a, this.table.getElements()).transform(),
-			(a) => new ErrorTransformer(a).transform(),
-			(a) =>
-				new ReferenceTransformer(a, this.table, this.itemApis, this.enumApis, this.globalApi, this.stdlib).transform(),
-			(a) => new ScopeTransformer(a).transform(),
-			(a) => new ClassTransformer(a).transformThisIdentifiers(),
-			(a) => new AmbiguityTransformer(a, this.itemApis, this.enumApis, this.globalApi, this.stdlib).transform(),
-			(a) => new ClassTransformer(a).transform(),
-			(a) => new WrapTransformer(a).transform(globalFunction, globalObject),
+			a => new FunctionHoistTransformer(a).transform(),
+			a => new EventTransformer(a, this.table.getElements()).transform(),
+			a => new ErrorTransformer(a).transform(),
+			a =>
+				new ReferenceTransformer(
+					a,
+					this.table,
+					this.itemApis,
+					this.enumApis,
+					this.globalApi,
+					this.stdlib,
+				).transform(),
+			a => new ScopeTransformer(a).transform(),
+			a => new ClassTransformer(a).transformThisIdentifiers(),
+			a => new AmbiguityTransformer(a, this.itemApis, this.enumApis, this.globalApi, this.stdlib).transform(),
+			a => new ClassTransformer(a).transform(),
+			a => new WrapTransformer(a).transform(globalFunction, globalObject),
 		]
 	}
 

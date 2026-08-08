@@ -51,7 +51,7 @@ function packEntries(entries: Entry[], maxSize: number): boolean {
 }
 
 function buildAtlas(entries: Entry[], maxSize: number) {
-	const neededH = Math.max(...entries.map((e) => e.y + e.h)) + 2
+	const neededH = Math.max(...entries.map(e => e.y + e.h)) + 2
 	const h = 2 ** Math.ceil(Math.log2(neededH))
 	const canvas = document.createElement('canvas')
 	canvas.width = maxSize

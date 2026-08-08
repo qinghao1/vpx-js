@@ -28,7 +28,7 @@ export class VpmController {
 
 	constructor(private readonly player: Player) {
 		this.Switch = this.boolProxy(
-			(i) => this.emulator.getSwitchInput(i),
+			i => this.emulator.getSwitchInput(i),
 			(n, v) => {
 				if (n < 89) return this.emulator.setSwitchInput(n, v)
 				const key = FLIPTRONICS[n]
@@ -42,15 +42,15 @@ export class VpmController {
 			(_, v) => (this.emulator.setDipSwitchByte(v), true),
 		)
 		this.Lamp = this.numProxy(
-			(i) => this.emulator.getLampState(i),
+			i => this.emulator.getLampState(i),
 			() => true,
 		)
 		this.Solenoid = this.numProxy(
-			(i) => this.emulator.getSolenoidState(i),
+			i => this.emulator.getSolenoidState(i),
 			() => true,
 		)
 		this.GIString = this.numProxy(
-			(i) => this.emulator.getGIState(i),
+			i => this.emulator.getGIState(i),
 			() => true,
 		)
 		const getGame = (name: string) => {
@@ -79,7 +79,7 @@ export class VpmController {
 	}
 	set GameName(v: string) {
 		this.gameName = v
-		this.loadPromise = this._loadGame(v).catch((e) => logger().error('DOWNLOAD_FAILED:', e))
+		this.loadPromise = this._loadGame(v).catch(e => logger().error('DOWNLOAD_FAILED:', e))
 	}
 	async whenReady(): Promise<void> {
 		if (this.loadPromise) await this.loadPromise

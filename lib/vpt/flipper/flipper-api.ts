@@ -51,7 +51,9 @@ export class FlipperApi extends ItemApi<FlipperData> {
 		if (!this.data.doOverridePhysics(this.table)) this.data.torqueDamping = v
 	}
 	get EOSTorqueAngle() {
-		return this.data.doOverridePhysics(this.table) ? this.data.overrideTorqueDampingAngle : this.data.torqueDampingAngle
+		return this.data.doOverridePhysics(this.table)
+			? this.data.overrideTorqueDampingAngle
+			: this.data.torqueDampingAngle
 	}
 	set EOSTorqueAngle(v) {
 		if (!this.data.doOverridePhysics(this.table)) this.data.torqueDampingAngle = v

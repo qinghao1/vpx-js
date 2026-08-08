@@ -10,7 +10,10 @@ const root = process.cwd()
 const wasmDir = path.join(root, 'wasm')
 const checks: Array<[string, () => boolean]> = [
 	['CMakeLists.txt exists', () => fs.existsSync(path.join(wasmDir, 'CMakeLists.txt'))],
-	['CMakeLists requires 3.28+', () => fs.readFileSync(path.join(wasmDir, 'CMakeLists.txt'), 'utf-8').includes('3.28')],
+	[
+		'CMakeLists requires 3.28+',
+		() => fs.readFileSync(path.join(wasmDir, 'CMakeLists.txt'), 'utf-8').includes('3.28'),
+	],
 	[
 		'CMakeLists has EMSCRIPTEN guard',
 		() => fs.readFileSync(path.join(wasmDir, 'CMakeLists.txt'), 'utf-8').includes('NOT EMSCRIPTEN'),

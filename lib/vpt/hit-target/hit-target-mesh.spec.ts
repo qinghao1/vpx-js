@@ -116,7 +116,12 @@ describe('The VPinball hit target generator', () => {
 	})
 
 	it('should generate a flat simple drop target mesh', async () => {
-		const targetMesh = three.find<Mesh>(gltf, 'hitTargets', 'DropTargetFlatSimple', 'hittarget-DropTargetFlatSimple')
+		const targetMesh = three.find<Mesh>(
+			gltf,
+			'hitTargets',
+			'DropTargetFlatSimple',
+			'hittarget-DropTargetFlatSimple',
+		)
 		const targetMeshVertices = three.vertices(targetMesh)
 		const expectedVertices = [
 			[236.600006, 1074.111694, -55.677631],
@@ -1837,7 +1842,7 @@ describe('The VPinball hit target generator', () => {
 			[442.866699, 803.400024, 5.273632],
 			[442.866699, 814.599976, -4.326368],
 		]
-		expectedVertices.forEach((v) => (v[2] += 52.0)) // drop status is not exported when dumping obj in vpx
+		expectedVertices.forEach(v => (v[2] += 52.0)) // drop status is not exported when dumping obj in vpx
 		three.expectVerticesInArray(expectedVertices, targetMeshVertices)
 	})
 })

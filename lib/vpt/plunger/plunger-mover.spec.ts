@@ -101,8 +101,8 @@ describe('The VPinball plunger physics', () => {
 
 		// retrieve plunger
 		const plungerObj = three.find<Mesh>(gltf, 'plungers', 'CustomPlunger')
-		const rodObj = plungerObj.children.find((c) => c.name === 'rod') as Mesh
-		const springObj = plungerObj.children.find((c) => c.name === 'spring') as Mesh
+		const rodObj = plungerObj.children.find(c => c.name === 'rod') as Mesh
+		const springObj = plungerObj.children.find(c => c.name === 'spring') as Mesh
 
 		// apply player state to plunger
 		plunger.getUpdater().applyState(plungerObj, plunger.getState(), renderApi, table)

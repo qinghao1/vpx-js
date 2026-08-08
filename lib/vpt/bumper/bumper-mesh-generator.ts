@@ -38,12 +38,12 @@ export class BumperMeshGenerator {
 		return {
 			base: this.transform(`bumper-base-${this.data.getName()}`, this.scaledBaseMesh, m, z),
 			ring: this.transform(`bumper-ring-${this.data.getName()}`, this.scaledRingMesh, m, z),
-			skirt: this.transform(`bumper-socket-${this.data.getName()}`, this.scaledSocketMesh, m, (v) => z(v) + 5),
+			skirt: this.transform(`bumper-socket-${this.data.getName()}`, this.scaledSocketMesh, m, v => z(v) + 5),
 			cap: this.transform(
 				`bumper-cap-${this.data.getName()}`,
 				this.scaledCapMesh,
 				m,
-				(v) => f4(f4(v + this.data.heightScale) * table.getScaleZ()) + height,
+				v => f4(f4(v + this.data.heightScale) * table.getScaleZ()) + height,
 			),
 		}
 	}

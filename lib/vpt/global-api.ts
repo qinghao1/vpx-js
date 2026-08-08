@@ -148,7 +148,7 @@ export class GlobalApi extends VbsApi {
 	public QuitPlayer(_closeType: number) {}
 
 	public GetBalls(): BallApi[] {
-		return this.player.getBalls().map((b) => b.getApi())
+		return this.player.getBalls().map(b => b.getApi())
 	}
 
 	public GetElements(): Array<Item<ItemData>> {

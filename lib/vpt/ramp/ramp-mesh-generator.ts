@@ -315,7 +315,9 @@ export class RampMeshGenerator {
 			currentLength = f4(currentLength + f4(Math.sqrt(f4(dx * dx) + f4(dy * dy))))
 
 			const percentage = f4(currentLength / totalLength)
-			let currentWidth = f4(f4(percentage * f4(this.state.widthTop - this.state.widthBottom)) + this.state.widthBottom)
+			let currentWidth = f4(
+				f4(percentage * f4(this.state.widthTop - this.state.widthBottom)) + this.state.widthBottom,
+			)
 			const height = f4(f4(vmiddle.z + f4(percentage * f4(topHeight - bottomHeight))) + bottomHeight)
 			ppheight[i] = height
 			this.assignHeightToControlPoint(vvertex[i], height)

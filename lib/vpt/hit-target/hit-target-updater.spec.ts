@@ -42,7 +42,9 @@ describe('The VPinball hit target updater', () => {
 	it('should apply the material', async () => {
 		const renderApi = new TestRenderApi()
 		spy(renderApi, 'applyMaterial')
-		table.hitTargets.target.getUpdater().applyState(null, { material: 'opaque' } as HitTargetState, renderApi, table)
+		table.hitTargets.target
+			.getUpdater()
+			.applyState(null, { material: 'opaque' } as HitTargetState, renderApi, table)
 		expect(renderApi.applyMaterial).to.have.been.calledOnce
 	})
 

@@ -98,7 +98,8 @@ export class FlipperMover implements MoverObject {
 
 		let ramp = this.getRampUpSpeed()
 		ramp = ramp <= 0 ? 1e6 : Math.min(this.getStrength() / ramp, 1e6)
-		if (desiredTorque >= this.curTorque) this.curTorque = Math.min(this.curTorque + ramp * PHYS_FACTOR, desiredTorque)
+		if (desiredTorque >= this.curTorque)
+			this.curTorque = Math.min(this.curTorque + ramp * PHYS_FACTOR, desiredTorque)
 		else this.curTorque = Math.max(this.curTorque - ramp * PHYS_FACTOR, desiredTorque)
 
 		let torque = this.curTorque
@@ -148,7 +149,9 @@ export class FlipperMover implements MoverObject {
 		return this.doOverridePhysics() ? this.data.overrideCoilRampUp! : this.data.rampUp!
 	}
 	private doOverridePhysics(): boolean {
-		return !!this.data.overridePhysics || (!!this.tableData.overridePhysicsFlipper && !!this.tableData.overridePhysics)
+		return (
+			!!this.data.overridePhysics || (!!this.tableData.overridePhysicsFlipper && !!this.tableData.overridePhysics)
+		)
 	}
 
 	public surfaceVelocity(surfP: Vertex3D, recycle = false): Vertex3D {

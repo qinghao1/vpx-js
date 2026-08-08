@@ -56,20 +56,20 @@ export class ThreeHelper {
 		if (!table.children?.length) {
 			throw new Error('GLTF table has no children!')
 		}
-		const objects = table.children.find((c) => c.name === groupName || c.name.startsWith(`${groupName}_`))
+		const objects = table.children.find(c => c.name === groupName || c.name.startsWith(`${groupName}_`))
 		if (!objects) {
 			throw new Error(
 				'GLTF table has no "' +
 					groupName +
 					'" group! (available: [' +
-					table.children.map((c) => c.name).join(', ') +
+					table.children.map(c => c.name).join(', ') +
 					'])',
 			)
 		}
 		if (!objects.children?.length) {
 			throw new Error(`The "${groupName}" group of the GLTF table has no children.`)
 		}
-		const item = objects.children.find((c) => c.name === itemName || c.name.startsWith(`${itemName}_`))
+		const item = objects.children.find(c => c.name === itemName || c.name.startsWith(`${itemName}_`))
 		if (!item) {
 			throw new Error(
 				'The "' +
@@ -77,7 +77,7 @@ export class ThreeHelper {
 					'" group of the GLTF table has no child named "' +
 					itemName +
 					'". (available: [' +
-					objects.children.map((c) => c.name).join(', ') +
+					objects.children.map(c => c.name).join(', ') +
 					'])',
 			)
 		}
@@ -86,7 +86,7 @@ export class ThreeHelper {
 			return item as T
 		}
 		const object = item.children.find(
-			(c) => c.name === objectName || (c.name && objectName && c.name.startsWith(`${objectName}_`)),
+			c => c.name === objectName || (c.name && objectName && c.name.startsWith(`${objectName}_`)),
 		)
 		if (!object) {
 			throw new Error(
@@ -97,7 +97,7 @@ export class ThreeHelper {
 					'" of the GLTF table has no child named "' +
 					objectName +
 					'". (available: [' +
-					item.children.map((c) => c.name).join(', ') +
+					item.children.map(c => c.name).join(', ') +
 					'])',
 			)
 		}
@@ -112,7 +112,7 @@ export class ThreeHelper {
 		if (!gltf?.scene?.children?.length) {
 			throw new Error('Cannot find scene in GLTF.')
 		}
-		const table = gltf.scene.children.find((c) => c.name === 'playfield' || c.name.startsWith('playfield'))
+		const table = gltf.scene.children.find(c => c.name === 'playfield' || c.name.startsWith('playfield'))
 		if (!table) {
 			throw new Error('Cannot find table in GLTF.')
 		}
@@ -124,20 +124,20 @@ export class ThreeHelper {
 		if (!table.children?.length) {
 			throw new Error('GLTF table has no children!')
 		}
-		const objects = table.children.find((c) => c.name === groupName || c.name.startsWith(`${groupName}_`))
+		const objects = table.children.find(c => c.name === groupName || c.name.startsWith(`${groupName}_`))
 		if (!objects) {
 			throw new Error(
 				'GLTF table has no "' +
 					groupName +
 					'" group! (available: [' +
-					table.children.map((c) => c.name).join(', ') +
+					table.children.map(c => c.name).join(', ') +
 					'])',
 			)
 		}
 		if (!objects.children) {
 			throw new Error(`The "${groupName}" group of the GLTF table has no children.`)
 		}
-		const item = objects.children.find((c) => c.name === itemName || c.name.startsWith(`${itemName}_`))
+		const item = objects.children.find(c => c.name === itemName || c.name.startsWith(`${itemName}_`))
 
 		if (objectName) {
 			if (!item) {
@@ -147,12 +147,12 @@ export class ThreeHelper {
 						'" group of the GLTF table has no child named "' +
 						objectName +
 						'". (available: [' +
-						objects.children.map((c) => c.name).join(', ') +
+						objects.children.map(c => c.name).join(', ') +
 						'])',
 				)
 			}
 			const object = item.children.find(
-				(c) => c.name === objectName || (c.name && objectName && c.name.startsWith(`${objectName}_`)),
+				c => c.name === objectName || (c.name && objectName && c.name.startsWith(`${objectName}_`)),
 			)
 			if (object) {
 				throw new Error(
@@ -183,20 +183,20 @@ export class ThreeHelper {
 		if (!table.children?.length) {
 			throw new Error('GLTF table has no children!')
 		}
-		const objects = table.children.find((c) => c.name === groupName || c.name.startsWith(`${groupName}_`))
+		const objects = table.children.find(c => c.name === groupName || c.name.startsWith(`${groupName}_`))
 		if (!objects) {
 			throw new Error(
 				'GLTF table has no "' +
 					groupName +
 					'" group! (available: [' +
-					table.children.map((c) => c.name).join(', ') +
+					table.children.map(c => c.name).join(', ') +
 					'])',
 			)
 		}
 		if (!objects.children?.length) {
 			throw new Error(`The "${groupName}" group of the GLTF table has no children.`)
 		}
-		const item = objects.children.find((c) => c.name === itemName || c.name.startsWith(`${itemName}_`))
+		const item = objects.children.find(c => c.name === itemName || c.name.startsWith(`${itemName}_`))
 		if (!item) {
 			throw new Error(
 				'The "' +
@@ -204,13 +204,13 @@ export class ThreeHelper {
 					'" group of the GLTF table has no child named "' +
 					objectName +
 					'". (available: [' +
-					objects.children.map((c) => c.name).join(', ') +
+					objects.children.map(c => c.name).join(', ') +
 					'])',
 			)
 		}
 		if (objectName) {
 			const object = item.children.find(
-				(c) => c.name === objectName || (c.name && objectName && c.name.startsWith(`${objectName}_`)),
+				c => c.name === objectName || (c.name && objectName && c.name.startsWith(`${objectName}_`)),
 			)
 			if (!object) {
 				throw new Error(
@@ -221,7 +221,7 @@ export class ThreeHelper {
 						'" group of the GLTF table has no child named "' +
 						objectName +
 						'". (available: [' +
-						item.children.map((c) => c.name).join(', ') +
+						item.children.map(c => c.name).join(', ') +
 						'])',
 				)
 			}
@@ -268,7 +268,7 @@ export class ThreeHelper {
 
 	public getBoundingBox(object3D: Object3D): Box3 {
 		let box: Box3 | null = null
-		object3D.traverse((obj3D) => {
+		object3D.traverse(obj3D => {
 			const geometry = (obj3D as Mesh).geometry
 			if (geometry === undefined) {
 				return

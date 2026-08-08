@@ -53,8 +53,8 @@ export class Texture extends BiffParser {
 				nestedTags: {
 					JPEG: {
 						onStart: () => new Binary(),
-						onTag: (binary) => binary.fromTag.bind(binary),
-						onEnd: (binary) => (texture.binary = binary),
+						onTag: binary => binary.fromTag.bind(binary),
+						onEnd: binary => (texture.binary = binary),
 					},
 				},
 			},
@@ -62,7 +62,9 @@ export class Texture extends BiffParser {
 	}
 
 	public getName(): string {
-		return this.localFileName ? basename(this.localFileName) : (this.szInternalName || this.szName || '').toLowerCase()
+		return this.localFileName
+			? basename(this.localFileName)
+			: (this.szInternalName || this.szName || '').toLowerCase()
 	}
 
 	/** Loads texture via renderer loader. */
@@ -78,7 +80,7 @@ export class Texture extends BiffParser {
 		} else if (this.localFileName) {
 			texture = await loader.loadDefaultTexture(this.getName(), ext, this.localFileName)
 		} else {
-			const data = await table.streamStorage<Uint8Array>('GameStg', (storage) =>
+			const data = await table.streamStorage<Uint8Array>('GameStg', storage =>
 				this.streamImage(storage, this.storageName, this.binary),
 			)
 			if (!data?.length) {
@@ -140,7 +142,13 @@ export class Texture extends BiffParser {
 				break
 			case 'BITS': {
 				let compressedLen: number
-				;[this.pdsBuffer, compressedLen] = await BaseTexture.get(storage, itemName, offset, this.width, this.height)
+				;[this.pdsBuffer, compressedLen] = await BaseTexture.get(
+					storage,
+					itemName,
+					offset,
+					this.width,
+					this.height,
+				)
 				return compressedLen + 4
 			}
 

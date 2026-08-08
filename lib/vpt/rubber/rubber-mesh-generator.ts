@@ -77,7 +77,9 @@ export class RubberMeshGenerator {
 			for (let j = 0; j < numSegments; j++) {
 				const u = i * invR
 				const v = f4(j + u) * invS
-				const tmp = Vertex3D.getRotatedAxis(j * (360 * invS), tangent, normal).multiplyScalar(this.data.thickness * 0.5)
+				const tmp = Vertex3D.getRotatedAxis(j * (360 * invS), tangent, normal).multiplyScalar(
+					this.data.thickness * 0.5,
+				)
 				const vtx = new Vertex3DNoTex2()
 				vtx.x = f4(sv.pMiddlePoints[i].x + tmp.x)
 				vtx.y = f4(sv.pMiddlePoints[i].y + tmp.y)

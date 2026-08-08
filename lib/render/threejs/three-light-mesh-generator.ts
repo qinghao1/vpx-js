@@ -47,7 +47,7 @@ export class ThreeLightMeshGenerator {
 	public getShape(lightData: LightData, table: Table): Shape {
 		const verts = SplineVertex.getCentralCurve(lightData.dragPoints, table.getDetailLevel(), -1)
 		return this.getPathFromPoints(
-			verts.map((v) => new Vector2(v.x, v.y)),
+			verts.map(v => new Vector2(v.x, v.y)),
 			new Shape(),
 		)
 	}

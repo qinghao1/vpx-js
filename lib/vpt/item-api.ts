@@ -110,7 +110,8 @@ export abstract class ItemApi<DATA extends ItemData> extends EventEmitter {
 
 	public _getTimers(): TimerHit[] {
 		this._beginPlay()
-		const interval = this.data.timer.interval >= 0 ? Math.max(this.data.timer.interval, MAX_TIMER_MSEC_INTERVAL) : -1
+		const interval =
+			this.data.timer.interval >= 0 ? Math.max(this.data.timer.interval, MAX_TIMER_MSEC_INTERVAL) : -1
 		this.hitTimer = new TimerHit(this.events, interval, interval)
 		return this.data.timer.enabled ? [this.hitTimer] : []
 	}

@@ -165,7 +165,9 @@ export class Grammar {
 			throw new Error('Unable to format script.')
 		} else if (ast.rest?.length) {
 			const start = script.length - ast.rest.length
-			throw new Error(`Unable to format script. Syntax error at: ${script.substr(start, script.indexOf('\n', start))}`)
+			throw new Error(
+				`Unable to format script. Syntax error at: ${script.substr(start, script.indexOf('\n', start))}`,
+			)
 		}
 		logger().info('[Grammar.format] Parsed in %sms', Date.now() - now)
 

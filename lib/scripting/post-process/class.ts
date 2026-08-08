@@ -68,7 +68,11 @@ function ppClassDeclaration(node: ESIToken): unknown {
 						const functionDecl = memberDecl.estree as FunctionDeclaration
 						const functionId = functionDecl.id as Identifier
 						methodDefinitions.push(
-							methodDefinition(functionId, 'method', functionExpression(functionDecl.body, functionDecl.params)),
+							methodDefinition(
+								functionId,
+								'method',
+								functionExpression(functionDecl.body, functionDecl.params),
+							),
 						)
 
 						break
@@ -98,10 +102,14 @@ function ppClassDeclaration(node: ESIToken): unknown {
 		}
 	}
 	if (!constructor) {
-		constructor = methodDefinition(identifier('constructor'), 'constructor', functionExpression(blockStatement([]), []))
+		constructor = methodDefinition(
+			identifier('constructor'),
+			'constructor',
+			functionExpression(blockStatement([]), []),
+		)
 	}
 	let body: ClassBody = classBody([constructor, ...methodDefinitions])
-	const idSet = new Set(ids.map((s) => s.toLowerCase()))
+	const idSet = new Set(ids.map(s => s.toLowerCase()))
 	body = replace(body, {
 		leave: (bodyNode, parentNode) => {
 			if (bodyNode.type === 'Identifier') {
@@ -164,7 +172,7 @@ function ppPropertyGetDeclaration(node: ESIToken): unknown {
 	}
 	if (block) {
 		block = replace(block, {
-			enter: (blockNode) => {
+			enter: blockNode => {
 				if (blockNode.type === 'ReturnStatement') {
 					blockNode.argument = id
 					return blockNode

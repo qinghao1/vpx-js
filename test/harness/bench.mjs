@@ -3,9 +3,9 @@ import { ensureVite, launchBrowser, loadPuppeteer, newPage } from './utils.mjs'
 
 const DEFAULT_URL = 'http://localhost:3000/?vpx=/test/fixtures/table-empty.vpx'
 
-const url = process.argv.find((a) => a.startsWith('--url='))?.slice('--url='.length) || DEFAULT_URL
-const balls = Number(process.argv.find((a) => a.startsWith('--balls='))?.slice('--balls='.length) ?? 10)
-const duration = Number(process.argv.find((a) => a.startsWith('--duration='))?.slice('--duration='.length) ?? 5000)
+const url = process.argv.find(a => a.startsWith('--url='))?.slice('--url='.length) || DEFAULT_URL
+const balls = Number(process.argv.find(a => a.startsWith('--balls='))?.slice('--balls='.length) ?? 10)
+const duration = Number(process.argv.find(a => a.startsWith('--duration='))?.slice('--duration='.length) ?? 5000)
 
 const puppeteer = await loadPuppeteer()
 const vite = await ensureVite(url, { cwd: path.resolve(import.meta.dirname, '../../demo-browser'), label: 'bench' })
@@ -14,7 +14,7 @@ const page = await newPage(browser)
 
 await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 })
 for (let i = 0; i < 30; i++) {
-	await new Promise((r) => setTimeout(r, 500))
+	await new Promise(r => setTimeout(r, 500))
 	const ready = await page
 		.evaluate(() => document.getElementById('log')?.innerText.includes('Ready'))
 		.catch(() => false)
@@ -32,10 +32,10 @@ await page.evaluate(() => {
 	} catch {}
 })
 
-await new Promise((r) => setTimeout(r, 1500))
+await new Promise(r => setTimeout(r, 1500))
 
 if (balls > 0) {
-	await page.evaluate(async (n) => {
+	await page.evaluate(async n => {
 		const p = window.viewer?.player
 		const w = p.table?.gameData?.width ?? 1000
 		const h = p.table?.gameData?.height ?? 2000
@@ -83,7 +83,8 @@ if (balls > 0) {
 				{
 					getBallCreationPosition: () =>
 						new T.Vector3(w / 2 + (Math.random() - 0.5) * 60, h / 2 + (Math.random() - 0.5) * 60, 30),
-					getBallCreationVelocity: () => new T.Vector3((Math.random() - 0.5) * 600, (Math.random() - 0.5) * 600, 50),
+					getBallCreationVelocity: () =>
+						new T.Vector3((Math.random() - 0.5) * 600, (Math.random() - 0.5) * 600, 50),
 					onBallCreated: () => {},
 				},
 				25,
@@ -93,11 +94,11 @@ if (balls > 0) {
 	}, balls)
 }
 
-const result = await page.evaluate(async (d) => {
+const result = await page.evaluate(async d => {
 	const viewer = window.viewer
 	const start = performance.now()
 	let frames = 0
-	await new Promise((r) => {
+	await new Promise(r => {
 		const id = setInterval(() => {
 			if (performance.now() - start >= d) {
 				clearInterval(id)
@@ -120,7 +121,7 @@ const result = await page.evaluate(async (d) => {
 		balls: viewer.player?.balls?.length ?? 0,
 		tris: (() => {
 			let c = 0
-			viewer.tableGroup.traverse((o) => {
+			viewer.tableGroup.traverse(o => {
 				if (o.isMesh && o.geometry?.attributes?.position) c += o.geometry.attributes.position.count / 3
 			})
 			return Math.round(c)

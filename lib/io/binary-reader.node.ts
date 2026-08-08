@@ -25,7 +25,7 @@ export class NodeBinaryReader implements IBinaryReader {
 
 	public async close(): Promise<void> {
 		if (this.fd)
-			await new Promise<void>((resolve, reject) => closeCb(this.fd, (err) => (err ? reject(err) : resolve())))
+			await new Promise<void>((resolve, reject) => closeCb(this.fd, err => (err ? reject(err) : resolve())))
 		this.fd = 0
 	}
 

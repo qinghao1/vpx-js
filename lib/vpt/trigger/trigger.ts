@@ -75,7 +75,10 @@ export class Trigger
 	public setupPlayer(player: Player, table: Table): void {
 		this.events = new EventProxy(this)
 		this.animation = new TriggerAnimation(this.data, this.state)
-		if (this.data.shape === Enums.TriggerShape.TriggerStar || this.data.shape === Enums.TriggerShape.TriggerButton) {
+		if (
+			this.data.shape === Enums.TriggerShape.TriggerStar ||
+			this.data.shape === Enums.TriggerShape.TriggerButton
+		) {
 			this.hits = [new TriggerHitCircle(this.data, this.animation, this.events, table)]
 		} else {
 			this.hits = this.hitGenerator.generateHitObjects(this.animation, this.events, table)

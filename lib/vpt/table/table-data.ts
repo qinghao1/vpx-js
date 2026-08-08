@@ -309,7 +309,14 @@ export class TableData extends ItemData {
 			this.bgImage[bgImg] = this.getString(buffer, len)
 			return 0
 		}
-		if (handleBiffTag(this, tag, buffer, len, { float: FLOAT_MAP, int: INT_MAP, bool: BOOL_MAP, string: STRING_MAP }))
+		if (
+			handleBiffTag(this, tag, buffer, len, {
+				float: FLOAT_MAP,
+				int: INT_MAP,
+				bool: BOOL_MAP,
+				string: STRING_MAP,
+			})
+		)
 			return 0
 		switch (tag) {
 			case 'PHML': {
@@ -376,7 +383,9 @@ export class TableData extends ItemData {
 
 	private getMaterials(buffer: Uint8Array, len: number, num: number): Material[] {
 		if (len < num * SaveMaterial.size)
-			throw new Error(`Cannot parse ${num} materials of ${num * SaveMaterial.size} bytes from a ${len} bytes buffer.`)
+			throw new Error(
+				`Cannot parse ${num} materials of ${num * SaveMaterial.size} bytes from a ${len} bytes buffer.`,
+			)
 		return Array.from({ length: num }, (_, i) => Material.fromSaved(new SaveMaterial(buffer, i)))
 	}
 
@@ -387,9 +396,9 @@ export class TableData extends ItemData {
 			)
 		for (let i = 0; i < num; i++) {
 			const pm = new SavePhysicsMaterial(buffer, i)
-			const mat = this.materials.find((m) => m.name === pm.name)
+			const mat = this.materials.find(m => m.name === pm.name)
 			if (!mat)
-				throw new Error(`Cannot find material "${pm.name}" in [${this.materials.map((m) => m.name).join(', ')}]`)
+				throw new Error(`Cannot find material "${pm.name}" in [${this.materials.map(m => m.name).join(', ')}]`)
 			mat.physUpdate(pm)
 		}
 	}

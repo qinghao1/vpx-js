@@ -129,7 +129,10 @@ export class BmpDecoder implements IImage {
 
 		// End of BITMAP_V2_INFO_HEADER
 
-		if (this.headerSize > HeaderTypes.BITMAP_V2_INFO_HEADER || this.compression === Compression.BI_ALPHA_BIT_FIELDS) {
+		if (
+			this.headerSize > HeaderTypes.BITMAP_V2_INFO_HEADER ||
+			this.compression === Compression.BI_ALPHA_BIT_FIELDS
+		) {
 			this.maskAlpha = this.readUInt32LE()
 		}
 

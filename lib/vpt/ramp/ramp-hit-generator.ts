@@ -39,13 +39,24 @@ export class RampHitGenerator {
 			for (let i = 0; i < cVertex - 1; i++) {
 				pv2 = rgvLocal[i]!
 				pv3 = rgvLocal[i + 1]!
-				hitObjects.push(...this.generateWallLineSeg(pv2, pv3, i > 0, rgHeight1[i]!, rgHeight1[i + 1]!, wallHeightRight))
 				hitObjects.push(
-					...this.generateWallLineSeg(pv3, pv2, i < cVertex - 2, rgHeight1[i]!, rgHeight1[i + 1]!, wallHeightRight),
+					...this.generateWallLineSeg(pv2, pv3, i > 0, rgHeight1[i]!, rgHeight1[i + 1]!, wallHeightRight),
+				)
+				hitObjects.push(
+					...this.generateWallLineSeg(
+						pv3,
+						pv2,
+						i < cVertex - 2,
+						rgHeight1[i]!,
+						rgHeight1[i + 1]!,
+						wallHeightRight,
+					),
 				)
 				if (i === 0) hitObjects.push(this.generateJoint2D(pv2, rgHeight1[0]!, rgHeight1[0]! + wallHeightRight))
 				if (i === cVertex - 2)
-					hitObjects.push(this.generateJoint2D(pv3, rgHeight1[cVertex - 1]!, rgHeight1[cVertex - 1]! + wallHeightRight))
+					hitObjects.push(
+						this.generateJoint2D(pv3, rgHeight1[cVertex - 1]!, rgHeight1[cVertex - 1]! + wallHeightRight),
+					)
 			}
 		}
 		if (wallHeightLeft > 0) {
@@ -73,8 +84,11 @@ export class RampHitGenerator {
 					),
 				)
 				if (i === 0)
-					hitObjects.push(this.generateJoint2D(pv2, rgHeight1[cVertex - 1]!, rgHeight1[cVertex - 1]! + wallHeightLeft))
-				if (i === cVertex - 2) hitObjects.push(this.generateJoint2D(pv3, rgHeight1[0]!, rgHeight1[0]! + wallHeightLeft))
+					hitObjects.push(
+						this.generateJoint2D(pv2, rgHeight1[cVertex - 1]!, rgHeight1[cVertex - 1]! + wallHeightLeft),
+					)
+				if (i === cVertex - 2)
+					hitObjects.push(this.generateJoint2D(pv3, rgHeight1[0]!, rgHeight1[0]! + wallHeightLeft))
 			}
 		}
 		let ph3dpolyOld!: HitTriangle
@@ -134,7 +148,7 @@ export class RampHitGenerator {
 			ph3dpoly = new HitTriangle(rgv3D)
 			if (!ph3dpoly.isDegenerate()) hitObjects.push(ph3dpoly)
 		}
-		return hitObjects.map((obj) => this.setupHitObject(obj, events, table))
+		return hitObjects.map(obj => this.setupHitObject(obj, events, table))
 	}
 
 	private getWallHeights(): { wallHeightRight: number; wallHeightLeft: number } {

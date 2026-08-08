@@ -153,10 +153,10 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 		const mats = this.data.materials
 		const lc = name.toLowerCase()
 		return (
-			mats.find((m) => m.name === name) ??
-			mats.find((m) => m.name.toLowerCase() === lc) ??
-			mats.find((m) => m.name.toLowerCase() === `_${lc}`) ??
-			(name.startsWith('_') ? mats.find((m) => m.name.toLowerCase() === lc.slice(1)) : undefined)
+			mats.find(m => m.name === name) ??
+			mats.find(m => m.name.toLowerCase() === lc) ??
+			mats.find(m => m.name.toLowerCase() === `_${lc}`) ??
+			(name.startsWith('_') ? mats.find(m => m.name.toLowerCase() === lc.slice(1)) : undefined)
 		)
 	}
 	public getApi(): TableApi {

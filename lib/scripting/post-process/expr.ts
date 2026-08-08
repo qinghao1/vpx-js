@@ -178,10 +178,10 @@ function ppRelationalExpression(node: ESIToken): Expression {
 				switch (RELATIONAL_OPERATORS[key]) {
 					case '==':
 					case '!=':
-						expr = callExpression(memberExpression(identifier(Transformer.VBSHELPER_NAME), identifier('equals')), [
-							expr,
-							child.estree,
-						])
+						expr = callExpression(
+							memberExpression(identifier(Transformer.VBSHELPER_NAME), identifier('equals')),
+							[expr, child.estree],
+						)
 						if (RELATIONAL_OPERATORS[key] === '!=') {
 							expr = unaryExpression('!', expr)
 						}
@@ -274,11 +274,14 @@ function ppSubExpression(node: ESIToken): unknown {
 	if (expr != null) {
 		let found = false
 		estree = replace(expr as Expression, {
-			enter: (astNode) => {
+			enter: astNode => {
 				if (!found) {
 					if (astNode.type === 'Identifier') {
 						found = true
-						return memberExpression(estree as Expression, identifier((astNode as Identifier).name.substring(1)))
+						return memberExpression(
+							estree as Expression,
+							identifier((astNode as Identifier).name.substring(1)),
+						)
 					}
 				}
 			},
@@ -338,7 +341,7 @@ function ppNewExpression(node: ESIToken): Expression {
 function ppPrepend(source: Expression, node: Expression): Expression {
 	let found = false
 	return replace(source, {
-		leave: (astNode) => {
+		leave: astNode => {
 			if (!found) {
 				found = true
 				return memberExpression(node, astNode as Identifier)
@@ -365,7 +368,7 @@ function ppAppend(source: Expression | undefined, node: Expression): Expression 
 function ppReplaceDots(source: Expression): Expression {
 	let first = true
 	return replace(source, {
-		enter: (node) => {
+		enter: node => {
 			if (node.type === 'Identifier') {
 				if (!first) {
 					if ((node as Identifier).name.startsWith('.')) {

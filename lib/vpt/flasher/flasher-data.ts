@@ -62,8 +62,8 @@ export class FlasherData extends ItemData {
 			nestedTags: {
 				DPNT: {
 					onStart: () => new DragPoint(),
-					onTag: (dp) => dp.fromTag.bind(dp),
-					onEnd: (dp) => d.dragPoints.push(dp),
+					onTag: dp => dp.fromTag.bind(dp),
+					onEnd: dp => d.dragPoints.push(dp),
 				},
 			},
 		})

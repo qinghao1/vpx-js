@@ -158,7 +158,7 @@ export class FileSystemObject {
 		const last = path
 			.replace(/\\+/g, '/')
 			.split('/')
-			.filter((p) => !!p)
+			.filter(p => !!p)
 			.reverse()[0]
 		if (last.indexOf('.') >= 0) {
 			return last.substr(0, last.lastIndexOf('.'))
@@ -195,7 +195,7 @@ export class FileSystemObject {
 		const last = path
 			.replace(/\\+/g, '/')
 			.split('/')
-			.filter((p) => !!p)
+			.filter(p => !!p)
 			.reverse()[0]
 		if (last.indexOf('.') >= 0) {
 			return last.substr(last.lastIndexOf('.') + 1)
@@ -224,7 +224,7 @@ export class FileSystemObject {
 		const last = pathspec
 			.replace(/\\+/g, '/')
 			.split('/')
-			.filter((p) => !!p)
+			.filter(p => !!p)
 			.reverse()[0]
 		return last
 	}

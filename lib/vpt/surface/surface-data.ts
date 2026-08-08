@@ -88,8 +88,8 @@ export class SurfaceData extends ItemData implements IPhysicalData {
 			nestedTags: {
 				DPNT: {
 					onStart: () => new DragPoint(),
-					onTag: (dp) => dp.fromTag.bind(dp),
-					onEnd: (dp) => d.dragPoints.push(dp),
+					onTag: dp => dp.fromTag.bind(dp),
+					onEnd: dp => d.dragPoints.push(dp),
 				},
 			},
 		})

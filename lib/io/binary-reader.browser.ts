@@ -15,7 +15,9 @@ export class BrowserBinaryReader implements IBinaryReader {
 		const slice = this.data.subarray(position, position + length)
 		target.set(slice, offset)
 		const copy =
-			typeof structuredClone !== 'undefined' ? structuredClone(slice as unknown as Uint8Array) : new Uint8Array(slice)
+			typeof structuredClone !== 'undefined'
+				? structuredClone(slice as unknown as Uint8Array)
+				: new Uint8Array(slice)
 		return Promise.resolve([length, copy as Uint8Array])
 	}
 

@@ -24,7 +24,9 @@ const MAX_CONCURRENCY_TEXTURES = 6
 const MAX_CONCURRENCY_COLLECTIONS = 4
 
 function hardwareConcurrency(): number {
-	return (globalThis as unknown as { navigator?: { hardwareConcurrency?: number } }).navigator?.hardwareConcurrency ?? 4
+	return (
+		(globalThis as unknown as { navigator?: { hardwareConcurrency?: number } }).navigator?.hardwareConcurrency ?? 4
+	)
 }
 
 /** Loads VPX OLE storage into table model. */
@@ -68,7 +70,7 @@ export class TableLoader {
 	public async streamStorage<T>(name: string, streamer: (stg: Storage) => Promise<T>): Promise<T> {
 		let release!: () => void
 		const prev = this._lock
-		this._lock = new Promise<void>((r) => (release = r))
+		this._lock = new Promise<void>(r => (release = r))
 		await prev
 		try {
 			await this.doc.reopen()
@@ -175,7 +177,7 @@ export class TableLoader {
 	private async yield(): Promise<void> {
 		const g = globalThis as unknown as { scheduler?: { yield?: () => Promise<void> } }
 		if (g.scheduler?.yield) await g.scheduler.yield()
-		else await new Promise<void>((r) => setTimeout(r, 0))
+		else await new Promise<void>(r => setTimeout(r, 0))
 	}
 }
 

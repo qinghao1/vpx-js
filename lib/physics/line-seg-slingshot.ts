@@ -35,7 +35,10 @@ export class LineSegSlingshot extends LineSeg {
 
 		if (!this.surfaceData.isDisabled && dot <= -this.surfaceData.slingshotThreshold) {
 			const len = (this.v2.x - this.v1.x) * n.y - (this.v2.y - this.v1.y) * n.x
-			const hp = Vertex2D.claim(ball.state.pos.x - n.x * ball.data.radius, ball.state.pos.y - n.y * ball.data.radius)
+			const hp = Vertex2D.claim(
+				ball.state.pos.x - n.x * ball.data.radius,
+				ball.state.pos.y - n.y * ball.data.radius,
+			)
 			const btd = (hp.x - this.v1.x) * n.y - (hp.y - this.v1.y) * n.x
 			Vertex2D.release(hp)
 			let force = Math.abs(len) > 1e-6 ? (btd + btd) / len - 1 : -1

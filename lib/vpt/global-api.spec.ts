@@ -96,7 +96,7 @@ describe('The VPinball global API', () => {
 	it('should correctly return the playfield elements', () => {
 		const api = new GlobalApi(table, player)
 		const elements = api.GetElements()
-		expect(elements.find((e) => e.getName() === 'Williams')).to.be.ok
+		expect(elements.find(e => e.getName() === 'Williams')).to.be.ok
 		expect(elements).to.have.lengthOf(13)
 	})
 

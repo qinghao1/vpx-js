@@ -33,7 +33,8 @@ export class CollectionApi extends ItemApi<CollectionData> implements IterableIt
 			set: (api, prop, value) => {
 				const intProp = parseInt(prop as string, 10)
 				/* istanbul ignore next */
-				if (!Number.isNaN(intProp)) throw new Error('Setting a new child of a collection by property is not supported.')
+				if (!Number.isNaN(intProp))
+					throw new Error('Setting a new child of a collection by property is not supported.')
 				Reflect.set(api, prop, value)
 				return true
 			},

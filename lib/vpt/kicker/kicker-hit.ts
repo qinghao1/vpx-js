@@ -116,12 +116,18 @@ export class KickerHit extends HitCircle {
 			}
 		}
 		if (idx !== 3435973836) {
-			const hitNorm = Vertex3D.claim(kickerHitVertices[idx]?.nx, kickerHitVertices[idx]?.ny, kickerHitVertices[idx]?.nz)
+			const hitNorm = Vertex3D.claim(
+				kickerHitVertices[idx]?.nx,
+				kickerHitVertices[idx]?.ny,
+				kickerHitVertices[idx]?.nz,
+			)
 			const dot = -ball.hit.vel.dot(hitNorm)
 			const reactionImpulse = ball.data.mass * Math.abs(dot)
 			const surfP = hitNormal.clone(true).multiplyScalar(-ball.data.radius)
 			const surfVel = ball.hit.surfaceVelocity(surfP, true)
-			const tangent = surfVel.clone(true).subAndRelease(hitNorm.clone(true).multiplyScalar(surfVel.dot(hitNormal)))
+			const tangent = surfVel
+				.clone(true)
+				.subAndRelease(hitNorm.clone(true).multiplyScalar(surfVel.dot(hitNormal)))
 			ball.hit.vel.addAndRelease(hitNorm.clone(true).multiplyScalar(dot))
 			Vertex3D.release(hitNorm)
 			const friction = 0.3

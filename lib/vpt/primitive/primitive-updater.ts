@@ -71,7 +71,13 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 			d.rotAndTra[5] - (s.translation?.z ?? d.rotAndTra[5]),
 		)
 		rotTrans.multiply(tmp)
-		const m = fromOrigin.clone().multiply(scaleZ).multiply(trans).multiply(rotTrans).multiply(scale).multiply(toOrigin)
+		const m = fromOrigin
+			.clone()
+			.multiply(scaleZ)
+			.multiply(trans)
+			.multiply(rotTrans)
+			.multiply(scale)
+			.multiply(toOrigin)
 		renderApi.applyMatrixToNode(m, obj)
 		Matrix3D.release(toOrigin, fromOrigin, scale, trans, rotTrans, tmp, scaleZ, m)
 	}

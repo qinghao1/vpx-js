@@ -47,7 +47,7 @@ export class DirectoryTree {
 				streams: {},
 			})
 		}
-		const root = entries.find((e) => e.type === DirectoryTree.EntryTypeRoot)
+		const root = entries.find(e => e.type === DirectoryTree.EntryTypeRoot)
 		if (!root) throw new Error('No root entry found.')
 		return new DirectoryTree(doc, root, entries)
 	}

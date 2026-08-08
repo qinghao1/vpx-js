@@ -114,7 +114,7 @@ export default class ThreeCsg {
 
 	public clone() {
 		const csg = new ThreeCsg()
-		csg.polygons = this.polygons.map((p) => p.clone())
+		csg.polygons = this.polygons.map(p => p.clone())
 		return csg
 	}
 
@@ -217,7 +217,7 @@ export default class ThreeCsg {
 	 */
 	public inverse(): ThreeCsg {
 		const csg = this.clone()
-		csg.polygons.map((p) => p.flip())
+		csg.polygons.map(p => p.flip())
 		return csg
 	}
 
@@ -479,7 +479,13 @@ class Plane {
 		front: Polygon[],
 		back: Polygon[],
 	) {
-		console.log('splitting polygon (%s/%s/%s/%s)', coplanarFront.length, coplanarBack.length, front.length, back.length)
+		console.log(
+			'splitting polygon (%s/%s/%s/%s)',
+			coplanarFront.length,
+			coplanarBack.length,
+			front.length,
+			back.length,
+		)
 		const COPLANAR = 0
 		const FRONT = 1
 		const BACK = 2
@@ -568,12 +574,12 @@ class Polygon {
 	}
 
 	public clone() {
-		const vertices = this.vertices.map((v) => v.clone())
+		const vertices = this.vertices.map(v => v.clone())
 		return new Polygon(vertices, this.shared)
 	}
 
 	public flip() {
-		this.vertices.reverse().map((v) => {
+		this.vertices.reverse().map(v => {
 			v.flip()
 		})
 		this.plane.flip()
@@ -605,7 +611,7 @@ class Node {
 		node.plane = this.plane?.clone()
 		node.front = this.front?.clone()
 		node.back = this.back?.clone()
-		node.polygons = this.polygons.map((p) => p.clone())
+		node.polygons = this.polygons.map(p => p.clone())
 		return node
 	}
 

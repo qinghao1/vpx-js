@@ -38,7 +38,10 @@ export class TriggerHitCircle extends HitCircle {
 	public override collide(coll: CollisionEvent, _physics: PlayerPhysics): void {
 		const ball = coll.ball
 
-		if ((this.objType !== CollisionType.Trigger && this.objType !== CollisionType.Kicker) || !ball.hit.isRealBall()) {
+		if (
+			(this.objType !== CollisionType.Trigger && this.objType !== CollisionType.Kicker) ||
+			!ball.hit.isRealBall()
+		) {
 			return
 		}
 

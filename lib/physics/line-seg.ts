@@ -89,7 +89,9 @@ export class LineSeg extends HitObject {
 		if (!Number.isFinite(hitTime!) || hitTime! < 0 || hitTime! > dTime) return -1
 		const btv = ball.hit.vel.x * this.normal.y - ball.hit.vel.y * this.normal.x
 		const btd =
-			(ball.state.pos.x - this.v1.x) * this.normal.y - (ball.state.pos.y - this.v1.y) * this.normal.x + btv * hitTime!
+			(ball.state.pos.x - this.v1.x) * this.normal.y -
+			(ball.state.pos.y - this.v1.y) * this.normal.x +
+			btv * hitTime!
 		if (btd < -C_TOL_ENDPNTS || btd > this.length + C_TOL_ENDPNTS) return -1
 		if (!rigid) coll.hitFlag = isUnHit
 		const hitZ = ball.state.pos.z + ball.hit.vel.z * hitTime!
@@ -106,7 +108,13 @@ export class LineSeg extends HitObject {
 
 	public override collide(coll: CollisionEvent): void {
 		const dot = coll.hitNormal.dot(coll.ball.hit.vel)
-		coll.ball.hit.collide3DWall(coll.hitNormal, this.elasticity, this.elasticityFalloff, this.friction, this.scatter)
+		coll.ball.hit.collide3DWall(
+			coll.hitNormal,
+			this.elasticity,
+			this.elasticityFalloff,
+			this.friction,
+			this.scatter,
+		)
 		if (dot <= -this.threshold) this.fireHitEvent(coll.ball)
 	}
 

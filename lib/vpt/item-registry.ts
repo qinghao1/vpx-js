@@ -39,7 +39,10 @@ type RegistryEntry = {
  */
 export const ITEM_REGISTRY: Record<number, RegistryEntry> = {
 	[ItemType.Surface]: { key: 'surfaces', factory: (s, n) => Surface.fromStorage(s, n) },
-	[ItemType.Primitive]: { key: 'primitives', factory: (s, n, o) => Primitive.fromStorage(s, n, o.skipMeshes === true) },
+	[ItemType.Primitive]: {
+		key: 'primitives',
+		factory: (s, n, o) => Primitive.fromStorage(s, n, o.skipMeshes === true),
+	},
 	[ItemType.Flasher]: { key: 'flashers', factory: (s, n) => Flasher.fromStorage(s, n) },
 	[ItemType.Rubber]: { key: 'rubbers', factory: (s, n) => Rubber.fromStorage(s, n) },
 	[ItemType.Flipper]: { key: 'flippers', factory: (s, n) => Flipper.fromStorage(s, n) },
@@ -60,7 +63,7 @@ export const ITEM_REGISTRY: Record<number, RegistryEntry> = {
 }
 
 /** All keys used in LoadedTable for game items. */
-export const ITEM_KEYS = Object.values(ITEM_REGISTRY).map((e) => e.key)
+export const ITEM_KEYS = Object.values(ITEM_REGISTRY).map(e => e.key)
 
 /**
  * Loads an item by ItemType using the registry.

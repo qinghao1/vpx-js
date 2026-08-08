@@ -145,8 +145,9 @@ function ppForEachStatement(node: ESIToken): unknown {
 				break
 		}
 	}
-	const safeExpr = callExpression(memberExpression(identifier(Transformer.VBSHELPER_NAME), identifier('toIterable')), [
-		expr,
-	])
+	const safeExpr = callExpression(
+		memberExpression(identifier(Transformer.VBSHELPER_NAME), identifier('toIterable')),
+		[expr],
+	)
 	return forOfStatement(id, safeExpr, block ? block : blockStatement([]))
 }

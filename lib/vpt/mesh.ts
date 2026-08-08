@@ -88,8 +88,8 @@ export class Mesh {
 	public clone(name?: string): Mesh {
 		const m = new Mesh()
 		m.name = name || this.name
-		m.vertices = this.vertices.map((v) => v.clone())
-		m.animationFrames = this.animationFrames.map((a) => a.clone())
+		m.vertices = this.vertices.map(v => v.clone())
+		m.animationFrames = this.animationFrames.map(a => a.clone())
 		m.indices = this.indices.slice()
 		m.faceIndexOffset = this.faceIndexOffset
 		return m
@@ -320,11 +320,19 @@ export class Mesh {
 		for (let i = 0; i < this.indices.length; i += 3) {
 			const f = this.indices
 			const v = [
-				[f[i + 2] + 1 + this.faceIndexOffset, f[i + 2] + 1 + this.faceIndexOffset, f[i + 2] + 1 + this.faceIndexOffset],
-				[f[i + 1] + 1 + this.faceIndexOffset, f[i + 1] + 1 + this.faceIndexOffset, f[i + 1] + 1 + this.faceIndexOffset],
+				[
+					f[i + 2] + 1 + this.faceIndexOffset,
+					f[i + 2] + 1 + this.faceIndexOffset,
+					f[i + 2] + 1 + this.faceIndexOffset,
+				],
+				[
+					f[i + 1] + 1 + this.faceIndexOffset,
+					f[i + 1] + 1 + this.faceIndexOffset,
+					f[i + 1] + 1 + this.faceIndexOffset,
+				],
 				[f[i] + 1 + this.faceIndexOffset, f[i] + 1 + this.faceIndexOffset, f[i] + 1 + this.faceIndexOffset],
 			]
-			out.push(`f ${v.map((x) => x.join('/')).join(' ')}`)
+			out.push(`f ${v.map(x => x.join('/')).join(' ')}`)
 		}
 	}
 }

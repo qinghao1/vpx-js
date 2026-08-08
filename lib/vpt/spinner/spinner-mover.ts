@@ -51,7 +51,10 @@ export class SpinnerMover implements MoverObject {
 						? -Math.PI
 						: Math.PI
 			this.state.angle += this.angleSpeed * dTime
-			if ((this.angleSpeed > 0 && this.state.angle > target) || (this.angleSpeed < 0 && this.state.angle < target)) {
+			if (
+				(this.angleSpeed > 0 && this.state.angle > target) ||
+				(this.angleSpeed < 0 && this.state.angle < target)
+			) {
 				this.events.fireGroupEvent(Event.SpinnerEventsSpin)
 			}
 			while (this.state.angle > 2 * Math.PI) this.state.angle -= 2 * Math.PI

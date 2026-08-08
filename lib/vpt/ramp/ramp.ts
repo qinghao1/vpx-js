@@ -122,6 +122,8 @@ export class Ramp extends Item<RampData> implements IRenderable<RampState>, IHit
 		startLength = f4(startLength + len)
 		const topHeight = f4(this.data.heightTop + table.getTableHeight())
 		const bottomHeight = f4(this.data.heightBottom + table.getTableHeight())
-		return f4(f4(vVertex[iSeg]?.z + f4(f4(startLength / totalLength) * f4(topHeight - bottomHeight))) + bottomHeight)
+		return f4(
+			f4(vVertex[iSeg]?.z + f4(f4(startLength / totalLength) * f4(topHeight - bottomHeight))) + bottomHeight,
+		)
 	}
 }

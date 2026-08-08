@@ -224,7 +224,7 @@ export class MeshExporter {
 	private uv = new Vector2()
 
 	public parse(object: Object3D): Mesh {
-		object.traverse((child) => {
+		object.traverse(child => {
 			if (child instanceof ThreeMesh) this.parseMesh(child as ThreeMesh)
 
 			if (child instanceof Line) {

@@ -19,7 +19,8 @@ export function ppConst(node: ESIToken): unknown {
 }
 
 function ppConstantMemberDeclaration(node: ESIToken): unknown {
-	const constDecls = node.children[0].type === 'ConstantDeclarators' ? node.children[0].estree : node.children[1].estree
+	const constDecls =
+		node.children[0].type === 'ConstantDeclarators' ? node.children[0].estree : node.children[1].estree
 	return variableDeclaration('const', constDecls)
 }
 

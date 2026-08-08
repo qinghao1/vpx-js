@@ -144,7 +144,9 @@ export class ReferenceTransformer extends Transformer {
 			enter: (node, parent: any) => {
 				const isFunction = parent && parent.type === 'CallExpression'
 				const isIdentifier =
-					node.type === 'MemberExpression' && node.object.type === 'Identifier' && node.property.type === 'Identifier'
+					node.type === 'MemberExpression' &&
+					node.object.type === 'Identifier' &&
+					node.property.type === 'Identifier'
 				if (isIdentifier && !isFunction) {
 					const enumNode = node as MemberExpression
 					const enumObject = enumNode.object as Identifier
@@ -152,7 +154,10 @@ export class ReferenceTransformer extends Transformer {
 					const enumName = this.enumApis._getPropertyName(enumObject.name)
 					let propName: string | undefined
 					if (enumName) {
-						propName = getPropName((this.enumApis as unknown as Record<string, unknown>)[enumName], enumProperty.name)
+						propName = getPropName(
+							(this.enumApis as unknown as Record<string, unknown>)[enumName],
+							enumProperty.name,
+						)
 						if (propName) {
 							enumNode.object = memberExpression(identifier(Transformer.ENUMS_NAME), identifier(enumName))
 							enumProperty.name = propName
@@ -198,7 +203,10 @@ export class ReferenceTransformer extends Transformer {
 				}
 				// patch property
 				if (parent.property?.name && (this.stdlib as unknown as Record<string, unknown>)[name]) {
-					const propName = getPropName((this.stdlib as unknown as Record<string, unknown>)[name], parent.property.name)
+					const propName = getPropName(
+						(this.stdlib as unknown as Record<string, unknown>)[name],
+						parent.property.name,
+					)
 					if (propName) {
 						parent.property.name = propName
 					}

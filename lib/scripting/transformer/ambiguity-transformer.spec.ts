@@ -111,7 +111,9 @@ describe('The scripting ambiguity transformer', () => {
 		it('should not use the helper for enums', () => {
 			const vbs = `shape = TriggerShape.TriggerWireA\n`
 			const js = transpiler.transpile(vbs)
-			expect(js).to.equal(`${Transformer.SCOPE_NAME}.shape = ${Transformer.ENUMS_NAME}.TriggerShape.TriggerWireA;`)
+			expect(js).to.equal(
+				`${Transformer.SCOPE_NAME}.shape = ${Transformer.ENUMS_NAME}.TriggerShape.TriggerWireA;`,
+			)
 		})
 
 		it('should not use the helper left-hand side of a loop', () => {

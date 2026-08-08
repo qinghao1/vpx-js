@@ -70,7 +70,7 @@ export class Player extends EventEmitter {
 
 	public async initAsync(scope: Record<string, unknown> = {}): Promise<this> {
 		this.prepareTable()
-		await new Promise((r) => setTimeout(r, 0))
+		await new Promise(r => setTimeout(r, 0))
 		try {
 			await this.runScript(scope, true)
 		} catch (e) {

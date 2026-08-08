@@ -138,7 +138,9 @@ describe('The VPinball table API', () => {
 		expect(api.BackdropImage_FS).to.equal('bgfs')
 		api.BackdropImage_FSS = 'bgfss'
 		expect(api.BackdropImage_FSS).to.equal('bgfss')
-		expect(() => (api.ColorGradeImage = 'test_pattern_jpg')).to.throw('Wrong image size, needs to be 256x16 resolution')
+		expect(() => (api.ColorGradeImage = 'test_pattern_jpg')).to.throw(
+			'Wrong image size, needs to be 256x16 resolution',
+		)
 		api.Gravity = 1
 		expect(api.Gravity).to.equal(1)
 		api.Friction = 0.6

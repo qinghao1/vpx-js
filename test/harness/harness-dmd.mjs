@@ -3,8 +3,8 @@ import path from 'node:path'
 import { attachLogging, launchBrowser, loadPuppeteer, newPage } from './utils.mjs'
 
 const puppeteer = await loadPuppeteer()
-const url = process.argv.find((a) => a.startsWith('--url='))?.split('=')[1] || 'http://localhost:3000/walking-dead.html'
-const out = process.argv.find((a) => a.startsWith('--out='))?.split('=')[1] || '/tmp'
+const url = process.argv.find(a => a.startsWith('--url='))?.split('=')[1] || 'http://localhost:3000/walking-dead.html'
+const out = process.argv.find(a => a.startsWith('--out='))?.split('=')[1] || '/tmp'
 console.log(`[harness-dmd] url=${url} out=${out}`)
 const browser = await launchBrowser(puppeteer)
 const page = await newPage(browser)
@@ -17,7 +17,7 @@ await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 })
 console.log('[harness-dmd] waiting for viewer Ready (up to 30s)')
 let viewerReady = false
 for (let i = 0; i < 30; i++) {
-	await new Promise((r) => setTimeout(r, 1000))
+	await new Promise(r => setTimeout(r, 1000))
 	const s = await page.evaluate(() => ({
 		title: document.getElementById('load-title')?.innerText || '',
 		log: document.getElementById('log')?.innerText || '',
@@ -46,11 +46,11 @@ await page.evaluate(() => {
 	}
 	if (window.viewer) window.viewer.viewerMode = 'play'
 })
-await new Promise((r) => setTimeout(r, 2000))
+await new Promise(r => setTimeout(r, 2000))
 console.log('[harness-dmd] waiting for play emu (up to 20s)')
 let _playReady = false
 for (let i = 0; i < 20; i++) {
-	await new Promise((r) => setTimeout(r, 1000))
+	await new Promise(r => setTimeout(r, 1000))
 	const s = await page.evaluate(() => ({
 		stats: document.getElementById('stats')?.innerText || '',
 		log: document.getElementById('log')?.innerText || '',
@@ -140,7 +140,7 @@ const inject = await page.evaluate(() => {
 	}
 })
 console.log('[harness-dmd] inject result', inject)
-await new Promise((r) => setTimeout(r, 800))
+await new Promise(r => setTimeout(r, 800))
 const afterRender = await page.evaluate(() => {
 	const v = window.viewer
 	const _emu = (window.viewer?.player || window.player)?.getPhysics?.()?.emu
@@ -151,7 +151,7 @@ const afterRender = await page.evaluate(() => {
 			: 'no-canvas',
 		dmdStatus: document.getElementById('dmd-status')?.innerText || '',
 		stats: document.getElementById('stats')?.innerText || '',
-		dmdMeshes: v?.dmdMeshes?.map((m) => ({
+		dmdMeshes: v?.dmdMeshes?.map(m => ({
 			name: m.name,
 			pos: `${m.position.x.toFixed(1)},${m.position.y.toFixed(1)},${m.position.z.toFixed(1)}`,
 			rot: `${((m.rotation.x * 180) / Math.PI).toFixed(1)},${((m.rotation.y * 180) / Math.PI).toFixed(1)},${((m.rotation.z * 180) / Math.PI).toFixed(1)}`,
@@ -218,11 +218,11 @@ const camInfo = await page.evaluate(() => {
 	}
 })
 console.log('[harness-dmd] camInfo', camInfo)
-await new Promise((r) => setTimeout(r, 600))
+await new Promise(r => setTimeout(r, 600))
 const shotPath = path.join(out, 'dmd_on_table.png')
 await page.screenshot({ path: shotPath })
 console.log(`[harness-dmd] screenshot 1 -> ${shotPath} ${fs.statSync(shotPath).size} bytes`)
-await new Promise((r) => setTimeout(r, 400))
+await new Promise(r => setTimeout(r, 400))
 // Also take a second shot from slightly different angle: overview
 const camInfo2 = await page.evaluate(() => {
 	try {
@@ -244,7 +244,7 @@ const camInfo2 = await page.evaluate(() => {
 	}
 })
 console.log('[harness-dmd] camInfo2', camInfo2)
-await new Promise((r) => setTimeout(r, 600))
+await new Promise(r => setTimeout(r, 600))
 const shotPath2 = path.join(out, 'dmd_overview.png')
 await page.screenshot({ path: shotPath2 })
 console.log(`[harness-dmd] screenshot 2 -> ${shotPath2} ${fs.statSync(shotPath2).size} bytes`)
@@ -259,7 +259,7 @@ await page.evaluate(() => {
 		if (window.renderer && window.scene && window.camera) window.renderer.render(window.scene, window.camera)
 	} catch {}
 })
-await new Promise((r) => setTimeout(r, 600))
+await new Promise(r => setTimeout(r, 600))
 const shotPath3 = path.join(out, 'dmd_play_cam.png')
 await page.screenshot({ path: shotPath3 })
 console.log(`[harness-dmd] screenshot 3 (play cam) -> ${shotPath3} ${fs.statSync(shotPath3).size} bytes`)

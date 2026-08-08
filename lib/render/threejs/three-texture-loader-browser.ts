@@ -372,7 +372,7 @@ function loadViaUrl(url: string, nameHint: string, playfieldMap?: string): Promi
 				} else resolve(tex)
 			},
 			undefined,
-			(err) => {
+			err => {
 				URL.revokeObjectURL(url)
 				reject(err)
 			},

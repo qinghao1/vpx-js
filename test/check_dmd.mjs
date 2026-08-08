@@ -15,10 +15,10 @@ for (const [k, v] of Object.entries(t.flashers)) {
 			'height',
 			d.height,
 			'pts',
-			d.dragPoints?.map((p) => `(${p.vertex.x},${p.vertex.y})`).join(' '),
+			d.dragPoints?.map(p => `(${p.vertex.x},${p.vertex.y})`).join(' '),
 		)
-		const xs = d.dragPoints.map((p) => p.vertex.x),
-			ys = d.dragPoints.map((p) => p.vertex.y)
+		const xs = d.dragPoints.map(p => p.vertex.x),
+			ys = d.dragPoints.map(p => p.vertex.y)
 		console.log('  w', Math.max(...xs) - Math.min(...xs), 'h', Math.max(...ys) - Math.min(...ys))
 	}
 }

@@ -70,6 +70,13 @@ export abstract class ItemUpdater<STATE extends ItemState> {
 		const plateObj = renderApi.findInGroup(obj, name)
 		renderApi.applyMatrixToNode(matrix, plateObj!)
 
-		Matrix3D.release(matTransToOrigin, matRotateToOrigin, matTransFromOrigin, matRotateFromOrigin, matRotateX, matrix)
+		Matrix3D.release(
+			matTransToOrigin,
+			matRotateToOrigin,
+			matTransFromOrigin,
+			matRotateFromOrigin,
+			matRotateX,
+			matrix,
+		)
 	}
 }

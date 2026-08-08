@@ -31,7 +31,14 @@ export class HitTargetState extends ItemState {
 	}
 
 	public clone(): HitTargetState {
-		return HitTargetState.claim(this.name, this.zOffset, this.xRotation, this.material, this.texture, this.isVisible)
+		return HitTargetState.claim(
+			this.name,
+			this.zOffset,
+			this.xRotation,
+			this.material,
+			this.texture,
+			this.isVisible,
+		)
 	}
 
 	public diff(state: HitTargetState): HitTargetState {

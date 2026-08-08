@@ -211,7 +211,10 @@ export class BallHit extends HitObject {
 			const maxFric = friction * reactionImpulse
 			const jt = clamp(-vt / kt, -maxFric, maxFric)
 			if (Number.isFinite(jt)) {
-				this.applySurfaceImpulseAndRelease(cross.clone(true).multiplyScalar(jt), tangent.clone(true).multiplyScalar(jt))
+				this.applySurfaceImpulseAndRelease(
+					cross.clone(true).multiplyScalar(jt),
+					tangent.clone(true).multiplyScalar(jt),
+				)
 			}
 			Vertex3D.release(cross)
 		}
@@ -264,7 +267,9 @@ export class BallHit extends HitObject {
 		this.vel.addAndRelease(coll.hitNormal.clone(true).multiplyScalar(normalForce))
 		if (coll.hitDistance <= PHYS_TOUCH) {
 			this.vel.addAndRelease(
-				coll.hitNormal.clone(true).multiplyScalar(Math.max(Math.min(C_EMBEDVELLIMIT, -coll.hitDistance), PHYS_TOUCH)),
+				coll.hitNormal
+					.clone(true)
+					.multiplyScalar(Math.max(Math.min(C_EMBEDVELLIMIT, -coll.hitDistance), PHYS_TOUCH)),
 			)
 		}
 		this.applyFriction(coll.hitNormal, dTime, friction, physics)
@@ -283,7 +288,9 @@ export class BallHit extends HitObject {
 		const normVel = this.vel.dot(hitNormal)
 		if (normVel <= 0.025 || slipspeed < C_PRECISION) {
 			const surfAcc = this.surfaceAcceleration(surfP, physics, true)
-			const slipAcc = surfAcc.clone(true).subAndRelease(hitNormal.clone(true).multiplyScalar(surfAcc.dot(hitNormal)))
+			const slipAcc = surfAcc
+				.clone(true)
+				.subAndRelease(hitNormal.clone(true).multiplyScalar(surfAcc.dot(hitNormal)))
 			if (slipAcc.lengthSq() < 1e-6) {
 				Vertex3D.release(surfVel, surfP, slip, slipAcc, surfAcc)
 				return

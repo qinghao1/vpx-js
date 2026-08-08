@@ -27,8 +27,8 @@ import { Table } from '../lib/vpt/table/table.js'
 		let vpxFiles: string[]
 		if (isFolder) {
 			vpxFiles = readdirSync(vpxPath)
-				.filter((f) => /\.vp[xt]$/i.test(f))
-				.map((f) => resolve(vpxPath, f))
+				.filter(f => /\.vp[xt]$/i.test(f))
+				.map(f => resolve(vpxPath, f))
 		} else {
 			if (!/\.vp[xt]$/i.test(vpxPath)) {
 				throw new Error('File must be a .vpx or .vpt file.')

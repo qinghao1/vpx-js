@@ -72,7 +72,7 @@ async function main() {
 	if (!a || !b || !c) process.exit(1)
 }
 
-main().catch((e) => {
+main().catch(e => {
 	console.error(e)
 	process.exit(1)
 })

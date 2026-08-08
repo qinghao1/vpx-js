@@ -92,7 +92,7 @@ export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, Poin
 	}
 
 	public findInGroup(group: Group, name: string): Object3D | undefined {
-		return group.children.find((c) => c.name === name)
+		return group.children.find(c => c.name === name)
 	}
 
 	public removeFromParent(group: Group, obj: Object3D | Group): void {

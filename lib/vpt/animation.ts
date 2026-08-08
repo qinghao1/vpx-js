@@ -13,7 +13,7 @@ export class FrameData {
 
 	public clone(): FrameData {
 		const f = new FrameData()
-		f.frameVerts = this.frameVerts.map((v) => v.clone())
+		f.frameVerts = this.frameVerts.map(v => v.clone())
 		return f
 	}
 }

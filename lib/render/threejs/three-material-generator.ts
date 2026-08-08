@@ -75,7 +75,7 @@ export class ThreeMaterialGenerator {
 	}
 
 	public applyEnvMap(threeMaterial: MeshStandardMaterial, envMap?: string): void {
-		this.applyTexture(threeMaterial, 'envMap', envMap, (m) => {
+		this.applyTexture(threeMaterial, 'envMap', envMap, m => {
 			m.envMapIntensity = 1
 		})
 	}

@@ -26,7 +26,13 @@ export class BumperHit extends HitCircle {
 	public override collide(coll: CollisionEvent, _physics: PlayerPhysics): void {
 		if (!this.isEnabled) return
 		const dot = coll.hitNormal.dot(coll.ball.hit.vel)
-		coll.ball.hit.collide3DWall(coll.hitNormal, this.elasticity, this.elasticityFalloff, this.friction, this.scatter)
+		coll.ball.hit.collide3DWall(
+			coll.hitNormal,
+			this.elasticity,
+			this.elasticityFalloff,
+			this.friction,
+			this.scatter,
+		)
 		if (this.data.hitEvent && dot <= -this.data.threshold) {
 			coll.ball.hit.vel.addAndRelease(coll.hitNormal.clone(true).multiplyScalar(this.data.force))
 			this.animation.hitEvent = true

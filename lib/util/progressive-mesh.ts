@@ -26,7 +26,7 @@ export class ProgMeshTriangle {
 	}
 
 	private computeNormal(): void {
-		const [a, b, c] = this.vertices.map((v) => v.position)
+		const [a, b, c] = this.vertices.map(v => v.position)
 		this.normal = cross(b?.sub(a!), c?.sub(b!))
 		const len = magnitude(this.normal)
 		if (len > FLT_MIN) this.normal = this.normal.divideScalar(len)
@@ -156,7 +156,7 @@ export class ProgMeshContext {
 	}
 
 	private computeEdgeCollapseCost(u: ProgMeshVertex, v: ProgMeshVertex): number {
-		const sides = u.face.filter((f) => f.hasVertex(v))
+		const sides = u.face.filter(f => f.hasVertex(v))
 		let curvature = 0
 		for (const f of u.face) {
 			let min = 1

@@ -16,7 +16,14 @@ export class TriggerLineSeg extends LineSeg {
 	private readonly data: TriggerData
 	private readonly animation: TriggerAnimation
 
-	constructor(p1: Vertex2D, p2: Vertex2D, zLow: number, zHigh: number, data: TriggerData, animation: TriggerAnimation) {
+	constructor(
+		p1: Vertex2D,
+		p2: Vertex2D,
+		zLow: number,
+		zHigh: number,
+		data: TriggerData,
+		animation: TriggerAnimation,
+	) {
 		super(p1, p2, zLow, zHigh, undefined)
 		this.data = data
 		this.animation = animation

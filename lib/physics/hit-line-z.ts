@@ -83,7 +83,13 @@ export class HitLineZ extends HitObject {
 
 	public override collide(coll: CollisionEvent): void {
 		const dot = coll.hitNormal.dot(coll.ball.hit.vel)
-		coll.ball.hit.collide3DWall(coll.hitNormal, this.elasticity, this.elasticityFalloff, this.friction, this.scatter)
+		coll.ball.hit.collide3DWall(
+			coll.hitNormal,
+			this.elasticity,
+			this.elasticityFalloff,
+			this.friction,
+			this.scatter,
+		)
 		if (dot <= -this.threshold) this.fireHitEvent(coll.ball)
 	}
 }

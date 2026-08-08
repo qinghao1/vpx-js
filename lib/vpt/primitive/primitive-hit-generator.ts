@@ -53,11 +53,11 @@ export class PrimitiveHitGenerator {
 			hitObjects.push(...addedEdges.addHitEdge(i2, i0, rgv3D[1]!, rgv3D[0]!))
 		}
 		for (const vertex of mesh.vertices) hitObjects.push(new HitPoint(vertex.getVertex()))
-		return hitObjects.map((obj) => this.setupHitObject(obj, events, table))
+		return hitObjects.map(obj => this.setupHitObject(obj, events, table))
 	}
 
 	public getReducedMesh(mesh: Mesh, reducedVertices: number): Mesh {
-		const progVertices = mesh.vertices.map((v) => new ProgMeshFloat3(v.x, v.y, v.z))
+		const progVertices = mesh.vertices.map(v => new ProgMeshFloat3(v.x, v.y, v.z))
 		const progIndices: ProgMeshTriData[] = []
 		let i2 = 0
 		for (let i = 0; i < mesh.indices.length; i += 3) {
@@ -68,9 +68,9 @@ export class PrimitiveHitGenerator {
 		permuteVertices(progPerm, progVertices, progIndices)
 		const progNewIndices: ProgMeshTriData[] = []
 		remapIndices(reducedVertices, progIndices, progNewIndices, progMap)
-		const reducedIndices = progNewIndices.flatMap((tri) => tri.v)
+		const reducedIndices = progNewIndices.flatMap(tri => tri.v)
 		return new Mesh(
-			progVertices.map((pv) => Vertex3DNoTex2.fromArray([pv.x, pv.y, pv.z, 0, 0, 0, 0, 0])),
+			progVertices.map(pv => Vertex3DNoTex2.fromArray([pv.x, pv.y, pv.z, 0, 0, 0, 0, 0])),
 			reducedIndices,
 		)
 	}

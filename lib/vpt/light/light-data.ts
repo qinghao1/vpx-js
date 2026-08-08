@@ -83,8 +83,8 @@ export class LightData extends ItemData {
 			nestedTags: {
 				DPNT: {
 					onStart: () => new DragPoint(),
-					onTag: (dp) => dp.fromTag.bind(dp),
-					onEnd: (dp) => d.dragPoints.push(dp),
+					onTag: dp => dp.fromTag.bind(dp),
+					onEnd: dp => d.dragPoints.push(dp),
 				},
 			},
 		})
@@ -116,8 +116,8 @@ export class LightData extends ItemData {
 		if (!this.szOffImage || this.bulbLight) return false
 		if (table.getPlayfieldMap()?.toLowerCase() === this.szOffImage.toLowerCase() && this.dragPoints.length > 2)
 			return true
-		if (Object.values(table.surfaces).some((s) => s.image === this.szOffImage)) return true
-		return Object.values(table.lights).filter((l) => l.offImage === this.szOffImage).length > 3
+		if (Object.values(table.surfaces).some(s => s.image === this.szOffImage)) return true
+		return Object.values(table.lights).filter(l => l.offImage === this.szOffImage).length > 3
 	}
 
 	private async fromTag(buffer: Uint8Array, tag: string, _offset: number, len: number): Promise<number> {

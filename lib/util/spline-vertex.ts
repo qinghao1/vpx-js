@@ -64,7 +64,12 @@ export class SplineVertex {
 	}
 
 	/** Central (thin) spine with adaptive accuracy. */
-	static getCentralCurve(dragPoints: DragPoint[], detail: number, acc: number, staticRendering = true): RenderVertex[] {
+	static getCentralCurve(
+		dragPoints: DragPoint[],
+		detail: number,
+		acc: number,
+		staticRendering = true,
+	): RenderVertex[] {
 		const accuracy = acc !== -1 ? acc : 4 * 10 ** ((10 - (staticRendering ? 10 : detail)) / 1.5)
 		return DragPoint.getRgVertex(dragPoints, () => new RenderVertex(), CatmullCurve2D.fromVertex2D, true, accuracy)
 	}

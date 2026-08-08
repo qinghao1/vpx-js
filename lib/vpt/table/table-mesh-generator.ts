@@ -31,7 +31,11 @@ export class TableMeshGenerator {
 		renderApi.transformScene(tableNode, this.table)
 		const renderGroups: IRenderGroup[] = [
 			{ name: 'playfield', meshes: [this.table], enabled: !!opts.exportPlayfield },
-			{ name: 'primitives', meshes: Object.values<Primitive>(this.table.primitives), enabled: !!opts.exportPrimitives },
+			{
+				name: 'primitives',
+				meshes: Object.values<Primitive>(this.table.primitives),
+				enabled: !!opts.exportPrimitives,
+			},
 			{ name: 'rubbers', meshes: Object.values<Rubber>(this.table.rubbers), enabled: !!opts.exportRubbers },
 			{ name: 'surfaces', meshes: Object.values<Surface>(this.table.surfaces), enabled: !!opts.exportSurfaces },
 			{ name: 'flippers', meshes: Object.values<Flipper>(this.table.flippers), enabled: !!opts.exportFlippers },
@@ -39,12 +43,12 @@ export class TableMeshGenerator {
 			{ name: 'ramps', meshes: Object.values<Ramp>(this.table.ramps), enabled: !!opts.exportRamps },
 			{
 				name: 'lightBulbs',
-				meshes: Object.values(this.table.lights).filter((l) => l.isBulbLight()),
+				meshes: Object.values(this.table.lights).filter(l => l.isBulbLight()),
 				enabled: !!opts.exportLightBulbs,
 			},
 			{
 				name: 'playfieldLights',
-				meshes: Object.values(this.table.lights).filter((l) => l.isSurfaceLight(this.table)),
+				meshes: Object.values(this.table.lights).filter(l => l.isSurfaceLight(this.table)),
 				enabled: !!opts.exportPlayfieldLights,
 			},
 			{ name: 'hitTargets', meshes: Object.values(this.table.hitTargets), enabled: !!opts.exportHitTargets },
@@ -55,7 +59,7 @@ export class TableMeshGenerator {
 			{ name: 'plungers', meshes: Object.values(this.table.plungers), enabled: !!opts.exportPlungers },
 		]
 
-		for (const group of renderGroups.filter((g) => g.enabled)) {
+		for (const group of renderGroups.filter(g => g.enabled)) {
 			progress().details(group.name)
 			const itemTypeGroup = renderApi.createParentNode(group.name)
 			for (const renderable of group.meshes) {
@@ -72,7 +76,7 @@ export class TableMeshGenerator {
 				lightGroup = renderApi.createParentNode('lightBulbs')
 				renderApi.addChildToParent(tableNode, lightGroup)
 			}
-			for (const lightInfo of Object.values(this.table.lights).filter((l) => l.isBulbLight())) {
+			for (const lightInfo of Object.values(this.table.lights).filter(l => l.isBulbLight())) {
 				let itemGroup = renderApi.findInGroup(lightGroup, lightInfo.getName())
 				if (!itemGroup) {
 					itemGroup = renderApi.createParentNode(lightInfo.getName())

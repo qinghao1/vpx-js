@@ -18,12 +18,12 @@ export class EmulatorState {
 	private switches = new Uint8Array()
 
 	private lampMap: (i: number) => number = OffsetIndex.mapIndexToMatrixIndex
-	private solMap: (i: number) => number = (i) => i + 1
+	private solMap: (i: number) => number = i => i + 1
 
 	updateState(s: WpcEmuWebWorkerApi.EmuStateAsic): void {
 		this.lampMap = OffsetIndex.mapIndexToMatrixIndex
-		this.solMap = (i) => i + 1
-		if (s.wpc.lampState) this.lamps = Uint8Array.from(s.wpc.lampState, (x) => (x > 127 ? 1 : 0))
+		this.solMap = i => i + 1
+		if (s.wpc.lampState) this.lamps = Uint8Array.from(s.wpc.lampState, x => (x > 127 ? 1 : 0))
 		if (s.wpc.solenoidState) this.sols = s.wpc.solenoidState.slice()
 		if (s.wpc.generalIlluminationState) this.gis = s.wpc.generalIlluminationState.slice()
 		if (s.dmd.dmdShadedBuffer) this.dmd = s.dmd.dmdShadedBuffer.slice()
@@ -31,8 +31,8 @@ export class EmulatorState {
 	}
 
 	applyPinmame(lamps: Uint8Array, sols: Uint8Array, gis: Uint8Array): void {
-		this.lampMap = (i) => i
-		this.solMap = (i) => i
+		this.lampMap = i => i
+		this.solMap = i => i
 		this.lamps = lamps.slice()
 		this.sols = sols.slice()
 		this.gis = gis.slice()

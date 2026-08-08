@@ -85,7 +85,9 @@ function ppEraseExpressions(node: ESIToken): unknown {
 				assignmentExpression(
 					child.estree,
 					'=',
-					callExpression(memberExpression(identifier(Transformer.VBSHELPER_NAME), identifier('erase')), [child.estree]),
+					callExpression(memberExpression(identifier(Transformer.VBSHELPER_NAME), identifier('erase')), [
+						child.estree,
+					]),
 				),
 			)
 		}

@@ -172,7 +172,10 @@ export class GLTFExporter {
 		const header = Buffer.alloc(12)
 		header.writeUInt32LE(GLB_MAGIC, 0)
 		header.writeUInt32LE(GLB_VERSION, 4)
-		header.writeUInt32LE(12 + jsonPrefix.byteLength + jsonChunk.byteLength + binPrefix.byteLength + bin.byteLength, 8)
+		header.writeUInt32LE(
+			12 + jsonPrefix.byteLength + jsonChunk.byteLength + binPrefix.byteLength + bin.byteLength,
+			8,
+		)
 		return Buffer.concat([header, jsonPrefix, jsonChunk, binPrefix, bin])
 	}
 
@@ -462,7 +465,9 @@ export class GLTFExporter {
 		if (this.options.truncateDrawRange && geometry !== undefined && geometry.index === null) {
 			const end = start + count
 			const end2 =
-				geometry.drawRange.count === Infinity ? attribute.count : geometry.drawRange.start + geometry.drawRange.count
+				geometry.drawRange.count === Infinity
+					? attribute.count
+					: geometry.drawRange.start + geometry.drawRange.count
 
 			start = Math.max(start, geometry.drawRange.start)
 			count = Math.min(end, end2) - start
@@ -542,12 +547,12 @@ export class GLTFExporter {
 			if (this.options.binary) {
 				this.pending.push(
 					() =>
-						new Promise((resolve) => {
+						new Promise(resolve => {
 							if (this.images.has(image.src)) {
 								gltfImage.bufferView = this.images.get(image.src)
 								resolve()
 							} else {
-								image.getImage(this.options.optimizeImages!).then((buffer) => {
+								image.getImage(this.options.optimizeImages!).then(buffer => {
 									gltfImage.bufferView = this.processBufferViewImage(buffer, image.src)
 									resolve()
 								})
@@ -557,8 +562,8 @@ export class GLTFExporter {
 			} else {
 				this.pending.push(
 					() =>
-						new Promise((resolve) => {
-							image.getImage(this.options.optimizeImages!).then((buffer) => {
+						new Promise(resolve => {
+							image.getImage(this.options.optimizeImages!).then(buffer => {
 								gltfImage.uri = `data:image/${image.getFormat()};base64,${buffer.toString('base64')}`
 								resolve()
 							})
@@ -644,7 +649,9 @@ export class GLTFExporter {
 			gltfMaterial.extensions = { KHR_materials_unlit: {} }
 			this.extensionsUsed.KHR_materials_unlit = true
 		} else if (!material.isMeshStandardMaterial) {
-			logger().warn('[GLTFExporter.processMaterial] Use MeshStandardMaterial or MeshBasicMaterial for best results.')
+			logger().warn(
+				'[GLTFExporter.processMaterial] Use MeshStandardMaterial or MeshBasicMaterial for best results.',
+			)
 		}
 
 		// pbrMetallicRoughness.baseColorFactor
@@ -836,7 +843,11 @@ export class GLTFExporter {
 			const array = attribute.array
 			if (attributeName === 'JOINTS_0' && !(array instanceof Uint16Array) && !(array instanceof Uint8Array)) {
 				logger().warn('[GLTFExporter.processMesh] Attribute "skinIndex" converted to type UNSIGNED_SHORT.')
-				modifiedAttribute = new BufferAttribute(new Uint16Array(array), attribute.itemSize, attribute.normalized)
+				modifiedAttribute = new BufferAttribute(
+					new Uint16Array(array),
+					attribute.itemSize,
+					attribute.normalized,
+				)
 			}
 
 			if (attributeName.substr(0, 5) !== 'MORPH') {
@@ -987,7 +998,9 @@ export class GLTFExporter {
 			}
 			if ((geometry as BufferGeometry).index !== null) {
 				if (this.cachedData.attributes.has((geometry as BufferGeometry).index as BufferAttribute)) {
-					primitive.indices = this.cachedData.attributes.get((geometry as BufferGeometry).index as BufferAttribute)
+					primitive.indices = this.cachedData.attributes.get(
+						(geometry as BufferGeometry).index as BufferAttribute,
+					)
 				} else {
 					primitive.indices = this.processAccessor(
 						(geometry as BufferGeometry).index as BufferAttribute,
@@ -995,7 +1008,10 @@ export class GLTFExporter {
 						groups[i].start,
 						groups[i].count,
 					)!
-					this.cachedData.attributes.set((geometry as BufferGeometry).index as BufferAttribute, primitive.indices)
+					this.cachedData.attributes.set(
+						(geometry as BufferGeometry).index as BufferAttribute,
+						primitive.indices,
+					)
 				}
 			}
 

@@ -43,7 +43,13 @@ export class HitPlane extends HitObject {
 	}
 
 	public override collide(coll: CollisionEvent, _physics?: PlayerPhysics): void {
-		coll.ball.hit.collide3DWall(coll.hitNormal, this.elasticity, this.elasticityFalloff, this.friction, this.scatter)
+		coll.ball.hit.collide3DWall(
+			coll.hitNormal,
+			this.elasticity,
+			this.elasticityFalloff,
+			this.friction,
+			this.scatter,
+		)
 		const bnd = this.normal.dot(coll.ball.state.pos) - coll.ball.data.radius - this.d
 		if (bnd >= 0) return
 		const v = this.normal.clone(true).multiplyScalar(bnd)
