@@ -7,6 +7,7 @@ import sinonChai from 'sinon-chai'
 import type { IEmulator } from '../game/iemulator.js'
 import type { Vertex2D } from '../util/math.js'
 import { EmulatorMessageQueue, MessageType } from './emulator-message-queue.js'
+import { EmulatorState } from './emulator-state.js'
 
 chai.use((sinonChai as any).default ?? sinonChai)
 describe('The WPC-EMU message queue', () => {
@@ -93,26 +94,53 @@ describe('The WPC-EMU message queue', () => {
 })
 
 class MockEmulator implements IEmulator {
-	private messages: object[]
-	constructor(cache: object[]) {
-		this.messages = cache
+	readonly emulatorState = new EmulatorState()
+	constructor(private readonly messages: object[]) {}
+	isInitialized(): boolean {
+		return true
 	}
-	public emuSimulateCycle(dTime: number): void {
+	getVersion(): string {
+		return 'mock'
+	}
+	setPaused(): void {}
+	getPaused(): boolean {
+		return false
+	}
+	registerAudioConsumer(): void {}
+	emuSimulateCycle(dTime: number): number {
 		this.messages.push({ dTime })
+		return 0
 	}
-	public getDmdFrame(): Uint8Array {
-		throw new Error('Method not implemented.')
+	getDmdFrame(): Uint8Array {
+		return new Uint8Array()
 	}
-	public getDmdDimensions(): Vertex2D {
-		throw new Error('Method not implemented.')
+	getDmdDimensions(): Vertex2D {
+		return { x: 128, y: 32 } as Vertex2D
 	}
-	public setCabinetInput(keyNr: number): void {
+	setCabinetInput(keyNr: number): void {
 		this.messages.push({ keyNr })
 	}
-	public setSwitchInput(switchNr: number, optionalEnableSwitch?: boolean): void {
+	setSwitchInput(switchNr: number, optionalEnableSwitch?: boolean): boolean {
 		this.messages.push({ switchNr, optionalEnableSwitch })
+		return true
 	}
-	public setDipSwitchByte(dipSwitch: number): void {
+	getSwitchInput(): number {
+		return 0
+	}
+	getLampState(): number {
+		return 0
+	}
+	getSolenoidState(): number {
+		return 0
+	}
+	getGIState(): number {
+		return 0
+	}
+	setFliptronicsInput(): void {}
+	getDipSwitchByte(): number {
+		return 0
+	}
+	setDipSwitchByte(dipSwitch: number): void {
 		this.messages.push({ dipSwitch })
 	}
 }

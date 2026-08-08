@@ -18,8 +18,8 @@ import {
 } from '../../refs.node.js'
 import { logger } from '../../util/logger.js'
 import type { ITextureLoader } from '../irender-api.js'
-import { EXRLoader } from './vendor/EXRLoader.js'
-import { RGBELoader } from './vendor/RGBELoader.js'
+import { EXRLoader } from 'three/examples/jsm/loaders/EXRLoader.js'
+import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js'
 
 /** ThreeTextureLoaderNode. */
 export class ThreeTextureLoaderNode implements ITextureLoader<ThreeTexture> {

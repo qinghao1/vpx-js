@@ -1,24 +1,28 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
+import type { EmulatorState } from '../emu/emulator-state.js'
 import type { Vertex2D } from '../util/math.js'
 
 export interface IEmulator {
-	/** Executes one emulator cycle (~1000Hz, after input, before physics). */
-	emuSimulateCycle(dTime: number): void
+	readonly emulatorState: EmulatorState
 
-	/** DMD frame buffer (top-left to bottom-right, 1 byte/pixel 0-3). */
+	isInitialized(): boolean
+	getVersion(): string
+	setPaused(v: boolean): void
+	getPaused(): boolean
+	registerAudioConsumer(cb: (msg: unknown) => void): void
+
+	emuSimulateCycle(ms: number): number
 	getDmdFrame(): Uint8Array
-
-	/** DMD dimensions (x=width, y=height). */
 	getDmdDimensions(): Vertex2D
-
-	/** Cabinet key (ESC, -, +, ENTER …). */
-	setCabinetInput(keyNr: number): void
-
-	/** Updates a switch state. */
-	setSwitchInput(switchNr: number, optionalEnableSwitch?: boolean): void
-
-	/** Updates emulator language DIP switch. */
-	setDipSwitchByte(dipSwitch: number): void
+	setCabinetInput(n: number): void
+	setSwitchInput(n: number, enable?: boolean): boolean
+	getSwitchInput(n: number): number
+	getLampState(n: number): number
+	getSolenoidState(n: number): number
+	getGIState(n: number): number
+	setFliptronicsInput(v: string, enable?: boolean): void
+	getDipSwitchByte(): number
+	setDipSwitchByte(v: number): void
 }

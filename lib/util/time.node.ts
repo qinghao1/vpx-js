@@ -3,5 +3,7 @@
 
 /** High-resolution time in milliseconds. */
 export function now(): number {
-	return Number(process.hrtime.bigint()) / 1e6
+	const hrtime = (globalThis as unknown as { process?: { hrtime?: { bigint?: () => bigint } } }).process?.hrtime?.bigint
+	if (typeof hrtime === 'function') return Number(hrtime()) / 1e6
+	return typeof performance !== 'undefined' && typeof performance.now === 'function' ? performance.now() : Date.now()
 }

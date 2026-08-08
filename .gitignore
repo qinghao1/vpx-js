@@ -17,3 +17,5 @@ walking_dead.vpx
 .agents/
 .github/
 demo-browser/
+wasm/build/
+wasm/dist/*.wasm

@@ -13,39 +13,39 @@ const INCLUDE_RAM = false
 
 /** WPC-EMU adapter. @see https://github.com/vpinball/wpc-emu */
 export class Emulator implements IEmulator {
-	public readonly emulatorState = new EmulatorState()
+	readonly emulatorState = new EmulatorState()
 	private readonly queue = new EmulatorMessageQueue()
 	private readonly dmdSize = new Vertex2D(128, 32)
 	private paused = false
 	private emulator?: WpcEmuApi.Emulator
 
-	public async loadGame(entry: GamelistDB.GameEntry, rom: Uint8Array): Promise<void> {
+	async loadGame(entry: GamelistDB.GameEntry, rom: Uint8Array): Promise<void> {
 		this.emulator = await WpcEmuApi.initVMwithRom({ u06: rom }, entry)
 		this.emulator.reset()
 		this.emulator.executeCycleForTime(1000, 4)
 		this.queue.addMessage(MessageType.CabinetInput, 16)
 		this.queue.replayMessages(this)
-		this.registerAudioConsumer((cb) => logger().debug('audioCallback', cb))
+		this.registerAudioConsumer((m) => logger().debug('audioCallback', m))
 	}
 
-	public isInitialized(): boolean {
+	isInitialized(): boolean {
 		return !!this.emulator
 	}
-	public getVersion(): string {
+	getVersion(): string {
 		return WpcEmuApi.getVersion()
 	}
-	public setPaused(v: boolean): void {
+	setPaused(v: boolean): void {
 		this.paused = v
 	}
-	public getPaused(): boolean {
+	getPaused(): boolean {
 		return this.paused
 	}
 
-	public registerAudioConsumer(cb: (m: WpcEmuApi.AudioMessage) => void): void {
-		this.emulator?.registerAudioConsumer(cb)
+	registerAudioConsumer(cb: (m: unknown) => void): void {
+		this.emulator?.registerAudioConsumer(cb as (m: WpcEmuApi.AudioMessage) => void)
 	}
 
-	public emuSimulateCycle(ms: number): number {
+	emuSimulateCycle(ms: number): number {
 		if (!this.emulator) {
 			this.queue.addMessage(MessageType.ExecuteTicks, ms)
 			return 0
@@ -57,20 +57,20 @@ export class Emulator implements IEmulator {
 		return cycles
 	}
 
-	public getSwitchInput(nr: number): number {
+	getSwitchInput(nr: number): number {
 		return this.emulatorState.getSwitchState(OffsetIndex.fromWpcMatrix(nr))
 	}
-	public getLampState(nr: number): number {
+	getLampState(nr: number): number {
 		return this.emulatorState.getLampState(OffsetIndex.fromWpcMatrix(nr))
 	}
-	public getSolenoidState(nr: number): number {
+	getSolenoidState(nr: number): number {
 		return this.emulatorState.getSolenoidState(nr)
 	}
-	public getGIState(nr: number): number {
+	getGIState(nr: number): number {
 		return this.emulatorState.getGIState(nr)
 	}
 
-	public setSwitchInput(nr: number, enable?: boolean): boolean {
+	setSwitchInput(nr: number, enable?: boolean): boolean {
 		if (!this.emulator) {
 			const type =
 				enable === true
@@ -85,7 +85,7 @@ export class Emulator implements IEmulator {
 		return true
 	}
 
-	public setCabinetInput(v: number): void {
+	setCabinetInput(v: number): void {
 		if (!this.emulator) {
 			this.queue.addMessage(MessageType.CabinetInput, v)
 			return
@@ -93,20 +93,20 @@ export class Emulator implements IEmulator {
 		this.emulator.setCabinetInput(v)
 	}
 
-	public setFliptronicsInput(v: string, enable?: boolean): void {
+	setFliptronicsInput(v: string, enable?: boolean): void {
 		this.emulator?.setFliptronicsInput(v, enable)
 	}
 
-	public getDmdDimensions(): Vertex2D {
+	getDmdDimensions(): Vertex2D {
 		return this.dmdSize
 	}
-	public getDmdFrame(): Uint8Array {
+	getDmdFrame(): Uint8Array {
 		return this.emulatorState.getDmdScreen()
 	}
-	public getDipSwitchByte(): number {
+	getDipSwitchByte(): number {
 		return this.emulator?.getDipSwitchByte() ?? 0
 	}
-	public setDipSwitchByte(v: number): void {
+	setDipSwitchByte(v: number): void {
 		if (!this.emulator) {
 			this.queue.addMessage(MessageType.SetDipByte, v)
 			return

@@ -1,111 +1,123 @@
 {
-	"name": "vpx-js",
-	"version": "2.0.0",
-	"description": "Visual Pinball for Node.js and the Browser",
-	"author": "freezy <freezy@vpdb.io>",
-	"contributors": [
-		"Jason Millard <jsm174@gmail.com>",
-		"Michael Vogt <michael@neeo.com>"
-	],
-	"repository": {
-		"type": "git",
-		"url": "https://github.com/vpdb/vpx-js"
-	},
-	"license": "GPL-2.0",
-	"type": "module",
-	"engines": {
-		"node": ">=22"
-	},
-	"exports": {
-		".": {
-			"types": "./dist/index.d.ts",
-			"import": "./dist/index.js"
-		},
-		"./lib/refs.node.js": {
-			"types": "./dist/lib/refs.node.d.ts",
-			"import": "./dist/lib/refs.node.js"
-		},
-		"./lib/refs.browser.js": {
-			"types": "./dist/lib/refs.browser.d.ts",
-			"import": "./dist/lib/refs.browser.js"
-		}
-	},
-	"main": "./dist/index.js",
-	"types": "./dist/index.d.ts",
-	"files": [
-		"dist/**",
-		"res/**"
-	],
-	"bin": {
-		"vbs2js": "./dist/bin/vbs2js.js",
-		"vpt2glb": "./dist/bin/vpt2glb.js",
-		"vptscript": "./dist/bin/vptscript.js"
-	},
-	"scripts": {
-		"build": "npm run build:pre && tsup && npm run build:cp",
-		"build:pre": "tsx build/compile-rules.ts && tsx build/write-info.ts",
-		"build:cp": "cp -r res dist/ && mkdir -p dist/lib/scripting/grammar && cp lib/scripting/grammar/grammar.bnf dist/lib/scripting/grammar/",
-		"typecheck": "tsc --noEmit",
-		"lint": "biome check .",
-		"format": "biome check --write .",
-		"test": "vitest run --coverage",
-		"test:watch": "vitest --watch",
-		"dev": "tsup --watch"
-	},
-	"dependencies": {
-		"dash-ast": "^2.0.0",
-		"ebnf": "^1.9.0",
-		"es6-promise-pool": "^2.5.0",
-		"escodegen": "^1.12.0",
-		"escope": "^3.6.0",
-		"estraverse": "^5.0.0",
-		"gltf-pipeline": "^4.3.1",
-		"gm": "^1.23.1",
-		"moo": "^0.5.1",
-		"pngquant": "^3.1.0",
-		"three": "^0.185.0",
-		"wpc-emu": "^0.36.7"
-	},
-	"optionalDependencies": {
-		"sharp": "^0.35.3"
-	},
-	"devDependencies": {
-		"@biomejs/biome": "^2.5.7",
-		"@types/chai": "^4.3.0",
-		"@types/escodegen": "0.0.6",
-		"@types/estraverse": "0.0.6",
-		"@types/estree": "^1.0.0",
-		"@types/gm": "^1.18.1",
-		"@types/mocha": "^10.0.0",
-		"@types/moo": "^0.5.3",
-		"@types/nearley": "^2.11.1",
-		"@types/node": "^22.0.0",
-		"@types/sharp": "^0.31.1",
-		"@types/sinon": "^17.0.0",
-		"@types/sinon-chai": "^3.2.0",
-		"@types/three": "^0.160.0",
-		"@vitest/coverage-v8": "^4.1.10",
-		"chai": "^4.3.6",
-		"looks-same": "^7.2.3",
-		"nock": "^13.5.0",
-		"sinon": "^17.0.0",
-		"sinon-chai": "^3.7.0",
-		"tsup": "^8.5.1",
-		"tsx": "^4.23.9",
-		"typescript": "^5.9.2",
-		"vite": "^7.0.0",
-		"vitest": "^4.1.10"
-	},
-	"bugs": {
-		"url": "https://github.com/vpdb/vpx-js/issues"
-	},
-	"homepage": "https://github.com/vpdb/vpx-js#readme",
-	"keywords": [
-		"pinball",
-		"visual pinball",
-		"vp10",
-		"vpx",
-		"glb",
-		"gltf"
-	]
+  "name": "vpx-js",
+  "version": "2.0.0",
+  "description": "Visual Pinball for Node.js and the Browser",
+  "author": "freezy <freezy@vpdb.io>",
+  "contributors": [
+    "Jason Millard <jsm174@gmail.com>",
+    "Michael Vogt <michael@neeo.com>"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vpdb/vpx-js"
+  },
+  "license": "GPL-2.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./lib/refs.node.js": {
+      "types": "./dist/lib/refs.node.d.ts",
+      "import": "./dist/lib/refs.node.js"
+    },
+    "./lib/refs.browser.js": {
+      "types": "./dist/lib/refs.browser.d.ts",
+      "import": "./dist/lib/refs.browser.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist/**",
+    "res/**"
+  ],
+  "bin": {
+    "vbs2js": "./dist/bin/vbs2js.js",
+    "vpt2glb": "./dist/bin/vpt2glb.js",
+    "vptscript": "./dist/bin/vptscript.js"
+  },
+  "scripts": {
+    "build": "npm run build:pre && tsup && npm run build:cp && npm run build:esm",
+    "build:pre": "tsx build/compile-rules.ts && tsx build/write-info.ts",
+    "build:cp": "cp -r res dist/ && mkdir -p dist/lib/scripting/grammar && cp lib/scripting/grammar/grammar.bnf dist/lib/scripting/grammar/",
+    "build:esm": "tsc --outDir dist-esm --rootDir . --module ESNext --target ES2024 --moduleResolution bundler --esModuleInterop --allowSyntheticDefaultImports --resolveJsonModule --skipLibCheck --declaration false --declarationMap false --sourceMap true && cp -r res dist-esm/ && mkdir -p dist-esm/lib/scripting/grammar && cp lib/scripting/grammar/grammar.bnf dist-esm/lib/scripting/grammar/ 2>/dev/null; cp lib/scripting/grammar/rules.ts dist-esm/lib/scripting/grammar/ 2>/dev/null; echo 'dist-esm built'",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "test": "vitest run --coverage",
+    "test:watch": "vitest --watch",
+    "dev": "tsup --watch",
+    "build:wasm": "wasm/build.sh",
+    "build:wasm:debug": "wasm/build.sh --debug",
+    "build:wasm:mock": "wasm/build.sh --mock",
+    "test:integration": "vitest run lib/emu/pinmame/pinmame.integration.spec.ts lib/emu/wasm-build.integration.spec.ts lib/scripting/objects/vpm-controller.integration.spec.ts lib/vpt/table/table.integration.spec.ts lib/game/player.integration.spec.ts",
+    "verify:pinmame": "tsx test/harness/verify-pinmame.ts",
+    "verify:wasm": "tsx test/harness/verify-wasm.ts",
+    "verify": "npm run verify:wasm && npm run verify:table && npm run verify:pinmame && npm run verify:player",
+    "verify:table": "tsx test/harness/verify-table.ts",
+    "verify:player": "tsx test/harness/verify-player.ts",
+    "verify:all": "tsx test/harness/verify-all.ts",
+    "verify:e2e": "tsx test/harness/verify-all.ts"
+  },
+  "dependencies": {
+    "dash-ast": "^2.0.0",
+    "ebnf": "^1.9.0",
+    "es6-promise-pool": "^2.5.0",
+    "escodegen": "^1.12.0",
+    "escope": "^3.6.0",
+    "estraverse": "^5.0.0",
+    "gltf-pipeline": "^4.3.1",
+    "gm": "^1.23.1",
+    "moo": "^0.5.1",
+    "pngquant": "^3.1.0",
+    "three": "^0.185.0",
+    "wpc-emu": "^0.36.7"
+  },
+  "optionalDependencies": {
+    "sharp": "^0.35.3"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.7",
+    "@types/chai": "^4.3.0",
+    "@types/escodegen": "0.0.6",
+    "@types/estraverse": "0.0.6",
+    "@types/estree": "^1.0.0",
+    "@types/gm": "^1.18.1",
+    "@types/mocha": "^10.0.0",
+    "@types/moo": "^0.5.3",
+    "@types/nearley": "^2.11.1",
+    "@types/node": "^22.0.0",
+    "@types/sharp": "^0.31.1",
+    "@types/sinon": "^17.0.0",
+    "@types/sinon-chai": "^3.2.0",
+    "@types/three": "^0.160.0",
+    "@vitest/coverage-v8": "^4.1.10",
+    "chai": "^4.3.6",
+    "looks-same": "^7.2.3",
+    "nock": "^13.5.0",
+    "sinon": "^17.0.0",
+    "sinon-chai": "^3.7.0",
+    "tsup": "^8.5.1",
+    "tsx": "^4.23.9",
+    "typescript": "^5.9.2",
+    "vite": "^7.0.0",
+    "vitest": "^4.1.10"
+  },
+  "bugs": {
+    "url": "https://github.com/vpdb/vpx-js/issues"
+  },
+  "homepage": "https://github.com/vpdb/vpx-js#readme",
+  "keywords": [
+    "pinball",
+    "visual pinball",
+    "vp10",
+    "vpx",
+    "glb",
+    "gltf"
+  ]
 }

@@ -30,6 +30,8 @@ import {
 import type { Player } from './player.js'
 
 const APP_KEYBOARD = 0
+const LEFT_KEYS = new Set([DIK_LSHIFT, DIK_LCONTROL])
+const RIGHT_KEYS = new Set([DIK_RSHIFT, DIK_RCONTROL])
 
 /** DirectInput key queue.
  * @see https://github.com/vpinball/vpinball/blob/master/pininput.cpp */
@@ -65,16 +67,16 @@ export class PinInput {
 		private readonly player: Player,
 	) {}
 
-	public onKeyDown(dkCode: number, timestamp: number): void {
-		this.diq.push(DirectInputDeviceObjectData.claim(dkCode, 0x80, timestamp))
+	onKeyDown(code: number, ts: number): void {
+		this.diq.push(DirectInputDeviceObjectData.claim(code, 0x80, ts))
 	}
 
-	public onKeyUp(dkCode: number, timestamp: number): void {
-		this.diq.push(DirectInputDeviceObjectData.claim(dkCode, 0x0, timestamp))
+	onKeyUp(code: number, ts: number): void {
+		this.diq.push(DirectInputDeviceObjectData.claim(code, 0x0, ts))
 	}
 
 	/** Drains queue and forwards key events. */
-	public processKeys(): void {
+	processKeys(): void {
 		let input: DirectInputDeviceObjectData | undefined
 		while ((input = this.diq.pop())) {
 			if (input.dwSequence === APP_KEYBOARD) {
@@ -82,8 +84,10 @@ export class PinInput {
 					input.dwOfs === this.rgKeys[AssignKey.FrameCount] ||
 					input.dwOfs === this.rgKeys[AssignKey.Enable3D] ||
 					input.dwOfs === this.rgKeys[AssignKey.DBGBalls]
-				if (!special)
-					this.fireKeyEvent(input.dwData & 0x80 ? Event.GameEventsKeyDown : Event.GameEventsKeyUp, input.dwOfs)
+				if (!special) {
+					const down = (input.dwData & 0x80) !== 0
+					this.fireKeyEvent(down ? Event.GameEventsKeyDown : Event.GameEventsKeyUp, input.dwOfs)
+				}
 			}
 			DirectInputDeviceObjectData.release(input)
 		}
@@ -91,25 +95,45 @@ export class PinInput {
 
 	private fireKeyEvent(dispid: Event, keycode: number): void {
 		this.table.getApi().fireKeyEvent(dispid, keycode)
+		this.syncFlippers(dispid === Event.GameEventsKeyDown, keycode)
+	}
+
+	private syncFlippers(isDown: boolean, keycode: number): void {
+		const left = keycode === this.rgKeys[AssignKey.LeftFlipperKey] || LEFT_KEYS.has(keycode)
+		const right = keycode === this.rgKeys[AssignKey.RightFlipperKey] || RIGHT_KEYS.has(keycode)
+		if (!left && !right) return
+		const flippers = Object.values(this.table.flippers)
+		if (!flippers.length) return
+		for (const flipper of flippers) {
+			const isRightFlipper = flipper.getName().toLowerCase().includes('right')
+			if (flippers.length > 1) {
+				if (left && isRightFlipper) continue
+				if (right && !isRightFlipper) continue
+			}
+			try {
+				const api = flipper.getApi()
+				isDown ? api.RotateToEnd() : api.RotateToStart()
+			} catch {}
+		}
 	}
 }
 
 class DirectInputDeviceObjectData {
-	public dwOfs = 0
-	public dwData = 0
-	public dwTimeStamp = 0
-	public dwSequence = APP_KEYBOARD
+	dwOfs = 0
+	dwData = 0
+	dwTimeStamp = 0
+	dwSequence = APP_KEYBOARD
 
-	public set(dwOfs: number, dwData: number, dwTimeStamp: number): this {
+	set(dwOfs: number, dwData: number, dwTimeStamp: number): this {
 		this.dwOfs = dwOfs
 		this.dwData = dwData
 		this.dwTimeStamp = dwTimeStamp
 		return this
 	}
 
-	public static claim(dwOfs: number, dwData: number, dwTimeStamp: number): DirectInputDeviceObjectData {
+	static claim(dwOfs: number, dwData: number, dwTimeStamp: number): DirectInputDeviceObjectData {
 		return new DirectInputDeviceObjectData().set(dwOfs, dwData, dwTimeStamp)
 	}
 
-	public static release(..._items: DirectInputDeviceObjectData[]): void {}
+	static release(..._items: DirectInputDeviceObjectData[]): void {}
 }

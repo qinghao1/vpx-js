@@ -45,7 +45,11 @@ export class Player extends EventEmitter {
 		this.table.setupCollections()
 		this.physics.init()
 		this.table.prepareToPlay()
-		this.table.runTableScript(this, scope)
+		try {
+			this.table.runTableScript(this, scope)
+		} catch (e) {
+			console.warn('Table script failed, continuing without script', e)
+		}
 		this.table.broadcastInit()
 		this.isInitialized = true
 		return this

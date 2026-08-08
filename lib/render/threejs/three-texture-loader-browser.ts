@@ -1,11 +1,13 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
+import { EXRLoader } from 'three/examples/jsm/loaders/EXRLoader.js'
 import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js'
 import {
 	CanvasTexture,
 	DataTexture,
 	LinearFilter,
+	LinearMipMapLinearFilter,
 	LinearSRGBColorSpace,
 	RGBAFormat,
 	SRGBColorSpace,
@@ -14,7 +16,6 @@ import {
 	UnsignedByteType,
 } from '../../refs.browser.js'
 import type { ITextureLoader } from '../irender-api.js'
-import { EXRLoader } from './vendor/EXRLoader.js'
 
 const imageMap: { [key: string]: string } = {
 	bumperbase: new URL('../../../res/maps/bumperbase.png', import.meta.url).href,
@@ -31,6 +32,18 @@ const imageMap: { [key: string]: string } = {
 
 const MAX_REGULAR = 1024
 const MAX_FLOAT = 512
+
+function tune(tex: any): void {
+	tex.generateMipmaps = true
+	tex.minFilter = LinearMipMapLinearFilter as any
+	tex.anisotropy = 4
+}
+
+function nameAndTune(tex: any, name: string): void {
+	tex.name = `texture:${name}`
+	tex.needsUpdate = true
+	tune(tex)
+}
 
 function getMaxSizeForTexture(name: string, w: number, h: number, isFloat: boolean): number {
 	try {
@@ -64,17 +77,14 @@ export class ThreeTextureLoaderBrowser implements ITextureLoader<ThreeTexture> {
 		texture.flipY = true
 		texture.colorSpace = SRGBColorSpace
 		texture.needsUpdate = true
-		texture.generateMipmaps = false
-		texture.minFilter = LinearFilter as any
-		texture.anisotropy = 1
+		tune(texture)
 		const max = getMaxSizeForTexture(name, width, height, false)
 		const ds = downsampleIfNeeded(texture, max, name)
 		if (ds && ds !== texture) {
 			try {
 				;(texture as any).dispose?.()
 			} catch {}
-			;(ds as any).name = `texture:${name}`
-			;(ds as any).needsUpdate = true
+			nameAndTune(ds as any, name)
 			return ds as ThreeTexture
 		}
 		return texture
@@ -89,12 +99,8 @@ export class ThreeTextureLoaderBrowser implements ITextureLoader<ThreeTexture> {
 				const buffer = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer
 				const loader = isExr ? new EXRLoader() : new HDRLoader()
 				const texture = (loader as any).createDataTexture(buffer) as ThreeTexture
-				texture.name = `texture:${name}`
-				texture.needsUpdate = true
+				nameAndTune(texture as any, name)
 				if ((texture as any).colorSpace === SRGBColorSpace) (texture as any).colorSpace = LinearSRGBColorSpace
-				;(texture as any).anisotropy = 1
-				texture.generateMipmaps = false
-				texture.minFilter = LinearFilter as any
 				const w = (texture.image as any)?.width || 0
 				const h = (texture.image as any)?.height || 0
 				const max = getMaxSizeForTexture(name, w, h, true)
@@ -103,10 +109,7 @@ export class ThreeTextureLoaderBrowser implements ITextureLoader<ThreeTexture> {
 					try {
 						;(texture as any).dispose?.()
 					} catch {}
-					if ((ds as any).image && (ds as any).image.data) {
-						;(ds as any).generateMipmaps = false
-						;(ds as any).minFilter = LinearFilter as any
-					}
+					if ((ds as any).image?.data) tune(ds as any)
 					return ds as ThreeTexture
 				}
 				return texture as ThreeTexture
@@ -122,9 +125,7 @@ export class ThreeTextureLoaderBrowser implements ITextureLoader<ThreeTexture> {
 			texture.name = `texture:${name}`
 			texture.colorSpace = SRGBColorSpace
 			texture.needsUpdate = true
-			texture.anisotropy = 1
-			texture.generateMipmaps = false
-			texture.minFilter = LinearFilter as any
+			tune(texture as any)
 			const w = (texture.image as any)?.width || (texture.image as any)?.naturalWidth || 0
 			const h = (texture.image as any)?.height || (texture.image as any)?.naturalHeight || 0
 			const max = getMaxSizeForTexture(name, w, h, false)
@@ -136,11 +137,7 @@ export class ThreeTextureLoaderBrowser implements ITextureLoader<ThreeTexture> {
 				try {
 					;(texture as any).image = null
 				} catch {}
-				ds.name = `texture:${name}`
-				ds.needsUpdate = true
-				ds.generateMipmaps = false
-				ds.minFilter = LinearFilter as any
-				ds.anisotropy = 1
+				nameAndTune(ds as any, name)
 				return ds as ThreeTexture
 			}
 			return texture as ThreeTexture
@@ -232,8 +229,7 @@ function downsampleIfNeeded(texture: any, maxSize: number, nameHint?: string): a
 				newTex.needsUpdate = true
 				newTex.colorSpace = (texture as any).colorSpace || LinearSRGBColorSpace
 				newTex.flipY = (texture as any).flipY ?? true
-				newTex.generateMipmaps = false
-				newTex.minFilter = LinearFilter as any
+				tune(newTex)
 				newTex.magFilter = LinearFilter as any
 				newTex.type = (texture as any).type || (isFloat ? (texture as any).type : UnsignedByteType)
 				newTex.name = (texture as any).name
@@ -276,9 +272,7 @@ function downsampleIfNeeded(texture: any, maxSize: number, nameHint?: string): a
 					newTex.colorSpace = (texture as any).colorSpace || SRGBColorSpace
 					newTex.needsUpdate = true
 					newTex.name = (texture as any).name
-					newTex.anisotropy = 1
-					newTex.generateMipmaps = false
-					newTex.minFilter = LinearFilter as any
+					tune(newTex)
 					newTex.flipY = (texture as any).flipY ?? true
 					try {
 						texture.dispose?.()
@@ -316,8 +310,7 @@ function load(
 				url,
 				(texture) => {
 					URL.revokeObjectURL(url)
-					texture.generateMipmaps = false
-					texture.minFilter = LinearFilter as any
+					tune(texture as any)
 					const w = (texture.image as any)?.width || (texture.image as any)?.naturalWidth || 0
 					const h = (texture.image as any)?.height || (texture.image as any)?.naturalHeight || 0
 					const max = nameHint ? getMaxSizeForTexture(nameHint, w, h, false) : MAX_REGULAR
@@ -358,8 +351,7 @@ function load(
 				url,
 				(texture) => {
 					URL.revokeObjectURL(url)
-					texture.generateMipmaps = false
-					texture.minFilter = LinearFilter as any
+					tune(texture as any)
 					const w = (texture.image as any)?.width || 0
 					const h = (texture.image as any)?.height || 0
 					const max = nameHint ? getMaxSizeForTexture(nameHint, w, h, true) : MAX_FLOAT
@@ -397,8 +389,7 @@ function load(
 				url,
 				(texture) => {
 					URL.revokeObjectURL(url)
-					texture.generateMipmaps = false
-					texture.minFilter = LinearFilter as any
+					tune(texture as any)
 					const w = (texture.image as any)?.width || 0
 					const h = (texture.image as any)?.height || 0
 					const max = nameHint ? getMaxSizeForTexture(nameHint, w, h, true) : MAX_FLOAT
