@@ -15,13 +15,13 @@ function openDB(): Promise<IDBDatabase> {
 	})
 }
 
-export async function idbGet(key: string): Promise<ArrayBuffer | undefined> {
+export async function idbGet(key: string): Promise<any | undefined> {
 	try {
 		const db = await openDB()
 		return await new Promise((resolve, reject) => {
 			const tx = db.transaction(STORE_TEX, 'readonly')
 			const req = tx.objectStore(STORE_TEX).get(key)
-			req.onsuccess = () => resolve(req.result as ArrayBuffer | undefined)
+			req.onsuccess = () => resolve(req.result as any)
 			req.onerror = () => reject(req.error)
 		})
 	} catch {
@@ -29,12 +29,12 @@ export async function idbGet(key: string): Promise<ArrayBuffer | undefined> {
 	}
 }
 
-export async function idbSet(key: string, buf: ArrayBuffer): Promise<void> {
+export async function idbSet(key: string, val: any): Promise<void> {
 	try {
 		const db = await openDB()
 		await new Promise<void>((resolve, reject) => {
 			const tx = db.transaction(STORE_TEX, 'readwrite')
-			tx.objectStore(STORE_TEX).put(buf, key)
+			tx.objectStore(STORE_TEX).put(val, key)
 			tx.oncomplete = () => resolve()
 			tx.onerror = () => reject(tx.error)
 		})
@@ -43,4 +43,8 @@ export async function idbSet(key: string, buf: ArrayBuffer): Promise<void> {
 
 export function texCacheKey(name: string, w: number, h: number, mtime = ''): string {
 	return `tex:${name.toLowerCase()}:${w}x${h}:${mtime}`
+}
+
+export function exrCacheKey(name: string, byteLength: number, kind: string): string {
+	return `exr:${name.toLowerCase()}:${kind}:${byteLength}`
 }

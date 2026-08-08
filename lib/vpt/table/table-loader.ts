@@ -16,6 +16,7 @@ const decoder = new TextDecoder()
 /** Loads VPX OLE storage into table model. */
 export class TableLoader {
 	private doc!: OleCompoundDoc
+	private _lock: Promise<void> = Promise.resolve()
 
 	public async load(reader: IBinaryReader, opts: TableLoadOptions = {}): Promise<LoadedTable> {
 		progress().start('table.load', 'Loading VPX file')
@@ -47,11 +48,16 @@ export class TableLoader {
 	}
 
 	public async streamStorage<T>(name: string, streamer: (stg: Storage) => Promise<T>): Promise<T> {
+		let release!: () => void
+		const prev = this._lock
+		this._lock = new Promise<void>((r) => (release = r))
+		await prev
 		try {
 			await this.doc.reopen()
 			return await streamer(this.doc.storage(name))
 		} finally {
 			await this.doc.close()
+			release()
 		}
 	}
 

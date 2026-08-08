@@ -55,8 +55,7 @@ export class PinMameEmulator implements IEmulator {
 			logger().warn('[pinmame] mock — physics only, run npm run build:wasm')
 			return
 		}
-		const wrap = (n: string, r: string | null, a: string[]) =>
-			module.cwrap(n, r, a) as unknown as Api[keyof Api]
+		const wrap = (n: string, r: string | null, a: string[]) => module.cwrap(n, r, a) as unknown as Api[keyof Api]
 		this.api = {
 			setConfig: wrap('PinmameSetConfig', null, ['number']) as Api['setConfig'],
 			run: wrap('PinmameRun', 'number', ['number']) as Api['run'],
@@ -81,7 +80,9 @@ export class PinMameEmulator implements IEmulator {
 		}
 		const m = this.mod
 		for (const dir of ['/pinmame/roms', '/pinmame/nvram', '/pinmame/cfg']) {
-			try { m.FS.mkdirTree(dir) } catch {}
+			try {
+				m.FS.mkdirTree(dir)
+			} catch {}
 		}
 		m.FS.writeFile(`/pinmame/roms/${game}.zip`, rom)
 		this.writeConfig(m)
@@ -109,24 +110,45 @@ export class PinMameEmulator implements IEmulator {
 		}
 	}
 
-	isInitialized(): boolean { return this.ready }
-	getVersion(): string { return 'libpinmame-3.7-wasm' }
-	setPaused(v: boolean): void { this.paused = v }
-	getPaused(): boolean { return this.paused }
+	isInitialized(): boolean {
+		return this.ready
+	}
+	getVersion(): string {
+		return 'libpinmame-3.7-wasm'
+	}
+	setPaused(v: boolean): void {
+		this.paused = v
+	}
+	getPaused(): boolean {
+		return this.paused
+	}
 	registerAudioConsumer(): void {}
-	getDmdDimensions(): Vertex2D { return DMD_SIZE }
+	getDmdDimensions(): Vertex2D {
+		return DMD_SIZE
+	}
 	getDmdFrame(): Uint8Array {
 		const d = this.emulatorState.getDmdScreen()
 		return d.length ? d : this.fallback
 	}
-	getDipSwitchByte(): number { return this.isMock || !this.api ? 0 : (this.api.getDIP(0) ?? 0) }
+	getDipSwitchByte(): number {
+		return this.isMock || !this.api ? 0 : (this.api.getDIP(0) ?? 0)
+	}
 	setDipSwitchByte(v: number): void {
-		if (!this.ready) { this.queue.addMessage(MessageType.SetDipByte, v); return }
-		if (!this.isMock && this.api) try { this.api.setDIP(0, v) } catch {}
+		if (!this.ready) {
+			this.queue.addMessage(MessageType.SetDipByte, v)
+			return
+		}
+		if (!this.isMock && this.api)
+			try {
+				this.api.setDIP(0, v)
+			} catch {}
 	}
 
 	emuSimulateCycle(ms: number): number {
-		if (!this.ready) { this.queue.addMessage(MessageType.ExecuteTicks, ms); return 0 }
+		if (!this.ready) {
+			this.queue.addMessage(MessageType.ExecuteTicks, ms)
+			return 0
+		}
 		if (this.paused || this.isMock) return ms
 		this.sync()
 		return ms
@@ -159,29 +181,49 @@ export class PinMameEmulator implements IEmulator {
 		}
 	}
 
-	getSwitchInput(n: number): number { return this.isMock || !this.api ? 0 : (this.api.getSwitch(n) ?? 0) }
-	getLampState(n: number): number { return this.emulatorState.getLampStateDirect(n) ?? this.lamps[n] ?? 0 }
-	getSolenoidState(n: number): number { return this.emulatorState.getSolenoidState(n) }
-	getGIState(n: number): number { return this.emulatorState.getGIState(n) }
+	private readonly mockSwitches = new Map<number, number>()
+
+	getSwitchInput(n: number): number {
+		return (this.isMock ? this.mockSwitches.get(n) : this.api?.getSwitch(n)) ?? 0
+	}
+	getLampState(n: number): number {
+		return this.emulatorState.getLampStateDirect(n) ?? this.lamps[n] ?? 0
+	}
+	getSolenoidState(n: number): number {
+		return this.emulatorState.getSolenoidState(n)
+	}
+	getGIState(n: number): number {
+		return this.emulatorState.getGIState(n)
+	}
 
 	setSwitchInput(n: number, enable?: boolean): boolean {
 		if (!this.ready) {
 			const t =
-				enable === true ? MessageType.SetSwitchInput
-				: enable === false ? MessageType.ClearSwitchInput
-				: MessageType.ToggleSwitchInput
+				enable === true
+					? MessageType.SetSwitchInput
+					: enable === false
+						? MessageType.ClearSwitchInput
+						: MessageType.ToggleSwitchInput
 			this.queue.addMessage(t, n)
 			return true
 		}
-		if (this.isMock || !this.api) return true
+		const cur = (this.isMock ? this.mockSwitches.get(n) : this.api?.getSwitch(n)) ?? 0
+		const next = enable === undefined ? (cur ? 0 : 1) : enable ? 1 : 0
+		if (this.isMock) {
+			this.mockSwitches.set(n, next)
+			return true
+		}
+		if (!this.api) return true
 		try {
-			const cur = this.api.getSwitch(n)
-			const next = enable === undefined ? (cur ? 0 : 1) : enable ? 1 : 0
 			this.api.setSwitch(n, next)
 			return true
-		} catch { return false }
+		} catch {
+			return false
+		}
 	}
 
-	setCabinetInput(v: number): void { if (!this.ready) this.queue.addMessage(MessageType.CabinetInput, v) }
+	setCabinetInput(v: number): void {
+		if (!this.ready) this.queue.addMessage(MessageType.CabinetInput, v)
+	}
 	setFliptronicsInput(): void {}
 }

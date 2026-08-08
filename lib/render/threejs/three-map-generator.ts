@@ -46,8 +46,8 @@ export class ThreeMapGenerator {
 		const hasLarge = textures.some((t) => t.width * t.height > 4 * 1024 * 1024)
 		const hasFloat = textures.some((t) => (t as any).isHdr?.() || /\.(exr|hdr)$/i.test((t as any).szPath ?? ''))
 		const cores = (typeof navigator !== 'undefined' && (navigator as any).hardwareConcurrency) || 4
-		if (hasLarge) return Math.min(2, cores)
-		if (hasFloat) return Math.min(3, cores)
+		if (hasFloat) return Math.min(4, cores)
+		if (hasLarge) return Math.min(3, cores)
 		return Math.min(6, cores)
 	}
 
@@ -102,6 +102,10 @@ export class ThreeMapGenerator {
 
 	public hasTexture(name: string): boolean {
 		return this.textureCache.has(name)
+	}
+
+	public getCache(): Map<string, ThreeTexture> {
+		return this.textureCache
 	}
 
 	public disposeUnused(usedNames: Set<string>): number {
