@@ -62,7 +62,8 @@
 		"verify:table": "tsx test/harness/verify-table.ts",
 		"verify:player": "tsx test/harness/verify-player.ts",
 		"verify:all": "tsx test/harness/verify-all.ts",
-		"verify:e2e": "tsx test/harness/verify-all.ts"
+		"verify:e2e": "tsx test/harness/verify-all.ts",
+		"prepare": "husky"
 	},
 	"dependencies": {
 		"dash-ast": "^2.0.0",
@@ -98,15 +99,17 @@
 		"@types/three": "^0.185.4",
 		"@vitest/coverage-v8": "^4.1.10",
 		"chai": "^4.3.6",
+		"husky": "^9.1.7",
+		"lint-staged": "^16.1.2",
 		"looks-same": "^7.2.3",
 		"nock": "^13.5.0",
+		"puppeteer-core": "^25.5.0",
 		"sinon": "^17.0.0",
 		"sinon-chai": "^3.7.0",
 		"tsup": "^8.5.1",
 		"tsx": "^4.23.11",
 		"typescript": "^6.0.3",
 		"vite": "^8.2.1",
-		"puppeteer-core": "^25.5.0",
 		"vitest": "^4.1.10"
 	},
 	"bugs": {
@@ -120,5 +123,10 @@
 		"vpx",
 		"glb",
 		"gltf"
-	]
+	],
+	"lint-staged": {
+		"*.{ts,js,cts,mts,json,jsonc}": [
+			"biome check --write --no-errors-on-unmatched"
+		]
+	}
 }
