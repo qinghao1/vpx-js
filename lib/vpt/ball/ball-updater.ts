@@ -8,22 +8,54 @@ import type { BallData } from './ball-data.js'
 import type { BallState } from './ball-state.js'
 
 // Ball pose: row-major R*S*T in D3D (ball.cpp:483) → col-major T*R*S*Flip in Three (matrix.ts:299)
+// antiStretch is viewport-dependent projection correction (ball.cpp:449) — uniform radius intentional for headless
 export class BallUpdater extends ItemUpdater<BallState> {
-	private readonly data: BallData
-	constructor(state: BallState, data: BallData) {
+	constructor(
+		state: BallState,
+		private readonly data: BallData,
+	) {
 		super(state)
-		this.data = data
 	}
-	applyState<NODE, GEOMETRY, POINT_LIGHT>(obj: NODE, state: BallState, api: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>, _table: Table): void {
+
+	applyState<NODE, GEOMETRY, POINT_LIGHT>(
+		obj: NODE,
+		state: BallState,
+		api: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
+		_table: Table,
+	): void {
 		Object.assign(this.state, state)
-		const pos = this.state.pos, z = this.state.isFrozen ? pos.z - this.data.radius : pos.z
+		const pos = this.state.pos
+		const z = this.state.isFrozen ? pos.z - this.data.radius : pos.z
 		const o = this.state.orientation.matrix
-		const orient = Matrix3D.claim().setEach(o[0]![0]!, o[1]![0]!, o[2]![0]!, 0, o[0]![1]!, o[1]![1]!, o[2]![1]!, 0, o[0]![2]!, o[1]![2]!, o[2]![2]!, 0, 0, 0, 0, 1)
+		const orient = Matrix3D.claim().setEach(
+			o[0]![0]!,
+			o[1]![0]!,
+			o[2]![0]!,
+			0,
+			o[0]![1]!,
+			o[1]![1]!,
+			o[2]![1]!,
+			0,
+			o[0]![2]!,
+			o[1]![2]!,
+			o[2]![2]!,
+			0,
+			0,
+			0,
+			0,
+			1,
+		)
 		const trans = Matrix3D.claim().setTranslation(pos.x, pos.y, z)
-		const m = Matrix3D.claim().setScaling(this.data.radius, this.data.radius, this.data.radius).preMultiply(orient).preMultiply(trans).toRightHanded()
-		api.applyMatrixToNode(m, obj)
-		Matrix3D.release(orient, trans, m)
-		const maybe = obj as unknown as { updateMatrixWorld?: (f: boolean) => void }
-		maybe.updateMatrixWorld?.(true)
+		const mat = Matrix3D.claim()
+			.setScaling(this.data.radius, this.data.radius, this.data.radius)
+			.preMultiply(orient)
+			.preMultiply(trans)
+			.toRightHanded()
+		try {
+			api.applyMatrixToNode(mat, obj)
+		} finally {
+			Matrix3D.release(orient, trans, mat)
+		}
+		;(obj as unknown as { updateMatrixWorld?: (f: boolean) => void }).updateMatrixWorld?.(true)
 	}
 }
