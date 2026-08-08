@@ -148,57 +148,17 @@ export class PinInput {
 
 	private tryMockTroughEject(isDown: boolean, code: number): void {
 		if (!isDown) return
-		const k = this.rgKeys
-		const isStart = code === DIK_1 || code === k[AssignKey.StartGameKey]
-		const isPlunger = code === k[AssignKey.PlungerKey]
-		if (!isStart && !isPlunger) return
-		if (isPlunger && this.hasLiveBall()) return
-		const emu = this.player.getPhysics().emu as unknown as {
-			isMock?: boolean
-			isInitialized?: () => boolean
-		} | null
+		if (code !== DIK_1 && code !== this.rgKeys[AssignKey.StartGameKey]) return
+		const emu = this.player.getPhysics().emu as unknown as { isMock?: boolean; isInitialized?: () => boolean } | null
 		if (emu && !emu.isMock && emu.isInitialized?.()) return
-		this.kickFirstTroughBall()
-	}
-
-	private hasLiveBall(): boolean {
-		return this.player.balls.some(b => !b.getState().isFrozen && !this.isInTrough(b))
-	}
-
-	private isInTrough(ball: { getState(): { pos: { x: number; y: number } } }): boolean {
-		const centers = this.troughCenters()
-		const p = ball.getState().pos
-		return centers.some(c => (p.x - c.x) ** 2 + (p.y - c.y) ** 2 < 2500)
-	}
-
-	private troughCenters(): Array<{ x: number; y: number }> {
-		return ['sw21', 'sw20', 'sw19', 'sw18']
-			.map(
-				n =>
-					this.table.kickers[n] ??
-					this.table.kickers[n.toLowerCase()] ??
-					Object.values(this.table.kickers).find(k => k.getName().toLowerCase() === n),
-			)
-			.filter(Boolean)
-			.map(k => (k as { data: { center: { x: number; y: number } } }).data.center)
-	}
-
-	private kickFirstTroughBall(): void {
-		const order = ['sw21', 'sw20', 'sw19', 'sw18']
-		const byName: Record<string, unknown> = {}
-		for (const [key, item] of Object.entries(this.table.kickers)) {
-			byName[key.toLowerCase()] = item
-			try {
-				byName[(item as { getName(): string }).getName().toLowerCase()] = item
-			} catch {}
-		}
-		for (const name of order) {
-			const kicker = byName[name] as
+		// no PinMAME solenoid in mock — emulate solTrough: sw21.kick 61,10
+		for (const name of ['sw21', 'sw20', 'sw19', 'sw18']) {
+			const kicker = (this.table.kickers[name] ??
+				Object.values(this.table.kickers).find((k) => k.getName().toLowerCase() === name)) as
 				| { hit?: { ball?: unknown }; getApi(): { Kick(a: number, s: number): void } }
 				| undefined
 			if (!kicker?.hit?.ball) continue
 			try {
-				// solTrough: sw21.kick 61,10 (walking_dead.vbs:790)
 				kicker.getApi().Kick(61, 10)
 			} catch {}
 			break
