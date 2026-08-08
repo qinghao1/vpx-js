@@ -17,6 +17,13 @@ const MAP: Record<string, string> = {
 	'grammar.bnf': grammar,
 }
 
+/** Whether a bundled text file exists without fallback. */
+export function hasTextFile(fileName: string): boolean {
+	const base = fileName.replace(/.*[\\/]/, '').toLowerCase()
+	if (MAP[base] !== undefined) return true
+	return MAP[fileName.toLowerCase()] !== undefined
+}
+
 /** getTextFile. */
 export function getTextFile(fileName: string): string {
 	const key = fileName.toLowerCase()

@@ -1,7 +1,7 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { getTextFile } from '../../refs.node.js'
+import { getTextFile, hasTextFile } from '../../refs.node.js'
 import { TextStream } from './text-stream.js'
 
 /** FileSystem. */
@@ -24,16 +24,9 @@ export class FileSystem {
 		this.files.delete(this.normalizePath(fileName))
 	}
 
-	public fileExists(fileName: string) {
-		if (this.files.has(this.normalizePath(fileName))) {
-			return true
-		}
-		try {
-			getTextFile(fileName)
-			return true
-		} catch (err) {
-			return false
-		}
+	public fileExists(fileName: string): boolean {
+		if (this.files.has(this.normalizePath(fileName))) return true
+		return hasTextFile(fileName)
 	}
 
 	public folderExists(folderName: string) {

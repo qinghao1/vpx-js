@@ -5,6 +5,24 @@ import { readFileSync } from 'fs'
 import { resolve } from 'path'
 
 /* istanbul ignore next: We don't test VB's core library. */
+/** Whether a bundled text file exists without fallback. */
+export function hasTextFile(fileName: string): boolean {
+	const base = fileName.replace(/.*[\\/]/, '')
+	try {
+		const p = getLocalPath(base)
+		readFileSync(p)
+		return true
+	} catch {
+		try {
+			const p2 = getLocalPath(fileName)
+			readFileSync(p2)
+			return true
+		} catch {
+			return false
+		}
+	}
+}
+
 /** getTextFile. */
 export function getTextFile(fileName: string): string {
 	const filePath = getLocalPath(fileName)

@@ -7,5 +7,5 @@ export { BrowserBinaryReader as BinaryReader } from './io/binary-reader.browser.
 export { storage } from './io/storage.browser.js'
 export * from './refs-three.js'
 export { ThreeTextureLoaderBrowser as ThreeTextureLoader } from './render/threejs/three-texture-loader-browser.js'
-export { getTextFile } from './scripting/vbs-scripts.browser.js'
+export { getTextFile, hasTextFile } from './scripting/vbs-scripts.browser.js'
 export { now } from './util/time.browser.js'
