@@ -34,15 +34,14 @@ declare function play(
 /** Transpiles VBS to JS and executes.
  * @see https://github.com/vpinball/vpinball/blob/master/codeview.cpp */
 function normalizeNewCall(vbs: string): string {
-	let out = vbs;
-	const setRe = /Set\s+(\w+)\s*=\s*\(\s*New\s+(\w+)\s*\)\s*\(([^)]*)\)/gi;
-	let prev: string;
-	do {
-		prev = out;
-		out = out.replace(setRe, (_m: string, varName: string, className: string, args: string) => `Set ${varName} = New ${className}\n${varName}.init(${args})`);
-	} while (out !== prev);
-	out = out.replace(/\(\s*New\s+(\w+)\s*\)\s*\(/gi, '(New $1).init(');
-	return out;
+	let out = vbs.replace(/Set\s+(\w+)\s*=\s*\(\s*New\s+(\w+)\s*\)\s*\(([^)]*)\)/gi, (_, v, c, a) => {
+		const args = (a as string).trim()
+		return args ? `Set ${v} = New ${c}\n${v}.init ${args}` : `Set ${v} = New ${c}`
+	})
+	out = out.replace(/\(\s*New\s+(\w+)\s*\)\s*\(/gi, '(New $1).init(')
+	out = out.replace(/\.Option\b/gi, '._Option')
+	out = out.replace(/(?<!\.)\bswitch\b/gi, 'aSwitch')
+	return out
 }
 
 export class Transpiler {
@@ -61,7 +60,7 @@ export class Transpiler {
 	}
 
 	public transpile(vbs: string, globalFunction?: string, globalObject?: string): string {
-		const src = normalizeNewCall(vbs);
+		const src = normalizeNewCall(vbs)
 		const t0 = Date.now()
 		let ast = this.grammar.transpile(src)
 		logger().info('[Transpiler] Parsed in %sms', Date.now() - t0)
@@ -91,7 +90,7 @@ export class Transpiler {
 
 	public execute(vbs: string, globalScope: Record<string, unknown>, globalObject?: string): void {
 		globalObject ||= typeof window !== 'undefined' ? 'window' : typeof self !== 'undefined' ? 'self' : 'global'
-		const js = this.transpile(normalizeNewCall(vbs), 'play', globalObject)
+		const js = this.transpile(vbs, 'play', globalObject)
 		let t = Date.now()
 		progress().details('evaluating')
 		eval('//@ sourceURL=game:///tablescript.vbs.js\n' + js)

@@ -598,6 +598,13 @@ export class TableApi extends ItemApi<TableData> {
 	public ExportPhysics(): void {}
 	public FireKnocker(_count: number): void {}
 	public QuitPlayer(_closeType: number): void {}
+	public Option(_name: string, _a: number, _b: number, def: number, ..._rest: unknown[]): number {
+		return def
+	}
+	/** Alias for VB keyword `Option` (renamed to `_Option` in transpiler). */
+	public _Option(name: string, a: number, b: number, def: number, ...rest: unknown[]): number {
+		return this.Option(name, a, b, def, ...rest)
+	}
 
 	protected _getPropertyNames(): string[] {
 		return Object.getOwnPropertyNames(TableApi.prototype)
