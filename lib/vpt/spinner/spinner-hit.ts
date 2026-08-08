@@ -59,7 +59,7 @@ export class SpinnerHit extends HitObject {
 		this.hitBBox = this.lineSegs[0].hitBBox
 	}
 
-	public override hitTest(ball: Ball, dTime: number, coll: CollisionEvent, physics: PlayerPhysics): number {
+	public override hitTest(ball: Ball, dTime: number, coll: CollisionEvent, _physics: PlayerPhysics): number {
 		if (!this.isEnabled) {
 			return -1.0
 		}
@@ -74,7 +74,7 @@ export class SpinnerHit extends HitObject {
 		return -1.0
 	}
 
-	public override collide(coll: CollisionEvent, physics: PlayerPhysics): void {
+	public override collide(coll: CollisionEvent, _physics: PlayerPhysics): void {
 		const dot = coll.hitNormal.dot(coll.ball.hit.vel)
 		if (dot < 0) {
 			// hit from back doesn't count

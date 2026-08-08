@@ -86,7 +86,7 @@ export class PlungerHit extends HitObject {
 		CollisionEvent.release(hit)
 		if (!isHit) return -1
 		if (this.mover.travelLimit < this.mover.pos) this.mover.travelLimit = this.mover.pos
-		if (coll.hitDistance <= 0 && coll.hitVel!.y === deltaY && Math.abs(deltaY) < Math.abs(coll.hitDistance))
+		if (coll.hitDistance <= 0 && coll.hitVel?.y === deltaY && Math.abs(deltaY) < Math.abs(coll.hitDistance))
 			coll.hitVel!.y = -Math.abs(coll.hitDistance)
 		return hitTime
 	}
@@ -94,7 +94,7 @@ export class PlungerHit extends HitObject {
 	public override collide(coll: CollisionEvent, physics: PlayerPhysics): void {
 		const ball = coll.ball
 		let dot =
-			(ball.hit.vel.x - coll.hitVel!.x) * coll.hitNormal.x + (ball.hit.vel.y - coll.hitVel!.y) * coll.hitNormal.y
+			(ball.hit.vel.x - coll.hitVel?.x) * coll.hitNormal.x + (ball.hit.vel.y - coll.hitVel?.y) * coll.hitNormal.y
 		if (dot >= -C_LOWNORMVEL) {
 			if (dot > C_LOWNORMVEL) return
 			if (coll.hitDistance < -C_EMBEDDED) dot = -C_EMBEDSHOT
@@ -108,7 +108,7 @@ export class PlungerHit extends HitObject {
 		}
 		const impulse = (-1.45 * dot) / (1 + 1 / this.mover.mass)
 		this.mover.fireBounce *= 0.6
-		if (coll.hitVel!.y !== 0)
+		if (coll.hitVel?.y !== 0)
 			this.mover.reverseImpulse = ball.hit.vel.y * impulse * (ball.data.mass / this.mover.mass) * 0.22
 		ball.hit.vel.addAndRelease(coll.hitNormal.clone(true).multiplyScalar(impulse))
 		ball.hit.vel.multiplyScalar(0.999)

@@ -69,10 +69,6 @@ export class HitTargetData extends ItemData implements IPhysicalData {
 		return d
 	}
 
-	public constructor(itemName: string) {
-		super(itemName)
-	}
-
 	public isDropTarget(): boolean {
 		return (
 			this.targetType === Enums.TargetType.DropTargetBeveled ||

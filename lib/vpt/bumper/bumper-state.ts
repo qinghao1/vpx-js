@@ -19,10 +19,6 @@ export class BumperState extends ItemState {
 	public baseMaterial?: string
 	public skirtMaterial?: string
 
-	public constructor() {
-		super()
-	}
-
 	public static claim(
 		name: string,
 		ringOffset: number,

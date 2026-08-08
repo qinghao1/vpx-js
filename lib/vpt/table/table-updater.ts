@@ -8,10 +8,6 @@ import type { TableState } from './table-state.js'
 
 /** Updates table render state. */
 export class TableUpdater extends ItemUpdater<TableState> {
-	constructor(state: TableState) {
-		super(state)
-	}
-
 	public override applyState<NODE, GEOMETRY, POINT_LIGHT>(
 		_obj: NODE,
 		_state: TableState,

@@ -276,10 +276,6 @@ export class TableData extends ItemData {
 		return d
 	}
 
-	public constructor(itemName: string) {
-		super(itemName)
-	}
-
 	public getName(): string {
 		return this.name
 	}

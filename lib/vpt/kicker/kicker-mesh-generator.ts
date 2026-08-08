@@ -54,8 +54,6 @@ export class KickerMeshGenerator {
 				return { zOffset: f4(-0.18), zRot: this.data.orientation }
 			case Enums.KickerType.KickerWilliams:
 				return { zOffset: 0, zRot: f4(this.data.orientation + 90) }
-			case Enums.KickerType.KickerHole:
-			case Enums.KickerType.KickerHoleSimple:
 			default:
 				return { zOffset: 0, zRot: 0 }
 		}
@@ -74,7 +72,6 @@ export class KickerMeshGenerator {
 				return kickerT1Mesh.clone(n)
 			case Enums.KickerType.KickerHole:
 				return kickerHoleMesh.clone(n)
-			case Enums.KickerType.KickerHoleSimple:
 			default:
 				return kickerSimpleHoleMesh.clone(n)
 		}

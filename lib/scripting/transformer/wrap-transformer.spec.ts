@@ -30,7 +30,7 @@ describe('The scripting wrap transformer', () => {
 	})
 })
 
-function transform(vbs: string, fctName: string, table: Table): string {
+function transform(vbs: string, fctName: string, _table: Table): string {
 	const scriptHelper = new ScriptHelper()
 	const ast = scriptHelper.vbsToAst(vbs)
 	const scriptTransformer = new WrapTransformer(ast)

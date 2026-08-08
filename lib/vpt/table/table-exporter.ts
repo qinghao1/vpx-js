@@ -9,7 +9,6 @@ import { TableMeshGenerator } from './table-mesh-generator.js'
 
 /** Exports a table to GLTF/GLB. */
 export class TableExporter {
-	private readonly table: Table
 	private readonly meshGenerator: TableMeshGenerator
 
 	constructor(table: Table) {

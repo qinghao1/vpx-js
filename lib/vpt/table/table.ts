@@ -125,7 +125,7 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 			'collections',
 			this.collections as unknown as Record<string, unknown>,
 		)
-		for (const [type, entry] of Object.entries(ITEM_REGISTRY)) {
+		for (const [_type, entry] of Object.entries(ITEM_REGISTRY)) {
 			const loadedKey = entry.key as keyof typeof loaded
 			const tableKey = loadedKey === 'textBoxes' ? 'textboxes' : loadedKey
 			this.populateFromLoaded(
@@ -143,7 +143,7 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 	}
 
 	public getName(): string {
-		return this.data!.getName()
+		return this.data?.getName()
 	}
 	public getTexture(name?: string): Texture | undefined {
 		return name ? this.textures[name.toLowerCase()] : undefined
@@ -172,19 +172,19 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 		return ['Exit', 'Init', 'KeyDown', 'KeyUp', 'MusicDone', 'Paused', 'UnPaused']
 	}
 
-	public setupPlayer(player: Player, table: Table): void {
+	public setupPlayer(player: Player, _table: Table): void {
 		this.events = new EventProxy(this)
 		this.api = new TableApi(this.data!, this.events, player, this)
 	}
 
 	public getBoundingBox(): FRect3D {
 		return new FRect3D(
-			this.data!.left,
-			this.data!.right,
-			this.data!.top,
-			this.data!.bottom,
+			this.data?.left,
+			this.data?.right,
+			this.data?.top,
+			this.data?.bottom,
 			this.getTableHeight(),
-			this.data!.glassHeight,
+			this.data?.glassHeight,
 		)
 	}
 
@@ -211,17 +211,17 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 		return this.getItems().filter(guard) as unknown as T[]
 	}
 	public getHitShapes(): HitObject[] {
-		return this.hitGenerator!.generateHitObjects()
+		return this.hitGenerator?.generateHitObjects()
 	}
 
 	public generatePlayfieldHit(): HitPlane {
-		return new HitPlane(new Vertex3D(0, 0, 1), this.data!.tableHeight ?? 0)
-			.setFriction(this.data!.getFriction())
-			.setElasticity(this.data!.getElasticity(), this.data!.getElasticityFalloff())
-			.setScatter(degToRad(this.data!.getScatter()))
+		return new HitPlane(new Vertex3D(0, 0, 1), this.data?.tableHeight ?? 0)
+			.setFriction(this.data?.getFriction())
+			.setElasticity(this.data?.getElasticity(), this.data?.getElasticityFalloff())
+			.setScatter(degToRad(this.data?.getScatter()))
 	}
 	public generateGlassHit(): HitPlane {
-		return new HitPlane(new Vertex3D(0, 0, -1), this.data!.glassHeight ?? 0).setElasticity(0.2)
+		return new HitPlane(new Vertex3D(0, 0, -1), this.data?.glassHeight ?? 0).setElasticity(0.2)
 	}
 
 	public getElementApis(): Record<string, ItemApi<ItemData>> {
@@ -298,7 +298,7 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 	}
 
 	public getMeshes<NODE, GEOMETRY, POINT_LIGHT>(
-		table: Table,
+		_table: Table,
 		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
 		opts: TableExportOptions,
 	): Meshes<GEOMETRY> {
@@ -306,7 +306,7 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 		return {
 			playfield: {
 				isVisible: true,
-				geometry: this.meshGenerator!.getPlayfieldMesh(renderApi, opts),
+				geometry: this.meshGenerator?.getPlayfieldMesh(renderApi, opts),
 				material: this.getMaterial(this.data.szPlayfieldMaterial),
 				map: this.getTexture(this.data.szImage),
 			},
@@ -321,7 +321,7 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 		if (opts.preloadTextures !== false) {
 			await renderApi.preloadTextures(Object.values(this.textures), this)
 		}
-		return this.meshGenerator!.generateTableNode(renderApi, opts)
+		return this.meshGenerator?.generateTableNode(renderApi, opts)
 	}
 
 	public prepareToPlay(): void {
@@ -349,7 +349,7 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 	}
 
 	public broadcastInit(): void {
-		this.events!.fireVoidEvent(Event.GameEventsInit)
+		this.events?.fireVoidEvent(Event.GameEventsInit)
 		for (const item of Object.values(this.items)) {
 			try {
 				const proxy = (item as unknown as { getEventProxy?: () => EventProxy })?.getEventProxy?.()
@@ -358,7 +358,7 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 		}
 	}
 	public fireVoidEvent(event: Event): this {
-		this.events!.fireVoidEvent(event)
+		this.events?.fireVoidEvent(event)
 		return this
 	}
 

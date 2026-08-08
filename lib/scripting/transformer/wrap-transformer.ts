@@ -21,10 +21,6 @@ import { Transformer } from './transformer.js'
  * @see ScopeTransformer
  */
 export class WrapTransformer extends Transformer {
-	constructor(ast: Program) {
-		super(ast)
-	}
-
 	public transform(mainFunctionName?: string, globalObjectName?: string): Program {
 		if (!mainFunctionName) {
 			return this.ast

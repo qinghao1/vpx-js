@@ -6,6 +6,10 @@ import type { ItemData } from './item-data.js'
 export abstract class Item<DATA extends ItemData> {
 	protected events?: EventProxy
 	constructor(public readonly data: DATA) {}
-	getName(): string { return this.data.getName() }
-	getEventProxy(): EventProxy { return this.events! }
+	getName(): string {
+		return this.data.getName()
+	}
+	getEventProxy(): EventProxy {
+		return this.events!
+	}
 }

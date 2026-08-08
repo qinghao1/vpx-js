@@ -4,7 +4,6 @@
 import * as chai from 'chai'
 import { expect } from 'chai'
 import sinonChai from 'sinon-chai'
-import { getTextFile } from '../vbs-scripts.node.js'
 import { Grammar } from './grammar.js'
 
 chai.use((sinonChai as any).default ?? sinonChai)

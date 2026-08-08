@@ -11,10 +11,6 @@ import { Transformer } from './transformer.js'
  * This hoists all function declarations of the root body to the top.
  */
 export class FunctionHoistTransformer extends Transformer {
-	constructor(ast: Program) {
-		super(ast)
-	}
-
 	public transform(): Program {
 		const functions: any[] = []
 		const others: any[] = []

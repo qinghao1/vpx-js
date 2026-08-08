@@ -97,7 +97,7 @@ export class Gate
 	}
 
 	public getMover(): GateMover {
-		return this.hitGate!.getMoverObject()
+		return this.hitGate?.getMoverObject()
 	}
 
 	public getState(): GateState {

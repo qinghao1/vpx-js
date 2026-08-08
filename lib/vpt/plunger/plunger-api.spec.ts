@@ -175,7 +175,7 @@ describe('The VPinball plunger API', () => {
 	})
 })
 
-function debugPlunger(plunger: PlungerApi, physics: PlayerPhysics, table: Table, t = 0) {
+function _debugPlunger(plunger: PlungerApi, physics: PlayerPhysics, table: Table, t = 0) {
 	for (let i = 0; i < 300; i++) {
 		physics.updatePhysics(t + i * 10)
 		console.log(t + i * 10, table.plungers.ModernPlunger.getState().frame, plunger.Position())

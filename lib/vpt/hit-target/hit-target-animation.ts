@@ -4,7 +4,6 @@
 import { Event } from '../../game/event.js'
 import type { EventProxy } from '../../game/event-proxy.js'
 import type { IAnimation } from '../../game/ianimatable.js'
-import { PlayerPhysics } from '../../game/player-physics.js'
 import type { Table } from '../table/table.js'
 import { HitTarget } from './hit-target.js'
 import type { HitTargetData } from './hit-target-data.js'

@@ -8,7 +8,7 @@ const out = process.argv.find((a) => a.startsWith('--out='))?.split('=')[1] || '
 console.log(`[harness-dmd] url=${url} out=${out}`)
 const browser = await launchBrowser(puppeteer)
 const page = await newPage(browser)
-const logs = attachLogging(page, {
+const _logs = attachLogging(page, {
 	filter: /PinMAME|GameName|DMD|Ready|Parsed|Framed|created|emu|Player/,
 	prefix: '[browser]',
 })
@@ -48,7 +48,7 @@ await page.evaluate(() => {
 })
 await new Promise((r) => setTimeout(r, 2000))
 console.log('[harness-dmd] waiting for play emu (up to 20s)')
-let playReady = false
+let _playReady = false
 for (let i = 0; i < 20; i++) {
 	await new Promise((r) => setTimeout(r, 1000))
 	const s = await page.evaluate(() => ({
@@ -62,7 +62,7 @@ for (let i = 0; i < 20; i++) {
 		console.log(
 			`[harness-dmd] play Ready at ${i}s emu=${s.emu} init=${s.emuInit} dmd=${s.dmdMeshes} stats=${s.stats.slice(0, 120).replace(/\n/g, ' | ')}`,
 		)
-		playReady = true
+		_playReady = true
 		break
 	}
 	if (i % 5 === 0)
@@ -108,7 +108,7 @@ const inject = await page.evaluate(() => {
 			else if (emu.emulatorState)
 				emu.emulatorState.applyPinmame?.(new Uint8Array(64), new Uint8Array(8), new Uint8Array(4))
 			// fallback: directly set viewer's dmdFallback override? we can monkey patch getDmdFrame
-			const orig = emu.getDmdFrame?.bind(emu)
+			const _orig = emu.getDmdFrame?.bind(emu)
 			// monkey patch to return our frame
 			emu.getDmdFrame = () => frame
 			emu.getDmdDimensions = () => ({ x: W, y: H, isVector2: true })
@@ -136,14 +136,14 @@ const inject = await page.evaluate(() => {
 		const got = (window.viewer?.player || window.player)?.getDmdFrame?.()
 		return `injected ${frame.length} got=${got?.length} max=${Math.max(...frame)} emu=${emu.constructor.name} dmdMeshes=${viewer.dmdMeshes?.length} texture=${!!viewer.dmdTexture} canvas=${!!viewer.dmdCanvas}`
 	} catch (e) {
-		return 'inject err ' + e.stack?.slice(0, 2000)
+		return `inject err ${e.stack?.slice(0, 2000)}`
 	}
 })
 console.log('[harness-dmd] inject result', inject)
 await new Promise((r) => setTimeout(r, 800))
 const afterRender = await page.evaluate(() => {
 	const v = window.viewer
-	const emu = (window.viewer?.player || window.player)?.getPhysics?.()?.emu
+	const _emu = (window.viewer?.player || window.player)?.getPhysics?.()?.emu
 	return {
 		dmdDisplay: getComputedStyle(document.getElementById('dmd-wrap')).display,
 		dmdCanvasDisplay: document.getElementById('dmd')
@@ -167,7 +167,7 @@ const afterRender = await page.evaluate(() => {
 				m.getWorldPosition(p)
 				return `${p.x.toFixed(2)},${p.y.toFixed(2)},${p.z.toFixed(2)}`
 			} catch (e) {
-				return 'err ' + e.message
+				return `err ${e.message}`
 			}
 		})(),
 		cam: (() => {
@@ -202,7 +202,7 @@ const camInfo = await page.evaluate(() => {
 		const controls = window.controls
 		// Save original
 		const origPos = cam.position.clone()
-		const origTarget = controls.target.clone()
+		const _origTarget = controls.target.clone()
 		// Offset south (+Z) and up (+Y)
 		const offset = new THREE.Vector3(0, 18, 45)
 		// For DMD at north end, south is positive Z, so add to worldPos
@@ -214,12 +214,12 @@ const camInfo = await page.evaluate(() => {
 		if (window.renderer && window.scene) window.renderer.render(window.scene, cam)
 		return `worldPos ${worldPos.x.toFixed(2)},${worldPos.y.toFixed(2)},${worldPos.z.toFixed(2)} cam ${cam.position.x.toFixed(1)},${cam.position.y.toFixed(1)},${cam.position.z.toFixed(1)} target ${controls.target.x.toFixed(1)},${controls.target.y.toFixed(1)},${controls.target.z.toFixed(1)} origPos ${origPos.x.toFixed(1)},${origPos.y.toFixed(1)},${origPos.z.toFixed(1)}`
 	} catch (e) {
-		return 'cam err ' + e.stack?.slice(0, 2000)
+		return `cam err ${e.stack?.slice(0, 2000)}`
 	}
 })
 console.log('[harness-dmd] camInfo', camInfo)
 await new Promise((r) => setTimeout(r, 600))
-let shotPath = path.join(out, 'dmd_on_table.png')
+const shotPath = path.join(out, 'dmd_on_table.png')
 await page.screenshot({ path: shotPath })
 console.log(`[harness-dmd] screenshot 1 -> ${shotPath} ${fs.statSync(shotPath).size} bytes`)
 await new Promise((r) => setTimeout(r, 400))
@@ -240,12 +240,12 @@ const camInfo2 = await page.evaluate(() => {
 		if (window.renderer && window.scene) window.renderer.render(window.scene, cam)
 		return `overview cam ${cam.position.x.toFixed(1)},${cam.position.y.toFixed(1)},${cam.position.z.toFixed(1)}`
 	} catch (e) {
-		return 'err ' + e.message
+		return `err ${e.message}`
 	}
 })
 console.log('[harness-dmd] camInfo2', camInfo2)
 await new Promise((r) => setTimeout(r, 600))
-let shotPath2 = path.join(out, 'dmd_overview.png')
+const shotPath2 = path.join(out, 'dmd_overview.png')
 await page.screenshot({ path: shotPath2 })
 console.log(`[harness-dmd] screenshot 2 -> ${shotPath2} ${fs.statSync(shotPath2).size} bytes`)
 // Also take play camera shot for comparison
@@ -260,7 +260,7 @@ await page.evaluate(() => {
 	} catch {}
 })
 await new Promise((r) => setTimeout(r, 600))
-let shotPath3 = path.join(out, 'dmd_play_cam.png')
+const shotPath3 = path.join(out, 'dmd_play_cam.png')
 await page.screenshot({ path: shotPath3 })
 console.log(`[harness-dmd] screenshot 3 (play cam) -> ${shotPath3} ${fs.statSync(shotPath3).size} bytes`)
 await browser.close()

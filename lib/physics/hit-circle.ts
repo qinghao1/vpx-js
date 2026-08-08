@@ -111,7 +111,7 @@ export class HitCircle extends HitObject {
 			isUnhit = t1 * t2 < 0
 			hitTime = isUnhit ? Math.max(t1, t2) : Math.min(t1, t2)
 		}
-		if (!isFinite(hitTime) || hitTime < 0 || hitTime > dTime) {
+		if (!Number.isFinite(hitTime) || hitTime < 0 || hitTime > dTime) {
 			Vertex3D.release(c)
 			return -1
 		}

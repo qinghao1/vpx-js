@@ -10,7 +10,6 @@ import { ItemData } from '../item-data.js'
 /** VPinball timer data. @see https://github.com/vpinball/vpinball/blob/master/timer.cpp */
 export class TimerData extends ItemData {
 	public vCenter!: Vertex2D
-	private isBackglass!: boolean
 
 	public static async fromStorage(storage: Storage, itemName: string): Promise<TimerData> {
 		const d = new TimerData(itemName)

@@ -10,7 +10,7 @@ import { VpmController } from './vpm-controller.js'
 import { WshShell } from './wsh-shell.js'
 
 /** getObject. */
-export function getObject<T>(name: string, player: Player): T | void {
+export function getObject<T>(name: string, player: Player): T | undefined {
 	switch (name.toLowerCase()) {
 		case 'scripting.dictionary': {
 			const dictionary = new Dictionary()

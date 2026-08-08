@@ -48,14 +48,14 @@ export class GateHit extends HitObject {
 	}
 
 	public override calcHitBBox(): void {
-		this.lineSeg[0]!.calcHitBBox()
-		this.hitBBox = this.lineSeg[0]!.hitBBox
+		this.lineSeg[0]?.calcHitBBox()
+		this.hitBBox = this.lineSeg[0]?.hitBBox
 	}
 
 	public override hitTest(ball: Ball, dTime: number, coll: CollisionEvent, _physics: PlayerPhysics): number {
 		if (!this.isEnabled) return -1
 		for (let i = 0; i < 2; i++) {
-			const t = this.lineSeg[i]!.hitTestBasic(ball, dTime, coll, false, true, false)
+			const t = this.lineSeg[i]?.hitTestBasic(ball, dTime, coll, false, true, false)
 			if (t >= 0) {
 				coll.hitFlag = !!i
 				return t

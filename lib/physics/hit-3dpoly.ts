@@ -72,10 +72,10 @@ export class Hit3DPoly extends HitObject {
 			ball.state.pos.addAndRelease(ball.hit.vel.clone(true).multiplyScalar(STATICTIME))
 			if (i < 0) {
 				ball.hit.vpVolObjs.push(this.obj!)
-				this.obj!.fireGroupEvent(Event.HitEventsHit)
+				this.obj?.fireGroupEvent(Event.HitEventsHit)
 			} else {
 				ball.hit.vpVolObjs.splice(i, 1)
-				this.obj!.fireGroupEvent(Event.HitEventsUnhit)
+				this.obj?.fireGroupEvent(Event.HitEventsUnhit)
 			}
 		}
 	}
@@ -116,7 +116,7 @@ export class Hit3DPoly extends HitObject {
 				bUnHit = !inside
 			} else hitTime = bnd / -bnv
 		}
-		if (!isFinite(hitTime) || hitTime < 0 || hitTime > dTime) {
+		if (!Number.isFinite(hitTime) || hitTime < 0 || hitTime > dTime) {
 			Vertex3D.release(hitPos)
 			return -1
 		}

@@ -110,8 +110,8 @@ export class RampHitGenerator {
 			}
 		}
 		if (cVertex >= 2) {
-			const v1 = new Vertex3D(pv4!.x, pv4!.y, rgHeight1[cVertex - 1]!)
-			const v2 = new Vertex3D(pv3!.x, pv3!.y, rgHeight1[cVertex - 1]!)
+			const v1 = new Vertex3D(pv4?.x, pv4?.y, rgHeight1[cVertex - 1]!)
+			const v2 = new Vertex3D(pv3?.x, pv3?.y, rgHeight1[cVertex - 1]!)
 			hitObjects.push(this.generateJoint(v1, v2))
 		}
 		for (let i = 0; i < cVertex - 1; i++) {

@@ -35,7 +35,7 @@ export class KickerHit extends HitCircle {
 		if (!this.data.legacyMode) {
 			const rad = this.radius * 0.8
 			for (let t = 0; t < kickerHitVertices.length; t++) {
-				const vPos = new Vertex3D(kickerHitVertices[t]!.x, kickerHitVertices[t]!.y, kickerHitVertices[t]!.z)
+				const vPos = new Vertex3D(kickerHitVertices[t]?.x, kickerHitVertices[t]?.y, kickerHitVertices[t]?.z)
 				vPos.x = vPos.x * rad + this.data.center.x
 				vPos.y = vPos.y * rad + this.data.center.y
 				vPos.z = vPos.z * rad * table.getScaleZ() + height
@@ -116,7 +116,7 @@ export class KickerHit extends HitCircle {
 			}
 		}
 		if (idx !== 3435973836) {
-			const hitNorm = Vertex3D.claim(kickerHitVertices[idx]!.nx, kickerHitVertices[idx]!.ny, kickerHitVertices[idx]!.nz)
+			const hitNorm = Vertex3D.claim(kickerHitVertices[idx]?.nx, kickerHitVertices[idx]?.ny, kickerHitVertices[idx]?.nz)
 			const dot = -ball.hit.vel.dot(hitNorm)
 			const reactionImpulse = ball.data.mass * Math.abs(dot)
 			const surfP = hitNormal.clone(true).multiplyScalar(-ball.data.radius)

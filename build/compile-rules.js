@@ -17,10 +17,10 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-const { readFileSync, writeFileSync } = require('fs')
-const { resolve } = require('path')
+const { readFileSync, writeFileSync } = require('node:fs')
+const { resolve } = require('node:path')
 const { Grammars } = require('ebnf')
-const { inspect } = require('util')
+const { inspect } = require('node:util')
 
 const bnfGrammar = readFileSync(resolve(__dirname, '../lib/scripting/grammar/grammar.bnf')).toString()
 const fileDest = resolve(__dirname, '../lib/scripting/grammar/rules.ts')

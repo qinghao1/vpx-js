@@ -61,7 +61,7 @@ export class HitTriangle extends HitObject {
 			Vertex3D.release(hitPos)
 			return -1
 		}
-		if (!isFinite(hitTime) || hitTime < 0 || hitTime > dTime) {
+		if (!Number.isFinite(hitTime) || hitTime < 0 || hitTime > dTime) {
 			Vertex3D.release(hitPos)
 			return -1
 		}

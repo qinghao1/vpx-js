@@ -117,7 +117,7 @@ describe('The VPinball collection', () => {
 		let i = 0
 		for (const item of coll) {
 			i++
-			expect(item.Name).to.equal('SuppressEventsTimer' + i)
+			expect(item.Name).to.equal(`SuppressEventsTimer${i}`)
 		}
 	})
 

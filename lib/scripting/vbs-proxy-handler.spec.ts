@@ -19,9 +19,9 @@ describe('The VBScript proxy handler', () => {
 		d.add('myKey2', 'myValue2')
 		d.ADD('myKey3', 'myValue3')
 
-		expect(d.Item['myKey1']).to.equal('myValue1')
-		expect(d.Item['myKey2']).to.equal('myValue2')
-		expect(d.Item['myKey3']).to.equal('myValue3')
+		expect(d.Item.myKey1).to.equal('myValue1')
+		expect(d.Item.myKey2).to.equal('myValue2')
+		expect(d.Item.myKey3).to.equal('myValue3')
 	})
 
 	it('should get a case insensitive property', () => {
@@ -59,7 +59,7 @@ describe('The VBScript proxy handler', () => {
 		vpm.PAUSE = false
 		expect(vpm.Pause).to.equal(false)
 
-		vpm['paUsE'] = true
+		vpm.paUsE = true
 		expect(vpm.Pause).to.equal(true)
 	})
 })

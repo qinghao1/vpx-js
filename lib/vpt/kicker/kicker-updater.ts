@@ -8,10 +8,6 @@ import type { KickerState } from './kicker-state.js'
 
 /** Kicker updater — visibility and material. */
 export class KickerUpdater extends ItemUpdater<KickerState> {
-	constructor(state: KickerState) {
-		super(state)
-	}
-
 	public applyState<NODE, GEOMETRY, POINT_LIGHT>(
 		obj: NODE,
 		state: KickerState,

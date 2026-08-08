@@ -2,7 +2,6 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import type { IAnimation } from '../../game/ianimatable.js'
-import { PlayerPhysics } from '../../game/player-physics.js'
 import { Enums } from '../enums.js'
 import type { Table } from '../table/table.js'
 import type { TriggerData } from './trigger-data.js'

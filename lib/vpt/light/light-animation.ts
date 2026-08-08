@@ -47,7 +47,7 @@ export class LightAnimation implements IAnimation {
 		this.timerDurationEndTime = timeMsec + this.duration
 	}
 
-	public updateAnimation(newTimeMsec: number, table: Table): void {
+	public updateAnimation(newTimeMsec: number, _table: Table): void {
 		if (!this.data.isVisible) return
 		const oldTimeMsec = this.timeMsec < newTimeMsec ? this.timeMsec : newTimeMsec
 		this.timeMsec = newTimeMsec

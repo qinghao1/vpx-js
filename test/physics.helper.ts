@@ -36,13 +36,13 @@ import type { Table } from '../lib/vpt/table/table'
  */
 export function createBall(player: Player, x: number, y: number, z: number, vx = 0, vy = 0, vz = 0): Ball {
 	return player.createBall({
-		getBallCreationPosition(t: Table): Vertex3D {
+		getBallCreationPosition(_t: Table): Vertex3D {
 			return new Vertex3D(x, y, z)
 		},
-		getBallCreationVelocity(t: Table): Vertex3D {
+		getBallCreationVelocity(_t: Table): Vertex3D {
 			return new Vertex3D(vx, vy, vz)
 		},
-		onBallCreated(p: PlayerPhysics, b: Ball): void {
+		onBallCreated(_p: PlayerPhysics, _b: Ball): void {
 			// do nothing
 		},
 	})

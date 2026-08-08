@@ -86,7 +86,7 @@ export class LineSeg extends HitObject {
 				isUnHit = !inside
 			} else hitTime = bnd / -bnv
 		}
-		if (!isFinite(hitTime!) || hitTime! < 0 || hitTime! > dTime) return -1
+		if (!Number.isFinite(hitTime!) || hitTime! < 0 || hitTime! > dTime) return -1
 		const btv = ball.hit.vel.x * this.normal.y - ball.hit.vel.y * this.normal.x
 		const btd =
 			(ball.state.pos.x - this.v1.x) * this.normal.y - (ball.state.pos.y - this.v1.y) * this.normal.x + btv * hitTime!

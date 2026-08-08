@@ -219,10 +219,6 @@ class RecyclableFloat32BufferAttribute extends Float32BufferAttribute {
 export class MeshExporter {
 	private output = new Mesh()
 
-	private indexVertex = 0
-	private indexVertexUvs = 0
-	private indexNormals = 0
-
 	private vertex = new Vector3()
 	private normal = new Vector3()
 	private uv = new Vector2()

@@ -53,7 +53,7 @@ export class DirectoryTree {
 	}
 
 	private constructor(
-		private readonly doc: OleCompoundDoc,
+		readonly _doc: OleCompoundDoc,
 		root: StorageEntry,
 		private readonly entries: StorageEntry[],
 	) {

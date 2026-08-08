@@ -43,9 +43,9 @@ export class PrimitiveHitGenerator {
 			const i1 = mesh.indices[i + 1]!
 			const i2 = mesh.indices[i + 2]!
 			const rgv3D: Vertex3D[] = [
-				mesh.vertices[i0]!.getVertex(),
-				mesh.vertices[i2]!.getVertex(),
-				mesh.vertices[i1]!.getVertex(),
+				mesh.vertices[i0]?.getVertex(),
+				mesh.vertices[i2]?.getVertex(),
+				mesh.vertices[i1]?.getVertex(),
 			]
 			hitObjects.push(new HitTriangle(rgv3D))
 			hitObjects.push(...addedEdges.addHitEdge(i0, i1, rgv3D[0]!, rgv3D[2]!))
@@ -78,9 +78,9 @@ export class PrimitiveHitGenerator {
 	private setupHitObject(obj: HitObject, events: EventProxy, table: Table): HitObject {
 		if (!this.data.useAsPlayfield) obj.applyPhysics(this.data, table)
 		else {
-			obj.setElasticity(table.data!.elasticity, table.data!.elasticityFalloff)
-			obj.setFriction(table.data!.friction)
-			obj.setScatter(degToRad(table.data!.scatter))
+			obj.setElasticity(table.data?.elasticity, table.data?.elasticityFalloff)
+			obj.setFriction(table.data?.friction)
+			obj.setScatter(degToRad(table.data?.scatter))
 			obj.setEnabled(true)
 		}
 		obj.threshold = this.data.threshold

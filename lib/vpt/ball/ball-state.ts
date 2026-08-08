@@ -10,10 +10,6 @@ export class BallState extends ItemState {
 	public orientation = Matrix2D.claim()
 	public isFrozen = false
 
-	public constructor() {
-		super()
-	}
-
 	public static claim(name: string, pos: Vertex3D): BallState {
 		const s = new BallState()
 		s.name = name

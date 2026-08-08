@@ -14,11 +14,11 @@ const three = new ThreeHelper()
 
 describe('The VPinball table API', () => {
 	let table: Table
-	let player: Player
+	let _player: Player
 
 	beforeEach(async () => {
 		table = await Table.load(new NodeBinaryReader(three.fixturePath('table-texture.vpx')))
-		player = new Player(table).init()
+		_player = new Player(table).init()
 	})
 
 	it('should correctly read and write the properties', async () => {

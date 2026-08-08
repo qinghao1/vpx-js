@@ -21,8 +21,8 @@ describe('Table integration', () => {
 
 	it('empty fixture has playfield dimensions', async () => {
 		const table = await Table.load(new NodeBinaryReader(EMPTY_FIXTURE))
-		expect(table.data!.right).toBeGreaterThan(0)
-		expect(table.data!.bottom).toBeGreaterThan(0)
+		expect(table.data?.right).toBeGreaterThan(0)
+		expect(table.data?.bottom).toBeGreaterThan(0)
 	})
 
 	it('TableBuilder produces minimal table usable by Table API', () => {
@@ -45,18 +45,18 @@ describe('Table integration', () => {
 		}
 		const table = await Table.load(new NodeBinaryReader(VPX_WALKING_DEAD))
 		expect(table.tableScript).toBeDefined()
-		expect(table.tableScript!.length).toBeGreaterThan(100_000)
+		expect(table.tableScript?.length).toBeGreaterThan(100_000)
 		expect(table.info?.TableName).toMatch(/Walking Dead/i)
 		expect(table.info?.AuthorName).toBeDefined()
-		const gameName = table.tableScript!.match(/cGameName\s*=\s*["']([^"']+)["']/i)?.[1]
+		const gameName = table.tableScript?.match(/cGameName\s*=\s*["']([^"']+)["']/i)?.[1]
 		expect(gameName?.length).toBeGreaterThan(2) // generic: any GameName, twd_160h is just the example ROM
 		expect(Object.keys(table.items).length).toBeGreaterThan(500)
 		expect(Object.keys(table.lights).length).toBeGreaterThan(100)
 		expect(Object.keys(table.flippers).length).toBeGreaterThanOrEqual(2)
 		expect(Object.keys(table.textures).length).toBeGreaterThan(10)
 		expect(Object.keys(table.collections).length).toBeGreaterThanOrEqual(0)
-		expect(table.data!.right).toBeGreaterThan(900)
-		expect(table.data!.bottom).toBeGreaterThan(2000)
+		expect(table.data?.right).toBeGreaterThan(900)
+		expect(table.data?.bottom).toBeGreaterThan(2000)
 	})
 
 	it('Table.load handles empty script gracefully', async () => {

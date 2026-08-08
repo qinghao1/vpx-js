@@ -88,7 +88,7 @@ export class Kicker
 
 	public getBallCreationPosition(table: Table): Vertex3D {
 		const height = table.getSurfaceHeight(this.data.szSurface, this.data.center.x, this.data.center.y)
-		return new Vertex3D(this.hit!.center.x, this.hit!.center.y, height)
+		return new Vertex3D(this.hit?.center.x, this.hit?.center.y, height)
 	}
 
 	public getBallCreationVelocity(_table: Table): Vertex3D {
@@ -98,7 +98,7 @@ export class Kicker
 	public onBallCreated(physics: PlayerPhysics, ball: Ball): void {
 		ball.coll.hitFlag = true
 		const hitNormal = new Vertex3D(FLT_MAX, FLT_MAX, FLT_MAX)
-		this.hit!.doCollide(physics, ball, hitNormal, false, true)
+		this.hit?.doCollide(physics, ball, hitNormal, false, true)
 	}
 
 	private getTexture(): Texture {
@@ -113,7 +113,6 @@ export class Kicker
 				return Texture.fromFilesystem('kickerT1.png')
 			case Enums.KickerType.KickerHole:
 				return Texture.fromFilesystem('kickerHoleWood.png')
-			case Enums.KickerType.KickerHoleSimple:
 			default:
 				return Texture.fromFilesystem('kickerHoleWood.png')
 		}

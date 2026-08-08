@@ -104,7 +104,7 @@ export class VBSHelper {
 	}
 
 	public equals(a: unknown, b: unknown): boolean {
-		if (a == b) return true
+		if (a === b) return true
 		const u1 = this.isUndef(a),
 			u2 = this.isUndef(b)
 		if (u1 || u2) {

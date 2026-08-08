@@ -4,7 +4,6 @@
 import { BiffParser } from '../io/biff-parser.js'
 import type { Storage } from '../io/ole-doc.js'
 import { ItemType } from './enums.js'
-import type { Table } from './table/table.js'
 
 const TYPE_NAMES: Record<number, string> = {
 	[ItemType.Surface]: 'Surface',
@@ -42,9 +41,6 @@ export abstract class ItemData extends BiffParser {
 
 	public timer = new TimerDataRoot()
 	public name!: string
-	private pdata?: number
-	private fLocked?: boolean
-	private layerIndex?: number
 
 	public constructor(public readonly itemName: string) {
 		super()

@@ -61,7 +61,7 @@ export class Storage {
 		const total = e.size - offset
 		const { shortStream, secSize, secIds, secOffset, innerOffset } = this.sectorInfo(e, offset, total)
 		const needed = secIds.slice(secOffset, secOffset + Math.ceil((innerOffset + total) / secSize))
-		let buf = shortStream
+		const buf = shortStream
 			? await this.doc.readShortSectors(needed, innerOffset, total)
 			: await this.doc.readSectors(needed, innerOffset, total)
 		let pos = 0
@@ -101,7 +101,7 @@ export class Storage {
 			: this.doc.readSectors(needed, innerOffset, bytesToRead)
 	}
 
-	private sectorInfo(e: StorageEntry, offset: number, bytes: number) {
+	private sectorInfo(e: StorageEntry, offset: number, _bytes: number) {
 		const shortStream = e.size < this.doc.header.shortStreamMax
 		const secSize = shortStream ? this.doc.header.shortSecSize : this.doc.header.secSize
 		const secIds = (shortStream ? this.doc.SSAT : this.doc.SAT).getSecIdChain(e.secId)

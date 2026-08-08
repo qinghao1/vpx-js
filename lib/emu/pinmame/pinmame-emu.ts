@@ -104,7 +104,7 @@ export class PinMameEmulator implements IEmulator {
 			m.HEAPU8.fill(0, ptr, ptr + CONFIG_SIZE)
 			new DataView(m.HEAPU8.buffer).setInt32(ptr + 4, SAMPLE_RATE, true)
 			m.HEAPU8.set(new TextEncoder().encode(VPM_DIR), ptr + 8)
-			this.api!.setConfig(ptr)
+			this.api?.setConfig(ptr)
 		} finally {
 			m._free(ptr)
 		}

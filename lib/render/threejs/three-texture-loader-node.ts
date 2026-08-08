@@ -13,16 +13,7 @@ const __dirname = dirname(__filename)
 
 import { EXRLoader } from 'three/examples/jsm/loaders/EXRLoader.js'
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js'
-import {
-	DataTexture,
-	FloatType,
-	HalfFloatType,
-	LinearSRGBColorSpace,
-	RGBAFormat,
-	SRGBColorSpace,
-	Texture as ThreeTexture,
-	UnsignedByteType,
-} from '../../refs.node.js'
+import { FloatType, HalfFloatType, Texture as ThreeTexture } from '../../refs.node.js'
 import { logger } from '../../util/logger.js'
 import type { ITextureLoader } from '../irender-api.js'
 
@@ -72,7 +63,7 @@ async function stream(localPath: string): Promise<Uint8Array> {
 		const buffers: Uint8Array[] = []
 		/* istanbul ignore if */
 		if (!readStream) {
-			return reject(new Error('No such stream "' + localPath + '".'))
+			return reject(new Error(`No such stream "${localPath}".`))
 		}
 		readStream.on('error', reject)
 		readStream.on('data', (buf: Buffer) => buffers.push(buf))
@@ -91,7 +82,7 @@ async function loadSharpImage(name: string, shrp: any): Promise<ThreeTexture> {
 	return texture
 }
 
-async function loadHdrImage(name: string, data: Uint8Array): Promise<ThreeTexture> {
+async function loadHdrImage(_name: string, data: Uint8Array): Promise<ThreeTexture> {
 	return new Promise((resolve, reject) => {
 		new RGBELoader().setDataType(HalfFloatType as any).load(
 			data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as any,
@@ -102,7 +93,7 @@ async function loadHdrImage(name: string, data: Uint8Array): Promise<ThreeTextur
 	})
 }
 
-async function loadExrImage(name: string, data: Uint8Array): Promise<ThreeTexture> {
+async function loadExrImage(_name: string, data: Uint8Array): Promise<ThreeTexture> {
 	return new Promise((resolve, reject) => {
 		new EXRLoader().setDataType(FloatType).load(
 			data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as any,

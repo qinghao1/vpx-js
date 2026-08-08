@@ -43,7 +43,7 @@ export class FlipperMover implements MoverObject {
 		private readonly data: FlipperData,
 		private readonly state: FlipperState,
 		private readonly events: EventProxy,
-		private readonly physics: PlayerPhysics,
+		readonly _physics: PlayerPhysics,
 		private readonly tableData: TableData,
 	) {
 		this.hitCircleBase = new HitCircle(config.center, config.baseRadius, config.zLow, config.zHigh)
@@ -161,7 +161,7 @@ export class FlipperMover implements MoverObject {
 			angleMax = Math.max(this.angleStart, this.angleEnd)
 		const dist = this.angleSpeed > 0 ? angleMax - this.state.angle : angleMin - this.state.angle
 		const hitTime = dist / this.angleSpeed
-		return !isFinite(hitTime) || hitTime < 0 ? -1 : hitTime
+		return !Number.isFinite(hitTime) || hitTime < 0 ? -1 : hitTime
 	}
 
 	/** @deprecated Use {@link #applyImpulseAndRelease()} */

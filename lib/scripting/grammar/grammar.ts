@@ -25,7 +25,7 @@ import { ppVarDecl } from '../post-process/vardecl.js'
 import { ppWith } from '../post-process/with.js'
 import { RULES } from './rules.js'
 
-const require = createRequire(import.meta.url)
+const _require = createRequire(import.meta.url)
 
 import dashAstImport from 'dash-ast'
 
@@ -160,12 +160,12 @@ export class Grammar {
 		let now = Date.now()
 
 		progress().details('formatting')
-		const ast = this.parser.getAST(script.trim() + '\n', this.GRAMMAR_TARGET_FORMAT)
+		const ast = this.parser.getAST(`${script.trim()}\n`, this.GRAMMAR_TARGET_FORMAT)
 		if (ast === null) {
 			throw new Error('Unable to format script.')
-		} else if (ast.rest && ast.rest.length) {
+		} else if (ast.rest?.length) {
 			const start = script.length - ast.rest.length
-			throw new Error('Unable to format script. Syntax error at: ' + script.substr(start, script.indexOf('\n', start)))
+			throw new Error(`Unable to format script. Syntax error at: ${script.substr(start, script.indexOf('\n', start))}`)
 		}
 		logger().info('[Grammar.format] Parsed in %sms', Date.now() - now)
 
@@ -184,7 +184,7 @@ export class Grammar {
 		const identifiersMap = this.identifiersMap
 
 		dashAst(ast, {
-			enter(node: IToken, parent: IToken) {
+			enter(node: IToken, _parent: IToken) {
 				switch (node.type) {
 					case 'LogicalLine':
 						hasLine = false
@@ -193,7 +193,7 @@ export class Grammar {
 						break
 				}
 			},
-			leave(node: IToken, parent: IToken) {
+			leave(node: IToken, _parent: IToken) {
 				switch (node.type) {
 					case 'LogicalLine':
 						if (hasLine) {
@@ -209,7 +209,7 @@ export class Grammar {
 						/**
 						 * Standardize Me identifier when it isn't after a dot
 						 */
-						if (!prevToken || prevToken.text !== '.') {
+						if (prevToken?.text !== '.') {
 							if (identifiersMap[node.text.toLowerCase()]) {
 								node.text = identifiersMap[node.text.toLowerCase()]
 							}
@@ -323,7 +323,7 @@ export class Grammar {
 		const ast = this.parser.getAST(formattedScript, this.GRAMMAR_TARGET_PROGRAM)
 		if (ast === null) {
 			throw new Error('Unable to transpile script.')
-		} else if (ast.rest && ast.rest.length) {
+		} else if (ast.rest?.length) {
 			const start = formattedScript.length - ast.rest.length
 			throw new Error(
 				'Unable to transpile script. Syntax error at: ' +
@@ -336,7 +336,7 @@ export class Grammar {
 		now = Date.now()
 		progress().details('post-processing')
 		dashAst(ast, {
-			leave(node: ESIToken, parent: ESIToken) {
+			leave(node: ESIToken, _parent: ESIToken) {
 				if (node.type === 'Program') {
 					for (const child of node.children) {
 						if (child.estree) {

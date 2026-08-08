@@ -8,10 +8,6 @@ import { omitEqual } from '../state-helpers.js'
 export class PlungerState extends ItemState {
 	public frame = 0
 
-	public constructor() {
-		super()
-	}
-
 	public static claim(name: string, frame: number): PlungerState {
 		const state = new PlungerState()
 		state.name = name

@@ -62,7 +62,7 @@ export class Flipper
 		return true
 	}
 	public getMover(): FlipperMover {
-		return this.hit!.getMoverObject()
+		return this.hit?.getMoverObject()
 	}
 	public getState(): FlipperState {
 		return this.state

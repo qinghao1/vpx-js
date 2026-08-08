@@ -10,10 +10,6 @@ export class LightState extends ItemState {
 	public color: number = 0
 	public colorFull: number = 0
 
-	public constructor() {
-		super()
-	}
-
 	public static claim(name: string, intensity: number, color: number, colorFull: number): LightState {
 		const state = new LightState()
 		state.name = name

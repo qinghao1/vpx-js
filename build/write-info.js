@@ -1,8 +1,8 @@
 // create json file with build information
 
-const path = require('path')
-const fs = require('fs')
-const childProcess = require('child_process')
+const path = require('node:path')
+const fs = require('node:fs')
+const childProcess = require('node:child_process')
 
 const timestamp = Date.now()
 const version = require('../package.json').version

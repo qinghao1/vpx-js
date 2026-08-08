@@ -16,10 +16,6 @@ export class PrimitiveState extends ItemState {
 	public map?: string
 	public normalMap?: string
 
-	public constructor() {
-		super()
-	}
-
 	public static claimFrom(
 		name: string,
 		position: Vertex3D,
@@ -53,7 +49,7 @@ export class PrimitiveState extends ItemState {
 		objectRotation: Vertex3D,
 		material: string | undefined,
 		map: string | undefined,
-		normalMap: string | undefined,
+		_normalMap: string | undefined,
 		isVisible: boolean,
 	): PrimitiveState {
 		const state = new PrimitiveState()

@@ -54,7 +54,7 @@ export class ThreeLightMeshGenerator {
 
 	private getPathFromPoints<T extends Path>(points: Vector2[], path: T): T {
 		if (points.length === 0) throw new Error('Cannot get path from no points.')
-		path.moveTo(points[0]!.x, points[0]!.y)
+		path.moveTo(points[0]?.x, points[0]?.y)
 		for (const v of points.slice(1)) path.lineTo(v.x, v.y)
 		return path
 	}

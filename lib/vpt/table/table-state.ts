@@ -8,10 +8,6 @@ import { omitEqual } from '../state-helpers.js'
 export class TableState extends ItemState {
 	public material?: string
 
-	public constructor() {
-		super()
-	}
-
 	public static claim(name: string, material: string | undefined, isVisible: boolean): TableState {
 		const state = new TableState()
 		state.name = name

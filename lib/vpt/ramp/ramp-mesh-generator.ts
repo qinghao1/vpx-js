@@ -163,21 +163,13 @@ export class RampMeshGenerator {
 		return mesh
 	}
 
-	private generateFlatLeftWall(table: Table, rv: RampVertexResult): Mesh {
-		return this.generateFlatWall(table, rv, 'left')
-	}
-
-	private generateFlatRightWall(table: Table, rv: RampVertexResult): Mesh {
-		return this.generateFlatWall(table, rv, 'right')
-	}
-
 	private generateWireMeshes(table: Table): Mesh[] {
 		let accuracy: number
 		if (table.getDetailLevel() < 5) accuracy = 6
 		else if (table.getDetailLevel() < 8) accuracy = 8
 		else accuracy = Math.floor(table.getDetailLevel() * f4(1.3))
 		const mat = table.getMaterial(this.state.material)
-		if (!mat || !mat.isOpacityActive) accuracy = f4(12)
+		if (!mat?.isOpacityActive) accuracy = f4(12)
 
 		const rv = this.getRampVertex(table, -1, false)
 		const n = rv.pcvertex
@@ -386,7 +378,7 @@ export class RampMeshGenerator {
 			accuracy = acc
 		} else {
 			const mat = table.getMaterial(this.state.material)
-			accuracy = !mat || !mat.isOpacityActive ? 10 : table.getDetailLevel()
+			accuracy = !mat?.isOpacityActive ? 10 : table.getDetailLevel()
 		}
 		accuracy = f4(f4(4) * f4(10 ** f4(f4(10 - accuracy) * f4(f4(1) / f4(1.5)))))
 		return DragPoint.getRgVertex(

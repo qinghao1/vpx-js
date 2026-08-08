@@ -51,7 +51,7 @@ describe('The VPinball spinner collision', () => {
 
 		// create ball
 		const kicker = table.kickers.BallRelease.getApi()
-		const ball = kicker.CreateBall()
+		const _ball = kicker.CreateBall()
 		kicker.Kick(0, -10)
 
 		// assert initial position

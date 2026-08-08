@@ -9,10 +9,6 @@ export class TriggerState extends ItemState {
 	public heightOffset = 0
 	public material?: string
 
-	public constructor() {
-		super()
-	}
-
 	public static claim(
 		name: string,
 		heightOffset: number,

@@ -2,8 +2,8 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { existsSync, writeFileSync } from 'fs'
-import { basename, dirname, resolve } from 'path'
+import { existsSync, writeFileSync } from 'node:fs'
+import { basename, dirname, resolve } from 'node:path'
 import { NodeBinaryReader } from '../lib/io/binary-reader.node.js'
 import { ThreeTextureLoaderNode } from '../lib/render/threejs/three-texture-loader-node.js'
 import { Logger } from '../lib/util/logger.js'
@@ -40,12 +40,12 @@ import { TableExporter } from '../lib/vpt/table/table-exporter.js'
 
 		// silence logs
 		Logger.setLogger({
-			debug(format: any, ...param: any[]): void {},
-			error(format: any, ...param: any[]): void {},
-			info(format: any, ...param: any[]): void {},
-			verbose(format: any, ...param: any[]): void {},
-			warn(format: any, ...param: any[]): void {},
-			wtf(format: any, ...param: any[]): void {},
+			debug(_format: any, ..._param: any[]): void {},
+			error(_format: any, ..._param: any[]): void {},
+			info(_format: any, ..._param: any[]): void {},
+			verbose(_format: any, ..._param: any[]): void {},
+			warn(_format: any, ..._param: any[]): void {},
+			wtf(_format: any, ..._param: any[]): void {},
 		})
 
 		const start = Date.now()
@@ -72,7 +72,7 @@ import { TableExporter } from '../lib/vpt/table/table-exporter.js'
 				throw new Error(`The folder where to write ${glbPath} does not exist.`)
 			}
 		} else {
-			const name = basename(vpxPath).split('.').slice(0, -1).join('.') + '.glb'
+			const name = `${basename(vpxPath).split('.').slice(0, -1).join('.')}.glb`
 			glbPath = resolve(dirname(vpxPath), name)
 		}
 

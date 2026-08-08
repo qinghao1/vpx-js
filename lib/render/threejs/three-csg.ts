@@ -31,7 +31,7 @@ class Face3 {
 	public normal: Vector3 = new Vector3()
 	public vertexNormals: Vector3[] = []
 	public color: any
-	constructor(a: number, b: number, c: number, normal?: Vector3, color?: any, materialIndex?: number) {
+	constructor(a: number, b: number, c: number, normal?: Vector3, _color?: any, _materialIndex?: number) {
 		this.a = a
 		this.b = b
 		this.c = c
@@ -323,7 +323,7 @@ export default class ThreeCsg {
 				} else {
 					normals.push(face.normal.x, face.normal.y, face.normal.z)
 				}
-				if (uv && uv[j]) {
+				if (uv?.[j]) {
 					uvs.push(uv[j].x, uv[j].y)
 				} else {
 					uvs.push(0, 0)
@@ -360,10 +360,6 @@ class Vector extends Vector3 {
 
 	public static fromArray(v: number[]): Vector {
 		return new Vector(v[0], v[1], v[2])
-	}
-
-	constructor(x: number, y: number, z: number) {
-		super(x, y, z)
 	}
 
 	public negated() {
@@ -520,13 +516,13 @@ class Plane {
 					const tj = types[j]
 					const vi = polygon.vertices[i]
 					const vj = polygon.vertices[j]
-					if (ti != BACK) {
+					if (ti !== BACK) {
 						f.push(vi)
 					}
-					if (ti != FRONT) {
-						b.push(ti != BACK ? vi.clone() : vi)
+					if (ti !== FRONT) {
+						b.push(ti !== BACK ? vi.clone() : vi)
 					}
-					if ((ti | tj) == SPANNING) {
+					if ((ti | tj) === SPANNING) {
 						const t = (this.w - this.normal.dot(vi.pos)) / this.normal.dot(vj.pos.minus(vi.pos))
 						const v = vi.interpolate(vj, t)
 						f.push(v)
@@ -606,9 +602,9 @@ class Node {
 
 	public clone(): Node {
 		const node = new Node()
-		node.plane = this.plane && this.plane.clone()
-		node.front = this.front && this.front.clone()
-		node.back = this.back && this.back.clone()
+		node.plane = this.plane?.clone()
+		node.front = this.front?.clone()
+		node.back = this.back?.clone()
 		node.polygons = this.polygons.map((p) => p.clone())
 		return node
 	}

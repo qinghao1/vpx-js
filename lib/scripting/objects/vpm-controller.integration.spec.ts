@@ -60,10 +60,10 @@ describe('VpmController integration', () => {
 		const vpxPath = path.resolve('walking_dead.vpx')
 		if (!fs.existsSync(vpxPath)) return
 		const table = await Table.load(new NodeBinaryReader(vpxPath))
-		expect(table.tableScript!.length).toBeGreaterThan(10000)
-		const m = table.tableScript!.match(/cGameName\s*=\s*["']([^"']+)["']/i)
+		expect(table.tableScript?.length).toBeGreaterThan(10000)
+		const m = table.tableScript?.match(/cGameName\s*=\s*["']([^"']+)["']/i)
 		expect(m).not.toBeNull()
-		expect(m![1].toLowerCase()).toBe('twd_160h')
+		expect(m?.[1].toLowerCase()).toBe('twd_160h')
 	})
 
 	it('generic game name routes to PinMAME — not just twd_160h', async () => {

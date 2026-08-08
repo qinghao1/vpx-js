@@ -48,7 +48,7 @@ describe('WPC-EMU', () => {
 	})
 
 	it('should ignore registerAudioConsumer when emu is not initialized', () => {
-		emulator.registerAudioConsumer((audioJSON: WpcEmuApi.AudioMessage) => {
+		emulator.registerAudioConsumer((_audioJSON: WpcEmuApi.AudioMessage) => {
 			// do nothing
 		})
 	})
@@ -138,7 +138,7 @@ class MockWpcEmulator implements WpcEmuApi.Emulator {
 	public start(): void {
 		throw new Error('Method not implemented.')
 	}
-	public getUiState(includeExpensiveData?: boolean): WpcEmuWebWorkerApi.EmuState {
+	public getUiState(_includeExpensiveData?: boolean): WpcEmuWebWorkerApi.EmuState {
 		return {
 			asic: {
 				sound: {
@@ -200,23 +200,23 @@ class MockWpcEmulator implements WpcEmuApi.Emulator {
 	public getState(): WpcEmuWebWorkerApi.EmuState {
 		throw new Error('Method not implemented.')
 	}
-	public setState(stateObject: WpcEmuWebWorkerApi.EmuState): void {
+	public setState(_stateObject: WpcEmuWebWorkerApi.EmuState): void {
 		throw new Error('Method not implemented.')
 	}
 	public registerAudioConsumer(callbackFunction: (audioJSON: WpcEmuApi.AudioMessage) => void): void {
 		callbackFunction({ command: 'FOO', id: 123 })
 	}
-	public executeCycle(ticksToRun: number, tickSteps: number): number {
+	public executeCycle(_ticksToRun: number, _tickSteps: number): number {
 		throw new Error('Method not implemented.')
 	}
-	public executeCycleForTime(advanceByMs: number, tickSteps: number): number {
+	public executeCycleForTime(advanceByMs: number, _tickSteps: number): number {
 		this.executedCyclesMs += advanceByMs
 		return 0
 	}
 	public setCabinetInput(value: number): void {
 		this.cabinetInput.push(value)
 	}
-	public setSwitchInput(switchNr: number, optionalValue?: boolean): void {
+	public setSwitchInput(switchNr: number, _optionalValue?: boolean): void {
 		this.switchInput.push(switchNr)
 	}
 	public setFliptronicsInput(value: string): void {

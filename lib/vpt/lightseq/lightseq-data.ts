@@ -10,11 +10,9 @@ import { ItemData } from '../item-data.js'
 /** LightSeq data.
  * @see https://github.com/vpinball/vpinball/blob/master/lightseq.cpp */
 export class LightSeqData extends ItemData {
-	private v!: Vertex2D
 	public collection?: string
 	public center: Vertex2D = new Vertex2D()
 	public updateInterval = 25
-	private backglass = false
 
 	public static async fromStorage(storage: Storage, itemName: string): Promise<LightSeqData> {
 		const d = new LightSeqData(itemName)

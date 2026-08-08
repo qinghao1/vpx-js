@@ -35,7 +35,7 @@ export class TriggerHitCircle extends HitCircle {
 		return super.hitTestBasicRadius(ball, dTime, coll, false, false, false)
 	}
 
-	public override collide(coll: CollisionEvent, physics: PlayerPhysics): void {
+	public override collide(coll: CollisionEvent, _physics: PlayerPhysics): void {
 		const ball = coll.ball
 
 		if ((this.objType !== CollisionType.Trigger && this.objType !== CollisionType.Kicker) || !ball.hit.isRealBall()) {
@@ -50,11 +50,11 @@ export class TriggerHitCircle extends HitCircle {
 			if (i < 0) {
 				ball.hit.vpVolObjs.push(this.obj!)
 				this.animation.triggerAnimationHit()
-				this.obj!.fireGroupEvent(Event.HitEventsHit)
+				this.obj?.fireGroupEvent(Event.HitEventsHit)
 			} else {
 				ball.hit.vpVolObjs.splice(i, 1)
 				this.animation.triggerAnimationUnhit()
-				this.obj!.fireGroupEvent(Event.HitEventsUnhit)
+				this.obj?.fireGroupEvent(Event.HitEventsUnhit)
 			}
 		}
 	}

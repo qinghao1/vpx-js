@@ -45,12 +45,12 @@ export class HitQuadtree {
 		const isLeft = bBox.left <= vcX
 		const isRight = bBox.right >= vcX
 		if (bBox.top <= vcY) {
-			if (isLeft) this.children[0]!.hitTestBall(ball, coll, physics)
-			if (isRight) this.children[1]!.hitTestBall(ball, coll, physics)
+			if (isLeft) this.children[0]?.hitTestBall(ball, coll, physics)
+			if (isRight) this.children[1]?.hitTestBall(ball, coll, physics)
 		}
 		if (bBox.bottom >= vcY) {
-			if (isLeft) this.children[2]!.hitTestBall(ball, coll, physics)
-			if (isRight) this.children[3]!.hitTestBall(ball, coll, physics)
+			if (isLeft) this.children[2]?.hitTestBall(ball, coll, physics)
+			if (isRight) this.children[3]?.hitTestBall(ball, coll, physics)
 		}
 	}
 

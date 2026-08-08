@@ -119,7 +119,7 @@ export class Stdlib extends VbsApi {
 		}
 	}
 
-	public LBound(a: unknown, _dimension?: number): number {
+	public LBound(_a: unknown, _dimension?: number): number {
 		return 0
 	}
 
@@ -203,7 +203,7 @@ export class Stdlib extends VbsApi {
 		if (typeof obj === 'boolean') {
 			return 'Boolean'
 		}
-		if (obj && obj.constructor && obj.constructor.name) {
+		if (obj?.constructor?.name) {
 			if (obj.constructor.name.endsWith('Api')) {
 				return obj.constructor.name.substr(0, obj.constructor.name.length - 3)
 			}

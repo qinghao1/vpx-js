@@ -49,7 +49,7 @@ export class SurfaceMeshGenerator {
 		mesh: Mesh,
 		verts: RenderVertex[],
 		texCoords: number[],
-		normals: Vertex2D[],
+		_normals: Vertex2D[],
 		bottom: number,
 		top: number,
 		textured: boolean,

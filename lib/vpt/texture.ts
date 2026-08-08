@@ -1,7 +1,7 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { basename } from 'path'
+import { basename } from 'node:path'
 import { LzwReader } from '../gltf/lzw-reader.js'
 import { BiffParser } from '../io/biff-parser.js'
 import { concatUint8Arrays } from '../io/binary-helpers.js'
@@ -27,7 +27,6 @@ export class Texture extends BiffParser {
 	public alphaTestValue?: number
 	public binary?: Binary
 	public pdsBuffer?: BaseTexture
-	private rgbTransparent: number = 0xffffff
 
 	private constructor() {
 		super()
@@ -72,7 +71,7 @@ export class Texture extends BiffParser {
 		const fileName = (this.szPath || this.localFileName)!
 		const ext = fileName.substr(fileName.lastIndexOf('.')).toLowerCase()
 		if (this.isRaw()) {
-			texture = await loader.loadRawTexture(this.getName(), this.pdsBuffer!.getData(), this.width, this.height)
+			texture = await loader.loadRawTexture(this.getName(), this.pdsBuffer?.getData(), this.width, this.height)
 			try {
 				this.pdsBuffer = undefined
 			} catch {}
@@ -82,7 +81,7 @@ export class Texture extends BiffParser {
 			const data = await table.streamStorage<Uint8Array>('GameStg', (storage) =>
 				this.streamImage(storage, this.storageName, this.binary),
 			)
-			if (!data || !data.length) {
+			if (!data?.length) {
 				throw new Error(`Cannot load image data for texture ${this.getName()}`)
 			}
 			texture = await loader.loadTexture(this.getName(), ext, data)
@@ -99,12 +98,12 @@ export class Texture extends BiffParser {
 	}
 
 	private async streamImage(storage: Storage, storageName?: string, binary?: Binary): Promise<Uint8Array> {
-		const strm = storage.stream(storageName!, binary!.pos, binary!.len)
+		const strm = storage.stream(storageName!, binary?.pos, binary?.len)
 		return new Promise<Uint8Array>((resolve, reject) => {
 			const bufs: Uint8Array[] = []
 			/* istanbul ignore if */
 			if (!strm) {
-				return reject(new Error('No such stream "' + storageName + '".'))
+				return reject(new Error(`No such stream "${storageName}".`))
 			}
 			strm.on('error', reject)
 			strm.on('data', (buf: Uint8Array) => bufs.push(buf))
@@ -177,7 +176,6 @@ class BaseTexture {
 	public static readonly RGB_FP = 1
 
 	private width: number
-	private height: number
 	public format: number = BaseTexture.RGBA
 	private data!: Uint8Array
 

@@ -114,7 +114,7 @@ export class Utils {
 			const targetIndex = sourceTrackNode.morphTargetDictionary[sourceTrackBinding.propertyIndex]
 
 			if (targetIndex === undefined) {
-				throw new Error('GLTFExporter: Morph target name not found: ' + sourceTrackBinding.propertyIndex)
+				throw new Error(`GLTFExporter: Morph target name not found: ${sourceTrackBinding.propertyIndex}`)
 			}
 
 			let mergedTrack: any
@@ -136,8 +136,8 @@ export class Utils {
 				continue
 			}
 
-			const mergedKeyframeIndex = 0
-			const sourceKeyframeIndex = 0
+			const _mergedKeyframeIndex = 0
+			const _sourceKeyframeIndex = 0
 			const sourceInterpolant = sourceTrack.createInterpolant(new sourceTrack.ValueBufferType(1))
 
 			mergedTrack = mergedTracks[sourceTrackNode.uuid]

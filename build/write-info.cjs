@@ -1,6 +1,6 @@
-const path = require('path')
-const fs = require('fs')
-const childProcess = require('child_process')
+const path = require('node:path')
+const fs = require('node:fs')
+const childProcess = require('node:child_process')
 const timestamp = Date.now()
 let version = '2.0.0'
 try {

@@ -10,13 +10,14 @@ export class VbsUndefined implements ProxyHandler<any> {
 	private readonly __errSet?: VbsError
 	private readonly __errGet?: VbsError
 
+	// biome-ignore lint/correctness/noConstructorReturn: Proxy trap - VbsUndefined sentinel
 	constructor(errSet?: VbsError, errGet?: VbsError) {
 		this.__errSet = errSet
 		this.__errGet = errGet
 		return new Proxy(this, this)
 	}
 
-	public get(target: any, p: string | number | symbol, receiver: any): any {
+	public get(target: any, p: string | number | symbol, _receiver: any): any {
 		if (p === UNDEF) {
 			return true
 		}
@@ -42,7 +43,7 @@ export class VbsUndefined implements ProxyHandler<any> {
 		return this
 	}
 
-	public set(target: any, p: string | number | symbol, value: any, receiver: any): boolean {
+	public set(_target: any, p: string | number | symbol, _value: any, _receiver: any): boolean {
 		ERR.Raise(
 			this.__errSet ||
 				new VbsError(`ReferenceError: Cannot set property "${String(p)}" of undefined array element.`, 9),
@@ -50,7 +51,7 @@ export class VbsUndefined implements ProxyHandler<any> {
 		return true
 	}
 
-	public has(target: any, p: string | number | symbol): boolean {
+	public has(_target: any, p: string | number | symbol): boolean {
 		if (p === Symbol.iterator || p === UNDEF) return true
 		return false
 	}

@@ -43,10 +43,6 @@ export class SpinnerData extends ItemData {
 		return d.correctAngles()
 	}
 
-	public constructor(itemName: string) {
-		super(itemName)
-	}
-
 	private correctAngles(): this {
 		const lo = Math.min(this.angleMin, this.angleMax)
 		const hi = Math.max(this.angleMin, this.angleMax)

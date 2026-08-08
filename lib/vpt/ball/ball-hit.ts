@@ -44,12 +44,7 @@ export class BallHit extends HitObject {
 	public inertia: number
 	public eventPos = new Vertex3D(-1, -1, -1)
 	public angularVelocity = new Vertex3D()
-
-	private playfieldReflectionStrength = 1
-	private reflectionEnabled = true
-	private forceReflection = false
 	public isVisible = true
-	private defaultZ = 25
 
 	constructor(ball: Ball, data: BallData, state: BallState, initialVelocity: Vertex3D, tableData: TableData) {
 		super()
@@ -118,7 +113,7 @@ export class BallHit extends HitObject {
 			const [t1, t2] = sol
 			hitTime = t1 * t2 < 0 ? Math.max(t1, t2) : Math.min(t1, t2)
 		}
-		if (!isFinite(hitTime) || hitTime < 0 || hitTime > dTime) return -1
+		if (!Number.isFinite(hitTime) || hitTime < 0 || hitTime > dTime) return -1
 		const hx = ball.state.pos.x + dvx * hitTime
 		const hy = ball.state.pos.y + dvy * hitTime
 		const hz = ball.state.pos.z + dvz * hitTime
@@ -215,7 +210,7 @@ export class BallHit extends HitObject {
 			Vertex3D.release(crossInertia)
 			const maxFric = friction * reactionImpulse
 			const jt = clamp(-vt / kt, -maxFric, maxFric)
-			if (isFinite(jt)) {
+			if (Number.isFinite(jt)) {
 				this.applySurfaceImpulseAndRelease(cross.clone(true).multiplyScalar(jt), tangent.clone(true).multiplyScalar(jt))
 			}
 			Vertex3D.release(cross)
@@ -306,7 +301,7 @@ export class BallHit extends HitObject {
 		const denom = this.invMass + slipDir.dotAndRelease(Vertex3D.crossProduct(p1, surfP, true))
 		const friction = clamp(numer / denom, -maxFric, maxFric)
 
-		if (isFinite(friction)) {
+		if (Number.isFinite(friction)) {
 			this.applySurfaceImpulseAndRelease(
 				cp.clone(true).multiplyScalar(dtime * friction),
 				slipDir.clone(true).multiplyScalar(dtime * friction),

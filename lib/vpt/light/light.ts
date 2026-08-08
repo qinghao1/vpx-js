@@ -9,7 +9,6 @@ import type { Player } from '../../game/player.js'
 import type { Storage } from '../../io/ole-doc.js'
 import type { IRenderApi } from '../../render/irender-api.js'
 import { Matrix3D } from '../../util/math.js'
-import { Enums } from '../enums.js'
 import { Item } from '../item.js'
 import { Material } from '../material.js'
 import type { Table } from '../table/table.js'
@@ -58,7 +57,7 @@ export class Light extends Item<LightData> implements IRenderable<LightState>, I
 		this.updater = new LightUpdater(this.data, this.state)
 	}
 
-	public isVisible(table: Table): boolean {
+	public isVisible(_table: Table): boolean {
 		return this.data.isVisible
 	}
 

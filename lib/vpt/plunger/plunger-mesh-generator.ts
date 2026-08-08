@@ -32,8 +32,6 @@ export class PlungerMeshGenerator {
 	private springRadius = 0
 	private readonly springMinSpacing = 2.2
 	private lathePoints!: number
-	private vtsPerFrame!: number
-	private indicesPerFrame!: number
 	private desc!: PlungerDesc
 
 	constructor(private readonly data: PlungerData) {
@@ -117,7 +115,7 @@ export class PlungerMeshGenerator {
 					tv = c.tv
 				if (m + 1 === this.lathePoints) {
 					y = this.rodY
-					tv = mesh.vertices[m - 1]!.tv + (tv - mesh.vertices[m - 1]!.tv) * (i * this.invScale)
+					tv = mesh.vertices[m - 1]?.tv + (tv - mesh.vertices[m - 1]?.tv) * (i * this.invScale)
 				}
 				const r = c.r
 				const pm = new Vertex3DNoTex2()
@@ -150,11 +148,11 @@ export class PlungerMeshGenerator {
 		return mesh
 	}
 
-	private buildSpring(i: number, rodVertices: Vertex3DNoTex2[]): Mesh {
+	private buildSpring(_i: number, rodVertices: Vertex3DNoTex2[]): Mesh {
 		const mesh = new Mesh('spring')
 		const gaugeRel = this.springGauge / this.data.width
 		const off = this.circlePoints * this.lathePoints
-		const y0 = rodVertices[off - 2]!.y
+		const y0 = rodVertices[off - 2]?.y
 		let n = Math.floor((this.springLoops + this.springEndLoops) * this.circlePoints)
 		const nEnd = Math.floor(this.springEndLoops * this.circlePoints)
 		const nMain = n - nEnd
@@ -211,7 +209,7 @@ export class PlungerMeshGenerator {
 			)
 		}
 		for (let idx = 0, k = 0; idx < mesh.vertices.length - 3; idx += 3) {
-			const nz = mesh.vertices[idx + 1]!.nz
+			const nz = mesh.vertices[idx + 1]?.nz
 			if (nz <= 0) {
 				mesh.indices[k++] = idx
 				mesh.indices[k++] = idx + 3

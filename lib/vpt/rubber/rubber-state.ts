@@ -13,10 +13,6 @@ export class RubberState extends ItemState {
 	public material?: string
 	public texture?: string
 
-	public constructor() {
-		super()
-	}
-
 	public static claim(
 		name: string,
 		height: number,

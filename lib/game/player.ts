@@ -1,7 +1,7 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { EventEmitter } from 'events'
+import { EventEmitter } from 'node:events'
 import { logger } from '../util/logger.js'
 import type { Vertex2D, Vertex3D } from '../util/math.js'
 import type { Ball } from '../vpt/ball/ball.js'
@@ -184,10 +184,10 @@ export class Player extends EventEmitter {
 		return !!this.physics.emu?.getDmdDimensions()
 	}
 	public getDmdDimensions(): Vertex2D {
-		return this.physics.emu!.getDmdDimensions()
+		return this.physics.emu?.getDmdDimensions()
 	}
 	public getDmdFrame(): Uint8Array {
-		return this.physics.emu!.getDmdFrame()
+		return this.physics.emu?.getDmdFrame()
 	}
 	public setCabinetInput(keyNr: number): void {
 		this.physics.emu?.setCabinetInput(keyNr)
@@ -241,7 +241,7 @@ export class ChangedStates<STATE extends ItemState = ItemState> {
 	}
 	public release(): void {
 		for (const k of this.keys) {
-			this.changedStates[k]!.release()
+			this.changedStates[k]?.release()
 			delete this.changedStates[k]
 		}
 	}

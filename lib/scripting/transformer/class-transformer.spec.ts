@@ -19,7 +19,9 @@ describe('The scripting class transformer', () => {
 	it('should convert member properties to lower case', () => {
 		const vbs = `Class Foo\nPublic LagCompensation\nEnd Class\n`
 		const js = transform(vbs)
-		expect(js).to.equal(`class Foo {\n    constructor() {\n        this.lagcompensation = undefined;\n        ${proxy}\n    }\n}`)
+		expect(js).to.equal(
+			`class Foo {\n    constructor() {\n        this.lagcompensation = undefined;\n        ${proxy}\n    }\n}`,
+		)
 	})
 
 	it.skip('should convert getters to lower case', () => {

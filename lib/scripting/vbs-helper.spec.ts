@@ -151,7 +151,7 @@ describe('The scripting VBS Helper', () => {
 	it('should get a value in a single-dimension array using "getOrCall"', () => {
 		const js = vbsHelper.dim([20])
 		js[20] = 'Test'
-		const value = vbsHelper.getOrCall(js, 20)
+		const _value = vbsHelper.getOrCall(js, 20)
 		expect(js[20]).to.equal(`Test`)
 	})
 

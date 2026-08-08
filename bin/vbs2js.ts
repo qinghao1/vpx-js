@@ -2,7 +2,7 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { existsSync, readFileSync } from 'fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { Progress } from '../lib/index.js'
 import { Grammar } from '../lib/scripting/grammar/grammar.js'
 
@@ -14,16 +14,16 @@ import { Grammar } from '../lib/scripting/grammar/grammar.js'
 
 		// mute progress logs
 		Progress.setProgress({
-			details(details: string): void {
+			details(_details: string): void {
 				/* do nothing */
 			},
-			end(id: string): void {
+			end(_id: string): void {
 				/* do nothing */
 			},
-			show(action: string, details?: string): void {
+			show(_action: string, _details?: string): void {
 				/* do nothing */
 			},
-			start(id: string, title: string): void {
+			start(_id: string, _title: string): void {
 				/* do nothing */
 			},
 		})

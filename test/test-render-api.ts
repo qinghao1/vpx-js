@@ -30,60 +30,64 @@ import type { Texture } from '../lib/vpt/texture'
 
 // tslint:disable:no-empty
 export class TestRenderApi implements IRenderApi<any, any, any> {
-	public addChildToParent(parent: any, child: any): void {}
+	public addChildToParent(_parent: any, _child: any): void {}
 
-	public applyLighting(state: LightState, initialIntensity: number, node: any | undefined): void {}
+	public applyLighting(_state: LightState, _initialIntensity: number, _node: any | undefined): void {}
 
 	public applyMaterial(
-		node: any | undefined,
-		material?: Material,
-		map?: string,
-		normalMap?: string,
-		envMap?: string,
-		emissiveMap?: string,
+		_node: any | undefined,
+		_material?: Material,
+		_map?: string,
+		_normalMap?: string,
+		_envMap?: string,
+		_emissiveMap?: string,
 	): void {}
 
-	public applyMatrixToNode(matrix: Matrix3D, node: any | undefined): void {}
+	public applyMatrixToNode(_matrix: Matrix3D, _node: any | undefined): void {}
 
-	public applyMeshToNode(mesh: Mesh, node: any | undefined): void {}
+	public applyMeshToNode(_mesh: Mesh, _node: any | undefined): void {}
 
-	public applyVisibility(isVisible: boolean, node: any | undefined): void {}
+	public applyVisibility(_isVisible: boolean, _node: any | undefined): void {}
 
-	public createLightGeometry(lightData: LightData, table: Table): any {
+	public createLightGeometry(_lightData: LightData, _table: Table): any {
 		return {}
 	}
 
-	public createMesh(obj: RenderInfo<any>): any {
+	public createMesh(_obj: RenderInfo<any>): any {
 		return {}
 	}
 
-	public createObjectFromRenderable(renderable: IRenderable<ItemState>, table: Table, opts: TableGenerateOptions): any {
+	public createObjectFromRenderable(
+		_renderable: IRenderable<ItemState>,
+		_table: Table,
+		_opts: TableGenerateOptions,
+	): any {
 		return {}
 	}
 
-	public createParentNode(name: string): any {
+	public createParentNode(_name: string): any {
 		return {}
 	}
 
-	public createPlayfieldGeometry(table: Table, opts: TableGenerateOptions): any {
+	public createPlayfieldGeometry(_table: Table, _opts: TableGenerateOptions): any {
 		return {}
 	}
 
-	public createPointLight(lightData: LightData): any {
+	public createPointLight(_lightData: LightData): any {
 		return undefined
 	}
 
-	public findInGroup(parent: any, name: string): any | undefined {
+	public findInGroup(_parent: any, _name: string): any | undefined {
 		return {}
 	}
 
-	public preloadTextures(textures: Texture[], table: Table): Promise<void> {
+	public preloadTextures(_textures: Texture[], _table: Table): Promise<void> {
 		return Promise.resolve()
 	}
 
-	public removeChildren(node: any | undefined): void {}
+	public removeChildren(_node: any | undefined): void {}
 
-	public removeFromParent(parent: any, child: any | undefined): void {}
+	public removeFromParent(_parent: any, _child: any | undefined): void {}
 
-	public transformScene(scene: any, table: Table): void {}
+	public transformScene(_scene: any, _table: Table): void {}
 }

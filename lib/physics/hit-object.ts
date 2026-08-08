@@ -75,7 +75,7 @@ export abstract class HitObject {
 			Vertex3D.release(posDiff)
 			ball.hit.eventPos.set(ball.state.pos.x, ball.state.pos.y, ball.state.pos.z)
 			const normalDist = this.objType === CollisionType.HitTarget ? 0 : 0.25
-			if (distLs > normalDist) this.obj!.fireGroupEvent(Event.HitEventsHit)
+			if (distLs > normalDist) this.obj?.fireGroupEvent(Event.HitEventsHit)
 		}
 	}
 	setElasticity(elasticity: number, elasticityFalloff?: number): this {

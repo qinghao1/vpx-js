@@ -13,7 +13,7 @@ import { EventTransformer } from './event-transformer.js'
 chai.use((sinonChai as any).default ?? sinonChai)
 
 describe('The scripting event transformer', () => {
-	const three = new ThreeHelper()
+	const _three = new ThreeHelper()
 	let table: Table
 
 	before(() => {

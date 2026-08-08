@@ -132,7 +132,7 @@ function ppLogicalExpression(node: ESIToken): Expression {
 	for (const child of node.children.slice(1)) {
 		const text = node.text.substr(index)
 		for (const key in LOGICAL_OPERATORS) {
-			if (text.startsWith(' ' + key + ' ')) {
+			if (text.startsWith(` ${key} `)) {
 				switch (LOGICAL_OPERATORS[key]) {
 					case 'Eqv':
 						expr = unaryExpression('~', binaryExpression('^', expr, child.estree))

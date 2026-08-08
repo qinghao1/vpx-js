@@ -14,11 +14,10 @@ import { LineSeg } from './line-seg.js'
 export class LineSegSlingshot extends LineSeg {
 	private slingshotAnim = new SlingshotAnimObject()
 	public force = 0
-	private eventTimeReset = 0
 	public doHitEvent = false
 
 	constructor(
-		private readonly surface: Surface,
+		readonly _surface: Surface,
 		private readonly surfaceData: SurfaceData,
 		p1: Vertex2D,
 		p2: Vertex2D,

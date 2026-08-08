@@ -36,7 +36,7 @@ export class WshShell {
 	 * @param id Specifies which application to activate. This can be a string containing the title of the application (as it appears in the title bar) or the application's Process ID.
 	 * @see https://docs.microsoft.com/en-us/previous-versions/windows/internet-explorer/ie-developer/windows-scripting/wzcddbek%28v%3dvs.84%29
 	 */
-	public AppActivate(id: string | number): void {
+	public AppActivate(_id: string | number): void {
 		// only used in ultradmd which we currently ignore
 		throw new VbsNotImplementedError()
 	}
@@ -46,7 +46,7 @@ export class WshShell {
 	 * @param strPathname String value indicating the pathname of the shortcut to create
 	 * @see https://docs.microsoft.com/en-us/previous-versions/windows/internet-explorer/ie-developer/windows-scripting/xsy6k3ys%28v%3dvs.84%29
 	 */
-	public CreateShortcut(strPathname: string): void {
+	public CreateShortcut(_strPathname: string): void {
 		// no usages found
 		throw new VbsNotImplementedError()
 	}
@@ -56,7 +56,7 @@ export class WshShell {
 	 * @param strCommand String value indicating the command line used to run the script. The command line should appear exactly as it would if you typed it at the command prompt.
 	 * @see https://docs.microsoft.com/en-us/previous-versions/windows/internet-explorer/ie-developer/windows-scripting/ateytk4a%28v%3dvs.84%29
 	 */
-	public Exec(strCommand: string): void {
+	public Exec(_strCommand: string): void {
 		// no usages found (fortunately!)
 		throw new VbsNotImplementedError()
 	}
@@ -66,7 +66,7 @@ export class WshShell {
 	 * @param strString String value indicating the name of the environment variable you want to expand.
 	 * @see https://docs.microsoft.com/en-us/previous-versions/windows/internet-explorer/ie-developer/windows-scripting/dy8116cf%28v%3dvs.84%29
 	 */
-	public ExpandEnvironmentStrings(strString: string): void {
+	public ExpandEnvironmentStrings(_strString: string): void {
 		// no usages found
 		throw new VbsNotImplementedError()
 	}
@@ -78,7 +78,7 @@ export class WshShell {
 	 * @param strTarget String value indicating the name of the computer system where the event log is stored (the default is the local computer system). Applies to Windows NT/2000 only.
 	 * @see https://docs.microsoft.com/en-us/previous-versions/windows/internet-explorer/ie-developer/windows-scripting/b4ce6by3%28v%3dvs.84%29
 	 */
-	public LogEvent(intType: number, strMessage: string, strTarget?: string): void {
+	public LogEvent(_intType: number, _strMessage: string, _strTarget?: string): void {
 		// no usages found
 		throw new VbsNotImplementedError()
 	}
@@ -92,7 +92,13 @@ export class WshShell {
 	 * @param intButton Integer value indicating the number of the button the user clicked to dismiss the message box. This is the value returned by the Popup method.
 	 * @see https://docs.microsoft.com/en-us/previous-versions/windows/internet-explorer/ie-developer/windows-scripting/x83z1d9f%28v%3dvs.84%29
 	 */
-	public Popup(strText: string, nSecondsToWait?: number, strTitle?: string, nType?: number, intButton?: number): void {
+	public Popup(
+		_strText: string,
+		_nSecondsToWait?: number,
+		_strTitle?: string,
+		_nType?: number,
+		_intButton?: number,
+	): void {
 		// no usages found
 		throw new VbsNotImplementedError()
 	}
@@ -102,7 +108,7 @@ export class WshShell {
 	 * @param strName String value indicating the name of the registry key or key value you want to delete.
 	 * @see https://docs.microsoft.com/en-us/previous-versions/windows/internet-explorer/ie-developer/windows-scripting/293bt9hh%28v%3dvs.84%29
 	 */
-	public RegDelete(strName: string): void {
+	public RegDelete(_strName: string): void {
 		// no usages found
 		throw new VbsNotImplementedError()
 	}
@@ -124,7 +130,7 @@ export class WshShell {
 	 * @param strType String value indicating the value's data type.
 	 * @see https://docs.microsoft.com/en-us/previous-versions/windows/internet-explorer/ie-developer/windows-scripting/yfdfhz1b%28v%3dvs.84%29
 	 */
-	public RegWrite(strName: string, anyValue: unknown, strType?: string): void {
+	public RegWrite(strName: string, anyValue: unknown, _strType?: string): void {
 		registry.regWrite(strName, anyValue as string | number)
 	}
 
@@ -135,7 +141,7 @@ export class WshShell {
 	 * @param bWaitOnReturn Boolean value indicating whether the script should wait for the program to finish executing before continuing to the next statement in your script. If set to true, script execution halts until the program finishes, and Run returns any error code returned by the program. If set to false (the default), the Run method returns immediately after starting the program, automatically returning 0 (not to be interpreted as an error code).
 	 * @see https://docs.microsoft.com/en-us/previous-versions/windows/internet-explorer/ie-developer/windows-scripting/d5fk67ky%28v%3dvs.84%29
 	 */
-	public Run(strCommand: string, intWindowStyle?: number, bWaitOnReturn?: boolean): void {
+	public Run(_strCommand: string, _intWindowStyle?: number, _bWaitOnReturn?: boolean): void {
 		// no usages found
 		throw new VbsNotImplementedError()
 	}
@@ -145,7 +151,7 @@ export class WshShell {
 	 * @param s String value indicating the keystroke(s) you want to send.
 	 * @see https://docs.microsoft.com/en-us/previous-versions/windows/internet-explorer/ie-developer/windows-scripting/8c6yea83%28v%3dvs.84%29#arguments
 	 */
-	public SendKeys(s: string): void {
+	public SendKeys(_s: string): void {
 		// no usages found
 		throw new VbsNotImplementedError()
 	}

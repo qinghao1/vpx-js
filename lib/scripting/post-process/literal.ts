@@ -48,13 +48,13 @@ function ppIntLiteral(node: ESIToken): unknown {
 
 function ppHexLiteral(node: ESIToken): unknown {
 	let value = node.text
-	value = '0x' + value.substr(2)
+	value = `0x${value.substr(2)}`
 	return literal(parseInt(value, 16), value)
 }
 
 function ppOctalLiteral(node: ESIToken): unknown {
 	let value = node.text
-	value = '0' + value.substr(2)
+	value = `0${value.substr(2)}`
 	return literal(parseInt(value, 8), value)
 }
 
@@ -68,14 +68,14 @@ function ppDateLiteral(node: ESIToken): unknown {
 	return newExpression(identifier('Date'), [literal(value)])
 }
 
-function ppNothingLiteral(node: ESIToken): unknown {
+function ppNothingLiteral(_node: ESIToken): unknown {
 	return identifier('Nothing')
 }
 
-function ppEmptyLiteral(node: ESIToken): unknown {
+function ppEmptyLiteral(_node: ESIToken): unknown {
 	return identifier('Empty')
 }
 
-function ppNullLiteral(node: ESIToken): unknown {
+function ppNullLiteral(_node: ESIToken): unknown {
 	return identifier('Null')
 }

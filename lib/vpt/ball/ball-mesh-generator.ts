@@ -9,7 +9,7 @@ const ballMesh = loadMesh('ball-mesh')
 
 /** Generates ball mesh. @see https://github.com/vpinball/vpinball/blob/master/ball.cpp */
 export class BallMeshGenerator {
-	constructor(private readonly data: BallData) {}
+	constructor(readonly _data: BallData) {}
 	public getMesh(): Mesh {
 		return ballMesh.clone()
 	}

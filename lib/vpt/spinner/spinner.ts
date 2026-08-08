@@ -72,7 +72,7 @@ export class Spinner
 
 	public getMeshes<GEOMETRY>(table: Table): Meshes<GEOMETRY> {
 		const spinner = this.meshGenerator.generateMeshes(table)
-		const meshes: Meshes<GEOMETRY> = {}
+		const _meshes: Meshes<GEOMETRY> = {}
 
 		return {
 			plate: {
@@ -111,7 +111,7 @@ export class Spinner
 	}
 
 	public getMover(): MoverObject {
-		return this.hit!.getMoverObject()
+		return this.hit?.getMoverObject()
 	}
 
 	public getState(): SpinnerState {

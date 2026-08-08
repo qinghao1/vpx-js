@@ -10,7 +10,7 @@ chai.use((sinonChai as any).default ?? sinonChai)
 describe('The VBScript undefined handler', () => {
 	it('should be comparable', () => {
 		const undef = new VbsUndefined() as unknown
-		expect(() => undef == 1).not.to.throw()
+		expect(() => undef === 1).not.to.throw()
 	})
 
 	it('should return "undefined" as string', () => {

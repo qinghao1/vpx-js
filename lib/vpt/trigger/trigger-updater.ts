@@ -9,10 +9,6 @@ import type { TriggerState } from './trigger-state.js'
 
 /** Trigger updater — visibility, material and height offset. */
 export class TriggerUpdater extends ItemUpdater<TriggerState> {
-	constructor(state: TriggerState) {
-		super(state)
-	}
-
 	public applyState<NODE, GEOMETRY, POINT_LIGHT>(
 		obj: NODE,
 		state: TriggerState,

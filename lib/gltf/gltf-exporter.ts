@@ -4,28 +4,20 @@
 import { createRequire } from 'node:module'
 import {
 	type AnimationClip,
-	type Bone,
 	BufferAttribute,
 	type BufferGeometry,
 	type Camera,
-	type Color,
 	DoubleSide,
 	type InterleavedBufferAttribute,
 	InterpolateDiscrete,
-	InterpolateLinear,
-	type KeyframeTrack,
-	type Light,
 	Math as M,
 	type Material,
-	type Matrix4,
 	type Mesh,
 	type Object3D,
 	type PixelFormat,
 	PropertyBinding,
 	Scene,
 	type Texture,
-	TriangleFanDrawMode,
-	TriangleStripDrawMode,
 	Vector3,
 } from '../refs.node.js'
 import { logger } from '../util/logger.js'
@@ -49,7 +41,6 @@ import type {
 	BufferView,
 	CameraInternal,
 	ExtensionsUsed,
-	GeometryInternal,
 	KeyframeTrackInternal,
 	LightDefinition,
 	LightInternal,
@@ -152,7 +143,7 @@ export class GLTFExporter {
 		this.started = true
 		if (this.options.animations?.length) this.options.trs = true
 		this.processInput(input)
-		const pool = new PromisePool(() => (this.pending.length ? this.pending.shift()!() : null), 1)
+		const pool = new PromisePool(() => (this.pending.length ? this.pending.shift()?.() : null), 1)
 		logger().info('[GLTFExporter.parse] Processing images..')
 		await pool.start()
 		const blob = Buffer.concat(this.buffers)
@@ -524,7 +515,7 @@ export class GLTFExporter {
 	 * @param  flipY before writing out the image
 	 * @return Index of the processed texture in the "images" array
 	 */
-	private processImage(image: NodeImage, format: PixelFormat, flipY: boolean) {
+	private processImage(image: NodeImage, _format: PixelFormat, flipY: boolean) {
 		const mimeType = image.getMimeType()
 		if (!this.outputJSON.images) {
 			this.outputJSON.images = []
@@ -778,7 +769,7 @@ export class GLTFExporter {
 	 * @return {Integer}      Index of the processed mesh in the "meshes" array
 	 */
 	private processMesh(mesh: MeshInternal): number | null {
-		const cacheKey = mesh.geometry.uuid + ':' + (mesh.material as Material).uuid
+		const cacheKey = `${mesh.geometry.uuid}:${(mesh.material as Material).uuid}`
 		if (this.cachedData.meshes.has(cacheKey)) {
 			return this.cachedData.meshes.get(cacheKey)!
 		}
@@ -1156,7 +1147,7 @@ export class GLTFExporter {
 		}
 
 		this.outputJSON.animations.push({
-			name: clip.name || 'clip_' + this.outputJSON.animations.length,
+			name: clip.name || `clip_${this.outputJSON.animations.length}`,
 			samplers,
 			channels,
 		})
@@ -1165,7 +1156,7 @@ export class GLTFExporter {
 	}
 
 	private processSkin(object: Object3DInternal) {
-		const node = this.outputJSON.nodes![this.nodeMap.get(object)]
+		const node = this.outputJSON.nodes?.[this.nodeMap.get(object)]
 		const skeleton = object.skeleton
 		const rootJoint = object.skeleton.bones[0]
 
@@ -1407,7 +1398,7 @@ export class GLTFExporter {
 	}
 
 	private processInput(pInput: any) {
-		pInput = pInput instanceof Array ? pInput : [pInput]
+		pInput = Array.isArray(pInput) ? pInput : [pInput]
 		const objectsWithoutScene = []
 
 		for (const p of pInput) {

@@ -104,17 +104,17 @@ describe('The VPinball global API', () => {
 		const api = new GlobalApi(table, player)
 		const element = api.GetElementByName('Williams')
 		expect(element).to.be.ok
-		expect(element!.getName()).to.equal('Williams')
+		expect(element?.getName()).to.equal('Williams')
 	})
 
 	it('should apply the color of a material', () => {
 		const api = new GlobalApi(table, player)
 		const material = table.getMaterial('Playfield')
 		expect(material).to.be.ok
-		expect(material!.baseColor).to.equal(0xb4b4b4)
+		expect(material?.baseColor).to.equal(0xb4b4b4)
 
 		api.MaterialColor('Playfield', 0xff0000)
-		expect(material!.baseColor).to.equal(0xff0000)
+		expect(material?.baseColor).to.equal(0xff0000)
 	})
 
 	it('should correctly save and load values', () => {

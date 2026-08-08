@@ -1,7 +1,7 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { EventEmitter } from 'events'
+import { EventEmitter } from 'node:events'
 import type { Event } from '../game/event.js'
 import type { EventProxy } from '../game/event-proxy.js'
 import type { Player } from '../game/player.js'
@@ -67,6 +67,7 @@ export abstract class ItemApi<DATA extends ItemData> extends EventEmitter {
 		this._setTimerEnabled(v)
 	}
 
+	// biome-ignore lint/correctness/noConstructorReturn: Proxy API - maps VBS property names via _getPropertyName
 	constructor(
 		protected readonly data: DATA,
 		protected readonly events: EventProxy,

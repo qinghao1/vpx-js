@@ -20,7 +20,7 @@ export class LightUpdater extends ItemUpdater<LightState> {
 		obj: NODE,
 		state: LightState,
 		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
-		table: Table,
+		_table: Table,
 	): void {
 		Object.assign(this.state, state)
 		renderApi.applyLighting(this.state, this.data.intensity, obj)

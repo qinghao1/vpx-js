@@ -21,13 +21,13 @@ describe('The VBScript dictionary', () => {
 		const d = new Dictionary()
 		d.Add('myKey', 'myValue')
 
-		expect(d.Item['myKey']).to.equal('myValue')
+		expect(d.Item.myKey).to.equal('myValue')
 	})
 
 	it('should read and write values via property', () => {
 		const d = new Dictionary()
-		d.Item['myKey'] = 'myValue'
-		expect(d.Item['myKey']).to.equal('myValue')
+		d.Item.myKey = 'myValue'
+		expect(d.Item.myKey).to.equal('myValue')
 		expect(d.Count).to.equal(1)
 	})
 
@@ -74,8 +74,8 @@ describe('The VBScript dictionary', () => {
 		d.Add('b', 'Belgrade')
 		d.Add('c', 'Cairo')
 
-		d.Key['a'] = 'aa'
-		expect(d.Item['aa']).to.equal('Athens')
+		d.Key.a = 'aa'
+		expect(d.Item.aa).to.equal('Athens')
 	})
 
 	it('should retrieve all keys', () => {
@@ -98,10 +98,10 @@ describe('The VBScript dictionary', () => {
 
 	it('should create an empty value', () => {
 		const d = new Dictionary()
-		const n = d.Item['new']
+		const n = d.Item.new
 
 		expect(n).to.be.null
-		expect(d.Item['new']).to.be.null
+		expect(d.Item.new).to.be.null
 	})
 
 	it('should fail adding an existing item', () => {
@@ -118,7 +118,7 @@ describe('The VBScript dictionary', () => {
 		d.Add('a', 'Athens')
 		d.Add('b', 'Belgrade')
 
-		d.Key['bb'] = 'bbb'
+		d.Key.bb = 'bbb'
 		expect(ERR.Number).to.equal(32811)
 	})
 

@@ -9,13 +9,12 @@ import type { IRenderApi, MeshConvertOptions } from '../irender-api.js'
 import type { ThreeMapGenerator } from './three-map-generator.js'
 import type { ThreeMaterialGenerator } from './three-material-generator.js'
 import type { ThreeMeshGenerator } from './three-mesh-generator.js'
-import { ThreeRenderApi } from './three-render-api.js'
 
 /** Converts renderables to Three.js groups/meshes. */
 export class ThreeConverter {
 	constructor(
 		private readonly meshGenerator: ThreeMeshGenerator,
-		private readonly mapGenerator: ThreeMapGenerator,
+		readonly _mapGenerator: ThreeMapGenerator,
 		private readonly materialGenerator: ThreeMaterialGenerator,
 		private readonly meshConvertOpts: MeshConvertOptions,
 	) {}
@@ -42,7 +41,7 @@ export class ThreeConverter {
 		const geometry = obj.geometry ?? this.meshGenerator.convertToBufferGeometry(obj.mesh!)
 		const material = this.materialGenerator.getInitialMaterial(obj, this.meshConvertOpts)
 		const mesh = new ThreeMesh(geometry, material)
-		mesh.name = (obj.geometry ?? obj.mesh!)!.name
+		mesh.name = (obj.geometry ?? obj.mesh!)?.name
 		mesh.matrixAutoUpdate = false
 		mesh.visible = obj.isVisible
 		return mesh

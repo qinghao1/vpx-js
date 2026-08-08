@@ -28,7 +28,6 @@ export class DecalData extends ItemData {
 	public color = 0x000000
 	public szMaterial?: string
 	public verticalText = false
-	private backglass = false
 	public font = ''
 
 	public static async fromStorage(storage: Storage, itemName: string): Promise<DecalData> {

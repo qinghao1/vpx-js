@@ -64,10 +64,6 @@ export class BumperData extends ItemData {
 		return d
 	}
 
-	public constructor(itemName: string) {
-		super(itemName)
-	}
-
 	private async fromTag(buffer: Uint8Array, tag: string, _offset: number, len: number): Promise<number> {
 		if (tag === 'VCEN') {
 			this.center = Vertex2D.get(buffer)

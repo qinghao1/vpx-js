@@ -8,10 +8,6 @@ import { Transformer } from './transformer.js'
 
 /** Transforms On Error. */
 export class ErrorTransformer extends Transformer {
-	constructor(ast: Program) {
-		super(ast)
-	}
-
 	public transform(): Program {
 		return replace(this.ast, {
 			enter: (node, parent: any) => {

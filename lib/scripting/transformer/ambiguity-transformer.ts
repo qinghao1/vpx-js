@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { replace } from 'estraverse'
-import type { CallExpression, Expression, Identifier, MemberExpression, Program } from 'estree'
+import type { CallExpression, Expression, MemberExpression, Program } from 'estree'
 import type { EnumsApi } from '../../vpt/enums.js'
 import type { GlobalApi } from '../../vpt/global-api.js'
 import { callExpression, identifier, literal, memberExpression } from '../estree.js'
@@ -33,7 +33,6 @@ import { Transformer } from './transformer.js'
 /** Resolves VBScript call vs array ambiguity. */
 export class AmbiguityTransformer extends Transformer {
 	private readonly itemApis: Record<string, unknown>
-	private readonly enumApis: EnumsApi
 	private readonly globalApi: GlobalApi
 	private readonly stdlib: Stdlib
 

@@ -14,11 +14,11 @@ chai.use((sinonChai as any).default ?? sinonChai)
 
 describe('The scripting function hoist transformer', () => {
 	let table: Table
-	let player: Player
+	let _player: Player
 
 	beforeEach(() => {
 		table = new TableBuilder().build()
-		player = new Player(table)
+		_player = new Player(table)
 	})
 
 	it('should move a function to the top', () => {

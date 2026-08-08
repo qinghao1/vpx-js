@@ -67,7 +67,7 @@ export class HitLineZ extends HitObject {
 			if (!sol) return -1
 			hitTime = sol[0]! * sol[1]! < 0 ? Math.max(sol[0]!, sol[1]!) : Math.min(sol[0]!, sol[1]!)
 		}
-		if (!isFinite(hitTime) || hitTime < 0 || hitTime > dTime) return -1
+		if (!Number.isFinite(hitTime) || hitTime < 0 || hitTime > dTime) return -1
 		const hitZ = ball.state.pos.z + hitTime * ball.hit.vel.z
 		if (hitZ < this.hitBBox.zlow || hitZ > this.hitBBox.zhigh) return -1
 		const hitX = ball.state.pos.x + hitTime * ball.hit.vel.x

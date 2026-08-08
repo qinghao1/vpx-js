@@ -63,19 +63,14 @@ export class PlayerPhysics {
 	private hitOcTreeDynamic = new HitKD()
 	private hitOcTree = new HitQuadtree()
 	private hitTimers: TimerHit[] = []
-	private minPhysLoopTime = 0
-	private lastFlipTime = 0
 	private lastTimeUsec = 0
 	private lastFrameDuration = 0
 	private cFrames = 0
 	private lastFpsTime = 0
 	private fps = 0
-	private fpsAvg = 0
-	private fpsCount = 0
 	private curPhysicsFrameTime = 0
 	private nextPhysicsFrameTime = 0
 	private startTimeUsec = 0
-	private physPeriod = 0
 	private activeBallDebug?: Ball
 	private scriptPeriod = 0
 
@@ -166,9 +161,9 @@ export class PlayerPhysics {
 			}
 			if (this.swapBallCollisionHandling) {
 				for (let i = this.contacts.length - 1; i >= 0; i--)
-					this.contacts[i]!.obj!.contact(this.contacts[i]!, hitTime, this)
+					this.contacts[i]?.obj?.contact(this.contacts[i]!, hitTime, this)
 			} else {
-				for (const c of this.contacts) c.obj!.contact(c, hitTime, this)
+				for (const c of this.contacts) c.obj?.contact(c, hitTime, this)
 			}
 			for (const c of this.contacts) CollisionEvent.releaseOne(c)
 			this.contacts.length = 0
@@ -266,7 +261,7 @@ export class PlayerPhysics {
 	}
 
 	public createBall(ballCreator: IBallCreationPosition, player: Player, radius = 25, mass = 1): Ball {
-		const data = new BallData(radius, mass, this.table.data!.defaultBulbIntensityScaleOnBall)
+		const data = new BallData(radius, mass, this.table.data?.defaultBulbIntensityScaleOnBall)
 		const id = Ball.idCounter++
 		const state = BallState.claim(`Ball\${id}`, ballCreator.getBallCreationPosition(this.table))
 		state.pos.z += data.radius

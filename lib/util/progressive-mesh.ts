@@ -20,14 +20,14 @@ export class ProgMeshTriangle {
 		this.computeNormal()
 		ctx.triangles.push(this)
 		for (let i = 0; i < 3; i++) {
-			this.vertices[i]!.face.push(this)
-			for (let j = 0; j < 3; j++) if (i !== j) addUnique(this.vertices[i]!.neighbor, this.vertices[j]!)
+			this.vertices[i]?.face.push(this)
+			for (let j = 0; j < 3; j++) if (i !== j) addUnique(this.vertices[i]?.neighbor, this.vertices[j]!)
 		}
 	}
 
 	private computeNormal(): void {
 		const [a, b, c] = this.vertices.map((v) => v.position)
-		this.normal = cross(b!.sub(a!), c!.sub(b!))
+		this.normal = cross(b?.sub(a!), c?.sub(b!))
 		const len = magnitude(this.normal)
 		if (len > FLT_MIN) this.normal = this.normal.divideScalar(len)
 	}
@@ -38,12 +38,12 @@ export class ProgMeshTriangle {
 
 	public destroy(): void {
 		removeFillWithBack(this.ctx.triangles, this)
-		for (let i = 0; i < 3; i++) if (this.vertices[i]) removeFillWithBack(this.vertices[i]!.face, this)
+		for (let i = 0; i < 3; i++) if (this.vertices[i]) removeFillWithBack(this.vertices[i]?.face, this)
 		for (let i = 0; i < 3; i++) {
 			const j = (i + 1) % 3
 			if (this.vertices[i] && this.vertices[j]) {
-				this.vertices[i]!.removeIfNonNeighbor(this.vertices[j]!)
-				this.vertices[j]!.removeIfNonNeighbor(this.vertices[i]!)
+				this.vertices[i]?.removeIfNonNeighbor(this.vertices[j]!)
+				this.vertices[j]?.removeIfNonNeighbor(this.vertices[i]!)
 			}
 		}
 	}
@@ -58,10 +58,10 @@ export class ProgMeshTriangle {
 		newV.face.push(this)
 		for (let i = 0; i < 3; i++) {
 			oldV.removeIfNonNeighbor(this.vertices[i]!)
-			this.vertices[i]!.removeIfNonNeighbor(oldV)
+			this.vertices[i]?.removeIfNonNeighbor(oldV)
 		}
 		for (let i = 0; i < 3; i++)
-			for (let j = 0; j < 3; j++) if (i !== j) addUnique(this.vertices[i]!.neighbor, this.vertices[j]!)
+			for (let j = 0; j < 3; j++) if (i !== j) addUnique(this.vertices[i]?.neighbor, this.vertices[j]!)
 		this.computeNormal()
 	}
 }
@@ -84,7 +84,7 @@ export class ProgMeshVertex {
 	public destroy(): void {
 		if (this.face.length) throw new Error('face must be empty')
 		while (this.neighbor.length) {
-			removeFillWithBack(this.neighbor[0]!.neighbor, this)
+			removeFillWithBack(this.neighbor[0]?.neighbor, this)
 			removeFillWithBack(this.neighbor, this.neighbor[0]!)
 		}
 		removeFillWithBack(this.ctx.vertices, this)
@@ -177,9 +177,9 @@ export class ProgMeshContext {
 		}
 		const tmp = [...u.neighbor]
 		let i = u.face.length
-		while (i--) if (u.face[i]!.hasVertex(v)) u.face[i]!.destroy()
+		while (i--) if (u.face[i]?.hasVertex(v)) u.face[i]?.destroy()
 		i = u.face.length
-		while (i--) u.face[i]!.replaceVertex(u, v)
+		while (i--) u.face[i]?.replaceVertex(u, v)
 		u.destroy()
 		for (const t of tmp) this.computeEdgeCostAtVertex(t)
 	}

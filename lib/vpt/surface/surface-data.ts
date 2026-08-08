@@ -95,10 +95,6 @@ export class SurfaceData extends ItemData implements IPhysicalData {
 		})
 	}
 
-	public constructor(itemName: string) {
-		super(itemName)
-	}
-
 	private async fromTag(buffer: Uint8Array, tag: string, _offset: number, len: number): Promise<number> {
 		if (
 			handleBiffTag(this, tag, buffer, len, {

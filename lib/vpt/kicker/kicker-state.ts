@@ -17,10 +17,6 @@ export class KickerState extends ItemState {
 	}
 	set isVisible(_v: boolean) {}
 
-	public constructor() {
-		super()
-	}
-
 	public static claim(name: string, type: number, material: string | undefined): KickerState {
 		const s = new KickerState()
 		s.name = name

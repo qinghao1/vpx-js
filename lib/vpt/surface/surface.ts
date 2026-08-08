@@ -28,7 +28,6 @@ export class Surface
 	private readonly hitGenerator: SurfaceHitGenerator
 	private readonly updater: SurfaceUpdater
 	private hits: HitObject[] = []
-	private drops: HitObject[] = []
 	private api?: SurfaceApi
 
 	get heightTop() {

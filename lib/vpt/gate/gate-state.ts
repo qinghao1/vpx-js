@@ -11,10 +11,6 @@ export class GateState extends ItemState {
 	public material?: string
 	public showBracket = true
 
-	public constructor() {
-		super()
-	}
-
 	public static claim(
 		name: string,
 		angle: number,

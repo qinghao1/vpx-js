@@ -105,9 +105,9 @@ export class HitTargetHitGenerator {
 			const i1 = hitMesh.indices[i + 1]!
 			const i2 = hitMesh.indices[i + 2]!
 			const rgv3D: Vertex3D[] = [
-				new Vertex3D(hitMesh.vertices[i0]!.x, hitMesh.vertices[i0]!.y, hitMesh.vertices[i0]!.z),
-				new Vertex3D(hitMesh.vertices[i2]!.x, hitMesh.vertices[i2]!.y, hitMesh.vertices[i2]!.z),
-				new Vertex3D(hitMesh.vertices[i1]!.x, hitMesh.vertices[i1]!.y, hitMesh.vertices[i1]!.z),
+				new Vertex3D(hitMesh.vertices[i0]?.x, hitMesh.vertices[i0]?.y, hitMesh.vertices[i0]?.z),
+				new Vertex3D(hitMesh.vertices[i2]?.x, hitMesh.vertices[i2]?.y, hitMesh.vertices[i2]?.z),
+				new Vertex3D(hitMesh.vertices[i1]?.x, hitMesh.vertices[i1]?.y, hitMesh.vertices[i1]?.z),
 			]
 			hitObjects.push(this.setupHitObject(new HitTriangle(rgv3D), events, setHitObject, table))
 			hitObjects.push(

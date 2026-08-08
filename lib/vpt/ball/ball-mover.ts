@@ -13,7 +13,7 @@ import type { BallState } from './ball-state.js'
 export class BallMover implements MoverObject {
 	constructor(
 		private readonly id: number,
-		private readonly data: BallData,
+		readonly _data: BallData,
 		private readonly state: BallState,
 		private readonly hit: BallHit,
 	) {}
@@ -37,7 +37,7 @@ export class BallMover implements MoverObject {
 
 	public updateVelocities(physics: PlayerPhysics): void {
 		if (!this.state.isFrozen) {
-			if (physics.ballControl && this.id === physics.activeBallBC!.id && physics.bcTarget) {
+			if (physics.ballControl && this.id === physics.activeBallBC?.id && physics.bcTarget) {
 				this.hit.vel.x *= 0.5
 				this.hit.vel.y *= 0.5
 				const clamp = (v: number) => Math.max(-10, Math.min(10, v / 10))

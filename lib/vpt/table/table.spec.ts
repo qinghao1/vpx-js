@@ -147,23 +147,23 @@ describe('The VPinball table generator', () => {
 	})
 
 	it('should read the table info correctly', async () => {
-		expect(table.info!.TableRules).to.equal('Rules')
-		expect(table.info!.AuthorName).to.equal('Table Author')
-		expect(table.info!.TableName).to.equal('Table Name')
-		expect(table.info!.TableBlurb).to.equal('Short Blurb')
-		expect(table.info!.ReleaseDate).to.equal('2019-04-14')
-		expect(table.info!.AuthorEmail).to.equal('test@vpdb.io')
-		expect(table.info!.customdata1).to.equal('customvalue1')
-		expect(table.info!.AuthorWebSite).to.equal('https://vpdb.io')
-		expect(table.info!.TableVersion).to.equal('Version')
-		expect(table.info!.TableDescription).to.equal('Description')
+		expect(table.info?.TableRules).to.equal('Rules')
+		expect(table.info?.AuthorName).to.equal('Table Author')
+		expect(table.info?.TableName).to.equal('Table Name')
+		expect(table.info?.TableBlurb).to.equal('Short Blurb')
+		expect(table.info?.ReleaseDate).to.equal('2019-04-14')
+		expect(table.info?.AuthorEmail).to.equal('test@vpdb.io')
+		expect(table.info?.customdata1).to.equal('customvalue1')
+		expect(table.info?.AuthorWebSite).to.equal('https://vpdb.io')
+		expect(table.info?.TableVersion).to.equal('Version')
+		expect(table.info?.TableDescription).to.equal('Description')
 	})
 
 	it('should not crash when reading a corrupt file', async () => {
 		try {
 			await Table.load(new NodeBinaryReader(three.fixturePath('table-corrupt.vpx')))
 			expect.fail('Exception expected.')
-		} catch (err) {
+		} catch (_err) {
 			// we're good in here
 		}
 	})

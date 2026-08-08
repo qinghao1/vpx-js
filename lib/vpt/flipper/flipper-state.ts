@@ -13,10 +13,6 @@ export class FlipperState extends ItemState {
 	public texture?: string
 	public rubberMaterial?: string
 
-	public constructor() {
-		super()
-	}
-
 	public static claim(
 		name: string,
 		angle: number,

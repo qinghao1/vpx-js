@@ -19,13 +19,13 @@ describe('The VpmController - VISUAL PINMAME COM OBJECT', () => {
 	let setSwitchInputSpy: SinonStub<[number, boolean?]>
 	let setFliptronicsInputSpy: SinonStub<[string, boolean?]>
 	let setDipSwitchByteSpy: SinonStub<[number]>
-	let getDipSwitchByteSpy: SinonStub<any>
+	let _getDipSwitchByteSpy: SinonStub<any>
 
 	beforeEach(() => {
 		setSwitchInputSpy = sandbox.stub(Emulator.prototype, 'setSwitchInput').returns(true)
 		setFliptronicsInputSpy = sandbox.stub(Emulator.prototype, 'setFliptronicsInput')
 		setDipSwitchByteSpy = sandbox.stub(Emulator.prototype, 'setDipSwitchByte')
-		getDipSwitchByteSpy = sandbox.stub(Emulator.prototype, 'getDipSwitchByte').returns(123)
+		_getDipSwitchByteSpy = sandbox.stub(Emulator.prototype, 'getDipSwitchByte').returns(123)
 
 		const table: Table = new TableBuilder().build()
 		const player: Player = new Player(table)

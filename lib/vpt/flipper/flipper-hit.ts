@@ -361,7 +361,7 @@ export class FlipperHit extends HitObject {
 			dp = bffnd
 		}
 		Vertex2D.release(vp)
-		if (!isFinite(t) || t < 0 || t > dTime || (k > C_INTERATIONS && Math.abs(bffnd) > ballR * 0.25)) {
+		if (!Number.isFinite(t) || t < 0 || t > dTime || (k > C_INTERATIONS && Math.abs(bffnd) > ballR * 0.25)) {
 			Vertex2D.release(faceN)
 			return -1
 		}
@@ -398,7 +398,7 @@ export class FlipperHit extends HitObject {
 		let asp = angleSpeed
 		if ((contactAng >= angleMax && asp > 0) || (contactAng <= angleMin && asp < 0)) asp = 0
 		coll.hitMomentBit = d === 0
-		const dv = Vertex2D.claim(bvX - coll.hitVel!.x * asp * d, bvY - coll.hitVel!.y * asp * d)
+		const dv = Vertex2D.claim(bvX - coll.hitVel?.x * asp * d, bvY - coll.hitVel?.y * asp * d)
 		const bnv = dv.x * coll.hitNormal.x + dv.y * coll.hitNormal.y
 		Vertex2D.release(dv)
 		if (Math.abs(bnv) <= C_CONTACTVEL && bffnd <= PHYS_TOUCH) {
@@ -492,7 +492,7 @@ export class FlipperHit extends HitObject {
 			dp = bFend
 		}
 		Vertex2D.release(vp)
-		if (!isFinite(t) || t < 0 || t > dTime || (k > C_INTERATIONS && Math.abs(bFend) > ballR * 0.25)) return -1
+		if (!Number.isFinite(t) || t < 0 || t > dTime || (k > C_INTERATIONS && Math.abs(bFend) > ballR * 0.25)) return -1
 		const hitz = ball.state.pos.z + ball.hit.vel.z * t
 		if (hitz + ballR * 0.5 < this.hitBBox.zlow || hitz - ballR * 0.5 > this.hitBBox.zhigh) return -1
 		const inv = 1 / cbce

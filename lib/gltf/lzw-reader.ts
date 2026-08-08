@@ -15,7 +15,6 @@ export class LzwReader {
 
 	private readonly pbBitsOutCur: BufferPtr
 	private readonly cbStride: number
-	private badCodeCount: number
 
 	private currSize: number = 0 /* The current code size */
 	private clear: number = 0 /* Value for a clear code */
@@ -38,8 +37,6 @@ export class LzwReader {
 	private prefix: number[] = [] /* Prefix linked list */
 
 	private readonly width: number
-	private readonly height: number
-	private linesLeft: number
 
 	constructor(pstm: Uint8Array, width: number, height: number, pitch: number) {
 		for (let i = 0; i < MAX_CODES + 1; i++) {

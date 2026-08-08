@@ -2,17 +2,9 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { createRequire } from 'node:module'
+import { inspect } from 'node:util'
 import { traverse } from 'estraverse'
-import type {
-	BaseNode,
-	BaseNodeWithoutComments,
-	Comment,
-	Identifier,
-	MemberExpression,
-	Program,
-	Statement,
-} from 'estree'
-import { inspect } from 'util'
+import type { BaseNode, Identifier, MemberExpression, Program, Statement } from 'estree'
 
 const require = createRequire(import.meta.url)
 

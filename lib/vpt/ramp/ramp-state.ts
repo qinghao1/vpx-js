@@ -23,10 +23,6 @@ export class RampState extends ItemState {
 	public textureAlignment?: number
 	public hasWallImage?: boolean
 
-	public constructor() {
-		super()
-	}
-
 	public static claim(
 		name: string,
 		heightBottom: number,

@@ -120,7 +120,7 @@ export class Primitive
 	}
 
 	public setCollidable(isCollidable: boolean) {
-		if (this.hits!.length > 0 && this.hits![0].isEnabled !== isCollidable) {
+		if (this.hits?.length > 0 && this.hits?.[0].isEnabled !== isCollidable) {
 			for (const hit of this.hits!) {
 				// !! costly
 				hit.isEnabled = isCollidable //copy to hit-testing on entities composing the object

@@ -12,10 +12,6 @@ export class HitTargetState extends ItemState {
 	public material?: string
 	public texture?: string
 
-	public constructor() {
-		super()
-	}
-
 	public static claim(
 		name: string,
 		zOffset: number,

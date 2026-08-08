@@ -14,8 +14,6 @@ export class TextStream {
 	public static readonly MODE_READ = 1
 	public static readonly MODE_WRITE = 2
 	public static readonly MODE_APPEND = 8
-
-	private readonly filename: string
 	private readonly unicode: boolean
 
 	private buffer: Uint8Array = new Uint8Array(0)
@@ -77,7 +75,7 @@ export class TextStream {
 	 * @param characters Number of characters that you want to read from the file.
 	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/read-method
 	 */
-	public Read(characters: number): string | void {
+	public Read(characters: number): string | undefined {
 		if (this.mode !== TextStream.MODE_READ) {
 			return ERR.Raise(54, undefined, 'Bad file mode')
 		}
@@ -90,7 +88,7 @@ export class TextStream {
 	 * Reads an entire TextStream file and returns the resulting string.
 	 * @see f
 	 */
-	public ReadAll(): string | void {
+	public ReadAll(): string | undefined {
 		if (this.mode !== TextStream.MODE_READ) {
 			return ERR.Raise(54, undefined, 'Bad file mode')
 		}
@@ -101,7 +99,7 @@ export class TextStream {
 	 * Reads an entire line (up to, but not including, the newline character) from a TextStream file and returns the resulting string.
 	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/readline-method
 	 */
-	public ReadLine(): string | void {
+	public ReadLine(): string | undefined {
 		if (this.mode !== TextStream.MODE_READ) {
 			return ERR.Raise(54, undefined, 'Bad file mode')
 		}
@@ -170,7 +168,7 @@ export class TextStream {
 	 * @param lines Number of newline characters you want to write to the file.
 	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/writeblanklines-method
 	 */
-	public WriteBlankLines(lines: number): void {
+	public WriteBlankLines(_lines: number): void {
 		// no usages found
 		throw new VbsNotImplementedError()
 	}
@@ -181,7 +179,7 @@ export class TextStream {
 	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/writeline-method
 	 */
 	public WriteLine(data: string): void {
-		this.Write(data + '\r\n')
+		this.Write(`${data}\r\n`)
 	}
 
 	public setContent(data: string): this {

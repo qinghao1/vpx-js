@@ -4,10 +4,6 @@
 import * as chai from 'chai'
 import { expect } from 'chai'
 import sinonChai from 'sinon-chai'
-import { TableBuilder } from '../../../test/table-builder.js'
-import { Player } from '../../game/player.js'
-import { Table } from '../../vpt/table/table.js'
-import { Transpiler } from '../transpiler.js'
 import { Err } from './err.js'
 
 chai.use((sinonChai as any).default ?? sinonChai)

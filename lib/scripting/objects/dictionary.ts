@@ -26,7 +26,7 @@ export class Dictionary<V> {
 	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/item-property-dictionary-object
 	 */
 	public Item: { [key: string]: V | null } = new Proxy(this, {
-		get: (target: {}, key: string | number | symbol) => {
+		get: (_target: {}, key: string | number | symbol) => {
 			if (this.d.has(key)) {
 				return this.d.get(key)
 			} else {
@@ -36,7 +36,7 @@ export class Dictionary<V> {
 				return null
 			}
 		},
-		set: (target: Dictionary<V>, key: string | number | symbol, value: V) => {
+		set: (_target: Dictionary<V>, key: string | number | symbol, value: V) => {
 			this.d.set(key, value)
 			return true
 		},
@@ -47,7 +47,7 @@ export class Dictionary<V> {
 	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/key-property
 	 */
 	public Key: { [key: string]: V | null } = new Proxy(this, {
-		set: (target: {}, oldKey: string | number | symbol, newKey: string | number | symbol) => {
+		set: (_target: {}, oldKey: string | number | symbol, newKey: string | number | symbol) => {
 			if (!this.d.has(oldKey)) {
 				ERR.Raise(32811, undefined, 'Element not found')
 				return true

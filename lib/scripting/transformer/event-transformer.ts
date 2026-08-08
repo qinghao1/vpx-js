@@ -4,12 +4,9 @@
 import { replace } from 'estraverse'
 import type { FunctionDeclaration, Program } from 'estree'
 import type { IScriptable } from '../../game/iscriptable.js'
-import { Table } from '../../vpt/table/table.js'
 import {
-	arrowFunctionExpression,
 	callExpression,
 	expressionStatement,
-	functionDeclaration,
 	functionExpression,
 	identifier,
 	literal,
@@ -32,7 +29,7 @@ export class EventTransformer extends Transformer {
 
 	public transform(): Program {
 		return replace(this.ast, {
-			enter: (node, parent: any) => {
+			enter: (node, _parent: any) => {
 				// must be a function
 				if (node.type !== 'FunctionDeclaration') {
 					return node

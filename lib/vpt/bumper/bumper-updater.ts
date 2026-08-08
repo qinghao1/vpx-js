@@ -60,7 +60,7 @@ export class BumperUpdater extends ItemUpdater<BumperState> {
 
 	private applySkirtState<NODE, GEOMETRY, POINT_LIGHT>(
 		obj: NODE,
-		state: BumperState,
+		_state: BumperState,
 		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
 		table: Table,
 	) {

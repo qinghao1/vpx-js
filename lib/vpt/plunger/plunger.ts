@@ -41,7 +41,7 @@ export class Plunger
 		return new Plunger(itemName, data)
 	}
 
-	public constructor(itemName: string, data: PlungerData) {
+	public constructor(_itemName: string, data: PlungerData) {
 		super(data)
 		this.meshGenerator = new PlungerMeshGenerator(data)
 		this.state = PlungerState.claim(this.getName(), 0)
@@ -78,7 +78,7 @@ export class Plunger
 	}
 
 	public getMover(): PlungerMover {
-		return this.hit!.getMoverObject()
+		return this.hit?.getMoverObject()
 	}
 
 	public getHitShapes(): HitObject[] {
@@ -109,11 +109,11 @@ export class Plunger
 		return new Vertex3D(x, y, height)
 	}
 
-	public getBallCreationVelocity(table: Table): Vertex3D {
+	public getBallCreationVelocity(_table: Table): Vertex3D {
 		return new Vertex3D(0, 0, 0)
 	}
 
-	public onBallCreated(physics: PlayerPhysics, ball: Ball): void {}
+	public onBallCreated(_physics: PlayerPhysics, _ball: Ball): void {}
 
 	public getEventNames(): string[] {
 		return ['Init', 'Timer', 'LimitEOS', 'LimitBOS']

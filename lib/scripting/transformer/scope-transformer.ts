@@ -50,10 +50,10 @@ export class ScopeTransformer extends Transformer {
 	 * case.
 	 */
 	private replaceDeclarations(): void {
-		let i = 0
+		let _i = 0
 		replace(this.ast, {
 			enter: (node, parent) => {
-				i++
+				_i++
 
 				// class declarations
 				if (node.type === 'ClassDeclaration') {
@@ -90,7 +90,7 @@ export class ScopeTransformer extends Transformer {
 				return node
 			},
 			leave: () => {
-				i--
+				_i--
 			},
 		})
 	}

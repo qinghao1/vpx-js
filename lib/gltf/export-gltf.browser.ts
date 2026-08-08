@@ -4,6 +4,6 @@
 import type { Scene } from '../refs.node.js'
 
 /** exportGltf. */
-export function exportGltf(scene: Scene, opts: any, gltfOpts?: any) {
+export function exportGltf(_scene: Scene, _opts: any, _gltfOpts?: any) {
 	throw new Error('not implemented')
 }

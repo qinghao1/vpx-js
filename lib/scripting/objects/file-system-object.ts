@@ -43,7 +43,7 @@ export class FileSystemObject {
 	 * @param overwrite Boolean value that indicates if existing files are to be overwritten. If True, files are overwritten; if False, they are not. The default is True. Note that CopyFile will fail if destination has the read-only attribute set, regardless of the value of overwrite.
 	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/copyfile-method
 	 */
-	public CopyFile(source: string, destination: string, overwrite = true): void {
+	public CopyFile(_source: string, _destination: string, _overwrite = true): void {
 		// only used in NVOffset(), which doesn't seem to be used very often.
 		throw new VbsNotImplementedError()
 	}
@@ -55,7 +55,7 @@ export class FileSystemObject {
 	 * @param overwrite Boolean value that indicates if existing folders are to be overwritten. If True, files are overwritten; if False, they are not. The default is True.
 	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/copyfolder-method
 	 */
-	public CopyFolder(source: string, destination: string, overwrite = true): void {
+	public CopyFolder(_source: string, _destination: string, _overwrite = true): void {
 		// no usages found
 		throw new VbsNotImplementedError()
 	}
@@ -65,7 +65,7 @@ export class FileSystemObject {
 	 * @param foldername String expression that identifies the folder to create.
 	 * @https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/createfolder-method
 	 */
-	public CreateFolder(foldername: string): void {
+	public CreateFolder(_foldername: string): void {
 		// no usages found
 		throw new VbsNotImplementedError()
 	}
@@ -78,7 +78,7 @@ export class FileSystemObject {
 	 * @param unicode Boolean value that indicates whether the file is created as a Unicode or ASCII file. The value is True if the file is created as a Unicode file; False if it's created as an ASCII file. If omitted, an ASCII file is assumed.
 	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/createtextfile-method
 	 */
-	public CreateTextFile(filename: string, overwrite = true, unicode = false): TextStream | void {
+	public CreateTextFile(filename: string, overwrite = true, unicode = false): TextStream | undefined {
 		if (FS.fileExists(filename) && !overwrite) {
 			return ERR.Raise(58, undefined, 'File already exists')
 		}
@@ -93,7 +93,7 @@ export class FileSystemObject {
 	 * @param force Boolean value that is True if files with the read-only attribute set are to be deleted; False (default) if they are not.
 	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/deletefile-method
 	 */
-	public DeleteFile(filespec: string, force = false): void {
+	public DeleteFile(filespec: string, _force = false): void {
 		if (!FS.fileExists(filespec)) {
 			return ERR.Raise(53, undefined, 'File not found')
 		}
@@ -106,7 +106,7 @@ export class FileSystemObject {
 	 * @param force Boolean value that is True if folders with the read-only attribute set are to be deleted; False (default) if they are not.
 	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/deletefolder-method
 	 */
-	public DeleteFolder(folderspec: string, force = false): void {
+	public DeleteFolder(_folderspec: string, _force = false): void {
 		// no usages found
 		throw new VbsNotImplementedError()
 	}
@@ -116,7 +116,7 @@ export class FileSystemObject {
 	 * @param drivespec A drive letter or a path specification for the root of the drive.
 	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/driveexists-method
 	 */
-	public DriveExists(drivespec: string): boolean {
+	public DriveExists(_drivespec: string): boolean {
 		// no usages found
 		throw new VbsNotImplementedError()
 	}
@@ -171,7 +171,7 @@ export class FileSystemObject {
 	 * @param drivespec The drivespec argument can be a drive letter (c), a drive letter with a colon appended (c:), a drive letter with a colon and path separator appended (c:), or any network share specification (\computer2\share1).
 	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/getdrive-method
 	 */
-	public GetDrive(drivespec: string): Drive {
+	public GetDrive(_drivespec: string): Drive {
 		// no usages found
 		throw new VbsNotImplementedError()
 	}
@@ -181,7 +181,7 @@ export class FileSystemObject {
 	 * @param path The path specification for the component whose drive name is to be returned.
 	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/getdrivename-method
 	 */
-	public GetDriveName(path: string): string {
+	public GetDriveName(_path: string): string {
 		// no usages found
 		throw new VbsNotImplementedError()
 	}
@@ -208,7 +208,7 @@ export class FileSystemObject {
 	 * @param filespec The filespec is the path (absolute or relative) to a specific file.
 	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/getfile-method
 	 */
-	public GetFile(filespec: string): File | void {
+	public GetFile(filespec: string): File | undefined {
 		if (!FS.fileExists(filespec)) {
 			return ERR.Raise(53, undefined, 'File not found')
 		}
@@ -234,7 +234,7 @@ export class FileSystemObject {
 	 * @param folderspec The folderspec is the path (absolute or relative) to a specific folder.
 	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/getfolder-method
 	 */
-	public GetFolder(folderspec: string): string {
+	public GetFolder(_folderspec: string): string {
 		// no usages found
 		throw new VbsNotImplementedError()
 	}
@@ -244,7 +244,7 @@ export class FileSystemObject {
 	 * @param path The path specification for the component whose parent folder name is to be returned.
 	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/getparentfoldername-method
 	 */
-	public GetParentFolderName(path: string): string {
+	public GetParentFolderName(_path: string): string {
 		// no usages found
 		throw new VbsNotImplementedError()
 	}
@@ -254,7 +254,7 @@ export class FileSystemObject {
 	 * @param folderspec The name of the special folder to be returned. Can be any of the constants shown in the Settings section.
 	 * @constructor
 	 */
-	public GetSpecialFolder(folderspec: number): {} {
+	public GetSpecialFolder(_folderspec: number): {} {
 		// no usages found
 		throw new VbsNotImplementedError()
 	}
@@ -274,7 +274,7 @@ export class FileSystemObject {
 	 * @param destination The path where the file or files are to be moved. The destination argument can't contain wildcard characters.
 	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/movefile-method
 	 */
-	public MoveFile(source: string, destination: string): void {
+	public MoveFile(_source: string, _destination: string): void {
 		// only used in NVOffset(), which doesn't seem to be used very often.
 		throw new VbsNotImplementedError()
 	}
@@ -285,7 +285,7 @@ export class FileSystemObject {
 	 * @param destination The path where the folder or folders are to be moved. The destination argument can't contain wildcard characters.
 	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/movefolder-method
 	 */
-	public MoveFolder(source: string, destination: string): void {
+	public MoveFolder(_source: string, _destination: string): void {
 		// no usages found
 		throw new VbsNotImplementedError()
 	}
@@ -298,7 +298,7 @@ export class FileSystemObject {
 	 * @param format One of three Tristate values used to indicate the format of the opened file. If omitted, the file is opened as ASCII.
 	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/opentextfile-method
 	 */
-	public OpenTextFile(filename: string, mode: number = 1, create = false, format = 0): TextStream | void {
+	public OpenTextFile(filename: string, mode: number = 1, create = false, _format = 0): TextStream | undefined {
 		if (!FS.fileExists(filename) && !create) {
 			return ERR.Raise(53, undefined, 'File not found')
 		}

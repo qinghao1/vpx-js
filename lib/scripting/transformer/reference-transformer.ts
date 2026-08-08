@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { replace } from 'estraverse'
-import type { CallExpression, Expression, Identifier, Literal, MemberExpression, Program } from 'estree'
+import type { Expression, Identifier, MemberExpression, Program } from 'estree'
 import { logger } from '../../util/logger.js'
 import type { EnumsApi } from '../../vpt/enums.js'
 import type { GlobalApi } from '../../vpt/global-api.js'
@@ -88,7 +88,7 @@ export class ReferenceTransformer extends Transformer {
 	 */
 	public replaceGetRef(ast: Program): void {
 		replace(ast, {
-			enter: (node, parent: any) => {
+			enter: (node, _parent: any) => {
 				if (node.type === 'CallExpression') {
 					if (
 						node.callee.type === 'MemberExpression' &&
@@ -128,7 +128,7 @@ export class ReferenceTransformer extends Transformer {
 				}
 
 				// patch property
-				if (parent.property && parent.property.name) {
+				if (parent.property?.name) {
 					const propName = getPropName(this.itemApis[elementName], parent.property.name)
 					if (propName) {
 						parent.property.name = propName
@@ -197,7 +197,7 @@ export class ReferenceTransformer extends Transformer {
 					return node
 				}
 				// patch property
-				if (parent.property && parent.property.name && (this.stdlib as unknown as Record<string, unknown>)[name]) {
+				if (parent.property?.name && (this.stdlib as unknown as Record<string, unknown>)[name]) {
 					const propName = getPropName((this.stdlib as unknown as Record<string, unknown>)[name], parent.property.name)
 					if (propName) {
 						parent.property.name = propName
@@ -246,7 +246,7 @@ export class ReferenceTransformer extends Transformer {
 	 */
 	public replaceExecuteGlobal(ast: Program): void {
 		replace(ast, {
-			enter: (node, parent: any) => {
+			enter: (node, _parent: any) => {
 				if (node.type === 'CallExpression') {
 					if (
 						node.callee.type === 'Identifier' &&

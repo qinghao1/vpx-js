@@ -48,7 +48,7 @@ export class HitPoint extends HitObject {
 			if (!sol) return -1
 			hitTime = sol[0]! * sol[1]! < 0 ? Math.max(sol[0]!, sol[1]!) : Math.min(sol[0]!, sol[1]!)
 		}
-		if (!isFinite(hitTime) || hitTime < 0 || hitTime > dTime) return -1
+		if (!Number.isFinite(hitTime) || hitTime < 0 || hitTime > dTime) return -1
 		const hitVel = ball.hit.vel.clone(true).multiplyScalar(hitTime)
 		const hitNormal = ball.state.pos.clone(true).add(hitVel).sub(this.p).normalize()
 		coll.hitNormal.set(hitNormal)

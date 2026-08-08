@@ -1,8 +1,8 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
+import { readFileSync, writeFileSync } from 'node:fs'
 import { expect } from 'chai'
-import { readFileSync, writeFileSync } from 'fs'
 import looksSame, { createDiff } from 'looks-same'
 import sharp from 'sharp'
 import { NodeBinaryReader } from '../../lib/io/binary-reader.node.js'
@@ -85,9 +85,9 @@ describe('The VPinball texture parser', () => {
 		const threeTexture = await texture.loadTexture(loader, vpt)
 		try {
 			const png = await threeTexture.image.getImage(true)
-			const match = await comparePngs(png, testPngOptimized, 30, true)
+			const _match = await comparePngs(png, testPngOptimized, 30, true)
 		} catch (err: any) {
-			if (err.message && err.message.includes('PngQuant')) {
+			if (err.message?.includes('PngQuant')) {
 				console.warn('Skipping pngquant test - binary not available:', err.message)
 				return
 			}
@@ -115,7 +115,7 @@ describe('The VPinball texture parser', () => {
 	it('should correctly export a local texture', async () => {
 		const kicker = vpt.kickers.Kicker1
 		const kickerMeshes = kicker.getMeshes(vpt)
-		const threeTexture = await kickerMeshes.kicker.map!.loadTexture(loader, vpt)
+		const threeTexture = await kickerMeshes.kicker.map?.loadTexture(loader, vpt)
 		expect(threeTexture.image.width).to.equal(256)
 		expect(threeTexture.image.height).to.equal(256)
 
@@ -146,7 +146,7 @@ async function comparePngs(
 	})
 }
 
-async function debug(img1: Buffer, img2: Buffer, tolerance = imgDiffTolerance, ignoreAntialiasing = false) {
+async function _debug(img1: Buffer, img2: Buffer, tolerance = imgDiffTolerance, ignoreAntialiasing = false) {
 	await comparePngs(img1, img2, tolerance, ignoreAntialiasing, true)
 	await new Promise<void>((resolve, reject) => {
 		createDiff(

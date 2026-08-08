@@ -32,14 +32,14 @@ export class VbsProxyHandler implements ProxyHandler<any> {
 		}
 	}
 
-	public get(target: any, name: string | number | symbol, receiver: any): any {
+	public get(target: any, name: string | number | symbol, _receiver: any): any {
 		if (typeof name === 'symbol') return target[name]
 		const norm = lc(name as string)
 		const real = this.__names[norm] ?? (this.__names[norm] = name)
 		return target[real]
 	}
 
-	public set(target: any, name: string | number | symbol, value: any, receiver: any): boolean {
+	public set(target: any, name: string | number | symbol, value: any, _receiver: any): boolean {
 		if (typeof name === 'symbol') {
 			target[name] = value
 			return true

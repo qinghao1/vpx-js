@@ -141,7 +141,7 @@ export class TableBuilder {
 		const mat = new Material()
 		mat.name = name
 		Object.assign(mat, attrs)
-		this.table.data!.materials.push(mat)
+		this.table.data?.materials.push(mat)
 		return this
 	}
 

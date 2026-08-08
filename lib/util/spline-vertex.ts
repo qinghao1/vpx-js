@@ -57,7 +57,7 @@ export class SplineVertex {
 				v.rgvLocal[(n + 1) * 2 - n - 1] = v.rgvLocal[(n + 1) * 2 - 1]!
 			}
 		}
-		v.ppfCross[n] = spine[0]!.fControlPoint
+		v.ppfCross[n] = spine[0]?.fControlPoint
 		v.pMiddlePoints[n] = v.pMiddlePoints[0]!
 		v.pcvertex = n + 1
 		return v

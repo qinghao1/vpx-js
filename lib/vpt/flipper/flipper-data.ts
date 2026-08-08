@@ -126,7 +126,7 @@ export class FlipperData extends ItemData {
 	}
 
 	public doOverridePhysics(table: Table): boolean {
-		return !!this.overridePhysics || !!(table.data!.overridePhysicsFlipper && table.data!.overridePhysics)
+		return !!this.overridePhysics || !!(table.data?.overridePhysicsFlipper && table.data?.overridePhysics)
 	}
 
 	private async fromTag(buffer: Uint8Array, tag: string, _offset: number, len: number): Promise<number> {

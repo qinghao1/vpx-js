@@ -8,6 +8,7 @@ import { UNDEF, VbsUndefined } from './vbs-undefined.js'
 export class VbsArray<T> implements ProxyHandler<VbsArray<T>> {
 	[key: number]: T
 
+	// biome-ignore lint/correctness/noConstructorReturn: Proxy trap - constructor returns Proxy for VBS array semantics
 	constructor(items?: T[]) {
 		return new Proxy<VbsArray<T>>((items ?? []) as unknown as VbsArray<T>, this)
 	}

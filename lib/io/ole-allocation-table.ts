@@ -10,7 +10,7 @@ export class AllocationTable {
 	private static SecIdEndOfChain = -2
 
 	private constructor(
-		private readonly doc: OleCompoundDoc,
+		readonly _doc: OleCompoundDoc,
 		private readonly table: number[],
 	) {}
 

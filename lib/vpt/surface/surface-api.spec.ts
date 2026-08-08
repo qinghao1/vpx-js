@@ -61,7 +61,7 @@ describe('The VPinball surface API', () => {
 		surface.SlingshotStrength = 8.6554
 		surface.Elasticity = 1.0043
 		surface.Friction = 3.552056
-		surface.Scatter = 3.14159
+		surface.Scatter = Math.PI
 		surface.Visible = false
 		expect(surface.Visible).to.equal(false)
 		surface.Visible = true
@@ -106,7 +106,7 @@ describe('The VPinball surface API', () => {
 		expect(surface.SlingshotStrength).to.equal(8.6554)
 		expect(surface.Elasticity).to.equal(1.0043)
 		expect(surface.Friction).to.equal(3.552056)
-		expect(surface.Scatter).to.equal(3.14159)
+		expect(surface.Scatter).to.equal(Math.PI)
 		expect(surface.Visible).to.equal(true)
 		expect(surface.Disabled).to.equal(true)
 		expect(surface.SideVisible).to.equal(true)

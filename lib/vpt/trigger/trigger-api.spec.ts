@@ -43,8 +43,8 @@ describe('The VPinball trigger API', () => {
 		expect(trigger.Visible).to.equal(true)
 		trigger.HitHeight = 554.987
 		expect(trigger.HitHeight).to.equal(554.987)
-		trigger.Rotation = 3.14159
-		expect(trigger.Rotation).to.equal(3.14159)
+		trigger.Rotation = Math.PI
+		expect(trigger.Rotation).to.equal(Math.PI)
 		trigger.WireThickness = 4
 		expect(trigger.WireThickness).to.equal(4)
 		trigger.AnimSpeed = 3.5

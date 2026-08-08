@@ -22,7 +22,7 @@ export class File {
 	 * @param format One of three Tristate values used to indicate the format of the opened file. If omitted, the file is opened as ASCII.
 	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/openastextstream-method
 	 */
-	public OpenAsTextStream(mode: number, tristate?: number): TextStream {
+	public OpenAsTextStream(mode: number, _tristate?: number): TextStream {
 		return FS.getStream(this.path, mode).cursorToStart()
 	}
 }

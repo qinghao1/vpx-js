@@ -49,11 +49,11 @@ export class TriggerLineSeg extends LineSeg {
 			if (i < 0) {
 				ball.hit.vpVolObjs.push(this.obj!)
 				this.animation.triggerAnimationHit()
-				this.obj!.fireGroupEvent(Event.HitEventsHit)
+				this.obj?.fireGroupEvent(Event.HitEventsHit)
 			} else {
 				ball.hit.vpVolObjs.splice(i, 1)
 				this.animation.triggerAnimationUnhit()
-				this.obj!.fireGroupEvent(Event.HitEventsUnhit)
+				this.obj?.fireGroupEvent(Event.HitEventsUnhit)
 			}
 		}
 	}

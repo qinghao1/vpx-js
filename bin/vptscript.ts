@@ -2,8 +2,8 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { closeSync, existsSync, futimesSync, lstatSync, openSync, readdirSync, statSync, writeFileSync } from 'fs'
-import { basename, dirname, resolve } from 'path'
+import { closeSync, existsSync, futimesSync, lstatSync, openSync, readdirSync, statSync, writeFileSync } from 'node:fs'
+import { basename, dirname, resolve } from 'node:path'
 import { NodeBinaryReader } from '../lib/io/binary-reader.node.js'
 import { Table } from '../lib/vpt/table/table.js'
 
@@ -45,7 +45,7 @@ import { Table } from '../lib/vpt/table/table.js'
 				if (writeToFile) {
 					const destPath = dirname(vpxFile)
 					const destName = basename(vpxFile)
-					const destFile = resolve(destPath, destName.substr(0, destName.length - 3) + 'vbs')
+					const destFile = resolve(destPath, `${destName.substr(0, destName.length - 3)}vbs`)
 
 					console.log('[vptscript] Writing to "%s".', destFile)
 					writeFileSync(destFile, vpt.getTableScript())

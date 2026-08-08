@@ -244,7 +244,11 @@ async function tryCreateBitmap(
 	}
 }
 
-async function tryLoadCached(name: string, kind: 'exr' | 'hdr', playfieldMap?: string): Promise<ThreeTexture | null> {
+async function tryLoadCached(
+	_name: string,
+	_kind: 'exr' | 'hdr',
+	_playfieldMap?: string,
+): Promise<ThreeTexture | null> {
 	try {
 		// byteLength unknown yet; try without length? Use exrCacheKey with 0 — but we need actual length, so skip if not found via wildcard
 		// Instead attempt to load via idb with known key pattern: we store with byteLength, so we need to probe via data length later.
