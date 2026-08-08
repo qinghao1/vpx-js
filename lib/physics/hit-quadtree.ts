@@ -8,18 +8,19 @@ import { Vertex3D } from '../util/math.js'
 import type { Ball } from '../vpt/ball/ball.js'
 import { CollisionEvent } from './collision-event.js'
 import type { HitObject } from './hit-object.js'
-import { CollisionType } from './collision-type.js'
 import { HitCircle } from './hit-circle.js'
 import { HitPlane } from './hit-plane.js'
 import { HitLineZ } from './hit-line-z.js'
 import { HitLine3D } from './hit-line-3d.js'
-import { getWasmKernels, getWasmBatchHitViewsOutCircle, isWasmReady, tryGetWasmBatchHitViewsOutCircle, tryGetWasmBatchHitViewsOutLineZ, tryGetWasmBatchHitViewsOutPlane, warmWasmPools } from './wasm/kernels.js'
+import { getWasmKernels, isWasmReady, tryGetWasmBatchHitViewsOutCircle, tryGetWasmBatchHitViewsOutLineZ, tryGetWasmBatchHitViewsOutPlane, warmWasmPools } from './wasm/kernels.js'
 import type { CircleViews, LineViews, PlaneViews } from './wasm/kernels.js'
 
 type Kind = 'circle' | 'plane' | 'lineZ' | 'other'
 type Order = { obj: HitObject; kind: Kind; idx: number }
 
-/** Quad-tree broadphase — batched WASM SoA. @see https://github.com/vpinball/vpinball/blob/master/quadtree.cpp */
+const isBatchCircle = (h: HitObject): h is HitCircle => h instanceof HitCircle && h.hitTest === HitCircle.prototype.hitTest
+
+/** @see https://github.com/vpinball/vpinball/blob/master/quadtree.cpp */
 export class HitQuadtree {
 	private unique?: EventProxy
 	private vho: HitObject[] = []
@@ -37,12 +38,10 @@ export class HitQuadtree {
 
 	public initialize(b?: FRect3D): void {
 		if (!b) { b = new FRect3D(); for (const h of this.vho) b.extend(h.hitBBox) }
-		// Warm SoA pools outside hot loop — direct alias to wasm memory, zero copy,
-		// no _malloc on hitTestBall. Count before split so cap >= max collect.
 		const warm = () => {
 			let c = 0, p = 0, l = 0
 			for (const h of this.vho) {
-				if (h instanceof HitCircle) c++
+				if (isBatchCircle(h)) c++
 				else if (h instanceof HitPlane) p++
 				else if (h instanceof HitLineZ && !(h instanceof HitLine3D)) l++
 			}
@@ -55,58 +54,32 @@ export class HitQuadtree {
 
 	public hitTestBall(ball: Ball, coll: CollisionEvent, physics: PlayerPhysics): void {
 		if (!isWasmReady() || !this.collect(ball)) return this.hitTestBallScalar(ball, coll, physics)
-
-		const { _circles: circles, _planes: planes, _lineZs: lineZs } = this
-		let cv = circles.length ? tryGetWasmBatchHitViewsOutCircle(circles.length) : null
-		let pv = planes.length ? tryGetWasmBatchHitViewsOutPlane(planes.length) : null
-		let lv = lineZs.length ? tryGetWasmBatchHitViewsOutLineZ(lineZs.length) : null
-		if ((circles.length && !cv) || (planes.length && !pv) || (lineZs.length && !lv)) {
-			// No _malloc on hot path — fall back to scalar and warm for next tick
-			queueMicrotask(() => warmWasmPools(circles.length, planes.length, lineZs.length))
+		const { _circles: c, _planes: p, _lineZs: l } = this
+		let cv = c.length ? tryGetWasmBatchHitViewsOutCircle(c.length) : null
+		let pv = p.length ? tryGetWasmBatchHitViewsOutPlane(p.length) : null
+		let lv = l.length ? tryGetWasmBatchHitViewsOutLineZ(l.length) : null
+		if ((c.length && !cv) || (p.length && !pv) || (l.length && !lv)) {
+			queueMicrotask(() => warmWasmPools(c.length, p.length, l.length))
 			return this.hitTestBallScalar(ball, coll, physics)
 		}
-
-		if (cv) this.fillCircles(cv, circles)
-		if (pv) this.fillPlanes(pv, planes)
-		if (lv) this.fillLineZs(lv, lineZs)
-
+		if (cv) this.fillCircles(cv, c)
+		if (pv) this.fillPlanes(pv, p)
+		if (lv) this.fillLineZs(lv, l)
 		const pos = ball.state.pos, vel = ball.hit.vel, r = ball.data.radius, dt = coll.hitTime
 		if (cv) cv.run(pos.x, pos.y, pos.z, vel.x, vel.y, vel.z, r, dt)
 		if (pv) pv.run(pos.x, pos.y, pos.z, vel.x, vel.y, vel.z, r, dt)
 		if (lv) lv.run(pos.x, pos.y, pos.z, vel.x, vel.y, vel.z, r, dt)
-
 		this.replay(ball, coll, physics, cv, pv, lv)
 	}
 
-	private fillCircles(cv: CircleViews, circles: HitCircle[]): void {
-		for (let i = 0; i < circles.length; i++) {
-			const h = circles[i]!
-			cv.cx[i] = h.center.x
-			cv.cy[i] = h.center.y
-			cv.cr[i] = h.radius
-			cv.zl[i] = h.hitBBox.zlow
-			cv.zh[i] = h.hitBBox.zhigh
-		}
+	private fillCircles(cv: CircleViews, a: HitCircle[]): void {
+		for (let i = 0; i < a.length; i++) { const h = a[i]!; cv.cx[i] = h.center.x; cv.cy[i] = h.center.y; cv.cr[i] = h.radius; cv.zl[i] = h.hitBBox.zlow; cv.zh[i] = h.hitBBox.zhigh }
 	}
-
-	private fillPlanes(pv: PlaneViews, planes: HitPlane[]): void {
-		for (let i = 0; i < planes.length; i++) {
-			const h = planes[i]!
-			pv.nx[i] = h.normal.x
-			pv.ny[i] = h.normal.y
-			pv.nz[i] = h.normal.z
-			pv.d[i] = h.d
-		}
+	private fillPlanes(pv: PlaneViews, a: HitPlane[]): void {
+		for (let i = 0; i < a.length; i++) { const h = a[i]!; pv.nx[i] = h.normal.x; pv.ny[i] = h.normal.y; pv.nz[i] = h.normal.z; pv.d[i] = h.d }
 	}
-
-	private fillLineZs(lv: LineViews, lineZs: HitLineZ[]): void {
-		for (let i = 0; i < lineZs.length; i++) {
-			const h = lineZs[i]!
-			lv.lx[i] = h.xy.x
-			lv.ly[i] = h.xy.y
-			lv.zl[i] = h.hitBBox.zlow
-			lv.zh[i] = h.hitBBox.zhigh
-		}
+	private fillLineZs(lv: LineViews, a: HitLineZ[]): void {
+		for (let i = 0; i < a.length; i++) { const h = a[i]!; lv.lx[i] = h.xy.x; lv.ly[i] = h.xy.y; lv.zl[i] = h.hitBBox.zlow; lv.zh[i] = h.hitBBox.zhigh }
 	}
 
 	private replay(ball: Ball, coll: CollisionEvent, physics: PlayerPhysics, cv: CircleViews | null, pv: PlaneViews | null, lv: LineViews | null): void {
@@ -114,12 +87,8 @@ export class HitQuadtree {
 			const e = this._order[i]!
 			if (e.kind === 'other') { e.obj.doHitTest(ball, coll, physics); continue }
 			const s = e.kind === 'circle' ? cv! : e.kind === 'plane' ? pv! : lv!
-			const t = s.oT[e.idx]!
-			const contact = s.oContact[e.idx]!
-			const nx = s.oNx[e.idx]!, ny = s.oNy[e.idx]!, nz = s.oNz[e.idx]!
-			const dist = s.oDist[e.idx]!, bnv = s.oBnv[e.idx]!
-			const isContact = !!contact
-			const valid = t >= -0.5 && t <= coll.hitTime
+			const t = s.oT[e.idx]!, contact = s.oContact[e.idx]!, nx = s.oNx[e.idx]!, ny = s.oNy[e.idx]!, nz = s.oNz[e.idx]!, dist = s.oDist[e.idx]!, bnv = s.oBnv[e.idx]!
+			const isContact = !!contact, valid = t >= -0.5 && t <= coll.hitTime
 			if (!isContact && !valid) continue
 			if (!physics.recordContacts) {
 				if (!valid) continue
@@ -141,17 +110,16 @@ export class HitQuadtree {
 	}
 
 	private hitTestBallScalar(ball: Ball, coll: CollisionEvent, physics: PlayerPhysics): void {
-		const bBox = ball.hit.hitBBox, pos = ball.state.pos, rs = ball.hit.rcHitRadiusSqr
-		for (let i = 0; i < this.vho.length; i++) { const h = this.vho[i]!; if (h !== ball.hit && h.hitBBox.intersectRect(bBox) && h.hitBBox.intersectSphere(pos, rs)) h.doHitTest(ball, coll, physics) }
+		const b = ball.hit.hitBBox, pos = ball.state.pos, rs = ball.hit.rcHitRadiusSqr
+		for (let i = 0; i < this.vho.length; i++) { const h = this.vho[i]!; if (h !== ball.hit && h.hitBBox.intersectRect(b) && h.hitBBox.intersectSphere(pos, rs)) h.doHitTest(ball, coll, physics) }
 		if (this.isLeaf) return
-		const { x, y } = this.vCenter, left = bBox.left <= x, right = bBox.right >= x
-		if (bBox.top <= y) { if (left) this.children[0]?.hitTestBall(ball, coll, physics); if (right) this.children[1]?.hitTestBall(ball, coll, physics) }
-		if (bBox.bottom >= y) { if (left) this.children[2]?.hitTestBall(ball, coll, physics); if (right) this.children[3]?.hitTestBall(ball, coll, physics) }
+		const { x, y } = this.vCenter, left = b.left <= x, right = b.right >= x
+		if (b.top <= y) { if (left) this.children[0]?.hitTestBall(ball, coll, physics); if (right) this.children[1]?.hitTestBall(ball, coll, physics) }
+		if (b.bottom >= y) { if (left) this.children[2]?.hitTestBall(ball, coll, physics); if (right) this.children[3]?.hitTestBall(ball, coll, physics) }
 	}
 
 	private pushOrder(o: HitObject, k: Kind, idx: number): void {
-		const a = this._order, n = this._orderLen
-		const e = a[n]
+		const a = this._order, n = this._orderLen, e = a[n]
 		if (e) { e.obj = o; e.kind = k; e.idx = idx } else a.push({ obj: o, kind: k, idx })
 		this._orderLen++
 	}
@@ -168,9 +136,8 @@ export class HitQuadtree {
 			const h = node.vho[i]!
 			if (h === ball.hit || h.obj?.abortHitTest?.() || !h.isEnabled) continue
 			if (!h.hitBBox.intersectRect(ball.hit.hitBBox) || !h.hitBBox.intersectSphere(ball.state.pos, ball.hit.rcHitRadiusSqr)) continue
-			if (h instanceof HitCircle && h.constructor === HitCircle && (h as unknown as { objType: CollisionType }).objType !== CollisionType.Kicker && (h as unknown as { objType: CollisionType }).objType !== CollisionType.Trigger) {
-				this.pushOrder(h, 'circle', c.length); c.push(h as HitCircle)
-			} else if (h instanceof HitPlane) { this.pushOrder(h, 'plane', p.length); p.push(h as HitPlane) }
+			if (isBatchCircle(h)) { this.pushOrder(h, 'circle', c.length); c.push(h) }
+			else if (h instanceof HitPlane) { this.pushOrder(h, 'plane', p.length); p.push(h as HitPlane) }
 			else if (h instanceof HitLineZ && !(h instanceof HitLine3D)) { this.pushOrder(h, 'lineZ', l.length); l.push(h as HitLineZ) }
 			else this.pushOrder(h, 'other', -1)
 		}

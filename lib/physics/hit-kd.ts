@@ -12,8 +12,9 @@ import { HitPlane } from './hit-plane.js'
 import { HitLineZ } from './hit-line-z.js'
 import { HitLine3D } from './hit-line-3d.js'
 
-/** KD-tree for dynamic hit objects.
- * @see https://github.com/vpinball/vpinball/blob/master/kdtree.cpp */
+const isBatchCircle = (h: HitObject): boolean => h instanceof HitCircle && h.hitTest === HitCircle.prototype.hitTest
+
+/** @see https://github.com/vpinball/vpinball/blob/master/kdtree.cpp */
 export class HitKD {
 	public orgIdx: number[] = []
 	private rootNode: HitKDNode
@@ -24,9 +25,7 @@ export class HitKD {
 	private nodes: HitKDNode[] = []
 	public numNodes = 0
 
-	constructor() {
-		this.rootNode = new HitKDNode(this)
-	}
+	constructor() { this.rootNode = new HitKDNode(this) }
 
 	public init(vho: HitObject[]): void {
 		this.orgVho = vho
@@ -49,16 +48,16 @@ export class HitKD {
 		this.rootNode.start = 0
 		this.rootNode.items = this.numItems
 		for (let i = 0; i < this.numItems; i++) {
-			const pho = vho[i]
-			pho.calcHitBBox()
-			this.rootNode.rectBounds.extend(pho.hitBBox)
+			const h = vho[i]!
+			h.calcHitBBox()
+			this.rootNode.rectBounds.extend(h.hitBBox)
 			this.orgIdx[i] = i
 		}
 		this.rootNode.createNextLevel(0, 0)
 		const warm = () => {
 			let c = 0, p = 0, l = 0
 			for (const h of vho) {
-				if (h instanceof HitCircle) c++
+				if (isBatchCircle(h)) c++
 				else if (h instanceof HitPlane) p++
 				else if (h instanceof HitLineZ && !(h instanceof HitLine3D)) l++
 			}
@@ -68,23 +67,10 @@ export class HitKD {
 		else void getWasmKernels().then(warm)
 	}
 
-	public update(): void {
-		this.fillFromVector(this.orgVho)
-	}
-
-	public finalize(): void {
-		this.tmp = []
-	}
-
-	public hitTestBall(ball: Ball, collision: CollisionEvent, physics: PlayerPhysics): void {
-		this.rootNode.hitTestBall(ball, collision, physics)
-	}
-
-	public getItemAt(i: number): HitObject {
-		return this.orgVho[this.orgIdx[i]]
-	}
-
-	/* istanbul ignore next */
+	public update(): void { this.fillFromVector(this.orgVho) }
+	public finalize(): void { this.tmp = [] }
+	public hitTestBall(ball: Ball, c: CollisionEvent, p: PlayerPhysics): void { this.rootNode.hitTestBall(ball, c, p) }
+	public getItemAt(i: number): HitObject { return this.orgVho[this.orgIdx[i]!]! }
 	public allocTwoNodes(): HitKDNode[] {
 		if (this.numNodes + 1 >= this.nodes.length) return []
 		this.numNodes += 2
