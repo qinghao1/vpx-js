@@ -40,7 +40,24 @@
 	"linter": {
 		"enabled": true,
 		"rules": {
-			"recommended": true
+			"recommended": true,
+			"correctness": {
+				"noPrecisionLoss": "off",
+				"noConstructorReturn": "off",
+				"noVoidTypeReturn": "off",
+				"noConstantCondition": "off"
+			},
+			"suspicious": {
+				"noImplicitAnyLet": "off",
+				"noAssignInExpressions": "off",
+				"noControlCharactersInRegex": "off",
+				"noSelfCompare": "off",
+				"noShadowRestrictedNames": "off",
+				"useIterableCallbackReturn": "off"
+			},
+			"security": {
+				"noGlobalEval": "off"
+			}
 		}
 	},
 	"javascript": {

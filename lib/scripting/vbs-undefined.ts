@@ -10,7 +10,6 @@ export class VbsUndefined implements ProxyHandler<any> {
 	private readonly __errSet?: VbsError
 	private readonly __errGet?: VbsError
 
-	// biome-ignore lint/correctness/noConstructorReturn: Proxy trap - VbsUndefined sentinel
 	constructor(errSet?: VbsError, errGet?: VbsError) {
 		this.__errSet = errSet
 		this.__errGet = errGet

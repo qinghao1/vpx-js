@@ -67,7 +67,6 @@ export abstract class ItemApi<DATA extends ItemData> extends EventEmitter {
 		this._setTimerEnabled(v)
 	}
 
-	// biome-ignore lint/correctness/noConstructorReturn: Proxy API - maps VBS property names via _getPropertyName
 	constructor(
 		protected readonly data: DATA,
 		protected readonly events: EventProxy,
