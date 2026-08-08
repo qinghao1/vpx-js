@@ -23,31 +23,27 @@ case "$preset" in --debug) preset="debug";; --release|--wasm) preset="wasm";; *)
 
 # Apply source patches for emcc compatibility (idempotent)
 PINMAME="$ROOT/external/pinmame"
-if [[ -f "$PINMAME/ext/miniaudio/miniaudio.h" && ! -f "$PINMAME/ext/miniaudio/miniaudio/miniaudio.h" ]]; then
-  mkdir -p "$PINMAME/ext/miniaudio/miniaudio"
-  cp "$PINMAME/ext/miniaudio/miniaudio.h" "$PINMAME/ext/miniaudio/miniaudio/miniaudio.h"
-fi
-if [[ -f "$PINMAME/ext/miniaudio/miniaudio/miniaudio.h" && ! -f "$PINMAME/ext/miniaudio/miniaudio.h" ]]; then
-  cp "$PINMAME/ext/miniaudio/miniaudio/miniaudio.h" "$PINMAME/ext/miniaudio/miniaudio.h"
-fi
-if [[ -f "$PINMAME/ext/libsamplerate/src_sinc.c" ]] && grep -q "static enum SRC_ERR int sinc_multichan" "$PINMAME/ext/libsamplerate/src_sinc.c" 2>/dev/null; then
-  sed -i 's/static enum SRC_ERR int sinc_multichan_vari_process/static enum SRC_ERR sinc_multichan_vari_process/' "$PINMAME/ext/libsamplerate/src_sinc.c"
-fi
+# miniaudio is included as both "miniaudio.h" and "miniaudio/miniaudio.h"
+mkdir -p "$PINMAME/ext/miniaudio/miniaudio" 2>/dev/null || true
+[[ -f "$PINMAME/ext/miniaudio/miniaudio.h" ]] && cp -n "$PINMAME/ext/miniaudio/miniaudio.h" "$PINMAME/ext/miniaudio/miniaudio/miniaudio.h" 2>/dev/null || true
+[[ -f "$PINMAME/ext/miniaudio/miniaudio/miniaudio.h" ]] && cp -n "$PINMAME/ext/miniaudio/miniaudio/miniaudio.h" "$PINMAME/ext/miniaudio/miniaudio.h" 2>/dev/null || true
+# upstream typo: static enum SRC_ERR int
+sed -i 's/static enum SRC_ERR int sinc_multichan/static enum SRC_ERR sinc_multichan/' "$PINMAME/ext/libsamplerate/src_sinc.c" 2>/dev/null || true
+# guard __rolq/__rorq intrinsics not available in WASM
 if grep -q '__rolq' "$PINMAME/src/common.h" 2>/dev/null && ! grep -q 'PINMAME_WASM.*__rolq' "$PINMAME/src/common.h"; then
-  python3 - << 'PYEOF'
+  python3 - << 'PY'
 import pathlib
-pp = pathlib.Path("external/pinmame/src/common.h")
-tt = pp.read_text()
-o1 = "#elif !defined(__arm__) && !defined(__aarch64__) && (defined(__INTEL_COMPILER) || (defined(__GNUC__) && (__GNUC__ > 3)) || defined(__clang__))\n    return __rolq(x, count);"
-n1 = "#elif !defined(__arm__) && !defined(__aarch64__) && !defined(WASM) && !defined(PINMAME_WASM) && (defined(__INTEL_COMPILER) || (defined(__GNUC__) && (__GNUC__ > 3)) || defined(__clang__))\n    return __rolq(x, count);"
-if o1 in tt:
-    tt=tt.replace(o1,n1)
-o2 = "#elif !defined(__arm__) && !defined(__aarch64__) && (defined(__INTEL_COMPILER) || (defined(__GNUC__) && (__GNUC__ > 3)) || defined(__clang__))\n    return __rorq(x, count);"
-n2 = "#elif !defined(__arm__) && !defined(__aarch64__) && !defined(WASM) && !defined(PINMAME_WASM) && (defined(__INTEL_COMPILER) || (defined(__GNUC__) && (__GNUC__ > 3)) || defined(__clang__))\n    return __rorq(x, count);"
-if o2 in tt:
-    tt=tt.replace(o2,n2)
-pp.write_text(tt)
-PYEOF
+p = pathlib.Path("external/pinmame/src/common.h")
+t = p.read_text()
+for o,n in [
+  ("#elif !defined(__arm__) && !defined(__aarch64__) && (defined(__INTEL_COMPILER) || (defined(__GNUC__) && (__GNUC__ > 3)) || defined(__clang__))\n    return __rolq(x, count);",
+   "#elif !defined(__arm__) && !defined(__aarch64__) && !defined(WASM) && !defined(PINMAME_WASM) && (defined(__INTEL_COMPILER) || (defined(__GNUC__) && (__GNUC__ > 3)) || defined(__clang__))\n    return __rolq(x, count);"),
+  ("#elif !defined(__arm__) && !defined(__aarch64__) && (defined(__INTEL_COMPILER) || (defined(__GNUC__) && (__GNUC__ > 3)) || defined(__clang__))\n    return __rorq(x, count);",
+   "#elif !defined(__arm__) && !defined(__aarch64__) && !defined(WASM) && !defined(PINMAME_WASM) && (defined(__INTEL_COMPILER) || (defined(__GNUC__) && (__GNUC__ > 3)) || defined(__clang__))\n    return __rorq(x, count);"),
+]:
+  t=t.replace(o,n)
+p.write_text(t)
+PY
 fi
 
 echo "[wasm] building $preset — $(emcc --version | head -1) — $(cmake --version | head -1)"
