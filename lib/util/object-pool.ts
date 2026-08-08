@@ -10,7 +10,7 @@ export interface IPoolable<T> {
 
 /** Tiny GC-reducing pool. */
 export class Pool<T> {
-	private static readonly MAX = 100
+	private static readonly MAX = 512
 	private readonly items: T[] = []
 	private warned = false
 
