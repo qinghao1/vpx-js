@@ -58,32 +58,27 @@ export class AnimationGate {
 	}
 }
 
-function getSharedGate(): AnimationGate {
-	// Vite serves lib/dist-esm and demo-browser as separate ESM graphs;
-	// module-local singleton would split, so share via globalThis.
-	const g = globalThis as unknown as { __vpxAnimGate?: AnimationGate }
-	if (!g.__vpxAnimGate) g.__vpxAnimGate = new AnimationGate()
-	return g.__vpxAnimGate
-}
-
-export const animationGate: AnimationGate = getSharedGate()
+// Module-local singleton for tests/single-graph usage;
+// for Vite cross-graph (demo-browser ↔ lib) pass the instance explicitly
+// via ThreeMapGenerator/Player/Transpiler constructors instead of relying on a global.
+export const animationGate = new AnimationGate()
 
 export function isAnimating(): boolean {
-	return getSharedGate().isAnimating()
+	return animationGate.isAnimating()
 }
 
 export function beginAnimation(): void {
-	getSharedGate().beginAnimation()
+	animationGate.beginAnimation()
 }
 
 export function endAnimation(): void {
-	getSharedGate().endAnimation()
+	animationGate.endAnimation()
 }
 
 export function waitIfAnimating(): Promise<void> {
-	return getSharedGate().waitIfAnimating()
+	return animationGate.waitIfAnimating()
 }
 
 export function yieldToMain(): Promise<void> {
-	return getSharedGate().yieldToMain()
+	return animationGate.yieldToMain()
 }
