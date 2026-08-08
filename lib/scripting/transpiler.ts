@@ -4,6 +4,7 @@
 import { generate } from 'escodegen'
 import type { Program } from 'estree'
 import type { Player } from '../game/player.js'
+import { waitIfAnimating, yieldToMain } from '../util/animation-gate.js'
 import { logger, progress } from '../util/logger.js'
 import { Enums, type EnumsApi } from '../vpt/enums.js'
 import { GlobalApi } from '../vpt/global-api.js'
@@ -55,35 +56,6 @@ export class Transpiler {
 	) {
 		this.itemApis = table.getElementApis()
 		this.globalApi = new GlobalApi(table, player)
-	}
-
-	private async waitIfAnimating(): Promise<void> {
-		const g = globalThis as unknown as { __vpxCameraAnimating?: boolean; __vpxAnimPromise?: Promise<void> }
-		if (g.__vpxCameraAnimating && g.__vpxAnimPromise) {
-			try {
-				await g.__vpxAnimPromise
-			} catch {}
-		} else if (g.__vpxCameraAnimating) {
-			await new Promise<void>(r => {
-				const check = () => {
-					const gg = globalThis as unknown as { __vpxCameraAnimating?: boolean }
-					if (!gg.__vpxCameraAnimating) r()
-					else setTimeout(check, 16)
-				}
-				setTimeout(check, 16)
-			})
-		}
-	}
-
-	private async yield(): Promise<void> {
-		await this.waitIfAnimating()
-		const g = globalThis as unknown as { scheduler?: { yield?: () => Promise<void> } }
-		if (typeof requestAnimationFrame === 'function') {
-			await new Promise<void>(r => requestAnimationFrame(() => r()))
-			if (g.scheduler?.yield) await g.scheduler.yield()
-			else await new Promise<void>(rr => setTimeout(rr, 0))
-		} else if (g.scheduler?.yield) await g.scheduler.yield()
-		else await new Promise<void>(r => setTimeout(r, 0))
 	}
 
 	private pipeline(globalFunction?: string, globalObject?: string): Array<(ast: Program) => Program> {
@@ -153,22 +125,17 @@ export class Transpiler {
 
 	public async transpileAsync(vbs: string, globalFunction?: string, globalObject?: string): Promise<string> {
 		const src = normalizeNewCall(vbs)
-		await this.waitIfAnimating()
+		await yieldToMain()
+		await waitIfAnimating()
 		const t0 = Date.now()
-		await this.yield()
-		let ast: Program
-		{
-			const g = globalThis as unknown as { __vpxCameraAnimating?: boolean }
-			if (g.__vpxCameraAnimating) await this.waitIfAnimating()
-			ast = this.grammar.transpile(src)
-		}
+		let ast = this.grammar.transpile(src)
 		logger().info('[Transpiler] Parsed in %sms', Date.now() - t0)
-		await this.yield()
+		await yieldToMain()
 		const t1 = Date.now()
 		for (const fn of this.pipeline(globalFunction, globalObject)) {
-			await this.waitIfAnimating()
+			await waitIfAnimating()
 			ast = fn(ast)
-			await this.yield()
+			await yieldToMain()
 		}
 		logger().info('[Transpiler] Transformed in %sms', Date.now() - t1)
 		const js = this.gen(ast, t0)
@@ -204,7 +171,7 @@ export class Transpiler {
 					logger().info('[Transpiler] Evaluated in %sms', Date.now() - t)
 					progress().details('executing')
 					t = Date.now()
-					await this.yield()
+					await yieldToMain()
 					play(
 						new Proxy(globalScope, new VbsProxyHandler()),
 						this.itemApis,
@@ -226,7 +193,7 @@ export class Transpiler {
 		logger().info('[Transpiler] Evaluated in %sms', Date.now() - t2)
 		progress().details('executing')
 		t2 = Date.now()
-		await this.yield()
+		await yieldToMain()
 		play(
 			new Proxy(globalScope, new VbsProxyHandler()),
 			this.itemApis,

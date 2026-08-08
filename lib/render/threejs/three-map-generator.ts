@@ -2,10 +2,16 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import type { Texture as ThreeTexture } from '../../refs.node.js'
+import { isAnimating, waitIfAnimating, yieldToMain } from '../../util/animation-gate.js'
 import { logger, progress } from '../../util/logger.js'
 import type { Table } from '../../vpt/table/table.js'
 import type { Texture } from '../../vpt/texture.js'
 import type { ITextureLoader } from '../irender-api.js'
+
+const LARGE_TEXTURE_PIXELS = 4 * 1024 * 1024
+const CONCURRENCY_ANIMATING = 1
+const CONCURRENCY_HEAVY = 2
+const CONCURRENCY_DEFAULT = 3
 
 /** Caches and preloads Three.js textures. */
 export class ThreeMapGenerator {
@@ -43,24 +49,24 @@ export class ThreeMapGenerator {
 	}
 
 	private pickConcurrency(textures: Texture[]): number {
-		const hasLarge = textures.some(t => t.width * t.height > 4 * 1024 * 1024)
+		const hasLarge = textures.some(t => t.width * t.height > LARGE_TEXTURE_PIXELS)
 		const hasFloat = textures.some(t => (t as any).isHdr?.() || /\.(exr|hdr)$/i.test((t as any).szPath ?? ''))
 		const cores = (typeof navigator !== 'undefined' && (navigator as any).hardwareConcurrency) || 4
-		if ((globalThis as unknown as { __vpxCameraAnimating?: boolean }).__vpxCameraAnimating) return 1
-		if (hasFloat) return Math.min(2, cores)
-		if (hasLarge) return Math.min(2, cores)
-		return Math.min(3, cores)
+		if (isAnimating()) return CONCURRENCY_ANIMATING
+		if (hasFloat) return Math.min(CONCURRENCY_HEAVY, cores)
+		if (hasLarge) return Math.min(CONCURRENCY_HEAVY, cores)
+		return Math.min(CONCURRENCY_DEFAULT, cores)
 	}
 
 	private async loadConcurrently(textures: Texture[], table: Table, concurrency: number): Promise<void> {
 		let next = 0
 		const workers = Array.from({ length: Math.min(concurrency, textures.length) }, async () => {
 			while (true) {
-				await this.waitIfAnimating()
+				await waitIfAnimating()
 				const i = next++
 				if (i >= textures.length) break
 				await this.loadOne(textures[i]!, table)
-				await this.yieldMain()
+				await yieldToMain()
 			}
 		})
 		await Promise.all(workers)
@@ -90,33 +96,6 @@ export class ThreeMapGenerator {
 				)
 			}
 		}
-	}
-
-	private async waitIfAnimating(): Promise<void> {
-		const g = globalThis as unknown as { __vpxCameraAnimating?: boolean; __vpxAnimPromise?: Promise<void> }
-		if (g.__vpxCameraAnimating && g.__vpxAnimPromise) {
-			try {
-				await g.__vpxAnimPromise
-			} catch {}
-		} else if ((globalThis as unknown as { __vpxCameraAnimating?: boolean }).__vpxCameraAnimating) {
-			await new Promise<void>(r =>
-				setTimeout(function check() {
-					if (!(globalThis as unknown as { __vpxCameraAnimating?: boolean }).__vpxCameraAnimating) r()
-					else setTimeout(check, 16)
-				}, 16),
-			)
-		}
-	}
-
-	private async yieldMain(): Promise<void> {
-		await this.waitIfAnimating()
-		const g = globalThis as unknown as { scheduler?: { yield?: () => Promise<void> } }
-		if (typeof requestAnimationFrame === 'function') {
-			await new Promise<void>(r => requestAnimationFrame(() => r()))
-			if (g.scheduler?.yield) await g.scheduler.yield()
-			else await new Promise<void>(rr => setTimeout(rr, 0))
-		} else if (g.scheduler?.yield) await g.scheduler.yield()
-		else await new Promise<void>(r => setTimeout(r, 0))
 	}
 
 	public getTexture(name: string): ThreeTexture {

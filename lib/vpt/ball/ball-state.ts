@@ -21,6 +21,7 @@ export class BallState extends ItemState {
 	public clone(): BallState {
 		const s = BallState.claim(this.name, this.pos)
 		s.orientation.set(this.orientation)
+		s.isFrozen = this.isFrozen
 		return s
 	}
 
