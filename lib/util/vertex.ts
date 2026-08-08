@@ -9,7 +9,7 @@ export interface Vertex {
 	x: number
 	y: number
 	clone(): Vertex
-	sub(v: Vertex): this
+	sub(v: any): this
 	length(): number
 }
 

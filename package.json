@@ -13,9 +13,9 @@
   },
   "license": "GPL-2.0",
   "type": "module",
-  "engines": {
-    "node": ">=22"
-  },
+	"engines": {
+		"node": ">=24"
+	},
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -45,7 +45,7 @@
     "build": "npm run build:pre && tsup && npm run build:cp && npm run build:esm",
     "build:pre": "tsx build/compile-rules.ts && tsx build/write-info.ts",
     "build:cp": "cp -r res dist/ && mkdir -p dist/lib/scripting/grammar && cp lib/scripting/grammar/grammar.bnf dist/lib/scripting/grammar/",
-    "build:esm": "tsc --outDir dist-esm --rootDir . --module ESNext --target ES2024 --moduleResolution bundler --esModuleInterop --allowSyntheticDefaultImports --resolveJsonModule --skipLibCheck --declaration false --declarationMap false --sourceMap true && cp -r res dist-esm/ && mkdir -p dist-esm/lib/scripting/grammar && cp lib/scripting/grammar/grammar.bnf dist-esm/lib/scripting/grammar/ 2>/dev/null; cp lib/scripting/grammar/rules.ts dist-esm/lib/scripting/grammar/ 2>/dev/null; echo 'dist-esm built'",
+		"build:esm": "tsc --outDir dist-esm --rootDir . --module ESNext --target ES2024 --moduleResolution bundler --esModuleInterop --allowSyntheticDefaultImports --resolveJsonModule --skipLibCheck --declaration false --declarationMap false --sourceMap true && cp -r res dist-esm/ && mkdir -p dist-esm/lib/scripting/grammar && cp lib/scripting/grammar/grammar.bnf dist-esm/lib/scripting/grammar/ 2>/dev/null && cp lib/scripting/grammar/rules.ts dist-esm/lib/scripting/grammar/ 2>/dev/null && echo 'dist-esm built'",
     "typecheck": "tsc --noEmit",
     "lint": "biome check .",
     "format": "biome check --write .",
@@ -64,50 +64,50 @@
     "verify:all": "tsx test/harness/verify-all.ts",
     "verify:e2e": "tsx test/harness/verify-all.ts"
   },
-  "dependencies": {
-    "dash-ast": "^2.0.0",
-    "ebnf": "^1.9.0",
-    "es6-promise-pool": "^2.5.0",
-    "escodegen": "^1.12.0",
-    "escope": "^3.6.0",
-    "estraverse": "^5.0.0",
-    "gltf-pipeline": "^4.3.1",
-    "gm": "^1.23.1",
-    "moo": "^0.5.1",
-    "pngquant": "^3.1.0",
-    "three": "^0.185.0",
-    "wpc-emu": "^0.36.7"
-  },
+	"dependencies": {
+		"dash-ast": "^2.0.0",
+		"ebnf": "^1.9.1",
+		"es6-promise-pool": "^2.5.0",
+		"escodegen": "^1.14.3",
+		"escope": "^4.0.0",
+		"estraverse": "^5.3.0",
+		"gltf-pipeline": "^4.3.1",
+		"gm": "^1.25.1",
+		"moo": "^0.5.3",
+		"pngquant": "^3.1.0",
+		"three": "^0.185.1",
+		"wpc-emu": "^0.36.7"
+	},
   "optionalDependencies": {
     "sharp": "^0.35.3"
   },
-  "devDependencies": {
-    "@biomejs/biome": "^2.5.7",
-    "@types/chai": "^4.3.0",
-    "@types/escodegen": "0.0.6",
-    "@types/estraverse": "0.0.6",
-    "@types/estree": "^1.0.0",
-    "@types/gm": "^1.18.1",
-    "@types/mocha": "^10.0.0",
-    "@types/moo": "^0.5.3",
-    "@types/nearley": "^2.11.1",
-    "@types/node": "^22.0.0",
-    "@types/sharp": "^0.31.1",
-    "@types/sinon": "^17.0.0",
-    "@types/sinon-chai": "^3.2.0",
-    "@types/three": "^0.160.0",
-    "@vitest/coverage-v8": "^4.1.10",
-    "chai": "^4.3.6",
-    "looks-same": "^7.2.3",
-    "nock": "^13.5.0",
-    "sinon": "^17.0.0",
-    "sinon-chai": "^3.7.0",
-    "tsup": "^8.5.1",
-    "tsx": "^4.23.9",
-    "typescript": "^5.9.2",
-    "vite": "^7.0.0",
-    "vitest": "^4.1.10"
-  },
+	"devDependencies": {
+		"@biomejs/biome": "^2.5.7",
+		"@types/chai": "^4.3.0",
+		"@types/escodegen": "0.0.10",
+		"@types/estraverse": "5.1.7",
+		"@types/estree": "^1.0.0",
+		"@types/gm": "^1.25.4",
+		"@types/mocha": "^10.0.0",
+		"@types/moo": "^0.5.10",
+		"@types/nearley": "^2.11.5",
+		"@types/node": "^24.13.3",
+		"@types/sharp": "^0.31.1",
+		"@types/sinon": "^17.0.0",
+		"@types/sinon-chai": "^3.2.0",
+		"@types/three": "^0.185.4",
+		"@vitest/coverage-v8": "^4.1.10",
+		"chai": "^4.3.6",
+		"looks-same": "^7.2.3",
+		"nock": "^13.5.0",
+		"sinon": "^17.0.0",
+		"sinon-chai": "^3.7.0",
+		"tsup": "^8.5.1",
+		"tsx": "^4.23.11",
+		"typescript": "^6.0.3",
+		"vite": "^8.2.1",
+		"vitest": "^4.1.10"
+	},
   "bugs": {
     "url": "https://github.com/vpdb/vpx-js/issues"
   },
