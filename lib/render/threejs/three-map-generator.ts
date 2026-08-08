@@ -44,10 +44,8 @@ export class ThreeMapGenerator {
 
 	private pickConcurrency(textures: Texture[]): number {
 		const hasLarge = textures.some((t) => t.width * t.height > 4 * 1024 * 1024)
-		const hasFloat = textures.some(
-			(t) => (t as unknown as { isHdr?: () => boolean }).isHdr?.() || /\.(exr|hdr)$/i.test((t as unknown as { szPath?: string }).szPath ?? ''),
-		)
-		const cores = (typeof navigator !== 'undefined' && (navigator as unknown as { hardwareConcurrency?: number }).hardwareConcurrency) || 4
+		const hasFloat = textures.some((t) => (t as any).isHdr?.() || /\.(exr|hdr)$/i.test((t as any).szPath ?? ''))
+		const cores = (typeof navigator !== 'undefined' && (navigator as any).hardwareConcurrency) || 4
 		if (hasLarge) return Math.min(2, cores)
 		if (hasFloat) return Math.min(3, cores)
 		return Math.min(6, cores)
@@ -60,7 +58,7 @@ export class ThreeMapGenerator {
 				const i = next++
 				if (i >= textures.length) break
 				await this.loadOne(textures[i]!, table)
-				if (i % 8 === 0) await this.yield()
+				if (i % 8 === 0) await this.yieldMain()
 			}
 		})
 		await Promise.all(workers)
@@ -74,7 +72,12 @@ export class ThreeMapGenerator {
 		} catch (err) {
 			const msg = (err as Error).message || ''
 			if (msg.includes('too large')) {
-				logger().debug('[ThreeMapGenerator.loadTextures] Skipping large texture %s (%s): %s', texture.getName(), texture.storageName, msg)
+				logger().debug(
+					'[ThreeMapGenerator.loadTextures] Skipping large texture %s (%s): %s',
+					texture.getName(),
+					texture.storageName,
+					msg,
+				)
 			} else {
 				logger().warn(
 					'[ThreeMapGenerator.loadTextures] Error loading texture %s (%s/%s): %s',
@@ -87,7 +90,7 @@ export class ThreeMapGenerator {
 		}
 	}
 
-	private async yield(): Promise<void> {
+	private async yieldMain(): Promise<void> {
 		const g = globalThis as unknown as { scheduler?: { yield?: () => Promise<void> } }
 		if (g.scheduler?.yield) await g.scheduler.yield()
 		else await new Promise<void>((r) => setTimeout(r, 0))
@@ -99,10 +102,6 @@ export class ThreeMapGenerator {
 
 	public hasTexture(name: string): boolean {
 		return this.textureCache.has(name)
-	}
-
-	public getCache(): Map<string, ThreeTexture> {
-		return this.textureCache
 	}
 
 	public disposeUnused(usedNames: Set<string>): number {
@@ -123,11 +122,11 @@ export class ThreeMapGenerator {
 
 	private disposeTexture(tex: ThreeTexture): void {
 		try {
-			;(tex as unknown as { dispose?: () => void }).dispose?.()
+			;(tex as any).dispose?.()
 		} catch {}
 		try {
-			const img = (tex as unknown as { image?: { data?: unknown } }).image
-			if (img?.data) (tex as unknown as { image: { data: unknown | null } }).image.data = null
+			const img = (tex as any).image
+			if (img?.data) (tex as any).image.data = null
 		} catch {}
 	}
 }

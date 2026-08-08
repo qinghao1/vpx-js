@@ -70,11 +70,7 @@ export class ThreeMaterialGenerator {
 	}
 
 	public applyNormalMap(threeMaterial: MeshStandardMaterial, normalMap?: string): void {
-		if (normalMap && this.mapGenerator.hasTexture(normalMap)) {
-			threeMaterial.normalMap = this.mapGenerator.getTexture(normalMap)
-			threeMaterial.normalMap.name = normalMap
-			threeMaterial.needsUpdate = true
-		}
+		this.applyTexture(threeMaterial, 'normalMap', normalMap)
 	}
 
 	public applyEnvMap(threeMaterial: MeshStandardMaterial, envMap?: string): void {
@@ -91,15 +87,51 @@ export class ThreeMaterialGenerator {
 
 	private applyTexture(
 		mat: MeshStandardMaterial,
-		key: 'map' | 'envMap' | 'emissiveMap',
+		key: 'map' | 'normalMap' | 'envMap' | 'emissiveMap',
 		name?: string,
 		init?: (m: MeshStandardMaterial) => void,
 	): void {
-		if (!name || !this.mapGenerator.hasTexture(name)) return
+		if (!name) return
+		if (!this.mapGenerator.hasTexture(name)) {
+			const pendingKey =
+				key === 'map'
+					? 'pendingMap'
+					: key === 'normalMap'
+						? 'pendingNormalMap'
+						: key === 'envMap'
+							? 'pendingEnvMap'
+							: 'pendingEmissiveMap'
+			;(mat.userData as Record<string, unknown>)[pendingKey] = name
+			return
+		}
 		;(mat as unknown as Record<string, unknown>)[key] = this.mapGenerator.getTexture(name)
 		;((mat as unknown as Record<string, { name: string }>)[key] as { name: string }).name = name
 		init?.(mat)
 		mat.needsUpdate = true
+	}
+
+	public resolvePendingTextures(): number {
+		let fixed = 0
+		for (const mat of Object.values(this.cachedMaterials)) {
+			const ud = mat.userData as Record<string, unknown>
+			for (const [pendingKey, texKey] of [
+				['pendingMap', 'map'],
+				['pendingNormalMap', 'normalMap'],
+				['pendingEnvMap', 'envMap'],
+				['pendingEmissiveMap', 'emissiveMap'],
+			] as const) {
+				const name = ud[pendingKey] as string | undefined
+				if (!name || !this.mapGenerator.hasTexture(name)) continue
+				const tex = this.mapGenerator.getTexture(name)
+				;(mat as unknown as Record<string, unknown>)[texKey] = tex
+				;(tex as unknown as { name: string }).name = name
+				if (texKey === 'envMap') (mat as MeshStandardMaterial).envMapIntensity = 1
+				delete ud[pendingKey]
+				mat.needsUpdate = true
+				fixed++
+			}
+		}
+		return fixed
 	}
 
 	private getKey(

@@ -7,17 +7,19 @@ export function createAtlas(
 	textures: Map<string, unknown>,
 	maxSize = 2048,
 ): { atlas: ThreeTexture; map: Map<string, { u: number; v: number; su: number; sv: number }> } | null {
-	const entries = collectSmallEntries(textures, maxSize)
+	const entries = collectSmallEntries(textures)
 	if (entries.length < 4) return null
 	if (!packEntries(entries, maxSize)) return null
 	const { canvas, map } = buildAtlas(entries, maxSize)
 	return { atlas: canvasTexture(canvas), map }
 }
 
-function collectSmallEntries(textures: Map<string, unknown>, maxSize: number): Entry[] {
+function collectSmallEntries(textures: Map<string, unknown>): Entry[] {
 	const out: Entry[] = []
 	for (const [name, tex] of textures) {
-		const img = (tex as { image?: unknown })?.image as { width?: number; naturalWidth?: number; height?: number; naturalHeight?: number; data?: unknown } | undefined
+		const img = (tex as any)?.image as
+			| { width?: number; naturalWidth?: number; height?: number; naturalHeight?: number; data?: unknown }
+			| undefined
 		if (!img || img.data) continue
 		const w = img.width ?? img.naturalWidth ?? 0
 		const h = img.height ?? img.naturalHeight ?? 0
@@ -57,7 +59,7 @@ function buildAtlas(entries: Entry[], maxSize: number) {
 	const ctx = canvas.getContext('2d')!
 	ctx.clearRect(0, 0, canvas.width, canvas.height)
 	for (const e of entries) {
-		const img = (e.tex as { image: CanvasImageSource }).image as CanvasImageSource
+		const img = (e.tex as any).image as CanvasImageSource
 		try {
 			ctx.drawImage(img as CanvasImageSource, e.x, e.y, e.w, e.h)
 		} catch {}
@@ -86,15 +88,22 @@ function canvasTexture(canvas: HTMLCanvasElement): ThreeTexture {
 	return tex as unknown as ThreeTexture
 }
 
-export function applyAtlas(root: unknown, atlas: ThreeTexture, map: Map<string, { u: number; v: number; su: number; sv: number }>): number {
+export function applyAtlas(
+	root: unknown,
+	atlas: ThreeTexture,
+	map: Map<string, { u: number; v: number; su: number; sv: number }>,
+): number {
 	let patched = 0
-	const traverse = (root as { traverse?: (cb: (o: unknown) => void) => void })?.traverse
+	const traverse = (root as any)?.traverse
 	if (typeof traverse !== 'function') return 0
-	;(root as { traverse: (cb: (o: unknown) => void) => void }).traverse((o: unknown) => {
+	;(root as any).traverse((o: unknown) => {
 		const obj = o as {
 			isMesh?: boolean
 			material?: unknown
-			geometry?: { attributes?: { uv?: { array: Float32Array; needsUpdate?: boolean } }; clone?: () => unknown } & Record<string, unknown>
+			geometry?: {
+				attributes?: { uv?: { array: Float32Array; needsUpdate?: boolean } }
+				clone?: () => unknown
+			} & Record<string, unknown>
 		}
 		if (!obj.isMesh || !obj.material) return
 		const mats = Array.isArray(obj.material) ? (obj.material as unknown[]) : [obj.material as unknown]
@@ -112,7 +121,12 @@ export function applyAtlas(root: unknown, atlas: ThreeTexture, map: Map<string, 
 			}
 		}
 		if (!entry || idx < 0) return
-		const orig = mats[idx] as { clone?: () => unknown; userData?: Record<string, unknown>; map?: unknown; needsUpdate?: boolean }
+		const orig = mats[idx] as {
+			clone?: () => unknown
+			userData?: Record<string, unknown>
+			map?: unknown
+			needsUpdate?: boolean
+		}
 		let cloned: unknown
 		try {
 			cloned = orig.clone?.() ?? { ...orig }
@@ -130,7 +144,10 @@ export function applyAtlas(root: unknown, atlas: ThreeTexture, map: Map<string, 
 		const geom = obj.geometry as
 			| {
 					attributes?: { uv?: { array: Float32Array; needsUpdate?: boolean } }
-					clone?: () => { attributes?: { uv?: { array: Float32Array; needsUpdate?: boolean } } } & Record<string, unknown>
+					clone?: () => { attributes?: { uv?: { array: Float32Array; needsUpdate?: boolean } } } & Record<
+						string,
+						unknown
+					>
 			  }
 			| undefined
 		if (!geom?.attributes?.uv) {

@@ -91,6 +91,7 @@ export class PinInput {
 	private fire(dispid: Event, code: number): void {
 		this.table.getApi().fireKeyEvent(dispid, code)
 		this.syncFlippers(dispid === Event.GameEventsKeyDown, code)
+		this.syncPlunger(dispid === Event.GameEventsKeyDown, code)
 	}
 
 	private syncFlippers(isDown: boolean, code: number): void {
@@ -111,6 +112,19 @@ export class PinInput {
 			try {
 				const api = flipper.getApi()
 				isDown ? api.RotateToEnd() : api.RotateToStart()
+			} catch {}
+		}
+	}
+
+	private syncPlunger(isDown: boolean, code: number): void {
+		if (code !== this.rgKeys[AssignKey.PlungerKey]) return
+		const plungers = Object.values(this.table.plungers)
+		if (!plungers.length) return
+		for (const plunger of plungers) {
+			try {
+				const api = plunger.getApi()
+				if (isDown) api.PullBack()
+				else api.Fire()
 			} catch {}
 		}
 	}
