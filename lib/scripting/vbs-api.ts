@@ -1,6 +1,15 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
+const lowerCache = new Map<string, string>()
+function lower(s: string): string {
+	let r = lowerCache.get(s)
+	if (r !== undefined) return r
+	r = s.toLowerCase()
+	if (lowerCache.size < 4096) lowerCache.set(s, r)
+	return r
+}
+
 /** Base for VBS-exposed APIs. */
 export abstract class VbsApi {
 	private propertyMap?: { [key: string]: string }
@@ -11,10 +20,10 @@ export abstract class VbsApi {
 		if (!this.propertyMap) {
 			this.propertyMap = {}
 			for (const name of this._getPropertyNames()) {
-				this.propertyMap[name.toLowerCase()] = name
+				this.propertyMap[lower(name)] = name
 			}
 		}
-		return this.propertyMap[vbScriptName.toLowerCase()]
+		return this.propertyMap[lower(vbScriptName)]
 	}
 }
 

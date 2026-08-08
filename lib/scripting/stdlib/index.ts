@@ -6,6 +6,7 @@ import { f4 } from '../../util/float.js'
 import { logger } from '../../util/logger.js'
 import { getObject } from '../objects/index.js'
 import { VbsApi } from '../vbs-api.js'
+import { UNDEF } from '../vbs-undefined.js'
 import { ERR } from './err.js'
 import { VbsMath } from './math.js'
 
@@ -109,7 +110,7 @@ export class Stdlib extends VbsApi {
 	}
 
 	public UBound(a: unknown, _dimension?: number): number {
-		if (a == null || (a as any)?.__isUndefined === true) return -1
+		if (a == null || (a as any)?.[UNDEF] === true) return -1
 		try {
 			const len = (a as any).length
 			return typeof len === 'number' ? len - 1 : -1
@@ -127,7 +128,7 @@ export class Stdlib extends VbsApi {
 	}
 
 	public IsEmpty(v: any): boolean {
-		return typeof v === 'undefined' || v === null
+		return typeof v === 'undefined' || v === null || (v as any)?.[UNDEF] === true
 	}
 
 	public IsObject(v: any): boolean {
@@ -181,7 +182,7 @@ export class Stdlib extends VbsApi {
 	}
 
 	public TypeName(obj: any): string {
-		if ((obj as any)?.__isUndefined === true) {
+		if ((obj as any)?.[UNDEF] === true) {
 			return 'Nothing'
 		}
 		if (typeof obj === 'string') {

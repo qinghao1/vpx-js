@@ -34,17 +34,28 @@ import {
 } from './key-code.js'
 import type { Player } from './player.js'
 
-const LEFT_KEYS = new Set([DIK_LSHIFT, DIK_LCONTROL, DIK_LEFT])
-const RIGHT_KEYS = new Set([DIK_RSHIFT, DIK_RCONTROL, DIK_RIGHT])
-
-const TROUGH_NAMES = new Set(['sw18', 'sw19', 'sw20', 'sw21'])
 const TROUGH_R2 = 2500
 
 type KeyEvent = { code: number; down: boolean; ts: number }
 
+function isTroughName(name: string): boolean {
+	const s = name.toLowerCase()
+	return s === 'sw18' || s === 'sw19' || s === 'sw20' || s === 'sw21'
+}
+
+function isLeftCode(code: number, leftKey: number): boolean {
+	return code === leftKey || code === DIK_LSHIFT || code === DIK_LCONTROL || code === DIK_LEFT
+}
+
+function isRightCode(code: number, rightKey: number): boolean {
+	return code === rightKey || code === DIK_RSHIFT || code === DIK_RCONTROL || code === DIK_RIGHT
+}
+
 /** DirectInput key queue — mirrors pininput.cpp. */
 export class PinInput {
 	private readonly queue: KeyEvent[] = []
+	private troughCache?: Array<{ x: number; y: number }>
+	private readonly flipperRight = new WeakMap<object, boolean>()
 
 	public readonly rgKeys: Record<number, number> = {
 		[AssignKey.LeftFlipperKey]: DIK_LCONTROL,
@@ -84,7 +95,8 @@ export class PinInput {
 	}
 
 	processKeys(): void {
-		for (const ev of this.queue) {
+		const q = this.queue.splice(0)
+		for (const ev of q) {
 			if (
 				ev.code === this.rgKeys[AssignKey.FrameCount] ||
 				ev.code === this.rgKeys[AssignKey.Enable3D] ||
@@ -93,7 +105,6 @@ export class PinInput {
 				continue
 			this.fire(ev.down ? Event.GameEventsKeyDown : Event.GameEventsKeyUp, ev.code)
 		}
-		this.queue.length = 0
 	}
 
 	private fire(dispid: Event, code: number): void {
@@ -105,19 +116,23 @@ export class PinInput {
 	}
 
 	private syncFlippers(isDown: boolean, code: number): void {
-		const isLeftKey = code === this.rgKeys[AssignKey.LeftFlipperKey] || LEFT_KEYS.has(code)
-		const isRightKey = code === this.rgKeys[AssignKey.RightFlipperKey] || RIGHT_KEYS.has(code)
-		if (!isLeftKey && !isRightKey) return
+		const isLeft = isLeftCode(code, this.rgKeys[AssignKey.LeftFlipperKey])
+		const isRight = isRightCode(code, this.rgKeys[AssignKey.RightFlipperKey])
+		if (!isLeft && !isRight) return
 
 		const flippers = Object.values(this.table.flippers)
 		if (!flippers.length) return
 
 		for (const flipper of flippers) {
-			const name = flipper.getName().toLowerCase()
-			const isRightFlipper = name.includes('right') || name === 'flipperr'
+			let isRightFlipper = this.flipperRight.get(flipper)
+			if (isRightFlipper === undefined) {
+				const n = flipper.getName().toLowerCase()
+				isRightFlipper = n.includes('right') || n === 'flipperr'
+				this.flipperRight.set(flipper, isRightFlipper)
+			}
 			if (flippers.length > 1) {
-				if (isLeftKey && isRightFlipper) continue
-				if (isRightKey && !isRightFlipper) continue
+				if (isLeft && isRightFlipper) continue
+				if (isRight && !isRightFlipper) continue
 			}
 			try {
 				const api = flipper.getApi()
@@ -156,9 +171,12 @@ export class PinInput {
 	}
 
 	private troughCenters(): Array<{ x: number; y: number }> {
-		return Object.values(this.table.kickers)
-			.filter((k) => TROUGH_NAMES.has(k.getName().toLowerCase()))
+		if (this.troughCache) return this.troughCache
+		const centers = Object.values(this.table.kickers)
+			.filter((k) => isTroughName(k.getName()))
 			.map((k) => (k as unknown as { data: { center: { x: number; y: number } } }).data.center)
+		this.troughCache = centers
+		return centers
 	}
 
 	private findTroughBall(balls: typeof this.player.balls, centers: Array<{ x: number; y: number }>) {

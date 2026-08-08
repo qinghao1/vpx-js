@@ -5,7 +5,7 @@ import { logger } from '../util/logger.js'
 import { ERR } from './stdlib/err.js'
 import type { Transpiler } from './transpiler.js'
 import { VbsArray } from './vbs-array.js'
-import { VbsUndefined } from './vbs-undefined.js'
+import { UNDEF, VbsUndefined } from './vbs-undefined.js'
 
 /** VBS runtime helpers. */
 export class VBSHelper {
@@ -19,7 +19,7 @@ export class VBSHelper {
 	}
 
 	private isUndef(v: unknown): boolean {
-		return !!v && typeof v === 'object' && '__isUndefined' in (v as any) && (v as any).__isUndefined === true
+		return !!v && typeof v === 'object' && (v as any)[UNDEF] === true
 	}
 
 	private sourcePrefix(vbs: string, filename?: string): string {
