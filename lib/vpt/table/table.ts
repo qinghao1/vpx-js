@@ -214,13 +214,13 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 	}
 
 	public generatePlayfieldHit(): HitPlane {
-		return new HitPlane(new Vertex3D(0, 0, 1), this.data!.tableHeight)
+		return new HitPlane(new Vertex3D(0, 0, 1), this.data!.tableHeight ?? 0)
 			.setFriction(this.data!.getFriction())
 			.setElasticity(this.data!.getElasticity(), this.data!.getElasticityFalloff())
 			.setScatter(degToRad(this.data!.getScatter()))
 	}
 	public generateGlassHit(): HitPlane {
-		return new HitPlane(new Vertex3D(0, 0, -1), this.data!.glassHeight).setElasticity(0.2)
+		return new HitPlane(new Vertex3D(0, 0, -1), this.data!.glassHeight ?? 0).setElasticity(0.2)
 	}
 
 	public getElementApis(): Record<string, ItemApi<ItemData>> {
@@ -255,7 +255,7 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 	}
 	public getTableHeight(): number {
 		if (!this.data) throw new Error('Table data not loaded')
-		return this.data.tableHeight
+		return this.data.tableHeight ?? 0
 	}
 	public getDimensions(): { width: number; height: number } {
 		if (!this.data) throw new Error('Table data not loaded')
@@ -267,11 +267,11 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 	}
 	public getSurfaceHeight(surface: string | undefined, x: number, y: number): number {
 		if (!this.data) throw new Error('Table data not loaded')
-		if (!surface) return this.data.tableHeight
-		if (this.surfaces[surface]) return f4(this.data.tableHeight + this.surfaces[surface]!.heightTop)
-		if (this.ramps[surface]) return f4(this.data.tableHeight + this.ramps[surface]!.getSurfaceHeight(x, y, this))
+		if (!surface) return this.data.tableHeight ?? 0
+		if (this.surfaces[surface]) return f4((this.data.tableHeight ?? 0) + this.surfaces[surface]!.heightTop)
+		if (this.ramps[surface]) return f4((this.data.tableHeight ?? 0) + this.ramps[surface]!.getSurfaceHeight(x, y, this))
 		logger().warn('[Table.getSurfaceHeight] Unknown surface %s.', surface)
-		return this.data.tableHeight
+		return this.data.tableHeight ?? 0
 	}
 
 	public async streamStorage<T>(name: string, streamer: (stg: Storage) => Promise<T>): Promise<T> {
@@ -305,9 +305,11 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 	/** Generates top-most scene node containing the entire table. */
 	public async generateTableNode<NODE, GEOMETRY, POINT_LIGHT>(
 		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
-		opts: TableExportOptions = {},
+		opts: TableExportOptions & { preloadTextures?: boolean } = {},
 	): Promise<NODE> {
-		await renderApi.preloadTextures(Object.values(this.textures), this)
+		if (opts.preloadTextures !== false) {
+			await renderApi.preloadTextures(Object.values(this.textures), this)
+		}
 		return this.meshGenerator!.generateTableNode(renderApi, opts)
 	}
 

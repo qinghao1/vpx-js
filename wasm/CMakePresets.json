@@ -1,0 +1,24 @@
+{
+	"version": 8,
+	"cmakeMinimumRequired": { "major": 3, "minor": 28 },
+	"configurePresets": [
+		{
+			"name": "wasm",
+			"displayName": "WASM Release",
+			"generator": "Ninja",
+			"binaryDir": "${sourceDir}/build/wasm",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Release",
+				"PINMAME_WASM_PTHREADS": "ON"
+			}
+		},
+		{
+			"name": "debug",
+			"displayName": "WASM Debug",
+			"inherits": "wasm",
+			"binaryDir": "${sourceDir}/build/wasm-debug",
+			"cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" }
+		}
+	],
+	"buildPresets": [{ "name": "wasm", "configurePreset": "wasm" }, { "name": "debug", "configurePreset": "debug" }]
+}

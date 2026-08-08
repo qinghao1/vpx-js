@@ -202,9 +202,9 @@ export class TableData extends ItemData {
 
 	public angleTiltMax!: number
 	public angletiltMin!: number
-	public glassHeight!: number
-	public glassBottomHeight!: number
-	public tableHeight!: number
+	public glassHeight = 0
+	public glassBottomHeight = 0
+	public tableHeight = 0
 
 	public szImage?: string
 	public szBallImage?: string

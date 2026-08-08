@@ -178,6 +178,7 @@ export class PlayerPhysics {
 	/** Advances physics to `time` (ms). Returns iterations run. */
 	public updatePhysics(time?: number): number {
 		const initial = time !== undefined ? time * 1000 : Math.floor(this.now() * 1000)
+		if (this.ensureInitialTime(initial)) return 0
 		if (this.isPaused) {
 			const delta = initial - this.curPhysicsFrameTime
 			this.startTimeUsec += delta
@@ -225,6 +226,21 @@ export class PlayerPhysics {
 		}
 		this.physPeriod = Math.floor(this.now() * 1000) - initial
 		return iterations
+	}
+
+	private ensureInitialTime(initial: number): boolean {
+		if (this.curPhysicsFrameTime !== 0 || this.nextPhysicsFrameTime !== 0 || this.startTimeUsec !== 0) return false
+		if (initial > 100000) {
+			this.curPhysicsFrameTime = initial
+			this.nextPhysicsFrameTime = initial + PHYSICS_STEPTIME
+			this.startTimeUsec = initial
+			this.lastTimeUsec = initial
+			return true
+		}
+		this.nextPhysicsFrameTime = PHYSICS_STEPTIME
+		this.startTimeUsec = 0
+		this.lastTimeUsec = initial
+		return false
 	}
 
 	private flushTimers(): void {

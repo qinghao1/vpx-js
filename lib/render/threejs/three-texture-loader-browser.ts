@@ -6,6 +6,8 @@ import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js'
 import {
 	CanvasTexture,
 	DataTexture,
+	FloatType,
+	HalfFloatType,
 	LinearFilter,
 	LinearMipMapLinearFilter,
 	LinearSRGBColorSpace,
@@ -34,9 +36,12 @@ const MAX_REGULAR = 1024
 const MAX_FLOAT = 512
 
 function tune(tex: any): void {
-	tex.generateMipmaps = true
-	tex.minFilter = LinearMipMapLinearFilter as any
-	tex.anisotropy = 4
+	const w = (tex.image as any)?.width || tex.image?.width || 0
+	const h = (tex.image as any)?.height || tex.image?.height || 0
+	const small = w > 0 && h > 0 && Math.max(w, h) <= 256
+	tex.generateMipmaps = !small
+	tex.minFilter = (small ? LinearFilter : LinearMipMapLinearFilter) as any
+	tex.anisotropy = small ? 1 : 4
 }
 
 function nameAndTune(tex: any, name: string): void {
@@ -45,15 +50,13 @@ function nameAndTune(tex: any, name: string): void {
 	tune(tex)
 }
 
-function getMaxSizeForTexture(name: string, w: number, h: number, isFloat: boolean): number {
+function getMaxSizeForTexture(name: string, w: number, h: number, isFloat: boolean, playfieldMap?: string): number {
 	try {
-		const n = (name || '').toLowerCase()
+		if (playfieldMap && name && name.toLowerCase() === playfieldMap.toLowerCase()) return 2048
 		if (isFloat) {
-			if (n.includes('vlm.nestmap')) return n.includes('vlm.nestmap0') || n.includes('vlm.nestmap4') ? 2048 : 512
+			if (w <= 512 && h <= 512) return Math.max(w, h)
 			return MAX_FLOAT
 		}
-		if (n.includes('vlm.nestmap0') || n.includes('vlm.nestmap4')) return 2048
-		if (n.includes('vlm.nestmap')) return 512
 		if (w > 2048 || h > 2048) return 1024
 		if (w <= 512 && h <= 512) return Math.max(w, h)
 		return MAX_REGULAR
@@ -62,8 +65,57 @@ function getMaxSizeForTexture(name: string, w: number, h: number, isFloat: boole
 	}
 }
 
+let exrWorker: Worker | null = null
+let exrSeq = 0
+const exrPending = new Map<number, { resolve: (v: any) => void; reject: (e: any) => void }>()
+
+function getExrWorker(): Worker | null {
+	if (typeof Worker === 'undefined') return null
+	if (exrWorker) return exrWorker
+	try {
+		exrWorker = new Worker(new URL('./workers/exr-worker.js', import.meta.url), { type: 'module' } as any)
+		exrWorker.onmessage = (e: MessageEvent) => {
+			const { id, ok, error, width, height, data, type, format, colorSpace } = e.data as any
+			const p = exrPending.get(id)
+			if (!p) return
+			exrPending.delete(id)
+			if (!ok) p.reject(new Error(error))
+			else p.resolve({ width, height, data, type, format, colorSpace })
+		}
+		exrWorker.onerror = (e: any) => {
+			for (const [, p] of exrPending) p.reject(e.error || new Error(String(e.message || e)))
+			exrPending.clear()
+		}
+		return exrWorker
+	} catch {
+		return null
+	}
+}
+
+async function parseWithWorker(buffer: ArrayBuffer, kind: 'exr' | 'hdr'): Promise<any> {
+	const w = getExrWorker()
+	if (!w) throw new Error('no worker')
+	const id = ++exrSeq
+	return await new Promise((resolve, reject) => {
+		exrPending.set(id, { resolve, reject })
+		try {
+			w.postMessage({ id, buffer, type: kind }, [buffer] as any)
+		} catch (e) {
+			exrPending.delete(id)
+			reject(e)
+		}
+		setTimeout(() => {
+			if (exrPending.has(id)) {
+				exrPending.delete(id)
+				reject(new Error('exr worker timeout'))
+			}
+		}, 15000)
+	})
+}
+
 /** ThreeTextureLoaderBrowser. */
 export class ThreeTextureLoaderBrowser implements ITextureLoader<ThreeTexture> {
+	public playfieldMap?: string
 	public async loadDefaultTexture(name: string, ext: string, fileName: string): Promise<ThreeTexture> {
 		const key = fileName.substr(0, fileName.lastIndexOf('.'))
 		if (!imageMap[key]) {
@@ -78,7 +130,7 @@ export class ThreeTextureLoaderBrowser implements ITextureLoader<ThreeTexture> {
 		texture.colorSpace = SRGBColorSpace
 		texture.needsUpdate = true
 		tune(texture)
-		const max = getMaxSizeForTexture(name, width, height, false)
+		const max = getMaxSizeForTexture(name, width, height, false, this.playfieldMap)
 		const ds = downsampleIfNeeded(texture, max, name)
 		if (ds && ds !== texture) {
 			try {
@@ -92,43 +144,142 @@ export class ThreeTextureLoaderBrowser implements ITextureLoader<ThreeTexture> {
 
 	public async loadTexture(name: string, ext: string, data: Uint8Array): Promise<ThreeTexture> {
 		const mimeType = getMimeType(data, ext) || 'image/png'
+		if (
+			!mimeType.includes('hdr') &&
+			!mimeType.includes('exr') &&
+			ext !== '.hdr' &&
+			ext !== '.exr' &&
+			typeof createImageBitmap !== 'undefined'
+		) {
+			try {
+				const canUseZeroCopy2 = data.byteOffset === 0 && data.byteLength === data.buffer.byteLength
+				const blobPart2: any = canUseZeroCopy2
+					? data
+					: data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength)
+				const blob2 = new Blob([blobPart2 as any], { type: mimeType as any })
+				let bitmap: any = await createImageBitmap(blob2 as any, { imageOrientation: 'flipY' } as any)
+				const w = bitmap.width,
+					h = bitmap.height
+				const max = getMaxSizeForTexture(name, w, h, false, this.playfieldMap)
+				if (w > max || h > max) {
+					const scale = Math.min(max / w, max / h)
+					const nw = Math.max(1, Math.floor(w * scale)),
+						nh = Math.max(1, Math.floor(h * scale))
+					try {
+						const resized: any = await (createImageBitmap as any)(bitmap, {
+							resizeWidth: nw,
+							resizeHeight: nh,
+							resizeQuality: 'high',
+						} as any)
+						try {
+							bitmap.close?.()
+						} catch {}
+						bitmap = resized
+					} catch {
+						try {
+							const canvas = document.createElement('canvas')
+							canvas.width = nw
+							canvas.height = nh
+							const ctx = canvas.getContext('2d')
+							if (ctx) {
+								ctx.imageSmoothingEnabled = true
+								;(ctx as any).imageSmoothingQuality = 'high'
+								ctx.drawImage(bitmap as any, 0, 0, nw, nh)
+								try {
+									bitmap.close?.()
+								} catch {}
+								const tex2: any = new CanvasTexture(canvas as any)
+								tex2.colorSpace = SRGBColorSpace
+								tex2.flipY = false
+								tex2.needsUpdate = true
+								tune(tex2)
+								tex2.name = `texture:${name}`
+								return tex2 as ThreeTexture
+							}
+						} catch {}
+					}
+				}
+				const tex: any = new CanvasTexture(bitmap as any)
+				tex.colorSpace = SRGBColorSpace
+				tex.flipY = false
+				tex.needsUpdate = true
+				tune(tex)
+				tex.name = `texture:${name}`
+				return tex as ThreeTexture
+			} catch {}
+		}
 		const isHdr = mimeType === 'image/hdr' || ext === '.hdr'
 		const isExr = mimeType === 'image/exr' || ext === '.exr'
 		if (isHdr || isExr) {
-			try {
-				const buffer = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer
-				const loader = isExr ? new EXRLoader() : new HDRLoader()
-				const texture = (loader as any).createDataTexture(buffer) as ThreeTexture
-				nameAndTune(texture as any, name)
-				if ((texture as any).colorSpace === SRGBColorSpace) (texture as any).colorSpace = LinearSRGBColorSpace
-				const w = (texture.image as any)?.width || 0
-				const h = (texture.image as any)?.height || 0
-				const max = getMaxSizeForTexture(name, w, h, true)
-				const ds = downsampleIfNeeded(texture, max, name)
-				if (ds && ds !== texture) {
-					try {
-						;(texture as any).dispose?.()
-					} catch {}
-					if ((ds as any).image?.data) tune(ds as any)
-					return ds as ThreeTexture
+			const kind: 'exr' | 'hdr' = isExr ? 'exr' : 'hdr'
+			const tryWorker = async (): Promise<ThreeTexture> => {
+				const buf = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer
+				let parsed: any = null
+				try {
+					parsed = await parseWithWorker(buf.slice(0) as ArrayBuffer, kind)
+				} catch {}
+				if (parsed && parsed.width && parsed.data) {
+					const tex = new DataTexture(
+						parsed.data as any,
+						parsed.width,
+						parsed.height,
+						parsed.format || (RGBAFormat as any),
+						parsed.type ?? (HalfFloatType as any),
+					)
+					tex.flipY = false
+					tex.colorSpace = (parsed.colorSpace as any) || LinearSRGBColorSpace
+					tex.needsUpdate = true
+					nameAndTune(tex as any, name)
+					const max = getMaxSizeForTexture(name, parsed.width, parsed.height, true, this.playfieldMap)
+					const ds = downsampleIfNeeded(tex as any, max, name)
+					if (ds && ds !== tex) {
+						try {
+							;(tex as any).dispose?.()
+						} catch {}
+						return ds as ThreeTexture
+					}
+					return tex as ThreeTexture
 				}
-				return texture as ThreeTexture
-			} catch (e: any) {
-				throw new Error(`HDR/EXR parse failed for "${name}" (${ext} ${mimeType}): ${e.message}`)
+				throw new Error('worker parse failed')
+			}
+			try {
+				return await tryWorker()
+			} catch {
+				try {
+					const buffer = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer
+					const loader = isExr ? new EXRLoader() : new HDRLoader()
+					const texture = (loader as any).createDataTexture(buffer) as ThreeTexture
+					nameAndTune(texture as any, name)
+					if ((texture as any).colorSpace === SRGBColorSpace) (texture as any).colorSpace = LinearSRGBColorSpace
+					const w = (texture.image as any)?.width || 0
+					const h = (texture.image as any)?.height || 0
+					const max = getMaxSizeForTexture(name, w, h, true, this.playfieldMap)
+					const ds = downsampleIfNeeded(texture, max, name)
+					if (ds && ds !== texture) {
+						try {
+							;(texture as any).dispose?.()
+						} catch {}
+						if ((ds as any).image?.data) tune(ds as any)
+						return ds as ThreeTexture
+					}
+					return texture as ThreeTexture
+				} catch (e: any) {
+					throw new Error(`HDR/EXR parse failed for "${name}" (${ext} ${mimeType}): ${e.message}`)
+				}
 			}
 		}
 		const canUseZeroCopy = data.byteOffset === 0 && data.byteLength === data.buffer.byteLength
 		const blobPart: any = canUseZeroCopy ? data : data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength)
 		const objectUrl = URL.createObjectURL(new Blob([blobPart as any], { type: mimeType as any }))
 		try {
-			const texture = await load(mimeType, objectUrl, ext, data, name)
+			const texture = await load(mimeType, objectUrl, ext, data, name, this.playfieldMap)
 			texture.name = `texture:${name}`
 			texture.colorSpace = SRGBColorSpace
 			texture.needsUpdate = true
 			tune(texture as any)
 			const w = (texture.image as any)?.width || (texture.image as any)?.naturalWidth || 0
 			const h = (texture.image as any)?.height || (texture.image as any)?.naturalHeight || 0
-			const max = getMaxSizeForTexture(name, w, h, false)
+			const max = getMaxSizeForTexture(name, w, h, false, this.playfieldMap)
 			const ds = downsampleIfNeeded(texture, max, name) as any
 			if (ds && ds !== texture) {
 				try {
@@ -297,6 +448,7 @@ function load(
 	ext?: string,
 	data?: Uint8Array,
 	nameHint?: string,
+	playfieldMap?: string,
 ): Promise<ThreeTexture> {
 	return new Promise((resolve, reject) => {
 		if (
@@ -313,7 +465,7 @@ function load(
 					tune(texture as any)
 					const w = (texture.image as any)?.width || (texture.image as any)?.naturalWidth || 0
 					const h = (texture.image as any)?.height || (texture.image as any)?.naturalHeight || 0
-					const max = nameHint ? getMaxSizeForTexture(nameHint, w, h, false) : MAX_REGULAR
+					const max = nameHint ? getMaxSizeForTexture(nameHint, w, h, false, playfieldMap) : MAX_REGULAR
 					const ds = downsampleIfNeeded(texture, max, nameHint) as any
 					if (ds && ds !== texture) {
 						try {
@@ -342,7 +494,7 @@ function load(
 					URL.revokeObjectURL(url)
 					const w = (tex.image as any)?.width || 0
 					const h = (tex.image as any)?.height || 0
-					const max = nameHint ? getMaxSizeForTexture(nameHint, w, h, true) : MAX_FLOAT
+					const max = nameHint ? getMaxSizeForTexture(nameHint, w, h, true, playfieldMap) : MAX_FLOAT
 					resolve(downsampleIfNeeded(tex, max, nameHint) as any)
 					return
 				}
@@ -354,7 +506,7 @@ function load(
 					tune(texture as any)
 					const w = (texture.image as any)?.width || 0
 					const h = (texture.image as any)?.height || 0
-					const max = nameHint ? getMaxSizeForTexture(nameHint, w, h, true) : MAX_FLOAT
+					const max = nameHint ? getMaxSizeForTexture(nameHint, w, h, true, playfieldMap) : MAX_FLOAT
 					const ds = downsampleIfNeeded(texture, max, nameHint) as any
 					if (ds && ds !== texture) {
 						try {
@@ -380,7 +532,7 @@ function load(
 					URL.revokeObjectURL(url)
 					const w = (tex.image as any)?.width || 0
 					const h = (tex.image as any)?.height || 0
-					const max = nameHint ? getMaxSizeForTexture(nameHint, w, h, true) : MAX_FLOAT
+					const max = nameHint ? getMaxSizeForTexture(nameHint, w, h, true, playfieldMap) : MAX_FLOAT
 					resolve(downsampleIfNeeded(tex, max, nameHint) as any)
 					return
 				}
@@ -392,7 +544,7 @@ function load(
 					tune(texture as any)
 					const w = (texture.image as any)?.width || 0
 					const h = (texture.image as any)?.height || 0
-					const max = nameHint ? getMaxSizeForTexture(nameHint, w, h, true) : MAX_FLOAT
+					const max = nameHint ? getMaxSizeForTexture(nameHint, w, h, true, playfieldMap) : MAX_FLOAT
 					const ds = downsampleIfNeeded(texture, max, nameHint) as any
 					if (ds && ds !== texture) {
 						try {
