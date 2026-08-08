@@ -1,5 +1,6 @@
 // Profiling harness — full gamut: load app, parse vpx, build scene, mount, play, physics + render.
-// Usage: node harness-profile.mjs [--url=http://localhost:3000/?vpx=/test/fixtures/table-empty.vpx] [--out=/tmp/profile.json] [--duration=5000]
+// Modern profiling: CDP Tracing, page.metrics(), User Timing (mark/measure), PerformanceObserver.
+// Usage: node harness-profile.mjs [--url=...] [--out=/tmp/profile.json] [--duration=5000] [--trace]
 
 import { spawn } from 'node:child_process'
 import fs from 'node:fs'
@@ -13,6 +14,9 @@ function pickPuppeteer() {
 	const cands = [
 		'/home/qinghao1/projects/vpx-js/demo-browser/node_modules/puppeteer-core/lib/esm/puppeteer/puppeteer-core.js',
 		'/home/qinghao1/projects/vpx-js/node_modules/puppeteer-core/lib/esm/puppeteer/puppeteer-core.js',
+		'/home/qinghao1/projects/qinghao1.com/node_modules/puppeteer-core/lib/esm/puppeteer/puppeteer-core.js',
+		'/home/qinghao1/.npm/_npx/7d92d9a2d2ccc630/node_modules/puppeteer-core/lib/esm/puppeteer/puppeteer-core.js',
+		'/home/qinghao1/.npm/_npx/7d92d9a2d2ccc630/node_modules/puppeteer-core/lib/puppeteer/puppeteer-core.js',
 	]
 	for (const p of cands) if (fs.existsSync(p)) return p
 	throw new Error('puppeteer-core not found')
@@ -70,9 +74,27 @@ const page = await browser.newPage()
 await page.setViewport({ width: 1280, height: 900 })
 
 await page.evaluateOnNewDocument(() => {
-	window.__profile = { t0: performance.now(), marks: {}, nav0: Date.now() }
-	window.__mark = (k) => (window.__profile.marks[k] = performance.now())
-	window.__measure = (a, b) => (window.__profile.marks[b] ?? 0) - (window.__profile.marks[a] ?? 0)
+	window.__profile = { marks: {}, measures: [] }
+	const obs = new PerformanceObserver((list) => {
+		for (const e of list.getEntries())
+			window.__profile.measures.push({
+				name: e.name,
+				entryType: e.entryType,
+				start: e.startTime,
+				duration: e.duration,
+				detail: e.detail,
+			})
+	})
+	try {
+		obs.observe({ entryTypes: ['mark', 'measure', 'longtask', 'paint', 'navigation'] })
+	} catch {}
+	performance.mark('nav-start')
+	window.__mark = (k) => performance.mark(k)
+	window.__measure = (a, b, n) => {
+		try {
+			performance.measure(n || `${a}->${b}`, a, b)
+		} catch {}
+	}
 })
 
 const logs = []
@@ -84,13 +106,39 @@ page.on('console', (m) => {
 })
 page.on('pageerror', (e) => console.log('[pageerror]', e.message.slice(0, 1000)))
 
+const outPath = out.endsWith('.json') ? out : path.join(out, 'profile.json')
+const tracePath = path.join(path.dirname(outPath), 'trace.json')
+let tracing = false
+try {
+	await page.tracing.start({
+		path: tracePath,
+		screenshots: false,
+		categories: ['devtools.timeline', 'v8.execute', 'blink.user_timing', 'disabled-by-default-devtools.timeline.frame'],
+	})
+	tracing = true
+	console.log('[profile] tracing started', tracePath)
+} catch (e) {
+	console.log('[profile] tracing not available', e.message)
+}
+
+try {
+	await page.coverage.startJSCoverage({ resetOnNavigation: false })
+} catch {}
+
 const tNav0 = performance.now()
 console.log(`[profile] goto ${url}`)
 await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 })
+await page.evaluate(() => {
+	performance.mark('domcontentloaded')
+	try {
+		performance.measure('nav->dom', 'nav-start', 'domcontentloaded')
+	} catch {}
+})
 const tDom = performance.now()
 
 try {
 	await page.evaluate(() => {
+		performance.mark('force-play-start')
 		const sel = document.getElementById('mode')
 		if (sel) {
 			sel.value = 'play'
@@ -102,6 +150,10 @@ try {
 				window.viewer.enterPlayMode()
 			} catch {}
 		}
+		performance.mark('force-play-end')
+		try {
+			performance.measure('force-play', 'force-play-start', 'force-play-end')
+		} catch {}
 	})
 } catch {}
 
@@ -120,6 +172,12 @@ for (let i = 0; i < 90; i++) {
 		ready = true
 		lastLog = s.log
 		elapsedReady = performance.now() - tNav0
+		await page.evaluate(() => {
+			performance.mark('ready')
+			try {
+				performance.measure('nav->ready', 'nav-start', 'ready')
+			} catch {}
+		})
 		break
 	}
 	if (s.log.includes('Failed')) {
@@ -131,11 +189,15 @@ for (let i = 0; i < 90; i++) {
 }
 if (!ready) {
 	console.log(lastLog.slice(-6000))
+	if (tracing)
+		try {
+			await page.tracing.stop()
+		} catch {}
 	await browser.close()
 	if (viteProc) viteProc.kill()
 	process.exit(1)
 }
-console.log(`[profile] Ready in ${(elapsedReady).toFixed(0)}ms (dom ${(tDom - tNav0).toFixed(0)}ms)`)
+console.log(`[profile] Ready in ${elapsedReady.toFixed(0)}ms (dom ${(tDom - tNav0).toFixed(0)}ms)`)
 
 const parsedTimes = (() => {
 	const txt = logs.join('\n')
@@ -164,6 +226,7 @@ const playState = await page.evaluate(
 console.log('[profile] before play switch', playState)
 if (!playState.includes('viewerMode=play') || playState.includes('hasPlayer=false')) {
 	console.log('[profile] switching to play...')
+	await page.evaluate(() => performance.mark('play-switch-start'))
 	await page.evaluate(async () => {
 		const sel = document.getElementById('mode')
 		if (sel) {
@@ -188,6 +251,12 @@ if (!playState.includes('viewerMode=play') || playState.includes('hasPlayer=fals
 			.catch(() => ({ hasPlayer: false }))
 		if (s.hasPlayer) break
 	}
+	await page.evaluate(() => {
+		performance.mark('play-switch-end')
+		try {
+			performance.measure('play-switch', 'play-switch-start', 'play-switch-end')
+		} catch {}
+	})
 	playSwitchMs = performance.now() - beforePlay
 	console.log(`[profile] play switch ${playSwitchMs.toFixed(0)}ms`)
 }
@@ -235,6 +304,10 @@ const initial = await page.evaluate(() => {
 	}
 })
 console.log('[profile] initial', initial)
+let metricsMid = {}
+try {
+	metricsMid = await page.metrics()
+} catch {}
 
 await page.evaluate(() => {
 	window.__fps = { frames: 0, last: performance.now(), fps: 0 }
@@ -249,7 +322,6 @@ await page.evaluate(() => {
 		requestAnimationFrame(loop)
 	}
 	requestAnimationFrame(loop)
-	window.__physSamples = []
 })
 
 console.log(`[profile] sampling physics+render for ${duration}ms...`)
@@ -283,17 +355,53 @@ while (performance.now() - tSample0 < duration) {
 	console.log(`[sample] t=${s.t ?? s.pt} fps=${s.fps} balls=${s.balls} draws=${s.draws} heap=${s.heap}MB`)
 }
 
+const perfEntries = await page
+	.evaluate(() => {
+		try {
+			return {
+				marks: performance
+					.getEntriesByType('mark')
+					.slice(-30)
+					.map((e) => ({ name: e.name, start: e.startTime })),
+				measures: performance
+					.getEntriesByType('measure')
+					.map((e) => ({ name: e.name, duration: e.duration, start: e.startTime })),
+				observer: window.__profile?.measures?.slice(-30),
+			}
+		} catch {
+			return {}
+		}
+	})
+	.catch(() => ({}))
+
+let metricsAfter = {}
+try {
+	metricsAfter = await page.metrics()
+} catch {}
+let coverage = null
+try {
+	const c = await page.coverage.stopJSCoverage()
+	coverage = { entries: c.length, used: c.reduce((a, e) => a + e.text.length, 0) }
+} catch {}
+
+if (tracing) {
+	try {
+		await page.tracing.stop()
+		console.log(
+			'[profile] trace saved',
+			tracePath,
+			fs.existsSync(tracePath) ? fs.statSync(tracePath).size + ' bytes' : 'missing',
+		)
+	} catch (e) {
+		console.log('[profile] trace stop err', e.message)
+	}
+}
+
 const physicsTicking =
 	samples.length >= 2 &&
 	typeof samples[0].t === 'number' &&
 	typeof samples[samples.length - 1].t === 'number' &&
 	samples[samples.length - 1].t > samples[0].t
-
-const pth = path.join(
-	out.endsWith('.json') ? path.dirname(out) : out,
-	out.endsWith('.json') ? path.basename(out) : 'profile.json',
-)
-const outPath = out.endsWith('.json') ? out : path.join(out, 'profile.json')
 const result = {
 	url,
 	at: new Date().toISOString(),
@@ -304,9 +412,13 @@ const result = {
 		...parsedTimes,
 	},
 	initial,
+	metrics: { before: metricsMid, after: metricsAfter },
+	perfEntries,
+	coverage,
 	samples,
 	physicsTicking,
 	duration,
+	trace: tracing && fs.existsSync(tracePath) ? tracePath : null,
 	logTail: logs.slice(-30).join('\n').slice(0, 4000),
 }
 fs.mkdirSync(path.dirname(outPath), { recursive: true })
@@ -315,13 +427,11 @@ console.log(`[profile] wrote ${outPath} ${fs.statSync(outPath).size} bytes`)
 console.log(
 	`[profile] physics ticking: ${physicsTicking ? 'PASS' : 'FAIL'} (${samples[0]?.t} -> ${samples[samples.length - 1]?.t})`,
 )
-
 try {
 	const shotPath = path.join(path.dirname(outPath), 'profile-play.png')
 	await page.screenshot({ path: shotPath })
 	console.log(`[profile] screenshot ${shotPath} ${fs.statSync(shotPath).size} bytes`)
 } catch {}
-
 await browser.close()
 if (viteProc) viteProc.kill()
 console.log('[profile] done')
