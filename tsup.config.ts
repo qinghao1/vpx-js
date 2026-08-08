@@ -10,7 +10,13 @@ export default defineConfig({
 		'bin/vbs-benchmark': 'bin/vbs-benchmark.ts',
 	},
 	format: ['esm'],
-	dts: true,
+	dts: {
+		entry: {
+			index: 'lib/index.ts',
+			'lib/refs.node': 'lib/refs.node.ts',
+			'lib/refs.browser': 'lib/refs.browser.ts',
+		},
+	},
 	splitting: false,
 	sourcemap: true,
 	clean: true,

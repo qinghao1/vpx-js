@@ -27,7 +27,8 @@
 		"noImplicitThis": false,
 		"noImplicitAny": false,
 		"noImplicitOverride": false,
-		"useDefineForClassFields": false
+		"useDefineForClassFields": false,
+		"ignoreDeprecations": "6.0"
 	},
 	"include": [
 		"lib/**/*",
@@ -42,6 +43,9 @@
 		"res",
 		"test/fixtures",
 		"demo-browser",
-		"demo-static"
+		"demo-static",
+		"**/*.spec.ts",
+		"**/*.integration.spec.ts",
+		"lib/render/threejs/vendor"
 	]
 }

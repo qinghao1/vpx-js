@@ -617,7 +617,7 @@ export class GLTFExporter {
 
 		const gltfTexture = {
 			sampler: this.processSampler(map),
-			source: this.processImage(map.image, map.format as any, map.flipY),
+			source: this.processImage(map.image as any, map.format as any, map.flipY),
 		}
 		this.outputJSON.textures.push(gltfTexture)
 		const index = this.outputJSON.textures.length - 1
@@ -1097,12 +1097,12 @@ export class GLTFExporter {
 
 		for (const track of tracks) {
 			const trackBinding = PropertyBinding.parseTrackName(track.name)
-			let trackNode = PropertyBinding.findNode(root, trackBinding.nodeName)
+			let trackNode = PropertyBinding.findNode(root, trackBinding.nodeName) as any
 			const trackProperty = PATH_PROPERTIES[trackBinding.propertyName]
 
 			if (trackBinding.objectName === 'bones') {
-				if (trackNode.isSkinnedMesh === true) {
-					trackNode = trackNode.skeleton.getBoneByName(trackBinding.objectIndex)
+				if ((trackNode as any).isSkinnedMesh === true) {
+					trackNode = (trackNode as any).skeleton.getBoneByName(trackBinding.objectIndex)
 				} else {
 					trackNode = undefined
 				}
@@ -1117,7 +1117,7 @@ export class GLTFExporter {
 			let outputItemSize = track.values.length / track.times.length
 
 			if (trackProperty === PATH_PROPERTIES.morphTargetInfluences) {
-				outputItemSize /= trackNode.morphTargetInfluences.length
+				outputItemSize /= (trackNode as any).morphTargetInfluences.length
 			}
 
 			let interpolation
