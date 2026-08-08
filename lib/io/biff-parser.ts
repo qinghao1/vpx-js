@@ -39,7 +39,9 @@ export class BiffParser {
 				chunk = data.subarray(8, 8 + len - 4)
 			}
 
-			if (!tag || tag === 'ENDB') {
+			// ENDB terminates a BIFF stream; FONT is an unrelated OLE directory entry that
+			// appears after the BIFF data in some VPX files and must also terminate parsing.
+			if (!tag || tag === 'ENDB' || tag === 'FONT') {
 				if (nested) {
 					nested.onEnd(nestedItem)
 					nested = nestedItem = null

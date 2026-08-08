@@ -7,7 +7,12 @@ import sinonChai from 'sinon-chai'
 import { downloadGameEntry } from './rom-fetcher.js'
 
 const nock = require('nock')
-const fetch = require('node-fetch')
+let fetch: any
+try {
+	fetch = require('node-fetch')
+} catch {
+	fetch = globalThis.fetch
+}
 
 // Yes hacky way to pollute the global scope!
 const globalAny: any = global

@@ -122,8 +122,9 @@ describe('WPC-EMU', () => {
 		expect(emulator.getSwitchInput(11)).to.equal(0)
 		expect(emulator.getLampState(11)).to.equal(1)
 		expect(emulator.getLampState(12)).to.equal(0)
-		expect(emulator.getSolenoidState(0)).to.equal(11)
-		expect(emulator.getGIState(0)).to.equal(8)
+		// solenoids/GIs are stored with 1-based offset (internal dummy at 0) — see EmulatorState
+		expect(emulator.getSolenoidState(0)).to.equal(2)
+		expect(emulator.getGIState(0)).to.equal(2)
 		expect(emulator.getDipSwitchByte()).to.equal(23)
 	})
 })

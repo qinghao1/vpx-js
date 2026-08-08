@@ -5,62 +5,71 @@ import type { WpcEmuWebWorkerApi } from 'wpc-emu'
 import { VbsArray } from '../scripting/vbs-array.js'
 import { OffsetIndex } from './offset-index.js'
 
-const empty = (n = 64): Uint8Array => new Uint8Array(n).fill(0)
+const empty = (n = 64) => new Uint8Array(n)
 
 /** Mirrors WPC emu RAM to VBS-visible lamp/solenoid/GI/DMD state. */
 export class EmulatorState {
-	private currentLampState: Uint8Array = empty()
-	private currentSolenoidState: Uint8Array = empty()
-	private currentGIState: Uint8Array = empty()
-	private lastSentLampState: Uint8Array = empty()
-	private lastSentSolenoidState: Uint8Array = empty()
-	private lastSentGIState: Uint8Array = empty()
-	private dmdScreen: Uint8Array = new Uint8Array()
-	private switchState: Uint8Array = new Uint8Array()
+	private lamps: Uint8Array = empty()
+	private sols: Uint8Array = empty()
+	private gis: Uint8Array = empty()
+	private lastLamps: Uint8Array = empty()
+	private lastSols: Uint8Array = empty()
+	private lastGis: Uint8Array = empty()
+	private dmd: Uint8Array = new Uint8Array()
+	private switches: Uint8Array = new Uint8Array()
 
-	/** Updates from emu UI state. */
-	public updateState(s: WpcEmuWebWorkerApi.EmuStateAsic): void {
-		if (s.wpc.lampState) this.currentLampState = this.normalize(s.wpc.lampState as unknown as Uint8Array)
-		if (s.wpc.solenoidState) this.currentSolenoidState = s.wpc.solenoidState as unknown as Uint8Array
-		if (s.wpc.generalIlluminationState) this.currentGIState = s.wpc.generalIlluminationState as unknown as Uint8Array
-		if (s.dmd.dmdShadedBuffer) this.dmdScreen = s.dmd.dmdShadedBuffer as unknown as Uint8Array
+	updateState(s: WpcEmuWebWorkerApi.EmuStateAsic): void {
+		if (s.wpc.lampState) this.lamps = this.normalize(s.wpc.lampState as unknown as Uint8Array)
+		if (s.wpc.solenoidState) this.sols = s.wpc.solenoidState as unknown as Uint8Array
+		if (s.wpc.generalIlluminationState) this.gis = s.wpc.generalIlluminationState as unknown as Uint8Array
+		if (s.dmd.dmdShadedBuffer) this.dmd = s.dmd.dmdShadedBuffer as unknown as Uint8Array
 		if (s.wpc.inputSwitchMatrixActiveColumn)
-			this.switchState = s.wpc.inputSwitchMatrixActiveColumn as unknown as Uint8Array
+			this.switches = s.wpc.inputSwitchMatrixActiveColumn as unknown as Uint8Array
 	}
 
-	public getSwitchState(o: OffsetIndex): number {
-		return this.switchState[o.zeroBasedIndex] ?? 0
-	}
-	public getLampState(o: OffsetIndex): number {
-		return this.currentLampState[o.zeroBasedIndex] ?? 0
-	}
-	public getSolenoidState(i: number): number {
-		return this.currentSolenoidState[i + 1] ?? 0
-	}
-	public getGIState(i: number): number {
-		return this.currentGIState[i + 1] ?? 0
+	applyPinmame(lamps: Uint8Array, sols: Uint8Array, gis: Uint8Array): void {
+		this.lamps = lamps.slice()
+		this.sols = new Uint8Array([0, ...sols])
+		this.gis = new Uint8Array([0, ...gis])
 	}
 
-	public getChangedLamps(): VbsArray<number[]> {
-		const diff = this.diff(this.lastSentLampState, this.currentLampState, OffsetIndex.mapIndexToMatrixIndex)
-		this.lastSentLampState = this.currentLampState
-		return new VbsArray(diff)
+	setDmd(frame: Uint8Array): void {
+		this.dmd = frame
 	}
-	public getChangedSolenoids(): number[][] {
-		const diff = this.diff(this.lastSentSolenoidState, this.currentSolenoidState, (i) => i + 1)
-		this.lastSentSolenoidState = this.currentSolenoidState
-		return diff
+
+	getSwitchState(o: OffsetIndex): number {
+		return this.switches[o.zeroBasedIndex] ?? 0
 	}
-	public getChangedGI(): number[][] {
-		const diff = this.diff(this.lastSentGIState, this.currentGIState, (i) => i + 1)
-		this.lastSentGIState = this.currentGIState
-		return diff
+	getLampState(o: OffsetIndex): number {
+		return this.lamps[o.zeroBasedIndex] ?? 0
 	}
-	public getChangedLEDs(): number[][] {
+	getSolenoidState(i: number): number {
+		return this.sols[i + 1] ?? 0
+	}
+	getGIState(i: number): number {
+		return this.gis[i + 1] ?? 0
+	}
+
+	getChangedLamps(): VbsArray<number[]> {
+		const d = this.diff(this.lastLamps, this.lamps, OffsetIndex.mapIndexToMatrixIndex)
+		this.lastLamps = this.lamps
+		return new VbsArray(d)
+	}
+	getChangedSolenoids(): number[][] {
+		const d = this.diff(this.lastSols, this.sols, (i) => i + 1)
+		this.lastSols = this.sols
+		return d
+	}
+	getChangedGI(): number[][] {
+		const d = this.diff(this.lastGis, this.gis, (i) => i + 1)
+		this.lastGis = this.gis
+		return d
+	}
+	getChangedLEDs(): number[][] {
 		return []
 	}
-	public getDmdScreen(): Uint8Array {
-		return this.dmdScreen
+	getDmdScreen(): Uint8Array {
+		return this.dmd
 	}
 
 	private normalize(v: Uint8Array): Uint8Array {

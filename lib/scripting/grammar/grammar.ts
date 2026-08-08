@@ -27,7 +27,9 @@ import { RULES } from './rules.js'
 
 const require = createRequire(import.meta.url)
 
-const dashAst = require('dash-ast')
+import dashAstImport from 'dash-ast'
+// dash-ast is CJS, handle both default and direct export
+const dashAst: (ast: any, opts: any) => void = (dashAstImport as any)?.default ?? (dashAstImport as any)
 
 export interface ESIToken extends IToken {
 	estree: any
