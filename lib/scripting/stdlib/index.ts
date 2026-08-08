@@ -108,9 +108,22 @@ export class Stdlib extends VbsApi {
 		return Math.sqrt(n)
 	}
 
-	public UBound(a: [], dimension?: number): number {
-		// TODO handle dimension
-		return a.length - 1
+	public UBound(a: unknown, dimension?: number): number {
+		if (a == null) return -1
+		const anyA = a as any
+		if (anyA.__isUndefined) return -1
+		if (Array.isArray(anyA)) return anyA.length - 1
+		if (typeof anyA.length === 'number') {
+			try { return anyA.length - 1 } catch { return -1 }
+		}
+		try { return (a as any[]).length - 1 } catch { return -1 }
+	}
+
+	public LBound(a: unknown, dimension?: number): number {
+		if (a == null) return 0
+		const anyA = a as any
+		if (anyA.__isUndefined) return 0
+		return 0
 	}
 
 	public IsArray(obj: any): boolean {
@@ -172,6 +185,9 @@ export class Stdlib extends VbsApi {
 	}
 
 	public TypeName(obj: any): string {
+		if (obj != null && (obj as any).__isUndefined) {
+			return 'Nothing'
+		}
 		if (typeof obj === 'string') {
 			return 'String'
 		}
@@ -190,7 +206,7 @@ export class Stdlib extends VbsApi {
 		if (typeof obj === 'boolean') {
 			return 'Boolean'
 		}
-		if (obj.constructor && obj.constructor.name) {
+		if (obj && obj.constructor && obj.constructor.name) {
 			if (obj.constructor.name.endsWith('Api')) {
 				return obj.constructor.name.substr(0, obj.constructor.name.length - 3)
 			}

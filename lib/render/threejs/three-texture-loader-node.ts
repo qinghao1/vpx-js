@@ -3,9 +3,14 @@
 
 import { Buffer } from 'node:buffer'
 import { createReadStream } from 'node:fs'
-import { resolve as resolvePath } from 'node:path'
+import { dirname, resolve as resolvePath } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
 import { NodeImage } from '../../gltf/image.node.js'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
+
 import {
 	DataTexture,
 	FloatType,

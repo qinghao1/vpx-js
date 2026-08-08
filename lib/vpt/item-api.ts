@@ -48,6 +48,54 @@ export abstract class ItemApi<DATA extends ItemData> extends EventEmitter {
 		protected readonly table: Table,
 	) {
 		super()
+		const internal = new Set(['data','events','player','table','collections','collectionsItemPos','propertyMap','hitTimer','UserValue','state','animation','constructor','prototype','__proto__'])
+		return new Proxy(this, {
+			get(target: unknown, prop: string | symbol, receiver: unknown) {
+				if (typeof prop === 'string' && !internal.has(prop) && prop !== 'constructor' && prop !== 'prototype') {
+					const mapped = (target as ItemApi<DATA>)._getPropertyName(prop)
+					if (mapped && mapped !== prop) {
+						const v = Reflect.get(target as object, mapped, receiver)
+						if (v !== undefined || mapped in (target as object)) return v
+					}
+					const low = prop.toLowerCase()
+					if (low !== prop && !internal.has(low)) {
+						const mappedLow = (target as ItemApi<DATA>)._getPropertyName(low)
+						if (mappedLow && mappedLow !== prop) {
+							const v2 = Reflect.get(target as object, mappedLow, receiver)
+							if (v2 !== undefined || mappedLow in (target as object)) return v2
+						}
+					}
+				}
+				const v = Reflect.get(target as object, prop, receiver)
+				if (typeof v === 'function' && typeof prop === 'string' && prop !== 'constructor' && prop !== 'prototype' && prop !== '__proto__') {
+					return v.bind(target)
+				}
+				return v
+			},
+			set(target: unknown, prop: string | symbol, value: unknown, receiver: unknown) {
+				if (typeof prop === 'string' && !internal.has(prop) && !internal.has(prop.toLowerCase())) {
+					const mapped = (target as ItemApi<DATA>)._getPropertyName(prop)
+					if (mapped && mapped !== prop) {
+						return Reflect.set(target as object, mapped, value, receiver)
+					}
+					const low = prop.toLowerCase()
+					if (low !== prop) {
+						const mappedLow = (target as ItemApi<DATA>)._getPropertyName(low)
+						if (mappedLow && mappedLow !== prop) {
+							return Reflect.set(target as object, mappedLow, value, receiver)
+						}
+					}
+				}
+				return Reflect.set(target as object, prop as string, value, receiver)
+			},
+			has(target: unknown, prop: string | symbol) {
+				if (typeof prop === 'string' && !internal.has(prop)) {
+					const mapped = (target as ItemApi<DATA>)._getPropertyName(prop)
+					if (mapped) return mapped in (target as object)
+				}
+				return Reflect.has(target as object, prop)
+			},
+		}) as unknown as ItemApi<DATA>
 	}
 
 	public fireKeyEvent(event: Event, ...args: unknown[]): void {

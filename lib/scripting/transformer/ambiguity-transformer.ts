@@ -69,8 +69,7 @@ export class AmbiguityTransformer extends Transformer {
 					// 	}
 					// }
 
-					// we know what `eval()` is..
-					if (node.callee.type === 'Identifier' && node.callee.name === 'eval') {
+					if (node.callee.type === 'Identifier' && node.callee.name.toLowerCase() === 'eval') {
 						return node
 					}
 

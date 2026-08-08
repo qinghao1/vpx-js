@@ -26,6 +26,7 @@ const EVENT_NAMES: Record<Event, string> = {
 	[Event.TargetEventsDropped]: 'Dropped',
 	[Event.TargetEventsRaised]: 'Raised',
 	[Event.TimerEventsTimer]: 'Timer',
+	[Event.AnimateEventsAnimate]: 'Animate',
 }
 
 /** Bridges gameplay events to script APIs. */

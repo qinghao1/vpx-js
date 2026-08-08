@@ -12,6 +12,7 @@ export class VBSHelper {
 	private static readonly UNDEFINED = new VbsUndefined()
 	private readonly transpiler: Transpiler
 	private transpileCount = 0
+	private readonly inlineCache = new Map<string, string>()
 
 	constructor(transpiler: Transpiler) {
 		this.transpiler = transpiler
@@ -36,10 +37,27 @@ export class VBSHelper {
 	}
 
 	public transpileInline(vbs: string, filename?: string): string {
+		const key = filename ?? vbs
+		const cached = this.inlineCache.get(key)
+		if (cached) return cached
 		let prefix = ''
 		if (filename) prefix = `//@ sourceURL=game:///${filename}.js\n`
 		else if (vbs.length > 150) prefix = `//@ sourceURL=game:///inline${this.transpileCount++}.js\n`
-		return prefix + this.transpiler.transpile(vbs)
+		const js = prefix + this.transpiler.transpile(vbs)
+		if (key.length < 50000) this.inlineCache.set(key, js)
+		return js
+	}
+
+	public async transpileInlineAsync(vbs: string, filename?: string): Promise<string> {
+		const key = filename ?? vbs
+		const cached = this.inlineCache.get(key)
+		if (cached) return cached
+		let prefix = ''
+		if (filename) prefix = `//@ sourceURL=game:///${filename}.js\n`
+		else if (vbs.length > 150) prefix = `//@ sourceURL=game:///inline${this.transpileCount++}.js\n`
+		const js = prefix + await this.transpiler.transpileAsync(vbs)
+		if (key.length < 50000) this.inlineCache.set(key, js)
+		return js
 	}
 
 	private redimResize(array: any[], dimensions: number[], pos = 0): any[] {
@@ -59,6 +77,23 @@ export class VBSHelper {
 			cur = (cur as unknown as unknown[])[0]
 		}
 		return this.dim(dims)
+	}
+
+	public toIterable(obj: unknown): Iterable<unknown> {
+		if (obj == null) return []
+		const anyObj = obj as any
+		if (anyObj.__isUndefined) return []
+		if (typeof anyObj[Symbol.iterator] === 'function') {
+			try {
+				const it = anyObj[Symbol.iterator]()
+				if (it && typeof it.next === 'function') return anyObj as Iterable<unknown>
+			} catch {}
+		}
+		if (Array.isArray(anyObj)) return anyObj as Iterable<unknown>
+		if (typeof anyObj === 'object' && 'length' in anyObj && typeof anyObj.length === 'number') {
+			try { return Array.from(anyObj as ArrayLike<unknown>) } catch {}
+		}
+		return []
 	}
 
 	public intDiv(a: number, b: number): number {
@@ -86,7 +121,15 @@ export class VBSHelper {
 
 	public getOrCall(obj: unknown, ...params: unknown[]): unknown {
 		if (obj == null) return VBSHelper.UNDEFINED
+		if ((obj as any).__isUndefined) return VBSHelper.UNDEFINED
 		if (typeof obj === 'function') {
+			if (obj === Array) {
+				try {
+					return (Array as unknown as { of: (...a: unknown[]) => unknown[] }).of(...params)
+				} catch {
+					return VBSHelper.UNDEFINED
+				}
+			}
 			try {
 				return (obj as (...a: unknown[]) => unknown).bind(obj as object)(...params)
 			} catch {
@@ -95,9 +138,15 @@ export class VBSHelper {
 		}
 		for (const p of params) {
 			if (obj == null) return VBSHelper.UNDEFINED
-			obj = (obj as Record<string | number, unknown>)[p as string] as unknown
+			if ((obj as any).__isUndefined) return VBSHelper.UNDEFINED
+			try {
+				obj = (obj as Record<string | number, unknown>)[p as string] as unknown
+			} catch {
+				return VBSHelper.UNDEFINED
+			}
+			if ((obj as any)?.__isUndefined) return VBSHelper.UNDEFINED
 		}
-		return obj ?? VBSHelper.UNDEFINED
+		return (obj as any)?.__isUndefined ? VBSHelper.UNDEFINED : (obj ?? VBSHelper.UNDEFINED)
 	}
 
 	public getOrCallBound(
@@ -106,9 +155,23 @@ export class VBSHelper {
 		...params: unknown[]
 	): unknown {
 		if (parent == null) return VBSHelper.UNDEFINED
-		let o: unknown = (parent as Record<string, unknown>)[prop]
+		if ((parent as any).__isUndefined) return VBSHelper.UNDEFINED
+		let o: unknown
+		try {
+			o = (parent as Record<string, unknown>)[prop]
+		} catch {
+			return VBSHelper.UNDEFINED
+		}
 		if (o == null) return VBSHelper.UNDEFINED
+		if ((o as any).__isUndefined) return VBSHelper.UNDEFINED
 		if (typeof o === 'function') {
+			if (o === Array) {
+				try {
+					return (Array as unknown as { of: (...a: unknown[]) => unknown[] }).of(...params)
+				} catch {
+					return VBSHelper.UNDEFINED
+				}
+			}
 			try {
 				return (o as (...a: unknown[]) => unknown).bind(parent as object)(...params)
 			} catch {
@@ -117,9 +180,15 @@ export class VBSHelper {
 		}
 		for (const p of params) {
 			if (o == null) return VBSHelper.UNDEFINED
-			o = (o as Record<string | number, unknown>)[p as string] as unknown
+			if ((o as any).__isUndefined) return VBSHelper.UNDEFINED
+			try {
+				o = (o as Record<string | number, unknown>)[p as string] as unknown
+			} catch {
+				return VBSHelper.UNDEFINED
+			}
+			if ((o as any)?.__isUndefined) return VBSHelper.UNDEFINED
 		}
-		return o ?? VBSHelper.UNDEFINED
+		return (o as any)?.__isUndefined ? VBSHelper.UNDEFINED : (o ?? VBSHelper.UNDEFINED)
 	}
 
 	public onErrorResumeNext(): void {

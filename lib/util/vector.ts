@@ -115,10 +115,16 @@ export class Vertex3D extends Vector3 {
 	override set(x: number, y: number, z?: number): this
 	override set(v: Vector3): this
 	override set(xOrV: number | Vector3, y?: number, z?: number): this {
+		if ((xOrV as any)?.__isUndefined) return super.set(0, 0, 0) as this
 		if (typeof xOrV === 'number') {
+			if ((y as any)?.__isUndefined) y = 0 as any
+			if ((z as any)?.__isUndefined) z = 0 as any
 			super.set(f4(xOrV), f4(y!), f4(z ?? 0))
 		} else {
-			super.set(f4(xOrV.x), f4(xOrV.y), f4(xOrV.z))
+			const vx = (xOrV as any)?.__isUndefined ? 0 : (xOrV as any)?.x
+			const vy = (xOrV as any)?.__isUndefined ? 0 : (xOrV as any)?.y
+			const vz = (xOrV as any)?.__isUndefined ? 0 : (xOrV as any)?.z
+			super.set(f4(vx ?? 0), f4(vy ?? 0), f4(vz ?? 0))
 		}
 		return this
 	}

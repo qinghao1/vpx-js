@@ -43,7 +43,8 @@ export class TableLoader {
 				out.data = await TableData.fromStorage(gameStg, 'GameData')
 				if (!opts.tableDataOnly) {
 					await this.loadGameItems(out, gameStg, out.data.numGameItems, opts)
-					await this.loadTextures(out, gameStg, out.data.numTextures)
+					if (!opts.skipTextures) await this.loadTextures(out, gameStg, out.data.numTextures)
+					else { out.textures = []; logger().info('[Table.load] Skipped %s textures (play without textures)', out.data.numTextures) }
 					await this.loadCollections(out, gameStg, out.data.numCollections)
 				}
 				if (opts.loadTableScript) {

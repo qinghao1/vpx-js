@@ -40,10 +40,15 @@ export class ClassTransformer extends Transformer {
 	}
 
 	public transformThisIdentifiers(): Program {
+		let classDepth = 0
 		return replace(this.ast, {
-			enter: (node, parent: any) => {
-				// make member usages lower case
+			enter: (node: any, parent: any) => {
+				if (node.type === 'ClassDeclaration' || node.type === 'ClassBody' || node.type === 'ClassExpression') {
+					classDepth++
+				}
+				// make member usages lower case only inside VBS classes
 				if (
+					classDepth > 0 &&
 					node.type === 'ThisExpression' &&
 					parent &&
 					parent.type === 'MemberExpression' &&
@@ -52,12 +57,16 @@ export class ClassTransformer extends Transformer {
 					parent.property.name = parent.property.name.toLowerCase()
 				}
 			},
+			leave: (node: any) => {
+				if (node.type === 'ClassDeclaration' || node.type === 'ClassBody' || node.type === 'ClassExpression') {
+					classDepth--
+				}
+			},
 		}) as Program
 	}
 }
 
 function proxyReturnStatement(): ReturnStatement {
-	// compute: return new Proxy(this, { get: (t, p, r) => Reflect.get(t, p.toLowerCase(), r) });
 	return returnStatement(
 		newExpression(identifier('Proxy'), [
 			thisExpression(),
@@ -73,6 +82,32 @@ function proxyReturnStatement(): ReturnStatement {
 							identifier('r'),
 						]),
 						[identifier('t'), identifier('p'), identifier('r')],
+					),
+				),
+				property(
+					'init',
+					identifier('set'),
+					arrowFunctionExpression(
+						true,
+						callExpression(memberExpression(identifier('Reflect'), identifier('set')), [
+							identifier('t'),
+							callExpression(memberExpression(identifier('p'), identifier('toLowerCase')), []),
+							identifier('v'),
+							identifier('r'),
+						]),
+						[identifier('t'), identifier('p'), identifier('v'), identifier('r')],
+					),
+				),
+				property(
+					'init',
+					identifier('has'),
+					arrowFunctionExpression(
+						true,
+						callExpression(memberExpression(identifier('Reflect'), identifier('has')), [
+							identifier('t'),
+							callExpression(memberExpression(identifier('p'), identifier('toLowerCase')), []),
+						]),
+						[identifier('t'), identifier('p')],
 					),
 				),
 			]),

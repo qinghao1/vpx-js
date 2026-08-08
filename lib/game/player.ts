@@ -55,6 +55,24 @@ export class Player extends EventEmitter {
 		return this
 	}
 
+	/** Async variant that yields to the event loop during transpilation. */
+	public async initAsync(scope: Record<string, unknown> = {}): Promise<this> {
+		this.table.setupCollections()
+		this.physics.init()
+		this.table.prepareToPlay()
+		await new Promise((r) => setTimeout(r, 0))
+		try {
+			const maybe = (this.table as unknown as { runTableScriptAsync?: (p: Player, s: Record<string, unknown>) => Promise<void> }).runTableScriptAsync
+			if (maybe) await maybe.call(this.table, this, scope)
+			else this.table.runTableScript(this, scope)
+		} catch (e) {
+			console.warn('Table script failed, continuing without script', e)
+		}
+		this.table.broadcastInit()
+		this.isInitialized = true
+		return this
+	}
+
 	private setupTableElements(): void {
 		for (const p of this.table.getPlayables()) p.setupPlayer(this, this.table)
 	}
