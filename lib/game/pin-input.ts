@@ -84,8 +84,7 @@ export class PinInput {
 	}
 
 	processKeys(): void {
-		while (this.queue.length) {
-			const ev = this.queue.shift()!
+		for (const ev of this.queue) {
 			if (
 				ev.code === this.rgKeys[AssignKey.FrameCount] ||
 				ev.code === this.rgKeys[AssignKey.Enable3D] ||
@@ -94,6 +93,7 @@ export class PinInput {
 				continue
 			this.fire(ev.down ? Event.GameEventsKeyDown : Event.GameEventsKeyUp, ev.code)
 		}
+		this.queue.length = 0
 	}
 
 	private fire(dispid: Event, code: number): void {
@@ -157,7 +157,7 @@ export class PinInput {
 
 	private troughCenters(): Array<{ x: number; y: number }> {
 		return Object.values(this.table.kickers)
-			.filter((k) => TROUGH_NAMES.has(k.getName()))
+			.filter((k) => TROUGH_NAMES.has(k.getName().toLowerCase()))
 			.map((k) => (k as unknown as { data: { center: { x: number; y: number } } }).data.center)
 	}
 
