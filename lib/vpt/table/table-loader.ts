@@ -13,6 +13,12 @@ import { TableData } from './table-data.js'
 
 const decoder = new TextDecoder()
 
+// Yield every N entries during bulk OLE parsing so large tables (1000+ items) don't block the UI.
+// Uses scheduler.yield() when available, otherwise setTimeout.
+const YIELD_EVERY_GAME_ITEMS = 32
+const YIELD_EVERY_TEXTURES = 16
+const YIELD_EVERY_COLLECTIONS = 16
+
 /** Loads VPX OLE storage into table model. */
 export class TableLoader {
 	private doc!: OleCompoundDoc
@@ -78,7 +84,7 @@ export class TableLoader {
 				progress().details(item.getName())
 				out.items[item.getName()] = item
 			}
-			if ((i & 31) === 31) await this.yield()
+			if ((i + 1) % YIELD_EVERY_GAME_ITEMS === 0) await this.yield()
 		}
 	}
 
@@ -105,7 +111,7 @@ export class TableLoader {
 			const tex = await Texture.fromStorage(storage, `Image${i}`)
 			out.textures.push(tex)
 			progress().details(tex.getName())
-			if ((i & 15) === 15) await this.yield()
+			if ((i + 1) % YIELD_EVERY_TEXTURES === 0) await this.yield()
 		}
 	}
 
@@ -124,7 +130,7 @@ export class TableLoader {
 			const col = await Collection.fromStorage(storage, `Collection${i}`)
 			out.collections.push(col)
 			out.items[col.getName()] = col
-			if ((i & 15) === 15) await this.yield()
+			if ((i + 1) % YIELD_EVERY_COLLECTIONS === 0) await this.yield()
 		}
 	}
 
