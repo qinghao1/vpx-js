@@ -34,8 +34,12 @@ export class CollisionEvent {
 		return e
 	}
 
+	public static releaseOne(e: CollisionEvent): void {
+		CollisionEvent.POOL.release(e)
+	}
+
 	public static release(...events: CollisionEvent[]): void {
-		for (const e of events) CollisionEvent.POOL.release(e)
+		for (let i = 0; i < events.length; i++) CollisionEvent.POOL.release(events[i]!)
 	}
 
 	public static reset(e: CollisionEvent): void {

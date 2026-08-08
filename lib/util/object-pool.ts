@@ -50,7 +50,7 @@ export function pooled<T>(ctor: IPoolable<T>) {
 			return pool.get()
 		},
 		release(...items: T[]): void {
-			for (const m of items) pool.release(m)
+			for (let i = 0; i < items.length; i++) pool.release(items[i]!)
 		},
 		reset(item: T): void {
 			ctor.reset?.(item)

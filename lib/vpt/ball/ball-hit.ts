@@ -89,66 +89,45 @@ export class BallHit extends HitObject {
 	}
 
 	public override hitTest(ball: Ball, dTime: number, coll: CollisionEvent, _physics?: PlayerPhysics): number {
-		const d = this.state.pos.clone(true).sub(ball.state.pos)
-		const dv = this.vel.clone(true).sub(ball.hit.vel)
-
-		let bcddSq = d.lengthSq()
+		const dx = this.state.pos.x - ball.state.pos.x
+		const dy = this.state.pos.y - ball.state.pos.y
+		const dz = this.state.pos.z - ball.state.pos.z
+		const bcddSq = dx * dx + dy * dy + dz * dz
 		const bcdd = Math.sqrt(bcddSq)
-
-		const b = dv.dot(d)
+		if (bcdd < 1e-6) return -1
+		const dvx = this.vel.x - ball.hit.vel.x
+		const dvy = this.vel.y - ball.hit.vel.y
+		const dvz = this.vel.z - ball.hit.vel.z
+		const b = dvx * dx + dvy * dy + dvz * dz
 		const bnv = b / bcdd
-		Vertex3D.release(d)
-
-		if (bnv > C_LOWNORMVEL) {
-			Vertex3D.release(dv)
-			return -1
-		}
-
-		const totalRadius = ball.data.radius + this.data.radius
-		const bnd = bcdd - totalRadius
-
+		if (bnv > C_LOWNORMVEL) return -1
+		const totalR = ball.data.radius + this.data.radius
+		const bnd = bcdd - totalR
 		let hitTime: number
 		let isContact = false
 		if (bnd <= PHYS_TOUCH) {
-			if (bnd < ball.data.radius * -2) {
-				Vertex3D.release(dv)
-				return -1
-			}
+			if (bnd < ball.data.radius * -2) return -1
 			if (Math.abs(bnv) > C_CONTACTVEL || bnd <= -PHYS_TOUCH) hitTime = 0
-			else hitTime = bnd * (1 / (2 * PHYS_TOUCH)) + 0.5 // hitball.cpp:166 (non-NEW_PHYSICS)
+			else hitTime = bnd * (1 / (2 * PHYS_TOUCH)) + 0.5
 			if (Math.abs(bnv) <= C_CONTACTVEL) isContact = true
 		} else {
-			const a = dv.lengthSq()
-			if (a < 1e-8) {
-				Vertex3D.release(dv)
-				return -1
-			}
-			const sol = solveQuadraticEq(a, 2 * b, bcddSq - totalRadius * totalRadius)
-			if (!sol) {
-				Vertex3D.release(dv)
-				return -1
-			}
+			const a = dvx * dvx + dvy * dvy + dvz * dvz
+			if (a < 1e-8) return -1
+			const sol = solveQuadraticEq(a, 2 * b, bcddSq - totalR * totalR)
+			if (!sol) return -1
 			const [t1, t2] = sol
 			hitTime = t1 * t2 < 0 ? Math.max(t1, t2) : Math.min(t1, t2)
 		}
-
-		if (!isFinite(hitTime) || hitTime < 0 || hitTime > dTime) {
-			Vertex3D.release(dv)
-			return -1
-		}
-
-		const hitPos = ball.state.pos.clone(true).add(dv.multiplyScalar(hitTime))
-		Vertex3D.release(dv)
-
-		const hitNormal = hitPos.clone(true).sub(this.state.pos)
-		Vertex3D.release(hitPos)
-		if (Math.abs(hitNormal.x) <= FLT_MIN && Math.abs(hitNormal.y) <= FLT_MIN && Math.abs(hitNormal.z) <= FLT_MIN) {
-			Vertex3D.release(hitNormal)
-			return -1
-		}
-		coll.hitNormal.set(hitNormal).normalize()
-		Vertex3D.release(hitNormal)
-
+		if (!isFinite(hitTime) || hitTime < 0 || hitTime > dTime) return -1
+		const hx = ball.state.pos.x + dvx * hitTime
+		const hy = ball.state.pos.y + dvy * hitTime
+		const hz = ball.state.pos.z + dvz * hitTime
+		const nx = hx - this.state.pos.x
+		const ny = hy - this.state.pos.y
+		const nz = hz - this.state.pos.z
+		if (Math.abs(nx) <= FLT_MIN && Math.abs(ny) <= FLT_MIN && Math.abs(nz) <= FLT_MIN) return -1
+		const len = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1
+		coll.hitNormal.set(nx / len, ny / len, nz / len)
 		coll.hitDistance = bnd
 		coll.isContact = isContact
 		if (isContact) coll.hitOrgNormalVelocity = bnv

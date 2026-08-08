@@ -23,16 +23,16 @@ export class BallMover implements MoverObject {
 		this.state.pos.addAndRelease(this.hit.vel.clone(true).multiplyScalar(dtime))
 		this.hit.calcHitBBox()
 
-		const skew = Matrix2D.claim().createSkewSymmetric(this.hit.angularVelocity)
-		const delta = Matrix2D.claim()
-		delta.multiplyMatrix(skew, this.state.orientation)
-		delta.multiplyScalar(dtime)
-
-		this.state.orientation.addMatrix(delta, this.state.orientation)
-		this.state.orientation.orthoNormalize()
+		if (this.hit.angularVelocity.lengthSq() >= 1e-12) {
+			const skew = Matrix2D.claim().createSkewSymmetric(this.hit.angularVelocity)
+			const delta = Matrix2D.claim()
+			delta.multiplyMatrix(skew, this.state.orientation)
+			delta.multiplyScalar(dtime)
+			this.state.orientation.addMatrix(delta, this.state.orientation)
+			this.state.orientation.orthoNormalize()
+			Matrix2D.release(skew, delta)
+		}
 		this.hit.angularVelocity.setAndRelease(this.hit.angularMomentum.clone(true).divideScalar(this.hit.inertia))
-
-		Matrix2D.release(skew, delta)
 	}
 
 	public updateVelocities(physics: PlayerPhysics): void {
