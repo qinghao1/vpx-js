@@ -7,34 +7,39 @@ import { OffsetIndex } from './offset-index.js'
 
 const empty = (n = 64) => new Uint8Array(n)
 
-/** Mirrors WPC emu RAM to VBS-visible lamp/solenoid/GI/DMD state. */
 export class EmulatorState {
-	private lamps: Uint8Array = empty()
-	private sols: Uint8Array = empty()
-	private gis: Uint8Array = empty()
-	private lastLamps: Uint8Array = empty()
-	private lastSols: Uint8Array = empty()
-	private lastGis: Uint8Array = empty()
-	private dmd: Uint8Array = new Uint8Array()
-	private switches: Uint8Array = new Uint8Array()
+	private lamps = empty()
+	private lastLamps = empty()
+	private sols = empty()
+	private lastSols = empty()
+	private gis = empty()
+	private lastGis = empty()
+	private dmd = new Uint8Array()
+	private switches = new Uint8Array()
+
+	private lampMap: (i: number) => number = OffsetIndex.mapIndexToMatrixIndex
+	private solMap: (i: number) => number = (i) => i + 1
 
 	updateState(s: WpcEmuWebWorkerApi.EmuStateAsic): void {
-		if (s.wpc.lampState) this.lamps = this.normalize(s.wpc.lampState as unknown as Uint8Array)
-		if (s.wpc.solenoidState) this.sols = s.wpc.solenoidState as unknown as Uint8Array
-		if (s.wpc.generalIlluminationState) this.gis = s.wpc.generalIlluminationState as unknown as Uint8Array
-		if (s.dmd.dmdShadedBuffer) this.dmd = s.dmd.dmdShadedBuffer as unknown as Uint8Array
-		if (s.wpc.inputSwitchMatrixActiveColumn)
-			this.switches = s.wpc.inputSwitchMatrixActiveColumn as unknown as Uint8Array
+		this.lampMap = OffsetIndex.mapIndexToMatrixIndex
+		this.solMap = (i) => i + 1
+		if (s.wpc.lampState) this.lamps = Uint8Array.from(s.wpc.lampState, (x) => (x > 127 ? 1 : 0))
+		if (s.wpc.solenoidState) this.sols = s.wpc.solenoidState.slice()
+		if (s.wpc.generalIlluminationState) this.gis = s.wpc.generalIlluminationState.slice()
+		if (s.dmd.dmdShadedBuffer) this.dmd = s.dmd.dmdShadedBuffer.slice()
+		if (s.wpc.inputSwitchMatrixActiveColumn) this.switches = s.wpc.inputSwitchMatrixActiveColumn.slice()
 	}
 
 	applyPinmame(lamps: Uint8Array, sols: Uint8Array, gis: Uint8Array): void {
+		this.lampMap = (i) => i
+		this.solMap = (i) => i
 		this.lamps = lamps.slice()
-		this.sols = new Uint8Array([0, ...sols])
-		this.gis = new Uint8Array([0, ...gis])
+		this.sols = sols.slice()
+		this.gis = gis.slice()
 	}
 
 	setDmd(frame: Uint8Array): void {
-		this.dmd = frame
+		this.dmd = frame.slice()
 	}
 
 	getSwitchState(o: OffsetIndex): number {
@@ -43,26 +48,29 @@ export class EmulatorState {
 	getLampState(o: OffsetIndex): number {
 		return this.lamps[o.zeroBasedIndex] ?? 0
 	}
+	getLampStateDirect(n: number): number {
+		return this.lamps[n] ?? 0
+	}
 	getSolenoidState(i: number): number {
-		return this.sols[i + 1] ?? 0
+		return this.sols[this.solMap(i)] ?? 0
 	}
 	getGIState(i: number): number {
-		return this.gis[i + 1] ?? 0
+		return this.gis[this.solMap(i)] ?? 0
 	}
 
 	getChangedLamps(): VbsArray<number[]> {
-		const d = this.diff(this.lastLamps, this.lamps, OffsetIndex.mapIndexToMatrixIndex)
-		this.lastLamps = this.lamps
+		const d = this.diff(this.lastLamps, this.lamps, this.lampMap)
+		this.lastLamps = this.lamps.slice()
 		return new VbsArray(d)
 	}
 	getChangedSolenoids(): number[][] {
-		const d = this.diff(this.lastSols, this.sols, (i) => i + 1)
-		this.lastSols = this.sols
+		const d = this.diff(this.lastSols, this.sols, this.solMap)
+		this.lastSols = this.sols.slice()
 		return d
 	}
 	getChangedGI(): number[][] {
-		const d = this.diff(this.lastGis, this.gis, (i) => i + 1)
-		this.lastGis = this.gis
+		const d = this.diff(this.lastGis, this.gis, this.solMap)
+		this.lastGis = this.gis.slice()
 		return d
 	}
 	getChangedLEDs(): number[][] {
@@ -72,12 +80,14 @@ export class EmulatorState {
 		return this.dmd
 	}
 
-	private normalize(v: Uint8Array): Uint8Array {
-		return Uint8Array.from(v, (x) => (x > 127 ? 1 : 0))
-	}
 	private diff(last: Uint8Array, cur: Uint8Array, map: (i: number) => number): number[][] {
 		const out: number[][] = []
-		for (let i = 0; i < cur.length; i++) if (last[i] !== cur[i]) out.push([map(i), cur[i]!])
+		const n = Math.max(last.length, cur.length)
+		for (let i = 0; i < n; i++) {
+			const a = last[i] ?? 0
+			const b = cur[i] ?? 0
+			if (a !== b) out.push([map(i), b])
+		}
 		return out
 	}
 }

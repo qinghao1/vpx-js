@@ -17,9 +17,14 @@ export class ThreeMapGenerator {
 		if (!this.textureLoader) return
 		const now = Date.now()
 		logger().debug('[ThreeMapGenerator.loadTextures] Pre-loading %s textures..', textures.length)
-		const isLarge = (t: Texture) => t.width * t.height > 4 * 1024 * 1024
-		const hasLarge = textures.some(isLarge)
-		const concurrency = hasLarge ? 2 : 4
+		try {
+			const anyLoader = this.textureLoader as any
+			if (anyLoader && 'playfieldMap' in anyLoader) anyLoader.playfieldMap = table.getPlayfieldMap()
+		} catch {}
+		const hasLarge = textures.some((t) => t.width * t.height > 4 * 1024 * 1024)
+		const hasFloat = textures.some((t) => (t as any).isHdr?.() || /\.(exr|hdr)$/i.test((t as any).szPath || ''))
+		const hw = (typeof navigator !== 'undefined' && (navigator as any).hardwareConcurrency) || 4
+		const concurrency = hasLarge ? Math.min(2, hw) : hasFloat ? Math.min(3, hw) : Math.min(6, hw)
 		let index = 0
 		const worker = async (): Promise<void> => {
 			while (true) {
@@ -43,6 +48,12 @@ export class ThreeMapGenerator {
 							texture.getName(),
 							msg,
 						)
+				}
+				if (i % 8 === 0) {
+					try {
+						if ((globalThis as any).scheduler?.yield) await (globalThis as any).scheduler.yield()
+						else await new Promise<void>((r) => setTimeout(r, 0))
+					} catch {}
 				}
 			}
 		}

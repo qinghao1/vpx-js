@@ -20,15 +20,14 @@ export class ThreeMaterialGenerator {
 	constructor(private readonly mapGenerator: ThreeMapGenerator) {}
 
 	public getInitialMaterial(obj: RenderInfo<BufferGeometry>, opts: MeshConvertOptions): ThreeMaterial {
-		const mat = this.getMaterial(
+		return this.getMaterial(
 			opts.applyMaterials && obj.material ? obj.material : undefined,
 			opts.applyTextures && obj.map ? obj.map.getName() : undefined,
 			opts.applyTextures && obj.normalMap ? obj.normalMap.getName() : undefined,
 			opts.applyTextures && obj.envMap ? obj.envMap.getName() : undefined,
 			opts.applyTextures && obj.material?.emissiveMap ? obj.material.emissiveMap.getName() : undefined,
+			!!obj.isTransparent,
 		)
-		mat.transparent = !!obj.isTransparent
-		return mat
 	}
 
 	public getMaterial(
@@ -37,8 +36,9 @@ export class ThreeMaterialGenerator {
 		normalMap?: string,
 		envMap?: string,
 		emissiveMap?: string,
+		isTransparent = false,
 	): ThreeMaterial {
-		const key = this.getKey(material, map, normalMap, envMap, emissiveMap)
+		const key = this.getKey(material, map, normalMap, envMap, emissiveMap, isTransparent)
 		if (this.cachedMaterials[key]) return this.cachedMaterials[key]!
 		const m = new MeshStandardMaterial()
 		this.applyMaterial(m, material)
@@ -46,6 +46,7 @@ export class ThreeMaterialGenerator {
 		this.applyNormalMap(m, normalMap)
 		this.applyEnvMap(m, envMap)
 		this.applyEmissiveMap(m, material, emissiveMap)
+		m.transparent = isTransparent
 		this.cachedMaterials[key] = m
 		return m
 	}
@@ -101,7 +102,14 @@ export class ThreeMaterialGenerator {
 		mat.needsUpdate = true
 	}
 
-	private getKey(material?: Material, map?: string, normalMap?: string, envMap?: string, emissiveMap?: string): string {
-		return `${material?.name ?? 'none'}:${map ?? 'none'}:${normalMap ?? 'none'}:${envMap ?? 'none'}:${emissiveMap ?? 'none'}`
+	private getKey(
+		material?: Material,
+		map?: string,
+		normalMap?: string,
+		envMap?: string,
+		emissiveMap?: string,
+		isTransparent = false,
+	): string {
+		return `${material?.name ?? 'none'}:${map ?? 'none'}:${normalMap ?? 'none'}:${envMap ?? 'none'}:${emissiveMap ?? 'none'}:${isTransparent ? 't' : 'o'}`
 	}
 }
