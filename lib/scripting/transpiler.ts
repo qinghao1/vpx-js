@@ -33,6 +33,18 @@ declare function play(
 
 /** Transpiles VBS to JS and executes.
  * @see https://github.com/vpinball/vpinball/blob/master/codeview.cpp */
+function normalizeNewCall(vbs: string): string {
+	let out = vbs;
+	const setRe = /Set\s+(\w+)\s*=\s*\(\s*New\s+(\w+)\s*\)\s*\(([^)]*)\)/gi;
+	let prev: string;
+	do {
+		prev = out;
+		out = out.replace(setRe, (_m: string, varName: string, className: string, args: string) => `Set ${varName} = New ${className}\n${varName}.init(${args})`);
+	} while (out !== prev);
+	out = out.replace(/\(\s*New\s+(\w+)\s*\)\s*\(/gi, '(New $1).init(');
+	return out;
+}
+
 export class Transpiler {
 	private readonly itemApis: Record<string, unknown>
 	private readonly enumApis: EnumsApi = Enums
@@ -49,8 +61,9 @@ export class Transpiler {
 	}
 
 	public transpile(vbs: string, globalFunction?: string, globalObject?: string): string {
+		const src = normalizeNewCall(vbs);
 		const t0 = Date.now()
-		let ast = this.grammar.transpile(vbs)
+		let ast = this.grammar.transpile(src)
 		logger().info('[Transpiler] Parsed in %sms', Date.now() - t0)
 
 		const t1 = Date.now()
@@ -78,7 +91,7 @@ export class Transpiler {
 
 	public execute(vbs: string, globalScope: Record<string, unknown>, globalObject?: string): void {
 		globalObject ||= typeof window !== 'undefined' ? 'window' : typeof self !== 'undefined' ? 'self' : 'global'
-		const js = this.transpile(vbs, 'play', globalObject)
+		const js = this.transpile(normalizeNewCall(vbs), 'play', globalObject)
 		let t = Date.now()
 		progress().details('evaluating')
 		eval('//@ sourceURL=game:///tablescript.vbs.js\n' + js)
@@ -98,7 +111,7 @@ export class Transpiler {
 	}
 
 	private parse(vbs: string): Program {
-		return this.grammar.transpile(vbs)
+		return this.grammar.transpile(normalizeNewCall(vbs))
 	}
 	private generate(ast: Program): string {
 		return generate(ast)
