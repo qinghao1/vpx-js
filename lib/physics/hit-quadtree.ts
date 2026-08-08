@@ -13,7 +13,7 @@ import { HitCircle } from './hit-circle.js'
 import { HitPlane } from './hit-plane.js'
 import { HitLineZ } from './hit-line-z.js'
 import { HitLine3D } from './hit-line-3d.js'
-import { getWasmBatchHitViewsOutCircle, getWasmBatchHitViewsOutPlane, getWasmBatchHitViewsOutLineZ, isWasmReady } from './wasm/kernels.js'
+import { getWasmKernels, getWasmBatchHitViewsOutCircle, isWasmReady, tryGetWasmBatchHitViewsOutCircle, tryGetWasmBatchHitViewsOutLineZ, tryGetWasmBatchHitViewsOutPlane, warmWasmPools } from './wasm/kernels.js'
 import type { CircleViews, LineViews, PlaneViews } from './wasm/kernels.js'
 
 type Kind = 'circle' | 'plane' | 'lineZ' | 'other'
@@ -37,6 +37,19 @@ export class HitQuadtree {
 
 	public initialize(b?: FRect3D): void {
 		if (!b) { b = new FRect3D(); for (const h of this.vho) b.extend(h.hitBBox) }
+		// Warm SoA pools outside hot loop — direct alias to wasm memory, zero copy,
+		// no _malloc on hitTestBall. Count before split so cap >= max collect.
+		const warm = () => {
+			let c = 0, p = 0, l = 0
+			for (const h of this.vho) {
+				if (h instanceof HitCircle) c++
+				else if (h instanceof HitPlane) p++
+				else if (h instanceof HitLineZ && !(h instanceof HitLine3D)) l++
+			}
+			if (c || p || l) warmWasmPools(c, p, l)
+		}
+		if (isWasmReady()) warm()
+		else void getWasmKernels().then(warm)
 		this.createNextLevel(b, 0, 0)
 	}
 
@@ -44,9 +57,14 @@ export class HitQuadtree {
 		if (!isWasmReady() || !this.collect(ball)) return this.hitTestBallScalar(ball, coll, physics)
 
 		const { _circles: circles, _planes: planes, _lineZs: lineZs } = this
-		const cv = circles.length ? getWasmBatchHitViewsOutCircle(circles.length) : null
-		const pv = planes.length ? getWasmBatchHitViewsOutPlane(planes.length) : null
-		const lv = lineZs.length ? getWasmBatchHitViewsOutLineZ(lineZs.length) : null
+		let cv = circles.length ? tryGetWasmBatchHitViewsOutCircle(circles.length) : null
+		let pv = planes.length ? tryGetWasmBatchHitViewsOutPlane(planes.length) : null
+		let lv = lineZs.length ? tryGetWasmBatchHitViewsOutLineZ(lineZs.length) : null
+		if ((circles.length && !cv) || (planes.length && !pv) || (lineZs.length && !lv)) {
+			// No _malloc on hot path — fall back to scalar and warm for next tick
+			queueMicrotask(() => warmWasmPools(circles.length, planes.length, lineZs.length))
+			return this.hitTestBallScalar(ball, coll, physics)
+		}
 
 		if (cv) this.fillCircles(cv, circles)
 		if (pv) this.fillPlanes(pv, planes)

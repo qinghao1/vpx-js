@@ -12,7 +12,7 @@ import { HitCircle } from './hit-circle.js'
 import { HitPlane } from './hit-plane.js'
 import { HitLineZ } from './hit-line-z.js'
 import { HitLine3D } from './hit-line-3d.js'
-import { getWasmBatchHitViewsOutCircle, getWasmBatchHitViewsOutPlane, getWasmBatchHitViewsOutLineZ, isWasmReady } from './wasm/kernels.js'
+import { isWasmReady, tryGetWasmBatchHitViewsOutCircle, tryGetWasmBatchHitViewsOutLineZ, tryGetWasmBatchHitViewsOutPlane, warmWasmPools } from './wasm/kernels.js'
 import type { CircleViews, LineViews, PlaneViews } from './wasm/kernels.js'
 import type { HitObject } from './hit-object.js'
 
@@ -39,9 +39,13 @@ export class HitKDNode {
 		if (!isWasmReady() || !this.collect(ball)) return this.hitTestBallScalar(ball, coll, physics)
 
 		const { _circles: circles, _planes: planes, _lineZs: lineZs } = this
-		const cv = circles.length ? getWasmBatchHitViewsOutCircle(circles.length) : null
-		const pv = planes.length ? getWasmBatchHitViewsOutPlane(planes.length) : null
-		const lv = lineZs.length ? getWasmBatchHitViewsOutLineZ(lineZs.length) : null
+		let cv = circles.length ? tryGetWasmBatchHitViewsOutCircle(circles.length) : null
+		let pv = planes.length ? tryGetWasmBatchHitViewsOutPlane(planes.length) : null
+		let lv = lineZs.length ? tryGetWasmBatchHitViewsOutLineZ(lineZs.length) : null
+		if ((circles.length && !cv) || (planes.length && !pv) || (lineZs.length && !lv)) {
+			queueMicrotask(() => warmWasmPools(circles.length, planes.length, lineZs.length))
+			return this.hitTestBallScalar(ball, coll, physics)
+		}
 
 		if (cv) this.fillCircles(cv, circles)
 		if (pv) this.fillPlanes(pv, planes)

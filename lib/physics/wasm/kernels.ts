@@ -21,6 +21,8 @@ export async function getWasmKernels(): Promise<Mod> {
 		const dir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../wasm/kernels/dist')
 		const { default: create } = await import(path.join(dir, 'kernels.js'))
 		mod = (await create({ locateFile: (p: string) => path.join(dir, p) })) as Mod
+		// Pre-warm outside hot loop so first hitTestBall never _mallocs.
+		try { warmWasmPools(512, 512, 512) } catch {}
 		return mod!
 	})()
 	return loading
@@ -66,6 +68,40 @@ type Soa<V> = { in: PoolState; out: PoolState; views: V | null; buf: ArrayBuffer
 const circleSoa: Soa<CircleViews> = { in: { cap: 0, ptrs: null }, out: { cap: 0, ptrs: null }, views: null, buf: null, capSnap: 0, outSnap: 0, n: 0 }
 const planeSoa: Soa<PlaneViews> = { in: { cap: 0, ptrs: null }, out: { cap: 0, ptrs: null }, views: null, buf: null, capSnap: 0, outSnap: 0, n: 0 }
 const lineSoa: Soa<LineViews> = { in: { cap: 0, ptrs: null }, out: { cap: 0, ptrs: null }, views: null, buf: null, capSnap: 0, outSnap: 0, n: 0 }
+
+// Warm pools outside the hot loop so hitTestBall never _mallocs.
+// Call once after wasm ready with max expected counts, or at table init.
+export function warmWasmPools(c = 0, p = 0, l = 0): void {
+	const m = getWasmModSync(); if (!m) return
+	if (c) getWasmBatchHitViewsOutCircle(c)
+	if (p) getWasmBatchHitViewsOutPlane(p)
+	if (l) getWasmBatchHitViewsOutLineZ(l)
+}
+
+// Hot-path getters — no _malloc, just cached SoA views (zero-copy direct alias
+// to wasm HEAPF32/HEAP32). Return null if not warmed / n > cap so caller can
+// fall back to scalar and warm for the next tick.
+export function tryGetWasmBatchHitViewsOutCircle(n: number): CircleViews | null {
+	if (n === 0 || n > circleSoa.in.cap || !circleSoa.views) return null
+	const m = getWasmModSync(); if (!m) return null
+	if (circleSoa.buf !== m.HEAPF32.buffer) return null
+	circleSoa.n = n
+	return circleSoa.views
+}
+export function tryGetWasmBatchHitViewsOutPlane(n: number): PlaneViews | null {
+	if (n === 0 || n > planeSoa.in.cap || !planeSoa.views) return null
+	const m = getWasmModSync(); if (!m) return null
+	if (planeSoa.buf !== m.HEAPF32.buffer) return null
+	planeSoa.n = n
+	return planeSoa.views
+}
+export function tryGetWasmBatchHitViewsOutLineZ(n: number): LineViews | null {
+	if (n === 0 || n > lineSoa.in.cap || !lineSoa.views) return null
+	const m = getWasmModSync(); if (!m) return null
+	if (lineSoa.buf !== m.HEAPF32.buffer) return null
+	lineSoa.n = n
+	return lineSoa.views
+}
 
 export function getWasmBatchHitViewsOutCircle(n: number): CircleViews {
 	const m = getWasmModSync()!

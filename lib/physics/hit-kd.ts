@@ -6,6 +6,11 @@ import type { Ball } from '../vpt/ball/ball.js'
 import type { CollisionEvent } from './collision-event.js'
 import { HitKDNode } from './hit-kd-node.js'
 import type { HitObject } from './hit-object.js'
+import { getWasmKernels, isWasmReady, warmWasmPools } from './wasm/kernels.js'
+import { HitCircle } from './hit-circle.js'
+import { HitPlane } from './hit-plane.js'
+import { HitLineZ } from './hit-line-z.js'
+import { HitLine3D } from './hit-line-3d.js'
 
 /** KD-tree for dynamic hit objects.
  * @see https://github.com/vpinball/vpinball/blob/master/kdtree.cpp */
@@ -50,6 +55,17 @@ export class HitKD {
 			this.orgIdx[i] = i
 		}
 		this.rootNode.createNextLevel(0, 0)
+		const warm = () => {
+			let c = 0, p = 0, l = 0
+			for (const h of vho) {
+				if (h instanceof HitCircle) c++
+				else if (h instanceof HitPlane) p++
+				else if (h instanceof HitLineZ && !(h instanceof HitLine3D)) l++
+			}
+			if (c || p || l) warmWasmPools(c, p, l)
+		}
+		if (isWasmReady()) warm()
+		else void getWasmKernels().then(warm)
 	}
 
 	public update(): void {
