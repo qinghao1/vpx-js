@@ -129,6 +129,44 @@ export class Stdlib extends VbsApi {
 		// Initializes the random-number generator in VBScript. Nothing to initialize here.
 	}
 
+	public Rnd(_n?: number): number {
+		return Math.random()
+	}
+
+	public Atn(n: number): number {
+		return Math.atan(n)
+	}
+
+	public Tan(n: number): number {
+		return Math.tan(n)
+	}
+
+	public Exp(n: number): number {
+		return Math.exp(n)
+	}
+
+	public Log(n: number): number {
+		return Math.log(n)
+	}
+
+	public Sgn(n: number): number {
+		return n > 0 ? 1 : n < 0 ? -1 : 0
+	}
+
+	public Fix(n: number): number {
+		return n >= 0 ? Math.floor(n) : Math.ceil(n)
+	}
+
+	public Hex(n: number): string {
+		return (Math.trunc(n) >>> 0).toString(16).toUpperCase()
+	}
+
+	public Oct(n: number): string {
+		return (Math.trunc(n) >>> 0).toString(8)
+	}
+
+	public SetLocale(_lcid: number): void {}
+
 	public GetRef(proc: string, scope: any): any {
 		return scope[proc]
 	}

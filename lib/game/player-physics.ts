@@ -125,7 +125,6 @@ export class PlayerPhysics {
 				if (t > 0 && t < hitTime) hitTime = t
 			}
 			this.recordContacts = true
-			CollisionEvent.release(...this.contacts)
 			this.contacts.length = 0
 			for (const ball of this.balls) {
 				if (ball.state.isFrozen) continue
@@ -133,7 +132,7 @@ export class PlayerPhysics {
 				ball.hit.coll.clear()
 				if (!this.meshAsPlayfield) this.hitPlayfield.doHitTest(ball, ball.coll, this)
 				this.hitTopGlass.doHitTest(ball, ball.coll, this)
-				if (Math.random() < 0.5) {
+				if (this.swapBallCollisionHandling) {
 					this.hitOcTreeDynamic.hitTestBall(ball, ball.coll, this)
 					this.hitOcTree.hitTestBall(ball, ball.coll, this)
 				} else {
@@ -164,11 +163,13 @@ export class PlayerPhysics {
 					else ball.hit.calcHitBBox()
 				}
 			}
-			if (Math.random() < 0.5) for (const c of this.contacts) c.obj!.contact(c, hitTime, this)
-			else
-				for (let i = this.contacts.length - 1; i >= 0; --i)
+			if (this.swapBallCollisionHandling) {
+				for (let i = this.contacts.length - 1; i >= 0; i--)
 					this.contacts[i]!.obj!.contact(this.contacts[i]!, hitTime, this)
-			CollisionEvent.release(...this.contacts)
+			} else {
+				for (const c of this.contacts) c.obj!.contact(c, hitTime, this)
+			}
+			for (const c of this.contacts) CollisionEvent.release(c)
 			this.contacts.length = 0
 			dTime -= hitTime
 			this.swapBallCollisionHandling = !this.swapBallCollisionHandling
