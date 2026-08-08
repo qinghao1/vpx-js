@@ -49,9 +49,10 @@ export class BallMover implements MoverObject {
 					),
 				)
 			} else {
-				this.hit.vel.addAndRelease(physics.gravity.clone(true).multiplyScalar(PHYS_FACTOR))
+				this.hit.vel.x += physics.gravity.x * PHYS_FACTOR
+				this.hit.vel.y += physics.gravity.y * PHYS_FACTOR
+				this.hit.vel.z += physics.gravity.z * PHYS_FACTOR
 			}
 		}
-		this.hit.calcHitBBox()
 	}
 }

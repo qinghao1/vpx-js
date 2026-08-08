@@ -12,23 +12,17 @@ export interface IPoolable<T> {
 export class Pool<T> {
 	private static readonly MAX = 100
 	private readonly items: T[] = []
-	private readonly pooled = new WeakSet<object>()
 	private warned = false
 
 	constructor(private readonly ctor: IPoolable<T>) {}
 
 	/** Claims or creates an instance. */
 	get(): T {
-		const obj = this.items.pop() ?? new this.ctor()
-		this.pooled.add(obj as object)
-		return obj
+		return this.items.pop() ?? new this.ctor()
 	}
 
 	/** Returns an instance. */
 	release(obj: T): void {
-		if (!this.pooled.has(obj as object)) {
-			return
-		}
 		if (this.items.length >= Pool.MAX) {
 			if (!this.warned) {
 				logger().warn('Pool %s exhausted (%s items), excess will be GC’d.', this.ctor.name, Pool.MAX)

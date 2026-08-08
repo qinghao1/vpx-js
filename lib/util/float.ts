@@ -12,9 +12,9 @@ export function fr(v: number): number {
 	return Math.round(v * f) / f
 }
 
-/** Converts to single precision. */
+/** No-op in JS — JS numbers are f64, skipping fround avoids per-component overhead in hot vector ops. */
 export function f4(v: number): number {
-	return Math.fround(v)
+	return v
 }
 
 /** Quantizes [0,1] to unsigned bits — mirrors math.h `quantizeUnsigned<Bits>`. */

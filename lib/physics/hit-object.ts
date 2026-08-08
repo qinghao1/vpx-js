@@ -97,17 +97,19 @@ export abstract class HitObject {
 	doHitTest(ball: Ball, coll: CollisionEvent, physics: PlayerPhysics): void {
 		if (!ball) return
 		if (this.obj?.abortHitTest?.()) return
-		const newColl = CollisionEvent.claim(ball)
-		const newTime = this.hitTest(ball, coll.hitTime, !physics.recordContacts ? coll : newColl, physics)
-		const validHit = newTime >= 0 && newTime <= coll.hitTime
 		if (!physics.recordContacts) {
-			if (validHit) {
+			const t = this.hitTest(ball, coll.hitTime, coll, physics)
+			if (t >= 0 && t <= coll.hitTime) {
 				coll.ball = ball
 				coll.obj = this
-				coll.hitTime = newTime
+				coll.hitTime = t
 			}
-			CollisionEvent.releaseOne(newColl)
-		} else if (newColl.isContact || validHit) {
+			return
+		}
+		const newColl = CollisionEvent.claim(ball)
+		const newTime = this.hitTest(ball, coll.hitTime, newColl, physics)
+		const validHit = newTime >= 0 && newTime <= coll.hitTime
+		if (newColl.isContact || validHit) {
 			newColl.ball = ball
 			newColl.obj = this
 			if (newColl.isContact) physics.contacts.push(newColl)
