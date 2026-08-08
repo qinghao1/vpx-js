@@ -263,10 +263,8 @@ export class BallHit extends HitObject {
 		const normVel = this.vel.dot(coll.hitNormal)
 		if (normVel > C_CONTACTVEL) return
 
-		const fe = physics.gravity.clone(true).multiplyScalar(this.data.mass)
-		const dot = fe.dot(coll.hitNormal)
+		const dot = physics.gravity.dot(coll.hitNormal) * this.data.mass
 		const normalForce = Math.max(0, -(dot * dTime + coll.hitOrgNormalVelocity!))
-		Vertex3D.release(fe)
 
 		this.vel.addAndRelease(coll.hitNormal.clone(true).multiplyScalar(normalForce))
 		if (coll.hitDistance <= PHYS_TOUCH) {
@@ -319,10 +317,9 @@ export class BallHit extends HitObject {
 
 	public surfaceAcceleration(surfP: Vertex3D, physics: PlayerPhysics, recycle = false): Vertex3D {
 		const p2 = Vertex3D.crossProduct(this.angularVelocity, surfP, true)
-		const acc = physics.gravity
-			.clone(recycle)
-			.multiplyScalar(this.invMass)
-			.addAndRelease(Vertex3D.crossProduct(this.angularVelocity, p2, true))
+		const acc = recycle ? Vertex3D.claim() : new Vertex3D()
+		acc.set(physics.gravity.x * this.invMass, physics.gravity.y * this.invMass, physics.gravity.z * this.invMass)
+		acc.addAndRelease(Vertex3D.crossProduct(this.angularVelocity, p2, true))
 		Vertex3D.release(p2)
 		return acc
 	}
