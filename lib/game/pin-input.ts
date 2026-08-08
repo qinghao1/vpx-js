@@ -94,20 +94,22 @@ export class PinInput {
 	}
 
 	private syncFlippers(isDown: boolean, code: number): void {
-		const left = code === this.rgKeys[AssignKey.LeftFlipperKey] || LEFT_KEYS.has(code)
-		const right = code === this.rgKeys[AssignKey.RightFlipperKey] || RIGHT_KEYS.has(code)
-		if (!left && !right) return
+		const isLeftKey = code === this.rgKeys[AssignKey.LeftFlipperKey] || LEFT_KEYS.has(code)
+		const isRightKey = code === this.rgKeys[AssignKey.RightFlipperKey] || RIGHT_KEYS.has(code)
+		if (!isLeftKey && !isRightKey) return
+
 		const flippers = Object.values(this.table.flippers)
 		if (!flippers.length) return
-		for (const f of flippers) {
-			const n = f.getName().toLowerCase()
-			const isRight = n.includes('right') || n === 'flipperr'
+
+		for (const flipper of flippers) {
+			const name = flipper.getName().toLowerCase()
+			const isRightFlipper = name.includes('right') || name === 'flipperr'
 			if (flippers.length > 1) {
-				if (left && isRight) continue
-				if (right && !isRight) continue
+				if (isLeftKey && isRightFlipper) continue
+				if (isRightKey && !isRightFlipper) continue
 			}
 			try {
-				const api = f.getApi()
+				const api = flipper.getApi()
 				isDown ? api.RotateToEnd() : api.RotateToStart()
 			} catch {}
 		}
