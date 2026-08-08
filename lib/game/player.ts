@@ -40,13 +40,25 @@ export class Player extends EventEmitter {
 		this.setupStates()
 	}
 
-	/** Initializes physics and runs table script. */
-	public init(scope: Record<string, unknown> = {}): this {
+	private prepareTable(): void {
 		this.table.setupCollections()
 		this.physics.init()
 		this.table.prepareToPlay()
+	}
+
+	private runScript(scope: Record<string, unknown>, async: boolean): Promise<void> | void {
+		const anyTable = this.table as unknown as {
+			runTableScriptAsync?: (p: Player, s: Record<string, unknown>) => Promise<void>
+		}
+		if (async && anyTable.runTableScriptAsync) return anyTable.runTableScriptAsync(this, scope)
+		this.table.runTableScript(this, scope)
+	}
+
+	/** Initializes physics and runs table script. */
+	public init(scope: Record<string, unknown> = {}): this {
+		this.prepareTable()
 		try {
-			this.table.runTableScript(this, scope)
+			this.runScript(scope, false)
 		} catch (e) {
 			console.warn('Table script failed, continuing without script', e)
 		}
@@ -55,16 +67,11 @@ export class Player extends EventEmitter {
 		return this
 	}
 
-	/** Async variant that yields to the event loop during transpilation. */
 	public async initAsync(scope: Record<string, unknown> = {}): Promise<this> {
-		this.table.setupCollections()
-		this.physics.init()
-		this.table.prepareToPlay()
+		this.prepareTable()
 		await new Promise((r) => setTimeout(r, 0))
 		try {
-			const maybe = (this.table as unknown as { runTableScriptAsync?: (p: Player, s: Record<string, unknown>) => Promise<void> }).runTableScriptAsync
-			if (maybe) await maybe.call(this.table, this, scope)
-			else this.table.runTableScript(this, scope)
+			await this.runScript(scope, true)
 		} catch (e) {
 			console.warn('Table script failed, continuing without script', e)
 		}

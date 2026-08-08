@@ -18,6 +18,16 @@ export class VBSHelper {
 		this.transpiler = transpiler
 	}
 
+	private isUndef(v: unknown): boolean {
+		return !!v && typeof v === 'object' && '__isUndefined' in (v as any) && (v as any).__isUndefined === true
+	}
+
+	private sourcePrefix(vbs: string, filename?: string): string {
+		if (filename) return `//@ sourceURL=game:///${filename}.js\n`
+		if (vbs.length > 150) return `//@ sourceURL=game:///inline${this.transpileCount++}.js\n`
+		return ''
+	}
+
 	public dim(dimensions: number[], pos = 0): any[] {
 		const n = dimensions?.length ? dimensions[pos] + 1 : 0
 		const arr = new VbsArray(new Array(n).fill(VBSHelper.UNDEFINED))
@@ -40,10 +50,7 @@ export class VBSHelper {
 		const key = filename ?? vbs
 		const cached = this.inlineCache.get(key)
 		if (cached) return cached
-		let prefix = ''
-		if (filename) prefix = `//@ sourceURL=game:///${filename}.js\n`
-		else if (vbs.length > 150) prefix = `//@ sourceURL=game:///inline${this.transpileCount++}.js\n`
-		const js = prefix + this.transpiler.transpile(vbs)
+		const js = this.sourcePrefix(vbs, filename) + this.transpiler.transpile(vbs)
 		if (key.length < 50000) this.inlineCache.set(key, js)
 		return js
 	}
@@ -52,10 +59,7 @@ export class VBSHelper {
 		const key = filename ?? vbs
 		const cached = this.inlineCache.get(key)
 		if (cached) return cached
-		let prefix = ''
-		if (filename) prefix = `//@ sourceURL=game:///${filename}.js\n`
-		else if (vbs.length > 150) prefix = `//@ sourceURL=game:///inline${this.transpileCount++}.js\n`
-		const js = prefix + await this.transpiler.transpileAsync(vbs)
+		const js = this.sourcePrefix(vbs, filename) + (await this.transpiler.transpileAsync(vbs))
 		if (key.length < 50000) this.inlineCache.set(key, js)
 		return js
 	}
@@ -80,18 +84,14 @@ export class VBSHelper {
 	}
 
 	public toIterable(obj: unknown): Iterable<unknown> {
-		if (obj == null) return []
-		const anyObj = obj as any
-		if (anyObj.__isUndefined) return []
-		if (typeof anyObj[Symbol.iterator] === 'function') {
+		if (obj == null || this.isUndef(obj)) return []
+		if (typeof (obj as any)[Symbol.iterator] === 'function') return obj as Iterable<unknown>
+		if (typeof obj === 'object' && 'length' in (obj as any) && typeof (obj as any).length === 'number') {
 			try {
-				const it = anyObj[Symbol.iterator]()
-				if (it && typeof it.next === 'function') return anyObj as Iterable<unknown>
-			} catch {}
-		}
-		if (Array.isArray(anyObj)) return anyObj as Iterable<unknown>
-		if (typeof anyObj === 'object' && 'length' in anyObj && typeof anyObj.length === 'number') {
-			try { return Array.from(anyObj as ArrayLike<unknown>) } catch {}
+				return Array.from(obj as ArrayLike<unknown>)
+			} catch {
+				return []
+			}
 		}
 		return []
 	}
@@ -105,13 +105,13 @@ export class VBSHelper {
 
 	public equals(a: unknown, b: unknown): boolean {
 		if (a == b) return true
-		const u1 = typeof a === 'object' && (a as unknown as Record<string, unknown>).__isUndefined,
-			u2 = typeof b === 'object' && (b as unknown as Record<string, unknown>).__isUndefined
-		if (u1 && typeof b === 'undefined') return true
-		if (typeof a === 'undefined' && u2) return true
-		if (u1 && u2) return true
-		if (u1 && b === '') return true
-		if (a === '' && u2) return true
+		const u1 = this.isUndef(a),
+			u2 = this.isUndef(b)
+		if (u1 || u2) {
+			if (u1 && u2) return true
+			if (u1 && (b === undefined || b === '')) return true
+			if (u2 && (a === undefined || a === '')) return true
+		}
 		return false
 	}
 
@@ -119,34 +119,38 @@ export class VBSHelper {
 		return a === b
 	}
 
-	public getOrCall(obj: unknown, ...params: unknown[]): unknown {
-		if (obj == null) return VBSHelper.UNDEFINED
-		if ((obj as any).__isUndefined) return VBSHelper.UNDEFINED
-		if (typeof obj === 'function') {
-			if (obj === Array) {
-				try {
-					return (Array as unknown as { of: (...a: unknown[]) => unknown[] }).of(...params)
-				} catch {
-					return VBSHelper.UNDEFINED
-				}
+	private arrayOf(params: unknown[]): unknown {
+		try {
+			return (Array as unknown as { of: (...a: unknown[]) => unknown[] }).of(...params)
+		} catch {
+			return VBSHelper.UNDEFINED
+		}
+	}
+
+	private traverse(obj: unknown, params: unknown[]): unknown {
+		for (const p of params) {
+			if (obj == null || this.isUndef(obj)) return VBSHelper.UNDEFINED
+			try {
+				obj = (obj as Record<string | number, unknown>)[p as string] as unknown
+			} catch {
+				return VBSHelper.UNDEFINED
 			}
+			if (this.isUndef(obj)) return VBSHelper.UNDEFINED
+		}
+		return this.isUndef(obj) ? VBSHelper.UNDEFINED : (obj ?? VBSHelper.UNDEFINED)
+	}
+
+	public getOrCall(obj: unknown, ...params: unknown[]): unknown {
+		if (obj == null || this.isUndef(obj)) return VBSHelper.UNDEFINED
+		if (typeof obj === 'function') {
+			if (obj === Array) return this.arrayOf(params)
 			try {
 				return (obj as (...a: unknown[]) => unknown).bind(obj as object)(...params)
 			} catch {
 				return VBSHelper.UNDEFINED
 			}
 		}
-		for (const p of params) {
-			if (obj == null) return VBSHelper.UNDEFINED
-			if ((obj as any).__isUndefined) return VBSHelper.UNDEFINED
-			try {
-				obj = (obj as Record<string | number, unknown>)[p as string] as unknown
-			} catch {
-				return VBSHelper.UNDEFINED
-			}
-			if ((obj as any)?.__isUndefined) return VBSHelper.UNDEFINED
-		}
-		return (obj as any)?.__isUndefined ? VBSHelper.UNDEFINED : (obj ?? VBSHelper.UNDEFINED)
+		return this.traverse(obj, params)
 	}
 
 	public getOrCallBound(
@@ -154,41 +158,23 @@ export class VBSHelper {
 		prop: string,
 		...params: unknown[]
 	): unknown {
-		if (parent == null) return VBSHelper.UNDEFINED
-		if ((parent as any).__isUndefined) return VBSHelper.UNDEFINED
+		if (parent == null || this.isUndef(parent)) return VBSHelper.UNDEFINED
 		let o: unknown
 		try {
 			o = (parent as Record<string, unknown>)[prop]
 		} catch {
 			return VBSHelper.UNDEFINED
 		}
-		if (o == null) return VBSHelper.UNDEFINED
-		if ((o as any).__isUndefined) return VBSHelper.UNDEFINED
+		if (o == null || this.isUndef(o)) return VBSHelper.UNDEFINED
 		if (typeof o === 'function') {
-			if (o === Array) {
-				try {
-					return (Array as unknown as { of: (...a: unknown[]) => unknown[] }).of(...params)
-				} catch {
-					return VBSHelper.UNDEFINED
-				}
-			}
+			if (o === Array) return this.arrayOf(params)
 			try {
 				return (o as (...a: unknown[]) => unknown).bind(parent as object)(...params)
 			} catch {
 				return VBSHelper.UNDEFINED
 			}
 		}
-		for (const p of params) {
-			if (o == null) return VBSHelper.UNDEFINED
-			if ((o as any).__isUndefined) return VBSHelper.UNDEFINED
-			try {
-				o = (o as Record<string | number, unknown>)[p as string] as unknown
-			} catch {
-				return VBSHelper.UNDEFINED
-			}
-			if ((o as any)?.__isUndefined) return VBSHelper.UNDEFINED
-		}
-		return (o as any)?.__isUndefined ? VBSHelper.UNDEFINED : (o ?? VBSHelper.UNDEFINED)
+		return this.traverse(o, params)
 	}
 
 	public onErrorResumeNext(): void {

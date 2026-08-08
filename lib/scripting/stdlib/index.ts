@@ -108,21 +108,17 @@ export class Stdlib extends VbsApi {
 		return Math.sqrt(n)
 	}
 
-	public UBound(a: unknown, dimension?: number): number {
-		if (a == null) return -1
-		const anyA = a as any
-		if (anyA.__isUndefined) return -1
-		if (Array.isArray(anyA)) return anyA.length - 1
-		if (typeof anyA.length === 'number') {
-			try { return anyA.length - 1 } catch { return -1 }
+	public UBound(a: unknown, _dimension?: number): number {
+		if (a == null || (a as any)?.__isUndefined === true) return -1
+		try {
+			const len = (a as any).length
+			return typeof len === 'number' ? len - 1 : -1
+		} catch {
+			return -1
 		}
-		try { return (a as any[]).length - 1 } catch { return -1 }
 	}
 
-	public LBound(a: unknown, dimension?: number): number {
-		if (a == null) return 0
-		const anyA = a as any
-		if (anyA.__isUndefined) return 0
+	public LBound(a: unknown, _dimension?: number): number {
 		return 0
 	}
 
@@ -185,7 +181,7 @@ export class Stdlib extends VbsApi {
 	}
 
 	public TypeName(obj: any): string {
-		if (obj != null && (obj as any).__isUndefined) {
+		if ((obj as any)?.__isUndefined === true) {
 			return 'Nothing'
 		}
 		if (typeof obj === 'string') {

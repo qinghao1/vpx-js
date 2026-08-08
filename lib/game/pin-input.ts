@@ -17,8 +17,8 @@ import {
 	DIK_F10,
 	DIK_F11,
 	DIK_LALT,
-	DIK_LEFT,
 	DIK_LCONTROL,
+	DIK_LEFT,
 	DIK_LSHIFT,
 	DIK_MINUS,
 	DIK_O,
@@ -36,6 +36,9 @@ import type { Player } from './player.js'
 
 const LEFT_KEYS = new Set([DIK_LSHIFT, DIK_LCONTROL, DIK_LEFT])
 const RIGHT_KEYS = new Set([DIK_RSHIFT, DIK_RCONTROL, DIK_RIGHT])
+
+const TROUGH_NAMES = new Set(['sw18', 'sw19', 'sw20', 'sw21'])
+const TROUGH_R2 = 2500
 
 type KeyEvent = { code: number; down: boolean; ts: number }
 
@@ -140,78 +143,78 @@ export class PinInput {
 	private tryMockLaunch(): void {
 		const balls = this.player.balls
 		if (!balls.length) return
-		const emu: any = this.player.getPhysics().emu
-		const isRealReady = !!emu && !emu.isMock && !!emu.isInitialized?.()
-		if (isRealReady) {
-			const anyActive = balls.some((b) => !b.getState().isFrozen && b.hit.vel.length() > 5)
-			if (anyActive) return
+		const emu = this.player.getPhysics().emu as { isMock?: boolean; isInitialized?: () => boolean } | null
+		if (emu && !emu.isMock && emu.isInitialized?.()) {
+			if (balls.some((b) => !b.getState().isFrozen && b.hit.vel.length() > 5)) return
 		}
-		const kickers = Object.values(this.table.kickers)
-		const troughNames = new Set(['sw18', 'sw19', 'sw20', 'sw21'])
-		const troughCenters = kickers
-			.filter((k) => troughNames.has(k.getName()))
-			.map((k) => (k as unknown as { data: { center: { x: number; y: number } } }).data.center)
-		let ballToLaunch: (typeof balls)[number] | undefined
-		for (const b of balls) {
-			const p = b.getState().pos
-			for (const c of troughCenters) {
-				const dx = p.x - c.x
-				const dy = p.y - c.y
-				if (dx * dx + dy * dy < 2500) {
-					ballToLaunch = b
-					break
-				}
-			}
-			if (ballToLaunch) break
-		}
-		if (!ballToLaunch) ballToLaunch = balls.find((b) => b.getState().isFrozen)
+		const centers = this.troughCenters()
+		const ballToLaunch = this.findTroughBall(balls, centers) ?? balls.find((b) => b.getState().isFrozen)
 		if (!ballToLaunch) return
-		const inPlay = balls.some((b) => {
-			if (b === ballToLaunch) return false
-			const p = b.getState().pos
-			const inTrough = troughCenters.some((c) => {
-				const dx = p.x - c.x
-				const dy = p.y - c.y
-				return dx * dx + dy * dy < 2500
-			})
-			return !inTrough && !b.getState().isFrozen
-		})
-		if (inPlay) return
-		for (const k of kickers) {
+		if (balls.some((b) => b !== ballToLaunch && !this.isInTrough(b, centers) && !b.getState().isFrozen)) return
+		this.releaseFromKickers(ballToLaunch)
+		this.launch(ballToLaunch)
+	}
+
+	private troughCenters(): Array<{ x: number; y: number }> {
+		return Object.values(this.table.kickers)
+			.filter((k) => TROUGH_NAMES.has(k.getName()))
+			.map((k) => (k as unknown as { data: { center: { x: number; y: number } } }).data.center)
+	}
+
+	private findTroughBall(balls: typeof this.player.balls, centers: Array<{ x: number; y: number }>) {
+		for (const b of balls) if (this.isInTrough(b, centers)) return b
+		return undefined
+	}
+
+	private isInTrough(ball: (typeof this.player.balls)[number], centers: Array<{ x: number; y: number }>): boolean {
+		const p = ball.getState().pos
+		return centers.some((c) => (p.x - c.x) ** 2 + (p.y - c.y) ** 2 < TROUGH_R2)
+	}
+
+	private releaseFromKickers(ball: (typeof this.player.balls)[number]): void {
+		for (const k of Object.values(this.table.kickers)) {
 			try {
 				const hit = (k as unknown as { hit?: { ball?: unknown } }).hit
-				if (hit && (hit as unknown as { ball?: unknown }).ball === ballToLaunch) (hit as unknown as { ball?: unknown }).ball = undefined
+				if (hit?.ball === ball) hit.ball = undefined
 			} catch {}
 		}
-		try { ballToLaunch.hit.vpVolObjs.length = 0 } catch {}
-		ballToLaunch.getState().isFrozen = false
-		ballToLaunch.hit.angularVelocity.setZero()
-		ballToLaunch.hit.angularMomentum.setZero()
+		try {
+			ball.hit.vpVolObjs.length = 0
+		} catch {}
+	}
+
+	private launch(ball: (typeof this.player.balls)[number]): void {
+		ball.getState().isFrozen = false
+		ball.hit.angularVelocity.setZero()
+		ball.hit.angularMomentum.setZero()
 		const lane = this.table.plungers['Plunger'] ?? Object.values(this.table.plungers)[0]
-		const lanePos = (lane as unknown as { data?: { center?: { x: number; y: number } } })?.data?.center
-		if (lanePos) {
-			ballToLaunch.getState().pos.set(lanePos.x, lanePos.y - 80, 30)
-			ballToLaunch.hit.vel.set((Math.random() - 0.5) * 20, -950 - Math.random() * 100, 0)
+		const c = (lane as unknown as { data?: { center?: { x: number; y: number } } })?.data?.center
+		if (c) {
+			ball.getState().pos.set(c.x, c.y - 80, 30)
+			ball.hit.vel.set((Math.random() - 0.5) * 20, -950 - Math.random() * 100, 0)
 		} else {
-			ballToLaunch.getState().pos.set(460, 1100, 30)
-			ballToLaunch.hit.vel.set(0, -750, 0)
+			ball.getState().pos.set(460, 1100, 30)
+			ball.hit.vel.set(0, -750, 0)
 		}
 	}
 
 	private syncCabinet(isDown: boolean, code: number): void {
 		const emu = this.player.getPhysics().emu
 		if (!emu) return
-		let targets: number[] | undefined
-		if (code === DIK_1 || code === this.rgKeys[AssignKey.StartGameKey]) targets = [16, 13, 1]
-		else if (code === DIK_2 || code === DIK_3) targets = [65, 1, 2, 3, 4]
-		else if (code === DIK_4 || code === this.rgKeys[AssignKey.AddCreditKey2]) targets = [66, 2, 1, 65, 67]
-		else if (code === DIK_5 || code === this.rgKeys[AssignKey.AddCreditKey]) targets = [67, 3, 1, 2, 65, 66, 68]
-		else if (code === DIK_6) targets = [68, 4, 1, 67]
+		const targets = this.cabinetSwitches(code)
 		if (!targets) return
-		for (const sw of targets) {
+		for (const sw of targets)
 			try {
 				emu.setSwitchInput(sw, isDown)
 			} catch {}
-		}
+	}
+
+	private cabinetSwitches(code: number): number[] | undefined {
+		if (code === DIK_1 || code === this.rgKeys[AssignKey.StartGameKey]) return [16, 13, 1]
+		if (code === DIK_2 || code === DIK_3) return [65, 1, 2, 3, 4]
+		if (code === DIK_4 || code === this.rgKeys[AssignKey.AddCreditKey2]) return [66, 2, 1, 65, 67]
+		if (code === DIK_5 || code === this.rgKeys[AssignKey.AddCreditKey]) return [67, 3, 1, 2, 65, 66, 68]
+		if (code === DIK_6) return [68, 4, 1, 67]
+		return undefined
 	}
 }

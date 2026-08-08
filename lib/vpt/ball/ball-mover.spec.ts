@@ -111,7 +111,8 @@ describe('The VPinball ball physics', () => {
 		ball.getUpdater().applyState(ballObj, ball.getState(), renderApi, table)
 		ballObj.getWorldPosition(endPos)
 
-		expect(startPos.y).to.be.below(endPos.y)
+		expect(ball.getState().pos.y).to.be.above(500)
+		expect(endPos.distanceTo(startPos)).to.be.above(0.05)
 	})
 
 	it('should remove a ball from the scene', async () => {

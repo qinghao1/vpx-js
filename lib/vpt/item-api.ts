@@ -12,6 +12,23 @@ import { MAX_TIMER_MSEC_INTERVAL } from './timer/timer-const.js'
 import { TimerHit } from './timer/timer-hit.js'
 import { TimerOnOff } from './timer/timer-on-off.js'
 
+const INTERNAL = new Set([
+	'data',
+	'events',
+	'player',
+	'table',
+	'collections',
+	'collectionsItemPos',
+	'propertyMap',
+	'hitTimer',
+	'UserValue',
+	'state',
+	'animation',
+	'constructor',
+	'prototype',
+	'__proto__',
+])
+
 /** Base for VBS-exposed item APIs. */
 export abstract class ItemApi<DATA extends ItemData> extends EventEmitter {
 	protected readonly collections: Collection[] = []
@@ -48,48 +65,28 @@ export abstract class ItemApi<DATA extends ItemData> extends EventEmitter {
 		protected readonly table: Table,
 	) {
 		super()
-		const internal = new Set(['data','events','player','table','collections','collectionsItemPos','propertyMap','hitTimer','UserValue','state','animation','constructor','prototype','__proto__'])
 		return new Proxy(this, {
 			get(target: unknown, prop: string | symbol, receiver: unknown) {
-				if (typeof prop === 'string' && !internal.has(prop) && prop !== 'constructor' && prop !== 'prototype') {
+				if (typeof prop === 'string' && !INTERNAL.has(prop)) {
 					const mapped = (target as ItemApi<DATA>)._getPropertyName(prop)
-					if (mapped && mapped !== prop) {
+					if (mapped) {
 						const v = Reflect.get(target as object, mapped, receiver)
-						if (v !== undefined || mapped in (target as object)) return v
-					}
-					const low = prop.toLowerCase()
-					if (low !== prop && !internal.has(low)) {
-						const mappedLow = (target as ItemApi<DATA>)._getPropertyName(low)
-						if (mappedLow && mappedLow !== prop) {
-							const v2 = Reflect.get(target as object, mappedLow, receiver)
-							if (v2 !== undefined || mappedLow in (target as object)) return v2
-						}
+						if (v !== undefined || mapped in (target as object))
+							return typeof v === 'function' ? (v as Function).bind(target) : v
 					}
 				}
 				const v = Reflect.get(target as object, prop, receiver)
-				if (typeof v === 'function' && typeof prop === 'string' && prop !== 'constructor' && prop !== 'prototype' && prop !== '__proto__') {
-					return v.bind(target)
-				}
-				return v
+				return typeof v === 'function' && typeof prop === 'string' && !INTERNAL.has(prop) ? v.bind(target) : v
 			},
 			set(target: unknown, prop: string | symbol, value: unknown, receiver: unknown) {
-				if (typeof prop === 'string' && !internal.has(prop) && !internal.has(prop.toLowerCase())) {
+				if (typeof prop === 'string' && !INTERNAL.has(prop)) {
 					const mapped = (target as ItemApi<DATA>)._getPropertyName(prop)
-					if (mapped && mapped !== prop) {
-						return Reflect.set(target as object, mapped, value, receiver)
-					}
-					const low = prop.toLowerCase()
-					if (low !== prop) {
-						const mappedLow = (target as ItemApi<DATA>)._getPropertyName(low)
-						if (mappedLow && mappedLow !== prop) {
-							return Reflect.set(target as object, mappedLow, value, receiver)
-						}
-					}
+					if (mapped) return Reflect.set(target as object, mapped, value, receiver)
 				}
 				return Reflect.set(target as object, prop as string, value, receiver)
 			},
 			has(target: unknown, prop: string | symbol) {
-				if (typeof prop === 'string' && !internal.has(prop)) {
+				if (typeof prop === 'string' && !INTERNAL.has(prop)) {
 					const mapped = (target as ItemApi<DATA>)._getPropertyName(prop)
 					if (mapped) return mapped in (target as object)
 				}

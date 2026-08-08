@@ -43,7 +43,7 @@ export class ClassTransformer extends Transformer {
 		let classDepth = 0
 		return replace(this.ast, {
 			enter: (node: any, parent: any) => {
-				if (node.type === 'ClassDeclaration' || node.type === 'ClassBody' || node.type === 'ClassExpression') {
+				if (node.type === 'ClassDeclaration' || node.type === 'ClassExpression') {
 					classDepth++
 				}
 				// make member usages lower case only inside VBS classes
@@ -58,7 +58,7 @@ export class ClassTransformer extends Transformer {
 				}
 			},
 			leave: (node: any) => {
-				if (node.type === 'ClassDeclaration' || node.type === 'ClassBody' || node.type === 'ClassExpression') {
+				if (node.type === 'ClassDeclaration' || node.type === 'ClassExpression') {
 					classDepth--
 				}
 			},

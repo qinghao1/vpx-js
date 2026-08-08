@@ -22,9 +22,9 @@ export class VbsUndefined implements ProxyHandler<any> {
 			return () => [][Symbol.iterator]()
 		}
 		if (p === 'toString') {
-			return () => ''
+			return () => 'undefined'
 		}
-		if (p === 'valueOf' || p === Symbol.toPrimitive) {
+		if (p === 'valueOf') {
 			return () => 0
 		}
 		if (p === 'constructor' || p === 'prototype' || p === '__proto__') {

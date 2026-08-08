@@ -55,7 +55,7 @@ export class Flipper
 			this.data.szRubberMaterial!,
 		)
 		this.updater = new FlipperUpdater(this.data, this.state)
-		this.animation = new FlipperAnimation(this.data, this.state)
+		this.animation = new FlipperAnimation(this.state)
 	}
 
 	public isCollidable(): boolean {
