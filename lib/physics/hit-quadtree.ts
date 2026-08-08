@@ -31,14 +31,11 @@ export class HitQuadtree {
 	}
 
 	public hitTestBall(ball: Ball, coll: CollisionEvent, physics: PlayerPhysics): void {
-		const vho = this.vho
-		const ballHit = ball.hit
-		const bBox = ballHit.hitBBox
+		const bBox = ball.hit.hitBBox
 		const pos = ball.state.pos
-		const radSq = ballHit.rcHitRadiusSqr
-		for (let i = 0; i < vho.length; i++) {
-			const h = vho[i]!
-			if (ballHit !== h && h.hitBBox.intersectRect(bBox) && h.hitBBox.intersectSphere(pos, radSq)) {
+		const radSq = ball.hit.rcHitRadiusSqr
+		for (const h of this.vho) {
+			if (ball.hit !== h && h.hitBBox.intersectRect(bBox) && h.hitBBox.intersectSphere(pos, radSq)) {
 				h.doHitTest(ball, coll, physics)
 			}
 		}
