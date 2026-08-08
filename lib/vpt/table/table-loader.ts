@@ -78,6 +78,7 @@ export class TableLoader {
 				progress().details(item.getName())
 				out.items[item.getName()] = item
 			}
+			if ((i & 31) === 31) await this.yield()
 		}
 	}
 
@@ -104,6 +105,7 @@ export class TableLoader {
 			const tex = await Texture.fromStorage(storage, `Image${i}`)
 			out.textures.push(tex)
 			progress().details(tex.getName())
+			if ((i & 15) === 15) await this.yield()
 		}
 	}
 
@@ -122,7 +124,14 @@ export class TableLoader {
 			const col = await Collection.fromStorage(storage, `Collection${i}`)
 			out.collections.push(col)
 			out.items[col.getName()] = col
+			if ((i & 15) === 15) await this.yield()
 		}
+	}
+
+	private async yield(): Promise<void> {
+		const g = globalThis as unknown as { scheduler?: { yield?: () => Promise<void> } }
+		if (g.scheduler?.yield) await g.scheduler.yield()
+		else await new Promise<void>((r) => setTimeout(r, 0))
 	}
 }
 

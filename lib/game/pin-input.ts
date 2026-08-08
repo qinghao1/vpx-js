@@ -6,8 +6,11 @@ import { Event } from './event.js'
 import {
 	AssignKey,
 	DIK_1,
+	DIK_2,
+	DIK_3,
 	DIK_4,
 	DIK_5,
+	DIK_6,
 	DIK_D,
 	DIK_EQUALS,
 	DIK_ESCAPE,
@@ -77,7 +80,7 @@ export class PinInput {
 
 	processKeys(): void {
 		while (this.queue.length) {
-			const ev = this.queue.pop()!
+			const ev = this.queue.shift()!
 			if (
 				ev.code === this.rgKeys[AssignKey.FrameCount] ||
 				ev.code === this.rgKeys[AssignKey.Enable3D] ||
@@ -89,9 +92,11 @@ export class PinInput {
 	}
 
 	private fire(dispid: Event, code: number): void {
+		const isDown = dispid === Event.GameEventsKeyDown
 		this.table.getApi().fireKeyEvent(dispid, code)
-		this.syncFlippers(dispid === Event.GameEventsKeyDown, code)
-		this.syncPlunger(dispid === Event.GameEventsKeyDown, code)
+		this.syncFlippers(isDown, code)
+		this.syncPlunger(isDown, code)
+		this.syncCabinet(isDown, code)
 	}
 
 	private syncFlippers(isDown: boolean, code: number): void {
@@ -125,6 +130,23 @@ export class PinInput {
 				const api = plunger.getApi()
 				if (isDown) api.PullBack()
 				else api.Fire()
+			} catch {}
+		}
+	}
+
+	private syncCabinet(isDown: boolean, code: number): void {
+		const emu = this.player.getPhysics().emu
+		if (!emu) return
+		let targets: number[] | undefined
+		if (code === DIK_1 || code === this.rgKeys[AssignKey.StartGameKey]) targets = [16, 13]
+		else if (code === DIK_2 || code === DIK_3) targets = [65, 1]
+		else if (code === DIK_4 || code === this.rgKeys[AssignKey.AddCreditKey2]) targets = [66, 2]
+		else if (code === DIK_5 || code === this.rgKeys[AssignKey.AddCreditKey]) targets = [67, 3]
+		else if (code === DIK_6) targets = [68, 4]
+		if (!targets) return
+		for (const sw of targets) {
+			try {
+				emu.setSwitchInput(sw, isDown)
 			} catch {}
 		}
 	}
