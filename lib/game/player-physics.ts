@@ -117,37 +117,27 @@ export class PlayerPhysics {
 
 	public physicsSimulateCycle(dTime: number): void {
 		let staticCnts = STATICCNTS
-		const ocTree = this.hitOcTree
-		const ocTreeDynamic = this.hitOcTreeDynamic
-		const movers = this.movers
-		const flipperMovers = this.flipperMovers
-		const contacts = this.contacts
-		const balls = this.balls
-		const playfield = this.hitPlayfield
-		const glass = this.hitTopGlass
-		ocTreeDynamic.update()
+		this.hitOcTreeDynamic.update()
 		while (dTime > 0) {
 			let hitTime = dTime
-			for (let i = 0; i < flipperMovers.length; i++) {
-				const f = flipperMovers[i]!
+			for (const f of this.flipperMovers) {
 				const t = f.getHitTime()
 				if (t > 0 && t < hitTime) hitTime = t
 			}
 			this.recordContacts = true
-			contacts.length = 0
-			for (let i = 0; i < balls.length; i++) {
-				const ball = balls[i]!
+			this.contacts.length = 0
+			for (const ball of this.balls) {
 				if (ball.state.isFrozen) continue
 				ball.hit.coll.hitTime = hitTime
 				ball.hit.coll.clear()
-				if (!this.meshAsPlayfield) playfield.doHitTest(ball, ball.coll, this)
-				glass.doHitTest(ball, ball.coll, this)
+				if (!this.meshAsPlayfield) this.hitPlayfield.doHitTest(ball, ball.coll, this)
+				this.hitTopGlass.doHitTest(ball, ball.coll, this)
 				if (this.swapBallCollisionHandling) {
-					ocTreeDynamic.hitTestBall(ball, ball.coll, this)
-					ocTree.hitTestBall(ball, ball.coll, this)
+					this.hitOcTreeDynamic.hitTestBall(ball, ball.coll, this)
+					this.hitOcTree.hitTestBall(ball, ball.coll, this)
 				} else {
-					ocTree.hitTestBall(ball, ball.coll, this)
-					ocTreeDynamic.hitTestBall(ball, ball.coll, this)
+					this.hitOcTree.hitTestBall(ball, ball.coll, this)
+					this.hitOcTreeDynamic.hitTestBall(ball, ball.coll, this)
 				}
 				const htz = ball.coll.hitTime
 				if (htz < 0) ball.coll.clear()
@@ -161,25 +151,26 @@ export class PlayerPhysics {
 			}
 			this.recordContacts = false
 			if (hitTime > STATICTIME) staticCnts = STATICCNTS
-			for (let i = 0; i < movers.length; i++) movers[i]!.updateDisplacements(hitTime)
-			for (let i = 0; i < balls.length; i++) {
-				const ball = balls[i]!
+			for (const m of this.movers) m.updateDisplacements(hitTime)
+			for (let i = 0; i < this.balls.length; i++) {
+				const ball = this.balls[i]!
 				const pho = ball.coll.obj
 				if (pho && ball.coll.hitTime <= hitTime) {
 					this.activeBall = ball
 					pho.collide(ball.coll, this)
 					ball.coll.clear()
-					if (balls[i] !== ball) --i
+					if (this.balls[i] !== ball) --i
 					else ball.hit.calcHitBBox()
 				}
 			}
 			if (this.swapBallCollisionHandling) {
-				for (let i = contacts.length - 1; i >= 0; i--) contacts[i]!.obj!.contact(contacts[i]!, hitTime, this)
+				for (let i = this.contacts.length - 1; i >= 0; i--)
+					this.contacts[i]!.obj!.contact(this.contacts[i]!, hitTime, this)
 			} else {
-				for (let i = 0; i < contacts.length; i++) contacts[i]!.obj!.contact(contacts[i]!, hitTime, this)
+				for (const c of this.contacts) c.obj!.contact(c, hitTime, this)
 			}
-			for (let i = 0; i < contacts.length; i++) CollisionEvent.releaseOne(contacts[i]!)
-			contacts.length = 0
+			for (const c of this.contacts) CollisionEvent.releaseOne(c)
+			this.contacts.length = 0
 			dTime -= hitTime
 			this.swapBallCollisionHandling = !this.swapBallCollisionHandling
 		}
