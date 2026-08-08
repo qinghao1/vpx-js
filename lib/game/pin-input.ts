@@ -104,6 +104,7 @@ export class PinInput {
 		this.syncFlippers(isDown, code)
 		this.syncPlunger(isDown, code)
 		this.syncCabinet(isDown, code)
+		this.tryMockTroughEject(isDown, code)
 	}
 
 	private syncFlippers(isDown: boolean, code: number): void {
@@ -142,6 +143,37 @@ export class PinInput {
 				if (isDown) api.PullBack()
 				else api.Fire()
 			} catch {}
+		}
+	}
+
+	private tryMockTroughEject(isDown: boolean, code: number): void {
+		if (!isDown) return
+		const k = this.rgKeys
+		const isStart = code === DIK_1 || code === k[AssignKey.StartGameKey]
+		if (!isStart) return
+		const emu = this.player.getPhysics().emu as unknown as {
+			isMock?: boolean
+			isInitialized?: () => boolean
+		} | null
+		if (emu && !emu.isMock && emu.isInitialized?.()) return
+		// mock: no PinMAME solenoid → simulate trough eject (see ~/projects/vpinball/kicker.cpp + walking_dead.vbs solTrough)
+		const order = ['sw21', 'sw20', 'sw19', 'sw18']
+		const byName: Record<string, unknown> = {}
+		for (const [key, item] of Object.entries(this.table.kickers)) {
+			byName[key.toLowerCase()] = item
+			try {
+				byName[(item as { getName(): string }).getName().toLowerCase()] = item
+			} catch {}
+		}
+		for (const name of order) {
+			const kicker = byName[name] as
+				| { hit?: { ball?: unknown }; getApi(): { Kick(a: number, s: number): void } }
+				| undefined
+			if (!kicker?.hit?.ball) continue
+			try {
+				kicker.getApi().Kick(61, 10)
+			} catch {}
+			break
 		}
 	}
 

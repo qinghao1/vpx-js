@@ -19,3 +19,4 @@ walking_dead.vpx
 demo-browser/
 wasm/build/
 wasm/dist/*.wasm
+profile_harness*.mjs
