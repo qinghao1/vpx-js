@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { EventEmitter } from 'events'
+import { logger } from '../util/logger.js'
 import type { Vertex2D, Vertex3D } from '../util/math.js'
 import type { Ball } from '../vpt/ball/ball.js'
 import type { ItemState } from '../vpt/item-state.js'
@@ -60,7 +61,7 @@ export class Player extends EventEmitter {
 		try {
 			this.runScript(scope, false)
 		} catch (e) {
-			console.warn('Table script failed, continuing without script', e)
+			logger().warn('Table script failed, continuing without script %s', (e as Error).message)
 		}
 		this.table.broadcastInit()
 		this.isInitialized = true
@@ -73,7 +74,7 @@ export class Player extends EventEmitter {
 		try {
 			await this.runScript(scope, true)
 		} catch (e) {
-			console.warn('Table script failed, continuing without script', e)
+			logger().warn('Table script failed, continuing without script %s', (e as Error).message)
 		}
 		this.table.broadcastInit()
 		this.isInitialized = true
