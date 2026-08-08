@@ -79,6 +79,11 @@ export class PlungerMover implements MoverObject {
 
 	private fStrokeEventsArmed = false
 
+	/** Recent mech readings for apex detection on release. */
+	private mech0 = 0
+	private mech1 = 0
+	private mech2 = 0
+
 	/** Scatter velocity for plunger-ball collision. */
 	public scatterVelocity = 0
 
@@ -152,7 +157,12 @@ export class PlungerMover implements MoverObject {
 	}
 
 	public updateVelocities(): void {
-		const isMech = this.data.mechPlunger
+		const pos = (this.pos - this.frameEnd) / this.frameLen
+		const mech = 0
+		const dMech = this.mech0 - mech
+		const autoPlunger = this.data.autoPlunger
+		const ReleaseThreshold = 0.2
+
 		if (this.fireTimer > 0) {
 			this.speed = this.fireSpeed
 			--this.fireTimer
@@ -160,15 +170,29 @@ export class PlungerMover implements MoverObject {
 			if (--this.autoFireTimer === 0) {
 				this.tableApi.fireKeyEvent(Event.GameEventsKeyUp, this.player.getKey(AssignKey.PlungerKey))
 			}
+		} else if (autoPlunger && dMech > ReleaseThreshold) {
+			this.tableApi.fireKeyEvent(Event.GameEventsKeyDown, this.player.getKey(AssignKey.PlungerKey))
+			this.autoFireTimer = 101
 		} else if (this.pullForce !== 0) {
 			this.speed += this.pullForce / this.mass
 			if (this.pos >= this.frameStart) this.speed = 0
-		} else if (isMech) {
-			const pos = (this.pos - this.frameEnd) / this.frameLen
-			const mech = 0
-			this.updateSyncVelocity(pos, mech, this.data.autoPlunger)
+		} else if (dMech > ReleaseThreshold) {
+			let apex = this.mech0
+			if (this.mech1 > apex) {
+				apex = this.mech1
+				if (this.mech2 > apex) apex = this.mech2
+			}
+			this.fire(apex)
+		} else {
+			this.updateSyncVelocity(pos, mech, autoPlunger)
 		}
+
 		this.reverseImpulse = 0
+		if (mech !== this.mech0) {
+			this.mech2 = this.mech1
+			this.mech1 = this.mech0
+			this.mech0 = mech
+		}
 	}
 
 	private updateSyncVelocity(pos: number, mech: number, autoPlunger: boolean): void {
