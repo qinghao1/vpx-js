@@ -17,6 +17,7 @@ import {
 	type Texture as ThreeTexture,
 	UnsignedByteType,
 } from '../../refs.browser.js'
+import { exrCacheKey, idbGet, idbSet } from '../../util/idb-cache.js'
 import type { ITextureLoader } from '../irender-api.js'
 
 const imageMap: { [key: string]: string } = {
@@ -65,36 +66,48 @@ function getMaxSizeForTexture(name: string, w: number, h: number, isFloat: boole
 	}
 }
 
-let exrWorker: Worker | null = null
+const EXR_POOL_SIZE = 4
+let exrPool: Worker[] | null = null
 let exrSeq = 0
+let exrNext = 0
 const exrPending = new Map<number, { resolve: (v: any) => void; reject: (e: any) => void }>()
 
-function getExrWorker(): Worker | null {
+function getExrPool(): Worker[] | null {
 	if (typeof Worker === 'undefined') return null
-	if (exrWorker) return exrWorker
+	if (exrPool) return exrPool
 	try {
-		exrWorker = new Worker(new URL('./workers/exr-worker.js', import.meta.url), { type: 'module' } as any)
-		exrWorker.onmessage = (e: MessageEvent) => {
-			const { id, ok, error, width, height, data, type, format, colorSpace } = e.data as any
-			const p = exrPending.get(id)
-			if (!p) return
-			exrPending.delete(id)
-			if (!ok) p.reject(new Error(error))
-			else p.resolve({ width, height, data, type, format, colorSpace })
+		const pool: Worker[] = []
+		const size = Math.min(
+			EXR_POOL_SIZE,
+			(typeof navigator !== 'undefined' && (navigator as any).hardwareConcurrency) || 4,
+		)
+		for (let i = 0; i < size; i++) {
+			const w = new Worker(new URL('./workers/exr-worker.js', import.meta.url), { type: 'module' } as any)
+			w.onmessage = (e: MessageEvent) => {
+				const { id, ok, error, width, height, data, type, format, colorSpace } = e.data as any
+				const p = exrPending.get(id)
+				if (!p) return
+				exrPending.delete(id)
+				if (!ok) p.reject(new Error(error))
+				else p.resolve({ width, height, data, type, format, colorSpace })
+			}
+			w.onerror = (e: any) => {
+				for (const [, p] of exrPending) p.reject(e.error || new Error(String(e.message || e)))
+				exrPending.clear()
+			}
+			pool.push(w)
 		}
-		exrWorker.onerror = (e: any) => {
-			for (const [, p] of exrPending) p.reject(e.error || new Error(String(e.message || e)))
-			exrPending.clear()
-		}
-		return exrWorker
+		exrPool = pool
+		return pool
 	} catch {
 		return null
 	}
 }
 
 async function parseWithWorker(buffer: ArrayBuffer, kind: 'exr' | 'hdr'): Promise<any> {
-	const w = getExrWorker()
-	if (!w) throw new Error('no worker')
+	const pool = getExrPool()
+	if (!pool || !pool.length) throw new Error('no worker')
+	const w = pool[exrNext++ % pool.length]
 	const id = ++exrSeq
 	return await new Promise((resolve, reject) => {
 		exrPending.set(id, { resolve, reject })
@@ -109,7 +122,7 @@ async function parseWithWorker(buffer: ArrayBuffer, kind: 'exr' | 'hdr'): Promis
 				exrPending.delete(id)
 				reject(new Error('exr worker timeout'))
 			}
-		}, 15000)
+		}, 30000)
 	})
 }
 
@@ -213,12 +226,50 @@ export class ThreeTextureLoaderBrowser implements ITextureLoader<ThreeTexture> {
 		if (isHdr || isExr) {
 			const kind: 'exr' | 'hdr' = isExr ? 'exr' : 'hdr'
 			const tryWorker = async (): Promise<ThreeTexture> => {
+				const rawLen = data.byteLength
+				const cacheKey = exrCacheKey(name, rawLen, kind)
+				try {
+					const cached: any = await idbGet(cacheKey)
+					if (cached && cached.width && cached.data) {
+						const tex = new DataTexture(
+							cached.data as any,
+							cached.width,
+							cached.height,
+							cached.format || (RGBAFormat as any),
+							cached.type ?? (HalfFloatType as any),
+						)
+						tex.flipY = false
+						tex.colorSpace = (cached.colorSpace as any) || LinearSRGBColorSpace
+						tex.needsUpdate = true
+						nameAndTune(tex as any, name)
+						const max = getMaxSizeForTexture(name, cached.width, cached.height, true, this.playfieldMap)
+						const ds = downsampleIfNeeded(tex as any, max, name)
+						if (ds && ds !== tex) {
+							try {
+								;(tex as any).dispose?.()
+							} catch {}
+							return ds as ThreeTexture
+						}
+						return tex as ThreeTexture
+					}
+				} catch {}
 				const buf = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer
 				let parsed: any = null
 				try {
 					parsed = await parseWithWorker(buf.slice(0) as ArrayBuffer, kind)
 				} catch {}
 				if (parsed && parsed.width && parsed.data) {
+					try {
+						const toCache: any = {
+							width: parsed.width,
+							height: parsed.height,
+							data: parsed.data,
+							type: parsed.type,
+							format: parsed.format,
+							colorSpace: parsed.colorSpace,
+						}
+						idbSet(cacheKey, toCache).catch(() => {})
+					} catch {}
 					const tex = new DataTexture(
 						parsed.data as any,
 						parsed.width,
