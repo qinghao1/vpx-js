@@ -251,6 +251,61 @@ const initial = await page.evaluate(() => {
 	}
 })
 console.log('[profile] initial', initial)
+const ballsArg = process.argv.find((a) => a.startsWith('--balls='))?.split('=')[1]
+const desiredBalls = ballsArg !== undefined ? Number(ballsArg) : initial.balls === 0 ? 10 : 0
+if (desiredBalls > 0) {
+	const created = await page.evaluate(async (n) => {
+		const p = window.viewer?.player
+		if (!p) return 'no player'
+		const width = p.table?.gameData?.width ?? 1000
+		const height = p.table?.gameData?.height ?? 2000
+		const THREE = window.THREE
+		if (!THREE?.Vector3) return 'no THREE'
+		if (!THREE.Vector3.prototype.subAndRelease) {
+			THREE.Vector3.prototype.subAndRelease = function (o) {
+				this.sub(o)
+				try {
+					o.release?.()
+				} catch {}
+				return this
+			}
+		}
+		if (!THREE.Vector3.prototype.addAndRelease) {
+			THREE.Vector3.prototype.addAndRelease = function (o) {
+				this.add(o)
+				try {
+					o.release?.()
+				} catch {}
+				return this
+			}
+		}
+		let ok = 0
+		for (let i = 0; i < n; i++) {
+			const x = width / 2 + (Math.random() - 0.5) * 60
+			const y = height / 2 + (Math.random() - 0.5) * 60
+			const z = 30
+			const vx = (Math.random() - 0.5) * 600
+			const vy = (Math.random() - 0.5) * 600
+			const vz = 50 + Math.random() * 100
+			try {
+				p.createBall(
+					{
+						getBallCreationPosition: () => new THREE.Vector3(x, y, z),
+						getBallCreationVelocity: () => new THREE.Vector3(vx, vy, vz),
+						onBallCreated: () => {},
+					},
+					25,
+					1,
+				)
+				ok++
+			} catch (e) {
+				return 'create err ' + (e?.message ?? String(e))
+			}
+		}
+		return `created ${ok}/${n} total ${p.balls.length}`
+	}, desiredBalls)
+	console.log(`[profile] ensure balls ${created}`)
+}
 let metricsMid = {}
 try {
 	metricsMid = await page.metrics()
