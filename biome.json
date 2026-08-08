@@ -1,7 +1,7 @@
 {
 	"$schema": "https://biomejs.dev/schemas/2.5.7/schema.json",
 	"vcs": {
-		"enabled": false,
+		"enabled": true,
 		"clientKind": "git",
 		"useIgnoreFile": true
 	},
@@ -11,7 +11,10 @@
 			"**",
 			"!node_modules",
 			"!dist",
+			"!dist-esm",
 			"!coverage",
+			"!external",
+			"!wasm/build",
 			"!test/fixtures",
 			"!lib/scripting/grammar/rules.ts",
 			"!lib/render/threejs/vendor",
@@ -27,58 +30,17 @@
 		"indentStyle": "tab",
 		"lineWidth": 120
 	},
+	"assist": {
+		"actions": {
+			"source": {
+				"organizeImports": "on"
+			}
+		}
+	},
 	"linter": {
 		"enabled": true,
 		"rules": {
-			"preset": "recommended",
-			"correctness": {
-				"noUnusedVariables": "off",
-				"noUnusedImports": "off",
-				"noUnusedFunctionParameters": "off",
-				"noConstructorReturn": "off",
-				"noPrecisionLoss": "off",
-				"noVoidTypeReturn": "off",
-				"noUnusedPrivateClassMembers": "off",
-				"noConstantCondition": "off"
-			},
-			"style": {
-				"useNodejsImportProtocol": "off",
-				"useConst": "off",
-				"useTemplate": "off",
-				"noNonNullAssertion": "off"
-			},
-			"suspicious": {
-				"noExplicitAny": "off",
-				"noAssignInExpressions": "off",
-				"noDoubleEquals": "off",
-				"noGlobalIsNan": "off",
-				"noGlobalIsFinite": "off",
-				"noImplicitAnyLet": "off",
-				"noConfusingVoidType": "off",
-				"noControlCharactersInRegex": "off",
-				"noApproximativeNumericConstant": "off",
-				"noSelfCompare": "off",
-				"noShadowRestrictedNames": "off",
-				"useIsArray": "off",
-				"useIterableCallbackReturn": "off",
-				"noExportsInTest": "off"
-			},
-			"complexity": {
-				"noBannedTypes": "off",
-				"noUselessConstructor": "off",
-				"useLiteralKeys": "off",
-				"useOptionalChain": "off",
-				"noArguments": "off",
-				"noStaticOnlyClass": "off",
-				"noUselessSwitchCase": "off",
-				"noCommaOperator": "off"
-			},
-			"security": {
-				"noGlobalEval": "off"
-			},
-			"a11y": {
-				"useButtonType": "off"
-			}
+			"recommended": true
 		}
 	},
 	"javascript": {
@@ -89,8 +51,25 @@
 	},
 	"overrides": [
 		{
-			"includes": ["**/*.js"],
+			"includes": ["**/*.spec.ts", "**/*.integration.spec.ts", "test/**", "build/**"],
 			"linter": {
+				"rules": {
+					"suspicious": {
+						"noExplicitAny": "off",
+						"noExportsInTest": "off"
+					}
+				}
+			}
+		},
+		{
+			"includes": ["lib/scripting/grammar/rules.ts", "lib/render/threejs/vendor/**"],
+			"formatter": {
+				"enabled": false
+			},
+			"linter": {
+				"enabled": false
+			},
+			"assist": {
 				"enabled": false
 			}
 		}
