@@ -21,6 +21,35 @@ command -v emcc >/dev/null 2>&1 || { echo "[wasm] emcc not found — using mock"
 preset="${1:---wasm}"
 case "$preset" in --debug) preset="debug";; --release|--wasm) preset="wasm";; *) preset="wasm";; esac
 
+# Apply source patches for emcc compatibility (idempotent)
+PINMAME="$ROOT/external/pinmame"
+if [[ -f "$PINMAME/ext/miniaudio/miniaudio.h" && ! -f "$PINMAME/ext/miniaudio/miniaudio/miniaudio.h" ]]; then
+  mkdir -p "$PINMAME/ext/miniaudio/miniaudio"
+  cp "$PINMAME/ext/miniaudio/miniaudio.h" "$PINMAME/ext/miniaudio/miniaudio/miniaudio.h"
+fi
+if [[ -f "$PINMAME/ext/miniaudio/miniaudio/miniaudio.h" && ! -f "$PINMAME/ext/miniaudio/miniaudio.h" ]]; then
+  cp "$PINMAME/ext/miniaudio/miniaudio/miniaudio.h" "$PINMAME/ext/miniaudio/miniaudio.h"
+fi
+if [[ -f "$PINMAME/ext/libsamplerate/src_sinc.c" ]] && grep -q "static enum SRC_ERR int sinc_multichan" "$PINMAME/ext/libsamplerate/src_sinc.c" 2>/dev/null; then
+  sed -i 's/static enum SRC_ERR int sinc_multichan_vari_process/static enum SRC_ERR sinc_multichan_vari_process/' "$PINMAME/ext/libsamplerate/src_sinc.c"
+fi
+if grep -q '__rolq' "$PINMAME/src/common.h" 2>/dev/null && ! grep -q 'PINMAME_WASM.*__rolq' "$PINMAME/src/common.h"; then
+  python3 - << 'PYEOF'
+import pathlib
+pp = pathlib.Path("external/pinmame/src/common.h")
+tt = pp.read_text()
+o1 = "#elif !defined(__arm__) && !defined(__aarch64__) && (defined(__INTEL_COMPILER) || (defined(__GNUC__) && (__GNUC__ > 3)) || defined(__clang__))\n    return __rolq(x, count);"
+n1 = "#elif !defined(__arm__) && !defined(__aarch64__) && !defined(WASM) && !defined(PINMAME_WASM) && (defined(__INTEL_COMPILER) || (defined(__GNUC__) && (__GNUC__ > 3)) || defined(__clang__))\n    return __rolq(x, count);"
+if o1 in tt:
+    tt=tt.replace(o1,n1)
+o2 = "#elif !defined(__arm__) && !defined(__aarch64__) && (defined(__INTEL_COMPILER) || (defined(__GNUC__) && (__GNUC__ > 3)) || defined(__clang__))\n    return __rorq(x, count);"
+n2 = "#elif !defined(__arm__) && !defined(__aarch64__) && !defined(WASM) && !defined(PINMAME_WASM) && (defined(__INTEL_COMPILER) || (defined(__GNUC__) && (__GNUC__ > 3)) || defined(__clang__))\n    return __rorq(x, count);"
+if o2 in tt:
+    tt=tt.replace(o2,n2)
+pp.write_text(tt)
+PYEOF
+fi
+
 echo "[wasm] building $preset — $(emcc --version | head -1) — $(cmake --version | head -1)"
 if ! (cd "$WASM_DIR" && emcmake cmake --preset "$preset" && cmake --build --preset "$preset"); then
   echo "[wasm] build failed — using mock fallback"
