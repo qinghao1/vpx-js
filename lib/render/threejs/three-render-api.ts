@@ -11,6 +11,7 @@ import {
 	type PointLight,
 	type Mesh as ThreeMesh,
 } from '../../refs.node.js'
+import { type AnimationGate, animationGate } from '../../util/animation-gate.js'
 import { progress } from '../../util/logger.js'
 import type { Matrix3D } from '../../util/math.js'
 import type { ItemState } from '../../vpt/item-state.js'
@@ -44,9 +45,9 @@ export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, Poin
 	private readonly materialGenerator: ThreeMaterialGenerator
 	private readonly lightGenerator = new ThreeLightGenerator()
 
-	constructor(opts?: MeshConvertOptions) {
+	constructor(opts?: MeshConvertOptions, gate: AnimationGate = animationGate) {
 		this.meshConvertOpts = opts ?? { applyMaterials: false, optimizeTextures: false }
-		this.mapGenerator = new ThreeMapGenerator(this.meshConvertOpts.applyTextures)
+		this.mapGenerator = new ThreeMapGenerator(this.meshConvertOpts.applyTextures, gate)
 		this.materialGenerator = new ThreeMaterialGenerator(this.mapGenerator)
 		this.converter = new ThreeConverter(
 			this.meshGenerator,

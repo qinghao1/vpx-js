@@ -4,75 +4,78 @@
 export const ANIM_SETTLE_MS = 80
 export const ANIM_POLL_MS = 16
 
-type GateState = {
-	animating: boolean
-	promise: Promise<void> | null
-	resolve: (() => void) | null
+export class AnimationGate {
+	private animating = false
+	private promise: Promise<void> | null = null
+	private resolve: (() => void) | null = null
+
+	isAnimating(): boolean {
+		return this.animating
+	}
+
+	beginAnimation(): void {
+		if (this.resolve) {
+			try {
+				this.resolve()
+			} catch {}
+		}
+		this.animating = true
+		this.promise = new Promise<void>(r => {
+			this.resolve = r
+		})
+	}
+
+	endAnimation(): void {
+		this.animating = false
+		const r = this.resolve
+		this.resolve = null
+		this.promise = null
+		try {
+			r?.()
+		} catch {}
+	}
+
+	async waitIfAnimating(): Promise<void> {
+		if (this.promise) {
+			try {
+				await this.promise
+			} catch {}
+		}
+	}
+
+	async yieldToMain(): Promise<void> {
+		await this.waitIfAnimating()
+		const g = globalThis as unknown as { scheduler?: { yield?: () => Promise<void> } }
+		if (typeof requestAnimationFrame === 'function') {
+			await new Promise<void>(r => requestAnimationFrame(() => r()))
+			if (g.scheduler?.yield) await g.scheduler.yield()
+			else await new Promise<void>(r => setTimeout(r, 0))
+		} else if (g.scheduler?.yield) {
+			await g.scheduler.yield()
+		} else {
+			await new Promise<void>(r => setTimeout(r, 0))
+		}
+	}
 }
 
-function getState(): GateState {
-	const g = globalThis as unknown as { __vpxAnimGate?: GateState }
-	if (!g.__vpxAnimGate) g.__vpxAnimGate = { animating: false, promise: null, resolve: null }
-	return g.__vpxAnimGate
-}
+export const animationGate = new AnimationGate()
 
 export function isAnimating(): boolean {
-	return getState().animating
+	return animationGate.isAnimating()
 }
 
 export function beginAnimation(): void {
-	const s = getState()
-	if (s.resolve) {
-		try {
-			s.resolve()
-		} catch {}
-	}
-	s.animating = true
-	s.promise = new Promise<void>(r => {
-		s.resolve = r
-	})
+	animationGate.beginAnimation()
 }
 
 export function endAnimation(): void {
-	const s = getState()
-	s.animating = false
-	const r = s.resolve
-	s.resolve = null
-	s.promise = null
-	try {
-		r?.()
-	} catch {}
+	animationGate.endAnimation()
 }
 
-export async function waitIfAnimating(): Promise<void> {
-	const s = getState()
-	if (s.promise) {
-		try {
-			await s.promise
-		} catch {}
-		return
-	}
-	if (s.animating) {
-		await new Promise<void>(r => {
-			const check = () => {
-				if (!getState().animating) r()
-				else setTimeout(check, ANIM_POLL_MS)
-			}
-			setTimeout(check, ANIM_POLL_MS)
-		})
-	}
+export function waitIfAnimating(): Promise<void> {
+	return animationGate.waitIfAnimating()
 }
 
-export async function yieldToMain(): Promise<void> {
-	await waitIfAnimating()
-	const g = globalThis as unknown as { scheduler?: { yield?: () => Promise<void> } }
-	if (typeof requestAnimationFrame === 'function') {
-		await new Promise<void>(r => requestAnimationFrame(() => r()))
-		if (g.scheduler?.yield) await g.scheduler.yield()
-		else await new Promise<void>(rr => setTimeout(rr, 0))
-	} else if (g.scheduler?.yield) {
-		await g.scheduler.yield()
-	} else {
-		await new Promise<void>(r => setTimeout(r, 0))
-	}
+export function yieldToMain(): Promise<void> {
+	return animationGate.yieldToMain()
 }

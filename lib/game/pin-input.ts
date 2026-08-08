@@ -151,17 +151,24 @@ export class PinInput {
 		if (code !== DIK_1 && code !== this.rgKeys[AssignKey.StartGameKey]) return
 		const emu = this.player.getPhysics().emu as unknown as { isMock?: boolean; isInitialized?: () => boolean } | null
 		if (emu && !emu.isMock && emu.isInitialized?.()) return
-		// no PinMAME solenoid in mock — emulate solTrough: sw21.kick 61,10
-		for (const name of ['sw21', 'sw20', 'sw19', 'sw18']) {
-			const kicker = (this.table.kickers[name] ??
-				Object.values(this.table.kickers).find((k) => k.getName().toLowerCase() === name)) as
-				| { hit?: { ball?: unknown }; getApi(): { Kick(a: number, s: number): void } }
-				| undefined
-			if (!kicker?.hit?.ball) continue
+		const withBall = (Object.values(this.table.kickers) as unknown as Array<{ hit?: { ball?: unknown }; getApi(): { Kick(a: number, s: number): void; DestroyBall(): number }; getName(): string; data: { center: { x: number } } }>).filter(
+			(k) => (k as any).hit?.ball,
+		)
+		if (!withBall.length) {
+			const plunger = Object.values(this.table.plungers)[0] as unknown as { getApi(): { CreateBall(): unknown } } | undefined
+			if (plunger) try { plunger.getApi().CreateBall() } catch {}
+			return
+		}
+		withBall.sort((a, b) => b.data.center.x - a.data.center.x)
+		const exit = withBall[0]!
+		try {
+			exit.getApi().Kick(60, 10)
+		} catch {
 			try {
-				kicker.getApi().Kick(61, 10)
+				exit.getApi().DestroyBall()
+				const plunger = Object.values(this.table.plungers)[0] as unknown as { getApi(): { CreateBall(): unknown } } | undefined
+				if (plunger) plunger.getApi().CreateBall()
 			} catch {}
-			break
 		}
 	}
 

@@ -4,7 +4,7 @@
 import { generate } from 'escodegen'
 import type { Program } from 'estree'
 import type { Player } from '../game/player.js'
-import { waitIfAnimating, yieldToMain } from '../util/animation-gate.js'
+import { type AnimationGate, animationGate } from '../util/animation-gate.js'
 import { logger, progress } from '../util/logger.js'
 import { Enums, type EnumsApi } from '../vpt/enums.js'
 import { GlobalApi } from '../vpt/global-api.js'
@@ -53,6 +53,7 @@ export class Transpiler {
 	constructor(
 		private readonly table: Table,
 		private readonly player: Player,
+		private readonly gate: AnimationGate = player.gate ?? animationGate,
 	) {
 		this.itemApis = table.getElementApis()
 		this.globalApi = new GlobalApi(table, player)
@@ -125,17 +126,17 @@ export class Transpiler {
 
 	public async transpileAsync(vbs: string, globalFunction?: string, globalObject?: string): Promise<string> {
 		const src = normalizeNewCall(vbs)
-		await yieldToMain()
-		await waitIfAnimating()
+		await this.gate.yieldToMain()
+		await this.gate.waitIfAnimating()
 		const t0 = Date.now()
 		let ast = this.grammar.transpile(src)
 		logger().info('[Transpiler] Parsed in %sms', Date.now() - t0)
-		await yieldToMain()
+		await this.gate.yieldToMain()
 		const t1 = Date.now()
 		for (const fn of this.pipeline(globalFunction, globalObject)) {
-			await waitIfAnimating()
+			await this.gate.waitIfAnimating()
 			ast = fn(ast)
-			await yieldToMain()
+			await this.gate.yieldToMain()
 		}
 		logger().info('[Transpiler] Transformed in %sms', Date.now() - t1)
 		const js = this.gen(ast, t0)
@@ -171,7 +172,7 @@ export class Transpiler {
 					logger().info('[Transpiler] Evaluated in %sms', Date.now() - t)
 					progress().details('executing')
 					t = Date.now()
-					await yieldToMain()
+					await this.gate.yieldToMain()
 					play(
 						new Proxy(globalScope, new VbsProxyHandler()),
 						this.itemApis,
@@ -193,7 +194,7 @@ export class Transpiler {
 		logger().info('[Transpiler] Evaluated in %sms', Date.now() - t2)
 		progress().details('executing')
 		t2 = Date.now()
-		await yieldToMain()
+		await this.gate.yieldToMain()
 		play(
 			new Proxy(globalScope, new VbsProxyHandler()),
 			this.itemApis,

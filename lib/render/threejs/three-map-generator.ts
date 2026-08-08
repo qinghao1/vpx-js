@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import type { Texture as ThreeTexture } from '../../refs.node.js'
-import { isAnimating, waitIfAnimating, yieldToMain } from '../../util/animation-gate.js'
+import { type AnimationGate, animationGate } from '../../util/animation-gate.js'
 import { logger, progress } from '../../util/logger.js'
 import type { Table } from '../../vpt/table/table.js'
 import type { Texture } from '../../vpt/texture.js'
@@ -17,7 +17,10 @@ const CONCURRENCY_DEFAULT = 3
 export class ThreeMapGenerator {
 	private readonly textureCache = new Map<string, ThreeTexture>()
 
-	constructor(private readonly textureLoader?: ITextureLoader<ThreeTexture>) {}
+	constructor(
+		private readonly textureLoader?: ITextureLoader<ThreeTexture>,
+		private readonly gate: AnimationGate = animationGate,
+	) {}
 
 	public async loadTextures(textures: Texture[], table: Table): Promise<void> {
 		if (!this.textureLoader) return
@@ -52,7 +55,7 @@ export class ThreeMapGenerator {
 		const hasLarge = textures.some(t => t.width * t.height > LARGE_TEXTURE_PIXELS)
 		const hasFloat = textures.some(t => (t as any).isHdr?.() || /\.(exr|hdr)$/i.test((t as any).szPath ?? ''))
 		const cores = (typeof navigator !== 'undefined' && (navigator as any).hardwareConcurrency) || 4
-		if (isAnimating()) return CONCURRENCY_ANIMATING
+		if (this.gate.isAnimating()) return CONCURRENCY_ANIMATING
 		if (hasFloat) return Math.min(CONCURRENCY_HEAVY, cores)
 		if (hasLarge) return Math.min(CONCURRENCY_HEAVY, cores)
 		return Math.min(CONCURRENCY_DEFAULT, cores)
@@ -62,11 +65,11 @@ export class ThreeMapGenerator {
 		let next = 0
 		const workers = Array.from({ length: Math.min(concurrency, textures.length) }, async () => {
 			while (true) {
-				await waitIfAnimating()
+				await this.gate.waitIfAnimating()
 				const i = next++
 				if (i >= textures.length) break
 				await this.loadOne(textures[i]!, table)
-				await yieldToMain()
+				await this.gate.yieldToMain()
 			}
 		})
 		await Promise.all(workers)

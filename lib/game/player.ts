@@ -10,6 +10,7 @@ import type { Table } from '../vpt/table/table.js'
 import { Event } from './event.js'
 import type { IEmulator } from './iemulator.js'
 import { type AssignKey, keyEventToDirectInputKey } from './key-code.js'
+import { type AnimationGate, animationGate } from '../util/animation-gate.js'
 import { PinInput } from './pin-input.js'
 import { PlayerPhysics } from './player-physics.js'
 
@@ -33,7 +34,10 @@ export class Player extends EventEmitter {
 		return this.physics.activeBall
 	}
 
-	constructor(private readonly table: Table) {
+	constructor(
+		private readonly table: Table,
+		public readonly gate: AnimationGate = animationGate,
+	) {
 		super()
 		this.pinInput = new PinInput(table, this)
 		this.physics = new PlayerPhysics(table, this.pinInput)
