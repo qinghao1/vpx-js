@@ -9,40 +9,36 @@ function openDB(): Promise<IDBDatabase> {
 		req.onupgradeneeded = () => {
 			const db = req.result
 			if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE)
-			// Clear old cache on version bump
-			try { if (db.objectStoreNames.contains('textures')) db.deleteObjectStore('textures') } catch {}
+			try {
+				if (db.objectStoreNames.contains('textures')) db.deleteObjectStore('textures')
+			} catch {}
 		}
 		req.onsuccess = () => resolve(req.result)
 		req.onerror = () => reject(req.error)
 	})
 }
 
-function getStore(db: IDBDatabase, mode: IDBTransactionMode) {
-	try { return db.transaction(STORE, mode).objectStore(STORE) } catch { return db.transaction('textures', mode).objectStore('textures') }
-}
-
 export async function idbGet(key: string): Promise<any | undefined> {
 	try {
 		const db = await openDB()
 		return await new Promise((resolve, reject) => {
-			let store: IDBObjectStore
-			try { store = getStore(db, 'readonly') } catch { resolve(undefined); return }
-			const req = store.get(key)
+			const req = db.transaction(STORE, 'readonly').objectStore(STORE).get(key)
 			req.onsuccess = () => resolve(req.result as any)
 			req.onerror = () => reject(req.error)
 		})
-	} catch { return undefined }
+	} catch {
+		return undefined
+	}
 }
 
 export async function idbSet(key: string, val: any): Promise<void> {
 	try {
 		const db = await openDB()
 		await new Promise<void>((resolve, reject) => {
-			let store: IDBObjectStore
-			try { store = getStore(db, 'readwrite') } catch { resolve(); return }
-			store.put(val, key)
-			store.transaction.oncomplete = () => resolve()
-			store.transaction.onerror = () => reject(store.transaction.error)
+			const tx = db.transaction(STORE, 'readwrite')
+			tx.objectStore(STORE).put(val, key)
+			tx.oncomplete = () => resolve()
+			tx.onerror = () => reject(tx.error)
 		})
 	} catch {}
 }

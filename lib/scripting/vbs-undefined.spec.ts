@@ -15,6 +15,6 @@ describe('The VBScript undefined handler', () => {
 
 	it('should return "undefined" as string', () => {
 		const undef = new VbsUndefined() as unknown
-		expect('' + undef).to.equal('undefined')
+		expect(String(undef)).to.equal('undefined')
 	})
 })

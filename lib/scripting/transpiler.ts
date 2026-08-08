@@ -21,7 +21,15 @@ import { WrapTransformer } from './transformer/wrap-transformer.js'
 import { VBSHelper } from './vbs-helper.js'
 import { VbsProxyHandler } from './vbs-proxy-handler.js'
 
-declare function play(scope: unknown, table: Record<string, unknown>, enums: EnumsApi, globalApi: GlobalApi, stdlib: Stdlib, vbsHelper: VBSHelper, player: Player): void
+declare function play(
+	scope: unknown,
+	table: Record<string, unknown>,
+	enums: EnumsApi,
+	globalApi: GlobalApi,
+	stdlib: Stdlib,
+	vbsHelper: VBSHelper,
+	player: Player,
+): void
 
 function normalizeNewCall(vbs: string): string {
 	let out = vbs.replace(/Set\s+(\w+)\s*=\s*\(\s*New\s+(\w+)\s*\)\s*\(([^)]*)\)/gi, (_, v, c, a) => {
@@ -41,9 +49,16 @@ export class Transpiler {
 	private readonly stdlib = new Stdlib()
 	private readonly grammar = new Grammar()
 
-	constructor(private readonly table: Table, private readonly player: Player) {
+	constructor(
+		private readonly table: Table,
+		private readonly player: Player,
+	) {
 		this.itemApis = table.getElementApis()
 		this.globalApi = new GlobalApi(table, player)
+	}
+
+	private yield(): Promise<void> {
+		return new Promise((r) => setTimeout(r, 0))
 	}
 
 	private pipeline(globalFunction?: string, globalObject?: string): Array<(ast: Program) => Program> {
@@ -51,7 +66,8 @@ export class Transpiler {
 			(a) => new FunctionHoistTransformer(a).transform(),
 			(a) => new EventTransformer(a, this.table.getElements()).transform(),
 			(a) => new ErrorTransformer(a).transform(),
-			(a) => new ReferenceTransformer(a, this.table, this.itemApis, this.enumApis, this.globalApi, this.stdlib).transform(),
+			(a) =>
+				new ReferenceTransformer(a, this.table, this.itemApis, this.enumApis, this.globalApi, this.stdlib).transform(),
 			(a) => new ScopeTransformer(a).transform(),
 			(a) => new ClassTransformer(a).transformThisIdentifiers(),
 			(a) => new AmbiguityTransformer(a, this.itemApis, this.enumApis, this.globalApi, this.stdlib).transform(),
@@ -60,19 +76,47 @@ export class Transpiler {
 		]
 	}
 
-	public transpile(vbs: string, globalFunction?: string, globalObject?: string): string {
+	private parseAndTransform(vbs: string, gf?: string, go?: string): { ast: Program; t0: number; t1: number } {
 		const src = normalizeNewCall(vbs)
 		const t0 = Date.now()
 		let ast = this.grammar.transpile(src)
 		logger().info('[Transpiler] Parsed in %sms', Date.now() - t0)
 		const t1 = Date.now()
-		ast = this.pipeline(globalFunction, globalObject).reduce((a, fn) => fn(a), ast)
+		ast = this.pipeline(gf, go).reduce((a, fn) => fn(a), ast)
 		logger().info('[Transpiler] Transformed in %sms', Date.now() - t1)
+		return { ast, t0, t1 }
+	}
+
+	private gen(ast: Program, t0: number): string {
 		const t2 = Date.now()
 		const js = generate(ast)
 		logger().info('[Transpiler] Generated in %sms (total %sms)', Date.now() - t2, Date.now() - t0)
 		logger().debug(js)
 		return js
+	}
+
+	private evalAndPlay(js: string, scope: Record<string, unknown>): void {
+		let t = Date.now()
+		progress().details('evaluating')
+		eval('//@ sourceURL=game:///tablescript.vbs.js\n' + js)
+		logger().info('[Transpiler] Evaluated in %sms', Date.now() - t)
+		progress().details('executing')
+		t = Date.now()
+		play(
+			new Proxy(scope, new VbsProxyHandler()),
+			this.itemApis,
+			this.enumApis,
+			this.globalApi,
+			this.stdlib,
+			new VBSHelper(this),
+			this.player,
+		)
+		logger().info('[Transpiler] Executed in %sms', Date.now() - t)
+	}
+
+	public transpile(vbs: string, globalFunction?: string, globalObject?: string): string {
+		const { ast, t0 } = this.parseAndTransform(vbs, globalFunction, globalObject)
+		return this.gen(ast, t0)
 	}
 
 	public async transpileAsync(vbs: string, globalFunction?: string, globalObject?: string): Promise<string> {
@@ -80,22 +124,22 @@ export class Transpiler {
 		const t0 = Date.now()
 		let ast = this.grammar.transpile(src)
 		logger().info('[Transpiler] Parsed in %sms', Date.now() - t0)
-		await new Promise((r) => setTimeout(r, 0))
+		await this.yield()
 		const t1 = Date.now()
 		for (const fn of this.pipeline(globalFunction, globalObject)) {
 			ast = fn(ast)
-			await new Promise((r) => setTimeout(r, 0))
+			await this.yield()
 		}
 		logger().info('[Transpiler] Transformed in %sms', Date.now() - t1)
-		const t2 = Date.now()
-		const js = generate(ast)
-		logger().info('[Transpiler] Generated in %sms (total %sms)', Date.now() - t2, Date.now() - t0)
-		logger().debug(js)
-		// Cache in background (best-effort, do not block)
+		const js = this.gen(ast, t0)
 		if (typeof window !== 'undefined' && typeof indexedDB !== 'undefined') {
-			import('../util/idb-cache.js').then(({ vbsCacheKey, idbSet }) => {
-				try { idbSet(vbsCacheKey(vbs), js).catch(() => {}) } catch {}
-			}).catch(() => {})
+			import('../util/idb-cache.js')
+				.then(({ vbsCacheKey, idbSet }) => {
+					try {
+						idbSet(vbsCacheKey(vbs), js).catch(() => {})
+					} catch {}
+				})
+				.catch(() => {})
 		}
 		return js
 	}
@@ -103,19 +147,11 @@ export class Transpiler {
 	public execute(vbs: string, globalScope: Record<string, unknown>, globalObject?: string): void {
 		globalObject ||= typeof window !== 'undefined' ? 'window' : typeof self !== 'undefined' ? 'self' : 'global'
 		const js = this.transpile(vbs, 'play', globalObject)
-		let t = Date.now()
-		progress().details('evaluating')
-		eval('//@ sourceURL=game:///tablescript.vbs.js\n' + js)
-		logger().info('[Transpiler] Evaluated in %sms', Date.now() - t)
-		progress().details('executing')
-		t = Date.now()
-		play(new Proxy(globalScope, new VbsProxyHandler()), this.itemApis, this.enumApis, this.globalApi, this.stdlib, new VBSHelper(this), this.player)
-		logger().info('[Transpiler] Executed in %sms', Date.now() - t)
+		this.evalAndPlay(js, globalScope)
 	}
 
 	public async executeAsync(vbs: string, globalScope: Record<string, unknown>, globalObject?: string): Promise<void> {
 		globalObject ||= typeof window !== 'undefined' ? 'window' : typeof self !== 'undefined' ? 'self' : 'global'
-		// Try cache first
 		if (typeof window !== 'undefined' && typeof indexedDB !== 'undefined') {
 			try {
 				const { vbsCacheKey, idbGet } = await import('../util/idb-cache.js')
@@ -128,22 +164,38 @@ export class Transpiler {
 					logger().info('[Transpiler] Evaluated in %sms', Date.now() - t)
 					progress().details('executing')
 					t = Date.now()
-					await new Promise((r) => setTimeout(r, 0))
-					play(new Proxy(globalScope, new VbsProxyHandler()), this.itemApis, this.enumApis, this.globalApi, this.stdlib, new VBSHelper(this), this.player)
+					await this.yield()
+					play(
+						new Proxy(globalScope, new VbsProxyHandler()),
+						this.itemApis,
+						this.enumApis,
+						this.globalApi,
+						this.stdlib,
+						new VBSHelper(this),
+						this.player,
+					)
 					logger().info('[Transpiler] Executed in %sms', Date.now() - t)
 					return
 				}
 			} catch {}
 		}
 		const js = await this.transpileAsync(vbs, 'play', globalObject)
-		let t = Date.now()
+		let t2 = Date.now()
 		progress().details('evaluating')
 		eval('//@ sourceURL=game:///tablescript.vbs.js\n' + js)
-		logger().info('[Transpiler] Evaluated in %sms', Date.now() - t)
+		logger().info('[Transpiler] Evaluated in %sms', Date.now() - t2)
 		progress().details('executing')
-		t = Date.now()
-		await new Promise((r) => setTimeout(r, 0))
-		play(new Proxy(globalScope, new VbsProxyHandler()), this.itemApis, this.enumApis, this.globalApi, this.stdlib, new VBSHelper(this), this.player)
-		logger().info('[Transpiler] Executed in %sms', Date.now() - t)
+		t2 = Date.now()
+		await this.yield()
+		play(
+			new Proxy(globalScope, new VbsProxyHandler()),
+			this.itemApis,
+			this.enumApis,
+			this.globalApi,
+			this.stdlib,
+			new VBSHelper(this),
+			this.player,
+		)
+		logger().info('[Transpiler] Executed in %sms', Date.now() - t2)
 	}
 }

@@ -47,7 +47,7 @@ export class BallUpdater extends ItemUpdater<BallState> {
 		const m = Matrix3D.claim()
 			.setScaling(this.data.radius, this.data.radius, this.data.radius)
 			.preMultiply(orient)
-			.multiply(trans)
+			.preMultiply(trans)
 			.toRightHanded()
 		renderApi.applyMatrixToNode(m, obj)
 		Matrix3D.release(orient, trans, m)

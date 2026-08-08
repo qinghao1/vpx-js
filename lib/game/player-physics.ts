@@ -18,6 +18,7 @@ import { HitQuadtree } from '../physics/hit-quadtree.js'
 import type { MoverObject } from '../physics/mover-object.js'
 import { now } from '../refs.node.js'
 import { degToRad } from '../util/float.js'
+import { logger } from '../util/logger.js'
 import { Vertex3D } from '../util/math.js'
 import { Ball } from '../vpt/ball/ball.js'
 import { BallData } from '../vpt/ball/ball-data.js'
@@ -216,7 +217,9 @@ export class PlayerPhysics {
 						try {
 							t.pfe.fireGroupEvent(Event.TimerEventsTimer)
 						} catch (e) {
-							try { console.warn('timer error', (e as Error).message) } catch {}
+							try {
+								logger().warn('timer error %s', (e as Error).message)
+							} catch {}
 						}
 						if (prev === t.nextFire) t.nextFire += t.interval
 					}

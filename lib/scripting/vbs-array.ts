@@ -13,6 +13,9 @@ export class VbsArray<T> implements ProxyHandler<VbsArray<T>> {
 	}
 
 	public get(target: unknown, key: string | symbol): T | VbsUndefined {
+		if (key === '__isUndefined' || typeof key === 'symbol') {
+			return (target as Record<string | symbol, unknown>)[key] as T
+		}
 		const t = target as Record<string | symbol, unknown>
 		return t[key] !== undefined
 			? (t[key] as T)
