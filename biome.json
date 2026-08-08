@@ -60,6 +60,9 @@
 			},
 			"security": {
 				"noGlobalEval": "off"
+			},
+			"performance": {
+				"noDelete": "warn"
 			}
 		}
 	},

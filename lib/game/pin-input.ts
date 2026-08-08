@@ -150,13 +150,40 @@ export class PinInput {
 		if (!isDown) return
 		const k = this.rgKeys
 		const isStart = code === DIK_1 || code === k[AssignKey.StartGameKey]
-		if (!isStart) return
+		const isPlunger = code === k[AssignKey.PlungerKey]
+		if (!isStart && !isPlunger) return
+		if (isPlunger && this.hasLiveBall()) return
 		const emu = this.player.getPhysics().emu as unknown as {
 			isMock?: boolean
 			isInitialized?: () => boolean
 		} | null
 		if (emu && !emu.isMock && emu.isInitialized?.()) return
-		// mock: no PinMAME solenoid → simulate trough eject (see ~/projects/vpinball/kicker.cpp + walking_dead.vbs solTrough)
+		this.kickFirstTroughBall()
+	}
+
+	private hasLiveBall(): boolean {
+		return this.player.balls.some(b => !b.getState().isFrozen && !this.isInTrough(b))
+	}
+
+	private isInTrough(ball: { getState(): { pos: { x: number; y: number } } }): boolean {
+		const centers = this.troughCenters()
+		const p = ball.getState().pos
+		return centers.some(c => (p.x - c.x) ** 2 + (p.y - c.y) ** 2 < 2500)
+	}
+
+	private troughCenters(): Array<{ x: number; y: number }> {
+		return ['sw21', 'sw20', 'sw19', 'sw18']
+			.map(
+				n =>
+					this.table.kickers[n] ??
+					this.table.kickers[n.toLowerCase()] ??
+					Object.values(this.table.kickers).find(k => k.getName().toLowerCase() === n),
+			)
+			.filter(Boolean)
+			.map(k => (k as { data: { center: { x: number; y: number } } }).data.center)
+	}
+
+	private kickFirstTroughBall(): void {
 		const order = ['sw21', 'sw20', 'sw19', 'sw18']
 		const byName: Record<string, unknown> = {}
 		for (const [key, item] of Object.entries(this.table.kickers)) {
@@ -171,6 +198,7 @@ export class PinInput {
 				| undefined
 			if (!kicker?.hit?.ball) continue
 			try {
+				// solTrough: sw21.kick 61,10 (walking_dead.vbs:790)
 				kicker.getApi().Kick(61, 10)
 			} catch {}
 			break

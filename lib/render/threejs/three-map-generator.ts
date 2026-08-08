@@ -8,7 +8,7 @@ import type { Texture } from '../../vpt/texture.js'
 import type { ITextureLoader } from '../irender-api.js'
 
 // Yield back to the event loop every N textures so 100+ texture loads don't freeze the UI.
-const YIELD_EVERY_TEXTURES = 8
+const YIELD_EVERY_TEXTURES = 2
 
 /** Caches and preloads Three.js textures. */
 export class ThreeMapGenerator {

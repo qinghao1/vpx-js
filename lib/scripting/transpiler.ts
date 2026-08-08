@@ -129,6 +129,7 @@ export class Transpiler {
 	public async transpileAsync(vbs: string, globalFunction?: string, globalObject?: string): Promise<string> {
 		const src = normalizeNewCall(vbs)
 		const t0 = Date.now()
+		await this.yield()
 		let ast = this.grammar.transpile(src)
 		logger().info('[Transpiler] Parsed in %sms', Date.now() - t0)
 		await this.yield()
