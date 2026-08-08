@@ -12,8 +12,8 @@ import { HitObject } from './hit-object.js'
  * @see https://github.com/vpinball/vpinball/blob/master/collide.cpp */
 export class HitPlane extends HitObject {
 	constructor(
-		private readonly normal: Vertex3D,
-		private readonly d: number,
+		public readonly normal: Vertex3D,
+		public readonly d: number,
 	) {
 		super()
 	}

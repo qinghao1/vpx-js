@@ -12,7 +12,7 @@ import { HitObject } from './hit-object.js'
  * @see https://github.com/vpinball/vpinball/blob/master/collide.cpp */
 export class HitLineZ extends HitObject {
 	constructor(
-		protected xy: Vertex2D,
+		public xy: Vertex2D,
 		zlow?: number,
 		zhigh?: number,
 	) {

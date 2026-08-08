@@ -13,69 +13,103 @@ import { HitPlane } from './hit-plane.js'
 import { HitLineZ } from './hit-line-z.js'
 import { HitLine3D } from './hit-line-3d.js'
 import { getWasmBatchHitViewsOutCircle, getWasmBatchHitViewsOutPlane, getWasmBatchHitViewsOutLineZ, isWasmReady } from './wasm/kernels.js'
+import type { CircleViews, LineViews, PlaneViews } from './wasm/kernels.js'
 import type { HitObject } from './hit-object.js'
 
-/** KD-tree node. @see https://github.com/vpinball/vpinball/blob/master/hitoctree.cpp */
+type Kind = 'circle' | 'plane' | 'lineZ' | 'other'
+type Order = { obj: HitObject; kind: Kind; idx: number }
+
+/** KD-tree — batched WASM SoA. @see https://github.com/vpinball/vpinball/blob/master/hitoctree.cpp */
 export class HitKDNode {
 	public rectBounds = new FRect3D()
 	public start = 0
 	public items = 0
 	private children: HitKDNode[] = []
+
 	private _circles: HitCircle[] = []
 	private _planes: HitPlane[] = []
 	private _lineZs: HitLineZ[] = []
-	private _order: Array<{ obj: HitObject; kind: 'circle' | 'plane' | 'lineZ' | 'other'; idx: number }> = []
+	private _order: Order[] = []
 	private _orderLen = 0
 
 	constructor(private hitOct: HitKD) {}
-
-	public reset(hitOct: HitKD): void { this.children.length = 0; this.hitOct = hitOct; this.start = 0; this.items = 0 }
+	public reset(o: HitKD): void { this.children.length = 0; this.hitOct = o; this.start = 0; this.items = 0 }
 
 	public hitTestBall(ball: Ball, coll: CollisionEvent, physics: PlayerPhysics): void {
-		if (!isWasmReady()) { this.hitTestBallScalar(ball, coll, physics); return }
-		if (!this.collect(ball)) return
-		const circles = this._circles
-		const planes = this._planes
-		const lineZs = this._lineZs
-		let cv: ReturnType<typeof getWasmBatchHitViewsOutCircle> | null = null
-		let pv: ReturnType<typeof getWasmBatchHitViewsOutPlane> | null = null
-		let lv: ReturnType<typeof getWasmBatchHitViewsOutLineZ> | null = null
-		if (circles.length) {
-			cv = getWasmBatchHitViewsOutCircle(circles.length)
-			for (let i = 0; i < circles.length; i++) { const h = circles[i]!; cv.cx[i] = h.center.x; cv.cy[i] = h.center.y; cv.cr[i] = h.radius; cv.zl[i] = h.hitBBox.zlow; cv.zh[i] = h.hitBBox.zhigh }
-			cv.run(ball.state.pos.x, ball.state.pos.y, ball.state.pos.z, ball.hit.vel.x, ball.hit.vel.y, ball.hit.vel.z, ball.data.radius, coll.hitTime)
+		if (!isWasmReady() || !this.collect(ball)) return this.hitTestBallScalar(ball, coll, physics)
+
+		const { _circles: circles, _planes: planes, _lineZs: lineZs } = this
+		const cv = circles.length ? getWasmBatchHitViewsOutCircle(circles.length) : null
+		const pv = planes.length ? getWasmBatchHitViewsOutPlane(planes.length) : null
+		const lv = lineZs.length ? getWasmBatchHitViewsOutLineZ(lineZs.length) : null
+
+		if (cv) this.fillCircles(cv, circles)
+		if (pv) this.fillPlanes(pv, planes)
+		if (lv) this.fillLineZs(lv, lineZs)
+
+		const pos = ball.state.pos, vel = ball.hit.vel, r = ball.data.radius, dt = coll.hitTime
+		if (cv) cv.run(pos.x, pos.y, pos.z, vel.x, vel.y, vel.z, r, dt)
+		if (pv) pv.run(pos.x, pos.y, pos.z, vel.x, vel.y, vel.z, r, dt)
+		if (lv) lv.run(pos.x, pos.y, pos.z, vel.x, vel.y, vel.z, r, dt)
+
+		this.replay(ball, coll, physics, cv, pv, lv)
+	}
+
+	private fillCircles(cv: CircleViews, circles: HitCircle[]): void {
+		for (let i = 0; i < circles.length; i++) {
+			const h = circles[i]!
+			cv.cx[i] = h.center.x
+			cv.cy[i] = h.center.y
+			cv.cr[i] = h.radius
+			cv.zl[i] = h.hitBBox.zlow
+			cv.zh[i] = h.hitBBox.zhigh
 		}
-		if (planes.length) {
-			pv = getWasmBatchHitViewsOutPlane(planes.length)
-			for (let i = 0; i < planes.length; i++) { const h = planes[i]! as unknown as { normal: Vertex3D; d: number }; pv.nx[i] = h.normal.x; pv.ny[i] = h.normal.y; pv.nz[i] = h.normal.z; pv.d[i] = h.d }
-			pv.run(ball.state.pos.x, ball.state.pos.y, ball.state.pos.z, ball.hit.vel.x, ball.hit.vel.y, ball.hit.vel.z, ball.data.radius, coll.hitTime)
+	}
+
+	private fillPlanes(pv: PlaneViews, planes: HitPlane[]): void {
+		for (let i = 0; i < planes.length; i++) {
+			const h = planes[i]!
+			pv.nx[i] = h.normal.x
+			pv.ny[i] = h.normal.y
+			pv.nz[i] = h.normal.z
+			pv.d[i] = h.d
 		}
-		if (lineZs.length) {
-			lv = getWasmBatchHitViewsOutLineZ(lineZs.length)
-			for (let i = 0; i < lineZs.length; i++) { const h = lineZs[i]! as unknown as { xy: { x: number; y: number }; hitBBox: FRect3D }; lv.lx[i] = h.xy.x; lv.ly[i] = h.xy.y; lv.zl[i] = h.hitBBox.zlow; lv.zh[i] = h.hitBBox.zhigh }
-			lv.run(ball.state.pos.x, ball.state.pos.y, ball.state.pos.z, ball.hit.vel.x, ball.hit.vel.y, ball.hit.vel.z, ball.data.radius, coll.hitTime)
+	}
+
+	private fillLineZs(lv: LineViews, lineZs: HitLineZ[]): void {
+		for (let i = 0; i < lineZs.length; i++) {
+			const h = lineZs[i]!
+			lv.lx[i] = h.xy.x
+			lv.ly[i] = h.xy.y
+			lv.zl[i] = h.hitBBox.zlow
+			lv.zh[i] = h.hitBBox.zhigh
 		}
-		for (let oi = 0; oi < this._orderLen; oi++) {
-			const e = this._order[oi]!
-			if (e.kind === 'other') { (e.obj as HitObject).doHitTest(ball, coll, physics); continue }
-			let t = -1, contact = 0, nx = 0, ny = 0, nz = 0, dist = 0, bnv = 0
-			if (e.kind === 'circle') { t = cv!.oT[e.idx]!; contact = cv!.oContact[e.idx]!; nx = cv!.oNx[e.idx]!; ny = cv!.oNy[e.idx]!; nz = cv!.oNz[e.idx]!; dist = cv!.oDist[e.idx]!; bnv = cv!.oBnv[e.idx]! }
-			else if (e.kind === 'plane') { t = pv!.oT[e.idx]!; contact = pv!.oContact[e.idx]!; nx = pv!.oNx[e.idx]!; ny = pv!.oNy[e.idx]!; nz = pv!.oNz[e.idx]!; dist = pv!.oDist[e.idx]!; bnv = pv!.oBnv[e.idx]! }
-			else { t = lv!.oT[e.idx]!; contact = lv!.oContact[e.idx]!; nx = lv!.oNx[e.idx]!; ny = lv!.oNy[e.idx]!; nz = lv!.oNz[e.idx]!; dist = lv!.oDist[e.idx]!; bnv = lv!.oBnv[e.idx]! }
-			const obj = e.obj as HitObject, isContact = !!contact, valid = t >= -0.5 && t <= coll.hitTime
+	}
+
+	private replay(ball: Ball, coll: CollisionEvent, physics: PlayerPhysics, cv: CircleViews | null, pv: PlaneViews | null, lv: LineViews | null): void {
+		for (let i = 0; i < this._orderLen; i++) {
+			const e = this._order[i]!
+			if (e.kind === 'other') { e.obj.doHitTest(ball, coll, physics); continue }
+			const s = e.kind === 'circle' ? cv! : e.kind === 'plane' ? pv! : lv!
+			const t = s.oT[e.idx]!
+			const contact = s.oContact[e.idx]!
+			const nx = s.oNx[e.idx]!, ny = s.oNy[e.idx]!, nz = s.oNz[e.idx]!
+			const dist = s.oDist[e.idx]!, bnv = s.oBnv[e.idx]!
+			const isContact = !!contact
+			const valid = t >= -0.5 && t <= coll.hitTime
 			if (!isContact && !valid) continue
 			if (!physics.recordContacts) {
 				if (!valid) continue
 				coll.hitNormal.x = nx; coll.hitNormal.y = ny; coll.hitNormal.z = nz
 				coll.hitDistance = dist; coll.isContact = isContact
 				if (isContact) coll.hitOrgNormalVelocity = bnv
-				coll.ball = ball; coll.obj = obj; coll.hitTime = t
+				coll.ball = ball; coll.obj = e.obj; coll.hitTime = t
 			} else {
 				const nc = CollisionEvent.claim(ball)
 				nc.hitNormal.x = nx; nc.hitNormal.y = ny; nc.hitNormal.z = nz
 				nc.hitDistance = dist; nc.isContact = isContact; nc.hitOrgNormalVelocity = bnv
 				if (isContact || valid) {
-					nc.ball = ball; nc.obj = obj
+					nc.ball = ball; nc.obj = e.obj
 					if (isContact) physics.contacts.push(nc)
 					else { coll.set(nc); coll.hitTime = t; CollisionEvent.releaseOne(nc) }
 				} else CollisionEvent.releaseOne(nc)
@@ -84,50 +118,44 @@ export class HitKDNode {
 	}
 
 	private hitTestBallScalar(ball: Ball, coll: CollisionEvent, physics: PlayerPhysics): void {
-		const n = this.items & 0x3fffffff, axis = this.items >> 30
-		for (let i = this.start; i < this.start + n; i++) { const o = this.hitOct.getItemAt(i); if (ball.hit !== o && o.hitBBox.intersectSphere(ball.state.pos, ball.hit.rcHitRadiusSqr)) o.doHitTest(ball, coll, physics) }
-		if (!this.children.length) return
-		const r = this.rectBounds, b = ball.hit.hitBBox
-		if (axis === 0) { const c = (r.left + r.right) * 0.5; if (b.left <= c) this.children[0]!.hitTestBall(ball, coll, physics); if (b.right >= c) this.children[1]!.hitTestBall(ball, coll, physics) }
-		else if (axis === 1) { const c = (r.top + r.bottom) * 0.5; if (b.top <= c) this.children[0]!.hitTestBall(ball, coll, physics); if (b.bottom >= c) this.children[1]!.hitTestBall(ball, coll, physics) }
-		else { const c = (r.zlow + r.zhigh) * 0.5; if (b.zlow <= c) this.children[0]!.hitTestBall(ball, coll, physics); if (b.zhigh >= c) this.children[1]!.hitTestBall(ball, coll, physics) }
+		const leaf = this.items & 0x3fffffff
+		for (let i = this.start; i < this.start + leaf; i++) { const h = this.hitOct.getItemAt(i); if (h !== ball.hit) h.doHitTest(ball, coll, physics) }
+		if (this.items & 0x40000000) this.children[0]?.hitTestBall(ball, coll, physics)
+		if (this.items & 0x80000000) this.children[1]?.hitTestBall(ball, coll, physics)
 	}
 
-	private pushOrder(obj: HitObject, kind: 'circle' | 'plane' | 'lineZ' | 'other', idx: number): void {
-		const o = this._order, n = this._orderLen
-		let e = o[n]
-		if (e) { e.obj = obj; e.kind = kind; e.idx = idx } else { e = { obj, kind, idx }; o.push(e) }
+	private pushOrder(o: HitObject, k: Kind, idx: number): void {
+		const a = this._order, n = this._orderLen
+		const e = a[n]
+		if (e) { e.obj = o; e.kind = k; e.idx = idx } else a.push({ obj: o, kind: k, idx })
 		this._orderLen++
 	}
 
 	private collect(ball: Ball): number {
-		const circles = this._circles; circles.length = 0
-		const planes = this._planes; planes.length = 0
-		const lineZs = this._lineZs; lineZs.length = 0
-		this._orderLen = 0
-		this.collectTraverse(this, ball)
+		this._circles.length = 0; this._planes.length = 0; this._lineZs.length = 0; this._orderLen = 0
+		this.traverse(this, ball)
 		return this._orderLen
 	}
 
-	private collectTraverse(node: HitKDNode, ball: Ball): void {
-		const circles = this._circles, planes = this._planes, lineZs = this._lineZs
-		const n = node.items & 0x3fffffff
-		for (let i = node.start; i < node.start + n; i++) {
+	private traverse(node: HitKDNode, ball: Ball): void {
+		const r = node.rectBounds, b = ball.hit.hitBBox, pos = ball.state.pos, rs = ball.hit.rcHitRadiusSqr
+		if (!r.intersectRect(b) || !r.intersectSphere(pos, rs)) return
+		const leaf = node.items & 0x3fffffff
+		for (let i = node.start; i < node.start + leaf; i++) {
 			const h = node.hitOct.getItemAt(i)
-			if (ball.hit === h) continue
-			if (h.obj?.abortHitTest?.()) continue
-			if (!h.isEnabled) continue
-			if (!h.hitBBox.intersectSphere(ball.state.pos, ball.hit.rcHitRadiusSqr)) continue
-			if (h instanceof HitCircle && (h as unknown as { objType: CollisionType }).objType !== CollisionType.Kicker && (h as unknown as { objType: CollisionType }).objType !== CollisionType.Trigger && h.constructor === HitCircle) { this.pushOrder(h, 'circle', circles.length); circles.push(h as HitCircle) }
-			else if (h instanceof HitPlane) { this.pushOrder(h, 'plane', planes.length); planes.push(h as HitPlane) }
-			else if (h instanceof HitLineZ && !(h instanceof HitLine3D)) { this.pushOrder(h, 'lineZ', lineZs.length); lineZs.push(h as HitLineZ) }
+			if (h === ball.hit || h.obj?.abortHitTest?.() || !h.isEnabled) continue
+			if (!h.hitBBox.intersectRect(b) || !h.hitBBox.intersectSphere(pos, rs)) continue
+			if (h instanceof HitCircle && h.constructor === HitCircle && (h as unknown as { objType: CollisionType }).objType !== CollisionType.Kicker && (h as unknown as { objType: CollisionType }).objType !== CollisionType.Trigger) {
+				this.pushOrder(h, 'circle', this._circles.length); this._circles.push(h as HitCircle)
+			} else if (h instanceof HitPlane) { this.pushOrder(h, 'plane', this._planes.length); this._planes.push(h as HitPlane) }
+			else if (h instanceof HitLineZ && !(h instanceof HitLine3D)) { this.pushOrder(h, 'lineZ', this._lineZs.length); this._lineZs.push(h as HitLineZ) }
 			else this.pushOrder(h, 'other', -1)
 		}
-		if (!node.children.length) return
-		const r = node.rectBounds, b = ball.hit.hitBBox, axis = node.items >> 30
-		if (axis === 0) { const c = (r.left + r.right) * 0.5; if (b.left <= c) this.collectTraverse(node.children[0]!, ball); if (b.right >= c) this.collectTraverse(node.children[1]!, ball) }
-		else if (axis === 1) { const c = (r.top + r.bottom) * 0.5; if (b.top <= c) this.collectTraverse(node.children[0]!, ball); if (b.bottom >= c) this.collectTraverse(node.children[1]!, ball) }
-		else { const c = (r.zlow + r.zhigh) * 0.5; if (b.zlow <= c) this.collectTraverse(node.children[0]!, ball); if (b.zhigh >= c) this.collectTraverse(node.children[1]!, ball) }
+		if (node.children.length === 0) return
+		const axis = node.items >> 30
+		if (axis === 0) { const cc = (r.left + r.right) * 0.5; if (b.left <= cc) this.traverse(node.children[0]!, ball); if (b.right >= cc) this.traverse(node.children[1]!, ball) }
+		else if (axis === 1) { const cc = (r.top + r.bottom) * 0.5; if (b.top <= cc) this.traverse(node.children[0]!, ball); if (b.bottom >= cc) this.traverse(node.children[1]!, ball) }
+		else { const cc = (r.zlow + r.zhigh) * 0.5; if (b.zlow <= cc) this.traverse(node.children[0]!, ball); if (b.zhigh >= cc) this.traverse(node.children[1]!, ball) }
 	}
 
 	public createNextLevel(level: number, levelEmpty: number): void {
@@ -158,12 +186,12 @@ export class HitKDNode {
 		if (levelEmptyLocal > 8) { this.hitOct.numNodes -= 2; this.children.length = 0; Vertex3D.release(vc); return }
 		this.children[0].start = this.start + middleCount; this.children[1].start = this.children[0].start + leftCount
 		let middle = 0; this.children[0].items = 0; this.children[1].items = 0
-		if (axis === 0) { for (let i = this.start; i < this.start + org; i++) { const idx = this.hitOct.orgIdx[i]; const h = this.hitOct.getItemAt(i).hitBBox; if (h.right < vc.x) this.hitOct.tmp[this.children[0].start + this.children[0].items++] = idx; else if (h.left > vc.x) this.hitOct.tmp[this.children[1].start + this.children[1].items++] = idx; else this.hitOct.orgIdx[this.start + middle++] = idx } }
-		else if (axis === 1) { for (let i = this.start; i < this.start + org; i++) { const idx = this.hitOct.orgIdx[i]; const h = this.hitOct.getItemAt(i).hitBBox; if (h.bottom < vc.y) this.hitOct.tmp[this.children[0].start + this.children[0].items++] = idx; else if (h.top > vc.y) this.hitOct.tmp[this.children[1].start + this.children[1].items++] = idx; else this.hitOct.orgIdx[this.start + middle++] = idx } }
-		else { for (let i = this.start; i < this.start + org; i++) { const idx = this.hitOct.orgIdx[i]; const h = this.hitOct.getItemAt(i).hitBBox; if (h.zhigh < vc.z) this.hitOct.tmp[this.children[0].start + this.children[0].items++] = idx; else if (h.zlow > vc.z) this.hitOct.tmp[this.children[1].start + this.children[1].items++] = idx; else this.hitOct.orgIdx[this.start + middle++] = idx } }
+		if (axis === 0) { for (let i = this.start; i < this.start + org; i++) { const idx = this.hitOct.orgIdx[i]!; const h = this.hitOct.getItemAt(i).hitBBox; if (h.right < vc.x) this.hitOct.tmp[this.children[0].start + this.children[0].items++] = idx; else if (h.left > vc.x) this.hitOct.tmp[this.children[1].start + this.children[1].items++] = idx; else this.hitOct.orgIdx[this.start + middle++] = idx } }
+		else if (axis === 1) { for (let i = this.start; i < this.start + org; i++) { const idx = this.hitOct.orgIdx[i]!; const h = this.hitOct.getItemAt(i).hitBBox; if (h.bottom < vc.y) this.hitOct.tmp[this.children[0].start + this.children[0].items++] = idx; else if (h.top > vc.y) this.hitOct.tmp[this.children[1].start + this.children[1].items++] = idx; else this.hitOct.orgIdx[this.start + middle++] = idx } }
+		else { for (let i = this.start; i < this.start + org; i++) { const idx = this.hitOct.orgIdx[i]!; const h = this.hitOct.getItemAt(i).hitBBox; if (h.zhigh < vc.z) this.hitOct.tmp[this.children[0].start + this.children[0].items++] = idx; else if (h.zlow > vc.z) this.hitOct.tmp[this.children[1].start + this.children[1].items++] = idx; else this.hitOct.orgIdx[this.start + middle++] = idx } }
 		this.items = middle | (axis << 30)
-		if (this.children[0].items > 0) for (let i = 0; i < this.children[0].items; i++) this.hitOct.orgIdx[this.children[0].start + i] = this.hitOct.tmp[this.children[0].start + i]
-		if (this.children[1].items > 0) for (let i = 0; i < this.children[1].items; i++) this.hitOct.orgIdx[this.children[1].start + i] = this.hitOct.tmp[this.children[1].start + i]
+		if (this.children[0].items > 0) for (let i = 0; i < this.children[0].items; i++) this.hitOct.orgIdx[this.children[0].start + i] = this.hitOct.tmp[this.children[0].start + i]!
+		if (this.children[1].items > 0) for (let i = 0; i < this.children[1].items; i++) this.hitOct.orgIdx[this.children[1].start + i] = this.hitOct.tmp[this.children[1].start + i]!
 		Vertex3D.release(vc)
 		this.children[0].createNextLevel(level + 1, levelEmptyLocal)
 		this.children[1].createNextLevel(level + 1, levelEmptyLocal)
