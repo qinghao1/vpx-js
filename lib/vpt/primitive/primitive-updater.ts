@@ -1,6 +1,6 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
-import { MathUtils } from 'three'
+import { Color, MathUtils } from 'three'
 
 import type { IRenderApi } from '../../render/irender-api.js'
 import { Matrix3D } from '../../util/matrix.js'
@@ -40,8 +40,9 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 		const needsColor =
 			state.color !== undefined ||
 			state.disableLightingTop !== undefined ||
-			state.disableLightingBelow !== undefined
-		if (needsColor) this.applyColor(obj)
+			state.disableLightingBelow !== undefined ||
+			state.material !== undefined
+		if (needsColor) this.applyColor(obj, table)
 		if (state.position || state.size || state.rotation || state.translation || state.objectRotation) {
 			this.applyTransformation(obj, renderApi, table)
 		}
@@ -57,10 +58,13 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 		}
 	}
 
-	private applyColor<NODE>(obj: NODE): void {
-		const color = this.state.color ?? this.data.color
+	private applyColor<NODE>(obj: NODE, table: Table): void {
+		const prim = this.state.color ?? this.data.color
 		const dl = this.state.disableLightingTop ?? this.data.disableLightingTop
 		const emissive = dl > DISABLE_THRESHOLD
+		const matName = this.state.material ?? this.data.szMaterial
+		const base = table.getMaterial(matName)?.baseColor ?? 0xffffff
+		const hex = new Color(base).multiply(new Color(prim)).getHex()
 		for (const m of this.meshes(obj)) {
 			const mat = m.material as unknown as
 				| {
@@ -71,9 +75,9 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 				  }
 				| undefined
 			if (!mat?.color || !mat?.emissive) continue
-			mat.color.set(color)
+			mat.color.set(hex)
 			if (emissive) {
-				mat.emissive.set(color)
+				mat.emissive.set(hex)
 				mat.emissiveIntensity = Math.min(MAX_EMISSIVE, dl * DISABLE_SCALE)
 			} else {
 				mat.emissive.set(0x000000)
