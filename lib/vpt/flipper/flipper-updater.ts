@@ -42,7 +42,7 @@ export class FlipperUpdater extends ItemUpdater<FlipperState> {
 		const angle = this.state.angle ?? 0
 		const mr = Matrix3D.claim().rotateZMatrix(angle - (this.data.startAngle * Math.PI) / 180)
 		const mt = Matrix3D.claim().setTranslation(dx, dy, 0)
-		const m = mt.clone().multiply(m1).multiply(mr).multiply(m0)
+		const m = m0.clone().multiply(mr).multiply(m1).multiply(mt)
 		renderApi.applyMatrixToNode(m, obj)
 		Matrix3D.release(m0, m1, mr, mt, m)
 	}

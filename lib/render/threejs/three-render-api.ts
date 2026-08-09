@@ -111,30 +111,25 @@ export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, Poin
 
 	public applyMatrixToNode(matrix: Matrix3D, obj: Object3D): void {
 		if (!obj) return
-		const m4 = new Matrix4()
-		const e = (matrix as unknown as { elements?: number[] }).elements
-		if (e && e.length === 16) {
-			m4.fromArray(e)
-		} else {
-			m4.set(
-				matrix._11,
-				matrix._21,
-				matrix._31,
-				matrix._41,
-				matrix._12,
-				matrix._22,
-				matrix._32,
-				matrix._42,
-				matrix._13,
-				matrix._23,
-				matrix._33,
-				matrix._43,
-				matrix._14,
-				matrix._24,
-				matrix._34,
-				matrix._44,
-			)
-		}
+		const e = matrix.elements
+		const m4 = new Matrix4().set(
+			e[0],
+			e[4],
+			e[8],
+			e[12],
+			e[1],
+			e[5],
+			e[9],
+			e[13],
+			e[2],
+			e[6],
+			e[10],
+			e[14],
+			e[3],
+			e[7],
+			e[11],
+			e[15],
+		)
 		obj.matrix.copy(m4)
 		obj.matrix.decompose(obj.position, obj.quaternion, obj.scale)
 		obj.updateMatrix()
