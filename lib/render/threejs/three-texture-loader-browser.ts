@@ -41,11 +41,10 @@ function getHardwareMax(): number {
 		const c = document.createElement('canvas')
 		const gl = (c.getContext('webgl2') ?? c.getContext('webgl')) as any
 		const v = gl?.getParameter(gl?.MAX_TEXTURE_SIZE)
-		hwMax = typeof v === 'number' && v >= 1024 ? v : 4096
+		return (hwMax = typeof v === 'number' && v >= 1024 ? v : 4096)
 	} catch {
-		hwMax = 4096
+		return (hwMax = 4096)
 	}
-	return hwMax!
 }
 
 function viewportBudget(): number {
@@ -57,40 +56,20 @@ function viewportBudget(): number {
 	}
 }
 
-function effectiveMax(name: string, isFloat: boolean, playfieldMap?: string): number {
+function effectiveMax(name: string, isFloat: boolean): number {
 	const hw = getHardwareMax()
 	const vp = viewportBudget()
-	if (playfieldMap && name.toLowerCase() === playfieldMap.toLowerCase()) return hw
 	if (isFloat) return Math.min(hw, Math.max(1024, Math.ceil(vp)))
 	if (name.toLowerCase().includes('vlm.nestmap')) return Math.min(hw, Math.max(1024, Math.ceil(vp * 0.75)))
 	if (vp >= 1400) return hw
 	return Math.min(hw, Math.max(2048, Math.ceil(vp * 2)))
 }
 
-let cachedAniso: number | undefined
-function getAniso(): number {
-	if (cachedAniso !== undefined) return cachedAniso
-	try {
-		if (typeof document === 'undefined') return (cachedAniso = 8)
-		const c = document.createElement('canvas')
-		const gl: any = c.getContext('webgl2') ?? c.getContext('webgl')
-		const ext =
-			gl?.getExtension('EXT_texture_filter_anisotropic') ??
-			gl?.getExtension('MOZ_EXT_texture_filter_anisotropic') ??
-			gl?.getExtension('WEBKIT_EXT_texture_filter_anisotropic')
-		const max = ext ? gl.getParameter(ext.MAX_TEXTURE_MAX_ANISOTROPY_EXT) : 0
-		cachedAniso = max ? Math.min(16, max) : 8
-	} catch {
-		cachedAniso = 8
-	}
-	return cachedAniso!
-}
-
 function tune(tex: any): void {
 	tex.generateMipmaps = true
 	tex.minFilter = LinearMipMapLinearFilter
 	tex.magFilter = LinearFilter
-	tex.anisotropy = getAniso()
+	tex.anisotropy = 16
 }
 
 function nameAndTune(tex: any, name: string): void {
@@ -99,8 +78,8 @@ function nameAndTune(tex: any, name: string): void {
 	tune(tex)
 }
 
-function finalize(tex: any, name: string, isFloat: boolean, _playfieldMap?: string): any {
-	const max = effectiveMax(name, isFloat, _playfieldMap)
+function finalize(tex: any, name: string, isFloat: boolean): any {
+	const max = effectiveMax(name, isFloat)
 	if (tex.image?.data && tex.image.width && tex.image.height) {
 		const ds = downsampleData(tex, max)
 		if (ds !== tex) {
@@ -120,7 +99,8 @@ let seq = 0
 const pending = new Map<number, { resolve: (v: any) => void; reject: (e: any) => void }>()
 
 function getWorker(): Worker | null {
-	if (typeof Worker === 'undefined' || worker) return worker
+	if (typeof Worker !== 'undefined' && worker) return worker
+	if (typeof Worker === 'undefined') return null
 	try {
 		worker = new Worker(new URL('./workers/exr-worker.js', import.meta.url), { type: 'module' } as any)
 		worker.onmessage = ({ data: { id, ok, error, width, height, data, type, format, colorSpace } }: any) => {
@@ -171,7 +151,7 @@ export class ThreeTextureLoaderBrowser implements ITextureLoader<ThreeTexture> {
 		const url = imageMap[key]
 		if (!url) throw new Error(`Unknown local texture "${key}".`)
 		const tex: any = await new TextureLoader().loadAsync(url)
-		return finalize(tex, _name || fileName, false, this.playfieldMap)
+		return finalize(tex, _name || fileName, false)
 	}
 
 	public async loadRawTexture(name: string, data: Uint8Array, width: number, height: number): Promise<ThreeTexture> {
@@ -179,33 +159,28 @@ export class ThreeTextureLoaderBrowser implements ITextureLoader<ThreeTexture> {
 		tex.flipY = true
 		tex.colorSpace = SRGBColorSpace
 		tex.needsUpdate = true
-		return finalize(tex, name, false, this.playfieldMap)
+		return finalize(tex, name, false)
 	}
 
 	public async loadTexture(name: string, ext: string, data: Uint8Array): Promise<ThreeTexture> {
 		const mime = getMimeType(data, ext) ?? 'image/png'
 		const isHdr = mime === 'image/hdr' || ext === '.hdr'
 		const isExr = mime === 'image/exr' || ext === '.exr'
-
 		if (!isHdr && !isExr && typeof createImageBitmap !== 'undefined') {
-			const bmp = await tryCreateBitmap(data, mime, name, this.playfieldMap)
+			const bmp = await tryCreateBitmap(data, mime, name)
 			if (bmp) return bmp
 		}
-
 		if (isHdr || isExr) {
 			const kind = isExr ? ('exr' as const) : ('hdr' as const)
-			const viaWorker = await tryLoadViaWorker(name, kind, data, this.playfieldMap)
+			const viaWorker = await tryLoadViaWorker(name, kind, data)
 			if (viaWorker) return viaWorker
-			return loadFloatFallback(name, ext, mime, data, this.playfieldMap)
+			return loadFloatFallback(name, ext, mime, data)
 		}
-
-		return loadRegular(name, mime, data, this.playfieldMap)
+		return loadRegular(name, mime, data)
 	}
 }
 
-// Procedural equirect env for the chrome ball. POT 256×128, no mipmaps and
-// ClampToEdge avoids SwiftShader failure with NPOT + Repeat + mips
-// (previous 116×116 ball.png caused PMREMGGXConvolution 1282).
+// POT 256×128 avoids SwiftShader failure with NPOT + Repeat + mips
 function createBallEnvTexture(name: string): ThreeTexture {
 	const w = 256
 	const h = 128
@@ -247,12 +222,7 @@ function createBallEnvTexture(name: string): ThreeTexture {
 	return tex as ThreeTexture
 }
 
-async function tryCreateBitmap(
-	data: Uint8Array,
-	mime: string,
-	name: string,
-	playfieldMap?: string,
-): Promise<ThreeTexture | null> {
+async function tryCreateBitmap(data: Uint8Array, mime: string, name: string): Promise<ThreeTexture | null> {
 	try {
 		const blob = new Blob(
 			[
@@ -263,7 +233,7 @@ async function tryCreateBitmap(
 			{ type: mime as any },
 		)
 		let bitmap: any = await createImageBitmap(blob as any, { imageOrientation: 'flipY' } as any)
-		const max = effectiveMax(name, false, playfieldMap)
+		const max = effectiveMax(name, false)
 		if (bitmap.width > max || bitmap.height > max) {
 			const scale = Math.min(max / bitmap.width, max / bitmap.height)
 			const nw = Math.max(1, Math.floor(bitmap.width * scale))
@@ -297,12 +267,7 @@ async function tryCreateBitmap(
 	}
 }
 
-async function tryLoadViaWorker(
-	name: string,
-	kind: 'exr' | 'hdr',
-	data: Uint8Array,
-	playfieldMap?: string,
-): Promise<ThreeTexture | null> {
+async function tryLoadViaWorker(name: string, kind: 'exr' | 'hdr', data: Uint8Array): Promise<ThreeTexture | null> {
 	const key = exrCacheKey(name, data.byteLength, kind)
 	try {
 		const cached: any = await idbGet(key)
@@ -311,7 +276,6 @@ async function tryLoadViaWorker(
 				floatTex(cached.width, cached.height, cached.data, cached.type, cached.format, cached.colorSpace),
 				name,
 				true,
-				playfieldMap,
 			)
 		}
 	} catch {}
@@ -333,7 +297,6 @@ async function tryLoadViaWorker(
 				floatTex(parsed.width, parsed.height, parsed.data, parsed.type, parsed.format, parsed.colorSpace),
 				name,
 				true,
-				playfieldMap,
 			)
 		}
 	} catch {}
@@ -354,25 +317,19 @@ function floatTex(width: number, height: number, data: any, type: any, format: a
 	return tex as ThreeTexture
 }
 
-function loadFloatFallback(
-	name: string,
-	ext: string,
-	mime: string,
-	data: Uint8Array,
-	playfieldMap?: string,
-): ThreeTexture {
+function loadFloatFallback(name: string, ext: string, mime: string, data: Uint8Array): ThreeTexture {
 	try {
 		const buf = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer
 		const Loader = mime === 'image/exr' || ext === '.exr' ? EXRLoader : HDRLoader
 		const tex: any = new (Loader as any)().createDataTexture(buf)
 		tex.colorSpace = LinearSRGBColorSpace
-		return finalize(tex, name, true, playfieldMap)
+		return finalize(tex, name, true)
 	} catch (e: any) {
 		throw new Error(`HDR/EXR parse failed for "${name}" (${ext} ${mime}): ${e.message}`)
 	}
 }
 
-async function loadRegular(name: string, mime: string, data: Uint8Array, playfieldMap?: string): Promise<ThreeTexture> {
+async function loadRegular(name: string, mime: string, data: Uint8Array): Promise<ThreeTexture> {
 	const blobPart: any =
 		data.byteOffset === 0 && data.byteLength === data.buffer.byteLength
 			? data
@@ -381,7 +338,7 @@ async function loadRegular(name: string, mime: string, data: Uint8Array, playfie
 	try {
 		const tex: any = await new TextureLoader().loadAsync(url)
 		tex.colorSpace = SRGBColorSpace
-		return finalize(tex, name, false, playfieldMap)
+		return finalize(tex, name, false)
 	} finally {
 		URL.revokeObjectURL(url)
 	}
