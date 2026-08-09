@@ -60,7 +60,7 @@ export class ThreeMaterialGenerator {
 		m.depthWrite = !isTransparent
 		if (depthBias !== 0) {
 			m.polygonOffset = true
-			m.polygonOffsetFactor = depthBias
+			m.polygonOffsetFactor = 0
 			m.polygonOffsetUnits = depthBias
 		}
 		if (material?.name === 'ball') {
