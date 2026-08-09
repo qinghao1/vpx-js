@@ -54,6 +54,7 @@ export class BallHit extends HitObject {
 	public eventPos = new Vertex3D(-1, -1, -1)
 	public angularVelocity = new Vertex3D()
 	public isVisible = true
+	private defaultZ = 25
 
 	constructor(ball: Ball, data: BallData, state: BallState, initialVelocity: Vertex3D, tableData: TableData) {
 		super()
