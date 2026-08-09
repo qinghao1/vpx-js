@@ -11,7 +11,7 @@ import { HitKind, HitObject } from './hit-object.js'
  * @see https://github.com/vpinball/vpinball/blob/master/collide.cpp */
 export class HitPoint extends HitObject {
 	public override hitKind = HitKind.Point
-	constructor(private readonly p: Vertex3D) {
+	constructor(public readonly p: Vertex3D) {
 		super()
 	}
 

@@ -91,16 +91,16 @@ export class HitKDNode {
 		for (let i = 0; i < lineZs.length; i++) { const h = lineZs[i]!; lineViews.lx[i] = h.xy.x; lineViews.ly[i] = h.xy.y; lineViews.zl[i] = h.hitBBox.zlow; lineViews.zh[i] = h.hitBBox.zhigh }
 	}
 	private fillPoints(pointViews: PointViews, points: HitPoint[]): void {
-		for (let i = 0; i < points.length; i++) { const h = points[i]! as unknown as { p: { x: number; y: number; z: number } }; pointViews.px[i] = h.p.x; pointViews.py[i] = h.p.y; pointViews.pz[i] = h.p.z }
+		for (let i = 0; i < points.length; i++) { const h = points[i]!; pointViews.px[i] = h.p.x; pointViews.py[i] = h.p.y; pointViews.pz[i] = h.p.z }
 	}
 	private fillTriangles(triangleViews: TriangleViews, triangles: HitTriangle[]): void {
 		for (let i = 0; i < triangles.length; i++) { const h = triangles[i]!; const r0 = h.rgv[0]!, r1 = h.rgv[1]!, r2 = h.rgv[2]!; triangleViews.r0x[i] = r0.x; triangleViews.r0y[i] = r0.y; triangleViews.r0z[i] = r0.z; triangleViews.r1x[i] = r1.x; triangleViews.r1y[i] = r1.y; triangleViews.r1z[i] = r1.z; triangleViews.r2x[i] = r2.x; triangleViews.r2y[i] = r2.y; triangleViews.r2z[i] = r2.z; triangleViews.nx[i] = h.normal.x; triangleViews.ny[i] = h.normal.y; triangleViews.nz[i] = h.normal.z }
 	}
 	private fillLineSegs(lineSegViews: LineSegViews, lineSegs: LineSeg[]): void {
-		for (let i = 0; i < lineSegs.length; i++) { const h = lineSegs[i]! as unknown as { v1: { x: number; y: number }; v2: { x: number; y: number }; normal: { x: number; y: number }; length: number; hitBBox: { zlow: number; zhigh: number } }; lineSegViews.v1x[i] = h.v1.x; lineSegViews.v1y[i] = h.v1.y; lineSegViews.v2x[i] = h.v2.x; lineSegViews.v2y[i] = h.v2.y; lineSegViews.nx[i] = h.normal.x; lineSegViews.ny[i] = h.normal.y; lineSegViews.len[i] = h.length; lineSegViews.zl[i] = h.hitBBox.zlow; lineSegViews.zh[i] = h.hitBBox.zhigh }
+		for (let i = 0; i < lineSegs.length; i++) { const h = lineSegs[i]!; lineSegViews.v1x[i] = h.v1.x; lineSegViews.v1y[i] = h.v1.y; lineSegViews.v2x[i] = h.v2.x; lineSegViews.v2y[i] = h.v2.y; lineSegViews.nx[i] = h.normal.x; lineSegViews.ny[i] = h.normal.y; lineSegViews.len[i] = h.length; lineSegViews.zl[i] = h.hitBBox.zlow; lineSegViews.zh[i] = h.hitBBox.zhigh }
 	}
 	private fillLine3Ds(line3DViews: Line3DViews, line3Ds: HitLine3D[]): void {
-		for (let i = 0; i < line3Ds.length; i++) { const h = line3Ds[i]! as unknown as { xy: { x: number; y: number }; zLow: number; zHigh: number; matrix: { elements: number[] } }; const m = h.matrix.elements; line3DViews.lx[i] = h.xy.x; line3DViews.ly[i] = h.xy.y; line3DViews.zl[i] = h.zLow; line3DViews.zh[i] = h.zHigh; line3DViews.m00[i] = m[0]!; line3DViews.m01[i] = m[3]!; line3DViews.m02[i] = m[6]!; line3DViews.m10[i] = m[1]!; line3DViews.m11[i] = m[4]!; line3DViews.m12[i] = m[7]!; line3DViews.m20[i] = m[2]!; line3DViews.m21[i] = m[5]!; line3DViews.m22[i] = m[8]! }
+		for (let i = 0; i < line3Ds.length; i++) { const h = line3Ds[i]!; const m = h.matrix.elements; line3DViews.lx[i] = h.xy.x; line3DViews.ly[i] = h.xy.y; line3DViews.zl[i] = h.zLow; line3DViews.zh[i] = h.zHigh; line3DViews.m00[i] = m[0]!; line3DViews.m01[i] = m[3]!; line3DViews.m02[i] = m[6]!; line3DViews.m10[i] = m[1]!; line3DViews.m11[i] = m[4]!; line3DViews.m12[i] = m[7]!; line3DViews.m20[i] = m[2]!; line3DViews.m21[i] = m[5]!; line3DViews.m22[i] = m[8]! }
 	}
 
 	private replay(ball: Ball, coll: CollisionEvent, physics: PlayerPhysics, circleViews: CircleViews | null, planeViews: PlaneViews | null, lineViews: LineViews | null, pointViews: PointViews | null, triangleViews: TriangleViews | null, lineSegViews: LineSegViews | null, line3DViews: Line3DViews | null): void {

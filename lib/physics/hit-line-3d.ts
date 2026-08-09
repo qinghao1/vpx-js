@@ -11,9 +11,9 @@ import { HitLineZ } from './hit-line-z.js'
  * @see https://github.com/vpinball/vpinball/blob/master/collide.cpp */
 export class HitLine3D extends HitLineZ {
 	public override hitKind: HitKind = HitKind.Line3D
-	private readonly matrix = new Matrix2D()
-	private zLow!: number
-	private zHigh!: number
+	public readonly matrix = new Matrix2D()
+	public zLow!: number
+	public zHigh!: number
 
 	constructor(v1: Vertex3D, v2: Vertex3D) {
 		super(new Vertex2D())

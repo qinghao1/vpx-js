@@ -14,8 +14,8 @@ export class LineSeg extends HitObject {
 	public override hitKind = HitKind.LineSeg
 	public readonly v1: Vertex2D
 	public readonly v2: Vertex2D
-	protected normal: Vertex2D = new Vertex2D()
-	protected length!: number
+	public normal: Vertex2D = new Vertex2D()
+	public length!: number
 
 	constructor(p1: Vertex2D, p2: Vertex2D, zLow: number, zHigh: number, objType?: CollisionType) {
 		super()
