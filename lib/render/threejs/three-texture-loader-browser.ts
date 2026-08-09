@@ -148,18 +148,7 @@ export class ThreeTextureLoaderBrowser implements ITextureLoader<ThreeTexture> {
 		tex.flipY = true
 		tex.colorSpace = SRGBColorSpace
 		tex.needsUpdate = true
-		tune(tex)
-		const max = maxFor(name, width, height, false, this.playfieldMap)
-		const ds = downsample(tex, max)
-		if (ds !== tex) {
-			try {
-				tex.dispose?.()
-			} catch {}
-			nameAndTune(ds, name)
-			return ds
-		}
-		nameAndTune(tex, name)
-		return tex
+		return finalize(tex, name, false, this.playfieldMap)
 	}
 
 	public async loadTexture(name: string, ext: string, data: Uint8Array): Promise<ThreeTexture> {
@@ -481,40 +470,18 @@ async function loadRegular(name: string, mime: string, data: Uint8Array, playfie
 			? data
 			: data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength)
 	const url = URL.createObjectURL(new Blob([blobPart as any], { type: mime as any }))
-	try {
-		const tex: any = await loadViaUrl(url, name, playfieldMap)
-		tex.name = `texture:${name}`
-		tex.colorSpace = SRGBColorSpace
-		tex.needsUpdate = true
-		return finalize(tex, name, false, playfieldMap)
-	} catch (e) {
-		try {
-			URL.revokeObjectURL(url)
-		} catch {}
-		throw e
-	}
+	const tex: any = await loadViaUrl(url)
+	tex.colorSpace = SRGBColorSpace
+	return finalize(tex, name, false, playfieldMap)
 }
 
-function loadViaUrl(url: string, nameHint: string, playfieldMap?: string): Promise<ThreeTexture> {
+function loadViaUrl(url: string): Promise<ThreeTexture> {
 	return new Promise((resolve, reject) => {
 		new TextureLoader().load(
 			url,
 			(tex: any) => {
 				URL.revokeObjectURL(url)
-				tune(tex)
-				const w = tex.image?.width ?? tex.image?.naturalWidth ?? 0
-				const h = tex.image?.height ?? tex.image?.naturalHeight ?? 0
-				const max = maxFor(nameHint, w, h, false, playfieldMap)
-				const ds = downsample(tex, max)
-				if (ds !== tex) {
-					try {
-						tex.dispose()
-					} catch {}
-					try {
-						tex.image = null
-					} catch {}
-					resolve(ds)
-				} else resolve(tex)
+				resolve(tex as ThreeTexture)
 			},
 			undefined,
 			err => {
