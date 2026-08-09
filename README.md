@@ -117,7 +117,7 @@ In short:
 - **Physics fixes** — VPX 10.8.1 defaults, timer/nudge/collision parity with desktop VPX.
 - **Scripting hardened** — broader VBScript coverage and a proper `with`-proxy sandbox.
 - **New: PinMAME WASM** — `external/pinmame` + `wasm/` build (WASM + mock fallback) for any PinMAME hardware; upstream only mentioned `wpc-emu`.
-- **Leaner repo** — `demo-static` removed; `demo-browser` (Vite viewer, not published) is local-only.
+- **Leaner repo** — `demo-static` removed.
 
 
 ## Development
@@ -138,12 +138,6 @@ npm run build:wasm        # release (needs emcc)
 npm run build:wasm:mock   # mock only
 ```
 
-Browser viewer (not published):
-
-```bash
-cd demo-browser && npm ci && npm run dev
-# drag a .vpx onto http://localhost:5173
-```
 
 ## License
 
