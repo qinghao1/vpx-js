@@ -1,7 +1,7 @@
 import { NodeBinaryReader } from '../lib/io/binary-reader.node.js'
 import { Table } from '../lib/vpt/table/table.js'
 
-const t = await Table.load(new NodeBinaryReader('../walking_dead.vpx'))
+const t = await Table.load(new NodeBinaryReader('../example-table.vpx'))
 for (const [k, v] of Object.entries(t.flashers)) {
 	const d = v.data
 	if (d.isDMD) {
