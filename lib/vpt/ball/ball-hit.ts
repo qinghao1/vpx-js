@@ -1,6 +1,7 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
+import { MathUtils } from 'three'
 import type { EventProxy } from '../../game/event-proxy.js'
 import type { PlayerPhysics } from '../../game/player-physics.js'
 import { CollisionEvent } from '../../physics/collision-event.js'
@@ -17,8 +18,7 @@ import {
 } from '../../physics/constants.js'
 import { elasticityWithFalloff, HARD_SCATTER } from '../../physics/functions.js'
 import { HitObject } from '../../physics/hit-object.js'
-import { FLT_MIN } from '../../util/float.js'
-import { clamp, solveQuadraticEq } from '../../util/functions.js'
+import { solveQuadraticEq } from '../../util/functions.js'
 import { Vertex3D } from '../../util/vector.js'
 import type { TableData } from '../table/table-data.js'
 import type { Ball } from './ball.js'
@@ -120,7 +120,7 @@ export class BallHit extends HitObject {
 		const nx = hx - this.state.pos.x
 		const ny = hy - this.state.pos.y
 		const nz = hz - this.state.pos.z
-		if (Math.abs(nx) <= FLT_MIN && Math.abs(ny) <= FLT_MIN && Math.abs(nz) <= FLT_MIN) return -1
+		if (nx === 0 && ny === 0 && nz === 0) return -1
 		const len = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1
 		coll.hitNormal.set(nx / len, ny / len, nz / len)
 		coll.hitDistance = bnd
@@ -249,7 +249,7 @@ export class BallHit extends HitObject {
 				cross2Z = ciX * sy - ciY * sx
 			const kt = this.invMass + tx * cross2X + ty * cross2Y + tz * cross2Z
 			const maxFric = friction * reaction
-			const jt = clamp(-vt / kt, -maxFric, maxFric)
+			const jt = MathUtils.clamp(-vt / kt, -maxFric, maxFric)
 			if (Number.isFinite(jt)) {
 				const jx = tx * jt,
 					jy = ty * jt,
@@ -405,7 +405,7 @@ export class BallHit extends HitObject {
 			crossY = p1z * sx - p1x * sz,
 			crossZ = p1x * sy - p1y * sx
 		const denom = this.invMass + slipDirX * crossX + slipDirY * crossY + slipDirZ * crossZ
-		const friction = clamp(numer / denom, -maxFric, maxFric)
+		const friction = MathUtils.clamp(numer / denom, -maxFric, maxFric)
 		if (Number.isFinite(friction)) {
 			const jx = slipDirX * dtime * friction,
 				jy = slipDirY * dtime * friction,

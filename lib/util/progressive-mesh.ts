@@ -1,7 +1,6 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { FLT_MAX, FLT_MIN } from './float.js'
 export class ProgMeshTriangle {
 	private vertices: ProgMeshVertex[]
 	public normal!: ProgMeshFloat3
@@ -25,7 +24,7 @@ export class ProgMeshTriangle {
 		const [a, b, c] = this.vertices.map(v => v.position)
 		this.normal = cross(b!.sub(a!), c!.sub(b!))
 		const len = magnitude(this.normal)
-		if (len > FLT_MIN) this.normal = this.normal.divideScalar(len)
+		if (len) this.normal = this.normal.divideScalar(len)
 	}
 
 	public hasVertex(v: ProgMeshVertex): boolean {
@@ -136,7 +135,7 @@ export class ProgMeshContext {
 			v.objdist = -0.01
 			return
 		}
-		v.objdist = FLT_MAX
+		v.objdist = Infinity
 		v.collapse = undefined
 		for (const n of v.neighbor) {
 			const d = this.computeEdgeCollapseCost(v, n)

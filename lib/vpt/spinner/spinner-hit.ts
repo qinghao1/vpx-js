@@ -9,7 +9,6 @@ import { CollisionType } from '../../physics/collision-type.js'
 import { PHYS_SKIN } from '../../physics/constants.js'
 import { HitObject } from '../../physics/hit-object.js'
 import { LineSeg } from '../../physics/line-seg.js'
-import { clamp } from '../../util/functions.js'
 import { Vertex2D } from '../../util/vector.js'
 import type { Ball } from '../ball/ball.js'
 import type { SpinnerData } from './spinner-data.js'
@@ -46,7 +45,7 @@ export class SpinnerHit extends HitObject {
 		this.lineSegs.push(new LineSeg(v2.clone(), v1.clone(), height, height + 2.0 * PHYS_SKIN, CollisionType.Spinner))
 
 		this.mover = new SpinnerMover(data, state, events)
-		this.state.angle = clamp(0.0, this.mover.angleMin, this.mover.angleMax)
+		this.state.angle = MathUtils.clamp(0.0, this.mover.angleMin, this.mover.angleMax)
 	}
 
 	public getMoverObject(): SpinnerMover {

@@ -9,7 +9,6 @@ import type { IBallCreationPosition, Player } from '../../game/player.js'
 import type { PlayerPhysics } from '../../game/player-physics.js'
 import type { Storage } from '../../io/ole-doc.js'
 import type { HitObject } from '../../physics/hit-object.js'
-import { FLT_MAX } from '../../util/float.js'
 import { Matrix3D } from '../../util/matrix.js'
 import { Vertex3D } from '../../util/vector.js'
 import type { Ball } from '../ball/ball.js'
@@ -98,7 +97,7 @@ export class Kicker
 
 	public onBallCreated(physics: PlayerPhysics, ball: Ball): void {
 		ball.coll.hitFlag = true
-		const hitNormal = new Vertex3D(FLT_MAX, FLT_MAX, FLT_MAX)
+		const hitNormal = new Vertex3D(Infinity, Infinity, Infinity)
 		this.hit?.doCollide(physics, ball, hitNormal, false, true)
 	}
 

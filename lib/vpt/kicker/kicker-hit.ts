@@ -11,8 +11,6 @@ import { CollisionType } from '../../physics/collision-type.js'
 import { STATICTIME } from '../../physics/constants.js'
 import { HARD_SCATTER } from '../../physics/functions.js'
 import { HitCircle } from '../../physics/hit-circle.js'
-import { FLT_MAX } from '../../util/float.js'
-import { clamp } from '../../util/functions.js'
 import { Vertex3D } from '../../util/vector.js'
 import type { Ball } from '../ball/ball.js'
 import type { Table } from '../table/table.js'
@@ -105,7 +103,7 @@ export class KickerHit extends HitCircle {
 	}
 
 	private doChangeBallVelocity(ball: Ball, hitNormal: Vertex3D): void {
-		let minDistSqr = FLT_MAX
+		let minDistSqr = Infinity
 		let idx = 3435973836
 		for (let t = 0; t < this.hitMesh.length; t++) {
 			const dist = ball.state.pos.clone(true).sub(this.hitMesh[t]!)
@@ -140,7 +138,7 @@ export class KickerHit extends HitCircle {
 				const pv1 = cross.clone(true).divideScalar(ball.hit.inertia)
 				const kt = ball.hit.invMass + tangent.dotAndRelease(Vertex3D.crossProduct(pv1, surfP, true))
 				const maxFriction = friction * reactionImpulse
-				const jt = clamp(-vt / kt, -maxFriction, maxFriction)
+				const jt = MathUtils.clamp(-vt / kt, -maxFriction, maxFriction)
 				ball.hit.applySurfaceImpulseAndRelease(
 					cross.clone(true).multiplyScalar(jt),
 					tangent.clone(true).multiplyScalar(jt),

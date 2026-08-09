@@ -5,7 +5,6 @@ import { MathUtils } from 'three'
 import type { EventProxy } from '../../game/event-proxy.js'
 import type { Player } from '../../game/player.js'
 import { PHYS_FACTOR } from '../../physics/constants.js'
-import { clamp } from '../../util/functions.js'
 import { ItemApi } from '../item-api.js'
 import type { Table } from '../table/table.js'
 import type { SpinnerData } from './spinner-data.js'
@@ -47,7 +46,7 @@ export class SpinnerApi extends ItemApi<SpinnerData> {
 		return this.mover.damping ** (1 / PHYS_FACTOR)
 	}
 	set Damping(v) {
-		this.mover.damping = clamp(v, 0, 1) ** PHYS_FACTOR
+		this.mover.damping = MathUtils.clamp(v, 0, 1) ** PHYS_FACTOR
 	}
 	get Material() {
 		return this.state.material
@@ -134,5 +133,5 @@ export class SpinnerApi extends ItemApi<SpinnerData> {
 }
 
 function clampAngleToRad(angle: number, min: number, max: number): number {
-	return MathUtils.degToRad(clamp(angle, min, max))
+	return MathUtils.degToRad(MathUtils.clamp(angle, min, max))
 }

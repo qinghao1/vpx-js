@@ -8,7 +8,6 @@ import type { HitObject } from '../../physics/hit-object.js'
 import { HitPoint } from '../../physics/hit-point.js'
 import { HitTriangle } from '../../physics/hit-triangle.js'
 import { EdgeSet } from '../../util/edge-set.js'
-import { clamp } from '../../util/functions.js'
 import {
 	ProgMeshFloat3,
 	ProgMeshTriData,
@@ -34,7 +33,10 @@ export class PrimitiveHitGenerator {
 		}
 		if (this.data.isToy && !this.data.useAsPlayfield) return []
 		const reducedVertices = Math.floor(
-			Math.max(mesh.vertices.length ** (clamp(1 - this.data.collisionReductionFactor, 0, 1) * 0.25 + 0.75), 420),
+			Math.max(
+				mesh.vertices.length ** (MathUtils.clamp(1 - this.data.collisionReductionFactor, 0, 1) * 0.25 + 0.75),
+				420,
+			),
 		)
 		if (reducedVertices < mesh.vertices.length) mesh = this.getReducedMesh(mesh, reducedVertices)
 		const addedEdges = new EdgeSet()

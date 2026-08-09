@@ -21,7 +21,6 @@ import {
 import { elasticityWithFalloff } from '../../physics/functions.js'
 import { HitObject } from '../../physics/hit-object.js'
 import { FRect3D } from '../../util/frect3d.js'
-import { clamp } from '../../util/functions.js'
 import { Vertex2D, Vertex3D } from '../../util/vector.js'
 import type { Ball } from '../ball/ball.js'
 import type { Table } from '../table/table.js'
@@ -179,7 +178,7 @@ export class FlipperHit extends HitObject {
 				const crossB = Vertex3D.crossProduct(rB, slipDir, true),
 					pv12 = crossB.clone(true).divideScalar(ball.hit.inertia)
 				const denomB = ball.hit.invMass + slipDir.dotAndRelease(Vertex3D.crossProduct(pv12, rB, true))
-				const friction = clamp(numer / (denomB + denomF), -maxF, maxF)
+				const friction = MathUtils.clamp(numer / (denomB + denomF), -maxF, maxF)
 				Vertex3D.release(rB, pv12)
 				ball.hit.applySurfaceImpulseAndRelease(
 					crossB.clone(true).multiplyScalar(dTime * friction),
@@ -256,7 +255,7 @@ export class FlipperHit extends HitObject {
 				pv13 = crossF.clone(true).divideScalar(this.mover.inertia)
 			kt += tangent.dotAndRelease(Vertex3D.crossProduct(pv13, rF, true))
 			const maxF = this.friction * impulse,
-				jt = clamp(-vt / kt, -maxF, maxF)
+				jt = MathUtils.clamp(-vt / kt, -maxF, maxF)
 			ball.hit.applySurfaceImpulseAndRelease(
 				crossB.clone(true).multiplyScalar(jt),
 				tangent.clone(true).multiplyScalar(jt),

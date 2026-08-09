@@ -3,7 +3,6 @@
 
 import { type Matrix3, Vector2, Vector3 } from 'three'
 import { UNDEF } from '../scripting/vbs-undefined.js'
-import { FLT_MIN } from './float.js'
 import type { Matrix2D, Matrix3D } from './matrix.js'
 import { pooled } from './object-pool.js'
 
@@ -119,7 +118,7 @@ export class Vertex3D extends Vector3 {
 		return this.set(0, 0, 0)
 	}
 	isZero(): boolean {
-		return Math.abs(this.x) < FLT_MIN && Math.abs(this.y) < FLT_MIN && Math.abs(this.z) < FLT_MIN
+		return this.x === 0 && this.y === 0 && this.z === 0
 	}
 	static crossProduct(a: Vertex3D, b: Vertex3D, recycle = false): Vertex3D {
 		const out = new Vector3().crossVectors(a, b)

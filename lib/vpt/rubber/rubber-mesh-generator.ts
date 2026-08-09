@@ -3,7 +3,6 @@
 
 import { MathUtils } from 'three'
 import { HIT_SHAPE_DETAIL_LEVEL } from '../../util/dragpoint.js'
-import { FLT_MAX, FLT_MIN } from '../../util/float.js'
 import { Matrix3D } from '../../util/matrix.js'
 import { SplineVertex } from '../../util/spline-vertex.js'
 import { Vertex3D } from '../../util/vector.js'
@@ -117,12 +116,12 @@ export class RubberMeshGenerator {
 		}
 		Mesh.computeNormals(mesh.vertices, numVertices, mesh.indices, 6 * numVertices)
 
-		let maxx = FLT_MIN,
-			minx = FLT_MAX,
-			maxy = FLT_MIN,
-			miny = FLT_MAX,
-			maxz = FLT_MIN,
-			minz = FLT_MAX
+		let maxx = -Infinity,
+			minx = Infinity,
+			maxy = -Infinity,
+			miny = Infinity,
+			maxz = -Infinity,
+			minz = Infinity
 		for (let i = 0; i < numVertices; i++) {
 			const v = mesh.vertices[i]!
 			if (v.x > maxx) maxx = v.x

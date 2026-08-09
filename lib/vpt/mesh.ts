@@ -1,14 +1,11 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { FLT_MAX, FLT_MIN } from '../util/float.js'
 import type { Matrix3D } from '../util/matrix.js'
 import { type RenderVertex, RenderVertex3D } from '../util/render-vertex.js'
 import { Vertex2D, Vertex3D } from '../util/vector.js'
 import { Vertex3DNoTex2 } from '../util/vertex.js'
 import type { FrameData } from './animation.js'
-
-export { FLT_MAX, FLT_MIN }
 
 /** VPinball mesh. @see https://github.com/vpinball/vpinball/blob/master/mesh.h */
 export class Mesh {
@@ -127,7 +124,7 @@ export class Mesh {
 		for (let i = 0; i < numVertices; i++) {
 			const v = vertices[i]
 			const l = v.nx * v.nx + v.ny * v.ny + v.nz * v.nz
-			const inv = l >= FLT_MIN ? 1 / Math.sqrt(l) : 0
+			const inv = l ? 1 / Math.sqrt(l) : 0
 			v.nx *= inv
 			v.ny *= inv
 			v.nz *= inv
@@ -157,7 +154,7 @@ export class Mesh {
 	/** Finds closest point on polygon to pvin. */
 	public static closestPointOnPolygon(rgv: RenderVertex3D[], pvin: Vertex2D, fClosed: boolean): [Vertex2D, number] {
 		const count = rgv.length
-		let mindist = FLT_MAX
+		let mindist = Infinity
 		let piSeg = -1 // in case we are not next to the line
 		const pvOut = new Vertex2D()
 		let cloop = count

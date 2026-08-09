@@ -4,7 +4,6 @@ import { MathUtils } from 'three'
 
 import type { EventProxy } from '../../game/event-proxy.js'
 import type { Player } from '../../game/player.js'
-import { clamp } from '../../util/functions.js'
 import { ItemApi } from '../item-api.js'
 import type { Table } from '../table/table.js'
 import type { FlipperData } from './flipper-data.js'
@@ -195,7 +194,7 @@ export class FlipperApi extends ItemApi<FlipperData> {
 		return this.mover.getReturnRatio()
 	}
 	set Return(v) {
-		if (!this.data.doOverridePhysics(this.table)) this.data.return = clamp(v, 0, 1)
+		if (!this.data.doOverridePhysics(this.table)) this.data.return = MathUtils.clamp(v, 0, 1)
 	}
 	get FlipperRadiusMin() {
 		return this.data.flipperRadiusMin

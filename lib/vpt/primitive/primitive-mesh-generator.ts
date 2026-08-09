@@ -2,7 +2,6 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { MathUtils } from 'three'
-import { FLT_MAX } from '../../util/float.js'
 import { Matrix3D } from '../../util/matrix.js'
 import { Vertex3DNoTex2 } from '../../util/vertex.js'
 import { Mesh } from '../mesh.js'
@@ -30,10 +29,10 @@ export class PrimitiveMeshGenerator {
 		const addAngle = (2 * Math.PI) / sides
 		const offsAngle = Math.PI / sides
 
-		let minX = FLT_MAX,
-			minY = FLT_MAX,
-			maxX = -FLT_MAX,
-			maxY = -FLT_MAX
+		let minX = Infinity,
+			minY = Infinity,
+			maxX = -Infinity,
+			maxY = -Infinity
 		mesh.vertices = []
 		mesh.vertices.push(Object.assign(new Vertex3DNoTex2(), { x: 0, y: 0, z: 0.5 }))
 		mesh.vertices[sides + 1] = Object.assign(new Vertex3DNoTex2(), { x: 0, y: 0, z: -0.5 })

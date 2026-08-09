@@ -1,3 +1,4 @@
+import { MathUtils } from 'three'
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
@@ -5,7 +6,6 @@ import type { EventProxy } from '../../game/event-proxy.js'
 import type { Player } from '../../game/player.js'
 import type { PlayerPhysics } from '../../game/player-physics.js'
 import type { HitObject } from '../../physics/hit-object.js'
-import { clamp } from '../../util/functions.js'
 import { ItemApi } from '../item-api.js'
 import type { Table } from '../table/table.js'
 import { HitTarget } from './hit-target.js'
@@ -116,7 +116,7 @@ export class HitTargetApi extends ItemApi<HitTargetData> {
 		return this.data.friction
 	}
 	set Friction(v) {
-		this.data.friction = clamp(v, 0, 1)
+		this.data.friction = MathUtils.clamp(v, 0, 1)
 	}
 	get Scatter() {
 		return this.data.scatter

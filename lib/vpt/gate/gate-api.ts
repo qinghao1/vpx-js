@@ -6,7 +6,6 @@ import type { EventProxy } from '../../game/event-proxy.js'
 import type { Player } from '../../game/player.js'
 import { PHYS_FACTOR } from '../../physics/constants.js'
 import type { LineSeg } from '../../physics/line-seg.js'
-import { clamp } from '../../util/functions.js'
 import { ItemApi } from '../item-api.js'
 import type { Table } from '../table/table.js'
 import type { GateData } from './gate-data.js'
@@ -111,19 +110,19 @@ export class GateApi extends ItemApi<GateData> {
 		return this.mover.friction
 	}
 	set Friction(v) {
-		this.mover.friction = clamp(v, 0, 1)
+		this.mover.friction = MathUtils.clamp(v, 0, 1)
 	}
 	get Damping() {
 		return this.mover.damping ** (1 / PHYS_FACTOR)
 	}
 	set Damping(v) {
-		this.mover.damping = clamp(v, 0, 1) ** PHYS_FACTOR
+		this.mover.damping = MathUtils.clamp(v, 0, 1) ** PHYS_FACTOR
 	}
 	get GravityFactor() {
 		return this.mover.gravityFactor
 	}
 	set GravityFactor(v) {
-		this.mover.gravityFactor = clamp(v, 0, 1)
+		this.mover.gravityFactor = MathUtils.clamp(v, 0, 1)
 	}
 	get Visible() {
 		return this.state.isVisible
@@ -166,14 +165,14 @@ export class GateApi extends ItemApi<GateData> {
 
 	private setCloseAngle(deg: number): void {
 		if (this.data.isCollidable) throw new Error("Gate is collidable! closing angles other than 0 aren't possible!")
-		const a = clamp(MathUtils.degToRad(deg), this.data.angleMin, this.data.angleMax)
+		const a = MathUtils.clamp(MathUtils.degToRad(deg), this.data.angleMin, this.data.angleMax)
 		if (this.mover.angleMax > a) this.mover.angleMin = a
 		else this.mover.angleMax = a
 	}
 
 	private setOpenAngle(deg: number): void {
 		if (this.data.isCollidable) throw new Error("Gate is collidable! open angles other than 90 aren't possible!")
-		const a = clamp(MathUtils.degToRad(deg), this.data.angleMin, this.data.angleMax)
+		const a = MathUtils.clamp(MathUtils.degToRad(deg), this.data.angleMin, this.data.angleMax)
 		if (this.mover.angleMin < a) this.mover.angleMax = a
 		else this.mover.angleMin = a
 	}
@@ -197,7 +196,7 @@ export class GateApi extends ItemApi<GateData> {
 
 		if (!dir || angle !== 0) {
 			angle *= Math.PI / 180
-			angle = clamp(angle, this.data.angleMin, this.data.angleMax)
+			angle = MathUtils.clamp(angle, this.data.angleMin, this.data.angleMax)
 			const da = angle - this.state.angle
 			if (da > 1e-5) dir = 1
 			else if (da < -1e-5) dir = -1
