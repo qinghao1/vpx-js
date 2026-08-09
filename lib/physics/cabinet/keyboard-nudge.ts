@@ -11,6 +11,7 @@ export class CabNudge {
 	private readonly cabinet = new CabinetPhysics()
 	private impulses: Array<{ elapsed: number; length: number; impulse: Vertex2D }> = []
 	private deactivationDelay = 0
+	private strength = 1
 
 	getAcceleration(): Vertex2D {
 		return this.cabinet.getAcceleration()
@@ -25,7 +26,7 @@ export class CabNudge {
 	nudge(angle: number, force: number): void {
 		const g = 9.80665
 		const baseScale = (0.5 * g) / 2
-		const actual = force * baseScale
+		const actual = force * this.strength * baseScale
 		const a = degToRad(angle)
 		this.impulses.push({
 			elapsed: 0,

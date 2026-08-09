@@ -149,11 +149,12 @@ export class PinInput {
 	}
 
 	private fire(dispId: Event, code: number): void {
+		const prevNudgeIndex = this.nudgeHandler.getIndex()
 		this.table.getApi().fireKeyEvent(dispId, code)
 		const isDown = dispId === Event.GameEventsKeyDown
 		this.syncFlippers(isDown, code)
 		this.syncPlunger(isDown, code)
-		this.syncNudge(isDown, code)
+		this.syncNudge(isDown, code, prevNudgeIndex)
 		this.syncCabinet(isDown, code)
 		this.tryMockTroughEject(isDown, code)
 	}
@@ -213,8 +214,9 @@ export class PinInput {
 		}
 	}
 
-	private syncNudge(isDown: boolean, code: number): void {
+	private syncNudge(isDown: boolean, code: number, prevIndex: number): void {
 		if (!isDown) return
+		if (prevIndex !== this.nudgeHandler.getIndex()) return
 		const leftKey = this.getKey(AssignKey.LeftTiltKey)
 		const rightKey = this.getKey(AssignKey.RightTiltKey)
 		const centerKey = this.getKey(AssignKey.CenterTiltKey)

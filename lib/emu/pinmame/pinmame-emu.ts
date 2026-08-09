@@ -272,9 +272,7 @@ export class PinMameEmulator implements IEmulator {
 	}
 
 	getSwitchInput(n: number): number {
-		const pending = this.pendingSwitches.get(n)
-		if (pending !== undefined) return pending
-		return (this.isMock ? this.mockSwitches.get(n) : this.api?.getSwitch(n)) ?? 0
+		return this.pendingSwitches.get(n) ?? (this.isMock ? this.mockSwitches.get(n) : this.api?.getSwitch(n)) ?? 0
 	}
 	getLampState(n: number): number {
 		return this.emulatorState.getLampStateDirect(n) ?? this.lamps[n] ?? 0
@@ -297,8 +295,8 @@ export class PinMameEmulator implements IEmulator {
 			this.queue.addMessage(t, n)
 			return true
 		}
-		const pending = this.pendingSwitches.get(n)
-		const cur = pending !== undefined ? pending : ((this.isMock ? this.mockSwitches.get(n) : this.api?.getSwitch(n)) ?? 0)
+		const cur =
+			this.pendingSwitches.get(n) ?? (this.isMock ? this.mockSwitches.get(n) : this.api?.getSwitch(n)) ?? 0
 		const next = enable === undefined ? (cur ? 0 : 1) : enable ? 1 : 0
 		if (this.isMock) {
 			this.mockSwitches.set(n, next)

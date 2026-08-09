@@ -4,9 +4,14 @@ import { CabNudge } from './keyboard-nudge.js'
 
 export class NudgeHandler {
 	private readonly nudge = new CabNudge()
+	private index = 0
 
 	applyImpulse(angle: number, force: number): void {
 		this.nudge.nudge(angle, force)
+		this.index++
+	}
+	getIndex(): number {
+		return this.index
 	}
 	stepOneMillisecond(): void {
 		this.nudge.stepOneMillisecond()
