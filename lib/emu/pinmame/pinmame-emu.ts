@@ -59,22 +59,22 @@ export class PinMameEmulator implements IEmulator {
 			logger().warn('[pinmame] mock — physics only, run npm run build:wasm')
 			return
 		}
-		const cw = module.cwrap.bind(module) as any
+		const c = module.cwrap.bind(module) as (id: string, rt: string | null, at: string[]) => (...a: unknown[]) => unknown
 		this.api = {
-			setConfig: cw('PinmameSetConfig', null, ['number']),
-			run: cw('PinmameRun', 'number', ['number']),
-			setSwitch: cw('PinmameSetSwitch', null, ['number', 'number']),
-			getSwitch: cw('PinmameGetSwitch', 'number', ['number']),
-			getChangedLamps: cw('PinmameGetChangedLamps', 'number', ['number']),
-			getChangedSols: cw('PinmameGetChangedSolenoids', 'number', ['number']),
-			getChangedGIs: cw('PinmameGetChangedGIs', 'number', ['number']),
-			getDIP: cw('PinmameGetDIP', 'number', ['number']),
-			setDIP: cw('PinmameSetDIP', null, ['number', 'number']),
-			getDmdWidth: cw('PinmameGetDmdWidth', 'number', []),
-			getDmdHeight: cw('PinmameGetDmdHeight', 'number', []),
-			getDmdDepth: cw('PinmameGetDmdDepth', 'number', []),
-			getDmdFrame: cw('PinmameGetDmdFrame', 'number', ['number']),
-		} as Api
+			setConfig: c('PinmameSetConfig', null, ['number']) as Api['setConfig'],
+			run: c('PinmameRun', 'number', ['number']) as Api['run'],
+			setSwitch: c('PinmameSetSwitch', null, ['number', 'number']) as Api['setSwitch'],
+			getSwitch: c('PinmameGetSwitch', 'number', ['number']) as Api['getSwitch'],
+			getChangedLamps: c('PinmameGetChangedLamps', 'number', ['number']) as Api['getChangedLamps'],
+			getChangedSols: c('PinmameGetChangedSolenoids', 'number', ['number']) as Api['getChangedSols'],
+			getChangedGIs: c('PinmameGetChangedGIs', 'number', ['number']) as Api['getChangedGIs'],
+			getDIP: c('PinmameGetDIP', 'number', ['number']) as Api['getDIP'],
+			setDIP: c('PinmameSetDIP', null, ['number', 'number']) as Api['setDIP'],
+			getDmdWidth: c('PinmameGetDmdWidth', 'number', []) as Api['getDmdWidth'],
+			getDmdHeight: c('PinmameGetDmdHeight', 'number', []) as Api['getDmdHeight'],
+			getDmdDepth: c('PinmameGetDmdDepth', 'number', []) as Api['getDmdDepth'],
+			getDmdFrame: c('PinmameGetDmdFrame', 'number', ['number']) as Api['getDmdFrame'],
+		}
 	}
 
 	async loadGame(name: string | { name?: string; pinmame?: { name?: string } }, rom: Uint8Array): Promise<void> {
@@ -106,7 +106,6 @@ export class PinMameEmulator implements IEmulator {
 		const ptr = m._malloc(CONFIG_SIZE)
 		try {
 			m.HEAPU8.fill(0, ptr, ptr + CONFIG_SIZE)
-			// PinmameConfig layout: offset 4 = sampleRate (int), 8 = vpmPath (char[])
 			new DataView(m.HEAPU8.buffer).setInt32(ptr + 4, SAMPLE_RATE, true)
 			m.HEAPU8.set(new TextEncoder().encode(VPM_DIR), ptr + 8)
 			this.api!.setConfig(ptr)
@@ -140,28 +139,28 @@ export class PinMameEmulator implements IEmulator {
 
 	private sync(): void {
 		if (!this.mod || !this.api || this.isMock) return
-		try { this.pull(this.api.getChangedLamps, this.lamps) } catch {}
-		try { this.pull(this.api.getChangedSols, this.sols) } catch {}
-		try { this.pull(this.api.getChangedGIs, this.gis) } catch {}
+		for (const [fn, buf] of [
+			[this.api.getChangedLamps, this.lamps],
+			[this.api.getChangedSols, this.sols],
+			[this.api.getChangedGIs, this.gis],
+		] as const) try { this.pull(fn, buf as Uint8Array) } catch {}
 		try { this.emulatorState.applyPinmame(this.lamps, this.sols, this.gis) } catch {}
 		try { this.pullDmd() } catch (e) { logger().warn('[pinmame] pullDmd failed', String(e)) }
 	}
 
 	private pullDmd(): void {
 		if (!this.mod || !this.api) return
+		const w = this.api.getDmdWidth()
+		const h = this.api.getDmdHeight()
+		if (!w || !h) return
+		this.dmdW = w; this.dmdH = h
+		const n = w * h
+		const ptr = this.mod._malloc(n)
 		try {
-			const w = this.api.getDmdWidth()
-			const h = this.api.getDmdHeight()
-			if (!w || !h) return
-			this.dmdW = w; this.dmdH = h
-			const n = w * h
-			const ptr = this.mod._malloc(n)
-			try {
-				if (this.api.getDmdFrame(ptr) > 0) {
-					this.emulatorState.setDmd(this.mod.HEAPU8.subarray(ptr, ptr + n).slice())
-				}
-			} finally { this.mod._free(ptr) }
-		} catch {}
+			if (this.api.getDmdFrame(ptr) > 0) {
+				this.emulatorState.setDmd(this.mod.HEAPU8.subarray(ptr, ptr + n).slice())
+			}
+		} finally { this.mod._free(ptr) }
 	}
 
 	private pull(fn: (p: number) => number, buf: Uint8Array): void {
