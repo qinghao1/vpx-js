@@ -8,7 +8,7 @@ import type { BallData } from './ball-data.js'
 import type { BallState } from './ball-state.js'
 
 // Ball pose: row-major R*S*T in D3D (ball.cpp:483) → col-major T*R*S*Flip in Three (matrix.ts:299)
-// LH (VPX) z up → RH (Three) y up: translation z negated, orientation basis via Flip; scene.rotateX(π/2) maps -z→+y
+// LH (VPX) z up → RH (Three) y up via Flip; scene.rotateX(π/2) maps Z→Y
 // antiStretch is viewport-dependent projection correction (ball.cpp:449) — uniform radius intentional for headless
 export class BallUpdater extends ItemUpdater<BallState> {
 	constructor(
@@ -54,7 +54,7 @@ export class BallUpdater extends ItemUpdater<BallState> {
 				0,
 				1,
 			)
-			trans.setTranslation(pos.x, pos.y, -z)
+			trans.setTranslation(pos.x, pos.y, z)
 			scale.setScaling(this.data.radius, this.data.radius, this.data.radius)
 			mat.copy(orient).multiply(scale).multiply(trans).toRightHanded()
 			api.applyMatrixToNode(mat, obj)
