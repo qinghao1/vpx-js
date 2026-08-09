@@ -18,13 +18,7 @@ const BALL_METALNESS = 1
 const BALL_ROUGHNESS = 0.18
 
 const pendingKeyFor = (key: 'map' | 'normalMap' | 'envMap' | 'emissiveMap'): string =>
-	key === 'map'
-		? 'pendingMap'
-		: key === 'normalMap'
-			? 'pendingNormalMap'
-			: key === 'envMap'
-				? 'pendingEnvMap'
-				: 'pendingEmissiveMap'
+	'pending' + key[0]!.toUpperCase() + key.slice(1)
 
 /** Generates/caches Three.js materials. */
 export class ThreeMaterialGenerator {

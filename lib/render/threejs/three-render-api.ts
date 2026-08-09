@@ -34,7 +34,6 @@ import { ThreePlayfieldMeshGenerator } from './three-playfield-mesh-generator.js
  * @see https://github.com/vpinball/vpinball/blob/master/RenderDevice.cpp */
 export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, PointLight> {
 	public static readonly SCALE = 0.05
-	public static readonly SHADOWS = true
 
 	private readonly converter: ThreeConverter
 	private readonly meshConvertOpts: MeshConvertOptions
