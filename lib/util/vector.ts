@@ -159,19 +159,8 @@ export class Vertex3D extends Vector3 {
 		return this
 	}
 	applyMatrix2D(m: Matrix2D): this {
-		const e = (m as any).elements ?? (m as any).matrix
-		const ex = Array.isArray(e[0]) ? e : null
-		if (ex) {
-			const x = ex[0][0] * this.x + ex[0][1] * this.y + ex[0][2] * this.z
-			const y = ex[1][0] * this.x + ex[1][1] * this.y + ex[1][2] * this.z
-			const z = ex[2][0] * this.x + ex[2][1] * this.y + ex[2][2] * this.z
-			return this.set(x, y, z)
-		}
-		const ee = (m as Matrix3).elements
-		const x = ee[0] * this.x + ee[3] * this.y + ee[6] * this.z
-		const y = ee[1] * this.x + ee[4] * this.y + ee[7] * this.z
-		const z = ee[2] * this.x + ee[5] * this.y + ee[8] * this.z
-		return this.set(x, y, z)
+		const e = (m as Matrix3).elements
+		return this.set(e[0] * this.x + e[3] * this.y + e[6] * this.z, e[1] * this.x + e[4] * this.y + e[7] * this.z, e[2] * this.x + e[5] * this.y + e[8] * this.z)
 	}
 	override dot(v: Vector3): number {
 		return f4(super.dot(v))
