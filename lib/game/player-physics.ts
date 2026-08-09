@@ -31,6 +31,7 @@ import type { PinInput } from './pin-input.js'
 import type { IBallCreationPosition, Player } from './player.js'
 
 const CLOCK_INIT_THRESHOLD_USEC = 100_000
+const MAX_CATCHUP_USEC = 100 * PHYSICS_STEPTIME
 
 /** Core physics loop — 1 kHz collision, timers, movers.
  * @see https://github.com/vpinball/vpinball/blob/master/player.cpp */
@@ -77,13 +78,8 @@ export class PlayerPhysics {
 		private readonly pinInput: PinInput,
 	) {}
 
-	public getCabinetAcceleration(): Vertex2D {
-		return this.pinInput.getCabinetAcceleration()
-	}
-
-	public getCabinetOffset(): Vertex2D {
-		return this.pinInput.getCabinetOffset()
-	}
+	public getCabinetAcceleration(): Vertex2D { return this.pinInput.getCabinetAcceleration() }
+	public getCabinetOffset(): Vertex2D { return this.pinInput.getCabinetOffset() }
 
 	public init(): void {
 		const d = this.table.data!
@@ -195,6 +191,12 @@ export class PlayerPhysics {
 			this.startTimeUsec += delta
 			this.nextPhysicsFrameTime += delta
 			this.curPhysicsFrameTime = initial
+		}
+		if (initial - this.curPhysicsFrameTime > MAX_CATCHUP_USEC) {
+			const drift = initial - this.curPhysicsFrameTime - MAX_CATCHUP_USEC
+			this.startTimeUsec += drift
+			this.curPhysicsFrameTime += drift
+			this.nextPhysicsFrameTime += drift
 		}
 		this.lastFrameDuration = initial - this.lastTimeUsec
 		if (this.lastFrameDuration > 1_000_000) this.lastFrameDuration = DEFAULT_STEPTIME

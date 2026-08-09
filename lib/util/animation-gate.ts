@@ -14,15 +14,9 @@ export class AnimationGate {
 	}
 
 	beginAnimation(): void {
-		if (this.resolve) {
-			try {
-				this.resolve()
-			} catch {}
-		}
+		this.resolve?.()
 		this.animating = true
-		this.promise = new Promise<void>(r => {
-			this.resolve = r
-		})
+		this.promise = new Promise<void>(r => (this.resolve = r))
 	}
 
 	endAnimation(): void {
@@ -30,17 +24,11 @@ export class AnimationGate {
 		const r = this.resolve
 		this.resolve = null
 		this.promise = null
-		try {
-			r?.()
-		} catch {}
+		r?.()
 	}
 
 	async waitIfAnimating(): Promise<void> {
-		if (this.promise) {
-			try {
-				await this.promise
-			} catch {}
-		}
+		if (this.promise) await this.promise
 	}
 
 	async yieldToMain(): Promise<void> {
@@ -50,15 +38,9 @@ export class AnimationGate {
 			await new Promise<void>(r => requestAnimationFrame(() => r()))
 			if (g.scheduler?.yield) await g.scheduler.yield()
 			else await new Promise<void>(r => setTimeout(r, 0))
-		} else if (g.scheduler?.yield) {
-			await g.scheduler.yield()
-		} else {
-			await new Promise<void>(r => setTimeout(r, 0))
-		}
+		} else if (g.scheduler?.yield) await g.scheduler.yield()
+		else await new Promise<void>(r => setTimeout(r, 0))
 	}
 }
 
-// Module-local singleton for tests/single-graph usage;
-// for Vite cross-graph (demo-browser ↔ lib) pass the instance explicitly
-// via ThreeMapGenerator/Player/Transpiler constructors instead of relying on a global.
 export const animationGate = new AnimationGate()
