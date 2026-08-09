@@ -105,41 +105,28 @@ export class VpmController {
 		if (GamelistDB.getByPinmameName(name)) {
 			const { wpcDbEntry, romFile } = await downloadGameEntry(name)
 			await (this.emulator as Emulator).loadGame(wpcDbEntry, romFile)
-			for (const [k, v] of this.switchCache) {
-				try { this.emulator.setSwitchInput(k, v) } catch {}
-			}
+			this.replay(this.emulator)
 			this.player.setEmulator(this.emulator)
 			return
 		}
 		const existing = this.player.getPhysics().emu
 		if (existing?.isInitialized() && existing instanceof PinMameEmulator) {
-			for (const [k, v] of this.solMaskCache) {
-				try {
-					;(existing as any).setSolMask?.(k, v)
-				} catch {}
-			}
-			for (const [k, v] of this.switchCache) {
-				try { existing.setSwitchInput(k, v) } catch {}
-			}
+			this.replay(existing as unknown as IEmulator)
 			this.emulator = existing
 			return
 		}
 		const emu = new PinMameEmulator()
-		for (const [k, v] of this.solMaskCache) {
-			try {
-				;(emu as any).setSolMask?.(k, v)
-			} catch {}
-		}
-		for (const [k, v] of this.switchCache) {
-			try { emu.setSwitchInput(k, v) } catch {}
-		}
+		this.replay(emu as unknown as IEmulator)
 		this.emulator = emu
 		const rom = await this.fetchRom(name)
 		await emu.loadGame(name, rom)
 		this.player.setEmulator(emu)
-		for (const [k, v] of this.switchCache) {
-			try { emu.setSwitchInput(k, v) } catch {}
-		}
+		this.replay(emu as unknown as IEmulator)
+	}
+
+	private replay(emu: IEmulator): void {
+		for (const [k, v] of this.solMaskCache) try { (emu as any).setSolMask?.(k, v) } catch {}
+		for (const [k, v] of this.switchCache) try { emu.setSwitchInput(k, v) } catch {}
 	}
 
 	private async fetchRom(name: string): Promise<Uint8Array> {

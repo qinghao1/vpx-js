@@ -12,6 +12,7 @@ import { Event } from './event.js'
 import type { IEmulator } from './iemulator.js'
 import { type AssignKey, keyEventToDirectInputKey } from './key-code.js'
 import { PinInput } from './pin-input.js'
+import type { NudgeHandler } from '../physics/cabinet/nudge-handler.js'
 import { PlayerPhysics } from './player-physics.js'
 
 /** Host-facing game controller: input, physics, animations and state diffing. */
@@ -172,9 +173,9 @@ export class Player extends EventEmitter {
 		return this.physics.balls
 	}
 	public getKey(key: AssignKey): number {
-		return this.pinInput.rgKeys[key]
+		return this.pinInput.rgKeys[key] ?? 0
 	}
-	public getNudgeHandler(): import('../physics/cabinet/nudge-handler.js').NudgeHandler {
+	public getNudgeHandler(): NudgeHandler {
 		return this.pinInput.getNudgeHandler()
 	}
 	public nudge(angle: number, force: number): void {

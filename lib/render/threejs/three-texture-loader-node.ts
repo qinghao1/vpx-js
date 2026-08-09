@@ -32,7 +32,7 @@ export class ThreeTextureLoaderNode implements ITextureLoader<ThreeTexture> {
 
 	async loadDefaultTexture(name: string, _: string, file: string): Promise<ThreeTexture> {
 		const buf = await readFile(join(__dirname, '../../../res/maps', file))
-		return this.loadTexture(name, 'png', buf as unknown as Uint8Array)
+		return this.loadTexture(name, 'png', buf as Uint8Array)
 	}
 }
 
@@ -46,5 +46,12 @@ function tex(data: Uint8Array, w: number, h: number, name: string): ThreeTexture
 }
 
 function floatTex(Loader: any, type: any, data: Uint8Array): Promise<ThreeTexture> {
-	return new Promise((res, rej) => new Loader().setDataType(type as never).load(data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as never, (v: any) => res(v as ThreeTexture), undefined, rej))
+	return new Promise((res, rej) =>
+		new Loader().setDataType(type as never).load(
+			data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as never,
+			(v: any) => res(v as ThreeTexture),
+			undefined,
+			rej,
+		),
+	)
 }

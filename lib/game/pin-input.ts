@@ -39,7 +39,7 @@ import type { Player } from './player.js'
 
 type KeyEvent = { code: number; down: boolean }
 
-const DEFAULT_KEYS: Readonly<Record<Exclude<AssignKey, AssignKey.CKeys>, number>> = {
+const DEFAULT_KEYS: Record<number, number> = {
 	[AssignKey.LeftFlipperKey]: DIK_LCONTROL,
 	[AssignKey.RightFlipperKey]: DIK_RCONTROL,
 	[AssignKey.LeftTiltKey]: DIK_Z,
@@ -61,16 +61,7 @@ const DEFAULT_KEYS: Readonly<Record<Exclude<AssignKey, AssignKey.CKeys>, number>
 	[AssignKey.LockbarKey]: DIK_LALT,
 	[AssignKey.Enable3D]: DIK_F10,
 	[AssignKey.Escape]: DIK_ESCAPE,
-} as const
-
-const IGNORED_KEYS = new Set<number>([
-	DEFAULT_KEYS[AssignKey.FrameCount],
-	DEFAULT_KEYS[AssignKey.Enable3D],
-	DEFAULT_KEYS[AssignKey.DBGBalls],
-])
-
-const LEFT_FALLBACKS = new Set<number>([DIK_LSHIFT, DIK_LCONTROL, DIK_LEFT])
-const RIGHT_FALLBACKS = new Set<number>([DIK_RSHIFT, DIK_RCONTROL, DIK_RIGHT])
+}
 
 const SWITCH_START = [16, 13, 1] as const
 const SWITCH_CREDIT_2_3 = [65, 1, 2, 3, 4] as const
@@ -82,17 +73,17 @@ const TROUGH_KICK_ANGLE = 60
 const TROUGH_KICK_SPEED = 10
 
 function isLeftCode(code: number, leftKey: number): boolean {
-	return code === leftKey || LEFT_FALLBACKS.has(code)
+	return code === leftKey || code === DIK_LSHIFT || code === DIK_LCONTROL || code === DIK_LEFT
 }
 
 function isRightCode(code: number, rightKey: number): boolean {
-	return code === rightKey || RIGHT_FALLBACKS.has(code)
+	return code === rightKey || code === DIK_RSHIFT || code === DIK_RCONTROL || code === DIK_RIGHT
 }
 
 export class PinInput {
 	private readonly queue: KeyEvent[] = []
 	private readonly pressed = new Set<number>()
-	private readonly nudgeHandler = new NudgeHandler('cab', 1)
+	private readonly nudgeHandler = new NudgeHandler()
 
 	readonly rgKeys: Record<number, number> = { ...DEFAULT_KEYS }
 
@@ -141,11 +132,12 @@ export class PinInput {
 		if (!this.queue.length) return
 		const queued = this.queue.splice(0, this.queue.length)
 		for (const ev of queued) {
-			if (IGNORED_KEYS.has(ev.code)) continue
+			if (ev.code === this.rgKeys[AssignKey.FrameCount] || ev.code === this.rgKeys[AssignKey.Enable3D] || ev.code === this.rgKeys[AssignKey.DBGBalls]) continue
 			if (ev.down) {
 				if (this.pressed.has(ev.code)) continue
 				this.pressed.add(ev.code)
 			} else {
+				if (!this.pressed.has(ev.code)) continue
 				this.pressed.delete(ev.code)
 			}
 			this.fire(ev.down ? Event.GameEventsKeyDown : Event.GameEventsKeyUp, ev.code)
@@ -224,7 +216,7 @@ export class PinInput {
 		const centerKey = this.getKey(AssignKey.CenterTiltKey)
 		if (code !== leftKey && code !== rightKey && code !== centerKey) return
 		const baseForce = 2
-		const angleVariance = (Math.random() - 0.5) * 15 * baseForce
+		const angleVariance = (Math.random() - 0.5) * 15
 		const force = (0.6 + Math.random() * 0.8) * baseForce
 		let angle: number
 		if (code === leftKey) angle = 75 + angleVariance
