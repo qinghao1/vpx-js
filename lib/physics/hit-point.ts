@@ -2,7 +2,6 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import type { Vertex3D } from '../util/math.js'
-import { solveQuadraticEq } from '../util/functions.js'
 import type { Ball } from '../vpt/ball/ball.js'
 import type { CollisionEvent } from './collision-event.js'
 import { C_CONTACTVEL, PHYS_TOUCH } from './constants.js'
@@ -42,9 +41,13 @@ export class HitPoint extends HitObject {
 			else hitTime = Math.max(0, -bnd / bnv);
 		} else {
 			if (a < 1e-8) return -1;
-			const sol = solveQuadraticEq(a, 2*b, bcddsq - ball.data.radius*ball.data.radius);
-			if (!sol) return -1;
-			hitTime = sol[0]!*sol[1]! < 0 ? Math.max(sol[0]!, sol[1]!) : Math.min(sol[0]!, sol[1]!);
+			const discr = 4 * b * b - 4 * a * (bcddsq - ball.data.radius * ball.data.radius)
+			if (discr < 0) return -1
+			const s = Math.sqrt(discr)
+			const inv = -0.5 / a
+			const t1 = (2 * b + s) * inv
+			const t2 = (2 * b - s) * inv
+			hitTime = t1 * t2 < 0 ? Math.max(t1, t2) : Math.min(t1, t2)
 		}
 		if (!Number.isFinite(hitTime) || hitTime < 0 || hitTime > dTime) return -1;
 		const hx = bx + vx*hitTime, hy = by + vy*hitTime, hz = bz + vz*hitTime;

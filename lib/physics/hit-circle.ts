@@ -2,7 +2,6 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import type { PlayerPhysics } from '../game/player-physics.js'
-import { solveQuadraticEq } from '../util/functions.js'
 import type { Vertex2D } from '../util/math.js'
 import type { Ball } from '../vpt/ball/ball.js'
 import type { CollisionEvent } from './collision-event.js'
@@ -91,9 +90,12 @@ export class HitCircle extends HitObject {
 			else isUnhit = bnd > 0
 		} else {
 			if ((!rigid && bnd * bnv > 0) || a < 1e-8) return -1
-			const sol = solveQuadraticEq(a, 2 * b, bcddsq - targetR * targetR)
-			if (!sol) return -1
-			const [t1, t2] = sol
+			const discr = 4 * b * b - 4 * a * (bcddsq - targetR * targetR)
+			if (discr < 0) return -1
+			const s = Math.sqrt(discr)
+			const inv = -0.5 / a
+			const t1 = (2 * b + s) * inv
+			const t2 = (2 * b - s) * inv
 			isUnhit = t1 * t2 < 0
 			hitTime = isUnhit ? Math.max(t1, t2) : Math.min(t1, t2)
 		}
