@@ -19,6 +19,7 @@ export class VpmController {
 	private loadPromise: Promise<void> | null = null
 	private readonly gameSettings = new Map<string, { Settings: { Value: Record<string, unknown> } }>()
 	private readonly solMaskCache = new Map<number, number>()
+	private readonly switchCache = new Map<number, boolean>()
 
 	readonly Switch: Record<number, number>
 	readonly Dip: Record<number, number>
@@ -30,8 +31,11 @@ export class VpmController {
 
 	constructor(private readonly player: Player) {
 		this.Switch = this.boolProxy(
-			i => this.emulator.getSwitchInput(i),
+			i => (this.switchCache.has(i) ? (this.switchCache.get(i)! ? 1 : 0) : this.emulator.getSwitchInput(i)),
 			(n, v) => {
+				if (v === true) this.switchCache.set(n, true)
+				else if (v === false) this.switchCache.set(n, false)
+				else if (v === undefined) this.switchCache.delete(n)
 				if (n < 89) return this.emulator.setSwitchInput(n, v)
 				const key = FLIPTRONICS[n]
 				if (key) return this.emulator.setFliptronicsInput(key, v), true
@@ -101,6 +105,9 @@ export class VpmController {
 		if (GamelistDB.getByPinmameName(name)) {
 			const { wpcDbEntry, romFile } = await downloadGameEntry(name)
 			await (this.emulator as Emulator).loadGame(wpcDbEntry, romFile)
+			for (const [k, v] of this.switchCache) {
+				try { this.emulator.setSwitchInput(k, v) } catch {}
+			}
 			this.player.setEmulator(this.emulator)
 			return
 		}
@@ -111,6 +118,9 @@ export class VpmController {
 					;(existing as any).setSolMask?.(k, v)
 				} catch {}
 			}
+			for (const [k, v] of this.switchCache) {
+				try { existing.setSwitchInput(k, v) } catch {}
+			}
 			this.emulator = existing
 			return
 		}
@@ -120,10 +130,16 @@ export class VpmController {
 				;(emu as any).setSolMask?.(k, v)
 			} catch {}
 		}
+		for (const [k, v] of this.switchCache) {
+			try { emu.setSwitchInput(k, v) } catch {}
+		}
 		this.emulator = emu
 		const rom = await this.fetchRom(name)
 		await emu.loadGame(name, rom)
 		this.player.setEmulator(emu)
+		for (const [k, v] of this.switchCache) {
+			try { emu.setSwitchInput(k, v) } catch {}
+		}
 	}
 
 	private async fetchRom(name: string): Promise<Uint8Array> {

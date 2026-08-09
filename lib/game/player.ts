@@ -174,6 +174,12 @@ export class Player extends EventEmitter {
 	public getKey(key: AssignKey): number {
 		return this.pinInput.rgKeys[key]
 	}
+	public getNudgeHandler(): import('../physics/cabinet/nudge-handler.js').NudgeHandler {
+		return this.pinInput.getNudgeHandler()
+	}
+	public nudge(angle: number, force: number): void {
+		this.pinInput.nudge(angle, force)
+	}
 	public getPhysics(): PlayerPhysics {
 		return this.physics
 	}

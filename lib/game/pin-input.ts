@@ -32,67 +32,119 @@ import {
 	DIK_Z,
 } from './key-code.js'
 import type { Player } from './player.js'
+import { logger } from '../util/logger.js'
+import { Vertex2D } from '../util/vector.js'
+import { NudgeHandler } from '../physics/cabinet/nudge-handler.js'
 
-type KeyEvent = { code: number; down: boolean; ts: number }
+type KeyEvent = { code: number; down: boolean }
+
+const DEFAULT_KEYS: Readonly<Record<Exclude<AssignKey, AssignKey.CKeys>, number>> = {
+	[AssignKey.LeftFlipperKey]: DIK_LCONTROL,
+	[AssignKey.RightFlipperKey]: DIK_RCONTROL,
+	[AssignKey.LeftTiltKey]: DIK_Z,
+	[AssignKey.RightTiltKey]: DIK_SLASH,
+	[AssignKey.CenterTiltKey]: DIK_SPACE,
+	[AssignKey.PlungerKey]: DIK_RETURN,
+	[AssignKey.FrameCount]: DIK_F11,
+	[AssignKey.DBGBalls]: DIK_O,
+	[AssignKey.Debugger]: DIK_D,
+	[AssignKey.AddCreditKey]: DIK_5,
+	[AssignKey.AddCreditKey2]: DIK_4,
+	[AssignKey.StartGameKey]: DIK_1,
+	[AssignKey.MechanicalTilt]: DIK_T,
+	[AssignKey.RightMagnaSave]: DIK_RSHIFT,
+	[AssignKey.LeftMagnaSave]: DIK_LSHIFT,
+	[AssignKey.ExitGame]: DIK_Q,
+	[AssignKey.VolumeUp]: DIK_EQUALS,
+	[AssignKey.VolumeDown]: DIK_MINUS,
+	[AssignKey.LockbarKey]: DIK_LALT,
+	[AssignKey.Enable3D]: DIK_F10,
+	[AssignKey.Escape]: DIK_ESCAPE,
+} as const
+
+const IGNORED_KEYS = new Set<number>([
+	DEFAULT_KEYS[AssignKey.FrameCount],
+	DEFAULT_KEYS[AssignKey.Enable3D],
+	DEFAULT_KEYS[AssignKey.DBGBalls],
+])
+
+const LEFT_FALLBACKS = new Set<number>([DIK_LSHIFT, DIK_LCONTROL, DIK_LEFT])
+const RIGHT_FALLBACKS = new Set<number>([DIK_RSHIFT, DIK_RCONTROL, DIK_RIGHT])
+
+const SWITCH_START = [16, 13, 1] as const
+const SWITCH_CREDIT_2_3 = [65, 1, 2, 3, 4] as const
+const SWITCH_CREDIT_4 = [66, 2, 1, 65, 67] as const
+const SWITCH_CREDIT_5 = [67, 3, 1, 2, 65, 66, 68] as const
+const SWITCH_CREDIT_6 = [68, 4, 1, 67] as const
+
+const TROUGH_KICK_ANGLE = 60
+const TROUGH_KICK_SPEED = 10
 
 function isLeftCode(code: number, leftKey: number): boolean {
-	return code === leftKey || code === DIK_LSHIFT || code === DIK_LCONTROL || code === DIK_LEFT
+	return code === leftKey || LEFT_FALLBACKS.has(code)
 }
 
 function isRightCode(code: number, rightKey: number): boolean {
-	return code === rightKey || code === DIK_RSHIFT || code === DIK_RCONTROL || code === DIK_RIGHT
+	return code === rightKey || RIGHT_FALLBACKS.has(code)
 }
 
 export class PinInput {
 	private readonly queue: KeyEvent[] = []
-	private readonly flipperRight = new WeakMap<object, boolean>()
+	private readonly pressed = new Set<number>()
+	private readonly nudgeHandler: NudgeHandler
 
-	readonly rgKeys: Record<number, number> = {
-		[AssignKey.LeftFlipperKey]: DIK_LCONTROL,
-		[AssignKey.RightFlipperKey]: DIK_RCONTROL,
-		[AssignKey.LeftTiltKey]: DIK_Z,
-		[AssignKey.RightTiltKey]: DIK_SLASH,
-		[AssignKey.CenterTiltKey]: DIK_SPACE,
-		[AssignKey.PlungerKey]: DIK_RETURN,
-		[AssignKey.FrameCount]: DIK_F11,
-		[AssignKey.DBGBalls]: DIK_O,
-		[AssignKey.Debugger]: DIK_D,
-		[AssignKey.AddCreditKey]: DIK_5,
-		[AssignKey.AddCreditKey2]: DIK_4,
-		[AssignKey.StartGameKey]: DIK_1,
-		[AssignKey.MechanicalTilt]: DIK_T,
-		[AssignKey.RightMagnaSave]: DIK_RSHIFT,
-		[AssignKey.LeftMagnaSave]: DIK_LSHIFT,
-		[AssignKey.ExitGame]: DIK_Q,
-		[AssignKey.VolumeUp]: DIK_EQUALS,
-		[AssignKey.VolumeDown]: DIK_MINUS,
-		[AssignKey.LockbarKey]: DIK_LALT,
-		[AssignKey.Enable3D]: DIK_F10,
-		[AssignKey.Escape]: DIK_ESCAPE,
-	}
+	readonly rgKeys: Record<number, number> = { ...DEFAULT_KEYS }
 
 	constructor(
 		private readonly table: Table,
 		private readonly player: Player,
-	) {}
-
-	onKeyDown(code: number, ts: number): void {
-		this.queue.push({ code, down: true, ts })
+	) {
+		this.nudgeHandler = new NudgeHandler('cab', 1)
 	}
 
-	onKeyUp(code: number, ts: number): void {
-		this.queue.push({ code, down: false, ts })
+	getKey(key: AssignKey): number {
+		return this.rgKeys[key]!
+	}
+
+	setKey(key: AssignKey, dik: number): void {
+		this.rgKeys[key] = dik
+	}
+
+	getNudgeHandler(): NudgeHandler {
+		return this.nudgeHandler
+	}
+
+	getCabinetAcceleration(): Vertex2D {
+		return this.nudgeHandler.getCabinetAcceleration()
+	}
+
+	getCabinetOffset(): Vertex2D {
+		return this.nudgeHandler.getCabinetOffset()
+	}
+
+	tickNudge(): void {
+		this.nudgeHandler.stepOneMillisecond()
+	}
+
+	onKeyDown(code: number, _ts?: number): void {
+		this.queue.push({ code, down: true })
+	}
+
+	onKeyUp(code: number, _ts?: number): void {
+		this.queue.push({ code, down: false })
 	}
 
 	processKeys(): void {
-		const queued = this.queue.splice(0)
+		if (!this.queue.length) return
+		const queued = this.queue.splice(0, this.queue.length)
 		for (const ev of queued) {
-			if (
-				ev.code === this.rgKeys[AssignKey.FrameCount] ||
-				ev.code === this.rgKeys[AssignKey.Enable3D] ||
-				ev.code === this.rgKeys[AssignKey.DBGBalls]
-			) {
-				continue
+			if (IGNORED_KEYS.has(ev.code)) continue
+			if (ev.down) {
+				if (this.pressed.has(ev.code)) continue
+				this.pressed.add(ev.code)
+			} else {
+				if (!this.pressed.has(ev.code)) continue
+				this.pressed.delete(ev.code)
 			}
 			this.fire(ev.down ? Event.GameEventsKeyDown : Event.GameEventsKeyUp, ev.code)
 		}
@@ -103,8 +155,21 @@ export class PinInput {
 		const isDown = dispId === Event.GameEventsKeyDown
 		this.syncFlippers(isDown, code)
 		this.syncPlunger(isDown, code)
+		this.syncNudge(isDown, code)
 		this.syncCabinet(isDown, code)
 		this.tryMockTroughEject(isDown, code)
+	}
+
+	private isRightFlipper(flipper: { getName(): string; data: { center: { x: number } } }): boolean {
+		const name = flipper.getName().toLowerCase()
+		if (name.includes('right') || name === 'flipperr') return true
+		if (name.includes('left')) return false
+		const d = this.table.data
+		if (d && typeof d.left === 'number' && typeof d.right === 'number') {
+			const mid = (d.left + d.right) / 2
+			return flipper.data.center.x > mid
+		}
+		return false
 	}
 
 	private syncFlippers(isDown: boolean, code: number): void {
@@ -112,100 +177,121 @@ export class PinInput {
 		const isRight = isRightCode(code, this.rgKeys[AssignKey.RightFlipperKey])
 		if (!isLeft && !isRight) return
 
-		const flippers = Object.values(this.table.flippers)
+		const flippers = Object.values(this.table.flippers) as Array<{ getName(): string; data: { center: { x: number } }; getApi(): { RotateToEnd(): void; RotateToStart(): void } }>
 		if (!flippers.length) return
 
 		for (const flipper of flippers) {
-			let isRightFlipper = this.flipperRight.get(flipper)
-			if (isRightFlipper === undefined) {
-				const name = flipper.getName().toLowerCase()
-				isRightFlipper = name.includes('right') || name === 'flipperr'
-				this.flipperRight.set(flipper, isRightFlipper)
-			}
 			if (flippers.length > 1) {
+				const isRightFlipper = this.isRightFlipper(flipper as any)
 				if (isLeft && isRightFlipper) continue
 				if (isRight && !isRightFlipper) continue
 			}
 			try {
 				const api = flipper.getApi()
-				isDown ? api.RotateToEnd() : api.RotateToStart()
-			} catch {}
+				if (isDown) api.RotateToEnd()
+				else api.RotateToStart()
+			} catch (err) {
+				logger().warn('flipper sync failed %s', (err as Error).message)
+			}
 		}
 	}
 
 	private syncPlunger(isDown: boolean, code: number): void {
 		if (code !== this.rgKeys[AssignKey.PlungerKey]) return
-		const plungers = Object.values(this.table.plungers)
+		const plungers = Object.values(this.table.plungers) as Array<{ getApi(): { PullBack(): void; Fire(): void } }>
 		if (!plungers.length) return
 		for (const plunger of plungers) {
 			try {
 				const api = plunger.getApi()
 				if (isDown) api.PullBack()
 				else api.Fire()
-			} catch {}
+			} catch (err) {
+				logger().warn('plunger sync failed %s', (err as Error).message)
+			}
 		}
+	}
+
+	private syncNudge(isDown: boolean, code: number): void {
+		if (!isDown) return
+		const leftKey = this.rgKeys[AssignKey.LeftTiltKey]
+		const rightKey = this.rgKeys[AssignKey.RightTiltKey]
+		const centerKey = this.rgKeys[AssignKey.CenterTiltKey]
+		if (code !== leftKey && code !== rightKey && code !== centerKey) return
+		const baseForce = 2
+		const angleVariance = (Math.random() - 0.5) * 15 * baseForce
+		const force = (0.6 + Math.random() * 0.8) * baseForce
+		let angle: number
+		if (code === leftKey) angle = 75 + angleVariance
+		else if (code === rightKey) angle = 285 + angleVariance
+		else angle = angleVariance
+		this.nudgeHandler.applyImpulse(angle, force)
+	}
+
+	nudge(angle: number, force: number): void {
+		this.nudgeHandler.applyImpulse(angle, force)
 	}
 
 	private tryMockTroughEject(isDown: boolean, code: number): void {
 		if (!isDown) return
 		if (code !== DIK_1 && code !== this.rgKeys[AssignKey.StartGameKey]) return
-		const emu = this.player.getPhysics().emu as unknown as {
-			isMock?: boolean
-			isInitialized?: () => boolean
-		} | null
+		const emu = this.player.getPhysics().emu as unknown as { isMock?: boolean; isInitialized?: () => boolean } | null
 		if (emu && !emu.isMock && emu.isInitialized?.()) return
-		const withBall = (
-			Object.values(this.table.kickers) as unknown as Array<{
-				hit?: { ball?: unknown }
-				getApi(): { Kick(a: number, s: number): void; DestroyBall(): number }
-				getName(): string
-				data: { center: { x: number } }
-			}>
-		).filter(k => (k as any).hit?.ball)
+
+		const kickers = Object.values(this.table.kickers) as unknown as Array<{
+			hit?: { ball?: unknown }
+			getApi(): { Kick(a: number, s: number): void; DestroyBall(): number }
+			getName(): string
+			data: { center: { x: number } }
+		}>
+
+		const withBall = kickers.filter(k => (k as any).hit?.ball)
 		if (!withBall.length) {
-			const plunger = Object.values(this.table.plungers)[0] as unknown as
-				| { getApi(): { CreateBall(): unknown } }
-				| undefined
-			if (plunger)
+			const plunger = (Object.values(this.table.plungers)[0] as unknown as { getApi(): { CreateBall(): unknown } } | undefined)
+			if (plunger) {
 				try {
 					plunger.getApi().CreateBall()
-				} catch {}
+				} catch (err) {
+					logger().warn('mock trough CreateBall failed %s', (err as Error).message)
+				}
+			}
 			return
 		}
+
 		withBall.sort((a, b) => b.data.center.x - a.data.center.x)
 		const exit = withBall[0]!
 		try {
-			exit.getApi().Kick(60, 10)
+			exit.getApi().Kick(TROUGH_KICK_ANGLE, TROUGH_KICK_SPEED)
 		} catch {
 			try {
 				exit.getApi().DestroyBall()
-				const plunger = Object.values(this.table.plungers)[0] as unknown as
-					| { getApi(): { CreateBall(): unknown } }
-					| undefined
+				const plunger = Object.values(this.table.plungers)[0] as unknown as { getApi(): { CreateBall(): unknown } } | undefined
 				if (plunger) plunger.getApi().CreateBall()
-			} catch {}
+			} catch (err) {
+				logger().warn('mock trough fallback failed %s', (err as Error).message)
+			}
 		}
 	}
 
 	private syncCabinet(isDown: boolean, code: number): void {
 		const emu = this.player.getPhysics().emu
 		if (!emu) return
-		const switches = this.cabinetSwitches(code)
+		const switches = this.getCabinetSwitches(code)
 		if (!switches) return
 		for (const sw of switches) {
 			try {
 				emu.setSwitchInput(sw, isDown)
-			} catch {}
+			} catch (err) {
+				logger().warn('cabinet switch %s failed %s', sw, (err as Error).message)
+			}
 		}
 	}
 
-	private cabinetSwitches(code: number): number[] | undefined {
-		const k = this.rgKeys
-		if (code === DIK_1 || code === k[AssignKey.StartGameKey]) return [16, 13, 1]
-		if (code === DIK_2 || code === DIK_3) return [65, 1, 2, 3, 4]
-		if (code === DIK_4 || code === k[AssignKey.AddCreditKey2]) return [66, 2, 1, 65, 67]
-		if (code === DIK_5 || code === k[AssignKey.AddCreditKey]) return [67, 3, 1, 2, 65, 66, 68]
-		if (code === DIK_6) return [68, 4, 1, 67]
+	private getCabinetSwitches(code: number): readonly number[] | undefined {
+		if (code === DIK_1 || code === this.rgKeys[AssignKey.StartGameKey]) return SWITCH_START
+		if (code === DIK_2 || code === DIK_3) return SWITCH_CREDIT_2_3
+		if (code === DIK_4 || code === this.rgKeys[AssignKey.AddCreditKey2]) return SWITCH_CREDIT_4
+		if (code === DIK_5 || code === this.rgKeys[AssignKey.AddCreditKey]) return SWITCH_CREDIT_5
+		if (code === DIK_6) return SWITCH_CREDIT_6
 		return undefined
 	}
 }

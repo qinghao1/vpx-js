@@ -10,6 +10,10 @@ import type { BallData } from './ball-data.js'
 import type { BallHit } from './ball-hit.js'
 import type { BallState } from './ball-state.js'
 
+const MTOVPU = (x: number): number => x * (50 / (0.0254 * 1.0625))
+const STOVPT = (x: number): number => x * 0.01
+const MS2TOVPUVPT2 = (x: number): number => MTOVPU(x) * STOVPT(STOVPT(1))
+
 /** Moves a ball each tick — integrates position, orientation, and velocity. */
 export class BallMover implements MoverObject {
 	constructor(
@@ -57,6 +61,15 @@ export class BallMover implements MoverObject {
 				this.hit.vel.x += physics.gravity.x * PHYS_FACTOR
 				this.hit.vel.y += physics.gravity.y * PHYS_FACTOR
 				this.hit.vel.z += physics.gravity.z * PHYS_FACTOR
+				const acc = physics.getCabinetAcceleration?.()
+				if (acc && (acc.x !== 0 || acc.y !== 0)) {
+					const strength = Math.hypot(physics.gravity.y, physics.gravity.z) || 1
+					const cosSlope = strength ? -physics.gravity.z / strength : 1
+					const sinSlope = strength ? physics.gravity.y / strength : 0
+					this.hit.vel.x -= PHYS_FACTOR * MS2TOVPUVPT2(acc.x)
+					this.hit.vel.y -= PHYS_FACTOR * MS2TOVPUVPT2(acc.y) * cosSlope
+					this.hit.vel.z -= PHYS_FACTOR * MS2TOVPUVPT2(acc.y) * sinSlope
+				}
 			}
 		}
 	}

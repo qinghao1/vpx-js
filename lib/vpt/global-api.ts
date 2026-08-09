@@ -167,7 +167,9 @@ export class GlobalApi extends VbsApi {
 		}
 	}
 
-	public Nudge(_angle: number, _force: number): void {}
+	public Nudge(angle: number, force: number): void {
+		this.player.nudge(angle, force)
+	}
 
 	public NudgeGetCalibration(): void {}
 

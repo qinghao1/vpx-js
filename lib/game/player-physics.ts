@@ -16,7 +16,7 @@ import type { HitPlane } from '../physics/hit-plane.js'
 import { HitQuadtree } from '../physics/hit-quadtree.js'
 import type { MoverObject } from '../physics/mover-object.js'
 import { logger } from '../util/logger.js'
-import { Vertex3D } from '../util/vector.js'
+import { Vertex2D, Vertex3D } from '../util/vector.js'
 import { Ball } from '../vpt/ball/ball.js'
 import { BallData } from '../vpt/ball/ball-data.js'
 import { BallState } from '../vpt/ball/ball-state.js'
@@ -76,12 +76,21 @@ export class PlayerPhysics {
 		private readonly pinInput: PinInput,
 	) {}
 
+	public getCabinetAcceleration(): Vertex2D {
+		return this.pinInput.getCabinetAcceleration()
+	}
+
+	public getCabinetOffset(): Vertex2D {
+		return this.pinInput.getCabinetOffset()
+	}
+
 	public init(): void {
 		const d = this.table.data!
+		const difficulty = d.globalDifficulty ?? 0.5
 		const slope = d.overridePhysics
-			? DEFAULT_TABLE_MIN_SLOPE + (DEFAULT_TABLE_MAX_SLOPE - DEFAULT_TABLE_MIN_SLOPE) * d.globalDifficulty!
-			: d.angletiltMin! + (d.angleTiltMax! - d.angletiltMin!) * d.globalDifficulty!
-		const g = d.overridePhysics ? DEFAULT_TABLE_GRAVITY : d.gravity
+			? DEFAULT_TABLE_MIN_SLOPE + (DEFAULT_TABLE_MAX_SLOPE - DEFAULT_TABLE_MIN_SLOPE) * difficulty
+			: (d.angletiltMin ?? DEFAULT_TABLE_MIN_SLOPE) + ((d.angleTiltMax ?? DEFAULT_TABLE_MAX_SLOPE) - (d.angletiltMin ?? DEFAULT_TABLE_MIN_SLOPE)) * difficulty
+		const g = d.overridePhysics ? DEFAULT_TABLE_GRAVITY : (d.gravity ?? DEFAULT_TABLE_GRAVITY)
 		this.setGravity(slope, g)
 		for (const a of this.table.getAnimatables()) a.getAnimation().init(this.timeMsec)
 		this.indexTableElements()
@@ -202,6 +211,7 @@ export class PlayerPhysics {
 			const dt = (this.nextPhysicsFrameTime - this.curPhysicsFrameTime) * (1 / DEFAULT_STEPTIME)
 			const curUsec = this.now()
 			this.pinInput.processKeys()
+			this.pinInput.tickNudge()
 			const oldBall = this.activeBall
 			this.activeBall = undefined
 			if (this.scriptPeriod <= 1000 * MAX_TIMERS_MSEC_OVERALL) {
