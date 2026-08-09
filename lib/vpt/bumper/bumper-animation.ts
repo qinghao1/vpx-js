@@ -18,7 +18,6 @@ export class BumperAnimation implements IAnimation {
 	private skirtCounter = 0
 	private updateSkirt = false
 	private _enableSkirtAnimation = true
-	private events?: EventProxy
 
 	public hitEvent = false
 	public ballHitPosition: Vertex3D = new Vertex3D()
@@ -26,10 +25,8 @@ export class BumperAnimation implements IAnimation {
 	constructor(
 		private readonly data: BumperData,
 		private readonly state: BumperState,
-		events?: EventProxy,
-	) {
-		this.events = events
-	}
+		private readonly events: EventProxy,
+	) {}
 
 	get enableSkirtAnimation(): boolean {
 		return this._enableSkirtAnimation
@@ -42,24 +39,19 @@ export class BumperAnimation implements IAnimation {
 		this._enableSkirtAnimation = value
 	}
 
-	public setEvents(events: EventProxy): void {
-		this.events = events
-	}
-
 	public init(timeMsec: number): void {
 		this.timeMsec = timeMsec
 	}
 
 	public updateAnimation(newTimeMsec: number, table: Table): void {
-		const oldTimeMsec = this.timeMsec < newTimeMsec ? this.timeMsec : newTimeMsec
+		const diff = Math.max(0, newTimeMsec - this.timeMsec)
 		this.timeMsec = newTimeMsec
-		const diffTimeMsec = newTimeMsec - oldTimeMsec
 		const state = this.hitEvent ? 1 : 0
-		this.updateRingAnimation(state, diffTimeMsec, table)
-		this.updateSkirtAnimation(state, diffTimeMsec)
+		this.updateRingAnimation(state, diff, table)
+		this.updateSkirtAnimation(state, diff)
 	}
 
-	private updateRingAnimation(state: number, diffTimeMsec: number, table: Table) {
+	private updateRingAnimation(state: number, diff: number, table: Table) {
 		const limit = this.data.ringDropOffset + this.data.heightScale * 0.5 * table.getScaleZ()
 		if (state === 1) {
 			this.ringAnimate = true
@@ -69,7 +61,7 @@ export class BumperAnimation implements IAnimation {
 		if (this.ringAnimate) {
 			let step = this.data.ringSpeed * table.getScaleZ()
 			if (this.ringDown) step = -step
-			this.state.ringOffset += step * diffTimeMsec
+			this.state.ringOffset += step * diff
 			if (this.ringDown) {
 				if (this.state.ringOffset <= -limit) {
 					this.state.ringOffset = -limit
@@ -81,11 +73,11 @@ export class BumperAnimation implements IAnimation {
 					this.ringAnimate = false
 				}
 			}
-			this.events?.fireGroupEvent(Event.AnimateEventsAnimate)
+			this.events.fireGroupEvent(Event.AnimateEventsAnimate)
 		}
 	}
 
-	private updateSkirtAnimation(state: number, diffTimeMsec: number) {
+	private updateSkirtAnimation(state: number, diff: number) {
 		if (this._enableSkirtAnimation) {
 			if (state === 1) {
 				this.doSkirtAnimation = true
@@ -93,17 +85,17 @@ export class BumperAnimation implements IAnimation {
 				this.skirtCounter = 0
 			}
 			if (this.doSkirtAnimation) {
-				this.skirtCounter += diffTimeMsec
+				this.skirtCounter += diff
 				if (this.skirtCounter > 160) {
 					this.doSkirtAnimation = false
 					this.resetSkirtState()
 				}
-				this.events?.fireGroupEvent(Event.AnimateEventsAnimate)
+				this.events.fireGroupEvent(Event.AnimateEventsAnimate)
 			}
 		} else if (this.updateSkirt) {
 			this.updateSkirt = false
 			this.resetSkirtState()
-			this.events?.fireGroupEvent(Event.AnimateEventsAnimate)
+			this.events.fireGroupEvent(Event.AnimateEventsAnimate)
 		}
 	}
 

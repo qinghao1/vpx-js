@@ -20,12 +20,10 @@ import { Transformer } from './transformer.js'
  * Example: `function Plunger_Init() {}` would become: `Plunger.on('Init', () => {})`.
  */
 export class EventTransformer extends Transformer {
-	private readonly items: { [p: string]: IScriptable<any> }
 	private readonly itemMap: Map<string, { key: string; item: IScriptable<any> }>
 
 	constructor(ast: Program, items: { [p: string]: IScriptable<any> }) {
 		super(ast)
-		this.items = items
 		this.itemMap = new Map()
 		for (const [k, v] of Object.entries(items)) this.itemMap.set(k.toLowerCase(), { key: k, item: v })
 	}

@@ -93,7 +93,7 @@ export class VpmController {
 			return
 		}
 		const existing = this.player.getPhysics().emu
-		if (existing && existing.isInitialized() && existing.constructor.name === 'PinMameEmulator') {
+		if (existing?.isInitialized() && existing instanceof PinMameEmulator) {
 			this.emulator = existing
 			return
 		}

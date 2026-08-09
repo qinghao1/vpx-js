@@ -89,21 +89,10 @@ export class PinMameEmulator implements IEmulator {
 		await this.init()
 		const game = gameName(name)
 		if (!game) throw new Error('PINMAME_GAME_NAME_MISSING')
-		if (this.isMock || !this.mod || !this.api) {
-			this.ready = true
-			this.queue.replayMessages(this)
-			return
-		}
-		if (this.api.isRunning() && this.game === game) {
-			this.ready = true
-			this.queue.replayMessages(this)
-			return
-		}
+		if (this.isMock || !this.mod || !this.api) return this.markReady()
 		if (this.api.isRunning()) {
-			logger().warn(`[pinmame] already running ${this.game}, refusing second run ${game}`)
-			this.ready = true
-			this.queue.replayMessages(this)
-			return
+			if (this.game !== game) logger().warn(`[pinmame] already running ${this.game}, refusing second run ${game}`)
+			return this.markReady()
 		}
 		const m = this.mod
 		for (const dir of ['/pinmame/roms', '/pinmame/nvram', '/pinmame/cfg'])
@@ -111,14 +100,11 @@ export class PinMameEmulator implements IEmulator {
 				m.FS.mkdirTree(dir)
 			} catch {}
 		if (rom.length) {
+			let reuse = false
 			try {
-				const s = m.FS.stat(`/pinmame/roms/${game}.zip`)
-				if (s.size === rom.length) {
-					/* reuse */
-				} else m.FS.writeFile(`/pinmame/roms/${game}.zip`, rom)
-			} catch {
-				m.FS.writeFile(`/pinmame/roms/${game}.zip`, rom)
-			}
+				reuse = m.FS.stat(`/pinmame/roms/${game}.zip`).size === rom.length
+			} catch {}
+			if (!reuse) m.FS.writeFile(`/pinmame/roms/${game}.zip`, rom)
 		}
 		this.writeConfig(m)
 		const ptr = m._malloc(m.lengthBytesUTF8(game) + 1)
@@ -130,6 +116,10 @@ export class PinMameEmulator implements IEmulator {
 		} finally {
 			m._free(ptr)
 		}
+		this.markReady()
+	}
+
+	private markReady(): void {
 		this.ready = true
 		this.queue.replayMessages(this)
 	}

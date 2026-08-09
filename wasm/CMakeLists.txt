@@ -80,7 +80,6 @@ set(PINMAME_EXPORTS
   "_PinmameGetChangedLamps" "_PinmameGetChangedSolenoids" "_PinmameGetChangedGIs" "_PinmameGetChangedLEDs"
   "_PinmameGetDIP" "_PinmameSetDIP"
   "_PinmameGetDmdWidth" "_PinmameGetDmdHeight" "_PinmameGetDmdDepth" "_PinmameGetDmdFrame"
-  
   "_malloc" "_free"
 )
 string(JOIN "," PINMAME_EXPORTS_JOIN ${PINMAME_EXPORTS})

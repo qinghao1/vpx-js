@@ -59,8 +59,6 @@ for patch in "$PATCH_DIR"/*.patch; do
   if git -C "$PINMAME" apply --check "$patch" >/dev/null 2>&1; then
     log "apply $(basename "$patch")"
     git -C "$PINMAME" apply "$patch"
-  else
-    log "skip $(basename "$patch")"
   fi
 done
 

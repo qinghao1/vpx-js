@@ -86,7 +86,6 @@ export class Bumper
 		this.animation = new BumperAnimation(this.data, this.state, this.events)
 		this.hit = new BumperHit(this.data, this.state, this.animation, this.events, height)
 		this.api = new BumperApi(this.state, this.animation, this.data, this.events, player, table)
-		this.animation.setEvents(this.events)
 	}
 
 	public getMeshes<GEOMETRY>(table: Table): Meshes<GEOMETRY> {
