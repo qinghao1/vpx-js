@@ -41,14 +41,14 @@ export class Vertex2D extends Vector2 {
 		Vertex2D.release(v)
 		return this
 	}
-	equals(v?: Vertex2D): boolean {
-		return !!v && this.x === v.x && this.y === v.y
+	override equals(v: Vector2): boolean {
+		return !!v && super.equals(v)
 	}
 	toThree(): Vector2 {
-		return new Vector2(this.x, this.y)
+		return new Vector2().copy(this)
 	}
 	static fromThree(v: Vector2): Vertex2D {
-		return new Vertex2D(v.x, v.y)
+		return new Vertex2D().copy(v) as Vertex2D
 	}
 	static get(buffer: Uint8Array): Vertex2D {
 		const view = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength)
@@ -130,8 +130,8 @@ export class Vertex3D extends Vector3 {
 	isZero(): boolean {
 		return Math.abs(this.x) < FLT_MIN && Math.abs(this.y) < FLT_MIN && Math.abs(this.z) < FLT_MIN
 	}
-	equals(v: Vector3): boolean {
-		return v.x === this.x && v.y === this.y && v.z === this.z
+	override equals(v: Vector3): boolean {
+		return super.equals(v)
 	}
 	static crossProduct(a: Vertex3D, b: Vertex3D, recycle = false): Vertex3D {
 		const out = new Vector3().crossVectors(a, b)
@@ -153,46 +153,21 @@ export class Vertex3D extends Vector3 {
 		return new Vertex3D(temp.dot(r0), temp.dot(r1), temp.dot(r2))
 	}
 	multiplyMatrix(m: Matrix3D): this {
-		const e = (m as unknown as { elements: number[] }).elements
-		if (!e) {
-			const x = this.x,
-				y = this.y,
-				z = this.z
-			const xp = m._11 * x + m._21 * y + m._31 * z + m._41
-			const yp = m._12 * x + m._22 * y + m._32 * z + m._42
-			const zp = m._13 * x + m._23 * y + m._33 * z + m._43
-			const wp = m._14 * x + m._24 * y + m._34 * z + m._44
-			const inv = 1 / wp
-			return this.set(xp * inv, yp * inv, zp * inv)
-		}
-		const x = this.x,
-			y = this.y,
-			z = this.z
-		const xp = e[0] * x + e[4] * y + e[8] * z + e[12]
-		const yp = e[1] * x + e[5] * y + e[9] * z + e[13]
-		const zp = e[2] * x + e[6] * y + e[10] * z + e[14]
-		const wp = e[3] * x + e[7] * y + e[11] * z + e[15]
-		const inv = 1 / wp
-		return this.set(xp * inv, yp * inv, zp * inv)
+		return this.applyMatrix4(m as unknown as Matrix3D & import('three').Matrix4)
 	}
 	multiplyMatrixNoTranslate(m: Matrix3D): this {
-		const e = (m as unknown as { elements: number[] }).elements
-		if (!e) {
-			const xp = m._11 * this.x + m._21 * this.y + m._31 * this.z
-			const yp = m._12 * this.x + m._22 * this.y + m._32 * this.z
-			const zp = m._13 * this.x + m._23 * this.y + m._33 * this.z
-			return this.set(xp, yp, zp)
-		}
-		const xp = e[0] * this.x + e[4] * this.y + e[8] * this.z
-		const yp = e[1] * this.x + e[5] * this.y + e[9] * this.z
-		const zp = e[2] * this.x + e[6] * this.y + e[10] * this.z
-		return this.set(xp, yp, zp)
+		const e = m.elements
+		return this.set(
+			e[0] * this.x + e[4] * this.y + e[8] * this.z,
+			e[1] * this.x + e[5] * this.y + e[9] * this.z,
+			e[2] * this.x + e[6] * this.y + e[10] * this.z,
+		)
 	}
 	toThree(): Vector3 {
-		return new Vector3(this.x, this.y, this.z)
+		return new Vector3().copy(this)
 	}
 	static fromThree(v: Vector3): Vertex3D {
-		return new Vertex3D(v.x, v.y, v.z)
+		return new Vertex3D().copy(v) as Vertex3D
 	}
 	static get(buffer: Uint8Array): Vertex3D {
 		const view = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength)

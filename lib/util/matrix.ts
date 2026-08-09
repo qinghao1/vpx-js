@@ -27,10 +27,6 @@ export class Matrix2D extends Matrix3 {
 	set matrix(m: number[][]) {
 		this.set(m[0][0], m[1][0], m[2][0], m[0][1], m[1][1], m[2][1], m[0][2], m[1][2], m[2][2])
 	}
-	override identity(): this {
-		super.identity()
-		return this
-	}
 	setIdentity(): this {
 		return this.identity()
 	}
@@ -64,22 +60,8 @@ export class Matrix2D extends Matrix3 {
 		return new Matrix2D().copy(this) as unknown as this
 	}
 	clonePooled(recycle = false): Matrix2D {
-		if (recycle) {
-			const m = Matrix2D.claim()
-			m.copy(this)
-			return m
-		}
+		if (recycle) return Matrix2D.claim().copy(this) as Matrix2D
 		return this.clone()
-	}
-	copyMatrix(m: Matrix2D): void {
-		this.copy(m)
-	}
-	setFromMatrix(m: Matrix2D): void {
-		this.copy(m)
-	}
-	setFrom(m: Matrix2D): this {
-		this.copy(m)
-		return this
 	}
 	override set(
 		n11: number,
@@ -103,15 +85,11 @@ export class Matrix2D extends Matrix3 {
 	multiplyMatrix(a: Matrix2D, b: Matrix2D): void {
 		this.multiplyMatrices(a, b)
 	}
-	override multiplyScalar(s: number): this {
-		super.multiplyScalar(s)
-		return this
-	}
 	addMatrix(a: Matrix2D, b: Matrix2D): void {
 		const ae = a.elements,
 			be = b.elements,
 			e = this.elements
-		for (let i = 0; i < 9; i++) e[i] = ae[i] + be[i]
+		for (let i = 0; i < 9; i++) e[i] = ae[i]! + be[i]!
 	}
 	orthoNormalize(): void {
 		const e = this.elements
@@ -131,16 +109,11 @@ export class Matrix2D extends Matrix3 {
 		e[7] = vz.y
 		e[8] = vz.z
 	}
-	override equals(m: Matrix3): boolean {
-		return super.equals(m)
-	}
 	toThree(): Matrix3 {
 		return this.clone()
 	}
 	static fromThree(m: Matrix3): Matrix2D {
-		const out = new Matrix2D()
-		out.copy(m)
-		return out
+		return new Matrix2D().copy(m) as Matrix2D
 	}
 	override toString(): string {
 		const r = (n: number) => Math.round(n * 1000) / 1000
@@ -161,10 +134,6 @@ export class Matrix3D extends Matrix4 {
 	}
 	static reset(m: Matrix3D): void {
 		m.identity()
-	}
-	override identity(): this {
-		super.identity()
-		return this
 	}
 	setIdentity(): this {
 		return this.identity()
@@ -262,15 +231,8 @@ export class Matrix3D extends Matrix4 {
 		this.makeRotationZ(rad)
 		return this
 	}
-	override multiply(m: Matrix4): this
-	override multiply(a: Matrix4, b: Matrix4): this
-	override multiply(a: any, b?: any): this {
-		if (b !== undefined) {
-			super.multiplyMatrices(a, b)
-			return this
-		}
-		const clone = this.clone()
-		super.multiplyMatrices(clone, a)
+	override multiply(m: Matrix4): this {
+		super.multiply(m)
 		return this
 	}
 	multiplyMatrices2(a: Matrix3D, b: Matrix3D): this {
@@ -278,14 +240,10 @@ export class Matrix3D extends Matrix4 {
 		return this
 	}
 	multiplyVP(a: Matrix3D, b?: Matrix3D): this {
-		if (b) {
-			return this.multiplyMatrices2(a, b)
-		}
-		return this.multiply(a)
+		return b ? this.multiplyMatrices2(a, b) : this.multiply(a)
 	}
 	preMultiply(a: Matrix3D): this {
-		const cur = this.clone()
-		super.multiplyMatrices(a, cur)
+		super.premultiply(a)
 		return this
 	}
 	toRightHanded(): this {
@@ -298,23 +256,14 @@ export class Matrix3D extends Matrix4 {
 		return new Matrix3D().copy(this) as unknown as this
 	}
 	clonePooled(recycle = false): Matrix3D {
-		if (recycle) {
-			const m = Matrix3D.claim()
-			m.copy(this)
-			return m
-		}
+		if (recycle) return Matrix3D.claim().copy(this) as Matrix3D
 		return this.clone()
-	}
-	override equals(m: Matrix4): boolean {
-		return super.equals(m)
 	}
 	toThree(): Matrix4 {
 		return this.clone()
 	}
 	static fromThreeMatrix(m: Matrix4): Matrix3D {
-		const out = new Matrix3D()
-		out.copy(m)
-		return out
+		return new Matrix3D().copy(m) as Matrix3D
 	}
 	debug(): string[] {
 		return [

@@ -1,10 +1,11 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
+import { Box3, Vector3 } from 'three'
 import { FLT_MAX } from './float.js'
-import type { Vertex3D } from './math.js'
+import type { Vertex3D } from './vector.js'
 
-/** Axis-aligned 3D bounding box. @see https://github.com/vpinball/vpinball/blob/master/kd.h */
+/** Axis-aligned 3D bounding box. Thin wrapper over {@link Box3} with VP `left/right/top/bottom/zlow/zhigh` naming. */
 export class FRect3D {
 	left = FLT_MAX
 	top = FLT_MAX
@@ -56,7 +57,7 @@ export class FRect3D {
 		this.clear()
 	}
 
-	/** Expands to include `o`. */
+	/** Expands to include `o` (`Box3.expandByPoint` / `union` equivalent). */
 	extend(o: FRect3D): void {
 		this.left = Math.min(this.left, o.left)
 		this.right = Math.max(this.right, o.right)
@@ -64,6 +65,18 @@ export class FRect3D {
 		this.bottom = Math.max(this.bottom, o.bottom)
 		this.zlow = Math.min(this.zlow, o.zlow)
 		this.zhigh = Math.max(this.zhigh, o.zhigh)
+	}
+
+	toBox3(): Box3 {
+		return new Box3(new Vector3(this.left, this.top, this.zlow), new Vector3(this.right, this.bottom, this.zhigh))
+	}
+
+	static fromBox3(b: Box3): FRect3D {
+		return new FRect3D(b.min.x, b.max.x, b.min.y, b.max.y, b.min.z, b.max.z)
+	}
+
+	clone(): FRect3D {
+		return new FRect3D(this.left, this.right, this.top, this.bottom, this.zlow, this.zhigh)
 	}
 
 	/** Tests sphere intersection (`rSq` = radius²). */
@@ -74,7 +87,7 @@ export class FRect3D {
 		return ex * ex + ey * ey + ez * ez <= rSq
 	}
 
-	/** Tests AABB overlap. */
+	/** Tests AABB overlap (`Box3.intersectsBox` equivalent). */
 	intersectRect(o: FRect3D): boolean {
 		return (
 			this.right >= o.left &&
