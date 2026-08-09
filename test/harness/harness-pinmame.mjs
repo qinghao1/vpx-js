@@ -1,6 +1,6 @@
 import { launchBrowser, loadPuppeteer, newPage } from './utils.mjs'
 
-const url = process.argv.find(a=>a.startsWith('--url='))?.split('=')[1] || 'http://localhost:3000/walking-dead.html?mode=play'
+const url = process.argv.find(a=>a.startsWith('--url='))?.slice(6) || 'http://127.0.0.1:3000/walking-dead.html?mode=play'
 const puppeteer = await loadPuppeteer()
 const browser = await launchBrowser(puppeteer)
 const page = await newPage(browser)

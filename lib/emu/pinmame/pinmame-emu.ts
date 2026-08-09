@@ -140,15 +140,11 @@ export class PinMameEmulator implements IEmulator {
 
 	private sync(): void {
 		if (!this.mod || !this.api || this.isMock) return
-		try {
-			this.pull(this.api.getChangedLamps, this.lamps)
-			this.pull(this.api.getChangedSols, this.sols)
-			this.pull(this.api.getChangedGIs, this.gis)
-			this.emulatorState.applyPinmame(this.lamps, this.sols, this.gis)
-			this.pullDmd()
-		} catch (e) {
-			logger().warn('[pinmame] poll failed', (e as Error).message)
-		}
+		try { this.pull(this.api.getChangedLamps, this.lamps) } catch {}
+		try { this.pull(this.api.getChangedSols, this.sols) } catch {}
+		try { this.pull(this.api.getChangedGIs, this.gis) } catch {}
+		try { this.emulatorState.applyPinmame(this.lamps, this.sols, this.gis) } catch {}
+		try { this.pullDmd() } catch (e) { logger().warn('[pinmame] pullDmd failed', String(e)) }
 	}
 
 	private pullDmd(): void {
@@ -172,7 +168,8 @@ export class PinMameEmulator implements IEmulator {
 		const m = this.mod!
 		const ptr = m._malloc(buf.length * 8)
 		try {
-			const n = fn(ptr)
+			let n = 0
+			try { n = fn(ptr) } catch (e) { if (String(e) !== 'unwind') throw e; n = 0 }
 			for (let i = 0; i < n; i++) {
 				const idx = m.getValue(ptr + i * 8, 'i32')
 				const val = m.getValue(ptr + i * 8 + 4, 'i32')
