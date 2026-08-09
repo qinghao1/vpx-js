@@ -1,0 +1,31 @@
+diff --git a/src/libpinmame/libpinmame.cpp b/src/libpinmame/libpinmame.cpp
+index f3fc5d2..d39d643 100644
+--- a/src/libpinmame/libpinmame.cpp
++++ b/src/libpinmame/libpinmame.cpp
+@@ -1064,7 +1064,7 @@ PINMAMEAPI PINMAME_HARDWARE_GEN PinmameGetHardwareGen()
+ 
+ PINMAMEAPI int PinmameGetSwitch(const int swNo)
+ {
+-	return (_isRunning) ? vp_getSwitch(swNo) : 0;
++	return coreData ? vp_getSwitch(swNo) : 0;
+ }
+ 
+ /******************************************************
+@@ -1073,7 +1073,7 @@ PINMAMEAPI int PinmameGetSwitch(const int swNo)
+ 
+ PINMAMEAPI void PinmameSetSwitch(const int swNo, const int state)
+ {
+-	if (!_isRunning)
++	if (!coreData)
+ 		return;
+ 
+ 	vp_putSwitch(swNo, state ? 1 : 0);
+@@ -1085,7 +1085,7 @@ PINMAMEAPI void PinmameSetSwitch(const int swNo, const int state)
+ 
+ PINMAMEAPI void PinmameSetSwitches(const PinmameSwitchState* const p_states, const int numSwitches)
+ {
+-	if (!_isRunning)
++	if (!coreData)
+ 		return;
+ 
+ 	for (int i = 0; i < numSwitches; ++i)

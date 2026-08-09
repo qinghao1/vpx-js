@@ -209,7 +209,7 @@ export class PinMameEmulator implements IEmulator {
 			this.queue.addMessage(MessageType.ExecuteTicks, ms)
 			return 0
 		}
-		if (this.pendingSwitches.size && this.api?.isRunning()) this.flushPendingSwitches()
+		if (this.pendingSwitches.size) this.flushPendingSwitches()
 		if (this.paused || this.isMock) return ms
 		this.sync()
 		return ms
@@ -310,27 +310,30 @@ export class PinMameEmulator implements IEmulator {
 			this.pendingSwitches.set(n, next)
 			return true
 		}
-		if (!this.api.isRunning()) {
+		try {
+			this.api.setSwitch(n, next)
+		} catch {
+			this.pendingSwitches.set(n, next)
+			return false
+		}
+		const got = this.api.getSwitch(n) ?? 0
+		if (!!got !== !!next) {
 			this.pendingSwitches.set(n, next)
 			return true
 		}
-		if (this.pendingSwitches.has(n)) this.pendingSwitches.delete(n)
-		try {
-			this.api.setSwitch(n, next)
-			return true
-		} catch {
-			return false
-		}
+		this.pendingSwitches.delete(n)
+		return true
 	}
 
 	private flushPendingSwitches(): void {
-		if (!this.api || !this.api.isRunning()) return
-		for (const [n, v] of this.pendingSwitches) {
+		if (!this.api) return
+		for (const [n, v] of Array.from(this.pendingSwitches.entries())) {
 			try {
 				this.api.setSwitch(n, v)
 			} catch {}
+			const got = this.api.getSwitch(n) ?? 0
+			if (!!got === !!v) this.pendingSwitches.delete(n)
 		}
-		this.pendingSwitches.clear()
 	}
 
 	setCabinetInput(v: number): void {
