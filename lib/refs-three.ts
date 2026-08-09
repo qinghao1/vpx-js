@@ -3,6 +3,7 @@
 
 /** Shared Three.js re-exports. */
 export {
+	DataUtils,
 	AdditiveBlending,
 	AnimationClip,
 	Bone,

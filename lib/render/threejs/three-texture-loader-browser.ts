@@ -7,6 +7,7 @@ import {
 	CanvasTexture,
 	ClampToEdgeWrapping,
 	DataTexture,
+	DataUtils,
 	EquirectangularReflectionMapping,
 	HalfFloatType,
 	LinearFilter,
@@ -227,6 +228,86 @@ function createBallEnvTexture(name: string): ThreeTexture {
 	return tex as ThreeTexture
 }
 
+function getCanvas(w: number, h: number): any {
+	if (typeof OffscreenCanvas !== 'undefined') {
+		try {
+			return new (OffscreenCanvas as any)(w, h)
+		} catch {}
+	}
+	if (typeof document !== 'undefined' && typeof (document as any).createElement === 'function') {
+		const c = (document as any).createElement('canvas')
+		c.width = w
+		c.height = h
+		return c
+	}
+	return null
+}
+
+function stepwiseCanvasDownscale(source: any, sW: number, sH: number, dW: number, dH: number): any | null {
+	let curSource: any = source
+	let curW = sW
+	let curH = sH
+	let curCanvas: any = null
+	try {
+		while (curW > dW * 2 || curH > dH * 2) {
+			const nextW = Math.max(dW, Math.floor(curW / 2))
+			const nextH = Math.max(dH, Math.floor(curH / 2))
+			if (nextW >= curW && nextH >= curH) break
+			const canvas: any = getCanvas(nextW, nextH)
+			if (!canvas) return null
+			canvas.width = nextW
+			canvas.height = nextH
+			const ctx: any = canvas.getContext('2d')
+			if (!ctx) return null
+			try {
+				ctx.imageSmoothingEnabled = true
+				;(ctx as any).imageSmoothingQuality = 'high'
+			} catch {}
+			try {
+				ctx.drawImage(curSource, 0, 0, curW, curH, 0, 0, nextW, nextH)
+			} catch {
+				try {
+					ctx.drawImage(curSource, 0, 0, nextW, nextH)
+				} catch {
+					return null
+				}
+			}
+			curSource = canvas
+			curCanvas = canvas
+			curW = nextW
+			curH = nextH
+		}
+		if (curCanvas && curW === dW && curH === dH) return curCanvas
+		if (curW === dW && curH === dH && !curCanvas) {
+			if (curSource instanceof HTMLCanvasElement || (typeof OffscreenCanvas !== 'undefined' && curSource instanceof (OffscreenCanvas as any))) {
+				return curSource
+			}
+		}
+		const finalCanvas: any = getCanvas(dW, dH)
+		if (!finalCanvas) return null
+		finalCanvas.width = dW
+		finalCanvas.height = dH
+		const ctx: any = finalCanvas.getContext('2d')
+		if (!ctx) return null
+		try {
+			ctx.imageSmoothingEnabled = true
+			;(ctx as any).imageSmoothingQuality = 'high'
+		} catch {}
+		try {
+			ctx.drawImage(curSource, 0, 0, curW, curH, 0, 0, dW, dH)
+		} catch {
+			try {
+				ctx.drawImage(curSource, 0, 0, dW, dH)
+			} catch {
+				return null
+			}
+		}
+		return finalCanvas
+	} catch {
+		return null
+	}
+}
+
 async function tryCreateBitmap(
 	data: Uint8Array,
 	mime: string,
@@ -248,28 +329,55 @@ async function tryCreateBitmap(
 			const scale = Math.min(max / bitmap.width, max / bitmap.height)
 			const nw = Math.max(1, Math.floor(bitmap.width * scale))
 			const nh = Math.max(1, Math.floor(bitmap.height * scale))
-			try {
-				const resized: any = await (createImageBitmap as any)(bitmap, {
-					resizeWidth: nw,
-					resizeHeight: nh,
-					resizeQuality: 'high',
-				} as any)
+			let curBmp: any = bitmap
+			let curW = bitmap.width
+			let curH = bitmap.height
+			let useCanvasFallback = false
+			while (curW > nw * 2 || curH > nh * 2) {
+				const nextW = Math.max(nw, Math.floor(curW / 2))
+				const nextH = Math.max(nh, Math.floor(curH / 2))
+				if (nextW >= curW && nextH >= curH) break
+				try {
+					const nextBmp: any = await (createImageBitmap as any)(curBmp, {
+						resizeWidth: nextW,
+						resizeHeight: nextH,
+						resizeQuality: 'high',
+					} as any)
+					try {
+						curBmp.close?.()
+					} catch {}
+					curBmp = nextBmp
+					curW = nextW
+					curH = nextH
+				} catch {
+					useCanvasFallback = true
+					break
+				}
+			}
+			if (!useCanvasFallback && (curW !== nw || curH !== nh)) {
+				try {
+					const finalBmp: any = await (createImageBitmap as any)(curBmp, {
+						resizeWidth: nw,
+						resizeHeight: nh,
+						resizeQuality: 'high',
+					} as any)
+					try {
+						curBmp.close?.()
+					} catch {}
+					curBmp = finalBmp
+				} catch {
+					useCanvasFallback = true
+				}
+			}
+			if (useCanvasFallback) {
+				const canvas: any = stepwiseCanvasDownscale(curBmp, curW, curH, nw, nh)
+				try {
+					curBmp.close?.()
+				} catch {}
 				try {
 					bitmap.close?.()
 				} catch {}
-				bitmap = resized
-			} catch {
-				try {
-					const canvas = document.createElement('canvas')
-					canvas.width = nw
-					canvas.height = nh
-					const ctx = canvas.getContext('2d')!
-					ctx.imageSmoothingEnabled = true
-					;(ctx as any).imageSmoothingQuality = 'high'
-					ctx.drawImage(bitmap as any, 0, 0, nw, nh)
-					try {
-						bitmap.close?.()
-					} catch {}
+				if (canvas) {
 					const tex: any = new CanvasTexture(canvas as any)
 					tex.colorSpace = SRGBColorSpace
 					tex.flipY = false
@@ -277,7 +385,9 @@ async function tryCreateBitmap(
 					tune(tex)
 					tex.name = `texture:${name}`
 					return tex
-				} catch {}
+				}
+			} else {
+				bitmap = curBmp
 			}
 		}
 		const tex: any = new CanvasTexture(bitmap as any)
@@ -478,22 +588,76 @@ function downsampleData(texture: any, maxSize: number): any {
 	const { width: w, height: h, data: src } = texture.image
 	if (w <= maxSize && h <= maxSize) return texture
 	const scale = Math.min(maxSize / w, maxSize / h)
-	const nw = Math.max(1, Math.floor(w * scale)),
-		nh = Math.max(1, Math.floor(h * scale))
+	const nw = Math.max(1, Math.floor(w * scale))
+	const nh = Math.max(1, Math.floor(h * scale))
 	const channels = Math.round(src.length / (w * h)) || 4
-	const dst = new (src.constructor as any)(nw * nh * channels)
-	for (let y = 0; y < nh; y++) {
-		const sy = Math.min(h - 1, Math.floor((y / nh) * h))
-		for (let x = 0; x < nw; x++) {
-			const sx = Math.min(w - 1, Math.floor((x / nw) * w))
-			const sIdx = (sy * w + sx) * channels,
-				dIdx = (y * nw + x) * channels
-			for (let c = 0; c < channels; c++) dst[dIdx + c] = src[sIdx + c]
+	const dst: any = new (src.constructor as any)(nw * nh * channels)
+	const xRatio = w / nw
+	const yRatio = h / nh
+	const isHalf = src instanceof Uint16Array && texture.type === HalfFloatType
+	const isFloat = src instanceof Float32Array
+	if (isHalf) {
+		for (let y = 0; y < nh; y++) {
+			const y0 = Math.floor(y * yRatio)
+			const y1 = Math.min(h, Math.ceil((y + 1) * yRatio))
+			for (let x = 0; x < nw; x++) {
+				const x0 = Math.floor(x * xRatio)
+				const x1 = Math.min(w, Math.ceil((x + 1) * xRatio))
+				const count = (x1 - x0) * (y1 - y0)
+				const dBase = (y * nw + x) * channels
+				for (let c = 0; c < channels; c++) {
+					let sum = 0
+					for (let sy = y0; sy < y1; sy++) {
+						const row = sy * w * channels
+						for (let sx = x0; sx < x1; sx++) sum += DataUtils.fromHalfFloat(src[row + sx * channels + c] as any)
+					}
+					dst[dBase + c] = DataUtils.toHalfFloat(sum / count)
+				}
+			}
+		}
+	} else if (isFloat) {
+		for (let y = 0; y < nh; y++) {
+			const y0 = Math.floor(y * yRatio)
+			const y1 = Math.min(h, Math.ceil((y + 1) * yRatio))
+			for (let x = 0; x < nw; x++) {
+				const x0 = Math.floor(x * xRatio)
+				const x1 = Math.min(w, Math.ceil((x + 1) * xRatio))
+				const count = (x1 - x0) * (y1 - y0)
+				const dBase = (y * nw + x) * channels
+				for (let c = 0; c < channels; c++) {
+					let sum = 0
+					for (let sy = y0; sy < y1; sy++) {
+						const row = sy * w * channels
+						for (let sx = x0; sx < x1; sx++) sum += (src as Float32Array)[row + sx * channels + c]!
+					}
+					dst[dBase + c] = sum / count
+				}
+			}
+		}
+	} else {
+		for (let y = 0; y < nh; y++) {
+			const y0 = Math.floor(y * yRatio)
+			const y1 = Math.min(h, Math.ceil((y + 1) * yRatio))
+			for (let x = 0; x < nw; x++) {
+				const x0 = Math.floor(x * xRatio)
+				const x1 = Math.min(w, Math.ceil((x + 1) * xRatio))
+				const count = (x1 - x0) * (y1 - y0)
+				const dBase = (y * nw + x) * channels
+				for (let c = 0; c < channels; c++) {
+					let sum = 0
+					for (let sy = y0; sy < y1; sy++) {
+						const row = sy * w * channels
+						for (let sx = x0; sx < x1; sx++) sum += (src as any)[row + sx * channels + c]
+					}
+					dst[dBase + c] = Math.round(sum / count)
+				}
+			}
 		}
 	}
 	const tex: any = new DataTexture(dst as any, nw, nh, texture.format ?? RGBAFormat)
 	tex.colorSpace = texture.colorSpace ?? SRGBColorSpace
 	tex.mapping = texture.mapping ?? tex.mapping
+	tex.type = texture.type ?? tex.type
 	tex.needsUpdate = true
 	tex.name = texture.name
 	tune(tex)
@@ -509,43 +673,41 @@ function downsampleData(texture: any, maxSize: number): any {
 
 function downsampleImage(texture: any, maxSize: number, w: number, h: number): any {
 	const scale = Math.min(maxSize / w, maxSize / h)
-	const nw = Math.max(1, Math.floor(w * scale)),
-		nh = Math.max(1, Math.floor(h * scale))
-	if (typeof document === 'undefined' || typeof document.createElement !== 'function') return texture
-	const canvas = document.createElement('canvas')
-	canvas.width = nw
-	canvas.height = nh
-	const ctx = canvas.getContext('2d')
-	if (!ctx || !texture.image) return texture
-	const img = texture.image
-	if (
-		!(
-			img instanceof HTMLImageElement ||
-			img instanceof HTMLCanvasElement ||
-			(typeof ImageBitmap !== 'undefined' && img instanceof ImageBitmap)
-		)
-	)
+	const nw = Math.max(1, Math.floor(w * scale))
+	const nh = Math.max(1, Math.floor(h * scale))
+	const hasOffscreen = typeof OffscreenCanvas !== 'undefined'
+	const hasDocument = typeof document !== 'undefined' && typeof (document as any).createElement === 'function'
+	if (!hasOffscreen && !hasDocument) return texture
+	const img: any = texture.image
+	if (!img) return texture
+	const isDrawable =
+		(typeof HTMLImageElement !== 'undefined' && img instanceof HTMLImageElement) ||
+		(typeof HTMLCanvasElement !== 'undefined' && img instanceof HTMLCanvasElement) ||
+		(typeof ImageBitmap !== 'undefined' && img instanceof ImageBitmap) ||
+		(hasOffscreen && img instanceof (OffscreenCanvas as any)) ||
+		(typeof HTMLVideoElement !== 'undefined' && img instanceof HTMLVideoElement)
+	if (!isDrawable && !(img.width && img.height)) return texture
+	try {
+		const canvas: any = stepwiseCanvasDownscale(img, w, h, nw, nh)
+		if (!canvas) return texture
+		const tex: any = new CanvasTexture(canvas)
+		tex.colorSpace = texture.colorSpace ?? SRGBColorSpace
+		tex.mapping = texture.mapping ?? tex.mapping
+		tex.needsUpdate = true
+		tex.name = texture.name
+		tune(tex)
+		tex.flipY = texture.flipY ?? true
+		try {
+			texture.dispose?.()
+		} catch {}
+		try {
+			URL.revokeObjectURL((img as any).src)
+		} catch {}
+		try {
+			texture.image = null
+		} catch {}
+		return tex
+	} catch {
 		return texture
-	try {
-		ctx.imageSmoothingEnabled = true
-		;(ctx as any).imageSmoothingQuality = 'high'
-	} catch {}
-	ctx.drawImage(img as any, 0, 0, nw, nh)
-	const tex: any = new CanvasTexture(canvas)
-	tex.colorSpace = texture.colorSpace ?? SRGBColorSpace
-	tex.mapping = texture.mapping ?? tex.mapping
-	tex.needsUpdate = true
-	tex.name = texture.name
-	tune(tex)
-	tex.flipY = texture.flipY ?? true
-	try {
-		texture.dispose?.()
-	} catch {}
-	try {
-		URL.revokeObjectURL((img as any).src)
-	} catch {}
-	try {
-		texture.image = null
-	} catch {}
-	return tex
+	}
 }
