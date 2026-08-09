@@ -1,134 +1,155 @@
 # Visual Pinball X in JavaScript
 
-*A port of the best pinball simulator out there*
+*A port of [Visual Pinball](https://github.com/vpinball/vpinball) for Node.js and the browser — parse `.vpx`, render with three.js, simulate physics, transpile VBScript, and emulate PinMAME.*
 
-[![Build Status][travis-image]][travis-url]
-[![codecov](https://codecov.io/gh/vpdb/vpx-js/branch/master/graph/badge.svg)](https://codecov.io/gh/vpdb/vpx-js)
-[![Dependencies][dependencies-image]][dependencies-url]
+![table](https://user-images.githubusercontent.com/70426/56841267-0419fc00-688d-11e9-9996-6d84070da392.png)
+
+> **v2.0.0** · ESM-only · Node `>=24` · TypeScript `^6` · three `^0.185` · GPL-2.0
+
+## Origin and License
+
+This is a maintained **fork of [`vpdb/vpx-js`](https://github.com/vpdb/vpx-js)** by [freezy](https://github.com/freezy) and contributors.
+
+- **Original:** [`vpdb/vpx-js@v1.3.4`](https://github.com/vpdb/vpx-js/releases/tag/v1.3.4) (`e8a6d6fa522`), GPL-2.0. This fork is ~1,500 commits ahead.
+- **License stays GPL-2.0.** See [`LICENSE`](LICENSE). All original `Copyright (C) 2019 freezy` headers are retained; modified files add `Copyright (C) 2026 Chu Qinghao`. No relicensing.
+- **Please credit both** the original project and this fork, and distribute source with any binary per GPL-2.0.
 
 ## Features
 
-This isn't a ready-to-use game. It's a library of loosely-coupled components that
-together implement [Visual Pinball](https://sourceforge.net/projects/vpinball/)'s
-player for the web.
+- **VPX parsing** — OLE/BIFF, meshes, materials, textures, and table scripts via `Table.load()` (VPX 10.8.1).
+- **Rendering** — `ThreeRenderApi` → three.js scenes; `TableExporter` → binary GLB with materials/textures/lights.
+- **Physics** — vpinball collision/rigid-body code ported 1:1; `Player` drives a 1 kHz physics + 60 Hz animation loop (including nudge).
+- **Scripting** — VBScript transpiled to JS (EBNF grammar + transformers) and run against per-item APIs.
+- **Emulation** — `wpc-emu` for WPC plus **PinMAME WASM** (libPinMAME 3.7) for SAM/Whitestar/S11/Data East and others via `VpmController`.
+- **Portable** — `Uint8Array`/`DataView` I/O, no Node shims; explicit `lib/refs.node.js` vs `lib/refs.browser.js` split.
 
-The player can be split into three parts:
+## Requirements
 
-1. The rendering engine
-2. The physics engine
-3. The scripting engine
+- Node `>=24` (ES2024, `"type": "module"`)
+- Browser with ESM + WebGL2
+- Rebuilding WASM needs Emscripten `>=4.0`, CMake `>=3.28`, Ninja `>=1.11` (otherwise a mock fallback is used)
 
-This library provides an abstraction layer for rendering with [three.js](https://threejs.org/),
-which covers the first point. A physics loop is implemented by the `Player`
-class. Collision detection and rigid body dynamics are fully ported, covering the
-second part. Work on scripting has begun with the wiring set up and the default
-table script working. More info about how we go about this can be found
-[here](https://github.com/freezy/vpweb/issues/1).
-
-### Rendering
-
-VPX-JS reads Visual Pinball's VPX format and extracts all meshes in VP's internal
-format. Using an abstraction layer, any WebGL framework can convert this format
-and construct a scene. An adapter for three.js is included.
-
-Additionally, VPX-JS supports direct export to [GLTF](https://www.khronos.org/gltf/)
-files, which is nice, because it allows off-loading the export to a server. It's
-also nice because GLTF allows doing stuff that Visual Pinball's [OBJ](https://en.wikipedia.org/wiki/Wavefront_.obj_file)
-export doesn't, for example:
-
-- Include materials, textures and lights in one single file
-- Apply optimizations:
-   - PNG textures with no transparency are converted to JPEG
-   - PNG textures with transparency are [PNG-crushed](https://en.wikipedia.org/wiki/Pngcrush)
-   - Compress meshes with [Draco](https://google.github.io/draco/)
-
-![image](https://user-images.githubusercontent.com/70426/56841267-0419fc00-688d-11e9-9996-6d84070da392.png)
-*A table in the browser using three.js*
-
-### Physics
-
-VPX-JS uses the same physics code than Visual Pinball. That means the gameplay
-is identical in the browser than when running VPX.
-
-### Scripting and VPM
-
-For scripting, see [this issue](https://github.com/freezy/vpweb/issues/1). About
-VPM, there isn't a JavaScript implementation of PinMAME yet. However, @neophob
-wrote a [WPC emulator](https://github.com/neophob/wpc-emu) from scratch that will
-cover many games already.
-
-## Changes since v1.3.4 (e8a6d6fa522)
-
-~1527 commits ahead of upstream `v1.3.4`. High-level intent:
-
-- **Stay current** — modern ESM build and current Node/browser targets so the library no longer relies on legacy polyfills and is trivial to publish/consume.
-- **Simpler toolchain** — single fast formatter/linter and test runner to reduce setup cost and make CI reliable.
-- **Ecosystem alignment** — track current three.js and related deps to avoid bit-rot, security gaps, and API drift.
-- **Portability** — use standard `Uint8Array`/`DataView` I/O so the same code runs in browsers without Node shims.
-- **VPX compatibility** — follow VPX 10.8.1 defaults/parsing so recent tables load as the desktop player intends.
-- **Gameplay parity** — fix physics divergences so simulation matches VPX.
-- **Look correct** — recalibrate lighting/material handling after the rendering upgrade to fix visual regressions.
-- **Maintainability** — tighten types and consolidate module structure so future changes are safer and easier to audit.
-- **Repo scope** — keep the library lean; `demo-static/` removed and `demo-browser/`/`/.github/`/`/.agents/` are local-only (ignored) rather than published.
-
-## Development Setup
-
-Given this is a lib, you'll need an actual web application to test. There is a
-simple one we're currently using for development [here](https://github.com/freezy/vpweb).
-
-This *vpweb* project retrieves VPX-JS from NPM, so in order to iterate rapidly,
-we'll link it to your local working copy.
+## Installation
 
 ```bash
-git clone https://github.com/vpdb/vpx-js.git
-cd vpx-js
-npm ci
-npm link
-npm run build:watch
+npm install vpx-js
+npm install sharp # optional — enables JPEG/PNG texture optimization
 ```
 
-And the vpweb host application:
+From source:
 
 ```bash
-git clone https://github.com/freezy/vpweb.git
-cd vpweb
+git clone <this-fork-url> && cd vpx-js
 npm ci
-npm link vpx-js
-npm start
+npm run build
 ```
-
-Then connect to `http://localhost:8080` and drag a VPX file into it. Note that
-the scripting engine is still limited. However, the table script of the default
-table should now work.
 
 ## Usage
 
-WIP. The API will be documented when it's considered stable.
+### Load a table
 
-## Tests
+```ts
+import { NodeBinaryReader } from 'vpx-js/lib/refs.node.js'
+import { Table } from 'vpx-js'
 
-Run tests with:
-
-```bash
-npm run test
+const table = await Table.load(new NodeBinaryReader('my_table.vpx'))
+console.log(table.info?.TableName, Object.keys(table.items).length)
+console.log(table.getTableScript().slice(0, 400))
 ```
 
-For more infos about how tests are written, see [here](https://github.com/vpdb/vpx-js/tree/master/test#readme)
+In the browser use `BrowserBinaryReader` with an `ArrayBuffer`:
 
-## Credits
+```ts
+import { BrowserBinaryReader } from 'vpx-js/lib/refs.browser.js'
+const buf = await fetch('/tables/my_table.vpx').then(r => r.arrayBuffer())
+const table = await Table.load(new BrowserBinaryReader(buf))
+```
 
-* @jsm174 for getting the Nearley grammar right and his work on translating VBScript to JavaScript
-* @neophob for his awesome WPC-EMU integration
+### Export to GLB
 
-<a title="IntelliJ IDEA" href="https://www.jetbrains.com/idea/"><img src="https://raw.githubusercontent.com/vpdb/server/master/assets/intellij-logo-text.svg?sanitize=true" alt="IntelliJ IDEA" width="250"></a>
+```ts
+import { writeFileSync } from 'node:fs'
+import { TableExporter } from 'vpx-js'
 
-Special thanks go to JetBrains for their awesome IDE and support of the Open Source Community!
+const glb = await new TableExporter(table).exportGlb({
+  applyMaterials: true,
+  optimizeTextures: true, // requires sharp
+})
+writeFileSync('my_table.glb', glb)
+```
+
+Open the result in [Babylon Sandbox](https://sandbox.babylonjs.com) or [gltf-viewer](https://gltf-viewer.donmccurdy.com).
+
+### Simulate
+
+```ts
+import { Player } from 'vpx-js'
+
+const player = new Player(table).init() // or initAsync()
+player.simulateTime(1000)
+const changed = player.onFrame() // diffed states for the renderer
+
+// example: kick a ball
+table.kickers.BallRelease.getApi().CreateBall()
+table.kickers.BallRelease.getApi().Kick(0, 5)
+```
+
+### CLI
+
+Build first (`npm run build`), then:
+
+```bash
+vbs2js <script.vbs> [--format-only]          # transpile VBScript → JS
+vpt2glb <table.vpx> [out.glb] [flags]         # convert to GLB
+vptscript <table.vpx|folder> [--save]        # extract table script
+```
+
+`vpt2glb` flags are all opt-out: `--skip-optimize`, `--no-textures`, `--no-materials`, `--no-lights`, `--no-primitives`, `--no-flippers`, etc. (Draco/`--compress-vertices` is removed).
+
+## What Changed Since Upstream v1.3.4
+
+~1,500 commits, 566 files, +71k/−85k lines. In short:
+
+- **Modern toolchain** — ESM-only, Node 24, `tsup` + `Biome` + `Vitest` replacing Rollup/TSLint/Mocha/NYC.
+- **Current dependencies** — three `^0.185` + `three-mesh-bvh` + `wpc-emu`; `sharp` is now optional.
+- **Portable I/O** — `Uint8Array`/`DataView` throughout; `refs.node`/`refs.browser` replaces the old `pkg.browser` shim.
+- **Rendering rework** — custom glTF/Draco code removed; GLB export now uses `three/addons/exporters/GLTFExporter`.
+- **Physics fixes** — VPX 10.8.1 defaults, timer/nudge/collision parity with desktop VPX.
+- **Scripting hardened** — broader VBScript coverage and a proper `with`-proxy sandbox.
+- **New: PinMAME WASM** — `external/pinmame` + `wasm/` build (WASM + mock fallback) for any PinMAME hardware; upstream only mentioned `wpc-emu`.
+- **Leaner repo** — `demo-static` removed; `demo-browser` (Vite viewer, not published) is local-only.
+
+Full diff: `git diff v1.3.4..HEAD --stat`.
+
+## Development
+
+```bash
+npm run build        # compile grammar + tsup + copy res/
+npm run dev          # watch mode
+npm run typecheck
+npm run lint         # biome check
+npm test             # vitest + v8 coverage
+npm run verify:all   # wasm + table + pinmame + player harness
+```
+
+Optional WASM rebuild:
+
+```bash
+npm run build:wasm        # release (needs emcc)
+npm run build:wasm:mock   # mock only
+```
+
+Browser viewer (not published):
+
+```bash
+cd demo-browser && npm ci && npm run dev
+# drag a .vpx onto http://localhost:5173
+```
 
 ## License
 
-GPLv2, see [LICENSE](LICENSE).
+GPL-2.0 — see [`LICENSE`](LICENSE). Same as [`vpdb/vpx-js`](https://github.com/vpdb/vpx-js).
 
-[travis-image]: https://img.shields.io/travis/vpdb/vpx-js/master?style=flat-square
-[travis-url]: https://travis-ci.org/vpdb/vpx-js
-[dependencies-image]: https://david-dm.org/vpdb/vpx-js.svg?style=flat-square
-[dependencies-url]: https://david-dm.org/vpdb/vpx-js
+## Credits
+
+Original project by [freezy](https://github.com/freezy) — especially [@jsm174](https://github.com/jsm174) (grammar) and [@neophob](https://github.com/neophob) (wpc-emu). Fork maintenance by Chu Qinghao. Thanks to JetBrains for IDE support of the original project.
