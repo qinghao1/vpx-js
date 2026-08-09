@@ -33,8 +33,8 @@ const imageMap: Record<string, string> = {
 	kickerWilliams: new URL('../../../res/maps/kickerWilliams.png', import.meta.url).href,
 }
 
-const MAX_REGULAR = 1024
-const MAX_FLOAT = 512
+const MAX_REGULAR = 2048
+const MAX_FLOAT = 1024
 const MAX_PLAYFIELD = 2048
 const MAX_VLM = 512
 
@@ -44,7 +44,7 @@ function tune(tex: any): void {
 	const small = w > 0 && h > 0 && Math.max(w, h) <= 256
 	tex.generateMipmaps = !small
 	tex.minFilter = small ? LinearFilter : LinearMipMapLinearFilter
-	tex.anisotropy = small ? 1 : 4
+	tex.anisotropy = small ? 1 : 8
 }
 
 function nameAndTune(tex: any, name: string): void {
@@ -58,7 +58,7 @@ function maxFor(name: string, w: number, h: number, isFloat: boolean, playfieldM
 	if (playfieldMap && lower === playfieldMap.toLowerCase()) return MAX_PLAYFIELD
 	if (lower.includes('vlm.nestmap')) return MAX_VLM
 	if (isFloat) return w <= 512 && h <= 512 ? Math.max(w, h) : MAX_FLOAT
-	if (w > 2048 || h > 2048) return 1024
+	if (w > 2048 || h > 2048) return MAX_REGULAR
 	if (w <= 512 && h <= 512) return Math.max(w, h)
 	return MAX_REGULAR
 }
