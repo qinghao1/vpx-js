@@ -15,4 +15,3 @@ ls -lh "$DIST"
 mkdir -p "$ROOT/../dist"
 cp -f "$DIST/kernels.js" "$ROOT/../dist/kernels.js" 2>/dev/null || true
 cp -f "$DIST/kernels.wasm" "$ROOT/../dist/kernels.wasm" 2>/dev/null || true
-ls -lh "$ROOT/../dist" | head -n 20

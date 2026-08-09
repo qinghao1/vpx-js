@@ -3,7 +3,6 @@
 
 import type { PlayerPhysics } from '../game/player-physics.js'
 import { FRect3D } from '../util/frect3d.js'
-import type { Vertex3D } from '../util/math.js'
 import type { Ball } from '../vpt/ball/ball.js'
 import { CollisionEvent } from './collision-event.js'
 import type { HitKD } from './hit-kd.js'
