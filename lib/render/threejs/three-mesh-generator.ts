@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { BufferAttribute, BufferGeometry, Float32BufferAttribute } from '../../refs.node.js'
-import { Mesh } from '../../vpt/mesh.js'
+import type { Mesh } from '../../vpt/mesh.js'
 
 export class ThreeMeshGenerator {
 	public convertToBufferGeometry(mesh: Mesh): BufferGeometry {
@@ -17,7 +17,8 @@ export class ThreeMeshGenerator {
 		let hasNormal = false
 		let hasUV = false
 		for (let i = 0; i < vc; i++) {
-			const v = mesh.vertices[i]!
+			const v = mesh.vertices[i]
+			if (!v) continue
 			const o3 = i * 3
 			positions[o3] = v.x
 			positions[o3 + 1] = v.y
@@ -34,14 +35,14 @@ export class ThreeMeshGenerator {
 		bg.setAttribute('position', new Float32BufferAttribute(positions, 3))
 		if (ic) {
 			const IndexArray = vc > 65535 ? Uint32Array : Uint16Array
-			const src = mesh.indices
-			const dst = new IndexArray(ic)
+			const indices = new IndexArray(mesh.indices)
+			// VPX is left-handed, Three.js is right-handed — reverse winding.
 			for (let i = 0; i < ic; i += 3) {
-				dst[i] = src[i + 2]!
-				dst[i + 1] = src[i + 1]!
-				dst[i + 2] = src[i]!
+				const a = indices[i]
+				indices[i] = indices[i + 2]
+				indices[i + 2] = a
 			}
-			bg.setIndex(new BufferAttribute(dst, 1))
+			bg.setIndex(new BufferAttribute(indices, 1))
 		}
 		if (hasNormal) bg.setAttribute('normal', new Float32BufferAttribute(normals, 3))
 		else bg.computeVertexNormals()
@@ -51,7 +52,10 @@ export class ThreeMeshGenerator {
 }
 
 export function releaseGeometry(geometry: BufferGeometry): void {
-	for (const name of Object.keys(geometry.attributes)) delete (geometry.attributes as any)[name]
+	for (const name of Object.keys(geometry.attributes))
+		delete (geometry.attributes as unknown as Record<string, unknown>)[name]
 	geometry.dispose()
-	try { (geometry as any).disposeBoundsTree?.() } catch {}
+	try {
+		;(geometry as unknown as { disposeBoundsTree?: () => void }).disposeBoundsTree?.()
+	} catch {}
 }
