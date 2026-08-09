@@ -69,33 +69,14 @@ links. This works pretty well for the main three.js library.
 
 ### Three.js Example Code
 
-The example code from three.js comes with a catch: For whatever reason, all
-JSM examples reference the main module, not individual files. So in Node.js they 
-don't work at all (there is no CommonJS version, only the `THREE` overrides and
-the JSM version), and in the browser we end up with the entire `three.module.js`
-again.
+Add-on loaders are imported directly from `three`:
 
-We currently only use two example files, `EXRLoader` and `RGBELoader`, so we
-suck it up and change their `three` reference to `refs.node` and include them in
-our source.
+```ts
+import { EXRLoader } from 'three/examples/jsm/loaders/EXRLoader.js'
+import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js'
+```
 
-Which brings us to our last problem: We now have JavaScript code in our library,
-so we need the `allowJs` flag in `tsconfig.json` on, which means we cannot use
-`declaration` anymore.
-
-BTW just copying the files won't work either because remember we ship a CommonJS
-build, and they still are in ES2015. Luckily Typescript has a `emitDeclarationOnly`
-flag, which we can use in a second `tsconfig.json` to generate the typings.
-
-**Note 1:** `ts-node` doesn't have any problems with running ES2015 imports, 
-because it will transpile them anyway.
-
-**Note 2:** Tree shaking three.js for VPX-JS gets it down to a third. But given
-that the host application will need more than that (for starters, a renderer),
-it might finally not be worth the effort and we can go back to 
-`import {} from 'three';`. However, the *examples* problem will always persist
-because there just isn't any Node.js compatible version packaged in three.js.
-
-**Note 3:** We ended up using the ESM version of three.js everywhere because it
-ended up in the build anyway (for unknown reasons) and thus resulted in shipping
-most of the code twice.
+`RGBELoader` was renamed to `HDRLoader` in three.js r180 and is no longer used.
+No vendored copy is needed — Node ≥24 runs ESM natively, so `three/examples/jsm/*`
+works in both Node and browser. All three.js core imports go through `refs.node.ts`
+/ `refs.browser.ts` for platform switching.

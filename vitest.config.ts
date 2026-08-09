@@ -31,7 +31,6 @@ export default defineConfig({
 				'lib/**/*.spec.ts',
 				'lib/gltf/gltf-exporter.ts',
 				'lib/util/logger.ts',
-				'lib/render/threejs/vendor/**',
 				'lib/scripting/grammar/rules.ts',
 			],
 			reporter: ['lcov', 'text-summary'],

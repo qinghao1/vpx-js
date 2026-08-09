@@ -17,7 +17,6 @@
 			"!!wasm/build",
 			"!test/fixtures",
 			"!lib/scripting/grammar/rules.ts",
-			"!lib/render/threejs/vendor",
 			"!!demo-browser/dist",
 			"!!demo-browser/node_modules",
 			"!lib/**/bench*.spec.ts",
@@ -113,7 +112,7 @@
 			}
 		},
 		{
-			"includes": ["lib/scripting/grammar/rules.ts", "lib/render/threejs/vendor/**"],
+			"includes": ["lib/scripting/grammar/rules.ts"],
 			"formatter": {
 				"enabled": false
 			},

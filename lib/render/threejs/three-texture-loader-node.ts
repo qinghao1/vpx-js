@@ -12,7 +12,7 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 
 import { EXRLoader } from 'three/examples/jsm/loaders/EXRLoader.js'
-import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js'
+import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js'
 import { FloatType, HalfFloatType, Texture as ThreeTexture } from '../../refs.node.js'
 import { logger } from '../../util/logger.js'
 import type { ITextureLoader } from '../irender-api.js'
@@ -84,7 +84,7 @@ async function loadSharpImage(name: string, shrp: any): Promise<ThreeTexture> {
 
 async function loadHdrImage(_name: string, data: Uint8Array): Promise<ThreeTexture> {
 	return new Promise((resolve, reject) => {
-		new RGBELoader().setDataType(HalfFloatType as any).load(
+		new HDRLoader().setDataType(HalfFloatType as any).load(
 			data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as any,
 			(texture: ThreeTexture) => resolve(texture),
 			undefined,
