@@ -1,5 +1,9 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
+
+import { NudgeHandler } from '../physics/cabinet/nudge-handler.js'
+import { logger } from '../util/logger.js'
+import type { Vertex2D } from '../util/vector.js'
 import type { Table } from '../vpt/table/table.js'
 import { Event } from './event.js'
 import {
@@ -32,9 +36,6 @@ import {
 	DIK_Z,
 } from './key-code.js'
 import type { Player } from './player.js'
-import { logger } from '../util/logger.js'
-import { Vertex2D } from '../util/vector.js'
-import { NudgeHandler } from '../physics/cabinet/nudge-handler.js'
 
 type KeyEvent = { code: number; down: boolean }
 
@@ -91,19 +92,17 @@ function isRightCode(code: number, rightKey: number): boolean {
 export class PinInput {
 	private readonly queue: KeyEvent[] = []
 	private readonly pressed = new Set<number>()
-	private readonly nudgeHandler: NudgeHandler
+	private readonly nudgeHandler = new NudgeHandler('cab', 1)
 
 	readonly rgKeys: Record<number, number> = { ...DEFAULT_KEYS }
 
 	constructor(
 		private readonly table: Table,
 		private readonly player: Player,
-	) {
-		this.nudgeHandler = new NudgeHandler('cab', 1)
-	}
+	) {}
 
 	getKey(key: AssignKey): number {
-		return this.rgKeys[key]!
+		return this.rgKeys[key] ?? 0
 	}
 
 	setKey(key: AssignKey, dik: number): void {
@@ -126,6 +125,10 @@ export class PinInput {
 		this.nudgeHandler.stepOneMillisecond()
 	}
 
+	nudge(angle: number, force: number): void {
+		this.nudgeHandler.applyImpulse(angle, force)
+	}
+
 	onKeyDown(code: number, _ts?: number): void {
 		this.queue.push({ code, down: true })
 	}
@@ -143,7 +146,6 @@ export class PinInput {
 				if (this.pressed.has(ev.code)) continue
 				this.pressed.add(ev.code)
 			} else {
-				if (!this.pressed.has(ev.code)) continue
 				this.pressed.delete(ev.code)
 			}
 			this.fire(ev.down ? Event.GameEventsKeyDown : Event.GameEventsKeyUp, ev.code)
@@ -173,16 +175,18 @@ export class PinInput {
 	}
 
 	private syncFlippers(isDown: boolean, code: number): void {
-		const isLeft = isLeftCode(code, this.rgKeys[AssignKey.LeftFlipperKey])
-		const isRight = isRightCode(code, this.rgKeys[AssignKey.RightFlipperKey])
+		const isLeft = isLeftCode(code, this.getKey(AssignKey.LeftFlipperKey))
+		const isRight = isRightCode(code, this.getKey(AssignKey.RightFlipperKey))
 		if (!isLeft && !isRight) return
-
-		const flippers = Object.values(this.table.flippers) as Array<{ getName(): string; data: { center: { x: number } }; getApi(): { RotateToEnd(): void; RotateToStart(): void } }>
+		const flippers = Object.values(this.table.flippers) as Array<{
+			getName(): string
+			data: { center: { x: number } }
+			getApi(): { RotateToEnd(): void; RotateToStart(): void }
+		}>
 		if (!flippers.length) return
-
 		for (const flipper of flippers) {
 			if (flippers.length > 1) {
-				const isRightFlipper = this.isRightFlipper(flipper as any)
+				const isRightFlipper = this.isRightFlipper(flipper)
 				if (isLeft && isRightFlipper) continue
 				if (isRight && !isRightFlipper) continue
 			}
@@ -197,8 +201,10 @@ export class PinInput {
 	}
 
 	private syncPlunger(isDown: boolean, code: number): void {
-		if (code !== this.rgKeys[AssignKey.PlungerKey]) return
-		const plungers = Object.values(this.table.plungers) as Array<{ getApi(): { PullBack(): void; Fire(): void } }>
+		if (code !== this.getKey(AssignKey.PlungerKey)) return
+		const plungers = Object.values(this.table.plungers) as Array<{
+			getApi(): { PullBack(): void; Fire(): void }
+		}>
 		if (!plungers.length) return
 		for (const plunger of plungers) {
 			try {
@@ -213,9 +219,9 @@ export class PinInput {
 
 	private syncNudge(isDown: boolean, code: number): void {
 		if (!isDown) return
-		const leftKey = this.rgKeys[AssignKey.LeftTiltKey]
-		const rightKey = this.rgKeys[AssignKey.RightTiltKey]
-		const centerKey = this.rgKeys[AssignKey.CenterTiltKey]
+		const leftKey = this.getKey(AssignKey.LeftTiltKey)
+		const rightKey = this.getKey(AssignKey.RightTiltKey)
+		const centerKey = this.getKey(AssignKey.CenterTiltKey)
 		if (code !== leftKey && code !== rightKey && code !== centerKey) return
 		const baseForce = 2
 		const angleVariance = (Math.random() - 0.5) * 15 * baseForce
@@ -227,26 +233,25 @@ export class PinInput {
 		this.nudgeHandler.applyImpulse(angle, force)
 	}
 
-	nudge(angle: number, force: number): void {
-		this.nudgeHandler.applyImpulse(angle, force)
-	}
-
 	private tryMockTroughEject(isDown: boolean, code: number): void {
 		if (!isDown) return
-		if (code !== DIK_1 && code !== this.rgKeys[AssignKey.StartGameKey]) return
-		const emu = this.player.getPhysics().emu as unknown as { isMock?: boolean; isInitialized?: () => boolean } | null
+		if (code !== DIK_1 && code !== this.getKey(AssignKey.StartGameKey)) return
+		const emu = this.player.getPhysics().emu as unknown as {
+			isMock?: boolean
+			isInitialized?: () => boolean
+		} | null
 		if (emu && !emu.isMock && emu.isInitialized?.()) return
-
 		const kickers = Object.values(this.table.kickers) as unknown as Array<{
 			hit?: { ball?: unknown }
 			getApi(): { Kick(a: number, s: number): void; DestroyBall(): number }
 			getName(): string
 			data: { center: { x: number } }
 		}>
-
-		const withBall = kickers.filter(k => (k as any).hit?.ball)
+		const withBall = kickers.filter(k => (k as unknown as { hit?: { ball?: unknown } }).hit?.ball)
 		if (!withBall.length) {
-			const plunger = (Object.values(this.table.plungers)[0] as unknown as { getApi(): { CreateBall(): unknown } } | undefined)
+			const plunger = Object.values(this.table.plungers)[0] as unknown as
+				| { getApi(): { CreateBall(): unknown } }
+				| undefined
 			if (plunger) {
 				try {
 					plunger.getApi().CreateBall()
@@ -256,15 +261,17 @@ export class PinInput {
 			}
 			return
 		}
-
 		withBall.sort((a, b) => b.data.center.x - a.data.center.x)
-		const exit = withBall[0]!
+		const exit = withBall[0] as (typeof withBall)[number]
+		if (!exit) return
 		try {
 			exit.getApi().Kick(TROUGH_KICK_ANGLE, TROUGH_KICK_SPEED)
 		} catch {
 			try {
 				exit.getApi().DestroyBall()
-				const plunger = Object.values(this.table.plungers)[0] as unknown as { getApi(): { CreateBall(): unknown } } | undefined
+				const plunger = Object.values(this.table.plungers)[0] as unknown as
+					| { getApi(): { CreateBall(): unknown } }
+					| undefined
 				if (plunger) plunger.getApi().CreateBall()
 			} catch (err) {
 				logger().warn('mock trough fallback failed %s', (err as Error).message)
@@ -287,10 +294,10 @@ export class PinInput {
 	}
 
 	private getCabinetSwitches(code: number): readonly number[] | undefined {
-		if (code === DIK_1 || code === this.rgKeys[AssignKey.StartGameKey]) return SWITCH_START
+		if (code === DIK_1 || code === this.getKey(AssignKey.StartGameKey)) return SWITCH_START
 		if (code === DIK_2 || code === DIK_3) return SWITCH_CREDIT_2_3
-		if (code === DIK_4 || code === this.rgKeys[AssignKey.AddCreditKey2]) return SWITCH_CREDIT_4
-		if (code === DIK_5 || code === this.rgKeys[AssignKey.AddCreditKey]) return SWITCH_CREDIT_5
+		if (code === DIK_4 || code === this.getKey(AssignKey.AddCreditKey2)) return SWITCH_CREDIT_4
+		if (code === DIK_5 || code === this.getKey(AssignKey.AddCreditKey)) return SWITCH_CREDIT_5
 		if (code === DIK_6) return SWITCH_CREDIT_6
 		return undefined
 	}

@@ -24,7 +24,13 @@ export class CabinetPhysics {
 		this.offset.y = this.oscY.getDisplacement() * 2
 	}
 
-	getAcceleration(): Vertex2D { return this.acceleration }
-	getOffset(): Vertex2D { return this.offset }
-	getMass(): number { return this.oscX.getMass() }
+	getAcceleration(): Vertex2D {
+		return this.acceleration
+	}
+	getOffset(): Vertex2D {
+		return this.offset
+	}
+	getMass(): number {
+		return this.oscX.getMass()
+	}
 }

@@ -1,16 +1,16 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
-import { PHYS_FACTOR } from '../constants.js'
+
 import { Vertex2D } from '../../util/vector.js'
+import { PHYS_FACTOR } from '../constants.js'
 import { CabinetPhysics } from './cabinet-physics.js'
 
-const VPUTOM = (x: number): number => x * (0.0254 * 1.0625 / 50)
-const MTOVPU = (x: number): number => x * (50 / (0.0254 * 1.0625))
-const STOVPT = (x: number): number => x * 0.01
+const VPUTOM = (x: number): number => x * ((0.0254 * 1.0625) / 50)
 const VPTTOS = (x: number): number => x / 0.01
-const MS2TOVPUVPT2 = (x: number): number => MTOVPU(x) * STOVPT(STOVPT(1))
 const VPUVPT2TOMS2 = (x: number): number => VPUTOM(x) * VPTTOS(VPTTOS(1))
 
-function degToRad(d: number): number { return (d * Math.PI) / 180 }
+function degToRad(d: number): number {
+	return (d * Math.PI) / 180
+}
 
 export interface KeyboardNudge {
 	getAcceleration(): Vertex2D
@@ -31,11 +31,21 @@ export class PushRetractKeyboardNudge implements KeyboardNudge {
 
 	constructor(private strength = 1) {}
 
-	getStrength(): number { return this.strength }
-	setStrength(v: number): void { this.strength = v }
-	getAcceleration(): Vertex2D { return this.acceleration }
-	getOffset(): Vertex2D { return this.offset }
-	isActive(): boolean { return this.deactivationDelay > 0 }
+	getStrength(): number {
+		return this.strength
+	}
+	setStrength(v: number): void {
+		this.strength = v
+	}
+	getAcceleration(): Vertex2D {
+		return this.acceleration
+	}
+	getOffset(): Vertex2D {
+		return this.offset
+	}
+	isActive(): boolean {
+		return this.deactivationDelay > 0
+	}
 
 	nudge(angle: number, force: number): void {
 		this.deactivationDelay = 10000
@@ -93,11 +103,21 @@ export class BoxModelKeyboardNudge implements KeyboardNudge {
 		this.damping = zeta * 2 * Math.sqrt(this.spring)
 	}
 
-	getStrength(): number { return this.strength }
-	setStrength(v: number): void { this.strength = v }
-	getAcceleration(): Vertex2D { return this.acceleration }
-	getOffset(): Vertex2D { return this.offset }
-	isActive(): boolean { return this.deactivationDelay > 0 }
+	getStrength(): number {
+		return this.strength
+	}
+	setStrength(v: number): void {
+		this.strength = v
+	}
+	getAcceleration(): Vertex2D {
+		return this.acceleration
+	}
+	getOffset(): Vertex2D {
+		return this.offset
+	}
+	isActive(): boolean {
+		return this.deactivationDelay > 0
+	}
 
 	nudge(angle: number, force: number): void {
 		this.deactivationDelay = 10000
@@ -128,16 +148,25 @@ export class BoxModelKeyboardNudge implements KeyboardNudge {
 export class CabModelKeyboardNudge implements KeyboardNudge {
 	private readonly cabinet = new CabinetPhysics()
 	private impulses: Array<{ elapsed: number; length: number; impulse: Vertex2D }> = []
-	private readonly acceleration = new Vertex2D()
 	private deactivationDelay = 0
 
 	constructor(private strength = 1) {}
 
-	getStrength(): number { return this.strength }
-	setStrength(v: number): void { this.strength = v }
-	getAcceleration(): Vertex2D { return this.cabinet.getAcceleration() }
-	getOffset(): Vertex2D { return this.cabinet.getOffset() }
-	isActive(): boolean { return this.deactivationDelay > 0 }
+	getStrength(): number {
+		return this.strength
+	}
+	setStrength(v: number): void {
+		this.strength = v
+	}
+	getAcceleration(): Vertex2D {
+		return this.cabinet.getAcceleration()
+	}
+	getOffset(): Vertex2D {
+		return this.cabinet.getOffset()
+	}
+	isActive(): boolean {
+		return this.deactivationDelay > 0
+	}
 
 	nudge(angle: number, force: number): void {
 		const g = 9.80665
@@ -173,8 +202,11 @@ export type KeyboardNudgeMode = 'push-retract' | 'box' | 'cab'
 
 export function createKeyboardNudge(mode: KeyboardNudgeMode = 'cab', strength = 1): KeyboardNudge {
 	switch (mode) {
-		case 'push-retract': return new PushRetractKeyboardNudge(strength)
-		case 'box': return new BoxModelKeyboardNudge(strength)
-		case 'cab': return new CabModelKeyboardNudge(strength)
+		case 'push-retract':
+			return new PushRetractKeyboardNudge(strength)
+		case 'box':
+			return new BoxModelKeyboardNudge(strength)
+		case 'cab':
+			return new CabModelKeyboardNudge(strength)
 	}
 }

@@ -29,8 +29,16 @@ export class DampedHarmonicOscillator {
 		this.displacement = 0
 	}
 
-	getDisplacement(): number { return this.displacement }
-	getVelocity(): number { return this.velocity }
-	getAcceleration(): number { return this.acceleration }
-	getMass(): number { return this.mass }
+	getDisplacement(): number {
+		return this.displacement
+	}
+	getVelocity(): number {
+		return this.velocity
+	}
+	getAcceleration(): number {
+		return this.acceleration
+	}
+	getMass(): number {
+		return this.mass
+	}
 }

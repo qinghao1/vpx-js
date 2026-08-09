@@ -54,6 +54,7 @@ export class PinMameEmulator implements IEmulator {
 	private readonly mockSwitches = new Map<number, number>()
 	private readonly solMasks = new Map<number, number>()
 	private readonly pendingSolMasks: Array<{ low: number; mask: number }> = []
+	private readonly pendingSwitches = new Map<number, number>()
 	private dmdW = DMD.x
 	private dmdH = DMD.y
 
@@ -208,6 +209,7 @@ export class PinMameEmulator implements IEmulator {
 			this.queue.addMessage(MessageType.ExecuteTicks, ms)
 			return 0
 		}
+		if (this.pendingSwitches.size && this.api?.isRunning()) this.flushPendingSwitches()
 		if (this.paused || this.isMock) return ms
 		this.sync()
 		return ms
@@ -273,6 +275,7 @@ export class PinMameEmulator implements IEmulator {
 	}
 
 	getSwitchInput(n: number): number {
+		if (this.pendingSwitches.has(n)) return this.pendingSwitches.get(n)!
 		return (this.isMock ? this.mockSwitches.get(n) : this.api?.getSwitch(n)) ?? 0
 	}
 	getLampState(n: number): number {
@@ -296,19 +299,38 @@ export class PinMameEmulator implements IEmulator {
 			this.queue.addMessage(t, n)
 			return true
 		}
-		const cur = (this.isMock ? this.mockSwitches.get(n) : this.api?.getSwitch(n)) ?? 0
+		const pending = this.pendingSwitches.get(n)
+		const cur = pending !== undefined ? pending : ((this.isMock ? this.mockSwitches.get(n) : this.api?.getSwitch(n)) ?? 0)
 		const next = enable === undefined ? (cur ? 0 : 1) : enable ? 1 : 0
 		if (this.isMock) {
 			this.mockSwitches.set(n, next)
 			return true
 		}
-		if (!this.api) return true
+		if (!this.api) {
+			this.pendingSwitches.set(n, next)
+			return true
+		}
+		if (!this.api.isRunning()) {
+			this.pendingSwitches.set(n, next)
+			return true
+		}
+		if (this.pendingSwitches.has(n)) this.pendingSwitches.delete(n)
 		try {
 			this.api.setSwitch(n, next)
 			return true
 		} catch {
 			return false
 		}
+	}
+
+	private flushPendingSwitches(): void {
+		if (!this.api || !this.api.isRunning()) return
+		for (const [n, v] of this.pendingSwitches) {
+			try {
+				this.api.setSwitch(n, v)
+			} catch {}
+		}
+		this.pendingSwitches.clear()
 	}
 
 	setCabinetInput(v: number): void {
