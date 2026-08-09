@@ -1,0 +1,36 @@
+From e3f5a5233ee71ef22db3437d62919ff96c1cd5a5 Mon Sep 17 00:00:00 2001
+From: Chu Qinghao <6337103+qinghao1@users.noreply.github.com>
+Date: Sun, 9 Aug 2026 01:43:38 -0400
+Subject: [PATCH 1/8] wasm: guard __rolq/__rorq for WASM
+
+__rolq/__rorq intrinsics are not available in WASM/Emscripten.
+Guard with WASM/PINMAME_WASM so the portable C fallback is used.
+
+---
+ src/common.h | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/common.h b/src/common.h
+index f0249b6..6218b2b 100644
+--- a/src/common.h
++++ b/src/common.h
+@@ -533,7 +533,7 @@ INLINE unsigned long long rotl_64(const unsigned long long x, const unsigned int
+ {
+ #ifdef _MSC_VER
+     return _rotl64(x, count);
+-#elif !defined(__arm__) && !defined(__aarch64__) && (defined(__INTEL_COMPILER) || (defined(__GNUC__) && (__GNUC__ > 3)) || defined(__clang__))
++#elif !defined(__arm__) && !defined(__aarch64__) && !defined(WASM) && !defined(PINMAME_WASM) && (defined(__INTEL_COMPILER) || (defined(__GNUC__) && (__GNUC__ > 3)) || defined(__clang__))
+     return __rolq(x, count);
+ #else
+     return (x<<count) | (x>>( (unsigned int)(-(int)count)&63 )); // -count&63 instead of 64-count to handle count==0
+@@ -555,7 +555,7 @@ INLINE unsigned long long rotr_64(const unsigned long long x, const unsigned int
+ {
+ #ifdef _MSC_VER
+     return _rotr64(x, count);
+-#elif !defined(__arm__) && !defined(__aarch64__) && (defined(__INTEL_COMPILER) || (defined(__GNUC__) && (__GNUC__ > 3)) || defined(__clang__))
++#elif !defined(__arm__) && !defined(__aarch64__) && !defined(WASM) && !defined(PINMAME_WASM) && (defined(__INTEL_COMPILER) || (defined(__GNUC__) && (__GNUC__ > 3)) || defined(__clang__))
+     return __rorq(x, count);
+ #else
+     return (x>>count) | (x<<( (unsigned int)(-(int)count)&63 )); // -count&63 instead of 64-count to handle count==0
+-- 
+2.53.0

@@ -1,0 +1,27 @@
+From 504197f3056ead849cce2a2f7b589506c99126d4 Mon Sep 17 00:00:00 2001
+From: Chu Qinghao <6337103+qinghao1@users.noreply.github.com>
+Date: Sun, 9 Aug 2026 01:43:38 -0400
+Subject: [PATCH 4/8] wasm: fix needs_update_display for polling
+
+Polling mode needs display updates even without a callback.
+Return config presence instead of callback presence.
+
+---
+ src/libpinmame/libpinmame.cpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/libpinmame/libpinmame.cpp b/src/libpinmame/libpinmame.cpp
+index ef03d37..ef28300 100644
+--- a/src/libpinmame/libpinmame.cpp
++++ b/src/libpinmame/libpinmame.cpp
+@@ -451,7 +451,7 @@ extern "C" int libpinmame_time_to_quit(void)
+  * libpinmame_update_display
+  ******************************************************/
+ 
+-extern "C" int libpinmame_needs_update_display() { return _p_Config->cb_OnDisplayUpdated != nullptr; }
++extern "C" int libpinmame_needs_update_display() { return _p_Config != nullptr; }
+ 
+ extern "C" void libpinmame_update_display(const struct core_dispLayout* layout, void* p_data)
+ {
+-- 
+2.53.0

@@ -1,0 +1,27 @@
+From 87221eebba6ddd9eb2bc56c79a873d9b339958f4 Mon Sep 17 00:00:00 2001
+From: Chu Qinghao <6337103+qinghao1@users.noreply.github.com>
+Date: Sun, 9 Aug 2026 01:43:38 -0400
+Subject: [PATCH 2/8] wasm: fix sinc_multichan declaration for emcc
+
+Fix invalid declaration `static enum SRC_ERR int ...` which emcc rejects.
+Remove the duplicate `int`.
+
+---
+ ext/libsamplerate/src_sinc.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/ext/libsamplerate/src_sinc.c b/ext/libsamplerate/src_sinc.c
+index 6476d99..2c491a5 100644
+--- a/ext/libsamplerate/src_sinc.c
++++ b/ext/libsamplerate/src_sinc.c
+@@ -59,7 +59,7 @@ typedef struct
+ 	float	buffer [] ;
+ } SINC_FILTER ;
+ 
+-static enum SRC_ERR int sinc_multichan_vari_process (SRC_PRIVATE *psrc, SRC_DATA *data) ;
++static enum SRC_ERR sinc_multichan_vari_process (SRC_PRIVATE *psrc, SRC_DATA *data) ;
+ static enum SRC_ERR sinc_hex_vari_process (SRC_PRIVATE *psrc, SRC_DATA *data) ;
+ static enum SRC_ERR sinc_quad_vari_process (SRC_PRIVATE *psrc, SRC_DATA *data) ;
+ static enum SRC_ERR sinc_stereo_vari_process (SRC_PRIVATE *psrc, SRC_DATA *data) ;
+-- 
+2.53.0

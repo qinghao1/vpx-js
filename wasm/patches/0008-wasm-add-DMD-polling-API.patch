@@ -1,0 +1,124 @@
+From a0cb73c199f0a22c205ff2c56d77fb118358640a Mon Sep 17 00:00:00 2001
+From: Chu Qinghao <6337103+qinghao1@users.noreply.github.com>
+Date: Sun, 9 Aug 2026 01:43:38 -0400
+Subject: [PATCH 8/8] wasm: add DMD polling API
+
+Add DMD polling API (FindDmdDisplay, GetDmdWidth/Height/Depth/Frame
+and generic DisplayCount/Info/Frame) used by PinMameEmulator.
+
+---
+ src/libpinmame/libpinmame.cpp | 86 +++++++++++++++++++++++++++++++++++
+ src/libpinmame/libpinmame.h   |  3 ++
+ 2 files changed, 89 insertions(+)
+
+diff --git a/src/libpinmame/libpinmame.cpp b/src/libpinmame/libpinmame.cpp
+index 629bc2c..f3fc5d2 100644
+--- a/src/libpinmame/libpinmame.cpp
++++ b/src/libpinmame/libpinmame.cpp
+@@ -1522,6 +1522,92 @@ PINMAMEAPI size_t PinmameGetRawMemoryRegionLength(const int region)
+ 	return _isRunning ? memory_region_length(region) : 0;
+ }
+ 
++
++/******************************************************
++ * PinmameGetDmdWidth / Height / Depth / Frame
++ ******************************************************/
++
++static PinmameDisplay* FindDmdDisplay()
++{
++	for (auto* d : _displays) if (d && (d->layout.type & PINMAME_DISPLAY_TYPE_SEGMASK) == PINMAME_DISPLAY_TYPE_DMD) return d;
++	for (auto* d : _displays) if (d && (d->layout.type & PINMAME_DISPLAY_TYPE_SEGMASK) == PINMAME_DISPLAY_TYPE_VIDEO) return d;
++	return nullptr;
++}
++
++PINMAMEAPI int PinmameGetDmdWidth()
++{
++	auto* d = FindDmdDisplay();
++	return d ? d->layout.width : 0;
++}
++
++PINMAMEAPI int PinmameGetDmdHeight()
++{
++	auto* d = FindDmdDisplay();
++	return d ? d->layout.height : 0;
++}
++
++PINMAMEAPI int PinmameGetDmdDepth()
++{
++	auto* d = FindDmdDisplay();
++	if (!d) return 0;
++	if ((d->layout.type & PINMAME_DISPLAY_TYPE_SEGMASK) == PINMAME_DISPLAY_TYPE_VIDEO) return 4;
++	return d->layout.depth;
++}
++
++PINMAMEAPI int PinmameGetDmdFrame(void* p_data)
++{
++	auto* d = FindDmdDisplay();
++	if (!d || !p_data) return 0;
++	if ((d->layout.type & PINMAME_DISPLAY_TYPE_SEGMASK) == PINMAME_DISPLAY_TYPE_VIDEO) {
++		uint8_t* dst = (uint8_t*)p_data;
++		uint8_t* src = (uint8_t*)d->pData;
++		int n = d->layout.width * d->layout.height;
++		for (int i = 0; i < n; i++) {
++			uint8_t r = src[i*3], g = src[i*3+1], b = src[i*3+2];
++			int v = (r * 77 + g * 150 + b * 29) >> 8;
++			dst[i] = (v * 15 + 127) / 255;
++		}
++		return n;
++	}
++	memcpy(p_data, d->pData, d->size);
++	return d->size;
++}
++
++PINMAMEAPI int PinmameGetDisplayCount()
++{
++	return _displays.size();
++}
++
++PINMAMEAPI int PinmameGetDisplayInfo(int idx, PinmameDisplayLayout* p_layout)
++{
++	if (idx < 0 || idx >= (int)_displays.size() || !p_layout) return 0;
++	PinmameDisplay* d = _displays[idx];
++	if (!d) return 0;
++	*p_layout = d->layout;
++	return d->size;
++}
++
++PINMAMEAPI int PinmameGetDisplayFrame(int idx, void* p_data, int size)
++{
++	if (idx < 0 || idx >= (int)_displays.size() || !p_data) return 0;
++	PinmameDisplay* d = _displays[idx];
++	if (!d || !d->pData) return 0;
++	if (size < d->size) return 0;
++	if ((d->layout.type & PINMAME_DISPLAY_TYPE_SEGMASK) == PINMAME_DISPLAY_TYPE_VIDEO) {
++		uint8_t* dst = (uint8_t*)p_data;
++		uint8_t* src = (uint8_t*)d->pData;
++		int n = d->layout.width * d->layout.height;
++		for (int i = 0; i < n; i++) {
++			uint8_t r = src[i*3], g = src[i*3+1], b = src[i*3+2];
++			int v = (r * 77 + g * 150 + b * 29) >> 8;
++			dst[i] = (v * 15 + 127) / 255;
++		}
++		return n;
++	}
++	memcpy(p_data, d->pData, d->size);
++	return d->size;
++}
++
+ /******************************************************
+  * PinmameSetUserData
+  ******************************************************/
+diff --git a/src/libpinmame/libpinmame.h b/src/libpinmame/libpinmame.h
+index 31e9f5a..6c9204f 100644
+--- a/src/libpinmame/libpinmame.h
++++ b/src/libpinmame/libpinmame.h
+@@ -486,4 +486,7 @@ PINMAMEAPI int PinmameGetChangedNVRAM(PinmameNVRAMState* const p_nvramStates);
+ PINMAMEAPI int PinmameReadMainCPUByte(uint32_t address, uint8_t* const p_value);
+ PINMAMEAPI const uint8_t* PinmameGetRawMemoryRegion(const int region);
+ PINMAMEAPI size_t PinmameGetRawMemoryRegionLength(const int region);
++PINMAMEAPI int PinmameGetDisplayCount();
++PINMAMEAPI int PinmameGetDisplayInfo(int idx, PinmameDisplayLayout* p_layout);
++PINMAMEAPI int PinmameGetDisplayFrame(int idx, void* p_data, int size);
+ PINMAMEAPI void PinmameSetUserData(void* const p_userData);
+-- 
+2.53.0

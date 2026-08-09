@@ -1,0 +1,72 @@
+From e6b11b59fb5acf706c8da31226088a89fd3d8e76 Mon Sep 17 00:00:00 2001
+From: Chu Qinghao <6337103+qinghao1@users.noreply.github.com>
+Date: Sun, 9 Aug 2026 01:43:38 -0400
+Subject: [PATCH 5/8] wasm: make update_display polling-safe
+
+Make libpinmame_update_display safe for polling: add bounds and null
+checks, copy pData unconditionally and guard callback invocations.
+
+---
+ src/libpinmame/libpinmame.cpp | 39 ++++++++++++++++-------------------
+ 1 file changed, 18 insertions(+), 21 deletions(-)
+
+diff --git a/src/libpinmame/libpinmame.cpp b/src/libpinmame/libpinmame.cpp
+index ef28300..6d4702c 100644
+--- a/src/libpinmame/libpinmame.cpp
++++ b/src/libpinmame/libpinmame.cpp
+@@ -455,35 +455,32 @@ extern "C" int libpinmame_needs_update_display() { return _p_Config != nullptr;
+ 
+ extern "C" void libpinmame_update_display(const struct core_dispLayout* layout, void* p_data)
+ {
+-	// If layout is null, update the custom DMD generated from alphanumeric segment displays
+ 	int index = layout == nullptr ? ((int)_displays.size() - 1) : layout->index;
++	if (index < 0 || index >= (int)_displays.size()) return;
+ 	PinmameDisplay* pDisplay = _displays[index];
++	if (!pDisplay) return;
+ 	if ((pDisplay->layout.type & CORE_SEGMASK) == CORE_VIDEO) {
+ 		const bool changed = UpdatePinmameDisplayBitmap(pDisplay, (mame_bitmap*)p_data);
+-		if (changed)
+-			pDisplay->frameId++;
+-		if (_p_Config->cb_OnDisplayUpdated)
++		if (changed) pDisplay->frameId++;
++		if (_p_Config && _p_Config->cb_OnDisplayUpdated)
+ 			(*(_p_Config->cb_OnDisplayUpdated))(index, changed ? pDisplay->pData : nullptr, &pDisplay->layout, _p_userData);
+-	}
+-	else if (_p_Config->cb_OnDisplayUpdated) {
+-		if ((pDisplay->layout.type & CORE_SEGMASK) == CORE_DMD) {
+-			if (memcmp(pDisplay->pData, p_data, pDisplay->size)) {
+-				memcpy(pDisplay->pData, p_data, pDisplay->size);
+-				pDisplay->frameId++;
++	} else if ((pDisplay->layout.type & CORE_SEGMASK) == CORE_DMD) {
++		if (memcmp(pDisplay->pData, p_data, pDisplay->size)) {
++			memcpy(pDisplay->pData, p_data, pDisplay->size);
++			pDisplay->frameId++;
++			if (_p_Config && _p_Config->cb_OnDisplayUpdated)
+ 				(*(_p_Config->cb_OnDisplayUpdated))(index, pDisplay->pData, &pDisplay->layout, _p_userData);
+-			}
+-			else
+-				(*(_p_Config->cb_OnDisplayUpdated))(index, nullptr, &pDisplay->layout, _p_userData);
++		} else if (_p_Config && _p_Config->cb_OnDisplayUpdated) {
++			(*(_p_Config->cb_OnDisplayUpdated))(index, nullptr, &pDisplay->layout, _p_userData);
+ 		}
+-		else
+-		{
+-			if (memcmp(pDisplay->pData, p_data, pDisplay->size)) {
+-				memcpy(pDisplay->pData, p_data, pDisplay->size);
+-				pDisplay->frameId++;
++	} else {
++		if (memcmp(pDisplay->pData, p_data, pDisplay->size)) {
++			memcpy(pDisplay->pData, p_data, pDisplay->size);
++			pDisplay->frameId++;
++			if (_p_Config && _p_Config->cb_OnDisplayUpdated)
+ 				(*(_p_Config->cb_OnDisplayUpdated))(index, pDisplay->pData, &pDisplay->layout, _p_userData);
+-			}
+-			else
+-				(*(_p_Config->cb_OnDisplayUpdated))(index, nullptr, &pDisplay->layout, _p_userData);
++		} else if (_p_Config && _p_Config->cb_OnDisplayUpdated) {
++			(*(_p_Config->cb_OnDisplayUpdated))(index, nullptr, &pDisplay->layout, _p_userData);
+ 		}
+ 	}
+ }
+-- 
+2.53.0
