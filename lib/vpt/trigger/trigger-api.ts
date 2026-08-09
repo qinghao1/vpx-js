@@ -115,12 +115,8 @@ export class TriggerApi extends ItemApi<TriggerData> {
 		return cnt
 	}
 
-	public _ballCountOver(): number {
+	get BallCntOver(): number {
 		return super._ballCountOver(this.events)
-	}
-
-	public get BallCntOver(): number {
-		return this._ballCountOver()
 	}
 
 	public InterfaceSupportsErrorInfo(_riid: unknown): boolean {

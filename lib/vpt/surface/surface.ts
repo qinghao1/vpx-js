@@ -64,16 +64,15 @@ export class Surface
 	}
 
 	public isTransparent(table: Table): boolean {
-		let result = false
 		if (this.data.isSideVisible) {
-			const sideMaterial = table.getMaterial(this.data.szSideMaterial)
-			result = !sideMaterial || (sideMaterial.isOpacityActive && sideMaterial.opacity < 0.999)
+			const m = table.getMaterial(this.data.szSideMaterial)
+			if (!m || (m.isOpacityActive && m.opacity < 0.999)) return true
 		}
 		if (this.data.isTopBottomVisible) {
-			const topMaterial = table.getMaterial(this.data.szTopMaterial)
-			result = result || !topMaterial || (topMaterial.isOpacityActive && topMaterial.opacity < 0.999)
+			const m = table.getMaterial(this.data.szTopMaterial)
+			if (!m || (m.isOpacityActive && m.opacity < 0.999)) return true
 		}
-		return result
+		return false
 	}
 
 	public getMeshes<GEOMETRY>(table: Table): Meshes<GEOMETRY> {
