@@ -82,7 +82,7 @@ export class TableMeshGenerator {
 					itemGroup = renderApi.createParentNode(lightInfo.getName())
 					renderApi.addChildToParent(lightGroup, itemGroup)
 				}
-				const pointLight = renderApi.createPointLight(lightInfo.data)
+				const pointLight = renderApi.createPointLight(lightInfo.data, this.table)
 				renderApi.addChildToParent(itemGroup, pointLight)
 			}
 		}

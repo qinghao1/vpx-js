@@ -257,17 +257,44 @@ export class Stdlib extends VbsApi {
 		return string1.indexOf(string2, start + 1) + 1
 	}
 
+	public Len(str: unknown): number {
+		if (str == null || (str as any)?.[UNDEF] === true) return 0
+		try {
+			return String(str).length
+		} catch {
+			return 0
+		}
+	}
+
 	/**
 	 * The Left function returns a specified number of characters from the left side of a string.
 	 *
 	 * @param str The string to return characters from
 	 * @param length Specifies how many characters to return. If set to 0, an empty string ("") is returned. If set to greater than or equal to the length of the string, the entire string is returned
 	 */
-	public Left(str: string, length: number): string {
-		if (length > str.length) {
-			return str
-		}
-		return str.substr(0, length)
+	public Left(str: unknown, length: number): string {
+		if (str == null || (str as any)?.[UNDEF] === true) return ''
+		const s = String(str)
+		if (length <= 0) return ''
+		if (length >= s.length) return s
+		return s.substr(0, length)
+	}
+
+	public Right(str: unknown, length: number): string {
+		if (str == null || (str as any)?.[UNDEF] === true) return ''
+		const s = String(str)
+		if (length <= 0) return ''
+		if (length >= s.length) return s
+		return s.substr(s.length - length)
+	}
+
+	public Mid(str: unknown, start: number, length?: number): string {
+		if (str == null || (str as any)?.[UNDEF] === true) return ''
+		const s = String(str)
+		const i = Math.max(0, start - 1)
+		if (length == null) return s.substr(i)
+		if (length <= 0) return ''
+		return s.substr(i, length)
 	}
 
 	public CreateObject(name: string, player: Player): any {

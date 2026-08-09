@@ -5,23 +5,19 @@ import { type MeshStandardMaterial, type Object3D, PointLight, type Mesh as Thre
 import { Enums } from '../../vpt/enums.js'
 import type { LightData } from '../../vpt/light/light-data.js'
 import type { LightState } from '../../vpt/light/light-state.js'
+import type { Table } from '../../vpt/table/table.js'
 import { ThreeRenderApi } from './three-render-api.js'
 
 /** Generates and updates Three.js lights. */
 export class ThreeLightGenerator {
-	public createPointLight(d: LightData): PointLight {
+	public createPointLight(d: LightData, table?: Table): PointLight {
 		const intensity = d.state !== Enums.LightStatus.LightStateOff ? d.intensity : 0
 		const light = new PointLight(d.color, intensity, d.falloff * ThreeRenderApi.SCALE, 2)
 		light.name = 'light'
 		light.color.set(d.color)
-		light.position.set(d.center.x, d.center.y, d.height)
+		const z = table ? table.getSurfaceHeight(d.szSurface, d.center.x, d.center.y) + d.height : d.height
+		light.position.set(d.center.x, d.center.y, z)
 		light.updateMatrixWorld()
-		if (d.shadows === Enums.ShadowMode.RaytracedBallShadows) {
-			light.castShadow = true
-			light.shadow.bias = -0.001
-			light.shadow.radius = 12
-			light.shadow.mapSize.set(512, 512)
-		}
 		return light
 	}
 

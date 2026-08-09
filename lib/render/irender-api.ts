@@ -159,8 +159,9 @@ export interface IRenderApi<NODE, GEOMETRY, POINT_LIGHT> {
 	 * Creates a new point light.
 	 *
 	 * @param lightData Light parameters from the VPX file.
+	 * @param table Optional table for surface height.
 	 */
-	createPointLight(lightData: LightData): POINT_LIGHT
+	createPointLight(lightData: LightData, table?: Table): POINT_LIGHT
 }
 
 export interface ITextureLoader<TEXTURE> {

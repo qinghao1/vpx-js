@@ -31,7 +31,7 @@ import type { PinInput } from './pin-input.js'
 import type { IBallCreationPosition, Player } from './player.js'
 
 const CLOCK_INIT_THRESHOLD_USEC = 100_000
-const MAX_CATCHUP_USEC = 100 * PHYSICS_STEPTIME
+const MAX_CATCHUP_USEC = 200 * PHYSICS_STEPTIME
 
 /** Core physics loop — 1 kHz collision, timers, movers.
  * @see https://github.com/vpinball/vpinball/blob/master/player.cpp */
@@ -209,7 +209,7 @@ export class PlayerPhysics {
 		}
 		this.scriptPeriod = 0
 		let iterations = 0
-		while (this.curPhysicsFrameTime < initial) {
+		while (this.nextPhysicsFrameTime < initial) {
 			this.timeMsec = Math.floor((this.curPhysicsFrameTime - this.startTimeUsec) / 1000)
 			iterations++
 			const dt = (this.nextPhysicsFrameTime - this.curPhysicsFrameTime) * (1 / DEFAULT_STEPTIME)
@@ -231,6 +231,7 @@ export class PlayerPhysics {
 			this.curPhysicsFrameTime = this.nextPhysicsFrameTime
 			this.nextPhysicsFrameTime += PHYSICS_STEPTIME
 		}
+		this.timeMsec = Math.floor((initial - this.startTimeUsec) / 1000)
 		this.fireTimers(TimerMode.OnNewFrame)
 		this.fireTimers(TimerMode.OnGameSync)
 		return iterations

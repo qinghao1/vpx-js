@@ -85,10 +85,14 @@ export class VBSHelper {
 
 	public toIterable(obj: unknown): Iterable<unknown> {
 		if (obj == null || this.isUndef(obj)) return []
-		if (typeof (obj as any)[Symbol.iterator] === 'function') return obj as Iterable<unknown>
+		if (typeof (obj as any)[Symbol.iterator] === 'function') {
+			const arr = [...(obj as Iterable<unknown>)]
+			return arr.filter(x => !this.isUndef(x))
+		}
 		if (typeof obj === 'object' && 'length' in (obj as any) && typeof (obj as any).length === 'number') {
 			try {
-				return Array.from(obj as ArrayLike<unknown>)
+				const arr = Array.from(obj as ArrayLike<unknown>)
+				return arr.filter(x => !this.isUndef(x))
 			} catch {
 				return []
 			}

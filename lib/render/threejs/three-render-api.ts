@@ -87,8 +87,8 @@ export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, Poin
 		return g
 	}
 
-	public createPointLight(lightData: LightData): PointLight {
-		return this.lightGenerator.createPointLight(lightData)
+	public createPointLight(lightData: LightData, table?: Table): PointLight {
+		return this.lightGenerator.createPointLight(lightData, table)
 	}
 
 	public addChildToParent(group: Group, obj: Object3D | Group): void {

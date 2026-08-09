@@ -35,7 +35,7 @@ export class PrimitiveApi extends ItemApi<PrimitiveData> {
 	}
 
 	get Image() {
-		return this.isDynamic ? this.state.map! : this.data.szImage
+		return this.isDynamic ? (this.state.map ?? '') : (this.data.szImage ?? '')
 	}
 	set Image(v) {
 		this._assertNonHdrImage(v)
@@ -43,7 +43,7 @@ export class PrimitiveApi extends ItemApi<PrimitiveData> {
 		else this.data.szImage = v
 	}
 	get NormalMap() {
-		return this.isDynamic ? this.state.normalMap! : this.data.szNormalMap
+		return this.isDynamic ? (this.state.normalMap ?? '') : (this.data.szNormalMap ?? '')
 	}
 	set NormalMap(v) {
 		this._assertNonHdrImage(v)
@@ -51,7 +51,7 @@ export class PrimitiveApi extends ItemApi<PrimitiveData> {
 		else this.data.szNormalMap = v
 	}
 	get Material() {
-		return this.isDynamic ? this.state.material! : this.data.szMaterial
+		return this.isDynamic ? (this.state.material ?? '') : (this.data.szMaterial ?? '')
 	}
 	set Material(v) {
 		if (this.isDynamic) this.state.material = v

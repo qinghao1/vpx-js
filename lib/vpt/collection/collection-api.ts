@@ -10,8 +10,7 @@ import type { TimerHit } from '../timer/timer-hit.js'
 import type { CollectionData } from './collection-data.js'
 
 /** Collection API — VBS surface for `Collection`. @see https://github.com/vpinball/vpinball/blob/master/collection.cpp */
-export class CollectionApi extends ItemApi<CollectionData> implements IterableIterator<ItemApi<ItemData>> {
-	private pointer = 0
+export class CollectionApi extends ItemApi<CollectionData> implements Iterable<ItemApi<ItemData>> {
 
 	/** Proxy mimics an array of item APIs. */
 	public static getInstance(
@@ -51,17 +50,12 @@ export class CollectionApi extends ItemApi<CollectionData> implements IterableIt
 		super(data, events, player, table)
 	}
 
-	public next(): IteratorResult<ItemApi<ItemData>> {
-		if (this.pointer < this.items.length) return { done: false, value: this.items[this.pointer++] }
-		return { done: true, value: null as unknown as ItemApi<ItemData> }
-	}
-
 	public _getTimers(): TimerHit[] {
 		return []
 	}
 
 	public [Symbol.iterator](): IterableIterator<ItemApi<ItemData>> {
-		return this
+		return this.items[Symbol.iterator]()
 	}
 
 	protected _getPropertyNames(): string[] {

@@ -39,7 +39,7 @@ export class ThreeLightMeshGenerator {
 				},
 			},
 		})
-		if (lightData.szSurface) geo.translate(0, 0, -table.getSurfaceHeight(lightData.szSurface, 0, 0))
+		if (lightData.szSurface) geo.translate(0, 0, -table.getSurfaceHeight(lightData.szSurface, lightData.center.x, lightData.center.y))
 		geo.name = 'surface.light'
 		return geo
 	}
