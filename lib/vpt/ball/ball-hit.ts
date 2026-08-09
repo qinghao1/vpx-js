@@ -18,15 +18,24 @@ import {
 } from '../../physics/constants.js'
 import { elasticityWithFalloff, HARD_SCATTER } from '../../physics/functions.js'
 import { HitObject } from '../../physics/hit-object.js'
-import { solveQuadraticEq } from '../../util/functions.js'
 import { Vertex3D } from '../../util/vector.js'
+
 import type { TableData } from '../table/table-data.js'
 import type { Ball } from './ball.js'
 import type { BallData } from './ball-data.js'
 import { BallMover } from './ball-mover.js'
 import type { BallState } from './ball-state.js'
 
+function solveQuadraticEq(a: number, b: number, c: number): [number, number] | undefined {
+	const discr = b * b - 4 * a * c
+	if (discr < 0) return undefined
+	const sqrt = Math.sqrt(discr)
+	const inv = -0.5 / a
+	return [(b + sqrt) * inv, (b - sqrt) * inv]
+}
+
 /** Ball collision shape — separated from {@code ball.cpp}. @see https://github.com/vpinball/vpinball/blob/master/ball.cpp */
+
 export class BallHit extends HitObject {
 	public readonly coll: CollisionEvent
 	public rcHitRadiusSqr = 0

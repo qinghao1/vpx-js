@@ -2,8 +2,8 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import type { Vertex3D } from './vector.js'
-import { RenderVertex, RenderVertex3D } from './render-vertex.js'
 import type { IRenderVertex, Vertex } from './vertex.js'
+import { RenderVertex, RenderVertex3D } from './vertex.js'
 
 export abstract class CatmullCurve {
 	abstract getPointAt(t: number): IRenderVertex

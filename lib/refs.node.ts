@@ -6,7 +6,7 @@ import { FileLoader } from 'three'
 
 export { exportGltf } from './gltf/export-gltf.node.js'
 export { NodeBinaryReader as BinaryReader } from './io/binary-reader.node.js'
-export { storage } from './io/storage.node.js'
+export { storage } from './io/storage.js'
 export * from './refs-three.js'
 export { ThreeTextureLoaderNode as ThreeTextureLoader } from './render/threejs/three-texture-loader-node.js'
 export { getTextFile, hasTextFile } from './scripting/vbs-scripts.node.js'

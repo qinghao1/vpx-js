@@ -4,8 +4,7 @@
 import { BiffParser } from '../io/biff-parser.js'
 import type { CatmullCurve } from './catmull-curve.js'
 import { Vertex3D } from './vector.js'
-import type { RenderVertex } from './render-vertex.js'
-import type { IRenderVertex, Vertex } from './vertex.js'
+import type { IRenderVertex, RenderVertex, Vertex } from './vertex.js'
 
 export const HIT_SHAPE_DETAIL_LEVEL = 7.0
 

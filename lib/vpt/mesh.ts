@@ -2,9 +2,8 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import type { Matrix3D } from '../util/matrix.js'
-import { type RenderVertex, RenderVertex3D } from '../util/render-vertex.js'
 import { Vertex2D, Vertex3D } from '../util/vector.js'
-import { Vertex3DNoTex2 } from '../util/vertex.js'
+import { type RenderVertex, RenderVertex3D, Vertex3DNoTex2 } from '../util/vertex.js'
 import type { FrameData } from './animation.js'
 
 /** VPinball mesh. @see https://github.com/vpinball/vpinball/blob/master/mesh.h */

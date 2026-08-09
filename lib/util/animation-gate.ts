@@ -62,23 +62,3 @@ export class AnimationGate {
 // for Vite cross-graph (demo-browser ↔ lib) pass the instance explicitly
 // via ThreeMapGenerator/Player/Transpiler constructors instead of relying on a global.
 export const animationGate = new AnimationGate()
-
-export function isAnimating(): boolean {
-	return animationGate.isAnimating()
-}
-
-export function beginAnimation(): void {
-	animationGate.beginAnimation()
-}
-
-export function endAnimation(): void {
-	animationGate.endAnimation()
-}
-
-export function waitIfAnimating(): Promise<void> {
-	return animationGate.waitIfAnimating()
-}
-
-export function yieldToMain(): Promise<void> {
-	return animationGate.yieldToMain()
-}

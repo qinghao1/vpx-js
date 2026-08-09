@@ -4,7 +4,7 @@
 /** refs.browser.ts — Visual Pinball lib module. */
 export { exportGltf } from './gltf/export-gltf.browser.js'
 export { BrowserBinaryReader as BinaryReader } from './io/binary-reader.browser.js'
-export { storage } from './io/storage.browser.js'
+export { storage } from './io/storage.js'
 export * from './refs-three.js'
 export { ThreeTextureLoaderBrowser as ThreeTextureLoader } from './render/threejs/three-texture-loader-browser.js'
 export { getTextFile, hasTextFile } from './scripting/vbs-scripts.browser.js'
