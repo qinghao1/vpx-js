@@ -2,7 +2,6 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { Matrix3, Matrix4, Vector3 } from 'three'
-import { f4 } from './float.js'
 import { pooled } from './object-pool.js'
 import { Vertex3D } from './vector.js'
 
@@ -239,31 +238,28 @@ export class Matrix3D extends Matrix4 {
 	}
 	setTranslation(tx: number, ty: number, tz: number): this {
 		this.identity()
-		this.elements[12] = f4(tx)
-		this.elements[13] = f4(ty)
-		this.elements[14] = f4(tz)
+		this.elements[12] = tx
+		this.elements[13] = ty
+		this.elements[14] = tz
 		return this
 	}
 	setScaling(sx: number, sy: number, sz: number): this {
 		this.identity()
-		this.elements[0] = f4(sx)
-		this.elements[5] = f4(sy)
-		this.elements[10] = f4(sz)
+		this.elements[0] = sx
+		this.elements[5] = sy
+		this.elements[10] = sz
 		return this
 	}
 	rotateXMatrix(rad: number): this {
-		this.makeRotationX(f4(rad))
-		for (let i = 0; i < 16; i++) this.elements[i] = f4(this.elements[i])
+		this.makeRotationX(rad)
 		return this
 	}
 	rotateYMatrix(rad: number): this {
-		this.makeRotationY(f4(rad))
-		for (let i = 0; i < 16; i++) this.elements[i] = f4(this.elements[i])
+		this.makeRotationY(rad)
 		return this
 	}
 	rotateZMatrix(rad: number): this {
-		this.makeRotationZ(f4(rad))
-		for (let i = 0; i < 16; i++) this.elements[i] = f4(this.elements[i])
+		this.makeRotationZ(rad)
 		return this
 	}
 	override multiply(m: Matrix4): this
@@ -271,17 +267,14 @@ export class Matrix3D extends Matrix4 {
 	override multiply(a: any, b?: any): this {
 		if (b !== undefined) {
 			super.multiplyMatrices(a, b)
-			for (let i = 0; i < 16; i++) this.elements[i] = f4(this.elements[i])
 			return this
 		}
 		const clone = this.clone()
 		super.multiplyMatrices(clone, a)
-		for (let i = 0; i < 16; i++) this.elements[i] = f4(this.elements[i])
 		return this
 	}
 	multiplyMatrices2(a: Matrix3D, b: Matrix3D): this {
 		super.multiplyMatrices(a, b)
-		for (let i = 0; i < 16; i++) this.elements[i] = f4(this.elements[i])
 		return this
 	}
 	multiplyVP(a: Matrix3D, b?: Matrix3D): this {
@@ -293,7 +286,6 @@ export class Matrix3D extends Matrix4 {
 	preMultiply(a: Matrix3D): this {
 		const cur = this.clone()
 		super.multiplyMatrices(a, cur)
-		for (let i = 0; i < 16; i++) this.elements[i] = f4(this.elements[i])
 		return this
 	}
 	toRightHanded(): this {
@@ -322,7 +314,6 @@ export class Matrix3D extends Matrix4 {
 	static fromThreeMatrix(m: Matrix4): Matrix3D {
 		const out = new Matrix3D()
 		out.copy(m)
-		for (let i = 0; i < 16; i++) out.elements[i] = f4(out.elements[i])
 		return out
 	}
 	debug(): string[] {
@@ -349,97 +340,97 @@ export class Matrix3D extends Matrix4 {
 		return this.elements[0]
 	}
 	set _11(v: number) {
-		this.elements[0] = f4(v)
+		this.elements[0] = v
 	}
 	get _12(): number {
 		return this.elements[1]
 	}
 	set _12(v: number) {
-		this.elements[1] = f4(v)
+		this.elements[1] = v
 	}
 	get _13(): number {
 		return this.elements[2]
 	}
 	set _13(v: number) {
-		this.elements[2] = f4(v)
+		this.elements[2] = v
 	}
 	get _14(): number {
 		return this.elements[3]
 	}
 	set _14(v: number) {
-		this.elements[3] = f4(v)
+		this.elements[3] = v
 	}
 	get _21(): number {
 		return this.elements[4]
 	}
 	set _21(v: number) {
-		this.elements[4] = f4(v)
+		this.elements[4] = v
 	}
 	get _22(): number {
 		return this.elements[5]
 	}
 	set _22(v: number) {
-		this.elements[5] = f4(v)
+		this.elements[5] = v
 	}
 	get _23(): number {
 		return this.elements[6]
 	}
 	set _23(v: number) {
-		this.elements[6] = f4(v)
+		this.elements[6] = v
 	}
 	get _24(): number {
 		return this.elements[7]
 	}
 	set _24(v: number) {
-		this.elements[7] = f4(v)
+		this.elements[7] = v
 	}
 	get _31(): number {
 		return this.elements[8]
 	}
 	set _31(v: number) {
-		this.elements[8] = f4(v)
+		this.elements[8] = v
 	}
 	get _32(): number {
 		return this.elements[9]
 	}
 	set _32(v: number) {
-		this.elements[9] = f4(v)
+		this.elements[9] = v
 	}
 	get _33(): number {
 		return this.elements[10]
 	}
 	set _33(v: number) {
-		this.elements[10] = f4(v)
+		this.elements[10] = v
 	}
 	get _34(): number {
 		return this.elements[11]
 	}
 	set _34(v: number) {
-		this.elements[11] = f4(v)
+		this.elements[11] = v
 	}
 	get _41(): number {
 		return this.elements[12]
 	}
 	set _41(v: number) {
-		this.elements[12] = f4(v)
+		this.elements[12] = v
 	}
 	get _42(): number {
 		return this.elements[13]
 	}
 	set _42(v: number) {
-		this.elements[13] = f4(v)
+		this.elements[13] = v
 	}
 	get _43(): number {
 		return this.elements[14]
 	}
 	set _43(v: number) {
-		this.elements[14] = f4(v)
+		this.elements[14] = v
 	}
 	get _44(): number {
 		return this.elements[15]
 	}
 	set _44(v: number) {
-		this.elements[15] = f4(v)
+		this.elements[15] = v
 	}
 	get matrix(): number[][] {
 		const e = this.elements
