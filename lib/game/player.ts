@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { EventEmitter } from 'node:events'
+import type { NudgeHandler } from '../physics/cabinet/nudge-handler.js'
 import { type AnimationGate, animationGate } from '../util/animation-gate.js'
 import { logger } from '../util/logger.js'
 import type { Vertex2D, Vertex3D } from '../util/vector.js'
@@ -12,7 +13,6 @@ import { Event } from './event.js'
 import type { IEmulator } from './iemulator.js'
 import { type AssignKey, keyEventToDirectInputKey } from './key-code.js'
 import { PinInput } from './pin-input.js'
-import type { NudgeHandler } from '../physics/cabinet/nudge-handler.js'
 import { PlayerPhysics } from './player-physics.js'
 
 /** Host-facing game controller: input, physics, animations and state diffing. */

@@ -16,7 +16,7 @@ import type { HitPlane } from '../physics/hit-plane.js'
 import { HitQuadtree } from '../physics/hit-quadtree.js'
 import type { MoverObject } from '../physics/mover-object.js'
 import { logger } from '../util/logger.js'
-import { Vertex2D, Vertex3D } from '../util/vector.js'
+import { type Vertex2D, Vertex3D } from '../util/vector.js'
 import { Ball } from '../vpt/ball/ball.js'
 import { BallData } from '../vpt/ball/ball-data.js'
 import { BallState } from '../vpt/ball/ball-state.js'
@@ -90,7 +90,8 @@ export class PlayerPhysics {
 		const difficulty = d.globalDifficulty ?? 0.5
 		const slope = d.overridePhysics
 			? DEFAULT_TABLE_MIN_SLOPE + (DEFAULT_TABLE_MAX_SLOPE - DEFAULT_TABLE_MIN_SLOPE) * difficulty
-			: (d.angletiltMin ?? DEFAULT_TABLE_MIN_SLOPE) + ((d.angleTiltMax ?? DEFAULT_TABLE_MAX_SLOPE) - (d.angletiltMin ?? DEFAULT_TABLE_MIN_SLOPE)) * difficulty
+			: (d.angletiltMin ?? DEFAULT_TABLE_MIN_SLOPE) +
+				((d.angleTiltMax ?? DEFAULT_TABLE_MAX_SLOPE) - (d.angletiltMin ?? DEFAULT_TABLE_MIN_SLOPE)) * difficulty
 		const g = d.overridePhysics ? DEFAULT_TABLE_GRAVITY : (d.gravity ?? DEFAULT_TABLE_GRAVITY)
 		this.setGravity(slope, g)
 		for (const a of this.table.getAnimatables()) a.getAnimation().init(this.timeMsec)
