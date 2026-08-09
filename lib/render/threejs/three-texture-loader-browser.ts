@@ -30,7 +30,6 @@ const imageMap: Record<string, string> = {
 	kickerHoleWood: new URL('../../../res/maps/kickerHoleWood.png', import.meta.url).href,
 	kickerT1: new URL('../../../res/maps/kickerT1.png', import.meta.url).href,
 	kickerWilliams: new URL('../../../res/maps/kickerWilliams.png', import.meta.url).href,
-	ball: new URL('../../../res/maps/ball.png', import.meta.url).href,
 }
 
 const MAX_REGULAR = 1024
@@ -184,34 +183,37 @@ export class ThreeTextureLoaderBrowser implements ITextureLoader<ThreeTexture> {
 	}
 }
 
+// Procedural equirect env for the chrome ball. POT 256×128, no mipmaps and
+// ClampToEdge avoids SwiftShader failure with NPOT + Repeat + mips
+// (previous 116×116 ball.png caused PMREMGGXConvolution 1282).
 function createBallEnvTexture(name: string): ThreeTexture {
 	const w = 256
 	const h = 128
-	const canvas = typeof document !== 'undefined' ? document.createElement('canvas') : ({} as HTMLCanvasElement)
+	if (typeof document === 'undefined') {
+		const tex: any = new DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1, RGBAFormat)
+		tex.colorSpace = SRGBColorSpace
+		tex.needsUpdate = true
+		tex.name = `texture:${name}`
+		return tex as ThreeTexture
+	}
+	const canvas = document.createElement('canvas')
 	canvas.width = w
 	canvas.height = h
-	const ctx = (canvas as any).getContext?.('2d') as CanvasRenderingContext2D | null
-	if (ctx) {
-		const bg = ctx.createLinearGradient(0, 0, 0, h)
-		bg.addColorStop(0, '#8fa0bc')
-		bg.addColorStop(0.22, '#d6deea')
-		bg.addColorStop(0.5, '#f1f4f8')
-		bg.addColorStop(0.72, '#a8b0c2')
-		bg.addColorStop(1, '#2a3142')
-		ctx.fillStyle = bg
-		ctx.fillRect(0, 0, w, h)
-		const rg = ctx.createRadialGradient(w * 0.46, h * 0.38, 2, w * 0.46, h * 0.38, 42)
-		rg.addColorStop(0, 'rgba(255,255,255,0.95)')
-		rg.addColorStop(0.35, 'rgba(255,255,255,0.45)')
-		rg.addColorStop(1, 'rgba(255,255,255,0)')
-		ctx.fillStyle = rg
-		ctx.fillRect(0, 0, w, h)
-		ctx.fillStyle = 'rgba(255,255,255,0.08)'
-		for (let i = 0; i < 3; i++) {
-			const x = (w * (0.15 + i * 0.32)) | 0
-			ctx.fillRect(x, 0, 2, h)
-		}
-	}
+	const ctx = canvas.getContext('2d')!
+	const bg = ctx.createLinearGradient(0, 0, 0, h)
+	bg.addColorStop(0, '#8fa0bc')
+	bg.addColorStop(0.22, '#d6deea')
+	bg.addColorStop(0.5, '#f1f4f8')
+	bg.addColorStop(0.72, '#a8b0c2')
+	bg.addColorStop(1, '#2a3142')
+	ctx.fillStyle = bg
+	ctx.fillRect(0, 0, w, h)
+	const rg = ctx.createRadialGradient(w * 0.46, h * 0.38, 2, w * 0.46, h * 0.38, 42)
+	rg.addColorStop(0, 'rgba(255,255,255,0.95)')
+	rg.addColorStop(0.35, 'rgba(255,255,255,0.45)')
+	rg.addColorStop(1, 'rgba(255,255,255,0)')
+	ctx.fillStyle = rg
+	ctx.fillRect(0, 0, w, h)
 	const tex: any = new CanvasTexture(canvas as any)
 	tex.colorSpace = SRGBColorSpace
 	tex.mapping = EquirectangularReflectionMapping

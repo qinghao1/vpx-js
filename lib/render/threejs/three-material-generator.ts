@@ -14,6 +14,9 @@ import type { Material } from '../../vpt/material.js'
 import type { MeshConvertOptions } from '../irender-api.js'
 import type { ThreeMapGenerator } from './three-map-generator.js'
 
+const BALL_METALNESS = 1
+const BALL_ROUGHNESS = 0.18
+
 /** Generates/caches Three.js materials. */
 export class ThreeMaterialGenerator {
 	private readonly cachedMaterials: Record<string, ThreeMaterial> = {}
@@ -50,8 +53,6 @@ export class ThreeMaterialGenerator {
 		this.applyEmissiveMap(m, material, emissiveMap)
 		m.transparent = isTransparent
 		if (material?.name === 'ball') {
-			m.metalness = 1
-			m.roughness = 0.18
 			m.envMapIntensity = 1
 		} else if (material?.isMetal && (m.userData as Record<string, unknown>).pendingEnvMap) {
 			m.metalness = 0.25
@@ -66,8 +67,8 @@ export class ThreeMaterialGenerator {
 		if (!material) return
 		threeMaterial.name = `material:${material.name}`
 		if (material.name === 'ball') {
-			threeMaterial.metalness = 1
-			threeMaterial.roughness = 0.18
+			threeMaterial.metalness = BALL_METALNESS
+			threeMaterial.roughness = BALL_ROUGHNESS
 		} else {
 			threeMaterial.metalness = material.isMetal ? 1 : 0
 			threeMaterial.roughness = Math.max(0, Math.min(1, 1 - material.roughness))
