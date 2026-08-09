@@ -63,12 +63,6 @@ export class FRect3D extends Box3 {
 	extend(o: FRect3D): void {
 		this.union(o)
 	}
-	toBox3(): Box3 {
-		return new Box3().copy(this)
-	}
-	static fromBox3(b: Box3): FRect3D {
-		return new FRect3D().copy(b) as FRect3D
-	}
 	override clone(): this {
 		return new FRect3D().copy(this) as this
 	}

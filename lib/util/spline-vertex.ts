@@ -3,18 +3,16 @@
 
 import { CatmullCurve2D } from './catmull-curve.js'
 import { DragPoint } from './dragpoint.js'
-import { f4 } from './float.js'
 import { Vertex2D } from './vector.js'
 import { RenderVertex } from './render-vertex.js'
 
-/** Thickened spline for wall/rubber. @see https://github.com/vpinball/vpinball/blob/master/spline.cpp */
+/** Thickened spline for wall/rubber. */
 export class SplineVertex {
 	pcvertex!: number
 	ppfCross: boolean[] = []
 	pMiddlePoints: Vertex2D[] = []
 	rgvLocal: Vertex2D[] = []
 
-	/** Builds thick spline from drag points. */
 	static getInstance(
 		dragPoints: DragPoint[],
 		thickness: number,
@@ -36,16 +34,16 @@ export class SplineVertex {
 			if (n === 2) normal = i === n - 1 ? n1 : n2
 			else if (Math.abs(n1.x - n2.x) < 1e-4 && Math.abs(n1.y - n2.y) < 1e-4) normal = n1
 			else {
-				const A = f4(prev.y - mid.y)
-				const B = f4(mid.x - prev.x)
-				const C = f4(A * (n1.x - prev.x) + B * (n1.y - prev.y))
-				const D = f4(next.y - mid.y)
-				const E = f4(mid.x - next.x)
-				const F = f4(D * (n2.x - next.x) + E * (n2.y - next.y))
-				const det = f4(A * E - B * D)
-				const inv = det ? f4(1 / det) : 0
-				const ix = f4((B * F - E * C) * inv)
-				const iy = f4((C * D - A * F) * inv)
+				const A = prev.y - mid.y
+				const B = mid.x - prev.x
+				const C = A * (n1.x - prev.x) + B * (n1.y - prev.y)
+				const D = next.y - mid.y
+				const E = mid.x - next.x
+				const F = D * (n2.x - next.x) + E * (n2.y - next.y)
+				const det = A * E - B * D
+				const inv = det ? 1 / det : 0
+				const ix = (B * F - E * C) * inv
+				const iy = (C * D - A * F) * inv
 				normal = new Vertex2D(mid.x - ix, mid.y - iy)
 			}
 			v.pMiddlePoints[i] = mid
@@ -63,7 +61,6 @@ export class SplineVertex {
 		return v
 	}
 
-	/** Central (thin) spine with adaptive accuracy. */
 	static getCentralCurve(
 		dragPoints: DragPoint[],
 		detail: number,

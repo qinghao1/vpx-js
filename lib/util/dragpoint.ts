@@ -3,14 +3,13 @@
 
 import { BiffParser } from '../io/biff-parser.js'
 import type { CatmullCurve } from './catmull-curve.js'
-import { f4 } from './float.js'
 import { Vertex3D } from './vector.js'
 import type { RenderVertex } from './render-vertex.js'
 import type { IRenderVertex, Vertex } from './vertex.js'
 
 export const HIT_SHAPE_DETAIL_LEVEL = 7.0
 
-/** Editable spline point (rubber, wall, etc.). */
+/** Editable spline point. */
 export class DragPoint extends BiffParser {
 	public vertex!: Vertex3D
 	public fSmooth!: boolean
@@ -19,7 +18,6 @@ export class DragPoint extends BiffParser {
 	public texturecoord!: number
 	public calcHeight?: number
 
-	/** Generates render vertices from drag points. */
 	public static getRgVertex<T extends IRenderVertex>(
 		vdpoint: DragPoint[],
 		instantiateT: () => T,
@@ -112,21 +110,21 @@ export class DragPoint extends BiffParser {
 			for (let l = startrenderpoint; l < endrenderpoint; l++) {
 				const pv1 = vv[l % cpoints],
 					pv2 = vv[(l + 1) % cpoints]
-				const dx = f4(pv1.x - pv2.x),
-					dy = f4(pv1.y - pv2.y)
-				totalLength = f4(totalLength + f4(Math.sqrt(f4(dx * dx) + f4(dy * dy))))
+				const dx = pv1.x - pv2.x
+				const dy = pv1.y - pv2.y
+				totalLength += Math.sqrt(dx * dx + dy * dy)
 			}
 			let partialLength = 0
 			for (let l = startrenderpoint; l < endrenderpoint; l++) {
 				const pv1 = vv[l % cpoints],
 					pv2 = vv[(l + 1) % cpoints]
-				const dx = f4(pv1.x - pv2.x),
-					dy = f4(pv1.y - pv2.y)
-				const length = f4(Math.sqrt(f4(dx * dx) + f4(dy * dy)))
+				const dx = pv1.x - pv2.x
+				const dy = pv1.y - pv2.y
+				const length = Math.sqrt(dx * dx + dy * dy)
 				if (totalLength === 0) totalLength = 1
-				const texCoord = f4(partialLength / totalLength)
+				const texCoord = partialLength / totalLength
 				ppcoords[l % cpoints] = texCoord * deltacoord + startTexCoord
-				partialLength = f4(partialLength + length)
+				partialLength += length
 			}
 		}
 		return ppcoords
@@ -141,7 +139,7 @@ export class DragPoint extends BiffParser {
 		vt2: T,
 		accuracy: number,
 	): T[] {
-		const tMid = f4(f4(t1 + t2) * 0.5)
+		const tMid = (t1 + t2) * 0.5
 		const vmid = cc.getPointAt(tMid) as T
 		vmid.fSmooth = true
 		vmid.fSlingshot = false
@@ -176,8 +174,8 @@ export class DragPoint extends BiffParser {
 		vMid: IRenderVertex,
 		accuracy: number,
 	): boolean {
-		const dblArea = f4(f4(vMid.x - v1.x) * f4(v2.y - v1.y)) - f4(f4(v2.x - v1.x) * f4(vMid.y - v1.y))
-		return f4(dblArea * dblArea) < accuracy
+		const dblArea = (vMid.x - v1.x) * (v2.y - v1.y) - (v2.x - v1.x) * (vMid.y - v1.y)
+		return dblArea * dblArea < accuracy
 	}
 
 	private static flatWithAccuracy3(v1: Vertex3D, v2: Vertex3D, vMid: Vertex3D, accuracy: number): boolean {
