@@ -68,7 +68,7 @@ export class Bumper
 		return this.api!
 	}
 	public getEventNames(): string[] {
-		return ['Init', 'Timer', 'Hit']
+		return ['Animate', 'Hit', 'Init', 'Timer']
 	}
 	public getUpdater(): BumperUpdater {
 		return this.updater
@@ -83,9 +83,10 @@ export class Bumper
 	public setupPlayer(player: Player, table: Table): void {
 		const height = table.getSurfaceHeight(this.data.szSurface, this.data.center.x, this.data.center.y)
 		this.events = new EventProxy(this)
-		this.animation = new BumperAnimation(this.data, this.state)
+		this.animation = new BumperAnimation(this.data, this.state, this.events)
 		this.hit = new BumperHit(this.data, this.state, this.animation, this.events, height)
 		this.api = new BumperApi(this.state, this.animation, this.data, this.events, player, table)
+		this.animation.setEvents(this.events)
 	}
 
 	public getMeshes<GEOMETRY>(table: Table): Meshes<GEOMETRY> {

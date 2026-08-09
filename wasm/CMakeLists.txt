@@ -80,13 +80,14 @@ set(PINMAME_EXPORTS
   "_PinmameGetChangedLamps" "_PinmameGetChangedSolenoids" "_PinmameGetChangedGIs" "_PinmameGetChangedLEDs"
   "_PinmameGetDIP" "_PinmameSetDIP"
   "_PinmameGetDmdWidth" "_PinmameGetDmdHeight" "_PinmameGetDmdDepth" "_PinmameGetDmdFrame"
+  
   "_malloc" "_free"
 )
 string(JOIN "," PINMAME_EXPORTS_JOIN ${PINMAME_EXPORTS})
 
 target_link_options(libpinmame PRIVATE
   "-O$<$<CONFIG:Debug>:0>$<$<CONFIG:Release>:3>"
-  -sWASM=1 -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=512MB -sMAXIMUM_MEMORY=1024MB -sSTACK_SIZE=4MB
+  -sWASM=1 -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=320MB -sMAXIMUM_MEMORY=1024MB -sSTACK_SIZE=4MB
   -sMODULARIZE=1 -sEXPORT_ES6=1 -sEXPORT_NAME=createPinmameModule
   "-sEXPORTED_FUNCTIONS=${PINMAME_EXPORTS_JOIN}"
   -sEXPORTED_RUNTIME_METHODS=cwrap,FS,HEAPU8,HEAPU32,UTF8ToString,stringToUTF8,lengthBytesUTF8,getValue,setValue

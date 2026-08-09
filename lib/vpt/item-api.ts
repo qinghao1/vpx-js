@@ -27,6 +27,10 @@ const INTERNAL: Record<string, boolean> = {
 	constructor: true,
 	prototype: true,
 	__proto__: true,
+	_events: true,
+	_eventsCount: true,
+	_maxListeners: true,
+	_e: true,
 }
 
 const lowerCache = new Map<string, string>()

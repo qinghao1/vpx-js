@@ -54,5 +54,5 @@ export function exrCacheKey(name: string, byteLength: number, kind: string): str
 export function vbsCacheKey(vbs: string): string {
 	let h = 5381
 	for (let i = 0; i < vbs.length; i++) h = ((h << 5) + h) ^ vbs.charCodeAt(i)
-	return `vbs4:${(h >>> 0).toString(36)}:${vbs.length}`
+	return `vbs5:${(h >>> 0).toString(36)}:${vbs.length}`
 }

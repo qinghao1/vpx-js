@@ -1,15 +1,11 @@
+import { Vector3 } from 'three'
 import { describe, expect, it } from 'vitest'
 import { Matrix2D, Vertex3D } from './math.js'
-import { Vector3 } from 'three'
 
 describe('Vertex3D.applyMatrix2D', () => {
 	it('matches THREE Matrix3 * Vector3 (row-major correct)', () => {
 		const m = new Matrix2D()
-		m.set(
-			1, 2, 3,
-			4, 5, 6,
-			7, 8, 9,
-		)
+		m.set(1, 2, 3, 4, 5, 6, 7, 8, 9)
 		const v = new Vertex3D(10, 20, 30)
 		const e = (m as unknown as { elements: number[] }).elements
 		const expected = new Vector3(
@@ -25,7 +21,8 @@ describe('Vertex3D.applyMatrix2D', () => {
 
 	it('matches vpinball Matrix3::operator* (row-major)', () => {
 		const axis = new Vertex3D(0.5, -0.3, 0.2).normalize()
-		const s = 0.6, c = 0.8
+		const s = 0.6,
+			c = 0.8
 		const m = new Matrix2D()
 		m.rotationAroundAxis(axis, s, c)
 		const v = new Vertex3D(1, 2, 3)
@@ -43,11 +40,7 @@ describe('Vertex3D.applyMatrix2D', () => {
 describe('Matrix2D.multiplyVectorT', () => {
 	it('is transpose of applyMatrix2D (MulVectorT)', () => {
 		const m = new Matrix2D()
-		m.set(
-			1, 2, 3,
-			4, 5, 6,
-			7, 8, 9,
-		)
+		m.set(1, 2, 3, 4, 5, 6, 7, 8, 9)
 		const v = new Vertex3D(10, 20, 30)
 		const e = (m as unknown as { elements: number[] }).elements
 		const transposed = new Vertex3D(

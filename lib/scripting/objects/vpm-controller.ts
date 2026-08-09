@@ -92,6 +92,11 @@ export class VpmController {
 			this.player.setEmulator(this.emulator)
 			return
 		}
+		const existing = this.player.getPhysics().emu
+		if (existing && existing.isInitialized() && existing.constructor.name === 'PinMameEmulator') {
+			this.emulator = existing
+			return
+		}
 		const emu = new PinMameEmulator()
 		this.emulator = emu
 		const rom = await this.fetchRom(name)

@@ -100,7 +100,11 @@ export class Vertex3D extends Vector3 {
 	}
 	applyMatrix2D(m: Matrix2D): this {
 		const e = (m as Matrix3).elements
-		return this.set(e[0] * this.x + e[3] * this.y + e[6] * this.z, e[1] * this.x + e[4] * this.y + e[7] * this.z, e[2] * this.x + e[5] * this.y + e[8] * this.z)
+		return this.set(
+			e[0] * this.x + e[3] * this.y + e[6] * this.z,
+			e[1] * this.x + e[4] * this.y + e[7] * this.z,
+			e[2] * this.x + e[5] * this.y + e[8] * this.z,
+		)
 	}
 	dotAndRelease(v: Vertex3D): number {
 		const d = this.dot(v)
@@ -151,7 +155,9 @@ export class Vertex3D extends Vector3 {
 	multiplyMatrix(m: Matrix3D): this {
 		const e = (m as unknown as { elements: number[] }).elements
 		if (!e) {
-			const x = this.x, y = this.y, z = this.z
+			const x = this.x,
+				y = this.y,
+				z = this.z
 			const xp = m._11 * x + m._21 * y + m._31 * z + m._41
 			const yp = m._12 * x + m._22 * y + m._32 * z + m._42
 			const zp = m._13 * x + m._23 * y + m._33 * z + m._43
@@ -159,7 +165,9 @@ export class Vertex3D extends Vector3 {
 			const inv = 1 / wp
 			return this.set(xp * inv, yp * inv, zp * inv)
 		}
-		const x = this.x, y = this.y, z = this.z
+		const x = this.x,
+			y = this.y,
+			z = this.z
 		const xp = e[0] * x + e[4] * y + e[8] * z + e[12]
 		const yp = e[1] * x + e[5] * y + e[9] * z + e[13]
 		const zp = e[2] * x + e[6] * y + e[10] * z + e[14]

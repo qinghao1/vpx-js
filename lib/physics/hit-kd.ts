@@ -4,21 +4,23 @@
 import type { PlayerPhysics } from '../game/player-physics.js'
 import type { Ball } from '../vpt/ball/ball.js'
 import type { CollisionEvent } from './collision-event.js'
-import { HitKDNode } from './hit-kd-node.js'
 import { CollisionType } from './collision-type.js'
-import { HitKind, type HitObject } from './hit-object.js'
-import { getWasmKernels, isWasmReady, warmWasmPools } from './wasm/kernels.js'
-import { Hit3DPoly } from './hit-3dpoly.js'
+import type { Hit3DPoly } from './hit-3dpoly.js'
 import { HitCircle } from './hit-circle.js'
-import { HitPlane } from './hit-plane.js'
-import { HitLineZ } from './hit-line-z.js'
+import { HitKDNode } from './hit-kd-node.js'
 import { HitLine3D } from './hit-line-3d.js'
+import { HitLineZ } from './hit-line-z.js'
+import { HitKind, type HitObject } from './hit-object.js'
+import { HitPlane } from './hit-plane.js'
 import { HitPoint } from './hit-point.js'
 import { HitTriangle } from './hit-triangle.js'
 import { LineSeg } from './line-seg.js'
+import { getWasmKernels, isWasmReady, warmWasmPools } from './wasm/kernels.js'
 
-const isBatchCircle = (h: HitObject): boolean => h.hitKind === HitKind.Circle && h.hitTest === HitCircle.prototype.hitTest
-const isBatchLineSeg = (h: HitObject): boolean => h.hitKind === HitKind.LineSeg && h.hitTest === LineSeg.prototype.hitTest
+const isBatchCircle = (h: HitObject): boolean =>
+	h.hitKind === HitKind.Circle && h.hitTest === HitCircle.prototype.hitTest
+const isBatchLineSeg = (h: HitObject): boolean =>
+	h.hitKind === HitKind.LineSeg && h.hitTest === LineSeg.prototype.hitTest
 
 /** @see https://github.com/vpinball/vpinball/blob/master/kdtree.cpp */
 export class HitKD {
@@ -31,7 +33,9 @@ export class HitKD {
 	private nodes: HitKDNode[] = []
 	public numNodes = 0
 
-	constructor() { this.rootNode = new HitKDNode(this) }
+	constructor() {
+		this.rootNode = new HitKDNode(this)
+	}
 
 	public init(vho: HitObject[]): void {
 		this.orgVho = vho
@@ -64,7 +68,14 @@ export class HitKD {
 	}
 
 	private warmPools(vho: HitObject[]): void {
-		let circleCount = 0, planeCount = 0, lineZCount = 0, pointCount = 0, triangleCount = 0, lineSegCount = 0, line3DCount = 0, polyCount = 0
+		let circleCount = 0,
+			planeCount = 0,
+			lineZCount = 0,
+			pointCount = 0,
+			triangleCount = 0,
+			lineSegCount = 0,
+			line3DCount = 0,
+			polyCount = 0
 		for (const h of vho) {
 			if (isBatchCircle(h)) circleCount++
 			else if (h.hitKind === HitKind.Plane) planeCount++
@@ -72,19 +83,63 @@ export class HitKD {
 			else if (h.hitKind === HitKind.Point) pointCount++
 			else if (h.hitKind === HitKind.Triangle) triangleCount++
 			else if (h.hitKind === HitKind.Line3D) line3DCount++
-			else if (h.hitKind === HitKind.Poly && (h as Hit3DPoly).objType !== CollisionType.Trigger && (h as Hit3DPoly).rgv.length <= 32) polyCount++
+			else if (
+				h.hitKind === HitKind.Poly &&
+				(h as Hit3DPoly).objType !== CollisionType.Trigger &&
+				(h as Hit3DPoly).rgv.length <= 32
+			)
+				polyCount++
 			else if (isBatchLineSeg(h)) lineSegCount++
 		}
-		if (circleCount || planeCount || lineZCount || pointCount || triangleCount || lineSegCount || line3DCount || polyCount) {
-			if (isWasmReady()) warmWasmPools(circleCount, planeCount, lineZCount, pointCount, triangleCount, lineSegCount, line3DCount, polyCount)
-			else void getWasmKernels().then(() => warmWasmPools(circleCount, planeCount, lineZCount, pointCount, triangleCount, lineSegCount, line3DCount, polyCount))
+		if (
+			circleCount ||
+			planeCount ||
+			lineZCount ||
+			pointCount ||
+			triangleCount ||
+			lineSegCount ||
+			line3DCount ||
+			polyCount
+		) {
+			if (isWasmReady())
+				warmWasmPools(
+					circleCount,
+					planeCount,
+					lineZCount,
+					pointCount,
+					triangleCount,
+					lineSegCount,
+					line3DCount,
+					polyCount,
+				)
+			else
+				void getWasmKernels().then(() =>
+					warmWasmPools(
+						circleCount,
+						planeCount,
+						lineZCount,
+						pointCount,
+						triangleCount,
+						lineSegCount,
+						line3DCount,
+						polyCount,
+					),
+				)
 		}
 	}
 
-	public update(): void { this.fillFromVector(this.orgVho) }
-	public finalize(): void { this.tmp = [] }
-	public hitTestBall(ball: Ball, c: CollisionEvent, p: PlayerPhysics): void { this.rootNode.hitTestBall(ball, c, p) }
-	public getItemAt(i: number): HitObject { return this.orgVho[this.orgIdx[i]!]! }
+	public update(): void {
+		this.fillFromVector(this.orgVho)
+	}
+	public finalize(): void {
+		this.tmp = []
+	}
+	public hitTestBall(ball: Ball, c: CollisionEvent, p: PlayerPhysics): void {
+		this.rootNode.hitTestBall(ball, c, p)
+	}
+	public getItemAt(i: number): HitObject {
+		return this.orgVho[this.orgIdx[i]!]!
+	}
 	public allocTwoNodes(): HitKDNode[] {
 		if (this.numNodes + 1 >= this.nodes.length) return []
 		this.numNodes += 2

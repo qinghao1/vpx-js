@@ -54,14 +54,21 @@ export class HitCircle extends HitObject {
 		rigid: boolean,
 	): number {
 		if (!this.isEnabled || ball.state.isFrozen) return -1
-		const cx = this.center.x, cy = this.center.y
-		const bx = ball.state.pos.x, by = ball.state.pos.y, bz = ball.state.pos.z
-		const vx = ball.hit.vel.x, vy = ball.hit.vel.y, vz = ball.hit.vel.z
+		const cx = this.center.x,
+			cy = this.center.y
+		const bx = ball.state.pos.x,
+			by = ball.state.pos.y,
+			bz = ball.state.pos.z
+		const vx = ball.hit.vel.x,
+			vy = ball.hit.vel.y,
+			vz = ball.hit.vel.z
 		const br = ball.data.radius
 		const capsule3D = !lateral && bz > this.hitBBox.zhigh
 		const isKicker = this.objType === CollisionType.Kicker
 		const isKickerOrTrigger = this.objType === CollisionType.Trigger || isKicker
-		let dz = 0, dvz = vz, targetR: number
+		let dz = 0,
+			dvz = vz,
+			targetR: number
 		if (capsule3D) {
 			targetR = this.radius * (13 / 5)
 			dz = bz - (this.hitBBox.zhigh - this.radius * (12 / 5))
@@ -69,7 +76,8 @@ export class HitCircle extends HitObject {
 			targetR = lateral ? this.radius + br : this.radius
 			dvz = 0
 		}
-		const dx = bx - cx, dy = by - cy
+		const dx = bx - cx,
+			dy = by - cy
 		const bcddsq = capsule3D ? dx * dx + dy * dy + dz * dz : dx * dx + dy * dy
 		const bcdd = Math.sqrt(bcddsq)
 		if (bcdd <= 1e-6) return -1
@@ -78,15 +86,18 @@ export class HitCircle extends HitObject {
 		if (direction && bnv > C_LOWNORMVEL) return -1
 		const bnd = bcdd - targetR
 		const a = capsule3D ? vx * vx + vy * vy + dvz * dvz : vx * vx + vy * vy
-		let hitTime = 0, isUnhit = false, isContact = false
+		let hitTime = 0,
+			isUnhit = false,
+			isContact = false
 		if (isKicker && bnd <= 0 && bnd >= -this.radius && a < C_CONTACTVEL * C_CONTACTVEL && ball.hit.isRealBall()) {
-			if (ball.hit.vpVolObjs.includes(this.obj!)) ball.hit.vpVolObjs.splice(ball.hit.vpVolObjs.indexOf(this.obj!), 1)
+			if (ball.hit.vpVolObjs.includes(this.obj!))
+				ball.hit.vpVolObjs.splice(ball.hit.vpVolObjs.indexOf(this.obj!), 1)
 		}
 		if (rigid && bnd < PHYS_TOUCH) {
 			if (bnd < -br) return -1
 			if (Math.abs(bnv) <= C_CONTACTVEL) isContact = true
 			else hitTime = Math.max(0, -bnd / bnv)
-		} else if (isKickerOrTrigger && ball.hit.isRealBall() && (bnd < 0) !== ball.hit.vpVolObjs.includes(this.obj!)) {
+		} else if (isKickerOrTrigger && ball.hit.isRealBall() && bnd < 0 !== ball.hit.vpVolObjs.includes(this.obj!)) {
 			if (Math.abs(bnd - this.radius) < 0.05) ball.hit.vpVolObjs.push(this.obj!)
 			else isUnhit = bnd > 0
 		} else {
@@ -102,8 +113,14 @@ export class HitCircle extends HitObject {
 		}
 		if (!Number.isFinite(hitTime) || hitTime < 0 || hitTime > dTime) return -1
 		const hitZ = bz + vz * hitTime
-		if (hitZ + br * 0.5 < this.hitBBox.zlow || (!capsule3D && hitZ - br * 0.5 > this.hitBBox.zhigh) || (capsule3D && hitZ < this.hitBBox.zhigh)) return -1
-		const hx = bx + vx * hitTime, hy = by + vy * hitTime
+		if (
+			hitZ + br * 0.5 < this.hitBBox.zlow ||
+			(!capsule3D && hitZ - br * 0.5 > this.hitBBox.zhigh) ||
+			(capsule3D && hitZ < this.hitBBox.zhigh)
+		)
+			return -1
+		const hx = bx + vx * hitTime,
+			hy = by + vy * hitTime
 		const sqr = (hx - cx) ** 2 + (hy - cy) ** 2
 		coll.hitNormal.setZero()
 		if (sqr > 1e-8) {

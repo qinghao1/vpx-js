@@ -17,6 +17,7 @@ const SAMPLE_RATE = 44100
 type Api = {
 	setConfig(p: number): void
 	run(p: number): number
+	isRunning(): number
 	setSwitch(n: number, v: number): void
 	getSwitch(n: number): number
 	getChangedLamps(p: number): number
@@ -43,6 +44,7 @@ export class PinMameEmulator implements IEmulator {
 	public isMock = false
 	private ready = false
 	private paused = false
+	private game: string = ''
 
 	private readonly lamps = new Uint8Array(624)
 	private readonly sols = new Uint8Array(72)
@@ -60,10 +62,15 @@ export class PinMameEmulator implements IEmulator {
 			logger().warn('[pinmame] mock — physics only, run npm run build:wasm')
 			return
 		}
-		const c = module.cwrap.bind(module) as (id: string, rt: string | null, at: string[]) => (...a: unknown[]) => unknown
+		const c = module.cwrap.bind(module) as (
+			id: string,
+			rt: string | null,
+			at: string[],
+		) => (...a: unknown[]) => unknown
 		this.api = {
 			setConfig: c('PinmameSetConfig', null, ['number']) as Api['setConfig'],
 			run: c('PinmameRun', 'number', ['number']) as Api['run'],
+			isRunning: c('PinmameIsRunning', 'number', []) as Api['isRunning'],
 			setSwitch: c('PinmameSetSwitch', null, ['number', 'number']) as Api['setSwitch'],
 			getSwitch: c('PinmameGetSwitch', 'number', ['number']) as Api['getSwitch'],
 			getChangedLamps: c('PinmameGetChangedLamps', 'number', ['number']) as Api['getChangedLamps'],
@@ -87,15 +94,39 @@ export class PinMameEmulator implements IEmulator {
 			this.queue.replayMessages(this)
 			return
 		}
+		if (this.api.isRunning() && this.game === game) {
+			this.ready = true
+			this.queue.replayMessages(this)
+			return
+		}
+		if (this.api.isRunning()) {
+			logger().warn(`[pinmame] already running ${this.game}, refusing second run ${game}`)
+			this.ready = true
+			this.queue.replayMessages(this)
+			return
+		}
 		const m = this.mod
-		for (const dir of ['/pinmame/roms', '/pinmame/nvram', '/pinmame/cfg']) try { m.FS.mkdirTree(dir) } catch {}
-		m.FS.writeFile(`/pinmame/roms/${game}.zip`, rom)
+		for (const dir of ['/pinmame/roms', '/pinmame/nvram', '/pinmame/cfg'])
+			try {
+				m.FS.mkdirTree(dir)
+			} catch {}
+		if (rom.length) {
+			try {
+				const s = m.FS.stat(`/pinmame/roms/${game}.zip`)
+				if (s.size === rom.length) {
+					/* reuse */
+				} else m.FS.writeFile(`/pinmame/roms/${game}.zip`, rom)
+			} catch {
+				m.FS.writeFile(`/pinmame/roms/${game}.zip`, rom)
+			}
+		}
 		this.writeConfig(m)
 		const ptr = m._malloc(m.lengthBytesUTF8(game) + 1)
 		try {
 			m.stringToUTF8(game, ptr, m.lengthBytesUTF8(game) + 1)
 			const st = this.api.run(ptr)
 			if (st !== 0) logger().warn(`[pinmame] PinmameRun(${game}) status=${st} — continuing with physics only`)
+			else this.game = game
 		} finally {
 			m._free(ptr)
 		}
@@ -115,24 +146,45 @@ export class PinMameEmulator implements IEmulator {
 		}
 	}
 
-	isInitialized(): boolean { return this.ready }
-	getVersion(): string { return 'libpinmame-3.7-wasm' }
-	setPaused(v: boolean): void { this.paused = v }
-	getPaused(): boolean { return this.paused }
+	isInitialized(): boolean {
+		return this.ready
+	}
+	getVersion(): string {
+		return 'libpinmame-3.7-wasm'
+	}
+	setPaused(v: boolean): void {
+		this.paused = v
+	}
+	getPaused(): boolean {
+		return this.paused
+	}
 	registerAudioConsumer(): void {}
-	getDmdDimensions(): Vertex2D { return new Vertex2D(this.dmdW, this.dmdH) }
+	getDmdDimensions(): Vertex2D {
+		return new Vertex2D(this.dmdW, this.dmdH)
+	}
 	getDmdFrame(): Uint8Array {
 		const d = this.emulatorState.getDmdScreen()
 		return d.length ? d : this.fallback
 	}
-	getDipSwitchByte(): number { return this.isMock || !this.api ? 0 : (this.api.getDIP(0) ?? 0) }
+	getDipSwitchByte(): number {
+		return this.isMock || !this.api ? 0 : (this.api.getDIP(0) ?? 0)
+	}
 	setDipSwitchByte(v: number): void {
-		if (!this.ready) { this.queue.addMessage(MessageType.SetDipByte, v); return }
-		if (!this.isMock && this.api) try { this.api.setDIP(0, v) } catch {}
+		if (!this.ready) {
+			this.queue.addMessage(MessageType.SetDipByte, v)
+			return
+		}
+		if (!this.isMock && this.api)
+			try {
+				this.api.setDIP(0, v)
+			} catch {}
 	}
 
 	emuSimulateCycle(ms: number): number {
-		if (!this.ready) { this.queue.addMessage(MessageType.ExecuteTicks, ms); return 0 }
+		if (!this.ready) {
+			this.queue.addMessage(MessageType.ExecuteTicks, ms)
+			return 0
+		}
 		if (this.paused || this.isMock) return ms
 		this.sync()
 		return ms
@@ -144,9 +196,18 @@ export class PinMameEmulator implements IEmulator {
 			[this.api.getChangedLamps, this.lamps],
 			[this.api.getChangedSols, this.sols],
 			[this.api.getChangedGIs, this.gis],
-		] as const) try { this.pull(fn, buf) } catch {}
-		try { this.emulatorState.applyPinmame(this.lamps, this.sols, this.gis) } catch {}
-		try { this.pullDmd() } catch (e) { logger().warn('[pinmame] pullDmd failed', String(e)) }
+		] as const)
+			try {
+				this.pull(fn, buf)
+			} catch {}
+		try {
+			this.emulatorState.applyPinmame(this.lamps, this.sols, this.gis)
+		} catch {}
+		try {
+			this.pullDmd()
+		} catch (e) {
+			logger().warn('[pinmame] pullDmd failed', String(e))
+		}
 	}
 
 	private pullDmd(): void {
@@ -154,14 +215,17 @@ export class PinMameEmulator implements IEmulator {
 		const w = this.api.getDmdWidth()
 		const h = this.api.getDmdHeight()
 		if (!w || !h) return
-		this.dmdW = w; this.dmdH = h
+		this.dmdW = w
+		this.dmdH = h
 		const n = w * h
 		const ptr = this.mod._malloc(n)
 		try {
 			if (this.api.getDmdFrame(ptr) > 0) {
 				this.emulatorState.setDmd(this.mod.HEAPU8.subarray(ptr, ptr + n).slice())
 			}
-		} finally { this.mod._free(ptr) }
+		} finally {
+			this.mod._free(ptr)
+		}
 	}
 
 	private pull(fn: (p: number) => number, buf: Uint8Array): void {
@@ -169,38 +233,63 @@ export class PinMameEmulator implements IEmulator {
 		const ptr = m._malloc(buf.length * 8)
 		try {
 			let n = 0
-			try { n = fn(ptr) } catch (e) { if (String(e) !== 'unwind') throw e; n = 0 }
+			try {
+				n = fn(ptr)
+			} catch (e) {
+				if (String(e) !== 'unwind') throw e
+				n = 0
+			}
 			for (let i = 0; i < n; i++) {
 				const idx = m.getValue(ptr + i * 8, 'i32')
 				const val = m.getValue(ptr + i * 8 + 4, 'i32')
 				if (idx >= 0 && idx < buf.length) buf[idx] = val ? 1 : 0
 			}
-		} finally { m._free(ptr) }
+		} finally {
+			m._free(ptr)
+		}
 	}
 
 	getSwitchInput(n: number): number {
 		return (this.isMock ? this.mockSwitches.get(n) : this.api?.getSwitch(n)) ?? 0
 	}
-	getLampState(n: number): number { return this.emulatorState.getLampStateDirect(n) ?? this.lamps[n] ?? 0 }
-	getSolenoidState(n: number): number { return this.emulatorState.getSolenoidState(n) }
-	getGIState(n: number): number { return this.emulatorState.getGIState(n) }
+	getLampState(n: number): number {
+		return this.emulatorState.getLampStateDirect(n) ?? this.lamps[n] ?? 0
+	}
+	getSolenoidState(n: number): number {
+		return this.emulatorState.getSolenoidState(n)
+	}
+	getGIState(n: number): number {
+		return this.emulatorState.getGIState(n)
+	}
 
 	setSwitchInput(n: number, enable?: boolean): boolean {
 		if (!this.ready) {
 			const t =
-				enable === true ? MessageType.SetSwitchInput :
-				enable === false ? MessageType.ClearSwitchInput :
-				MessageType.ToggleSwitchInput
+				enable === true
+					? MessageType.SetSwitchInput
+					: enable === false
+						? MessageType.ClearSwitchInput
+						: MessageType.ToggleSwitchInput
 			this.queue.addMessage(t, n)
 			return true
 		}
 		const cur = (this.isMock ? this.mockSwitches.get(n) : this.api?.getSwitch(n)) ?? 0
 		const next = enable === undefined ? (cur ? 0 : 1) : enable ? 1 : 0
-		if (this.isMock) { this.mockSwitches.set(n, next); return true }
+		if (this.isMock) {
+			this.mockSwitches.set(n, next)
+			return true
+		}
 		if (!this.api) return true
-		try { this.api.setSwitch(n, next); return true } catch { return false }
+		try {
+			this.api.setSwitch(n, next)
+			return true
+		} catch {
+			return false
+		}
 	}
 
-	setCabinetInput(v: number): void { if (!this.ready) this.queue.addMessage(MessageType.CabinetInput, v) }
+	setCabinetInput(v: number): void {
+		if (!this.ready) this.queue.addMessage(MessageType.CabinetInput, v)
+	}
 	setFliptronicsInput(): void {}
 }

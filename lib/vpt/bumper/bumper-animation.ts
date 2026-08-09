@@ -1,6 +1,8 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
+import { Event } from '../../game/event.js'
+import type { EventProxy } from '../../game/event-proxy.js'
 import type { IAnimation } from '../../game/ianimatable.js'
 import { Vertex3D } from '../../util/math.js'
 import type { Table } from '../table/table.js'
@@ -14,15 +16,35 @@ export class BumperAnimation implements IAnimation {
 	private ringDown = false
 	private doSkirtAnimation = false
 	private skirtCounter = 0
+	private updateSkirt = false
+	private _enableSkirtAnimation = true
+	private events?: EventProxy
 
-	public enableSkirtAnimation = true
 	public hitEvent = false
 	public ballHitPosition: Vertex3D = new Vertex3D()
 
 	constructor(
 		private readonly data: BumperData,
 		private readonly state: BumperState,
-	) {}
+		events?: EventProxy,
+	) {
+		this.events = events
+	}
+
+	get enableSkirtAnimation(): boolean {
+		return this._enableSkirtAnimation
+	}
+
+	set enableSkirtAnimation(value: boolean) {
+		if (this._enableSkirtAnimation !== value && !value) {
+			this.updateSkirt = true
+		}
+		this._enableSkirtAnimation = value
+	}
+
+	public setEvents(events: EventProxy): void {
+		this.events = events
+	}
 
 	public init(timeMsec: number): void {
 		this.timeMsec = timeMsec
@@ -38,50 +60,50 @@ export class BumperAnimation implements IAnimation {
 	}
 
 	private updateRingAnimation(state: number, diffTimeMsec: number, table: Table) {
-		if (this.data.isRingVisible) {
-			const limit = this.data.ringDropOffset + this.data.heightScale * 0.5 * table.getScaleZ()
-			if (state === 1) {
-				this.ringAnimate = true
-				this.ringDown = true
-				this.hitEvent = false
-			}
-			if (this.ringAnimate) {
-				let step = this.data.ringSpeed * table.getScaleZ()
-				if (this.ringDown) step = -step
-				this.state.ringOffset += step * diffTimeMsec
-				if (this.ringDown) {
-					if (this.state.ringOffset <= -limit) {
-						this.state.ringOffset = -limit
-						this.ringDown = false
-					}
-				} else {
-					if (this.state.ringOffset >= 0) {
-						this.state.ringOffset = 0
-						this.ringAnimate = false
-					}
+		const limit = this.data.ringDropOffset + this.data.heightScale * 0.5 * table.getScaleZ()
+		if (state === 1) {
+			this.ringAnimate = true
+			this.ringDown = true
+			this.hitEvent = false
+		}
+		if (this.ringAnimate) {
+			let step = this.data.ringSpeed * table.getScaleZ()
+			if (this.ringDown) step = -step
+			this.state.ringOffset += step * diffTimeMsec
+			if (this.ringDown) {
+				if (this.state.ringOffset <= -limit) {
+					this.state.ringOffset = -limit
+					this.ringDown = false
+				}
+			} else {
+				if (this.state.ringOffset >= 0) {
+					this.state.ringOffset = 0
+					this.ringAnimate = false
 				}
 			}
+			this.events?.fireGroupEvent(Event.AnimateEventsAnimate)
 		}
 	}
 
 	private updateSkirtAnimation(state: number, diffTimeMsec: number) {
-		if (this.data.isSkirtVisible) {
-			if (this.enableSkirtAnimation) {
-				if (state === 1) {
-					this.doSkirtAnimation = true
-					this.updateSkirtState()
-					this.skirtCounter = 0
-				}
-				if (this.doSkirtAnimation) {
-					this.skirtCounter += diffTimeMsec
-					if (this.skirtCounter > 160) {
-						this.doSkirtAnimation = false
-						this.resetSkirtState()
-					}
-				}
+		if (this._enableSkirtAnimation) {
+			if (state === 1) {
+				this.doSkirtAnimation = true
+				this.updateSkirtState()
+				this.skirtCounter = 0
 			}
-		} else {
+			if (this.doSkirtAnimation) {
+				this.skirtCounter += diffTimeMsec
+				if (this.skirtCounter > 160) {
+					this.doSkirtAnimation = false
+					this.resetSkirtState()
+				}
+				this.events?.fireGroupEvent(Event.AnimateEventsAnimate)
+			}
+		} else if (this.updateSkirt) {
+			this.updateSkirt = false
 			this.resetSkirtState()
+			this.events?.fireGroupEvent(Event.AnimateEventsAnimate)
 		}
 	}
 

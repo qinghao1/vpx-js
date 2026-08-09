@@ -138,10 +138,18 @@ export class BallHit extends HitObject {
 		) {
 			return
 		}
-		const nx = coll.hitNormal.x, ny = coll.hitNormal.y, nz = coll.hitNormal.z
-		const bvx = ball.hit.vel.x, bvy = ball.hit.vel.y, bvz = ball.hit.vel.z
-		const tvx = this.vel.x, tvy = this.vel.y, tvz = this.vel.z
-		const dvx = bvx - tvx, dvy = bvy - tvy, dvz = bvz - tvz
+		const nx = coll.hitNormal.x,
+			ny = coll.hitNormal.y,
+			nz = coll.hitNormal.z
+		const bvx = ball.hit.vel.x,
+			bvy = ball.hit.vel.y,
+			bvz = ball.hit.vel.z
+		const tvx = this.vel.x,
+			tvy = this.vel.y,
+			tvz = this.vel.z
+		const dvx = bvx - tvx,
+			dvy = bvy - tvy,
+			dvz = bvz - tvz
 		let dot = dvx * nx + dvy * ny + dvz * nz
 		if (dot >= -C_LOWNORMVEL) {
 			if (dot > C_LOWNORMVEL) return
@@ -176,8 +184,16 @@ export class BallHit extends HitObject {
 		ball.hit.vel.z += nz * impulse * ball.hit.invMass
 	}
 
-	public collide3DWall(hitNormal: Vertex3D, elasticity: number, elasticityFalloff: number, friction: number, scatterAngle: number): void {
-		const nx = hitNormal.x, ny = hitNormal.y, nz = hitNormal.z
+	public collide3DWall(
+		hitNormal: Vertex3D,
+		elasticity: number,
+		elasticityFalloff: number,
+		friction: number,
+		scatterAngle: number,
+	): void {
+		const nx = hitNormal.x,
+			ny = hitNormal.y,
+			nz = hitNormal.z
 		let dot = this.vel.x * nx + this.vel.y * ny + this.vel.z * nz
 		if (dot >= -C_LOWNORMVEL) {
 			if (dot > C_LOWNORMVEL) return
@@ -199,26 +215,48 @@ export class BallHit extends HitObject {
 		this.vel.z += nz * dot
 
 		const r = this.data.radius
-		const sx = -nx * r, sy = -ny * r, sz = -nz * r
-		const avx = this.angularVelocity.x, avy = this.angularVelocity.y, avz = this.angularVelocity.z
-		const cx = avy * sz - avz * sy, cy = avz * sx - avx * sz, cz = avx * sy - avy * sx
-		const svx = this.vel.x + cx, svy = this.vel.y + cy, svz = this.vel.z + cz
+		const sx = -nx * r,
+			sy = -ny * r,
+			sz = -nz * r
+		const avx = this.angularVelocity.x,
+			avy = this.angularVelocity.y,
+			avz = this.angularVelocity.z
+		const cx = avy * sz - avz * sy,
+			cy = avz * sx - avx * sz,
+			cz = avx * sy - avy * sx
+		const svx = this.vel.x + cx,
+			svy = this.vel.y + cy,
+			svz = this.vel.z + cz
 		const dotSN = svx * nx + svy * ny + svz * nz
-		let tx = svx - dotSN * nx, ty = svy - dotSN * ny, tz = svz - dotSN * nz
+		let tx = svx - dotSN * nx,
+			ty = svy - dotSN * ny,
+			tz = svz - dotSN * nz
 		const tsq = tx * tx + ty * ty + tz * tz
 		if (tsq > 1e-6) {
 			const inv = 1 / Math.sqrt(tsq)
-			tx *= inv; ty *= inv; tz *= inv
+			tx *= inv
+			ty *= inv
+			tz *= inv
 			const vt = svx * tx + svy * ty + svz * tz
-			const crossX = sy * tz - sz * ty, crossY = sz * tx - sx * tz, crossZ = sx * ty - sy * tx
-			const ciX = crossX / this.inertia, ciY = crossY / this.inertia, ciZ = crossZ / this.inertia
-			const cross2X = ciY * sz - ciZ * sy, cross2Y = ciZ * sx - ciX * sz, cross2Z = ciX * sy - ciY * sx
+			const crossX = sy * tz - sz * ty,
+				crossY = sz * tx - sx * tz,
+				crossZ = sx * ty - sy * tx
+			const ciX = crossX / this.inertia,
+				ciY = crossY / this.inertia,
+				ciZ = crossZ / this.inertia
+			const cross2X = ciY * sz - ciZ * sy,
+				cross2Y = ciZ * sx - ciX * sz,
+				cross2Z = ciX * sy - ciY * sx
 			const kt = this.invMass + tx * cross2X + ty * cross2Y + tz * cross2Z
 			const maxFric = friction * reaction
 			const jt = clamp(-vt / kt, -maxFric, maxFric)
 			if (Number.isFinite(jt)) {
-				const jx = tx * jt, jy = ty * jt, jz = tz * jt
-				const rotX = crossX * jt, rotY = crossY * jt, rotZ = crossZ * jt
+				const jx = tx * jt,
+					jy = ty * jt,
+					jz = tz * jt
+				const rotX = crossX * jt,
+					rotY = crossY * jt,
+					rotZ = crossZ * jt
 				this.vel.x += jx * this.invMass
 				this.vel.y += jy * this.invMass
 				this.vel.z += jz * this.invMass
@@ -236,8 +274,10 @@ export class BallHit extends HitObject {
 		if (dot > 1 && scatterAngle > 1e-5) {
 			let scatter = Math.random() * 2 - 1
 			scatter *= (1 - scatter * scatter) * 2.59808 * scatterAngle
-			const s = Math.sin(scatter), c = Math.cos(scatter)
-			const vx = this.vel.x, vy = this.vel.y
+			const s = Math.sin(scatter),
+				c = Math.cos(scatter)
+			const vx = this.vel.x,
+				vy = this.vel.y
 			this.vel.x = vx * c - vy * s
 			this.vel.y = vy * c + vx * s
 		}
@@ -245,7 +285,9 @@ export class BallHit extends HitObject {
 
 	public surfaceVelocity(surfP: Vertex3D, recycle = false): Vertex3D {
 		const av = this.angularVelocity
-		const cx = av.y * surfP.z - av.z * surfP.y, cy = av.z * surfP.x - av.x * surfP.z, cz = av.x * surfP.y - av.y * surfP.x
+		const cx = av.y * surfP.z - av.z * surfP.y,
+			cy = av.z * surfP.x - av.x * surfP.z,
+			cz = av.x * surfP.y - av.y * surfP.x
 		if (recycle) return Vertex3D.claim(this.vel.x + cx, this.vel.y + cy, this.vel.z + cz)
 		return new Vertex3D(this.vel.x + cx, this.vel.y + cy, this.vel.z + cz)
 	}
@@ -279,7 +321,9 @@ export class BallHit extends HitObject {
 	}
 
 	public handleStaticContact(coll: CollisionEvent, friction: number, dTime: number, physics: PlayerPhysics): void {
-		const nx = coll.hitNormal.x, ny = coll.hitNormal.y, nz = coll.hitNormal.z
+		const nx = coll.hitNormal.x,
+			ny = coll.hitNormal.y,
+			nz = coll.hitNormal.z
 		const normVel = this.vel.x * nx + this.vel.y * ny + this.vel.z * nz
 		if (normVel > C_CONTACTVEL) return
 		const gdot = physics.gravity.x * nx + physics.gravity.y * ny + physics.gravity.z * nz
@@ -297,41 +341,78 @@ export class BallHit extends HitObject {
 	}
 
 	public applyFriction(hitNormal: Vertex3D, dtime: number, fricCoeff: number, physics: PlayerPhysics): void {
-		const nx = hitNormal.x, ny = hitNormal.y, nz = hitNormal.z
+		const nx = hitNormal.x,
+			ny = hitNormal.y,
+			nz = hitNormal.z
 		const r = this.data.radius
-		const sx = -nx * r, sy = -ny * r, sz = -nz * r
-		const avx = this.angularVelocity.x, avy = this.angularVelocity.y, avz = this.angularVelocity.z
-		const cx = avy * sz - avz * sy, cy = avz * sx - avx * sz, cz = avx * sy - avy * sx
-		const svx = this.vel.x + cx, svy = this.vel.y + cy, svz = this.vel.z + cz
+		const sx = -nx * r,
+			sy = -ny * r,
+			sz = -nz * r
+		const avx = this.angularVelocity.x,
+			avy = this.angularVelocity.y,
+			avz = this.angularVelocity.z
+		const cx = avy * sz - avz * sy,
+			cy = avz * sx - avx * sz,
+			cz = avx * sy - avy * sx
+		const svx = this.vel.x + cx,
+			svy = this.vel.y + cy,
+			svz = this.vel.z + cz
 		const dot = svx * nx + svy * ny + svz * nz
-		const slipX = svx - dot * nx, slipY = svy - dot * ny, slipZ = svz - dot * nz
-		const maxFric = fricCoeff * this.data.mass * -(physics.gravity.x * nx + physics.gravity.y * ny + physics.gravity.z * nz)
+		const slipX = svx - dot * nx,
+			slipY = svy - dot * ny,
+			slipZ = svz - dot * nz
+		const maxFric =
+			fricCoeff * this.data.mass * -(physics.gravity.x * nx + physics.gravity.y * ny + physics.gravity.z * nz)
 		const slipspeed = Math.sqrt(slipX * slipX + slipY * slipY + slipZ * slipZ)
 		let slipDirX: number, slipDirY: number, slipDirZ: number, numer: number
-		if ((this.vel.x * nx + this.vel.y * ny + this.vel.z * nz) <= 0.025 || slipspeed < C_PRECISION) {
-			const gx = physics.gravity.x * this.invMass, gy = physics.gravity.y * this.invMass, gz = physics.gravity.z * this.invMass
-			const p2x = avy * sz - avz * sy, p2y = avz * sx - avx * sz, p2z = avx * sy - avy * sx
-			const crossAx = avy * p2z - avz * p2y, crossAy = avz * p2x - avx * p2z, crossAz = avx * p2y - avy * p2x
-			const ax = gx + crossAx, ay = gy + crossAy, az = gz + crossAz
+		if (this.vel.x * nx + this.vel.y * ny + this.vel.z * nz <= 0.025 || slipspeed < C_PRECISION) {
+			const gx = physics.gravity.x * this.invMass,
+				gy = physics.gravity.y * this.invMass,
+				gz = physics.gravity.z * this.invMass
+			const p2x = avy * sz - avz * sy,
+				p2y = avz * sx - avx * sz,
+				p2z = avx * sy - avy * sx
+			const crossAx = avy * p2z - avz * p2y,
+				crossAy = avz * p2x - avx * p2z,
+				crossAz = avx * p2y - avy * p2x
+			const ax = gx + crossAx,
+				ay = gy + crossAy,
+				az = gz + crossAz
 			const adot = ax * nx + ay * ny + az * nz
-			const sAx = ax - adot * nx, sAy = ay - adot * ny, sAz = az - adot * nz
+			const sAx = ax - adot * nx,
+				sAy = ay - adot * ny,
+				sAz = az - adot * nz
 			if (sAx * sAx + sAy * sAy + sAz * sAz < 1e-6) return
 			const inv = 1 / Math.sqrt(sAx * sAx + sAy * sAy + sAz * sAz)
-			slipDirX = sAx * inv; slipDirY = sAy * inv; slipDirZ = sAz * inv
+			slipDirX = sAx * inv
+			slipDirY = sAy * inv
+			slipDirZ = sAz * inv
 			numer = -(slipDirX * ax + slipDirY * ay + slipDirZ * az)
 		} else {
 			const inv = 1 / slipspeed
-			slipDirX = slipX * inv; slipDirY = slipY * inv; slipDirZ = slipZ * inv
+			slipDirX = slipX * inv
+			slipDirY = slipY * inv
+			slipDirZ = slipZ * inv
 			numer = -(slipDirX * svx + slipDirY * svy + slipDirZ * svz)
 		}
-		const cpX = sy * slipDirZ - sz * slipDirY, cpY = sz * slipDirX - sx * slipDirZ, cpZ = sx * slipDirY - sy * slipDirX
-		const p1x = cpX / this.inertia, p1y = cpY / this.inertia, p1z = cpZ / this.inertia
-		const crossX = p1y * sz - p1z * sy, crossY = p1z * sx - p1x * sz, crossZ = p1x * sy - p1y * sx
+		const cpX = sy * slipDirZ - sz * slipDirY,
+			cpY = sz * slipDirX - sx * slipDirZ,
+			cpZ = sx * slipDirY - sy * slipDirX
+		const p1x = cpX / this.inertia,
+			p1y = cpY / this.inertia,
+			p1z = cpZ / this.inertia
+		const crossX = p1y * sz - p1z * sy,
+			crossY = p1z * sx - p1x * sz,
+			crossZ = p1x * sy - p1y * sx
 		const denom = this.invMass + slipDirX * crossX + slipDirY * crossY + slipDirZ * crossZ
 		const friction = clamp(numer / denom, -maxFric, maxFric)
 		if (Number.isFinite(friction)) {
-			const jx = slipDirX * dtime * friction, jy = slipDirY * dtime * friction, jz = slipDirZ * dtime * friction
-			const rotX = cpX * dtime * friction, rotY = cpY * dtime * friction, rotZ = cpZ * dtime * friction
+			const jx = slipDirX * dtime * friction,
+				jy = slipDirY * dtime * friction,
+				jz = slipDirZ * dtime * friction
+			const rotX = cpX * dtime * friction,
+				rotY = cpY * dtime * friction,
+				rotZ = cpZ * dtime * friction
 			this.vel.x += jx * this.invMass
 			this.vel.y += jy * this.invMass
 			this.vel.z += jz * this.invMass
@@ -346,11 +427,21 @@ export class BallHit extends HitObject {
 	}
 
 	public surfaceAcceleration(surfP: Vertex3D, physics: PlayerPhysics, _recycle = false): Vertex3D {
-		const avx = this.angularVelocity.x, avy = this.angularVelocity.y, avz = this.angularVelocity.z
-		const p2x = avy * surfP.z - avz * surfP.y, p2y = avz * surfP.x - avx * surfP.z, p2z = avx * surfP.y - avy * surfP.x
-		const crossX = avy * p2z - avz * p2y, crossY = avz * p2x - avx * p2z, crossZ = avx * p2y - avy * p2x
+		const avx = this.angularVelocity.x,
+			avy = this.angularVelocity.y,
+			avz = this.angularVelocity.z
+		const p2x = avy * surfP.z - avz * surfP.y,
+			p2y = avz * surfP.x - avx * surfP.z,
+			p2z = avx * surfP.y - avy * surfP.x
+		const crossX = avy * p2z - avz * p2y,
+			crossY = avz * p2x - avx * p2z,
+			crossZ = avx * p2y - avy * p2x
 		const inv = this.invMass
-		return new Vertex3D(physics.gravity.x * inv + crossX, physics.gravity.y * inv + crossY, physics.gravity.z * inv + crossZ)
+		return new Vertex3D(
+			physics.gravity.x * inv + crossX,
+			physics.gravity.y * inv + crossY,
+			physics.gravity.z * inv + crossZ,
+		)
 	}
 
 	public setMass(mass: number): void {

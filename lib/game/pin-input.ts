@@ -149,14 +149,27 @@ export class PinInput {
 	private tryMockTroughEject(isDown: boolean, code: number): void {
 		if (!isDown) return
 		if (code !== DIK_1 && code !== this.rgKeys[AssignKey.StartGameKey]) return
-		const emu = this.player.getPhysics().emu as unknown as { isMock?: boolean; isInitialized?: () => boolean } | null
+		const emu = this.player.getPhysics().emu as unknown as {
+			isMock?: boolean
+			isInitialized?: () => boolean
+		} | null
 		if (emu && !emu.isMock && emu.isInitialized?.()) return
-		const withBall = (Object.values(this.table.kickers) as unknown as Array<{ hit?: { ball?: unknown }; getApi(): { Kick(a: number, s: number): void; DestroyBall(): number }; getName(): string; data: { center: { x: number } } }>).filter(
-			(k) => (k as any).hit?.ball,
-		)
+		const withBall = (
+			Object.values(this.table.kickers) as unknown as Array<{
+				hit?: { ball?: unknown }
+				getApi(): { Kick(a: number, s: number): void; DestroyBall(): number }
+				getName(): string
+				data: { center: { x: number } }
+			}>
+		).filter(k => (k as any).hit?.ball)
 		if (!withBall.length) {
-			const plunger = Object.values(this.table.plungers)[0] as unknown as { getApi(): { CreateBall(): unknown } } | undefined
-			if (plunger) try { plunger.getApi().CreateBall() } catch {}
+			const plunger = Object.values(this.table.plungers)[0] as unknown as
+				| { getApi(): { CreateBall(): unknown } }
+				| undefined
+			if (plunger)
+				try {
+					plunger.getApi().CreateBall()
+				} catch {}
 			return
 		}
 		withBall.sort((a, b) => b.data.center.x - a.data.center.x)
@@ -166,7 +179,9 @@ export class PinInput {
 		} catch {
 			try {
 				exit.getApi().DestroyBall()
-				const plunger = Object.values(this.table.plungers)[0] as unknown as { getApi(): { CreateBall(): unknown } } | undefined
+				const plunger = Object.values(this.table.plungers)[0] as unknown as
+					| { getApi(): { CreateBall(): unknown } }
+					| undefined
 				if (plunger) plunger.getApi().CreateBall()
 			} catch {}
 		}

@@ -3,9 +3,6 @@
 
 /** Shared Three.js re-exports. */
 export {
-	CubeUVReflectionMapping,
-	EquirectangularReflectionMapping,
-	EquirectangularRefractionMapping,
 	AdditiveBlending,
 	AnimationClip,
 	Bone,
@@ -16,10 +13,13 @@ export {
 	CanvasTexture,
 	ClampToEdgeWrapping,
 	Color,
+	CubeUVReflectionMapping,
 	DataTexture,
 	DataTextureLoader,
 	DefaultLoadingManager,
 	DoubleSide,
+	EquirectangularReflectionMapping,
+	EquirectangularRefractionMapping,
 	ExtrudeGeometry,
 	ExtrudeGeometry as ExtrudeBufferGeometry,
 	Float32BufferAttribute,

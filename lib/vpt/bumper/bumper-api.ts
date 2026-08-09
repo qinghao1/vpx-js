@@ -178,6 +178,18 @@ export class BumperApi extends ItemApi<BumperData> {
 		this.animation.enableSkirtAnimation = v
 	}
 
+	get CurrentRingOffset() {
+		return this.state.ringOffset
+	}
+
+	get RotX() {
+		return this.state.skirtRotX
+	}
+
+	get RotY() {
+		return this.state.skirtRotY
+	}
+
 	public PlayHit(): void {
 		this.animation.hitEvent = true
 	}

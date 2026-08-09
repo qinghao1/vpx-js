@@ -21,10 +21,13 @@ import { Transformer } from './transformer.js'
  */
 export class EventTransformer extends Transformer {
 	private readonly items: { [p: string]: IScriptable<any> }
+	private readonly itemMap: Map<string, { key: string; item: IScriptable<any> }>
 
 	constructor(ast: Program, items: { [p: string]: IScriptable<any> }) {
 		super(ast)
 		this.items = items
+		this.itemMap = new Map()
+		for (const [k, v] of Object.entries(items)) this.itemMap.set(k.toLowerCase(), { key: k, item: v })
 	}
 
 	public transform(): Program {
@@ -50,19 +53,16 @@ export class EventTransformer extends Transformer {
 				const objName = functionNode.id.name.substr(0, functionNode.id.name.lastIndexOf('_'))
 				const eventName = functionNode.id.name.substr(functionNode.id.name.lastIndexOf('_') + 1)
 
-				// table item must exist
-				if (!this.items[objName]) {
-					return node
-				}
+				const entry = this.itemMap.get(objName.toLowerCase())
+				if (!entry) return node
 
-				// table item must support given event
-				const existingEventName = matchEventName(this.items[objName].getEventNames(), eventName)
+				const existingEventName = matchEventName(entry.item.getEventNames(), eventName)
 				if (!existingEventName) {
 					return node
 				}
 
 				return expressionStatement(
-					callExpression(memberExpression(identifier(objName), identifier('on')), [
+					callExpression(memberExpression(identifier(entry.key), identifier('on')), [
 						literal(existingEventName),
 						functionExpression(functionNode.body, functionNode.params),
 					]),
