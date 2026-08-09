@@ -9,42 +9,38 @@ import { ThreeRenderApi } from '../../render/threejs/three-render-api.js'
 import type { Table, TableGenerateOptions } from './table.js'
 import { TableMeshGenerator } from './table-mesh-generator.js'
 
-/** Exports a table to GLTF/GLB. */
 export class TableExporter {
-	private readonly table: Table
 	private readonly meshGenerator: TableMeshGenerator
 
 	constructor(table: Table) {
-		this.table = table
 		this.meshGenerator = new TableMeshGenerator(table)
 	}
 
-	public async exportGlb(opts: TableExportOptions = {}): Promise<Buffer> {
-		opts = Object.assign({}, defaultOptions, opts)
-		opts.gltfOptions!.binary = true
-		return await this.export<Buffer>(opts)
+	async exportGlb(opts: TableExportOptions = {}): Promise<Buffer> {
+		const o = {
+			...defaultOptions,
+			...opts,
+			gltfOptions: { ...defaultOptions.gltfOptions, ...opts.gltfOptions, binary: true },
+		}
+		return this.export(o)
 	}
 
 	private async export<T>(opts: TableExportOptions): Promise<T> {
 		const renderApi = new ThreeRenderApi(opts)
-		const playfieldGroup = this.meshGenerator.generateTableNode(renderApi, opts)
-
+		const group = this.meshGenerator.generateTableNode(renderApi, opts)
 		const scene = new Scene()
 		scene.name = 'table'
-		scene.add(playfieldGroup)
-
+		scene.add(group)
 		if (typeof document === 'undefined') ensureNodeCanvasPolyfill()
 		const exporter = new GLTFExporter()
 		const result = await exporter.parseAsync(scene, {
-			binary: !!opts.gltfOptions?.binary,
+			binary: true,
 			trs: !!opts.gltfOptions?.trs,
 			onlyVisible: opts.gltfOptions?.onlyVisible ?? true,
 			animations: opts.gltfOptions?.animations ?? [],
 			maxTextureSize: opts.gltfOptions?.maxTextureSize ?? Infinity,
-			includeCustomExtensions: !!opts.gltfOptions?.includeCustomExtensions,
 		})
-		if (result instanceof ArrayBuffer) return Buffer.from(result) as unknown as T
-		return result as unknown as T
+		return (result instanceof ArrayBuffer ? Buffer.from(result) : result) as unknown as T
 	}
 }
 
