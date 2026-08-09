@@ -7,7 +7,7 @@ import { TableBuilder } from '../../../test/table-builder.js'
 import { NodeBinaryReader } from '../../io/binary-reader.node.js'
 import { Table } from './table.js'
 
-const EXAMPLE_VPX = path.resolve('example-table.vpx')
+const VPX_WALKING_DEAD = path.resolve('walking_dead.vpx')
 const EMPTY_FIXTURE = path.resolve('test/fixtures/table-empty.vpx')
 
 describe('Table integration', () => {
@@ -38,16 +38,15 @@ describe('Table integration', () => {
 		expect(table.tableScript).toBe(vbs)
 	})
 
-	it('loads example VPX and extracts metadata — generic GameName check (skipped if missing)', async () => {
-		if (!fs.existsSync(EXAMPLE_VPX)) {
-			console.warn('[integration] example-table.vpx not found — skip (symlink any .vpx with GameName)')
+	it('loads example VPX (walking_dead) and extracts metadata — generic GameName check (skipped if missing)', async () => {
+		if (!fs.existsSync(VPX_WALKING_DEAD)) {
+			console.warn('[integration] walking_dead.vpx not found — skip')
 			return
 		}
-		const table = await Table.load(new NodeBinaryReader(EXAMPLE_VPX))
+		const table = await Table.load(new NodeBinaryReader(VPX_WALKING_DEAD))
 		expect(table.tableScript).toBeDefined()
 		expect(table.tableScript?.length).toBeGreaterThan(100_000)
-		expect(table.info?.TableName).toBeDefined()
-		expect(table.info?.TableName.length).toBeGreaterThan(2)
+		expect(table.info?.TableName).toMatch(/Walking Dead/i)
 		expect(table.info?.AuthorName).toBeDefined()
 		const gameName = table.tableScript?.match(/cGameName\s*=\s*["']([^"']+)["']/i)?.[1]
 		expect(gameName?.length).toBeGreaterThan(2) // generic: any GameName, twd_160h is just the example ROM

@@ -67,14 +67,11 @@ export class PlayerPhysics {
 	private cFrames = 0
 	private lastFpsTime = 0
 	private fps = 0
-	private fpsAvg = 0
-	private fpsCount = 0
 	private curPhysicsFrameTime = 0
 	private nextPhysicsFrameTime = 0
 	private startTimeUsec = 0
 	private activeBallDebug?: Ball
 	private scriptPeriod = 0
-	private physPeriod = 0
 
 	constructor(
 		private readonly table: Table,
@@ -191,8 +188,6 @@ export class PlayerPhysics {
 		if (this.timeMsec - this.lastFpsTime > 1000) {
 			this.fps = (this.cFrames * 1000) / (this.timeMsec - this.lastFpsTime)
 			this.lastFpsTime = this.timeMsec
-			this.fpsAvg += this.fps
-			this.fpsCount++
 			this.cFrames = 0
 		}
 		this.scriptPeriod = 0
@@ -233,17 +228,15 @@ export class PlayerPhysics {
 			this.curPhysicsFrameTime = this.nextPhysicsFrameTime
 			this.nextPhysicsFrameTime += PHYSICS_STEPTIME
 		}
+		for (const mode of [-1, -2] as const) {
+			this.flushTimers()
+			this.fireTimers(mode)
+		}
 		this.flushTimers()
-		this.fireTimers(-1)
-		this.flushTimers()
-		this.fireTimers(-2)
-		this.flushTimers()
-		this.physPeriod = Math.floor(this.now() * 1000) - initial
 		return iterations
 	}
 
-	private fireTimers(mode: number): void {
-		if (mode !== -1 && mode !== -2) return
+	private fireTimers(mode: -1 | -2): void {
 		for (const t of this.hitTimers) {
 			if (t.interval !== mode) continue
 			try {

@@ -8,7 +8,7 @@ import * as path from 'node:path'
 import { NodeBinaryReader } from '../../lib/io/binary-reader.node.js'
 import { Table } from '../../lib/vpt/table/table.js'
 
-const VPX_EXAMPLE = path.resolve('example-table.vpx') // any VPX; example-table is just an example
+const VPX_EXAMPLE = path.resolve('walking_dead.vpx') // any VPX; walking_dead is just an example
 const EMPTY = path.resolve('test/fixtures/table-empty.vpx')
 
 async function verifyEmpty() {

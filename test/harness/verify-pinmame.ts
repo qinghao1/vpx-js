@@ -1,8 +1,8 @@
 // Copyright (C) 2026 Chu Qinghao — GPL-2.0 — see LICENSE
 /**
- * Manual end-to-end harness for generic PinMAME (any game). Example uses example-table/twd_160h but any ROM works.
+ * Manual end-to-end harness for generic PinMAME (any game). Example uses walking_dead/twd_160h but any ROM works.
  * Run: npx tsx test/harness/verify-pinmame.ts
- * Requires: example VPX + ROM — default checks example-table.vpx + ~/.pinmame/roms/<gamename>.zip if present, else mock.
+ * Requires: example VPX + ROM — default checks walking_dead.vpx + ~/.pinmame/roms/<gamename>.zip if present, else mock.
  */
 import * as fs from 'node:fs'
 import * as os from 'node:os'
@@ -19,7 +19,7 @@ const ROM_CANDIDATES = ['twd_160h', 'mm_109', 'afm_113b', 'totan_14', 'example']
 	.map(n => path.join(os.homedir(), `.pinmame/roms/${n}.zip`))
 	.concat([path.join(os.homedir(), 'Downloads/twd_160h.zip')])
 const ROMS = ROM_CANDIDATES
-const VPX = path.resolve('example-table.vpx')
+const VPX = path.resolve('walking_dead.vpx')
 
 function findRom(): string | undefined {
 	for (const p of ROMS) if (fs.existsSync(p)) return p
@@ -40,7 +40,7 @@ async function verifyWasm() {
 async function verifyVpx() {
 	console.log('\n=== VPX ===')
 	if (!fs.existsSync(VPX)) {
-		console.log(`  SKIP — ${VPX} not found (symlink any .vpx with GameName to example-table.vpx)`)
+		console.log(`  SKIP — ${VPX} not found (symlink to ~/Downloads/walking_dead.vpx)`)
 		return null
 	}
 	const reader = new NodeBinaryReader(VPX)

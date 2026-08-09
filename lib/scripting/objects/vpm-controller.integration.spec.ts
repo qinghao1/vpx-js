@@ -56,14 +56,14 @@ describe('VpmController integration', () => {
 		expect(() => (vpm.Switch[112] = 0)).not.toThrow()
 	})
 
-	it('loads example VPX and extracts GameName (if present)', async () => {
-		const vpxPath = path.resolve('example-table.vpx')
+	it('loads Walking Dead VPX and extracts GameName (if present)', async () => {
+		const vpxPath = path.resolve('walking_dead.vpx')
 		if (!fs.existsSync(vpxPath)) return
 		const table = await Table.load(new NodeBinaryReader(vpxPath))
 		expect(table.tableScript?.length).toBeGreaterThan(10000)
 		const m = table.tableScript?.match(/cGameName\s*=\s*["']([^"']+)["']/i)
 		expect(m).not.toBeNull()
-		expect(m?.[1].length).toBeGreaterThan(2)
+		expect(m?.[1].toLowerCase()).toBe('twd_160h')
 	})
 
 	it('generic game name routes to PinMAME — not just twd_160h', async () => {
@@ -86,7 +86,7 @@ describe('VpmController integration', () => {
 		expect(stub.firstCall.args[0]).toBe('twd_160h')
 		await vpm.whenReady()
 		expect(player.getPhysics().emu?.constructor.name).toBe('PinMameEmulator')
-		expect(vpm.Version).toBe('03070000')
+		expect(vpm.Version).toBe('00990201')
 		expect(vpm.ChangedLamps).toBeDefined()
 	})
 
