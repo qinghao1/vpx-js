@@ -10,16 +10,17 @@ import type { Player } from '../../game/player.js'
 import { logger } from '../../util/logger.js'
 import type { VbsArray } from '../vbs-array.js'
 
-const FLIPTRONICS: Record<number, string> = { 112: 'F2', 114: 'F4', 116: 'F6', 118: 'F8' }
-
 export class VpmController {
+	private static readonly FLIPTRONICS: Record<number, string> = { 112: 'F2', 114: 'F4', 116: 'F6', 118: 'F8' }
+
 	private emulator: IEmulator = new Emulator()
 	private gameName = ''
 	private splashInfoLine = ''
+	private timeFence = 0
 	private loadPromise: Promise<void> | null = null
-	private readonly gameSettings = new Map<string, { Settings: { Value: Record<string, unknown> } }>()
-	private readonly solMaskCache = new Map<number, number>()
-	private readonly switchCache = new Map<number, boolean>()
+	private readonly gameSettings = new Map<string, { Settings: { Value: Record<string, unknown> } } >()
+	private readonly solMaskCache = new Map<number, number >()
+	private readonly switchCache = new Map<number, boolean >()
 
 	readonly Switch: Record<number, number>
 	readonly Dip: Record<number, number>
@@ -28,6 +29,8 @@ export class VpmController {
 	readonly Solenoid: Record<number, number>
 	readonly GIString: Record<number, number>
 	readonly Games: any
+	readonly Mech: Record<number, number>
+	readonly GetMech: Record<number, number>
 
 	constructor(private readonly player: Player) {
 		this.Switch = this.boolProxy(
@@ -39,8 +42,9 @@ export class VpmController {
 				if (v === true) this.switchCache.set(n, true)
 				else if (v === false) this.switchCache.set(n, false)
 				else if (v === undefined) this.switchCache.delete(n)
+				if (this.emulator instanceof PinMameEmulator) return this.emulator.setSwitchInput(n, v)
 				if (n < 89) return this.emulator.setSwitchInput(n, v)
-				const key = FLIPTRONICS[n]
+				const key = (VpmController.FLIPTRONICS as Record<number, string>)[n]
 				if (key) {
 					this.emulator.setFliptronicsInput(key, v)
 					return true
@@ -52,32 +56,24 @@ export class VpmController {
 		this.Dip = this.numProxy(
 			() => this.emulator.getDipSwitchByte(),
 			(_, v) => {
-				this.emulator.setDipSwitchByte(v)
+				try { this.emulator.setDipSwitchByte(v) } catch {}
 				return true
 			},
 		)
 		this.SolMask = this.numProxy(
-			i => this.solMaskCache.get(i) ?? (this.emulator as any).getSolMask?.(i) ?? 0,
+			i => this.solMaskCache.get(i) ?? this.emulator.getSolMask?.(i) ?? 0,
 			(n, v) => {
 				this.solMaskCache.set(n, v)
-				try {
-					;(this.emulator as any).setSolMask?.(n, v)
-				} catch {}
+				try { this.emulator.setSolMask?.(n, v) } catch (e) { logger().debug('SolMask set failed', e) }
 				return true
 			},
 		)
-		this.Lamp = this.numProxy(
-			i => this.emulator.getLampState(i),
-			() => true,
-		)
-		this.Solenoid = this.numProxy(
-			i => this.emulator.getSolenoidState(i),
-			() => true,
-		)
-		this.GIString = this.numProxy(
-			i => this.emulator.getGIState(i),
-			() => true,
-		)
+		this.Lamp = this.numProxy(i => this.emulator.getLampState(i), () => true)
+		this.Solenoid = this.numProxy(i => this.emulator.getSolenoidState(i), () => true)
+		this.GIString = this.numProxy(i => this.emulator.getGIState(i), () => true)
+		this.Mech = this.numProxy(() => 0, (n, v) => { this.stub('Mech', { n, v }); return true })
+		this.GetMech = this.numProxy(i => { this.stub('GetMech', i); return 0 }, () => false)
+
 		const getGame = (name: string) => {
 			const key = String(name ?? '')
 			let g = this.gameSettings.get(key)
@@ -89,26 +85,20 @@ export class VpmController {
 		}
 		const fn = ((name: string) => getGame(name)) as unknown as Record<string, unknown>
 		this.Games = new Proxy(fn, {
-			get: (_t, p) =>
-				typeof p === 'string' && !['length', 'name', 'prototype'].includes(p)
-					? ((fn as Record<string, unknown>)[p] ?? getGame(p))
-					: undefined,
+			get: (_t, p) => typeof p === 'string' && !['length', 'name', 'prototype'].includes(p) ? ((fn as Record<string, unknown>)[p] ?? getGame(p)) : undefined,
 			apply: (_t, _this, a) => getGame(String(a[0])),
 		})
-		this.Run = this.Run.bind(this)
-		this.Stop = this.Stop.bind(this)
+
+
 	}
 
-	get GameName(): string {
-		return this.gameName
-	}
+	get GameName(): string { return this.gameName }
 	set GameName(v: string) {
+		if (v === this.gameName) return
 		this.gameName = v
 		this.loadPromise = this._loadGame(v).catch(e => logger().error('DOWNLOAD_FAILED:', e))
 	}
-	async whenReady(): Promise<void> {
-		if (this.loadPromise) await this.loadPromise
-	}
+	async whenReady(): Promise<void> { if (this.loadPromise) await this.loadPromise }
 
 	private async _loadGame(name: string): Promise<void> {
 		if (GamelistDB.getByPinmameName(name)) {
@@ -134,180 +124,99 @@ export class VpmController {
 	}
 
 	private replay(emu: IEmulator): void {
-		for (const [k, v] of this.solMaskCache) try { (emu as any).setSolMask?.(k, v) } catch {}
-		for (const [k, v] of this.switchCache) try { emu.setSwitchInput(k, v) } catch {}
+		for (const [k, v] of this.solMaskCache) try { emu.setSolMask?.(k, v) } catch (e) { logger().debug('replay SolMask failed', e) }
+		for (const [k, v] of this.switchCache) try { emu.setSwitchInput(k, v) } catch (e) { logger().debug('replay Switch failed', e) }
 	}
 
 	private async fetchRom(name: string): Promise<Uint8Array> {
 		for (const url of [`/pinmame/roms/${name}.zip`, `/roms/${name}.zip`]) {
-			try {
-				const r = await fetch(url)
-				if (r.ok) return new Uint8Array(await r.arrayBuffer())
-			} catch {}
+			try { const r = await fetch(url); if (r.ok) return new Uint8Array(await r.arrayBuffer()) } catch {}
 		}
 		logger().warn(`[pinmame] no ROM for ${name} — mock`)
 		return new Uint8Array()
 	}
 
-	get Running(): boolean {
-		return this.emulator.getPaused() && this.emulator.isInitialized()
-	}
-	get Pause(): boolean {
-		return this.emulator.getPaused()
-	}
-	set Pause(v: boolean) {
-		this.emulator.setPaused(v)
-	}
-	get Version(): string {
-		return '03070000'
-	}
-	Run(): void {
+	get ROMName(): string { return this.gameName }
+	get Running(): boolean { return this.emulator.isInitialized() && !this.emulator.getPaused() }
+	get Pause(): boolean { return this.emulator.getPaused() }
+	set Pause(v: boolean) { this.emulator.setPaused(v) }
+	get Version(): string { return '03070000' }
+	get TimeFence(): number { return this.timeFence }
+	set TimeFence(v: number) { this.timeFence = v; this.stub('TimeFence', v) }
+	Run(nMinVersion = 0, hParentWnd = 0): void {
+		if (!this.gameName) { this.stub('Run', { nMinVersion, hParentWnd }); return }
+		if (!this.loadPromise) this.loadPromise = this._loadGame(this.gameName).catch(e => logger().error('DOWNLOAD_FAILED:', e))
 		logger().debug('RUN', this.gameName)
 	}
-	Stop(): void {
-		logger().debug('STOP')
-	}
+	Stop(): void { logger().debug('STOP'); try { this.emulator.setPaused(true) } catch {} }
 
-	get WPCNumbering(): number {
-		return 1
-	}
-	get SampleRate(): number {
-		return 22050
-	}
-	get SplashInfoLine(): string {
-		return this.splashInfoLine
-	}
-	set SplashInfoLine(v: string) {
-		this.splashInfoLine = v
-	}
-	get HandleMechanics(): number {
-		return 0
-	}
-	set HandleMechanics(v: number) {
-		this.stub('HandleMechanics', v)
-	}
-	get ShowFrame(): boolean {
-		return false
-	}
-	set ShowFrame(v: boolean) {
-		this.stub('ShowFrame', v)
-	}
-	get DoubleSize(): boolean {
-		return false
-	}
-	set DoubleSize(v: boolean) {
-		this.stub('DoubleSize', v)
-	}
-	get Antialias(): boolean {
-		return false
-	}
-	set Antialias(v: boolean) {
-		this.stub('Antialias', v)
-	}
-	get BorderSizeX(): number {
-		return 0
-	}
-	set BorderSizeX(v: number) {
-		this.stub('BorderSizeX', v)
-	}
-	get BorderSizeY(): number {
-		return 0
-	}
-	set BorderSizeY(v: number) {
-		this.stub('BorderSizeY', v)
-	}
-	get WindowPosX(): number {
-		return 0
-	}
-	set WindowPosX(v: number) {
-		this.stub('WindowPosX', v)
-	}
-	get WindowPosY(): number {
-		return 0
-	}
-	set WindowPosY(v: number) {
-		this.stub('WindowPosY', v)
-	}
-	get LockDisplay(): boolean {
-		return false
-	}
-	set LockDisplay(v: boolean) {
-		this.stub('LockDisplay', v)
-	}
-	get Hidden(): boolean {
-		return false
-	}
-	set Hidden(v: boolean) {
-		this.stub('Hidden', v)
-	}
-	get ShowDMDOnly(): boolean {
-		return false
-	}
-	set ShowDMDOnly(v: boolean) {
-		this.stub('ShowDMDOnly', v)
-	}
-	get HandleKeyboard(): boolean {
-		return false
-	}
-	set HandleKeyboard(v: boolean) {
-		this.stub('HandleKeyboard', v)
-	}
-	get ShowTitle(): boolean {
-		return false
-	}
-	set ShowTitle(v: boolean) {
-		this.stub('ShowTitle', v)
-	}
+	get WPCNumbering(): number { return 1 }
+	get SampleRate(): number { return 22050 }
+	get SplashInfoLine(): string { return this.splashInfoLine }
+	set SplashInfoLine(v: string) { this.splashInfoLine = v }
+	get HandleMechanics(): number { return 0 }
+	set HandleMechanics(v: number) { this.stub('HandleMechanics', v) }
 
-	SetDisplayPosition(x: number, y: number, hWnd: unknown): void {
-		this.stub('SetDisplayPosition', { x, y, hWnd })
-	}
-	ShowOptsDialog(hWnd: unknown): void {
-		this.stub('ShowOptsDialog', hWnd)
-	}
-	ShowPathesDialog(hWnd: unknown): void {
-		this.stub('ShowPathesDialog', hWnd)
-	}
-	ShowAboutDialog(hWnd: unknown): void {
-		this.stub('ShowAboutDialog', hWnd)
-	}
-	CheckROMS(n: number): boolean {
-		this.stub('CheckROMS', n)
-		return true
-	}
+	get NVRAM(): Uint8Array { return new Uint8Array() }
+	get ChangedNVRAM(): number[][] { return [] }
+	get NewSoundCommands(): number[][] { return [] }
+	get RawDmdWidth(): number { try { return this.emulator.getDmdDimensions().x } catch { return 0 } }
+	get RawDmdHeight(): number { try { return this.emulator.getDmdDimensions().y } catch { return 0 } }
+	get RawDmdPixels(): Uint8Array { try { return this.emulator.getDmdFrame() } catch { return new Uint8Array() } }
+	get RawDmdColoredPixels(): Uint32Array { return new Uint32Array(this.RawDmdPixels.length) }
 
-	get ChangedLamps(): VbsArray<number[]> {
-		return this.emulator.emulatorState.getChangedLamps()
-	}
-	get ChangedSolenoids(): number[][] {
-		return this.emulator.emulatorState.getChangedSolenoids()
-	}
-	get ChangedGI(): number[][] {
-		return this.emulator.emulatorState.getChangedGI()
-	}
-	get ChangedLEDs(): number[][] {
-		return this.emulator.emulatorState.getChangedLEDs()
-	}
+	SetDisplayPosition(x: number, y: number, hWnd: unknown): void { this.stub('SetDisplayPosition', { x, y, hWnd }) }
+	ShowOptsDialog(hWnd: unknown): void { this.stub('ShowOptsDialog', hWnd) }
+	ShowPathesDialog(hWnd: unknown): void { this.stub('ShowPathesDialog', hWnd) }
+	ShowAboutDialog(hWnd: unknown): void { this.stub('ShowAboutDialog', hWnd) }
+	CheckROMS(n: number): boolean { this.stub('CheckROMS', n); return true }
 
-	private stub(name: string, v?: unknown): void {
-		logger().debug(name, v)
-	}
+	get ChangedLamps(): VbsArray<number[]> { return this.emulator.emulatorState.getChangedLamps() }
+	get ChangedSolenoids(): number[][] { return this.emulator.emulatorState.getChangedSolenoids() }
+	get ChangedGI(): number[][] { return this.emulator.emulatorState.getChangedGI() }
+	get ChangedLEDs(): VbsArray<number[]> { return this.emulator.emulatorState.getChangedLEDs() as unknown as VbsArray<number[]> }
+
+	private stub(name: string, v?: unknown): void { logger().debug(name, v) }
 
 	private numProxy(get: (n: number) => number, set: (n: number, v: number) => boolean): Record<number, number> {
-		return new Proxy({} as Record<number, number>, {
-			get: (_, p) => get(Number(p)),
-			set: (_, p, v) => set(Number(p), v as number),
+		return new Proxy({} as Record<number, number> , {
+			get: (_, p) => {
+				const n = Number(p)
+				if (Number.isNaN(n)) return undefined as any
+				return get(n)
+			},
+			set: (_, p, v) => {
+				const n = Number(p)
+				if (Number.isNaN(n)) return false
+				return set(n, v as number)
+			},
 		})
 	}
 	private boolProxy(get: (n: number) => number, set: (n: number, v?: boolean) => boolean): Record<number, number> {
-		return new Proxy({} as Record<number, number>, {
-			get: (_, p) => get(Number(p)),
+		return new Proxy({} as Record<number, number> , {
+			get: (_, p) => {
+				const n = Number(p)
+				if (Number.isNaN(n)) return undefined as any
+				return get(n)
+			},
 			set: (_, p, v) => {
 				const n = Number(p)
+				if (Number.isNaN(n)) return false
 				if (v === 1 || v === true) return set(n, true)
 				if (v === 0 || v === false) return set(n, false)
 				return set(n)
 			},
+		})
+	}
+
+	static {
+		const bools = ['ShowFrame','DoubleSize','Antialias','LockDisplay','Hidden','ShowDMDOnly','HandleKeyboard','ShowTitle','ShowPinDMD','ShowWinDMD'] as const
+		for (const k of bools) Object.defineProperty(VpmController.prototype, k, {
+			get(this: VpmController){ return false }, set(this: VpmController, v:any){ this.stub(k, v) }, configurable:true, enumerable:true,
+		})
+		const ints = ['BorderSizeX','BorderSizeY','WindowPosX','WindowPosY','FastFrames','CabinetMode','SoundMode','IgnoreRomCrc'] as const
+		for (const k of ints) Object.defineProperty(VpmController.prototype, k, {
+			get(this: VpmController){ return 0 }, set(this: VpmController, v:any){ this.stub(k, v) }, configurable:true, enumerable:true,
 		})
 	}
 }
