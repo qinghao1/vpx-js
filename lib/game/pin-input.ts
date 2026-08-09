@@ -132,12 +132,16 @@ export class PinInput {
 		if (!this.queue.length) return
 		const queued = this.queue.splice(0, this.queue.length)
 		for (const ev of queued) {
-			if (ev.code === this.rgKeys[AssignKey.FrameCount] || ev.code === this.rgKeys[AssignKey.Enable3D] || ev.code === this.rgKeys[AssignKey.DBGBalls]) continue
+			if (
+				ev.code === this.rgKeys[AssignKey.FrameCount] ||
+				ev.code === this.rgKeys[AssignKey.Enable3D] ||
+				ev.code === this.rgKeys[AssignKey.DBGBalls]
+			)
+				continue
 			if (ev.down) {
 				if (this.pressed.has(ev.code)) continue
 				this.pressed.add(ev.code)
 			} else {
-				if (!this.pressed.has(ev.code)) continue
 				this.pressed.delete(ev.code)
 			}
 			this.fire(ev.down ? Event.GameEventsKeyDown : Event.GameEventsKeyUp, ev.code)
@@ -216,7 +220,7 @@ export class PinInput {
 		const centerKey = this.getKey(AssignKey.CenterTiltKey)
 		if (code !== leftKey && code !== rightKey && code !== centerKey) return
 		const baseForce = 2
-		const angleVariance = (Math.random() - 0.5) * 15
+		const angleVariance = (Math.random() - 0.5) * 15 * baseForce
 		const force = (0.6 + Math.random() * 0.8) * baseForce
 		let angle: number
 		if (code === leftKey) angle = 75 + angleVariance

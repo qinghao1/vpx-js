@@ -5,8 +5,16 @@ import { CabNudge } from './keyboard-nudge.js'
 export class NudgeHandler {
 	private readonly nudge = new CabNudge()
 
-	applyImpulse(angle: number, force: number): void { this.nudge.nudge(angle, force) }
-	stepOneMillisecond(): void { this.nudge.stepOneMillisecond() }
-	getCabinetAcceleration(): Vertex2D { return this.nudge.getAcceleration() }
-	getCabinetOffset(): Vertex2D { return this.nudge.getOffset() }
+	applyImpulse(angle: number, force: number): void {
+		this.nudge.nudge(angle, force)
+	}
+	stepOneMillisecond(): void {
+		this.nudge.stepOneMillisecond()
+	}
+	getCabinetAcceleration(): Vertex2D {
+		return this.nudge.getAcceleration()
+	}
+	getCabinetOffset(): Vertex2D {
+		return this.nudge.getOffset()
+	}
 }

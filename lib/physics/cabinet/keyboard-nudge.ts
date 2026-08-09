@@ -3,10 +3,6 @@
 import { Vertex2D } from '../../util/vector.js'
 import { CabinetPhysics } from './cabinet-physics.js'
 
-const VPUTOM = (x: number): number => x * ((0.0254 * 1.0625) / 50)
-const VPTTOS = (x: number): number => x / 0.01
-const VPUVPT2TOMS2 = (x: number): number => VPUTOM(x) * VPTTOS(VPTTOS(1))
-
 function degToRad(d: number): number {
 	return (d * Math.PI) / 180
 }
@@ -16,15 +12,26 @@ export class CabNudge {
 	private impulses: Array<{ elapsed: number; length: number; impulse: Vertex2D }> = []
 	private deactivationDelay = 0
 
-	getAcceleration(): Vertex2D { return this.cabinet.getAcceleration() }
-	getOffset(): Vertex2D { return this.cabinet.getOffset() }
+	getAcceleration(): Vertex2D {
+		return this.cabinet.getAcceleration()
+	}
+	getOffset(): Vertex2D {
+		return this.cabinet.getOffset()
+	}
+	isActive(): boolean {
+		return this.deactivationDelay > 0
+	}
 
 	nudge(angle: number, force: number): void {
 		const g = 9.80665
 		const baseScale = (0.5 * g) / 2
 		const actual = force * baseScale
 		const a = degToRad(angle)
-		this.impulses.push({ elapsed: 0, length: 25, impulse: new Vertex2D(Math.sin(a) * actual, -Math.cos(a) * actual) })
+		this.impulses.push({
+			elapsed: 0,
+			length: 25,
+			impulse: new Vertex2D(Math.sin(a) * actual, -Math.cos(a) * actual),
+		})
 		this.deactivationDelay = 10000
 	}
 

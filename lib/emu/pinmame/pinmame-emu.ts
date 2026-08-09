@@ -127,11 +127,11 @@ export class PinMameEmulator implements IEmulator {
 	private markReady(): void {
 		this.ready = true
 		this.queue.replayMessages(this)
+		if (this.isMock || !this.api) return
 		for (const [low, mask] of this.solMasks) {
-			if (!this.isMock && this.api)
-				try {
-					this.api.setSolMask(low, mask)
-				} catch {}
+			try {
+				this.api.setSolMask(low, mask)
+			} catch {}
 		}
 	}
 
