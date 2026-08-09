@@ -222,6 +222,13 @@ export class Player extends EventEmitter {
 		this.table.fireVoidEvent(Event.GameEventsUnPaused)
 		this.emit('resumed')
 	}
+
+	public setPhysicsEnabled(enabled: boolean): void {
+		this.physics.disablePhysics = !enabled
+	}
+	public isPhysicsEnabled(): boolean {
+		return !this.physics.disablePhysics
+	}
 }
 
 export interface IBallCreationPosition {

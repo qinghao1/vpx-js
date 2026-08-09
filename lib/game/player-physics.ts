@@ -47,6 +47,7 @@ export class PlayerPhysics {
 	public ballControl = false
 	public bcTarget?: Vertex3D
 	public isPaused = false
+	public disablePhysics = false
 	public readonly changedHitTimers: TimerOnOff[] = []
 	public emu?: IEmulator
 
@@ -220,8 +221,10 @@ export class PlayerPhysics {
 			}
 			this.activeBall = oldBall
 			if (this.emu) this.emu.emuSimulateCycle(dt * 10)
-			this.updateVelocities()
-			this.physicsSimulateCycle(dt)
+			if (!this.disablePhysics) {
+				this.updateVelocities()
+				this.physicsSimulateCycle(dt)
+			}
 			this.curPhysicsFrameTime = this.nextPhysicsFrameTime
 			this.nextPhysicsFrameTime += PHYSICS_STEPTIME
 		}
