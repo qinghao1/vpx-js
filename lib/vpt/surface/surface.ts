@@ -17,6 +17,7 @@ import { SurfaceHitGenerator } from './surface-hit-generator.js'
 import { SurfaceMeshGenerator } from './surface-mesh-generator.js'
 import { SurfaceState } from './surface-state.js'
 import { SurfaceUpdater } from './surface-updater.js'
+import type { Material } from '../material.js'
 
 /** Surface item. @see https://github.com/vpinball/vpinball/blob/master/surface.cpp */
 export class Surface
@@ -63,32 +64,26 @@ export class Surface
 		return this.data.isCollidable
 	}
 
+	private static isTransparentMat(m?: Material): boolean {
+		return !m || (m.isOpacityActive && m.opacity < 0.999)
+	}
+
 	public isTransparent(table: Table): boolean {
-		if (this.data.isSideVisible) {
-			const m = table.getMaterial(this.data.szSideMaterial)
-			if (!m || (m.isOpacityActive && m.opacity < 0.999)) return true
-		}
-		if (this.data.isTopBottomVisible) {
-			const m = table.getMaterial(this.data.szTopMaterial)
-			if (!m || (m.isOpacityActive && m.opacity < 0.999)) return true
-		}
+		if (this.data.isSideVisible && Surface.isTransparentMat(table.getMaterial(this.data.szSideMaterial))) return true
+		if (this.data.isTopBottomVisible && Surface.isTransparentMat(table.getMaterial(this.data.szTopMaterial))) return true
 		return false
 	}
 
 	public getMeshes<GEOMETRY>(table: Table): Meshes<GEOMETRY> {
 		const meshes: Meshes<GEOMETRY> = {}
 		const surface = this.meshGenerator.generateMeshes(this.data, table)
-		const topMat = table.getMaterial(this.data.szTopMaterial)
-		const sideMat = table.getMaterial(this.data.szSideMaterial)
-		const topTransparent = !topMat || (topMat.isOpacityActive && topMat.opacity < 0.999)
-		const sideTransparent = !sideMat || (sideMat.isOpacityActive && sideMat.opacity < 0.999)
 		if (surface.top) {
 			meshes.top = {
 				isVisible: this.data.isTopBottomVisible,
 				mesh: surface.top.transform(Matrix3D.RIGHT_HANDED),
 				map: table.getTexture(this.data.szImage),
 				material: table.getMaterial(this.data.szTopMaterial),
-				isTransparent: topTransparent,
+				isTransparent: Surface.isTransparentMat(table.getMaterial(this.data.szTopMaterial)),
 			}
 		}
 		if (surface.side) {
@@ -97,7 +92,7 @@ export class Surface
 				mesh: surface.side.transform(Matrix3D.RIGHT_HANDED),
 				map: table.getTexture(this.data.szSideImage),
 				material: table.getMaterial(this.data.szSideMaterial),
-				isTransparent: sideTransparent,
+				isTransparent: Surface.isTransparentMat(table.getMaterial(this.data.szSideMaterial)),
 			}
 		}
 		return meshes

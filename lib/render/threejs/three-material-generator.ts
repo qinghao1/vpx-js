@@ -127,14 +127,10 @@ export class ThreeMaterialGenerator {
 	public resolvePendingTextures(): number {
 		let fixed = 0
 		for (const mat of Object.values(this.cachedMaterials)) {
-			const ud = mat.userData as Record<string, unknown>
-			for (const [pendingKey, texKey] of [
-				['pendingMap', 'map'],
-				['pendingNormalMap', 'normalMap'],
-				['pendingEnvMap', 'envMap'],
-				['pendingEmissiveMap', 'emissiveMap'],
-			] as const) {
-				const name = ud[pendingKey] as string | undefined
+			const ud = mat.userData as Record<string, string | undefined>
+			for (const texKey of ['map', 'normalMap', 'envMap', 'emissiveMap'] as const) {
+				const pendingKey = pendingKeyFor(texKey)
+				const name = ud[pendingKey]
 				if (!name || !this.mapGenerator.hasTexture(name)) continue
 				const tex = this.mapGenerator.getTexture(name)
 				;(mat as unknown as Record<string, unknown>)[texKey] = tex

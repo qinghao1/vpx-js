@@ -34,10 +34,9 @@ export class Logger implements ILogger {
 	static get isDebugEnabled(): boolean {
 		if (Logger._forcedDebug !== null) return Logger._forcedDebug
 		try {
-			if (typeof location !== 'undefined' && location.search.includes('debug')) return true
-		} catch {}
-		try {
-			if (typeof localStorage !== 'undefined' && localStorage.getItem('vpx:debug') === '1') return true
+			const loc = (globalThis as unknown as { location?: { search: string } }).location
+			if (loc && new URLSearchParams(loc.search).has('debug')) return true
+			if ((globalThis as unknown as { localStorage?: Storage }).localStorage?.getItem('vpx:debug') === '1') return true
 		} catch {}
 		return false
 	}
@@ -64,10 +63,10 @@ export class Logger implements ILogger {
 }
 
 try {
-	const _origDebug = console.debug.bind(console)
+	const orig = console.debug.bind(console)
 	console.debug = (...a: unknown[]) => {
 		if (!Logger.isDebugEnabled) return
-		_origDebug(...a)
+		orig(...a)
 	}
 } catch {}
 

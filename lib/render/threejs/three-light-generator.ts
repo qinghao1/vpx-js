@@ -6,7 +6,6 @@ import {
 	type Object3D,
 	PointLight,
 	type Mesh as ThreeMesh,
-	Vector2,
 } from '../../refs.node.js'
 import { Enums } from '../../vpt/enums.js'
 import type { LightData } from '../../vpt/light/light-data.js'
@@ -26,7 +25,7 @@ export class ThreeLightGenerator {
 			light.castShadow = true
 			light.shadow.bias = -0.001
 			light.shadow.radius = 12
-			light.shadow.mapSize = new Vector2(512, 512)
+			light.shadow.mapSize.set(512, 512)
 		}
 		return light
 	}
@@ -34,18 +33,24 @@ export class ThreeLightGenerator {
 	public applyLighting(state: LightState, initial: number, obj?: Object3D): void {
 		if (!obj) return
 		for (const child of obj.children) {
-			if (child.name === 'light') {
-				;(child as PointLight).intensity = state.intensity
-				;(child as PointLight).color.set(state.color)
-			} else if (child.name === 'bulb.light') {
-				const m = (child as ThreeMesh).material as MeshStandardMaterial
-				m.emissiveIntensity = state.intensity / initial
-				m.color.set(state.color)
-				m.emissive.set(state.color)
-			} else if (child.name === 'surface.light') {
-				const m = (child as ThreeMesh).material as MeshStandardMaterial
-				m.emissiveIntensity = state.intensity
-				m.emissive.set(state.color)
+			switch (child.name) {
+				case 'light':
+					;(child as PointLight).intensity = state.intensity
+					;(child as PointLight).color.set(state.color)
+					break
+				case 'bulb.light': {
+					const m = (child as ThreeMesh).material as MeshStandardMaterial
+					m.emissiveIntensity = state.intensity / initial
+					m.color.set(state.color)
+					m.emissive.set(state.color)
+					break
+				}
+				case 'surface.light': {
+					const m = (child as ThreeMesh).material as MeshStandardMaterial
+					m.emissiveIntensity = state.intensity
+					m.emissive.set(state.color)
+					break
+				}
 			}
 		}
 	}
