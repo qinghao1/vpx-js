@@ -31,21 +31,30 @@ export class VpmController {
 
 	constructor(private readonly player: Player) {
 		this.Switch = this.boolProxy(
-			i => (this.switchCache.has(i) ? (this.switchCache.get(i)! ? 1 : 0) : this.emulator.getSwitchInput(i)),
+			i => {
+				const cached = this.switchCache.get(i)
+				return cached !== undefined ? (cached ? 1 : 0) : this.emulator.getSwitchInput(i)
+			},
 			(n, v) => {
 				if (v === true) this.switchCache.set(n, true)
 				else if (v === false) this.switchCache.set(n, false)
 				else if (v === undefined) this.switchCache.delete(n)
 				if (n < 89) return this.emulator.setSwitchInput(n, v)
 				const key = FLIPTRONICS[n]
-				if (key) return this.emulator.setFliptronicsInput(key, v), true
+				if (key) {
+					this.emulator.setFliptronicsInput(key, v)
+					return true
+				}
 				logger().error('INVALID_SWITCH_ID:', n)
 				return false
 			},
 		)
 		this.Dip = this.numProxy(
 			() => this.emulator.getDipSwitchByte(),
-			(_, v) => (this.emulator.setDipSwitchByte(v), true),
+			(_, v) => {
+				this.emulator.setDipSwitchByte(v)
+				return true
+			},
 		)
 		this.SolMask = this.numProxy(
 			i => this.solMaskCache.get(i) ?? (this.emulator as any).getSolMask?.(i) ?? 0,

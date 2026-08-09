@@ -144,7 +144,7 @@ export class PinMameEmulator implements IEmulator {
 			m.HEAPU8.fill(0, ptr, ptr + CONFIG_SIZE)
 			new DataView(m.HEAPU8.buffer).setInt32(ptr + 4, SAMPLE_RATE, true)
 			m.HEAPU8.set(new TextEncoder().encode(VPM_DIR), ptr + 8)
-			this.api!.setConfig(ptr)
+			this.api?.setConfig(ptr)
 		} finally {
 			m._free(ptr)
 		}
@@ -185,7 +185,8 @@ export class PinMameEmulator implements IEmulator {
 	}
 
 	getSolMask(low: number): number {
-		if (this.solMasks.has(low)) return this.solMasks.get(low)!
+		const cached = this.solMasks.get(low)
+		if (cached !== undefined) return cached
 		if (this.isMock || !this.api) return 0
 		try {
 			return this.api.getSolMask(low) ?? 0
@@ -254,7 +255,8 @@ export class PinMameEmulator implements IEmulator {
 	}
 
 	private pull(fn: (p: number) => number, buf: Uint8Array): void {
-		const m = this.mod!
+		const m = this.mod
+		if (!m) return
 		const ptr = m._malloc(buf.length * 8)
 		try {
 			let n = 0
@@ -275,7 +277,8 @@ export class PinMameEmulator implements IEmulator {
 	}
 
 	getSwitchInput(n: number): number {
-		if (this.pendingSwitches.has(n)) return this.pendingSwitches.get(n)!
+		const pending = this.pendingSwitches.get(n)
+		if (pending !== undefined) return pending
 		return (this.isMock ? this.mockSwitches.get(n) : this.api?.getSwitch(n)) ?? 0
 	}
 	getLampState(n: number): number {
@@ -316,8 +319,7 @@ export class PinMameEmulator implements IEmulator {
 			this.pendingSwitches.set(n, next)
 			return false
 		}
-		const got = this.api.getSwitch(n) ?? 0
-		if (!!got !== !!next) {
+		if (!this.isSwitchSettled(n, next)) {
 			this.pendingSwitches.set(n, next)
 			return true
 		}
@@ -327,13 +329,17 @@ export class PinMameEmulator implements IEmulator {
 
 	private flushPendingSwitches(): void {
 		if (!this.api) return
-		for (const [n, v] of Array.from(this.pendingSwitches.entries())) {
+		for (const [n, v] of [...this.pendingSwitches]) {
 			try {
 				this.api.setSwitch(n, v)
 			} catch {}
-			const got = this.api.getSwitch(n) ?? 0
-			if (!!got === !!v) this.pendingSwitches.delete(n)
+			if (this.isSwitchSettled(n, v)) this.pendingSwitches.delete(n)
 		}
+	}
+
+	private isSwitchSettled(n: number, expected: number): boolean {
+		const got = this.api?.getSwitch(n) ?? 0
+		return !!got === !!expected
 	}
 
 	setCabinetInput(v: number): void {
