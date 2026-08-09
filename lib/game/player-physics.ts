@@ -24,7 +24,7 @@ import { BallData } from '../vpt/ball/ball-data.js'
 import { BallState } from '../vpt/ball/ball-state.js'
 import type { FlipperMover } from '../vpt/flipper/flipper-mover.js'
 import type { Table } from '../vpt/table/table.js'
-import { MAX_TIMERS_MSEC_OVERALL } from '../vpt/timer/timer-const.js'
+import { MAX_TIMERS_MSEC_OVERALL, TimerMode } from '../vpt/timer/timer-const.js'
 import type { TimerHit } from '../vpt/timer/timer-hit.js'
 import { TimerOnOff } from '../vpt/timer/timer-on-off.js'
 import { Event } from './event.js'
@@ -202,7 +202,7 @@ export class PlayerPhysics {
 			const oldBall = this.activeBall
 			this.activeBall = undefined
 			if (this.scriptPeriod <= 1000 * MAX_TIMERS_MSEC_OVERALL) {
-				this.fireTimers(0)
+				this.fireTimers(TimerMode.Update)
 				this.scriptPeriod += Math.floor(this.now() - curUsec)
 			}
 			this.activeBall = oldBall
@@ -212,14 +212,14 @@ export class PlayerPhysics {
 			this.curPhysicsFrameTime = this.nextPhysicsFrameTime
 			this.nextPhysicsFrameTime += PHYSICS_STEPTIME
 		}
-		this.fireTimers(-1)
-		this.fireTimers(-2)
+		this.fireTimers(TimerMode.OnNewFrame)
+		this.fireTimers(TimerMode.OnGameSync)
 		return iterations
 	}
 
-	private fireTimers(mode: 0 | -1 | -2): void {
+	private fireTimers(mode: TimerMode): void {
 		this.deferTimerChanges = true
-		if (mode === 0) {
+		if (mode === TimerMode.Update) {
 			const cur = this.timeMsec
 			for (const t of this.hitTimers) {
 				if (t.interval < 0) continue

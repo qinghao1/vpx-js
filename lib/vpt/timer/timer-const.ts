@@ -11,3 +11,9 @@ export const MAX_TIMER_MSEC_INTERVAL = 1
  * fall behind, if set to < somelargevalue)
  */
 export const MAX_TIMERS_MSEC_OVERALL = 5
+
+export enum TimerMode {
+	Update = 0,
+	OnNewFrame = -1,
+	OnGameSync = -2,
+}

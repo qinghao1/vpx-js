@@ -8,7 +8,7 @@ import type { Player } from '../game/player.js'
 import type { Collection } from './collection/collection.js'
 import type { ItemData } from './item-data.js'
 import type { Table } from './table/table.js'
-import { MAX_TIMER_MSEC_INTERVAL } from './timer/timer-const.js'
+import { MAX_TIMER_MSEC_INTERVAL, TimerMode } from './timer/timer-const.js'
 import { TimerHit } from './timer/timer-hit.js'
 
 const INTERNAL: Record<string, boolean> = {
@@ -116,7 +116,7 @@ export abstract class ItemApi<DATA extends ItemData> extends EventEmitter {
 		const interval =
 			this.data.timer.interval >= 0
 				? Math.max(this.data.timer.interval, MAX_TIMER_MSEC_INTERVAL)
-				: Math.max(-2, this.data.timer.interval)
+				: Math.max(TimerMode.OnGameSync, this.data.timer.interval)
 		this.hitTimer = new TimerHit(this.events, interval, interval)
 		return this.data.timer.enabled ? [this.hitTimer] : []
 	}
@@ -181,7 +181,7 @@ export abstract class ItemApi<DATA extends ItemData> extends EventEmitter {
 		this.data.timer.interval = interval
 		if (this.hitTimer) {
 			this.hitTimer.interval =
-				interval >= 0 ? Math.max(interval, MAX_TIMER_MSEC_INTERVAL) : Math.max(-2, interval)
+				interval >= 0 ? Math.max(interval, MAX_TIMER_MSEC_INTERVAL) : Math.max(TimerMode.OnGameSync, interval)
 			this.hitTimer.nextFire = this.player.getPhysics().timeMsec + this.hitTimer.interval
 		}
 	}
