@@ -17,8 +17,9 @@ export interface IRenderApi<NODE, GEOMETRY, POINT_LIGHT> {
 	 * so they can be loaded and swapped synchronously later.
 	 * @param textures
 	 * @param table
+	 * @param onTexture optional per-texture progress callback (streaming)
 	 */
-	preloadTextures(textures: Texture[], table: Table): Promise<void>
+	preloadTextures(textures: Texture[], table: Table, onTexture?: (tex: Texture, ok: boolean) => void): Promise<void>
 
 	/**
 	 * Applies global transformations to the scene.

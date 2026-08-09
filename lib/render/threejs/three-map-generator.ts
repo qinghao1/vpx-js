@@ -22,14 +22,19 @@ export class ThreeMapGenerator {
 		private readonly gate: AnimationGate = animationGate,
 	) {}
 
-	public async loadTextures(textures: Texture[], table: Table): Promise<void> {
+	public async loadTextures(
+		textures: Texture[],
+		table: Table,
+		onTexture?: (tex: Texture, ok: boolean) => void,
+	): Promise<void> {
 		if (!this.textureLoader) return
+		if (!textures.length) return
 		const started = Date.now()
 		logger().debug('[ThreeMapGenerator.loadTextures] Pre-loading %s textures..', textures.length)
 		this.setPlayfieldHint(table)
 
 		const concurrency = this.pickConcurrency(textures)
-		await this.loadConcurrently(textures, table, concurrency)
+		await this.loadConcurrently(textures, table, concurrency, onTexture)
 
 		logger().debug(
 			'[ThreeMapGenerator.loadTextures] Loaded %s/%s textures in %sms (concurrency %s).',
@@ -61,25 +66,32 @@ export class ThreeMapGenerator {
 		return Math.min(CONCURRENCY_DEFAULT, cores)
 	}
 
-	private async loadConcurrently(textures: Texture[], table: Table, concurrency: number): Promise<void> {
+	private async loadConcurrently(
+		textures: Texture[],
+		table: Table,
+		concurrency: number,
+		onTexture?: (tex: Texture, ok: boolean) => void,
+	): Promise<void> {
 		let next = 0
 		const workers = Array.from({ length: Math.min(concurrency, textures.length) }, async () => {
 			while (true) {
 				await this.gate.waitIfAnimating()
 				const i = next++
 				if (i >= textures.length) break
-				await this.loadOne(textures[i]!, table)
+				const ok = await this.loadOne(textures[i]!, table)
+				onTexture?.(textures[i]!, ok)
 				await this.gate.yieldToMain()
 			}
 		})
 		await Promise.all(workers)
 	}
 
-	private async loadOne(texture: Texture, table: Table): Promise<void> {
+	private async loadOne(texture: Texture, table: Table): Promise<boolean> {
 		try {
 			const tex = await texture.loadTexture(this.textureLoader!, table)
 			this.textureCache.set(texture.getName(), tex)
 			progress().details(texture.getName())
+			return true
 		} catch (err) {
 			const msg = (err as Error).message || ''
 			if (msg.includes('too large')) {
@@ -98,6 +110,7 @@ export class ThreeMapGenerator {
 					msg,
 				)
 			}
+			return false
 		}
 	}
 

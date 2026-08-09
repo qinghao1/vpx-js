@@ -57,9 +57,13 @@ export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, Poin
 		)
 	}
 
-	public async preloadTextures(textures: Texture[], table: Table): Promise<void> {
+	public async preloadTextures(
+		textures: Texture[],
+		table: Table,
+		onTexture?: (tex: Texture, ok: boolean) => void,
+	): Promise<void> {
 		progress().show('Pre-loading textures')
-		await this.mapGenerator.loadTextures(textures, table)
+		await this.mapGenerator.loadTextures(textures, table, onTexture)
 	}
 
 	public getMapGenerator(): ThreeMapGenerator {
