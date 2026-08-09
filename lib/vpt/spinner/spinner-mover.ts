@@ -1,11 +1,11 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
+import { MathUtils } from 'three'
 
 import { Event } from '../../game/event.js'
 import type { EventProxy } from '../../game/event-proxy.js'
 import { PHYS_FACTOR } from '../../physics/constants.js'
 import type { MoverObject } from '../../physics/mover-object.js'
-import { degToRad, radToDeg } from '../../util/float.js'
 import type { SpinnerData } from './spinner-data.js'
 import type { SpinnerState } from './spinner-state.js'
 
@@ -22,8 +22,8 @@ export class SpinnerMover implements MoverObject {
 		private readonly state: SpinnerState,
 		private readonly events: EventProxy,
 	) {
-		this.angleMax = degToRad(data.angleMax)
-		this.angleMin = degToRad(data.angleMin)
+		this.angleMax = MathUtils.degToRad(data.angleMax)
+		this.angleMin = MathUtils.degToRad(data.angleMin)
 		this.damping = data.damping ** PHYS_FACTOR
 		this.elasticity = data.elasticity
 	}
@@ -33,12 +33,12 @@ export class SpinnerMover implements MoverObject {
 			this.state.angle += this.angleSpeed * dTime
 			if (this.state.angle > this.angleMax) {
 				this.state.angle = this.angleMax
-				this.events.fireVoidEventParm(Event.LimitEventsEOS, Math.abs(radToDeg(this.angleSpeed)))
+				this.events.fireVoidEventParm(Event.LimitEventsEOS, Math.abs(MathUtils.radToDeg(this.angleSpeed)))
 				if (this.angleSpeed > 0) this.angleSpeed *= -0.005 - this.elasticity
 			}
 			if (this.state.angle < this.angleMin) {
 				this.state.angle = this.angleMin
-				this.events.fireVoidEventParm(Event.LimitEventsBOS, Math.abs(radToDeg(this.angleSpeed)))
+				this.events.fireVoidEventParm(Event.LimitEventsBOS, Math.abs(MathUtils.radToDeg(this.angleSpeed)))
 				if (this.angleSpeed < 0) this.angleSpeed *= -0.005 - this.elasticity
 			}
 		} else {

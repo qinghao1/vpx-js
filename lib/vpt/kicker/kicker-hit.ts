@@ -1,6 +1,7 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
+import { MathUtils } from 'three'
 import { kickerHitVertices } from '../../../res/meshes/kicker-hit-mesh.js'
 import { Event } from '../../game/event.js'
 import type { EventProxy } from '../../game/event-proxy.js'
@@ -10,7 +11,7 @@ import { CollisionType } from '../../physics/collision-type.js'
 import { STATICTIME } from '../../physics/constants.js'
 import { HARD_SCATTER } from '../../physics/functions.js'
 import { HitCircle } from '../../physics/hit-circle.js'
-import { degToRad, FLT_MAX } from '../../util/float.js'
+import { FLT_MAX } from '../../util/float.js'
 import { clamp } from '../../util/functions.js'
 import { Vertex3D } from '../../util/vector.js'
 import type { Ball } from '../ball/ball.js'
@@ -161,9 +162,9 @@ export class KickerHit extends HitCircle {
 		if (!this.ball) return
 		if (!physics.activeBallBC) physics.activeBallBC = this.ball
 		if (physics.activeBallBC === this.ball) physics.bcTarget = undefined
-		let angleRad = degToRad(angle)
+		let angleRad = MathUtils.degToRad(angle)
 		if (Math.abs(inclination) > Math.PI / 2) inclination *= Math.PI / 180
-		let scatterAngle = this.data.scatter < 0 ? HARD_SCATTER : degToRad(this.data.scatter)
+		let scatterAngle = this.data.scatter < 0 ? HARD_SCATTER : MathUtils.degToRad(this.data.scatter)
 		scatterAngle *= table.getGlobalDifficulty()
 		if (scatterAngle > 1e-5) {
 			let scatter = Math.random() * 2 - 1

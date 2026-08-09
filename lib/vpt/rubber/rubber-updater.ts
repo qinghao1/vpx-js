@@ -1,10 +1,10 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
+import { MathUtils } from 'three'
 
 import type { IRenderApi } from '../../render/irender-api.js'
-import { degToRad } from '../../util/float.js'
-import type { Vertex3D } from '../../util/vector.js'
 import { Matrix3D } from '../../util/matrix.js'
+import type { Vertex3D } from '../../util/vector.js'
 import { ItemUpdater } from '../item-updater.js'
 import type { Table } from '../table/table.js'
 import type { RubberData } from './rubber-data.js'
@@ -47,11 +47,11 @@ export class RubberUpdater extends ItemUpdater<RubberState> {
 		const dX = this.data.rotX - this.state.rotX
 		const dY = this.data.rotY - this.state.rotY
 		const dZ = -(this.data.rotZ - this.state.rotZ)
-		const rot = Matrix3D.claim().rotateXMatrix(degToRad(dX))
+		const rot = Matrix3D.claim().rotateXMatrix(MathUtils.degToRad(dX))
 		const tmp = Matrix3D.claim()
-		tmp.rotateYMatrix(degToRad(dY))
+		tmp.rotateYMatrix(MathUtils.degToRad(dY))
 		rot.multiply(tmp)
-		tmp.rotateZMatrix(degToRad(dZ))
+		tmp.rotateZMatrix(MathUtils.degToRad(dZ))
 		rot.multiply(tmp)
 		const m = Matrix3D.claim()
 		tmp.setTranslation(this.middlePoint.x, this.middlePoint.y, -this.state.height - table.getTableHeight())

@@ -1,8 +1,8 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
+import { MathUtils } from 'three'
 
 import type { IRenderApi } from '../../render/irender-api.js'
-import { degToRad } from '../../util/float.js'
 import { Matrix3D } from '../../util/matrix.js'
 import { ItemUpdater } from '../item-updater.js'
 import type { Table } from '../table/table.js'
@@ -53,17 +53,17 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 			d.position.z - (s.position?.z ?? d.position.z),
 		)
 		const rotTrans = Matrix3D.claim()
-		rotTrans.rotateXMatrix(degToRad(d.rotAndTra[6] - (s.objectRotation?.x ?? d.rotAndTra[6])))
+		rotTrans.rotateXMatrix(MathUtils.degToRad(d.rotAndTra[6] - (s.objectRotation?.x ?? d.rotAndTra[6])))
 		const tmp = Matrix3D.claim()
-		tmp.rotateYMatrix(degToRad(d.rotAndTra[7] - (s.objectRotation?.y ?? d.rotAndTra[7])))
+		tmp.rotateYMatrix(MathUtils.degToRad(d.rotAndTra[7] - (s.objectRotation?.y ?? d.rotAndTra[7])))
 		rotTrans.multiply(tmp)
-		tmp.rotateZMatrix(degToRad(-(d.rotAndTra[8] - (s.objectRotation?.z ?? d.rotAndTra[8]))))
+		tmp.rotateZMatrix(MathUtils.degToRad(-(d.rotAndTra[8] - (s.objectRotation?.z ?? d.rotAndTra[8]))))
 		rotTrans.multiply(tmp)
-		tmp.rotateXMatrix(degToRad(d.rotAndTra[0] - (s.rotation?.x ?? d.rotAndTra[0])))
+		tmp.rotateXMatrix(MathUtils.degToRad(d.rotAndTra[0] - (s.rotation?.x ?? d.rotAndTra[0])))
 		rotTrans.multiply(tmp)
-		tmp.rotateYMatrix(degToRad(d.rotAndTra[1] - (s.rotation?.y ?? d.rotAndTra[1])))
+		tmp.rotateYMatrix(MathUtils.degToRad(d.rotAndTra[1] - (s.rotation?.y ?? d.rotAndTra[1])))
 		rotTrans.multiply(tmp)
-		tmp.rotateZMatrix(degToRad(-(d.rotAndTra[2] - (s.rotation?.z ?? d.rotAndTra[2]))))
+		tmp.rotateZMatrix(MathUtils.degToRad(-(d.rotAndTra[2] - (s.rotation?.z ?? d.rotAndTra[2]))))
 		rotTrans.multiply(tmp)
 		tmp.setTranslation(
 			-(d.rotAndTra[3] - (s.translation?.x ?? d.rotAndTra[3])),

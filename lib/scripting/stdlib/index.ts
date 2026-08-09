@@ -2,7 +2,6 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import type { Player } from '../../game/player.js'
-import { f4 } from '../../util/float.js'
 import { logger } from '../../util/logger.js'
 import { getObject } from '../objects/index.js'
 import { VbsApi } from '../vbs-api.js'
@@ -94,7 +93,7 @@ export class Stdlib extends VbsApi {
 	 * @see https://docs.microsoft.com/en-us/dotnet/visual-basic/language-reference/functions/type-conversion-functions
 	 */
 	public Csng(n: number): number {
-		return f4(n)
+		return n
 	}
 
 	public Int(n: number): number {

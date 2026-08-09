@@ -4,11 +4,11 @@
 import * as chai from 'chai'
 import { expect } from 'chai'
 import sinonChai from 'sinon-chai'
+import { MathUtils } from 'three'
 import { createBall } from '../../../test/physics.helper'
 import { ThreeHelper } from '../../../test/three.helper'
 import { Player } from '../../game/player.js'
 import { NodeBinaryReader } from '../../io/binary-reader.node.js'
-import { radToDeg } from '../../util/float.js'
 import { Table } from '../table/table.js'
 import type { GateState } from './gate-state.js'
 
@@ -37,17 +37,17 @@ describe('The VPinball gate mover', () => {
 		expect(gate.getState().angle).to.equal(0)
 
 		player.updatePhysics(100)
-		expect(radToDeg(gate.getState().angle)).to.be.within(73, 75)
+		expect(MathUtils.radToDeg(gate.getState().angle)).to.be.within(73, 75)
 		player.updatePhysics(150)
-		expect(radToDeg(gate.getState().angle)).to.be.within(13, 16)
+		expect(MathUtils.radToDeg(gate.getState().angle)).to.be.within(13, 16)
 		player.updatePhysics(200)
-		expect(radToDeg(gate.getState().angle)).to.be.within(-81, -79)
+		expect(MathUtils.radToDeg(gate.getState().angle)).to.be.within(-81, -79)
 		player.updatePhysics(300)
-		expect(radToDeg(gate.getState().angle)).to.be.within(33, 35)
+		expect(MathUtils.radToDeg(gate.getState().angle)).to.be.within(33, 35)
 		player.updatePhysics(600)
-		expect(radToDeg(gate.getState().angle)).to.be.within(-81, -79)
+		expect(MathUtils.radToDeg(gate.getState().angle)).to.be.within(-81, -79)
 		player.updatePhysics(1990)
-		expect(radToDeg(gate.getState().angle)).to.be.within(-32, -30)
+		expect(MathUtils.radToDeg(gate.getState().angle)).to.be.within(-32, -30)
 	})
 
 	it('should make the two-way gate bracket stand still', () => {
@@ -61,11 +61,11 @@ describe('The VPinball gate mover', () => {
 
 		// for (let i = 0; i < 500; i++) {
 		// 	player.updatePhysics(i * 10);
-		// 	console.log(i * 10, radToDeg(gate.getState().angle));
+		// 	console.log(i * 10, MathUtils.radToDeg(gate.getState().angle));
 		// }
 
 		player.updatePhysics(500)
-		expect(radToDeg(gate.getState().angle)).to.be.above(40)
+		expect(MathUtils.radToDeg(gate.getState().angle)).to.be.above(40)
 		player.updatePhysics(4090)
 		expect(gate.getState().angle).to.equal(0)
 	})
@@ -80,13 +80,13 @@ describe('The VPinball gate mover', () => {
 		expect(gate.getState().angle).to.equal(0)
 
 		player.updatePhysics(100)
-		expect(radToDeg(gate.getState().angle)).to.be.within(69, 71)
+		expect(MathUtils.radToDeg(gate.getState().angle)).to.be.within(69, 71)
 		player.updatePhysics(150)
-		expect(radToDeg(gate.getState().angle)).to.be.within(73, 75)
+		expect(MathUtils.radToDeg(gate.getState().angle)).to.be.within(73, 75)
 		player.updatePhysics(200)
-		expect(radToDeg(gate.getState().angle)).to.be.within(79, 81)
+		expect(MathUtils.radToDeg(gate.getState().angle)).to.be.within(79, 81)
 		player.updatePhysics(1000)
-		expect(radToDeg(gate.getState().angle)).to.be.within(36, 38)
+		expect(MathUtils.radToDeg(gate.getState().angle)).to.be.within(36, 38)
 		player.updatePhysics(1970)
 		expect(gate.getState().angle).to.equal(0)
 	})

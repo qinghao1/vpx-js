@@ -1,10 +1,10 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { FLT_MAX, FLT_MIN, f4, fr } from '../util/float.js'
+import { FLT_MAX, FLT_MIN } from '../util/float.js'
 import type { Matrix3D } from '../util/matrix.js'
-import { Vertex2D, Vertex3D } from '../util/vector.js'
 import { type RenderVertex, RenderVertex3D } from '../util/render-vertex.js'
+import { Vertex2D, Vertex3D } from '../util/vector.js'
 import { Vertex3DNoTex2 } from '../util/vertex.js'
 import type { FrameData } from './animation.js'
 
@@ -67,9 +67,9 @@ export class Mesh {
 	/** Translates mesh. */
 	public makeTranslation(x: number, y: number, z: number): this {
 		for (const v of this.vertices) {
-			v.x += f4(x)
-			v.y += f4(y)
-			v.z += f4(z)
+			v.x += x
+			v.y += y
+			v.z += z
 		}
 		return this
 	}
@@ -77,9 +77,9 @@ export class Mesh {
 	/** Scales mesh. */
 	public makeScale(x: number, y: number, z: number): this {
 		for (const v of this.vertices) {
-			v.x *= f4(x)
-			v.y *= f4(y)
-			v.z *= f4(z)
+			v.x *= x
+			v.y *= y
+			v.z *= z
 		}
 		return this
 	}
@@ -126,8 +126,8 @@ export class Mesh {
 		}
 		for (let i = 0; i < numVertices; i++) {
 			const v = vertices[i]
-			const l = f4(f4(f4(v.nx * v.nx) + f4(v.ny * v.ny)) + f4(v.nz * v.nz))
-			const inv = l >= FLT_MIN ? f4(1 / f4(Math.sqrt(l))) : 0
+			const l = v.nx * v.nx + v.ny * v.ny + v.nz * v.nz
+			const inv = l >= FLT_MIN ? 1 / Math.sqrt(l) : 0
 			v.nx *= inv
 			v.ny *= inv
 			v.nz *= inv
@@ -141,9 +141,9 @@ export class Mesh {
 		for (let i = 0; i < count; i++) {
 			const l = rgi[i],
 				m = rgi[i < count - 1 ? i + 1 : 0]
-			n.x += f4(rgv[l].y - rgv[m].y) * f4(rgv[l].z + rgv[m].z)
-			n.y += f4(rgv[l].z - rgv[m].z) * f4(rgv[l].x + rgv[m].x)
-			n.z += f4(rgv[l].x - rgv[m].x) * f4(rgv[l].y + rgv[m].y)
+			n.x += (rgv[l].y - rgv[m].y) * (rgv[l].z + rgv[m].z)
+			n.y += (rgv[l].z - rgv[m].z) * (rgv[l].x + rgv[m].x)
+			n.z += (rgv[l].x - rgv[m].x) * (rgv[l].y + rgv[m].y)
 		}
 		n.normalize()
 		for (let i = 0; i < applyCount; i++) {
@@ -172,28 +172,26 @@ export class Mesh {
 			rgvi.set(rgv[i].x, rgv[i].y, rgv[i].z)
 			const rgvp2 = new RenderVertex3D()
 			rgvp2.set(rgv[p2].x, rgv[p2].y, rgv[p2].z)
-			const A = f4(rgvi.y - rgvp2.y)
-			const B = f4(rgvp2.x - rgvi.x)
-			const C = -f4(f4(A * rgvi.x) + f4(B * rgvi.y))
+			const A = rgvi.y - rgvp2.y
+			const B = rgvp2.x - rgvi.x
+			const C = -(A * rgvi.x + B * rgvi.y)
 
-			const dist = f4(
-				f4(Math.abs(f4(f4(f4(A * pvin.x) + f4(B * pvin.y)) + C))) / f4(Math.sqrt(f4(f4(A * A) + f4(B * B)))),
-			)
+			const dist = Math.abs(A * pvin.x + B * pvin.y + C) / Math.sqrt(A * A + B * B)
 
 			if (dist < mindist) {
 				const D = -B
-				const F = -f4(f4(D * pvin.x) + f4(A * pvin.y))
+				const F = -(D * pvin.x + A * pvin.y)
 
-				const det = f4(f4(A * A) - f4(B * D))
-				const invDet = det !== 0.0 ? f4(1.0 / det) : 0.0
-				const intersectX = f4(f4(f4(B * F) - f4(A * C)) * invDet)
-				const intersectY = f4(f4(f4(C * D) - f4(A * F)) * invDet)
+				const det = A * A - B * D
+				const invDet = det !== 0.0 ? 1.0 / det : 0.0
+				const intersectX = (B * F - A * C) * invDet
+				const intersectY = (C * D - A * F) * invDet
 
 				if (
-					intersectX >= f4(Math.min(rgvi.x, rgvp2.x) - f4(0.1)) &&
-					intersectX <= f4(Math.max(rgvi.x, rgvp2.x) + f4(0.1)) &&
-					intersectY >= f4(Math.min(rgvi.y, rgvp2.y) - f4(0.1)) &&
-					intersectY <= f4(Math.max(rgvi.y, rgvp2.y) + f4(0.1))
+					intersectX >= Math.min(rgvi.x, rgvp2.x) - 0.1 &&
+					intersectX <= Math.max(rgvi.x, rgvp2.x) + 0.1 &&
+					intersectY >= Math.min(rgvi.y, rgvp2.y) - 0.1 &&
+					intersectY <= Math.max(rgvi.y, rgvp2.y) + 0.1
 				) {
 					mindist = dist
 					const seg = i
@@ -286,14 +284,14 @@ export class Mesh {
 			y3 = b1.y,
 			x4 = b2.x,
 			y4 = b2.y
-		const d123 = f4(f4(f4(x2 - x1) * f4(y3 - y1)) - f4(f4(x3 - x1) * f4(y2 - y1)))
+		const d123 = (x2 - x1) * (y3 - y1) - (x3 - x1) * (y2 - y1)
 		if (d123 === 0) return x3 >= Math.min(x1, x2) && x3 <= Math.max(x2, x1)
-		const d124 = f4(f4(f4(x2 - x1) * f4(y4 - y1)) - f4(f4(x4 - x1) * f4(y2 - y1)))
+		const d124 = (x2 - x1) * (y4 - y1) - (x4 - x1) * (y2 - y1)
 		if (d124 === 0) return x4 >= Math.min(x1, x2) && x4 <= Math.max(x2, x1)
 		if (d123 * d124 >= 0) return false
-		const d341 = f4(f4(f4(x3 - x1) * f4(y4 - y1)) - f4(f4(x4 - x1) * f4(y3 - y1)))
+		const d341 = (x3 - x1) * (y4 - y1) - (x4 - x1) * (y3 - y1)
 		if (d341 === 0) return x1 >= Math.min(x3, x4) && x1 <= Math.max(x3, x4)
-		const d342 = f4(f4(d123 - d124) + d341)
+		const d342 = d123 - d124 + d341
 		if (d342 === 0) return x2 >= Math.min(x3, x4) && x2 <= Math.max(x3, x4)
 		return d341 * d342 < 0
 	}
@@ -305,14 +303,14 @@ export class Mesh {
 	private _writeVertexInfo(out: string[]): void {
 		for (const v of this.vertices)
 			out.push(
-				`v ${fr(v.x).toFixed(Mesh.exportPrecision)} ${fr(v.y).toFixed(Mesh.exportPrecision)} ${fr(v.z).toFixed(Mesh.exportPrecision)}`,
+				`v ${(v.x).toFixed(Mesh.exportPrecision)} ${(v.y).toFixed(Mesh.exportPrecision)} ${(v.z).toFixed(Mesh.exportPrecision)}`,
 			)
 		for (const v of this.vertices)
 			if (v.hasTextureCoordinates())
-				out.push(`vt ${fr(v.tu).toFixed(Mesh.exportPrecision)} ${fr(1 - v.tv).toFixed(Mesh.exportPrecision)}`)
+				out.push(`vt ${(v.tu).toFixed(Mesh.exportPrecision)} ${(1 - v.tv).toFixed(Mesh.exportPrecision)}`)
 		for (const v of this.vertices)
 			out.push(
-				`vn ${fr(v.nx).toFixed(Mesh.exportPrecision)} ${fr(v.ny).toFixed(Mesh.exportPrecision)} ${fr(v.nz).toFixed(Mesh.exportPrecision)}`,
+				`vn ${(v.nx).toFixed(Mesh.exportPrecision)} ${(v.ny).toFixed(Mesh.exportPrecision)} ${(v.nz).toFixed(Mesh.exportPrecision)}`,
 			)
 	}
 

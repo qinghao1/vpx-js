@@ -1,10 +1,10 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
+import { MathUtils } from 'three'
 
 import { Event } from '../game/event.js'
 import type { EventProxy } from '../game/event-proxy.js'
 import type { PlayerPhysics } from '../game/player-physics.js'
-import { degToRad } from '../util/float.js'
 import { FRect3D } from '../util/frect3d.js'
 import { Vertex3D } from '../util/vector.js'
 import type { Ball } from '../vpt/ball/ball.js'
@@ -140,11 +140,11 @@ export abstract class HitObject {
 		if (mat && !data.overwritePhysics) {
 			this.setElasticity(mat.elasticity, mat.elasticityFalloff)
 			this.setFriction(mat.friction)
-			this.setScatter(degToRad(mat.scatterAngle))
+			this.setScatter(MathUtils.degToRad(mat.scatterAngle))
 		} else {
 			this.setElasticity(data.elasticity, data.elasticityFalloff)
 			this.setFriction(data.friction)
-			this.setScatter(degToRad(data.scatter))
+			this.setScatter(MathUtils.degToRad(data.scatter))
 		}
 		this.setEnabled(data.isCollidable)
 	}

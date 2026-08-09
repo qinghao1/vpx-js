@@ -4,10 +4,9 @@
 import type { Meshes } from '../../game/irenderable.js'
 import { CatmullCurve3D } from '../../util/catmull-curve.js'
 import { DragPoint } from '../../util/dragpoint.js'
-import { f4 } from '../../util/float.js'
-import { Vertex2D, Vertex3D } from '../../util/vector.js'
 import { Matrix3D } from '../../util/matrix.js'
 import { RenderVertex3D } from '../../util/render-vertex.js'
+import { Vertex2D, Vertex3D } from '../../util/vector.js'
 import { Vertex3DNoTex2 } from '../../util/vertex.js'
 import { Enums } from '../enums.js'
 import { Mesh } from '../mesh.js'
@@ -97,8 +96,8 @@ export class RampMeshGenerator {
 	private generateFlatFloorMesh(table: Table, rv: RampVertexResult): Mesh {
 		const n = rv.pcvertex
 		const dim = table.getDimensions()
-		const invW = f4(1 / f4(dim.width))
-		const invH = f4(1 / f4(dim.height))
+		const invW = 1 / dim.width
+		const invH = 1 / dim.height
 		const mesh = new Mesh(`ramp.floor-${this.data.getName()}`)
 		for (let i = 0; i < n; i++) {
 			const v1 = new Vertex3DNoTex2()
@@ -132,8 +131,8 @@ export class RampMeshGenerator {
 	private generateFlatWall(table: Table, rv: RampVertexResult, side: 'left' | 'right'): Mesh {
 		const n = rv.pcvertex
 		const dim = table.getDimensions()
-		const invW = f4(1 / f4(dim.width))
-		const invH = f4(1 / f4(dim.height))
+		const invW = 1 / dim.width
+		const invH = 1 / dim.height
 		const wallH = side === 'left' ? this.state.leftWallHeightVisible : this.state.rightWallHeightVisible
 		const mesh = new Mesh(`ramp.${side}-${this.data.getName()}`)
 		for (let i = 0; i < n; i++) {
@@ -145,7 +144,7 @@ export class RampMeshGenerator {
 			v1.z = rv.ppheight[i] * table.getScaleZ()
 			v2.x = v1.x
 			v2.y = v1.y
-			v2.z = f4(rv.ppheight[i] + wallH) * table.getScaleZ()
+			v2.z = (rv.ppheight[i] + wallH) * table.getScaleZ()
 			if (this.state.texture && this.state.hasWallImage) {
 				if (this.state.textureAlignment === Enums.RampImageAlignment.ImageModeWorld) {
 					v1.tu = v1.x * invW
@@ -168,9 +167,9 @@ export class RampMeshGenerator {
 		let accuracy: number
 		if (table.getDetailLevel() < 5) accuracy = 6
 		else if (table.getDetailLevel() < 8) accuracy = 8
-		else accuracy = Math.floor(table.getDetailLevel() * f4(1.3))
+		else accuracy = Math.floor(table.getDetailLevel() * 1.3)
 		const mat = table.getMaterial(this.state.material)
-		if (!mat?.isOpacityActive) accuracy = f4(12)
+		if (!mat?.isOpacityActive) accuracy = 12
 
 		const rv = this.getRampVertex(table, -1, false)
 		const n = rv.pcvertex
@@ -260,13 +259,13 @@ export class RampMeshGenerator {
 			normal.normalize()
 			prevB = binorm
 
-			const invNumRings = f4(1 / f4(numRings))
-			const invNumSegments = f4(1 / f4(numSegments))
-			const u = f4(i * invNumRings)
+			const invNumRings = 1 / numRings
+			const invNumSegments = 1 / numSegments
+			const u = i * invNumRings
 			for (let j = 0; j < numSegments; j++, index++) {
-				const v = f4(f4(j + u) * invNumSegments)
-				const tmp = Vertex3D.getRotatedAxis(f4(j * f4(360 * invNumSegments)), tangent, normal).multiplyScalar(
-					this.data.wireDiameter * f4(0.5),
+				const v = (j + u) * invNumSegments
+				const tmp = Vertex3D.getRotatedAxis(j * (360 * invNumSegments), tangent, normal).multiplyScalar(
+					this.data.wireDiameter * 0.5,
 				)
 				const vtx = new Vertex3DNoTex2()
 				vtx.x = midPoints[i].x + tmp.x
@@ -275,7 +274,7 @@ export class RampMeshGenerator {
 				vtx.tu = u
 				vtx.tv = v
 				const n = new Vertex3D(vtx.x - midPoints[i].x, vtx.y - midPoints[i].y, vtx.z - height)
-				const len = f4(1 / f4(Math.sqrt(f4(f4(f4(n.x * n.x) + f4(n.y * n.y)) + f4(n.z * n.z)))))
+				const len = 1 / Math.sqrt(n.x * n.x + n.y * n.y + n.z * n.z)
 				vtx.nx = n.x * len
 				vtx.ny = n.y * len
 				vtx.nz = n.z * len
@@ -293,14 +292,14 @@ export class RampMeshGenerator {
 		const vvertex = this.getCentralCurve(table, accuracy)
 		const cvertex = vvertex.length
 		const rgvLocal: Vertex2D[] = []
-		const bottomHeight = f4(this.state.heightBottom + table.getTableHeight())
-		const topHeight = f4(this.state.heightTop + table.getTableHeight())
+		const bottomHeight = this.state.heightBottom + table.getTableHeight()
+		const topHeight = this.state.heightTop + table.getTableHeight()
 
 		let totalLength = 0
 		for (let i = 0; i < cvertex - 1; i++) {
-			const dx = f4(vvertex[i].x - vvertex[i + 1].x)
-			const dy = f4(vvertex[i].y - vvertex[i + 1].y)
-			totalLength = f4(totalLength + f4(Math.sqrt(f4(dx * dx) + f4(dy * dy))))
+			const dx = vvertex[i].x - vvertex[i + 1].x
+			const dy = vvertex[i].y - vvertex[i + 1].y
+			totalLength = totalLength + Math.sqrt(dx * dx + dy * dy)
 		}
 
 		let currentLength = 0
@@ -311,18 +310,16 @@ export class RampMeshGenerator {
 			ppfCross[i] = vmiddle.fControlPoint
 
 			const vnormal = this.computeNormal(vprev, vmiddle, vnext, i, cvertex)
-			const dx = f4(vprev.x - vmiddle.x)
-			const dy = f4(vprev.y - vmiddle.y)
-			currentLength = f4(currentLength + f4(Math.sqrt(f4(dx * dx) + f4(dy * dy))))
+			const dx = vprev.x - vmiddle.x
+			const dy = vprev.y - vmiddle.y
+			currentLength = currentLength + Math.sqrt(dx * dx + dy * dy)
 
-			const percentage = f4(currentLength / totalLength)
-			let currentWidth = f4(
-				f4(percentage * f4(this.state.widthTop - this.state.widthBottom)) + this.state.widthBottom,
-			)
-			const height = f4(f4(vmiddle.z + f4(percentage * f4(topHeight - bottomHeight))) + bottomHeight)
+			const percentage = currentLength / totalLength
+			let currentWidth = percentage * (this.state.widthTop - this.state.widthBottom) + this.state.widthBottom
+			const height = vmiddle.z + percentage * (topHeight - bottomHeight) + bottomHeight
 			ppheight[i] = height
 			this.assignHeightToControlPoint(vvertex[i], height)
-			ppratio[i] = f4(1 - percentage)
+			ppratio[i] = 1 - percentage
 
 			if (this.isHabitrail() && this.state.type !== Enums.RampType.RampType1Wire) {
 				currentWidth = this.data.wireDistanceX + (incWidth ? 20 : 0)
@@ -331,9 +328,9 @@ export class RampMeshGenerator {
 			}
 
 			pMiddlePoints[i] = new Vertex2D(vmiddle.x, vmiddle.y).add(vnormal)
-			rgvLocal[i] = new Vertex2D(vmiddle.x, vmiddle.y).add(vnormal.clone().multiplyScalar(currentWidth * f4(0.5)))
+			rgvLocal[i] = new Vertex2D(vmiddle.x, vmiddle.y).add(vnormal.clone().multiplyScalar(currentWidth * 0.5))
 			rgvLocal[cvertex * 2 - i - 1] = new Vertex2D(vmiddle.x, vmiddle.y).sub(
-				vnormal.clone().multiplyScalar(currentWidth * f4(0.5)),
+				vnormal.clone().multiplyScalar(currentWidth * 0.5),
 			)
 		}
 		return { rgvLocal, pcvertex: cvertex, ppheight, ppfCross, ppratio, pMiddlePoints }
@@ -358,21 +355,20 @@ export class RampMeshGenerator {
 		}
 		v1normal.normalize()
 		v2normal.normalize()
-		if (Math.abs(f4(v1normal.x - v2normal.x)) < 0.0001 && Math.abs(f4(v1normal.y - v2normal.y)) < 0.0001)
-			return v1normal
+		if (Math.abs(v1normal.x - v2normal.x) < 0.0001 && Math.abs(v1normal.y - v2normal.y) < 0.0001) return v1normal
 
-		const A = f4(vprev.y - vmiddle.y)
-		const B = f4(vmiddle.x - vprev.x)
-		const C = -f4(f4(A * f4(vprev.x - v1normal.x)) + f4(B * f4(vprev.y - v1normal.y)))
-		const D = f4(vnext.y - vmiddle.y)
-		const E = f4(vmiddle.x - vnext.x)
-		const F = -f4(f4(D * f4(vnext.x - v2normal.x)) + f4(E * f4(vnext.y - v2normal.y)))
-		const det = f4(f4(A * E) - f4(B * D))
-		const invDet = det !== 0 ? f4(1 / det) : 0
-		const ix = f4(f4(f4(B * F) - f4(E * C)) * invDet)
-		const iy = f4(f4(f4(C * D) - f4(A * F)) * invDet)
+		const A = vprev.y - vmiddle.y
+		const B = vmiddle.x - vprev.x
+		const C = -(A * (vprev.x - v1normal.x) + B * (vprev.y - v1normal.y))
+		const D = vnext.y - vmiddle.y
+		const E = vmiddle.x - vnext.x
+		const F = -(D * (vnext.x - v2normal.x) + E * (vnext.y - v2normal.y))
+		const det = A * E - B * D
+		const invDet = det !== 0 ? 1 / det : 0
+		const ix = (B * F - E * C) * invDet
+		const iy = (C * D - A * F) * invDet
 		// vnormal = vmiddle - intersection
-		return new Vertex2D(f4(vmiddle.x - ix), f4(vmiddle.y - iy))
+		return new Vertex2D(vmiddle.x - ix, vmiddle.y - iy)
 	}
 
 	public getCentralCurve(table: Table, acc = -1): RenderVertex3D[] {
@@ -383,7 +379,7 @@ export class RampMeshGenerator {
 			const mat = table.getMaterial(this.state.material)
 			accuracy = !mat?.isOpacityActive ? 10 : table.getDetailLevel()
 		}
-		accuracy = f4(f4(4) * f4(10 ** f4(f4(10 - accuracy) * f4(f4(1) / f4(1.5)))))
+		accuracy = 4 * 10 ** ((10 - accuracy) * (1 / 1.5))
 		return DragPoint.getRgVertex(
 			this.data.dragPoints,
 			() => new RenderVertex3D(),

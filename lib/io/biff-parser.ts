@@ -2,7 +2,6 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { inflate } from 'node:zlib'
-import { f4 } from '../util/float.js'
 import { decodeUtf8, getDataView, readInt32LE } from './binary-helpers.js'
 import type { ReadResult } from './ole-doc.js'
 
@@ -105,7 +104,7 @@ export class BiffParser {
 
 	/** Reads float32 at 0 (single precision). */
 	public getFloat(buf: Uint8Array): number {
-		return f4(getDataView(buf).getFloat32(0, true))
+		return getDataView(buf).getFloat32(0, true)
 	}
 
 	/** Reads bool (int32 !== 0). */

@@ -4,7 +4,6 @@
 import { BiffParser } from '../../io/biff-parser.js'
 import type { Storage } from '../../io/ole-doc.js'
 import { DragPoint } from '../../util/dragpoint.js'
-import { f4 } from '../../util/float.js'
 import { handleBiffTag } from '../biff-helper.js'
 import { type IPhysicalData, ItemData } from '../item-data.js'
 
@@ -34,9 +33,9 @@ const STRING_MAP: Record<string, string> = { MATR: 'szMaterial', IMAG: 'szImage'
 /** Rubber data.
  * @see https://github.com/vpinball/vpinball/blob/master/rubber.cpp */
 export class RubberData extends ItemData implements IPhysicalData {
-	public height: number = f4(25)
-	public hitHeight: number = f4(25)
-	public thickness: number = f4(8)
+	public height: number = 25
+	public hitHeight: number = 25
+	public thickness: number = 8
 	public hitEvent = false
 	public szMaterial?: string
 	public szImage?: string

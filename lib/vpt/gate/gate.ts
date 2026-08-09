@@ -1,5 +1,6 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
+import { MathUtils } from 'three'
 
 import { EventProxy } from '../../game/event-proxy.js'
 import type { IHittable } from '../../game/ihittable.js'
@@ -12,9 +13,8 @@ import type { Storage } from '../../io/ole-doc.js'
 import type { HitCircle } from '../../physics/hit-circle.js'
 import type { HitObject } from '../../physics/hit-object.js'
 import type { LineSeg } from '../../physics/line-seg.js'
-import { degToRad } from '../../util/float.js'
-import { Vertex2D } from '../../util/vector.js'
 import { Matrix3D } from '../../util/matrix.js'
+import { Vertex2D } from '../../util/vector.js'
 import { Item } from '../item.js'
 import type { Table } from '../table/table.js'
 import { GateApi } from './gate-api.js'
@@ -75,7 +75,7 @@ export class Gate
 
 	public setupPlayer(player: Player, table: Table): void {
 		const height = table.getSurfaceHeight(this.data.szSurface, this.data.center.x, this.data.center.y)
-		const radAngle = degToRad(this.data.rotation)
+		const radAngle = MathUtils.degToRad(this.data.rotation)
 		const tangent = new Vertex2D(Math.cos(radAngle), Math.sin(radAngle))
 		this.events = new EventProxy(this)
 		this.hitGate = this.hitGenerator.generateGateHit(this.state, this.events, height)

@@ -1,5 +1,6 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
+import { MathUtils } from 'three'
 
 import { CollisionEvent } from '../physics/collision-event.js'
 import {
@@ -17,7 +18,6 @@ import type { HitPlane } from '../physics/hit-plane.js'
 import { HitQuadtree } from '../physics/hit-quadtree.js'
 import type { MoverObject } from '../physics/mover-object.js'
 import { now } from '../refs.node.js'
-import { degToRad } from '../util/float.js'
 import { logger } from '../util/logger.js'
 import { Vertex3D } from '../util/vector.js'
 import { Ball } from '../vpt/ball/ball.js'
@@ -295,7 +295,7 @@ export class PlayerPhysics {
 
 	public setGravity(slopeDeg: number, strength: number): void {
 		this.gravity.x = 0
-		this.gravity.y = Math.sin(degToRad(slopeDeg)) * strength
-		this.gravity.z = -Math.cos(degToRad(slopeDeg)) * strength
+		this.gravity.y = Math.sin(MathUtils.degToRad(slopeDeg)) * strength
+		this.gravity.z = -Math.cos(MathUtils.degToRad(slopeDeg)) * strength
 	}
 }

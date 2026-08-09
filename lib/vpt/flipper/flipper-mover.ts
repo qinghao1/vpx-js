@@ -1,5 +1,6 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
+import { MathUtils } from 'three'
 
 import { Event } from '../../game/event.js'
 import type { EventProxy } from '../../game/event-proxy.js'
@@ -7,7 +8,6 @@ import type { PlayerPhysics } from '../../game/player-physics.js'
 import { PHYS_FACTOR } from '../../physics/constants.js'
 import { HitCircle } from '../../physics/hit-circle.js'
 import type { MoverObject } from '../../physics/mover-object.js'
-import { degToRad, radToDeg } from '../../util/float.js'
 import { logger } from '../../util/logger.js'
 import { Vertex2D, Vertex3D } from '../../util/vector.js'
 import type { TableData } from '../table/table-data.js'
@@ -72,7 +72,7 @@ export class FlipperMover implements MoverObject {
 		else if (this.state.angle === angleMin && this.angleSpeed < 0) handleEvent = true
 
 		if (handleEvent) {
-			const anglespd = Math.abs(radToDeg(this.angleSpeed))
+			const anglespd = Math.abs(MathUtils.radToDeg(this.angleSpeed))
 			this.angularMomentum *= -0.3
 			this.angleSpeed = this.angularMomentum / this.inertia
 			if (this.enableRotateEvent > 0) {
@@ -89,7 +89,7 @@ export class FlipperMover implements MoverObject {
 	public updateVelocities(): void {
 		let desiredTorque = this.getStrength()
 		if (!this.solState) desiredTorque *= -this.getReturnRatio()
-		const eosAngle = degToRad(this.getTorqueDampingAngle())
+		const eosAngle = MathUtils.degToRad(this.getTorqueDampingAngle())
 		if (Math.abs(this.state.angle - this.angleEnd) < eosAngle) {
 			const lerp = Math.sqrt(Math.sqrt(Math.abs(this.state.angle - this.angleEnd) / eosAngle))
 			desiredTorque *= lerp + this.getTorqueDamping() * (1 - lerp)

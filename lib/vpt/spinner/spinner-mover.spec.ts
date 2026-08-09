@@ -4,12 +4,12 @@
 import * as chai from 'chai'
 import { expect } from 'chai'
 import sinonChai from 'sinon-chai'
+import { MathUtils } from 'three'
 import { createBall } from '../../../test/physics.helper'
 import { ThreeHelper } from '../../../test/three.helper'
 import { Player } from '../../game/player.js'
 import type { PlayerPhysics } from '../../game/player-physics.js'
 import { NodeBinaryReader } from '../../io/binary-reader.node.js'
-import { degToRad, radToDeg } from '../../util/float.js'
 import { Table } from '../table/table.js'
 import type { Spinner } from './spinner.js'
 import type { SpinnerState } from './spinner-state.js'
@@ -62,12 +62,15 @@ describe('The VPinball spinner collision', () => {
 		player.updatePhysics(250)
 
 		// assert rotated position
-		expect(spinner.getState().angle).to.be.below(degToRad(-70))
+		expect(spinner.getState().angle).to.be.below(MathUtils.degToRad(-70))
 
 		// assert it stays in defined angles
 		for (let i = 0; i <= 200; i++) {
 			player.updatePhysics(260 + i * 10)
-			expect(spinner.getState().angle).to.be.within(degToRad(spinner.angleMin), degToRad(spinner.angleMax))
+			expect(spinner.getState().angle).to.be.within(
+				MathUtils.degToRad(spinner.angleMin),
+				MathUtils.degToRad(spinner.angleMax),
+			)
 		}
 	})
 
@@ -99,6 +102,11 @@ describe('The VPinball spinner collision', () => {
 export function debugSpinner(physics: PlayerPhysics, spinner: Spinner, numCycles = 300, cycleLength = 5) {
 	for (let i = 0; i <= numCycles; i++) {
 		physics.updatePhysics(i * cycleLength)
-		console.log('[%sms] %s (%s°)', i * cycleLength, spinner.getState().angle, radToDeg(spinner.getState().angle))
+		console.log(
+			'[%sms] %s (%s°)',
+			i * cycleLength,
+			spinner.getState().angle,
+			MathUtils.radToDeg(spinner.getState().angle),
+		)
 	}
 }

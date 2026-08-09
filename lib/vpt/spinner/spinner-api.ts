@@ -1,10 +1,10 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
+import { MathUtils } from 'three'
 
 import type { EventProxy } from '../../game/event-proxy.js'
 import type { Player } from '../../game/player.js'
 import { PHYS_FACTOR } from '../../physics/constants.js'
-import { degToRad, radToDeg } from '../../util/float.js'
 import { clamp } from '../../util/functions.js'
 import { ItemApi } from '../item-api.js'
 import type { Table } from '../table/table.js'
@@ -87,7 +87,7 @@ export class SpinnerApi extends ItemApi<SpinnerData> {
 		this.state.showBracket = v
 	}
 	get AngleMax() {
-		return radToDeg(this.mover.angleMax)
+		return MathUtils.radToDeg(this.mover.angleMax)
 	}
 	set AngleMax(v) {
 		if (this.data.angleMin !== this.data.angleMax) {
@@ -97,7 +97,7 @@ export class SpinnerApi extends ItemApi<SpinnerData> {
 		}
 	}
 	get AngleMin() {
-		return radToDeg(this.mover.angleMin)
+		return MathUtils.radToDeg(this.mover.angleMin)
 	}
 	set AngleMin(v) {
 		if (this.data.angleMin !== this.data.angleMax) {
@@ -134,5 +134,5 @@ export class SpinnerApi extends ItemApi<SpinnerData> {
 }
 
 function clampAngleToRad(angle: number, min: number, max: number): number {
-	return degToRad(clamp(angle, min, max))
+	return MathUtils.degToRad(clamp(angle, min, max))
 }

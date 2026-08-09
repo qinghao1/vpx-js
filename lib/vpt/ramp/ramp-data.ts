@@ -4,7 +4,6 @@
 import { BiffParser } from '../../io/biff-parser.js'
 import type { Storage } from '../../io/ole-doc.js'
 import { DragPoint } from '../../util/dragpoint.js'
-import { f4 } from '../../util/float.js'
 import { handleBiffTag } from '../biff-helper.js'
 import { Enums } from '../enums.js'
 import { type IPhysicalData, ItemData } from '../item-data.js'
@@ -46,28 +45,28 @@ export class RampData extends ItemData implements IPhysicalData {
 	public friction = 0.3
 	public hitEvent = false
 	public heightBottom = 0
-	public heightTop = f4(50)
+	public heightTop = 50
 	public imageAlignment: number = Enums.RampImageAlignment.ImageModeWorld
 	public imageWalls = true
 	public isCollidable = true
 	public isReflectionEnabled = true
 	public isVisible = true
-	public leftWallHeight = f4(62)
-	public leftWallHeightVisible = f4(30)
+	public leftWallHeight = 62
+	public leftWallHeightVisible = 30
 	public overwritePhysics = true
 	public rampType: number = Enums.RampType.RampTypeFlat
-	public rightWallHeight = f4(62)
-	public rightWallHeightVisible = f4(30)
+	public rightWallHeight = 62
+	public rightWallHeightVisible = 30
 	public scatter = 0
 	public szImage?: string
 	public szMaterial?: string
 	public szPhysicsMaterial?: string
 	public threshold = 2
-	public widthBottom = f4(75)
-	public widthTop = f4(60)
-	public wireDiameter = f4(8)
-	public wireDistanceX = f4(38)
-	public wireDistanceY = f4(88)
+	public widthBottom = 75
+	public widthTop = 60
+	public wireDiameter = 8
+	public wireDistanceX = 38
+	public wireDistanceY = 88
 
 	public static async fromStorage(storage: Storage, itemName: string): Promise<RampData> {
 		const d = new RampData(itemName)

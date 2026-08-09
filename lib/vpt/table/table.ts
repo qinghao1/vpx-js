@@ -1,5 +1,6 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
+import { MathUtils } from 'three'
 
 import { Event } from '../../game/event.js'
 import { EventProxy } from '../../game/event-proxy.js'
@@ -15,7 +16,6 @@ import type { HitObject } from '../../physics/hit-object.js'
 import { HitPlane } from '../../physics/hit-plane.js'
 import type { IRenderApi } from '../../render/irender-api.js'
 import { Transpiler } from '../../scripting/transpiler.js'
-import { degToRad, f4 } from '../../util/float.js'
 import { FRect3D } from '../../util/frect3d.js'
 import { logger, progress } from '../../util/logger.js'
 import { Vertex3D } from '../../util/vector.js'
@@ -244,7 +244,7 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 		return new HitPlane(new Vertex3D(0, 0, 1), this.data?.tableHeight ?? 0)
 			.setFriction(this.data?.getFriction())
 			.setElasticity(this.data?.getElasticity(), this.data?.getElasticityFalloff())
-			.setScatter(degToRad(this.data?.getScatter()))
+			.setScatter(MathUtils.degToRad(this.data?.getScatter()))
 	}
 	public generateGlassHit(): HitPlane {
 		return new HitPlane(new Vertex3D(0, 0, -1), this.data?.glassHeight ?? 0).setElasticity(0.2)
@@ -272,7 +272,7 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 
 	public getScaleZ(): number {
 		if (!this.data) throw new Error('Table data not loaded')
-		return f4(this.data.bgScaleZ[this.data.bgCurrentSet]!) || 1.0
+		return this.data.bgScaleZ[this.data.bgCurrentSet]! || 1.0
 	}
 	public getDetailLevel(): number {
 		return 10
@@ -304,9 +304,9 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 		const base = this.baseHeight
 		if (!surface) return base
 		const s = this.surfaces[surface]
-		if (s) return f4(base + s.heightTop)
+		if (s) return base + s.heightTop
 		const r = this.ramps[surface]
-		if (r) return f4(base + r.getSurfaceHeight(x, y, this))
+		if (r) return base + r.getSurfaceHeight(x, y, this)
 		logger().warn('[Table.getSurfaceHeight] Unknown surface %s.', surface)
 		return base
 	}

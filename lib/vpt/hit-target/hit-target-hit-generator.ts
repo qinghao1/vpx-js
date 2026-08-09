@@ -1,5 +1,6 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
+import { MathUtils } from 'three'
 
 import type { EventProxy } from '../../game/event-proxy.js'
 import { CollisionType } from '../../physics/collision-type.js'
@@ -7,9 +8,8 @@ import type { HitObject } from '../../physics/hit-object.js'
 import { HitPoint } from '../../physics/hit-point.js'
 import { HitTriangle } from '../../physics/hit-triangle.js'
 import { EdgeSet } from '../../util/edge-set.js'
-import { degToRad } from '../../util/float.js'
-import { Vertex3D } from '../../util/vector.js'
 import { Matrix3D } from '../../util/matrix.js'
+import { Vertex3D } from '../../util/vector.js'
 import { Enums } from '../enums.js'
 import type { Mesh } from '../mesh.js'
 import type { Table } from '../table/table.js'
@@ -33,7 +33,7 @@ export class HitTargetHitGenerator {
 		const addedEdges = new EdgeSet()
 		const hitMesh = this.meshGenerator.generateMesh(table)
 		const hitObjects = this.generateCollidables(hitMesh, addedEdges, this.data.legacy, events, table)
-		const tempMatrix = new Matrix3D().rotateZMatrix(degToRad(this.data.rotZ))
+		const tempMatrix = new Matrix3D().rotateZMatrix(MathUtils.degToRad(this.data.rotZ))
 		const fullMatrix = new Matrix3D().multiply(tempMatrix)
 		if (!this.data.legacy) {
 			const rgv3D: Vertex3D[] = []

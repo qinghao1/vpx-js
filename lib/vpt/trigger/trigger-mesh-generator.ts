@@ -1,10 +1,10 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
+import { MathUtils } from 'three'
 
-import { degToRad, f4 } from '../../util/float.js'
 import { logger } from '../../util/logger.js'
-import { Vertex3D } from '../../util/vector.js'
 import { Matrix3D } from '../../util/matrix.js'
+import { Vertex3D } from '../../util/vector.js'
 import { Enums } from '../enums.js'
 import type { Mesh } from '../mesh.js'
 import { loadMesh } from '../mesh-loader.js'
@@ -34,13 +34,13 @@ export class TriggerMeshGenerator {
 		for (const v of mesh.vertices) {
 			const vert = Vertex3D.claim(v.x, v.y, v.z).multiplyMatrix(fullMatrix)
 			if (isRound) {
-				v.x = f4(vert.x * this.data.radius) + this.data.center.x
-				v.y = f4(vert.y * this.data.radius) + this.data.center.y
-				v.z = f4(f4(vert.z * this.data.radius) * table.getScaleZ() + baseHeight) + zOffset
+				v.x = vert.x * this.data.radius + this.data.center.x
+				v.y = vert.y * this.data.radius + this.data.center.y
+				v.z = vert.z * this.data.radius * table.getScaleZ() + baseHeight + zOffset
 			} else {
-				v.x = f4(vert.x * this.data.scaleX) + this.data.center.x
-				v.y = f4(vert.y * this.data.scaleY) + this.data.center.y
-				v.z = f4(vert.z * table.getScaleZ() + baseHeight) + zOffset
+				v.x = vert.x * this.data.scaleX + this.data.center.x
+				v.y = vert.y * this.data.scaleY + this.data.center.y
+				v.z = vert.z * table.getScaleZ() + baseHeight + zOffset
 			}
 			const n = Vertex3D.claim(v.nx, v.ny, v.nz).multiplyMatrixNoTranslate(fullMatrix)
 			v.nx = n.x
@@ -60,15 +60,15 @@ export class TriggerMeshGenerator {
 	private getFullMatrix(): Matrix3D {
 		const m = new Matrix3D()
 		if (this.data.shape === Enums.TriggerShape.TriggerWireB) {
-			m.rotateZMatrix(degToRad(this.data.rotation))
-			const tmp = new Matrix3D().rotateXMatrix(degToRad(-23))
+			m.rotateZMatrix(MathUtils.degToRad(this.data.rotation))
+			const tmp = new Matrix3D().rotateXMatrix(MathUtils.degToRad(-23))
 			m.multiply(tmp)
 		} else if (this.data.shape === Enums.TriggerShape.TriggerWireC) {
-			m.rotateZMatrix(degToRad(this.data.rotation))
-			const tmp = new Matrix3D().rotateXMatrix(degToRad(140))
+			m.rotateZMatrix(MathUtils.degToRad(this.data.rotation))
+			const tmp = new Matrix3D().rotateXMatrix(MathUtils.degToRad(140))
 			m.multiply(tmp)
 		} else {
-			m.rotateZMatrix(degToRad(this.data.rotation))
+			m.rotateZMatrix(MathUtils.degToRad(this.data.rotation))
 		}
 		return m
 	}

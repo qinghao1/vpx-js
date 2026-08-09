@@ -4,11 +4,11 @@
 import * as chai from 'chai'
 import { expect } from 'chai'
 import sinonChai from 'sinon-chai'
+import { MathUtils } from 'three'
 import { createBall } from '../../../test/physics.helper'
 import { ThreeHelper } from '../../../test/three.helper'
 import { Player } from '../../game/player.js'
 import { NodeBinaryReader } from '../../io/binary-reader.node.js'
-import { radToDeg } from '../../util/float.js'
 import { Table } from '../table/table.js'
 
 chai.use((sinonChai as any).default ?? sinonChai)
@@ -84,13 +84,13 @@ describe('The VPinball flipper collision', () => {
 		createBall(player, 395, 1547, 0, 0, 20)
 
 		// assert initial flipper position
-		expect(radToDeg(flipper.getState().angle)).to.equal(121)
+		expect(MathUtils.radToDeg(flipper.getState().angle)).to.equal(121)
 
 		// let it collide
 		player.updatePhysics(0)
 		player.updatePhysics(100)
 
-		expect(radToDeg(flipper.getState().angle)).to.be.below(115)
+		expect(MathUtils.radToDeg(flipper.getState().angle)).to.be.below(115)
 	})
 
 	it('should move when hit at the same time', () => {
@@ -139,18 +139,18 @@ describe('The VPinball flipper collision', () => {
 		createBall(player, 374, 1766, 0, 0, -10)
 
 		player.updatePhysics(0)
-		expect(radToDeg(flipper.getState().angle)).to.equal(121)
+		expect(MathUtils.radToDeg(flipper.getState().angle)).to.equal(121)
 
 		player.updatePhysics(50)
-		expect(radToDeg(flipper.getState().angle)).to.be.below(121)
+		expect(MathUtils.radToDeg(flipper.getState().angle)).to.be.below(121)
 
 		player.updatePhysics(100)
-		expect(radToDeg(flipper.getState().angle)).to.be.below(110)
+		expect(MathUtils.radToDeg(flipper.getState().angle)).to.be.below(110)
 
 		player.updatePhysics(150)
-		expect(radToDeg(flipper.getState().angle)).to.be.above(110)
+		expect(MathUtils.radToDeg(flipper.getState().angle)).to.be.above(110)
 
 		player.updatePhysics(200)
-		expect(radToDeg(flipper.getState().angle)).to.equal(121)
+		expect(MathUtils.radToDeg(flipper.getState().angle)).to.equal(121)
 	})
 })

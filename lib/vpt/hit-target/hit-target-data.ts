@@ -3,7 +3,6 @@
 
 import { BiffParser } from '../../io/biff-parser.js'
 import type { Storage } from '../../io/ole-doc.js'
-import { f4 } from '../../util/float.js'
 import { Vertex3D } from '../../util/vector.js'
 import { handleBiffTag } from '../biff-helper.js'
 import { Enums } from '../enums.js'
@@ -100,6 +99,6 @@ export class HitTargetData extends ItemData implements IPhysicalData {
 	}
 
 	public getPositionZ(z: number, table: Table): number {
-		return f4(f4(f4(z * table.getScaleZ()) + this.position.z) + table.getTableHeight())
+		return z * table.getScaleZ() + this.position.z + table.getTableHeight()
 	}
 }

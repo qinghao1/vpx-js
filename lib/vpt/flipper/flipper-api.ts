@@ -1,9 +1,9 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
+import { MathUtils } from 'three'
 
 import type { EventProxy } from '../../game/event-proxy.js'
 import type { Player } from '../../game/player.js'
-import { degToRad, radToDeg } from '../../util/float.js'
 import { clamp } from '../../util/functions.js'
 import { ItemApi } from '../item-api.js'
 import type { Table } from '../table/table.js'
@@ -78,20 +78,20 @@ export class FlipperApi extends ItemApi<FlipperData> {
 	}
 	set StartAngle(v) {
 		this.data.startAngle = v
-		this.mover.setStartAngle(degToRad(v))
+		this.mover.setStartAngle(MathUtils.degToRad(v))
 	}
 	get StartAngle() {
 		return this.data.startAngle
 	}
 	set EndAngle(v) {
 		this.data.endAngle = v
-		this.mover.setEndAngle(degToRad(v))
+		this.mover.setEndAngle(MathUtils.degToRad(v))
 	}
 	get EndAngle() {
 		return this.data.endAngle
 	}
 	get CurrentAngle() {
-		return radToDeg(this.state.angle)
+		return MathUtils.radToDeg(this.state.angle)
 	}
 	get Material() {
 		return this.state.material

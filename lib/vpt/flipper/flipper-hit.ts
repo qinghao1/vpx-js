@@ -1,5 +1,6 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
+import { MathUtils } from 'three'
 
 import { Event } from '../../game/event.js'
 import type { EventProxy } from '../../game/event-proxy.js'
@@ -19,7 +20,6 @@ import {
 } from '../../physics/constants.js'
 import { elasticityWithFalloff } from '../../physics/functions.js'
 import { HitObject } from '../../physics/hit-object.js'
-import { degToRad } from '../../util/float.js'
 import { FRect3D } from '../../util/frect3d.js'
 import { clamp } from '../../util/functions.js'
 import { Vertex2D, Vertex3D } from '../../util/vector.js'
@@ -60,8 +60,8 @@ export class FlipperHit extends HitObject {
 				baseRadius: Math.max(data.baseRadius, 0.01),
 				endRadius: Math.max(data.endRadius, 0.01),
 				flipperRadius: Math.max(data.flipperRadius, 0.01),
-				angleStart: degToRad(data.startAngle),
-				angleEnd: degToRad(data.endAngle),
+				angleStart: MathUtils.degToRad(data.startAngle),
+				angleEnd: MathUtils.degToRad(data.endAngle),
 				zLow: h,
 				zHigh: h + data.height,
 			},
@@ -285,7 +285,7 @@ export class FlipperHit extends HitObject {
 			: this.data.elasticityFalloff!
 		this.elasticity = useOverride ? (this.data.overrideElasticity ?? this.data.elasticity!) : this.data.elasticity!
 		this.setFriction(useOverride ? (this.data.overrideFriction ?? this.data.friction!) : this.data.friction!)
-		this.scatter = degToRad(
+		this.scatter = MathUtils.degToRad(
 			useOverride ? (this.data.overrideScatterAngle ?? this.data.scatter!) : this.data.scatter!,
 		)
 	}

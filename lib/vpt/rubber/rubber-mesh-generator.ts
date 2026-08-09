@@ -1,11 +1,12 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
+import { MathUtils } from 'three'
 import { HIT_SHAPE_DETAIL_LEVEL } from '../../util/dragpoint.js'
-import { degToRad, FLT_MAX, FLT_MIN, f4 } from '../../util/float.js'
-import { Vertex3D } from '../../util/vector.js'
+import { FLT_MAX, FLT_MIN } from '../../util/float.js'
 import { Matrix3D } from '../../util/matrix.js'
 import { SplineVertex } from '../../util/spline-vertex.js'
+import { Vertex3D } from '../../util/vector.js'
 import { Vertex3DNoTex2 } from '../../util/vertex.js'
 import { Mesh } from '../mesh.js'
 import type { Table } from '../table/table.js'
@@ -44,8 +45,8 @@ export class RubberMeshGenerator {
 		const height = this.data.hitHeight + table.getTableHeight()
 
 		let prevB = new Vertex3D()
-		const invR = f4(1 / numRings)
-		const invS = f4(1 / numSegments)
+		const invR = 1 / numRings
+		const invS = 1 / numSegments
 		let idx = 0
 		for (let i = 0; i < numRings; i++) {
 			const i2 = i === numRings - 1 ? 0 : i + 1
@@ -60,13 +61,13 @@ export class RubberMeshGenerator {
 				const up = new Vertex3D(
 					sv.pMiddlePoints[i2].x + sv.pMiddlePoints[i].x,
 					sv.pMiddlePoints[i2].y + sv.pMiddlePoints[i].y,
-					f4(height * 2),
+					height * 2,
 				)
-				normal = new Vertex3D(tangent.y * up.z, -tangent.x * up.z, f4(tangent.x * up.y) - f4(tangent.y * up.x))
+				normal = new Vertex3D(tangent.y * up.z, -tangent.x * up.z, tangent.x * up.y - tangent.y * up.x)
 				binorm = new Vertex3D(
 					tangent.y * normal.z,
 					-tangent.x * normal.z,
-					f4(tangent.x * normal.y) - f4(tangent.y * normal.x),
+					tangent.x * normal.y - tangent.y * normal.x,
 				)
 			} else {
 				normal = prevB.clone().cross(tangent)
@@ -77,13 +78,13 @@ export class RubberMeshGenerator {
 			prevB = binorm
 			for (let j = 0; j < numSegments; j++) {
 				const u = i * invR
-				const v = f4(j + u) * invS
+				const v = (j + u) * invS
 				const tmp = Vertex3D.getRotatedAxis(j * (360 * invS), tangent, normal).multiplyScalar(
 					this.data.thickness * 0.5,
 				)
 				const vtx = new Vertex3DNoTex2()
-				vtx.x = f4(sv.pMiddlePoints[i].x + tmp.x)
-				vtx.y = f4(sv.pMiddlePoints[i].y + tmp.y)
+				vtx.x = sv.pMiddlePoints[i].x + tmp.x
+				vtx.y = sv.pMiddlePoints[i].y + tmp.y
 				if (createHitShape && (j === 0 || j === 3)) tmp.z *= 0.6
 				vtx.z = height + tmp.z
 				vtx.tu = u
@@ -131,9 +132,9 @@ export class RubberMeshGenerator {
 			if (v.z > maxz) maxz = v.z
 			if (v.z < minz) minz = v.z
 		}
-		this.middlePoint.x = f4(maxx + minx) * 0.5
-		this.middlePoint.y = f4(maxy + miny) * 0.5
-		this.middlePoint.z = f4(maxz + minz) * 0.5
+		this.middlePoint.x = (maxx + minx) * 0.5
+		this.middlePoint.y = (maxy + miny) * 0.5
+		this.middlePoint.z = (maxz + minz) * 0.5
 
 		const [vertexMatrix, fullMatrix] = this.getMatrices(table)
 		return mesh.transform(vertexMatrix, fullMatrix)
@@ -142,10 +143,10 @@ export class RubberMeshGenerator {
 	private getMatrices(table: Table): [Matrix3D, Matrix3D] {
 		const full = new Matrix3D()
 		const tmp = new Matrix3D()
-		full.rotateXMatrix(degToRad(this.data.rotX))
-		tmp.rotateYMatrix(degToRad(this.data.rotY))
+		full.rotateXMatrix(MathUtils.degToRad(this.data.rotX))
+		tmp.rotateYMatrix(MathUtils.degToRad(this.data.rotY))
 		full.multiply(tmp)
-		tmp.rotateZMatrix(degToRad(this.data.rotZ))
+		tmp.rotateZMatrix(MathUtils.degToRad(this.data.rotZ))
 		full.multiply(tmp)
 		const vert = new Matrix3D()
 		if (this.data.height === this.data.hitHeight)
@@ -154,7 +155,7 @@ export class RubberMeshGenerator {
 			tmp.setTranslation(
 				this.middlePoint.x,
 				this.middlePoint.y,
-				f4(this.data.height * table.getScaleZ()) + table.getTableHeight(),
+				this.data.height * table.getScaleZ() + table.getTableHeight(),
 			)
 		vert.multiply(tmp)
 		tmp.setScaling(1, 1, table.getScaleZ())

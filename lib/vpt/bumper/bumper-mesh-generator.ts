@@ -1,9 +1,8 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
-
-import { degToRad, f4 } from '../../util/float.js'
-import { Vertex3D } from '../../util/vector.js'
+import { MathUtils } from 'three'
 import { Matrix3D } from '../../util/matrix.js'
+import { Vertex3D } from '../../util/vector.js'
 import type { Mesh } from '../mesh.js'
 import { loadMesh } from '../mesh-loader.js'
 import type { Table } from '../table/table.js'
@@ -32,10 +31,10 @@ export class BumperMeshGenerator {
 
 	public getMeshes(table: Table): BumperMesh {
 		if (!this.data.center) throw new Error(`Cannot export bumper ${this.data.getName()} without center.`)
-		const m = new Matrix3D().rotateZMatrix(degToRad(this.data.orientation))
+		const m = new Matrix3D().rotateZMatrix(MathUtils.degToRad(this.data.orientation))
 		const height =
 			table.getSurfaceHeight(this.data.szSurface, this.data.center.x, this.data.center.y) * table.getScaleZ()
-		const z = (v: number) => f4(v * table.getScaleZ()) + height
+		const z = (v: number) => v * table.getScaleZ() + height
 		return {
 			base: this.transform(`bumper-base-${this.data.getName()}`, this.scaledBaseMesh, m, z),
 			ring: this.transform(`bumper-ring-${this.data.getName()}`, this.scaledRingMesh, m, z),
@@ -44,7 +43,7 @@ export class BumperMeshGenerator {
 				`bumper-cap-${this.data.getName()}`,
 				this.scaledCapMesh,
 				m,
-				v => f4(f4(v + this.data.heightScale) * table.getScaleZ()) + height,
+				v => (v + this.data.heightScale) * table.getScaleZ() + height,
 			),
 		}
 	}

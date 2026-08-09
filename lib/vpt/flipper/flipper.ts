@@ -1,5 +1,6 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
+import { MathUtils } from 'three'
 
 import { EventProxy } from '../../game/event-proxy.js'
 import type { IAnimatable, IAnimation } from '../../game/ianimatable.js'
@@ -11,9 +12,8 @@ import type { IScriptable } from '../../game/iscriptable.js'
 import type { Player } from '../../game/player.js'
 import type { Storage } from '../../io/ole-doc.js'
 import type { HitObject } from '../../physics/hit-object.js'
-import { degToRad } from '../../util/float.js'
-import type { Vertex2D } from '../../util/vector.js'
 import { Matrix3D } from '../../util/matrix.js'
+import type { Vertex2D } from '../../util/vector.js'
 import { Item } from '../item.js'
 import type { Table } from '../table/table.js'
 import { FlipperAnimation } from './flipper-animation.js'
@@ -109,7 +109,7 @@ export class Flipper
 
 	private getMatrix(rotation: number = this.data.startAngle): Matrix3D {
 		const trafoMatrix = new Matrix3D().setTranslation(this.data.center.x, this.data.center.y, 0)
-		const tempMatrix = Matrix3D.claim().rotateZMatrix(degToRad(rotation))
+		const tempMatrix = Matrix3D.claim().rotateZMatrix(MathUtils.degToRad(rotation))
 		trafoMatrix.multiply(tempMatrix)
 		Matrix3D.release(tempMatrix)
 		return trafoMatrix

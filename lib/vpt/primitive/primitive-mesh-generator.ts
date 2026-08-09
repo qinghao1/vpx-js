@@ -1,7 +1,8 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { degToRad, FLT_MAX } from '../../util/float.js'
+import { MathUtils } from 'three'
+import { FLT_MAX } from '../../util/float.js'
 import { Matrix3D } from '../../util/matrix.js'
 import { Vertex3DNoTex2 } from '../../util/vertex.js'
 import { Mesh } from '../mesh.js'
@@ -124,17 +125,17 @@ export class PrimitiveMeshGenerator {
 		const trans = new Matrix3D().setTranslation(this.data.position.x, this.data.position.y, this.data.position.z)
 		const sz = new Matrix3D().setScaling(1, 1, table.getScaleZ())
 		const rotTransCol = new Matrix3D()
-		rotTransCol.rotateXMatrix(degToRad(this.data.rotAndTra[6]!))
+		rotTransCol.rotateXMatrix(MathUtils.degToRad(this.data.rotAndTra[6]!))
 		const tmp = new Matrix3D()
-		tmp.rotateYMatrix(degToRad(this.data.rotAndTra[7]!))
+		tmp.rotateYMatrix(MathUtils.degToRad(this.data.rotAndTra[7]!))
 		rotTransCol.multiply(tmp)
-		tmp.rotateZMatrix(degToRad(this.data.rotAndTra[8]!))
+		tmp.rotateZMatrix(MathUtils.degToRad(this.data.rotAndTra[8]!))
 		rotTransCol.multiply(tmp)
-		tmp.rotateXMatrix(degToRad(this.data.rotAndTra[0]!))
+		tmp.rotateXMatrix(MathUtils.degToRad(this.data.rotAndTra[0]!))
 		rotTransCol.multiply(tmp)
-		tmp.rotateYMatrix(degToRad(this.data.rotAndTra[1]!))
+		tmp.rotateYMatrix(MathUtils.degToRad(this.data.rotAndTra[1]!))
 		rotTransCol.multiply(tmp)
-		tmp.rotateZMatrix(degToRad(this.data.rotAndTra[2]!))
+		tmp.rotateZMatrix(MathUtils.degToRad(this.data.rotAndTra[2]!))
 		rotTransCol.multiply(tmp)
 		tmp.setTranslation(this.data.rotAndTra[3]!, this.data.rotAndTra[4]!, this.data.rotAndTra[5]!)
 		rotTransCol.multiply(tmp)

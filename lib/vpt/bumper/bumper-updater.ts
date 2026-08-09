@@ -1,8 +1,8 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
+import { MathUtils } from 'three'
 
 import type { IRenderApi } from '../../render/irender-api.js'
-import { degToRad } from '../../util/float.js'
 import { Matrix3D } from '../../util/matrix.js'
 import { ItemUpdater } from '../item-updater.js'
 import type { Material } from '../material.js'
@@ -70,8 +70,8 @@ export class BumperUpdater extends ItemUpdater<BumperState> {
 				table.getSurfaceHeight(this.data.szSurface, this.data.center.x, this.data.center.y) * table.getScaleZ()
 			const matToOrigin = Matrix3D.claim().setTranslation(-this.data.center.x, -this.data.center.y, height)
 			const matFromOrigin = Matrix3D.claim().setTranslation(this.data.center.x, this.data.center.y, -height)
-			const matRotX = Matrix3D.claim().rotateXMatrix(degToRad(this.state.skirtRotX))
-			const matRotY = Matrix3D.claim().rotateYMatrix(degToRad(this.state.skirtRotY))
+			const matRotX = Matrix3D.claim().rotateXMatrix(MathUtils.degToRad(this.state.skirtRotX))
+			const matRotY = Matrix3D.claim().rotateYMatrix(MathUtils.degToRad(this.state.skirtRotY))
 
 			const matrix = matFromOrigin.clone().multiply(matRotX).multiply(matRotY).multiply(matToOrigin)
 

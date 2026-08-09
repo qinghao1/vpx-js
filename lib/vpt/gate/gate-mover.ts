@@ -1,12 +1,12 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
+import { MathUtils } from 'three'
 
 import { Event } from '../../game/event.js'
 import type { EventProxy } from '../../game/event-proxy.js'
 import type { PlayerPhysics } from '../../game/player-physics.js'
 import { PHYS_FACTOR } from '../../physics/constants.js'
 import type { MoverObject } from '../../physics/mover-object.js'
-import { radToDeg } from '../../util/float.js'
 import type { GateData } from './gate-data.js'
 import type { GateState } from './gate-state.js'
 
@@ -35,7 +35,7 @@ export class GateMover implements MoverObject {
 	}
 
 	public updateDisplacements(dtime: number): void {
-		const spd = Math.abs(radToDeg(this.angleSpeed))
+		const spd = Math.abs(MathUtils.radToDeg(this.angleSpeed))
 		const reflect = () => {
 			if (!this.forcedMove) this.angleSpeed = -this.angleSpeed * this.damping * 0.8
 			else if (

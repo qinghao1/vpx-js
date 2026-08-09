@@ -1,11 +1,11 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
+import { MathUtils } from 'three'
 
 import type { EventProxy } from '../../game/event-proxy.js'
 import type { Player } from '../../game/player.js'
 import { PHYS_FACTOR } from '../../physics/constants.js'
 import type { LineSeg } from '../../physics/line-seg.js'
-import { degToRad, radToDeg } from '../../util/float.js'
 import { clamp } from '../../util/functions.js'
 import { ItemApi } from '../item-api.js'
 import type { Table } from '../table/table.js'
@@ -90,13 +90,13 @@ export class GateApi extends ItemApi<GateData> {
 		this.state.showBracket = v
 	}
 	get CloseAngle() {
-		return radToDeg(this.mover.angleMin)
+		return MathUtils.radToDeg(this.mover.angleMin)
 	}
 	set CloseAngle(v) {
 		this.setCloseAngle(v)
 	}
 	get OpenAngle() {
-		return radToDeg(this.mover.angleMax)
+		return MathUtils.radToDeg(this.mover.angleMax)
 	}
 	set OpenAngle(v) {
 		this.setOpenAngle(v)
@@ -166,14 +166,14 @@ export class GateApi extends ItemApi<GateData> {
 
 	private setCloseAngle(deg: number): void {
 		if (this.data.isCollidable) throw new Error("Gate is collidable! closing angles other than 0 aren't possible!")
-		const a = clamp(degToRad(deg), this.data.angleMin, this.data.angleMax)
+		const a = clamp(MathUtils.degToRad(deg), this.data.angleMin, this.data.angleMax)
 		if (this.mover.angleMax > a) this.mover.angleMin = a
 		else this.mover.angleMax = a
 	}
 
 	private setOpenAngle(deg: number): void {
 		if (this.data.isCollidable) throw new Error("Gate is collidable! open angles other than 90 aren't possible!")
-		const a = clamp(degToRad(deg), this.data.angleMin, this.data.angleMax)
+		const a = clamp(MathUtils.degToRad(deg), this.data.angleMin, this.data.angleMax)
 		if (this.mover.angleMin < a) this.mover.angleMax = a
 		else this.mover.angleMin = a
 	}

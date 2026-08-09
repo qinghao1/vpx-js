@@ -8,7 +8,6 @@ import type { IScriptable } from '../../game/iscriptable.js'
 import type { Player } from '../../game/player.js'
 import type { Storage } from '../../io/ole-doc.js'
 import type { HitObject } from '../../physics/hit-object.js'
-import { f4 } from '../../util/float.js'
 import { Vertex2D } from '../../util/vector.js'
 import { Item } from '../item.js'
 import { Mesh } from '../mesh.js'
@@ -110,20 +109,18 @@ export class Ramp extends Item<RampData> implements IRenderable<RampState>, IHit
 		let startLength = 0
 		const cVertex = vVertex.length
 		for (let i2 = 1; i2 < cVertex; i2++) {
-			const vDx = f4(vVertex[i2]?.x - vVertex[i2 - 1]?.x)
-			const vDy = f4(vVertex[i2]?.y - vVertex[i2 - 1]?.y)
-			const vLen = f4(Math.sqrt(f4(f4(vDx * vDx) + f4(vDy * vDy))))
-			if (i2 <= iSeg) startLength = f4(startLength + vLen)
-			totalLength = f4(totalLength + vLen)
+			const vDx = vVertex[i2]?.x - vVertex[i2 - 1]?.x
+			const vDy = vVertex[i2]?.y - vVertex[i2 - 1]?.y
+			const vLen = Math.sqrt(vDx * vDx + vDy * vDy)
+			if (i2 <= iSeg) startLength = startLength + vLen
+			totalLength = totalLength + vLen
 		}
-		const dx = f4(vOut.x - vVertex[iSeg]?.x)
-		const dy = f4(vOut.y - vVertex[iSeg]?.y)
-		const len = f4(Math.sqrt(f4(f4(dx * dx) + f4(dy * dy))))
-		startLength = f4(startLength + len)
-		const topHeight = f4(this.data.heightTop + table.getTableHeight())
-		const bottomHeight = f4(this.data.heightBottom + table.getTableHeight())
-		return f4(
-			f4(vVertex[iSeg]?.z + f4(f4(startLength / totalLength) * f4(topHeight - bottomHeight))) + bottomHeight,
-		)
+		const dx = vOut.x - vVertex[iSeg]?.x
+		const dy = vOut.y - vVertex[iSeg]?.y
+		const len = Math.sqrt(dx * dx + dy * dy)
+		startLength = startLength + len
+		const topHeight = this.data.heightTop + table.getTableHeight()
+		const bottomHeight = this.data.heightBottom + table.getTableHeight()
+		return vVertex[iSeg]?.z + (startLength / totalLength) * (topHeight - bottomHeight) + bottomHeight
 	}
 }

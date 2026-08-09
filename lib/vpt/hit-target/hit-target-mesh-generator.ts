@@ -1,9 +1,8 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
-
-import { degToRad, f4 } from '../../util/float.js'
-import { Vertex3D } from '../../util/vector.js'
+import { MathUtils } from 'three'
 import { Matrix3D } from '../../util/matrix.js'
+import { Vertex3D } from '../../util/vector.js'
 import { Enums } from '../enums.js'
 import type { Mesh } from '../mesh.js'
 import { loadMesh } from '../mesh-loader.js'
@@ -26,13 +25,13 @@ export class HitTargetMeshGenerator {
 	constructor(private readonly data: HitTargetData) {}
 	public getMesh(table: Table): Mesh {
 		const drop =
-			this.data.isDropTarget() && this.data.isDropped ? -f4(HitTarget.DROP_TARGET_LIMIT * table.getScaleZ()) : 0
+			this.data.isDropTarget() && this.data.isDropped ? -(HitTarget.DROP_TARGET_LIMIT * table.getScaleZ()) : 0
 		return this.generateMesh(table, drop)
 	}
 	public generateMesh(table: Table, dropOffset = 0): Mesh {
 		const mesh = this.getBaseMesh()
 		mesh.name = `hit.target-${this.data.getName()}`
-		const m = new Matrix3D().rotateZMatrix(degToRad(this.data.rotZ))
+		const m = new Matrix3D().rotateZMatrix(MathUtils.degToRad(this.data.rotZ))
 		const sx = this.data.vSize.x,
 			sy = this.data.vSize.y,
 			sz = this.data.vSize.z
@@ -43,9 +42,9 @@ export class HitTargetMeshGenerator {
 			tableH = table.getTableHeight()
 		for (const v of mesh.vertices) {
 			const vert = Vertex3D.claim(v.x * sx, v.y * sy, v.z * sz).multiplyMatrix(m)
-			v.x = f4(vert.x + px)
-			v.y = f4(vert.y + py)
-			v.z = f4(vert.z * scaleZ + pz + tableH) + dropOffset
+			v.x = vert.x + px
+			v.y = vert.y + py
+			v.z = vert.z * scaleZ + pz + tableH + dropOffset
 			const n = Vertex3D.claim(v.nx, v.ny, v.nz).multiplyMatrixNoTranslate(m)
 			v.nx = n.x
 			v.ny = n.y

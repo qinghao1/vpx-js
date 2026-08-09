@@ -4,10 +4,10 @@
 import * as chai from 'chai'
 import { expect } from 'chai'
 import sinonChai from 'sinon-chai'
+import { MathUtils } from 'three'
 import { ThreeHelper } from '../../../test/three.helper'
 import { Player } from '../../game/player.js'
 import { NodeBinaryReader } from '../../io/binary-reader.node.js'
-import { degToRad } from '../../util/float.js'
 import { Table } from '../table/table.js'
 import type { FlipperState } from './flipper-state.js'
 
@@ -29,7 +29,7 @@ describe('The VPinball flipper physics', () => {
 	it('should move to the end when solenoid is on', async () => {
 		const flipper = table.flippers.FlipperR
 		const flipperState = flipper.getState()
-		const endAngleRad = degToRad(flipper.getFlipperData().endAngle)
+		const endAngleRad = MathUtils.degToRad(flipper.getFlipperData().endAngle)
 
 		flipper.getApi().RotateToEnd()
 		player.simulateTime(100)
@@ -40,7 +40,7 @@ describe('The VPinball flipper physics', () => {
 	it('should move to the start when solenoid is off again', async () => {
 		const flipper = table.flippers.FlipperR
 		const flipperState = flipper.getState()
-		const startAngleRad = degToRad(flipper.getFlipperData().startAngle)
+		const startAngleRad = MathUtils.degToRad(flipper.getFlipperData().startAngle)
 
 		// move up
 		flipper.getApi().RotateToEnd()
@@ -56,8 +56,8 @@ describe('The VPinball flipper physics', () => {
 	it('should move back to end when pressed while moving', async () => {
 		const flipper = table.flippers.FlipperR
 		const flipperState = flipper.getState()
-		const startAngleRad = degToRad(flipper.getFlipperData().startAngle)
-		const endAngleRad = degToRad(flipper.getFlipperData().endAngle)
+		const startAngleRad = MathUtils.degToRad(flipper.getFlipperData().startAngle)
+		const endAngleRad = MathUtils.degToRad(flipper.getFlipperData().endAngle)
 
 		// move up
 		flipper.getApi().RotateToEnd()

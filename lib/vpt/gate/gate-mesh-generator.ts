@@ -1,10 +1,10 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
+import { MathUtils } from 'three'
 
-import { degToRad, f4 } from '../../util/float.js'
 import { logger } from '../../util/logger.js'
-import { Vertex3D } from '../../util/vector.js'
 import { Matrix3D } from '../../util/matrix.js'
+import { Vertex3D } from '../../util/vector.js'
 import { Enums } from '../enums.js'
 import type { Mesh } from '../mesh.js'
 import { loadMesh } from '../mesh-loader.js'
@@ -49,15 +49,15 @@ export class GateMeshGenerator {
 	}
 
 	private positionMesh(mesh: Mesh, table: Table, baseHeight: number): Mesh {
-		const m = new Matrix3D().rotateZMatrix(degToRad(this.data.rotation))
+		const m = new Matrix3D().rotateZMatrix(MathUtils.degToRad(this.data.rotation))
 		const len = this.data.length
 		const zScale = table.getScaleZ()
-		const height = f4(this.data.height * zScale)
+		const height = this.data.height * zScale
 		for (const v of mesh.vertices) {
 			const vert = Vertex3D.claim(v.x, v.y, v.z).multiplyMatrix(m)
-			v.x = f4(vert.x * len) + this.data.center.x
-			v.y = f4(vert.y * len) + this.data.center.y
-			v.z = f4(vert.z * len * zScale + height) + baseHeight
+			v.x = vert.x * len + this.data.center.x
+			v.y = vert.y * len + this.data.center.y
+			v.z = vert.z * len * zScale + height + baseHeight
 			const n = Vertex3D.claim(v.nx, v.ny, v.nz).multiplyMatrixNoTranslate(m)
 			v.nx = n.x
 			v.ny = n.y

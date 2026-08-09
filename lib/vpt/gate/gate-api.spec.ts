@@ -4,10 +4,10 @@
 import * as chai from 'chai'
 import { expect } from 'chai'
 import sinonChai from 'sinon-chai'
+import { MathUtils } from 'three'
 import { ThreeHelper } from '../../../test/three.helper'
 import { Player } from '../../game/player.js'
 import { NodeBinaryReader } from '../../io/binary-reader.node.js'
-import { radToDeg } from '../../util/float.js'
 import { Table } from '../table/table.js'
 
 chai.use((sinonChai as any).default ?? sinonChai)
@@ -157,19 +157,19 @@ describe('The VPinball gate API', () => {
 		plate.getApi().move(1, 1, 30)
 
 		player.updatePhysics(0)
-		expect(Math.round(radToDeg(plate.getState().angle))).to.equal(0)
+		expect(Math.round(MathUtils.radToDeg(plate.getState().angle))).to.equal(0)
 
 		player.updatePhysics(50)
-		expect(Math.round(radToDeg(plate.getState().angle))).to.equal(5)
+		expect(Math.round(MathUtils.radToDeg(plate.getState().angle))).to.equal(5)
 
 		player.updatePhysics(200)
-		expect(Math.round(radToDeg(plate.getState().angle))).to.equal(20)
+		expect(Math.round(MathUtils.radToDeg(plate.getState().angle))).to.equal(20)
 
 		player.updatePhysics(300)
-		expect(Math.round(radToDeg(plate.getState().angle))).to.equal(30)
+		expect(Math.round(MathUtils.radToDeg(plate.getState().angle))).to.equal(30)
 
 		player.updatePhysics(500)
-		expect(Math.round(radToDeg(plate.getState().angle))).to.equal(30)
+		expect(Math.round(MathUtils.radToDeg(plate.getState().angle))).to.equal(30)
 	})
 
 	it('should correctly move manually on a one-way gate', () => {
@@ -177,23 +177,23 @@ describe('The VPinball gate API', () => {
 		plate.getApi().move(1, 1, 120)
 
 		player.updatePhysics(0)
-		expect(Math.round(radToDeg(plate.getState().angle))).to.equal(0)
+		expect(Math.round(MathUtils.radToDeg(plate.getState().angle))).to.equal(0)
 
 		player.updatePhysics(50)
-		expect(Math.round(radToDeg(plate.getState().angle))).to.equal(5)
+		expect(Math.round(MathUtils.radToDeg(plate.getState().angle))).to.equal(5)
 
 		player.updatePhysics(200)
-		expect(Math.round(radToDeg(plate.getState().angle))).to.equal(20)
+		expect(Math.round(MathUtils.radToDeg(plate.getState().angle))).to.equal(20)
 
 		player.updatePhysics(300)
-		expect(Math.round(radToDeg(plate.getState().angle))).to.equal(30)
+		expect(Math.round(MathUtils.radToDeg(plate.getState().angle))).to.equal(30)
 
 		player.updatePhysics(500)
-		expect(Math.round(radToDeg(plate.getState().angle))).to.equal(50)
+		expect(Math.round(MathUtils.radToDeg(plate.getState().angle))).to.equal(50)
 
 		// for (let i = 0; i < 200; i++) {
 		// 	player.updatePhysics(i * 10);
-		// 	console.log(i * 10, radToDeg(plate.getState().angle));
+		// 	console.log(i * 10, MathUtils.radToDeg(plate.getState().angle));
 		// }
 	})
 })

@@ -9,7 +9,6 @@ import type { IScriptable } from '../../game/iscriptable.js'
 import type { Player } from '../../game/player.js'
 import type { Storage } from '../../io/ole-doc.js'
 import type { HitObject } from '../../physics/hit-object.js'
-import { f4 } from '../../util/float.js'
 import { Matrix3D } from '../../util/matrix.js'
 import type { Ball } from '../ball/ball.js'
 import { Item } from '../item.js'
@@ -27,7 +26,7 @@ export class HitTarget
 	extends Item<HitTargetData>
 	implements IRenderable<HitTargetState>, IHittable, IAnimatable, IScriptable<HitTargetApi>
 {
-	public static DROP_TARGET_LIMIT = f4(52.0)
+	public static DROP_TARGET_LIMIT = 52.0
 
 	private readonly state: HitTargetState
 	private readonly meshGenerator: HitTargetMeshGenerator

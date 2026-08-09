@@ -1,9 +1,8 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
-
-import { degToRad, f4 } from '../../util/float.js'
-import { Vertex3D } from '../../util/vector.js'
+import { MathUtils } from 'three'
 import { Matrix3D } from '../../util/matrix.js'
+import { Vertex3D } from '../../util/vector.js'
 import type { Mesh } from '../mesh.js'
 import { loadMesh } from '../mesh-loader.js'
 import type { Table } from '../table/table.js'
@@ -14,22 +13,18 @@ const flipperBaseMesh = loadMesh('flipper-base-mesh')
 /** Flipper mesh. @see https://github.com/vpinball/vpinball/blob/master/flipper.cpp */
 export class FlipperMesh {
 	public generateMeshes(data: FlipperData, table: Table): { base: Mesh; rubber?: Mesh } {
-		const m = new Matrix3D().rotateZMatrix(degToRad(180))
+		const m = new Matrix3D().rotateZMatrix(MathUtils.degToRad(180))
 		const height = table.getSurfaceHeight(data.szSurface, data.center.x, data.center.y)
-		const baseRadius = f4(data.baseRadius - data.rubberThickness)
-		const endRadius = f4(data.endRadius - data.rubberThickness)
+		const baseRadius = data.baseRadius - data.rubberThickness
+		const endRadius = data.endRadius - data.rubberThickness
 		const baseScale = 10
 		const base = flipperBaseMesh.clone(`flipper.base-${data.getName()}`)
 		this.applyScale(base, data, baseRadius, endRadius, baseScale)
-		base.transform(m, undefined, z => f4(f4(z * data.height) * table.getScaleZ()) + height)
+		base.transform(m, undefined, z => z * data.height * table.getScaleZ() + height)
 		if (data.rubberThickness <= 0) return { base }
 		const rubber = flipperBaseMesh.clone(`flipper.rubber-${data.getName()}`)
 		this.applyScale(rubber, data, data.baseRadius, data.endRadius, baseScale, true)
-		rubber.transform(
-			m,
-			undefined,
-			z => f4(f4(z * data.rubberWidth) * table.getScaleZ()) + f4(height + data.rubberHeight),
-		)
+		rubber.transform(m, undefined, z => z * data.rubberWidth * table.getScaleZ() + (height + data.rubberHeight))
 		return { base, rubber }
 	}
 
@@ -45,39 +40,39 @@ export class FlipperMesh {
 			for (const v of mesh.vertices) {
 				if (this.match(v, FlipperMesh.vertsBaseBottom[t]!)) {
 					if (isRubber) {
-						v.x = f4(v.x * baseR) * scale
-						v.y = f4(v.y * baseR) * scale
+						v.x = v.x * baseR * scale
+						v.y = v.y * baseR * scale
 					} else {
-						v.x *= f4(baseR * scale)
-						v.y *= f4(baseR * scale)
+						v.x *= baseR * scale
+						v.y *= baseR * scale
 					}
 				} else if (this.match(v, FlipperMesh.vertsTipBottom[t]!)) {
 					if (isRubber) {
-						v.x = f4(v.x * endR) * scale
-						v.y = f4(v.y * endR) * scale
-						v.y = f4(v.y + data.flipperRadius) - f4(endR * 7.9)
+						v.x = v.x * endR * scale
+						v.y = v.y * endR * scale
+						v.y = v.y + data.flipperRadius - endR * 7.9
 					} else {
-						v.x *= f4(endR * scale)
-						v.y *= f4(endR * scale)
-						v.y += data.flipperRadius - f4(endR * 7.9)
+						v.x *= endR * scale
+						v.y *= endR * scale
+						v.y += data.flipperRadius - endR * 7.9
 					}
 				} else if (this.match(v, FlipperMesh.vertsBaseTop[t]!)) {
 					if (isRubber) {
-						v.x = f4(v.x * baseR) * scale
-						v.y = f4(v.y * baseR) * scale
+						v.x = v.x * baseR * scale
+						v.y = v.y * baseR * scale
 					} else {
-						v.x *= f4(baseR * scale)
-						v.y *= f4(baseR * scale)
+						v.x *= baseR * scale
+						v.y *= baseR * scale
 					}
 				} else if (this.match(v, FlipperMesh.vertsTipTop[t]!)) {
 					if (isRubber) {
-						v.x = f4(v.x * endR) * scale
-						v.y = f4(v.y * endR) * scale
-						v.y = f4(v.y + data.flipperRadius) - f4(endR * 7.9)
+						v.x = v.x * endR * scale
+						v.y = v.y * endR * scale
+						v.y = v.y + data.flipperRadius - endR * 7.9
 					} else {
-						v.x *= f4(endR * scale)
-						v.y *= f4(endR * scale)
-						v.y += data.flipperRadius - f4(endR * 7.9)
+						v.x *= endR * scale
+						v.y *= endR * scale
+						v.y += data.flipperRadius - endR * 7.9
 					}
 				}
 			}

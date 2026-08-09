@@ -6,7 +6,6 @@ import { expect } from 'chai'
 import sinonChai from 'sinon-chai'
 import { TableBuilder } from '../../../test/table-builder.js'
 import { Player } from '../../game/player.js'
-import { f4 } from '../../util/float.js'
 import type { Table } from '../../vpt/table/table.js'
 import { Transpiler } from '../transpiler.js'
 
@@ -45,7 +44,7 @@ describe('The VBScript stdlib', () => {
 		const transpiler = new Transpiler(table, player)
 		transpiler.execute(vbs, scope, 'global')
 
-		expect(scope.result).to.equal(f4(1.3))
+		expect(scope.result).to.equal(1.3)
 	})
 
 	it('should provide the Int function', () => {

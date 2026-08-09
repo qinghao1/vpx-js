@@ -1,8 +1,8 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
+import { MathUtils } from 'three'
 
 import type { IRenderApi } from '../../render/irender-api.js'
-import { degToRad } from '../../util/float.js'
 import { Matrix3D } from '../../util/matrix.js'
 import { ItemUpdater } from '../item-updater.js'
 import type { Table } from '../table/table.js'
@@ -37,10 +37,10 @@ export class HitTargetUpdater extends ItemUpdater<HitTargetState> {
 	): void {
 		const p = this.data.position
 		const toOrigin = Matrix3D.claim().setTranslation(-p.x, -p.y, -p.z)
-		const rotToOrigin = Matrix3D.claim().rotateZMatrix(degToRad(-this.data.rotZ))
+		const rotToOrigin = Matrix3D.claim().rotateZMatrix(MathUtils.degToRad(-this.data.rotZ))
 		const fromOrigin = Matrix3D.claim().setTranslation(p.x, p.y, p.z)
-		const rotFromOrigin = Matrix3D.claim().rotateZMatrix(degToRad(this.data.rotZ))
-		const rotX = Matrix3D.claim().rotateXMatrix(degToRad(state.xRotation))
+		const rotFromOrigin = Matrix3D.claim().rotateZMatrix(MathUtils.degToRad(this.data.rotZ))
+		const rotX = Matrix3D.claim().rotateXMatrix(MathUtils.degToRad(state.xRotation))
 		const transZ = Matrix3D.claim().setTranslation(0, 0, -state.zOffset)
 		const m = fromOrigin
 			.clone()
