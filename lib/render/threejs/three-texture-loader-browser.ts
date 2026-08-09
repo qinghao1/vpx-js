@@ -56,13 +56,13 @@ function viewportBudget(): number {
 	}
 }
 
-function effectiveMax(name: string, isFloat: boolean): number {
+function effectiveMax(_name: string, isFloat: boolean): number {
 	const hw = getHardwareMax()
 	const vp = viewportBudget()
 	if (isFloat) return Math.min(hw, Math.max(1024, Math.ceil(vp)))
-	if (name.toLowerCase().includes('vlm.nestmap')) return Math.min(hw, Math.max(1024, Math.ceil(vp * 0.75)))
-	if (vp >= 1400) return hw
-	return Math.min(hw, Math.max(2048, Math.ceil(vp * 2)))
+	// keep playfield / lightmaps crisp: at least 4096, scale with viewport, cap at hw
+	if (vp >= 1200) return Math.min(hw, Math.max(4096, Math.ceil(vp * 1.5)))
+	return Math.min(hw, Math.max(4096, Math.ceil(vp * 2)))
 }
 
 function tune(tex: any): void {
