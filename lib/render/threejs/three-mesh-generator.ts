@@ -35,14 +35,7 @@ export class ThreeMeshGenerator {
 		bg.setAttribute('position', new Float32BufferAttribute(positions, 3))
 		if (ic) {
 			const IndexArray = vc > 65535 ? Uint32Array : Uint16Array
-			const indices = new IndexArray(mesh.indices)
-			// VPX is left-handed, Three.js is right-handed — reverse winding.
-			for (let i = 0; i < ic; i += 3) {
-				const a = indices[i]
-				indices[i] = indices[i + 2]
-				indices[i + 2] = a
-			}
-			bg.setIndex(new BufferAttribute(indices, 1))
+			bg.setIndex(new BufferAttribute(new IndexArray(mesh.indices), 1))
 		}
 		if (hasNormal) bg.setAttribute('normal', new Float32BufferAttribute(normals, 3))
 		else bg.computeVertexNormals()
@@ -53,7 +46,7 @@ export class ThreeMeshGenerator {
 
 export function releaseGeometry(geometry: BufferGeometry): void {
 	for (const name of Object.keys(geometry.attributes))
-		delete (geometry.attributes as unknown as Record<string, unknown>)[name]
+		delete (geometry.attributes as any)[name]
 	geometry.dispose()
 	try {
 		;(geometry as unknown as { disposeBoundsTree?: () => void }).disposeBoundsTree?.()
