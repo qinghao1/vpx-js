@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import type { PlayerPhysics } from '../game/player-physics.js'
-import { Vertex3D } from '../util/math.js'
+import type { Vertex3D } from '../util/math.js'
 import type { Ball } from '../vpt/ball/ball.js'
 import type { CollisionEvent } from './collision-event.js'
 import { C_CONTACTVEL, PHYS_TOUCH } from './constants.js'
@@ -52,8 +52,8 @@ export class HitPlane extends HitObject {
 		)
 		const bnd = this.normal.dot(coll.ball.state.pos) - coll.ball.data.radius - this.d
 		if (bnd >= 0) return
-		const v = this.normal.clone(true).multiplyScalar(bnd)
-		coll.ball.state.pos.sub(v)
-		Vertex3D.release(v)
+		coll.ball.state.pos.x -= this.normal.x * bnd
+		coll.ball.state.pos.y -= this.normal.y * bnd
+		coll.ball.state.pos.z -= this.normal.z * bnd
 	}
 }

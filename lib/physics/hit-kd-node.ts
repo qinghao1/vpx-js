@@ -3,7 +3,7 @@
 
 import type { PlayerPhysics } from '../game/player-physics.js'
 import { FRect3D } from '../util/frect3d.js'
-import { Vertex3D } from '../util/math.js'
+import type { Vertex3D } from '../util/math.js'
 import type { Ball } from '../vpt/ball/ball.js'
 import { CollisionEvent } from './collision-event.js'
 import type { HitKD } from './hit-kd.js'
@@ -151,38 +151,40 @@ export class HitKDNode {
 	public createNextLevel(level: number, levelEmpty: number): void {
 		const org = this.items & COUNT_MASK
 		if (org <= 4 || level >= 64) return
-		const d = Vertex3D.claim(this.rectBounds.right - this.rectBounds.left, this.rectBounds.bottom - this.rectBounds.top, this.rectBounds.zhigh - this.rectBounds.zlow)
+		const dx = this.rectBounds.right - this.rectBounds.left
+		const dy = this.rectBounds.bottom - this.rectBounds.top
+		const dz = this.rectBounds.zhigh - this.rectBounds.zlow
 		let axis: number
-		if (d.x > d.y && d.x > d.z) { if (d.x < 1e-4) { Vertex3D.release(d); return } axis = 0 }
-		else if (d.y > d.z) { if (d.y < 1e-4) { Vertex3D.release(d); return } axis = 1 }
-		else { if (d.z < 1e-4) { Vertex3D.release(d); return } axis = 2 }
-		Vertex3D.release(d)
+		if (dx > dy && dx > dz) { if (dx < 1e-4) return; axis = 0 }
+		else if (dy > dz) { if (dy < 1e-4) return; axis = 1 }
+		else { if (dz < 1e-4) return; axis = 2 }
 		this.children = this.hitOct.allocTwoNodes()
 		if (!this.children.length) return
 		this.children[0].rectBounds = new FRect3D(this.rectBounds.left, this.rectBounds.right, this.rectBounds.top, this.rectBounds.bottom, this.rectBounds.zlow, this.rectBounds.zhigh)
 		this.children[1].rectBounds = new FRect3D(this.rectBounds.left, this.rectBounds.right, this.rectBounds.top, this.rectBounds.bottom, this.rectBounds.zlow, this.rectBounds.zhigh)
-		const vc = Vertex3D.claim((this.rectBounds.left + this.rectBounds.right) * 0.5, (this.rectBounds.top + this.rectBounds.bottom) * 0.5, (this.rectBounds.zlow + this.rectBounds.zhigh) * 0.5)
-		if (axis === 0) { this.children[0].rectBounds.right = vc.x; this.children[1].rectBounds.left = vc.x }
-		else if (axis === 1) { this.children[0].rectBounds.bottom = vc.y; this.children[1].rectBounds.top = vc.y }
-		else { this.children[0].rectBounds.zhigh = vc.z; this.children[1].rectBounds.zlow = vc.z }
+		const vcX = (this.rectBounds.left + this.rectBounds.right) * 0.5
+		const vcY = (this.rectBounds.top + this.rectBounds.bottom) * 0.5
+		const vcZ = (this.rectBounds.zlow + this.rectBounds.zhigh) * 0.5
+		if (axis === 0) { this.children[0].rectBounds.right = vcX; this.children[1].rectBounds.left = vcX }
+		else if (axis === 1) { this.children[0].rectBounds.bottom = vcY; this.children[1].rectBounds.top = vcY }
+		else { this.children[0].rectBounds.zhigh = vcZ; this.children[1].rectBounds.zlow = vcZ }
 		for (const ch of this.children) { ch.hitOct = this.hitOct; ch.items = 0; ch.children.length = 0 }
-		if (axis === 0) { for (let i = this.start; i < this.start + org; i++) { const h = this.hitOct.getItemAt(i).hitBBox; if (h.right < vc.x) this.children[0].items++; else if (h.left > vc.x) this.children[1].items++ } }
-		else if (axis === 1) { for (let i = this.start; i < this.start + org; i++) { const h = this.hitOct.getItemAt(i).hitBBox; if (h.bottom < vc.y) this.children[0].items++; else if (h.top > vc.y) this.children[1].items++ } }
-		else { for (let i = this.start; i < this.start + org; i++) { const h = this.hitOct.getItemAt(i).hitBBox; if (h.zhigh < vc.z) this.children[0].items++; else if (h.zlow > vc.z) this.children[1].items++ } }
+		if (axis === 0) { for (let i = this.start; i < this.start + org; i++) { const h = this.hitOct.getItemAt(i).hitBBox; if (h.right < vcX) this.children[0].items++; else if (h.left > vcX) this.children[1].items++ } }
+		else if (axis === 1) { for (let i = this.start; i < this.start + org; i++) { const h = this.hitOct.getItemAt(i).hitBBox; if (h.bottom < vcY) this.children[0].items++; else if (h.top > vcY) this.children[1].items++ } }
+		else { for (let i = this.start; i < this.start + org; i++) { const h = this.hitOct.getItemAt(i).hitBBox; if (h.zhigh < vcZ) this.children[0].items++; else if (h.zlow > vcZ) this.children[1].items++ } }
 		const leftCount = this.children[0].items, rightCount = this.children[1].items
 		let levelEmptyLocal = levelEmpty, middleCount = org - leftCount - rightCount, countEmpty = 0
 		if (leftCount === 0) countEmpty++; if (rightCount === 0) countEmpty++; if (middleCount === 0) countEmpty++
 		if (countEmpty >= 2) levelEmptyLocal++; else levelEmptyLocal = 0
-		if (levelEmptyLocal > 8) { this.hitOct.numNodes -= 2; this.children.length = 0; Vertex3D.release(vc); return }
+		if (levelEmptyLocal > 8) { this.hitOct.numNodes -= 2; this.children.length = 0; return }
 		this.children[0].start = this.start + middleCount; this.children[1].start = this.children[0].start + leftCount
 		let middle = 0; this.children[0].items = 0; this.children[1].items = 0
-		if (axis === 0) { for (let i = this.start; i < this.start + org; i++) { const idx = this.hitOct.orgIdx[i]!; const h = this.hitOct.getItemAt(i).hitBBox; if (h.right < vc.x) this.hitOct.tmp[this.children[0].start + this.children[0].items++] = idx; else if (h.left > vc.x) this.hitOct.tmp[this.children[1].start + this.children[1].items++] = idx; else this.hitOct.orgIdx[this.start + middle++] = idx } }
-		else if (axis === 1) { for (let i = this.start; i < this.start + org; i++) { const idx = this.hitOct.orgIdx[i]!; const h = this.hitOct.getItemAt(i).hitBBox; if (h.bottom < vc.y) this.hitOct.tmp[this.children[0].start + this.children[0].items++] = idx; else if (h.top > vc.y) this.hitOct.tmp[this.children[1].start + this.children[1].items++] = idx; else this.hitOct.orgIdx[this.start + middle++] = idx } }
-		else { for (let i = this.start; i < this.start + org; i++) { const idx = this.hitOct.orgIdx[i]!; const h = this.hitOct.getItemAt(i).hitBBox; if (h.zhigh < vc.z) this.hitOct.tmp[this.children[0].start + this.children[0].items++] = idx; else if (h.zlow > vc.z) this.hitOct.tmp[this.children[1].start + this.children[1].items++] = idx; else this.hitOct.orgIdx[this.start + middle++] = idx } }
+		if (axis === 0) { for (let i = this.start; i < this.start + org; i++) { const idx = this.hitOct.orgIdx[i]!; const h = this.hitOct.getItemAt(i).hitBBox; if (h.right < vcX) this.hitOct.tmp[this.children[0].start + this.children[0].items++] = idx; else if (h.left > vcX) this.hitOct.tmp[this.children[1].start + this.children[1].items++] = idx; else this.hitOct.orgIdx[this.start + middle++] = idx } }
+		else if (axis === 1) { for (let i = this.start; i < this.start + org; i++) { const idx = this.hitOct.orgIdx[i]!; const h = this.hitOct.getItemAt(i).hitBBox; if (h.bottom < vcY) this.hitOct.tmp[this.children[0].start + this.children[0].items++] = idx; else if (h.top > vcY) this.hitOct.tmp[this.children[1].start + this.children[1].items++] = idx; else this.hitOct.orgIdx[this.start + middle++] = idx } }
+		else { for (let i = this.start; i < this.start + org; i++) { const idx = this.hitOct.orgIdx[i]!; const h = this.hitOct.getItemAt(i).hitBBox; if (h.zhigh < vcZ) this.hitOct.tmp[this.children[0].start + this.children[0].items++] = idx; else if (h.zlow > vcZ) this.hitOct.tmp[this.children[1].start + this.children[1].items++] = idx; else this.hitOct.orgIdx[this.start + middle++] = idx } }
 		this.items = middle | (axis << AXIS_SHIFT)
 		if (this.children[0].items > 0) for (let i = 0; i < this.children[0].items; i++) this.hitOct.orgIdx[this.children[0].start + i] = this.hitOct.tmp[this.children[0].start + i]!
 		if (this.children[1].items > 0) for (let i = 0; i < this.children[1].items; i++) this.hitOct.orgIdx[this.children[1].start + i] = this.hitOct.tmp[this.children[1].start + i]!
-		Vertex3D.release(vc)
 		this.children[0].createNextLevel(level + 1, levelEmptyLocal)
 		this.children[1].createNextLevel(level + 1, levelEmptyLocal)
 	}

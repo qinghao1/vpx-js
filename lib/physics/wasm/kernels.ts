@@ -1,6 +1,3 @@
-import { fileURLToPath } from 'node:url'
-import path from 'node:path'
-
 type Mod = {
 	_malloc: (n: number) => number
 	_free: (p: number) => void
@@ -19,11 +16,42 @@ export async function getWasmKernels(): Promise<Mod> {
 	if (mod) return mod
 	if (loading) return loading
 	loading = (async () => {
-		const dir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../wasm/kernels/dist')
-		const { default: create } = await import(path.join(dir, 'kernels.js'))
-		mod = (await create({ locateFile: (p: string) => path.join(dir, p) })) as Mod
-		try { warmWasmPools(512, 512, 512) } catch {}
-		return mod!
+		const candidates: string[] = []
+		if (import.meta.url.startsWith('http')) {
+			candidates.push(
+				new URL('/wasm/kernels/dist/kernels.js', import.meta.url).href,
+				new URL('/wasm/kernels.js', import.meta.url).href,
+			)
+		}
+		for (const rel of [
+			'../../../wasm/kernels/dist/kernels.js',
+			'../../../../wasm/kernels/dist/kernels.js',
+			'../../wasm/kernels/dist/kernels.js',
+		]) {
+			try {
+				const u = new URL(rel, import.meta.url).href
+				if (!candidates.includes(u)) candidates.push(u)
+			} catch {}
+		}
+		let lastErr: unknown
+		for (const url of candidates) {
+			try {
+				const { default: create } = await import(/* @vite-ignore */ url)
+				const base = new URL('.', url).href
+				const locateFile = (p: string) => {
+					const u = new URL(p, base)
+					return u.protocol === 'file:' ? decodeURIComponent(u.pathname) : u.href
+				}
+				try {
+					mod = (await (create as (o?: unknown) => Promise<Mod> )({ locateFile })) as Mod
+				} catch {
+					mod = (await (create as () => Promise<Mod> )()) as Mod
+				}
+				try { warmWasmPools(512, 512, 512) } catch {}
+				return mod!
+			} catch (e) { lastErr = e }
+		}
+		throw new Error(`WASM kernels not found${lastErr ? `: ${(lastErr as Error).message}` : ''}`)
 	})()
 	return loading
 }

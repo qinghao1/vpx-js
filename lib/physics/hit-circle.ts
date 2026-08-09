@@ -4,7 +4,6 @@
 import type { PlayerPhysics } from '../game/player-physics.js'
 import { solveQuadraticEq } from '../util/functions.js'
 import type { Vertex2D } from '../util/math.js'
-import { Vertex3D } from '../util/math.js'
 import type { Ball } from '../vpt/ball/ball.js'
 import type { CollisionEvent } from './collision-event.js'
 import { CollisionType } from './collision-type.js'
@@ -55,96 +54,64 @@ export class HitCircle extends HitObject {
 		rigid: boolean,
 	): number {
 		if (!this.isEnabled || ball.state.isFrozen) return -1
-		const c = Vertex3D.claim(this.center.x, this.center.y, 0)
-		const dist = ball.state.pos.clone(true).sub(c)
-		const dv = ball.hit.vel.clone(true)
-		const capsule3D = !lateral && ball.state.pos.z > this.hitBBox.zhigh
+		const cx = this.center.x, cy = this.center.y
+		const bx = ball.state.pos.x, by = ball.state.pos.y, bz = ball.state.pos.z
+		const vx = ball.hit.vel.x, vy = ball.hit.vel.y, vz = ball.hit.vel.z
+		const br = ball.data.radius
+		const capsule3D = !lateral && bz > this.hitBBox.zhigh
 		const isKicker = this.objType === CollisionType.Kicker
 		const isKickerOrTrigger = this.objType === CollisionType.Trigger || isKicker
-		let targetR: number
+		let dz = 0, dvz = vz, targetR: number
 		if (capsule3D) {
 			targetR = this.radius * (13 / 5)
-			c.z = this.hitBBox.zhigh - this.radius * (12 / 5)
-			dist.z = ball.state.pos.z - c.z
+			dz = bz - (this.hitBBox.zhigh - this.radius * (12 / 5))
 		} else {
-			targetR = lateral ? this.radius + ball.data.radius : this.radius
-			dist.z = 0
-			dv.z = 0
+			targetR = lateral ? this.radius + br : this.radius
+			dvz = 0
 		}
-		const bcddsq = dist.lengthSq()
+		const dx = bx - cx, dy = by - cy
+		const bcddsq = capsule3D ? dx * dx + dy * dy + dz * dz : dx * dx + dy * dy
 		const bcdd = Math.sqrt(bcddsq)
-		if (bcdd <= 1e-6) {
-			Vertex3D.release(dist, dv, c)
-			return -1
-		}
-		const b = dist.dot(dv)
+		if (bcdd <= 1e-6) return -1
+		const b = capsule3D ? dx * vx + dy * vy + dz * dvz : dx * vx + dy * vy
 		const bnv = b / bcdd
-		Vertex3D.release(dist)
-		if (direction && bnv > C_LOWNORMVEL) {
-			Vertex3D.release(dv, c)
-			return -1
-		}
+		if (direction && bnv > C_LOWNORMVEL) return -1
 		const bnd = bcdd - targetR
-		const a = dv.lengthSq()
-		Vertex3D.release(dv)
-		let hitTime = 0
-		let isUnhit = false
-		let isContact = false
+		const a = capsule3D ? vx * vx + vy * vy + dvz * dvz : vx * vx + vy * vy
+		let hitTime = 0, isUnhit = false, isContact = false
 		if (isKicker && bnd <= 0 && bnd >= -this.radius && a < C_CONTACTVEL * C_CONTACTVEL && ball.hit.isRealBall()) {
-			if (ball.hit.vpVolObjs.includes(this.obj!))
-				ball.hit.vpVolObjs.splice(ball.hit.vpVolObjs.indexOf(this.obj!), 1)
+			if (ball.hit.vpVolObjs.includes(this.obj!)) ball.hit.vpVolObjs.splice(ball.hit.vpVolObjs.indexOf(this.obj!), 1)
 		}
 		if (rigid && bnd < PHYS_TOUCH) {
-			if (bnd < -ball.data.radius) {
-				Vertex3D.release(c)
-				return -1
-			}
+			if (bnd < -br) return -1
 			if (Math.abs(bnv) <= C_CONTACTVEL) isContact = true
 			else hitTime = Math.max(0, -bnd / bnv)
-		} else if (isKickerOrTrigger && ball.hit.isRealBall() && bnd < 0 !== ball.hit.vpVolObjs.includes(this.obj!)) {
+		} else if (isKickerOrTrigger && ball.hit.isRealBall() && (bnd < 0) !== ball.hit.vpVolObjs.includes(this.obj!)) {
 			if (Math.abs(bnd - this.radius) < 0.05) ball.hit.vpVolObjs.push(this.obj!)
 			else isUnhit = bnd > 0
 		} else {
-			if ((!rigid && bnd * bnv > 0) || a < 1e-8) {
-				Vertex3D.release(c)
-				return -1
-			}
+			if ((!rigid && bnd * bnv > 0) || a < 1e-8) return -1
 			const sol = solveQuadraticEq(a, 2 * b, bcddsq - targetR * targetR)
-			if (!sol) {
-				Vertex3D.release(c)
-				return -1
-			}
+			if (!sol) return -1
 			const [t1, t2] = sol
 			isUnhit = t1 * t2 < 0
 			hitTime = isUnhit ? Math.max(t1, t2) : Math.min(t1, t2)
 		}
-		if (!Number.isFinite(hitTime) || hitTime < 0 || hitTime > dTime) {
-			Vertex3D.release(c)
-			return -1
-		}
-		const hitZ = ball.state.pos.z + ball.hit.vel.z * hitTime
-		if (
-			hitZ + ball.data.radius * 0.5 < this.hitBBox.zlow ||
-			(!capsule3D && hitZ - ball.data.radius * 0.5 > this.hitBBox.zhigh) ||
-			(capsule3D && hitZ < this.hitBBox.zhigh)
-		) {
-			Vertex3D.release(c)
-			return -1
-		}
-		const hx = ball.state.pos.x + ball.hit.vel.x * hitTime
-		const hy = ball.state.pos.y + ball.hit.vel.y * hitTime
-		const sqr = (hx - c.x) ** 2 + (hy - c.y) ** 2
+		if (!Number.isFinite(hitTime) || hitTime < 0 || hitTime > dTime) return -1
+		const hitZ = bz + vz * hitTime
+		if (hitZ + br * 0.5 < this.hitBBox.zlow || (!capsule3D && hitZ - br * 0.5 > this.hitBBox.zhigh) || (capsule3D && hitZ < this.hitBBox.zhigh)) return -1
+		const hx = bx + vx * hitTime, hy = by + vy * hitTime
+		const sqr = (hx - cx) ** 2 + (hy - cy) ** 2
 		coll.hitNormal.setZero()
 		if (sqr > 1e-8) {
 			const inv = 1 / Math.sqrt(sqr)
-			coll.hitNormal.x = (hx - c.x) * inv
-			coll.hitNormal.y = (hy - c.y) * inv
+			coll.hitNormal.x = (hx - cx) * inv
+			coll.hitNormal.y = (hy - cy) * inv
 		} else {
 			coll.hitNormal.x = 0
 			coll.hitNormal.y = 1
 			coll.hitNormal.z = 0
 		}
-		Vertex3D.release(c)
 		if (!rigid) coll.hitFlag = isUnhit
 		coll.isContact = isContact
 		if (isContact) coll.hitOrgNormalVelocity = bnv

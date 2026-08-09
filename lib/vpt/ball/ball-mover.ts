@@ -20,9 +20,10 @@ export class BallMover implements MoverObject {
 
 	public updateDisplacements(dtime: number): void {
 		if (this.state.isFrozen) return
-		this.state.pos.addAndRelease(this.hit.vel.clone(true).multiplyScalar(dtime))
+		this.state.pos.x += this.hit.vel.x * dtime
+		this.state.pos.y += this.hit.vel.y * dtime
+		this.state.pos.z += this.hit.vel.z * dtime
 		this.hit.calcHitBBox()
-
 		if (this.hit.angularVelocity.lengthSq() >= 1e-12) {
 			const skew = Matrix2D.claim().createSkewSymmetric(this.hit.angularVelocity)
 			const delta = Matrix2D.claim()
@@ -32,7 +33,10 @@ export class BallMover implements MoverObject {
 			this.state.orientation.orthoNormalize()
 			Matrix2D.release(skew, delta)
 		}
-		this.hit.angularVelocity.setAndRelease(this.hit.angularMomentum.clone(true).divideScalar(this.hit.inertia))
+		const inv = 1 / this.hit.inertia
+		this.hit.angularVelocity.x = this.hit.angularMomentum.x * inv
+		this.hit.angularVelocity.y = this.hit.angularMomentum.y * inv
+		this.hit.angularVelocity.z = this.hit.angularMomentum.z * inv
 	}
 
 	public updateVelocities(physics: PlayerPhysics): void {

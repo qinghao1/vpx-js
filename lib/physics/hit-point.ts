@@ -1,9 +1,8 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { FRect3D } from '../util/frect3d.js'
+import type { Vertex3D } from '../util/math.js'
 import { solveQuadraticEq } from '../util/functions.js'
-import { Vertex3D } from '../util/math.js'
 import type { Ball } from '../vpt/ball/ball.js'
 import type { CollisionEvent } from './collision-event.js'
 import { C_CONTACTVEL, PHYS_TOUCH } from './constants.js'
@@ -17,46 +16,45 @@ export class HitPoint extends HitObject {
 	}
 
 	public override calcHitBBox(): void {
-		this.hitBBox = new FRect3D(this.p.x, this.p.x, this.p.y, this.p.y, this.p.z, this.p.z)
+		const b = this.hitBBox;
+		b.left = b.right = this.p.x;
+		b.top = b.bottom = this.p.y;
+		b.zlow = b.zhigh = this.p.z;
 	}
 
 	public override hitTest(ball: Ball, dTime: number, coll: CollisionEvent): number {
 		if (!this.isEnabled) return -1
-		const dist = ball.state.pos.clone(true).sub(this.p)
-		const bcddsq = dist.lengthSq()
-		const bcdd = Math.sqrt(bcddsq)
-		if (bcdd <= 1e-6) {
-			Vertex3D.release(dist)
-			return -1
-		}
-		const b = dist.dot(ball.hit.vel)
-		const bnv = b / bcdd
-		Vertex3D.release(dist)
-		if (bnv > C_CONTACTVEL) return -1
-		const bnd = bcdd - ball.data.radius
-		const a = ball.hit.vel.lengthSq()
-		let hitTime = 0
-		let isContact = false
+		const px = this.p.x, py = this.p.y, pz = this.p.z;
+		const bx = ball.state.pos.x, by = ball.state.pos.y, bz = ball.state.pos.z;
+		const vx = ball.hit.vel.x, vy = ball.hit.vel.y, vz = ball.hit.vel.z;
+		const dx = bx - px, dy = by - py, dz = bz - pz;
+		const bcddsq = dx*dx+dy*dy+dz*dz;
+		const bcdd = Math.sqrt(bcddsq);
+		if (bcdd <= 1e-6) return -1;
+		const b = dx*vx + dy*vy + dz*vz;
+		const bnv = b / bcdd;
+		if (bnv > C_CONTACTVEL) return -1;
+		const bnd = bcdd - ball.data.radius;
+		const a = vx*vx+vy*vy+vz*vz;
+		let hitTime = 0, isContact = false;
 		if (bnd < PHYS_TOUCH) {
-			if (Math.abs(bnv) <= C_CONTACTVEL) {
-				isContact = true
-				hitTime = 0
-			} else hitTime = Math.max(0, -bnd / bnv)
+			if (Math.abs(bnv) <= C_CONTACTVEL) isContact = true;
+			else hitTime = Math.max(0, -bnd / bnv);
 		} else {
-			if (a < 1e-8) return -1
-			const sol = solveQuadraticEq(a, 2 * b, bcddsq - ball.data.radius * ball.data.radius)
-			if (!sol) return -1
-			hitTime = sol[0]! * sol[1]! < 0 ? Math.max(sol[0]!, sol[1]!) : Math.min(sol[0]!, sol[1]!)
+			if (a < 1e-8) return -1;
+			const sol = solveQuadraticEq(a, 2*b, bcddsq - ball.data.radius*ball.data.radius);
+			if (!sol) return -1;
+			hitTime = sol[0]!*sol[1]! < 0 ? Math.max(sol[0]!, sol[1]!) : Math.min(sol[0]!, sol[1]!);
 		}
-		if (!Number.isFinite(hitTime) || hitTime < 0 || hitTime > dTime) return -1
-		const hitVel = ball.hit.vel.clone(true).multiplyScalar(hitTime)
-		const hitNormal = ball.state.pos.clone(true).add(hitVel).sub(this.p).normalize()
-		coll.hitNormal.set(hitNormal)
-		Vertex3D.release(hitVel, hitNormal)
-		coll.isContact = isContact
-		if (isContact) coll.hitOrgNormalVelocity = bnv
-		coll.hitDistance = bnd
-		return hitTime
+		if (!Number.isFinite(hitTime) || hitTime < 0 || hitTime > dTime) return -1;
+		const hx = bx + vx*hitTime, hy = by + vy*hitTime, hz = bz + vz*hitTime;
+		const nx = hx - px, ny = hy - py, nz = hz - pz;
+		const len = Math.sqrt(nx*nx+ny*ny+nz*nz) || 1;
+		coll.hitNormal.x = nx/len; coll.hitNormal.y = ny/len; coll.hitNormal.z = nz/len;
+		coll.isContact = isContact;
+		if (isContact) coll.hitOrgNormalVelocity = bnv;
+		coll.hitDistance = bnd;
+		return hitTime;
 	}
 
 	public override collide(coll: CollisionEvent): void {

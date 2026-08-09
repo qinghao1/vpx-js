@@ -12,3 +12,7 @@ emcc "$ROOT/kernels.cpp" -O3 -flto -msimd128 \
   -sALLOW_MEMORY_GROWTH=1 -sENVIRONMENT=web,worker,node -sFILESYSTEM=0 --no-entry \
   -o "$DIST/kernels.js"
 ls -lh "$DIST"
+mkdir -p "$ROOT/../dist"
+cp -f "$DIST/kernels.js" "$ROOT/../dist/kernels.js" 2>/dev/null || true
+cp -f "$DIST/kernels.wasm" "$ROOT/../dist/kernels.wasm" 2>/dev/null || true
+ls -lh "$ROOT/../dist" | head -n 20
