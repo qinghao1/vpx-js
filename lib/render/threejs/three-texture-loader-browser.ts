@@ -56,13 +56,11 @@ function viewportBudget(): number {
 	}
 }
 
-function effectiveMax(_name: string, isFloat: boolean): number {
+function effectiveMax(isFloat: boolean): number {
 	const hw = getHardwareMax()
 	const vp = viewportBudget()
 	if (isFloat) return Math.min(hw, Math.max(1024, Math.ceil(vp)))
-	// keep playfield / lightmaps crisp: at least 4096, scale with viewport, cap at hw
-	if (vp >= 1200) return Math.min(hw, Math.max(4096, Math.ceil(vp * 1.5)))
-	return Math.min(hw, Math.max(4096, Math.ceil(vp * 2)))
+	return Math.min(hw, Math.max(4096, Math.ceil(vp * (vp >= 1200 ? 1.5 : 2))))
 }
 
 function tune(tex: any): void {
@@ -79,7 +77,7 @@ function nameAndTune(tex: any, name: string): void {
 }
 
 function finalize(tex: any, name: string, isFloat: boolean): any {
-	const max = effectiveMax(name, isFloat)
+	const max = effectiveMax(isFloat)
 	if (tex.image?.data && tex.image.width && tex.image.height) {
 		const ds = downsampleData(tex, max)
 		if (ds !== tex) {
@@ -233,7 +231,7 @@ async function tryCreateBitmap(data: Uint8Array, mime: string, name: string): Pr
 			{ type: mime as any },
 		)
 		let bitmap: any = await createImageBitmap(blob as any, { imageOrientation: 'flipY' } as any)
-		const max = effectiveMax(name, false)
+		const max = effectiveMax(false)
 		if (bitmap.width > max || bitmap.height > max) {
 			const scale = Math.min(max / bitmap.width, max / bitmap.height)
 			const nw = Math.max(1, Math.floor(bitmap.width * scale))
