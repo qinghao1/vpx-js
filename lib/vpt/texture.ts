@@ -2,13 +2,13 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { basename } from 'node:path'
-import { LzwReader } from '../gltf/lzw-reader.js'
 import { BiffParser } from '../io/biff-parser.js'
 import { concatUint8Arrays } from '../io/binary-helpers.js'
 import type { Storage } from '../io/ole-doc.js'
 import type { ITextureLoader } from '../render/irender-api.js'
 import { logger } from '../util/logger.js'
 import { Binary } from './binary.js'
+import { LzwReader } from './lzw-reader.js'
 import type { Table } from './table/table.js'
 
 /**
