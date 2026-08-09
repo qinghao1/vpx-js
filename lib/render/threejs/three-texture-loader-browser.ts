@@ -36,7 +36,7 @@ const imageMap: Record<string, string> = {
 const MAX_REGULAR = 4096
 const MAX_FLOAT = 2048
 const MAX_PLAYFIELD = 4096
-const MAX_VLM = 512
+const MAX_VLM = 1024
 
 function tune(tex: any): void {
 	tex.generateMipmaps = true
