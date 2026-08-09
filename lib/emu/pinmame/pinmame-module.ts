@@ -1,5 +1,5 @@
 export interface PinmameModule {
-	FS: { mkdirTree(p: string): void; writeFile(p: string, d: Uint8Array): void; readFile(p: string): Uint8Array }
+	FS: { mkdirTree(p: string): void; writeFile(p: string, d: Uint8Array): void; readFile(p: string): Uint8Array; stat(p: string): { size: number } }
 	HEAPU8: Uint8Array
 	HEAPU32: Uint32Array
 	_malloc(n: number): number
