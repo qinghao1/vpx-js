@@ -4,7 +4,7 @@
 import type { EventProxy } from '../game/event-proxy.js'
 import type { PlayerPhysics } from '../game/player-physics.js'
 import { FRect3D } from '../util/frect3d.js'
-import { Vertex3D } from '../util/math.js'
+import { Vertex3D } from '../util/vector.js'
 import type { Ball } from '../vpt/ball/ball.js'
 import { CollisionEvent } from './collision-event.js'
 import { CollisionType } from './collision-type.js'

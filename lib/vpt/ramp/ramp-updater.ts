@@ -3,7 +3,7 @@
 
 import type { RenderInfo } from '../../game/irenderable.js'
 import type { IRenderApi } from '../../render/irender-api.js'
-import { Matrix3D } from '../../util/math.js'
+import { Matrix3D } from '../../util/matrix.js'
 import { ItemUpdater } from '../item-updater.js'
 import type { Table } from '../table/table.js'
 import type { RampMeshGenerator } from './ramp-mesh-generator.js'

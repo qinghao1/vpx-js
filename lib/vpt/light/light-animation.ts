@@ -49,26 +49,21 @@ export class LightAnimation implements IAnimation {
 
 	public updateAnimation(newTimeMsec: number, _table: Table): void {
 		if (!this.data.isVisible) return
-		const oldTimeMsec = this.timeMsec < newTimeMsec ? this.timeMsec : newTimeMsec
+		const diff = Math.max(0, newTimeMsec - this.timeMsec)
 		this.timeMsec = newTimeMsec
-		const diffTimeMsec = newTimeMsec - oldTimeMsec
 		if (this.duration > 0 && this.timerDurationEndTime < this.timeMsec) {
 			this.realState = this.finalState
 			this.duration = 0
 			if (this.realState === Enums.LightStatus.LightStateBlinking) this.restartBlinker(newTimeMsec)
 		}
 		if (this.realState === Enums.LightStatus.LightStateBlinking) this.updateBlinker(newTimeMsec)
-		if (this.isOn()) {
-			if (this.state.intensity < this.data.intensity * this.intensityScale) {
-				this.state.intensity += this.data.fadeSpeedUp * diffTimeMsec
-				if (this.state.intensity > this.data.intensity * this.intensityScale)
-					this.state.intensity = this.data.intensity * this.intensityScale
-			}
-		} else {
-			if (this.state.intensity > 0) {
-				this.state.intensity -= this.data.fadeSpeedDown * diffTimeMsec
-				if (this.state.intensity < 0) this.state.intensity = 0
-			}
+		const lightState =
+			this.realState === Enums.LightStatus.LightStateBlinking ? (this.isBlinkOn() ? 1 : 0) : this.realState
+		const target = this.data.intensity * this.intensityScale * Math.max(0, Math.min(1, lightState))
+		if (this.state.intensity < target) {
+			this.state.intensity = Math.min(target, this.state.intensity + this.data.fadeSpeedUp * diff)
+		} else if (this.state.intensity > target) {
+			this.state.intensity = Math.max(target, this.state.intensity - this.data.fadeSpeedDown * diff)
 		}
 	}
 
@@ -92,13 +87,10 @@ export class LightAnimation implements IAnimation {
 	}
 
 	public updateIntensity() {
-		if (this.isOn()) this.state.intensity = this.data.intensity * this.intensityScale
-	}
-
-	private isOn(): boolean {
-		return this.realState === Enums.LightStatus.LightStateBlinking
-			? this.isBlinkOn()
-			: this.realState !== Enums.LightStatus.LightStateOff
+		const lightState =
+			this.realState === Enums.LightStatus.LightStateBlinking ? (this.isBlinkOn() ? 1 : 0) : this.realState
+		const target = this.data.intensity * this.intensityScale * Math.max(0, Math.min(1, lightState))
+		this.state.intensity = target
 	}
 
 	private isBlinkOn(): boolean {

@@ -3,8 +3,8 @@
 
 import type { IRenderApi } from '../render/irender-api.js'
 import { degToRad } from '../util/float.js'
-import type { Vertex2D } from '../util/math.js'
-import { Matrix3D } from '../util/math.js'
+import type { Vertex2D } from '../util/vector.js'
+import { Matrix3D } from '../util/matrix.js'
 import type { ItemState } from './item-state.js'
 import type { Table } from './table/table.js'
 

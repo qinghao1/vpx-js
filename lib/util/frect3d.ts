@@ -2,29 +2,11 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { Box3, Vector3 } from 'three'
-import { FLT_MAX } from './float.js'
 import type { Vertex3D } from './vector.js'
 
-/** Axis-aligned 3D bounding box. Thin wrapper over {@link Box3} with VP `left/right/top/bottom/zlow/zhigh` naming. */
-export class FRect3D {
-	left = FLT_MAX
-	top = FLT_MAX
-	right = -FLT_MAX
-	bottom = -FLT_MAX
-	zlow = FLT_MAX
-	zhigh = -FLT_MAX
-
-	get width(): number {
-		return Math.abs(this.left - this.right)
-	}
-	get height(): number {
-		return Math.abs(this.top - this.bottom)
-	}
-	get depth(): number {
-		return Math.abs(this.zlow - this.zhigh)
-	}
-
+export class FRect3D extends Box3 {
 	constructor(left?: number, right?: number, top?: number, bottom?: number, zLow?: number, zHigh?: number) {
+		super()
 		if (
 			left !== undefined &&
 			right !== undefined &&
@@ -33,69 +15,70 @@ export class FRect3D {
 			zLow !== undefined &&
 			zHigh !== undefined
 		) {
-			this.left = left
-			this.right = right
-			this.top = top
-			this.bottom = bottom
-			this.zlow = zLow
-			this.zhigh = zHigh
+			this.min.set(left, top, zLow)
+			this.max.set(right, bottom, zHigh)
+		} else {
+			this.makeEmpty()
 		}
 	}
-
-	/** Resets to inverted (empty) bounds. */
+	get left(): number {
+		return this.min.x
+	}
+	set left(v: number) {
+		this.min.x = v
+	}
+	get right(): number {
+		return this.max.x
+	}
+	set right(v: number) {
+		this.max.x = v
+	}
+	get top(): number {
+		return this.min.y
+	}
+	set top(v: number) {
+		this.min.y = v
+	}
+	get bottom(): number {
+		return this.max.y
+	}
+	set bottom(v: number) {
+		this.max.y = v
+	}
+	get zlow(): number {
+		return this.min.z
+	}
+	set zlow(v: number) {
+		this.min.z = v
+	}
+	get zhigh(): number {
+		return this.max.z
+	}
+	set zhigh(v: number) {
+		this.max.z = v
+	}
 	clear(): void {
-		this.left = FLT_MAX
-		this.right = -FLT_MAX
-		this.top = FLT_MAX
-		this.bottom = -FLT_MAX
-		this.zlow = FLT_MAX
-		this.zhigh = -FLT_MAX
+		this.makeEmpty()
 	}
-
-	/** Legacy alias for {@link clear}. */
-	Clear(): void {
-		this.clear()
-	}
-
-	/** Expands to include `o` (`Box3.expandByPoint` / `union` equivalent). */
 	extend(o: FRect3D): void {
-		this.left = Math.min(this.left, o.left)
-		this.right = Math.max(this.right, o.right)
-		this.top = Math.min(this.top, o.top)
-		this.bottom = Math.max(this.bottom, o.bottom)
-		this.zlow = Math.min(this.zlow, o.zlow)
-		this.zhigh = Math.max(this.zhigh, o.zhigh)
+		this.union(o)
 	}
-
 	toBox3(): Box3 {
-		return new Box3(new Vector3(this.left, this.top, this.zlow), new Vector3(this.right, this.bottom, this.zhigh))
+		return new Box3().copy(this)
 	}
-
 	static fromBox3(b: Box3): FRect3D {
-		return new FRect3D(b.min.x, b.max.x, b.min.y, b.max.y, b.min.z, b.max.z)
+		return new FRect3D().copy(b) as FRect3D
 	}
-
-	clone(): FRect3D {
-		return new FRect3D(this.left, this.right, this.top, this.bottom, this.zlow, this.zhigh)
+	override clone(): this {
+		return new FRect3D().copy(this) as this
 	}
-
-	/** Tests sphere intersection (`rSq` = radius²). */
 	intersectSphere(p: Vertex3D, rSq: number): boolean {
-		const ex = Math.max(this.left - p.x, 0) + Math.max(p.x - this.right, 0)
-		const ey = Math.max(this.top - p.y, 0) + Math.max(p.y - this.bottom, 0)
-		const ez = Math.max(this.zlow - p.z, 0) + Math.max(p.z - this.zhigh, 0)
+		const ex = Math.max(this.min.x - p.x, 0) + Math.max(p.x - this.max.x, 0)
+		const ey = Math.max(this.min.y - p.y, 0) + Math.max(p.y - this.max.y, 0)
+		const ez = Math.max(this.min.z - p.z, 0) + Math.max(p.z - this.max.z, 0)
 		return ex * ex + ey * ey + ez * ez <= rSq
 	}
-
-	/** Tests AABB overlap (`Box3.intersectsBox` equivalent). */
 	intersectRect(o: FRect3D): boolean {
-		return (
-			this.right >= o.left &&
-			this.bottom >= o.top &&
-			this.left <= o.right &&
-			this.top <= o.bottom &&
-			this.zlow <= o.zhigh &&
-			this.zhigh >= o.zlow
-		)
+		return this.intersectsBox(o)
 	}
 }

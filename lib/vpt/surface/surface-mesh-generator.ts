@@ -3,7 +3,7 @@
 
 import { CatmullCurve2D } from '../../util/catmull-curve.js'
 import { DragPoint } from '../../util/dragpoint.js'
-import { Vertex2D } from '../../util/math.js'
+import { Vertex2D } from '../../util/vector.js'
 import { RenderVertex } from '../../util/render-vertex.js'
 import { Vertex3DNoTex2 } from '../../util/vertex.js'
 import { Mesh } from '../mesh.js'

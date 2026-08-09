@@ -5,7 +5,7 @@ import * as chai from 'chai'
 import { expect } from 'chai'
 import sinonChai from 'sinon-chai'
 import type { IEmulator } from '../game/iemulator.js'
-import type { Vertex2D } from '../util/math.js'
+import type { Vertex2D } from '../util/vector.js'
 import { EmulatorMessageQueue, MessageType } from './emulator-message-queue.js'
 import { EmulatorState } from './emulator-state.js'
 

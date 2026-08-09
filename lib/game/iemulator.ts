@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import type { EmulatorState } from '../emu/emulator-state.js'
-import type { Vertex2D } from '../util/math.js'
+import type { Vertex2D } from '../util/vector.js'
 
 export interface IEmulator {
 	readonly emulatorState: EmulatorState
@@ -26,4 +26,6 @@ export interface IEmulator {
 	setFliptronicsInput(v: string, enable?: boolean): void
 	getDipSwitchByte(): number
 	setDipSwitchByte(v: number): void
+	getSolMask?(low: number): number
+	setSolMask?(low: number, mask: number): void
 }

@@ -3,7 +3,8 @@
 
 import { HIT_SHAPE_DETAIL_LEVEL } from '../../util/dragpoint.js'
 import { degToRad, FLT_MAX, FLT_MIN, f4 } from '../../util/float.js'
-import { Matrix3D, Vertex3D } from '../../util/math.js'
+import { Vertex3D } from '../../util/vector.js'
+import { Matrix3D } from '../../util/matrix.js'
 import { SplineVertex } from '../../util/spline-vertex.js'
 import { Vertex3DNoTex2 } from '../../util/vertex.js'
 import { Mesh } from '../mesh.js'

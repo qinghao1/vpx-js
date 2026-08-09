@@ -82,9 +82,6 @@ export class Matrix2D extends Matrix3 {
 		}
 		return super.set(args[0], args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8])
 	}
-	multiplyMatrix(a: Matrix2D, b: Matrix2D): void {
-		this.multiplyMatrices(a, b)
-	}
 	addMatrix(a: Matrix2D, b: Matrix2D): void {
 		const ae = a.elements,
 			be = b.elements,
@@ -108,12 +105,6 @@ export class Matrix2D extends Matrix3 {
 		e[6] = vz.x
 		e[7] = vz.y
 		e[8] = vz.z
-	}
-	toThree(): Matrix3 {
-		return this.clone()
-	}
-	static fromThree(m: Matrix3): Matrix2D {
-		return new Matrix2D().copy(m) as Matrix2D
 	}
 	override toString(): string {
 		const r = (n: number) => Math.round(n * 1000) / 1000
@@ -235,13 +226,6 @@ export class Matrix3D extends Matrix4 {
 		super.multiply(m)
 		return this
 	}
-	multiplyMatrices2(a: Matrix3D, b: Matrix3D): this {
-		super.multiplyMatrices(a, b)
-		return this
-	}
-	multiplyVP(a: Matrix3D, b?: Matrix3D): this {
-		return b ? this.multiplyMatrices2(a, b) : this.multiply(a)
-	}
 	preMultiply(a: Matrix3D): this {
 		super.premultiply(a)
 		return this
@@ -258,32 +242,6 @@ export class Matrix3D extends Matrix4 {
 	clonePooled(recycle = false): Matrix3D {
 		if (recycle) return Matrix3D.claim().copy(this) as Matrix3D
 		return this.clone()
-	}
-	toThree(): Matrix4 {
-		return this.clone()
-	}
-	static fromThreeMatrix(m: Matrix4): Matrix3D {
-		return new Matrix3D().copy(m) as Matrix3D
-	}
-	debug(): string[] {
-		return [
-			`_11: ${this._11}`,
-			`_12: ${this._12}`,
-			`_13: ${this._13}`,
-			`_14: ${this._14}`,
-			`_21: ${this._21}`,
-			`_22: ${this._22}`,
-			`_23: ${this._23}`,
-			`_24: ${this._24}`,
-			`_31: ${this._31}`,
-			`_32: ${this._32}`,
-			`_33: ${this._33}`,
-			`_34: ${this._34}`,
-			`_41: ${this._41}`,
-			`_42: ${this._42}`,
-			`_43: ${this._43}`,
-			`_44: ${this._44}`,
-		]
 	}
 	get _11(): number {
 		return this.elements[0]

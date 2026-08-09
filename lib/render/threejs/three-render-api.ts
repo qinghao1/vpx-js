@@ -13,7 +13,7 @@ import {
 } from '../../refs.node.js'
 import { type AnimationGate, animationGate } from '../../util/animation-gate.js'
 import { progress } from '../../util/logger.js'
-import type { Matrix3D } from '../../util/math.js'
+import type { Matrix3D } from '../../util/matrix.js'
 import type { ItemState } from '../../vpt/item-state.js'
 import type { LightData } from '../../vpt/light/light-data.js'
 import type { LightState } from '../../vpt/light/light-state.js'

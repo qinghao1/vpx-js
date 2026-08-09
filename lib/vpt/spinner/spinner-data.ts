@@ -3,7 +3,7 @@
 
 import { BiffParser } from '../../io/biff-parser.js'
 import type { Storage } from '../../io/ole-doc.js'
-import { Vertex2D } from '../../util/math.js'
+import { Vertex2D } from '../../util/vector.js'
 import { handleBiffTag } from '../biff-helper.js'
 import { ItemData } from '../item-data.js'
 

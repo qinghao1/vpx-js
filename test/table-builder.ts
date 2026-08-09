@@ -18,7 +18,7 @@
  */
 
 import { DragPoint } from '../lib/util/dragpoint.js'
-import { Vertex2D, Vertex3D } from '../lib/util/math.js'
+import { Vertex2D, Vertex3D } from '../lib/util/vector.js'
 import { Bumper } from '../lib/vpt/bumper/bumper'
 import { BumperData } from '../lib/vpt/bumper/bumper-data'
 import { Flipper } from '../lib/vpt/flipper/flipper'

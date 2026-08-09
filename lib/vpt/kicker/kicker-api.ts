@@ -4,7 +4,7 @@
 import type { EventProxy } from '../../game/event-proxy.js'
 import type { IBallCreationPosition, Player } from '../../game/player.js'
 import { logger } from '../../util/logger.js'
-import { Vertex3D } from '../../util/math.js'
+import { Vertex3D } from '../../util/vector.js'
 import type { Ball } from '../ball/ball.js'
 import { ItemApi } from '../item-api.js'
 import type { Table } from '../table/table.js'

@@ -4,7 +4,8 @@
 import type { PlayerPhysics } from '../../game/player-physics.js'
 import { PHYS_FACTOR } from '../../physics/constants.js'
 import type { MoverObject } from '../../physics/mover-object.js'
-import { Matrix2D, Vertex3D } from '../../util/math.js'
+import { Vertex3D } from '../../util/vector.js'
+import { Matrix2D } from '../../util/matrix.js'
 import type { BallData } from './ball-data.js'
 import type { BallHit } from './ball-hit.js'
 import type { BallState } from './ball-state.js'
@@ -27,7 +28,7 @@ export class BallMover implements MoverObject {
 		if (this.hit.angularVelocity.lengthSq() >= 1e-12) {
 			const skew = Matrix2D.claim().createSkewSymmetric(this.hit.angularVelocity)
 			const delta = Matrix2D.claim()
-			delta.multiplyMatrix(skew, this.state.orientation)
+			delta.multiplyMatrices(skew, this.state.orientation)
 			delta.multiplyScalar(dtime)
 			this.state.orientation.addMatrix(delta, this.state.orientation)
 			this.state.orientation.orthoNormalize()

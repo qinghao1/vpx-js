@@ -4,7 +4,7 @@
 import { CatmullCurve2D } from './catmull-curve.js'
 import { DragPoint } from './dragpoint.js'
 import { f4 } from './float.js'
-import { Vertex2D } from './math.js'
+import { Vertex2D } from './vector.js'
 import { RenderVertex } from './render-vertex.js'
 
 /** Thickened spline for wall/rubber. @see https://github.com/vpinball/vpinball/blob/master/spline.cpp */

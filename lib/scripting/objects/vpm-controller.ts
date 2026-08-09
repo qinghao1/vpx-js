@@ -18,9 +18,11 @@ export class VpmController {
 	private splashInfoLine = ''
 	private loadPromise: Promise<void> | null = null
 	private readonly gameSettings = new Map<string, { Settings: { Value: Record<string, unknown> } }>()
+	private readonly solMaskCache = new Map<number, number>()
 
 	readonly Switch: Record<number, number>
 	readonly Dip: Record<number, number>
+	readonly SolMask: Record<number, number>
 	readonly Lamp: Record<number, number>
 	readonly Solenoid: Record<number, number>
 	readonly GIString: Record<number, number>
@@ -40,6 +42,16 @@ export class VpmController {
 		this.Dip = this.numProxy(
 			() => this.emulator.getDipSwitchByte(),
 			(_, v) => (this.emulator.setDipSwitchByte(v), true),
+		)
+		this.SolMask = this.numProxy(
+			i => this.solMaskCache.get(i) ?? (this.emulator as any).getSolMask?.(i) ?? 0,
+			(n, v) => {
+				this.solMaskCache.set(n, v)
+				try {
+					;(this.emulator as any).setSolMask?.(n, v)
+				} catch {}
+				return true
+			},
 		)
 		this.Lamp = this.numProxy(
 			i => this.emulator.getLampState(i),
@@ -94,10 +106,20 @@ export class VpmController {
 		}
 		const existing = this.player.getPhysics().emu
 		if (existing?.isInitialized() && existing instanceof PinMameEmulator) {
+			for (const [k, v] of this.solMaskCache) {
+				try {
+					;(existing as any).setSolMask?.(k, v)
+				} catch {}
+			}
 			this.emulator = existing
 			return
 		}
 		const emu = new PinMameEmulator()
+		for (const [k, v] of this.solMaskCache) {
+			try {
+				;(emu as any).setSolMask?.(k, v)
+			} catch {}
+		}
 		this.emulator = emu
 		const rom = await this.fetchRom(name)
 		await emu.loadGame(name, rom)

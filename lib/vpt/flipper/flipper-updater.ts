@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import type { IRenderApi } from '../../render/irender-api.js'
-import { Matrix3D } from '../../util/math.js'
+import { Matrix3D } from '../../util/matrix.js'
 import { ItemUpdater } from '../item-updater.js'
 import type { Table } from '../table/table.js'
 import type { FlipperData } from './flipper-data.js'

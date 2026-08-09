@@ -3,7 +3,7 @@
 
 import { HitCircle } from '../../physics/hit-circle.js'
 import { degToRad } from '../../util/float.js'
-import { Vertex2D } from '../../util/math.js'
+import { Vertex2D } from '../../util/vector.js'
 import type { SpinnerData } from './spinner-data.js'
 import type { SpinnerState } from './spinner-state.js'
 

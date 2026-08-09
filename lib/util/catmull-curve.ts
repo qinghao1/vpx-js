@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { f4 } from './float.js'
-import type { Vertex3D } from './math.js'
+import type { Vertex3D } from './vector.js'
 import { RenderVertex, RenderVertex3D } from './render-vertex.js'
 import type { IRenderVertex, Vertex } from './vertex.js'
 

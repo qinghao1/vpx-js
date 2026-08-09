@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { Vertex3D } from '../util/math.js'
+import { Vertex3D } from '../util/vector.js'
 import { CollisionEvent } from './collision-event.js'
 import { HitLine3D } from './hit-line-3d.js'
 

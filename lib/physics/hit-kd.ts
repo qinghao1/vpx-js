@@ -54,7 +54,7 @@ export class HitKD {
 
 	public fillFromVector(vho: HitObject[], warm = false): void {
 		this.init(vho)
-		this.rootNode.rectBounds.Clear()
+		this.rootNode.rectBounds.clear()
 		this.rootNode.start = 0
 		this.rootNode.items = this.numItems
 		for (let i = 0; i < this.numItems; i++) {

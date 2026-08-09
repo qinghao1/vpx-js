@@ -5,7 +5,7 @@ import { Hit3DPoly } from '../../physics/hit-3dpoly.js'
 import type { HitObject } from '../../physics/hit-object.js'
 import { LineSeg } from '../../physics/line-seg.js'
 import { logger } from '../../util/logger.js'
-import { Vertex2D, Vertex3D } from '../../util/math.js'
+import { Vertex2D, Vertex3D } from '../../util/vector.js'
 import type { TableData } from './table-data.js'
 
 /** Generates table hit shapes. @see https://github.com/vpinball/vpinball/blob/master/table.cpp */

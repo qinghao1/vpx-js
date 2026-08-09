@@ -3,7 +3,7 @@
 
 import type { IRenderApi } from '../../render/irender-api.js'
 import { degToRad } from '../../util/float.js'
-import { Matrix3D } from '../../util/math.js'
+import { Matrix3D } from '../../util/matrix.js'
 import { ItemUpdater } from '../item-updater.js'
 import type { Material } from '../material.js'
 import type { Table } from '../table/table.js'

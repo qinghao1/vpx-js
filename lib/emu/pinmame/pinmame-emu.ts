@@ -3,7 +3,7 @@
 
 import type { IEmulator } from '../../game/iemulator.js'
 import { logger } from '../../util/logger.js'
-import { Vertex2D } from '../../util/math.js'
+import { Vertex2D } from '../../util/vector.js'
 import { EmulatorMessageQueue, MessageType } from '../emulator-message-queue.js'
 import { EmulatorState } from '../emulator-state.js'
 import { createPinmameModule } from './pinmame-loader.js'
@@ -29,6 +29,8 @@ type Api = {
 	getDmdHeight(): number
 	getDmdDepth(): number
 	getDmdFrame(p: number): number
+	getSolMask(low: number): number
+	setSolMask(low: number, mask: number): void
 }
 
 const gameName = (v: string | { name?: string; pinmame?: { name?: string } }) =>
@@ -50,6 +52,8 @@ export class PinMameEmulator implements IEmulator {
 	private readonly sols = new Uint8Array(72)
 	private readonly gis = new Uint8Array(8)
 	private readonly mockSwitches = new Map<number, number>()
+	private readonly solMasks = new Map<number, number>()
+	private readonly pendingSolMasks: Array<{ low: number; mask: number }> = []
 	private dmdW = DMD.x
 	private dmdH = DMD.y
 
@@ -82,6 +86,8 @@ export class PinMameEmulator implements IEmulator {
 			getDmdHeight: c('PinmameGetDmdHeight', 'number', []) as Api['getDmdHeight'],
 			getDmdDepth: c('PinmameGetDmdDepth', 'number', []) as Api['getDmdDepth'],
 			getDmdFrame: c('PinmameGetDmdFrame', 'number', ['number']) as Api['getDmdFrame'],
+			getSolMask: c('PinmameGetSolenoidMask', 'number', ['number']) as Api['getSolMask'],
+			setSolMask: c('PinmameSetSolenoidMask', null, ['number', 'number']) as Api['setSolMask'],
 		}
 	}
 
@@ -122,6 +128,13 @@ export class PinMameEmulator implements IEmulator {
 	private markReady(): void {
 		this.ready = true
 		this.queue.replayMessages(this)
+		for (const { low, mask } of this.pendingSolMasks) {
+			try {
+				this.api?.setSolMask(low, mask)
+				this.solMasks.set(low, mask)
+			} catch {}
+		}
+		this.pendingSolMasks.length = 0
 	}
 
 	private writeConfig(m: PinmameModule): void {
@@ -168,6 +181,26 @@ export class PinMameEmulator implements IEmulator {
 			try {
 				this.api.setDIP(0, v)
 			} catch {}
+	}
+
+	getSolMask(low: number): number {
+		if (this.solMasks.has(low)) return this.solMasks.get(low)!
+		if (this.isMock || !this.api) return 0
+		try {
+			return this.api.getSolMask(low) ?? 0
+		} catch {
+			return 0
+		}
+	}
+	setSolMask(low: number, mask: number): void {
+		this.solMasks.set(low, mask)
+		if (!this.ready || this.isMock || !this.api) {
+			if (!this.ready) this.pendingSolMasks.push({ low, mask })
+			return
+		}
+		try {
+			this.api.setSolMask(low, mask)
+		} catch {}
 	}
 
 	emuSimulateCycle(ms: number): number {
@@ -232,7 +265,7 @@ export class PinMameEmulator implements IEmulator {
 			for (let i = 0; i < n; i++) {
 				const idx = m.getValue(ptr + i * 8, 'i32')
 				const val = m.getValue(ptr + i * 8 + 4, 'i32')
-				if (idx >= 0 && idx < buf.length) buf[idx] = val ? 1 : 0
+				if (idx >= 0 && idx < buf.length) buf[idx] = Math.max(0, Math.min(255, val))
 			}
 		} finally {
 			m._free(ptr)

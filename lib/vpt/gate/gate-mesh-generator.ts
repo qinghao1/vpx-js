@@ -3,7 +3,8 @@
 
 import { degToRad, f4 } from '../../util/float.js'
 import { logger } from '../../util/logger.js'
-import { Matrix3D, Vertex3D } from '../../util/math.js'
+import { Vertex3D } from '../../util/vector.js'
+import { Matrix3D } from '../../util/matrix.js'
 import { Enums } from '../enums.js'
 import type { Mesh } from '../mesh.js'
 import { loadMesh } from '../mesh-loader.js'

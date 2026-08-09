@@ -9,7 +9,7 @@ import { HitTriangle } from '../../physics/hit-triangle.js'
 import { EdgeSet } from '../../util/edge-set.js'
 import { degToRad } from '../../util/float.js'
 import { clamp } from '../../util/functions.js'
-import type { Vertex3D } from '../../util/math.js'
+import type { Vertex3D } from '../../util/vector.js'
 import {
 	ProgMeshFloat3,
 	ProgMeshTriData,

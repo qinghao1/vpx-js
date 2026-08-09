@@ -41,18 +41,9 @@ export class Vertex2D extends Vector2 {
 		Vertex2D.release(v)
 		return this
 	}
-	override equals(v: Vector2): boolean {
-		return !!v && super.equals(v)
-	}
-	toThree(): Vector2 {
-		return new Vector2().copy(this)
-	}
-	static fromThree(v: Vector2): Vertex2D {
-		return new Vertex2D().copy(v) as Vertex2D
-	}
 	static get(buffer: Uint8Array): Vertex2D {
-		const view = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength)
-		return new Vertex2D(view.getFloat32(0, true), view.getFloat32(4, true))
+		const v = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength)
+		return new Vertex2D(v.getFloat32(0, true), v.getFloat32(4, true))
 	}
 }
 
@@ -130,9 +121,6 @@ export class Vertex3D extends Vector3 {
 	isZero(): boolean {
 		return Math.abs(this.x) < FLT_MIN && Math.abs(this.y) < FLT_MIN && Math.abs(this.z) < FLT_MIN
 	}
-	override equals(v: Vector3): boolean {
-		return super.equals(v)
-	}
 	static crossProduct(a: Vertex3D, b: Vertex3D, recycle = false): Vertex3D {
 		const out = new Vector3().crossVectors(a, b)
 		return recycle ? Vertex3D.claim(out.x, out.y, out.z) : new Vertex3D(out.x, out.y, out.z)
@@ -162,12 +150,6 @@ export class Vertex3D extends Vector3 {
 			e[1] * this.x + e[5] * this.y + e[9] * this.z,
 			e[2] * this.x + e[6] * this.y + e[10] * this.z,
 		)
-	}
-	toThree(): Vector3 {
-		return new Vector3().copy(this)
-	}
-	static fromThree(v: Vector3): Vertex3D {
-		return new Vertex3D().copy(v) as Vertex3D
 	}
 	static get(buffer: Uint8Array): Vertex3D {
 		const view = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength)

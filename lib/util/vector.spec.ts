@@ -1,6 +1,7 @@
 import { Vector3 } from 'three'
 import { describe, expect, it } from 'vitest'
-import { Matrix2D, Vertex3D } from './math.js'
+import { Matrix2D } from './matrix.js'
+import { Vertex3D } from './vector.js'
 
 describe('Vertex3D.applyMatrix2D', () => {
 	it('matches THREE Matrix3 * Vector3 (row-major correct)', () => {

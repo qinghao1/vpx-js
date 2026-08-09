@@ -19,7 +19,7 @@
 
 import type { Player } from '../lib/game/player'
 import type { PlayerPhysics } from '../lib/game/player-physics'
-import { Vertex3D } from '../lib/util/math.js'
+import { Vertex3D } from '../lib/util/vector.js'
 import type { Ball } from '../lib/vpt/ball/ball'
 import type { Table } from '../lib/vpt/table/table'
 

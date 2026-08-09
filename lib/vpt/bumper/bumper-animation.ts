@@ -4,7 +4,7 @@
 import { Event } from '../../game/event.js'
 import type { EventProxy } from '../../game/event-proxy.js'
 import type { IAnimation } from '../../game/ianimatable.js'
-import { Vertex3D } from '../../util/math.js'
+import { Vertex3D } from '../../util/vector.js'
 import type { Table } from '../table/table.js'
 import type { BumperData } from './bumper-data.js'
 import type { BumperState } from './bumper-state.js'

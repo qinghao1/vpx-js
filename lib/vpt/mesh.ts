@@ -2,8 +2,8 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { FLT_MAX, FLT_MIN, f4, fr } from '../util/float.js'
-import type { Matrix3D } from '../util/math.js'
-import { Vertex2D, Vertex3D } from '../util/math.js'
+import type { Matrix3D } from '../util/matrix.js'
+import { Vertex2D, Vertex3D } from '../util/vector.js'
 import { type RenderVertex, RenderVertex3D } from '../util/render-vertex.js'
 import { Vertex3DNoTex2 } from '../util/vertex.js'
 import type { FrameData } from './animation.js'

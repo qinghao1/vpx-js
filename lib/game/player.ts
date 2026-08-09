@@ -4,7 +4,7 @@
 import { EventEmitter } from 'node:events'
 import { type AnimationGate, animationGate } from '../util/animation-gate.js'
 import { logger } from '../util/logger.js'
-import type { Vertex2D, Vertex3D } from '../util/math.js'
+import type { Vertex2D, Vertex3D } from '../util/vector.js'
 import type { Ball } from '../vpt/ball/ball.js'
 import type { ItemState } from '../vpt/item-state.js'
 import type { Table } from '../vpt/table/table.js'

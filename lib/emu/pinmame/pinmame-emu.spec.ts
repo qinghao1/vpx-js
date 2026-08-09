@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import type { Vertex2D } from '../../util/math.js'
+import type { Vertex2D } from '../../util/vector.js'
 import { PinMameEmulator } from './pinmame-emu.js'
 
 describe('PinMAME WASM emulator (mock)', () => {

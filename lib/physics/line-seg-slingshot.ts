@@ -3,7 +3,7 @@
 
 import { Event } from '../game/event.js'
 import type { PlayerPhysics } from '../game/player-physics.js'
-import { Vertex2D, Vertex3D } from '../util/math.js'
+import { Vertex2D, Vertex3D } from '../util/vector.js'
 import type { Surface } from '../vpt/surface/surface.js'
 import type { SurfaceData } from '../vpt/surface/surface-data.js'
 import { SlingshotAnimObject } from './anim-slingshot.js'
