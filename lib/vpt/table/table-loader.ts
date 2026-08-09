@@ -68,6 +68,10 @@ export class TableLoader {
 	}
 
 	public async streamStorage<T>(name: string, streamer: (stg: Storage) => Promise<T>): Promise<T> {
+		const readerData = (this.doc as unknown as { reader?: { data?: Uint8Array } }).reader?.data
+		if (readerData) {
+			return await streamer(this.doc.storage(name))
+		}
 		let release!: () => void
 		const prev = this._lock
 		this._lock = new Promise<void>(r => (release = r))

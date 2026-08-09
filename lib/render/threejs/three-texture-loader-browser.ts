@@ -53,6 +53,7 @@ function nameAndTune(tex: any, name: string): void {
 
 function maxFor(name: string, w: number, h: number, isFloat: boolean, playfieldMap?: string): number {
 	if (playfieldMap && name.toLowerCase() === playfieldMap.toLowerCase()) return 2048
+	if (name.toLowerCase().includes('vlm.nestmap')) return 512
 	if (isFloat) return w <= 512 && h <= 512 ? Math.max(w, h) : MAX_FLOAT
 	if (w > 2048 || h > 2048) return 1024
 	if (w <= 512 && h <= 512) return Math.max(w, h)
@@ -279,7 +280,10 @@ function stepwiseCanvasDownscale(source: any, sW: number, sH: number, dW: number
 		}
 		if (curCanvas && curW === dW && curH === dH) return curCanvas
 		if (curW === dW && curH === dH && !curCanvas) {
-			if (curSource instanceof HTMLCanvasElement || (typeof OffscreenCanvas !== 'undefined' && curSource instanceof (OffscreenCanvas as any))) {
+			if (
+				curSource instanceof HTMLCanvasElement ||
+				(typeof OffscreenCanvas !== 'undefined' && curSource instanceof (OffscreenCanvas as any))
+			) {
 				return curSource
 			}
 		}
@@ -609,7 +613,8 @@ function downsampleData(texture: any, maxSize: number): any {
 					let sum = 0
 					for (let sy = y0; sy < y1; sy++) {
 						const row = sy * w * channels
-						for (let sx = x0; sx < x1; sx++) sum += DataUtils.fromHalfFloat(src[row + sx * channels + c] as any)
+						for (let sx = x0; sx < x1; sx++)
+							sum += DataUtils.fromHalfFloat(src[row + sx * channels + c] as any)
 					}
 					dst[dBase + c] = DataUtils.toHalfFloat(sum / count)
 				}
