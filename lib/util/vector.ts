@@ -168,9 +168,9 @@ export class Vertex3D extends Vector3 {
 			return this.set(x, y, z)
 		}
 		const ee = (m as Matrix3).elements
-		const x = ee[0] * this.x + ee[1] * this.y + ee[2] * this.z
-		const y = ee[3] * this.x + ee[4] * this.y + ee[5] * this.z
-		const z = ee[6] * this.x + ee[7] * this.y + ee[8] * this.z
+		const x = ee[0] * this.x + ee[3] * this.y + ee[6] * this.z
+		const y = ee[1] * this.x + ee[4] * this.y + ee[7] * this.z
+		const z = ee[2] * this.x + ee[5] * this.y + ee[8] * this.z
 		return this.set(x, y, z)
 	}
 	override dot(v: Vector3): number {
