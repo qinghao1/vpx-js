@@ -40,7 +40,8 @@ export class ThreeMaterialGenerator {
 		isTransparent = false,
 	): ThreeMaterial {
 		const key = this.getKey(material, map, normalMap, envMap, emissiveMap, isTransparent)
-		if (this.cachedMaterials[key]) return this.cachedMaterials[key]!
+		const cached = this.cachedMaterials[key]
+		if (cached) return cached
 		const m = new MeshStandardMaterial()
 		this.applyMaterial(m, material)
 		this.applyMap(m, map)

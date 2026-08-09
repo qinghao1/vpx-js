@@ -134,40 +134,29 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 				(this as unknown as Record<string, unknown>)[tableKey] as Record<string, unknown>,
 			)
 		}
-		this.normalizeFlipperBatPrimitives()
+		this.fixFlipperBats()
 	}
 
-	private normalizeFlipperBatPrimitives(): void {
-		if (!Object.keys(this.primitives).length || !Object.keys(this.flippers).length) return
-		const FLIPPER_BAT_PROXIMITY = 15
-		const FLIPPER_ANGLE_TOLERANCE_DEG = 0.6
+	private fixFlipperBats(): void {
+		const PROXIMITY = 15
+		const TOLERANCE = 0.6
 		const flippers = Object.values(this.flippers)
+		if (!flippers.length) return
 		for (const prim of Object.values(this.primitives)) {
-			const d = prim.data as unknown as {
-				rotAndTra: number[]
-				position: { x: number; y: number }
-				size: { x: number; y: number; z: number }
-				staticRendering: boolean
-			}
-			if (d.staticRendering) continue
-			if (d.rotAndTra[2] !== 0 || d.rotAndTra[8] === 0) continue
-			if (d.rotAndTra[0] !== 0 || d.rotAndTra[1] !== 0) continue
-			if (d.size.x !== 1 || d.size.y !== 1 || d.size.z !== 1) continue
+			const d = prim.data.rotAndTra
+			if (prim.data.staticRendering) continue
+			if (d[2] !== 0 || !d[8] || d[0] !== 0 || d[1] !== 0) continue
 			for (const f of flippers) {
-				const c = f.data.center as unknown as { x: number; y: number }
-				if (Math.hypot(d.position.x - c.x, d.position.y - c.y) > FLIPPER_BAT_PROXIMITY) continue
-				if (Math.abs(d.rotAndTra[8]! - f.data.startAngle) > FLIPPER_ANGLE_TOLERANCE_DEG) continue
-				// Table stores bat rotation in ObjRotZ (data[8]) but script drives RotZ (data[2]) via
-				// `nrx.RotZ = Left/RightFlipper.currentAngle`. Without remapping the mesh bakes
-				// ObjRotZ and the delta adds RotZ, yielding double angle (e.g. 123.6+123.6).
-				const v = d.rotAndTra[8]!
-				d.rotAndTra[8] = 0
-				d.rotAndTra[2] = v
-				try {
-					const s = prim.getState() as unknown as { rotation: { z: number }; objectRotation: { z: number } }
-					s.objectRotation.z = 0
-					s.rotation.z = v
-				} catch {}
+				const c = f.data.center
+				if (Math.hypot(prim.data.position.x - c.x, prim.data.position.y - c.y) > PROXIMITY) continue
+				const angle = d[8] as number
+				if (Math.abs(angle - f.data.startAngle) > TOLERANCE) continue
+				// Bat stored in ObjRotZ but driven via RotZ → double without remap.
+				d[8] = 0
+				d[2] = angle
+				const s = prim.getState()
+				s.objectRotation.z = 0
+				s.rotation.z = angle
 				break
 			}
 		}

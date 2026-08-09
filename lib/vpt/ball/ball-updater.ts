@@ -27,23 +27,26 @@ export class BallUpdater extends ItemUpdater<BallState> {
 		Object.assign(this.state, state)
 		const pos = this.state.pos
 		const z = this.state.isFrozen ? pos.z - this.data.radius : pos.z
-		const o = this.state.orientation.matrix
+		const m = this.state.orientation.matrix as unknown as number[][]
+		const r0 = m[0] as number[]
+		const r1 = m[1] as number[]
+		const r2 = m[2] as number[]
 		const orient = Matrix3D.claim()
 		const trans = Matrix3D.claim()
 		const mat = Matrix3D.claim()
 		try {
 			orient.setEach(
-				o[0]![0]!,
-				o[1]![0]!,
-				o[2]![0]!,
+				r0[0] as number,
+				r1[0] as number,
+				r2[0] as number,
 				0,
-				o[0]![1]!,
-				o[1]![1]!,
-				o[2]![1]!,
+				r0[1] as number,
+				r1[1] as number,
+				r2[1] as number,
 				0,
-				o[0]![2]!,
-				o[1]![2]!,
-				o[2]![2]!,
+				r0[2] as number,
+				r1[2] as number,
+				r2[2] as number,
 				0,
 				0,
 				0,

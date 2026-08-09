@@ -4,55 +4,63 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 WASM_DIR="$ROOT/wasm"
 DIST_DIR="$WASM_DIR/dist"
 MOCK_SRC="$WASM_DIR/mock/libpinmame.mock.js"
+PINMAME="$ROOT/external/pinmame"
 
 [[ -x /tmp/uv-cmake/bin/cmake ]] && export PATH="/tmp/uv-cmake/bin:${PATH:-}"
-if [[ -n "${EMSDK:-}" && -f "$EMSDK/emsdk_env.sh" ]]; then
-  source "$EMSDK/emsdk_env.sh" >/dev/null 2>&1 || true
-elif [[ -f "$HOME/projects/emsdk/emsdk_env.sh" ]]; then
-  source "$HOME/projects/emsdk/emsdk_env.sh" >/dev/null 2>&1 || true
+if [[ -n "${EMSDK:-}" && -f "$EMSDK/emsdk_env.sh" ]]; then source "$EMSDK/emsdk_env.sh" >/dev/null 2>&1 || true
+elif [[ -f "$HOME/projects/emsdk/emsdk_env.sh" ]]; then source "$HOME/projects/emsdk/emsdk_env.sh" >/dev/null 2>&1 || true
 fi
 mkdir -p "$DIST_DIR"
 
-use_mock() { cp "$MOCK_SRC" "$DIST_DIR/libpinmame.js"; echo "[wasm] mock copied to $DIST_DIR/libpinmame.js"; exit 0; }
-
+use_mock() { cp "$MOCK_SRC" "$DIST_DIR/libpinmame.js"; echo "[wasm] mock copied"; exit 0; }
 [[ "${1:-}" == "--mock" ]] && use_mock
 command -v emcc >/dev/null 2>&1 || { echo "[wasm] emcc not found — using mock"; use_mock; }
 
 preset="${1:---wasm}"
 case "$preset" in --debug) preset="debug";; --release|--wasm) preset="wasm";; *) preset="wasm";; esac
 
-# Apply source patches for emcc compatibility (idempotent)
-PINMAME="$ROOT/external/pinmame"
-# miniaudio is included as both "miniaudio.h" and "miniaudio/miniaudio.h"
+# emcc compat: miniaudio header duplicated path
 mkdir -p "$PINMAME/ext/miniaudio/miniaudio" 2>/dev/null || true
 [[ -f "$PINMAME/ext/miniaudio/miniaudio.h" ]] && cp -n "$PINMAME/ext/miniaudio/miniaudio.h" "$PINMAME/ext/miniaudio/miniaudio/miniaudio.h" 2>/dev/null || true
 [[ -f "$PINMAME/ext/miniaudio/miniaudio/miniaudio.h" ]] && cp -n "$PINMAME/ext/miniaudio/miniaudio/miniaudio.h" "$PINMAME/ext/miniaudio/miniaudio.h" 2>/dev/null || true
-# upstream typo: static enum SRC_ERR int
 sed -i 's/static enum SRC_ERR int sinc_multichan/static enum SRC_ERR sinc_multichan/' "$PINMAME/ext/libsamplerate/src_sinc.c" 2>/dev/null || true
-# guard __rolq/__rorq intrinsics not available in WASM
+
+# __rolq/__rorq not available in WASM
 if grep -q '__rolq' "$PINMAME/src/common.h" 2>/dev/null && ! grep -q 'PINMAME_WASM.*__rolq' "$PINMAME/src/common.h"; then
-  python3 - << 'PY'
+python3 - <<'PY'
 import pathlib
 p = pathlib.Path("external/pinmame/src/common.h")
 t = p.read_text()
-for o,n in [
-  ("#elif !defined(__arm__) && !defined(__aarch64__) && (defined(__INTEL_COMPILER) || (defined(__GNUC__) && (__GNUC__ > 3)) || defined(__clang__))\n    return __rolq(x, count);",
-   "#elif !defined(__arm__) && !defined(__aarch64__) && !defined(WASM) && !defined(PINMAME_WASM) && (defined(__INTEL_COMPILER) || (defined(__GNUC__) && (__GNUC__ > 3)) || defined(__clang__))\n    return __rolq(x, count);"),
-  ("#elif !defined(__arm__) && !defined(__aarch64__) && (defined(__INTEL_COMPILER) || (defined(__GNUC__) && (__GNUC__ > 3)) || defined(__clang__))\n    return __rorq(x, count);",
-   "#elif !defined(__arm__) && !defined(__aarch64__) && !defined(WASM) && !defined(PINMAME_WASM) && (defined(__INTEL_COMPILER) || (defined(__GNUC__) && (__GNUC__ > 3)) || defined(__clang__))\n    return __rorq(x, count);"),
-]:
-  t=t.replace(o,n)
+t = t.replace(
+  "#elif !defined(__arm__) && !defined(__aarch64__) && (defined(__INTEL_COMPILER) || (defined(__GNUC__) && (__GNUC__ > 3)) || defined(__clang__))\n    return __rolq(x, count);",
+  "#elif !defined(__arm__) && !defined(__aarch64__) && !defined(WASM) && !defined(PINMAME_WASM) && (defined(__INTEL_COMPILER) || (defined(__GNUC__) && (__GNUC__ > 3)) || defined(__clang__))\n    return __rolq(x, count);")
+t = t.replace(
+  "#elif !defined(__arm__) && !defined(__aarch64__) && (defined(__INTEL_COMPILER) || (defined(__GNUC__) && (__GNUC__ > 3)) || defined(__clang__))\n    return __rorq(x, count);",
+  "#elif !defined(__arm__) && !defined(__aarch64__) && !defined(WASM) && !defined(PINMAME_WASM) && (defined(__INTEL_COMPILER) || (defined(__GNUC__) && (__GNUC__ > 3)) || defined(__clang__))\n    return __rorq(x, count);")
 p.write_text(t)
+print("[wasm] patched common.h __rolq")
 PY
 fi
 
-# patch libpinmame for DMD polling and unconditional display update (idempotent)
-if ! grep -q "PinmameGetDmdWidth" "$PINMAME/src/libpinmame/libpinmame.cpp" 2>/dev/null; then
-  python3 - << 'PYEOF'
+# ComposePath missing '/' — causes ROM audit failure (/pinmame + roms)
+if grep -q 'strcpy(newPath + pathLength, file);' "$PINMAME/src/libpinmame/libpinmame.cpp" 2>/dev/null; then
+python3 - <<'PY'
+import pathlib
+p = pathlib.Path("external/pinmame/src/libpinmame/libpinmame.cpp")
+t = p.read_text()
+t = t.replace("strcpy(newPath, path);\n\tstrcpy(newPath + pathLength, file);",
+              "strcpy(newPath, path);\n\tif (pathLength > 0 && path[pathLength - 1] != '/' && path[pathLength - 1] != '\\\\')\n\t\tstrcat(newPath, \"/\");\n\tstrcat(newPath, file);")
+p.write_text(t)
+print("[wasm] patched ComposePath")
+PY
+fi
+
+# libpinmame_update_display must copy pData unconditionally (otherwise polling sees stale) + null-guard _p_Config
+if grep -q 'cb_OnDisplayUpdated.*index.*changed' "$PINMAME/src/libpinmame/libpinmame.cpp" 2>/dev/null && ! grep -q 'FindDmdDisplay' "$PINMAME/src/libpinmame/libpinmame.cpp" 2>/dev/null; then
+python3 - <<'PYEOF'
 import pathlib
 cpp = pathlib.Path("external/pinmame/src/libpinmame/libpinmame.cpp")
 h = cpp.read_text()
-# fix update_display to always copy pData
 old = """extern "C" void libpinmame_update_display(const struct core_dispLayout* layout, void* p_data)
 {
 \t// If layout is null, update the custom DMD generated from alphanumeric segment displays
@@ -120,7 +128,17 @@ new = """extern "C" void libpinmame_update_display(const struct core_dispLayout*
 }"""
 if old in h:
     h = h.replace(old, new)
-    print("[wasm] patched libpinmame_update_display for unconditional copy", flush=True)
+    print("[wasm] patched libpinmame_update_display", flush=True)
+cpp.write_text(h)
+PYEOF
+fi
+
+# Add DMD polling API (used by PinMameEmulator.pullDmd)
+if ! grep -q "PinmameGetDmdWidth" "$PINMAME/src/libpinmame/libpinmame.cpp" 2>/dev/null; then
+python3 - <<'PYEOF'
+import pathlib
+cpp = pathlib.Path("external/pinmame/src/libpinmame/libpinmame.cpp")
+h = cpp.read_text()
 api = """
 /******************************************************
  * PinmameGetDmdWidth / Height / Depth / Frame
@@ -173,27 +191,42 @@ PINMAMEAPI int PinmameGetDmdFrame(void* p_data)
 }
 
 """
-if "PinmameGetDmdWidth" not in h:
-    h = h.replace("/******************************************************\n * PinmameSetUserData", api + "/******************************************************\n * PinmameSetUserData")
-    print("[wasm] added PinmameGetDmd* API", flush=True)
+h = h.replace("/******************************************************\n * PinmameSetUserData", api + "/******************************************************\n * PinmameSetUserData")
 cpp.write_text(h)
+print("[wasm] added PinmameGetDmd* API", flush=True)
 PYEOF
 fi
+
+# AT91 JIT needs exec memory — not available in WASM, fallback to interpreter
 if grep -q "options.at91jit = 1;" "$PINMAME/src/libpinmame/libpinmame.cpp" 2>/dev/null; then
-  if ! grep -q "PINMAME_WASM" "$PINMAME/src/libpinmame/libpinmame.cpp" 2>/dev/null; then
-    python3 - << 'PY2'
+python3 - <<'PY2'
 import pathlib
-cpp = pathlib.Path("external/pinmame/src/libpinmame/libpinmame.cpp")
-h = cpp.read_text()
-old = "\toptions.at91jit = 1;"
-new = "\t// Enable the AT91 JIT (SAM games via sam.c, DE/Whitestar AT91 sound boards via desound.c;\n\t// 1 = default address range). Only effective in builds that compile a JIT in\n\t// For WASM, disable JIT (interpreter fallback) — JIT requires executable memory not available in Emscripten.\n\t#ifdef PINMAME_WASM\n\toptions.at91jit = 0;\n\t#else\n\toptions.at91jit = 1;\n\t#endif"
-if old in h:
-    h = h.replace(old, new)
-    cpp.write_text(h)
-    print("[wasm] patched at91jit for WASM", flush=True)
+p = pathlib.Path("external/pinmame/src/libpinmame/libpinmame.cpp")
+t = p.read_text()
+t = t.replace("\toptions.at91jit = 1;",
+              "\t#ifdef PINMAME_WASM\n\toptions.at91jit = 0;\n\t#else\n\toptions.at91jit = 1;\n\t#endif")
+p.write_text(t)
+print("[wasm] patched at91jit for WASM", flush=True)
 PY2
-  fi
 fi
+
+# Log fallback — printf when no callback (helps debugging ROM load failures)
+if grep -q 'if (!_p_Config->cb_OnLogMessage)' "$PINMAME/src/libpinmame/libpinmame.cpp" 2>/dev/null; then
+python3 - <<'PY3'
+import pathlib
+p = pathlib.Path("external/pinmame/src/libpinmame/libpinmame.cpp")
+t = p.read_text()
+t = t.replace(
+  "extern \"C\" void libpinmame_log_info(const char* format, ...)\n{\n\tif (!_p_Config->cb_OnLogMessage)\n\t\treturn;\n\n\tva_list args;\n\tva_start(args, format);\n\t(*(_p_Config->cb_OnLogMessage))(PINMAME_LOG_LEVEL_INFO, format, args, _p_userData);\n\tva_end(args);\n}",
+  "extern \"C\" void libpinmame_log_info(const char* format, ...)\n{\n\tva_list args;\n\tva_start(args, format);\n\tif (_p_Config && _p_Config->cb_OnLogMessage)\n\t\t(*(_p_Config->cb_OnLogMessage))(PINMAME_LOG_LEVEL_INFO, format, args, _p_userData);\n\telse { vprintf(format, args); printf(\"\\n\"); }\n\tva_end(args);\n}")
+t = t.replace(
+  "extern \"C\" void libpinmame_log_error(const char* format, ...)\n{\n\tif (!_p_Config->cb_OnLogMessage)\n\t\treturn;\n\n\tva_list args;\n\tva_start(args, format);\n\t(*(_p_Config->cb_OnLogMessage))(PINMAME_LOG_LEVEL_ERROR, format, args, _p_userData);\n\tva_end(args);\n}",
+  "extern \"C\" void libpinmame_log_error(const char* format, ...)\n{\n\tva_list args;\n\tva_start(args, format);\n\tif (_p_Config && _p_Config->cb_OnLogMessage)\n\t\t(*(_p_Config->cb_OnLogMessage))(PINMAME_LOG_LEVEL_ERROR, format, args, _p_userData);\n\telse { vfprintf(stderr, format, args); fprintf(stderr, \"\\n\"); }\n\tva_end(args);\n}")
+p.write_text(t)
+print("[wasm] patched log fallback", flush=True)
+PY3
+fi
+
 echo "[wasm] building $preset — $(emcc --version | head -1) — $(cmake --version | head -1)"
 if ! (cd "$WASM_DIR" && emcmake cmake --preset "$preset" && cmake --build --preset "$preset"); then
   echo "[wasm] build failed — using mock fallback"
