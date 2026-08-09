@@ -60,12 +60,12 @@ export abstract class ItemUpdater<STATE extends ItemState> {
 		const matRotateFromOrigin = Matrix3D.claim().rotateZMatrix(MathUtils.degToRad(rotationZ))
 		const matRotateX = Matrix3D.claim().rotateXMatrix(angle)
 
-		const matrix = matTransFromOrigin
+		const matrix = matTransToOrigin
 			.clone()
-			.multiply(matRotateFromOrigin)
-			.multiply(matRotateX)
 			.multiply(matRotateToOrigin)
-			.multiply(matTransToOrigin)
+			.multiply(matRotateX)
+			.multiply(matRotateFromOrigin)
+			.multiply(matTransFromOrigin)
 
 		const plateObj = renderApi.findInGroup(obj, name)
 		renderApi.applyMatrixToNode(matrix, plateObj!)

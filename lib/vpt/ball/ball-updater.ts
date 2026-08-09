@@ -33,6 +33,7 @@ export class BallUpdater extends ItemUpdater<BallState> {
 		const r2 = m[2] as number[]
 		const orient = Matrix3D.claim()
 		const trans = Matrix3D.claim()
+		const scale = Matrix3D.claim()
 		const mat = Matrix3D.claim()
 		try {
 			orient.setEach(
@@ -54,13 +55,11 @@ export class BallUpdater extends ItemUpdater<BallState> {
 				1,
 			)
 			trans.setTranslation(pos.x, pos.y, -z)
-			mat.setScaling(this.data.radius, this.data.radius, this.data.radius)
-				.preMultiply(orient)
-				.preMultiply(trans)
-				.toRightHanded()
+			scale.setScaling(this.data.radius, this.data.radius, this.data.radius)
+			mat.copy(orient).multiply(scale).multiply(trans).toRightHanded()
 			api.applyMatrixToNode(mat, obj)
 		} finally {
-			Matrix3D.release(orient, trans, mat)
+			Matrix3D.release(orient, trans, scale, mat)
 		}
 		;(obj as unknown as { updateMatrixWorld?: (f: boolean) => void }).updateMatrixWorld?.(true)
 	}

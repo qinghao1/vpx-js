@@ -73,7 +73,7 @@ export class BumperUpdater extends ItemUpdater<BumperState> {
 			const matRotX = Matrix3D.claim().rotateXMatrix(MathUtils.degToRad(this.state.skirtRotX))
 			const matRotY = Matrix3D.claim().rotateYMatrix(MathUtils.degToRad(this.state.skirtRotY))
 
-			const matrix = matFromOrigin.clone().multiply(matRotX).multiply(matRotY).multiply(matToOrigin)
+			const matrix = matToOrigin.clone().multiply(matRotY).multiply(matRotX).multiply(matFromOrigin)
 
 			renderApi.applyMatrixToNode(matrix, skirtObj)
 			Matrix3D.release(matToOrigin, matFromOrigin, matRotX, matRotY, matrix)

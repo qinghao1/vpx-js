@@ -120,25 +120,18 @@ export class PrimitiveMeshGenerator {
 	}
 
 	private getMatrix(table: Table): Matrix3D {
+		const rt = new Matrix3D().setTranslation(this.data.rotAndTra[3]!, this.data.rotAndTra[4]!, this.data.rotAndTra[5]!)
+		rt.multiply(new Matrix3D().rotateZMatrix(MathUtils.degToRad(this.data.rotAndTra[2]!)))
+		rt.multiply(new Matrix3D().rotateYMatrix(MathUtils.degToRad(this.data.rotAndTra[1]!)))
+		rt.multiply(new Matrix3D().rotateXMatrix(MathUtils.degToRad(this.data.rotAndTra[0]!)))
+		rt.multiply(new Matrix3D().rotateZMatrix(MathUtils.degToRad(this.data.rotAndTra[8]!)))
+		rt.multiply(new Matrix3D().rotateYMatrix(MathUtils.degToRad(this.data.rotAndTra[7]!)))
+		rt.multiply(new Matrix3D().rotateXMatrix(MathUtils.degToRad(this.data.rotAndTra[6]!)))
 		const scale = new Matrix3D().setScaling(this.data.size.x, this.data.size.y, this.data.size.z)
 		const trans = new Matrix3D().setTranslation(this.data.position.x, this.data.position.y, this.data.position.z)
-		const sz = new Matrix3D().setScaling(1, 1, table.getScaleZ())
-		const rotTransCol = new Matrix3D()
-		rotTransCol.rotateXMatrix(MathUtils.degToRad(this.data.rotAndTra[6]!))
-		const tmp = new Matrix3D()
-		tmp.rotateYMatrix(MathUtils.degToRad(this.data.rotAndTra[7]!))
-		rotTransCol.multiply(tmp)
-		tmp.rotateZMatrix(MathUtils.degToRad(this.data.rotAndTra[8]!))
-		rotTransCol.multiply(tmp)
-		tmp.rotateXMatrix(MathUtils.degToRad(this.data.rotAndTra[0]!))
-		rotTransCol.multiply(tmp)
-		tmp.rotateYMatrix(MathUtils.degToRad(this.data.rotAndTra[1]!))
-		rotTransCol.multiply(tmp)
-		tmp.rotateZMatrix(MathUtils.degToRad(this.data.rotAndTra[2]!))
-		rotTransCol.multiply(tmp)
-		tmp.setTranslation(this.data.rotAndTra[3]!, this.data.rotAndTra[4]!, this.data.rotAndTra[5]!)
-		rotTransCol.multiply(tmp)
-		const full = sz.clone().multiply(trans).multiply(rotTransCol).multiply(scale)
+		const full = scale.clone().multiply(rt).multiply(trans)
+		const sz = table.getScaleZ()
+		if (sz !== 1) full.multiply(new Matrix3D().setScaling(1, 1, sz))
 		return full
 	}
 }

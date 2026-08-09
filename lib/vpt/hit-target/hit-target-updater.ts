@@ -42,13 +42,13 @@ export class HitTargetUpdater extends ItemUpdater<HitTargetState> {
 		const rotFromOrigin = Matrix3D.claim().rotateZMatrix(MathUtils.degToRad(this.data.rotZ))
 		const rotX = Matrix3D.claim().rotateXMatrix(MathUtils.degToRad(state.xRotation))
 		const transZ = Matrix3D.claim().setTranslation(0, 0, -state.zOffset)
-		const m = fromOrigin
+		const m = toOrigin
 			.clone()
-			.multiply(rotFromOrigin)
-			.multiply(transZ)
-			.multiply(rotX)
 			.multiply(rotToOrigin)
-			.multiply(toOrigin)
+			.multiply(rotX)
+			.multiply(transZ)
+			.multiply(rotFromOrigin)
+			.multiply(fromOrigin)
 		renderApi.applyMatrixToNode(m, obj)
 		Matrix3D.release(toOrigin, rotToOrigin, fromOrigin, rotFromOrigin, rotX, transZ, m)
 	}

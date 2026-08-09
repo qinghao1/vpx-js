@@ -219,11 +219,15 @@ export class Matrix3D extends Matrix4 {
 		return this
 	}
 	override multiply(m: Matrix4): this {
-		super.multiply(m)
+		Matrix4.prototype.multiplyMatrices.call(this as unknown as Matrix4, m as unknown as Matrix4, this as unknown as Matrix4)
 		return this
 	}
 	preMultiply(a: Matrix3D): this {
-		super.premultiply(a)
+		Matrix4.prototype.multiplyMatrices.call(this as unknown as Matrix4, this as unknown as Matrix4, a as unknown as Matrix4)
+		return this
+	}
+	override multiplyMatrices(a: Matrix4, b: Matrix4): this {
+		Matrix4.prototype.multiplyMatrices.call(this as unknown as Matrix4, b as unknown as Matrix4, a as unknown as Matrix4)
 		return this
 	}
 	toRightHanded(): this {
