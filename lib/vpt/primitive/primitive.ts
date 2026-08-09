@@ -49,6 +49,9 @@ export class Primitive
 			data.szImage,
 			data.szNormalMap,
 			data.isVisible,
+			data.color,
+			data.disableLightingTop,
+			data.disableLightingBelow,
 		)
 		this.updater = new PrimitiveUpdater(data, this.state)
 		this.meshGenerator = new PrimitiveMeshGenerator(data)

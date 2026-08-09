@@ -15,6 +15,9 @@ export class PrimitiveState extends ItemState {
 	public material?: string
 	public map?: string
 	public normalMap?: string
+	public color: number = 0xffffff
+	public disableLightingTop: number = 0
+	public disableLightingBelow: number = 1
 
 	public static claimFrom(
 		name: string,
@@ -25,6 +28,9 @@ export class PrimitiveState extends ItemState {
 		map: string | undefined,
 		normalMap: string | undefined,
 		isVisible: boolean,
+		color: number = 0xffffff,
+		disableLightingTop: number = 0,
+		disableLightingBelow: number = 1,
 	) {
 		return PrimitiveState.claim(
 			name,
@@ -37,6 +43,9 @@ export class PrimitiveState extends ItemState {
 			map,
 			normalMap,
 			isVisible,
+			color,
+			disableLightingTop,
+			disableLightingBelow,
 		)
 	}
 
@@ -49,8 +58,11 @@ export class PrimitiveState extends ItemState {
 		objectRotation: Vertex3D,
 		material: string | undefined,
 		map: string | undefined,
-		_normalMap: string | undefined,
+		normalMap: string | undefined,
 		isVisible: boolean,
+		color: number = 0xffffff,
+		disableLightingTop: number = 0,
+		disableLightingBelow: number = 1,
 	): PrimitiveState {
 		const state = new PrimitiveState()
 		state.name = name
@@ -61,8 +73,11 @@ export class PrimitiveState extends ItemState {
 		state.objectRotation = objectRotation
 		state.material = material
 		state.map = map
-		state.normalMap = map
+		state.normalMap = normalMap
 		state.isVisible = isVisible
+		state.color = color
+		state.disableLightingTop = disableLightingTop
+		state.disableLightingBelow = disableLightingBelow
 		return state
 	}
 
@@ -78,6 +93,9 @@ export class PrimitiveState extends ItemState {
 			this.map,
 			this.normalMap,
 			this.isVisible,
+			this.color,
+			this.disableLightingTop,
+			this.disableLightingBelow,
 		)
 	}
 
@@ -85,28 +103,36 @@ export class PrimitiveState extends ItemState {
 		const diff = this.clone()
 		if (diff.position.equals(state.position)) {
 			Vertex3D.release(diff.position)
+			// biome-ignore lint/performance/noDelete: partial diff requires deletion
 			delete diff.position
 		}
 		if (diff.size.equals(state.size)) {
 			Vertex3D.release(diff.size)
+			// biome-ignore lint/performance/noDelete: partial diff requires deletion
 			delete diff.size
 		}
 		if (diff.rotation.equals(state.rotation)) {
 			Vertex3D.release(diff.rotation)
+			// biome-ignore lint/performance/noDelete: partial diff requires deletion
 			delete diff.rotation
 		}
 		if (diff.translation.equals(state.translation)) {
 			Vertex3D.release(diff.translation)
+			// biome-ignore lint/performance/noDelete: partial diff requires deletion
 			delete diff.translation
 		}
 		if (diff.objectRotation.equals(state.objectRotation)) {
 			Vertex3D.release(diff.objectRotation)
+			// biome-ignore lint/performance/noDelete: partial diff requires deletion
 			delete diff.objectRotation
 		}
 		omitEqual(diff, state, 'material')
 		omitEqual(diff, state, 'map')
 		omitEqual(diff, state, 'normalMap')
 		omitEqual(diff, state, 'isVisible')
+		omitEqual(diff, state, 'color')
+		omitEqual(diff, state, 'disableLightingTop')
+		omitEqual(diff, state, 'disableLightingBelow')
 		return diff
 	}
 
@@ -129,7 +155,10 @@ export class PrimitiveState extends ItemState {
 			state.material === this.material &&
 			state.map === this.map &&
 			state.normalMap === this.normalMap &&
-			state.isVisible === this.isVisible
+			state.isVisible === this.isVisible &&
+			state.color === this.color &&
+			state.disableLightingTop === this.disableLightingTop &&
+			state.disableLightingBelow === this.disableLightingBelow
 		)
 	}
 }

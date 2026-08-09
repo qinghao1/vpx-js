@@ -13,7 +13,8 @@ import type { PrimitiveData } from './primitive-data.js'
 import type { PrimitiveState } from './primitive-state.js'
 
 function num(v: unknown): number {
-	return (v as any)?.[UNDEF] === true ? 0 : Number(v as number) || 0
+	if (typeof v === 'object' && v !== null && (v as Record<symbol, unknown>)[UNDEF] === true) return 0
+	return Number(v as number) || 0
 }
 
 /** Primitive API — VBS surface for `Primitive`. @see https://github.com/vpinball/vpinball/blob/master/primitive.cpp */
@@ -333,23 +334,37 @@ export class PrimitiveApi extends ItemApi<PrimitiveData> {
 	set BackfacesEnabled(v) {
 		this.data.backfacesEnabled = v
 	}
+	get Color() {
+		return this.isDynamic ? this.state.color : this.data.color
+	}
+	set Color(v) {
+		v = num(v)
+		if (this.isDynamic) this.state.color = v
+		else this.data.color = v
+	}
 	get DisableLighting() {
-		return this.data.disableLightingTop !== 0
+		return this.isDynamic ? this.state.disableLightingTop !== 0 : this.data.disableLightingTop !== 0
 	}
 	set DisableLighting(v) {
-		this.data.disableLightingTop = v ? 1 : 0
+		const val = v ? 1 : 0
+		if (this.isDynamic) this.state.disableLightingTop = val
+		else this.data.disableLightingTop = val
 	}
 	get BlendDisableLighting() {
-		return this.data.disableLightingTop
+		return this.isDynamic ? this.state.disableLightingTop : this.data.disableLightingTop
 	}
 	set BlendDisableLighting(v) {
-		this.data.disableLightingTop = v
+		v = num(v)
+		if (this.isDynamic) this.state.disableLightingTop = v
+		else this.data.disableLightingTop = v
 	}
 	get BlendDisableLightingFromBelow() {
-		return this.data.disableLightingBelow
+		return this.isDynamic ? this.state.disableLightingBelow : this.data.disableLightingBelow
 	}
 	set BlendDisableLightingFromBelow(v) {
-		this.data.disableLightingBelow = v
+		v = num(v)
+		if (this.isDynamic) this.state.disableLightingBelow = v
+		else this.data.disableLightingBelow = v
 	}
 	get ReflectionEnabled() {
 		return this.data.isReflectionEnabled

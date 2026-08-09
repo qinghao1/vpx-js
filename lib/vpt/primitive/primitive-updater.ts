@@ -9,6 +9,10 @@ import type { Table } from '../table/table.js'
 import type { PrimitiveData } from './primitive-data.js'
 import type { PrimitiveState } from './primitive-state.js'
 
+const DISABLE_THRESHOLD = 0.001
+const DISABLE_SCALE = 0.01
+const MAX_EMISSIVE = 4
+
 /** Primitive updater — syncs state to render node. */
 export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 	constructor(
@@ -26,10 +30,63 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 	): void {
 		Object.assign(this.state, state)
 		this.applyVisibility(obj, state, renderApi)
+		const needsClone =
+			state.material !== undefined ||
+			state.map !== undefined ||
+			state.color !== undefined ||
+			state.disableLightingTop !== undefined
+		if (needsClone) this.ensureCloned(obj)
 		this.applyMaterial(obj, state.material, state.map, renderApi, table)
+		const needsColor =
+			state.color !== undefined ||
+			state.disableLightingTop !== undefined ||
+			state.disableLightingBelow !== undefined
+		if (needsColor) this.applyColor(obj)
 		if (state.position || state.size || state.rotation || state.translation || state.objectRotation) {
 			this.applyTransformation(obj, renderApi, table)
 		}
+	}
+
+	private ensureCloned<NODE>(obj: NODE): void {
+		for (const m of this.meshes(obj)) {
+			const mat = m.material as unknown as { userData: Record<string, unknown>; clone: () => unknown } | undefined
+			if (!mat?.clone || mat.userData.__primitiveCloned) continue
+			const cloned = mat.clone() as typeof mat
+			;(cloned.userData as Record<string, unknown>).__primitiveCloned = true
+			m.material = cloned as unknown as typeof m.material
+		}
+	}
+
+	private applyColor<NODE>(obj: NODE): void {
+		const color = this.state.color ?? this.data.color
+		const dl = this.state.disableLightingTop ?? this.data.disableLightingTop
+		const emissive = dl > DISABLE_THRESHOLD
+		for (const m of this.meshes(obj)) {
+			const mat = m.material as unknown as
+				| {
+						color: { set: (v: number) => void }
+						emissive: { set: (v: number) => void }
+						emissiveIntensity: number
+						needsUpdate: boolean
+				  }
+				| undefined
+			if (!mat?.color || !mat?.emissive) continue
+			mat.color.set(color)
+			if (emissive) {
+				mat.emissive.set(color)
+				mat.emissiveIntensity = Math.min(MAX_EMISSIVE, dl * DISABLE_SCALE)
+			} else {
+				mat.emissive.set(0x000000)
+				mat.emissiveIntensity = 0
+			}
+			mat.needsUpdate = true
+		}
+	}
+
+	private meshes<NODE>(obj: NODE): Array<{ material: unknown }> {
+		const anyObj = obj as unknown as { children?: unknown[] }
+		if (anyObj.children?.length) return anyObj.children as Array<{ material: unknown }>
+		return [anyObj as unknown as { material: unknown }]
 	}
 
 	private applyTransformation<NODE, GEOMETRY, POINT_LIGHT>(
