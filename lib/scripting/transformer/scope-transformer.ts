@@ -143,6 +143,11 @@ export class ScopeTransformer extends Transformer {
 					}
 
 					const varScope = this.findScope(this.getVarName(node, parent), (node as any).__scope)
+					if (varScope && varScope !== this.rootScope) {
+						const v = this.findVariable(this.getVarName(node, parent), varScope)
+						if (v && v.name !== node.name) node.name = v.name
+						return node
+					}
 					const inRootScope = !varScope || varScope === this.rootScope // !varScope because we can't find the declaration, in which case it's part of an external file, where we assume it was declared in the root scope.
 					if (!this.isKnown(node, parent) && inRootScope) {
 						if (
@@ -190,5 +195,12 @@ export class ScopeTransformer extends Transformer {
 		const lower = name.toLowerCase()
 		const variable = currentScope.variables.find((v: any) => v.name.toLowerCase() === lower)
 		return variable ? currentScope : this.findScope(name, currentScope.upper)
+	}
+
+	private findVariable(name: string, currentScope: any): any {
+		if (!currentScope) return null
+		const lower = name.toLowerCase()
+		const v = currentScope.variables.find((v: any) => v.name.toLowerCase() === lower)
+		return v ?? this.findVariable(name, currentScope.upper)
 	}
 }
