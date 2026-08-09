@@ -134,6 +134,43 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 				(this as unknown as Record<string, unknown>)[tableKey] as Record<string, unknown>,
 			)
 		}
+		this.normalizeFlipperBatPrimitives()
+	}
+
+	private normalizeFlipperBatPrimitives(): void {
+		if (!Object.keys(this.primitives).length || !Object.keys(this.flippers).length) return
+		const FLIPPER_BAT_PROXIMITY = 15
+		const FLIPPER_ANGLE_TOLERANCE_DEG = 0.6
+		const flippers = Object.values(this.flippers)
+		for (const prim of Object.values(this.primitives)) {
+			const d = prim.data as unknown as {
+				rotAndTra: number[]
+				position: { x: number; y: number }
+				size: { x: number; y: number; z: number }
+				staticRendering: boolean
+			}
+			if (d.staticRendering) continue
+			if (d.rotAndTra[2] !== 0 || d.rotAndTra[8] === 0) continue
+			if (d.rotAndTra[0] !== 0 || d.rotAndTra[1] !== 0) continue
+			if (d.size.x !== 1 || d.size.y !== 1 || d.size.z !== 1) continue
+			for (const f of flippers) {
+				const c = f.data.center as unknown as { x: number; y: number }
+				if (Math.hypot(d.position.x - c.x, d.position.y - c.y) > FLIPPER_BAT_PROXIMITY) continue
+				if (Math.abs(d.rotAndTra[8]! - f.data.startAngle) > FLIPPER_ANGLE_TOLERANCE_DEG) continue
+				// Table stores bat rotation in ObjRotZ (data[8]) but script drives RotZ (data[2]) via
+				// `nrx.RotZ = Left/RightFlipper.currentAngle`. Without remapping the mesh bakes
+				// ObjRotZ and the delta adds RotZ, yielding double angle (e.g. 123.6+123.6).
+				const v = d.rotAndTra[8]!
+				d.rotAndTra[8] = 0
+				d.rotAndTra[2] = v
+				try {
+					const s = prim.getState() as unknown as { rotation: { z: number }; objectRotation: { z: number } }
+					s.objectRotation.z = 0
+					s.rotation.z = v
+				} catch {}
+				break
+			}
+		}
 	}
 
 	private populateFromLoaded(loaded: Record<string, unknown>, key: string, dict: Record<string, unknown>): void {
