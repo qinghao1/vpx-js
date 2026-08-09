@@ -33,12 +33,9 @@ export class AnimationGate {
 
 	async yieldToMain(): Promise<void> {
 		await this.waitIfAnimating()
+		if (typeof requestAnimationFrame === 'function') await new Promise<void>(r => requestAnimationFrame(() => r()))
 		const g = globalThis as unknown as { scheduler?: { yield?: () => Promise<void> } }
-		if (typeof requestAnimationFrame === 'function') {
-			await new Promise<void>(r => requestAnimationFrame(() => r()))
-			if (g.scheduler?.yield) await g.scheduler.yield()
-			else await new Promise<void>(r => setTimeout(r, 0))
-		} else if (g.scheduler?.yield) await g.scheduler.yield()
+		if (g.scheduler?.yield) await g.scheduler.yield()
 		else await new Promise<void>(r => setTimeout(r, 0))
 	}
 }
