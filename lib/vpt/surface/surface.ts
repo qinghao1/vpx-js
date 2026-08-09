@@ -70,7 +70,7 @@ export class Surface
 			result = !sideMaterial || sideMaterial.isOpacityActive
 		}
 		if (this.data.isTopBottomVisible) {
-			const topMaterial = table.getMaterial(this.data.szSideMaterial)
+			const topMaterial = table.getMaterial(this.data.szTopMaterial)
 			result = result || !topMaterial || topMaterial.isOpacityActive
 		}
 		return result
@@ -79,14 +79,17 @@ export class Surface
 	public getMeshes<GEOMETRY>(table: Table): Meshes<GEOMETRY> {
 		const meshes: Meshes<GEOMETRY> = {}
 		const surface = this.meshGenerator.generateMeshes(this.data, table)
-		const isTransparent = this.isTransparent(table)
+		const topMat = table.getMaterial(this.data.szTopMaterial)
+		const sideMat = table.getMaterial(this.data.szSideMaterial)
+		const topTransparent = !topMat || topMat.isOpacityActive
+		const sideTransparent = !sideMat || sideMat.isOpacityActive
 		if (surface.top) {
 			meshes.top = {
 				isVisible: this.data.isTopBottomVisible,
 				mesh: surface.top.transform(Matrix3D.RIGHT_HANDED),
 				map: table.getTexture(this.data.szImage),
 				material: table.getMaterial(this.data.szTopMaterial),
-				isTransparent,
+				isTransparent: topTransparent,
 			}
 		}
 		if (surface.side) {
@@ -95,7 +98,7 @@ export class Surface
 				mesh: surface.side.transform(Matrix3D.RIGHT_HANDED),
 				map: table.getTexture(this.data.szSideImage),
 				material: table.getMaterial(this.data.szSideMaterial),
-				isTransparent,
+				isTransparent: sideTransparent,
 			}
 		}
 		return meshes

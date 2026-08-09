@@ -19,7 +19,7 @@ export abstract class ItemUpdater<STATE extends ItemState> {
 		table: Table,
 	): void
 
-	protected constructor(state: STATE) {
+	constructor(state: STATE) {
 		this.state = state
 	}
 

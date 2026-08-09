@@ -25,6 +25,7 @@ export class Texture extends BiffParser {
 	public width!: number
 	public height!: number
 	public alphaTestValue?: number
+	public rgbTransparent?: number
 	public binary?: Binary
 	public pdsBuffer?: BaseTexture
 
@@ -184,6 +185,7 @@ class BaseTexture {
 	public static readonly RGB_FP = 1
 
 	private width: number
+	private height: number
 	public format: number = BaseTexture.RGBA
 	private data!: Uint8Array
 

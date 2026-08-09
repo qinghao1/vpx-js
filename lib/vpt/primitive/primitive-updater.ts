@@ -84,6 +84,7 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 	}
 
 	private meshes<NODE>(obj: NODE): Array<{ material: unknown }> {
+		if (!obj) return []
 		const anyObj = obj as unknown as { children?: unknown[] }
 		if (anyObj.children?.length) return anyObj.children as Array<{ material: unknown }>
 		return [anyObj as unknown as { material: unknown }]
