@@ -38,32 +38,11 @@ const MAX_FLOAT = 2048
 const MAX_PLAYFIELD = 4096
 const MAX_VLM = 1024
 
-let cachedAniso: number | undefined
-function getAnisotropy(): number {
-	if (cachedAniso !== undefined) return cachedAniso
-	try {
-		if (typeof document === 'undefined') return (cachedAniso = 4)
-		const canvas = document.createElement('canvas')
-		const gl: any = canvas.getContext('webgl2') ?? canvas.getContext('webgl')
-		const ext =
-			gl?.getExtension('EXT_texture_filter_anisotropic') ??
-			gl?.getExtension('MOZ_EXT_texture_filter_anisotropic') ??
-			gl?.getExtension('WEBKIT_EXT_texture_filter_anisotropic')
-		const max = ext ? gl.getParameter(ext.MAX_TEXTURE_MAX_ANISOTROPY_EXT) : 0
-		cachedAniso = max ? Math.min(16, max) : 4
-	} catch {
-		cachedAniso = 4
-	}
-	return cachedAniso!
-}
-
 function tune(tex: any): void {
 	tex.generateMipmaps = true
 	tex.minFilter = LinearMipMapLinearFilter
 	tex.magFilter = LinearFilter
-	try {
-		tex.anisotropy = getAnisotropy()
-	} catch {}
+	tex.anisotropy = 16
 }
 
 function nameAndTune(tex: any, name: string): void {
@@ -81,13 +60,15 @@ function maxFor(name: string, isFloat: boolean, playfieldMap?: string): number {
 
 function finalize(tex: any, name: string, isFloat: boolean, playfieldMap?: string): any {
 	const max = maxFor(name, isFloat, playfieldMap)
-	const ds = downsample(tex, max)
-	if (ds !== tex) {
-		try {
-			tex.dispose?.()
-		} catch {}
-		nameAndTune(ds, name)
-		return ds
+	if (tex.image?.data && tex.image.width && tex.image.height) {
+		const ds = downsampleData(tex, max)
+		if (ds !== tex) {
+			try {
+				tex.dispose?.()
+			} catch {}
+			nameAndTune(ds, name)
+			return ds
+		}
 	}
 	nameAndTune(tex, name)
 	return tex
@@ -285,17 +266,7 @@ async function tryLoadViaWorker(
 	try {
 		const cached: any = await idbGet(key)
 		if (cached?.width && cached?.data) {
-			const tex: any = new DataTexture(
-				cached.data as any,
-				cached.width,
-				cached.height,
-				cached.format ?? (RGBAFormat as any),
-				cached.type ?? (HalfFloatType as any),
-			)
-			tex.flipY = false
-			tex.colorSpace = cached.colorSpace ?? LinearSRGBColorSpace
-			tex.needsUpdate = true
-			return finalize(tex, name, true, playfieldMap)
+			return finalize(floatTex(cached.width, cached.height, cached.data, cached.type, cached.format, cached.colorSpace), name, true, playfieldMap)
 		}
 	} catch {}
 	try {
@@ -312,20 +283,18 @@ async function tryLoadViaWorker(
 					colorSpace: parsed.colorSpace,
 				}).catch(() => {})
 			} catch {}
-			const tex: any = new DataTexture(
-				parsed.data as any,
-				parsed.width,
-				parsed.height,
-				parsed.format ?? (RGBAFormat as any),
-				parsed.type ?? (HalfFloatType as any),
-			)
-			tex.flipY = false
-			tex.colorSpace = parsed.colorSpace ?? LinearSRGBColorSpace
-			tex.needsUpdate = true
-			return finalize(tex, name, true, playfieldMap)
+			return finalize(floatTex(parsed.width, parsed.height, parsed.data, parsed.type, parsed.format, parsed.colorSpace), name, true, playfieldMap)
 		}
 	} catch {}
 	return null
+}
+
+function floatTex(width: number, height: number, data: any, type: any, format: any, colorSpace: any): ThreeTexture {
+	const tex: any = new DataTexture(data as any, width, height, format ?? (RGBAFormat as any), type ?? (HalfFloatType as any))
+	tex.flipY = false
+	tex.colorSpace = colorSpace ?? LinearSRGBColorSpace
+	tex.needsUpdate = true
+	return tex as ThreeTexture
 }
 
 function loadFloatFallback(
@@ -383,24 +352,19 @@ function getMimeType(data: Uint8Array, ext: string): string | null {
 		return 'image/webp'
 	if (data[0] === 0x23 && data[1] === 0x3f) return 'image/hdr'
 	if (data[0] === 0x76 && data[1] === 0x2f) return 'image/exr'
-	if (ext === '.hdr') return 'image/hdr'
-	if (ext === '.exr') return 'image/exr'
-	if (ext === '.png') return 'image/png'
-	if (ext === '.jpg' || ext === '.jpeg') return 'image/jpeg'
-	if (ext === '.bmp') return 'image/bmp'
-	if (ext === '.gif') return 'image/gif'
-	if (ext === '.webp') return 'image/webp'
-	return 'image/png'
-}
-
-function downsample(texture: any, maxSize: number): any {
-	try {
-		const img = texture.image
-		if (!img?.data || !img.width || !img.height) return texture
-		return downsampleData(texture, maxSize)
-	} catch {
-		return texture
-	}
+	const e = ext.toLowerCase()
+	return (
+		{
+			'.hdr': 'image/hdr',
+			'.exr': 'image/exr',
+			'.png': 'image/png',
+			'.jpg': 'image/jpeg',
+			'.jpeg': 'image/jpeg',
+			'.bmp': 'image/bmp',
+			'.gif': 'image/gif',
+			'.webp': 'image/webp',
+		}[e] ?? 'image/png'
+	)
 }
 
 function downsampleData(texture: any, maxSize: number): any {
