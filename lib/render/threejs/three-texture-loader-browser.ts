@@ -6,6 +6,7 @@ import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js'
 import {
 	CanvasTexture,
 	DataTexture,
+	EquirectangularReflectionMapping,
 	HalfFloatType,
 	LinearFilter,
 	LinearMipMapLinearFilter,
@@ -134,7 +135,20 @@ export class ThreeTextureLoaderBrowser implements ITextureLoader<ThreeTexture> {
 		const key = fileName.slice(0, fileName.lastIndexOf('.'))
 		const url = imageMap[key]
 		if (!url) throw new Error(`Unknown local texture "${key}".`)
-		return new TextureLoader().load(url)
+		const tex: any = await new TextureLoader().loadAsync(url)
+		if (key.toLowerCase() === 'ball') {
+			tex.mapping = EquirectangularReflectionMapping
+			tex.colorSpace = SRGBColorSpace
+		}
+		const out: any = finalize(tex, _name || fileName, false, this.playfieldMap)
+		if (key.toLowerCase() === 'ball') {
+			out.mapping = EquirectangularReflectionMapping
+			out.colorSpace = SRGBColorSpace
+			out.generateMipmaps = true
+			out.minFilter = LinearMipMapLinearFilter
+			out.needsUpdate = true
+		}
+		return out
 	}
 
 	public async loadRawTexture(name: string, data: Uint8Array, width: number, height: number): Promise<ThreeTexture> {
@@ -445,6 +459,7 @@ function downsampleData(texture: any, maxSize: number): any {
 	}
 	const tex: any = new DataTexture(dst as any, nw, nh, texture.format ?? RGBAFormat)
 	tex.colorSpace = texture.colorSpace ?? SRGBColorSpace
+	tex.mapping = texture.mapping ?? tex.mapping
 	tex.needsUpdate = true
 	tex.name = texture.name
 	tune(tex)
@@ -484,6 +499,7 @@ function downsampleImage(texture: any, maxSize: number, w: number, h: number): a
 	ctx.drawImage(img as any, 0, 0, nw, nh)
 	const tex: any = new CanvasTexture(canvas)
 	tex.colorSpace = texture.colorSpace ?? SRGBColorSpace
+	tex.mapping = texture.mapping ?? tex.mapping
 	tex.needsUpdate = true
 	tex.name = texture.name
 	tune(tex)

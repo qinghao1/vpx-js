@@ -50,9 +50,10 @@ export class ThreeMaterialGenerator {
 		this.applyEmissiveMap(m, material, emissiveMap)
 		m.transparent = isTransparent
 		if (material?.isMetal && (m.userData as Record<string, unknown>).pendingEnvMap) {
-			m.metalness = 0.25
-			m.roughness = 0.35
-			m.envMapIntensity = 0.6
+			const isBall = material.name === 'ball'
+			m.metalness = isBall ? 1 : 0.25
+			m.roughness = isBall ? 0.15 : 0.35
+			m.envMapIntensity = isBall ? 1 : 0.6
 		}
 		this.cachedMaterials[key] = m
 		return m

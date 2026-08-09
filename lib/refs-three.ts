@@ -3,6 +3,9 @@
 
 /** Shared Three.js re-exports. */
 export {
+	CubeUVReflectionMapping,
+	EquirectangularReflectionMapping,
+	EquirectangularRefractionMapping,
 	AdditiveBlending,
 	AnimationClip,
 	Bone,

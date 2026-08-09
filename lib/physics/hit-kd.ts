@@ -11,6 +11,9 @@ import { HitCircle } from './hit-circle.js'
 import { HitPlane } from './hit-plane.js'
 import { HitLineZ } from './hit-line-z.js'
 import { HitLine3D } from './hit-line-3d.js'
+import { HitPoint } from './hit-point.js'
+import { HitTriangle } from './hit-triangle.js'
+import { LineSeg } from './line-seg.js'
 
 const isBatchCircle = (h: HitObject): boolean => h instanceof HitCircle && h.hitTest === HitCircle.prototype.hitTest
 
@@ -58,15 +61,19 @@ export class HitKD {
 	}
 
 	private warmPools(vho: HitObject[]): void {
-		let c = 0, p = 0, l = 0
+		let circleCount = 0, planeCount = 0, lineZCount = 0, pointCount = 0, triangleCount = 0, lineSegCount = 0, line3DCount = 0
 		for (const h of vho) {
-			if (isBatchCircle(h)) c++
-			else if (h instanceof HitPlane) p++
-			else if (h instanceof HitLineZ && !(h instanceof HitLine3D)) l++
+			if (isBatchCircle(h)) circleCount++
+			else if (h instanceof HitPlane) planeCount++
+			else if (h instanceof HitLineZ && !(h instanceof HitLine3D)) lineZCount++
+			else if (h instanceof HitPoint) pointCount++
+			else if (h instanceof HitTriangle) triangleCount++
+			else if (h instanceof HitLine3D) line3DCount++
+			else if (h instanceof LineSeg) lineSegCount++
 		}
-		if (c || p || l) {
-			if (isWasmReady()) warmWasmPools(c, p, l)
-			else void getWasmKernels().then(() => warmWasmPools(c, p, l))
+		if (circleCount || planeCount || lineZCount || pointCount || triangleCount || lineSegCount || line3DCount) {
+			if (isWasmReady()) warmWasmPools(circleCount, planeCount, lineZCount, pointCount, triangleCount, lineSegCount, line3DCount)
+			else void getWasmKernels().then(() => warmWasmPools(circleCount, planeCount, lineZCount, pointCount, triangleCount, lineSegCount, line3DCount))
 		}
 	}
 
