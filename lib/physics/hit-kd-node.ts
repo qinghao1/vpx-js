@@ -6,6 +6,8 @@ import { FRect3D } from '../util/frect3d.js'
 import type { Ball } from '../vpt/ball/ball.js'
 import { CollisionEvent } from './collision-event.js'
 import type { HitKD } from './hit-kd.js'
+import { Hit3DPoly } from './hit-3dpoly.js'
+import { CollisionType } from './collision-type.js'
 import { HitCircle } from './hit-circle.js'
 import { HitPlane } from './hit-plane.js'
 import { HitLineZ } from './hit-line-z.js'
@@ -13,8 +15,9 @@ import { HitLine3D } from './hit-line-3d.js'
 import { HitPoint } from './hit-point.js'
 import { HitTriangle } from './hit-triangle.js'
 import { LineSeg } from './line-seg.js'
-import { isWasmReady, tryGetWasmBatchHitViewsOutCircle, tryGetWasmBatchHitViewsOutLine3D, tryGetWasmBatchHitViewsOutLineSeg, tryGetWasmBatchHitViewsOutLineZ, tryGetWasmBatchHitViewsOutPlane, tryGetWasmBatchHitViewsOutPoint, tryGetWasmBatchHitViewsOutTriangle, warmWasmPools } from './wasm/kernels.js'
-import type { CircleViews, Line3DViews, LineSegViews, LineViews, PlaneViews, PointViews, TriangleViews } from './wasm/kernels.js'
+import { isWasmReady, tryGetWasmBatchHitViewsOutCircle, tryGetWasmBatchHitViewsOutLine3D, tryGetWasmBatchHitViewsOutLineSeg, tryGetWasmBatchHitViewsOutLineZ, tryGetWasmBatchHitViewsOutPlane, tryGetWasmBatchHitViewsOutPoint, tryGetWasmBatchHitViewsOutPoly, tryGetWasmBatchHitViewsOutTriangle, warmWasmPools } from './wasm/kernels.js'
+import { POLY_MAX_VERTS } from './wasm/kernels.js'
+import type { CircleViews, Line3DViews, LineSegViews, LineViews, PlaneViews, PointViews, PolyViews, TriangleViews } from './wasm/kernels.js'
 import { HitKind, type HitObject } from './hit-object.js'
 
 type Kind = HitKind
@@ -28,6 +31,8 @@ const isBatchPoint = (h: HitObject): h is HitPoint => h.hitKind === HitKind.Poin
 const isBatchTriangle = (h: HitObject): h is HitTriangle => h.hitKind === HitKind.Triangle
 const isBatchLineSeg = (h: HitObject): h is LineSeg => h.hitKind === HitKind.LineSeg && h.hitTest === LineSeg.prototype.hitTest
 const isBatchLine3D = (h: HitObject): h is HitLine3D => h.hitKind === HitKind.Line3D
+const isBatchPoly = (h: HitObject): h is Hit3DPoly => h.hitKind === HitKind.Poly && (h as Hit3DPoly).objType !== CollisionType.Trigger && (h as Hit3DPoly).rgv.length <= 32
+const WASM_THRESHOLD = 64
 
 /** @see https://github.com/vpinball/vpinball/blob/master/kdtree.cpp */
 export class HitKDNode {
@@ -43,6 +48,7 @@ export class HitKDNode {
 	private _triangles: HitTriangle[] = []
 	private _lineSegs: LineSeg[] = []
 	private _line3Ds: HitLine3D[] = []
+	private _polys: Hit3DPoly[] = []
 	private _order: Order[] = []
 	private _orderLen = 0
 
@@ -50,8 +56,11 @@ export class HitKDNode {
 	public reset(o: HitKD): void { this.children.length = 0; this.hitOct = o; this.start = 0; this.items = 0 }
 
 	public hitTestBall(ball: Ball, coll: CollisionEvent, physics: PlayerPhysics): void {
-		if (!isWasmReady() || !this.collect(ball)) return this.hitTestBallScalar(ball, coll, physics)
-		const { _circles: circles, _planes: planes, _lineZs: lineZs, _points: points, _triangles: triangles, _lineSegs: lineSegs, _line3Ds: line3Ds } = this
+		if (!isWasmReady()) return this.hitTestBallScalar(ball, coll, physics)
+		if (this._orderLen > 0 && this._orderLen < WASM_THRESHOLD) return this.hitTestBallScalar(ball, coll, physics)
+		if (!this.collect(ball)) return this.hitTestBallScalar(ball, coll, physics)
+		if (this._orderLen < WASM_THRESHOLD) { for (let i = 0; i < this._orderLen; i++) this._order[i]!.obj.doHitTest(ball, coll, physics); return }
+		const { _circles: circles, _planes: planes, _lineZs: lineZs, _points: points, _triangles: triangles, _lineSegs: lineSegs, _line3Ds: line3Ds, _polys: polys } = this
 		let circleViews = circles.length ? tryGetWasmBatchHitViewsOutCircle(circles.length) : null
 		let planeViews = planes.length ? tryGetWasmBatchHitViewsOutPlane(planes.length) : null
 		let lineViews = lineZs.length ? tryGetWasmBatchHitViewsOutLineZ(lineZs.length) : null
@@ -59,8 +68,9 @@ export class HitKDNode {
 		let triangleViews = triangles.length ? tryGetWasmBatchHitViewsOutTriangle(triangles.length) : null
 		let lineSegViews = lineSegs.length ? tryGetWasmBatchHitViewsOutLineSeg(lineSegs.length) : null
 		let line3DViews = line3Ds.length ? tryGetWasmBatchHitViewsOutLine3D(line3Ds.length) : null
-		if ((circles.length && !circleViews) || (planes.length && !planeViews) || (lineZs.length && !lineViews) || (points.length && !pointViews) || (triangles.length && !triangleViews) || (lineSegs.length && !lineSegViews) || (line3Ds.length && !line3DViews)) {
-			queueMicrotask(() => warmWasmPools(circles.length, planes.length, lineZs.length, points.length, triangles.length, lineSegs.length, line3Ds.length))
+		let polyViews = polys.length ? tryGetWasmBatchHitViewsOutPoly(polys.length) : null
+		if ((circles.length && !circleViews) || (planes.length && !planeViews) || (lineZs.length && !lineViews) || (points.length && !pointViews) || (triangles.length && !triangleViews) || (lineSegs.length && !lineSegViews) || (line3Ds.length && !line3DViews) || (polys.length && !polyViews)) {
+			queueMicrotask(() => warmWasmPools(circles.length, planes.length, lineZs.length, points.length, triangles.length, lineSegs.length, line3Ds.length, polys.length))
 			return this.hitTestBallScalar(ball, coll, physics)
 		}
 		if (circleViews) this.fillCircles(circleViews, circles)
@@ -70,6 +80,7 @@ export class HitKDNode {
 		if (triangleViews) this.fillTriangles(triangleViews, triangles)
 		if (lineSegViews) this.fillLineSegs(lineSegViews, lineSegs)
 		if (line3DViews) this.fillLine3Ds(line3DViews, line3Ds)
+		if (polyViews) this.fillPolys(polyViews, polys)
 		const pos = ball.state.pos, vel = ball.hit.vel, r = ball.data.radius, dt = coll.hitTime
 		if (circleViews) circleViews.run(pos.x, pos.y, pos.z, vel.x, vel.y, vel.z, r, dt)
 		if (planeViews) planeViews.run(pos.x, pos.y, pos.z, vel.x, vel.y, vel.z, r, dt)
@@ -78,7 +89,8 @@ export class HitKDNode {
 		if (triangleViews) triangleViews.run(pos.x, pos.y, pos.z, vel.x, vel.y, vel.z, r, dt)
 		if (lineSegViews) lineSegViews.run(pos.x, pos.y, pos.z, vel.x, vel.y, vel.z, r, dt)
 		if (line3DViews) line3DViews.run(pos.x, pos.y, pos.z, vel.x, vel.y, vel.z, r, dt)
-		this.replay(ball, coll, physics, circleViews, planeViews, lineViews, pointViews, triangleViews, lineSegViews, line3DViews)
+		if (polyViews) polyViews.run(pos.x, pos.y, pos.z, vel.x, vel.y, vel.z, r, dt)
+		this.replay(ball, coll, physics, circleViews, planeViews, lineViews, pointViews, triangleViews, lineSegViews, line3DViews, polyViews)
 	}
 
 	private fillCircles(circleViews: CircleViews, circles: HitCircle[]): void {
@@ -102,12 +114,22 @@ export class HitKDNode {
 	private fillLine3Ds(line3DViews: Line3DViews, line3Ds: HitLine3D[]): void {
 		for (let i = 0; i < line3Ds.length; i++) { const h = line3Ds[i]!; const m = h.matrix.elements; line3DViews.lx[i] = h.xy.x; line3DViews.ly[i] = h.xy.y; line3DViews.zl[i] = h.zLow; line3DViews.zh[i] = h.zHigh; line3DViews.m00[i] = m[0]!; line3DViews.m01[i] = m[3]!; line3DViews.m02[i] = m[6]!; line3DViews.m10[i] = m[1]!; line3DViews.m11[i] = m[4]!; line3DViews.m12[i] = m[7]!; line3DViews.m20[i] = m[2]!; line3DViews.m21[i] = m[5]!; line3DViews.m22[i] = m[8]! }
 	}
+	private fillPolys(polyViews: PolyViews, polys: Hit3DPoly[]): void {
+		for (let i = 0; i < polys.length; i++) {
+			const h = polys[i]!
+			polyViews.nx[i] = h.normal.x; polyViews.ny[i] = h.normal.y; polyViews.nz[i] = h.normal.z
+			const r0 = h.rgv[0]!; polyViews.r0x[i] = r0.x; polyViews.r0y[i] = r0.y; polyViews.r0z[i] = r0.z
+			polyViews.numVerts[i] = h.rgv.length
+			const base = i * POLY_MAX_VERTS
+			for (let j = 0; j < h.rgv.length; j++) { polyViews.vertsX[base + j] = h.rgv[j]!.x; polyViews.vertsY[base + j] = h.rgv[j]!.y }
+		}
+	}
 
-	private replay(ball: Ball, coll: CollisionEvent, physics: PlayerPhysics, circleViews: CircleViews | null, planeViews: PlaneViews | null, lineViews: LineViews | null, pointViews: PointViews | null, triangleViews: TriangleViews | null, lineSegViews: LineSegViews | null, line3DViews: Line3DViews | null): void {
+	private replay(ball: Ball, coll: CollisionEvent, physics: PlayerPhysics, circleViews: CircleViews | null, planeViews: PlaneViews | null, lineViews: LineViews | null, pointViews: PointViews | null, triangleViews: TriangleViews | null, lineSegViews: LineSegViews | null, line3DViews: Line3DViews | null, polyViews: PolyViews | null): void {
 		for (let i = 0; i < this._orderLen; i++) {
 			const e = this._order[i]!
 			if (e.kind === HitKind.Other) { e.obj.doHitTest(ball, coll, physics); continue }
-			const s = e.kind === HitKind.Circle ? circleViews! : e.kind === HitKind.Plane ? planeViews! : e.kind === HitKind.LineZ ? lineViews! : e.kind === HitKind.Point ? pointViews! : e.kind === HitKind.Triangle ? triangleViews! : e.kind === HitKind.LineSeg ? lineSegViews! : line3DViews!
+			const s = e.kind === HitKind.Circle ? circleViews! : e.kind === HitKind.Plane ? planeViews! : e.kind === HitKind.LineZ ? lineViews! : e.kind === HitKind.Point ? pointViews! : e.kind === HitKind.Triangle ? triangleViews! : e.kind === HitKind.LineSeg ? lineSegViews! : e.kind === HitKind.Line3D ? line3DViews! : polyViews!
 			const t = s.oT[e.idx]!, contact = s.oContact[e.idx]!, nx = s.oNx[e.idx]!, ny = s.oNy[e.idx]!, nz = s.oNz[e.idx]!, dist = s.oDist[e.idx]!, bnv = s.oBnv[e.idx]!
 			const isContact = !!contact, valid = t >= -0.5 && t <= coll.hitTime
 			if (!isContact && !valid) continue
@@ -157,7 +179,7 @@ export class HitKDNode {
 	}
 
 	private collect(ball: Ball): number {
-		this._circles.length = 0; this._planes.length = 0; this._lineZs.length = 0; this._points.length = 0; this._triangles.length = 0; this._lineSegs.length = 0; this._line3Ds.length = 0; this._orderLen = 0
+		this._circles.length = 0; this._planes.length = 0; this._lineZs.length = 0; this._points.length = 0; this._triangles.length = 0; this._lineSegs.length = 0; this._line3Ds.length = 0; this._polys.length = 0; this._orderLen = 0
 		this.traverse(this, ball)
 		return this._orderLen
 	}
@@ -177,6 +199,7 @@ export class HitKDNode {
 			else if (isBatchTriangle(h)) { this.pushOrder(h, HitKind.Triangle, this._triangles.length); this._triangles.push(h) }
 			else if (isBatchLine3D(h)) { this.pushOrder(h, HitKind.Line3D, this._line3Ds.length); this._line3Ds.push(h) }
 			else if (isBatchLineSeg(h)) { this.pushOrder(h, HitKind.LineSeg, this._lineSegs.length); this._lineSegs.push(h) }
+			else if (isBatchPoly(h)) { this.pushOrder(h, HitKind.Poly, this._polys.length); this._polys.push(h) }
 			else this.pushOrder(h, HitKind.Other, -1)
 		}
 		if (node.children.length === 0) return

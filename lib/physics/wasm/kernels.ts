@@ -10,6 +10,7 @@ type Mod = {
 	_batchHitTestTriangle: (n: number, bx: number, by: number, bz: number, vx: number, vy: number, vz: number, r: number, r0x: number, r0y: number, r0z: number, r1x: number, r1y: number, r1z: number, r2x: number, r2y: number, r2z: number, nx: number, ny: number, nz: number, dt: number, oT: number, oContact: number, oNx: number, oNy: number, oNz: number, oDist: number, oBnv: number) => void
 	_batchHitTestLineSeg: (n: number, bx: number, by: number, bz: number, vx: number, vy: number, vz: number, r: number, v1x: number, v1y: number, v2x: number, v2y: number, nx: number, ny: number, len: number, zl: number, zh: number, dt: number, oT: number, oContact: number, oNx: number, oNy: number, oNz: number, oDist: number, oBnv: number) => void
 	_batchHitTestLine3D: (n: number, bx: number, by: number, bz: number, vx: number, vy: number, vz: number, r: number, lx: number, ly: number, zl: number, zh: number, m00: number, m01: number, m02: number, m10: number, m11: number, m12: number, m20: number, m21: number, m22: number, dt: number, oT: number, oContact: number, oNx: number, oNy: number, oNz: number, oDist: number, oBnv: number) => void
+	_batchHitTestPoly: (n: number, bx: number, by: number, bz: number, vx: number, vy: number, vz: number, r: number, nx: number, ny: number, nz: number, r0x: number, r0y: number, r0z: number, numVerts: number, vertsX: number, vertsY: number, dt: number, oT: number, oContact: number, oNx: number, oNy: number, oNz: number, oDist: number, oBnv: number) => void
 	_batchElasticityWithFalloff: (n: number, e: number, f: number, v: number, o: number) => void
 }
 
@@ -47,7 +48,7 @@ export async function getWasmKernels(): Promise<Mod> {
 				} catch {
 					mod = (await (create as () => Promise<Mod> )()) as Mod
 				}
-				try { warmWasmPools(512, 512, 512, 512, 512, 512, 512) } catch {}
+				try { warmWasmPools(512, 512, 512, 512, 512, 512, 512, 512) } catch {}
 				return mod!
 			} catch (e) { lastErr = e }
 		}
@@ -77,6 +78,9 @@ const pointKeys = ['px', 'py', 'pz'] as const
 const triangleKeys = ['r0x', 'r0y', 'r0z', 'r1x', 'r1y', 'r1z', 'r2x', 'r2y', 'r2z', 'nx', 'ny', 'nz'] as const
 const lineSegKeys = ['v1x', 'v1y', 'v2x', 'v2y', 'nx', 'ny', 'len', 'zl', 'zh'] as const
 const line3DKeys = ['lx', 'ly', 'zl', 'zh', 'm00', 'm01', 'm02', 'm10', 'm11', 'm12', 'm20', 'm21', 'm22'] as const
+export const POLY_MAX_VERTS = 32
+const polyKeys = ['nx', 'ny', 'nz', 'r0x', 'r0y', 'r0z', 'numVerts'] as const
+const polyVertsKeys = ['vertsX', 'vertsY'] as const
 const outKeys = ['oT', 'oContact', 'oNx', 'oNy', 'oNz', 'oDist', 'oBnv'] as const
 
 type HitOut = { oT: Float32Array; oContact: Int32Array; oNx: Float32Array; oNy: Float32Array; oNz: Float32Array; oDist: Float32Array; oBnv: Float32Array }
@@ -87,6 +91,7 @@ export type PointViews = { px: Float32Array; py: Float32Array; pz: Float32Array 
 export type TriangleViews = { r0x: Float32Array; r0y: Float32Array; r0z: Float32Array; r1x: Float32Array; r1y: Float32Array; r1z: Float32Array; r2x: Float32Array; r2y: Float32Array; r2z: Float32Array; nx: Float32Array; ny: Float32Array; nz: Float32Array } & HitOut & { run: (bx: number, by: number, bz: number, vx: number, vy: number, vz: number, r: number, dt: number) => void }
 export type LineSegViews = { v1x: Float32Array; v1y: Float32Array; v2x: Float32Array; v2y: Float32Array; nx: Float32Array; ny: Float32Array; len: Float32Array; zl: Float32Array; zh: Float32Array } & HitOut & { run: (bx: number, by: number, bz: number, vx: number, vy: number, vz: number, r: number, dt: number) => void }
 export type Line3DViews = { lx: Float32Array; ly: Float32Array; zl: Float32Array; zh: Float32Array; m00: Float32Array; m01: Float32Array; m02: Float32Array; m10: Float32Array; m11: Float32Array; m12: Float32Array; m20: Float32Array; m21: Float32Array; m22: Float32Array } & HitOut & { run: (bx: number, by: number, bz: number, vx: number, vy: number, vz: number, r: number, dt: number) => void }
+export type PolyViews = { nx: Float32Array; ny: Float32Array; nz: Float32Array; r0x: Float32Array; r0y: Float32Array; r0z: Float32Array; numVerts: Int32Array; vertsX: Float32Array; vertsY: Float32Array } & HitOut & { run: (bx: number, by: number, bz: number, vx: number, vy: number, vz: number, r: number, dt: number) => void }
 
 type Soa<V> = { in: Pool; out: Pool; views: V | null; buf: ArrayBufferLike | null; viewCap: number; n: number }
 
@@ -97,8 +102,10 @@ const pointSoa: Soa<PointViews> = { in: { cap: 0, ptrs: null }, out: { cap: 0, p
 const triangleSoa: Soa<TriangleViews> = { in: { cap: 0, ptrs: null }, out: { cap: 0, ptrs: null }, views: null, buf: null, viewCap: 0, n: 0 }
 const lineSegSoa: Soa<LineSegViews> = { in: { cap: 0, ptrs: null }, out: { cap: 0, ptrs: null }, views: null, buf: null, viewCap: 0, n: 0 }
 const line3DSoa: Soa<Line3DViews> = { in: { cap: 0, ptrs: null }, out: { cap: 0, ptrs: null }, views: null, buf: null, viewCap: 0, n: 0 }
+const polySoa: Soa<PolyViews> = { in: { cap: 0, ptrs: null }, out: { cap: 0, ptrs: null }, views: null, buf: null, viewCap: 0, n: 0 }
+const polyVertsPool: Pool = { cap: 0, ptrs: null }
 
-export function warmWasmPools(circleCount = 0, planeCount = 0, lineZCount = 0, pointCount = 0, triangleCount = 0, lineSegCount = 0, line3DCount = 0): void {
+export function warmWasmPools(circleCount = 0, planeCount = 0, lineZCount = 0, pointCount = 0, triangleCount = 0, lineSegCount = 0, line3DCount = 0, polyCount = 0): void {
 	const m = getWasmModSync(); if (!m) return
 	if (circleCount) getWasmBatchHitViewsOutCircle(circleCount)
 	if (planeCount) getWasmBatchHitViewsOutPlane(planeCount)
@@ -107,6 +114,7 @@ export function warmWasmPools(circleCount = 0, planeCount = 0, lineZCount = 0, p
 	if (triangleCount) getWasmBatchHitViewsOutTriangle(triangleCount)
 	if (lineSegCount) getWasmBatchHitViewsOutLineSeg(lineSegCount)
 	if (line3DCount) getWasmBatchHitViewsOutLine3D(line3DCount)
+	if (polyCount) getWasmBatchHitViewsOutPoly(polyCount)
 }
 
 function tryGet<V extends HitOut & { run: Function } > (soa: Soa<V >, count: number): V | null {
@@ -123,6 +131,12 @@ export function tryGetWasmBatchHitViewsOutPoint(count: number): PointViews | nul
 export function tryGetWasmBatchHitViewsOutTriangle(count: number): TriangleViews | null { return tryGet(triangleSoa, count) }
 export function tryGetWasmBatchHitViewsOutLineSeg(count: number): LineSegViews | null { return tryGet(lineSegSoa, count) }
 export function tryGetWasmBatchHitViewsOutLine3D(count: number): Line3DViews | null { return tryGet(line3DSoa, count) }
+export function tryGetWasmBatchHitViewsOutPoly(count: number): PolyViews | null {
+	if (count === 0 || count > polySoa.in.cap || count * POLY_MAX_VERTS > polyVertsPool.cap || !polySoa.views) return null
+	const m = getWasmModSync(); if (!m || polySoa.buf !== m.HEAPF32.buffer) return null
+	polySoa.n = count
+	return polySoa.views
+}
 
 function allocOut(m: Mod, ptrs: Record<string, number> , cap: number): HitOut {
 	return {
@@ -305,3 +319,31 @@ export function getWasmBatchHitViewsOutLine3D(count: number): Line3DViews {
 	return line3DSoa.views
 }
 
+
+export function getWasmBatchHitViewsOutPoly(count: number): PolyViews {
+	const m = getWasmModSync()!
+	const ip = ensure(m, count, polyKeys, polySoa.in)
+	const vertsCount = count * POLY_MAX_VERTS
+	const vp = ensure(m, vertsCount, polyVertsKeys, polyVertsPool)
+	const op = ensure(m, count, outKeys, polySoa.out)
+	polySoa.n = count
+	if (!polySoa.views || polySoa.buf !== m.HEAPF32.buffer || polySoa.viewCap !== polySoa.in.cap || polySoa.views.vertsX.length !== vertsCount) {
+		const out = allocOut(m, op, polySoa.out.cap)
+		polySoa.views = {
+			nx: new Float32Array(m.HEAPF32.buffer, ip.nx!, polySoa.in.cap),
+			ny: new Float32Array(m.HEAPF32.buffer, ip.ny!, polySoa.in.cap),
+			nz: new Float32Array(m.HEAPF32.buffer, ip.nz!, polySoa.in.cap),
+			r0x: new Float32Array(m.HEAPF32.buffer, ip.r0x!, polySoa.in.cap),
+			r0y: new Float32Array(m.HEAPF32.buffer, ip.r0y!, polySoa.in.cap),
+			r0z: new Float32Array(m.HEAPF32.buffer, ip.r0z!, polySoa.in.cap),
+			numVerts: new Int32Array(m.HEAP32.buffer, ip.numVerts!, polySoa.in.cap),
+			vertsX: new Float32Array(m.HEAPF32.buffer, vp.vertsX!, vertsCount),
+			vertsY: new Float32Array(m.HEAPF32.buffer, vp.vertsY!, vertsCount),
+			...out,
+			run: (bx, by, bz, vx, vy, vz, r, dt) => getWasmModSync()!._batchHitTestPoly(polySoa.n, bx, by, bz, vx, vy, vz, r, ip.nx!, ip.ny!, ip.nz!, ip.r0x!, ip.r0y!, ip.r0z!, ip.numVerts!, vp.vertsX!, vp.vertsY!, dt, op.oT!, op.oContact!, op.oNx!, op.oNy!, op.oNz!, op.oDist!, op.oBnv!),
+		}
+		polySoa.buf = m.HEAPF32.buffer
+		polySoa.viewCap = polySoa.in.cap
+	}
+	return polySoa.views
+}

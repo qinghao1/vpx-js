@@ -322,6 +322,57 @@ __attribute__((visibility("default"))) void batchHitTestLine3D(int n, float bx, 
 	}
 }
 
+
+constexpr int POLY_MAX_VERTS = 32;
+
+inline Hit testPoly(float bx, float by, float bz, float vx, float vy, float vz, float r,
+                    float nx, float ny, float nz, float r0x, float r0y, float r0z,
+                    int numVerts, const float* vertsX, const float* vertsY, float dTime) {
+	Hit h;
+	if (numVerts < 3 || numVerts > POLY_MAX_VERTS) return h;
+	float bnv = nx*vx + ny*vy + nz*vz;
+	if (bnv > C_LOWNORMVEL) return h;
+	float hx0 = bx - nx*r, hy0 = by - ny*r, hz0 = bz - nz*r;
+	float bnd = nx*(hx0 - r0x) + ny*(hy0 - r0y) + nz*(hz0 - r0z);
+	bool inside = bnd <= 0;
+	float hitTime = 0;
+	if (bnd < -r) return h;
+	if (bnd <= PHYS_TOUCH) {
+		if (inside || std::fabs(bnv) > C_CONTACTVEL || bnd <= -PHYS_TOUCH) hitTime = 0;
+		else hitTime = bnd * (0.5f / PHYS_TOUCH) + 0.5f;
+	} else if (std::fabs(bnv) > C_LOWNORMVEL) hitTime = bnd / -bnv;
+	else return h;
+	if (!std::isfinite(hitTime) || hitTime < 0 || hitTime > dTime) return h;
+	float hpx = hx0 + vx*hitTime, hpy = hy0 + vy*hitTime;
+	float x2 = vertsX[0], y2 = vertsY[0];
+	bool hx2 = hpx >= x2, hy2 = hpy <= y2;
+	int cross = 0;
+	for (int i = 0; i < numVerts; i++) {
+		float x1 = x2, y1 = y2; bool hx1 = hx2, hy1 = hy2;
+		int j = (i + 1) % numVerts;
+		x2 = vertsX[j]; y2 = vertsY[j];
+		hx2 = hpx >= x2; hy2 = hpy <= y2;
+		if (y1 == y2 || (hy1 && hy2) || (!hy1 && !hy2) || (hx1 && hx2)) continue;
+		if (!hx1 && !hx2) { cross ^= 1; continue; }
+		if (x2 == x1) { if (!hx2) cross ^= 1; continue; }
+		if (x2 - ((y2 - hpy)*(x1 - x2))/(y1 - y2) > hpx) cross ^= 1;
+	}
+	if (!(cross & 1)) return h;
+	h.t = hitTime; h.nx = nx; h.ny = ny; h.nz = nz; h.dist = bnd;
+	return h;
+}
+
+__attribute__((visibility("default"))) void batchHitTestPoly(int n, float bx, float by, float bz, float vx, float vy, float vz, float r,
+                              float* nx, float* ny, float* nz, float* r0x, float* r0y, float* r0z, int* numVerts, float* vertsX, float* vertsY, float dTime,
+                              float* oT, int* oContact, float* oNx, float* oNy, float* oNz, float* oDist, float* oBnv) {
+	for (int i = 0; i < n; i++) {
+		const float* vxArr = vertsX + i * POLY_MAX_VERTS;
+		const float* vyArr = vertsY + i * POLY_MAX_VERTS;
+		Hit h = testPoly(bx, by, bz, vx, vy, vz, r, nx[i], ny[i], nz[i], r0x[i], r0y[i], r0z[i], numVerts[i], vxArr, vyArr, dTime);
+		oT[i] = h.t; oContact[i] = h.contact; oNx[i] = h.nx; oNy[i] = h.ny; oNz[i] = h.nz; oDist[i] = h.dist; oBnv[i] = h.bnv;
+	}
+}
+
 __attribute__((visibility("default"))) void batchElasticityWithFalloff(int n, float* e, float* f, float* v, float* o) {
 #ifdef __wasm_simd128__
 	const v128_t k = wasm_f32x4_splat(1.f / 18.53f);

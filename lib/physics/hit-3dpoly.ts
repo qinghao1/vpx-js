@@ -13,8 +13,8 @@ import { HitKind, HitObject } from './hit-object.js'
  * @see https://github.com/vpinball/vpinball/blob/master/hit3dpoly.cpp */
 export class Hit3DPoly extends HitObject {
 	public override hitKind = HitKind.Poly
-	private readonly rgv: Vertex3D[]
-	private readonly normal = new Vertex3D()
+	public readonly rgv: Vertex3D[]
+	public readonly normal = new Vertex3D()
 
 	constructor(rgv: Vertex3D[], objType?: CollisionType) {
 		super()

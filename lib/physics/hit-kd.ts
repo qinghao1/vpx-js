@@ -5,8 +5,10 @@ import type { PlayerPhysics } from '../game/player-physics.js'
 import type { Ball } from '../vpt/ball/ball.js'
 import type { CollisionEvent } from './collision-event.js'
 import { HitKDNode } from './hit-kd-node.js'
+import { CollisionType } from './collision-type.js'
 import { HitKind, type HitObject } from './hit-object.js'
 import { getWasmKernels, isWasmReady, warmWasmPools } from './wasm/kernels.js'
+import { Hit3DPoly } from './hit-3dpoly.js'
 import { HitCircle } from './hit-circle.js'
 import { HitPlane } from './hit-plane.js'
 import { HitLineZ } from './hit-line-z.js'
@@ -62,7 +64,7 @@ export class HitKD {
 	}
 
 	private warmPools(vho: HitObject[]): void {
-		let circleCount = 0, planeCount = 0, lineZCount = 0, pointCount = 0, triangleCount = 0, lineSegCount = 0, line3DCount = 0
+		let circleCount = 0, planeCount = 0, lineZCount = 0, pointCount = 0, triangleCount = 0, lineSegCount = 0, line3DCount = 0, polyCount = 0
 		for (const h of vho) {
 			if (isBatchCircle(h)) circleCount++
 			else if (h.hitKind === HitKind.Plane) planeCount++
@@ -70,11 +72,12 @@ export class HitKD {
 			else if (h.hitKind === HitKind.Point) pointCount++
 			else if (h.hitKind === HitKind.Triangle) triangleCount++
 			else if (h.hitKind === HitKind.Line3D) line3DCount++
+			else if (h.hitKind === HitKind.Poly && (h as Hit3DPoly).objType !== CollisionType.Trigger && (h as Hit3DPoly).rgv.length <= 32) polyCount++
 			else if (isBatchLineSeg(h)) lineSegCount++
 		}
-		if (circleCount || planeCount || lineZCount || pointCount || triangleCount || lineSegCount || line3DCount) {
-			if (isWasmReady()) warmWasmPools(circleCount, planeCount, lineZCount, pointCount, triangleCount, lineSegCount, line3DCount)
-			else void getWasmKernels().then(() => warmWasmPools(circleCount, planeCount, lineZCount, pointCount, triangleCount, lineSegCount, line3DCount))
+		if (circleCount || planeCount || lineZCount || pointCount || triangleCount || lineSegCount || line3DCount || polyCount) {
+			if (isWasmReady()) warmWasmPools(circleCount, planeCount, lineZCount, pointCount, triangleCount, lineSegCount, line3DCount, polyCount)
+			else void getWasmKernels().then(() => warmWasmPools(circleCount, planeCount, lineZCount, pointCount, triangleCount, lineSegCount, line3DCount, polyCount))
 		}
 	}
 

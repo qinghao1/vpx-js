@@ -37,7 +37,7 @@ export abstract class HitObject {
 	public friction = 0.3
 	/** Scatter angle in radians. */
 	public scatter = 0
-	protected objType: CollisionType = CollisionType.Null
+	public objType: CollisionType = CollisionType.Null
 	public isEnabled = true
 	public hitKind: HitKind = HitKind.Other
 	/** @deprecated use {@link fireEvents} */
