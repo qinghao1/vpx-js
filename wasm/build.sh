@@ -1,67 +1,90 @@
 #!/usr/bin/env bash
 set -euo pipefail
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-WASM_DIR="$ROOT/wasm"
-DIST_DIR="$WASM_DIR/dist"
-MOCK_SRC="$WASM_DIR/mock/libpinmame.mock.js"
-PINMAME="$ROOT/external/pinmame"
+IFS=$'\n\t'
 
-[[ -x /tmp/uv-cmake/bin/cmake ]] && export PATH="/tmp/uv-cmake/bin:${PATH:-}"
-if [[ -n "${EMSDK:-}" && -f "$EMSDK/emsdk_env.sh" ]]; then source "$EMSDK/emsdk_env.sh" >/dev/null 2>&1 || true
-elif [[ -f "$HOME/projects/emsdk/emsdk_env.sh" ]]; then source "$HOME/projects/emsdk/emsdk_env.sh" >/dev/null 2>&1 || true
+# shellcheck disable=SC2155
+readonly ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+readonly WASM_DIR="$ROOT/wasm"
+readonly DIST_DIR="$WASM_DIR/dist"
+readonly MOCK_SRC="$WASM_DIR/mock/libpinmame.mock.js"
+readonly PINMAME="$ROOT/external/pinmame"
+
+log() { printf '[wasm] %s\n' "$*"; }
+
+copy_mock() {
+  mkdir -p "$DIST_DIR"
+  cp -- "$MOCK_SRC" "$DIST_DIR/libpinmame.js"
+  log "mock copied"
+}
+
+if [[ -x /tmp/uv-cmake/bin/cmake ]]; then
+  PATH="/tmp/uv-cmake/bin:$PATH"
+  export PATH
 fi
-mkdir -p "$DIST_DIR"
+# shellcheck disable=SC1091
+if [[ -n "${EMSDK:-}" && -f "$EMSDK/emsdk_env.sh" ]]; then
+  source "$EMSDK/emsdk_env.sh" >/dev/null 2>&1 || true
+elif [[ -f "$HOME/projects/emsdk/emsdk_env.sh" ]]; then
+  source "$HOME/projects/emsdk/emsdk_env.sh" >/dev/null 2>&1 || true
+fi
 
-use_mock() { cp "$MOCK_SRC" "$DIST_DIR/libpinmame.js"; echo "[wasm] mock copied"; exit 0; }
-[[ "${1:-}" == "--mock" ]] && use_mock
-command -v emcc >/dev/null 2>&1 || { echo "[wasm] emcc not found — using mock"; use_mock; }
+case "${1:-}" in
+  --mock) copy_mock; exit 0 ;;
+  -h|--help)
+    printf 'Usage: %s [--mock|--debug|--release|--wasm]\n' "$0"
+    exit 0
+    ;;
+esac
+
+if ! command -v emcc >/dev/null 2>&1; then
+  log "emcc not found — using mock"
+  copy_mock; exit 0
+fi
 
 preset="${1:---wasm}"
-case "$preset" in --debug) preset="debug";; --release|--wasm) preset="wasm";; *) preset="wasm";; esac
+case "$preset" in
+  --debug) preset="debug" ;;
+  --release|--wasm) preset="wasm" ;;
+  --*) log "unknown option $preset — using wasm"; preset="wasm" ;;
+  *) preset="wasm" ;;
+esac
 
-# emcc compat: miniaudio header duplicated path
 mkdir -p "$PINMAME/ext/miniaudio/miniaudio" 2>/dev/null || true
 [[ -f "$PINMAME/ext/miniaudio/miniaudio.h" ]] && cp -n "$PINMAME/ext/miniaudio/miniaudio.h" "$PINMAME/ext/miniaudio/miniaudio/miniaudio.h" 2>/dev/null || true
 [[ -f "$PINMAME/ext/miniaudio/miniaudio/miniaudio.h" ]] && cp -n "$PINMAME/ext/miniaudio/miniaudio/miniaudio.h" "$PINMAME/ext/miniaudio/miniaudio.h" 2>/dev/null || true
-sed -i 's/static enum SRC_ERR int sinc_multichan/static enum SRC_ERR sinc_multichan/' "$PINMAME/ext/libsamplerate/src_sinc.c" 2>/dev/null || true
+[[ -f "$PINMAME/ext/libsamplerate/src_sinc.c" ]] && sed -i 's/static enum SRC_ERR int sinc_multichan/static enum SRC_ERR sinc_multichan/' "$PINMAME/ext/libsamplerate/src_sinc.c" 2>/dev/null || true
 
-# __rolq/__rorq not available in WASM
-if grep -q '__rolq' "$PINMAME/src/common.h" 2>/dev/null && ! grep -q 'PINMAME_WASM.*__rolq' "$PINMAME/src/common.h"; then
-python3 - <<'PY'
+PINMAME="$PINMAME" python3 <<'PY'
+import os
 import pathlib
-p = pathlib.Path("external/pinmame/src/common.h")
-t = p.read_text()
-t = t.replace(
-  "#elif !defined(__arm__) && !defined(__aarch64__) && (defined(__INTEL_COMPILER) || (defined(__GNUC__) && (__GNUC__ > 3)) || defined(__clang__))\n    return __rolq(x, count);",
-  "#elif !defined(__arm__) && !defined(__aarch64__) && !defined(WASM) && !defined(PINMAME_WASM) && (defined(__INTEL_COMPILER) || (defined(__GNUC__) && (__GNUC__ > 3)) || defined(__clang__))\n    return __rolq(x, count);")
-t = t.replace(
-  "#elif !defined(__arm__) && !defined(__aarch64__) && (defined(__INTEL_COMPILER) || (defined(__GNUC__) && (__GNUC__ > 3)) || defined(__clang__))\n    return __rorq(x, count);",
-  "#elif !defined(__arm__) && !defined(__aarch64__) && !defined(WASM) && !defined(PINMAME_WASM) && (defined(__INTEL_COMPILER) || (defined(__GNUC__) && (__GNUC__ > 3)) || defined(__clang__))\n    return __rorq(x, count);")
-p.write_text(t)
-print("[wasm] patched common.h __rolq")
-PY
-fi
 
-# ComposePath missing '/' — causes ROM audit failure (/pinmame + roms)
-if grep -q 'strcpy(newPath + pathLength, file);' "$PINMAME/src/libpinmame/libpinmame.cpp" 2>/dev/null; then
-python3 - <<'PY'
-import pathlib
-p = pathlib.Path("external/pinmame/src/libpinmame/libpinmame.cpp")
-t = p.read_text()
-t = t.replace("strcpy(newPath, path);\n\tstrcpy(newPath + pathLength, file);",
-              "strcpy(newPath, path);\n\tif (pathLength > 0 && path[pathLength - 1] != '/' && path[pathLength - 1] != '\\\\')\n\t\tstrcat(newPath, \"/\");\n\tstrcat(newPath, file);")
-p.write_text(t)
-print("[wasm] patched ComposePath")
-PY
-fi
+pinmame = pathlib.Path(os.environ["PINMAME"])
+common = pinmame / "src/common.h"
+cpp = pinmame / "src/libpinmame/libpinmame.cpp"
 
-# libpinmame_update_display must copy pData unconditionally (otherwise polling sees stale) + null-guard _p_Config
-if grep -q 'cb_OnDisplayUpdated.*index.*changed' "$PINMAME/src/libpinmame/libpinmame.cpp" 2>/dev/null && ! grep -q 'FindDmdDisplay' "$PINMAME/src/libpinmame/libpinmame.cpp" 2>/dev/null; then
-python3 - <<'PYEOF'
-import pathlib
-cpp = pathlib.Path("external/pinmame/src/libpinmame/libpinmame.cpp")
-h = cpp.read_text()
-old = """extern "C" void libpinmame_update_display(const struct core_dispLayout* layout, void* p_data)
+if common.is_file():
+    t = common.read_text()
+    o1 = "#elif !defined(__arm__) && !defined(__aarch64__) && (defined(__INTEL_COMPILER) || (defined(__GNUC__) && (__GNUC__ > 3)) || defined(__clang__))\n    return __rolq(x, count);"
+    n1 = "#elif !defined(__arm__) && !defined(__aarch64__) && !defined(WASM) && !defined(PINMAME_WASM) && (defined(__INTEL_COMPILER) || (defined(__GNUC__) && (__GNUC__ > 3)) || defined(__clang__))\n    return __rolq(x, count);"
+    o2 = "#elif !defined(__arm__) && !defined(__aarch64__) && (defined(__INTEL_COMPILER) || (defined(__GNUC__) && (__GNUC__ > 3)) || defined(__clang__))\n    return __rorq(x, count);"
+    n2 = "#elif !defined(__arm__) && !defined(__aarch64__) && !defined(WASM) && !defined(PINMAME_WASM) && (defined(__INTEL_COMPILER) || (defined(__GNUC__) && (__GNUC__ > 3)) || defined(__clang__))\n    return __rorq(x, count);"
+    if o1 in t or o2 in t:
+        t = t.replace(o1, n1).replace(o2, n2)
+        common.write_text(t)
+        print("[wasm] patched common.h __rolq/__rorq")
+
+if cpp.is_file():
+    t = cpp.read_text()
+    orig = t
+
+    if "strcpy(newPath + pathLength, file);" in t:
+        t = t.replace(
+            "strcpy(newPath, path);\n\tstrcpy(newPath + pathLength, file);",
+            "strcpy(newPath, path);\n\tif (pathLength > 0 && path[pathLength - 1] != '/' && path[pathLength - 1] != '\\\\')\n\t\tstrcat(newPath, \"/\");\n\tstrcat(newPath, file);",
+        )
+        print("[wasm] patched ComposePath")
+
+    old = """extern "C" void libpinmame_update_display(const struct core_dispLayout* layout, void* p_data)
 {
 \t// If layout is null, update the custom DMD generated from alphanumeric segment displays
 \tint index = layout == nullptr ? ((int)_displays.size() - 1) : layout->index;
@@ -95,7 +118,7 @@ old = """extern "C" void libpinmame_update_display(const struct core_dispLayout*
 \t\t}
 \t}
 }"""
-new = """extern "C" void libpinmame_update_display(const struct core_dispLayout* layout, void* p_data)
+    new = """extern "C" void libpinmame_update_display(const struct core_dispLayout* layout, void* p_data)
 {
 \tint index = layout == nullptr ? ((int)_displays.size() - 1) : layout->index;
 \tif (index < 0 || index >= (int)_displays.size()) return;
@@ -126,20 +149,12 @@ new = """extern "C" void libpinmame_update_display(const struct core_dispLayout*
 \t\t}
 \t}
 }"""
-if old in h:
-    h = h.replace(old, new)
-    print("[wasm] patched libpinmame_update_display", flush=True)
-cpp.write_text(h)
-PYEOF
-fi
+    if old in t:
+        t = t.replace(old, new)
+        print("[wasm] patched libpinmame_update_display")
 
-# Add DMD polling API (used by PinMameEmulator.pullDmd)
-if ! grep -q "PinmameGetDmdWidth" "$PINMAME/src/libpinmame/libpinmame.cpp" 2>/dev/null; then
-python3 - <<'PYEOF'
-import pathlib
-cpp = pathlib.Path("external/pinmame/src/libpinmame/libpinmame.cpp")
-h = cpp.read_text()
-api = """
+    if "PinmameGetDmdWidth" not in t:
+        api = """
 /******************************************************
  * PinmameGetDmdWidth / Height / Depth / Frame
  ******************************************************/
@@ -191,47 +206,49 @@ PINMAMEAPI int PinmameGetDmdFrame(void* p_data)
 }
 
 """
-h = h.replace("/******************************************************\n * PinmameSetUserData", api + "/******************************************************\n * PinmameSetUserData")
-cpp.write_text(h)
-print("[wasm] added PinmameGetDmd* API", flush=True)
-PYEOF
-fi
+        t = t.replace(
+            "/******************************************************\n * PinmameSetUserData",
+            api + "/******************************************************\n * PinmameSetUserData",
+        )
+        print("[wasm] added PinmameGetDmd* API")
 
-# AT91 JIT needs exec memory — not available in WASM, fallback to interpreter
-if grep -q "options.at91jit = 1;" "$PINMAME/src/libpinmame/libpinmame.cpp" 2>/dev/null; then
-python3 - <<'PY2'
-import pathlib
-p = pathlib.Path("external/pinmame/src/libpinmame/libpinmame.cpp")
-t = p.read_text()
-t = t.replace("\toptions.at91jit = 1;",
-              "\t#ifdef PINMAME_WASM\n\toptions.at91jit = 0;\n\t#else\n\toptions.at91jit = 1;\n\t#endif")
-p.write_text(t)
-print("[wasm] patched at91jit for WASM", flush=True)
-PY2
-fi
+    if "\toptions.at91jit = 1;" in t:
+        t = t.replace(
+            "\toptions.at91jit = 1;",
+            "\t#ifdef PINMAME_WASM\n\toptions.at91jit = 0;\n\t#else\n\toptions.at91jit = 1;\n\t#endif",
+        )
+        print("[wasm] patched at91jit for WASM")
 
-# Log fallback — printf when no callback (helps debugging ROM load failures)
-if grep -q 'if (!_p_Config->cb_OnLogMessage)' "$PINMAME/src/libpinmame/libpinmame.cpp" 2>/dev/null; then
-python3 - <<'PY3'
-import pathlib
-p = pathlib.Path("external/pinmame/src/libpinmame/libpinmame.cpp")
-t = p.read_text()
-t = t.replace(
-  "extern \"C\" void libpinmame_log_info(const char* format, ...)\n{\n\tif (!_p_Config->cb_OnLogMessage)\n\t\treturn;\n\n\tva_list args;\n\tva_start(args, format);\n\t(*(_p_Config->cb_OnLogMessage))(PINMAME_LOG_LEVEL_INFO, format, args, _p_userData);\n\tva_end(args);\n}",
-  "extern \"C\" void libpinmame_log_info(const char* format, ...)\n{\n\tva_list args;\n\tva_start(args, format);\n\tif (_p_Config && _p_Config->cb_OnLogMessage)\n\t\t(*(_p_Config->cb_OnLogMessage))(PINMAME_LOG_LEVEL_INFO, format, args, _p_userData);\n\telse { vprintf(format, args); printf(\"\\n\"); }\n\tva_end(args);\n}")
-t = t.replace(
-  "extern \"C\" void libpinmame_log_error(const char* format, ...)\n{\n\tif (!_p_Config->cb_OnLogMessage)\n\t\treturn;\n\n\tva_list args;\n\tva_start(args, format);\n\t(*(_p_Config->cb_OnLogMessage))(PINMAME_LOG_LEVEL_ERROR, format, args, _p_userData);\n\tva_end(args);\n}",
-  "extern \"C\" void libpinmame_log_error(const char* format, ...)\n{\n\tva_list args;\n\tva_start(args, format);\n\tif (_p_Config && _p_Config->cb_OnLogMessage)\n\t\t(*(_p_Config->cb_OnLogMessage))(PINMAME_LOG_LEVEL_ERROR, format, args, _p_userData);\n\telse { vfprintf(stderr, format, args); fprintf(stderr, \"\\n\"); }\n\tva_end(args);\n}")
-p.write_text(t)
-print("[wasm] patched log fallback", flush=True)
-PY3
-fi
+    if 'if (!_p_Config->cb_OnLogMessage)' in t:
+        t = t.replace(
+            "extern \"C\" void libpinmame_log_info(const char* format, ...)\n{\n\tif (!_p_Config->cb_OnLogMessage)\n\t\treturn;\n\n\tva_list args;\n\tva_start(args, format);\n\t(*(_p_Config->cb_OnLogMessage))(PINMAME_LOG_LEVEL_INFO, format, args, _p_userData);\n\tva_end(args);\n}",
+            "extern \"C\" void libpinmame_log_info(const char* format, ...)\n{\n\tva_list args;\n\tva_start(args, format);\n\tif (_p_Config && _p_Config->cb_OnLogMessage)\n\t\t(*(_p_Config->cb_OnLogMessage))(PINMAME_LOG_LEVEL_INFO, format, args, _p_userData);\n\telse { vprintf(format, args); printf(\"\\n\"); }\n\tva_end(args);\n}",
+        )
+        t = t.replace(
+            "extern \"C\" void libpinmame_log_error(const char* format, ...)\n{\n\tif (!_p_Config->cb_OnLogMessage)\n\t\treturn;\n\n\tva_list args;\n\tva_start(args, format);\n\t(*(_p_Config->cb_OnLogMessage))(PINMAME_LOG_LEVEL_ERROR, format, args, _p_userData);\n\tva_end(args);\n}",
+            "extern \"C\" void libpinmame_log_error(const char* format, ...)\n{\n\tva_list args;\n\tva_start(args, format);\n\tif (_p_Config && _p_Config->cb_OnLogMessage)\n\t\t(*(_p_Config->cb_OnLogMessage))(PINMAME_LOG_LEVEL_ERROR, format, args, _p_userData);\n\telse { vfprintf(stderr, format, args); fprintf(stderr, \"\\n\"); }\n\tva_end(args);\n}",
+        )
+        print("[wasm] patched log fallback")
 
-echo "[wasm] building $preset — $(emcc --version | head -1) — $(cmake --version | head -1)"
+    if 'extern "C" int libpinmame_needs_update_display() { return _p_Config->cb_OnDisplayUpdated != nullptr; }' in t:
+        t = t.replace(
+            'extern "C" int libpinmame_needs_update_display() { return _p_Config->cb_OnDisplayUpdated != nullptr; }',
+            'extern "C" int libpinmame_needs_update_display() { return _p_Config != nullptr; }',
+        )
+        print("[wasm] patched needs_update_display")
+
+    if t != orig:
+        cpp.write_text(t)
+PY
+
+mkdir -p "$DIST_DIR"
+log "building $preset — $(emcc --version 2>/dev/null | head -n1) — $(cmake --version 2>/dev/null | head -n1)"
 if ! (cd "$WASM_DIR" && emcmake cmake --preset "$preset" && cmake --build --preset "$preset"); then
-  echo "[wasm] build failed — using mock fallback"
-  cp "$MOCK_SRC" "$DIST_DIR/libpinmame.js"
-  ls -lh "$DIST_DIR" | head
+  log "build failed — using mock fallback"
+  cp -- "$MOCK_SRC" "$DIST_DIR/libpinmame.js"
+  # shellcheck disable=SC2012
+  ls -lh "$DIST_DIR" | head -n 20
   exit 0
 fi
-ls -lh "$DIST_DIR" | head
+# shellcheck disable=SC2012
+ls -lh "$DIST_DIR" | head -n 20
