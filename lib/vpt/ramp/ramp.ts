@@ -65,7 +65,7 @@ export class Ramp extends Item<RampData> implements IRenderable<RampState>, IHit
 
 	public isTransparent(table: Table): boolean {
 		const material = table.getMaterial(this.data.szMaterial)
-		return !material || material.isOpacityActive
+		return !material || (material.isOpacityActive && material.opacity < 0.999)
 	}
 
 	public setupPlayer(player: Player, table: Table): void {

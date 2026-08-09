@@ -67,11 +67,11 @@ export class Surface
 		let result = false
 		if (this.data.isSideVisible) {
 			const sideMaterial = table.getMaterial(this.data.szSideMaterial)
-			result = !sideMaterial || sideMaterial.isOpacityActive
+			result = !sideMaterial || (sideMaterial.isOpacityActive && sideMaterial.opacity < 0.999)
 		}
 		if (this.data.isTopBottomVisible) {
 			const topMaterial = table.getMaterial(this.data.szTopMaterial)
-			result = result || !topMaterial || topMaterial.isOpacityActive
+			result = result || !topMaterial || (topMaterial.isOpacityActive && topMaterial.opacity < 0.999)
 		}
 		return result
 	}
@@ -81,8 +81,8 @@ export class Surface
 		const surface = this.meshGenerator.generateMeshes(this.data, table)
 		const topMat = table.getMaterial(this.data.szTopMaterial)
 		const sideMat = table.getMaterial(this.data.szSideMaterial)
-		const topTransparent = !topMat || topMat.isOpacityActive
-		const sideTransparent = !sideMat || sideMat.isOpacityActive
+		const topTransparent = !topMat || (topMat.isOpacityActive && topMat.opacity < 0.999)
+		const sideTransparent = !sideMat || (sideMat.isOpacityActive && sideMat.opacity < 0.999)
 		if (surface.top) {
 			meshes.top = {
 				isVisible: this.data.isTopBottomVisible,

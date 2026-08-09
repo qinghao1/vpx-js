@@ -17,6 +17,15 @@ import type { ThreeMapGenerator } from './three-map-generator.js'
 const BALL_METALNESS = 1
 const BALL_ROUGHNESS = 0.18
 
+const pendingKeyFor = (key: 'map' | 'normalMap' | 'envMap' | 'emissiveMap'): string =>
+	key === 'map'
+		? 'pendingMap'
+		: key === 'normalMap'
+			? 'pendingNormalMap'
+			: key === 'envMap'
+				? 'pendingEnvMap'
+				: 'pendingEmissiveMap'
+
 /** Generates/caches Three.js materials. */
 export class ThreeMaterialGenerator {
 	private readonly cachedMaterials: Record<string, ThreeMaterial> = {}
@@ -52,6 +61,8 @@ export class ThreeMaterialGenerator {
 		this.applyEnvMap(m, envMap)
 		this.applyEmissiveMap(m, material, emissiveMap)
 		m.transparent = isTransparent
+		m.depthWrite = !isTransparent
+		if (isTransparent) m.alphaTest = 0.1
 		if (material?.name === 'ball') {
 			m.envMapIntensity = 1
 		} else if (material?.isMetal && (m.userData as Record<string, unknown>).pendingEnvMap) {
@@ -110,15 +121,7 @@ export class ThreeMaterialGenerator {
 	): void {
 		if (!name) return
 		if (!this.mapGenerator.hasTexture(name)) {
-			const pendingKey =
-				key === 'map'
-					? 'pendingMap'
-					: key === 'normalMap'
-						? 'pendingNormalMap'
-						: key === 'envMap'
-							? 'pendingEnvMap'
-							: 'pendingEmissiveMap'
-			;(mat.userData as Record<string, unknown>)[pendingKey] = name
+			;(mat.userData as Record<string, unknown>)[pendingKeyFor(key)] = name
 			return
 		}
 		;(mat as unknown as Record<string, unknown>)[key] = this.mapGenerator.getTexture(name)

@@ -60,7 +60,7 @@ export class Primitive
 
 	public isTransparent(table: Table): boolean {
 		const material = table.getMaterial(this.data.szMaterial)
-		return !material || material.isOpacityActive
+		return !material || (material.isOpacityActive && material.opacity < 0.999)
 	}
 
 	public isCollidable(): boolean {

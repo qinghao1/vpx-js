@@ -6,6 +6,7 @@ let cached: { module: PinmameModule; isMock: boolean } | null = null
 const CANDIDATES = [
 	'/wasm/libpinmame.js',
 	'/wasm/libpinmame.mock.js',
+	'/wasm/mock/libpinmame.mock.js',
 	'../../../wasm/dist/libpinmame.js',
 	'../../../../wasm/dist/libpinmame.js',
 	'../../../wasm/mock/libpinmame.mock.js',
