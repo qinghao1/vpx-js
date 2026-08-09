@@ -1,0 +1,65 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Chu Qinghao <6337103+qinghao1@users.noreply.github.com>
+Date: Sun, 9 Aug 2026 12:20:00 -0400
+Subject: [PATCH 10/10] wasm: disable time fence for browser (free-running)
+
+Browser uses free-running emulation; time fence with sem_timedwait
+would stall the pinmame thread when the main thread's clock is behind.
+For WASM, report fence not supported so cpu_timeslice ignores it.
+
+diff --git a/src/cpuexec.c b/src/cpuexec.c
+index ca7401f..fe83c41 100644
+--- a/src/cpuexec.c
++++ b/src/cpuexec.c
+@@ -870,12 +870,16 @@ static HANDLE time_fence_semaphore = NULL;
+ 
+ int time_fence_is_supported()
+ {
++#if defined(WASM) || defined(PINMAME_WASM)
++	return 0;
++#else
+ 	if (time_fence_semaphore == NULL)
+ 	{
+ 		time_fence_semaphore = CreateSemaphore(NULL, 0, LONG_MAX, NULL);
+ 		return (time_fence_semaphore != NULL);
+ 	}
+ 	return 1;
++#endif
+ }
+ 
+ void time_fence_post()
+@@ -913,12 +917,16 @@ static int max(int a, int b)
+ 
+ int time_fence_is_supported()
+ {
++#if defined(WASM) || defined(PINMAME_WASM)
++	return 0;
++#else
+ 	if (!time_fence_initialized)
+ 	{
+ 		time_fence_initialized = 1;
+ 		time_fence_semaphore = dispatch_semaphore_create(0);
+ 	}
+ 	return 1;
++#endif
+ }
+ 
+ void time_fence_post()
+@@ -955,6 +963,9 @@ static int max(int a, int b)
+ 
+ int time_fence_is_supported()
+ {
++#if defined(WASM) || defined(PINMAME_WASM)
++	return 0;
++#else
+ 	if (!time_fence_initialized)
+ 	{
+ 		if (sem_init(&time_fence_semaphore, 0, 0) != 0)
+@@ -962,6 +973,7 @@ int time_fence_is_supported()
+ 		time_fence_initialized = 1;
+ 	}
+ 	return 1;
++#endif
+ }
+ 
+ void time_fence_post()
