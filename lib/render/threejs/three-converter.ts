@@ -44,6 +44,7 @@ export class ThreeConverter {
 		mesh.name = (obj.geometry ?? obj.mesh!)?.name
 		mesh.matrixAutoUpdate = false
 		mesh.visible = obj.isVisible
+		if (obj.depthBias) mesh.renderOrder = obj.depthBias
 		return mesh
 	}
 }

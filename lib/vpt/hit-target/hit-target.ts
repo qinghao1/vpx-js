@@ -54,12 +54,16 @@ export class HitTarget
 	}
 
 	public getMeshes<GEOMETRY>(table: Table): Meshes<GEOMETRY> {
+		const m = table.getMaterial(this.data.szMaterial)
+		const isTransparent = !m || (m.isOpacityActive && m.opacity < 0.999)
 		return {
 			hitTarget: {
 				isVisible: this.data.isVisible,
 				mesh: this.meshGenerator.getMesh(table).transform(Matrix3D.RIGHT_HANDED),
 				map: table.getTexture(this.data.szImage),
-				material: table.getMaterial(this.data.szMaterial),
+				material: m,
+				isTransparent,
+				depthBias: this.data.depthBias ?? 0,
 			},
 		}
 	}

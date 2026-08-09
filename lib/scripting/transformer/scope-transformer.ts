@@ -144,7 +144,10 @@ export class ScopeTransformer extends Transformer {
 
 					const varScope = this.findScope(this.getVarName(node, parent), (node as any).__scope)
 					if (varScope && varScope !== this.rootScope) {
-						const v = this.findVariable(this.getVarName(node, parent), varScope)
+						if (parent?.type === 'MemberExpression' && parent.property === node) {
+							return node
+						}
+						const v = this.findVariable(node.name, varScope)
 						if (v && v.name !== node.name) node.name = v.name
 						return node
 					}

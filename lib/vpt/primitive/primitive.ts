@@ -77,6 +77,7 @@ export class Primitive
 				normalMap: table.getTexture(this.data.szNormalMap),
 				material: table.getMaterial(this.data.szMaterial),
 				isTransparent,
+				depthBias: this.data.depthBias,
 			},
 		}
 	}

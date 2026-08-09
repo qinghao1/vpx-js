@@ -96,7 +96,9 @@ export class Ramp extends Item<RampData> implements IRenderable<RampState>, IHit
 
 	public getMeshes<GEOMETRY>(table: Table): Meshes<GEOMETRY> {
 		const isTransparent = this.isTransparent(table)
-		return this.meshGenerator.getMeshes(isTransparent, table)
+		const meshes = this.meshGenerator.getMeshes(isTransparent, table) as unknown as Meshes<GEOMETRY>
+		for (const k of Object.keys(meshes)) (meshes as unknown as Record<string, { depthBias?: number }>)[k]!.depthBias = this.data.depthBias
+		return meshes
 	}
 
 	public getSurfaceHeight(x: number, y: number, table: Table) {

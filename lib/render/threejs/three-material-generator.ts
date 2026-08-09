@@ -34,6 +34,7 @@ export class ThreeMaterialGenerator {
 			opts.applyTextures && obj.envMap ? obj.envMap.getName() : undefined,
 			opts.applyTextures && obj.material?.emissiveMap ? obj.material.emissiveMap.getName() : undefined,
 			!!obj.isTransparent,
+			obj.depthBias ?? 0,
 		)
 	}
 
@@ -44,19 +45,24 @@ export class ThreeMaterialGenerator {
 		envMap?: string,
 		emissiveMap?: string,
 		isTransparent = false,
+		depthBias = 0,
 	): ThreeMaterial {
-		const key = this.getKey(material, map, normalMap, envMap, emissiveMap, isTransparent)
+		const key = this.getKey(material, map, normalMap, envMap, emissiveMap, isTransparent, depthBias)
 		const cached = this.cachedMaterials[key]
 		if (cached) return cached
 		const m = new MeshStandardMaterial()
-		this.applyMaterial(m, material)
+		this.applyMaterial(m, material, isTransparent)
 		this.applyMap(m, map)
 		this.applyNormalMap(m, normalMap)
 		this.applyEnvMap(m, envMap)
 		this.applyEmissiveMap(m, material, emissiveMap)
 		m.transparent = isTransparent
 		m.depthWrite = !isTransparent
-		if (isTransparent) m.alphaTest = 0.1
+		if (depthBias !== 0) {
+			m.polygonOffset = true
+			m.polygonOffsetFactor = depthBias
+			m.polygonOffsetUnits = depthBias
+		}
 		if (material?.name === 'ball') {
 			m.envMapIntensity = 1
 		} else if (material?.isMetal && (m.userData as Record<string, unknown>).pendingEnvMap) {
@@ -68,8 +74,22 @@ export class ThreeMaterialGenerator {
 		return m
 	}
 
-	public applyMaterial(threeMaterial: MeshStandardMaterial, material?: Material): void {
-		if (!material) return
+	public applyMaterial(threeMaterial: MeshStandardMaterial, material?: Material, isTransparent = false): void {
+		if (!material) {
+			if (isTransparent) {
+				threeMaterial.color = new Color(0xc0c0c0)
+				threeMaterial.metalness = 0
+				threeMaterial.roughness = 0.4
+				threeMaterial.opacity = 0.4
+			} else {
+				threeMaterial.color = new Color(0xb469ff)
+				threeMaterial.metalness = 0
+				threeMaterial.roughness = 0
+				threeMaterial.opacity = 1
+			}
+			threeMaterial.side = isTransparent ? DoubleSide : FrontSide
+			return
+		}
 		threeMaterial.name = `material:${material.name}`
 		if (material.name === 'ball') {
 			threeMaterial.metalness = BALL_METALNESS
@@ -80,7 +100,7 @@ export class ThreeMaterialGenerator {
 		}
 		threeMaterial.color = new Color(material.baseColor)
 		threeMaterial.opacity = material.isOpacityActive ? Math.min(1, Math.max(0, material.opacity)) : 1
-		threeMaterial.side = material.name === 'ball' ? DoubleSide : FrontSide // ball uses Flip(1,1,-1): negative scale → DoubleSide avoids culling
+		threeMaterial.side = material.name === 'ball' || isTransparent ? DoubleSide : FrontSide
 		if (material.emissiveIntensity > 0) {
 			threeMaterial.emissive = new Color(material.emissiveColor)
 			threeMaterial.emissiveIntensity = material.emissiveIntensity
@@ -151,7 +171,8 @@ export class ThreeMaterialGenerator {
 		envMap?: string,
 		emissiveMap?: string,
 		isTransparent = false,
+		depthBias = 0,
 	): string {
-		return `${material?.name ?? 'none'}:${map ?? 'none'}:${normalMap ?? 'none'}:${envMap ?? 'none'}:${emissiveMap ?? 'none'}:${isTransparent ? 't' : 'o'}`
+		return `${material?.name ?? 'none'}:${map ?? 'none'}:${normalMap ?? 'none'}:${envMap ?? 'none'}:${emissiveMap ?? 'none'}:${isTransparent ? 't' : 'o'}:${depthBias}`
 	}
 }

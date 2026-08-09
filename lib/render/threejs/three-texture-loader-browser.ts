@@ -33,18 +33,16 @@ const imageMap: Record<string, string> = {
 	kickerWilliams: new URL('../../../res/maps/kickerWilliams.png', import.meta.url).href,
 }
 
-const MAX_REGULAR = 2048
-const MAX_FLOAT = 1024
-const MAX_PLAYFIELD = 2048
+const MAX_REGULAR = 4096
+const MAX_FLOAT = 2048
+const MAX_PLAYFIELD = 4096
 const MAX_VLM = 512
 
 function tune(tex: any): void {
-	const w = tex.image?.width ?? tex.image?.naturalWidth ?? 0
-	const h = tex.image?.height ?? tex.image?.naturalHeight ?? 0
-	const small = w > 0 && h > 0 && Math.max(w, h) <= 256
-	tex.generateMipmaps = !small
-	tex.minFilter = small ? LinearFilter : LinearMipMapLinearFilter
-	tex.anisotropy = small ? 1 : 8
+	tex.generateMipmaps = true
+	tex.minFilter = LinearMipMapLinearFilter
+	tex.magFilter = LinearFilter
+	tex.anisotropy = 16
 }
 
 function nameAndTune(tex: any, name: string): void {

@@ -38,4 +38,5 @@ export interface RenderInfo<GEOMETRY> {
 	envMap?: Texture
 	material?: Material
 	isTransparent?: boolean
+	depthBias?: number
 }
