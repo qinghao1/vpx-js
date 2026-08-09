@@ -16,7 +16,9 @@ import { TableExporter } from '../lib/vpt/table/table-exporter.js'
 		const argDest = process.argv[3]
 
 		// other options
-		const compressVertices = process.argv.includes('--compress-vertices')
+		if (process.argv.includes('--compress-vertices')) {
+			console.warn('--compress-vertices is deprecated (Draco compression removed)')
+		}
 		const optimizeTextures = !process.argv.includes('--skip-optimize')
 		const applyTextures = !process.argv.includes('--no-textures') ? new ThreeTextureLoaderNode() : undefined
 		const applyMaterials = !process.argv.includes('--no-materials')
@@ -87,7 +89,7 @@ import { TableExporter } from '../lib/vpt/table/table-exporter.js'
 			applyMaterials,
 			exportLightBulbLights,
 			optimizeTextures,
-			gltfOptions: { compressVertices, forcePowerOfTwoTextures: true },
+			gltfOptions: { binary: true },
 
 			exportPrimitives,
 			exportTriggers,

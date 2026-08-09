@@ -19,17 +19,23 @@ describe('The VPinball texture parser', () => {
 	const testPng = readFileSync(three.fixturePath('test_pattern.png'))
 	const testPngPow2 = readFileSync(three.fixturePath('test_pattern_pow2.png'))
 	const testPngTransparent = readFileSync(three.fixturePath('test_pattern_transparent.png'))
-	const testPngOptimized = readFileSync(three.fixturePath('test_pattern_optimized.png'))
 	const testLocalGottliebKicker = readFileSync(three.resPath('kickerGottlieb.png'))
 
 	before(async () => {
 		vpt = await Table.load(new NodeBinaryReader(three.fixturePath('table-texture.vpx')))
 	})
 
+	async function encode(tex: any, format: 'png' | 'jpeg' = 'png', quality = 100): Promise<Buffer> {
+		const { data, width, height } = tex.image
+		const buf = Buffer.from(data.buffer, data.byteOffset, data.byteLength)
+		const pipeline = sharp(buf, { raw: { width, height, channels: 4 } })
+		return format === 'jpeg' ? pipeline.jpeg({ quality }).toBuffer() : pipeline.png().toBuffer()
+	}
+
 	it('should correctly export a png', async () => {
 		const texture = vpt.getTexture('test_pattern_transparent')!
 		const threeTexture = await texture.loadTexture(loader, vpt)
-		const png = await threeTexture.image.getImage(false)
+		const png = await encode(threeTexture as any, 'png')
 		const match = await comparePngs(png, testPngTransparent, 10, true)
 		expect(match).to.equal(true)
 	})
@@ -37,7 +43,7 @@ describe('The VPinball texture parser', () => {
 	it('should convert an opaque png to jpeg', async () => {
 		const texture = vpt.getTexture('test_pattern_png')!
 		const threeTexture = await texture.loadTexture(loader, vpt)
-		const jpg = await threeTexture.image.getImage(false, 100)
+		const jpg = await encode(threeTexture as any, 'jpeg', 100)
 		const png = await sharp(jpg).png().toBuffer()
 		const match = await comparePngs(png, testPng, 30)
 		expect(match).to.equal(true)
@@ -46,7 +52,7 @@ describe('The VPinball texture parser', () => {
 	it('should correctly export a jpeg', async () => {
 		const texture = vpt.getTexture('test_pattern_jpg')!
 		const threeTexture = await texture.loadTexture(loader, vpt)
-		const jpg = await threeTexture.image.getImage(false, 100)
+		const jpg = await encode(threeTexture as any, 'jpeg', 100)
 		const png = await sharp(jpg).png().toBuffer()
 		const match = await comparePngs(png, testPng, 30)
 		expect(match).to.equal(true)
@@ -55,7 +61,7 @@ describe('The VPinball texture parser', () => {
 	it('should correctly export an lzw-compressed bitmap', async () => {
 		const texture = vpt.getTexture('test_pattern_xrgb')!
 		const threeTexture = await texture.loadTexture(loader, vpt)
-		const jpg = await threeTexture.image.getImage(false, 100)
+		const jpg = await encode(threeTexture as any, 'jpeg', 100)
 		const png = await sharp(jpg).png().toBuffer()
 		const match = await comparePngs(png, testPng, 30)
 		expect(match).to.equal(true)
@@ -64,7 +70,7 @@ describe('The VPinball texture parser', () => {
 	it('should correctly export an lzw-compressed xrgba bitmap', async () => {
 		const texture = vpt.getTexture('test_pattern_argb')!
 		const threeTexture = await texture.loadTexture(loader, vpt)
-		const jpg = await threeTexture.image.getImage(false, 100)
+		const jpg = await encode(threeTexture as any, 'jpeg', 100)
 		const png = await sharp(jpg).png().toBuffer()
 		const match = await comparePngs(png, testPng, 30)
 		expect(match).to.equal(true)
@@ -73,53 +79,42 @@ describe('The VPinball texture parser', () => {
 	it('should resize an image to power of two', async () => {
 		const texture = vpt.getTexture('test_pattern_png')!
 		const threeTexture = await texture.loadTexture(loader, vpt)
-		threeTexture.image.resize(1024, 512)
-		const jpg = await threeTexture.image.getImage(false, 100)
+		const { data, width, height } = (threeTexture as any).image
+		const jpg = await sharp(Buffer.from(data.buffer, data.byteOffset, data.byteLength), {
+			raw: { width, height, channels: 4 },
+		})
+			.resize(1024, 512, { fit: 'fill' })
+			.jpeg({ quality: 100 })
+			.toBuffer()
 		const png = await sharp(jpg).png().toBuffer()
 		const match = await comparePngs(png, testPngPow2, 50)
 		expect(match).to.equal(true)
 	})
 
-	it('should optimize a png', async () => {
-		const texture = vpt.getTexture('test_pattern_transparent')!
-		const threeTexture = await texture.loadTexture(loader, vpt)
-		try {
-			const png = await threeTexture.image.getImage(true)
-			const _match = await comparePngs(png, testPngOptimized, 30, true)
-		} catch (err: any) {
-			if (err.message?.includes('PngQuant')) {
-				console.warn('Skipping pngquant test - binary not available:', err.message)
-				return
-			}
-			throw err
-		}
-		//expect(match).to.equal(true); fuck you pngcrush
-	})
-
 	it('should correctly export a HDR environment map', async () => {
 		const texture = vpt.getTexture('test_pattern_hdr')!
 		const threeTexture = await texture.loadTexture(loader, vpt)
-		expect(threeTexture.image.width).to.equal(1024)
-		expect(threeTexture.image.height).to.equal(512)
-		expect(threeTexture.image.data.length).to.equal(2097152)
+		expect((threeTexture as any).image.width).to.equal(1024)
+		expect((threeTexture as any).image.height).to.equal(512)
+		expect((threeTexture as any).image.data.length).to.equal(2097152)
 	})
 
 	it('should correctly export a EXR environment map', async () => {
 		const texture = vpt.getTexture('test_pattern_exr')!
 		const threeTexture = await texture.loadTexture(loader, vpt)
-		expect(threeTexture.image.width).to.equal(587)
-		expect(threeTexture.image.height).to.equal(675)
-		expect(threeTexture.image.data.length).to.equal(1584900)
+		expect((threeTexture as any).image.width).to.equal(587)
+		expect((threeTexture as any).image.height).to.equal(675)
+		expect((threeTexture as any).image.data.length).to.equal(1584900)
 	})
 
 	it('should correctly export a local texture', async () => {
 		const kicker = vpt.kickers.Kicker1
 		const kickerMeshes = kicker.getMeshes(vpt)
 		const threeTexture = await kickerMeshes.kicker.map?.loadTexture(loader, vpt)
-		expect(threeTexture.image.width).to.equal(256)
-		expect(threeTexture.image.height).to.equal(256)
+		expect((threeTexture as any).image.width).to.equal(256)
+		expect((threeTexture as any).image.height).to.equal(256)
 
-		const jpg = await threeTexture.image.getImage(false, 100)
+		const jpg = await encode(threeTexture as any, 'jpeg', 100)
 		const png = await sharp(jpg).png().toBuffer()
 		const match = await comparePngs(png, testLocalGottliebKicker, 30)
 		expect(match).to.equal(true)

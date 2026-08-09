@@ -6,14 +6,20 @@ import { createReadStream } from 'node:fs'
 import { dirname, resolve as resolvePath } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
-import { NodeImage } from '../../gltf/image.node.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 
 import { EXRLoader } from 'three/examples/jsm/loaders/EXRLoader.js'
 import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js'
-import { FloatType, HalfFloatType, Texture as ThreeTexture } from '../../refs.node.js'
+import {
+	DataTexture,
+	FloatType,
+	HalfFloatType,
+	RGBAFormat,
+	SRGBColorSpace,
+	type Texture as ThreeTexture,
+} from '../../refs.node.js'
 import { logger } from '../../util/logger.js'
 import type { ITextureLoader } from '../irender-api.js'
 
@@ -26,7 +32,10 @@ export class ThreeTextureLoaderNode implements ITextureLoader<ThreeTexture> {
 				(sharp as any)(Buffer.from(data.buffer, data.byteOffset, data.byteLength) as any),
 			)
 		} catch (err) {
-			logger().warn('[Image.init] Could not read metadata from buffer (%s), using GM to read image.', err.message)
+			logger().warn(
+				'[Image.init] Could not read metadata from buffer (%s), using GM to read image.',
+				(err as Error).message,
+			)
 
 			if (ext === '.hdr') {
 				return await loadHdrImage(name, data)
@@ -39,16 +48,12 @@ export class ThreeTextureLoaderNode implements ITextureLoader<ThreeTexture> {
 	}
 
 	public async loadRawTexture(name: string, data: Uint8Array, width: number, height: number): Promise<ThreeTexture> {
-		return loadSharpImage(
-			name,
-			(sharp as any)(Buffer.from(data.buffer, data.byteOffset, data.byteLength) as any, {
-				raw: {
-					width,
-					height,
-					channels: 4,
-				},
-			}).png(),
-		)
+		const tex = new DataTexture(data as unknown as Uint8Array, width, height, RGBAFormat)
+		tex.flipY = false
+		tex.colorSpace = SRGBColorSpace
+		tex.needsUpdate = true
+		tex.name = `texture:${name}`
+		return tex as unknown as ThreeTexture
 	}
 
 	public async loadDefaultTexture(name: string, ext: string, fileName: string): Promise<ThreeTexture> {
@@ -72,14 +77,18 @@ async function stream(localPath: string): Promise<Uint8Array> {
 }
 
 async function loadSharpImage(name: string, shrp: any): Promise<ThreeTexture> {
-	const stats = await shrp.stats()
-	const metadata = await shrp.metadata()
-	const image = new NodeImage(name, metadata.width!, metadata.height!, metadata.format!, stats, shrp)
-
-	const texture = new ThreeTexture()
-	texture.name = `texture:${name}`
-	texture.image = image
-	return texture
+	const { data, info } = await shrp.ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+	const tex = new DataTexture(
+		new Uint8Array(data.buffer, data.byteOffset, data.byteLength),
+		info.width,
+		info.height,
+		RGBAFormat,
+	)
+	tex.flipY = false
+	tex.colorSpace = SRGBColorSpace
+	tex.needsUpdate = true
+	tex.name = `texture:${name}`
+	return tex as unknown as ThreeTexture
 }
 
 async function loadHdrImage(_name: string, data: Uint8Array): Promise<ThreeTexture> {

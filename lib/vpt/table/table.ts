@@ -457,23 +457,9 @@ export interface TableGenerateOptions {
 
 export interface TableGenerateGltfOptions {
 	binary?: boolean
-	optimizeImages?: boolean
 	trs?: boolean
 	onlyVisible?: boolean
-	truncateDrawRange?: boolean
-	embedImages?: boolean
 	animations?: any[]
-	forceIndices?: boolean
-	forcePowerOfTwoTextures?: boolean
-	compressVertices?: boolean
-	versionString?: string
-	dracoOptions?: {
-		compressionLevel?: number
-		quantizePosition?: number
-		quantizeNormal?: number
-		quantizeTexcoord?: number
-		quantizeColor?: number
-		quantizeSkin?: number
-		unifiedQuantization?: boolean
-	}
+	maxTextureSize?: number
+	includeCustomExtensions?: boolean
 }

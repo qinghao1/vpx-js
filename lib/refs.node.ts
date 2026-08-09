@@ -4,7 +4,6 @@
 /** refs.node.ts — Visual Pinball lib module. */
 import { FileLoader } from 'three'
 
-export { exportGltf } from './gltf/export-gltf.node.js'
 export { NodeBinaryReader as BinaryReader } from './io/binary-reader.node.js'
 export { storage } from './io/storage.js'
 export * from './refs-three.js'

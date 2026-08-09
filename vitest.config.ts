@@ -29,7 +29,6 @@ export default defineConfig({
 			include: ['lib/**/*.ts'],
 			exclude: [
 				'lib/**/*.spec.ts',
-				'lib/gltf/gltf-exporter.ts',
 				'lib/util/logger.ts',
 				'lib/scripting/grammar/rules.ts',
 			],
