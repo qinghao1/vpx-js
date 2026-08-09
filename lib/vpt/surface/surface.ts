@@ -10,6 +10,7 @@ import type { Storage } from '../../io/ole-doc.js'
 import type { HitObject } from '../../physics/hit-object.js'
 import { Matrix3D } from '../../util/matrix.js'
 import { Item } from '../item.js'
+import type { Material } from '../material.js'
 import type { Table } from '../table/table.js'
 import { SurfaceApi } from './surface-api.js'
 import { SurfaceData } from './surface-data.js'
@@ -17,7 +18,6 @@ import { SurfaceHitGenerator } from './surface-hit-generator.js'
 import { SurfaceMeshGenerator } from './surface-mesh-generator.js'
 import { SurfaceState } from './surface-state.js'
 import { SurfaceUpdater } from './surface-updater.js'
-import type { Material } from '../material.js'
 
 /** Surface item. @see https://github.com/vpinball/vpinball/blob/master/surface.cpp */
 export class Surface
@@ -69,8 +69,10 @@ export class Surface
 	}
 
 	public isTransparent(table: Table): boolean {
-		if (this.data.isSideVisible && Surface.isTransparentMat(table.getMaterial(this.data.szSideMaterial))) return true
-		if (this.data.isTopBottomVisible && Surface.isTransparentMat(table.getMaterial(this.data.szTopMaterial))) return true
+		if (this.data.isSideVisible && Surface.isTransparentMat(table.getMaterial(this.data.szSideMaterial)))
+			return true
+		if (this.data.isTopBottomVisible && Surface.isTransparentMat(table.getMaterial(this.data.szTopMaterial)))
+			return true
 		return false
 	}
 

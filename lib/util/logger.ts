@@ -36,7 +36,8 @@ export class Logger implements ILogger {
 		try {
 			const loc = (globalThis as unknown as { location?: { search: string } }).location
 			if (loc && new URLSearchParams(loc.search).has('debug')) return true
-			if ((globalThis as unknown as { localStorage?: Storage }).localStorage?.getItem('vpx:debug') === '1') return true
+			if ((globalThis as unknown as { localStorage?: Storage }).localStorage?.getItem('vpx:debug') === '1')
+				return true
 		} catch {}
 		return false
 	}
