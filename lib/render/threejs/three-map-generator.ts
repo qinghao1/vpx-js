@@ -9,7 +9,6 @@ import type { Texture } from '../../vpt/texture.js'
 import type { ITextureLoader } from '../irender-api.js'
 
 const LARGE_TEXTURE_PIXELS = 4 * 1024 * 1024
-const CONCURRENCY_ANIMATING = 4
 const CONCURRENCY_HEAVY = 3
 const CONCURRENCY_DEFAULT = 6
 
@@ -57,12 +56,14 @@ export class ThreeMapGenerator {
 	}
 
 	private pickConcurrency(textures: Texture[]): number {
-		const hasLarge = textures.some(t => t.width * t.height > LARGE_TEXTURE_PIXELS)
-		const hasFloat = textures.some(t => (t as any).isHdr?.() || /\.(exr|hdr)$/i.test((t as any).szPath ?? ''))
+		const hasHeavy = textures.some(
+			t =>
+				t.width * t.height > LARGE_TEXTURE_PIXELS ||
+				(t as any).isHdr?.() ||
+				/\.(exr|hdr)$/i.test((t as any).szPath ?? ''),
+		)
 		const cores = (typeof navigator !== 'undefined' && (navigator as any).hardwareConcurrency) || 4
-		if (hasFloat) return Math.min(CONCURRENCY_HEAVY, cores)
-		if (hasLarge) return Math.min(CONCURRENCY_HEAVY, cores)
-		return Math.min(CONCURRENCY_DEFAULT, cores)
+		return Math.min(hasHeavy ? CONCURRENCY_HEAVY : CONCURRENCY_DEFAULT, cores)
 	}
 
 	private async loadConcurrently(

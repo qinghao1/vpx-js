@@ -35,6 +35,8 @@ const imageMap: Record<string, string> = {
 
 const MAX_REGULAR = 1024
 const MAX_FLOAT = 512
+const MAX_PLAYFIELD = 2048
+const MAX_VLM = 512
 
 function tune(tex: any): void {
 	const w = tex.image?.width ?? tex.image?.naturalWidth ?? 0
@@ -52,8 +54,9 @@ function nameAndTune(tex: any, name: string): void {
 }
 
 function maxFor(name: string, w: number, h: number, isFloat: boolean, playfieldMap?: string): number {
-	if (playfieldMap && name.toLowerCase() === playfieldMap.toLowerCase()) return 2048
-	if (name.toLowerCase().includes('vlm.nestmap')) return 512
+	const lower = name.toLowerCase()
+	if (playfieldMap && lower === playfieldMap.toLowerCase()) return MAX_PLAYFIELD
+	if (lower.includes('vlm.nestmap')) return MAX_VLM
 	if (isFloat) return w <= 512 && h <= 512 ? Math.max(w, h) : MAX_FLOAT
 	if (w > 2048 || h > 2048) return 1024
 	if (w <= 512 && h <= 512) return Math.max(w, h)

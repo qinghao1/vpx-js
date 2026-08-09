@@ -68,6 +68,7 @@ export class TableLoader {
 	}
 
 	public async streamStorage<T>(name: string, streamer: (stg: Storage) => Promise<T>): Promise<T> {
+		// Browser reader retains buffer after close, so bypass lock/reopen for concurrency.
 		const readerData = (this.doc as unknown as { reader?: { data?: Uint8Array } }).reader?.data
 		if (readerData) {
 			return await streamer(this.doc.storage(name))
