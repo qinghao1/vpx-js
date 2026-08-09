@@ -49,11 +49,14 @@ export class ThreeMaterialGenerator {
 		this.applyEnvMap(m, envMap)
 		this.applyEmissiveMap(m, material, emissiveMap)
 		m.transparent = isTransparent
-		if (material?.isMetal && (m.userData as Record<string, unknown>).pendingEnvMap) {
-			const isBall = material.name === 'ball'
-			m.metalness = isBall ? 1 : 0.25
-			m.roughness = isBall ? 0.15 : 0.35
-			m.envMapIntensity = isBall ? 1 : 0.6
+		if (material?.name === 'ball') {
+			m.metalness = 1
+			m.roughness = 0.18
+			m.envMapIntensity = 1
+		} else if (material?.isMetal && (m.userData as Record<string, unknown>).pendingEnvMap) {
+			m.metalness = 0.25
+			m.roughness = 0.35
+			m.envMapIntensity = 0.6
 		}
 		this.cachedMaterials[key] = m
 		return m
@@ -62,8 +65,13 @@ export class ThreeMaterialGenerator {
 	public applyMaterial(threeMaterial: MeshStandardMaterial, material?: Material): void {
 		if (!material) return
 		threeMaterial.name = `material:${material.name}`
-		threeMaterial.metalness = material.isMetal ? 1 : 0
-		threeMaterial.roughness = Math.max(0, Math.min(1, 1 - material.roughness))
+		if (material.name === 'ball') {
+			threeMaterial.metalness = 1
+			threeMaterial.roughness = 0.18
+		} else {
+			threeMaterial.metalness = material.isMetal ? 1 : 0
+			threeMaterial.roughness = Math.max(0, Math.min(1, 1 - material.roughness))
+		}
 		threeMaterial.color = new Color(material.baseColor)
 		threeMaterial.opacity = material.isOpacityActive ? Math.min(1, Math.max(0, material.opacity)) : 1
 		threeMaterial.side = material.name === 'ball' ? DoubleSide : FrontSide // ball uses Flip(1,1,-1): negative scale → DoubleSide avoids culling

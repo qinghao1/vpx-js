@@ -5,6 +5,7 @@ import { EXRLoader } from 'three/examples/jsm/loaders/EXRLoader.js'
 import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js'
 import {
 	CanvasTexture,
+	ClampToEdgeWrapping,
 	DataTexture,
 	EquirectangularReflectionMapping,
 	HalfFloatType,
@@ -132,23 +133,13 @@ export class ThreeTextureLoaderBrowser implements ITextureLoader<ThreeTexture> {
 	public playfieldMap?: string
 
 	public async loadDefaultTexture(_name: string, _ext: string, fileName: string): Promise<ThreeTexture> {
+		const keyLc = fileName.slice(0, fileName.lastIndexOf('.')).toLowerCase()
+		if (keyLc === 'ball') return createBallEnvTexture(_name || fileName)
 		const key = fileName.slice(0, fileName.lastIndexOf('.'))
 		const url = imageMap[key]
 		if (!url) throw new Error(`Unknown local texture "${key}".`)
 		const tex: any = await new TextureLoader().loadAsync(url)
-		if (key.toLowerCase() === 'ball') {
-			tex.mapping = EquirectangularReflectionMapping
-			tex.colorSpace = SRGBColorSpace
-		}
-		const out: any = finalize(tex, _name || fileName, false, this.playfieldMap)
-		if (key.toLowerCase() === 'ball') {
-			out.mapping = EquirectangularReflectionMapping
-			out.colorSpace = SRGBColorSpace
-			out.generateMipmaps = true
-			out.minFilter = LinearMipMapLinearFilter
-			out.needsUpdate = true
-		}
-		return out
+		return finalize(tex, _name || fileName, false, this.playfieldMap)
 	}
 
 	public async loadRawTexture(name: string, data: Uint8Array, width: number, height: number): Promise<ThreeTexture> {
@@ -191,6 +182,47 @@ export class ThreeTextureLoaderBrowser implements ITextureLoader<ThreeTexture> {
 
 		return loadRegular(name, mime, data, this.playfieldMap)
 	}
+}
+
+function createBallEnvTexture(name: string): ThreeTexture {
+	const w = 256
+	const h = 128
+	const canvas = typeof document !== 'undefined' ? document.createElement('canvas') : ({} as HTMLCanvasElement)
+	canvas.width = w
+	canvas.height = h
+	const ctx = (canvas as any).getContext?.('2d') as CanvasRenderingContext2D | null
+	if (ctx) {
+		const bg = ctx.createLinearGradient(0, 0, 0, h)
+		bg.addColorStop(0, '#8fa0bc')
+		bg.addColorStop(0.22, '#d6deea')
+		bg.addColorStop(0.5, '#f1f4f8')
+		bg.addColorStop(0.72, '#a8b0c2')
+		bg.addColorStop(1, '#2a3142')
+		ctx.fillStyle = bg
+		ctx.fillRect(0, 0, w, h)
+		const rg = ctx.createRadialGradient(w * 0.46, h * 0.38, 2, w * 0.46, h * 0.38, 42)
+		rg.addColorStop(0, 'rgba(255,255,255,0.95)')
+		rg.addColorStop(0.35, 'rgba(255,255,255,0.45)')
+		rg.addColorStop(1, 'rgba(255,255,255,0)')
+		ctx.fillStyle = rg
+		ctx.fillRect(0, 0, w, h)
+		ctx.fillStyle = 'rgba(255,255,255,0.08)'
+		for (let i = 0; i < 3; i++) {
+			const x = (w * (0.15 + i * 0.32)) | 0
+			ctx.fillRect(x, 0, 2, h)
+		}
+	}
+	const tex: any = new CanvasTexture(canvas as any)
+	tex.colorSpace = SRGBColorSpace
+	tex.mapping = EquirectangularReflectionMapping
+	tex.wrapS = ClampToEdgeWrapping
+	tex.wrapT = ClampToEdgeWrapping
+	tex.generateMipmaps = false
+	tex.minFilter = LinearFilter
+	tex.magFilter = LinearFilter
+	tex.needsUpdate = true
+	tex.name = `texture:${name}`
+	return tex as ThreeTexture
 }
 
 async function tryCreateBitmap(
