@@ -75,20 +75,21 @@ target_compile_options(libpinmame PRIVATE $<$<CONFIG:Release>:-O3> $<$<CONFIG:De
 
 # Minimal exports needed by lib/emu/pinmame — keep list tight to reduce wasm size
 set(PINMAME_EXPORTS
-  "_PinmameSetConfig" "_PinmameRun"
+  "_PinmameSetConfig" "_PinmameRun" "_PinmameIsRunning"
   "_PinmameSetSwitch" "_PinmameGetSwitch" "_PinmameSetSwitches"
-  "_PinmameGetChangedLamps" "_PinmameGetChangedSolenoids" "_PinmameGetChangedGIs"
+  "_PinmameGetChangedLamps" "_PinmameGetChangedSolenoids" "_PinmameGetChangedGIs" "_PinmameGetChangedLEDs"
   "_PinmameGetDIP" "_PinmameSetDIP"
+  "_PinmameGetDmdWidth" "_PinmameGetDmdHeight" "_PinmameGetDmdDepth" "_PinmameGetDmdFrame"
   "_malloc" "_free"
 )
 string(JOIN "," PINMAME_EXPORTS_JOIN ${PINMAME_EXPORTS})
 
 target_link_options(libpinmame PRIVATE
   "-O$<$<CONFIG:Debug>:0>$<$<CONFIG:Release>:3>"
-  -sWASM=1 -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=64MB -sMAXIMUM_MEMORY=256MB
+  -sWASM=1 -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=320MB -sMAXIMUM_MEMORY=1024MB -sSTACK_SIZE=4MB
   -sMODULARIZE=1 -sEXPORT_ES6=1 -sEXPORT_NAME=createPinmameModule
   "-sEXPORTED_FUNCTIONS=${PINMAME_EXPORTS_JOIN}"
-  -sEXPORTED_RUNTIME_METHODS=cwrap,FS,HEAPU8,UTF8ToString,stringToUTF8,lengthBytesUTF8,getValue,setValue
+  -sEXPORTED_RUNTIME_METHODS=cwrap,FS,HEAPU8,HEAPU32,UTF8ToString,stringToUTF8,lengthBytesUTF8,getValue,setValue
   -sFORCE_FILESYSTEM=1 -sINVOKE_RUN=0 -sENVIRONMENT=web,worker,node -sWASM_ASYNC_COMPILATION=1
   "SHELL:-s ASSERTIONS=$<IF:$<CONFIG:Debug>,1,0>"
   --no-entry

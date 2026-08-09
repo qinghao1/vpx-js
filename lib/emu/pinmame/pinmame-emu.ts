@@ -24,6 +24,10 @@ type Api = {
 	getChangedGIs(p: number): number
 	getDIP(b: number): number
 	setDIP(b: number, v: number): void
+	getDmdWidth(): number
+	getDmdHeight(): number
+	getDmdDepth(): number
+	getDmdFrame(p: number): number
 }
 
 function resolveName(name: string | { name?: string; pinmame?: { name?: string } }): string {
@@ -45,6 +49,8 @@ export class PinMameEmulator implements IEmulator {
 	private readonly lamps = new Uint8Array(624)
 	private readonly sols = new Uint8Array(72)
 	private readonly gis = new Uint8Array(8)
+	private dmdW = DMD_SIZE.x
+	private dmdH = DMD_SIZE.y
 
 	async init(): Promise<void> {
 		if (this.mod) return
@@ -66,6 +72,10 @@ export class PinMameEmulator implements IEmulator {
 			getChangedGIs: wrap('PinmameGetChangedGIs', 'number', ['number']) as Api['getChangedGIs'],
 			getDIP: wrap('PinmameGetDIP', 'number', ['number']) as Api['getDIP'],
 			setDIP: wrap('PinmameSetDIP', null, ['number', 'number']) as Api['setDIP'],
+			getDmdWidth: wrap('PinmameGetDmdWidth', 'number', []) as Api['getDmdWidth'],
+			getDmdHeight: wrap('PinmameGetDmdHeight', 'number', []) as Api['getDmdHeight'],
+			getDmdDepth: wrap('PinmameGetDmdDepth', 'number', []) as Api['getDmdDepth'],
+			getDmdFrame: wrap('PinmameGetDmdFrame', 'number', ['number']) as Api['getDmdFrame'],
 		}
 	}
 
@@ -124,7 +134,7 @@ export class PinMameEmulator implements IEmulator {
 	}
 	registerAudioConsumer(): void {}
 	getDmdDimensions(): Vertex2D {
-		return DMD_SIZE
+		return new Vertex2D(this.dmdW, this.dmdH)
 	}
 	getDmdFrame(): Uint8Array {
 		const d = this.emulatorState.getDmdScreen()
@@ -161,9 +171,31 @@ export class PinMameEmulator implements IEmulator {
 			this.pull(this.api.getChangedSols, this.sols)
 			this.pull(this.api.getChangedGIs, this.gis)
 			this.emulatorState.applyPinmame(this.lamps, this.sols, this.gis)
+			this.pullDmd()
 		} catch (e) {
 			logger().warn('[pinmame] poll failed', (e as Error).message)
 		}
+	}
+
+	private pullDmd(): void {
+		if (!this.mod || !this.api) return
+		try {
+			const w = this.api.getDmdWidth()
+			const h = this.api.getDmdHeight()
+			if (!w || !h) return
+			this.dmdW = w
+			this.dmdH = h
+			const n = w * h
+			const ptr = this.mod._malloc(n)
+			try {
+				const got = this.api.getDmdFrame(ptr)
+				if (got <= 0) return
+				const frame = this.mod.HEAPU8.subarray(ptr, ptr + n).slice()
+				this.emulatorState.setDmd(frame)
+			} finally {
+				this.mod._free(ptr)
+			}
+		} catch {}
 	}
 
 	private pull(fn: (p: number) => number, buf: Uint8Array): void {
