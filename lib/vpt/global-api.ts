@@ -79,6 +79,12 @@ export class GlobalApi extends VbsApi {
 	get GameTime() {
 		return this.player.getGameTime()
 	}
+	get PreciseGameTime() {
+		return this.player.getGameTime() / 1000
+	}
+	get FrameIndex() {
+		return Math.floor(this.player.getGameTime() / 16.666)
+	}
 	get SystemTime() {
 		return performance.now()
 	}

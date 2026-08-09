@@ -79,7 +79,7 @@ set(PINMAME_EXPORTS
   "_PinmameSetSwitch" "_PinmameGetSwitch" "_PinmameSetSwitches"
   "_PinmameGetChangedLamps" "_PinmameGetChangedSolenoids" "_PinmameGetChangedGIs" "_PinmameGetChangedLEDs"
   "_PinmameGetDIP" "_PinmameSetDIP" "_PinmameGetSolenoidMask" "_PinmameSetSolenoidMask"
-  "_PinmameGetDmdWidth" "_PinmameGetDmdHeight" "_PinmameGetDmdDepth" "_PinmameGetDmdFrame"
+  "_PinmameGetDmdWidth" "_PinmameGetDmdHeight" "_PinmameGetDmdDepth" "_PinmameGetDmdFrame" "_PinmameSetTimeFence"
   "_malloc" "_free"
 )
 string(JOIN "," PINMAME_EXPORTS_JOIN ${PINMAME_EXPORTS})

@@ -60,10 +60,24 @@ export class LightAnimation implements IAnimation {
 		const lightState =
 			this.realState === Enums.LightStatus.LightStateBlinking ? (this.isBlinkOn() ? 1 : 0) : this.realState
 		const target = this.data.intensity * this.intensityScale * Math.max(0, Math.min(1, lightState))
-		if (this.state.intensity < target) {
-			this.state.intensity = Math.min(target, this.state.intensity + this.data.fadeSpeedUp * diff)
+		if (this.data.fader === Enums.Fader.None) {
+			this.state.intensity = target
+		} else if (this.state.intensity < target) {
+			if (diff === 0) {
+				const s = this.data.fadeSpeedUp
+				if (!Number.isFinite(s)) this.state.intensity = target
+				return
+			}
+			const s = this.data.fadeSpeedUp
+			this.state.intensity = !Number.isFinite(s) ? target : Math.min(target, this.state.intensity + s * diff)
 		} else if (this.state.intensity > target) {
-			this.state.intensity = Math.max(target, this.state.intensity - this.data.fadeSpeedDown * diff)
+			if (diff === 0) {
+				const s = this.data.fadeSpeedDown
+				if (!Number.isFinite(s)) this.state.intensity = target
+				return
+			}
+			const s = this.data.fadeSpeedDown
+			this.state.intensity = !Number.isFinite(s) ? target : Math.max(target, this.state.intensity - s * diff)
 		}
 	}
 

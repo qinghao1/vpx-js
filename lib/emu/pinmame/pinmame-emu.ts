@@ -31,6 +31,7 @@ type Api = {
 	getDmdFrame(p: number): number
 	getSolMask(low: number): number
 	setSolMask(low: number, mask: number): void
+	setTimeFence(t: number): void
 }
 
 const gameName = (v: string | { name?: string; pinmame?: { name?: string } }) =>
@@ -88,6 +89,7 @@ export class PinMameEmulator implements IEmulator {
 			getDmdFrame: c('PinmameGetDmdFrame', 'number', ['number']) as Api['getDmdFrame'],
 			getSolMask: c('PinmameGetSolenoidMask', 'number', ['number']) as Api['getSolMask'],
 			setSolMask: c('PinmameSetSolenoidMask', null, ['number', 'number']) as Api['setSolMask'],
+			setTimeFence: c('PinmameSetTimeFence', null, ['number']) as Api['setTimeFence'],
 		}
 	}
 
@@ -209,6 +211,14 @@ export class PinMameEmulator implements IEmulator {
 		if (this.paused || this.isMock) return ms
 		this.sync()
 		return ms
+	}
+
+	setTimeFence(time: number): void {
+		if (!this.ready || this.isMock || !this.api) {
+			this.queue.addMessage(MessageType.SetTimeFence, time)
+			return
+		}
+		try { this.api.setTimeFence(time) } catch {}
 	}
 
 	private sync(): void {

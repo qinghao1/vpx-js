@@ -142,7 +142,10 @@ export class VpmController {
 	set Pause(v: boolean) { this.emulator.setPaused(v) }
 	get Version(): string { return '03070000' }
 	get TimeFence(): number { return this.timeFence }
-	set TimeFence(v: number) { this.timeFence = v; this.stub('TimeFence', v) }
+	set TimeFence(v: number) {
+		this.timeFence = v
+		try { (this.emulator as unknown as { setTimeFence?: (t: number) => void }).setTimeFence?.(v) } catch {}
+	}
 	Run(nMinVersion = 0, hParentWnd = 0): void {
 		if (!this.gameName) { this.stub('Run', { nMinVersion, hParentWnd }); return }
 		if (!this.loadPromise) this.loadPromise = this._loadGame(this.gameName).catch(e => logger().error('DOWNLOAD_FAILED:', e))

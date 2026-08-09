@@ -42,6 +42,9 @@ export class EmulatorMessageQueue {
 				case MessageType.SetDipByte:
 					emu.setDipSwitchByte(value)
 					break
+				case MessageType.SetTimeFence:
+					emu.setTimeFence?.(value)
+					break
 				default:
 					logger().warn('UNKNOWN CACHE TYPE', cacheType)
 			}
@@ -56,6 +59,7 @@ export enum MessageType {
 	CabinetInput,
 	ExecuteTicks,
 	SetDipByte,
+	SetTimeFence,
 }
 
 interface QueueItem {

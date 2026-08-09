@@ -28,4 +28,5 @@ export interface IEmulator {
 	setDipSwitchByte(v: number): void
 	getSolMask?(low: number): number
 	setSolMask?(low: number, mask: number): void
+	setTimeFence?(time: number): void
 }
