@@ -33,16 +33,64 @@ const imageMap: Record<string, string> = {
 	kickerWilliams: new URL('../../../res/maps/kickerWilliams.png', import.meta.url).href,
 }
 
-const MAX_REGULAR = 4096
-const MAX_FLOAT = 2048
-const MAX_PLAYFIELD = 4096
-const MAX_VLM = 1024
+let hwMax: number | undefined
+function getHardwareMax(): number {
+	if (hwMax !== undefined) return hwMax
+	try {
+		if (typeof document === 'undefined') return (hwMax = 4096)
+		const c = document.createElement('canvas')
+		const gl = (c.getContext('webgl2') ?? c.getContext('webgl')) as any
+		const v = gl?.getParameter(gl?.MAX_TEXTURE_SIZE)
+		hwMax = typeof v === 'number' && v >= 1024 ? v : 4096
+	} catch {
+		hwMax = 4096
+	}
+	return hwMax!
+}
+
+function viewportBudget(): number {
+	try {
+		if (typeof window === 'undefined' || !window.innerWidth) return getHardwareMax()
+		return Math.max(window.innerWidth, window.innerHeight) * (window.devicePixelRatio || 1)
+	} catch {
+		return getHardwareMax()
+	}
+}
+
+function effectiveMax(name: string, isFloat: boolean, playfieldMap?: string): number {
+	const hw = getHardwareMax()
+	const vp = viewportBudget()
+	if (playfieldMap && name.toLowerCase() === playfieldMap.toLowerCase()) return hw
+	if (isFloat) return Math.min(hw, Math.max(1024, Math.ceil(vp)))
+	if (name.toLowerCase().includes('vlm.nestmap')) return Math.min(hw, Math.max(1024, Math.ceil(vp * 0.75)))
+	if (vp >= 1400) return hw
+	return Math.min(hw, Math.max(2048, Math.ceil(vp * 2)))
+}
+
+let cachedAniso: number | undefined
+function getAniso(): number {
+	if (cachedAniso !== undefined) return cachedAniso
+	try {
+		if (typeof document === 'undefined') return (cachedAniso = 8)
+		const c = document.createElement('canvas')
+		const gl: any = c.getContext('webgl2') ?? c.getContext('webgl')
+		const ext =
+			gl?.getExtension('EXT_texture_filter_anisotropic') ??
+			gl?.getExtension('MOZ_EXT_texture_filter_anisotropic') ??
+			gl?.getExtension('WEBKIT_EXT_texture_filter_anisotropic')
+		const max = ext ? gl.getParameter(ext.MAX_TEXTURE_MAX_ANISOTROPY_EXT) : 0
+		cachedAniso = max ? Math.min(16, max) : 8
+	} catch {
+		cachedAniso = 8
+	}
+	return cachedAniso!
+}
 
 function tune(tex: any): void {
 	tex.generateMipmaps = true
 	tex.minFilter = LinearMipMapLinearFilter
 	tex.magFilter = LinearFilter
-	tex.anisotropy = 4
+	tex.anisotropy = getAniso()
 }
 
 function nameAndTune(tex: any, name: string): void {
@@ -51,15 +99,8 @@ function nameAndTune(tex: any, name: string): void {
 	tune(tex)
 }
 
-function maxFor(name: string, isFloat: boolean, playfieldMap?: string): number {
-	const lower = name.toLowerCase()
-	if (playfieldMap && lower === playfieldMap.toLowerCase()) return MAX_PLAYFIELD
-	if (lower.includes('vlm.nestmap')) return MAX_VLM
-	return isFloat ? MAX_FLOAT : MAX_REGULAR
-}
-
-function finalize(tex: any, name: string, isFloat: boolean, playfieldMap?: string): any {
-	const max = maxFor(name, isFloat, playfieldMap)
+function finalize(tex: any, name: string, isFloat: boolean, _playfieldMap?: string): any {
+	const max = effectiveMax(name, isFloat, _playfieldMap)
 	if (tex.image?.data && tex.image.width && tex.image.height) {
 		const ds = downsampleData(tex, max)
 		if (ds !== tex) {
@@ -222,7 +263,7 @@ async function tryCreateBitmap(
 			{ type: mime as any },
 		)
 		let bitmap: any = await createImageBitmap(blob as any, { imageOrientation: 'flipY' } as any)
-		const max = maxFor(name, false, playfieldMap)
+		const max = effectiveMax(name, false, playfieldMap)
 		if (bitmap.width > max || bitmap.height > max) {
 			const scale = Math.min(max / bitmap.width, max / bitmap.height)
 			const nw = Math.max(1, Math.floor(bitmap.width * scale))
@@ -266,7 +307,12 @@ async function tryLoadViaWorker(
 	try {
 		const cached: any = await idbGet(key)
 		if (cached?.width && cached?.data) {
-			return finalize(floatTex(cached.width, cached.height, cached.data, cached.type, cached.format, cached.colorSpace), name, true, playfieldMap)
+			return finalize(
+				floatTex(cached.width, cached.height, cached.data, cached.type, cached.format, cached.colorSpace),
+				name,
+				true,
+				playfieldMap,
+			)
 		}
 	} catch {}
 	try {
@@ -283,14 +329,25 @@ async function tryLoadViaWorker(
 					colorSpace: parsed.colorSpace,
 				}).catch(() => {})
 			} catch {}
-			return finalize(floatTex(parsed.width, parsed.height, parsed.data, parsed.type, parsed.format, parsed.colorSpace), name, true, playfieldMap)
+			return finalize(
+				floatTex(parsed.width, parsed.height, parsed.data, parsed.type, parsed.format, parsed.colorSpace),
+				name,
+				true,
+				playfieldMap,
+			)
 		}
 	} catch {}
 	return null
 }
 
 function floatTex(width: number, height: number, data: any, type: any, format: any, colorSpace: any): ThreeTexture {
-	const tex: any = new DataTexture(data as any, width, height, format ?? (RGBAFormat as any), type ?? (HalfFloatType as any))
+	const tex: any = new DataTexture(
+		data as any,
+		width,
+		height,
+		format ?? (RGBAFormat as any),
+		type ?? (HalfFloatType as any),
+	)
 	tex.flipY = false
 	tex.colorSpace = colorSpace ?? LinearSRGBColorSpace
 	tex.needsUpdate = true
@@ -391,7 +448,10 @@ function downsampleData(texture: any, maxSize: number): any {
 				let sum = 0
 				for (let sy = y0; sy < y1; sy++) {
 					const row = sy * w * channels
-					for (let sx = x0; sx < x1; sx++) sum += isHalf ? DataUtils.fromHalfFloat(src[row + sx * channels + c] as any) : (src as any)[row + sx * channels + c]
+					for (let sx = x0; sx < x1; sx++)
+						sum += isHalf
+							? DataUtils.fromHalfFloat(src[row + sx * channels + c] as any)
+							: (src as any)[row + sx * channels + c]
 				}
 				const avg = sum / count
 				dst[dBase + c] = isHalf ? DataUtils.toHalfFloat(avg) : isFloat ? avg : Math.round(avg)
