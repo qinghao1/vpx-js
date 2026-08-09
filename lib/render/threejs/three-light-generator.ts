@@ -1,7 +1,13 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { type MeshStandardMaterial, type Object3D, PointLight, type Mesh as ThreeMesh } from '../../refs.node.js'
+import {
+	type MeshStandardMaterial,
+	type Object3D,
+	PointLight,
+	type Mesh as ThreeMesh,
+	Vector2,
+} from '../../refs.node.js'
 import { Enums } from '../../vpt/enums.js'
 import type { LightData } from '../../vpt/light/light-data.js'
 import type { LightState } from '../../vpt/light/light-state.js'
@@ -16,6 +22,12 @@ export class ThreeLightGenerator {
 		light.color.set(d.color)
 		light.position.set(d.center.x, d.center.y, d.height)
 		light.updateMatrixWorld()
+		if (d.shadows === Enums.ShadowMode.RaytracedBallShadows) {
+			light.castShadow = true
+			light.shadow.bias = -0.001
+			light.shadow.radius = 12
+			light.shadow.mapSize = new Vector2(512, 512)
+		}
 		return light
 	}
 
