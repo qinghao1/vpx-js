@@ -58,7 +58,6 @@ function maxFor(name: string, w: number, h: number, isFloat: boolean, playfieldM
 	if (playfieldMap && lower === playfieldMap.toLowerCase()) return MAX_PLAYFIELD
 	if (lower.includes('vlm.nestmap')) return MAX_VLM
 	if (isFloat) return w <= 512 && h <= 512 ? Math.max(w, h) : MAX_FLOAT
-	if (w > 2048 || h > 2048) return MAX_REGULAR
 	if (w <= 512 && h <= 512) return Math.max(w, h)
 	return MAX_REGULAR
 }
