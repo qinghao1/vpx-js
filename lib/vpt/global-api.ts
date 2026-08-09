@@ -3,7 +3,7 @@
 
 import { AssignKey } from '../game/key-code.js'
 import type { Player } from '../game/player.js'
-import { getTextFile, now, storage } from '../refs.node.js'
+import { getTextFile, storage } from '../refs.node.js'
 import { VbsApi } from '../scripting/vbs-api.js'
 import type { BallApi } from './ball/ball-api.js'
 import type { Item } from './item.js'
@@ -80,7 +80,7 @@ export class GlobalApi extends VbsApi {
 		return this.player.getGameTime()
 	}
 	get SystemTime() {
-		return now()
+		return performance.now()
 	}
 	get NightDay() {
 		return this.table.getApi().NightDay

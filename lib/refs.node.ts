@@ -10,7 +10,6 @@ export { storage } from './io/storage.node.js'
 export * from './refs-three.js'
 export { ThreeTextureLoaderNode as ThreeTextureLoader } from './render/threejs/three-texture-loader-node.js'
 export { getTextFile, hasTextFile } from './scripting/vbs-scripts.node.js'
-export { now } from './util/time.node.js'
 
 /**
  * Patch `FileLoader` to accept raw buffers as URLs.

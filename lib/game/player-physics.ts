@@ -17,7 +17,6 @@ import type { HitObject } from '../physics/hit-object.js'
 import type { HitPlane } from '../physics/hit-plane.js'
 import { HitQuadtree } from '../physics/hit-quadtree.js'
 import type { MoverObject } from '../physics/mover-object.js'
-import { now } from '../refs.node.js'
 import { logger } from '../util/logger.js'
 import { Vertex3D } from '../util/vector.js'
 import { Ball } from '../vpt/ball/ball.js'
@@ -290,7 +289,7 @@ export class PlayerPhysics {
 	}
 
 	private now(): number {
-		return now() * SLOW_MO
+		return performance.now() * SLOW_MO
 	}
 
 	public setGravity(slopeDeg: number, strength: number): void {
