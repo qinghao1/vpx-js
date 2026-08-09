@@ -1,7 +1,10 @@
-import { MathUtils } from 'three'
+import { Group, MathUtils, Matrix4, Vector3 } from 'three'
 import { describe, expect, it } from 'vitest'
 import { Matrix2D, Matrix3D } from './matrix.js'
 import { Vertex3D } from './vector.js'
+import { Mesh } from '../vpt/mesh.js'
+import { Vertex3DNoTex2 } from './vertex.js'
+import { ThreeRenderApi } from '../render/threejs/three-render-api.js'
 
 type Row4 = number[][]
 
@@ -83,6 +86,109 @@ describe('Matrix3D D3D row semantics', () => {
 		const v=new Vertex3D(1,2,3).multiplyMatrixNoTranslate(tr)
 		expect(v.x).toBeCloseTo(1,5); expect(v.y).toBeCloseTo(2,5); expect(v.z).toBeCloseTo(3,5)
 	})
+
+	it('setFromArray and matrix getter round-trip row-major', () => {
+		const src=[[1,2,3,4],[5,6,7,8],[9,10,11,12],[13,14,15,16]]
+		const m=new Matrix3D().setFromArray(src)
+		expect(m.matrix).toEqual(src)
+		expect(toRow(m)).toEqual(src)
+	})
+
+	it('setEach stores row-major directly', () => {
+		const m=new Matrix3D().setEach(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16)
+		expect(m.elements).toEqual([1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16])
+		expect(toRow(m)).toEqual([[1,2,3,4],[5,6,7,8],[9,10,11,12],[13,14,15,16]])
+	})
+
+	it('clone and copy preserve row-major', () => {
+		const a=new Matrix3D().setTranslation(7,8,9)
+		const b=a.clone()
+		expect(rowClose(toRow(a), toRow(b))).toBe(true)
+		const c=new Matrix3D().copy(a) as Matrix3D
+		expect(rowClose(toRow(a), toRow(c))).toBe(true)
+	})
+
+	it('multiplyMatrices(a,b) equals a*b row', () => {
+		const a=new Matrix3D().setTranslation(3,0,0)
+		const b=new Matrix3D().setScaling(2,2,2)
+		const r=new Matrix3D().multiplyMatrices(a,b)
+		expect(rowClose(toRow(r), rowMul(rowTranslate(3,0,0), rowScale(2,2,2)))).toBe(true)
+		const s=new Matrix3D().multiplyMatrices(b,a)
+		expect(rowClose(toRow(s), rowMul(rowScale(2,2,2), rowTranslate(3,0,0)))).toBe(true)
+	})
+
+	it('identity is neutral for multiply', () => {
+		const m=new Matrix3D().setTranslation(4,5,6).multiply(new Matrix3D().rotateZMatrix(0.7))
+		const id=new Matrix3D().identity()
+		expect(rowClose(toRow(m.clone().multiply(id)), toRow(m))).toBe(true)
+		expect(rowClose(toRow(id.clone().multiply(m)), toRow(m))).toBe(true)
+	})
+
+	it('toRightHanded equals M*S and negates col2', () => {
+		const m=new Matrix3D().setTranslation(1,2,3)
+		m.multiply(new Matrix3D().rotateXMatrix(0.3))
+		const rh=m.clone().toRightHanded()
+		const ref=rowMul(toRow(m), rowScale(1,1,-1))
+		expect(rowClose(toRow(rh), ref)).toBe(true)
+		const e=rh.elements
+		const o=m.elements
+		expect(e[2]).toBeCloseTo(-o[2],5)
+		expect(e[6]).toBeCloseTo(-o[6],5)
+		expect(e[10]).toBeCloseTo(-o[10],5)
+		expect(e[14]).toBeCloseTo(-o[14],5)
+	})
+
+	it('RIGHT_HANDED static is scale(1,1,-1)', () => {
+		const rh=Matrix3D.RIGHT_HANDED
+		expect(rowClose(toRow(rh), rowScale(1,1,-1))).toBe(true)
+	})
+
+	it('Mesh.transform bakes row vertices and normals', () => {
+		const mesh=new Mesh('test')
+		mesh.vertices=[Object.assign(new Vertex3DNoTex2(),{x:1,y:0,z:0,nx:1,ny:0,nz:0}), Object.assign(new Vertex3DNoTex2(),{x:0,y:1,z:0,nx:0,ny:1,nz:0})]
+		mesh.indices=[0,1,0]
+		const tr=new Matrix3D().setTranslation(10,0,0)
+		mesh.transform(tr)
+		expect(mesh.vertices[0]!.x).toBeCloseTo(11,5)
+		expect(mesh.vertices[0]!.nx).toBeCloseTo(1,5)
+		const rot=new Matrix3D().rotateZMatrix(MathUtils.degToRad(90))
+		const mesh2=new Mesh('test2')
+		mesh2.vertices=[Object.assign(new Vertex3DNoTex2(),{x:1,y:0,z:0,nx:1,ny:0,nz:0})]
+		mesh2.indices=[0,0,0]
+		mesh2.transform(rot)
+		expect(mesh2.vertices[0]!.x).toBeCloseTo(0,5)
+		expect(mesh2.vertices[0]!.y).toBeCloseTo(1,5)
+		expect(mesh2.vertices[0]!.nx).toBeCloseTo(0,5)
+		expect(mesh2.vertices[0]!.ny).toBeCloseTo(1,5)
+	})
+
+	it('ThreeRenderApi applyMatrixToNode transposes row to col correctly', () => {
+		const api=new ThreeRenderApi()
+		const row=new Matrix3D().setTranslation(10,20,30).multiply(new Matrix3D().rotateZMatrix(MathUtils.degToRad(90)))
+		const obj=new Group()
+		obj.matrixAutoUpdate=false
+		api.applyMatrixToNode(row, obj)
+		const v=new Vector3(1,0,0)
+		v.applyMatrix4(obj.matrix)
+		const expected=new Vertex3D(1,0,0).multiplyMatrix(row)
+		expect(v.x).toBeCloseTo(expected.x,4)
+		expect(v.y).toBeCloseTo(expected.y,4)
+		expect(v.z).toBeCloseTo(expected.z,4)
+		const col=new Matrix4().set(row._11,row._21,row._31,row._41,row._12,row._22,row._32,row._42,row._13,row._23,row._33,row._43,row._14,row._24,row._34,row._44)
+		expect(obj.matrix.equals(col)).toBe(true)
+	})
+
+	it('flipper row order m0*Mr*m1*Mt', () => {
+		const center={x:100,y:200}
+		const dx=5, dy=-3, h=10
+		const m0=new Matrix3D().setTranslation(-center.x,-center.y,h)
+		const m1=new Matrix3D().setTranslation(center.x,center.y,-h)
+		const mr=new Matrix3D().rotateZMatrix(0.5)
+		const mt=new Matrix3D().setTranslation(dx,dy,0)
+		const row=rowMul(rowMul(rowMul(rowTranslate(-center.x,-center.y,h), rowRotateZ(0.5)), rowTranslate(center.x,center.y,-h)), rowTranslate(dx,dy,0))
+		const m=m0.clone().multiply(mr).multiply(m1).multiply(mt)
+		expect(rowClose(toRow(m), row)).toBe(true)
+	})
 })
 
 describe('Matrix2D row semantics', () => {
@@ -90,8 +196,19 @@ describe('Matrix2D row semantics', () => {
 		const skew=new Matrix2D().createSkewSymmetric(new Vertex3D(0,0,1))
 		const ori=new Matrix2D().set(1,0,0, 0,1,0, 0,0,1)
 		const out=new Matrix2D().multiplyMatrices(skew, ori)
-		// reference row skew * identity = skew
 		const e=(out as any).elements
-		expect(e[0]).toBeCloseTo(0,5); expect(e[1]).toBeCloseTo(1,5) // _21 = 1? skew should be [0 -1 0; 1 0 0; 0 0 0] but mapping?
+		expect(e[0]).toBeCloseTo(0,5); expect(e[1]).toBeCloseTo(1,5)
+	})
+
+	it('applyMatrix2D and multiplyVectorT are transposes', () => {
+		const m=new Matrix2D().set(2,3,5,7,11,13,17,19,23)
+		const v=new Vertex3D(1,2,3)
+		const a=v.clone(true).applyMatrix2D(m)
+		const e=(m as any).elements
+		expect(a.x).toBeCloseTo(e[0]*1+e[3]*2+e[6]*3,5)
+		expect(a.y).toBeCloseTo(e[1]*1+e[4]*2+e[7]*3,5)
+		const t=m.multiplyVectorT(v)
+		expect(t.x).toBeCloseTo(e[0]*1+e[1]*2+e[2]*3,5)
+		expect(t.y).toBeCloseTo(e[3]*1+e[4]*2+e[5]*3,5)
 	})
 })
