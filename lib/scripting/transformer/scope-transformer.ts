@@ -37,21 +37,12 @@ export class ScopeTransformer extends Transformer {
 				if (this.isRootScope(node)) {
 					const isLoopVarDecl = parent && /^For.*Statement$/.test(parent.type)
 					if (node.type === 'VariableDeclaration' && !isLoopVarDecl) {
-						const declarationNode = node as VariableDeclaration
-						const nodes = []
-						for (const declaration of declarationNode.declarations as unknown as {
-							id?: { name: string }
-							name?: string
-							init?: import('estree').Expression
-						}[]) {
-							nodes.push(
-								this.wrapAssignment(
-									identifier(declaration.id ? declaration.id.name : declaration.name, node), // fixme
-									declaration.init || literal(null, undefined, node),
-									node,
-								),
-							)
-						}
+						const decls = (node as VariableDeclaration).declarations
+						const nodes = decls.map(d => {
+							const name = (d.id as Identifier).name
+							const init = (d.init as Expression | null) ?? literal(null, undefined, node)
+							return this.wrapAssignment(identifier(name, node), init, node)
+						})
 						return this.replaceMany(nodes, node)
 					}
 

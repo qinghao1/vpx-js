@@ -174,8 +174,6 @@ export class ThreeTextureLoaderBrowser implements ITextureLoader<ThreeTexture> {
 
 		if (isHdr || isExr) {
 			const kind = isExr ? ('exr' as const) : ('hdr' as const)
-			const cached = await tryLoadCached(name, kind, this.playfieldMap)
-			if (cached) return cached
 			const viaWorker = await tryLoadViaWorker(name, kind, data, this.playfieldMap)
 			if (viaWorker) return viaWorker
 			return loadFloatFallback(name, ext, mime, data, this.playfieldMap)
@@ -401,21 +399,6 @@ async function tryCreateBitmap(
 		tune(tex)
 		tex.name = `texture:${name}`
 		return tex
-	} catch {
-		return null
-	}
-}
-
-async function tryLoadCached(
-	_name: string,
-	_kind: 'exr' | 'hdr',
-	_playfieldMap?: string,
-): Promise<ThreeTexture | null> {
-	try {
-		// byteLength unknown yet; try without length? Use exrCacheKey with 0 — but we need actual length, so skip if not found via wildcard
-		// Instead attempt to load via idb with known key pattern: we store with byteLength, so we need to probe via data length later.
-		// Caller will pass data, so this helper is only used when we don't have data length; we handle cache inside tryLoadViaWorker.
-		return null
 	} catch {
 		return null
 	}

@@ -65,7 +65,7 @@ export class ThreeMaterialGenerator {
 		}
 		if (material?.name === 'ball') {
 			m.envMapIntensity = 1
-		} else if (material?.isMetal && (m.userData as Record<string, unknown>).pendingEnvMap) {
+		} else if (material?.isMetal && (m.userData as any).pendingEnvMap) {
 			m.metalness = 0.25
 			m.roughness = 0.35
 			m.envMapIntensity = 0.6
@@ -135,11 +135,11 @@ export class ThreeMaterialGenerator {
 	): void {
 		if (!name) return
 		if (!this.mapGenerator.hasTexture(name)) {
-			;(mat.userData as Record<string, unknown>)[pendingKeyFor(key)] = name
+			;(mat.userData as any)[pendingKeyFor(key)] = name
 			return
 		}
-		;(mat as unknown as Record<string, unknown>)[key] = this.mapGenerator.getTexture(name)
-		;((mat as unknown as Record<string, { name: string }>)[key] as { name: string }).name = name
+		;(mat as any)[key] = this.mapGenerator.getTexture(name)
+		;((mat as any)[key] as { name: string }).name = name
 		init?.(mat)
 		mat.needsUpdate = true
 	}
@@ -147,14 +147,14 @@ export class ThreeMaterialGenerator {
 	public resolvePendingTextures(): number {
 		let fixed = 0
 		for (const mat of Object.values(this.cachedMaterials)) {
-			const ud = mat.userData as Record<string, string | undefined>
+			const ud = mat.userData as any
 			for (const texKey of ['map', 'normalMap', 'envMap', 'emissiveMap'] as const) {
 				const pendingKey = pendingKeyFor(texKey)
 				const name = ud[pendingKey]
 				if (!name || !this.mapGenerator.hasTexture(name)) continue
 				const tex = this.mapGenerator.getTexture(name)
-				;(mat as unknown as Record<string, unknown>)[texKey] = tex
-				;(tex as unknown as { name: string }).name = name
+				;(mat as any)[texKey] = tex
+				;(tex as any).name = name
 				if (texKey === 'envMap') (mat as MeshStandardMaterial).envMapIntensity = 1
 				delete ud[pendingKey]
 				mat.needsUpdate = true
