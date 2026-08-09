@@ -3,7 +3,6 @@
 
 /** Barrel for threejs render generators. */
 export * from './three-converter.js'
-export * from './three-csg.js'
 export * from './three-light-generator.js'
 export * from './three-light-mesh-generator.js'
 export * from './three-map-generator.js'
