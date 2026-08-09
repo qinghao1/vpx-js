@@ -135,6 +135,10 @@ export abstract class ItemApi<DATA extends ItemData> extends EventEmitter {
 		if (!this.propertyMap) {
 			this.propertyMap = {}
 			for (const name of this._getPropertyNames()) this.propertyMap[lc(name)] = name
+			for (const name of Object.getOwnPropertyNames(ItemApi.prototype)) {
+				const key = lc(name)
+				if (!(key in this.propertyMap)) this.propertyMap[key] = name
+			}
 		}
 		return this.propertyMap[lc(vbScriptName)]
 	}

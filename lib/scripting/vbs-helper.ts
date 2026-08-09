@@ -87,12 +87,12 @@ export class VBSHelper {
 		if (obj == null || this.isUndef(obj)) return []
 		if (typeof (obj as any)[Symbol.iterator] === 'function') {
 			const arr = [...(obj as Iterable<unknown>)]
-			return arr.filter(x => !this.isUndef(x))
+			return arr.filter(x => x != null && !this.isUndef(x))
 		}
 		if (typeof obj === 'object' && 'length' in (obj as any) && typeof (obj as any).length === 'number') {
 			try {
 				const arr = Array.from(obj as ArrayLike<unknown>)
-				return arr.filter(x => !this.isUndef(x))
+				return arr.filter(x => x != null && !this.isUndef(x))
 			} catch {
 				return []
 			}

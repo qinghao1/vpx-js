@@ -86,6 +86,10 @@ export class FlasherData extends ItemData {
 			this.alpha = Math.max(0, this.getInt(buffer))
 			return 0
 		}
+		if (tag === 'RDMD') {
+			this.isDMD = this.getInt(buffer) === 1
+			return 0
+		}
 		if (
 			handleBiffTag(this, tag, buffer, len, {
 				float: FLOAT_MAP,

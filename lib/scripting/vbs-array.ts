@@ -12,10 +12,13 @@ export class VbsArray<T> implements ProxyHandler<VbsArray<T>> {
 		return new Proxy<VbsArray<T>>((items ?? []) as unknown as VbsArray<T>, this)
 	}
 
-public get(target: unknown, key: string | symbol): T | VbsUndefined {
+	public get(target: unknown, key: string | symbol): T | VbsUndefined {
 		if (key === UNDEF || typeof key === 'symbol') {
 			return (target as Record<string | symbol, unknown>)[key] as T
 		}
+		if (key === 'undefined' || key === 'null') key = '0'
+		else if (key != null && typeof key === 'object' && (key as Record<symbol, unknown>)[UNDEF] === true) key = '0'
+		else if (key == null) key = '0'
 		if (typeof key === 'string' && /^-?\d+$/.test(key)) {
 			const n = Number(key)
 			const t = target as unknown as Record<number, unknown>
@@ -31,6 +34,9 @@ public get(target: unknown, key: string | symbol): T | VbsUndefined {
 	}
 
 	public set(target: unknown, key: string | symbol, value: unknown): boolean {
+		if (key === 'undefined' || key === 'null') key = '0'
+		else if (key != null && typeof key === 'object' && (key as Record<symbol, unknown>)[UNDEF] === true) key = '0'
+		else if (key == null) key = '0'
 		if (typeof key === 'string' && /^-?\d+$/.test(key)) {
 			const n = Number(key)
 			;(target as Record<number, unknown>)[n] = value

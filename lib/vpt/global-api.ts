@@ -167,10 +167,40 @@ export class GlobalApi extends VbsApi {
 
 	public MaterialColor(name: string, color: number): void {
 		const material = this.table.getMaterial(name)
-		if (material) {
-			// TODO: apply to render realm
-			material.baseColor = color
-		}
+		if (!material) return
+		material.baseColor = color
+		try {
+			const g = globalThis as unknown as Record<string, unknown>
+			const groups: unknown[] = [g['tableGroup'], g['scene'], (g['viewer'] as Record<string, unknown> | undefined)?.['tableGroup'], (g['viewer'] as Record<string, unknown> | undefined)?.['scene']].filter(Boolean)
+			const target = name.toLowerCase()
+			for (const grp of groups) {
+				const traverse = (grp as { traverse?: (cb: (o: unknown) => void) => void })?.traverse
+				if (typeof traverse !== 'function') continue
+				traverse.call(grp, (o: unknown) => {
+					const obj = o as { material?: unknown }
+					const mats = Array.isArray(obj.material) ? (obj.material as unknown[]) : obj.material ? [obj.material] : []
+					for (const m of mats) {
+						const mat = m as { name?: string; color?: { set: (c: number) => void }; needsUpdate?: boolean }
+						if (!mat?.color) continue
+						const n = (mat.name ?? '').toLowerCase()
+						if (n === `material:${target}` || n === target || n.includes(target)) {
+							mat.color.set(color)
+							mat.needsUpdate = true
+						}
+					}
+				})
+			}
+			const gen = (g['renderApi'] as { getMaterialGenerator?: () => { cachedMaterials?: Record<string, unknown> } } | undefined)?.getMaterialGenerator?.() ?? (g['viewer'] as { renderApi?: { getMaterialGenerator?: () => { cachedMaterials?: Record<string, unknown> } } } | undefined)?.renderApi?.getMaterialGenerator?.()
+			if (gen?.cachedMaterials) {
+				for (const [k, m] of Object.entries(gen.cachedMaterials)) {
+					if (k.split(':')[0]?.toLowerCase() === target) {
+						const mat = m as { color?: { set: (c: number) => void }; needsUpdate?: boolean }
+						mat.color?.set(color)
+						mat.needsUpdate = true
+					}
+				}
+			}
+		} catch {}
 	}
 
 	public Nudge(angle: number, force: number): void {

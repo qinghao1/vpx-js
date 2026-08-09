@@ -187,7 +187,8 @@ export class ScopeTransformer extends Transformer {
 		if (!currentScope) {
 			return null
 		}
-		const variable = currentScope.variables.find((v: any) => v.name === name)
+		const lower = name.toLowerCase()
+		const variable = currentScope.variables.find((v: any) => v.name.toLowerCase() === lower)
 		return variable ? currentScope : this.findScope(name, currentScope.upper)
 	}
 }
