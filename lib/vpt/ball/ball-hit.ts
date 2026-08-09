@@ -138,192 +138,219 @@ export class BallHit extends HitObject {
 		) {
 			return
 		}
-
-		const vRel = ball.hit.vel.clone(true).sub(this.vel)
-		const vNormal = coll.hitNormal.clone(true) // hitball.cpp:245 — by value, don't alias pooled hitNormal
-		let dot = vRel.dot(vNormal)
-		Vertex3D.release(vRel)
-
+		const nx = coll.hitNormal.x, ny = coll.hitNormal.y, nz = coll.hitNormal.z
+		const bvx = ball.hit.vel.x, bvy = ball.hit.vel.y, bvz = ball.hit.vel.z
+		const tvx = this.vel.x, tvy = this.vel.y, tvz = this.vel.z
+		const dvx = bvx - tvx, dvy = bvy - tvy, dvz = bvz - tvz
+		let dot = dvx * nx + dvy * ny + dvz * nz
 		if (dot >= -C_LOWNORMVEL) {
 			if (dot > C_LOWNORMVEL) return
 			if (coll.hitDistance < -C_EMBEDDED) dot = -C_EMBEDSHOT
 			else return
 		}
-
 		let eDist = -C_DISP_GAIN * coll.hitDistance
 		if (eDist > 1e-4) {
 			if (eDist > C_DISP_LIMIT) eDist = C_DISP_LIMIT
 			if (!this.state.isFrozen) eDist *= 0.5
-			ball.state.pos.addAndRelease(vNormal.clone(true).multiplyScalar(eDist))
+			ball.state.pos.x += nx * eDist
+			ball.state.pos.y += ny * eDist
+			ball.state.pos.z += nz * eDist
 		}
-		eDist = -C_DISP_GAIN * this.coll.hitDistance // hitball.cpp:259 — m_coll is noisy, recompute
+		eDist = -C_DISP_GAIN * this.coll.hitDistance
 		if (!this.state.isFrozen && eDist > 1e-4) {
 			if (eDist > C_DISP_LIMIT) eDist = C_DISP_LIMIT
 			eDist *= 0.5
-			this.state.pos.subAndRelease(vNormal.clone(true).multiplyScalar(eDist))
+			this.state.pos.x -= nx * eDist
+			this.state.pos.y -= ny * eDist
+			this.state.pos.z -= nz * eDist
 		}
-
-		const myInvMass = this.state.isFrozen ? 0 : this.invMass
-		const impulse = (-(1 + 0.8) * dot) / (myInvMass + ball.hit.invMass)
-
-		if (!this.state.isFrozen) this.vel.subAndRelease(vNormal.clone(true).multiplyScalar(impulse * myInvMass))
-		ball.hit.vel.addAndRelease(vNormal.clone(true).multiplyScalar(impulse * ball.hit.invMass))
-		Vertex3D.release(vNormal)
+		const myInv = this.state.isFrozen ? 0 : this.invMass
+		const impulse = (-(1 + 0.8) * dot) / (myInv + ball.hit.invMass)
+		if (!this.state.isFrozen) {
+			this.vel.x -= nx * impulse * myInv
+			this.vel.y -= ny * impulse * myInv
+			this.vel.z -= nz * impulse * myInv
+		}
+		ball.hit.vel.x += nx * impulse * ball.hit.invMass
+		ball.hit.vel.y += ny * impulse * ball.hit.invMass
+		ball.hit.vel.z += nz * impulse * ball.hit.invMass
 	}
 
-	public collide3DWall(
-		hitNormal: Vertex3D,
-		elasticity: number,
-		elasticityFalloff: number,
-		friction: number,
-		scatterAngle: number,
-	): void {
-		let dot = this.vel.dot(hitNormal)
+	public collide3DWall(hitNormal: Vertex3D, elasticity: number, elasticityFalloff: number, friction: number, scatterAngle: number): void {
+		const nx = hitNormal.x, ny = hitNormal.y, nz = hitNormal.z
+		let dot = this.vel.x * nx + this.vel.y * ny + this.vel.z * nz
 		if (dot >= -C_LOWNORMVEL) {
 			if (dot > C_LOWNORMVEL) return
 			if (this.coll.hitDistance < -C_EMBEDDED) dot = -C_EMBEDSHOT
 			else return
 		}
-
 		let hDist = -C_DISP_GAIN * this.coll.hitDistance
 		if (hDist > 1e-4) {
 			if (hDist > C_DISP_LIMIT) hDist = C_DISP_LIMIT
-			this.state.pos.addAndRelease(hitNormal.clone(true).multiplyScalar(hDist))
+			this.state.pos.x += nx * hDist
+			this.state.pos.y += ny * hDist
+			this.state.pos.z += nz * hDist
 		}
-
-		const reactionImpulse = this.data.mass * Math.abs(dot)
+		const reaction = this.data.mass * Math.abs(dot)
 		elasticity = elasticityWithFalloff(elasticity, elasticityFalloff, dot)
 		dot *= -(1 + elasticity)
-		this.vel.addAndRelease(hitNormal.clone(true).multiplyScalar(dot))
+		this.vel.x += nx * dot
+		this.vel.y += ny * dot
+		this.vel.z += nz * dot
 
-		const surfP = hitNormal.clone(true).multiplyScalar(-this.data.radius)
-		const surfVel = this.surfaceVelocity(surfP, true)
-		const tangent = surfVel.clone(true).subAndRelease(hitNormal.clone(true).multiplyScalar(surfVel.dot(hitNormal)))
-
-		const tangentSpSq = tangent.lengthSq()
-		if (tangentSpSq > 1e-6) {
-			tangent.divideScalar(Math.sqrt(tangentSpSq))
-			const vt = surfVel.dot(tangent)
-			const cross = Vertex3D.crossProduct(surfP, tangent, true)
-			const crossInertia = cross.clone(true).divideScalar(this.inertia)
-			const kt = this.invMass + tangent.dotAndRelease(Vertex3D.crossProduct(crossInertia, surfP, true))
-			Vertex3D.release(crossInertia)
-			const maxFric = friction * reactionImpulse
+		const r = this.data.radius
+		const sx = -nx * r, sy = -ny * r, sz = -nz * r
+		const avx = this.angularVelocity.x, avy = this.angularVelocity.y, avz = this.angularVelocity.z
+		const cx = avy * sz - avz * sy, cy = avz * sx - avx * sz, cz = avx * sy - avy * sx
+		const svx = this.vel.x + cx, svy = this.vel.y + cy, svz = this.vel.z + cz
+		const dotSN = svx * nx + svy * ny + svz * nz
+		let tx = svx - dotSN * nx, ty = svy - dotSN * ny, tz = svz - dotSN * nz
+		const tsq = tx * tx + ty * ty + tz * tz
+		if (tsq > 1e-6) {
+			const inv = 1 / Math.sqrt(tsq)
+			tx *= inv; ty *= inv; tz *= inv
+			const vt = svx * tx + svy * ty + svz * tz
+			const crossX = sy * tz - sz * ty, crossY = sz * tx - sx * tz, crossZ = sx * ty - sy * tx
+			const ciX = crossX / this.inertia, ciY = crossY / this.inertia, ciZ = crossZ / this.inertia
+			const cross2X = ciY * sz - ciZ * sy, cross2Y = ciZ * sx - ciX * sz, cross2Z = ciX * sy - ciY * sx
+			const kt = this.invMass + tx * cross2X + ty * cross2Y + tz * cross2Z
+			const maxFric = friction * reaction
 			const jt = clamp(-vt / kt, -maxFric, maxFric)
 			if (Number.isFinite(jt)) {
-				this.applySurfaceImpulseAndRelease(
-					cross.clone(true).multiplyScalar(jt),
-					tangent.clone(true).multiplyScalar(jt),
-				)
+				const jx = tx * jt, jy = ty * jt, jz = tz * jt
+				const rotX = crossX * jt, rotY = crossY * jt, rotZ = crossZ * jt
+				this.vel.x += jx * this.invMass
+				this.vel.y += jy * this.invMass
+				this.vel.z += jz * this.invMass
+				this.angularMomentum.x += rotX
+				this.angularMomentum.y += rotY
+				this.angularMomentum.z += rotZ
+				const inv = 1 / this.inertia
+				this.angularVelocity.x = this.angularMomentum.x * inv
+				this.angularVelocity.y = this.angularMomentum.y * inv
+				this.angularVelocity.z = this.angularMomentum.z * inv
 			}
-			Vertex3D.release(cross)
 		}
-		Vertex3D.release(surfP, surfVel, tangent)
-
 		if (scatterAngle < 0) scatterAngle = HARD_SCATTER
 		scatterAngle *= this.tableData.globalDifficulty!
-
 		if (dot > 1 && scatterAngle > 1e-5) {
 			let scatter = Math.random() * 2 - 1
 			scatter *= (1 - scatter * scatter) * 2.59808 * scatterAngle
-			const radsin = Math.sin(scatter)
-			const radcos = Math.cos(scatter)
-			const vxt = this.vel.x
-			const vyt = this.vel.y
-			this.vel.x = vxt * radcos - vyt * radsin
-			this.vel.y = vyt * radcos + vxt * radsin
+			const s = Math.sin(scatter), c = Math.cos(scatter)
+			const vx = this.vel.x, vy = this.vel.y
+			this.vel.x = vx * c - vy * s
+			this.vel.y = vy * c + vx * s
 		}
 	}
 
 	public surfaceVelocity(surfP: Vertex3D, recycle = false): Vertex3D {
-		return this.vel.clone(recycle).addAndRelease(Vertex3D.crossProduct(this.angularVelocity, surfP, true))
+		const av = this.angularVelocity
+		const cx = av.y * surfP.z - av.z * surfP.y, cy = av.z * surfP.x - av.x * surfP.z, cz = av.x * surfP.y - av.y * surfP.x
+		if (recycle) return Vertex3D.claim(this.vel.x + cx, this.vel.y + cy, this.vel.z + cz)
+		return new Vertex3D(this.vel.x + cx, this.vel.y + cy, this.vel.z + cz)
 	}
 
-	/** @deprecated prefer applySurfaceImpulseAndRelease */
 	public applySurfaceImpulse(rotI: Vertex3D, impulse: Vertex3D, recycle = false): void {
-		this.vel.addAndRelease(impulse.clone(true).multiplyScalar(this.invMass))
-		this.angularMomentum.add(rotI)
-		const am = this.angularMomentum.clone(true)
-		this.angularVelocity.set(am.divideScalar(this.inertia))
+		this.vel.x += impulse.x * this.invMass
+		this.vel.y += impulse.y * this.invMass
+		this.vel.z += impulse.z * this.invMass
+		this.angularMomentum.x += rotI.x
+		this.angularMomentum.y += rotI.y
+		this.angularMomentum.z += rotI.z
+		const inv = 1 / this.inertia
+		this.angularVelocity.x = this.angularMomentum.x * inv
+		this.angularVelocity.y = this.angularMomentum.y * inv
+		this.angularVelocity.z = this.angularMomentum.z * inv
 		if (recycle) Vertex3D.release(rotI, impulse)
-		Vertex3D.release(am)
 	}
 
 	public applySurfaceImpulseAndRelease(rotI: Vertex3D, impulse: Vertex3D): void {
-		this.vel.addAndRelease(impulse.clone(true).multiplyScalar(this.invMass))
-		this.angularMomentum.add(rotI)
-		const am = this.angularMomentum.clone(true)
-		this.angularVelocity.set(am.divideScalar(this.inertia))
-		Vertex3D.release(rotI, impulse, am)
+		this.vel.x += impulse.x * this.invMass
+		this.vel.y += impulse.y * this.invMass
+		this.vel.z += impulse.z * this.invMass
+		this.angularMomentum.x += rotI.x
+		this.angularMomentum.y += rotI.y
+		this.angularMomentum.z += rotI.z
+		const inv = 1 / this.inertia
+		this.angularVelocity.x = this.angularMomentum.x * inv
+		this.angularVelocity.y = this.angularMomentum.y * inv
+		this.angularVelocity.z = this.angularMomentum.z * inv
+		Vertex3D.release(rotI, impulse)
 	}
 
 	public handleStaticContact(coll: CollisionEvent, friction: number, dTime: number, physics: PlayerPhysics): void {
-		const normVel = this.vel.dot(coll.hitNormal)
+		const nx = coll.hitNormal.x, ny = coll.hitNormal.y, nz = coll.hitNormal.z
+		const normVel = this.vel.x * nx + this.vel.y * ny + this.vel.z * nz
 		if (normVel > C_CONTACTVEL) return
-
-		const dot = physics.gravity.dot(coll.hitNormal) * this.data.mass
-		const normalForce = Math.max(0, -(dot * dTime + coll.hitOrgNormalVelocity!))
-
-		this.vel.addAndRelease(coll.hitNormal.clone(true).multiplyScalar(normalForce))
+		const gdot = physics.gravity.x * nx + physics.gravity.y * ny + physics.gravity.z * nz
+		const normalForce = Math.max(0, -(gdot * this.data.mass * dTime + coll.hitOrgNormalVelocity!))
+		this.vel.x += nx * normalForce
+		this.vel.y += ny * normalForce
+		this.vel.z += nz * normalForce
 		if (coll.hitDistance <= PHYS_TOUCH) {
-			this.vel.addAndRelease(
-				coll.hitNormal
-					.clone(true)
-					.multiplyScalar(Math.max(Math.min(C_EMBEDVELLIMIT, -coll.hitDistance), PHYS_TOUCH)),
-			)
+			const push = Math.max(Math.min(C_EMBEDVELLIMIT, -coll.hitDistance), PHYS_TOUCH)
+			this.vel.x += nx * push
+			this.vel.y += ny * push
+			this.vel.z += nz * push
 		}
 		this.applyFriction(coll.hitNormal, dTime, friction, physics)
 	}
 
 	public applyFriction(hitNormal: Vertex3D, dtime: number, fricCoeff: number, physics: PlayerPhysics): void {
-		const surfP = hitNormal.clone(true).multiplyScalar(-this.data.radius)
-		const surfVel = this.surfaceVelocity(surfP, true)
-		const slip = surfVel.clone(true).subAndRelease(hitNormal.clone(true).multiplyScalar(surfVel.dot(hitNormal)))
-
-		const maxFric = fricCoeff * this.data.mass * -physics.gravity.dot(hitNormal)
-		const slipspeed = slip.length()
-		let slipDir: Vertex3D
-		let numer: number
-
-		const normVel = this.vel.dot(hitNormal)
-		if (normVel <= 0.025 || slipspeed < C_PRECISION) {
-			const surfAcc = this.surfaceAcceleration(surfP, physics, true)
-			const slipAcc = surfAcc
-				.clone(true)
-				.subAndRelease(hitNormal.clone(true).multiplyScalar(surfAcc.dot(hitNormal)))
-			if (slipAcc.lengthSq() < 1e-6) {
-				Vertex3D.release(surfVel, surfP, slip, slipAcc, surfAcc)
-				return
-			}
-			slipDir = slipAcc.clone(true).normalize()
-			numer = -slipDir.dot(surfAcc)
-			Vertex3D.release(surfAcc, slipAcc)
+		const nx = hitNormal.x, ny = hitNormal.y, nz = hitNormal.z
+		const r = this.data.radius
+		const sx = -nx * r, sy = -ny * r, sz = -nz * r
+		const avx = this.angularVelocity.x, avy = this.angularVelocity.y, avz = this.angularVelocity.z
+		const cx = avy * sz - avz * sy, cy = avz * sx - avx * sz, cz = avx * sy - avy * sx
+		const svx = this.vel.x + cx, svy = this.vel.y + cy, svz = this.vel.z + cz
+		const dot = svx * nx + svy * ny + svz * nz
+		const slipX = svx - dot * nx, slipY = svy - dot * ny, slipZ = svz - dot * nz
+		const maxFric = fricCoeff * this.data.mass * -(physics.gravity.x * nx + physics.gravity.y * ny + physics.gravity.z * nz)
+		const slipspeed = Math.sqrt(slipX * slipX + slipY * slipY + slipZ * slipZ)
+		let slipDirX: number, slipDirY: number, slipDirZ: number, numer: number
+		if ((this.vel.x * nx + this.vel.y * ny + this.vel.z * nz) <= 0.025 || slipspeed < C_PRECISION) {
+			const gx = physics.gravity.x * this.invMass, gy = physics.gravity.y * this.invMass, gz = physics.gravity.z * this.invMass
+			const p2x = avy * sz - avz * sy, p2y = avz * sx - avx * sz, p2z = avx * sy - avy * sx
+			const crossAx = avy * p2z - avz * p2y, crossAy = avz * p2x - avx * p2z, crossAz = avx * p2y - avy * p2x
+			const ax = gx + crossAx, ay = gy + crossAy, az = gz + crossAz
+			const adot = ax * nx + ay * ny + az * nz
+			const sAx = ax - adot * nx, sAy = ay - adot * ny, sAz = az - adot * nz
+			if (sAx * sAx + sAy * sAy + sAz * sAz < 1e-6) return
+			const inv = 1 / Math.sqrt(sAx * sAx + sAy * sAy + sAz * sAz)
+			slipDirX = sAx * inv; slipDirY = sAy * inv; slipDirZ = sAz * inv
+			numer = -(slipDirX * ax + slipDirY * ay + slipDirZ * az)
 		} else {
-			slipDir = slip.clone(true).divideScalar(slipspeed)
-			numer = -slipDir.dot(surfVel)
+			const inv = 1 / slipspeed
+			slipDirX = slipX * inv; slipDirY = slipY * inv; slipDirZ = slipZ * inv
+			numer = -(slipDirX * svx + slipDirY * svy + slipDirZ * svz)
 		}
-
-		const cp = Vertex3D.crossProduct(surfP, slipDir, true)
-		const p1 = cp.clone(true).divideScalar(this.inertia)
-		const denom = this.invMass + slipDir.dotAndRelease(Vertex3D.crossProduct(p1, surfP, true))
+		const cpX = sy * slipDirZ - sz * slipDirY, cpY = sz * slipDirX - sx * slipDirZ, cpZ = sx * slipDirY - sy * slipDirX
+		const p1x = cpX / this.inertia, p1y = cpY / this.inertia, p1z = cpZ / this.inertia
+		const crossX = p1y * sz - p1z * sy, crossY = p1z * sx - p1x * sz, crossZ = p1x * sy - p1y * sx
+		const denom = this.invMass + slipDirX * crossX + slipDirY * crossY + slipDirZ * crossZ
 		const friction = clamp(numer / denom, -maxFric, maxFric)
-
 		if (Number.isFinite(friction)) {
-			this.applySurfaceImpulseAndRelease(
-				cp.clone(true).multiplyScalar(dtime * friction),
-				slipDir.clone(true).multiplyScalar(dtime * friction),
-			)
+			const jx = slipDirX * dtime * friction, jy = slipDirY * dtime * friction, jz = slipDirZ * dtime * friction
+			const rotX = cpX * dtime * friction, rotY = cpY * dtime * friction, rotZ = cpZ * dtime * friction
+			this.vel.x += jx * this.invMass
+			this.vel.y += jy * this.invMass
+			this.vel.z += jz * this.invMass
+			this.angularMomentum.x += rotX
+			this.angularMomentum.y += rotY
+			this.angularMomentum.z += rotZ
+			const inv = 1 / this.inertia
+			this.angularVelocity.x = this.angularMomentum.x * inv
+			this.angularVelocity.y = this.angularMomentum.y * inv
+			this.angularVelocity.z = this.angularMomentum.z * inv
 		}
-		Vertex3D.release(surfVel, cp, surfP, slip, slipDir, p1)
 	}
 
-	public surfaceAcceleration(surfP: Vertex3D, physics: PlayerPhysics, recycle = false): Vertex3D {
-		const p2 = Vertex3D.crossProduct(this.angularVelocity, surfP, true)
-		const acc = recycle ? Vertex3D.claim() : new Vertex3D()
-		acc.set(physics.gravity.x * this.invMass, physics.gravity.y * this.invMass, physics.gravity.z * this.invMass)
-		acc.addAndRelease(Vertex3D.crossProduct(this.angularVelocity, p2, true))
-		Vertex3D.release(p2)
-		return acc
+	public surfaceAcceleration(surfP: Vertex3D, physics: PlayerPhysics, _recycle = false): Vertex3D {
+		const avx = this.angularVelocity.x, avy = this.angularVelocity.y, avz = this.angularVelocity.z
+		const p2x = avy * surfP.z - avz * surfP.y, p2y = avz * surfP.x - avx * surfP.z, p2z = avx * surfP.y - avy * surfP.x
+		const crossX = avy * p2z - avz * p2y, crossY = avz * p2x - avx * p2z, crossZ = avx * p2y - avy * p2x
+		const inv = this.invMass
+		return new Vertex3D(physics.gravity.x * inv + crossX, physics.gravity.y * inv + crossY, physics.gravity.z * inv + crossZ)
 	}
 
 	public setMass(mass: number): void {
