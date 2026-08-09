@@ -26,7 +26,7 @@ import type { FlipperMover } from '../vpt/flipper/flipper-mover.js'
 import type { Table } from '../vpt/table/table.js'
 import { MAX_TIMERS_MSEC_OVERALL } from '../vpt/timer/timer-const.js'
 import type { TimerHit } from '../vpt/timer/timer-hit.js'
-import type { TimerOnOff } from '../vpt/timer/timer-on-off.js'
+import { TimerOnOff } from '../vpt/timer/timer-on-off.js'
 import { Event } from './event.js'
 import type { IEmulator } from './iemulator.js'
 import type { PinInput } from './pin-input.js'
@@ -72,6 +72,7 @@ export class PlayerPhysics {
 	private startTimeUsec = 0
 	private activeBallDebug?: Ball
 	private scriptPeriod = 0
+	private deferTimerChanges = false
 
 	constructor(
 		private readonly table: Table,
@@ -198,27 +199,10 @@ export class PlayerPhysics {
 			const dt = (this.nextPhysicsFrameTime - this.curPhysicsFrameTime) * (1 / DEFAULT_STEPTIME)
 			const curUsec = this.now()
 			this.pinInput.processKeys()
-			this.flushTimers()
 			const oldBall = this.activeBall
 			this.activeBall = undefined
 			if (this.scriptPeriod <= 1000 * MAX_TIMERS_MSEC_OVERALL) {
-				const cur = (this.curPhysicsFrameTime - this.startTimeUsec) / 1000
-				for (const t of this.hitTimers) {
-					if (t.interval < 0) continue
-					if (t.nextFire <= cur) {
-						const prev = t.nextFire
-						try {
-							t.pfe.fireGroupEvent(Event.TimerEventsTimer)
-						} catch (e) {
-							try {
-								logger().warn('timer error %s', (e as Error).message)
-							} catch {}
-						}
-						if (prev === t.nextFire && t.interval > 0) {
-							while (t.nextFire <= cur) t.nextFire += t.interval
-						}
-					}
-				}
+				this.fireTimers(0)
 				this.scriptPeriod += Math.floor(this.now() - curUsec)
 			}
 			this.activeBall = oldBall
@@ -228,24 +212,61 @@ export class PlayerPhysics {
 			this.curPhysicsFrameTime = this.nextPhysicsFrameTime
 			this.nextPhysicsFrameTime += PHYSICS_STEPTIME
 		}
-		for (const mode of [-1, -2] as const) {
-			this.flushTimers()
-			this.fireTimers(mode)
-		}
-		this.flushTimers()
+		this.fireTimers(-1)
+		this.fireTimers(-2)
 		return iterations
 	}
 
-	private fireTimers(mode: -1 | -2): void {
-		for (const t of this.hitTimers) {
-			if (t.interval !== mode) continue
-			try {
-				t.pfe.fireGroupEvent(Event.TimerEventsTimer)
-			} catch (e) {
-				try {
-					logger().warn('timer error %s', (e as Error).message)
-				} catch {}
+	private fireTimers(mode: 0 | -1 | -2): void {
+		this.deferTimerChanges = true
+		if (mode === 0) {
+			const cur = this.timeMsec
+			for (const t of this.hitTimers) {
+				if (t.interval < 0) continue
+				if (t.nextFire <= cur) {
+					const prev = t.nextFire
+					try {
+						t.pfe.fireGroupEvent(Event.TimerEventsTimer)
+					} catch (e) {
+						try {
+							logger().warn('timer error %s', (e as Error).message)
+						} catch {}
+					}
+					if (prev === t.nextFire && t.interval > 0) {
+						while (t.nextFire <= cur) t.nextFire += t.interval
+					}
+				}
 			}
+		} else {
+			for (const t of this.hitTimers) {
+				if (t.interval !== mode) continue
+				try {
+					t.pfe.fireGroupEvent(Event.TimerEventsTimer)
+				} catch (e) {
+					try {
+						logger().warn('timer error %s', (e as Error).message)
+					} catch {}
+				}
+			}
+		}
+		this.deferTimerChanges = false
+		this.flushTimers()
+	}
+
+	public timerStateChange(timer: TimerHit, enabled: boolean): void {
+		if (this.deferTimerChanges) {
+			if (enabled) timer.nextFire = this.timeMsec + timer.interval
+			else timer.nextFire = 0xffffffff
+			const existing = this.changedHitTimers.find(c => c.timer === timer)
+			if (existing) existing.enabled = enabled
+			else this.changedHitTimers.push(new TimerOnOff(enabled, timer))
+		} else if (enabled) {
+			timer.nextFire = this.timeMsec + timer.interval
+			if (!this.hitTimers.includes(timer)) this.hitTimers.push(timer)
+		} else {
+			const idx = this.hitTimers.indexOf(timer)
+			if (idx >= 0) this.hitTimers.splice(idx, 1)
+			timer.nextFire = 0xffffffff
 		}
 	}
 

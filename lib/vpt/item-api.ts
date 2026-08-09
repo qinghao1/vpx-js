@@ -10,7 +10,6 @@ import type { ItemData } from './item-data.js'
 import type { Table } from './table/table.js'
 import { MAX_TIMER_MSEC_INTERVAL } from './timer/timer-const.js'
 import { TimerHit } from './timer/timer-hit.js'
-import { TimerOnOff } from './timer/timer-on-off.js'
 
 const INTERNAL: Record<string, boolean> = {
 	data: true,
@@ -173,16 +172,7 @@ export abstract class ItemApi<DATA extends ItemData> extends EventEmitter {
 
 	protected _setTimerEnabled(isEnabled: boolean): void {
 		if (isEnabled !== this.data.timer.enabled && this.hitTimer) {
-			let found = false
-			for (const c of this.player.getPhysics().changedHitTimers) {
-				if (c.timer === this.hitTimer) {
-					c.enabled = isEnabled
-					found = true
-					break
-				}
-			}
-			if (!found) this.player.getPhysics().changedHitTimers.push(new TimerOnOff(isEnabled, this.hitTimer))
-			this.hitTimer.nextFire = isEnabled ? this.player.getPhysics().timeMsec + this.hitTimer.interval : 0xffffffff
+			this.player.getPhysics().timerStateChange(this.hitTimer, isEnabled)
 		}
 		this.data.timer.enabled = isEnabled
 	}
