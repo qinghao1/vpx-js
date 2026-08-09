@@ -247,10 +247,7 @@ export class PlayerPhysics {
 						const prev = t.nextFire
 						this.safeFire(t)
 						if (prev === t.nextFire && t.interval > 0) {
-							while (t.nextFire <= cur) {
-								if (t.interval <= 0) break
-								t.nextFire += t.interval
-							}
+							while (t.nextFire <= cur) t.nextFire += t.interval
 						}
 					}
 				}
@@ -267,13 +264,7 @@ export class PlayerPhysics {
 	}
 
 	private safeFire(t: TimerHit): void {
-		try {
-			t.pfe.fireGroupEvent(Event.TimerEventsTimer)
-		} catch (e) {
-			try {
-				logger().warn('timer error %s', (e as Error).message)
-			} catch {}
-		}
+		try { t.pfe.fireGroupEvent(Event.TimerEventsTimer) } catch (e) { logger().warn('timer error %s', (e as Error).message) }
 	}
 
 	public timerStateChange(timer: TimerHit, enabled: boolean): void {
