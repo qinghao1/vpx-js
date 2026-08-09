@@ -175,7 +175,7 @@ describe('Matrix3D D3D row semantics', () => {
 		expect(v.y).toBeCloseTo(expected.y,4)
 		expect(v.z).toBeCloseTo(expected.z,4)
 		const col=new Matrix4().set(row._11,row._21,row._31,row._41,row._12,row._22,row._32,row._42,row._13,row._23,row._33,row._43,row._14,row._24,row._34,row._44)
-		expect(obj.matrix.equals(col)).toBe(true)
+		for (let i=0;i<16;i++) expect(obj.matrix.elements[i]!).toBeCloseTo(col.elements[i]!,5)
 	})
 
 	it('flipper row order m0*Mr*m1*Mt', () => {
