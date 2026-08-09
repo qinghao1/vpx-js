@@ -59,10 +59,6 @@ export class Matrix2D extends Matrix3 {
 	override clone(): this {
 		return new Matrix2D().copy(this) as unknown as this
 	}
-	clonePooled(recycle = false): Matrix2D {
-		if (recycle) return Matrix2D.claim().copy(this) as Matrix2D
-		return this.clone()
-	}
 	override set(
 		n11: number,
 		n12: number,
@@ -238,10 +234,6 @@ export class Matrix3D extends Matrix4 {
 	}
 	override clone(): this {
 		return new Matrix3D().copy(this) as unknown as this
-	}
-	clonePooled(recycle = false): Matrix3D {
-		if (recycle) return Matrix3D.claim().copy(this) as Matrix3D
-		return this.clone()
 	}
 	get _11(): number {
 		return this.elements[0]

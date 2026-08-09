@@ -157,7 +157,4 @@ export class Vertex3D extends Vector3 {
 		if (buffer.length >= 12) v.z = view.getFloat32(8, true)
 		return v
 	}
-	static from(data: Record<string, unknown>): Vertex3D {
-		return Object.assign(new Vertex3D(), data)
-	}
 }

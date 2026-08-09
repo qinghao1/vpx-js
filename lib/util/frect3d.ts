@@ -1,7 +1,7 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { Box3, Vector3 } from 'three'
+import { Box3 } from 'three'
 import type { Vertex3D } from './vector.js'
 
 export class FRect3D extends Box3 {

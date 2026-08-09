@@ -1,20 +1,17 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { f4 } from './float.js'
 import type { Vertex3D } from './vector.js'
 import { RenderVertex, RenderVertex3D } from './render-vertex.js'
 import type { IRenderVertex, Vertex } from './vertex.js'
 
-/** Non-uniform centripetal Catmull-Rom spline. @see https://github.com/vpinball/vpinball/blob/master/mesh.h */
 export abstract class CatmullCurve {
-	/** Evaluate at `t` ∈ [0,1]. */
 	abstract getPointAt(t: number): IRenderVertex
 
 	protected static dt(v0: Vertex, v1: Vertex, v2: Vertex, v3: Vertex): [number, number, number] {
-		let dt0 = f4(Math.sqrt(v1.clone().sub(v0).length()))
-		let dt1 = f4(Math.sqrt(v2.clone().sub(v1).length()))
-		let dt2 = f4(Math.sqrt(v3.clone().sub(v2).length()))
+		let dt0 = Math.sqrt(v1.clone().sub(v0).length())
+		let dt1 = Math.sqrt(v2.clone().sub(v1).length())
+		let dt2 = Math.sqrt(v3.clone().sub(v2).length())
 		if (dt1 < 1e-4) dt1 = 1
 		if (dt0 < 1e-4) dt0 = dt1
 		if (dt2 < 1e-4) dt2 = dt1
@@ -30,25 +27,24 @@ export abstract class CatmullCurve {
 		dt1: number,
 		dt2: number,
 	): number[] {
-		let t1 = f4((x1 - x0) / dt0 - (x2 - x0) / (dt0 + dt1) + (x2 - x1) / dt1)
-		let t2 = f4((x2 - x1) / dt1 - (x3 - x1) / (dt1 + dt2) + (x3 - x2) / dt2)
-		t1 = f4(t1 * dt1)
-		t2 = f4(t2 * dt1)
+		let t1 = (x1 - x0) / dt0 - (x2 - x0) / (dt0 + dt1) + (x2 - x1) / dt1
+		let t2 = (x2 - x1) / dt1 - (x3 - x1) / (dt1 + dt2) + (x3 - x2) / dt2
+		t1 *= dt1
+		t2 *= dt1
 		return CatmullCurve.coeffs(x1, x2, t1, t2)
 	}
 
 	private static coeffs(x0: number, x1: number, t0: number, t1: number): number[] {
-		return [f4(x0), f4(t0), f4(-3 * x0 + 3 * x1 - 2 * t0 - t1), f4(2 * x0 - 2 * x1 + t0 + t1)]
+		return [x0, t0, -3 * x0 + 3 * x1 - 2 * t0 - t1, 2 * x0 - 2 * x1 + t0 + t1]
 	}
 
 	protected static evalCubic(c: number[], t: number): number {
-		const t2 = f4(t * t)
-		const t3 = f4(t2 * t)
-		return f4(c[3]! * t3 + c[2]! * t2 + c[1]! * t) + c[0]!
+		const t2 = t * t
+		const t3 = t2 * t
+		return c[3]! * t3 + c[2]! * t2 + c[1]! * t + c[0]!
 	}
 }
 
-/** 2D Catmull curve. */
 export class CatmullCurve2D extends CatmullCurve {
 	private readonly c: { x: number[]; y: number[] }
 
@@ -74,7 +70,6 @@ export class CatmullCurve2D extends CatmullCurve {
 	}
 }
 
-/** 3D Catmull curve. */
 export class CatmullCurve3D extends CatmullCurve {
 	private readonly c: { x: number[]; y: number[]; z: number[] }
 
