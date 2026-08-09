@@ -47,13 +47,13 @@ export class Matrix2D extends Matrix3 {
 		const oc = 1 - c
 		this.set(
 			x * x + c * (1 - x * x),
-			x * y * oc - z * s,
-			z * x * oc + y * s,
 			x * y * oc + z * s,
-			y * y + c * (1 - y * y),
-			y * z * oc - x * s,
 			z * x * oc - y * s,
+			x * y * oc - z * s,
+			y * y + c * (1 - y * y),
 			y * z * oc + x * s,
+			z * x * oc + y * s,
+			y * z * oc - x * s,
 			z * z + c * (1 - z * z),
 		)
 	}
