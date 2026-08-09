@@ -126,7 +126,7 @@ inline Hit testPoint(float bx, float by, float bz, float vx, float vy, float vz,
 	float hx = bx + vx*t, hy = by + vy*t, hz = bz + vz*t;
 	float nx = hx - px, ny = hy - py, nz = hz - pz;
 	float len = std::sqrt(nx*nx + ny*ny + nz*nz);
-	if (len > 1e-8f) { nx/=len; ny/=len; nz/=len; } else { nx=0; ny=1; nz=0; }
+	if (len > 1e-8f) { nx/=len; ny/=len; nz/=len; } else { nx=0; ny=0; nz=0; }
 	h.t = t; h.contact = contact; h.nx = nx; h.ny = ny; h.nz = nz; h.dist = bnd; h.bnv = contact ? bnv : 0;
 	return h;
 }
@@ -158,7 +158,6 @@ inline Hit testTriangle(float bx, float by, float bz, float vx, float vy, float 
 	float dot11 = v1x*v1x + v1y*v1y + v1z*v1z;
 	float dot12 = v1x*v2x + v1y*v2y + v1z*v2z;
 	float denom = dot00*dot11 - dot01*dot01;
-	if (std::fabs(denom) < 1e-8f) return h;
 	float invDenom = 1.f / denom;
 	float u = (dot11*dot02 - dot01*dot12) * invDenom;
 	float v = (dot00*dot12 - dot01*dot02) * invDenom;

@@ -24,7 +24,7 @@ type Order = { obj: HitObject; kind: Kind; idx: number }
 const isBatchCircle = (h: HitObject): h is HitCircle => h instanceof HitCircle && h.hitTest === HitCircle.prototype.hitTest
 const isBatchPoint = (h: HitObject): h is HitPoint => h instanceof HitPoint
 const isBatchTriangle = (h: HitObject): h is HitTriangle => h instanceof HitTriangle
-const isBatchLineSeg = (h: HitObject): h is LineSeg => h instanceof LineSeg
+const isBatchLineSeg = (h: HitObject): h is LineSeg => h instanceof LineSeg && h.hitTest === LineSeg.prototype.hitTest
 const isBatchLine3D = (h: HitObject): h is HitLine3D => h instanceof HitLine3D
 
 /** @see https://github.com/vpinball/vpinball/blob/master/quadtree.cpp */

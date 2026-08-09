@@ -16,6 +16,7 @@ import { HitTriangle } from './hit-triangle.js'
 import { LineSeg } from './line-seg.js'
 
 const isBatchCircle = (h: HitObject): boolean => h instanceof HitCircle && h.hitTest === HitCircle.prototype.hitTest
+const isBatchLineSeg = (h: HitObject): boolean => h instanceof LineSeg && h.hitTest === LineSeg.prototype.hitTest
 
 /** @see https://github.com/vpinball/vpinball/blob/master/kdtree.cpp */
 export class HitKD {
@@ -69,7 +70,7 @@ export class HitKD {
 			else if (h instanceof HitPoint) pointCount++
 			else if (h instanceof HitTriangle) triangleCount++
 			else if (h instanceof HitLine3D) line3DCount++
-			else if (h instanceof LineSeg) lineSegCount++
+			else if (isBatchLineSeg(h)) lineSegCount++
 		}
 		if (circleCount || planeCount || lineZCount || pointCount || triangleCount || lineSegCount || line3DCount) {
 			if (isWasmReady()) warmWasmPools(circleCount, planeCount, lineZCount, pointCount, triangleCount, lineSegCount, line3DCount)
