@@ -15,6 +15,18 @@ import { CollisionType } from './collision-type.js'
 
 /** Base for all collidable shapes.
  * @see https://github.com/vpinball/vpinball/blob/master/collide.h */
+export enum HitKind {
+	Circle = 0,
+	Plane = 1,
+	LineZ = 2,
+	Line3D = 3,
+	Point = 4,
+	Triangle = 5,
+	LineSeg = 6,
+	Poly = 7,
+	Other = 8,
+}
+
 export abstract class HitObject {
 	/** @deprecated use {@link eventProxy} */
 	public obj?: EventProxy
@@ -27,6 +39,7 @@ export abstract class HitObject {
 	public scatter = 0
 	protected objType: CollisionType = CollisionType.Null
 	public isEnabled = true
+	public hitKind: HitKind = HitKind.Other
 	/** @deprecated use {@link fireEvents} */
 	public fe = false
 	/** @deprecated use {@link isPrimitive} */

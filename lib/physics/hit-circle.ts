@@ -7,11 +7,12 @@ import type { Ball } from '../vpt/ball/ball.js'
 import type { CollisionEvent } from './collision-event.js'
 import { CollisionType } from './collision-type.js'
 import { C_CONTACTVEL, C_LOWNORMVEL, PHYS_TOUCH } from './constants.js'
-import { HitObject } from './hit-object.js'
+import { HitKind, HitObject } from './hit-object.js'
 
 /** Vertical cylinder hit shape.
  * @see https://github.com/vpinball/vpinball/blob/master/hitcircle.cpp */
 export class HitCircle extends HitObject {
+	public override hitKind = HitKind.Circle
 	constructor(
 		public center: Vertex2D,
 		public readonly radius: number,

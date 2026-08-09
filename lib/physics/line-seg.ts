@@ -6,11 +6,12 @@ import type { Ball } from '../vpt/ball/ball.js'
 import type { CollisionEvent } from './collision-event.js'
 import { CollisionType } from './collision-type.js'
 import { C_CONTACTVEL, C_LOWNORMVEL, C_TOL_ENDPNTS, C_TOL_RADIUS, PHYS_TOUCH } from './constants.js'
-import { HitObject } from './hit-object.js'
+import { HitKind, HitObject } from './hit-object.js'
 
 /** 2D line segment hit shape.
  * @see https://github.com/vpinball/vpinball/blob/master/collide.cpp */
 export class LineSeg extends HitObject {
+	public override hitKind = HitKind.LineSeg
 	public readonly v1: Vertex2D
 	public readonly v2: Vertex2D
 	protected normal: Vertex2D = new Vertex2D()

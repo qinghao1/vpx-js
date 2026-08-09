@@ -7,7 +7,7 @@ import { FRect3D } from '../util/frect3d.js'
 import { Vertex3D } from '../util/math.js'
 import type { Ball } from '../vpt/ball/ball.js'
 import { CollisionEvent } from './collision-event.js'
-import type { HitObject } from './hit-object.js'
+import { HitKind, type HitObject } from './hit-object.js'
 import { HitCircle } from './hit-circle.js'
 import { HitPlane } from './hit-plane.js'
 import { HitLineZ } from './hit-line-z.js'
@@ -18,14 +18,14 @@ import { LineSeg } from './line-seg.js'
 import { getWasmKernels, isWasmReady, tryGetWasmBatchHitViewsOutCircle, tryGetWasmBatchHitViewsOutLine3D, tryGetWasmBatchHitViewsOutLineSeg, tryGetWasmBatchHitViewsOutLineZ, tryGetWasmBatchHitViewsOutPlane, tryGetWasmBatchHitViewsOutPoint, tryGetWasmBatchHitViewsOutTriangle, warmWasmPools } from './wasm/kernels.js'
 import type { CircleViews, Line3DViews, LineSegViews, LineViews, PlaneViews, PointViews, TriangleViews } from './wasm/kernels.js'
 
-type Kind = 'circle' | 'plane' | 'lineZ' | 'point' | 'triangle' | 'lineSeg' | 'line3D' | 'other'
+type Kind = HitKind
 type Order = { obj: HitObject; kind: Kind; idx: number }
 
-const isBatchCircle = (h: HitObject): h is HitCircle => h instanceof HitCircle && h.hitTest === HitCircle.prototype.hitTest
-const isBatchPoint = (h: HitObject): h is HitPoint => h instanceof HitPoint
-const isBatchTriangle = (h: HitObject): h is HitTriangle => h instanceof HitTriangle
-const isBatchLineSeg = (h: HitObject): h is LineSeg => h instanceof LineSeg && h.hitTest === LineSeg.prototype.hitTest
-const isBatchLine3D = (h: HitObject): h is HitLine3D => h instanceof HitLine3D
+const isBatchCircle = (h: HitObject): h is HitCircle => h.hitKind === HitKind.Circle && h.hitTest === HitCircle.prototype.hitTest
+const isBatchPoint = (h: HitObject): h is HitPoint => h.hitKind === HitKind.Point
+const isBatchTriangle = (h: HitObject): h is HitTriangle => h.hitKind === HitKind.Triangle
+const isBatchLineSeg = (h: HitObject): h is LineSeg => h.hitKind === HitKind.LineSeg && h.hitTest === LineSeg.prototype.hitTest
+const isBatchLine3D = (h: HitObject): h is HitLine3D => h.hitKind === HitKind.Line3D
 
 /** @see https://github.com/vpinball/vpinball/blob/master/quadtree.cpp */
 export class HitQuadtree {
@@ -53,8 +53,8 @@ export class HitQuadtree {
 			let circleCount = 0, planeCount = 0, lineZCount = 0, pointCount = 0, triangleCount = 0, lineSegCount = 0, line3DCount = 0
 			for (const h of this.vho) {
 				if (isBatchCircle(h)) circleCount++
-				else if (h instanceof HitPlane) planeCount++
-				else if (h instanceof HitLineZ && !(h instanceof HitLine3D)) lineZCount++
+				else if (h.hitKind === HitKind.Plane) planeCount++
+				else if (h.hitKind === HitKind.LineZ) lineZCount++
 				else if (isBatchPoint(h)) pointCount++
 				else if (isBatchTriangle(h)) triangleCount++
 				else if (isBatchLineSeg(h)) lineSegCount++
@@ -124,8 +124,8 @@ export class HitQuadtree {
 	private replay(ball: Ball, coll: CollisionEvent, physics: PlayerPhysics, circleViews: CircleViews | null, planeViews: PlaneViews | null, lineViews: LineViews | null, pointViews: PointViews | null, triangleViews: TriangleViews | null, lineSegViews: LineSegViews | null, line3DViews: Line3DViews | null): void {
 		for (let i = 0; i < this._orderLen; i++) {
 			const e = this._order[i]!
-			if (e.kind === 'other') { e.obj.doHitTest(ball, coll, physics); continue }
-			const s = e.kind === 'circle' ? circleViews! : e.kind === 'plane' ? planeViews! : e.kind === 'lineZ' ? lineViews! : e.kind === 'point' ? pointViews! : e.kind === 'triangle' ? triangleViews! : e.kind === 'lineSeg' ? lineSegViews! : line3DViews!
+			if (e.kind === HitKind.Other) { e.obj.doHitTest(ball, coll, physics); continue }
+			const s = e.kind === HitKind.Circle ? circleViews! : e.kind === HitKind.Plane ? planeViews! : e.kind === HitKind.LineZ ? lineViews! : e.kind === HitKind.Point ? pointViews! : e.kind === HitKind.Triangle ? triangleViews! : e.kind === HitKind.LineSeg ? lineSegViews! : line3DViews!
 			const t = s.oT[e.idx]!, contact = s.oContact[e.idx]!, nx = s.oNx[e.idx]!, ny = s.oNy[e.idx]!, nz = s.oNz[e.idx]!, dist = s.oDist[e.idx]!, bnv = s.oBnv[e.idx]!
 			const isContact = !!contact, valid = t >= -0.5 && t <= coll.hitTime
 			if (!isContact && !valid) continue
@@ -175,14 +175,14 @@ export class HitQuadtree {
 			const h = node.vho[i]!
 			if (h === ball.hit || h.obj?.abortHitTest?.() || !h.isEnabled) continue
 			if (!h.hitBBox.intersectRect(ball.hit.hitBBox) || !h.hitBBox.intersectSphere(ball.state.pos, ball.hit.rcHitRadiusSqr)) continue
-			if (isBatchCircle(h)) { this.pushOrder(h, 'circle', circles.length); circles.push(h) }
-			else if (h instanceof HitPlane) { this.pushOrder(h, 'plane', planes.length); planes.push(h as HitPlane) }
-			else if (h instanceof HitLineZ && !(h instanceof HitLine3D)) { this.pushOrder(h, 'lineZ', lineZs.length); lineZs.push(h as HitLineZ) }
-			else if (isBatchPoint(h)) { this.pushOrder(h, 'point', points.length); points.push(h) }
-			else if (isBatchTriangle(h)) { this.pushOrder(h, 'triangle', triangles.length); triangles.push(h) }
-			else if (isBatchLine3D(h)) { this.pushOrder(h, 'line3D', line3Ds.length); line3Ds.push(h) }
-			else if (isBatchLineSeg(h)) { this.pushOrder(h, 'lineSeg', lineSegs.length); lineSegs.push(h) }
-			else this.pushOrder(h, 'other', -1)
+			if (isBatchCircle(h)) { this.pushOrder(h, HitKind.Circle, circles.length); circles.push(h) }
+			else if (h.hitKind === HitKind.Plane) { this.pushOrder(h, HitKind.Plane, planes.length); planes.push(h as HitPlane) }
+			else if (h.hitKind === HitKind.LineZ) { this.pushOrder(h, HitKind.LineZ, lineZs.length); lineZs.push(h as HitLineZ) }
+			else if (isBatchPoint(h)) { this.pushOrder(h, HitKind.Point, points.length); points.push(h) }
+			else if (isBatchTriangle(h)) { this.pushOrder(h, HitKind.Triangle, triangles.length); triangles.push(h) }
+			else if (isBatchLine3D(h)) { this.pushOrder(h, HitKind.Line3D, line3Ds.length); line3Ds.push(h) }
+			else if (isBatchLineSeg(h)) { this.pushOrder(h, HitKind.LineSeg, lineSegs.length); lineSegs.push(h) }
+			else this.pushOrder(h, HitKind.Other, -1)
 		}
 		if (node.isLeaf) return
 		const b = ball.hit.hitBBox, { x, y } = node.vCenter, left = b.left <= x, right = b.right >= x

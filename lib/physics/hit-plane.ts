@@ -6,11 +6,12 @@ import type { Vertex3D } from '../util/math.js'
 import type { Ball } from '../vpt/ball/ball.js'
 import type { CollisionEvent } from './collision-event.js'
 import { C_CONTACTVEL, PHYS_TOUCH } from './constants.js'
-import { HitObject } from './hit-object.js'
+import { HitKind, HitObject } from './hit-object.js'
 
 /** Infinite plane (playfield / glass).
  * @see https://github.com/vpinball/vpinball/blob/master/collide.cpp */
 export class HitPlane extends HitObject {
+	public override hitKind = HitKind.Plane
 	constructor(
 		public readonly normal: Vertex3D,
 		public readonly d: number,

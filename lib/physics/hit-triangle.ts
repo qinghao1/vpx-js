@@ -6,11 +6,12 @@ import { Vertex3D } from '../util/math.js'
 import type { Ball } from '../vpt/ball/ball.js'
 import type { CollisionEvent } from './collision-event.js'
 import { C_CONTACTVEL, C_LOWNORMVEL, PHYS_TOUCH } from './constants.js'
-import { HitObject } from './hit-object.js'
+import { HitKind, HitObject } from './hit-object.js'
 
 /** Triangular hit face.
  * @see https://github.com/vpinball/vpinball/blob/master/collide.cpp */
 export class HitTriangle extends HitObject {
+	public override hitKind = HitKind.Triangle
 	public readonly normal: Vertex3D
 
 	constructor(public readonly rgv: Vertex3D[]) {

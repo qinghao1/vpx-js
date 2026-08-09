@@ -5,7 +5,7 @@ import type { PlayerPhysics } from '../game/player-physics.js'
 import type { Ball } from '../vpt/ball/ball.js'
 import type { CollisionEvent } from './collision-event.js'
 import { HitKDNode } from './hit-kd-node.js'
-import type { HitObject } from './hit-object.js'
+import { HitKind, type HitObject } from './hit-object.js'
 import { getWasmKernels, isWasmReady, warmWasmPools } from './wasm/kernels.js'
 import { HitCircle } from './hit-circle.js'
 import { HitPlane } from './hit-plane.js'
@@ -15,8 +15,8 @@ import { HitPoint } from './hit-point.js'
 import { HitTriangle } from './hit-triangle.js'
 import { LineSeg } from './line-seg.js'
 
-const isBatchCircle = (h: HitObject): boolean => h instanceof HitCircle && h.hitTest === HitCircle.prototype.hitTest
-const isBatchLineSeg = (h: HitObject): boolean => h instanceof LineSeg && h.hitTest === LineSeg.prototype.hitTest
+const isBatchCircle = (h: HitObject): boolean => h.hitKind === HitKind.Circle && h.hitTest === HitCircle.prototype.hitTest
+const isBatchLineSeg = (h: HitObject): boolean => h.hitKind === HitKind.LineSeg && h.hitTest === LineSeg.prototype.hitTest
 
 /** @see https://github.com/vpinball/vpinball/blob/master/kdtree.cpp */
 export class HitKD {
@@ -65,11 +65,11 @@ export class HitKD {
 		let circleCount = 0, planeCount = 0, lineZCount = 0, pointCount = 0, triangleCount = 0, lineSegCount = 0, line3DCount = 0
 		for (const h of vho) {
 			if (isBatchCircle(h)) circleCount++
-			else if (h instanceof HitPlane) planeCount++
-			else if (h instanceof HitLineZ && !(h instanceof HitLine3D)) lineZCount++
-			else if (h instanceof HitPoint) pointCount++
-			else if (h instanceof HitTriangle) triangleCount++
-			else if (h instanceof HitLine3D) line3DCount++
+			else if (h.hitKind === HitKind.Plane) planeCount++
+			else if (h.hitKind === HitKind.LineZ) lineZCount++
+			else if (h.hitKind === HitKind.Point) pointCount++
+			else if (h.hitKind === HitKind.Triangle) triangleCount++
+			else if (h.hitKind === HitKind.Line3D) line3DCount++
 			else if (isBatchLineSeg(h)) lineSegCount++
 		}
 		if (circleCount || planeCount || lineZCount || pointCount || triangleCount || lineSegCount || line3DCount) {

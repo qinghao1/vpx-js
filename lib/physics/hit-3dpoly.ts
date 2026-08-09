@@ -7,11 +7,12 @@ import type { Ball } from '../vpt/ball/ball.js'
 import type { CollisionEvent } from './collision-event.js'
 import { CollisionType } from './collision-type.js'
 import { C_CONTACTVEL, C_LOWNORMVEL, PHYS_TOUCH, STATICTIME } from './constants.js'
-import { HitObject } from './hit-object.js'
+import { HitKind, HitObject } from './hit-object.js'
 
 /** 3D polygon.
  * @see https://github.com/vpinball/vpinball/blob/master/hit3dpoly.cpp */
 export class Hit3DPoly extends HitObject {
+	public override hitKind = HitKind.Poly
 	private readonly rgv: Vertex3D[]
 	private readonly normal = new Vertex3D()
 

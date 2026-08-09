@@ -15,19 +15,19 @@ import { HitTriangle } from './hit-triangle.js'
 import { LineSeg } from './line-seg.js'
 import { isWasmReady, tryGetWasmBatchHitViewsOutCircle, tryGetWasmBatchHitViewsOutLine3D, tryGetWasmBatchHitViewsOutLineSeg, tryGetWasmBatchHitViewsOutLineZ, tryGetWasmBatchHitViewsOutPlane, tryGetWasmBatchHitViewsOutPoint, tryGetWasmBatchHitViewsOutTriangle, warmWasmPools } from './wasm/kernels.js'
 import type { CircleViews, Line3DViews, LineSegViews, LineViews, PlaneViews, PointViews, TriangleViews } from './wasm/kernels.js'
-import type { HitObject } from './hit-object.js'
+import { HitKind, type HitObject } from './hit-object.js'
 
-type Kind = 'circle' | 'plane' | 'lineZ' | 'point' | 'triangle' | 'lineSeg' | 'line3D' | 'other'
+type Kind = HitKind
 type Order = { obj: HitObject; kind: Kind; idx: number }
 
 const COUNT_MASK = 0x3fffffff
 const AXIS_SHIFT = 30
 
-const isBatchCircle = (h: HitObject): h is HitCircle => h instanceof HitCircle && h.hitTest === HitCircle.prototype.hitTest
-const isBatchPoint = (h: HitObject): h is HitPoint => h instanceof HitPoint
-const isBatchTriangle = (h: HitObject): h is HitTriangle => h instanceof HitTriangle
-const isBatchLineSeg = (h: HitObject): h is LineSeg => h instanceof LineSeg && h.hitTest === LineSeg.prototype.hitTest
-const isBatchLine3D = (h: HitObject): h is HitLine3D => h instanceof HitLine3D
+const isBatchCircle = (h: HitObject): h is HitCircle => h.hitKind === HitKind.Circle && h.hitTest === HitCircle.prototype.hitTest
+const isBatchPoint = (h: HitObject): h is HitPoint => h.hitKind === HitKind.Point
+const isBatchTriangle = (h: HitObject): h is HitTriangle => h.hitKind === HitKind.Triangle
+const isBatchLineSeg = (h: HitObject): h is LineSeg => h.hitKind === HitKind.LineSeg && h.hitTest === LineSeg.prototype.hitTest
+const isBatchLine3D = (h: HitObject): h is HitLine3D => h.hitKind === HitKind.Line3D
 
 /** @see https://github.com/vpinball/vpinball/blob/master/kdtree.cpp */
 export class HitKDNode {
@@ -106,8 +106,8 @@ export class HitKDNode {
 	private replay(ball: Ball, coll: CollisionEvent, physics: PlayerPhysics, circleViews: CircleViews | null, planeViews: PlaneViews | null, lineViews: LineViews | null, pointViews: PointViews | null, triangleViews: TriangleViews | null, lineSegViews: LineSegViews | null, line3DViews: Line3DViews | null): void {
 		for (let i = 0; i < this._orderLen; i++) {
 			const e = this._order[i]!
-			if (e.kind === 'other') { e.obj.doHitTest(ball, coll, physics); continue }
-			const s = e.kind === 'circle' ? circleViews! : e.kind === 'plane' ? planeViews! : e.kind === 'lineZ' ? lineViews! : e.kind === 'point' ? pointViews! : e.kind === 'triangle' ? triangleViews! : e.kind === 'lineSeg' ? lineSegViews! : line3DViews!
+			if (e.kind === HitKind.Other) { e.obj.doHitTest(ball, coll, physics); continue }
+			const s = e.kind === HitKind.Circle ? circleViews! : e.kind === HitKind.Plane ? planeViews! : e.kind === HitKind.LineZ ? lineViews! : e.kind === HitKind.Point ? pointViews! : e.kind === HitKind.Triangle ? triangleViews! : e.kind === HitKind.LineSeg ? lineSegViews! : line3DViews!
 			const t = s.oT[e.idx]!, contact = s.oContact[e.idx]!, nx = s.oNx[e.idx]!, ny = s.oNy[e.idx]!, nz = s.oNz[e.idx]!, dist = s.oDist[e.idx]!, bnv = s.oBnv[e.idx]!
 			const isContact = !!contact, valid = t >= -0.5 && t <= coll.hitTime
 			if (!isContact && !valid) continue
@@ -170,14 +170,14 @@ export class HitKDNode {
 			const h = node.hitOct.getItemAt(i)
 			if (h === ball.hit || h.obj?.abortHitTest?.() || !h.isEnabled) continue
 			if (!h.hitBBox.intersectRect(b) || !h.hitBBox.intersectSphere(pos, rs)) continue
-			if (isBatchCircle(h)) { this.pushOrder(h, 'circle', this._circles.length); this._circles.push(h) }
-			else if (h instanceof HitPlane) { this.pushOrder(h, 'plane', this._planes.length); this._planes.push(h as HitPlane) }
-			else if (h instanceof HitLineZ && !(h instanceof HitLine3D)) { this.pushOrder(h, 'lineZ', this._lineZs.length); this._lineZs.push(h as HitLineZ) }
-			else if (isBatchPoint(h)) { this.pushOrder(h, 'point', this._points.length); this._points.push(h) }
-			else if (isBatchTriangle(h)) { this.pushOrder(h, 'triangle', this._triangles.length); this._triangles.push(h) }
-			else if (isBatchLine3D(h)) { this.pushOrder(h, 'line3D', this._line3Ds.length); this._line3Ds.push(h) }
-			else if (isBatchLineSeg(h)) { this.pushOrder(h, 'lineSeg', this._lineSegs.length); this._lineSegs.push(h) }
-			else this.pushOrder(h, 'other', -1)
+			if (isBatchCircle(h)) { this.pushOrder(h, HitKind.Circle, this._circles.length); this._circles.push(h) }
+			else if (h.hitKind === HitKind.Plane) { this.pushOrder(h, HitKind.Plane, this._planes.length); this._planes.push(h as HitPlane) }
+			else if (h.hitKind === HitKind.LineZ) { this.pushOrder(h, HitKind.LineZ, this._lineZs.length); this._lineZs.push(h as HitLineZ) }
+			else if (isBatchPoint(h)) { this.pushOrder(h, HitKind.Point, this._points.length); this._points.push(h) }
+			else if (isBatchTriangle(h)) { this.pushOrder(h, HitKind.Triangle, this._triangles.length); this._triangles.push(h) }
+			else if (isBatchLine3D(h)) { this.pushOrder(h, HitKind.Line3D, this._line3Ds.length); this._line3Ds.push(h) }
+			else if (isBatchLineSeg(h)) { this.pushOrder(h, HitKind.LineSeg, this._lineSegs.length); this._lineSegs.push(h) }
+			else this.pushOrder(h, HitKind.Other, -1)
 		}
 		if (node.children.length === 0) return
 		const axis = node.items >> AXIS_SHIFT

@@ -4,11 +4,13 @@
 import { Matrix2D, Vertex2D, Vertex3D } from '../util/math.js'
 import type { Ball } from '../vpt/ball/ball.js'
 import type { CollisionEvent } from './collision-event.js'
+import { HitKind } from './hit-object.js'
 import { HitLineZ } from './hit-line-z.js'
 
 /** 3D cylinder hit shape.
  * @see https://github.com/vpinball/vpinball/blob/master/collide.cpp */
 export class HitLine3D extends HitLineZ {
+	public override hitKind: HitKind = HitKind.Line3D
 	private readonly matrix = new Matrix2D()
 	private zLow!: number
 	private zHigh!: number

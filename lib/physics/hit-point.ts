@@ -5,11 +5,12 @@ import type { Vertex3D } from '../util/math.js'
 import type { Ball } from '../vpt/ball/ball.js'
 import type { CollisionEvent } from './collision-event.js'
 import { C_CONTACTVEL, PHYS_TOUCH } from './constants.js'
-import { HitObject } from './hit-object.js'
+import { HitKind, HitObject } from './hit-object.js'
 
 /** Point hit shape.
  * @see https://github.com/vpinball/vpinball/blob/master/collide.cpp */
 export class HitPoint extends HitObject {
+	public override hitKind = HitKind.Point
 	constructor(private readonly p: Vertex3D) {
 		super()
 	}
