@@ -1,7 +1,5 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
-import { MathUtils } from 'three'
-
 import { CollisionEvent } from '../physics/collision-event.js'
 import {
 	DEFAULT_STEPTIME,
@@ -24,7 +22,7 @@ import { BallData } from '../vpt/ball/ball-data.js'
 import { BallState } from '../vpt/ball/ball-state.js'
 import type { FlipperMover } from '../vpt/flipper/flipper-mover.js'
 import type { Table } from '../vpt/table/table.js'
-import { MAX_TIMERS_MSEC_OVERALL, TimerMode } from '../vpt/timer/timer-const.js'
+import { MAX_TIMERS_MSEC_OVERALL, TIMER_DISABLED, TimerMode } from '../vpt/timer/timer-const.js'
 import type { TimerHit } from '../vpt/timer/timer-hit.js'
 import { TimerOnOff } from '../vpt/timer/timer-on-off.js'
 import { Event } from './event.js'
@@ -32,7 +30,7 @@ import type { IEmulator } from './iemulator.js'
 import type { PinInput } from './pin-input.js'
 import type { IBallCreationPosition, Player } from './player.js'
 
-const SLOW_MO = 1
+const CLOCK_INIT_THRESHOLD_USEC = 100_000
 
 /** Core physics loop — 1 kHz collision, timers, movers.
  * @see https://github.com/vpinball/vpinball/blob/master/player.cpp */
@@ -58,7 +56,6 @@ export class PlayerPhysics {
 	private readonly hitObjectsDynamic: HitObject[] = []
 	private hitPlayfield!: HitPlane
 	private hitTopGlass!: HitPlane
-	private meshAsPlayfield = false
 	private hitOcTreeDynamic = new HitKD()
 	private hitOcTree = new HitQuadtree()
 	private hitTimers: TimerHit[] = []
@@ -92,17 +89,18 @@ export class PlayerPhysics {
 	}
 
 	private indexTableElements(): void {
-		for (const m of this.table.getMovables()) this.movers.push(m.getMover())
-		for (const h of this.table.getHittables())
+		this.movers.push(...this.table.getMovables().map(m => m.getMover()))
+		for (const h of this.table.getHittables()) {
 			for (const o of h.getHitShapes()) {
 				this.hitObjects.push(o)
 				o.calcHitBBox()
 			}
-		for (const s of this.table.getScriptables()) this.hitTimers.push(...s.getApi()._getTimers())
+		}
+		this.hitTimers.push(...this.table.getScriptables().flatMap(s => s.getApi()._getTimers()))
 		this.hitObjects.push(...this.table.getHitShapes())
 		this.hitPlayfield = this.table.generatePlayfieldHit()
 		this.hitTopGlass = this.table.generateGlassHit()
-		for (const f of Object.values(this.table.flippers)) this.flipperMovers.push(f.getMover())
+		this.flipperMovers.push(...Object.values(this.table.flippers).map(f => f.getMover()))
 	}
 
 	private initOcTree(table: Table): void {
@@ -112,40 +110,45 @@ export class PlayerPhysics {
 	}
 
 	public physicsSimulateCycle(dTime: number): void {
+		if (!this.hitPlayfield || !this.hitTopGlass) return
 		let staticCnts = STATICCNTS
 		this.hitOcTreeDynamic.update()
 		while (dTime > 0) {
 			let hitTime = dTime
 			for (const f of this.flipperMovers) {
 				const t = f.getHitTime()
-				if (t > 0 && t < hitTime) hitTime = t
+				if (Number.isFinite(t) && t > 0 && t < hitTime) hitTime = t
 			}
+			hitTime = Number.isFinite(hitTime) && hitTime > 0 ? hitTime : Number.EPSILON
 			this.recordContacts = true
 			this.contacts.length = 0
-			for (const ball of this.balls) {
-				if (ball.state.isFrozen) continue
-				ball.hit.coll.hitTime = hitTime
-				ball.hit.coll.clear()
-				if (!this.meshAsPlayfield) this.hitPlayfield.doHitTest(ball, ball.coll, this)
-				this.hitTopGlass.doHitTest(ball, ball.coll, this)
-				if (this.swapBallCollisionHandling) {
-					this.hitOcTreeDynamic.hitTestBall(ball, ball.coll, this)
-					this.hitOcTree.hitTestBall(ball, ball.coll, this)
-				} else {
-					this.hitOcTree.hitTestBall(ball, ball.coll, this)
-					this.hitOcTreeDynamic.hitTestBall(ball, ball.coll, this)
-				}
-				const htz = ball.coll.hitTime
-				if (htz < 0) ball.coll.clear()
-				if (ball.coll.obj && htz <= hitTime) {
-					hitTime = htz
-					if (htz < STATICTIME && --staticCnts < 0) {
-						staticCnts = 0
-						hitTime = STATICTIME
+			try {
+				for (const ball of this.balls) {
+					if (ball.state.isFrozen) continue
+					ball.hit.coll.hitTime = hitTime
+					ball.hit.coll.clear()
+					this.hitPlayfield.doHitTest(ball, ball.coll, this)
+					this.hitTopGlass.doHitTest(ball, ball.coll, this)
+					if (this.swapBallCollisionHandling) {
+						this.hitOcTreeDynamic.hitTestBall(ball, ball.coll, this)
+						this.hitOcTree.hitTestBall(ball, ball.coll, this)
+					} else {
+						this.hitOcTree.hitTestBall(ball, ball.coll, this)
+						this.hitOcTreeDynamic.hitTestBall(ball, ball.coll, this)
+					}
+					const htz = ball.coll.hitTime
+					if (htz < 0) ball.coll.clear()
+					if (ball.coll.obj && htz <= hitTime) {
+						hitTime = htz
+						if (htz < STATICTIME && --staticCnts < 0) {
+							staticCnts = 0
+							hitTime = STATICTIME
+						}
 					}
 				}
+			} finally {
+				this.recordContacts = false
 			}
-			this.recordContacts = false
 			if (hitTime > STATICTIME) staticCnts = STATICCNTS
 			for (const m of this.movers) m.updateDisplacements(hitTime)
 			for (let i = 0; i < this.balls.length; i++) {
@@ -167,7 +170,7 @@ export class PlayerPhysics {
 			}
 			for (const c of this.contacts) CollisionEvent.releaseOne(c)
 			this.contacts.length = 0
-			dTime -= hitTime
+			dTime = Math.max(0, dTime - hitTime)
 			this.swapBallCollisionHandling = !this.swapBallCollisionHandling
 		}
 	}
@@ -183,7 +186,7 @@ export class PlayerPhysics {
 			this.curPhysicsFrameTime = initial
 		}
 		this.lastFrameDuration = initial - this.lastTimeUsec
-		if (this.lastFrameDuration > 1_000_000) this.lastFrameDuration = 0
+		if (this.lastFrameDuration > 1_000_000) this.lastFrameDuration = DEFAULT_STEPTIME
 		this.lastTimeUsec = initial
 		this.cFrames++
 		if (this.timeMsec - this.lastFpsTime > 1000) {
@@ -194,7 +197,7 @@ export class PlayerPhysics {
 		this.scriptPeriod = 0
 		let iterations = 0
 		while (this.curPhysicsFrameTime < initial) {
-			this.timeMsec = (this.curPhysicsFrameTime - this.startTimeUsec) / 1000
+			this.timeMsec = Math.floor((this.curPhysicsFrameTime - this.startTimeUsec) / 1000)
 			iterations++
 			const dt = (this.nextPhysicsFrameTime - this.curPhysicsFrameTime) * (1 / DEFAULT_STEPTIME)
 			const curUsec = this.now()
@@ -219,44 +222,48 @@ export class PlayerPhysics {
 
 	private fireTimers(mode: TimerMode): void {
 		this.deferTimerChanges = true
-		if (mode === TimerMode.Update) {
-			const cur = this.timeMsec
-			for (const t of this.hitTimers) {
-				if (t.interval < 0) continue
-				if (t.nextFire <= cur) {
-					const prev = t.nextFire
-					try {
-						t.pfe.fireGroupEvent(Event.TimerEventsTimer)
-					} catch (e) {
-						try {
-							logger().warn('timer error %s', (e as Error).message)
-						} catch {}
-					}
-					if (prev === t.nextFire && t.interval > 0) {
-						while (t.nextFire <= cur) t.nextFire += t.interval
+		try {
+			if (mode === TimerMode.Update) {
+				const cur = this.timeMsec
+				for (const t of this.hitTimers) {
+					if (t.interval < 0) continue
+					if (t.nextFire <= cur) {
+						const prev = t.nextFire
+						this.safeFire(t)
+						if (prev === t.nextFire && t.interval > 0) {
+							while (t.nextFire <= cur) {
+								if (t.interval <= 0) break
+								t.nextFire += t.interval
+							}
+						}
 					}
 				}
-			}
-		} else {
-			for (const t of this.hitTimers) {
-				if (t.interval !== mode) continue
-				try {
-					t.pfe.fireGroupEvent(Event.TimerEventsTimer)
-				} catch (e) {
-					try {
-						logger().warn('timer error %s', (e as Error).message)
-					} catch {}
+			} else {
+				for (const t of this.hitTimers) {
+					if (t.interval !== mode) continue
+					this.safeFire(t)
 				}
 			}
+		} finally {
+			this.deferTimerChanges = false
+			this.flushTimers()
 		}
-		this.deferTimerChanges = false
-		this.flushTimers()
+	}
+
+	private safeFire(t: TimerHit): void {
+		try {
+			t.pfe.fireGroupEvent(Event.TimerEventsTimer)
+		} catch (e) {
+			try {
+				logger().warn('timer error %s', (e as Error).message)
+			} catch {}
+		}
 	}
 
 	public timerStateChange(timer: TimerHit, enabled: boolean): void {
 		if (this.deferTimerChanges) {
 			if (enabled) timer.nextFire = this.timeMsec + timer.interval
-			else timer.nextFire = 0xffffffff
+			else timer.nextFire = TIMER_DISABLED
 			const existing = this.changedHitTimers.find(c => c.timer === timer)
 			if (existing) existing.enabled = enabled
 			else this.changedHitTimers.push(new TimerOnOff(enabled, timer))
@@ -266,13 +273,13 @@ export class PlayerPhysics {
 		} else {
 			const idx = this.hitTimers.indexOf(timer)
 			if (idx >= 0) this.hitTimers.splice(idx, 1)
-			timer.nextFire = 0xffffffff
+			timer.nextFire = TIMER_DISABLED
 		}
 	}
 
 	private ensureInitialTime(initial: number): boolean {
 		if (this.curPhysicsFrameTime !== 0 || this.nextPhysicsFrameTime !== 0 || this.startTimeUsec !== 0) return false
-		if (initial > 100000) {
+		if (initial > CLOCK_INIT_THRESHOLD_USEC) {
 			this.curPhysicsFrameTime = initial
 			this.nextPhysicsFrameTime = initial + PHYSICS_STEPTIME
 			this.startTimeUsec = initial
@@ -320,21 +327,24 @@ export class PlayerPhysics {
 		if (wasActive) this.activeBall = undefined
 		if (wasDebug) this.activeBallDebug = undefined
 		if (this.activeBallBC === ball) this.activeBallBC = undefined
-		this.balls.splice(this.balls.indexOf(ball), 1)
-		this.movers.splice(this.movers.indexOf(ball.getMover()), 1)
-		this.hitObjectsDynamic.splice(this.hitObjectsDynamic.indexOf(ball.hit), 1)
+		const bi = this.balls.indexOf(ball)
+		if (bi >= 0) this.balls.splice(bi, 1)
+		const mi = this.movers.indexOf(ball.getMover())
+		if (mi >= 0) this.movers.splice(mi, 1)
+		const hi = this.hitObjectsDynamic.indexOf(ball.hit)
+		if (hi >= 0) this.hitObjectsDynamic.splice(hi, 1)
 		this.hitOcTreeDynamic.fillFromVector(this.hitObjectsDynamic, true)
 		if (wasDebug && this.balls.length) this.activeBallDebug = this.balls[0]
 		if (wasActive && this.balls.length) this.activeBall = this.balls[0]
 	}
 
 	private now(): number {
-		return performance.now() * SLOW_MO
+		return performance.now()
 	}
 
 	public setGravity(slopeDeg: number, strength: number): void {
 		this.gravity.x = 0
-		this.gravity.y = Math.sin(MathUtils.degToRad(slopeDeg)) * strength
-		this.gravity.z = -Math.cos(MathUtils.degToRad(slopeDeg)) * strength
+		this.gravity.y = Math.sin((slopeDeg * Math.PI) / 180) * strength
+		this.gravity.z = -Math.cos((slopeDeg * Math.PI) / 180) * strength
 	}
 }

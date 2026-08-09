@@ -17,3 +17,5 @@ export enum TimerMode {
 	OnNewFrame = -1,
 	OnGameSync = -2,
 }
+
+export const TIMER_DISABLED = 0xffffffff
