@@ -4,18 +4,32 @@
 import { createRequire } from 'node:module'
 import {
 	type AnimationClip,
+	type Bone,
 	BufferAttribute,
 	type BufferGeometry,
 	type Camera,
+	ClampToEdgeWrapping,
+	type Color,
 	DoubleSide,
 	type InterleavedBufferAttribute,
 	InterpolateDiscrete,
+	InterpolateLinear,
+	type Light,
+	LinearFilter,
+	LinearMipMapLinearFilter,
+	LinearMipMapNearestFilter,
 	Math as M,
 	type Material,
+	type Matrix4,
 	type Mesh,
+	MirroredRepeatWrapping,
+	NearestFilter,
+	NearestMipMapLinearFilter,
+	NearestMipMapNearestFilter,
 	type Object3D,
 	type PixelFormat,
 	PropertyBinding,
+	RepeatWrapping,
 	Scene,
 	type Texture,
 	Vector3,
@@ -35,36 +49,398 @@ import type {
 	GltfNode,
 	GltfScene,
 } from './gltf.js'
-import { Utils } from './gltf-animation-utils.js'
-import type {
-	AnimationClipInternal,
-	BufferView,
-	CameraInternal,
-	ExtensionsUsed,
-	KeyframeTrackInternal,
-	LightDefinition,
-	LightInternal,
-	MapDefinition,
-	MaterialInternal,
-	MeshInternal,
-	Object3DInternal,
-	TransformDefinition,
-} from './gltf-internal.js'
 import type { NodeImage } from './image.node.js'
+
+/** WebGL enum values used in glTF. */
+export const WEBGL_CONSTANTS: Record<string, number> = {
+	POINTS: 0x0000,
+	LINES: 0x0001,
+	LINE_LOOP: 0x0002,
+	LINE_STRIP: 0x0003,
+	TRIANGLES: 0x0004,
+	TRIANGLE_STRIP: 0x0005,
+	TRIANGLE_FAN: 0x0006,
+
+	UNSIGNED_BYTE: 0x1401,
+	UNSIGNED_SHORT: 0x1403,
+	FLOAT: 0x1406,
+	UNSIGNED_INT: 0x1405,
+	ARRAY_BUFFER: 0x8892,
+	ELEMENT_ARRAY_BUFFER: 0x8893,
+
+	NEAREST: 0x2600,
+	LINEAR: 0x2601,
+	NEAREST_MIPMAP_NEAREST: 0x2700,
+	LINEAR_MIPMAP_NEAREST: 0x2701,
+	NEAREST_MIPMAP_LINEAR: 0x2702,
+	LINEAR_MIPMAP_LINEAR: 0x2703,
+
+	CLAMP_TO_EDGE: 33071,
+	MIRRORED_REPEAT: 33648,
+	REPEAT: 10497,
+}
+
+/** Mapping from Three.js constants to WebGL constants. */
+export const THREE_TO_WEBGL: Record<string | number, number> = {
+	[NearestFilter]: WEBGL_CONSTANTS.NEAREST,
+	[NearestMipMapNearestFilter]: WEBGL_CONSTANTS.NEAREST_MIPMAP_NEAREST,
+	[NearestMipMapLinearFilter]: WEBGL_CONSTANTS.NEAREST_MIPMAP_LINEAR,
+	[LinearFilter]: WEBGL_CONSTANTS.LINEAR,
+	[LinearMipMapNearestFilter]: WEBGL_CONSTANTS.LINEAR_MIPMAP_NEAREST,
+	[LinearMipMapLinearFilter]: WEBGL_CONSTANTS.LINEAR_MIPMAP_LINEAR,
+	[ClampToEdgeWrapping]: WEBGL_CONSTANTS.CLAMP_TO_EDGE,
+	[RepeatWrapping]: WEBGL_CONSTANTS.REPEAT,
+	[MirroredRepeatWrapping]: WEBGL_CONSTANTS.MIRRORED_REPEAT,
+}
+
+/** glTF animation path property mapping. */
+export const PATH_PROPERTIES: Record<string, string> = {
+	scale: 'scale',
+	position: 'translation',
+	quaternion: 'rotation',
+	morphTargetInfluences: 'weights',
+}
+
+/** Return true if arrays are shallow-equal. */
+export function equalArray(a: unknown[], b: unknown[]): boolean {
+	return a.length === b.length && a.every((v, i) => v === b[i])
+}
+
+/** Convert string to Buffer, replacing multi-byte chars with space. */
+export function stringToBuffer(text: string): Buffer {
+	const array = Buffer.alloc(text.length)
+	for (let i = 0; i < text.length; i++) {
+		const v = text.charCodeAt(i)
+		array[i] = v > 0xff ? 0x20 : v
+	}
+	return array
+}
+
+/** Pad buffer size to next 4-byte boundary. */
+export function getPaddedBufferSize(size: number): number {
+	return Math.ceil(size / 4) * 4
+}
+
+/** Return buffer padded to 4-byte boundary. */
+export function getPaddedArrayBuffer(buf: Buffer, pad = 0x0): Buffer {
+	const padded = getPaddedBufferSize(buf.byteLength)
+	if (padded === buf.byteLength) return buf
+	return Buffer.concat([buf, Buffer.alloc(padded - buf.byteLength, pad)])
+}
+
+/** Serialize `object.userData` safely. */
+export function serializeUserData(object: Object3D | Material | BufferGeometry): Record<string, unknown> {
+	try {
+		return JSON.parse(JSON.stringify(object.userData))
+	} catch (err) {
+		logger().warn(
+			`[GLTFExporter.serializeUserData] userData of '${object.name}' won't be serialized: ${(err as Error).message}`,
+		)
+		return {}
+	}
+}
+
+export interface MapDefinition {
+	index: number
+	scale?: number
+	texCoord?: number
+	strength?: number
+	extensions?: {
+		[key: string]: TransformDefinition
+	}
+}
+
+export interface TransformDefinition {
+	rotation?: number
+	offset?: number[]
+	scale?: number[]
+}
+
+export interface LightDefinition {
+	name?: string
+	color?: number[]
+	intensity?: number
+	type?: 'directional' | 'point' | 'spot'
+	range?: number
+	spot?: {
+		innerConeAngle?: number
+		outerConeAngle?: number
+	}
+}
+
+export interface ExtensionsUsed {
+	KHR_materials_unlit?: boolean
+	KHR_texture_transform?: boolean
+	KHR_lights_punctual?: boolean
+}
+
+export interface BufferView {
+	id?: number
+	byteLength: number
+	buffer?: number
+	byteOffset?: number
+	byteStride?: number
+	target?: number
+}
+
+export interface MaterialInternal extends Material {
+	isMeshBasicMaterial: boolean
+	isLineBasicMaterial: boolean
+	isPointsMaterial: boolean
+	isMeshStandardMaterial: boolean
+	isShaderMaterial: boolean
+	color: Color
+	map: Texture
+	normalMap: Texture
+	metalness: number
+	metalnessMap: Texture
+	roughness: number
+	roughnessMap: Texture
+	emissive: Vector3
+	emissiveMap: Texture
+	emissiveIntensity: number
+	normalScale: Vector3
+	aoMap: Texture
+	aoMapIntensity: number
+	wireframe: number
+}
+
+export interface MeshInternal extends Mesh {
+	isLineSegments: boolean
+	isLineLoop: boolean
+	isLine: boolean
+	isPoints: boolean
+}
+
+export interface GeometryInternal extends BufferGeometry {
+	isBufferGeometry: true
+}
+
+export interface CameraInternal extends Camera {
+	isOrthographicCamera: boolean
+	right: number
+	top: number
+	far: number
+	near: number
+	aspect?: number
+	fov: number
+}
+
+// @ts-expect-error
+export interface AnimationClipInternal extends AnimationClip {
+	clone(): AnimationClipInternal
+	tracks: any
+}
+
+// @ts-expect-error
+export interface KeyframeTrackInternal extends KeyframeTrack {
+	times: any
+	values: any
+	ValueBufferType: any
+	InterpolantFactoryMethodDiscrete: any
+	InterpolantFactoryMethodLinear: any
+	createInterpolant: {
+		isInterpolantFactoryMethodGLTFCubicSpline: boolean
+	}
+	getValueSize(): number
+}
+
+export interface LightInternal extends Light {
+	isDirectionalLight: boolean
+	isPointLight: boolean
+	isSpotLight: boolean
+	distance: number
+	range: number
+	penumbra: number
+	angle: number
+	decay: number
+	target: {
+		parent: LightInternal
+		position: {
+			x: number
+			y: number
+			z: number
+		}
+	}
+}
+
+export interface Object3DInternal extends Object3D {
+	skeleton: {
+		bones: Bone[]
+		boneInverses: Matrix4[]
+	}
+	isMesh: boolean
+	isSkinnedMesh: boolean
+	isLine: boolean
+	isPoints: boolean
+	isCamera: boolean
+
+	isLight: boolean
+	isDirectionalLight: boolean
+	isPointLight: boolean
+	isSpotLight: boolean
+}
+
+export class Utils {
+	public static insertKeyframe(track: KeyframeTrackInternal, time: number): number {
+		const tolerance = 0.001 // 1ms
+		const valueSize = track.getValueSize()
+
+		const times = new Float32Array(track.times.length + 1)
+		const values = new Float32Array(track.values.length + valueSize)
+		const interpolant = (track as any).createInterpolant(new Float32Array(valueSize))
+
+		let index = 0
+
+		if (track.times.length === 0) {
+			times[0] = time
+
+			for (let i = 0; i < valueSize; i++) {
+				values[i] = 0
+			}
+
+			index = 0
+		} else if (time < track.times[0]) {
+			if (Math.abs(track.times[0] - time) < tolerance) {
+				return 0
+			}
+
+			times[0] = time
+			times.set(track.times, 1)
+
+			values.set(interpolant.evaluate(time), 0)
+			values.set(track.values, valueSize)
+
+			index = 0
+		} else if (time > track.times[track.times.length - 1]) {
+			if (Math.abs(track.times[track.times.length - 1] - time) < tolerance) {
+				return track.times.length - 1
+			}
+
+			times[times.length - 1] = time
+			times.set(track.times, 0)
+
+			values.set(track.values, 0)
+			values.set(interpolant.evaluate(time), track.values.length)
+
+			index = times.length - 1
+		} else {
+			for (let i = 0; i < track.times.length; i++) {
+				if (Math.abs(track.times[i] - time) < tolerance) {
+					return i
+				}
+
+				if (track.times[i] < time && track.times[i + 1] > time) {
+					times.set(track.times.slice(0, i + 1), 0)
+					times[i + 1] = time
+					times.set(track.times.slice(i + 1), i + 2)
+
+					values.set(track.values.slice(0, (i + 1) * valueSize), 0)
+					values.set(interpolant.evaluate(time), (i + 1) * valueSize)
+					values.set(track.values.slice((i + 1) * valueSize), (i + 2) * valueSize)
+
+					index = i + 1
+
+					break
+				}
+			}
+		}
+		track.times = times as any
+		track.values = values as any
+		return index
+	}
+
+	public static mergeMorphTargetTracks(clip: AnimationClipInternal, root: any) {
+		const tracks = []
+		const mergedTracks: any = {}
+		const sourceTracks = clip.tracks as any
+
+		for (let sourceTrack of sourceTracks) {
+			const sourceTrackBinding = PropertyBinding.parseTrackName(sourceTrack.name)
+			const sourceTrackNode = PropertyBinding.findNode(root, sourceTrackBinding.nodeName) as any
+
+			if (
+				sourceTrackBinding.propertyName !== 'morphTargetInfluences' ||
+				sourceTrackBinding.propertyIndex === undefined
+			) {
+				// Tracks that don't affect morph targets, or that affect all morph targets together, can be left as-is.
+				tracks.push(sourceTrack)
+				continue
+			}
+
+			if (
+				sourceTrack.createInterpolant !== sourceTrack.InterpolantFactoryMethodDiscrete &&
+				sourceTrack.createInterpolant !== sourceTrack.InterpolantFactoryMethodLinear
+			) {
+				if (sourceTrack.createInterpolant.isInterpolantFactoryMethodGLTFCubicSpline) {
+					// This should never happen, because glTF morph target animations
+					// affect all targets already.
+					throw new Error('GLTFExporter: Cannot merge tracks with glTF CUBICSPLINE interpolation.')
+				}
+
+				logger().warn(
+					'[GLTFExporter.mergeMorphTargetTracks]: Morph target interpolation mode not yet supported. Using LINEAR instead.',
+				)
+
+				sourceTrack = sourceTrack.clone()
+				sourceTrack.setInterpolation(InterpolateLinear)
+			}
+
+			const targetCount = sourceTrackNode.morphTargetInfluences.length
+			const targetIndex = sourceTrackNode.morphTargetDictionary[sourceTrackBinding.propertyIndex]
+
+			if (targetIndex === undefined) {
+				throw new Error(`GLTFExporter: Morph target name not found: ${sourceTrackBinding.propertyIndex}`)
+			}
+
+			let mergedTrack: any
+
+			// If this is the first time we've seen this object, create a new
+			// track to store merged keyframe data for each morph target.
+			if (mergedTracks[sourceTrackNode.uuid] === undefined) {
+				mergedTrack = sourceTrack.clone()
+				const values = new mergedTrack.ValueBufferType(targetCount * mergedTrack.times.length)
+				for (let j = 0; j < mergedTrack.times.length; j++) {
+					values[j * targetCount + targetIndex] = mergedTrack.values[j]
+				}
+
+				mergedTrack.name = '.morphTargetInfluences'
+				mergedTrack.values = values
+
+				mergedTracks[sourceTrackNode.uuid] = mergedTrack
+				tracks.push(mergedTrack)
+				continue
+			}
+
+			const _mergedKeyframeIndex = 0
+			const _sourceKeyframeIndex = 0
+			const sourceInterpolant = sourceTrack.createInterpolant(new sourceTrack.ValueBufferType(1))
+
+			mergedTrack = mergedTracks[sourceTrackNode.uuid]
+
+			// For every existing keyframe of the merged track, write a (possibly
+			// interpolated) value from the source track.
+			for (let j = 0; j < mergedTrack.times.length; j++) {
+				mergedTrack.values[j * targetCount + targetIndex] = sourceInterpolant.evaluate(mergedTrack.times[j])
+			}
+
+			// For every existing keyframe of the source track, write a (possibly
+			// new) keyframe to the merged track. Values from the previous loop may
+			// be written again, but keyframes are de-duplicated.
+			for (let j = 0; j < sourceTrack.times.length; j++) {
+				const keyframeIndex = Utils.insertKeyframe(mergedTrack, sourceTrack.times[j])
+				mergedTrack.values[keyframeIndex * targetCount + targetIndex] = sourceTrack.values[j]
+			}
+		}
+		clip.tracks = tracks
+		return clip
+	}
+}
 
 const require = createRequire(import.meta.url)
 
 const gltfPipeline = require('gltf-pipeline')
 const PromisePool = require('es6-promise-pool')
-
-import { PATH_PROPERTIES, THREE_TO_WEBGL, WEBGL_CONSTANTS } from './gltf-constants.js'
-import {
-	equalArray,
-	getPaddedArrayBuffer,
-	getPaddedBufferSize,
-	serializeUserData,
-	stringToBuffer,
-} from './gltf-utils.js'
 
 /**
  * This is a modified version of Three's GLTF exporter that runs better
