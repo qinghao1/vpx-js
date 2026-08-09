@@ -47,6 +47,7 @@ export class PinMameEmulator implements IEmulator {
 	private readonly lamps = new Uint8Array(624)
 	private readonly sols = new Uint8Array(72)
 	private readonly gis = new Uint8Array(8)
+	private readonly mockSwitches = new Map<number, number>()
 	private dmdW = DMD.x
 	private dmdH = DMD.y
 
@@ -143,7 +144,7 @@ export class PinMameEmulator implements IEmulator {
 			[this.api.getChangedLamps, this.lamps],
 			[this.api.getChangedSols, this.sols],
 			[this.api.getChangedGIs, this.gis],
-		] as const) try { this.pull(fn, buf as Uint8Array) } catch {}
+		] as const) try { this.pull(fn, buf) } catch {}
 		try { this.emulatorState.applyPinmame(this.lamps, this.sols, this.gis) } catch {}
 		try { this.pullDmd() } catch (e) { logger().warn('[pinmame] pullDmd failed', String(e)) }
 	}
@@ -176,8 +177,6 @@ export class PinMameEmulator implements IEmulator {
 			}
 		} finally { m._free(ptr) }
 	}
-
-	private readonly mockSwitches = new Map<number, number>()
 
 	getSwitchInput(n: number): number {
 		return (this.isMock ? this.mockSwitches.get(n) : this.api?.getSwitch(n)) ?? 0
