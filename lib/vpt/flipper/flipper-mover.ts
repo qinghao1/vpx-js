@@ -76,10 +76,10 @@ export class FlipperMover implements MoverObject {
 			this.angularMomentum *= -0.3
 			this.angleSpeed = this.angularMomentum / this.inertia
 			if (this.enableRotateEvent > 0) {
-				logger().info('[%s] Flipper is up', this.data.getName())
+				logger().debug('[%s] Flipper is up', this.data.getName())
 				this.events.fireVoidEventParm(Event.LimitEventsEOS, anglespd)
 			} else if (this.enableRotateEvent < 0) {
-				logger().info('[%s] Flipper is down', this.data.getName())
+				logger().debug('[%s] Flipper is down', this.data.getName())
 				this.events.fireVoidEventParm(Event.LimitEventsBOS, anglespd)
 			}
 			this.enableRotateEvent = 0

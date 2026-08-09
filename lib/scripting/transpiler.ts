@@ -85,17 +85,17 @@ export class Transpiler {
 		const src = normalizeNewCall(vbs)
 		const t0 = Date.now()
 		let ast = this.grammar.transpile(src)
-		logger().info('[Transpiler] Parsed in %sms', Date.now() - t0)
+		logger().debug('[Transpiler] Parsed in %sms', Date.now() - t0)
 		const t1 = Date.now()
 		ast = this.pipeline(gf, go).reduce((a, fn) => fn(a), ast)
-		logger().info('[Transpiler] Transformed in %sms', Date.now() - t1)
+		logger().debug('[Transpiler] Transformed in %sms', Date.now() - t1)
 		return { ast, t0, t1 }
 	}
 
 	private gen(ast: Program, t0: number): string {
 		const t2 = Date.now()
 		const js = generate(ast)
-		logger().info('[Transpiler] Generated in %sms (total %sms)', Date.now() - t2, Date.now() - t0)
+		logger().debug('[Transpiler] Generated in %sms (total %sms)', Date.now() - t2, Date.now() - t0)
 		logger().debug(js)
 		return js
 	}
@@ -104,7 +104,7 @@ export class Transpiler {
 		let t = Date.now()
 		progress().details('evaluating')
 		eval(`//@ sourceURL=game:///tablescript.vbs.js\n${js}`)
-		logger().info('[Transpiler] Evaluated in %sms', Date.now() - t)
+		logger().debug('[Transpiler] Evaluated in %sms', Date.now() - t)
 		progress().details('executing')
 		t = Date.now()
 		play(
@@ -116,7 +116,7 @@ export class Transpiler {
 			new VBSHelper(this),
 			this.player,
 		)
-		logger().info('[Transpiler] Executed in %sms', Date.now() - t)
+		logger().debug('[Transpiler] Executed in %sms', Date.now() - t)
 	}
 
 	public transpile(vbs: string, globalFunction?: string, globalObject?: string): string {
@@ -130,7 +130,7 @@ export class Transpiler {
 		await this.gate.waitIfAnimating()
 		const t0 = Date.now()
 		let ast = this.grammar.transpile(src)
-		logger().info('[Transpiler] Parsed in %sms', Date.now() - t0)
+		logger().debug('[Transpiler] Parsed in %sms', Date.now() - t0)
 		await this.gate.yieldToMain()
 		const t1 = Date.now()
 		for (const fn of this.pipeline(globalFunction, globalObject)) {
@@ -138,7 +138,7 @@ export class Transpiler {
 			ast = fn(ast)
 			await this.gate.yieldToMain()
 		}
-		logger().info('[Transpiler] Transformed in %sms', Date.now() - t1)
+		logger().debug('[Transpiler] Transformed in %sms', Date.now() - t1)
 		const js = this.gen(ast, t0)
 		if (typeof window !== 'undefined' && typeof indexedDB !== 'undefined') {
 			import('../util/idb-cache.js')
@@ -165,11 +165,11 @@ export class Transpiler {
 				const { vbsCacheKey, idbGet } = await import('../util/idb-cache.js')
 				const cached = await idbGet(vbsCacheKey(vbs))
 				if (typeof cached === 'string' && cached.length > 1000) {
-					logger().info('[Transpiler] Cache hit (%s chars)', cached.length)
+					logger().debug('[Transpiler] Cache hit (%s chars)', cached.length)
 					let t = Date.now()
 					progress().details('evaluating')
 					eval(`//@ sourceURL=game:///tablescript.vbs.js\n${cached}`)
-					logger().info('[Transpiler] Evaluated in %sms', Date.now() - t)
+					logger().debug('[Transpiler] Evaluated in %sms', Date.now() - t)
 					progress().details('executing')
 					t = Date.now()
 					await this.gate.yieldToMain()
@@ -182,7 +182,7 @@ export class Transpiler {
 						new VBSHelper(this),
 						this.player,
 					)
-					logger().info('[Transpiler] Executed in %sms', Date.now() - t)
+					logger().debug('[Transpiler] Executed in %sms', Date.now() - t)
 					return
 				}
 			} catch {}
@@ -191,7 +191,7 @@ export class Transpiler {
 		let t2 = Date.now()
 		progress().details('evaluating')
 		eval(`//@ sourceURL=game:///tablescript.vbs.js\n${js}`)
-		logger().info('[Transpiler] Evaluated in %sms', Date.now() - t2)
+		logger().debug('[Transpiler] Evaluated in %sms', Date.now() - t2)
 		progress().details('executing')
 		t2 = Date.now()
 		await this.gate.yieldToMain()
@@ -204,6 +204,6 @@ export class Transpiler {
 			new VBSHelper(this),
 			this.player,
 		)
-		logger().info('[Transpiler] Executed in %sms', Date.now() - t2)
+		logger().debug('[Transpiler] Executed in %sms', Date.now() - t2)
 	}
 }

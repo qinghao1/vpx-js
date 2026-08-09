@@ -361,7 +361,7 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 		}
 		progress().show('Transpiling and executing table script')
 		new Transpiler(this, player).execute(this.tableScript, scope)
-		logger().info('Table script loaded, transpiled and executed.')
+		logger().debug('Table script loaded, transpiled and executed.')
 	}
 
 	public async runTableScriptAsync(player: Player, scope: Record<string, unknown> = {}): Promise<void> {
@@ -371,7 +371,7 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 		}
 		progress().show('Transpiling and executing table script')
 		await new Transpiler(this, player).executeAsync(this.tableScript, scope)
-		logger().info('Table script loaded, transpiled and executed.')
+		logger().debug('Table script loaded, transpiled and executed.')
 	}
 
 	public broadcastInit(): void {

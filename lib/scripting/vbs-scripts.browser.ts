@@ -8,6 +8,8 @@ import VPMKeys from '../../res/scripts/VPMKeys.vbs'
 import WPC from '../../res/scripts/WPC.vbs'
 import grammar from './grammar/grammar.bnf'
 
+import { logger } from '../util/logger.js'
+
 const MAP: Record<string, string> = {
 	'controller.vbs': controller,
 	'core.vbs': core,
@@ -34,7 +36,7 @@ export function getTextFile(fileName: string): string {
 	// The VBS itself does `On Error Resume Next` around GetTextFile, so
 	// returning empty would also be valid — but core is a safer default.
 	if (key.endsWith('.vbs')) {
-		console.warn(`[vbs] GetTextFile("${fileName}") not bundled — falling back to core.vbs`)
+		logger().debug(`[vbs] GetTextFile("${fileName}") not bundled — falling back to core.vbs`)
 		return core
 	}
 	throw new Error(`Cannot find text file ${fileName}`)

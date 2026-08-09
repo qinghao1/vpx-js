@@ -48,7 +48,7 @@ export class TableLoader {
 					if (!opts.skipTextures) await this.loadTextures(out, gameStg, out.data.numTextures)
 					else {
 						out.textures = []
-						logger().info('[Table.load] Skipped %s textures (play without textures)', out.data.numTextures)
+						logger().debug('[Table.load] Skipped %s textures (play without textures)', out.data.numTextures)
 					}
 					await this.loadCollections(out, gameStg, out.data.numCollections)
 				}
@@ -59,7 +59,7 @@ export class TableLoader {
 				}
 			}
 			if (opts.tableInfoOnly || !opts.tableDataOnly) await this.loadTableInfo(out)
-			logger().info('[Table.load] Table loaded in %sms.', Date.now() - t0)
+			logger().debug('[Table.load] Table loaded in %sms.', Date.now() - t0)
 			return out
 		} finally {
 			await this.doc.close()

@@ -113,11 +113,11 @@ export class PlungerMover implements MoverObject {
 		const limit = this.frameLen / 50
 		const hyst = limit * 2
 		if (this.fStrokeEventsArmed && this.pos + dx > this.frameStart - limit) {
-			logger().info('[%s] Pulled back.', this.data.getName())
+			logger().debug('[%s] Pulled back.', this.data.getName())
 			this.events.fireVoidEventParm(Event.LimitEventsBOS, Math.abs(this.speed))
 			this.fStrokeEventsArmed = false
 		} else if (this.fStrokeEventsArmed && this.pos + dx < this.frameEnd + limit) {
-			logger().info('[%s] Fired.', this.data.getName())
+			logger().debug('[%s] Fired.', this.data.getName())
 			this.events.fireVoidEventParm(Event.LimitEventsEOS, Math.abs(this.speed))
 			this.fStrokeEventsArmed = false
 		} else if (this.pos > this.frameEnd + hyst && this.pos < this.frameStart - hyst) {

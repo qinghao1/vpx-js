@@ -169,7 +169,7 @@ export class Grammar {
 				`Unable to format script. Syntax error at: ${script.substr(start, script.indexOf('\n', start))}`,
 			)
 		}
-		logger().info('[Grammar.format] Parsed in %sms', Date.now() - now)
+		logger().debug('[Grammar.format] Parsed in %sms', Date.now() - now)
 
 		/**
 		 * Reformat the script by parsing into logical lines and tokens.
@@ -310,7 +310,7 @@ export class Grammar {
 				}
 			},
 		})
-		logger().info('[Grammar.format] Standardized in %sms', Date.now() - now)
+		logger().debug('[Grammar.format] Standardized in %sms', Date.now() - now)
 		return output
 	}
 
@@ -332,7 +332,7 @@ export class Grammar {
 					formattedScript.substr(start, formattedScript.indexOf('\n', start)),
 			)
 		}
-		logger().info('[Grammar.transpile] Parsed in %sms', Date.now() - now)
+		logger().debug('[Grammar.transpile] Parsed in %sms', Date.now() - now)
 
 		const postProcessors = this.postProcessors
 		now = Date.now()
@@ -372,7 +372,7 @@ export class Grammar {
 				}
 			},
 		})
-		logger().info('[Grammar.transpile] Post-processed in %sms', Date.now() - now)
+		logger().debug('[Grammar.transpile] Post-processed in %sms', Date.now() - now)
 
 		return program(stmts)
 	}

@@ -21,13 +21,28 @@ export interface IProgress {
 /** Console logger with replaceable singleton. */
 export class Logger implements ILogger {
 	private static _instance: ILogger = new Logger()
+	private static _forcedDebug: boolean | null = null
 	static logger(): ILogger {
 		return Logger._instance
 	}
 	static setLogger(l: ILogger): void {
 		Logger._instance = l
 	}
+	static setDebugEnabled(v: boolean): void {
+		Logger._forcedDebug = v
+	}
+	static get isDebugEnabled(): boolean {
+		if (Logger._forcedDebug !== null) return Logger._forcedDebug
+		try {
+			if (typeof location !== 'undefined' && location.search.includes('debug')) return true
+		} catch {}
+		try {
+			if (typeof localStorage !== 'undefined' && localStorage.getItem('vpx:debug') === '1') return true
+		} catch {}
+		return false
+	}
 	debug(f: string, ...a: unknown[]): void {
+		if (!Logger.isDebugEnabled) return
 		console.debug(f, ...a)
 	}
 	error(f: string, ...a: unknown[]): void {
@@ -37,6 +52,7 @@ export class Logger implements ILogger {
 		console.log(f, ...a)
 	}
 	verbose(f: string, ...a: unknown[]): void {
+		if (!Logger.isDebugEnabled) return
 		console.debug(f, ...a)
 	}
 	warn(f: string, ...a: unknown[]): void {
@@ -46,6 +62,14 @@ export class Logger implements ILogger {
 		console.error(f, ...a)
 	}
 }
+
+try {
+	const _origDebug = console.debug.bind(console)
+	console.debug = (...a: unknown[]) => {
+		if (!Logger.isDebugEnabled) return
+		_origDebug(...a)
+	}
+} catch {}
 
 /** Throttled console progress. */
 export class Progress implements IProgress {
