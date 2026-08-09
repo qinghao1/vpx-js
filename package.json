@@ -73,6 +73,7 @@
 		"estraverse": "^5.3.0",
 		"moo": "^0.5.3",
 		"three": "^0.185.1",
+		"three-mesh-bvh": "^0.9.14",
 		"wpc-emu": "^0.36.7"
 	},
 	"optionalDependencies": {

@@ -1,65 +1,69 @@
 // Copyright (C) 2026 Chu Qinghao — GPL-2.0 — see LICENSE
-import { BufferGeometry, Mesh } from '../../refs.node.js';
+import { BufferGeometry, Mesh } from 'three';
 import { acceleratedRaycast, computeBoundsTree, disposeBoundsTree } from 'three-mesh-bvh';
+
+type BvhGeometry = BufferGeometry & {
+	boundsTree?: unknown;
+	computeBoundsTree?: (opts?: unknown) => void;
+	disposeBoundsTree?: () => void;
+};
 
 let installed = false;
 
 export function installBvh(): void {
 	if (installed) return;
-	const gProto = BufferGeometry.prototype as unknown as Record<string, unknown>;
-	if (!gProto.computeBoundsTree) gProto.computeBoundsTree = computeBoundsTree as unknown as never;
-	if (!gProto.disposeBoundsTree) gProto.disposeBoundsTree = disposeBoundsTree as unknown as never;
-	const mProto = Mesh.prototype as unknown as Record<string, unknown>;
-	if (mProto.raycast !== acceleratedRaycast) mProto.raycast = acceleratedRaycast as unknown as never;
+	(BufferGeometry.prototype as unknown as Record<string, unknown>).computeBoundsTree ??= computeBoundsTree as unknown as never;
+	(BufferGeometry.prototype as unknown as Record<string, unknown>).disposeBoundsTree ??= disposeBoundsTree as unknown as never;
+	if ((Mesh.prototype as unknown as Record<string, unknown>).raycast !== acceleratedRaycast) {
+		(Mesh.prototype as unknown as Record<string, unknown>).raycast = acceleratedRaycast as unknown as never;
+	}
 	installed = true;
 }
 
-export function buildBvhForGeometry(geom: BufferGeometry, opts?: Record<string, unknown>): void {
-	const g = geom as unknown as { boundsTree?: unknown; computeBoundsTree?: (o?: unknown) => void; index?: { count: number } | null; attributes: { position: { count: number } } };
+export function buildBvhForGeometry(geom: BufferGeometry): void {
+	installBvh();
+	const g = geom as BvhGeometry;
 	if (g.boundsTree) return;
 	const tris = g.index ? g.index.count / 3 : g.attributes.position.count / 3;
 	if (tris < 200) return;
-	try { g.computeBoundsTree?.(opts ?? {}); } catch {}
+	try { g.computeBoundsTree?.({}); } catch {}
 }
 
-export function buildBvhForNode(root: unknown, opts?: Record<string, unknown>): number {
+export function buildBvhForNode(root: { traverse(cb: (o: unknown) => void): void }): number {
+	installBvh();
 	let built = 0;
-	const node = root as { traverse?: (cb: (o: unknown) => void) => void };
-	if (!node?.traverse) return 0;
-	node.traverse((o: unknown) => {
+	root.traverse((o: unknown) => {
 		const m = o as { isMesh?: boolean; geometry?: BufferGeometry };
 		if (!m.isMesh || !m.geometry) return;
-		const g = m.geometry as unknown as { boundsTree?: unknown };
+		const g = m.geometry as BvhGeometry;
 		if (g.boundsTree) return;
-		buildBvhForGeometry(m.geometry, opts);
-		if ((m.geometry as unknown as { boundsTree?: unknown }).boundsTree) built++;
+		buildBvhForGeometry(m.geometry);
+		if ((m.geometry as BvhGeometry).boundsTree) built++;
 	});
 	return built;
 }
 
-export function buildBvhIdle(root: unknown, chunkSize = 30): void {
-	const queue: unknown[] = [];
-	const node = root as { traverse?: (cb: (o: unknown) => void) => void };
-	if (!node?.traverse) return;
-	node.traverse((o: unknown) => {
-		const m = o as { isMesh?: boolean; geometry?: BufferGeometry };
-		if (m.isMesh && m.geometry && !(m.geometry as unknown as { boundsTree?: unknown }).boundsTree) queue.push(m.geometry);
+export function buildBvhIdle(root: { traverse(cb: (o: unknown) => void): void }, chunkSize = 30): void {
+	installBvh();
+	const queue: BvhGeometry[] = [];
+	root.traverse((o: unknown) => {
+		const m = o as { isMesh?: boolean; geometry?: BvhGeometry };
+		if (m.isMesh && m.geometry && !m.geometry.boundsTree) queue.push(m.geometry);
 	});
+	if (!queue.length) return;
 	let idx = 0;
-	const step = (deadline?: any) => {
+	const schedule = (cb: IdleRequestCallback): void => {
+		if (typeof requestIdleCallback !== 'undefined') (requestIdleCallback as unknown as (c: IdleRequestCallback, o?: unknown) => void)(cb, { timeout: 200 });
+		else setTimeout(() => (cb as unknown as (d: IdleDeadline) => void)({ didTimeout: false, timeRemaining: () => 8 } as unknown as IdleDeadline), 16);
+	};
+	const step: IdleRequestCallback = deadline => {
 		const start = performance.now();
 		while (idx < queue.length) {
-			if (deadline && (deadline as any).timeRemaining() <= 1) break;
+			if (deadline.timeRemaining() <= 1) break;
 			if (performance.now() - start > 8) break;
-			for (let i = 0; i < chunkSize && idx < queue.length; i++, idx++) {
-				buildBvhForGeometry(queue[idx] as BufferGeometry);
-			}
+			for (let n = 0; n < chunkSize && idx < queue.length; n++, idx++) buildBvhForGeometry(queue[idx]!);
 		}
-		if (idx < queue.length) {
-			if (typeof requestIdleCallback !== 'undefined') (requestIdleCallback as unknown as (cb: any, o?: unknown) => number)(step as unknown as any, { timeout: 200 });
-			else setTimeout(() => step(), 16);
-		}
+		if (idx < queue.length) schedule(step);
 	};
-	if (typeof requestIdleCallback !== 'undefined') (requestIdleCallback as unknown as (cb: any, o?: unknown) => number)(step as unknown as any, { timeout: 200 });
-	else setTimeout(() => step(), 16);
+	schedule(step as IdleRequestCallback);
 }

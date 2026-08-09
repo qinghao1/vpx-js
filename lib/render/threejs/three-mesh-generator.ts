@@ -3,14 +3,14 @@
 
 import { BufferAttribute, BufferGeometry, Float32BufferAttribute } from '../../refs.node.js'
 import { Mesh } from '../../vpt/mesh.js'
-import { installBvh } from './three-bvh.js'
 
 export class ThreeMeshGenerator {
 	public convertToBufferGeometry(mesh: Mesh): BufferGeometry {
-		installBvh()
 		const vc = mesh.vertices.length
 		const ic = mesh.indices.length
 		if (!vc) return new BufferGeometry()
+		const bg = new BufferGeometry()
+		bg.name = mesh.name
 		const positions = new Float32Array(vc * 3)
 		const normals = new Float32Array(vc * 3)
 		const uvs = new Float32Array(vc * 2)
@@ -31,16 +31,21 @@ export class ThreeMeshGenerator {
 			uvs[o2 + 1] = 1 - v.tv
 			if (v.tu || v.tv) hasUV = true
 		}
-		const bg = new BufferGeometry()
-		bg.name = mesh.name
 		bg.setAttribute('position', new Float32BufferAttribute(positions, 3))
+		if (ic) {
+			const IndexArray = vc > 65535 ? Uint32Array : Uint16Array
+			const src = mesh.indices
+			const dst = new IndexArray(ic)
+			for (let i = 0; i < ic; i += 3) {
+				dst[i] = src[i + 2]!
+				dst[i + 1] = src[i + 1]!
+				dst[i + 2] = src[i]!
+			}
+			bg.setIndex(new BufferAttribute(dst, 1))
+		}
 		if (hasNormal) bg.setAttribute('normal', new Float32BufferAttribute(normals, 3))
 		else bg.computeVertexNormals()
 		if (hasUV) bg.setAttribute('uv', new Float32BufferAttribute(uvs, 2))
-		if (ic) {
-			const IndexArray = vc > 65535 ? Uint32Array : Uint16Array
-			bg.setIndex(new BufferAttribute(new IndexArray(mesh.indices), 1))
-		}
 		return bg
 	}
 }
