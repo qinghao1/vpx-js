@@ -55,9 +55,9 @@ export class HitLine3D extends HitLineZ {
 		if (hitTime >= 0) {
 			const e = (this.matrix as any).elements as number[];
 			const nx = coll.hitNormal.x, ny = coll.hitNormal.y, nz = coll.hitNormal.z;
-			coll.hitNormal.x = e[0]*nx + e[1]*ny + e[2]*nz;
-			coll.hitNormal.y = e[3]*nx + e[4]*ny + e[5]*nz;
-			coll.hitNormal.z = e[6]*nx + e[7]*ny + e[8]*nz;
+			coll.hitNormal.x = e[0]*nx + e[3]*ny + e[6]*nz;
+			coll.hitNormal.y = e[1]*nx + e[4]*ny + e[7]*nz;
+			coll.hitNormal.z = e[2]*nx + e[5]*ny + e[8]*nz;
 		}
 		return hitTime;
 	}

@@ -205,9 +205,9 @@ inline Hit testLine3D(float bx, float by, float bz, float vx, float vy, float vz
 	Hit h = testLineZ(tbx, tby, tbz, tvx, tvy, tvz, r, lx, ly, zl, zh, dTime);
 	if (h.t >= 0) {
 		float onx = h.nx, ony = h.ny, onz = h.nz;
-		h.nx = m00*onx + m01*ony + m02*onz;
-		h.ny = m10*onx + m11*ony + m12*onz;
-		h.nz = m20*onx + m21*ony + m22*onz;
+		h.nx = m00*onx + m10*ony + m20*onz;
+		h.ny = m01*onx + m11*ony + m21*onz;
+		h.nz = m02*onx + m12*ony + m22*onz;
 	}
 	return h;
 }
