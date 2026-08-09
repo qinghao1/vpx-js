@@ -125,7 +125,7 @@
 		"gltf"
 	],
 	"lint-staged": {
-		"*.{js,ts,jsx,tsx,cts,mts,json,jsonc,css,html}": [
+		"*.{js,mjs,cjs,ts,jsx,tsx,cts,mts,json,jsonc,css,html}": [
 			"biome check --write --no-errors-on-unmatched"
 		]
 	}
