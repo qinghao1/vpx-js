@@ -440,25 +440,7 @@ export class Utils {
 const require = createRequire(import.meta.url)
 
 const gltfPipeline = require('gltf-pipeline')
-const PromisePool = require('es6-promise-pool')
 
-/**
- * This is a modified version of Three's GLTF exporter that runs better
- * on Node.js.
- *
- * Changes:
- *
- *  - Port to Typescript (and make it a module)
- *  - Don't use Canvas but ~20x faster sharp.js for image manipulation
- *  - Don't resolve all pending promises at once but use a pool
- *  - Be intelligent about re-using images
- *  - Adds Draco compression support
- *
- * @see https://github.com/mrdoob/three.js/blob/master/examples/js/exporters/GLTFExporter.js
- * @author fernandojsg / http://fernandojsg.com
- * @author Don McCurdy / https://www.donmccurdy.com
- * @author Takahiro / https://github.com/takahirox
- */
 /** GLTFExporter. */
 export class GLTFExporter {
 	private started = false
@@ -510,18 +492,13 @@ export class GLTFExporter {
 		this.outputJSON.asset.generator = this.options.versionString
 	}
 
-	/**
-	 * Parse scenes and generate GLTF output
-	 * @param input Scene or array of Scenes
-	 */
-	public async parse(input: Scene | Scene[]): Promise<any> {
+		public async parse(input: Scene | Scene[]): Promise<any> {
 		if (this.started) throw new Error('GLTFExporter: already started — create a new instance.')
 		this.started = true
 		if (this.options.animations?.length) this.options.trs = true
 		this.processInput(input)
-		const pool = new PromisePool(() => (this.pending.length ? this.pending.shift()?.() : null), 1)
-		logger().info('[GLTFExporter.parse] Processing images..')
-		await pool.start()
+		for (const task of this.pending) await task()
+		this.pending = []
 		const blob = Buffer.concat(this.buffers)
 		const used = Object.keys(this.extensionsUsed)
 		if (used.length) this.outputJSON.extensionsUsed = used
@@ -567,22 +544,13 @@ export class GLTFExporter {
 		}
 	}
 	private compressGlb(glb: Buffer) {
-		logger().info('[GLTFExporter] Compressing vertices..')
 		return gltfPipeline.processGlb(glb, { dracoOptions: this.dracoOpts })
 	}
 	private compressGltf(json: GltfFile) {
-		logger().info('[GLTFExporter] Compressing vertices..')
 		return gltfPipeline.processGltf(json, { dracoOptions: this.dracoOpts })
 	}
 
-	/**
-	 * Get the min and max vectors from the given attribute
-	 * @param  {BufferAttribute} attribute Attribute to find the min/max in range from start to start + count
-	 * @param  {Integer} start
-	 * @param  {Integer} count
-	 * @return {Object} Object containing the `min` and `max` values (As an array of attribute.itemSize components)
-	 */
-	private getMinMax(attribute: BufferAttribute | InterleavedBufferAttribute, start: number, count: number) {
+		private getMinMax(attribute: BufferAttribute | InterleavedBufferAttribute, start: number, count: number) {
 		const output = {
 			min: new Array(attribute.itemSize).fill(Number.POSITIVE_INFINITY),
 			max: new Array(attribute.itemSize).fill(Number.NEGATIVE_INFINITY),
@@ -598,13 +566,11 @@ export class GLTFExporter {
 		return output
 	}
 
-	/** Whether image dimensions are power-of-two. */
-	private isPowerOfTwo(image: NodeImage) {
+		private isPowerOfTwo(image: NodeImage) {
 		return M.isPowerOfTwo(image.width) && M.isPowerOfTwo(image.height)
 	}
 
-	/** Whether normals are normalized. */
-	private isNormalizedNormalAttribute(normal: BufferAttribute | InterleavedBufferAttribute) {
+		private isNormalizedNormalAttribute(normal: BufferAttribute | InterleavedBufferAttribute) {
 		if (this.cachedData.attributesNormalized.has(normal)) {
 			return false
 		}
@@ -621,8 +587,7 @@ export class GLTFExporter {
 		return true
 	}
 
-	/** Creates normalized copy of normals. */
-	private createNormalizedNormalAttribute(normal: BufferAttribute): BufferAttribute {
+		private createNormalizedNormalAttribute(normal: BufferAttribute): BufferAttribute {
 		if (this.cachedData.attributesNormalized.has(normal)) {
 			return this.cachedData.attributesNormalized.get(normal)!
 		}
@@ -647,8 +612,7 @@ export class GLTFExporter {
 		return attribute
 	}
 
-	/** Applies KHR_texture_transform if needed. */
-	private applyTextureTransform(mapDef: MapDefinition, texture: Texture) {
+		private applyTextureTransform(mapDef: MapDefinition, texture: Texture) {
 		let didTransform = false
 		const transformDef: TransformDefinition = {}
 
@@ -674,20 +638,16 @@ export class GLTFExporter {
 		}
 	}
 
-	/** Appends buffer to default. */
-	private processBuffer(buffer: Buffer): number {
+		private processBuffer(buffer: Buffer): number {
 		if (!this.outputJSON.buffers) {
 			this.outputJSON.buffers = [{ byteLength: 0 }]
 		}
-
-		// All buffers are merged before export.
 		this.buffers.push(buffer)
 
 		return 0
 	}
 
-	/** Creates/returns a bufferView for an attribute. */
-	private processBufferView(
+		private processBufferView(
 		attribute: BufferAttribute | InterleavedBufferAttribute,
 		componentType: number,
 		start: number,
@@ -697,8 +657,6 @@ export class GLTFExporter {
 		if (!this.outputJSON.bufferViews) {
 			this.outputJSON.bufferViews = []
 		}
-
-		// Create a new dataview and dump the attribute's array into it
 
 		let componentSize
 		if (componentType === WEBGL_CONSTANTS.UNSIGNED_BYTE) {
@@ -716,7 +674,6 @@ export class GLTFExporter {
 		try {
 			for (let i = start; i < start + count; i++) {
 				for (let a = 0; a < attribute.itemSize; a++) {
-					// @TODO Fails on InterleavedBufferAttribute, and could probably be
 					// optimized for normal BufferAttribute.
 					const value = attribute.array[i * attribute.itemSize + a]
 
@@ -748,14 +705,11 @@ export class GLTFExporter {
 		}
 
 		if (target === WEBGL_CONSTANTS.ARRAY_BUFFER) {
-			// Only define byteStride for vertex attributes.
 			gltfBufferView.byteStride = attribute.itemSize * componentSize
 		}
 
 		this.byteOffset += byteLength
 		this.outputJSON.bufferViews.push(gltfBufferView)
-
-		// @TODO Merge bufferViews where possible.
 		const output: BufferView = {
 			id: this.outputJSON.bufferViews.length - 1,
 			byteLength: 0,
@@ -764,18 +718,11 @@ export class GLTFExporter {
 		return output
 	}
 
-	/**
-	 * Process and generate a BufferView from an image Blob.
-	 * @param blob Image data
-	 * @param uri Identifier
-	 * @returns buffer view index
-	 */
-	private processBufferViewImage(blob: Buffer, uri: string): number {
+		private processBufferViewImage(blob: Buffer, uri: string): number {
 		if (!this.outputJSON.bufferViews) {
 			this.outputJSON.bufferViews = []
 		}
 		if (this.images.has(uri)) {
-			// maybe a parallel process resolved this now, so check again
 			return this.images.get(uri)!
 		}
 		const buffer = getPaddedArrayBuffer(blob)
@@ -793,15 +740,7 @@ export class GLTFExporter {
 		return index
 	}
 
-	/**
-	 * Process attribute to generate an accessor
-	 * @param attribute Attribute to process
-	 * @param geometry (Optional) Geometry used for truncated draw range
-	 * @param start (Optional)
-	 * @param count (Optional)
-	 * @return Index of the processed accessor on the "accessors" array
-	 */
-	private processAccessor(
+		private processAccessor(
 		attribute: BufferAttribute | InterleavedBufferAttribute,
 		geometry?: BufferGeometry,
 		start?: number,
@@ -816,8 +755,6 @@ export class GLTFExporter {
 		}
 
 		let componentType
-
-		// Detect the component type of the attribute array (float, uint or ushort)
 		if (attribute.array.constructor === Float32Array) {
 			componentType = WEBGL_CONSTANTS.FLOAT
 		} else if (attribute.array.constructor === Uint32Array) {
@@ -836,8 +773,6 @@ export class GLTFExporter {
 		if (count === undefined) {
 			count = attribute.count
 		}
-
-		// @TODO Indexed buffer geometry with drawRange not supported yet
 		if (this.options.truncateDrawRange && geometry !== undefined && geometry.index === null) {
 			const end = start + count
 			const end2 =
@@ -852,8 +787,6 @@ export class GLTFExporter {
 				count = 0
 			}
 		}
-
-		// Skip creating an accessor if the attribute doesn't have data to export
 		if (count === 0) {
 			return null
 		}
@@ -861,8 +794,6 @@ export class GLTFExporter {
 		const minMax = this.getMinMax(attribute, start, count)
 
 		let bufferViewTarget
-
-		// If geometry isn't provided, don't infer the target usage of the bufferView. For
 		// animation samplers, target must not be set.
 		if (geometry !== undefined) {
 			bufferViewTarget =
@@ -889,14 +820,7 @@ export class GLTFExporter {
 		return this.outputJSON.accessors.length - 1
 	}
 
-	/**
-	 * Process image
-	 * @param  image image to process
-	 * @param  format of the image (e.g. RGBFormat, RGBAFormat etc)
-	 * @param  flipY before writing out the image
-	 * @return Index of the processed texture in the "images" array
-	 */
-	private processImage(image: NodeImage, _format: PixelFormat, flipY: boolean) {
+		private processImage(image: NodeImage, _format: PixelFormat, flipY: boolean) {
 		const mimeType = image.getMimeType()
 		if (!this.outputJSON.images) {
 			this.outputJSON.images = []
@@ -953,12 +877,7 @@ export class GLTFExporter {
 		return this.outputJSON.images.length - 1
 	}
 
-	/**
-	 * Process sampler
-	 * @param  {Texture} map Texture to process
-	 * @return {Integer}     Index of the processed texture in the "samplers" array
-	 */
-	private processSampler(map: Texture) {
+		private processSampler(map: Texture) {
 		if (!this.outputJSON.samplers) {
 			this.outputJSON.samplers = []
 		}
@@ -973,12 +892,7 @@ export class GLTFExporter {
 		return this.outputJSON.samplers.length - 1
 	}
 
-	/**
-	 * Process texture
-	 * @param  {Texture} map Map to process
-	 * @return {Integer}     Index of the processed texture in the "textures" array
-	 */
-	private processTexture(map: Texture): number {
+		private processTexture(map: Texture): number {
 		if (this.cachedData.textures.has(map)) {
 			return this.cachedData.textures.get(map)!
 		}
@@ -997,12 +911,7 @@ export class GLTFExporter {
 		return index
 	}
 
-	/**
-	 * Process material
-	 * @param  {Material} material Material to process
-	 * @return {Integer}      Index of the processed material in the "materials" array
-	 */
-	private processMaterial(material: MaterialInternal): number | null {
+		private processMaterial(material: MaterialInternal): number | null {
 		if (this.cachedData.materials.has(material)) {
 			return this.cachedData.materials.get(material)!
 		}
@@ -1015,8 +924,6 @@ export class GLTFExporter {
 			logger().warn('[GLTFExporter.processMaterial] ShaderMaterial not supported.')
 			return null
 		}
-
-		// @QUESTION Should we avoid including any attribute that has the default value?
 		const gltfMaterial: GltfMaterial = {
 			pbrMetallicRoughness: {},
 		}
@@ -1146,12 +1053,7 @@ export class GLTFExporter {
 		return index
 	}
 
-	/**
-	 * Process mesh
-	 * @param  {Mesh} mesh Mesh to process
-	 * @return {Integer}      Index of the processed mesh in the "meshes" array
-	 */
-	private processMesh(mesh: MeshInternal): number | null {
+		private processMesh(mesh: MeshInternal): number | null {
 		const cacheKey = `${mesh.geometry.uuid}:${(mesh.material as Material).uuid}`
 		if (this.cachedData.meshes.has(cacheKey)) {
 			return this.cachedData.meshes.get(cacheKey)!
@@ -1160,8 +1062,6 @@ export class GLTFExporter {
 		const geometry = mesh.geometry
 
 		let mode
-
-		// Use the correct mode
 		if (mesh.isLineSegments) {
 			mode = WEBGL_CONSTANTS.LINES
 		} else if (mesh.isLineLoop) {
@@ -1180,8 +1080,6 @@ export class GLTFExporter {
 		const attributes: { [key: string]: GltfId } = {}
 		const primitives: GltfMeshPrimitive[] = []
 		const targets: Array<{ [key: string]: GltfId }> = []
-
-		// Conversion between attributes names in threejs and gltf spec
 		const nameConversion: { [key: string]: string } = {
 			uv: 'TEXCOORD_0',
 			uv2: 'TEXCOORD_1',
@@ -1202,9 +1100,6 @@ export class GLTFExporter {
 				this.createNormalizedNormalAttribute(originalNormal as BufferAttribute),
 			)
 		}
-
-		// @QUESTION Detect if .vertexColors = VertexColors?
-		// For every attribute create an accessor
 		for (let attributeName of Object.keys((geometry as BufferGeometry).attributes)) {
 			const attribute = (geometry as BufferGeometry).attributes[attributeName] as BufferAttribute
 			attributeName = nameConversion[attributeName] || attributeName.toUpperCase()
@@ -1213,8 +1108,6 @@ export class GLTFExporter {
 				attributes[attributeName] = this.cachedData.attributes.get(attribute)!
 				continue
 			}
-
-			// JOINTS_0 must be UNSIGNED_BYTE or UNSIGNED_SHORT.
 			let modifiedAttribute: BufferAttribute | null = null
 			const array = attribute.array
 			if (attributeName === 'JOINTS_0' && !(array instanceof Uint16Array) && !(array instanceof Uint8Array)) {
@@ -1276,8 +1169,6 @@ export class GLTFExporter {
 
 					// js morph attribute has absolute values while the one of glTF has relative values.
 					//
-					// glTF 2.0 Specification:
-					// https://github.com/KhronosGroup/glTF/tree/master/specification/2.0#morph-targets
 
 					const baseAttribute = (geometry as BufferGeometry).attributes[attributeName]
 
@@ -1285,8 +1176,6 @@ export class GLTFExporter {
 						target[gltfAttributeName] = this.cachedData.attributes.get(attribute)!
 						continue
 					}
-
-					// Clones attribute not to override
 					const relativeAttribute = attribute.clone()
 
 					let j = 0
@@ -1417,12 +1306,7 @@ export class GLTFExporter {
 		return index
 	}
 
-	/**
-	 * Process camera
-	 * @param  {Camera} camera Camera to process
-	 * @return {Integer}      Index of the processed mesh in the "camera" array
-	 */
-	private processCamera(camera: CameraInternal): number {
+		private processCamera(camera: CameraInternal): number {
 		if (!this.outputJSON.cameras) {
 			this.outputJSON.cameras = []
 		}
@@ -1457,17 +1341,7 @@ export class GLTFExporter {
 		return this.outputJSON.cameras.length - 1
 	}
 
-	/**
-	 * Creates glTF animation entry from AnimationClip object.
-	 *
-	 * Status:
-	 * - Only properties listed in PATH_PROPERTIES may be animated.
-	 *
-	 * @param {AnimationClip} clip
-	 * @param {Object3D} root
-	 * @return {number}
-	 */
-	private processAnimation(clip: AnimationClipInternal, root: Object3D) {
+		private processAnimation(clip: AnimationClipInternal, root: Object3D) {
 		if (!this.outputJSON.animations) {
 			this.outputJSON.animations = []
 		}
@@ -1504,8 +1378,6 @@ export class GLTFExporter {
 			}
 
 			let interpolation
-
-			// @TODO export CubicInterpolant(InterpolateSmooth) as CUBICSPLINE
 
 			// Detecting glTF cubic spline interpolant by checking factory method's special property
 			// GLTFCubicSplineInterpolant is a custom interpolant and track doesn't return
@@ -1629,12 +1501,7 @@ export class GLTFExporter {
 		return lights.length - 1
 	}
 
-	/**
-	 * Process Object3D node
-	 * @param  {Object3D} object Object3D to processNode
-	 * @return {Integer}      Index of the node in the nodes list
-	 */
-	private processNode(object: Object3DInternal): number | null {
+		private processNode(object: Object3DInternal): number | null {
 		if (!this.outputJSON.nodes) {
 			this.outputJSON.nodes = []
 		}
@@ -1663,8 +1530,6 @@ export class GLTFExporter {
 				gltfNode.matrix = object.matrix.elements
 			}
 		}
-
-		// We don't export empty strings name because it represents no-name in js.
 		if (object.name !== '') {
 			gltfNode.name = String(object.name)
 		}
@@ -1733,11 +1598,7 @@ export class GLTFExporter {
 		return nodeIndex
 	}
 
-	/**
-	 * Process Scene
-	 * @param  {Scene} scene Scene to process
-	 */
-	private processScene(scene: Scene) {
+		private processScene(scene: Scene) {
 		if (!this.outputJSON.scenes) {
 			this.outputJSON.scenes = []
 			this.outputJSON.scene = 0
@@ -1774,15 +1635,10 @@ export class GLTFExporter {
 		}
 	}
 
-	/**
-	 * Creates a Scene to hold a list of objects and parse it
-	 * @param  {Array} objects List of objects to process
-	 */
-	private processObjects(objects: Object3D[]) {
+		private processObjects(objects: Object3D[]) {
 		const scene = new Scene()
 		scene.name = 'AuxScene'
 		for (const obj of objects) {
-			// We push directly to children instead of calling `add` to prevent
 			// modify the .parent and break its original scene and hierarchy
 			scene.children.push(obj)
 		}
