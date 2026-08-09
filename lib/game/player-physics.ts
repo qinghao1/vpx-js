@@ -108,7 +108,7 @@ export class PlayerPhysics {
 	private initOcTree(table: Table): void {
 		for (const o of this.hitObjects) this.hitOcTree.addElement(o)
 		this.hitOcTree.initialize(table.getBoundingBox())
-		this.hitOcTreeDynamic.fillFromVector(this.hitObjectsDynamic)
+		this.hitOcTreeDynamic.fillFromVector(this.hitObjectsDynamic, true)
 	}
 
 	public physicsSimulateCycle(dTime: number): void {
@@ -270,7 +270,7 @@ export class PlayerPhysics {
 		this.balls.push(ball)
 		this.movers.push(ball.getMover())
 		this.hitObjectsDynamic.push(ball.hit)
-		this.hitOcTreeDynamic.fillFromVector(this.hitObjectsDynamic)
+		this.hitOcTreeDynamic.fillFromVector(this.hitObjectsDynamic, true)
 		return ball
 	}
 
@@ -284,7 +284,7 @@ export class PlayerPhysics {
 		this.balls.splice(this.balls.indexOf(ball), 1)
 		this.movers.splice(this.movers.indexOf(ball.getMover()), 1)
 		this.hitObjectsDynamic.splice(this.hitObjectsDynamic.indexOf(ball.hit), 1)
-		this.hitOcTreeDynamic.fillFromVector(this.hitObjectsDynamic)
+		this.hitOcTreeDynamic.fillFromVector(this.hitObjectsDynamic, true)
 		if (wasDebug && this.balls.length) this.activeBallDebug = this.balls[0]
 		if (wasActive && this.balls.length) this.activeBall = this.balls[0]
 	}

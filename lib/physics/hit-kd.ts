@@ -42,7 +42,7 @@ export class HitKD {
 		this.rootNode.reset(this)
 	}
 
-	public fillFromVector(vho: HitObject[]): void {
+	public fillFromVector(vho: HitObject[], warm = false): void {
 		this.init(vho)
 		this.rootNode.rectBounds.Clear()
 		this.rootNode.start = 0
@@ -54,17 +54,20 @@ export class HitKD {
 			this.orgIdx[i] = i
 		}
 		this.rootNode.createNextLevel(0, 0)
-		const warm = () => {
-			let c = 0, p = 0, l = 0
-			for (const h of vho) {
-				if (isBatchCircle(h)) c++
-				else if (h instanceof HitPlane) p++
-				else if (h instanceof HitLineZ && !(h instanceof HitLine3D)) l++
-			}
-			if (c || p || l) warmWasmPools(c, p, l)
+		if (warm) this.warmPools(vho)
+	}
+
+	private warmPools(vho: HitObject[]): void {
+		let c = 0, p = 0, l = 0
+		for (const h of vho) {
+			if (isBatchCircle(h)) c++
+			else if (h instanceof HitPlane) p++
+			else if (h instanceof HitLineZ && !(h instanceof HitLine3D)) l++
 		}
-		if (isWasmReady()) warm()
-		else void getWasmKernels().then(warm)
+		if (c || p || l) {
+			if (isWasmReady()) warmWasmPools(c, p, l)
+			else void getWasmKernels().then(() => warmWasmPools(c, p, l))
+		}
 	}
 
 	public update(): void { this.fillFromVector(this.orgVho) }
