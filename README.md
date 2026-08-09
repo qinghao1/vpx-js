@@ -10,7 +10,7 @@
 
 This is a maintained **fork of [`vpdb/vpx-js`](https://github.com/vpdb/vpx-js)** by [freezy](https://github.com/freezy) and contributors.
 
-- **Original:** [`vpdb/vpx-js@v1.3.4`](https://github.com/vpdb/vpx-js/releases/tag/v1.3.4) (`e8a6d6fa522`), GPL-2.0. This fork is ~1,500 commits ahead.
+- **Original:** [`vpdb/vpx-js@v1.3.4`](https://github.com/vpdb/vpx-js/releases/tag/v1.3.4) (`e8a6d6fa522`), GPL-2.0.
 - **License stays GPL-2.0.** See [`LICENSE`](LICENSE). All original `Copyright (C) 2019 freezy` headers are retained; modified files add `Copyright (C) 2026 Chu Qinghao`. No relicensing.
 - **Please credit both** the original project and this fork, and distribute source with any binary per GPL-2.0.
 
@@ -108,7 +108,7 @@ vptscript <table.vpx|folder> [--save]        # extract table script
 
 ## What Changed Since Upstream v1.3.4
 
-~1,500 commits, 566 files, +71k/−85k lines. In short:
+In short:
 
 - **Modern toolchain** — ESM-only, Node 24, `tsup` + `Biome` + `Vitest` replacing Rollup/TSLint/Mocha/NYC.
 - **Current dependencies** — three `^0.185` + `three-mesh-bvh` + `wpc-emu`; `sharp` is now optional.
@@ -119,7 +119,6 @@ vptscript <table.vpx|folder> [--save]        # extract table script
 - **New: PinMAME WASM** — `external/pinmame` + `wasm/` build (WASM + mock fallback) for any PinMAME hardware; upstream only mentioned `wpc-emu`.
 - **Leaner repo** — `demo-static` removed; `demo-browser` (Vite viewer, not published) is local-only.
 
-Full diff: `git diff v1.3.4..HEAD --stat`.
 
 ## Development
 
