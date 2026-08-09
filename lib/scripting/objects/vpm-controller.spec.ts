@@ -181,7 +181,7 @@ describe('The VpmController - VISUAL PINMAME COM OBJECT', () => {
 
 	it('get Version', () => {
 		const result: string = vpmController.Version
-		expect(result).to.equal('00990201')
+		expect(result).to.equal('03070000')
 	})
 
 	it('set and get SplashInfoLine', () => {

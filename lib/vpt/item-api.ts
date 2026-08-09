@@ -115,7 +115,9 @@ export abstract class ItemApi<DATA extends ItemData> extends EventEmitter {
 	public _getTimers(): TimerHit[] {
 		this._beginPlay()
 		const interval =
-			this.data.timer.interval >= 0 ? Math.max(this.data.timer.interval, MAX_TIMER_MSEC_INTERVAL) : -1
+			this.data.timer.interval >= 0
+				? Math.max(this.data.timer.interval, MAX_TIMER_MSEC_INTERVAL)
+				: Math.max(-2, this.data.timer.interval)
 		this.hitTimer = new TimerHit(this.events, interval, interval)
 		return this.data.timer.enabled ? [this.hitTimer] : []
 	}
@@ -188,7 +190,8 @@ export abstract class ItemApi<DATA extends ItemData> extends EventEmitter {
 	protected _setTimerInterval(interval: number): void {
 		this.data.timer.interval = interval
 		if (this.hitTimer) {
-			this.hitTimer.interval = interval >= 0 ? Math.max(interval, MAX_TIMER_MSEC_INTERVAL) : -1
+			this.hitTimer.interval =
+				interval >= 0 ? Math.max(interval, MAX_TIMER_MSEC_INTERVAL) : Math.max(-2, interval)
 			this.hitTimer.nextFire = this.player.getPhysics().timeMsec + this.hitTimer.interval
 		}
 	}

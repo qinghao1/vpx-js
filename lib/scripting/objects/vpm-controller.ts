@@ -147,7 +147,7 @@ export class VpmController {
 		this.emulator.setPaused(v)
 	}
 	get Version(): string {
-		return '00990201'
+		return '03070000'
 	}
 	Run(): void {
 		logger().debug('RUN', this.gameName)

@@ -67,11 +67,14 @@ export class PlayerPhysics {
 	private cFrames = 0
 	private lastFpsTime = 0
 	private fps = 0
+	private fpsAvg = 0
+	private fpsCount = 0
 	private curPhysicsFrameTime = 0
 	private nextPhysicsFrameTime = 0
 	private startTimeUsec = 0
 	private activeBallDebug?: Ball
 	private scriptPeriod = 0
+	private physPeriod = 0
 
 	constructor(
 		private readonly table: Table,
@@ -205,8 +208,9 @@ export class PlayerPhysics {
 			this.activeBall = undefined
 			if (this.scriptPeriod <= 1000 * MAX_TIMERS_MSEC_OVERALL) {
 				const cur = (this.curPhysicsFrameTime - this.startTimeUsec) / 1000
-				for (const t of this.hitTimers)
-					if ((t.interval >= 0 && t.nextFire <= cur) || t.interval < 0) {
+				for (const t of this.hitTimers) {
+					if (t.interval < 0) continue
+					if (t.nextFire <= cur) {
 						const prev = t.nextFire
 						try {
 							t.pfe.fireGroupEvent(Event.TimerEventsTimer)
@@ -215,8 +219,11 @@ export class PlayerPhysics {
 								logger().warn('timer error %s', (e as Error).message)
 							} catch {}
 						}
-						if (prev === t.nextFire) t.nextFire += t.interval
+						if (prev === t.nextFire && t.interval > 0) {
+							while (t.nextFire <= cur) t.nextFire += t.interval
+						}
 					}
+				}
 				this.scriptPeriod += Math.floor(this.now() - curUsec)
 			}
 			this.activeBall = oldBall
@@ -226,8 +233,27 @@ export class PlayerPhysics {
 			this.curPhysicsFrameTime = this.nextPhysicsFrameTime
 			this.nextPhysicsFrameTime += PHYSICS_STEPTIME
 		}
+		this.flushTimers()
+		this.fireTimers(-1)
+		this.flushTimers()
+		this.fireTimers(-2)
+		this.flushTimers()
 		this.physPeriod = Math.floor(this.now() * 1000) - initial
 		return iterations
+	}
+
+	private fireTimers(mode: number): void {
+		if (mode !== -1 && mode !== -2) return
+		for (const t of this.hitTimers) {
+			if (t.interval !== mode) continue
+			try {
+				t.pfe.fireGroupEvent(Event.TimerEventsTimer)
+			} catch (e) {
+				try {
+					logger().warn('timer error %s', (e as Error).message)
+				} catch {}
+			}
+		}
 	}
 
 	private ensureInitialTime(initial: number): boolean {
