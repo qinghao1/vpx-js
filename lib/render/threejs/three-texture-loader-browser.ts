@@ -51,19 +51,15 @@ function nameAndTune(tex: any, name: string): void {
 	tune(tex)
 }
 
-function maxFor(name: string, w: number, h: number, isFloat: boolean, playfieldMap?: string): number {
+function maxFor(name: string, isFloat: boolean, playfieldMap?: string): number {
 	const lower = name.toLowerCase()
 	if (playfieldMap && lower === playfieldMap.toLowerCase()) return MAX_PLAYFIELD
 	if (lower.includes('vlm.nestmap')) return MAX_VLM
-	if (isFloat) return w <= 512 && h <= 512 ? Math.max(w, h) : MAX_FLOAT
-	if (w <= 512 && h <= 512) return Math.max(w, h)
-	return MAX_REGULAR
+	return isFloat ? MAX_FLOAT : MAX_REGULAR
 }
 
 function finalize(tex: any, name: string, isFloat: boolean, playfieldMap?: string): any {
-	const w = tex.image?.width ?? tex.image?.naturalWidth ?? 0
-	const h = tex.image?.height ?? tex.image?.naturalHeight ?? 0
-	const max = maxFor(name, w, h, isFloat, playfieldMap)
+	const max = maxFor(name, isFloat, playfieldMap)
 	const ds = downsample(tex, max)
 	if (ds !== tex) {
 		try {
@@ -315,7 +311,7 @@ async function tryCreateBitmap(
 			{ type: mime as any },
 		)
 		let bitmap: any = await createImageBitmap(blob as any, { imageOrientation: 'flipY' } as any)
-		const max = maxFor(name, bitmap.width, bitmap.height, false, playfieldMap)
+		const max = maxFor(name, false, playfieldMap)
 		if (bitmap.width > max || bitmap.height > max) {
 			const scale = Math.min(max / bitmap.width, max / bitmap.height)
 			const nw = Math.max(1, Math.floor(bitmap.width * scale))
