@@ -212,13 +212,11 @@ export class ThreeMaterialGenerator {
 
 	private applyBaked(mat: MeshStandardMaterial, mapTex?: unknown, backfacesEnabled?: boolean): void {
 		mat.color.set(0xffffff)
-		if (mapTex && !(mat as any).emissiveMap) (mat as any).emissiveMap = mapTex
-		else if ((mat as any).map && !(mat as any).emissiveMap) (mat as any).emissiveMap = (mat as any).map
-		if (!mat.emissive || mat.emissive.getHex() === 0x000000) mat.emissive = new Color(0xffffff)
-		else mat.emissive.set(0xffffff)
-		mat.emissiveIntensity = BAKED_EMISSIVE
+		if ((mat as any).emissiveMap) (mat as any).emissiveMap = null
+		if (mat.emissive) mat.emissive.set(0x000000)
+		mat.emissiveIntensity = 0
 		mat.side = backfacesEnabled === true ? DoubleSide : backfacesEnabled === false ? FrontSide : DoubleSide
-		mat.toneMapped = false
+		mat.toneMapped = true
 		mat.roughness = BAKED_ROUGH
 		mat.metalness = BAKED_METAL
 		;(mat as any).envMapIntensity = 0

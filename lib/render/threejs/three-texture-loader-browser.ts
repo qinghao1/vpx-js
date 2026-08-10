@@ -93,7 +93,43 @@ function nameAndTune(tex: any, name: string): void {
 	tune(tex)
 }
 
+function bitmapToCanvasTexture(bitmap: any, name: string): any {
+	try {
+		if (typeof document === 'undefined' || !bitmap?.width || !bitmap?.height) return null
+		const canvas: any = document.createElement('canvas')
+		canvas.width = bitmap.width
+		canvas.height = bitmap.height
+		const ctx: any = canvas.getContext('2d')
+		if (!ctx) return null
+		ctx.drawImage(bitmap as any, 0, 0, bitmap.width, bitmap.height)
+		try { bitmap.close?.() } catch {}
+		const tex: any = new CanvasTexture(canvas)
+		tex.colorSpace = SRGBColorSpace
+		tex.flipY = false
+		tex.needsUpdate = true
+		tune(tex)
+		tex.name = `texture:${name}`
+		return tex
+	} catch {
+		return null
+	}
+}
+
 function finalize(tex: any, name: string, isFloat: boolean): any {
+	if (tex?.image && typeof (tex.image as any).close === 'function' && (tex.image as any).width) {
+		try {
+			const img: any = tex.image
+			const isBitmap = typeof ImageBitmap !== 'undefined' ? img instanceof ImageBitmap : false
+			const looksBitmap = isBitmap || (typeof img.width === 'number' && typeof img.height === 'number' && typeof img.close === 'function')
+			if (looksBitmap) {
+				const conv = bitmapToCanvasTexture(img, name)
+				if (conv) {
+					try { tex.dispose?.() } catch {}
+					tex = conv
+				}
+			}
+		} catch {}
+	}
 	const max = effectiveMax(isFloat)
 	if (tex.image?.data && tex.image.width && tex.image.height) {
 		const ds = downsampleData(tex, max)
@@ -181,7 +217,8 @@ export class ThreeTextureLoaderBrowser implements ITextureLoader<ThreeTexture> {
 		const mime = getMimeType(data, ext) ?? 'image/png'
 		const isHdr = mime === 'image/hdr' || ext === '.hdr'
 		const isExr = mime === 'image/exr' || ext === '.exr'
-		if (!isHdr && !isExr && typeof createImageBitmap !== 'undefined') {
+		const tooLarge = data.byteLength > 4 * 1024 * 1024
+		if (!isHdr && !isExr && !tooLarge && typeof createImageBitmap !== 'undefined') {
 			const bmp = await tryCreateBitmap(data, mime, name)
 			if (bmp) return bmp
 		}
@@ -270,6 +307,8 @@ async function tryCreateBitmap(data: Uint8Array, mime: string, name: string): Pr
 				return null
 			}
 		}
+		const conv: any = bitmapToCanvasTexture(bitmap as any, name)
+		if (conv) return conv
 		const tex: any = new CanvasTexture(bitmap as any)
 		tex.colorSpace = SRGBColorSpace
 		tex.flipY = false
