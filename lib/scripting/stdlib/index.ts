@@ -35,6 +35,19 @@ export class Stdlib extends VbsApi {
 		return this.math
 	}
 
+	get ScriptEngine() {
+		return 'VBScript'
+	}
+	get ScriptEngineMajorVersion() {
+		return 5
+	}
+	get ScriptEngineMinorVersion() {
+		return 0
+	}
+	get ScriptEngineBuildVersion() {
+		return 0
+	}
+
 	/**
 	 * String Constants
 	 */

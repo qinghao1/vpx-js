@@ -44,7 +44,11 @@ export class ThreeConverter {
 		mesh.name = (obj.geometry ?? obj.mesh!)?.name
 		mesh.matrixAutoUpdate = false
 		mesh.visible = obj.isVisible
-		if (obj.depthBias) mesh.renderOrder = obj.depthBias
+		if (obj.depthBias) {
+			const scaled = obj.depthBias / 500
+			const clamped = Math.max(-100, Math.min(100, scaled))
+			mesh.renderOrder = Math.round(clamped)
+		}
 		return mesh
 	}
 }

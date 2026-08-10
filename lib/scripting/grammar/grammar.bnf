@@ -47,7 +47,7 @@ IntLiteral ::= [0-9]+
 HexLiteral ::= '&H' [0-9A-Fa-f]+ {ignoreCase=true}
 OctalLiteral ::= '&O' [0-7]+ {ignoreCase=true}
 FloatingPointLiteral ::= FloatingPointLiteralValue
-FloatingPointLiteralValue ::= IntLiteral ( '.' IntLiteral Exponent? | Exponent ) | '.' IntLiteral Exponent?
+FloatingPointLiteralValue ::= IntLiteral ( '.' IntLiteral? Exponent? | Exponent ) | '.' IntLiteral Exponent?
 Exponent ::= 'E' Sign? IntLiteral
 Sign ::= [+\-]
 StringLiteral ::= '"' ([^"] | '""')* '"'

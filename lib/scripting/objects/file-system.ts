@@ -30,6 +30,8 @@ export class FileSystem {
 	}
 
 	public folderExists(folderName: string) {
+		const n = folderName?.trim()
+		if (!n || n === '.' || n === './' || n === '.\\' || n === '/' || n === '\\') return true
 		const f = this.normalizePath(folderName)
 		for (const fileName of this.files.keys()) {
 			if (fileName.startsWith(f)) {

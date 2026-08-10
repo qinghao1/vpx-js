@@ -61,7 +61,11 @@ export class ThreeMaterialGenerator {
 		if (depthBias !== 0) {
 			m.polygonOffset = true
 			m.polygonOffsetFactor = 0
-			m.polygonOffsetUnits = depthBias
+			const scaled = depthBias / 500
+			const clamped = Math.max(-10, Math.min(10, scaled))
+			const units = Math.abs(clamped) < 0.25 ? Math.sign(clamped) * 0.25 : clamped
+			m.polygonOffsetUnits = Math.abs(depthBias) < 0.5 ? 0 : units
+			if (m.polygonOffsetUnits === 0) m.polygonOffset = false
 		}
 		if (material?.name === 'ball') {
 			m.envMapIntensity = 1

@@ -32,6 +32,7 @@ import { Transformer } from './transformer.js'
  */
 /** Resolves VBScript call vs array ambiguity. */
 export class AmbiguityTransformer extends Transformer {
+	private readonly enumApis: EnumsApi
 	private readonly itemApis: Record<string, unknown>
 	private readonly globalApi: GlobalApi
 	private readonly stdlib: Stdlib
@@ -100,6 +101,27 @@ export class AmbiguityTransformer extends Transformer {
 								Transformer.PLAYER_NAME,
 							].includes(topMemberName)
 						) {
+							// zero-arg call on a property getter (e.g. __global.FrameIndex()) should be property, not call
+							if (node.arguments.length === 0) {
+								let api: unknown
+								switch (topMemberName) {
+									case Transformer.GLOBAL_NAME:
+										api = this.globalApi
+										break
+									case Transformer.ITEMS_NAME:
+										api = this.itemApis
+										break
+									case Transformer.STDLIB_NAME:
+										api = this.stdlib
+										break
+									case Transformer.ENUMS_NAME:
+										return node
+								}
+								const obj = getValue(api, node.callee as MemberExpression)
+								if (typeof obj !== 'function' && typeof obj !== 'undefined') {
+									return node.callee as unknown as typeof node
+								}
+							}
 							return node
 						}
 					}
