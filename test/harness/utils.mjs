@@ -45,7 +45,7 @@ export function attachLogging(page, { filter = /./, prefix = '[c]' } = {}) {
 }
 
 export async function ensureVite(url, { cwd = import.meta.dirname, label = 'vite' } = {}) {
-	const candidates = [url.replace(/\?.*$/, ''), 'http://localhost:3000/', 'http://localhost:3000/walking-dead.html']
+	const candidates = [url.replace(/\?.*$/, ''), 'http://localhost:3000/']
 	for (let attempt = 0; attempt < 3; attempt++) {
 		for (const u of candidates) {
 			try {

@@ -3,7 +3,7 @@ import path from 'node:path'
 import { attachLogging, launchBrowser, loadPuppeteer, newPage } from './utils.mjs'
 
 const puppeteer = await loadPuppeteer()
-const url = process.argv.find(a => a.startsWith('--url='))?.split('=')[1] || 'http://localhost:3000/walking-dead.html'
+const url = process.argv.find(a => a.startsWith('--url='))?.split('=')[1] || 'http://localhost:3000/?vpx=/test/fixtures/table-empty.vpx'
 const out = process.argv.find(a => a.startsWith('--out='))?.split('=')[1] || '/tmp'
 console.log(`[harness-dmd] url=${url} out=${out}`)
 const browser = await launchBrowser(puppeteer)
@@ -196,7 +196,6 @@ const camInfo = await page.evaluate(() => {
 		// Try offsets Empirically: try multiple offsets and pick one that shows DMD
 		// Current play cam is at 0,47,135 target 0,-3,6 -> looking from south towards north, slightly down
 		// DMD at height 635 local -> world Y approx? Let's get worldPos Y
-		// For walking_dead DMD worldPos previously at ~? we will log
 		// Choose camera offset 35 units south (+Z) and 20 up (+Y)
 		const cam = window.camera
 		const controls = window.controls

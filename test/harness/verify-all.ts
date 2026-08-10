@@ -43,7 +43,7 @@ async function verifyWasm(): Promise<boolean> {
 async function verifyTable(): Promise<boolean> {
 	console.log('# table — empty + example VPX (any GameName)')
 	const empty = path.resolve('test/fixtures/table-empty.vpx')
-	const exampleVpx = path.resolve('walking_dead.vpx') // example; any VPX with cGameName works
+	const exampleVpx = path.resolve('walking_dead.vpx') // example local VPX; any cGameName table works
 	if (!fs.existsSync(empty)) {
 		console.log('  ✗ empty fixture missing')
 		return false
@@ -73,7 +73,7 @@ async function verifyPinmame(): Promise<boolean> {
 			break
 		}
 	}
-	const vpx = path.resolve('walking_dead.vpx')
+	const vpx = path.resolve('walking_dead.vpx') // any local VPX with GameName
 	if (fs.existsSync(vpx)) {
 		const table = await Table.load(new NodeBinaryReader(vpx))
 		const gameName = table.tableScript?.match(/cGameName\s*=\s*["']([^"']+)["']/i)?.[1] ?? 'twd_160h'

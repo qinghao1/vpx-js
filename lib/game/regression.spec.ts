@@ -1,6 +1,6 @@
 // Copyright (C) 2026 Chu Qinghao — GPL-2.0 — see LICENSE
 /**
- * Regression for viewer hover + fallback ball (see walking_dead issues).
+ * Regression for viewer hover + fallback ball.
  * - hover Play tip must fire only for cabinet outer or playfield, not VR floor outside
  * - hitIsPlayfield must check mesh name only, not ancestor playfield group
  * - fallback ball must not spawn for ROM tables (cGameName / PinMAME)

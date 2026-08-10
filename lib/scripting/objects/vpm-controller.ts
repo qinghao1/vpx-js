@@ -177,6 +177,14 @@ export class VpmController {
 	}
 
 	private async fetchRom(name: string): Promise<Uint8Array> {
+		try {
+			const w = globalThis as unknown as { __pendingRom?: Uint8Array; __pendingRomName?: string; __pendingRomUrl?: string }
+			if (w.__pendingRom?.length && (!w.__pendingRomName || w.__pendingRomName === name)) return w.__pendingRom
+			const romParam = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('rom') : null
+			if (romParam) {
+				try { const r = await fetch(romParam); if (r.ok) return new Uint8Array(await r.arrayBuffer()) } catch {}
+			}
+		} catch {}
 		for (const url of [`/pinmame/roms/${name}.zip`, `/roms/${name}.zip`]) {
 			try {
 				const r = await fetch(url)
