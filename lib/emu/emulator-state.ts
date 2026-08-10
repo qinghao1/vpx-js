@@ -33,7 +33,7 @@ export class EmulatorState {
 	applyPinmame(lamps: Uint8Array, sols: Uint8Array, gis: Uint8Array): void {
 		this.lampMap = i => i
 		this.solMap = i => i
-		this.lamps = Uint8Array.from(lamps, v => v === 1 ? 255 : v)
+		this.lamps = lamps.slice()
 		this.sols = sols.slice()
 		this.gis = gis.slice()
 	}

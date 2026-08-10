@@ -40,7 +40,7 @@ export class EmulatorMessageQueue {
 					emu.emuSimulateCycle(value)
 					break
 				case MessageType.SetDipByte:
-					emu.setDipSwitchByte(value)
+					emu.setDipSwitchByte(value & 0xff, value >> 8)
 					break
 				case MessageType.SetTimeFence:
 					emu.setTimeFence?.(value)

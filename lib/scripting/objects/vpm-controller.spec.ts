@@ -18,7 +18,7 @@ describe('The VpmController - VISUAL PINMAME COM OBJECT', () => {
 	let vpmController: VpmController
 	let setSwitchInputSpy: SinonStub<[number, boolean?]>
 	let setFliptronicsInputSpy: SinonStub<[string, boolean?]>
-	let setDipSwitchByteSpy: SinonStub<[number]>
+	let setDipSwitchByteSpy: SinonStub<[number, number?]>
 	let _getDipSwitchByteSpy: SinonStub<any>
 
 	beforeEach(() => {
@@ -63,11 +63,12 @@ describe('The VpmController - VISUAL PINMAME COM OBJECT', () => {
 		expect(vpmController.Running).to.equal(false)
 	})
 
-	it('should set and get Dip[0] - note the Dip index is ignored, as WPC has only one!', () => {
+	it('should set and get Dip[0] - bank-aware, WPC uses bank 0', () => {
 		const VALUE: number = 0x55
 		vpmController.Dip[0] = VALUE
-		expect(setDipSwitchByteSpy.args[0]).to.deep.equal([VALUE])
-		expect(vpmController.Dip[0]).to.equal(123)
+		expect(setDipSwitchByteSpy.args[0][0]).to.equal(VALUE)
+		expect(setDipSwitchByteSpy.args[0][1]).to.equal(0)
+		expect(vpmController.Dip[0]).to.equal(VALUE)
 	})
 
 	it('no changed lamps detected', () => {

@@ -40,7 +40,8 @@ describe('VpmController integration test', () => {
 		setupPlayerTable(vbs)
 
 		expect(setDipSwitchByteSpy.args.length).to.equal(1)
-		expect(setDipSwitchByteSpy.args[0]).to.deep.equal([0])
+		expect(setDipSwitchByteSpy.args[0][0]).to.equal(0)
+		expect(setDipSwitchByteSpy.args[0][1]).to.equal(0)
 	})
 
 	it('VBS should update language setting, Controller.Dip()', () => {
@@ -49,7 +50,8 @@ describe('VpmController integration test', () => {
 		setupPlayerTable(vbs)
 
 		expect(setDipSwitchByteSpy.args.length).to.equal(1)
-		expect(setDipSwitchByteSpy.args[0]).to.deep.equal([112])
+		expect(setDipSwitchByteSpy.args[0][0]).to.equal(112)
+		expect(setDipSwitchByteSpy.args[0][1]).to.equal(0)
 	})
 
 	it('VBS should read solenoid, Controller.Solenoid()', () => {

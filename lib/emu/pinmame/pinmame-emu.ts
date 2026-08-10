@@ -9,7 +9,7 @@ import { EmulatorState } from '../emulator-state.js'
 import { createPinmameModule } from './pinmame-loader.js'
 import type { PinmameModule } from './pinmame-module.js'
 
-const DMD = new Vertex2D(128, 32)
+const FALLBACK_DMD = new Vertex2D(128, 32)
 const CONFIG_SIZE = 1024
 const VPM_DIR = '/pinmame'
 const SAMPLE_RATE = 44100
@@ -40,7 +40,7 @@ const gameName = (v: string | { name?: string; pinmame?: { name?: string } }) =>
 export class PinMameEmulator implements IEmulator {
 	readonly emulatorState = new EmulatorState()
 	private readonly queue = new EmulatorMessageQueue()
-	private readonly fallback = new Uint8Array(DMD.x * DMD.y)
+	private fallback = new Uint8Array(FALLBACK_DMD.x * FALLBACK_DMD.y)
 
 	private mod: PinmameModule | null = null
 	private api: Api | null = null
@@ -49,14 +49,14 @@ export class PinMameEmulator implements IEmulator {
 	private paused = false
 	private game: string = ''
 
-	private readonly lamps = new Uint8Array(624)
-	private readonly sols = new Uint8Array(72)
-	private readonly gis = new Uint8Array(8)
+	private readonly lamps = new Uint8Array(1024)
+	private readonly sols = new Uint8Array(128)
+	private readonly gis = new Uint8Array(32)
 	private readonly mockSwitches = new Map<number, number>()
 	private readonly solMasks = new Map<number, number>()
 	private readonly pendingSwitches = new Map<number, number>()
-	private dmdW = DMD.x
-	private dmdH = DMD.y
+	private dmdW = FALLBACK_DMD.x
+	private dmdH = FALLBACK_DMD.y
 
 	async init(): Promise<void> {
 		if (this.mod) return
@@ -168,19 +168,22 @@ export class PinMameEmulator implements IEmulator {
 	}
 	getDmdFrame(): Uint8Array {
 		const d = this.emulatorState.getDmdScreen()
-		return d.length ? d : this.fallback
+		if (d.length) return d
+		const want = this.dmdW * this.dmdH
+		if (this.fallback.length !== want) this.fallback = new Uint8Array(want)
+		return this.fallback
 	}
-	getDipSwitchByte(): number {
-		return this.isMock || !this.api ? 0 : (this.api.getDIP(0) ?? 0)
+	getDipSwitchByte(bank = 0): number {
+		return this.isMock || !this.api ? 0 : (this.api.getDIP(bank) ?? 0)
 	}
-	setDipSwitchByte(v: number): void {
+	setDipSwitchByte(v: number, bank = 0): void {
 		if (!this.ready) {
-			this.queue.addMessage(MessageType.SetDipByte, v)
+			this.queue.addMessage(MessageType.SetDipByte, (bank << 8) | (v & 0xff))
 			return
 		}
 		if (!this.isMock && this.api)
 			try {
-				this.api.setDIP(0, v)
+				this.api.setDIP(bank, v)
 			} catch {}
 	}
 

@@ -103,10 +103,12 @@ export class Emulator implements IEmulator {
 	getDmdFrame(): Uint8Array {
 		return this.emulatorState.getDmdScreen()
 	}
-	getDipSwitchByte(): number {
+	getDipSwitchByte(bank = 0): number {
+		if (bank !== 0) return 0
 		return this.emulator?.getDipSwitchByte() ?? 0
 	}
-	setDipSwitchByte(v: number): void {
+	setDipSwitchByte(v: number, bank = 0): void {
+		if (bank !== 0) return
 		if (!this.emulator) {
 			this.queue.addMessage(MessageType.SetDipByte, v)
 			return

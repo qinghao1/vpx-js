@@ -24,8 +24,8 @@ export interface IEmulator {
 	getSolenoidState(n: number): number
 	getGIState(n: number): number
 	setFliptronicsInput(v: string, enable?: boolean): void
-	getDipSwitchByte(): number
-	setDipSwitchByte(v: number): void
+	getDipSwitchByte(bank?: number): number
+	setDipSwitchByte(v: number, bank?: number): void
 	getSolMask?(low: number): number
 	setSolMask?(low: number, mask: number): void
 	setTimeFence?(time: number): void

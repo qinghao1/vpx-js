@@ -20,6 +20,7 @@ export class VpmController {
 	private loadPromise: Promise<void> | null = null
 	private readonly gameSettings = new Map<string, { Settings: { Value: Record<string, unknown> } }>()
 	private readonly solMaskCache = new Map<number, number>()
+	private readonly dipCache = new Map<number, number>()
 	private readonly switchCache = new Map<number, boolean>()
 
 	readonly Switch: Record<number, number>
@@ -54,10 +55,11 @@ export class VpmController {
 			},
 		)
 		this.Dip = this.numProxy(
-			() => this.emulator.getDipSwitchByte(),
-			(_, v) => {
+			n => this.dipCache.get(n) ?? this.emulator.getDipSwitchByte(n),
+			(n, v) => {
+				this.dipCache.set(n, v & 0xff)
 				try {
-					this.emulator.setDipSwitchByte(v)
+					this.emulator.setDipSwitchByte(v & 0xff, n)
 				} catch {}
 				return true
 			},
@@ -156,6 +158,12 @@ export class VpmController {
 	}
 
 	private replay(emu: IEmulator): void {
+		for (const [k, v] of this.dipCache)
+			try {
+				emu.setDipSwitchByte(v & 0xff, k)
+			} catch (e) {
+				logger().debug('replay Dip failed', e)
+			}
 		for (const [k, v] of this.solMaskCache)
 			try {
 				emu.setSolMask?.(k, v)
