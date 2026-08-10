@@ -15,6 +15,7 @@ const triggerButtonMesh = loadMesh('trigger-button-mesh')
 const triggerSimpleMesh = loadMesh('trigger-simple-mesh')
 const triggerStarMesh = loadMesh('trigger-star-mesh')
 const triggerDWireMesh = loadMesh('trigger-wire-d-mesh')
+const triggerInderMesh = loadMesh('trigger-inder-mesh')
 
 /** Generates trigger mesh. @see https://github.com/vpinball/vpinball/blob/master/trigger.cpp */
 export class TriggerMeshGenerator {
@@ -82,6 +83,8 @@ export class TriggerMeshGenerator {
 				return triggerSimpleMesh.clone(name)
 			case Enums.TriggerShape.TriggerWireD:
 				return triggerDWireMesh.clone(name)
+			case Enums.TriggerShape.TriggerInder:
+				return triggerInderMesh.clone(name)
 			case Enums.TriggerShape.TriggerButton:
 				return triggerButtonMesh.clone(name)
 			case Enums.TriggerShape.TriggerStar:

@@ -97,6 +97,7 @@ export class TriggerShape extends VbsApi {
 	public readonly TriggerButton = 4
 	public readonly TriggerWireC = 5
 	public readonly TriggerWireD = 6
+	public readonly TriggerInder = 7
 
 	protected _getPropertyNames(): string[] {
 		return [
@@ -107,6 +108,7 @@ export class TriggerShape extends VbsApi {
 			'TriggerButton',
 			'TriggerWireC',
 			'TriggerWireD',
+			'TriggerInder',
 		]
 	}
 }
