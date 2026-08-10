@@ -43,15 +43,13 @@ export class VpmController {
 				if (v === true) this.switchCache.set(n, true)
 				else if (v === false) this.switchCache.set(n, false)
 				else if (v === undefined) this.switchCache.delete(n)
-				if (this.emulator instanceof PinMameEmulator) return this.emulator.setSwitchInput(n, v)
-				if (n < 89) return this.emulator.setSwitchInput(n, v)
-				const key = (VpmController.FLIPTRONICS as Record<number, string>)[n]
-				if (key) {
+				const f = (VpmController.FLIPTRONICS as Record<number, string>)[n]
+				if (f && this.emulator instanceof Emulator) {
+					const key = f
 					this.emulator.setFliptronicsInput(key, v)
 					return true
 				}
-				logger().error('INVALID_SWITCH_ID:', n)
-				return false
+				return this.emulator.setSwitchInput(n, v)
 			},
 		)
 		this.Dip = this.numProxy(

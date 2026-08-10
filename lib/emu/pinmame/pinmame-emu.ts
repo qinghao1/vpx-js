@@ -40,7 +40,6 @@ const gameName = (v: string | { name?: string; pinmame?: { name?: string } }) =>
 export class PinMameEmulator implements IEmulator {
 	readonly emulatorState = new EmulatorState()
 	private readonly queue = new EmulatorMessageQueue()
-	private fallback = new Uint8Array(FALLBACK_DMD.x * FALLBACK_DMD.y)
 
 	private mod: PinmameModule | null = null
 	private api: Api | null = null
@@ -67,29 +66,26 @@ export class PinMameEmulator implements IEmulator {
 			logger().warn('[pinmame] mock — physics only, run npm run build:wasm')
 			return
 		}
-		const c = module.cwrap.bind(module) as (
-			id: string,
-			rt: string | null,
-			at: string[],
-		) => (...a: unknown[]) => unknown
+		const c = module.cwrap.bind(module) as (id: string, rt: string | null, at: string[]) => (...a: unknown[]) => unknown
+		const b = (id: string, rt: string | null, at: string[]) => c(id, rt, at) as unknown
 		this.api = {
-			setConfig: c('PinmameSetConfig', null, ['number']) as Api['setConfig'],
-			run: c('PinmameRun', 'number', ['number']) as Api['run'],
-			isRunning: c('PinmameIsRunning', 'number', []) as Api['isRunning'],
-			setSwitch: c('PinmameSetSwitch', null, ['number', 'number']) as Api['setSwitch'],
-			getSwitch: c('PinmameGetSwitch', 'number', ['number']) as Api['getSwitch'],
-			getChangedLamps: c('PinmameGetChangedLamps', 'number', ['number']) as Api['getChangedLamps'],
-			getChangedSols: c('PinmameGetChangedSolenoids', 'number', ['number']) as Api['getChangedSols'],
-			getChangedGIs: c('PinmameGetChangedGIs', 'number', ['number']) as Api['getChangedGIs'],
-			getDIP: c('PinmameGetDIP', 'number', ['number']) as Api['getDIP'],
-			setDIP: c('PinmameSetDIP', null, ['number', 'number']) as Api['setDIP'],
-			getDmdWidth: c('PinmameGetDmdWidth', 'number', []) as Api['getDmdWidth'],
-			getDmdHeight: c('PinmameGetDmdHeight', 'number', []) as Api['getDmdHeight'],
-			getDmdDepth: c('PinmameGetDmdDepth', 'number', []) as Api['getDmdDepth'],
-			getDmdFrame: c('PinmameGetDmdFrame', 'number', ['number']) as Api['getDmdFrame'],
-			getSolMask: c('PinmameGetSolenoidMask', 'number', ['number']) as Api['getSolMask'],
-			setSolMask: c('PinmameSetSolenoidMask', null, ['number', 'number']) as Api['setSolMask'],
-			setTimeFence: c('PinmameSetTimeFence', null, ['number']) as Api['setTimeFence'],
+			setConfig: b('PinmameSetConfig', null, ['number']) as Api['setConfig'],
+			run: b('PinmameRun', 'number', ['number']) as Api['run'],
+			isRunning: b('PinmameIsRunning', 'number', []) as Api['isRunning'],
+			setSwitch: b('PinmameSetSwitch', null, ['number', 'number']) as Api['setSwitch'],
+			getSwitch: b('PinmameGetSwitch', 'number', ['number']) as Api['getSwitch'],
+			getChangedLamps: b('PinmameGetChangedLamps', 'number', ['number']) as Api['getChangedLamps'],
+			getChangedSols: b('PinmameGetChangedSolenoids', 'number', ['number']) as Api['getChangedSols'],
+			getChangedGIs: b('PinmameGetChangedGIs', 'number', ['number']) as Api['getChangedGIs'],
+			getDIP: b('PinmameGetDIP', 'number', ['number']) as Api['getDIP'],
+			setDIP: b('PinmameSetDIP', null, ['number', 'number']) as Api['setDIP'],
+			getDmdWidth: b('PinmameGetDmdWidth', 'number', []) as Api['getDmdWidth'],
+			getDmdHeight: b('PinmameGetDmdHeight', 'number', []) as Api['getDmdHeight'],
+			getDmdDepth: b('PinmameGetDmdDepth', 'number', []) as Api['getDmdDepth'],
+			getDmdFrame: b('PinmameGetDmdFrame', 'number', ['number']) as Api['getDmdFrame'],
+			getSolMask: b('PinmameGetSolenoidMask', 'number', ['number']) as Api['getSolMask'],
+			setSolMask: b('PinmameSetSolenoidMask', null, ['number', 'number']) as Api['setSolMask'],
+			setTimeFence: b('PinmameSetTimeFence', null, ['number']) as Api['setTimeFence'],
 		}
 	}
 
@@ -168,10 +164,7 @@ export class PinMameEmulator implements IEmulator {
 	}
 	getDmdFrame(): Uint8Array {
 		const d = this.emulatorState.getDmdScreen()
-		if (d.length) return d
-		const want = this.dmdW * this.dmdH
-		if (this.fallback.length !== want) this.fallback = new Uint8Array(want)
-		return this.fallback
+		return d.length ? d : new Uint8Array(this.dmdW * this.dmdH)
 	}
 	getDipSwitchByte(bank = 0): number {
 		return this.isMock || !this.api ? 0 : (this.api.getDIP(bank) ?? 0)
