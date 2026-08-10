@@ -9,7 +9,7 @@ import type { Texture } from '../../vpt/texture.js'
 import type { ITextureLoader } from '../irender-api.js'
 
 const LARGE_TEXTURE_PIXELS = 4 * 1024 * 1024
-const CONCURRENCY_HEAVY = 3
+const CONCURRENCY_HEAVY = 6
 const CONCURRENCY_DEFAULT = 6
 
 /** Caches and preloads Three.js textures. */

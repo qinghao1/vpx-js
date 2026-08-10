@@ -28,12 +28,18 @@ export class AnimationGate {
 	}
 
 	async waitIfAnimating(): Promise<void> {
-		if (this.promise) await this.promise
+		if (!this.promise) return
+		// Don't block texture/streaming workers indefinitely if animation
+		// is stuck (e.g. cancelled transition). Race with a short timeout.
+		const p = this.promise
+		await Promise.race([p, new Promise<void>(r => setTimeout(r, 1200))])
 	}
 
 	async yieldToMain(): Promise<void> {
 		await this.waitIfAnimating()
-		if (typeof requestAnimationFrame === 'function') await new Promise<void>(r => requestAnimationFrame(() => r()))
+		// rAF throttles to ~1 fps in background/headless tabs (puppeteer) which
+		// would stall texture streaming (101 textures → 100 s). Use scheduler
+		// or timeout directly; rAF is only needed for smooth 60 fps animations.
 		const g = globalThis as unknown as { scheduler?: { yield?: () => Promise<void> } }
 		if (g.scheduler?.yield) await g.scheduler.yield()
 		else await new Promise<void>(r => setTimeout(r, 0))

@@ -34,6 +34,22 @@ const imageMap: Record<string, string> = {
 }
 
 let hwMax: number | undefined
+let isSwiftShaderCache: boolean | undefined
+function isSwiftShader(): boolean {
+	if (isSwiftShaderCache !== undefined) return isSwiftShaderCache
+	try {
+		if (typeof document === 'undefined') return (isSwiftShaderCache = false)
+		const c = document.createElement('canvas')
+		const gl = (c.getContext('webgl2') ?? c.getContext('webgl') ?? c.getContext('experimental-webgl')) as any
+		if (!gl) return (isSwiftShaderCache = false)
+		const ext = gl.getExtension('WEBGL_debug_renderer_info')
+		const renderer = ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : ''
+		const s = String(renderer || '').toLowerCase()
+		return (isSwiftShaderCache = s.includes('swiftshader') || s.includes('swift shader'))
+	} catch {
+		return (isSwiftShaderCache = false)
+	}
+}
 function getHardwareMax(): number {
 	if (hwMax !== undefined) return hwMax
 	try {
@@ -58,9 +74,10 @@ function viewportBudget(): number {
 
 function effectiveMax(isFloat: boolean): number {
 	const hw = getHardwareMax()
-	const vp = viewportBudget()
-	if (isFloat) return Math.min(hw, Math.max(1024, Math.ceil(vp)))
-	return Math.min(hw, Math.max(4096, Math.ceil(vp * (vp >= 1200 ? 1.5 : 2))))
+	const swift = isSwiftShader()
+	const cap = swift ? 1024 : 2048
+	if (isFloat) return Math.min(hw, cap, Math.max(1024, Math.ceil(viewportBudget())))
+	return Math.min(hw, cap)
 }
 
 function tune(tex: any): void {
@@ -336,6 +353,30 @@ async function loadRegular(name: string, mime: string, data: Uint8Array): Promis
 	try {
 		const tex: any = await new TextureLoader().loadAsync(url)
 		tex.colorSpace = SRGBColorSpace
+		const img: any = tex.image
+		const max = effectiveMax(false)
+		if (img && typeof img.width === 'number' && typeof img.height === 'number' && (img.width > max || img.height > max) && typeof document !== 'undefined') {
+			const scale = Math.min(max / img.width, max / img.height)
+			const nw = Math.max(1, Math.floor(img.width * scale))
+			const nh = Math.max(1, Math.floor(img.height * scale))
+			try {
+				const canvas = document.createElement('canvas')
+				canvas.width = nw
+				canvas.height = nh
+				const ctx: any = canvas.getContext('2d')
+				if (ctx) {
+					ctx.imageSmoothingEnabled = true
+					ctx.imageSmoothingQuality = 'high'
+					ctx.drawImage(img as any, 0, 0, nw, nh)
+					const cTex: any = new CanvasTexture(canvas as any)
+					cTex.colorSpace = SRGBColorSpace
+					cTex.name = `texture:${name}`
+					tune(cTex)
+					try { tex.dispose?.() } catch {}
+					return cTex as ThreeTexture
+				}
+			} catch {}
+		}
 		return finalize(tex, name, false)
 	} finally {
 		URL.revokeObjectURL(url)
@@ -391,25 +432,41 @@ function downsampleData(texture: any, maxSize: number): any {
 	const yRatio = h / nh
 	const isHalf = src instanceof Uint16Array && texture.type === HalfFloatType
 	const isFloat = src instanceof Float32Array
-	for (let y = 0; y < nh; y++) {
-		const y0 = Math.floor(y * yRatio)
-		const y1 = Math.min(h, Math.ceil((y + 1) * yRatio))
-		for (let x = 0; x < nw; x++) {
-			const x0 = Math.floor(x * xRatio)
-			const x1 = Math.min(w, Math.ceil((x + 1) * xRatio))
-			const count = (x1 - x0) * (y1 - y0)
-			const dBase = (y * nw + x) * channels
-			for (let c = 0; c < channels; c++) {
-				let sum = 0
-				for (let sy = y0; sy < y1; sy++) {
-					const row = sy * w * channels
-					for (let sx = x0; sx < x1; sx++)
-						sum += isHalf
-							? DataUtils.fromHalfFloat(src[row + sx * channels + c] as any)
-							: (src as any)[row + sx * channels + c]
+	// SwiftShader has tiny GPU/CPU budget — use nearest sampling for huge textures.
+	const fast = w * h > 4 * 1024 * 1024
+	if (fast) {
+		for (let y = 0; y < nh; y++) {
+			const sy = Math.min(h - 1, Math.floor(y * yRatio))
+			const srcRow = sy * w * channels
+			const dstRow = y * nw * channels
+			for (let x = 0; x < nw; x++) {
+				const sx = Math.min(w - 1, Math.floor(x * xRatio))
+				const sBase = srcRow + sx * channels
+				const dBase = dstRow + x * channels
+				for (let c = 0; c < channels; c++) dst[dBase + c] = (src as any)[sBase + c]
+			}
+		}
+	} else {
+		for (let y = 0; y < nh; y++) {
+			const y0 = Math.floor(y * yRatio)
+			const y1 = Math.min(h, Math.ceil((y + 1) * yRatio))
+			for (let x = 0; x < nw; x++) {
+				const x0 = Math.floor(x * xRatio)
+				const x1 = Math.min(w, Math.ceil((x + 1) * xRatio))
+				const count = (x1 - x0) * (y1 - y0)
+				const dBase = (y * nw + x) * channels
+				for (let c = 0; c < channels; c++) {
+					let sum = 0
+					for (let sy = y0; sy < y1; sy++) {
+						const row = sy * w * channels
+						for (let sx = x0; sx < x1; sx++)
+							sum += isHalf
+								? DataUtils.fromHalfFloat(src[row + sx * channels + c] as any)
+								: (src as any)[row + sx * channels + c]
+					}
+					const avg = sum / count
+					dst[dBase + c] = isHalf ? DataUtils.toHalfFloat(avg) : isFloat ? avg : Math.round(avg)
 				}
-				const avg = sum / count
-				dst[dBase + c] = isHalf ? DataUtils.toHalfFloat(avg) : isFloat ? avg : Math.round(avg)
 			}
 		}
 	}
