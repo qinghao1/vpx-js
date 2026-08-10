@@ -78,6 +78,8 @@ export class Primitive
 				material: table.getMaterial(this.data.szMaterial),
 				isTransparent,
 				depthBias: this.data.depthBias,
+				disableLighting: this.data.disableLightingTop,
+				backfacesEnabled: this.data.backfacesEnabled,
 			},
 		}
 	}

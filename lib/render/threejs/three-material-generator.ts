@@ -17,6 +17,13 @@ import type { ThreeMapGenerator } from './three-map-generator.js'
 const BALL_METALNESS = 1
 const BALL_ROUGHNESS = 0.18
 
+const RE_BAKE_MAT = /bake/i
+const RE_BAKE_MAP = /bake|nestmap/i
+const BAKED_EMISSIVE = 0.85
+const BAKED_ROUGH = 0.75
+const BAKED_METAL = 0.1
+const DISABLE_LIGHTING_THRESHOLD = 0.5
+
 const pendingKeyFor = (key: 'map' | 'normalMap' | 'envMap' | 'emissiveMap'): string =>
 	`pending${key.charAt(0).toUpperCase()}${key.slice(1)}`
 
@@ -35,6 +42,8 @@ export class ThreeMaterialGenerator {
 			opts.applyTextures && obj.material?.emissiveMap ? obj.material.emissiveMap.getName() : undefined,
 			!!obj.isTransparent,
 			obj.depthBias ?? 0,
+			obj.disableLighting,
+			obj.backfacesEnabled,
 		)
 	}
 
@@ -46,8 +55,20 @@ export class ThreeMaterialGenerator {
 		emissiveMap?: string,
 		isTransparent = false,
 		depthBias = 0,
+		disableLighting?: number,
+		backfacesEnabled?: boolean,
 	): ThreeMaterial {
-		const key = this.getKey(material, map, normalMap, envMap, emissiveMap, isTransparent, depthBias)
+		const key = this.getKey(
+			material,
+			map,
+			normalMap,
+			envMap,
+			emissiveMap,
+			isTransparent,
+			depthBias,
+			disableLighting,
+			backfacesEnabled,
+		)
 		const cached = this.cachedMaterials[key]
 		if (cached) return cached
 		const m = new MeshStandardMaterial()
@@ -58,6 +79,11 @@ export class ThreeMaterialGenerator {
 		this.applyEmissiveMap(m, material, emissiveMap)
 		m.transparent = isTransparent
 		m.depthWrite = !isTransparent
+		if (this.isBaked(material, map, disableLighting)) {
+			this.applyBaked(m, (m as any).map, backfacesEnabled)
+			;(m.userData as any).__isBaked = true
+			;(m.userData as any).__backfacesEnabled = backfacesEnabled
+		}
 		if (depthBias !== 0) {
 			m.polygonOffset = true
 			m.polygonOffsetFactor = 0
@@ -160,12 +186,43 @@ export class ThreeMaterialGenerator {
 				;(mat as any)[texKey] = tex
 				;(tex as any).name = name
 				if (texKey === 'envMap') (mat as MeshStandardMaterial).envMapIntensity = 1
+				if (texKey === 'map') {
+					const m = mat as MeshStandardMaterial
+					const isBakedPending =
+						ud.__isBaked || this.isBaked(undefined, name) || (m.name && RE_BAKE_MAT.test(m.name))
+					if (isBakedPending) this.applyBaked(m, tex, ud.__backfacesEnabled)
+				}
 				delete ud[pendingKey]
 				mat.needsUpdate = true
 				fixed++
 			}
 		}
 		return fixed
+	}
+
+	private isBaked(material?: Material, map?: string, disableLighting?: number): boolean {
+		if (disableLighting !== undefined && disableLighting > DISABLE_LIGHTING_THRESHOLD) return true
+		// TODO: name heuristic is a content convention, not an engine contract.
+		// vpinball never checks name; it uses PrimitiveData.disableLightingTop (see primitive.cpp:1135).
+		// Keep as fallback until all RenderInfo producers expose disableLighting.
+		if (material && RE_BAKE_MAT.test(material.name)) return true
+		if (map && RE_BAKE_MAP.test(map) && !map.toLowerCase().startsWith('vr_')) return true
+		return false
+	}
+
+	private applyBaked(mat: MeshStandardMaterial, mapTex?: unknown, backfacesEnabled?: boolean): void {
+		mat.color.set(0xffffff)
+		if (mapTex && !(mat as any).emissiveMap) (mat as any).emissiveMap = mapTex
+		else if ((mat as any).map && !(mat as any).emissiveMap) (mat as any).emissiveMap = (mat as any).map
+		if (!mat.emissive || mat.emissive.getHex() === 0x000000) mat.emissive = new Color(0xffffff)
+		else mat.emissive.set(0xffffff)
+		mat.emissiveIntensity = BAKED_EMISSIVE
+		mat.side = backfacesEnabled === true ? DoubleSide : backfacesEnabled === false ? FrontSide : DoubleSide
+		mat.toneMapped = false
+		mat.roughness = BAKED_ROUGH
+		mat.metalness = BAKED_METAL
+		;(mat as any).envMapIntensity = 0
+		mat.needsUpdate = true
 	}
 
 	private getKey(
@@ -176,7 +233,9 @@ export class ThreeMaterialGenerator {
 		emissiveMap?: string,
 		isTransparent = false,
 		depthBias = 0,
+		disableLighting?: number,
+		backfacesEnabled?: boolean,
 	): string {
-		return `${material?.name ?? 'none'}:${map ?? 'none'}:${normalMap ?? 'none'}:${envMap ?? 'none'}:${emissiveMap ?? 'none'}:${isTransparent ? 't' : 'o'}:${depthBias}`
+		return `${material?.name ?? 'none'}:${map ?? 'none'}:${normalMap ?? 'none'}:${envMap ?? 'none'}:${emissiveMap ?? 'none'}:${isTransparent ? 't' : 'o'}:${depthBias}:${disableLighting ?? 'x'}:${backfacesEnabled ?? 'x'}`
 	}
 }

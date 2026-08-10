@@ -64,6 +64,7 @@ export class HitTarget
 				material: m,
 				isTransparent,
 				depthBias: this.data.depthBias ?? 0,
+				disableLighting: this.data.disableLightingTop,
 			},
 		}
 	}

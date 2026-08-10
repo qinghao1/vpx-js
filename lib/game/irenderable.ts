@@ -39,4 +39,9 @@ export interface RenderInfo<GEOMETRY> {
 	material?: Material
 	isTransparent?: boolean
 	depthBias?: number
+	// vpinball primitive: m_disableLightingTop (0..1). When >0.5 the primitive is pre-baked / unlit
+	// (see ~/projects/vpinball/src/parts/primitive.cpp:1135 SHADER_fDisableLighting_top_below and
+	//   SHADER_TECHNIQUE_unshaded_with_texture selection). Used to emulate unlit without name hacks.
+	disableLighting?: number
+	backfacesEnabled?: boolean
 }

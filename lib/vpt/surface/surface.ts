@@ -86,6 +86,7 @@ export class Surface
 				map: table.getTexture(this.data.szImage),
 				material: table.getMaterial(this.data.szTopMaterial),
 				isTransparent: Surface.isTransparentMat(table.getMaterial(this.data.szTopMaterial)),
+				disableLighting: this.data.disableLightingTop,
 			}
 		}
 		if (surface.side) {
