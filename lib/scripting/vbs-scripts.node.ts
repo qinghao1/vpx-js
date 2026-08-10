@@ -8,6 +8,8 @@ import { fileURLToPath } from 'node:url'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 
+import { ERR } from './stdlib/err.js'
+
 /* istanbul ignore next: We don't test VB's core library. */
 /** Whether a bundled text file exists without fallback. */
 export function hasTextFile(fileName: string): boolean {
@@ -29,19 +31,15 @@ export function hasTextFile(fileName: string): boolean {
 
 /** getTextFile. */
 export function getTextFile(fileName: string): string {
-	const filePath = getLocalPath(fileName)
 	try {
-		return readFileSync(filePath).toString('utf8')
-	} catch (e: any) {
-		const key = fileName.toLowerCase()
-		if (key.endsWith('.vbs')) {
-			// Fall back to core.vbs so SolCallback / cvpmMagnet remain defined
-			try {
-				return readFileSync(resolve(__dirname, '../../res/scripts/core.vbs')).toString('utf8')
-			} catch {}
-		}
-		throw new Error(`Cannot find text file ${fileName}: ${e?.message}`)
-	}
+		return readFileSync(getLocalPath(fileName)).toString('utf8')
+	} catch {}
+	try {
+		const base = fileName.replace(/.*[\\/]/, '')
+		return readFileSync(getLocalPath(base)).toString('utf8')
+	} catch {}
+	ERR.Raise(53, 'GetTextFile', `Unable to open ${fileName}`)
+	return ''
 }
 
 /* istanbul ignore next: We don't test VB's core library. */

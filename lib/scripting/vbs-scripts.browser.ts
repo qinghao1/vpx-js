@@ -8,7 +8,7 @@ import VPMKeys from '../../res/scripts/VPMKeys.vbs'
 import WPC from '../../res/scripts/WPC.vbs'
 import grammar from './grammar/grammar.bnf'
 
-import { logger } from '../util/logger.js'
+import { ERR } from './stdlib/err.js'
 
 const MAP: Record<string, string> = {
 	'controller.vbs': controller,
@@ -28,16 +28,10 @@ export function hasTextFile(fileName: string): boolean {
 
 /** getTextFile. */
 export function getTextFile(fileName: string): string {
-	const key = fileName.toLowerCase()
-	if (MAP[key] !== undefined) return MAP[key]
-	// Generic fallback: sam-driven tables all load core.vbs indirectly;
-	// returning core ensures SolCallback / cvpmMagnet exist so script
-	// can continue even when a niche VBS (capcom.vbs, etc.) is missing.
-	// The VBS itself does `On Error Resume Next` around GetTextFile, so
-	// returning empty would also be valid — but core is a safer default.
-	if (key.endsWith('.vbs')) {
-		logger().debug(`[vbs] GetTextFile("${fileName}") not bundled — falling back to core.vbs`)
-		return core
-	}
-	throw new Error(`Cannot find text file ${fileName}`)
+	const lower = fileName.toLowerCase()
+	if (MAP[lower] !== undefined) return MAP[lower]
+	const base = fileName.replace(/.*[\\/]/, '').toLowerCase()
+	if (MAP[base] !== undefined) return MAP[base]
+	ERR.Raise(53, 'GetTextFile', `Unable to open ${fileName}`)
+	return ''
 }

@@ -70,6 +70,27 @@ export class GlobalApi extends VbsApi {
 	get UserDirectory() {
 		return '.'
 	}
+	get ScriptsDirectory() {
+		return './Scripts/'
+	}
+	get TablesDirectory() {
+		return './Tables/'
+	}
+	get MusicDirectory() {
+		return '.'
+	}
+	get ActiveTable() {
+		return this.table.getApi()
+	}
+	get PlatformOS() {
+		return 'Linux'
+	}
+	get PlatformCPU() {
+		return 'x86-64'
+	}
+	get PlatformBits() {
+		return '64'
+	}
 	get GetPlayerHWnd() {
 		return null
 	}
