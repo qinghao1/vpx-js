@@ -14,12 +14,18 @@ const presets = path.join(wasmDir, 'CMakePresets.json')
 const buildSh = path.join(wasmDir, 'build.sh')
 
 describe('WASM build artifacts', () => {
-	it('CMakeLists.txt is modern (min 3.28, has EMSCRIPTEN guard, pthreads)', () => {
+	it('CMakeLists.txt is modern (umbrella, min 3.28, EMSCRIPTEN, add_subdirectory)', () => {
 		const txt = fs.readFileSync(cmakeLists, 'utf-8')
 		expect(txt).toMatch(/cmake_minimum_required\(VERSION 3\.28/)
 		expect(txt).toMatch(/if\(NOT EMSCRIPTEN\)/)
-		expect(txt).toMatch(/PINMAME_WASM_PTHREADS/)
-		expect(txt).toMatch(/EXPORTED_FUNCTIONS/)
+		expect(txt).toMatch(/add_subdirectory\(modules\/kernels\)/)
+		expect(txt).toMatch(/add_subdirectory\(modules\/pinmame\)/)
+		const pinmameCmake = fs.readFileSync(path.join(wasmDir, 'modules/pinmame/CMakeLists.txt'), 'utf-8')
+		expect(pinmameCmake).toMatch(/PINMAME_WASM_PTHREADS/)
+		expect(pinmameCmake).toMatch(/EXPORTED_FUNCTIONS/)
+		const kernelsCmake = fs.readFileSync(path.join(wasmDir, 'modules/kernels/CMakeLists.txt'), 'utf-8')
+		expect(kernelsCmake).toMatch(/createKernelsModule/)
+		expect(kernelsCmake).toMatch(/msimd128/)
 	})
 
 	it('CMakePresets.json has wasm and debug presets with distinct binaryDir', () => {
@@ -40,6 +46,8 @@ describe('WASM build artifacts', () => {
 		expect(txt).toMatch(/--mock/)
 		expect(txt).toMatch(/emcc not found/)
 		expect(txt).toMatch(/emcmake cmake --preset/)
+		expect(txt).toMatch(/modules\/pinmame\/patches/)
+		expect(txt).toMatch(/kernels/)
 	})
 
 	it('mock exists and exports createPinmameModule + isMock', async () => {
@@ -78,5 +86,21 @@ describe('WASM build artifacts', () => {
 	it('external/pinmame submodule exists', () => {
 		expect(fs.existsSync(path.join(root, 'external/pinmame/src/libpinmame/libpinmame.h'))).toBe(true)
 		expect(fs.existsSync(path.join(root, 'external/pinmame/src/wpc'))).toBe(true)
+	})
+
+	it('modules layout is idiomatic (kernels + pinmame subdirs)', () => {
+		expect(fs.existsSync(path.join(wasmDir, 'modules/kernels/src/kernels.cpp'))).toBe(true)
+		expect(fs.existsSync(path.join(wasmDir, 'modules/kernels/CMakeLists.txt'))).toBe(true)
+		expect(fs.existsSync(path.join(wasmDir, 'modules/pinmame/CMakeLists.txt'))).toBe(true)
+		expect(fs.existsSync(path.join(wasmDir, 'modules/pinmame/patches'))).toBe(true)
+		const patches = fs.readdirSync(path.join(wasmDir, 'modules/pinmame/patches')).filter(f => f.endsWith('.patch'))
+		expect(patches.length).toBeGreaterThanOrEqual(10)
+		expect(fs.existsSync(path.join(wasmDir, 'dist'))).toBe(true)
+	})
+
+	it('kernels dist exists or legacy copy', () => {
+		const canonical = path.join(wasmDir, 'dist/kernels.js')
+		const legacy = path.join(wasmDir, 'kernels/dist/kernels.js')
+		expect(fs.existsSync(canonical) || fs.existsSync(legacy)).toBe(true)
 	})
 })

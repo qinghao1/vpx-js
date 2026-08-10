@@ -294,8 +294,8 @@ function refLine3D(
 
 describe('wasm kernels vs JS reference', () => {
 	it('plane', async () => {
-		const { default: create } = await import('../../../wasm/kernels/dist/kernels.js')
-		const mod: any = await (create as any)({ locateFile: (p: string) => `wasm/kernels/dist/${p}` })
+		const { default: create } = await import('../../../wasm/dist/kernels.js')
+		const mod: any = await (create as any)({ locateFile: (p: string) => `wasm/dist/${p}` })
 		const rand = (a: number, b: number) => Math.random() * (b - a) + a
 		for (let i = 0; i < 200; i++) {
 			const bx = rand(-50, 50),
@@ -370,8 +370,8 @@ describe('wasm kernels vs JS reference', () => {
 	})
 
 	it('circle', async () => {
-		const { default: create } = await import('../../../wasm/kernels/dist/kernels.js')
-		const mod: any = await (create as any)({ locateFile: (p: string) => `wasm/kernels/dist/${p}` })
+		const { default: create } = await import('../../../wasm/dist/kernels.js')
+		const mod: any = await (create as any)({ locateFile: (p: string) => `wasm/dist/${p}` })
 		const rand = (a: number, b: number) => Math.random() * (b - a) + a
 		for (let i = 0; i < 200; i++) {
 			const bx = rand(-50, 50),
@@ -447,8 +447,8 @@ describe('wasm kernels vs JS reference', () => {
 	})
 
 	it('lineZ', async () => {
-		const { default: create } = await import('../../../wasm/kernels/dist/kernels.js')
-		const mod: any = await (create as any)({ locateFile: (p: string) => `wasm/kernels/dist/${p}` })
+		const { default: create } = await import('../../../wasm/dist/kernels.js')
+		const mod: any = await (create as any)({ locateFile: (p: string) => `wasm/dist/${p}` })
 		const rand = (a: number, b: number) => Math.random() * (b - a) + a
 		for (let i = 0; i < 200; i++) {
 			const bx = rand(-50, 50),
@@ -519,8 +519,8 @@ describe('wasm kernels vs JS reference', () => {
 	})
 
 	it('point', async () => {
-		const { default: create } = await import('../../../wasm/kernels/dist/kernels.js')
-		const mod: any = await (create as any)({ locateFile: (p: string) => `wasm/kernels/dist/${p}` })
+		const { default: create } = await import('../../../wasm/dist/kernels.js')
+		const mod: any = await (create as any)({ locateFile: (p: string) => `wasm/dist/${p}` })
 		const rand = (a: number, b: number) => Math.random() * (b - a) + a
 		for (let i = 0; i < 200; i++) {
 			const bx = rand(-50, 50),
@@ -566,8 +566,8 @@ describe('wasm kernels vs JS reference', () => {
 	})
 
 	it('triangle', async () => {
-		const { default: create } = await import('../../../wasm/kernels/dist/kernels.js')
-		const mod: any = await (create as any)({ locateFile: (p: string) => `wasm/kernels/dist/${p}` })
+		const { default: create } = await import('../../../wasm/dist/kernels.js')
+		const mod: any = await (create as any)({ locateFile: (p: string) => `wasm/dist/${p}` })
 		const rand = (a: number, b: number) => Math.random() * (b - a) + a
 		for (let i = 0; i < 200; i++) {
 			const bx = rand(-50, 50),
@@ -703,8 +703,8 @@ describe('wasm kernels vs JS reference', () => {
 	})
 
 	it('lineSeg', async () => {
-		const { default: create } = await import('../../../wasm/kernels/dist/kernels.js')
-		const mod: any = await (create as any)({ locateFile: (p: string) => `wasm/kernels/dist/${p}` })
+		const { default: create } = await import('../../../wasm/dist/kernels.js')
+		const mod: any = await (create as any)({ locateFile: (p: string) => `wasm/dist/${p}` })
 		const rand = (a: number, b: number) => Math.random() * (b - a) + a
 		for (let i = 0; i < 200; i++) {
 			const bx = rand(-50, 50),
@@ -803,8 +803,8 @@ describe('wasm kernels vs JS reference', () => {
 	})
 
 	it('line3D', async () => {
-		const { default: create } = await import('../../../wasm/kernels/dist/kernels.js')
-		const mod: any = await (create as any)({ locateFile: (p: string) => `wasm/kernels/dist/${p}` })
+		const { default: create } = await import('../../../wasm/dist/kernels.js')
+		const mod: any = await (create as any)({ locateFile: (p: string) => `wasm/dist/${p}` })
 		const rand = (a: number, b: number) => Math.random() * (b - a) + a
 		for (let i = 0; i < 200; i++) {
 			const bx = rand(-50, 50),
@@ -953,8 +953,8 @@ describe('wasm kernels vs JS reference', () => {
 	})
 
 	it('elasticity', async () => {
-		const { default: create } = await import('../../../wasm/kernels/dist/kernels.js')
-		const mod: any = await (create as any)({ locateFile: (p: string) => `wasm/kernels/dist/${p}` })
+		const { default: create } = await import('../../../wasm/dist/kernels.js')
+		const mod: any = await (create as any)({ locateFile: (p: string) => `wasm/dist/${p}` })
 		const n = 16,
 			pE = mod._malloc(n * 4),
 			pF = mod._malloc(n * 4),

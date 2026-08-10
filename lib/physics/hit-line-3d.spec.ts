@@ -5,8 +5,8 @@ import { HitLine3D } from './hit-line-3d.js'
 
 describe('HitLine3D', () => {
 	it('scalar hitTest matches vpinball reference (matrix transpose correct)', async () => {
-		const { default: createKernels } = await import('../../wasm/kernels/dist/kernels.js')
-		const mod: any = await (createKernels as any)({ locateFile: (p: string) => `wasm/kernels/dist/${p}` })
+		const { default: createKernels } = await import('../../wasm/dist/kernels.js')
+		const mod: any = await (createKernels as any)({ locateFile: (p: string) => `wasm/dist/${p}` })
 		const C_CONTACTVEL = 0.099
 		function testLineZ(
 			bx: number,
