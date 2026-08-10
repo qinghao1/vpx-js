@@ -5,7 +5,7 @@ import path from 'node:path'
 export async function verifyBrowser(): Promise<boolean> {
 	console.log('# browser — integration (viewer + physics + DMD)')
 	const root = process.cwd()
-	const script = path.join(root, 'demo-browser/harness/integration.mjs')
+	const script = path.join(root, 'demo-browser/e2e/integration.mjs')
 	try {
 		const code = await new Promise<number>(res => {
 			const p = spawn('node', [script], { stdio: 'inherit' })
