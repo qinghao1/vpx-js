@@ -14,7 +14,6 @@ readonly ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 readonly WASM_DIR="$ROOT/wasm"
 readonly DIST_DIR="$WASM_DIR/dist"
 readonly PATCH_DIR="$WASM_DIR/modules/pinmame/patches"
-readonly LEGACY_PATCH_DIR="$WASM_DIR/patches"
 readonly MOCK_SRC="$WASM_DIR/mock/libpinmame.mock.js"
 readonly PINMAME="$ROOT/external/pinmame"
 
@@ -66,15 +65,12 @@ mkdir -p "$PINMAME/ext/miniaudio/miniaudio" 2>/dev/null || true
 [[ -f "$PINMAME/ext/miniaudio/miniaudio/miniaudio.h" ]] && cp -n "$PINMAME/ext/miniaudio/miniaudio/miniaudio.h" "$PINMAME/ext/miniaudio/miniaudio.h" 2>/dev/null || true
 
 # Apply PinMAME WASM patches (idempotent — git apply --check)
-for dir in "$PATCH_DIR" "$LEGACY_PATCH_DIR"; do
-  [[ -d "$dir" ]] || continue
-  for patch in "$dir"/*.patch; do
-    [[ -e "$patch" ]] || continue
-    if git -C "$PINMAME" apply --check "$patch" >/dev/null 2>&1; then
-      log "apply $(basename "$patch")"
-      git -C "$PINMAME" apply "$patch"
-    fi
-  done
+for patch in "$PATCH_DIR"/*.patch; do
+  [[ -e "$patch" ]] || continue
+  if git -C "$PINMAME" apply --check "$patch" >/dev/null 2>&1; then
+    log "apply $(basename "$patch")"
+    git -C "$PINMAME" apply "$patch"
+  fi
 done
 
 mkdir -p "$DIST_DIR"
@@ -85,14 +81,6 @@ if ! (cd "$WASM_DIR" && emcmake cmake --preset "$preset" && cmake --build --pres
   # shellcheck disable=SC2012
   ls -lh "$DIST_DIR" | head -n 20
   exit 0
-fi
-
-# Compatibility: keep legacy wasm/kernels/dist/ populated for code/tests that still import from old path.
-# New canonical output is wasm/dist/kernels.js — update imports when possible.
-if [[ -f "$DIST_DIR/kernels.js" ]]; then
-  mkdir -p "$WASM_DIR/kernels/dist" 2>/dev/null || true
-  cp -f "$DIST_DIR/kernels.js" "$WASM_DIR/kernels/dist/kernels.js" 2>/dev/null || true
-  cp -f "$DIST_DIR/kernels.wasm" "$WASM_DIR/kernels/dist/kernels.wasm" 2>/dev/null || true
 fi
 
 # shellcheck disable=SC2012

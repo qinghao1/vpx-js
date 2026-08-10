@@ -98,9 +98,7 @@ describe('WASM build artifacts', () => {
 		expect(fs.existsSync(path.join(wasmDir, 'dist'))).toBe(true)
 	})
 
-	it('kernels dist exists or legacy copy', () => {
-		const canonical = path.join(wasmDir, 'dist/kernels.js')
-		const legacy = path.join(wasmDir, 'kernels/dist/kernels.js')
-		expect(fs.existsSync(canonical) || fs.existsSync(legacy)).toBe(true)
+	it('kernels dist exists', () => {
+		expect(fs.existsSync(path.join(wasmDir, 'dist/kernels.js'))).toBe(true)
 	})
 })

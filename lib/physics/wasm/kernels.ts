@@ -218,18 +218,9 @@ export async function getWasmKernels(): Promise<Mod> {
 	loading = (async () => {
 		const candidates: string[] = []
 		if (import.meta.url.startsWith('http')) {
-			candidates.push(
-				new URL('/wasm/dist/kernels.js', import.meta.url).href,
-				new URL('/wasm/kernels/dist/kernels.js', import.meta.url).href,
-				new URL('/wasm/kernels.js', import.meta.url).href,
-			)
+			candidates.push(new URL('/wasm/dist/kernels.js', import.meta.url).href)
 		}
-		for (const rel of [
-			'../../../wasm/dist/kernels.js',
-			'../../../../wasm/dist/kernels.js',
-			'../../../wasm/kernels/dist/kernels.js',
-			'../../../../wasm/kernels/dist/kernels.js',
-		]) {
+		for (const rel of ['../../../wasm/dist/kernels.js', '../../../../wasm/dist/kernels.js']) {
 			try {
 				const u = new URL(rel, import.meta.url).href
 				if (!candidates.includes(u)) candidates.push(u)

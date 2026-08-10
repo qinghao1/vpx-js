@@ -39,7 +39,7 @@ const checks: Array<[string, () => boolean]> = [
 	['build.sh mentions kernels', () => fs.readFileSync(path.join(wasmDir, 'build.sh'), 'utf-8').includes('kernels')],
 	['mock file exists', () => fs.existsSync(path.join(wasmDir, 'mock/libpinmame.mock.js'))],
 	['dist/libpinmame.js exists', () => fs.existsSync(path.join(wasmDir, 'dist/libpinmame.js'))],
-	['dist/kernels.js exists (canonical or legacy)', () => fs.existsSync(path.join(wasmDir, 'dist/kernels.js')) || fs.existsSync(path.join(wasmDir, 'kernels/dist/kernels.js'))],
+	['dist/kernels.js exists', () => fs.existsSync(path.join(wasmDir, 'dist/kernels.js'))],
 	['external/pinmame present', () => fs.existsSync(path.join(root, 'external/pinmame/src/libpinmame/libpinmame.h'))],
 ]
 

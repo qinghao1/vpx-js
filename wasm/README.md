@@ -29,10 +29,6 @@ wasm/
     pinmame/
       CMakeLists.txt
       patches/*.patch
-  kernels/                    # legacy — shim to modules/kernels (deprecated, will be removed)
-    build.sh                  # shim → ../build.sh
-    kernels.cpp               # duplicate source (canonical is modules/kernels/src/kernels.cpp)
-    dist/                     # legacy copy of dist/kernels.* (populated by build.sh for compatibility)
   build/                      # ephemeral — CMake build dirs (gitignored)
 external/pinmame/             # upstream submodule (repo root)
 ```
@@ -62,7 +58,6 @@ wasm/build.sh --mock
 
 Without `emcc`, the build copies the PinMAME mock so `npm run build` still works. Build intermediates are in `wasm/build/wasm` and `wasm/build/wasm-debug` (gitignored).
 
-Legacy path `wasm/kernels/build.sh` still works as a shim but is deprecated — use the unified build above.
 
 ## Outputs
 
@@ -94,7 +89,7 @@ const mod = await getWasmKernels()
 mod._batchHitTestCircle(n, bx, by, bz, vx, vy, vz, br, cxPtr, cyPtr, ...)
 ```
 
-Loader tries `wasm/dist/kernels.js` first, then legacy `wasm/kernels/dist/kernels.js` and `/wasm/kernels.js` for compatibility. Pure-JS fallbacks exist if WASM is unavailable.
+Loader uses `wasm/dist/kernels.js`. Pure-JS fallbacks exist if WASM is unavailable.
 
 ## Notes
 
