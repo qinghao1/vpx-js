@@ -217,8 +217,12 @@ export async function getWasmKernels(): Promise<Mod> {
 	if (loading) return loading
 	loading = (async () => {
 		const candidates: string[] = []
-		if (import.meta.url.startsWith('http')) {
-			candidates.push(new URL('/wasm/dist/kernels.js', import.meta.url).href)
+		try {
+			const origin = typeof location !== 'undefined' && location.origin ? location.origin : typeof window !== 'undefined' && (window as any).location?.origin ? (window as any).location.origin : ''
+			if (origin) candidates.push(origin + '/wasm/dist/kernels.js')
+			else candidates.push('/wasm/dist/kernels.js')
+		} catch {
+			candidates.push('/wasm/dist/kernels.js')
 		}
 		for (const rel of ['../../../wasm/dist/kernels.js', '../../../../wasm/dist/kernels.js']) {
 			try {
