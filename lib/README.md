@@ -1,82 +1,67 @@
-# Modules
+# `lib/` — Library Source
 
-This library is written in Typescript, so in the code, we use ES2015 imports.
-That's great, but we finally want to ship JavaScript code. That's when things
-get hairy. What we would like to do is the following: 
+ESM TypeScript source for `vpx-js` (Node `>=24`, `ES2024`, `type: module`). Built with `tsup` to `dist/` (ESM + `.d.ts`) and mirrored to `dist-esm/` for tooling. No CommonJS, no `pkg.browser` switch, no vendored three.
 
-- Ship JavaScript as tree-shakable ES2015 module using [`pkg.module`](https://github.com/rollup/rollup/wiki/pkg.module)
-- Also ship JavaScript as CommonJS module for Node.js
-- Include typings
-- Ship code that works on both Node.js and in the browser
+## Exports
 
-The last point is a bit tricky because Node.js and the browser don't have the
-same APIs. What we do is use [`pkg.browser`](https://docs.npmjs.com/files/package.json#browser)
-which will switch out a file when compiling for a browser environment.
+`package.json` exposes three entry points (see `tsup.config.ts`):
 
-The switched out file is [`refs.node.ts`](refs.node.ts), which is replaced by 
-[`refs.browser.ts`](refs.browser.ts). Here we reference stuff we only want in 
-one environment.
+```json
+".": "dist/index.js",
+"./lib/refs.node.js": "dist/lib/refs.node.js",
+"./lib/refs.browser.js": "dist/lib/refs.browser.js"
+```
+
+- `lib/index.ts` — public surface (`VP_VERSION_*`, `Table`, `Player`, `TableExporter`, `ThreeRenderApi`, `Ball`, `OleCompoundDoc`, etc.).
+- `lib/refs.node.ts` / `lib/refs.browser.ts` — platform-specific surface. Import one explicitly:
+
+```ts
+import { BinaryReader, storage, ThreeTextureLoader } from 'vpx-js/lib/refs.node.js'    // Node
+import { BinaryReader, storage, ThreeTextureLoader } from 'vpx-js/lib/refs.browser.js' // Browser
+```
+
+`lib/refs-three.ts` re-exports three core symbols (`Mesh`, `Scene`, `Color`, …) so library code never imports from `three` directly except for addons.
+
+## Platform Split
+
+| file | Node | Browser |
+|---|---|---|
+| `refs.node.ts` | `NodeBinaryReader`, `storage` (node fs), `ThreeTextureLoaderNode` (sharp), `getTextFile` via `readFileSync(res/scripts/…)`, patches `FileLoader.load` to accept `ArrayBuffer` | — |
+| `refs.browser.ts` | — | `BrowserBinaryReader`, `ThreeTextureLoaderBrowser` (canvas), `getTextFile` via bundled `import … from 'res/scripts/….vbs'` |
+| `refs-three.ts` | shared three re-exports for both | shared |
+
+Explicit imports avoid bundler hacks and keep browser bundles free of Node shims (`Uint8Array`/`DataView` throughout).
 
 ## Three.js
 
-Three.js comes in three flavors.
-
-1. As an CommonJS module (`build/three.js`)
-2. As an ES2015 module (`build/three.module.js`)
-3. As individual files (`src/*`)
-
-In Typescript, when importing `from 'three'`, definitions point to the modules.
-In the browser, that means the entire `three.module.js` is referenced and hence
-included in the build. On Node.js, the CommonJS module is used (where we care less 
-about tree-shaking).
-
-We can [solve the tree-shaking problem](https://github.com/mrdoob/three.js/issues/9403)
-by not importing `from 'three'` but from each file individually. So
+`three@0.185` + `three-mesh-bvh` as ESM. Node `>=24` handles ESM natively, so the same imports work everywhere:
 
 ```ts
-import { Object3D } from 'three'; 
-```
-becomes
-```ts
-import { Object3D } from 'three/src/core/Object3D';
-```
+// core — always via refs-three
+import { Mesh, Scene } from 'vpx-js/lib/refs.node.js' // or refs.browser.js
 
-However, that will bork Node.js, because the source files use ES2015 imports
-among each other, which isn't supported by Node.js. So we need to handle the two
-separately.
-
-What we ended up with are object exports in our reference files above. In
-`refs.node.ts`, we have:
-
-```ts
-export { Object3D } from 'three';
+// addons — directly from three
+import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js'
+import { EXRLoader } from 'three/addons/loaders/EXRLoader.js'
+import { HDRLoader } from 'three/addons/loaders/HDRLoader.js'
 ```
 
-In `refs.browser.ts`, we have:
-```ts
-export { Object3D } from 'three/src/core/Object3D';
+No `three/src/*` per-file imports and no vendored `RGBELoader` — `three/addons/*` works in both runtimes.
+
+## Layout
+
+```
+lib/
+├── index.ts          public entry
+├── refs-*.ts         platform & three shims
+├── io/               OLE / BIFF / BinaryReader (node+browser)
+├── vpt/              VPX table + 22 item types + mesh/material/texture
+├── game/             Player, PlayerPhysics, PinInput, I* interfaces
+├── physics/          hit shapes, HitKD/Quadtree, constants
+├── render/threejs/   ThreeRenderApi, mesh/material/light generators
+├── scripting/        VBScript grammar, Transpiler, stdlib, VBS scripts
+├── emu/              wpc-emu + pinmame/ WASM wrapper
+└── util/             logger, vectors, storage helpers
 ```
 
-And in our code we have:
-
-```ts
-import { Object3D } from '../refs.node';
-```
-
-So in Node.js, all three.js references point to the CommonJS module, while 
-during browser builds they get they get switched out to tree-shakable `src` 
-links. This works pretty well for the main three.js library.
-
-### Three.js Example Code
-
-Add-on loaders are imported directly from `three`:
-
-```ts
-import { EXRLoader } from 'three/examples/jsm/loaders/EXRLoader.js'
-import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js'
-```
-
-`RGBELoader` was renamed to `HDRLoader` in three.js r180 and is no longer used.
-No vendored copy is needed — Node ≥24 runs ESM natively, so `three/examples/jsm/*`
-works in both Node and browser. All three.js core imports go through `refs.node.ts`
-/ `refs.browser.ts` for platform switching.
+Build is `npm run build` — `build/compile-rules.ts` generates `lib/scripting/grammar/rules.ts` from `grammar.bnf`, then `tsup` (no treeshake/shims, `.vbs`/`.bnf` as `text`).
