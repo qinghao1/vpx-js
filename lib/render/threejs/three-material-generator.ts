@@ -211,10 +211,19 @@ export class ThreeMaterialGenerator {
 	}
 
 	private applyBaked(mat: MeshStandardMaterial, mapTex?: unknown, backfacesEnabled?: boolean): void {
-		mat.color.set(0xffffff)
-		if ((mat as any).emissiveMap) (mat as any).emissiveMap = null
-		if (mat.emissive) mat.emissive.set(0x000000)
-		mat.emissiveIntensity = 0
+		const tex = (mapTex as any) ?? (mat as any).map
+		if (tex) {
+			;(mat as any).map = tex
+			;(mat as any).emissiveMap = tex
+			if (!mat.emissive) (mat as any).emissive = new Color(0xffffff)
+			else mat.emissive.set(0xffffff)
+			mat.emissiveIntensity = 1
+			mat.color.set(0x000000)
+		} else {
+			mat.color.set(0xffffff)
+			if (mat.emissive) mat.emissive.set(0x000000)
+			mat.emissiveIntensity = 0
+		}
 		mat.side = backfacesEnabled === true ? DoubleSide : backfacesEnabled === false ? FrontSide : DoubleSide
 		mat.toneMapped = true
 		mat.roughness = BAKED_ROUGH
