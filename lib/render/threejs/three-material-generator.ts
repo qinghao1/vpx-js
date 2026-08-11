@@ -217,7 +217,7 @@ export class ThreeMaterialGenerator {
 			;(mat as any).emissiveMap = tex
 			if (!mat.emissive) (mat as any).emissive = new Color(0xffffff)
 			else mat.emissive.set(0xffffff)
-			mat.emissiveIntensity = 1
+			mat.emissiveIntensity = BAKED_EMISSIVE
 			mat.color.set(0x000000)
 		} else {
 			mat.color.set(0xffffff)

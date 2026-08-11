@@ -78,8 +78,12 @@ export class PlayerPhysics {
 		private readonly pinInput: PinInput,
 	) {}
 
-	public getCabinetAcceleration(): Vertex2D { return this.pinInput.getCabinetAcceleration() }
-	public getCabinetOffset(): Vertex2D { return this.pinInput.getCabinetOffset() }
+	public getCabinetAcceleration(): Vertex2D {
+		return this.pinInput.getCabinetAcceleration()
+	}
+	public getCabinetOffset(): Vertex2D {
+		return this.pinInput.getCabinetOffset()
+	}
 
 	public init(): void {
 		const d = this.table.data!
@@ -213,14 +217,14 @@ export class PlayerPhysics {
 			this.timeMsec = Math.floor((this.curPhysicsFrameTime - this.startTimeUsec) / 1000)
 			iterations++
 			const dt = (this.nextPhysicsFrameTime - this.curPhysicsFrameTime) * (1 / DEFAULT_STEPTIME)
-			const curUsec = this.now()
+			const t0 = performance.now()
 			this.pinInput.processKeys()
 			this.pinInput.tickNudge()
 			const oldBall = this.activeBall
 			this.activeBall = undefined
 			if (this.scriptPeriod <= 1000 * MAX_TIMERS_MSEC_OVERALL) {
 				this.fireTimers(TimerMode.Update)
-				this.scriptPeriod += Math.floor(this.now() - curUsec)
+				this.scriptPeriod += Math.floor(performance.now() - t0)
 			}
 			this.activeBall = oldBall
 			if (this.emu) this.emu.emuSimulateCycle(dt * 10)
@@ -265,7 +269,11 @@ export class PlayerPhysics {
 	}
 
 	private safeFire(t: TimerHit): void {
-		try { t.pfe.fireGroupEvent(Event.TimerEventsTimer) } catch (e) { logger().warn('timer error %s', (e as Error).message) }
+		try {
+			t.pfe.fireGroupEvent(Event.TimerEventsTimer)
+		} catch (e) {
+			logger().warn('timer error %s', (e as Error).message)
+		}
 	}
 
 	public timerStateChange(timer: TimerHit, enabled: boolean): void {

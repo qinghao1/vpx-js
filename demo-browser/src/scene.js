@@ -50,7 +50,7 @@ function fixBaked(mat, map) {
 		mat.emissiveMap = tex
 		if (!mat.emissive) mat.emissive = new THREE.Color(0xffffff)
 		else mat.emissive.set(0xffffff)
-		mat.emissiveIntensity = 1
+		mat.emissiveIntensity = BAKED_EMISSIVE
 		mat.color?.set?.(0x000000)
 	} else {
 		mat.color?.set?.(0xffffff)
@@ -229,11 +229,8 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 		const c = classify(n, matName, mapName, !!o.material?.userData?.__isBaked)
 		if (c.isGlass) { hideMesh(o, 'glass', stats); return }
 		if (c.isLm || (c.isVlmBake && !c.isMainBake)) {
-			o.visible = false
 			stats.lightmaps++
 			if (n.includes('bumper')) stats.bumperLM++
-			try { o.geometry?.dispose?.() } catch {}
-			return
 		}
 		if (n.includes('playfield') && o.visible === false) { o.visible = true; makeParentsVisible(o, node, stats) }
 		if (viewerMode === 'play' && c.isVr && !c.isCab) {

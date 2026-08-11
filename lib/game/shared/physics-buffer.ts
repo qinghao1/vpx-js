@@ -5,11 +5,11 @@ export const MAX_BALLS = 32
 export const BALL_STRIDE = 12
 export const SAB_SIZE = 16 * 1024
 
-const HEADER_SIZE = 128 // 2×64B cache lines; 128B on Apple M1/M2 — keeps HEAD/TAIL separate
-const TIMES_OFFSET = 128 // pad header→times to 128B to avoid false sharing with TAIL
+const HEADER_SIZE = 128 // 2×64B cache lines; 128B on Apple M1/M2 — keeps HEAD/TAIL on separate lines
+const TIMES_OFFSET = 128 // pad header→times to 128B to avoid false sharing with TAIL (tail line is hot)
 const TIMES_SLOTS = 3
 const TIMES_STRIDE = 3
-const BALLS_OFFSET = 256 // 1536B per slot = 24×64B, already 64B-aligned (12×128B on Apple)
+const BALLS_OFFSET = 256 // 1536B per slot = 24×64B, already 64B-aligned (12×128B on Apple) — ball data is read-mostly, separate from header lines
 const BALLS_PER_SLOT = MAX_BALLS * BALL_STRIDE
 const INPUT_OFFSET = BALLS_OFFSET + BALLS_PER_SLOT * 3 * 4
 const INPUT_CAPACITY = 256
@@ -18,6 +18,13 @@ const INPUT_ENTRY = 8
 
 const FLAGS_IDX = 0
 const GEN_IDX = 1
+// HEAD (main→worker) and TAIL (worker→main) must be on separate cache lines
+// to avoid false sharing / MESI ping-pong: HEAD at 16B (line 0, main writer),
+// TAIL at 80B (line 1, worker writer). On JS this matters at the HW level:
+// SharedArrayBuffer + TypedArray offsets are byte-precise and stable, so the
+// separation is real — unlike C++ `alignas(64)` we can't force alignment, but
+// choosing offsets that are 64B apart guarantees different lines on x86 (64B)
+// and separated on Apple Silicon (128B lines: HEAD line0, TAIL line1).
 const HEAD_IDX = 4 // offset 16 — line 0, written by main (pushInput), read by worker
 const TAIL_IDX = 20 // offset 80 — line 1, written by worker (drainInput), read by main; separate line avoids MESI ping-pong
 const COUNT_BASE = 24 // offset 96 — in tail line, written by worker (slot counts)

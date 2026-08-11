@@ -334,6 +334,20 @@ export class PrimitiveApi extends ItemApi<PrimitiveData> {
 	set BackfacesEnabled(v) {
 		this.data.backfacesEnabled = v
 	}
+	get Opacity() {
+		return this.isDynamic ? (this.state.alpha ?? this.data.alpha) : this.data.alpha
+	}
+	set Opacity(v) {
+		v = num(v)
+		if (this.isDynamic) this.state.alpha = v
+		else this.data.alpha = v
+	}
+	get Alpha() {
+		return this.Opacity
+	}
+	set Alpha(v) {
+		this.Opacity = v
+	}
 	get Color() {
 		return this.isDynamic ? this.state.color : this.data.color
 	}

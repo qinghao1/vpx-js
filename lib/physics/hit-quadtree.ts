@@ -133,7 +133,6 @@ export class HitQuadtree {
 
 	public hitTestBall(ball: Ball, coll: CollisionEvent, physics: PlayerPhysics): void {
 		if (!isWasmReady()) return this.hitTestBallScalar(ball, coll, physics)
-		if (this._orderLen > 0 && this._orderLen < WASM_THRESHOLD) return this.hitTestBallScalar(ball, coll, physics)
 		if (!this.collect(ball)) return this.hitTestBallScalar(ball, coll, physics)
 		if (this._orderLen < WASM_THRESHOLD) {
 			for (let i = 0; i < this._orderLen; i++) this._order[i]!.obj.doHitTest(ball, coll, physics)
@@ -167,17 +166,15 @@ export class HitQuadtree {
 			(line3Ds.length && !line3DViews) ||
 			(polys.length && !polyViews)
 		) {
-			queueMicrotask(() =>
-				warmWasmPools(
-					circles.length,
-					planes.length,
-					lineZs.length,
-					points.length,
-					triangles.length,
-					lineSegs.length,
-					line3Ds.length,
-					polys.length,
-				),
+			warmWasmPools(
+				circles.length,
+				planes.length,
+				lineZs.length,
+				points.length,
+				triangles.length,
+				lineSegs.length,
+				line3Ds.length,
+				polys.length,
 			)
 			return this.hitTestBallScalar(ball, coll, physics)
 		}

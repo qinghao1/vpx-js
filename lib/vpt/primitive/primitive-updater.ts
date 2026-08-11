@@ -11,6 +11,7 @@ import type { PrimitiveState } from './primitive-state.js'
 
 const DISABLE_THRESHOLD = 0.001
 const DISABLE_SCALE = 0.01
+const ALPHA_SCALE = 0.01
 const MAX_EMISSIVE = 4
 
 /** Primitive updater — syncs state to render node. */
@@ -34,6 +35,7 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 			state.material !== undefined ||
 			state.map !== undefined ||
 			state.color !== undefined ||
+			state.alpha !== undefined ||
 			state.disableLightingTop !== undefined ||
 			state.disableLightingBelow !== undefined
 		if (needsClone) this.ensureCloned(obj)
@@ -42,10 +44,12 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 		}
 		const needsColor =
 			state.color !== undefined ||
+			state.alpha !== undefined ||
 			state.disableLightingTop !== undefined ||
 			state.disableLightingBelow !== undefined ||
 			state.material !== undefined
 		if (needsColor) this.applyColor(obj, table)
+		if (state.alpha !== undefined) this.applyAlpha(obj)
 		if (state.position || state.size || state.rotation || state.translation || state.objectRotation) {
 			this.applyTransformation(obj, renderApi, table)
 		}
@@ -67,7 +71,9 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 		const dlBelow = this.state.disableLightingBelow ?? this.data.disableLightingBelow
 		const topIntensity = dlTop > DISABLE_THRESHOLD ? dlTop * DISABLE_SCALE : 0
 		const belowIntensity = dlBelow < 1 - DISABLE_THRESHOLD ? (1 - dlBelow) * DISABLE_SCALE * 0.5 : 0
-		const intensity = Math.min(MAX_EMISSIVE, topIntensity + belowIntensity)
+		const rawAlpha = this.state.alpha ?? this.data.alpha
+		const alphaIntensity = this.data.addBlend ? Math.min(MAX_EMISSIVE, Math.max(0, rawAlpha) * ALPHA_SCALE * 0.5) : 0
+		const intensity = Math.min(MAX_EMISSIVE, topIntensity + belowIntensity + alphaIntensity)
 		const emissive = intensity > 0
 		const matName = this.state.material ?? this.data.szMaterial
 		const base = table.getMaterial(matName)?.baseColor ?? 0xffffff
@@ -90,6 +96,30 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 				mat.emissive.set(0x000000)
 				mat.emissiveIntensity = 0
 			}
+			mat.needsUpdate = true
+		}
+	}
+
+	private applyAlpha<NODE>(obj: NODE): void {
+		const rawAlpha = this.state.alpha ?? this.data.alpha
+		const opacity = Math.min(1, Math.max(0, rawAlpha * ALPHA_SCALE))
+		const isAdditive = !!this.data.addBlend
+		for (const m of this.meshes(obj)) {
+			const mat = m.material as unknown as
+				| {
+						opacity: number
+						transparent: boolean
+						depthWrite: boolean
+						blending: number
+						needsUpdate: boolean
+						userData: Record<string, unknown>
+				  }
+				| undefined
+			if (!mat) continue
+			mat.opacity = opacity
+			mat.transparent = opacity < 0.999
+			mat.depthWrite = !mat.transparent
+			if (isAdditive) mat.blending = opacity < 0.999 ? 2 : 1
 			mat.needsUpdate = true
 		}
 	}

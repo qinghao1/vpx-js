@@ -137,19 +137,25 @@ if (balls > 0) {
 const physTimes: number[] = []
 const animTimes: number[] = []
 const t3 = performance.now()
+let curTime = 16
+// prime physics clock: first updatePhysics establishes startTimeUsec
+;(player as any).updatePhysics(curTime)
 for (let i = 0; i < ticks; i++) {
+	curTime += 16
 	const a = performance.now()
-	;(player as any).updatePhysics(16)
+	;(player as any).updatePhysics(curTime)
 	physTimes.push(performance.now() - a)
 	const b = performance.now()
-	;(player as any).updateAnimations((player as any).getGameTime?.() ?? i * 16)
+	;(player as any).updateAnimations((player as any).getGameTime?.() ?? curTime)
 	animTimes.push(performance.now() - b)
 }
 const total = performance.now() - t3
 console.log(
-	` Physics x${ticks} ${(total).toFixed(0)}ms — ${(total / ticks).toFixed(2)}ms/tick p95 ${stats(physTimes)?.p95}ms`,
+	` Physics x${ticks} ${(total).toFixed(0)}ms — ${(total / ticks).toFixed(2)}ms/frame (16ms simulated, ${ticks * 16}ms total) p95 ${stats(physTimes)?.p95}ms`,
 )
-console.log(`  Throughput ${Math.round((ticks * 1000) / total)} ticks/sec`)
+console.log(
+	`  Throughput ${Math.round((ticks * 16 * 1000) / total)} simulated ms/sec  (${Math.round((ticks * 1000) / total)} frames/sec)`,
+)
 
 const mem = process.memoryUsage()
 console.log(

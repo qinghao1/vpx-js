@@ -107,7 +107,7 @@ const applyBakedMaterial = (mat, tex, info, meshName) => {
 	const nl = meshName.toLowerCase()
 	mat.emissiveMap = tex
 	try { if (mat.emissive) mat.emissive.set(0xffffff); else mat.emissive = new THREE.Color(0xffffff) } catch {}
-	mat.emissiveIntensity = 1
+	mat.emissiveIntensity = BAKED_EMISSIVE
 	try { if (!mat.color) mat.color = new THREE.Color(0x000000); else mat.color.set(0x000000) } catch {}
 	mat.side = THREE.DoubleSide; mat.toneMapped = true; mat.roughness = BAKED_ROUGH; mat.metalness = BAKED_METAL
 	wrapBakedTex(tex); wrapBakedTex(mat.emissiveMap)
@@ -974,7 +974,6 @@ export class Viewer {
 				if (!o.isMesh || !o.material) return
 				const n = (o.name || '').toLowerCase()
 				const isMainBake = n.includes('playfield') && (n.includes('bm_') || RE_BAKE_MAP.test(n))
-				if (n.includes('lm_')) return
 				const mats = Array.isArray(o.material) ? o.material : [o.material]
 				for (const m of mats) {
 					for (const k of ['map', 'normalMap', 'envMap', 'emissiveMap']) {

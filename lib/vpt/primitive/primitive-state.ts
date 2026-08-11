@@ -16,6 +16,7 @@ export class PrimitiveState extends ItemState {
 	public map?: string
 	public normalMap?: string
 	public color: number = 0xffffff
+	public alpha: number = 100
 	public disableLightingTop: number = 0
 	public disableLightingBelow: number = 1
 
@@ -31,6 +32,7 @@ export class PrimitiveState extends ItemState {
 		color: number = 0xffffff,
 		disableLightingTop: number = 0,
 		disableLightingBelow: number = 1,
+		alpha: number = 100,
 	) {
 		return PrimitiveState.claim(
 			name,
@@ -46,6 +48,7 @@ export class PrimitiveState extends ItemState {
 			color,
 			disableLightingTop,
 			disableLightingBelow,
+			alpha,
 		)
 	}
 
@@ -63,6 +66,7 @@ export class PrimitiveState extends ItemState {
 		color: number = 0xffffff,
 		disableLightingTop: number = 0,
 		disableLightingBelow: number = 1,
+		alpha: number = 100,
 	): PrimitiveState {
 		const state = new PrimitiveState()
 		state.name = name
@@ -76,6 +80,7 @@ export class PrimitiveState extends ItemState {
 		state.normalMap = normalMap
 		state.isVisible = isVisible
 		state.color = color
+		state.alpha = alpha
 		state.disableLightingTop = disableLightingTop
 		state.disableLightingBelow = disableLightingBelow
 		return state
@@ -96,6 +101,7 @@ export class PrimitiveState extends ItemState {
 			this.color,
 			this.disableLightingTop,
 			this.disableLightingBelow,
+			this.alpha,
 		)
 	}
 
@@ -131,6 +137,7 @@ export class PrimitiveState extends ItemState {
 		omitEqual(diff, state, 'normalMap')
 		omitEqual(diff, state, 'isVisible')
 		omitEqual(diff, state, 'color')
+		omitEqual(diff, state, 'alpha')
 		omitEqual(diff, state, 'disableLightingTop')
 		omitEqual(diff, state, 'disableLightingBelow')
 		return diff
@@ -157,6 +164,7 @@ export class PrimitiveState extends ItemState {
 			state.normalMap === this.normalMap &&
 			state.isVisible === this.isVisible &&
 			state.color === this.color &&
+			state.alpha === this.alpha &&
 			state.disableLightingTop === this.disableLightingTop &&
 			state.disableLightingBelow === this.disableLightingBelow
 		)
