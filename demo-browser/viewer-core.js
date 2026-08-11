@@ -1,6 +1,5 @@
 import { Buffer } from 'buffer'
 import * as THREE from 'three'
-import { OutlineEffect } from 'three/addons/effects/OutlineEffect.js'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { Player } from '../dist-esm/lib/game/player.js'
 import { BrowserBinaryReader } from '../dist-esm/lib/io/binary-reader.browser.js'
@@ -24,7 +23,6 @@ import {
 	RE_BAKE_MAT,
 	RE_CAB,
 	RE_OUTER,
-	RE_VR,
 } from './src/config.js'
 import { DmdController } from './src/dmd.js'
 import { createHarness } from './src/log-overlay.js'
@@ -212,9 +210,6 @@ export class Viewer {
 		this._hasPinmame = false
 		this._rendererBackend = 'webgl'
 		this.renderer = null
-		this.outlineEffect = null
-		this._outlineHover = false
-		this._outerMeshes = []
 		this.controls = null
 		this._eventCleanups = []
 		this._boundResize = () => this._onResize()
@@ -333,18 +328,6 @@ export class Viewer {
 		renderer.toneMappingExposure = 1.0
 		this.renderer = renderer
 		this._rendererBackend = backend
-		if (backend !== 'webgpu' && this.viewerMode !== 'play') {
-			try {
-				this.outlineEffect = new OutlineEffect(this.renderer, {
-					defaultThickness: 0.0025,
-					defaultColor: [1, 1, 1],
-					defaultAlpha: 1,
-					defaultKeepAlive: true,
-				})
-			} catch (e) {
-				console.warn('OutlineEffect init failed', e)
-			}
-		}
 		this.controls?.dispose?.()
 		this.controls = new OrbitControls(this.camera, this.renderer.domElement)
 		this.controls.enableDamping = true
@@ -366,46 +349,6 @@ export class Viewer {
 	async _ensureRenderer() {
 		await this._rendererReady
 		return this.renderer
-	}
-
-
-	_collectMeshes(re) {
-		const out = []
-		this.tableGroup.traverse(o => { if (o.isMesh && re.test(o.name || '')) out.push(o) })
-		return out
-	}
-
-	_updateOuterMeshes() {
-		if (!this.tableGroup) return
-		let meshes = this._collectMeshes(RE_OUTER)
-		if (!meshes.length) meshes = this._collectMeshes(RE_CAB)
-		this._outerMeshes = meshes
-		for (const m of meshes) {
-			m.frustumCulled = this.viewerMode === 'play'
-			if (!m.geometry) continue
-			try { m.geometry.computeBoundingSphere(); m.geometry.computeBoundingBox() } catch {}
-		}
-		this._configureOuterOutline(false)
-	}
-
-	_ensureOutlineParams(mat, visible) {
-		if (!mat) return
-		if (!mat.userData) mat.userData = {}
-		const p = mat.userData.outlineParameters || (mat.userData.outlineParameters = {})
-		p.thickness = 0.0025; p.color = [1, 1, 1]; p.alpha = 1; p.visible = visible; p.keepAlive = true
-	}
-
-	_configureOuterOutline(visible) {
-		if (!this._outerMeshes?.length) return
-		for (const m of this._outerMeshes) {
-			if (!m.geometry?.attributes?.normal) try { m.geometry.computeVertexNormals() } catch {}
-			for (const mat of (m.material ? (Array.isArray(m.material) ? m.material : [m.material]) : [])) this._ensureOutlineParams(mat, visible)
-		}
-	}
-
-	_setOuterOutline(visible) {
-		if (!this._outerMeshes?.length || !this.outlineEffect) return
-		for (const m of this._outerMeshes) for (const mat of (m.material ? (Array.isArray(m.material) ? m.material : [m.material]) : [])) if (mat?.userData?.outlineParameters) mat.userData.outlineParameters.visible = visible
 	}
 
 	_onResize() {
@@ -431,7 +374,7 @@ export class Viewer {
 		const tip = this.dom.playTip
 		const canvas = this.dom.canvas
 		let hovered = false
-		const isOuter = n => (this._outerMeshes.length ? RE_OUTER.test(n) : RE_CAB.test(n || ''))
+		const isOuter = n => RE_OUTER.test(n || '') || RE_CAB.test(n || '')
 		const hitIsOuter = o => {
 			for (let c = o; c; c = c.parent) if (isOuter(c.name || '')) return true
 			return false
@@ -442,20 +385,16 @@ export class Viewer {
 		}
 		const hideTip = () => {
 			hovered = false
-			this._outlineHover = false
 			if (tip) tip.hidden = true
 			if (canvas) canvas.classList.remove('is-pointer')
-			this._setOuterOutline(false)
 		}
 		const showTipAt = (x, y) => {
 			if (!tip || this.viewerMode !== 'viewer' || !this.tableGroup) return
 			hovered = true
-			this._outlineHover = isOuterHit(x, y)
 			tip.style.setProperty('--tip-x', `${x}px`)
 			tip.style.setProperty('--tip-y', `${y}px`)
 			tip.hidden = false
 			if (canvas) canvas.classList.add('is-pointer')
-			this._setOuterOutline(this._outlineHover)
 		}
 		this._hidePlayTip = hideTip
 		if (!canvas) return
@@ -472,7 +411,6 @@ export class Viewer {
 			const hits = getHits(x, y)
 			return hits.length ? hits.some(h => hitIsOuter(h.object) || hitIsPlayfield(h.object)) : false
 		}
-		const isOuterHit = (x, y) => getHits(x, y).some(h => hitIsOuter(h.object))
 		let hoverRaf = 0
 		let hoverX = 0,
 			hoverY = 0
@@ -481,7 +419,6 @@ export class Viewer {
 			if (this.viewerMode !== 'viewer' || !this.tableGroup) return hideTip()
 			if (!hitTest(hoverX, hoverY)) return hideTip()
 			showTipAt(hoverX, hoverY)
-			this._setOuterOutline(isOuterHit(hoverX, hoverY))
 		}
 		const onHover = e => {
 			hoverX = e.clientX
@@ -521,7 +458,7 @@ export class Viewer {
 	async _switchToViewer() {
 		if (this.viewerMode !== 'play' || !this.tableGroup) return
 		this.viewerMode = 'viewer'
-		if (this.renderer) { this.renderer.setPixelRatio(getTargetPixelRatio('viewer')); if (!this.outlineEffect && this._rendererBackend !== 'webgpu') { try { this.outlineEffect = new OutlineEffect(this.renderer, { defaultThickness:0.0025, defaultColor:[1,1,1], defaultAlpha:1, defaultKeepAlive:true }) } catch (e) { if (_isDev) console.warn('OutlineEffect recreate failed', e) } } }
+		if (this.renderer) this.renderer.setPixelRatio(getTargetPixelRatio('viewer'))
 		this._hidePlayTip?.()
 		showCabFlippers(this.tableGroup)
 		this._syncChrome()
@@ -600,7 +537,6 @@ export class Viewer {
 			this._cameraRaf = requestAnimationFrame(tick)
 		})
 	}
-
 
 	_createPhysicsWorker() {
 		try {
@@ -1077,8 +1013,6 @@ export class Viewer {
 		this.scene.add(node)
 		const pp = postProcessScene(node, { viewerMode: this.viewerMode, harnessLog: this.harnessLog, table })
 		if (this.viewerMode === 'play') hideCabFlippers(node)
-		this._updateOuterMeshes()
-		this._setOuterOutline(false)
 		this.buildNodeCache()
 		try {
 			this.dmd._ensureTexture()
@@ -1330,33 +1264,7 @@ export class Viewer {
 							}
 						})
 					}
-					if (fixed && this._outerMeshes?.length && this.outlineEffect) {
-						const visible = !!this._outlineHover
-						for (const outer of this._outerMeshes) {
-							const mm = outer.material
-								? Array.isArray(outer.material)
-									? outer.material
-									: [outer.material]
-								: []
-							for (const mmMat of mm) {
-								if (!mmMat?.userData) continue
-								if (!mmMat.userData.outlineParameters) {
-									mmMat.userData.outlineParameters = {
-										thickness: 0.0025,
-										color: [1, 1, 1],
-										alpha: 1,
-										visible,
-										keepAlive: true,
-									}
-								} else mmMat.userData.outlineParameters.visible = visible
-							}
-							if (!outer.geometry?.attributes?.normal) {
-								try {
-									outer.geometry.computeVertexNormals()
-								} catch {}
-							}
-						}
-					}
+
 					return fixed
 				} catch {
 					return 0
@@ -1713,7 +1621,6 @@ export class Viewer {
 		try { this.player.nudge(angle, force) } catch {}
 		try { this._flashNudge(angle) } catch {}
 	}
-
 
 	_sendKey(code, down) {
 		try { down ? this.player.onKeyDown({ code, key: code === 'Enter' ? 'Enter' : 'Shift', ts: Date.now() }) : this.player.onKeyUp({ code, key: code === 'Enter' ? 'Enter' : 'Shift', ts: Date.now() }) } catch {}
