@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { PHYSICS_STEPTIME } from '../physics/constants.js'
-import { BALL_STRIDE, drainInput, MAX_BALLS, writeFrame } from './shared/physics-buffer.js'
+import { BALL_STRIDE, drainInput, type InputEvent, MAX_BALLS, writeFrame } from './shared/physics-buffer.js'
 
 declare const self: { postMessage(m: unknown): void; onmessage: ((e: MessageEvent) => void) | null }
 
@@ -40,10 +40,13 @@ async function ensureWasm(): Promise<void> {
 	} catch {}
 }
 
+const drainScratch: InputEvent[] = []
+
 function tick(): void {
 	if (!sab) return
 	try {
-		drainInput(sab, [])
+		drainScratch.length = 0
+		drainInput(sab, drainScratch)
 	} catch {}
 	curUsec = nextUsec
 	nextUsec += PHYSICS_STEPTIME
@@ -69,8 +72,13 @@ function startLoop(): void {
 	void ensureWasm()
 	const loop = () => {
 		if (!running || !sab) return
-		const end = performance.now() + 1
-		while (running && performance.now() < end) tick()
+		const nowUsec = Math.floor(performance.now() * 1000)
+		let ticks = 0
+		while (nextUsec < nowUsec && ticks < 16 && running) {
+			tick()
+			ticks++
+		}
+		if (ticks === 0) tick()
 		timer = setTimeout(loop, 1)
 	}
 	loop()

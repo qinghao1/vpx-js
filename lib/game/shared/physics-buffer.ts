@@ -47,6 +47,47 @@ const isSAB = (sab: ArrayBufferLike) => {
 	}
 }
 
+const headerCache = new WeakMap<SharedArrayBuffer, Int32Array>()
+const timesCache = new WeakMap<SharedArrayBuffer, Float64Array>()
+const ballsCache = new WeakMap<SharedArrayBuffer, Float32Array>()
+const ringCache = new WeakMap<SharedArrayBuffer, DataView>()
+
+function getHeader(sab: SharedArrayBuffer): Int32Array {
+	let v = headerCache.get(sab)
+	if (!v) {
+		v = new Int32Array(sab as unknown as ArrayBuffer, 0, HEADER_SIZE / 4)
+		headerCache.set(sab, v)
+	}
+	return v
+}
+
+function getTimes(sab: SharedArrayBuffer): Float64Array {
+	let v = timesCache.get(sab)
+	if (!v) {
+		v = new Float64Array(sab as unknown as ArrayBuffer, TIMES_OFFSET, TIMES_SLOTS * TIMES_STRIDE)
+		timesCache.set(sab, v)
+	}
+	return v
+}
+
+function getBalls(sab: SharedArrayBuffer): Float32Array {
+	let v = ballsCache.get(sab)
+	if (!v) {
+		v = new Float32Array(sab as unknown as ArrayBuffer, BALLS_OFFSET, BALLS_PER_SLOT * 3)
+		ballsCache.set(sab, v)
+	}
+	return v
+}
+
+function getRing(sab: SharedArrayBuffer): DataView {
+	let v = ringCache.get(sab)
+	if (!v) {
+		v = new DataView(sab as unknown as ArrayBuffer, INPUT_OFFSET, INPUT_CAPACITY * INPUT_ENTRY)
+		ringCache.set(sab, v)
+	}
+	return v
+}
+
 export function canThread(): boolean {
 	try {
 		if (
@@ -92,14 +133,13 @@ export function writeFrame(
 	if (!Number.isFinite(tPrev) || !Number.isFinite(tNext) || !Number.isFinite(timeMsec))
 		throw new RangeError('time not finite')
 	if (tNext < tPrev) throw new RangeError('tNext < tPrev')
-	const h = new Int32Array(sab as unknown as ArrayBuffer, 0, HEADER_SIZE / 4)
-	const times = new Float64Array(sab as unknown as ArrayBuffer, TIMES_OFFSET, TIMES_SLOTS * TIMES_STRIDE)
-	const all = new Float32Array(sab as unknown as ArrayBuffer, BALLS_OFFSET, BALLS_PER_SLOT * 3)
+	const h = getHeader(sab)
+	const times = getTimes(sab)
+	const all = getBalls(sab)
 	const w = Atomics.load(h, FLAGS_IDX) & MASK
 	const base = w * BALLS_PER_SLOT
 	const need = count * BALL_STRIDE
 	if (need > 0) all.set(balls.subarray(0, need), base)
-	if (need < BALLS_PER_SLOT) all.fill(0, base + need, base + BALLS_PER_SLOT)
 	const tb = w * TIMES_STRIDE
 	times[tb] = tPrev
 	times[tb + 1] = tNext
@@ -118,9 +158,9 @@ export function writeFrame(
 }
 
 export function trySnap(sab: SharedArrayBuffer, out: Float32Array): FrameSnapshot | null {
-	const h = new Int32Array(sab as unknown as ArrayBuffer, 0, HEADER_SIZE / 4)
-	const times = new Float64Array(sab as unknown as ArrayBuffer, TIMES_OFFSET, TIMES_SLOTS * TIMES_STRIDE)
-	const all = new Float32Array(sab as unknown as ArrayBuffer, BALLS_OFFSET, BALLS_PER_SLOT * 3)
+	const h = getHeader(sab)
+	const times = getTimes(sab)
+	const all = getBalls(sab)
 	while (true) {
 		const old = Atomics.load(h, FLAGS_IDX)
 		const dirty = (old >> 2) & MASK
@@ -150,8 +190,8 @@ export function trySnap(sab: SharedArrayBuffer, out: Float32Array): FrameSnapsho
 export const readFrame = trySnap
 
 export function pushInput(sab: SharedArrayBuffer, kind: number, key: number, val: number): boolean {
-	const h = new Int32Array(sab as unknown as ArrayBuffer, 0, HEADER_SIZE / 4)
-	const dv = new DataView(sab as unknown as ArrayBuffer, INPUT_OFFSET, INPUT_CAPACITY * INPUT_ENTRY)
+	const h = getHeader(sab)
+	const dv = getRing(sab)
 	const head = Atomics.load(h, HEAD_IDX)
 	const tail = Atomics.load(h, TAIL_IDX)
 	const nxt = (head + 1) & INPUT_MASK
@@ -174,8 +214,8 @@ export function pushInput(sab: SharedArrayBuffer, kind: number, key: number, val
 }
 
 export function drainInput(sab: SharedArrayBuffer, out: InputEvent[]): number {
-	const h = new Int32Array(sab as unknown as ArrayBuffer, 0, HEADER_SIZE / 4)
-	const dv = new DataView(sab as unknown as ArrayBuffer, INPUT_OFFSET, INPUT_CAPACITY * INPUT_ENTRY)
+	const h = getHeader(sab)
+	const dv = getRing(sab)
 	let n = 0
 	while (true) {
 		const head = Atomics.load(h, HEAD_IDX)
