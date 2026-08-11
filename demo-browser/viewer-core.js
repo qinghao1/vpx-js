@@ -10,7 +10,6 @@ import { buildBvhIdle, installBvh } from '../dist-esm/lib/render/threejs/three-b
 import { ThreeRenderApi } from '../dist-esm/lib/render/threejs/three-render-api.js'
 import { ThreeTextureLoaderBrowser } from '../dist-esm/lib/render/threejs/three-texture-loader-browser.js'
 import { ANIM_SETTLE_MS, AnimationGate } from '../dist-esm/lib/util/animation-gate.js'
-import { Vertex3D } from '../dist-esm/lib/util/vector.js'
 import { Table } from '../dist-esm/lib/vpt/table/table.js'
 import { isWasmReady } from '../dist-esm/lib/physics/wasm/kernels.js'
 import { BALL_STRIDE, createPhysicsSAB, MAX_BALLS, pushInput, trySnap } from '../dist-esm/lib/game/shared/physics-buffer.js'
@@ -100,24 +99,34 @@ const wrapBakedTex = tex => {
 const applyBakedMaterial = (mat, tex, info, meshName) => {
 	const nl = meshName.toLowerCase()
 	mat.emissiveMap = tex
-	try { if (mat.emissive) mat.emissive.set(0xffffff); else mat.emissive = new THREE.Color(0xffffff) } catch {}
+	// vpinball: baked base uses Material.m_cBase tint (see ScriptGlobalTable::MaterialColor
+	// and TWD's VLM.Bake.*). For overlay (LM) the primitive color*alpha drives intensity
+	// (primitive.cpp:1171 convertColor). Here we handle initial static view before
+	// script runs: use full intensity 1.0, script/primitive-updater will later set
+	// correct alpha-based intensity (e.g. LM_GI0_Playfield 250 -> 2.5). No hand-tuned 0.12.
+	try {
+		// Preserve existing material color as tint if not black, else white
+		const cur = mat.color ? mat.color.getHex() : 0xffffff
+		const tint = cur !== 0x000000 ? new THREE.Color(cur) : new THREE.Color(0xffffff)
+		if (mat.emissive) mat.emissive.copy(tint); else mat.emissive = tint
+	} catch { try { mat.emissive = new THREE.Color(0xffffff) } catch {} }
 	const isOverlay = info.isVlmBake && !info.isMainBake
-	const isRamp = /ramp|armp|botramp|rampscrw/i.test(nl) || info.isRampFamily
+	// const isRamp = /ramp|armp|botramp|rampscrw/i.test(nl) || info.isRampFamily // no hand-tuned ramp dim
 	if (isOverlay) {
 		const hasTex = !!tex
 		if (!hasTex) {
 			mat.emissiveIntensity = 0
 			mat.transparent = true; mat.opacity = 0; mat.blending = THREE.AdditiveBlending; mat.depthWrite = false; mat.alphaTest = 0
 		} else {
-			mat.emissiveIntensity = isRamp ? 0.12 : 0.20
-			mat.transparent = true; mat.opacity = isRamp ? 0.55 : 0.50; mat.blending = THREE.AdditiveBlending; mat.depthWrite = false; mat.alphaTest = 0
+			mat.emissiveIntensity = 1.0
+			mat.transparent = true; mat.opacity = 1.0; mat.blending = THREE.AdditiveBlending; mat.depthWrite = false; mat.alphaTest = 0
 		}
 		try { if (!mat.color) mat.color = new THREE.Color(0x000000); else mat.color.set(0x000000) } catch {}
 		mat.side = THREE.DoubleSide; mat.toneMapped = true; mat.roughness = BAKED_ROUGH; mat.metalness = BAKED_METAL
 		wrapBakedTex(tex); wrapBakedTex(mat.emissiveMap)
 		mat.polygonOffset = true; mat.polygonOffsetFactor = -2; mat.polygonOffsetUnits = -4
 	} else {
-		mat.emissiveIntensity = isRamp ? 0.45 : BAKED_EMISSIVE
+		mat.emissiveIntensity = BAKED_EMISSIVE
 		try { if (!mat.color) mat.color = new THREE.Color(0x000000); else mat.color.set(0x000000) } catch {}
 		mat.side = THREE.DoubleSide; mat.toneMapped = true; mat.roughness = BAKED_ROUGH; mat.metalness = BAKED_METAL
 		wrapBakedTex(tex); wrapBakedTex(mat.emissiveMap)
@@ -206,7 +215,6 @@ export class Viewer {
 		this._streamId = 0
 		this._touchMap = new Map()
 		this._autoPlayTimer = null
-		this._fallbackBallTimer = null
 		this._hasPinmame = false
 		this._rendererBackend = 'webgl'
 		this.renderer = null
@@ -243,7 +251,6 @@ export class Viewer {
 		try { if (this.animFrame) cancelAnimationFrame(this.animFrame) } catch {}
 		try { if (this.animFrame) clearTimeout(this.animFrame) } catch {}
 		try { if (this._autoPlayTimer) clearTimeout(this._autoPlayTimer) } catch {}
-		try { if (this._fallbackBallTimer) clearTimeout(this._fallbackBallTimer) } catch {}
 		try { this._nudgeCleanup?.() } catch {}
 		try { this._touchCleanup?.() } catch {}
 		try { this._terminatePhysicsWorker() } catch {}
@@ -327,7 +334,11 @@ export class Viewer {
 		renderer.shadowMap.enabled = p.has('shadows')
 		if (renderer.shadowMap.enabled) renderer.shadowMap.type = THREE.PCFSoftShadowMap
 		renderer.outputColorSpace = THREE.SRGBColorSpace
-		renderer.toneMapping = THREE.ACESFilmicToneMapping
+		// vpinball reference: TWD table comment "Please don't change the tonemapping to
+		// anything else then AgX, table is optimized & rendered for AgX"
+		// (see script header). VPX default is TM_AGX (Renderer.cpp m_toneMapper = TM_AGX).
+		// Use AgXToneMapping to match vpinball and avoid hand-tuned dim (0.12 vs 1.0).
+		renderer.toneMapping = THREE.AgXToneMapping ?? THREE.ACESFilmicToneMapping
 		renderer.toneMappingExposure = 1.0
 		this.renderer = renderer
 		this._rendererBackend = backend
@@ -646,10 +657,6 @@ export class Viewer {
 			clearTimeout(this._autoPlayTimer)
 			this._autoPlayTimer = null
 		}
-		if (this._fallbackBallTimer) {
-			clearTimeout(this._fallbackBallTimer)
-			this._fallbackBallTimer = null
-		}
 		for (const code of this._touchMap.values()) {
 			try {
 				this.player?.onKeyUp({ code, key: code === 'Enter' ? 'Enter' : 'Shift', ts: Date.now() })
@@ -732,71 +739,9 @@ export class Viewer {
 					} catch {}
 				}, 500)
 				this.log('Auto credit/start (5 → 1)', 'info')
-				this._scheduleFallbackBall()
 			} catch {}
 		}
 		this._autoPlayTimer = setTimeout(() => attemptSend(0), 900)
-	}
-
-	_scheduleFallbackBall() {
-		if (this._fallbackBallTimer) clearTimeout(this._fallbackBallTimer)
-		if (this._hasPinmame) return
-		try {
-			const emu = this.player?.getPhysics?.()?.emu
-			if (emu && !emu.isMock && emu.isInitialized?.()) return
-		} catch {}
-		this._fallbackBallTimer = setTimeout(() => {
-			try {
-				if (this.viewerMode !== 'play' || !this.player || !this.table) return
-				if (this._hasPinmame) return
-				try {
-					const emu = this.player.getPhysics?.()?.emu
-					if (emu && !emu.isMock) return
-				} catch {}
-				const balls = this.player.balls
-				if (balls.some(b => !b.state.isFrozen)) return
-				if (balls.length === 0) return
-				this.log('No ball ejected (no ROM?) — spawning fallback ball', 'warn')
-				this._spawnFallbackBall()
-			} catch {}
-		}, 3500)
-	}
-
-	_spawnFallbackBall() {
-		try {
-			if (!this.player || !this.table) return
-			let pos = new Vertex3D(475, 800, 45)
-			try {
-				const kickers = Object.values(this.table.kickers ?? this.table.items ?? {}).filter(v => v?.constructor?.name === 'Kicker' || v?.data?.isKicker)
-				let kicker = kickers.find(k => /drain|trough|ballrelease/i.test(k.getName?.() ?? k.data?.name ?? '')) ?? kickers[0]
-				if (kicker?.data) {
-					const d = kicker.data
-					const x = d.center?.x ?? d.position?.x ?? d.vCenter?.x
-					const y = d.center?.y ?? d.position?.y ?? d.vCenter?.y
-					if (Number.isFinite(x) && Number.isFinite(y)) pos = new Vertex3D(x, y, 45)
-				} else {
-					const dim = this.table.getDimensions?.()
-					if (dim?.width && dim?.height) pos = new Vertex3D(dim.width * 0.5, dim.height * 0.35, 45)
-				}
-			} catch {}
-			const vel = new Vertex3D(0, 0, 0)
-			const creator = {
-				getBallCreationPosition: () => pos,
-				getBallCreationVelocity: () => vel,
-				onBallCreated: () => {},
-			}
-			const ball = this.player.createBall(creator, 25, 1)
-			ball.state.isFrozen = false
-			try {
-				ball.hit.vel.set(0, 0, 0)
-			} catch {}
-			this.log(
-				`Fallback ball ${ball.getName()} at ${ball.state.pos.x.toFixed(0)},${ball.state.pos.y.toFixed(0)}`,
-				'info',
-			)
-		} catch (e) {
-			this.log('Fallback ball failed: ' + e.message, 'warn')
-		}
 	}
 
 	buildNodeCache() {
@@ -1824,13 +1769,6 @@ export class Viewer {
 				togglePause()
 				e.preventDefault()
 				return
-			}
-			if ((e.code === 'KeyB' || e.key === 'b' || e.key === 'B') && !e.repeat && down) {
-				if (this.viewerMode === 'play' && this.player) {
-					this._spawnFallbackBall()
-					e.preventDefault()
-					return
-				}
 			}
 			if (e.code === 'Escape' && this.viewerMode === 'play') {
 				if (down) this._switchToViewer()
