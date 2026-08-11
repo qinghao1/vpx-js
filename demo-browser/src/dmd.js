@@ -28,9 +28,7 @@ export class DmdController {
 			return
 		}
 		if (!this.wrap) return
-		try {
-			this.wrap.hidden = true
-		} catch {}
+		this.wrap.hidden = true
 		const c = document.createElement('canvas')
 		c.id = 'dmd'
 		c.className = 'dmd-canvas'
@@ -47,27 +45,23 @@ export class DmdController {
 
 	_ensureTexture() {
 		if (this.offscreen && this.texture) return
-		try {
-			const c = document.createElement('canvas')
-			c.width = DMD.w
-			c.height = DMD.h
-			this.offscreen = c
-			this.offCtx = c.getContext('2d', { alpha: false })
-			const tex = new THREE.CanvasTexture(c)
-			tex.colorSpace = THREE.SRGBColorSpace
-			tex.magFilter = THREE.NearestFilter
-			tex.minFilter = THREE.NearestFilter
-			tex.generateMipmaps = false
-			tex.wrapS = THREE.ClampToEdgeWrapping
-			tex.wrapT = THREE.ClampToEdgeWrapping
-			tex.needsUpdate = true
-			this.texture = tex
-			this.viewer.dmdTexture = tex
-			this.viewer._dmdOffscreen = c
-			this.viewer._dmdOffCtx = this.offCtx
-		} catch (e) {
-			console.warn('DMD texture init', e)
-		}
+		const c = document.createElement('canvas')
+		c.width = DMD.w
+		c.height = DMD.h
+		this.offscreen = c
+		this.offCtx = c.getContext('2d', { alpha: false })
+		const tex = new THREE.CanvasTexture(c)
+		tex.colorSpace = THREE.SRGBColorSpace
+		tex.magFilter = THREE.NearestFilter
+		tex.minFilter = THREE.NearestFilter
+		tex.generateMipmaps = false
+		tex.wrapS = THREE.ClampToEdgeWrapping
+		tex.wrapT = THREE.ClampToEdgeWrapping
+		tex.needsUpdate = true
+		this.texture = tex
+		this.viewer.dmdTexture = tex
+		this.viewer._dmdOffscreen = c
+		this.viewer._dmdOffCtx = this.offCtx
 	}
 
 	findMeshes() {
@@ -76,14 +70,12 @@ export class DmdController {
 		if (!tableGroup) return
 		const names = new Set(['dmd', 'vr_dmd'])
 		const flashers = []
-		try {
-			for (const k in table?.flashers || {})
-				if (table.flashers[k]?.data?.isDMD) {
-					names.add(k.toLowerCase())
-					flashers.push(table.flashers[k])
-				}
-			for (const k in table?.textboxes || {}) if (table.textboxes[k]?.data?.isDMD) names.add(k.toLowerCase())
-		} catch {}
+		for (const k in table?.flashers || {})
+			if (table.flashers[k]?.data?.isDMD) {
+				names.add(k.toLowerCase())
+				flashers.push(table.flashers[k])
+			}
+		for (const k in table?.textboxes || {}) if (table.textboxes[k]?.data?.isDMD) names.add(k.toLowerCase())
 		const isPlay = this.viewer.viewerMode === 'play'
 		tableGroup.traverse(o => {
 			if (!o.isMesh) return
@@ -130,40 +122,36 @@ export class DmdController {
 			if (f.length) toCreate = f
 		}
 		for (const fl of toCreate) {
-			try {
-				const d = fl.data
-				const pts = d.dragPoints || []
-				let w = 600,
+			const d = fl.data
+			const pts = d.dragPoints || []
+			let w = 600,
+				h = 160
+			if (pts.length >= 4) {
+				const xs = pts.map(p => p.vertex.x),
+					ys = pts.map(p => p.vertex.y)
+				w = Math.max(...xs) - Math.min(...xs)
+				h = Math.max(...ys) - Math.min(...ys)
+				if (!w || !h) {
+					w = 600
 					h = 160
-				if (pts.length >= 4) {
-					const xs = pts.map(p => p.vertex.x),
-						ys = pts.map(p => p.vertex.y)
-					w = Math.max(...xs) - Math.min(...xs)
-					h = Math.max(...ys) - Math.min(...ys)
-					if (!w || !h) {
-						w = 600
-						h = 160
-					}
 				}
-				const geom = new THREE.PlaneGeometry(w, h)
-				const mat = new THREE.MeshBasicMaterial({ map: this.texture, side: THREE.DoubleSide })
-				const mesh = new THREE.Mesh(geom, mat)
-				mesh.name = `DMD_${fl.getName()}`
-				mesh.renderOrder = 1000
-				mesh.frustumCulled = false
-				mesh.position.set(d.center?.x ?? 470, d.center?.y ?? 40, -(d.height ?? 620))
-				mesh.rotation.set(
-					THREE.MathUtils.degToRad(d.rotX ?? 0),
-					THREE.MathUtils.degToRad(d.rotY ?? 0),
-					THREE.MathUtils.degToRad(d.rotZ ?? 0),
-				)
-				mesh.translateZ(1.8)
-				mesh.userData.isProceduralDMD = true
-				tableGroup.add(mesh)
-				this.meshes.push(mesh)
-			} catch (e) {
-				console.warn('create procedural DMD', e)
 			}
+			const geom = new THREE.PlaneGeometry(w, h)
+			const mat = new THREE.MeshBasicMaterial({ map: this.texture, side: THREE.DoubleSide })
+			const mesh = new THREE.Mesh(geom, mat)
+			mesh.name = `DMD_${fl.getName()}`
+			mesh.renderOrder = 1000
+			mesh.frustumCulled = false
+			mesh.position.set(d.center?.x ?? 470, d.center?.y ?? 40, -(d.height ?? 620))
+			mesh.rotation.set(
+				THREE.MathUtils.degToRad(d.rotX ?? 0),
+				THREE.MathUtils.degToRad(d.rotY ?? 0),
+				THREE.MathUtils.degToRad(d.rotZ ?? 0),
+			)
+			mesh.translateZ(1.8)
+			mesh.userData.isProceduralDMD = true
+			tableGroup.add(mesh)
+			this.meshes.push(mesh)
 		}
 		if (this.meshes.length) {
 			this.viewer.log(`DMD: created ${this.meshes.length} procedural on-table mesh(es) from FlasherData`, 'info')
@@ -193,12 +181,8 @@ export class DmdController {
 
 	render() {
 		if (!this.viewer.player) return
-		let frame = null,
-			dims = null
-		try {
-			frame = this.viewer.player.getDmdFrame?.()
-			dims = this.viewer.player.getDmdDimensions?.()
-		} catch {}
+		const frame = this.viewer.player.getDmdFrame?.()
+		const dims = this.viewer.player.getDmdDimensions?.()
 		if (!frame?.length) return
 		const w = Math.round(dims?.x ?? DMD.w) || DMD.w
 		const h = Math.round(dims?.y ?? DMD.h) || DMD.h

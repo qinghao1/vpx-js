@@ -92,16 +92,10 @@ export const wrapBakedTex = wrapTexBaked
 export const applyBakedMaterial = (mat, tex, info, meshName) => {
 	const nl = (meshName || '').toLowerCase()
 	mat.emissiveMap = tex
-	try {
-		const cur = mat.color ? mat.color.getHex() : 0xffffff
-		const tint = cur !== 0x000000 ? new THREE.Color(cur) : new THREE.Color(0xffffff)
-		if (mat.emissive) mat.emissive.copy(tint)
-		else mat.emissive = tint
-	} catch {
-		try {
-			mat.emissive = new THREE.Color(0xffffff)
-		} catch {}
-	}
+	const cur = mat.color ? mat.color.getHex() : 0xffffff
+	const tint = cur !== 0x000000 ? new THREE.Color(cur) : new THREE.Color(0xffffff)
+	if (mat.emissive) mat.emissive.copy(tint)
+	else mat.emissive = tint
 	const isOverlay = info.isVlmBake && !info.isMainBake
 	if (isOverlay) {
 		const hasTex = !!tex
@@ -120,10 +114,8 @@ export const applyBakedMaterial = (mat, tex, info, meshName) => {
 			mat.depthWrite = false
 			mat.alphaTest = 0
 		}
-		try {
-			if (!mat.color) mat.color = new THREE.Color(0x000000)
-			else mat.color.set(0x000000)
-		} catch {}
+		if (!mat.color) mat.color = new THREE.Color(0x000000)
+		else mat.color.set(0x000000)
 		mat.side = THREE.DoubleSide
 		mat.toneMapped = true
 		mat.roughness = BAKED_ROUGH
@@ -135,10 +127,8 @@ export const applyBakedMaterial = (mat, tex, info, meshName) => {
 		mat.polygonOffsetUnits = -4
 	} else {
 		mat.emissiveIntensity = BAKED_EMISSIVE
-		try {
-			if (!mat.color) mat.color = new THREE.Color(0x000000)
-			else mat.color.set(0x000000)
-		} catch {}
+		if (!mat.color) mat.color = new THREE.Color(0x000000)
+		else mat.color.set(0x000000)
 		mat.side = THREE.DoubleSide
 		mat.toneMapped = true
 		mat.roughness = BAKED_ROUGH
@@ -227,14 +217,9 @@ function sanitizeNaN(node, stats) {
 		if (!bad) return
 		for (let i = 0; i < pos.array.length; i++) if (!Number.isFinite(pos.array[i])) pos.array[i] = 0
 		pos.needsUpdate = true
-		try {
-			o.geometry.computeBoundingSphere()
-			o.geometry.computeBoundingBox()
-			stats.nanFixed++
-		} catch {
-			o.visible = false
-			stats.nanHidden++
-		}
+		o.geometry.computeBoundingSphere()
+		o.geometry.computeBoundingBox()
+		stats.nanFixed++
 	})
 }
 
@@ -242,9 +227,7 @@ const hideMesh = (o, statsKey, stats) => {
 	if (!o.visible) return
 	o.visible = false
 	if (statsKey) stats[statsKey]++
-	try {
-		o.geometry?.dispose?.()
-	} catch {}
+	o.geometry?.dispose?.()
 }
 
 export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {}) {
@@ -426,9 +409,7 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 			if (o.visible) {
 				o.visible = false
 				stats.cabHidden++
-				try {
-					o.geometry?.dispose?.()
-				} catch {}
+				o.geometry?.dispose?.()
 			}
 			return
 		}
@@ -465,16 +446,15 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 				if (mc.isBakedMat && !m.map) {
 					m.color?.set?.(0xffffff)
 					m.emissive = new THREE.Color(0x444444)
-					m.emissiveIntensity = 0.6
+					m.emissiveIntensity = BAKED_EMISSIVE
 					m.roughness = 0.45
 					m.metalness = 0
 					m.side = THREE.DoubleSide
 				}
-				if (m.map && m.map.colorSpace !== THREE.SRGBColorSpace)
-					try {
-						m.map.colorSpace = THREE.SRGBColorSpace
-						m.map.needsUpdate = true
-					} catch {}
+				if (m.map && m.map.colorSpace !== THREE.SRGBColorSpace) {
+					m.map.colorSpace = THREE.SRGBColorSpace
+					m.map.needsUpdate = true
+				}
 				o.castShadow = false
 				o.receiveShadow = false
 				continue
@@ -489,10 +469,8 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 				o.castShadow = false
 				o.receiveShadow = false
 				o.frustumCulled = true
-				try {
-					o.geometry?.computeBoundingSphere?.()
-					o.geometry?.computeBoundingBox?.()
-				} catch {}
+				o.geometry?.computeBoundingSphere?.()
+				o.geometry?.computeBoundingBox?.()
 				stats.vlmFixed++
 				continue
 			}
@@ -506,10 +484,8 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 				o.castShadow = false
 				o.receiveShadow = false
 				o.frustumCulled = true
-				try {
-					o.geometry?.computeBoundingSphere?.()
-					o.geometry?.computeBoundingBox?.()
-				} catch {}
+				o.geometry?.computeBoundingSphere?.()
+				o.geometry?.computeBoundingBox?.()
 				stats.vlmFixed++
 				continue
 			}
@@ -529,19 +505,16 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 				m.metalness = Math.min(m.metalness ?? 0, 0.05)
 				m.needsUpdate = true
 			}
-			if (m.map && m.map.colorSpace !== THREE.SRGBColorSpace)
-				try {
-					m.map.colorSpace = THREE.SRGBColorSpace
-					m.map.needsUpdate = true
-				} catch {}
+			if (m.map && m.map.colorSpace !== THREE.SRGBColorSpace) {
+				m.map.colorSpace = THREE.SRGBColorSpace
+				m.map.needsUpdate = true
+			}
 		}
 		o.receiveShadow = false
 		if (c.isVr || c.isCab) {
 			o.frustumCulled = true
-			try {
-				o.geometry?.computeBoundingSphere?.()
-				o.geometry?.computeBoundingBox?.()
-			} catch {}
+			o.geometry?.computeBoundingSphere?.()
+			o.geometry?.computeBoundingBox?.()
 		}
 		if (n.includes('plastic') || n.includes('ramp'))
 			for (const mat of Array.isArray(o.material) ? o.material : [o.material]) mat.side = THREE.DoubleSide
@@ -694,10 +667,8 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 }
 
 export function ensureProceduralRoom(scene, center, size, opts = {}) {
-	try {
-		const e = scene.getObjectByName('vr_procedural_room')
-		if (e) scene.remove(e)
-	} catch {}
+	const e = scene.getObjectByName('vr_procedural_room')
+	if (e) scene.remove(e)
 	if (opts.hasVr) return null
 	const maxDim = Math.max(size.x, size.y, size.z)
 	const W = Math.max(1600, maxDim * 8),
@@ -722,11 +693,9 @@ export function ensureProceduralRoom(scene, center, size, opts = {}) {
 	grid.position.set(center.x, center.y, floorY + 1.2)
 	grid.rotation.x = Math.PI / 2
 	g.add(grid)
-	try {
-		const h = new THREE.HemisphereLight(0xffffff, 0x1a1f2e, 0.45)
-		h.name = 'proc_hemi'
-		g.add(h)
-	} catch {}
+	const h = new THREE.HemisphereLight(0xffffff, 0x1a1f2e, 0.45)
+	h.name = 'proc_hemi'
+	g.add(h)
 	scene.add(g)
 	return g
 }
@@ -737,11 +706,7 @@ function framingBox(node, exclude) {
 	node.traverse(o => {
 		if (!o.isMesh || !o.visible || !o.geometry?.attributes?.position) return
 		if (exclude?.((o.name || '').toLowerCase())) return
-		try {
-			box.expandByObject(o)
-		} catch (e) {
-			console.warn('[Box3]', o.name, e.message)
-		}
+		box.expandByObject(o)
 	})
 	if (box.isEmpty() || !Number.isFinite(box.min.x)) box.setFromObject(node)
 	const center = box.getCenter(new THREE.Vector3())

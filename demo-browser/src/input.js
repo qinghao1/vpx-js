@@ -30,9 +30,7 @@ export function attachKeyboard(viewer) {
 
 	const togglePause = () => {
 		viewer.isPaused = !viewer.isPaused
-		try {
-			viewer.isPaused ? viewer.player.pause() : viewer.player.resume()
-		} catch {}
+		viewer.isPaused ? viewer.player.pause() : viewer.player.resume()
 		viewer.log(viewer.isPaused ? 'Paused (P to resume)' : 'Resumed', viewer.isPaused ? 'warn' : 'info')
 	}
 
@@ -57,17 +55,12 @@ export function attachKeyboard(viewer) {
 		}
 		const ae = aliasEvent(e)
 		const ev = ae || { code: e.code, key: e.key, ts: Date.now() }
-		try {
-			if (down) viewer.player.onKeyDown(ev)
-			else viewer.player.onKeyUp(ev)
-		} catch {}
-		try {
-			if (viewer._physicsSab) {
-				const kind = down ? 1 : 0
-				const keyCode = keyToCode(ev.code)
-				pushInput(viewer._physicsSab, kind, keyCode, ev.ts ?? Date.now())
-			}
-		} catch {}
+		if (down) viewer.player.onKeyDown(ev)
+		else viewer.player.onKeyUp(ev)
+		if (viewer._physicsSab) {
+			const kind = down ? 1 : 0
+			pushInput(viewer._physicsSab, kind, keyToCode(ev.code), ev.ts ?? Date.now())
+		}
 		if (ae || PLAY_KEYS.has(e.code)) e.preventDefault()
 	}
 
@@ -77,12 +70,8 @@ export function attachKeyboard(viewer) {
 	addEventListener('keyup', viewer._boundKeyUp)
 
 	return () => {
-		try {
-			if (viewer._boundKeyDown) removeEventListener('keydown', viewer._boundKeyDown)
-		} catch {}
-		try {
-			if (viewer._boundKeyUp) removeEventListener('keyup', viewer._boundKeyUp)
-		} catch {}
+		if (viewer._boundKeyDown) removeEventListener('keydown', viewer._boundKeyDown)
+		if (viewer._boundKeyUp) removeEventListener('keyup', viewer._boundKeyUp)
 		viewer._boundKeyDown = null
 		viewer._boundKeyUp = null
 	}
@@ -91,24 +80,13 @@ export function attachKeyboard(viewer) {
 export function attachPointerTouch(viewer) {
 	const canvas = viewer.dom.canvas
 	if (!canvas) return () => {}
-
-	if (viewer._touchCleanup) {
-		try {
-			viewer._touchCleanup()
-		} catch {}
-		viewer._touchCleanup = null
-	}
+	if (viewer._touchCleanup) viewer._touchCleanup()
+	viewer._touchCleanup = null
 
 	canvas.tabIndex = 0
-	try {
-		canvas.focus()
-	} catch {}
+	canvas.focus()
 
-	const onCanvasClick = () => {
-		try {
-			canvas.focus()
-		} catch {}
-	}
+	const onCanvasClick = () => canvas.focus()
 	canvas.addEventListener('click', onCanvasClick)
 
 	const active = viewer._touchMap
@@ -129,28 +107,22 @@ export function attachPointerTouch(viewer) {
 		active.delete(id)
 		viewer._sendKey(code, false)
 	}
-
 	const onDown = e => {
 		if (e.pointerType === 'touch') return
 		if (e.pointerType === 'mouse' && e.button !== 0) return
 		down(e.pointerId, toCode(e.clientX, e.clientY))
 		if (viewer.viewerMode === 'play') e.preventDefault()
-		try {
-			canvas.setPointerCapture(e.pointerId)
-		} catch {}
+		canvas.setPointerCapture(e.pointerId)
 	}
 	const onUp = e => {
 		if (e.pointerType === 'touch') return
 		up(e.pointerId)
 		if (viewer.viewerMode === 'play') e.preventDefault()
-		try {
-			canvas.releasePointerCapture(e.pointerId)
-		} catch {}
+		canvas.releasePointerCapture(e.pointerId)
 	}
 	const onCancel = e => {
 		if (e.pointerType !== 'touch') up(e.pointerId)
 	}
-
 	const touchStarts = new Map()
 	const onTouchStart = e => {
 		for (const t of e.changedTouches) {
@@ -168,9 +140,7 @@ export function attachPointerTouch(viewer) {
 				const dt = performance.now() - st.t
 				touchStarts.delete(id)
 				if (dt < 600 && Math.hypot(dx, dy) > 50) {
-					try {
-						up(id)
-					} catch {}
+					up(id)
 					const ang = swipeNudge(dx, dy, NUDGE)
 					if (ang !== null) {
 						viewer._nudge(ang, ang === NUDGE.back ? 2.0 : NUDGE.force)
@@ -184,7 +154,6 @@ export function attachPointerTouch(viewer) {
 	const onContext = e => {
 		if (viewer.viewerMode === 'play') e.preventDefault()
 	}
-
 	canvas.addEventListener('pointerdown', onDown)
 	canvas.addEventListener('pointerup', onUp)
 	canvas.addEventListener('pointercancel', onCancel)
@@ -192,11 +161,8 @@ export function attachPointerTouch(viewer) {
 	canvas.addEventListener('touchend', onTouchEnd, { passive: true })
 	canvas.addEventListener('touchcancel', onTouchEnd, { passive: true })
 	canvas.addEventListener('contextmenu', onContext)
-
 	const cleanup = () => {
-		try {
-			canvas.removeEventListener('click', onCanvasClick)
-		} catch {}
+		canvas.removeEventListener('click', onCanvasClick)
 		canvas.removeEventListener('pointerdown', onDown)
 		canvas.removeEventListener('pointerup', onUp)
 		canvas.removeEventListener('pointercancel', onCancel)
@@ -210,9 +176,7 @@ export function attachPointerTouch(viewer) {
 }
 
 export function attachNudgeInput(viewer) {
-	try {
-		if (viewer._nudgeCleanup) viewer._nudgeCleanup()
-	} catch {}
+	if (viewer._nudgeCleanup) viewer._nudgeCleanup()
 	viewer._nudgeCleanup = null
 	const cleanups = []
 	const trigger = (angle, force = NUDGE.force) => viewer._nudge(angle, force)
@@ -277,32 +241,29 @@ export function attachNudgeInput(viewer) {
 		const now = performance.now()
 		if (now - lastShake < 700) return
 		lastShake = now
-		const ang = (acc.x ?? 0) > 0 ? 285 : 75
-		trigger(ang, 3.0)
+		trigger((acc.x ?? 0) > 0 ? 285 : 75, 3.0)
 	}
 	let motionActive = false
-	try {
-		if (typeof DeviceMotionEvent !== 'undefined' && 'requestPermission' in DeviceMotionEvent) {
-			const btn = document.getElementById('enable-motion')
-			if (btn) {
-				btn.hidden = false
-				btn.onclick = async () => {
-					try {
-						const perm = await DeviceMotionEvent.requestPermission()
-						if (perm === 'granted') {
-							addEventListener('devicemotion', onMotion)
-							motionActive = true
-							btn.hidden = true
-							viewer.log('Motion nudge enabled', 'info')
-						}
-					} catch {}
-				}
+	if (typeof DeviceMotionEvent !== 'undefined' && 'requestPermission' in DeviceMotionEvent) {
+		const btn = document.getElementById('enable-motion')
+		if (btn) {
+			btn.hidden = false
+			btn.onclick = async () => {
+				try {
+					const perm = await DeviceMotionEvent.requestPermission()
+					if (perm === 'granted') {
+						addEventListener('devicemotion', onMotion)
+						motionActive = true
+						btn.hidden = true
+						viewer.log('Motion nudge enabled', 'info')
+					}
+				} catch {}
 			}
-		} else {
-			addEventListener('devicemotion', onMotion)
-			motionActive = true
 		}
-	} catch {}
+	} else {
+		addEventListener('devicemotion', onMotion)
+		motionActive = true
+	}
 	cleanups.push(() => {
 		if (motionActive) removeEventListener('devicemotion', onMotion)
 	})
@@ -310,48 +271,43 @@ export function attachNudgeInput(viewer) {
 	let gpRaf = 0
 	const lastBy = new Map()
 	const pollGP = () => {
-		try {
-			const gps = navigator.getGamepads?.()
-			if (gps) {
-				for (const gp of gps) {
-					if (!gp) continue
-					const now = performance.now()
-					const btnKey = `b${gp.index}`
-					const axisKey = `a${gp.index}`
-					let ang = null
-					if (gp.buttons[4]?.pressed) ang = 75
-					else if (gp.buttons[5]?.pressed) ang = 285
-					else if (gp.buttons[0]?.pressed || gp.buttons[2]?.pressed) ang = 0
-					if (ang !== null) {
-						const last = lastBy.get(btnKey) ?? 0
-						if (now - last >= 180) {
-							trigger(ang, 2.8)
-							lastBy.set(btnKey, now)
-						}
+		const gps = navigator.getGamepads?.()
+		if (gps) {
+			for (const gp of gps) {
+				if (!gp) continue
+				const now = performance.now()
+				const btnKey = `b${gp.index}`
+				const axisKey = `a${gp.index}`
+				let ang = null
+				if (gp.buttons[4]?.pressed) ang = 75
+				else if (gp.buttons[5]?.pressed) ang = 285
+				else if (gp.buttons[0]?.pressed || gp.buttons[2]?.pressed) ang = 0
+				if (ang !== null) {
+					const last = lastBy.get(btnKey) ?? 0
+					if (now - last >= 180) {
+						trigger(ang, 2.8)
+						lastBy.set(btnKey, now)
 					}
-					const ax0 = gp.axes[0] ?? 0
-					const ax1 = gp.axes[1] ?? 0
-					if (Math.abs(ax0) > 0.85 || Math.abs(ax1) > 0.85) {
-						const last = lastBy.get(axisKey) ?? 0
-						if (now - last >= 300) {
-							if (Math.abs(ax0) > Math.abs(ax1)) trigger(ax0 < 0 ? 75 : 285, 2.5)
-							else trigger(ax1 < 0 ? 0 : 180, 2.2)
-							lastBy.set(axisKey, now)
-						}
+				}
+				const ax0 = gp.axes[0] ?? 0
+				const ax1 = gp.axes[1] ?? 0
+				if (Math.abs(ax0) > 0.85 || Math.abs(ax1) > 0.85) {
+					const last = lastBy.get(axisKey) ?? 0
+					if (now - last >= 300) {
+						if (Math.abs(ax0) > Math.abs(ax1)) trigger(ax0 < 0 ? 75 : 285, 2.5)
+						else trigger(ax1 < 0 ? 0 : 180, 2.2)
+						lastBy.set(axisKey, now)
 					}
 				}
 			}
-		} catch {}
+		}
 		gpRaf = requestAnimationFrame(pollGP)
 	}
 	gpRaf = requestAnimationFrame(pollGP)
 	cleanups.push(() => cancelAnimationFrame(gpRaf))
 
 	viewer._nudgeCleanup = () => {
-		for (const fn of cleanups)
-			try {
-				fn()
-			} catch {}
+		for (const fn of cleanups) fn()
 	}
 	return viewer._nudgeCleanup
 }
@@ -361,14 +317,8 @@ export function attachInput(viewer) {
 	const cleanPT = attachPointerTouch(viewer)
 	const cleanNudge = attachNudgeInput(viewer)
 	return () => {
-		try {
-			cleanKB()
-		} catch {}
-		try {
-			cleanPT()
-		} catch {}
-		try {
-			cleanNudge()
-		} catch {}
+		cleanKB()
+		cleanPT()
+		cleanNudge()
 	}
 }

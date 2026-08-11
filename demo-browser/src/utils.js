@@ -29,14 +29,12 @@ export const computeTexMem = root => {
 }
 
 export const logMem = (log, stage) => {
-	try {
-		const m = performance.memory
-		if (m)
-			log?.(
-				`[mem] ${stage}: ${(m.usedJSHeapSize / 1_048_576).toFixed(0)}/${(m.totalJSHeapSize / 1_048_576).toFixed(0)} MB`,
-				'debug',
-			)
-	} catch {}
+	const m = performance.memory
+	if (m)
+		log?.(
+			`[mem] ${stage}: ${(m.usedJSHeapSize / 1_048_576).toFixed(0)}/${(m.totalJSHeapSize / 1_048_576).toFixed(0)} MB`,
+			'debug',
+		)
 }
 
 export const resolveVpxCandidates = ({ defaultName = null, queryParam = 'vpx' } = {}) => {
@@ -94,9 +92,7 @@ export const filterTextures = (table, log) => {
 			name === 'glassnormal' ||
 			(name.startsWith('glass') && name.length < 20)
 		) {
-			try {
-				table.textures[k].binary = undefined
-			} catch {}
+			table.textures[k].binary = undefined
 			delete table.textures[k]
 			skipped++
 		}

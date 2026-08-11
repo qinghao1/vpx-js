@@ -8,13 +8,9 @@ const viewer = new Viewer({
 	viewerMode: params.get('mode') === 'play' ? 'play' : 'viewer',
 })
 const _isDev = (() => {
-	try {
-		if (import.meta.env?.DEV) return true
-	} catch {}
-	try {
-		const h = location.hostname
-		return h === 'localhost' || h === '127.0.0.1' || h === '' || h === '0.0.0.0'
-	} catch { return false }
+	if (import.meta.env?.DEV) return true
+	const h = location.hostname
+	return h === 'localhost' || h === '127.0.0.1' || h === '' || h === '0.0.0.0'
 })()
 if (_isDev) window.viewer = viewer
 initHelp(viewer)

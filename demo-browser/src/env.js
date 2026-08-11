@@ -2,15 +2,9 @@ import { Buffer } from 'buffer'
 import { installBvh } from '../../dist-esm/lib/render/threejs/three-bvh.js'
 
 export const isDev = (() => {
-	try {
-		if (import.meta.env?.DEV) return true
-	} catch {}
-	try {
-		const h = typeof location !== 'undefined' ? location.hostname : ''
-		return h === 'localhost' || h === '127.0.0.1' || h === '' || h === '0.0.0.0'
-	} catch {
-		return false
-	}
+	if (import.meta.env?.DEV) return true
+	const h = typeof location !== 'undefined' ? location.hostname : ''
+	return h === 'localhost' || h === '127.0.0.1' || h === '' || h === '0.0.0.0'
 })()
 
 let bvhInstalled = false
@@ -27,12 +21,10 @@ export const ensureBvh = () => {
 let globalsEnsured = false
 export const ensureGlobals = () => {
 	if (globalsEnsured) return
-	try {
-		if (typeof window !== 'undefined') {
-			window.Buffer ??= Buffer
-			window.global ??= window
-		}
-	} catch {}
+	if (typeof window !== 'undefined') {
+		window.Buffer ??= Buffer
+		window.global ??= window
+	}
 	globalsEnsured = true
 }
 

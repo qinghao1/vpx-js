@@ -68,12 +68,9 @@ export {
 
 const cGameName = t => t?.tableScript?.match(/cGameName\s*=\s*["']([^"']+)["']/i)?.[1] || ''
 const setTitle = s => {
-	try {
-		const el = document.getElementById('title')
-		if (el && s) el.textContent = s
-	} catch {}
+	const el = document.getElementById('title')
+	if (el && s) el.textContent = s
 }
-
 export class Viewer {
 	constructor(opts = {}) {
 		ensureGlobals()
@@ -153,7 +150,12 @@ export class Viewer {
 		this._disposed = false
 		this._rendererReady = this._createRenderer()
 		this.dmd = new DmdController(this)
-		if (_isDev) Object.assign(window, { scene: this.scene, camera: this.camera, THREE })
+		if (_isDev)
+			Object.assign(window, {
+				scene: this.scene,
+				camera: this.camera,
+				THREE,
+			})
 		addEventListener('resize', this._boundResize)
 		this._eventCleanups.push(() => removeEventListener('resize', this._boundResize))
 		{
@@ -166,74 +168,34 @@ export class Viewer {
 		this._setupDebugToggle()
 		this._syncChrome()
 	}
-
-	// Lifecycle
 	destroy() {
 		if (this._disposed) return
 		this._disposed = true
-		try {
-			if (this._cameraRaf) cancelAnimationFrame(this._cameraRaf)
-		} catch {}
-		try {
-			if (this._cameraTimeout) clearTimeout(this._cameraTimeout)
-		} catch {}
-
-		try {
-			if (this._animRaf) cancelAnimationFrame(this._animRaf)
-		} catch {}
-		try {
-			if (this._animTimeout) clearTimeout(this._animTimeout)
-		} catch {}
-		try {
-			if (this.animFrame) cancelAnimationFrame(this.animFrame)
-		} catch {}
-		try {
-			if (this.animFrame) clearTimeout(this.animFrame)
-		} catch {}
-		try {
-			if (this._autoPlayTimer) clearTimeout(this._autoPlayTimer)
-		} catch {}
-		try {
-			this._inputCleanup?.()
-		} catch {}
+		if (this._cameraRaf) cancelAnimationFrame(this._cameraRaf)
+		if (this._cameraTimeout) clearTimeout(this._cameraTimeout)
+		if (this._animRaf) cancelAnimationFrame(this._animRaf)
+		if (this._animTimeout) clearTimeout(this._animTimeout)
+		if (this.animFrame) cancelAnimationFrame(this.animFrame)
+		if (this.animFrame) clearTimeout(this.animFrame)
+		if (this._autoPlayTimer) clearTimeout(this._autoPlayTimer)
+		this._inputCleanup?.()
 		this._nudgeCleanup = null
 		this._touchCleanup = null
-		try {
-			this._terminatePhysicsWorker()
-		} catch {}
-		for (const fn of this._eventCleanups)
-			try {
-				fn()
-			} catch {}
+		this._terminatePhysicsWorker()
+		for (const fn of this._eventCleanups) fn()
 		this._eventCleanups = []
-		try {
-			if (this._boundKeyDown) removeEventListener('keydown', this._boundKeyDown)
-		} catch {}
-		try {
-			if (this._boundKeyUp) removeEventListener('keyup', this._boundKeyUp)
-		} catch {}
-		try {
-			this.controls?.dispose?.()
-		} catch {}
-		try {
-			this.renderer?.dispose?.()
-		} catch {}
-		try {
-			this.scene?.clear?.()
-		} catch {}
+		if (this._boundKeyDown) removeEventListener('keydown', this._boundKeyDown)
+		if (this._boundKeyUp) removeEventListener('keyup', this._boundKeyUp)
+		this.controls?.dispose?.()
+		this.renderer?.dispose?.()
+		this.scene?.clear?.()
 	}
-
-	// Physics worker
 	_terminatePhysicsWorker() {
-		try {
-			this._physicsWorker?.terminate?.()
-		} catch {}
+		this._physicsWorker?.terminate?.()
 		this._physicsWorker = null
 		this._physicsSab = null
 		this._physicsScratch = null
 	}
-
-	// Debug
 	_setupDebugToggle() {
 		const btn = document.getElementById('debug-toggle')
 		const toggle = () => document.body.classList.toggle('show-debug')
@@ -251,8 +213,6 @@ export class Viewer {
 		addEventListener('keydown', onKey)
 		this._eventCleanups.push(() => removeEventListener('keydown', onKey))
 	}
-
-	// Renderer
 	async _createRenderer() {
 		const canvas = this.dom.canvas
 		const p = new URLSearchParams(location.search)
@@ -263,7 +223,10 @@ export class Viewer {
 		if (wantWebGPU) {
 			try {
 				const { WebGPURenderer } = await import('three/webgpu')
-				renderer = new WebGPURenderer({ canvas, antialias: wantAA })
+				renderer = new WebGPURenderer({
+					canvas,
+					antialias: wantAA,
+				})
 				await renderer.init()
 				const fallback = !!renderer.backend?.isWebGLBackend
 				backend = fallback ? 'webgl-fallback' : 'webgpu'
@@ -301,9 +264,6 @@ export class Viewer {
 		renderer.shadowMap.enabled = p.has('shadows')
 		if (renderer.shadowMap.enabled) renderer.shadowMap.type = THREE.PCFSoftShadowMap
 		renderer.outputColorSpace = THREE.SRGBColorSpace
-		// vpinball: Renderer.cpp m_toneMapper=TM_AGX default, m_exposure from table (TWD NightDay 48 => 0.6 via m_globalEmissionScale)
-		// See src/renderer/Renderer.cpp:53 TM_AGX and pintable.cpp m_globalEmissionScale (NightDay/100 clamps 0.15-1)
-		// AgX + 0.6 exposure matches vpinball HDR->LDR for walking_dead (prevents blown highlights, keeps GI)
 		renderer.toneMapping = THREE.AgXToneMapping ?? THREE.ACESFilmicToneMapping
 		renderer.toneMappingExposure = 0.6
 		this.renderer = renderer
@@ -326,12 +286,10 @@ export class Viewer {
 		this.log(`Renderer ready: ${backend} (three r${THREE.REVISION})`)
 		return renderer
 	}
-
 	async _ensureRenderer() {
 		await this._rendererReady
 		return this.renderer
 	}
-
 	_onResize() {
 		const w = typeof window !== 'undefined' ? window.innerWidth : 800
 		const h = typeof window !== 'undefined' ? window.innerHeight : 600
@@ -341,8 +299,6 @@ export class Viewer {
 		this.renderer?.setSize(w, h)
 		this.dmd?._resize?.()
 	}
-
-	// Viewer / Play mode
 	_setupModeSwitch() {
 		const onOrbitToggle = e => {
 			if ((e.key === 'o' || e.key === 'O') && this.viewerMode === 'play') {
@@ -422,8 +378,6 @@ export class Viewer {
 			this._switchToPlay()
 		})
 	}
-
-	// Mode switching
 	async _switchToPlay() {
 		if (this.viewerMode === 'play' || !this.tableGroup) return
 		this.viewerMode = 'play'
@@ -442,7 +396,6 @@ export class Viewer {
 		} else if (this.table) await this._createPlayer()
 		else this.load().catch(e => this.log(`Play load failed: ${e.message}`, 'error'))
 	}
-
 	async _switchToViewer() {
 		if (this.viewerMode !== 'play' || !this.tableGroup) return
 		this.viewerMode = 'viewer'
@@ -455,39 +408,26 @@ export class Viewer {
 		if (this.player) this.player.setPhysicsEnabled(false)
 		this.exitPlayMode()
 	}
-
-	// Chrome / Camera
 	_syncChrome() {
 		const hint = document.getElementById('mode-hint')
 		const isPlay = this.viewerMode === 'play'
 		document.body.classList.toggle('is-play', isPlay)
 		renderModeHint(hint, isPlay)
 	}
-
 	setupPlayCamera() {
 		if (!this.tableGroup || !this.controls) return
-		try {
-			const state = computePlayFraming(this.tableGroup)
-			applyCameraState(this.camera, this.controls, state)
-			this._playCameraApplied = true
-		} catch (e) {
-			console.warn('setupPlayCamera', e)
-		}
+		const state = computePlayFraming(this.tableGroup)
+		applyCameraState(this.camera, this.controls, state)
+		this._playCameraApplied = true
 	}
-
-	// Camera animation
 	async _animateCameraTo(state, duration = CAM_ANIM.durationMode) {
 		if (!state || !this.controls) return
 		if (this._cameraRaf) {
-			try {
-				cancelAnimationFrame(this._cameraRaf)
-			} catch {}
+			cancelAnimationFrame(this._cameraRaf)
 			this._cameraRaf = null
 		}
 		if (this._cameraTimeout) {
-			try {
-				clearTimeout(this._cameraTimeout)
-			} catch {}
+			clearTimeout(this._cameraTimeout)
 			this._cameraTimeout = null
 		}
 		const fromPos = this.camera.position.clone()
@@ -541,20 +481,22 @@ export class Viewer {
 			this._cameraRaf = requestAnimationFrame(tick)
 		})
 	}
-
-	// Physics
 	_createPhysicsWorker() {
 		try {
-			if (this._physicsWorker)
-				try {
-					this._physicsWorker.terminate()
-				} catch {}
+			if (this._physicsWorker) this._physicsWorker.terminate()
 			const sab = createPhysicsSAB()
 			const scratch = new Float32Array(MAX_BALLS * BALL_STRIDE)
 			const workerUrl = new URL('../dist-esm/lib/game/physics.worker.js', import.meta.url)
-			const worker = new Worker(workerUrl, { type: 'module' })
-			worker.postMessage({ type: 'init', sab })
-			worker.postMessage({ type: 'start' })
+			const worker = new Worker(workerUrl, {
+				type: 'module',
+			})
+			worker.postMessage({
+				type: 'init',
+				sab,
+			})
+			worker.postMessage({
+				type: 'start',
+			})
 			worker.onmessage = e => {
 				if (e.data?.type === 'heartbeat')
 					this.log(`[physics-worker] heartbeat ${e.data.timeMsec} ticks ${e.data.tickCount}`, 'debug')
@@ -562,22 +504,23 @@ export class Viewer {
 			worker.onerror = e => {
 				this.log(`worker error ${e.message}`, 'warn')
 				this._physicsSab = null
-				try {
-					worker.terminate()
-				} catch {}
+				worker.terminate()
 				if (this._physicsWorker === worker) this._physicsWorker = null
 			}
 			this._physicsSab = sab
 			this._physicsScratch = scratch
 			this._physicsWorker = worker
-			return { sab, scratch, worker }
+			return {
+				sab,
+				scratch,
+				worker,
+			}
 		} catch (e) {
 			this.log(`physics worker init failed ${e.message}`, 'warn')
 			if (_isDev) console.warn(e)
 			return null
 		}
 	}
-
 	_ensurePhysicsWorker() {
 		if (this._physicsSab && this._physicsWorker) return true
 		if (!this.player) return false
@@ -586,23 +529,14 @@ export class Viewer {
 		this.log(`[physics] SAB ${res.sab.byteLength} worker started`, 'info')
 		return true
 	}
-	// Play state
 	enterPlayMode() {
 		if (this.controls) this.controls.enabled = false
-		try {
-			this._ensurePhysicsWorker()
-		} catch (e) {
-			if (_isDev) console.warn(e)
-		}
+		this._ensurePhysicsWorker()
 		if (this.tableGroup) hideCabFlippers(this.tableGroup)
-		try {
-			const bg = this.tableGroup?.getObjectByName('balls')
-			if (bg) bg.visible = true
-		} catch {}
+		const bg = this.tableGroup?.getObjectByName('balls')
+		if (bg) bg.visible = true
 		this._emitModeChange()
-		try {
-			this.dom.canvas?.focus()
-		} catch {}
+		this.dom.canvas?.focus()
 		this._scheduleAutoPlay()
 	}
 	exitPlayMode() {
@@ -611,17 +545,17 @@ export class Viewer {
 			this._autoPlayTimer = null
 		}
 		for (const code of this._touchMap.values()) {
-			try {
-				this.player?.onKeyUp({ code, key: code === 'Enter' ? 'Enter' : 'Shift', ts: Date.now() })
-			} catch {}
+			this.player?.onKeyUp({
+				code,
+				key: code === 'Enter' ? 'Enter' : 'Shift',
+				ts: Date.now(),
+			})
 		}
 		this._touchMap.clear()
 		if (this.controls) this.controls.enabled = true
 		if (this.tableGroup) showCabFlippers(this.tableGroup)
-		try {
-			const bg = this.tableGroup?.getObjectByName('balls')
-			if (bg) bg.visible = false
-		} catch {}
+		const bg = this.tableGroup?.getObjectByName('balls')
+		if (bg) bg.visible = false
 		this._emitModeChange()
 	}
 	_scheduleAutoPlay() {
@@ -637,31 +571,27 @@ export class Viewer {
 			const isPinmame = emu && !isMock
 			if (isPinmame) {
 				let running = false
-				try {
-					running = emu.isInitialized?.() && emu.api?.isRunning?.() === 1
-				} catch {}
+				running = emu.isInitialized?.() && emu.api?.isRunning?.() === 1
 				if (!running) {
 					if (attempt < 40) {
 						this._autoPlayTimer = setTimeout(() => attemptSend(attempt + 1), 500)
 						return
 					}
 				} else {
-					try {
-						const frame = this.player.getDmdFrame?.()
-						let sum = 0
-						if (frame?.length) for (let i = 0; i < Math.min(frame.length, 4096); i++) sum += frame[i] ?? 0
-						if (sum < 1000 && attempt < 40) {
+					const frame = this.player.getDmdFrame?.()
+					let sum = 0
+					if (frame?.length) for (let i = 0; i < Math.min(frame.length, 4096); i++) sum += frame[i] ?? 0
+					if (sum < 1000 && attempt < 40) {
+						this._autoPlayTimer = setTimeout(() => attemptSend(attempt + 1), 500)
+						return
+					}
+					if (attempt < 30) {
+						const dmdReady = sum > 50000
+						if (!dmdReady) {
 							this._autoPlayTimer = setTimeout(() => attemptSend(attempt + 1), 500)
 							return
 						}
-						if (attempt < 30) {
-							const dmdReady = sum > 50000
-							if (!dmdReady) {
-								this._autoPlayTimer = setTimeout(() => attemptSend(attempt + 1), 500)
-								return
-							}
-						}
-					} catch {}
+					}
 					if (attempt < 2) {
 						this._autoPlayTimer = setTimeout(() => attemptSend(attempt + 1), 1000)
 						return
@@ -676,30 +606,36 @@ export class Viewer {
 					}
 				}
 			}
-			try {
-				this.player.onKeyDown({ code: 'Digit5', key: '5', ts: Date.now() })
-				setTimeout(() => {
-					try {
-						this.player.onKeyUp({ code: 'Digit5', key: '5', ts: Date.now() })
-					} catch {}
-				}, 120)
-				setTimeout(() => {
-					try {
-						this.player.onKeyDown({ code: 'Digit1', key: '1', ts: Date.now() })
-					} catch {}
-				}, 380)
-				setTimeout(() => {
-					try {
-						this.player.onKeyUp({ code: 'Digit1', key: '1', ts: Date.now() })
-					} catch {}
-				}, 500)
-				this.log('Auto credit/start (5 → 1)', 'info')
-			} catch {}
+			this.player.onKeyDown({
+				code: 'Digit5',
+				key: '5',
+				ts: Date.now(),
+			})
+			setTimeout(() => {
+				this.player.onKeyUp({
+					code: 'Digit5',
+					key: '5',
+					ts: Date.now(),
+				})
+			}, 120)
+			setTimeout(() => {
+				this.player.onKeyDown({
+					code: 'Digit1',
+					key: '1',
+					ts: Date.now(),
+				})
+			}, 380)
+			setTimeout(() => {
+				this.player.onKeyUp({
+					code: 'Digit1',
+					key: '1',
+					ts: Date.now(),
+				})
+			}, 500)
+			this.log('Auto credit/start (5 → 1)', 'info')
 		}
 		this._autoPlayTimer = setTimeout(() => attemptSend(0), 900)
 	}
-
-	// Scene graph
 	buildNodeCache() {
 		this.nodeCache.clear()
 		if (!this.tableGroup || !this.table) return
@@ -712,44 +648,41 @@ export class Viewer {
 				continue
 			const item = this.table.items[name]
 			const node = this.tableGroup.getObjectByName(name) || this.tableGroup.getObjectByName(name.toLowerCase())
-			if (item?.getUpdater && node) this.nodeCache.set(name, { item, node })
+			if (item?.getUpdater && node)
+				this.nodeCache.set(name, {
+					item,
+					node,
+				})
 		}
 	}
-
 	handleBallLifecycle(ball, created) {
 		const ballsGroup = this.tableGroup?.getObjectByName('balls')
 		if (!ballsGroup || !ball) return
 		if (created) {
-			try {
-				const meshes = ball.getMeshes(this.table, this.renderApi, {})
-				const group = this.renderApi.createParentNode(ball.getName())
-				for (const obj of Object.values(meshes)) group.add(this.renderApi.createMesh(obj))
-				ballsGroup.add(group)
-				group.traverse(o => {
-					if (o.isMesh) {
-						o.castShadow = true
-						o.receiveShadow = false
-						o.frustumCulled = false
-					}
-				})
-				group.frustumCulled = false
-				this.nodeCache.set(ball.getName(), { item: ball, node: group })
-				try {
-					ball.getUpdater().applyState(group, ball.getState(), this.renderApi, this.table)
-				} catch (e) {
-					console.warn('ball initial state', e)
+			const meshes = ball.getMeshes(this.table, this.renderApi, {})
+			const group = this.renderApi.createParentNode(ball.getName())
+			for (const obj of Object.values(meshes)) group.add(this.renderApi.createMesh(obj))
+			ballsGroup.add(group)
+			group.traverse(o => {
+				if (o.isMesh) {
+					o.castShadow = true
+					o.receiveShadow = false
+					o.frustumCulled = false
 				}
-				if (this.viewerMode !== 'play') ballsGroup.visible = false
-			} catch (e) {
-				console.warn('ballCreated', e)
-			}
+			})
+			group.frustumCulled = false
+			this.nodeCache.set(ball.getName(), {
+				item: ball,
+				node: group,
+			})
+			ball.getUpdater().applyState(group, ball.getState(), this.renderApi, this.table)
+			if (this.viewerMode !== 'play') ballsGroup.visible = false
 		} else {
 			const entry = this.nodeCache.get(ball.getName())
 			if (entry?.node) ballsGroup.remove(entry.node)
 			this.nodeCache.delete(ball.getName())
 		}
 	}
-
 	applyChangedStates(changed) {
 		if (!changed || !this.tableGroup || !this.renderApi) {
 			changed?.release?.()
@@ -767,25 +700,27 @@ export class Viewer {
 				if (!node) node = this.tableGroup.getObjectByName(name)
 				const item = this.table.items[name] || this.player?.balls.find(b => b.getName() === name)
 				if (item?.getUpdater && node) {
-					entry = { item, node }
+					entry = {
+						item,
+						node,
+					}
 					this.nodeCache.set(name, entry)
 				}
 			}
 			if (!entry) continue
-			try {
-				entry.item.getUpdater().applyState(entry.node, state, this.renderApi, this.table)
-			} catch {}
+			entry.item.getUpdater().applyState(entry.node, state, this.renderApi, this.table)
 		}
 		changed.release()
 	}
-
-	// UI helpers
 	_emitModeChange() {
-		try {
-			document.dispatchEvent(new CustomEvent('viewer:modechange', { detail: { mode: this.viewerMode } }))
-		} catch {}
+		document.dispatchEvent(
+			new CustomEvent('viewer:modechange', {
+				detail: {
+					mode: this.viewerMode,
+				},
+			}),
+		)
 	}
-
 	log(msg, level = 'info') {
 		this.harnessLog?.(msg, level)
 	}
@@ -832,8 +767,6 @@ export class Viewer {
 		if (this.dom.subtitle) this.dom.subtitle.textContent = msg
 		if (this.dom.status) this.dom.status.textContent = msg
 	}
-
-	// Loading
 	async _loadTable(reader) {
 		logMem(this.harnessLog, 'after reader.open')
 		this._loading(66, 'Opening table…', 'Reading table data…')
@@ -841,11 +774,7 @@ export class Viewer {
 		const table = await Table.load(reader)
 		this.table = table
 		if (_isDev) window.table = table
-		try {
-			this._hasPinmame = !!cGameName(table)
-		} catch {
-			this._hasPinmame = false
-		}
+		this._hasPinmame = !!cGameName(table)
 		const dt = performance.now() - t0
 		this.log(
 			`Parsed in ${dt.toFixed(0)}ms — ${Object.keys(table.items).length} items, ${Object.keys(table.textures).length} textures`,
@@ -854,7 +783,6 @@ export class Viewer {
 		filterTextures(table, this.log.bind(this))
 		return table
 	}
-
 	async _buildScene(table) {
 		this._setStatus('')
 		this._loading(70, 'Building playfield…', 'Preparing visuals…')
@@ -870,11 +798,9 @@ export class Viewer {
 		this.renderApi = renderApi
 		if (_isDev) window.renderApi = renderApi
 		if (_isDev) window.textureLoader = texLoader
-		try {
-			const ballTex = await texLoader.loadDefaultTexture('ball.png', '.png', 'ball.png')
-			renderApi.getMapGenerator().getCache().set('ball.png', ballTex)
-			ballTex.name = 'texture:ball.png'
-		} catch {}
+		const ballTex = await texLoader.loadDefaultTexture('ball.png', '.png', 'ball.png')
+		renderApi.getMapGenerator().getCache().set('ball.png', ballTex)
+		ballTex.name = 'texture:ball.png'
 		await Promise.all(
 			[
 				'bumperbase.png',
@@ -887,12 +813,10 @@ export class Viewer {
 				'kickerT1.png',
 				'kickerWilliams.png',
 			].map(async nm => {
-				try {
-					const t = await texLoader.loadDefaultTexture(nm, '.png', nm)
-					renderApi.getMapGenerator().getCache().set(nm, t)
-					t.name = `texture:${nm}`
-					renderApi.getMapGenerator().getCache().set(nm.toLowerCase(), t)
-				} catch {}
+				const t = await texLoader.loadDefaultTexture(nm, '.png', nm)
+				renderApi.getMapGenerator().getCache().set(nm, t)
+				t.name = `texture:${nm}`
+				renderApi.getMapGenerator().getCache().set(nm.toLowerCase(), t)
 			}),
 		)
 		let textures = []
@@ -1016,114 +940,109 @@ export class Viewer {
 				)
 			this.log(`[stream] ${textures.length} textures pending — streaming`)
 		}
-		return { node, textures }
+		return {
+			node,
+			textures,
+		}
 	}
-
 	async _cleanupReader(reader) {
-		try {
-			if (reader.release) await reader.release()
-			else await reader.close()
-		} catch {}
-		try {
-			reader.data = undefined
-			reader.blob = undefined
-			if (window.gc) window.gc()
-		} catch {}
+		if (reader.release) await reader.release()
+		else await reader.close()
+		reader.data = undefined
+		reader.blob = undefined
+		if (window.gc) window.gc()
 		logMem(this.harnessLog, 'after reader release')
 	}
-
 	_clearRawTextures() {
-		try {
-			let n = 0
-			if (!this.table?.textures) return
-			for (const k of Object.keys(this.table.textures)) {
-				try {
-					this.table.textures[k].binary = undefined
-					this.table.textures[k].pdsBuffer = undefined
-					n++
-				} catch {}
-			}
-			// Keep entries but clear raw buffers; delete would break fast mode-switch, so just clear.
-			if (n) this.harnessLog?.(`[mem] Cleared ${n} raw texture buffers`, 'info')
-		} catch {}
+		let n = 0
+		if (!this.table?.textures) return
+		for (const k of Object.keys(this.table.textures)) {
+			this.table.textures[k].binary = undefined
+			this.table.textures[k].pdsBuffer = undefined
+			n++
+		}
+		if (n) this.harnessLog?.(`[mem] Cleared ${n} raw texture buffers`, 'info')
 	}
-
 	async _mount(table, node, opts = {}, source = null) {
 		if (this.tableGroup) this.scene.remove(this.tableGroup)
 		this.tableGroup = node
-		try {
-			this._tableBasePos = node.position.clone()
-		} catch {}
+		this._tableBasePos = node.position.clone()
 		this.scene.add(node)
-		const pp = postProcessScene(node, { viewerMode: this.viewerMode, harnessLog: this.harnessLog, table })
+		const pp = postProcessScene(node, {
+			viewerMode: this.viewerMode,
+			harnessLog: this.harnessLog,
+			table,
+		})
 		if (this.viewerMode === 'play') hideCabFlippers(node)
 		this.buildNodeCache()
-		try {
-			this.dmd._ensureTexture()
-			this.dmd.findMeshes()
-		} catch {}
+		this.dmd._ensureTexture()
+		this.dmd.findMeshes()
 		let framed
-		if (opts.skipCamera) framed = { center: this.controls.target.clone(), size: new THREE.Vector3(), maxDim: 1 }
+		if (opts.skipCamera)
+			framed = {
+				center: this.controls.target.clone(),
+				size: new THREE.Vector3(),
+				maxDim: 1,
+			}
 		else if (this.viewerMode === 'play') {
 			const state = computePlayFraming(this.tableGroup)
 			applyCameraState(this.camera, this.controls, state)
 			this._playCameraApplied = true
-			framed = { center: state.center, size: state.size, maxDim: state.maxDim }
+			framed = {
+				center: state.center,
+				size: state.size,
+				maxDim: state.maxDim,
+			}
 			this.harnessLog?.(
 				`[mount] play cam ${state.position.x.toFixed(0)},${state.position.y.toFixed(0)},${state.position.z.toFixed(0)} tgt ${state.target.x.toFixed(0)},${state.target.y.toFixed(0)},${state.target.z.toFixed(0)} maxDim ${state.maxDim.toFixed(0)}`,
 				'info',
 			)
 		} else framed = frameCamera(this.tableGroup, this.camera, this.controls)
-		try {
-			const center = framed.center,
-				size = framed.size || new THREE.Vector3(1, 1, 1)
-			let hasVr = false
-			node.traverse(o => {
-				if (o.isMesh && o.visible && o.name?.toLowerCase().includes('vr_')) hasVr = true
-			})
-			ensureProceduralRoom(this.scene, center, size, { hasVr })
-		} catch {}
+		const center = framed.center,
+			size = framed.size || new THREE.Vector3(1, 1, 1)
+		let hasVr = false
+		node.traverse(o => {
+			if (o.isMesh && o.visible && o.name?.toLowerCase().includes('vr_')) hasVr = true
+		})
+		ensureProceduralRoom(this.scene, center, size, {
+			hasVr,
+		})
 		this._showCanvas()
 		this.log(
 			`Framed ${pp.lightmaps ? `(hid ${pp.lightmaps} lm)` : ''} — ${this.tableGroup ? countObjects(this.tableGroup) : 0} objs`.trim(),
 		)
 		logMem(this.harnessLog, 'Ready — streaming textures')
 		this._emitModeChange()
-		try {
-			const gn = cGameName(table)
-			const src =
-				(opts && typeof opts.source === 'string' ? opts.source : null) ??
-				(typeof source === 'string' ? source : '')
-			const basename =
-				typeof src === 'string' && src
-					? src
-							.split('/')
-							.pop()
-							?.replace(/\.vpx$/i, '')
-					: ''
-			const rawGet = table?.getName?.()
-			const infoName = table?.info?.TableName?.trim()
-			let vpxName = ''
-			if (rawGet && rawGet !== 'Table' && rawGet !== 'Table1') vpxName = rawGet
-			else if (
-				infoName &&
-				infoName !== 'Table Name' &&
-				infoName !== 'Table1' &&
-				infoName.toLowerCase() !== 'table name'
-			)
-				vpxName = infoName
-			else if (basename) vpxName = basename.replace(/[_-]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
-			if (vpxName) setTitle(vpxName)
-			else if (gn) setTitle(gn)
-			if (gn) {
-				const romParam = new URLSearchParams(location.search).get('rom')
-				const candidates = romParam ? resolveRomCandidates(romParam) : [`/pinmame/roms/${gn}.zip`]
-				this.log(`PinMAME GameName: ${gn} — trying ${candidates.join(', ')}`)
-			}
-			if (this.dom.subtitle) this.dom.subtitle.textContent = ''
-		} catch (e) {
-			if (_isDev) console.warn('title/resolve failed', e)
+		const gn = cGameName(table)
+		const src =
+			(opts && typeof opts.source === 'string' ? opts.source : null) ?? (typeof source === 'string' ? source : '')
+		const basename =
+			typeof src === 'string' && src
+				? src
+						.split('/')
+						.pop()
+						?.replace(/\.vpx$/i, '')
+				: ''
+		const rawGet = table?.getName?.()
+		const infoName = table?.info?.TableName?.trim()
+		let vpxName = ''
+		if (rawGet && rawGet !== 'Table' && rawGet !== 'Table1') vpxName = rawGet
+		else if (
+			infoName &&
+			infoName !== 'Table Name' &&
+			infoName !== 'Table1' &&
+			infoName.toLowerCase() !== 'table name'
+		)
+			vpxName = infoName
+		else if (basename) vpxName = basename.replace(/[_-]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+		if (vpxName) setTitle(vpxName)
+		else if (gn) setTitle(gn)
+		if (gn) {
+			const romParam = new URLSearchParams(location.search).get('rom')
+			const candidates = romParam ? resolveRomCandidates(romParam) : [`/pinmame/roms/${gn}.zip`]
+			this.log(`PinMAME GameName: ${gn} — trying ${candidates.join(', ')}`)
 		}
+		if (this.dom.subtitle) this.dom.subtitle.textContent = ''
 		if (!opts.skipPlayer) {
 			this._loading(92, 'Almost ready…', 'Starting game logic…')
 			await new Promise(r => setTimeout(r, 0))
@@ -1139,113 +1058,97 @@ export class Viewer {
 		} else {
 			this._loading(88, 'Finishing up…', 'Finishing up…')
 		}
-		if (_isDev) Object.assign(window, { table, tableGroup: node, player: this.player })
-		try {
-			buildBvhIdle(node)
-		} catch (e) {
-			if (_isDev) console.warn('buildBvhIdle failed', e)
-		}
-		this.startLoop()
-		return { loaded: table, node, pp, framed }
-	}
-
-	async _createPlayer() {
-		try {
-			if (this.player)
-				try {
-					this.player.removeAllListeners?.()
-				} catch {}
-			this.player = new Player(this.table, (this.gate ??= new AnimationGate()))
-			this.player.setPhysicsEnabled(this.viewerMode === 'play')
-			const p = this.player
-			if (typeof p.initAsync === 'function') await p.initAsync()
-			else this.player.init()
-			this.nodeCache.clear()
-			this.buildNodeCache()
-			try {
-				let ballsGroup = this.tableGroup?.getObjectByName('balls')
-				if (!ballsGroup && this.tableGroup && this.renderApi) {
-					ballsGroup = this.renderApi.createParentNode('balls')
-					this.tableGroup.add(ballsGroup)
-				}
-				for (const b of this.player.balls) this.handleBallLifecycle(b, true)
-				try {
-					if (ballsGroup) ballsGroup.visible = this.viewerMode === 'play'
-				} catch {}
-				try {
-					this.player.updateAnimations(this.player.getGameTime() ?? this.player.getPhysics().timeMsec ?? 0)
-				} catch {}
-				const init = this.player.popStates()
-				this.applyChangedStates(init)
-				// viewer mode no longer spawns a debug ball — playfield should be empty
-			} catch (e) {
-				console.warn('init balls/states', e)
-			}
-			this.player.on('ballCreated', b => this.handleBallLifecycle(b, true))
-			this.player.on('ballDestroyed', b => this.handleBallLifecycle(b, false))
-			this.player.on('emuStarted', () => {
-				this._emuStartLogged = true
-				this.log(`PinMAME emu ready: ${this.player.getPhysics().emu?.constructor.name}`)
+		if (_isDev)
+			Object.assign(window, {
+				table,
+				tableGroup: node,
+				player: this.player,
 			})
-			let tries = 0
-			const fallback = async () => {
-				try {
-					let emu = this.player.getPhysics().emu
-					if (emu) {
-						this.log(
-							`Emu after init: ${emu.constructor.name} init=${emu.isInitialized?.()} mock=${emu.isMock} run=${(() => {
-								try {
-									return emu.api?.isRunning?.()
-								} catch {
-									return '?'
-								}
-							})()}`,
-						)
-						return
-					}
-					if (++tries < 10) {
-						setTimeout(fallback, 1000)
-						return
-					}
-					const gn = cGameName(this.table)
-					if (!gn) return
-					this.log(`PinMAME: no emu yet for ${gn} — trying manual fallback`, 'warn')
-					const { VpmController } = await import('../dist-esm/lib/scripting/objects/vpm-controller.js')
-					if (this.player.getPhysics().emu) return
-					const vpm = new VpmController(this.player)
-					vpm.GameName = gn
-					await vpm.whenReady()
-					emu = this.player.getPhysics().emu
-					if (emu) {
-						this._emuStartLogged = true
-						this.log(`PinMAME fallback emu ready: ${emu.constructor.name} init=${emu.isInitialized()}`)
-						this.dmd._ensureTexture()
-						this.dmd.findMeshes()
-					}
-				} catch (e) {
-					this.log(`PinMAME fallback failed: ${e.message}`, 'warn')
-				}
-			}
-			setTimeout(fallback, 3000)
-			this.log('Player init OK')
-			this.isPaused = false
-			this.hookInput()
-			if (this.viewerMode === 'play') this.enterPlayMode()
-			else this.exitPlayMode()
-		} catch (e) {
-			this.log(`Player init failed:${e.message}`, 'error')
-			console.error(e)
+		buildBvhIdle(node)
+		this.startLoop()
+		return {
+			loaded: table,
+			node,
+			pp,
+			framed,
 		}
 	}
-
-	// Streaming
+	async _createPlayer() {
+		if (this.player) this.player.removeAllListeners?.()
+		this.player = new Player(this.table, (this.gate ??= new AnimationGate()))
+		this.player.setPhysicsEnabled(this.viewerMode === 'play')
+		const p = this.player
+		if (typeof p.initAsync === 'function') await p.initAsync()
+		else this.player.init()
+		this.nodeCache.clear()
+		this.buildNodeCache()
+		let ballsGroup = this.tableGroup?.getObjectByName('balls')
+		if (!ballsGroup && this.tableGroup && this.renderApi) {
+			ballsGroup = this.renderApi.createParentNode('balls')
+			this.tableGroup.add(ballsGroup)
+		}
+		for (const b of this.player.balls) this.handleBallLifecycle(b, true)
+		if (ballsGroup) ballsGroup.visible = this.viewerMode === 'play'
+		this.player.updateAnimations(this.player.getGameTime() ?? this.player.getPhysics().timeMsec ?? 0)
+		const init = this.player.popStates()
+		this.applyChangedStates(init)
+		this.player.on('ballCreated', b => this.handleBallLifecycle(b, true))
+		this.player.on('ballDestroyed', b => this.handleBallLifecycle(b, false))
+		this.player.on('emuStarted', () => {
+			this._emuStartLogged = true
+			this.log(`PinMAME emu ready: ${this.player.getPhysics().emu?.constructor.name}`)
+		})
+		let tries = 0
+		const fallback = async () => {
+			try {
+				let emu = this.player.getPhysics().emu
+				if (emu) {
+					this.log(
+						`Emu after init: ${emu.constructor.name} init=${emu.isInitialized?.()} mock=${emu.isMock} run=${(() => {
+							try {
+								return emu.api?.isRunning?.()
+							} catch {
+								return '?'
+							}
+						})()}`,
+					)
+					return
+				}
+				if (++tries < 10) {
+					setTimeout(fallback, 1000)
+					return
+				}
+				const gn = cGameName(this.table)
+				if (!gn) return
+				this.log(`PinMAME: no emu yet for ${gn} — trying manual fallback`, 'warn')
+				const { VpmController } = await import('../dist-esm/lib/scripting/objects/vpm-controller.js')
+				if (this.player.getPhysics().emu) return
+				const vpm = new VpmController(this.player)
+				vpm.GameName = gn
+				await vpm.whenReady()
+				emu = this.player.getPhysics().emu
+				if (emu) {
+					this._emuStartLogged = true
+					this.log(`PinMAME fallback emu ready: ${emu.constructor.name} init=${emu.isInitialized()}`)
+					this.dmd._ensureTexture()
+					this.dmd.findMeshes()
+				}
+			} catch (e) {
+				this.log(`PinMAME fallback failed: ${e.message}`, 'warn')
+			}
+		}
+		setTimeout(fallback, 3000)
+		this.log('Player init OK')
+		this.isPaused = false
+		this.hookInput()
+		if (this.viewerMode === 'play') this.enterPlayMode()
+		else this.exitPlayMode()
+	}
 	_streamTextures(table, textures, reader) {
 		if (!textures?.length) {
 			if (reader) void this._cleanupReader(reader).catch(() => {})
 			if (this.viewerMode !== 'play') {
-				try {
-					this._clearRawTextures?.()
-				} catch {}
+				this._clearRawTextures?.()
 			}
 			return
 		}
@@ -1260,104 +1163,92 @@ export class Viewer {
 			this.log(`[stream] Streaming ${total} textures…`)
 			let scheduled = false
 			const patchCloned = () => {
-				try {
-					const cache = this.renderApi.getMapGenerator?.().getCache?.()
-					if (!cache || !this.tableGroup) return 0
-					let fixed = 0
-					this.tableGroup.traverse(o => {
-						if (!o.isMesh || !o.material) return
-						const mats = Array.isArray(o.material) ? o.material : [o.material]
-						for (const m of mats) {
-							for (const k of ['map', 'normalMap', 'envMap', 'emissiveMap']) {
-								const pk = `pending${k[0].toUpperCase()}${k.slice(1)}`
-								const name = m.userData?.[pk]
-								if (!name) continue
-								let tex = cache.get(name)
-								if (!tex) {
-									for (const [ck, cv] of cache)
-										if (ck.toLowerCase() === String(name).toLowerCase()) {
-											tex = cv
-											break
-										}
-								}
-								if (!tex) continue
-								m[k] = tex
-								try {
-									tex.name = name
-								} catch {}
-								delete m.userData[pk]
-								m.needsUpdate = true
-								if (k === 'map') {
-									const info = isBakedMeshByNames(o.name || '', m.name || '', tex.name || '')
-									if (info.isBaked) {
-										try {
-											applyBakedMaterial(m, tex, info, o.name || '')
-										} catch {}
-										const isPlayfieldOverlay =
-											info.isVlmBake &&
-											!info.isMainBake &&
-											(o.name || '').toLowerCase().includes('playfield')
-										if (
-											(info.isMainBake || isPlayfieldOverlay) &&
-											o.visible === false &&
-											(o.name || '').toLowerCase().includes('playfield')
-										) {
-											o.visible = true
-											for (let p = o.parent; p && p !== this.tableGroup; p = p.parent)
-												if (p.visible === false) p.visible = true
-										}
+				const cache = this.renderApi.getMapGenerator?.().getCache?.()
+				if (!cache || !this.tableGroup) return 0
+				let fixed = 0
+				this.tableGroup.traverse(o => {
+					if (!o.isMesh || !o.material) return
+					const mats = Array.isArray(o.material) ? o.material : [o.material]
+					for (const m of mats) {
+						for (const k of ['map', 'normalMap', 'envMap', 'emissiveMap']) {
+							const pk = `pending${k[0].toUpperCase()}${k.slice(1)}`
+							const name = m.userData?.[pk]
+							if (!name) continue
+							let tex = cache.get(name)
+							if (!tex) {
+								for (const [ck, cv] of cache)
+									if (ck.toLowerCase() === String(name).toLowerCase()) {
+										tex = cv
+										break
+									}
+							}
+							if (!tex) continue
+							m[k] = tex
+							tex.name = name
+							delete m.userData[pk]
+							m.needsUpdate = true
+							if (k === 'map') {
+								const info = isBakedMeshByNames(o.name || '', m.name || '', tex.name || '')
+								if (info.isBaked) {
+									applyBakedMaterial(m, tex, info, o.name || '')
+									const isPlayfieldOverlay =
+										info.isVlmBake &&
+										!info.isMainBake &&
+										(o.name || '').toLowerCase().includes('playfield')
+									if (
+										(info.isMainBake || isPlayfieldOverlay) &&
+										o.visible === false &&
+										(o.name || '').toLowerCase().includes('playfield')
+									) {
+										o.visible = true
+										for (let p = o.parent; p && p !== this.tableGroup; p = p.parent)
+											if (p.visible === false) p.visible = true
 									}
 								}
-								fixed++
 							}
+							fixed++
 						}
+					}
+				})
+				if (fixed) {
+					let hasReadyBake = false
+					this.tableGroup.traverse(o2 => {
+						if (!o2.isMesh) return
+						const n2 = o2.name || '',
+							m2 = Array.isArray(o2.material) ? o2.material[0] : o2.material
+						if (!m2?.map) return
+						if (!n2.toLowerCase().includes('playfield') && !n2.toLowerCase().includes('bm_')) return
+						const info = isBakedMeshByNames(n2, m2.name || '', m2.map?.name || '')
+						if (info.isBaked) hasReadyBake = true
 					})
-					if (fixed) {
-						let hasReadyBake = false
+					if (hasReadyBake) {
 						this.tableGroup.traverse(o2 => {
-							if (!o2.isMesh) return
-							const n2 = o2.name || '',
-								m2 = Array.isArray(o2.material) ? o2.material[0] : o2.material
-							if (!m2?.map) return
-							if (!n2.toLowerCase().includes('playfield') && !n2.toLowerCase().includes('bm_')) return
-							const info = isBakedMeshByNames(n2, m2.name || '', m2.map?.name || '')
-							if (info.isBaked) hasReadyBake = true
-						})
-						if (hasReadyBake) {
-							this.tableGroup.traverse(o2 => {
-								if (!o2.isMesh || !o2.visible || !(o2.name || '').toLowerCase().includes('playfield'))
-									return
-								const m2 = Array.isArray(o2.material) ? o2.material[0] : o2.material
-								if (!m2) return
-								const info = isBakedMeshByNames(o2.name || '', m2.name || '', m2.map?.name || '')
-								if (!info.isBaked && !info.isMainBake && !info.isVlmBake) {
-									o2.visible = false
-									try {
-										o2.geometry?.dispose?.()
-									} catch {}
-								}
-							})
-						}
-						// ensure baked playfield is visible after streaming (fix depthBias dedup / pending hide)
-						this.tableGroup.traverse(o2 => {
-							if (!o2.isMesh) return
-							const n2 = (o2.name || '').toLowerCase()
-							if (!n2.includes('playfield')) return
+							if (!o2.isMesh || !o2.visible || !(o2.name || '').toLowerCase().includes('playfield'))
+								return
 							const m2 = Array.isArray(o2.material) ? o2.material[0] : o2.material
-							if (!m2?.map) return
-							const info2 = isBakedMeshByNames(n2, m2.name || '', m2.map?.name || '')
-							if ((info2.isMainBake || (info2.isVlmBake && !info2.isMainBake)) && o2.visible === false) {
-								o2.visible = true
-								for (let p = o2.parent; p && p !== this.tableGroup; p = p.parent)
-									if (p.visible === false) p.visible = true
+							if (!m2) return
+							const info = isBakedMeshByNames(o2.name || '', m2.name || '', m2.map?.name || '')
+							if (!info.isBaked && !info.isMainBake && !info.isVlmBake) {
+								o2.visible = false
+								o2.geometry?.dispose?.()
 							}
 						})
 					}
-
-					return fixed
-				} catch {
-					return 0
+					this.tableGroup.traverse(o2 => {
+						if (!o2.isMesh) return
+						const n2 = (o2.name || '').toLowerCase()
+						if (!n2.includes('playfield')) return
+						const m2 = Array.isArray(o2.material) ? o2.material[0] : o2.material
+						if (!m2?.map) return
+						const info2 = isBakedMeshByNames(n2, m2.name || '', m2.map?.name || '')
+						if ((info2.isMainBake || (info2.isVlmBake && !info2.isMainBake)) && o2.visible === false) {
+							o2.visible = true
+							for (let p = o2.parent; p && p !== this.tableGroup; p = p.parent)
+								if (p.visible === false) p.visible = true
+						}
+					})
 				}
+				return fixed
 			}
 			const schedulePatch = () => {
 				if (scheduled) return
@@ -1365,12 +1256,8 @@ export class Viewer {
 				queueMicrotask(() => {
 					scheduled = false
 					if (this._streamId !== streamId) return
-					try {
-						this.renderApi.getMaterialGenerator?.().resolvePendingTextures?.()
-					} catch {}
-					try {
-						patchCloned()
-					} catch {}
+					this.renderApi.getMaterialGenerator?.().resolvePendingTextures?.()
+					patchCloned()
 				})
 			}
 			const onTexture = (_tex, _ok) => {
@@ -1379,100 +1266,75 @@ export class Viewer {
 				schedulePatch()
 				if (done % 2 === 0 || done === total) this._setStreamProgress(done, total)
 			}
-			try {
-				await this.renderApi.preloadTextures(textures, table, onTexture)
-				if (this._streamId !== streamId) return
-				const fixed = this.renderApi.getMaterialGenerator?.().resolvePendingTextures?.() ?? 0
-				const fixed2 = patchCloned()
-				if (fixed || fixed2)
-					this.log(`[stream] Patched ${fixed + fixed2} materials (${fixed} cached + ${fixed2} cloned)`)
-				const tm = computeTexMem(this.tableGroup)
-				this.log(
-					`[stream] Done ${done}/${total} in ${(performance.now() - t0) | 0}ms — now ${tm.texCount} ~${tm.texMemMB} MB`,
-				)
-				this._setStreamProgress(total, total)
-				if (this.dom.streamLabel) this.dom.streamLabel.textContent = 'Visuals ready'
-				setTimeout(() => this._hideStream(), 1200)
-				logMem(this.harnessLog, 'Stream ready')
-			} catch (e) {
-				if (this._streamId !== streamId) return
-				this.log(`[stream] failed: ${e.message}`, 'warn')
-				this._hideStream()
-			} finally {
-				if (reader) {
-					try {
-						await this._cleanupReader(reader)
-					} catch {}
-				}
-				if (this.viewerMode !== 'play') {
-					try {
-						this._clearRawTextures?.()
-					} catch {}
-				}
+			await this.renderApi.preloadTextures(textures, table, onTexture)
+			if (this._streamId !== streamId) return
+			const fixed = this.renderApi.getMaterialGenerator?.().resolvePendingTextures?.() ?? 0
+			const fixed2 = patchCloned()
+			if (fixed || fixed2)
+				this.log(`[stream] Patched ${fixed + fixed2} materials (${fixed} cached + ${fixed2} cloned)`)
+			const tm = computeTexMem(this.tableGroup)
+			this.log(
+				`[stream] Done ${done}/${total} in ${(performance.now() - t0) | 0}ms — now ${tm.texCount} ~${tm.texMemMB} MB`,
+			)
+			this._setStreamProgress(total, total)
+			if (this.dom.streamLabel) this.dom.streamLabel.textContent = 'Visuals ready'
+			setTimeout(() => this._hideStream(), 1200)
+			logMem(this.harnessLog, 'Stream ready')
+			if (reader) {
+				await this._cleanupReader(reader)
+			}
+			if (this.viewerMode !== 'play') {
+				this._clearRawTextures?.()
 			}
 		})()
 	}
-
 	async _waitForPinmame(timeout = 45000) {
 		if (!this._hasPinmame) return true
 		this.log(`[wait] PinMAME wait up to ${timeout}ms — throttling render`)
 		const start = performance.now()
 		while (performance.now() - start < timeout) {
-			try {
-				const emu = this.player?.getPhysics?.()?.emu
-				if (emu?.isMock) return true
-				if (emu?.api?.isRunning?.() === 1) {
-					this.log(`[wait] isRunning=1 after ${(performance.now() - start) | 0}ms`)
-					return true
-				}
-			} catch {}
+			const emu = this.player?.getPhysics?.()?.emu
+			if (emu?.isMock) return true
+			if (emu?.api?.isRunning?.() === 1) {
+				this.log(`[wait] isRunning=1 after ${(performance.now() - start) | 0}ms`)
+				return true
+			}
 			await new Promise(r => setTimeout(r, 200))
 		}
-		try {
-			const emu = this.player?.getPhysics?.()?.emu
-			this.log(`[wait] timeout ${timeout}ms isRunning=${emu?.api?.isRunning?.()} init=${emu?.isInitialized?.()}`)
-		} catch {}
+		const emu = this.player?.getPhysics?.()?.emu
+		this.log(`[wait] timeout ${timeout}ms isRunning=${emu?.api?.isRunning?.()} init=${emu?.isInitialized?.()}`)
 		return false
 	}
-
 	async _fromReader(reader, source) {
-		try {
-			setTitle(
-				typeof source === 'string'
-					? source
-							.split('/')
-							.pop()
-							?.replace(/\.vpx$/i, '')
-					: '',
-			)
-			this._loading(62, 'Opening table…', 'Reading table data…')
-			const table = await this._loadTable(reader)
-			const { node, textures } = await this._buildScene(table)
-			const mounted = await this._mount(table, node, {}, source)
-			const ok = await this._waitForPinmame(5000)
-			this.log(`[wait] done ok=${ok} streaming ${textures.length}`)
-			this._streamTextures(table, textures, reader)
-			return mounted
-		} catch (err) {
-			this.log(`Failed: ${err.stack || err.message}`, 'error')
-			console.error(err)
-			this._loading(0, 'Failed to load', err.message)
-			throw err
-		}
+		setTitle(
+			typeof source === 'string'
+				? source
+						.split('/')
+						.pop()
+						?.replace(/\.vpx$/i, '')
+				: '',
+		)
+		this._loading(62, 'Opening table…', 'Reading table data…')
+		const table = await this._loadTable(reader)
+		const { node, textures } = await this._buildScene(table)
+		const mounted = await this._mount(table, node, {}, source)
+		const ok = await this._waitForPinmame(5000)
+		this.log(`[wait] done ok=${ok} streaming ${textures.length}`)
+		this._streamTextures(table, textures, reader)
+		return mounted
 	}
-
-	// Public API
 	async load() {
 		await this._ensureRenderer()
 		if (this.dom.loading) this.dom.loading.hidden = false
 		if (this.dom.wrap) this.dom.wrap.hidden = false
-		try {
-			const _w = typeof window !== 'undefined' ? window.innerWidth : 800
-			const _h = typeof window !== 'undefined' ? window.innerHeight : 600
-			this.renderer?.setSize(_w, _h)
-		} catch {}
+		const _w = typeof window !== 'undefined' ? window.innerWidth : 800
+		const _h = typeof window !== 'undefined' ? window.innerHeight : 600
+		this.renderer?.setSize(_w, _h)
 		this._loading(2, 'Getting ready…', 'Looking for table…')
-		const candidates = resolveVpxCandidates({ defaultName: this.defaultVpx, queryParam: this.queryParam })
+		const candidates = resolveVpxCandidates({
+			defaultName: this.defaultVpx,
+			queryParam: this.queryParam,
+		})
 		if (!candidates.length) {
 			this.log('No VPX candidate (pass ?vpx=name)', 'warn')
 			return
@@ -1514,7 +1376,6 @@ export class Viewer {
 		}
 		throw new Error(`Failed: none of ${candidates.join(', ')}`)
 	}
-
 	async loadFromFile(file) {
 		this._loading(5, 'Reading file…', `Reading ${file.name}…`)
 		this.log(`Reading ${file.name}…`)
@@ -1522,61 +1383,39 @@ export class Viewer {
 		await reader.open()
 		return this._fromReader(reader, file.name)
 	}
-
 	async loadRomFile(file) {
-		try {
-			const buf = new Uint8Array(await file.arrayBuffer())
-			window.__pendingRom = buf
-			window.__pendingRomName = file.name.replace(/\.zip$/i, '')
-			this.log(`ROM file ${file.name} ${fmtBytes(buf.length)} — stored`)
-			return buf
-		} catch (e) {
-			this.log(`loadRomFile failed: ${e.message}`, 'error')
-			throw e
-		}
+		const buf = new Uint8Array(await file.arrayBuffer())
+		window.__pendingRom = buf
+		window.__pendingRomName = file.name.replace(/\.zip$/i, '')
+		this.log(`ROM file ${file.name} ${fmtBytes(buf.length)} — stored`)
+		return buf
 	}
-
 	async preloadRom(url) {
-		try {
-			this.log(`Preloading ROM ${url}…`)
-			const data = await fetchWithProgress(url, p => this.setBar(5 + p * 40, `ROM ${(p * 100).toFixed(0)}%`))
-			window.__pendingRom = data
-			window.__pendingRomName =
-				url
-					.split('/')
-					.pop()
-					?.replace(/\.zip$/i, '') || ''
-			window.__pendingRomUrl = url
-			this.log(`ROM preload OK ${fmtBytes(data.length)}`)
-			return data
-		} catch (e) {
-			this.log(`ROM preload failed: ${e.message}`, 'error')
-			throw e
-		}
+		this.log(`Preloading ROM ${url}…`)
+		const data = await fetchWithProgress(url, p => this.setBar(5 + p * 40, `ROM ${(p * 100).toFixed(0)}%`))
+		window.__pendingRom = data
+		window.__pendingRomName =
+			url
+				.split('/')
+				.pop()
+				?.replace(/\.zip$/i, '') || ''
+		window.__pendingRomUrl = url
+		this.log(`ROM preload OK ${fmtBytes(data.length)}`)
+		return data
 	}
-
-	// Render loop
 	async startLoop() {
 		await this._ensureRenderer()
 		if (this._disposed) return
 		if (this.animFrame) {
-			try {
-				cancelAnimationFrame(this.animFrame)
-			} catch {}
-			try {
-				clearTimeout(this.animFrame)
-			} catch {}
+			cancelAnimationFrame(this.animFrame)
+			clearTimeout(this.animFrame)
 		}
 		if (this._animRaf) {
-			try {
-				cancelAnimationFrame(this._animRaf)
-			} catch {}
+			cancelAnimationFrame(this._animRaf)
 			this._animRaf = null
 		}
 		if (this._animTimeout) {
-			try {
-				clearTimeout(this._animTimeout)
-			} catch {}
+			clearTimeout(this._animTimeout)
 			this._animTimeout = null
 		}
 		let last = performance.now(),
@@ -1587,29 +1426,17 @@ export class Viewer {
 			if (!this._hasPinmame) return false
 			const emu = this.player?.getPhysics?.()?.emu
 			if (!emu || emu.isMock || !emu.isInitialized?.()) return false
-			try {
-				return emu.api?.isRunning?.() === 0
-			} catch {
-				return false
-			}
+			return emu.api?.isRunning?.() === 0
 		}
 		if (this.player && (!this._physicsSab || !this._physicsWorker)) {
-			try {
-				const res = this._createPhysicsWorker()
-				if (res) this.log(`[physics] SAB ${res.sab.byteLength} worker started`, 'info')
-			} catch (e) {
-				if (_isDev) console.warn('physics worker start failed', e)
-			}
+			const res = this._createPhysicsWorker()
+			if (res) this.log(`[physics] SAB ${res.sab.byteLength} worker started`, 'info')
 		} else if (this._physicsSab) {
 			this.log(`[physics] reusing SAB ${this._physicsSab.byteLength}`, 'debug')
 		}
 		const tickPhysics = now => {
 			if (!this.player || this.isPaused) return
-			try {
-				if (this._physicsSab && this._physicsScratch) trySnap(this._physicsSab, this._physicsScratch)
-			} catch (e) {
-				if (_isDev) console.warn('trySnap failed', e)
-			}
+			if (this._physicsSab && this._physicsScratch) trySnap(this._physicsSab, this._physicsScratch)
 			this.player.setPhysicsEnabled(this.viewerMode === 'play')
 			this.player.updatePhysics(now)
 			this.player.updateAnimations(this.player.getGameTime())
@@ -1638,16 +1465,8 @@ export class Viewer {
 			if (this.controls?.enabled) this.controls.update()
 			tickPhysics(now)
 			this._pollPinmame()
-			try {
-				this._applyNudgeVisual()
-			} catch (e) {
-				if (_isDev) console.warn('_applyNudgeVisual', e)
-			}
-			try {
-				this.renderer.render(this.scene, this.camera)
-			} catch (e) {
-				if (_isDev) console.warn('render', e)
-			}
+			this._applyNudgeVisual()
+			this.renderer.render(this.scene, this.camera)
 			frames++
 			const now2 = performance.now()
 			if (now2 - last > 500) {
@@ -1673,9 +1492,7 @@ export class Viewer {
 				const tFmt = t ? `${(t / 1000).toFixed(1)}s` : '—'
 				const emuLabel = emuStat ? `${emuRaw} · ${emuStat}` : emuRaw
 				let wasmReady = false
-				try {
-					wasmReady = isWasmReady()
-				} catch {}
+				wasmReady = isWasmReady()
 				const wasmLabel = wasmReady ? 'Ready' : 'Loading…'
 				renderStats(this.dom.stats, {
 					fps,
@@ -1695,8 +1512,6 @@ export class Viewer {
 		}
 		loop()
 	}
-
-	// DMD / Nudge visuals
 	_pollPinmame() {
 		if (!this._emuStartLogged) {
 			const emu = this.player?.getPhysics()?.emu
@@ -1707,132 +1522,110 @@ export class Viewer {
 		}
 		this.dmd.render()
 	}
-
 	_applyNudgeVisual() {
 		if (!this.tableGroup || !this.player || this.viewerMode !== 'play') return
-		try {
-			const phys = this.player.getPhysics?.()
-			if (!phys) return
-			if (!this._tableBasePos) {
-				try {
-					this._tableBasePos = this.tableGroup.position.clone()
-				} catch {
-					this._tableBasePos = new THREE.Vector3()
+		const phys = this.player.getPhysics?.()
+		if (!phys) return
+		if (!this._tableBasePos) {
+			this._tableBasePos = this.tableGroup.position.clone()
+		}
+		const base = this._tableBasePos
+		const off = phys.getCabinetOffset?.()
+		const acc = phys.getCabinetAcceleration?.()
+		const hasOff = off && (Math.abs(off.x) > 1e-4 || Math.abs(off.y) > 1e-4)
+		const hasAcc = acc && (Math.abs(acc.x) > 1e-3 || Math.abs(acc.y) > 1e-3)
+		if (!hasOff && !hasAcc) {
+			if (this.tableGroup.userData._nudgeApplied) {
+				this.tableGroup.position.x += (base.x - this.tableGroup.position.x) * 0.15
+				this.tableGroup.position.y += (base.y - this.tableGroup.position.y) * 0.15
+				if (Math.hypot(this.tableGroup.position.x - base.x, this.tableGroup.position.y - base.y) < 0.01) {
+					this.tableGroup.position.x = base.x
+					this.tableGroup.position.y = base.y
+					this.tableGroup.userData._nudgeApplied = false
 				}
 			}
-			const base = this._tableBasePos
-			const off = phys.getCabinetOffset?.()
-			const acc = phys.getCabinetAcceleration?.()
-			const hasOff = off && (Math.abs(off.x) > 1e-4 || Math.abs(off.y) > 1e-4)
-			const hasAcc = acc && (Math.abs(acc.x) > 1e-3 || Math.abs(acc.y) > 1e-3)
-			if (!hasOff && !hasAcc) {
-				if (this.tableGroup.userData._nudgeApplied) {
-					this.tableGroup.position.x += (base.x - this.tableGroup.position.x) * 0.15
-					this.tableGroup.position.y += (base.y - this.tableGroup.position.y) * 0.15
-					if (Math.hypot(this.tableGroup.position.x - base.x, this.tableGroup.position.y - base.y) < 0.01) {
-						this.tableGroup.position.x = base.x
-						this.tableGroup.position.y = base.y
-						this.tableGroup.userData._nudgeApplied = false
-					}
-				}
-				try {
-					const wrap = document.getElementById('canvas-wrap')
-					if (wrap) {
-						wrap.classList.remove('is-nudging')
-						wrap.style.removeProperty('--nudge-transform')
-					}
-				} catch {}
-				return
+			const wrap = document.getElementById('canvas-wrap')
+			if (wrap) {
+				wrap.classList.remove('is-nudging')
+				wrap.style.removeProperty('--nudge-transform')
 			}
-			const ampOff = 110
-			const ampAcc = 0.22
-			const tx = (off?.x ?? 0) * ampOff + (acc?.x ?? 0) * ampAcc
-			const ty = (off?.y ?? 0) * ampOff + (acc?.y ?? 0) * ampAcc
-			const scaleX = Math.max(-6, Math.min(6, tx))
-			const scaleY = Math.max(-6, Math.min(6, -ty * 0.6))
-			this.tableGroup.position.x = base.x + scaleX
-			this.tableGroup.position.y = base.y + scaleY
-			this.tableGroup.userData._nudgeApplied = true
-			try {
-				const wrap = document.getElementById('canvas-wrap')
-				if (wrap) {
-					const shake = Math.hypot(scaleX, scaleY)
-					if (shake > 0.05) {
-						wrap.style.setProperty('--nudge-transform', `translate(${scaleX * 0.6}px, ${scaleY * 0.6}px)`)
-						wrap.classList.add('is-nudging')
-					} else {
-						wrap.classList.remove('is-nudging')
-						wrap.style.removeProperty('--nudge-transform')
-					}
-				}
-			} catch {}
-		} catch {}
+			return
+		}
+		const ampOff = 110
+		const ampAcc = 0.22
+		const tx = (off?.x ?? 0) * ampOff + (acc?.x ?? 0) * ampAcc
+		const ty = (off?.y ?? 0) * ampOff + (acc?.y ?? 0) * ampAcc
+		const scaleX = Math.max(-6, Math.min(6, tx))
+		const scaleY = Math.max(-6, Math.min(6, -ty * 0.6))
+		this.tableGroup.position.x = base.x + scaleX
+		this.tableGroup.position.y = base.y + scaleY
+		this.tableGroup.userData._nudgeApplied = true
+		const wrap = document.getElementById('canvas-wrap')
+		if (wrap) {
+			const shake = Math.hypot(scaleX, scaleY)
+			if (shake > 0.05) {
+				wrap.style.setProperty('--nudge-transform', `translate(${scaleX * 0.6}px, ${scaleY * 0.6}px)`)
+				wrap.classList.add('is-nudging')
+			} else {
+				wrap.classList.remove('is-nudging')
+				wrap.style.removeProperty('--nudge-transform')
+			}
+		}
 	}
-
-	// Input bridge
 	_nudge(angle, force = 2.6) {
 		if (!this.player || this.viewerMode !== 'play' || this.isPaused) return
-		try {
-			this.player.nudge(angle, force)
-		} catch {}
-		try {
-			this._flashNudge(angle)
-		} catch {}
+		this.player.nudge(angle, force)
+		this._flashNudge(angle)
 	}
-
 	_sendKey(code, down) {
-		try {
-			if (down) this.player.onKeyDown({ code, key: code === 'Enter' ? 'Enter' : 'Shift', ts: Date.now() })
-			else this.player.onKeyUp({ code, key: code === 'Enter' ? 'Enter' : 'Shift', ts: Date.now() })
-		} catch {}
-		try {
-			if (this._physicsSab) {
-				let h = 0
-				for (let i = 0; i < code.length; i++) h = ((h * 31 + code.charCodeAt(i)) & 0xffff) >>> 0
-				pushInput(this._physicsSab, down ? 1 : 0, h || 1, Date.now())
-			}
-		} catch {}
+		if (down)
+			this.player.onKeyDown({
+				code,
+				key: code === 'Enter' ? 'Enter' : 'Shift',
+				ts: Date.now(),
+			})
+		else
+			this.player.onKeyUp({
+				code,
+				key: code === 'Enter' ? 'Enter' : 'Shift',
+				ts: Date.now(),
+			})
+		if (this._physicsSab) {
+			let h = 0
+			for (let i = 0; i < code.length; i++) h = ((h * 31 + code.charCodeAt(i)) & 0xffff) >>> 0
+			pushInput(this._physicsSab, down ? 1 : 0, h || 1, Date.now())
+		}
 	}
 	_flashNudge(angle) {
-		try {
-			const el = document.getElementById('nudge-flash')
-			if (!el || this.viewerMode !== 'play') return
-			const dir =
-				angle >= 45 && angle < 135
-					? 'left'
-					: angle >= 135 && angle < 225
-						? 'down'
-						: angle >= 225 && angle < 315
-							? 'right'
-							: 'up'
-			el.textContent =
-				dir === 'left' ? '‹ NUDGE' : dir === 'right' ? 'NUDGE ›' : dir === 'up' ? '▲ NUDGE' : '▼ NUDGE'
-			el.dataset.dir = dir
-			el.hidden = false
+		const el = document.getElementById('nudge-flash')
+		if (!el || this.viewerMode !== 'play') return
+		const dir =
+			angle >= 45 && angle < 135
+				? 'left'
+				: angle >= 135 && angle < 225
+					? 'down'
+					: angle >= 225 && angle < 315
+						? 'right'
+						: 'up'
+		el.textContent = dir === 'left' ? '‹ NUDGE' : dir === 'right' ? 'NUDGE ›' : dir === 'up' ? '▲ NUDGE' : '▼ NUDGE'
+		el.dataset.dir = dir
+		el.hidden = false
+		el.classList.remove('show')
+		void el.offsetWidth
+		el.classList.add('show')
+		clearTimeout(this._nudgeFlashTimer)
+		this._nudgeFlashTimer = setTimeout(() => {
 			el.classList.remove('show')
-			void el.offsetWidth
-			el.classList.add('show')
-			clearTimeout(this._nudgeFlashTimer)
-			this._nudgeFlashTimer = setTimeout(() => {
-				try {
-					el.classList.remove('show')
-					el.hidden = true
-				} catch {}
-			}, 420)
-		} catch {}
+			el.hidden = true
+		}, 420)
 	}
-
 	hookInput() {
 		if (!this.player) return
-		try {
-			this._inputCleanup?.()
-		} catch {}
+		this._inputCleanup?.()
 		this._inputCleanup = attachInput(this)
 	}
-
 	_setupNudgeInput() {}
 }
-
 export function createViewer(opts) {
 	return new Viewer(opts)
 }
