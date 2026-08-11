@@ -64,7 +64,12 @@
 		"verify:e2e": "tsx test/harness/verify-all.ts",
 		"prepare": "husky",
 		"build:wasm:debug": "wasm/build.sh --debug",
-		"test:integration": "vitest run lib/emu/pinmame/pinmame.integration.spec.ts lib/emu/wasm-build.integration.spec.ts lib/scripting/objects/vpm-controller.integration.spec.ts lib/vpt/table/table.integration.spec.ts lib/game/player.integration.spec.ts"
+		"test:integration": "vitest run lib/emu/pinmame/pinmame.integration.spec.ts lib/emu/wasm-build.integration.spec.ts lib/scripting/objects/vpm-controller.integration.spec.ts lib/vpt/table/table.integration.spec.ts lib/game/player.integration.spec.ts",
+		"bench": "node test/harness/bench.mjs",
+		"bench:node": "tsx test/harness/bench-node.ts",
+		"bench:walking-dead": "node test/harness/bench.mjs --vpx=walking_dead.vpx --profile",
+		"bench:walking-dead:node": "tsx test/harness/bench-node.ts --vpx=walking_dead.vpx --ticks=300 --balls=1",
+		"bench:walking-dead:browser": "node test/harness/bench.mjs --vpx=walking_dead.vpx --balls=1 --duration=5000 --warmup=1500 --profile"
 	},
 	"dependencies": {
 		"dash-ast": "^2.0.0",

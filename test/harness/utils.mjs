@@ -11,19 +11,23 @@ export async function loadPuppeteer() {
 }
 
 export async function launchBrowser(puppeteer, opts = {}) {
+	const { gpu, ...rest } = opts
+	const gpuArgs = gpu
+		? gpu === 'gl'
+			? ['--enable-gpu', '--use-gl=angle', '--use-angle=gl']
+			: ['--enable-gpu', '--use-gl=angle', '--use-angle=vulkan']
+		: ['--enable-unsafe-swiftshader', '--use-gl=angle', '--use-angle=swiftshader']
 	return puppeteer.launch({
 		executablePath: '/usr/bin/google-chrome',
 		headless: 'new',
 		args: [
 			'--no-sandbox',
 			'--disable-dev-shm-usage',
-			'--enable-unsafe-swiftshader',
-			'--use-gl=angle',
-			'--use-angle=swiftshader',
+			...gpuArgs,
 			'--window-size=1280,900',
 			'--disable-gpu-sandbox',
 		],
-		...opts,
+		...rest,
 	})
 }
 
