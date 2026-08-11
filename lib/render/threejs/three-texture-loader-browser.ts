@@ -248,18 +248,23 @@ function createBallEnvTexture(name: string): ThreeTexture {
 	canvas.height = h
 	const ctx = canvas.getContext('2d')!
 	const bg = ctx.createLinearGradient(0, 0, 0, h)
-	bg.addColorStop(0, '#8fa0bc')
-	bg.addColorStop(0.22, '#d6deea')
-	bg.addColorStop(0.5, '#f1f4f8')
-	bg.addColorStop(0.72, '#a8b0c2')
-	bg.addColorStop(1, '#2a3142')
+	bg.addColorStop(0, '#1b2436')
+	bg.addColorStop(0.32, '#6f7f9e')
+	bg.addColorStop(0.5, '#e8edf5')
+	bg.addColorStop(0.62, '#6f7f9e')
+	bg.addColorStop(1, '#0f141f')
 	ctx.fillStyle = bg
 	ctx.fillRect(0, 0, w, h)
-	const rg = ctx.createRadialGradient(w * 0.46, h * 0.38, 2, w * 0.46, h * 0.38, 42)
-	rg.addColorStop(0, 'rgba(255,255,255,0.95)')
-	rg.addColorStop(0.35, 'rgba(255,255,255,0.45)')
+	const rg = ctx.createRadialGradient(w * 0.46, h * 0.34, 1, w * 0.46, h * 0.34, 30)
+	rg.addColorStop(0, 'rgba(255,255,255,1)')
+	rg.addColorStop(0.25, 'rgba(255,255,255,0.55)')
 	rg.addColorStop(1, 'rgba(255,255,255,0)')
 	ctx.fillStyle = rg
+	ctx.fillRect(0, 0, w, h)
+	const rg2 = ctx.createRadialGradient(w * 0.76, h * 0.68, 1, w * 0.76, h * 0.68, 14)
+	rg2.addColorStop(0, 'rgba(255,255,255,0.35)')
+	rg2.addColorStop(1, 'rgba(255,255,255,0)')
+	ctx.fillStyle = rg2
 	ctx.fillRect(0, 0, w, h)
 	const tex: any = new CanvasTexture(canvas as any)
 	tex.colorSpace = SRGBColorSpace

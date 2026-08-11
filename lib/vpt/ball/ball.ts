@@ -113,7 +113,7 @@ export class Ball implements IPlayable, IMovable, IRenderable<BallState>, IScrip
 		const m = new Material()
 		m.name = 'ball'
 		m.isMetal = true
-		m.baseColor = 0xffffff
+		m.baseColor = 0xc0c0c0
 		m.roughness = 0.8
 		return m
 	}
