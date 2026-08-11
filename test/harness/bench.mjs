@@ -191,6 +191,27 @@ if (url.includes('walking_dead')) {
 	await new Promise(r => setTimeout(r, 500))
 }
 
+console.log('[bench] waiting for PinMAME…')
+for (let i = 0; i < 20; i++) {
+	const s = await page.evaluate(() => {
+		try {
+			const emu = window.viewer?.player?.getPhysics?.()?.emu
+			if (!emu) return { hasEmu: false, running: false }
+			return { hasEmu: true, running: emu.isMock ? true : emu.api?.isRunning?.() === 1, mock: !!emu.isMock }
+		} catch {
+			return { hasEmu: false, running: false }
+		}
+	})
+	if (!s.hasEmu || s.running) {
+		console.log(
+			`[bench] PinMAME ${s.hasEmu ? (s.mock ? 'mock' : s.running ? 'running' : 'loading') : 'none'} after ${i}s`,
+		)
+		break
+	}
+	if (i % 5 === 0) console.log(`[bench] PinMAME wait ${i}s`)
+	await new Promise(r => setTimeout(r, 1000))
+}
+
 await page.evaluate(() => window.viewer?.renderer?.render?.(window.viewer.scene, window.viewer.camera))
 const postPlayMetrics = await page.evaluate(collectMetrics)
 console.log('[bench] post-play metrics', postPlayMetrics)
@@ -257,9 +278,20 @@ if (balls > 0) {
 			p.createBall(
 				{
 					getBallCreationPosition: () =>
-						new T.Vector3(w / 2 + (Math.random() - 0.5) * 60, h / 2 + (Math.random() - 0.5) * 60, 30),
+						(() => {
+							try {
+								const k = Object.values(p.table?.kickers ?? {})[0]
+								const d = k?.data
+								if (d) {
+									const x = d.center?.x ?? d.position?.x ?? d.vCenter?.x
+									const y = d.center?.y ?? d.position?.y ?? d.vCenter?.y
+									if (Number.isFinite(x) && Number.isFinite(y)) return new T.Vector3(x, y, 45)
+								}
+							} catch {}
+							return new T.Vector3(w * 0.5 + (Math.random() - 0.5) * 40, h * 0.85, 30)
+						})(),
 					getBallCreationVelocity: () =>
-						new T.Vector3((Math.random() - 0.5) * 600, (Math.random() - 0.5) * 600, 50),
+						new T.Vector3((Math.random() - 0.5) * 80, -480 - Math.random() * 120, 40),
 					onBallCreated: () => {},
 				},
 				25,

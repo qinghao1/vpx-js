@@ -245,7 +245,7 @@ export async function getWasmKernels(): Promise<Mod> {
 					mod = (await (create as () => Promise<Mod>)()) as Mod
 				}
 				try {
-					warmWasmPools(512, 512, 512, 512, 512, 512, 512, 512)
+					warmWasmPools(2048, 2048, 2048, 2048, 2048, 2048, 2048, 2048)
 				} catch {}
 				return mod!
 			} catch (e) {
