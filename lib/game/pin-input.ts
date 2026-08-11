@@ -40,8 +40,8 @@ import type { Player } from './player.js'
 type KeyEvent = { code: number; down: boolean }
 
 const DEFAULT_KEYS: Record<number, number> = {
-	[AssignKey.LeftFlipperKey]: DIK_LCONTROL,
-	[AssignKey.RightFlipperKey]: DIK_RCONTROL,
+	[AssignKey.LeftFlipperKey]: DIK_LSHIFT,
+	[AssignKey.RightFlipperKey]: DIK_RSHIFT,
 	[AssignKey.LeftTiltKey]: DIK_Z,
 	[AssignKey.RightTiltKey]: DIK_SLASH,
 	[AssignKey.CenterTiltKey]: DIK_SPACE,
@@ -53,8 +53,8 @@ const DEFAULT_KEYS: Record<number, number> = {
 	[AssignKey.AddCreditKey2]: DIK_4,
 	[AssignKey.StartGameKey]: DIK_1,
 	[AssignKey.MechanicalTilt]: DIK_T,
-	[AssignKey.RightMagnaSave]: DIK_RSHIFT,
-	[AssignKey.LeftMagnaSave]: DIK_LSHIFT,
+	[AssignKey.RightMagnaSave]: DIK_RCONTROL,
+	[AssignKey.LeftMagnaSave]: DIK_LCONTROL,
 	[AssignKey.ExitGame]: DIK_Q,
 	[AssignKey.VolumeUp]: DIK_EQUALS,
 	[AssignKey.VolumeDown]: DIK_MINUS,
@@ -73,11 +73,11 @@ const TROUGH_KICK_ANGLE = 60
 const TROUGH_KICK_SPEED = 10
 
 function isLeftCode(code: number, leftKey: number): boolean {
-	return code === leftKey || code === DIK_LSHIFT || code === DIK_LCONTROL || code === DIK_LEFT
+	return code === leftKey || code === DIK_LEFT
 }
 
 function isRightCode(code: number, rightKey: number): boolean {
-	return code === rightKey || code === DIK_RSHIFT || code === DIK_RCONTROL || code === DIK_RIGHT
+	return code === rightKey || code === DIK_RIGHT
 }
 
 export class PinInput {
