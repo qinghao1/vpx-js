@@ -80,6 +80,13 @@ export {
 const cGameName = t => t?.tableScript?.match(/cGameName\s*=\s*["']([^"']+)["']/i)?.[1] || ''
 const setTitle = s => { try { const el = document.getElementById('title'); if (el && s) el.textContent = s } catch {} }
 
+const NUDGE = { left: 75, right: 285, forward: 0, back: 180, force: 2.6 }
+const swipeNudge = (dx, dy) => {
+	const adx = Math.abs(dx), ady = Math.abs(dy)
+	if (adx > ady * 1.2) return dx < 0 ? NUDGE.left : NUDGE.right
+	if (ady > adx * 1.2) return dy < 0 ? NUDGE.forward : NUDGE.back
+	return null
+}
 const TABLE_OPTS = {
 	exportPlayfield: true,
 	exportPrimitives: true,
@@ -358,26 +365,20 @@ export class Viewer {
 		}
 		this._hidePlayTip = hideTip
 		if (!canvas) return
+		const getHits = (x, y) => {
+			if (this.viewerMode !== 'viewer' || !this.tableGroup) return []
+			const r = canvas.getBoundingClientRect()
+			this._mouse.x = ((x - r.left) / r.width) * 2 - 1
+			this._mouse.y = -((y - r.top) / r.height) * 2 + 1
+			this._raycaster.setFromCamera(this._mouse, this.camera)
+			return this._raycaster.intersectObject(this.tableGroup, true)
+		}
 		const hitTest = (x, y) => {
-			if (this.viewerMode !== 'viewer' || !this.tableGroup) return false
 			if (this.controls?.state !== -1) return hovered
-			const r = canvas.getBoundingClientRect()
-			this._mouse.x = ((x - r.left) / r.width) * 2 - 1
-			this._mouse.y = -((y - r.top) / r.height) * 2 + 1
-			this._raycaster.setFromCamera(this._mouse, this.camera)
-			const hits = this._raycaster.intersectObject(this.tableGroup, true)
-			if (!hits.length) return false
-			return hits.some(h => hitIsOuter(h.object) || hitIsPlayfield(h.object))
+			const hits = getHits(x, y)
+			return hits.length ? hits.some(h => hitIsOuter(h.object) || hitIsPlayfield(h.object)) : false
 		}
-		const isOuterHit = (x, y) => {
-			if (this.viewerMode !== 'viewer' || !this.tableGroup) return false
-			const r = canvas.getBoundingClientRect()
-			this._mouse.x = ((x - r.left) / r.width) * 2 - 1
-			this._mouse.y = -((y - r.top) / r.height) * 2 + 1
-			this._raycaster.setFromCamera(this._mouse, this.camera)
-			const hits = this._raycaster.intersectObject(this.tableGroup, true)
-			return hits.some(h => hitIsOuter(h.object))
-		}
+		const isOuterHit = (x, y) => getHits(x, y).some(h => hitIsOuter(h.object))
 		let hoverRaf = 0
 		let hoverX = 0,
 			hoverY = 0
@@ -1789,6 +1790,11 @@ export class Viewer {
 		try { this._flashNudge(angle) } catch {}
 	}
 
+
+	_sendKey(code, down) {
+		try { down ? this.player.onKeyDown({ code, key: code === 'Enter' ? 'Enter' : 'Shift', ts: Date.now() }) : this.player.onKeyUp({ code, key: code === 'Enter' ? 'Enter' : 'Shift', ts: Date.now() }) } catch {}
+		try { if (this._physicsSab) pushInput(this._physicsSab, down ? 1 : 0, code.charCodeAt(0) || 0, Date.now()) } catch {}
+	}
 	_flashNudge(angle) {
 		try {
 			const el = document.getElementById('nudge-flash')
@@ -1888,16 +1894,12 @@ export class Viewer {
 			}
 			const down = (id, code) => {
 				if (active.has(id) || this.viewerMode !== 'play' || !this.player) return
-				active.set(id, code)
-				this.player.onKeyDown({ code, key: code === 'Enter' ? 'Enter' : 'Shift', ts: Date.now() })
-				try { if (this._physicsSab) pushInput(this._physicsSab, 1, code.charCodeAt(0) || 0, Date.now()) } catch {}
+				active.set(id, code); this._sendKey(code, true)
 			}
 			const up = id => {
 				const code = active.get(id)
 				if (!code) return
-				active.delete(id)
-				this.player.onKeyUp({ code, key: code === 'Enter' ? 'Enter' : 'Shift', ts: Date.now() })
-				try { if (this._physicsSab) pushInput(this._physicsSab, 0, code.charCodeAt(0) || 0, Date.now()) } catch {}
+				active.delete(id); this._sendKey(code, false)
 			}
 			const onDown = e => {
 				if (e.pointerType === 'touch') return
@@ -1936,16 +1938,9 @@ export class Viewer {
 						const dt = performance.now() - st.t
 						touchStarts.delete(id)
 						if (dt < 600 && Math.hypot(dx, dy) > 50) {
-							const adx = Math.abs(dx), ady = Math.abs(dy)
 							try { up(id) } catch {}
-							if (adx > ady * 1.2) {
-								if (dx < 0) this._nudge(75, 2.6)
-								else this._nudge(285, 2.6)
-							} else if (ady > adx * 1.2) {
-								if (dy < 0) this._nudge(0, 2.6)
-								else this._nudge(180, 2.0)
-							}
-							continue
+							const ang = swipeNudge(dx, dy)
+							if (ang !== null) { this._nudge(ang, ang === NUDGE.back ? 2.0 : NUDGE.force); continue }
 						}
 					}
 					up(id)
@@ -1983,9 +1978,9 @@ export class Viewer {
 			pad.hidden = false
 			const handler = e => {
 				const dir = e.currentTarget?.dataset?.nudge
-				if (dir === 'left') trigger(75, 2.8)
-				else if (dir === 'right') trigger(285, 2.8)
-				else if (dir === 'center' || dir === 'up') trigger(0, 2.8)
+				if (dir === 'left') trigger(NUDGE.left, 2.8)
+				else if (dir === 'right') trigger(NUDGE.right, 2.8)
+				else if (dir === 'center' || dir === 'up') trigger(NUDGE.forward, 2.8)
 				e.preventDefault()
 			}
 			for (const btn of pad.querySelectorAll('[data-nudge]')) {
@@ -2006,19 +2001,11 @@ export class Viewer {
 			}
 			const onPtrUp = e => {
 				if (activeId !== e.pointerId) return
-				const dx = e.clientX - startX
-				const dy = e.clientY - startY
-				const dt = performance.now() - startT
+				const dx = e.clientX - startX, dy = e.clientY - startY, dt = performance.now() - startT
 				activeId = null
 				if (dt > 600 || Math.hypot(dx, dy) < 45) return
-				const adx = Math.abs(dx), ady = Math.abs(dy)
-				if (adx > ady * 1.2) {
-					if (dx < 0) trigger(75, 2.5)
-					else trigger(285, 2.5)
-				} else if (ady > adx * 1.2) {
-					if (dy < 0) trigger(0, 2.5)
-					else trigger(180, 1.8)
-				}
+				const ang = swipeNudge(dx, dy)
+				if (ang !== null) trigger(ang, ang === NUDGE.back ? 1.8 : 2.5)
 			}
 			canvas.addEventListener('pointerdown', onPtrDown)
 			canvas.addEventListener('pointerup', onPtrUp)
