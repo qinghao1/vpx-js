@@ -1,4 +1,4 @@
-export const BAKED_EMISSIVE = 0.85
+export const BAKED_EMISSIVE = 1.0 // baked is unlit
 export const BAKED_ROUGH = 0.75
 export const BAKED_METAL = 0.1
 

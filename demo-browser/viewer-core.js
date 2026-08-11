@@ -1,5 +1,3 @@
-// Viewer core — loads VPX, builds Three.js scene, bridges Player physics & input.
-
 import { Buffer } from 'buffer'
 import * as THREE from 'three'
 import { OutlineEffect } from 'three/addons/effects/OutlineEffect.js'
@@ -100,19 +98,14 @@ const wrapBakedTex = tex => {
 const applyBakedMaterial = (mat, tex, info, meshName) => {
 	const nl = meshName.toLowerCase()
 	mat.emissiveMap = tex
-	// vpinball: baked base uses Material.m_cBase tint (see ScriptGlobalTable::MaterialColor
-	// and TWD's VLM.Bake.*). For overlay (LM) the primitive color*alpha drives intensity
-	// (primitive.cpp:1171 convertColor). Here we handle initial static view before
-	// script runs: use full intensity 1.0, script/primitive-updater will later set
-	// correct alpha-based intensity (e.g. LM_GI0_Playfield 250 -> 2.5). No hand-tuned 0.12.
+	// baked tint via Material.m_cBase; overlay intensity via alpha
 	try {
-		// Preserve existing material color as tint if not black, else white
+		// tint via baseColor if present
 		const cur = mat.color ? mat.color.getHex() : 0xffffff
 		const tint = cur !== 0x000000 ? new THREE.Color(cur) : new THREE.Color(0xffffff)
 		if (mat.emissive) mat.emissive.copy(tint); else mat.emissive = tint
 	} catch { try { mat.emissive = new THREE.Color(0xffffff) } catch {} }
 	const isOverlay = info.isVlmBake && !info.isMainBake
-	// const isRamp = /ramp|armp|botramp|rampscrw/i.test(nl) || info.isRampFamily // no hand-tuned ramp dim
 	if (isOverlay) {
 		const hasTex = !!tex
 		if (!hasTex) {
@@ -335,10 +328,7 @@ export class Viewer {
 		renderer.shadowMap.enabled = p.has('shadows')
 		if (renderer.shadowMap.enabled) renderer.shadowMap.type = THREE.PCFSoftShadowMap
 		renderer.outputColorSpace = THREE.SRGBColorSpace
-		// vpinball reference: TWD table comment "Please don't change the tonemapping to
-		// anything else then AgX, table is optimized & rendered for AgX"
-		// (see script header). VPX default is TM_AGX (Renderer.cpp m_toneMapper = TM_AGX).
-		// Use AgXToneMapping to match vpinball and avoid hand-tuned dim (0.12 vs 1.0).
+		// TWD requires AgX
 		renderer.toneMapping = THREE.AgXToneMapping ?? THREE.ACESFilmicToneMapping
 		renderer.toneMappingExposure = 1.0
 		this.renderer = renderer

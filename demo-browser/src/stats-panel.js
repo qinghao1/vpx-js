@@ -1,6 +1,6 @@
 export function renderStats(container, data) {
 	if (!container) return
-	const { fps, draws, trisFmt, balls, tFmt, tHasValue, emuLabel, emuRaw, wasmLabel, wasmReady, backend, mode, isPaused } = data
+	const { fps, draws, trisFmt, balls, tFmt, tHasValue, emuLabel, emuRaw, wasmLabel, wasmReady, backend, mode } = data
 	const modeCls = mode.includes('PAUSED') ? 'badge--paused' : mode === 'PLAY' ? 'badge--play' : 'badge--viewer'
 	const modeLabel = mode === 'PLAY PAUSED' ? 'PAUSED' : mode
 	const fpsCls = fps >= 55 ? 'fps--good' : fps >= 30 ? 'fps--mid' : fps > 0 ? 'fps--low' : ''

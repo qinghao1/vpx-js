@@ -19,7 +19,7 @@ const BALL_ROUGHNESS = 0.08
 
 const RE_BAKE_MAT = /bake/i
 const RE_BAKE_MAP = /bake|nestmap/i
-const BAKED_EMISSIVE = 0.85
+const BAKED_EMISSIVE = 1.0 // baked is unlit
 const BAKED_ROUGH = 0.75
 const BAKED_METAL = 0.1
 const DISABLE_LIGHTING_THRESHOLD = 0.5
@@ -215,8 +215,9 @@ export class ThreeMaterialGenerator {
 		if (tex) {
 			;(mat as any).map = tex
 			;(mat as any).emissiveMap = tex
-			if (!mat.emissive) (mat as any).emissive = new Color(0xffffff)
-			else mat.emissive.set(0xffffff)
+			const tint = mat.color && (mat.color as Color).getHex() !== 0x000000 ? (mat.color as Color).clone() : new Color(0xffffff) // tint via baseColor
+			if (!mat.emissive) (mat as any).emissive = tint
+			else mat.emissive.copy(tint)
 			mat.emissiveIntensity = BAKED_EMISSIVE
 			mat.color.set(0x000000)
 		} else {

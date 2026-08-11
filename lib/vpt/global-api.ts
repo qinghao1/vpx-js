@@ -249,9 +249,11 @@ export class GlobalApi extends VbsApi {
 						const n = (m.name ?? '').toLowerCase()
 						if (n === `material:${target}` || n === target || n.includes(target)) {
 							const isBaked = !!(m as any).userData?.__isBaked || !!(m as any).emissiveMap
-							if (isBaked) {
-								if ((m as any).emissive) (m as any).emissive.set(0x000000)
-								;(m as any).emissiveIntensity = 0
+							if (isBaked) { // baked tint via emissive
+								if ((m as any).emissive) (m as any).emissive.set(color)
+								else (m as any).emissive = new (m as any).color.constructor(color)
+								;(m as any).emissiveIntensity = 1.0
+								;(m as any).color?.set(0x000000)
 							} else {
 								m.color.set(color)
 							}
@@ -265,8 +267,10 @@ export class GlobalApi extends VbsApi {
 				if (k.split(':')[0].toLowerCase() === target) {
 					const isBaked = !!(m as any).userData?.__isBaked || !!(m as any).emissiveMap
 					if (isBaked) {
-						if ((m as any).emissive) (m as any).emissive.set(0x000000)
-						;(m as any).emissiveIntensity = 0
+						if ((m as any).emissive) (m as any).emissive.set(color)
+						else (m as any).emissive = new (m as any).color.constructor(color)
+						;(m as any).emissiveIntensity = 1.0
+						;(m as any).color?.set(0x000000)
 					} else {
 						;(m as any).color?.set(color)
 					}

@@ -18,6 +18,7 @@ const classify = (mesh, mat, map, baked = false) => {
 	const mp = map.toLowerCase()
 	const me = mesh.toLowerCase()
 	const isBakedMat = baked || RE_BAKE_MAT.test(m) || RE_BAKE_MAP.test(mp) || RE_BAKE_MAP.test(me)
+	// name heuristic fallback for TWD BM_*/VLM.Bake
 	const isBakedFamily = me.includes('bm_') || me.includes('playfield') || me.includes('armp') || me.includes('ramp')
 	const isRampFamily = me.includes('armp') || me.includes('ramp') || me.includes('botramp') || me.includes('rampscrw')
 	return {
@@ -57,8 +58,10 @@ function fixBaked(mat, map) {
 	if (tex) {
 		mat.map = tex
 		mat.emissiveMap = tex
-		if (!mat.emissive) mat.emissive = new THREE.Color(0xffffff)
-		else mat.emissive.set(0xffffff)
+		// tint via Material.m_cBase
+		const tint = mat.color && mat.color.getHex() !== 0x000000 ? mat.color.clone() : new THREE.Color(0xffffff)
+		if (!mat.emissive) mat.emissive = tint
+		else mat.emissive.copy(tint)
 		mat.emissiveIntensity = BAKED_EMISSIVE
 		mat.color?.set?.(0x000000)
 	} else {
@@ -183,18 +186,15 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 		const key = `${base.name}|${base.map?.name ?? pending}|${isMainBake ? 'main' : isOverlay ? 'overlay' : alpha ? 'alpha' : 'opaque'}|${base.polygonOffset ? `${base.polygonOffsetFactor}/${base.polygonOffsetUnits}` : '0'}`
 		let v = bakedCache.get(key)
 		if (v) return v
-	v = base.clone()
+	v = base.clone() // unlit baked at 1.0 with AgX
 		if (isMainBake) {
 			fixBaked(v, v.map)
-			if (isRamp) {
-				v.emissiveIntensity = 0.45
-				v.toneMapped = true
-				v.needsUpdate = true
-			}
+			// 1.0 unlit
+			v.toneMapped = true
+			v.needsUpdate = true
 		} else if (isOverlay) {
 			const hasMap = !!v.map
 			fixBaked(v, v.map)
-			const isRampOverlay = isRamp || isRampFamily
 			if (!hasMap && pending) {
 				v.emissiveIntensity = 0
 				v.transparent = true
@@ -204,9 +204,10 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 				v.toneMapped = true
 				v.needsUpdate = true
 			} else {
-				v.emissiveIntensity = isRampOverlay ? 0.12 : 0.20
+				// alpha/100 — 250 => 2.5 HDR
+				v.emissiveIntensity = 1.0
 				v.transparent = true
-				v.opacity = isRampOverlay ? 0.55 : 0.50
+				v.opacity = 1.0
 				v.blending = THREE.AdditiveBlending
 				v.depthWrite = false
 				v.toneMapped = true
@@ -217,7 +218,7 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 			v.color?.set?.(0x000000)
 			if (!v.emissive) v.emissive = new THREE.Color(0xffffff)
 			else v.emissive.set(0xffffff)
-			v.emissiveIntensity = isRamp ? 0.45 : BAKED_EMISSIVE
+			v.emissiveIntensity = BAKED_EMISSIVE
 			v.toneMapped = true
 		}
 	if (isOverlay) {
@@ -233,7 +234,7 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 			v.transparent = true
 			v.alphaTest = 0
 			v.depthWrite = false
-			v.opacity = (isRamp || isRampFamily) ? 0.55 : 0.50
+			v.opacity = 1.0
 			v.blending = THREE.AdditiveBlending
 			v.polygonOffset = true; v.polygonOffsetFactor = -2; v.polygonOffsetUnits = -4
 		}

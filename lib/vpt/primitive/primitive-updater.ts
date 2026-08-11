@@ -78,8 +78,24 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 		const nonBakedEmissive = nonBakedIntensity > 0
 		const matName = this.state.material ?? this.data.szMaterial
 		const base = table.getMaterial(matName)?.baseColor ?? 0xffffff
-		const hex = new Color(base).multiply(new Color(prim)).getHex()
-		const isRamp = /ramp|armp|botramp|rampscrw/i.test(this.data.name || '')
+		const hex = new Color(base).multiply(new Color(prim)).getHex() // unlit: emissive = base*prim, intensity = alpha/100
+		const lightName = this.data.szLightmap
+		let lightFactor = 1
+		if (lightName) {
+			try {
+				const l = (table as any).lights?.[lightName] ?? (table as any).getLight?.(lightName)
+				// light state intensity vs data intensity
+				const st = (l as any)?.getState?.() ?? (l as any)?.state
+				const dataInt = (l as any)?.data?.intensity ?? (l as any)?.intensity ?? 1
+				const scale = (l as any)?.data?.intensityScale ?? (l as any)?.animation?.intensityScale ?? 1
+				const cur = st?.intensity ?? dataInt
+				if (dataInt !== 0 && scale !== 0) lightFactor = cur / (dataInt * scale)
+				else lightFactor = 0
+				if (!Number.isFinite(lightFactor)) lightFactor = 0
+			} catch { lightFactor = 1 }
+		}
+		const effectiveAlpha = rawAlphaClamped * lightFactor
+		const effectiveIntensity = Math.min(MAX_EMISSIVE, effectiveAlpha * ALPHA_SCALE)
 		for (const m of this.meshes(obj)) {
 			const mat = m.material as unknown as
 				| {
@@ -103,18 +119,15 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 					mat.emissiveIntensity = 0
 					continue
 				}
-				if (this.data.addBlend) {
-					const factor = isRamp ? 0.12 : 0.20
-					const overlayIntensity = Math.min(MAX_EMISSIVE, rawAlphaClamped * ALPHA_SCALE * factor)
+				if (this.data.addBlend) { // unlit additive
 					mat.color.set(0x000000)
-					mat.emissive.set(0xffffff)
-					mat.emissiveIntensity = overlayIntensity
+					mat.emissive.set(hex)
+					mat.emissiveIntensity = effectiveIntensity
 				} else {
 					mat.color.set(0x000000)
-					if (!mat.emissive) (mat as any).emissive = new Color(0xffffff)
-					else mat.emissive.set(0xffffff)
-					if (mat.emissiveIntensity === 0) mat.emissiveIntensity = isRamp ? 0.45 : 0.85
-					else if (isRamp && mat.emissiveIntensity > 0.6) mat.emissiveIntensity = 0.45
+					if (!mat.emissive) (mat as any).emissive = new Color(hex)
+					else mat.emissive.set(hex)
+					mat.emissiveIntensity = 1.0
 				}
 			} else {
 				mat.color.set(hex)
