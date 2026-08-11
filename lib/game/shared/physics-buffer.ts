@@ -5,11 +5,11 @@ export const MAX_BALLS = 32
 export const BALL_STRIDE = 12
 export const SAB_SIZE = 16 * 1024
 
-const HEADER_SIZE = 128
-const TIMES_OFFSET = 128
+const HEADER_SIZE = 128 // 2×64B cache lines; 128B on Apple M1/M2 — keeps HEAD/TAIL separate
+const TIMES_OFFSET = 128 // pad header→times to 128B to avoid false sharing with TAIL
 const TIMES_SLOTS = 3
 const TIMES_STRIDE = 3
-const BALLS_OFFSET = 256
+const BALLS_OFFSET = 256 // 1536B per slot = 24×64B, already 64B-aligned (12×128B on Apple)
 const BALLS_PER_SLOT = MAX_BALLS * BALL_STRIDE
 const INPUT_OFFSET = BALLS_OFFSET + BALLS_PER_SLOT * 3 * 4
 const INPUT_CAPACITY = 256
@@ -18,9 +18,9 @@ const INPUT_ENTRY = 8
 
 const FLAGS_IDX = 0
 const GEN_IDX = 1
-const HEAD_IDX = 4
-const TAIL_IDX = 20
-const COUNT_BASE = 24
+const HEAD_IDX = 4 // offset 16 — line 0, written by main (pushInput), read by worker
+const TAIL_IDX = 20 // offset 80 — line 1, written by worker (drainInput), read by main; separate line avoids MESI ping-pong
+const COUNT_BASE = 24 // offset 96 — in tail line, written by worker (slot counts)
 
 const MASK = 3
 const SENTINEL = 3
