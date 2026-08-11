@@ -15,7 +15,7 @@ import type { MeshConvertOptions } from '../irender-api.js'
 import type { ThreeMapGenerator } from './three-map-generator.js'
 
 const BALL_METALNESS = 1
-const BALL_ROUGHNESS = 0.14
+const BALL_ROUGHNESS = 0.08
 
 const RE_BAKE_MAT = /bake/i
 const RE_BAKE_MAP = /bake|nestmap/i

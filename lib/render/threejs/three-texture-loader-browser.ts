@@ -248,11 +248,11 @@ function createBallEnvTexture(name: string): ThreeTexture {
 	canvas.height = h
 	const ctx = canvas.getContext('2d')!
 	const bg = ctx.createLinearGradient(0, 0, 0, h)
-	bg.addColorStop(0, '#1b2436')
-	bg.addColorStop(0.32, '#6f7f9e')
-	bg.addColorStop(0.5, '#e8edf5')
-	bg.addColorStop(0.62, '#6f7f9e')
-	bg.addColorStop(1, '#0f141f')
+	bg.addColorStop(0, '#14181a')
+	bg.addColorStop(0.32, '#787b80')
+	bg.addColorStop(0.5, '#f2f2f3')
+	bg.addColorStop(0.68, '#787b80')
+	bg.addColorStop(1, '#0c0e10')
 	ctx.fillStyle = bg
 	ctx.fillRect(0, 0, w, h)
 	const rg = ctx.createRadialGradient(w * 0.46, h * 0.34, 1, w * 0.46, h * 0.34, 30)
