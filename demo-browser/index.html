@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+		<title>vpx-js — Browser Demo</title>
+		<link rel="stylesheet" href="./src/app.css">
+		<script src="./src/log-capture.js"></script>
+	</head>
+	<body>
+		<header id="brand" aria-label="vpx-js branding">
+			<span class="kicker">vpx-js</span>
+			<h1 id="title">Visual Pinball</h1>
+			<span class="sub" id="subtitle">Loading …</span>
+		</header>
+		<nav id="actions" aria-label="Primary actions">
+			<button id="help-btn" type="button" title="Controls (?)">Controls</button>
+			<button id="reset" type="button" title="Reset camera (R)">Reset view</button>
+		</nav>
+		<main id="loading" aria-live="polite">
+			<section id="loading-card" aria-labelledby="load-title">
+				<h2 id="load-title">Drop a table to begin</h2>
+				<p>Drag &amp; drop a <code>.vpx</code> table (and optional <code>.zip</code> ROM) — works entirely in the browser.</p>
+				<p class="load-hint">Or use <code>?vpx=/tables/example.vpx&amp;rom=/roms/example.zip</code> — try <code>/test/fixtures/table-empty.vpx</code></p>
+				<div id="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Loading progress"><div id="bar-fill"></div></div>
+				<div id="bar-text">Waiting for table…</div>
+				<p id="load-detail"></p>
+				<div class="picker picker--files">
+					<label class="btn" for="file-vpx">Open .vpx</label>
+					<input type="file" id="file-vpx" accept=".vpx">
+					<label class="btn btn--alt" for="file-rom">Open .zip ROM</label>
+					<input type="file" id="file-rom" accept=".zip">
+				</div>
+				<div class="picker picker--urls">
+					<div class="picker-row">
+						<input type="text" id="vpx-input" placeholder="?vpx=/tables/example.vpx" aria-label="VPX URL">
+						<button id="picker-vpx" class="btn" type="button">Load VPX</button>
+					</div>
+					<div class="picker-row">
+						<input type="text" id="rom-input" placeholder="?rom=/roms/example.zip" aria-label="ROM URL">
+						<button id="picker-rom" class="btn btn--alt" type="button">Load ROM</button>
+					</div>
+				</div>
+			</section>
+		</main>
+		<div id="stream-progress" hidden>
+			<span id="stream-label">Enhancing visuals…</span>
+			<div id="stream-bar"><div id="stream-fill"></div></div>
+			<span id="stream-text">0%</span>
+		</div>
+		<div id="canvas-wrap"><canvas id="canvas" tabindex="0"></canvas><div id="nudge-flash" hidden></div></div>
+		<div id="nudge-pad" hidden>
+			<button data-nudge="left" aria-label="Nudge left">‹</button>
+			<button data-nudge="center" aria-label="Nudge forward">▲</button>
+			<button data-nudge="right" aria-label="Nudge right">›</button>
+			<button id="enable-motion" hidden>Enable shake</button>
+		</div>
+		<div id="play-tip">▶ Play</div>
+		<button id="debug-toggle" title="Toggle debug info (`)" aria-label="Toggle debug">≡</button>
+		<div id="dmd-wrap" style="display:none">
+			<canvas id="dmd" width="512" height="128"></canvas>
+			<div id="dmd-status">DMD: waiting…</div>
+		</div>
+		<aside id="debug-panel" class="debug-panel" aria-label="Debug information">
+			<div id="stats" class="stats"></div>
+			<div id="log-wrap" class="log-wrap">
+				<div id="log" role="log" aria-live="polite"></div>
+				<div id="harness-actions">
+					<button id="dump-log" type="button">Dump log</button>
+					<button id="copy-log" type="button">Copy log</button>
+					<button id="toggle-log" type="button">Toggle log</button>
+				</div>
+			</div>
+		</aside>
+		<dialog id="help" class="help" closedby="any" aria-labelledby="help-title">
+			<div class="help-head">
+				<h3 id="help-title">Controls</h3>
+				<button data-close-help aria-label="Close help" type="button">×</button>
+			</div>
+			<div class="help-grid">
+				<div class="help-row"><span class="help-label">Left Flipper</span><span class="help-keys"><kbd>Shift</kbd><span class="hint">L</span> <span class="sep">·</span> <kbd>←</kbd><span class="sep">·</span><kbd>A</kbd></span></div>
+				<div class="help-row"><span class="help-label">Right Flipper</span><span class="help-keys"><kbd>Shift</kbd><span class="hint">R</span> <span class="sep">·</span> <kbd>→</kbd><span class="sep">·</span><kbd>D</kbd></span></div>
+				<div class="help-row"><span class="help-label">Magna Save</span><span class="help-keys"><kbd>Ctrl</kbd><span class="hint">L / R</span></span></div>
+				<div class="help-row"><span class="help-label">Plunger</span><span class="help-keys"><kbd>Enter</kbd><span class="hint">hold → release</span><span class="sep">·</span>touch bottom-right</span></div>
+				<div class="help-row"><span class="help-label">Nudge</span><span class="help-keys"><kbd>Z</kbd><kbd>/</kbd><kbd>Space</kbd><span class="hint">or swipe / shake</span></span></div>
+				<div class="help-row"><span class="help-label">Start / Coin</span><span class="help-keys"><kbd>1</kbd><span class="sep">/</span><kbd>5</kbd></span></div>
+				<div class="help-row"><span class="help-label">View</span><span class="help-keys"><kbd>P</kbd> pause<span class="sep">·</span><kbd>O</kbd> orbit<span class="sep">·</span><kbd>R</kbd> reset<span class="sep">·</span><kbd>?</kbd> help<span class="sep">·</span><kbd>Esc</kbd> exit</span></div>
+			</div>
+			<div class="help-foot">Touch: tap sides = flippers · swipe = nudge · drag to orbit · wheel to zoom · <kbd>Esc</kbd> back to viewer</div>
+		</dialog>
+		<script type="module" src="./src/app.js"></script>
+	</body>
+</html>

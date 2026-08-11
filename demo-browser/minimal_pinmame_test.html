@@ -1,0 +1,31 @@
+<!doctype html>
+<html><body>
+<script type="module">
+import { PinMameEmulator } from '../dist-esm/lib/emu/pinmame/pinmame-emu.js'
+
+async function test(){
+  const params=new URLSearchParams(location.search)
+  const romUrl=params.get('rom')||'/pinmame/roms/my_generic_999.zip'
+  const gameName=params.get('game')|| romUrl.split('/').pop()?.replace(/\.zip$/i,'') || 'my_generic_999'
+  console.log(`fetch rom ${romUrl} game ${gameName}`)
+  const romResp = await fetch(romUrl)
+  const rom = new Uint8Array(await romResp.arrayBuffer())
+  console.log(`ROM fetched ${rom.length}`)
+  const emu = new PinMameEmulator()
+  console.log('init emu')
+  await emu.loadGame(gameName, rom)
+  console.log(`after load isInit ${emu.isInitialized()} isRunning ${emu.api?.isRunning?.()}`)
+  for(let i=0;i<40;i++){
+    await new Promise(r=>setTimeout(r,1000))
+    let run
+    try{ run = emu.api?.isRunning?.() }catch(e){ run='err:'+e.message }
+    let sum=0
+    try{ const dmd = emu.getDmdFrame(); for(const v of dmd) sum+=v }catch(e){ sum=-1 }
+    console.log(`t${i} run=${run} dmdSum=${sum}`)
+    try{ emu.emuSimulateCycle(16) }catch(e){ console.log('simulate err', e.message) }
+  }
+  console.log('done')
+}
+test().catch(e=> console.error('test failed', e))
+</script>
+</body></html>

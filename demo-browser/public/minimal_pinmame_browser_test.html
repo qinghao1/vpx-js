@@ -1,0 +1,28 @@
+<!DOCTYPE html><meta charset="utf-8"><title>minimal pinmame</title>
+<script type="module">
+import { PinMameEmulator } from '/@fs/home/qinghao1/projects/vpx-js/dist-esm/lib/emu/pinmame/pinmame-emu.js'
+import { createPinmameModule } from '/@fs/home/qinghao1/projects/vpx-js/dist-esm/lib/emu/pinmame/pinmame-loader.js'
+console.log('starting minimal pinmame browser test (generic)')
+const params=new URLSearchParams(location.search)
+const romUrl=params.get('rom')||'/pinmame/roms/my_generic_999.zip'
+const gameName=params.get('game')|| romUrl.split('/').pop()?.replace(/\.zip$/i,'') || 'my_generic_999'
+console.log(`fetch rom ${romUrl} game ${gameName}`)
+const romRes = await fetch(romUrl)
+console.log('fetch rom', romRes.ok, romRes.headers.get('content-length'))
+const rom = new Uint8Array(await romRes.arrayBuffer())
+console.log('rom bytes', rom.length)
+const { module, isMock } = await createPinmameModule()
+console.log('module isMock', isMock, 'heap', module.HEAPU8.length)
+const emu = new PinMameEmulator()
+console.log('emu before load', emu.isInitialized())
+await emu.loadGame(gameName, rom)
+console.log('emu after load isInit', emu.isInitialized(), 'isMock', emu.isMock)
+for(let i=0;i<45;i++){
+ await new Promise(r=>setTimeout(r,1000))
+ let run; try{ run = emu.api?.isRunning?.() }catch(e){ run='err:'+e.message }
+ let sum=0; try{ const dmd=emu.getDmdFrame(); for(const v of dmd) sum+=v; console.log(`t${i} isRunning=${run} dmdSum=${sum} len=${dmd.length}`) }catch(e){ console.log(`t${i} isRunning=${run} dmd err ${e.message}`)}
+ try{ emu.emuSimulateCycle(16) }catch(e){ console.log('simulate err', e.message)}
+ if(run===1 && sum>0){ console.log('SUCCESS minimal'); break }
+}
+console.log('done minimal')
+</script>
