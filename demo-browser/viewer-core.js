@@ -1,33 +1,37 @@
-import { Buffer } from 'buffer'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { Player } from '../dist-esm/lib/game/player.js'
+import {
+	BALL_STRIDE,
+	createPhysicsSAB,
+	MAX_BALLS,
+	pushInput,
+	trySnap,
+} from '../dist-esm/lib/game/shared/physics-buffer.js'
 import { BrowserBinaryReader } from '../dist-esm/lib/io/binary-reader.browser.js'
-import { buildBvhIdle, installBvh } from '../dist-esm/lib/render/threejs/three-bvh.js'
+import { isWasmReady } from '../dist-esm/lib/physics/wasm/kernels.js'
+import { buildBvhIdle } from '../dist-esm/lib/render/threejs/three-bvh.js'
 import { ThreeRenderApi } from '../dist-esm/lib/render/threejs/three-render-api.js'
 import { ThreeTextureLoaderBrowser } from '../dist-esm/lib/render/threejs/three-texture-loader-browser.js'
 import { ANIM_SETTLE_MS, AnimationGate } from '../dist-esm/lib/util/animation-gate.js'
 import { Table } from '../dist-esm/lib/vpt/table/table.js'
-import { isWasmReady } from '../dist-esm/lib/physics/wasm/kernels.js'
-import { BALL_STRIDE, createPhysicsSAB, MAX_BALLS, pushInput, trySnap } from '../dist-esm/lib/game/shared/physics-buffer.js'
 import {
-	BAKED_EMISSIVE,
-	BAKED_METAL,
-	BAKED_ROUGH,
 	CAM,
 	CAM_ANIM,
 	LIGHT_AMBIENT,
 	LIGHT_DIR,
 	LIGHT_HEMI,
 	RE_BAKE_MAP,
-	RE_BAKE_MAT,
 	RE_CAB,
 	RE_OUTER,
+	TABLE_OPTS,
 } from './src/config.js'
 import { DmdController } from './src/dmd.js'
+import { isDev as _isDev, ensureBvh, ensureGlobals, getTargetPixelRatio } from './src/env.js'
+import { attachInput } from './src/input.js'
 import { createHarness } from './src/log-overlay.js'
-import { renderModeHint, renderStats } from './src/stats-panel.js'
 import {
+	applyBakedMaterial,
 	applyCameraState,
 	computePlayFraming,
 	computeViewerFraming,
@@ -39,9 +43,9 @@ import {
 	postProcessScene,
 	showCabFlippers,
 } from './src/scene.js'
+import { renderModeHint, renderStats } from './src/stats-panel.js'
 import {
 	$,
-	aliasEvent,
 	computeTexMem,
 	countObjects,
 	fetchWithProgress,
@@ -51,19 +55,6 @@ import {
 	resolveRomCandidates,
 	resolveVpxCandidates,
 } from './src/utils.js'
-
-window.Buffer ??= Buffer
-window.global ??= window
-const _isDev = (() => {
-	try { if (import.meta.env.DEV) return true } catch {}
-	try {
-		const h = typeof location !== 'undefined' ? location.hostname : ''
-		return h === 'localhost' || h === '127.0.0.1' || h === '' || h === '0.0.0.0'
-	} catch { return false }
-})()
-try { installBvh() } catch (e) { if (_isDev) console.warn('installBvh failed', e) }
-
-const getTargetPixelRatio = mode => Math.min(typeof devicePixelRatio !== 'undefined' ? devicePixelRatio : 1, mode === 'play' ? 1 : 1.5)
 
 export {
 	createHarness,
@@ -76,80 +67,17 @@ export {
 }
 
 const cGameName = t => t?.tableScript?.match(/cGameName\s*=\s*["']([^"']+)["']/i)?.[1] || ''
-const setTitle = s => { try { const el = document.getElementById('title'); if (el && s) el.textContent = s } catch {} }
-
-const NUDGE = { left: 75, right: 285, forward: 0, back: 180, force: 2.6 }
-const swipeNudge = (dx, dy) => {
-	const adx = Math.abs(dx), ady = Math.abs(dy)
-	if (adx > ady * 1.2) return dx < 0 ? NUDGE.left : NUDGE.right
-	if (ady > adx * 1.2) return dy < 0 ? NUDGE.forward : NUDGE.back
-	return null
-}
-
-const isBakedMesh = isBakedMeshByNames
-const wrapBakedTex = tex => {
-	if (!tex) return
-	tex.wrapS = THREE.ClampToEdgeWrapping; tex.wrapT = THREE.ClampToEdgeWrapping
-	tex.generateMipmaps = true; tex.minFilter = THREE.LinearMipmapLinearFilter; tex.magFilter = THREE.LinearFilter
-	tex.anisotropy = 1; tex.needsUpdate = true
-}
-const applyBakedMaterial = (mat, tex, info, meshName) => {
-	const nl = meshName.toLowerCase()
-	mat.emissiveMap = tex
-	// baked tint via Material.m_cBase; overlay intensity via alpha
+const setTitle = s => {
 	try {
-		// tint via baseColor if present
-		const cur = mat.color ? mat.color.getHex() : 0xffffff
-		const tint = cur !== 0x000000 ? new THREE.Color(cur) : new THREE.Color(0xffffff)
-		if (mat.emissive) mat.emissive.copy(tint); else mat.emissive = tint
-	} catch { try { mat.emissive = new THREE.Color(0xffffff) } catch {} }
-	const isOverlay = info.isVlmBake && !info.isMainBake
-	if (isOverlay) {
-		const hasTex = !!tex
-		if (!hasTex) {
-			mat.emissiveIntensity = 0
-			mat.transparent = true; mat.opacity = 0; mat.blending = THREE.AdditiveBlending; mat.depthWrite = false; mat.alphaTest = 0
-		} else {
-			mat.emissiveIntensity = 1.0
-			mat.transparent = true; mat.opacity = 1.0; mat.blending = THREE.AdditiveBlending; mat.depthWrite = false; mat.alphaTest = 0
-		}
-		try { if (!mat.color) mat.color = new THREE.Color(0x000000); else mat.color.set(0x000000) } catch {}
-		mat.side = THREE.DoubleSide; mat.toneMapped = true; mat.roughness = BAKED_ROUGH; mat.metalness = BAKED_METAL
-		wrapBakedTex(tex); wrapBakedTex(mat.emissiveMap)
-		mat.polygonOffset = true; mat.polygonOffsetFactor = -2; mat.polygonOffsetUnits = -4
-	} else {
-		mat.emissiveIntensity = BAKED_EMISSIVE
-		try { if (!mat.color) mat.color = new THREE.Color(0x000000); else mat.color.set(0x000000) } catch {}
-		mat.side = THREE.DoubleSide; mat.toneMapped = true; mat.roughness = BAKED_ROUGH; mat.metalness = BAKED_METAL
-		wrapBakedTex(tex); wrapBakedTex(mat.emissiveMap)
-		if (info.isMainBake && !nl.includes('non_opaque') && !/ramp|armp|botramp|rampscrw/i.test(nl)) {
-			mat.polygonOffset = true; mat.polygonOffsetFactor = -1; mat.polygonOffsetUnits = -1
-			mat.depthWrite = true; mat.transparent = false; mat.alphaTest = 0
-		}
-	}
-}
-
-const TABLE_OPTS = {
-	exportPlayfield: true,
-	exportPrimitives: true,
-	exportRubbers: true,
-	exportSurfaces: true,
-	exportFlippers: true,
-	exportBumpers: true,
-	exportRamps: true,
-	exportLightBulbs: true,
-	exportPlayfieldLights: true,
-	exportHitTargets: true,
-	exportGates: true,
-	exportKickers: true,
-	exportTriggers: true,
-	exportSpinners: true,
-	exportPlungers: true,
-	exportLightBulbLights: true,
+		const el = document.getElementById('title')
+		if (el && s) el.textContent = s
+	} catch {}
 }
 
 export class Viewer {
 	constructor(opts = {}) {
+		ensureGlobals()
+		ensureBvh()
 		const { defaultVpx = null, queryParam = 'vpx', dom = {}, viewerMode = 'viewer' } = opts
 		this.defaultVpx = defaultVpx
 		this.queryParam = queryParam
@@ -182,7 +110,13 @@ export class Viewer {
 		this.harnessLog = createHarness(this.dom.logEl).harnessLog
 		this.scene = new THREE.Scene()
 		this.scene.background = new THREE.Color(0x0f1115)
-		this.camera = new THREE.PerspectiveCamera(CAM.fov, innerWidth / innerHeight, CAM.near, CAM.far)
+		this.camera = new THREE.PerspectiveCamera(
+			CAM.fov,
+			(typeof window !== 'undefined' ? window.innerWidth : 800) /
+				(typeof window !== 'undefined' ? window.innerHeight : 600),
+			CAM.near,
+			CAM.far,
+		)
 		this.camera.position.set(0, -800, 1500)
 		this.scene.add(new THREE.HemisphereLight(LIGHT_HEMI.sky, LIGHT_HEMI.ground, LIGHT_HEMI.intensity))
 		const dir = new THREE.DirectionalLight(LIGHT_DIR.color, LIGHT_DIR.intensity)
@@ -198,7 +132,7 @@ export class Viewer {
 		this._boundKeyDown = null
 		this._boundKeyUp = null
 		this._playCameraApplied = false
-		this._cameraAnim = null
+		this._cameraTimeout = null
 		this._cameraRaf = null
 		this.animFrame = null
 		this._animRaf = null
@@ -206,6 +140,9 @@ export class Viewer {
 		this._emuStartLogged = false
 		this._streamId = 0
 		this._touchMap = new Map()
+		this._inputCleanup = null
+		this._nudgeCleanup = null
+		this._touchCleanup = null
 		this._autoPlayTimer = null
 		this._hasPinmame = false
 		this._rendererBackend = 'webgl'
@@ -222,43 +159,81 @@ export class Viewer {
 		{
 			const onReset = () => this._onResetView()
 			this.dom.resetBtn?.addEventListener('click', onReset)
-			if (this.dom.resetBtn) this._eventCleanups.push(() => this.dom.resetBtn?.removeEventListener('click', onReset))
+			if (this.dom.resetBtn)
+				this._eventCleanups.push(() => this.dom.resetBtn?.removeEventListener('click', onReset))
 		}
 		this._setupModeSwitch()
 		this._setupDebugToggle()
 		this._syncChrome()
 	}
 
+	// Lifecycle
 	destroy() {
 		if (this._disposed) return
 		this._disposed = true
-		try { if (this._cameraRaf) cancelAnimationFrame(this._cameraRaf) } catch {}
-		try { if (this._cameraAnim) cancelAnimationFrame(this._cameraAnim) } catch {}
-		try { if (typeof this._cameraAnim === 'number') clearTimeout(this._cameraAnim) } catch {}
-		try { if (this._animRaf) cancelAnimationFrame(this._animRaf) } catch {}
-		try { if (this._animTimeout) clearTimeout(this._animTimeout) } catch {}
-		try { if (this.animFrame) cancelAnimationFrame(this.animFrame) } catch {}
-		try { if (this.animFrame) clearTimeout(this.animFrame) } catch {}
-		try { if (this._autoPlayTimer) clearTimeout(this._autoPlayTimer) } catch {}
-		try { this._nudgeCleanup?.() } catch {}
-		try { this._touchCleanup?.() } catch {}
-		try { this._terminatePhysicsWorker() } catch {}
-		for (const fn of this._eventCleanups) try { fn() } catch {}
+		try {
+			if (this._cameraRaf) cancelAnimationFrame(this._cameraRaf)
+		} catch {}
+		try {
+			if (this._cameraTimeout) clearTimeout(this._cameraTimeout)
+		} catch {}
+
+		try {
+			if (this._animRaf) cancelAnimationFrame(this._animRaf)
+		} catch {}
+		try {
+			if (this._animTimeout) clearTimeout(this._animTimeout)
+		} catch {}
+		try {
+			if (this.animFrame) cancelAnimationFrame(this.animFrame)
+		} catch {}
+		try {
+			if (this.animFrame) clearTimeout(this.animFrame)
+		} catch {}
+		try {
+			if (this._autoPlayTimer) clearTimeout(this._autoPlayTimer)
+		} catch {}
+		try {
+			this._inputCleanup?.()
+		} catch {}
+		this._nudgeCleanup = null
+		this._touchCleanup = null
+		try {
+			this._terminatePhysicsWorker()
+		} catch {}
+		for (const fn of this._eventCleanups)
+			try {
+				fn()
+			} catch {}
 		this._eventCleanups = []
-		try { if (this._boundKeyDown) removeEventListener('keydown', this._boundKeyDown) } catch {}
-		try { if (this._boundKeyUp) removeEventListener('keyup', this._boundKeyUp) } catch {}
-		try { this.controls?.dispose?.() } catch {}
-		try { this.renderer?.dispose?.() } catch {}
-		try { this.scene?.clear?.() } catch {}
+		try {
+			if (this._boundKeyDown) removeEventListener('keydown', this._boundKeyDown)
+		} catch {}
+		try {
+			if (this._boundKeyUp) removeEventListener('keyup', this._boundKeyUp)
+		} catch {}
+		try {
+			this.controls?.dispose?.()
+		} catch {}
+		try {
+			this.renderer?.dispose?.()
+		} catch {}
+		try {
+			this.scene?.clear?.()
+		} catch {}
 	}
 
+	// Physics worker
 	_terminatePhysicsWorker() {
-		try { this._physicsWorker?.terminate?.() } catch {}
+		try {
+			this._physicsWorker?.terminate?.()
+		} catch {}
 		this._physicsWorker = null
 		this._physicsSab = null
 		this._physicsScratch = null
 	}
 
+	// Debug
 	_setupDebugToggle() {
 		const btn = document.getElementById('debug-toggle')
 		const toggle = () => document.body.classList.toggle('show-debug')
@@ -277,6 +252,7 @@ export class Viewer {
 		this._eventCleanups.push(() => removeEventListener('keydown', onKey))
 	}
 
+	// Renderer
 	async _createRenderer() {
 		const canvas = this.dom.canvas
 		const p = new URLSearchParams(location.search)
@@ -300,12 +276,14 @@ export class Viewer {
 		const isSwiftShader = (() => {
 			try {
 				const c = document.createElement('canvas')
-				const gl = (c.getContext('webgl2') ?? c.getContext('webgl'))
+				const gl = c.getContext('webgl2') ?? c.getContext('webgl')
 				if (!gl) return false
 				const ext = gl.getExtension('WEBGL_debug_renderer_info')
 				const r = ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : ''
 				return String(r).toLowerCase().includes('swiftshader')
-			} catch { return false }
+			} catch {
+				return false
+			}
 		})()
 		const useAA = wantAA && !isSwiftShader
 		if (!renderer) {
@@ -334,13 +312,14 @@ export class Viewer {
 		this.controls.target.set(0, 0, 0)
 		this.controls.update()
 		this.controls.enabled = this.viewerMode !== 'play'
-		if (_isDev) Object.assign(window, {
-			scene: this.scene,
-			camera: this.camera,
-			controls: this.controls,
-			renderer: this.renderer,
-			THREE,
-		})
+		if (_isDev)
+			Object.assign(window, {
+				scene: this.scene,
+				camera: this.camera,
+				controls: this.controls,
+				renderer: this.renderer,
+				THREE,
+			})
 		this._onResize()
 		this.log(`Renderer ready: ${backend} (three r${THREE.REVISION})`)
 		return renderer
@@ -352,13 +331,16 @@ export class Viewer {
 	}
 
 	_onResize() {
-		this.camera.aspect = (typeof window !== 'undefined' ? window.innerWidth : 800) / (typeof window !== 'undefined' ? window.innerHeight : 600)
+		const w = typeof window !== 'undefined' ? window.innerWidth : 800
+		const h = typeof window !== 'undefined' ? window.innerHeight : 600
+		this.camera.aspect = w / h
 		this.camera.updateProjectionMatrix()
 		if (this.renderer) this.renderer.setPixelRatio(getTargetPixelRatio(this.viewerMode))
-		this.renderer?.setSize(typeof window !== 'undefined' ? window.innerWidth : 800, typeof window !== 'undefined' ? window.innerHeight : 600)
+		this.renderer?.setSize(w, h)
 		this.dmd?._resize?.()
 	}
 
+	// Viewer / Play mode
 	_setupModeSwitch() {
 		const onOrbitToggle = e => {
 			if ((e.key === 'o' || e.key === 'O') && this.viewerMode === 'play') {
@@ -439,10 +421,14 @@ export class Viewer {
 		})
 	}
 
+	// Mode switching
 	async _switchToPlay() {
 		if (this.viewerMode === 'play' || !this.tableGroup) return
 		this.viewerMode = 'play'
-		if (this.renderer) { this.renderer.setPixelRatio(getTargetPixelRatio('play')); this.renderer.sortObjects = false }
+		if (this.renderer) {
+			this.renderer.setPixelRatio(getTargetPixelRatio('play'))
+			this.renderer.sortObjects = false
+		}
 		this._hidePlayTip?.()
 		hideCabFlippers(this.tableGroup)
 		this._syncChrome()
@@ -452,7 +438,7 @@ export class Viewer {
 			this.player.setPhysicsEnabled(true)
 			this.enterPlayMode()
 		} else if (this.table) await this._createPlayer()
-		else this.load().catch(e => this.log('Play load failed: ' + e.message, 'error'))
+		else this.load().catch(e => this.log(`Play load failed: ${e.message}`, 'error'))
 	}
 
 	async _switchToViewer() {
@@ -468,6 +454,7 @@ export class Viewer {
 		this.exitPlayMode()
 	}
 
+	// Chrome / Camera
 	_syncChrome() {
 		const hint = document.getElementById('mode-hint')
 		const isPlay = this.viewerMode === 'play'
@@ -486,12 +473,21 @@ export class Viewer {
 		}
 	}
 
+	// Camera animation
 	async _animateCameraTo(state, duration = CAM_ANIM.durationMode) {
 		if (!state || !this.controls) return
-		if (this._cameraRaf) cancelAnimationFrame(this._cameraRaf)
-		if (this._cameraAnim) { try { cancelAnimationFrame(this._cameraAnim) } catch {} try { clearTimeout(this._cameraAnim) } catch {} }
-		this._cameraRaf = null
-		this._cameraAnim = null
+		if (this._cameraRaf) {
+			try {
+				cancelAnimationFrame(this._cameraRaf)
+			} catch {}
+			this._cameraRaf = null
+		}
+		if (this._cameraTimeout) {
+			try {
+				clearTimeout(this._cameraTimeout)
+			} catch {}
+			this._cameraTimeout = null
+		}
 		const fromPos = this.camera.position.clone()
 		const fromTarget = this.controls.target.clone()
 		const fromNear = this.camera.near
@@ -509,13 +505,19 @@ export class Viewer {
 		this.controls.enabled = false
 		this.gate ??= new AnimationGate()
 		this.gate.beginAnimation()
-		// Let texture/transpile workers yield before animating
-		await new Promise(r => setTimeout(r, ANIM_SETTLE_MS))
+		await new Promise(r => {
+			this._cameraTimeout = setTimeout(r, ANIM_SETTLE_MS)
+		})
+		this._cameraTimeout = null
 		const start = performance.now()
 		return new Promise(resolve => {
-			const tick = now => {
-				if (this._disposed) { this.gate.endAnimation(); resolve(); return }
-				const t = Math.min(1, (now - start) / duration)
+			const tick = () => {
+				if (this._disposed) {
+					this.gate.endAnimation()
+					resolve()
+					return
+				}
+				const t = Math.min(1, (performance.now() - start) / duration)
 				const e = ease(t)
 				this.camera.position.lerpVectors(fromPos, toPos, e)
 				this.controls.target.lerpVectors(fromTarget, toTarget, e)
@@ -538,19 +540,40 @@ export class Viewer {
 		})
 	}
 
+	// Physics
 	_createPhysicsWorker() {
 		try {
-			if (this._physicsWorker) try { this._physicsWorker.terminate() } catch {}
+			if (this._physicsWorker)
+				try {
+					this._physicsWorker.terminate()
+				} catch {}
 			const sab = createPhysicsSAB()
 			const scratch = new Float32Array(MAX_BALLS * BALL_STRIDE)
 			const workerUrl = new URL('../dist-esm/lib/game/physics.worker.js', import.meta.url)
 			const worker = new Worker(workerUrl, { type: 'module' })
-			worker.postMessage({ type: 'init', sab }); worker.postMessage({ type: 'start' })
-			worker.onmessage = e => { if (e.data?.type === 'heartbeat') this.log(`[physics-worker] heartbeat ${e.data.timeMsec} ticks ${e.data.tickCount}`, 'debug') }
-			worker.onerror = e => { this.log(`worker error ${e.message}`, 'warn'); this._physicsSab = null; try { worker.terminate() } catch {} if (this._physicsWorker === worker) this._physicsWorker = null }
-			this._physicsSab = sab; this._physicsScratch = scratch; this._physicsWorker = worker
+			worker.postMessage({ type: 'init', sab })
+			worker.postMessage({ type: 'start' })
+			worker.onmessage = e => {
+				if (e.data?.type === 'heartbeat')
+					this.log(`[physics-worker] heartbeat ${e.data.timeMsec} ticks ${e.data.tickCount}`, 'debug')
+			}
+			worker.onerror = e => {
+				this.log(`worker error ${e.message}`, 'warn')
+				this._physicsSab = null
+				try {
+					worker.terminate()
+				} catch {}
+				if (this._physicsWorker === worker) this._physicsWorker = null
+			}
+			this._physicsSab = sab
+			this._physicsScratch = scratch
+			this._physicsWorker = worker
 			return { sab, scratch, worker }
-		} catch (e) { this.log(`physics worker init failed ${e.message}`, 'warn'); if (_isDev) console.warn(e); return null }
+		} catch (e) {
+			this.log(`physics worker init failed ${e.message}`, 'warn')
+			if (_isDev) console.warn(e)
+			return null
+		}
 	}
 
 	_ensurePhysicsWorker() {
@@ -561,9 +584,14 @@ export class Viewer {
 		this.log(`[physics] SAB ${res.sab.byteLength} worker started`, 'info')
 		return true
 	}
+	// Play state
 	enterPlayMode() {
 		if (this.controls) this.controls.enabled = false
-		try { this._ensurePhysicsWorker() } catch (e) { if (_isDev) console.warn(e) }
+		try {
+			this._ensurePhysicsWorker()
+		} catch (e) {
+			if (_isDev) console.warn(e)
+		}
 		if (this.tableGroup) hideCabFlippers(this.tableGroup)
 		try {
 			const bg = this.tableGroup?.getObjectByName('balls')
@@ -607,7 +635,9 @@ export class Viewer {
 			const isPinmame = emu && !isMock
 			if (isPinmame) {
 				let running = false
-				try { running = emu.isInitialized?.() && emu.api?.isRunning?.() === 1 } catch {}
+				try {
+					running = emu.isInitialized?.() && emu.api?.isRunning?.() === 1
+				} catch {}
 				if (!running) {
 					if (attempt < 40) {
 						this._autoPlayTimer = setTimeout(() => attemptSend(attempt + 1), 500)
@@ -667,6 +697,7 @@ export class Viewer {
 		this._autoPlayTimer = setTimeout(() => attemptSend(0), 900)
 	}
 
+	// Scene graph
 	buildNodeCache() {
 		this.nodeCache.clear()
 		if (!this.tableGroup || !this.table) return
@@ -746,6 +777,7 @@ export class Viewer {
 		changed.release()
 	}
 
+	// UI helpers
 	_emitModeChange() {
 		try {
 			document.dispatchEvent(new CustomEvent('viewer:modechange', { detail: { mode: this.viewerMode } }))
@@ -787,7 +819,10 @@ export class Viewer {
 		if (this.dom.dropzone) this.dom.dropzone.hidden = true
 		if (this.dom.wrap) this.dom.wrap.hidden = false
 		if (this.dom.loading) this.dom.loading.hidden = true
-		this.renderer?.setSize(innerWidth, innerHeight)
+		this.renderer?.setSize(
+			typeof window !== 'undefined' ? window.innerWidth : 800,
+			typeof window !== 'undefined' ? window.innerHeight : 600,
+		)
 		this.dom.canvas?.focus()
 		if (this.dom.dmdWrap) this.dom.dmdWrap.hidden = true
 	}
@@ -796,6 +831,7 @@ export class Viewer {
 		if (this.dom.status) this.dom.status.textContent = msg
 	}
 
+	// Loading
 	async _loadTable(reader) {
 		logMem(this.harnessLog, 'after reader.open')
 		this._loading(66, 'Opening table…', 'Reading table data…')
@@ -803,7 +839,11 @@ export class Viewer {
 		const table = await Table.load(reader)
 		this.table = table
 		if (_isDev) window.table = table
-		try { this._hasPinmame = !!cGameName(table) } catch { this._hasPinmame = false }
+		try {
+			this._hasPinmame = !!cGameName(table)
+		} catch {
+			this._hasPinmame = false
+		}
 		const dt = performance.now() - t0
 		this.log(
 			`Parsed in ${dt.toFixed(0)}ms — ${Object.keys(table.items).length} items, ${Object.keys(table.textures).length} textures`,
@@ -907,7 +947,7 @@ export class Viewer {
 				const mats = Array.isArray(o.material) ? o.material : [o.material]
 				for (const m of mats) {
 					for (const k of ['map', 'normalMap', 'envMap', 'emissiveMap']) {
-						const pending = (m.userData || {})['pending' + k[0].toUpperCase() + k.slice(1)]
+						const pending = m.userData?.[`pending${k[0].toUpperCase()}${k.slice(1)}`]
 						if (pending) {
 							const key = String(pending).toLowerCase()
 							used.add(key)
@@ -1009,7 +1049,9 @@ export class Viewer {
 	async _mount(table, node, opts = {}, source = null) {
 		if (this.tableGroup) this.scene.remove(this.tableGroup)
 		this.tableGroup = node
-		try { this._tableBasePos = node.position.clone() } catch {}
+		try {
+			this._tableBasePos = node.position.clone()
+		} catch {}
 		this.scene.add(node)
 		const pp = postProcessScene(node, { viewerMode: this.viewerMode, harnessLog: this.harnessLog, table })
 		if (this.viewerMode === 'play') hideCabFlippers(node)
@@ -1025,7 +1067,10 @@ export class Viewer {
 			applyCameraState(this.camera, this.controls, state)
 			this._playCameraApplied = true
 			framed = { center: state.center, size: state.size, maxDim: state.maxDim }
-			this.harnessLog?.(`[mount] play cam ${state.position.x.toFixed(0)},${state.position.y.toFixed(0)},${state.position.z.toFixed(0)} tgt ${state.target.x.toFixed(0)},${state.target.y.toFixed(0)},${state.target.z.toFixed(0)} maxDim ${state.maxDim.toFixed(0)}`, 'info')
+			this.harnessLog?.(
+				`[mount] play cam ${state.position.x.toFixed(0)},${state.position.y.toFixed(0)},${state.position.z.toFixed(0)} tgt ${state.target.x.toFixed(0)},${state.target.y.toFixed(0)},${state.target.z.toFixed(0)} maxDim ${state.maxDim.toFixed(0)}`,
+				'info',
+			)
 		} else framed = frameCamera(this.tableGroup, this.camera, this.controls)
 		try {
 			const center = framed.center,
@@ -1044,13 +1089,27 @@ export class Viewer {
 		this._emitModeChange()
 		try {
 			const gn = cGameName(table)
-			const src = (opts && typeof opts.source === 'string' ? opts.source : null) ?? (typeof source === 'string' ? source : '')
-			const basename = typeof src === 'string' && src ? src.split('/').pop()?.replace(/\.vpx$/i, '') : ''
+			const src =
+				(opts && typeof opts.source === 'string' ? opts.source : null) ??
+				(typeof source === 'string' ? source : '')
+			const basename =
+				typeof src === 'string' && src
+					? src
+							.split('/')
+							.pop()
+							?.replace(/\.vpx$/i, '')
+					: ''
 			const rawGet = table?.getName?.()
 			const infoName = table?.info?.TableName?.trim()
 			let vpxName = ''
 			if (rawGet && rawGet !== 'Table' && rawGet !== 'Table1') vpxName = rawGet
-			else if (infoName && infoName !== 'Table Name' && infoName !== 'Table1' && infoName.toLowerCase() !== 'table name') vpxName = infoName
+			else if (
+				infoName &&
+				infoName !== 'Table Name' &&
+				infoName !== 'Table1' &&
+				infoName.toLowerCase() !== 'table name'
+			)
+				vpxName = infoName
 			else if (basename) vpxName = basename.replace(/[_-]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
 			if (vpxName) setTitle(vpxName)
 			else if (gn) setTitle(gn)
@@ -1060,7 +1119,9 @@ export class Viewer {
 				this.log(`PinMAME GameName: ${gn} — trying ${candidates.join(', ')}`)
 			}
 			if (this.dom.subtitle) this.dom.subtitle.textContent = ''
-		} catch (e) { if (_isDev) console.warn('title/resolve failed', e) }
+		} catch (e) {
+			if (_isDev) console.warn('title/resolve failed', e)
+		}
 		if (!opts.skipPlayer) {
 			this._loading(92, 'Almost ready…', 'Starting game logic…')
 			await new Promise(r => setTimeout(r, 0))
@@ -1079,7 +1140,9 @@ export class Viewer {
 		if (_isDev) Object.assign(window, { table, tableGroup: node, player: this.player })
 		try {
 			buildBvhIdle(node)
-		} catch (e) { if (_isDev) console.warn('buildBvhIdle failed', e) }
+		} catch (e) {
+			if (_isDev) console.warn('buildBvhIdle failed', e)
+		}
 		this.startLoop()
 		return { loaded: table, node, pp, framed }
 	}
@@ -1127,7 +1190,15 @@ export class Viewer {
 				try {
 					let emu = this.player.getPhysics().emu
 					if (emu) {
-						this.log(`Emu after init: ${emu.constructor.name} init=${emu.isInitialized?.()} mock=${emu.isMock} run=${(()=>{try{return emu.api?.isRunning?.()}catch{return '?' }})()}`)
+						this.log(
+							`Emu after init: ${emu.constructor.name} init=${emu.isInitialized?.()} mock=${emu.isMock} run=${(() => {
+								try {
+									return emu.api?.isRunning?.()
+								} catch {
+									return '?'
+								}
+							})()}`,
+						)
 						return
 					}
 					if (++tries < 10) {
@@ -1160,11 +1231,12 @@ export class Viewer {
 			if (this.viewerMode === 'play') this.enterPlayMode()
 			else this.exitPlayMode()
 		} catch (e) {
-			this.log('Player init failed:' + e.message, 'error')
+			this.log(`Player init failed:${e.message}`, 'error')
 			console.error(e)
 		}
 	}
 
+	// Streaming
 	_streamTextures(table, textures, reader) {
 		if (!textures?.length) {
 			if (reader) void this._cleanupReader(reader).catch(() => {})
@@ -1195,7 +1267,7 @@ export class Viewer {
 						const mats = Array.isArray(o.material) ? o.material : [o.material]
 						for (const m of mats) {
 							for (const k of ['map', 'normalMap', 'envMap', 'emissiveMap']) {
-								const pk = 'pending' + k[0].toUpperCase() + k.slice(1)
+								const pk = `pending${k[0].toUpperCase()}${k.slice(1)}`
 								const name = m.userData?.[pk]
 								if (!name) continue
 								let tex = cache.get(name)
@@ -1214,13 +1286,23 @@ export class Viewer {
 								delete m.userData[pk]
 								m.needsUpdate = true
 								if (k === 'map') {
-									const info = isBakedMesh(o.name || '', m.name || '', tex.name || '')
+									const info = isBakedMeshByNames(o.name || '', m.name || '', tex.name || '')
 									if (info.isBaked) {
-										try { applyBakedMaterial(m, tex, info, o.name || '') } catch {}
-										const isPlayfieldOverlay = info.isVlmBake && !info.isMainBake && (o.name || '').toLowerCase().includes('playfield')
-										if ((info.isMainBake || isPlayfieldOverlay) && (o.visible === false) && (o.name || '').toLowerCase().includes('playfield')) {
+										try {
+											applyBakedMaterial(m, tex, info, o.name || '')
+										} catch {}
+										const isPlayfieldOverlay =
+											info.isVlmBake &&
+											!info.isMainBake &&
+											(o.name || '').toLowerCase().includes('playfield')
+										if (
+											(info.isMainBake || isPlayfieldOverlay) &&
+											o.visible === false &&
+											(o.name || '').toLowerCase().includes('playfield')
+										) {
 											o.visible = true
-											for (let p = o.parent; p && p !== this.tableGroup; p = p.parent) if (p.visible === false) p.visible = true
+											for (let p = o.parent; p && p !== this.tableGroup; p = p.parent)
+												if (p.visible === false) p.visible = true
 										}
 									}
 								}
@@ -1232,21 +1314,25 @@ export class Viewer {
 						let hasReadyBake = false
 						this.tableGroup.traverse(o2 => {
 							if (!o2.isMesh) return
-							const n2 = o2.name || '', m2 = Array.isArray(o2.material) ? o2.material[0] : o2.material
+							const n2 = o2.name || '',
+								m2 = Array.isArray(o2.material) ? o2.material[0] : o2.material
 							if (!m2?.map) return
 							if (!n2.toLowerCase().includes('playfield') && !n2.toLowerCase().includes('bm_')) return
-							const info = isBakedMesh(n2, m2.name || '', m2.map?.name || '')
+							const info = isBakedMeshByNames(n2, m2.name || '', m2.map?.name || '')
 							if (info.isBaked) hasReadyBake = true
 						})
 						if (hasReadyBake) {
 							this.tableGroup.traverse(o2 => {
-								if (!o2.isMesh || !o2.visible || !(o2.name || '').toLowerCase().includes('playfield')) return
+								if (!o2.isMesh || !o2.visible || !(o2.name || '').toLowerCase().includes('playfield'))
+									return
 								const m2 = Array.isArray(o2.material) ? o2.material[0] : o2.material
 								if (!m2) return
-								const info = isBakedMesh(o2.name || '', m2.name || '', m2.map?.name || '')
+								const info = isBakedMeshByNames(o2.name || '', m2.name || '', m2.map?.name || '')
 								if (!info.isBaked && !info.isMainBake && !info.isVlmBake) {
 									o2.visible = false
-									try { o2.geometry?.dispose?.() } catch {}
+									try {
+										o2.geometry?.dispose?.()
+									} catch {}
 								}
 							})
 						}
@@ -1257,10 +1343,11 @@ export class Viewer {
 							if (!n2.includes('playfield')) return
 							const m2 = Array.isArray(o2.material) ? o2.material[0] : o2.material
 							if (!m2?.map) return
-							const info2 = isBakedMesh(n2, m2.name || '', m2.map?.name || '')
+							const info2 = isBakedMeshByNames(n2, m2.name || '', m2.map?.name || '')
 							if ((info2.isMainBake || (info2.isVlmBake && !info2.isMainBake)) && o2.visible === false) {
 								o2.visible = true
-								for (let p = o2.parent; p && p !== this.tableGroup; p = p.parent) if (p.visible === false) p.visible = true
+								for (let p = o2.parent; p && p !== this.tableGroup; p = p.parent)
+									if (p.visible === false) p.visible = true
 							}
 						})
 					}
@@ -1284,7 +1371,7 @@ export class Viewer {
 					} catch {}
 				})
 			}
-			const onTexture = (tex, ok) => {
+			const onTexture = (_tex, _ok) => {
 				if (this._streamId !== streamId) return
 				done++
 				schedulePatch()
@@ -1307,7 +1394,7 @@ export class Viewer {
 				logMem(this.harnessLog, 'Stream ready')
 			} catch (e) {
 				if (this._streamId !== streamId) return
-				this.log('[stream] failed: ' + e.message, 'warn')
+				this.log(`[stream] failed: ${e.message}`, 'warn')
 				this._hideStream()
 			} finally {
 				if (reader) {
@@ -1333,7 +1420,7 @@ export class Viewer {
 				const emu = this.player?.getPhysics?.()?.emu
 				if (emu?.isMock) return true
 				if (emu?.api?.isRunning?.() === 1) {
-					this.log(`[wait] isRunning=1 after ${((performance.now()-start)|0)}ms`)
+					this.log(`[wait] isRunning=1 after ${(performance.now() - start) | 0}ms`)
 					return true
 				}
 			} catch {}
@@ -1348,7 +1435,14 @@ export class Viewer {
 
 	async _fromReader(reader, source) {
 		try {
-			setTitle(typeof source === 'string' ? source.split('/').pop()?.replace(/\.vpx$/i,'') : '')
+			setTitle(
+				typeof source === 'string'
+					? source
+							.split('/')
+							.pop()
+							?.replace(/\.vpx$/i, '')
+					: '',
+			)
 			this._loading(62, 'Opening table…', 'Reading table data…')
 			const table = await this._loadTable(reader)
 			const { node, textures } = await this._buildScene(table)
@@ -1365,12 +1459,15 @@ export class Viewer {
 		}
 	}
 
+	// Public API
 	async load() {
 		await this._ensureRenderer()
 		if (this.dom.loading) this.dom.loading.hidden = false
 		if (this.dom.wrap) this.dom.wrap.hidden = false
 		try {
-			this.renderer?.setSize(innerWidth, innerHeight)
+			const _w = typeof window !== 'undefined' ? window.innerWidth : 800
+			const _h = typeof window !== 'undefined' ? window.innerHeight : 600
+			this.renderer?.setSize(_w, _h)
 		} catch {}
 		this._loading(2, 'Getting ready…', 'Looking for table…')
 		const candidates = resolveVpxCandidates({ defaultName: this.defaultVpx, queryParam: this.queryParam })
@@ -1442,7 +1539,11 @@ export class Viewer {
 			this.log(`Preloading ROM ${url}…`)
 			const data = await fetchWithProgress(url, p => this.setBar(5 + p * 40, `ROM ${(p * 100).toFixed(0)}%`))
 			window.__pendingRom = data
-			window.__pendingRomName = url.split('/').pop()?.replace(/\.zip$/i, '') || ''
+			window.__pendingRomName =
+				url
+					.split('/')
+					.pop()
+					?.replace(/\.zip$/i, '') || ''
 			window.__pendingRomUrl = url
 			this.log(`ROM preload OK ${fmtBytes(data.length)}`)
 			return data
@@ -1452,15 +1553,30 @@ export class Viewer {
 		}
 	}
 
+	// Render loop
 	async startLoop() {
 		await this._ensureRenderer()
 		if (this._disposed) return
 		if (this.animFrame) {
-			try { cancelAnimationFrame(this.animFrame) } catch {}
-			try { clearTimeout(this.animFrame) } catch {}
+			try {
+				cancelAnimationFrame(this.animFrame)
+			} catch {}
+			try {
+				clearTimeout(this.animFrame)
+			} catch {}
 		}
-		if (this._animRaf) { try { cancelAnimationFrame(this._animRaf) } catch {} this._animRaf = null }
-		if (this._animTimeout) { try { clearTimeout(this._animTimeout) } catch {} this._animTimeout = null }
+		if (this._animRaf) {
+			try {
+				cancelAnimationFrame(this._animRaf)
+			} catch {}
+			this._animRaf = null
+		}
+		if (this._animTimeout) {
+			try {
+				clearTimeout(this._animTimeout)
+			} catch {}
+			this._animTimeout = null
+		}
 		let last = performance.now(),
 			frames = 0,
 			fps = 0
@@ -1469,19 +1585,29 @@ export class Viewer {
 			if (!this._hasPinmame) return false
 			const emu = this.player?.getPhysics?.()?.emu
 			if (!emu || emu.isMock || !emu.isInitialized?.()) return false
-			try { return emu.api?.isRunning?.() === 0 } catch { return false }
+			try {
+				return emu.api?.isRunning?.() === 0
+			} catch {
+				return false
+			}
 		}
 		if (this.player && (!this._physicsSab || !this._physicsWorker)) {
 			try {
 				const res = this._createPhysicsWorker()
 				if (res) this.log(`[physics] SAB ${res.sab.byteLength} worker started`, 'info')
-			} catch (e) { if (_isDev) console.warn('physics worker start failed', e) }
+			} catch (e) {
+				if (_isDev) console.warn('physics worker start failed', e)
+			}
 		} else if (this._physicsSab) {
 			this.log(`[physics] reusing SAB ${this._physicsSab.byteLength}`, 'debug')
 		}
 		const tickPhysics = now => {
 			if (!this.player || this.isPaused) return
-			try { if (this._physicsSab && this._physicsScratch) trySnap(this._physicsSab, this._physicsScratch) } catch (e) { if (_isDev) console.warn('trySnap failed', e) }
+			try {
+				if (this._physicsSab && this._physicsScratch) trySnap(this._physicsSab, this._physicsScratch)
+			} catch (e) {
+				if (_isDev) console.warn('trySnap failed', e)
+			}
 			this.player.setPhysicsEnabled(this.viewerMode === 'play')
 			this.player.updatePhysics(now)
 			this.player.updateAnimations(this.player.getGameTime())
@@ -1494,7 +1620,9 @@ export class Viewer {
 			const pinLoading = isPinLoading()
 			if (pinLoading !== pinLoadingLogged) {
 				pinLoadingLogged = pinLoading
-				this.log(pinLoading ? '[loop] PinMAME loading — pausing render' : '[loop] PinMAME ready — resuming render')
+				this.log(
+					pinLoading ? '[loop] PinMAME loading — pausing render' : '[loop] PinMAME ready — resuming render',
+				)
 			}
 			if (pinLoading) {
 				this._animTimeout = setTimeout(loop, 16)
@@ -1508,8 +1636,16 @@ export class Viewer {
 			if (this.controls?.enabled) this.controls.update()
 			tickPhysics(now)
 			this._pollPinmame()
-			try { this._applyNudgeVisual() } catch (e) { if (_isDev) console.warn('_applyNudgeVisual', e) }
-			try { this.renderer.render(this.scene, this.camera) } catch (e) { if (_isDev) console.warn('render', e) }
+			try {
+				this._applyNudgeVisual()
+			} catch (e) {
+				if (_isDev) console.warn('_applyNudgeVisual', e)
+			}
+			try {
+				this.renderer.render(this.scene, this.camera)
+			} catch (e) {
+				if (_isDev) console.warn('render', e)
+			}
 			frames++
 			const now2 = performance.now()
 			if (now2 - last > 500) {
@@ -1526,11 +1662,18 @@ export class Viewer {
 				const emuStat = !emu ? '' : emu.isInitialized?.() ? 'ok' : 'loading'
 				const draws = this.renderer?.info?.render?.calls ?? 0
 				const tris = this.renderer?.info?.render?.triangles ?? 0
-				const trisFmt = tris >= 1e6 ? `${(tris / 1e6).toFixed(1)}M` : tris >= 1e3 ? `${(tris / 1e3).toFixed(1)}k` : `${tris}`
+				const trisFmt =
+					tris >= 1e6
+						? `${(tris / 1e6).toFixed(1)}M`
+						: tris >= 1e3
+							? `${(tris / 1e3).toFixed(1)}k`
+							: `${tris}`
 				const tFmt = t ? `${(t / 1000).toFixed(1)}s` : '—'
 				const emuLabel = emuStat ? `${emuRaw} · ${emuStat}` : emuRaw
 				let wasmReady = false
-				try { wasmReady = isWasmReady() } catch {}
+				try {
+					wasmReady = isWasmReady()
+				} catch {}
 				const wasmLabel = wasmReady ? 'Ready' : 'Loading…'
 				renderStats(this.dom.stats, {
 					fps,
@@ -1551,6 +1694,7 @@ export class Viewer {
 		loop()
 	}
 
+	// DMD / Nudge visuals
 	_pollPinmame() {
 		if (!this._emuStartLogged) {
 			const emu = this.player?.getPhysics()?.emu
@@ -1568,7 +1712,11 @@ export class Viewer {
 			const phys = this.player.getPhysics?.()
 			if (!phys) return
 			if (!this._tableBasePos) {
-				try { this._tableBasePos = this.tableGroup.position.clone() } catch { this._tableBasePos = new THREE.Vector3() }
+				try {
+					this._tableBasePos = this.tableGroup.position.clone()
+				} catch {
+					this._tableBasePos = new THREE.Vector3()
+				}
 			}
 			const base = this._tableBasePos
 			const off = phys.getCabinetOffset?.()
@@ -1587,7 +1735,10 @@ export class Viewer {
 				}
 				try {
 					const wrap = document.getElementById('canvas-wrap')
-					if (wrap) { wrap.classList.remove('is-nudging'); wrap.style.removeProperty('--nudge-transform') }
+					if (wrap) {
+						wrap.classList.remove('is-nudging')
+						wrap.style.removeProperty('--nudge-transform')
+					}
 				} catch {}
 				return
 			}
@@ -1616,300 +1767,68 @@ export class Viewer {
 		} catch {}
 	}
 
+	// Input bridge
 	_nudge(angle, force = 2.6) {
 		if (!this.player || this.viewerMode !== 'play' || this.isPaused) return
-		try { this.player.nudge(angle, force) } catch {}
-		try { this._flashNudge(angle) } catch {}
+		try {
+			this.player.nudge(angle, force)
+		} catch {}
+		try {
+			this._flashNudge(angle)
+		} catch {}
 	}
 
 	_sendKey(code, down) {
-		try { down ? this.player.onKeyDown({ code, key: code === 'Enter' ? 'Enter' : 'Shift', ts: Date.now() }) : this.player.onKeyUp({ code, key: code === 'Enter' ? 'Enter' : 'Shift', ts: Date.now() }) } catch {}
-		try { if (this._physicsSab) pushInput(this._physicsSab, down ? 1 : 0, code.charCodeAt(0) || 0, Date.now()) } catch {}
+		try {
+			if (down) this.player.onKeyDown({ code, key: code === 'Enter' ? 'Enter' : 'Shift', ts: Date.now() })
+			else this.player.onKeyUp({ code, key: code === 'Enter' ? 'Enter' : 'Shift', ts: Date.now() })
+		} catch {}
+		try {
+			if (this._physicsSab) {
+				let h = 0
+				for (let i = 0; i < code.length; i++) h = ((h * 31 + code.charCodeAt(i)) & 0xffff) >>> 0
+				pushInput(this._physicsSab, down ? 1 : 0, h || 1, Date.now())
+			}
+		} catch {}
 	}
 	_flashNudge(angle) {
 		try {
 			const el = document.getElementById('nudge-flash')
 			if (!el || this.viewerMode !== 'play') return
-			const dir = angle >= 45 && angle < 135 ? 'left' : angle >= 135 && angle < 225 ? 'down' : angle >= 225 && angle < 315 ? 'right' : 'up'
-			el.textContent = dir === 'left' ? '‹ NUDGE' : dir === 'right' ? 'NUDGE ›' : dir === 'up' ? '▲ NUDGE' : '▼ NUDGE'
+			const dir =
+				angle >= 45 && angle < 135
+					? 'left'
+					: angle >= 135 && angle < 225
+						? 'down'
+						: angle >= 225 && angle < 315
+							? 'right'
+							: 'up'
+			el.textContent =
+				dir === 'left' ? '‹ NUDGE' : dir === 'right' ? 'NUDGE ›' : dir === 'up' ? '▲ NUDGE' : '▼ NUDGE'
 			el.dataset.dir = dir
 			el.hidden = false
 			el.classList.remove('show')
 			void el.offsetWidth
 			el.classList.add('show')
 			clearTimeout(this._nudgeFlashTimer)
-			this._nudgeFlashTimer = setTimeout(() => { try { el.classList.remove('show'); el.hidden = true } catch {} }, 420)
+			this._nudgeFlashTimer = setTimeout(() => {
+				try {
+					el.classList.remove('show')
+					el.hidden = true
+				} catch {}
+			}, 420)
 		} catch {}
 	}
 
 	hookInput() {
 		if (!this.player) return
-		if (this._boundKeyDown) removeEventListener('keydown', this._boundKeyDown)
-		if (this._boundKeyUp) removeEventListener('keyup', this._boundKeyUp)
-		const togglePause = () => {
-			this.isPaused = !this.isPaused
-			try {
-				this.isPaused ? this.player.pause() : this.player.resume()
-			} catch {}
-			this.log(this.isPaused ? 'Paused (P to resume)' : 'Resumed', this.isPaused ? 'warn' : 'info')
-		}
-		const send = (e, down) => {
-			if (['?', 'h', 'H', 'o', 'O'].includes(e.key)) return
-			if (
-				(e.key === 'p' || e.key === 'P' || e.code === 'KeyP') &&
-				this.viewerMode === 'play' &&
-				!e.ctrlKey &&
-				!e.metaKey &&
-				!e.repeat
-			) {
-				if (!down) return
-				togglePause()
-				e.preventDefault()
-				return
-			}
-			if (e.code === 'Escape' && this.viewerMode === 'play') {
-				if (down) this._switchToViewer()
-				e.preventDefault()
-				return
-			}
-			const ae = aliasEvent(e)
-			const ev = ae || { code: e.code, key: e.key, ts: Date.now() }
-			try {
-				down ? this.player.onKeyDown(ev) : this.player.onKeyUp(ev)
-			} catch {}
-			try {
-				if (this._physicsSab) {
-					const kind = down ? 1 : 0
-					const keyCode = ev.code ? ev.code.charCodeAt(0) : 0
-					pushInput(this._physicsSab, kind, keyCode, ev.ts ?? Date.now())
-				}
-			} catch {}
-			if (
-				ae ||
-				['Space', 'KeyZ', 'Slash', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Enter', 'Digit1', 'Digit5', 'KeyT'].includes(
-					e.code,
-				)
-			)
-				e.preventDefault()
-		}
-		this._boundKeyDown = e => send(e, true)
-		this._boundKeyUp = e => send(e, false)
-		addEventListener('keydown', this._boundKeyDown)
-		addEventListener('keyup', this._boundKeyUp)
-		if (this.dom.canvas) {
-			this.dom.canvas.tabIndex = 0
-			try {
-				this.dom.canvas.focus()
-			} catch {}
-			if (this._touchCleanup) {
-				try {
-					this._touchCleanup()
-				} catch {}
-				this._touchCleanup = null
-			}
-			const onCanvasClick = () => { try { this.dom.canvas.focus() } catch {} }
-			this.dom.canvas.addEventListener('click', onCanvasClick)
-			const active = this._touchMap
-			const toCode = (x, y) => {
-				const r = this.dom.canvas.getBoundingClientRect()
-				const nx = (x - r.left) / r.width
-				const ny = (y - r.top) / r.height
-				return nx > 0.65 && ny > 0.55 ? 'Enter' : nx < 0.5 ? 'ShiftLeft' : 'ShiftRight'
-			}
-			const down = (id, code) => {
-				if (active.has(id) || this.viewerMode !== 'play' || !this.player) return
-				active.set(id, code); this._sendKey(code, true)
-			}
-			const up = id => {
-				const code = active.get(id)
-				if (!code) return
-				active.delete(id); this._sendKey(code, false)
-			}
-			const onDown = e => {
-				if (e.pointerType === 'touch') return
-				if (e.pointerType === 'mouse' && e.button !== 0) return
-				down(e.pointerId, toCode(e.clientX, e.clientY))
-				if (this.viewerMode === 'play') e.preventDefault()
-				try {
-					this.dom.canvas.setPointerCapture(e.pointerId)
-				} catch {}
-			}
-			const onUp = e => {
-				if (e.pointerType === 'touch') return
-				up(e.pointerId)
-				if (this.viewerMode === 'play') e.preventDefault()
-				try {
-					this.dom.canvas.releasePointerCapture(e.pointerId)
-				} catch {}
-			}
-			const onCancel = e => {
-				if (e.pointerType !== 'touch') up(e.pointerId)
-			}
-			const touchStarts = new Map()
-			const onTouchStart = e => {
-				for (const t of e.changedTouches) {
-					touchStarts.set(t.identifier + 1000, { x: t.clientX, y: t.clientY, t: performance.now() })
-					down(t.identifier + 1000, toCode(t.clientX, t.clientY))
-				}
-			}
-			const onTouchEnd = e => {
-				for (const t of e.changedTouches) {
-					const id = t.identifier + 1000
-					const st = touchStarts.get(id)
-					if (st) {
-						const dx = t.clientX - st.x
-						const dy = t.clientY - st.y
-						const dt = performance.now() - st.t
-						touchStarts.delete(id)
-						if (dt < 600 && Math.hypot(dx, dy) > 50) {
-							try { up(id) } catch {}
-							const ang = swipeNudge(dx, dy)
-							if (ang !== null) { this._nudge(ang, ang === NUDGE.back ? 2.0 : NUDGE.force); continue }
-						}
-					}
-					up(id)
-				}
-			}
-			const onContext = e => {
-				if (this.viewerMode === 'play') e.preventDefault()
-			}
-			this.dom.canvas.addEventListener('pointerdown', onDown)
-			this.dom.canvas.addEventListener('pointerup', onUp)
-			this.dom.canvas.addEventListener('pointercancel', onCancel)
-			this.dom.canvas.addEventListener('touchstart', onTouchStart, { passive: true })
-			this.dom.canvas.addEventListener('touchend', onTouchEnd, { passive: true })
-			this.dom.canvas.addEventListener('touchcancel', onTouchEnd, { passive: true })
-			this.dom.canvas.addEventListener('contextmenu', onContext)
-			this._touchCleanup = () => {
-				try { this.dom.canvas.removeEventListener('click', onCanvasClick) } catch {}
-				this.dom.canvas.removeEventListener('pointerdown', onDown)
-				this.dom.canvas.removeEventListener('pointerup', onUp)
-				this.dom.canvas.removeEventListener('pointercancel', onCancel)
-				this.dom.canvas.removeEventListener('touchstart', onTouchStart)
-				this.dom.canvas.removeEventListener('touchend', onTouchEnd)
-				this.dom.canvas.removeEventListener('touchcancel', onTouchEnd)
-				this.dom.canvas.removeEventListener('contextmenu', onContext)
-			}
-		}
-		this._setupNudgeInput()
-	}
-	_setupNudgeInput() {
-		try { if (this._nudgeCleanup) this._nudgeCleanup() } catch {}
-		this._nudgeCleanup = null
-		const cleanups = []
-		const trigger = (angle, force = 2.6) => this._nudge(angle, force)
-		const pad = document.getElementById('nudge-pad')
-		if (pad) {
-			pad.hidden = false
-			const handler = e => {
-				const dir = e.currentTarget?.dataset?.nudge
-				if (dir === 'left') trigger(NUDGE.left, 2.8)
-				else if (dir === 'right') trigger(NUDGE.right, 2.8)
-				else if (dir === 'center' || dir === 'up') trigger(NUDGE.forward, 2.8)
-				e.preventDefault()
-			}
-			for (const btn of pad.querySelectorAll('[data-nudge]')) {
-				btn.addEventListener('touchstart', handler, { passive: false })
-				btn.addEventListener('mousedown', handler)
-				cleanups.push(() => {
-					btn.removeEventListener('touchstart', handler)
-					btn.removeEventListener('mousedown', handler)
-				})
-			}
-		}
-		const canvas = this.dom.canvas
-		if (canvas) {
-			let startX = 0, startY = 0, startT = 0, activeId = null
-			const onPtrDown = e => {
-				if (e.pointerType === 'touch' || e.button !== 2) return
-				startX = e.clientX; startY = e.clientY; startT = performance.now(); activeId = e.pointerId
-			}
-			const onPtrUp = e => {
-				if (activeId !== e.pointerId) return
-				const dx = e.clientX - startX, dy = e.clientY - startY, dt = performance.now() - startT
-				activeId = null
-				if (dt > 600 || Math.hypot(dx, dy) < 45) return
-				const ang = swipeNudge(dx, dy)
-				if (ang !== null) trigger(ang, ang === NUDGE.back ? 1.8 : 2.5)
-			}
-			canvas.addEventListener('pointerdown', onPtrDown)
-			canvas.addEventListener('pointerup', onPtrUp)
-			cleanups.push(() => {
-				canvas.removeEventListener('pointerdown', onPtrDown)
-				canvas.removeEventListener('pointerup', onPtrUp)
-			})
-			// touch swipe handled in hookInput (unified)
-		}
-		let lastShake = 0
-		const onMotion = e => {
-			const acc = e.accelerationIncludingGravity || e.acceleration
-			if (!acc) return
-			const mag = Math.hypot(acc.x ?? 0, acc.y ?? 0, acc.z ?? 0)
-			if (mag < 18) return
-			const now = performance.now()
-			if (now - lastShake < 700) return
-			lastShake = now
-			const ang = (acc.x ?? 0) > 0 ? 285 : 75
-			trigger(ang, 3.0)
-		}
-		let motionActive = false
 		try {
-			if (typeof DeviceMotionEvent !== 'undefined' && 'requestPermission' in DeviceMotionEvent) {
-				const btn = document.getElementById('enable-motion')
-				if (btn) {
-					btn.hidden = false
-					btn.onclick = async () => {
-						try {
-							const perm = await DeviceMotionEvent.requestPermission()
-							if (perm === 'granted') {
-								addEventListener('devicemotion', onMotion)
-								motionActive = true
-								btn.hidden = true
-								this.log('Motion nudge enabled', 'info')
-							}
-						} catch {}
-					}
-				}
-			} else {
-				addEventListener('devicemotion', onMotion)
-				motionActive = true
-			}
+			this._inputCleanup?.()
 		} catch {}
-		cleanups.push(() => {
-			if (motionActive) removeEventListener('devicemotion', onMotion)
-		})
-		let gpRaf = 0
-		let lastGP = 0
-		const pollGP = () => {
-			try {
-				const gps = navigator.getGamepads?.()
-				if (gps) {
-					for (const gp of gps) {
-						if (!gp) continue
-						const now = performance.now()
-						if (now - lastGP < 180) continue
-						let ang = null
-						if (gp.buttons[4]?.pressed) ang = 75
-						else if (gp.buttons[5]?.pressed) ang = 285
-						else if (gp.buttons[0]?.pressed || gp.buttons[2]?.pressed) ang = 0
-						if (ang !== null) { trigger(ang, 2.8); lastGP = now }
-						const ax0 = gp.axes[0] ?? 0
-						const ax1 = gp.axes[1] ?? 0
-						if (Math.abs(ax0) > 0.85 || Math.abs(ax1) > 0.85) {
-							if (now - lastGP < 300) continue
-							if (Math.abs(ax0) > Math.abs(ax1)) trigger(ax0 < 0 ? 75 : 285, 2.5)
-							else trigger(ax1 < 0 ? 0 : 180, 2.2)
-							lastGP = now
-						}
-					}
-				}
-			} catch {}
-			gpRaf = requestAnimationFrame(pollGP)
-		}
-		gpRaf = requestAnimationFrame(pollGP)
-		cleanups.push(() => cancelAnimationFrame(gpRaf))
-		this._nudgeCleanup = () => { for (const fn of cleanups) try { fn() } catch {} }
+		this._inputCleanup = attachInput(this)
 	}
+
+	_setupNudgeInput() {}
 }
 
 export function createViewer(opts) {

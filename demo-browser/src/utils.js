@@ -54,21 +54,31 @@ export const resolveRomCandidates = romParam => (romParam?.trim() ? [romParam.tr
 export const fetchWithProgress = async (url, onProgress) => {
 	const res = await fetch(url, { cache: 'no-store' })
 	if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText} for ${url}`)
-	const len = Number(res.headers.get('content-length') || 0)
-	if (!res.body || !len) {
+	if (!res.body) {
 		const b = await res.arrayBuffer()
 		onProgress?.(1)
 		return new Uint8Array(b)
 	}
+	const len = Number(res.headers.get('content-length') || 0)
 	const reader = res.body.getReader()
-	const out = new Uint8Array(len)
-	let off = 0
+	const chunks = []
+	let received = 0
 	while (true) {
 		const { done, value } = await reader.read()
 		if (done) break
-		out.set(value, off)
-		off += value.length
-		onProgress?.(off / len)
+		if (!value) continue
+		chunks.push(value)
+		received += value.length
+		if (len) onProgress?.(Math.min(received / len, 1))
+		else onProgress?.(Math.min(received / (2 * 1024 * 1024), 0.99))
+	}
+	onProgress?.(1)
+	if (chunks.length === 1) return chunks[0]
+	const out = new Uint8Array(received)
+	let off = 0
+	for (const c of chunks) {
+		out.set(c, off)
+		off += c.length
 	}
 	return out
 }

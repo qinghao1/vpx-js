@@ -18,3 +18,24 @@ export const RE_CAB = /vrcab|cabinet|lockbar|pincab/i
 export const RE_OUTER = /VRCab_(Cabinet|Backbox|LegsFront|LegsBack)$/i
 export const RE_GLASS = /glass/i
 export const RE_LM = /lm_/i
+
+export const NUDGE = { left: 75, right: 285, forward: 0, back: 180, force: 2.6 }
+
+export const TABLE_OPTS = {
+	exportPlayfield: true,
+	exportPrimitives: true,
+	exportRubbers: true,
+	exportSurfaces: true,
+	exportFlippers: true,
+	exportBumpers: true,
+	exportRamps: true,
+	exportLightBulbs: true,
+	exportPlayfieldLights: true,
+	exportHitTargets: true,
+	exportGates: true,
+	exportKickers: true,
+	exportTriggers: true,
+	exportSpinners: true,
+	exportPlungers: true,
+	exportLightBulbLights: true,
+}
