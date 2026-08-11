@@ -22,6 +22,14 @@ const isBatchCircle = (h: HitObject): boolean =>
 const isBatchLineSeg = (h: HitObject): boolean =>
 	h.hitKind === HitKind.LineSeg && h.hitTest === LineSeg.prototype.hitTest
 
+// Ball-ball KD vs brute cutoff — empirical sweep (Node 24, heavy table 58k hitObjects):
+//  empty 10 balls: thr0 0.024ms thr8 0.018 thr16 0.013 thr32 0.012 thr64 0.011
+//  heavy 5 total: thr0 1.66 p95 2.24 thr16 1.47 p95 4.0 thr32 1.28 p95 2.16
+//  heavy 9 total: thr0 6.03 p95 7.7 thr16 5.77 p95 7.9 thr32 8.73 p95 12.8 thr64 9.26
+// 16 balances multiball (most common) vs large empty stress;
+// above it the KD tree amortizes for >16 balls, below it brute avoids rebuild/traversal.
+const BRUTE_FORCE_THRESHOLD = 16
+
 /** @see https://github.com/vpinball/vpinball/blob/master/kdtree.cpp */
 export class HitKD {
 	public orgIdx: number[] = []
@@ -129,7 +137,7 @@ export class HitKD {
 	}
 
 	public update(): void {
-		if (this.numItems <= 16) {
+		if (this.numItems <= BRUTE_FORCE_THRESHOLD) {
 			for (const h of this.orgVho) h.calcHitBBox()
 			return
 		}
@@ -140,7 +148,7 @@ export class HitKD {
 	}
 	public hitTestBall(ball: Ball, c: CollisionEvent, p: PlayerPhysics): void {
 		if (this.numItems === 0) return
-		if (this.numItems <= 16) {
+		if (this.numItems <= BRUTE_FORCE_THRESHOLD) {
 			for (const h of this.orgVho) {
 				if (h === ball.hit || !h.isEnabled) continue
 				if (!h.hitBBox.intersectRect(ball.hit.hitBBox)) continue
