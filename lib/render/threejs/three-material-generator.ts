@@ -224,7 +224,7 @@ export class ThreeMaterialGenerator {
 			if (mat.emissive) mat.emissive.set(0x000000)
 			mat.emissiveIntensity = 0
 		}
-		mat.side = backfacesEnabled === true ? DoubleSide : backfacesEnabled === false ? FrontSide : DoubleSide
+		mat.side = backfacesEnabled === true ? DoubleSide : FrontSide
 		mat.toneMapped = true
 		mat.roughness = BAKED_ROUGH
 		mat.metalness = BAKED_METAL

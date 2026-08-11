@@ -260,6 +260,7 @@ if (balls > 0) {
 			proto.normalizeSafe = function () {
 				return this.lengthSq() > 0 ? this.normalize() : this
 			}
+		if (!proto.setZero) proto.setZero = function () { return this.set(0, 0, 0) }
 		if (!proto.release) proto.release = () => {}
 		if (!proto.applyMatrix2D)
 			proto.applyMatrix2D = function (m) {
