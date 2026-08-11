@@ -1,7 +1,7 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { DEFAULT_STEPTIME, PHYSICS_STEPTIME } from '../physics/constants.js'
+import { PHYSICS_STEPTIME } from '../physics/constants.js'
 import { BALL_STRIDE, drainInput, MAX_BALLS, writeFrame } from './shared/physics-buffer.js'
 
 declare const self: { postMessage(m: unknown): void; onmessage: ((e: MessageEvent) => void) | null }
@@ -42,42 +42,15 @@ async function ensureWasm(): Promise<void> {
 
 function tick(): void {
 	if (!sab) return
-	const evs: { kind: number; key: number; val: number }[] = []
 	try {
-		drainInput(sab, evs)
+		drainInput(sab, [])
 	} catch {}
-	if (evs.length) {
-		for (const e of evs)
-			if (e.kind === 1) {
-				for (let i = 0; i < 1; i++) {
-					const o = i * BALL_STRIDE
-					scratch[o + 3] += (Math.random() - 0.5) * 40
-					scratch[o + 4] += (Math.random() - 0.5) * 40
-				}
-			}
-	}
-	const dt = PHYSICS_STEPTIME / DEFAULT_STEPTIME
-	for (let i = 0; i < 1; i++) {
-		const o = i * BALL_STRIDE
-		scratch[o] += scratch[o + 3] * dt
-		scratch[o + 1] += scratch[o + 4] * dt
-		scratch[o + 2] += scratch[o + 5] * dt
-		if (scratch[o + 1] > 2000) scratch[o + 4] = -Math.abs(scratch[o + 4])
-		if (scratch[o + 1] < 0) scratch[o + 4] = Math.abs(scratch[o + 4])
-		if (scratch[o] > 2000) scratch[o + 3] = -Math.abs(scratch[o + 3])
-		if (scratch[o] < 0) scratch[o + 3] = Math.abs(scratch[o + 3])
-		if (scratch[o + 2] < 25) {
-			scratch[o + 2] = 25
-			if (scratch[o + 5] < 0) scratch[o + 5] = -scratch[o + 5] * 0.7
-		}
-		scratch[o + 5] -= 1.8 * dt
-	}
 	curUsec = nextUsec
 	nextUsec += PHYSICS_STEPTIME
 	timeMsec = Math.floor((curUsec - startUsec) / 1000)
 	const tPrev = Math.floor((curUsec - PHYSICS_STEPTIME - startUsec) / 1000)
 	try {
-		writeFrame(sab, scratch, 1, tPrev, timeMsec, timeMsec)
+		writeFrame(sab, scratch, 0, tPrev, timeMsec, timeMsec)
 	} catch {}
 	if (++tickCount % 1000 === 0) {
 		try {

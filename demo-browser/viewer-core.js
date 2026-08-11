@@ -1586,36 +1586,14 @@ export class Viewer {
 			if (changed.keys.length) this.applyChangedStates(changed)
 		}
 		const tickPhysicsThreaded = now => {
-			const curSab = this._physicsSab
-			const curScratch = this._physicsScratch
-			if (!curSab || !curScratch || !this.player || this.isPaused) return
+			if (!this.player || this.isPaused) return
+			// Worker currently runs dummy physics that would overwrite real ball
+			// positions and make them fly. Run physics on main thread for correctness
+			// and just drain the SAB for future interpolation.
 			try {
-				const res = trySnap(curSab, curScratch)
-				if (res) {
-					for (let i = 0; i < Math.min(res.count, this.player.balls.length); i++) {
-						const off = i * BALL_STRIDE
-						const b = this.player.balls[i]
-						if (!b) continue
-						const st = b.getState()
-						st.pos.x = curScratch[off]
-						st.pos.y = curScratch[off + 1]
-						st.pos.z = curScratch[off + 2]
-						if (st.vel) {
-							st.vel.x = curScratch[off + 3]
-							st.vel.y = curScratch[off + 4]
-							st.vel.z = curScratch[off + 5]
-						}
-					}
-					this.player.updateAnimations(res.timeMsec)
-					const changed = this.player.popStates()
-					if (changed.keys.length) this.applyChangedStates(changed)
-				} else {
-					const t = this.player.getPhysics()?.timeMsec ?? now
-					this.player.updateAnimations(t)
-					const changed = this.player.popStates()
-					if (changed.keys.length) this.applyChangedStates(changed)
-				}
+				if (this._physicsSab && this._physicsScratch) trySnap(this._physicsSab, this._physicsScratch)
 			} catch {}
+			tickPhysics(now)
 		}
 		const loop = () => {
 			if (!threaded && this._physicsSab) threaded = true
