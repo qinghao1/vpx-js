@@ -13,28 +13,32 @@ import {
 } from './config.js'
 
 const pendingOf = m => (m.userData?.pendingMap ?? m.userData?.pendingmap ?? '').toString().toLowerCase()
-const classify = (mesh, mat, map, baked = false) => {
+// vpinball: baked detection is engine-based, not name-based.
+// PrimitiveData.disableLightingTop (three-material-generator isBaked) + material/map name fallback
+// (RE_BAKE_MAT/RE_BAKE_MAP). Overlay vs main is engine contract addBlend (primitive.cpp:102
+// addBlend true => additive unlit via SRC_ALPHA ONE, primitive.cpp:107/1171 alpha/100 HDR).
+const classify = (mesh, mat, map, baked = false, addBlend = false) => {
 	const m = mat.toLowerCase()
 	const mp = map.toLowerCase()
 	const me = mesh.toLowerCase()
 	const isBakedMat = baked || RE_BAKE_MAT.test(m) || RE_BAKE_MAP.test(mp) || RE_BAKE_MAP.test(me)
-	// name heuristic fallback for TWD BM_*/VLM.Bake
-	const isBakedFamily = me.includes('bm_') || me.includes('playfield') || me.includes('armp') || me.includes('ramp')
 	const isRampFamily = me.includes('armp') || me.includes('ramp') || me.includes('botramp') || me.includes('rampscrw')
+	const isMainBake = isBakedMat && !addBlend
+	const isVlmBake = isBakedMat && addBlend
 	return {
 		isGlass: RE_GLASS.test(me) || RE_GLASS.test(m) || (me === 'primitive-primitive001' && m === 'material:glass'),
 		isLm: RE_LM.test(me),
 		isVr: RE_VR.test(me),
 		isCab: RE_CAB.test(me),
-		isVlmBake: (me.includes('playfield') || isRampFamily) && (RE_LM.test(me) || isBakedMat || me.includes('bm_')),
-		isMainBake: isBakedFamily && isBakedMat && !RE_LM.test(me),
+		isVlmBake,
+		isMainBake,
 		isBakedMat,
 		needsAlpha: RE_ALPHA_MESH.test(me),
 		isRampFamily,
 	}
 }
-const isBasePlayfield = (n, c) => n.includes('playfield') && !c.isMainBake && !c.isVlmBake && !c.isBakedMat
-const isBakedMesh = c => c.isMainBake || c.isBakedMat || c.isVlmBake
+const isBasePlayfield = (n, c) => n.includes('playfield') && !c.isBakedMat
+const isBakedMesh = c => !!c.isBakedMat
 
 export const isBakedMeshByNames = (meshName, matName, mapName) => {
 	const c = classify(meshName ?? '', matName ?? '', mapName ?? '')
@@ -70,7 +74,7 @@ function fixBaked(mat, map) {
 		mat.emissiveIntensity = 0
 	}
 	mat.side = THREE.DoubleSide
-	mat.toneMapped = true
+	mat.toneMapped = false
 	mat.roughness = BAKED_ROUGH
 	mat.metalness = BAKED_METAL
 	wrapTexBaked(mat.map)
@@ -82,6 +86,7 @@ function fixVr(mat) {
 	if (mat.map) wrapTexBaked(mat.map)
 	if (mat.emissiveMap) wrapTexBaked(mat.emissiveMap)
 	mat.side = THREE.DoubleSide
+	mat.toneMapped = false
 	mat.roughness = BAKED_ROUGH
 	mat.metalness = BAKED_METAL
 	mat.needsUpdate = true
@@ -96,7 +101,10 @@ export const applyBakedMaterial = (mat, tex, info, meshName) => {
 	const tint = cur !== 0x000000 ? new THREE.Color(cur) : new THREE.Color(0xffffff)
 	if (mat.emissive) mat.emissive.copy(tint)
 	else mat.emissive = tint
-	const isOverlay = info.isVlmBake && !info.isMainBake
+	// Generic: overlay is additive baked (primitive.cpp:102 addBlend true => SRC_ALPHA ONE, 107 alpha/100 HDR)
+	// info.isVlmBake/isMainBake are now derived from addBlend in classify; also fall back to mat userData for streamed clones.
+	const isOverlay = !!mat.userData?.__addBlend || (info.isVlmBake && !info.isMainBake)
+	const isMain = !!(info.isMainBake || (info.isBakedMat && !isOverlay))
 	if (isOverlay) {
 		const hasTex = !!tex
 		if (!hasTex) {
@@ -117,7 +125,7 @@ export const applyBakedMaterial = (mat, tex, info, meshName) => {
 		if (!mat.color) mat.color = new THREE.Color(0x000000)
 		else mat.color.set(0x000000)
 		mat.side = THREE.DoubleSide
-		mat.toneMapped = true
+		mat.toneMapped = false
 		mat.roughness = BAKED_ROUGH
 		mat.metalness = BAKED_METAL
 		wrapTexBaked(tex)
@@ -130,12 +138,12 @@ export const applyBakedMaterial = (mat, tex, info, meshName) => {
 		if (!mat.color) mat.color = new THREE.Color(0x000000)
 		else mat.color.set(0x000000)
 		mat.side = THREE.DoubleSide
-		mat.toneMapped = true
+		mat.toneMapped = false
 		mat.roughness = BAKED_ROUGH
 		mat.metalness = BAKED_METAL
 		wrapTexBaked(tex)
 		wrapTexBaked(mat.emissiveMap)
-		if (info.isMainBake && !nl.includes('non_opaque') && !/ramp|armp|botramp|rampscrw/i.test(nl)) {
+		if (isMain && !nl.includes('non_opaque') && !/ramp|armp|botramp|rampscrw/i.test(nl)) {
 			mat.polygonOffset = true
 			mat.polygonOffsetFactor = -1
 			mat.polygonOffsetUnits = -1
@@ -255,8 +263,9 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 		const pending = pendingOf(base)
 		const mapPre = (base.map?.name || pending || '').toLowerCase()
 		const bakedFlag = !!base.userData?.__isBaked
-		const { isMainBake, isVlmBake, needsAlpha } = classify(mesh, matName, mapPre, bakedFlag)
-		const isOverlay = isVlmBake && !isMainBake
+		const addBlend = !!base.userData?.__addBlend
+		const { isMainBake, isVlmBake, needsAlpha } = classify(mesh, matName, mapPre, bakedFlag, addBlend)
+		const isOverlay = isVlmBake
 		const isApron = mesh.includes('bm_non_opaque') || mesh.includes('non_opaque')
 		const isRamp =
 			mesh.includes('ramp') || mesh.includes('armp') || mesh.includes('botramp') || mesh.includes('rampscrw')
@@ -268,7 +277,7 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 		if (isMainBake) {
 			fixBaked(v, v.map)
 			// 1.0 unlit
-			v.toneMapped = true
+			v.toneMapped = false
 			v.needsUpdate = true
 		} else if (isOverlay) {
 			const hasMap = !!v.map
@@ -279,7 +288,7 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 				v.opacity = 0
 				v.blending = THREE.AdditiveBlending
 				v.depthWrite = false
-				v.toneMapped = true
+				v.toneMapped = false
 				v.needsUpdate = true
 			} else {
 				// alpha/100 — 250 => 2.5 HDR
@@ -288,7 +297,7 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 				v.opacity = 1.0
 				v.blending = THREE.AdditiveBlending
 				v.depthWrite = false
-				v.toneMapped = true
+				v.toneMapped = false
 				v.needsUpdate = true
 			}
 		} else fixVr(v)
@@ -297,7 +306,7 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 			if (!v.emissive) v.emissive = new THREE.Color(0xffffff)
 			else v.emissive.set(0xffffff)
 			v.emissiveIntensity = BAKED_EMISSIVE
-			v.toneMapped = true
+			v.toneMapped = false
 		}
 		if (isOverlay) {
 			const hasMapOverlay = !!v.map

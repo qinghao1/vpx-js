@@ -43,6 +43,7 @@ export class ThreeMaterialGenerator {
 			!!obj.isTransparent,
 			obj.depthBias ?? 0,
 			obj.disableLighting,
+			!!obj.addBlend,
 			obj.backfacesEnabled,
 		)
 	}
@@ -56,6 +57,7 @@ export class ThreeMaterialGenerator {
 		isTransparent = false,
 		depthBias = 0,
 		disableLighting?: number,
+		addBlend = false,
 		backfacesEnabled?: boolean,
 	): ThreeMaterial {
 		const key = this.getKey(
@@ -67,6 +69,7 @@ export class ThreeMaterialGenerator {
 			isTransparent,
 			depthBias,
 			disableLighting,
+			addBlend,
 			backfacesEnabled,
 		)
 		const cached = this.cachedMaterials[key]
@@ -79,11 +82,19 @@ export class ThreeMaterialGenerator {
 		this.applyEmissiveMap(m, material, emissiveMap)
 		m.transparent = isTransparent
 		m.depthWrite = !isTransparent
-		if (this.isBaked(material, map, disableLighting)) {
+		const baked = this.isBaked(material, map, disableLighting)
+		if (baked) {
 			this.applyBaked(m, (m as any).map, backfacesEnabled)
 			;(m.userData as any).__isBaked = true
 			;(m.userData as any).__backfacesEnabled = backfacesEnabled
 		}
+		;(m.userData as any).__addBlend = !!addBlend
+		// vpinball: Renderer.cpp:2373 single HDR tonemap after scene (exposure*) — not per-material LDR.
+		// Three's per-material toneMapped would sum LDR via AdditiveBlending (SRC_ALPHA ONE, RenderDevice.cpp:2497)
+		// and blown highlights. Use global EffectComposer + OutputPass (viewer-core) so HDR additive
+		// (primitive.cpp:107 convertColor(alpha/100) premul, fs_unshaded.sc result*tex) sums linear then tonemaps once.
+		// Generic: all materials write linear HDR (toneMapped false) and rely on global pass.
+		m.toneMapped = false
 		if (depthBias !== 0) {
 			m.polygonOffset = true
 			m.polygonOffsetFactor = 0
@@ -226,7 +237,7 @@ export class ThreeMaterialGenerator {
 			mat.emissiveIntensity = 0
 		}
 		mat.side = backfacesEnabled === true ? DoubleSide : backfacesEnabled === false ? FrontSide : DoubleSide
-		mat.toneMapped = true
+		mat.toneMapped = false
 		mat.roughness = BAKED_ROUGH
 		mat.metalness = BAKED_METAL
 		;(mat as any).envMapIntensity = 0
@@ -242,8 +253,9 @@ export class ThreeMaterialGenerator {
 		isTransparent = false,
 		depthBias = 0,
 		disableLighting?: number,
+		addBlend = false,
 		backfacesEnabled?: boolean,
 	): string {
-		return `${material?.name ?? 'none'}:${map ?? 'none'}:${normalMap ?? 'none'}:${envMap ?? 'none'}:${emissiveMap ?? 'none'}:${isTransparent ? 't' : 'o'}:${depthBias}:${disableLighting ?? 'x'}:${backfacesEnabled ?? 'x'}`
+		return `${material?.name ?? 'none'}:${map ?? 'none'}:${normalMap ?? 'none'}:${envMap ?? 'none'}:${emissiveMap ?? 'none'}:${isTransparent ? 't' : 'o'}:${depthBias}:${disableLighting ?? 'x'}:${addBlend ? 'a' : 'o'}:${backfacesEnabled ?? 'x'}`
 	}
 }

@@ -103,6 +103,8 @@ export class Viewer {
 			streamFill: dom.streamFill || document.getElementById('stream-fill'),
 			streamText: dom.streamText || document.getElementById('stream-text'),
 			streamLabel: dom.streamLabel || document.getElementById('stream-label'),
+			nudgeFlash: dom.nudgeFlash || document.getElementById('nudge-flash'),
+			modeHint: dom.modeHint || document.getElementById('mode-hint'),
 		}
 		this.harnessLog = createHarness(this.dom.logEl).harnessLog
 		this.scene = new THREE.Scene()
@@ -136,6 +138,10 @@ export class Viewer {
 		this._animTimeout = null
 		this._emuStartLogged = false
 		this._streamId = 0
+		this._loadId = 0
+		this._cameraGen = 0
+		this._cameraTimeoutResolver = null
+		this._loadAbort = null
 		this._touchMap = new Map()
 		this._inputCleanup = null
 		this._nudgeCleanup = null
@@ -179,14 +185,31 @@ export class Viewer {
 		if (this.animFrame) clearTimeout(this.animFrame)
 		if (this._autoPlayTimer) clearTimeout(this._autoPlayTimer)
 		this._inputCleanup?.()
+		this._inputCleanup = null
+		this._nudgeCleanup?.()
 		this._nudgeCleanup = null
+		this._touchCleanup?.()
 		this._touchCleanup = null
+		if (this._cameraTimeoutResolver) {
+			const _r = this._cameraTimeoutResolver
+			this._cameraTimeoutResolver = null
+			try {
+				_r()
+			} catch {}
+		}
+		if (this._loadAbort) {
+			try {
+				this._loadAbort.abort()
+			} catch {}
+			this._loadAbort = null
+		}
 		this._terminatePhysicsWorker()
 		for (const fn of this._eventCleanups) fn()
 		this._eventCleanups = []
 		if (this._boundKeyDown) removeEventListener('keydown', this._boundKeyDown)
 		if (this._boundKeyUp) removeEventListener('keyup', this._boundKeyUp)
 		this.controls?.dispose?.()
+		this.composer?.dispose?.()
 		this.renderer?.dispose?.()
 		this.scene?.clear?.()
 	}
@@ -264,10 +287,50 @@ export class Viewer {
 		renderer.shadowMap.enabled = p.has('shadows')
 		if (renderer.shadowMap.enabled) renderer.shadowMap.type = THREE.PCFSoftShadowMap
 		renderer.outputColorSpace = THREE.SRGBColorSpace
-		renderer.toneMapping = THREE.AgXToneMapping ?? THREE.ACESFilmicToneMapping
-		renderer.toneMappingExposure = 0.6
+		// vpinball: Renderer.cpp:53 m_toneMapper from TableSettings (typedefs3D.h:56 TM_* enums), :56 m_exposure from Table (0..2, Settings_properties.inl:725), pintable.cpp:2279 defaults TM_REINHARD/exposure 1, Renderer.cpp:2373 fb_*tonemap
+		// Generic mapping of table.data.toneMapper/exposure to THREE, not table-specific 0.6 hardcode.
+		const toneMapFor = tm => {
+			if (tm === 0) return THREE.ReinhardToneMapping ?? THREE.ACESFilmicToneMapping
+			if (tm === 1) return THREE.AgXToneMapping ?? THREE.ACESFilmicToneMapping
+			if (tm === 2) return THREE.ACESFilmicToneMapping ?? THREE.ReinhardToneMapping
+			if (tm === 3) return THREE.NeutralToneMapping ?? THREE.LinearToneMapping ?? THREE.ACESFilmicToneMapping
+			if (tm === 4) return THREE.AgXToneMapping ?? THREE.ACESFilmicToneMapping
+			if (tm === 5) return THREE.LinearToneMapping ?? THREE.AgXToneMapping ?? THREE.ACESFilmicToneMapping
+			return THREE.ReinhardToneMapping ?? THREE.AgXToneMapping ?? THREE.ACESFilmicToneMapping
+		}
+		const exposureFor = ex => {
+			const v = Number.isFinite(ex) ? ex : 1
+			return Math.max(0.1, Math.min(2, v))
+		}
+		const t = this.table?.data ?? null
+		renderer.toneMapping = toneMapFor(t?.toneMapper)
+		renderer.toneMappingExposure = exposureFor(t?.exposure)
+		this._applyTableToneMapping = tbl => {
+			if (!this.renderer || !tbl?.data) return
+			this.renderer.toneMapping = toneMapFor(tbl.data.toneMapper)
+			this.renderer.toneMappingExposure = exposureFor(tbl.data.exposure)
+		}
 		this.renderer = renderer
 		this._rendererBackend = backend
+		// vpinball: Renderer.cpp:2373 single HDR tonemap after scene (exposure*), not per-material LDR sum.
+		// Three's per-material tonemap with AdditiveBlending (SRC_ALPHA ONE) summed LDR -> blown (TWD 8% white at 1.0).
+		// Generic fix: HDR EffectComposer (HalfFloat) + OutputPass so additive HDR (alpha/100) sums linear then tonemaps once.
+		// Matches primitive.cpp:1171 convertColor(alpha/100) premul and fs_unshaded.sc result*tex, then fb tonemap.
+		this.composer = null
+		if (backend.startsWith('webgl')) {
+			try {
+				const { EffectComposer } = await import('three/addons/postprocessing/EffectComposer.js')
+				const { RenderPass } = await import('three/addons/postprocessing/RenderPass.js')
+				const { OutputPass } = await import('three/addons/postprocessing/OutputPass.js')
+				const composer = new EffectComposer(renderer)
+				composer.addPass(new RenderPass(this.scene, this.camera))
+				composer.addPass(new OutputPass())
+				this.composer = composer
+			} catch (e) {
+				console.warn('EffectComposer init failed, falling back to direct render', e)
+				this.composer = null
+			}
+		}
 		this.controls?.dispose?.()
 		this.controls = new OrbitControls(this.camera, this.renderer.domElement)
 		this.controls.enableDamping = true
@@ -295,8 +358,11 @@ export class Viewer {
 		const h = typeof window !== 'undefined' ? window.innerHeight : 600
 		this.camera.aspect = w / h
 		this.camera.updateProjectionMatrix()
-		if (this.renderer) this.renderer.setPixelRatio(getTargetPixelRatio(this.viewerMode))
+		const pr = getTargetPixelRatio(this.viewerMode)
+		if (this.renderer) this.renderer.setPixelRatio(pr)
 		this.renderer?.setSize(w, h)
+		this.composer?.setSize(w, h)
+		this.composer?.setPixelRatio(pr)
 		this.dmd?._resize?.()
 	}
 	_setupModeSwitch() {
@@ -409,7 +475,7 @@ export class Viewer {
 		this.exitPlayMode()
 	}
 	_syncChrome() {
-		const hint = document.getElementById('mode-hint')
+		const hint = this.dom.modeHint
 		const isPlay = this.viewerMode === 'play'
 		document.body.classList.toggle('is-play', isPlay)
 		renderModeHint(hint, isPlay)
@@ -422,6 +488,8 @@ export class Viewer {
 	}
 	async _animateCameraTo(state, duration = CAM_ANIM.durationMode) {
 		if (!state || !this.controls) return
+		this._cameraGen = (this._cameraGen ?? 0) + 1
+		const _gen = this._cameraGen
 		if (this._cameraRaf) {
 			cancelAnimationFrame(this._cameraRaf)
 			this._cameraRaf = null
@@ -429,6 +497,13 @@ export class Viewer {
 		if (this._cameraTimeout) {
 			clearTimeout(this._cameraTimeout)
 			this._cameraTimeout = null
+		}
+		if (this._cameraTimeoutResolver) {
+			const _r = this._cameraTimeoutResolver
+			this._cameraTimeoutResolver = null
+			try {
+				_r()
+			} catch {}
 		}
 		const fromPos = this.camera.position.clone()
 		const fromTarget = this.controls.target.clone()
@@ -448,14 +523,36 @@ export class Viewer {
 		this.gate ??= new AnimationGate()
 		this.gate.beginAnimation()
 		await new Promise(r => {
-			this._cameraTimeout = setTimeout(r, ANIM_SETTLE_MS)
+			this._cameraTimeoutResolver = r
+			this._cameraTimeout = setTimeout(() => {
+				this._cameraTimeout = null
+				const _rr = this._cameraTimeoutResolver
+				this._cameraTimeoutResolver = null
+				if (_rr) _rr()
+			}, ANIM_SETTLE_MS)
 		})
 		this._cameraTimeout = null
+		this._cameraTimeoutResolver = null
+		if (_gen !== this._cameraGen) {
+			return
+		}
+		if (this._disposed) {
+			try {
+				this.gate.endAnimation()
+			} catch {}
+			return
+		}
 		const start = performance.now()
 		return new Promise(resolve => {
 			const tick = () => {
+				if (_gen !== this._cameraGen) {
+					resolve()
+					return
+				}
 				if (this._disposed) {
-					this.gate.endAnimation()
+					try {
+						this.gate.endAnimation()
+					} catch {}
 					resolve()
 					return
 				}
@@ -773,6 +870,9 @@ export class Viewer {
 		const t0 = performance.now()
 		const table = await Table.load(reader)
 		this.table = table
+		try {
+			this._applyTableToneMapping?.(table)
+		} catch {}
 		if (_isDev) window.table = table
 		this._hasPinmame = !!cGameName(table)
 		const dt = performance.now() - t0
@@ -1267,7 +1367,14 @@ export class Viewer {
 				if (done % 2 === 0 || done === total) this._setStreamProgress(done, total)
 			}
 			await this.renderApi.preloadTextures(textures, table, onTexture)
-			if (this._streamId !== streamId) return
+			if (this._streamId !== streamId) {
+				if (reader) {
+					try {
+						await this._cleanupReader(reader)
+					} catch {}
+				}
+				return
+			}
 			const fixed = this.renderApi.getMaterialGenerator?.().resolvePendingTextures?.() ?? 0
 			const fixed2 = patchCloned()
 			if (fixed || fixed2)
@@ -1305,7 +1412,13 @@ export class Viewer {
 		this.log(`[wait] timeout ${timeout}ms isRunning=${emu?.api?.isRunning?.()} init=${emu?.isInitialized?.()}`)
 		return false
 	}
-	async _fromReader(reader, source) {
+	async _fromReader(reader, source, _loadGen = this._loadId) {
+		if (_loadGen !== this._loadId) {
+			try {
+				await this._cleanupReader(reader)
+			} catch {}
+			return null
+		}
 		setTitle(
 			typeof source === 'string'
 				? source
@@ -1316,15 +1429,49 @@ export class Viewer {
 		)
 		this._loading(62, 'Opening table…', 'Reading table data…')
 		const table = await this._loadTable(reader)
+		if (_loadGen !== this._loadId) {
+			try {
+				await this._cleanupReader(reader)
+			} catch {}
+			return null
+		}
 		const { node, textures } = await this._buildScene(table)
+		if (_loadGen !== this._loadId) {
+			try {
+				await this._cleanupReader(reader)
+			} catch {}
+			return null
+		}
 		const mounted = await this._mount(table, node, {}, source)
+		if (_loadGen !== this._loadId) {
+			try {
+				await this._cleanupReader(reader)
+			} catch {}
+			return mounted
+		}
 		const ok = await this._waitForPinmame(5000)
+		if (_loadGen !== this._loadId) {
+			try {
+				await this._cleanupReader(reader)
+			} catch {}
+			return mounted
+		}
 		this.log(`[wait] done ok=${ok} streaming ${textures.length}`)
 		this._streamTextures(table, textures, reader)
 		return mounted
 	}
 	async load() {
+		this._loadId = (this._loadId ?? 0) + 1
+		const _loadGen = this._loadId
+		if (this._loadAbort)
+			try {
+				this._loadAbort.abort()
+			} catch {}
+		this._loadAbort = new AbortController()
+		const _signal = this._loadAbort.signal
+		this._streamId++
 		await this._ensureRenderer()
+		if (_loadGen !== this._loadId) return
 		if (this.dom.loading) this.dom.loading.hidden = false
 		if (this.dom.wrap) this.dom.wrap.hidden = false
 		const _w = typeof window !== 'undefined' ? window.innerWidth : 800
@@ -1341,6 +1488,8 @@ export class Viewer {
 		}
 		this.log(`Trying ${candidates.join(', ')}`)
 		for (const cand of candidates) {
+			if (_loadGen !== this._loadId) return
+			if (_signal.aborted) throw new DOMException('Aborted', 'AbortError')
 			try {
 				try {
 					const { idbGet } = await import('../dist-esm/lib/util/idb-cache.js')
@@ -1349,17 +1498,31 @@ export class Viewer {
 						this.log(`[IDB] hit ${cand.split('/').pop()} ${fmtBytes(cached.byteLength)} — using cached`)
 						const reader = new BrowserBinaryReader(new Uint8Array(cached))
 						await reader.open()
-						return await this._fromReader(reader, cand)
+						if (_loadGen !== this._loadId) {
+							try {
+								await this._cleanupReader(reader)
+							} catch {}
+							return
+						}
+						const _res = await this._fromReader(reader, cand, _loadGen)
+						if (_loadGen === this._loadId) this._loadAbort = null
+						return _res
 					}
 				} catch {}
+				if (_loadGen !== this._loadId) return
+				if (_signal.aborted) throw new DOMException('Aborted', 'AbortError')
 				this.log(`Fetching ${cand}…`)
 				this._loading(5, 'Downloading…', 'Downloading table…')
 				const t0 = performance.now()
 				const vpxKey = cand.split('/').pop()
-				const data = await fetchWithProgress(cand, p => {
-					const pct = Math.round(p * 100)
-					this._loading(5 + p * 60, `Downloading… ${pct}%`, `Downloading table… ${pct}%`)
-				})
+				const data = await fetchWithProgress(
+					cand,
+					p => {
+						const pct = Math.round(p * 100)
+						this._loading(5 + p * 60, `Downloading… ${pct}%`, `Downloading table… ${pct}%`)
+					},
+					{ signal: _signal },
+				)
 				this.log(`Fetched ${fmtBytes(data.length)} in ${((performance.now() - t0) / 1000).toFixed(1)}s`)
 				try {
 					const { idbSet } = await import('../dist-esm/lib/util/idb-cache.js')
@@ -1367,21 +1530,49 @@ export class Viewer {
 						() => {},
 					)
 				} catch {}
+				if (_loadGen !== this._loadId) return
 				const reader = new BrowserBinaryReader(data)
 				await reader.open()
-				return await this._fromReader(reader, cand)
+				if (_loadGen !== this._loadId) {
+					try {
+						await this._cleanupReader(reader)
+					} catch {}
+					return
+				}
+				const _res2 = await this._fromReader(reader, cand, _loadGen)
+				if (_loadGen === this._loadId) this._loadAbort = null
+				return _res2
 			} catch (err) {
+				if (_signal.aborted || err?.name === 'AbortError' || _loadGen !== this._loadId) return
 				if (!String(err.message).includes('Failed:')) this.log(`Not at ${cand}: ${err.message}`, 'debug')
 			}
 		}
+		if (_loadGen !== this._loadId) return
+		if (_loadGen === this._loadId) this._loadAbort = null
 		throw new Error(`Failed: none of ${candidates.join(', ')}`)
 	}
 	async loadFromFile(file) {
+		this._loadId = (this._loadId ?? 0) + 1
+		const _loadGen = this._loadId
+		if (this._loadAbort)
+			try {
+				this._loadAbort.abort()
+			} catch {}
+		this._loadAbort = new AbortController()
+		this._streamId++
 		this._loading(5, 'Reading file…', `Reading ${file.name}…`)
 		this.log(`Reading ${file.name}…`)
 		const reader = new BrowserBinaryReader(file)
 		await reader.open()
-		return this._fromReader(reader, file.name)
+		if (_loadGen !== this._loadId) {
+			try {
+				await this._cleanupReader(reader)
+			} catch {}
+			return null
+		}
+		const _res = await this._fromReader(reader, file.name, _loadGen)
+		if (_loadGen === this._loadId) this._loadAbort = null
+		return _res
 	}
 	async loadRomFile(file) {
 		const buf = new Uint8Array(await file.arrayBuffer())
@@ -1392,7 +1583,9 @@ export class Viewer {
 	}
 	async preloadRom(url) {
 		this.log(`Preloading ROM ${url}…`)
-		const data = await fetchWithProgress(url, p => this.setBar(5 + p * 40, `ROM ${(p * 100).toFixed(0)}%`))
+		const data = await fetchWithProgress(url, p => this.setBar(5 + p * 40, `ROM ${(p * 100).toFixed(0)}%`), {
+			signal: this._loadAbort?.signal,
+		})
 		window.__pendingRom = data
 		window.__pendingRomName =
 			url
@@ -1466,7 +1659,8 @@ export class Viewer {
 			tickPhysics(now)
 			this._pollPinmame()
 			this._applyNudgeVisual()
-			this.renderer.render(this.scene, this.camera)
+			if (this.composer) this.composer.render()
+			else this.renderer.render(this.scene, this.camera)
 			frames++
 			const now2 = performance.now()
 			if (now2 - last > 500) {
@@ -1544,7 +1738,7 @@ export class Viewer {
 					this.tableGroup.userData._nudgeApplied = false
 				}
 			}
-			const wrap = document.getElementById('canvas-wrap')
+			const wrap = this.dom.wrap
 			if (wrap) {
 				wrap.classList.remove('is-nudging')
 				wrap.style.removeProperty('--nudge-transform')
@@ -1560,7 +1754,7 @@ export class Viewer {
 		this.tableGroup.position.x = base.x + scaleX
 		this.tableGroup.position.y = base.y + scaleY
 		this.tableGroup.userData._nudgeApplied = true
-		const wrap = document.getElementById('canvas-wrap')
+		const wrap = this.dom.wrap
 		if (wrap) {
 			const shake = Math.hypot(scaleX, scaleY)
 			if (shake > 0.05) {
@@ -1597,7 +1791,7 @@ export class Viewer {
 		}
 	}
 	_flashNudge(angle) {
-		const el = document.getElementById('nudge-flash')
+		const el = this.dom.nudgeFlash
 		if (!el || this.viewerMode !== 'play') return
 		const dir =
 			angle >= 45 && angle < 135

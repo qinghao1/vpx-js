@@ -49,8 +49,10 @@ export const resolveVpxCandidates = ({ defaultName = null, queryParam = 'vpx' } 
 
 export const resolveRomCandidates = romParam => (romParam?.trim() ? [romParam.trim()] : [])
 
-export const fetchWithProgress = async (url, onProgress) => {
-	const res = await fetch(url, { cache: 'no-store' })
+export const fetchWithProgress = async (url, onProgress, opts = {}) => {
+	const signal = opts?.signal
+	if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
+	const res = await fetch(url, { cache: 'no-store', signal })
 	if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText} for ${url}`)
 	if (!res.body) {
 		const b = await res.arrayBuffer()
@@ -61,14 +63,25 @@ export const fetchWithProgress = async (url, onProgress) => {
 	const reader = res.body.getReader()
 	const chunks = []
 	let received = 0
-	while (true) {
-		const { done, value } = await reader.read()
-		if (done) break
-		if (!value) continue
-		chunks.push(value)
-		received += value.length
-		if (len) onProgress?.(Math.min(received / len, 1))
-		else onProgress?.(Math.min(received / (2 * 1024 * 1024), 0.99))
+	const onAbort = () => {
+		try {
+			reader.cancel()
+		} catch {}
+	}
+	if (signal) signal.addEventListener('abort', onAbort, { once: true })
+	try {
+		while (true) {
+			if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
+			const { done, value } = await reader.read()
+			if (done) break
+			if (!value) continue
+			chunks.push(value)
+			received += value.length
+			if (len) onProgress?.(Math.min(received / len, 1))
+			else onProgress?.(Math.min(received / (2 * 1024 * 1024), 0.99))
+		}
+	} finally {
+		if (signal) signal.removeEventListener('abort', onAbort)
 	}
 	onProgress?.(1)
 	if (chunks.length === 1) return chunks[0]

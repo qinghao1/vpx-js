@@ -43,5 +43,9 @@ export interface RenderInfo<GEOMETRY> {
 	// (see ~/projects/vpinball/src/parts/primitive.cpp:1135 SHADER_fDisableLighting_top_below and
 	//   SHADER_TECHNIQUE_unshaded_with_texture selection). Used to emulate unlit without name hacks.
 	disableLighting?: number
+	// vpinball primitive: m_d.m_addBlend (see ~/projects/vpinball/src/parts/primitive.cpp:102)
+	// Additive primitives are unlit and use SRC_ALPHA ONE blending (RenderDevice.cpp:2497 EnableAlphaBlend)
+	// with premultiplied color*alpha (primitive.cpp:107 convertColor(alpha/100)).
+	addBlend?: boolean
 	backfacesEnabled?: boolean
 }

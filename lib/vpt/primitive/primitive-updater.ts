@@ -11,8 +11,13 @@ import type { PrimitiveState } from './primitive-state.js'
 
 const DISABLE_THRESHOLD = 0.001
 const DISABLE_SCALE = 0.01
+// vpinball: src/parts/primitive.cpp:107/1171 convertColor(c, alpha*(1/100)) — alpha 0..100 maps 0..1,
+// 250 => 2.5 HDR, 3000 => 30 HDR (TWD inserts). ALPHA_SCALE 0.01 is the 1/100 factor, not a hand-tuned 0.3.
 const ALPHA_SCALE = 0.01
-const MAX_EMISSIVE = 4
+// vpinball: src/shaders/bgfx/fs_pp_tonemap.sc:71 MAX_BURST 1000.0 clamps HDR before nan/inf.
+// Generic clamp well above typical primitive HDR (30) so tonemapper (AgX/Reinhard) compresses, not blown white.
+// Earlier 4 was TWD-specific clamp that dimmed inserts; 1000 is engine-faithful (effectively unclamped).
+const MAX_EMISSIVE = 1000
 
 /** Primitive updater — syncs state to render node. */
 export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
@@ -73,7 +78,7 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 		const belowIntensity = dlBelow < 1 - DISABLE_THRESHOLD ? (1 - dlBelow) * DISABLE_SCALE * 0.5 : 0
 		const rawAlpha = this.state.alpha ?? this.data.alpha
 		const rawAlphaClamped = Math.max(0, rawAlpha)
-		const alphaIntensity = this.data.addBlend ? Math.min(MAX_EMISSIVE, rawAlphaClamped * ALPHA_SCALE * 0.3) : 0
+		const alphaIntensity = this.data.addBlend ? Math.min(MAX_EMISSIVE, rawAlphaClamped * ALPHA_SCALE) : 0
 		const nonBakedIntensity = Math.min(MAX_EMISSIVE, topIntensity + belowIntensity + alphaIntensity)
 		const nonBakedEmissive = nonBakedIntensity > 0
 		const matName = this.state.material ?? this.data.szMaterial
@@ -92,7 +97,9 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 				if (dataInt !== 0 && scale !== 0) lightFactor = cur / (dataInt * scale)
 				else lightFactor = 0
 				if (!Number.isFinite(lightFactor)) lightFactor = 0
-			} catch { lightFactor = 1 }
+			} catch {
+				lightFactor = 1
+			}
 		}
 		const effectiveAlpha = rawAlphaClamped * lightFactor
 		const effectiveIntensity = Math.min(MAX_EMISSIVE, effectiveAlpha * ALPHA_SCALE)
@@ -112,14 +119,18 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 			const isBaked = !!(mat as any).userData?.__isBaked || !!(mat as any).emissiveMap
 			if (isBaked) {
 				const hasMap = !!(mat as any).emissiveMap || !!(mat as any).map
-				const pending = (mat as any).userData?.pendingMap || (mat as any).userData?.pendingmap || (mat as any).userData?.pendingEmissiveMap
+				const pending =
+					(mat as any).userData?.pendingMap ||
+					(mat as any).userData?.pendingmap ||
+					(mat as any).userData?.pendingEmissiveMap
 				if (!hasMap && pending) {
 					mat.color.set(0x000000)
 					mat.emissive.set(0xffffff)
 					mat.emissiveIntensity = 0
 					continue
 				}
-				if (this.data.addBlend) { // unlit additive
+				if (this.data.addBlend) {
+					// unlit additive
 					mat.color.set(0x000000)
 					mat.emissive.set(hex)
 					mat.emissiveIntensity = effectiveIntensity
@@ -161,7 +172,11 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 				  }
 				| undefined
 			if (!mat) continue
-			const isBakedPending = !!(mat as any).userData?.__isBaked && !mat.map && !mat.emissiveMap && ((mat as any).userData?.pendingMap || (mat as any).userData?.pendingEmissiveMap)
+			const isBakedPending =
+				!!(mat as any).userData?.__isBaked &&
+				!mat.map &&
+				!mat.emissiveMap &&
+				((mat as any).userData?.pendingMap || (mat as any).userData?.pendingEmissiveMap)
 			if (isBakedPending) {
 				mat.opacity = 0
 				mat.transparent = true

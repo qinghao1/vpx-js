@@ -80,6 +80,7 @@ export class Primitive
 				isTransparent,
 				depthBias: this.data.depthBias,
 				disableLighting: this.data.disableLightingTop,
+				addBlend: this.data.addBlend,
 				backfacesEnabled: this.data.backfacesEnabled,
 			},
 		}
