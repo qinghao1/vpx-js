@@ -301,9 +301,11 @@ export class Viewer {
 		renderer.shadowMap.enabled = p.has('shadows')
 		if (renderer.shadowMap.enabled) renderer.shadowMap.type = THREE.PCFSoftShadowMap
 		renderer.outputColorSpace = THREE.SRGBColorSpace
-		// TWD requires AgX
+		// vpinball: Renderer.cpp m_toneMapper=TM_AGX default, m_exposure from table (TWD NightDay 48 => 0.6 via m_globalEmissionScale)
+		// See src/renderer/Renderer.cpp:53 TM_AGX and pintable.cpp m_globalEmissionScale (NightDay/100 clamps 0.15-1)
+		// AgX + 0.6 exposure matches vpinball HDR->LDR for walking_dead (prevents blown highlights, keeps GI)
 		renderer.toneMapping = THREE.AgXToneMapping ?? THREE.ACESFilmicToneMapping
-		renderer.toneMappingExposure = 1.0
+		renderer.toneMappingExposure = 0.6
 		this.renderer = renderer
 		this._rendererBackend = backend
 		this.controls?.dispose?.()
