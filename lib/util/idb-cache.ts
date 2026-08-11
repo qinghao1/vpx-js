@@ -1,6 +1,6 @@
 // Minimal IndexedDB cache for textures and transpiled VBS.
 const DB_NAME = 'vpx-js-cache'
-const DB_VERSION = 3
+const DB_VERSION = 4
 const STORE = 'cache'
 
 function openDB(): Promise<IDBDatabase> {
@@ -8,10 +8,9 @@ function openDB(): Promise<IDBDatabase> {
 		const req = indexedDB.open(DB_NAME, DB_VERSION)
 		req.onupgradeneeded = () => {
 			const db = req.result
-			if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE)
-			try {
-				if (db.objectStoreNames.contains('textures')) db.deleteObjectStore('textures')
-			} catch {}
+			try { db.deleteObjectStore('textures') } catch {}
+			try { db.deleteObjectStore(STORE) } catch {}
+			db.createObjectStore(STORE)
 		}
 		req.onsuccess = () => resolve(req.result)
 		req.onerror = () => reject(req.error)
@@ -54,5 +53,5 @@ export function exrCacheKey(name: string, byteLength: number, kind: string): str
 export function vbsCacheKey(vbs: string): string {
 	let h = 5381
 	for (let i = 0; i < vbs.length; i++) h = ((h << 5) + h) ^ vbs.charCodeAt(i)
-	return `vbs5:${(h >>> 0).toString(36)}:${vbs.length}`
+	return `vbs6:${(h >>> 0).toString(36)}:${vbs.length}`
 }

@@ -169,7 +169,12 @@ const RELATIONAL_OPERATORS: Record<string, string> = {
 }
 
 function ppRelationalExpression(node: ESIToken): Expression {
-	let expr = node.children[0].estree
+	let expr: Expression = node.children[0].estree as Expression
+	let isNot = false
+	while (node.children.length > 1 && (expr as any)?.type === 'UnaryExpression' && (expr as any).operator === '!') {
+		isNot = !isNot
+		expr = (expr as any).argument as Expression
+	}
 	let index = node.children[0].text.length
 	for (const child of node.children.slice(1)) {
 		const text = node.text.substr(index)
@@ -195,11 +200,17 @@ function ppRelationalExpression(node: ESIToken): Expression {
 			}
 		}
 	}
+	if (isNot) expr = unaryExpression('!', expr)
 	return expr
 }
 
 function ppTypeExpression(node: ESIToken): Expression {
-	let expr = node.children[0].estree
+	let expr: Expression = node.children[0].estree as Expression
+	let isNot = false
+	while (node.children.length > 1 && (expr as any)?.type === 'UnaryExpression' && (expr as any).operator === '!') {
+		isNot = !isNot
+		expr = (expr as any).argument as Expression
+	}
 	let index = node.children[0].text.length
 	for (const child of node.children.slice(1)) {
 		if (node.text.substr(index).startsWith(' Is ')) {
@@ -210,6 +221,7 @@ function ppTypeExpression(node: ESIToken): Expression {
 			index += child.text.length + 4
 		}
 	}
+	if (isNot) expr = unaryExpression('!', expr)
 	return expr
 }
 

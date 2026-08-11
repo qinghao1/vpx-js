@@ -1,7 +1,7 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { AssignKey } from '../game/key-code.js'
+import { AssignKey, DIK_0, DIK_3, DIK_4, DIK_5, DIK_6, DIK_7, DIK_8, DIK_9, DIK_B, DIK_END, DIK_F3, DIK_F12, DIK_HOME, DIK_MINUS, DIK_PRIOR, DIK_T } from '../game/key-code.js'
 import type { Player } from '../game/player.js'
 import { getTextFile, storage } from '../refs.node.js'
 import { VbsApi } from '../scripting/vbs-api.js'
@@ -65,6 +65,55 @@ export class GlobalApi extends VbsApi {
 	}
 	get LockbarKey() {
 		return this.player.getKey(AssignKey.LockbarKey)
+	}
+	// vpinball mirrors staged when m_tblMirrorEnabled; vpx-js has no mirror flag, return base flipper
+	get StagedLeftFlipperKey() {
+		return this.player.getKey(AssignKey.LeftFlipperKey)
+	}
+	get StagedRightFlipperKey() {
+		return this.player.getKey(AssignKey.RightFlipperKey)
+	}
+	public VPXActionKey(actionIndex: number): number {
+		switch (actionIndex) {
+			case 0: return this.player.getKey(AssignKey.LeftFlipperKey)
+			case 1: return this.player.getKey(AssignKey.RightFlipperKey)
+			case 2: return this.player.getKey(AssignKey.LeftFlipperKey)
+			case 3: return this.player.getKey(AssignKey.RightFlipperKey)
+			case 4: return this.player.getKey(AssignKey.LeftTiltKey)
+			case 5: return this.player.getKey(AssignKey.RightTiltKey)
+			case 6: return this.player.getKey(AssignKey.CenterTiltKey)
+			case 7: return this.player.getKey(AssignKey.PlungerKey)
+			case 8: return this.player.getKey(AssignKey.StartGameKey)
+			case 9: return this.player.getKey(AssignKey.AddCreditKey)
+			case 10: return this.player.getKey(AssignKey.AddCreditKey2)
+			case 11: return DIK_3
+			case 12: return DIK_6
+			case 13: return this.player.getKey(AssignKey.MechanicalTilt)
+			case 14: return this.player.getKey(AssignKey.LeftMagnaSave)
+			case 15: return this.player.getKey(AssignKey.RightMagnaSave)
+			case 16: return this.player.getKey(AssignKey.ExitGame)
+			case 17: return DIK_F12
+			case 18: return this.player.getKey(AssignKey.LockbarKey)
+			case 19: return DIK_F3
+			case 20: return this.player.getKey(AssignKey.VolumeDown)
+			case 21: return this.player.getKey(AssignKey.VolumeUp)
+			case 22: return DIK_B
+			case 23: return DIK_HOME
+			case 24: return DIK_END
+			case 25: return DIK_7
+			case 26: return DIK_8
+			case 27: return DIK_9
+			case 28: return DIK_0
+			case 29: return DIK_6
+			case 30: return DIK_PRIOR
+			case 31: return DIK_MINUS
+			case 32: return 0
+			case 64: return 0
+			case 65: return 0
+			case 66: return 0
+			case 67: return 0
+			default: return 0
+		}
 	}
 	set MusicVolume(_v: number) {}
 	get UserDirectory() {

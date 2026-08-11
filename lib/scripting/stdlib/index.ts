@@ -92,6 +92,88 @@ export class Stdlib extends VbsApi {
 		return Math.abs(n)
 	}
 
+	public CBool(v: any): boolean {
+		if (v == null || (v as any)?.[UNDEF] === true) return false
+		if (typeof v === 'boolean') return v
+		if (typeof v === 'number') return v !== 0
+		if (typeof v === 'string') {
+			const trimmed = v.trim().toLowerCase()
+			if (trimmed === 'true') return true
+			if (trimmed === 'false' || trimmed === '') return false
+			const numeric = Number(v)
+			if (!isNaN(numeric)) return numeric !== 0
+			return !!v
+		}
+		return !!v
+	}
+
+	private bankersRound(value: number): number {
+		const truncated = Math.trunc(value)
+		if (Math.abs(value - truncated) !== 0.5) return Math.round(value)
+		return truncated % 2 === 0 ? truncated : truncated + (value >= 0 ? 1 : -1)
+	}
+
+	public CByte(v: any): number {
+		if (v == null || (v as any)?.[UNDEF] === true) return 0
+		const n = Number(v)
+		if (isNaN(n)) return 0
+		const rounded = this.bankersRound(n)
+		return Math.max(0, Math.min(255, rounded))
+	}
+
+	public CInt(v: any): number {
+		if (v == null || (v as any)?.[UNDEF] === true) return 0
+		const n = Number(v)
+		if (isNaN(n)) return 0
+		const rounded = this.bankersRound(n)
+		return Math.max(-32768, Math.min(32767, rounded)) | 0
+	}
+
+	public CLng(v: any): number {
+		if (v == null || (v as any)?.[UNDEF] === true) return 0
+		const n = Number(v)
+		if (isNaN(n)) return 0
+		const rounded = this.bankersRound(n)
+		return Math.max(-2147483648, Math.min(2147483647, rounded)) | 0
+	}
+
+	public CSng(v: any): number {
+		if (v == null || (v as any)?.[UNDEF] === true) return 0
+		const n = Number(v)
+		return isNaN(n) ? 0 : Math.fround(n)
+	}
+
+	public CDbl(v: any): number {
+		if (v == null || (v as any)?.[UNDEF] === true) return 0
+		const n = Number(v)
+		return isNaN(n) ? 0 : n
+	}
+
+	public CStr(v: any): string {
+		if (v == null || (v as any)?.[UNDEF] === true) return ''
+		if (typeof v === 'string') return v
+		if (typeof v === 'boolean') return v ? 'True' : 'False'
+		return String(v)
+	}
+
+	public CDate(v: any): Date | string {
+		if (v == null || (v as any)?.[UNDEF] === true) return ''
+		try {
+			const input = String(v).trim().replace(/^#|#$/g, '')
+			const date = new Date(input)
+			return isNaN(date.getTime()) ? String(v) : date
+		} catch {
+			return String(v)
+		}
+	}
+
+	public CCur(v: any): number {
+		if (v == null || (v as any)?.[UNDEF] === true) return 0
+		const n = Number(v)
+		if (isNaN(n)) return 0
+		return Math.round(n * 10000) / 10000
+	}
+
 	public Cos(n: number): number {
 		return Math.cos(n)
 	}
