@@ -212,6 +212,17 @@ for (let i = 0; i < 20; i++) {
 	await new Promise(r => setTimeout(r, 1000))
 }
 
+const isolation = await page.evaluate(() => ({
+	hasSAB: typeof SharedArrayBuffer !== 'undefined',
+	isolated: typeof crossOriginIsolated !== 'undefined' ? crossOriginIsolated : false,
+	waitAsync: typeof Atomics !== 'undefined' && typeof Atomics.waitAsync === 'function',
+	threaded: !!globalThis.viewer?._physicsWorker || !!globalThis.viewer?._physicsSab,
+}))
+console.log('[bench] isolation', isolation)
+if (!isolation.hasSAB || !isolation.isolated)
+	console.warn('[bench] fallback: SAB unavailable or not isolated — threaded disabled')
+else if (!isolation.waitAsync) console.warn('[bench] fallback: Atomics.waitAsync unavailable')
+else console.log('[bench] threaded capable')
 await page.evaluate(() => window.viewer?.renderer?.render?.(window.viewer.scene, window.viewer.camera))
 const postPlayMetrics = await page.evaluate(collectMetrics)
 console.log('[bench] post-play metrics', postPlayMetrics)
@@ -260,7 +271,10 @@ if (balls > 0) {
 			proto.normalizeSafe = function () {
 				return this.lengthSq() > 0 ? this.normalize() : this
 			}
-		if (!proto.setZero) proto.setZero = function () { return this.set(0, 0, 0) }
+		if (!proto.setZero)
+			proto.setZero = function () {
+				return this.set(0, 0, 0)
+			}
 		if (!proto.release) proto.release = () => {}
 		if (!proto.applyMatrix2D)
 			proto.applyMatrix2D = function (m) {
