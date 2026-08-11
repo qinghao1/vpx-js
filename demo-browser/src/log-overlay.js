@@ -4,8 +4,7 @@ export function createHarness(logEl) {
 		try {
 			const d=document.createElement('div');
 			d.textContent='['+new Date().toLocaleTimeString()+'] '+msg;
-			d.style.cssText='white-space:pre-wrap;word-break:break-word;font-family:ui-monospace,monospace;';
-			d.style.color=level==='error'?'#ff6b6b':level==='warn'?'#ffcc66':level==='debug'?'#8be9fd':'#e6e6e6';
+			d.className=`log-entry log-entry--${level}`;
 			logEl.appendChild(d);
 			while(logEl.children.length>600) logEl.removeChild(logEl.firstChild);
 			logEl.scrollTop=logEl.scrollHeight;

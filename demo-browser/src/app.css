@@ -713,11 +713,14 @@ dialog.help::backdrop {
 	border: 1px solid var(--border-faint);
 	border-radius: var(--radius-panel);
 	padding: 8px 10px;
-	display: none;
+	display: flex;
 	flex-direction: column;
 	align-items: center;
 	gap: 6px;
 	box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+}
+#dmd-wrap[hidden] {
+	display: none !important;
 }
 #dmd {
 	image-rendering: pixelated;
@@ -725,6 +728,8 @@ dialog.help::backdrop {
 	background: #05070a;
 	display: block;
 	box-shadow: 0 0 0 1px var(--border-subtle) inset;
+	width: var(--dmd-w, 512px);
+	height: var(--dmd-h, 128px);
 }
 #dmd-status {
 	font-size: 10px;
@@ -886,3 +891,54 @@ body:not(.is-play) #nudge-pad { display: none !important; }
 		max-height: min(80vh, calc(100vh - 72px));
 	}
 }
+
+/* Extracted from JS: log entries, DMD canvas, and mode-hint sep */
+.log-entry {
+	margin: 2px 0;
+	word-break: break-word;
+	white-space: pre-wrap;
+	font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+	color: #e6e6e6;
+}
+.log-entry--error { color: #ff6b6b; }
+.log-entry--warn { color: #ffcc66; }
+.log-entry--debug { color: #8be9fd; }
+.log-entry--info { color: #e6e6e6; }
+
+.dmd-canvas {
+	image-rendering: pixelated;
+	border: 1px solid #2a2f3a;
+	border-radius: 6px;
+	background: #05070a;
+	display: none;
+	width: var(--dmd-w, 512px);
+	height: var(--dmd-h, 128px);
+}
+.dmd-canvas.is-visible { display: block; }
+
+.sep-muted { opacity: 0.35; }
+
+/* Play tip positioned via CSS vars instead of inline left/top */
+#play-tip {
+	--tip-x: 0px;
+	--tip-y: 0px;
+	left: var(--tip-x);
+	top: var(--tip-y);
+}
+
+/* Progress bars driven by CSS var --progress (0-100) */
+#bar-fill,
+#stream-fill {
+	width: calc(var(--progress, 0) * 1%);
+}
+
+/* Canvas states via classes instead of inline cursor/display */
+#canvas.is-pointer { cursor: pointer; }
+
+#canvas-wrap.is-nudging {
+	transform: var(--nudge-transform, none);
+}
+
+.hidden { display: none !important; }
+
+[hidden] { display: none !important; }

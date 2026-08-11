@@ -36,13 +36,7 @@ window.Buffer = window.Buffer || { isBuffer: () => false }
 			if (el) {
 				const d = document.createElement('div')
 				d.textContent = '[' + new Date().toLocaleTimeString() + '] [' + level + '] ' + txt.slice(0, 3000)
-				d.style.whiteSpace = 'pre-wrap'
-				d.style.wordBreak = 'break-word'
-				d.style.fontFamily = 'ui-monospace, SFMono-Regular, monospace'
-				if (level === 'error') d.style.color = '#ff6b6b'
-				else if (level === 'warn') d.style.color = '#ffcc66'
-				else if (level === 'debug') d.style.color = '#8be9fd'
-				else d.style.color = '#e6e6e6'
+				d.className = `log-entry log-entry--${level}`
 				el.appendChild(d)
 				while (el.children.length > 700) el.removeChild(el.firstChild)
 				el.scrollTop = el.scrollHeight
@@ -178,8 +172,7 @@ window.Buffer = window.Buffer || { isBuffer: () => false }
 			try {
 				const d=document.createElement('div');
 				d.textContent='['+new Date().toLocaleTimeString()+'] '+msg;
-				d.style.cssText='white-space:pre-wrap;word-break:break-word;font-family:ui-monospace,monospace;';
-				d.style.color=level==='error'?'#ff6b6b':level==='warn'?'#ffcc66':level==='debug'?'#8be9fd':'#e6e6e6';
+				d.className=`log-entry log-entry--${level}`;
 				logEl.appendChild(d);
 				while(logEl.children.length>600) logEl.removeChild(logEl.firstChild);
 				logEl.scrollTop=logEl.scrollHeight;

@@ -30,6 +30,7 @@ import {
 } from './src/config.js'
 import { DmdController } from './src/dmd.js'
 import { createHarness } from './src/log-overlay.js'
+import { renderModeHint, renderStats } from './src/stats-panel.js'
 import {
 	applyCameraState,
 	computePlayFraming,
@@ -452,18 +453,18 @@ export class Viewer {
 		const hideTip = () => {
 			hovered = false
 			this._outlineHover = false
-			if (tip) tip.style.display = 'none'
-			if (canvas) canvas.style.cursor = ''
+			if (tip) tip.hidden = true
+			if (canvas) canvas.classList.remove('is-pointer')
 			this._setOuterOutline(false)
 		}
 		const showTipAt = (x, y) => {
 			if (!tip || this.viewerMode !== 'viewer' || !this.tableGroup) return
 			hovered = true
 			this._outlineHover = isOuterHit(x, y)
-			tip.style.left = x + 'px'
-			tip.style.top = y + 'px'
-			tip.style.display = 'block'
-			if (canvas) canvas.style.cursor = 'pointer'
+			tip.style.setProperty('--tip-x', `${x}px`)
+			tip.style.setProperty('--tip-y', `${y}px`)
+			tip.hidden = false
+			if (canvas) canvas.classList.add('is-pointer')
 			this._setOuterOutline(this._outlineHover)
 		}
 		this._hidePlayTip = hideTip
@@ -544,11 +545,7 @@ export class Viewer {
 		const hint = document.getElementById('mode-hint')
 		const isPlay = this.viewerMode === 'play'
 		document.body.classList.toggle('is-play', isPlay)
-		if (hint) {
-			hint.innerHTML = isPlay
-				? '<span class="dot"></span><b>Play</b> <span style="opacity:0.35">—</span> Esc to exit <span style="opacity:0.35">·</span> P pause <span style="opacity:0.35">·</span> ? help'
-				: '<span class="dot"></span><b>Viewer</b> <span style="opacity:0.35">—</span> drag to orbit · click cabinet to <b>Play</b>'
-		}
+		renderModeHint(hint, isPlay)
 	}
 
 	setupPlayCamera() {
@@ -833,7 +830,7 @@ export class Viewer {
 		this.harnessLog?.(msg, level)
 	}
 	setBar(pct, txt) {
-		if (this.dom.barFill) this.dom.barFill.style.width = `${Math.max(0, Math.min(100, pct))}%`
+		if (this.dom.barFill) this.dom.barFill.style.setProperty('--progress', String(Math.max(0, Math.min(100, pct))))
 		if (this.dom.barText) this.dom.barText.textContent = txt ?? `${pct.toFixed(0)}%`
 	}
 	_loading(pct, title, detail = '') {
@@ -843,7 +840,7 @@ export class Viewer {
 	}
 	_setStreamProgress(done, total) {
 		const pct = total ? Math.round((done / total) * 100) : 0
-		if (this.dom.streamFill) this.dom.streamFill.style.width = `${pct}%`
+		if (this.dom.streamFill) this.dom.streamFill.style.setProperty('--progress', String(pct))
 		if (this.dom.streamText) this.dom.streamText.textContent = total ? `${done}/${total} · ${pct}%` : `${pct}%`
 	}
 	_showStream() {
@@ -861,12 +858,12 @@ export class Viewer {
 		}, 400)
 	}
 	_showCanvas() {
-		if (this.dom.dropzone) this.dom.dropzone.style.display = 'none'
-		if (this.dom.wrap) this.dom.wrap.style.display = 'block'
-		if (this.dom.loading) this.dom.loading.style.display = 'none'
+		if (this.dom.dropzone) this.dom.dropzone.hidden = true
+		if (this.dom.wrap) this.dom.wrap.hidden = false
+		if (this.dom.loading) this.dom.loading.hidden = true
 		this.renderer?.setSize(innerWidth, innerHeight)
 		this.dom.canvas?.focus()
-		if (this.dom.dmdWrap) this.dom.dmdWrap.style.display = 'none'
+		if (this.dom.dmdWrap) this.dom.dmdWrap.hidden = true
 	}
 	_setStatus(msg) {
 		if (this.dom.subtitle) this.dom.subtitle.textContent = msg
@@ -1472,8 +1469,8 @@ export class Viewer {
 
 	async load() {
 		await this._ensureRenderer()
-		if (this.dom.loading) this.dom.loading.style.display = 'flex'
-		if (this.dom.wrap) this.dom.wrap.style.display = 'block'
+		if (this.dom.loading) this.dom.loading.hidden = false
+		if (this.dom.wrap) this.dom.wrap.hidden = false
 		try {
 			this.renderer?.setSize(innerWidth, innerHeight)
 		} catch {}
@@ -1632,28 +1629,25 @@ export class Viewer {
 				const draws = this.renderer?.info?.render?.calls ?? 0
 				const tris = this.renderer?.info?.render?.triangles ?? 0
 				const trisFmt = tris >= 1e6 ? `${(tris / 1e6).toFixed(1)}M` : tris >= 1e3 ? `${(tris / 1e3).toFixed(1)}k` : `${tris}`
-				const fpsCls = fps >= 55 ? 'fps--good' : fps >= 30 ? 'fps--mid' : fps > 0 ? 'fps--low' : ''
-				const modeCls = mode.includes('PAUSED') ? 'badge--paused' : mode === 'PLAY' ? 'badge--play' : 'badge--viewer'
-				const modeLabel = mode === 'PLAY PAUSED' ? 'PAUSED' : mode
 				const tFmt = t ? `${(t / 1000).toFixed(1)}s` : '—'
 				const emuLabel = emuStat ? `${emuRaw} · ${emuStat}` : emuRaw
 				let wasmReady = false
 				try { wasmReady = isWasmReady() } catch {}
 				const wasmLabel = wasmReady ? 'Ready' : 'Loading…'
-				this.dom.stats.innerHTML = `
-					<div class="stats-head">
-						<span class="badge ${modeCls}">${modeLabel}</span>
-						<span class="sep">·</span><span>${this._rendererBackend}</span>
-						<span class="sep">·</span><span class="fps ${fpsCls}">${fps} fps</span><span> · threaded</span>
-					</div>
-					<div class="stats-grid">
-						<div class="stats-item"><span class="k">Draws</span><span class="v">${draws}</span></div>
-						<div class="stats-item"><span class="k">Tris</span><span class="v">${trisFmt}</span></div>
-						<div class="stats-item"><span class="k">Balls</span><span class="v">${balls}</span></div>
-						<div class="stats-item"><span class="k">Time</span><span class="v ${t ? '' : 'v--muted'}">${tFmt}</span></div>
-						<div class="stats-item"><span class="k">Emu</span><span class="v ${emuRaw === '—' ? 'v--muted' : ''}">${emuLabel}</span></div>
-						<div class="stats-item"><span class="k">WASM</span><span class="v ${wasmReady ? '' : 'v--muted'}">${wasmLabel}</span></div>
-					</div>`
+				renderStats(this.dom.stats, {
+					fps,
+					draws,
+					trisFmt,
+					balls,
+					tFmt,
+					tHasValue: !!t,
+					emuLabel,
+					emuRaw,
+					wasmLabel,
+					wasmReady,
+					backend: this._rendererBackend,
+					mode,
+				})
 			}
 		}
 		loop()
@@ -1695,7 +1689,7 @@ export class Viewer {
 				}
 				try {
 					const wrap = document.getElementById('canvas-wrap')
-					if (wrap) wrap.style.transform = ''
+					if (wrap) { wrap.classList.remove('is-nudging'); wrap.style.removeProperty('--nudge-transform') }
 				} catch {}
 				return
 			}
@@ -1712,7 +1706,13 @@ export class Viewer {
 				const wrap = document.getElementById('canvas-wrap')
 				if (wrap) {
 					const shake = Math.hypot(scaleX, scaleY)
-					wrap.style.transform = shake > 0.05 ? `translate(${scaleX * 0.6}px, ${scaleY * 0.6}px)` : ''
+					if (shake > 0.05) {
+						wrap.style.setProperty('--nudge-transform', `translate(${scaleX * 0.6}px, ${scaleY * 0.6}px)`)
+						wrap.classList.add('is-nudging')
+					} else {
+						wrap.classList.remove('is-nudging')
+						wrap.style.removeProperty('--nudge-transform')
+					}
 				}
 			} catch {}
 		} catch {}
@@ -1804,7 +1804,6 @@ export class Viewer {
 			try {
 				this.dom.canvas.focus()
 			} catch {}
-			this.dom.canvas.style.touchAction = 'none'
 			if (this._touchCleanup) {
 				try {
 					this._touchCleanup()

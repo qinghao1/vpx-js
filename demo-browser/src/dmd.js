@@ -22,27 +22,22 @@ export class DmdController {
 
 	_ensureCanvas() {
 		if (this.canvas) {
+			this.canvas.classList.add('dmd-canvas')
 			this.ctx = this.canvas.getContext('2d', { alpha: false })
 			this._resize()
 			return
 		}
 		if (!this.wrap) return
 		try {
-			this.wrap.style.display = 'none'
+			this.wrap.hidden = true
 		} catch {}
 		const c = document.createElement('canvas')
 		c.id = 'dmd'
+		c.className = 'dmd-canvas'
 		c.width = this.w * this.scale
 		c.height = this.h * this.scale
-		Object.assign(c.style, {
-			width: `${this.w * this.scale}px`,
-			height: `${this.h * this.scale}px`,
-			imageRendering: 'pixelated',
-			border: '1px solid #2a2f3a',
-			borderRadius: '6px',
-			background: '#05070a',
-			display: 'none',
-		})
+		c.style.setProperty('--dmd-w', `${this.w * this.scale}px`)
+		c.style.setProperty('--dmd-h', `${this.h * this.scale}px`)
 		this.wrap.appendChild(c)
 		this.canvas = c
 		this.viewer.dom.dmdCanvas = c
@@ -187,13 +182,13 @@ export class DmdController {
 		const maxW = Math.min(512, this.wrap.clientWidth - 24)
 		const scale = Math.max(2, Math.floor(maxW / this.w))
 		this.scale = scale
-		this.canvas.style.width = `${this.w * scale}px`
-		this.canvas.style.height = `${this.h * scale}px`
+		this.canvas.style.setProperty('--dmd-w', `${this.w * scale}px`)
+		this.canvas.style.setProperty('--dmd-h', `${this.h * scale}px`)
 	}
 
 	_showOverlay() {
-		if (this.wrap?.style.display === 'none') this.wrap.style.display = 'flex'
-		if (this.canvas?.style.display === 'none') this.canvas.style.display = 'block'
+		if (this.wrap) this.wrap.hidden = false
+		if (this.canvas) this.canvas.classList.add('is-visible')
 	}
 
 	render() {
@@ -263,7 +258,7 @@ export class DmdController {
 		if (this.texture) this.texture.needsUpdate = true
 
 		if (this.meshes.length) {
-			if (this.wrap) this.wrap.style.display = 'none'
+			if (this.wrap) this.wrap.hidden = true
 		} else this._showOverlay()
 
 		if (this.statusEl) {
