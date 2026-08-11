@@ -79,6 +79,7 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 		const matName = this.state.material ?? this.data.szMaterial
 		const base = table.getMaterial(matName)?.baseColor ?? 0xffffff
 		const hex = new Color(base).multiply(new Color(prim)).getHex()
+		const isRamp = /ramp|armp|botramp|rampscrw/i.test(this.data.name || '')
 		for (const m of this.meshes(obj)) {
 			const mat = m.material as unknown as
 				| {
@@ -86,6 +87,7 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 						emissive: { set: (v: number) => void }
 						emissiveIntensity: number
 						emissiveMap?: unknown
+						map?: unknown
 						userData?: Record<string, unknown>
 						needsUpdate: boolean
 				  }
@@ -93,8 +95,17 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 			if (!mat?.color || !mat?.emissive) continue
 			const isBaked = !!(mat as any).userData?.__isBaked || !!(mat as any).emissiveMap
 			if (isBaked) {
+				const hasMap = !!(mat as any).emissiveMap || !!(mat as any).map
+				const pending = (mat as any).userData?.pendingMap || (mat as any).userData?.pendingmap || (mat as any).userData?.pendingEmissiveMap
+				if (!hasMap && pending) {
+					mat.color.set(0x000000)
+					mat.emissive.set(0xffffff)
+					mat.emissiveIntensity = 0
+					continue
+				}
 				if (this.data.addBlend) {
-					const overlayIntensity = Math.min(MAX_EMISSIVE, rawAlphaClamped * ALPHA_SCALE * 0.35)
+					const factor = isRamp ? 0.12 : 0.20
+					const overlayIntensity = Math.min(MAX_EMISSIVE, rawAlphaClamped * ALPHA_SCALE * factor)
 					mat.color.set(0x000000)
 					mat.emissive.set(0xffffff)
 					mat.emissiveIntensity = overlayIntensity
@@ -102,7 +113,8 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 					mat.color.set(0x000000)
 					if (!mat.emissive) (mat as any).emissive = new Color(0xffffff)
 					else mat.emissive.set(0xffffff)
-					if (mat.emissiveIntensity === 0) mat.emissiveIntensity = 0.85
+					if (mat.emissiveIntensity === 0) mat.emissiveIntensity = isRamp ? 0.45 : 0.85
+					else if (isRamp && mat.emissiveIntensity > 0.6) mat.emissiveIntensity = 0.45
 				}
 			} else {
 				mat.color.set(hex)
@@ -131,9 +143,19 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 						blending: number
 						needsUpdate: boolean
 						userData: Record<string, unknown>
+						map?: unknown
+						emissiveMap?: unknown
 				  }
 				| undefined
 			if (!mat) continue
+			const isBakedPending = !!(mat as any).userData?.__isBaked && !mat.map && !mat.emissiveMap && ((mat as any).userData?.pendingMap || (mat as any).userData?.pendingEmissiveMap)
+			if (isBakedPending) {
+				mat.opacity = 0
+				mat.transparent = true
+				mat.depthWrite = false
+				mat.needsUpdate = true
+				continue
+			}
 			if (isAdditive) {
 				mat.opacity = opacity
 				mat.transparent = true

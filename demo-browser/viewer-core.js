@@ -92,11 +92,12 @@ const swipeNudge = (dx, dy) => {
 const isBakedMesh = (meshName, matName, mapName) => {
 	const ml = matName.toLowerCase(), nl = meshName.toLowerCase(), mp = mapName.toLowerCase()
 	const isBakedMat = RE_BAKE_MAT.test(ml) || RE_BAKE_MAP.test(mp) || RE_BAKE_MAP.test(nl)
-	const isBakedFamily = nl.includes('bm_') || nl.includes('playfield')
+	const isBakedFamily = nl.includes('bm_') || nl.includes('playfield') || nl.includes('armp') || nl.includes('ramp')
+	const isRampFamily = nl.includes('armp') || nl.includes('ramp') || nl.includes('botramp') || nl.includes('rampscrw')
 	const isMainBake = isBakedFamily && isBakedMat && !/lm_/i.test(nl)
-	const isVlmBake = nl.includes('playfield') && (/lm_/i.test(nl) || isBakedMat || nl.includes('bm_'))
+	const isVlmBake = (nl.includes('playfield') || isRampFamily) && (/lm_/i.test(nl) || isBakedMat || nl.includes('bm_'))
 	const isVrCab = RE_VR.test(nl) || RE_CAB.test(nl) || RE_VR.test(ml) || RE_CAB.test(ml)
-	return { isBakedMat, isMainBake, isVlmBake, isVrCab, isBaked: isBakedMat || isMainBake || isVlmBake || isVrCab }
+	return { isBakedMat, isMainBake, isVlmBake, isVrCab, isRampFamily, isBaked: isBakedMat || isMainBake || isVlmBake || isVrCab }
 }
 const wrapBakedTex = tex => {
 	if (!tex) return
@@ -109,15 +110,22 @@ const applyBakedMaterial = (mat, tex, info, meshName) => {
 	mat.emissiveMap = tex
 	try { if (mat.emissive) mat.emissive.set(0xffffff); else mat.emissive = new THREE.Color(0xffffff) } catch {}
 	const isOverlay = info.isVlmBake && !info.isMainBake
+	const isRamp = /ramp|armp|botramp|rampscrw/i.test(nl) || info.isRampFamily
 	if (isOverlay) {
-		mat.emissiveIntensity = 0.35
+		const hasTex = !!tex
+		if (!hasTex) {
+			mat.emissiveIntensity = 0
+			mat.transparent = true; mat.opacity = 0; mat.blending = THREE.AdditiveBlending; mat.depthWrite = false; mat.alphaTest = 0
+		} else {
+			mat.emissiveIntensity = isRamp ? 0.12 : 0.20
+			mat.transparent = true; mat.opacity = isRamp ? 0.55 : 0.50; mat.blending = THREE.AdditiveBlending; mat.depthWrite = false; mat.alphaTest = 0
+		}
 		try { if (!mat.color) mat.color = new THREE.Color(0x000000); else mat.color.set(0x000000) } catch {}
-		mat.side = THREE.DoubleSide; mat.toneMapped = false; mat.roughness = BAKED_ROUGH; mat.metalness = BAKED_METAL
+		mat.side = THREE.DoubleSide; mat.toneMapped = true; mat.roughness = BAKED_ROUGH; mat.metalness = BAKED_METAL
 		wrapBakedTex(tex); wrapBakedTex(mat.emissiveMap)
-		mat.transparent = true; mat.opacity = 0.85; mat.blending = THREE.AdditiveBlending; mat.depthWrite = false; mat.alphaTest = 0
 		mat.polygonOffset = true; mat.polygonOffsetFactor = -2; mat.polygonOffsetUnits = -4
 	} else {
-		mat.emissiveIntensity = BAKED_EMISSIVE
+		mat.emissiveIntensity = isRamp ? 0.45 : BAKED_EMISSIVE
 		try { if (!mat.color) mat.color = new THREE.Color(0x000000); else mat.color.set(0x000000) } catch {}
 		mat.side = THREE.DoubleSide; mat.toneMapped = true; mat.roughness = BAKED_ROUGH; mat.metalness = BAKED_METAL
 		wrapBakedTex(tex); wrapBakedTex(mat.emissiveMap)
@@ -1299,7 +1307,8 @@ export class Viewer {
 									const info = isBakedMesh(o.name || '', m.name || '', tex.name || '')
 									if (info.isBaked) {
 										try { applyBakedMaterial(m, tex, info, o.name || '') } catch {}
-										if (info.isMainBake && (o.visible === false) && (o.name || '').toLowerCase().includes('playfield')) {
+										const isPlayfieldOverlay = info.isVlmBake && !info.isMainBake && (o.name || '').toLowerCase().includes('playfield')
+										if ((info.isMainBake || isPlayfieldOverlay) && (o.visible === false) && (o.name || '').toLowerCase().includes('playfield')) {
 											o.visible = true
 											for (let p = o.parent; p && p !== this.tableGroup; p = p.parent) if (p.visible === false) p.visible = true
 										}
@@ -1335,10 +1344,11 @@ export class Viewer {
 						this.tableGroup.traverse(o2 => {
 							if (!o2.isMesh) return
 							const n2 = (o2.name || '').toLowerCase()
-							if (!n2.includes('bm_playfield')) return
+							if (!n2.includes('playfield')) return
 							const m2 = Array.isArray(o2.material) ? o2.material[0] : o2.material
 							if (!m2?.map) return
-							if (o2.visible === false) {
+							const info2 = isBakedMesh(n2, m2.name || '', m2.map?.name || '')
+							if ((info2.isMainBake || (info2.isVlmBake && !info2.isMainBake)) && o2.visible === false) {
 								o2.visible = true
 								for (let p = o2.parent; p && p !== this.tableGroup; p = p.parent) if (p.visible === false) p.visible = true
 							}

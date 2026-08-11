@@ -18,16 +18,18 @@ const classify = (mesh, mat, map, baked = false) => {
 	const mp = map.toLowerCase()
 	const me = mesh.toLowerCase()
 	const isBakedMat = baked || RE_BAKE_MAT.test(m) || RE_BAKE_MAP.test(mp) || RE_BAKE_MAP.test(me)
-	const isBakedFamily = me.includes('bm_') || me.includes('playfield')
+	const isBakedFamily = me.includes('bm_') || me.includes('playfield') || me.includes('armp') || me.includes('ramp')
+	const isRampFamily = me.includes('armp') || me.includes('ramp') || me.includes('botramp') || me.includes('rampscrw')
 	return {
 		isGlass: RE_GLASS.test(me) || RE_GLASS.test(m) || (me === 'primitive-primitive001' && m === 'material:glass'),
 		isLm: RE_LM.test(me),
 		isVr: RE_VR.test(me),
 		isCab: RE_CAB.test(me),
-		isVlmBake: me.includes('playfield') && (RE_LM.test(me) || isBakedMat || me.includes('bm_')),
+		isVlmBake: (me.includes('playfield') || isRampFamily) && (RE_LM.test(me) || isBakedMat || me.includes('bm_')),
 		isMainBake: isBakedFamily && isBakedMat && !RE_LM.test(me),
 		isBakedMat,
 		needsAlpha: RE_ALPHA_MESH.test(me),
+		isRampFamily,
 	}
 }
 const isBasePlayfield = (n, c) => n.includes('playfield') && !c.isMainBake && !c.isVlmBake && !c.isBakedMat
@@ -167,7 +169,7 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 		const pending = pendingOf(base)
 		const mapPre = (base.map?.name || pending || '').toLowerCase()
 		const bakedFlag = !!base.userData?.__isBaked
-		const { isMainBake, isVlmBake, needsAlpha, isLm } = classify(mesh, matName, mapPre, bakedFlag)
+		const { isMainBake, isVlmBake, needsAlpha, isLm, isRampFamily } = classify(mesh, matName, mapPre, bakedFlag)
 		const isOverlay = isVlmBake && !isMainBake
 		const isApron = mesh.includes('bm_non_opaque') || mesh.includes('non_opaque')
 		const isRamp = mesh.includes('ramp') || mesh.includes('armp') || mesh.includes('botramp') || mesh.includes('rampscrw')
@@ -175,43 +177,71 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 		const key = `${base.name}|${base.map?.name ?? pending}|${isMainBake ? 'main' : isOverlay ? 'overlay' : alpha ? 'alpha' : 'opaque'}|${base.polygonOffset ? `${base.polygonOffsetFactor}/${base.polygonOffsetUnits}` : '0'}`
 		let v = bakedCache.get(key)
 		if (v) return v
-		v = base.clone()
-		if (isMainBake) fixBaked(v, v.map)
-		else if (isOverlay) {
+	v = base.clone()
+		if (isMainBake) {
 			fixBaked(v, v.map)
-			v.emissiveIntensity = 0.35
-			v.transparent = true
-			v.opacity = 0.85
-			v.blending = THREE.AdditiveBlending
-			v.depthWrite = false
-			v.toneMapped = false
-			v.needsUpdate = true
+			if (isRamp) {
+				v.emissiveIntensity = 0.45
+				v.toneMapped = true
+				v.needsUpdate = true
+			}
+		} else if (isOverlay) {
+			const hasMap = !!v.map
+			fixBaked(v, v.map)
+			const isRampOverlay = isRamp || isRampFamily
+			if (!hasMap && pending) {
+				v.emissiveIntensity = 0
+				v.transparent = true
+				v.opacity = 0
+				v.blending = THREE.AdditiveBlending
+				v.depthWrite = false
+				v.toneMapped = true
+				v.needsUpdate = true
+			} else {
+				v.emissiveIntensity = isRampOverlay ? 0.12 : 0.20
+				v.transparent = true
+				v.opacity = isRampOverlay ? 0.55 : 0.50
+				v.blending = THREE.AdditiveBlending
+				v.depthWrite = false
+				v.toneMapped = true
+				v.needsUpdate = true
+			}
 		} else fixVr(v)
 		if (isMainBake && !v.map && pending) {
 			v.color?.set?.(0x000000)
 			if (!v.emissive) v.emissive = new THREE.Color(0xffffff)
 			else v.emissive.set(0xffffff)
-			v.emissiveIntensity = BAKED_EMISSIVE
+			v.emissiveIntensity = isRamp ? 0.45 : BAKED_EMISSIVE
 			v.toneMapped = true
 		}
 	if (isOverlay) {
-		v.transparent = true
-		v.alphaTest = 0
-		v.depthWrite = false
-		v.opacity = 0.85
-		v.blending = THREE.AdditiveBlending
-		v.polygonOffset = true; v.polygonOffsetFactor = -2; v.polygonOffsetUnits = -4
+		const hasMapOverlay = !!v.map
+		if (!hasMapOverlay && pending) {
+			v.transparent = true
+			v.alphaTest = 0
+			v.depthWrite = false
+			v.opacity = 0
+			v.blending = THREE.AdditiveBlending
+			v.polygonOffset = true; v.polygonOffsetFactor = -2; v.polygonOffsetUnits = -4
+		} else {
+			v.transparent = true
+			v.alphaTest = 0
+			v.depthWrite = false
+			v.opacity = (isRamp || isRampFamily) ? 0.55 : 0.50
+			v.blending = THREE.AdditiveBlending
+			v.polygonOffset = true; v.polygonOffsetFactor = -2; v.polygonOffsetUnits = -4
+		}
 	} else {
-		v.transparent = !isMainBake && alpha && !isApron && !isRamp
-		v.alphaTest = v.transparent ? 0.1 : 0
-		v.depthWrite = !v.transparent
-		if (v.opacity === undefined || !isOverlay) v.opacity = 1
-		if (isMainBake && !isApron && !isRamp) { v.polygonOffset = true; v.polygonOffsetFactor = -1; v.polygonOffsetUnits = -1 } else if (!isMainBake && alpha && !isApron && !isRamp) { v.polygonOffset = true; v.polygonOffsetFactor = -2; v.polygonOffsetUnits = -4 } else if (!isOverlay) { v.polygonOffset = false; v.polygonOffsetFactor = 0; v.polygonOffsetUnits = 0 }
-		if (isApron || isRamp) { v.transparent = false; v.alphaTest = 0; v.depthWrite = true; if (!isMainBake) { v.polygonOffset = false; v.polygonOffsetFactor = 0; v.polygonOffsetUnits = 0 } }
+			v.transparent = !isMainBake && alpha && !isApron && !isRamp
+			v.alphaTest = v.transparent ? 0.1 : 0
+			v.depthWrite = !v.transparent
+			if (v.opacity === undefined || !isOverlay) v.opacity = 1
+			if (isMainBake && !isApron && !isRamp) { v.polygonOffset = true; v.polygonOffsetFactor = -1; v.polygonOffsetUnits = -1 } else if (!isMainBake && alpha && !isApron && !isRamp) { v.polygonOffset = true; v.polygonOffsetFactor = -2; v.polygonOffsetUnits = -4 } else if (!isOverlay) { v.polygonOffset = false; v.polygonOffsetFactor = 0; v.polygonOffsetUnits = 0 }
+			if (isApron || isRamp) { v.transparent = false; v.alphaTest = 0; v.depthWrite = true; if (!isMainBake) { v.polygonOffset = false; v.polygonOffsetFactor = 0; v.polygonOffsetUnits = 0 } }
+		}
+		bakedCache.set(key, v)
+		return v
 	}
-	bakedCache.set(key, v)
-	return v
-}
 	const getVr = base => {
 		const pending = pendingOf(base)
 		const key = `${base.name}|${base.map?.name ?? pending}|${base.polygonOffset ? `${base.polygonOffsetFactor}/${base.polygonOffsetUnits}` : '0'}`
@@ -351,7 +381,11 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 			const pending = pendingOf(m)
 			const mapName = (m.map?.name || '').toLowerCase()
 			const c = classify(n, (m.name||'').toLowerCase(), mapName || pending, !!m.userData?.__isBaked)
-			if (n.includes('playfield') && isBakedMesh(c) && pending && !mapName && o.visible) { o.visible = false; stats.playfieldHidden++ }
+			if (c.isMainBake && pending && !mapName && o.visible) { o.visible = false; stats.playfieldHidden++ }
+			else if (n.includes('playfield') && isBakedMesh(c) && pending && !mapName && o.visible) {
+				const mats = Array.isArray(o.material) ? o.material : [o.material]
+				for (const mm of mats) { mm.transparent = true; mm.opacity = 0; mm.depthWrite = false; mm.blending = THREE.AdditiveBlending; mm.needsUpdate = true }
+			}
 			if (isBasePlayfield(n, c) && o.visible === false) { o.visible = true; makeParentsVisible(o, node, stats) }
 		})
 	}
