@@ -13,7 +13,7 @@ import { ANIM_SETTLE_MS, AnimationGate } from '../dist-esm/lib/util/animation-ga
 import { Vertex3D } from '../dist-esm/lib/util/vector.js'
 import { Table } from '../dist-esm/lib/vpt/table/table.js'
 import { isWasmReady } from '../dist-esm/lib/physics/wasm/kernels.js'
-import { BALL_STRIDE, canThread, createPhysicsSAB, MAX_BALLS, pushInput, trySnap } from '../dist-esm/lib/game/shared/physics-buffer.js'
+import { BALL_STRIDE, createPhysicsSAB, MAX_BALLS, pushInput, trySnap } from '../dist-esm/lib/game/shared/physics-buffer.js'
 import {
 	BAKED_EMISSIVE,
 	BAKED_METAL,
@@ -616,23 +616,20 @@ export class Viewer {
 			worker.onerror = e => { this.log(`worker error ${e.message}`, 'warn'); this._physicsSab = null; try { worker.terminate() } catch {} if (this._physicsWorker === worker) this._physicsWorker = null }
 			this._physicsSab = sab; this._physicsScratch = scratch; this._physicsWorker = worker
 			return { sab, scratch, worker }
-		} catch (e) { this.log(`threaded init failed ${e.message}`, 'warn'); if (_isDev) console.warn(e); return null }
+		} catch (e) { this.log(`physics worker init failed ${e.message}`, 'warn'); if (_isDev) console.warn(e); return null }
 	}
 
-	_ensureThreadedPhysics() {
-		try {
-			if (!canThread()) return false
-			if (this._physicsSab && this._physicsWorker) return true
-			if (!this.player) return false
-			const res = this._createPhysicsWorker()
-			if (!res) return false
-			this.log(`[threaded] lazy SAB ${res.sab.byteLength} worker started`, 'info')
-			return true
-		} catch (e) { this.log(`lazy threaded init failed ${e.message}`, 'warn'); if (_isDev) console.warn(e); return false }
+	_ensurePhysicsWorker() {
+		if (this._physicsSab && this._physicsWorker) return true
+		if (!this.player) return false
+		const res = this._createPhysicsWorker()
+		if (!res) return false
+		this.log(`[physics] SAB ${res.sab.byteLength} worker started`, 'info')
+		return true
 	}
 	enterPlayMode() {
 		if (this.controls) this.controls.enabled = false
-		try { this._ensureThreadedPhysics() } catch {}
+		try { this._ensurePhysicsWorker() } catch (e) { if (_isDev) console.warn(e) }
 		if (this.tableGroup) hideCabFlippers(this.tableGroup)
 		try {
 			const bg = this.tableGroup?.getObjectByName('balls')
@@ -1634,41 +1631,25 @@ export class Viewer {
 			if (!emu || emu.isMock || !emu.isInitialized?.()) return false
 			try { return emu.api?.isRunning?.() === 0 } catch { return false }
 		}
-		let threaded = !!(this._physicsSab && this._physicsWorker)
-		try {
-			if (!threaded && canThread() && this.player && this.viewerMode === 'play') {
+		if (this.player && (!this._physicsSab || !this._physicsWorker)) {
+			try {
 				const res = this._createPhysicsWorker()
-				if (res) {
-					threaded = true
-					this.log(`[threaded] SAB ${res.sab.byteLength} worker started`, 'info')
-				}
-			} else if (!canThread()) {
-				try { this.log(`[threaded] disabled hasSAB=${typeof SharedArrayBuffer !== 'undefined'} isolated=${globalThis.crossOriginIsolated} waitAsync=${typeof Atomics?.waitAsync}`, 'debug') } catch {}
-			} else if (threaded) {
-				this.log(`[threaded] reusing existing SAB ${this._physicsSab?.byteLength}`, 'debug')
-			}
-		} catch (e) { if (_isDev) console.warn('threaded check failed', e) }
+				if (res) this.log(`[physics] SAB ${res.sab.byteLength} worker started`, 'info')
+			} catch (e) { if (_isDev) console.warn('physics worker start failed', e) }
+		} else if (this._physicsSab) {
+			this.log(`[physics] reusing SAB ${this._physicsSab.byteLength}`, 'debug')
+		}
 		const tickPhysics = now => {
 			if (!this.player || this.isPaused) return
+			try { if (this._physicsSab && this._physicsScratch) trySnap(this._physicsSab, this._physicsScratch) } catch (e) { if (_isDev) console.warn('trySnap failed', e) }
 			this.player.setPhysicsEnabled(this.viewerMode === 'play')
 			this.player.updatePhysics(now)
 			this.player.updateAnimations(this.player.getGameTime())
 			const changed = this.player.popStates()
 			if (changed.keys.length) this.applyChangedStates(changed)
 		}
-		const tickPhysicsThreaded = now => {
-			if (!this.player || this.isPaused) return
-			// Worker currently runs dummy physics that would overwrite real ball
-			// positions and make them fly. Run physics on main thread for correctness
-			// and just drain the SAB for future interpolation.
-			try {
-				if (this._physicsSab && this._physicsScratch) trySnap(this._physicsSab, this._physicsScratch)
-			} catch (e) { if (_isDev) console.warn('trySnap failed', e) }
-			tickPhysics(now)
-		}
 		const loop = () => {
 			if (this._disposed) return
-			if (!threaded && this._physicsSab) threaded = true
 			const now = performance.now()
 			const pinLoading = isPinLoading()
 			if (pinLoading !== pinLoadingLogged) {
@@ -1678,16 +1659,14 @@ export class Viewer {
 			if (pinLoading) {
 				this._animTimeout = setTimeout(loop, 16)
 				this.animFrame = this._animTimeout
-				if (threaded) tickPhysicsThreaded(now)
-				else tickPhysics(now)
+				tickPhysics(now)
 				this._pollPinmame()
 				return
 			}
 			this._animRaf = requestAnimationFrame(loop)
 			this.animFrame = this._animRaf
 			if (this.controls?.enabled) this.controls.update()
-			if (threaded) tickPhysicsThreaded(now)
-			else tickPhysics(now)
+			tickPhysics(now)
 			this._pollPinmame()
 			try { this._applyNudgeVisual() } catch (e) { if (_isDev) console.warn('_applyNudgeVisual', e) }
 			try { this.renderer.render(this.scene, this.camera) } catch (e) { if (_isDev) console.warn('render', e) }
@@ -1716,12 +1695,11 @@ export class Viewer {
 				let wasmReady = false
 				try { wasmReady = isWasmReady() } catch {}
 				const wasmLabel = wasmReady ? 'Ready' : 'Loading…'
-				const threadLabel = threaded ? ' · threaded' : ''
 				this.dom.stats.innerHTML = `
 					<div class="stats-head">
 						<span class="badge ${modeCls}">${modeLabel}</span>
 						<span class="sep">·</span><span>${this._rendererBackend}</span>
-						<span class="sep">·</span><span class="fps ${fpsCls}">${fps} fps</span><span>${threadLabel}</span>
+						<span class="sep">·</span><span class="fps ${fpsCls}">${fps} fps</span><span> · threaded</span>
 					</div>
 					<div class="stats-grid">
 						<div class="stats-item"><span class="k">Draws</span><span class="v">${draws}</span></div>
