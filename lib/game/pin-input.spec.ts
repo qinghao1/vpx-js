@@ -25,7 +25,7 @@ describe('The VPinball input handler', () => {
 	})
 
 	it('should react on left flipper key down', () => {
-		player.onKeyDown({ code: 'ControlLeft', key: 'Control', ts: Date.now() })
+		player.onKeyDown({ code: 'ShiftLeft', key: 'Shift', ts: Date.now() })
 		player.updatePhysics(20)
 		expect(scope.keyDown).to.be.equal(player.getKey(AssignKey.LeftFlipperKey))
 	})
@@ -43,7 +43,7 @@ describe('The VPinball input handler', () => {
 	})
 
 	it('should react on a key up', () => {
-		player.onKeyUp({ code: 'ControlRight', key: 'Control', ts: Date.now() })
+		player.onKeyUp({ code: 'ShiftRight', key: 'Shift', ts: Date.now() })
 		player.updatePhysics(20)
 		expect(scope.keyUp).to.be.equal(player.getKey(AssignKey.RightFlipperKey))
 	})
