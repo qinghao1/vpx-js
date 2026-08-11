@@ -5,8 +5,8 @@ export const MAX_BALLS = 32
 export const BALL_STRIDE = 12
 export const SAB_SIZE = 16 * 1024
 
-const HEADER_SIZE = 64
-const TIMES_OFFSET = 64
+const HEADER_SIZE = 128
+const TIMES_OFFSET = 128
 const TIMES_SLOTS = 3
 const TIMES_STRIDE = 3
 const BALLS_OFFSET = 256
@@ -19,8 +19,8 @@ const INPUT_ENTRY = 8
 const FLAGS_IDX = 0
 const GEN_IDX = 1
 const HEAD_IDX = 4
-const TAIL_IDX = 5
-const COUNT_BASE = 8
+const TAIL_IDX = 20
+const COUNT_BASE = 24
 
 const MASK = 3
 const SENTINEL = 3
