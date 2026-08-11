@@ -35,6 +35,12 @@ const classify = (mesh, mat, map, baked = false) => {
 const isBasePlayfield = (n, c) => n.includes('playfield') && !c.isMainBake && !c.isVlmBake && !c.isBakedMat
 const isBakedMesh = c => c.isMainBake || c.isBakedMat || c.isVlmBake
 
+export const isBakedMeshByNames = (meshName, matName, mapName) => {
+	const c = classify(meshName ?? '', matName ?? '', mapName ?? '')
+	return { ...c, isVrCab: !!(c.isVr || c.isCab), isBaked: isBakedMesh(c) }
+}
+export { classify, isBakedMesh }
+
 function wrapTexBaked(tex) {
 	if (!tex) return
 	tex.wrapS = THREE.ClampToEdgeWrapping

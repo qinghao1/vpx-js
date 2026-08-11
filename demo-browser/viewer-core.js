@@ -9,11 +9,11 @@ import { BrowserBinaryReader } from '../dist-esm/lib/io/binary-reader.browser.js
 import { buildBvhIdle, installBvh } from '../dist-esm/lib/render/threejs/three-bvh.js'
 import { ThreeRenderApi } from '../dist-esm/lib/render/threejs/three-render-api.js'
 import { ThreeTextureLoaderBrowser } from '../dist-esm/lib/render/threejs/three-texture-loader-browser.js'
-import { ANIM_POLL_MS, ANIM_SETTLE_MS, AnimationGate } from '../dist-esm/lib/util/animation-gate.js'
+import { ANIM_SETTLE_MS, AnimationGate } from '../dist-esm/lib/util/animation-gate.js'
 import { Vertex3D } from '../dist-esm/lib/util/vector.js'
 import { Table } from '../dist-esm/lib/vpt/table/table.js'
 import { isWasmReady } from '../dist-esm/lib/physics/wasm/kernels.js'
-import { BALL_STRIDE, createPhysicsSAB, MAX_BALLS, pushInput, trySnap } from '../dist-esm/lib/game/shared/physics-buffer.js'
+import { BALL_STRIDE, canThread, createPhysicsSAB, MAX_BALLS, pushInput, trySnap } from '../dist-esm/lib/game/shared/physics-buffer.js'
 import {
 	BAKED_EMISSIVE,
 	BAKED_METAL,
@@ -38,6 +38,7 @@ import {
 	ensureProceduralRoom,
 	frameCamera,
 	hideCabFlippers,
+	isBakedMeshByNames,
 	isDeferred,
 	postProcessScene,
 	showCabFlippers,
@@ -64,9 +65,9 @@ const _isDev = (() => {
 		return h === 'localhost' || h === '127.0.0.1' || h === '' || h === '0.0.0.0'
 	} catch { return false }
 })()
-try {
-	installBvh()
-} catch {}
+try { installBvh() } catch (e) { if (_isDev) console.warn('installBvh failed', e) }
+
+const getTargetPixelRatio = mode => Math.min(typeof devicePixelRatio !== 'undefined' ? devicePixelRatio : 1, mode === 'play' ? 1 : 1.5)
 
 export {
 	createHarness,
@@ -89,16 +90,7 @@ const swipeNudge = (dx, dy) => {
 	return null
 }
 
-const isBakedMesh = (meshName, matName, mapName) => {
-	const ml = matName.toLowerCase(), nl = meshName.toLowerCase(), mp = mapName.toLowerCase()
-	const isBakedMat = RE_BAKE_MAT.test(ml) || RE_BAKE_MAP.test(mp) || RE_BAKE_MAP.test(nl)
-	const isBakedFamily = nl.includes('bm_') || nl.includes('playfield') || nl.includes('armp') || nl.includes('ramp')
-	const isRampFamily = nl.includes('armp') || nl.includes('ramp') || nl.includes('botramp') || nl.includes('rampscrw')
-	const isMainBake = isBakedFamily && isBakedMat && !/lm_/i.test(nl)
-	const isVlmBake = (nl.includes('playfield') || isRampFamily) && (/lm_/i.test(nl) || isBakedMat || nl.includes('bm_'))
-	const isVrCab = RE_VR.test(nl) || RE_CAB.test(nl) || RE_VR.test(ml) || RE_CAB.test(ml)
-	return { isBakedMat, isMainBake, isVlmBake, isVrCab, isRampFamily, isBaked: isBakedMat || isMainBake || isVlmBake || isVrCab }
-}
+const isBakedMesh = isBakedMeshByNames
 const wrapBakedTex = tex => {
 	if (!tex) return
 	tex.wrapS = THREE.ClampToEdgeWrapping; tex.wrapT = THREE.ClampToEdgeWrapping
@@ -206,38 +198,87 @@ export class Viewer {
 		this._boundKeyUp = null
 		this._playCameraApplied = false
 		this._cameraAnim = null
+		this._cameraRaf = null
 		this.animFrame = null
+		this._animRaf = null
+		this._animTimeout = null
 		this._emuStartLogged = false
 		this._streamId = 0
 		this._touchMap = new Map()
 		this._autoPlayTimer = null
+		this._fallbackBallTimer = null
+		this._hasPinmame = false
 		this._rendererBackend = 'webgl'
 		this.renderer = null
 		this.outlineEffect = null
 		this._outlineHover = false
 		this._outerMeshes = []
 		this.controls = null
+		this._eventCleanups = []
+		this._boundResize = () => this._onResize()
+		this._disposed = false
 		this._rendererReady = this._createRenderer()
 		this.dmd = new DmdController(this)
 		if (_isDev) Object.assign(window, { scene: this.scene, camera: this.camera, THREE })
-		addEventListener('resize', () => this._onResize())
-		this.dom.resetBtn?.addEventListener('click', () => this._onResetView())
+		addEventListener('resize', this._boundResize)
+		this._eventCleanups.push(() => removeEventListener('resize', this._boundResize))
+		{
+			const onReset = () => this._onResetView()
+			this.dom.resetBtn?.addEventListener('click', onReset)
+			if (this.dom.resetBtn) this._eventCleanups.push(() => this.dom.resetBtn?.removeEventListener('click', onReset))
+		}
 		this._setupModeSwitch()
 		this._setupDebugToggle()
 		this._syncChrome()
 	}
 
+	destroy() {
+		if (this._disposed) return
+		this._disposed = true
+		try { if (this._cameraRaf) cancelAnimationFrame(this._cameraRaf) } catch {}
+		try { if (this._cameraAnim) cancelAnimationFrame(this._cameraAnim) } catch {}
+		try { if (typeof this._cameraAnim === 'number') clearTimeout(this._cameraAnim) } catch {}
+		try { if (this._animRaf) cancelAnimationFrame(this._animRaf) } catch {}
+		try { if (this._animTimeout) clearTimeout(this._animTimeout) } catch {}
+		try { if (this.animFrame) cancelAnimationFrame(this.animFrame) } catch {}
+		try { if (this.animFrame) clearTimeout(this.animFrame) } catch {}
+		try { if (this._autoPlayTimer) clearTimeout(this._autoPlayTimer) } catch {}
+		try { if (this._fallbackBallTimer) clearTimeout(this._fallbackBallTimer) } catch {}
+		try { this._nudgeCleanup?.() } catch {}
+		try { this._touchCleanup?.() } catch {}
+		try { this._terminatePhysicsWorker() } catch {}
+		for (const fn of this._eventCleanups) try { fn() } catch {}
+		this._eventCleanups = []
+		try { if (this._boundKeyDown) removeEventListener('keydown', this._boundKeyDown) } catch {}
+		try { if (this._boundKeyUp) removeEventListener('keyup', this._boundKeyUp) } catch {}
+		try { this.controls?.dispose?.() } catch {}
+		try { this.renderer?.dispose?.() } catch {}
+		try { this.scene?.clear?.() } catch {}
+	}
+
+	_terminatePhysicsWorker() {
+		try { this._physicsWorker?.terminate?.() } catch {}
+		this._physicsWorker = null
+		this._physicsSab = null
+		this._physicsScratch = null
+	}
+
 	_setupDebugToggle() {
 		const btn = document.getElementById('debug-toggle')
 		const toggle = () => document.body.classList.toggle('show-debug')
-		btn?.addEventListener('click', toggle)
-		addEventListener('keydown', e => {
+		if (btn) {
+			btn.addEventListener('click', toggle)
+			this._eventCleanups.push(() => btn.removeEventListener('click', toggle))
+		}
+		const onKey = e => {
 			if ((e.code === 'Backquote' || e.key === '`' || e.key === 'F2') && !e.ctrlKey && !e.metaKey && !e.altKey) {
 				const tag = (document.activeElement?.tagName || '').toLowerCase()
 				if (tag === 'input' || tag === 'textarea' || tag === 'select') return
 				toggle()
 			}
-		})
+		}
+		addEventListener('keydown', onKey)
+		this._eventCleanups.push(() => removeEventListener('keydown', onKey))
 	}
 
 	async _createRenderer() {
@@ -281,7 +322,7 @@ export class Viewer {
 			})
 			backend = 'webgl'
 		}
-		renderer.setPixelRatio(Math.min(devicePixelRatio, this.viewerMode === 'play' ? 1 : 1.5))
+		renderer.setPixelRatio(getTargetPixelRatio(this.viewerMode))
 		renderer.sortObjects = false
 		renderer.shadowMap.enabled = p.has('shadows')
 		if (renderer.shadowMap.enabled) renderer.shadowMap.type = THREE.PCFSoftShadowMap
@@ -308,7 +349,7 @@ export class Viewer {
 		this.controls.target.set(0, 0, 0)
 		this.controls.update()
 		this.controls.enabled = this.viewerMode !== 'play'
-		Object.assign(window, {
+		if (_isDev) Object.assign(window, {
 			scene: this.scene,
 			camera: this.camera,
 			controls: this.controls,
@@ -366,20 +407,22 @@ export class Viewer {
 	}
 
 	_onResize() {
-		this.camera.aspect = innerWidth / innerHeight
+		this.camera.aspect = (typeof window !== 'undefined' ? window.innerWidth : 800) / (typeof window !== 'undefined' ? window.innerHeight : 600)
 		this.camera.updateProjectionMatrix()
-		if (this.renderer) this.renderer.setPixelRatio(Math.min(devicePixelRatio, this.viewerMode === 'play' ? 1 : 1.5))
-		this.renderer?.setSize(innerWidth, innerHeight)
+		if (this.renderer) this.renderer.setPixelRatio(getTargetPixelRatio(this.viewerMode))
+		this.renderer?.setSize(typeof window !== 'undefined' ? window.innerWidth : 800, typeof window !== 'undefined' ? window.innerHeight : 600)
 		this.dmd?._resize?.()
 	}
 
 	_setupModeSwitch() {
-		addEventListener('keydown', e => {
+		const onOrbitToggle = e => {
 			if ((e.key === 'o' || e.key === 'O') && this.viewerMode === 'play') {
 				this.controls.enabled = !this.controls.enabled
 				this.log(`Orbit ${this.controls.enabled ? 'enabled' : 'disabled'}`)
 			}
-		})
+		}
+		addEventListener('keydown', onOrbitToggle)
+		this._eventCleanups.push(() => removeEventListener('keydown', onOrbitToggle))
 		this._raycaster = new THREE.Raycaster()
 		this._raycaster.firstHitOnly = false
 		this._mouse = new THREE.Vector2()
@@ -460,7 +503,7 @@ export class Viewer {
 	async _switchToPlay() {
 		if (this.viewerMode === 'play' || !this.tableGroup) return
 		this.viewerMode = 'play'
-		if (this.renderer) { this.renderer.setPixelRatio(Math.min(devicePixelRatio, 1)); this.renderer.sortObjects = false }
+		if (this.renderer) { this.renderer.setPixelRatio(getTargetPixelRatio('play')); this.renderer.sortObjects = false }
 		this._hidePlayTip?.()
 		hideCabFlippers(this.tableGroup)
 		this._syncChrome()
@@ -476,7 +519,7 @@ export class Viewer {
 	async _switchToViewer() {
 		if (this.viewerMode !== 'play' || !this.tableGroup) return
 		this.viewerMode = 'viewer'
-		if (this.renderer) { this.renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5)); if (!this.outlineEffect && this._rendererBackend !== 'webgpu') { try { this.outlineEffect = new OutlineEffect(this.renderer, { defaultThickness:0.0025, defaultColor:[1,1,1], defaultAlpha:1, defaultKeepAlive:true }) } catch {} } }
+		if (this.renderer) { this.renderer.setPixelRatio(getTargetPixelRatio('viewer')); if (!this.outlineEffect && this._rendererBackend !== 'webgpu') { try { this.outlineEffect = new OutlineEffect(this.renderer, { defaultThickness:0.0025, defaultColor:[1,1,1], defaultAlpha:1, defaultKeepAlive:true }) } catch (e) { if (_isDev) console.warn('OutlineEffect recreate failed', e) } } }
 		this._hidePlayTip?.()
 		showCabFlippers(this.tableGroup)
 		this._syncChrome()
@@ -510,7 +553,9 @@ export class Viewer {
 
 	async _animateCameraTo(state, duration = CAM_ANIM.durationMode) {
 		if (!state || !this.controls) return
-		if (this._cameraAnim) clearTimeout(this._cameraAnim)
+		if (this._cameraRaf) cancelAnimationFrame(this._cameraRaf)
+		if (this._cameraAnim) { try { cancelAnimationFrame(this._cameraAnim) } catch {} try { clearTimeout(this._cameraAnim) } catch {} }
+		this._cameraRaf = null
 		this._cameraAnim = null
 		const fromPos = this.camera.position.clone()
 		const fromTarget = this.controls.target.clone()
@@ -534,6 +579,7 @@ export class Viewer {
 		const start = performance.now()
 		return new Promise(resolve => {
 			const tick = now => {
+				if (this._disposed) { this.gate.endAnimation(); resolve(); return }
 				const t = Math.min(1, (now - start) / duration)
 				const e = ease(t)
 				this.camera.position.lerpVectors(fromPos, toPos, e)
@@ -543,9 +589,9 @@ export class Viewer {
 				this.camera.updateProjectionMatrix()
 				this.camera.lookAt(this.controls.target)
 				this.controls.update()
-				if (t < 1) this._cameraAnim = setTimeout(() => tick(performance.now()), ANIM_POLL_MS)
+				if (t < 1) this._cameraRaf = requestAnimationFrame(tick)
 				else {
-					this._cameraAnim = null
+					this._cameraRaf = null
 					applyCameraState(this.camera, this.controls, state)
 					this._playCameraApplied = this.viewerMode === 'play'
 					this.controls.enabled = this.viewerMode !== 'play'
@@ -553,36 +599,36 @@ export class Viewer {
 					resolve()
 				}
 			}
-			this._cameraAnim = setTimeout(() => tick(performance.now()), ANIM_POLL_MS)
+			this._cameraRaf = requestAnimationFrame(tick)
 		})
 	}
 
 
 	_createPhysicsWorker() {
 		try {
+			if (this._physicsWorker) try { this._physicsWorker.terminate() } catch {}
 			const sab = createPhysicsSAB()
 			const scratch = new Float32Array(MAX_BALLS * BALL_STRIDE)
 			const workerUrl = new URL('../dist-esm/lib/game/physics.worker.js', import.meta.url)
 			const worker = new Worker(workerUrl, { type: 'module' })
 			worker.postMessage({ type: 'init', sab }); worker.postMessage({ type: 'start' })
 			worker.onmessage = e => { if (e.data?.type === 'heartbeat') this.log(`[physics-worker] heartbeat ${e.data.timeMsec} ticks ${e.data.tickCount}`, 'debug') }
-			worker.onerror = e => { this.log(`worker error ${e.message}`, 'warn'); this._physicsSab = null }
+			worker.onerror = e => { this.log(`worker error ${e.message}`, 'warn'); this._physicsSab = null; try { worker.terminate() } catch {} if (this._physicsWorker === worker) this._physicsWorker = null }
 			this._physicsSab = sab; this._physicsScratch = scratch; this._physicsWorker = worker
 			return { sab, scratch, worker }
-		} catch (e) { this.log(`threaded init failed ${e.message}`, 'warn'); return null }
+		} catch (e) { this.log(`threaded init failed ${e.message}`, 'warn'); if (_isDev) console.warn(e); return null }
 	}
 
 	_ensureThreadedPhysics() {
 		try {
-			const can = typeof SharedArrayBuffer !== 'undefined' && typeof Atomics !== 'undefined' && typeof Atomics.waitAsync === 'function' && globalThis.crossOriginIsolated
-			if (!can) return false
+			if (!canThread()) return false
 			if (this._physicsSab && this._physicsWorker) return true
 			if (!this.player) return false
 			const res = this._createPhysicsWorker()
 			if (!res) return false
 			this.log(`[threaded] lazy SAB ${res.sab.byteLength} worker started`, 'info')
 			return true
-		} catch (e) { this.log(`lazy threaded init failed ${e.message}`, 'warn'); return false }
+		} catch (e) { this.log(`lazy threaded init failed ${e.message}`, 'warn'); if (_isDev) console.warn(e); return false }
 	}
 	enterPlayMode() {
 		if (this.controls) this.controls.enabled = false
@@ -1095,7 +1141,7 @@ export class Viewer {
 		} catch {}
 	}
 
-	async _mount(table, node, opts = {}) {
+	async _mount(table, node, opts = {}, source = null) {
 		if (this.tableGroup) this.scene.remove(this.tableGroup)
 		this.tableGroup = node
 		try { this._tableBasePos = node.position.clone() } catch {}
@@ -1135,7 +1181,8 @@ export class Viewer {
 		this._emitModeChange()
 		try {
 			const gn = cGameName(table)
-			const basename = typeof source === 'string' ? source.split('/').pop()?.replace(/\.vpx$/i, '') : ''
+			const src = (opts && typeof opts.source === 'string' ? opts.source : null) ?? (typeof source === 'string' ? source : '')
+			const basename = typeof src === 'string' && src ? src.split('/').pop()?.replace(/\.vpx$/i, '') : ''
 			const rawGet = table?.getName?.()
 			const infoName = table?.info?.TableName?.trim()
 			let vpxName = ''
@@ -1150,7 +1197,7 @@ export class Viewer {
 				this.log(`PinMAME GameName: ${gn} — trying ${candidates.join(', ')}`)
 			}
 			if (this.dom.subtitle) this.dom.subtitle.textContent = ''
-		} catch {}
+		} catch (e) { if (_isDev) console.warn('title/resolve failed', e) }
 		if (!opts.skipPlayer) {
 			this._loading(92, 'Almost ready…', 'Starting game logic…')
 			await new Promise(r => setTimeout(r, 0))
@@ -1166,10 +1213,10 @@ export class Viewer {
 		} else {
 			this._loading(88, 'Finishing up…', 'Finishing up…')
 		}
-		Object.assign(window, { table, tableGroup: node, player: this.player })
+		if (_isDev) Object.assign(window, { table, tableGroup: node, player: this.player })
 		try {
 			buildBvhIdle(node)
-		} catch {}
+		} catch (e) { if (_isDev) console.warn('buildBvhIdle failed', e) }
 		this.startLoop()
 		return { loaded: table, node, pp, framed }
 	}
@@ -1468,7 +1515,7 @@ export class Viewer {
 			this._loading(62, 'Opening table…', 'Reading table data…')
 			const table = await this._loadTable(reader)
 			const { node, textures } = await this._buildScene(table)
-			const mounted = await this._mount(table, node)
+			const mounted = await this._mount(table, node, {}, source)
 			const ok = await this._waitForPinmame(5000)
 			this.log(`[wait] done ok=${ok} streaming ${textures.length}`)
 			this._streamTextures(table, textures, reader)
@@ -1570,10 +1617,13 @@ export class Viewer {
 
 	async startLoop() {
 		await this._ensureRenderer()
+		if (this._disposed) return
 		if (this.animFrame) {
 			try { cancelAnimationFrame(this.animFrame) } catch {}
 			try { clearTimeout(this.animFrame) } catch {}
 		}
+		if (this._animRaf) { try { cancelAnimationFrame(this._animRaf) } catch {} this._animRaf = null }
+		if (this._animTimeout) { try { clearTimeout(this._animTimeout) } catch {} this._animTimeout = null }
 		let last = performance.now(),
 			frames = 0,
 			fps = 0
@@ -1584,19 +1634,20 @@ export class Viewer {
 			if (!emu || emu.isMock || !emu.isInitialized?.()) return false
 			try { return emu.api?.isRunning?.() === 0 } catch { return false }
 		}
-		let threaded = false
+		let threaded = !!(this._physicsSab && this._physicsWorker)
 		try {
-			const can = typeof SharedArrayBuffer !== 'undefined' && typeof Atomics !== 'undefined' && typeof Atomics.waitAsync === 'function' && globalThis.crossOriginIsolated
-			if (can && this.player && this.viewerMode === 'play') {
+			if (!threaded && canThread() && this.player && this.viewerMode === 'play') {
 				const res = this._createPhysicsWorker()
 				if (res) {
 					threaded = true
 					this.log(`[threaded] SAB ${res.sab.byteLength} worker started`, 'info')
 				}
-			} else if (!can) {
+			} else if (!canThread()) {
 				try { this.log(`[threaded] disabled hasSAB=${typeof SharedArrayBuffer !== 'undefined'} isolated=${globalThis.crossOriginIsolated} waitAsync=${typeof Atomics?.waitAsync}`, 'debug') } catch {}
+			} else if (threaded) {
+				this.log(`[threaded] reusing existing SAB ${this._physicsSab?.byteLength}`, 'debug')
 			}
-		} catch {}
+		} catch (e) { if (_isDev) console.warn('threaded check failed', e) }
 		const tickPhysics = now => {
 			if (!this.player || this.isPaused) return
 			this.player.setPhysicsEnabled(this.viewerMode === 'play')
@@ -1612,10 +1663,11 @@ export class Viewer {
 			// and just drain the SAB for future interpolation.
 			try {
 				if (this._physicsSab && this._physicsScratch) trySnap(this._physicsSab, this._physicsScratch)
-			} catch {}
+			} catch (e) { if (_isDev) console.warn('trySnap failed', e) }
 			tickPhysics(now)
 		}
 		const loop = () => {
+			if (this._disposed) return
 			if (!threaded && this._physicsSab) threaded = true
 			const now = performance.now()
 			const pinLoading = isPinLoading()
@@ -1624,19 +1676,21 @@ export class Viewer {
 				this.log(pinLoading ? '[loop] PinMAME loading — pausing render' : '[loop] PinMAME ready — resuming render')
 			}
 			if (pinLoading) {
-				this.animFrame = setTimeout(loop, 16)
+				this._animTimeout = setTimeout(loop, 16)
+				this.animFrame = this._animTimeout
 				if (threaded) tickPhysicsThreaded(now)
 				else tickPhysics(now)
 				this._pollPinmame()
 				return
 			}
-			this.animFrame = requestAnimationFrame(loop)
+			this._animRaf = requestAnimationFrame(loop)
+			this.animFrame = this._animRaf
 			if (this.controls?.enabled) this.controls.update()
 			if (threaded) tickPhysicsThreaded(now)
 			else tickPhysics(now)
 			this._pollPinmame()
-			try { this._applyNudgeVisual() } catch {}
-			this.renderer.render(this.scene, this.camera)
+			try { this._applyNudgeVisual() } catch (e) { if (_isDev) console.warn('_applyNudgeVisual', e) }
+			try { this.renderer.render(this.scene, this.camera) } catch (e) { if (_isDev) console.warn('render', e) }
 			frames++
 			const now2 = performance.now()
 			if (now2 - last > 500) {
@@ -1829,7 +1883,6 @@ export class Viewer {
 		this._boundKeyUp = e => send(e, false)
 		addEventListener('keydown', this._boundKeyDown)
 		addEventListener('keyup', this._boundKeyUp)
-		this.dom.canvas?.addEventListener('click', () => this.dom.canvas.focus())
 		if (this.dom.canvas) {
 			this.dom.canvas.tabIndex = 0
 			try {
@@ -1842,6 +1895,8 @@ export class Viewer {
 				} catch {}
 				this._touchCleanup = null
 			}
+			const onCanvasClick = () => { try { this.dom.canvas.focus() } catch {} }
+			this.dom.canvas.addEventListener('click', onCanvasClick)
 			const active = this._touchMap
 			const toCode = (x, y) => {
 				const r = this.dom.canvas.getBoundingClientRect()
@@ -1914,6 +1969,7 @@ export class Viewer {
 			this.dom.canvas.addEventListener('touchcancel', onTouchEnd, { passive: true })
 			this.dom.canvas.addEventListener('contextmenu', onContext)
 			this._touchCleanup = () => {
+				try { this.dom.canvas.removeEventListener('click', onCanvasClick) } catch {}
 				this.dom.canvas.removeEventListener('pointerdown', onDown)
 				this.dom.canvas.removeEventListener('pointerup', onUp)
 				this.dom.canvas.removeEventListener('pointercancel', onCancel)
