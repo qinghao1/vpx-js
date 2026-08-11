@@ -178,19 +178,6 @@ export class Stdlib extends VbsApi {
 		return Math.cos(n)
 	}
 
-	/**
-	 * Converts to Single Data Type:
-	 *
-	 * -3.402823E+38 through -1.401298E-45 for negative values;
-	 * 1.401298E-45 through 3.402823E+38 for positive values.
-	 *
-	 * @param n Number to convert
-	 * @see https://docs.microsoft.com/en-us/dotnet/visual-basic/language-reference/functions/type-conversion-functions
-	 */
-	public Csng(n: number): number {
-		return n
-	}
-
 	public Int(n: number): number {
 		return Math.floor(n)
 	}

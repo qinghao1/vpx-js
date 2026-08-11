@@ -44,7 +44,7 @@ describe('The VBScript stdlib', () => {
 		const transpiler = new Transpiler(table, player)
 		transpiler.execute(vbs, scope, 'global')
 
-		expect(scope.result).to.equal(1.3)
+		expect(scope.result).to.equal(Math.fround(1.3))
 	})
 
 	it('should provide the Int function', () => {

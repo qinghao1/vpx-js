@@ -1,7 +1,7 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { AssignKey, DIK_0, DIK_3, DIK_4, DIK_5, DIK_6, DIK_7, DIK_8, DIK_9, DIK_B, DIK_END, DIK_F3, DIK_F12, DIK_HOME, DIK_MINUS, DIK_PRIOR, DIK_T } from '../game/key-code.js'
+import { AssignKey, DIK_0, DIK_3, DIK_6, DIK_7, DIK_8, DIK_9, DIK_B, DIK_END, DIK_F3, DIK_F12, DIK_HOME, DIK_MINUS, DIK_PRIOR } from '../game/key-code.js'
 import type { Player } from '../game/player.js'
 import { getTextFile, storage } from '../refs.node.js'
 import { VbsApi } from '../scripting/vbs-api.js'
