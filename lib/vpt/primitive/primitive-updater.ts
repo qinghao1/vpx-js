@@ -34,9 +34,12 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 			state.material !== undefined ||
 			state.map !== undefined ||
 			state.color !== undefined ||
-			state.disableLightingTop !== undefined
+			state.disableLightingTop !== undefined ||
+			state.disableLightingBelow !== undefined
 		if (needsClone) this.ensureCloned(obj)
-		this.applyMaterial(obj, state.material, state.map, renderApi, table)
+		if (state.material !== undefined || state.map !== undefined || state.normalMap !== undefined) {
+			this.applyMaterial(obj, state.material, state.map, renderApi, table)
+		}
 		const needsColor =
 			state.color !== undefined ||
 			state.disableLightingTop !== undefined ||
@@ -60,8 +63,12 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 
 	private applyColor<NODE>(obj: NODE, table: Table): void {
 		const prim = this.state.color ?? this.data.color
-		const dl = this.state.disableLightingTop ?? this.data.disableLightingTop
-		const emissive = dl > DISABLE_THRESHOLD
+		const dlTop = this.state.disableLightingTop ?? this.data.disableLightingTop
+		const dlBelow = this.state.disableLightingBelow ?? this.data.disableLightingBelow
+		const topIntensity = dlTop > DISABLE_THRESHOLD ? dlTop * DISABLE_SCALE : 0
+		const belowIntensity = dlBelow < 1 - DISABLE_THRESHOLD ? (1 - dlBelow) * DISABLE_SCALE * 0.5 : 0
+		const intensity = Math.min(MAX_EMISSIVE, topIntensity + belowIntensity)
+		const emissive = intensity > 0
 		const matName = this.state.material ?? this.data.szMaterial
 		const base = table.getMaterial(matName)?.baseColor ?? 0xffffff
 		const hex = new Color(base).multiply(new Color(prim)).getHex()
@@ -78,7 +85,7 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 			mat.color.set(hex)
 			if (emissive) {
 				mat.emissive.set(hex)
-				mat.emissiveIntensity = Math.min(MAX_EMISSIVE, dl * DISABLE_SCALE)
+				mat.emissiveIntensity = intensity
 			} else {
 				mat.emissive.set(0x000000)
 				mat.emissiveIntensity = 0

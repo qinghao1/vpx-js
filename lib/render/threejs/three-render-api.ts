@@ -172,7 +172,7 @@ export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, Poin
 		const targets = obj.children?.length ? (obj.children as Object3D[]) : [obj]
 		for (const child of targets) {
 			const mat = (child as ThreeMesh).material as MeshStandardMaterial
-			this.materialGenerator.applyMaterial(mat, material)
+			if (material) this.materialGenerator.applyMaterial(mat, material)
 			this.materialGenerator.applyMap(mat, map)
 			this.materialGenerator.applyNormalMap(mat, normalMap)
 			this.materialGenerator.applyEnvMap(mat, envMap)
