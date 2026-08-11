@@ -169,6 +169,7 @@ export default defineConfig({
 		include: ['three', 'three-mesh-bvh'],
 		exclude: ['wpc-emu', 'microtime', 'sharp', 'gltf-pipeline', 'pngquant', 'gm'],
 	},
+	worker: { format: 'es' },
 	build: {
 		target: 'esnext',
 		rollupOptions: {

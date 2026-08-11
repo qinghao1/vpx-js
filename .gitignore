@@ -9,14 +9,15 @@ lib/scripting/grammar/rules.ts
 lib/**/bench*.spec.ts
 lib/*.bench*.ts
 bench*.spec.ts
-*.vpx
+/*.vpx
 !test/fixtures/*.vpx
-walking_dead.vpx
 *.bak
 
 .agents/
 .github/
-demo-browser/
+demo-browser/dist/
+demo-browser/node_modules/
+demo-browser/.vite/
 wasm/build/
 wasm/dist/*.wasm
 profile_harness*.mjs

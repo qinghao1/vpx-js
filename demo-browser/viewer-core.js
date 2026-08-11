@@ -3,9 +3,6 @@
 import { Buffer } from 'buffer'
 import * as THREE from 'three'
 import { OutlineEffect } from 'three/addons/effects/OutlineEffect.js'
-import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js'
-import { OutputPass } from 'three/addons/postprocessing/OutputPass.js'
-import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { Player } from '../dist-esm/lib/game/player.js'
 import { BrowserBinaryReader } from '../dist-esm/lib/io/binary-reader.browser.js'
@@ -16,8 +13,8 @@ import { ANIM_POLL_MS, ANIM_SETTLE_MS, AnimationGate } from '../dist-esm/lib/uti
 import { Vertex3D } from '../dist-esm/lib/util/vector.js'
 import { Table } from '../dist-esm/lib/vpt/table/table.js'
 import { isWasmReady } from '../dist-esm/lib/physics/wasm/kernels.js'
+import { BALL_STRIDE, createPhysicsSAB, MAX_BALLS, pushInput, trySnap } from '../dist-esm/lib/game/shared/physics-buffer.js'
 import {
-	BAKED_EMISSIVE,
 	BAKED_METAL,
 	BAKED_ROUGH,
 	CAM,
@@ -47,7 +44,6 @@ import {
 import {
 	$,
 	aliasEvent,
-	aliasEventExtra,
 	computeTexMem,
 	countObjects,
 	fetchWithProgress,
@@ -80,8 +76,6 @@ export {
 	postProcessScene,
 	resolveVpxCandidates,
 }
-
-const SKIP_TEXTURES_IN_PLAY = false
 
 const cGameName = t => t?.tableScript?.match(/cGameName\s*=\s*["']([^"']+)["']/i)?.[1] || ''
 const setTitle = s => { try { const el = document.getElementById('title'); if (el && s) el.textContent = s } catch {} }
@@ -163,8 +157,6 @@ export class Viewer {
 		this._autoPlayTimer = null
 		this._rendererBackend = 'webgl'
 		this.renderer = null
-		this.composer = null
-		this.outlinePass = null
 		this.outlineEffect = null
 		this._outlineHover = false
 		this._outerMeshes = []
@@ -267,7 +259,6 @@ export class Viewer {
 			renderer: this.renderer,
 			THREE,
 		})
-		this._ensureComposer()
 		this._onResize()
 		this.log(`Renderer ready: ${backend} (three r${THREE.REVISION})`)
 		return renderer
@@ -278,88 +269,44 @@ export class Viewer {
 		return this.renderer
 	}
 
-	_ensureComposer() {
-		if (this.composer || !this.renderer || !this.scene || !this.camera) return
-		if (this._rendererBackend === 'webgpu') return
-		if (this.viewerMode === 'play') return
-		try {
-			const composer = new EffectComposer(this.renderer)
-			composer.addPass(new RenderPass(this.scene, this.camera))
-			composer.addPass(new OutputPass())
-			this.composer = composer
-			this.outlinePass = null
-			this._updateOuterMeshes()
-		} catch (e) {
-			console.warn('Composer init failed', e)
-		}
+
+	_collectMeshes(re) {
+		const out = []
+		this.tableGroup.traverse(o => { if (o.isMesh && re.test(o.name || '')) out.push(o) })
+		return out
 	}
 
 	_updateOuterMeshes() {
 		if (!this.tableGroup) return
-		const outer = []
-		this.tableGroup.traverse(o => {
-			if (o.isMesh && RE_OUTER.test(o.name || '')) outer.push(o)
-		})
-		if (outer.length) {
-			this._outerMeshes = outer
-			for (const m of outer) {
-				m.frustumCulled = this.viewerMode !== 'play' ? false : true
-				if (m.geometry) {
-					try {
-						m.geometry.computeBoundingSphere()
-						m.geometry.computeBoundingBox()
-					} catch {}
-				}
-			}
-		} else {
-			const cab = []
-			this.tableGroup.traverse(o => {
-				if (o.isMesh && RE_CAB.test(o.name || '')) cab.push(o)
-			})
-			this._outerMeshes = cab
-			for (const m of cab) {
-				m.frustumCulled = this.viewerMode !== 'play' ? false : true
-				if (m.geometry) {
-					try {
-						m.geometry.computeBoundingSphere()
-						m.geometry.computeBoundingBox()
-					} catch {}
-				}
-			}
-			if (this.outlinePass && !cab.length) this.outlinePass.selectedObjects = []
+		let meshes = this._collectMeshes(RE_OUTER)
+		if (!meshes.length) meshes = this._collectMeshes(RE_CAB)
+		this._outerMeshes = meshes
+		for (const m of meshes) {
+			m.frustumCulled = this.viewerMode !== 'play' ? false : true
+			if (!m.geometry) continue
+			try { m.geometry.computeBoundingSphere(); m.geometry.computeBoundingBox() } catch {}
 		}
 		this._configureOuterOutline(false)
+	}
+
+	_ensureOutlineParams(mat, visible) {
+		if (!mat) return
+		if (!mat.userData) mat.userData = {}
+		const p = mat.userData.outlineParameters || (mat.userData.outlineParameters = {})
+		p.thickness = 0.0025; p.color = [1, 1, 1]; p.alpha = 1; p.visible = visible; p.keepAlive = true
 	}
 
 	_configureOuterOutline(visible) {
 		if (!this._outerMeshes?.length) return
 		for (const m of this._outerMeshes) {
-			if (!m.geometry?.attributes?.normal) {
-				try {
-					m.geometry.computeVertexNormals()
-				} catch {}
-			}
-			const mats = m.material ? (Array.isArray(m.material) ? m.material : [m.material]) : []
-			for (const mat of mats) {
-				if (!mat) continue
-				if (!mat.userData) mat.userData = {}
-				const p = mat.userData.outlineParameters || (mat.userData.outlineParameters = {})
-				p.thickness = 0.0025
-				p.color = [1, 1, 1]
-				p.alpha = 1
-				p.visible = visible
-				p.keepAlive = true
-			}
+			if (!m.geometry?.attributes?.normal) try { m.geometry.computeVertexNormals() } catch {}
+			for (const mat of (m.material ? (Array.isArray(m.material) ? m.material : [m.material]) : [])) this._ensureOutlineParams(mat, visible)
 		}
 	}
 
 	_setOuterOutline(visible) {
 		if (!this._outerMeshes?.length || !this.outlineEffect) return
-		for (const m of this._outerMeshes) {
-			const mats = m.material ? (Array.isArray(m.material) ? m.material : [m.material]) : []
-			for (const mat of mats)
-				if (mat?.userData?.outlineParameters) mat.userData.outlineParameters.visible = visible
-		}
+		for (const m of this._outerMeshes) for (const mat of (m.material ? (Array.isArray(m.material) ? m.material : [m.material]) : [])) if (mat?.userData?.outlineParameters) mat.userData.outlineParameters.visible = visible
 	}
 
 	_onResize() {
@@ -367,18 +314,7 @@ export class Viewer {
 		this.camera.updateProjectionMatrix()
 		if (this.renderer) this.renderer.setPixelRatio(Math.min(devicePixelRatio, this.viewerMode === 'play' ? 1 : 1.5))
 		this.renderer?.setSize(innerWidth, innerHeight)
-		if (this.composer) {
-			this.composer.setSize(innerWidth, innerHeight)
-			this.outlinePass?.setSize(innerWidth, innerHeight)
-		}
 		this.dmd?._resize?.()
-	}
-
-	_onResetView() {
-		if (!this.tableGroup || !this.controls) return
-		const target =
-			this.viewerMode === 'play' ? computePlayFraming(this.tableGroup) : computeViewerFraming(this.tableGroup)
-		this._animateCameraTo(target, CAM_ANIM.durationReset)
 	}
 
 	_setupModeSwitch() {
@@ -490,7 +426,7 @@ export class Viewer {
 	async _switchToViewer() {
 		if (this.viewerMode !== 'play' || !this.tableGroup) return
 		this.viewerMode = 'viewer'
-		if (this.renderer) { this.renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5)); this._ensureComposer(); if (!this.outlineEffect && this._rendererBackend !== 'webgpu') { try { this.outlineEffect = new OutlineEffect(this.renderer, { defaultThickness:0.0025, defaultColor:[1,1,1], defaultAlpha:1, defaultKeepAlive:true }) } catch {} } }
+		if (this.renderer) { this.renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5)); if (!this.outlineEffect && this._rendererBackend !== 'webgpu') { try { this.outlineEffect = new OutlineEffect(this.renderer, { defaultThickness:0.0025, defaultColor:[1,1,1], defaultAlpha:1, defaultKeepAlive:true }) } catch {} } }
 		this._hidePlayTip?.()
 		showCabFlippers(this.tableGroup)
 		this._syncChrome()
@@ -571,8 +507,36 @@ export class Viewer {
 		})
 	}
 
+
+	_createPhysicsWorker() {
+		try {
+			const sab = createPhysicsSAB()
+			const scratch = new Float32Array(MAX_BALLS * BALL_STRIDE)
+			const workerUrl = new URL('../dist-esm/lib/game/physics.worker.js', import.meta.url)
+			const worker = new Worker(workerUrl, { type: 'module' })
+			worker.postMessage({ type: 'init', sab }); worker.postMessage({ type: 'start' })
+			worker.onmessage = e => { if (e.data?.type === 'heartbeat') this.log(`[physics-worker] heartbeat ${e.data.timeMsec} ticks ${e.data.tickCount}`, 'debug') }
+			worker.onerror = e => { this.log(`worker error ${e.message}`, 'warn'); this._physicsSab = null }
+			this._physicsSab = sab; this._physicsScratch = scratch; this._physicsWorker = worker
+			return { sab, scratch, worker }
+		} catch (e) { this.log(`threaded init failed ${e.message}`, 'warn'); return null }
+	}
+
+	_ensureThreadedPhysics() {
+		try {
+			const can = typeof SharedArrayBuffer !== 'undefined' && typeof Atomics !== 'undefined' && typeof Atomics.waitAsync === 'function' && globalThis.crossOriginIsolated
+			if (!can) return false
+			if (this._physicsSab && this._physicsWorker) return true
+			if (!this.player) return false
+			const res = this._createPhysicsWorker()
+			if (!res) return false
+			this.log(`[threaded] lazy SAB ${res.sab.byteLength} worker started`, 'info')
+			return true
+		} catch (e) { this.log(`lazy threaded init failed ${e.message}`, 'warn'); return false }
+	}
 	enterPlayMode() {
 		if (this.controls) this.controls.enabled = false
+		try { this._ensureThreadedPhysics() } catch {}
 		if (this.tableGroup) hideCabFlippers(this.tableGroup)
 		try {
 			const bg = this.tableGroup?.getObjectByName('balls')
@@ -892,11 +856,10 @@ export class Viewer {
 		this._setStatus('')
 		this._loading(70, 'Building playfield…', 'Preparing visuals…')
 		const texLoader = new ThreeTextureLoaderBrowser()
-		const skipTextures = this.viewerMode === 'play' && SKIP_TEXTURES_IN_PLAY
 		const renderApi = new ThreeRenderApi(
 			{
 				applyMaterials: true,
-				applyTextures: skipTextures ? undefined : texLoader,
+				applyTextures: texLoader,
 				optimizeTextures: false,
 			},
 			(this.gate ??= new AnimationGate()),
@@ -930,9 +893,7 @@ export class Viewer {
 			}),
 		)
 		let textures = []
-		if (skipTextures) {
-			this.log('[progressive] SKIP_TEXTURES_IN_PLAY — no textures in Play mode')
-		} else {
+		{
 			const all = Object.values(table.textures)
 			const high = all.filter(tx => !isDeferred(tx, table))
 			const deferred = all.filter(tx => isDeferred(tx, table))
@@ -1086,14 +1047,12 @@ export class Viewer {
 	}
 
 	async _mount(table, node, opts = {}) {
-		if (opts.skipPlayer) this._skipPlayerInMount = true
 		if (this.tableGroup) this.scene.remove(this.tableGroup)
 		this.tableGroup = node
 		try { this._tableBasePos = node.position.clone() } catch {}
 		this.scene.add(node)
 		const pp = postProcessScene(node, { viewerMode: this.viewerMode, harnessLog: this.harnessLog, table })
 		if (this.viewerMode === 'play') hideCabFlippers(node)
-		this._ensureComposer()
 		this._updateOuterMeshes()
 		this._setOuterOutline(false)
 		this.buildNodeCache()
@@ -1143,7 +1102,7 @@ export class Viewer {
 			}
 			if (this.dom.subtitle) this.dom.subtitle.textContent = ''
 		} catch {}
-		if (!opts.skipPlayer && !this._skipPlayerInMount) {
+		if (!opts.skipPlayer) {
 			this._loading(92, 'Almost ready…', 'Starting game logic…')
 			await new Promise(r => setTimeout(r, 0))
 			await this._createPlayer()
@@ -1155,8 +1114,7 @@ export class Viewer {
 						: 'Ready — VIEWER: drag to orbit, wheel to zoom — click table to Play (Esc to return)'
 			this.log(this.dom.loadTitle.textContent)
 			logMem(this.harnessLog, 'Ready final')
-		} else if (opts.skipPlayer || this._skipPlayerInMount) {
-			this._skipPlayerInMount = false
+		} else {
 			this._loading(88, 'Finishing up…', 'Finishing up…')
 		}
 		Object.assign(window, { table, tableGroup: node, player: this.player })
@@ -1643,6 +1601,22 @@ export class Viewer {
 			if (!emu || emu.isMock || !emu.isInitialized?.()) return false
 			try { return emu.api?.isRunning?.() === 0 } catch { return false }
 		}
+		let canThread = false
+		let sab = null
+		let worker = null
+		let snapScratch = null
+		try {
+			canThread = typeof SharedArrayBuffer !== 'undefined' && typeof Atomics !== 'undefined' && typeof Atomics.waitAsync === 'function' && globalThis.crossOriginIsolated
+		} catch { canThread = false }
+		if (canThread && this.player && this.viewerMode === 'play') {
+			const res = this._createPhysicsWorker()
+			if (res) { sab = res.sab; snapScratch = res.scratch; worker = res.worker; this.log(`[threaded] SAB ${sab.byteLength} crossOriginIsolated=${globalThis.crossOriginIsolated} worker started`, 'info') }
+			else { canThread = false; sab = null; this._physicsSab = null }
+		} else if (!canThread) {
+			try { this.log(`[threaded] disabled hasSAB=${typeof SharedArrayBuffer !== 'undefined'} isolated=${globalThis.crossOriginIsolated} waitAsync=${typeof Atomics?.waitAsync}`, 'debug') } catch {}
+		}
+		let threaded = canThread && sab && snapScratch
+		this._threadedCheck = () => !!(this._physicsSab && this._physicsScratch)
 		const tickPhysics = now => {
 			if (!this.player || this.isPaused) return
 			this.player.setPhysicsEnabled(this.viewerMode === 'play')
@@ -1651,7 +1625,40 @@ export class Viewer {
 			const changed = this.player.popStates()
 			if (changed.keys.length) this.applyChangedStates(changed)
 		}
+		const tickPhysicsThreaded = now => {
+			const curSab = this._physicsSab || sab
+			const curScratch = this._physicsScratch || snapScratch
+			if (!curSab || !curScratch || !this.player || this.isPaused) return
+			try {
+				const res = trySnap(curSab, curScratch)
+				if (res) {
+					for (let i = 0; i < Math.min(res.count, this.player.balls.length); i++) {
+						const off = i * BALL_STRIDE
+						const b = this.player.balls[i]
+						if (!b) continue
+						const st = b.getState()
+						st.pos.x = curScratch[off]
+						st.pos.y = curScratch[off + 1]
+						st.pos.z = curScratch[off + 2]
+						if (st.vel) {
+							st.vel.x = curScratch[off + 3]
+							st.vel.y = curScratch[off + 4]
+							st.vel.z = curScratch[off + 5]
+						}
+					}
+					this.player.updateAnimations(res.timeMsec)
+					const changed = this.player.popStates()
+					if (changed.keys.length) this.applyChangedStates(changed)
+				} else {
+					const t = this.player.getPhysics()?.timeMsec ?? now
+					this.player.updateAnimations(t)
+					const changed = this.player.popStates()
+					if (changed.keys.length) this.applyChangedStates(changed)
+				}
+			} catch {}
+		}
 		const loop = () => {
+			if (!threaded && this._physicsSab) threaded = true
 			const now = performance.now()
 			const pinLoading = isPinLoading()
 			if (pinLoading !== pinLoadingLogged) {
@@ -1660,13 +1667,15 @@ export class Viewer {
 			}
 			if (pinLoading) {
 				this.animFrame = setTimeout(loop, 16)
-				tickPhysics(now)
+				if (threaded) tickPhysicsThreaded(now)
+				else tickPhysics(now)
 				this._pollPinmame()
 				return
 			}
 			this.animFrame = requestAnimationFrame(loop)
 			if (this.controls?.enabled) this.controls.update()
-			tickPhysics(now)
+			if (threaded) tickPhysicsThreaded(now)
+			else tickPhysics(now)
 			this._pollPinmame()
 			try { this._applyNudgeVisual() } catch {}
 			this.renderer.render(this.scene, this.camera)
@@ -1695,11 +1704,12 @@ export class Viewer {
 				let wasmReady = false
 				try { wasmReady = isWasmReady() } catch {}
 				const wasmLabel = wasmReady ? 'Ready' : 'Loading…'
+				const threadLabel = threaded ? ' · threaded' : ''
 				this.dom.stats.innerHTML = `
 					<div class="stats-head">
 						<span class="badge ${modeCls}">${modeLabel}</span>
 						<span class="sep">·</span><span>${this._rendererBackend}</span>
-						<span class="sep">·</span><span class="fps ${fpsCls}">${fps} fps</span>
+						<span class="sep">·</span><span class="fps ${fpsCls}">${fps} fps</span><span>${threadLabel}</span>
 					</div>
 					<div class="stats-grid">
 						<div class="stats-item"><span class="k">Draws</span><span class="v">${draws}</span></div>
@@ -1832,19 +1842,20 @@ export class Viewer {
 				e.preventDefault()
 				return
 			}
-			const ae = aliasEvent(e),
-				ae2 = aliasEventExtra(e)
+			const ae = aliasEvent(e)
 			const ev = ae || { code: e.code, key: e.key, ts: Date.now() }
 			try {
 				down ? this.player.onKeyDown(ev) : this.player.onKeyUp(ev)
 			} catch {}
-			if (ae2)
-				try {
-					down ? this.player.onKeyDown(ae2) : this.player.onKeyUp(ae2)
-				} catch {}
+			try {
+				if (this._physicsSab) {
+					const kind = down ? 1 : 0
+					const keyCode = ev.code ? ev.code.charCodeAt(0) : 0
+					pushInput(this._physicsSab, kind, keyCode, ev.ts ?? Date.now())
+				}
+			} catch {}
 			if (
 				ae ||
-				ae2 ||
 				['Space', 'KeyZ', 'Slash', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Enter', 'Digit1', 'Digit5', 'KeyT'].includes(
 					e.code,
 				)
@@ -1879,12 +1890,14 @@ export class Viewer {
 				if (active.has(id) || this.viewerMode !== 'play' || !this.player) return
 				active.set(id, code)
 				this.player.onKeyDown({ code, key: code === 'Enter' ? 'Enter' : 'Shift', ts: Date.now() })
+				try { if (this._physicsSab) pushInput(this._physicsSab, 1, code.charCodeAt(0) || 0, Date.now()) } catch {}
 			}
 			const up = id => {
 				const code = active.get(id)
 				if (!code) return
 				active.delete(id)
 				this.player.onKeyUp({ code, key: code === 'Enter' ? 'Enter' : 'Shift', ts: Date.now() })
+				try { if (this._physicsSab) pushInput(this._physicsSab, 0, code.charCodeAt(0) || 0, Date.now()) } catch {}
 			}
 			const onDown = e => {
 				if (e.pointerType === 'touch') return
