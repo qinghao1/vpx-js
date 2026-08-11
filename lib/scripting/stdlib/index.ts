@@ -13,24 +13,19 @@ import { VbsMath } from './math.js'
 export class Stdlib extends VbsApi {
 	private readonly math = new VbsMath()
 
-	/** Get Empty. */
 	get Empty() {
 		return undefined
 	}
-	/** Get Nothing. */
 	get Nothing() {
 		return undefined
 	}
-	/** Get Null. */
 	get Null() {
 		return null
 	}
 
-	/** Get Err. */
 	get Err() {
 		return ERR
 	}
-	/** Get Math. */
 	get Math() {
 		return this.math
 	}
@@ -48,42 +43,30 @@ export class Stdlib extends VbsApi {
 		return 0
 	}
 
-	/**
-	 * String Constants
-	 */
-	/** Get vbCr. */
 	get vbCr() {
 		return '\x0d'
 	}
-	/** Get vbCrLf. */
 	get vbCrLf() {
 		return '\x0d\x0a'
 	}
-	/** Get vbFormFeed. */
 	get vbFormFeed() {
 		return '\x0c'
 	}
-	/** Get vbLf. */
 	get vbLf() {
 		return '\x0a'
 	}
-	/** Get vbNewLine. */
 	get vbNewLine() {
 		return '\n'
 	}
-	/** Get vbNullChar. */
 	get vbNullChar() {
 		return '\x00'
 	}
-	/** Get vbNullString. */
 	get vbNullString() {
 		return null
 	}
-	/** Get vbTab. */
 	get vbTab() {
 		return '\x09'
 	}
-	/** Get vbVerticalTab. */
 	get vbVerticalTab() {
 		return '\x0b'
 	}
@@ -303,40 +286,14 @@ export class Stdlib extends VbsApi {
 		return (r << 16) + (g << 8) + b
 	}
 
-	/**
-	 * The InStrRev function returns the position of the first occurrence of one string within another. The search begins from the end of string, but the position returned counts from the beginning of the string.
-	 *
-	 * The InStrRev function can return the following values:
-	 *   - If string1 is "" - InStrRev returns 0
-	 *   - If string1 is Null - InStrRev returns Null
-	 *   - If string2 is "" - InStrRev returns start
-	 *   - If string2 is Null - InStrRev returns Null
-	 *   - If string2 is not found - InStrRev returns 0
-	 *   - If string2 is found within string1 - InStrRev returns the position at which match is found
-	 *   - If start > Len(string1) - InStrRev returns 0
-	 *
-	 * @param string1 The string to be searched
-	 * @param string2 The string expression to search for
-	 * @param start Specifies the starting position for each search. The search begins at the last character position by default (-1)
-	 * @see https://docs.microsoft.com/en-us/dotnet/api/microsoft.visualbasic.strings.instrrev?view=netframework-4.8
-	 */
 	public InStrRev(string1: string, string2: string, start: number = -1): any {
-		if (string1 === '') {
-			return 0
-		}
-		if (string1 === null) {
-			return null
-		}
-		if (string2 === '') {
-			return start
-		}
-		if (string2 === null) {
-			return null
-		}
-		if (start > string1.length) {
-			return 0
-		}
-		return string1.indexOf(string2, start + 1) + 1
+		if (string1 === '') return 0
+		if (string1 === null) return null
+		if (string2 === '') return start === -1 ? string1.length : start
+		if (string2 === null) return null
+		if (start > string1.length) return 0
+		const pos = start === -1 ? string1.lastIndexOf(string2) : string1.substring(0, start).lastIndexOf(string2)
+		return pos === -1 ? 0 : pos + 1
 	}
 
 	public Len(str: unknown): number {
@@ -348,12 +305,6 @@ export class Stdlib extends VbsApi {
 		}
 	}
 
-	/**
-	 * The Left function returns a specified number of characters from the left side of a string.
-	 *
-	 * @param str The string to return characters from
-	 * @param length Specifies how many characters to return. If set to 0, an empty string ("") is returned. If set to greater than or equal to the length of the string, the entire string is returned
-	 */
 	public Left(str: unknown, length: number): string {
 		if (str == null || (str as any)?.[UNDEF] === true) return ''
 		const s = String(str)

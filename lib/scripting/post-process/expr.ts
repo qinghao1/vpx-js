@@ -90,7 +90,6 @@ function ppIntegerDivisionExpression(node: ESIToken): Expression {
 	return expr
 }
 
-/** ppModuloExpression. */
 export function ppModuloExpression(node: ESIToken): Expression {
 	let expr = node.children[0].estree
 	for (const child of node.children.slice(1)) {
@@ -110,7 +109,6 @@ export function ppExponentExpression(node: ESIToken): Expression {
 	return expr
 }
 
-/** ppConcatExpression. */
 export function ppConcatExpression(node: ESIToken): Expression {
 	let expr = node.children[0].estree
 	for (const child of node.children.slice(1)) {
@@ -169,6 +167,7 @@ const RELATIONAL_OPERATORS: Record<string, string> = {
 }
 
 function ppRelationalExpression(node: ESIToken): Expression {
+	// VBScript: Not binds to whole comparison (Not a = b → !(a==b))
 	let expr: Expression = node.children[0].estree as Expression
 	let isNot = false
 	while (node.children.length > 1 && (expr as any)?.type === 'UnaryExpression' && (expr as any).operator === '!') {
@@ -205,6 +204,7 @@ function ppRelationalExpression(node: ESIToken): Expression {
 }
 
 function ppTypeExpression(node: ESIToken): Expression {
+	// Like ppRelationalExpression: Not binds to whole Is check
 	let expr: Expression = node.children[0].estree as Expression
 	let isNot = false
 	while (node.children.length > 1 && (expr as any)?.type === 'UnaryExpression' && (expr as any).operator === '!') {

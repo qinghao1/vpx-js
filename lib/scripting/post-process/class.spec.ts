@@ -30,7 +30,7 @@ describe('The VBScript transpiler - Class', () => {
 		const vbs = `Class cvpmDictionary\nPrivate mDict\nPrivate Sub Class_Initialize : Set mDict = CreateObject("Scripting.Dictionary") : End Sub\nEnd Class`
 		const js = grammar.vbsToJs(vbs)
 		expect(js).to.equal(
-			`class cvpmDictionary {\n    constructor() {\n        this.mDict = undefined;\n        this.mDict = CreateObject('Scripting.Dictionary');\n    }\n}`,
+			`class cvpmDictionary {\n    constructor() {\n        this.mDict = undefined;\n        this.mdict = CreateObject('Scripting.Dictionary');\n    }\n}`,
 		)
 	})
 
@@ -38,7 +38,7 @@ describe('The VBScript transpiler - Class', () => {
 		const vbs = `Class cvpmTest\nPrivate mEnabled\nPublic Property Get Balls(test):mEnabled=test:Balls=mEnabled:If Balls=1 Then Exit Property:End Property\nEnd Class`
 		const js = grammar.vbsToJs(vbs)
 		expect(js).to.equal(
-			`class cvpmTest {\n    constructor() {\n        this.mEnabled = undefined;\n    }\n    Balls(test) {\n        let Balls = undefined;\n        this.mEnabled = test;\n        Balls = this.mEnabled;\n        if (${Transformer.VBSHELPER_NAME}.equals(Balls, 1)) {\n            return Balls;\n        }\n        return Balls;\n    }\n}`,
+			`class cvpmTest {\n    constructor() {\n        this.mEnabled = undefined;\n    }\n    Balls(test) {\n        let Balls = undefined;\n        this.menabled = test;\n        Balls = this.menabled;\n        if (${Transformer.VBSHELPER_NAME}.equals(Balls, 1)) {\n            return Balls;\n        }\n        return Balls;\n    }\n}`,
 		)
 	})
 
@@ -54,7 +54,7 @@ describe('The VBScript transpiler - Class', () => {
 		const vbs = `Class cvpmDictionary\nPrivate mDict\nPublic Property Set Key(aKey)\nmDict=Nothing:End Property\nEnd Class`
 		const js = grammar.vbsToJs(vbs)
 		expect(js).to.equal(
-			'class cvpmDictionary {\n    constructor() {\n        this.mDict = undefined;\n    }\n    Key(aKey) {\n        this.mDict = Nothing;\n    }\n}',
+			'class cvpmDictionary {\n    constructor() {\n        this.mDict = undefined;\n    }\n    Key(aKey) {\n        this.mdict = Nothing;\n    }\n}',
 		)
 	})
 
@@ -62,7 +62,7 @@ describe('The VBScript transpiler - Class', () => {
 		const vbs = `Class cvpmTimer\nPrivate mDebug\nPublic Property Let isDebug(enabled):mDebug=enabled:End Property\nEnd Class`
 		const js = grammar.vbsToJs(vbs)
 		expect(js).to.equal(
-			'class cvpmTimer {\n    constructor() {\n        this.mDebug = undefined;\n    }\n    isDebug(enabled) {\n        this.mDebug = enabled;\n    }\n}',
+			'class cvpmTimer {\n    constructor() {\n        this.mDebug = undefined;\n    }\n    isDebug(enabled) {\n        this.mdebug = enabled;\n    }\n}',
 		)
 	})
 
@@ -70,7 +70,7 @@ describe('The VBScript transpiler - Class', () => {
 		const vbs = `Class cvpmImpulseP\nPrivate mEntrySnd\nPublic Sub InitEntrySnd(aNoBall):mEntrySnd=aNoBall:End Sub\nEnd Class`
 		const js = grammar.vbsToJs(vbs)
 		expect(js).to.equal(
-			'class cvpmImpulseP {\n    constructor() {\n        this.mEntrySnd = undefined;\n    }\n    InitEntrySnd(aNoBall) {\n        this.mEntrySnd = aNoBall;\n    }\n}',
+			'class cvpmImpulseP {\n    constructor() {\n        this.mEntrySnd = undefined;\n    }\n    InitEntrySnd(aNoBall) {\n        this.mentrysnd = aNoBall;\n    }\n}',
 		)
 	})
 
@@ -78,7 +78,7 @@ describe('The VBScript transpiler - Class', () => {
 		const vbs = `Class cvpmTimer\nPublic mBalls\nPublic Property Get Balls():Balls=mBalls.Keys:Test=x.mBalls:End Property\nEnd Class`
 		const js = grammar.vbsToJs(vbs)
 		expect(js).to.equal(
-			'class cvpmTimer {\n    constructor() {\n        this.mBalls = undefined;\n    }\n    Balls() {\n        let Balls = undefined;\n        Balls = this.mBalls.Keys;\n        Test = x.mBalls;\n        return Balls;\n    }\n}',
+			'class cvpmTimer {\n    constructor() {\n        this.mBalls = undefined;\n    }\n    Balls() {\n        let Balls = undefined;\n        Balls = this.mballs.Keys;\n        Test = x.mBalls;\n        return Balls;\n    }\n}',
 		)
 	})
 })

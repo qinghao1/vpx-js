@@ -240,34 +240,25 @@ export class GlobalApi extends VbsApi {
 		if (!material) return
 		material.baseColor = color
 		try {
-			const g = globalThis as unknown as Record<string, unknown>
-			const groups: unknown[] = [g['tableGroup'], g['scene'], (g['viewer'] as Record<string, unknown> | undefined)?.['tableGroup'], (g['viewer'] as Record<string, unknown> | undefined)?.['scene']].filter(Boolean)
+			const g = globalThis as any
 			const target = name.toLowerCase()
-			for (const grp of groups) {
-				const traverse = (grp as { traverse?: (cb: (o: unknown) => void) => void })?.traverse
-				if (typeof traverse !== 'function') continue
-				traverse.call(grp, (o: unknown) => {
-					const obj = o as { material?: unknown }
-					const mats = Array.isArray(obj.material) ? (obj.material as unknown[]) : obj.material ? [obj.material] : []
-					for (const m of mats) {
-						const mat = m as { name?: string; color?: { set: (c: number) => void }; needsUpdate?: boolean }
-						if (!mat?.color) continue
-						const n = (mat.name ?? '').toLowerCase()
+			for (const grp of [g.tableGroup, g.scene, g.viewer?.tableGroup, g.viewer?.scene].filter(Boolean)) {
+				grp.traverse((o: any) => {
+					for (const m of o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : []) {
+						if (!m?.color) continue
+						const n = (m.name ?? '').toLowerCase()
 						if (n === `material:${target}` || n === target || n.includes(target)) {
-							mat.color.set(color)
-							mat.needsUpdate = true
+							m.color.set(color)
+							m.needsUpdate = true
 						}
 					}
 				})
 			}
-			const gen = (g['renderApi'] as { getMaterialGenerator?: () => { cachedMaterials?: Record<string, unknown> } } | undefined)?.getMaterialGenerator?.() ?? (g['viewer'] as { renderApi?: { getMaterialGenerator?: () => { cachedMaterials?: Record<string, unknown> } } } | undefined)?.renderApi?.getMaterialGenerator?.()
-			if (gen?.cachedMaterials) {
-				for (const [k, m] of Object.entries(gen.cachedMaterials)) {
-					if (k.split(':')[0]?.toLowerCase() === target) {
-						const mat = m as { color?: { set: (c: number) => void }; needsUpdate?: boolean }
-						mat.color?.set(color)
-						mat.needsUpdate = true
-					}
+			const gen = g.renderApi?.getMaterialGenerator?.() ?? g.viewer?.renderApi?.getMaterialGenerator?.()
+			for (const [k, m] of Object.entries(gen?.cachedMaterials ?? {})) {
+				if (k.split(':')[0].toLowerCase() === target) {
+					;(m as any).color?.set(color)
+					;(m as any).needsUpdate = true
 				}
 			}
 		} catch {}
@@ -279,16 +270,13 @@ export class GlobalApi extends VbsApi {
 
 	public NudgeGetCalibration(): void {}
 
-	public NudgeSetCalibration() {
-		// not doing that for the browser
-	}
+	public NudgeSetCalibration() {}
 
 	public NudgeSensorStatus(): void {}
 
 	public NudgeTiltStatus(): void {}
 
 	public GetCustomParam(): string {
-		// these are command line args when launching vp, so none here!
 		return ''
 	}
 
@@ -304,13 +292,9 @@ export class GlobalApi extends VbsApi {
 		return storage.getItem(key)
 	}
 
-	public BeginModal(): void {
-		// no idea what this is
-	}
+	public BeginModal(): void {}
 
-	public EndModal(): void {
-		// still no idea
-	}
+	public EndModal(): void {}
 
 	protected _getPropertyNames(): string[] {
 		return Object.getOwnPropertyNames(GlobalApi.prototype)

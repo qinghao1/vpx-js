@@ -34,7 +34,7 @@ describe('The VBScript transpiler - Loop', () => {
 		const vbs = `If BallsInPlay>=1 Then For Each x In BulbP:x.image="Bulb_On":x.TriggerSingleUpdate:Next`
 		const js = grammar.vbsToJs(vbs)
 		expect(js).to.equal(
-			"if (BallsInPlay >= 1) {\n    for (x of BulbP) {\n        x.image = 'Bulb_On';\n        x.TriggerSingleUpdate();\n    }\n}",
+			"if (BallsInPlay >= 1) {\n    for (x of __vbs.toIterable(BulbP)) {\n        x.image = 'Bulb_On';\n        x.TriggerSingleUpdate();\n    }\n}",
 		)
 	})
 
@@ -53,13 +53,13 @@ describe('The VBScript transpiler - Loop', () => {
 	it('should transpile a "For/Each...Next" statement', () => {
 		const vbs = `For Each x In students\ntotal = total + x\nNext`
 		const js = grammar.vbsToJs(vbs)
-		expect(js).to.equal('for (x of students) {\n    total = total + x;\n}')
+		expect(js).to.equal('for (x of __vbs.toIterable(students)) {\n    total = total + x;\n}')
 	})
 
 	it('should transpile an empty "For/Each...Next" statement', () => {
 		const vbs = `For Each x In students\nNext`
 		const js = grammar.vbsToJs(vbs)
-		expect(js).to.equal('for (x of students) {\n}')
+		expect(js).to.equal('for (x of __vbs.toIterable(students)) {\n}')
 	})
 
 	it('should transpile a "Do While...Loop" statement', () => {
