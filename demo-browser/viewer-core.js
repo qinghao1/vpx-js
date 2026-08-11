@@ -87,6 +87,36 @@ const swipeNudge = (dx, dy) => {
 	if (ady > adx * 1.2) return dy < 0 ? NUDGE.forward : NUDGE.back
 	return null
 }
+
+const isBakedMesh = (meshName, matName, mapName) => {
+	const ml = matName.toLowerCase(), nl = meshName.toLowerCase(), mp = mapName.toLowerCase()
+	const isBakedMat = RE_BAKE_MAT.test(ml) || RE_BAKE_MAP.test(mp) || RE_BAKE_MAP.test(nl)
+	const isBakedFamily = nl.includes('bm_') || nl.includes('playfield')
+	const isMainBake = isBakedFamily && isBakedMat
+	const isVlmBake = nl.includes('playfield') && (/lm_/i.test(nl) || isBakedMat || nl.includes('bm_'))
+	const isVrCab = RE_VR.test(nl) || RE_CAB.test(nl) || RE_VR.test(ml) || RE_CAB.test(ml)
+	return { isBakedMat, isMainBake, isVlmBake, isVrCab, isBaked: isBakedMat || isMainBake || isVlmBake || isVrCab }
+}
+const wrapBakedTex = tex => {
+	if (!tex) return
+	tex.wrapS = THREE.ClampToEdgeWrapping; tex.wrapT = THREE.ClampToEdgeWrapping
+	tex.generateMipmaps = true; tex.minFilter = THREE.LinearMipmapLinearFilter; tex.magFilter = THREE.LinearFilter
+	tex.anisotropy = 1; tex.needsUpdate = true
+}
+const applyBakedMaterial = (mat, tex, info, meshName) => {
+	const nl = meshName.toLowerCase()
+	mat.emissiveMap = tex
+	try { if (mat.emissive) mat.emissive.set(0xffffff); else mat.emissive = new THREE.Color(0xffffff) } catch {}
+	mat.emissiveIntensity = 1
+	try { if (!mat.color) mat.color = new THREE.Color(0x000000); else mat.color.set(0x000000) } catch {}
+	mat.side = THREE.DoubleSide; mat.toneMapped = true; mat.roughness = BAKED_ROUGH; mat.metalness = BAKED_METAL
+	wrapBakedTex(tex); wrapBakedTex(mat.emissiveMap)
+	if (info.isMainBake && !nl.includes('non_opaque') && !/ramp|armp|botramp|rampscrw/i.test(nl)) {
+		mat.polygonOffset = true; mat.polygonOffsetFactor = -1; mat.polygonOffsetUnits = -1
+		mat.depthWrite = true; mat.transparent = false; mat.alphaTest = 0
+	}
+}
+
 const TABLE_OPTS = {
 	exportPlayfield: true,
 	exportPrimitives: true,
@@ -289,7 +319,7 @@ export class Viewer {
 		if (!meshes.length) meshes = this._collectMeshes(RE_CAB)
 		this._outerMeshes = meshes
 		for (const m of meshes) {
-			m.frustumCulled = this.viewerMode !== 'play' ? false : true
+			m.frustumCulled = this.viewerMode === 'play'
 			if (!m.geometry) continue
 			try { m.geometry.computeBoundingSphere(); m.geometry.computeBoundingBox() } catch {}
 		}
@@ -328,7 +358,7 @@ export class Viewer {
 		addEventListener('keydown', e => {
 			if ((e.key === 'o' || e.key === 'O') && this.viewerMode === 'play') {
 				this.controls.enabled = !this.controls.enabled
-				this.log('Orbit ' + (this.controls.enabled ? 'enabled' : 'disabled'))
+				this.log(`Orbit ${this.controls.enabled ? 'enabled' : 'disabled'}`)
 			}
 		})
 		this._raycaster = new THREE.Raycaster()
@@ -1256,67 +1286,13 @@ export class Viewer {
 								delete m.userData[pk]
 								m.needsUpdate = true
 								if (k === 'map') {
-									const ml = m.name?.toLowerCase() ?? ''
-									const nl = (o.name || '').toLowerCase()
-									const mp = (tex.name || '').toLowerCase()
-									const isBakedMat = RE_BAKE_MAT.test(ml) || RE_BAKE_MAP.test(mp) || RE_BAKE_MAP.test(nl)
-									const isBakedFamily = nl.includes('bm_') || nl.includes('playfield')
-									const isMainBake = isBakedFamily && isBakedMat
-									const isVlmBake = nl.includes('playfield') && (/lm_/i.test(nl) || isBakedMat || nl.includes('bm_'))
-									const isVrCab = RE_VR.test(nl) || RE_CAB.test(nl) || RE_VR.test(ml) || RE_CAB.test(ml)
-									const isBaked = isBakedMat || isMainBake || isVlmBake || isVrCab
-									if (isBaked) {
-										try {
-											m.emissiveMap = tex
-											try {
-												if (m.emissive) m.emissive.set(0xffffff)
-												else m.emissive = new THREE.Color(0xffffff)
-											} catch {}
-											m.emissiveIntensity = 1
-											if (!m.color) m.color = new THREE.Color(0x000000)
-											else
-												try {
-													m.color.set(0x000000)
-												} catch {}
-											m.side = THREE.DoubleSide
-											m.toneMapped = true
-											m.roughness = BAKED_ROUGH
-											m.metalness = BAKED_METAL
-											try {
-												tex.wrapS = THREE.ClampToEdgeWrapping
-												tex.wrapT = THREE.ClampToEdgeWrapping
-												tex.generateMipmaps = true
-												tex.minFilter = THREE.LinearMipmapLinearFilter
-												tex.magFilter = THREE.LinearFilter
-												tex.anisotropy = 1
-												tex.needsUpdate = true
-											} catch {}
-											try {
-												if (m.emissiveMap) {
-													m.emissiveMap.wrapS = THREE.ClampToEdgeWrapping
-													m.emissiveMap.wrapT = THREE.ClampToEdgeWrapping
-													m.emissiveMap.generateMipmaps = true
-													m.emissiveMap.minFilter = THREE.LinearMipmapLinearFilter
-													m.emissiveMap.magFilter = THREE.LinearFilter
-													m.emissiveMap.anisotropy = 1
-													m.emissiveMap.needsUpdate = true
-												}
-											} catch {}
-											if (isMainBake && !nl.includes('non_opaque') && !/ramp|armp|botramp|rampscrw/i.test(nl)) {
-												m.polygonOffset = true
-												m.polygonOffsetFactor = -1
-												m.polygonOffsetUnits = -1
-												m.depthWrite = true
-												m.transparent = false
-												m.alphaTest = 0
-											}
-											if (isMainBake && nl.includes('playfield') && o.visible === false) {
-												o.visible = true
-												for (let p = o.parent; p && p !== this.tableGroup; p = p.parent) {
-													if (p.visible === false) p.visible = true
-												}
-											}
-										} catch {}
+									const info = isBakedMesh(o.name || '', m.name || '', tex.name || '')
+									if (info.isBaked) {
+										try { applyBakedMaterial(m, tex, info, o.name || '') } catch {}
+										if (info.isMainBake && (o.visible === false) && (o.name || '').toLowerCase().includes('playfield')) {
+											o.visible = true
+											for (let p = o.parent; p && p !== this.tableGroup; p = p.parent) if (p.visible === false) p.visible = true
+										}
 									}
 								}
 								fixed++
@@ -1327,33 +1303,19 @@ export class Viewer {
 						let hasReadyBake = false
 						this.tableGroup.traverse(o2 => {
 							if (!o2.isMesh) return
-							const n2 = (o2.name || '').toLowerCase()
-							if (!n2.includes('playfield') && !n2.includes('bm_')) return
-							const m2 = Array.isArray(o2.material) ? o2.material[0] : o2.material
-							if (!m2) return
-							const ml2 = (m2.name || '').toLowerCase()
-							const mp2 = (m2.map?.name || '').toLowerCase()
-							const isBakedMat2 = RE_BAKE_MAT.test(ml2) || RE_BAKE_MAP.test(mp2) || RE_BAKE_MAP.test(n2)
-							const isBakedFamily2 = n2.includes('bm_') || n2.includes('playfield')
-							const isMainBake2 = isBakedFamily2 && isBakedMat2
-							const isVlmBake2 = n2.includes('playfield') && (/lm_/i.test(n2) || isBakedMat2 || n2.includes('bm_'))
-							if ((isMainBake2 || isBakedMat2 || isVlmBake2) && m2.map) hasReadyBake = true
+							const n2 = o2.name || '', m2 = Array.isArray(o2.material) ? o2.material[0] : o2.material
+							if (!m2?.map) return
+							if (!n2.toLowerCase().includes('playfield') && !n2.toLowerCase().includes('bm_')) return
+							const info = isBakedMesh(n2, m2.name || '', m2.map?.name || '')
+							if (info.isBaked) hasReadyBake = true
 						})
 						if (hasReadyBake) {
 							this.tableGroup.traverse(o2 => {
-								if (!o2.isMesh || !o2.visible) return
-								const n2 = (o2.name || '').toLowerCase()
-								if (!n2.includes('playfield')) return
+								if (!o2.isMesh || !o2.visible || !(o2.name || '').toLowerCase().includes('playfield')) return
 								const m2 = Array.isArray(o2.material) ? o2.material[0] : o2.material
 								if (!m2) return
-								const ml2 = (m2.name || '').toLowerCase()
-								const mp2 = (m2.map?.name || '').toLowerCase()
-								const isBakedMat2 = RE_BAKE_MAT.test(ml2) || RE_BAKE_MAP.test(mp2) || RE_BAKE_MAP.test(n2)
-								const isBakedFamily2 = n2.includes('bm_') || n2.includes('playfield')
-								const isMainBake2 = isBakedFamily2 && isBakedMat2
-								const isVlmBake2 = n2.includes('playfield') && (/lm_/i.test(n2) || isBakedMat2 || n2.includes('bm_'))
-								const isBasePlayfield = n2.includes('playfield') && !isMainBake2 && !isVlmBake2 && !isBakedMat2
-								if (isBasePlayfield) {
+								const info = isBakedMesh(o2.name || '', m2.name || '', m2.map?.name || '')
+								if (!info.isBaked && !info.isMainBake && !info.isVlmBake) {
 									o2.visible = false
 									try { o2.geometry?.dispose?.() } catch {}
 								}
@@ -1602,22 +1564,19 @@ export class Viewer {
 			if (!emu || emu.isMock || !emu.isInitialized?.()) return false
 			try { return emu.api?.isRunning?.() === 0 } catch { return false }
 		}
-		let canThread = false
-		let sab = null
-		let worker = null
-		let snapScratch = null
+		let threaded = false
 		try {
-			canThread = typeof SharedArrayBuffer !== 'undefined' && typeof Atomics !== 'undefined' && typeof Atomics.waitAsync === 'function' && globalThis.crossOriginIsolated
-		} catch { canThread = false }
-		if (canThread && this.player && this.viewerMode === 'play') {
-			const res = this._createPhysicsWorker()
-			if (res) { sab = res.sab; snapScratch = res.scratch; worker = res.worker; this.log(`[threaded] SAB ${sab.byteLength} crossOriginIsolated=${globalThis.crossOriginIsolated} worker started`, 'info') }
-			else { canThread = false; sab = null; this._physicsSab = null }
-		} else if (!canThread) {
-			try { this.log(`[threaded] disabled hasSAB=${typeof SharedArrayBuffer !== 'undefined'} isolated=${globalThis.crossOriginIsolated} waitAsync=${typeof Atomics?.waitAsync}`, 'debug') } catch {}
-		}
-		let threaded = canThread && sab && snapScratch
-		this._threadedCheck = () => !!(this._physicsSab && this._physicsScratch)
+			const can = typeof SharedArrayBuffer !== 'undefined' && typeof Atomics !== 'undefined' && typeof Atomics.waitAsync === 'function' && globalThis.crossOriginIsolated
+			if (can && this.player && this.viewerMode === 'play') {
+				const res = this._createPhysicsWorker()
+				if (res) {
+					threaded = true
+					this.log(`[threaded] SAB ${res.sab.byteLength} worker started`, 'info')
+				}
+			} else if (!can) {
+				try { this.log(`[threaded] disabled hasSAB=${typeof SharedArrayBuffer !== 'undefined'} isolated=${globalThis.crossOriginIsolated} waitAsync=${typeof Atomics?.waitAsync}`, 'debug') } catch {}
+			}
+		} catch {}
 		const tickPhysics = now => {
 			if (!this.player || this.isPaused) return
 			this.player.setPhysicsEnabled(this.viewerMode === 'play')
@@ -1627,8 +1586,8 @@ export class Viewer {
 			if (changed.keys.length) this.applyChangedStates(changed)
 		}
 		const tickPhysicsThreaded = now => {
-			const curSab = this._physicsSab || sab
-			const curScratch = this._physicsScratch || snapScratch
+			const curSab = this._physicsSab
+			const curScratch = this._physicsScratch
 			if (!curSab || !curScratch || !this.player || this.isPaused) return
 			try {
 				const res = trySnap(curSab, curScratch)

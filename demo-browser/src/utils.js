@@ -96,15 +96,16 @@ export const filterTextures = (table, log) => {
 	return { before, after }
 }
 
-const LEFT_MAP = { ArrowLeft: ['ShiftLeft'], KeyA: ['ShiftLeft'] }
-const RIGHT_MAP = { ArrowRight: ['ShiftRight'], KeyD: ['ShiftRight'] }
-
-export const aliasEvent = e => {
-	if (LEFT_MAP[e.code]) return { code: 'ShiftLeft', key: 'Shift', ts: Date.now() }
-	if (RIGHT_MAP[e.code]) return { code: 'ShiftRight', key: 'Shift', ts: Date.now() }
-	if (e.code === 'Enter' || e.code === 'NumpadEnter') return { code: 'Enter', key: 'Enter', ts: Date.now() }
-	return null
+const ALIAS = {
+	ArrowLeft: 'ShiftLeft',
+	KeyA: 'ShiftLeft',
+	ArrowRight: 'ShiftRight',
+	KeyD: 'ShiftRight',
+	Enter: 'Enter',
+	NumpadEnter: 'Enter',
 }
-export const aliasEventExtra = e => {
-	return null
+export const aliasEvent = e => {
+	const code = ALIAS[e.code]
+	if (!code) return null
+	return { code, key: code === 'Enter' ? 'Enter' : 'Shift', ts: Date.now() }
 }
