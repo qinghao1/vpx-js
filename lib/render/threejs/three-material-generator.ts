@@ -243,6 +243,10 @@ export class ThreeMaterialGenerator {
 		disableLighting?: number,
 		backfacesEnabled?: boolean,
 	): string {
-		return `${material?.name ?? 'none'}:${map ?? 'none'}:${normalMap ?? 'none'}:${envMap ?? 'none'}:${emissiveMap ?? 'none'}:${isTransparent ? 't' : 'o'}:${depthBias}:${disableLighting ?? 'x'}:${backfacesEnabled ?? 'x'}`
+		const bias = depthBias === 0 ? 0 : Math.round(depthBias / 500)
+		const baked = this.isBaked(material, map, disableLighting)
+		const lightKey = baked ? 'b' : 'x'
+		const backKey = backfacesEnabled ? '1' : '0'
+		return `${material?.name ?? 'none'}:${map ?? 'none'}:${normalMap ?? 'none'}:${envMap ?? 'none'}:${emissiveMap ?? 'none'}:${isTransparent ? 't' : 'o'}:${bias}:${lightKey}:${backKey}`
 	}
 }

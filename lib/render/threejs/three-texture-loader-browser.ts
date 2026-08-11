@@ -84,7 +84,7 @@ function tune(tex: any): void {
 	tex.generateMipmaps = true
 	tex.minFilter = LinearMipMapLinearFilter
 	tex.magFilter = LinearFilter
-	tex.anisotropy = 4
+	tex.anisotropy = 1
 }
 
 function nameAndTune(tex: any, name: string): void {
