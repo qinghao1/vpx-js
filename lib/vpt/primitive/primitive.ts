@@ -52,6 +52,7 @@ export class Primitive
 			data.color,
 			data.disableLightingTop,
 			data.disableLightingBelow,
+			data.alpha,
 		)
 		this.updater = new PrimitiveUpdater(data, this.state)
 		this.meshGenerator = new PrimitiveMeshGenerator(data)

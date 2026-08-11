@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import {
+	BAKED_EMISSIVE,
 	BAKED_METAL,
 	BAKED_ROUGH,
 	RE_ALPHA_MESH,
@@ -24,7 +25,7 @@ const classify = (mesh, mat, map, baked = false) => {
 		isVr: RE_VR.test(me),
 		isCab: RE_CAB.test(me),
 		isVlmBake: me.includes('playfield') && (RE_LM.test(me) || isBakedMat || me.includes('bm_')),
-		isMainBake: isBakedFamily && isBakedMat,
+		isMainBake: isBakedFamily && isBakedMat && !RE_LM.test(me),
 		isBakedMat,
 		needsAlpha: RE_ALPHA_MESH.test(me),
 	}
@@ -166,29 +167,48 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 		const pending = pendingOf(base)
 		const mapPre = (base.map?.name || pending || '').toLowerCase()
 		const bakedFlag = !!base.userData?.__isBaked
-		const { isMainBake, needsAlpha } = classify(mesh, matName, mapPre, bakedFlag)
+		const { isMainBake, isVlmBake, needsAlpha, isLm } = classify(mesh, matName, mapPre, bakedFlag)
+		const isOverlay = isVlmBake && !isMainBake
 		const isApron = mesh.includes('bm_non_opaque') || mesh.includes('non_opaque')
 		const isRamp = mesh.includes('ramp') || mesh.includes('armp') || mesh.includes('botramp') || mesh.includes('rampscrw')
 		const alpha = !isMainBake && !isRamp && !isApron && needsAlpha
-		const key = `${base.name}|${base.map?.name ?? pending}|${isMainBake ? 'main' : alpha ? 'alpha' : 'opaque'}|${base.polygonOffset ? `${base.polygonOffsetFactor}/${base.polygonOffsetUnits}` : '0'}`
+		const key = `${base.name}|${base.map?.name ?? pending}|${isMainBake ? 'main' : isOverlay ? 'overlay' : alpha ? 'alpha' : 'opaque'}|${base.polygonOffset ? `${base.polygonOffsetFactor}/${base.polygonOffsetUnits}` : '0'}`
 		let v = bakedCache.get(key)
 		if (v) return v
 		v = base.clone()
 		if (isMainBake) fixBaked(v, v.map)
-		else fixVr(v)
+		else if (isOverlay) {
+			fixBaked(v, v.map)
+			v.emissiveIntensity = 0.35
+			v.transparent = true
+			v.opacity = 0.85
+			v.blending = THREE.AdditiveBlending
+			v.depthWrite = false
+			v.toneMapped = false
+			v.needsUpdate = true
+		} else fixVr(v)
 		if (isMainBake && !v.map && pending) {
 			v.color?.set?.(0x000000)
 			if (!v.emissive) v.emissive = new THREE.Color(0xffffff)
 			else v.emissive.set(0xffffff)
-			v.emissiveIntensity = 1
+			v.emissiveIntensity = BAKED_EMISSIVE
 			v.toneMapped = true
 		}
-	v.transparent = !isMainBake && alpha && !isApron && !isRamp
-	v.alphaTest = v.transparent ? 0.1 : 0
-	v.depthWrite = !v.transparent
-	v.opacity = 1
-	if (isMainBake && !isApron && !isRamp) { v.polygonOffset = true; v.polygonOffsetFactor = -1; v.polygonOffsetUnits = -1 } else if (!isMainBake && alpha && !isApron && !isRamp) { v.polygonOffset = true; v.polygonOffsetFactor = -2; v.polygonOffsetUnits = -4 } else { v.polygonOffset = false; v.polygonOffsetFactor = 0; v.polygonOffsetUnits = 0 }
-	if (isApron || isRamp) { v.transparent = false; v.alphaTest = 0; v.depthWrite = true; if (!isMainBake) { v.polygonOffset = false; v.polygonOffsetFactor = 0; v.polygonOffsetUnits = 0 } }
+	if (isOverlay) {
+		v.transparent = true
+		v.alphaTest = 0
+		v.depthWrite = false
+		v.opacity = 0.85
+		v.blending = THREE.AdditiveBlending
+		v.polygonOffset = true; v.polygonOffsetFactor = -2; v.polygonOffsetUnits = -4
+	} else {
+		v.transparent = !isMainBake && alpha && !isApron && !isRamp
+		v.alphaTest = v.transparent ? 0.1 : 0
+		v.depthWrite = !v.transparent
+		if (v.opacity === undefined || !isOverlay) v.opacity = 1
+		if (isMainBake && !isApron && !isRamp) { v.polygonOffset = true; v.polygonOffsetFactor = -1; v.polygonOffsetUnits = -1 } else if (!isMainBake && alpha && !isApron && !isRamp) { v.polygonOffset = true; v.polygonOffsetFactor = -2; v.polygonOffsetUnits = -4 } else if (!isOverlay) { v.polygonOffset = false; v.polygonOffsetFactor = 0; v.polygonOffsetUnits = 0 }
+		if (isApron || isRamp) { v.transparent = false; v.alphaTest = 0; v.depthWrite = true; if (!isMainBake) { v.polygonOffset = false; v.polygonOffsetFactor = 0; v.polygonOffsetUnits = 0 } }
+	}
 	bakedCache.set(key, v)
 	return v
 }

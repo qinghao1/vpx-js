@@ -15,6 +15,7 @@ import { Table } from '../dist-esm/lib/vpt/table/table.js'
 import { isWasmReady } from '../dist-esm/lib/physics/wasm/kernels.js'
 import { BALL_STRIDE, createPhysicsSAB, MAX_BALLS, pushInput, trySnap } from '../dist-esm/lib/game/shared/physics-buffer.js'
 import {
+	BAKED_EMISSIVE,
 	BAKED_METAL,
 	BAKED_ROUGH,
 	CAM,
@@ -92,7 +93,7 @@ const isBakedMesh = (meshName, matName, mapName) => {
 	const ml = matName.toLowerCase(), nl = meshName.toLowerCase(), mp = mapName.toLowerCase()
 	const isBakedMat = RE_BAKE_MAT.test(ml) || RE_BAKE_MAP.test(mp) || RE_BAKE_MAP.test(nl)
 	const isBakedFamily = nl.includes('bm_') || nl.includes('playfield')
-	const isMainBake = isBakedFamily && isBakedMat
+	const isMainBake = isBakedFamily && isBakedMat && !/lm_/i.test(nl)
 	const isVlmBake = nl.includes('playfield') && (/lm_/i.test(nl) || isBakedMat || nl.includes('bm_'))
 	const isVrCab = RE_VR.test(nl) || RE_CAB.test(nl) || RE_VR.test(ml) || RE_CAB.test(ml)
 	return { isBakedMat, isMainBake, isVlmBake, isVrCab, isBaked: isBakedMat || isMainBake || isVlmBake || isVrCab }
@@ -107,13 +108,23 @@ const applyBakedMaterial = (mat, tex, info, meshName) => {
 	const nl = meshName.toLowerCase()
 	mat.emissiveMap = tex
 	try { if (mat.emissive) mat.emissive.set(0xffffff); else mat.emissive = new THREE.Color(0xffffff) } catch {}
-	mat.emissiveIntensity = BAKED_EMISSIVE
-	try { if (!mat.color) mat.color = new THREE.Color(0x000000); else mat.color.set(0x000000) } catch {}
-	mat.side = THREE.DoubleSide; mat.toneMapped = true; mat.roughness = BAKED_ROUGH; mat.metalness = BAKED_METAL
-	wrapBakedTex(tex); wrapBakedTex(mat.emissiveMap)
-	if (info.isMainBake && !nl.includes('non_opaque') && !/ramp|armp|botramp|rampscrw/i.test(nl)) {
-		mat.polygonOffset = true; mat.polygonOffsetFactor = -1; mat.polygonOffsetUnits = -1
-		mat.depthWrite = true; mat.transparent = false; mat.alphaTest = 0
+	const isOverlay = info.isVlmBake && !info.isMainBake
+	if (isOverlay) {
+		mat.emissiveIntensity = 0.35
+		try { if (!mat.color) mat.color = new THREE.Color(0x000000); else mat.color.set(0x000000) } catch {}
+		mat.side = THREE.DoubleSide; mat.toneMapped = false; mat.roughness = BAKED_ROUGH; mat.metalness = BAKED_METAL
+		wrapBakedTex(tex); wrapBakedTex(mat.emissiveMap)
+		mat.transparent = true; mat.opacity = 0.85; mat.blending = THREE.AdditiveBlending; mat.depthWrite = false; mat.alphaTest = 0
+		mat.polygonOffset = true; mat.polygonOffsetFactor = -2; mat.polygonOffsetUnits = -4
+	} else {
+		mat.emissiveIntensity = BAKED_EMISSIVE
+		try { if (!mat.color) mat.color = new THREE.Color(0x000000); else mat.color.set(0x000000) } catch {}
+		mat.side = THREE.DoubleSide; mat.toneMapped = true; mat.roughness = BAKED_ROUGH; mat.metalness = BAKED_METAL
+		wrapBakedTex(tex); wrapBakedTex(mat.emissiveMap)
+		if (info.isMainBake && !nl.includes('non_opaque') && !/ramp|armp|botramp|rampscrw/i.test(nl)) {
+			mat.polygonOffset = true; mat.polygonOffsetFactor = -1; mat.polygonOffsetUnits = -1
+			mat.depthWrite = true; mat.transparent = false; mat.alphaTest = 0
+		}
 	}
 }
 
@@ -268,7 +279,7 @@ export class Viewer {
 		if (renderer.shadowMap.enabled) renderer.shadowMap.type = THREE.PCFSoftShadowMap
 		renderer.outputColorSpace = THREE.SRGBColorSpace
 		renderer.toneMapping = THREE.ACESFilmicToneMapping
-		renderer.toneMappingExposure = 1.25
+		renderer.toneMappingExposure = 1.0
 		this.renderer = renderer
 		this._rendererBackend = backend
 		if (backend !== 'webgpu' && this.viewerMode !== 'play') {

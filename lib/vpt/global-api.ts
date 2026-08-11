@@ -248,7 +248,13 @@ export class GlobalApi extends VbsApi {
 						if (!m?.color) continue
 						const n = (m.name ?? '').toLowerCase()
 						if (n === `material:${target}` || n === target || n.includes(target)) {
-							m.color.set(color)
+							const isBaked = !!(m as any).userData?.__isBaked || !!(m as any).emissiveMap
+							if (isBaked) {
+								if ((m as any).emissive) (m as any).emissive.set(0x000000)
+								;(m as any).emissiveIntensity = 0
+							} else {
+								m.color.set(color)
+							}
 							m.needsUpdate = true
 						}
 					}
@@ -257,7 +263,13 @@ export class GlobalApi extends VbsApi {
 			const gen = g.renderApi?.getMaterialGenerator?.() ?? g.viewer?.renderApi?.getMaterialGenerator?.()
 			for (const [k, m] of Object.entries(gen?.cachedMaterials ?? {})) {
 				if (k.split(':')[0].toLowerCase() === target) {
-					;(m as any).color?.set(color)
+					const isBaked = !!(m as any).userData?.__isBaked || !!(m as any).emissiveMap
+					if (isBaked) {
+						if ((m as any).emissive) (m as any).emissive.set(0x000000)
+						;(m as any).emissiveIntensity = 0
+					} else {
+						;(m as any).color?.set(color)
+					}
 					;(m as any).needsUpdate = true
 				}
 			}

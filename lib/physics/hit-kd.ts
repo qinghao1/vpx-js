@@ -129,12 +129,26 @@ export class HitKD {
 	}
 
 	public update(): void {
+		if (this.numItems <= 16) {
+			for (const h of this.orgVho) h.calcHitBBox()
+			return
+		}
 		this.fillFromVector(this.orgVho)
 	}
 	public finalize(): void {
 		this.tmp = []
 	}
 	public hitTestBall(ball: Ball, c: CollisionEvent, p: PlayerPhysics): void {
+		if (this.numItems === 0) return
+		if (this.numItems <= 16) {
+			for (const h of this.orgVho) {
+				if (h === ball.hit || !h.isEnabled) continue
+				if (!h.hitBBox.intersectRect(ball.hit.hitBBox)) continue
+				if (!h.hitBBox.intersectSphere(ball.state.pos, ball.hit.rcHitRadiusSqr)) continue
+				h.doHitTest(ball, c, p)
+			}
+			return
+		}
 		this.rootNode.hitTestBall(ball, c, p)
 	}
 	public getItemAt(i: number): HitObject {

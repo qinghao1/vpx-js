@@ -72,9 +72,10 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 		const topIntensity = dlTop > DISABLE_THRESHOLD ? dlTop * DISABLE_SCALE : 0
 		const belowIntensity = dlBelow < 1 - DISABLE_THRESHOLD ? (1 - dlBelow) * DISABLE_SCALE * 0.5 : 0
 		const rawAlpha = this.state.alpha ?? this.data.alpha
-		const alphaIntensity = this.data.addBlend ? Math.min(MAX_EMISSIVE, Math.max(0, rawAlpha) * ALPHA_SCALE * 0.5) : 0
-		const intensity = Math.min(MAX_EMISSIVE, topIntensity + belowIntensity + alphaIntensity)
-		const emissive = intensity > 0
+		const rawAlphaClamped = Math.max(0, rawAlpha)
+		const alphaIntensity = this.data.addBlend ? Math.min(MAX_EMISSIVE, rawAlphaClamped * ALPHA_SCALE * 0.3) : 0
+		const nonBakedIntensity = Math.min(MAX_EMISSIVE, topIntensity + belowIntensity + alphaIntensity)
+		const nonBakedEmissive = nonBakedIntensity > 0
 		const matName = this.state.material ?? this.data.szMaterial
 		const base = table.getMaterial(matName)?.baseColor ?? 0xffffff
 		const hex = new Color(base).multiply(new Color(prim)).getHex()
@@ -84,17 +85,34 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 						color: { set: (v: number) => void }
 						emissive: { set: (v: number) => void }
 						emissiveIntensity: number
+						emissiveMap?: unknown
+						userData?: Record<string, unknown>
 						needsUpdate: boolean
 				  }
 				| undefined
 			if (!mat?.color || !mat?.emissive) continue
-			mat.color.set(hex)
-			if (emissive) {
-				mat.emissive.set(hex)
-				mat.emissiveIntensity = intensity
+			const isBaked = !!(mat as any).userData?.__isBaked || !!(mat as any).emissiveMap
+			if (isBaked) {
+				if (this.data.addBlend) {
+					const overlayIntensity = Math.min(MAX_EMISSIVE, rawAlphaClamped * ALPHA_SCALE * 0.35)
+					mat.color.set(0x000000)
+					mat.emissive.set(0xffffff)
+					mat.emissiveIntensity = overlayIntensity
+				} else {
+					mat.color.set(0x000000)
+					if (!mat.emissive) (mat as any).emissive = new Color(0xffffff)
+					else mat.emissive.set(0xffffff)
+					if (mat.emissiveIntensity === 0) mat.emissiveIntensity = 0.85
+				}
 			} else {
-				mat.emissive.set(0x000000)
-				mat.emissiveIntensity = 0
+				mat.color.set(hex)
+				if (nonBakedEmissive) {
+					mat.emissive.set(hex)
+					mat.emissiveIntensity = nonBakedIntensity
+				} else {
+					mat.emissive.set(0x000000)
+					mat.emissiveIntensity = 0
+				}
 			}
 			mat.needsUpdate = true
 		}
@@ -116,10 +134,16 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 				  }
 				| undefined
 			if (!mat) continue
-			mat.opacity = opacity
-			mat.transparent = opacity < 0.999
-			mat.depthWrite = !mat.transparent
-			if (isAdditive) mat.blending = opacity < 0.999 ? 2 : 1
+			if (isAdditive) {
+				mat.opacity = opacity
+				mat.transparent = true
+				mat.depthWrite = false
+				mat.blending = 2
+			} else {
+				mat.opacity = opacity
+				mat.transparent = opacity < 0.999
+				mat.depthWrite = !mat.transparent
+			}
 			mat.needsUpdate = true
 		}
 	}

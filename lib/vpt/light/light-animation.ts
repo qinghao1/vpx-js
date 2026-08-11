@@ -59,20 +59,22 @@ export class LightAnimation implements IAnimation {
 		if (this.realState === Enums.LightStatus.LightStateBlinking) this.updateBlinker(newTimeMsec)
 		const lightState =
 			this.realState === Enums.LightStatus.LightStateBlinking ? (this.isBlinkOn() ? 1 : 0) : this.realState
-		const target = this.data.intensity * this.intensityScale * Math.max(0, Math.min(1, lightState))
+		const safeIntensity = Math.max(0, this.data.intensity / Math.max(0.001, this.intensityScale || 1)) * Math.max(0.001, this.intensityScale || 1)
+		const clampedIntensity = Math.max(0, Math.min(100000, safeIntensity))
+		const target = clampedIntensity * Math.max(0, Math.min(1, lightState))
 		if (this.state.intensity < target) {
 			if (diff === 0) {
 				if (!Number.isFinite(this.data.fadeSpeedUp)) this.state.intensity = target
 				return
 			}
-			const s = this.data.fadeSpeedUp
+			const s = Number.isFinite(this.data.fadeSpeedUp) ? Math.max(0, this.data.fadeSpeedUp) : 0
 			this.state.intensity = !Number.isFinite(s) ? target : Math.min(target, this.state.intensity + s * diff)
 		} else if (this.state.intensity > target) {
 			if (diff === 0) {
 				if (!Number.isFinite(this.data.fadeSpeedDown)) this.state.intensity = target
 				return
 			}
-			const s = this.data.fadeSpeedDown
+			const s = Number.isFinite(this.data.fadeSpeedDown) ? Math.max(0, this.data.fadeSpeedDown) : 0
 			this.state.intensity = !Number.isFinite(s) ? target : Math.max(target, this.state.intensity - s * diff)
 		}
 	}
@@ -99,7 +101,9 @@ export class LightAnimation implements IAnimation {
 	public updateIntensity() {
 		const lightState =
 			this.realState === Enums.LightStatus.LightStateBlinking ? (this.isBlinkOn() ? 1 : 0) : this.realState
-		const target = this.data.intensity * this.intensityScale * Math.max(0, Math.min(1, lightState))
+		const safeIntensity = Math.max(0, this.data.intensity / Math.max(0.001, this.intensityScale || 1)) * Math.max(0.001, this.intensityScale || 1)
+		const clampedIntensity = Math.max(0, Math.min(100000, safeIntensity))
+		const target = clampedIntensity * Math.max(0, Math.min(1, lightState))
 		this.state.intensity = target
 	}
 
