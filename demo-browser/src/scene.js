@@ -748,8 +748,8 @@ function framingBox(node, exclude) {
 
 const excludeNonPlayfield = n => !n.includes('playfield') && !n.includes('button') && !n.includes('coin') && !n.includes('plunger') && !n.includes('apron')
 const excludeVrNonCab = n => RE_VR.test(n) && !RE_CAB.test(n)
-const VIEWER = { dist: 1.35, elev: 0.85, azim: 0.65, near: 0.015, farScale: 8, farMin: 2000 }
-const PLAY = { dist: 1.15, elev: 0.92, azim: 0.88, near: 0.012, farScale: 10, farMin: 4000, forwardBias: 0.07 }
+const VIEWER = { dist: 1.2, elev: 0.85, azim: 0.65, near: 0.015, farScale: 8, farMin: 2000 }
+const PLAY = { dist: 0.95, elev: 0.95, azim: 0.92, near: 0.012, farScale: 10, farMin: 4000, forwardBias: 0.07 }
 
 function framingState(node, targetExclude, sizeExclude, cfg) {
 	const target = framingBox(node, targetExclude).center.clone()
