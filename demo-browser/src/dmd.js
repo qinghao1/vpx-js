@@ -140,6 +140,7 @@ export class DmdController {
 			}
 		})()
 		const dupThreshold = Math.min(DUP_MAX, Math.max(dim.width, dim.height) * DUP_FACTOR)
+		const isVR = s => String(s || '').toLowerCase().includes('vr')
 		const cluster = list => {
 			const clusters = []
 			for (const fl of list) {
@@ -149,6 +150,7 @@ export class DmdController {
 				for (const cl of clusters) {
 					const rep = cl[0]
 					const repPos = getPos(rep)
+					if (isVR(fl.getName()) !== isVR(rep.getName())) continue
 					if (Math.hypot(pos.x - repPos.x, pos.y - repPos.y) > dupThreshold) continue
 					const repSize = getSize(rep)
 					if (size.w && repSize.w) {
@@ -178,9 +180,22 @@ export class DmdController {
 			}
 			return { cluster: cl, chosen: best }
 		})
+		const isVRName = n => String(n || '').toLowerCase().includes('vr')
+		const wantVR = this.viewer.viewerMode !== 'play'
+		let filteredReps = reps
+		if (reps.length > 1) {
+			const hasVR = reps.some(r => isVRName(r.chosen.getName()))
+			const hasNonVR = reps.some(r => !isVRName(r.chosen.getName()))
+			if (hasVR && hasNonVR) {
+				const pref = reps.filter(r => isVRName(r.chosen.getName()) === wantVR)
+				if (pref.length) filteredReps = pref
+			}
+		}
+		// use filteredReps for subsequent logic
+		const finalReps = filteredReps
 		if (clusters.some(c => c.length > 1)) {
 			this.viewer.log(
-				`DMD: deduped ${flashers.length} flashers in ${clusters.length} cluster(s) -> ${reps.map(r => r.chosen.getName()).join(', ')} (visible ? farthest)`,
+				`DMD: deduped ${flashers.length} flashers in ${clusters.length} cluster(s) -> ${finalReps.map(r => r.chosen.getName()).join(', ')} (visible ? farthest)`,
 				'info',
 			)
 		}
@@ -231,18 +246,18 @@ export class DmdController {
 				m.getWorldPosition(tmpVec)
 				return distToCenter(tmpVec.x, tmpVec.y)
 			}
-			const buckets = new Map(reps.map(r => [r.chosen.getName().toLowerCase(), []]))
+			const buckets = new Map(finalReps.map(r => [r.chosen.getName().toLowerCase(), []]))
 			const unmapped = []
 			for (const m of candidates) {
 				const key = (m.name || '').toLowerCase().replace(/^dmd_/, '')
 				const fl = flasherMap.get(key)
-				const rep = fl ? reps.find(r => r.cluster.includes(fl)) : null
+				const rep = fl ? finalReps.find(r => r.cluster.includes(fl)) ?? reps.find(r => r.cluster.includes(fl)) : null
 				const bKey = rep?.chosen.getName().toLowerCase()
 				if (bKey && buckets.has(bKey)) buckets.get(bKey).push(m)
 				else unmapped.push(m)
 			}
 			const keep = []
-			for (const rep of reps) {
+			for (const rep of finalReps) {
 				const bucket = buckets.get(rep.chosen.getName().toLowerCase()) ?? []
 				if (bucket.length) {
 					let best = bucket[0],
@@ -300,7 +315,7 @@ export class DmdController {
 			return
 		}
 
-		for (const rep of reps) {
+		for (const rep of finalReps) {
 			const fl = rep.chosen
 			const d = fl.data
 			const pts = d.dragPoints ?? d._dragPoints ?? []
@@ -317,7 +332,7 @@ export class DmdController {
 				}
 			}
 			const geom = new THREE.PlaneGeometry(w, h)
-			const mat = new THREE.MeshBasicMaterial({ map: this.texture, side: THREE.DoubleSide })
+			const mat = new THREE.MeshBasicMaterial({ map: this.texture, side: THREE.DoubleSide, depthTest: false, depthWrite: false, transparent: false })
 			const mesh = new THREE.Mesh(geom, mat)
 			mesh.name = `DMD_${fl.getName()}`
 			mesh.renderOrder = 1000
@@ -421,9 +436,8 @@ export class DmdController {
 		if (this.ctx) draw(this.ctx, this.scale)
 		if (this.texture) this.texture.needsUpdate = true
 
-		if (this.meshes.length) {
-			if (this.wrap) this.wrap.hidden = true
-		} else this._showOverlay()
+		if (max > 0) this._showOverlay()
+		else if (this.wrap) this.wrap.hidden = true
 
 		if (this.statusEl) {
 			const emu = this.viewer.player.getPhysics?.()?.emu

@@ -38,12 +38,24 @@ export function batchStaticOpaques(root: Group, table: Table, _renderApi: ThreeR
 		return false
 	}
 	const buckets = new Map<string, { material: MeshStandardMaterial; meshes: Mesh[] }>()
+	const dmdNames = new Set<string>()
+	try {
+		for (const k in (table as any).flashers) {
+			const fl = (table as any).flashers[k]
+			if (fl?.data?.isDMD) dmdNames.add(fl.getName().toLowerCase())
+		}
+		for (const k in (table as any).textboxes) {
+			const tb = (table as any).textboxes[k]
+			if (tb?.data?.isDMD) dmdNames.add(tb.getName().toLowerCase())
+		}
+	} catch {}
 	root.traverse((o: any) => {
 		if (!o.isMesh || !o.geometry || !o.material) return
 		if (Array.isArray(o.material)) return
 		const mat = o.material as MeshStandardMaterial
 		if (!canBatch(mat) || isAnimated(o)) return
-		if (o.userData?.isProceduralDMD || o.name.startsWith('DMD_')) return
+		const n = (o.name || '').toLowerCase()
+		if (o.userData?.isProceduralDMD || o.name.startsWith('DMD_') || n.includes('dmd') || dmdNames.has(n)) return
 		if (o.name.toLowerCase().includes('ball')) return
 		const geo = o.geometry as BufferGeometry
 		if (!geo.getAttribute('position')) return
