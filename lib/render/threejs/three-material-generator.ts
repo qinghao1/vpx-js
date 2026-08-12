@@ -24,6 +24,12 @@ const BAKED_ROUGH = 0.75
 const BAKED_METAL = 0.1
 const DISABLE_LIGHTING_THRESHOLD = 0.5
 
+let _globalEmissionScale = 1
+export const setGlobalEmissionScale = (v: number) => {
+	_globalEmissionScale = Number.isFinite(v) ? Math.max(0.15, Math.min(1, v)) : 1
+}
+export const getGlobalEmissionScale = () => _globalEmissionScale
+
 const pendingKeyFor = (key: 'map' | 'normalMap' | 'envMap' | 'emissiveMap'): string =>
 	`pending${key.charAt(0).toUpperCase()}${key.slice(1)}`
 
@@ -229,7 +235,7 @@ export class ThreeMaterialGenerator {
 			const tint = mat.color && (mat.color as Color).getHex() !== 0x000000 ? (mat.color as Color).clone() : new Color(0xffffff) // tint via baseColor
 			if (!mat.emissive) (mat as any).emissive = tint
 			else mat.emissive.copy(tint)
-			mat.emissiveIntensity = BAKED_EMISSIVE
+			mat.emissiveIntensity = BAKED_EMISSIVE * _globalEmissionScale
 			mat.color.set(0x000000)
 		} else {
 			mat.color.set(0xffffff)

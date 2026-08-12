@@ -23,18 +23,18 @@ export function installBvh(): void {
 	installed = true
 }
 
-export function buildBvhForGeometry(geom: BufferGeometry): void {
+export function buildBvhForGeometry(geom: BufferGeometry, force = false): void {
 	installBvh()
 	const g = geom as BvhGeometry
 	if (g.boundsTree) return
 	const tris = g.index ? g.index.count / 3 : g.attributes.position.count / 3
-	if (tris < 200) return
+	if (!force && tris < 200) return
 	try {
 		g.computeBoundsTree?.({ includeInstances: true } as any)
 	} catch {}
 }
 
-export function buildBvhForNode(root: { traverse(cb: (o: unknown) => void): void }): number {
+export function buildBvhForNode(root: { traverse(cb: (o: unknown) => void): void }, forceButton = false): number {
 	installBvh()
 	let built = 0
 	root.traverse((o: unknown) => {
@@ -43,23 +43,37 @@ export function buildBvhForNode(root: { traverse(cb: (o: unknown) => void): void
 			isInstancedMesh?: boolean
 			isBatchedMesh?: boolean
 			geometry?: BufferGeometry
+			userData?: Record<string, unknown>
+			name?: string
 		}
 		if ((!m.isMesh && !m.isInstancedMesh && !m.isBatchedMesh) || !m.geometry) return
+		const isButton = !!(m.userData?.isCabinetButton || (m.name && /button|coin|plunger|tour|start|fire/i.test(m.name)))
+		if (isButton) {
+			buildBvhForGeometry(m.geometry, true)
+			if ((m.geometry as BvhGeometry).boundsTree) built++
+			return
+		}
 		const g = m.geometry as BvhGeometry
 		if (g.boundsTree) return
-		buildBvhForGeometry(m.geometry)
+		buildBvhForGeometry(m.geometry, forceButton)
 		if ((m.geometry as BvhGeometry).boundsTree) built++
 	})
 	return built
 }
 
-export function buildBvhIdle(root: { traverse(cb: (o: unknown) => void): void }, chunkSize = 30): void {
+export function buildBvhIdle(root: { traverse(cb: (o: unknown) => void): void }, chunkSize = 30, forceButton = true): void {
 	installBvh()
 	const queue: BvhGeometry[] = []
 	root.traverse((o: unknown) => {
-		const m = o as { isMesh?: boolean; isInstancedMesh?: boolean; isBatchedMesh?: boolean; geometry?: BvhGeometry }
-		if ((m.isMesh || m.isInstancedMesh || m.isBatchedMesh) && m.geometry && !m.geometry.boundsTree)
+		const m = o as { isMesh?: boolean; isInstancedMesh?: boolean; isBatchedMesh?: boolean; geometry?: BvhGeometry; userData?: Record<string, unknown>; name?: string }
+		if ((m.isMesh || m.isInstancedMesh || m.isBatchedMesh) && m.geometry && !m.geometry.boundsTree) {
+			const isButton = !!(m.userData?.isCabinetButton || (m.name && /button|coin|plunger|tour|start|fire/i.test(m.name)))
+			if (isButton) {
+				try { (m.geometry as BvhGeometry).computeBoundsTree?.({ includeInstances: true } as any) } catch {}
+				return
+			}
 			queue.push(m.geometry)
+		}
 	})
 	if (!queue.length) return
 	let idx = 0

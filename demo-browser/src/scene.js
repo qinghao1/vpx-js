@@ -14,6 +14,14 @@ import {
 } from './config.js'
 
 const pendingOf = m => (m.userData?.pendingMap ?? m.userData?.pendingmap ?? '').toString().toLowerCase()
+const emissionScale = () => {
+	let v = 1
+	try {
+		const w = typeof window !== 'undefined' ? window.viewer?._globalEmissionScale : 1
+		if (Number.isFinite(w)) v = w
+	} catch {}
+	return Math.max(0.15, Math.min(1, v))
+}
 // vpinball: baked detection is engine-based, not name-based.
 // PrimitiveData.disableLightingTop (three-material-generator isBaked) + material/map name fallback
 // (RE_BAKE_MAT/RE_BAKE_MAP). Overlay vs main is engine contract addBlend (primitive.cpp:102
@@ -71,7 +79,7 @@ function fixBaked(mat, map) {
 		const tint = mat.color && mat.color.getHex() !== 0x000000 ? mat.color.clone() : new THREE.Color(0xffffff)
 		if (!mat.emissive) mat.emissive = tint
 		else mat.emissive.copy(tint)
-		mat.emissiveIntensity = BAKED_EMISSIVE
+		mat.emissiveIntensity = BAKED_EMISSIVE * emissionScale()
 		mat.color?.set?.(0x000000)
 	} else {
 		mat.color?.set?.(0xffffff)
@@ -136,7 +144,7 @@ export const applyBakedMaterial = (mat, tex, info, meshName) => {
 			mat.depthWrite = false
 			mat.alphaTest = 0
 		} else {
-			mat.emissiveIntensity = 1.0
+			mat.emissiveIntensity = 1.0 * emissionScale()
 			mat.transparent = true
 			mat.opacity = 1.0
 			mat.blending = THREE.AdditiveBlending
@@ -155,7 +163,7 @@ export const applyBakedMaterial = (mat, tex, info, meshName) => {
 		mat.polygonOffsetFactor = -2
 		mat.polygonOffsetUnits = -4
 	} else {
-		mat.emissiveIntensity = BAKED_EMISSIVE
+		mat.emissiveIntensity = BAKED_EMISSIVE * emissionScale()
 		if (!mat.color) mat.color = new THREE.Color(0x000000)
 		else mat.color.set(0x000000)
 		mat.side = THREE.DoubleSide
@@ -409,7 +417,7 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 		}
 		if (!o.isMesh) {
 			const n = (o.name || '').toLowerCase()
-			if (n && RE_CAB.test(n) && o.visible === false) {
+			if (n && (RE_CAB.test(n) || resolveButtonCode(n)) && o.visible === false) {
 				o.visible = true
 				stats.cabForced++
 			}
@@ -458,6 +466,11 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 		const buttonCode = resolveButtonCode(n)
 		const isButtonMesh = !!buttonCode
 		if (isButtonMesh) {
+			if (!o.visible) {
+				o.visible = true
+				stats.cabForced++
+				makeParentsVisible(o, node, stats)
+			}
 			o.frustumCulled = false
 			o.geometry?.computeBoundingSphere?.()
 			o.geometry?.computeBoundingBox?.()
@@ -472,7 +485,17 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 			o.renderOrder = 100
 			o.userData.isCabinetButton = true
 			o.userData.buttonCode = buttonCode
-			if (o.visible) makeParentsVisible(o, node, stats)
+			makeParentsVisible(o, node, stats)
+		}
+		if (!o.visible) {
+			const matsForGen = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : []
+			const hasMap = matsForGen.some(mm => mm?.map || pendingOf(mm))
+			const isWhite = matsForGen.length > 0 && matsForGen.every(mm => (mm?.color?.getHexString?.()?.toLowerCase() === 'ffffff' || mm?.color?.getHex?.() === 0xffffff) && !mm?.map && !pendingOf(mm))
+			if (hasMap && !isWhite) {
+				o.visible = true
+				stats.cabForced++
+				makeParentsVisible(o, node, stats)
+			}
 		}
 		if (!o.visible) return
 		const mats = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : []
@@ -848,7 +871,7 @@ export const isDeferred = (tx, table) => {
 	const n = tx.getName().toLowerCase()
 	const pf = table.getPlayfieldMap().toLowerCase()
 	if (n === pf) return false
-	if (n.includes('nestmap0') || n.includes('playfield') || n === 'blueprintsv2noramps') return false
+	if (n.includes('nestmap') || n.includes('bake') || n.includes('playfield') || n === 'blueprintsv2noramps') return false
 	const p = (tx.szPath || '').toLowerCase()
 	if (p.endsWith('.exr') || p.endsWith('.hdr') || tx.isHdr?.()) return true
 	return tx.width * tx.height > 1_048_576

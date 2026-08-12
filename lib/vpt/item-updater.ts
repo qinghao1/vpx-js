@@ -54,9 +54,9 @@ export abstract class ItemUpdater<STATE extends ItemState> {
 		angle: number,
 		name: string,
 	) {
-		const matTransToOrigin = Matrix3D.claim().setTranslation(-center.x, -center.y, posZ)
+		const matTransToOrigin = Matrix3D.claim().setTranslation(-center.x, -center.y, -posZ)
 		const matRotateToOrigin = Matrix3D.claim().rotateZMatrix(MathUtils.degToRad(-rotationZ))
-		const matTransFromOrigin = Matrix3D.claim().setTranslation(center.x, center.y, -posZ)
+		const matTransFromOrigin = Matrix3D.claim().setTranslation(center.x, center.y, posZ)
 		const matRotateFromOrigin = Matrix3D.claim().rotateZMatrix(MathUtils.degToRad(rotationZ))
 		const matRotateX = Matrix3D.claim().rotateXMatrix(angle)
 

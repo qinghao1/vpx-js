@@ -31,8 +31,10 @@ function canBatch(mat: MeshStandardMaterial): boolean {
 
 export function batchStaticOpaques(root: Group, table: Table, _renderApi: ThreeRenderApi): number {
 	const animatables = new Set(table.getAnimatables().map(a => a.getName()))
+	const movables = new Set(table.getMovables().map(a => a.getName()))
 	const isAnimated = (o: any): boolean => {
-		for (let p = o.parent; p && p !== root; p = p.parent) if (animatables.has(p.name)) return true
+		for (let p = o.parent; p && p !== root; p = p.parent)
+			if (animatables.has(p.name) || movables.has(p.name)) return true
 		return false
 	}
 	const buckets = new Map<string, { material: MeshStandardMaterial; meshes: Mesh[] }>()

@@ -12,6 +12,7 @@ import { BrowserBinaryReader } from '../dist-esm/lib/io/binary-reader.browser.js
 import { isWasmReady } from '../dist-esm/lib/physics/wasm/kernels.js'
 import { optimizeScene as _optimizeScene } from '../dist-esm/lib/render/threejs/three-batched-builder.js'
 import { buildBvhIdle } from '../dist-esm/lib/render/threejs/three-bvh.js'
+import { setGlobalEmissionScale } from '../dist-esm/lib/render/threejs/three-material-generator.js'
 import { ThreeRenderApi } from '../dist-esm/lib/render/threejs/three-render-api.js'
 import { ThreeTextureLoaderBrowser } from '../dist-esm/lib/render/threejs/three-texture-loader-browser.js'
 import { ANIM_SETTLE_MS, AnimationGate } from '../dist-esm/lib/util/animation-gate.js'
@@ -289,7 +290,7 @@ export class Viewer {
 		if (renderer.shadowMap.enabled) renderer.shadowMap.type = THREE.PCFSoftShadowMap
 		renderer.outputColorSpace = THREE.SRGBColorSpace
 		// vpinball: Renderer.cpp:53 m_toneMapper from TableSettings (typedefs3D.h:56 TM_* enums), :56 m_exposure from Table (0..2, Settings_properties.inl:725), pintable.cpp:2279 defaults TM_REINHARD/exposure 1, Renderer.cpp:2373 fb_*tonemap
-		// Generic mapping of table.data.toneMapper/exposure to THREE, not table-specific 0.6 hardcode.
+		// Keep exposure and emissionScale separate (Renderer.cpp:56 m_exposure, :398 m_emissionScale). EmissionScale modulates baked/light, not tonemap.
 		const toneMapFor = tm => {
 			if (tm === 0) return THREE.ReinhardToneMapping ?? THREE.ACESFilmicToneMapping
 			if (tm === 1) return THREE.AgXToneMapping ?? THREE.ACESFilmicToneMapping
@@ -299,21 +300,19 @@ export class Viewer {
 			if (tm === 5) return THREE.LinearToneMapping ?? THREE.AgXToneMapping ?? THREE.ACESFilmicToneMapping
 			return THREE.ReinhardToneMapping ?? THREE.AgXToneMapping ?? THREE.ACESFilmicToneMapping
 		}
-		const exposureFor = (ex, tbl) => {
+		const exposureFor = ex => {
 			const v = Number.isFinite(ex) ? ex : 1
-			const base = Math.max(0.1, Math.min(2, v))
-			const emissionScale = tbl?.globalEmissionScale
-			const raw = Number.isFinite(emissionScale) ? emissionScale : 1
-			const scale = Math.max(0.5, Math.min(1, Math.max(0.01, raw) ** 0.5))
-			return base * scale
+			return Math.max(0.1, Math.min(2, v))
 		}
 		const t = this.table?.data ?? null
 		renderer.toneMapping = toneMapFor(t?.toneMapper)
-		renderer.toneMappingExposure = exposureFor(t?.exposure, t)
+		renderer.toneMappingExposure = exposureFor(t?.exposure)
+		this._globalEmissionScale = Number.isFinite(t?.globalEmissionScale) ? t.globalEmissionScale : 1
 		this._applyTableToneMapping = tbl => {
 			if (!this.renderer || !tbl?.data) return
 			this.renderer.toneMapping = toneMapFor(tbl.data.toneMapper)
-			this.renderer.toneMappingExposure = exposureFor(tbl.data.exposure, tbl.data)
+			this.renderer.toneMappingExposure = exposureFor(tbl.data.exposure)
+			this._globalEmissionScale = Number.isFinite(tbl.data.globalEmissionScale) ? tbl.data.globalEmissionScale : 1
 		}
 		this.renderer = renderer
 		this._rendererBackend = backend
@@ -887,6 +886,10 @@ export class Viewer {
 	async _buildScene(table) {
 		this._setStatus('')
 		this._loading(70, 'Building playfield…', 'Preparing visuals…')
+		try {
+			const g = table.data.globalEmissionScale
+			if (Number.isFinite(g)) setGlobalEmissionScale(g)
+		} catch {}
 		const texLoader = new ThreeTextureLoaderBrowser()
 		const renderApi = new ThreeRenderApi(
 			{
@@ -934,6 +937,16 @@ export class Viewer {
 				if (idx > 0) {
 					const [pfTx] = textures.splice(idx, 1)
 					textures.unshift(pfTx)
+				} else if (idx === -1) {
+					const best = [...textures].sort((a, b) => b.width * b.height - a.width * a.height)[0]
+					if (best) {
+						const fIdx = textures.indexOf(best)
+						if (fIdx > 0) {
+							const [f] = textures.splice(fIdx, 1)
+							textures.unshift(f)
+						}
+						this.log(`[stream] Playfield map "${pf}" missing — fallback to largest "${best.getName()}"`, 'warn')
+					}
 				}
 			}
 			if (textures.length) {
@@ -948,6 +961,24 @@ export class Viewer {
 			...TABLE_OPTS,
 			preloadTextures: false,
 		})
+		{
+			const pfLower = table.getPlayfieldMap()?.toLowerCase()
+			const hasPfTex = pfLower ? !!table.getTexture(pfLower) : false
+			if (!hasPfTex) {
+				const best = Object.values(table.textures).sort((a, b) => b.width * b.height - a.width * a.height)[0]
+				if (best) {
+					node.traverse(o => {
+						if (!o.isMesh || o.name !== 'primitive-playfield_mesh') return
+						const mat = o.material
+						if (!mat || mat.map || mat.userData?.pendingMap) return
+						mat.userData.pendingMap = best.getName()
+						mat.userData.__isBaked = true
+						mat.needsUpdate = true
+					})
+					if (best) this.log(`[playfield] Patched missing "${pfLower}" with "${best.getName()}"`, 'info')
+				}
+			}
+		}
 		const dt = performance.now() - t0
 		let tris = 0,
 			draws = 0
