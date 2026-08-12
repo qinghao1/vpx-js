@@ -68,17 +68,32 @@ export class DmdController {
 		this.meshes = []
 		const { tableGroup, table } = this.viewer
 		if (!tableGroup) return
-		const names = new Set(['dmd', 'vr_dmd'])
 		const flashers = []
 		const flasherMap = new Map()
-		for (const k in table?.flashers || {})
-			if (table.flashers[k]?.data?.isDMD) {
-				names.add(k.toLowerCase())
-				flashers.push(table.flashers[k])
-				flasherMap.set(k.toLowerCase(), table.flashers[k])
+		for (const k in table?.flashers ?? {}) {
+			const fl = table.flashers[k]
+			if (fl?.data?.isDMD) {
+				flashers.push(fl)
+				flasherMap.set(k.toLowerCase(), fl)
+				flasherMap.set(fl.getName().toLowerCase(), fl)
 			}
-		for (const k in table?.textboxes || {}) if (table.textboxes[k]?.data?.isDMD) names.add(k.toLowerCase())
-		const isPlay = this.viewer.viewerMode === 'play'
+		}
+		for (const k in table?.textboxes ?? {}) {
+			const tb = table.textboxes[k]
+			if (tb?.data?.isDMD) {
+				const fake = { getName: () => k, data: tb.data }
+				flashers.push(fake)
+				flasherMap.set(k.toLowerCase(), fake)
+			}
+		}
+		if (!flashers.length) {
+			this.viewer.log(
+				'DMD: no on-table DMD mesh found — overlay fallback will be used in Play mode if needed',
+				'warn',
+			)
+			this.viewer.dmdMeshes = this.meshes
+			return
+		}
 		const tableCenter = (() => {
 			const d = table?.data
 			if (
@@ -98,14 +113,93 @@ export class DmdController {
 			return { x: 470, y: 600 }
 		})()
 		const distToCenter = (x, y) => Math.hypot(x - tableCenter.x, y - tableCenter.y)
-		const tmpVec = new THREE.Vector3()
-		const scoreForMesh = m => {
-			const key = (m.name || '').toLowerCase().replace(/^dmd_/, '')
-			const fl = flasherMap.get(key)
-			if (fl) return distToCenter(fl.data.center.x, fl.data.center.y)
-			m.getWorldPosition(tmpVec)
-			return distToCenter(tmpVec.x, tmpVec.y)
+		const getFlasherSize = fl => {
+			const raw = fl.data?.dragPoints ?? fl.data?._dragPoints ?? []
+			const pts = Array.isArray(raw) ? raw : []
+			if (pts.length >= 4) {
+				const xs = pts.map(p => p?.vertex?.x ?? p?.x ?? 0)
+				const ys = pts.map(p => p?.vertex?.y ?? p?.y ?? 0)
+				const w = Math.max(...xs) - Math.min(...xs)
+				const h = Math.max(...ys) - Math.min(...ys)
+				if (w > 1 && h > 1) return { w, h }
+			}
+			return { w: 0, h: 0 }
 		}
+		const getFlasherPos = fl => ({ x: fl.data?.center?.x ?? 0, y: fl.data?.center?.y ?? 0 })
+		const dim = (() => {
+			try {
+				return table?.getDimensions?.() ?? { width: 1000, height: 2000 }
+			} catch {
+				return { width: 1000, height: 2000 }
+			}
+		})()
+		const dupThreshold = Math.min(600, Math.max(dim.width, dim.height) * 0.3)
+		const clusterFlashers = list => {
+			const clusters = []
+			for (const fl of list) {
+				let placed = false
+				const pos = getFlasherPos(fl)
+				const size = getFlasherSize(fl)
+				for (const cl of clusters) {
+					const rep = cl[0]
+					const repPos = getFlasherPos(rep)
+					const d = Math.hypot(pos.x - repPos.x, pos.y - repPos.y)
+					if (d > dupThreshold) continue
+					const repSize = getFlasherSize(rep)
+					if (size.w && repSize.w) {
+						const wRatio = Math.abs(size.w - repSize.w) / Math.max(size.w, repSize.w)
+						const hRatio = Math.abs(size.h - repSize.h) / Math.max(size.h, repSize.h)
+						if (wRatio > 0.4 || hRatio > 0.4) continue
+					}
+					cl.push(fl)
+					placed = true
+					break
+				}
+				if (!placed) clusters.push([fl])
+			}
+			return clusters
+		}
+		const scoreFlasher = fl => {
+			const visible = fl.data?.isVisible ? 1 : 0
+			const pos = getFlasherPos(fl)
+			const dist = distToCenter(pos.x, pos.y)
+			return visible * 1e6 + dist
+		}
+		const clusters = clusterFlashers(flashers)
+		const representatives = clusters.map(cl => {
+			let best = cl[0]
+			let bestScore = scoreFlasher(best)
+			for (let i = 1; i < cl.length; i++) {
+				const s = scoreFlasher(cl[i])
+				if (s > bestScore) {
+					best = cl[i]
+					bestScore = s
+				}
+			}
+			return { cluster: cl, chosen: best }
+		})
+		const chosenNames = representatives.map(r => r.chosen.getName()).join(', ')
+		if (clusters.some(c => c.length > 1)) {
+			this.viewer.log(
+				`DMD: deduped ${flashers.length} flashers in ${clusters.length} cluster(s) -> ${chosenNames} (visible ? farthest)`,
+				'info',
+			)
+		}
+		const existingProcedural = []
+		tableGroup.traverse(o => {
+			if (o.userData?.isProceduralDMD) existingProcedural.push(o)
+		})
+		for (const o of existingProcedural) o.parent?.remove(o)
+		const dmdNameSet = new Set([...flasherMap.keys(), 'dmd'])
+		const candidates = []
+		tableGroup.traverse(o => {
+			if (!o.isMesh) return
+			const n = (o.name || '').toLowerCase()
+			const isDmdMesh = dmdNameSet.has(n) || n.includes('dmd')
+			if (!isDmdMesh) return
+			candidates.push(o)
+		})
+		for (const m of candidates) m.visible = true
 		const applyDmdMaterial = m => {
 			for (const mat of Array.isArray(m.material) ? m.material : [m.material]) {
 				if (!mat || !this.texture) continue
@@ -125,100 +219,106 @@ export class DmdController {
 			m.renderOrder = 1000
 			m.frustumCulled = false
 		}
-		const candidates = []
-		tableGroup.traverse(o => {
-			if (!o.isMesh) return
-			const n = (o.name || '').toLowerCase()
-			if (!names.has(n) && !n.includes('dmd')) return
-			candidates.push(o)
-		})
-		const idealFlasher = (() => {
-			if (!flashers.length) return null
-			let pool = flashers
-			if (isPlay) {
-				const nonVr = flashers.filter(f => !f.getName().toLowerCase().includes('vr_'))
-				if (nonVr.length) pool = nonVr
+		if (candidates.length) {
+			const tmpVec = new THREE.Vector3()
+			const scoreForMesh = m => {
+				const key = (m.name || '').toLowerCase().replace(/^dmd_/, '')
+				const fl = flasherMap.get(key)
+				if (fl) return scoreFlasher(fl)
+				m.getWorldPosition(tmpVec)
+				return distToCenter(tmpVec.x, tmpVec.y)
 			}
-			let best = pool[0]
-			let bestScore = distToCenter(best.data.center.x, best.data.center.y)
-			for (let i = 1; i < pool.length; i++) {
-				const s = distToCenter(pool[i].data.center.x, pool[i].data.center.y)
-				const better = isPlay ? s > bestScore : s < bestScore
-				if (better) {
-					best = pool[i]
-					bestScore = s
+			const candidatesByCluster = new Map()
+			for (const rep of representatives) {
+				candidatesByCluster.set(rep.chosen.getName().toLowerCase(), [])
+			}
+			const unmapped = []
+			for (const m of candidates) {
+				const key = (m.name || '').toLowerCase().replace(/^dmd_/, '')
+				const fl = flasherMap.get(key)
+				if (fl) {
+					const rep = representatives.find(r => r.cluster.includes(fl))
+					const repKey = rep?.chosen.getName().toLowerCase()
+					if (repKey && candidatesByCluster.has(repKey)) {
+						candidatesByCluster.get(repKey).push(m)
+						continue
+					}
+				}
+				unmapped.push(m)
+			}
+			const keep = []
+			for (const rep of representatives) {
+				const key = rep.chosen.getName().toLowerCase()
+				const bucket = candidatesByCluster.get(key) ?? []
+				if (bucket.length) {
+					let best = bucket[0]
+					let bestScore = scoreForMesh(best)
+					for (let i = 1; i < bucket.length; i++) {
+						const s = scoreForMesh(bucket[i])
+						if (s > bestScore) {
+							best = bucket[i]
+							bestScore = s
+						}
+					}
+					keep.push(best)
+				} else if (unmapped.length) {
+					let best = unmapped[0]
+					let bestScore = scoreForMesh(best)
+					let bestIdx = 0
+					for (let i = 1; i < unmapped.length; i++) {
+						const s = scoreForMesh(unmapped[i])
+						if (s > bestScore) {
+							best = unmapped[i]
+							bestScore = s
+							bestIdx = i
+						}
+					}
+					keep.push(best)
+					unmapped.splice(bestIdx, 1)
 				}
 			}
-			return best
-		})()
-		if (candidates.length) {
-			const selectable = (() => {
-				if (!isPlay) return candidates
-				const nonVr = candidates.filter(m => !m.name.toLowerCase().includes('vr_'))
-				return nonVr.length ? nonVr : candidates
-			})()
-			let best = null
-			if (idealFlasher) {
-				const idealKey = idealFlasher.getName().toLowerCase()
-				best = selectable.find(m => (m.name || '').toLowerCase().replace(/^dmd_/, '') === idealKey) || null
-				if (best)
-					this.viewer.log(
-						`DMD: found ${candidates.length} on-table mesh(es) -> keep ${best.name} (ideal ${idealKey})`,
-						'info',
-					)
-			}
-			if (!best) {
-				best = selectable[0]
+			if (unmapped.length && !keep.length) {
+				let best = unmapped[0]
 				let bestScore = scoreForMesh(best)
-				for (let i = 1; i < selectable.length; i++) {
-					const s = scoreForMesh(selectable[i])
-					const better = isPlay ? s > bestScore : s < bestScore
-					if (better) {
-						best = selectable[i]
+				for (let i = 1; i < unmapped.length; i++) {
+					const s = scoreForMesh(unmapped[i])
+					if (s > bestScore) {
+						best = unmapped[i]
 						bestScore = s
 					}
 				}
+				keep.push(best)
+			}
+			const keepSet = new Set(keep)
+			for (const m of candidates) if (!keepSet.has(m)) m.visible = false
+			for (const m of keep) {
+				m.visible = true
+				for (let p = m.parent; p && p !== tableGroup; p = p.parent) if (p.visible === false) p.visible = true
+				applyDmdMaterial(m)
+			}
+			this.meshes = keep
+			this.viewer.dmdMeshes = this.meshes
+			if (keep.length)
 				this.viewer.log(
-					`DMD: found ${candidates.length} on-table mesh(es) -> keep ${best.name} (geometric)`,
+					`DMD: kept ${keep.length}/${candidates.length} on-table mesh(es) -> ${keep.map(m => m.name).join(', ')}`,
 					'info',
 				)
-			}
-			for (const m of candidates) if (m !== best) m.visible = false
-			best.visible = true
-			for (let p = best.parent; p && p !== tableGroup; p = p.parent) if (p.visible === false) p.visible = true
-			applyDmdMaterial(best)
-			this.meshes = [best]
-			this.viewer.dmdMeshes = this.meshes
 			return
 		}
-		if (!flashers.length) {
-			this.viewer.log(
-				'DMD: no on-table DMD mesh found — overlay fallback will be used in Play mode if needed',
-				'warn',
-			)
-			this.viewer.dmdMeshes = this.meshes
-			return
-		}
-		const chosen = idealFlasher || flashers[0]
-		if (flashers.length > 1 && idealFlasher) {
-			this.viewer.log(
-				`DMD: deduped ${flashers.length} flashers -> ${chosen.getName()} (${isPlay ? 'play:farthest' : 'viewer:closest'} to center)`,
-				'info',
-			)
-		}
-		for (const fl of [chosen]) {
+		for (const rep of representatives) {
+			const fl = rep.chosen
 			const d = fl.data
-			const pts = d.dragPoints || []
-			let w = 600,
-				h = 160
-			if (pts.length >= 4) {
-				const xs = pts.map(p => p.vertex.x),
-					ys = pts.map(p => p.vertex.y)
-				w = Math.max(...xs) - Math.min(...xs)
-				h = Math.max(...ys) - Math.min(...ys)
-				if (!w || !h) {
-					w = 600
-					h = 160
+			const pts = d.dragPoints ?? d._dragPoints ?? []
+			let w = 600
+			let h = 160
+			if (Array.isArray(pts) && pts.length >= 4) {
+				const xs = pts.map(p => p?.vertex?.x ?? p?.x ?? 0)
+				const ys = pts.map(p => p?.vertex?.y ?? p?.y ?? 0)
+				const bw = Math.max(...xs) - Math.min(...xs)
+				const bh = Math.max(...ys) - Math.min(...ys)
+				if (bw > 1 && bh > 1) {
+					w = bw
+					h = bh
 				}
 			}
 			const geom = new THREE.PlaneGeometry(w, h)
