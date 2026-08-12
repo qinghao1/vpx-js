@@ -7,6 +7,7 @@ import {
 	CanvasTexture,
 	ClampToEdgeWrapping,
 	DataTexture,
+	Texture,
 	DataUtils,
 	EquirectangularReflectionMapping,
 	HalfFloatType,
@@ -221,7 +222,7 @@ export class ThreeTextureLoaderBrowser implements ITextureLoader<ThreeTexture> {
 		const mime = getMimeType(data, ext) ?? 'image/png'
 		const isHdr = mime === 'image/hdr' || ext === '.hdr'
 		const isExr = mime === 'image/exr' || ext === '.exr'
-		const tooLarge = data.byteLength > 4 * 1024 * 1024
+		const tooLarge = data.byteLength > 16 * 1024 * 1024
 		if (!isHdr && !isExr && !tooLarge && typeof createImageBitmap !== 'undefined') {
 			const bmp = await tryCreateBitmap(data, mime, name)
 			if (bmp) return bmp
@@ -316,6 +317,15 @@ async function tryCreateBitmap(data: Uint8Array, mime: string, name: string): Pr
 				return null
 			}
 		}
+		try {
+			const tex: any = new Texture(bitmap as any)
+			tex.colorSpace = SRGBColorSpace
+			tex.flipY = false
+			tex.needsUpdate = true
+			tune(tex)
+			tex.name = `texture:${name}`
+			return tex
+		} catch {}
 		const conv: any = bitmapToCanvasTexture(bitmap as any, name)
 		if (conv) return conv
 		const tex: any = new CanvasTexture(bitmap as any)

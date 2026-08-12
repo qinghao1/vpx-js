@@ -9,8 +9,8 @@ import type { Texture } from '../../vpt/texture.js'
 import type { ITextureLoader } from '../irender-api.js'
 
 const LARGE_TEXTURE_PIXELS = 4 * 1024 * 1024
-const CONCURRENCY_HEAVY = 6
-const CONCURRENCY_DEFAULT = 6
+const CONCURRENCY_HEAVY = 8
+const CONCURRENCY_DEFAULT = 12
 
 /** Caches and preloads Three.js textures. */
 export class ThreeMapGenerator {
@@ -63,7 +63,8 @@ export class ThreeMapGenerator {
 				/\.(exr|hdr)$/i.test((t as any).szPath ?? ''),
 		)
 		const cores = (typeof navigator !== 'undefined' && (navigator as any).hardwareConcurrency) || 4
-		return Math.min(hasHeavy ? CONCURRENCY_HEAVY : CONCURRENCY_DEFAULT, cores)
+		const cap = hasHeavy ? CONCURRENCY_HEAVY : CONCURRENCY_DEFAULT
+		return Math.min(cap, Math.max(4, cores * 2))
 	}
 
 	private async loadConcurrently(
@@ -75,12 +76,12 @@ export class ThreeMapGenerator {
 		let next = 0
 		const workers = Array.from({ length: Math.min(concurrency, textures.length) }, async () => {
 			while (true) {
-				await this.gate.waitIfAnimating()
+				if (this.gate.isAnimating()) await this.gate.waitIfAnimating()
 				const i = next++
 				if (i >= textures.length) break
 				const ok = await this.loadOne(textures[i]!, table)
 				onTexture?.(textures[i]!, ok)
-				await this.gate.yieldToMain()
+				if (i % 4 === 0) await this.gate.yieldToMain()
 			}
 		})
 		await Promise.all(workers)
