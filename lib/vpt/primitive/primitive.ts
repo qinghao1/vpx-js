@@ -76,7 +76,7 @@ export class Primitive
 		return {
 			primitive: {
 				isVisible: this.data.isVisible,
-				mesh: this.getDisplayMesh(table),
+				mesh: this.getMesh(table).clone().transform(Matrix3D.RIGHT_HANDED),
 				map: table.getTexture(this.data.szImage),
 				normalMap: table.getTexture(this.data.szNormalMap),
 				material: table.getMaterial(this.data.szMaterial),
@@ -93,21 +93,8 @@ export class Primitive
 		this.data.mesh = new Mesh()
 	}
 
-	private getDisplayMesh(table: Table): Mesh {
-		return this.getMesh(table).clone().transform(Matrix3D.RIGHT_HANDED)
-	}
-
 	private getMesh(table: Table): Mesh {
-		if (!this.mesh) {
-			this.mesh = this.meshGenerator.getMesh(table)
-		}
-		return this.mesh
-	}
-
-	private ensureMesh(table: Table): Mesh {
-		const m = this.getMesh(table)
-		if (!this.updater.hasMesh()) this.updater.setMesh(m.clone().transform(Matrix3D.RIGHT_HANDED))
-		return m
+		return (this.mesh ??= this.meshGenerator.getMesh(table))
 	}
 
 	public setupPlayer(player: Player, table: Table): void {
@@ -116,10 +103,11 @@ export class Primitive
 			this.events!.currentHitThreshold = dot
 			obj.fireHitEvent(ball)
 		}
-		const mesh = this.ensureMesh(table)
-		this.hits = this.hitGenerator.generateHitObjects(mesh, this.events, table)
-		this.animation = new PrimitiveAnimation(this.data, this.state, mesh.clone().transform(Matrix3D.RIGHT_HANDED))
-		this.updater.setMesh(mesh.clone().transform(Matrix3D.RIGHT_HANDED))
+		const base = this.getMesh(table)
+		this.hits = this.hitGenerator.generateHitObjects(base, this.events, table)
+		const display = base.clone().transform(Matrix3D.RIGHT_HANDED)
+		this.updater.setMesh(display.clone())
+		this.animation = new PrimitiveAnimation(this.data, this.state, display.clone())
 		this.api = new PrimitiveApi(this, this.state, this.data, this.hits!, this.events, player, table, this.animation)
 	}
 

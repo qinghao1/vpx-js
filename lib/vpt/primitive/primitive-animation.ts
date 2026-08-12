@@ -26,11 +26,12 @@ export class PrimitiveAnimation implements IAnimation {
 	}
 
 	public updateAnimation(newTimeMsec: number, _table: Table): void {
-		if (this.currentFrame === -1 || !this.doAnimation) {
-			this.timeMsec = newTimeMsec
-			return
-		}
-		if (this.mesh.animationFrames.length === 0 || this.data.staticRendering) {
+		if (
+			this.currentFrame === -1 ||
+			!this.doAnimation ||
+			!this.mesh.animationFrames.length ||
+			this.data.staticRendering
+		) {
 			this.timeMsec = newTimeMsec
 			return
 		}
@@ -52,24 +53,19 @@ export class PrimitiveAnimation implements IAnimation {
 	}
 
 	public playAnim(startFrame: number, speed: number): void {
-		if (this.mesh.animationFrames.length === 0 || this.data.staticRendering) return
+		if (!this.mesh.animationFrames.length || this.data.staticRendering) return
 		if (startFrame >= this.mesh.animationFrames.length) startFrame = 0
-		if (speed < 0) speed = -speed
-		if (this.currentFrame !== startFrame || this.speed !== speed || !this.doAnimation || this.endless) {
-			// will trigger regenerate in updater via state diff
-		}
 		this.currentFrame = startFrame
-		this.speed = speed
+		this.speed = speed < 0 ? -speed : speed
 		this.doAnimation = true
 		this.endless = false
 		this.state.currentFrame = this.currentFrame
 	}
 
 	public playAnimEndless(speed: number): void {
-		if (this.mesh.animationFrames.length === 0 || this.data.staticRendering) return
-		if (speed < 0) speed = -speed
+		if (!this.mesh.animationFrames.length || this.data.staticRendering) return
 		this.currentFrame = 0
-		this.speed = speed
+		this.speed = speed < 0 ? -speed : speed
 		this.doAnimation = true
 		this.endless = true
 		this.state.currentFrame = this.currentFrame
@@ -81,15 +77,13 @@ export class PrimitiveAnimation implements IAnimation {
 
 	public continueAnim(speed: number): void {
 		if (this.currentFrame <= 0 || this.data.staticRendering) return
-		if (speed < 0) speed = -speed
-		this.speed = speed
+		this.speed = speed < 0 ? -speed : speed
 		this.doAnimation = true
 	}
 
 	public showFrame(frame: number): void {
-		if (this.mesh.animationFrames.length === 0 || frame < 0 || this.data.staticRendering) return
-		if (frame >= this.mesh.animationFrames.length) frame = this.mesh.animationFrames.length - 1
-		this.currentFrame = frame
+		if (!this.mesh.animationFrames.length || frame < 0 || this.data.staticRendering) return
+		this.currentFrame = Math.min(frame, this.mesh.animationFrames.length - 1)
 		this.doAnimation = false
 		this.state.currentFrame = this.currentFrame
 	}
