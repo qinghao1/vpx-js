@@ -97,9 +97,6 @@ export class Viewer {
 			card: dom.card || $('card'),
 			status: dom.status || $('status'),
 			fileInput: dom.fileInput || $('file'),
-			dmdWrap: dom.dmdWrap || document.getElementById('dmd-wrap'),
-			dmdCanvas: dom.dmdCanvas || document.getElementById('dmd'),
-			dmdStatus: dom.dmdStatus || document.getElementById('dmd-status'),
 			playTip: dom.playTip || document.getElementById('play-tip'),
 			streamWrap: dom.streamWrap || document.getElementById('stream-progress'),
 			streamFill: dom.streamFill || document.getElementById('stream-fill'),
@@ -367,7 +364,6 @@ export class Viewer {
 		this.renderer?.setSize(w, h)
 		this.composer?.setSize(w, h)
 		this.composer?.setPixelRatio(pr)
-		this.dmd?._resize?.()
 	}
 	_setupModeSwitch() {
 		const onOrbitToggle = e => {
@@ -858,7 +854,6 @@ export class Viewer {
 			typeof window !== 'undefined' ? window.innerHeight : 600,
 		)
 		this.dom.canvas?.focus()
-		if (this.dom.dmdWrap) this.dom.dmdWrap.hidden = true
 	}
 	_setStatus(msg) {
 		if (this.dom.subtitle) this.dom.subtitle.textContent = msg

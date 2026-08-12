@@ -700,44 +700,6 @@ dialog.help::backdrop {
 #help-btn:active { transform: translateY(0); }
 #help-btn[hidden] { display: none !important; }
 
-/* DMD */
-#dmd-wrap {
-	position: fixed;
-	top: max(14px, env(safe-area-inset-top));
-	left: 50%;
-	transform: translateX(-50%);
-	z-index: 12;
-	background: rgba(8, 12, 20, 0.78);
-	backdrop-filter: blur(14px);
-	-webkit-backdrop-filter: blur(14px);
-	border: 1px solid var(--border-faint);
-	border-radius: var(--radius-panel);
-	padding: 8px 10px;
-	display: flex;
-	flex-direction: column;
-	align-items: center;
-	gap: 6px;
-	box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
-}
-#dmd-wrap[hidden] {
-	display: none !important;
-}
-#dmd {
-	image-rendering: pixelated;
-	border-radius: 8px;
-	background: #05070a;
-	display: block;
-	box-shadow: 0 0 0 1px var(--border-subtle) inset;
-	width: var(--dmd-w, 512px);
-	height: var(--dmd-h, 128px);
-}
-#dmd-status {
-	font-size: 10px;
-	color: #8a94a8;
-	font-family: ui-monospace, monospace;
-	white-space: pre;
-	letter-spacing: 0.02em;
-}
 
 /* Play tip & chrome states */
 #play-tip {
@@ -892,7 +854,7 @@ body:not(.is-play) #nudge-pad { display: none !important; }
 	}
 }
 
-/* Extracted from JS: log entries, DMD canvas, and mode-hint sep */
+/* Extracted from JS: log entries and mode-hint sep */
 .log-entry {
 	margin: 2px 0;
 	word-break: break-word;
@@ -905,16 +867,6 @@ body:not(.is-play) #nudge-pad { display: none !important; }
 .log-entry--debug { color: #8be9fd; }
 .log-entry--info { color: #e6e6e6; }
 
-.dmd-canvas {
-	image-rendering: pixelated;
-	border: 1px solid #2a2f3a;
-	border-radius: 6px;
-	background: #05070a;
-	display: none;
-	width: var(--dmd-w, 512px);
-	height: var(--dmd-h, 128px);
-}
-.dmd-canvas.is-visible { display: block; }
 
 .sep-muted { opacity: 0.35; }
 

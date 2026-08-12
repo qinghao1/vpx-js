@@ -11,41 +11,12 @@ export class DmdController {
 		this.viewer = viewer
 		this.w = DMD.w
 		this.h = DMD.h
-		this.scale = DMD.scale
-		this.canvas = viewer.dom.dmdCanvas || null
-		this.ctx = null
-		this.wrap = viewer.dom.dmdWrap || document.getElementById('dmd-wrap')
-		this.statusEl = viewer.dom.dmdStatus || document.getElementById('dmd-status')
 		this.texture = null
 		this.offscreen = null
 		this.offCtx = null
 		this.meshes = []
 		this.lastHash = -1
-		this._ensureCanvas()
 		this._ensureTexture()
-	}
-
-	_ensureCanvas() {
-		if (this.canvas) {
-			this.canvas.classList.add('dmd-canvas')
-			this.ctx = this.canvas.getContext('2d', { alpha: false })
-			this._resize()
-			return
-		}
-		if (!this.wrap) return
-		this.wrap.hidden = true
-		const c = document.createElement('canvas')
-		c.id = 'dmd'
-		c.className = 'dmd-canvas'
-		c.width = this.w * this.scale
-		c.height = this.h * this.scale
-		c.style.setProperty('--dmd-w', `${this.w * this.scale}px`)
-		c.style.setProperty('--dmd-h', `${this.h * this.scale}px`)
-		this.wrap.appendChild(c)
-		this.canvas = c
-		this.viewer.dom.dmdCanvas = c
-		this.ctx = c.getContext('2d', { alpha: false })
-		if (this.statusEl) this.statusEl.textContent = ''
 	}
 
 	_ensureTexture() {
@@ -92,10 +63,7 @@ export class DmdController {
 			}
 		}
 		if (!flashers.length) {
-			this.viewer.log(
-				'DMD: no on-table DMD mesh found — overlay fallback will be used in Play mode if needed',
-				'warn',
-			)
+			this.viewer.log('DMD: no on-table DMD mesh found', 'warn')
 			this.viewer.dmdMeshes = this.meshes
 			return
 		}
@@ -140,7 +108,10 @@ export class DmdController {
 			}
 		})()
 		const dupThreshold = Math.min(DUP_MAX, Math.max(dim.width, dim.height) * DUP_FACTOR)
-		const isVR = s => String(s || '').toLowerCase().includes('vr')
+		const isVR = s =>
+			String(s || '')
+				.toLowerCase()
+				.includes('vr')
 		const cluster = list => {
 			const clusters = []
 			for (const fl of list) {
@@ -180,7 +151,10 @@ export class DmdController {
 			}
 			return { cluster: cl, chosen: best }
 		})
-		const isVRName = n => String(n || '').toLowerCase().includes('vr')
+		const isVRName = n =>
+			String(n || '')
+				.toLowerCase()
+				.includes('vr')
 		const wantVR = this.viewer.viewerMode !== 'play'
 		let filteredReps = reps
 		if (reps.length > 1) {
@@ -251,7 +225,9 @@ export class DmdController {
 			for (const m of candidates) {
 				const key = (m.name || '').toLowerCase().replace(/^dmd_/, '')
 				const fl = flasherMap.get(key)
-				const rep = fl ? finalReps.find(r => r.cluster.includes(fl)) ?? reps.find(r => r.cluster.includes(fl)) : null
+				const rep = fl
+					? (finalReps.find(r => r.cluster.includes(fl)) ?? reps.find(r => r.cluster.includes(fl)))
+					: null
 				const bKey = rep?.chosen.getName().toLowerCase()
 				if (bKey && buckets.has(bKey)) buckets.get(bKey).push(m)
 				else unmapped.push(m)
@@ -332,7 +308,13 @@ export class DmdController {
 				}
 			}
 			const geom = new THREE.PlaneGeometry(w, h)
-			const mat = new THREE.MeshBasicMaterial({ map: this.texture, side: THREE.DoubleSide, depthTest: false, depthWrite: false, transparent: false })
+			const mat = new THREE.MeshBasicMaterial({
+				map: this.texture,
+				side: THREE.DoubleSide,
+				depthTest: false,
+				depthWrite: false,
+				transparent: false,
+			})
 			const mesh = new THREE.Mesh(geom, mat)
 			mesh.name = `DMD_${fl.getName()}`
 			mesh.renderOrder = 1000
@@ -353,25 +335,8 @@ export class DmdController {
 			this.viewer.dmdMeshes = this.meshes
 			return
 		}
-		this.viewer.log(
-			'DMD: no on-table DMD mesh found — overlay fallback will be used in Play mode if needed',
-			'warn',
-		)
+		this.viewer.log('DMD: no on-table DMD mesh found', 'warn')
 		this.viewer.dmdMeshes = this.meshes
-	}
-
-	_resize() {
-		if (!this.canvas || !this.ctx || !this.wrap || this.wrap.clientWidth === 0) return
-		const maxW = Math.min(512, this.wrap.clientWidth - 24)
-		const scale = Math.max(2, Math.floor(maxW / this.w))
-		this.scale = scale
-		this.canvas.style.setProperty('--dmd-w', `${this.w * scale}px`)
-		this.canvas.style.setProperty('--dmd-h', `${this.h * scale}px`)
-	}
-
-	_showOverlay() {
-		if (this.wrap) this.wrap.hidden = false
-		if (this.canvas) this.canvas.classList.add('is-visible')
 	}
 
 	render() {
@@ -397,19 +362,14 @@ export class DmdController {
 			this.offscreen.width = w
 			this.offscreen.height = h
 		}
-		if (this.canvas.width !== w * this.scale || this.canvas.height !== h * this.scale) {
-			this.canvas.width = w * this.scale
-			this.canvas.height = h * this.scale
-			this._resize()
-		}
 
 		let max = 0
 		for (let i = 0; i < frame.length; i++) if (frame[i] > max) max = frame[i]
 		const is2bit = max <= 3,
 			isNibble = max <= 15 && max > 3
 
-		const draw = (ctx, scale) => {
-			if (!ctx) return
+		if (this.offCtx) {
+			const ctx = this.offCtx
 			ctx.imageSmoothingEnabled = false
 			const img = ctx.createImageData(w, h)
 			for (let i = 0; i < w * h; i++) {
@@ -421,33 +381,8 @@ export class DmdController {
 				img.data[o + 2] = 0
 				img.data[o + 3] = 255
 			}
-			if (scale === 1) ctx.putImageData(img, 0, 0)
-			else {
-				const off = document.createElement('canvas')
-				off.width = w
-				off.height = h
-				off.getContext('2d').putImageData(img, 0, 0)
-				ctx.fillStyle = '#05070a'
-				ctx.fillRect(0, 0, w * scale, h * scale)
-				ctx.drawImage(off, 0, 0, w * scale, h * scale)
-			}
+			ctx.putImageData(img, 0, 0)
 		}
-		if (this.offCtx) draw(this.offCtx, 1)
-		if (this.ctx) draw(this.ctx, this.scale)
 		if (this.texture) this.texture.needsUpdate = true
-
-		if (max > 0) this._showOverlay()
-		else if (this.wrap) this.wrap.hidden = true
-
-		if (this.statusEl) {
-			const emu = this.viewer.player.getPhysics?.()?.emu
-			const mock =
-				emu?.constructor.name === 'PinMameEmulator' && !emu.isInitialized?.()
-					? ' (mock — no ROM)'
-					: emu?.isInitialized?.()
-						? ''
-						: ' (loading…)'
-			this.statusEl.textContent = `DMD ${w}×${h}${mock}`
-		}
 	}
 }
