@@ -59,7 +59,7 @@ export class TableLoader {
 				}
 			}
 			if (opts.tableInfoOnly || !opts.tableDataOnly) await this.loadTableInfo(out)
-			logger().debug('[Table.load] Table loaded in %sms.', Date.now() - t0)
+			logger().info('[Table.load] Table loaded in %sms.', Date.now() - t0)
 			return out
 		} finally {
 			await this.doc.close()

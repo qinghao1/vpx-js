@@ -360,8 +360,9 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 			return
 		}
 		progress().show('Transpiling and executing table script')
+		const started = Date.now()
 		new Transpiler(this, player).execute(this.tableScript, scope)
-		logger().debug('Table script loaded, transpiled and executed.')
+		logger().info('Table script transpiled and executed in %sms.', Date.now() - started)
 	}
 
 	public async runTableScriptAsync(player: Player, scope: Record<string, unknown> = {}): Promise<void> {
@@ -370,8 +371,9 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 			return
 		}
 		progress().show('Transpiling and executing table script')
+		const started = Date.now()
 		await new Transpiler(this, player).executeAsync(this.tableScript, scope)
-		logger().debug('Table script loaded, transpiled and executed.')
+		logger().info('Table script transpiled and executed in %sms.', Date.now() - started)
 	}
 
 	public broadcastInit(): void {
