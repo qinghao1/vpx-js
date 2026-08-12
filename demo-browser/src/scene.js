@@ -454,6 +454,22 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 			stats.cabForced++
 			makeParentsVisible(o, node, stats)
 		}
+		const isButtonMesh = n.includes('button') || n.includes('coin') || n.includes('plunger')
+		if (isButtonMesh) {
+			o.frustumCulled = false
+			o.geometry?.computeBoundingSphere?.()
+			o.geometry?.computeBoundingBox?.()
+			for (const mat of o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : []) {
+				mat.side = THREE.DoubleSide
+				mat.polygonOffset = true
+				mat.polygonOffsetFactor = -1
+				mat.polygonOffsetUnits = -1
+				mat.depthWrite = true
+				mat.needsUpdate = true
+			}
+			o.renderOrder = 100
+			if (o.visible) makeParentsVisible(o, node, stats)
+		}
 		if (!o.visible) return
 		const mats = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : []
 		if (
