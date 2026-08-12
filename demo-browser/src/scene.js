@@ -21,7 +21,11 @@ const classify = (mesh, mat, map, baked = false, addBlend = false) => {
 	const m = mat.toLowerCase()
 	const mp = map.toLowerCase()
 	const me = mesh.toLowerCase()
-	const isBakedMat = baked || RE_BAKE_MAT.test(m) || RE_BAKE_MAP.test(mp) || RE_BAKE_MAP.test(me)
+	const isBakedMat =
+		baked ||
+		RE_BAKE_MAT.test(m) ||
+		(RE_BAKE_MAP.test(mp) && !mp.startsWith('vr_')) ||
+		(RE_BAKE_MAP.test(me) && !me.startsWith('vr_') && !me.includes('vr_'))
 	const isRampFamily = me.includes('armp') || me.includes('ramp') || me.includes('botramp') || me.includes('rampscrw')
 	const isMainBake = isBakedMat && !addBlend
 	const isVlmBake = isBakedMat && addBlend
@@ -540,7 +544,7 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 		const pending = pendingOf(m)
 		const mapName = (m.map?.name || '').toLowerCase()
 		const eff = mapName || pending
-		const c = classify(n, (m.name || '').toLowerCase(), eff, !!m.userData?.__isBaked)
+		const c = classify(n, (m.name || '').toLowerCase(), eff, !!m.userData?.__isBaked, !!m.userData?.__addBlend)
 		if (!isBakedMesh(c)) return
 		if (mapName) hasReadyBake = true
 		else if (pending) hasPendingBake = true
@@ -554,7 +558,7 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 			if (!m) return
 			const pending = pendingOf(m)
 			const mapName = (m.map?.name || '').toLowerCase()
-			const c = classify(n, (m.name || '').toLowerCase(), mapName || pending, !!m.userData?.__isBaked)
+			const c = classify(n, (m.name || '').toLowerCase(), mapName || pending, !!m.userData?.__isBaked, !!m.userData?.__addBlend)
 			if (isBasePlayfield(n, c) && o.visible) hideMesh(o, 'playfieldHidden', stats)
 		})
 	} else if (hasPendingBake) {
@@ -565,8 +569,8 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 			if (!m) return
 			const pending = pendingOf(m)
 			const mapName = (m.map?.name || '').toLowerCase()
-			const c = classify(n, (m.name || '').toLowerCase(), mapName || pending, !!m.userData?.__isBaked)
-			if (c.isMainBake && pending && !mapName && o.visible) {
+			const c = classify(n, (m.name || '').toLowerCase(), mapName || pending, !!m.userData?.__isBaked, !!m.userData?.__addBlend)
+			if (c.isMainBake && pending && !mapName && !c.isVr && !c.isCab && o.visible) {
 				o.visible = false
 				stats.playfieldHidden++
 			} else if (n.includes('playfield') && isBakedMesh(c) && pending && !mapName && o.visible) {

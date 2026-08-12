@@ -1291,15 +1291,10 @@ export class Viewer {
 								const info = isBakedMeshByNames(o.name || '', m.name || '', tex.name || '')
 								if (info.isBaked) {
 									applyBakedMaterial(m, tex, info, o.name || '')
-									const isPlayfieldOverlay =
-										info.isVlmBake &&
-										!info.isMainBake &&
-										(o.name || '').toLowerCase().includes('playfield')
-									if (
-										(info.isMainBake || isPlayfieldOverlay) &&
-										o.visible === false &&
-										(o.name || '').toLowerCase().includes('playfield')
-									) {
+									const nl = (o.name || '').toLowerCase()
+									const isPlayfieldOverlay = info.isVlmBake && !info.isMainBake && nl.includes('playfield')
+									const isBakedMeshName = nl.includes('playfield') || nl.includes('bm_')
+									if ((info.isMainBake || isPlayfieldOverlay) && o.visible === false && isBakedMeshName) {
 										o.visible = true
 										for (let p = o.parent; p && p !== this.tableGroup; p = p.parent)
 											if (p.visible === false) p.visible = true
@@ -1337,7 +1332,7 @@ export class Viewer {
 					this.tableGroup.traverse(o2 => {
 						if (!o2.isMesh) return
 						const n2 = (o2.name || '').toLowerCase()
-						if (!n2.includes('playfield')) return
+						if (!n2.includes('playfield') && !n2.includes('bm_')) return
 						const m2 = Array.isArray(o2.material) ? o2.material[0] : o2.material
 						if (!m2?.map) return
 						const info2 = isBakedMeshByNames(n2, m2.name || '', m2.map?.name || '')
