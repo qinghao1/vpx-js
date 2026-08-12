@@ -1,9 +1,19 @@
+import { CONTROL_SCHEME } from './config.js'
+
 export function initHelp(viewer) {
 	const help = document.getElementById('help')
 	const btn = document.getElementById('help-btn')
 	if (!help) return
 	const isDialog = help instanceof HTMLDialogElement
 	const closeBtn = help.querySelector('[data-close-help]')
+
+	const grid = help.querySelector('.help-grid')
+	if (grid && !grid.dataset.populated) {
+		grid.innerHTML = CONTROL_SCHEME.map(
+			c => `<div class="help-row"><span class="help-label">${c.label}</span><span class="help-keys">${c.help}</span></div>`,
+		).join('')
+		grid.dataset.populated = '1'
+	}
 
 	const isOpen = () => (isDialog ? help.open : !help.hidden)
 	const open = () => {

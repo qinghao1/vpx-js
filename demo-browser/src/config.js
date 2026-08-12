@@ -21,12 +21,65 @@ export const RE_LM = /lm_/i
 
 export const NUDGE = { left: 75, right: 285, forward: 0, back: 180, force: 2.6 }
 
+export const CONTROL_SCHEME = [
+	{
+		label: 'Left Flipper',
+		help: '<kbd>Shift</kbd><span class="hint">L</span> <span class="sep">·</span> <kbd>←</kbd><span class="sep">·</span><kbd>A</kbd>',
+		keys: ['ShiftLeft', 'ArrowLeft', 'KeyA'],
+	},
+	{
+		label: 'Right Flipper',
+		help: '<kbd>Shift</kbd><span class="hint">R</span> <span class="sep">·</span> <kbd>→</kbd><span class="sep">·</span><kbd>D</kbd>',
+		keys: ['ShiftRight', 'ArrowRight', 'KeyD'],
+	},
+	{
+		label: 'Magna Save',
+		help: '<kbd>Ctrl</kbd><span class="hint">L / R</span>',
+		keys: ['ControlLeft', 'ControlRight'],
+		buttons: [
+			{ regex: /magna.*left|left.*magna/i, code: 'ControlLeft' },
+			{ regex: /magna/i, code: 'ControlRight' },
+		],
+	},
+	{
+		label: 'Fire / Lockbar',
+		help: '<kbd>Alt</kbd><span class="hint">L</span><span class="sep">·</span>tap yellow apron button',
+		keys: ['AltLeft'],
+		buttons: { regex: /fire|lockbar/i, code: 'AltLeft' },
+	},
+	{
+		label: 'Plunger',
+		help: '<kbd>Enter</kbd><span class="hint">hold → release</span><span class="sep">·</span>touch bottom-right',
+		keys: ['Enter'],
+		buttons: { regex: /plunger|launch/i, code: 'Enter' },
+	},
+	{
+		label: 'Start / Coin',
+		help: '<kbd>1</kbd><span class="sep">/</span><kbd>5</kbd>',
+		keys: ['Digit1', 'Digit5'],
+		buttons: [
+			{ regex: /coin/i, code: 'Digit5' },
+			{ regex: /start/i, code: 'Digit1' },
+			{ regex: /tour/i, code: 'Digit1' },
+		],
+	},
+	{
+		label: 'Nudge',
+		help: '<kbd>Z</kbd><kbd>/</kbd><kbd>Space</kbd><span class="hint">or swipe / shake</span>',
+		keys: ['KeyZ', 'Slash', 'Space'],
+	},
+	{
+		label: 'View',
+		help: '<kbd>P</kbd> pause<span class="sep">·</span><kbd>O</kbd> orbit<span class="sep">·</span><kbd>R</kbd> reset<span class="sep">·</span><kbd>?</kbd> help<span class="sep">·</span><kbd>Esc</kbd> exit',
+		keys: ['KeyP', 'KeyO', 'KeyR', 'Escape'],
+	},
+]
+
 export const BUTTON_CODE_PATTERNS = [
-	{ regex: /coin/i, code: 'Digit5' },
-	{ regex: /start/i, code: 'Digit1' },
-	{ regex: /tour/i, code: 'Digit1' },
-	{ regex: /plunger|launch/i, code: 'Enter' },
-	{ regex: /fire|lockbar/i, code: 'AltLeft' },
+	...CONTROL_SCHEME.find(c => c.label === 'Start / Coin').buttons,
+	...[CONTROL_SCHEME.find(c => c.label === 'Plunger').buttons].flat(),
+	...[CONTROL_SCHEME.find(c => c.label === 'Fire / Lockbar').buttons].flat(),
+	...CONTROL_SCHEME.find(c => c.label === 'Magna Save').buttons,
 	{ regex: /button/i, code: 'Digit1' },
 ]
 
