@@ -317,18 +317,7 @@ async function tryCreateBitmap(data: Uint8Array, mime: string, name: string): Pr
 				return null
 			}
 		}
-		try {
-			const tex: any = new Texture(bitmap as any)
-			tex.colorSpace = SRGBColorSpace
-			tex.flipY = false
-			tex.needsUpdate = true
-			tune(tex)
-			tex.name = `texture:${name}`
-			return tex
-		} catch {}
-		const conv: any = bitmapToCanvasTexture(bitmap as any, name)
-		if (conv) return conv
-		const tex: any = new CanvasTexture(bitmap as any)
+		const tex: any = new Texture(bitmap as any)
 		tex.colorSpace = SRGBColorSpace
 		tex.flipY = false
 		tex.needsUpdate = true

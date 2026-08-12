@@ -8,9 +8,7 @@ import type { Table } from '../../vpt/table/table.js'
 import type { Texture } from '../../vpt/texture.js'
 import type { ITextureLoader } from '../irender-api.js'
 
-const LARGE_TEXTURE_PIXELS = 4 * 1024 * 1024
-const CONCURRENCY_HEAVY = 8
-const CONCURRENCY_DEFAULT = 12
+const HARDWARE_CONCURRENCY_FALLBACK = 4
 
 /** Caches and preloads Three.js textures. */
 export class ThreeMapGenerator {
@@ -55,16 +53,10 @@ export class ThreeMapGenerator {
 		if (loader && 'playfieldMap' in loader) loader.playfieldMap = table.getPlayfieldMap()
 	}
 
-	private pickConcurrency(textures: Texture[]): number {
-		const hasHeavy = textures.some(
-			t =>
-				t.width * t.height > LARGE_TEXTURE_PIXELS ||
-				(t as any).isHdr?.() ||
-				/\.(exr|hdr)$/i.test((t as any).szPath ?? ''),
-		)
-		const cores = (typeof navigator !== 'undefined' && (navigator as any).hardwareConcurrency) || 4
-		const cap = hasHeavy ? CONCURRENCY_HEAVY : CONCURRENCY_DEFAULT
-		return Math.min(cap, Math.max(4, cores * 2))
+	private pickConcurrency(_textures: Texture[]): number {
+		const cores =
+			(typeof navigator !== 'undefined' && (navigator as any).hardwareConcurrency) || HARDWARE_CONCURRENCY_FALLBACK
+		return Math.max(1, cores)
 	}
 
 	private async loadConcurrently(
