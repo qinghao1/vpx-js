@@ -77,6 +77,7 @@ export class Progress implements IProgress {
 	private title?: string
 	private action?: string
 	private lastPrint = 0
+	private startTime = 0
 	static progress(): IProgress {
 		return Progress._instance
 	}
@@ -85,10 +86,18 @@ export class Progress implements IProgress {
 	}
 	start(_id: string, title: string): void {
 		this.title = title
+		this.startTime = Date.now()
+		this.lastPrint = 0
 	}
-	end(_id: string): void {}
+	end(_id: string): void {
+		if (this.startTime) {
+			logger().info('%s: %s done in %sms', this.title ?? _id, this.action ?? 'done', Date.now() - this.startTime)
+		}
+		this.startTime = 0
+	}
 	show(action: string, details?: string): void {
 		this.action = action
+		if (!this.startTime) this.startTime = Date.now()
 		this.print(details)
 	}
 	details(details: string): void {
@@ -98,7 +107,8 @@ export class Progress implements IProgress {
 		const now = Date.now()
 		if (now - this.lastPrint < 300) return
 		this.lastPrint = now
-		logger().info('%s: %s%s', this.title, this.action, details ? ` (${details})` : '')
+		const elapsed = this.startTime ? ` +${now - this.startTime}ms` : ''
+		logger().info('%s: %s%s%s', this.title, this.action, details ? ` (${details})` : '', elapsed)
 	}
 }
 
