@@ -57,7 +57,7 @@ function wrapTexBaked(tex) {
 	tex.generateMipmaps = true
 	tex.minFilter = THREE.LinearMipmapLinearFilter
 	tex.magFilter = THREE.LinearFilter
-	tex.anisotropy = 1
+	tex.anisotropy = 16
 	tex.needsUpdate = true
 }
 
@@ -81,14 +81,30 @@ function fixBaked(mat, map) {
 	mat.toneMapped = false
 	mat.roughness = BAKED_ROUGH
 	mat.metalness = BAKED_METAL
-	wrapTexBaked(mat.map)
-	if (mat.emissiveMap) wrapTexBaked(mat.emissiveMap)
+	if (mat.map) wrapTexBaked(mat.map)
+	if (mat.emissiveMap && mat.emissiveMap !== mat.map) wrapTexBaked(mat.emissiveMap)
 	mat.needsUpdate = true
 }
 
 function fixVr(mat) {
-	if (mat.map) wrapTexBaked(mat.map)
-	if (mat.emissiveMap) wrapTexBaked(mat.emissiveMap)
+	if (mat.map) {
+		mat.map.wrapS = THREE.ClampToEdgeWrapping
+		mat.map.wrapT = THREE.ClampToEdgeWrapping
+		mat.map.generateMipmaps = true
+		mat.map.minFilter = THREE.LinearMipmapLinearFilter
+		mat.map.magFilter = THREE.LinearFilter
+		mat.map.anisotropy = 8
+		mat.map.needsUpdate = true
+	}
+	if (mat.emissiveMap && mat.emissiveMap !== mat.map) {
+		mat.emissiveMap.wrapS = THREE.ClampToEdgeWrapping
+		mat.emissiveMap.wrapT = THREE.ClampToEdgeWrapping
+		mat.emissiveMap.generateMipmaps = true
+		mat.emissiveMap.minFilter = THREE.LinearMipmapLinearFilter
+		mat.emissiveMap.magFilter = THREE.LinearFilter
+		mat.emissiveMap.anisotropy = 8
+		mat.emissiveMap.needsUpdate = true
+	}
 	mat.side = THREE.DoubleSide
 	mat.toneMapped = false
 	mat.roughness = BAKED_ROUGH

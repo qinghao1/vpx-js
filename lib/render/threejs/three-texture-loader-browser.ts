@@ -76,8 +76,11 @@ function effectiveMax(isFloat: boolean, name?: string): number {
 	const hw = getHardwareMax()
 	const swift = isSwiftShader()
 	const isPlayfield = !!name && /playfield|nestmap|bake/i.test(name)
-	const cap = swift ? (isPlayfield ? 2048 : 1024) : isPlayfield ? Math.min(8192, hw) : 4096
-	if (isFloat) return Math.min(hw, cap, Math.max(1024, Math.ceil(viewportBudget())))
+	const cap = swift ? (isPlayfield ? 4096 : 2048) : isPlayfield ? Math.min(16384, hw) : 4096
+	if (isFloat) {
+		if (isPlayfield) return Math.min(hw, cap)
+		return Math.min(hw, cap, Math.max(1024, Math.ceil(viewportBudget())))
+	}
 	return Math.min(hw, cap)
 }
 
@@ -85,7 +88,7 @@ function tune(tex: any): void {
 	tex.generateMipmaps = true
 	tex.minFilter = LinearMipMapLinearFilter
 	tex.magFilter = LinearFilter
-	tex.anisotropy = 4
+	tex.anisotropy = 16
 }
 
 function nameAndTune(tex: any, name: string): void {
@@ -133,7 +136,7 @@ function finalize(tex: any, name: string, isFloat: boolean): any {
 	}
 	const max = effectiveMax(isFloat, name)
 	if (tex.image?.data && tex.image.width && tex.image.height) {
-		const ds = downsampleData(tex, max)
+		const ds = downsampleData(tex, max, name)
 		if (ds !== tex) {
 			try {
 				tex.dispose?.()
@@ -465,7 +468,7 @@ function getMimeType(data: Uint8Array, ext: string): string | null {
 	)
 }
 
-function downsampleData(texture: any, maxSize: number): any {
+function downsampleData(texture: any, maxSize: number, name?: string): any {
 	const { width: w, height: h, data: src } = texture.image
 	if (w <= maxSize && h <= maxSize) return texture
 	const scale = Math.min(maxSize / w, maxSize / h)
@@ -477,8 +480,8 @@ function downsampleData(texture: any, maxSize: number): any {
 	const yRatio = h / nh
 	const isHalf = src instanceof Uint16Array && texture.type === HalfFloatType
 	const isFloat = src instanceof Float32Array
-	// SwiftShader has tiny GPU/CPU budget — use nearest sampling for huge textures.
-	const fast = w * h > 4 * 1024 * 1024
+	const isPlayfield = !!name && /playfield|nestmap|bake/i.test(name)
+	const fast = !isPlayfield && w * h > 4 * 1024 * 1024
 	if (fast) {
 		for (let y = 0; y < nh; y++) {
 			const sy = Math.min(h - 1, Math.floor(y * yRatio))
