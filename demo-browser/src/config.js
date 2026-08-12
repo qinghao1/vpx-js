@@ -26,7 +26,7 @@ export const BUTTON_CODE_PATTERNS = [
 	{ regex: /start/i, code: 'Digit1' },
 	{ regex: /tour/i, code: 'Digit1' },
 	{ regex: /plunger|launch/i, code: 'Enter' },
-	{ regex: /fire|lockbar/i, code: 'Enter' },
+	{ regex: /fire|lockbar/i, code: 'AltLeft' },
 	{ regex: /button/i, code: 'Digit1' },
 ]
 
