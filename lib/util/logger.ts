@@ -98,7 +98,7 @@ export class Progress implements IProgress {
 		const now = Date.now()
 		if (now - this.lastPrint < 300) return
 		this.lastPrint = now
-		logger().error('%s: %s%s', this.title, this.action, details ? ` (${details})` : '')
+		logger().info('%s: %s%s', this.title, this.action, details ? ` (${details})` : '')
 	}
 }
 
