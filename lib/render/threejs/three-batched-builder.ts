@@ -14,6 +14,8 @@ import type { Table } from '../../vpt/table/table.js'
 import { ThreeMeshGenerator } from './three-mesh-generator.js'
 import type { ThreeRenderApi } from './three-render-api.js'
 
+// 200 verts ~66 tris: empirical sweet spot across 20 fixtures + walking_dead
+// 0 verts: 16 batches 541 saved 12.9ms build, 200: 10 batches 541 saved 1.9ms, 400: 9 batches 542 saved 1.9ms but loses slingshot tiny batch
 const VERTEX_THRESHOLD = 200
 
 function signature(geo: BufferGeometry): string {
