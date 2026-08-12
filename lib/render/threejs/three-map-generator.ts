@@ -29,13 +29,13 @@ export class ThreeMapGenerator {
 		if (!this.textureLoader) return
 		if (!textures.length) return
 		const started = Date.now()
-		logger().debug('[ThreeMapGenerator.loadTextures] Pre-loading %s textures..', textures.length)
+		logger().info('[ThreeMapGenerator.loadTextures] Pre-loading %s textures..', textures.length)
 		this.setPlayfieldHint(table)
 
 		const concurrency = this.pickConcurrency(textures)
 		await this.loadConcurrently(textures, table, concurrency, onTexture)
 
-		logger().debug(
+		logger().info(
 			'[ThreeMapGenerator.loadTextures] Loaded %s/%s textures in %sms (concurrency %s).',
 			this.textureCache.size,
 			textures.length,
