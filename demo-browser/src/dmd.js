@@ -70,58 +70,139 @@ export class DmdController {
 		if (!tableGroup) return
 		const names = new Set(['dmd', 'vr_dmd'])
 		const flashers = []
+		const flasherMap = new Map()
 		for (const k in table?.flashers || {})
 			if (table.flashers[k]?.data?.isDMD) {
 				names.add(k.toLowerCase())
 				flashers.push(table.flashers[k])
+				flasherMap.set(k.toLowerCase(), table.flashers[k])
 			}
 		for (const k in table?.textboxes || {}) if (table.textboxes[k]?.data?.isDMD) names.add(k.toLowerCase())
 		const isPlay = this.viewer.viewerMode === 'play'
+		const tableCenter = (() => {
+			const d = table?.data
+			if (
+				d &&
+				typeof d.left === 'number' &&
+				typeof d.right === 'number' &&
+				typeof d.top === 'number' &&
+				typeof d.bottom === 'number'
+			)
+				return { x: (d.left + d.right) / 2, y: (d.top + d.bottom) / 2 }
+			const dim = table?.getDimensions?.()
+			if (dim) return { x: dim.width / 2, y: dim.height / 2 }
+			return { x: 470, y: 600 }
+		})()
+		const distToCenter = (x, y) => Math.hypot(x - tableCenter.x, y - tableCenter.y)
+		const scoreForMesh = m => {
+			const key = (m.name || '').toLowerCase().replace(/^dmd_/, '')
+			const fl = flasherMap.get(key)
+			if (fl) return distToCenter(fl.data.center.x, fl.data.center.y)
+			const p = m.position
+			if (p && typeof p.x === 'number' && typeof p.y === 'number') return distToCenter(p.x, p.y)
+			return Number.POSITIVE_INFINITY
+		}
+		const applyDmdMaterial = m => {
+			for (const mat of Array.isArray(m.material) ? m.material : [m.material]) {
+				if (!mat || !this.texture) continue
+				mat.map = this.texture
+				mat.needsUpdate = true
+				mat.side = THREE.DoubleSide
+				mat.toneMapped = false
+				if ('emissive' in mat) {
+					mat.emissiveMap = this.texture
+					mat.emissive = new THREE.Color(0xff8800)
+					mat.emissiveIntensity = 1
+					mat.color?.set?.(0xffffff)
+				}
+				mat.transparent = false
+				mat.depthWrite = true
+			}
+			m.renderOrder = 1000
+			m.frustumCulled = false
+		}
+		const candidates = []
 		tableGroup.traverse(o => {
 			if (!o.isMesh) return
 			const n = (o.name || '').toLowerCase()
 			if (!names.has(n) && !n.includes('dmd')) return
-			if (isPlay && n.includes('vr_dmd')) {
-				o.visible = false
+			candidates.push(o)
+		})
+		const idealFlasher = (() => {
+			if (!flashers.length) return null
+			let best = flashers[0]
+			let bestScore = distToCenter(best.data.center.x, best.data.center.y)
+			for (let i = 1; i < flashers.length; i++) {
+				const s = distToCenter(flashers[i].data.center.x, flashers[i].data.center.y)
+				const better = isPlay ? s > bestScore : s < bestScore
+				if (better) {
+					best = flashers[i]
+					bestScore = s
+				}
+			}
+			return best
+		})()
+		if (candidates.length) {
+			let best = null
+			if (idealFlasher) {
+				const idealKey = idealFlasher.getName().toLowerCase()
+				best = candidates.find(m => (m.name || '').toLowerCase().replace(/^dmd_/, '') === idealKey) || null
+				if (best)
+					this.viewer.log(
+						`DMD: found ${candidates.length} on-table mesh(es) -> keep ${best.name} (ideal ${idealKey})`,
+						'info',
+					)
+			}
+			if (!best) {
+				best = candidates[0]
+				let bestScore = scoreForMesh(best)
+				for (let i = 1; i < candidates.length; i++) {
+					const s = scoreForMesh(candidates[i])
+					const better = isPlay ? s > bestScore : s < bestScore
+					if (better) {
+						best = candidates[i]
+						bestScore = s
+					}
+				}
+				this.viewer.log(
+					`DMD: found ${candidates.length} on-table mesh(es) -> keep ${best.name} (geometric)`,
+					'info',
+				)
+			}
+			for (const m of candidates) if (m !== best) m.visible = false
+			if (
+				idealFlasher &&
+				!candidates.some(
+					m => (m.name || '').toLowerCase().replace(/^dmd_/, '') === idealFlasher.getName().toLowerCase(),
+				)
+			) {
+				for (const m of candidates) m.visible = false
+				this.meshes = []
+			} else {
+				best.visible = true
+				for (let p = best.parent; p && p !== tableGroup; p = p.parent) if (p.visible === false) p.visible = true
+				applyDmdMaterial(best)
+				this.meshes = [best]
+				this.viewer.dmdMeshes = this.meshes
 				return
 			}
-			this.meshes.push(o)
-			if (isPlay) {
-				o.visible = true
-				for (let p = o.parent; p && p !== tableGroup; p = p.parent) if (p.visible === false) p.visible = true
-			}
-			for (const m of Array.isArray(o.material) ? o.material : [o.material]) {
-				if (!m || !this.texture) continue
-				m.map = this.texture
-				m.needsUpdate = true
-				m.side = THREE.DoubleSide
-				m.toneMapped = false
-				if ('emissive' in m) {
-					m.emissiveMap = this.texture
-					m.emissive = new THREE.Color(0xff8800)
-					m.emissiveIntensity = 1
-					m.color?.set?.(0xffffff)
-				}
-				m.transparent = false
-				m.depthWrite = true
-			}
-			o.renderOrder = 1000
-			o.frustumCulled = false
-		})
-		if (this.meshes.length) {
+		}
+		if (!flashers.length) {
 			this.viewer.log(
-				`DMD: found ${this.meshes.length} on-table mesh(es): ${this.meshes.map(m => m.name).join(', ')}`,
-				'info',
+				'DMD: no on-table DMD mesh found — overlay fallback will be used in Play mode if needed',
+				'warn',
 			)
 			this.viewer.dmdMeshes = this.meshes
 			return
 		}
-		let toCreate = flashers
-		if (isPlay) {
-			const f = flashers.filter(x => !x.getName().toLowerCase().includes('vr_'))
-			if (f.length) toCreate = f
+		const chosen = idealFlasher || flashers[0]
+		if (flashers.length > 1 && idealFlasher) {
+			this.viewer.log(
+				`DMD: deduped ${flashers.length} flashers -> ${chosen.getName()} (${isPlay ? 'play:farthest' : 'viewer:closest'} to center)`,
+				'info',
+			)
 		}
-		for (const fl of toCreate) {
+		for (const fl of [chosen]) {
 			const d = fl.data
 			const pts = d.dragPoints || []
 			let w = 600,

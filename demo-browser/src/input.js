@@ -1,3 +1,4 @@
+import * as THREE from 'three'
 import { pushInput } from '../../dist-esm/lib/game/shared/physics-buffer.js'
 import { NUDGE } from './config.js'
 import { swipeNudge } from './scene.js'
@@ -77,6 +78,21 @@ export function attachKeyboard(viewer) {
 	}
 }
 
+const findButtonCode = obj => {
+	for (let cur = obj; cur; cur = cur.parent) {
+		const n = (cur.name || '').toLowerCase()
+		if (n.includes('startbutton')) return 'Digit1'
+		if (n.includes('tourbutton')) return 'Digit1'
+		if (n.includes('firebutton')) return 'Enter'
+		if (n.includes('plunger')) return 'Enter'
+		if (n.includes('coin')) return 'Digit5'
+		if (n.includes('launch')) return 'Enter'
+	}
+	const n = (obj.name || '').toLowerCase()
+	if (n.includes('button')) return 'Digit1'
+	return null
+}
+
 export function attachPointerTouch(viewer) {
 	const canvas = viewer.dom.canvas
 	if (!canvas) return () => {}
@@ -107,32 +123,208 @@ export function attachPointerTouch(viewer) {
 		active.delete(id)
 		viewer._sendKey(code, false)
 	}
+
+	const raycaster = new THREE.Raycaster()
+	const buttonActive = new Map()
+	let orbitPrevEnabled = null
+	let hoverRaf = 0
+	let hoverX = 0
+	let hoverY = 0
+	let isHoveringButton = false
+
+	const getButtonHit = (clientX, clientY) => {
+		if (!viewer.tableGroup || !viewer.camera) return null
+		if (viewer.viewerMode !== 'play') return null
+		if (!viewer.player) return null
+		viewer.tableGroup.updateMatrixWorld(true)
+		const rect = canvas.getBoundingClientRect()
+		if (clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom) return null
+		const x = ((clientX - rect.left) / rect.width) * 2 - 1
+		const y = -((clientY - rect.top) / rect.height) * 2 + 1
+		const mouse = new THREE.Vector2(x, y)
+		raycaster.setFromCamera(mouse, viewer.camera)
+		const hits = raycaster.intersectObject(viewer.tableGroup, true)
+		for (const h of hits) {
+			const code = findButtonCode(h.object)
+			if (code) return { code, object: h.object, distance: h.distance }
+		}
+		return null
+	}
+
+	const setButtonVisual = (hitObject, isDown) => {
+		if (!hitObject) return
+		let btnNode = null
+		for (let cur = hitObject; cur; cur = cur.parent) {
+			const n = (cur.name || '').toLowerCase()
+			if (n.includes('button') || n.includes('coin') || n.includes('plunger') || n.includes('launch')) {
+				btnNode = cur
+				break
+			}
+		}
+		if (!btnNode) btnNode = hitObject
+		const meshes = []
+		if (btnNode.isMesh) meshes.push(btnNode)
+		else
+			btnNode.traverse?.(o => {
+				if (o.isMesh) meshes.push(o)
+			})
+		if (!meshes.length && hitObject.isMesh) meshes.push(hitObject)
+		for (const mesh of meshes) {
+			if (!mesh.material) continue
+			const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
+			for (const mat of mats) {
+				if (isDown) {
+					if (mat.userData.__origEmissive === undefined) {
+						mat.userData.__origEmissive = mat.emissive ? mat.emissive.clone() : new THREE.Color(0x000000)
+						mat.userData.__origEmissiveIntensity = mat.emissiveIntensity ?? 0
+					}
+					if (mat.emissive) {
+						mat.emissive.setHex(0x666666)
+						mat.emissiveIntensity = 0.7
+					}
+					mat.needsUpdate = true
+				} else {
+					if (mat.userData.__origEmissive !== undefined) {
+						if (mat.emissive) mat.emissive.copy(mat.userData.__origEmissive)
+						mat.emissiveIntensity = mat.userData.__origEmissiveIntensity
+						mat.needsUpdate = true
+					}
+				}
+			}
+			if (isDown) {
+				if (!mesh.userData.__origScale) mesh.userData.__origScale = mesh.scale.clone()
+				mesh.scale.set(0.97, 0.97, 0.97)
+			} else {
+				if (mesh.userData.__origScale) mesh.scale.copy(mesh.userData.__origScale)
+			}
+		}
+	}
+
+	const disableOrbit = () => {
+		if (viewer.controls) {
+			orbitPrevEnabled = viewer.controls.enabled
+			viewer.controls.enabled = false
+		}
+	}
+	const restoreOrbitIfNoButtons = () => {
+		if (buttonActive.size === 0 && orbitPrevEnabled !== null && viewer.controls) {
+			viewer.controls.enabled = orbitPrevEnabled
+			orbitPrevEnabled = null
+		}
+	}
+	const clearButtonHover = () => {
+		if (isHoveringButton) {
+			canvas.classList.remove('is-pointer')
+			canvas.style.cursor = ''
+			isHoveringButton = false
+		}
+	}
+	const flushHover = () => {
+		hoverRaf = 0
+		if (viewer.viewerMode !== 'play' || !viewer.tableGroup) {
+			clearButtonHover()
+			return
+		}
+		const hit = getButtonHit(hoverX, hoverY)
+		if (hit) {
+			if (!isHoveringButton) {
+				canvas.classList.add('is-pointer')
+				canvas.style.cursor = 'pointer'
+				isHoveringButton = true
+			}
+		} else {
+			clearButtonHover()
+		}
+	}
+	const onPointerMoveHover = e => {
+		hoverX = e.clientX
+		hoverY = e.clientY
+		if (hoverRaf) return
+		hoverRaf = requestAnimationFrame(flushHover)
+	}
+	const onPointerLeave = () => {
+		if (hoverRaf) {
+			cancelAnimationFrame(hoverRaf)
+			hoverRaf = 0
+		}
+		clearButtonHover()
+	}
+
 	const onDown = e => {
 		if (e.pointerType === 'touch') return
 		if (e.pointerType === 'mouse' && e.button !== 0) return
-		down(e.pointerId, toCode(e.clientX, e.clientY))
+		const hit = getButtonHit(e.clientX, e.clientY)
+		let code
+		if (hit) {
+			code = hit.code
+			buttonActive.set(e.pointerId, { code, object: hit.object })
+			setButtonVisual(hit.object, true)
+			disableOrbit()
+			try {
+				e.stopImmediatePropagation()
+			} catch {}
+			try {
+				e.stopPropagation()
+			} catch {}
+		} else {
+			code = toCode(e.clientX, e.clientY)
+		}
+		down(e.pointerId, code)
 		if (viewer.viewerMode === 'play') e.preventDefault()
-		canvas.setPointerCapture(e.pointerId)
+		try {
+			canvas.setPointerCapture(e.pointerId)
+		} catch {}
 	}
 	const onUp = e => {
 		if (e.pointerType === 'touch') return
+		const btnInfo = buttonActive.get(e.pointerId)
+		if (btnInfo) {
+			setButtonVisual(btnInfo.object, false)
+			buttonActive.delete(e.pointerId)
+			restoreOrbitIfNoButtons()
+		}
 		up(e.pointerId)
 		if (viewer.viewerMode === 'play') e.preventDefault()
-		canvas.releasePointerCapture(e.pointerId)
+		try {
+			canvas.releasePointerCapture(e.pointerId)
+		} catch {}
 	}
 	const onCancel = e => {
-		if (e.pointerType !== 'touch') up(e.pointerId)
+		if (e.pointerType !== 'touch') {
+			const btnInfo = buttonActive.get(e.pointerId)
+			if (btnInfo) {
+				setButtonVisual(btnInfo.object, false)
+				buttonActive.delete(e.pointerId)
+				restoreOrbitIfNoButtons()
+			}
+			up(e.pointerId)
+		}
 	}
 	const touchStarts = new Map()
 	const onTouchStart = e => {
 		for (const t of e.changedTouches) {
+			const hit = getButtonHit(t.clientX, t.clientY)
+			let code
+			if (hit) {
+				code = hit.code
+				buttonActive.set(t.identifier + 1000, { code, object: hit.object })
+				setButtonVisual(hit.object, true)
+				disableOrbit()
+			} else {
+				code = toCode(t.clientX, t.clientY)
+			}
 			touchStarts.set(t.identifier + 1000, { x: t.clientX, y: t.clientY, t: performance.now() })
-			down(t.identifier + 1000, toCode(t.clientX, t.clientY))
+			down(t.identifier + 1000, code)
 		}
 	}
 	const onTouchEnd = e => {
 		for (const t of e.changedTouches) {
 			const id = t.identifier + 1000
+			const btnInfo = buttonActive.get(id)
+			if (btnInfo) {
+				setButtonVisual(btnInfo.object, false)
+				buttonActive.delete(id)
+			}
 			const st = touchStarts.get(id)
 			if (st) {
 				const dx = t.clientX - st.x
@@ -150,26 +342,43 @@ export function attachPointerTouch(viewer) {
 			}
 			up(id)
 		}
+		if (buttonActive.size === 0) restoreOrbitIfNoButtons()
 	}
 	const onContext = e => {
 		if (viewer.viewerMode === 'play') e.preventDefault()
 	}
-	canvas.addEventListener('pointerdown', onDown)
-	canvas.addEventListener('pointerup', onUp)
-	canvas.addEventListener('pointercancel', onCancel)
-	canvas.addEventListener('touchstart', onTouchStart, { passive: true })
+	canvas.addEventListener('click', onCanvasClick)
+	canvas.addEventListener('pointerdown', onDown, true)
+	canvas.addEventListener('pointerup', onUp, true)
+	canvas.addEventListener('pointercancel', onCancel, true)
+	canvas.addEventListener('pointermove', onPointerMoveHover)
+	canvas.addEventListener('pointerleave', onPointerLeave)
+	canvas.addEventListener('touchstart', onTouchStart, { passive: true, capture: true })
 	canvas.addEventListener('touchend', onTouchEnd, { passive: true })
 	canvas.addEventListener('touchcancel', onTouchEnd, { passive: true })
 	canvas.addEventListener('contextmenu', onContext)
 	const cleanup = () => {
 		canvas.removeEventListener('click', onCanvasClick)
-		canvas.removeEventListener('pointerdown', onDown)
-		canvas.removeEventListener('pointerup', onUp)
-		canvas.removeEventListener('pointercancel', onCancel)
-		canvas.removeEventListener('touchstart', onTouchStart)
+		canvas.removeEventListener('pointerdown', onDown, true)
+		canvas.removeEventListener('pointerup', onUp, true)
+		canvas.removeEventListener('pointercancel', onCancel, true)
+		canvas.removeEventListener('pointermove', onPointerMoveHover)
+		canvas.removeEventListener('pointerleave', onPointerLeave)
+		canvas.removeEventListener('touchstart', onTouchStart, { capture: true })
 		canvas.removeEventListener('touchend', onTouchEnd)
 		canvas.removeEventListener('touchcancel', onTouchEnd)
 		canvas.removeEventListener('contextmenu', onContext)
+		if (hoverRaf) {
+			cancelAnimationFrame(hoverRaf)
+			hoverRaf = 0
+		}
+		for (const { object } of buttonActive.values()) setButtonVisual(object, false)
+		buttonActive.clear()
+		if (orbitPrevEnabled !== null && viewer.controls) {
+			viewer.controls.enabled = orbitPrevEnabled
+			orbitPrevEnabled = null
+		}
+		clearButtonHover()
 	}
 	viewer._touchCleanup = cleanup
 	return cleanup

@@ -1772,18 +1772,16 @@ export class Viewer {
 		this._flashNudge(angle)
 	}
 	_sendKey(code, down) {
-		if (down)
-			this.player.onKeyDown({
-				code,
-				key: code === 'Enter' ? 'Enter' : 'Shift',
-				ts: Date.now(),
-			})
-		else
-			this.player.onKeyUp({
-				code,
-				key: code === 'Enter' ? 'Enter' : 'Shift',
-				ts: Date.now(),
-			})
+		const keyForCode = c => {
+			if (c === 'Enter') return 'Enter'
+			if (c.startsWith('Digit')) return c.slice(5)
+			if (c === 'Space') return ' '
+			if (c === 'ShiftLeft' || c === 'ShiftRight') return 'Shift'
+			return c
+		}
+		const key = keyForCode(code)
+		if (down) this.player.onKeyDown({ code, key, ts: Date.now() })
+		else this.player.onKeyUp({ code, key, ts: Date.now() })
 		if (this._physicsSab) {
 			let h = 0
 			for (let i = 0; i < code.length; i++) h = ((h * 31 + code.charCodeAt(i)) & 0xffff) >>> 0
