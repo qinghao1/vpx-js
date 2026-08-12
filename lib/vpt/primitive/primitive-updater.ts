@@ -4,7 +4,9 @@ import { Color, MathUtils } from 'three'
 
 import type { IRenderApi } from '../../render/irender-api.js'
 import { Matrix3D } from '../../util/matrix.js'
+import { Vertex3DNoTex2 } from '../../util/vertex.js'
 import { ItemUpdater } from '../item-updater.js'
+import { Mesh } from '../mesh.js'
 import type { Table } from '../table/table.js'
 import type { PrimitiveData } from './primitive-data.js'
 import type { PrimitiveState } from './primitive-state.js'
@@ -21,11 +23,21 @@ const MAX_EMISSIVE = 1000
 
 /** Primitive updater — syncs state to render node. */
 export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
+	private animMesh?: Mesh
+
 	constructor(
 		private readonly data: PrimitiveData,
 		state: PrimitiveState,
 	) {
 		super(state)
+	}
+
+	public setMesh(mesh: Mesh): void {
+		this.animMesh = mesh
+	}
+
+	public hasMesh(): boolean {
+		return !!this.animMesh
 	}
 
 	public applyState<NODE, GEOMETRY, POINT_LIGHT>(
@@ -58,6 +70,7 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 		if (state.position || state.size || state.rotation || state.translation || state.objectRotation) {
 			this.applyTransformation(obj, renderApi, table)
 		}
+		if (state.currentFrame !== undefined) this.applyAnimationFrame(obj, state, renderApi)
 	}
 
 	private ensureCloned<NODE>(obj: NODE): void {
@@ -68,6 +81,71 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 			;(cloned.userData as Record<string, unknown>).__primitiveCloned = true
 			m.material = cloned as unknown as typeof m.material
 		}
+	}
+
+	private applyAnimationFrame<NODE, GEOMETRY, POINT_LIGHT>(
+		obj: NODE,
+		state: PrimitiveState,
+		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
+	): void {
+		const mesh = this.animMesh
+		if (!mesh || mesh.animationFrames.length === 0) return
+		const frame = state.currentFrame
+		if (frame === undefined || frame === -1) return
+		const frames = mesh.animationFrames
+		const num = frames.length
+		if (num === 0) return
+		const clamped = Math.max(0, Math.min(frame, num - 1))
+		const iFrame = Math.floor(clamped)
+		const fract = clamped - iFrame
+		const interp = new Mesh(mesh.name)
+		interp.indices = mesh.indices.slice()
+		interp.vertices = mesh.vertices.map((base, idx) => {
+			let x: number, y: number, z: number, nx: number, ny: number, nz: number
+			if (iFrame + 1 < num) {
+				const v0 = frames[iFrame]!.frameVerts[idx]!
+				const v1 = frames[iFrame + 1]!.frameVerts[idx]!
+				x = v0.x + (v1.x - v0.x) * fract
+				y = v0.y + (v1.y - v0.y) * fract
+				z = v0.z + (v1.z - v0.z) * fract
+				nx = v0.nx + (v1.nx - v0.nx) * fract
+				ny = v0.ny + (v1.ny - v0.ny) * fract
+				nz = v0.nz + (v1.nz - v0.nz) * fract
+			} else {
+				const v0 = frames[iFrame]!.frameVerts[idx]!
+				x = v0.x
+				y = v0.y
+				z = v0.z
+				nx = v0.nx
+				ny = v0.ny
+				nz = v0.nz
+			}
+			const v = new Vertex3DNoTex2()
+			v.x = x
+			v.y = y
+			v.z = z
+			v.nx = nx
+			v.ny = ny
+			v.nz = nz
+			v.tu = base.tu
+			v.tv = base.tv
+			return v
+		})
+		interp.animationFrames = []
+		const target = this.findMeshNode(obj) as unknown as NODE | undefined
+		if (target) renderApi.applyMeshToNode(interp, target)
+	}
+
+	private findMeshNode<NODE>(obj: NODE): unknown {
+		const anyObj = obj as unknown as { isMesh?: boolean; geometry?: unknown; children?: unknown[] }
+		if (anyObj.isMesh && anyObj.geometry) return anyObj
+		if (Array.isArray(anyObj.children)) {
+			for (const child of anyObj.children as unknown[]) {
+				const found = this.findMeshNode(child as unknown as NODE)
+				if (found) return found as unknown
+			}
+		}
+		return undefined
 	}
 
 	private applyColor<NODE>(obj: NODE, table: Table): void {

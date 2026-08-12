@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { EventProxy } from '../../game/event-proxy.js'
+import type { IAnimatable, IAnimation } from '../../game/ianimatable.js'
 import type { IHittable } from '../../game/ihittable.js'
 import type { IRenderable, Meshes } from '../../game/irenderable.js'
 import type { IScriptable } from '../../game/iscriptable.js'
@@ -13,6 +14,7 @@ import type { Ball } from '../ball/ball.js'
 import { Item } from '../item.js'
 import { Mesh } from '../mesh.js'
 import type { Table } from '../table/table.js'
+import { PrimitiveAnimation } from './primitive-animation.js'
 import { PrimitiveApi } from './primitive-api.js'
 import { PrimitiveData } from './primitive-data.js'
 import { PrimitiveHitGenerator } from './primitive-hit-generator.js'
@@ -23,7 +25,7 @@ import { PrimitiveUpdater } from './primitive-updater.js'
 /** Primitive item. @see https://github.com/vpinball/vpinball/blob/master/primitive.cpp */
 export class Primitive
 	extends Item<PrimitiveData>
-	implements IRenderable<PrimitiveState>, IHittable, IScriptable<PrimitiveApi>
+	implements IRenderable<PrimitiveState>, IHittable, IScriptable<PrimitiveApi>, IAnimatable
 {
 	private readonly state: PrimitiveState
 	private readonly meshGenerator: PrimitiveMeshGenerator
@@ -32,6 +34,7 @@ export class Primitive
 	private mesh?: Mesh
 	private api?: PrimitiveApi
 	private hits?: HitObject[]
+	private animation?: PrimitiveAnimation
 
 	public static async fromStorage(storage: Storage, itemName: string, loadMeshes: boolean): Promise<Primitive> {
 		const data = await PrimitiveData.fromStorage(storage, itemName, loadMeshes)
@@ -73,7 +76,7 @@ export class Primitive
 		return {
 			primitive: {
 				isVisible: this.data.isVisible,
-				mesh: this.getMesh(table).clone().transform(Matrix3D.RIGHT_HANDED),
+				mesh: this.getDisplayMesh(table),
 				map: table.getTexture(this.data.szImage),
 				normalMap: table.getTexture(this.data.szNormalMap),
 				material: table.getMaterial(this.data.szMaterial),
@@ -90,11 +93,21 @@ export class Primitive
 		this.data.mesh = new Mesh()
 	}
 
+	private getDisplayMesh(table: Table): Mesh {
+		return this.getMesh(table).clone().transform(Matrix3D.RIGHT_HANDED)
+	}
+
 	private getMesh(table: Table): Mesh {
 		if (!this.mesh) {
 			this.mesh = this.meshGenerator.getMesh(table)
 		}
 		return this.mesh
+	}
+
+	private ensureMesh(table: Table): Mesh {
+		const m = this.getMesh(table)
+		if (!this.updater.hasMesh()) this.updater.setMesh(m.clone().transform(Matrix3D.RIGHT_HANDED))
+		return m
 	}
 
 	public setupPlayer(player: Player, table: Table): void {
@@ -103,8 +116,11 @@ export class Primitive
 			this.events!.currentHitThreshold = dot
 			obj.fireHitEvent(ball)
 		}
-		this.hits = this.hitGenerator.generateHitObjects(this.getMesh(table), this.events, table)
-		this.api = new PrimitiveApi(this, this.state, this.data, this.hits!, this.events, player, table)
+		const mesh = this.ensureMesh(table)
+		this.hits = this.hitGenerator.generateHitObjects(mesh, this.events, table)
+		this.animation = new PrimitiveAnimation(this.data, this.state, mesh.clone().transform(Matrix3D.RIGHT_HANDED))
+		this.updater.setMesh(mesh.clone().transform(Matrix3D.RIGHT_HANDED))
+		this.api = new PrimitiveApi(this, this.state, this.data, this.hits!, this.events, player, table, this.animation)
 	}
 
 	public getApi(): PrimitiveApi {
@@ -117,6 +133,10 @@ export class Primitive
 
 	public getUpdater(): PrimitiveUpdater {
 		return this.updater
+	}
+
+	public getAnimation(): IAnimation {
+		return this.animation!
 	}
 
 	public getHitShapes(): HitObject[] {

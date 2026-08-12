@@ -19,6 +19,7 @@ export class PrimitiveState extends ItemState {
 	public alpha: number = 100
 	public disableLightingTop: number = 0
 	public disableLightingBelow: number = 1
+	public currentFrame: number = -1
 
 	public static claimFrom(
 		name: string,
@@ -67,6 +68,7 @@ export class PrimitiveState extends ItemState {
 		disableLightingTop: number = 0,
 		disableLightingBelow: number = 1,
 		alpha: number = 100,
+		currentFrame: number = -1,
 	): PrimitiveState {
 		const state = new PrimitiveState()
 		state.name = name
@@ -83,6 +85,7 @@ export class PrimitiveState extends ItemState {
 		state.alpha = alpha
 		state.disableLightingTop = disableLightingTop
 		state.disableLightingBelow = disableLightingBelow
+		state.currentFrame = currentFrame
 		return state
 	}
 
@@ -102,6 +105,7 @@ export class PrimitiveState extends ItemState {
 			this.disableLightingTop,
 			this.disableLightingBelow,
 			this.alpha,
+			this.currentFrame,
 		)
 	}
 
@@ -140,6 +144,7 @@ export class PrimitiveState extends ItemState {
 		omitEqual(diff, state, 'alpha')
 		omitEqual(diff, state, 'disableLightingTop')
 		omitEqual(diff, state, 'disableLightingBelow')
+		omitEqual(diff, state, 'currentFrame')
 		return diff
 	}
 
@@ -166,7 +171,8 @@ export class PrimitiveState extends ItemState {
 			state.color === this.color &&
 			state.alpha === this.alpha &&
 			state.disableLightingTop === this.disableLightingTop &&
-			state.disableLightingBelow === this.disableLightingBelow
+			state.disableLightingBelow === this.disableLightingBelow &&
+			state.currentFrame === this.currentFrame
 		)
 	}
 }

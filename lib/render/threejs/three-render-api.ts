@@ -22,6 +22,7 @@ import type { Mesh } from '../../vpt/mesh.js'
 import type { Table, TableGenerateOptions } from '../../vpt/table/table.js'
 import type { Texture } from '../../vpt/texture.js'
 import type { IRenderApi, MeshConvertOptions } from '../irender-api.js'
+import { installBvh } from './three-bvh.js'
 import { ThreeConverter } from './three-converter.js'
 import { ThreeLightGenerator } from './three-light-generator.js'
 import { ThreeLightMeshGenerator } from './three-light-mesh-generator.js'
@@ -45,6 +46,7 @@ export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, Poin
 	private readonly lightGenerator = new ThreeLightGenerator()
 
 	constructor(opts?: MeshConvertOptions, gate: AnimationGate = animationGate) {
+		installBvh()
 		this.meshConvertOpts = opts ?? { applyMaterials: false, optimizeTextures: false }
 		this.mapGenerator = new ThreeMapGenerator(this.meshConvertOpts.applyTextures, gate)
 		this.materialGenerator = new ThreeMaterialGenerator(this.mapGenerator)
@@ -150,9 +152,40 @@ export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, Poin
 			throw new Error(
 				`Trying to apply geometry of ${srcGeo.attributes.position.array.length} positions to ${destGeo.attributes.position.array.length} positions.`,
 			)
-		for (let i = 0; i < destGeo.attributes.position.array.length; i++)
-			destGeo.attributes.position.array[i] = srcGeo.attributes.position.array[i]
-		destGeo.attributes.position.needsUpdate = true
+		const destPos = destGeo.attributes.position
+		const srcPos = srcGeo.attributes.position
+		if (destPos && srcPos) {
+			;(destPos.array as Float32Array).set(srcPos.array as Float32Array)
+			destPos.needsUpdate = true
+		}
+		const destNorm = destGeo.attributes.normal as unknown as
+			| { array: Float32Array; needsUpdate: boolean }
+			| undefined
+		const srcNorm = srcGeo.attributes.normal as unknown as { array: Float32Array } | undefined
+		if (destNorm && srcNorm && destNorm.array.length === srcNorm.array.length) {
+			destNorm.array.set(srcNorm.array)
+			destNorm.needsUpdate = true
+		} else if (srcNorm && !destNorm) {
+			destGeo.setAttribute('normal', srcGeo.attributes.normal.clone())
+		} else if (destNorm && srcNorm) {
+			destGeo.computeVertexNormals()
+		}
+		destGeo.computeBoundingBox()
+		destGeo.computeBoundingSphere()
+		try {
+			const bvhGeo = destGeo as unknown as {
+				boundsTree?: unknown
+				disposeBoundsTree?: () => void
+				computeBoundsTree?: (o: unknown) => void
+			}
+			if (bvhGeo.boundsTree) {
+				bvhGeo.disposeBoundsTree?.()
+				bvhGeo.boundsTree = undefined
+				try {
+					bvhGeo.computeBoundsTree?.({})
+				} catch {}
+			}
+		} catch {}
 		releaseGeometry(srcGeo)
 	}
 

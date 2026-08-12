@@ -57,6 +57,19 @@ export class Mesh {
 			v.nz = n.z
 			Vertex3D.release(vert, n)
 		}
+		for (const frame of this.animationFrames) {
+			for (const v of frame.frameVerts) {
+				const vert = Vertex3D.claim(v.x, v.y, v.z).multiplyMatrix(matrix)
+				;(v as unknown as Record<string, number>).x = vert.x
+				;(v as unknown as Record<string, number>).y = vert.y
+				;(v as unknown as Record<string, number>).z = getZ ? getZ(vert.z) : vert.z
+				const n = Vertex3D.claim(v.nx, v.ny, v.nz).multiplyMatrixNoTranslate(normalMatrix || matrix)
+				;(v as unknown as Record<string, number>).nx = n.x
+				;(v as unknown as Record<string, number>).ny = n.y
+				;(v as unknown as Record<string, number>).nz = n.z
+				Vertex3D.release(vert, n)
+			}
+		}
 		return this
 	}
 

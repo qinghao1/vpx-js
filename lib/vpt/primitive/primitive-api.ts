@@ -9,6 +9,7 @@ import { ItemApi } from '../item-api.js'
 import type { Table } from '../table/table.js'
 import type { TimerHit } from '../timer/timer-hit.js'
 import type { Primitive } from './primitive.js'
+import type { PrimitiveAnimation } from './primitive-animation.js'
 import type { PrimitiveData } from './primitive-data.js'
 import type { PrimitiveState } from './primitive-state.js'
 
@@ -29,6 +30,7 @@ export class PrimitiveApi extends ItemApi<PrimitiveData> {
 		events: EventProxy,
 		player: Player,
 		table: Table,
+		private readonly animation?: PrimitiveAnimation,
 	) {
 		super(data, events, player, table)
 		this.isDynamic = !data.staticRendering
@@ -414,16 +416,21 @@ export class PrimitiveApi extends ItemApi<PrimitiveData> {
 		this.data.depthBias = v
 	}
 
-	/* istanbul ignore next */
-	public PlayAnim(_startFrame: number, _speed: number): void {}
-	/* istanbul ignore next */
-	public PlayAnimEndless(_speed: number): void {}
-	/* istanbul ignore next */
-	public StopAnim(): void {}
-	/* istanbul ignore next */
-	public ContinueAnim(_speed: number): void {}
-	/* istanbul ignore next */
-	public ShowFrame(_frame: number): void {}
+	public PlayAnim(startFrame: number, speed: number): void {
+		this.animation?.playAnim(num(startFrame), num(speed))
+	}
+	public PlayAnimEndless(speed: number): void {
+		this.animation?.playAnimEndless(num(speed))
+	}
+	public StopAnim(): void {
+		this.animation?.stopAnim()
+	}
+	public ContinueAnim(speed: number): void {
+		this.animation?.continueAnim(num(speed))
+	}
+	public ShowFrame(frame: number): void {
+		this.animation?.showFrame(num(frame))
+	}
 
 	public _getTimers(): TimerHit[] {
 		this._beginPlay()
