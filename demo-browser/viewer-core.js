@@ -303,7 +303,7 @@ export class Viewer {
 			const base = Math.max(0.1, Math.min(2, v))
 			const emissionScale = tbl?.globalEmissionScale
 			const raw = Number.isFinite(emissionScale) ? emissionScale : 1
-			const scale = Math.max(0.5, Math.min(1, Math.pow(Math.max(0.01, raw), 0.5)))
+			const scale = Math.max(0.5, Math.min(1, Math.max(0.01, raw) ** 0.5))
 			return base * scale
 		}
 		const t = this.table?.data ?? null
@@ -1165,6 +1165,14 @@ export class Viewer {
 				player: this.player,
 			})
 		buildBvhIdle(node)
+		this._buttonMeshes = []
+		try {
+			node.traverse(o => {
+				if (o.isMesh && o.userData?.isCabinetButton) this._buttonMeshes.push(o)
+			})
+			if (this._buttonMeshes.length)
+				this.harnessLog?.(`[input] ${this._buttonMeshes.length} cabinet button meshes (BVH)`, 'info')
+		} catch {}
 		this.startLoop()
 		return {
 			loaded: table,

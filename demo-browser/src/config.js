@@ -21,6 +21,21 @@ export const RE_LM = /lm_/i
 
 export const NUDGE = { left: 75, right: 285, forward: 0, back: 180, force: 2.6 }
 
+export const BUTTON_CODE_PATTERNS = [
+	{ regex: /coin/i, code: 'Digit5' },
+	{ regex: /start/i, code: 'Digit1' },
+	{ regex: /tour/i, code: 'Digit1' },
+	{ regex: /plunger|launch/i, code: 'Enter' },
+	{ regex: /fire|lockbar/i, code: 'Enter' },
+	{ regex: /button/i, code: 'Digit1' },
+]
+
+export const resolveButtonCode = name => {
+	const n = String(name || '').toLowerCase()
+	for (const { regex, code } of BUTTON_CODE_PATTERNS) if (regex.test(n)) return code
+	return null
+}
+
 export const TABLE_OPTS = {
 	exportPlayfield: true,
 	exportPrimitives: true,

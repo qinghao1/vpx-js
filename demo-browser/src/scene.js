@@ -10,6 +10,7 @@ import {
 	RE_GLASS,
 	RE_LM,
 	RE_VR,
+	resolveButtonCode,
 } from './config.js'
 
 const pendingOf = m => (m.userData?.pendingMap ?? m.userData?.pendingmap ?? '').toString().toLowerCase()
@@ -454,7 +455,8 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 			stats.cabForced++
 			makeParentsVisible(o, node, stats)
 		}
-		const isButtonMesh = n.includes('button') || n.includes('coin') || n.includes('plunger')
+		const buttonCode = resolveButtonCode(n)
+		const isButtonMesh = !!buttonCode
 		if (isButtonMesh) {
 			o.frustumCulled = false
 			o.geometry?.computeBoundingSphere?.()
@@ -468,6 +470,8 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 				mat.needsUpdate = true
 			}
 			o.renderOrder = 100
+			o.userData.isCabinetButton = true
+			o.userData.buttonCode = buttonCode
 			if (o.visible) makeParentsVisible(o, node, stats)
 		}
 		if (!o.visible) return
@@ -590,7 +594,13 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 			if (!m) return
 			const pending = pendingOf(m)
 			const mapName = (m.map?.name || '').toLowerCase()
-			const c = classify(n, (m.name || '').toLowerCase(), mapName || pending, !!m.userData?.__isBaked, !!m.userData?.__addBlend)
+			const c = classify(
+				n,
+				(m.name || '').toLowerCase(),
+				mapName || pending,
+				!!m.userData?.__isBaked,
+				!!m.userData?.__addBlend,
+			)
 			if (isBasePlayfield(n, c) && o.visible) hideMesh(o, 'playfieldHidden', stats)
 		})
 	} else if (hasPendingBake) {
@@ -601,7 +611,13 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 			if (!m) return
 			const pending = pendingOf(m)
 			const mapName = (m.map?.name || '').toLowerCase()
-			const c = classify(n, (m.name || '').toLowerCase(), mapName || pending, !!m.userData?.__isBaked, !!m.userData?.__addBlend)
+			const c = classify(
+				n,
+				(m.name || '').toLowerCase(),
+				mapName || pending,
+				!!m.userData?.__isBaked,
+				!!m.userData?.__addBlend,
+			)
 			if (c.isMainBake && pending && !mapName && !c.isVr && !c.isCab && o.visible) {
 				o.visible = false
 				stats.playfieldHidden++
@@ -711,6 +727,27 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 	if (whiteWallsHidden) harnessLog?.(`[wall] Hid ${whiteWallsHidden} white untextured stray meshes`, 'info')
 	if (stats.nanFixed || stats.nanHidden)
 		harnessLog?.(`[sanitize] ${stats.nanFixed} fixed ${stats.nanHidden} hidden`, 'info')
+	node.traverse(o => {
+		if (!o.isMesh) return
+		if (o.userData.isCabinetButton) return
+		for (let cur = o.parent; cur && cur !== node; cur = cur.parent) {
+			if (cur.userData?.isCabinetButton && cur.userData.buttonCode) {
+				o.userData.isCabinetButton = true
+				o.userData.buttonCode = cur.userData.buttonCode
+				o.frustumCulled = false
+				o.renderOrder = 100
+				break
+			}
+			const ancCode = resolveButtonCode((cur.name || '').toLowerCase())
+			if (ancCode) {
+				o.userData.isCabinetButton = true
+				o.userData.buttonCode = ancCode
+				o.frustumCulled = false
+				o.renderOrder = 100
+				break
+			}
+		}
+	})
 	return stats
 }
 
@@ -762,7 +799,12 @@ function framingBox(node, exclude) {
 	return { box, center, size, maxDim: Math.max(size.x, size.y, size.z) }
 }
 
-const excludeNonPlayfield = n => !n.includes('playfield') && !n.includes('button') && !n.includes('coin') && !n.includes('plunger') && !n.includes('apron')
+const excludeNonPlayfield = n =>
+	!n.includes('playfield') &&
+	!n.includes('button') &&
+	!n.includes('coin') &&
+	!n.includes('plunger') &&
+	!n.includes('apron')
 const excludeVrNonCab = n => RE_VR.test(n) && !RE_CAB.test(n)
 const VIEWER = { dist: 1.2, elev: 0.85, azim: 0.65, near: 0.015, farScale: 8, farMin: 2000 }
 const PLAY = { dist: 0.95, elev: 0.95, azim: 0.92, near: 0.012, farScale: 10, farMin: 4000, forwardBias: 0.07 }

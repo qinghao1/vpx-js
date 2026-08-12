@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { pushInput } from '../../dist-esm/lib/game/shared/physics-buffer.js'
 import { NUDGE } from './config.js'
+import { ensureBvh } from './env.js'
 import { swipeNudge } from './scene.js'
 import { aliasEvent } from './utils.js'
 
@@ -78,22 +79,8 @@ export function attachKeyboard(viewer) {
 	}
 }
 
-const findButtonCode = obj => {
-	for (let cur = obj; cur; cur = cur.parent) {
-		const n = (cur.name || '').toLowerCase()
-		if (n.includes('startbutton')) return 'Digit1'
-		if (n.includes('tourbutton')) return 'Digit1'
-		if (n.includes('firebutton')) return 'Enter'
-		if (n.includes('plunger')) return 'Enter'
-		if (n.includes('coin')) return 'Digit5'
-		if (n.includes('launch')) return 'Enter'
-	}
-	const n = (obj.name || '').toLowerCase()
-	if (n.includes('button')) return 'Digit1'
-	return null
-}
-
 export function attachPointerTouch(viewer) {
+	ensureBvh()
 	const canvas = viewer.dom.canvas
 	if (!canvas) return () => {}
 	if (viewer._touchCleanup) viewer._touchCleanup()
@@ -132,40 +119,51 @@ export function attachPointerTouch(viewer) {
 	let hoverY = 0
 	let isHoveringButton = false
 
+	const emissiveOrig = new WeakMap()
+	const emissiveIntOrig = new WeakMap()
+	const scaleOrig = new WeakMap()
+
 	const getButtonHit = (clientX, clientY) => {
 		if (!viewer.tableGroup || !viewer.camera) return null
 		if (viewer.viewerMode !== 'play') return null
 		if (!viewer.player) return null
-		viewer.tableGroup.updateMatrixWorld(true)
+		const meshes = viewer._buttonMeshes
 		const rect = canvas.getBoundingClientRect()
 		if (clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom) return null
+		viewer.tableGroup.updateMatrixWorld(true)
 		const x = ((clientX - rect.left) / rect.width) * 2 - 1
 		const y = -((clientY - rect.top) / rect.height) * 2 + 1
 		const mouse = new THREE.Vector2(x, y)
 		raycaster.setFromCamera(mouse, viewer.camera)
+		if (meshes?.length) {
+			raycaster.firstHitOnly = true
+			const hits = raycaster.intersectObjects(meshes, false)
+			if (!hits.length) return null
+			const h = hits[0]
+			const code = h.object.userData?.buttonCode || h.object.userData?.__buttonCode
+			if (!code) return null
+			return { code, object: h.object, distance: h.distance }
+		}
+		raycaster.firstHitOnly = false
 		const hits = raycaster.intersectObject(viewer.tableGroup, true)
 		for (const h of hits) {
-			const code = findButtonCode(h.object)
-			if (code) return { code, object: h.object, distance: h.distance }
+			for (let cur = h.object; cur; cur = cur.parent) {
+				const code =
+					cur.userData?.buttonCode ||
+					cur.userData?.__buttonCode ||
+					(cur.userData?.isCabinetButton ? cur.userData.buttonCode : null)
+				if (code) return { code, object: h.object, distance: h.distance }
+			}
 		}
 		return null
 	}
 
 	const setButtonVisual = (hitObject, isDown) => {
 		if (!hitObject) return
-		let btnNode = null
-		for (let cur = hitObject; cur; cur = cur.parent) {
-			const n = (cur.name || '').toLowerCase()
-			if (n.includes('button') || n.includes('coin') || n.includes('plunger') || n.includes('launch')) {
-				btnNode = cur
-				break
-			}
-		}
-		if (!btnNode) btnNode = hitObject
 		const meshes = []
-		if (btnNode.isMesh) meshes.push(btnNode)
+		if (hitObject.isMesh) meshes.push(hitObject)
 		else
-			btnNode.traverse?.(o => {
+			hitObject.traverse?.(o => {
 				if (o.isMesh) meshes.push(o)
 			})
 		if (!meshes.length && hitObject.isMesh) meshes.push(hitObject)
@@ -174,9 +172,9 @@ export function attachPointerTouch(viewer) {
 			const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
 			for (const mat of mats) {
 				if (isDown) {
-					if (mat.userData.__origEmissive === undefined) {
-						mat.userData.__origEmissive = mat.emissive ? mat.emissive.clone() : new THREE.Color(0x000000)
-						mat.userData.__origEmissiveIntensity = mat.emissiveIntensity ?? 0
+					if (!emissiveOrig.has(mat)) {
+						emissiveOrig.set(mat, mat.emissive ? mat.emissive.clone() : new THREE.Color(0x000000))
+						emissiveIntOrig.set(mat, mat.emissiveIntensity ?? 0)
 					}
 					if (mat.emissive) {
 						mat.emissive.setHex(0x666666)
@@ -184,18 +182,20 @@ export function attachPointerTouch(viewer) {
 					}
 					mat.needsUpdate = true
 				} else {
-					if (mat.userData.__origEmissive !== undefined) {
-						if (mat.emissive) mat.emissive.copy(mat.userData.__origEmissive)
-						mat.emissiveIntensity = mat.userData.__origEmissiveIntensity
+					if (emissiveOrig.has(mat)) {
+						const orig = emissiveOrig.get(mat)
+						if (mat.emissive && orig) mat.emissive.copy(orig)
+						mat.emissiveIntensity = emissiveIntOrig.get(mat) ?? 0
 						mat.needsUpdate = true
 					}
 				}
 			}
 			if (isDown) {
-				if (!mesh.userData.__origScale) mesh.userData.__origScale = mesh.scale.clone()
+				if (!scaleOrig.has(mesh)) scaleOrig.set(mesh, mesh.scale.clone())
 				mesh.scale.set(0.97, 0.97, 0.97)
 			} else {
-				if (mesh.userData.__origScale) mesh.scale.copy(mesh.userData.__origScale)
+				const orig = scaleOrig.get(mesh)
+				if (orig) mesh.scale.copy(orig)
 			}
 		}
 	}

@@ -90,17 +90,21 @@ export class DmdController {
 			)
 				return { x: (d.left + d.right) / 2, y: (d.top + d.bottom) / 2 }
 			const dim = table?.getDimensions?.()
-			if (dim) return { x: dim.width / 2, y: dim.height / 2 }
+			if (dim) {
+				const left = typeof d?.left === 'number' ? d.left : 0
+				const top = typeof d?.top === 'number' ? d.top : 0
+				return { x: left + dim.width / 2, y: top + dim.height / 2 }
+			}
 			return { x: 470, y: 600 }
 		})()
 		const distToCenter = (x, y) => Math.hypot(x - tableCenter.x, y - tableCenter.y)
+		const tmpVec = new THREE.Vector3()
 		const scoreForMesh = m => {
 			const key = (m.name || '').toLowerCase().replace(/^dmd_/, '')
 			const fl = flasherMap.get(key)
 			if (fl) return distToCenter(fl.data.center.x, fl.data.center.y)
-			const p = m.position
-			if (p && typeof p.x === 'number' && typeof p.y === 'number') return distToCenter(p.x, p.y)
-			return Number.POSITIVE_INFINITY
+			m.getWorldPosition(tmpVec)
+			return distToCenter(tmpVec.x, tmpVec.y)
 		}
 		const applyDmdMaterial = m => {
 			for (const mat of Array.isArray(m.material) ? m.material : [m.material]) {
@@ -130,23 +134,33 @@ export class DmdController {
 		})
 		const idealFlasher = (() => {
 			if (!flashers.length) return null
-			let best = flashers[0]
+			let pool = flashers
+			if (isPlay) {
+				const nonVr = flashers.filter(f => !f.getName().toLowerCase().includes('vr_'))
+				if (nonVr.length) pool = nonVr
+			}
+			let best = pool[0]
 			let bestScore = distToCenter(best.data.center.x, best.data.center.y)
-			for (let i = 1; i < flashers.length; i++) {
-				const s = distToCenter(flashers[i].data.center.x, flashers[i].data.center.y)
+			for (let i = 1; i < pool.length; i++) {
+				const s = distToCenter(pool[i].data.center.x, pool[i].data.center.y)
 				const better = isPlay ? s > bestScore : s < bestScore
 				if (better) {
-					best = flashers[i]
+					best = pool[i]
 					bestScore = s
 				}
 			}
 			return best
 		})()
 		if (candidates.length) {
+			const selectable = (() => {
+				if (!isPlay) return candidates
+				const nonVr = candidates.filter(m => !m.name.toLowerCase().includes('vr_'))
+				return nonVr.length ? nonVr : candidates
+			})()
 			let best = null
 			if (idealFlasher) {
 				const idealKey = idealFlasher.getName().toLowerCase()
-				best = candidates.find(m => (m.name || '').toLowerCase().replace(/^dmd_/, '') === idealKey) || null
+				best = selectable.find(m => (m.name || '').toLowerCase().replace(/^dmd_/, '') === idealKey) || null
 				if (best)
 					this.viewer.log(
 						`DMD: found ${candidates.length} on-table mesh(es) -> keep ${best.name} (ideal ${idealKey})`,
@@ -154,13 +168,13 @@ export class DmdController {
 					)
 			}
 			if (!best) {
-				best = candidates[0]
+				best = selectable[0]
 				let bestScore = scoreForMesh(best)
-				for (let i = 1; i < candidates.length; i++) {
-					const s = scoreForMesh(candidates[i])
+				for (let i = 1; i < selectable.length; i++) {
+					const s = scoreForMesh(selectable[i])
 					const better = isPlay ? s > bestScore : s < bestScore
 					if (better) {
-						best = candidates[i]
+						best = selectable[i]
 						bestScore = s
 					}
 				}
@@ -170,22 +184,12 @@ export class DmdController {
 				)
 			}
 			for (const m of candidates) if (m !== best) m.visible = false
-			if (
-				idealFlasher &&
-				!candidates.some(
-					m => (m.name || '').toLowerCase().replace(/^dmd_/, '') === idealFlasher.getName().toLowerCase(),
-				)
-			) {
-				for (const m of candidates) m.visible = false
-				this.meshes = []
-			} else {
-				best.visible = true
-				for (let p = best.parent; p && p !== tableGroup; p = p.parent) if (p.visible === false) p.visible = true
-				applyDmdMaterial(best)
-				this.meshes = [best]
-				this.viewer.dmdMeshes = this.meshes
-				return
-			}
+			best.visible = true
+			for (let p = best.parent; p && p !== tableGroup; p = p.parent) if (p.visible === false) p.visible = true
+			applyDmdMaterial(best)
+			this.meshes = [best]
+			this.viewer.dmdMeshes = this.meshes
+			return
 		}
 		if (!flashers.length) {
 			this.viewer.log(
