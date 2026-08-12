@@ -10,6 +10,7 @@ import {
 } from '../dist-esm/lib/game/shared/physics-buffer.js'
 import { BrowserBinaryReader } from '../dist-esm/lib/io/binary-reader.browser.js'
 import { isWasmReady } from '../dist-esm/lib/physics/wasm/kernels.js'
+import { optimizeScene as _optimizeScene } from '../dist-esm/lib/render/threejs/three-batched-builder.js'
 import { buildBvhIdle } from '../dist-esm/lib/render/threejs/three-bvh.js'
 import { ThreeRenderApi } from '../dist-esm/lib/render/threejs/three-render-api.js'
 import { ThreeTextureLoaderBrowser } from '../dist-esm/lib/render/threejs/three-texture-loader-browser.js'
@@ -1074,6 +1075,26 @@ export class Viewer {
 			table,
 		})
 		if (this.viewerMode === 'play') hideCabFlippers(node)
+		try {
+			const params = new URLSearchParams(location.search)
+			const useBatch = !params.has('nobatched')
+			if (useBatch && table && this.renderApi) {
+				const res = _optimizeScene(node, table, this.renderApi)
+				if ((res.batched || res.instanced) && this.harnessLog) {
+					const before = (() => {
+						let c = 0
+						node.traverse(o => {
+							if (o.isMesh) c++
+						})
+						return c
+					})()
+					this.harnessLog(
+						`[batch] BatchedMesh ${res.batched} + Instanced ${res.instanced} — meshes ${before}`,
+						'info',
+					)
+				}
+			}
+		} catch {}
 		this.buildNodeCache()
 		this.dmd._ensureTexture()
 		this.dmd.findMeshes()
@@ -1200,6 +1221,10 @@ export class Viewer {
 		this.player.updateAnimations(this.player.getGameTime() ?? this.player.getPhysics().timeMsec ?? 0)
 		const init = this.player.popStates()
 		this.applyChangedStates(init)
+		try {
+			this.dmd._ensureTexture()
+			this.dmd.findMeshes()
+		} catch {}
 		this.player.on('ballCreated', b => this.handleBallLifecycle(b, true))
 		this.player.on('ballDestroyed', b => this.handleBallLifecycle(b, false))
 		this.player.on('emuStarted', () => {

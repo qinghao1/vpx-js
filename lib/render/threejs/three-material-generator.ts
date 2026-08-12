@@ -244,7 +244,7 @@ export class ThreeMaterialGenerator {
 		mat.needsUpdate = true
 	}
 
-	private getKey(
+	public getKey(
 		material?: Material,
 		map?: string,
 		normalMap?: string,

@@ -30,7 +30,7 @@ export function buildBvhForGeometry(geom: BufferGeometry): void {
 	const tris = g.index ? g.index.count / 3 : g.attributes.position.count / 3
 	if (tris < 200) return
 	try {
-		g.computeBoundsTree?.({})
+		g.computeBoundsTree?.({ includeInstances: true } as any)
 	} catch {}
 }
 
@@ -38,8 +38,13 @@ export function buildBvhForNode(root: { traverse(cb: (o: unknown) => void): void
 	installBvh()
 	let built = 0
 	root.traverse((o: unknown) => {
-		const m = o as { isMesh?: boolean; geometry?: BufferGeometry }
-		if (!m.isMesh || !m.geometry) return
+		const m = o as {
+			isMesh?: boolean
+			isInstancedMesh?: boolean
+			isBatchedMesh?: boolean
+			geometry?: BufferGeometry
+		}
+		if ((!m.isMesh && !m.isInstancedMesh && !m.isBatchedMesh) || !m.geometry) return
 		const g = m.geometry as BvhGeometry
 		if (g.boundsTree) return
 		buildBvhForGeometry(m.geometry)
@@ -52,8 +57,9 @@ export function buildBvhIdle(root: { traverse(cb: (o: unknown) => void): void },
 	installBvh()
 	const queue: BvhGeometry[] = []
 	root.traverse((o: unknown) => {
-		const m = o as { isMesh?: boolean; geometry?: BvhGeometry }
-		if (m.isMesh && m.geometry && !m.geometry.boundsTree) queue.push(m.geometry)
+		const m = o as { isMesh?: boolean; isInstancedMesh?: boolean; isBatchedMesh?: boolean; geometry?: BvhGeometry }
+		if ((m.isMesh || m.isInstancedMesh || m.isBatchedMesh) && m.geometry && !m.geometry.boundsTree)
+			queue.push(m.geometry)
 	})
 	if (!queue.length) return
 	let idx = 0

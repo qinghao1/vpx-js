@@ -1,6 +1,11 @@
 import * as THREE from 'three'
 import { DMD } from './config.js'
 
+const VISIBLE_WEIGHT = 1e6
+const DUP_MAX = 600
+const DUP_FACTOR = 0.3
+const SIZE_TOL = 0.4
+
 export class DmdController {
 	constructor(viewer) {
 		this.viewer = viewer
@@ -94,6 +99,7 @@ export class DmdController {
 			this.viewer.dmdMeshes = this.meshes
 			return
 		}
+
 		const tableCenter = (() => {
 			const d = table?.data
 			if (
@@ -113,7 +119,8 @@ export class DmdController {
 			return { x: 470, y: 600 }
 		})()
 		const distToCenter = (x, y) => Math.hypot(x - tableCenter.x, y - tableCenter.y)
-		const getFlasherSize = fl => {
+		const getPos = fl => ({ x: fl.data?.center?.x ?? 0, y: fl.data?.center?.y ?? 0 })
+		const getSize = fl => {
 			const raw = fl.data?.dragPoints ?? fl.data?._dragPoints ?? []
 			const pts = Array.isArray(raw) ? raw : []
 			if (pts.length >= 4) {
@@ -125,7 +132,6 @@ export class DmdController {
 			}
 			return { w: 0, h: 0 }
 		}
-		const getFlasherPos = fl => ({ x: fl.data?.center?.x ?? 0, y: fl.data?.center?.y ?? 0 })
 		const dim = (() => {
 			try {
 				return table?.getDimensions?.() ?? { width: 1000, height: 2000 }
@@ -133,23 +139,21 @@ export class DmdController {
 				return { width: 1000, height: 2000 }
 			}
 		})()
-		const dupThreshold = Math.min(600, Math.max(dim.width, dim.height) * 0.3)
-		const clusterFlashers = list => {
+		const dupThreshold = Math.min(DUP_MAX, Math.max(dim.width, dim.height) * DUP_FACTOR)
+		const cluster = list => {
 			const clusters = []
 			for (const fl of list) {
+				const pos = getPos(fl)
+				const size = getSize(fl)
 				let placed = false
-				const pos = getFlasherPos(fl)
-				const size = getFlasherSize(fl)
 				for (const cl of clusters) {
 					const rep = cl[0]
-					const repPos = getFlasherPos(rep)
-					const d = Math.hypot(pos.x - repPos.x, pos.y - repPos.y)
-					if (d > dupThreshold) continue
-					const repSize = getFlasherSize(rep)
+					const repPos = getPos(rep)
+					if (Math.hypot(pos.x - repPos.x, pos.y - repPos.y) > dupThreshold) continue
+					const repSize = getSize(rep)
 					if (size.w && repSize.w) {
-						const wRatio = Math.abs(size.w - repSize.w) / Math.max(size.w, repSize.w)
-						const hRatio = Math.abs(size.h - repSize.h) / Math.max(size.h, repSize.h)
-						if (wRatio > 0.4 || hRatio > 0.4) continue
+						if (Math.abs(size.w - repSize.w) / Math.max(size.w, repSize.w) > SIZE_TOL) continue
+						if (Math.abs(size.h - repSize.h) / Math.max(size.h, repSize.h) > SIZE_TOL) continue
 					}
 					cl.push(fl)
 					placed = true
@@ -159,18 +163,14 @@ export class DmdController {
 			}
 			return clusters
 		}
-		const scoreFlasher = fl => {
-			const visible = fl.data?.isVisible ? 1 : 0
-			const pos = getFlasherPos(fl)
-			const dist = distToCenter(pos.x, pos.y)
-			return visible * 1e6 + dist
-		}
-		const clusters = clusterFlashers(flashers)
-		const representatives = clusters.map(cl => {
-			let best = cl[0]
-			let bestScore = scoreFlasher(best)
+		const score = fl => (fl.data?.isVisible ? VISIBLE_WEIGHT : 0) + distToCenter(getPos(fl).x, getPos(fl).y)
+
+		const clusters = cluster(flashers)
+		const reps = clusters.map(cl => {
+			let best = cl[0],
+				bestScore = score(best)
 			for (let i = 1; i < cl.length; i++) {
-				const s = scoreFlasher(cl[i])
+				const s = score(cl[i])
 				if (s > bestScore) {
 					best = cl[i]
 					bestScore = s
@@ -178,29 +178,31 @@ export class DmdController {
 			}
 			return { cluster: cl, chosen: best }
 		})
-		const chosenNames = representatives.map(r => r.chosen.getName()).join(', ')
 		if (clusters.some(c => c.length > 1)) {
 			this.viewer.log(
-				`DMD: deduped ${flashers.length} flashers in ${clusters.length} cluster(s) -> ${chosenNames} (visible ? farthest)`,
+				`DMD: deduped ${flashers.length} flashers in ${clusters.length} cluster(s) -> ${reps.map(r => r.chosen.getName()).join(', ')} (visible ? farthest)`,
 				'info',
 			)
 		}
-		const existingProcedural = []
+
+		// Remove previous procedural planes
+		const oldProcedural = []
 		tableGroup.traverse(o => {
-			if (o.userData?.isProceduralDMD) existingProcedural.push(o)
+			if (o.userData?.isProceduralDMD) oldProcedural.push(o)
 		})
-		for (const o of existingProcedural) o.parent?.remove(o)
-		const dmdNameSet = new Set([...flasherMap.keys(), 'dmd'])
+		for (const o of oldProcedural) o.parent?.remove(o)
+
+		const dmdNames = new Set([...flasherMap.keys(), 'dmd'])
 		const candidates = []
 		tableGroup.traverse(o => {
 			if (!o.isMesh) return
 			const n = (o.name || '').toLowerCase()
-			const isDmdMesh = dmdNameSet.has(n) || n.includes('dmd')
-			if (!isDmdMesh) return
-			candidates.push(o)
+			if (dmdNames.has(n) || n === 'dmd' || n.startsWith('dmd_') || n.startsWith('dmd.') || n.includes('_dmd'))
+				candidates.push(o)
 		})
 		for (const m of candidates) m.visible = true
-		const applyDmdMaterial = m => {
+
+		const applyMat = m => {
 			for (const mat of Array.isArray(m.material) ? m.material : [m.material]) {
 				if (!mat || !this.texture) continue
 				mat.map = this.texture
@@ -219,42 +221,34 @@ export class DmdController {
 			m.renderOrder = 1000
 			m.frustumCulled = false
 		}
+
 		if (candidates.length) {
 			const tmpVec = new THREE.Vector3()
-			const scoreForMesh = m => {
+			const meshScore = m => {
 				const key = (m.name || '').toLowerCase().replace(/^dmd_/, '')
 				const fl = flasherMap.get(key)
-				if (fl) return scoreFlasher(fl)
+				if (fl) return score(fl)
 				m.getWorldPosition(tmpVec)
 				return distToCenter(tmpVec.x, tmpVec.y)
 			}
-			const candidatesByCluster = new Map()
-			for (const rep of representatives) {
-				candidatesByCluster.set(rep.chosen.getName().toLowerCase(), [])
-			}
+			const buckets = new Map(reps.map(r => [r.chosen.getName().toLowerCase(), []]))
 			const unmapped = []
 			for (const m of candidates) {
 				const key = (m.name || '').toLowerCase().replace(/^dmd_/, '')
 				const fl = flasherMap.get(key)
-				if (fl) {
-					const rep = representatives.find(r => r.cluster.includes(fl))
-					const repKey = rep?.chosen.getName().toLowerCase()
-					if (repKey && candidatesByCluster.has(repKey)) {
-						candidatesByCluster.get(repKey).push(m)
-						continue
-					}
-				}
-				unmapped.push(m)
+				const rep = fl ? reps.find(r => r.cluster.includes(fl)) : null
+				const bKey = rep?.chosen.getName().toLowerCase()
+				if (bKey && buckets.has(bKey)) buckets.get(bKey).push(m)
+				else unmapped.push(m)
 			}
 			const keep = []
-			for (const rep of representatives) {
-				const key = rep.chosen.getName().toLowerCase()
-				const bucket = candidatesByCluster.get(key) ?? []
+			for (const rep of reps) {
+				const bucket = buckets.get(rep.chosen.getName().toLowerCase()) ?? []
 				if (bucket.length) {
-					let best = bucket[0]
-					let bestScore = scoreForMesh(best)
+					let best = bucket[0],
+						bestScore = meshScore(best)
 					for (let i = 1; i < bucket.length; i++) {
-						const s = scoreForMesh(bucket[i])
+						const s = meshScore(bucket[i])
 						if (s > bestScore) {
 							best = bucket[i]
 							bestScore = s
@@ -262,11 +256,11 @@ export class DmdController {
 					}
 					keep.push(best)
 				} else if (unmapped.length) {
-					let best = unmapped[0]
-					let bestScore = scoreForMesh(best)
-					let bestIdx = 0
+					let best = unmapped[0],
+						bestScore = meshScore(best),
+						bestIdx = 0
 					for (let i = 1; i < unmapped.length; i++) {
-						const s = scoreForMesh(unmapped[i])
+						const s = meshScore(unmapped[i])
 						if (s > bestScore) {
 							best = unmapped[i]
 							bestScore = s
@@ -277,11 +271,11 @@ export class DmdController {
 					unmapped.splice(bestIdx, 1)
 				}
 			}
-			if (unmapped.length && !keep.length) {
-				let best = unmapped[0]
-				let bestScore = scoreForMesh(best)
+			if (!keep.length && unmapped.length) {
+				let best = unmapped[0],
+					bestScore = meshScore(best)
 				for (let i = 1; i < unmapped.length; i++) {
-					const s = scoreForMesh(unmapped[i])
+					const s = meshScore(unmapped[i])
 					if (s > bestScore) {
 						best = unmapped[i]
 						bestScore = s
@@ -294,7 +288,7 @@ export class DmdController {
 			for (const m of keep) {
 				m.visible = true
 				for (let p = m.parent; p && p !== tableGroup; p = p.parent) if (p.visible === false) p.visible = true
-				applyDmdMaterial(m)
+				applyMat(m)
 			}
 			this.meshes = keep
 			this.viewer.dmdMeshes = this.meshes
@@ -305,12 +299,13 @@ export class DmdController {
 				)
 			return
 		}
-		for (const rep of representatives) {
+
+		for (const rep of reps) {
 			const fl = rep.chosen
 			const d = fl.data
 			const pts = d.dragPoints ?? d._dragPoints ?? []
-			let w = 600
-			let h = 160
+			let w = 600,
+				h = 160
 			if (Array.isArray(pts) && pts.length >= 4) {
 				const xs = pts.map(p => p?.vertex?.x ?? p?.x ?? 0)
 				const ys = pts.map(p => p?.vertex?.y ?? p?.y ?? 0)
