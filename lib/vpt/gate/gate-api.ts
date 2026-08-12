@@ -134,6 +134,8 @@ export class GateApi extends ItemApi<GateData> {
 		return this.data.twoWay
 	}
 	set TwoWay(v) {
+		if (this.hitGate) this.hitGate.twoWay = v
+		else this.data.twoWay = v
 		this.data.twoWay = v
 	}
 	get ReflectionEnabled() {

@@ -19,7 +19,7 @@ import type { GateState } from './gate-state.js'
 export class GateHit extends HitObject {
 	public readonly mover: GateMover
 	public readonly lineSeg: LineSeg[] = []
-	public twoWay = false
+	public twoWay: boolean
 
 	constructor(
 		private readonly data: GateData,
@@ -40,6 +40,7 @@ export class GateHit extends HitObject {
 			new LineSeg(v1, v2, z0, z1, CollisionType.Gate),
 			new LineSeg(v2.clone(), v1.clone(), z0, z1, CollisionType.Gate),
 		)
+		this.twoWay = data.twoWay
 		this.mover = new GateMover(data, state, events)
 	}
 
