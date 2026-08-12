@@ -1824,7 +1824,6 @@ export class Viewer {
 		this._inputCleanup?.()
 		this._inputCleanup = attachInput(this)
 	}
-	_setupNudgeInput() {}
 }
 export function createViewer(opts) {
 	return new Viewer(opts)

@@ -55,11 +55,7 @@ function tick(): void {
 	try {
 		writeFrame(sab, scratch, 0, tPrev, timeMsec, timeMsec)
 	} catch {}
-	if (++tickCount % 1000 === 0) {
-		try {
-			self.postMessage({ type: 'heartbeat', timeMsec, tickCount })
-		} catch {}
-	}
+	tickCount++
 }
 
 function startLoop(): void {

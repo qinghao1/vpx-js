@@ -10,7 +10,8 @@ export function initHelp(viewer) {
 	const grid = help.querySelector('.help-grid')
 	if (grid && !grid.dataset.populated) {
 		grid.innerHTML = CONTROL_SCHEME.map(
-			c => `<div class="help-row"><span class="help-label">${c.label}</span><span class="help-keys">${c.help}</span></div>`,
+			c =>
+				`<div class="help-row"><span class="help-label">${c.label}</span><span class="help-keys">${c.help}</span></div>`,
 		).join('')
 		grid.dataset.populated = '1'
 	}
@@ -43,9 +44,6 @@ export function initHelp(viewer) {
 	help.addEventListener('click', e => {
 		if (e.target === help) close()
 	})
-	if (isDialog) {
-		help.addEventListener('close', () => {})
-	}
 
 	addEventListener(
 		'keydown',
@@ -57,7 +55,11 @@ export function initHelp(viewer) {
 			}
 			if (e.key === '?' || (e.key === 'h' && !e.ctrlKey && !e.metaKey && !e.repeat)) {
 				const t = e.target
-				if (t instanceof HTMLElement && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
+				if (
+					t instanceof HTMLElement &&
+					(t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)
+				)
+					return
 				e.preventDefault()
 				toggle()
 			}

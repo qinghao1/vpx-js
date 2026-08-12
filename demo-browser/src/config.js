@@ -45,13 +45,13 @@ export const CONTROL_SCHEME = [
 		label: 'Fire / Lockbar',
 		help: '<kbd>Alt</kbd><span class="hint">L</span><span class="sep">·</span>tap yellow apron button',
 		keys: ['AltLeft'],
-		buttons: { regex: /fire|lockbar/i, code: 'AltLeft' },
+		buttons: [{ regex: /fire|lockbar/i, code: 'AltLeft' }],
 	},
 	{
 		label: 'Plunger',
 		help: '<kbd>Enter</kbd><span class="hint">hold → release</span><span class="sep">·</span>touch bottom-right',
 		keys: ['Enter'],
-		buttons: { regex: /plunger|launch/i, code: 'Enter' },
+		buttons: [{ regex: /plunger|launch/i, code: 'Enter' }],
 	},
 	{
 		label: 'Start / Coin',
@@ -75,11 +75,13 @@ export const CONTROL_SCHEME = [
 	},
 ]
 
+const buttons = label => CONTROL_SCHEME.find(c => c.label === label)?.buttons ?? []
+
 export const BUTTON_CODE_PATTERNS = [
-	...CONTROL_SCHEME.find(c => c.label === 'Start / Coin').buttons,
-	...[CONTROL_SCHEME.find(c => c.label === 'Plunger').buttons].flat(),
-	...[CONTROL_SCHEME.find(c => c.label === 'Fire / Lockbar').buttons].flat(),
-	...CONTROL_SCHEME.find(c => c.label === 'Magna Save').buttons,
+	...buttons('Start / Coin'),
+	...buttons('Plunger'),
+	...buttons('Fire / Lockbar'),
+	...buttons('Magna Save'),
 	{ regex: /button/i, code: 'Digit1' },
 ]
 
