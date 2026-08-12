@@ -1,7 +1,5 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
-import { MathUtils } from 'three'
-
 import type { IRenderApi } from '../../render/irender-api.js'
 import { ItemUpdater } from '../item-updater.js'
 import type { Table } from '../table/table.js'
@@ -29,13 +27,17 @@ export class GateUpdater extends ItemUpdater<GateState> {
 		if (state.showBracket !== undefined)
 			renderApi.applyVisibility(state.showBracket, renderApi.findInGroup(obj, `gate.bracket-${state.name}`))
 		if (state.angle !== undefined) {
+			const scaleZ = table.getScaleZ()
+			const baseHeight = table.getSurfaceHeight(this.data.szSurface, this.data.center.x, this.data.center.y) * scaleZ
+			const posZ = this.data.height * scaleZ + baseHeight
+			const angle = this.data.twoWay ? state.angle : -state.angle
 			this.applyXRotation(
 				obj,
 				renderApi,
 				this.data.center,
-				this.data.height,
+				posZ,
 				this.data.rotation,
-				state.angle - MathUtils.degToRad(this.data.angleMin),
+				angle,
 				`gate.wire-${this.state.getName()}`,
 			)
 		}

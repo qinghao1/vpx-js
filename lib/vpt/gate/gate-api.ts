@@ -153,6 +153,7 @@ export class GateApi extends ItemApi<GateData> {
 	}
 
 	private openGate(isOpen: boolean): void {
+		this.mover.hitDirection = false
 		this.mover.angleMax = this.data.angleMax
 		this.mover.angleMin = this.data.angleMin
 		this.mover.forcedMove = true
@@ -187,6 +188,7 @@ export class GateApi extends ItemApi<GateData> {
 	}
 
 	public move(dir: number, speed: number, angle: number): void {
+		this.mover.hitDirection = false
 		this.mover.forcedMove = true
 		this.mover.open = true
 		this.hitGate.isEnabled = false

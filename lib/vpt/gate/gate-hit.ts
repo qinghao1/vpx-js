@@ -71,9 +71,11 @@ export class GateHit extends HitObject {
 		if (Math.abs(h) > 1) speed /= h
 		this.mover.angleSpeed = speed
 		if (!coll.hitFlag && !this.twoWay) {
-			this.mover.angleSpeed /= 8
+			this.mover.hitDirection = coll.hitNormal.dot(ball.hit.vel) > 0
+			this.mover.angleSpeed *= 1 / 50
 			return
 		}
+		this.mover.hitDirection = false
 		if (coll.hitFlag && this.twoWay) this.mover.angleSpeed = -this.mover.angleSpeed
 		this.fireHitEvent(ball)
 	}
