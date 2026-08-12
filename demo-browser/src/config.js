@@ -4,9 +4,9 @@ export const BAKED_METAL = 0.1
 
 export const CAM = { fov: 45, near: 10, far: 10000 }
 export const CAM_ANIM = { durationMode: 900, durationReset: 700 }
-export const LIGHT_HEMI = { sky: 0xffffff, ground: 0x444444, intensity: 1.0 }
-export const LIGHT_DIR = { color: 0xffffff, intensity: 1.0, pos: [400, -600, 1200] }
-export const LIGHT_AMBIENT = { color: 0xffffff, intensity: 0.6 }
+export const LIGHT_HEMI = { sky: 0xffffff, ground: 0x444444, intensity: 0.35 }
+export const LIGHT_DIR = { color: 0xffffff, intensity: 0.4, pos: [400, -600, 1200] }
+export const LIGHT_AMBIENT = { color: 0xffffff, intensity: 0.18 }
 
 export const DMD = { w: 128, h: 32, scale: 4 }
 

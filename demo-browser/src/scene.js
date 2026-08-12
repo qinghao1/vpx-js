@@ -659,6 +659,9 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 			n.includes('kicker') ||
 			n.includes('target') ||
 			n.includes('spinner') ||
+			n.includes('button') ||
+			n.includes('coin') ||
+			n.includes('plunger') ||
 			n.includes('primitive-bm') ||
 			n.includes('bm_')
 		)
@@ -689,7 +692,7 @@ export function ensureProceduralRoom(scene, center, size, opts = {}) {
 		H = Math.max(900, maxDim * 6)
 	const g = new THREE.Group()
 	g.name = 'vr_procedural_room'
-	const floorY = center.z - size.z * 0.6 - 50
+	const floorY = center.z - size.z * 0.6 - 200
 	const box = new THREE.Mesh(
 		new THREE.BoxGeometry(W, D, H),
 		new THREE.MeshStandardMaterial({ color: 0x1c222e, roughness: 0.95, side: THREE.BackSide }),
@@ -727,10 +730,10 @@ function framingBox(node, exclude) {
 	return { box, center, size, maxDim: Math.max(size.x, size.y, size.z) }
 }
 
-const excludeNonPlayfield = n => !n.includes('playfield')
+const excludeNonPlayfield = n => !n.includes('playfield') && !n.includes('button') && !n.includes('coin') && !n.includes('plunger') && !n.includes('apron')
 const excludeVrNonCab = n => RE_VR.test(n) && !RE_CAB.test(n)
-const VIEWER = { dist: 1.2, elev: 0.85, azim: 0.65, near: 0.015, farScale: 8, farMin: 2000 }
-const PLAY = { dist: 0.95, elev: 0.95, azim: 0.92, near: 0.012, farScale: 10, farMin: 4000, forwardBias: 0.07 }
+const VIEWER = { dist: 1.35, elev: 0.85, azim: 0.65, near: 0.015, farScale: 8, farMin: 2000 }
+const PLAY = { dist: 1.15, elev: 0.92, azim: 0.88, near: 0.012, farScale: 10, farMin: 4000, forwardBias: 0.07 }
 
 function framingState(node, targetExclude, sizeExclude, cfg) {
 	const target = framingBox(node, targetExclude).center.clone()
@@ -768,8 +771,10 @@ export function frameCamera(node, camera, controls) {
 }
 
 export const isDeferred = (tx, table) => {
+	const n = tx.getName().toLowerCase()
 	const pf = table.getPlayfieldMap().toLowerCase()
-	if (tx.getName().toLowerCase() === pf) return false
+	if (n === pf) return false
+	if (n.includes('nestmap0') || n.includes('playfield') || n === 'blueprintsv2noramps') return false
 	const p = (tx.szPath || '').toLowerCase()
 	if (p.endsWith('.exr') || p.endsWith('.hdr') || tx.isHdr?.()) return true
 	return tx.width * tx.height > 1_048_576

@@ -298,17 +298,21 @@ export class Viewer {
 			if (tm === 5) return THREE.LinearToneMapping ?? THREE.AgXToneMapping ?? THREE.ACESFilmicToneMapping
 			return THREE.ReinhardToneMapping ?? THREE.AgXToneMapping ?? THREE.ACESFilmicToneMapping
 		}
-		const exposureFor = ex => {
+		const exposureFor = (ex, tbl) => {
 			const v = Number.isFinite(ex) ? ex : 1
-			return Math.max(0.1, Math.min(2, v))
+			const base = Math.max(0.1, Math.min(2, v))
+			const emissionScale = tbl?.globalEmissionScale
+			const raw = Number.isFinite(emissionScale) ? emissionScale : 1
+			const scale = Math.max(0.5, Math.min(1, Math.pow(Math.max(0.01, raw), 0.5)))
+			return base * scale
 		}
 		const t = this.table?.data ?? null
 		renderer.toneMapping = toneMapFor(t?.toneMapper)
-		renderer.toneMappingExposure = exposureFor(t?.exposure)
+		renderer.toneMappingExposure = exposureFor(t?.exposure, t)
 		this._applyTableToneMapping = tbl => {
 			if (!this.renderer || !tbl?.data) return
 			this.renderer.toneMapping = toneMapFor(tbl.data.toneMapper)
-			this.renderer.toneMappingExposure = exposureFor(tbl.data.exposure)
+			this.renderer.toneMappingExposure = exposureFor(tbl.data.exposure, tbl.data)
 		}
 		this.renderer = renderer
 		this._rendererBackend = backend

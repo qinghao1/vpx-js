@@ -72,10 +72,11 @@ function viewportBudget(): number {
 	}
 }
 
-function effectiveMax(isFloat: boolean): number {
+function effectiveMax(isFloat: boolean, name?: string): number {
 	const hw = getHardwareMax()
 	const swift = isSwiftShader()
-	const cap = swift ? 1024 : 2048
+	const isPlayfield = !!name && /playfield|nestmap|bake/i.test(name)
+	const cap = swift ? (isPlayfield ? 2048 : 1024) : isPlayfield ? Math.min(8192, hw) : 4096
 	if (isFloat) return Math.min(hw, cap, Math.max(1024, Math.ceil(viewportBudget())))
 	return Math.min(hw, cap)
 }
@@ -84,7 +85,7 @@ function tune(tex: any): void {
 	tex.generateMipmaps = true
 	tex.minFilter = LinearMipMapLinearFilter
 	tex.magFilter = LinearFilter
-	tex.anisotropy = 1
+	tex.anisotropy = 4
 }
 
 function nameAndTune(tex: any, name: string): void {
@@ -130,7 +131,7 @@ function finalize(tex: any, name: string, isFloat: boolean): any {
 			}
 		} catch {}
 	}
-	const max = effectiveMax(isFloat)
+	const max = effectiveMax(isFloat, name)
 	if (tex.image?.data && tex.image.width && tex.image.height) {
 		const ds = downsampleData(tex, max)
 		if (ds !== tex) {
@@ -290,7 +291,7 @@ async function tryCreateBitmap(data: Uint8Array, mime: string, name: string): Pr
 			{ type: mime as any },
 		)
 		let bitmap: any = await createImageBitmap(blob as any, { imageOrientation: 'flipY' } as any)
-		const max = effectiveMax(false)
+		const max = effectiveMax(false, name)
 		if (bitmap.width > max || bitmap.height > max) {
 			const scale = Math.min(max / bitmap.width, max / bitmap.height)
 			const nw = Math.max(1, Math.floor(bitmap.width * scale))
@@ -398,7 +399,7 @@ async function loadRegular(name: string, mime: string, data: Uint8Array): Promis
 		const tex: any = await new TextureLoader().loadAsync(url)
 		tex.colorSpace = SRGBColorSpace
 		const img: any = tex.image
-		const max = effectiveMax(false)
+		const max = effectiveMax(false, name)
 		if (img && typeof img.width === 'number' && typeof img.height === 'number' && (img.width > max || img.height > max) && typeof document !== 'undefined') {
 			const scale = Math.min(max / img.width, max / img.height)
 			const nw = Math.max(1, Math.floor(img.width * scale))
