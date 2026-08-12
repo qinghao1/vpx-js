@@ -169,6 +169,11 @@ export function attachPointerTouch(viewer) {
 		if (!meshes.length && hitObject.isMesh) meshes.push(hitObject)
 		for (const mesh of meshes) {
 			if (!mesh.material) continue
+			if (isDown && !mesh.userData.__clonedMaterial) {
+				if (Array.isArray(mesh.material)) mesh.material = mesh.material.map(m => m.clone())
+				else mesh.material = mesh.material.clone()
+				mesh.userData.__clonedMaterial = true
+			}
 			const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
 			for (const mat of mats) {
 				if (isDown) {
@@ -201,7 +206,7 @@ export function attachPointerTouch(viewer) {
 	}
 
 	const disableOrbit = () => {
-		if (viewer.controls) {
+		if (viewer.controls && orbitPrevEnabled === null) {
 			orbitPrevEnabled = viewer.controls.enabled
 			viewer.controls.enabled = false
 		}
@@ -347,7 +352,6 @@ export function attachPointerTouch(viewer) {
 	const onContext = e => {
 		if (viewer.viewerMode === 'play') e.preventDefault()
 	}
-	canvas.addEventListener('click', onCanvasClick)
 	canvas.addEventListener('pointerdown', onDown, true)
 	canvas.addEventListener('pointerup', onUp, true)
 	canvas.addEventListener('pointercancel', onCancel, true)
@@ -364,7 +368,7 @@ export function attachPointerTouch(viewer) {
 		canvas.removeEventListener('pointercancel', onCancel, true)
 		canvas.removeEventListener('pointermove', onPointerMoveHover)
 		canvas.removeEventListener('pointerleave', onPointerLeave)
-		canvas.removeEventListener('touchstart', onTouchStart, { capture: true })
+		canvas.removeEventListener('touchstart', onTouchStart, true)
 		canvas.removeEventListener('touchend', onTouchEnd)
 		canvas.removeEventListener('touchcancel', onTouchEnd)
 		canvas.removeEventListener('contextmenu', onContext)
