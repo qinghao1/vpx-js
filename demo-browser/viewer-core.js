@@ -594,10 +594,6 @@ export class Viewer {
 			worker.postMessage({
 				type: 'start',
 			})
-			worker.onmessage = e => {
-				if (e.data?.type === 'heartbeat')
-					this.log(`[physics-worker] heartbeat ${e.data.timeMsec} ticks ${e.data.tickCount}`, 'debug')
-			}
 			worker.onerror = e => {
 				this.log(`worker error ${e.message}`, 'warn')
 				this._physicsSab = null
@@ -1292,9 +1288,14 @@ export class Viewer {
 								if (info.isBaked) {
 									applyBakedMaterial(m, tex, info, o.name || '')
 									const nl = (o.name || '').toLowerCase()
-									const isPlayfieldOverlay = info.isVlmBake && !info.isMainBake && nl.includes('playfield')
+									const isPlayfieldOverlay =
+										info.isVlmBake && !info.isMainBake && nl.includes('playfield')
 									const isBakedMeshName = nl.includes('playfield') || nl.includes('bm_')
-									if ((info.isMainBake || isPlayfieldOverlay) && o.visible === false && isBakedMeshName) {
+									if (
+										(info.isMainBake || isPlayfieldOverlay) &&
+										o.visible === false &&
+										isBakedMeshName
+									) {
 										o.visible = true
 										for (let p = o.parent; p && p !== this.tableGroup; p = p.parent)
 											if (p.visible === false) p.visible = true
