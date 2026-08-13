@@ -673,6 +673,22 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 				stats.vlmFixed++
 				continue
 			}
+			const pendingGeneric =
+				pendingOf(m) ||
+				m.userData?.pendingNormalMap ||
+				m.userData?.pendingEnvMap ||
+				m.userData?.pendingEmissiveMap
+			if (pendingGeneric && !m.map && !m.emissiveMap) {
+				m.transparent = true
+				m.opacity = 0
+				m.depthWrite = false
+				m.alphaTest = 0
+				m.blending = THREE.NormalBlending
+				if (m.emissive) m.emissive.set(0x000000)
+				m.emissiveIntensity = 0
+				m.needsUpdate = true
+				continue
+			}
 			if ((m.metalness > 0.3 || m.roughness < 0.4) && !m.name.toLowerCase().includes('ball')) {
 				m.roughness = Math.max(m.roughness, 0.75)
 				m.metalness = Math.min(m.metalness, 0.1)

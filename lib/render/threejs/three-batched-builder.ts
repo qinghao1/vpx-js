@@ -46,7 +46,7 @@ function materialKey(mat: MeshStandardMaterial): string {
 }
 
 function canBatch(mat: MeshStandardMaterial): boolean {
-	if (!mat || mat.transparent || mat.polygonOffset || (mat.userData as any).__addBlend) return false
+	if (!mat || mat.transparent || (mat.userData as any).__addBlend) return false
 	const ud = mat.userData as any
 	if (ud.pendingMap || ud.pendingmap || ud.pendingNormalMap || ud.pendingEnvMap || ud.pendingEmissiveMap) return false
 	return true
@@ -214,7 +214,7 @@ export function instancedBulbs(root: Group, table: Table, _renderApi: ThreeRende
 	const invRoot = new Matrix4().copy(root.matrixWorld).invert()
 	const group = root.getObjectByName('lightBulbs') as Group | undefined
 	if (!group) return 0
-	const bulbs = Object.values(table.lights).filter(l => (l as any).isBulbLight?.())
+	const bulbs = Object.values(table.lights).filter(l => (l as any).isBulbLight?.() || (l as any).data?.bulbLight)
 	if (bulbs.length < 2) return 0
 
 	const socketMeshes: Mesh[] = []

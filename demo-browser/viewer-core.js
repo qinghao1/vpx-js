@@ -1369,6 +1369,15 @@ export class Viewer {
 										}
 										m.needsUpdate = true
 									}
+								} else {
+									if (m.transparent && m.opacity === 0) {
+										m.transparent = false
+										m.opacity = 1
+										m.depthWrite = true
+										m.alphaTest = 0
+										m.blending = THREE.NormalBlending
+										m.needsUpdate = true
+									}
 								}
 							}
 							fixed++

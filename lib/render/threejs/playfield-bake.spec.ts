@@ -127,4 +127,23 @@ describe('regression: playfield baked hide', () => {
 		expect(outMat.opacity, 'pending VR must be invisible').to.equal(0)
 		expect(outMat.depthWrite, 'pending VR must not write depth').to.equal(false)
 	})
+
+	it('hides generic pending insert until texture streams (white ghost)', () => {
+		const root = new THREE.Group()
+		const mat = new THREE.MeshStandardMaterial({ color: 0xffffff })
+		mat.name = 'material:insertrectangle1off'
+		;(mat.userData as any).pendingMap = 'insertrectangle1off'
+		mat.roughness = 0.5
+		const geom = new THREE.PlaneGeometry(20, 20)
+		const mesh = makeMesh('primitive-015_Primitive011', geom, mat)
+		root.add(mesh)
+
+		root.updateMatrixWorld(true)
+		postProcessScene(root, { harnessLog: () => {}, viewerMode: 'viewer' })
+
+		const outMat = mesh.material as THREE.MeshStandardMaterial
+		expect(outMat.transparent, 'pending insert must be transparent').to.equal(true)
+		expect(outMat.opacity, 'pending insert must be invisible').to.equal(0)
+		expect(outMat.depthWrite, 'pending insert must not write depth').to.equal(false)
+	})
 })
