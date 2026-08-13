@@ -40,12 +40,10 @@ import {
 	ensureProceduralRoom,
 	frameCamera,
 	hideCabFlippers,
-	hideCabOuter,
 	isBakedMeshByNames,
 	isDeferred,
 	postProcessScene,
 	showCabFlippers,
-	showCabOuter,
 } from './src/scene.js'
 import { renderModeHint, renderStats } from './src/stats-panel.js'
 import {
@@ -453,11 +451,6 @@ export class Viewer {
 		}
 		this._hidePlayTip?.()
 		hideCabFlippers(this.tableGroup)
-		hideCabOuter(this.tableGroup)
-		{
-			const r = this.scene.getObjectByName('vr_procedural_room')
-			if (r) r.visible = false
-		}
 		this._syncChrome()
 		const target = computePlayFraming(this.tableGroup)
 		await this._animateCameraTo(target, CAM_ANIM.durationMode)
@@ -480,21 +473,6 @@ export class Viewer {
 		if (this.renderer) this.renderer.setPixelRatio(getTargetPixelRatio('viewer'))
 		this._hidePlayTip?.()
 		showCabFlippers(this.tableGroup)
-		showCabOuter(this.tableGroup)
-		{
-			const r = this.scene.getObjectByName('vr_procedural_room')
-			if (r) r.visible = true
-			else if (this.tableGroup) {
-				const state = computeViewerFraming(this.tableGroup)
-				const center = state.center,
-					size = state.size
-				let hasVr = false
-				this.tableGroup.traverse(o => {
-					if (o.isMesh && o.visible && o.name?.toLowerCase().includes('vr_')) hasVr = true
-				})
-				ensureProceduralRoom(this.scene, center, size, { hasVr, viewerMode: this.viewerMode })
-			}
-		}
 		this._syncChrome()
 		const target = computeViewerFraming(this.tableGroup)
 		await this._animateCameraTo(target, CAM_ANIM.durationMode)
@@ -1058,10 +1036,7 @@ export class Viewer {
 			harnessLog: this.harnessLog,
 			table,
 		})
-		if (this.viewerMode === 'play') {
-			hideCabFlippers(node)
-			hideCabOuter(node)
-		}
+		if (this.viewerMode === 'play') hideCabFlippers(node)
 		try {
 			const params = new URLSearchParams(location.search)
 			const useBatch = !params.has('nobatched')
@@ -1127,7 +1102,6 @@ export class Viewer {
 		})
 		ensureProceduralRoom(this.scene, center, size, {
 			hasVr,
-			viewerMode: this.viewerMode,
 		})
 		this._showCanvas()
 		this.log(

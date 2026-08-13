@@ -489,28 +489,13 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 		}
 		if (!o.isMesh) {
 			const n = (o.name || '').toLowerCase()
-			const isCabish = RE_CAB.test(n) || _isCabVrName(n) || RE_OUTER.test(o.name || '')
-			const isProtectedGroup =
-				n.includes('playfield') ||
-				n.includes('apron') ||
-				n.includes('button') ||
-				n.includes('coin') ||
-				n.includes('plunger') ||
-				!!resolveButtonCode(n)
-			if (viewerMode === 'play' && isCabish && !isProtectedGroup) {
-				if (o.visible !== false) {
-					o.visible = false
-					stats.cabHidden++
-				}
-			} else {
-				if (n && (RE_CAB.test(n) || resolveButtonCode(n)) && o.visible === false) {
-					o.visible = true
-					stats.cabForced++
-				}
-				if (n && RE_VR.test(n) && o.visible === false) {
-					o.visible = true
-					stats.vrKept++
-				}
+			if (n && (RE_CAB.test(n) || resolveButtonCode(n)) && o.visible === false) {
+				o.visible = true
+				stats.cabForced++
+			}
+			if (n && RE_VR.test(n) && o.visible === false) {
+				o.visible = true
+				stats.vrKept++
 			}
 			return
 		}
@@ -529,31 +514,6 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 		if (n.includes('playfield') && o.visible === false) {
 			o.visible = true
 			makeParentsVisible(o, node, stats)
-		}
-		if (viewerMode === 'play' && c.isVr && !c.isCab) {
-			if (o.visible) {
-				o.visible = false
-				stats.cabHidden++
-				o.geometry?.dispose?.()
-			}
-			return
-		}
-		if (viewerMode === 'play' && (c.isCab || RE_OUTER.test(o.name) || _isCabVrName(n))) {
-			const isProtected =
-				n.includes('playfield') ||
-				n.includes('apron') ||
-				n.includes('button') ||
-				n.includes('coin') ||
-				n.includes('plunger') ||
-				!!resolveButtonCode(n)
-			if (!isProtected) {
-				if (o.visible) {
-					o.visible = false
-					stats.cabHidden++
-					o.geometry?.dispose?.()
-				}
-				return
-			}
 		}
 		if (c.isVr) {
 			if (o.visible === false) o.visible = true
@@ -966,7 +926,7 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 export function ensureProceduralRoom(scene, center, size, opts = {}) {
 	const e = scene.getObjectByName('vr_procedural_room')
 	if (e) scene.remove(e)
-	if (opts.hasVr || opts.viewerMode === 'play') return null
+	if (opts.hasVr) return null
 	const maxDim = Math.max(size.x, size.y, size.z)
 	const W = Math.max(1600, maxDim * 8),
 		D = Math.max(1600, maxDim * 8),
@@ -1019,7 +979,7 @@ const excludeNonPlayfield = n =>
 	!n.includes('apron')
 const excludeVrNonCab = n => RE_VR.test(n) && !RE_CAB.test(n)
 const VIEWER = { dist: 1.2, elev: 0.85, azim: 0.65, near: 0.015, farScale: 8, farMin: 2000 }
-const PLAY = { dist: 0.82, elev: 1.05, azim: 0.68, near: 0.012, farScale: 10, farMin: 4000, forwardBias: -0.06 }
+const PLAY = { dist: 0.65, elev: 1.20, azim: 0.85, near: 0.012, farScale: 10, farMin: 4000, forwardBias: -0.10 }
 
 function framingState(node, targetExclude, sizeExclude, cfg) {
 	const target = framingBox(node, targetExclude).center.clone()
@@ -1038,7 +998,8 @@ function framingState(node, targetExclude, sizeExclude, cfg) {
 }
 
 export const computeViewerFraming = node => framingState(node, excludeNonPlayfield, excludeVrNonCab, VIEWER)
-export const computePlayFraming = node => framingState(node, excludeNonPlayfield, excludeNonPlayfield, PLAY)
+const excludeLegsForPlay = n => n.includes('leg') || n.includes('support') || n.includes('bottom') || (RE_VR.test(n) && !RE_CAB.test(n))
+export const computePlayFraming = node => framingState(node, excludeNonPlayfield, excludeLegsForPlay, PLAY)
 
 export function applyCameraState(camera, controls, state) {
 	controls.target.copy(state.target)
