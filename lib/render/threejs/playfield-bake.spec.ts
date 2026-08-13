@@ -1,0 +1,111 @@
+// Copyright (C) 2026 Chu Qinghao — GPL-2.0 — see LICENSE
+import * as chai from 'chai'
+import { expect } from 'chai'
+import * as THREE from 'three'
+import sinonChai from 'sinon-chai'
+import { postProcessScene } from '../../../demo-browser/src/scene.js'
+
+chai.use((sinonChai as any).default ?? sinonChai)
+
+function makeMesh(name: string, geometry: THREE.BufferGeometry, mat: THREE.Material | THREE.Material[]): THREE.Mesh {
+	const mesh = new THREE.Mesh(geometry, mat as any)
+	mesh.name = name
+	return mesh
+}
+
+describe('regression: playfield baked hide', () => {
+	it('hides pending BM when hasReadyBake (bright artifact)', () => {
+		const root = new THREE.Group()
+		root.name = 'table'
+
+		// base playfield (unbaked)
+		const baseMat = new THREE.MeshStandardMaterial({ color: 0xffffff })
+		baseMat.name = 'Playfield'
+		const baseGeom = new THREE.PlaneGeometry(20, 20)
+		const base = makeMesh('playfield_base', baseGeom, baseMat)
+		root.add(base)
+
+		// baked BM with ready map (hasReadyBake true)
+		const readyMat = new THREE.MeshStandardMaterial({ color: 0x000000 })
+		readyMat.name = 'material:VLM.Bake.Active'
+		const readyTex = new THREE.DataTexture(new Uint8Array([0, 0, 0, 255]), 1, 1)
+		readyTex.name = 'vlm.nestmap0'
+		readyMat.map = readyTex as any
+		;(readyMat.userData as any).__isBaked = true
+		;(readyMat.userData as any).__addBlend = false
+		const readyGeom = new THREE.PlaneGeometry(20, 20)
+		const readyBM = makeMesh('primitive-BM_Playfield', readyGeom, readyMat)
+		root.add(readyBM)
+
+		// pending BM (same bake, no map yet) — should be hidden to avoid bright white
+		const pendingMat = new THREE.MeshStandardMaterial({ color: 0xffffff })
+		pendingMat.name = 'material:VLM.Bake.Active'
+		;(pendingMat.userData as any).__isBaked = true
+		;(pendingMat.userData as any).__addBlend = false
+		;(pendingMat.userData as any).pendingMap = 'vlm.nestmap0'
+		pendingMat.emissive = new THREE.Color(0xffffff)
+		pendingMat.emissiveIntensity = 1
+		const pendingGeom = new THREE.PlaneGeometry(20, 20)
+		const pendingBM = makeMesh('primitive-BM_Bumper1_Ring', pendingGeom, pendingMat)
+		root.add(pendingBM)
+
+		root.updateMatrixWorld(true)
+		postProcessScene(root, { harnessLog: () => {}, viewerMode: 'viewer' })
+
+		expect(readyBM.visible, 'ready BM must remain visible').to.equal(true)
+		expect(pendingBM.visible, 'pending BM must be hidden when hasReadyBake (avoid bright)').to.equal(false)
+		expect(base.visible, 'base playfield must be hidden when baked ready').to.equal(false)
+	})
+
+	it('hides pending BM and keeps base visible when only pending (no ready)', () => {
+		const root = new THREE.Group()
+		const baseMat = new THREE.MeshStandardMaterial({ color: 0xffffff })
+		baseMat.name = 'Playfield'
+		const baseGeom = new THREE.PlaneGeometry(20, 20)
+		const base = makeMesh('playfield_base', baseGeom, baseMat)
+		root.add(base)
+
+		const pendingMat = new THREE.MeshStandardMaterial({ color: 0xffffff })
+		pendingMat.name = 'material:VLM.Bake.Active'
+		;(pendingMat.userData as any).__isBaked = true
+		;(pendingMat.userData as any).__addBlend = false
+		;(pendingMat.userData as any).pendingMap = 'vlm.nestmap0'
+		const pendingGeom = new THREE.PlaneGeometry(20, 20)
+		const pendingBM = makeMesh('primitive-BM_Playfield', pendingGeom, pendingMat)
+		root.add(pendingBM)
+
+		root.updateMatrixWorld(true)
+		postProcessScene(root, { harnessLog: () => {}, viewerMode: 'viewer' })
+
+		expect(pendingBM.visible, 'pending BM must be hidden when hasPendingBake').to.equal(false)
+		expect(base.visible, 'base playfield must stay visible when only pending').to.equal(true)
+	})
+
+	it('is generic: uses engine addBlend, not name', () => {
+		const root = new THREE.Group()
+		const readyMat = new THREE.MeshStandardMaterial({ color: 0x000000 })
+		readyMat.name = 'material:VLM.Bake.Active'
+		const readyTex = new THREE.DataTexture(new Uint8Array([0, 0, 0, 255]), 1, 1)
+		readyTex.name = 'custom_bake_map'
+		readyMat.map = readyTex as any
+		;(readyMat.userData as any).__isBaked = true
+		;(readyMat.userData as any).__addBlend = false
+		const readyGeom = new THREE.PlaneGeometry(20, 20)
+		const readyBM = makeMesh('primitive-BM_Custom', readyGeom, readyMat)
+		root.add(readyBM)
+
+		const pendingMat = new THREE.MeshStandardMaterial({ color: 0xffffff })
+		pendingMat.name = 'material:VLM.Bake.Active'
+		;(pendingMat.userData as any).__isBaked = true
+		;(pendingMat.userData as any).__addBlend = false
+		;(pendingMat.userData as any).pendingMap = 'custom_bake_map'
+		const pendingGeom = new THREE.PlaneGeometry(20, 20)
+		const pendingBM = makeMesh('primitive-BM_Other', pendingGeom, pendingMat)
+		root.add(pendingBM)
+
+		root.updateMatrixWorld(true)
+		postProcessScene(root, { harnessLog: () => {} })
+
+		expect(pendingBM.visible, 'pending custom bake must be hidden generically').to.equal(false)
+	})
+})

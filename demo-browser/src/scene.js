@@ -308,7 +308,7 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 		const isRamp =
 			mesh.includes('ramp') || mesh.includes('armp') || mesh.includes('botramp') || mesh.includes('rampscrw')
 		const alpha = !isMainBake && !isRamp && !isApron && needsAlpha
-		const key = `${base.name}|${base.map?.name ?? pending}|${isMainBake ? 'main' : isOverlay ? 'overlay' : alpha ? 'alpha' : 'opaque'}|${base.polygonOffset ? `${base.polygonOffsetFactor}/${base.polygonOffsetUnits}` : '0'}`
+		const key = `${base.name}|${base.map?.name ?? ''}|${pending}|${isMainBake ? 'main' : isOverlay ? 'overlay' : alpha ? 'alpha' : 'opaque'}|${base.polygonOffset ? `${base.polygonOffsetFactor}/${base.polygonOffsetUnits}` : '0'}`
 		let v = bakedCache.get(key)
 		if (v) return v
 		v = base.clone() // unlit baked at 1.0 with AgX
@@ -630,7 +630,21 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 				!!m.userData?.__isBaked,
 				!!m.userData?.__addBlend,
 			)
-			if (isBasePlayfield(n, c) && o.visible) hideMesh(o, 'playfieldHidden', stats)
+			if (c.isMainBake && pending && !mapName && !c.isVr && !c.isCab && o.visible) {
+				o.visible = false
+				stats.playfieldHidden++
+			} else if (n.includes('playfield') && isBakedMesh(c) && pending && !mapName && o.visible) {
+				const mats = Array.isArray(o.material) ? o.material : [o.material]
+				for (const mm of mats) {
+					mm.transparent = true
+					mm.opacity = 0
+					mm.depthWrite = false
+					mm.blending = THREE.AdditiveBlending
+					mm.needsUpdate = true
+				}
+			} else if (isBasePlayfield(n, c) && o.visible) {
+				hideMesh(o, 'playfieldHidden', stats)
+			}
 		})
 	} else if (hasPendingBake) {
 		node.traverse(o => {
