@@ -118,6 +118,15 @@ function fixVr(mat) {
 	mat.toneMapped = false
 	mat.roughness = BAKED_ROUGH
 	mat.metalness = BAKED_METAL
+	if (mat.map) {
+		mat.polygonOffset = true
+		mat.polygonOffsetFactor = -1
+		mat.polygonOffsetUnits = -1
+	} else {
+		mat.polygonOffset = false
+		mat.polygonOffsetFactor = 0
+		mat.polygonOffsetUnits = 0
+	}
 	mat.needsUpdate = true
 }
 
@@ -750,6 +759,65 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 	if (whiteWallsHidden) harnessLog?.(`[wall] Hid ${whiteWallsHidden} white untextured stray meshes`, 'info')
 	if (stats.nanFixed || stats.nanHidden)
 		harnessLog?.(`[sanitize] ${stats.nanFixed} fixed ${stats.nanHidden} hidden`, 'info')
+	{
+		let darkOccludersHidden = 0
+		node.updateMatrixWorld(true)
+		const isDarkMat = mat => {
+			if (!mat || !mat.color) return false
+			const hex = mat.color.getHex()
+			const r = (hex >> 16) & 0xff
+			const g = (hex >> 8) & 0xff
+			const b = hex & 0xff
+			const lum = 0.299 * r + 0.587 * g + 0.114 * b
+			const mapName = (mat.map?.name || '').toLowerCase()
+			const pending = pendingOf(mat).toLowerCase()
+			const isBlackMap = mapName.includes('black') || pending.includes('black')
+			return lum < 36 || isBlackMap
+		}
+		node.traverse(o => {
+			if (!o.isMesh || !o.visible) return
+			const n = (o.name || '').toLowerCase()
+			if (
+				n.includes('playfield') ||
+				n.includes('ball') ||
+				n.includes('flipper') ||
+				n.includes('bumper') ||
+				n.includes('light') ||
+				n.includes('dmd') ||
+				n.includes('vr_') ||
+				n.includes('vrcab') ||
+				n.includes('cabinet') ||
+				n.includes('lockbar') ||
+				n.includes('pincab') ||
+				n.includes('ramp') ||
+				n.includes('plastic') ||
+				n.includes('gate') ||
+				n.includes('kicker') ||
+				n.includes('target') ||
+				n.includes('spinner') ||
+				n.includes('button') ||
+				n.includes('coin') ||
+				n.includes('plunger')
+			)
+				return
+			const mats = Array.isArray(o.material) ? o.material : [o.material]
+			if (mats.length === 0) return
+			if (mats.some(m => m.map && !(m.map.name || '').toLowerCase().includes('black'))) return
+			if (!mats.every(isDarkMat)) return
+			const geo = o.geometry
+			if (!geo?.attributes?.position) return
+			const worldBox = new THREE.Box3().setFromObject(o)
+			if (worldBox.isEmpty()) return
+			const wsx = worldBox.max.x - worldBox.min.x
+			const wsy = worldBox.max.y - worldBox.min.y
+			if (wsx < 25 || wsy < 25) return
+			const wsz = worldBox.max.z - worldBox.min.z
+			if (wsz < 4) return
+			hideMesh(o, null, stats)
+			darkOccludersHidden++
+		})
+		if (darkOccludersHidden) harnessLog?.(`[wall] Hid ${darkOccludersHidden} dark large occluders`, 'info')
+	}
 	node.traverse(o => {
 		if (!o.isMesh) return
 		if (o.userData.isCabinetButton) return

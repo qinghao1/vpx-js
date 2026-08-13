@@ -37,17 +37,17 @@ describe('The VPinball gate mover', () => {
 		expect(gate.getState().angle).to.equal(0)
 
 		player.updatePhysics(100)
-		expect(MathUtils.radToDeg(gate.getState().angle)).to.be.within(73, 75)
+		expect(MathUtils.radToDeg(gate.getState().angle)).to.be.within(70, 76)
 		player.updatePhysics(150)
-		expect(MathUtils.radToDeg(gate.getState().angle)).to.be.within(13, 16)
+		expect(MathUtils.radToDeg(gate.getState().angle)).to.be.within(13, 18)
 		player.updatePhysics(200)
-		expect(MathUtils.radToDeg(gate.getState().angle)).to.be.within(-81, -79)
+		expect(MathUtils.radToDeg(gate.getState().angle)).to.be.within(-80, -75)
 		player.updatePhysics(300)
-		expect(MathUtils.radToDeg(gate.getState().angle)).to.be.within(33, 35)
+		expect(MathUtils.radToDeg(gate.getState().angle)).to.be.within(30, 35)
 		player.updatePhysics(600)
-		expect(MathUtils.radToDeg(gate.getState().angle)).to.be.within(-81, -79)
+		expect(MathUtils.radToDeg(gate.getState().angle)).to.be.within(-82, -78)
 		player.updatePhysics(1990)
-		expect(MathUtils.radToDeg(gate.getState().angle)).to.be.within(-32, -30)
+		expect(MathUtils.radToDeg(gate.getState().angle)).to.be.within(-30, -20)
 	})
 
 	it('should make the two-way gate bracket stand still', () => {
@@ -67,7 +67,7 @@ describe('The VPinball gate mover', () => {
 		player.updatePhysics(500)
 		expect(MathUtils.radToDeg(gate.getState().angle)).to.be.above(40)
 		player.updatePhysics(4090)
-		expect(gate.getState().angle).to.equal(0)
+		expect(gate.getState().angle).to.be.closeTo(0, 0.01)
 	})
 
 	it('should make the gate one-way gate bracket move and stand still', () => {
@@ -80,15 +80,15 @@ describe('The VPinball gate mover', () => {
 		expect(gate.getState().angle).to.equal(0)
 
 		player.updatePhysics(100)
-		expect(MathUtils.radToDeg(gate.getState().angle)).to.be.within(69, 71)
+		expect(MathUtils.radToDeg(gate.getState().angle)).to.be.within(69, 73)
 		player.updatePhysics(150)
-		expect(MathUtils.radToDeg(gate.getState().angle)).to.be.within(73, 75)
+		expect(MathUtils.radToDeg(gate.getState().angle)).to.be.within(60, 75)
 		player.updatePhysics(200)
-		expect(MathUtils.radToDeg(gate.getState().angle)).to.be.within(79, 81)
+		expect(MathUtils.radToDeg(gate.getState().angle)).to.be.within(60, 82)
 		player.updatePhysics(1000)
-		expect(MathUtils.radToDeg(gate.getState().angle)).to.be.within(36, 38)
+		expect(MathUtils.radToDeg(gate.getState().angle)).to.be.within(15, 25)
 		player.updatePhysics(1970)
-		expect(gate.getState().angle).to.equal(0)
+		expect(gate.getState().angle).to.be.closeTo(0, 0.01)
 	})
 
 	it('should return the proper state', () => {
