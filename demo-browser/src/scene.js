@@ -406,9 +406,6 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 		if (v) return v
 		v = base.clone()
 		fixVr(v)
-		v.polygonOffset = false
-		v.polygonOffsetFactor = 0
-		v.polygonOffsetUnits = 0
 		v.depthWrite = true
 		v.transparent = false
 		v.alphaTest = 0
