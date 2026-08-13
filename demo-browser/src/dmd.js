@@ -205,9 +205,13 @@ export class DmdController {
 					mat.color?.set?.(0xffffff)
 				}
 				mat.transparent = false
+				mat.depthTest = true
 				mat.depthWrite = true
+				mat.polygonOffset = true
+				mat.polygonOffsetFactor = -1
+				mat.polygonOffsetUnits = -1
 			}
-			m.renderOrder = 1000
+			m.renderOrder = 1
 			m.frustumCulled = false
 		}
 
@@ -311,13 +315,16 @@ export class DmdController {
 			const mat = new THREE.MeshBasicMaterial({
 				map: this.texture,
 				side: THREE.DoubleSide,
-				depthTest: false,
-				depthWrite: false,
+				depthTest: true,
+				depthWrite: true,
+				polygonOffset: true,
+				polygonOffsetFactor: -1,
+				polygonOffsetUnits: -1,
 				transparent: false,
 			})
 			const mesh = new THREE.Mesh(geom, mat)
 			mesh.name = `DMD_${fl.getName()}`
-			mesh.renderOrder = 1000
+			mesh.renderOrder = 1
 			mesh.frustumCulled = false
 			mesh.position.set(d.center?.x ?? 470, d.center?.y ?? 40, -(d.height ?? 620))
 			mesh.rotation.set(
