@@ -108,4 +108,23 @@ describe('regression: playfield baked hide', () => {
 
 		expect(pendingBM.visible, 'pending custom bake must be hidden generically').to.equal(false)
 	})
+
+	it('hides pending VR until texture streams (white ghost)', () => {
+		const root = new THREE.Group()
+		const vrMat = new THREE.MeshStandardMaterial({ color: 0xffffff })
+		vrMat.name = '_noXtraShadinglight'
+		;(vrMat.userData as any).pendingMap = 'VR_MegaRailing_Bake1_CyclesBake_COMBINED_1'
+		vrMat.roughness = 0.5
+		const vrGeom = new THREE.PlaneGeometry(20, 20)
+		const vrMesh = makeMesh('primitive-VR_MegaRailing', vrGeom, vrMat)
+		root.add(vrMesh)
+
+		root.updateMatrixWorld(true)
+		postProcessScene(root, { harnessLog: () => {}, viewerMode: 'viewer' })
+
+		const outMat = vrMesh.material as THREE.MeshStandardMaterial
+		expect(outMat.transparent, 'pending VR must be transparent').to.equal(true)
+		expect(outMat.opacity, 'pending VR must be invisible').to.equal(0)
+		expect(outMat.depthWrite, 'pending VR must not write depth').to.equal(false)
+	})
 })

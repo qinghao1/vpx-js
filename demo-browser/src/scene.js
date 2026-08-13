@@ -247,8 +247,21 @@ export function hideCabOuter(root) {
 	root.traverse(o => {
 		if (!o.isMesh) return
 		const n = (o.name || '').toLowerCase()
-		if (n.includes('playfield') || n.includes('apron') || n.includes('button') || n.includes('coin') || n.includes('plunger') || resolveButtonCode(n)) return
-		const c = classify(n, (o.material?.name || '').toLowerCase(), (o.material?.map?.name || '').toLowerCase(), !!o.material?.userData?.__isBaked)
+		if (
+			n.includes('playfield') ||
+			n.includes('apron') ||
+			n.includes('button') ||
+			n.includes('coin') ||
+			n.includes('plunger') ||
+			resolveButtonCode(n)
+		)
+			return
+		const c = classify(
+			n,
+			(o.material?.name || '').toLowerCase(),
+			(o.material?.map?.name || '').toLowerCase(),
+			!!o.material?.userData?.__isBaked,
+		)
 		if (c.isCab || c.isVr || RE_OUTER.test(o.name) || _isCabVrName(n)) {
 			if (o.visible !== false) {
 				o.visible = false
@@ -266,7 +279,12 @@ export function showCabOuter(root) {
 		if (!o.isMesh) return
 		const n = (o.name || '').toLowerCase()
 		if (n.includes('playfield') || n.includes('apron')) return
-		const c = classify(n, (o.material?.name || '').toLowerCase(), (o.material?.map?.name || '').toLowerCase(), !!o.material?.userData?.__isBaked)
+		const c = classify(
+			n,
+			(o.material?.name || '').toLowerCase(),
+			(o.material?.map?.name || '').toLowerCase(),
+			!!o.material?.userData?.__isBaked,
+		)
 		if (c.isCab || c.isVr || RE_OUTER.test(o.name) || _isCabVrName(n)) {
 			if (o.visible === false) {
 				o.visible = true
@@ -472,7 +490,13 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 		if (!o.isMesh) {
 			const n = (o.name || '').toLowerCase()
 			const isCabish = RE_CAB.test(n) || _isCabVrName(n) || RE_OUTER.test(o.name || '')
-			const isProtectedGroup = n.includes('playfield') || n.includes('apron') || n.includes('button') || n.includes('coin') || n.includes('plunger') || !!resolveButtonCode(n)
+			const isProtectedGroup =
+				n.includes('playfield') ||
+				n.includes('apron') ||
+				n.includes('button') ||
+				n.includes('coin') ||
+				n.includes('plunger') ||
+				!!resolveButtonCode(n)
 			if (viewerMode === 'play' && isCabish && !isProtectedGroup) {
 				if (o.visible !== false) {
 					o.visible = false
@@ -515,7 +539,13 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 			return
 		}
 		if (viewerMode === 'play' && (c.isCab || RE_OUTER.test(o.name) || _isCabVrName(n))) {
-			const isProtected = n.includes('playfield') || n.includes('apron') || n.includes('button') || n.includes('coin') || n.includes('plunger') || !!resolveButtonCode(n)
+			const isProtected =
+				n.includes('playfield') ||
+				n.includes('apron') ||
+				n.includes('button') ||
+				n.includes('coin') ||
+				n.includes('plunger') ||
+				!!resolveButtonCode(n)
 			if (!isProtected) {
 				if (o.visible) {
 					o.visible = false
@@ -564,7 +594,15 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 		if (!o.visible) {
 			const matsForGen = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : []
 			const hasMap = matsForGen.some(mm => mm?.map || pendingOf(mm))
-			const isWhite = matsForGen.length > 0 && matsForGen.every(mm => (mm?.color?.getHexString?.()?.toLowerCase() === 'ffffff' || mm?.color?.getHex?.() === 0xffffff) && !mm?.map && !pendingOf(mm))
+			const isWhite =
+				matsForGen.length > 0 &&
+				matsForGen.every(
+					mm =>
+						(mm?.color?.getHexString?.()?.toLowerCase() === 'ffffff' ||
+							mm?.color?.getHex?.() === 0xffffff) &&
+						!mm?.map &&
+						!pendingOf(mm),
+				)
 			if (hasMap && !isWhite) {
 				o.visible = true
 				stats.cabForced++
@@ -698,18 +736,12 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 				!!m.userData?.__isBaked,
 				!!m.userData?.__addBlend,
 			)
-			if (c.isMainBake && pending && !mapName && !c.isVr && !c.isCab && o.visible) {
+			if ((c.isMainBake || c.isVlmBake) && pending && !mapName && !c.isVr && !c.isCab && o.visible) {
 				o.visible = false
 				stats.playfieldHidden++
 			} else if (n.includes('playfield') && isBakedMesh(c) && pending && !mapName && o.visible) {
-				const mats = Array.isArray(o.material) ? o.material : [o.material]
-				for (const mm of mats) {
-					mm.transparent = true
-					mm.opacity = 0
-					mm.depthWrite = false
-					mm.blending = THREE.AdditiveBlending
-					mm.needsUpdate = true
-				}
+				o.visible = false
+				stats.playfieldHidden++
 			} else if (isBasePlayfield(n, c) && o.visible) {
 				hideMesh(o, 'playfieldHidden', stats)
 			}
@@ -729,18 +761,12 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 				!!m.userData?.__isBaked,
 				!!m.userData?.__addBlend,
 			)
-			if (c.isMainBake && pending && !mapName && !c.isVr && !c.isCab && o.visible) {
+			if ((c.isMainBake || c.isVlmBake) && pending && !mapName && !c.isVr && !c.isCab && o.visible) {
 				o.visible = false
 				stats.playfieldHidden++
 			} else if (n.includes('playfield') && isBakedMesh(c) && pending && !mapName && o.visible) {
-				const mats = Array.isArray(o.material) ? o.material : [o.material]
-				for (const mm of mats) {
-					mm.transparent = true
-					mm.opacity = 0
-					mm.depthWrite = false
-					mm.blending = THREE.AdditiveBlending
-					mm.needsUpdate = true
-				}
+				o.visible = false
+				stats.playfieldHidden++
 			}
 			if (isBasePlayfield(n, c) && o.visible === false) {
 				o.visible = true
@@ -1018,7 +1044,8 @@ export const isDeferred = (tx, table) => {
 	const n = tx.getName().toLowerCase()
 	const pf = table.getPlayfieldMap().toLowerCase()
 	if (n === pf) return false
-	if (n.includes('nestmap') || n.includes('bake') || n.includes('playfield') || n === 'blueprintsv2noramps') return false
+	if (n.includes('nestmap') || n.includes('bake') || n.includes('playfield') || n === 'blueprintsv2noramps')
+		return false
 	const p = (tx.szPath || '').toLowerCase()
 	if (p.endsWith('.exr') || p.endsWith('.hdr') || tx.isHdr?.()) return true
 	return tx.width * tx.height > 1_048_576

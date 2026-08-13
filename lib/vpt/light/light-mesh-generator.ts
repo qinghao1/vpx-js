@@ -17,9 +17,9 @@ export class LightMeshGenerator {
 		table: Table,
 		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
 	): LightMeshes<GEOMETRY> {
-		return this.data.isBulbLight()
-			? this.getBulbMeshes(table)
-			: { surfaceLight: renderApi.createLightGeometry(this.data, table) }
+		if (this.data.isBulbLight()) return this.getBulbMeshes(table)
+		if (this.data.isSurfaceLight(table)) return { surfaceLight: renderApi.createLightGeometry(this.data, table) }
+		return {}
 	}
 	private getBulbMeshes<GEOMETRY>(table: Table): LightMeshes<GEOMETRY> {
 		const h =

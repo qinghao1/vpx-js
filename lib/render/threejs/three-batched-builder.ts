@@ -14,7 +14,7 @@ import type { Table } from '../../vpt/table/table.js'
 import { ThreeMeshGenerator } from './three-mesh-generator.js'
 import type { ThreeRenderApi } from './three-render-api.js'
 
-const VERTEX_THRESHOLD = 200
+const VERTEX_THRESHOLD = 100
 
 const RE_VR = /vr_/i
 const RE_CAB = /vrcab|cabinet|lockbar|pincab/i
@@ -32,8 +32,24 @@ function signature(geo: BufferGeometry): string {
 	return `${hasIndex ? 'i' : 'n'}:${hasUv ? 'uv' : 'nou'}:${hasNormal ? 'n' : 'non'}:${hasColor ? 'c' : 'nc'}:${hasTangent ? 't' : 'nt'}`
 }
 
+function geoHash(geo: BufferGeometry): string {
+	const pos = geo.getAttribute('position')
+	const idx = geo.getIndex()
+	return `${pos.count}:${idx ? idx.count : 0}:${signature(geo)}`
+}
+
+function materialKey(mat: MeshStandardMaterial): string {
+	const ud = mat.userData as any
+	const map = (mat.map as any)?.name ?? 'nomap'
+	const pending = ud.pendingMap ?? ud.pendingmap ?? ''
+	return `${mat.name ?? 'noname'}|${map}|${pending}|${mat.transparent ? 't' : 'o'}|${mat.polygonOffset ? `${mat.polygonOffsetFactor}/${mat.polygonOffsetUnits}` : '0'}|${ud.__addBlend ? 'a' : 'o'}|${ud.__isBaked ? 'b' : 'o'}`
+}
+
 function canBatch(mat: MeshStandardMaterial): boolean {
-	return !!mat && !mat.transparent && !mat.polygonOffset && !(mat.userData as any).__addBlend
+	if (!mat || mat.transparent || mat.polygonOffset || (mat.userData as any).__addBlend) return false
+	const ud = mat.userData as any
+	if (ud.pendingMap || ud.pendingmap || ud.pendingNormalMap || ud.pendingEnvMap || ud.pendingEmissiveMap) return false
+	return true
 }
 
 function isEffectiveVisible(o: any, root: Group): boolean {
@@ -113,7 +129,7 @@ export function batchStaticOpaques(root: Group, table: Table, _renderApi: ThreeR
 		if (isVrCabName(n)) return
 		const geo = o.geometry as BufferGeometry
 		if (!geo.getAttribute('position')) return
-		const key = `${(mat as any).uuid ?? mat.name}:${signature(geo)}:${o.renderOrder ?? 0}:${o.castShadow ? 1 : 0}:${o.receiveShadow ? 1 : 0}`
+		const key = `${materialKey(mat)}:${signature(geo)}:${o.renderOrder ?? 0}:${o.castShadow ? 1 : 0}:${o.receiveShadow ? 1 : 0}`
 		let bucket = buckets.get(key)
 		if (!bucket) {
 			bucket = { material: mat, meshes: [] }
@@ -138,11 +154,36 @@ export function batchStaticOpaques(root: Group, table: Table, _renderApi: ThreeR
 			}
 		}
 		if (totalVerts < VERTEX_THRESHOLD) continue
+		const uniqueGeos = new Set(meshes.map(m => geoHash(m.geometry as BufferGeometry)))
+		if (uniqueGeos.size === 1 && meshes.length >= 3) {
+			try {
+				const baseGeo = meshes[0].geometry as BufferGeometry
+				const instanced = new InstancedMesh(baseGeo, material, meshes.length)
+				instanced.name = `instanced:generic:${material.name || 'opaque'}:${meshes.length}`
+				instanced.frustumCulled = true
+				for (let i = 0; i < meshes.length; i++) {
+					const mesh = meshes[i]
+					mesh.updateMatrixWorld(true)
+					const local = new Matrix4().multiplyMatrices(invRoot, mesh.matrixWorld)
+					instanced.setMatrixAt(i, local)
+				}
+				instanced.instanceMatrix.needsUpdate = true
+				instanced.computeBoundingBox()
+				instanced.computeBoundingSphere()
+				try {
+					;(instanced.geometry as any).computeBoundsTree?.({ includeInstances: true } as any)
+				} catch {}
+				root.add(instanced)
+				for (const mesh of meshes) mesh.visible = false
+				count++
+				continue
+			} catch {}
+		}
 		try {
 			const batched = new BatchedMesh(
 				meshes.length,
 				totalVerts,
-				hasIndex ? totalIndices : totalVerts * 2,
+				hasIndex ? totalIndices : totalVerts * 3,
 				material,
 			)
 			batched.name = `batched:${material.name || 'opaque'}:${meshes.length}`
