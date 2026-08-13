@@ -9,6 +9,7 @@ import {
 	RE_CAB,
 	RE_GLASS,
 	RE_LM,
+	RE_OUTER,
 	RE_VR,
 	resolveButtonCode,
 } from './config.js'
@@ -241,6 +242,41 @@ export function showCabFlippers(root) {
 	return shown
 }
 
+export function hideCabOuter(root) {
+	let hidden = 0
+	root.traverse(o => {
+		if (!o.isMesh) return
+		const n = (o.name || '').toLowerCase()
+		if (n.includes('playfield') || n.includes('apron') || n.includes('button') || n.includes('coin') || n.includes('plunger') || resolveButtonCode(n)) return
+		const c = classify(n, (o.material?.name || '').toLowerCase(), (o.material?.map?.name || '').toLowerCase(), !!o.material?.userData?.__isBaked)
+		if (c.isCab || c.isVr || RE_OUTER.test(o.name) || _isCabVrName(n)) {
+			if (o.visible !== false) {
+				o.visible = false
+				hidden++
+				o.geometry?.dispose?.()
+			}
+		}
+	})
+	return hidden
+}
+
+export function showCabOuter(root) {
+	let shown = 0
+	root.traverse(o => {
+		if (!o.isMesh) return
+		const n = (o.name || '').toLowerCase()
+		if (n.includes('playfield') || n.includes('apron')) return
+		const c = classify(n, (o.material?.name || '').toLowerCase(), (o.material?.map?.name || '').toLowerCase(), !!o.material?.userData?.__isBaked)
+		if (c.isCab || c.isVr || RE_OUTER.test(o.name) || _isCabVrName(n)) {
+			if (o.visible === false) {
+				o.visible = true
+				shown++
+			}
+		}
+	})
+	return shown
+}
+
 function makeParentsVisible(mesh, root, stats) {
 	for (let p = mesh.parent; p && p !== root; p = p.parent) {
 		if (p.visible === false && !isInCabFlipper(p)) {
@@ -406,10 +442,22 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 		if (v) return v
 		v = base.clone()
 		fixVr(v)
-		v.depthWrite = true
-		v.transparent = false
-		v.alphaTest = 0
-		v.opacity = 1
+		const hasPending = !!pending && !base.map
+		if (hasPending) {
+			v.transparent = true
+			v.opacity = 0
+			v.depthWrite = false
+			v.alphaTest = 0
+			v.blending = THREE.NormalBlending
+			if (v.emissive) v.emissive.set(0x000000)
+			v.emissiveIntensity = 0
+		} else {
+			v.depthWrite = true
+			v.transparent = false
+			v.alphaTest = 0
+			v.opacity = 1
+			if (v.blending !== THREE.NormalBlending) v.blending = THREE.NormalBlending
+		}
 		v.needsUpdate = true
 		vrCache.set(key, v)
 		return v
@@ -423,13 +471,22 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 		}
 		if (!o.isMesh) {
 			const n = (o.name || '').toLowerCase()
-			if (n && (RE_CAB.test(n) || resolveButtonCode(n)) && o.visible === false) {
-				o.visible = true
-				stats.cabForced++
-			}
-			if (n && RE_VR.test(n) && o.visible === false) {
-				o.visible = true
-				stats.vrKept++
+			const isCabish = RE_CAB.test(n) || _isCabVrName(n) || RE_OUTER.test(o.name || '')
+			const isProtectedGroup = n.includes('playfield') || n.includes('apron') || n.includes('button') || n.includes('coin') || n.includes('plunger') || !!resolveButtonCode(n)
+			if (viewerMode === 'play' && isCabish && !isProtectedGroup) {
+				if (o.visible !== false) {
+					o.visible = false
+					stats.cabHidden++
+				}
+			} else {
+				if (n && (RE_CAB.test(n) || resolveButtonCode(n)) && o.visible === false) {
+					o.visible = true
+					stats.cabForced++
+				}
+				if (n && RE_VR.test(n) && o.visible === false) {
+					o.visible = true
+					stats.vrKept++
+				}
 			}
 			return
 		}
@@ -456,6 +513,17 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 				o.geometry?.dispose?.()
 			}
 			return
+		}
+		if (viewerMode === 'play' && (c.isCab || RE_OUTER.test(o.name) || _isCabVrName(n))) {
+			const isProtected = n.includes('playfield') || n.includes('apron') || n.includes('button') || n.includes('coin') || n.includes('plunger') || !!resolveButtonCode(n)
+			if (!isProtected) {
+				if (o.visible) {
+					o.visible = false
+					stats.cabHidden++
+					o.geometry?.dispose?.()
+				}
+				return
+			}
 		}
 		if (c.isVr) {
 			if (o.visible === false) o.visible = true
@@ -856,7 +924,7 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 export function ensureProceduralRoom(scene, center, size, opts = {}) {
 	const e = scene.getObjectByName('vr_procedural_room')
 	if (e) scene.remove(e)
-	if (opts.hasVr) return null
+	if (opts.hasVr || opts.viewerMode === 'play') return null
 	const maxDim = Math.max(size.x, size.y, size.z)
 	const W = Math.max(1600, maxDim * 8),
 		D = Math.max(1600, maxDim * 8),
@@ -909,7 +977,7 @@ const excludeNonPlayfield = n =>
 	!n.includes('apron')
 const excludeVrNonCab = n => RE_VR.test(n) && !RE_CAB.test(n)
 const VIEWER = { dist: 1.2, elev: 0.85, azim: 0.65, near: 0.015, farScale: 8, farMin: 2000 }
-const PLAY = { dist: 0.95, elev: 0.95, azim: 0.92, near: 0.012, farScale: 10, farMin: 4000, forwardBias: 0.07 }
+const PLAY = { dist: 0.82, elev: 1.05, azim: 0.68, near: 0.012, farScale: 10, farMin: 4000, forwardBias: -0.06 }
 
 function framingState(node, targetExclude, sizeExclude, cfg) {
 	const target = framingBox(node, targetExclude).center.clone()

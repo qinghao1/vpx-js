@@ -40,10 +40,12 @@ import {
 	ensureProceduralRoom,
 	frameCamera,
 	hideCabFlippers,
+	hideCabOuter,
 	isBakedMeshByNames,
 	isDeferred,
 	postProcessScene,
 	showCabFlippers,
+	showCabOuter,
 } from './src/scene.js'
 import { renderModeHint, renderStats } from './src/stats-panel.js'
 import {
@@ -451,6 +453,11 @@ export class Viewer {
 		}
 		this._hidePlayTip?.()
 		hideCabFlippers(this.tableGroup)
+		hideCabOuter(this.tableGroup)
+		{
+			const r = this.scene.getObjectByName('vr_procedural_room')
+			if (r) r.visible = false
+		}
 		this._syncChrome()
 		const target = computePlayFraming(this.tableGroup)
 		await this._animateCameraTo(target, CAM_ANIM.durationMode)
@@ -466,6 +473,18 @@ export class Viewer {
 		if (this.renderer) this.renderer.setPixelRatio(getTargetPixelRatio('viewer'))
 		this._hidePlayTip?.()
 		showCabFlippers(this.tableGroup)
+		showCabOuter(this.tableGroup)
+		{
+			const r = this.scene.getObjectByName('vr_procedural_room')
+			if (r) r.visible = true
+			else if (this.tableGroup) {
+				const state = computeViewerFraming(this.tableGroup)
+				const center = state.center, size = state.size
+				let hasVr = false
+				this.tableGroup.traverse(o => { if (o.isMesh && o.visible && o.name?.toLowerCase().includes('vr_')) hasVr = true })
+				ensureProceduralRoom(this.scene, center, size, { hasVr, viewerMode: this.viewerMode })
+			}
+		}
 		this._syncChrome()
 		const target = computeViewerFraming(this.tableGroup)
 		await this._animateCameraTo(target, CAM_ANIM.durationMode)
@@ -1068,6 +1087,7 @@ export class Viewer {
 		})
 		ensureProceduralRoom(this.scene, center, size, {
 			hasVr,
+			viewerMode: this.viewerMode,
 		})
 		this._showCanvas()
 		this.log(
@@ -1277,6 +1297,29 @@ export class Viewer {
 										o.visible = true
 										for (let p = o.parent; p && p !== this.tableGroup; p = p.parent)
 											if (p.visible === false) p.visible = true
+									}
+								} else if (info.isVrCab) {
+									const nl = (o.name || '').toLowerCase()
+									if (o.visible === false && (nl.includes('vr_') || nl.includes('vrcab') || nl.includes('cabinet') || nl.includes('lockbar') || nl.includes('pincab'))) {
+										o.visible = true
+										for (let p = o.parent; p && p !== this.tableGroup; p = p.parent) if (p.visible === false) p.visible = true
+									}
+									if (m.transparent && m.opacity === 0) {
+										m.transparent = false
+										m.opacity = 1
+										m.depthWrite = true
+										m.alphaTest = 0
+										m.blending = THREE.NormalBlending
+										if (tex) {
+											tex.wrapS = THREE.ClampToEdgeWrapping
+											tex.wrapT = THREE.ClampToEdgeWrapping
+											tex.generateMipmaps = true
+											tex.minFilter = THREE.LinearMipmapLinearFilter
+											tex.magFilter = THREE.LinearFilter
+											tex.anisotropy = 8
+											tex.needsUpdate = true
+										}
+										m.needsUpdate = true
 									}
 								}
 							}
