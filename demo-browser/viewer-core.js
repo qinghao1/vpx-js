@@ -145,7 +145,6 @@ export class Viewer {
 		this._inputCleanup = null
 		this._nudgeCleanup = null
 		this._touchCleanup = null
-		this._autoPlayTimer = null
 		this._hasPinmame = false
 		this._rendererBackend = 'webgl'
 		this.renderer = null
@@ -182,7 +181,6 @@ export class Viewer {
 		if (this._animTimeout) clearTimeout(this._animTimeout)
 		if (this.animFrame) cancelAnimationFrame(this.animFrame)
 		if (this.animFrame) clearTimeout(this.animFrame)
-		if (this._autoPlayTimer) clearTimeout(this._autoPlayTimer)
 		this._inputCleanup?.()
 		this._inputCleanup = null
 		this._nudgeCleanup?.()
@@ -630,13 +628,8 @@ export class Viewer {
 		if (bg) bg.visible = true
 		this._emitModeChange()
 		this.dom.canvas?.focus()
-		this._scheduleAutoPlay()
 	}
 	exitPlayMode() {
-		if (this._autoPlayTimer) {
-			clearTimeout(this._autoPlayTimer)
-			this._autoPlayTimer = null
-		}
 		for (const code of this._touchMap.values()) {
 			this.player?.onKeyUp({
 				code,
@@ -650,84 +643,6 @@ export class Viewer {
 		const bg = this.tableGroup?.getObjectByName('balls')
 		if (bg) bg.visible = false
 		this._emitModeChange()
-	}
-	_scheduleAutoPlay() {
-		if (this._autoPlayTimer) {
-			clearTimeout(this._autoPlayTimer)
-			this._autoPlayTimer = null
-		}
-		if (this.viewerMode !== 'play' || !this.player) return
-		const attemptSend = (attempt = 0) => {
-			if (this.viewerMode !== 'play' || !this.player) return
-			const emu = this.player.getPhysics?.()?.emu
-			const isMock = emu?.isMock
-			const isPinmame = emu && !isMock
-			if (isPinmame) {
-				let running = false
-				running = emu.isInitialized?.() && emu.api?.isRunning?.() === 1
-				if (!running) {
-					if (attempt < 40) {
-						this._autoPlayTimer = setTimeout(() => attemptSend(attempt + 1), 500)
-						return
-					}
-				} else {
-					const frame = this.player.getDmdFrame?.()
-					let sum = 0
-					if (frame?.length) for (let i = 0; i < Math.min(frame.length, 4096); i++) sum += frame[i] ?? 0
-					if (sum < 1000 && attempt < 40) {
-						this._autoPlayTimer = setTimeout(() => attemptSend(attempt + 1), 500)
-						return
-					}
-					if (attempt < 30) {
-						const dmdReady = sum > 50000
-						if (!dmdReady) {
-							this._autoPlayTimer = setTimeout(() => attemptSend(attempt + 1), 500)
-							return
-						}
-					}
-					if (attempt < 2) {
-						this._autoPlayTimer = setTimeout(() => attemptSend(attempt + 1), 1000)
-						return
-					}
-				}
-			} else {
-				if (attempt === 0) {
-					const emuReady = !emu || emu.isInitialized?.()
-					if (!emuReady) {
-						this._autoPlayTimer = setTimeout(() => attemptSend(attempt + 1), 500)
-						return
-					}
-				}
-			}
-			this.player.onKeyDown({
-				code: 'Digit5',
-				key: '5',
-				ts: Date.now(),
-			})
-			setTimeout(() => {
-				this.player.onKeyUp({
-					code: 'Digit5',
-					key: '5',
-					ts: Date.now(),
-				})
-			}, 120)
-			setTimeout(() => {
-				this.player.onKeyDown({
-					code: 'Digit1',
-					key: '1',
-					ts: Date.now(),
-				})
-			}, 380)
-			setTimeout(() => {
-				this.player.onKeyUp({
-					code: 'Digit1',
-					key: '1',
-					ts: Date.now(),
-				})
-			}, 500)
-			this.log('Auto credit/start (5 → 1)', 'info')
-		}
-		this._autoPlayTimer = setTimeout(() => attemptSend(0), 900)
 	}
 	buildNodeCache() {
 		this.nodeCache.clear()
