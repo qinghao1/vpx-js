@@ -14,19 +14,30 @@ import type { Table } from '../../vpt/table/table.js'
 import { ThreeMeshGenerator } from './three-mesh-generator.js'
 import type { ThreeRenderApi } from './three-render-api.js'
 
-// 200 verts ~66 tris: empirical sweet spot across 20 fixtures + walking_dead
-// 0 verts: 16 batches 541 saved 12.9ms build, 200: 10 batches 541 saved 1.9ms, 400: 9 batches 542 saved 1.9ms but loses slingshot tiny batch
 const VERTEX_THRESHOLD = 200
 
 function signature(geo: BufferGeometry): string {
 	const hasIndex = !!geo.getIndex()
 	const hasUv = !!geo.getAttribute('uv')
 	const hasNormal = !!geo.getAttribute('normal')
-	return `${hasIndex ? 'i' : 'n'}:${hasUv ? 'uv' : 'nou'}:${hasNormal ? 'n' : 'non'}`
+	const hasColor = !!geo.getAttribute('color')
+	const hasTangent = !!geo.getAttribute('tangent')
+	return `${hasIndex ? 'i' : 'n'}:${hasUv ? 'uv' : 'nou'}:${hasNormal ? 'n' : 'non'}:${hasColor ? 'c' : 'nc'}:${hasTangent ? 't' : 'nt'}`
 }
 
 function canBatch(mat: MeshStandardMaterial): boolean {
 	return !!mat && !mat.transparent && !mat.polygonOffset && !(mat.userData as any).__addBlend
+}
+
+function isEffectiveVisible(o: any, root: Group): boolean {
+	if (!o.visible) return false
+	for (let p = o.parent; p && p !== root; p = p.parent) if (!p.visible) return false
+	return true
+}
+
+function isInLightBulbs(o: any, root: Group): boolean {
+	for (let p = o.parent; p && p !== root; p = p.parent) if (p.name === 'lightBulbs') return true
+	return false
 }
 
 export function batchStaticOpaques(root: Group, table: Table, _renderApi: ThreeRenderApi): number {
@@ -72,7 +83,8 @@ export function batchStaticOpaques(root: Group, table: Table, _renderApi: ThreeR
 	root.traverse((o: any) => {
 		if (!o.isMesh || !o.geometry || !o.material) return
 		if (Array.isArray(o.material)) return
-		if (!o.visible) return
+		if (!isEffectiveVisible(o, root)) return
+		if (isInLightBulbs(o, root)) return
 		const mat = o.material as MeshStandardMaterial
 		if (!canBatch(mat)) return
 		if (isAnimated(o)) return
@@ -82,7 +94,7 @@ export function batchStaticOpaques(root: Group, table: Table, _renderApi: ThreeR
 		if (n.includes('ball')) return
 		const geo = o.geometry as BufferGeometry
 		if (!geo.getAttribute('position')) return
-		const key = `${(mat as any).uuid ?? mat.name}:${signature(geo)}`
+		const key = `${(mat as any).uuid ?? mat.name}:${signature(geo)}:${o.renderOrder ?? 0}:${o.castShadow ? 1 : 0}:${o.receiveShadow ? 1 : 0}`
 		let bucket = buckets.get(key)
 		if (!bucket) {
 			bucket = { material: mat, meshes: [] }
@@ -126,13 +138,7 @@ export function batchStaticOpaques(root: Group, table: Table, _renderApi: ThreeR
 			batched.computeBoundingBox()
 			batched.computeBoundingSphere()
 			root.add(batched)
-			for (const mesh of meshes) {
-				const parent = mesh.parent as Group | null
-				if (parent) parent.remove(mesh)
-				try {
-					mesh.geometry.dispose()
-				} catch {}
-			}
+			for (const mesh of meshes) mesh.visible = false
 			count++
 		} catch {}
 	}
@@ -182,13 +188,7 @@ export function instancedBulbs(root: Group, table: Table, _renderApi: ThreeRende
 			instanced.instanceMatrix.needsUpdate = true
 			instanced.computeBoundingBox()
 			instanced.computeBoundingSphere()
-			for (const m of meshes) {
-				const parent = m.parent as Group | null
-				if (parent) parent.remove(m)
-				try {
-					m.geometry.dispose()
-				} catch {}
-			}
+			for (const m of meshes) m.visible = false
 			root.add(instanced)
 			return true
 		} catch {
@@ -224,13 +224,7 @@ export function instancedBulbs(root: Group, table: Table, _renderApi: ThreeRende
 			instanced.instanceMatrix.needsUpdate = true
 			instanced.computeBoundingBox()
 			instanced.computeBoundingSphere()
-			for (const m of socketMeshes) {
-				const parent = m.parent as Group | null
-				if (parent) parent.remove(m)
-				try {
-					m.geometry.dispose()
-				} catch {}
-			}
+			for (const m of socketMeshes) m.visible = false
 			root.add(instanced)
 			instancedCount++
 		} catch {}
@@ -244,7 +238,7 @@ export function optimizeScene(
 	renderApi: ThreeRenderApi,
 	opts: { batched?: boolean; instanced?: boolean } = {},
 ): { batched: number; instanced: number } {
-	const batched = (opts.batched ?? true) ? batchStaticOpaques(root, table, renderApi) : 0
 	const instanced = (opts.instanced ?? true) ? instancedBulbs(root, table, renderApi) : 0
+	const batched = (opts.batched ?? true) ? batchStaticOpaques(root, table, renderApi) : 0
 	return { batched, instanced }
 }
