@@ -51,7 +51,17 @@ export class Light extends Item<LightData> implements IRenderable<LightState>, I
 
 	private constructor(data: LightData) {
 		super(data)
-		this.state = LightState.claim(this.getName(), 0, data.color, data.color2)
+		const initialIntensity = (() => {
+			const st = data.state
+			if (st === 0) return 0
+			if (st === 2) {
+				const pat = data.rgBlinkPattern
+				return pat && pat[0] === '1' ? data.intensity : 0
+			}
+			const clamped = Math.max(0, Math.min(1, st as number))
+			return data.intensity * clamped
+		})()
+		this.state = LightState.claim(this.getName(), initialIntensity, data.color, data.color2)
 		this.data = data
 		this.meshGenerator = new LightMeshGenerator(data)
 		this.updater = new LightUpdater(this.data, this.state)

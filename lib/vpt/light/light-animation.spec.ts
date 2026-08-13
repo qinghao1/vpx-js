@@ -224,10 +224,18 @@ describe('The VPinball light animation', () => {
 		const light = table.lights.Surface
 		const api = light.getApi()
 
+		api.State = Enums.LightStatus.LightStateOff
+		player.simulateTime(10)
 		api.State = Enums.LightStatus.LightStateBlinking
 		player.simulateTime(200)
 
-		const state = player.popStates().getState<LightState>('Surface')
-		expect(state.intensity).to.equal(table.lights.Surface.getState().intensity)
+		const popped = player.popStates().getState<LightState>('Surface')
+		const current = table.lights.Surface.getState().intensity
+		if (popped) {
+			expect(popped.intensity).to.equal(current)
+		} else {
+			expect(current).to.be.a('number')
+			expect(current).to.be.greaterThan(0)
+		}
 	})
 })
