@@ -16,6 +16,13 @@ import type { ThreeRenderApi } from './three-render-api.js'
 
 const VERTEX_THRESHOLD = 200
 
+const RE_VR = /vr_/i
+const RE_CAB = /vrcab|cabinet|lockbar|pincab/i
+
+function isVrCabName(n: string): boolean {
+	return RE_VR.test(n) || RE_CAB.test(n)
+}
+
 function signature(geo: BufferGeometry): string {
 	const hasIndex = !!geo.getIndex()
 	const hasUv = !!geo.getAttribute('uv')
@@ -40,7 +47,17 @@ function isInLightBulbs(o: any, root: Group): boolean {
 	return false
 }
 
+function isInVrCab(o: any, root: Group): boolean {
+	for (let p = o; p && p !== root; p = p.parent) {
+		const n = (p.name || '').toLowerCase()
+		if (isVrCabName(n)) return true
+	}
+	return false
+}
+
 export function batchStaticOpaques(root: Group, table: Table, _renderApi: ThreeRenderApi): number {
+	root.updateMatrixWorld(true)
+	const invRoot = new Matrix4().copy(root.matrixWorld).invert()
 	const movables = new Set(table.getMovables().map(a => a.getName()))
 	const staticPrimitives = new Set(
 		Object.values(table.primitives)
@@ -85,6 +102,7 @@ export function batchStaticOpaques(root: Group, table: Table, _renderApi: ThreeR
 		if (Array.isArray(o.material)) return
 		if (!isEffectiveVisible(o, root)) return
 		if (isInLightBulbs(o, root)) return
+		if (isInVrCab(o, root)) return
 		const mat = o.material as MeshStandardMaterial
 		if (!canBatch(mat)) return
 		if (isAnimated(o)) return
@@ -92,6 +110,7 @@ export function batchStaticOpaques(root: Group, table: Table, _renderApi: ThreeR
 		if (o.userData?.isProceduralDMD || o.name.startsWith('DMD_') || n.includes('dmd') || dmdNames.has(n)) return
 		if (o.userData?.isCabinetButton || /button|coin|plunger|tour|start|fire|magna/i.test(o.name)) return
 		if (n.includes('ball')) return
+		if (isVrCabName(n)) return
 		const geo = o.geometry as BufferGeometry
 		if (!geo.getAttribute('position')) return
 		const key = `${(mat as any).uuid ?? mat.name}:${signature(geo)}:${o.renderOrder ?? 0}:${o.castShadow ? 1 : 0}:${o.receiveShadow ? 1 : 0}`
@@ -133,10 +152,14 @@ export function batchStaticOpaques(root: Group, table: Table, _renderApi: ThreeR
 				mesh.updateMatrixWorld(true)
 				const geoId = batched.addGeometry(mesh.geometry as BufferGeometry)
 				const instanceId = batched.addInstance(geoId)
-				batched.setMatrixAt(instanceId, mesh.matrixWorld)
+				const local = new Matrix4().multiplyMatrices(invRoot, mesh.matrixWorld)
+				batched.setMatrixAt(instanceId, local)
 			}
 			batched.computeBoundingBox()
 			batched.computeBoundingSphere()
+			try {
+				;(batched.geometry as any).computeBoundsTree?.({ includeInstances: true } as any)
+			} catch {}
 			root.add(batched)
 			for (const mesh of meshes) mesh.visible = false
 			count++
@@ -146,6 +169,8 @@ export function batchStaticOpaques(root: Group, table: Table, _renderApi: ThreeR
 }
 
 export function instancedBulbs(root: Group, table: Table, _renderApi: ThreeRenderApi): number {
+	root.updateMatrixWorld(true)
+	const invRoot = new Matrix4().copy(root.matrixWorld).invert()
 	const group = root.getObjectByName('lightBulbs') as Group | undefined
 	if (!group) return 0
 	const bulbs = Object.values(table.lights).filter(l => (l as any).isBulbLight?.())
@@ -175,7 +200,8 @@ export function instancedBulbs(root: Group, table: Table, _renderApi: ThreeRende
 			for (let i = 0; i < bulbs.length; i++) {
 				if (i < meshes.length) {
 					meshes[i].updateMatrixWorld(true)
-					instanced.setMatrixAt(i, meshes[i].matrixWorld)
+					const local = new Matrix4().multiplyMatrices(invRoot, meshes[i].matrixWorld)
+					instanced.setMatrixAt(i, local)
 				} else {
 					const data: any = (bulbs[i] as any).data
 					const s = data.meshRadius ?? 20
@@ -188,6 +214,9 @@ export function instancedBulbs(root: Group, table: Table, _renderApi: ThreeRende
 			instanced.instanceMatrix.needsUpdate = true
 			instanced.computeBoundingBox()
 			instanced.computeBoundingSphere()
+			try {
+				;(instanced.geometry as any).computeBoundsTree?.({ includeInstances: true } as any)
+			} catch {}
 			for (const m of meshes) m.visible = false
 			root.add(instanced)
 			return true
@@ -211,7 +240,8 @@ export function instancedBulbs(root: Group, table: Table, _renderApi: ThreeRende
 			for (let i = 0; i < bulbs.length; i++) {
 				if (i < socketMeshes.length) {
 					socketMeshes[i].updateMatrixWorld(true)
-					instanced.setMatrixAt(i, socketMeshes[i].matrixWorld)
+					const local = new Matrix4().multiplyMatrices(invRoot, socketMeshes[i].matrixWorld)
+					instanced.setMatrixAt(i, local)
 				} else {
 					const data: any = (bulbs[i] as any).data
 					const s = data.meshRadius ?? 20
@@ -224,6 +254,9 @@ export function instancedBulbs(root: Group, table: Table, _renderApi: ThreeRende
 			instanced.instanceMatrix.needsUpdate = true
 			instanced.computeBoundingBox()
 			instanced.computeBoundingSphere()
+			try {
+				;(instanced.geometry as any).computeBoundsTree?.({ includeInstances: true } as any)
+			} catch {}
 			for (const m of socketMeshes) m.visible = false
 			root.add(instanced)
 			instancedCount++
