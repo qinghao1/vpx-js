@@ -461,6 +461,13 @@ export class Viewer {
 		this._syncChrome()
 		const target = computePlayFraming(this.tableGroup)
 		await this._animateCameraTo(target, CAM_ANIM.durationMode)
+		{
+			const fov = Number.isFinite(this.table?.data?.bgFov?.[0]) ? this.table.data.bgFov[0] : CAM.fov
+			if (Number.isFinite(fov) && Math.abs(this.camera.fov - fov) > 0.5) {
+				this.camera.fov = Math.max(20, Math.min(70, fov))
+				this.camera.updateProjectionMatrix()
+			}
+		}
 		if (this.player) {
 			this.player.setPhysicsEnabled(true)
 			this.enterPlayMode()
@@ -479,15 +486,22 @@ export class Viewer {
 			if (r) r.visible = true
 			else if (this.tableGroup) {
 				const state = computeViewerFraming(this.tableGroup)
-				const center = state.center, size = state.size
+				const center = state.center,
+					size = state.size
 				let hasVr = false
-				this.tableGroup.traverse(o => { if (o.isMesh && o.visible && o.name?.toLowerCase().includes('vr_')) hasVr = true })
+				this.tableGroup.traverse(o => {
+					if (o.isMesh && o.visible && o.name?.toLowerCase().includes('vr_')) hasVr = true
+				})
 				ensureProceduralRoom(this.scene, center, size, { hasVr, viewerMode: this.viewerMode })
 			}
 		}
 		this._syncChrome()
 		const target = computeViewerFraming(this.tableGroup)
 		await this._animateCameraTo(target, CAM_ANIM.durationMode)
+		if (Math.abs(this.camera.fov - CAM.fov) > 0.5) {
+			this.camera.fov = CAM.fov
+			this.camera.updateProjectionMatrix()
+		}
 		if (this.player) this.player.setPhysicsEnabled(false)
 		this.exitPlayMode()
 	}
@@ -501,6 +515,13 @@ export class Viewer {
 		if (!this.tableGroup || !this.controls) return
 		const state = computePlayFraming(this.tableGroup)
 		applyCameraState(this.camera, this.controls, state)
+		{
+			const fov = Number.isFinite(this.table?.data?.bgFov?.[0]) ? this.table.data.bgFov[0] : CAM.fov
+			if (Number.isFinite(fov) && Math.abs(this.camera.fov - fov) > 0.5) {
+				this.camera.fov = Math.max(20, Math.min(70, fov))
+				this.camera.updateProjectionMatrix()
+			}
+		}
 		this._playCameraApplied = true
 	}
 	async _animateCameraTo(state, duration = CAM_ANIM.durationMode) {
@@ -874,7 +895,10 @@ export class Viewer {
 							const [f] = textures.splice(fIdx, 1)
 							textures.unshift(f)
 						}
-						this.log(`[stream] Playfield map "${pf}" missing — fallback to largest "${best.getName()}"`, 'warn')
+						this.log(
+							`[stream] Playfield map "${pf}" missing — fallback to largest "${best.getName()}"`,
+							'warn',
+						)
 					}
 				}
 			}
@@ -1034,7 +1058,10 @@ export class Viewer {
 			harnessLog: this.harnessLog,
 			table,
 		})
-		if (this.viewerMode === 'play') hideCabFlippers(node)
+		if (this.viewerMode === 'play') {
+			hideCabFlippers(node)
+			hideCabOuter(node)
+		}
 		try {
 			const params = new URLSearchParams(location.search)
 			const useBatch = !params.has('nobatched')
@@ -1068,6 +1095,13 @@ export class Viewer {
 		else if (this.viewerMode === 'play') {
 			const state = computePlayFraming(this.tableGroup)
 			applyCameraState(this.camera, this.controls, state)
+			{
+				const fov = Number.isFinite(this.table?.data?.bgFov?.[0]) ? this.table.data.bgFov[0] : CAM.fov
+				if (Number.isFinite(fov) && Math.abs(this.camera.fov - fov) > 0.5) {
+					this.camera.fov = Math.max(20, Math.min(70, fov))
+					this.camera.updateProjectionMatrix()
+				}
+			}
 			this._playCameraApplied = true
 			framed = {
 				center: state.center,
@@ -1078,7 +1112,13 @@ export class Viewer {
 				`[mount] play cam ${state.position.x.toFixed(0)},${state.position.y.toFixed(0)},${state.position.z.toFixed(0)} tgt ${state.target.x.toFixed(0)},${state.target.y.toFixed(0)},${state.target.z.toFixed(0)} maxDim ${state.maxDim.toFixed(0)}`,
 				'info',
 			)
-		} else framed = frameCamera(this.tableGroup, this.camera, this.controls)
+		} else {
+			framed = frameCamera(this.tableGroup, this.camera, this.controls)
+			if (Math.abs(this.camera.fov - CAM.fov) > 0.5) {
+				this.camera.fov = CAM.fov
+				this.camera.updateProjectionMatrix()
+			}
+		}
 		const center = framed.center,
 			size = framed.size || new THREE.Vector3(1, 1, 1)
 		let hasVr = false
@@ -1300,9 +1340,17 @@ export class Viewer {
 									}
 								} else if (info.isVrCab) {
 									const nl = (o.name || '').toLowerCase()
-									if (o.visible === false && (nl.includes('vr_') || nl.includes('vrcab') || nl.includes('cabinet') || nl.includes('lockbar') || nl.includes('pincab'))) {
+									if (
+										o.visible === false &&
+										(nl.includes('vr_') ||
+											nl.includes('vrcab') ||
+											nl.includes('cabinet') ||
+											nl.includes('lockbar') ||
+											nl.includes('pincab'))
+									) {
 										o.visible = true
-										for (let p = o.parent; p && p !== this.tableGroup; p = p.parent) if (p.visible === false) p.visible = true
+										for (let p = o.parent; p && p !== this.tableGroup; p = p.parent)
+											if (p.visible === false) p.visible = true
 									}
 									if (m.transparent && m.opacity === 0) {
 										m.transparent = false
