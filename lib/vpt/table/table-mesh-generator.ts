@@ -76,7 +76,7 @@ export class TableMeshGenerator {
 				lightGroup = renderApi.createParentNode('lightBulbs')
 				renderApi.addChildToParent(tableNode, lightGroup)
 			}
-			for (const lightInfo of Object.values(this.table.lights).filter(l => l.isBulbLight())) {
+			for (const lightInfo of Object.values(this.table.lights).filter(l => l.data.bulbLight)) {
 				let itemGroup = renderApi.findInGroup(lightGroup, lightInfo.getName())
 				if (!itemGroup) {
 					itemGroup = renderApi.createParentNode(lightInfo.getName())

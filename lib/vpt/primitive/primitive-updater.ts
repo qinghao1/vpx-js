@@ -161,7 +161,9 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 		const nonBakedEmissive = nonBakedIntensity > 0
 		const matName = this.state.material ?? this.data.szMaterial
 		const mapName = this.state.map ?? this.data.szImage
-		const isBakedByName = /bake/i.test(matName ?? '') || (/bake|nestmap/i.test(mapName ?? '') && !mapName.toLowerCase().startsWith('vr_'))
+		const isBakedByName =
+			/bake/i.test(matName ?? '') ||
+			(/bake|nestmap/i.test(mapName ?? '') && !mapName.toLowerCase().startsWith('vr_'))
 		const base = table.getMaterial(matName)?.baseColor ?? 0xffffff
 		const hex = new Color(base).multiply(new Color(prim)).getHex() // unlit: emissive = base*prim, intensity = alpha/100
 		const lightName = this.data.szLightmap
@@ -196,14 +198,16 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 				  }
 				| undefined
 			if (!mat?.color || !mat?.emissive) continue
-			const isBaked = dlTop > 0.5 || isBakedByName || !!(mat as any).userData?.__isBaked || !!(mat as any).emissiveMap
+			const isBaked =
+				dlTop > 0.5 || isBakedByName || !!(mat as any).userData?.__isBaked || !!(mat as any).emissiveMap
 			if (isBaked) {
 				const hasMap = !!(mat as any).emissiveMap || !!(mat as any).map
 				const pending =
 					(mat as any).userData?.pendingMap ||
 					(mat as any).userData?.pendingmap ||
 					(mat as any).userData?.pendingEmissiveMap
-				if (!hasMap && pending) {
+				const isBakedByCache = isBakedByName || !!(mat as any).userData?.__isBaked || !!(mat as any).emissiveMap
+				if (!hasMap && pending && isBakedByCache) {
 					mat.color.set(0x000000)
 					mat.emissive.set(0xffffff)
 					mat.emissiveIntensity = 0
