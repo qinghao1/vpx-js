@@ -353,7 +353,8 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 		const isRamp =
 			mesh.includes('ramp') || mesh.includes('armp') || mesh.includes('botramp') || mesh.includes('rampscrw')
 		const alpha = !isMainBake && !isRamp && !isApron && needsAlpha
-		const key = `${base.name}|${base.map?.name ?? ''}|${pending}|${isMainBake ? 'main' : isOverlay ? 'overlay' : alpha ? 'alpha' : 'opaque'}|${base.polygonOffset ? `${base.polygonOffsetFactor}/${base.polygonOffsetUnits}` : '0'}`
+		const isGI = isOverlay && (mesh.includes('gi0') || mesh.includes('gi1') || mesh.includes('_gi') || mesh.includes('gi_'))
+		const key = `${base.name}|${base.map?.name ?? ''}|${pending}|${isMainBake ? 'main' : isOverlay ? (isGI ? 'overlay_gi' : 'overlay_off') : alpha ? 'alpha' : 'opaque'}|${base.polygonOffset ? `${base.polygonOffsetFactor}/${base.polygonOffsetUnits}` : '0'}`
 		let v = bakedCache.get(key)
 		if (v) return v
 		v = base.clone() // unlit baked at 1.0 with AgX
@@ -364,7 +365,7 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 			v.needsUpdate = true
 		} else if (isOverlay) {
 			fixBaked(v, v.map)
-			const isLit = mesh.includes('gi0') || mesh.includes('gi1') || mesh.includes('_gi') || mesh.includes('gi_')
+			const isLit = isGI
 			v.emissiveIntensity = isLit ? 1.0 : 0
 			v.transparent = true
 			v.opacity = isLit ? 1.0 : 0
