@@ -12,9 +12,12 @@ async function getNodeWorker(): Promise<any> {
 	if (nodeReady) return nodeReady
 	nodeReady = (async () => {
 		const { Worker } = await import('node:worker_threads')
-		const w: any = new Worker(new URL('./transpiler.worker.node.ts', import.meta.url) as any, {
-			execArgv: ['--import', 'tsx/esm'],
-		} as any)
+		const w: any = new Worker(
+			new URL('./transpiler.worker.node.ts', import.meta.url) as any,
+			{
+				execArgv: ['--import', 'tsx/esm'],
+			} as any,
+		)
 		w.on('message', (m: any) => {
 			const p = nodePending.get(m.id)
 			if (!p) return
@@ -56,7 +59,12 @@ function getBrowserWorker(): Worker {
 	return browserWorker
 }
 
-export async function transpileWithWorker(vbs: string, gf?: string, go?: string, td?: TableDataPayload | null): Promise<string> {
+export async function transpileWithWorker(
+	vbs: string,
+	gf?: string,
+	go?: string,
+	td?: TableDataPayload | null,
+): Promise<string> {
 	const isBrowser = typeof window !== 'undefined' && typeof document !== 'undefined'
 	if (isBrowser) {
 		const w = getBrowserWorker()
@@ -137,7 +145,10 @@ export function getTableDataForWorker(table: any, player?: any): TableDataPayloa
 		const globalFuncs: string[] = []
 		const globalUndef: string[] = []
 		let sample: any = null
-		if (player) try { sample = new GlobalApi(table, player) } catch {}
+		if (player)
+			try {
+				sample = new GlobalApi(table, player)
+			} catch {}
 		for (const p of Object.getOwnPropertyNames(GlobalApi.prototype)) {
 			if (isMethod(GlobalApi.prototype, p)) globalFuncs.push(p)
 			else if (sample) {
@@ -148,7 +159,15 @@ export function getTableDataForWorker(table: any, player?: any): TableDataPayloa
 				}
 			}
 		}
-		return { elementNames: names, elementEvents: events, elementApis, elementApiFuncs: elementFuncs, elementApiUndefined: elementUndef, globalFuncs, globalUndefined: globalUndef }
+		return {
+			elementNames: names,
+			elementEvents: events,
+			elementApis,
+			elementApiFuncs: elementFuncs,
+			elementApiUndefined: elementUndef,
+			globalFuncs,
+			globalUndefined: globalUndef,
+		}
 	} catch {
 		return null
 	}
