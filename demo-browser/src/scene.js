@@ -517,7 +517,7 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 			o.userData.buttonCode = buttonCode
 			makeParentsVisible(o, node, stats)
 		}
-		if (!o.visible) {
+		if (!o.visible && !n.includes('underwall') && !n.includes('wall')) {
 			const matsForGen = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : []
 			const hasMap = matsForGen.some(mm => mm?.map || pendingOf(mm))
 			const isWhite =
@@ -551,7 +551,7 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 			let m = mats[i]
 			const mName = (m.name || '').toLowerCase()
 			const mp = (m.map?.name || '').toLowerCase()
-			const mc = classify('', mName, mp, !!m.userData?.__isBaked, !!m.userData?.__addBlend)
+			const mc = classify(n, mName, mp, !!m.userData?.__isBaked, !!m.userData?.__addBlend)
 			if (n.includes('flipper')) {
 				if (mc.isBakedMat && !m.map) {
 					m.color?.set?.(0xffffff)

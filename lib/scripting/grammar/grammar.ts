@@ -159,7 +159,7 @@ export class Grammar {
 		const joined: string[] = []
 		let buffer = ''
 		for (let li = 0; li < lines.length; li++) {
-			const line = lines[li]!
+			let line = lines[li]!
 			let out = ''
 			let inStr = false
 			let commentPos = -1
@@ -182,7 +182,7 @@ export class Grammar {
 				out += ch
 			}
 			let content = commentPos >= 0 ? out.slice(0, commentPos) : out
-			const trimmed = content.trimStart()
+			let trimmed = content.trimStart()
 			if (
 				trimmed.length >= 3 &&
 				trimmed.slice(0, 3).toLowerCase() === 'rem' &&
@@ -207,6 +207,7 @@ export class Grammar {
 			if (isCont) {
 				const part = content.slice(0, lastNonWs).trimEnd()
 				buffer = buffer ? buffer + ' ' + part : part
+				continue
 			} else {
 				if (buffer) {
 					content = buffer + ' ' + content
@@ -220,6 +221,7 @@ export class Grammar {
 			let res = ''
 			let prevTokenType: string | null = null
 			let prevTokenText = ''
+			let hadSep = false
 			let i = 0
 			const n = raw.length
 			const isAlpha = (c: string) => /[A-Za-z_]/.test(c)
@@ -255,9 +257,11 @@ export class Grammar {
 					res += str
 					prevTokenType = 'Literal'
 					prevTokenText = '"'
+					hadSep = false
 					continue
 				}
 				if (ch === ' ' || ch === '\t') {
+					hadSep = true
 					i++
 					continue
 				}
@@ -267,6 +271,7 @@ export class Grammar {
 					while (i < n && (raw[i] === ' ' || raw[i] === '\t')) i++
 					prevTokenType = 'Colon'
 					prevTokenText = ':'
+					hadSep = false
 					continue
 				}
 				if (ch === ',') {
@@ -275,6 +280,7 @@ export class Grammar {
 					while (i < n && (raw[i] === ' ' || raw[i] === '\t')) i++
 					prevTokenType = 'Separator'
 					prevTokenText = ','
+					hadSep = false
 					continue
 				}
 				if (ch === '(') {
@@ -283,6 +289,7 @@ export class Grammar {
 					i++
 					prevTokenType = 'Operator'
 					prevTokenText = '('
+					hadSep = false
 					continue
 				}
 				if (ch === '-') {
@@ -291,34 +298,7 @@ export class Grammar {
 					i++
 					prevTokenType = 'Operator'
 					prevTokenText = ch
-					continue
-				}
-				if (ch === '.' || ch === '&' || ch === '+') {
-					res += ch
-					i++
-					prevTokenType = 'Operator'
-					prevTokenText = ch
-					continue
-				}
-				if (
-					ch === ')' ||
-					ch === '=' ||
-					ch === '*' ||
-					ch === '/' ||
-					ch === '\\' ||
-					ch === '^' ||
-					ch === '<' ||
-					ch === '>' ||
-					ch === '!' ||
-					ch === '#' ||
-					ch === '?' ||
-					ch === '{' ||
-					ch === '}'
-				) {
-					res += ch
-					i++
-					prevTokenType = 'Operator'
-					prevTokenText = ch
+					hadSep = false
 					continue
 				}
 				if (
@@ -378,6 +358,42 @@ export class Grammar {
 					res += num
 					prevTokenType = 'Literal'
 					prevTokenText = num
+					hadSep = false
+					continue
+				}
+				if (ch === '.' || ch === '&' || ch === '+') {
+					if (ch === '.') {
+						if (hadSep && prevTokenType && prevTokenType !== 'Operator' && prevTokenText !== ':' && prevTokenType !== 'Colon' && prevTokenType !== 'Separator') {
+							res += ' '
+						}
+					}
+					res += ch
+					i++
+					prevTokenType = 'Operator'
+					prevTokenText = ch
+					hadSep = false
+					continue
+				}
+				if (
+					ch === ')' ||
+					ch === '=' ||
+					ch === '*' ||
+					ch === '/' ||
+					ch === '\\' ||
+					ch === '^' ||
+					ch === '<' ||
+					ch === '>' ||
+					ch === '!' ||
+					ch === '#' ||
+					ch === '?' ||
+					ch === '{' ||
+					ch === '}'
+				) {
+					res += ch
+					i++
+					prevTokenType = 'Operator'
+					prevTokenText = ch
+					hadSep = false
 					continue
 				}
 				if (isAlpha(ch)) {
@@ -387,7 +403,7 @@ export class Grammar {
 						i++
 					}
 					const lower = word.toLowerCase()
-					const std = this.keywordsMap[lower]
+					let std = this.keywordsMap[lower]
 					let type = 'Identifier'
 					let text = word
 					if (std) {
@@ -424,10 +440,12 @@ export class Grammar {
 					res += text
 					prevTokenType = type
 					prevTokenText = text
+					hadSep = false
 					continue
 				}
 				res += ch
 				i++
+				hadSep = false
 			}
 			outLines.push(res)
 		}

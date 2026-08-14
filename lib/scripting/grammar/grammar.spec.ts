@@ -4,6 +4,7 @@
 import * as chai from 'chai'
 import { expect } from 'chai'
 import sinonChai from 'sinon-chai'
+import { getTextFile } from '../../refs.node.js'
 import { Grammar } from './grammar.js'
 
 chai.use((sinonChai as any).default ?? sinonChai)
@@ -72,4 +73,55 @@ describe('The scripting grammar - transpile', () => {
 	// 	const vbs = getTextFile('core.vbs');
 	// 	expect(() => grammar.transpile(vbs)).not.to.throw(Error);
 	// });
+})
+
+describe('The scripting grammar - fastFormat parity', () => {
+	it('should match legacyFormat for bundled scripts', () => {
+		const names = ['controller.vbs', 'core.vbs', 'sam.vbs', 'WPC.vbs', 'VPMKeys.vbs']
+		for (const n of names) {
+			let vbs: string
+			try {
+				vbs = getTextFile(n)
+			} catch {
+				continue
+			}
+			const fast = (grammar as any).fastFormat.call(grammar, vbs)
+			const leg = (grammar as any).legacyFormat.call(grammar, vbs)
+			expect(fast).to.equal(leg, n)
+			expect(() => grammar.transpile(vbs)).not.to.throw(Error, n)
+		}
+	})
+
+	it('should match legacyFormat for walking_dead when available', async () => {
+		const fs = await import('node:fs')
+		const path = '/home/qinghao1/Downloads/walking_dead.vpx'
+		if (!fs.existsSync(path)) return
+		const { NodeBinaryReader } = await import('../../io/binary-reader.node.js')
+		const { Table } = await import('../../vpt/table/table.js')
+		const { Player } = await import('../../game/player.js')
+		const { Transpiler } = await import('../transpiler.js')
+		const table = await Table.load(new NodeBinaryReader(path), { skipTextures: true } as any)
+		const vbs = (table as any).tableScript as string
+		expect(vbs.length).to.be.greaterThan(10000)
+		const fast = (grammar as any).fastFormat.call(grammar, vbs)
+		const leg = (grammar as any).legacyFormat.call(grammar, vbs)
+		expect(fast).to.equal(leg)
+		const player = new Player(table)
+		const transpiler = new Transpiler(table, player)
+		let jsFast: string
+		expect(() => { jsFast = transpiler.transpile(vbs) }).not.to.throw()
+		expect(jsFast!.length).to.be.greaterThan(10000)
+		const orig = Grammar.prototype.format
+		const legacy = (grammar as any).legacyFormat.bind(grammar)
+		;(Grammar.prototype as any).format = function (s: string) { return legacy(s) }
+		let jsLeg: string
+		try {
+			jsLeg = new Transpiler(table, player).transpile(vbs)
+		} finally {
+			;(Grammar.prototype as any).format = orig
+		}
+		expect(jsFast!).to.equal(jsLeg!)
+		const prog = grammar.transpile('Dim x\n')
+		expect(prog.body.length).to.equal(1)
+	})
 })
