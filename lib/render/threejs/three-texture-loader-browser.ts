@@ -73,7 +73,7 @@ function viewportBudget(): number {
 	}
 }
 
-function effectiveMax(isFloat: boolean, name?: string): number {
+export function effectiveMax(isFloat: boolean, name?: string): number {
 	const hw = getHardwareMax()
 	const swift = isSwiftShader()
 	const isPlayfield = !!name && /playfield|nestmap|bake/i.test(name)
@@ -83,6 +83,11 @@ function effectiveMax(isFloat: boolean, name?: string): number {
 		return Math.min(hw, cap, Math.max(1024, Math.ceil(viewportBudget())))
 	}
 	return Math.min(hw, cap)
+}
+
+export function _testResetTextureLimits(): void {
+	hwMax = undefined
+	isSwiftShaderCache = undefined
 }
 
 function tune(tex: any): void {

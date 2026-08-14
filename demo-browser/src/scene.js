@@ -51,14 +51,14 @@ const classify = (mesh, mat, map, baked = false, addBlend = false) => {
 		isRampFamily,
 	}
 }
-const isBasePlayfield = (n, c) => n.includes('playfield') && !c.isBakedMat
-const isBakedMesh = c => !!c.isBakedMat
+export const isBasePlayfield = (n, c) => n.includes('playfield') && !c.isBakedMat
+export const isBakedMesh = c => !!c.isBakedMat
 
 export const isBakedMeshByNames = (meshName, matName, mapName, baked, addBlend) => {
 	const c = classify(meshName ?? '', matName ?? '', mapName ?? '', baked ?? false, addBlend ?? false)
 	return { ...c, isVrCab: !!c.isCab || !!c.isVr, isBaked: isBakedMesh(c) }
 }
-export { classify, isBakedMesh }
+export { classify }
 
 function wrapTexBaked(tex) {
 	if (!tex) return

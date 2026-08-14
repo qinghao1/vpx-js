@@ -64,7 +64,8 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 			state.alpha !== undefined ||
 			state.disableLightingTop !== undefined ||
 			state.disableLightingBelow !== undefined ||
-			state.material !== undefined
+			state.material !== undefined ||
+			!!this.data.szLightmap
 		if (needsColor) this.applyColor(obj, table)
 		if (state.alpha !== undefined) this.applyAlpha(obj)
 		if (state.position || state.size || state.rotation || state.translation || state.objectRotation) {

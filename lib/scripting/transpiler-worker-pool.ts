@@ -12,6 +12,8 @@ async function getNodeWorker(): Promise<any> {
 	if (nodeReady) return nodeReady
 	nodeReady = (async () => {
 		const { Worker } = await import('node:worker_threads')
+		const { existsSync } = await import('node:fs')
+		const { fileURLToPath } = await import('node:url')
 		const tryCreate = (url: URL, withTsx: boolean) => {
 			try {
 				if (withTsx) return new Worker(url as any, { execArgv: ['--import', 'tsx/esm'] } as any)
@@ -27,7 +29,11 @@ async function getNodeWorker(): Promise<any> {
 			['./transpiler.worker.node.ts', true],
 		] as const) {
 			try {
-				w = tryCreate(new URL(p, import.meta.url) as any, tsx)
+				const url = new URL(p, import.meta.url) as any
+				try {
+					if (!existsSync(fileURLToPath(url))) continue
+				} catch {}
+				w = tryCreate(url, tsx)
 				if (w) break
 			} catch {}
 		}

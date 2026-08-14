@@ -33,6 +33,7 @@ async function getHdrWorkers(): Promise<any[]> {
 	if (hdrReady) return hdrReady
 	hdrReady = (async () => {
 		const { Worker } = await import('node:worker_threads')
+		const { existsSync } = await import('node:fs')
 		const workers: any[] = []
 		for (let i = 0; i < HDR_POOL_SIZE; i++) {
 			const tryCreate = (url: URL, withTsx: boolean) => {
@@ -51,6 +52,9 @@ async function getHdrWorkers(): Promise<any[]> {
 			] as const) {
 				try {
 					const u = new URL(p, import.meta.url) as any
+					try {
+						if (!existsSync(fileURLToPath(u))) continue
+					} catch {}
 					w = tryCreate(u, tsx)
 					if (w) break
 				} catch {}
@@ -153,7 +157,7 @@ export class ThreeTextureLoaderNode implements ITextureLoader<ThreeTexture> {
 	}
 }
 
-function getMaxTextureSize(name: string): number {
+export function getMaxTextureSize(name: string): number {
 	const isPlayfield = /playfield|nestmap|bake/i.test(name)
 	return isPlayfield ? 4096 : 2048
 }
