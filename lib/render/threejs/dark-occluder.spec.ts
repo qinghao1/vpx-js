@@ -3,8 +3,8 @@
 
 import * as chai from 'chai'
 import { expect } from 'chai'
-import * as THREE from 'three'
 import sinonChai from 'sinon-chai'
+import * as THREE from 'three'
 import { postProcessScene } from '../../../demo-browser/src/scene.js'
 
 chai.use((sinonChai as any).default ?? sinonChai)
@@ -79,19 +79,28 @@ describe('regression: dark occluder side artifact', () => {
 		root.updateMatrixWorld(true)
 		postProcessScene(root, { harnessLog, viewerMode: 'viewer' })
 
-		expect(blackbox.visible, 'primitive-blackbox large dark must be hidden (generic heuristic, not name-specific)').to.equal(false)
+		expect(
+			blackbox.visible,
+			'primitive-blackbox large dark must be hidden (generic heuristic, not name-specific)',
+		).to.equal(false)
 		expect(small.visible, 'small dark LM should remain visible (size <25 threshold)').to.equal(true)
 		expect(cabinet.visible, 'textured VR cabinet must stay visible').to.equal(true)
-		const cabMatAfter = Array.isArray(cabinet.material) ? (cabinet.material[0] as THREE.MeshStandardMaterial) : (cabinet.material as THREE.MeshStandardMaterial)
-		expect(cabMatAfter.polygonOffset, 'textured VR cabinet should be pushed forward with polygonOffset').to.equal(true)
-		expect(cabMatAfter.polygonOffsetFactor).to.equal(-1)
+		const cabMatAfter = Array.isArray(cabinet.material)
+			? (cabinet.material[0] as THREE.MeshStandardMaterial)
+			: (cabinet.material as THREE.MeshStandardMaterial)
+		expect(cabMatAfter.polygonOffset, 'textured VR cabinet should be pushed forward with polygonOffset').to.equal(
+			true,
+		)
+		expect(cabMatAfter.polygonOffsetFactor).to.equal(0)
 		expect(cabMatAfter.polygonOffsetUnits).to.equal(-1)
 
 		expect(whiteWall.visible, 'white untextured stray must be hidden').to.equal(false)
 		expect(playfield.visible, 'playfield must remain visible despite white').to.equal(true)
 		expect(gate.visible, 'gate large dark must NOT be hidden (excluded by name)').to.equal(true)
 		expect(vrDark.visible, 'VR dark without map must remain visible (excluded)').to.equal(true)
-		const vrMatAfter = Array.isArray(vrDark.material) ? (vrDark.material[0] as THREE.MeshStandardMaterial) : (vrDark.material as THREE.MeshStandardMaterial)
+		const vrMatAfter = Array.isArray(vrDark.material)
+			? (vrDark.material[0] as THREE.MeshStandardMaterial)
+			: (vrDark.material as THREE.MeshStandardMaterial)
 		expect(vrMatAfter.polygonOffset, 'untextured VR should have polygonOffset false').to.equal(false)
 
 		const logText = logs.join(' ')

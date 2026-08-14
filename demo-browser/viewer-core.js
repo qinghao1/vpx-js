@@ -280,7 +280,7 @@ export class Viewer {
 			backend = 'webgl'
 		}
 		renderer.setPixelRatio(getTargetPixelRatio(this.viewerMode))
-		renderer.sortObjects = false
+		renderer.sortObjects = true
 		renderer.shadowMap.enabled = p.has('shadows')
 		if (renderer.shadowMap.enabled) renderer.shadowMap.type = THREE.PCFSoftShadowMap
 		renderer.outputColorSpace = THREE.SRGBColorSpace
@@ -447,7 +447,7 @@ export class Viewer {
 		this.viewerMode = 'play'
 		if (this.renderer) {
 			this.renderer.setPixelRatio(getTargetPixelRatio('play'))
-			this.renderer.sortObjects = false
+			this.renderer.sortObjects = true
 		}
 		this._hidePlayTip?.()
 		hideCabFlippers(this.tableGroup)
@@ -1296,17 +1296,20 @@ export class Viewer {
 							delete m.userData[pk]
 							m.needsUpdate = true
 							if (k === 'map') {
-								const info = isBakedMeshByNames(o.name || '', m.name || '', tex.name || '', !!m.userData?.__isBaked, !!m.userData?.__addBlend)
+								const info = isBakedMeshByNames(
+									o.name || '',
+									m.name || '',
+									tex.name || '',
+									!!m.userData?.__isBaked,
+									!!m.userData?.__addBlend,
+								)
 								if (info.isBaked) {
 									applyBakedMaterial(m, tex, info, o.name || '')
 									const nl = (o.name || '').toLowerCase()
 									const isPlayfieldOverlay =
 										info.isVlmBake && !info.isMainBake && nl.includes('playfield')
 									const isBakedMeshName = nl.includes('playfield') || nl.includes('bm_')
-									if (
-										(info.isMainBake || isPlayfieldOverlay) &&
-										isBakedMeshName
-									) {
+									if ((info.isMainBake || isPlayfieldOverlay) && isBakedMeshName) {
 										const makeVisible = obj => {
 											if (obj.visible === false) {
 												obj.visible = true
@@ -1357,7 +1360,14 @@ export class Viewer {
 								} else {
 									const texName = String(tex?.name ?? name ?? '').toLowerCase()
 									const isRoundInsert = texName.includes('round') && !texName.includes('ground')
-									const isInsertTex = texName.includes('insert') || texName.includes('rect') || isRoundInsert || texName.includes('dot') || texName.includes('triangle') || texName.includes('flasher') || texName.includes('vrlight')
+									const isInsertTex =
+										texName.includes('insert') ||
+										texName.includes('rect') ||
+										isRoundInsert ||
+										texName.includes('dot') ||
+										texName.includes('triangle') ||
+										texName.includes('flasher') ||
+										texName.includes('vrlight')
 									if (isInsertTex && m.transparent && m.opacity === 0) {
 										m.transparent = false
 										m.opacity = 1
@@ -1380,7 +1390,13 @@ export class Viewer {
 							m2 = Array.isArray(o2.material) ? o2.material[0] : o2.material
 						if (!m2?.map) return
 						if (!n2.toLowerCase().includes('playfield') && !n2.toLowerCase().includes('bm_')) return
-						const info = isBakedMeshByNames(n2, m2.name || '', m2.map?.name || '', !!m2.userData?.__isBaked, !!m2.userData?.__addBlend)
+						const info = isBakedMeshByNames(
+							n2,
+							m2.name || '',
+							m2.map?.name || '',
+							!!m2.userData?.__isBaked,
+							!!m2.userData?.__addBlend,
+						)
 						if (info.isBaked) hasReadyBake = true
 					})
 					if (hasReadyBake) {
@@ -1389,7 +1405,13 @@ export class Viewer {
 								return
 							const m2 = Array.isArray(o2.material) ? o2.material[0] : o2.material
 							if (!m2) return
-							const info = isBakedMeshByNames(o2.name || '', m2.name || '', m2.map?.name || '', !!m2.userData?.__isBaked, !!m2.userData?.__addBlend)
+							const info = isBakedMeshByNames(
+								o2.name || '',
+								m2.name || '',
+								m2.map?.name || '',
+								!!m2.userData?.__isBaked,
+								!!m2.userData?.__addBlend,
+							)
 							if (!info.isBaked && !info.isMainBake && !info.isVlmBake) {
 								o2.visible = false
 								o2.geometry?.dispose?.()
@@ -1403,7 +1425,13 @@ export class Viewer {
 						const m2 = Array.isArray(o2.material) ? o2.material[0] : o2.material
 						if (!m2?.map) return
 						const isBaked = !!(m2.userData && m2.userData.__isBaked)
-						const info2 = isBakedMeshByNames(n2, m2.name || '', m2.map?.name || '', !!m2.userData?.__isBaked, !!m2.userData?.__addBlend)
+						const info2 = isBakedMeshByNames(
+							n2,
+							m2.name || '',
+							m2.map?.name || '',
+							!!m2.userData?.__isBaked,
+							!!m2.userData?.__addBlend,
+						)
 						const shouldShow = isBaked || info2.isMainBake || (info2.isVlmBake && !info2.isMainBake)
 						if (shouldShow && o2.visible === false) {
 							o2.visible = true

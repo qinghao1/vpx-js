@@ -121,7 +121,7 @@ function fixVr(mat) {
 	mat.metalness = BAKED_METAL
 	if (mat.map) {
 		mat.polygonOffset = true
-		mat.polygonOffsetFactor = -1
+		mat.polygonOffsetFactor = 0
 		mat.polygonOffsetUnits = -1
 	} else {
 		mat.polygonOffset = false
@@ -170,7 +170,7 @@ export const applyBakedMaterial = (mat, tex, info, meshName) => {
 		wrapTexBaked(tex)
 		wrapTexBaked(mat.emissiveMap)
 		mat.polygonOffset = true
-		mat.polygonOffsetFactor = -2
+		mat.polygonOffsetFactor = 0
 		mat.polygonOffsetUnits = -4
 	} else {
 		mat.emissiveIntensity = BAKED_EMISSIVE * emissionScale()
@@ -184,7 +184,7 @@ export const applyBakedMaterial = (mat, tex, info, meshName) => {
 		wrapTexBaked(mat.emissiveMap)
 		if (isMain && !nl.includes('non_opaque') && !/ramp|armp|botramp|rampscrw/i.test(nl)) {
 			mat.polygonOffset = true
-			mat.polygonOffsetFactor = -1
+			mat.polygonOffsetFactor = 0
 			mat.polygonOffsetUnits = -1
 			mat.depthWrite = true
 			mat.transparent = false
@@ -409,7 +409,7 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 				v.opacity = 0
 				v.blending = THREE.AdditiveBlending
 				v.polygonOffset = true
-				v.polygonOffsetFactor = -2
+				v.polygonOffsetFactor = 0
 				v.polygonOffsetUnits = -4
 			} else {
 				v.transparent = true
@@ -418,7 +418,7 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 				v.opacity = 1.0
 				v.blending = THREE.AdditiveBlending
 				v.polygonOffset = true
-				v.polygonOffsetFactor = -2
+				v.polygonOffsetFactor = 0
 				v.polygonOffsetUnits = -4
 			}
 		} else {
@@ -428,11 +428,11 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 			if (v.opacity === undefined || !isOverlay) v.opacity = 1
 			if (isMainBake && !isApron && !isRamp) {
 				v.polygonOffset = true
-				v.polygonOffsetFactor = -1
+				v.polygonOffsetFactor = 0
 				v.polygonOffsetUnits = -1
 			} else if (!isMainBake && alpha && !isApron && !isRamp) {
 				v.polygonOffset = true
-				v.polygonOffsetFactor = -2
+				v.polygonOffsetFactor = 0
 				v.polygonOffsetUnits = -4
 			} else if (!isOverlay) {
 				v.polygonOffset = false
@@ -541,7 +541,7 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 			for (const mat of o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : []) {
 				mat.side = THREE.DoubleSide
 				mat.polygonOffset = true
-				mat.polygonOffsetFactor = -1
+				mat.polygonOffsetFactor = 0
 				mat.polygonOffsetUnits = -1
 				mat.depthWrite = true
 				mat.needsUpdate = true
@@ -641,7 +641,15 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 			const isInsertPending = (() => {
 				const p = String(pendingGeneric).toLowerCase()
 				const isRoundInsert = p.includes('round') && !p.includes('ground')
-				return p.includes('insert') || p.includes('rect') || isRoundInsert || p.includes('dot') || p.includes('triangle') || p.includes('flasher') || p.includes('vrlight')
+				return (
+					p.includes('insert') ||
+					p.includes('rect') ||
+					isRoundInsert ||
+					p.includes('dot') ||
+					p.includes('triangle') ||
+					p.includes('flasher') ||
+					p.includes('vrlight')
+				)
 			})()
 			if (pendingGeneric && !m.map && !m.emissiveMap && isInsertPending) {
 				m.transparent = true
@@ -717,7 +725,15 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 				!!m.userData?.__isBaked,
 				!!m.userData?.__addBlend,
 			)
-			if ((c.isMainBake || c.isVlmBake) && pending && !mapName && n.includes('playfield') && !c.isVr && !c.isCab && o.visible) {
+			if (
+				(c.isMainBake || c.isVlmBake) &&
+				pending &&
+				!mapName &&
+				n.includes('playfield') &&
+				!c.isVr &&
+				!c.isCab &&
+				o.visible
+			) {
 				o.visible = false
 				stats.playfieldHidden++
 			} else if (n.includes('playfield') && isBakedMesh(c) && pending && !mapName && o.visible) {
@@ -742,7 +758,15 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 				!!m.userData?.__isBaked,
 				!!m.userData?.__addBlend,
 			)
-			if ((c.isMainBake || c.isVlmBake) && pending && !mapName && n.includes('playfield') && !c.isVr && !c.isCab && o.visible) {
+			if (
+				(c.isMainBake || c.isVlmBake) &&
+				pending &&
+				!mapName &&
+				n.includes('playfield') &&
+				!c.isVr &&
+				!c.isCab &&
+				o.visible
+			) {
 				o.visible = false
 				stats.playfieldHidden++
 			} else if (n.includes('playfield') && isBakedMesh(c) && pending && !mapName && o.visible) {
@@ -779,7 +803,13 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 		if (!isSling) return
 		const m = Array.isArray(o.material) ? o.material[0] : o.material
 		const c = m
-			? classify(n, (m.name || '').toLowerCase(), (m.map?.name || '').toLowerCase(), !!m.userData?.__isBaked, !!m.userData?.__addBlend)
+			? classify(
+					n,
+					(m.name || '').toLowerCase(),
+					(m.map?.name || '').toLowerCase(),
+					!!m.userData?.__isBaked,
+					!!m.userData?.__addBlend,
+				)
 			: { isGlass: false, isLm: false, isVlmBake: false, isMainBake: false }
 		if (c.isGlass || c.isLm || (c.isVlmBake && !c.isMainBake)) return
 		if (m && (m.name || '').toLowerCase().includes('green')) return
@@ -986,7 +1016,7 @@ const excludeNonPlayfield = n =>
 	!n.includes('apron')
 const excludeVrNonCab = n => RE_VR.test(n) && !RE_CAB.test(n)
 const VIEWER = { dist: 1.2, elev: 0.85, azim: 0.65, near: 0.015, farScale: 8, farMin: 2000 }
-const PLAY = { dist: 1.00, elev: 1.10, azim: 0.68, near: 0.012, farScale: 10, farMin: 4000, forwardBias: -0.07 }
+const PLAY = { dist: 1.0, elev: 1.1, azim: 0.68, near: 0.012, farScale: 10, farMin: 4000, forwardBias: -0.07 }
 
 function framingState(node, targetExclude, sizeExclude, cfg) {
 	const target = framingBox(node, targetExclude).center.clone()
@@ -1005,7 +1035,8 @@ function framingState(node, targetExclude, sizeExclude, cfg) {
 }
 
 export const computeViewerFraming = node => framingState(node, excludeNonPlayfield, excludeVrNonCab, VIEWER)
-const excludeLegsForPlay = n => n.includes('leg') || n.includes('support') || n.includes('bottom') || (RE_VR.test(n) && !RE_CAB.test(n))
+const excludeLegsForPlay = n =>
+	n.includes('leg') || n.includes('support') || n.includes('bottom') || (RE_VR.test(n) && !RE_CAB.test(n))
 export const computePlayFraming = node => framingState(node, excludeNonPlayfield, excludeLegsForPlay, PLAY)
 
 export function applyCameraState(camera, controls, state) {
