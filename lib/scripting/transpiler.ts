@@ -43,6 +43,8 @@ function normalizeNewCall(vbs: string): string {
 	return out
 }
 
+const workerCache: Promise<string> | null = null
+
 export class Transpiler {
 	private readonly itemApis: Record<string, unknown>
 	private readonly enumApis: EnumsApi = Enums
@@ -125,6 +127,27 @@ export class Transpiler {
 	}
 
 	public async transpileAsync(vbs: string, globalFunction?: string, globalObject?: string): Promise<string> {
+		if (vbs.length > 2000 && typeof window !== 'undefined' && typeof Worker !== 'undefined') {
+			try {
+				const { transpileWithWorker, getTableDataForWorker } = await import('./transpiler-worker-pool.js')
+				const tableData = getTableDataForWorker(this.table)
+				const t0 = Date.now()
+				const js = await transpileWithWorker(vbs, globalFunction, globalObject, tableData)
+				logger().debug('[Transpiler] Worker transpiled in %sms', Date.now() - t0)
+				if (typeof window !== 'undefined' && typeof indexedDB !== 'undefined') {
+					import('../util/idb-cache.js')
+						.then(({ vbsCacheKey, idbSet }) => {
+							try {
+								idbSet(vbsCacheKey(vbs), js).catch(() => {})
+							} catch {}
+						})
+						.catch(() => {})
+				}
+				return js
+			} catch (e) {
+				logger().debug('[Transpiler] Worker failed, fallback %s', (e as Error).message)
+			}
+		}
 		const src = normalizeNewCall(vbs)
 		await this.gate.yieldToMain()
 		await this.gate.waitIfAnimating()
