@@ -32,7 +32,7 @@ describe.skipIf(!isWalkingDead)('transpiler', () => {
 				table = await Table.load(new NodeBinaryReader(vpx!), { skipTextures: true } as any)
 				player = new Player(table)
 				vbs = (table as any).tableScript
-				tableData = getTableDataForWorker(table)
+				tableData = getTableDataForWorker(table, player)
 			}
 			const transpiler = new Transpiler(table, player)
 			transpiler.transpile(vbs, 'play', 'global')
@@ -47,7 +47,7 @@ describe.skipIf(!isWalkingDead)('transpiler', () => {
 				table = await Table.load(new NodeBinaryReader(vpx!), { skipTextures: true } as any)
 				player = new Player(table)
 				vbs = (table as any).tableScript
-				tableData = getTableDataForWorker(table)
+				tableData = getTableDataForWorker(table, player)
 			}
 			await transpileWithWorker(vbs, 'play', 'global', tableData)
 		},

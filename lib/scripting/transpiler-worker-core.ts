@@ -31,8 +31,10 @@ export interface TableDataPayload {
 	elementEvents: Record<string, string[]>
 	elementApis: Record<string, string[]>
 	elementApiFuncs?: Record<string, string[]>
+	elementApiUndefined?: Record<string, string[]>
 	globalProps?: string[]
 	globalFuncs?: string[]
+	globalUndefined?: string[]
 	stdlibProps?: string[]
 	enumProps?: Record<string, string[]>
 }
@@ -68,24 +70,31 @@ export async function transpileInWorker(payload: {
 			},
 		}
 		const apiFuncs = (tableData.elementApiFuncs ?? {}) as Record<string, string[]>
+		const apiUndef = (tableData.elementApiUndefined ?? {}) as Record<string, string[]>
 		for (const [name, props] of Object.entries(tableData.elementApis as Record<string, string[]>)) {
 			const propMap = new Map<string, string>()
 			const mock: any = {}
 			const funcSet = new Set((apiFuncs[name] ?? []).map(s => s.toLowerCase()))
+			const undefSet = new Set((apiUndef[name] ?? []).map(s => s.toLowerCase()))
 			for (const p of props) {
 				propMap.set(p.toLowerCase(), p)
-				mock[p] = funcSet.has(p.toLowerCase()) ? (() => {}) : 0
+				if (funcSet.has(p.toLowerCase())) mock[p] = () => {}
+				else if (undefSet.has(p.toLowerCase())) mock[p] = undefined
+				else mock[p] = 0
 			}
 			mock._getPropertyName = (n: string) => propMap.get(n.toLowerCase())
 			itemApis[name] = mock
 		}
 		const globalFuncsSet = new Set((tableData.globalFuncs ?? []).map(s => s.toLowerCase()))
+		const globalUndefSet = new Set((tableData.globalUndefined ?? []).map(s => s.toLowerCase()))
 		const globalPropMap = new Map<string, string>()
 		const gMock: any = {}
 		const globalProtoProps = tableData.globalProps ?? Object.getOwnPropertyNames(GlobalApi.prototype)
 		for (const p of globalProtoProps) {
 			globalPropMap.set(p.toLowerCase(), p)
-			gMock[p] = globalFuncsSet.has(p.toLowerCase()) ? (() => {}) : 0
+			if (globalFuncsSet.has(p.toLowerCase())) gMock[p] = () => {}
+			else if (globalUndefSet.has(p.toLowerCase())) gMock[p] = undefined
+			else gMock[p] = 0
 		}
 		gMock._getPropertyName = (n: string) => globalPropMap.get(n.toLowerCase())
 		globalMock = gMock

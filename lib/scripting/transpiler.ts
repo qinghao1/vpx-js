@@ -130,7 +130,7 @@ export class Transpiler {
 		if (vbs.length > 2000 && typeof window !== 'undefined' && typeof Worker !== 'undefined') {
 			try {
 				const { transpileWithWorker, getTableDataForWorker } = await import('./transpiler-worker-pool.js')
-				const tableData = getTableDataForWorker(this.table)
+				const tableData = getTableDataForWorker(this.table, this.player)
 				const t0 = Date.now()
 				const js = await transpileWithWorker(vbs, globalFunction, globalObject, tableData)
 				logger().debug('[Transpiler] Worker transpiled in %sms', Date.now() - t0)
