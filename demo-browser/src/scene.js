@@ -56,7 +56,7 @@ const isBakedMesh = c => !!c.isBakedMat
 
 export const isBakedMeshByNames = (meshName, matName, mapName, baked, addBlend) => {
 	const c = classify(meshName ?? '', matName ?? '', mapName ?? '', baked ?? false, addBlend ?? false)
-	return { ...c, isVrCab: !!c.isCab, isBaked: isBakedMesh(c) }
+	return { ...c, isVrCab: !!c.isCab || !!c.isVr, isBaked: isBakedMesh(c) }
 }
 export { classify, isBakedMesh }
 
@@ -462,13 +462,8 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 			o.visible = false
 			return
 		}
-		if (viewerMode === 'play' && RE_VR.test(n) && !RE_CAB.test(n)) {
-			if (o.visible !== false) stats.cabHidden++
-			o.visible = false
-			return
-		}
 		if (!o.isMesh) {
-			if (n && (RE_CAB.test(n) || resolveButtonCode(n)) && o.visible === false) {
+			if (n && (RE_CAB.test(n) || RE_VR.test(n) || resolveButtonCode(n)) && o.visible === false) {
 				o.visible = true
 				stats.cabForced++
 			}
