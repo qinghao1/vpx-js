@@ -10,14 +10,8 @@ import { transpileInWorker } from './transpiler-worker-core.js'
 import { getTableDataForWorker } from './transpiler-worker-pool.js'
 
 function findWalkingDead(): string | null {
-	const cands = [
-		path.resolve('walking_dead.vpx'),
-		path.join(process.env.HOME ?? '/home/qinghao1', 'Downloads/walking_dead.vpx'),
-	]
-	for (const p of cands)
-		try {
-			if (fs.existsSync(p) && fs.statSync(p).size > 1_000_000) return p
-		} catch {}
+	const cands = [path.resolve('walking_dead.vpx'), path.join(process.env.HOME ?? '/home/qinghao1', 'Downloads/walking_dead.vpx')]
+	for (const p of cands) try { if (fs.existsSync(p) && fs.statSync(p).size > 1_000_000) return p } catch {}
 	return null
 }
 const walkingDead = findWalkingDead()
@@ -29,9 +23,7 @@ describe('Transpiler worker parity', () => {
 		const vbs = 'MyFlipper.Y = 123\nx = MyFlipper.Y\n'
 		const sync = new Transpiler(table, player).transpile(vbs, 'play', 'global')
 		const td = getTableDataForWorker(table, player)
-		expect(
-			await transpileInWorker({ vbs, globalFunction: 'play', globalObject: 'global', tableData: td }),
-		).to.equal(sync)
+		expect(await transpileInWorker({ vbs, globalFunction: 'play', globalObject: 'global', tableData: td })).to.equal(sync)
 	})
 
 	it('should preserve TimerEnabled casing', async () => {
@@ -41,9 +33,16 @@ describe('Transpiler worker parity', () => {
 		const sync = new Transpiler(table, player).transpile(vbs, 'play', 'global')
 		expect(sync).to.contain('TimerEnabled')
 		const td = getTableDataForWorker(table, player)
-		expect(
-			await transpileInWorker({ vbs, globalFunction: 'play', globalObject: 'global', tableData: td }),
-		).to.equal(sync)
+		expect(await transpileInWorker({ vbs, globalFunction: 'play', globalObject: 'global', tableData: td })).to.equal(sync)
+	})
+
+	it('should match via worker thread', async () => {
+		const table = new TableBuilder().addFlipper('MyFlipper').build()
+		const player = new Player(table)
+		const vbs = 'MyFlipper.Y = 123\n'
+		const sync = new Transpiler(table, player).transpile(vbs, 'play', 'global')
+		const asyncJs = await new Transpiler(table, player).transpileAsync(vbs, 'play', 'global')
+		expect(asyncJs).to.equal(sync)
 	})
 
 	it.skipIf(!walkingDead)('should match sync for walking_dead', async () => {
@@ -52,9 +51,7 @@ describe('Transpiler worker parity', () => {
 		const vbs = (table as any).tableScript as string
 		const sync = new Transpiler(table, player).transpile(vbs, 'play', 'global')
 		const td = getTableDataForWorker(table, player)
-		expect(
-			await transpileInWorker({ vbs, globalFunction: 'play', globalObject: 'global', tableData: td }),
-		).to.equal(sync)
+		expect(await transpileInWorker({ vbs, globalFunction: 'play', globalObject: 'global', tableData: td })).to.equal(sync)
 		expect(sync.length).to.equal(309376)
 	})
 })
