@@ -61,14 +61,14 @@ async function getHdrWorkers(): Promise<any[]> {
 	return hdrReady
 }
 
-async function decodeHdrViaWorker(buffer: ArrayBuffer, type: 'hdr' | 'exr'): Promise<any> {
+async function decodeHdrViaWorker(buffer: ArrayBuffer, type: 'hdr' | 'exr', name?: string): Promise<any> {
 	const workers = await getHdrWorkers()
 	const w = workers[hdrNextWorker++ % workers.length]!
 	return new Promise((resolve, reject) => {
 		const id = hdrNextId++
 		hdrPending.set(id, { resolve, reject })
 		try {
-			w.postMessage({ id, buffer, type }, [buffer] as any)
+			w.postMessage({ id, buffer, type, name }, [buffer] as any)
 		} catch (e) {
 			hdrPending.delete(id)
 			reject(e)
@@ -94,7 +94,12 @@ export class ThreeTextureLoaderNode implements ITextureLoader<ThreeTexture> {
 			return floatTex(lowerExt === '.hdr' ? HDRLoader : EXRLoader, lowerExt === '.hdr' ? HalfFloatType : FloatType, data)
 		}
 		try {
-			const { data: raw, info } = await (sharp as any)(data).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+			const max = getMaxTextureSize(name)
+			const { data: raw, info } = await (sharp as any)(data)
+				.resize({ width: max, height: max, fit: 'inside', withoutEnlargement: true })
+				.ensureAlpha()
+				.raw()
+				.toBuffer({ resolveWithObject: true })
 			return tex(raw, info.width, info.height, name)
 		} catch (e) {
 			logger().warn('[Texture] failed to load %s: %s', name, (e as Error).message)
@@ -115,7 +120,7 @@ export class ThreeTextureLoaderNode implements ITextureLoader<ThreeTexture> {
 
 	private async loadHdrViaWorker(name: string, ext: '.hdr' | '.exr', data: Uint8Array): Promise<ThreeTexture> {
 		const buffer = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer
-		const res: any = await decodeHdrViaWorker(buffer, ext.slice(1) as 'hdr' | 'exr')
+		const res: any = await decodeHdrViaWorker(buffer, ext.slice(1) as 'hdr' | 'exr', name)
 		const texData = res.data as any
 		const width = res.width as number
 		const height = res.height as number
@@ -128,6 +133,11 @@ export class ThreeTextureLoaderNode implements ITextureLoader<ThreeTexture> {
 		t.name = `texture:${name}`
 		return t as ThreeTexture
 	}
+}
+
+function getMaxTextureSize(name: string): number {
+	const isPlayfield = /playfield|nestmap|bake/i.test(name)
+	return isPlayfield ? 4096 : 2048
 }
 
 function tex(data: Uint8Array, w: number, h: number, name: string): ThreeTexture {

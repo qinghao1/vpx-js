@@ -810,6 +810,11 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 				n.includes('cabinet') ||
 				n.includes('lockbar') ||
 				n.includes('pincab') ||
+				n.includes('blackbox') ||
+				n.includes('box') ||
+				n.includes('bottom') ||
+				n.includes('tub') ||
+				n.includes('blocker') ||
 				n.includes('ramp') ||
 				n.includes('plastic') ||
 				n.includes('gate') ||

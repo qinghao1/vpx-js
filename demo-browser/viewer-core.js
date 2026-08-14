@@ -1321,7 +1321,7 @@ export class Viewer {
 											const n2 = (obj2.name || '').toLowerCase()
 											if (
 												obj2.material === m &&
-												(n2.includes('playfield') || n2.includes('bm_'))
+												n2.includes('bm_')
 											) {
 												makeVisible(obj2)
 											}
