@@ -42,7 +42,7 @@ const classify = (mesh, mat, map, baked = false, addBlend = false) => {
 	return {
 		isGlass: RE_GLASS.test(me) || RE_GLASS.test(m) || (me === 'primitive-primitive001' && m === 'material:glass'),
 		isLm: RE_LM.test(me),
-		isVr: RE_VR.test(me),
+		isVr: RE_VR.test(me) && !RE_CAB.test(me),
 		isCab: RE_CAB.test(me),
 		isVlmBake,
 		isMainBake,
@@ -56,7 +56,7 @@ const isBakedMesh = c => !!c.isBakedMat
 
 export const isBakedMeshByNames = (meshName, matName, mapName, baked, addBlend) => {
 	const c = classify(meshName ?? '', matName ?? '', mapName ?? '', baked ?? false, addBlend ?? false)
-	return { ...c, isVrCab: !!(c.isVr || c.isCab), isBaked: isBakedMesh(c) }
+	return { ...c, isVrCab: !!c.isCab, isBaked: isBakedMesh(c) }
 }
 export { classify, isBakedMesh }
 
@@ -482,24 +482,24 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 	}
 
 	node.traverse(o => {
+		const n = (o.name || '').toLowerCase()
 		if (isInCabFlipper(o) && viewerMode === 'play') {
 			if (o.visible !== false) stats.cabFlipperHidden++
 			o.visible = false
 			return
 		}
+		if (viewerMode === 'play' && RE_VR.test(n) && !RE_CAB.test(n)) {
+			if (o.visible !== false) stats.cabHidden++
+			o.visible = false
+			return
+		}
 		if (!o.isMesh) {
-			const n = (o.name || '').toLowerCase()
 			if (n && (RE_CAB.test(n) || resolveButtonCode(n)) && o.visible === false) {
 				o.visible = true
 				stats.cabForced++
 			}
-			if (n && RE_VR.test(n) && o.visible === false) {
-				o.visible = true
-				stats.vrKept++
-			}
 			return
 		}
-		const n = (o.name || '').toLowerCase()
 		const matName = (o.material?.name || '').toLowerCase()
 		const mapName = (o.material?.map?.name || '').toLowerCase()
 		const c = classify(n, matName, mapName, !!o.material?.userData?.__isBaked, !!o.material?.userData?.__addBlend)
@@ -514,13 +514,6 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 		if (n.includes('playfield') && !n.includes('underwall') && !n.includes('wall') && o.visible === false) {
 			o.visible = true
 			makeParentsVisible(o, node, stats)
-		}
-		if (c.isVr) {
-			if (o.visible === false) o.visible = true
-			if (o.visible) {
-				makeParentsVisible(o, node, stats)
-				stats.vrKept++
-			}
 		}
 		if (c.isCab && !o.visible) {
 			o.visible = true

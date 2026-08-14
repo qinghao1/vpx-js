@@ -1330,8 +1330,7 @@ export class Viewer {
 									const nl = (o.name || '').toLowerCase()
 									if (
 										o.visible === false &&
-										(nl.includes('vr_') ||
-											nl.includes('vrcab') ||
+										(nl.includes('vrcab') ||
 											nl.includes('cabinet') ||
 											nl.includes('lockbar') ||
 											nl.includes('pincab'))

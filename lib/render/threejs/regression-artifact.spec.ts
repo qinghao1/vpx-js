@@ -350,4 +350,25 @@ describe('regression: artifact harness', () => {
 			}
 		})
 	})
+	it('VR room non-cab meshes must stay hidden in play mode (no railing stripes across table)', () => {
+		const root = new THREE.Group()
+		root.name = 'table'
+		const railingMat = new THREE.MeshStandardMaterial({ color: 0x888888 })
+		railingMat.name = 'material:_noXtraShadinglight'
+		const railingMesh = makeMesh('primitive-VR_MegaRailing', new THREE.BoxGeometry(100, 10, 100), railingMat)
+		railingMesh.visible = false
+		root.add(railingMesh)
+
+		const cabMat = new THREE.MeshStandardMaterial({ color: 0x111111 })
+		cabMat.name = 'material:colormaxnoreflectionhalf'
+		const cabMesh = makeMesh('primitive-VRCab_Cabinet', new THREE.BoxGeometry(50, 50, 50), cabMat)
+		cabMesh.visible = false
+		root.add(cabMesh)
+
+		root.updateMatrixWorld(true)
+		postProcessScene(root, { harnessLog: () => {}, viewerMode: 'play' })
+
+		expect(railingMesh.visible, 'VR_MegaRailing must remain hidden in play mode').to.equal(false)
+		expect(cabMesh.visible, 'VRCab_Cabinet must remain visible in play mode').to.equal(true)
+	})
 })
