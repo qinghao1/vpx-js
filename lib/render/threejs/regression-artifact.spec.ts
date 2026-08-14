@@ -422,18 +422,27 @@ describe('regression: artifact harness', () => {
 		})) as THREE.Group
 		group.updateMatrixWorld(true)
 		postProcessScene(group, { harnessLog: () => {}, viewerMode: 'play' })
+		let bmPlayfieldVisible = false
+		let pfMeshVisible = false
+		let vrMeshCount = 0
 		let brightOverlayCount = 0
 		group.traverse(o => {
-			if (!o.isMesh || !o.visible) return
+			if (!o.isMesh) return
 			const n = (o.name || '').toLowerCase()
-			if (n.startsWith('primitive-lm_flsh') && n.includes('playfield')) {
+			if (n === 'primitive-bm_playfield') bmPlayfieldVisible = o.visible
+			if (n === 'primitive-playfield_mesh') pfMeshVisible = o.visible
+			if (o.visible && (n.includes('vr_mega') || n.includes('vr_mini'))) vrMeshCount++
+			if (o.visible && (n.includes('lm_flsh') || n.includes('lm_insrt'))) {
 				const mat = Array.isArray(o.material) ? o.material[0] : o.material
 				if (mat && mat.opacity > 0) brightOverlayCount++
 			}
 		})
+		expect(bmPlayfieldVisible, 'BM_Playfield must remain visible as solid playfield').to.equal(true)
+		expect(pfMeshVisible, 'playfield_mesh must be hidden to prevent z-fighting').to.equal(false)
+		expect(vrMeshCount, 'VR room meshes must remain visible').to.be.greaterThan(10)
 		expect(
 			brightOverlayCount,
-			'LM_flsh* playfield overlay meshes must not be lit at full opacity initially',
+			'LM_flsh* and LM_insrt* overlay meshes must not be lit at full opacity initially',
 		).to.equal(0)
 	})
 })
