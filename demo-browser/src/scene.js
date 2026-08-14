@@ -51,7 +51,11 @@ const classify = (mesh, mat, map, baked = false, addBlend = false) => {
 		isRampFamily,
 	}
 }
-const isBasePlayfield = (n, c) => n.includes('playfield') && !c.isBakedMat
+const isBasePlayfield = (n, c, matName = '', parentName = '') =>
+	(n.includes('playfield') || matName.includes('playfield') || parentName.includes('table')) &&
+	!n.includes('bm_') &&
+	!n.includes('lm_') &&
+	!c?.isBakedMat
 const isBakedMesh = c => !!c.isBakedMat
 
 export const isBakedMeshByNames = (meshName, matName, mapName, baked, addBlend) => {
@@ -667,7 +671,9 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 		node.traverse(o => {
 			if (!o.isMesh) return
 			const n = (o.name || '').toLowerCase()
-			if (isBasePlayfield(n, { isBakedMat: false }) && o.visible) {
+			const matName = (o.material?.name || '').toLowerCase()
+			const parentName = (o.parent?.name || '').toLowerCase()
+			if (isBasePlayfield(n, { isBakedMat: false }, matName, parentName) && o.visible) {
 				hideMesh(o, 'playfieldHidden', stats)
 			}
 			if (n.includes('bm_playfield') && o.visible === false) {
