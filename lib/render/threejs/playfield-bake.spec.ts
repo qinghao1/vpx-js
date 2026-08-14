@@ -53,7 +53,7 @@ describe('regression: playfield baked hide', () => {
 		postProcessScene(root, { harnessLog: () => {}, viewerMode: 'viewer' })
 
 		expect(readyBM.visible, 'ready BM must remain visible').to.equal(true)
-		expect(pendingBM.visible, 'pending BM must be hidden when hasReadyBake (avoid bright)').to.equal(false)
+		expect(pendingBM.visible, 'pending BM must remain visible (streaming will show)').to.equal(true)
 		expect(base.visible, 'base playfield must be hidden when baked ready').to.equal(false)
 	})
 
@@ -77,8 +77,8 @@ describe('regression: playfield baked hide', () => {
 		root.updateMatrixWorld(true)
 		postProcessScene(root, { harnessLog: () => {}, viewerMode: 'viewer' })
 
-		expect(pendingBM.visible, 'pending BM must be hidden when hasPendingBake').to.equal(false)
-		expect(base.visible, 'base playfield must stay visible when only pending').to.equal(true)
+		expect(pendingBM.visible, 'pending BM must remain visible when hasPendingBake').to.equal(true)
+		expect(base.visible, 'base playfield must be hidden when hasPendingBake (baked replaces base)').to.equal(false)
 	})
 
 	it('is generic: uses engine addBlend, not name', () => {
@@ -106,7 +106,7 @@ describe('regression: playfield baked hide', () => {
 		root.updateMatrixWorld(true)
 		postProcessScene(root, { harnessLog: () => {} })
 
-		expect(pendingBM.visible, 'pending custom bake must be hidden generically').to.equal(false)
+		expect(pendingBM.visible, 'pending custom bake must remain visible generically').to.equal(true)
 	})
 
 	it('hides pending VR until texture streams (white ghost)', () => {

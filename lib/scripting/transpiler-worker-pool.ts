@@ -12,12 +12,26 @@ async function getNodeWorker(): Promise<any> {
 	if (nodeReady) return nodeReady
 	nodeReady = (async () => {
 		const { Worker } = await import('node:worker_threads')
-		const w: any = new Worker(
-			new URL('./transpiler.worker.node.ts', import.meta.url) as any,
-			{
-				execArgv: ['--import', 'tsx/esm'],
-			} as any,
-		)
+		const tryCreate = (url: URL, withTsx: boolean) => {
+			try {
+				if (withTsx) return new Worker(url as any, { execArgv: ['--import', 'tsx/esm'] } as any)
+				return new Worker(url as any)
+			} catch {
+				return null
+			}
+		}
+		let w: any = null
+		for (const [p, tsx] of [
+			['./transpiler.worker.node.js', false],
+			['./transpiler.worker.node.js', true],
+			['./transpiler.worker.node.ts', true],
+		] as const) {
+			try {
+				w = tryCreate(new URL(p, import.meta.url) as any, tsx)
+				if (w) break
+			} catch {}
+		}
+		if (!w) throw new Error('transpiler worker not available - expected ./transpiler.worker.node.js')
 		w.on('message', (m: any) => {
 			const p = nodePending.get(m.id)
 			if (!p) return
@@ -32,6 +46,7 @@ async function getNodeWorker(): Promise<any> {
 			nodeWorker = null
 			nodeReady = null
 		})
+		try { (w as any).unref?.() } catch {}
 		nodeWorker = w
 		return w
 	})()
@@ -44,7 +59,15 @@ let browserNextId = 1
 
 function getBrowserWorker(): Worker {
 	if (browserWorker) return browserWorker
-	browserWorker = new Worker(new URL('./transpiler.worker.browser.ts', import.meta.url), { type: 'module' } as any)
+	try {
+		browserWorker = new Worker(new URL('./transpiler.worker.browser.js', import.meta.url), { type: 'module' } as any)
+	} catch {
+		try {
+			browserWorker = new Worker(new URL('./transpiler.worker.browser.ts', import.meta.url), { type: 'module' } as any)
+		} catch (e) {
+			throw e
+		}
+	}
 	browserWorker.onmessage = (e: MessageEvent) => {
 		const m: any = (e as any).data
 		const p = browserPending.get(m.id)
@@ -81,10 +104,16 @@ export async function transpileWithWorker(
 		})
 	}
 	const w = await getNodeWorker()
-	return new Promise<string>((resolve, reject) => {
+	return await new Promise<string>((resolve, reject) => {
 		const id = nodeNextId++
 		nodePending.set(id, { resolve, reject })
-		w.postMessage({ id, vbs, globalFunction: gf, globalObject: go, tableData: td })
+		try {
+			w.postMessage({ id, vbs, globalFunction: gf, globalObject: go, tableData: td })
+		} catch (e) {
+			nodePending.delete(id)
+			reject(e)
+			return
+		}
 		setTimeout(() => {
 			if (nodePending.has(id)) {
 				nodePending.delete(id)

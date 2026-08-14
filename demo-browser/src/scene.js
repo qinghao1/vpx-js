@@ -51,11 +51,7 @@ const classify = (mesh, mat, map, baked = false, addBlend = false) => {
 		isRampFamily,
 	}
 }
-const isBasePlayfield = (n, c, matName = '', parentName = '') =>
-	(n.includes('playfield') || matName.includes('playfield') || parentName.includes('table')) &&
-	!n.includes('bm_') &&
-	!n.includes('lm_') &&
-	!c?.isBakedMat
+const isBasePlayfield = (n, c) => n.includes('playfield') && !c.isBakedMat
 const isBakedMesh = c => !!c.isBakedMat
 
 export const isBakedMeshByNames = (meshName, matName, mapName, baked, addBlend) => {
@@ -166,8 +162,8 @@ export const applyBakedMaterial = (mat, tex, info, meshName) => {
 		wrapTexBaked(tex)
 		wrapTexBaked(mat.emissiveMap)
 		mat.polygonOffset = true
-		mat.polygonOffsetFactor = 0
-		mat.polygonOffsetUnits = 0
+		mat.polygonOffsetFactor = -2
+		mat.polygonOffsetUnits = -4
 	} else {
 		mat.emissiveIntensity = BAKED_EMISSIVE * emissionScale()
 		if (!mat.color) mat.color = new THREE.Color(0x000000)
@@ -180,7 +176,7 @@ export const applyBakedMaterial = (mat, tex, info, meshName) => {
 		wrapTexBaked(mat.emissiveMap)
 		if (isMain && !nl.includes('non_opaque') && !/ramp|armp|botramp|rampscrw/i.test(nl)) {
 			mat.polygonOffset = true
-			mat.polygonOffsetFactor = 0
+			mat.polygonOffsetFactor = -1
 			mat.polygonOffsetUnits = -1
 			mat.depthWrite = true
 			mat.transparent = false
@@ -377,8 +373,8 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 			v.depthWrite = false
 			v.toneMapped = false
 			v.polygonOffset = true
-			v.polygonOffsetFactor = 0
-			v.polygonOffsetUnits = 0
+			v.polygonOffsetFactor = -2
+			v.polygonOffsetUnits = -4
 			v.needsUpdate = true
 		} else fixVr(v)
 		if (isMainBake && !v.map && pending) {
@@ -397,8 +393,8 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 			v.emissiveIntensity = isLit ? 1.0 : 0
 			v.blending = THREE.AdditiveBlending
 			v.polygonOffset = true
-			v.polygonOffsetFactor = 0
-			v.polygonOffsetUnits = 0
+			v.polygonOffsetFactor = -2
+			v.polygonOffsetUnits = -4
 		} else {
 			v.transparent = !isMainBake && alpha && !isApron && !isRamp
 			v.alphaTest = v.transparent ? 0.1 : 0
@@ -406,11 +402,11 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 			if (v.opacity === undefined || !isOverlay) v.opacity = 1
 			if (isMainBake && !isApron && !isRamp) {
 				v.polygonOffset = true
-				v.polygonOffsetFactor = 0
+				v.polygonOffsetFactor = -1
 				v.polygonOffsetUnits = -1
 			} else if (!isMainBake && alpha && !isApron && !isRamp) {
 				v.polygonOffset = true
-				v.polygonOffsetFactor = 0
+				v.polygonOffsetFactor = -2
 				v.polygonOffsetUnits = -4
 			} else if (!isOverlay) {
 				v.polygonOffset = false
@@ -507,7 +503,7 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 			for (const mat of o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : []) {
 				mat.side = THREE.DoubleSide
 				mat.polygonOffset = true
-				mat.polygonOffsetFactor = 0
+				mat.polygonOffsetFactor = -1
 				mat.polygonOffsetUnits = -1
 				mat.depthWrite = true
 				mat.needsUpdate = true
@@ -671,9 +667,14 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 		node.traverse(o => {
 			if (!o.isMesh) return
 			const n = (o.name || '').toLowerCase()
-			const matName = (o.material?.name || '').toLowerCase()
-			const parentName = (o.parent?.name || '').toLowerCase()
-			if (isBasePlayfield(n, { isBakedMat: false }, matName, parentName) && o.visible) {
+			const m = Array.isArray(o.material) ? o.material[0] : o.material
+			const matName = (m?.name || '').toLowerCase()
+			const mapName = (m?.map?.name || '').toLowerCase()
+			const pending = pendingOf(m)
+			const eff = mapName || pending
+			const c = classify(n, matName, eff, !!m?.userData?.__isBaked, !!m?.userData?.__addBlend)
+			const isBase = isBasePlayfield(n, c) || n === 'primitive-playfield_mesh'
+			if (isBase && o.visible) {
 				hideMesh(o, 'playfieldHidden', stats)
 			}
 			if (n.includes('bm_playfield') && o.visible === false) {

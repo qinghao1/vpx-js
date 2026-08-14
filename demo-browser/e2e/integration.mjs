@@ -1,4 +1,5 @@
 import path from 'node:path'
+import { execSync } from 'node:child_process'
 import { attachLogging, launchBrowser, loadPuppeteer, newPage } from '../../test/harness/utils.mjs'
 import { DEFAULT_URL, ballChecks, diagnostics, dmdChecks, hideOverlays, nudgeChecks, physicsChecks, playfieldLightsCheck, playfieldLightsCheckAfterLamp, pollLog, shot, waitReady } from './lib/helpers.mjs'
 
@@ -18,6 +19,13 @@ function labelFromUrl(u){
 
 const puppeteer = await loadPuppeteer()
 const browser = await launchBrowser(puppeteer, { useSwiftShader: useSwift })
+const _forceKillChrome = () => { try { execSync('pkill -9 -f "chrome.*headless.*puppeteer" 2>/dev/null || true', { timeout: 2000, stdio: 'ignore' }) } catch {} }
+process.once('exit', _forceKillChrome)
+process.once('SIGINT', () => { _forceKillChrome(); process.exit(1) })
+process.once('SIGTERM', () => { _forceKillChrome(); process.exit(1) })
+process.once('SIGHUP', () => { _forceKillChrome(); process.exit(1) })
+process.on('uncaughtException', e => { console.error('[integration] uncaught', e); _forceKillChrome(); process.exit(1) })
+process.on('unhandledRejection', e => { console.error('[integration] unhandled', e); _forceKillChrome(); process.exit(1) })
 
 async function runOne(targetUrl, label) {
 	const page = await newPage(browser)
@@ -179,9 +187,9 @@ async function runOne(targetUrl, label) {
 }
 if (url) {
 	const label = labelFromUrl(url)
-	const res = await runOne(url, label)
-	await browser.close().catch(()=>{})
-	process.exit(res.ok ? 0 : 1)
+	let res
+	try { res = await runOne(url, label) } catch(e){ console.error('[integration] runOne error', e); res = { ok: false } } finally { try { await browser.close() } catch{}; _forceKillChrome(); }
+	process.exit(res?.ok ? 0 : 1)
 } else {
 	const primaryUrl = DEFAULT_URL
 	const urls = [[primaryUrl,'primary']]
@@ -197,7 +205,7 @@ if (url) {
 	for (const [u,l] of urls) {
 		try { const r=await runOne(u,l); overallOk = overallOk && r.ok } catch(e){ console.log(`[integration:${l}] error ${e.message}`); overallOk=false }
 	}
-	await browser.close().catch(()=>{})
+	try { await browser.close() } catch{}; _forceKillChrome();
 	console.log(`\n# overall ${overallOk?'PASS':'FAIL'}`)
 	process.exit(overallOk?0:1)
 }

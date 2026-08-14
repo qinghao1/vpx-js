@@ -714,9 +714,11 @@ export class Viewer {
 			changed?.release?.()
 			return
 		}
+		const changedLightNames = new Set()
 		for (const name of changed.keys || Object.keys(changed.changedStates || {})) {
 			const state = changed.getState ? changed.getState(name) : changed.changedStates[name]
 			if (!state) continue
+			if (this.table.lights && this.table.lights[name]) changedLightNames.add(name)
 			let entry = this.nodeCache.get(name)
 			if (!entry) {
 				let node = null
@@ -735,6 +737,32 @@ export class Viewer {
 			}
 			if (!entry) continue
 			entry.item.getUpdater().applyState(entry.node, state, this.renderApi, this.table)
+		}
+		if (changedLightNames.size) {
+			for (const primName of Object.keys(this.table.primitives || {})) {
+				const prim = this.table.primitives[primName]
+				const lm = prim?.data?.szLightmap
+				if (!lm || !changedLightNames.has(lm)) continue
+				let node = this.tableGroup.getObjectByName(primName)
+				if (!node) {
+					this.tableGroup.traverse(o => {
+						if (o.name === primName) node = o
+					})
+				}
+				if (!node) continue
+				let entry = this.nodeCache.get(primName)
+				if (!entry) {
+					const it = this.table.items[primName]
+					if (it?.getUpdater && node) {
+						entry = { item: it, node }
+						this.nodeCache.set(primName, entry)
+					}
+				}
+				if (!entry) continue
+				try {
+					entry.item.getUpdater().applyState(entry.node, {}, this.renderApi, this.table)
+				} catch {}
+			}
 		}
 		changed.release()
 	}
@@ -895,7 +923,15 @@ export class Viewer {
 		{
 			const pfLower = table.getPlayfieldMap()?.toLowerCase()
 			const hasPfTex = pfLower ? !!table.getTexture(pfLower) : false
-			if (!hasPfTex) {
+			const hasBM = (() => {
+				let found = false
+				node.traverse(o => {
+					if (found) return
+					if ((o.name || '').toLowerCase().includes('bm_playfield')) found = true
+				})
+				return found
+			})()
+			if (!hasPfTex && !hasBM) {
 				const best = Object.values(table.textures).sort((a, b) => b.width * b.height - a.width * a.height)[0]
 				if (best) {
 					node.traverse(o => {
@@ -1295,7 +1331,7 @@ export class Viewer {
 							tex.name = name
 							delete m.userData[pk]
 							m.needsUpdate = true
-							if (k === 'map') {
+							if (k === 'map' || k === 'emissiveMap') {
 								const info = isBakedMeshByNames(
 									o.name || '',
 									m.name || '',

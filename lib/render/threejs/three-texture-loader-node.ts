@@ -35,10 +35,27 @@ async function getHdrWorkers(): Promise<any[]> {
 		const { Worker } = await import('node:worker_threads')
 		const workers: any[] = []
 		for (let i = 0; i < HDR_POOL_SIZE; i++) {
-			const ext = import.meta.url.includes('/dist-esm/') || import.meta.url.endsWith('.js') ? '.js' : '.ts'
-			const w: any = new Worker(new URL(`./hdr-decode.worker.node${ext}`, import.meta.url) as any, {
-				execArgv: ['--import', 'tsx/esm'],
-			} as any)
+			const tryCreate = (url: URL, withTsx: boolean) => {
+				try {
+					if (withTsx) return new Worker(url as any, { execArgv: ['--import', 'tsx/esm'] } as any)
+					return new Worker(url as any)
+				} catch {
+					return null
+				}
+			}
+			let w: any = null
+			for (const [p, tsx] of [
+				[`./hdr-decode.worker.node.js`, false],
+				[`./hdr-decode.worker.node.js`, true],
+				[`./hdr-decode.worker.node.ts`, true],
+			] as const) {
+				try {
+					const u = new URL(p, import.meta.url) as any
+					w = tryCreate(u, tsx)
+					if (w) break
+				} catch {}
+			}
+			if (!w) throw new Error('hdr worker not available - expected ./hdr-decode.worker.node.js')
 			w.on('message', (m: any) => {
 				const p = hdrPending.get(m.id)
 				if (!p) return
@@ -53,6 +70,7 @@ async function getHdrWorkers(): Promise<any[]> {
 				hdrWorkers = hdrWorkers.filter(x => x !== w)
 				if (!hdrWorkers.length) hdrReady = null
 			})
+			try { (w as any).unref?.() } catch {}
 			workers.push(w)
 		}
 		hdrWorkers = workers
