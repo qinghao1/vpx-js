@@ -979,7 +979,7 @@ const excludeNonPlayfield = n =>
 	!n.includes('apron')
 const excludeVrNonCab = n => RE_VR.test(n) && !RE_CAB.test(n)
 const VIEWER = { dist: 1.2, elev: 0.85, azim: 0.65, near: 0.015, farScale: 8, farMin: 2000 }
-const PLAY = { dist: 0.80, elev: 1.15, azim: 0.75, near: 0.012, farScale: 10, farMin: 4000, forwardBias: -0.06 }
+const PLAY = { dist: 0.90, elev: 1.15, azim: 0.70, near: 0.012, farScale: 10, farMin: 4000, forwardBias: -0.06 }
 
 function framingState(node, targetExclude, sizeExclude, cfg) {
 	const target = framingBox(node, targetExclude).center.clone()
