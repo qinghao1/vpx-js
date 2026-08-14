@@ -1344,7 +1344,10 @@ export class Viewer {
 										m.needsUpdate = true
 									}
 								} else {
-									if (m.transparent && m.opacity === 0) {
+									const texName = String(tex?.name ?? name ?? '').toLowerCase()
+									const isRoundInsert = texName.includes('round') && !texName.includes('ground')
+									const isInsertTex = texName.includes('insert') || texName.includes('rect') || isRoundInsert || texName.includes('dot') || texName.includes('triangle') || texName.includes('flasher') || texName.includes('vrlight')
+									if (isInsertTex && m.transparent && m.opacity === 0) {
 										m.transparent = false
 										m.opacity = 1
 										m.depthWrite = true

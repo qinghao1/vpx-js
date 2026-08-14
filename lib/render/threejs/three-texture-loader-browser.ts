@@ -77,9 +77,9 @@ function effectiveMax(isFloat: boolean, name?: string): number {
 	const hw = getHardwareMax()
 	const swift = isSwiftShader()
 	const isPlayfield = !!name && /playfield|nestmap|bake/i.test(name)
-	const cap = isPlayfield ? Math.min(16384, hw) : swift ? 2048 : 4096
+	const cap = isPlayfield ? Math.min(16384, Math.max(hw, 8192)) : swift ? 2048 : 4096
 	if (isFloat) {
-		if (isPlayfield) return Math.min(hw, cap)
+		if (isPlayfield) return cap
 		return Math.min(hw, cap, Math.max(1024, Math.ceil(viewportBudget())))
 	}
 	return Math.min(hw, cap)

@@ -46,7 +46,7 @@ function materialKey(mat: MeshStandardMaterial): string {
 }
 
 function canBatch(mat: MeshStandardMaterial): boolean {
-	if (!mat || mat.transparent || (mat.userData as any).__addBlend) return false
+	if (!mat || mat.transparent || mat.polygonOffset || (mat.userData as any).__addBlend) return false
 	const ud = mat.userData as any
 	if (ud.pendingMap || ud.pendingmap || ud.pendingNormalMap || ud.pendingEnvMap || ud.pendingEmissiveMap) return false
 	return true

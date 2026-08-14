@@ -638,7 +638,12 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 				m.userData?.pendingNormalMap ||
 				m.userData?.pendingEnvMap ||
 				m.userData?.pendingEmissiveMap
-			if (pendingGeneric && !m.map && !m.emissiveMap) {
+			const isInsertPending = (() => {
+				const p = String(pendingGeneric).toLowerCase()
+				const isRoundInsert = p.includes('round') && !p.includes('ground')
+				return p.includes('insert') || p.includes('rect') || isRoundInsert || p.includes('dot') || p.includes('triangle') || p.includes('flasher') || p.includes('vrlight')
+			})()
+			if (pendingGeneric && !m.map && !m.emissiveMap && isInsertPending) {
 				m.transparent = true
 				m.opacity = 0
 				m.depthWrite = false

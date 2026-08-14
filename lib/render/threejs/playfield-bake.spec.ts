@@ -146,4 +146,22 @@ describe('regression: playfield baked hide', () => {
 		expect(outMat.opacity, 'pending insert must be invisible').to.equal(0)
 		expect(outMat.depthWrite, 'pending insert must not write depth').to.equal(false)
 	})
+
+	it('does not hide large non-insert pending as generic (no frosted overlay)', () => {
+		const root = new THREE.Group()
+		const mat = new THREE.MeshStandardMaterial({ color: 0xffffff })
+		mat.name = 'material:Playfield'
+		;(mat.userData as any).pendingMap = 'some_large_backdrop'
+		mat.roughness = 0.5
+		const geom = new THREE.PlaneGeometry(200, 200)
+		const mesh = makeMesh('primitive-playfield_large', geom, mat)
+		root.add(mesh)
+
+		root.updateMatrixWorld(true)
+		postProcessScene(root, { harnessLog: () => {}, viewerMode: 'viewer' })
+
+		const outMat = mesh.material as THREE.MeshStandardMaterial
+		expect(outMat.transparent, 'large non-insert must not be hidden via generic pending').to.equal(false)
+		expect(outMat.opacity, 'large non-insert must stay opaque').to.equal(1)
+	})
 })
