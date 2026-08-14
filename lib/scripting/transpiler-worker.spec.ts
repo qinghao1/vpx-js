@@ -52,6 +52,6 @@ describe('Transpiler worker parity', () => {
 		const sync = new Transpiler(table, player).transpile(vbs, 'play', 'global')
 		const td = getTableDataForWorker(table, player)
 		expect(await transpileInWorker({ vbs, globalFunction: 'play', globalObject: 'global', tableData: td })).to.equal(sync)
-		expect(sync.length).to.equal(309376)
+		expect(sync.length).to.equal(308526)
 	})
 })

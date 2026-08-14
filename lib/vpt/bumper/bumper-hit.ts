@@ -6,6 +6,7 @@ import type { EventProxy } from '../../game/event-proxy.js'
 import type { PlayerPhysics } from '../../game/player-physics.js'
 import type { CollisionEvent } from '../../physics/collision-event.js'
 import { HitCircle } from '../../physics/hit-circle.js'
+import { MathUtils } from 'three'
 import type { BumperAnimation } from './bumper-animation.js'
 import type { BumperData } from './bumper-data.js'
 import type { BumperState } from './bumper-state.js'
@@ -21,7 +22,7 @@ export class BumperHit extends HitCircle {
 	) {
 		super(data.center, data.radius, height, height + data.heightScale)
 		this.isEnabled = data.isCollidable
-		this.scatter = data.scatter!
+		this.scatter = MathUtils.degToRad(data.scatter!)
 	}
 	public override collide(coll: CollisionEvent, _physics: PlayerPhysics): void {
 		if (!this.isEnabled) return

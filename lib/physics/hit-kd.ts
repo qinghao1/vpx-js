@@ -164,7 +164,8 @@ export class HitKD {
 	}
 	public allocTwoNodes(): HitKDNode[] {
 		if (this.numNodes + 1 >= this.nodes.length) return []
+		const idx = this.numNodes
 		this.numNodes += 2
-		return this.nodes.slice(this.numNodes - 2)
+		return [this.nodes[idx]!, this.nodes[idx + 1]!]
 	}
 }

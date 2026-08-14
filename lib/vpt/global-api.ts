@@ -144,7 +144,7 @@ export class GlobalApi extends VbsApi {
 		return null
 	}
 	get ActiveBall() {
-		return this.player.getActiveBall()
+		return this.player.getActiveBall()?.getApi() ?? null
 	}
 	get GameTime() {
 		return this.player.getGameTime()

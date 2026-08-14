@@ -6,6 +6,8 @@
 constexpr float C_CONTACTVEL = 0.099f;
 constexpr float C_LOWNORMVEL = 0.0001f;
 constexpr float PHYS_TOUCH = 0.05f;
+constexpr float C_TOL_ENDPNTS = 0.0f;
+constexpr float C_TOL_RADIUS = 0.005f;
 
 struct Hit {
 	float t = -1;
@@ -184,7 +186,7 @@ inline Hit testLineSeg(float bx, float by, float bz, float vx, float vy, float v
 	if (!std::isfinite(t) || t < 0 || t > dTime) return h;
 	float btv = vx*ny - vy*nx;
 	float btd = (bx - v1x)*ny - (by - v1y)*nx + btv*t;
-	if (btd < 0 || btd > len) return h;
+	if (btd < -C_TOL_ENDPNTS || btd > len + C_TOL_ENDPNTS) return h;
 	float hz = bz + vz*t;
 	if (hz + r*0.5f < zl || hz - r*0.5f > zh) return h;
 	int contact = (std::fabs(bnv) <= C_CONTACTVEL && std::fabs(bnd) <= PHYS_TOUCH) ? 1 : 0;

@@ -214,22 +214,61 @@ export class Mesh {
 		return [pvOut, piSeg]
 	}
 
+	private static findCornerVertex(vertices: Vertex2D[]): number {
+		let minVertex = -1
+		let minY = Infinity
+		let minXAtMinY = Infinity
+		for (let i = 0; i < vertices.length; i++) {
+			const v = vertices[i]!
+			if (v.y > minY) continue
+			if (v.y === minY && v.x >= minXAtMinY) continue
+			minVertex = i
+			minY = v.y
+			minXAtMinY = v.x
+		}
+		return minVertex
+	}
+
+	private static wrapAt(i: number, n: number): number {
+		return (i + n) % n
+	}
+
+	private static determineWindingOrder(vertices: Vertex2D[]): 'Clockwise' | 'CounterClockwise' {
+		let nVerts = vertices.length
+		if (nVerts > 1) {
+			const last = vertices[nVerts - 1]!
+			const first = vertices[0]!
+			if (last.x === first.x && last.y === first.y) nVerts--
+		}
+		if (nVerts < 3) return 'CounterClockwise'
+		const iMin = Mesh.findCornerVertex(vertices.slice(0, nVerts))
+		const a = vertices[Mesh.wrapAt(iMin - 1, nVerts)]!
+		const b = vertices[iMin]!
+		const c = vertices[Mesh.wrapAt(iMin + 1, nVerts)]!
+		const det = b.x * c.y + a.x * b.y + a.y * c.x - (a.y * b.x + b.y * c.x + a.x * c.y)
+		return det > 0 ? 'Clockwise' : 'CounterClockwise'
+	}
+
 	/** Triangulates polygon via ear clipping. */
 	public static polygonToTriangles(rgv: RenderVertex[], pvpoly: number[]): number[] {
 		const pvtri: number[] = []
 		if (pvpoly.length < 3) return pvtri
+		if (pvpoly.length > 3) {
+			const polyVerts: Vertex2D[] = pvpoly.map(i => rgv[i]! as unknown as Vertex2D)
+			if (Mesh.determineWindingOrder(polyVerts) === 'Clockwise') pvpoly.reverse()
+		}
 		while (pvpoly.length > 3) {
 			let found = false
 			for (let i = 0; i < pvpoly.length; i++) {
 				const s = pvpoly.length
-				const a = pvpoly[i],
-					b = pvpoly[i < s - 1 ? i + 1 : 0],
-					c = pvpoly[i < s - 2 ? i + 2 : i + 2 - s]
-				const pre = pvpoly[i < s - 1 ? i - 1 + s : s - 1] ?? pvpoly[s - 1],
-					post = pvpoly[i < s - 3 ? i + 3 : i + 3 - s]
+				const a = pvpoly[i]!,
+					b = pvpoly[(i + 1) % s]!,
+					c = pvpoly[(i + 2) % s]!
+				const pre = pvpoly[(i - 1 + s) % s]!,
+					post = pvpoly[(i + 3) % s]!
 				if (Mesh.advancePoint(rgv, pvpoly, a, b, c, pre, post)) {
 					pvtri.push(a, c, b)
-					pvpoly.splice(i < s - 1 ? i + 1 : 0, 1)
+					pvpoly.splice((i + 1) % s, 1)
 					found = true
 					break
 				}
@@ -272,7 +311,7 @@ export class Mesh {
 				(c1.y >= miny || c2.y >= miny) &&
 				(c1.y <= maxy || c2.y <= maxy) &&
 				(c1.x >= minx || c2.x >= minx) &&
-				(c1.x <= maxx || c2.y <= maxx) &&
+				(c1.x <= maxx || c2.x <= maxx) &&
 				Mesh.fLinesIntersect(pv1, pv3, c1, c2)
 			)
 				return false

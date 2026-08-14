@@ -50,7 +50,7 @@ export class LineSegSlingshot extends LineSeg {
 
 		ball.hit.collide3DWall(n, this.elasticity, this.elasticityFalloff, this.friction, this.scatter)
 
-		if (this.obj && this.fe && !this.surfaceData.isDisabled && this.threshold) {
+		if (this.obj && this.fe && !this.surfaceData.isDisabled && dot <= -this.surfaceData.slingshotThreshold) {
 			const posDiff = ball.hit.eventPos.clone(true).sub(ball.state.pos)
 			const distSq = posDiff.lengthSq()
 			Vertex3D.release(posDiff)
