@@ -1306,10 +1306,8 @@ export class Viewer {
 								if (info.isBaked) {
 									applyBakedMaterial(m, tex, info, o.name || '')
 									const nl = (o.name || '').toLowerCase()
-									const isPlayfieldOverlay =
-										info.isVlmBake && !info.isMainBake && nl.includes('playfield')
 									const isBakedMeshName = nl.includes('playfield') || nl.includes('bm_')
-									if ((info.isMainBake || isPlayfieldOverlay) && isBakedMeshName) {
+									if (info.isMainBake && isBakedMeshName) {
 										const makeVisible = obj => {
 											if (obj.visible === false) {
 												obj.visible = true
@@ -1326,11 +1324,12 @@ export class Viewer {
 											makeVisible(obj2)
 										})
 									}
-								} else if (info.isVrCab) {
+								} else if (info.isVrCab || info.isVr) {
 									const nl = (o.name || '').toLowerCase()
 									if (
 										o.visible === false &&
-										(nl.includes('vrcab') ||
+										(nl.includes('vr_') ||
+											nl.includes('vrcab') ||
 											nl.includes('cabinet') ||
 											nl.includes('lockbar') ||
 											nl.includes('pincab'))

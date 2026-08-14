@@ -145,22 +145,12 @@ export const applyBakedMaterial = (mat, tex, info, meshName) => {
 	const isOverlay = !!mat.userData?.__addBlend || (info.isVlmBake && !info.isMainBake)
 	const isMain = !!(info.isMainBake || (info.isBakedMat && !isOverlay))
 	if (isOverlay) {
-		const hasTex = !!tex
-		if (!hasTex) {
-			mat.emissiveIntensity = 0
-			mat.transparent = true
-			mat.opacity = 0
-			mat.blending = THREE.AdditiveBlending
-			mat.depthWrite = false
-			mat.alphaTest = 0
-		} else {
-			mat.emissiveIntensity = 1.0 * emissionScale()
-			mat.transparent = true
-			mat.opacity = 1.0
-			mat.blending = THREE.AdditiveBlending
-			mat.depthWrite = false
-			mat.alphaTest = 0
-		}
+		mat.emissiveIntensity = 0
+		mat.transparent = true
+		mat.opacity = 0
+		mat.blending = THREE.AdditiveBlending
+		mat.depthWrite = false
+		mat.alphaTest = 0
 		if (!mat.color) mat.color = new THREE.Color(0x000000)
 		else mat.color.set(0x000000)
 		mat.side = THREE.DoubleSide
@@ -171,7 +161,7 @@ export const applyBakedMaterial = (mat, tex, info, meshName) => {
 		wrapTexBaked(mat.emissiveMap)
 		mat.polygonOffset = true
 		mat.polygonOffsetFactor = 0
-		mat.polygonOffsetUnits = -4
+		mat.polygonOffsetUnits = 0
 	} else {
 		mat.emissiveIntensity = BAKED_EMISSIVE * emissionScale()
 		if (!mat.color) mat.color = new THREE.Color(0x000000)
@@ -372,26 +362,17 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 			v.toneMapped = false
 			v.needsUpdate = true
 		} else if (isOverlay) {
-			const hasMap = !!v.map
 			fixBaked(v, v.map)
-			if (!hasMap && pending) {
-				v.emissiveIntensity = 0
-				v.transparent = true
-				v.opacity = 0
-				v.blending = THREE.AdditiveBlending
-				v.depthWrite = false
-				v.toneMapped = false
-				v.needsUpdate = true
-			} else {
-				// alpha/100 — 250 => 2.5 HDR
-				v.emissiveIntensity = 1.0
-				v.transparent = true
-				v.opacity = 1.0
-				v.blending = THREE.AdditiveBlending
-				v.depthWrite = false
-				v.toneMapped = false
-				v.needsUpdate = true
-			}
+			v.emissiveIntensity = 0
+			v.transparent = true
+			v.opacity = 0
+			v.blending = THREE.AdditiveBlending
+			v.depthWrite = false
+			v.toneMapped = false
+			v.polygonOffset = true
+			v.polygonOffsetFactor = 0
+			v.polygonOffsetUnits = 0
+			v.needsUpdate = true
 		} else fixVr(v)
 		if (isMainBake && !v.map && pending) {
 			v.color?.set?.(0x000000)
@@ -401,26 +382,15 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 			v.toneMapped = false
 		}
 		if (isOverlay) {
-			const hasMapOverlay = !!v.map
-			if (!hasMapOverlay && pending) {
-				v.transparent = true
-				v.alphaTest = 0
-				v.depthWrite = false
-				v.opacity = 0
-				v.blending = THREE.AdditiveBlending
-				v.polygonOffset = true
-				v.polygonOffsetFactor = 0
-				v.polygonOffsetUnits = -4
-			} else {
-				v.transparent = true
-				v.alphaTest = 0
-				v.depthWrite = false
-				v.opacity = 1.0
-				v.blending = THREE.AdditiveBlending
-				v.polygonOffset = true
-				v.polygonOffsetFactor = 0
-				v.polygonOffsetUnits = -4
-			}
+			v.transparent = true
+			v.alphaTest = 0
+			v.depthWrite = false
+			v.opacity = 0
+			v.emissiveIntensity = 0
+			v.blending = THREE.AdditiveBlending
+			v.polygonOffset = true
+			v.polygonOffsetFactor = 0
+			v.polygonOffsetUnits = 0
 		} else {
 			v.transparent = !isMainBake && alpha && !isApron && !isRamp
 			v.alphaTest = v.transparent ? 0.1 : 0
@@ -488,13 +458,8 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 			o.visible = false
 			return
 		}
-		if (viewerMode === 'play' && RE_VR.test(n) && !RE_CAB.test(n)) {
-			if (o.visible !== false) stats.cabHidden++
-			o.visible = false
-			return
-		}
 		if (!o.isMesh) {
-			if (n && (RE_CAB.test(n) || resolveButtonCode(n)) && o.visible === false) {
+			if (n && (RE_CAB.test(n) || RE_VR.test(n) || resolveButtonCode(n)) && o.visible === false) {
 				o.visible = true
 				stats.cabForced++
 			}
@@ -515,7 +480,7 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 			o.visible = true
 			makeParentsVisible(o, node, stats)
 		}
-		if (c.isCab && !o.visible) {
+		if ((c.isCab || c.isVr) && !o.visible) {
 			o.visible = true
 			stats.cabForced++
 			makeParentsVisible(o, node, stats)
