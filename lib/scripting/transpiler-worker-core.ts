@@ -30,7 +30,9 @@ export interface TableDataPayload {
 	elementNames: string[]
 	elementEvents: Record<string, string[]>
 	elementApis: Record<string, string[]>
+	elementApiFuncs?: Record<string, string[]>
 	globalProps?: string[]
+	globalFuncs?: string[]
 	stdlibProps?: string[]
 	enumProps?: Record<string, string[]>
 }
@@ -65,22 +67,25 @@ export async function transpileInWorker(payload: {
 				return els
 			},
 		}
+		const apiFuncs = (tableData.elementApiFuncs ?? {}) as Record<string, string[]>
 		for (const [name, props] of Object.entries(tableData.elementApis as Record<string, string[]>)) {
 			const propMap = new Map<string, string>()
 			const mock: any = {}
+			const funcSet = new Set((apiFuncs[name] ?? []).map(s => s.toLowerCase()))
 			for (const p of props) {
 				propMap.set(p.toLowerCase(), p)
-				mock[p] = 0
+				mock[p] = funcSet.has(p.toLowerCase()) ? (() => {}) : 0
 			}
 			mock._getPropertyName = (n: string) => propMap.get(n.toLowerCase())
 			itemApis[name] = mock
 		}
+		const globalFuncsSet = new Set((tableData.globalFuncs ?? []).map(s => s.toLowerCase()))
 		const globalPropMap = new Map<string, string>()
 		const gMock: any = {}
-		const globalProtoProps = Object.getOwnPropertyNames(GlobalApi.prototype)
+		const globalProtoProps = tableData.globalProps ?? Object.getOwnPropertyNames(GlobalApi.prototype)
 		for (const p of globalProtoProps) {
 			globalPropMap.set(p.toLowerCase(), p)
-			gMock[p] = () => {}
+			gMock[p] = globalFuncsSet.has(p.toLowerCase()) ? (() => {}) : 0
 		}
 		gMock._getPropertyName = (n: string) => globalPropMap.get(n.toLowerCase())
 		globalMock = gMock

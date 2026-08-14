@@ -106,6 +106,20 @@ export async function transpileWithWorker(
 	}
 }
 
+function isPrototypeMethod(proto: any, prop: string): boolean {
+	let cur = proto
+	while (cur && cur !== Object.prototype) {
+		const desc = Object.getOwnPropertyDescriptor(cur, prop)
+		if (desc) {
+			if (typeof desc.value === 'function') return true
+			if (desc.get) return false
+			return false
+		}
+		cur = Object.getPrototypeOf(cur)
+	}
+	return false
+}
+
 export function getTableDataForWorker(table: any): TableDataPayload | null {
 	try {
 		const elements = table.getElements ? table.getElements() : {}
@@ -120,15 +134,30 @@ export function getTableDataForWorker(table: any): TableDataPayload | null {
 		}
 		const apis = table.getElementApis ? table.getElementApis() : {}
 		const elementApis: Record<string, string[]> = {}
+		const elementApiFuncs: Record<string, string[]> = {}
 		for (const name of elementNames) {
 			const api = apis[name]
 			if (!api) continue
 			try {
 				const names: string[] = (api as any)._getPropertyNames?.() ?? []
 				if (names.length) elementApis[name] = names
+				const proto = Object.getPrototypeOf(api)
+				const funcs: string[] = []
+				for (const p of names) {
+					try {
+						if (isPrototypeMethod(proto, p)) funcs.push(p)
+					} catch {}
+				}
+				if (funcs.length) elementApiFuncs[name] = funcs
 			} catch {}
 		}
 		const globalProps = Object.getOwnPropertyNames(GlobalApi.prototype)
+		const globalFuncs: string[] = []
+		for (const p of globalProps) {
+			try {
+				if (isPrototypeMethod(GlobalApi.prototype, p)) globalFuncs.push(p)
+			} catch {}
+		}
 		const stdlibInst = new Stdlib()
 		const stdlibProps = Object.getOwnPropertyNames(Object.getPrototypeOf(stdlibInst)).concat(
 			Object.getOwnPropertyNames(stdlibInst),
@@ -146,7 +175,7 @@ export function getTableDataForWorker(table: any): TableDataPayload | null {
 				} catch {}
 			}
 		}
-		return { elementNames, elementEvents, elementApis, globalProps, stdlibProps, enumProps }
+		return { elementNames, elementEvents, elementApis, elementApiFuncs, globalProps, globalFuncs, stdlibProps, enumProps }
 	} catch {
 		return null
 	}

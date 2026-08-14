@@ -717,7 +717,7 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 				!!m.userData?.__isBaked,
 				!!m.userData?.__addBlend,
 			)
-			if ((c.isMainBake || c.isVlmBake) && pending && !mapName && !c.isVr && !c.isCab && o.visible) {
+			if ((c.isMainBake || c.isVlmBake) && pending && !mapName && n.includes('playfield') && !c.isVr && !c.isCab && o.visible) {
 				o.visible = false
 				stats.playfieldHidden++
 			} else if (n.includes('playfield') && isBakedMesh(c) && pending && !mapName && o.visible) {
@@ -742,7 +742,7 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 				!!m.userData?.__isBaked,
 				!!m.userData?.__addBlend,
 			)
-			if ((c.isMainBake || c.isVlmBake) && pending && !mapName && !c.isVr && !c.isCab && o.visible) {
+			if ((c.isMainBake || c.isVlmBake) && pending && !mapName && n.includes('playfield') && !c.isVr && !c.isCab && o.visible) {
 				o.visible = false
 				stats.playfieldHidden++
 			} else if (n.includes('playfield') && isBakedMesh(c) && pending && !mapName && o.visible) {

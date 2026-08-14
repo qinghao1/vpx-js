@@ -46,7 +46,7 @@ describe('regression: playfield baked hide', () => {
 		pendingMat.emissive = new THREE.Color(0xffffff)
 		pendingMat.emissiveIntensity = 1
 		const pendingGeom = new THREE.PlaneGeometry(20, 20)
-		const pendingBM = makeMesh('primitive-BM_Bumper1_Ring', pendingGeom, pendingMat)
+		const pendingBM = makeMesh('primitive-BM_Playfield_Bumper1_Ring', pendingGeom, pendingMat)
 		root.add(pendingBM)
 
 		root.updateMatrixWorld(true)
@@ -91,7 +91,7 @@ describe('regression: playfield baked hide', () => {
 		;(readyMat.userData as any).__isBaked = true
 		;(readyMat.userData as any).__addBlend = false
 		const readyGeom = new THREE.PlaneGeometry(20, 20)
-		const readyBM = makeMesh('primitive-BM_Custom', readyGeom, readyMat)
+		const readyBM = makeMesh('primitive-BM_Playfield_Custom', readyGeom, readyMat)
 		root.add(readyBM)
 
 		const pendingMat = new THREE.MeshStandardMaterial({ color: 0xffffff })
@@ -100,7 +100,7 @@ describe('regression: playfield baked hide', () => {
 		;(pendingMat.userData as any).__addBlend = false
 		;(pendingMat.userData as any).pendingMap = 'custom_bake_map'
 		const pendingGeom = new THREE.PlaneGeometry(20, 20)
-		const pendingBM = makeMesh('primitive-BM_Other', pendingGeom, pendingMat)
+		const pendingBM = makeMesh('primitive-BM_Playfield_Other', pendingGeom, pendingMat)
 		root.add(pendingBM)
 
 		root.updateMatrixWorld(true)

@@ -29,7 +29,7 @@ describe('regression: artifact harness', () => {
     sharedMat.emissiveIntensity = 1
     for (let i=0;i<5;i++) {
       const geom = new THREE.PlaneGeometry(20,20)
-      const mesh = makeMesh(`primitive-BM_Test${i}`, geom, sharedMat)
+      const mesh = makeMesh(`primitive-BM_Playfield_Test${i}`, geom, sharedMat)
       root.add(mesh)
     }
     const baseMat = new THREE.MeshStandardMaterial({ color: 0xffffff })
@@ -39,7 +39,7 @@ describe('regression: artifact harness', () => {
     root.add(base)
     root.updateMatrixWorld(true)
     postProcessScene(root, { harnessLog: ()=>{}, viewerMode: 'viewer' })
-    const bms = root.children.filter(c=>c.name.includes('BM_Test'))
+    const bms = root.children.filter(c=>c.name.includes('BM_Playfield_Test'))
     for (const bm of bms) expect(bm.visible).to.equal(false)
     expect(base.visible).to.equal(true)
     const tex = new THREE.DataTexture(new Uint8Array([0,0,0,255]),1,1)
@@ -178,7 +178,7 @@ describe('regression: artifact harness', () => {
     pendingMat.emissive=new THREE.Color(0xffffff)
     pendingMat.emissiveIntensity=1
     const pendingGeom=new THREE.PlaneGeometry(20,20)
-    const pending=makeMesh('primitive-BM_Bumper1', pendingGeom, pendingMat)
+    const pending=makeMesh('primitive-BM_Playfield_Bumper1', pendingGeom, pendingMat)
     pending.position.set(0,0,0.02)
     root.add(pending)
     root.updateMatrixWorld(true)
