@@ -1296,7 +1296,7 @@ export class Viewer {
 							delete m.userData[pk]
 							m.needsUpdate = true
 							if (k === 'map') {
-								const info = isBakedMeshByNames(o.name || '', m.name || '', tex.name || '')
+								const info = isBakedMeshByNames(o.name || '', m.name || '', tex.name || '', !!m.userData?.__isBaked, !!m.userData?.__addBlend)
 								if (info.isBaked) {
 									applyBakedMaterial(m, tex, info, o.name || '')
 									const nl = (o.name || '').toLowerCase()
@@ -1380,7 +1380,7 @@ export class Viewer {
 							m2 = Array.isArray(o2.material) ? o2.material[0] : o2.material
 						if (!m2?.map) return
 						if (!n2.toLowerCase().includes('playfield') && !n2.toLowerCase().includes('bm_')) return
-						const info = isBakedMeshByNames(n2, m2.name || '', m2.map?.name || '')
+						const info = isBakedMeshByNames(n2, m2.name || '', m2.map?.name || '', !!m2.userData?.__isBaked, !!m2.userData?.__addBlend)
 						if (info.isBaked) hasReadyBake = true
 					})
 					if (hasReadyBake) {
@@ -1389,7 +1389,7 @@ export class Viewer {
 								return
 							const m2 = Array.isArray(o2.material) ? o2.material[0] : o2.material
 							if (!m2) return
-							const info = isBakedMeshByNames(o2.name || '', m2.name || '', m2.map?.name || '')
+							const info = isBakedMeshByNames(o2.name || '', m2.name || '', m2.map?.name || '', !!m2.userData?.__isBaked, !!m2.userData?.__addBlend)
 							if (!info.isBaked && !info.isMainBake && !info.isVlmBake) {
 								o2.visible = false
 								o2.geometry?.dispose?.()
@@ -1403,7 +1403,7 @@ export class Viewer {
 						const m2 = Array.isArray(o2.material) ? o2.material[0] : o2.material
 						if (!m2?.map) return
 						const isBaked = !!(m2.userData && m2.userData.__isBaked)
-						const info2 = isBakedMeshByNames(n2, m2.name || '', m2.map?.name || '')
+						const info2 = isBakedMeshByNames(n2, m2.name || '', m2.map?.name || '', !!m2.userData?.__isBaked, !!m2.userData?.__addBlend)
 						const shouldShow = isBaked || info2.isMainBake || (info2.isVlmBake && !info2.isMainBake)
 						if (shouldShow && o2.visible === false) {
 							o2.visible = true

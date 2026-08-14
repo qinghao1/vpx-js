@@ -54,8 +54,8 @@ const classify = (mesh, mat, map, baked = false, addBlend = false) => {
 const isBasePlayfield = (n, c) => n.includes('playfield') && !c.isBakedMat
 const isBakedMesh = c => !!c.isBakedMat
 
-export const isBakedMeshByNames = (meshName, matName, mapName) => {
-	const c = classify(meshName ?? '', matName ?? '', mapName ?? '')
+export const isBakedMeshByNames = (meshName, matName, mapName, baked, addBlend) => {
+	const c = classify(meshName ?? '', matName ?? '', mapName ?? '', baked ?? false, addBlend ?? false)
 	return { ...c, isVrCab: !!(c.isVr || c.isCab), isBaked: isBakedMesh(c) }
 }
 export { classify, isBakedMesh }
@@ -502,7 +502,7 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 		const n = (o.name || '').toLowerCase()
 		const matName = (o.material?.name || '').toLowerCase()
 		const mapName = (o.material?.map?.name || '').toLowerCase()
-		const c = classify(n, matName, mapName, !!o.material?.userData?.__isBaked)
+		const c = classify(n, matName, mapName, !!o.material?.userData?.__isBaked, !!o.material?.userData?.__addBlend)
 		if (c.isGlass) {
 			hideMesh(o, 'glass', stats)
 			return
@@ -511,7 +511,7 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 			stats.lightmaps++
 			if (n.includes('bumper')) stats.bumperLM++
 		}
-		if (n.includes('playfield') && o.visible === false) {
+		if (n.includes('playfield') && !n.includes('underwall') && !n.includes('wall') && o.visible === false) {
 			o.visible = true
 			makeParentsVisible(o, node, stats)
 		}
@@ -585,7 +585,7 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 			let m = mats[i]
 			const mName = (m.name || '').toLowerCase()
 			const mp = (m.map?.name || '').toLowerCase()
-			const mc = classify('', mName, mp, !!m.userData?.__isBaked)
+			const mc = classify('', mName, mp, !!m.userData?.__isBaked, !!m.userData?.__addBlend)
 			if (n.includes('flipper')) {
 				if (mc.isBakedMat && !m.map) {
 					m.color?.set?.(0xffffff)
@@ -684,7 +684,7 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 		if (n.includes('plastic') || n.includes('ramp'))
 			for (const mat of Array.isArray(o.material) ? o.material : [o.material]) mat.side = THREE.DoubleSide
 	})
-
+	// removed debug
 	let hasReadyBake = false,
 		hasPendingBake = false
 	node.traverse(o => {
@@ -749,7 +749,7 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 				o.visible = false
 				stats.playfieldHidden++
 			}
-			if (isBasePlayfield(n, c) && o.visible === false) {
+			if (isBasePlayfield(n, c) && !n.includes('underwall') && !n.includes('wall') && o.visible === false) {
 				o.visible = true
 				makeParentsVisible(o, node, stats)
 			}
@@ -775,10 +775,11 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 	node.traverse(o => {
 		if (!o.isMesh || o.visible) return
 		const n = (o.name || '').toLowerCase()
-		if (!(n.includes('su') || n.includes('sling'))) return
+		const isSling = n.includes('sling') || /su[0-9]/i.test(n) || n.includes('_su') || n.includes('su_')
+		if (!isSling) return
 		const m = Array.isArray(o.material) ? o.material[0] : o.material
 		const c = m
-			? classify(n, (m.name || '').toLowerCase(), (m.map?.name || '').toLowerCase(), !!m.userData?.__isBaked)
+			? classify(n, (m.name || '').toLowerCase(), (m.map?.name || '').toLowerCase(), !!m.userData?.__isBaked, !!m.userData?.__addBlend)
 			: { isGlass: false, isLm: false, isVlmBake: false, isMainBake: false }
 		if (c.isGlass || c.isLm || (c.isVlmBake && !c.isMainBake)) return
 		if (m && (m.name || '').toLowerCase().includes('green')) return
@@ -788,7 +789,8 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 	node.traverse(o => {
 		if (o.isMesh || o.visible !== false) return
 		const n = (o.name || '').toLowerCase()
-		if (!n.includes('su') && !n.includes('sling')) return
+		const isSling = n.includes('sling') || /su[0-9]/i.test(n) || n.includes('_su') || n.includes('su_')
+		if (!isSling) return
 		if (n.includes('vrcab') || n.includes('vr_')) return
 		o.visible = true
 		makeParentsVisible(o, node, stats)
