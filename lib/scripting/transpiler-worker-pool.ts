@@ -1,4 +1,3 @@
-import * as EnumsMod from '../vpt/enums.js'
 import { GlobalApi } from '../vpt/global-api.js'
 import { ItemApi } from '../vpt/item-api.js'
 import { Stdlib } from './stdlib/index.js'
@@ -15,12 +14,11 @@ async function getNodeWorkerAsync(): Promise<any> {
 		try {
 			const { Worker } = await import('node:worker_threads')
 			const w: any = new Worker(new URL('./transpiler.worker.node.ts', import.meta.url) as any, {} as any)
-			w.on('message', (msg: any) => {
-				const p = nodePending.get(msg.id)
+			w.on('message', (m: any) => {
+				const p = nodePending.get(m.id)
 				if (!p) return
-				nodePending.delete(msg.id)
-				if (msg.ok) p.resolve(msg.js)
-				else p.reject(new Error(msg.error))
+				nodePending.delete(m.id)
+				m.ok ? p.resolve(m.js) : p.reject(new Error(m.error))
 			})
 			w.on('error', (e: any) => {
 				for (const [, p] of nodePending) p.reject(e)
@@ -43,7 +41,6 @@ async function getNodeWorkerAsync(): Promise<any> {
 let browserWorker: Worker | null = null
 const browserPending = new Map<number, { resolve: (s: string) => void; reject: (e: any) => void }>()
 let browserNextId = 1
-
 function getBrowserWorker(): Worker | null {
 	if (browserWorker) return browserWorker
 	if (typeof Worker === 'undefined') return null
@@ -52,12 +49,11 @@ function getBrowserWorker(): Worker | null {
 			type: 'module',
 		} as any)
 		browserWorker.onmessage = (e: MessageEvent) => {
-			const msg: any = (e as any).data
-			const p = browserPending.get(msg.id)
+			const m: any = (e as any).data
+			const p = browserPending.get(m.id)
 			if (!p) return
-			browserPending.delete(msg.id)
-			if (msg.ok) p.resolve(msg.js)
-			else p.reject(new Error(msg.error))
+			browserPending.delete(m.id)
+			m.ok ? p.resolve(m.js) : p.reject(new Error(m.error))
 		}
 		browserWorker.onerror = (e: any) => {
 			for (const [, p] of browserPending) p.reject(new Error(e.message ?? String(e)))
@@ -71,18 +67,18 @@ function getBrowserWorker(): Worker | null {
 
 export async function transpileWithWorker(
 	vbs: string,
-	globalFunction?: string,
-	globalObject?: string,
-	tableData?: TableDataPayload | null,
+	gf?: string,
+	go?: string,
+	td?: TableDataPayload | null,
 ): Promise<string> {
 	const isBrowser = typeof window !== 'undefined' && typeof document !== 'undefined' && typeof Worker !== 'undefined'
 	if (isBrowser) {
 		const w = getBrowserWorker()
-		if (!w) return coreTranspile({ vbs, globalFunction, globalObject, tableData })
+		if (!w) return coreTranspile({ vbs, globalFunction: gf, globalObject: go, tableData: td })
 		return new Promise<string>((resolve, reject) => {
 			const id = browserNextId++
 			browserPending.set(id, { resolve, reject })
-			w.postMessage({ id, vbs, globalFunction, globalObject, tableData })
+			w.postMessage({ id, vbs, globalFunction: gf, globalObject: go, tableData: td })
 			setTimeout(() => {
 				if (browserPending.has(id)) {
 					browserPending.delete(id)
@@ -90,42 +86,37 @@ export async function transpileWithWorker(
 				}
 			}, 20000)
 		})
-	} else {
-		try {
-			const w = await getNodeWorkerAsync()
-			if (!w) return coreTranspile({ vbs, globalFunction, globalObject, tableData })
-			return await new Promise<string>((resolve, reject) => {
-				const id = nodeNextId++
-				nodePending.set(id, { resolve, reject })
-				try {
-					w.postMessage({ id, vbs, globalFunction, globalObject, tableData })
-				} catch (e) {
+	}
+	try {
+		const w = await getNodeWorkerAsync()
+		if (!w) return coreTranspile({ vbs, globalFunction: gf, globalObject: go, tableData: td })
+		return await new Promise<string>((resolve, reject) => {
+			const id = nodeNextId++
+			nodePending.set(id, { resolve, reject })
+			try {
+				w.postMessage({ id, vbs, globalFunction: gf, globalObject: go, tableData: td })
+			} catch (e) {
+				nodePending.delete(id)
+				reject(e)
+				return
+			}
+			setTimeout(() => {
+				if (nodePending.has(id)) {
 					nodePending.delete(id)
-					reject(e)
-					return
+					reject(new Error('worker timeout'))
 				}
-				setTimeout(() => {
-					if (nodePending.has(id)) {
-						nodePending.delete(id)
-						reject(new Error('worker timeout'))
-					}
-				}, 20000)
-			})
-		} catch {
-			return coreTranspile({ vbs, globalFunction, globalObject, tableData })
-		}
+			}, 20000)
+		})
+	} catch {
+		return coreTranspile({ vbs, globalFunction: gf, globalObject: go, tableData: td })
 	}
 }
 
-function isPrototypeMethod(proto: any, prop: string): boolean {
+function isMethod(proto: any, prop: string): boolean {
 	let cur = proto
 	while (cur && cur !== Object.prototype) {
-		const desc = Object.getOwnPropertyDescriptor(cur, prop)
-		if (desc) {
-			if (typeof desc.value === 'function') return true
-			if (desc.get) return false
-			return false
-		}
+		const d = Object.getOwnPropertyDescriptor(cur, prop)
+		if (d) return typeof d.value === 'function'
 		cur = Object.getPrototypeOf(cur)
 	}
 	return false
@@ -133,102 +124,67 @@ function isPrototypeMethod(proto: any, prop: string): boolean {
 
 export function getTableDataForWorker(table: any, player?: any): TableDataPayload | null {
 	try {
-		const elements = table.getElements ? table.getElements() : {}
-		const elementNames = Object.keys(elements)
-		const elementEvents: Record<string, string[]> = {}
-		for (const name of elementNames) {
+		const elements = table.getElements?.() ?? {}
+		const names = Object.keys(elements)
+		const events: Record<string, string[]> = {}
+		for (const n of names) {
 			try {
-				elementEvents[name] = elements[name]?.getEventNames?.() ?? []
+				events[n] = elements[n]?.getEventNames?.() ?? []
 			} catch {
-				elementEvents[name] = []
+				events[n] = []
 			}
 		}
-		const apis = table.getElementApis ? table.getElementApis() : {}
+		const apis = table.getElementApis?.() ?? {}
 		const elementApis: Record<string, string[]> = {}
-		const elementApiFuncs: Record<string, string[]> = {}
-		const elementApiUndefined: Record<string, string[]> = {}
-		for (const name of elementNames) {
-			const api = apis[name]
+		const elementFuncs: Record<string, string[]> = {}
+		const elementUndef: Record<string, string[]> = {}
+		for (const n of names) {
+			const api = apis[n]
 			if (!api) continue
-			try {
-				let names: string[] = (api as any)._getPropertyNames?.() ?? []
-				const baseNames = Object.getOwnPropertyNames(ItemApi.prototype)
-				const merged = new Set<string>([...names, ...baseNames])
-				names = [...merged]
-				if (names.length) elementApis[name] = names
-				const proto = Object.getPrototypeOf(api)
-				const funcs: string[] = []
-				const undef: string[] = []
-				for (const p of names) {
+			let props: string[] = api._getPropertyNames?.() ?? []
+			props = [...new Set([...props, ...Object.getOwnPropertyNames(ItemApi.prototype)])]
+			if (props.length) elementApis[n] = props
+			const proto = Object.getPrototypeOf(api)
+			const funcs: string[] = []
+			const undef: string[] = []
+			for (const p of props) {
+				if (isMethod(proto, p)) funcs.push(p)
+				else {
 					try {
-						if (isPrototypeMethod(proto, p)) funcs.push(p)
-						else {
-							let v: unknown
-							try {
-								v = (api as any)[p]
-							} catch {
-								v = undefined
-							}
-							if (typeof v === 'undefined') undef.push(p)
-						}
-					} catch {}
-				}
-				if (funcs.length) elementApiFuncs[name] = funcs
-				if (undef.length) elementApiUndefined[name] = undef
-			} catch {}
-		}
-		const globalProps = Object.getOwnPropertyNames(GlobalApi.prototype)
-		const globalFuncs: string[] = []
-		const globalUndefined: string[] = []
-		let globalSample: any = null
-		if (player) {
-			try {
-				globalSample = new GlobalApi(table, player)
-			} catch {}
-		}
-		for (const p of globalProps) {
-			try {
-				if (isPrototypeMethod(GlobalApi.prototype, p)) {
-					globalFuncs.push(p)
-				} else if (globalSample) {
-					let v: unknown
-					try {
-						v = (globalSample as any)[p]
+						if (typeof (api as any)[p] === 'undefined') undef.push(p)
 					} catch {
-						v = undefined
+						undef.push(p)
 					}
-					if (typeof v === 'undefined') globalUndefined.push(p)
 				}
-			} catch {}
+			}
+			if (funcs.length) elementFuncs[n] = funcs
+			if (undef.length) elementUndef[n] = undef
 		}
-		const stdlibInst = new Stdlib()
-		const stdlibProps = Object.getOwnPropertyNames(Object.getPrototypeOf(stdlibInst)).concat(
-			Object.getOwnPropertyNames(stdlibInst),
-		)
-		const enumProps: Record<string, string[]> = {}
-		for (const k of Object.keys(EnumsMod as any)) {
-			const v = (EnumsMod as any)[k]
-			if (v && typeof v === 'function' && v.prototype) {
+		const globalFuncs: string[] = []
+		const globalUndef: string[] = []
+		let sample: any = null
+		if (player)
+			try {
+				sample = new GlobalApi(table, player)
+			} catch {}
+		for (const p of Object.getOwnPropertyNames(GlobalApi.prototype)) {
+			if (isMethod(GlobalApi.prototype, p)) globalFuncs.push(p)
+			else if (sample) {
 				try {
-					enumProps[k] = Object.getOwnPropertyNames(v.prototype)
-				} catch {}
-			} else if (v && typeof v === 'object') {
-				try {
-					enumProps[k] = Object.getOwnPropertyNames(v)
-				} catch {}
+					if (typeof sample[p] === 'undefined') globalUndef.push(p)
+				} catch {
+					globalUndef.push(p)
+				}
 			}
 		}
 		return {
-			elementNames,
-			elementEvents,
+			elementNames: names,
+			elementEvents: events,
 			elementApis,
-			elementApiFuncs,
-			elementApiUndefined,
-			globalProps,
+			elementApiFuncs: elementFuncs,
+			elementApiUndefined: elementUndef,
 			globalFuncs,
-			globalUndefined,
-			stdlibProps,
-			enumProps,
+			globalUndefined: globalUndef,
 		}
 	} catch {
 		return null

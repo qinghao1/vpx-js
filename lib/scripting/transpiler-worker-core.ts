@@ -1,5 +1,3 @@
-// Shared core for worker - no worker lifecycle, just logic
-
 import { generate } from 'escodegen'
 import type { Program } from 'estree'
 import { Enums } from '../vpt/enums.js'
@@ -32,11 +30,8 @@ export interface TableDataPayload {
 	elementApis: Record<string, string[]>
 	elementApiFuncs?: Record<string, string[]>
 	elementApiUndefined?: Record<string, string[]>
-	globalProps?: string[]
 	globalFuncs?: string[]
 	globalUndefined?: string[]
-	stdlibProps?: string[]
-	enumProps?: Record<string, string[]>
 }
 
 export async function transpileInWorker(payload: {
@@ -47,83 +42,69 @@ export async function transpileInWorker(payload: {
 }): Promise<string> {
 	const { vbs, globalFunction, globalObject, tableData } = payload
 	const grammar = new Grammar()
-	const src = normalizeNewCall(vbs)
-	let ast: Program = grammar.transpile(src)
+	let ast: Program = grammar.transpile(normalizeNewCall(vbs))
 	let tableMock: any = null
 	const itemApis: Record<string, unknown> = {}
-	const enumApis: any = Enums
-	const stdlibInstance = new Stdlib()
-	const stdlibMock: any = stdlibInstance
+	const stdlibMock: any = new Stdlib()
 	let globalMock: any = null
-	const enumMock: any = Enums
 	if (tableData) {
 		const lowerMap = new Map<string, string>()
-		for (const name of tableData.elementNames) lowerMap.set(name.toLowerCase(), name)
+		for (const n of tableData.elementNames) lowerMap.set(n.toLowerCase(), n)
 		tableMock = {
 			getElementApiName: (n: string) => lowerMap.get(n.toLowerCase()),
 			getElements: () => {
 				const els: Record<string, any> = {}
-				for (const name of tableData.elementNames) {
-					els[name] = { getName: () => name, getEventNames: () => tableData.elementEvents?.[name] ?? [] }
-				}
+				for (const n of tableData.elementNames)
+					els[n] = { getName: () => n, getEventNames: () => tableData.elementEvents?.[n] ?? [] }
 				return els
 			},
 		}
-		const apiFuncs = (tableData.elementApiFuncs ?? {}) as Record<string, string[]>
-		const apiUndef = (tableData.elementApiUndefined ?? {}) as Record<string, string[]>
-		for (const [name, props] of Object.entries(tableData.elementApis as Record<string, string[]>)) {
-			const propMap = new Map<string, string>()
+		const funcs = tableData.elementApiFuncs ?? {}
+		const undef = tableData.elementApiUndefined ?? {}
+		for (const [name, props] of Object.entries(tableData.elementApis)) {
+			const map = new Map<string, string>()
 			const mock: any = {}
-			const funcSet = new Set((apiFuncs[name] ?? []).map(s => s.toLowerCase()))
-			const undefSet = new Set((apiUndef[name] ?? []).map(s => s.toLowerCase()))
+			const f = new Set((funcs[name] ?? []).map(s => s.toLowerCase()))
+			const u = new Set((undef[name] ?? []).map(s => s.toLowerCase()))
 			for (const p of props) {
-				propMap.set(p.toLowerCase(), p)
-				if (funcSet.has(p.toLowerCase())) mock[p] = () => {}
-				else if (undefSet.has(p.toLowerCase())) mock[p] = undefined
-				else mock[p] = 0
+				map.set(p.toLowerCase(), p)
+				mock[p] = f.has(p.toLowerCase()) ? () => {} : u.has(p.toLowerCase()) ? undefined : 0
 			}
-			mock._getPropertyName = (n: string) => propMap.get(n.toLowerCase())
+			mock._getPropertyName = (n: string) => map.get(n.toLowerCase())
 			itemApis[name] = mock
 		}
-		const globalFuncsSet = new Set((tableData.globalFuncs ?? []).map(s => s.toLowerCase()))
-		const globalUndefSet = new Set((tableData.globalUndefined ?? []).map(s => s.toLowerCase()))
-		const globalPropMap = new Map<string, string>()
+		const gf = new Set((tableData.globalFuncs ?? []).map(s => s.toLowerCase()))
+		const gu = new Set((tableData.globalUndefined ?? []).map(s => s.toLowerCase()))
+		const gMap = new Map<string, string>()
 		const gMock: any = {}
-		const globalProtoProps = tableData.globalProps ?? Object.getOwnPropertyNames(GlobalApi.prototype)
-		for (const p of globalProtoProps) {
-			globalPropMap.set(p.toLowerCase(), p)
-			if (globalFuncsSet.has(p.toLowerCase())) gMock[p] = () => {}
-			else if (globalUndefSet.has(p.toLowerCase())) gMock[p] = undefined
-			else gMock[p] = 0
+		for (const p of Object.getOwnPropertyNames(GlobalApi.prototype)) {
+			gMap.set(p.toLowerCase(), p)
+			gMock[p] = gf.has(p.toLowerCase()) ? () => {} : gu.has(p.toLowerCase()) ? undefined : 0
 		}
-		gMock._getPropertyName = (n: string) => globalPropMap.get(n.toLowerCase())
+		gMock._getPropertyName = (n: string) => gMap.get(n.toLowerCase())
 		globalMock = gMock
 	} else {
-		tableMock = {
-			getElementApiName: () => undefined,
-			getElements: () => ({}),
-		}
+		tableMock = { getElementApiName: () => undefined, getElements: () => ({}) }
 		globalMock = {
 			_getPropertyName: (n: string) => {
-				const proto = GlobalApi.prototype as any
-				for (const key of Object.getOwnPropertyNames(proto)) {
-					if (key.toLowerCase() === n.toLowerCase()) return key
-				}
+				for (const k of Object.getOwnPropertyNames(GlobalApi.prototype))
+					if (k.toLowerCase() === n.toLowerCase()) return k
 				return undefined
 			},
 		}
 	}
-	const pipeline: Array<(ast: Program) => Program> = []
-	pipeline.push(a => new FunctionHoistTransformer(a).transform())
-	pipeline.push(a => new EventTransformer(a, tableMock.getElements()).transform())
-	pipeline.push(a => new ErrorTransformer(a).transform())
-	pipeline.push(a => new ReferenceTransformer(a, tableMock, itemApis, enumMock, globalMock, stdlibMock).transform())
-	pipeline.push(a => new ScopeTransformer(a).transform())
-	pipeline.push(a => new ClassTransformer(a).transformThisIdentifiers())
-	pipeline.push(a => new AmbiguityTransformer(a, itemApis, enumMock, globalMock, stdlibMock).transform())
-	pipeline.push(a => new ClassTransformer(a).transform())
-	pipeline.push(a => new WrapTransformer(a).transform(globalFunction, globalObject))
+	const pipeline = [
+		(a: Program) => new FunctionHoistTransformer(a).transform(),
+		(a: Program) => new EventTransformer(a, tableMock.getElements()).transform(),
+		(a: Program) => new ErrorTransformer(a).transform(),
+		(a: Program) =>
+			new ReferenceTransformer(a, tableMock, itemApis, Enums as any, globalMock, stdlibMock).transform(),
+		(a: Program) => new ScopeTransformer(a).transform(),
+		(a: Program) => new ClassTransformer(a).transformThisIdentifiers(),
+		(a: Program) => new AmbiguityTransformer(a, itemApis, Enums as any, globalMock, stdlibMock).transform(),
+		(a: Program) => new ClassTransformer(a).transform(),
+		(a: Program) => new WrapTransformer(a).transform(globalFunction, globalObject),
+	]
 	for (const fn of pipeline) ast = fn(ast)
-	const js = generate(ast)
-	return js
+	return generate(ast)
 }

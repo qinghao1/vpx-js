@@ -43,8 +43,6 @@ function normalizeNewCall(vbs: string): string {
 	return out
 }
 
-const workerCache: Promise<string> | null = null
-
 export class Transpiler {
 	private readonly itemApis: Record<string, unknown>
 	private readonly enumApis: EnumsApi = Enums
