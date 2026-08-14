@@ -1318,18 +1318,20 @@ export class Viewer {
 										makeVisible(o)
 										this.tableGroup.traverse(obj2 => {
 											if (!obj2.isMesh || obj2 === o) return
-											if (obj2.material !== m) return
 											const n2 = (obj2.name || '').toLowerCase()
-											if (!n2.includes('playfield') && !n2.includes('bm_')) return
-											makeVisible(obj2)
+											if (
+												obj2.material === m &&
+												(n2.includes('playfield') || n2.includes('bm_'))
+											) {
+												makeVisible(obj2)
+											}
 										})
 									}
-								} else if (info.isVrCab || info.isVr) {
+								} else if (info.isVrCab) {
 									const nl = (o.name || '').toLowerCase()
 									if (
 										o.visible === false &&
-										(nl.includes('vr_') ||
-											nl.includes('vrcab') ||
+										(nl.includes('vrcab') ||
 											nl.includes('cabinet') ||
 											nl.includes('lockbar') ||
 											nl.includes('pincab'))

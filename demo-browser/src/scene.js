@@ -142,12 +142,14 @@ export const applyBakedMaterial = (mat, tex, info, meshName) => {
 	else mat.emissive = tint
 	// Generic: overlay is additive baked (primitive.cpp:102 addBlend true => SRC_ALPHA ONE, 107 alpha/100 HDR)
 	// info.isVlmBake/isMainBake are now derived from addBlend in classify; also fall back to mat userData for streamed clones.
+	const isGI = nl.includes('gi0') || nl.includes('gi1') || nl.includes('_gi') || nl.includes('gi_')
 	const isOverlay = !!mat.userData?.__addBlend || (info.isVlmBake && !info.isMainBake)
 	const isMain = !!(info.isMainBake || (info.isBakedMat && !isOverlay))
 	if (isOverlay) {
-		mat.emissiveIntensity = 0
+		const isLit = isGI
+		mat.emissiveIntensity = isLit ? 1.0 * emissionScale() : 0
 		mat.transparent = true
-		mat.opacity = 0
+		mat.opacity = isLit ? 1.0 : 0
 		mat.blending = THREE.AdditiveBlending
 		mat.depthWrite = false
 		mat.alphaTest = 0
@@ -317,7 +319,6 @@ const hideMesh = (o, statsKey, stats) => {
 	if (!o.visible) return
 	o.visible = false
 	if (statsKey) stats[statsKey]++
-	o.geometry?.dispose?.()
 }
 
 export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {}) {
@@ -363,9 +364,10 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 			v.needsUpdate = true
 		} else if (isOverlay) {
 			fixBaked(v, v.map)
-			v.emissiveIntensity = 0
+			const isLit = mesh.includes('gi0') || mesh.includes('gi1') || mesh.includes('_gi') || mesh.includes('gi_')
+			v.emissiveIntensity = isLit ? 1.0 : 0
 			v.transparent = true
-			v.opacity = 0
+			v.opacity = isLit ? 1.0 : 0
 			v.blending = THREE.AdditiveBlending
 			v.depthWrite = false
 			v.toneMapped = false
@@ -382,11 +384,12 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 			v.toneMapped = false
 		}
 		if (isOverlay) {
+			const isLit = mesh.includes('gi0') || mesh.includes('gi1') || mesh.includes('_gi') || mesh.includes('gi_')
 			v.transparent = true
 			v.alphaTest = 0
 			v.depthWrite = false
-			v.opacity = 0
-			v.emissiveIntensity = 0
+			v.opacity = isLit ? 1.0 : 0
+			v.emissiveIntensity = isLit ? 1.0 : 0
 			v.blending = THREE.AdditiveBlending
 			v.polygonOffset = true
 			v.polygonOffsetFactor = 0
@@ -458,8 +461,13 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 			o.visible = false
 			return
 		}
+		if (viewerMode === 'play' && RE_VR.test(n) && !RE_CAB.test(n)) {
+			if (o.visible !== false) stats.cabHidden++
+			o.visible = false
+			return
+		}
 		if (!o.isMesh) {
-			if (n && (RE_CAB.test(n) || RE_VR.test(n) || resolveButtonCode(n)) && o.visible === false) {
+			if (n && (RE_CAB.test(n) || resolveButtonCode(n)) && o.visible === false) {
 				o.visible = true
 				stats.cabForced++
 			}
@@ -480,7 +488,7 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 			o.visible = true
 			makeParentsVisible(o, node, stats)
 		}
-		if ((c.isCab || c.isVr) && !o.visible) {
+		if (c.isCab && !o.visible) {
 			o.visible = true
 			stats.cabForced++
 			makeParentsVisible(o, node, stats)
@@ -972,7 +980,7 @@ const excludeNonPlayfield = n =>
 	!n.includes('coin') &&
 	!n.includes('plunger') &&
 	!n.includes('apron')
-const excludeVrNonCab = n => RE_VR.test(n) && !RE_CAB.test(n)
+const excludeVrNonCab = n => (RE_VR.test(n) && !RE_CAB.test(n)) || n.includes('vr_mega') || n.includes('vr_mini')
 const VIEWER = { dist: 1.2, elev: 0.85, azim: 0.65, near: 0.015, farScale: 8, farMin: 2000 }
 const PLAY = { dist: 1.0, elev: 1.1, azim: 0.68, near: 0.012, farScale: 10, farMin: 4000, forwardBias: -0.07 }
 
@@ -994,7 +1002,12 @@ function framingState(node, targetExclude, sizeExclude, cfg) {
 
 export const computeViewerFraming = node => framingState(node, excludeNonPlayfield, excludeVrNonCab, VIEWER)
 const excludeLegsForPlay = n =>
-	n.includes('leg') || n.includes('support') || n.includes('bottom') || (RE_VR.test(n) && !RE_CAB.test(n))
+	n.includes('leg') ||
+	n.includes('support') ||
+	n.includes('bottom') ||
+	(RE_VR.test(n) && !RE_CAB.test(n)) ||
+	n.includes('vr_mega') ||
+	n.includes('vr_mini')
 export const computePlayFraming = node => framingState(node, excludeNonPlayfield, excludeLegsForPlay, PLAY)
 
 export function applyCameraState(camera, controls, state) {

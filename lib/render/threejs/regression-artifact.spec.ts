@@ -367,7 +367,7 @@ describe('regression: artifact harness', () => {
 		expect(m.opacity, 'Overlay lightmap opacity must be 0 until activated').to.equal(0)
 		expect(m.emissiveIntensity, 'Overlay lightmap emissiveIntensity must be 0 until activated').to.equal(0)
 	})
-	it('VR room meshes and cabinet meshes remain visible in the scene graph', () => {
+	it('VR room non-cab meshes must stay hidden in play mode to avoid blocking desktop camera', () => {
 		const root = new THREE.Group()
 		root.name = 'table'
 		const roomMat = new THREE.MeshStandardMaterial({ color: 0x888888 })
@@ -385,7 +385,7 @@ describe('regression: artifact harness', () => {
 		root.updateMatrixWorld(true)
 		postProcessScene(root, { harnessLog: () => {}, viewerMode: 'play' })
 
-		expect(roomMesh.visible, 'VR_MegaWall005 room mesh should be visible').to.equal(true)
+		expect(roomMesh.visible, 'VR_MegaWall005 room mesh should stay hidden in play mode').to.equal(false)
 		expect(cabMesh.visible, 'VRCab_Cabinet must remain visible').to.equal(true)
 	})
 	it('TWD lightmap overlays on playfield must have opacity 0 initially when loading real table', async () => {

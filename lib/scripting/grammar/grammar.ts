@@ -151,6 +151,290 @@ export class Grammar {
 	}
 
 	public format(script: string): string {
+		return this.fastFormat(script)
+	}
+
+	private fastFormat(script: string): string {
+		const lines = script.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n')
+		const joined: string[] = []
+		let buffer = ''
+		for (let li = 0; li < lines.length; li++) {
+			const line = lines[li]!
+			let out = ''
+			let inStr = false
+			let commentPos = -1
+			for (let ci = 0; ci < line.length; ci++) {
+				const ch = line[ci]!
+				if (ch === '"') {
+					if (inStr && line[ci + 1] === '"') {
+						out += '""'
+						ci++
+						continue
+					}
+					inStr = !inStr
+					out += ch
+					continue
+				}
+				if (!inStr && ch === "'") {
+					commentPos = ci
+					break
+				}
+				out += ch
+			}
+			let content = commentPos >= 0 ? out.slice(0, commentPos) : out
+			const trimmed = content.trimStart()
+			if (
+				trimmed.length >= 3 &&
+				trimmed.slice(0, 3).toLowerCase() === 'rem' &&
+				(trimmed.length === 3 || /[\s:]/.test(trimmed[3]!))
+			) {
+				const idx = content.toLowerCase().indexOf('rem')
+				if (idx >= 0) {
+					const before = content.slice(0, idx)
+					if (before.trimEnd() === '' || before.trimEnd().endsWith(':')) content = content.slice(0, idx)
+				}
+			}
+			content = content.trimEnd()
+			if (!content.trim()) continue
+			let lastNonWs = -1
+			for (let ci = content.length - 1; ci >= 0; ci--) {
+				if (content[ci] !== ' ' && content[ci] !== '\t') {
+					lastNonWs = ci
+					break
+				}
+			}
+			const isCont = lastNonWs >= 0 && content[lastNonWs] === '_' && !inStr
+			if (isCont) {
+				const part = content.slice(0, lastNonWs).trimEnd()
+				buffer = buffer ? buffer + ' ' + part : part
+			} else {
+				if (buffer) {
+					content = buffer + ' ' + content
+					buffer = ''
+				}
+				joined.push(content)
+			}
+		}
+		const outLines: string[] = []
+		for (const raw of joined) {
+			let res = ''
+			let prevTokenType: string | null = null
+			let prevTokenText = ''
+			let i = 0
+			const n = raw.length
+			const isAlpha = (c: string) => /[A-Za-z_]/.test(c)
+			const isAlNum = (c: string) => /[A-Za-z0-9_]/.test(c)
+			while (i < n) {
+				const ch = raw[i]!
+				if (ch === '"') {
+					let str = '"'
+					i++
+					while (i < n) {
+						const c = raw[i]!
+						str += c
+						if (c === '"') {
+							if (i + 1 < n && raw[i + 1] === '"') {
+								str += '"'
+								i += 2
+								continue
+							}
+							i++
+							break
+						}
+						i++
+					}
+					if (
+						prevTokenType &&
+						(prevTokenType === 'Keyword' ||
+							prevTokenType === 'Identifier' ||
+							prevTokenType === 'Literal' ||
+							prevTokenText === ')')
+					) {
+						res += ' '
+					}
+					res += str
+					prevTokenType = 'Literal'
+					prevTokenText = '"'
+					continue
+				}
+				if (ch === ' ' || ch === '\t') {
+					i++
+					continue
+				}
+				if (ch === ':') {
+					res += ':'
+					i++
+					while (i < n && (raw[i] === ' ' || raw[i] === '\t')) i++
+					prevTokenType = 'Colon'
+					prevTokenText = ':'
+					continue
+				}
+				if (ch === ',') {
+					res += ','
+					i++
+					while (i < n && (raw[i] === ' ' || raw[i] === '\t')) i++
+					prevTokenType = 'Separator'
+					prevTokenText = ','
+					continue
+				}
+				if (ch === '(') {
+					if (prevTokenType === 'Keyword') res += ' '
+					res += '('
+					i++
+					prevTokenType = 'Operator'
+					prevTokenText = '('
+					continue
+				}
+				if (ch === '-') {
+					if (prevTokenType === 'Keyword') res += ' '
+					res += ch
+					i++
+					prevTokenType = 'Operator'
+					prevTokenText = ch
+					continue
+				}
+				if (ch === '.' || ch === '&' || ch === '+') {
+					res += ch
+					i++
+					prevTokenType = 'Operator'
+					prevTokenText = ch
+					continue
+				}
+				if (
+					ch === ')' ||
+					ch === '=' ||
+					ch === '*' ||
+					ch === '/' ||
+					ch === '\\' ||
+					ch === '^' ||
+					ch === '<' ||
+					ch === '>' ||
+					ch === '!' ||
+					ch === '#' ||
+					ch === '?' ||
+					ch === '{' ||
+					ch === '}'
+				) {
+					res += ch
+					i++
+					prevTokenType = 'Operator'
+					prevTokenText = ch
+					continue
+				}
+				if (
+					/[0-9]/.test(ch) ||
+					(ch === '.' && i + 1 < n && /[0-9]/.test(raw[i + 1]!)) ||
+					(ch === '&' && i + 1 < n && /[HhOo]/.test(raw[i + 1]!))
+				) {
+					let num = ''
+					if (ch === '&' && i + 1 < n && /[HhOo]/.test(raw[i + 1]!)) {
+						num += raw[i]! + raw[i + 1]!
+						i += 2
+						while (i < n && /[0-9A-Fa-f]/.test(raw[i]!)) {
+							num += raw[i]!
+							i++
+						}
+					} else if (ch === '.') {
+						num += '.'
+						i++
+						while (i < n && /[0-9]/.test(raw[i]!)) {
+							num += raw[i]!
+							i++
+						}
+					} else {
+						while (i < n && /[0-9]/.test(raw[i]!)) {
+							num += raw[i]!
+							i++
+						}
+						if (i < n && raw[i] === '.' && i + 1 < n && /[0-9]/.test(raw[i + 1]!)) {
+							num += '.'
+							i++
+							while (i < n && /[0-9]/.test(raw[i]!)) {
+								num += raw[i]!
+								i++
+							}
+						}
+						if (i < n && (raw[i] === 'E' || raw[i] === 'e')) {
+							let hasExp = false
+							const j = i + 1
+							if (j < n && (raw[j] === '+' || raw[j] === '-')) {
+								if (j + 1 < n && /[0-9]/.test(raw[j + 1]!)) hasExp = true
+							} else if (j < n && /[0-9]/.test(raw[j]!)) hasExp = true
+							if (hasExp) {
+								num += raw[i]!
+								i++
+								if (i < n && (raw[i] === '+' || raw[i] === '-')) {
+									num += raw[i]!
+									i++
+								}
+								while (i < n && /[0-9]/.test(raw[i]!)) {
+									num += raw[i]!
+									i++
+								}
+							}
+						}
+					}
+					if (prevTokenType === 'Keyword' || prevTokenType === 'Identifier') res += ' '
+					res += num
+					prevTokenType = 'Literal'
+					prevTokenText = num
+					continue
+				}
+				if (isAlpha(ch)) {
+					let word = ''
+					while (i < n && isAlNum(raw[i]!)) {
+						word += raw[i]!
+						i++
+					}
+					const lower = word.toLowerCase()
+					const std = this.keywordsMap[lower]
+					let type = 'Identifier'
+					let text = word
+					if (std) {
+						text = std
+						type = 'Keyword'
+					}
+					if (lower === 'me' && prevTokenText !== '.') {
+						text = this.identifiersMap[lower] ?? word
+						type = 'Identifier'
+					}
+					if (prevTokenType) {
+						if (type === 'Keyword') {
+							if (
+								prevTokenType === 'Keyword' ||
+								prevTokenType === 'Identifier' ||
+								prevTokenType === 'Literal' ||
+								prevTokenText === ')'
+							) {
+								res += ' '
+							}
+						} else if (type === 'Identifier') {
+							if (
+								prevTokenType === 'Keyword' ||
+								prevTokenType === 'Identifier' ||
+								prevTokenType === 'Literal' ||
+								prevTokenText === ')'
+							) {
+								res += ' '
+							}
+						} else if (type === 'Literal') {
+							if (prevTokenType === 'Keyword' || prevTokenType === 'Identifier') res += ' '
+						}
+					}
+					res += text
+					prevTokenType = type
+					prevTokenText = text
+					continue
+				}
+				res += ch
+				i++
+			}
+			outLines.push(res)
+		}
+		return outLines.join('\n') + '\n'
+	}
+
+	private legacyFormat(script: string): string {
 		let output = ''
 
 		let hasLine: boolean = false
