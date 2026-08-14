@@ -1305,12 +1305,23 @@ export class Viewer {
 									const isBakedMeshName = nl.includes('playfield') || nl.includes('bm_')
 									if (
 										(info.isMainBake || isPlayfieldOverlay) &&
-										o.visible === false &&
 										isBakedMeshName
 									) {
-										o.visible = true
-										for (let p = o.parent; p && p !== this.tableGroup; p = p.parent)
-											if (p.visible === false) p.visible = true
+										const makeVisible = obj => {
+											if (obj.visible === false) {
+												obj.visible = true
+												for (let pp = obj.parent; pp && pp !== this.tableGroup; pp = pp.parent)
+													if (pp.visible === false) pp.visible = true
+											}
+										}
+										makeVisible(o)
+										this.tableGroup.traverse(obj2 => {
+											if (!obj2.isMesh || obj2 === o) return
+											if (obj2.material !== m) return
+											const n2 = (obj2.name || '').toLowerCase()
+											if (!n2.includes('playfield') && !n2.includes('bm_')) return
+											makeVisible(obj2)
+										})
 									}
 								} else if (info.isVrCab) {
 									const nl = (o.name || '').toLowerCase()
@@ -1391,8 +1402,10 @@ export class Viewer {
 						if (!n2.includes('playfield') && !n2.includes('bm_')) return
 						const m2 = Array.isArray(o2.material) ? o2.material[0] : o2.material
 						if (!m2?.map) return
+						const isBaked = !!(m2.userData && m2.userData.__isBaked)
 						const info2 = isBakedMeshByNames(n2, m2.name || '', m2.map?.name || '')
-						if ((info2.isMainBake || (info2.isVlmBake && !info2.isMainBake)) && o2.visible === false) {
+						const shouldShow = isBaked || info2.isMainBake || (info2.isVlmBake && !info2.isMainBake)
+						if (shouldShow && o2.visible === false) {
 							o2.visible = true
 							for (let p = o2.parent; p && p !== this.tableGroup; p = p.parent)
 								if (p.visible === false) p.visible = true
