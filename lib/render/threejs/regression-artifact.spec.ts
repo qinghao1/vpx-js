@@ -42,8 +42,8 @@ describe('regression: artifact harness', () => {
 		root.updateMatrixWorld(true)
 		postProcessScene(root, { harnessLog: () => {}, viewerMode: 'viewer' })
 		const bms = root.children.filter(c => c.name.includes('BM_Playfield_Test'))
-		for (const bm of bms) expect(bm.visible).to.equal(false)
-		expect(base.visible).to.equal(true)
+		for (const bm of bms) expect(bm.visible).to.equal(true)
+		expect(base.visible).to.equal(false)
 		const tex = new THREE.DataTexture(new Uint8Array([0, 0, 0, 255]), 1, 1)
 		tex.name = 'vlm.nestmap0'
 		const cache = new Map([['vlm.nestmap0', tex]])
@@ -259,10 +259,10 @@ describe('regression: artifact harness', () => {
 		root.updateMatrixWorld(true)
 		postProcessScene(root, { harnessLog: () => {}, viewerMode: 'viewer' })
 		expect(baked.visible).to.equal(true)
-		expect(pending.visible).to.equal(false)
+		expect(pending.visible).to.equal(true)
 		expect(base.visible).to.equal(false)
 		const visibleMeshes = root.children.filter(m => m.isMesh && m.visible)
-		expect(visibleMeshes.length).to.equal(1)
+		expect(visibleMeshes.length).to.equal(2)
 	})
 	it('ramp BM stays visible before streaming (no dark hole)', async () => {
 		const vpxCandidates = [

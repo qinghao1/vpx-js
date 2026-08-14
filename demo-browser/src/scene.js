@@ -657,85 +657,20 @@ export function postProcessScene(node, { viewerMode = 'viewer', harnessLog } = {
 	// removed debug
 	let hasReadyBake = false,
 		hasPendingBake = false
+	let hasBakedPlayfield = false
 	node.traverse(o => {
-		if (!o.isMesh) return
-		const n = (o.name || '').toLowerCase()
-		if (!n.includes('playfield') && !n.includes('bm_')) return
-		const m = Array.isArray(o.material) ? o.material[0] : o.material
-		if (!m) return
-		const pending = pendingOf(m)
-		const mapName = (m.map?.name || '').toLowerCase()
-		const eff = mapName || pending
-		const c = classify(n, (m.name || '').toLowerCase(), eff, !!m.userData?.__isBaked, !!m.userData?.__addBlend)
-		if (!isBakedMesh(c)) return
-		if (mapName) hasReadyBake = true
-		else if (pending) hasPendingBake = true
-		else hasReadyBake = true
+		if (o.isMesh && (o.name || '').toLowerCase().includes('bm_playfield')) {
+			hasBakedPlayfield = true
+		}
 	})
-	if (hasReadyBake) {
+	if (hasBakedPlayfield) {
 		node.traverse(o => {
 			if (!o.isMesh) return
 			const n = (o.name || '').toLowerCase()
-			const m = Array.isArray(o.material) ? o.material[0] : o.material
-			if (!m) return
-			const pending = pendingOf(m)
-			const mapName = (m.map?.name || '').toLowerCase()
-			const c = classify(
-				n,
-				(m.name || '').toLowerCase(),
-				mapName || pending,
-				!!m.userData?.__isBaked,
-				!!m.userData?.__addBlend,
-			)
-			if (
-				(c.isMainBake || c.isVlmBake) &&
-				pending &&
-				!mapName &&
-				n.includes('playfield') &&
-				!c.isVr &&
-				!c.isCab &&
-				o.visible
-			) {
-				o.visible = false
-				stats.playfieldHidden++
-			} else if (n.includes('playfield') && isBakedMesh(c) && pending && !mapName && o.visible) {
-				o.visible = false
-				stats.playfieldHidden++
-			} else if (isBasePlayfield(n, c) && o.visible) {
+			if (isBasePlayfield(n, { isBakedMat: false }) && o.visible) {
 				hideMesh(o, 'playfieldHidden', stats)
 			}
-		})
-	} else if (hasPendingBake) {
-		node.traverse(o => {
-			if (!o.isMesh) return
-			const n = (o.name || '').toLowerCase()
-			const m = Array.isArray(o.material) ? o.material[0] : o.material
-			if (!m) return
-			const pending = pendingOf(m)
-			const mapName = (m.map?.name || '').toLowerCase()
-			const c = classify(
-				n,
-				(m.name || '').toLowerCase(),
-				mapName || pending,
-				!!m.userData?.__isBaked,
-				!!m.userData?.__addBlend,
-			)
-			if (
-				(c.isMainBake || c.isVlmBake) &&
-				pending &&
-				!mapName &&
-				n.includes('playfield') &&
-				!c.isVr &&
-				!c.isCab &&
-				o.visible
-			) {
-				o.visible = false
-				stats.playfieldHidden++
-			} else if (n.includes('playfield') && isBakedMesh(c) && pending && !mapName && o.visible) {
-				o.visible = false
-				stats.playfieldHidden++
-			}
-			if (isBasePlayfield(n, c) && !n.includes('underwall') && !n.includes('wall') && o.visible === false) {
+			if (n.includes('bm_playfield') && o.visible === false) {
 				o.visible = true
 				makeParentsVisible(o, node, stats)
 			}
