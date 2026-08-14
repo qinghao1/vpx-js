@@ -7,21 +7,99 @@ import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
 import { EXRLoader } from 'three/examples/jsm/loaders/EXRLoader.js'
 import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js'
-import { DataTexture, FloatType, HalfFloatType, RGBAFormat, SRGBColorSpace, type Texture as ThreeTexture } from '../../refs.node.js'
+import {
+	DataTexture,
+	FloatType,
+	HalfFloatType,
+	LinearSRGBColorSpace,
+	RGBAFormat,
+	SRGBColorSpace,
+	type Texture as ThreeTexture,
+} from '../../refs.node.js'
 import { logger } from '../../util/logger.js'
 import type { ITextureLoader } from '../irender-api.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
+let hdrWorkers: any[] = []
+let hdrReady: Promise<any[]> | null = null
+const hdrPending = new Map<number, { resolve: (v: any) => void; reject: (e: any) => void }>()
+let hdrNextId = 1
+let hdrNextWorker = 0
+const HDR_POOL_SIZE = 2
+
+async function getHdrWorkers(): Promise<any[]> {
+	if (hdrWorkers.length) return hdrWorkers
+	if (hdrReady) return hdrReady
+	hdrReady = (async () => {
+		const { Worker } = await import('node:worker_threads')
+		const workers: any[] = []
+		for (let i = 0; i < HDR_POOL_SIZE; i++) {
+			const ext = import.meta.url.includes('/dist-esm/') || import.meta.url.endsWith('.js') ? '.js' : '.ts'
+			const w: any = new Worker(new URL(`./hdr-decode.worker.node${ext}`, import.meta.url) as any, {
+				execArgv: ['--import', 'tsx/esm'],
+			} as any)
+			w.on('message', (m: any) => {
+				const p = hdrPending.get(m.id)
+				if (!p) return
+				hdrPending.delete(m.id)
+				m.ok ? p.resolve(m) : p.reject(new Error(m.error))
+			})
+			w.on('error', (e: any) => {
+				for (const [, p] of hdrPending) p.reject(e)
+				hdrPending.clear()
+			})
+			w.on('exit', () => {
+				hdrWorkers = hdrWorkers.filter(x => x !== w)
+				if (!hdrWorkers.length) hdrReady = null
+			})
+			workers.push(w)
+		}
+		hdrWorkers = workers
+		return workers
+	})()
+	return hdrReady
+}
+
+async function decodeHdrViaWorker(buffer: ArrayBuffer, type: 'hdr' | 'exr'): Promise<any> {
+	const workers = await getHdrWorkers()
+	const w = workers[hdrNextWorker++ % workers.length]!
+	return new Promise((resolve, reject) => {
+		const id = hdrNextId++
+		hdrPending.set(id, { resolve, reject })
+		try {
+			w.postMessage({ id, buffer, type }, [buffer] as any)
+		} catch (e) {
+			hdrPending.delete(id)
+			reject(e)
+		}
+		setTimeout(() => {
+			if (hdrPending.has(id)) {
+				hdrPending.delete(id)
+				reject(new Error('hdr worker timeout'))
+			}
+		}, 60000)
+	})
+}
+
 export class ThreeTextureLoaderNode implements ITextureLoader<ThreeTexture> {
 	async loadTexture(name: string, ext: string, data: Uint8Array): Promise<ThreeTexture> {
+		const lowerExt = ext.toLowerCase()
+		if (lowerExt === '.hdr' || lowerExt === '.exr') {
+			try {
+				return await this.loadHdrViaWorker(name, lowerExt as '.hdr' | '.exr', data)
+			} catch (e) {
+				logger().warn('[Texture] hdr worker failed for %s: %s, falling back to main thread', name, (e as Error).message)
+			}
+			return floatTex(lowerExt === '.hdr' ? HDRLoader : EXRLoader, lowerExt === '.hdr' ? HalfFloatType : FloatType, data)
+		}
 		try {
 			const { data: raw, info } = await (sharp as any)(data).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
 			return tex(raw, info.width, info.height, name)
 		} catch (e) {
 			logger().warn('[Texture] failed to load %s: %s', name, (e as Error).message)
-			if (ext === '.hdr') return floatTex(HDRLoader, HalfFloatType, data)
-			if (ext === '.exr') return floatTex(EXRLoader, FloatType, data)
+			if (lowerExt === '.hdr') return floatTex(HDRLoader, HalfFloatType, data)
+			if (lowerExt === '.exr') return floatTex(EXRLoader, FloatType, data)
 			throw e
 		}
 	}
@@ -33,6 +111,22 @@ export class ThreeTextureLoaderNode implements ITextureLoader<ThreeTexture> {
 	async loadDefaultTexture(name: string, _: string, file: string): Promise<ThreeTexture> {
 		const buf = await readFile(join(__dirname, '../../../res/maps', file))
 		return this.loadTexture(name, 'png', buf as Uint8Array)
+	}
+
+	private async loadHdrViaWorker(name: string, ext: '.hdr' | '.exr', data: Uint8Array): Promise<ThreeTexture> {
+		const buffer = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer
+		const res: any = await decodeHdrViaWorker(buffer, ext.slice(1) as 'hdr' | 'exr')
+		const texData = res.data as any
+		const width = res.width as number
+		const height = res.height as number
+		const type = res.type as any
+		const format = res.format as any
+		const t: any = new DataTexture(texData, width, height, format, type)
+		t.colorSpace = res.colorSpace ?? LinearSRGBColorSpace
+		t.flipY = false
+		t.needsUpdate = true
+		t.name = `texture:${name}`
+		return t as ThreeTexture
 	}
 }
 
