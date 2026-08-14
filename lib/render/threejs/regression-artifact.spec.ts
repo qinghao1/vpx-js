@@ -189,4 +189,24 @@ describe('regression: artifact harness', () => {
     const visibleMeshes=root.children.filter(m=>m.isMesh&&m.visible)
     expect(visibleMeshes.length).to.equal(1)
   })
+  it('ramp BM stays visible before streaming (no dark hole)', async () => {
+    const vpxCandidates=[path.resolve('walking_dead.vpx'), path.join(process.env.HOME||'/home/qinghao1','Downloads/walking_dead.vpx')]
+    const vpx=vpxCandidates.find(p=>{ try{ return fs.existsSync(p)&&fs.statSync(p).size>1024*1024 } catch{ return false } })
+    if (!vpx) return
+    const table=await Table.load(new NodeBinaryReader(vpx), {skipTextures:false} as any)
+    const api=new ThreeRenderApi({applyMaterials:true, applyTextures:true, optimizeTextures:false} as any)
+    const group=await (table as any).generateTableNode(api, {exportPlayfield:true,exportPrimitives:true,exportFlippers:true,exportBumpers:true,exportRamps:true,exportSurfaces:true,exportRubbers:true,exportLightBulbs:true,exportHitTargets:true,exportGates:true,exportKickers:true,exportTriggers:true,exportSpinners:true,exportPlungers:true,preloadTextures:false}) as THREE.Group
+    group.updateMatrixWorld(true)
+    postProcessScene(group,{harnessLog:()=>{},viewerMode:'viewer'})
+    let rampBMVisible=0, rampBMHidden=0
+    group.traverse(o=>{
+      if (!o.isMesh) return
+      const n=(o.name||'').toLowerCase()
+      if (n.includes('bm_') && (n.includes('armp')||n.includes('botramp')||n.includes('rampscrw'))) {
+        if (o.visible) rampBMVisible++; else rampBMHidden++
+      }
+    })
+    expect(rampBMVisible, 'ramp BM (BotRamp/armp) must stay visible before streaming, not dark hole').to.be.greaterThan(0)
+    expect(rampBMHidden).to.equal(0)
+  })
 })
