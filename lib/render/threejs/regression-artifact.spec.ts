@@ -371,4 +371,49 @@ describe('regression: artifact harness', () => {
 		expect(railingMesh.visible, 'VR_MegaRailing must remain hidden in play mode').to.equal(false)
 		expect(cabMesh.visible, 'VRCab_Cabinet must remain visible in play mode').to.equal(true)
 	})
+	it('TWD VR room meshes (VR_Mega*) must remain hidden in play mode when loading real table', async () => {
+		const vpxCandidates = [
+			path.resolve('walking_dead.vpx'),
+			path.join(process.env.HOME || '/home/qinghao1', 'Downloads/walking_dead.vpx'),
+		]
+		const vpx = vpxCandidates.find(p => {
+			try {
+				return fs.existsSync(p) && fs.statSync(p).size > 1024 * 1024
+			} catch {
+				return false
+			}
+		})
+		if (!vpx) return
+		const table = await Table.load(new NodeBinaryReader(vpx), { skipTextures: false } as any)
+		const api = new ThreeRenderApi({ applyMaterials: true, applyTextures: true, optimizeTextures: false } as any)
+		const group = (await (table as any).generateTableNode(api, {
+			exportPlayfield: true,
+			exportPrimitives: true,
+			exportFlippers: true,
+			exportBumpers: true,
+			exportRamps: true,
+			exportSurfaces: true,
+			exportRubbers: true,
+			exportLightBulbs: true,
+			exportHitTargets: true,
+			exportGates: true,
+			exportKickers: true,
+			exportTriggers: true,
+			exportSpinners: true,
+			exportPlungers: true,
+			preloadTextures: false,
+		})) as THREE.Group
+		group.updateMatrixWorld(true)
+		postProcessScene(group, { harnessLog: () => {}, viewerMode: 'play' })
+		let vrMegaVisible = 0
+		group.traverse(o => {
+			if (!o.isMesh || !o.visible) return
+			const n = (o.name || '').toLowerCase()
+			if (n.includes('vr_mega')) vrMegaVisible++
+		})
+		expect(
+			vrMegaVisible,
+			'VR_Mega room decoration meshes (railings, walls, pipes) must stay hidden in play mode',
+		).to.equal(0)
+	})
 })
