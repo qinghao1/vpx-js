@@ -69,7 +69,9 @@
 		"bench:node": "tsx test/harness/bench-node.ts",
 		"bench:walking-dead": "node test/harness/bench.mjs --vpx=walking_dead.vpx --profile",
 		"bench:walking-dead:node": "tsx test/harness/bench-node.ts --vpx=walking_dead.vpx --ticks=300 --balls=1",
-		"bench:walking-dead:browser": "node test/harness/bench.mjs --vpx=walking_dead.vpx --balls=1 --duration=5000 --warmup=1500 --profile"
+		"bench:walking-dead:browser": "node test/harness/bench.mjs --vpx=walking_dead.vpx --balls=1 --duration=5000 --warmup=1500 --profile",
+		"bench:walking-dead:vitest": "vitest bench test/bench/walking-dead.bench.ts --run",
+		"bench:walking-dead:breakdown": "tsx test/harness/bench-node.ts --vpx=/home/qinghao1/Downloads/walking_dead.vpx --ticks=5 --breakdown"
 	},
 	"dependencies": {
 		"dash-ast": "^2.0.0",

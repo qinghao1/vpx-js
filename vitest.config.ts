@@ -21,6 +21,7 @@ export default defineConfig({
 		globals: true,
 		environment: 'node',
 		include: ['lib/**/*.spec.ts'],
+		bench: { include: ['test/bench/**/*.bench.ts', 'lib/**/*.bench.ts'] },
 		setupFiles: ['./test/setup.ts'],
 		fileParallelism: false,
 		pool: 'forks',

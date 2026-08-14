@@ -34,6 +34,7 @@ if (!exists(vpx)) {
 const balls = Number(getArg('balls', vpx.includes('walking_dead') ? '1' : '0') ?? '0')
 const ticks = Number(getArg('ticks', '300') ?? '300')
 const noTextures = hasFlag('no-textures')
+const breakdown = hasFlag('breakdown') || hasFlag('profile')
 
 const st = fs.statSync(vpx)
 console.log(`vpx-js Node bench — ${new Date().toISOString()}`)
@@ -56,9 +57,51 @@ function stats(arr: number[]) {
 }
 
 const reader = new NodeBinaryReader(vpx)
-const t0 = performance.now()
-const table = await Table.load(reader, { skipTextures: noTextures })
-const tLoad = performance.now() - t0
+let tLoad = 0
+let table: Table
+if (breakdown) {
+	const { TableLoader } = await import('../../lib/vpt/table/table-loader.js')
+	const origGame = (TableLoader.prototype as any).loadGameItems
+	const origTex = (TableLoader.prototype as any).loadTextures
+	const origColl = (TableLoader.prototype as any).loadCollections
+	let gameMs = 0
+	let texMs = 0
+	let collMs = 0
+	;(TableLoader.prototype as any).loadGameItems = async function (...a: any[]) {
+		const s = performance.now()
+		const r = await origGame.apply(this, a)
+		gameMs = performance.now() - s
+		console.log(` [breakdown] loadGameItems ${gameMs.toFixed(0)}ms`)
+		return r
+	}
+	;(TableLoader.prototype as any).loadTextures = async function (...a: any[]) {
+		const s = performance.now()
+		const r = await origTex.apply(this, a)
+		texMs = performance.now() - s
+		console.log(` [breakdown] loadTextures ${texMs.toFixed(0)}ms`)
+		return r
+	}
+	;(TableLoader.prototype as any).loadCollections = async function (...a: any[]) {
+		const s = performance.now()
+		const r = await origColl.apply(this, a)
+		collMs = performance.now() - s
+		console.log(` [breakdown] loadCollections ${collMs.toFixed(0)}ms`)
+		return r
+	}
+	const t0 = performance.now()
+	table = await Table.load(reader, { skipTextures: noTextures })
+	tLoad = performance.now() - t0
+	;(TableLoader.prototype as any).loadGameItems = origGame
+	;(TableLoader.prototype as any).loadTextures = origTex
+	;(TableLoader.prototype as any).loadCollections = origColl
+	console.log(
+		` [breakdown] Table.load total ${tLoad.toFixed(0)}ms — items=${Object.keys((table as any).items).length} textures=${Object.keys((table as any).textures).length} (game ${gameMs.toFixed(0)}ms tex ${texMs.toFixed(0)}ms coll ${collMs.toFixed(0)}ms)`,
+	)
+} else {
+	const t0 = performance.now()
+	table = await Table.load(reader, { skipTextures: noTextures })
+	tLoad = performance.now() - t0
+}
 console.log(
 	` Table.load ${(tLoad).toFixed(0)}ms — items=${Object.keys((table as any).items).length} textures=${Object.keys((table as any).textures).length}`,
 )
@@ -110,9 +153,58 @@ try {
 	console.warn(` Scene gen skipped: ${e.message.slice(0, 300)}`)
 }
 
-const t2 = performance.now()
-const player = new Player(table).init()
-const tInit = performance.now() - t2
+let tInit = 0
+let player: Player
+if (breakdown) {
+	const { Transpiler } = await import('../../lib/scripting/transpiler.js')
+	const script = (table as any).tableScript as string | undefined
+	const origExec = Transpiler.prototype.execute as any
+	const origExecAsync = (Transpiler.prototype as any).executeAsync as any
+	let execMs = 0
+	let execAsyncMs = 0
+	Transpiler.prototype.execute = function (...a: any[]) {
+		const s = performance.now()
+		const r = origExec.apply(this, a as any)
+		execMs = performance.now() - s
+		return r
+	} as any
+	;(Transpiler.prototype as any).executeAsync = async function (...a: any[]) {
+		const s = performance.now()
+		const r = await origExecAsync.apply(this, a as any)
+		execAsyncMs = performance.now() - s
+		return r
+	} as any
+	const { PlayerPhysics } = await import('../../lib/game/player-physics.js')
+	const origInit = PlayerPhysics.prototype.init
+	let physMs = 0
+	PlayerPhysics.prototype.init = function (...a: any[]) {
+		const s = performance.now()
+		const r = (origInit as any).apply(this, a as any)
+		physMs = performance.now() - s
+		return r
+	} as any
+	const tI0 = performance.now()
+	player = new Player(table).init()
+	tInit = performance.now() - tI0
+	Transpiler.prototype.execute = origExec
+	;(Transpiler.prototype as any).executeAsync = origExecAsync
+	PlayerPhysics.prototype.init = origInit
+	const phys: any = (player as any).physics ?? (player as any)['physics']
+	if (script)
+		console.log(
+			` [breakdown] Transpiler execute ${execMs.toFixed(0)}ms executeAsync ${execAsyncMs.toFixed(0)}ms script ${(script.length / 1024).toFixed(1)} KB`,
+		)
+	console.log(
+		` [breakdown] PlayerPhysics.init ${physMs.toFixed(0)}ms — hitObjects=${phys?.hitObjects?.length ?? '?'} hitTimers=${phys?.hitTimers?.length ?? phys?.['hitTimers']?.length ?? '?'} movers=${phys?.movers?.length ?? phys?.['movers']?.length ?? '?'}`,
+	)
+	console.log(
+		` [breakdown] Player.init total ${tInit.toFixed(0)}ms — (phys ${physMs.toFixed(0)}ms + transpiler ${execMs.toFixed(0)}ms)`,
+	)
+} else {
+	const t2 = performance.now()
+	player = new Player(table).init()
+	tInit = performance.now() - t2
+}
 console.log(` Player.init ${(tInit).toFixed(0)}ms — hitObjects=${(player as any).physics?.hitObjects?.length ?? '?'}`)
 
 if (balls > 0) {
