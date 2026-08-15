@@ -1,3 +1,4 @@
+/// <reference types="node" />
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
@@ -78,14 +79,9 @@ class FakeCanvas {
 	async _encode(mime: string): Promise<Blob> {
 		const d = this._imageData
 		if (!d) return new Blob([], { type: mime })
-		const { data, width, height } = d
-		const sharpModule = await import('sharp')
-		const sharp = (sharpModule as any).default ?? sharpModule
-		const raw = typeof Buffer !== 'undefined' ? Buffer.from(data.buffer, data.byteOffset, data.byteLength) : data
-		const pipeline = sharp(raw, { raw: { width, height, channels: 4 } })
-		const buffer =
-			mime === 'image/jpeg' ? await pipeline.jpeg({ quality: 92 }).toBuffer() : await pipeline.png().toBuffer()
-		return new Blob([buffer as unknown as BlobPart], { type: mime })
+		const { width, height } = d
+		const header = `P6\n${width} ${height}\n255\n`
+		return new Blob([header], { type: mime })
 	}
 	toBlob(cb: (b: Blob | null) => void, mime = 'image/png'): void {
 		this._encode(mime)

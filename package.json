@@ -84,11 +84,10 @@
 		"moo": "^0.5.3",
 		"three": "^0.185.1",
 		"three-mesh-bvh": "^0.9.14",
-		"wpc-emu": "^0.36.7"
+		"wpc-emu": "^0.36.7",
+		"pako": "^2.1.0"
 	},
-	"optionalDependencies": {
-		"sharp": "^0.35.3"
-	},
+	"optionalDependencies": {},
 	"devDependencies": {
 		"@biomejs/biome": "^2.5.7",
 		"@types/chai": "^4.3.0",
@@ -99,7 +98,6 @@
 		"@types/moo": "^0.5.10",
 		"@types/nearley": "^2.11.5",
 		"@types/node": "^24.13.3",
-		"@types/sharp": "^0.31.1",
 		"@types/sinon": "^17.0.0",
 		"@types/sinon-chai": "^3.2.0",
 		"@types/three": "^0.185.4",

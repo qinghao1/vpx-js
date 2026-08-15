@@ -197,5 +197,4 @@ export interface ITextureLoader<TEXTURE> {
 export interface MeshConvertOptions {
 	applyMaterials?: boolean
 	applyTextures?: ITextureLoader<any>
-	optimizeTextures?: boolean
 }

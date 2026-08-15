@@ -34,7 +34,7 @@ CLI:
 vpt2glb <source.vpx> [<destination.glb>]
 ```
 
-Additional options are `--compress-vertices`, `--skip-optimize`, `--no-textures`,
+Additional options are `--no-textures`,
 `--no-materials` and `--no-lights`. You can also skip generation of individual
 item types by using `--no-primitives`, `--no-triggers`, `--no-kickers`, `--no-gates`,
 `--no-targets`, `--no-flippers`, `--no-bumpers`, `--no-ramps`, `--no-surfaces`,
@@ -56,7 +56,6 @@ const { Table } = require(`vpx-toolbox`);
 		applyTextures: true,
 		applyMaterials: true,
 		exportLightBulbLights: true,
-		optimizeTextures: true,
 		gltfOptions: { compressVertices: true, forcePowerOfTwoTextures: true },
 		exportPrimitives: true,
 		exportTriggers: true,

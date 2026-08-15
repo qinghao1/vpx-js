@@ -4,7 +4,6 @@
 import { readFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import sharp from 'sharp'
 import {
 	DataTexture,
 	FloatType,
@@ -125,20 +124,13 @@ export class ThreeTextureLoaderNode implements ITextureLoader<ThreeTexture> {
 				data,
 			)
 		}
-		try {
-			const max = getMaxTextureSize(name)
-			const { data: raw, info } = await (sharp as any)(data)
-				.resize({ width: max, height: max, fit: 'inside', withoutEnlargement: true })
-				.ensureAlpha()
-				.raw()
-				.toBuffer({ resolveWithObject: true })
-			return tex(raw, info.width, info.height, name)
-		} catch (e) {
-			logger().warn('[Texture] failed to load %s: %s', name, (e as Error).message)
-			if (lowerExt === '.hdr') return floatTex(HDRLoader, HalfFloatType, data)
-			if (lowerExt === '.exr') return floatTex(EXRLoader, FloatType, data)
-			throw e
-		}
+		logger().warn(
+			'[Texture] sharp removed – returning 1x1 placeholder for %s (%s, %s bytes)',
+			name,
+			ext,
+			data.byteLength,
+		)
+		return tex(new Uint8Array([255, 255, 255, 255]), 1, 1, name)
 	}
 
 	async loadRawTexture(name: string, data: Uint8Array, w: number, h: number): Promise<ThreeTexture> {
@@ -167,9 +159,8 @@ export class ThreeTextureLoaderNode implements ITextureLoader<ThreeTexture> {
 	}
 }
 
-export function getMaxTextureSize(name: string): number {
-	const isPlayfield = /playfield|nestmap|bake/i.test(name)
-	return isPlayfield ? 4096 : 2048
+export function getMaxTextureSize(_name: string): number {
+	return 2048
 }
 
 function tex(data: Uint8Array, w: number, h: number, name: string): ThreeTexture {

@@ -48,7 +48,6 @@ export interface TableExportOptions extends TableGenerateOptions, MeshConvertOpt
 
 const defaultOptions: TableExportOptions = {
 	applyMaterials: true,
-	optimizeTextures: false,
 	exportPlayfield: true,
 	exportPrimitives: true,
 	exportRubbers: true,

@@ -47,7 +47,7 @@ export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, Poin
 
 	constructor(opts?: MeshConvertOptions, gate: AnimationGate = animationGate) {
 		installBvh()
-		this.meshConvertOpts = opts ?? { applyMaterials: false, optimizeTextures: false }
+		this.meshConvertOpts = opts ?? { applyMaterials: false }
 		this.mapGenerator = new ThreeMapGenerator(this.meshConvertOpts.applyTextures, gate)
 		this.materialGenerator = new ThreeMaterialGenerator(this.mapGenerator)
 		this.converter = new ThreeConverter(

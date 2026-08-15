@@ -19,7 +19,9 @@ import { TableExporter } from '../lib/vpt/table/table-exporter.js'
 		if (process.argv.includes('--compress-vertices')) {
 			console.warn('--compress-vertices is deprecated (Draco compression removed)')
 		}
-		const optimizeTextures = !process.argv.includes('--skip-optimize')
+		if (process.argv.includes('--skip-optimize')) {
+			console.warn('--skip-optimize is deprecated (sharp optimization removed)')
+		}
 		const applyTextures = !process.argv.includes('--no-textures') ? new ThreeTextureLoaderNode() : undefined
 		const applyMaterials = !process.argv.includes('--no-materials')
 		const exportLightBulbLights = !process.argv.includes('--no-lights')
@@ -88,7 +90,6 @@ import { TableExporter } from '../lib/vpt/table/table-exporter.js'
 			applyTextures,
 			applyMaterials,
 			exportLightBulbLights,
-			optimizeTextures,
 			gltfOptions: { binary: true },
 
 			exportPrimitives,

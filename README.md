@@ -33,7 +33,6 @@ This is a maintained **fork of [`vpdb/vpx-js`](https://github.com/vpdb/vpx-js)**
 
 ```bash
 npm install vpx-js
-npm install sharp # optional — enables JPEG/PNG texture optimization
 ```
 
 From source:
@@ -73,7 +72,6 @@ import { TableExporter } from 'vpx-js'
 
 const glb = await new TableExporter(table).exportGlb({
   applyMaterials: true,
-  optimizeTextures: true, // requires sharp
 })
 writeFileSync('my_table.glb', glb)
 ```
@@ -104,14 +102,14 @@ vpt2glb <table.vpx> [out.glb] [flags]         # convert to GLB
 vptscript <table.vpx|folder> [--save]        # extract table script
 ```
 
-`vpt2glb` flags are all opt-out: `--skip-optimize`, `--no-textures`, `--no-materials`, `--no-lights`, `--no-primitives`, `--no-flippers`, etc. (Draco/`--compress-vertices` is removed).
+`vpt2glb` flags are all opt-out: `--no-textures`, `--no-materials`, `--no-lights`, `--no-primitives`, `--no-flippers`, etc. (Draco/`--compress-vertices` is removed).
 
 ## What Changed Since Upstream v1.3.4
 
 In short:
 
 - **Modern toolchain** — ESM-only, Node 24, `tsup` + `Biome` + `Vitest` replacing Rollup/TSLint/Mocha/NYC.
-- **Current dependencies** — three `^0.185` + `three-mesh-bvh` + `wpc-emu`; `sharp` is now optional.
+- **Current dependencies** — three `^0.185` + `three-mesh-bvh` + `wpc-emu` + `pako`.
 - **Portable I/O** — `Uint8Array`/`DataView` throughout; `refs.node`/`refs.browser` replaces the old `pkg.browser` shim.
 - **Rendering rework** — custom glTF/Draco code removed; GLB export now uses `three/addons/exporters/GLTFExporter`.
 - **Physics fixes** — VPX 10.8.1 defaults, timer/nudge/collision parity with desktop VPX.
