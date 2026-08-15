@@ -3,7 +3,7 @@
 
 import { ERR, VbsError } from './stdlib/err.js'
 
-export const UNDEF = Symbol('undef')
+export const UNDEF = Symbol.for('vbs.undefined')
 
 /** VBS undefined sentinel. */
 export class VbsUndefined implements ProxyHandler<any> {

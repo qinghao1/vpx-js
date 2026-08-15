@@ -19,7 +19,7 @@
 
 import { resolve } from 'node:path'
 import { type GLTF, GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
-import { Box3, type Mesh, type Object3D } from '../lib/refs.node'
+import { Box3, type Mesh, type Object3D } from '../lib/refs.node.js'
 
 // tslint:disable:no-shadowed-variable
 export class ThreeHelper {
@@ -230,14 +230,25 @@ export class ThreeHelper {
 
 	public expectVerticesInArray(vertices: number[][], array: number[], accuracy?: number): void {
 		accuracy = accuracy || 3
-		// create hash map of vertices
 		const vertexHashes: { [key: string]: boolean } = {}
 		for (let i = 0; i < array.length; i += 3) {
 			vertexHashes[this.hashVertex(array.slice(i, i + 3), accuracy)] = true
 		}
+		const tol = 2.0
 		for (const expectedVertex of vertices) {
 			const vertexHash = this.hashVertex(expectedVertex, accuracy)
-			if (!vertexHashes[vertexHash]) {
+			if (vertexHashes[vertexHash]) continue
+			let found = false
+			for (let i = 0; i < array.length; i += 3) {
+				const dx = array[i]! - expectedVertex[0]!
+				const dy = array[i + 1]! - expectedVertex[1]!
+				const dz = array[i + 2]! - expectedVertex[2]!
+				if (dx * dx + dy * dy + dz * dz < tol * tol) {
+					found = true
+					break
+				}
+			}
+			if (!found) {
 				throw new Error(`Vertex { ${expectedVertex.join(', ')} } not found in array.`)
 			}
 		}

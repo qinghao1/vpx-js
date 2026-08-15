@@ -108,7 +108,7 @@ export class VBSHelper {
 	}
 
 	public equals(a: unknown, b: unknown): boolean {
-		// eslint-disable-next-line eqeqeq
+		// biome-ignore lint/suspicious/noDoubleEquals: VBS equals semantics
 		if (a == b) return true
 		const u1 = this.isUndef(a),
 			u2 = this.isUndef(b)

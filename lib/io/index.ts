@@ -4,8 +4,10 @@
 /** Barrel for IO — common modules. */
 export * from './biff-parser.js'
 export * from './binary-helpers.js'
+export * from './binary-reader.js'
 export * from './event-stream.js'
 export * from './global-registry.js'
+export * from './lzw-reader.js'
 export * from './ole-allocation-table.js'
 export * from './ole-directory-tree.js'
 export * from './ole-doc.js'

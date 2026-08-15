@@ -7,7 +7,6 @@ import {
 	CanvasTexture,
 	ClampToEdgeWrapping,
 	DataTexture,
-	Texture,
 	DataUtils,
 	EquirectangularReflectionMapping,
 	HalfFloatType,
@@ -16,6 +15,7 @@ import {
 	LinearSRGBColorSpace,
 	RGBAFormat,
 	SRGBColorSpace,
+	Texture,
 	TextureLoader,
 	type Texture as ThreeTexture,
 } from '../../refs.browser.js'
@@ -112,7 +112,9 @@ function bitmapToCanvasTexture(bitmap: any, name: string): any {
 		const ctx: any = canvas.getContext('2d')
 		if (!ctx) return null
 		ctx.drawImage(bitmap as any, 0, 0, bitmap.width, bitmap.height)
-		try { bitmap.close?.() } catch {}
+		try {
+			bitmap.close?.()
+		} catch {}
 		const tex: any = new CanvasTexture(canvas)
 		tex.colorSpace = SRGBColorSpace
 		tex.flipY = false
@@ -130,11 +132,15 @@ function finalize(tex: any, name: string, isFloat: boolean): any {
 		try {
 			const img: any = tex.image
 			const isBitmap = typeof ImageBitmap !== 'undefined' ? img instanceof ImageBitmap : false
-			const looksBitmap = isBitmap || (typeof img.width === 'number' && typeof img.height === 'number' && typeof img.close === 'function')
+			const looksBitmap =
+				isBitmap ||
+				(typeof img.width === 'number' && typeof img.height === 'number' && typeof img.close === 'function')
 			if (looksBitmap) {
 				const conv = bitmapToCanvasTexture(img, name)
 				if (conv) {
-					try { tex.dispose?.() } catch {}
+					try {
+						tex.dispose?.()
+					} catch {}
 					tex = conv
 				}
 			}
@@ -407,7 +413,13 @@ async function loadRegular(name: string, mime: string, data: Uint8Array): Promis
 		tex.colorSpace = SRGBColorSpace
 		const img: any = tex.image
 		const max = effectiveMax(false, name)
-		if (img && typeof img.width === 'number' && typeof img.height === 'number' && (img.width > max || img.height > max) && typeof document !== 'undefined') {
+		if (
+			img &&
+			typeof img.width === 'number' &&
+			typeof img.height === 'number' &&
+			(img.width > max || img.height > max) &&
+			typeof document !== 'undefined'
+		) {
 			const scale = Math.min(max / img.width, max / img.height)
 			const nw = Math.max(1, Math.floor(img.width * scale))
 			const nh = Math.max(1, Math.floor(img.height * scale))
@@ -424,7 +436,9 @@ async function loadRegular(name: string, mime: string, data: Uint8Array): Promis
 					cTex.colorSpace = SRGBColorSpace
 					cTex.name = `texture:${name}`
 					tune(cTex)
-					try { tex.dispose?.() } catch {}
+					try {
+						tex.dispose?.()
+					} catch {}
 					return cTex as ThreeTexture
 				}
 			} catch {}

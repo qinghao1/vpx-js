@@ -151,7 +151,10 @@ describe('regression: P0 critical fixes', () => {
 
 	describe('bumper scatter radians', () => {
 		it('bumper-hit must convert scatter degrees to radians', () => {
-			const src = fs.readFileSync('lib/vpt/bumper/bumper-hit.ts', 'utf-8')
+			const file = fs.existsSync('lib/vpt/bumper/bumper-physics.ts')
+				? 'lib/vpt/bumper/bumper-physics.ts'
+				: 'lib/vpt/bumper/bumper-hit.ts'
+			const src = fs.readFileSync(file, 'utf-8')
 			expect(src).toContain('degToRad')
 			expect(src).toMatch(/MathUtils\.degToRad\(data\.scatter/)
 		})
@@ -206,7 +209,7 @@ describe('regression: P0 critical fixes', () => {
 			const table = new TableBuilder().build()
 			const player = new Player(table).init()
 			const api = new GlobalApi(table, player)
-			expect(api.ActiveBall).toEqual(null) // no ball yet -> null
+			expect(api.ActiveBall).toBeUndefined() // no ball yet -> undefined
 			// create ball via kicker? use direct player API
 			// Instead mock player.getActiveBall to return Ball with getApi
 			const mockBallApi = { name: 'ballApi' }
@@ -214,7 +217,7 @@ describe('regression: P0 critical fixes', () => {
 			;(player as any).getActiveBall = () => mockBall
 			expect(api.ActiveBall).toBe(mockBallApi)
 			;(player as any).getActiveBall = () => null
-			expect(api.ActiveBall).toBeNull()
+			expect(api.ActiveBall).toBeUndefined()
 		})
 	})
 

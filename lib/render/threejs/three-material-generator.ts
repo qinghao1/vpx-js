@@ -1,7 +1,6 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import type { RenderInfo } from '../../game/irenderable.js'
 import {
 	type BufferGeometry,
 	Color,
@@ -9,7 +8,8 @@ import {
 	FrontSide,
 	MeshStandardMaterial,
 	type Material as ThreeMaterial,
-} from '../../refs.node.js'
+} from 'three'
+import type { RenderInfo } from '../../game/irenderable.js'
 import type { Material } from '../../vpt/material.js'
 import type { MeshConvertOptions } from '../irender-api.js'
 import type { ThreeMapGenerator } from './three-map-generator.js'
@@ -232,7 +232,10 @@ export class ThreeMaterialGenerator {
 		if (tex) {
 			;(mat as any).map = tex
 			;(mat as any).emissiveMap = tex
-			const tint = mat.color && (mat.color as Color).getHex() !== 0x000000 ? (mat.color as Color).clone() : new Color(0xffffff) // tint via baseColor
+			const tint =
+				mat.color && (mat.color as Color).getHex() !== 0x000000
+					? (mat.color as Color).clone()
+					: new Color(0xffffff) // tint via baseColor
 			if (!mat.emissive) (mat as any).emissive = tint
 			else mat.emissive.copy(tint)
 			mat.emissiveIntensity = BAKED_EMISSIVE * _globalEmissionScale

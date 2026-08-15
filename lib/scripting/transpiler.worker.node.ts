@@ -1,4 +1,4 @@
-import { parentPort, isMainThread } from 'node:worker_threads'
+import { isMainThread, parentPort } from 'node:worker_threads'
 import { transpileInWorker } from './transpiler-worker-core.js'
 
 if (!isMainThread) {

@@ -41,6 +41,9 @@ export abstract class ItemData extends BiffParser {
 
 	public timer = new TimerDataRoot()
 	public name!: string
+	public pdata?: number
+	public fLocked?: boolean
+	public layerIndex?: number
 
 	public constructor(public readonly itemName: string) {
 		super()

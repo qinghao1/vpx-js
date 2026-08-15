@@ -109,10 +109,9 @@ export class Flipper
 
 	private getMatrix(rotation: number = this.data.startAngle): Matrix3D {
 		const trafoMatrix = new Matrix3D().setTranslation(this.data.center.x, this.data.center.y, 0)
-		const tempMatrix = Matrix3D.claim().rotateZMatrix(MathUtils.degToRad(rotation))
-		trafoMatrix.multiply(tempMatrix)
-		Matrix3D.release(tempMatrix)
-		return trafoMatrix
+		const rotMatrix = new Matrix3D().rotateZMatrix(MathUtils.degToRad(rotation))
+		rotMatrix.multiply(trafoMatrix)
+		return rotMatrix
 	}
 
 	public getEventNames(): string[] {

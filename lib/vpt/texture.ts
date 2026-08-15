@@ -4,11 +4,11 @@
 import { basename } from 'node:path'
 import { BiffParser } from '../io/biff-parser.js'
 import { concatUint8Arrays } from '../io/binary-helpers.js'
+import { LzwReader } from '../io/lzw-reader.js'
 import type { Storage } from '../io/ole-doc.js'
 import type { ITextureLoader } from '../render/irender-api.js'
 import { logger } from '../util/logger.js'
 import { Binary } from './binary.js'
-import { LzwReader } from './lzw-reader.js'
 import type { Table } from './table/table.js'
 
 /**

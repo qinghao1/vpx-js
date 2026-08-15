@@ -5,8 +5,6 @@ import { readFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
-import { EXRLoader } from 'three/examples/jsm/loaders/EXRLoader.js'
-import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js'
 import {
 	DataTexture,
 	FloatType,
@@ -15,7 +13,9 @@ import {
 	RGBAFormat,
 	SRGBColorSpace,
 	type Texture as ThreeTexture,
-} from '../../refs.node.js'
+} from 'three'
+import { EXRLoader } from 'three/examples/jsm/loaders/EXRLoader.js'
+import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js'
 import { logger } from '../../util/logger.js'
 import type { ITextureLoader } from '../irender-api.js'
 
@@ -74,7 +74,9 @@ async function getHdrWorkers(): Promise<any[]> {
 				hdrWorkers = hdrWorkers.filter(x => x !== w)
 				if (!hdrWorkers.length) hdrReady = null
 			})
-			try { (w as any).unref?.() } catch {}
+			try {
+				;(w as any).unref?.()
+			} catch {}
 			workers.push(w)
 		}
 		hdrWorkers = workers
@@ -111,9 +113,17 @@ export class ThreeTextureLoaderNode implements ITextureLoader<ThreeTexture> {
 			try {
 				return await this.loadHdrViaWorker(name, lowerExt as '.hdr' | '.exr', data)
 			} catch (e) {
-				logger().warn('[Texture] hdr worker failed for %s: %s, falling back to main thread', name, (e as Error).message)
+				logger().warn(
+					'[Texture] hdr worker failed for %s: %s, falling back to main thread',
+					name,
+					(e as Error).message,
+				)
 			}
-			return floatTex(lowerExt === '.hdr' ? HDRLoader : EXRLoader, lowerExt === '.hdr' ? HalfFloatType : FloatType, data)
+			return floatTex(
+				lowerExt === '.hdr' ? HDRLoader : EXRLoader,
+				lowerExt === '.hdr' ? HalfFloatType : FloatType,
+				data,
+			)
 		}
 		try {
 			const max = getMaxTextureSize(name)
@@ -173,11 +183,13 @@ function tex(data: Uint8Array, w: number, h: number, name: string): ThreeTexture
 
 function floatTex(Loader: any, type: any, data: Uint8Array): Promise<ThreeTexture> {
 	return new Promise((res, rej) =>
-		new Loader().setDataType(type as never).load(
-			data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as never,
-			(v: any) => res(v as ThreeTexture),
-			undefined,
-			rej,
-		),
+		new Loader()
+			.setDataType(type as never)
+			.load(
+				data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as never,
+				(v: any) => res(v as ThreeTexture),
+				undefined,
+				rej,
+			),
 	)
 }

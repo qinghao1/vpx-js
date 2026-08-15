@@ -1,5 +1,5 @@
 // Unified E2E — runs all verify-* harnesses with TAP summary
-import { spawn, execSync } from 'node:child_process'
+import { execSync, spawn } from 'node:child_process'
 import path from 'node:path'
 
 const checks = [
@@ -18,11 +18,19 @@ async function run(script: string): Promise<boolean> {
 	})
 }
 
-const killStale = () => { try { execSync('pkill -9 -f "chrome.*headless.*puppeteer" 2>/dev/null || true', { timeout: 2000, stdio: 'ignore' }) } catch {} }
+const killStale = () => {
+	try {
+		execSync('pkill -9 -f "chrome.*headless.*puppeteer" 2>/dev/null || true', { timeout: 2000, stdio: 'ignore' })
+	} catch {}
+}
 process.once('exit', killStale)
 process.once('SIGINT', killStale)
 process.once('SIGTERM', killStale)
-process.on('uncaughtException', e => { console.error('[verify-all] uncaught', e); killStale(); process.exit(1) })
+process.on('uncaughtException', e => {
+	console.error('[verify-all] uncaught', e)
+	killStale()
+	process.exit(1)
+})
 
 console.log(`TAP version 13\n# vpx-js E2E — ${new Date().toISOString()}`)
 console.log(`1..${checks.length}`)

@@ -3,15 +3,15 @@
 
 import * as chai from 'chai'
 import { expect } from 'chai'
-import { MathUtils } from 'three'
 import { spy } from 'sinon'
 import sinonChai from 'sinon-chai'
+import { MathUtils } from 'three'
 import { TableBuilder } from '../../../test/table-builder.js'
 import { TestRenderApi } from '../../../test/test-render-api.js'
 import { Player } from '../../game/player.js'
 import { Matrix3D } from '../../util/matrix.js'
-import { SpinnerMeshGenerator } from './spinner-mesh-generator.js'
 import type { Table } from '../table/table.js'
+import { SpinnerMeshGenerator } from './spinner-mesh-generator.js'
 import type { SpinnerState } from './spinner-state.js'
 
 chai.use((sinonChai as any).default ?? sinonChai)

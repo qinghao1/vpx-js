@@ -1355,10 +1355,7 @@ export class Viewer {
 										this.tableGroup.traverse(obj2 => {
 											if (!obj2.isMesh || obj2 === o) return
 											const n2 = (obj2.name || '').toLowerCase()
-											if (
-												obj2.material === m &&
-												n2.includes('bm_')
-											) {
+											if (obj2.material === m && n2.includes('bm_')) {
 												makeVisible(obj2)
 											}
 										})

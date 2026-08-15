@@ -189,14 +189,14 @@ export class PlayerPhysics {
 	/** Advances physics to `time` (ms). Returns iterations run. */
 	public updatePhysics(time?: number): number {
 		const initial = time !== undefined ? time * 1000 : Math.floor(this.now() * 1000)
-		if (this.ensureInitialTime(initial)) return 0
+		if (this.ensureInitialTime(initial, time)) return 0
 		if (this.isPaused) {
 			const delta = initial - this.curPhysicsFrameTime
 			this.startTimeUsec += delta
 			this.nextPhysicsFrameTime += delta
 			this.curPhysicsFrameTime = initial
 		}
-		if (initial - this.curPhysicsFrameTime > MAX_CATCHUP_USEC) {
+		if (time === undefined && initial - this.curPhysicsFrameTime > MAX_CATCHUP_USEC) {
 			const drift = initial - this.curPhysicsFrameTime - MAX_CATCHUP_USEC
 			this.startTimeUsec += drift
 			this.curPhysicsFrameTime += drift
@@ -213,7 +213,7 @@ export class PlayerPhysics {
 		}
 		this.scriptPeriod = 0
 		let iterations = 0
-		while (this.nextPhysicsFrameTime < initial) {
+		while (this.curPhysicsFrameTime < initial) {
 			this.timeMsec = Math.floor((this.curPhysicsFrameTime - this.startTimeUsec) / 1000)
 			iterations++
 			const dt = (this.nextPhysicsFrameTime - this.curPhysicsFrameTime) * (1 / DEFAULT_STEPTIME)
@@ -293,9 +293,9 @@ export class PlayerPhysics {
 		}
 	}
 
-	private ensureInitialTime(initial: number): boolean {
+	private ensureInitialTime(initial: number, time?: number): boolean {
 		if (this.curPhysicsFrameTime !== 0 || this.nextPhysicsFrameTime !== 0 || this.startTimeUsec !== 0) return false
-		if (initial > CLOCK_INIT_THRESHOLD_USEC) {
+		if (time === undefined && initial > CLOCK_INIT_THRESHOLD_USEC) {
 			this.curPhysicsFrameTime = initial
 			this.nextPhysicsFrameTime = initial + PHYSICS_STEPTIME
 			this.startTimeUsec = initial

@@ -52,7 +52,9 @@ async function getNodeWorker(): Promise<any> {
 			nodeWorker = null
 			nodeReady = null
 		})
-		try { (w as any).unref?.() } catch {}
+		try {
+			;(w as any).unref?.()
+		} catch {}
 		nodeWorker = w
 		return w
 	})()
@@ -66,10 +68,14 @@ let browserNextId = 1
 function getBrowserWorker(): Worker {
 	if (browserWorker) return browserWorker
 	try {
-		browserWorker = new Worker(new URL('./transpiler.worker.browser.js', import.meta.url), { type: 'module' } as any)
+		browserWorker = new Worker(new URL('./transpiler.worker.browser.js', import.meta.url), {
+			type: 'module',
+		} as any)
 	} catch {
 		try {
-			browserWorker = new Worker(new URL('./transpiler.worker.browser.ts', import.meta.url), { type: 'module' } as any)
+			browserWorker = new Worker(new URL('./transpiler.worker.browser.ts', import.meta.url), {
+				type: 'module',
+			} as any)
 		} catch (e) {
 			throw e
 		}

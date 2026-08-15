@@ -20,9 +20,24 @@
 		<main id="loading" aria-live="polite">
 			<section id="loading-card" aria-labelledby="load-title">
 				<h2 id="load-title">Drop a table to begin</h2>
-				<p>Drag &amp; drop a <code>.vpx</code> table (and optional <code>.zip</code> ROM) — works entirely in the browser.</p>
-				<p class="load-hint">Or use <code>?vpx=/tables/example.vpx&amp;rom=/roms/example.zip</code> — try <code>/test/fixtures/table-empty.vpx</code></p>
-				<div id="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Loading progress"><div id="bar-fill"></div></div>
+				<p>
+					Drag &amp; drop a <code>.vpx</code> table (and optional <code>.zip</code> ROM) — works entirely in
+					the browser.
+				</p>
+				<p class="load-hint">
+					Or use <code>?vpx=/tables/example.vpx&amp;rom=/roms/example.zip</code> — try
+					<code>/test/fixtures/table-empty.vpx</code>
+				</p>
+				<div
+					id="bar"
+					role="progressbar"
+					aria-valuemin="0"
+					aria-valuemax="100"
+					aria-valuenow="0"
+					aria-label="Loading progress"
+				>
+					<div id="bar-fill"></div>
+				</div>
 				<div id="bar-text">Waiting for table…</div>
 				<p id="load-detail"></p>
 				<div class="picker picker--files">
@@ -48,7 +63,10 @@
 			<div id="stream-bar"><div id="stream-fill"></div></div>
 			<span id="stream-text">0%</span>
 		</div>
-		<div id="canvas-wrap"><canvas id="canvas" tabindex="0"></canvas><div id="nudge-flash" hidden></div></div>
+		<div id="canvas-wrap">
+			<canvas id="canvas" tabindex="0"></canvas>
+			<div id="nudge-flash" hidden></div>
+		</div>
 		<div id="nudge-pad" hidden>
 			<button data-nudge="left" aria-label="Nudge left">‹</button>
 			<button data-nudge="center" aria-label="Nudge forward">▲</button>
@@ -74,7 +92,10 @@
 				<button data-close-help aria-label="Close help" type="button">×</button>
 			</div>
 			<div class="help-grid"></div>
-			<div class="help-foot">Touch: tap sides = flippers · tap apron/yellow = fire · swipe = nudge · drag to orbit · wheel to zoom · <kbd>Esc</kbd> back to viewer</div>
+			<div class="help-foot">
+				Touch: tap sides = flippers · tap apron/yellow = fire · swipe = nudge · drag to orbit · wheel to zoom ·
+				<kbd>Esc</kbd> back to viewer
+			</div>
 		</dialog>
 		<script type="module" src="./src/app.js"></script>
 	</body>

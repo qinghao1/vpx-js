@@ -5,7 +5,7 @@ import { createRequire } from 'node:module'
 import { Grammars, type IToken, Parser } from 'ebnf'
 import { generate } from 'escodegen'
 import type { Program, Statement } from 'estree'
-import { getTextFile } from '../../refs.node.js'
+import { getTextFile } from '../../scripting/vbs-scripts.node.js'
 import { logger, progress } from '../../util/logger.js'
 import { program } from '../estree.js'
 import { ppArray } from '../post-process/array.js'
@@ -159,7 +159,7 @@ export class Grammar {
 		const joined: string[] = []
 		let buffer = ''
 		for (let li = 0; li < lines.length; li++) {
-			let line = lines[li]!
+			const line = lines[li]!
 			let out = ''
 			let inStr = false
 			let commentPos = -1
@@ -182,7 +182,7 @@ export class Grammar {
 				out += ch
 			}
 			let content = commentPos >= 0 ? out.slice(0, commentPos) : out
-			let trimmed = content.trimStart()
+			const trimmed = content.trimStart()
 			if (
 				trimmed.length >= 3 &&
 				trimmed.slice(0, 3).toLowerCase() === 'rem' &&
@@ -207,7 +207,6 @@ export class Grammar {
 			if (isCont) {
 				const part = content.slice(0, lastNonWs).trimEnd()
 				buffer = buffer ? buffer + ' ' + part : part
-				continue
 			} else {
 				if (buffer) {
 					content = buffer + ' ' + content
@@ -257,6 +256,33 @@ export class Grammar {
 					res += str
 					prevTokenType = 'Literal'
 					prevTokenText = '"'
+					hadSep = false
+					continue
+				}
+				if (ch === '#') {
+					let dateLit = '#'
+					i++
+					while (i < n) {
+						const c = raw[i]!
+						dateLit += c
+						if (c === '#') {
+							i++
+							break
+						}
+						i++
+					}
+					if (
+						prevTokenType &&
+						(prevTokenType === 'Keyword' ||
+							prevTokenType === 'Identifier' ||
+							prevTokenType === 'Literal' ||
+							prevTokenText === ')')
+					) {
+						res += ' '
+					}
+					res += dateLit
+					prevTokenType = 'Literal'
+					prevTokenText = '#'
 					hadSep = false
 					continue
 				}
@@ -363,7 +389,14 @@ export class Grammar {
 				}
 				if (ch === '.' || ch === '&' || ch === '+') {
 					if (ch === '.') {
-						if (hadSep && prevTokenType && prevTokenType !== 'Operator' && prevTokenText !== ':' && prevTokenType !== 'Colon' && prevTokenType !== 'Separator') {
+						if (
+							hadSep &&
+							prevTokenType &&
+							prevTokenType !== 'Operator' &&
+							prevTokenText !== ':' &&
+							prevTokenType !== 'Colon' &&
+							prevTokenType !== 'Separator'
+						) {
 							res += ' '
 						}
 					}
@@ -384,7 +417,6 @@ export class Grammar {
 					ch === '<' ||
 					ch === '>' ||
 					ch === '!' ||
-					ch === '#' ||
 					ch === '?' ||
 					ch === '{' ||
 					ch === '}'
@@ -403,7 +435,7 @@ export class Grammar {
 						i++
 					}
 					const lower = word.toLowerCase()
-					let std = this.keywordsMap[lower]
+					const std = this.keywordsMap[lower]
 					let type = 'Identifier'
 					let text = word
 					if (std) {

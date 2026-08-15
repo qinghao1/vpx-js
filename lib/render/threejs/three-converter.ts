@@ -1,8 +1,8 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
+import { type BufferGeometry, Group, type Object3D, type PointLight, Mesh as ThreeMesh } from 'three'
 import type { IRenderable, RenderInfo } from '../../game/irenderable.js'
-import { type BufferGeometry, Group, type Object3D, type PointLight, Mesh as ThreeMesh } from '../../refs.node.js'
 import type { ItemState } from '../../vpt/item-state.js'
 import type { Table, TableGenerateOptions } from '../../vpt/table/table.js'
 import type { IRenderApi, MeshConvertOptions } from '../irender-api.js'

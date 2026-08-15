@@ -218,7 +218,12 @@ export async function getWasmKernels(): Promise<Mod> {
 	loading = (async () => {
 		const candidates: string[] = []
 		try {
-			const origin = typeof location !== 'undefined' && location.origin ? location.origin : typeof window !== 'undefined' && (window as any).location?.origin ? (window as any).location.origin : ''
+			const origin =
+				typeof location !== 'undefined' && location.origin
+					? location.origin
+					: typeof window !== 'undefined' && (window as any).location?.origin
+						? (window as any).location.origin
+						: ''
 			if (origin) candidates.push(origin + '/wasm/dist/kernels.js')
 			else candidates.push('/wasm/dist/kernels.js')
 		} catch {

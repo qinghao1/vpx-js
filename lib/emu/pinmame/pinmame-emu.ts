@@ -66,7 +66,11 @@ export class PinMameEmulator implements IEmulator {
 			logger().warn('[pinmame] mock — physics only, run npm run build:wasm')
 			return
 		}
-		const c = module.cwrap.bind(module) as (id: string, rt: string | null, at: string[]) => (...a: unknown[]) => unknown
+		const c = module.cwrap.bind(module) as (
+			id: string,
+			rt: string | null,
+			at: string[],
+		) => (...a: unknown[]) => unknown
 		const b = (id: string, rt: string | null, at: string[]) => c(id, rt, at) as unknown
 		this.api = {
 			setConfig: b('PinmameSetConfig', null, ['number']) as Api['setConfig'],
@@ -214,7 +218,9 @@ export class PinMameEmulator implements IEmulator {
 			this.queue.addMessage(MessageType.SetTimeFence, time)
 			return
 		}
-		try { this.api.setTimeFence(time) } catch {}
+		try {
+			this.api.setTimeFence(time)
+		} catch {}
 	}
 
 	private sync(): void {

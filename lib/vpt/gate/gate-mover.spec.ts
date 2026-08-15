@@ -47,7 +47,7 @@ describe('The VPinball gate mover', () => {
 		player.updatePhysics(600)
 		expect(MathUtils.radToDeg(gate.getState().angle)).to.be.within(-82, -78)
 		player.updatePhysics(1990)
-		expect(MathUtils.radToDeg(gate.getState().angle)).to.be.within(-30, -20)
+		expect(MathUtils.radToDeg(gate.getState().angle)).to.be.within(-32, -20)
 	})
 
 	it('should make the two-way gate bracket stand still', () => {

@@ -125,7 +125,10 @@ export default defineConfig({
 					res.setHeader('Content-Length', String(fs.statSync(file).size))
 					res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin')
 					res.setHeader('Access-Control-Allow-Origin', '*')
-					if (req.method === 'HEAD') { res.end(); return true }
+					if (req.method === 'HEAD') {
+						res.end()
+						return true
+					}
 					fs.createReadStream(file).pipe(res)
 					return true
 				}
@@ -139,16 +142,23 @@ export default defineConfig({
 							resolve(parentRoot, `wasm/dist/${rel}`),
 							resolve(parentRoot, `wasm/mock/${rel}`),
 						]
-						if (rel === 'kernels.js' || rel === 'kernels.wasm') tries.unshift(resolve(parentRoot, `wasm/kernels/dist/${rel}`))
-						for (const f of tries) if (fs.existsSync(f)) {
-							try {
-								const ext = path.extname(f).toLowerCase()
-								const ct = ext === '.wasm' ? 'application/wasm' : ext === '.js' ? 'application/javascript' : 'application/octet-stream'
-								res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp')
-								res.setHeader('Cache-Control', 'no-cache')
-								if (send(res, req, f, ct)) return
-							} catch {}
-						}
+						if (rel === 'kernels.js' || rel === 'kernels.wasm')
+							tries.unshift(resolve(parentRoot, `wasm/kernels/dist/${rel}`))
+						for (const f of tries)
+							if (fs.existsSync(f)) {
+								try {
+									const ext = path.extname(f).toLowerCase()
+									const ct =
+										ext === '.wasm'
+											? 'application/wasm'
+											: ext === '.js'
+												? 'application/javascript'
+												: 'application/octet-stream'
+									res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp')
+									res.setHeader('Cache-Control', 'no-cache')
+									if (send(res, req, f, ct)) return
+								} catch {}
+							}
 					}
 					if (url.startsWith('/test/fixtures/') && url.endsWith('.vpx')) {
 						req.url = '/@fs' + resolve(parentRoot, url.slice(1))
@@ -156,8 +166,16 @@ export default defineConfig({
 					}
 					if (url.endsWith('.zip') && (url.includes('/roms/') || url.includes('/pinmame/'))) {
 						const base = path.basename(url)
-						for (const c of [resolve(__dirname, 'public', url.slice(1)), resolve(__dirname, `public/pinmame/roms/${base}`), resolve(__dirname, `public/roms/${base}`)]) {
-							if (fs.existsSync(c)) { try { if (send(res, req, c, 'application/zip')) return } catch {} }
+						for (const c of [
+							resolve(__dirname, 'public', url.slice(1)),
+							resolve(__dirname, `public/pinmame/roms/${base}`),
+							resolve(__dirname, `public/roms/${base}`),
+						]) {
+							if (fs.existsSync(c)) {
+								try {
+									if (send(res, req, c, 'application/zip')) return
+								} catch {}
+							}
 						}
 					}
 					next()

@@ -1,7 +1,7 @@
 // Copyright (C) 2026 Chu Qinghao — GPL-2.0 — see LICENSE
 
+import { BufferGeometry, Mesh } from 'three'
 import { acceleratedRaycast, computeBoundsTree, disposeBoundsTree } from 'three-mesh-bvh'
-import { BufferGeometry, Mesh } from '../../refs.node.js'
 
 type BvhGeometry = BufferGeometry & {
 	boundsTree?: unknown
@@ -47,7 +47,10 @@ export function buildBvhForNode(root: { traverse(cb: (o: unknown) => void): void
 			name?: string
 		}
 		if ((!m.isMesh && !m.isInstancedMesh && !m.isBatchedMesh) || !m.geometry) return
-		const isButton = !!(m.userData?.isCabinetButton || (m.name && /button|coin|plunger|tour|start|fire/i.test(m.name)))
+		const isButton = !!(
+			m.userData?.isCabinetButton ||
+			(m.name && /button|coin|plunger|tour|start|fire/i.test(m.name))
+		)
 		if (isButton) {
 			buildBvhForGeometry(m.geometry, true)
 			if ((m.geometry as BvhGeometry).boundsTree) built++
@@ -61,15 +64,31 @@ export function buildBvhForNode(root: { traverse(cb: (o: unknown) => void): void
 	return built
 }
 
-export function buildBvhIdle(root: { traverse(cb: (o: unknown) => void): void }, chunkSize = 30, forceButton = true): void {
+export function buildBvhIdle(
+	root: { traverse(cb: (o: unknown) => void): void },
+	chunkSize = 30,
+	forceButton = true,
+): void {
 	installBvh()
 	const queue: BvhGeometry[] = []
 	root.traverse((o: unknown) => {
-		const m = o as { isMesh?: boolean; isInstancedMesh?: boolean; isBatchedMesh?: boolean; geometry?: BvhGeometry; userData?: Record<string, unknown>; name?: string }
+		const m = o as {
+			isMesh?: boolean
+			isInstancedMesh?: boolean
+			isBatchedMesh?: boolean
+			geometry?: BvhGeometry
+			userData?: Record<string, unknown>
+			name?: string
+		}
 		if ((m.isMesh || m.isInstancedMesh || m.isBatchedMesh) && m.geometry && !m.geometry.boundsTree) {
-			const isButton = !!(m.userData?.isCabinetButton || (m.name && /button|coin|plunger|tour|start|fire/i.test(m.name)))
+			const isButton = !!(
+				m.userData?.isCabinetButton ||
+				(m.name && /button|coin|plunger|tour|start|fire/i.test(m.name))
+			)
 			if (isButton) {
-				try { (m.geometry as BvhGeometry).computeBoundsTree?.({ includeInstances: true } as any) } catch {}
+				try {
+					;(m.geometry as BvhGeometry).computeBoundsTree?.({ includeInstances: true } as any)
+				} catch {}
 				return
 			}
 			queue.push(m.geometry)

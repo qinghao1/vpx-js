@@ -14,6 +14,7 @@ export class TextStream {
 	public static readonly MODE_READ = 1
 	public static readonly MODE_WRITE = 2
 	public static readonly MODE_APPEND = 8
+	private readonly filename: string
 	private readonly unicode: boolean
 
 	private buffer: Uint8Array = new Uint8Array(0)

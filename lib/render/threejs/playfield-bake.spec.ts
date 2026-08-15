@@ -1,8 +1,8 @@
 // Copyright (C) 2026 Chu Qinghao — GPL-2.0 — see LICENSE
 import * as chai from 'chai'
 import { expect } from 'chai'
-import * as THREE from 'three'
 import sinonChai from 'sinon-chai'
+import * as THREE from 'three'
 import { postProcessScene } from '../../../demo-browser/src/scene.js'
 
 chai.use((sinonChai as any).default ?? sinonChai)

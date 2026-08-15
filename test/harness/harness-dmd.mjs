@@ -3,7 +3,9 @@ import path from 'node:path'
 import { attachLogging, launchBrowser, loadPuppeteer, newPage } from './utils.mjs'
 
 const puppeteer = await loadPuppeteer()
-const url = process.argv.find(a => a.startsWith('--url='))?.split('=')[1] || 'http://localhost:3000/?vpx=/test/fixtures/table-empty.vpx'
+const url =
+	process.argv.find(a => a.startsWith('--url='))?.split('=')[1] ||
+	'http://localhost:3000/?vpx=/test/fixtures/table-empty.vpx'
 const out = process.argv.find(a => a.startsWith('--out='))?.split('=')[1] || '/tmp'
 console.log(`[harness-dmd] url=${url} out=${out}`)
 const browser = await launchBrowser(puppeteer)

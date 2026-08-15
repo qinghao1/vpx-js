@@ -1,7 +1,7 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { ExtrudeGeometry, type Path, Shape, Vector2 } from '../../refs.node.js'
+import { ExtrudeGeometry, type Path, Shape, Vector2 } from 'three'
 import { SplineVertex } from '../../util/spline-vertex.js'
 import type { LightData } from '../../vpt/light/light-data.js'
 import type { Table } from '../../vpt/table/table.js'
@@ -39,7 +39,8 @@ export class ThreeLightMeshGenerator {
 				},
 			},
 		})
-		if (lightData.szSurface) geo.translate(0, 0, -table.getSurfaceHeight(lightData.szSurface, lightData.center.x, lightData.center.y))
+		if (lightData.szSurface)
+			geo.translate(0, 0, -table.getSurfaceHeight(lightData.szSurface, lightData.center.x, lightData.center.y))
 		geo.name = 'surface.light'
 		return geo
 	}

@@ -69,7 +69,13 @@ export function renderModeHint(hintEl, isPlay) {
 	hintEl.append(dot)
 	const b = document.createElement('b')
 	b.textContent = isPlay ? 'Play' : 'Viewer'
-	hintEl.append(b, textWithClass(' — ', 'sep-muted'), createText(isPlay ? 'Esc to exit' : 'drag to orbit'), textWithClass(' · ', 'sep-muted'), isPlay ? createPlayHintFragment() : createViewerHintFragment())
+	hintEl.append(
+		b,
+		textWithClass(' — ', 'sep-muted'),
+		createText(isPlay ? 'Esc to exit' : 'drag to orbit'),
+		textWithClass(' · ', 'sep-muted'),
+		isPlay ? createPlayHintFragment() : createViewerHintFragment(),
+	)
 }
 
 function textWithClass(txt, cls) {

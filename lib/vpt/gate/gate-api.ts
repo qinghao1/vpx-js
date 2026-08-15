@@ -89,13 +89,13 @@ export class GateApi extends ItemApi<GateData> {
 		this.state.showBracket = v
 	}
 	get CloseAngle() {
-		return MathUtils.radToDeg(this.mover.angleMin)
+		return Math.round(MathUtils.radToDeg(this.mover.angleMin) * 1e5) / 1e5
 	}
 	set CloseAngle(v) {
 		this.setCloseAngle(v)
 	}
 	get OpenAngle() {
-		return MathUtils.radToDeg(this.mover.angleMax)
+		return Math.round(MathUtils.radToDeg(this.mover.angleMax) * 1e5) / 1e5
 	}
 	set OpenAngle(v) {
 		this.setOpenAngle(v)

@@ -79,7 +79,8 @@ const isDeferred = (tx: any, tbl: Table) => {
 	const n = tx.getName().toLowerCase()
 	const pf = tbl.getPlayfieldMap().toLowerCase()
 	if (n === pf) return false
-	if (n.includes('nestmap') || n.includes('bake') || n.includes('playfield') || n === 'blueprintsv2noramps') return false
+	if (n.includes('nestmap') || n.includes('bake') || n.includes('playfield') || n === 'blueprintsv2noramps')
+		return false
 	const p = (tx.szPath || '').toLowerCase()
 	if (p.endsWith('.exr') || p.endsWith('.hdr') || (tx as any).isHdr?.()) return true
 	return tx.width * tx.height > 1_048_576
@@ -111,7 +112,7 @@ try {
 } catch (e: any) {
 	console.warn(`generateTableNode failed: ${e.message?.slice(0, 500)}`)
 }
-let renderMs = performance.now() - t
+const renderMs = performance.now() - t
 push('Three.generateTableNode', renderMs)
 {
 	let tris = 0
@@ -180,7 +181,9 @@ if (node) {
 				}
 				const tex = (m as any)[k]
 				if (tex?.name) {
-					const key = String(tex.name).replace(/^texture:/, '').toLowerCase()
+					const key = String(tex.name)
+						.replace(/^texture:/, '')
+						.toLowerCase()
 					used.add(key)
 					if (isMainBake) mainBakeUsed.add(key)
 				}
@@ -217,8 +220,10 @@ if (node) {
 		const aMain = mainBakeUsed.has(aN) ? 0 : 1
 		const bMain = mainBakeUsed.has(bN) ? 0 : 1
 		if (aMain !== bMain) return aMain - bMain
-		const aCab = aN.includes('vrcab') || aN.includes('vr_') || aN.includes('lockbar') || aN.includes('cabinet') ? 0 : 1
-		const bCab = bN.includes('vrcab') || bN.includes('vr_') || bN.includes('lockbar') || bN.includes('cabinet') ? 0 : 1
+		const aCab =
+			aN.includes('vrcab') || aN.includes('vr_') || aN.includes('lockbar') || aN.includes('cabinet') ? 0 : 1
+		const bCab =
+			bN.includes('vrcab') || bN.includes('vr_') || bN.includes('lockbar') || bN.includes('cabinet') ? 0 : 1
 		if (aCab !== bCab) return aCab - bCab
 		if (aMain === 0) return b.width * b.height - a.width * a.height
 		if (aCab === 0) return b.width * b.height - a.width * a.height
@@ -228,7 +233,8 @@ if (node) {
 	console.log(
 		` Textures all=${totalTex} high=${high.length} deferred=${deferred.length} filtered=${filteredCount} used=${usedSize} mainBake=${mainBakeSize} raw=${(totalBytesRaw / 1048576).toFixed(1)}MB pf=${pfMap || 'none'}`,
 	)
-	if (before !== filteredCount) console.log(` Filtered ${before} → ${filteredCount} (kept inserts, removed unused nestmaps)`)
+	if (before !== filteredCount)
+		console.log(` Filtered ${before} → ${filteredCount} (kept inserts, removed unused nestmaps)`)
 }
 const texMemMB = (textures.reduce((s, tx) => s + tx.width * tx.height * 4, 0) / 1048576).toFixed(1)
 console.log(` Streaming ${textures.length} textures ~${texMemMB} MB decoded estimate (filtered)`)
@@ -257,7 +263,11 @@ if (textures.length) {
 }
 let preloadAllMs = 0
 if (process.argv.includes('--preload-all') && allTex.length) {
-	const api2 = new ThreeRenderApi({ applyMaterials: true, applyTextures: new ThreeTextureLoaderNode() as any, optimizeTextures: false })
+	const api2 = new ThreeRenderApi({
+		applyMaterials: true,
+		applyTextures: new ThreeTextureLoaderNode() as any,
+		optimizeTextures: false,
+	})
 	await table.generateTableNode(api2 as any, { ...genOpts, preloadTextures: false } as any)
 	const s2 = performance.now()
 	await api2.preloadTextures(allTex, table)

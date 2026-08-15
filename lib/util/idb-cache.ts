@@ -8,8 +8,12 @@ function openDB(): Promise<IDBDatabase> {
 		const req = indexedDB.open(DB_NAME, DB_VERSION)
 		req.onupgradeneeded = () => {
 			const db = req.result
-			try { db.deleteObjectStore('textures') } catch {}
-			try { db.deleteObjectStore(STORE) } catch {}
+			try {
+				db.deleteObjectStore('textures')
+			} catch {}
+			try {
+				db.deleteObjectStore(STORE)
+			} catch {}
 			db.createObjectStore(STORE)
 		}
 		req.onsuccess = () => resolve(req.result)

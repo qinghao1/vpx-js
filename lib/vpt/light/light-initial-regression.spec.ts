@@ -22,8 +22,44 @@ describe('regression: light initial intensity not dark', () => {
 		const table = new TableBuilder().build()
 		const t = table as any
 		t.lights = {
-			a: { data: { bulbLight: true, showBulbMesh: false, meshRadius: 20, state: 1, intensity: 5, rgBlinkPattern: '10', isOn() { return true } }, isBulbLight() { return false }, getName() { return 'a' } },
-			b: { data: { bulbLight: true, showBulbMesh: false, meshRadius: 20, state: 0, intensity: 5, rgBlinkPattern: '10', isOn() { return false } }, isBulbLight() { return false }, getName() { return 'b' } },
+			a: {
+				data: {
+					bulbLight: true,
+					showBulbMesh: false,
+					meshRadius: 20,
+					state: 1,
+					intensity: 5,
+					rgBlinkPattern: '10',
+					isOn() {
+						return true
+					},
+				},
+				isBulbLight() {
+					return false
+				},
+				getName() {
+					return 'a'
+				},
+			},
+			b: {
+				data: {
+					bulbLight: true,
+					showBulbMesh: false,
+					meshRadius: 20,
+					state: 0,
+					intensity: 5,
+					rgBlinkPattern: '10',
+					isOn() {
+						return false
+					},
+				},
+				isBulbLight() {
+					return false
+				},
+				getName() {
+					return 'b'
+				},
+			},
 		}
 		const lights = Object.values(t.lights) as any[]
 		const bright = lights.filter(l => l.data.isOn())

@@ -181,25 +181,39 @@ if (!noTextures) {
 			const n = tx.getName().toLowerCase()
 			const pf = tbl.getPlayfieldMap().toLowerCase()
 			if (n === pf) return false
-			if (n.includes('nestmap') || n.includes('bake') || n.includes('playfield') || n === 'blueprintsv2noramps') return false
+			if (n.includes('nestmap') || n.includes('bake') || n.includes('playfield') || n === 'blueprintsv2noramps')
+				return false
 			const p = (tx.szPath || '').toLowerCase()
 			if (p.endsWith('.exr') || p.endsWith('.hdr') || (tx as any).isHdr?.()) return true
 			return tx.width * tx.height > 1048576
 		}
 		const RE_BAKE_MAP = /bake|nestmap/i
 		const tPre0 = performance.now()
-		const node2: any = await (table as any).generateTableNode(api2 as any, { ...genOpts2, preloadTextures: false } as any)
+		const node2: any = await (table as any).generateTableNode(
+			api2 as any,
+			{ ...genOpts2, preloadTextures: false } as any,
+		)
 		const gen2Ms = Math.round(performance.now() - tPre0)
 		console.log(` Three.generateTableNode ${gen2Ms}ms (for preload)`)
-		let all: any[] = Object.values((table as any).textures)
-		let textures: any[] = [...all.filter((tx: any) => !isDeferred(tx, table)), ...all.filter((tx: any) => isDeferred(tx, table))]
+		const all: any[] = Object.values((table as any).textures)
+		let textures: any[] = [
+			...all.filter((tx: any) => !isDeferred(tx, table)),
+			...all.filter((tx: any) => isDeferred(tx, table)),
+		]
 		textures.sort((a: any, b: any) => a.width * a.height - b.width * b.height)
 		const pfMap = (() => {
-			try { return (table as any).getPlayfieldMap().toLowerCase() } catch { return '' }
+			try {
+				return (table as any).getPlayfieldMap().toLowerCase()
+			} catch {
+				return ''
+			}
 		})()
 		if (pfMap) {
 			const idx = textures.findIndex((tx: any) => tx.getName().toLowerCase() === pfMap)
-			if (idx > 0) { const [pfTx] = textures.splice(idx, 1); textures.unshift(pfTx) }
+			if (idx > 0) {
+				const [pfTx] = textures.splice(idx, 1)
+				textures.unshift(pfTx)
+			}
 		}
 		if (node2) {
 			const used = new Set<string>()
@@ -213,14 +227,35 @@ if (!noTextures) {
 					for (const k of ['map', 'normalMap', 'envMap', 'emissiveMap'] as const) {
 						const pk = `pending${k[0].toUpperCase()}${k.slice(1)}`
 						const pending = (m as any).userData?.[pk]
-						if (pending) { const key = String(pending).toLowerCase(); used.add(key); if (isMainBake) mainBakeUsed.add(key) }
+						if (pending) {
+							const key = String(pending).toLowerCase()
+							used.add(key)
+							if (isMainBake) mainBakeUsed.add(key)
+						}
 						const tex = (m as any)[k]
-						if (tex?.name) { const key = String(tex.name).replace(/^texture:/, '').toLowerCase(); used.add(key); if (isMainBake) mainBakeUsed.add(key) }
+						if (tex?.name) {
+							const key = String(tex.name)
+								.replace(/^texture:/, '')
+								.toLowerCase()
+							used.add(key)
+							if (isMainBake) mainBakeUsed.add(key)
+						}
 					}
 				}
 			})
 			const before = textures.length
-			const keepAllInserts = (n: string) => n.includes('insert') || n.includes('round') || n.includes('rect') || n.includes('switc') || n.includes('vrlight') || n.includes('flasher') || n.includes('scratches') || n.includes('ball_') || n.includes('bumper') || n.includes('kicker') || n.includes('bump')
+			const keepAllInserts = (n: string) =>
+				n.includes('insert') ||
+				n.includes('round') ||
+				n.includes('rect') ||
+				n.includes('switc') ||
+				n.includes('vrlight') ||
+				n.includes('flasher') ||
+				n.includes('scratches') ||
+				n.includes('ball_') ||
+				n.includes('bumper') ||
+				n.includes('kicker') ||
+				n.includes('bump')
 			textures = textures.filter((tx: any) => {
 				const n = tx.getName().toLowerCase()
 				if (used.has(n) || (pfMap && n === pfMap)) return true
@@ -229,18 +264,28 @@ if (!noTextures) {
 				return false
 			})
 			textures.sort((a: any, b: any) => {
-				const aN = a.getName().toLowerCase(), bN = b.getName().toLowerCase()
+				const aN = a.getName().toLowerCase(),
+					bN = b.getName().toLowerCase()
 				if (aN === pfMap && bN !== pfMap) return -1
 				if (bN === pfMap && aN !== pfMap) return 1
-				const aMain = mainBakeUsed.has(aN) ? 0 : 1, bMain = mainBakeUsed.has(bN) ? 0 : 1
+				const aMain = mainBakeUsed.has(aN) ? 0 : 1,
+					bMain = mainBakeUsed.has(bN) ? 0 : 1
 				if (aMain !== bMain) return aMain - bMain
-				const aCab = aN.includes('vrcab') || aN.includes('vr_') || aN.includes('lockbar') || aN.includes('cabinet') ? 0 : 1
-				const bCab = bN.includes('vrcab') || bN.includes('vr_') || bN.includes('lockbar') || bN.includes('cabinet') ? 0 : 1
+				const aCab =
+					aN.includes('vrcab') || aN.includes('vr_') || aN.includes('lockbar') || aN.includes('cabinet')
+						? 0
+						: 1
+				const bCab =
+					bN.includes('vrcab') || bN.includes('vr_') || bN.includes('lockbar') || bN.includes('cabinet')
+						? 0
+						: 1
 				if (aCab !== bCab) return aCab - bCab
 				return a.width * a.height - b.width * b.height
 			})
 			filteredTexCount = textures.length
-			console.log(` Textures filtered ${before} → ${filteredTexCount} used=${used.size} mainBake=${mainBakeUsed.size}`)
+			console.log(
+				` Textures filtered ${before} → ${filteredTexCount} used=${used.size} mainBake=${mainBakeUsed.size}`,
+			)
 		}
 		const tP = performance.now()
 		await (api2 as any).preloadTextures(textures, table)
@@ -248,7 +293,11 @@ if (!noTextures) {
 		console.log(` Three.preloadTextures (filtered) ${preloadFilteredMs}ms — ${textures.length} tex`)
 		if (process.argv.includes('--preload-all')) {
 			const tPA = performance.now()
-			const apiAll = new Api2({ applyMaterials: true, applyTextures: new ThreeTextureLoaderNode() as any, optimizeTextures: false })
+			const apiAll = new Api2({
+				applyMaterials: true,
+				applyTextures: new ThreeTextureLoaderNode() as any,
+				optimizeTextures: false,
+			})
 			await (table as any).generateTableNode(apiAll as any, { ...genOpts2, preloadTextures: false } as any)
 			await (apiAll as any).preloadTextures(all, table)
 			preloadMs = Math.round(performance.now() - tPA)

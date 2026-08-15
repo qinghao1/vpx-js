@@ -120,7 +120,11 @@ export class PrimitiveMeshGenerator {
 	}
 
 	private getMatrix(table: Table): Matrix3D {
-		const rt = new Matrix3D().setTranslation(this.data.rotAndTra[3]!, this.data.rotAndTra[4]!, this.data.rotAndTra[5]!)
+		const rt = new Matrix3D().setTranslation(
+			this.data.rotAndTra[3]!,
+			this.data.rotAndTra[4]!,
+			this.data.rotAndTra[5]!,
+		)
 		rt.multiply(new Matrix3D().rotateZMatrix(MathUtils.degToRad(this.data.rotAndTra[2]!)))
 		rt.multiply(new Matrix3D().rotateYMatrix(MathUtils.degToRad(this.data.rotAndTra[1]!)))
 		rt.multiply(new Matrix3D().rotateXMatrix(MathUtils.degToRad(this.data.rotAndTra[0]!)))

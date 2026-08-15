@@ -6,18 +6,360 @@ import type { IAnimatable, IAnimation } from '../../game/ianimatable.js'
 import type { IRenderable, Meshes } from '../../game/irenderable.js'
 import type { IScriptable } from '../../game/iscriptable.js'
 import type { Player } from '../../game/player.js'
+import { BiffParser } from '../../io/biff-parser.js'
 import type { Storage } from '../../io/ole-doc.js'
 import type { IRenderApi } from '../../render/irender-api.js'
 import { Matrix3D } from '../../util/matrix.js'
+import { Vertex2D } from '../../util/vector.js'
+import { handleBiffTag } from '../biff-helper.js'
+import { DragPoint } from '../dragpoint.js'
+import { Enums } from '../enums.js'
 import { Item } from '../item.js'
+import { ItemApi } from '../item-api.js'
+import { ItemData } from '../item-data.js'
+import { ItemState } from '../item-state.js'
 import { Material } from '../material.js'
 import type { Table } from '../table/table.js'
-import { LightAnimation } from './light-animation.js'
-import { LightApi } from './light-api.js'
-import { LightData } from './light-data.js'
-import { LightMeshGenerator } from './light-mesh-generator.js'
-import { LightState } from './light-state.js'
-import { LightUpdater } from './light-updater.js'
+import { LightAnimation } from './light-physics.js'
+import { LightMeshGenerator, LightUpdater } from './light-view.js'
+
+const FLOAT_MAP: Record<string, string> = {
+	HGHT: 'height',
+	RADI: 'falloff',
+	FAPO: 'falloffPower',
+	BWTH: 'intensity',
+	TRMS: 'transmissionScale',
+	LIDB: 'depthBias',
+	FASP: 'fadeSpeedUp',
+	FASD: 'fadeSpeedDown',
+	BMSC: 'meshRadius',
+	BMVA: 'bulbModulateVsAdd',
+	BHHI: 'bulbHaloHeight',
+	STTF: 'state',
+}
+const INT_MAP: Record<string, string> = { STAT: 'state', BINT: 'blinkInterval', SHDW: 'shadows', FADE: 'fader' }
+const BOOL_MAP: Record<string, string> = {
+	SHAP: 'roundLight',
+	BGLS: 'isBackglass',
+	BULT: 'bulbLight',
+	IMMO: 'imageMode',
+	SHBM: 'showBulbMesh',
+	STBM: 'staticBulbMesh',
+	SHRB: 'showReflectionOnBall',
+	VSBL: 'isVisible',
+}
+const STRING_MAP: Record<string, string> = { IMG1: 'szOffImage', BPAT: 'rgBlinkPattern', SURF: 'szSurface' }
+
+/** Light data.
+ * @see https://github.com/vpinball/vpinball/blob/master/light.cpp */
+export class LightData extends ItemData {
+	public center!: Vertex2D
+	public falloff = 50
+	public falloffPower = 2
+	public state: number = Enums.LightStatus.LightStateOff
+	public color = 0x57a9ff // RGB(255,169,87) 2700K
+	public color2 = 0x57a9ff
+	public szOffImage?: string
+	public roundLight = false
+	public rgBlinkPattern = '10'
+	public blinkInterval = 125
+	public intensity = 10
+	public transmissionScale = 0
+	public szSurface?: string
+	public isBackglass = false
+	public depthBias?: number
+	public fadeSpeedUp = 0.05
+	public fadeSpeedDown = 0.02
+	public bulbLight = false
+	public imageMode = false
+	public showBulbMesh = false
+	public staticBulbMesh = true
+	public showReflectionOnBall = true
+	public meshRadius = 20
+	public bulbModulateVsAdd = 0.9
+	public bulbHaloHeight = 28
+	public height = 0
+	public shadows = 0 // ShadowMode::NONE
+	public fader = 0 // Fader::LINEAR
+	public dragPoints: DragPoint[] = []
+	public isVisible = true
+
+	public static async fromStorage(storage: Storage, itemName: string): Promise<LightData> {
+		const d = new LightData(itemName)
+		await storage.streamFiltered(itemName, 4, LightData.createStreamHandler(d))
+		return d
+	}
+
+	private static createStreamHandler(d: LightData) {
+		d.dragPoints = []
+		return BiffParser.stream(d.fromTag.bind(d), {
+			nestedTags: {
+				DPNT: {
+					onStart: () => new DragPoint(),
+					onTag: dp => dp.fromTag.bind(dp),
+					onEnd: dp => d.dragPoints.push(dp),
+				},
+			},
+		})
+	}
+
+	public constructor(itemName: string) {
+		super(itemName)
+	}
+
+	public isOn(): boolean {
+		if (this.state === Enums.LightStatus.LightStateOff) return false
+		if (this.state === Enums.LightStatus.LightStateBlinking) return this.rgBlinkPattern?.[0] === '1'
+		return this.state === Enums.LightStatus.LightStateOn
+	}
+
+	public isBulbLight(): boolean {
+		return this.showBulbMesh && this.meshRadius > 0
+	}
+
+	public isPlayfieldLight(table: Table): boolean {
+		return this.isSurfaceLight(table) && !this.isOnSurface(table)
+	}
+
+	private isOnSurface(table: Table): boolean {
+		return !!this.szSurface && !!table.surfaces[this.szSurface]
+	}
+
+	public isSurfaceLight(table: Table): boolean {
+		if (!this.szOffImage || this.bulbLight) return false
+		if (table.getPlayfieldMap()?.toLowerCase() === this.szOffImage.toLowerCase() && this.dragPoints.length > 2)
+			return true
+		if (Object.values(table.surfaces).some(s => s.image === this.szOffImage)) return true
+		return Object.values(table.lights).filter(l => l.offImage === this.szOffImage).length > 3
+	}
+
+	private async fromTag(buffer: Uint8Array, tag: string, _offset: number, len: number): Promise<number> {
+		if (tag === 'VCEN') {
+			this.center = Vertex2D.get(buffer)
+			return 0
+		}
+		if (tag === 'COLR') {
+			this.color = BiffParser.bgrToRgb(this.getInt(buffer))
+			return 0
+		}
+		if (tag === 'COL2') {
+			this.color2 = BiffParser.bgrToRgb(this.getInt(buffer))
+			return 0
+		}
+		if (
+			handleBiffTag(this, tag, buffer, len, {
+				float: FLOAT_MAP,
+				int: INT_MAP,
+				bool: BOOL_MAP,
+				string: STRING_MAP,
+			})
+		)
+			return 0
+		this.getCommonBlock(buffer, tag, len)
+		return 0
+	}
+}
+
+/** Light state. @see https://github.com/vpinball/vpinball/blob/master/light.cpp */
+export class LightState extends ItemState {
+	public intensity = 0
+	public color: number = 0
+	public colorFull: number = 0
+
+	public static claim(name: string, intensity: number, color: number, colorFull: number): LightState {
+		const state = new LightState()
+		state.name = name
+		state.intensity = intensity
+		state.color = color
+		state.colorFull = colorFull
+		return state
+	}
+}
+
+/** Light API — VBS surface for `Light`. @see https://github.com/vpinball/vpinball/blob/master/light.cpp */
+export class LightApi extends ItemApi<LightData> {
+	constructor(
+		private readonly state: LightState,
+		private readonly animation: LightAnimation,
+		data: LightData,
+		events: EventProxy,
+		player: Player,
+		table: Table,
+	) {
+		super(data, events, player, table)
+	}
+
+	get Falloff() {
+		return this.data.falloff
+	}
+	set Falloff(v) {
+		if (v > 0) this.data.falloff = v
+	}
+	get FalloffPower() {
+		return this.data.falloffPower
+	}
+	set FalloffPower(v) {
+		this.data.falloffPower = v
+	}
+	get State() {
+		return this.animation.lockedByLS ? this.data.state : this.animation.realState
+	}
+	set State(v) {
+		/* istanbul ignore next: No light sequences yet */
+		if (!this.animation.lockedByLS) this.animation.setState(v, this.player.getPhysics())
+		this.data.state = v
+	}
+	get Color() {
+		return this.state.color
+	}
+	set Color(v) {
+		this.state.color = v
+	}
+	get ColorFull() {
+		return this.state.colorFull
+	}
+	set ColorFull(v) {
+		this.state.colorFull = v
+	}
+	get X() {
+		return this.data.center.x
+	}
+	set X(v) {
+		this.data.center.x = v
+	}
+	get Y() {
+		return this.data.center.y
+	}
+	set Y(v) {
+		this.data.center.y = v
+	}
+	get BlinkPattern() {
+		return this.data.rgBlinkPattern
+	}
+	set BlinkPattern(v) {
+		this.data.rgBlinkPattern = v || '0'
+		this.animation.restartBlinker(this.player.getPhysics().timeMsec)
+	}
+	get BlinkInterval() {
+		return this.data.blinkInterval
+	}
+	set BlinkInterval(v) {
+		this.data.blinkInterval = v
+		this.animation.timeNextBlink = this.player.getPhysics().timeMsec + this.data.blinkInterval
+	}
+	get Intensity() {
+		return this.data.intensity
+	}
+	set Intensity(v) {
+		this.data.intensity = Math.max(0, v)
+		this.animation.updateIntensity()
+	}
+	get TransmissionScale() {
+		return this.data.transmissionScale
+	}
+	set TransmissionScale(v) {
+		this.data.transmissionScale = Math.max(0, v)
+	}
+	get IntensityScale() {
+		return this.animation.intensityScale
+	}
+	set IntensityScale(v) {
+		this.animation.intensityScale = v
+		this.animation.updateIntensity()
+	}
+	get Surface() {
+		return this.data.szSurface
+	}
+	set Surface(v) {
+		this.data.szSurface = v
+	}
+	get Image() {
+		return this.data.szOffImage
+	}
+	set Image(v) {
+		this.data.szOffImage = v
+	}
+	get DepthBias() {
+		return this.data.depthBias
+	}
+	set DepthBias(v) {
+		this.data.depthBias = v
+	}
+	get FadeSpeedUp() {
+		return this.data.fadeSpeedUp
+	}
+	set FadeSpeedUp(v) {
+		this.data.fadeSpeedUp = v
+	}
+	get FadeSpeedDown() {
+		return this.data.fadeSpeedDown
+	}
+	set FadeSpeedDown(v) {
+		this.data.fadeSpeedDown = v
+	}
+	get Bulb() {
+		return this.data.bulbLight
+	}
+	set Bulb(v) {
+		this.data.bulbLight = v
+	}
+	get ImageMode() {
+		return this.data.imageMode
+	}
+	set ImageMode(v) {
+		this.data.imageMode = v
+	}
+	get ShowBulbMesh() {
+		return this.data.showBulbMesh
+	}
+	set ShowBulbMesh(v) {
+		this.data.showBulbMesh = v
+	}
+	get StaticBulbMesh() {
+		return this.data.staticBulbMesh
+	}
+	set StaticBulbMesh(v) {
+		this.data.staticBulbMesh = v
+	}
+	get ShowReflectionOnBall() {
+		return this.data.showReflectionOnBall
+	}
+	set ShowReflectionOnBall(v) {
+		this.data.showReflectionOnBall = v
+	}
+	get ScaleBulbMesh() {
+		return this.data.meshRadius
+	}
+	set ScaleBulbMesh(v) {
+		this.data.meshRadius = v
+	}
+	get BulbModulateVsAdd() {
+		return this.data.bulbModulateVsAdd
+	}
+	set BulbModulateVsAdd(v) {
+		this.data.bulbModulateVsAdd = v
+	}
+	get BulbHaloHeight() {
+		return this.data.bulbHaloHeight
+	}
+	set BulbHaloHeight(v) {
+		this.data.bulbHaloHeight = v
+	}
+	get Visible() {
+		return this.data.isVisible
+	}
+	set Visible(v) {
+		this.data.isVisible = v
+	}
+
+	public Duration(startState: number, duration: number, endState: number): void {
+		this.animation.setDuration(startState, duration, endState, this.player.getPhysics().timeMsec)
+	}
+
+	protected _getPropertyNames(): string[] {
+		return Object.getOwnPropertyNames(LightApi.prototype)
+	}
+}
 
 /** Light item. @see https://github.com/vpinball/vpinball/blob/master/light.cpp */
 export class Light extends Item<LightData> implements IRenderable<LightState>, IAnimatable, IScriptable<LightApi> {
@@ -49,7 +391,7 @@ export class Light extends Item<LightData> implements IRenderable<LightState>, I
 		return new Light(data)
 	}
 
-	private constructor(data: LightData) {
+	public constructor(data: LightData) {
 		super(data)
 		const initialIntensity = (() => {
 			const st = data.state

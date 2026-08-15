@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
 import * as fs from 'node:fs'
+import { describe, expect, it } from 'vitest'
 import { TableBuilder } from '../../test/table-builder.js'
 import { Player } from '../game/player.js'
 import { Transpiler } from './transpiler.js'
@@ -22,7 +22,12 @@ describe('regression: transpiler must always use worker (no fallback)', () => {
 		const vbs = 'MyFlipper.Y = 123\nx = MyFlipper.Y\n'
 		const sync = new Transpiler(table, player).transpile(vbs, 'play', 'global')
 		const td = getTableDataForWorker(table, player)
-		const viaWorkerCore = await transpileInWorker({ vbs, globalFunction: 'play', globalObject: 'global', tableData: td })
+		const viaWorkerCore = await transpileInWorker({
+			vbs,
+			globalFunction: 'play',
+			globalObject: 'global',
+			tableData: td,
+		})
 		expect(viaWorkerCore).toEqual(sync)
 	})
 

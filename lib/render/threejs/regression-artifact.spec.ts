@@ -344,11 +344,22 @@ describe('regression: artifact harness', () => {
 					if (mat.polygonOffset) {
 						const isOverlay = o.name.toLowerCase().includes('lm_')
 						if (isOverlay) {
-							expect(mat.polygonOffsetFactor, `polygonOffsetFactor on overlay ${o.name} must be -2`).to.equal(-2)
-							expect(mat.polygonOffsetUnits, `polygonOffsetUnits on overlay ${o.name} must be -4`).to.equal(-4)
+							expect(
+								mat.polygonOffsetFactor,
+								`polygonOffsetFactor on overlay ${o.name} must be -2`,
+							).to.equal(-2)
+							expect(
+								mat.polygonOffsetUnits,
+								`polygonOffsetUnits on overlay ${o.name} must be -4`,
+							).to.equal(-4)
 						} else {
-							expect(mat.polygonOffsetFactor, `polygonOffsetFactor on main ${o.name} must be -1`).to.equal(-1)
-							expect(mat.polygonOffsetUnits, `polygonOffsetUnits on main ${o.name} must be -1`).to.equal(-1)
+							expect(
+								mat.polygonOffsetFactor,
+								`polygonOffsetFactor on main ${o.name} must be -1`,
+							).to.equal(-1)
+							expect(mat.polygonOffsetUnits, `polygonOffsetUnits on main ${o.name} must be -1`).to.equal(
+								-1,
+							)
 						}
 					}
 				}

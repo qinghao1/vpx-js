@@ -53,21 +53,36 @@ export class Player extends EventEmitter {
 	}
 
 	private runScript(scope: Record<string, unknown>, async: boolean): Promise<void> | void {
-		const t = this.table as unknown as { runTableScriptAsync?: (p: Player, s: Record<string, unknown>) => Promise<void> }
-		return async && t.runTableScriptAsync ? t.runTableScriptAsync(this, scope) : this.table.runTableScript(this, scope)
+		const t = this.table as unknown as {
+			runTableScriptAsync?: (p: Player, s: Record<string, unknown>) => Promise<void>
+		}
+		return async && t.runTableScriptAsync
+			? t.runTableScriptAsync(this, scope)
+			: this.table.runTableScript(this, scope)
 	}
 
-	private finishInit(): void { this.table.broadcastInit(); this.isInitialized = true }
+	private finishInit(): void {
+		this.table.broadcastInit()
+		this.isInitialized = true
+	}
 	public init(scope: Record<string, unknown> = {}): this {
 		this.prepareTable()
-		try { this.runScript(scope, false) } catch (e) { logger().warn('Table script failed %s', (e as Error).message) }
+		try {
+			this.runScript(scope, false)
+		} catch (e) {
+			logger().warn('Table script failed %s', (e as Error).message)
+		}
 		this.finishInit()
 		return this
 	}
 	public async initAsync(scope: Record<string, unknown> = {}): Promise<this> {
 		this.prepareTable()
 		await new Promise(r => setTimeout(r, 0))
-		try { await this.runScript(scope, true) } catch (e) { logger().warn('Table script failed %s', (e as Error).message) }
+		try {
+			await this.runScript(scope, true)
+		} catch (e) {
+			logger().warn('Table script failed %s', (e as Error).message)
+		}
 		this.finishInit()
 		return this
 	}
@@ -92,20 +107,36 @@ export class Player extends EventEmitter {
 		}
 	}
 
-	public updatePhysics(dTime?: number): number { return this.physics.updatePhysics(dTime) }
-	public onFrame(): ChangedStates<ItemState> { this.updateAnimations(this.physics.timeMsec); return this.popStates() }
-	public updateAnimations(timeMs: number): void { for (const a of this.table.getAnimatables()) a.getAnimation().updateAnimation(timeMs, this.table) }
+	public updatePhysics(dTime?: number): number {
+		return this.physics.updatePhysics(dTime)
+	}
+	public onFrame(): ChangedStates<ItemState> {
+		this.updateAnimations(this.physics.timeMsec)
+		return this.popStates()
+	}
+	public updateAnimations(timeMs: number): void {
+		for (const a of this.table.getAnimatables()) a.getAnimation().updateAnimation(timeMs, this.table)
+	}
 	public popStates(): ChangedStates<ItemState> {
 		const changed = ChangedStates.claim()
 		for (const name of Object.keys(this.currentStates)) {
-			const next = this.currentStates[name]!, prev = this.previousStates[name]!
-			if (!next.equals(prev)) { changed.setState(name, next.diff(prev)); prev.release(); this.previousStates[name] = next.clone() }
+			const next = this.currentStates[name]!,
+				prev = this.previousStates[name]!
+			if (!next.equals(prev)) {
+				changed.setState(name, next.diff(prev))
+				prev.release()
+				this.previousStates[name] = next.clone()
+			}
 		}
 		return changed
 	}
 
-	public onKeyUp(e: { code: string; key: string; ts: number }): void { this.pinInput.onKeyUp(keyEventToDirectInputKey(e), e.ts) }
-	public onKeyDown(e: { code: string; key: string; ts: number }): void { this.pinInput.onKeyDown(keyEventToDirectInputKey(e), e.ts) }
+	public onKeyUp(e: { code: string; key: string; ts: number }): void {
+		this.pinInput.onKeyUp(keyEventToDirectInputKey(e), e.ts)
+	}
+	public onKeyDown(e: { code: string; key: string; ts: number }): void {
+		this.pinInput.onKeyDown(keyEventToDirectInputKey(e), e.ts)
+	}
 
 	public createBall(creator: IBallCreationPosition, radius = 25, mass = 1): Ball {
 		const ball = this.physics.createBall(creator, this, radius, mass)
@@ -149,17 +180,45 @@ export class Player extends EventEmitter {
 	public setGravity(slopeDeg: number, strength: number): void {
 		this.physics.setGravity(slopeDeg, strength)
 	}
-	public setEmulator(emu: IEmulator): void { this.physics.emu = emu; this.emit('emuStarted') }
-	public hasDmd(): boolean { return !!this.physics.emu?.getDmdDimensions() }
-	public getDmdDimensions(): Vertex2D { return this.physics.emu?.getDmdDimensions() }
-	public getDmdFrame(): Uint8Array { return this.physics.emu?.getDmdFrame() }
-	public setCabinetInput(keyNr: number): void { this.physics.emu?.setCabinetInput(keyNr) }
-	public setSwitchInput(nr: number, enable?: boolean): void { this.physics.emu?.setSwitchInput(nr, enable) }
-	public setDimensions(w: number, h: number): void { this.width = w; this.height = h }
-	public pause(): void { this.physics.isPaused = true; this.table.fireVoidEvent(Event.GameEventsPaused); this.emit('paused') }
-	public resume(): void { this.physics.isPaused = false; this.table.fireVoidEvent(Event.GameEventsUnPaused); this.emit('resumed') }
-	public setPhysicsEnabled(enabled: boolean): void { this.physics.disablePhysics = !enabled }
-	public isPhysicsEnabled(): boolean { return !this.physics.disablePhysics }
+	public setEmulator(emu: IEmulator): void {
+		this.physics.emu = emu
+		this.emit('emuStarted')
+	}
+	public hasDmd(): boolean {
+		return !!this.physics.emu?.getDmdDimensions()
+	}
+	public getDmdDimensions(): Vertex2D {
+		return this.physics.emu?.getDmdDimensions()
+	}
+	public getDmdFrame(): Uint8Array {
+		return this.physics.emu?.getDmdFrame()
+	}
+	public setCabinetInput(keyNr: number): void {
+		this.physics.emu?.setCabinetInput(keyNr)
+	}
+	public setSwitchInput(nr: number, enable?: boolean): void {
+		this.physics.emu?.setSwitchInput(nr, enable)
+	}
+	public setDimensions(w: number, h: number): void {
+		this.width = w
+		this.height = h
+	}
+	public pause(): void {
+		this.physics.isPaused = true
+		this.table.fireVoidEvent(Event.GameEventsPaused)
+		this.emit('paused')
+	}
+	public resume(): void {
+		this.physics.isPaused = false
+		this.table.fireVoidEvent(Event.GameEventsUnPaused)
+		this.emit('resumed')
+	}
+	public setPhysicsEnabled(enabled: boolean): void {
+		this.physics.disablePhysics = !enabled
+	}
+	public isPhysicsEnabled(): boolean {
+		return !this.physics.disablePhysics
+	}
 }
 
 export interface IBallCreationPosition {
@@ -172,12 +231,22 @@ export interface IBallCreationPosition {
 export class ChangedStates<STATE extends ItemState = ItemState> {
 	public changedStates: Record<string, STATE> = {}
 
-	get keys(): string[] { return Object.keys(this.changedStates) }
-	get states(): STATE[] { return Object.values(this.changedStates) }
+	get keys(): string[] {
+		return Object.keys(this.changedStates)
+	}
+	get states(): STATE[] {
+		return Object.values(this.changedStates)
+	}
 
-	public static claim(): ChangedStates { return new ChangedStates() }
-	public setState(name: string, state: STATE): void { this.changedStates[name] = state }
-	public getState<S extends STATE>(name: string): S { return this.changedStates[name] as S }
+	public static claim(): ChangedStates {
+		return new ChangedStates()
+	}
+	public setState(name: string, state: STATE): void {
+		this.changedStates[name] = state
+	}
+	public getState<S extends STATE>(name: string): S {
+		return this.changedStates[name] as S
+	}
 	public release(): void {
 		for (const k of this.keys) {
 			this.changedStates[k]?.release()

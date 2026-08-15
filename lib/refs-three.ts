@@ -3,7 +3,6 @@
 
 /** Shared Three.js re-exports. */
 export {
-	DataUtils,
 	AdditiveBlending,
 	AnimationClip,
 	BatchedMesh,
@@ -18,6 +17,7 @@ export {
 	CubeUVReflectionMapping,
 	DataTexture,
 	DataTextureLoader,
+	DataUtils,
 	DefaultLoadingManager,
 	DoubleSide,
 	EquirectangularReflectionMapping,

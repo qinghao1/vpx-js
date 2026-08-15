@@ -1,7 +1,7 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import type { Texture as ThreeTexture } from '../../refs.node.js'
+import type { Texture as ThreeTexture } from 'three'
 import { type AnimationGate, animationGate } from '../../util/animation-gate.js'
 import { logger, progress } from '../../util/logger.js'
 import type { Table } from '../../vpt/table/table.js'
@@ -55,7 +55,8 @@ export class ThreeMapGenerator {
 
 	private pickConcurrency(_textures: Texture[]): number {
 		const cores =
-			(typeof navigator !== 'undefined' && (navigator as any).hardwareConcurrency) || HARDWARE_CONCURRENCY_FALLBACK
+			(typeof navigator !== 'undefined' && (navigator as any).hardwareConcurrency) ||
+			HARDWARE_CONCURRENCY_FALLBACK
 		return Math.max(1, cores)
 	}
 

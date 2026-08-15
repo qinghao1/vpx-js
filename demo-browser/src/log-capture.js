@@ -167,27 +167,27 @@ window.Buffer = window.Buffer || { isBuffer: () => false }
 		}
 	} catch {}
 	window.__harnessPush = push
-	window.__makeHarnessLog = function(logEl) {
-		return function harnessLog(msg, level='info') {
+	window.__makeHarnessLog = function (logEl) {
+		return function harnessLog(msg, level = 'info') {
 			try {
-				const d=document.createElement('div');
-				d.textContent='['+new Date().toLocaleTimeString()+'] '+msg;
-				d.className=`log-entry log-entry--${level}`;
-				logEl.appendChild(d);
-				while(logEl.children.length>600) logEl.removeChild(logEl.firstChild);
-				logEl.scrollTop=logEl.scrollHeight;
+				const d = document.createElement('div')
+				d.textContent = '[' + new Date().toLocaleTimeString() + '] ' + msg
+				d.className = `log-entry log-entry--${level}`
+				logEl.appendChild(d)
+				while (logEl.children.length > 600) logEl.removeChild(logEl.firstChild)
+				logEl.scrollTop = logEl.scrollHeight
 			} catch {}
 		}
 	}
-	window.__createHarness = function(logEl) {
-		const harnessLog=window.__makeHarnessLog(logEl);
+	window.__createHarness = function (logEl) {
+		const harnessLog = window.__makeHarnessLog(logEl)
 		try {
-			if(window.__earlyLogs?.length){
-				for(const e of window.__earlyLogs) harnessLog(`[${e.level}] ${e.txt}`,e.level);
-				window.__earlyLogs.length=0;
+			if (window.__earlyLogs?.length) {
+				for (const e of window.__earlyLogs) harnessLog(`[${e.level}] ${e.txt}`, e.level)
+				window.__earlyLogs.length = 0
 			}
-		}catch{}
-		return {harnessLog};
+		} catch {}
+		return { harnessLog }
 	}
 	// Also expose a helper to dump early logs via console
 	window.__dumpHarness = () => window.__earlyLogs.map(e => `[${e.t}] [${e.level}] ${e.txt}`).join('\n')

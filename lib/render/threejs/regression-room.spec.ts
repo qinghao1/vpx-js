@@ -1,7 +1,7 @@
-import { describe, expect, it } from 'vitest'
-import * as THREE from 'three'
 import * as fs from 'node:fs'
-import { isBasePlayfield, classify, postProcessScene } from '../../../demo-browser/src/scene.js'
+import * as THREE from 'three'
+import { describe, expect, it } from 'vitest'
+import { classify, isBasePlayfield, postProcessScene } from '../../../demo-browser/src/scene.js'
 
 function makeMesh(name: string, geom: THREE.BufferGeometry, mat: THREE.Material): THREE.Mesh {
 	const m = new THREE.Mesh(geom as any, mat as any)
@@ -15,10 +15,16 @@ describe('regression: room must remain visible', () => {
 		const unbaked = { isBakedMat: false } as any
 		expect(isBasePlayfield('playfield_base', unbaked), 'playfield unbaked is base').toEqual(true)
 		expect(isBasePlayfield('primitive-playfield_mesh', unbaked), 'playfield_mesh is base').toEqual(true)
-		expect(isBasePlayfield('primitive-bm_playfield', unbaked), 'bm_playfield contains playfield but also baked? check baked flag')
+		expect(
+			isBasePlayfield('primitive-bm_playfield', unbaked),
+			'bm_playfield contains playfield but also baked? check baked flag',
+		)
 		// bm_playfield is baked, so !isBakedMat false => not base
 		expect(isBasePlayfield('primitive-bm_playfield', bakedClass), 'baked bm should NOT be base').toEqual(false)
-		expect(isBasePlayfield('primitive-bm_playfield', unbaked), 'unbaked bm with playfield name currently counts as base - but postProcess hides via primitive-playfield_mesh check')
+		expect(
+			isBasePlayfield('primitive-bm_playfield', unbaked),
+			'unbaked bm with playfield name currently counts as base - but postProcess hides via primitive-playfield_mesh check',
+		)
 		// Room must NOT be base
 		expect(isBasePlayfield('primitive-vr_megawall005', unbaked), 'VR room must not be base').toEqual(false)
 		expect(isBasePlayfield('primitive-vrcab_cabinet', unbaked), 'cabinet must not be base').toEqual(false)
@@ -50,40 +56,40 @@ describe('regression: room must remain visible', () => {
 		// base playfield unbaked
 		const baseMat = new THREE.MeshStandardMaterial({ color: 0xffffff })
 		baseMat.name = 'Playfield'
-		const base = makeMesh('playfield_base', new THREE.PlaneGeometry(20,20), baseMat)
+		const base = makeMesh('playfield_base', new THREE.PlaneGeometry(20, 20), baseMat)
 		root.add(base)
 		// second base: primitive-playfield_mesh (default Table1)
 		const meshMat = new THREE.MeshStandardMaterial({ color: 0xffffff })
 		meshMat.name = 'Playfield'
-		const mesh = makeMesh('primitive-playfield_mesh', new THREE.PlaneGeometry(20,20), meshMat)
+		const mesh = makeMesh('primitive-playfield_mesh', new THREE.PlaneGeometry(20, 20), meshMat)
 		root.add(mesh)
 		// BM baked main
 		const bmMat = new THREE.MeshStandardMaterial({ color: 0x000000 })
 		bmMat.name = 'material:VLM.Bake.Active'
-		const tex = new THREE.DataTexture(new Uint8Array([0,0,0,255]),1,1)
+		const tex = new THREE.DataTexture(new Uint8Array([0, 0, 0, 255]), 1, 1)
 		tex.name = 'vlm.nestmap0'
 		bmMat.map = tex as any
 		;(bmMat.userData as any).__isBaked = true
-		const bm = makeMesh('primitive-bm_playfield', new THREE.PlaneGeometry(20,20), bmMat)
+		const bm = makeMesh('primitive-bm_playfield', new THREE.PlaneGeometry(20, 20), bmMat)
 		root.add(bm)
 		// VR room
 		const vrMat = new THREE.MeshStandardMaterial({ color: 0x888888 })
 		vrMat.name = 'material:vr_wall'
-		const vr = makeMesh('primitive-vr_megawall005', new THREE.BoxGeometry(10,10,10), vrMat)
+		const vr = makeMesh('primitive-vr_megawall005', new THREE.BoxGeometry(10, 10, 10), vrMat)
 		root.add(vr)
 		// Cabinet
 		const cabMat = new THREE.MeshStandardMaterial({ color: 0x111111 })
 		cabMat.name = 'material:cabinet'
-		const cab = makeMesh('primitive-vrcab_cabinet', new THREE.BoxGeometry(10,10,10), cabMat)
+		const cab = makeMesh('primitive-vrcab_cabinet', new THREE.BoxGeometry(10, 10, 10), cabMat)
 		// blackbox (should stay now, not hidden)
 		const bbMat = new THREE.MeshStandardMaterial({ color: 0x010101 })
 		bbMat.name = 'black'
-		const bb = makeMesh('primitive-blackbox', new THREE.BoxGeometry(100,100,10), bbMat)
+		const bb = makeMesh('primitive-blackbox', new THREE.BoxGeometry(100, 100, 10), bbMat)
 		root.add(cab)
 		root.add(bb)
 
 		root.updateMatrixWorld(true)
-		postProcessScene(root, { harnessLog: ()=>{}, viewerMode: 'viewer' })
+		postProcessScene(root, { harnessLog: () => {}, viewerMode: 'viewer' })
 
 		expect(base.visible, 'base playfield must be hidden when BM ready').toEqual(false)
 		expect(mesh.visible, 'playfield_mesh must be hidden').toEqual(false)
@@ -97,12 +103,12 @@ describe('regression: room must remain visible', () => {
 		const root = new THREE.Group()
 		const baseMat = new THREE.MeshStandardMaterial({ color: 0xffffff })
 		baseMat.name = 'Playfield'
-		const base = makeMesh('playfield_base', new THREE.PlaneGeometry(20,20), baseMat)
+		const base = makeMesh('playfield_base', new THREE.PlaneGeometry(20, 20), baseMat)
 		root.add(base)
 		const vrMat = new THREE.MeshStandardMaterial({ color: 0x888888 })
-		const vr = makeMesh('primitive-vr_megawall005', new THREE.BoxGeometry(10,10,10), vrMat)
+		const vr = makeMesh('primitive-vr_megawall005', new THREE.BoxGeometry(10, 10, 10), vrMat)
 		root.add(vr)
-		postProcessScene(root, { harnessLog: ()=>{} })
+		postProcessScene(root, { harnessLog: () => {} })
 		expect(base.visible, 'without baked, base should stay').toEqual(true)
 		expect(vr.visible, 'VR stays').toEqual(true)
 	})
@@ -110,16 +116,17 @@ describe('regression: room must remain visible', () => {
 	it('playfield_mesh hiding must be generic (only that name)', () => {
 		const root = new THREE.Group()
 		const m = new THREE.MeshStandardMaterial({ color: 0xffffff })
-		const a = makeMesh('primitive-playfield_mesh', new THREE.PlaneGeometry(5,5), m)
-		const b = makeMesh('primitive-playfield_wall', new THREE.PlaneGeometry(5,5), m.clone())
-		root.add(a); root.add(b)
+		const a = makeMesh('primitive-playfield_mesh', new THREE.PlaneGeometry(5, 5), m)
+		const b = makeMesh('primitive-playfield_wall', new THREE.PlaneGeometry(5, 5), m.clone())
+		root.add(a)
+		root.add(b)
 		const bmMat = new THREE.MeshStandardMaterial({ color: 0x000000 })
 		bmMat.name = 'material:VLM.Bake.Active'
-		bmMat.map = new THREE.DataTexture(new Uint8Array([0,0,0,255]),1,1) as any
-		;(bmMat.userData as any).__isBaked=true
-		const bm = makeMesh('primitive-bm_playfield', new THREE.PlaneGeometry(5,5), bmMat)
+		bmMat.map = new THREE.DataTexture(new Uint8Array([0, 0, 0, 255]), 1, 1) as any
+		;(bmMat.userData as any).__isBaked = true
+		const bm = makeMesh('primitive-bm_playfield', new THREE.PlaneGeometry(5, 5), bmMat)
 		root.add(bm)
-		postProcessScene(root, { harnessLog: ()=>{} })
+		postProcessScene(root, { harnessLog: () => {} })
 		expect(a.visible, 'playfield_mesh hidden').toEqual(false)
 		expect(b.visible, 'playfield_wall should be hidden via isBasePlayfield (contains playfield)').toEqual(false)
 	})

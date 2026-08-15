@@ -8,7 +8,7 @@ import {
 	Matrix4,
 	type Mesh,
 	type MeshStandardMaterial,
-} from '../../refs.node.js'
+} from 'three'
 import { loadMesh } from '../../vpt/mesh-loader.js'
 import type { Table } from '../../vpt/table/table.js'
 import { ThreeMeshGenerator } from './three-mesh-generator.js'
@@ -46,7 +46,14 @@ function materialKey(mat: MeshStandardMaterial): string {
 }
 
 function canBatch(mat: MeshStandardMaterial): boolean {
-	if (!mat || mat.transparent || mat.polygonOffset || (mat.userData as any).__addBlend || (mat.userData as any).__isBaked) return false
+	if (
+		!mat ||
+		mat.transparent ||
+		mat.polygonOffset ||
+		(mat.userData as any).__addBlend ||
+		(mat.userData as any).__isBaked
+	)
+		return false
 	const ud = mat.userData as any
 	if (ud.pendingMap || ud.pendingmap || ud.pendingNormalMap || ud.pendingEnvMap || ud.pendingEmissiveMap) return false
 	return true

@@ -79,10 +79,7 @@ describe('regression: dark occluder side artifact', () => {
 		root.updateMatrixWorld(true)
 		postProcessScene(root, { harnessLog, viewerMode: 'viewer' })
 
-		expect(
-			blackbox.visible,
-			'primitive-blackbox large dark must remain visible (cabinet interior)',
-		).to.equal(true)
+		expect(blackbox.visible, 'primitive-blackbox large dark must remain visible (cabinet interior)').to.equal(true)
 		expect(small.visible, 'small dark LM should remain visible (size <25 threshold)').to.equal(true)
 		expect(cabinet.visible, 'textured VR cabinet must stay visible').to.equal(true)
 		const cabMatAfter = Array.isArray(cabinet.material)

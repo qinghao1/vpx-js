@@ -1,7 +1,6 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import type { IRenderable, RenderInfo } from '../../game/irenderable.js'
 import {
 	type BufferGeometry,
 	Group,
@@ -10,7 +9,8 @@ import {
 	type Object3D,
 	type PointLight,
 	type Mesh as ThreeMesh,
-} from '../../refs.node.js'
+} from 'three'
+import type { IRenderable, RenderInfo } from '../../game/irenderable.js'
 import { type AnimationGate, animationGate } from '../../util/animation-gate.js'
 import { progress } from '../../util/logger.js'
 import type { Matrix3D } from '../../util/matrix.js'

@@ -66,7 +66,7 @@ describe('The scripting scope transformer', () => {
 		const vbs = `For each xx in GI:xx.State = 1: Next\n`
 		const js = transform(vbs)
 		expect(js).to.equal(
-			`for (${Transformer.SCOPE_NAME}.xx of ${Transformer.SCOPE_NAME}.GI) {\n    ${Transformer.SCOPE_NAME}.xx.State = 1;\n}`,
+			`for (${Transformer.SCOPE_NAME}.xx of ${Transformer.VBSHELPER_NAME}.toIterable(${Transformer.SCOPE_NAME}.GI)) {\n    ${Transformer.SCOPE_NAME}.xx.State = 1;\n}`,
 		)
 	})
 
@@ -100,7 +100,7 @@ describe('The scripting scope transformer', () => {
 		const vbs = `Class cvpmDictionary\nPrivate mDict\nPrivate Sub Class_Initialize : Set mDict = CreateObject("Scripting.Dictionary") : End Sub\nEnd Class\n`
 		const js = transpiler.transpile(vbs)
 		expect(js).to.equal(
-			`${Transformer.SCOPE_NAME}.cvpmDictionary = class {\n    constructor() {\n        this.mdict = undefined;\n        this.mdict = ${Transformer.STDLIB_NAME}.CreateObject('Scripting.Dictionary', ${Transformer.PLAYER_NAME});\n        return new Proxy(this, { get: (t, p, r) => Reflect.get(t, p.toLowerCase(), r) });\n    }\n};`,
+			`${Transformer.SCOPE_NAME}.cvpmDictionary = class {\n    constructor() {\n        this.mdict = undefined;\n        this.mdict = ${Transformer.STDLIB_NAME}.CreateObject('Scripting.Dictionary', ${Transformer.PLAYER_NAME});\n        return new Proxy(this, {\n            get: (t, p, r) => Reflect.get(t, typeof p === 'string' ? p.toLowerCase() : p, r),\n            set: (t, p, v, r) => Reflect.set(t, typeof p === 'string' ? p.toLowerCase() : p, v, r),\n            has: (t, p) => Reflect.has(t, typeof p === 'string' ? p.toLowerCase() : p)\n        });\n    }\n};`,
 		)
 	})
 })

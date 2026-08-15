@@ -1,7 +1,9 @@
 import { launchBrowser, loadPuppeteer, newPage } from '../../../test/harness/utils.mjs'
 
 const mode = process.argv.find(a => a.startsWith('--mode='))?.slice(7) || 'viewer'
-const url = process.argv.find(a => a.startsWith('--url='))?.slice(6) || `http://localhost:3000/?vpx=/test/fixtures/table-empty.vpx&mode=${mode}`
+const url =
+	process.argv.find(a => a.startsWith('--url='))?.slice(6) ||
+	`http://localhost:3000/?vpx=/test/fixtures/table-empty.vpx&mode=${mode}`
 
 const puppeteer = await loadPuppeteer()
 const browser = await launchBrowser(puppeteer)

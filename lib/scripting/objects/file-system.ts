@@ -1,7 +1,7 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { getTextFile, hasTextFile } from '../../refs.node.js'
+import { getTextFile, hasTextFile } from '../../scripting/vbs-scripts.node.js'
 import { TextStream } from './text-stream.js'
 
 /** FileSystem. */

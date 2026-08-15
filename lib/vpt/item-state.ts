@@ -5,10 +5,33 @@
 export abstract class ItemState {
 	public name = ''
 	public isVisible = true
-	public abstract clone(): ItemState
-	public abstract equals(state: ItemState): boolean
-	public abstract diff(state: ItemState): ItemState
-	public abstract release(): void
+
+	public clone(): ItemState {
+		const copy = new (this.constructor as new () => any)()
+		return Object.assign(copy, this)
+	}
+
+	public equals(state: ItemState): boolean {
+		const keys = Object.keys(this) as (keyof this)[]
+		for (const k of keys) {
+			if (this[k] !== (state as any)[k]) return false
+		}
+		return true
+	}
+
+	public diff(state: ItemState): ItemState {
+		const result = this.clone()
+		const keys = Object.keys(this) as (keyof this)[]
+		for (const k of keys) {
+			if ((result as any)[k] === (state as any)[k] && k !== 'name') {
+				delete (result as any)[k]
+			}
+		}
+		return result
+	}
+
+	public release(): void {}
+
 	public getName(): string {
 		return this.name
 	}

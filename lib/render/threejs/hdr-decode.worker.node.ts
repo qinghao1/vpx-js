@@ -1,11 +1,16 @@
 import { parentPort } from 'node:worker_threads'
+import { DataUtils, HalfFloatType } from 'three'
 import { EXRLoader } from 'three/examples/jsm/loaders/EXRLoader.js'
 import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js'
-import { DataUtils, HalfFloatType } from 'three'
 
 if (parentPort) {
 	parentPort.on('message', (msg: any) => {
-		const { id, buffer, type, name } = msg as { id: number; buffer: ArrayBuffer; type: 'hdr' | 'exr'; name?: string }
+		const { id, buffer, type, name } = msg as {
+			id: number
+			buffer: ArrayBuffer
+			type: 'hdr' | 'exr'
+			name?: string
+		}
 		try {
 			const loader = type === 'hdr' ? new HDRLoader() : new EXRLoader()
 			let texData: any = (loader as any).parse(buffer)
@@ -35,7 +40,10 @@ if (parentPort) {
 								let sum = 0
 								for (let sy = y0; sy < y1; sy++) {
 									const row = sy * width * comps
-									for (let sx = x0; sx < x1; sx++) sum += isHalf ? DataUtils.fromHalfFloat((data as any)[row + sx * comps + c] as any) : (data as any)[row + sx * comps + c]
+									for (let sx = x0; sx < x1; sx++)
+										sum += isHalf
+											? DataUtils.fromHalfFloat((data as any)[row + sx * comps + c] as any)
+											: (data as any)[row + sx * comps + c]
 								}
 								const avg = sum / count
 								out[dBase + c] = isHalf ? DataUtils.toHalfFloat(avg) : isFloat ? avg : Math.round(avg)
@@ -112,7 +120,10 @@ export function downscaleHdrData(
 					let sum = 0
 					for (let sy = y0; sy < y1; sy++) {
 						const row = sy * width * comps
-						for (let sx = x0; sx < x1; sx++) sum += isHalf ? DataUtils.fromHalfFloat((data as any)[row + sx * comps + c] as any) : (data as any)[row + sx * comps + c]
+						for (let sx = x0; sx < x1; sx++)
+							sum += isHalf
+								? DataUtils.fromHalfFloat((data as any)[row + sx * comps + c] as any)
+								: (data as any)[row + sx * comps + c]
 					}
 					const avg = sum / count
 					out[dBase + c] = isHalf ? DataUtils.toHalfFloat(avg) : isFloat ? avg : Math.round(avg)

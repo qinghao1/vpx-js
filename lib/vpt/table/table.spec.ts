@@ -2,10 +2,10 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { expect } from 'chai'
+import type { Mesh } from 'three'
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { ThreeHelper } from '../../../test/three.helper'
 import { NodeBinaryReader } from '../../io/binary-reader.node.js'
-import type { Mesh } from '../../refs.node.js'
 import { Table } from './table.js'
 import { TableExporter } from './table-exporter.js'
 

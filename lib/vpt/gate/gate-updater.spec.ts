@@ -3,9 +3,9 @@
 
 import * as chai from 'chai'
 import { expect } from 'chai'
-import { MathUtils } from 'three'
 import { spy } from 'sinon'
 import sinonChai from 'sinon-chai'
+import { MathUtils } from 'three'
 import { TableBuilder } from '../../../test/table-builder.js'
 import { TestRenderApi } from '../../../test/test-render-api.js'
 import { Player } from '../../game/player.js'
@@ -120,7 +120,11 @@ describe('The VPinball gate updater', () => {
 						const cap = captureMatrix(angle, { gateType, twoWay, rotation: rot })
 						const ideal = twoWay ? -angle : angle
 						const exp = expectedMatrix({ x: 500, y: 500 }, posZ, rot, ideal)
-						for (let i = 0; i < 16; i++) expect(cap.elements[i], `type ${gateType} rot ${rot} twoWay ${twoWay}`).to.be.closeTo(exp.elements[i], 1e-6)
+						for (let i = 0; i < 16; i++)
+							expect(cap.elements[i], `type ${gateType} rot ${rot} twoWay ${twoWay}`).to.be.closeTo(
+								exp.elements[i],
+								1e-6,
+							)
 					}
 				}
 			}

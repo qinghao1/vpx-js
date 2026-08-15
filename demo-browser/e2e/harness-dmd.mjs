@@ -1,6 +1,8 @@
 import { launchBrowser, loadPuppeteer, newPage } from '../../test/harness/utils.mjs'
 import { dmdChecks, waitReady } from './lib/helpers.mjs'
-const url = process.argv.find(a => a.startsWith('--url='))?.slice(6) || 'http://localhost:3000/?vpx=/test/fixtures/table-empty.vpx'
+const url =
+	process.argv.find(a => a.startsWith('--url='))?.slice(6) ||
+	'http://localhost:3000/?vpx=/test/fixtures/table-empty.vpx'
 const puppeteer = await loadPuppeteer()
 const browser = await launchBrowser(puppeteer)
 const page = await newPage(browser)

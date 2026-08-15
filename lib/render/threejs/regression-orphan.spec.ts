@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
 import * as fs from 'node:fs'
+import { describe, expect, it } from 'vitest'
 
 describe('regression: orphan chrome must be systematically cleaned', () => {
 	it('test/harness/utils.mjs must track browsers and vites and kill stale', () => {
@@ -55,12 +55,22 @@ describe('regression: orphan chrome must be systematically cleaned', () => {
 		const table = new TableBuilder().addFlipper('F1').build()
 		const player = new Player(table)
 		const td = getTableDataForWorker(table, player)
-		const js = await transpileInWorker({ vbs: 'F1.Y=1\n', globalFunction: 'play', globalObject: 'global', tableData: td })
+		const js = await transpileInWorker({
+			vbs: 'F1.Y=1\n',
+			globalFunction: 'play',
+			globalObject: 'global',
+			tableData: td,
+		})
 		expect(js).toContain('F1')
 		// scene sanity
 		const { postProcessScene } = await import('../../../demo-browser/src/scene.js')
 		const root = new (await import('three')).Group()
-		root.add(new (await import('three')).Mesh(new (await import('three')).BoxGeometry(1,1,1), new (await import('three')).MeshStandardMaterial()))
-		expect(() => postProcessScene(root, { harnessLog: ()=>{} })).not.toThrow()
+		root.add(
+			new (await import('three')).Mesh(
+				new (await import('three')).BoxGeometry(1, 1, 1),
+				new (await import('three')).MeshStandardMaterial(),
+			),
+		)
+		expect(() => postProcessScene(root, { harnessLog: () => {} })).not.toThrow()
 	})
 })

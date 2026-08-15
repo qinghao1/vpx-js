@@ -7,21 +7,261 @@ import type { IRenderable, Meshes } from '../../game/irenderable.js'
 import type { IScriptable } from '../../game/iscriptable.js'
 import type { IBallCreationPosition, Player } from '../../game/player.js'
 import type { PlayerPhysics } from '../../game/player-physics.js'
+import { BiffParser } from '../../io/biff-parser.js'
 import type { Storage } from '../../io/ole-doc.js'
 import type { HitObject } from '../../physics/hit-object.js'
+import { logger } from '../../util/logger.js'
 import { Matrix3D } from '../../util/matrix.js'
-import { Vertex3D } from '../../util/vector.js'
+import { Vertex2D, Vertex3D } from '../../util/vector.js'
 import type { Ball } from '../ball/ball.js'
+import { handleBiffTag } from '../biff-helper.js'
 import { Enums } from '../enums.js'
 import { Item } from '../item.js'
+import { ItemApi } from '../item-api.js'
+import { ItemData } from '../item-data.js'
+import { ItemState } from '../item-state.js'
 import type { Table } from '../table/table.js'
 import { Texture } from '../texture.js'
-import { KickerApi } from './kicker-api.js'
-import { KickerData } from './kicker-data.js'
-import { KickerHit } from './kicker-hit.js'
-import { KickerMeshGenerator } from './kicker-mesh-generator.js'
-import { KickerState } from './kicker-state.js'
-import { KickerUpdater } from './kicker-updater.js'
+import { KickerHit } from './kicker-physics.js'
+import { KickerMeshGenerator, KickerUpdater } from './kicker-view.js'
+
+const FLOAT_MAP: Record<string, string> = {
+	RADI: 'radius',
+	KSCT: 'scatter',
+	KHAC: 'hitAccuracy',
+	KHHI: 'hitHeight',
+	KORI: 'orientation',
+}
+const BOOL_MAP: Record<string, string> = { EBLD: 'isEnabled', FATH: 'fallThrough', LEMO: 'legacyMode' }
+const STRING_MAP: Record<string, string> = { MATR: 'szMaterial', SURF: 'szSurface' }
+
+/** Kicker data. @see https://github.com/vpinball/vpinball/blob/master/kicker.cpp */
+export class KickerData extends ItemData {
+	public kickerType: number = Enums.KickerType.KickerHole
+	public center!: Vertex2D
+	public radius = 25
+	public scatter = 0
+	public hitAccuracy = 0.5
+	public hitHeight = 35
+	public orientation = 0
+	public szMaterial?: string
+	public szSurface?: string
+	public fallThrough = false
+	public isEnabled = true
+	public legacyMode = true
+
+	public static async fromStorage(storage: Storage, itemName: string): Promise<KickerData> {
+		const d = new KickerData(itemName)
+		await storage.streamFiltered(itemName, 4, BiffParser.stream(d.fromTag.bind(d)))
+		return d
+	}
+
+	public constructor(itemName: string) {
+		super(itemName)
+	}
+
+	private async fromTag(buffer: Uint8Array, tag: string, _offset: number, len: number): Promise<number> {
+		if (tag === 'VCEN') {
+			this.center = Vertex2D.get(buffer)
+			return 0
+		}
+		if (tag === 'TYPE') {
+			this.kickerType = this.getInt(buffer)
+			if (this.kickerType > Enums.KickerType.KickerCup2) this.kickerType = Enums.KickerType.KickerInvisible
+			return 0
+		}
+		if (
+			handleBiffTag(this, tag, buffer, len, {
+				float: FLOAT_MAP,
+				bool: BOOL_MAP,
+				string: STRING_MAP,
+			})
+		)
+			return 0
+		this.getCommonBlock(buffer, tag, len)
+		return 0
+	}
+}
+
+/** Kicker state — type and material.
+ * @see https://github.com/vpinball/vpinball/blob/master/kicker.cpp */
+export class KickerState extends ItemState {
+	public type!: number
+	public material?: string
+
+	// @ts-expect-error — derived visibility from type
+	get isVisible(): boolean {
+		return this.type !== Enums.KickerType.KickerInvisible
+	}
+	set isVisible(_v: boolean) {}
+
+	public static claim(name: string, type: number, material: string | undefined): KickerState {
+		const s = new KickerState()
+		s.name = name
+		s.type = type
+		s.material = material
+		return s
+	}
+}
+
+/** Kicker API — VBS surface for `Kicker`. @see https://github.com/vpinball/vpinball/blob/master/kicker.cpp */
+export class KickerApi extends ItemApi<KickerData> {
+	constructor(
+		private readonly state: KickerState,
+		data: KickerData,
+		private readonly hit: KickerHit,
+		events: EventProxy,
+		private readonly ballCreator: IBallCreationPosition,
+		player: Player,
+		table: Table,
+	) {
+		super(data, events, player, table)
+	}
+
+	get X() {
+		return this.data.center.x
+	}
+	set X(v) {
+		this.data.center.x = v
+	}
+	get Y() {
+		return this.data.center.y
+	}
+	set Y(v) {
+		this.data.center.y = v
+	}
+	get Surface() {
+		return this.data.szSurface
+	}
+	set Surface(v) {
+		this.data.szSurface = v
+	}
+	get Enabled() {
+		return this.hit.isEnabled
+	}
+	set Enabled(v) {
+		this.hit.isEnabled = v
+	}
+	get Scatter() {
+		return this.data.scatter
+	}
+	set Scatter(v) {
+		this.data.scatter = v
+	}
+	get HitAccuracy() {
+		return this.data.hitAccuracy
+	}
+	set HitAccuracy(v) {
+		this.data.hitAccuracy = v
+	}
+	get HitHeight() {
+		return this.data.hitHeight
+	}
+	set HitHeight(v) {
+		this.data.hitHeight = v
+	}
+	get Orientation() {
+		return this.data.orientation
+	}
+	set Orientation(v) {
+		this.data.orientation = v
+	}
+	get Radius() {
+		return this.data.radius
+	}
+	set Radius(v) {
+		this.data.radius = v
+	}
+	get FallThrough() {
+		return this.data.fallThrough
+	}
+	set FallThrough(v) {
+		this.data.fallThrough = v
+	}
+	get Legacy() {
+		return this.data.legacyMode
+	}
+	set Legacy(v) {
+		this.data.legacyMode = v
+	}
+	get KickerType() {
+		return this.state.type
+	}
+	set KickerType(v) {
+		this.state.type = v
+	}
+	get Material() {
+		return this.state.material
+	}
+	set Material(v) {
+		this.state.material = v
+	}
+	get DrawStyle() {
+		return this.state.type
+	}
+	set DrawStyle(v) {
+		this.state.type = v
+	}
+
+	get LastCapturedBall(): Ball | null {
+		if (!this.hit.lastCapturedBall) return null
+		let ballFound = false
+		for (const ball of this.player.getBalls()) {
+			if (ball === this.hit.lastCapturedBall) {
+				ballFound = true
+				break
+			}
+		}
+		if (!ballFound) {
+			logger().error('LastCapturedBall was called but ball is already destroyed!')
+			return null
+		}
+		return this.hit.lastCapturedBall
+	}
+
+	public CreateSizedBallWithMass(radius: number, mass: number): Ball {
+		return this.player.createBall(this.ballCreator, radius, mass)
+	}
+
+	public CreateSizedBall(radius: number): Ball {
+		return this.player.createBall(this.ballCreator, radius)
+	}
+
+	public CreateBall(): Ball {
+		return this.player.createBall(this.ballCreator)
+	}
+
+	public DestroyBall(): number {
+		let cnt = 0
+		if (this.hit.ball) {
+			++cnt
+			const b = this.hit.ball
+			this.hit.ball = undefined
+			this.player.destroyBall(b)
+		}
+		return cnt
+	}
+
+	public KickXYZ(angle: number, speed: number, inclination: number, x: number, y: number, z: number): void {
+		this.hit.kickXyz(this.table, this.player.getPhysics(), angle, speed, inclination, new Vertex3D(x, y, z))
+	}
+
+	public KickZ(angle: number, speed: number, inclination: number, heightZ: number): void {
+		this.hit.kickXyz(this.table, this.player.getPhysics(), angle, speed, inclination, new Vertex3D(0, 0, heightZ))
+	}
+
+	public Kick(angle: number, speed: number, inclination = 0): void {
+		this.hit.kickXyz(this.table, this.player.getPhysics(), angle, speed, inclination, new Vertex3D(0, 0, 0))
+	}
+
+	get BallCntOver(): number {
+		return super._ballCountOver(this.events)
+	}
+
+	protected _getPropertyNames(): string[] {
+		return Object.getOwnPropertyNames(KickerApi.prototype)
+	}
+}
 
 /** Kicker item. @see https://github.com/vpinball/vpinball/blob/master/kicker.cpp */
 export class Kicker
@@ -61,17 +301,37 @@ export class Kicker
 		}
 	}
 
+	public getBallCreationPosition(table: Table): Vertex3D {
+		const height = table.getSurfaceHeight(this.data.szSurface, this.data.center.x, this.data.center.y)
+		return new Vertex3D(this.data.center.x, this.data.center.y, (height + 25) * table.getScaleZ())
+	}
+
+	public getBallCreationVelocity(_table: Table): Vertex3D {
+		return new Vertex3D()
+	}
+
+	public onBallCreated(physics: PlayerPhysics, ball: Ball): void {
+		this.hit?.doCollide(physics, ball, new Vertex3D(0, 0, 1), false, true)
+	}
+
 	public setupPlayer(player: Player, table: Table): void {
+		this.events = new EventProxy(this)
 		const height =
 			table.getSurfaceHeight(this.data.szSurface, this.data.center.x, this.data.center.y) * table.getScaleZ()
-		const radius = this.data.radius * (this.data.legacyMode ? (this.data.fallThrough ? 0.75 : 0.6) : 1)
-		this.events = new EventProxy(this)
-		this.hit = new KickerHit(this.data, this.events, table, radius, height)
+		this.hit = new KickerHit(this.data, this.events, table, this.data.radius, height)
 		this.api = new KickerApi(this.state, this.data, this.hit, this.events, this, player, table)
 	}
 
 	public getApi(): KickerApi {
 		return this.api!
+	}
+
+	public getEventNames(): string[] {
+		return ['Hit', 'Init', 'Timer', 'Unhit']
+	}
+
+	public getHitShapes(): HitObject[] {
+		return [this.hit!]
 	}
 
 	public getState(): KickerState {
@@ -82,23 +342,8 @@ export class Kicker
 		return this.updater
 	}
 
-	public getHitShapes(): HitObject[] {
-		return [this.hit!]
-	}
-
-	public getBallCreationPosition(table: Table): Vertex3D {
-		const height = table.getSurfaceHeight(this.data.szSurface, this.data.center.x, this.data.center.y)
-		return new Vertex3D(this.hit?.center.x, this.hit?.center.y, height)
-	}
-
-	public getBallCreationVelocity(_table: Table): Vertex3D {
-		return new Vertex3D(0.1, 0, 0)
-	}
-
-	public onBallCreated(physics: PlayerPhysics, ball: Ball): void {
-		ball.coll.hitFlag = true
-		const hitNormal = new Vertex3D(Infinity, Infinity, Infinity)
-		this.hit?.doCollide(physics, ball, hitNormal, false, true)
+	public getHit(): KickerHit {
+		return this.hit!
 	}
 
 	private getTexture(): Texture {
@@ -116,9 +361,5 @@ export class Kicker
 			default:
 				return Texture.fromFilesystem('kickerHoleWood.png')
 		}
-	}
-
-	public getEventNames(): string[] {
-		return ['Init', 'Hit', 'Unhit', 'Timer']
 	}
 }

@@ -28,11 +28,7 @@ export default defineConfig({
 		coverage: {
 			provider: 'v8',
 			include: ['lib/**/*.ts'],
-			exclude: [
-				'lib/**/*.spec.ts',
-				'lib/util/logger.ts',
-				'lib/scripting/grammar/rules.ts',
-			],
+			exclude: ['lib/**/*.spec.ts', 'lib/util/logger.ts', 'lib/scripting/grammar/rules.ts'],
 			reporter: ['lcov', 'text-summary'],
 		},
 		testTimeout: 10000,

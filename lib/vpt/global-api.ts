@@ -1,10 +1,26 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { AssignKey, DIK_0, DIK_3, DIK_6, DIK_7, DIK_8, DIK_9, DIK_B, DIK_END, DIK_F3, DIK_F12, DIK_HOME, DIK_MINUS, DIK_PRIOR } from '../game/key-code.js'
+import {
+	AssignKey,
+	DIK_0,
+	DIK_3,
+	DIK_6,
+	DIK_7,
+	DIK_8,
+	DIK_9,
+	DIK_B,
+	DIK_END,
+	DIK_F3,
+	DIK_F12,
+	DIK_HOME,
+	DIK_MINUS,
+	DIK_PRIOR,
+} from '../game/key-code.js'
 import type { Player } from '../game/player.js'
-import { getTextFile, storage } from '../refs.node.js'
+import { storage } from '../io/storage.js'
 import { VbsApi } from '../scripting/vbs-api.js'
+import { getTextFile } from '../scripting/vbs-scripts.node.js'
 import type { BallApi } from './ball/ball-api.js'
 import type { Item } from './item.js'
 import type { ItemData } from './item-data.js'
@@ -75,44 +91,82 @@ export class GlobalApi extends VbsApi {
 	}
 	public VPXActionKey(actionIndex: number): number {
 		switch (actionIndex) {
-			case 0: return this.player.getKey(AssignKey.LeftFlipperKey)
-			case 1: return this.player.getKey(AssignKey.RightFlipperKey)
-			case 2: return this.player.getKey(AssignKey.LeftFlipperKey)
-			case 3: return this.player.getKey(AssignKey.RightFlipperKey)
-			case 4: return this.player.getKey(AssignKey.LeftTiltKey)
-			case 5: return this.player.getKey(AssignKey.RightTiltKey)
-			case 6: return this.player.getKey(AssignKey.CenterTiltKey)
-			case 7: return this.player.getKey(AssignKey.PlungerKey)
-			case 8: return this.player.getKey(AssignKey.StartGameKey)
-			case 9: return this.player.getKey(AssignKey.AddCreditKey)
-			case 10: return this.player.getKey(AssignKey.AddCreditKey2)
-			case 11: return DIK_3
-			case 12: return DIK_6
-			case 13: return this.player.getKey(AssignKey.MechanicalTilt)
-			case 14: return this.player.getKey(AssignKey.LeftMagnaSave)
-			case 15: return this.player.getKey(AssignKey.RightMagnaSave)
-			case 16: return this.player.getKey(AssignKey.ExitGame)
-			case 17: return DIK_F12
-			case 18: return this.player.getKey(AssignKey.LockbarKey)
-			case 19: return DIK_F3
-			case 20: return this.player.getKey(AssignKey.VolumeDown)
-			case 21: return this.player.getKey(AssignKey.VolumeUp)
-			case 22: return DIK_B
-			case 23: return DIK_HOME
-			case 24: return DIK_END
-			case 25: return DIK_7
-			case 26: return DIK_8
-			case 27: return DIK_9
-			case 28: return DIK_0
-			case 29: return DIK_6
-			case 30: return DIK_PRIOR
-			case 31: return DIK_MINUS
-			case 32: return 0
-			case 64: return 0
-			case 65: return 0
-			case 66: return 0
-			case 67: return 0
-			default: return 0
+			case 0:
+				return this.player.getKey(AssignKey.LeftFlipperKey)
+			case 1:
+				return this.player.getKey(AssignKey.RightFlipperKey)
+			case 2:
+				return this.player.getKey(AssignKey.LeftFlipperKey)
+			case 3:
+				return this.player.getKey(AssignKey.RightFlipperKey)
+			case 4:
+				return this.player.getKey(AssignKey.LeftTiltKey)
+			case 5:
+				return this.player.getKey(AssignKey.RightTiltKey)
+			case 6:
+				return this.player.getKey(AssignKey.CenterTiltKey)
+			case 7:
+				return this.player.getKey(AssignKey.PlungerKey)
+			case 8:
+				return this.player.getKey(AssignKey.StartGameKey)
+			case 9:
+				return this.player.getKey(AssignKey.AddCreditKey)
+			case 10:
+				return this.player.getKey(AssignKey.AddCreditKey2)
+			case 11:
+				return DIK_3
+			case 12:
+				return DIK_6
+			case 13:
+				return this.player.getKey(AssignKey.MechanicalTilt)
+			case 14:
+				return this.player.getKey(AssignKey.LeftMagnaSave)
+			case 15:
+				return this.player.getKey(AssignKey.RightMagnaSave)
+			case 16:
+				return this.player.getKey(AssignKey.ExitGame)
+			case 17:
+				return DIK_F12
+			case 18:
+				return this.player.getKey(AssignKey.LockbarKey)
+			case 19:
+				return DIK_F3
+			case 20:
+				return this.player.getKey(AssignKey.VolumeDown)
+			case 21:
+				return this.player.getKey(AssignKey.VolumeUp)
+			case 22:
+				return DIK_B
+			case 23:
+				return DIK_HOME
+			case 24:
+				return DIK_END
+			case 25:
+				return DIK_7
+			case 26:
+				return DIK_8
+			case 27:
+				return DIK_9
+			case 28:
+				return DIK_0
+			case 29:
+				return DIK_6
+			case 30:
+				return DIK_PRIOR
+			case 31:
+				return DIK_MINUS
+			case 32:
+				return 0
+			case 64:
+				return 0
+			case 65:
+				return 0
+			case 66:
+				return 0
+			case 67:
+				return 0
+			default:
+				return 0
 		}
 	}
 	set MusicVolume(_v: number) {}
@@ -144,7 +198,7 @@ export class GlobalApi extends VbsApi {
 		return null
 	}
 	get ActiveBall() {
-		return this.player.getActiveBall()?.getApi() ?? null
+		return this.player.getActiveBall()?.getApi()
 	}
 	get GameTime() {
 		return this.player.getGameTime()
@@ -249,7 +303,8 @@ export class GlobalApi extends VbsApi {
 						const n = (m.name ?? '').toLowerCase()
 						if (n === `material:${target}` || n === target || n.includes(target)) {
 							const isBaked = !!(m as any).userData?.__isBaked || !!(m as any).emissiveMap
-							if (isBaked) { // baked tint via emissive
+							if (isBaked) {
+								// baked tint via emissive
 								if ((m as any).emissive) (m as any).emissive.set(color)
 								else (m as any).emissive = new (m as any).color.constructor(color)
 								;(m as any).emissiveIntensity = 1.0

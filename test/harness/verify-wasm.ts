@@ -13,7 +13,10 @@ const checks: Array<[string, () => boolean]> = [
 	['modules/kernels CMake exists', () => fs.existsSync(path.join(wasmDir, 'modules/kernels/CMakeLists.txt'))],
 	['modules/kernels source exists', () => fs.existsSync(path.join(wasmDir, 'modules/kernels/src/kernels.cpp'))],
 	['modules/pinmame CMake exists', () => fs.existsSync(path.join(wasmDir, 'modules/pinmame/CMakeLists.txt'))],
-	['modules/pinmame patches exist', () => fs.existsSync(path.join(wasmDir, 'modules/pinmame/patches/0001-wasm-guard-__rolq-__rorq-for-WASM.patch'))],
+	[
+		'modules/pinmame patches exist',
+		() => fs.existsSync(path.join(wasmDir, 'modules/pinmame/patches/0001-wasm-guard-__rolq-__rorq-for-WASM.patch')),
+	],
 	[
 		'CMakeLists requires 3.28+',
 		() => fs.readFileSync(path.join(wasmDir, 'CMakeLists.txt'), 'utf-8').includes('3.28'),
@@ -24,7 +27,10 @@ const checks: Array<[string, () => boolean]> = [
 	],
 	[
 		'CMakeLists is umbrella (add_subdirectory)',
-		() => fs.readFileSync(path.join(wasmDir, 'CMakeLists.txt'), 'utf-8').includes('add_subdirectory(modules/kernels)'),
+		() =>
+			fs
+				.readFileSync(path.join(wasmDir, 'CMakeLists.txt'), 'utf-8')
+				.includes('add_subdirectory(modules/kernels)'),
 	],
 	[
 		'CMakePresets has wasm+debug distinct dirs',

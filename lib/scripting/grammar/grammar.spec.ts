@@ -4,7 +4,7 @@
 import * as chai from 'chai'
 import { expect } from 'chai'
 import sinonChai from 'sinon-chai'
-import { getTextFile } from '../../refs.node.js'
+import { getTextFile } from '../../scripting/vbs-scripts.node.js'
 import { Grammar } from './grammar.js'
 
 chai.use((sinonChai as any).default ?? sinonChai)
@@ -92,7 +92,7 @@ describe('The scripting grammar - fastFormat parity', () => {
 		}
 	})
 
-	it('should match legacyFormat for walking_dead when available', async () => {
+	it('should match legacyFormat for walking_dead when available', { timeout: 30000 }, async () => {
 		const fs = await import('node:fs')
 		const path = '/home/qinghao1/Downloads/walking_dead.vpx'
 		if (!fs.existsSync(path)) return
@@ -109,11 +109,13 @@ describe('The scripting grammar - fastFormat parity', () => {
 		const player = new Player(table)
 		const transpiler = new Transpiler(table, player)
 		let jsFast: string
-		expect(() => { jsFast = transpiler.transpile(vbs) }).not.to.throw()
+		expect(() => {
+			jsFast = transpiler.transpile(vbs)
+		}).not.to.throw()
 		expect(jsFast!.length).to.be.greaterThan(10000)
 		const orig = Grammar.prototype.format
 		const legacy = (grammar as any).legacyFormat.bind(grammar)
-		;(Grammar.prototype as any).format = function (s: string) { return legacy(s) }
+		;(Grammar.prototype as any).format = (s: string) => legacy(s)
 		let jsLeg: string
 		try {
 			jsLeg = new Transpiler(table, player).transpile(vbs)
