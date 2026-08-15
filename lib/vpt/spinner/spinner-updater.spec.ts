@@ -73,7 +73,7 @@ describe('The VPinball spinner updater', () => {
 			spinner.getUpdater().applyState({}, { angle } as SpinnerState, api, t)
 			if (!cap) throw new Error('no matrix')
 			const gen = new SpinnerMeshGenerator(spinner.data)
-			const posZ = -gen.getZ(t)
+			const posZ = gen.getZ(t)
 			return { cap: cap as Matrix3D, posZ, table: t }
 		}
 
@@ -86,11 +86,11 @@ describe('The VPinball spinner updater', () => {
 			return Tneg.clone().multiply(RzNeg).multiply(Rx).multiply(RzPos).multiply(Tpos)
 		}
 
-		it('should use posZ = -getZ and angle = +state.angle (matches VPinball Rx(-angle))', () => {
+		it('should use posZ = +getZ and angle = -state.angle (matches VPinball Rx(-angle))', () => {
 			const angle = 0.5
 			for (const rot of [0, -90, 30]) {
 				const { cap, posZ } = captureSpinner(angle, rot)
-				const ideal = angle
+				const ideal = -angle
 				const exp = expected({ x: 500, y: 500 }, posZ, rot, ideal)
 				for (let i = 0; i < 16; i++) expect(cap.elements[i], `rot ${rot}`).to.be.closeTo(exp.elements[i], 1e-6)
 			}
@@ -98,7 +98,7 @@ describe('The VPinball spinner updater', () => {
 
 		it('should handle negative angle', () => {
 			const { cap, posZ } = captureSpinner(-0.7, 15)
-			const exp = expected({ x: 500, y: 500 }, posZ, 15, -0.7)
+			const exp = expected({ x: 500, y: 500 }, posZ, 15, 0.7)
 			for (let i = 0; i < 16; i++) expect(cap.elements[i]).to.be.closeTo(exp.elements[i], 1e-6)
 		})
 	})

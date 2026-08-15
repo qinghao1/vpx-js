@@ -12,17 +12,7 @@ import type { GateState } from './gate-state.js'
 
 chai.use((sinonChai as any).default ?? sinonChai)
 
-const RIGHT_HANDED = new Matrix3D().setScaling(1, 1, -1)
-
-function toWorldFromD3D(p: Vertex3D): Vertex3D {
-	return new Vertex3D(p.x, p.z, p.y)
-}
-
-function toWorldFromRH(p: Vertex3D): Vertex3D {
-	return new Vertex3D(p.x, -p.z, p.y)
-}
-
-function bruteD3D(
+function bruteGateWorld(
 	raw: Vertex3D,
 	len: number,
 	scaleZ: number,
@@ -38,14 +28,11 @@ function bruteD3D(
 	const rot = (rotDeg * Math.PI) / 180
 	const posZ = height * scaleZ + base
 	const full = new Matrix3D().rotateXMatrix(cppAngle).multiply(new Matrix3D().rotateZMatrix(rot))
-	const vert = full
-		.clone()
-		.multiply(new Matrix3D().setScaling(len, len, len))
-		.multiply(new Matrix3D().setTranslation(cx, cy, posZ))
-	return new Vertex3D(raw.x, raw.y, raw.z).multiplyMatrix(vert)
+	const v = new Vertex3D(raw.x, raw.y, raw.z).multiplyMatrix(full)
+	return new Vertex3D(v.x * len + cx, v.y * len + cy, v.z * len * scaleZ + posZ)
 }
 
-function jsWorldViaUpdater(
+function jsGateViaUpdater(
 	raw: Vertex3D,
 	len: number,
 	scaleZ: number,
@@ -57,14 +44,11 @@ function jsWorldViaUpdater(
 	updaterMatrix: Matrix3D,
 ): Vertex3D {
 	const rot = (rotDeg * Math.PI) / 180
-	const posZWorld = height * scaleZ + base
+	const posZ = height * scaleZ + base
 	const mRz = new Matrix3D().rotateZMatrix(rot)
-	const Slen = new Matrix3D().setScaling(len, len, len * scaleZ)
-	const Tworld = new Matrix3D().setTranslation(cx, cy, posZWorld)
-	const staticMat = mRz.clone().multiply(Slen).multiply(Tworld)
-	const staticWithHand = staticMat.clone().multiply(RIGHT_HANDED)
-	const total = staticWithHand.clone().multiply(updaterMatrix)
-	return new Vertex3D(raw.x, raw.y, raw.z).multiplyMatrix(total)
+	const vRz = new Vertex3D(raw.x, raw.y, raw.z).multiplyMatrix(mRz)
+	const vStatic = new Vertex3D(vRz.x * len + cx, vRz.y * len + cy, vRz.z * len * scaleZ + posZ)
+	return vStatic.multiplyMatrix(updaterMatrix)
 }
 
 function captureGateMatrix(
@@ -136,11 +120,9 @@ describe('Gate visual regression vs VPinball C++ brute', () => {
 					})
 					let maxErr = 0
 					for (const raw of raws) {
-						const cD3d = bruteD3D(raw, len, scaleZ, cx, cy, height, base, rot, angle, twoWay)
-						const cWorld = toWorldFromD3D(cD3d)
-						const jRh = jsWorldViaUpdater(raw, len, scaleZ, cx, cy, height, base, rot, matrix)
-						const jWorld = toWorldFromRH(jRh)
-						const err = Math.hypot(cWorld.x - jWorld.x, cWorld.y - jWorld.y, cWorld.z - jWorld.z)
+						const brute = bruteGateWorld(raw, len, scaleZ, cx, cy, height, base, rot, angle, twoWay)
+						const js = jsGateViaUpdater(raw, len, scaleZ, cx, cy, height, base, rot, matrix)
+						const err = Math.hypot(brute.x - js.x, brute.y - js.y, brute.z - js.z)
 						if (err > maxErr) maxErr = err
 					}
 					expect(maxErr, `gateType ${gateType} rot ${rot} twoWay ${twoWay} maxErr`).to.be.below(1e-4)
@@ -159,29 +141,21 @@ describe('Gate visual regression vs VPinball C++ brute', () => {
 			rotation: rot,
 			twoWay,
 		})
-		const cD3d = bruteD3D(raw, len, scaleZ, cx, cy, height, base, rot, angle, twoWay)
-		const cWorld = toWorldFromD3D(cD3d)
-		const jRh = jsWorldViaUpdater(raw, len, scaleZ, cx, cy, height, base, rot, matrix)
-		const jWorld = toWorldFromRH(jRh)
-		const errCorrect = Math.hypot(cWorld.x - jWorld.x, cWorld.y - jWorld.y, cWorld.z - jWorld.z)
+		const brute = bruteGateWorld(raw, len, scaleZ, cx, cy, height, base, rot, angle, twoWay)
+		const js = jsGateViaUpdater(raw, len, scaleZ, cx, cy, height, base, rot, matrix)
+		const errCorrect = Math.hypot(brute.x - js.x, brute.y - js.y, brute.z - js.z)
 		expect(errCorrect).to.be.below(1e-4)
 
-		const flippedAngle = twoWay ? angle : -angle
-		const oppositeIdeal = flippedAngle
-		const posZjs = -(height * scaleZ + base)
+		const flippedAngle = twoWay ? -angle : angle
+		const posZjs = height * scaleZ + base
 		const Tneg = new Matrix3D().setTranslation(-cx, -cy, -posZjs)
 		const RzNeg = new Matrix3D().rotateZMatrix((-rot * Math.PI) / 180)
-		const Rx = new Matrix3D().rotateXMatrix(oppositeIdeal)
+		const Rx = new Matrix3D().rotateXMatrix(flippedAngle)
 		const RzPos = new Matrix3D().rotateZMatrix((rot * Math.PI) / 180)
 		const Tpos = new Matrix3D().setTranslation(cx, cy, posZjs)
 		const flippedMatrix = Tneg.clone().multiply(RzNeg).multiply(Rx).multiply(RzPos).multiply(Tpos)
-		const jRhFlipped = jsWorldViaUpdater(raw, len, scaleZ, cx, cy, height, base, rot, flippedMatrix)
-		const jWorldFlipped = toWorldFromRH(jRhFlipped)
-		const errFlipped = Math.hypot(
-			cWorld.x - jWorldFlipped.x,
-			cWorld.y - jWorldFlipped.y,
-			cWorld.z - jWorldFlipped.z,
-		)
+		const jsFlipped = jsGateViaUpdater(raw, len, scaleZ, cx, cy, height, base, rot, flippedMatrix)
+		const errFlipped = Math.hypot(brute.x - jsFlipped.x, brute.y - jsFlipped.y, brute.z - jsFlipped.z)
 		expect(errFlipped).to.be.above(30)
 	})
 
@@ -209,15 +183,13 @@ describe('Gate visual regression vs VPinball C++ brute', () => {
 		const twoWay = gate.data.twoWay
 		let maxErr = 0
 		for (const raw of raws) {
-			const cD3d = bruteD3D(raw, len, scaleZ, cx, cy, height, base, rot, angle, twoWay)
-			const cWorld = toWorldFromD3D(cD3d)
-			const jRh = jsWorldViaUpdater(raw, len, scaleZ, cx, cy, height, base, rot, cap as Matrix3D)
-			const jWorld = toWorldFromRH(jRh)
-			const err = Math.hypot(cWorld.x - jWorld.x, cWorld.y - jWorld.y, cWorld.z - jWorld.z)
+			const brute = bruteGateWorld(raw, len, scaleZ, cx, cy, height, base, rot, angle, twoWay)
+			const js = jsGateViaUpdater(raw, len, scaleZ, cx, cy, height, base, rot, cap as Matrix3D)
+			const err = Math.hypot(brute.x - js.x, brute.y - js.y, brute.z - js.z)
 			if (err > maxErr) maxErr = err
 		}
 		expect(maxErr).to.be.below(1e-4)
-		expect(-(gate.data.height * scaleZ + base)).to.equal(-100)
+		expect(gate.data.height * scaleZ + base).to.equal(100)
 	})
 
 	it('should move gate bottom in correct world direction (wire vs plate parity)', () => {
@@ -229,43 +201,12 @@ describe('Gate visual regression vs VPinball C++ brute', () => {
 				rotation: 0,
 				twoWay: true,
 			})
-			const j0 = jsWorldViaUpdater(
-				new Vertex3D(0, 0, 0),
-				len,
-				scaleZ,
-				cx,
-				cy,
-				height,
-				base,
-				rot,
-				new Matrix3D().identity(),
-			)
-			const jRh = jsWorldViaUpdater(rawsBottom, len, scaleZ, cx, cy, height, base, rot, matrix)
-			const jWorld0 = toWorldFromRH(
-				jsWorldViaUpdater(
-					new Vertex3D(0, 0, -0.35),
-					len,
-					scaleZ,
-					cx,
-					cy,
-					height,
-					base,
-					rot,
-					new Matrix3D().identity(),
-				) as any,
-			)
-			void j0
-			void jWorld0
-			const cD3d0 = bruteD3D(rawsBottom, len, scaleZ, cx, cy, height, base, rot, 0, true)
-			const cWorld0 = toWorldFromD3D(cD3d0)
-			const cD3d = bruteD3D(rawsBottom, len, scaleZ, cx, cy, height, base, rot, angle, true)
-			const cWorld = toWorldFromD3D(cD3d)
-			const deltaY = cWorld.y - cWorld0.y
-			const jWorldBottom0 = toWorldFromRH(
-				jsWorldViaUpdater(rawsBottom, len, scaleZ, cx, cy, height, base, rot, new Matrix3D().identity()),
-			)
-			const jWorldBottom = toWorldFromRH(jRh)
-			const jDeltaY = jWorldBottom.y - jWorldBottom0.y
+			const brute0 = bruteGateWorld(rawsBottom, len, scaleZ, cx, cy, height, base, rot, 0, true)
+			const brute = bruteGateWorld(rawsBottom, len, scaleZ, cx, cy, height, base, rot, angle, true)
+			const deltaY = brute.y - brute0.y
+			const js0 = jsGateViaUpdater(rawsBottom, len, scaleZ, cx, cy, height, base, rot, new Matrix3D().identity())
+			const jsWorld = jsGateViaUpdater(rawsBottom, len, scaleZ, cx, cy, height, base, rot, matrix)
+			const jDeltaY = jsWorld.y - js0.y
 			expect(Math.sign(jDeltaY), `gateType ${gateType} jDeltaY`).to.equal(Math.sign(deltaY))
 			expect(jDeltaY).to.be.closeTo(deltaY, 1e-4)
 		}
