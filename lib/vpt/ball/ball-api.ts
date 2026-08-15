@@ -14,7 +14,7 @@ import type { BallState } from './ball-state.js'
 export class BallApi extends ItemApi<BallData> {
 	constructor(
 		private readonly ball: Ball,
-		private readonly state: BallState,
+		private readonly _state: BallState,
 		private readonly hit: BallHit,
 		data: BallData,
 		events: EventProxy,
@@ -25,22 +25,22 @@ export class BallApi extends ItemApi<BallData> {
 	}
 
 	get X() {
-		return this.state.pos.x
+		return this._state.pos.x
 	}
 	set X(v) {
-		this.state.pos.x = v
+		this._state.pos.x = v
 	}
 	get Y() {
-		return this.state.pos.y
+		return this._state.pos.y
 	}
 	set Y(v) {
-		this.state.pos.y = v
+		this._state.pos.y = v
 	}
 	get Z() {
-		return this.state.pos.z
+		return this._state.pos.z
 	}
 	set Z(v) {
-		this.state.pos.z = v
+		this._state.pos.z = v
 	}
 	get VelX() {
 		return this.hit.vel.x

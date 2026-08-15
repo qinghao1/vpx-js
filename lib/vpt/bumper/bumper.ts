@@ -175,7 +175,7 @@ export class BumperApi extends ItemApi<BumperData> {
 	private readonly isSkirtDynamic: boolean
 
 	constructor(
-		private readonly state: BumperState,
+		private readonly _state: BumperState,
 		private readonly animation: BumperAnimation,
 		data: BumperData,
 		events: EventProxy,
@@ -259,28 +259,28 @@ export class BumperApi extends ItemApi<BumperData> {
 		return this.data.szCapMaterial
 	}
 	set CapMaterial(v) {
-		if (this.isCapDynamic) this.state.capMaterial = v
+		if (this.isCapDynamic) this._state.capMaterial = v
 		this.data.szCapMaterial = v
 	}
 	get BaseMaterial() {
 		return this.data.szBaseMaterial
 	}
 	set BaseMaterial(v) {
-		if (this.isBaseDynamic) this.state.baseMaterial = v
+		if (this.isBaseDynamic) this._state.baseMaterial = v
 		this.data.szBaseMaterial = v
 	}
 	get SkirtMaterial() {
 		return this.data.szSkirtMaterial
 	}
 	set SkirtMaterial(v) {
-		if (this.isSkirtDynamic) this.state.skirtMaterial = v
+		if (this.isSkirtDynamic) this._state.skirtMaterial = v
 		this.data.szSkirtMaterial = v
 	}
 	get RingMaterial() {
 		return this.data.szRingMaterial
 	}
 	set RingMaterial(v) {
-		if (this.isRingDynamic) this.state.ringMaterial = v
+		if (this.isRingDynamic) this._state.ringMaterial = v
 		this.data.szRingMaterial = v
 	}
 	get HasHitEvent() {
@@ -299,28 +299,28 @@ export class BumperApi extends ItemApi<BumperData> {
 		return this.data.isCapVisible
 	}
 	set CapVisible(v) {
-		if (this.isCapDynamic) this.state.isCapVisible = v
+		if (this.isCapDynamic) this._state.isCapVisible = v
 		this.data.isCapVisible = v
 	}
 	get BaseVisible() {
 		return this.data.isBaseVisible
 	}
 	set BaseVisible(v) {
-		if (this.isBaseDynamic) this.state.isBaseVisible = v
+		if (this.isBaseDynamic) this._state.isBaseVisible = v
 		this.data.isBaseVisible = v
 	}
 	get RingVisible() {
 		return this.data.isRingVisible
 	}
 	set RingVisible(v) {
-		if (this.isRingDynamic) this.state.isRingVisible = v
+		if (this.isRingDynamic) this._state.isRingVisible = v
 		this.data.isRingVisible = v
 	}
 	get SkirtVisible() {
 		return this.data.isSkirtVisible
 	}
 	set SkirtVisible(v) {
-		if (this.isSkirtDynamic) this.state.isSkirtVisible = v
+		if (this.isSkirtDynamic) this._state.isSkirtVisible = v
 		this.data.isSkirtVisible = v
 	}
 	get ReflectionEnabled() {
@@ -343,15 +343,15 @@ export class BumperApi extends ItemApi<BumperData> {
 	}
 
 	get CurrentRingOffset() {
-		return this.state.ringOffset
+		return this._state.ringOffset
 	}
 
 	get RotX() {
-		return this.state.skirtRotX
+		return this._state.skirtRotX
 	}
 
 	get RotY() {
-		return this.state.skirtRotY
+		return this._state.skirtRotY
 	}
 
 	public PlayHit(): void {

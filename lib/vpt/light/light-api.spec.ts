@@ -93,4 +93,14 @@ describe('The VPinball light API', () => {
 		light.Visible = true
 		expect(light.Visible).to.equal(true)
 	})
+
+	it('should support case-insensitive state and color proxy access from VBScript', async () => {
+		const light = table.lights.Surface.getApi() as any
+		light.state = 0.5
+		expect(light.State).to.equal(0.5)
+		light.color = 0xff00ff
+		expect(light.Color).to.equal(0xff00ff)
+		light.colorfull = 0x00ffff
+		expect(light.ColorFull).to.equal(0x00ffff)
+	})
 })

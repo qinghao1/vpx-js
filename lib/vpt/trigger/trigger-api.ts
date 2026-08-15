@@ -12,7 +12,7 @@ import type { TriggerState } from './trigger-state.js'
 /** Trigger API — VBS surface for `Trigger`. @see https://github.com/vpinball/vpinball/blob/master/trigger.cpp */
 export class TriggerApi extends ItemApi<TriggerData> {
 	constructor(
-		private readonly state: TriggerState,
+		private readonly _state: TriggerState,
 		data: TriggerData,
 		events: EventProxy,
 		player: Player,
@@ -52,11 +52,11 @@ export class TriggerApi extends ItemApi<TriggerData> {
 		this.data.isEnabled = v
 	}
 	get Visible() {
-		return this.state.isVisible
+		return this._state.isVisible
 	}
 	set Visible(v) {
 		this.data.isVisible = v
-		this.state.isVisible = v && this.data.shape !== Enums.TriggerShape.TriggerNone
+		this._state.isVisible = v && this.data.shape !== Enums.TriggerShape.TriggerNone
 	}
 	get HitHeight() {
 		return this.data.hitHeight
@@ -83,17 +83,17 @@ export class TriggerApi extends ItemApi<TriggerData> {
 		this.data.animSpeed = v
 	}
 	get Material() {
-		return this.state.material
+		return this._state.material
 	}
 	set Material(v) {
-		this.state.material = v
+		this._state.material = v
 	}
 	get TriggerShape() {
 		return this.data.shape
 	}
 	set TriggerShape(v) {
 		this.data.shape = v
-		this.state.isVisible = this.data.isVisible && v !== Enums.TriggerShape.TriggerNone
+		this._state.isVisible = this.data.isVisible && v !== Enums.TriggerShape.TriggerNone
 	}
 	get ReflectionEnabled() {
 		return this.data.isReflectionEnabled

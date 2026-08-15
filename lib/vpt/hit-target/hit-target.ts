@@ -149,7 +149,7 @@ export class HitTargetState extends ItemState {
 /** Hit target API — VBS surface for `HitTarget`. @see https://github.com/vpinball/vpinball/blob/master/hittarget.cpp */
 export class HitTargetApi extends ItemApi<HitTargetData> {
 	constructor(
-		private readonly state: HitTargetState,
+		private readonly _state: HitTargetState,
 		data: HitTargetData,
 		private readonly hits: HitObject[],
 		private readonly animation: HitTargetAnimation,
@@ -161,23 +161,23 @@ export class HitTargetApi extends ItemApi<HitTargetData> {
 	}
 
 	get Image() {
-		return this.state.texture
+		return this._state.texture
 	}
 	set Image(v) {
 		this._assertNonHdrImage(v)
-		this.state.texture = v
+		this._state.texture = v
 	}
 	get Material() {
-		return this.state.material
+		return this._state.material
 	}
 	set Material(v) {
-		this.state.material = v
+		this._state.material = v
 	}
 	get Visible() {
-		return this.state.isVisible
+		return this._state.isVisible
 	}
 	set Visible(v) {
-		this.state.isVisible = v
+		this._state.isVisible = v
 	}
 	get X() {
 		return this.data.position.x
@@ -329,11 +329,11 @@ export class HitTargetApi extends ItemApi<HitTargetData> {
 		if (this.data.isDropped !== val && this.animation) {
 			if (val) {
 				this.animation.moveAnimation = true
-				this.state.zOffset = 0
+				this._state.zOffset = 0
 				this.animation.moveDown = true
 			} else {
 				this.animation.moveAnimation = true
-				this.state.zOffset = -HitTarget.DROP_TARGET_LIMIT * table.getScaleZ()
+				this._state.zOffset = -HitTarget.DROP_TARGET_LIMIT * table.getScaleZ()
 				this.animation.moveDown = false
 				this.animation.timeStamp = physics.timeMsec
 			}

@@ -8,6 +8,14 @@ import type { Table } from '../table/table.js'
 import type { LightData } from './light-data.js'
 import type { LightState } from './light-state.js'
 
+/** Clamps light state according to VPinball rules (0..1, 2 for blinking, -1/255 -> 1). */
+export function clampLightState(state: number): number {
+	if (state < 0) return 1
+	if (state === 2) return 2
+	if (state > 1) return 1
+	return state
+}
+
 /** Light animation. @see https://github.com/vpinball/vpinball/blob/master/light.cpp */
 export class LightAnimation implements IAnimation {
 	public realState: number = Enums.LightStatus.LightStateOff
@@ -25,12 +33,18 @@ export class LightAnimation implements IAnimation {
 		private readonly data: LightData,
 		private readonly state: LightState,
 	) {
-		this.realState = this.data.state
+		this.realState = clampLightState(this.data.state)
 	}
 
-	public init(): void {}
+	public init(timeMsec = 0): void {
+		this.timeMsec = timeMsec
+		if (this.realState === Enums.LightStatus.LightStateBlinking) {
+			this.restartBlinker(timeMsec)
+		}
+	}
 
 	public setState(newVal: number, physics: PlayerPhysics) {
+		newVal = clampLightState(newVal)
 		if (newVal !== this.realState) {
 			this.realState = newVal
 			if (this.realState === Enums.LightStatus.LightStateBlinking) {
@@ -90,9 +104,9 @@ export class LightAnimation implements IAnimation {
 	}
 
 	public setDuration(startState: number, duration: number, endState: number, timeMsec: number) {
-		this.realState = startState
+		this.realState = clampLightState(startState)
 		this.duration = duration
-		this.finalState = endState
+		this.finalState = clampLightState(endState)
 		this.timerDurationEndTime = timeMsec + this.duration
 		if (this.realState === Enums.LightStatus.LightStateBlinking) {
 			this.iBlinkFrame = 0

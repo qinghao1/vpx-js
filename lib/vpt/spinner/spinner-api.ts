@@ -14,7 +14,7 @@ import type { SpinnerState } from './spinner-state.js'
 /** Spinner API — VBS surface for `Spinner`. @see https://github.com/vpinball/vpinball/blob/master/spinner.cpp */
 export class SpinnerApi extends ItemApi<SpinnerData> {
 	constructor(
-		private readonly state: SpinnerState,
+		private readonly _state: SpinnerState,
 		private readonly mover: SpinnerMover,
 		data: SpinnerData,
 		events: EventProxy,
@@ -49,17 +49,17 @@ export class SpinnerApi extends ItemApi<SpinnerData> {
 		this.mover.damping = MathUtils.clamp(v, 0, 1) ** PHYS_FACTOR
 	}
 	get Material() {
-		return this.state.material
+		return this._state.material
 	}
 	set Material(v) {
-		this.state.material = v
+		this._state.material = v
 	}
 	get Image() {
-		return this.state.texture
+		return this._state.texture
 	}
 	set Image(v) {
 		this._assertNonHdrImage(v)
-		this.state.texture = v
+		this._state.texture = v
 	}
 	get X() {
 		return this.data.center.x
@@ -80,10 +80,10 @@ export class SpinnerApi extends ItemApi<SpinnerData> {
 		this.data.szSurface = v
 	}
 	get ShowBracket() {
-		return this.state.showBracket
+		return this._state.showBracket
 	}
 	set ShowBracket(v) {
-		this.state.showBracket = v
+		this._state.showBracket = v
 	}
 	get AngleMax() {
 		return MathUtils.radToDeg(this.mover.angleMax)
@@ -112,10 +112,10 @@ export class SpinnerApi extends ItemApi<SpinnerData> {
 		this.mover.elasticity = v
 	}
 	get Visible() {
-		return this.state.isVisible
+		return this._state.isVisible
 	}
 	set Visible(v) {
-		this.state.isVisible = v
+		this._state.isVisible = v
 	}
 	get ReflectionEnabled() {
 		return this.data.isReflectionEnabled
@@ -124,7 +124,7 @@ export class SpinnerApi extends ItemApi<SpinnerData> {
 		this.data.isReflectionEnabled = v
 	}
 	get CurrentAngle() {
-		return this.state.angle
+		return this._state.angle
 	}
 
 	protected _getPropertyNames(): string[] {

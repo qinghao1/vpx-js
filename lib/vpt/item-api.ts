@@ -21,7 +21,6 @@ const INTERNAL: Record<string, boolean> = {
 	propertyMap: true,
 	hitTimer: true,
 	UserValue: true,
-	state: true,
 	animation: true,
 	constructor: true,
 	prototype: true,
@@ -79,7 +78,7 @@ export abstract class ItemApi<DATA extends ItemData> extends EventEmitter {
 		super()
 		return new Proxy(this, {
 			get(target: unknown, prop: string | symbol, receiver: unknown) {
-				if (typeof prop === 'string' && !INTERNAL[prop]) {
+				if (typeof prop === 'string' && !prop.startsWith('_') && !INTERNAL[prop]) {
 					const mapped = (target as ItemApi<DATA>)._getPropertyName(prop)
 					if (mapped) {
 						const v = Reflect.get(target as object, mapped, receiver)
@@ -91,14 +90,14 @@ export abstract class ItemApi<DATA extends ItemData> extends EventEmitter {
 				return typeof v === 'function' && typeof prop === 'string' && !INTERNAL[prop] ? v.bind(target) : v
 			},
 			set(target: unknown, prop: string | symbol, value: unknown, receiver: unknown) {
-				if (typeof prop === 'string' && !INTERNAL[prop]) {
+				if (typeof prop === 'string' && !prop.startsWith('_') && !INTERNAL[prop]) {
 					const mapped = (target as ItemApi<DATA>)._getPropertyName(prop)
 					if (mapped) return Reflect.set(target as object, mapped, value, receiver)
 				}
-				return Reflect.set(target as object, prop as string, value, receiver)
+				return Reflect.set(target as object, prop as string, value)
 			},
 			has(target: unknown, prop: string | symbol) {
-				if (typeof prop === 'string' && !INTERNAL[prop]) {
+				if (typeof prop === 'string' && !prop.startsWith('_') && !INTERNAL[prop]) {
 					const mapped = (target as ItemApi<DATA>)._getPropertyName(prop)
 					if (mapped) return mapped in (target as object)
 				}

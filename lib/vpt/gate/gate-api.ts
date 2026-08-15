@@ -18,7 +18,7 @@ export class GateApi extends ItemApi<GateData> {
 	constructor(
 		data: GateData,
 		events: EventProxy,
-		private readonly state: GateState,
+		private readonly _state: GateState,
 		private readonly mover: GateMover,
 		private readonly hitGate: GateHit,
 		private readonly hitLine: LineSeg | null,
@@ -65,10 +65,10 @@ export class GateApi extends ItemApi<GateData> {
 		this.data.szSurface = v
 	}
 	get Material() {
-		return this.state.material
+		return this._state.material
 	}
 	set Material(v) {
-		this.state.material = v
+		this._state.material = v
 	}
 	get Open() {
 		return this.mover.open
@@ -83,10 +83,10 @@ export class GateApi extends ItemApi<GateData> {
 		this.data.elasticity = v
 	}
 	get ShowBracket() {
-		return this.state.showBracket
+		return this._state.showBracket
 	}
 	set ShowBracket(v) {
-		this.state.showBracket = v
+		this._state.showBracket = v
 	}
 	get CloseAngle() {
 		return Math.round(MathUtils.radToDeg(this.mover.angleMin) * 1e5) / 1e5
@@ -125,10 +125,10 @@ export class GateApi extends ItemApi<GateData> {
 		this.mover.gravityFactor = MathUtils.clamp(v, 0, 1)
 	}
 	get Visible() {
-		return this.state.isVisible
+		return this._state.isVisible
 	}
 	set Visible(v) {
-		this.state.isVisible = v
+		this._state.isVisible = v
 	}
 	get TwoWay() {
 		return this.data.twoWay
@@ -145,7 +145,7 @@ export class GateApi extends ItemApi<GateData> {
 		this.data.isReflectionEnabled = v
 	}
 	get CurrentAngle() {
-		return this.state.angle
+		return this._state.angle
 	}
 	get DrawStyle() {
 		return this.data.gateType
@@ -162,8 +162,8 @@ export class GateApi extends ItemApi<GateData> {
 		this.mover.open = isOpen
 		this.hitGate.isEnabled = isOpen ? false : this.data.isCollidable
 		if (this.hitLine) this.hitLine.isEnabled = this.hitGate.isEnabled
-		if (isOpen && this.state.angle < this.mover.angleMax) this.mover.angleSpeed = 0.2
-		if (!isOpen && this.state.angle > this.mover.angleMin) this.mover.angleSpeed = -0.2
+		if (isOpen && this._state.angle < this.mover.angleMax) this.mover.angleSpeed = 0.2
+		if (!isOpen && this._state.angle > this.mover.angleMin) this.mover.angleSpeed = -0.2
 	}
 
 	private setCloseAngle(deg: number): void {
@@ -201,7 +201,7 @@ export class GateApi extends ItemApi<GateData> {
 		if (!dir || angle !== 0) {
 			angle *= Math.PI / 180
 			angle = MathUtils.clamp(angle, this.data.angleMin, this.data.angleMax)
-			const da = angle - this.state.angle
+			const da = angle - this._state.angle
 			if (da > 1e-5) dir = 1
 			else if (da < -1e-5) dir = -1
 			else {
@@ -214,10 +214,10 @@ export class GateApi extends ItemApi<GateData> {
 
 		if (dir > 0) {
 			this.mover.angleMax = angle
-			if (this.state.angle < this.mover.angleMax) this.mover.angleSpeed = speed
+			if (this._state.angle < this.mover.angleMax) this.mover.angleSpeed = speed
 		} else if (dir < 0) {
 			this.mover.angleMin = angle
-			if (this.state.angle > this.mover.angleMin) this.mover.angleSpeed = -speed
+			if (this._state.angle > this.mover.angleMin) this.mover.angleSpeed = -speed
 		}
 	}
 

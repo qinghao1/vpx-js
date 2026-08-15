@@ -23,23 +23,30 @@ export class ThreeLightGenerator {
 
 	public applyLighting(state: LightState, initial: number, obj?: Object3D): void {
 		if (!obj) return
-		for (const child of obj.children) {
+		const targets = [obj, ...obj.children]
+		for (const child of targets) {
 			switch (child.name) {
 				case 'light':
-					;(child as PointLight).intensity = state.intensity
-					;(child as PointLight).color.set(state.color)
+					if (state.intensity !== undefined) (child as PointLight).intensity = state.intensity
+					if (state.color !== undefined) (child as PointLight).color.set(state.color)
 					break
 				case 'bulb.light': {
 					const m = (child as ThreeMesh).material as MeshStandardMaterial
-					m.emissiveIntensity = state.intensity / initial
-					m.color.set(state.color)
-					m.emissive.set(state.color)
+					if (m) {
+						if (state.intensity !== undefined) m.emissiveIntensity = state.intensity / (initial || 1)
+						if (state.color !== undefined) {
+							m.color.set(state.color)
+							m.emissive.set(state.color)
+						}
+					}
 					break
 				}
 				case 'surface.light': {
 					const m = (child as ThreeMesh).material as MeshStandardMaterial
-					m.emissiveIntensity = state.intensity
-					m.emissive.set(state.color)
+					if (m) {
+						if (state.intensity !== undefined) m.emissiveIntensity = state.intensity
+						if (state.color !== undefined) m.emissive.set(state.color)
+					}
 					break
 				}
 			}

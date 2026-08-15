@@ -107,7 +107,7 @@ export class KickerState extends ItemState {
 /** Kicker API — VBS surface for `Kicker`. @see https://github.com/vpinball/vpinball/blob/master/kicker.cpp */
 export class KickerApi extends ItemApi<KickerData> {
 	constructor(
-		private readonly state: KickerState,
+		private readonly _state: KickerState,
 		data: KickerData,
 		private readonly hit: KickerHit,
 		events: EventProxy,
@@ -185,22 +185,22 @@ export class KickerApi extends ItemApi<KickerData> {
 		this.data.legacyMode = v
 	}
 	get KickerType() {
-		return this.state.type
+		return this._state.type
 	}
 	set KickerType(v) {
-		this.state.type = v
+		this._state.type = v
 	}
 	get Material() {
-		return this.state.material
+		return this._state.material
 	}
 	set Material(v) {
-		this.state.material = v
+		this._state.material = v
 	}
 	get DrawStyle() {
-		return this.state.type
+		return this._state.type
 	}
 	set DrawStyle(v) {
-		this.state.type = v
+		this._state.type = v
 	}
 
 	get LastCapturedBall(): Ball | null {

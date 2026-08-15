@@ -188,7 +188,7 @@ export class SurfaceApi extends ItemApi<SurfaceData> {
 	private isDynamic = false
 
 	constructor(
-		private readonly state: SurfaceState,
+		private readonly _state: SurfaceState,
 		data: SurfaceData,
 		private readonly hits: HitObject[],
 		private readonly hitGenerator: SurfaceHitGenerator,
@@ -224,14 +224,14 @@ export class SurfaceApi extends ItemApi<SurfaceData> {
 		return this.data.szImage
 	}
 	set Image(v) {
-		if (this.isDynamic) this.state.topTexture = v
+		if (this.isDynamic) this._state.topTexture = v
 		this.data.szImage = v
 	}
 	get SideMaterial() {
 		return this.data.szSideMaterial
 	}
 	set SideMaterial(v) {
-		if (this.isDynamic) this.state.sideMaterial = v
+		if (this.isDynamic) this._state.sideMaterial = v
 		this.data.szSideMaterial = v
 	}
 	get SlingshotMaterial() {
@@ -258,7 +258,7 @@ export class SurfaceApi extends ItemApi<SurfaceData> {
 		return this.data.szTopMaterial
 	}
 	set TopMaterial(v) {
-		if (this.isDynamic) this.state.topMaterial = v
+		if (this.isDynamic) this._state.topMaterial = v
 		this.data.szTopMaterial = v
 	}
 	get PhysicsMaterial() {
@@ -292,7 +292,7 @@ export class SurfaceApi extends ItemApi<SurfaceData> {
 		this.data.isBottomSolid = v
 	}
 	get IsDropped() {
-		return this.state.isDropped
+		return this._state.isDropped
 	}
 	set IsDropped(v) {
 		this._setDropped(v)
@@ -331,7 +331,7 @@ export class SurfaceApi extends ItemApi<SurfaceData> {
 		return this.data.isTopBottomVisible
 	}
 	set Visible(v) {
-		if (this.isDynamic) this.state.isTopVisible = v
+		if (this.isDynamic) this._state.isTopVisible = v
 		this.data.isTopBottomVisible = v
 	}
 	get SideImage() {
@@ -339,7 +339,7 @@ export class SurfaceApi extends ItemApi<SurfaceData> {
 	}
 	set SideImage(v) {
 		this._assertNonHdrImage(v)
-		if (this.isDynamic) this.state.sideTexture = v
+		if (this.isDynamic) this._state.sideTexture = v
 		this.data.szSideImage = v
 	}
 	get Disabled() {
@@ -352,7 +352,7 @@ export class SurfaceApi extends ItemApi<SurfaceData> {
 		return this.data.isSideVisible
 	}
 	set SideVisible(v) {
-		if (this.isDynamic) this.state.isSideVisible = v
+		if (this.isDynamic) this._state.isSideVisible = v
 		this.data.isSideVisible = v
 	}
 	get Collidable() {
@@ -404,15 +404,15 @@ export class SurfaceApi extends ItemApi<SurfaceData> {
 
 	private _setDropped(isDropped: boolean): void {
 		if (!this.data.isDroppable) throw new Error(`Surface "${this.Name}" is not droppable.`)
-		if (this.state.isDropped !== isDropped) {
-			this.state.isDropped = isDropped
-			const b = !this.state.isDropped && this.data.isCollidable
+		if (this._state.isDropped !== isDropped) {
+			this._state.isDropped = isDropped
+			const b = !this._state.isDropped && this.data.isCollidable
 			if (this.hits.length > 0 && this.hits[0]!.isEnabled !== b) for (const drop of this.hits) drop.setEnabled(b)
 		}
 	}
 
 	private _setCollidable(isCollidable: boolean): void {
-		const b = this.data.isDroppable ? isCollidable && !this.state.isDropped : isCollidable
+		const b = this.data.isDroppable ? isCollidable && !this._state.isDropped : isCollidable
 		if (this.hits.length > 0 && this.hits[0]!.isEnabled !== b) for (const hit of this.hits) hit.isEnabled = b
 	}
 

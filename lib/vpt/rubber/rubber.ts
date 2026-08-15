@@ -144,7 +144,7 @@ export class RubberApi extends ItemApi<RubberData> {
 	private readonly isDynamic: boolean
 
 	constructor(
-		private readonly state: RubberState,
+		private readonly _state: RubberState,
 		private readonly hits: HitObject[],
 		data: RubberData,
 		events: EventProxy,
@@ -159,7 +159,7 @@ export class RubberApi extends ItemApi<RubberData> {
 		return this.data.height
 	}
 	set Height(v) {
-		if (this.isDynamic) this.state.height = v
+		if (this.isDynamic) this._state.height = v
 		this.data.height = v
 	}
 	get HitHeight() {
@@ -178,7 +178,7 @@ export class RubberApi extends ItemApi<RubberData> {
 		return this.data.szMaterial
 	}
 	set Material(v) {
-		if (this.isDynamic) this.state.material = v
+		if (this.isDynamic) this._state.material = v
 		this.data.szMaterial = v
 	}
 	get Image() {
@@ -186,7 +186,7 @@ export class RubberApi extends ItemApi<RubberData> {
 	}
 	set Image(v) {
 		this._assertNonHdrImage(v)
-		if (this.isDynamic) this.state.texture = v
+		if (this.isDynamic) this._state.texture = v
 		this.data.szImage = v
 	}
 	get HasHitEvent() {
@@ -229,7 +229,7 @@ export class RubberApi extends ItemApi<RubberData> {
 		return this.data.isVisible
 	}
 	set Visible(v) {
-		if (this.isDynamic) this.state.isVisible = v
+		if (this.isDynamic) this._state.isVisible = v
 		this.data.isVisible = v
 	}
 	get EnableStaticRendering() {
@@ -254,21 +254,21 @@ export class RubberApi extends ItemApi<RubberData> {
 		return this.data.rotX
 	}
 	set RotX(v) {
-		if (this.isDynamic) this.state.rotX = v
+		if (this.isDynamic) this._state.rotX = v
 		this.data.rotX = v
 	}
 	get RotY() {
 		return this.data.rotY
 	}
 	set RotY(v) {
-		if (this.isDynamic) this.state.rotY = v
+		if (this.isDynamic) this._state.rotY = v
 		this.data.rotY = v
 	}
 	get RotZ() {
 		return this.data.rotZ
 	}
 	set RotZ(v) {
-		if (this.isDynamic) this.state.rotZ = v
+		if (this.isDynamic) this._state.rotZ = v
 		this.data.rotZ = v
 	}
 	get PhysicsMaterial() {

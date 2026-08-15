@@ -24,7 +24,7 @@ export class PrimitiveApi extends ItemApi<PrimitiveData> {
 
 	constructor(
 		private readonly primitive: Primitive,
-		private readonly state: PrimitiveState,
+		private readonly _state: PrimitiveState,
 		data: PrimitiveData,
 		private readonly hits: HitObject[],
 		events: EventProxy,
@@ -37,26 +37,26 @@ export class PrimitiveApi extends ItemApi<PrimitiveData> {
 	}
 
 	get Image() {
-		return this.isDynamic ? (this.state.map ?? '') : (this.data.szImage ?? '')
+		return this.isDynamic ? (this._state.map ?? '') : (this.data.szImage ?? '')
 	}
 	set Image(v) {
 		this._assertNonHdrImage(v)
-		if (this.isDynamic) this.state.map = v
+		if (this.isDynamic) this._state.map = v
 		else this.data.szImage = v
 	}
 	get NormalMap() {
-		return this.isDynamic ? (this.state.normalMap ?? '') : (this.data.szNormalMap ?? '')
+		return this.isDynamic ? (this._state.normalMap ?? '') : (this.data.szNormalMap ?? '')
 	}
 	set NormalMap(v) {
 		this._assertNonHdrImage(v)
-		if (this.isDynamic) this.state.normalMap = v
+		if (this.isDynamic) this._state.normalMap = v
 		else this.data.szNormalMap = v
 	}
 	get Material() {
-		return this.isDynamic ? (this.state.material ?? '') : (this.data.szMaterial ?? '')
+		return this.isDynamic ? (this._state.material ?? '') : (this.data.szMaterial ?? '')
 	}
 	set Material(v) {
-		if (this.isDynamic) this.state.material = v
+		if (this.isDynamic) this._state.material = v
 		else this.data.szMaterial = v
 	}
 	get MeshFileName() {
@@ -78,10 +78,10 @@ export class PrimitiveApi extends ItemApi<PrimitiveData> {
 		this.data.sideColor = v
 	}
 	get Visible() {
-		return this.isDynamic ? this.state.isVisible : this.data.isVisible
+		return this.isDynamic ? this._state.isVisible : this.data.isVisible
 	}
 	set Visible(v) {
-		if (this.isDynamic) this.state.isVisible = v
+		if (this.isDynamic) this._state.isVisible = v
 		else this.data.isVisible = v
 	}
 	get DrawTexturesInside() {
@@ -91,51 +91,51 @@ export class PrimitiveApi extends ItemApi<PrimitiveData> {
 		this.data.drawTexturesInside = v
 	}
 	get X() {
-		return this.isDynamic ? this.state.position.x : this.data.position.x
+		return this.isDynamic ? this._state.position.x : this.data.position.x
 	}
 	set X(v) {
 		v = num(v)
-		if (this.isDynamic) this.state.position.x = v
+		if (this.isDynamic) this._state.position.x = v
 		else this.data.position.x = v
 	}
 	get Y() {
-		return this.isDynamic ? this.state.position.y : this.data.position.y
+		return this.isDynamic ? this._state.position.y : this.data.position.y
 	}
 	set Y(v) {
 		v = num(v)
-		if (this.isDynamic) this.state.position.y = v
+		if (this.isDynamic) this._state.position.y = v
 		else this.data.position.y = v
 	}
 	get Z() {
-		return this.isDynamic ? this.state.position.z : this.data.position.z
+		return this.isDynamic ? this._state.position.z : this.data.position.z
 	}
 	set Z(v) {
 		v = num(v)
-		if (this.isDynamic) this.state.position.z = v
+		if (this.isDynamic) this._state.position.z = v
 		else this.data.position.z = v
 	}
 	get Size_X() {
-		return this.isDynamic ? this.state.size.x : this.data.size.x
+		return this.isDynamic ? this._state.size.x : this.data.size.x
 	}
 	set Size_X(v) {
 		v = num(v)
-		if (this.isDynamic) this.state.size.x = v
+		if (this.isDynamic) this._state.size.x = v
 		else this.data.size.x = v
 	}
 	get Size_Y() {
-		return this.isDynamic ? this.state.size.y : this.data.size.y
+		return this.isDynamic ? this._state.size.y : this.data.size.y
 	}
 	set Size_Y(v) {
 		v = num(v)
-		if (this.isDynamic) this.state.size.y = v
+		if (this.isDynamic) this._state.size.y = v
 		else this.data.size.y = v
 	}
 	get Size_Z() {
-		return this.isDynamic ? this.state.size.z : this.data.size.z
+		return this.isDynamic ? this._state.size.z : this.data.size.z
 	}
 	set Size_Z(v) {
 		v = num(v)
-		if (this.isDynamic) this.state.size.z = v
+		if (this.isDynamic) this._state.size.z = v
 		else this.data.size.z = v
 	}
 	get RotAndTra0() {
@@ -145,11 +145,11 @@ export class PrimitiveApi extends ItemApi<PrimitiveData> {
 		this.RotX = v
 	}
 	get RotX() {
-		return this.isDynamic ? this.state.rotation.x : this.data.rotAndTra[0]
+		return this.isDynamic ? this._state.rotation.x : this.data.rotAndTra[0]
 	}
 	set RotX(v) {
 		v = num(v)
-		if (this.isDynamic) this.state.rotation.x = v
+		if (this.isDynamic) this._state.rotation.x = v
 		else this.data.rotAndTra[0] = v
 	}
 	get RotAndTra1() {
@@ -159,11 +159,11 @@ export class PrimitiveApi extends ItemApi<PrimitiveData> {
 		this.RotY = v
 	}
 	get RotY() {
-		return this.isDynamic ? this.state.rotation.y : this.data.rotAndTra[1]
+		return this.isDynamic ? this._state.rotation.y : this.data.rotAndTra[1]
 	}
 	set RotY(v) {
 		v = num(v)
-		if (this.isDynamic) this.state.rotation.y = v
+		if (this.isDynamic) this._state.rotation.y = v
 		else this.data.rotAndTra[1] = v
 	}
 	get RotAndTra2() {
@@ -173,11 +173,11 @@ export class PrimitiveApi extends ItemApi<PrimitiveData> {
 		this.RotZ = v
 	}
 	get RotZ() {
-		return this.isDynamic ? this.state.rotation.z : this.data.rotAndTra[2]
+		return this.isDynamic ? this._state.rotation.z : this.data.rotAndTra[2]
 	}
 	set RotZ(v) {
 		v = num(v)
-		if (this.isDynamic) this.state.rotation.z = v
+		if (this.isDynamic) this._state.rotation.z = v
 		else this.data.rotAndTra[2] = v
 	}
 	get RotAndTra3() {
@@ -187,11 +187,11 @@ export class PrimitiveApi extends ItemApi<PrimitiveData> {
 		this.TransX = v
 	}
 	get TransX() {
-		return this.isDynamic ? this.state.translation.x : this.data.rotAndTra[3]
+		return this.isDynamic ? this._state.translation.x : this.data.rotAndTra[3]
 	}
 	set TransX(v) {
 		v = num(v)
-		if (this.isDynamic) this.state.translation.x = v
+		if (this.isDynamic) this._state.translation.x = v
 		else this.data.rotAndTra[3] = v
 	}
 	get RotAndTra4() {
@@ -201,11 +201,11 @@ export class PrimitiveApi extends ItemApi<PrimitiveData> {
 		this.TransY = v
 	}
 	get TransY() {
-		return this.isDynamic ? this.state.translation.y : this.data.rotAndTra[4]
+		return this.isDynamic ? this._state.translation.y : this.data.rotAndTra[4]
 	}
 	set TransY(v) {
 		v = num(v)
-		if (this.isDynamic) this.state.translation.y = v
+		if (this.isDynamic) this._state.translation.y = v
 		else this.data.rotAndTra[4] = v
 	}
 	get RotAndTra5() {
@@ -215,11 +215,11 @@ export class PrimitiveApi extends ItemApi<PrimitiveData> {
 		this.TransZ = v
 	}
 	get TransZ() {
-		return this.isDynamic ? this.state.translation.z : this.data.rotAndTra[5]
+		return this.isDynamic ? this._state.translation.z : this.data.rotAndTra[5]
 	}
 	set TransZ(v) {
 		v = num(v)
-		if (this.isDynamic) this.state.translation.z = v
+		if (this.isDynamic) this._state.translation.z = v
 		else this.data.rotAndTra[5] = v
 	}
 	get RotAndTra6() {
@@ -229,11 +229,11 @@ export class PrimitiveApi extends ItemApi<PrimitiveData> {
 		this.ObjRotX = v
 	}
 	get ObjRotX() {
-		return this.isDynamic ? this.state.objectRotation.x : this.data.rotAndTra[6]
+		return this.isDynamic ? this._state.objectRotation.x : this.data.rotAndTra[6]
 	}
 	set ObjRotX(v) {
 		v = num(v)
-		if (this.isDynamic) this.state.objectRotation.x = v
+		if (this.isDynamic) this._state.objectRotation.x = v
 		else this.data.rotAndTra[6] = v
 	}
 	get RotAndTra7() {
@@ -243,11 +243,11 @@ export class PrimitiveApi extends ItemApi<PrimitiveData> {
 		this.ObjRotY = v
 	}
 	get ObjRotY() {
-		return this.isDynamic ? this.state.objectRotation.y : this.data.rotAndTra[7]
+		return this.isDynamic ? this._state.objectRotation.y : this.data.rotAndTra[7]
 	}
 	set ObjRotY(v) {
 		v = num(v)
-		if (this.isDynamic) this.state.objectRotation.y = v
+		if (this.isDynamic) this._state.objectRotation.y = v
 		else this.data.rotAndTra[7] = v
 	}
 	get RotAndTra8() {
@@ -257,11 +257,11 @@ export class PrimitiveApi extends ItemApi<PrimitiveData> {
 		this.ObjRotZ = v
 	}
 	get ObjRotZ() {
-		return this.isDynamic ? this.state.objectRotation.z : this.data.rotAndTra[8]
+		return this.isDynamic ? this._state.objectRotation.z : this.data.rotAndTra[8]
 	}
 	set ObjRotZ(v) {
 		v = num(v)
-		if (this.isDynamic) this.state.objectRotation.z = v
+		if (this.isDynamic) this._state.objectRotation.z = v
 		else this.data.rotAndTra[8] = v
 	}
 	get EdgeFactorUI() {
@@ -337,11 +337,11 @@ export class PrimitiveApi extends ItemApi<PrimitiveData> {
 		this.data.backfacesEnabled = v
 	}
 	get Opacity() {
-		return this.isDynamic ? (this.state.alpha ?? this.data.alpha) : this.data.alpha
+		return this.isDynamic ? (this._state.alpha ?? this.data.alpha) : this.data.alpha
 	}
 	set Opacity(v) {
 		v = num(v)
-		if (this.isDynamic) this.state.alpha = v
+		if (this.isDynamic) this._state.alpha = v
 		else this.data.alpha = v
 	}
 	get Alpha() {
@@ -351,35 +351,35 @@ export class PrimitiveApi extends ItemApi<PrimitiveData> {
 		this.Opacity = v
 	}
 	get Color() {
-		return this.isDynamic ? this.state.color : this.data.color
+		return this.isDynamic ? this._state.color : this.data.color
 	}
 	set Color(v) {
 		v = num(v)
-		if (this.isDynamic) this.state.color = v
+		if (this.isDynamic) this._state.color = v
 		else this.data.color = v
 	}
 	get DisableLighting() {
-		return this.isDynamic ? this.state.disableLightingTop !== 0 : this.data.disableLightingTop !== 0
+		return this.isDynamic ? this._state.disableLightingTop !== 0 : this.data.disableLightingTop !== 0
 	}
 	set DisableLighting(v) {
 		const val = v ? 1 : 0
-		if (this.isDynamic) this.state.disableLightingTop = val
+		if (this.isDynamic) this._state.disableLightingTop = val
 		else this.data.disableLightingTop = val
 	}
 	get BlendDisableLighting() {
-		return this.isDynamic ? this.state.disableLightingTop : this.data.disableLightingTop
+		return this.isDynamic ? this._state.disableLightingTop : this.data.disableLightingTop
 	}
 	set BlendDisableLighting(v) {
 		v = num(v)
-		if (this.isDynamic) this.state.disableLightingTop = v
+		if (this.isDynamic) this._state.disableLightingTop = v
 		else this.data.disableLightingTop = v
 	}
 	get BlendDisableLightingFromBelow() {
-		return this.isDynamic ? this.state.disableLightingBelow : this.data.disableLightingBelow
+		return this.isDynamic ? this._state.disableLightingBelow : this.data.disableLightingBelow
 	}
 	set BlendDisableLightingFromBelow(v) {
 		v = num(v)
-		if (this.isDynamic) this.state.disableLightingBelow = v
+		if (this.isDynamic) this._state.disableLightingBelow = v
 		else this.data.disableLightingBelow = v
 	}
 	get ReflectionEnabled() {

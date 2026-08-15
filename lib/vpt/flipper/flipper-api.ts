@@ -15,7 +15,7 @@ import type { FlipperState } from './flipper-state.js'
 export class FlipperApi extends ItemApi<FlipperData> {
 	constructor(
 		data: FlipperData,
-		private readonly state: FlipperState,
+		private readonly _state: FlipperState,
 		private readonly hit: FlipperHit,
 		private readonly mover: FlipperMover,
 		events: EventProxy,
@@ -58,16 +58,16 @@ export class FlipperApi extends ItemApi<FlipperData> {
 		if (!this.data.doOverridePhysics(this.table)) this.data.torqueDampingAngle = v
 	}
 	get X() {
-		return this.state.center.x
+		return this._state.center.x
 	}
 	set X(v) {
-		this.state.center.x = v
+		this._state.center.x = v
 	}
 	get Y() {
-		return this.state.center.y
+		return this._state.center.y
 	}
 	set Y(v) {
-		this.state.center.y = v
+		this._state.center.y = v
 	}
 	get Surface() {
 		return this.data.szSurface
@@ -90,13 +90,13 @@ export class FlipperApi extends ItemApi<FlipperData> {
 		return this.data.endAngle
 	}
 	get CurrentAngle() {
-		return MathUtils.radToDeg(this.state.angle)
+		return MathUtils.radToDeg(this._state.angle)
 	}
 	get Material() {
-		return this.state.material
+		return this._state.material
 	}
 	set Material(v) {
-		this.state.material = v
+		this._state.material = v
 	}
 	get Mass() {
 		return this.mover.getMass()
@@ -113,10 +113,10 @@ export class FlipperApi extends ItemApi<FlipperData> {
 		this.hit.updatePhysicsFromFlipper()
 	}
 	get RubberMaterial() {
-		return this.state.rubberMaterial
+		return this._state.rubberMaterial
 	}
 	set RubberMaterial(v) {
-		this.state.rubberMaterial = v
+		this._state.rubberMaterial = v
 	}
 	get RubberThickness() {
 		return this.data.rubberThickness
@@ -143,10 +143,10 @@ export class FlipperApi extends ItemApi<FlipperData> {
 		if (!this.data.doOverridePhysics(this.table)) this.data.strength = v
 	}
 	get Visible() {
-		return this.state.isVisible
+		return this._state.isVisible
 	}
 	set Visible(v) {
-		this.state.isVisible = v
+		this._state.isVisible = v
 	}
 	get Enabled() {
 		return this.data.isEnabled
@@ -204,11 +204,11 @@ export class FlipperApi extends ItemApi<FlipperData> {
 		this.data.flipperRadiusMin = v
 	}
 	get Image() {
-		return this.state.texture
+		return this._state.texture
 	}
 	set Image(v) {
 		this._assertNonHdrImage(v)
-		this.state.texture = v
+		this._state.texture = v
 	}
 	get ReflectionEnabled() {
 		return this.data.isReflectionEnabled
