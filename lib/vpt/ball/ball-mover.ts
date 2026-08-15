@@ -25,9 +25,15 @@ export class BallMover implements MoverObject {
 
 	public updateDisplacements(dtime: number): void {
 		if (this.state.isFrozen) return
+		if (!Number.isFinite(this.hit.vel.x)) this.hit.vel.x = 0
+		if (!Number.isFinite(this.hit.vel.y)) this.hit.vel.y = 0
+		if (!Number.isFinite(this.hit.vel.z)) this.hit.vel.z = 0
 		this.state.pos.x += this.hit.vel.x * dtime
 		this.state.pos.y += this.hit.vel.y * dtime
 		this.state.pos.z += this.hit.vel.z * dtime
+		if (!Number.isFinite(this.state.pos.x)) this.state.pos.x = 0
+		if (!Number.isFinite(this.state.pos.y)) this.state.pos.y = 0
+		if (!Number.isFinite(this.state.pos.z)) this.state.pos.z = this._data.radius
 		this.hit.calcHitBBox()
 		if (this.hit.angularVelocity.lengthSq() >= 1e-12) {
 			const skew = Matrix2D.claim().createSkewSymmetric(this.hit.angularVelocity)

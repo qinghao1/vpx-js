@@ -143,17 +143,18 @@ export class FlipperHit extends HitObject {
 				const aBc = n.clone(true).multiplyScalar(ball.hit.invMass),
 					pv2 = n.clone(true).multiplyScalar(-1)
 				const cross = Vertex3D.crossProduct(rF, pv2, true),
-					pv1 = cross.clone(true).divideScalar(this.mover.inertia),
+					pv1 =
+						this.mover.inertia > 0 ? cross.clone(true).divideScalar(this.mover.inertia) : Vertex3D.claim(),
 					aFc = Vertex3D.crossProduct(pv1, rF, true)
 				const contactAcc = n.dotAndRelease(aBc.clone(true).sub(aFc))
-				const j = -normAcc / contactAcc
+				const j = contactAcc > 1e-7 ? -normAcc / contactAcc : 0
 				ball.hit.vel.addAndRelease(
 					n.clone(true).multiplyScalar(j * dTime * ball.hit.invMass - coll.hitOrgNormalVelocity),
 				)
 				this.mover.applyImpulseAndRelease(cross.clone(true).multiplyScalar(j * dTime))
 				Vertex3D.release(aBc, aFc, cross, pv1, pv2)
 				const slip = vRel.clone(true).subAndRelease(n.clone(true).multiplyScalar(normVel)),
-					maxF = j * this.friction,
+					absMaxF = Math.abs(j * this.friction),
 					slipSpeed = slip.length()
 				let slipDir: Vertex3D, crossF: Vertex3D, numer: number, denomF: number, pv13: Vertex3D
 				if (slipSpeed < C_PRECISION) {
@@ -165,20 +166,23 @@ export class FlipperHit extends HitObject {
 					slipDir = slipAcc.normalize()
 					numer = -slipDir.dot(aRel)
 					crossF = Vertex3D.crossProduct(rF, slipDir, true)
-					pv13 = crossF.clone(true).divideScalar(-this.mover.inertia)
+					pv13 =
+						this.mover.inertia > 0 ? crossF.clone(true).divideScalar(-this.mover.inertia) : Vertex3D.claim()
 					denomF = slipDir.dotAndRelease(Vertex3D.crossProduct(pv13, rF, true))
 				} else {
 					slipDir = slip.clone(true).divideScalar(slipSpeed)
 					numer = -slipDir.dot(vRel)
 					crossF = Vertex3D.crossProduct(rF, slipDir, true)
-					pv13 = crossF.clone(true).divideScalar(this.mover.inertia)
+					pv13 =
+						this.mover.inertia > 0 ? crossF.clone(true).divideScalar(this.mover.inertia) : Vertex3D.claim()
 					denomF = slipDir.dotAndRelease(Vertex3D.crossProduct(pv13, rF, true))
 				}
 				Vertex3D.release(aRel, vRel, rF, slip, pv13)
 				const crossB = Vertex3D.crossProduct(rB, slipDir, true),
 					pv12 = crossB.clone(true).divideScalar(ball.hit.inertia)
 				const denomB = ball.hit.invMass + slipDir.dotAndRelease(Vertex3D.crossProduct(pv12, rB, true))
-				const friction = MathUtils.clamp(numer / (denomB + denomF), -maxF, maxF)
+				const denom = denomB + denomF
+				const friction = denom > 1e-7 ? MathUtils.clamp(numer / denom, -absMaxF, absMaxF) : 0
 				Vertex3D.release(rB, pv12)
 				ball.hit.applySurfaceImpulseAndRelease(
 					crossB.clone(true).multiplyScalar(dTime * friction),
@@ -226,13 +230,16 @@ export class FlipperHit extends HitObject {
 			scale = 0.5
 		}
 		const eps = elasticityWithFalloff(this.elasticity, this.elasticityFalloff, bnv)
-		const pv1 = angResp.clone(true).divideScalar(this.mover.inertia)
-		let impulse = (-(1 + eps) * bnv) / (ball.hit.invMass + n.dotAndRelease(Vertex3D.crossProduct(pv1, rF, true)))
+		const pv1 = this.mover.inertia > 0 ? angResp.clone(true).divideScalar(this.mover.inertia) : Vertex3D.claim()
+		const crossPv1 = Vertex3D.crossProduct(pv1, rF, true)
+		const denom = ball.hit.invMass + n.dotAndRelease(crossPv1)
+		let impulse = denom > 1e-7 ? (-(1 + eps) * bnv) / denom : -(1 + eps) * bnv * ball.data.mass
+		if (!Number.isFinite(impulse)) impulse = 0
 		const flipImp = n.clone(true).multiplyScalar(-(impulse * scale))
 		Vertex3D.release(angResp, pv1)
 		const rotI = Vertex3D.crossProduct(rF, flipImp, true)
-		if (this.mover.isInContact && rotI.z * this.mover.contactTorque! < 0) {
-			const recoil = -rotI.z / this.mover.contactTorque!,
+		if (this.mover.isInContact && this.mover.contactTorque && rotI.z * this.mover.contactTorque < 0) {
+			const recoil = -rotI.z / this.mover.contactTorque,
 				bnvAfter = bnv + impulse * ball.hit.invMass
 			if (recoil <= 0.5 || bnvAfter > 0) {
 				impulse = -(1 + eps) * bnv * ball.data.mass
@@ -252,10 +259,10 @@ export class FlipperHit extends HitObject {
 				pv12 = crossB.clone(true).divideScalar(ball.hit.inertia)
 			let kt = ball.hit.invMass + tangent.dotAndRelease(Vertex3D.crossProduct(pv12, rB, true))
 			const crossF = Vertex3D.crossProduct(rF, tangent, true),
-				pv13 = crossF.clone(true).divideScalar(this.mover.inertia)
+				pv13 = this.mover.inertia > 0 ? crossF.clone(true).divideScalar(this.mover.inertia) : Vertex3D.claim()
 			kt += tangent.dotAndRelease(Vertex3D.crossProduct(pv13, rF, true))
-			const maxF = this.friction * impulse,
-				jt = MathUtils.clamp(-vt / kt, -maxF, maxF)
+			const absMaxF = Math.abs(this.friction * impulse)
+			const jt = kt > 1e-7 ? MathUtils.clamp(-vt / kt, -absMaxF, absMaxF) : 0
 			ball.hit.applySurfaceImpulseAndRelease(
 				crossB.clone(true).multiplyScalar(jt),
 				tangent.clone(true).multiplyScalar(jt),
@@ -393,13 +400,13 @@ export class FlipperHit extends HitObject {
 		)
 		Vertex2D.release(faceN)
 		const d = Math.sqrt(dist.x * dist.x + dist.y * dist.y),
-			inv = 1 / d
+			inv = d > 0 ? 1 / d : 0
 		coll.hitVel.set(-dist.y * inv, dist.x * inv)
 		Vertex2D.release(dist)
 		let asp = angleSpeed
 		if ((contactAng >= angleMax && asp > 0) || (contactAng <= angleMin && asp < 0)) asp = 0
 		coll.hitMomentBit = d === 0
-		const dv = Vertex2D.claim(bvX - coll.hitVel?.x * asp * d, bvY - coll.hitVel?.y * asp * d)
+		const dv = Vertex2D.claim(bvX - coll.hitVel.x * asp * d, bvY - coll.hitVel.y * asp * d)
 		const bnv = dv.x * coll.hitNormal.x + dv.y * coll.hitNormal.y
 		Vertex2D.release(dv)
 		if (Math.abs(bnv) <= C_CONTACTVEL && bffnd <= PHYS_TOUCH) {
@@ -501,7 +508,7 @@ export class FlipperHit extends HitObject {
 			return -1
 		const hitz = ball.state.pos.z + ball.hit.vel.z * t
 		if (hitz + ballR * 0.5 < this.hitBBox.zlow || hitz - ballR * 0.5 > this.hitBBox.zhigh) return -1
-		const inv = 1 / cbce
+		const inv = cbce > 0 ? 1 / cbce : 0
 		coll.hitNormal.set(bvtx * inv, bvty * inv, 0)
 		const dist = Vertex2D.claim(
 			bx + bvX * t - ballR * coll.hitNormal.x - base.x,
@@ -509,7 +516,7 @@ export class FlipperHit extends HitObject {
 		)
 		const d = Math.sqrt(dist.x * dist.x + dist.y * dist.y)
 		if ((contactAng >= aMax && angleSpeed > 0) || (contactAng <= aMin && angleSpeed < 0)) angleSpeed = 0
-		const invD = 1 / d
+		const invD = d > 0 ? 1 / d : 0
 		coll.hitVel.set(-dist.y * invD, dist.x * invD)
 		coll.hitMomentBit = d === 0
 		Vertex2D.release(dist)

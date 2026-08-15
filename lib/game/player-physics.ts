@@ -338,7 +338,7 @@ export class PlayerPhysics {
 
 	public destroyBall(ball: Ball): void {
 		if (!ball) return
-		const wasActive = this.activeBallBC === ball
+		const wasActive = this.activeBall === ball
 		const wasDebug = this.activeBallDebug === ball
 		if (wasActive) this.activeBall = undefined
 		if (wasDebug) this.activeBallDebug = undefined

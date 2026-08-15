@@ -7,6 +7,7 @@ const checks = [
 	{ name: 'table', script: 'test/harness/verify-table.ts' },
 	{ name: 'pinmame', script: 'test/harness/verify-pinmame.ts' },
 	{ name: 'player', script: 'test/harness/verify-player.ts' },
+	{ name: 'gameplay', script: 'test/harness/harness-gameplay.ts' },
 	{ name: 'browser', script: 'test/harness/verify-browser.ts', optional: true },
 ]
 
