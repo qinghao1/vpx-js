@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 import { MathUtils } from 'three'
 
+import type { IAnimatable, IAnimation } from '../../game/ianimatable.js'
 import { EventProxy } from '../../game/event-proxy.js'
 import type { IHittable } from '../../game/ihittable.js'
 import type { IMovable } from '../../game/imovable.js'
@@ -17,6 +18,7 @@ import { Matrix3D } from '../../util/matrix.js'
 import { Vertex2D } from '../../util/vector.js'
 import { Item } from '../item.js'
 import type { Table } from '../table/table.js'
+import { GateAnimation } from './gate-animation.js'
 import { GateApi } from './gate-api.js'
 import { GateData } from './gate-data.js'
 import type { GateHit } from './gate-hit.js'
@@ -29,12 +31,13 @@ import { GateUpdater } from './gate-updater.js'
 /** Gate item. @see https://github.com/vpinball/vpinball/blob/master/gate.cpp */
 export class Gate
 	extends Item<GateData>
-	implements IRenderable<GateState>, IPlayable, IMovable, IHittable, IScriptable<GateApi>
+	implements IRenderable<GateState>, IPlayable, IMovable, IHittable, IScriptable<GateApi>, IAnimatable
 {
 	private readonly meshGenerator: GateMeshGenerator
 	private readonly hitGenerator: GateHitGenerator
 	private readonly state: GateState
 	private readonly updater: GateUpdater
+	private readonly animation: GateAnimation
 	private api?: GateApi
 	private hitGate?: GateHit
 	private hitLines?: LineSeg[]
@@ -51,6 +54,7 @@ export class Gate
 		this.meshGenerator = new GateMeshGenerator(data)
 		this.hitGenerator = new GateHitGenerator(data)
 		this.updater = new GateUpdater(this.data, this.state)
+		this.animation = new GateAnimation(this.state)
 	}
 
 	public isCollidable(): boolean {
@@ -91,6 +95,7 @@ export class Gate
 			player,
 			table,
 		)
+		this.animation.setEvents(this.events)
 	}
 
 	public getHitShapes(): HitObject[] {
@@ -114,6 +119,10 @@ export class Gate
 	}
 
 	public getEventNames(): string[] {
-		return ['Hit', 'Init', 'LimitBOS', 'LimitEOS', 'Timer']
+		return ['Hit', 'Init', 'LimitBOS', 'LimitEOS', 'Timer', 'Animate']
+	}
+
+	public getAnimation(): IAnimation {
+		return this.animation
 	}
 }
