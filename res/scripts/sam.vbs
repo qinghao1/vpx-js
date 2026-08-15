@@ -169,7 +169,7 @@ Class cvpmFFlipsSAM	'test fastflips with support for both Rom and Game-On Soleno
 			FlipperSub(idx) = "NullFunction"
 			Set FlipperSubRef(idx) = Nothing
 		Next
-		Delay=0: FlippersEnabled=1: DebugOn=0 : LagCompensation=0 : Sol=0 : TiltObjects=1: RomMode=True
+		Delay=0: FlippersEnabled=1: DebugOn=0 : LagCompensation=0 : Sol=0 : TiltObjects=1: RomMode=False
 		FlipperSolNumber(0)=sLLFlipper
 		FlipperSolNumber(1)=sLRFlipper
 		FlipperSolNumber(2)=sULFlipper

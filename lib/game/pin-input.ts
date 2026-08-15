@@ -68,6 +68,8 @@ const SWITCH_CREDIT_2_3 = [65, 1, 2, 3, 4] as const
 const SWITCH_CREDIT_4 = [66, 2, 1, 65, 67] as const
 const SWITCH_CREDIT_5 = [67, 3, 1, 2, 65, 66, 68] as const
 const SWITCH_CREDIT_6 = [68, 4, 1, 67] as const
+const SWITCH_FLIPPER_L = [84, 114, 112] as const
+const SWITCH_FLIPPER_R = [82, 86, 112, 116] as const
 
 const TROUGH_KICK_ANGLE = 60
 const TROUGH_KICK_SPEED = 10
@@ -297,6 +299,8 @@ export class PinInput {
 		if (code === DIK_4 || code === this.getKey(AssignKey.AddCreditKey2)) return SWITCH_CREDIT_4
 		if (code === DIK_5 || code === this.getKey(AssignKey.AddCreditKey)) return SWITCH_CREDIT_5
 		if (code === DIK_6) return SWITCH_CREDIT_6
+		if (isLeftCode(code, this.getKey(AssignKey.LeftFlipperKey))) return SWITCH_FLIPPER_L
+		if (isRightCode(code, this.getKey(AssignKey.RightFlipperKey))) return SWITCH_FLIPPER_R
 		return undefined
 	}
 }
