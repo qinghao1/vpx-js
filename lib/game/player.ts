@@ -70,7 +70,7 @@ export class Player extends EventEmitter {
 		try {
 			this.runScript(scope, false)
 		} catch (e) {
-			logger().warn('Table script failed %s', (e as Error).message)
+			logger().warn('Table script failed %s\n%s', (e as Error).message, (e as Error).stack ?? '')
 		}
 		this.finishInit()
 		return this
@@ -81,7 +81,7 @@ export class Player extends EventEmitter {
 		try {
 			await this.runScript(scope, true)
 		} catch (e) {
-			logger().warn('Table script failed %s', (e as Error).message)
+			logger().warn('Table script failed %s\n%s', (e as Error).message, (e as Error).stack ?? '')
 		}
 		this.finishInit()
 		return this

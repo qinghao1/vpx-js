@@ -189,6 +189,7 @@ describe('The VPinball light animation', () => {
 		api.State = Enums.LightStatus.LightStateBlinking
 		api.Intensity = 100
 		api.IntensityScale = 1
+		api.Fader = Enums.Fader.Linear
 		api.FadeSpeedDown = 0.3
 		api.FadeSpeedUp = 0.4
 

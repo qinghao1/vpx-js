@@ -80,7 +80,7 @@ export class LightData extends ItemData {
 	public bulbHaloHeight = 28
 	public height = 0
 	public shadows = 0 // ShadowMode::NONE
-	public fader = 0 // Fader::LINEAR
+	public fader = 1 // Fader::LINEAR
 	public dragPoints: DragPoint[] = []
 	public isVisible = true
 
@@ -352,6 +352,13 @@ export class LightApi extends ItemApi<LightData> {
 	}
 	set Visible(v) {
 		this.data.isVisible = v
+	}
+
+	get Fader() {
+		return this.data.fader
+	}
+	set Fader(v) {
+		this.data.fader = v
 	}
 
 	public Duration(startState: number, duration: number, endState: number): void {
