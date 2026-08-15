@@ -86,6 +86,7 @@ export default defineConfig({
 			{ find: '../refs.node.js', replacement: resolve(parentRoot, 'dist-esm/lib/refs.browser.js') },
 			{ find: '../../../refs.node.js', replacement: resolve(parentRoot, 'dist-esm/lib/refs.browser.js') },
 			{ find: /^.*refs\.node\.js(\?.*)?$/, replacement: resolve(parentRoot, 'dist-esm/lib/refs.browser.js') },
+			{ find: /^.*vbs-scripts\.node\.js(\?.*)?$/, replacement: resolve(parentRoot, 'dist-esm/lib/scripting/vbs-scripts.browser.js') },
 		],
 	},
 	assetsInclude: ['**/*.vpx', '**/*.wasm', '**/*.zip'],

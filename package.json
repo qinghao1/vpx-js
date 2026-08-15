@@ -45,7 +45,7 @@
 		"build": "npm run build:pre && tsup && npm run build:cp && npm run build:esm",
 		"build:pre": "tsx build/compile-rules.ts && tsx build/write-info.ts",
 		"build:cp": "cp -r res dist/ && mkdir -p dist/lib/scripting/grammar && cp lib/scripting/grammar/grammar.bnf dist/lib/scripting/grammar/",
-		"build:esm": "tsc --outDir dist-esm --rootDir . --module ESNext --target ES2024 --moduleResolution bundler --esModuleInterop --allowSyntheticDefaultImports --resolveJsonModule --skipLibCheck --declaration false --declarationMap false --sourceMap true || true; cp -r res dist-esm/; mkdir -p dist-esm/lib/scripting/grammar; cp lib/scripting/grammar/grammar.bnf dist-esm/lib/scripting/grammar/ 2>/dev/null; cp lib/scripting/grammar/rules.ts dist-esm/lib/scripting/grammar/ 2>/dev/null; echo 'dist-esm built'",
+		"build:esm": "npm run build:pre && tsc --outDir dist-esm --rootDir . --module ESNext --target ES2024 --moduleResolution bundler --esModuleInterop --allowSyntheticDefaultImports --resolveJsonModule --skipLibCheck --declaration false --declarationMap false --sourceMap true || true; cp -r res dist-esm/; mkdir -p dist-esm/lib/scripting/grammar; cp lib/scripting/grammar/grammar.bnf dist-esm/lib/scripting/grammar/ 2>/dev/null; echo 'dist-esm built'",
 		"build:wasm": "wasm/build.sh",
 		"build:wasm:mock": "wasm/build.sh --mock",
 		"typecheck": "tsc --noEmit",

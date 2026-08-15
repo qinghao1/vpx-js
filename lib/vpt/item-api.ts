@@ -92,7 +92,7 @@ export abstract class ItemApi<DATA extends ItemData> extends EventEmitter {
 			set(target: unknown, prop: string | symbol, value: unknown, receiver: unknown) {
 				if (typeof prop === 'string' && !prop.startsWith('_') && !INTERNAL[prop]) {
 					const mapped = (target as ItemApi<DATA>)._getPropertyName(prop)
-					if (mapped) return Reflect.set(target as object, mapped, value, receiver)
+					if (mapped) return Reflect.set(target as object, mapped, value)
 				}
 				return Reflect.set(target as object, prop as string, value)
 			},
