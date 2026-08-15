@@ -1,7 +1,6 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import type { IAnimatable, IAnimation } from '../../game/ianimatable.js'
 import { EventProxy } from '../../game/event-proxy.js'
 import type { IHittable } from '../../game/ihittable.js'
 import type { IMovable } from '../../game/imovable.js'
@@ -16,7 +15,6 @@ import type { MoverObject } from '../../physics/mover-object.js'
 import { Matrix3D } from '../../util/matrix.js'
 import { Item } from '../item.js'
 import type { Table } from '../table/table.js'
-import { SpinnerAnimation } from './spinner-animation.js'
 import { SpinnerApi } from './spinner-api.js'
 import { SpinnerData } from './spinner-data.js'
 import { SpinnerHit } from './spinner-hit.js'
@@ -28,13 +26,12 @@ import { SpinnerUpdater } from './spinner-updater.js'
 /** Spinner item. @see https://github.com/vpinball/vpinball/blob/master/spinner.cpp */
 export class Spinner
 	extends Item<SpinnerData>
-	implements IRenderable<SpinnerState>, IPlayable, IMovable, IHittable, IScriptable<SpinnerApi>, IAnimatable
+	implements IRenderable<SpinnerState>, IPlayable, IMovable, IHittable, IScriptable<SpinnerApi>
 {
 	private readonly meshGenerator: SpinnerMeshGenerator
 	private readonly state: SpinnerState
 	private readonly hitGenerator: SpinnerHitGenerator
 	private readonly updater: SpinnerUpdater
-	private readonly animation: SpinnerAnimation
 	private hit?: SpinnerHit
 	private hitCircles: HitCircle[] = []
 	private api?: SpinnerApi
@@ -67,7 +64,6 @@ export class Spinner
 		this.meshGenerator = new SpinnerMeshGenerator(data)
 		this.hitGenerator = new SpinnerHitGenerator(data)
 		this.updater = new SpinnerUpdater(this.state, this.data, this.meshGenerator)
-		this.animation = new SpinnerAnimation(this.state)
 	}
 
 	public isCollidable(): boolean {
@@ -100,7 +96,6 @@ export class Spinner
 		this.hit = new SpinnerHit(this.data, this.state, this.events, height)
 		this.hitCircles = this.hitGenerator.getHitShapes(this.state, height)
 		this.api = new SpinnerApi(this.state, this.hit.getMoverObject(), this.data, this.events, player, table)
-		this.animation.setEvents(this.events)
 	}
 
 	public getApi(): SpinnerApi {
@@ -108,7 +103,7 @@ export class Spinner
 	}
 
 	public getEventNames(): string[] {
-		return ['Init', 'LimitBOS', 'LimitEOS', 'Spin', 'Timer', 'Animate']
+		return ['Init', 'LimitBOS', 'LimitEOS', 'Spin', 'Timer']
 	}
 
 	public getHitShapes(): HitObject[] {
@@ -125,9 +120,5 @@ export class Spinner
 
 	public getUpdater(): SpinnerUpdater {
 		return this.updater
-	}
-
-	public getAnimation(): IAnimation {
-		return this.animation
 	}
 }

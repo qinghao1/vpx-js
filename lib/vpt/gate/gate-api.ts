@@ -145,7 +145,7 @@ export class GateApi extends ItemApi<GateData> {
 		this.data.isReflectionEnabled = v
 	}
 	get CurrentAngle() {
-		return MathUtils.radToDeg(this.state.angle)
+		return this.state.angle
 	}
 	get DrawStyle() {
 		return this.data.gateType

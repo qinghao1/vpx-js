@@ -297,57 +297,45 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 	): void {
 		const d = this.data
 		const s = this.state
-		const scaleZ = table.getScaleZ()
-		const oldPos = d.position
-		const oldSize = d.size
-		const oldRot = { x: d.rotAndTra[0]!, y: d.rotAndTra[1]!, z: d.rotAndTra[2]! }
-		const oldTrans = { x: d.rotAndTra[3]!, y: d.rotAndTra[4]!, z: d.rotAndTra[5]! }
-		const oldObj = { x: d.rotAndTra[6]!, y: d.rotAndTra[7]!, z: d.rotAndTra[8]! }
-		const newPos = s.position ?? oldPos
-		const newSize = s.size ?? oldSize
-		const newRot = s.rotation ? { x: s.rotation.x, y: s.rotation.y, z: s.rotation.z } : oldRot
-		const newTrans = s.translation ? { x: s.translation.x, y: s.translation.y, z: s.translation.z } : oldTrans
-		const newObj = s.objectRotation ? { x: s.objectRotation.x, y: s.objectRotation.y, z: s.objectRotation.z } : oldObj
-		const buildFull = (
-			pos: { x: number; y: number; z: number },
-			sz: { x: number; y: number; z: number },
-			rot: { x: number; y: number; z: number },
-			trans: { x: number; y: number; z: number },
-			obj: { x: number; y: number; z: number },
-		): Matrix3D => {
-			const rt = Matrix3D.claim().setTranslation(trans.x, trans.y, trans.z)
-			const tmp = Matrix3D.claim()
-			tmp.rotateZMatrix(MathUtils.degToRad(rot.z))
-			rt.multiply(tmp)
-			tmp.rotateYMatrix(MathUtils.degToRad(rot.y))
-			rt.multiply(tmp)
-			tmp.rotateXMatrix(MathUtils.degToRad(rot.x))
-			rt.multiply(tmp)
-			tmp.rotateZMatrix(MathUtils.degToRad(obj.z))
-			rt.multiply(tmp)
-			tmp.rotateYMatrix(MathUtils.degToRad(obj.y))
-			rt.multiply(tmp)
-			tmp.rotateXMatrix(MathUtils.degToRad(obj.x))
-			rt.multiply(tmp)
-			const scale = Matrix3D.claim().setScaling(sz.x, sz.y, sz.z)
-			const tpos = Matrix3D.claim().setTranslation(pos.x, pos.y, pos.z)
-			const full = scale.clone().multiply(rt).multiply(tpos)
-			if (scaleZ !== 1) {
-				const zs = Matrix3D.claim().setScaling(1, 1, scaleZ)
-				full.multiply(zs)
-				Matrix3D.release(zs)
-			}
-			Matrix3D.release(rt, tmp, scale, tpos)
-			return full
-		}
-		const oldFull = buildFull(oldPos, oldSize, oldRot, oldTrans, oldObj)
-		const newFull = buildFull(newPos, newSize, newRot, newTrans, newObj)
-		const rh = Matrix3D.claim().setScaling(1, 1, -1)
-		const oldRH = oldFull.clone().multiply(rh)
-		const newRH = newFull.clone().multiply(rh)
-		const invOldRH = oldRH.clone().transpose().invert().transpose()
-		const delta = invOldRH.clone().multiply(newRH)
-		renderApi.applyMatrixToNode(delta, obj)
-		Matrix3D.release(oldFull, newFull, rh, oldRH, newRH, invOldRH, delta)
+		const toOrigin = Matrix3D.claim().setTranslation(-d.position.x, -d.position.y, d.position.z)
+		const fromOrigin = Matrix3D.claim().setTranslation(d.position.x, d.position.y, -d.position.z)
+		const scale = Matrix3D.claim().setScaling(
+			(s.size?.x ?? d.size.x) / d.size.x,
+			(s.size?.y ?? d.size.y) / d.size.y,
+			(s.size?.z ?? d.size.z) / d.size.z,
+		)
+		const scaleZ = Matrix3D.claim().setScaling(1, 1, table.getScaleZ())
+		const trans = Matrix3D.claim().setTranslation(
+			-(d.position.x - (s.position?.x ?? d.position.x)),
+			-(d.position.y - (s.position?.y ?? d.position.y)),
+			d.position.z - (s.position?.z ?? d.position.z),
+		)
+		const rotTrans = Matrix3D.claim().setTranslation(
+			-(d.rotAndTra[3] - (s.translation?.x ?? d.rotAndTra[3])),
+			-(d.rotAndTra[4] - (s.translation?.y ?? d.rotAndTra[4])),
+			d.rotAndTra[5] - (s.translation?.z ?? d.rotAndTra[5]),
+		)
+		const tmp = Matrix3D.claim()
+		tmp.rotateZMatrix(MathUtils.degToRad(-(d.rotAndTra[2] - (s.rotation?.z ?? d.rotAndTra[2]))))
+		rotTrans.multiply(tmp)
+		tmp.rotateYMatrix(MathUtils.degToRad(d.rotAndTra[1] - (s.rotation?.y ?? d.rotAndTra[1])))
+		rotTrans.multiply(tmp)
+		tmp.rotateXMatrix(MathUtils.degToRad(d.rotAndTra[0] - (s.rotation?.x ?? d.rotAndTra[0])))
+		rotTrans.multiply(tmp)
+		tmp.rotateZMatrix(MathUtils.degToRad(-(d.rotAndTra[8] - (s.objectRotation?.z ?? d.rotAndTra[8]))))
+		rotTrans.multiply(tmp)
+		tmp.rotateYMatrix(MathUtils.degToRad(d.rotAndTra[7] - (s.objectRotation?.y ?? d.rotAndTra[7])))
+		rotTrans.multiply(tmp)
+		tmp.rotateXMatrix(MathUtils.degToRad(d.rotAndTra[6] - (s.objectRotation?.x ?? d.rotAndTra[6])))
+		rotTrans.multiply(tmp)
+		const m = toOrigin
+			.clone()
+			.multiply(scale)
+			.multiply(rotTrans)
+			.multiply(trans)
+			.multiply(scaleZ)
+			.multiply(fromOrigin)
+		renderApi.applyMatrixToNode(m, obj)
+		Matrix3D.release(toOrigin, fromOrigin, scale, trans, rotTrans, tmp, scaleZ, m)
 	}
 }
