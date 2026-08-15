@@ -21,7 +21,6 @@ const INTERNAL: Record<string, boolean> = {
 	propertyMap: true,
 	hitTimer: true,
 	UserValue: true,
-	state: true,
 	animation: true,
 	constructor: true,
 	prototype: true,

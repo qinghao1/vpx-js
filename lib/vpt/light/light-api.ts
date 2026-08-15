@@ -12,7 +12,7 @@ import type { LightState } from './light-state.js'
 /** Light API — VBS surface for `Light`. @see https://github.com/vpinball/vpinball/blob/master/light.cpp */
 export class LightApi extends ItemApi<LightData> {
 	constructor(
-		private readonly state: LightState,
+		private readonly _state: LightState,
 		private readonly animation: LightAnimation,
 		data: LightData,
 		events: EventProxy,
@@ -43,16 +43,16 @@ export class LightApi extends ItemApi<LightData> {
 		this.data.state = v
 	}
 	get Color() {
-		return this.state.color
+		return this._state.color
 	}
 	set Color(v) {
-		this.state.color = v
+		this._state.color = v
 	}
 	get ColorFull() {
-		return this.state.colorFull
+		return this._state.colorFull
 	}
 	set ColorFull(v) {
-		this.state.colorFull = v
+		this._state.colorFull = v
 	}
 	get X() {
 		return this.data.center.x
