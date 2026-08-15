@@ -97,14 +97,14 @@ describe('The VPinball gate updater', () => {
 			return Tneg.clone().multiply(RzNeg).multiply(Rx).multiply(RzPos).multiply(Tpos)
 		}
 
-		it('should use posZ = +(height*scaleZ+base) and angle = twoWay?angle:-angle (matches VPinball)', () => {
+		it('should use posZ = -(height*scaleZ+base) and angle = twoWay?-angle:angle', () => {
 			const angle = 0.5
 			for (const twoWay of [true, false]) {
 				const cap = captureMatrix(angle, { twoWay, rotation: 0 })
 				const scaleZ = 1
 				const base = 0
-				const posZ = 50 * scaleZ + base
-				const ideal = twoWay ? angle : -angle
+				const posZ = -(50 * scaleZ + base)
+				const ideal = twoWay ? -angle : angle
 				const exp = expectedMatrix({ x: 500, y: 500 }, posZ, 0, ideal)
 				for (let i = 0; i < 16; i++) expect(cap.elements[i]).to.be.closeTo(exp.elements[i], 1e-6)
 			}
@@ -112,13 +112,13 @@ describe('The VPinball gate updater', () => {
 
 		it('should match VPinball C++ for all gate types and rotations (metal wire regression)', () => {
 			const scaleZ = 1
-			const posZ = 50 * scaleZ + 0
+			const posZ = -(50 * scaleZ + 0)
 			for (const gateType of [1, 2, 3, 4]) {
 				for (const rot of [0, -90, -15.2]) {
 					for (const twoWay of [true, false]) {
 						const angle = 0.5
 						const cap = captureMatrix(angle, { gateType, twoWay, rotation: rot })
-						const ideal = twoWay ? angle : -angle
+						const ideal = twoWay ? -angle : angle
 						const exp = expectedMatrix({ x: 500, y: 500 }, posZ, rot, ideal)
 						for (let i = 0; i < 16; i++) expect(cap.elements[i], `type ${gateType} rot ${rot} twoWay ${twoWay}`).to.be.closeTo(exp.elements[i], 1e-6)
 					}
@@ -131,8 +131,8 @@ describe('The VPinball gate updater', () => {
 			const capWire = captureMatrix(angle, { gateType: 1, twoWay: true, rotation: 0 })
 			const capPlate = captureMatrix(angle, { gateType: 3, twoWay: true, rotation: 0 })
 			const center = { x: 500, y: 500 }
-			const posZ = 50
-			const ideal = angle
+			const posZ = -50
+			const ideal = -angle
 			const exp = expectedMatrix(center, posZ, 0, ideal)
 			for (let i = 0; i < 16; i++) {
 				expect(capWire.elements[i]).to.be.closeTo(exp.elements[i], 1e-6)
@@ -140,7 +140,7 @@ describe('The VPinball gate updater', () => {
 			}
 		})
 
-		it('should use positive posZ for surface gates (fixture)', async () => {
+		it('should use negative posZ for surface gates (fixture)', async () => {
 			const { Table } = await import('../table/table.js')
 			const { NodeBinaryReader } = await import('../../io/binary-reader.node.js')
 			const table = await Table.load(new NodeBinaryReader('test/fixtures/table-gate.vpx'))
@@ -155,9 +155,9 @@ describe('The VPinball gate updater', () => {
 			gate.getUpdater().applyState({}, { angle } as GateState, api, table)
 			const scaleZ = table.getScaleZ()
 			const base = table.getSurfaceHeight(gate.data.szSurface, gate.data.center.x, gate.data.center.y) * scaleZ
-			const expPosZ = gate.data.height * scaleZ + base
-			expect(expPosZ).to.equal(100)
-			const exp = expectedMatrix(gate.data.center, expPosZ, gate.data.rotation, angle)
+			const expPosZ = -(gate.data.height * scaleZ + base)
+			expect(expPosZ).to.equal(-100)
+			const exp = expectedMatrix(gate.data.center, expPosZ, gate.data.rotation, -angle)
 			for (let i = 0; i < 16; i++) expect(cap!.elements[i]).to.be.closeTo(exp.elements[i], 1e-6)
 		})
 	})

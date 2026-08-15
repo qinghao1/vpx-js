@@ -13,10 +13,20 @@ import type { SpinnerState } from './spinner-state.js'
 
 chai.use((sinonChai as any).default ?? sinonChai)
 
-function bruteSpinnerWorld(
+const RIGHT_HANDED = new Matrix3D().setScaling(1, 1, -1)
+
+function toWorldFromD3D(p: Vertex3D): Vertex3D {
+	return new Vertex3D(p.x, p.z, p.y)
+}
+
+function toWorldFromRH(p: Vertex3D): Vertex3D {
+	return new Vertex3D(p.x, -p.z, p.y)
+}
+
+function bruteSpinnerD3D(
 	raw: Vertex3D,
 	len: number,
-	scaleZ: number,
+	_scaleZ: number,
 	cx: number,
 	cy: number,
 	posZ: number,
@@ -25,11 +35,14 @@ function bruteSpinnerWorld(
 ): Vertex3D {
 	const rot = (rotDeg * Math.PI) / 180
 	const full = new Matrix3D().rotateXMatrix(-angle).multiply(new Matrix3D().rotateZMatrix(rot))
-	const v = new Vertex3D(raw.x, raw.y, raw.z).multiplyMatrix(full)
-	return new Vertex3D(v.x * len + cx, v.y * len + cy, v.z * len * scaleZ + posZ)
+	const vert = full
+		.clone()
+		.multiply(new Matrix3D().setScaling(len, len, len))
+		.multiply(new Matrix3D().setTranslation(cx, cy, posZ))
+	return new Vertex3D(raw.x, raw.y, raw.z).multiplyMatrix(vert)
 }
 
-function jsSpinnerViaUpdater(
+function jsSpinnerWorld(
 	raw: Vertex3D,
 	len: number,
 	scaleZ: number,
@@ -41,9 +54,12 @@ function jsSpinnerViaUpdater(
 ): Vertex3D {
 	const rot = (rotDeg * Math.PI) / 180
 	const mRz = new Matrix3D().rotateZMatrix(rot)
-	const vRz = new Vertex3D(raw.x, raw.y, raw.z).multiplyMatrix(mRz)
-	const vStatic = new Vertex3D(vRz.x * len + cx, vRz.y * len + cy, vRz.z * len * scaleZ + posZ)
-	return vStatic.multiplyMatrix(updaterMatrix)
+	const Slen = new Matrix3D().setScaling(len, len, len * scaleZ)
+	const Tworld = new Matrix3D().setTranslation(cx, cy, posZ)
+	const staticMat = mRz.clone().multiply(Slen).multiply(Tworld)
+	const staticWithHand = staticMat.clone().multiply(RIGHT_HANDED)
+	const total = staticWithHand.clone().multiply(updaterMatrix)
+	return new Vertex3D(raw.x, raw.y, raw.z).multiplyMatrix(total)
 }
 
 function captureSpinnerMatrix(
@@ -91,9 +107,11 @@ describe('Spinner visual regression vs VPinball C++ brute', () => {
 			const { matrix, cx, cy, posZ, scaleZ, len } = captureSpinnerMatrix(angle, rot)
 			let maxErr = 0
 			for (const raw of raws) {
-				const brute = bruteSpinnerWorld(raw, len, scaleZ, cx, cy, posZ, rot, angle)
-				const js = jsSpinnerViaUpdater(raw, len, scaleZ, cx, cy, posZ, rot, matrix)
-				const err = Math.hypot(brute.x - js.x, brute.y - js.y, brute.z - js.z)
+				const cD3d = bruteSpinnerD3D(raw, len, scaleZ, cx, cy, posZ, rot, angle)
+				const cWorld = toWorldFromD3D(cD3d)
+				const jRh = jsSpinnerWorld(raw, len, scaleZ, cx, cy, posZ, rot, matrix)
+				const jWorld = toWorldFromRH(jRh)
+				const err = Math.hypot(cWorld.x - jWorld.x, cWorld.y - jWorld.y, cWorld.z - jWorld.z)
 				if (err > maxErr) maxErr = err
 			}
 			expect(maxErr, `rot ${rot}`).to.be.below(1e-4)
@@ -105,20 +123,27 @@ describe('Spinner visual regression vs VPinball C++ brute', () => {
 		const rot = 15
 		const raw = new Vertex3D(0, 0, 0.2)
 		const { matrix, cx, cy, posZ, scaleZ, len } = captureSpinnerMatrix(angle, rot)
-		const brute = bruteSpinnerWorld(raw, len, scaleZ, cx, cy, posZ, rot, angle)
-		const js = jsSpinnerViaUpdater(raw, len, scaleZ, cx, cy, posZ, rot, matrix)
-		const errCorrect = Math.hypot(brute.x - js.x, brute.y - js.y, brute.z - js.z)
+		const cD3d = bruteSpinnerD3D(raw, len, scaleZ, cx, cy, posZ, rot, angle)
+		const cWorld = toWorldFromD3D(cD3d)
+		const jRh = jsSpinnerWorld(raw, len, scaleZ, cx, cy, posZ, rot, matrix)
+		const jWorld = toWorldFromRH(jRh)
+		const errCorrect = Math.hypot(cWorld.x - jWorld.x, cWorld.y - jWorld.y, cWorld.z - jWorld.z)
 		expect(errCorrect).to.be.below(1e-4)
 
 		const posZjsFlipped = posZ
 		const Tneg = new Matrix3D().setTranslation(-cx, -cy, -posZjsFlipped)
 		const RzNeg = new Matrix3D().rotateZMatrix((-rot * Math.PI) / 180)
-		const Rx = new Matrix3D().rotateXMatrix(angle)
+		const Rx = new Matrix3D().rotateXMatrix(-angle)
 		const RzPos = new Matrix3D().rotateZMatrix((rot * Math.PI) / 180)
 		const Tpos = new Matrix3D().setTranslation(cx, cy, posZjsFlipped)
 		const flipped = Tneg.clone().multiply(RzNeg).multiply(Rx).multiply(RzPos).multiply(Tpos)
-		const jsFlipped = jsSpinnerViaUpdater(raw, len, scaleZ, cx, cy, posZ, rot, flipped)
-		const errFlipped = Math.hypot(brute.x - jsFlipped.x, brute.y - jsFlipped.y, brute.z - jsFlipped.z)
+		const jRhFlipped = jsSpinnerWorld(raw, len, scaleZ, cx, cy, posZ, rot, flipped)
+		const jWorldFlipped = toWorldFromRH(jRhFlipped)
+		const errFlipped = Math.hypot(
+			cWorld.x - jWorldFlipped.x,
+			cWorld.y - jWorldFlipped.y,
+			cWorld.z - jWorldFlipped.z,
+		)
 		expect(errFlipped).to.be.above(5)
 	})
 
@@ -133,9 +158,11 @@ describe('Spinner visual regression vs VPinball C++ brute', () => {
 			const { matrix, cx, cy, posZ, scaleZ, len, rot } = captureSpinnerMatrix(0.4, 0)
 			let maxErr = 0
 			for (const raw of raws) {
-				const brute = bruteSpinnerWorld(raw, len, scaleZ, cx, cy, posZ, rot, 0.4)
-				const js = jsSpinnerViaUpdater(raw, len, scaleZ, cx, cy, posZ, rot, matrix)
-				const err = Math.hypot(brute.x - js.x, brute.y - js.y, brute.z - js.z)
+				const cD3d = bruteSpinnerD3D(raw, len, scaleZ, cx, cy, posZ, rot, 0.4)
+				const cWorld = toWorldFromD3D(cD3d)
+				const jRh = jsSpinnerWorld(raw, len, scaleZ, cx, cy, posZ, rot, matrix)
+				const jWorld = toWorldFromRH(jRh)
+				const err = Math.hypot(cWorld.x - jWorld.x, cWorld.y - jWorld.y, cWorld.z - jWorld.z)
 				if (err > maxErr) maxErr = err
 			}
 			expect(maxErr).to.be.below(1e-4)
@@ -156,7 +183,7 @@ describe('Spinner visual regression vs VPinball C++ brute', () => {
 		if (!cap) throw new Error('no matrix')
 		let maxErr = 0
 		for (const raw of raws) {
-			const brute = bruteSpinnerWorld(
+			const cD3d = bruteSpinnerD3D(
 				raw,
 				s.data.length,
 				scaleZ,
@@ -166,7 +193,8 @@ describe('Spinner visual regression vs VPinball C++ brute', () => {
 				s.data.rotation,
 				angle,
 			)
-			const js = jsSpinnerViaUpdater(
+			const cWorld = toWorldFromD3D(cD3d)
+			const jRh = jsSpinnerWorld(
 				raw,
 				s.data.length,
 				scaleZ,
@@ -176,7 +204,8 @@ describe('Spinner visual regression vs VPinball C++ brute', () => {
 				s.data.rotation,
 				cap as Matrix3D,
 			)
-			const err = Math.hypot(brute.x - js.x, brute.y - js.y, brute.z - js.z)
+			const jWorld = toWorldFromRH(jRh)
+			const err = Math.hypot(cWorld.x - jWorld.x, cWorld.y - jWorld.y, cWorld.z - jWorld.z)
 			if (err > maxErr) maxErr = err
 		}
 		expect(maxErr).to.be.below(1e-4)
