@@ -7,6 +7,7 @@ window.process = window.process || {
 	off: () => {},
 	nextTick: (cb, ...a) => setTimeout(() => cb(...a), 0),
 }
+globalThis.process = window.process
 window.Buffer = window.Buffer || { isBuffer: () => false }
 // Early harness: capture all errors before module loads so import failures are visible in #log (no manual forwarding needed)
 ;(() => {

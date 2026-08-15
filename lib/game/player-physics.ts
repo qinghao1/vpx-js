@@ -65,7 +65,7 @@ export class PlayerPhysics {
 	private lastFrameDuration = 0
 	private cFrames = 0
 	private lastFpsTime = 0
-	private fps = 0
+	public fps = 0
 	private curPhysicsFrameTime = 0
 	private nextPhysicsFrameTime = 0
 	private startTimeUsec = 0
@@ -136,8 +136,8 @@ export class PlayerPhysics {
 			try {
 				for (const ball of this.balls) {
 					if (ball.state.isFrozen) continue
-					ball.hit.coll.hitTime = hitTime
-					ball.hit.coll.clear()
+					ball.coll.clear()
+					ball.coll.hitTime = hitTime
 					this.hitPlayfield.doHitTest(ball, ball.coll, this)
 					this.hitTopGlass.doHitTest(ball, ball.coll, this)
 					if (this.swapBallCollisionHandling) {

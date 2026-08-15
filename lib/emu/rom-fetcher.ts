@@ -1,8 +1,10 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { GamelistDB } from 'wpc-emu'
+import wpcEmuPkg, { type GamelistDB as GamelistDBType } from 'wpc-emu'
 import { logger } from '../util/logger.js'
+
+const GamelistDB = (wpcEmuPkg as any)?.GamelistDB ?? (wpcEmuPkg as any)?.default?.GamelistDB ?? wpcEmuPkg
 
 /** Fetches a WPC ROM from VPDB.io. */
 export async function downloadGameEntry(pinmameGameName: string): Promise<LoadedGameEntry> {
@@ -44,7 +46,7 @@ async function fetchBytes(url: string): Promise<Uint8Array> {
 }
 
 export interface LoadedGameEntry {
-	wpcDbEntry: GamelistDB.ClientGameEntry
+	wpcDbEntry: GamelistDBType.ClientGameEntry
 	romFile: Uint8Array
 }
 

@@ -1,14 +1,15 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { createRequire } from 'node:module'
-import { inspect } from 'node:util'
+import * as escope from 'escope'
 import { traverse } from 'estraverse'
 import type { BaseNode, Identifier, MemberExpression, Program, Statement } from 'estree'
 
-const require = createRequire(import.meta.url)
-
-const { analyze } = require('escope')
+const escopePkg = escope as unknown as {
+	analyze?: (ast: unknown) => unknown
+	default?: { analyze?: (ast: unknown) => unknown }
+}
+const analyze: (ast: any) => any = (escopePkg.analyze ?? escopePkg.default?.analyze ?? escopePkg) as (ast: any) => any
 
 /** Base AST transformer with scope analysis. */
 export class Transformer {
@@ -167,7 +168,7 @@ export class Transformer {
 				return this.getTopMemberName(obj.callee.callee)
 			}
 			throw new Error(
-				`Unknown callee type "${obj.callee.type}" when looking for top member name: ${inspect(obj, { depth: Infinity })}`,
+				`Unknown callee type "${obj.callee.type}" when looking for top member name: ${JSON.stringify(obj, null, 2)}`,
 			)
 		}
 		if (obj.type === 'ThisExpression') {

@@ -20,7 +20,7 @@ Requires `dist-esm` built. `server.fs.allow` covers repo root, `dist`, `dist-esm
 - `viewer-core.js` — Viewer (Three.js + `Player` + `BrowserBinaryReader`). Title from VPX `info.TableName`/`getName`/pretty basename, not ROM `cGameName`. Generic trough handling (`drain|trough|ballrelease|outhole`) for fallback ball.
 - `src/log-capture.js` + `src/log-overlay.js` — early console/fetch capture (`__earlyLogs`/`__createHarness`) + tiny ESM delegator. Don't double-patch `console`.
 - `src/app.js`, `scene.js`, `dmd.js`, `config.js`, `utils.js`, `app.css`
-- `vite.config.js` — `port:3000` `host:true`, dedupes `three`/`three-mesh-bvh`, aliases `buffer` + shims (`fs`/`sharp`/`wpc-emu`…), `refs.node` → `refs.browser`, `rawLoader` for `.vbs`/`.bnf`
+- `vite.config.js` — `port:3000` `host:true`, dedupes `three`/`three-mesh-bvh`, aliases `refs.node` → `refs.browser`, `rawLoader` for `.vbs`/`.bnf`
 - `e2e/` — single generic harness: `integration.mjs` (waitReady → diagnostics → physics → DMD → shots) + `lib/helpers.mjs`; thin wrappers `check.mjs`/`harness-*.mjs`. Generic trough detection (any `trough|drain|ballrelease|outhole` kicker). Called by `test/harness/verify-browser.ts` as part of `verify-all.ts` TAP 1..5.
 
 ## Conventions

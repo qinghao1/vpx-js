@@ -1,7 +1,7 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { EventEmitter } from 'node:events'
+import { EventEmitter } from '../util/event-emitter.js'
 
 /** Minimal event stream. */
 export class Stream extends EventEmitter {}
@@ -11,7 +11,9 @@ const nextTick: (cb: () => void) => void =
 		? queueMicrotask.bind(globalThis)
 		: (globalThis as unknown as { setImmediate?: (cb: () => void) => void }).setImmediate
 			? (globalThis as unknown as { setImmediate: (cb: () => void) => void }).setImmediate.bind(globalThis)
-			: process.nextTick.bind(process)
+			: typeof process !== 'undefined' && process.nextTick
+				? process.nextTick.bind(process)
+				: (cb: () => void) => setTimeout(cb, 0)
 
 /** Lazy readable streaming `fn` until it returns null. */
 export function readableStream<T>(fn: (s: Stream, i: number) => Promise<T | null>, continueOnError = false) {

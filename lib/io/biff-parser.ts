@@ -1,7 +1,6 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { inflate } from 'node:zlib'
 import { decodeUtf8, getDataView, readInt32LE } from './binary-helpers.js'
 import type { ReadResult } from './ole-doc.js'
 
@@ -57,6 +56,31 @@ export class BiffParser {
 
 	/** Decompresses a BIFF chunk. */
 	static async decompress(buf: Uint8Array): Promise<Uint8Array> {
+		if (typeof DecompressionStream !== 'undefined') {
+			try {
+				const ds = new DecompressionStream('deflate')
+				const writer = ds.writable.getWriter()
+				writer.write(buf as unknown as BufferSource)
+				writer.close()
+				const chunks: Uint8Array[] = []
+				const reader = ds.readable.getReader()
+				while (true) {
+					const { done, value } = await reader.read()
+					if (done) break
+					if (value) chunks.push(value)
+				}
+				if (chunks.length === 1) return chunks[0]
+				const total = chunks.reduce((sum, c) => sum + c.length, 0)
+				const out = new Uint8Array(total)
+				let offset = 0
+				for (const chunk of chunks) {
+					out.set(chunk, offset)
+					offset += chunk.length
+				}
+				return out
+			} catch {}
+		}
+		const { inflate } = await import('node:zlib')
 		return new Promise((resolve, reject) => {
 			inflate(buf as unknown as Parameters<typeof inflate>[0], (err: unknown, res: unknown) => {
 				if (err) return reject(err as Error)

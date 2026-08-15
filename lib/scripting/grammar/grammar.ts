@@ -1,11 +1,10 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { createRequire } from 'node:module'
+import dashAstImport from 'dash-ast'
 import { Grammars, type IToken, Parser } from 'ebnf'
 import { generate } from 'escodegen'
 import type { Program, Statement } from 'estree'
-import { getTextFile } from '../../refs.node.js'
 import { logger, progress } from '../../util/logger.js'
 import { program } from '../estree.js'
 import { ppArray } from '../post-process/array.js'
@@ -23,11 +22,8 @@ import { ppLoop } from '../post-process/loop.js'
 import { ppMethod } from '../post-process/method.js'
 import { ppVarDecl } from '../post-process/vardecl.js'
 import { ppWith } from '../post-process/with.js'
+import { getTextFile } from '../vbs-scripts.node.js'
 import { RULES } from './rules.js'
-
-const _require = createRequire(import.meta.url)
-
-import dashAstImport from 'dash-ast'
 
 // dash-ast is CJS, handle both default and direct export
 const dashAst: (ast: any, opts: any) => void = (dashAstImport as any)?.default ?? (dashAstImport as any)

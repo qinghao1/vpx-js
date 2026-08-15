@@ -1,9 +1,6 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { Buffer } from 'node:buffer'
-import sharp from 'sharp'
-
 class FakeImageData {
 	data: Uint8ClampedArray
 	width: number
@@ -37,7 +34,10 @@ class NodeFileReader {
 	readAsDataURL(blob: Blob): void {
 		blob.arrayBuffer().then(
 			buf => {
-				const b64 = Buffer.from(buf).toString('base64')
+				const bytes = new Uint8Array(buf)
+				let binary = ''
+				for (let idx = 0; idx < bytes.byteLength; idx++) binary += String.fromCharCode(bytes[idx])
+				const b64 = typeof Buffer !== 'undefined' ? Buffer.from(buf).toString('base64') : btoa(binary)
 				this.result = `data:${(blob as Blob).type || 'application/octet-stream'};base64,${b64}`
 				this.onloadend?.()
 			},
@@ -79,7 +79,9 @@ class FakeCanvas {
 		const d = this._imageData
 		if (!d) return new Blob([], { type: mime })
 		const { data, width, height } = d
-		const raw = Buffer.from(data.buffer, data.byteOffset, data.byteLength)
+		const sharpModule = await import('sharp')
+		const sharp = (sharpModule as any).default ?? sharpModule
+		const raw = typeof Buffer !== 'undefined' ? Buffer.from(data.buffer, data.byteOffset, data.byteLength) : data
 		const pipeline = sharp(raw, { raw: { width, height, channels: 4 } })
 		const buffer =
 			mime === 'image/jpeg' ? await pipeline.jpeg({ quality: 92 }).toBuffer() : await pipeline.png().toBuffer()
@@ -101,7 +103,7 @@ class FakeCanvas {
 let installed = false
 
 export function ensureNodeCanvasPolyfill(): void {
-	if (installed) return
+	if (installed || typeof window !== 'undefined' || (globalThis as any).document?.createElement) return
 	installed = true
 	const g = globalThis as unknown as Record<string, unknown>
 	if (!g.ImageData) g.ImageData = FakeImageData as unknown as typeof ImageData

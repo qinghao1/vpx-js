@@ -1,7 +1,6 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { basename } from 'node:path'
 import { BiffParser } from '../io/biff-parser.js'
 import { concatUint8Arrays } from '../io/binary-helpers.js'
 import { LzwReader } from '../io/lzw-reader.js'
@@ -64,7 +63,7 @@ export class Texture extends BiffParser {
 
 	public getName(): string {
 		return this.localFileName
-			? basename(this.localFileName)
+			? this.localFileName.split(/[\\/]/).pop() || ''
 			: (this.szInternalName || this.szName || '').toLowerCase()
 	}
 

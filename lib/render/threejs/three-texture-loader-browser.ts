@@ -552,3 +552,5 @@ function downsampleData(texture: any, maxSize: number, name?: string): any {
 	} catch {}
 	return tex
 }
+
+export default ThreeTextureLoaderBrowser

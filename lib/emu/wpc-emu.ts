@@ -1,9 +1,12 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { type GamelistDB, WpcEmuApi, type WpcEmuWebWorkerApi } from 'wpc-emu'
+import wpcEmuPkg, { type GamelistDB, type WpcEmuApi as WpcEmuApiType, type WpcEmuWebWorkerApi } from 'wpc-emu'
 import type { IEmulator } from '../game/iemulator.js'
 import { logger } from '../util/logger.js'
+
+const WpcEmuApi = (wpcEmuPkg as any)?.WpcEmuApi ?? (wpcEmuPkg as any)?.default?.WpcEmuApi ?? wpcEmuPkg
+
 import { Vertex2D } from '../util/vector.js'
 import { EmulatorMessageQueue, MessageType } from './emulator-message-queue.js'
 import { EmulatorState } from './emulator-state.js'
@@ -17,7 +20,7 @@ export class Emulator implements IEmulator {
 	private readonly queue = new EmulatorMessageQueue()
 	private readonly dmdSize = new Vertex2D(128, 32)
 	private paused = false
-	private emulator?: WpcEmuApi.Emulator
+	private emulator?: WpcEmuApiType.Emulator
 
 	async loadGame(entry: GamelistDB.GameEntry, rom: Uint8Array): Promise<void> {
 		this.emulator = await WpcEmuApi.initVMwithRom({ u06: rom }, entry)
@@ -42,7 +45,7 @@ export class Emulator implements IEmulator {
 	}
 
 	registerAudioConsumer(cb: (m: unknown) => void): void {
-		this.emulator?.registerAudioConsumer(cb as (m: WpcEmuApi.AudioMessage) => void)
+		this.emulator?.registerAudioConsumer(cb as (m: WpcEmuApiType.AudioMessage) => void)
 	}
 
 	emuSimulateCycle(ms: number): number {

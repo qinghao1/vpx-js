@@ -1,10 +1,10 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { EventEmitter } from 'node:events'
 import type { Event } from '../game/event.js'
 import type { EventProxy } from '../game/event-proxy.js'
 import type { Player } from '../game/player.js'
+import { EventEmitter } from '../util/event-emitter.js'
 import type { Collection } from './collection/collection.js'
 import type { ItemData } from './item-data.js'
 import type { Table } from './table/table.js'

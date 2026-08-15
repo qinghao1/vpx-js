@@ -1,7 +1,10 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { GamelistDB } from 'wpc-emu'
+import wpcEmuPkg from 'wpc-emu'
+
+const GamelistDB = (wpcEmuPkg as any)?.GamelistDB ?? (wpcEmuPkg as any)?.default?.GamelistDB ?? wpcEmuPkg
+
 import { PinMameEmulator } from '../../emu/pinmame/pinmame-emu.js'
 import { downloadGameEntry } from '../../emu/rom-fetcher.js'
 import { Emulator } from '../../emu/wpc-emu.js'

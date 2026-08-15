@@ -91,15 +91,18 @@ export class Transpiler {
 
 	private evalAndPlay(js: string, scope: Record<string, unknown>): void {
 		eval(`//@ sourceURL=game:///tablescript.vbs.js\n${js}`)
-		play(
-			new Proxy(scope, new VbsProxyHandler()),
-			this.itemApis,
-			this.enumApis,
-			this.globalApi,
-			this.stdlib,
-			new VBSHelper(this),
-			this.player,
-		)
+		const playFn = (globalThis as any).play ?? (typeof play === 'function' ? play : undefined)
+		if (typeof playFn === 'function') {
+			playFn(
+				new Proxy(scope, new VbsProxyHandler()),
+				this.itemApis,
+				this.enumApis,
+				this.globalApi,
+				this.stdlib,
+				new VBSHelper(this),
+				this.player,
+			)
+		}
 	}
 
 	public transpile(vbs: string, gf?: string, go?: string): string {
@@ -114,12 +117,12 @@ export class Transpiler {
 	}
 
 	public execute(vbs: string, scope: Record<string, unknown>, go?: string): void {
-		go ||= typeof window !== 'undefined' ? 'window' : 'global'
+		go ||= 'globalThis'
 		this.evalAndPlay(this.transpile(vbs, 'play', go), scope)
 	}
 
 	public async executeAsync(vbs: string, scope: Record<string, unknown>, go?: string): Promise<void> {
-		go ||= typeof window !== 'undefined' ? 'window' : 'global'
+		go ||= 'globalThis'
 		this.evalAndPlay(await this.transpileAsync(vbs, 'play', go), scope)
 	}
 }

@@ -45,11 +45,41 @@ function labelFromUrl(u) {
 
 const puppeteer = await loadPuppeteer()
 const browser = await launchBrowser(puppeteer, { useSwiftShader: useSwift })
+let viteProc = null
 const _forceKillChrome = () => {
 	try {
 		execSync('pkill -9 -f "chrome.*headless.*puppeteer" 2>/dev/null || true', { timeout: 2000, stdio: 'ignore' })
 	} catch {}
+	if (viteProc) {
+		try {
+			process.kill(-viteProc.pid)
+		} catch {}
+	}
 }
+
+async function ensureServer() {
+	try {
+		const res = await fetch('http://localhost:3000', { signal: AbortSignal.timeout(1000) })
+		if (res.ok || res.status === 404) return
+	} catch {}
+	const { spawn } = await import('node:child_process')
+	const root = process.cwd()
+	viteProc = spawn('npx', ['vite', 'demo-browser', '--port', '3000'], {
+		cwd: root,
+		stdio: 'ignore',
+		detached: true,
+	})
+	viteProc.unref()
+	for (let i = 0; i < 30; i++) {
+		await new Promise(r => setTimeout(r, 200))
+		try {
+			const res = await fetch('http://localhost:3000', { signal: AbortSignal.timeout(500) })
+			if (res.ok || res.status === 404) break
+		} catch {}
+	}
+}
+
+await ensureServer()
 process.once('exit', _forceKillChrome)
 process.once('SIGINT', () => {
 	_forceKillChrome()
