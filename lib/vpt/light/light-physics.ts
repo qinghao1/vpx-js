@@ -78,20 +78,18 @@ export class LightAnimation implements IAnimation {
 			Math.max(0.001, this.intensityScale || 1)
 		const clampedIntensity = Math.max(0, Math.min(100000, safeIntensity))
 		const target = clampedIntensity * Math.max(0, Math.min(1, lightState))
-		if (!this.data.fader || this.data.fader === 0) {
-			this.state.intensity = target
-		} else if (this.state.intensity < target) {
+		if (this.state.intensity < target) {
 			const s = this.data.fadeSpeedUp > 0 ? this.data.fadeSpeedUp : 0
-			if (s <= 0 || diff === 0) {
+			if (s <= 0) {
 				this.state.intensity = target
-			} else {
+			} else if (diff > 0) {
 				this.state.intensity = Math.min(target, this.state.intensity + s * diff)
 			}
 		} else if (this.state.intensity > target) {
 			const s = this.data.fadeSpeedDown > 0 ? this.data.fadeSpeedDown : 0
-			if (s <= 0 || diff === 0) {
+			if (s <= 0) {
 				this.state.intensity = target
-			} else {
+			} else if (diff > 0) {
 				this.state.intensity = Math.max(target, this.state.intensity - s * diff)
 			}
 		}

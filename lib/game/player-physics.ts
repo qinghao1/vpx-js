@@ -325,7 +325,7 @@ export class PlayerPhysics {
 	public createBall(ballCreator: IBallCreationPosition, player: Player, radius = 25, mass = 1): Ball {
 		const data = new BallData(radius, mass, this.table.data?.defaultBulbIntensityScaleOnBall)
 		const id = Ball.idCounter++
-		const state = BallState.claim(`Ball\${id}`, ballCreator.getBallCreationPosition(this.table))
+		const state = BallState.claim(`Ball${id}`, ballCreator.getBallCreationPosition(this.table))
 		state.pos.z += data.radius
 		const ball = new Ball(id, data, state, ballCreator.getBallCreationVelocity(this.table), player, this.table)
 		ballCreator.onBallCreated(this, ball)
