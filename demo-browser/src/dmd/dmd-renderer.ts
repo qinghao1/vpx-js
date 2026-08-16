@@ -156,14 +156,40 @@ export class DmdRenderer {
 			String(n || '')
 				.toLowerCase()
 				.includes('vr')
-		const wantVR = this.viewer.viewerMode !== 'play'
+		// generic: prefer VR DMD when a VR cabinet exists (VRCab_*), otherwise desktop DMD.
+		// References vpinball LoadVRRoom / VR_Cab collections — walking_dead has VRCab_Backbox etc.
+		// Detecting cabinet presence via tableGroup is table-agnostic and avoids viewerMode hack.
+		const hasCab = (() => {
+			try {
+				let found = false
+				tableGroup.traverse(o => {
+					if (found) return
+					const nm = (o.name || '').toLowerCase()
+					if (
+						nm.includes('vrcab') ||
+						nm.includes('cabinet') ||
+						nm.includes('pincab') ||
+						nm.includes('lockbar')
+					)
+						found = true
+				})
+				return found
+			} catch {
+				return false
+			}
+		})()
 		let filteredReps = reps
 		if (reps.length > 1) {
 			const hasVR = reps.some(r => isVRName(r.chosen.getName()))
 			const hasNonVR = reps.some(r => !isVRName(r.chosen.getName()))
 			if (hasVR && hasNonVR) {
-				const pref = reps.filter(r => isVRName(r.chosen.getName()) === wantVR)
-				if (pref.length) filteredReps = pref
+				if (hasCab) {
+					const pref = reps.filter(r => isVRName(r.chosen.getName()))
+					if (pref.length) filteredReps = pref
+				} else {
+					const pref = reps.filter(r => !isVRName(r.chosen.getName()))
+					if (pref.length) filteredReps = pref
+				}
 			}
 		}
 		// use filteredReps for subsequent logic
@@ -206,18 +232,17 @@ export class DmdRenderer {
 					mat.color?.set?.(0xffffff)
 				}
 				mat.transparent = false
-				// vpinball: flasher.cpp DMD uses ZWRITEENABLE false with depthBias -10000 and
-				// SetupSegmentRenderer; generic THREE equivalent is depthTest true, depthWrite false
-				// with polygonOffset to bias forward without writing depth (prevents show-through
-				// while staying behind playfield/cab if actually behind).
+				// vpinball: flasher.cpp:1306 ZWRITEENABLE false, DrawMesh depthBias -10000 (1212 pos height, 1188 tempMatrix Translate(center,height)*RotX/Y/Z)
+				// THREE generic: depthTest true, depthWrite false, strong polygonOffset to emulate -10000 bias without overlay show-through
+				// (overlay depthTest false caused apron show-through; true+offset keeps correct occlusion vs playfield while surfacing DMD forward through backbox thickness).
 				mat.depthTest = true
 				mat.depthWrite = false
 				mat.polygonOffset = true
-				mat.polygonOffsetFactor = -1
-				mat.polygonOffsetUnits = -1
+				mat.polygonOffsetFactor = -4
+				mat.polygonOffsetUnits = -4
 			}
-			// vpinball depthBias -10000 brings DMD forward; THREE renderOrder 1 with offset achieves same generically.
-			m.renderOrder = 1
+			// vpinball -10000 bias: strong forward bias in THREE is polygonOffset -4/-4 plus renderOrder 10 (after cab/backglass at 0, before overlay 1000)
+			m.renderOrder = 10
 			m.frustumCulled = false
 		}
 
@@ -324,13 +349,13 @@ export class DmdRenderer {
 				depthTest: true,
 				depthWrite: false,
 				polygonOffset: true,
-				polygonOffsetFactor: -1,
-				polygonOffsetUnits: -1,
+				polygonOffsetFactor: -4,
+				polygonOffsetUnits: -4,
 				transparent: false,
 			})
 			const mesh = new THREE.Mesh(geom, mat)
 			mesh.name = `DMD_${fl.getName()}`
-			mesh.renderOrder = 1
+			mesh.renderOrder = 10
 			mesh.frustumCulled = false
 			// vpinball: flasher.cpp FlasherData.m_height/m_rotX/Y/Z define DMD quad in playfield XY at positive Z up
 			// (MatrixTranslate(center,height) * RotX/Y/Z). ThreeRenderApi.transformScene maps LH Z up → RH Y up

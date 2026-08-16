@@ -246,7 +246,7 @@ export class TableData extends ItemData {
 	public bloomStrength?: number
 	public colorBackdrop?: number
 	public rgcolorcustom?: number[]
-	public globalDifficulty!: number
+	public globalDifficulty = 0.2
 	public szT?: string
 	public vCustomInfoTag: string[] = []
 	public tableSoundVolume!: number

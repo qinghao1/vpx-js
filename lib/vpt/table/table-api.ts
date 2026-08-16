@@ -303,7 +303,7 @@ export class TableApi extends ItemApi<TableData> {
 		this.data.gravity = v * GRAVITYCONST
 		const minSlope = this.data.overridePhysics ? this.overrideMinSlope : this.data.angletiltMin
 		const maxSlope = this.data.overridePhysics ? this.overrideMaxSlope : this.data.angleTiltMax
-		const slope = minSlope + (maxSlope - minSlope) * this.data.globalDifficulty
+		const slope = minSlope + (maxSlope - minSlope) * (this.data.globalDifficulty ?? 0.2)
 		this.player.setGravity(slope, this.data.overridePhysics ? this.overrideGravityConstant : this.data.gravity)
 	}
 	get Friction() {
@@ -431,8 +431,9 @@ export class TableApi extends ItemApi<TableData> {
 	}
 	set SlopeMax(v) {
 		this.data.angleTiltMax = v
-		const slope =
-			this.data.angletiltMin + (this.data.angleTiltMax - this.data.angletiltMin) * this.data.globalDifficulty
+		const minSlope = this.data.overridePhysics ? this.overrideMinSlope : this.data.angletiltMin
+		const maxSlope = this.data.overridePhysics ? this.overrideMaxSlope : this.data.angleTiltMax
+		const slope = minSlope + (maxSlope - minSlope) * (this.data.globalDifficulty ?? 0.2)
 		this.player.setGravity(slope, this.data.overridePhysics ? this.overrideGravityConstant : this.data.gravity)
 	}
 	get SlopeMin() {
@@ -440,8 +441,9 @@ export class TableApi extends ItemApi<TableData> {
 	}
 	set SlopeMin(v) {
 		this.data.angletiltMin = v
-		const slope =
-			this.data.angletiltMin + (this.data.angleTiltMax - this.data.angletiltMin) * this.data.globalDifficulty
+		const minSlope = this.data.overridePhysics ? this.overrideMinSlope : this.data.angletiltMin
+		const maxSlope = this.data.overridePhysics ? this.overrideMaxSlope : this.data.angleTiltMax
+		const slope = minSlope + (maxSlope - minSlope) * (this.data.globalDifficulty ?? 0.2)
 		this.player.setGravity(slope, this.data.overridePhysics ? this.overrideGravityConstant : this.data.gravity)
 	}
 	get BallImage() {

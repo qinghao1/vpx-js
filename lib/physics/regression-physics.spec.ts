@@ -138,6 +138,35 @@ describe('regression: flipper physics must launch ball (walking_dead tip bug)', 
 		expect(ball.getState().pos.y).toBeGreaterThan(1650)
 	})
 
+	it('globalDifficulty defaults and fallbacks must be 0.2', async () => {
+		const tdSrc = fssync.readFileSync('lib/vpt/table/table-data.ts', 'utf-8')
+		expect(tdSrc).toContain('globalDifficulty = 0.2')
+		expect(tdSrc).not.toMatch(/globalDifficulty!:\s*number/)
+		const ppSrc = fssync.readFileSync('lib/game/player-physics.ts', 'utf-8')
+		expect(ppSrc).toContain('globalDifficulty ?? 0.2')
+		expect(ppSrc).not.toContain('?? 0.5')
+		const tblSrc = fssync.readFileSync('lib/vpt/table/table.ts', 'utf-8')
+		expect(tblSrc).toContain('getGlobalDifficulty')
+		expect(tblSrc).toContain('?? 0.2')
+		// functional: missing TDFT should give 0.2
+		const { TableData } = await import('../vpt/table/table-data.js')
+		const td: any = new (TableData as any)()
+		expect(td.globalDifficulty).toBeCloseTo(0.2, 5)
+	})
+
+	it('plunger scatter must scale with globalDifficulty', () => {
+		const src = fssync.readFileSync('lib/vpt/plunger/plunger-hit.ts', 'utf-8')
+		expect(src).toContain('getGlobalDifficulty()')
+		expect(src).toMatch(/scatterVelocity \*.*getGlobalDifficulty/)
+	})
+
+	it('SlopeMax/Min setters must respect overridePhysics', () => {
+		const src = fssync.readFileSync('lib/vpt/table/table-api.ts', 'utf-8')
+		expect(src).toMatch(/set SlopeMax.*overrideMinSlope.*overrideMaxSlope/s)
+		expect(src).toMatch(/set SlopeMin.*overrideMinSlope.*overrideMaxSlope/s)
+		expect(src).toMatch(/globalDifficulty \?\? 0\.2/)
+	})
+
 	it('flipper must push ball up when rotating', async () => {
 		const table = await Table.load(new NodeBinaryReader(three.fixturePath('table-flipper.vpx')))
 		const player = new Player(table).init()

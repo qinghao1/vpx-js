@@ -87,7 +87,7 @@ export class PlayerPhysics {
 
 	public init(): void {
 		const d = this.table.data!
-		const difficulty = d.globalDifficulty ?? 0.5
+		const difficulty = d.globalDifficulty ?? 0.2
 		const slope = d.overridePhysics
 			? DEFAULT_TABLE_MIN_SLOPE + (DEFAULT_TABLE_MAX_SLOPE - DEFAULT_TABLE_MIN_SLOPE) * difficulty
 			: (d.angletiltMin ?? DEFAULT_TABLE_MIN_SLOPE) +

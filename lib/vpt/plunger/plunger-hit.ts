@@ -17,6 +17,7 @@ import type { PlungerState } from './plunger-state.js'
 /** Plunger collision — static walls + moving tip. @see https://github.com/vpinball/vpinball/blob/master/plunger.cpp */
 export class PlungerHit extends HitObject {
 	private readonly mover: PlungerMover
+	private readonly table: Table
 
 	constructor(
 		private readonly data: PlungerData,
@@ -27,6 +28,7 @@ export class PlungerHit extends HitObject {
 		table: Table,
 	) {
 		super()
+		this.table = table
 		const z = table.getSurfaceHeight(data.szSurface, data.center.x, data.center.y)
 		const cfg: PlungerConfig = {
 			x: data.center.x - data.width,
@@ -112,7 +114,7 @@ export class PlungerHit extends HitObject {
 			this.mover.reverseImpulse = ball.hit.vel.y * impulse * (ball.data.mass / this.mover.mass) * 0.22
 		ball.hit.vel.addAndRelease(coll.hitNormal.clone(true).multiplyScalar(impulse))
 		ball.hit.vel.multiplyScalar(0.999)
-		const sv = this.mover.scatterVelocity
+		const sv = this.mover.scatterVelocity * this.table.getGlobalDifficulty()
 		if (sv > 0 && Math.abs(ball.hit.vel.y) > sv) {
 			let s = Math.random() * 2 - 1
 			s *= (1 - s * s) * 2.59808 * sv

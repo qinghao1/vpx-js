@@ -278,7 +278,7 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 		return 10
 	}
 	public getGlobalDifficulty(): number {
-		return this.data!.globalDifficulty!
+		return this.data?.globalDifficulty ?? 0.2
 	}
 	private get baseHeight(): number {
 		if (!this.data) throw new Error('Table data not loaded')
