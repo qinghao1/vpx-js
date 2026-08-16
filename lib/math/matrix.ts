@@ -86,21 +86,39 @@ export class Matrix2D extends Matrix3 {
 	}
 	orthoNormalize(): void {
 		const e = this.elements
-		const vx = new Vector3(e[0], e[1], e[2])
-		const vy = new Vector3(e[3], e[4], e[5])
-		const vz = new Vector3().crossVectors(vx, vy)
-		vx.normalize()
-		vz.normalize()
-		const vyy = new Vector3().crossVectors(vz, vx)
-		e[0] = vx.x
-		e[1] = vx.y
-		e[2] = vx.z
-		e[3] = vyy.x
-		e[4] = vyy.y
-		e[5] = vyy.z
-		e[6] = vz.x
-		e[7] = vz.y
-		e[8] = vz.z
+		let vxX = e[0]!
+		let vxY = e[1]!
+		let vxZ = e[2]!
+		const vyX = e[3]!
+		const vyY = e[4]!
+		const vyZ = e[5]!
+		let len = Math.hypot(vxX, vxY, vxZ)
+		if (len > 1e-10) {
+			vxX /= len
+			vxY /= len
+			vxZ /= len
+		}
+		let vzX = vxY * vyZ - vxZ * vyY
+		let vzY = vxZ * vyX - vxX * vyZ
+		let vzZ = vxX * vyY - vxY * vyX
+		len = Math.hypot(vzX, vzY, vzZ)
+		if (len > 1e-10) {
+			vzX /= len
+			vzY /= len
+			vzZ /= len
+		}
+		const vyyX = vzY * vxZ - vzZ * vxY
+		const vyyY = vzZ * vxX - vzX * vxZ
+		const vyyZ = vzX * vxY - vzY * vxX
+		e[0] = vxX
+		e[1] = vxY
+		e[2] = vxZ
+		e[3] = vyyX
+		e[4] = vyyY
+		e[5] = vyyZ
+		e[6] = vzX
+		e[7] = vzY
+		e[8] = vzZ
 	}
 	override toString(): string {
 		const r = (n: number) => Math.round(n * 1000) / 1000

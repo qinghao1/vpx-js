@@ -3,6 +3,7 @@
 
 import type { EventProxy } from '../../game/event-proxy.js'
 import type { Player } from '../../game/player.js'
+import type { HitObject } from '../../physics/hit-object.js'
 import { Enums } from '../enums.js'
 import { ItemApi } from '../item-api.js'
 import type { Table } from '../table/table.js'
@@ -14,6 +15,7 @@ export class TriggerApi extends ItemApi<TriggerData> {
 	constructor(
 		private readonly _state: TriggerState,
 		data: TriggerData,
+		private readonly hits: HitObject[],
 		events: EventProxy,
 		player: Player,
 		table: Table,
@@ -50,6 +52,7 @@ export class TriggerApi extends ItemApi<TriggerData> {
 	}
 	set Enabled(v) {
 		this.data.isEnabled = v
+		for (const hit of this.hits) hit.isEnabled = v
 	}
 	get Visible() {
 		return this._state.isVisible

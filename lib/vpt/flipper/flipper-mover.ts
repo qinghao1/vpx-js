@@ -91,7 +91,9 @@ export class FlipperMover implements MoverObject {
 		if (!this.solState) desiredTorque *= -this.getReturnRatio()
 		const eosAngle = MathUtils.degToRad(this.getTorqueDampingAngle())
 		if (Math.abs(this.state.angle - this.angleEnd) < eosAngle) {
-			const lerp = Math.sqrt(Math.sqrt(Math.abs(this.state.angle - this.angleEnd) / eosAngle))
+			const u = Math.abs(this.state.angle - this.angleEnd) / eosAngle
+			const u2 = u * u
+			const lerp = u2 * u2
 			desiredTorque *= lerp + this.getTorqueDamping() * (1 - lerp)
 		}
 		if (!this.direction) desiredTorque = -desiredTorque

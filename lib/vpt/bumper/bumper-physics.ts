@@ -115,7 +115,7 @@ export class BumperAnimation implements IAnimation {
 		let dy = Math.abs(hitY - this.data.center.y)
 		if (dy === 0) dy = 0.000001
 		const dx = Math.abs(hitX - this.data.center.x)
-		const skirtA = Math.tan(dx / dy)
+		const skirtA = Math.atan(dx / dy)
 		let rotX = Math.cos(skirtA) * SKIRT_TILT
 		let rotY = Math.sin(skirtA) * SKIRT_TILT
 		if (this.data.center.y < hitY) rotX = -rotX

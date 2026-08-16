@@ -83,7 +83,7 @@ export class Trigger
 		} else {
 			this.hits = this.hitGenerator.generateHitObjects(this.animation, this.events, table)
 		}
-		this.api = new TriggerApi(this.state, this.data, this.events, player, table)
+		this.api = new TriggerApi(this.state, this.data, this.hits, this.events, player, table)
 	}
 
 	public getApi(): TriggerApi {

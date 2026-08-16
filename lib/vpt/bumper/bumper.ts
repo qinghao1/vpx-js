@@ -179,6 +179,7 @@ export class BumperApi extends ItemApi<BumperData> {
 		private readonly animation: BumperAnimation,
 		data: BumperData,
 		events: EventProxy,
+		private readonly hit: HitObject,
 		player: Player,
 		table: Table,
 	) {
@@ -294,6 +295,7 @@ export class BumperApi extends ItemApi<BumperData> {
 	}
 	set Collidable(v) {
 		this.data.isCollidable = v
+		this.hit.isEnabled = v
 	}
 	get CapVisible() {
 		return this.data.isCapVisible
@@ -443,7 +445,7 @@ export class Bumper
 		this.animation = new BumperAnimation(this.data, this.state, this.events)
 		const height = table.getSurfaceHeight(this.data.szSurface, this.data.center.x, this.data.center.y)
 		this.hit = new BumperHit(this.data, this.state, this.animation, this.events, height)
-		this.api = new BumperApi(this.state, this.animation, this.data, this.events, player, table)
+		this.api = new BumperApi(this.state, this.animation, this.data, this.events, this.hit, player, table)
 	}
 
 	public getApi(): BumperApi {

@@ -12,6 +12,8 @@ export class CabNudge {
 	private impulses: Array<{ elapsed: number; length: number; impulse: Vertex2D }> = []
 	private deactivationDelay = 0
 	private strength = 1
+	private readonly scratch = new Vertex2D()
+	private readonly stepForce = new Vertex2D()
 
 	getAcceleration(): Vertex2D {
 		return this.cabinet.getAcceleration()
@@ -38,18 +40,23 @@ export class CabNudge {
 
 	stepOneMillisecond(): void {
 		if (this.deactivationDelay) this.deactivationDelay--
-		const impulse = new Vertex2D()
-		this.impulses = this.impulses.filter(it => {
+		this.scratch.x = 0
+		this.scratch.y = 0
+		let write = 0
+		for (let read = 0; read < this.impulses.length; read++) {
+			const it = this.impulses[read]!
 			it.elapsed++
 			if (it.elapsed <= it.length) {
 				const t = it.elapsed / it.length
 				const s = 0.5 * (1 - Math.cos(2 * Math.PI * t))
-				impulse.x += it.impulse.x * s
-				impulse.y += it.impulse.y * s
-				return true
+				this.scratch.x += it.impulse.x * s
+				this.scratch.y += it.impulse.y * s
+				this.impulses[write++] = it
 			}
-			return false
-		})
-		this.cabinet.step(new Vertex2D(this.cabinet.getMass() * impulse.x, this.cabinet.getMass() * impulse.y))
+		}
+		if (write < this.impulses.length) this.impulses.length = write
+		this.stepForce.x = this.cabinet.getMass() * this.scratch.x
+		this.stepForce.y = this.cabinet.getMass() * this.scratch.y
+		this.cabinet.step(this.stepForce)
 	}
 }

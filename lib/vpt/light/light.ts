@@ -57,8 +57,8 @@ export class LightData extends ItemData {
 	public falloff = 50
 	public falloffPower = 2
 	public state: number = Enums.LightStatus.LightStateOff
-	public color = 0x57a9ff // RGB(255,169,87) 2700K
-	public color2 = 0x57a9ff
+	public color = 0xffa957
+	public color2 = 0xffffff
 	public szOffImage?: string
 	public roundLight = false
 	public rgBlinkPattern = '10'

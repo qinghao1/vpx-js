@@ -137,9 +137,10 @@ export class KickerApi extends ItemApi<KickerData> {
 		this.data.szSurface = v
 	}
 	get Enabled() {
-		return this.hit.isEnabled
+		return this.data.isEnabled
 	}
 	set Enabled(v) {
+		this.data.isEnabled = v
 		this.hit.isEnabled = v
 	}
 	get Scatter() {

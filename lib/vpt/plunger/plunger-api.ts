@@ -93,6 +93,7 @@ export class PlungerApi extends ItemApi<PlungerData> {
 	}
 	set ScatterVelocity(v) {
 		this.data.scatterVelocity = v
+		this.hit.getMoverObject().scatterVelocity = v
 	}
 	get MomentumXfer() {
 		return this.data.momentumXfer

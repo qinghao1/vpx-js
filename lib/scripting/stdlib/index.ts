@@ -269,7 +269,7 @@ export class Stdlib extends VbsApi {
 		}
 		if (obj?.constructor?.name) {
 			if (obj.constructor.name.endsWith('Api')) {
-				return obj.constructor.name.substr(0, obj.constructor.name.length - 3)
+				return obj.constructor.name.slice(0, obj.constructor.name.length - 3)
 			}
 			if (obj.constructor.name === 'VbsUndefined') {
 				return 'Nothing'
@@ -310,7 +310,7 @@ export class Stdlib extends VbsApi {
 		const s = String(str)
 		if (length <= 0) return ''
 		if (length >= s.length) return s
-		return s.substr(0, length)
+		return s.slice(0, length)
 	}
 
 	public Right(str: unknown, length: number): string {
@@ -318,16 +318,16 @@ export class Stdlib extends VbsApi {
 		const s = String(str)
 		if (length <= 0) return ''
 		if (length >= s.length) return s
-		return s.substr(s.length - length)
+		return s.slice(s.length - length)
 	}
 
 	public Mid(str: unknown, start: number, length?: number): string {
 		if (str == null || (str as any)?.[UNDEF] === true) return ''
 		const s = String(str)
 		const i = Math.max(0, start - 1)
-		if (length == null) return s.substr(i)
+		if (length == null) return s.slice(i)
 		if (length <= 0) return ''
-		return s.substr(i, length)
+		return s.slice(i, i + length)
 	}
 
 	public CreateObject(name: string, player: Player): any {
