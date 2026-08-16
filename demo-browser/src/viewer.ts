@@ -1294,9 +1294,12 @@ export class Viewer {
 	_streamTextures(table, textures, reader) {
 		if (!textures?.length) {
 			if (reader) void this._cleanupReader(reader).catch(() => {})
-			if (this.viewerMode !== 'play') {
-				this._clearRawTextures?.()
-			}
+			// generic: free raw texture binaries after streaming regardless of mode; keeps GPU textures only
+			this._clearRawTextures?.()
+			if (typeof (globalThis as any).gc === 'function')
+				try {
+					;(globalThis as any).gc()
+				} catch {}
 			return
 		}
 		this._showStream()
@@ -1308,6 +1311,14 @@ export class Viewer {
 			let done = 0
 			const t0 = performance.now()
 			this.log(`[stream] Streaming ${total} textures…`)
+			// generic: early free of VPX blob to reduce peak (table.textures already have binaries)
+			if (reader) {
+				try {
+					await this._cleanupReader(reader)
+				} catch {}
+				// prevent double-free at the end
+				reader = null
+			}
 			let scheduled = false
 			const patchCloned = () => {
 				const cache = this.renderApi.getMapGenerator?.().getCache?.()
@@ -1518,9 +1529,12 @@ export class Viewer {
 			if (reader) {
 				await this._cleanupReader(reader)
 			}
-			if (this.viewerMode !== 'play') {
-				this._clearRawTextures?.()
-			}
+			// generic: free raw texture binaries after streaming regardless of mode; keeps GPU textures only
+			this._clearRawTextures?.()
+			if (typeof (globalThis as any).gc === 'function')
+				try {
+					;(globalThis as any).gc()
+				} catch {}
 		})()
 	}
 	async _waitForPinmame(timeout = 45000) {

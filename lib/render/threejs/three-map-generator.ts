@@ -85,6 +85,13 @@ export class ThreeMapGenerator {
 			const tex = await texture.loadTexture(this.textureLoader!, table)
 			this.textureCache.set(texture.getName(), tex)
 			progress().details(texture.getName())
+			// generic: free raw source after GPU upload to keep peak memory low for any table
+			try {
+				;(texture as any).binary = undefined
+			} catch {}
+			try {
+				;(texture as any).pdsBuffer = undefined
+			} catch {}
 			return true
 		} catch (err) {
 			const msg = (err as Error).message || ''
@@ -104,6 +111,12 @@ export class ThreeMapGenerator {
 					msg,
 				)
 			}
+			try {
+				;(texture as any).binary = undefined
+			} catch {}
+			try {
+				;(texture as any).pdsBuffer = undefined
+			} catch {}
 			return false
 		}
 	}

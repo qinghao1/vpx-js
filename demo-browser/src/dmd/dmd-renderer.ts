@@ -206,13 +206,11 @@ export class DmdRenderer {
 					mat.color?.set?.(0xffffff)
 				}
 				mat.transparent = false
-				mat.depthTest = true
-				mat.depthWrite = true
-				mat.polygonOffset = true
-				mat.polygonOffsetFactor = -1
-				mat.polygonOffsetUnits = -1
+				mat.depthTest = false
+				mat.depthWrite = false
+				mat.polygonOffset = false
 			}
-			m.renderOrder = 1
+			m.renderOrder = 1000
 			m.frustumCulled = false
 		}
 
@@ -316,18 +314,17 @@ export class DmdRenderer {
 			const mat = new THREE.MeshBasicMaterial({
 				map: this.texture,
 				side: THREE.DoubleSide,
-				depthTest: true,
-				depthWrite: true,
-				polygonOffset: true,
-				polygonOffsetFactor: -1,
-				polygonOffsetUnits: -1,
+				depthTest: false,
+				depthWrite: false,
 				transparent: false,
 			})
 			const mesh = new THREE.Mesh(geom, mat)
 			mesh.name = `DMD_${fl.getName()}`
-			mesh.renderOrder = 1
+			mesh.renderOrder = 1000
 			mesh.frustumCulled = false
-			mesh.position.set(d.center?.x ?? 470, d.center?.y ?? 40, -(d.height ?? 620))
+			// vpinball: flasher.cpp FlasherData.m_height/m_rotX/Y/Z define DMD quad in playfield XY at positive Z up.
+			// Generic fallback height 24 (playfield slightly above) keeps DMD visible for any table when data missing.
+			mesh.position.set(d.center?.x ?? 470, d.center?.y ?? 40, d.height ?? 24)
 			mesh.rotation.set(
 				THREE.MathUtils.degToRad(d.rotX ?? 0),
 				THREE.MathUtils.degToRad(d.rotY ?? 0),
