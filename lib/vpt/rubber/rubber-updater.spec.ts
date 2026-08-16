@@ -28,10 +28,11 @@ describe('The VPinball rubber updater', () => {
 		player = new Player(table).init()
 	})
 
-	it('should not update visibility when rendering is static', async () => {
+	it('should update visibility even when rendering is static', async () => {
 		table.rubbers.r2.getApi().Visible = false
 		const states = player.popStates()
-		expect(states.getState<RubberState>('r2')).not.to.be.ok
+		expect(states.getState<RubberState>('r2').isVisible).to.equal(false)
+		states.getState<RubberState>('r2').release()
 	})
 
 	it('should update visibility when rendering is dynamic', async () => {

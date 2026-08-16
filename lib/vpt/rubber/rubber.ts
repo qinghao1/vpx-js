@@ -141,8 +141,6 @@ export class RubberState extends ItemState {
 
 /** Rubber API — VBS surface for `Rubber`. @see https://github.com/vpinball/vpinball/blob/master/rubber.cpp */
 export class RubberApi extends ItemApi<RubberData> {
-	private readonly isDynamic: boolean
-
 	constructor(
 		private readonly _state: RubberState,
 		private readonly hits: HitObject[],
@@ -152,14 +150,13 @@ export class RubberApi extends ItemApi<RubberData> {
 		table: Table,
 	) {
 		super(data, events, player, table)
-		this.isDynamic = !data.staticRendering
 	}
 
 	get Height() {
-		return this.data.height
+		return this._state.height ?? this.data.height
 	}
 	set Height(v) {
-		if (this.isDynamic) this._state.height = v
+		this._state.height = v
 		this.data.height = v
 	}
 	get HitHeight() {
@@ -175,18 +172,18 @@ export class RubberApi extends ItemApi<RubberData> {
 		this.data.thickness = v
 	}
 	get Material() {
-		return this.data.szMaterial
+		return this._state.material ?? this.data.szMaterial ?? ''
 	}
 	set Material(v) {
-		if (this.isDynamic) this._state.material = v
+		this._state.material = v
 		this.data.szMaterial = v
 	}
 	get Image() {
-		return this.data.szImage
+		return this._state.texture ?? this.data.szImage ?? ''
 	}
 	set Image(v) {
 		this._assertNonHdrImage(v)
-		if (this.isDynamic) this._state.texture = v
+		this._state.texture = v
 		this.data.szImage = v
 	}
 	get HasHitEvent() {
@@ -226,11 +223,11 @@ export class RubberApi extends ItemApi<RubberData> {
 		if (v !== this.Collidable) for (const hit of this.hits) hit.isEnabled = v
 	}
 	get Visible() {
-		return this.data.isVisible
+		return this._state.isVisible
 	}
 	set Visible(v) {
-		if (this.isDynamic) this._state.isVisible = v
-		this.data.isVisible = v
+		this._state.isVisible = !!v
+		this.data.isVisible = !!v
 	}
 	get EnableStaticRendering() {
 		return this.data.staticRendering
@@ -251,24 +248,24 @@ export class RubberApi extends ItemApi<RubberData> {
 		this.data.isReflectionEnabled = v
 	}
 	get RotX() {
-		return this.data.rotX
+		return this._state.rotX
 	}
 	set RotX(v) {
-		if (this.isDynamic) this._state.rotX = v
+		this._state.rotX = v
 		this.data.rotX = v
 	}
 	get RotY() {
-		return this.data.rotY
+		return this._state.rotY
 	}
 	set RotY(v) {
-		if (this.isDynamic) this._state.rotY = v
+		this._state.rotY = v
 		this.data.rotY = v
 	}
 	get RotZ() {
-		return this.data.rotZ
+		return this._state.rotZ
 	}
 	set RotZ(v) {
-		if (this.isDynamic) this._state.rotZ = v
+		this._state.rotZ = v
 		this.data.rotZ = v
 	}
 	get PhysicsMaterial() {

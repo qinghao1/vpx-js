@@ -86,26 +86,13 @@ export function batchStaticOpaques(root: Group, table: Table, _renderApi: ThreeR
 	root.updateMatrixWorld(true)
 	const invRoot = new Matrix4().copy(root.matrixWorld).invert()
 	const movables = new Set(table.getMovables().map(a => a.getName()))
-	const staticPrimitives = new Set(
-		Object.values(table.primitives)
-			.filter(p => (p as any).data?.staticRendering)
-			.map(p => p.getName()),
-	)
-	const staticRubbers = new Set(
-		Object.values(table.rubbers)
-			.filter(r => (r as any).data?.staticRendering)
-			.map(r => r.getName()),
-	)
-	const animatables = new Set(
-		table
-			.getAnimatables()
-			.map(a => a.getName())
-			.filter(n => !staticPrimitives.has(n) && !staticRubbers.has(n)),
-	)
+	const primitives = new Set(Object.values(table.primitives).map(p => p.getName()))
+	const rubbers = new Set(Object.values(table.rubbers).map(r => r.getName()))
+	const animatables = new Set(table.getAnimatables().map(a => a.getName()))
 
 	const isAnimated = (o: any): boolean => {
 		for (let p = o.parent; p && p !== root; p = p.parent) {
-			if (staticPrimitives.has(p.name) || staticRubbers.has(p.name)) continue
+			if (primitives.has(p.name) || rubbers.has(p.name)) return true
 			if (movables.has(p.name) || animatables.has(p.name)) return true
 		}
 		return false
