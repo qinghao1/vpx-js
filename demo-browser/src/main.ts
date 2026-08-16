@@ -7,7 +7,7 @@ const params = new URLSearchParams(location.search)
 const viewer = new Viewer({
 	queryParam: 'vpx',
 	defaultVpx: null,
-	viewerMode: params.get('mode') === 'viewer' ? 'viewer' : 'play',
+	viewerMode: params.get('mode') === 'play' ? 'play' : 'viewer',
 })
 const _isDev = (() => {
 	if (import.meta.env?.DEV) return true

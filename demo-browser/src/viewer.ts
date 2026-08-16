@@ -529,16 +529,34 @@ export class Viewer {
 		const fromTarget = this.controls.target.clone()
 		const fromNear = this.camera.near
 		const fromFar = this.camera.far
+		const fromFov = this.camera.fov
 		const toPos = state.position.clone()
 		const toTarget = state.target.clone()
 		const toNear = state.near
 		const toFar = state.far
-		if (fromPos.distanceTo(toPos) < 0.5 && fromTarget.distanceTo(toTarget) < 0.5) {
+		const toFov = (() => {
+			if (this.viewerMode === 'play') {
+				const f = Number.isFinite(this.table?.data?.bgFov?.[0]) ? this.table.data.bgFov[0] : CAM.fov
+				return Number.isFinite(f) ? Math.max(20, Math.min(70, f)) : CAM.fov
+			}
+			return CAM.fov
+		})()
+		if (
+			fromPos.distanceTo(toPos) < 0.5 &&
+			fromTarget.distanceTo(toTarget) < 0.5 &&
+			Math.abs(fromFov - toFov) < 0.1
+		) {
 			applyCameraState(this.camera, this.controls, state)
+			if (Math.abs(this.camera.fov - toFov) > 0.1) {
+				this.camera.fov = toFov
+				this.camera.updateProjectionMatrix()
+			}
 			this._playCameraApplied = this.viewerMode === 'play'
 			return
 		}
-		const ease = t => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2)
+		const ease = t => t * t * (3 - 2 * t)
+		const prevDamping = this.controls.enableDamping
+		this.controls.enableDamping = false
 		this.controls.enabled = false
 		this.gate ??= new AnimationGate()
 		this.gate.beginAnimation()
@@ -549,6 +567,7 @@ export class Viewer {
 					try {
 						this.gate.endAnimation()
 					} catch {}
+					this.controls.enableDamping = prevDamping
 					this.controls.enabled = this.viewerMode !== 'play'
 					resolve()
 					return
@@ -557,6 +576,7 @@ export class Viewer {
 					try {
 						this.gate.endAnimation()
 					} catch {}
+					this.controls.enableDamping = prevDamping
 					resolve()
 					return
 				}
@@ -566,6 +586,7 @@ export class Viewer {
 				this.controls.target.lerpVectors(fromTarget, toTarget, e)
 				this.camera.near = THREE.MathUtils.lerp(fromNear, toNear, e)
 				this.camera.far = THREE.MathUtils.lerp(fromFar, toFar, e)
+				this.camera.fov = THREE.MathUtils.lerp(fromFov, toFov, e)
 				this.camera.updateProjectionMatrix()
 				this.camera.lookAt(this.controls.target)
 				this.controls.update()
@@ -573,7 +594,12 @@ export class Viewer {
 				else {
 					this._cameraRaf = null
 					applyCameraState(this.camera, this.controls, state)
+					if (Math.abs(this.camera.fov - toFov) > 0.1) {
+						this.camera.fov = toFov
+						this.camera.updateProjectionMatrix()
+					}
 					this._playCameraApplied = this.viewerMode === 'play'
+					this.controls.enableDamping = prevDamping
 					this.controls.enabled = this.viewerMode !== 'play'
 					this.gate.endAnimation()
 					resolve()

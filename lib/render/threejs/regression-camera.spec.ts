@@ -42,11 +42,38 @@ describe('regression: camera smooth transition (viewer <-> play)', () => {
 
 	it('viewer.ts must clean up gate on cancel and restore controls', () => {
 		const src = fs.readFileSync('demo-browser/src/viewer.ts', 'utf-8')
-		// gate must be ended even when gen mismatches (cancelled mid-flight)
 		expect(src, 'must end gate on gen mismatch').toMatch(/_gen !== this\._cameraGen[\s\S]*gate\.endAnimation/)
 		expect(src, 'must restore controls.enabled on cancel').toMatch(
 			/_gen !== this\._cameraGen[\s\S]*controls\.enabled/,
 		)
+		expect(src, 'must restore damping on cancel').toMatch(
+			/enableDamping\s*=\s*false[\s\S]*enableDamping\s*=\s*prevDamping/,
+		)
+	})
+
+	it('viewer.ts must animate FOV together with position (no snap)', () => {
+		const src = fs.readFileSync('demo-browser/src/viewer.ts', 'utf-8')
+		expect(src, 'must lerp FOV inside _animateCameraTo').toMatch(
+			/fromFov[\s\S]*toFov[\s\S]*MathUtils\.lerp\(fromFov/,
+		)
+		expect(src, 'must compute toFov from bgFov/CAM.fov').toMatch(/bgFov[\s\S]*CAM\.fov/)
+	})
+
+	it('viewer.ts must use smooth easing (no middle teleport)', () => {
+		const src = fs.readFileSync('demo-browser/src/viewer.ts', 'utf-8')
+		expect(src, 'must use smoothstep easing to avoid cubic middle jump').toMatch(
+			/t\s*\*\s*t\s*\*\s*\(3\s*-\s*2\s*\*\s*t\)/,
+		)
+		expect(src, 'must not use cubic 4*t^3 sharp middle').not.toMatch(/4\s*\*\s*t\s*\*\s*t\s*\*\s*t/)
+	})
+
+	it('viewer default must be viewer mode (not play)', () => {
+		const main = fs.readFileSync('demo-browser/src/main.ts', 'utf-8')
+		expect(main, 'main.ts must default to viewer when mode param missing').toMatch(
+			/===\s*'play'\s*\?\s*'play'\s*:\s*'viewer'/,
+		)
+		const helpers = fs.readFileSync('demo-browser/e2e/helpers.mjs', 'utf-8')
+		expect(helpers, 'helpers DEFAULT_URL must use mode=viewer').toMatch(/DEFAULT_URL[^\n]*mode=viewer/)
 	})
 
 	it('animation lerp must be smooth — no teleport in middle', () => {
