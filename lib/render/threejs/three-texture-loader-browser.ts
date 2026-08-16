@@ -20,7 +20,7 @@ import {
 	type Texture as ThreeTexture,
 } from '../../refs.browser.js'
 import { exrCacheKey, idbGet, idbSet } from '../../util/idb-cache.js'
-import { isLowQuality, isLowQualityMode, QUALITY_CAPS } from '../../util/quality.js'
+import { _resetQualityCache, isLowQuality, QUALITY_CAPS } from '../../util/quality.js'
 import type { ITextureLoader } from '../irender-api.js'
 
 const imageMap: Record<string, string> = {
@@ -75,8 +75,6 @@ function viewportBudget(): number {
 	}
 }
 
-export { isLowQualityMode }
-
 export function effectiveMax(_isFloat: boolean, name?: string): number {
 	const hw = getHardwareMax()
 	const swift = isSwiftShader()
@@ -94,6 +92,7 @@ export function effectiveMax(_isFloat: boolean, name?: string): number {
 export function _testResetTextureLimits(): void {
 	hwMax = undefined
 	isSwiftShaderCache = undefined
+	_resetQualityCache()
 }
 
 function tune(tex: any): void {

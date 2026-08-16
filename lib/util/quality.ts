@@ -7,7 +7,14 @@ export const QUALITY_CAPS = {
 	high: { playfield: 4096, other: 4096, floor: 1024, aniso: 16 },
 } as const
 
-export function isLowQuality(): boolean {
+export const QUALITY_MAX_LIGHTS = {
+	low: 8,
+	high: 128,
+} as const
+
+let cachedLow: boolean | undefined
+
+function computeIsLowQuality(): boolean {
 	try {
 		if (typeof window === 'undefined' || typeof location === 'undefined') return false
 		const params = new URLSearchParams(location.search)
@@ -47,16 +54,19 @@ export function isLowQuality(): boolean {
 	}
 }
 
-export const isLowQualityMode = isLowQuality
+export function isLowQuality(): boolean {
+	if (cachedLow !== undefined) return cachedLow
+	cachedLow = computeIsLowQuality()
+	return cachedLow
+}
+
+export function _resetQualityCache(): void {
+	cachedLow = undefined
+}
 
 export function getQuality(): Quality {
 	return isLowQuality() ? 'low' : 'high'
 }
-
-export const QUALITY_MAX_LIGHTS = {
-	low: 8,
-	high: 128,
-} as const
 
 export function getMaxLights(): number {
 	return isLowQuality() ? QUALITY_MAX_LIGHTS.low : QUALITY_MAX_LIGHTS.high
