@@ -5,7 +5,7 @@ import * as chai from 'chai'
 import { expect } from 'chai'
 import sinonChai from 'sinon-chai'
 import * as THREE from 'three'
-import { postProcessScene } from '../../../demo-browser/src/scene.js'
+import { postProcessScene } from './three-scene-postprocess.js'
 
 chai.use((sinonChai as any).default ?? sinonChai)
 

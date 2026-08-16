@@ -159,8 +159,9 @@ export class ThreeTextureLoaderNode implements ITextureLoader<ThreeTexture> {
 	}
 }
 
-export function getMaxTextureSize(_name: string): number {
-	return 2048
+export function getMaxTextureSize(name: string): number {
+	const isPlayfield = /playfield|nestmap|bake/i.test(name)
+	return isPlayfield ? 4096 : 2048
 }
 
 function tex(data: Uint8Array, w: number, h: number, name: string): ThreeTexture {

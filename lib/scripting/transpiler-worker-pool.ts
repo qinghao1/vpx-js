@@ -67,19 +67,9 @@ let browserNextId = 1
 
 function getBrowserWorker(): Worker {
 	if (browserWorker) return browserWorker
-	try {
-		browserWorker = new Worker(new URL('./transpiler.worker.browser.js', import.meta.url), {
-			type: 'module',
-		} as any)
-	} catch {
-		try {
-			browserWorker = new Worker(new URL('./transpiler.worker.browser.ts', import.meta.url), {
-				type: 'module',
-			} as any)
-		} catch (e) {
-			throw e
-		}
-	}
+	browserWorker = new Worker(new URL('./transpiler.worker.browser.js', import.meta.url), {
+		type: 'module',
+	} as any)
 	browserWorker.onmessage = (e: MessageEvent) => {
 		const m: any = (e as any).data
 		const p = browserPending.get(m.id)

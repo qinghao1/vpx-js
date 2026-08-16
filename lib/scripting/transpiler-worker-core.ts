@@ -1,4 +1,3 @@
-import { generate } from 'escodegen'
 import type { Program } from 'estree'
 import { Enums } from '../vpt/enums.js'
 import { GlobalApi } from '../vpt/global-api.js'
@@ -12,7 +11,6 @@ import { FunctionHoistTransformer } from './transformer/function-hoist-transform
 import { ReferenceTransformer } from './transformer/reference-transformer.js'
 import { ScopeTransformer } from './transformer/scope-transformer.js'
 import { WrapTransformer } from './transformer/wrap-transformer.js'
-
 function normalizeNewCall(vbs: string): string {
 	let out = vbs.replace(/Set\s+(\w+)\s*=\s*\(\s*New\s+(\w+)\s*\)\s*\(([^)]*)\)/gi, (_, v, c, a) => {
 		const args = (a as string).trim()
@@ -40,6 +38,8 @@ export async function transpileInWorker(payload: {
 	globalObject?: string
 	tableData?: TableDataPayload | null
 }): Promise<string> {
+	const escodegenModule: any = await import('escodegen')
+	const generate = escodegenModule.generate ?? escodegenModule.default?.generate ?? escodegenModule.default?.default?.generate
 	const { vbs, globalFunction, globalObject, tableData } = payload
 	const grammar = new Grammar()
 	let ast: Program = grammar.transpile(normalizeNewCall(vbs))

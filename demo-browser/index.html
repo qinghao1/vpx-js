@@ -4,8 +4,9 @@
 		<meta charset="UTF-8">
 		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 		<title>vpx-js — Browser Demo</title>
-		<link rel="stylesheet" href="./src/app.css">
-		<script src="./src/log-capture.js"></script>
+		<link rel="stylesheet" href="./src/styles/app.css">
+	<script>window.global=window;window.process=window.process||{env:{},browser:true,platform:"browser",version:"",argv:[],cwd:()=>"/",on:()=>{},once:()=>{},off:()=>{},addListener:()=>{},removeListener:()=>{},removeAllListeners:()=>{},emit:()=>{},nextTick:(cb,...a)=>(typeof queueMicrotask!="undefined"?queueMicrotask(()=>cb(...a)):setTimeout(()=>cb(...a),0))};globalThis.process=window.process;globalThis.global=globalThis;window.Buffer=window.Buffer||{isBuffer:()=>false};</script>
+		<!-- log-capture replaced by src/ui/log-viewer.ts typed events -->
 	</head>
 	<body>
 		<header id="brand" aria-label="vpx-js branding">
@@ -97,6 +98,6 @@
 				<kbd>Esc</kbd> back to viewer
 			</div>
 		</dialog>
-		<script type="module" src="./src/app.js"></script>
+		<script type="module" src="./src/main.ts"></script>
 	</body>
 </html>

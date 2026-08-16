@@ -1,7 +1,7 @@
 import * as fs from 'node:fs'
 import * as THREE from 'three'
 import { describe, expect, it } from 'vitest'
-import { classify, isBasePlayfield, postProcessScene } from '../../../demo-browser/src/scene.js'
+import { classify, isBasePlayfield, postProcessScene } from './three-scene-postprocess.js'
 
 function makeMesh(name: string, geom: THREE.BufferGeometry, mat: THREE.Material): THREE.Mesh {
 	const m = new THREE.Mesh(geom as any, mat as any)
@@ -33,7 +33,7 @@ describe('regression: room must remain visible', () => {
 		// old bug: matName includes playfield or parentName includes table would hide room
 		expect(isBasePlayfield('some_wall', unbaked), 'wall not base').toEqual(false)
 		// file guard: ensure old loose check not present
-		const src = fs.readFileSync('demo-browser/src/scene.js', 'utf-8')
+		const src = fs.readFileSync('lib/render/threejs/three-scene-postprocess.ts', 'utf-8')
 		expect(src, 'isBasePlayfield must not check parentName/table').not.toContain('parentName')
 		expect(src, 'must not check matName.includes(playfield)').not.toMatch(/matName\.includes\('playfield'\)/)
 		expect(src).toContain("n.includes('playfield') && !c.isBakedMat")

@@ -1,12 +1,12 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import controller from '../../res/scripts/controller.vbs'
-import core from '../../res/scripts/core.vbs'
-import sam from '../../res/scripts/sam.vbs'
-import VPMKeys from '../../res/scripts/VPMKeys.vbs'
-import WPC from '../../res/scripts/WPC.vbs'
-import grammar from './grammar/grammar.bnf'
+import controller from '../../res/scripts/controller.vbs?raw'
+import core from '../../res/scripts/core.vbs?raw'
+import sam from '../../res/scripts/sam.vbs?raw'
+import VPMKeys from '../../res/scripts/VPMKeys.vbs?raw'
+import WPC from '../../res/scripts/WPC.vbs?raw'
+import grammar from './grammar/grammar.bnf?raw'
 
 import { ERR } from './stdlib/err.js'
 

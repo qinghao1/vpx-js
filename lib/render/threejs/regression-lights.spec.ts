@@ -74,7 +74,15 @@ describe('regression: playfield lights via szLightmap', () => {
 	})
 
 	it('Viewer.applyChangedStates must propagate to szLightmap primitives (file guard)', async () => {
-		const viewerCore = fs.readFileSync('demo-browser/viewer-core.js', 'utf-8')
+		let viewerCore = ''
+		try {
+			viewerCore = fs.readFileSync('demo-browser/viewer-core.js', 'utf-8')
+		} catch {}
+		if (!viewerCore.includes('changedLightNames')) {
+			try {
+				viewerCore = fs.readFileSync('demo-browser/src/viewer.ts', 'utf-8')
+			} catch {}
+		}
 		expect(viewerCore, 'viewer-core must collect changedLightNames').toContain('changedLightNames')
 		expect(viewerCore, 'must iterate primitives with szLightmap').toContain('szLightmap')
 		expect(viewerCore, 'must call primitive applyState for lightmaps').toMatch(

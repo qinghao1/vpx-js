@@ -117,7 +117,7 @@ describe('regression: texture stripe artifacts', () => {
 	})
 
 	it('polygonOffset must be negative to avoid z-fighting stripes', () => {
-		const src = fs.readFileSync('demo-browser/src/scene.js', 'utf-8')
+		const src = fs.readFileSync('lib/render/threejs/three-scene-postprocess.ts', 'utf-8')
 		// main bake should be -1, overlay -2/-4
 		expect(src).toMatch(/polygonOffsetFactor\s*=\s*-1/)
 		expect(src).toMatch(/polygonOffsetFactor\s*=\s*-2/)

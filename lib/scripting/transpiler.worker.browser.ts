@@ -1,17 +1,25 @@
 ;(globalThis as any).process ??= {
 	env: {},
+	browser: true,
+	platform: 'browser',
+	version: '',
+	argv: [],
 	cwd: () => '/',
 	nextTick: (cb: (...a: any[]) => void, ...a: any[]) =>
 		typeof queueMicrotask !== 'undefined' ? queueMicrotask(() => cb(...a)) : setTimeout(() => cb(...a), 0),
 	on: () => {},
 	once: () => {},
 	off: () => {},
-	emit: () => {},
+	addListener: () => {},
 	removeListener: () => {},
+	removeAllListeners: () => {},
+	emit: () => {},
 } as any
 ;(globalThis as any).global ??= globalThis
 ;(self as any).process ??= (globalThis as any).process
 ;(self as any).global ??= (globalThis as any).global
+if (!(self as any).process?.on) (self as any).process.on = () => {}
+if (!(globalThis as any).process?.on) (globalThis as any).process.on = () => {}
 
 let transpileInWorker: ((p: any) => Promise<string>) | undefined
 

@@ -3,7 +3,7 @@ import * as chai from 'chai'
 import { expect } from 'chai'
 import sinonChai from 'sinon-chai'
 import * as THREE from 'three'
-import { computePlayFraming, computeViewerFraming } from '../../../demo-browser/src/scene.js'
+import { computePlayFraming, computeViewerFraming } from './three-camera-framing.js'
 
 chai.use((sinonChai as any).default ?? sinonChai)
 

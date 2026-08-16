@@ -80,21 +80,16 @@ export class BiffParser {
 				return out
 			} catch {}
 		}
-		const { inflate } = await import('node:zlib')
-		return new Promise((resolve, reject) => {
-			inflate(buf as unknown as Parameters<typeof inflate>[0], (err: unknown, res: unknown) => {
-				if (err) return reject(err as Error)
-				resolve(
-					res instanceof Uint8Array
-						? res
-						: new Uint8Array(
-								(res as Uint8Array).buffer,
-								(res as Uint8Array).byteOffset,
-								(res as Uint8Array).byteLength,
-							),
-				)
-			})
-		})
+		try {
+			// @ts-ignore
+			const pako = await import('pako')
+			const inflate = (pako as unknown as { inflate: (data: Uint8Array) => Uint8Array }).inflate ?? (pako as unknown as { default: { inflate: (data: Uint8Array) => Uint8Array } }).default?.inflate
+			if (inflate) {
+				const res = inflate(buf)
+				return res instanceof Uint8Array ? res : new Uint8Array(res)
+			}
+		} catch {}
+		throw new Error('Decompression failed: DecompressionStream unavailable and pako not available')
 	}
 
 	/** Reads a null-terminated UTF-8 string. */

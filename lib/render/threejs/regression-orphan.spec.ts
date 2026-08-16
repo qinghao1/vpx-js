@@ -63,7 +63,7 @@ describe('regression: orphan chrome must be systematically cleaned', () => {
 		})
 		expect(js).toContain('F1')
 		// scene sanity
-		const { postProcessScene } = await import('../../../demo-browser/src/scene.js')
+		const { postProcessScene } = await import('./three-scene-postprocess.js')
 		const root = new (await import('three')).Group()
 		root.add(
 			new (await import('three')).Mesh(

@@ -14,7 +14,7 @@ import {
 	pollLog,
 	shot,
 	waitReady,
-} from './lib/helpers.mjs'
+} from './helpers.mjs'
 
 const url =
 	process.argv.find(a => a.startsWith('--url='))?.slice(6) ||
