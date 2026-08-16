@@ -206,11 +206,18 @@ export class DmdRenderer {
 					mat.color?.set?.(0xffffff)
 				}
 				mat.transparent = false
-				mat.depthTest = false
+				// vpinball: flasher.cpp DMD uses ZWRITEENABLE false with depthBias -10000 and
+				// SetupSegmentRenderer; generic THREE equivalent is depthTest true, depthWrite false
+				// with polygonOffset to bias forward without writing depth (prevents show-through
+				// while staying behind playfield/cab if actually behind).
+				mat.depthTest = true
 				mat.depthWrite = false
-				mat.polygonOffset = false
+				mat.polygonOffset = true
+				mat.polygonOffsetFactor = -1
+				mat.polygonOffsetUnits = -1
 			}
-			m.renderOrder = 1000
+			// vpinball depthBias -10000 brings DMD forward; THREE renderOrder 1 with offset achieves same generically.
+			m.renderOrder = 1
 			m.frustumCulled = false
 		}
 
@@ -314,17 +321,22 @@ export class DmdRenderer {
 			const mat = new THREE.MeshBasicMaterial({
 				map: this.texture,
 				side: THREE.DoubleSide,
-				depthTest: false,
+				depthTest: true,
 				depthWrite: false,
+				polygonOffset: true,
+				polygonOffsetFactor: -1,
+				polygonOffsetUnits: -1,
 				transparent: false,
 			})
 			const mesh = new THREE.Mesh(geom, mat)
 			mesh.name = `DMD_${fl.getName()}`
-			mesh.renderOrder = 1000
+			mesh.renderOrder = 1
 			mesh.frustumCulled = false
-			// vpinball: flasher.cpp FlasherData.m_height/m_rotX/Y/Z define DMD quad in playfield XY at positive Z up.
-			// Generic fallback height 24 (playfield slightly above) keeps DMD visible for any table when data missing.
-			mesh.position.set(d.center?.x ?? 470, d.center?.y ?? 40, d.height ?? 24)
+			// vpinball: flasher.cpp FlasherData.m_height/m_rotX/Y/Z define DMD quad in playfield XY at positive Z up
+			// (MatrixTranslate(center,height) * RotX/Y/Z). ThreeRenderApi.transformScene maps LH Z up → RH Y up
+			// via scene.rotateX(π/2) (Y = -Z), so positive height must be negated locally to appear above
+			// playfield in world space. Generic fallback 24 keeps DMD just above playfield for any table.
+			mesh.position.set(d.center?.x ?? 470, d.center?.y ?? 40, -(d.height ?? 24))
 			mesh.rotation.set(
 				THREE.MathUtils.degToRad(d.rotX ?? 0),
 				THREE.MathUtils.degToRad(d.rotY ?? 0),
