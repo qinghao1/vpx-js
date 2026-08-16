@@ -1311,14 +1311,6 @@ export class Viewer {
 			let done = 0
 			const t0 = performance.now()
 			this.log(`[stream] Streaming ${total} textures…`)
-			// generic: early free of VPX blob to reduce peak (table.textures already have binaries)
-			if (reader) {
-				try {
-					await this._cleanupReader(reader)
-				} catch {}
-				// prevent double-free at the end
-				reader = null
-			}
 			let scheduled = false
 			const patchCloned = () => {
 				const cache = this.renderApi.getMapGenerator?.().getCache?.()
