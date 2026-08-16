@@ -11,6 +11,6 @@ const ballMesh = loadMesh('ball-mesh')
 export class BallMeshGenerator {
 	constructor(readonly _data: BallData) {}
 	public getMesh(): Mesh {
-		return ballMesh.clone()
+		return ballMesh.clone('ball')
 	}
 }

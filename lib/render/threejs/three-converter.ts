@@ -49,6 +49,9 @@ export class ThreeConverter {
 			const clamped = Math.max(-100, Math.min(100, scaled))
 			mesh.renderOrder = Math.round(clamped)
 		}
+		if (obj.material?.name === 'ball') {
+			mesh.renderOrder = 1
+		}
 		return mesh
 	}
 }

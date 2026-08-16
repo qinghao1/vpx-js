@@ -74,6 +74,14 @@ function isInVrCab(o: any, root: Group): boolean {
 	return false
 }
 
+function isInBalls(o: any, root: Group): boolean {
+	for (let p = o; p && p !== root; p = p.parent) {
+		const n = (p.name || '').toLowerCase()
+		if (n === 'balls' || n.startsWith('ball')) return true
+	}
+	return false
+}
+
 export function batchStaticOpaques(root: Group, table: Table, _renderApi: ThreeRenderApi): number {
 	root.updateMatrixWorld(true)
 	const invRoot = new Matrix4().copy(root.matrixWorld).invert()
@@ -123,10 +131,12 @@ export function batchStaticOpaques(root: Group, table: Table, _renderApi: ThreeR
 		if (!isEffectiveVisible(o, root)) return
 		if (isInLightBulbs(o, root)) return
 		if (isInVrCab(o, root)) return
+		if (isInBalls(o, root)) return
 		const mat = o.material as MeshStandardMaterial
 		if (!canBatch(mat)) return
 		if (isAnimated(o)) return
 		const n = (o.name || '').toLowerCase()
+		if (mat.name && mat.name.toLowerCase().includes('ball')) return
 		if (o.userData?.isProceduralDMD || o.name.startsWith('DMD_') || n.includes('dmd') || dmdNames.has(n)) return
 		if (o.userData?.isCabinetButton || /button|coin|plunger|tour|start|fire|magna/i.test(o.name)) return
 		if (n.includes('ball')) return

@@ -105,6 +105,7 @@ export class Ball implements IPlayable, IMovable, IRenderable<BallState>, IScrip
 				mesh: this.meshGenerator.getMesh().transform(Matrix3D.RIGHT_HANDED),
 				envMap: Texture.fromFilesystem('ball.png'),
 				material: this.getMaterial(),
+				depthBias: -1,
 			},
 		}
 	}

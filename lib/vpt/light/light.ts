@@ -133,6 +133,7 @@ export class LightData extends ItemData {
 	 * @see https://github.com/vpinball/vpinball/blob/master/src/parts/light.cpp#L433
 	 */
 	public isSurfaceLight(_table: Table): boolean {
+		if (this.isBackglass) return false
 		if (this.bulbLight || this.isBulbLight()) return false
 		return this.dragPoints.length > 2
 	}
