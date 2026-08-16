@@ -522,7 +522,7 @@ export const ballChecks = async (page, timeout = 60000) => {
 							return 'kicker'
 						}
 					})()
-					k.hit.kickXyz = function (...args) {
+					k.hit.kickXyz = (...args) => {
 						window.__kickCount++
 						window.__kickTrace.push(name + ':hit:' + args.join(','))
 						try {
@@ -544,7 +544,7 @@ export const ballChecks = async (page, timeout = 60000) => {
 								return 'kicker'
 							}
 						})()
-						api.Kick = function (a, s) {
+						api.Kick = (a, s) => {
 							window.__kickCount++
 							window.__kickTrace.push(name + ':apiKick:' + a + ',' + s)
 							return orig2(a, s)
@@ -1056,4 +1056,88 @@ export const playfieldLightsCheckAfterLamp = async page => {
 	} catch (e) {
 		return { pass: false, error: String(e) }
 	}
+}
+
+export const cameraTransitionChecks = async page => {
+	return page.evaluate(async () => {
+		const v = window.viewer
+		if (!v || !v.tableGroup || !v.camera || !v.controls) return { pass: true, reason: 'no viewer/camera' }
+		async function sampleTransition(toMode) {
+			const startPos = v.camera.position.clone()
+			const startTgt = v.controls.target.clone()
+			let promise
+			if (toMode === 'play') promise = v._switchToPlay()
+			else promise = v._switchToViewer()
+			const samples = []
+			const startTime = performance.now()
+			const interval = setInterval(() => {
+				try {
+					samples.push({
+						t: performance.now() - startTime,
+						pos: v.camera.position.clone(),
+						tgt: v.controls.target.clone(),
+					})
+				} catch {}
+			}, 16)
+			try {
+				await promise
+			} catch {}
+			await new Promise(r => setTimeout(r, 200))
+			clearInterval(interval)
+			try {
+				samples.push({
+					t: performance.now() - startTime,
+					pos: v.camera.position.clone(),
+					tgt: v.controls.target.clone(),
+				})
+			} catch {}
+			if (samples.length < 2) return { pass: true, reason: 'too few samples', samples: samples.length }
+			const endPos = samples[samples.length - 1].pos
+			const total = startPos.distanceTo(endPos)
+			if (total < 1)
+				return { pass: true, reason: 'no movement (already at target)', total, samples: samples.length }
+			let maxJump = 0
+			for (let i = 1; i < samples.length; i++) {
+				const d = samples[i].pos.distanceTo(samples[i - 1].pos)
+				if (d > maxJump) maxJump = d
+			}
+			const isTeleport = maxJump > total * 0.35 && maxJump > 3 && total > 5
+			const afterIdx = Math.min(5, samples.length - 1)
+			const after80 = samples[afterIdx].pos.distanceTo(startPos)
+			const isFrozen = after80 < 0.02 && total > 5
+			const tgtTotal = startTgt.distanceTo(samples[samples.length - 1].tgt)
+			let maxTgtJump = 0
+			for (let i = 1; i < samples.length; i++) {
+				const d = samples[i].tgt.distanceTo(samples[i - 1].tgt)
+				if (d > maxTgtJump) maxTgtJump = d
+			}
+			const tgtTeleport = maxTgtJump > tgtTotal * 0.4 && maxTgtJump > 1.5 && tgtTotal > 2
+			const pass = !isTeleport && !isFrozen && !tgtTeleport
+			const reason = pass
+				? 'smooth'
+				: isTeleport
+					? `teleport maxJump ${maxJump.toFixed(2)} total ${total.toFixed(2)}`
+					: isFrozen
+						? `frozen after80 ${after80.toFixed(2)} total ${total.toFixed(2)}`
+						: `tgtTeleport ${maxTgtJump.toFixed(2)}`
+			return { pass, total, maxJump, after80, tgtTotal, maxTgtJump, samples: samples.length, reason }
+		}
+		const initialMode = v.viewerMode
+		let res1, res2
+		try {
+			if (initialMode === 'viewer') {
+				res1 = await sampleTransition('play')
+				await new Promise(r => setTimeout(r, 300))
+				res2 = await sampleTransition('viewer')
+			} else {
+				res1 = await sampleTransition('viewer')
+				await new Promise(r => setTimeout(r, 300))
+				res2 = await sampleTransition('play')
+			}
+		} catch (e) {
+			return { pass: false, error: String(e) }
+		}
+		const pass = !!(res1?.pass && res2?.pass)
+		return { pass, res1, res2, reason: pass ? 'smooth' : `fail res1:${res1?.reason} res2:${res2?.reason}` }
+	})
 }

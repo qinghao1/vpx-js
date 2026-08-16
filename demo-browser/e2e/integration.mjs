@@ -1,9 +1,10 @@
-import path from 'node:path'
 import { execSync } from 'node:child_process'
+import path from 'node:path'
 import { attachLogging, launchBrowser, loadPuppeteer, newPage } from '../../test/harness/utils.mjs'
 import {
-	DEFAULT_URL,
 	ballChecks,
+	cameraTransitionChecks,
+	DEFAULT_URL,
 	diagnostics,
 	dmdChecks,
 	hideOverlays,
@@ -235,7 +236,7 @@ async function runOne(targetUrl, label) {
 	try {
 		ball = await ballChecks(page)
 		console.log(`[ball:${label}]`, JSON.stringify(ball))
-		let ballPass = !!ball.pass
+		const ballPass = !!ball.pass
 		results.ball = ballPass
 		console.log(
 			`[integration:${label}] ball ${results.ball ? 'PASS' : 'FAIL'} moved=${ball.moved} kickPos=${JSON.stringify(ball.kickPos)} solFired=${ball.solFired} isMock=${ball.isMock} trough=${JSON.stringify(ball.troughPos)} kickers=${JSON.stringify(ball.kickerNames)}`,
@@ -283,6 +284,16 @@ async function runOne(targetUrl, label) {
 	console.log(`[dmd:${label}]`, JSON.stringify(dmd))
 	results.dmd = dmd.meshes?.length > 0 || dmd.len === 4096
 	console.log(`[dmd:${label}] dmd ${results.dmd ? 'PASS' : 'WARN check meshes'}`)
+	try {
+		const camTrans = await cameraTransitionChecks(page)
+		console.log(`[camera:${label}]`, JSON.stringify(camTrans))
+		results.camera = !!camTrans.pass
+		console.log(`[integration:${label}] camera ${results.camera ? 'PASS' : 'FAIL'} ${camTrans.reason}`)
+		if (!results.camera) console.log(`[camera:${label}] FAIL ${JSON.stringify(camTrans)}`)
+	} catch (e) {
+		console.log(`[camera:${label}] error ${e.message}`)
+		results.camera = false
+	}
 	const cam = await page
 		.evaluate(() => {
 			const c = window.camera,
@@ -344,7 +355,8 @@ async function runOne(targetUrl, label) {
 	const ballOk = ball ? (ball.isMock ? true : !!results.ball) : !!results.ball
 	const nudgeOk = results.nudge !== false
 	const playfieldOk = results.playfield !== false
-	const ok = results.diagnostics && results.physics && ballOk && nudgeOk && playfieldOk
+	const cameraOk = results.camera !== false
+	const ok = results.diagnostics && results.physics && ballOk && nudgeOk && playfieldOk && cameraOk
 	console.log(`\n# integration ${label} ${ok ? 'PASS' : 'FAIL'} ${JSON.stringify(results)}`)
 	return { ok, results }
 }

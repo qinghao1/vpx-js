@@ -32,7 +32,7 @@ import {
 	showCabFlippers,
 } from '../../dist-esm/lib/render/threejs/three-scene-postprocess.js'
 import { ThreeTextureLoaderBrowser } from '../../dist-esm/lib/render/threejs/three-texture-loader-browser.js'
-import { ANIM_SETTLE_MS, AnimationGate } from '../../dist-esm/lib/util/animation-gate.js'
+import { AnimationGate } from '../../dist-esm/lib/util/animation-gate.js'
 import { Table } from '../../dist-esm/lib/vpt/table/table.js'
 import {
 	CAM,
@@ -542,30 +542,14 @@ export class Viewer {
 		this.controls.enabled = false
 		this.gate ??= new AnimationGate()
 		this.gate.beginAnimation()
-		await new Promise(r => {
-			this._cameraTimeoutResolver = r
-			this._cameraTimeout = setTimeout(() => {
-				this._cameraTimeout = null
-				const _rr = this._cameraTimeoutResolver
-				this._cameraTimeoutResolver = null
-				if (_rr) _rr()
-			}, ANIM_SETTLE_MS)
-		})
-		this._cameraTimeout = null
-		this._cameraTimeoutResolver = null
-		if (_gen !== this._cameraGen) {
-			return
-		}
-		if (this._disposed) {
-			try {
-				this.gate.endAnimation()
-			} catch {}
-			return
-		}
 		const start = performance.now()
 		return new Promise(resolve => {
 			const tick = () => {
 				if (_gen !== this._cameraGen) {
+					try {
+						this.gate.endAnimation()
+					} catch {}
+					this.controls.enabled = this.viewerMode !== 'play'
 					resolve()
 					return
 				}
