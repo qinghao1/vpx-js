@@ -12,7 +12,10 @@ import {
 } from '../../dist-esm/lib/game/shared/physics-buffer.js'
 import { BrowserBinaryReader } from '../../dist-esm/lib/io/binary-reader.browser.js'
 import { isWasmReady } from '../../dist-esm/lib/physics/wasm/kernels.js'
-import { optimizeScene as _optimizeScene } from '../../dist-esm/lib/render/threejs/three-batched-builder.js'
+import {
+	batchStaticOpaques as _batchStaticOpaques,
+	optimizeScene as _optimizeScene,
+} from '../../dist-esm/lib/render/threejs/three-batched-builder.js'
 import { buildBvhIdle } from '../../dist-esm/lib/render/threejs/three-bvh.js'
 import {
 	applyCameraState,
@@ -1520,6 +1523,20 @@ export class Viewer {
 			const fixed2 = patchCloned()
 			if (fixed || fixed2)
 				this.log(`[stream] Patched ${fixed + fixed2} materials (${fixed} cached + ${fixed2} cloned)`)
+			try {
+				if (this.tableGroup && table && this.renderApi) {
+					const params = new URLSearchParams(location.search)
+					if (!params.has('nobatched')) {
+						const bakedRes = _batchStaticOpaques(this.tableGroup, table, this.renderApi)
+						if (bakedRes) {
+							this.log(`[batch] Post-stream baked ${bakedRes} BatchedMesh`, 'info')
+							try {
+								buildBvhIdle(this.tableGroup)
+							} catch {}
+						}
+					}
+				}
+			} catch {}
 			const tm = computeTexMem(this.tableGroup)
 			this.log(
 				`[stream] Done ${done}/${total} in ${(performance.now() - t0) | 0}ms — now ${tm.texCount} ~${tm.texMemMB} MB`,

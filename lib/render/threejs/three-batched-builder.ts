@@ -45,17 +45,13 @@ function materialKey(mat: MeshStandardMaterial): string {
 	return `${mat.name ?? 'noname'}|${map}|${pending}|${mat.transparent ? 't' : 'o'}|${mat.polygonOffset ? `${mat.polygonOffsetFactor}/${mat.polygonOffsetUnits}` : '0'}|${ud.__addBlend ? 'a' : 'o'}|${ud.__isBaked ? 'b' : 'o'}`
 }
 
+// Opaque baked (emissiveMap, toneMapped false) can be batched after textures resolve; polygonOffset is per-material via materialKey, transparent/additive overlays remain unbatched for per-light animation.
 function canBatch(mat: MeshStandardMaterial): boolean {
-	if (
-		!mat ||
-		mat.transparent ||
-		mat.polygonOffset ||
-		(mat.userData as any).__addBlend ||
-		(mat.userData as any).__isBaked
-	)
-		return false
+	if (!mat || mat.transparent || (mat.userData as any).__addBlend) return false
 	const ud = mat.userData as any
 	if (ud.pendingMap || ud.pendingmap || ud.pendingNormalMap || ud.pendingEnvMap || ud.pendingEmissiveMap) return false
+	if (ud.__isBaked) return true
+	if (mat.polygonOffset) return false
 	return true
 }
 
@@ -122,6 +118,7 @@ export function batchStaticOpaques(root: Group, table: Table, _renderApi: ThreeR
 	const buckets = new Map<string, { material: MeshStandardMaterial; meshes: Mesh[] }>()
 	root.traverse((o: any) => {
 		if (!o.isMesh || !o.geometry || !o.material) return
+		if ((o as any).isBatchedMesh || (o as any).isInstancedMesh) return
 		if (Array.isArray(o.material)) return
 		if (!isEffectiveVisible(o, root)) return
 		if (isInLightBulbs(o, root)) return
@@ -217,6 +214,7 @@ export function batchStaticOpaques(root: Group, table: Table, _renderApi: ThreeR
 }
 
 export function instancedBulbs(root: Group, table: Table, _renderApi: ThreeRenderApi): number {
+	for (const c of (root as any).children as any[]) if (String(c.name).startsWith('instanced:bulb')) return 0
 	root.updateMatrixWorld(true)
 	const invRoot = new Matrix4().copy(root.matrixWorld).invert()
 	const group = root.getObjectByName('lightBulbs') as Group | undefined
