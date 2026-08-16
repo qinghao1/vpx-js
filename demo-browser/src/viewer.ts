@@ -49,7 +49,16 @@ import {
 	TABLE_OPTS,
 } from './config.js'
 import { DmdController } from './dmd.js'
-import { isDev as _isDev, ensureBvh, ensureGlobals, getTargetPixelRatio, isLowQuality, QUALITY_CAPS } from './env.js'
+import {
+	isDev as _isDev,
+	ensureBvh,
+	ensureGlobals,
+	getMaxLights,
+	getTargetPixelRatio,
+	isLowQuality,
+	QUALITY_CAPS,
+	QUALITY_MAX_LIGHTS,
+} from './env.js'
 import { attachInput } from './input.js'
 import { createHarness } from './log-overlay.js'
 import { renderModeHint, renderStats } from './stats-panel.js'
@@ -64,6 +73,25 @@ import {
 	resolveRomCandidates,
 	resolveVpxCandidates,
 } from './utils.js'
+
+function cullExcessLights(root, maxLights) {
+	const lights = []
+	root.traverse(o => {
+		if (o.isPointLight) lights.push(o)
+	})
+	if (lights.length <= maxLights) return null
+	lights.sort((a, b) => (b.intensity || 0) - (a.intensity || 0) || (b.distance || 0) - (a.distance || 0))
+	const keep = new Set(lights.slice(0, maxLights))
+	let culled = 0
+	for (const light of lights) {
+		if (keep.has(light)) continue
+		light.visible = false
+		light.intensity = 0
+		if (light.parent) light.parent.remove(light)
+		culled++
+	}
+	return { before: lights.length, after: maxLights, culled }
+}
 
 export {
 	createHarness,
@@ -289,7 +317,7 @@ export class Viewer {
 		}
 		renderer.setPixelRatio(getTargetPixelRatio(this.viewerMode))
 		renderer.sortObjects = true
-		renderer.shadowMap.enabled = p.has('shadows')
+		renderer.shadowMap.enabled = p.has('shadows') && !isLowQuality()
 		if (renderer.shadowMap.enabled) renderer.shadowMap.type = THREE.PCFSoftShadowMap
 		renderer.outputColorSpace = THREE.SRGBColorSpace
 		// vpinball: Renderer.cpp:53 m_toneMapper from TableSettings (typedefs3D.h:56 TM_* enums), :56 m_exposure from Table (0..2, Settings_properties.inl:725), pintable.cpp:2279 defaults TM_REINHARD/exposure 1, Renderer.cpp:2373 fb_*tonemap
@@ -362,6 +390,15 @@ export class Viewer {
 	async _ensureRenderer() {
 		await this._rendererReady
 		return this.renderer
+	}
+	_onResetView() {
+		if (this.viewerMode === 'play') {
+			this._switchToViewer()
+			return
+		}
+		if (!this.tableGroup || !this.controls) return
+		const state = computeViewerFraming(this.tableGroup)
+		this._animateCameraTo(state, CAM_ANIM.durationReset)
 	}
 	_onResize() {
 		const w = typeof window !== 'undefined' ? window.innerWidth : 800
@@ -452,6 +489,22 @@ export class Viewer {
 			if (!hovered && !hitTest(e.clientX, e.clientY)) return
 			this._switchToPlay()
 		})
+		const onViewerTouchEnd = e => {
+			if (this.viewerMode !== 'viewer' || !this.tableGroup) return
+			const t = e.changedTouches?.[0]
+			if (!t) return
+			if (window.matchMedia?.('(pointer: coarse)')?.matches) {
+				this._switchToPlay()
+				try {
+					e.preventDefault()
+				} catch {}
+				return
+			}
+			if (!hovered && !hitTest(t.clientX, t.clientY)) return
+			this._switchToPlay()
+		}
+		canvas.addEventListener('touchend', onViewerTouchEnd, { passive: false })
+		this._eventCleanups.push(() => canvas.removeEventListener('touchend', onViewerTouchEnd))
 	}
 	async _switchToPlay() {
 		if (this.viewerMode === 'play' || !this.tableGroup) return
@@ -968,6 +1021,12 @@ export class Viewer {
 			}
 		}
 		const dt = performance.now() - t0
+		if (isLowQuality()) {
+			const maxLights = getMaxLights()
+			const culled = cullExcessLights(node, maxLights)
+			if (culled)
+				this.log(`[quality] low — lights ${culled.before} → ${culled.after} (culled ${culled.culled})`, 'info')
+		}
 		let tris = 0,
 			draws = 0
 		node.traverse(o => {
