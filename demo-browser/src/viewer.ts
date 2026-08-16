@@ -49,16 +49,7 @@ import {
 	TABLE_OPTS,
 } from './config.js'
 import { DmdController } from './dmd.js'
-import {
-	isDev as _isDev,
-	ensureBvh,
-	ensureGlobals,
-	getMaxLights,
-	getTargetPixelRatio,
-	isLowQuality,
-	QUALITY_CAPS,
-	QUALITY_MAX_LIGHTS,
-} from './env.js'
+import { isDev as _isDev, ensureBvh, ensureGlobals, getTargetPixelRatio, isLowQuality, QUALITY_CAPS } from './env.js'
 import { attachInput } from './input.js'
 import { createHarness } from './log-overlay.js'
 import { renderModeHint, renderStats } from './stats-panel.js'
@@ -73,25 +64,6 @@ import {
 	resolveRomCandidates,
 	resolveVpxCandidates,
 } from './utils.js'
-
-function cullExcessLights(root, maxLights) {
-	const lights = []
-	root.traverse(o => {
-		if (o.isPointLight) lights.push(o)
-	})
-	if (lights.length <= maxLights) return null
-	lights.sort((a, b) => (b.intensity || 0) - (a.intensity || 0) || (b.distance || 0) - (a.distance || 0))
-	const keep = new Set(lights.slice(0, maxLights))
-	let culled = 0
-	for (const light of lights) {
-		if (keep.has(light)) continue
-		light.visible = false
-		light.intensity = 0
-		if (light.parent) light.parent.remove(light)
-		culled++
-	}
-	return { before: lights.length, after: maxLights, culled }
-}
 
 export {
 	createHarness,
@@ -1021,12 +993,6 @@ export class Viewer {
 			}
 		}
 		const dt = performance.now() - t0
-		if (isLowQuality()) {
-			const maxLights = getMaxLights()
-			const culled = cullExcessLights(node, maxLights)
-			if (culled)
-				this.log(`[quality] low — lights ${culled.before} → ${culled.after} (culled ${culled.culled})`, 'info')
-		}
 		let tris = 0,
 			draws = 0
 		node.traverse(o => {

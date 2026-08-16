@@ -150,46 +150,6 @@ export function cacheKey(vbs: string, gf?: string, go?: string, td?: TableDataPa
 	return `${vbsCacheKey(vbs)}:${tdHash(td)}:${gf ?? ''}:${go ?? ''}`
 }
 
-async function tryLoadPrecompiled(key: string): Promise<string | null> {
-	try {
-		const isBrowser = typeof window !== 'undefined' && typeof document !== 'undefined'
-		if (isBrowser) {
-			try {
-				const res = await fetch(`/precompiled/${encodeURIComponent(key)}.js`)
-				if (res.ok) {
-					const js = await res.text()
-					if (js && js.length > 500) return js
-				}
-			} catch {}
-			try {
-				const res = await fetch(`/dist/precompiled/${encodeURIComponent(key)}.js`)
-				if (res.ok) {
-					const js = await res.text()
-					if (js && js.length > 500) return js
-				}
-			} catch {}
-			return null
-		} else {
-			const { readFile } = await import('node:fs/promises')
-			const { join } = await import('node:path')
-			const candidates = [
-				join(process.cwd(), 'dist/precompiled', `${key}.js`),
-				join(process.cwd(), 'dist-esm/precompiled', `${key}.js`),
-				join(new URL('.', import.meta.url).pathname, '../../dist/precompiled', `${key}.js`),
-				join(new URL('.', import.meta.url).pathname, '../../dist-esm/precompiled', `${key}.js`),
-			]
-			for (const file of candidates) {
-				try {
-					const js = await readFile(file, 'utf-8')
-					if (js && js.length > 500) return js
-				} catch {}
-			}
-			return null
-		}
-	} catch {
-		return null
-	}
-}
 function getBrowserWorker(): Worker {
 	if (browserWorker) return browserWorker
 	browserWorker = new Worker(new URL('./transpiler.worker.browser.js', import.meta.url), {
@@ -228,16 +188,6 @@ export async function transpileWithWorker(
 				vbsMemCache.set(key, hit)
 				return hit
 			}
-		}
-	} catch {}
-	try {
-		const pre = await tryLoadPrecompiled(key)
-		if (pre) {
-			vbsMemCache.set(key, pre)
-			try {
-				if (typeof indexedDB !== 'undefined') void idbSet(key, pre).catch(() => {})
-			} catch {}
-			return pre
 		}
 	} catch {}
 	const isBrowser = typeof window !== 'undefined' && typeof document !== 'undefined'

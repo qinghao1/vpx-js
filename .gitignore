@@ -21,9 +21,3 @@ demo-browser/.vite/
 wasm/build/
 wasm/dist/*.wasm
 profile_harness*.mjs
-
-# precompiled VBS cache — generic file-based (no bundled Map), generated at build time per table
-lib/scripting/precompiled-cache.generated.ts
-dist/precompiled/
-dist-esm/precompiled/
-demo-browser/public/precompiled/
