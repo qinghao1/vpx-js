@@ -28,5 +28,10 @@ export const ensureGlobals = () => {
 	globalsEnsured = true
 }
 
-export const getTargetPixelRatio = mode =>
-	Math.min(typeof devicePixelRatio !== 'undefined' ? devicePixelRatio : 1, mode === 'play' ? 1 : 1.5)
+export {
+	getQuality,
+	getTargetPixelRatio,
+	isLowQuality,
+	isLowQualityMode,
+	QUALITY_CAPS,
+} from '../../dist-esm/lib/util/quality.js'

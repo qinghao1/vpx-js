@@ -20,6 +20,7 @@ import {
 	type Texture as ThreeTexture,
 } from '../../refs.browser.js'
 import { exrCacheKey, idbGet, idbSet } from '../../util/idb-cache.js'
+import { isLowQuality, isLowQualityMode, QUALITY_CAPS } from '../../util/quality.js'
 import type { ITextureLoader } from '../irender-api.js'
 
 const imageMap: Record<string, string> = {
@@ -67,22 +68,27 @@ function getHardwareMax(): number {
 function viewportBudget(): number {
 	try {
 		if (typeof window === 'undefined' || !window.innerWidth) return getHardwareMax()
-		return Math.max(window.innerWidth, window.innerHeight) * (window.devicePixelRatio || 1)
+		const dpr = window.devicePixelRatio || 1
+		return Math.max(window.innerWidth, window.innerHeight) * dpr
 	} catch {
 		return getHardwareMax()
 	}
 }
 
-export function effectiveMax(isFloat: boolean, name?: string): number {
+export { isLowQualityMode }
+
+export function effectiveMax(_isFloat: boolean, name?: string): number {
 	const hw = getHardwareMax()
 	const swift = isSwiftShader()
 	const isPlayfield = !!name && /playfield|nestmap|bake/i.test(name)
-	const cap = isPlayfield ? 4096 : swift ? 2048 : 4096
-	if (isFloat) {
-		if (isPlayfield) return cap
-		return Math.min(hw, cap, Math.max(1024, Math.ceil(viewportBudget())))
-	}
-	return Math.min(hw, cap)
+	const low = isLowQuality()
+	const caps = low ? QUALITY_CAPS.low : QUALITY_CAPS.high
+	const cap = isPlayfield ? caps.playfield : swift ? 1024 : caps.other
+	const budget = viewportBudget()
+	const factor = low ? (isPlayfield ? 0.75 : 0.5) : 1
+	const viewport = Math.max(caps.floor, Math.ceil(budget * factor))
+	const viewportClamped = low ? Math.min(viewport, isPlayfield ? caps.playfield : caps.other) : viewport
+	return Math.min(hw, cap, viewportClamped)
 }
 
 export function _testResetTextureLimits(): void {
@@ -91,10 +97,11 @@ export function _testResetTextureLimits(): void {
 }
 
 function tune(tex: any): void {
+	const low = isLowQuality()
 	tex.generateMipmaps = true
 	tex.minFilter = LinearMipMapLinearFilter
 	tex.magFilter = LinearFilter
-	tex.anisotropy = 16
+	tex.anisotropy = low ? QUALITY_CAPS.low.aniso : QUALITY_CAPS.high.aniso
 }
 
 function nameAndTune(tex: any, name: string): void {

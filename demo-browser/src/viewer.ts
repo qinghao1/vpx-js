@@ -49,7 +49,7 @@ import {
 	TABLE_OPTS,
 } from './config.js'
 import { DmdController } from './dmd.js'
-import { isDev as _isDev, ensureBvh, ensureGlobals, getTargetPixelRatio } from './env.js'
+import { isDev as _isDev, ensureBvh, ensureGlobals, getTargetPixelRatio, isLowQuality, QUALITY_CAPS } from './env.js'
 import { attachInput } from './input.js'
 import { createHarness } from './log-overlay.js'
 import { renderModeHint, renderStats } from './stats-panel.js'
@@ -275,7 +275,8 @@ export class Viewer {
 				return false
 			}
 		})()
-		const useAA = wantAA && !isSwiftShader
+		const lowQuality = isLowQuality()
+		const useAA = wantAA && !isSwiftShader && !lowQuality
 		if (!renderer) {
 			renderer = new THREE.WebGLRenderer({
 				canvas,
@@ -323,7 +324,7 @@ export class Viewer {
 		// Generic fix: HDR EffectComposer (HalfFloat) + OutputPass so additive HDR (alpha/100) sums linear then tonemaps once.
 		// Matches primitive.cpp:1171 convertColor(alpha/100) premul and fs_unshaded.sc result*tex, then fb tonemap.
 		this.composer = null
-		if (backend.startsWith('webgl')) {
+		if (backend.startsWith('webgl') && !lowQuality) {
 			try {
 				const { EffectComposer } = await import('three/addons/postprocessing/EffectComposer.js')
 				const { RenderPass } = await import('three/addons/postprocessing/RenderPass.js')
@@ -336,6 +337,9 @@ export class Viewer {
 				console.warn('EffectComposer init failed, falling back to direct render', e)
 				this.composer = null
 			}
+		} else if (lowQuality) {
+			this.composer = null
+			console.log('[renderer] low quality: EffectComposer disabled for memory/perf')
 		}
 		this.controls?.dispose?.()
 		this.controls = new OrbitControls(this.camera, this.renderer.domElement)
@@ -352,7 +356,7 @@ export class Viewer {
 				THREE,
 			})
 		this._onResize()
-		this.log(`Renderer ready: ${backend} (three r${THREE.REVISION})`)
+		this.log(`Renderer ready: ${backend} (three r${THREE.REVISION})${lowQuality ? ' [low]' : ''}`)
 		return renderer
 	}
 	async _ensureRenderer() {
@@ -1423,7 +1427,7 @@ export class Viewer {
 											tex.generateMipmaps = true
 											tex.minFilter = THREE.LinearMipmapLinearFilter
 											tex.magFilter = THREE.LinearFilter
-											tex.anisotropy = 8
+											tex.anisotropy = isLowQuality() ? QUALITY_CAPS.low.aniso : 8
 											tex.needsUpdate = true
 										}
 										m.needsUpdate = true

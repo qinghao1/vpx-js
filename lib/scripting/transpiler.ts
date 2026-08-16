@@ -58,6 +58,66 @@ function normalizeNewCall(vbs: string): string {
 	return out
 }
 
+function tryLoadPrecompiledSync(key: string): string | null {
+	try {
+		if (typeof process === 'undefined' || !(process as any).versions?.node) return null
+		let fs: any = null
+		let path: any = null
+		try {
+			const gbm: any = (process as any).getBuiltinModule
+			if (typeof gbm === 'function') {
+				fs = gbm('node:fs')
+				path = gbm('node:path')
+			}
+		} catch {}
+		if (!fs || !path) {
+			try {
+				const req: any = (Function('try{return require}catch(e){return null}') as any)()
+				if (req) {
+					fs = req('node:fs')
+					path = req('node:path')
+				}
+			} catch {}
+		}
+		if (!fs || !path) return null
+		for (const base of ['dist/precompiled', 'dist-esm/precompiled']) {
+			try {
+				const file = path.join(process.cwd(), base, `${key}.js`)
+				if (fs.existsSync(file)) {
+					const js = fs.readFileSync(file, 'utf-8')
+					if (js && js.length > 500) return js
+				}
+			} catch {}
+		}
+		try {
+			let fileURLToPath: any = null
+			try {
+				const gbm: any = (process as any).getBuiltinModule
+				if (typeof gbm === 'function') fileURLToPath = gbm('node:url')?.fileURLToPath
+			} catch {}
+			if (!fileURLToPath) {
+				try {
+					const req: any = (Function('try{return require}catch(e){return null}') as any)()
+					if (req) fileURLToPath = req('node:url')?.fileURLToPath
+				} catch {}
+			}
+			if (fileURLToPath) {
+				const thisDir = path.dirname(fileURLToPath(import.meta.url))
+				for (const base of ['../../dist/precompiled', '../../dist-esm/precompiled', './precompiled']) {
+					try {
+						const file = path.join(thisDir, base, `${key}.js`)
+						if (fs.existsSync(file)) {
+							const js = fs.readFileSync(file, 'utf-8')
+							if (js && js.length > 500) return js
+						}
+					} catch {}
+				}
+			}
+		} catch {}
+	} catch {}
+	return null
+}
+
 export class Transpiler {
 	private readonly itemApis: Record<string, unknown>
 	private readonly enumApis: EnumsApi = Enums
@@ -129,6 +189,11 @@ export class Transpiler {
 			const key = `${vbsCacheKey(vbs)}:${tableHashForTranspiler(this.table)}:${gf ?? ''}:${go ?? ''}`
 			const hit = syncMemCache.get(key)
 			if (hit) return hit
+			const pre = tryLoadPrecompiledSync(key)
+			if (pre) {
+				syncMemCache.set(key, pre)
+				return pre
+			}
 			const { ast, t0 } = this.parseAndTransform(vbs, gf, go)
 			const js = this.gen(ast, t0)
 			syncMemCache.set(key, js)
