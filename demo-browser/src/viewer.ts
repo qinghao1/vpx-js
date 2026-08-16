@@ -1010,7 +1010,6 @@ export class Viewer {
 			textures = textures.filter(tx => {
 				const n = tx.getName().toLowerCase()
 				if (used.has(n) || (pf2 && n === pf2)) return true
-				if (n.startsWith('vlm.nestmap') && !mainBakeUsed.has(n) && n !== pf2) return false
 				if (keepAllInserts(n)) return true
 				return false
 			})

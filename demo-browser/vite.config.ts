@@ -1,3 +1,4 @@
+import os from 'node:os'
 import fs from 'node:fs'
 import path, { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -6,7 +7,7 @@ import { defineConfig } from 'vite'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const root = resolve(__dirname)
 const repoRoot = resolve(__dirname, '..')
-const home = process.env.HOME || '/home/qinghao1'
+const home = process.env.HOME || os.homedir() || '/home/qinghao1'
 
 function rawLoader() {
 	return {
