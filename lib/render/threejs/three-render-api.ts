@@ -35,6 +35,7 @@ import { ThreePlayfieldMeshGenerator } from './three-playfield-mesh-generator.js
  * @see https://github.com/vpinball/vpinball/blob/master/RenderDevice.cpp */
 export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, PointLight> {
 	public static readonly SCALE = 0.05
+	private static readonly _scratchM4 = new Matrix4()
 
 	private readonly converter: ThreeConverter
 	private readonly meshConvertOpts: MeshConvertOptions
@@ -114,7 +115,7 @@ export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, Poin
 	public applyMatrixToNode(matrix: Matrix3D, obj: Object3D): void {
 		if (!obj) return
 		const e = matrix.elements
-		const m4 = new Matrix4().set(
+		ThreeRenderApi._scratchM4.set(
 			e[0],
 			e[4],
 			e[8],
@@ -132,7 +133,7 @@ export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, Poin
 			e[11],
 			e[15],
 		)
-		obj.matrix.copy(m4)
+		obj.matrix.copy(ThreeRenderApi._scratchM4)
 		obj.matrix.decompose(obj.position, obj.quaternion, obj.scale)
 		obj.updateMatrix()
 		obj.updateMatrixWorld(true)

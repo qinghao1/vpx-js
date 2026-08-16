@@ -23,32 +23,37 @@ export class ThreeLightGenerator {
 
 	public applyLighting(state: LightState, initial: number, obj?: Object3D): void {
 		if (!obj) return
-		const targets = [obj, ...obj.children]
-		for (const child of targets) {
-			switch (child.name) {
-				case 'light':
-					if (state.intensity !== undefined) (child as PointLight).intensity = state.intensity
-					if (state.color !== undefined) (child as PointLight).color.set(state.color)
-					break
-				case 'bulb.light': {
-					const m = (child as ThreeMesh).material as MeshStandardMaterial
-					if (m) {
-						if (state.intensity !== undefined) m.emissiveIntensity = state.intensity / (initial || 1)
-						if (state.color !== undefined) {
-							m.color.set(state.color)
-							m.emissive.set(state.color)
-						}
+		this._applyLightToTarget(obj, state, initial)
+		const children = obj.children
+		for (let i = 0; i < children.length; i++) {
+			this._applyLightToTarget(children[i]!, state, initial)
+		}
+	}
+
+	private _applyLightToTarget(child: Object3D, state: LightState, initial: number): void {
+		switch (child.name) {
+			case 'light':
+				if (state.intensity !== undefined) (child as PointLight).intensity = state.intensity
+				if (state.color !== undefined) (child as PointLight).color.set(state.color)
+				break
+			case 'bulb.light': {
+				const m = (child as ThreeMesh).material as MeshStandardMaterial
+				if (m) {
+					if (state.intensity !== undefined) m.emissiveIntensity = state.intensity / (initial || 1)
+					if (state.color !== undefined) {
+						m.color.set(state.color)
+						m.emissive.set(state.color)
 					}
-					break
 				}
-				case 'surface.light': {
-					const m = (child as ThreeMesh).material as MeshStandardMaterial
-					if (m) {
-						if (state.intensity !== undefined) m.emissiveIntensity = state.intensity
-						if (state.color !== undefined) m.emissive.set(state.color)
-					}
-					break
+				break
+			}
+			case 'surface.light': {
+				const m = (child as ThreeMesh).material as MeshStandardMaterial
+				if (m) {
+					if (state.intensity !== undefined) m.emissiveIntensity = state.intensity
+					if (state.color !== undefined) m.emissive.set(state.color)
 				}
+				break
 			}
 		}
 	}
