@@ -111,6 +111,45 @@ export class Player extends EventEmitter {
 		if (name) this.dirtySet.add(name)
 	}
 
+	private wrapSingleApi(api: any, name: string): any {
+		if (!api || !name || api.__isDirtyProxy) return api
+		const player = this
+		const methodCache = new Map<string | symbol, (...args: any[]) => unknown>()
+		const proxy = new Proxy(api, {
+			set(target: any, prop: string | symbol, value: any, receiver: any): boolean {
+				const ok = Reflect.set(target, prop, value, receiver)
+				player.markDirty(name)
+				return ok
+			},
+			get(target: any, prop: string | symbol, receiver: any): any {
+				const val = Reflect.get(target, prop, receiver)
+				if (typeof val === 'function') {
+					let cached = methodCache.get(prop)
+					if (cached) return cached
+					cached = (...args: any[]): unknown => {
+						const res = val.apply(target, args)
+						const key = String(prop)
+						if (
+							!key.startsWith('get') &&
+							!key.startsWith('is') &&
+							!key.startsWith('has') &&
+							key !== '_getPropertyNames' &&
+							key !== '_getTimers'
+						) {
+							player.markDirty(name)
+						}
+						return res
+					}
+					methodCache.set(prop, cached)
+					return cached
+				}
+				return val
+			},
+		})
+		;(proxy as any).__isDirtyProxy = true
+		return proxy
+	}
+
 	private wrapApis(): void {
 		try {
 			for (const item of this.table.getScriptables() as unknown as Array<{
@@ -119,42 +158,8 @@ export class Player extends EventEmitter {
 			}>) {
 				const api: any = (item as any).getApi?.()
 				const name = item.getName()
-				if (!api || !name || api.__isDirtyProxy) continue
-				const player = this
-				const methodCache = new Map<string | symbol, (...args: any[]) => unknown>()
-				const proxy = new Proxy(api, {
-					set(target: any, prop: string | symbol, value: any, receiver: any): boolean {
-						const ok = Reflect.set(target, prop, value, receiver)
-						player.markDirty(name)
-						return ok
-					},
-					get(target: any, prop: string | symbol, receiver: any): any {
-						const val = Reflect.get(target, prop, receiver)
-						if (typeof val === 'function') {
-							let cached = methodCache.get(prop)
-							if (cached) return cached
-							cached = (...args: any[]): unknown => {
-								const res = val.apply(target, args)
-								const key = String(prop)
-								if (
-									!key.startsWith('get') &&
-									!key.startsWith('is') &&
-									!key.startsWith('has') &&
-									key !== '_getPropertyNames' &&
-									key !== '_getTimers'
-								) {
-									player.markDirty(name)
-								}
-								return res
-							}
-							methodCache.set(prop, cached)
-							return cached
-						}
-						return val
-					},
-				})
-				;(proxy as any).__isDirtyProxy = true
-				;(item as any).api = proxy
+				const wrapped = this.wrapSingleApi(api, name)
+				if (wrapped !== api) (item as any).api = wrapped
 			}
 		} catch {}
 	}
@@ -244,6 +249,11 @@ export class Player extends EventEmitter {
 
 	public createBall(creator: IBallCreationPosition, radius = 25, mass = 1): Ball {
 		const ball = this.physics.createBall(creator, this, radius, mass)
+		try {
+			const api: any = (ball as any).getApi?.()
+			const wrapped = this.wrapSingleApi(api, ball.getName())
+			if (wrapped !== api) (ball as any).api = wrapped
+		} catch {}
 		this.currentStates[ball.getName()] = ball.getState()
 		this.previousStates[ball.getName()] = ball.getState().clone()
 		this.allStateNames.push(ball.getName())
