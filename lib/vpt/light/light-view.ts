@@ -27,7 +27,8 @@ export class LightMeshGenerator {
 		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
 	): LightMeshes<GEOMETRY> {
 		if (this.data.isBulbLight()) return this.getBulbMeshes(table)
-		if (this.data.isSurfaceLight(table)) return { surfaceLight: renderApi.createLightGeometry(this.data, table) }
+		if (this.data.isSurfaceLight(table) || (this.data.dragPoints?.length > 2 && !this.data.bulbLight))
+			return { surfaceLight: renderApi.createLightGeometry(this.data, table) }
 		return {}
 	}
 

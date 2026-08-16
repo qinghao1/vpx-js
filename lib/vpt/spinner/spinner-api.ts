@@ -124,7 +124,7 @@ export class SpinnerApi extends ItemApi<SpinnerData> {
 		this.data.isReflectionEnabled = v
 	}
 	get CurrentAngle() {
-		return this._state.angle
+		return MathUtils.radToDeg(this._state.angle)
 	}
 
 	protected _getPropertyNames(): string[] {

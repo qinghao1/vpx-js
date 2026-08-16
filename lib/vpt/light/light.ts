@@ -126,6 +126,7 @@ export class LightData extends ItemData {
 	}
 
 	public isSurfaceLight(table: Table): boolean {
+		if (this.dragPoints.length > 2 && !this.isOnSurface(table) && !this.bulbLight) return true
 		if (!this.szOffImage || this.bulbLight) return false
 		if (table.getPlayfieldMap()?.toLowerCase() === this.szOffImage.toLowerCase() && this.dragPoints.length > 2)
 			return true
@@ -460,6 +461,7 @@ export class Light extends Item<LightData> implements IRenderable<LightState>, I
 					geometry: light.surfaceLight,
 					map: table.getTexture(this.data.szOffImage),
 					material: this.getSurfaceMaterial(table),
+					depthBias: this.data.depthBias ?? -1,
 				},
 			}
 		}
@@ -514,8 +516,8 @@ export class Light extends Item<LightData> implements IRenderable<LightState>, I
 		const material = new Material()
 		material.name = `surface-${this.getName()}`
 		material.emissiveMap = table.getTexture(this.data.szOffImage)
-		material.emissiveIntensity = 0
-		material.emissiveColor = 0x0
+		material.emissiveIntensity = this.data.isOn() ? 1 : 0
+		material.emissiveColor = this.data.color
 		material.opacity = 1
 		return material
 	}
