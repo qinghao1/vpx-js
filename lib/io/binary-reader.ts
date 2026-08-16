@@ -14,11 +14,7 @@ export class BinaryReader implements IBinaryReader {
 		if (!this.data) throw new Error('BinaryReader not open')
 		const slice = this.data.subarray(position, position + length)
 		target.set(slice, offset)
-		const copy =
-			typeof structuredClone !== 'undefined'
-				? structuredClone(slice as unknown as Uint8Array)
-				: new Uint8Array(slice)
-		return Promise.resolve([length, copy as Uint8Array])
+		return Promise.resolve([length, target.subarray(offset, offset + length)])
 	}
 
 	public close(): Promise<void> {

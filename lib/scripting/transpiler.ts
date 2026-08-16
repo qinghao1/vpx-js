@@ -2,6 +2,7 @@ import { generate } from 'escodegen'
 import type { Program } from 'estree'
 import type { Player } from '../game/player.js'
 import { type AnimationGate, animationGate } from '../util/animation-gate.js'
+import { vbsCacheKey } from '../util/idb-cache.js'
 import { Enums, type EnumsApi } from '../vpt/enums.js'
 import { GlobalApi } from '../vpt/global-api.js'
 import type { Table } from '../vpt/table/table.js'
@@ -17,6 +18,24 @@ import { ScopeTransformer } from './transformer/scope-transformer.js'
 import { WrapTransformer } from './transformer/wrap-transformer.js'
 import { VBSHelper } from './vbs-helper.js'
 import { VbsProxyHandler } from './vbs-proxy-handler.js'
+
+const syncMemCache = new Map<string, string>()
+
+function hashStr(s: string): string {
+	let h = 5381
+	for (let i = 0; i < s.length; i++) h = ((h << 5) + h) ^ s.charCodeAt(i)
+	return (h >>> 0).toString(36)
+}
+function tableHashForTranspiler(table: Table): string {
+	try {
+		const els = Object.keys(table.getElements?.() ?? {})
+			.sort()
+			.join(',')
+		return hashStr(els)
+	} catch {
+		return 'notable'
+	}
+}
 
 declare function play(
 	scope: unknown,
@@ -106,8 +125,18 @@ export class Transpiler {
 	}
 
 	public transpile(vbs: string, gf?: string, go?: string): string {
-		const { ast, t0 } = this.parseAndTransform(vbs, gf, go)
-		return this.gen(ast, t0)
+		try {
+			const key = `${vbsCacheKey(vbs)}:${tableHashForTranspiler(this.table)}:${gf ?? ''}:${go ?? ''}`
+			const hit = syncMemCache.get(key)
+			if (hit) return hit
+			const { ast, t0 } = this.parseAndTransform(vbs, gf, go)
+			const js = this.gen(ast, t0)
+			syncMemCache.set(key, js)
+			return js
+		} catch {
+			const { ast, t0 } = this.parseAndTransform(vbs, gf, go)
+			return this.gen(ast, t0)
+		}
 	}
 
 	public async transpileAsync(vbs: string, gf?: string, go?: string): Promise<string> {

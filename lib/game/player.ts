@@ -23,6 +23,11 @@ export class Player extends EventEmitter {
 	private previousStates: Record<string, ItemState> = {}
 	private currentStates: Record<string, ItemState> = {}
 	private simulatedTimeMs = 0
+	private dirtySet = new Set<string>()
+	private allStateNames: string[] = []
+	private cachedAnimatables: Array<{ getName(): string }> | null = null
+	private cachedMovables: Array<{ getName(): string }> | null = null
+	private frameCount = 0
 
 	public width = 0
 	public height = 0
@@ -44,6 +49,7 @@ export class Player extends EventEmitter {
 		this.physics = new PlayerPhysics(table, this.pinInput)
 		this.setupTableElements()
 		this.setupStates()
+		this.wrapApis()
 	}
 
 	private prepareTable(): void {
@@ -96,7 +102,81 @@ export class Player extends EventEmitter {
 			const s = r.getState() as ItemState
 			this.currentStates[s.getName()] = s
 			this.previousStates[s.getName()] = s.clone()
+			this.dirtySet.add(s.getName())
 		}
+		this.allStateNames = Object.keys(this.currentStates)
+	}
+
+	public markDirty(name: string): void {
+		if (name) this.dirtySet.add(name)
+	}
+
+	private wrapApis(): void {
+		try {
+			for (const item of this.table.getScriptables() as unknown as Array<{
+				getName(): string
+				getApi(): unknown
+			}>) {
+				const api: any = (item as any).getApi?.()
+				const name = item.getName()
+				if (!api || !name || api.__isDirtyProxy) continue
+				const player = this
+				const methodCache = new Map<string | symbol, (...args: any[]) => unknown>()
+				const proxy = new Proxy(api, {
+					set(target: any, prop: string | symbol, value: any, receiver: any): boolean {
+						const ok = Reflect.set(target, prop, value, receiver)
+						player.markDirty(name)
+						return ok
+					},
+					get(target: any, prop: string | symbol, receiver: any): any {
+						const val = Reflect.get(target, prop, receiver)
+						if (typeof val === 'function') {
+							let cached = methodCache.get(prop)
+							if (cached) return cached
+							cached = (...args: any[]): unknown => {
+								const res = val.apply(target, args)
+								const key = String(prop)
+								if (
+									!key.startsWith('get') &&
+									!key.startsWith('is') &&
+									!key.startsWith('has') &&
+									key !== '_getPropertyNames' &&
+									key !== '_getTimers'
+								) {
+									player.markDirty(name)
+								}
+								return res
+							}
+							methodCache.set(prop, cached)
+							return cached
+						}
+						return val
+					},
+				})
+				;(proxy as any).__isDirtyProxy = true
+				;(item as any).api = proxy
+			}
+		} catch {}
+	}
+
+	private getAnimatables(): Array<{ getName(): string }> {
+		if (this.cachedAnimatables) return this.cachedAnimatables
+		try {
+			this.cachedAnimatables = (this.table as any).getAnimatables?.() ?? []
+		} catch {
+			this.cachedAnimatables = []
+		}
+		return this.cachedAnimatables!
+	}
+
+	private getMovables(): Array<{ getName(): string }> {
+		if (this.cachedMovables) return this.cachedMovables
+		try {
+			this.cachedMovables = (this.table as any).getMovables?.() ?? []
+		} catch {
+			this.cachedMovables = []
+		}
+		return this.cachedMovables!
 	}
 
 	public simulateTime(dTime: number): void {
@@ -108,26 +188,50 @@ export class Player extends EventEmitter {
 	}
 
 	public updatePhysics(dTime?: number): number {
-		return this.physics.updatePhysics(dTime)
+		const it = this.physics.updatePhysics(dTime)
+		for (const b of this.physics.balls) this.markDirty(b.getName())
+		for (const m of this.getMovables()) {
+			try {
+				this.markDirty(m.getName())
+			} catch {}
+		}
+		return it
 	}
 	public onFrame(): ChangedStates<ItemState> {
 		this.updateAnimations(this.physics.timeMsec)
 		return this.popStates()
 	}
 	public updateAnimations(timeMs: number): void {
-		for (const a of this.table.getAnimatables()) a.getAnimation().updateAnimation(timeMs, this.table)
+		for (const a of this.getAnimatables() as unknown as Array<{
+			getAnimation(): { updateAnimation(n: number, t: Table): void }
+			getName(): string
+		}>) {
+			try {
+				a.getAnimation().updateAnimation(timeMs, this.table)
+			} catch {}
+			try {
+				this.markDirty(a.getName())
+			} catch {}
+		}
 	}
 	public popStates(): ChangedStates<ItemState> {
 		const changed = ChangedStates.claim()
-		for (const name of Object.keys(this.currentStates)) {
-			const next = this.currentStates[name]!,
-				prev = this.previousStates[name]!
+		this.frameCount++
+		const useFull = this.frameCount % 60 === 0 && this.dirtySet.size < this.allStateNames.length * 0.5
+		if (useFull) {
+			for (const name of this.allStateNames) this.dirtySet.add(name)
+		}
+		for (const name of this.dirtySet) {
+			const next = this.currentStates[name]
+			const prev = this.previousStates[name]
+			if (!next || !prev) continue
 			if (!next.equals(prev)) {
 				changed.setState(name, next.diff(prev))
 				prev.release()
 				this.previousStates[name] = next.clone()
 			}
 		}
+		this.dirtySet.clear()
 		return changed
 	}
 
@@ -142,6 +246,8 @@ export class Player extends EventEmitter {
 		const ball = this.physics.createBall(creator, this, radius, mass)
 		this.currentStates[ball.getName()] = ball.getState()
 		this.previousStates[ball.getName()] = ball.getState().clone()
+		this.allStateNames.push(ball.getName())
+		this.markDirty(ball.getName())
 		this.emit('ballCreated', ball)
 		return ball
 	}
@@ -153,6 +259,8 @@ export class Player extends EventEmitter {
 		this.previousStates[ball.getName()].release()
 		delete this.currentStates[ball.getName()]
 		delete this.previousStates[ball.getName()]
+		this.dirtySet.delete(ball.getName())
+		this.allStateNames = this.allStateNames.filter(n => n !== ball.getName())
 		this.emit('ballDestroyed', ball)
 	}
 

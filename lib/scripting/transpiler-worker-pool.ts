@@ -1,3 +1,4 @@
+import { idbGet, idbSet, vbsCacheKey } from '../util/idb-cache.js'
 import { GlobalApi } from '../vpt/global-api.js'
 import { ItemApi } from '../vpt/item-api.js'
 import type { TableDataPayload } from './transpiler-worker-core.js'
@@ -65,6 +66,90 @@ let browserWorker: Worker | null = null
 const browserPending = new Map<number, { resolve: (s: string) => void; reject: (e: any) => void }>()
 let browserNextId = 1
 
+const vbsMemCache = new Map<string, string>()
+
+function hashStr(s: string): string {
+	let h = 5381
+	for (let i = 0; i < s.length; i++) h = ((h << 5) + h) ^ s.charCodeAt(i)
+	return (h >>> 0).toString(36)
+}
+
+function tdHash(td: TableDataPayload | null | undefined): string {
+	if (!td) return 'notd'
+	try {
+		let h = 5381
+		const feed = (s: string): void => {
+			for (let i = 0; i < s.length; i++) h = ((h << 5) + h) ^ s.charCodeAt(i)
+		}
+		const names = [...(td.elementNames ?? [])].sort()
+		for (const n of names) {
+			feed(n)
+			feed('|')
+		}
+		feed(';')
+		const apiKeys = Object.keys(td.elementApis ?? {}).sort()
+		for (const k of apiKeys) {
+			feed(k)
+			feed(':')
+			for (const v of (td.elementApis as Record<string, string[]>)[k] ?? []) {
+				feed(v)
+				feed(',')
+			}
+			feed('|')
+		}
+		feed(';')
+		const funcKeys = Object.keys(td.elementApiFuncs ?? {}).sort()
+		for (const k of funcKeys) {
+			feed(k)
+			feed(':')
+			for (const v of (td.elementApiFuncs as Record<string, string[]>)[k] ?? []) {
+				feed(v)
+				feed(',')
+			}
+			feed('|')
+		}
+		feed(';')
+		const undefKeys = Object.keys(td.elementApiUndefined ?? {}).sort()
+		for (const k of undefKeys) {
+			feed(k)
+			feed(':')
+			for (const v of (td.elementApiUndefined as Record<string, string[]>)[k] ?? []) {
+				feed(v)
+				feed(',')
+			}
+			feed('|')
+		}
+		feed(';')
+		for (const v of [...(td.globalFuncs ?? [])].sort()) {
+			feed(v)
+			feed(',')
+		}
+		feed(';')
+		for (const v of [...(td.globalUndefined ?? [])].sort()) {
+			feed(v)
+			feed(',')
+		}
+		feed(';')
+		const eventKeys = Object.keys(td.elementEvents ?? {}).sort()
+		for (const k of eventKeys) {
+			feed(k)
+			feed(':')
+			for (const v of (td.elementEvents as Record<string, string[]>)[k] ?? []) {
+				feed(v)
+				feed(',')
+			}
+			feed('|')
+		}
+		return (h >>> 0).toString(36)
+	} catch {
+		return 'badtd'
+	}
+}
+
+function cacheKey(vbs: string, gf?: string, go?: string, td?: TableDataPayload | null): string {
+	return `${vbsCacheKey(vbs)}:${tdHash(td)}:${gf ?? ''}:${go ?? ''}`
+}
+
 function getBrowserWorker(): Worker {
 	if (browserWorker) return browserWorker
 	browserWorker = new Worker(new URL('./transpiler.worker.browser.js', import.meta.url), {
@@ -90,10 +175,25 @@ export async function transpileWithWorker(
 	go?: string,
 	td?: TableDataPayload | null,
 ): Promise<string> {
+	const key = cacheKey(vbs, gf, go, td)
+	try {
+		const mem = vbsMemCache.get(key)
+		if (mem) return mem
+	} catch {}
+	try {
+		if (typeof indexedDB !== 'undefined') {
+			const hit = await idbGet(key)
+			if (typeof hit === 'string' && hit.length) {
+				vbsMemCache.set(key, hit)
+				return hit
+			}
+		}
+	} catch {}
 	const isBrowser = typeof window !== 'undefined' && typeof document !== 'undefined'
+	let js: string
 	if (isBrowser) {
 		const w = getBrowserWorker()
-		return new Promise<string>((resolve, reject) => {
+		js = await new Promise<string>((resolve, reject) => {
 			const id = browserNextId++
 			browserPending.set(id, { resolve, reject })
 			w.postMessage({ id, vbs, globalFunction: gf, globalObject: go, tableData: td })
@@ -104,25 +204,33 @@ export async function transpileWithWorker(
 				}
 			}, 20000)
 		})
-	}
-	const w = await getNodeWorker()
-	return await new Promise<string>((resolve, reject) => {
-		const id = nodeNextId++
-		nodePending.set(id, { resolve, reject })
-		try {
-			w.postMessage({ id, vbs, globalFunction: gf, globalObject: go, tableData: td })
-		} catch (e) {
-			nodePending.delete(id)
-			reject(e)
-			return
-		}
-		setTimeout(() => {
-			if (nodePending.has(id)) {
+	} else {
+		const w = await getNodeWorker()
+		js = await new Promise<string>((resolve, reject) => {
+			const id = nodeNextId++
+			nodePending.set(id, { resolve, reject })
+			try {
+				w.postMessage({ id, vbs, globalFunction: gf, globalObject: go, tableData: td })
+			} catch (e) {
 				nodePending.delete(id)
-				reject(new Error('worker timeout'))
+				reject(e)
+				return
 			}
-		}, 20000)
-	})
+			setTimeout(() => {
+				if (nodePending.has(id)) {
+					nodePending.delete(id)
+					reject(new Error('worker timeout'))
+				}
+			}, 20000)
+		})
+	}
+	try {
+		vbsMemCache.set(key, js)
+	} catch {}
+	try {
+		if (typeof indexedDB !== 'undefined') void idbSet(key, js).catch(() => {})
+	} catch {}
+	return js
 }
 
 function isMethod(proto: any, prop: string): boolean {

@@ -1028,6 +1028,25 @@ export class Viewer {
 			})
 			if (textures.length !== before)
 				this.log(`[stream] Filtered ${before} → ${textures.length} used textures (kept inserts)`)
+			{
+				const keepSet = new Set(textures.map(tx => tx.getName().toLowerCase()))
+				let cleared = 0
+				for (const tx of Object.values(table.textures) as any[]) {
+					const n = tx.getName().toLowerCase()
+					if (!keepSet.has(n)) {
+						if (tx.binary || tx.pdsBuffer) cleared++
+						tx.binary = undefined
+						tx.pdsBuffer = undefined
+					}
+				}
+				if (cleared) {
+					this.log(`[mem] Eagerly cleared ${cleared} unused raw texture buffers`, 'info')
+					if (typeof window !== 'undefined' && (window as any).gc)
+						try {
+							;(window as any).gc()
+						} catch {}
+				}
+			}
 			textures.sort((a, b) => {
 				const aN = a.getName().toLowerCase(),
 					bN = b.getName().toLowerCase()

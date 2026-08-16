@@ -3,6 +3,8 @@
 import { initHelp } from './ui/help-dialog.js'
 import { Viewer } from './viewer.js'
 
+void import('../../dist-esm/lib/physics/wasm/kernels.js').then(m => m.getWasmKernels().catch(() => {})).catch(() => {})
+
 const params = new URLSearchParams(location.search)
 const viewer = new Viewer({
 	queryParam: 'vpx',

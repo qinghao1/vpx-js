@@ -14,11 +14,7 @@ export class NodeBinaryReader implements IBinaryReader {
 		return new Promise((resolve, reject) => {
 			readCb(this.fd, target as unknown as Buffer, offset, length, position, (err, bytesRead, buffer) => {
 				if (err) return reject(err)
-				const cloned =
-					typeof structuredClone !== 'undefined'
-						? structuredClone(buffer.subarray(0, bytesRead))
-						: buffer.slice(0, bytesRead)
-				resolve([bytesRead, cloned as Uint8Array])
+				resolve([bytesRead, (target as Uint8Array).subarray(offset, offset + bytesRead)])
 			})
 		})
 	}
