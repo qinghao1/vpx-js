@@ -239,10 +239,10 @@ export class DmdRenderer {
 				mat.depthWrite = false
 				mat.polygonOffset = true
 				mat.polygonOffsetFactor = -4
-				mat.polygonOffsetUnits = -4
+				mat.polygonOffsetUnits = -8
 			}
-			// vpinball -10000 bias: strong forward bias in THREE is polygonOffset -4/-4 plus renderOrder 10 (after cab/backglass at 0, before overlay 1000)
-			m.renderOrder = 10
+			// vpinball -10000 bias: strong forward bias in THREE is polygonOffset -4/-8 plus renderOrder 20 (after cab/backglass at 0, before overlay 1000)
+			m.renderOrder = 20
 			m.frustumCulled = false
 		}
 
@@ -350,12 +350,12 @@ export class DmdRenderer {
 				depthWrite: false,
 				polygonOffset: true,
 				polygonOffsetFactor: -4,
-				polygonOffsetUnits: -4,
+				polygonOffsetUnits: -8,
 				transparent: false,
 			})
 			const mesh = new THREE.Mesh(geom, mat)
 			mesh.name = `DMD_${fl.getName()}`
-			mesh.renderOrder = 10
+			mesh.renderOrder = 20
 			mesh.frustumCulled = false
 			// vpinball: flasher.cpp FlasherData.m_height/m_rotX/Y/Z define DMD quad in playfield XY at positive Z up
 			// (MatrixTranslate(center,height) * RotX/Y/Z). ThreeRenderApi.transformScene maps LH Z up → RH Y up
