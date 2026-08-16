@@ -54,9 +54,15 @@ export abstract class ItemUpdater<STATE extends ItemState> {
 		angle: number,
 		name: string,
 	) {
-		const matTransToOrigin = Matrix3D.claim().setTranslation(-center.x, -center.y, -posZ)
+		// Row-major v'=v*M: left-to-right T(-c)*Rz(-)*Rx*Rz(+)*T(+c). Static geometry is
+		// Rz*Scale*Trans then mapped to Three via RIGHT_HANDED (1,1,-1) and transpose in
+		// applyMatrixToNode. To cancel T*RH*T residual, updater uses opposite Z signs
+		// (+posZ / -posZ) so callers pass positive world height generically.
+		// @see https://github.com/vpinball/vpinball/blob/master/src/parts/spinner.cpp#L400
+		// @see https://github.com/vpinball/vpinball/blob/master/src/parts/gate.cpp#L429
+		const matTransToOrigin = Matrix3D.claim().setTranslation(-center.x, -center.y, posZ)
 		const matRotateToOrigin = Matrix3D.claim().rotateZMatrix(MathUtils.degToRad(-rotationZ))
-		const matTransFromOrigin = Matrix3D.claim().setTranslation(center.x, center.y, posZ)
+		const matTransFromOrigin = Matrix3D.claim().setTranslation(center.x, center.y, -posZ)
 		const matRotateFromOrigin = Matrix3D.claim().rotateZMatrix(MathUtils.degToRad(rotationZ))
 		const matRotateX = Matrix3D.claim().rotateXMatrix(angle)
 

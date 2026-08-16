@@ -125,13 +125,16 @@ export class LightData extends ItemData {
 		return !!this.szSurface && !!table.surfaces[this.szSurface]
 	}
 
-	public isSurfaceLight(table: Table): boolean {
-		if (this.dragPoints.length > 2 && !this.isOnSurface(table) && !this.bulbLight) return true
-		if (!this.szOffImage || this.bulbLight) return false
-		if (table.getPlayfieldMap()?.toLowerCase() === this.szOffImage.toLowerCase() && this.dragPoints.length > 2)
-			return true
-		if (Object.values(table.surfaces).some(s => s.image === this.szOffImage)) return true
-		return Object.values(table.lights).filter(l => l.offImage === this.szOffImage).length > 3
+	/**
+	 * Playfield insert: polygon light directly on the playfield.
+	 * Mirrors vpinball `Light::RenderSetup` which builds `m_lightmapMeshBuffer`
+	 * from `GetRgVertex` for *any* light with vertices — the only generic
+	 * discriminator is shape vs bulb/surface placement.
+	 * @see https://github.com/vpinball/vpinball/blob/master/src/parts/light.cpp#L433
+	 */
+	public isSurfaceLight(_table: Table): boolean {
+		if (this.bulbLight || this.isBulbLight()) return false
+		return this.dragPoints.length > 2
 	}
 
 	private async fromTag(buffer: Uint8Array, tag: string, _offset: number, len: number): Promise<number> {

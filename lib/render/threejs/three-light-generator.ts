@@ -50,7 +50,7 @@ export class ThreeLightGenerator {
 			case 'surface.light': {
 				const m = (child as ThreeMesh).material as MeshStandardMaterial
 				if (m) {
-					if (state.intensity !== undefined) m.emissiveIntensity = state.intensity
+					if (state.intensity !== undefined) m.emissiveIntensity = state.intensity / (initial || 1)
 					if (state.color !== undefined) m.emissive.set(state.color)
 				}
 				break

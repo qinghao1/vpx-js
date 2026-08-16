@@ -34,7 +34,7 @@ export class SpinnerUpdater extends ItemUpdater<SpinnerState> {
 				obj,
 				renderApi,
 				this.data.center,
-				-this.meshGenerator.getZ(table),
+				this.meshGenerator.getZ(table),
 				this.data.rotation,
 				state.angle,
 				`spinner.plate-${this.state.getName()}`,

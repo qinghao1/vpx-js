@@ -176,12 +176,13 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 				const dataInt = (l as any)?.data?.intensity ?? (l as any)?.intensity ?? 1
 				const scale = (l as any)?.data?.intensityScale ?? (l as any)?.animation?.intensityScale ?? 1
 				const cur = st?.intensity ?? dataInt
-				if (dataInt !== 0 && scale !== 0) {
-					if (cur <= 1 && cur >= 0 && dataInt > 1) lightFactor = Math.max(0, Math.min(1, cur))
-					else lightFactor = cur / (dataInt * scale)
-				} else lightFactor = 0
-				if (!Number.isFinite(lightFactor)) lightFactor = 0
-				lightFactor = Math.max(0, Math.min(1, lightFactor))
+				const denom = dataInt * scale
+				let rawFactor: number
+				if (denom !== 0) {
+					rawFactor = cur / denom
+					if (cur >= 0 && cur <= 1 && denom > 1) rawFactor = cur
+				} else rawFactor = 0
+				lightFactor = Math.max(0, Math.min(1, Number.isFinite(rawFactor) ? rawFactor : 0))
 			} catch {
 				lightFactor = 1
 			}

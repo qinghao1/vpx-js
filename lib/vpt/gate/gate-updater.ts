@@ -30,7 +30,7 @@ export class GateUpdater extends ItemUpdater<GateState> {
 			const scaleZ = table.getScaleZ()
 			const baseHeight =
 				table.getSurfaceHeight(this.data.szSurface, this.data.center.x, this.data.center.y) * scaleZ
-			const posZ = -(this.data.height * scaleZ + baseHeight)
+			const posZ = this.data.height * scaleZ + baseHeight
 			const angle = this.data.twoWay ? -state.angle : state.angle
 			this.applyXRotation(
 				obj,
