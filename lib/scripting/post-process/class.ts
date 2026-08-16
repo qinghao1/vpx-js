@@ -6,6 +6,7 @@ import type {
 	BlockStatement,
 	ClassBody,
 	FunctionDeclaration,
+	FunctionExpression,
 	Identifier,
 	MethodDefinition,
 	Statement,
@@ -53,6 +54,7 @@ function ppClassDeclaration(node: ESIToken): unknown {
 	const methodDefinitions: MethodDefinition[] = []
 	const varStmts: Statement[] = []
 	const ids: string[] = []
+	const methodNames: string[] = []
 	for (const child of node.children) {
 		switch (child.type) {
 			case 'Identifier':
@@ -67,6 +69,7 @@ function ppClassDeclaration(node: ESIToken): unknown {
 					case 'MethodMemberDeclaration': {
 						const functionDecl = memberDecl.estree as FunctionDeclaration
 						const functionId = functionDecl.id as Identifier
+						methodNames.push(functionId.name)
 						methodDefinitions.push(
 							methodDefinition(
 								functionId,
@@ -78,7 +81,12 @@ function ppClassDeclaration(node: ESIToken): unknown {
 						break
 					}
 					case 'PropertyMemberDeclaration':
-						methodDefinitions.push(memberDecl.estree)
+						{
+							const md = memberDecl.estree as MethodDefinition
+							const key = (md.key as Identifier).name
+							methodNames.push(key)
+							methodDefinitions.push(md)
+						}
 						break
 					case 'VariableMemberDeclaration':
 					case 'ConstantMemberDeclaration':
@@ -109,24 +117,51 @@ function ppClassDeclaration(node: ESIToken): unknown {
 		)
 	}
 	let body: ClassBody = classBody([constructor, ...methodDefinitions])
-	const idSet = new Set(ids.map(s => s.toLowerCase()))
+	const idSet = new Set([...ids, ...methodNames].map(s => s.toLowerCase()))
+	const methodLocals = new Map<string, Set<string>>()
+	for (const m of body.body) {
+		const md = m as MethodDefinition
+		const key = (md.key as Identifier).name.toLowerCase()
+		const fn = md.value as unknown as FunctionExpression
+		const locals = new Set<string>()
+		locals.add(key)
+		for (const p of fn.params as Identifier[]) locals.add((p.name as string).toLowerCase())
+		replace(fn.body as unknown as any, {
+			enter: (n: any) => {
+				if (n.type === 'VariableDeclarator' && n.id?.type === 'Identifier') {
+					locals.add((n.id.name as string).toLowerCase())
+				}
+			},
+		})
+		methodLocals.set(key, locals)
+	}
+	let currentMethod: string | undefined
 	body = replace(body, {
-		leave: (bodyNode, parentNode) => {
+		enter: (bodyNode: any, parentNode: any) => {
+			if (bodyNode.type === 'MethodDefinition') {
+				currentMethod = (bodyNode.key as Identifier).name.toLowerCase()
+			}
 			if (bodyNode.type === 'Identifier') {
-				if (parentNode !== null && parentNode.type !== 'MethodDefinition') {
-					if (idSet.has(bodyNode.name.toLowerCase())) {
-						if (parentNode.type === 'MemberExpression') {
-							if (parentNode.object.type === 'Identifier') {
-								if (parentNode.object.name.toLowerCase() === bodyNode.name.toLowerCase()) {
-									return memberExpression(thisExpression(), identifier(bodyNode.name.toLowerCase()))
-								}
+				if (parentNode?.type === 'MethodDefinition') return
+				if (parentNode?.type === 'VariableDeclarator' && parentNode.id === bodyNode) return
+				if (parentNode?.type === 'FunctionExpression' && (parentNode.params as any[])?.includes(bodyNode))
+					return
+				if (currentMethod && methodLocals.get(currentMethod)?.has(bodyNode.name.toLowerCase())) return
+				if (idSet.has(bodyNode.name.toLowerCase())) {
+					if (parentNode?.type === 'MemberExpression') {
+						if (parentNode.object?.type === 'Identifier') {
+							if (parentNode.object.name.toLowerCase() === bodyNode.name.toLowerCase()) {
+								return memberExpression(thisExpression(), identifier(bodyNode.name.toLowerCase()))
 							}
-						} else {
-							return memberExpression(thisExpression(), identifier(bodyNode.name.toLowerCase()))
 						}
+					} else {
+						return memberExpression(thisExpression(), identifier(bodyNode.name.toLowerCase()))
 					}
 				}
 			}
+		},
+		leave: (bodyNode: any) => {
+			if (bodyNode.type === 'MethodDefinition') currentMethod = undefined
 		},
 	}) as ClassBody
 	if ('value' in body.body[0]) {
@@ -186,7 +221,8 @@ function ppPropertyGetDeclaration(node: ESIToken): unknown {
 	if (block.body[block.body.length - 1].type !== 'ReturnStatement') {
 		block.body.push(returnStatement(id))
 	}
-	return methodDefinition(id, 'method', functionExpression(block, params))
+	const kind = params.length === 0 ? ('get' as const) : ('method' as const)
+	return methodDefinition(id, kind as any, functionExpression(block, params))
 }
 
 function ppPropertyLetDeclaration(node: ESIToken): unknown {
@@ -206,7 +242,8 @@ function ppPropertyLetDeclaration(node: ESIToken): unknown {
 				break
 		}
 	}
-	return methodDefinition(id, 'method', functionExpression(block ? block : blockStatement([]), params))
+	const kind = params.length === 1 ? ('set' as const) : ('method' as const)
+	return methodDefinition(id, kind as any, functionExpression(block ? block : blockStatement([]), params))
 }
 
 function ppPropertySetDeclaration(node: ESIToken): unknown {
@@ -226,5 +263,6 @@ function ppPropertySetDeclaration(node: ESIToken): unknown {
 				break
 		}
 	}
-	return methodDefinition(id, 'method', functionExpression(block ? block : blockStatement([]), params))
+	const kind = params.length === 1 ? ('set' as const) : ('method' as const)
+	return methodDefinition(id, kind as any, functionExpression(block ? block : blockStatement([]), params))
 }

@@ -30,7 +30,7 @@ import type { IEmulator } from './iemulator.js'
 import type { PinInput } from './pin-input.js'
 import type { IBallCreationPosition, Player } from './player.js'
 
-const CLOCK_INIT_THRESHOLD_USEC = 10_000_000
+const CLOCK_INIT_THRESHOLD_USEC = 1_000_000
 const MAX_CATCHUP_USEC = 1000 * PHYSICS_STEPTIME
 
 /** Core physics loop — 1 kHz collision, timers, movers.

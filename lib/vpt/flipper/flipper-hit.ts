@@ -50,7 +50,8 @@ export class FlipperHit extends HitObject {
 		data.updatePhysicsSettings(table)
 		const h = table.getSurfaceHeight(data.szSurface, data.center.x, data.center.y)
 		if (data.flipperRadiusMin > 0 && data.flipperRadiusMax > data.flipperRadiusMin) {
-			data.flipperRadius = data.flipperRadiusMax - (data.flipperRadiusMax - data.flipperRadiusMin)
+			data.flipperRadius =
+				data.flipperRadiusMax - (data.flipperRadiusMax - data.flipperRadiusMin) * table.data!.globalDifficulty!
 			data.flipperRadius = Math.max(data.flipperRadius, data.baseRadius - data.endRadius + 0.05)
 		} else data.flipperRadius = data.flipperRadiusMax
 		return new FlipperHit(

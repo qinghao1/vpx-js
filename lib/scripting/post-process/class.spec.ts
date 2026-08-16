@@ -46,7 +46,7 @@ describe('The VBScript transpiler - Class', () => {
 		const vbs = `Class cvpmTest\nPrivate mEnabled\nPublic Property Get Balls():End Property\nEnd Class`
 		const js = grammar.vbsToJs(vbs)
 		expect(js).to.equal(
-			'class cvpmTest {\n    constructor() {\n        this.mEnabled = undefined;\n    }\n    Balls() {\n        let Balls = undefined;\n        return Balls;\n    }\n}',
+			'class cvpmTest {\n    constructor() {\n        this.mEnabled = undefined;\n    }\n    get Balls() {\n        let Balls = undefined;\n        return Balls;\n    }\n}',
 		)
 	})
 
@@ -54,7 +54,7 @@ describe('The VBScript transpiler - Class', () => {
 		const vbs = `Class cvpmDictionary\nPrivate mDict\nPublic Property Set Key(aKey)\nmDict=Nothing:End Property\nEnd Class`
 		const js = grammar.vbsToJs(vbs)
 		expect(js).to.equal(
-			'class cvpmDictionary {\n    constructor() {\n        this.mDict = undefined;\n    }\n    Key(aKey) {\n        this.mdict = Nothing;\n    }\n}',
+			'class cvpmDictionary {\n    constructor() {\n        this.mDict = undefined;\n    }\n    set Key(aKey) {\n        this.mdict = Nothing;\n    }\n}',
 		)
 	})
 
@@ -62,7 +62,7 @@ describe('The VBScript transpiler - Class', () => {
 		const vbs = `Class cvpmTimer\nPrivate mDebug\nPublic Property Let isDebug(enabled):mDebug=enabled:End Property\nEnd Class`
 		const js = grammar.vbsToJs(vbs)
 		expect(js).to.equal(
-			'class cvpmTimer {\n    constructor() {\n        this.mDebug = undefined;\n    }\n    isDebug(enabled) {\n        this.mdebug = enabled;\n    }\n}',
+			'class cvpmTimer {\n    constructor() {\n        this.mDebug = undefined;\n    }\n    set isDebug(enabled) {\n        this.mdebug = enabled;\n    }\n}',
 		)
 	})
 
@@ -78,7 +78,7 @@ describe('The VBScript transpiler - Class', () => {
 		const vbs = `Class cvpmTimer\nPublic mBalls\nPublic Property Get Balls():Balls=mBalls.Keys:Test=x.mBalls:End Property\nEnd Class`
 		const js = grammar.vbsToJs(vbs)
 		expect(js).to.equal(
-			'class cvpmTimer {\n    constructor() {\n        this.mBalls = undefined;\n    }\n    Balls() {\n        let Balls = undefined;\n        Balls = this.mballs.Keys;\n        Test = x.mBalls;\n        return Balls;\n    }\n}',
+			'class cvpmTimer {\n    constructor() {\n        this.mBalls = undefined;\n    }\n    get Balls() {\n        let Balls = undefined;\n        Balls = this.mballs.Keys;\n        Test = x.mBalls;\n        return Balls;\n    }\n}',
 		)
 	})
 })

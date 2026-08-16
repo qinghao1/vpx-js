@@ -14,8 +14,23 @@ import { BrowserBinaryReader } from '../../dist-esm/lib/io/binary-reader.browser
 import { isWasmReady } from '../../dist-esm/lib/physics/wasm/kernels.js'
 import { optimizeScene as _optimizeScene } from '../../dist-esm/lib/render/threejs/three-batched-builder.js'
 import { buildBvhIdle } from '../../dist-esm/lib/render/threejs/three-bvh.js'
+import {
+	applyCameraState,
+	computePlayFraming,
+	computeViewerFraming,
+	frameCamera,
+} from '../../dist-esm/lib/render/threejs/three-camera-framing.js'
 import { setGlobalEmissionScale } from '../../dist-esm/lib/render/threejs/three-material-generator.js'
 import { ThreeRenderApi } from '../../dist-esm/lib/render/threejs/three-render-api.js'
+import {
+	applyBakedMaterial,
+	ensureProceduralRoom,
+	hideCabFlippers,
+	isBakedMeshByNames,
+	isDeferred,
+	postProcessScene,
+	showCabFlippers,
+} from '../../dist-esm/lib/render/threejs/three-scene-postprocess.js'
 import { ThreeTextureLoaderBrowser } from '../../dist-esm/lib/render/threejs/three-texture-loader-browser.js'
 import { ANIM_SETTLE_MS, AnimationGate } from '../../dist-esm/lib/util/animation-gate.js'
 import { Table } from '../../dist-esm/lib/vpt/table/table.js'
@@ -34,21 +49,6 @@ import { DmdController } from './dmd.js'
 import { isDev as _isDev, ensureBvh, ensureGlobals, getTargetPixelRatio } from './env.js'
 import { attachInput } from './input.js'
 import { createHarness } from './log-overlay.js'
-import {
-	applyBakedMaterial,
-	ensureProceduralRoom,
-	hideCabFlippers,
-	isBakedMeshByNames,
-	isDeferred,
-	postProcessScene,
-	showCabFlippers,
-} from '../../dist-esm/lib/render/threejs/three-scene-postprocess.js'
-import {
-	applyCameraState,
-	computePlayFraming,
-	computeViewerFraming,
-	frameCamera,
-} from '../../dist-esm/lib/render/threejs/three-camera-framing.js'
 import { renderModeHint, renderStats } from './stats-panel.js'
 import {
 	$,
@@ -1755,11 +1755,11 @@ export class Viewer {
 		} else if (this._physicsSab) {
 			this.log(`[physics] reusing SAB ${this._physicsSab.byteLength}`, 'debug')
 		}
-		const tickPhysics = now => {
+		const tickPhysics = () => {
 			if (!this.player || this.isPaused) return
 			if (this._physicsSab && this._physicsScratch) trySnap(this._physicsSab, this._physicsScratch)
 			this.player.setPhysicsEnabled(this.viewerMode === 'play')
-			this.player.updatePhysics(now)
+			this.player.updatePhysics()
 			this.player.updateAnimations(this.player.getGameTime())
 			const changed = this.player.popStates()
 			if (changed.keys.length) this.applyChangedStates(changed)
@@ -1777,14 +1777,14 @@ export class Viewer {
 			if (pinLoading) {
 				this._animTimeout = setTimeout(loop, 16)
 				this.animFrame = this._animTimeout
-				tickPhysics(now)
+				tickPhysics()
 				this._pollPinmame()
 				return
 			}
 			this._animRaf = requestAnimationFrame(loop)
 			this.animFrame = this._animRaf
 			if (this.controls?.enabled) this.controls.update()
-			tickPhysics(now)
+			tickPhysics()
 			this._pollPinmame()
 			this._applyNudgeVisual()
 			if (this.composer) this.composer.render()
