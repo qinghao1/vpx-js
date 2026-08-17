@@ -18,8 +18,21 @@
 ;(globalThis as any).global ??= globalThis
 ;(self as any).process ??= (globalThis as any).process
 ;(self as any).global ??= (globalThis as any).global
-if (!(self as any).process?.on) (self as any).process.on = () => {}
 if (!(globalThis as any).process?.on) (globalThis as any).process.on = () => {}
+if (typeof (globalThis as any).localStorage === 'undefined') {
+	const _store = new Map<string, string>()
+	;(globalThis as any).localStorage = {
+		getItem: (k: string) => _store.get(k) ?? null,
+		setItem: (k: string, v: string) => _store.set(k, String(v)),
+		removeItem: (k: string) => _store.delete(k),
+		clear: () => _store.clear(),
+		key: (i: number) => Array.from(_store.keys())[i] ?? null,
+		get length() {
+			return _store.size
+		},
+	}
+}
+;(self as any).localStorage = (globalThis as any).localStorage
 
 let transpileInWorker: ((p: any) => Promise<string>) | undefined
 

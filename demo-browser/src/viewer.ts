@@ -1364,8 +1364,7 @@ export class Viewer {
 			if (reader) void this._cleanupReader(reader).catch(() => {})
 			// generic: free raw texture binaries after streaming regardless of mode; keeps GPU textures only
 			this._clearRawTextures?.()
-			if (typeof (globalThis as any).gc === 'function');
-			;(globalThis as any).gc()
+			if (typeof (globalThis as any).gc === 'function') (globalThis as any).gc()
 			return
 		}
 		this._showStream()
@@ -1597,8 +1596,7 @@ export class Viewer {
 			}
 			// generic: free raw texture binaries after streaming regardless of mode; keeps GPU textures only
 			this._clearRawTextures?.()
-			if (typeof (globalThis as any).gc === 'function');
-			;(globalThis as any).gc()
+			if (typeof (globalThis as any).gc === 'function') (globalThis as any).gc()
 		})()
 	}
 	async _waitForPinmame(timeout = 45000) {

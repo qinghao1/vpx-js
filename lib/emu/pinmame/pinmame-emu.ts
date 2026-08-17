@@ -106,7 +106,12 @@ export class PinMameEmulator implements IEmulator {
 		for (const dir of ['/pinmame/roms', '/pinmame/nvram', '/pinmame/cfg']) m.FS.mkdirTree(dir)
 		if (rom.length) {
 			let reuse = false
-			reuse = m.FS.stat(`/pinmame/roms/${game}.zip`).size === rom.length
+			try {
+				reuse = m.FS.stat(`/pinmame/roms/${game}.zip`).size === rom.length
+			} catch (e) {
+				const errno = (e as unknown as { errno?: number })?.errno
+				if (errno !== 44) throw e
+			}
 			if (!reuse) m.FS.writeFile(`/pinmame/roms/${game}.zip`, rom)
 		}
 		this.writeConfig(m)

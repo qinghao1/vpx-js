@@ -108,11 +108,13 @@ export class Player extends EventEmitter {
 		const methodCache = new Map<string | symbol, (...args: any[]) => unknown>()
 		const proxy = new Proxy(api, {
 			set(target: any, prop: string | symbol, value: any, receiver: any): boolean {
+				if (typeof prop === 'symbol') return Reflect.set(target, prop, value, receiver)
 				const ok = Reflect.set(target, prop, value, receiver)
 				player.markDirty(name)
 				return ok
 			},
 			get(target: any, prop: string | symbol, receiver: any): any {
+				if (typeof prop === 'symbol') return Reflect.get(target, prop, receiver)
 				if (
 					prop === 'constructor' ||
 					prop === '__proto__' ||

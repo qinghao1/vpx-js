@@ -16,49 +16,69 @@ const exists = p => {
 	}
 }
 
-function resolveVpxToUrl(vpxPath) {
-	const abs = path.resolve(vpxPath)
-	if (!exists(abs)) throw new Error(`VPX not found: ${abs}`)
-	const st = fs.statSync(abs)
-	console.log(`[bench] VPX ${abs} ${(st.size / 1024 / 1024).toFixed(1)} MB`)
+const home = process.env.HOME ?? '/home/qinghao1'
+const vpxCandidates = [
+	path.join(home, 'Downloads/walking_dead.vpx'),
+	path.resolve('walking_dead.vpx'),
+	path.resolve('test/fixtures/table-empty.vpx'),
+]
+const romCandidates = [
+	path.join(home, '.pinmame/roms/twd_160h.zip'),
+	path.join(home, 'Downloads/twd_160h.zip'),
+	path.resolve('twd_160h.zip'),
+]
+
+function resolvePathToParam(filePath) {
+	const abs = path.resolve(filePath)
+	if (!exists(abs)) return null
 	const pubLink = path.resolve('demo-browser/public', path.basename(abs))
 	try {
 		if (exists(pubLink) && fs.realpathSync(pubLink) === fs.realpathSync(abs)) {
-			return `http://localhost:3000/?vpx=/${path.basename(abs)}`
+			return `/${path.basename(abs)}`
 		}
 	} catch {}
-	if (abs.includes('/test/fixtures/')) return `http://localhost:3000/?vpx=${abs.slice(path.resolve('.').length)}`
-	return `http://localhost:3000/?vpx=/@fs${abs}`
+	if (abs.includes('/test/fixtures/')) return abs.slice(path.resolve('.').length)
+	return `/@fs${abs}`
 }
 
-const home = process.env.HOME ?? '/home/qinghao1'
-const candidates = [
-	path.resolve('walking_dead.vpx'),
-	path.join(home, 'Downloads/walking_dead.vpx'),
-	path.resolve('test/fixtures/table-empty.vpx'),
-]
+function resolveUrl(vpxPath, romPath) {
+	const vpxParam = resolvePathToParam(vpxPath)
+	if (!vpxParam) throw new Error(`VPX not found: ${vpxPath}`)
+	const abs = path.resolve(vpxPath)
+	const st = fs.statSync(abs)
+	console.log(`[bench] VPX ${abs} ${(st.size / 1024 / 1024).toFixed(1)} MB`)
+	let u = `http://localhost:3000/?vpx=${vpxParam}`
+	if (romPath) {
+		const romParam = resolvePathToParam(romPath)
+		if (romParam) {
+			console.log(`[bench] ROM ${romPath}`)
+			u += `&rom=${romParam}`
+		}
+	}
+	return `${u}&mode=play`
+}
 
 let url = getArg('url', null)
 const vpxArg = getArg('vpx', null)
+const romArg = getArg('rom', null)
 if (!url) {
-	if (vpxArg) url = resolveVpxToUrl(vpxArg)
-	else {
-		const found = candidates.find(exists)
-		url = found ? resolveVpxToUrl(found) : `http://localhost:3000/?vpx=${DEFAULT_EMPTY}`
-		if (found) console.log(`[bench] auto-detected ${found}`)
-	}
+	const vpxPath = vpxArg ?? vpxCandidates.find(exists) ?? DEFAULT_EMPTY
+	const romPath = romArg ?? (vpxPath.includes('walking_dead') ? romCandidates.find(exists) : null)
+	url = resolveUrl(vpxPath, romPath)
+	if (!vpxArg && vpxCandidates.find(exists)) console.log(`[bench] auto-detected table: ${vpxPath}`)
 }
 
-const balls = Number(getArg('balls', url.includes('walking_dead') ? '0' : '10'))
-const duration = Number(getArg('duration', '5000'))
+const balls = Number(getArg('balls', '-1'))
+const duration = Number(getArg('duration', '3000'))
 const warmup = Number(getArg('warmup', url.includes('walking_dead') ? '2000' : '800'))
 const outPath = getArg('out', null)
-const profile = hasFlag('profile') || hasFlag('breakdown')
+const profile = hasFlag('profile') || hasFlag('breakdown') || !hasFlag('no-profile')
+const interactive = !hasFlag('no-interact') && !hasFlag('passive')
 const headed = hasFlag('headed')
 const gpu = getArg('gpu', hasFlag('gpu') ? 'vulkan' : null)
 
 console.log(
-	`[bench] url=${url} balls=${balls} duration=${duration} warmup=${warmup} profile=${profile} gpu=${gpu ?? false} headed=${headed}`,
+	`[bench] url=${url} balls=${balls} duration=${duration} warmup=${warmup} interactive=${interactive} profile=${profile} gpu=${gpu ?? false} headed=${headed}`,
 )
 
 const puppeteer = await loadPuppeteer()
@@ -66,44 +86,81 @@ const vite = await ensureVite(url, {
 	cwd: path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../demo-browser'),
 	label: 'bench',
 })
-const browser = await launchBrowser(puppeteer, { ...(headed ? { headless: false } : {}), ...(gpu ? { gpu } : {}) })
+const browser = await launchBrowser(puppeteer, {
+	...(headed ? { headless: false } : {}),
+	...(gpu ? { gpu } : {}),
+	timeout: 300_000,
+})
 const page = await newPage(browser)
-page.setDefaultTimeout(120000)
+page.setDefaultTimeout(180000)
 
 const logs = attachLogging(page, {
-	filter: /Parsed|Scene|Textures|Ready|Loaded|physics|VPX|GameName|FPS|stream|Visuals/,
+	filter: /./,
 	prefix: '[c]',
 })
 
-console.log(`[bench] goto ${url}`)
+// === 1. LOAD JOURNEY ===
+console.log(`[bench] === 1. LOAD JOURNEY ===`)
 const tNavStart = performance.now()
-await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 90000 })
+await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 120000 })
+const navMs = Math.round(performance.now() - tNavStart)
 
 let readyMs = null
 for (let i = 0; i < 90; i++) {
 	await new Promise(r => setTimeout(r, 1000))
-	const ready = await page.evaluate(() => document.getElementById('log')?.innerText.includes('Ready') ?? false)
-	if (ready) {
+	const s = await page.evaluate(() => {
+		const txt = document.getElementById('log')?.innerText ?? ''
+		const v = window.viewer
+		const hasPlayer = !!v?.player
+		const isReady =
+			txt.includes('Ready') ||
+			txt.includes('Player init OK') ||
+			txt.includes('PLAY: Enter=plunger') ||
+			txt.includes('VIEWER: drag to orbit') ||
+			hasPlayer
+		const lastLines = txt.split('\n').filter(Boolean).slice(-2).join(' | ')
+		return { isReady, hasPlayer, lastLines }
+	})
+	if (s.isReady && s.hasPlayer) {
 		readyMs = Math.round(performance.now() - tNavStart)
-		console.log(`[bench] Ready after ${readyMs}ms`)
+		console.log(`[bench] Ready after ${readyMs}ms (nav: ${navMs}ms)`)
 		break
 	}
-	if (i % 5 === 0) console.log(`[bench] waiting ${i}s…`)
+	if (i % 5 === 0) console.log(`[bench] waiting ready ${i}s… [${s.lastLines}]`)
 }
 if (readyMs == null) {
 	console.error('[bench] not Ready within 90s')
-	await page.screenshot({ path: '/tmp/bench-not-ready.png' }).catch(() => {})
 	await browser.close()
 	vite?.kill()
 	process.exit(1)
 }
 
-function collectMetrics() {
+// Await background texture streaming / pre-loading if present
+let streamMs = 0
+for (let i = 0; i < 60; i++) {
+	const status = await page.evaluate(() => {
+		const txt = document.getElementById('log')?.innerText ?? ''
+		const isStreaming = txt.includes('Streaming') || txt.includes('Enhancing visuals')
+		const isDone = txt.includes('[stream] Done') || txt.includes('Visuals ready')
+		return { isStreaming, isDone }
+	})
+	if (status.isDone) {
+		streamMs = (i + 1) * 500
+		console.log(`[bench] texture streaming complete (${streamMs}ms)`)
+		break
+	}
+	if (!status.isStreaming && i > 3) break
+	await new Promise(r => setTimeout(r, 500))
+}
+
+// Collect complete table & WebGL state
+const loadState = await page.evaluate(() => {
 	const v = window.viewer
+	if (!v) return null
 	let tris = 0
 	let meshes = 0
 	try {
-		v.tableGroup.traverse(o => {
+		v.tableGroup?.traverse(o => {
 			if (o.isMesh && o.geometry?.attributes?.position) {
 				tris += o.geometry.attributes.position.count / 3
 				meshes++
@@ -111,272 +168,195 @@ function collectMetrics() {
 		})
 	} catch {}
 	const info = v.renderer?.info?.render ?? {}
+	const emu = v.player?.getPhysics()?.emu
+
+	let glVendor = '?'
+	let glRenderer = '?'
+	let glVersion = '?'
+	try {
+		const gl = v.renderer?.getContext()
+		if (gl) {
+			glVendor = gl.getParameter(gl.VENDOR) ?? '?'
+			glRenderer = gl.getParameter(gl.RENDERER) ?? '?'
+			glVersion = gl.getParameter(gl.VERSION) ?? '?'
+		}
+	} catch {}
+
 	return {
 		tris: Math.round(tris),
 		meshes,
-		calls: info.calls ?? 0,
-		triangles: info.triangles ?? 0,
+		draws: info.calls ?? 0,
 		balls: v.player?.balls?.length ?? 0,
-	}
-}
-
-const preMetrics = await page.evaluate(collectMetrics)
-console.log('[bench] pre-metrics', preMetrics)
-
-await page.evaluate(() => {
-	const sel = document.getElementById('mode')
-	if (sel) {
-		sel.value = 'play'
-		sel.dispatchEvent(new Event('change', { bubbles: true }))
-	}
-	window.viewer.viewerMode = 'play'
-	try {
-		window.viewer.enterPlayMode()
-	} catch {}
-})
-
-let playReady = false
-for (let i = 0; i < 30; i++) {
-	await new Promise(r => setTimeout(r, 1000))
-	const s = await page.evaluate(() => ({
-		hasPlayer: !!window.viewer?.player,
-		stats: document.getElementById('stats')?.innerText ?? '',
-	}))
-	if (s.hasPlayer && s.stats.includes('PLAY')) {
-		playReady = true
-		console.log(`[bench] PLAY ready after ${(i + 1) * 1000}ms`)
-		break
-	}
-	if (i % 3 === 0) console.log(`[bench] waiting PLAY ${i}s hasPlayer=${s.hasPlayer}`)
-}
-if (!playReady) console.log('[bench] PLAY not confirmed, continuing')
-
-await new Promise(r => setTimeout(r, warmup))
-
-const glInfo = await page.evaluate(() => {
-	try {
-		const c = document.createElement('canvas')
-		const gl = c.getContext('webgl2') || c.getContext('webgl') || c.getContext('experimental-webgl')
-		if (!gl) return { error: 'no gl' }
-		const dbg = gl.getExtension('WEBGL_debug_renderer_info')
-		return {
-			vendor: dbg ? gl.getParameter(dbg.UNMASKED_VENDOR_WEBGL) : '?',
-			renderer: dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : '?',
-			version: gl.getParameter(gl.VERSION),
-		}
-	} catch (e) {
-		return { error: e.message }
+		hasEmu: !!emu,
+		emuRunning: emu ? (emu.isMock ? true : emu.api?.isRunning?.() === 1) : false,
+		emuMock: !!emu?.isMock,
+		gameName: v.table?.data?.gameName ?? v.table?.info?.TableName ?? null,
+		gl: { vendor: glVendor, renderer: glRenderer, version: glVersion },
+		isolation: {
+			hasSAB: typeof SharedArrayBuffer !== 'undefined',
+			isolated: typeof crossOriginIsolated !== 'undefined' ? crossOriginIsolated : false,
+			waitAsync: typeof Atomics !== 'undefined' && typeof Atomics.waitAsync === 'function',
+			threaded: !!v._physicsWorker || !!v._physicsSab,
+		},
 	}
 })
-console.log('[bench] GL', glInfo)
-if (gpu && glInfo.renderer?.includes('SwiftShader')) console.warn('[bench] warning: requested gpu but got SwiftShader')
-if (!gpu && glInfo.renderer?.includes('Vulkan') && !glInfo.renderer?.includes('SwiftShader')) {
-	console.warn('[bench] warning: got Vulkan without --gpu flag')
-}
 
-if (url.includes('walking_dead')) {
-	console.log('[bench] waiting for streaming textures…')
-	let done = false
-	for (let i = 0; i < 60; i++) {
-		const txt = await page.evaluate(() => document.getElementById('log')?.innerText ?? '')
-		if (txt.includes('[stream] Done') || txt.includes('Visuals ready')) {
-			console.log(`[bench] stream done after ${i}s`)
-			done = true
-			break
+const totalLoadMs = Math.round(performance.now() - tNavStart)
+console.log(`[bench] === Total Load Journey: ${totalLoadMs}ms ===\n`)
+
+// === 2. PLAY JOURNEY (User Simulation & Active Performance) ===
+console.log(`[bench] === 2. PLAY JOURNEY (User Simulation) ===`)
+
+const journeyResult = await page.evaluate(
+	async opt => {
+		const v = window.viewer
+		const p = v?.player
+		const r = v?.renderer
+		const play = {
+			coin: { pass: false, responseMs: 0 },
+			start: { pass: false, responseMs: 0 },
+			plunge: { pass: false, responseMs: 0 },
+			flippers: { flipsCount: 0, leftAngleDelta: 0, rightAngleDelta: 0 },
+			nudge: { pass: false, mag: 0 },
+			ballsInPlay: 0,
 		}
-		if (i % 5 === 0) console.log(`[bench] streaming wait ${i}s`)
-		await new Promise(r => setTimeout(r, 1000))
-	}
-	if (!done) console.log('[bench] stream not done after 60s')
-	await new Promise(r => setTimeout(r, 500))
-}
 
-console.log('[bench] waiting for PinMAME…')
-for (let i = 0; i < 20; i++) {
-	const s = await page.evaluate(() => {
-		try {
-			const emu = window.viewer?.player?.getPhysics?.()?.emu
-			if (!emu) return { hasEmu: false, running: false }
-			return { hasEmu: true, running: emu.isMock ? true : emu.api?.isRunning?.() === 1, mock: !!emu.isMock }
-		} catch {
-			return { hasEmu: false, running: false }
+		if (opt.interactive && p) {
+			// Step 1: Insert Coin (Key 5)
+			const t0 = performance.now()
+			p.onKeyDown({ code: 'Digit5', key: '5', ts: Date.now() })
+			await new Promise(res => setTimeout(res, 180))
+			p.onKeyUp({ code: 'Digit5', key: '5', ts: Date.now() })
+			play.coin = { pass: true, responseMs: Math.round(performance.now() - t0) }
+
+			// Step 2: Press Start (Key 1)
+			const t1 = performance.now()
+			p.onKeyDown({ code: 'Digit1', key: '1', ts: Date.now() })
+			await new Promise(res => setTimeout(res, 180))
+			p.onKeyUp({ code: 'Digit1', key: '1', ts: Date.now() })
+			play.start = { pass: true, responseMs: Math.round(performance.now() - t1) }
+
+			// Step 3: Plunge ball (Key Enter)
+			await new Promise(res => setTimeout(res, 400))
+			const t2 = performance.now()
+			p.onKeyDown({ code: 'Enter', key: 'Enter', ts: Date.now() })
+			await new Promise(res => setTimeout(res, 500))
+			p.onKeyUp({ code: 'Enter', key: 'Enter', ts: Date.now() })
+			play.plunge = { pass: true, responseMs: Math.round(performance.now() - t2) }
+
+			// Step 4: Ensure ball in play if needed
+			const ballCount = p.balls?.length ?? 0
+			if ((opt.balls > 0 || ballCount === 0) && opt.balls !== 0) {
+				const count = opt.balls > 0 ? opt.balls : 1
+				const kicker = Object.values(v.table?.kickers ?? {})[0]
+				if (kicker?.getApi?.()?.CreateBall) {
+					for (let i = 0; i < count; i++) kicker.getApi().CreateBall()
+				} else if (kicker?.createBall) {
+					for (let i = 0; i < count; i++) kicker.createBall()
+				}
+			}
+
+			// Step 5: Test flippers & nudge
+			const lf = v.table?.flippers?.LeftFlipper || Object.values(v.table?.flippers ?? {})[0]
+			const rf = v.table?.flippers?.RightFlipper || Object.values(v.table?.flippers ?? {})[1]
+			if (lf) {
+				const b = lf.getState().angle
+				p.onKeyDown({ code: 'ShiftLeft', key: 'Shift', ts: Date.now(), location: 1 })
+				await new Promise(res => setTimeout(res, 150))
+				play.flippers.leftAngleDelta = +Math.abs(lf.getState().angle - b).toFixed(3)
+				p.onKeyUp({ code: 'ShiftLeft', key: 'Shift', ts: Date.now(), location: 1 })
+			}
+			if (rf) {
+				const b = rf.getState().angle
+				p.onKeyDown({ code: 'ShiftRight', key: 'Shift', ts: Date.now(), location: 2 })
+				await new Promise(res => setTimeout(res, 150))
+				play.flippers.rightAngleDelta = +Math.abs(rf.getState().angle - b).toFixed(3)
+				p.onKeyUp({ code: 'ShiftRight', key: 'Shift', ts: Date.now(), location: 2 })
+			}
+			try {
+				p.nudge(75, 2.5)
+				const acc = p.getPhysics()?.getCabinetAcceleration?.() ?? { x: 0, y: 0 }
+				play.nudge = { pass: true, mag: +Math.hypot(acc.x, acc.y).toFixed(3) }
+			} catch {
+				play.nudge = { pass: false, mag: 0 }
+			}
 		}
-	})
-	if (!s.hasEmu || s.running) {
-		console.log(
-			`[bench] PinMAME ${s.hasEmu ? (s.mock ? 'mock' : s.running ? 'running' : 'loading') : 'none'} after ${i}s`,
-		)
-		break
-	}
-	if (i % 5 === 0) console.log(`[bench] PinMAME wait ${i}s`)
-	await new Promise(r => setTimeout(r, 1000))
-}
 
-const isolation = await page.evaluate(() => ({
-	hasSAB: typeof SharedArrayBuffer !== 'undefined',
-	isolated: typeof crossOriginIsolated !== 'undefined' ? crossOriginIsolated : false,
-	waitAsync: typeof Atomics !== 'undefined' && typeof Atomics.waitAsync === 'function',
-	threaded: !!globalThis.viewer?._physicsWorker || !!globalThis.viewer?._physicsSab,
-}))
-console.log('[bench] isolation', isolation)
-if (!isolation.hasSAB || !isolation.isolated)
-	console.warn('[bench] fallback: SAB unavailable or not isolated — threaded disabled')
-else if (!isolation.waitAsync) console.warn('[bench] fallback: Atomics.waitAsync unavailable')
-else console.log('[bench] threaded capable')
-await page.evaluate(() => window.viewer?.renderer?.render?.(window.viewer.scene, window.viewer.camera))
-const postPlayMetrics = await page.evaluate(collectMetrics)
-console.log('[bench] post-play metrics', postPlayMetrics)
+		await new Promise(res => setTimeout(res, opt.warmup))
 
-if (balls > 0) {
-	await page.evaluate(async n => {
-		const p = window.viewer?.player
-		if (!p) return
-		const w = p.table?.data?.width ?? 1000
-		const h = p.table?.data?.height ?? 2000
-		const T = window.THREE
-		const proto = T.Vector3.prototype
-		if (!proto.subAndRelease)
-			proto.subAndRelease = function (o) {
-				this.sub(o)
-				try {
-					o.release?.()
-				} catch {}
-				return this
-			}
-		if (!proto.addAndRelease)
-			proto.addAndRelease = function (o) {
-				this.add(o)
-				try {
-					o.release?.()
-				} catch {}
-				return this
-			}
-		if (!proto.dotAndRelease)
-			proto.dotAndRelease = function (o) {
-				const d = this.dot(o)
-				try {
-					o.release?.()
-				} catch {}
-				return d
-			}
-		if (!proto.setAndRelease)
-			proto.setAndRelease = function (o) {
-				this.set(o.x, o.y, o.z)
-				try {
-					o.release?.()
-				} catch {}
-				return this
-			}
-		if (!proto.normalizeSafe)
-			proto.normalizeSafe = function () {
-				return this.lengthSq() > 0 ? this.normalize() : this
-			}
-		if (!proto.setZero)
-			proto.setZero = function () {
-				return this.set(0, 0, 0)
-			}
-		if (!proto.release) proto.release = () => {}
-		if (!proto.applyMatrix2D)
-			proto.applyMatrix2D = function (m) {
-				const e = m.elements
-				return this.set(
-					e[0] * this.x + e[3] * this.y + e[6] * this.z,
-					e[1] * this.x + e[4] * this.y + e[7] * this.z,
-					e[2] * this.x + e[5] * this.y + e[8] * this.z,
-				)
-			}
-		if (!proto.cloneAndRelease)
-			proto.cloneAndRelease = function () {
-				return this.clone()
-			}
-		for (let i = 0; i < n; i++) {
-			p.createBall(
-				{
-					getBallCreationPosition: () =>
-						(() => {
-							try {
-								const k = Object.values(p.table?.kickers ?? {})[0]
-								const d = k?.data
-								if (d) {
-									const x = d.center?.x ?? d.position?.x ?? d.vCenter?.x
-									const y = d.center?.y ?? d.position?.y ?? d.vCenter?.y
-									if (Number.isFinite(x) && Number.isFinite(y)) return new T.Vector3(x, y, 45)
-								}
-							} catch {}
-							return new T.Vector3(w * 0.5 + (Math.random() - 0.5) * 40, h * 0.85, 30)
-						})(),
-					getBallCreationVelocity: () =>
-						new T.Vector3((Math.random() - 0.5) * 80, -480 - Math.random() * 120, 40),
-					onBallCreated: () => {},
-				},
-				25,
-				1,
-			)
-		}
-	}, balls)
-	await new Promise(r => setTimeout(r, 500))
-}
-
-const result = await page.evaluate(
-	async (d, doProfile) => {
-		const viewer = window.viewer
-		const player = viewer.player
-		const renderer = viewer.renderer
+		// === 3. ACTIVE PROFILING LOOP ===
 		const physicsMs = []
 		const animMs = []
 		const renderMs = []
 		const frameMs = []
 		let renders = 0
+		let flipsCount = 0
 		const start = performance.now()
 		let last = start
 		let startFrame = 0
 		try {
-			startFrame = renderer.info?.render?.frame ?? 0
+			startFrame = r?.info?.render?.frame ?? 0
 		} catch {}
 
-		let origPhys
-		let origAnim
-		if (doProfile && player) {
-			try {
-				origPhys = player.updatePhysics.bind(player)
-				origAnim = player.updateAnimations.bind(player)
-				player.updatePhysics = (...a) => {
-					const t = performance.now()
-					const r = origPhys(...a)
-					physicsMs.push(performance.now() - t)
-					return r
-				}
-				player.updateAnimations = (...a) => {
-					const t = performance.now()
-					const r = origAnim(...a)
-					animMs.push(performance.now() - t)
-					return r
-				}
-			} catch {}
-		}
-		if (renderer) {
-			try {
-				const origRender = renderer.render.bind(renderer)
-				renderer.render = (...a) => {
-					renders++
-					const t = performance.now()
-					const r = origRender(...a)
-					if (doProfile) renderMs.push(performance.now() - t)
-					return r
-				}
-			} catch {}
+		if (opt.profile && p) {
+			const origPhys = p.updatePhysics.bind(p)
+			const origAnim = p.updateAnimations.bind(p)
+			p.updatePhysics = (...a) => {
+				const t = performance.now()
+				const res = origPhys(...a)
+				physicsMs.push(performance.now() - t)
+				return res
+			}
+			p.updateAnimations = (...a) => {
+				const t = performance.now()
+				const res = origAnim(...a)
+				animMs.push(performance.now() - t)
+				return res
+			}
 		}
 
-		await new Promise(r => {
-			const id = setInterval(() => {
-				if (performance.now() - start >= d) {
-					clearInterval(id)
-					r(null)
+		const targetRenderer = v?.composer ?? r
+		if (targetRenderer) {
+			const origRender = targetRenderer.render.bind(targetRenderer)
+			targetRenderer.render = (...a) => {
+				renders++
+				const t = performance.now()
+				const res = origRender(...a)
+				if (opt.profile) renderMs.push(performance.now() - t)
+				return res
+			}
+		}
+
+		let actorTimer = null
+		if (opt.interactive && p) {
+			let cycle = 0
+			actorTimer = setInterval(() => {
+				const now = Date.now()
+				cycle++
+				const code = cycle % 2 === 1 ? 'ShiftLeft' : 'ShiftRight'
+				const loc = cycle % 2 === 1 ? 1 : 2
+				p.onKeyDown({ code, key: 'Shift', ts: now, location: loc })
+				setTimeout(() => p.onKeyUp({ code, key: 'Shift', ts: Date.now(), location: loc }), 160)
+				flipsCount++
+				if (cycle % 4 === 0) {
+					try {
+						p.nudge(45, 1.8)
+					} catch {}
 				}
-			}, 50)
+			}, 500)
+		}
+
+		await new Promise(resolve => {
+			const id = setInterval(() => {
+				if (performance.now() - start >= opt.duration) {
+					clearInterval(id)
+					if (actorTimer) clearInterval(actorTimer)
+					resolve(null)
+				}
+			}, 30)
 			function raf() {
 				const now = performance.now()
-				if (now - start < d) {
+				if (now - start < opt.duration) {
 					frameMs.push(now - last)
 					last = now
 					requestAnimationFrame(raf)
@@ -390,9 +370,8 @@ const result = await page.evaluate(
 		function stats(arr) {
 			if (!arr.length) return null
 			const s = [...arr].sort((a, b) => a - b)
-			const avg = s.reduce((a, b) => a + b, 0) / s.length
 			return {
-				avg: +avg.toFixed(2),
+				avg: +(s.reduce((a, b) => a + b, 0) / s.length).toFixed(2),
 				p50: +s[Math.floor(s.length * 0.5)].toFixed(2),
 				p95: +s[Math.floor(s.length * 0.95)].toFixed(2),
 				p99: +s[Math.floor(s.length * 0.99)].toFixed(2),
@@ -404,38 +383,38 @@ const result = await page.evaluate(
 
 		let tris = 0
 		try {
-			viewer.tableGroup.traverse(o => {
+			v?.tableGroup?.traverse(o => {
 				if (o.isMesh && o.geometry?.attributes?.position) tris += o.geometry.attributes.position.count / 3
 			})
 		} catch {}
-		const draws = renderer.info.render.calls
-		let endFrame = 0
-		try {
-			endFrame = renderer.info?.render?.frame ?? 0
-		} catch {}
-		const frameDelta = endFrame - startFrame
-		if (!renders && frameDelta) renders = frameDelta
-		const fpsByRender = renders ? Math.round((renders * 1000) / elapsed) : null
-		const fpsByRaf = frameMs.length ? Math.round((frameMs.length * 1000) / elapsed) : null
+		const endFrame = r?.info?.render?.frame ?? 0
+		const delta = endFrame - startFrame
+		if (!renders && delta) renders = delta
+		const fpsRender = renders ? Math.round((renders * 1000) / elapsed) : null
+		const fpsRaf = frameMs.length ? Math.round((frameMs.length * 1000) / elapsed) : null
+
+		play.flippers.flipsCount = flipsCount
+		play.ballsInPlay = p?.balls?.length ?? 0
+
 		return {
-			frames: renders,
-			rafFrames: frameMs.length,
-			fps: fpsByRender ?? fpsByRaf,
-			fpsRender: fpsByRender,
-			fpsRaf: fpsByRaf,
-			elapsed: Math.round(elapsed),
-			frameStats: stats(frameMs),
-			physicsStats: stats(physicsMs),
-			animStats: stats(animMs),
-			renderStats: stats(renderMs),
-			draws,
-			tris: Math.round(tris),
-			balls: player?.balls?.length ?? 0,
-			heap: performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) : null,
+			play,
+			performance: {
+				durationMs: Math.round(elapsed),
+				fps: fpsRender ?? fpsRaf,
+				fpsRender,
+				fpsRaf,
+				draws: r?.info?.render?.calls ?? 0,
+				tris: Math.round(tris),
+				jankFrames: frameMs.filter(f => f > 33.3).length,
+				heapMb: performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) : null,
+				frameStats: stats(frameMs),
+				physicsStats: stats(physicsMs),
+				animStats: stats(animMs),
+				renderStats: stats(renderMs),
+			},
 		}
 	},
-	duration,
-	profile,
+	{ duration, warmup, balls, interactive, profile },
 )
 
 const parsed = {}
@@ -450,16 +429,32 @@ for (const l of logs) {
 
 const payload = {
 	url,
-	vpx: vpxArg ?? candidates.find(exists) ?? DEFAULT_EMPTY,
-	balls,
-	duration,
-	warmup,
-	readyMs,
-	glInfo,
-	preMetrics,
-	postPlayMetrics,
-	result,
-	parsed,
+	vpx: vpxArg ?? vpxCandidates.find(exists) ?? DEFAULT_EMPTY,
+	rom: romArg ?? (url.includes('rom=') ? decodeURIComponent(url.match(/rom=([^&]+)/)?.[1] ?? '') : null),
+	loadJourney: {
+		navMs,
+		readyMs,
+		parseMs: parsed.parseMs ?? null,
+		sceneGenMs: parsed.sceneGenMs ?? null,
+		streamMs,
+		totalLoadMs,
+		textures: parsed.texScene ?? null,
+		emu: {
+			hasEmu: loadState?.hasEmu ?? false,
+			running: loadState?.emuRunning ?? false,
+			mock: loadState?.emuMock ?? false,
+			gameName: loadState?.gameName ?? null,
+		},
+		isolation: loadState?.isolation ?? null,
+	},
+	playJourney: journeyResult.play,
+	performance: journeyResult.performance,
+	glInfo: loadState?.gl ?? null,
+	metrics: {
+		tris: loadState?.tris ?? 0,
+		meshes: loadState?.meshes ?? 0,
+		draws: loadState?.draws ?? 0,
+	},
 	at: new Date().toISOString(),
 }
 
@@ -467,7 +462,9 @@ if (outPath) {
 	fs.writeFileSync(outPath, JSON.stringify(payload, null, 2))
 	console.log(`[bench] wrote ${outPath}`)
 }
+console.log(`\n[bench] === BENCHMARK REPORT ===`)
 console.log(JSON.stringify(payload, null, 2))
 
 await browser.close()
 vite?.kill()
+process.exit(0)

@@ -1,4 +1,4 @@
-import { execSync, spawn } from 'node:child_process'
+import { spawn } from 'node:child_process'
 import { readdirSync, rmSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 
@@ -15,10 +15,8 @@ export async function loadPuppeteer() {
 const _browsers = new Set()
 const _vites = new Set()
 let _cleanupRegistered = false
+
 function killStaleChromeSync() {
-	try {
-		execSync('pkill -9 -f "chrome.*headless.*puppeteer" 2>/dev/null || true', { timeout: 2000, stdio: 'ignore' })
-	} catch {}
 	try {
 		const tmp = '/tmp'
 		for (const name of readdirSync(tmp)) {
@@ -26,16 +24,12 @@ function killStaleChromeSync() {
 			const full = join(tmp, name)
 			try {
 				const st = statSync(full)
-				if (Date.now() - st.mtimeMs > 60 * 1000) rmSync(full, { recursive: true, force: true })
+				if (Date.now() - st.mtimeMs > 600 * 1000) rmSync(full, { recursive: true, force: true })
 			} catch {}
 		}
 	} catch {}
 }
-function killStaleViteSync() {
-	try {
-		execSync('pkill -9 -f "vite.*--port" 2>/dev/null || true', { timeout: 2000, stdio: 'ignore' })
-	} catch {}
-}
+
 function registerCleanup() {
 	if (_cleanupRegistered) return
 	_cleanupRegistered = true
@@ -69,25 +63,6 @@ function registerCleanup() {
 			} catch {}
 		}
 		_vites.clear()
-		try {
-			execSync('pkill -9 -f "chrome.*headless.*puppeteer" 2>/dev/null || true', {
-				timeout: 2000,
-				stdio: 'ignore',
-			})
-		} catch {}
-		try {
-			execSync('pkill -9 -f "vite.*--port" 2>/dev/null || true', { timeout: 2000, stdio: 'ignore' })
-		} catch {}
-		try {
-			const tmp = '/tmp'
-			for (const name of readdirSync(tmp)) {
-				if (!name.startsWith('puppeteer_dev_chrome')) continue
-				const full = join(tmp, name)
-				try {
-					rmSync(full, { recursive: true, force: true })
-				} catch {}
-			}
-		} catch {}
 	}
 	process.once('exit', _cleanup)
 	process.once('beforeExit', _cleanup)
@@ -113,42 +88,18 @@ function registerCleanup() {
 		_cleanup()
 		process.exit(1)
 	})
-	setInterval(() => {
-		if (_browsers.size === 0) {
-			try {
-				execSync('pkill -9 -f "chrome.*headless.*puppeteer" 2>/dev/null || true', {
-					timeout: 2000,
-					stdio: 'ignore',
-				})
-			} catch {}
-			try {
-				const tmp = '/tmp'
-				for (const name of readdirSync(tmp)) {
-					if (!name.startsWith('puppeteer_dev_chrome')) continue
-					const full = join(tmp, name)
-					try {
-						const st = statSync(full)
-						if (Date.now() - st.mtimeMs > 60 * 1000) rmSync(full, { recursive: true, force: true })
-					} catch {}
-				}
-			} catch {}
-		}
-		if (_vites.size === 0) {
-			try {
-				execSync('pkill -9 -f "vite.*--port" 2>/dev/null || true', { timeout: 2000, stdio: 'ignore' })
-			} catch {}
-		}
-	}, 30000).unref?.()
 }
+
 if (typeof process !== 'undefined') {
 	registerCleanup()
 }
+
 export async function launchBrowser(puppeteer, opts = {}) {
 	registerCleanup()
 	try {
 		killStaleChromeSync()
 	} catch {}
-	const { gpu, ...rest } = opts
+	const { gpu, timeout, ...rest } = opts
 	const gpuArgs = gpu
 		? gpu === 'gl'
 			? ['--enable-gpu', '--use-gl=angle', '--use-angle=gl']
@@ -160,6 +111,7 @@ export async function launchBrowser(puppeteer, opts = {}) {
 		args: [
 			'--no-sandbox',
 			'--disable-dev-shm-usage',
+			'--js-flags=--max-old-space-size=4096',
 			...gpuArgs,
 			'--window-size=1280,900',
 			'--disable-gpu-sandbox',
@@ -172,6 +124,7 @@ export async function launchBrowser(puppeteer, opts = {}) {
 	})
 	_browsers.add(browser)
 	const pid = browser.process()?.pid
+	const timeoutMs = timeout ?? 300_000
 	const autoKill = setTimeout(() => {
 		try {
 			browser.close().catch(() => {})
@@ -182,13 +135,7 @@ export async function launchBrowser(puppeteer, opts = {}) {
 		try {
 			browser.process()?.kill('SIGKILL')
 		} catch {}
-		try {
-			execSync('pkill -9 -f "chrome.*headless.*puppeteer" 2>/dev/null || true', {
-				timeout: 2000,
-				stdio: 'ignore',
-			})
-		} catch {}
-	}, 90_000)
+	}, timeoutMs)
 	if (autoKill.unref) autoKill.unref()
 	const origClose = browser.close.bind(browser)
 	browser.close = async (...a) => {
@@ -204,22 +151,6 @@ export async function launchBrowser(puppeteer, opts = {}) {
 			} catch {}
 			try {
 				browser.process()?.kill?.('SIGKILL')
-			} catch {}
-			try {
-				execSync('pkill -9 -f "chrome.*headless.*puppeteer" 2>/dev/null || true', {
-					timeout: 2000,
-					stdio: 'ignore',
-				})
-			} catch {}
-			try {
-				const tmp = '/tmp'
-				for (const name of readdirSync(tmp)) {
-					if (!name.startsWith('puppeteer_dev_chrome')) continue
-					const full = join(tmp, name)
-					try {
-						rmSync(full, { recursive: true, force: true })
-					} catch {}
-				}
 			} catch {}
 		}
 	}
@@ -266,57 +197,24 @@ export async function ensureVite(
 		}
 		if (attempt < 2) {
 			console.log(`[${label}] vite not ready, retry ${attempt + 1}/3…`)
-			await new Promise(r => setTimeout(r, 800))
+			await new Promise(r => setTimeout(r, 400))
 		}
 	}
 	console.log(`[${label}] starting vite in ${cwd}…`)
-	const proc = spawn('npx', ['vite', '--host', '--port', '3000', '--clearScreen', 'false'], {
+	const proc = spawn('npx', ['vite', '--port', '3000'], {
 		cwd,
-		stdio: ['ignore', 'pipe', 'pipe'],
+		stdio: 'pipe',
+		shell: true,
 	})
 	_vites.add(proc)
+	proc.stdout?.on('data', d => {
+		const s = d.toString()
+		if (s.includes('ready') || s.includes('Local:')) console.log(`[${label}]`, s.trim())
+	})
+	proc.stderr?.on('data', d => console.error(`[${label}:err]`, d.toString().trim()))
 	proc.once('exit', () => _vites.delete(proc))
-	const viteAutoKill = setTimeout(() => {
-		try {
-			proc.kill('SIGTERM')
-		} catch {}
-		try {
-			proc.kill('SIGKILL')
-		} catch {}
-		try {
-			process.kill(proc.pid, 'SIGKILL')
-		} catch {}
-		_vites.delete(proc)
-	}, 120_000)
-	if (viteAutoKill.unref) viteAutoKill.unref()
-	const origKill = proc.kill.bind(proc)
-	proc.kill = (...a) => {
-		clearTimeout(viteAutoKill)
-		_vites.delete(proc)
-		return origKill(...a)
-	}
-	if (typeof process !== 'undefined') {
-		const _kill = () => {
-			try {
-				proc.kill('SIGTERM')
-			} catch {}
-			try {
-				proc.kill('SIGKILL')
-			} catch {}
-			try {
-				process.kill(proc.pid, 'SIGKILL')
-			} catch {}
-			_vites.delete(proc)
-		}
-		process.once('exit', _kill)
-		process.once('SIGINT', _kill)
-		process.once('SIGTERM', _kill)
-		process.once('SIGHUP', _kill)
-	}
-	proc.stdout.on('data', d => process.stdout.write(`[${label}] ${d}`))
-	proc.stderr.on('data', d => process.stderr.write(`[${label}] ${d}`))
-	for (let i = 0; i < 30; i++) {
-		await new Promise(r => setTimeout(r, 1000))
+	for (let i = 0; i < 40; i++) {
+		await new Promise(r => setTimeout(r, 250))
 		try {
 			if ((await fetch('http://localhost:3000/', { method: 'HEAD' })).ok) {
 				console.log(`[${label}] vite ready`)
@@ -324,5 +222,5 @@ export async function ensureVite(
 			}
 		} catch {}
 	}
-	throw new Error('vite not ready in 30s')
+	throw new Error(`vite did not become ready within 10s`)
 }
