@@ -4,7 +4,6 @@
 import type { NudgeHandler } from '../physics/cabinet/nudge-handler.js'
 import { type AnimationGate, animationGate } from '../util/animation-gate.js'
 import { EventEmitter } from '../util/event-emitter.js'
-import { logger } from '../util/logger.js'
 import type { Vertex2D, Vertex3D } from '../util/vector.js'
 import type { Ball } from '../vpt/ball/ball.js'
 import type { ItemState } from '../vpt/item-state.js'
@@ -73,22 +72,14 @@ export class Player extends EventEmitter {
 	}
 	public init(scope: Record<string, unknown> = {}): this {
 		this.prepareTable()
-		try {
-			this.runScript(scope, false)
-		} catch (e) {
-			logger().warn('Table script failed %s\n%s', (e as Error).message, (e as Error).stack ?? '')
-		}
+		this.runScript(scope, false)
 		this.finishInit()
 		return this
 	}
 	public async initAsync(scope: Record<string, unknown> = {}): Promise<this> {
 		this.prepareTable()
 		await new Promise(r => setTimeout(r, 0))
-		try {
-			await this.runScript(scope, true)
-		} catch (e) {
-			logger().warn('Table script failed %s\n%s', (e as Error).message, (e as Error).stack ?? '')
-		}
+		await this.runScript(scope, true)
 		this.finishInit()
 		return this
 	}
@@ -162,36 +153,26 @@ export class Player extends EventEmitter {
 	}
 
 	private wrapApis(): void {
-		try {
-			for (const item of this.table.getScriptables() as unknown as Array<{
-				getName(): string
-				getApi(): unknown
-			}>) {
-				const api: any = (item as any).getApi?.()
-				const name = item.getName()
-				const wrapped = this.wrapSingleApi(api, name)
-				if (wrapped !== api) (item as any).api = wrapped
-			}
-		} catch {}
+		for (const item of this.table.getScriptables() as unknown as Array<{
+			getName(): string
+			getApi(): unknown
+		}>) {
+			const api: any = (item as any).getApi?.()
+			const name = item.getName()
+			const wrapped = this.wrapSingleApi(api, name)
+			if (wrapped !== api) (item as any).api = wrapped
+		}
 	}
 
 	private getAnimatables(): Array<{ getName(): string }> {
 		if (this.cachedAnimatables) return this.cachedAnimatables
-		try {
-			this.cachedAnimatables = (this.table as any).getAnimatables?.() ?? []
-		} catch {
-			this.cachedAnimatables = []
-		}
+		this.cachedAnimatables = (this.table as any).getAnimatables?.() ?? []
 		return this.cachedAnimatables!
 	}
 
 	private getMovables(): Array<{ getName(): string }> {
 		if (this.cachedMovables) return this.cachedMovables
-		try {
-			this.cachedMovables = (this.table as any).getMovables?.() ?? []
-		} catch {
-			this.cachedMovables = []
-		}
+		this.cachedMovables = (this.table as any).getMovables?.() ?? []
 		return this.cachedMovables!
 	}
 
@@ -207,9 +188,7 @@ export class Player extends EventEmitter {
 		const it = this.physics.updatePhysics(dTime)
 		for (const b of this.physics.balls) this.markDirty(b.getName())
 		for (const m of this.getMovables()) {
-			try {
-				this.markDirty(m.getName())
-			} catch {}
+			this.markDirty(m.getName())
 		}
 		return it
 	}
@@ -222,12 +201,8 @@ export class Player extends EventEmitter {
 			getAnimation(): { updateAnimation(n: number, t: Table): void }
 			getName(): string
 		}>) {
-			try {
-				a.getAnimation().updateAnimation(timeMs, this.table)
-			} catch {}
-			try {
-				this.markDirty(a.getName())
-			} catch {}
+			a.getAnimation().updateAnimation(timeMs, this.table)
+			this.markDirty(a.getName())
 		}
 	}
 	public popStates(): ChangedStates<ItemState> {
@@ -274,11 +249,9 @@ export class Player extends EventEmitter {
 
 	public createBall(creator: IBallCreationPosition, radius = 25, mass = 1): Ball {
 		const ball = this.physics.createBall(creator, this, radius, mass)
-		try {
-			const api: any = (ball as any).getApi?.()
-			const wrapped = this.wrapSingleApi(api, ball.getName())
-			if (wrapped !== api) (ball as any).api = wrapped
-		} catch {}
+		const api: any = (ball as any).getApi?.()
+		const wrapped = this.wrapSingleApi(api, ball.getName())
+		if (wrapped !== api) (ball as any).api = wrapped
 		this.currentStates[ball.getName()] = ball.getState()
 		this.previousStates[ball.getName()] = ball.getState().clone()
 		this.allStateNames.push(ball.getName())
@@ -326,9 +299,7 @@ export class Player extends EventEmitter {
 	public setEmulator(emu: IEmulator): void {
 		this.physics.emu = emu
 		this.emit('emuStarted')
-		try {
-			this.pinInput.ensureFreePlay()
-		} catch {}
+		this.pinInput.ensureFreePlay()
 	}
 	public hasDmd(): boolean {
 		return !!this.physics.emu?.getDmdDimensions()

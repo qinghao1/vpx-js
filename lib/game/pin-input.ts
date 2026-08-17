@@ -2,7 +2,6 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { NudgeHandler } from '../physics/cabinet/nudge-handler.js'
-import { logger } from '../util/logger.js'
 import type { Vertex2D } from '../util/vector.js'
 import type { Table } from '../vpt/table/table.js'
 import { Event } from './event.js'
@@ -132,15 +131,11 @@ export class PinInput {
 		const emu = this.player.getPhysics().emu
 		if (!emu) return
 		for (const sw of switches) {
-			try {
-				emu.setSwitchInput(sw, true)
-			} catch {}
+			emu.setSwitchInput(sw, true)
 		}
 		setTimeout(() => {
 			for (const sw of switches) {
-				try {
-					emu.setSwitchInput(sw, false)
-				} catch {}
+				emu.setSwitchInput(sw, false)
 			}
 		}, 120)
 	}
@@ -171,14 +166,10 @@ export class PinInput {
 		const direct = this.discoverCoinSwitches().slice(0, 3)
 		for (let i = 0; i < count; i++) {
 			setTimeout(() => {
-				try {
-					this.onKeyDown(key)
-					setTimeout(() => {
-						try {
-							this.onKeyUp(key)
-						} catch {}
-					}, 120)
-				} catch {}
+				this.onKeyDown(key)
+				setTimeout(() => {
+					this.onKeyUp(key)
+				}, 120)
 				this.pulseSwitches(direct)
 			}, i * 250)
 		}
@@ -258,13 +249,9 @@ export class PinInput {
 				if (isLeft && isRightFlipper) continue
 				if (isRight && !isRightFlipper) continue
 			}
-			try {
-				const api = flipper.getApi()
-				if (isDown) api.RotateToEnd()
-				else api.RotateToStart()
-			} catch (err) {
-				logger().warn('flipper sync failed %s', (err as Error).message)
-			}
+			const api = flipper.getApi()
+			if (isDown) api.RotateToEnd()
+			else api.RotateToStart()
 		}
 	}
 
@@ -275,13 +262,9 @@ export class PinInput {
 		}>
 		if (!plungers.length) return
 		for (const plunger of plungers) {
-			try {
-				const api = plunger.getApi()
-				if (isDown) api.PullBack()
-				else api.Fire()
-			} catch (err) {
-				logger().warn('plunger sync failed %s', (err as Error).message)
-			}
+			const api = plunger.getApi()
+			if (isDown) api.PullBack()
+			else api.Fire()
 		}
 	}
 
@@ -322,30 +305,14 @@ export class PinInput {
 				| { getApi(): { CreateBall(): unknown } }
 				| undefined
 			if (plunger) {
-				try {
-					plunger.getApi().CreateBall()
-				} catch (err) {
-					logger().warn('mock trough CreateBall failed %s', (err as Error).message)
-				}
+				plunger.getApi().CreateBall()
 			}
 			return
 		}
 		withBall.sort((a, b) => b.data.center.x - a.data.center.x)
 		const exit = withBall[0] as (typeof withBall)[number]
 		if (!exit) return
-		try {
-			exit.getApi().Kick(TROUGH_KICK_ANGLE, TROUGH_KICK_SPEED)
-		} catch {
-			try {
-				exit.getApi().DestroyBall()
-				const plunger = Object.values(this.table.plungers)[0] as unknown as
-					| { getApi(): { CreateBall(): unknown } }
-					| undefined
-				if (plunger) plunger.getApi().CreateBall()
-			} catch (err) {
-				logger().warn('mock trough fallback failed %s', (err as Error).message)
-			}
-		}
+		exit.getApi().Kick(TROUGH_KICK_ANGLE, TROUGH_KICK_SPEED)
 	}
 
 	private syncCabinet(isDown: boolean, code: number): void {
@@ -357,11 +324,7 @@ export class PinInput {
 		const switches = this.getCabinetSwitches(code)
 		if (!switches) return
 		for (const sw of switches) {
-			try {
-				emu.setSwitchInput(sw, isDown)
-			} catch (err) {
-				logger().warn('cabinet switch %s failed %s', sw, (err as Error).message)
-			}
+			emu.setSwitchInput(sw, isDown)
 		}
 	}
 
