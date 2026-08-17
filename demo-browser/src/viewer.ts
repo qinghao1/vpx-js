@@ -288,8 +288,17 @@ export class Viewer {
 		}
 		renderer.setPixelRatio(getTargetPixelRatio(this.viewerMode))
 		renderer.sortObjects = true
-		renderer.shadowMap.enabled = p.has('shadows') && !isLowQuality()
-		if (renderer.shadowMap.enabled) renderer.shadowMap.type = THREE.PCFSoftShadowMap
+		renderer.shadowMap.enabled = false
+		if (p.has('shadows')) {
+			this.log(
+				`[renderer] shadows disabled for perf (was ${p.get('shadows') || '1'}) — add ?shadows=force to override in viewer mode`,
+				'info',
+			)
+			if (p.get('shadows') === 'force' && !isLowQuality() && this.viewerMode !== 'play') {
+				renderer.shadowMap.enabled = true
+				renderer.shadowMap.type = THREE.PCFSoftShadowMap
+			}
+		}
 		renderer.outputColorSpace = THREE.SRGBColorSpace
 		// vpinball: Renderer.cpp:53 m_toneMapper from TableSettings (typedefs3D.h:56 TM_* enums), :56 m_exposure from Table (0..2, Settings_properties.inl:725), pintable.cpp:2279 defaults TM_REINHARD/exposure 1, Renderer.cpp:2373 fb_*tonemap
 		// Keep exposure and emissionScale separate (Renderer.cpp:56 m_exposure, :398 m_emissionScale). EmissionScale modulates baked/light, not tonemap.
@@ -678,6 +687,7 @@ export class Viewer {
 		return true
 	}
 	enterPlayMode() {
+		if (this.renderer) this.renderer.shadowMap.enabled = false
 		if (this.controls) this.controls.enabled = false
 		this._ensurePhysicsWorker()
 		if (this.tableGroup) hideCabFlippers(this.tableGroup)
