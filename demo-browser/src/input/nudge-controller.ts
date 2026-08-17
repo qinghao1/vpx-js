@@ -71,15 +71,19 @@ function attachNudgeHost(host: InputHost, signal: AbortSignal): void {
 		trigger((a.x ?? 0) > 0 ? 285 : 75, 3.0)
 	}
 
-	if (!('requestPermission' in (DeviceMotionEvent as any))) {
+	const hasMotion = typeof DeviceMotionEvent !== 'undefined'
+	const needsPermission = hasMotion && 'requestPermission' in (DeviceMotionEvent as any)
+	if (hasMotion && !needsPermission) {
 		window.addEventListener('devicemotion', onMotion as any, { signal } as any)
-	} else if (host.enableMotionButton) {
+	} else if (needsPermission && host.enableMotionButton) {
 		const btn = host.enableMotionButton
 		btn.hidden = false
 		btn.onclick = async () => {
 			const granted = host.requestMotionPermission
 				? await host.requestMotionPermission()
-				: (await (DeviceMotionEvent as any).requestPermission()) === 'granted'
+				: typeof DeviceMotionEvent !== 'undefined' &&
+					'requestPermission' in (DeviceMotionEvent as any) &&
+					(await (DeviceMotionEvent as any).requestPermission()) === 'granted'
 			if (granted) {
 				window.addEventListener('devicemotion', onMotion as any, { signal } as any)
 				btn.hidden = true
