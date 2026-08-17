@@ -68,64 +68,9 @@ import {
 	resolveVpxCandidates,
 } from './utils.js'
 
-let _prerenderedBackground: THREE.Texture | THREE.Color | null = null
-function getPrerenderedBackground(): THREE.Texture | THREE.Color {
-	if (_prerenderedBackground) return _prerenderedBackground
-	try {
-		if (typeof document === 'undefined') return (_prerenderedBackground = new THREE.Color(0x1a2335))
-		const W = 1024
-		const H = 1024
-		const canvas = document.createElement('canvas')
-		canvas.width = W
-		canvas.height = H
-		const ctx = canvas.getContext('2d')
-		if (!ctx) return (_prerenderedBackground = new THREE.Color(0x1a2335))
-		ctx.fillStyle = '#0f141e'
-		ctx.fillRect(0, 0, W, H)
-		const horizon = H * 0.52
-		const sky = ctx.createLinearGradient(0, 0, 0, horizon)
-		sky.addColorStop(0, '#111a2a')
-		sky.addColorStop(0.55, '#1a2335')
-		sky.addColorStop(1, '#232d42')
-		ctx.fillStyle = sky
-		ctx.fillRect(0, 0, W, horizon)
-		const floor = ctx.createLinearGradient(0, horizon, 0, H)
-		floor.addColorStop(0, '#232d42')
-		floor.addColorStop(0.28, '#1c2335')
-		floor.addColorStop(1, '#0f141e')
-		ctx.fillStyle = floor
-		ctx.fillRect(0, horizon, W, H - horizon)
-		ctx.fillStyle = 'rgba(90,110,150,0.04)'
-		ctx.fillRect(0, horizon - 1, W, 36)
-		ctx.strokeStyle = 'rgba(90,110,150,0.09)'
-		ctx.lineWidth = 1
-		for (let i = -3; i <= 3; i++) {
-			ctx.beginPath()
-			ctx.moveTo(W * 0.5 + i * 90, horizon)
-			ctx.lineTo(W * 0.5 + i * 420, H)
-			ctx.stroke()
-		}
-		for (let y = horizon + 36; y < H; y += 72) {
-			const t = (y - horizon) / (H - horizon)
-			const w = W * (0.08 + t * 0.92)
-			ctx.beginPath()
-			ctx.moveTo(W * 0.5 - w * 0.5, y)
-			ctx.lineTo(W * 0.5 + w * 0.5, y)
-			ctx.stroke()
-		}
-		const vg = ctx.createRadialGradient(W * 0.5, H * 0.5, 0, W * 0.5, H * 0.5, 760)
-		vg.addColorStop(0, 'rgba(0,0,0,0)')
-		vg.addColorStop(0.68, 'rgba(0,0,0,0.18)')
-		vg.addColorStop(1, 'rgba(0,0,0,0.42)')
-		ctx.fillStyle = vg
-		ctx.fillRect(0, 0, W, H)
-		const tex = new THREE.CanvasTexture(canvas)
-		tex.colorSpace = THREE.SRGBColorSpace
-		tex.needsUpdate = true
-		return (_prerenderedBackground = tex)
-	} catch {
-		return (_prerenderedBackground = new THREE.Color(0x1a2335))
-	}
+const BACKGROUND = new THREE.Color(0x121a2b)
+function getPrerenderedBackground(): THREE.Color {
+	return BACKGROUND
 }
 
 function syncRoom(
@@ -146,7 +91,7 @@ function syncRoom(
 			hasVr = true
 	})
 	const room = ensureProceduralRoom(scene, center, size, { hasVr })
-	scene.background = room ? (null as any) : (getPrerenderedBackground() as any)
+	scene.background = getPrerenderedBackground() as any
 	return room
 }
 
