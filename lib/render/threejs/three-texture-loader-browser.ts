@@ -23,6 +23,7 @@ import {
 import { exrCacheKey, idbGet, idbSet } from '../../util/idb-cache.js'
 import { _resetQualityCache, getEffectiveCaps, isLowQuality, isPlayMode, QUALITY_CAPS } from '../../util/quality.js'
 import type { ITextureLoader } from '../irender-api.js'
+import { decodeInWorker, hasImageWorker } from './image-worker-pool.js'
 
 const imageMap: Record<string, string> = {
 	bumperbase: new URL('../../../res/maps/bumperbase.png', import.meta.url).href,
@@ -193,14 +194,14 @@ function getWorker(): Worker | null {
 	return worker
 }
 
-function parseWorker(buffer: ArrayBuffer, kind: 'exr' | 'hdr'): Promise<any> {
+function parseWorker(buffer: ArrayBuffer, kind: 'exr' | 'hdr', max?: number, name?: string): Promise<any> {
 	const w = getWorker()
 	if (!w) return Promise.reject(new Error('no worker'))
 	const id = ++seq
 	return new Promise((resolve, reject) => {
 		pending.set(id, { resolve, reject })
 		try {
-			w.postMessage({ id, buffer, type: kind }, [buffer] as any)
+			w.postMessage({ id, buffer, type: kind, max, name }, [buffer] as any)
 		} catch (e) {
 			pending.delete(id)
 			reject(e)
@@ -212,6 +213,22 @@ function parseWorker(buffer: ArrayBuffer, kind: 'exr' | 'hdr'): Promise<any> {
 			}
 		}, 30000)
 	})
+}
+
+async function loadRegularWorker(name: string, mime: string, data: Uint8Array): Promise<ThreeTexture | null> {
+	const max = effectiveMax(false, name)
+	try {
+		const bitmap: any = await decodeInWorker(data, mime, max, name)
+		const tex: any = new Texture(bitmap as any)
+		tex.colorSpace = SRGBColorSpace
+		tex.flipY = false
+		tex.needsUpdate = true
+		tune(tex)
+		tex.name = `texture:${name}`
+		return tex as ThreeTexture
+	} catch {
+		return null
+	}
 }
 
 export class ThreeTextureLoaderBrowser implements ITextureLoader<ThreeTexture> {
@@ -260,9 +277,15 @@ export class ThreeTextureLoaderBrowser implements ITextureLoader<ThreeTexture> {
 		const isHdr = mime === 'image/hdr' || ext === '.hdr'
 		const isExr = mime === 'image/exr' || ext === '.exr'
 		const tooLarge = data.byteLength > 16 * 1024 * 1024
-		if (!isHdr && !isExr && !tooLarge && typeof createImageBitmap !== 'undefined') {
-			const bmp = await tryCreateBitmap(data, mime, name)
-			if (bmp) return bmp
+		if (!isHdr && !isExr && !tooLarge) {
+			if (hasImageWorker()) {
+				const workerTex = await loadRegularWorker(name, mime, data).catch(() => null)
+				if (workerTex) return workerTex
+			}
+			if (typeof createImageBitmap !== 'undefined') {
+				const bmp = await tryCreateBitmap(data, mime, name)
+				if (bmp) return bmp
+			}
 		}
 		if (isHdr || isExr) {
 			const kind = isExr ? ('exr' as const) : ('hdr' as const)
@@ -367,7 +390,8 @@ async function tryCreateBitmap(data: Uint8Array, mime: string, name: string): Pr
 }
 
 async function tryLoadViaWorker(name: string, kind: 'exr' | 'hdr', data: Uint8Array): Promise<ThreeTexture | null> {
-	const key = exrCacheKey(name, data.byteLength, kind)
+	const max = effectiveMax(true, name)
+	const key = exrCacheKey(name, data.byteLength, kind, max)
 	const cached: any = await idbGet(key)
 	if (cached?.width && cached?.data) {
 		return finalize(
@@ -377,7 +401,7 @@ async function tryLoadViaWorker(name: string, kind: 'exr' | 'hdr', data: Uint8Ar
 		)
 	}
 	const buf = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer
-	const parsed: any = await parseWorker(buf.slice(0) as ArrayBuffer, kind)
+	const parsed: any = await parseWorker(buf.slice(0) as ArrayBuffer, kind, max, name)
 	if (parsed?.width && parsed?.data) {
 		idbSet(key, {
 			width: parsed.width,

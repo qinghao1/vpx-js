@@ -52,8 +52,9 @@ export function texCacheKey(name: string, w: number, h: number, mtime = ''): str
 	return `tex:${name.toLowerCase()}:${w}x${h}:${mtime}`
 }
 
-export function exrCacheKey(name: string, byteLength: number, kind: string): string {
-	return `exr:${name.toLowerCase()}:${kind}:${byteLength}`
+export function exrCacheKey(name: string, byteLength: number, kind: string, max?: number): string {
+	const base = `exr:${name.toLowerCase()}:${kind}:${byteLength}`
+	return typeof max === 'number' && max > 0 ? `${base}:${max}` : base
 }
 
 export function vbsCacheKey(vbs: string): string {
