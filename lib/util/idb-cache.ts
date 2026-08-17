@@ -8,8 +8,12 @@ function openDB(): Promise<IDBDatabase> {
 		const req = indexedDB.open(DB_NAME, DB_VERSION)
 		req.onupgradeneeded = () => {
 			const db = req.result
-			db.deleteObjectStore('textures')
-			db.deleteObjectStore(STORE)
+			if (db.objectStoreNames.contains('textures')) {
+				db.deleteObjectStore('textures')
+			}
+			if (db.objectStoreNames.contains(STORE)) {
+				db.deleteObjectStore(STORE)
+			}
 			db.createObjectStore(STORE)
 		}
 		req.onsuccess = () => resolve(req.result)
@@ -25,7 +29,11 @@ export async function idbGet(key: string): Promise<any | undefined> {
 			req.onsuccess = () => resolve(req.result as any)
 			req.onerror = () => reject(req.error)
 		})
-	} catch {
+	} catch (error) {
+		// IDB may be unavailable (private mode, quota, VersionError) or store missing on first open.
+		// Cache is optional — return undefined to indicate miss rather than failing the load.
+		// Expected: DOMException (AbortError, NotFoundError, InvalidStateError, QuotaExceededError) or ReferenceError if indexedDB is undefined.
+		void error
 		return undefined
 	}
 }

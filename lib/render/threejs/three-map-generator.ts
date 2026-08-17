@@ -30,7 +30,7 @@ export class ThreeMapGenerator {
 		logger().info('[ThreeMapGenerator.loadTextures] Pre-loading %s textures..', textures.length)
 		this.setPlayfieldHint(table)
 
-		const concurrency = this.pickConcurrency(textures)
+		const concurrency = this.pickConcurrency()
 		await this.loadConcurrently(textures, table, concurrency, onTexture)
 
 		logger().info(
@@ -53,11 +53,11 @@ export class ThreeMapGenerator {
 		if (loader && 'playfieldMap' in loader) loader.playfieldMap = table.getPlayfieldMap()
 	}
 
-	private pickConcurrency(_textures: Texture[]): number {
+	private pickConcurrency(): number {
 		const cores =
 			(typeof navigator !== 'undefined' && (navigator as any).hardwareConcurrency) ||
 			HARDWARE_CONCURRENCY_FALLBACK
-		return Math.max(1, cores)
+		return Math.max(1, Math.min(cores, 4))
 	}
 
 	private async loadConcurrently(
@@ -74,10 +74,25 @@ export class ThreeMapGenerator {
 				if (i >= textures.length) break
 				const ok = await this.loadOne(textures[i]!, table)
 				onTexture?.(textures[i]!, ok)
-				if (i % 4 === 0) await this.gate.yieldToMain()
+				if (i % 2 === 0) await this.gate.yieldToMain()
 			}
 		})
 		await Promise.all(workers)
+	}
+
+	private clearTextureSource(texture: Texture): void {
+		try {
+			;(texture as any).binary = undefined
+		} catch (error) {
+			// Expected: TypeError if property non-writable or object frozen — best-effort cleanup.
+			void error
+		}
+		try {
+			;(texture as any).pdsBuffer = undefined
+		} catch (error) {
+			// Expected: TypeError if property non-writable or object frozen — best-effort cleanup.
+			void error
+		}
 	}
 
 	private async loadOne(texture: Texture, table: Table): Promise<boolean> {
@@ -85,16 +100,11 @@ export class ThreeMapGenerator {
 			const tex = await texture.loadTexture(this.textureLoader!, table)
 			this.textureCache.set(texture.getName(), tex)
 			progress().details(texture.getName())
-			// generic: free raw source after GPU upload to keep peak memory low for any table
-			try {
-				;(texture as any).binary = undefined
-			} catch {}
-			try {
-				;(texture as any).pdsBuffer = undefined
-			} catch {}
+			this.clearTextureSource(texture)
 			return true
-		} catch (err) {
-			const msg = (err as Error).message || ''
+		} catch (error) {
+			// Expected: Error from texture.loadTexture (e.g., "too large" for oversized textures, ImageDecoder/EXR decode failures, or abort) — per-texture failure, logged and returns false so remaining textures can still load, not reraised.
+			const msg = (error as Error).message || ''
 			if (msg.includes('too large')) {
 				logger().debug(
 					'[ThreeMapGenerator.loadTextures] Skipping large texture %s (%s): %s',
@@ -111,12 +121,7 @@ export class ThreeMapGenerator {
 					msg,
 				)
 			}
-			try {
-				;(texture as any).binary = undefined
-			} catch {}
-			try {
-				;(texture as any).pdsBuffer = undefined
-			} catch {}
+			this.clearTextureSource(texture)
 			return false
 		}
 	}
