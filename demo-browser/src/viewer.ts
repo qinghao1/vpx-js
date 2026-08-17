@@ -188,6 +188,7 @@ export class Viewer {
 		if (this._animTimeout) clearTimeout(this._animTimeout)
 		if (this.animFrame) cancelAnimationFrame(this.animFrame)
 		if (this.animFrame) clearTimeout(this.animFrame)
+		if ((this as any)._physicsTimeout) clearTimeout((this as any)._physicsTimeout)
 		this._inputCleanup?.()
 		this._inputCleanup = null
 		this._nudgeCleanup?.()
@@ -488,6 +489,12 @@ export class Viewer {
 		this._hidePlayTip?.()
 		hideCabFlippers(this.tableGroup)
 		this._syncChrome()
+		try {
+			this.hookInput()
+		} catch {}
+		try {
+			this.dom.canvas?.focus()
+		} catch {}
 		const target = computePlayFraming(this.tableGroup)
 		await this._animateCameraTo(target, CAM_ANIM.durationMode)
 		{
@@ -690,8 +697,34 @@ export class Viewer {
 		if (this.tableGroup) hideCabFlippers(this.tableGroup)
 		const bg = this.tableGroup?.getObjectByName('balls')
 		if (bg) bg.visible = true
+		try {
+			this.player?.setPhysicsEnabled(true)
+		} catch {}
 		this._emitModeChange()
-		this.dom.canvas?.focus()
+		try {
+			if (this.dom.canvas) {
+				this.dom.canvas.tabIndex = 0
+				this.dom.canvas.focus()
+			}
+		} catch {}
+		try {
+			this.hookInput()
+		} catch {}
+		try {
+			if (!this._blurHandler) {
+				this._blurHandler = () => {
+					try {
+						this.player?.onKeyUp({ code: 'ShiftLeft', key: 'Shift', ts: Date.now(), location: 1 })
+						this.player?.onKeyUp({ code: 'ShiftRight', key: 'Shift', ts: Date.now(), location: 2 })
+						this.player?.onKeyUp({ code: 'Shift', key: 'Shift', ts: Date.now() })
+					} catch {}
+				}
+				window.addEventListener('blur', this._blurHandler)
+				document.addEventListener('visibilitychange', () => {
+					if (document.hidden) this._blurHandler()
+				})
+			}
+		} catch {}
 	}
 	exitPlayMode() {
 		for (const code of this._touchMap.values()) {
@@ -702,6 +735,10 @@ export class Viewer {
 			})
 		}
 		this._touchMap.clear()
+		try {
+			this.player?.onKeyUp({ code: 'ShiftLeft', key: 'Shift', ts: Date.now(), location: 1 })
+			this.player?.onKeyUp({ code: 'ShiftRight', key: 'Shift', ts: Date.now(), location: 2 })
+		} catch {}
 		if (this.controls) this.controls.enabled = true
 		if (this.tableGroup) showCabFlippers(this.tableGroup)
 		const bg = this.tableGroup?.getObjectByName('balls')
@@ -1270,6 +1307,19 @@ export class Viewer {
 				this.harnessLog?.(`[input] ${this._buttonMeshes.length} cabinet button meshes (BVH)`, 'info')
 		} catch {}
 		this.startLoop()
+		if (this.viewerMode === 'viewer') {
+			const p = new URLSearchParams(location.search)
+			const hasVpx = !!(p.get('vpx') || p.get('table'))
+			const mode = p.get('mode')
+			if (hasVpx && mode !== 'viewer') {
+				this.log('[viewer] auto-switch to play (vpx URL)', 'info')
+				setTimeout(() => {
+					try {
+						this._switchToPlay()
+					} catch {}
+				}, 600)
+			}
+		}
 		return {
 			loaded: table,
 			node,
@@ -1820,10 +1870,24 @@ export class Viewer {
 			clearTimeout(this._animTimeout)
 			this._animTimeout = null
 		}
+		if ((this as any)._physicsTimeout) {
+			clearTimeout((this as any)._physicsTimeout)
+			;(this as any)._physicsTimeout = null
+		}
 		let last = performance.now(),
 			frames = 0,
 			fps = 0
 		let pinLoadingLogged = false
+		let lastHeartbeat = performance.now()
+		let lastTimeMsec = 0
+		let swiftShader = false
+		try {
+			const gl = (this.renderer as any)?.getContext?.()
+			const rstr = gl?.getParameter?.(gl.RENDERER) ?? ''
+			if (String(rstr).toLowerCase().includes('swiftshader') || String(rstr).toLowerCase().includes('software'))
+				swiftShader = true
+		} catch {}
+		if (swiftShader) this.log('[render] SwiftShader detected — throttling render for physics', 'warn')
 		const isPinLoading = () => {
 			if (!this._hasPinmame) return false
 			const emu = this.player?.getPhysics?.()?.emu
@@ -1838,16 +1902,29 @@ export class Viewer {
 		}
 		const tickPhysics = () => {
 			if (!this.player || this.isPaused) return
-			if (this._physicsSab && this._physicsScratch) trySnap(this._physicsSab, this._physicsScratch)
-			this.player.setPhysicsEnabled(this.viewerMode === 'play')
-			this.player.updatePhysics()
-			this.player.updateAnimations(this.player.getGameTime())
-			const changed = this.player.popStates()
-			if (changed.keys.length) this.applyChangedStates(changed)
+			try {
+				if (this._physicsSab && this._physicsScratch) trySnap(this._physicsSab, this._physicsScratch)
+				this.player.setPhysicsEnabled(this.viewerMode === 'play')
+				this.player.updatePhysics()
+				this.player.updateAnimations(this.player.getGameTime())
+				const changed = this.player.popStates()
+				if (changed.keys.length) this.applyChangedStates(changed)
+				if (performance.now() - lastHeartbeat > 2000) {
+					lastHeartbeat = performance.now()
+					const cur = this.player.getPhysics().timeMsec
+					if (cur === lastTimeMsec && this.viewerMode === 'play' && !this.isPaused) {
+						console.warn('[physics] stalled at', cur, 'swiftShader', swiftShader)
+					}
+					lastTimeMsec = cur
+				}
+			} catch (e) {
+				console.warn('[tickPhysics] failed', e)
+			}
 		}
-		const loop = () => {
+		const physicsLoop = () => {
 			if (this._disposed) return
-			const now = performance.now()
+			;(this as any)._physicsTimeout = setTimeout(physicsLoop, 16)
+			this._animTimeout = (this as any)._physicsTimeout
 			const pinLoading = isPinLoading()
 			if (pinLoading !== pinLoadingLogged) {
 				pinLoadingLogged = pinLoading
@@ -1856,64 +1933,98 @@ export class Viewer {
 				)
 			}
 			if (pinLoading) {
-				this._animTimeout = setTimeout(loop, 16)
 				this.animFrame = this._animTimeout
+			}
+			try {
 				tickPhysics()
 				this._pollPinmame()
-				return
-			}
-			this._animRaf = requestAnimationFrame(loop)
-			this.animFrame = this._animRaf
-			if (this.controls?.enabled) this.controls.update()
-			tickPhysics()
-			this._pollPinmame()
-			this._applyNudgeVisual()
-			if (this.composer) this.composer.render()
-			else this.renderer.render(this.scene, this.camera)
-			frames++
-			const now2 = performance.now()
-			if (now2 - last > 500) {
-				fps = Math.round((frames * 1000) / (now2 - last))
-				last = now2
-				frames = 0
-			}
-			if (this.dom.stats) {
-				const balls = this.player?.balls.length ?? 0
-				const t = this.player?.getPhysics()?.timeMsec ?? 0
-				const mode = this.viewerMode === 'play' ? (this.isPaused ? 'PLAY PAUSED' : 'PLAY') : 'VIEWER'
-				const emu = this.player?.getPhysics()?.emu
-				const emuRaw = emu ? emu.constructor.name : '—'
-				const emuStat = !emu ? '' : emu.isInitialized?.() ? 'ok' : 'loading'
-				const draws = this.renderer?.info?.render?.calls ?? 0
-				const tris = this.renderer?.info?.render?.triangles ?? 0
-				const trisFmt =
-					tris >= 1e6
-						? `${(tris / 1e6).toFixed(1)}M`
-						: tris >= 1e3
-							? `${(tris / 1e3).toFixed(1)}k`
-							: `${tris}`
-				const tFmt = t ? `${(t / 1000).toFixed(1)}s` : '—'
-				const emuLabel = emuStat ? `${emuRaw} · ${emuStat}` : emuRaw
-				let wasmReady = false
-				wasmReady = isWasmReady()
-				const wasmLabel = wasmReady ? 'Ready' : 'Loading…'
-				renderStats(this.dom.stats, {
-					fps,
-					draws,
-					trisFmt,
-					balls,
-					tFmt,
-					tHasValue: !!t,
-					emuLabel,
-					emuRaw,
-					wasmLabel,
-					wasmReady,
-					backend: this._rendererBackend,
-					mode,
-				})
+			} catch (e) {
+				console.warn('[physicsLoop] failed', e)
 			}
 		}
-		loop()
+		physicsLoop()
+		let renderSkip = 0
+		const renderLoop = () => {
+			if (this._disposed) return
+			this._animRaf = requestAnimationFrame(renderLoop)
+			const pinLoading = isPinLoading()
+			if (!pinLoading) {
+				this.animFrame = this._animRaf
+			}
+			if (pinLoading) {
+				return
+			}
+			if (swiftShader) {
+				renderSkip = (renderSkip + 1) % 3
+				if (renderSkip !== 0) return
+			}
+			try {
+				if (this.controls?.enabled) this.controls.update()
+				this._applyNudgeVisual()
+				if (this.composer) this.composer.render()
+				else this.renderer.render(this.scene, this.camera)
+				frames++
+				const now2 = performance.now()
+				if (now2 - last > 500) {
+					fps = Math.round((frames * 1000) / (now2 - last))
+					last = now2
+					frames = 0
+				}
+				if (this.dom.stats) {
+					const balls = this.player?.balls.length ?? 0
+					const t = this.player?.getPhysics()?.timeMsec ?? 0
+					const mode = this.viewerMode === 'play' ? (this.isPaused ? 'PLAY PAUSED' : 'PLAY') : 'VIEWER'
+					const emu = this.player?.getPhysics()?.emu
+					const emuRaw = emu ? emu.constructor.name : '—'
+					const emuStat = !emu ? '' : emu.isInitialized?.() ? 'ok' : 'loading'
+					const draws = this.renderer?.info?.render?.calls ?? 0
+					const tris = this.renderer?.info?.render?.triangles ?? 0
+					const trisFmt =
+						tris >= 1e6
+							? `${(tris / 1e6).toFixed(1)}M`
+							: tris >= 1e3
+								? `${(tris / 1e3).toFixed(1)}k`
+								: `${tris}`
+					const tFmt = t ? `${(t / 1000).toFixed(1)}s` : '—'
+					const emuLabel = emuStat ? `${emuRaw} · ${emuStat}` : emuRaw
+					let wasmReady = false
+					wasmReady = isWasmReady()
+					const wasmLabel = wasmReady ? 'Ready' : 'Loading…'
+					renderStats(this.dom.stats, {
+						fps,
+						draws,
+						trisFmt,
+						balls,
+						tFmt,
+						tHasValue: !!t,
+						emuLabel,
+						emuRaw,
+						wasmLabel,
+						wasmReady,
+						backend: this._rendererBackend,
+						mode,
+					})
+				}
+				{
+					const hud = this.dom.fpsHud || document.getElementById('fps-hud')
+					if (hud) {
+						let el = hud.querySelector('.fps')
+						if (!el) {
+							el = document.createElement('span')
+							el.className = 'fps'
+							hud.textContent = ''
+							hud.append(el)
+						}
+						el.textContent = `${fps} fps`
+						const cls = fps >= 55 ? 'fps--good' : fps >= 30 ? 'fps--mid' : fps > 0 ? 'fps--low' : ''
+						el.className = `fps ${cls}`.trim()
+					}
+				}
+			} catch (e) {
+				console.warn('[renderLoop] failed', e)
+			}
+		}
+		renderLoop()
 	}
 	_pollPinmame() {
 		if (!this._emuStartLogged) {
@@ -2024,6 +2135,21 @@ export class Viewer {
 		if (!this.player) return
 		this._inputCleanup?.()
 		this._inputCleanup = attachInput(this)
+		try {
+			if (this.dom.canvas) {
+				this.dom.canvas.tabIndex = 0
+				setTimeout(() => {
+					try {
+						this.dom.canvas.focus()
+					} catch {}
+				}, 50)
+				setTimeout(() => {
+					try {
+						this.dom.canvas.focus()
+					} catch {}
+				}, 300)
+			}
+		} catch {}
 	}
 }
 export function createViewer(opts) {

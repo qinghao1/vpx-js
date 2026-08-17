@@ -93,7 +93,6 @@ export class PrimitiveApi extends ItemApi<PrimitiveData> {
 	set X(v) {
 		v = num(v)
 		this._state.position.x = v
-		this.data.position.x = v
 	}
 	get Y() {
 		return this._state.position.y
@@ -101,7 +100,6 @@ export class PrimitiveApi extends ItemApi<PrimitiveData> {
 	set Y(v) {
 		v = num(v)
 		this._state.position.y = v
-		this.data.position.y = v
 	}
 	get Z() {
 		return this._state.position.z
@@ -109,7 +107,6 @@ export class PrimitiveApi extends ItemApi<PrimitiveData> {
 	set Z(v) {
 		v = num(v)
 		this._state.position.z = v
-		this.data.position.z = v
 	}
 	get Size_X() {
 		return this._state.size.x
@@ -117,7 +114,6 @@ export class PrimitiveApi extends ItemApi<PrimitiveData> {
 	set Size_X(v) {
 		v = num(v)
 		this._state.size.x = v
-		this.data.size.x = v
 	}
 	get Size_Y() {
 		return this._state.size.y
@@ -125,7 +121,6 @@ export class PrimitiveApi extends ItemApi<PrimitiveData> {
 	set Size_Y(v) {
 		v = num(v)
 		this._state.size.y = v
-		this.data.size.y = v
 	}
 	get Size_Z() {
 		return this._state.size.z
@@ -133,7 +128,6 @@ export class PrimitiveApi extends ItemApi<PrimitiveData> {
 	set Size_Z(v) {
 		v = num(v)
 		this._state.size.z = v
-		this.data.size.z = v
 	}
 	get RotAndTra0() {
 		return this.RotX
@@ -147,7 +141,6 @@ export class PrimitiveApi extends ItemApi<PrimitiveData> {
 	set RotX(v) {
 		v = num(v)
 		this._state.rotation.x = v
-		this.data.rotAndTra[0] = v
 	}
 	get RotAndTra1() {
 		return this.RotY
@@ -161,7 +154,6 @@ export class PrimitiveApi extends ItemApi<PrimitiveData> {
 	set RotY(v) {
 		v = num(v)
 		this._state.rotation.y = v
-		this.data.rotAndTra[1] = v
 	}
 	get RotAndTra2() {
 		return this.RotZ
@@ -175,7 +167,6 @@ export class PrimitiveApi extends ItemApi<PrimitiveData> {
 	set RotZ(v) {
 		v = num(v)
 		this._state.rotation.z = v
-		this.data.rotAndTra[2] = v
 	}
 	get RotAndTra3() {
 		return this.TransX
@@ -189,7 +180,6 @@ export class PrimitiveApi extends ItemApi<PrimitiveData> {
 	set TransX(v) {
 		v = num(v)
 		this._state.translation.x = v
-		this.data.rotAndTra[3] = v
 	}
 	get RotAndTra4() {
 		return this.TransY
@@ -203,7 +193,6 @@ export class PrimitiveApi extends ItemApi<PrimitiveData> {
 	set TransY(v) {
 		v = num(v)
 		this._state.translation.y = v
-		this.data.rotAndTra[4] = v
 	}
 	get RotAndTra5() {
 		return this.TransZ
@@ -217,7 +206,6 @@ export class PrimitiveApi extends ItemApi<PrimitiveData> {
 	set TransZ(v) {
 		v = num(v)
 		this._state.translation.z = v
-		this.data.rotAndTra[5] = v
 	}
 	get RotAndTra6() {
 		return this.ObjRotX
@@ -231,7 +219,6 @@ export class PrimitiveApi extends ItemApi<PrimitiveData> {
 	set ObjRotX(v) {
 		v = num(v)
 		this._state.objectRotation.x = v
-		this.data.rotAndTra[6] = v
 	}
 	get RotAndTra7() {
 		return this.ObjRotY
@@ -245,7 +232,6 @@ export class PrimitiveApi extends ItemApi<PrimitiveData> {
 	set ObjRotY(v) {
 		v = num(v)
 		this._state.objectRotation.y = v
-		this.data.rotAndTra[7] = v
 	}
 	get RotAndTra8() {
 		return this.ObjRotZ
@@ -259,7 +245,6 @@ export class PrimitiveApi extends ItemApi<PrimitiveData> {
 	set ObjRotZ(v) {
 		v = num(v)
 		this._state.objectRotation.z = v
-		this.data.rotAndTra[8] = v
 	}
 	get EdgeFactorUI() {
 		return this.data.edgeFactorUI

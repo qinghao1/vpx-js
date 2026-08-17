@@ -268,6 +268,9 @@ export class Stdlib extends VbsApi {
 			return 'Boolean'
 		}
 		if (obj?.constructor?.name) {
+			if (obj.constructor.name === 'BallApi') {
+				return 'IBall'
+			}
 			if (obj.constructor.name.endsWith('Api')) {
 				return obj.constructor.name.slice(0, obj.constructor.name.length - 3)
 			}

@@ -1,22 +1,45 @@
 // @ts-nocheck
 import * as THREE from 'three'
 import { pushInput } from '../../../dist-esm/lib/game/shared/physics-buffer.js'
+import { swipeNudge } from '../../../dist-esm/lib/render/threejs/three-scene-postprocess.js'
 import { NUDGE } from '../config.js'
 import { ensureBvh } from '../env.js'
-import { swipeNudge } from '../../../dist-esm/lib/render/threejs/three-scene-postprocess.js'
 import { aliasEvent } from '../utils.js'
 
-const keyToCode = (code) => {
+const keyToCode = code => {
 	if (!code) return 0
 	let h = 0
 	for (let i = 0; i < code.length; i++) h = ((h * 31 + code.charCodeAt(i)) & 0xffff) >>> 0
 	return h || 1
 }
-const PLAY_KEYS = new Set(['Space','KeyZ','Slash','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Enter','Digit1','Digit5','KeyT'])
+const PLAY_KEYS = new Set([
+	'Space',
+	'KeyZ',
+	'Slash',
+	'ArrowLeft',
+	'ArrowRight',
+	'ArrowUp',
+	'ArrowDown',
+	'Enter',
+	'Digit1',
+	'Digit5',
+	'KeyT',
+	'ShiftLeft',
+	'ShiftRight',
+	'Shift',
+])
 
 export function attachKeyboard(viewer) {
-	if (viewer._boundKeyDown) removeEventListener('keydown', viewer._boundKeyDown)
-	if (viewer._boundKeyUp) removeEventListener('keyup', viewer._boundKeyUp)
+	if (viewer._boundKeyDown) {
+		removeEventListener('keydown', viewer._boundKeyDown)
+		document.removeEventListener('keydown', viewer._boundKeyDown)
+		window.removeEventListener('keydown', viewer._boundKeyDown)
+	}
+	if (viewer._boundKeyUp) {
+		removeEventListener('keyup', viewer._boundKeyUp)
+		document.removeEventListener('keyup', viewer._boundKeyUp)
+		window.removeEventListener('keyup', viewer._boundKeyUp)
+	}
 
 	const togglePause = () => {
 		viewer.isPaused = !viewer.isPaused
@@ -25,6 +48,43 @@ export function attachKeyboard(viewer) {
 	}
 
 	const send = (e, down) => {
+		if (viewer.viewerMode === 'viewer' && down) {
+			const c = e.code || e.key || ''
+			const isPlayKey =
+				PLAY_KEYS.has(c) ||
+				PLAY_KEYS.has(e.key) ||
+				c === 'ShiftLeft' ||
+				c === 'ShiftRight' ||
+				e.key === 'Shift' ||
+				c === 'ArrowLeft' ||
+				c === 'ArrowRight' ||
+				c === 'Space' ||
+				c === 'Enter'
+			if (isPlayKey) {
+				try {
+					viewer.viewerMode = 'play'
+					try {
+						viewer.player?.setPhysicsEnabled(true)
+					} catch {}
+					try {
+						viewer.enterPlayMode?.()
+					} catch {}
+					viewer._switchToPlay?.()
+				} catch {}
+			}
+		}
+		try {
+			if (
+				viewer.viewerMode === 'play' &&
+				(e.code === 'ShiftLeft' ||
+					e.code === 'ShiftRight' ||
+					e.key === 'Shift' ||
+					e.key === 'ShiftLeft' ||
+					e.key === 'ShiftRight')
+			) {
+				// ensure immediate visual feedback even if physics is delayed
+			}
+		} catch {}
 		if (['?', 'h', 'H', 'o', 'O'].includes(e.key)) return
 		if (
 			(e.key === 'p' || e.key === 'P' || e.code === 'KeyP') &&
@@ -44,29 +104,72 @@ export function attachKeyboard(viewer) {
 			return
 		}
 		const ae = aliasEvent(e)
-		const ev = ae || { code: e.code, key: e.key, ts: Date.now() }
-		if (down) viewer.player.onKeyDown(ev)
-		else viewer.player.onKeyUp(ev)
+		const ev = ae || {
+			code: e.code || e.key,
+			key: e.key,
+			ts: Date.now(),
+			location: e.location,
+			keyCode: e.keyCode,
+			which: e.which,
+		}
+		if (!ev.code && e.key) ev.code = e.key
+		if (ev.code === 'Shift' && typeof e.location === 'number') {
+			ev.code = e.location === 2 ? 'ShiftRight' : 'ShiftLeft'
+		}
+		if (e.key === 'Shift' && !e.code) {
+			ev.code = e.location === 2 ? 'ShiftRight' : 'ShiftLeft'
+		}
+		try {
+			if (down) viewer.player.onKeyDown(ev)
+			else viewer.player.onKeyUp(ev)
+		} catch (err) {
+			console.warn('[input] onKey failed', err)
+		}
 		if (viewer._physicsSab) {
 			const kind = down ? 1 : 0
 			pushInput(viewer._physicsSab, kind, keyToCode(ev.code), ev.ts ?? Date.now())
 		}
-		if (ae || PLAY_KEYS.has(e.code)) e.preventDefault()
+		if (
+			ae ||
+			PLAY_KEYS.has(e.code) ||
+			PLAY_KEYS.has(e.key) ||
+			e.code === 'ShiftLeft' ||
+			e.code === 'ShiftRight' ||
+			e.key === 'Shift'
+		)
+			e.preventDefault()
 	}
 
 	viewer._boundKeyDown = e => send(e, true)
 	viewer._boundKeyUp = e => send(e, false)
 	addEventListener('keydown', viewer._boundKeyDown)
 	addEventListener('keyup', viewer._boundKeyUp)
+	document.addEventListener('keydown', viewer._boundKeyDown)
+	document.addEventListener('keyup', viewer._boundKeyUp)
+	window.addEventListener('keydown', viewer._boundKeyDown)
+	window.addEventListener('keyup', viewer._boundKeyUp)
+	try {
+		viewer.dom?.canvas?.focus?.()
+	} catch {}
+	try {
+		if (viewer.dom?.canvas) viewer.dom.canvas.tabIndex = 0
+	} catch {}
 
 	return () => {
-		if (viewer._boundKeyDown) removeEventListener('keydown', viewer._boundKeyDown)
-		if (viewer._boundKeyUp) removeEventListener('keyup', viewer._boundKeyUp)
+		if (viewer._boundKeyDown) {
+			removeEventListener('keydown', viewer._boundKeyDown)
+			document.removeEventListener('keydown', viewer._boundKeyDown)
+			window.removeEventListener('keydown', viewer._boundKeyDown)
+		}
+		if (viewer._boundKeyUp) {
+			removeEventListener('keyup', viewer._boundKeyUp)
+			document.removeEventListener('keyup', viewer._boundKeyUp)
+			window.removeEventListener('keyup', viewer._boundKeyUp)
+		}
 		viewer._boundKeyDown = null
 		viewer._boundKeyUp = null
 	}
 }
-
 
 export function attachPointerTouch(viewer) {
 	ensureBvh()
@@ -376,4 +479,3 @@ export function attachPointerTouch(viewer) {
 	viewer._touchCleanup = cleanup
 	return cleanup
 }
-

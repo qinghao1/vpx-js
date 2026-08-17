@@ -122,6 +122,17 @@ export class Player extends EventEmitter {
 				return ok
 			},
 			get(target: any, prop: string | symbol, receiver: any): any {
+				if (
+					prop === 'constructor' ||
+					prop === '__proto__' ||
+					prop === 'prototype' ||
+					prop === '__isDirtyProxy'
+				) {
+					return Reflect.get(target, prop, receiver)
+				}
+				if (typeof prop === 'string' && prop.startsWith('_')) {
+					return Reflect.get(target, prop, receiver)
+				}
 				const val = Reflect.get(target, prop, receiver)
 				if (typeof val === 'function') {
 					let cached = methodCache.get(prop)
@@ -240,11 +251,25 @@ export class Player extends EventEmitter {
 		return changed
 	}
 
-	public onKeyUp(e: { code: string; key: string; ts: number }): void {
-		this.pinInput.onKeyUp(keyEventToDirectInputKey(e), e.ts)
+	public onKeyUp(e: {
+		code: string
+		key: string
+		ts: number
+		location?: number
+		keyCode?: number
+		which?: number
+	}): void {
+		this.pinInput.onKeyUp(keyEventToDirectInputKey(e as any), e.ts)
 	}
-	public onKeyDown(e: { code: string; key: string; ts: number }): void {
-		this.pinInput.onKeyDown(keyEventToDirectInputKey(e), e.ts)
+	public onKeyDown(e: {
+		code: string
+		key: string
+		ts: number
+		location?: number
+		keyCode?: number
+		which?: number
+	}): void {
+		this.pinInput.onKeyDown(keyEventToDirectInputKey(e as any), e.ts)
 	}
 
 	public createBall(creator: IBallCreationPosition, radius = 25, mass = 1): Ball {

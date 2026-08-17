@@ -139,14 +139,33 @@ export const DIK_RWIN = 0xdc /* Right Windows key */
  *
  * @param event Key pressed by the user
  */
-export function keyEventToDirectInputKey(event: { key: string; code: string }): number {
-	const codeDi = KEY_JS2DI[event.key.toLowerCase()]
+export function keyEventToDirectInputKey(event: {
+	key: string
+	code: string
+	location?: number
+	keyCode?: number
+	which?: number
+}): number {
+	const loc = (event as any).location ?? (event as any).keyLocation ?? 0
+	const kc = (event as any).keyCode ?? (event as any).which ?? 0
+	const keyLower = String(event.key ?? '').toLowerCase()
+	const codeStr = String(event.code ?? '')
+	if (codeStr === 'ShiftLeft' || (keyLower === 'shift' && loc === 1)) return DIK_LSHIFT
+	if (codeStr === 'ShiftRight' || (keyLower === 'shift' && loc === 2)) return DIK_RSHIFT
+	if (keyLower === 'shift' && !codeStr) {
+		if (loc === 2) return DIK_RSHIFT
+		if (loc === 1 || kc === 16) return DIK_LSHIFT
+		return DIK_LSHIFT
+	}
+	if (kc === 16) {
+		if (loc === 2) return DIK_RSHIFT
+		return DIK_LSHIFT
+	}
+	const codeDi = KEY_JS2DI[keyLower]
 	if (codeDi) {
 		return codeDi
 	}
-
-	// first try by code (actual key name)
-	switch (event.code) {
+	switch (codeStr) {
 		case 'ControlLeft':
 			return DIK_LCONTROL
 		case 'ControlRight':

@@ -163,6 +163,10 @@ export async function launchBrowser(puppeteer, opts = {}) {
 			...gpuArgs,
 			'--window-size=1280,900',
 			'--disable-gpu-sandbox',
+			'--disable-background-timer-throttling',
+			'--disable-renderer-backgrounding',
+			'--disable-backgrounding-occluded-windows',
+			'--disable-features=CalculateNativeWinOcclusion',
 		],
 		...rest,
 	})
