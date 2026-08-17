@@ -210,7 +210,7 @@ export class Player extends EventEmitter {
 	public popStates(): ChangedStates<ItemState> {
 		const changed = ChangedStates.claim()
 		this.frameCount++
-		const useFull = this.frameCount % 60 === 0 && this.dirtySet.size < this.allStateNames.length * 0.5
+		const useFull = this.frameCount % 300 === 0 && this.dirtySet.size < this.allStateNames.length * 0.5
 		if (useFull) {
 			for (const name of this.allStateNames) this.dirtySet.add(name)
 		}

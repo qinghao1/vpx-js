@@ -45,13 +45,10 @@ function materialKey(mat: MeshStandardMaterial): string {
 	return `${mat.name ?? 'noname'}|${map}|${pending}|${mat.transparent ? 't' : 'o'}|${mat.polygonOffset ? `${mat.polygonOffsetFactor}/${mat.polygonOffsetUnits}` : '0'}|${ud.__addBlend ? 'a' : 'o'}|${ud.__isBaked ? 'b' : 'o'}`
 }
 
-// Opaque baked (emissiveMap, toneMapped false) can be batched after textures resolve; polygonOffset is per-material via materialKey, transparent/additive overlays remain unbatched for per-light animation.
 function canBatch(mat: MeshStandardMaterial): boolean {
 	if (!mat || mat.transparent || (mat.userData as any).__addBlend) return false
 	const ud = mat.userData as any
 	if (ud.pendingMap || ud.pendingmap || ud.pendingNormalMap || ud.pendingEnvMap || ud.pendingEmissiveMap) return false
-	if (ud.__isBaked) return true
-	if (mat.polygonOffset) return false
 	return true
 }
 

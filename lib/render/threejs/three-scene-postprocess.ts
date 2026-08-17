@@ -2,14 +2,13 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import * as THREE from 'three'
-import { isLowQuality, QUALITY_CAPS } from '../../util/quality.js'
+import { getEffectiveCaps, isLowQuality, isPlayMode } from '../../util/quality.js'
 import { getGlobalEmissionScale } from './three-material-generator.js'
 
 export const BAKED_EMISSIVE = 1.0
 export const BAKED_ROUGH = 0.75
 export const BAKED_METAL = 0.1
 
-const ANISOTROPY_BAKED = 16
 const ANISOTROPY_VR = 8
 const LARGE_TEXTURE_PIXELS = 1_048_576
 
@@ -118,7 +117,7 @@ function wrapTexBaked(tex: THREE.Texture | null | undefined): void {
 	tex.generateMipmaps = true
 	tex.minFilter = THREE.LinearMipmapLinearFilter
 	tex.magFilter = THREE.LinearFilter
-	tex.anisotropy = isLowQuality() ? QUALITY_CAPS.low.aniso : ANISOTROPY_BAKED
+	tex.anisotropy = getEffectiveCaps().aniso
 	tex.needsUpdate = true
 }
 
@@ -150,19 +149,18 @@ function fixBaked(mat: THREE.MeshStandardMaterial, map?: THREE.Texture | null): 
 }
 
 function fixVr(mat: THREE.MeshStandardMaterial): void {
-	const apply = (tex: THREE.Texture | null | undefined, aniso: number) => {
+	const apply = (tex: THREE.Texture | null | undefined) => {
 		if (!tex) return
 		tex.wrapS = THREE.ClampToEdgeWrapping
 		tex.wrapT = THREE.ClampToEdgeWrapping
 		tex.generateMipmaps = true
 		tex.minFilter = THREE.LinearMipmapLinearFilter
 		tex.magFilter = THREE.LinearFilter
-		tex.anisotropy = isLowQuality() ? QUALITY_CAPS.low.aniso : aniso
+		tex.anisotropy = isLowQuality() ? 1 : isPlayMode() ? 4 : ANISOTROPY_VR
 		tex.needsUpdate = true
 	}
-	apply(mat.map as THREE.Texture | undefined, ANISOTROPY_VR)
-	if (mat.emissiveMap && mat.emissiveMap !== mat.map)
-		apply(mat.emissiveMap as THREE.Texture | undefined, ANISOTROPY_VR)
+	apply(mat.map as THREE.Texture | undefined)
+	if (mat.emissiveMap && mat.emissiveMap !== mat.map) apply(mat.emissiveMap as THREE.Texture | undefined)
 	mat.side = THREE.DoubleSide
 	mat.toneMapped = false
 	mat.roughness = BAKED_ROUGH
@@ -260,6 +258,33 @@ function isInCabFlipper(obj: THREE.Object3D): boolean {
 
 const isCabOrVrName = (n: string): boolean => RE_VR.test(n) || RE_CAB.test(n)
 
+function hasCabAncestor(mesh: THREE.Object3D, root: THREE.Object3D): boolean {
+	for (let p: THREE.Object3D | null = mesh.parent; p && p !== root; p = p.parent) {
+		const pn = (p.name ?? '').toLowerCase()
+		if (isCabOrVrName(pn) || RE_OUTER.test(p.name) || RE_CAB.test(pn) || RE_VR.test(pn)) return true
+	}
+	return false
+}
+
+function isKeepInPlay(mesh: THREE.Object3D, root: THREE.Object3D): boolean {
+	for (let cur: THREE.Object3D | null = mesh; cur && cur !== root; cur = cur.parent) {
+		const n = (cur.name ?? '').toLowerCase()
+		if (n.includes('dmd')) return true
+		if ((cur as any).userData?.isProceduralDMD) return true
+		if (cur.name.startsWith('DMD_')) return true
+		if (n.includes('cabinet')) return true
+		if (n.includes('backbox')) return true
+	}
+	const m = (mesh as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined
+	if (m) {
+		const mn = (m.name ?? '').toLowerCase()
+		if (mn.includes('dmd')) return true
+		const tn = (m.map as THREE.Texture | undefined)?.name?.toLowerCase() ?? ''
+		if (tn.includes('dmd')) return true
+	}
+	return false
+}
+
 export function hideCabFlippers(root: THREE.Object3D): number {
 	let hidden = 0
 	root.traverse(o => {
@@ -287,6 +312,7 @@ export function hideCabOuter(root: THREE.Object3D): number {
 	root.traverse(o => {
 		const mesh = o as THREE.Mesh
 		if (!mesh.isMesh) return
+		if (isKeepInPlay(mesh, root)) return
 		const n = (mesh.name ?? '').toLowerCase()
 		if (
 			n.includes('playfield') ||
@@ -297,6 +323,7 @@ export function hideCabOuter(root: THREE.Object3D): number {
 			resolveButtonCode(n)
 		)
 			return
+		const isCabAncestor = hasCabAncestor(mesh, root)
 		const mat = mesh.material as THREE.Material | undefined as THREE.MeshStandardMaterial | undefined
 		const c = classify(
 			n,
@@ -304,11 +331,10 @@ export function hideCabOuter(root: THREE.Object3D): number {
 			((mat?.map as THREE.Texture | undefined)?.name ?? '').toLowerCase(),
 			!!(mat?.userData as unknown as Record<string, unknown>)?.__isBaked,
 		)
-		if (c.isCab || c.isVr || RE_OUTER.test(mesh.name) || isCabOrVrName(n)) {
+		if (c.isCab || c.isVr || RE_OUTER.test(mesh.name) || isCabOrVrName(n) || isCabAncestor) {
 			if (mesh.visible !== false) {
 				mesh.visible = false
 				hidden++
-				mesh.geometry?.dispose?.()
 			}
 		}
 	})
@@ -322,6 +348,7 @@ export function showCabOuter(root: THREE.Object3D): number {
 		if (!mesh.isMesh) return
 		const n = (mesh.name ?? '').toLowerCase()
 		if (n.includes('playfield') || n.includes('apron')) return
+		const isCabAncestor = hasCabAncestor(mesh, root)
 		const mat = mesh.material as THREE.Material | undefined as THREE.MeshStandardMaterial | undefined
 		const c = classify(
 			n,
@@ -329,7 +356,7 @@ export function showCabOuter(root: THREE.Object3D): number {
 			((mat?.map as THREE.Texture | undefined)?.name ?? '').toLowerCase(),
 			!!(mat?.userData as unknown as Record<string, unknown>)?.__isBaked,
 		)
-		if (c.isCab || c.isVr || RE_OUTER.test(mesh.name) || isCabOrVrName(n)) {
+		if (c.isCab || c.isVr || RE_OUTER.test(mesh.name) || isCabOrVrName(n) || isCabAncestor) {
 			if (mesh.visible === false) {
 				mesh.visible = true
 				shown++
@@ -337,6 +364,14 @@ export function showCabOuter(root: THREE.Object3D): number {
 		}
 	})
 	return shown
+}
+
+export function hideCab(root: THREE.Object3D): number {
+	return hideCabFlippers(root) + hideCabOuter(root)
+}
+
+export function showCab(root: THREE.Object3D): number {
+	return showCabFlippers(root) + showCabOuter(root)
 }
 
 function makeParentsVisible(mesh: THREE.Object3D, root: THREE.Object3D, stats: Record<string, number>): void {

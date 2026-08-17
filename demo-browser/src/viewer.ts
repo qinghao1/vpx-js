@@ -29,10 +29,12 @@ import { ThreeRenderApi } from '../../dist-esm/lib/render/threejs/three-render-a
 import {
 	applyBakedMaterial,
 	ensureProceduralRoom,
+	hideCab,
 	hideCabFlippers,
 	isBakedMeshByNames,
 	isDeferred,
 	postProcessScene,
+	showCab,
 	showCabFlippers,
 } from '../../dist-esm/lib/render/threejs/three-scene-postprocess.js'
 import { ThreeTextureLoaderBrowser } from '../../dist-esm/lib/render/threejs/three-texture-loader-browser.js'
@@ -65,6 +67,88 @@ import {
 	resolveRomCandidates,
 	resolveVpxCandidates,
 } from './utils.js'
+
+let _prerenderedBackground: THREE.Texture | THREE.Color | null = null
+function getPrerenderedBackground(): THREE.Texture | THREE.Color {
+	if (_prerenderedBackground) return _prerenderedBackground
+	try {
+		if (typeof document === 'undefined') return (_prerenderedBackground = new THREE.Color(0x1a2335))
+		const W = 1024
+		const H = 1024
+		const canvas = document.createElement('canvas')
+		canvas.width = W
+		canvas.height = H
+		const ctx = canvas.getContext('2d')
+		if (!ctx) return (_prerenderedBackground = new THREE.Color(0x1a2335))
+		ctx.fillStyle = '#0f141e'
+		ctx.fillRect(0, 0, W, H)
+		const horizon = H * 0.52
+		const sky = ctx.createLinearGradient(0, 0, 0, horizon)
+		sky.addColorStop(0, '#111a2a')
+		sky.addColorStop(0.55, '#1a2335')
+		sky.addColorStop(1, '#232d42')
+		ctx.fillStyle = sky
+		ctx.fillRect(0, 0, W, horizon)
+		const floor = ctx.createLinearGradient(0, horizon, 0, H)
+		floor.addColorStop(0, '#232d42')
+		floor.addColorStop(0.28, '#1c2335')
+		floor.addColorStop(1, '#0f141e')
+		ctx.fillStyle = floor
+		ctx.fillRect(0, horizon, W, H - horizon)
+		ctx.fillStyle = 'rgba(90,110,150,0.04)'
+		ctx.fillRect(0, horizon - 1, W, 36)
+		ctx.strokeStyle = 'rgba(90,110,150,0.09)'
+		ctx.lineWidth = 1
+		for (let i = -3; i <= 3; i++) {
+			ctx.beginPath()
+			ctx.moveTo(W * 0.5 + i * 90, horizon)
+			ctx.lineTo(W * 0.5 + i * 420, H)
+			ctx.stroke()
+		}
+		for (let y = horizon + 36; y < H; y += 72) {
+			const t = (y - horizon) / (H - horizon)
+			const w = W * (0.08 + t * 0.92)
+			ctx.beginPath()
+			ctx.moveTo(W * 0.5 - w * 0.5, y)
+			ctx.lineTo(W * 0.5 + w * 0.5, y)
+			ctx.stroke()
+		}
+		const vg = ctx.createRadialGradient(W * 0.5, H * 0.5, 0, W * 0.5, H * 0.5, 760)
+		vg.addColorStop(0, 'rgba(0,0,0,0)')
+		vg.addColorStop(0.68, 'rgba(0,0,0,0.18)')
+		vg.addColorStop(1, 'rgba(0,0,0,0.42)')
+		ctx.fillStyle = vg
+		ctx.fillRect(0, 0, W, H)
+		const tex = new THREE.CanvasTexture(canvas)
+		tex.colorSpace = THREE.SRGBColorSpace
+		tex.needsUpdate = true
+		return (_prerenderedBackground = tex)
+	} catch {
+		return (_prerenderedBackground = new THREE.Color(0x1a2335))
+	}
+}
+
+function syncRoom(
+	scene: THREE.Scene,
+	node: THREE.Object3D,
+	center: THREE.Vector3,
+	size: THREE.Vector3,
+): THREE.Group | null {
+	let hasVr = false
+	node.traverse((o: any) => {
+		if (
+			o.isMesh &&
+			o.visible &&
+			String(o.name ?? '')
+				.toLowerCase()
+				.includes('vr_')
+		)
+			hasVr = true
+	})
+	const room = ensureProceduralRoom(scene, center, size, { hasVr })
+	scene.background = room ? (null as any) : (getPrerenderedBackground() as any)
+	return room
+}
 
 export {
 	createHarness,
@@ -116,7 +200,7 @@ export class Viewer {
 		}
 		this.harnessLog = createHarness(this.dom.logEl).harnessLog
 		this.scene = new THREE.Scene()
-		this.scene.background = new THREE.Color(0x0f1115)
+		this.scene.background = getPrerenderedBackground() as any
 		this.camera = new THREE.PerspectiveCamera(
 			CAM.fov,
 			(typeof window !== 'undefined' ? window.innerWidth : 800) /
@@ -505,6 +589,10 @@ export class Viewer {
 				this.camera.updateProjectionMatrix()
 			}
 		}
+		{
+			const framing = computePlayFraming(this.tableGroup)
+			syncRoom(this.scene, this.tableGroup, framing.center, framing.size)
+		}
 		if (this.player) {
 			this.player.setPhysicsEnabled(true)
 			this.enterPlayMode()
@@ -516,7 +604,7 @@ export class Viewer {
 		this.viewerMode = 'viewer'
 		if (this.renderer) this.renderer.setPixelRatio(getTargetPixelRatio('viewer'))
 		this._hidePlayTip?.()
-		showCabFlippers(this.tableGroup)
+		showCab(this.tableGroup)
 		this._syncChrome()
 		const target = computeViewerFraming(this.tableGroup)
 		await this._animateCameraTo(target, CAM_ANIM.durationMode)
@@ -524,6 +612,8 @@ export class Viewer {
 			this.camera.fov = CAM.fov
 			this.camera.updateProjectionMatrix()
 		}
+		if (this.tableGroup)
+			syncRoom(this.scene, this.tableGroup, target.center, (target as any).size || new THREE.Vector3(1, 1, 1))
 		if (this.player) this.player.setPhysicsEnabled(false)
 		this.exitPlayMode()
 	}
@@ -691,6 +781,12 @@ export class Viewer {
 		if (this.controls) this.controls.enabled = false
 		this._ensurePhysicsWorker()
 		if (this.tableGroup) hideCabFlippers(this.tableGroup)
+		{
+			const framing = this.tableGroup ? computePlayFraming(this.tableGroup) : null
+			const center = framing?.center ?? new THREE.Vector3()
+			const size = framing?.size ?? new THREE.Vector3(1000, 2000, 500)
+			syncRoom(this.scene, this.tableGroup ?? this.scene, center, size)
+		}
 		const bg = this.tableGroup?.getObjectByName('balls')
 		if (bg) bg.visible = true
 		this.player?.setPhysicsEnabled(true)
@@ -724,7 +820,7 @@ export class Viewer {
 		this.player?.onKeyUp({ code: 'ShiftLeft', key: 'Shift', ts: Date.now(), location: 1 })
 		this.player?.onKeyUp({ code: 'ShiftRight', key: 'Shift', ts: Date.now(), location: 2 })
 		if (this.controls) this.controls.enabled = true
-		if (this.tableGroup) showCabFlippers(this.tableGroup)
+		if (this.tableGroup) showCab(this.tableGroup)
 		const bg = this.tableGroup?.getObjectByName('balls')
 		if (bg) bg.visible = false
 		this._emitModeChange()
@@ -1206,13 +1302,7 @@ export class Viewer {
 		}
 		const center = framed.center,
 			size = framed.size || new THREE.Vector3(1, 1, 1)
-		let hasVr = false
-		node.traverse(o => {
-			if (o.isMesh && o.visible && o.name?.toLowerCase().includes('vr_')) hasVr = true
-		})
-		ensureProceduralRoom(this.scene, center, size, {
-			hasVr,
-		})
+		syncRoom(this.scene, node, center, size)
 		this._showCanvas()
 		this.log(
 			`Framed ${pp.lightmaps ? `(hid ${pp.lightmaps} lm)` : ''} — ${this.tableGroup ? countObjects(this.tableGroup) : 0} objs`.trim(),

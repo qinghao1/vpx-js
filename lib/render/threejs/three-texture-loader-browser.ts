@@ -14,13 +14,14 @@ import {
 	LinearMipMapLinearFilter,
 	LinearSRGBColorSpace,
 	RGBAFormat,
+	RGBFormat,
 	SRGBColorSpace,
 	Texture,
 	TextureLoader,
 	type Texture as ThreeTexture,
 } from '../../refs.browser.js'
 import { exrCacheKey, idbGet, idbSet } from '../../util/idb-cache.js'
-import { _resetQualityCache, isLowQuality, QUALITY_CAPS } from '../../util/quality.js'
+import { _resetQualityCache, getEffectiveCaps, isLowQuality, isPlayMode, QUALITY_CAPS } from '../../util/quality.js'
 import type { ITextureLoader } from '../irender-api.js'
 
 const imageMap: Record<string, string> = {
@@ -79,9 +80,14 @@ export function effectiveMax(_isFloat: boolean, name?: string): number {
 	const hw = getHardwareMax()
 	const swift = isSwiftShader()
 	const isPlayfield = !!name && /playfield|nestmap|bake/i.test(name)
+	const isVlm = !!name && /vlm/i.test(name)
 	const low = isLowQuality()
-	const caps = low ? QUALITY_CAPS.low : QUALITY_CAPS.high
-	const cap = isPlayfield ? caps.playfield : swift ? 1024 : caps.other
+	const caps = low ? QUALITY_CAPS.low : getEffectiveCaps()
+	let cap: number
+	if (isVlm && isPlayMode()) cap = 1024
+	else if (isPlayfield) cap = caps.playfield
+	else if (swift) cap = 1024
+	else cap = caps.other
 	const budget = viewportBudget()
 	const factor = low ? (isPlayfield ? 0.75 : 0.5) : 1
 	const viewport = Math.max(caps.floor, Math.ceil(budget * factor))
@@ -96,11 +102,11 @@ export function _testResetTextureLimits(): void {
 }
 
 function tune(tex: any): void {
-	const low = isLowQuality()
+	const caps = getEffectiveCaps()
 	tex.generateMipmaps = true
 	tex.minFilter = LinearMipMapLinearFilter
 	tex.magFilter = LinearFilter
-	tex.anisotropy = low ? QUALITY_CAPS.low.aniso : QUALITY_CAPS.high.aniso
+	tex.anisotropy = caps.aniso
 }
 
 function nameAndTune(tex: any, name: string): void {
@@ -222,7 +228,27 @@ export class ThreeTextureLoaderBrowser implements ITextureLoader<ThreeTexture> {
 	}
 
 	public async loadRawTexture(name: string, data: Uint8Array, width: number, height: number): Promise<ThreeTexture> {
-		const tex: any = new DataTexture(data as any, width, height, RGBAFormat as any)
+		let format: any = RGBAFormat
+		let src: Uint8Array = data
+		if (data.length === width * height * 4) {
+			let opaque = true
+			for (let i = 3; i < data.length; i += 4)
+				if (data[i] !== 0xff) {
+					opaque = false
+					break
+				}
+			if (opaque) {
+				const rgb = new Uint8Array(width * height * 3)
+				for (let i = 0, j = 0; i < data.length; i += 4, j += 3) {
+					rgb[j] = data[i]
+					rgb[j + 1] = data[i + 1]
+					rgb[j + 2] = data[i + 2]
+				}
+				src = rgb
+				format = RGBFormat
+			}
+		}
+		const tex: any = new DataTexture(src as any, width, height, format as any)
 		tex.flipY = true
 		tex.colorSpace = SRGBColorSpace
 		tex.needsUpdate = true

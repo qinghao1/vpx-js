@@ -12,6 +12,24 @@ export const QUALITY_MAX_LIGHTS = {
 	high: 128,
 } as const
 
+export function isPlayMode(): boolean {
+	try {
+		if (typeof location === 'undefined') return false
+		const p = new URLSearchParams(location.search)
+		if (p.get('mode') === 'play') return true
+		if (p.get('viewerMode') === 'play') return true
+		return false
+	} catch {
+		return false
+	}
+}
+
+export function getEffectiveCaps(): { playfield: number; other: number; floor: number; aniso: number } {
+	if (isLowQuality()) return QUALITY_CAPS.low
+	if (isPlayMode()) return { playfield: 4096, other: 2048, floor: 1024, aniso: 4 }
+	return QUALITY_CAPS.high
+}
+
 let cachedLow: boolean | undefined
 
 function computeIsLowQuality(): boolean {
