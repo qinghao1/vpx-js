@@ -326,6 +326,9 @@ export class Player extends EventEmitter {
 	public setEmulator(emu: IEmulator): void {
 		this.physics.emu = emu
 		this.emit('emuStarted')
+		try {
+			this.pinInput.ensureFreePlay()
+		} catch {}
 	}
 	public hasDmd(): boolean {
 		return !!this.physics.emu?.getDmdDimensions()

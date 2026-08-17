@@ -881,61 +881,30 @@ body.show-debug #debug-toggle {
 	color: #6ea8ff;
 }
 
-/* Nudge */
-#nudge-pad {
+#fps-hud {
 	position: fixed;
-	bottom: max(18px, env(safe-area-inset-bottom));
-	left: 50%;
-	transform: translateX(-50%);
-	z-index: 11;
-	display: flex;
-	gap: 8px;
+	bottom: max(14px, env(safe-area-inset-bottom));
+	left: calc(max(14px, env(safe-area-inset-left)) + 40px);
+	z-index: 12;
+	height: 32px;
+	display: inline-flex;
 	align-items: center;
+	padding: 0 12px;
 	background: var(--surface-muted, rgba(16, 20, 30, 0.62));
 	backdrop-filter: blur(12px);
 	-webkit-backdrop-filter: blur(12px);
 	border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
-	padding: 6px;
 	border-radius: var(--radius);
-	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-}
-#nudge-pad[hidden] {
-	display: none !important;
-}
-body:not(.is-play) #nudge-pad {
-	display: none !important;
-}
-#nudge-pad button[data-nudge] {
-	width: 42px;
-	height: 36px;
-	display: grid;
-	place-items: center;
-	background: var(--border-faint);
-	border: 1px solid var(--border, rgba(255, 255, 255, 0.1));
-	color: #e6e6e6;
-	border-radius: var(--radius);
-	font-size: 16px;
-	font-weight: 700;
-	cursor: pointer;
-	touch-action: manipulation;
-	user-select: none;
-	transition:
-		background 0.12s,
-		transform 0.08s;
-}
-#nudge-pad button[data-nudge]:active {
-	background: rgba(76, 139, 245, 0.28);
-	transform: scale(0.94);
-}
-#nudge-pad #enable-motion {
-	background: rgba(255, 255, 255, 0.92);
-	color: #111;
-	border: none;
-	padding: 6px 10px;
-	border-radius: var(--radius);
+	color: #cbd5e1;
 	font-size: 11px;
 	font-weight: 600;
-	cursor: pointer;
+	letter-spacing: 0.02em;
+	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+	pointer-events: none;
+	font-variant-numeric: tabular-nums;
+}
+#fps-hud .fps {
+	font-variant-numeric: tabular-nums;
 }
 #canvas-wrap {
 	transition: transform 0.08s linear;

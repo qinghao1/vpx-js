@@ -63,6 +63,10 @@ const DEFAULT_KEYS: Record<number, number> = {
 	[AssignKey.Escape]: DIK_ESCAPE,
 }
 
+// Cabinet switches from vpinball InputManager.cpp; free-play coin search mirrors
+// Jakobud/freeplay MAME plugin (init.lua: search ioport fields by name "Free Play"):
+// we search tableScript for "Const swCoin* = N" by name (driver-agnostic) and use the
+// script's AddCreditKey path (vpmKeyDown -> PulseSw) plus a tiny direct pulse for timing.
 const SWITCH_START = [16, 13, 1] as const
 const SWITCH_CREDIT_2_3 = [65, 1, 2, 3, 4] as const
 const SWITCH_CREDIT_4 = [66, 2, 1, 65, 67] as const
@@ -88,6 +92,8 @@ export class PinInput {
 	private readonly nudgeHandler = new NudgeHandler()
 
 	readonly rgKeys: Record<number, number> = { ...DEFAULT_KEYS }
+	public freePlay = true
+	private cachedCoinSwitches: number[] | null = null
 
 	constructor(
 		private readonly table: Table,
@@ -120,6 +126,69 @@ export class PinInput {
 
 	nudge(angle: number, force: number): void {
 		this.nudgeHandler.applyImpulse(angle, force)
+	}
+
+	private pulseSwitches(switches: readonly number[]): void {
+		const emu = this.player.getPhysics().emu
+		if (!emu) return
+		for (const sw of switches) {
+			try {
+				emu.setSwitchInput(sw, true)
+			} catch {}
+		}
+		setTimeout(() => {
+			for (const sw of switches) {
+				try {
+					emu.setSwitchInput(sw, false)
+				} catch {}
+			}
+		}, 120)
+	}
+
+	private discoverCoinSwitches(): number[] {
+		if (this.cachedCoinSwitches) return this.cachedCoinSwitches
+		const script = (this.table as unknown as { tableScript?: string }).tableScript ?? ''
+		const re = /Const\s+swCoin\d*\s*=\s*(-?\d+)/gi
+		const seen = new Set<number>()
+		const out: number[] = []
+		let m: RegExpExecArray | null
+		while ((m = re.exec(script))) {
+			const v = Number.parseInt(m[1] ?? '', 10)
+			if (Number.isFinite(v) && v >= 0 && !seen.has(v)) {
+				seen.add(v)
+				out.push(v)
+			}
+		}
+		if (out.length) {
+			this.cachedCoinSwitches = out
+			return out
+		}
+		return [65, 1, 2]
+	}
+
+	public addCredit(count = 1): void {
+		const key = this.getKey(AssignKey.AddCreditKey)
+		const direct = this.discoverCoinSwitches().slice(0, 3)
+		for (let i = 0; i < count; i++) {
+			setTimeout(() => {
+				try {
+					this.onKeyDown(key)
+					setTimeout(() => {
+						try {
+							this.onKeyUp(key)
+						} catch {}
+					}, 120)
+				} catch {}
+				this.pulseSwitches(direct)
+			}, i * 250)
+		}
+	}
+
+	public ensureFreePlay(): void {
+		if (!this.freePlay) return
+		this.addCredit(3)
+		setTimeout(() => this.addCredit(2), 1500)
+		setTimeout(() => this.addCredit(2), 3500)
 	}
 
 	onKeyDown(code: number, _ts?: number): void {
@@ -282,6 +351,9 @@ export class PinInput {
 	private syncCabinet(isDown: boolean, code: number): void {
 		const emu = this.player.getPhysics().emu
 		if (!emu) return
+		if (this.freePlay && isDown && (code === DIK_1 || code === this.getKey(AssignKey.StartGameKey))) {
+			this.pulseSwitches(this.discoverCoinSwitches())
+		}
 		const switches = this.getCabinetSwitches(code)
 		if (!switches) return
 		for (const sw of switches) {
