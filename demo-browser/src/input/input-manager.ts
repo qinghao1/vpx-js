@@ -1,153 +1,510 @@
-// @ts-nocheck
 import * as THREE from 'three'
+import { keyEventToDirectInputKey } from '../../../dist-esm/lib/game/key-code.js'
 import { pushInput } from '../../../dist-esm/lib/game/shared/physics-buffer.js'
 import { swipeNudge } from '../../../dist-esm/lib/render/threejs/three-scene-postprocess.js'
-import { NUDGE } from '../config.js'
+import { CONTROL_SCHEME, NUDGE } from '../config.js'
 import { ensureBvh } from '../env.js'
-import { aliasEvent } from '../utils.js'
 
-const keyToCode = code => {
-	if (!code) return 0
-	let h = 0
-	for (let i = 0; i < code.length; i++) h = ((h * 31 + code.charCodeAt(i)) & 0xffff) >>> 0
-	return h || 1
+// Generic helpers used by any table: map physical code → logical key + location.
+// Covers all codes from CONTROL_SCHEME and BUTTON_CODE_PATTERNS (Digit*/Key*/Shift*/Control*/Alt*).
+export const keyForCode = (c: string): string =>
+	c === 'Enter'
+		? 'Enter'
+		: c.startsWith('Digit')
+			? c.slice(5)
+			: c.startsWith('Key')
+				? c.slice(3).toLowerCase()
+				: c.startsWith('Shift')
+					? 'Shift'
+					: c.startsWith('Control')
+						? 'Control'
+						: c.startsWith('Alt')
+							? 'Alt'
+							: c === 'Space'
+								? ' '
+								: c
+
+export const locationForCode = (code: string): number | undefined =>
+	code.endsWith('Left') ? 1 : code.endsWith('Right') ? 2 : undefined
+
+export interface InputHost {
+	readonly canvas: HTMLCanvasElement
+	readonly player: {
+		onKeyDown: (e: { code: string; key: string; location?: number; ts: number }) => void
+		onKeyUp: (e: { code: string; key: string; location?: number; ts: number }) => void
+		nudge: (angle: number, force: number) => void
+	} | null
+	readonly viewerMode: 'viewer' | 'play'
+	readonly controls: { enabled: boolean } | null
+	readonly camera: THREE.Camera | null
+	readonly tableGroup: THREE.Group | null
+	readonly buttonMeshes: readonly THREE.Object3D[] | null
+	readonly physicsSab: SharedArrayBuffer | null
+	readonly enableMotionButton?: HTMLButtonElement | null
+	log?(msg: string, level?: string): void
+	enterPlayMode(): void
+	exitPlayMode(): void
+	togglePause(): void
+	releaseKeys(codes: string[]): void
+	requestMotionPermission?(): Promise<boolean>
 }
-const PLAY_KEYS = new Set([
-	'Space',
-	'KeyZ',
-	'Slash',
-	'ArrowLeft',
-	'ArrowRight',
-	'ArrowUp',
-	'ArrowDown',
-	'Enter',
-	'Digit1',
-	'Digit5',
-	'KeyT',
-	'ShiftLeft',
-	'ShiftRight',
-	'Shift',
-])
 
-export function attachKeyboard(viewer) {
-	if (viewer._boundKeyDown) {
-		removeEventListener('keydown', viewer._boundKeyDown)
-		document.removeEventListener('keydown', viewer._boundKeyDown)
-		window.removeEventListener('keydown', viewer._boundKeyDown)
-	}
-	if (viewer._boundKeyUp) {
-		removeEventListener('keyup', viewer._boundKeyUp)
-		document.removeEventListener('keyup', viewer._boundKeyUp)
-		window.removeEventListener('keyup', viewer._boundKeyUp)
-	}
+const PLAY_CODES = new Set(CONTROL_SCHEME.flatMap(c => c.keys))
 
-	const togglePause = () => {
-		viewer.isPaused = !viewer.isPaused
-		viewer.isPaused ? viewer.player.pause() : viewer.player.resume()
-		viewer.log(viewer.isPaused ? 'Paused (P to resume)' : 'Resumed', viewer.isPaused ? 'warn' : 'info')
-	}
+// Generic screen zones for touch fallback when no cabinet mesh is hit.
+// These are not walking_dead-specific: left/right halves are flipper zones on any table,
+// bottom-right quadrant is the conventional plunger/launch zone. Tables that provide real
+// cabinet button meshes (via viewer._buttonMeshes / isCabinetButton) bypass this entirely
+// through raycasting — this is only the low-cost fallback for VR-less or minimal tables.
+const FALLBACK_ZONES = {
+	plunger: { xMin: 0.65, yMin: 0.55 },
+	flipperSplit: 0.5,
+} as const
 
-	const send = (e, down) => {
-		if (viewer.viewerMode === 'viewer' && down) {
-			const c = e.code || e.key || ''
-			const isPlayKey =
-				PLAY_KEYS.has(c) ||
-				PLAY_KEYS.has(e.key) ||
-				c === 'ShiftLeft' ||
-				c === 'ShiftRight' ||
-				e.key === 'Shift' ||
-				c === 'ArrowLeft' ||
-				c === 'ArrowRight' ||
-				c === 'Space' ||
-				c === 'Enter'
-			if (isPlayKey) {
+function toHost(viewer: any): InputHost {
+	return {
+		get canvas() {
+			return viewer.dom?.canvas as HTMLCanvasElement
+		},
+		get player() {
+			return viewer.player ?? null
+		},
+		get viewerMode() {
+			return viewer.viewerMode as 'viewer' | 'play'
+		},
+		get controls() {
+			return viewer.controls ?? null
+		},
+		get camera() {
+			return viewer.camera ?? null
+		},
+		get tableGroup() {
+			return viewer.tableGroup ?? null
+		},
+		get buttonMeshes() {
+			return (viewer._buttonMeshes ?? null) as readonly THREE.Object3D[] | null
+		},
+		get physicsSab() {
+			return (viewer._physicsSab ?? null) as SharedArrayBuffer | null
+		},
+		get enableMotionButton() {
+			return typeof document !== 'undefined'
+				? (document.getElementById('enable-motion') as HTMLButtonElement | null)
+				: null
+		},
+		log(msg: string, level?: string) {
+			try {
+				viewer.log?.(msg, level)
+			} catch {}
+		},
+		enterPlayMode() {
+			try {
+				viewer.viewerMode = 'play'
+			} catch {}
+			try {
+				viewer.player?.setPhysicsEnabled?.(true)
+			} catch {}
+			try {
+				viewer.enterPlayMode?.()
+			} catch {}
+			try {
+				viewer._switchToPlay?.()
+			} catch {}
+		},
+		exitPlayMode() {
+			try {
+				viewer._switchToViewer?.()
+			} catch {}
+			try {
+				viewer.exitPlayMode?.()
+			} catch {}
+		},
+		togglePause() {
+			try {
+				viewer.isPaused = !viewer.isPaused
+				if (viewer.isPaused) viewer.player?.pause?.()
+				else viewer.player?.resume?.()
+				viewer.log?.(viewer.isPaused ? 'Paused (P to resume)' : 'Resumed', viewer.isPaused ? 'warn' : 'info')
+			} catch {}
+		},
+		releaseKeys(codes: string[]) {
+			for (const code of codes) {
 				try {
-					viewer.viewerMode = 'play'
-					try {
-						viewer.player?.setPhysicsEnabled(true)
-					} catch {}
-					try {
-						viewer.enterPlayMode?.()
-					} catch {}
-					viewer._switchToPlay?.()
+					viewer._sendKey?.(code, false)
+				} catch {}
+				try {
+					const key = keyForCode(code)
+					const loc = locationForCode(code)
+					const ev = { code, key, location: loc, ts: Date.now() } as any
+					viewer.player?.onKeyUp?.(ev)
 				} catch {}
 			}
+		},
+		requestMotionPermission:
+			typeof DeviceMotionEvent !== 'undefined' && 'requestPermission' in (DeviceMotionEvent as any)
+				? async () => {
+						try {
+							const perm = await (DeviceMotionEvent as any).requestPermission()
+							return perm === 'granted'
+						} catch {
+							return false
+						}
+					}
+				: undefined,
+	}
+}
+
+function attachKeyboardHost(host: InputHost, signal: AbortSignal): void {
+	const pressed = new Set<number>()
+
+	const onKey = (e: KeyboardEvent, down: boolean): void => {
+		if (e.key === '?' || (e.key.length === 1 && ['h', 'o'].includes(e.key.toLowerCase()))) return
+
+		if (down && host.viewerMode === 'viewer' && (PLAY_CODES.has(e.code) || PLAY_CODES.has(e.key))) {
+			host.enterPlayMode()
 		}
-		try {
-			if (
-				viewer.viewerMode === 'play' &&
-				(e.code === 'ShiftLeft' ||
-					e.code === 'ShiftRight' ||
-					e.key === 'Shift' ||
-					e.key === 'ShiftLeft' ||
-					e.key === 'ShiftRight')
-			) {
-				// ensure immediate visual feedback even if physics is delayed
+
+		if (host.viewerMode !== 'play') return
+
+		if (e.code === 'Escape' && down) {
+			host.exitPlayMode()
+			e.preventDefault()
+			return
+		}
+
+		if ((e.code === 'KeyP' || e.key.toLowerCase() === 'p') && down && !e.ctrlKey && !e.metaKey && !e.repeat) {
+			host.togglePause()
+			e.preventDefault()
+			return
+		}
+
+		const dik = keyEventToDirectInputKey(e as any)
+		if (dik) {
+			if (down) {
+				if (pressed.has(dik)) return
+				pressed.add(dik)
+			} else {
+				pressed.delete(dik)
 			}
-		} catch {}
-		if (['?', 'h', 'H', 'o', 'O'].includes(e.key)) return
-		if (
-			(e.key === 'p' || e.key === 'P' || e.code === 'KeyP') &&
-			viewer.viewerMode === 'play' &&
-			!e.ctrlKey &&
-			!e.metaKey &&
-			!e.repeat
-		) {
-			if (!down) return
-			togglePause()
-			e.preventDefault()
-			return
 		}
-		if (e.code === 'Escape' && viewer.viewerMode === 'play') {
-			if (down) viewer._switchToViewer()
-			e.preventDefault()
-			return
-		}
-		const ae = aliasEvent(e)
-		const ev = ae || {
+
+		const ev = {
 			code: e.code || e.key,
 			key: e.key,
+			location: (e as any).location,
+			keyCode: (e as any).keyCode,
+			which: (e as any).which,
 			ts: Date.now(),
-			location: e.location,
-			keyCode: e.keyCode,
-			which: e.which,
+		} as any
+
+		if (host.player) {
+			if (down) {
+				try {
+					host.player.onKeyDown(ev)
+				} catch (err) {
+					console.warn('[input] onKeyDown failed', err)
+				}
+			} else {
+				try {
+					host.player.onKeyUp(ev)
+				} catch (err) {
+					console.warn('[input] onKeyUp failed', err)
+				}
+			}
 		}
-		if (!ev.code && e.key) ev.code = e.key
-		if (ev.code === 'Shift' && typeof e.location === 'number') {
-			ev.code = e.location === 2 ? 'ShiftRight' : 'ShiftLeft'
+
+		if (host.physicsSab && dik) {
+			pushInput(host.physicsSab, down ? 1 : 0, dik, Date.now())
 		}
-		if (e.key === 'Shift' && !e.code) {
-			ev.code = e.location === 2 ? 'ShiftRight' : 'ShiftLeft'
-		}
-		try {
-			if (down) viewer.player.onKeyDown(ev)
-			else viewer.player.onKeyUp(ev)
-		} catch (err) {
-			console.warn('[input] onKey failed', err)
-		}
-		if (viewer._physicsSab) {
-			const kind = down ? 1 : 0
-			pushInput(viewer._physicsSab, kind, keyToCode(ev.code), ev.ts ?? Date.now())
-		}
-		if (
-			ae ||
-			PLAY_KEYS.has(e.code) ||
-			PLAY_KEYS.has(e.key) ||
-			e.code === 'ShiftLeft' ||
-			e.code === 'ShiftRight' ||
-			e.key === 'Shift'
-		)
+
+		if (dik || PLAY_CODES.has(e.code) || PLAY_CODES.has(e.key)) {
 			e.preventDefault()
+		}
 	}
 
-	viewer._boundKeyDown = e => send(e, true)
-	viewer._boundKeyUp = e => send(e, false)
-	addEventListener('keydown', viewer._boundKeyDown)
-	addEventListener('keyup', viewer._boundKeyUp)
-	document.addEventListener('keydown', viewer._boundKeyDown)
-	document.addEventListener('keyup', viewer._boundKeyUp)
-	window.addEventListener('keydown', viewer._boundKeyDown)
-	window.addEventListener('keyup', viewer._boundKeyUp)
+	window.addEventListener('keydown', e => onKey(e, true), { signal })
+	window.addEventListener('keyup', e => onKey(e, false), { signal })
+	window.addEventListener(
+		'blur',
+		() => {
+			pressed.clear()
+			host.releaseKeys(['ShiftLeft', 'ShiftRight', 'ControlLeft', 'ControlRight', 'AltLeft', 'AltRight'])
+		},
+		{ signal },
+	)
+	document.addEventListener(
+		'visibilitychange',
+		() => {
+			if (document.hidden)
+				host.releaseKeys(['ShiftLeft', 'ShiftRight', 'ControlLeft', 'ControlRight', 'AltLeft', 'AltRight'])
+		},
+		{ signal },
+	)
+}
+
+function attachPointerHost(host: InputHost, signal: AbortSignal): void {
+	ensureBvh()
+	const canvas = host.canvas
+	if (!canvas) return
+
+	const active = new Map<number, string>()
+	const raycaster = new THREE.Raycaster()
+	const ndc = new THREE.Vector2()
+	;(raycaster as any).firstHitOnly = true
+	let rect: DOMRect | null = null
+	let hoverRaf = 0
+	let hoverX = 0
+	let hoverY = 0
+	const swipeStart = new Map<number, { x: number; y: number; t: number }>()
+
+	let ro: ResizeObserver | null = null
+	try {
+		ro = new ResizeObserver(() => {
+			rect = canvas.getBoundingClientRect()
+		})
+		ro.observe(canvas)
+		signal.addEventListener('abort', () => ro?.disconnect(), { once: true })
+	} catch {}
+
+	window.addEventListener(
+		'scroll',
+		() => {
+			rect = null
+		},
+		{ signal, passive: true } as any,
+	)
+
+	try {
+		canvas.tabIndex = 0
+	} catch {}
+	const onCanvasClick = (): void => {
+		try {
+			canvas.focus()
+		} catch {}
+	}
+	canvas.addEventListener('click', onCanvasClick, { signal })
+
+	const zoneFor = (x: number, y: number): string => {
+		const r = rect ?? (rect = canvas.getBoundingClientRect())
+		if (!r || !r.width || !r.height) return 'ShiftLeft'
+		const nx = (x - r.left) / r.width
+		const ny = (y - r.top) / r.height
+		// Generic fallback zones: works for any table orientation; real cabinet meshes take precedence
+		if (nx > FALLBACK_ZONES.plunger.xMin && ny > FALLBACK_ZONES.plunger.yMin) return 'Enter'
+		return nx < FALLBACK_ZONES.flipperSplit ? 'ShiftLeft' : 'ShiftRight'
+	}
+
+	const hitFor = (
+		x: number,
+		y: number,
+		opts: { hover?: boolean } = {},
+	): { code: string; obj: THREE.Object3D } | null => {
+		if (!host.tableGroup || !host.camera || host.viewerMode !== 'play' || !host.player) return null
+		const r = rect ?? (rect = canvas.getBoundingClientRect())
+		if (!r || !r.width || !r.height) return null
+		if (x < r.left || x > r.right || y < r.top || y > r.bottom) return null
+		ndc.set(((x - r.left) / r.width) * 2 - 1, -((y - r.top) / r.height) * 2 + 1)
+		raycaster.setFromCamera(ndc, host.camera)
+		const meshes = host.buttonMeshes
+		if (meshes?.length) {
+			const hits = raycaster.intersectObjects(meshes as THREE.Object3D[], false)
+			const h = hits[0] as any
+			if (h?.object) {
+				for (let cur: any = h.object; cur; cur = cur.parent) {
+					const code: string | null = cur.userData?.buttonCode ?? cur.userData?.__buttonCode ?? null
+					if (code) return { code, obj: cur as THREE.Object3D }
+				}
+			}
+			if (opts.hover) return null
+		}
+		if (opts.hover) return null
+		// Generic fallback for any table: if no cabinet mesh list (or hit misses), walk the scene
+		// once on pointerdown (rare) — not on hover (60 Hz). This catches tables where buttons are
+		// plain primitives grouped under a cabinet node without isCabinetButton flag.
+		try {
+			const hits = raycaster.intersectObject(host.tableGroup, true)
+			for (const h of hits) {
+				for (let cur: any = (h as any).object; cur; cur = cur.parent) {
+					const code: string | null =
+						cur.userData?.buttonCode ??
+						cur.userData?.__buttonCode ??
+						(cur.userData?.isCabinetButton ? cur.userData.buttonCode : null)
+					if (code) return { code, obj: (h as any).object as THREE.Object3D }
+				}
+			}
+		} catch {}
+		return null
+	}
+
+	const scheduleHover = (x: number, y: number): void => {
+		hoverX = x
+		hoverY = y
+		if (hoverRaf) return
+		hoverRaf = requestAnimationFrame(() => {
+			hoverRaf = 0
+			const hit = hitFor(hoverX, hoverY, { hover: true })
+			canvas.classList.toggle('is-pointer', !!hit)
+			if (hit) canvas.style.cursor = 'pointer'
+			else canvas.style.cursor = ''
+		})
+	}
+
+	canvas.addEventListener(
+		'pointerdown',
+		(e: PointerEvent) => {
+			if (e.button !== 0 && e.button !== 2) return
+			const isRightClick = e.button === 2
+			const hit = hitFor(e.clientX, e.clientY, { hover: false })
+			const code = isRightClick ? '__nudge' : (hit?.code ?? zoneFor(e.clientX, e.clientY))
+			active.set(e.pointerId, code)
+			swipeStart.set(e.pointerId, { x: e.clientX, y: e.clientY, t: performance.now() })
+
+			if (!isRightClick) {
+				const key = keyForCode(code)
+				const location = locationForCode(code)
+				const ev = { code, key, location, ts: Date.now() } as any
+				try {
+					host.player?.onKeyDown(ev)
+				} catch (err) {
+					console.warn('[input] onKeyDown failed', err)
+				}
+				if (host.physicsSab) {
+					const dik = keyEventToDirectInputKey(ev)
+					if (dik) pushInput(host.physicsSab, 1, dik, Date.now())
+				}
+			}
+
+			if (hit) {
+				canvas.setAttribute('data-pressed', code)
+				try {
+					e.stopPropagation()
+				} catch {}
+				if (host.controls) {
+					const c: any = host.controls
+					if (c._inputPrevEnabled == null) c._inputPrevEnabled = c.enabled
+					c.enabled = false
+				}
+			}
+
+			try {
+				canvas.setPointerCapture(e.pointerId)
+			} catch {}
+			if (host.viewerMode === 'play') e.preventDefault()
+			if (isRightClick) e.preventDefault()
+		},
+		{ signal },
+	)
+
+	const end = (e: PointerEvent): void => {
+		const code = active.get(e.pointerId)
+		if (!code) return
+		active.delete(e.pointerId)
+
+		if (code !== '__nudge') {
+			const key = keyForCode(code)
+			const location = locationForCode(code)
+			const ev = { code, key, location, ts: Date.now() } as any
+			try {
+				host.player?.onKeyUp(ev)
+			} catch (err) {
+				console.warn('[input] onKeyUp failed', err)
+			}
+			if (host.physicsSab) {
+				const dik = keyEventToDirectInputKey(ev)
+				if (dik) pushInput(host.physicsSab, 0, dik, Date.now())
+			}
+		}
+
+		if (active.size === 0) canvas.removeAttribute('data-pressed')
+
+		if (active.size === 0 && host.controls) {
+			const c: any = host.controls
+			if (c._inputPrevEnabled != null) {
+				c.enabled = c._inputPrevEnabled
+				c._inputPrevEnabled = null
+			}
+		}
+
+		const s = swipeStart.get(e.pointerId)
+		swipeStart.delete(e.pointerId)
+		if (s) {
+			const dx = e.clientX - s.x
+			const dy = e.clientY - s.y
+			const dt = performance.now() - s.t
+			if (dt < 600 && Math.hypot(dx, dy) > 50) {
+				const ang = swipeNudge(dx, dy, NUDGE as any)
+				if (ang !== null) {
+					try {
+						host.player?.nudge(ang, ang === NUDGE.back ? 2.0 : NUDGE.force)
+					} catch {}
+				}
+			}
+		}
+
+		try {
+			canvas.releasePointerCapture(e.pointerId)
+		} catch {}
+	}
+
+	canvas.addEventListener('pointerup', end as any, { signal })
+	canvas.addEventListener('pointercancel', end as any, { signal })
+	canvas.addEventListener('pointermove', (e: PointerEvent) => scheduleHover(e.clientX, e.clientY), {
+		signal,
+		passive: true,
+	} as any)
+	canvas.addEventListener(
+		'pointerleave',
+		() => {
+			if (hoverRaf) {
+				cancelAnimationFrame(hoverRaf)
+				hoverRaf = 0
+			}
+			canvas.classList.remove('is-pointer')
+			canvas.style.cursor = ''
+		},
+		{ signal },
+	)
+	canvas.addEventListener(
+		'contextmenu',
+		(e: MouseEvent) => {
+			if (host.viewerMode === 'play') e.preventDefault()
+		},
+		{ signal },
+	)
+
+	signal.addEventListener('abort', () => {
+		if (hoverRaf) {
+			cancelAnimationFrame(hoverRaf)
+			hoverRaf = 0
+		}
+		canvas.classList.remove('is-pointer')
+		canvas.style.cursor = ''
+		canvas.removeAttribute('data-pressed')
+		active.clear()
+		swipeStart.clear()
+		if (host.controls) {
+			const c: any = host.controls
+			if (c._inputPrevEnabled != null) {
+				c.enabled = c._inputPrevEnabled
+				c._inputPrevEnabled = null
+			}
+		}
+	})
+}
+
+export function attachKeyboard(viewer: any): () => void {
+	const host = toHost(viewer)
+	const ctrl = new AbortController()
+
+	if (viewer._keyboardCtrl) {
+		try {
+			viewer._keyboardCtrl.abort()
+		} catch {}
+	}
+	viewer._keyboardCtrl = ctrl
+
+	attachKeyboardHost(host, ctrl.signal)
+
 	try {
 		viewer.dom?.canvas?.focus?.()
 	} catch {}
@@ -156,326 +513,38 @@ export function attachKeyboard(viewer) {
 	} catch {}
 
 	return () => {
-		if (viewer._boundKeyDown) {
-			removeEventListener('keydown', viewer._boundKeyDown)
-			document.removeEventListener('keydown', viewer._boundKeyDown)
-			window.removeEventListener('keydown', viewer._boundKeyDown)
-		}
-		if (viewer._boundKeyUp) {
-			removeEventListener('keyup', viewer._boundKeyUp)
-			document.removeEventListener('keyup', viewer._boundKeyUp)
-			window.removeEventListener('keyup', viewer._boundKeyUp)
-		}
-		viewer._boundKeyDown = null
-		viewer._boundKeyUp = null
+		try {
+			ctrl.abort()
+		} catch {}
+		if (viewer._keyboardCtrl === ctrl) viewer._keyboardCtrl = null
 	}
 }
 
-export function attachPointerTouch(viewer) {
-	ensureBvh()
-	const canvas = viewer.dom.canvas
-	if (!canvas) return () => {}
-	if (viewer._touchCleanup) viewer._touchCleanup()
-	viewer._touchCleanup = null
+export function attachPointerTouch(viewer: any): () => void {
+	const host = toHost(viewer)
+	const ctrl = new AbortController()
 
-	canvas.tabIndex = 0
-	canvas.focus()
-
-	const onCanvasClick = () => canvas.focus()
-	canvas.addEventListener('click', onCanvasClick)
-
-	const active = viewer._touchMap
-	const toCode = (x, y) => {
-		const r = canvas.getBoundingClientRect()
-		const nx = (x - r.left) / r.width
-		const ny = (y - r.top) / r.height
-		return nx > 0.65 && ny > 0.55 ? 'Enter' : nx < 0.5 ? 'ShiftLeft' : 'ShiftRight'
-	}
-	const down = (id, code) => {
-		if (active.has(id) || viewer.viewerMode !== 'play' || !viewer.player) return
-		active.set(id, code)
-		viewer._sendKey(code, true)
-	}
-	const up = id => {
-		const code = active.get(id)
-		if (!code) return
-		active.delete(id)
-		viewer._sendKey(code, false)
-	}
-
-	const raycaster = new THREE.Raycaster()
-	const buttonActive = new Map()
-	let orbitPrevEnabled = null
-	let hoverRaf = 0
-	let hoverX = 0
-	let hoverY = 0
-	let isHoveringButton = false
-
-	const emissiveOrig = new WeakMap()
-	const emissiveIntOrig = new WeakMap()
-	const scaleOrig = new WeakMap()
-
-	const getButtonHit = (clientX, clientY) => {
-		if (!viewer.tableGroup || !viewer.camera) return null
-		if (viewer.viewerMode !== 'play') return null
-		if (!viewer.player) return null
-		const meshes = viewer._buttonMeshes
-		const rect = canvas.getBoundingClientRect()
-		if (clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom) return null
-		viewer.tableGroup.updateMatrixWorld(true)
-		const x = ((clientX - rect.left) / rect.width) * 2 - 1
-		const y = -((clientY - rect.top) / rect.height) * 2 + 1
-		const mouse = new THREE.Vector2(x, y)
-		raycaster.setFromCamera(mouse, viewer.camera)
-		if (meshes?.length) {
-			raycaster.firstHitOnly = true
-			const hits = raycaster.intersectObjects(meshes, false)
-			if (!hits.length) return null
-			const h = hits[0]
-			const code = h.object.userData?.buttonCode || h.object.userData?.__buttonCode
-			if (!code) return null
-			return { code, object: h.object, distance: h.distance }
-		}
-		raycaster.firstHitOnly = false
-		const hits = raycaster.intersectObject(viewer.tableGroup, true)
-		for (const h of hits) {
-			for (let cur = h.object; cur; cur = cur.parent) {
-				const code =
-					cur.userData?.buttonCode ||
-					cur.userData?.__buttonCode ||
-					(cur.userData?.isCabinetButton ? cur.userData.buttonCode : null)
-				if (code) return { code, object: h.object, distance: h.distance }
-			}
-		}
-		return null
-	}
-
-	const setButtonVisual = (hitObject, isDown) => {
-		if (!hitObject) return
-		const meshes = []
-		if (hitObject.isMesh) meshes.push(hitObject)
-		else
-			hitObject.traverse?.(o => {
-				if (o.isMesh) meshes.push(o)
-			})
-		if (!meshes.length && hitObject.isMesh) meshes.push(hitObject)
-		for (const mesh of meshes) {
-			if (!mesh.material) continue
-			if (isDown && !mesh.userData.__clonedMaterial) {
-				if (Array.isArray(mesh.material)) mesh.material = mesh.material.map(m => m.clone())
-				else mesh.material = mesh.material.clone()
-				mesh.userData.__clonedMaterial = true
-			}
-			const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
-			for (const mat of mats) {
-				if (isDown) {
-					if (!emissiveOrig.has(mat)) {
-						emissiveOrig.set(mat, mat.emissive ? mat.emissive.clone() : new THREE.Color(0x000000))
-						emissiveIntOrig.set(mat, mat.emissiveIntensity ?? 0)
-					}
-					if (mat.emissive) {
-						mat.emissive.setHex(0x666666)
-						mat.emissiveIntensity = 0.7
-					}
-					mat.needsUpdate = true
-				} else {
-					if (emissiveOrig.has(mat)) {
-						const orig = emissiveOrig.get(mat)
-						if (mat.emissive && orig) mat.emissive.copy(orig)
-						mat.emissiveIntensity = emissiveIntOrig.get(mat) ?? 0
-						mat.needsUpdate = true
-					}
-				}
-			}
-			if (isDown) {
-				if (!scaleOrig.has(mesh)) scaleOrig.set(mesh, mesh.scale.clone())
-				mesh.scale.set(0.97, 0.97, 0.97)
-			} else {
-				const orig = scaleOrig.get(mesh)
-				if (orig) mesh.scale.copy(orig)
-			}
-		}
-	}
-
-	const disableOrbit = () => {
-		if (viewer.controls && orbitPrevEnabled === null) {
-			orbitPrevEnabled = viewer.controls.enabled
-			viewer.controls.enabled = false
-		}
-	}
-	const restoreOrbitIfNoButtons = () => {
-		if (buttonActive.size === 0 && orbitPrevEnabled !== null && viewer.controls) {
-			viewer.controls.enabled = orbitPrevEnabled
-			orbitPrevEnabled = null
-		}
-	}
-	const clearButtonHover = () => {
-		if (isHoveringButton) {
-			canvas.classList.remove('is-pointer')
-			canvas.style.cursor = ''
-			isHoveringButton = false
-		}
-	}
-	const flushHover = () => {
-		hoverRaf = 0
-		if (viewer.viewerMode !== 'play' || !viewer.tableGroup) {
-			clearButtonHover()
-			return
-		}
-		const hit = getButtonHit(hoverX, hoverY)
-		if (hit) {
-			if (!isHoveringButton) {
-				canvas.classList.add('is-pointer')
-				canvas.style.cursor = 'pointer'
-				isHoveringButton = true
-			}
-		} else {
-			clearButtonHover()
-		}
-	}
-	const onPointerMoveHover = e => {
-		hoverX = e.clientX
-		hoverY = e.clientY
-		if (hoverRaf) return
-		hoverRaf = requestAnimationFrame(flushHover)
-	}
-	const onPointerLeave = () => {
-		if (hoverRaf) {
-			cancelAnimationFrame(hoverRaf)
-			hoverRaf = 0
-		}
-		clearButtonHover()
-	}
-
-	const onDown = e => {
-		if (e.pointerType === 'touch') return
-		if (e.pointerType === 'mouse' && e.button !== 0) return
-		const hit = getButtonHit(e.clientX, e.clientY)
-		let code
-		if (hit) {
-			code = hit.code
-			buttonActive.set(e.pointerId, { code, object: hit.object })
-			setButtonVisual(hit.object, true)
-			disableOrbit()
-			try {
-				e.stopImmediatePropagation()
-			} catch {}
-			try {
-				e.stopPropagation()
-			} catch {}
-		} else {
-			code = toCode(e.clientX, e.clientY)
-		}
-		down(e.pointerId, code)
-		if (viewer.viewerMode === 'play') e.preventDefault()
+	if (viewer._pointerCtrl) {
 		try {
-			canvas.setPointerCapture(e.pointerId)
+			viewer._pointerCtrl.abort()
 		} catch {}
 	}
-	const onUp = e => {
-		if (e.pointerType === 'touch') return
-		const btnInfo = buttonActive.get(e.pointerId)
-		if (btnInfo) {
-			setButtonVisual(btnInfo.object, false)
-			buttonActive.delete(e.pointerId)
-			restoreOrbitIfNoButtons()
-		}
-		up(e.pointerId)
-		if (viewer.viewerMode === 'play') e.preventDefault()
+	viewer._pointerCtrl = ctrl
+
+	attachPointerHost(host, ctrl.signal)
+
+	return () => {
 		try {
-			canvas.releasePointerCapture(e.pointerId)
+			ctrl.abort()
+		} catch {}
+		if (viewer._pointerCtrl === ctrl) viewer._pointerCtrl = null
+		try {
+			viewer._touchCleanup = null
 		} catch {}
 	}
-	const onCancel = e => {
-		if (e.pointerType !== 'touch') {
-			const btnInfo = buttonActive.get(e.pointerId)
-			if (btnInfo) {
-				setButtonVisual(btnInfo.object, false)
-				buttonActive.delete(e.pointerId)
-				restoreOrbitIfNoButtons()
-			}
-			up(e.pointerId)
-		}
-	}
-	const touchStarts = new Map()
-	const onTouchStart = e => {
-		for (const t of e.changedTouches) {
-			const hit = getButtonHit(t.clientX, t.clientY)
-			let code
-			if (hit) {
-				code = hit.code
-				buttonActive.set(t.identifier + 1000, { code, object: hit.object })
-				setButtonVisual(hit.object, true)
-				disableOrbit()
-			} else {
-				code = toCode(t.clientX, t.clientY)
-			}
-			touchStarts.set(t.identifier + 1000, { x: t.clientX, y: t.clientY, t: performance.now() })
-			down(t.identifier + 1000, code)
-		}
-	}
-	const onTouchEnd = e => {
-		for (const t of e.changedTouches) {
-			const id = t.identifier + 1000
-			const btnInfo = buttonActive.get(id)
-			if (btnInfo) {
-				setButtonVisual(btnInfo.object, false)
-				buttonActive.delete(id)
-			}
-			const st = touchStarts.get(id)
-			if (st) {
-				const dx = t.clientX - st.x
-				const dy = t.clientY - st.y
-				const dt = performance.now() - st.t
-				touchStarts.delete(id)
-				if (dt < 600 && Math.hypot(dx, dy) > 50) {
-					up(id)
-					const ang = swipeNudge(dx, dy, NUDGE)
-					if (ang !== null) {
-						viewer._nudge(ang, ang === NUDGE.back ? 2.0 : NUDGE.force)
-						continue
-					}
-				}
-			}
-			up(id)
-		}
-		if (buttonActive.size === 0) restoreOrbitIfNoButtons()
-	}
-	const onContext = e => {
-		if (viewer.viewerMode === 'play') e.preventDefault()
-	}
-	canvas.addEventListener('pointerdown', onDown, true)
-	canvas.addEventListener('pointerup', onUp, true)
-	canvas.addEventListener('pointercancel', onCancel, true)
-	canvas.addEventListener('pointermove', onPointerMoveHover)
-	canvas.addEventListener('pointerleave', onPointerLeave)
-	canvas.addEventListener('touchstart', onTouchStart, { passive: true, capture: true })
-	canvas.addEventListener('touchend', onTouchEnd, { passive: true })
-	canvas.addEventListener('touchcancel', onTouchEnd, { passive: true })
-	canvas.addEventListener('contextmenu', onContext)
-	const cleanup = () => {
-		canvas.removeEventListener('click', onCanvasClick)
-		canvas.removeEventListener('pointerdown', onDown, true)
-		canvas.removeEventListener('pointerup', onUp, true)
-		canvas.removeEventListener('pointercancel', onCancel, true)
-		canvas.removeEventListener('pointermove', onPointerMoveHover)
-		canvas.removeEventListener('pointerleave', onPointerLeave)
-		canvas.removeEventListener('touchstart', onTouchStart, true)
-		canvas.removeEventListener('touchend', onTouchEnd)
-		canvas.removeEventListener('touchcancel', onTouchEnd)
-		canvas.removeEventListener('contextmenu', onContext)
-		if (hoverRaf) {
-			cancelAnimationFrame(hoverRaf)
-			hoverRaf = 0
-		}
-		for (const { object } of buttonActive.values()) setButtonVisual(object, false)
-		buttonActive.clear()
-		if (orbitPrevEnabled !== null && viewer.controls) {
-			viewer.controls.enabled = orbitPrevEnabled
-			orbitPrevEnabled = null
-		}
-		clearButtonHover()
-	}
-	viewer._touchCleanup = cleanup
-	return cleanup
+}
+
+export function attachInputHost(host: InputHost, signal: AbortSignal): void {
+	attachKeyboardHost(host, signal)
+	attachPointerHost(host, signal)
 }

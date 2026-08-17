@@ -1,141 +1,181 @@
-// @ts-nocheck
 import { NUDGE } from '../config.js'
-import { swipeNudge } from '../../../dist-esm/lib/render/threejs/three-scene-postprocess.js'
+import type { InputHost } from './input-manager.js'
 
-export function attachNudgeInput(viewer) {
-	if (viewer._nudgeCleanup) viewer._nudgeCleanup()
-	viewer._nudgeCleanup = null
-	const cleanups = []
-	const trigger = (angle, force = NUDGE.force) => viewer._nudge(angle, force)
-
-	const pad = document.getElementById('nudge-pad')
-	if (pad) {
-		pad.hidden = false
-		const handler = e => {
-			const dir = e.currentTarget?.dataset?.nudge
-			if (dir === 'left') trigger(NUDGE.left, 2.8)
-			else if (dir === 'right') trigger(NUDGE.right, 2.8)
-			else if (dir === 'center' || dir === 'up') trigger(NUDGE.forward, 2.8)
-			e.preventDefault()
-		}
-		for (const btn of pad.querySelectorAll('[data-nudge]')) {
-			btn.addEventListener('touchstart', handler, { passive: false })
-			btn.addEventListener('mousedown', handler)
-			cleanups.push(() => {
-				btn.removeEventListener('touchstart', handler)
-				btn.removeEventListener('mousedown', handler)
-			})
-		}
+function toNudgeHost(viewer: any): InputHost {
+	return {
+		get canvas() {
+			return viewer.dom?.canvas as HTMLCanvasElement
+		},
+		get player() {
+			return viewer.player ?? null
+		},
+		get viewerMode() {
+			return viewer.viewerMode as 'viewer' | 'play'
+		},
+		get controls() {
+			return viewer.controls ?? null
+		},
+		get camera() {
+			return viewer.camera ?? null
+		},
+		get tableGroup() {
+			return viewer.tableGroup ?? null
+		},
+		get buttonMeshes() {
+			return (viewer._buttonMeshes ?? null) as any
+		},
+		get physicsSab() {
+			return (viewer._physicsSab ?? null) as any
+		},
+		get enableMotionButton() {
+			return typeof document !== 'undefined'
+				? (document.getElementById('enable-motion') as HTMLButtonElement | null)
+				: null
+		},
+		log(msg: string, level?: string) {
+			try {
+				viewer.log?.(msg, level)
+			} catch {}
+		},
+		enterPlayMode() {},
+		exitPlayMode() {},
+		togglePause() {},
+		releaseKeys() {},
+		requestMotionPermission:
+			typeof DeviceMotionEvent !== 'undefined' && 'requestPermission' in (DeviceMotionEvent as any)
+				? async () => {
+						try {
+							const perm = await (DeviceMotionEvent as any).requestPermission()
+							return perm === 'granted'
+						} catch {
+							return false
+						}
+					}
+				: undefined,
 	}
+}
 
-	const canvas = viewer.dom.canvas
-	if (canvas) {
-		let startX = 0,
-			startY = 0,
-			startT = 0,
-			activeId = null
-		const onPtrDown = e => {
-			if (e.pointerType === 'touch' || e.button !== 2) return
-			startX = e.clientX
-			startY = e.clientY
-			startT = performance.now()
-			activeId = e.pointerId
-		}
-		const onPtrUp = e => {
-			if (activeId !== e.pointerId) return
-			const dx = e.clientX - startX,
-				dy = e.clientY - startY,
-				dt = performance.now() - startT
-			activeId = null
-			if (dt > 600 || Math.hypot(dx, dy) < 45) return
-			const ang = swipeNudge(dx, dy, NUDGE)
-			if (ang !== null) trigger(ang, ang === NUDGE.back ? 1.8 : 2.5)
-		}
-		canvas.addEventListener('pointerdown', onPtrDown)
-		canvas.addEventListener('pointerup', onPtrUp)
-		cleanups.push(() => {
-			canvas.removeEventListener('pointerdown', onPtrDown)
-			canvas.removeEventListener('pointerup', onPtrUp)
-		})
+function attachNudgeHost(host: InputHost, signal: AbortSignal): void {
+	const trigger = (angle: number, force = NUDGE.force): void => {
+		try {
+			if (!host.player || host.viewerMode !== 'play') return
+			host.player.nudge(angle, force)
+		} catch {}
 	}
 
 	let lastShake = 0
-	const onMotion = e => {
-		const acc = e.accelerationIncludingGravity || e.acceleration
-		if (!acc) return
-		const mag = Math.hypot(acc.x ?? 0, acc.y ?? 0, acc.z ?? 0)
+	const onMotion = (e: DeviceMotionEvent): void => {
+		const a: any = (e as any).accelerationIncludingGravity ?? (e as any).acceleration
+		if (!a) return
+		const mag = Math.hypot(a.x ?? 0, a.y ?? 0, a.z ?? 0)
 		if (mag < 18) return
 		const now = performance.now()
 		if (now - lastShake < 700) return
 		lastShake = now
-		trigger((acc.x ?? 0) > 0 ? 285 : 75, 3.0)
+		trigger((a.x ?? 0) > 0 ? 285 : 75, 3.0)
 	}
-	let motionActive = false
-	if (typeof DeviceMotionEvent !== 'undefined' && 'requestPermission' in DeviceMotionEvent) {
-		const btn = document.getElementById('enable-motion')
-		if (btn) {
-			btn.hidden = false
-			btn.onclick = async () => {
-				try {
-					const perm = await DeviceMotionEvent.requestPermission()
-					if (perm === 'granted') {
-						addEventListener('devicemotion', onMotion)
-						motionActive = true
-						btn.hidden = true
-						viewer.log('Motion nudge enabled', 'info')
-					}
-				} catch {}
+
+	if (!('requestPermission' in (DeviceMotionEvent as any))) {
+		window.addEventListener('devicemotion', onMotion as any, { signal } as any)
+	} else if (host.enableMotionButton) {
+		const btn = host.enableMotionButton
+		btn.hidden = false
+		btn.onclick = async () => {
+			try {
+				const granted = host.requestMotionPermission
+					? await host.requestMotionPermission()
+					: (await (DeviceMotionEvent as any).requestPermission()) === 'granted'
+				if (granted) {
+					window.addEventListener('devicemotion', onMotion as any, { signal } as any)
+					btn.hidden = true
+					host.log?.('Motion nudge enabled', 'info')
+				}
+			} catch {}
+		}
+		signal.addEventListener('abort', () => {
+			try {
+				if (host.enableMotionButton) host.enableMotionButton.onclick = null
+			} catch {}
+		})
+	}
+
+	let raf = 0
+	let lastPoll = 0
+	const hasPad = (): boolean => !!navigator.getGamepads?.()?.some(p => !!p)
+
+	const lastBy = new Map<string, number>()
+
+	const loop = (t: number): void => {
+		raf = requestAnimationFrame(loop)
+		if (t - lastPoll < 33) return
+		if (!hasPad()) return
+		lastPoll = t
+
+		const pads = navigator.getGamepads?.()
+		if (!pads) return
+		for (const gp of pads) {
+			if (!gp) continue
+			const now = performance.now()
+			const btnKey = `b${gp.index}`
+			const axisKey = `a${gp.index}`
+			let ang: number | null = null
+			if (gp.buttons[4]?.pressed) ang = 75
+			else if (gp.buttons[5]?.pressed) ang = 285
+			else if (gp.buttons[0]?.pressed || gp.buttons[2]?.pressed) ang = 0
+			if (ang !== null) {
+				const last = lastBy.get(btnKey) ?? 0
+				if (now - last >= 180) {
+					trigger(ang, 2.8)
+					lastBy.set(btnKey, now)
+				}
+			}
+			const ax0 = gp.axes[0] ?? 0
+			const ax1 = gp.axes[1] ?? 0
+			if (Math.abs(ax0) > 0.85 || Math.abs(ax1) > 0.85) {
+				const last = lastBy.get(axisKey) ?? 0
+				if (now - last >= 300) {
+					if (Math.abs(ax0) > Math.abs(ax1)) trigger(ax0 < 0 ? 75 : 285, 2.5)
+					else trigger(ax1 < 0 ? 0 : 180, 2.2)
+					lastBy.set(axisKey, now)
+				}
 			}
 		}
-	} else {
-		addEventListener('devicemotion', onMotion)
-		motionActive = true
 	}
-	cleanups.push(() => {
-		if (motionActive) removeEventListener('devicemotion', onMotion)
+
+	if (hasPad()) raf = requestAnimationFrame(loop)
+	window.addEventListener(
+		'gamepadconnected',
+		() => {
+			if (!raf) raf = requestAnimationFrame(loop)
+		},
+		{ signal } as any,
+	)
+	signal.addEventListener('abort', () => {
+		if (raf) cancelAnimationFrame(raf)
+		raf = 0
 	})
-
-	let gpRaf = 0
-	const lastBy = new Map()
-	const pollGP = () => {
-		const gps = navigator.getGamepads?.()
-		if (gps) {
-			for (const gp of gps) {
-				if (!gp) continue
-				const now = performance.now()
-				const btnKey = `b${gp.index}`
-				const axisKey = `a${gp.index}`
-				let ang = null
-				if (gp.buttons[4]?.pressed) ang = 75
-				else if (gp.buttons[5]?.pressed) ang = 285
-				else if (gp.buttons[0]?.pressed || gp.buttons[2]?.pressed) ang = 0
-				if (ang !== null) {
-					const last = lastBy.get(btnKey) ?? 0
-					if (now - last >= 180) {
-						trigger(ang, 2.8)
-						lastBy.set(btnKey, now)
-					}
-				}
-				const ax0 = gp.axes[0] ?? 0
-				const ax1 = gp.axes[1] ?? 0
-				if (Math.abs(ax0) > 0.85 || Math.abs(ax1) > 0.85) {
-					const last = lastBy.get(axisKey) ?? 0
-					if (now - last >= 300) {
-						if (Math.abs(ax0) > Math.abs(ax1)) trigger(ax0 < 0 ? 75 : 285, 2.5)
-						else trigger(ax1 < 0 ? 0 : 180, 2.2)
-						lastBy.set(axisKey, now)
-					}
-				}
-			}
-		}
-		gpRaf = requestAnimationFrame(pollGP)
-	}
-	gpRaf = requestAnimationFrame(pollGP)
-	cleanups.push(() => cancelAnimationFrame(gpRaf))
-
-	viewer._nudgeCleanup = () => {
-		for (const fn of cleanups) fn()
-	}
-	return viewer._nudgeCleanup
 }
 
+export function attachNudgeInput(viewer: any): () => void {
+	const host = toNudgeHost(viewer)
+	const ctrl = new AbortController()
+
+	if (viewer._nudgeCtrl) {
+		try {
+			viewer._nudgeCtrl.abort()
+		} catch {}
+	}
+	viewer._nudgeCtrl = ctrl
+
+	attachNudgeHost(host, ctrl.signal)
+
+	return () => {
+		try {
+			ctrl.abort()
+		} catch {}
+		if (viewer._nudgeCtrl === ctrl) viewer._nudgeCtrl = null
+		try {
+			viewer._nudgeCleanup = null
+		} catch {}
+	}
+}

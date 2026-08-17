@@ -2,6 +2,7 @@
 // Viewer coordinator - delegates to subsystems
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
+import { keyEventToDirectInputKey } from '../../dist-esm/lib/game/key-code.js'
 import { Player } from '../../dist-esm/lib/game/player.js'
 import {
 	BALL_STRIDE,
@@ -110,6 +111,7 @@ export class Viewer {
 			streamText: dom.streamText || document.getElementById('stream-text'),
 			streamLabel: dom.streamLabel || document.getElementById('stream-label'),
 			nudgeFlash: dom.nudgeFlash || document.getElementById('nudge-flash'),
+			fpsHud: dom.fpsHud || document.getElementById('fps-hud'),
 			modeHint: dom.modeHint || document.getElementById('mode-hint'),
 		}
 		this.harnessLog = createHarness(this.dom.logEl).harnessLog
@@ -1311,7 +1313,7 @@ export class Viewer {
 			const p = new URLSearchParams(location.search)
 			const hasVpx = !!(p.get('vpx') || p.get('table'))
 			const mode = p.get('mode')
-			if (hasVpx && mode !== 'viewer') {
+			if (hasVpx && mode === 'play') {
 				this.log('[viewer] auto-switch to play (vpx URL)', 'info')
 				setTimeout(() => {
 					try {
@@ -2092,20 +2094,31 @@ export class Viewer {
 		this._flashNudge(angle)
 	}
 	_sendKey(code, down) {
-		const keyForCode = c => {
-			if (c === 'Enter') return 'Enter'
-			if (c.startsWith('Digit')) return c.slice(5)
-			if (c === 'Space') return ' '
-			if (c === 'ShiftLeft' || c === 'ShiftRight') return 'Shift'
-			return c
-		}
+		const keyForCode = c =>
+			c === 'Enter'
+				? 'Enter'
+				: c.startsWith('Digit')
+					? c.slice(5)
+					: c.startsWith('Key')
+						? c.slice(3).toLowerCase()
+						: c.startsWith('Shift')
+							? 'Shift'
+							: c.startsWith('Control')
+								? 'Control'
+								: c.startsWith('Alt')
+									? 'Alt'
+									: c === 'Space'
+										? ' '
+										: c
+		const locationForCode = c => (c.endsWith('Left') ? 1 : c.endsWith('Right') ? 2 : undefined)
 		const key = keyForCode(code)
-		if (down) this.player.onKeyDown({ code, key, ts: Date.now() })
-		else this.player.onKeyUp({ code, key, ts: Date.now() })
+		const location = locationForCode(code)
+		const ev = { code, key, location, ts: Date.now() }
+		if (down) this.player.onKeyDown(ev)
+		else this.player.onKeyUp(ev)
 		if (this._physicsSab) {
-			let h = 0
-			for (let i = 0; i < code.length; i++) h = ((h * 31 + code.charCodeAt(i)) & 0xffff) >>> 0
-			pushInput(this._physicsSab, down ? 1 : 0, h || 1, Date.now())
+			const dik = keyEventToDirectInputKey(ev as any)
+			if (dik) pushInput(this._physicsSab, down ? 1 : 0, dik, Date.now())
 		}
 	}
 	_flashNudge(angle) {
