@@ -33,28 +33,22 @@ for (let i = 0; i < MAX_BALLS; i++) {
 }
 
 async function ensureWasm(): Promise<void> {
-	try {
-		const mod = await import('../physics/wasm/kernels.js')
-		await mod.getWasmKernels?.()
-		mod.warmWasmPools?.(2048, 2048, 2048, 2048, 2048, 2048, 2048, 2048)
-	} catch {}
+	const mod = await import('../physics/wasm/kernels.js')
+	await mod.getWasmKernels?.()
+	mod.warmWasmPools?.(2048, 2048, 2048, 2048, 2048, 2048, 2048, 2048)
 }
 
 const drainScratch: InputEvent[] = []
 
 function tick(): void {
 	if (!sab) return
-	try {
-		drainScratch.length = 0
-		drainInput(sab, drainScratch)
-	} catch {}
+	drainScratch.length = 0
+	drainInput(sab, drainScratch)
 	curUsec = nextUsec
 	nextUsec += PHYSICS_STEPTIME
 	timeMsec = Math.floor((curUsec - startUsec) / 1000)
 	const tPrev = Math.floor((curUsec - PHYSICS_STEPTIME - startUsec) / 1000)
-	try {
-		writeFrame(sab, scratch, 0, tPrev, timeMsec, timeMsec)
-	} catch {}
+	writeFrame(sab, scratch, 0, tPrev, timeMsec, timeMsec)
 	tickCount++
 }
 
@@ -78,9 +72,7 @@ function startLoop(): void {
 		timer = setTimeout(loop, 1)
 	}
 	loop()
-	try {
-		self.postMessage({ type: 'started', timeMsec: 0 })
-	} catch {}
+	self.postMessage({ type: 'started', timeMsec: 0 })
 }
 
 function stopLoop(): void {
@@ -89,9 +81,7 @@ function stopLoop(): void {
 		clearTimeout(timer)
 		timer = null
 	}
-	try {
-		self.postMessage({ type: 'stopped' })
-	} catch {}
+	self.postMessage({ type: 'stopped' })
 }
 
 self.onmessage = (e: MessageEvent) => {
@@ -101,20 +91,14 @@ self.onmessage = (e: MessageEvent) => {
 	if (d.type === 'init') {
 		if (d.sab) sab = d.sab
 		void ensureWasm()
-		try {
-			self.postMessage({ type: 'ready' })
-		} catch {}
+		self.postMessage({ type: 'ready' })
 	} else if (d.type === 'start') {
 		startLoop()
 	} else if (d.type === 'stop') {
 		stopLoop()
 	} else if (d.type === 'ping') {
-		try {
-			self.postMessage({ type: 'pong', id: d.id ?? 0, timeMsec, tickCount })
-		} catch {}
+		self.postMessage({ type: 'pong', id: d.id ?? 0, timeMsec, tickCount })
 	}
 }
 
-try {
-	self.postMessage({ type: 'worker-ready' })
-} catch {}
+self.postMessage({ type: 'worker-ready' })

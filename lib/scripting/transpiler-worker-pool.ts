@@ -29,14 +29,10 @@ async function getNodeWorker(): Promise<any> {
 			['./transpiler.worker.node.js', true],
 			['./transpiler.worker.node.ts', true],
 		] as const) {
-			try {
-				const url = new URL(p, import.meta.url) as any
-				try {
-					if (!existsSync(fileURLToPath(url))) continue
-				} catch {}
-				w = tryCreate(url, tsx)
-				if (w) break
-			} catch {}
+			const url = new URL(p, import.meta.url) as any
+			if (!existsSync(fileURLToPath(url))) continue
+			w = tryCreate(url, tsx)
+			if (w) break
 		}
 		if (!w) throw new Error('transpiler worker not available - expected ./transpiler.worker.node.js')
 		w.on('message', (m: any) => {
@@ -53,9 +49,7 @@ async function getNodeWorker(): Promise<any> {
 			nodeWorker = null
 			nodeReady = null
 		})
-		try {
-			;(w as any).unref?.()
-		} catch {}
+		;(w as any).unref?.()
 		nodeWorker = w
 		return w
 	})()
@@ -176,20 +170,16 @@ export async function transpileWithWorker(
 	td?: TableDataPayload | null,
 ): Promise<string> {
 	const key = cacheKey(vbs, gf, go, td)
-	try {
-		const mem = vbsMemCache.get(key)
-		if (mem) return mem
-	} catch {}
+	const mem = vbsMemCache.get(key)
+	if (mem) return mem
 
-	try {
-		if (typeof indexedDB !== 'undefined') {
-			const hit = await idbGet(key)
-			if (typeof hit === 'string' && hit.length) {
-				vbsMemCache.set(key, hit)
-				return hit
-			}
+	if (typeof indexedDB !== 'undefined') {
+		const hit = await idbGet(key)
+		if (typeof hit === 'string' && hit.length) {
+			vbsMemCache.set(key, hit)
+			return hit
 		}
-	} catch {}
+	}
 	const isBrowser = typeof window !== 'undefined' && typeof document !== 'undefined'
 	let js: string
 	if (isBrowser) {
@@ -225,12 +215,8 @@ export async function transpileWithWorker(
 			}, 20000)
 		})
 	}
-	try {
-		vbsMemCache.set(key, js)
-	} catch {}
-	try {
-		if (typeof indexedDB !== 'undefined') void idbSet(key, js).catch(() => {})
-	} catch {}
+	vbsMemCache.set(key, js)
+	if (typeof indexedDB !== 'undefined') void idbSet(key, js).catch(() => {})
 	return js
 }
 

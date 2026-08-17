@@ -33,12 +33,10 @@ export class Logger implements ILogger {
 	}
 	static get isDebugEnabled(): boolean {
 		if (Logger._forcedDebug !== null) return Logger._forcedDebug
-		try {
-			const loc = (globalThis as unknown as { location?: { search: string } }).location
-			if (loc && new URLSearchParams(loc.search).has('debug')) return true
-			if ((globalThis as unknown as { localStorage?: Storage }).localStorage?.getItem('vpx:debug') === '1')
-				return true
-		} catch {}
+		const loc = (globalThis as unknown as { location?: { search: string } }).location
+		if (loc && new URLSearchParams(loc.search).has('debug')) return true
+		if ((globalThis as unknown as { localStorage?: Storage }).localStorage?.getItem('vpx:debug') === '1')
+			return true
 		return false
 	}
 	debug(f: string, ...a: unknown[]): void {
@@ -63,13 +61,11 @@ export class Logger implements ILogger {
 	}
 }
 
-try {
-	const orig = console.debug.bind(console)
-	console.debug = (...a: unknown[]) => {
-		if (!Logger.isDebugEnabled) return
-		orig(...a)
-	}
-} catch {}
+const orig = console.debug.bind(console)
+console.debug = (...a: unknown[]) => {
+	if (!Logger.isDebugEnabled) return
+	orig(...a)
+}
 
 /** Throttled console progress. */
 export class Progress implements IProgress {

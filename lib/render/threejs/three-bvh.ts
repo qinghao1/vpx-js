@@ -29,9 +29,7 @@ export function buildBvhForGeometry(geom: BufferGeometry, force = false): void {
 	if (g.boundsTree) return
 	const tris = g.index ? g.index.count / 3 : g.attributes.position.count / 3
 	if (!force && tris < 200) return
-	try {
-		g.computeBoundsTree?.({ includeInstances: true } as any)
-	} catch {}
+	g.computeBoundsTree?.({ includeInstances: true } as any)
 }
 
 export function buildBvhForNode(root: { traverse(cb: (o: unknown) => void): void }, forceButton = false): number {
@@ -86,9 +84,7 @@ export function buildBvhIdle(
 				(m.name && /button|coin|plunger|tour|start|fire/i.test(m.name))
 			)
 			if (isButton) {
-				try {
-					;(m.geometry as BvhGeometry).computeBoundsTree?.({ includeInstances: true } as any)
-				} catch {}
+				;(m.geometry as BvhGeometry).computeBoundsTree?.({ includeInstances: true } as any)
 				return
 			}
 			queue.push(m.geometry)

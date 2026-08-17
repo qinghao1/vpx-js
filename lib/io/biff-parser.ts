@@ -57,38 +57,35 @@ export class BiffParser {
 	/** Decompresses a BIFF chunk. */
 	static async decompress(buf: Uint8Array): Promise<Uint8Array> {
 		if (typeof DecompressionStream !== 'undefined') {
-			try {
-				const ds = new DecompressionStream('deflate')
-				const writer = ds.writable.getWriter()
-				writer.write(buf as unknown as BufferSource)
-				writer.close()
-				const chunks: Uint8Array[] = []
-				const reader = ds.readable.getReader()
-				while (true) {
-					const { done, value } = await reader.read()
-					if (done) break
-					if (value) chunks.push(value)
-				}
-				if (chunks.length === 1) return chunks[0]
-				const total = chunks.reduce((sum, c) => sum + c.length, 0)
-				const out = new Uint8Array(total)
-				let offset = 0
-				for (const chunk of chunks) {
-					out.set(chunk, offset)
-					offset += chunk.length
-				}
-				return out
-			} catch {}
-		}
-		try {
-			// @ts-ignore
-			const pako = await import('pako')
-			const inflate = (pako as unknown as { inflate: (data: Uint8Array) => Uint8Array }).inflate ?? (pako as unknown as { default: { inflate: (data: Uint8Array) => Uint8Array } }).default?.inflate
-			if (inflate) {
-				const res = inflate(buf)
-				return res instanceof Uint8Array ? res : new Uint8Array(res)
+			const ds = new DecompressionStream('deflate')
+			const writer = ds.writable.getWriter()
+			writer.write(buf as unknown as BufferSource)
+			writer.close()
+			const chunks: Uint8Array[] = []
+			const reader = ds.readable.getReader()
+			while (true) {
+				const { done, value } = await reader.read()
+				if (done) break
+				if (value) chunks.push(value)
 			}
-		} catch {}
+			if (chunks.length === 1) return chunks[0]
+			const total = chunks.reduce((sum, c) => sum + c.length, 0)
+			const out = new Uint8Array(total)
+			let offset = 0
+			for (const chunk of chunks) {
+				out.set(chunk, offset)
+				offset += chunk.length
+			}
+			return out
+		}
+		const pako = await import('pako')
+		const inflate =
+			(pako as unknown as { inflate: (data: Uint8Array) => Uint8Array }).inflate ??
+			(pako as unknown as { default: { inflate: (data: Uint8Array) => Uint8Array } }).default?.inflate
+		if (inflate) {
+			const res = inflate(buf)
+			return res instanceof Uint8Array ? res : new Uint8Array(res)
+		}
 		throw new Error('Decompression failed: DecompressionStream unavailable and pako not available')
 	}
 

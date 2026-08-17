@@ -99,16 +99,14 @@ export function batchStaticOpaques(root: Group, table: Table, _renderApi: ThreeR
 	}
 
 	const dmdNames = new Set<string>()
-	try {
-		for (const k in (table as any).flashers) {
-			const fl = (table as any).flashers[k]
-			if (fl?.data?.isDMD) dmdNames.add(fl.getName().toLowerCase())
-		}
-		for (const k in (table as any).textboxes) {
-			const tb = (table as any).textboxes[k]
-			if (tb?.data?.isDMD) dmdNames.add(tb.getName().toLowerCase())
-		}
-	} catch {}
+	for (const k in (table as any).flashers) {
+		const fl = (table as any).flashers[k]
+		if (fl?.data?.isDMD) dmdNames.add(fl.getName().toLowerCase())
+	}
+	for (const k in (table as any).textboxes) {
+		const tb = (table as any).textboxes[k]
+		if (tb?.data?.isDMD) dmdNames.add(tb.getName().toLowerCase())
+	}
 
 	const buckets = new Map<string, { material: MeshStandardMaterial; meshes: Mesh[] }>()
 	root.traverse((o: any) => {
@@ -157,55 +155,42 @@ export function batchStaticOpaques(root: Group, table: Table, _renderApi: ThreeR
 		if (totalVerts < VERTEX_THRESHOLD) continue
 		const uniqueGeos = new Set(meshes.map(m => geoHash(m.geometry as BufferGeometry)))
 		if (uniqueGeos.size === 1 && meshes.length >= 3) {
-			try {
-				const baseGeo = meshes[0].geometry as BufferGeometry
-				const instanced = new InstancedMesh(baseGeo, material, meshes.length)
-				instanced.name = `instanced:generic:${material.name || 'opaque'}:${meshes.length}`
-				instanced.frustumCulled = true
-				for (let i = 0; i < meshes.length; i++) {
-					const mesh = meshes[i]
-					mesh.updateMatrixWorld(true)
-					const local = new Matrix4().multiplyMatrices(invRoot, mesh.matrixWorld)
-					instanced.setMatrixAt(i, local)
-				}
-				instanced.instanceMatrix.needsUpdate = true
-				instanced.computeBoundingBox()
-				instanced.computeBoundingSphere()
-				try {
-					;(instanced.geometry as any).computeBoundsTree?.({ includeInstances: true } as any)
-				} catch {}
-				root.add(instanced)
-				for (const mesh of meshes) mesh.visible = false
-				count++
-				continue
-			} catch {}
-		}
-		try {
-			const batched = new BatchedMesh(
-				meshes.length,
-				totalVerts,
-				hasIndex ? totalIndices : totalVerts * 3,
-				material,
-			)
-			batched.name = `batched:${material.name || 'opaque'}:${meshes.length}`
-			batched.perObjectFrustumCulled = true
-			batched.frustumCulled = true
-			for (const mesh of meshes) {
+			const baseGeo = meshes[0].geometry as BufferGeometry
+			const instanced = new InstancedMesh(baseGeo, material, meshes.length)
+			instanced.name = `instanced:generic:${material.name || 'opaque'}:${meshes.length}`
+			instanced.frustumCulled = true
+			for (let i = 0; i < meshes.length; i++) {
+				const mesh = meshes[i]
 				mesh.updateMatrixWorld(true)
-				const geoId = batched.addGeometry(mesh.geometry as BufferGeometry)
-				const instanceId = batched.addInstance(geoId)
 				const local = new Matrix4().multiplyMatrices(invRoot, mesh.matrixWorld)
-				batched.setMatrixAt(instanceId, local)
+				instanced.setMatrixAt(i, local)
 			}
-			batched.computeBoundingBox()
-			batched.computeBoundingSphere()
-			try {
-				;(batched.geometry as any).computeBoundsTree?.({ includeInstances: true } as any)
-			} catch {}
-			root.add(batched)
+			instanced.instanceMatrix.needsUpdate = true
+			instanced.computeBoundingBox()
+			instanced.computeBoundingSphere()
+			;(instanced.geometry as any).computeBoundsTree?.({ includeInstances: true } as any)
+			root.add(instanced)
 			for (const mesh of meshes) mesh.visible = false
 			count++
-		} catch {}
+			continue
+		}
+		const batched = new BatchedMesh(meshes.length, totalVerts, hasIndex ? totalIndices : totalVerts * 3, material)
+		batched.name = `batched:${material.name || 'opaque'}:${meshes.length}`
+		batched.perObjectFrustumCulled = true
+		batched.frustumCulled = true
+		for (const mesh of meshes) {
+			mesh.updateMatrixWorld(true)
+			const geoId = batched.addGeometry(mesh.geometry as BufferGeometry)
+			const instanceId = batched.addInstance(geoId)
+			const local = new Matrix4().multiplyMatrices(invRoot, mesh.matrixWorld)
+			batched.setMatrixAt(instanceId, local)
+		}
+		batched.computeBoundingBox()
+		batched.computeBoundingSphere()
+		;(batched.geometry as any).computeBoundsTree?.({ includeInstances: true } as any)
+		root.add(batched)
+		for (const mesh of meshes) mesh.visible = false
+		count++
 	}
 	return count
 }
@@ -272,38 +257,34 @@ export function instancedBulbs(root: Group, table: Table, _renderApi: ThreeRende
 	if (lightMeshes.length >= 2 && tryInstanced(lightMeshes, 'bulb-light-mesh', 'bulb-light')) instancedCount++
 
 	if (instancedCount === 0 && socketMeshes.length >= 2) {
-		try {
-			const mg = new ThreeMeshGenerator()
-			const baseSocket = loadMesh('bulb-socket-mesh')
-			const socketGeo = mg.convertToBufferGeometry(baseSocket.clone('bulb.socket'))
-			const mat = socketMeshes[0].material as MeshStandardMaterial
-			const instanced = new InstancedMesh(socketGeo, mat, bulbs.length)
-			instanced.name = `instanced:bulb-socket:${bulbs.length}`
-			instanced.frustumCulled = false
-			for (let i = 0; i < bulbs.length; i++) {
-				if (i < socketMeshes.length) {
-					socketMeshes[i].updateMatrixWorld(true)
-					const local = new Matrix4().multiplyMatrices(invRoot, socketMeshes[i].matrixWorld)
-					instanced.setMatrixAt(i, local)
-				} else {
-					const data: any = (bulbs[i] as any).data
-					const s = data.meshRadius ?? 20
-					const h = table.getSurfaceHeight(data.szSurface, data.center.x, data.center.y) * table.getScaleZ()
-					const m = new Matrix4().makeScale(s, s, s * table.getScaleZ())
-					m.setPosition(data.center.x, data.center.y, h)
-					instanced.setMatrixAt(i, m)
-				}
+		const mg = new ThreeMeshGenerator()
+		const baseSocket = loadMesh('bulb-socket-mesh')
+		const socketGeo = mg.convertToBufferGeometry(baseSocket.clone('bulb.socket'))
+		const mat = socketMeshes[0].material as MeshStandardMaterial
+		const instanced = new InstancedMesh(socketGeo, mat, bulbs.length)
+		instanced.name = `instanced:bulb-socket:${bulbs.length}`
+		instanced.frustumCulled = false
+		for (let i = 0; i < bulbs.length; i++) {
+			if (i < socketMeshes.length) {
+				socketMeshes[i].updateMatrixWorld(true)
+				const local = new Matrix4().multiplyMatrices(invRoot, socketMeshes[i].matrixWorld)
+				instanced.setMatrixAt(i, local)
+			} else {
+				const data: any = (bulbs[i] as any).data
+				const s = data.meshRadius ?? 20
+				const h = table.getSurfaceHeight(data.szSurface, data.center.x, data.center.y) * table.getScaleZ()
+				const m = new Matrix4().makeScale(s, s, s * table.getScaleZ())
+				m.setPosition(data.center.x, data.center.y, h)
+				instanced.setMatrixAt(i, m)
 			}
-			instanced.instanceMatrix.needsUpdate = true
-			instanced.computeBoundingBox()
-			instanced.computeBoundingSphere()
-			try {
-				;(instanced.geometry as any).computeBoundsTree?.({ includeInstances: true } as any)
-			} catch {}
-			for (const m of socketMeshes) m.visible = false
-			root.add(instanced)
-			instancedCount++
-		} catch {}
+		}
+		instanced.instanceMatrix.needsUpdate = true
+		instanced.computeBoundingBox()
+		instanced.computeBoundingSphere()
+		;(instanced.geometry as any).computeBoundsTree?.({ includeInstances: true } as any)
+		for (const m of socketMeshes) m.visible = false
+		root.add(instanced)
+		instancedCount++
 	}
 	return instancedCount
 }

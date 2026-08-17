@@ -6,7 +6,12 @@ export const filterTextures = (table, log) => {
 	let skipped = 0
 	for (const k in table.textures) {
 		const name = table.textures[k].getName().toLowerCase()
-		if (name === 'glass' || name === 'glassblood' || name === 'glassnormal' || (name.startsWith('glass') && name.length < 20)) {
+		if (
+			name === 'glass' ||
+			name === 'glassblood' ||
+			name === 'glassnormal' ||
+			(name.startsWith('glass') && name.length < 20)
+		) {
 			table.textures[k].binary = undefined
 			delete table.textures[k]
 			skipped++
@@ -24,14 +29,14 @@ export class TextureStreamer {
 	}
 	prioritize(table, textures, isDeferred) {
 		const all = Object.values(table.textures)
-		const high = all.filter((tx) => !isDeferred(tx, table))
-		const deferred = all.filter((tx) => isDeferred(tx, table))
+		const high = all.filter(tx => !isDeferred(tx, table))
+		const deferred = all.filter(tx => isDeferred(tx, table))
 		high.sort((a, b) => a.width * a.height - b.width * b.height)
 		deferred.sort((a, b) => a.width * a.height - b.width * b.height)
-		let result = [...high, ...deferred]
+		const result = [...high, ...deferred]
 		const pf = table.getPlayfieldMap()?.toLowerCase()
 		if (pf) {
-			const idx = result.findIndex((tx) => tx.getName().toLowerCase() === pf)
+			const idx = result.findIndex(tx => tx.getName().toLowerCase() === pf)
 			if (idx > 0) {
 				const [pfTx] = result.splice(idx, 1)
 				result.unshift(pfTx)
@@ -55,12 +60,12 @@ export class TextureStreamer {
 		let done = 0
 		for (const tx of textures) {
 			if (this.streamId !== streamId) return
-			try {
-				await renderApi.getMapGenerator().loadTexture(tx, table)
-			} catch {}
+			await renderApi.getMapGenerator().loadTexture(tx, table)
 			done++
 			this.viewer._setStreamProgress?.(done, total)
 		}
 	}
-	cancel() { this.streamId++ }
+	cancel() {
+		this.streamId++
+	}
 }

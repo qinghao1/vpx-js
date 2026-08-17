@@ -16,9 +16,7 @@ const ROM_CANDIDATES = [
 
 function findRom(): string | null {
 	for (const p of ROM_CANDIDATES) {
-		try {
-			if (fs.existsSync(p) && fs.statSync(p).size > 1024) return p
-		} catch {}
+		if (fs.existsSync(p) && fs.statSync(p).size > 1024) return p
 	}
 	return null
 }

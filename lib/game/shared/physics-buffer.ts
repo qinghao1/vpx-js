@@ -210,9 +210,7 @@ export function pushInput(sab: SharedArrayBuffer, kind: number, key: number, val
 	if (isSAB(sab)) {
 		Atomics.store(h, HEAD_IDX, nxt)
 		if (tail === head) {
-			try {
-				Atomics.notify(h, TAIL_IDX, 1)
-			} catch {}
+			Atomics.notify(h, TAIL_IDX, 1)
 		}
 	} else {
 		h[HEAD_IDX] = nxt

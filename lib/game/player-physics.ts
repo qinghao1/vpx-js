@@ -269,11 +269,7 @@ export class PlayerPhysics {
 	}
 
 	private safeFire(t: TimerHit): void {
-		try {
-			t.pfe.fireGroupEvent(Event.TimerEventsTimer)
-		} catch (e) {
-			logger().warn('timer error %s', (e as Error).message)
-		}
+		t.pfe.fireGroupEvent(Event.TimerEventsTimer)
 	}
 
 	public timerStateChange(timer: TimerHit, enabled: boolean): void {

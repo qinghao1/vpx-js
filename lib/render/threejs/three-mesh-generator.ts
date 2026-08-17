@@ -46,7 +46,5 @@ export class ThreeMeshGenerator {
 
 export function releaseGeometry(geometry: BufferGeometry): void {
 	geometry.dispose()
-	try {
-		;(geometry as unknown as { disposeBoundsTree?: () => void }).disposeBoundsTree?.()
-	} catch {}
+	;(geometry as unknown as { disposeBoundsTree?: () => void }).disposeBoundsTree?.()
 }

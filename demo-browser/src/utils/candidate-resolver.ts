@@ -9,7 +9,7 @@ export const resolveVpxCandidates = ({ defaultName = null, queryParam = 'vpx' } 
 	return [`/${name.split('/').pop()}`]
 }
 
-export const resolveRomCandidates = (romParam) => (romParam?.trim() ? [romParam.trim()] : [])
+export const resolveRomCandidates = romParam => (romParam?.trim() ? [romParam.trim()] : [])
 
 export const fetchWithProgress = async (url, onProgress, opts = {}) => {
 	const signal = opts?.signal
@@ -26,7 +26,7 @@ export const fetchWithProgress = async (url, onProgress, opts = {}) => {
 	const chunks = []
 	let received = 0
 	const onAbort = () => {
-		try { reader.cancel() } catch {}
+		reader.cancel()
 	}
 	if (signal) signal.addEventListener('abort', onAbort, { once: true })
 	try {
@@ -47,6 +47,9 @@ export const fetchWithProgress = async (url, onProgress, opts = {}) => {
 	if (chunks.length === 1) return chunks[0]
 	const out = new Uint8Array(received)
 	let off = 0
-	for (const c of chunks) { out.set(c, off); off += c.length }
+	for (const c of chunks) {
+		out.set(c, off)
+		off += c.length
+	}
 	return out
 }

@@ -33,9 +33,7 @@ function toNudgeHost(viewer: any): InputHost {
 				: null
 		},
 		log(msg: string, level?: string) {
-			try {
-				viewer.log?.(msg, level)
-			} catch {}
+			viewer.log?.(msg, level)
 		},
 		enterPlayMode() {},
 		exitPlayMode() {},
@@ -57,10 +55,8 @@ function toNudgeHost(viewer: any): InputHost {
 
 function attachNudgeHost(host: InputHost, signal: AbortSignal): void {
 	const trigger = (angle: number, force = NUDGE.force): void => {
-		try {
-			if (!host.player || host.viewerMode !== 'play') return
-			host.player.nudge(angle, force)
-		} catch {}
+		if (!host.player || host.viewerMode !== 'play') return
+		host.player.nudge(angle, force)
 	}
 
 	let lastShake = 0
@@ -81,21 +77,17 @@ function attachNudgeHost(host: InputHost, signal: AbortSignal): void {
 		const btn = host.enableMotionButton
 		btn.hidden = false
 		btn.onclick = async () => {
-			try {
-				const granted = host.requestMotionPermission
-					? await host.requestMotionPermission()
-					: (await (DeviceMotionEvent as any).requestPermission()) === 'granted'
-				if (granted) {
-					window.addEventListener('devicemotion', onMotion as any, { signal } as any)
-					btn.hidden = true
-					host.log?.('Motion nudge enabled', 'info')
-				}
-			} catch {}
+			const granted = host.requestMotionPermission
+				? await host.requestMotionPermission()
+				: (await (DeviceMotionEvent as any).requestPermission()) === 'granted'
+			if (granted) {
+				window.addEventListener('devicemotion', onMotion as any, { signal } as any)
+				btn.hidden = true
+				host.log?.('Motion nudge enabled', 'info')
+			}
 		}
 		signal.addEventListener('abort', () => {
-			try {
-				if (host.enableMotionButton) host.enableMotionButton.onclick = null
-			} catch {}
+			if (host.enableMotionButton) host.enableMotionButton.onclick = null
 		})
 	}
 
@@ -161,21 +153,15 @@ export function attachNudgeInput(viewer: any): () => void {
 	const ctrl = new AbortController()
 
 	if (viewer._nudgeCtrl) {
-		try {
-			viewer._nudgeCtrl.abort()
-		} catch {}
+		viewer._nudgeCtrl.abort()
 	}
 	viewer._nudgeCtrl = ctrl
 
 	attachNudgeHost(host, ctrl.signal)
 
 	return () => {
-		try {
-			ctrl.abort()
-		} catch {}
+		ctrl.abort()
 		if (viewer._nudgeCtrl === ctrl) viewer._nudgeCtrl = null
-		try {
-			viewer._nudgeCleanup = null
-		} catch {}
+		viewer._nudgeCleanup = null
 	}
 }

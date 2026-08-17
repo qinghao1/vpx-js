@@ -200,14 +200,10 @@ export class Viewer {
 		if (this._cameraTimeoutResolver) {
 			const _r = this._cameraTimeoutResolver
 			this._cameraTimeoutResolver = null
-			try {
-				_r()
-			} catch {}
+			_r()
 		}
 		if (this._loadAbort) {
-			try {
-				this._loadAbort.abort()
-			} catch {}
+			this._loadAbort.abort()
 			this._loadAbort = null
 		}
 		this._terminatePhysicsWorker()
@@ -470,9 +466,7 @@ export class Viewer {
 			if (!t) return
 			if (window.matchMedia?.('(pointer: coarse)')?.matches) {
 				this._switchToPlay()
-				try {
-					e.preventDefault()
-				} catch {}
+				e.preventDefault()
 				return
 			}
 			if (!hovered && !hitTest(t.clientX, t.clientY)) return
@@ -491,12 +485,8 @@ export class Viewer {
 		this._hidePlayTip?.()
 		hideCabFlippers(this.tableGroup)
 		this._syncChrome()
-		try {
-			this.hookInput()
-		} catch {}
-		try {
-			this.dom.canvas?.focus()
-		} catch {}
+		this.hookInput()
+		this.dom.canvas?.focus()
 		const target = computePlayFraming(this.tableGroup)
 		await this._animateCameraTo(target, CAM_ANIM.durationMode)
 		{
@@ -562,9 +552,7 @@ export class Viewer {
 		if (this._cameraTimeoutResolver) {
 			const _r = this._cameraTimeoutResolver
 			this._cameraTimeoutResolver = null
-			try {
-				_r()
-			} catch {}
+			_r()
 		}
 		const fromPos = this.camera.position.clone()
 		const fromTarget = this.controls.target.clone()
@@ -605,18 +593,14 @@ export class Viewer {
 		return new Promise(resolve => {
 			const tick = () => {
 				if (_gen !== this._cameraGen) {
-					try {
-						this.gate.endAnimation()
-					} catch {}
+					this.gate.endAnimation()
 					this.controls.enableDamping = prevDamping
 					this.controls.enabled = this.viewerMode !== 'play'
 					resolve()
 					return
 				}
 				if (this._disposed) {
-					try {
-						this.gate.endAnimation()
-					} catch {}
+					this.gate.endAnimation()
 					this.controls.enableDamping = prevDamping
 					resolve()
 					return
@@ -699,34 +683,24 @@ export class Viewer {
 		if (this.tableGroup) hideCabFlippers(this.tableGroup)
 		const bg = this.tableGroup?.getObjectByName('balls')
 		if (bg) bg.visible = true
-		try {
-			this.player?.setPhysicsEnabled(true)
-		} catch {}
+		this.player?.setPhysicsEnabled(true)
 		this._emitModeChange()
-		try {
-			if (this.dom.canvas) {
-				this.dom.canvas.tabIndex = 0
-				this.dom.canvas.focus()
+		if (this.dom.canvas) {
+			this.dom.canvas.tabIndex = 0
+			this.dom.canvas.focus()
+		}
+		this.hookInput()
+		if (!this._blurHandler) {
+			this._blurHandler = () => {
+				this.player?.onKeyUp({ code: 'ShiftLeft', key: 'Shift', ts: Date.now(), location: 1 })
+				this.player?.onKeyUp({ code: 'ShiftRight', key: 'Shift', ts: Date.now(), location: 2 })
+				this.player?.onKeyUp({ code: 'Shift', key: 'Shift', ts: Date.now() })
 			}
-		} catch {}
-		try {
-			this.hookInput()
-		} catch {}
-		try {
-			if (!this._blurHandler) {
-				this._blurHandler = () => {
-					try {
-						this.player?.onKeyUp({ code: 'ShiftLeft', key: 'Shift', ts: Date.now(), location: 1 })
-						this.player?.onKeyUp({ code: 'ShiftRight', key: 'Shift', ts: Date.now(), location: 2 })
-						this.player?.onKeyUp({ code: 'Shift', key: 'Shift', ts: Date.now() })
-					} catch {}
-				}
-				window.addEventListener('blur', this._blurHandler)
-				document.addEventListener('visibilitychange', () => {
-					if (document.hidden) this._blurHandler()
-				})
-			}
-		} catch {}
+			window.addEventListener('blur', this._blurHandler)
+			document.addEventListener('visibilitychange', () => {
+				if (document.hidden) this._blurHandler()
+			})
+		}
 	}
 	exitPlayMode() {
 		for (const code of this._touchMap.values()) {
@@ -737,10 +711,8 @@ export class Viewer {
 			})
 		}
 		this._touchMap.clear()
-		try {
-			this.player?.onKeyUp({ code: 'ShiftLeft', key: 'Shift', ts: Date.now(), location: 1 })
-			this.player?.onKeyUp({ code: 'ShiftRight', key: 'Shift', ts: Date.now(), location: 2 })
-		} catch {}
+		this.player?.onKeyUp({ code: 'ShiftLeft', key: 'Shift', ts: Date.now(), location: 1 })
+		this.player?.onKeyUp({ code: 'ShiftRight', key: 'Shift', ts: Date.now(), location: 2 })
 		if (this.controls) this.controls.enabled = true
 		if (this.tableGroup) showCabFlippers(this.tableGroup)
 		const bg = this.tableGroup?.getObjectByName('balls')
@@ -844,9 +816,7 @@ export class Viewer {
 					}
 				}
 				if (!entry) continue
-				try {
-					entry.item.getUpdater().applyState(entry.node, {}, this.renderApi, this.table)
-				} catch {}
+				entry.item.getUpdater().applyState(entry.node, {}, this.renderApi, this.table)
 			}
 		}
 		changed.release()
@@ -911,9 +881,7 @@ export class Viewer {
 		const t0 = performance.now()
 		const table = await Table.load(reader)
 		this.table = table
-		try {
-			this._applyTableToneMapping?.(table)
-		} catch {}
+		this._applyTableToneMapping?.(table)
 		if (_isDev) window.table = table
 		this._hasPinmame = !!cGameName(table)
 		const dt = performance.now() - t0
@@ -927,10 +895,8 @@ export class Viewer {
 	async _buildScene(table) {
 		this._setStatus('')
 		this._loading(70, 'Building playfield…', 'Preparing visuals…')
-		try {
-			const g = table.data.globalEmissionScale
-			if (Number.isFinite(g)) setGlobalEmissionScale(g)
-		} catch {}
+		const g = table.data.globalEmissionScale
+		if (Number.isFinite(g)) setGlobalEmissionScale(g)
 		const texLoader = new ThreeTextureLoaderBrowser()
 		const renderApi = new ThreeRenderApi(
 			{
@@ -1109,10 +1075,7 @@ export class Viewer {
 				}
 				if (cleared) {
 					this.log(`[mem] Eagerly cleared ${cleared} unused raw texture buffers`, 'info')
-					if (typeof window !== 'undefined' && (window as any).gc)
-						try {
-							;(window as any).gc()
-						} catch {}
+					if (typeof (window as any).gc === 'function') (window as any).gc()
 				}
 			}
 			textures.sort((a, b) => {
@@ -1152,7 +1115,7 @@ export class Viewer {
 		else await reader.close()
 		reader.data = undefined
 		reader.blob = undefined
-		if (window.gc) window.gc()
+		if (typeof (window as any).gc === 'function') (window as any).gc()
 		logMem(this.harnessLog, 'after reader release')
 	}
 	_clearRawTextures() {
@@ -1176,26 +1139,24 @@ export class Viewer {
 			table,
 		})
 		if (this.viewerMode === 'play') hideCabFlippers(node)
-		try {
-			const params = new URLSearchParams(location.search)
-			const useBatch = !params.has('nobatched')
-			if (useBatch && table && this.renderApi) {
-				const res = _optimizeScene(node, table, this.renderApi)
-				if ((res.batched || res.instanced) && this.harnessLog) {
-					const before = (() => {
-						let c = 0
-						node.traverse(o => {
-							if (o.isMesh) c++
-						})
-						return c
-					})()
-					this.harnessLog(
-						`[batch] BatchedMesh ${res.batched} + Instanced ${res.instanced} — meshes ${before}`,
-						'info',
-					)
-				}
+		const params = new URLSearchParams(location.search)
+		const useBatch = !params.has('nobatched')
+		if (useBatch && table && this.renderApi) {
+			const res = _optimizeScene(node, table, this.renderApi)
+			if ((res.batched || res.instanced) && this.harnessLog) {
+				const before = (() => {
+					let c = 0
+					node.traverse(o => {
+						if (o.isMesh) c++
+					})
+					return c
+				})()
+				this.harnessLog(
+					`[batch] BatchedMesh ${res.batched} + Instanced ${res.instanced} — meshes ${before}`,
+					'info',
+				)
 			}
-		} catch {}
+		}
 		this.buildNodeCache()
 		this.dmd._ensureTexture()
 		this.dmd.findMeshes()
@@ -1301,13 +1262,11 @@ export class Viewer {
 			})
 		buildBvhIdle(node)
 		this._buttonMeshes = []
-		try {
-			node.traverse(o => {
-				if (o.isMesh && o.userData?.isCabinetButton) this._buttonMeshes.push(o)
-			})
-			if (this._buttonMeshes.length)
-				this.harnessLog?.(`[input] ${this._buttonMeshes.length} cabinet button meshes (BVH)`, 'info')
-		} catch {}
+		node.traverse(o => {
+			if (o.isMesh && o.userData?.isCabinetButton) this._buttonMeshes.push(o)
+		})
+		if (this._buttonMeshes.length)
+			this.harnessLog?.(`[input] ${this._buttonMeshes.length} cabinet button meshes (BVH)`, 'info')
 		this.startLoop()
 		if (this.viewerMode === 'viewer') {
 			const p = new URLSearchParams(location.search)
@@ -1316,9 +1275,7 @@ export class Viewer {
 			if (hasVpx && mode === 'play') {
 				this.log('[viewer] auto-switch to play (vpx URL)', 'info')
 				setTimeout(() => {
-					try {
-						this._switchToPlay()
-					} catch {}
+					this._switchToPlay()
 				}, 600)
 			}
 		}
@@ -1348,10 +1305,8 @@ export class Viewer {
 		this.player.updateAnimations(this.player.getGameTime() ?? this.player.getPhysics().timeMsec ?? 0)
 		const init = this.player.popStates()
 		this.applyChangedStates(init)
-		try {
-			this.dmd._ensureTexture()
-			this.dmd.findMeshes()
-		} catch {}
+		this.dmd._ensureTexture()
+		this.dmd.findMeshes()
 		this.player.on('ballCreated', b => this.handleBallLifecycle(b, true))
 		this.player.on('ballDestroyed', b => this.handleBallLifecycle(b, false))
 		this.player.on('emuStarted', () => {
@@ -1409,10 +1364,8 @@ export class Viewer {
 			if (reader) void this._cleanupReader(reader).catch(() => {})
 			// generic: free raw texture binaries after streaming regardless of mode; keeps GPU textures only
 			this._clearRawTextures?.()
-			if (typeof (globalThis as any).gc === 'function')
-				try {
-					;(globalThis as any).gc()
-				} catch {}
+			if (typeof (globalThis as any).gc === 'function');
+			;(globalThis as any).gc()
 			return
 		}
 		this._showStream()
@@ -1613,9 +1566,7 @@ export class Viewer {
 			await this.renderApi.preloadTextures(textures, table, onTexture)
 			if (this._streamId !== streamId) {
 				if (reader) {
-					try {
-						await this._cleanupReader(reader)
-					} catch {}
+					await this._cleanupReader(reader)
 				}
 				return
 			}
@@ -1623,20 +1574,16 @@ export class Viewer {
 			const fixed2 = patchCloned()
 			if (fixed || fixed2)
 				this.log(`[stream] Patched ${fixed + fixed2} materials (${fixed} cached + ${fixed2} cloned)`)
-			try {
-				if (this.tableGroup && table && this.renderApi) {
-					const params = new URLSearchParams(location.search)
-					if (!params.has('nobatched')) {
-						const bakedRes = _batchStaticOpaques(this.tableGroup, table, this.renderApi)
-						if (bakedRes) {
-							this.log(`[batch] Post-stream baked ${bakedRes} BatchedMesh`, 'info')
-							try {
-								buildBvhIdle(this.tableGroup)
-							} catch {}
-						}
+			if (this.tableGroup && table && this.renderApi) {
+				const params = new URLSearchParams(location.search)
+				if (!params.has('nobatched')) {
+					const bakedRes = _batchStaticOpaques(this.tableGroup, table, this.renderApi)
+					if (bakedRes) {
+						this.log(`[batch] Post-stream baked ${bakedRes} BatchedMesh`, 'info')
+						buildBvhIdle(this.tableGroup)
 					}
 				}
-			} catch {}
+			}
 			const tm = computeTexMem(this.tableGroup)
 			this.log(
 				`[stream] Done ${done}/${total} in ${(performance.now() - t0) | 0}ms — now ${tm.texCount} ~${tm.texMemMB} MB`,
@@ -1650,10 +1597,8 @@ export class Viewer {
 			}
 			// generic: free raw texture binaries after streaming regardless of mode; keeps GPU textures only
 			this._clearRawTextures?.()
-			if (typeof (globalThis as any).gc === 'function')
-				try {
-					;(globalThis as any).gc()
-				} catch {}
+			if (typeof (globalThis as any).gc === 'function');
+			;(globalThis as any).gc()
 		})()
 	}
 	async _waitForPinmame(timeout = 45000) {
@@ -1675,9 +1620,7 @@ export class Viewer {
 	}
 	async _fromReader(reader, source, _loadGen = this._loadId) {
 		if (_loadGen !== this._loadId) {
-			try {
-				await this._cleanupReader(reader)
-			} catch {}
+			await this._cleanupReader(reader)
 			return null
 		}
 		setTitle(
@@ -1691,30 +1634,22 @@ export class Viewer {
 		this._loading(62, 'Opening table…', 'Reading table data…')
 		const table = await this._loadTable(reader)
 		if (_loadGen !== this._loadId) {
-			try {
-				await this._cleanupReader(reader)
-			} catch {}
+			await this._cleanupReader(reader)
 			return null
 		}
 		const { node, textures } = await this._buildScene(table)
 		if (_loadGen !== this._loadId) {
-			try {
-				await this._cleanupReader(reader)
-			} catch {}
+			await this._cleanupReader(reader)
 			return null
 		}
 		const mounted = await this._mount(table, node, {}, source)
 		if (_loadGen !== this._loadId) {
-			try {
-				await this._cleanupReader(reader)
-			} catch {}
+			await this._cleanupReader(reader)
 			return mounted
 		}
 		const ok = await this._waitForPinmame(5000)
 		if (_loadGen !== this._loadId) {
-			try {
-				await this._cleanupReader(reader)
-			} catch {}
+			await this._cleanupReader(reader)
 			return mounted
 		}
 		this.log(`[wait] done ok=${ok} streaming ${textures.length}`)
@@ -1724,10 +1659,7 @@ export class Viewer {
 	async load() {
 		this._loadId = (this._loadId ?? 0) + 1
 		const _loadGen = this._loadId
-		if (this._loadAbort)
-			try {
-				this._loadAbort.abort()
-			} catch {}
+		if (this._loadAbort) this._loadAbort.abort()
 		this._loadAbort = new AbortController()
 		const _signal = this._loadAbort.signal
 		this._streamId++
@@ -1805,7 +1737,7 @@ export class Viewer {
 				return _res2
 			} catch (err) {
 				if (_signal.aborted || err?.name === 'AbortError' || _loadGen !== this._loadId) return
-				if (!String(err.message).includes('Failed:')) this.log(`Not at ${cand}: ${err.message}`, 'debug')
+				this.log(`Error loading ${cand}: ${err?.stack ?? err?.message}`, 'error')
 			}
 		}
 		if (_loadGen !== this._loadId) return
@@ -1815,10 +1747,7 @@ export class Viewer {
 	async loadFromFile(file) {
 		this._loadId = (this._loadId ?? 0) + 1
 		const _loadGen = this._loadId
-		if (this._loadAbort)
-			try {
-				this._loadAbort.abort()
-			} catch {}
+		if (this._loadAbort) this._loadAbort.abort()
 		this._loadAbort = new AbortController()
 		this._streamId++
 		this._loading(5, 'Reading file…', `Reading ${file.name}…`)
@@ -1826,9 +1755,7 @@ export class Viewer {
 		const reader = new BrowserBinaryReader(file)
 		await reader.open()
 		if (_loadGen !== this._loadId) {
-			try {
-				await this._cleanupReader(reader)
-			} catch {}
+			await this._cleanupReader(reader)
 			return null
 		}
 		const _res = await this._fromReader(reader, file.name, _loadGen)
@@ -1883,12 +1810,10 @@ export class Viewer {
 		let lastHeartbeat = performance.now()
 		let lastTimeMsec = 0
 		let swiftShader = false
-		try {
-			const gl = (this.renderer as any)?.getContext?.()
-			const rstr = gl?.getParameter?.(gl.RENDERER) ?? ''
-			if (String(rstr).toLowerCase().includes('swiftshader') || String(rstr).toLowerCase().includes('software'))
-				swiftShader = true
-		} catch {}
+		const gl = (this.renderer as any)?.getContext?.()
+		const rstr = gl?.getParameter?.(gl.RENDERER) ?? ''
+		if (String(rstr).toLowerCase().includes('swiftshader') || String(rstr).toLowerCase().includes('software'))
+			swiftShader = true
 		if (swiftShader) this.log('[render] SwiftShader detected — throttling render for physics', 'warn')
 		const isPinLoading = () => {
 			if (!this._hasPinmame) return false
@@ -1904,23 +1829,19 @@ export class Viewer {
 		}
 		const tickPhysics = () => {
 			if (!this.player || this.isPaused) return
-			try {
-				if (this._physicsSab && this._physicsScratch) trySnap(this._physicsSab, this._physicsScratch)
-				this.player.setPhysicsEnabled(this.viewerMode === 'play')
-				this.player.updatePhysics()
-				this.player.updateAnimations(this.player.getGameTime())
-				const changed = this.player.popStates()
-				if (changed.keys.length) this.applyChangedStates(changed)
-				if (performance.now() - lastHeartbeat > 2000) {
-					lastHeartbeat = performance.now()
-					const cur = this.player.getPhysics().timeMsec
-					if (cur === lastTimeMsec && this.viewerMode === 'play' && !this.isPaused) {
-						console.warn('[physics] stalled at', cur, 'swiftShader', swiftShader)
-					}
-					lastTimeMsec = cur
+			if (this._physicsSab && this._physicsScratch) trySnap(this._physicsSab, this._physicsScratch)
+			this.player.setPhysicsEnabled(this.viewerMode === 'play')
+			this.player.updatePhysics()
+			this.player.updateAnimations(this.player.getGameTime())
+			const changed = this.player.popStates()
+			if (changed.keys.length) this.applyChangedStates(changed)
+			if (performance.now() - lastHeartbeat > 2000) {
+				lastHeartbeat = performance.now()
+				const cur = this.player.getPhysics().timeMsec
+				if (cur === lastTimeMsec && this.viewerMode === 'play' && !this.isPaused) {
+					console.warn('[physics] stalled at', cur, 'swiftShader', swiftShader)
 				}
-			} catch (e) {
-				console.warn('[tickPhysics] failed', e)
+				lastTimeMsec = cur
 			}
 		}
 		const physicsLoop = () => {
@@ -1937,12 +1858,8 @@ export class Viewer {
 			if (pinLoading) {
 				this.animFrame = this._animTimeout
 			}
-			try {
-				tickPhysics()
-				this._pollPinmame()
-			} catch (e) {
-				console.warn('[physicsLoop] failed', e)
-			}
+			tickPhysics()
+			this._pollPinmame()
 		}
 		physicsLoop()
 		let renderSkip = 0
@@ -1960,70 +1877,66 @@ export class Viewer {
 				renderSkip = (renderSkip + 1) % 3
 				if (renderSkip !== 0) return
 			}
-			try {
-				if (this.controls?.enabled) this.controls.update()
-				this._applyNudgeVisual()
-				if (this.composer) this.composer.render()
-				else this.renderer.render(this.scene, this.camera)
-				frames++
-				const now2 = performance.now()
-				if (now2 - last > 500) {
-					fps = Math.round((frames * 1000) / (now2 - last))
-					last = now2
-					frames = 0
-				}
-				if (this.dom.stats) {
-					const balls = this.player?.balls.length ?? 0
-					const t = this.player?.getPhysics()?.timeMsec ?? 0
-					const mode = this.viewerMode === 'play' ? (this.isPaused ? 'PLAY PAUSED' : 'PLAY') : 'VIEWER'
-					const emu = this.player?.getPhysics()?.emu
-					const emuRaw = emu ? emu.constructor.name : '—'
-					const emuStat = !emu ? '' : emu.isInitialized?.() ? 'ok' : 'loading'
-					const draws = this.renderer?.info?.render?.calls ?? 0
-					const tris = this.renderer?.info?.render?.triangles ?? 0
-					const trisFmt =
-						tris >= 1e6
-							? `${(tris / 1e6).toFixed(1)}M`
-							: tris >= 1e3
-								? `${(tris / 1e3).toFixed(1)}k`
-								: `${tris}`
-					const tFmt = t ? `${(t / 1000).toFixed(1)}s` : '—'
-					const emuLabel = emuStat ? `${emuRaw} · ${emuStat}` : emuRaw
-					let wasmReady = false
-					wasmReady = isWasmReady()
-					const wasmLabel = wasmReady ? 'Ready' : 'Loading…'
-					renderStats(this.dom.stats, {
-						fps,
-						draws,
-						trisFmt,
-						balls,
-						tFmt,
-						tHasValue: !!t,
-						emuLabel,
-						emuRaw,
-						wasmLabel,
-						wasmReady,
-						backend: this._rendererBackend,
-						mode,
-					})
-				}
-				{
-					const hud = this.dom.fpsHud || document.getElementById('fps-hud')
-					if (hud) {
-						let el = hud.querySelector('.fps')
-						if (!el) {
-							el = document.createElement('span')
-							el.className = 'fps'
-							hud.textContent = ''
-							hud.append(el)
-						}
-						el.textContent = `${fps} fps`
-						const cls = fps >= 55 ? 'fps--good' : fps >= 30 ? 'fps--mid' : fps > 0 ? 'fps--low' : ''
-						el.className = `fps ${cls}`.trim()
+			if (this.controls?.enabled) this.controls.update()
+			this._applyNudgeVisual()
+			if (this.composer) this.composer.render()
+			else this.renderer.render(this.scene, this.camera)
+			frames++
+			const now2 = performance.now()
+			if (now2 - last > 500) {
+				fps = Math.round((frames * 1000) / (now2 - last))
+				last = now2
+				frames = 0
+			}
+			if (this.dom.stats) {
+				const balls = this.player?.balls.length ?? 0
+				const t = this.player?.getPhysics()?.timeMsec ?? 0
+				const mode = this.viewerMode === 'play' ? (this.isPaused ? 'PLAY PAUSED' : 'PLAY') : 'VIEWER'
+				const emu = this.player?.getPhysics()?.emu
+				const emuRaw = emu ? emu.constructor.name : '—'
+				const emuStat = !emu ? '' : emu.isInitialized?.() ? 'ok' : 'loading'
+				const draws = this.renderer?.info?.render?.calls ?? 0
+				const tris = this.renderer?.info?.render?.triangles ?? 0
+				const trisFmt =
+					tris >= 1e6
+						? `${(tris / 1e6).toFixed(1)}M`
+						: tris >= 1e3
+							? `${(tris / 1e3).toFixed(1)}k`
+							: `${tris}`
+				const tFmt = t ? `${(t / 1000).toFixed(1)}s` : '—'
+				const emuLabel = emuStat ? `${emuRaw} · ${emuStat}` : emuRaw
+				let wasmReady = false
+				wasmReady = isWasmReady()
+				const wasmLabel = wasmReady ? 'Ready' : 'Loading…'
+				renderStats(this.dom.stats, {
+					fps,
+					draws,
+					trisFmt,
+					balls,
+					tFmt,
+					tHasValue: !!t,
+					emuLabel,
+					emuRaw,
+					wasmLabel,
+					wasmReady,
+					backend: this._rendererBackend,
+					mode,
+				})
+			}
+			{
+				const hud = this.dom.fpsHud || document.getElementById('fps-hud')
+				if (hud) {
+					let el = hud.querySelector('.fps')
+					if (!el) {
+						el = document.createElement('span')
+						el.className = 'fps'
+						hud.textContent = ''
+						hud.append(el)
 					}
+					el.textContent = `${fps} fps`
+					const cls = fps >= 55 ? 'fps--good' : fps >= 30 ? 'fps--mid' : fps > 0 ? 'fps--low' : ''
+					el.className = `fps ${cls}`.trim()
 				}
-			} catch (e) {
-				console.warn('[renderLoop] failed', e)
 			}
 		}
 		renderLoop()
@@ -2148,21 +2061,15 @@ export class Viewer {
 		if (!this.player) return
 		this._inputCleanup?.()
 		this._inputCleanup = attachInput(this)
-		try {
-			if (this.dom.canvas) {
-				this.dom.canvas.tabIndex = 0
-				setTimeout(() => {
-					try {
-						this.dom.canvas.focus()
-					} catch {}
-				}, 50)
-				setTimeout(() => {
-					try {
-						this.dom.canvas.focus()
-					} catch {}
-				}, 300)
-			}
-		} catch {}
+		if (this.dom.canvas) {
+			this.dom.canvas.tabIndex = 0
+			setTimeout(() => {
+				this.dom.canvas.focus()
+			}, 50)
+			setTimeout(() => {
+				this.dom.canvas.focus()
+			}, 300)
+		}
 	}
 }
 export function createViewer(opts) {

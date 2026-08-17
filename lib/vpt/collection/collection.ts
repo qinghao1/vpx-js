@@ -58,10 +58,8 @@ export class CollectionApi extends ItemApi<CollectionData> implements Iterable<I
 		return new Proxy<CollectionApi>(new CollectionApi(data, items, events, player, table), {
 			get: (api, prop) => {
 				if (prop === 'length') return api.items[prop as unknown as number]
-				try {
-					const intProp = parseInt(prop as string, 10)
-					if (!Number.isNaN(intProp)) return api.items[intProp]
-				} catch {}
+				const intProp = parseInt(prop as string, 10)
+				if (!Number.isNaN(intProp)) return api.items[intProp]
 				return Reflect.get(api, prop)
 			},
 			set: (api, prop, value) => {

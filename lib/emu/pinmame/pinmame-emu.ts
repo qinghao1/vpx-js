@@ -103,15 +103,10 @@ export class PinMameEmulator implements IEmulator {
 			return this.markReady()
 		}
 		const m = this.mod
-		for (const dir of ['/pinmame/roms', '/pinmame/nvram', '/pinmame/cfg'])
-			try {
-				m.FS.mkdirTree(dir)
-			} catch {}
+		for (const dir of ['/pinmame/roms', '/pinmame/nvram', '/pinmame/cfg']) m.FS.mkdirTree(dir)
 		if (rom.length) {
 			let reuse = false
-			try {
-				reuse = m.FS.stat(`/pinmame/roms/${game}.zip`).size === rom.length
-			} catch {}
+			reuse = m.FS.stat(`/pinmame/roms/${game}.zip`).size === rom.length
 			if (!reuse) m.FS.writeFile(`/pinmame/roms/${game}.zip`, rom)
 		}
 		this.writeConfig(m)
@@ -132,9 +127,7 @@ export class PinMameEmulator implements IEmulator {
 		this.queue.replayMessages(this)
 		if (this.isMock || !this.api) return
 		for (const [low, mask] of this.solMasks) {
-			try {
-				this.api.setSolMask(low, mask)
-			} catch {}
+			this.api.setSolMask(low, mask)
 		}
 	}
 
@@ -178,10 +171,7 @@ export class PinMameEmulator implements IEmulator {
 			this.queue.addMessage(MessageType.SetDipByte, (bank << 8) | (v & 0xff))
 			return
 		}
-		if (!this.isMock && this.api)
-			try {
-				this.api.setDIP(bank, v)
-			} catch {}
+		if (!this.isMock && this.api) this.api.setDIP(bank, v)
 	}
 
 	getSolMask(low: number): number {
@@ -197,9 +187,7 @@ export class PinMameEmulator implements IEmulator {
 	setSolMask(low: number, mask: number): void {
 		this.solMasks.set(low, mask)
 		if (!this.ready || this.isMock || !this.api) return
-		try {
-			this.api.setSolMask(low, mask)
-		} catch {}
+		this.api.setSolMask(low, mask)
 	}
 
 	emuSimulateCycle(ms: number): number {
@@ -218,9 +206,7 @@ export class PinMameEmulator implements IEmulator {
 			this.queue.addMessage(MessageType.SetTimeFence, time)
 			return
 		}
-		try {
-			this.api.setTimeFence(time)
-		} catch {}
+		this.api.setTimeFence(time)
 	}
 
 	private sync(): void {
@@ -230,17 +216,9 @@ export class PinMameEmulator implements IEmulator {
 			[this.api.getChangedSols, this.sols],
 			[this.api.getChangedGIs, this.gis],
 		] as const)
-			try {
-				this.pull(fn, buf)
-			} catch {}
-		try {
-			this.emulatorState.applyPinmame(this.lamps, this.sols, this.gis)
-		} catch {}
-		try {
-			this.pullDmd()
-		} catch (e) {
-			logger().warn('[pinmame] pullDmd failed', String(e))
-		}
+			this.pull(fn, buf)
+		this.emulatorState.applyPinmame(this.lamps, this.sols, this.gis)
+		this.pullDmd()
 	}
 
 	private pullDmd(): void {
@@ -335,9 +313,7 @@ export class PinMameEmulator implements IEmulator {
 	private flushPendingSwitches(): void {
 		if (!this.api) return
 		for (const [n, v] of [...this.pendingSwitches]) {
-			try {
-				this.api.setSwitch(n, v)
-			} catch {}
+			this.api.setSwitch(n, v)
 			if (this.isSwitchSettled(n, v)) this.pendingSwitches.delete(n)
 		}
 	}

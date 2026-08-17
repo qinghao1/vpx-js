@@ -150,12 +150,8 @@ export class ThreeMapGenerator {
 	}
 
 	private disposeTexture(tex: ThreeTexture): void {
-		try {
-			;(tex as any).dispose?.()
-		} catch {}
-		try {
-			const img = (tex as any).image
-			if (img?.data) (tex as any).image.data = null
-		} catch {}
+		;(tex as any).dispose?.()
+		const img = (tex as any).image
+		if (img?.data) (tex as any).image.data = null
 	}
 }

@@ -173,20 +173,16 @@ export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, Poin
 		}
 		destGeo.computeBoundingBox()
 		destGeo.computeBoundingSphere()
-		try {
-			const bvhGeo = destGeo as unknown as {
-				boundsTree?: unknown
-				disposeBoundsTree?: () => void
-				computeBoundsTree?: (o: unknown) => void
-			}
-			if (bvhGeo.boundsTree) {
-				bvhGeo.disposeBoundsTree?.()
-				bvhGeo.boundsTree = undefined
-				try {
-					bvhGeo.computeBoundsTree?.({})
-				} catch {}
-			}
-		} catch {}
+		const bvhGeo = destGeo as unknown as {
+			boundsTree?: unknown
+			disposeBoundsTree?: () => void
+			computeBoundsTree?: (o: unknown) => void
+		}
+		if (bvhGeo.boundsTree) {
+			bvhGeo.disposeBoundsTree?.()
+			bvhGeo.boundsTree = undefined
+			bvhGeo.computeBoundsTree?.({})
+		}
 		releaseGeometry(srcGeo)
 	}
 

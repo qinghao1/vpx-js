@@ -74,9 +74,7 @@ export class Texture extends BiffParser {
 		const ext = fileName.substr(fileName.lastIndexOf('.')).toLowerCase()
 		if (this.isRaw()) {
 			texture = await loader.loadRawTexture(this.getName(), this.pdsBuffer?.getData(), this.width, this.height)
-			try {
-				this.pdsBuffer = undefined
-			} catch {}
+			this.pdsBuffer = undefined
 		} else if (this.localFileName) {
 			texture = await loader.loadDefaultTexture(this.getName(), ext, this.localFileName)
 		} else {

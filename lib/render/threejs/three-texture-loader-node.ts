@@ -49,14 +49,10 @@ async function getHdrWorkers(): Promise<any[]> {
 				[`./hdr-decode.worker.node.js`, true],
 				[`./hdr-decode.worker.node.ts`, true],
 			] as const) {
-				try {
-					const u = new URL(p, import.meta.url) as any
-					try {
-						if (!existsSync(fileURLToPath(u))) continue
-					} catch {}
-					w = tryCreate(u, tsx)
-					if (w) break
-				} catch {}
+				const u = new URL(p, import.meta.url) as any
+				if (!existsSync(fileURLToPath(u))) continue
+				w = tryCreate(u, tsx)
+				if (w) break
 			}
 			if (!w) throw new Error('hdr worker not available - expected ./hdr-decode.worker.node.js')
 			w.on('message', (m: any) => {
@@ -73,9 +69,7 @@ async function getHdrWorkers(): Promise<any[]> {
 				hdrWorkers = hdrWorkers.filter(x => x !== w)
 				if (!hdrWorkers.length) hdrReady = null
 			})
-			try {
-				;(w as any).unref?.()
-			} catch {}
+			;(w as any).unref?.()
 			workers.push(w)
 		}
 		hdrWorkers = workers
@@ -109,15 +103,7 @@ export class ThreeTextureLoaderNode implements ITextureLoader<ThreeTexture> {
 	async loadTexture(name: string, ext: string, data: Uint8Array): Promise<ThreeTexture> {
 		const lowerExt = ext.toLowerCase()
 		if (lowerExt === '.hdr' || lowerExt === '.exr') {
-			try {
-				return await this.loadHdrViaWorker(name, lowerExt as '.hdr' | '.exr', data)
-			} catch (e) {
-				logger().warn(
-					'[Texture] hdr worker failed for %s: %s, falling back to main thread',
-					name,
-					(e as Error).message,
-				)
-			}
+			return await this.loadHdrViaWorker(name, lowerExt as '.hdr' | '.exr', data)
 			return floatTex(
 				lowerExt === '.hdr' ? HDRLoader : EXRLoader,
 				lowerExt === '.hdr' ? HalfFloatType : FloatType,

@@ -135,30 +135,24 @@ function bitmapToCanvasTexture(bitmap: any, name: string): any {
 
 function finalize(tex: any, name: string, isFloat: boolean): any {
 	if (tex?.image && typeof (tex.image as any).close === 'function' && (tex.image as any).width) {
-		try {
-			const img: any = tex.image
-			const isBitmap = typeof ImageBitmap !== 'undefined' ? img instanceof ImageBitmap : false
-			const looksBitmap =
-				isBitmap ||
-				(typeof img.width === 'number' && typeof img.height === 'number' && typeof img.close === 'function')
-			if (looksBitmap) {
-				const conv = bitmapToCanvasTexture(img, name)
-				if (conv) {
-					try {
-						tex.dispose?.()
-					} catch {}
-					tex = conv
-				}
+		const img: any = tex.image
+		const isBitmap = typeof ImageBitmap !== 'undefined' ? img instanceof ImageBitmap : false
+		const looksBitmap =
+			isBitmap ||
+			(typeof img.width === 'number' && typeof img.height === 'number' && typeof img.close === 'function')
+		if (looksBitmap) {
+			const conv = bitmapToCanvasTexture(img, name)
+			if (conv) {
+				tex.dispose?.()
+				tex = conv
 			}
-		} catch {}
+		}
 	}
 	const max = effectiveMax(isFloat, name)
 	if (tex.image?.data && tex.image.width && tex.image.height) {
 		const ds = downsampleData(tex, max, name)
 		if (ds !== tex) {
-			try {
-				tex.dispose?.()
-			} catch {}
+			tex.dispose?.()
 			nameAndTune(ds, name)
 			return ds
 		}
@@ -348,37 +342,31 @@ async function tryCreateBitmap(data: Uint8Array, mime: string, name: string): Pr
 
 async function tryLoadViaWorker(name: string, kind: 'exr' | 'hdr', data: Uint8Array): Promise<ThreeTexture | null> {
 	const key = exrCacheKey(name, data.byteLength, kind)
-	try {
-		const cached: any = await idbGet(key)
-		if (cached?.width && cached?.data) {
-			return finalize(
-				floatTex(cached.width, cached.height, cached.data, cached.type, cached.format, cached.colorSpace),
-				name,
-				true,
-			)
-		}
-	} catch {}
-	try {
-		const buf = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer
-		const parsed: any = await parseWorker(buf.slice(0) as ArrayBuffer, kind)
-		if (parsed?.width && parsed?.data) {
-			try {
-				idbSet(key, {
-					width: parsed.width,
-					height: parsed.height,
-					data: parsed.data,
-					type: parsed.type,
-					format: parsed.format,
-					colorSpace: parsed.colorSpace,
-				}).catch(() => {})
-			} catch {}
-			return finalize(
-				floatTex(parsed.width, parsed.height, parsed.data, parsed.type, parsed.format, parsed.colorSpace),
-				name,
-				true,
-			)
-		}
-	} catch {}
+	const cached: any = await idbGet(key)
+	if (cached?.width && cached?.data) {
+		return finalize(
+			floatTex(cached.width, cached.height, cached.data, cached.type, cached.format, cached.colorSpace),
+			name,
+			true,
+		)
+	}
+	const buf = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer
+	const parsed: any = await parseWorker(buf.slice(0) as ArrayBuffer, kind)
+	if (parsed?.width && parsed?.data) {
+		idbSet(key, {
+			width: parsed.width,
+			height: parsed.height,
+			data: parsed.data,
+			type: parsed.type,
+			format: parsed.format,
+			colorSpace: parsed.colorSpace,
+		}).catch(() => {})
+		return finalize(
+			floatTex(parsed.width, parsed.height, parsed.data, parsed.type, parsed.format, parsed.colorSpace),
+			name,
+			true,
+		)
+	}
 	return null
 }
 
@@ -550,12 +538,8 @@ function downsampleData(texture: any, maxSize: number, name?: string): any {
 	tex.name = texture.name
 	tune(tex)
 	tex.flipY = texture.flipY ?? false
-	try {
-		texture.dispose?.()
-	} catch {}
-	try {
-		texture.image.data = null
-	} catch {}
+	texture.dispose?.()
+	texture.image.data = null
 	return tex
 }
 

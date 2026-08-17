@@ -31,13 +31,9 @@ export function hasTextFile(fileName: string): boolean {
 
 /** getTextFile. */
 export function getTextFile(fileName: string): string {
-	try {
-		return readFileSync(getLocalPath(fileName)).toString('utf8')
-	} catch {}
-	try {
-		const base = fileName.replace(/.*[\\/]/, '')
-		return readFileSync(getLocalPath(base)).toString('utf8')
-	} catch {}
+	return readFileSync(getLocalPath(fileName)).toString('utf8')
+	const base = fileName.replace(/.*[\\/]/, '')
+	return readFileSync(getLocalPath(base)).toString('utf8')
 	ERR.Raise(53, 'GetTextFile', `Unable to open ${fileName}`)
 	return ''
 }
@@ -65,10 +61,8 @@ function getLocalPath(fileName: string): string {
 		resolve(__dirname, `../../res/scripts/${lower}`),
 	]
 	for (const c of candidates) {
-		try {
-			readFileSync(c)
-			return c
-		} catch {}
+		readFileSync(c)
+		return c
 	}
 	throw new Error(`Cannot find text file ${fileName}`)
 }

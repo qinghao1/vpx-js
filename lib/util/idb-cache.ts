@@ -8,12 +8,8 @@ function openDB(): Promise<IDBDatabase> {
 		const req = indexedDB.open(DB_NAME, DB_VERSION)
 		req.onupgradeneeded = () => {
 			const db = req.result
-			try {
-				db.deleteObjectStore('textures')
-			} catch {}
-			try {
-				db.deleteObjectStore(STORE)
-			} catch {}
+			db.deleteObjectStore('textures')
+			db.deleteObjectStore(STORE)
 			db.createObjectStore(STORE)
 		}
 		req.onsuccess = () => resolve(req.result)
@@ -35,15 +31,13 @@ export async function idbGet(key: string): Promise<any | undefined> {
 }
 
 export async function idbSet(key: string, val: any): Promise<void> {
-	try {
-		const db = await openDB()
-		await new Promise<void>((resolve, reject) => {
-			const tx = db.transaction(STORE, 'readwrite')
-			tx.objectStore(STORE).put(val, key)
-			tx.oncomplete = () => resolve()
-			tx.onerror = () => reject(tx.error)
-		})
-	} catch {}
+	const db = await openDB()
+	await new Promise<void>((resolve, reject) => {
+		const tx = db.transaction(STORE, 'readwrite')
+		tx.objectStore(STORE).put(val, key)
+		tx.oncomplete = () => resolve()
+		tx.onerror = () => reject(tx.error)
+	})
 }
 
 export function texCacheKey(name: string, w: number, h: number, mtime = ''): string {

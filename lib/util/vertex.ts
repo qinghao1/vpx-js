@@ -37,18 +37,16 @@ export class Vertex3DNoTex2 {
 	static get(buffer: Uint8Array, pos: number): Vertex3DNoTex2 {
 		const off = pos * Vertex3DNoTex2.size
 		const v = new Vertex3DNoTex2()
-		try {
-			const f32 = new Float32Array(buffer.buffer, buffer.byteOffset + off, 8)
-			v.x = f32[0]!
-			v.y = f32[1]!
-			v.z = f32[2]!
-			v.nx = f32[3]!
-			v.ny = f32[4]!
-			v.nz = f32[5]!
-			v.tu = f32[6]!
-			v.tv = f32[7]!
-			return v
-		} catch {}
+		const f32 = new Float32Array(buffer.buffer, buffer.byteOffset + off, 8)
+		v.x = f32[0]!
+		v.y = f32[1]!
+		v.z = f32[2]!
+		v.nx = f32[3]!
+		v.ny = f32[4]!
+		v.nz = f32[5]!
+		v.tu = f32[6]!
+		v.tv = f32[7]!
+		return v
 		const d = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength)
 		v.x = d.getFloat32(off, true)
 		v.y = d.getFloat32(off + 4, true)

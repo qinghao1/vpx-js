@@ -93,51 +93,31 @@ function toHost(viewer: any): InputHost {
 				: null
 		},
 		log(msg: string, level?: string) {
-			try {
-				viewer.log?.(msg, level)
-			} catch {}
+			viewer.log?.(msg, level)
 		},
 		enterPlayMode() {
-			try {
-				viewer.viewerMode = 'play'
-			} catch {}
-			try {
-				viewer.player?.setPhysicsEnabled?.(true)
-			} catch {}
-			try {
-				viewer.enterPlayMode?.()
-			} catch {}
-			try {
-				viewer._switchToPlay?.()
-			} catch {}
+			viewer.viewerMode = 'play'
+			viewer.player?.setPhysicsEnabled?.(true)
+			viewer.enterPlayMode?.()
+			viewer._switchToPlay?.()
 		},
 		exitPlayMode() {
-			try {
-				viewer._switchToViewer?.()
-			} catch {}
-			try {
-				viewer.exitPlayMode?.()
-			} catch {}
+			viewer._switchToViewer?.()
+			viewer.exitPlayMode?.()
 		},
 		togglePause() {
-			try {
-				viewer.isPaused = !viewer.isPaused
-				if (viewer.isPaused) viewer.player?.pause?.()
-				else viewer.player?.resume?.()
-				viewer.log?.(viewer.isPaused ? 'Paused (P to resume)' : 'Resumed', viewer.isPaused ? 'warn' : 'info')
-			} catch {}
+			viewer.isPaused = !viewer.isPaused
+			if (viewer.isPaused) viewer.player?.pause?.()
+			else viewer.player?.resume?.()
+			viewer.log?.(viewer.isPaused ? 'Paused (P to resume)' : 'Resumed', viewer.isPaused ? 'warn' : 'info')
 		},
 		releaseKeys(codes: string[]) {
 			for (const code of codes) {
-				try {
-					viewer._sendKey?.(code, false)
-				} catch {}
-				try {
-					const key = keyForCode(code)
-					const loc = locationForCode(code)
-					const ev = { code, key, location: loc, ts: Date.now() } as any
-					viewer.player?.onKeyUp?.(ev)
-				} catch {}
+				viewer._sendKey?.(code, false)
+				const key = keyForCode(code)
+				const loc = locationForCode(code)
+				const ev = { code, key, location: loc, ts: Date.now() } as any
+				viewer.player?.onKeyUp?.(ev)
 			}
 		},
 		requestMotionPermission:
@@ -199,17 +179,9 @@ function attachKeyboardHost(host: InputHost, signal: AbortSignal): void {
 
 		if (host.player) {
 			if (down) {
-				try {
-					host.player.onKeyDown(ev)
-				} catch (err) {
-					console.warn('[input] onKeyDown failed', err)
-				}
+				host.player.onKeyDown(ev)
 			} else {
-				try {
-					host.player.onKeyUp(ev)
-				} catch (err) {
-					console.warn('[input] onKeyUp failed', err)
-				}
+				host.player.onKeyUp(ev)
 			}
 		}
 
@@ -258,13 +230,11 @@ function attachPointerHost(host: InputHost, signal: AbortSignal): void {
 	const swipeStart = new Map<number, { x: number; y: number; t: number }>()
 
 	let ro: ResizeObserver | null = null
-	try {
-		ro = new ResizeObserver(() => {
-			rect = canvas.getBoundingClientRect()
-		})
-		ro.observe(canvas)
-		signal.addEventListener('abort', () => ro?.disconnect(), { once: true })
-	} catch {}
+	ro = new ResizeObserver(() => {
+		rect = canvas.getBoundingClientRect()
+	})
+	ro.observe(canvas)
+	signal.addEventListener('abort', () => ro?.disconnect(), { once: true })
 
 	window.addEventListener(
 		'scroll',
@@ -274,13 +244,9 @@ function attachPointerHost(host: InputHost, signal: AbortSignal): void {
 		{ signal, passive: true } as any,
 	)
 
-	try {
-		canvas.tabIndex = 0
-	} catch {}
+	canvas.tabIndex = 0
 	const onCanvasClick = (): void => {
-		try {
-			canvas.focus()
-		} catch {}
+		canvas.focus()
 	}
 	canvas.addEventListener('click', onCanvasClick, { signal })
 
@@ -321,18 +287,16 @@ function attachPointerHost(host: InputHost, signal: AbortSignal): void {
 		// Generic fallback for any table: if no cabinet mesh list (or hit misses), walk the scene
 		// once on pointerdown (rare) — not on hover (60 Hz). This catches tables where buttons are
 		// plain primitives grouped under a cabinet node without isCabinetButton flag.
-		try {
-			const hits = raycaster.intersectObject(host.tableGroup, true)
-			for (const h of hits) {
-				for (let cur: any = (h as any).object; cur; cur = cur.parent) {
-					const code: string | null =
-						cur.userData?.buttonCode ??
-						cur.userData?.__buttonCode ??
-						(cur.userData?.isCabinetButton ? cur.userData.buttonCode : null)
-					if (code) return { code, obj: (h as any).object as THREE.Object3D }
-				}
+		const hits = raycaster.intersectObject(host.tableGroup, true)
+		for (const h of hits) {
+			for (let cur: any = (h as any).object; cur; cur = cur.parent) {
+				const code: string | null =
+					cur.userData?.buttonCode ??
+					cur.userData?.__buttonCode ??
+					(cur.userData?.isCabinetButton ? cur.userData.buttonCode : null)
+				if (code) return { code, obj: (h as any).object as THREE.Object3D }
 			}
-		} catch {}
+		}
 		return null
 	}
 
@@ -363,11 +327,7 @@ function attachPointerHost(host: InputHost, signal: AbortSignal): void {
 				const key = keyForCode(code)
 				const location = locationForCode(code)
 				const ev = { code, key, location, ts: Date.now() } as any
-				try {
-					host.player?.onKeyDown(ev)
-				} catch (err) {
-					console.warn('[input] onKeyDown failed', err)
-				}
+				host.player?.onKeyDown(ev)
 				if (host.physicsSab) {
 					const dik = keyEventToDirectInputKey(ev)
 					if (dik) pushInput(host.physicsSab, 1, dik, Date.now())
@@ -376,9 +336,7 @@ function attachPointerHost(host: InputHost, signal: AbortSignal): void {
 
 			if (hit) {
 				canvas.setAttribute('data-pressed', code)
-				try {
-					e.stopPropagation()
-				} catch {}
+				e.stopPropagation()
 				if (host.controls) {
 					const c: any = host.controls
 					if (c._inputPrevEnabled == null) c._inputPrevEnabled = c.enabled
@@ -386,9 +344,7 @@ function attachPointerHost(host: InputHost, signal: AbortSignal): void {
 				}
 			}
 
-			try {
-				canvas.setPointerCapture(e.pointerId)
-			} catch {}
+			canvas.setPointerCapture(e.pointerId)
 			if (host.viewerMode === 'play') e.preventDefault()
 			if (isRightClick) e.preventDefault()
 		},
@@ -404,11 +360,7 @@ function attachPointerHost(host: InputHost, signal: AbortSignal): void {
 			const key = keyForCode(code)
 			const location = locationForCode(code)
 			const ev = { code, key, location, ts: Date.now() } as any
-			try {
-				host.player?.onKeyUp(ev)
-			} catch (err) {
-				console.warn('[input] onKeyUp failed', err)
-			}
+			host.player?.onKeyUp(ev)
 			if (host.physicsSab) {
 				const dik = keyEventToDirectInputKey(ev)
 				if (dik) pushInput(host.physicsSab, 0, dik, Date.now())
@@ -434,16 +386,12 @@ function attachPointerHost(host: InputHost, signal: AbortSignal): void {
 			if (dt < 600 && Math.hypot(dx, dy) > 50) {
 				const ang = swipeNudge(dx, dy, NUDGE as any)
 				if (ang !== null) {
-					try {
-						host.player?.nudge(ang, ang === NUDGE.back ? 2.0 : NUDGE.force)
-					} catch {}
+					host.player?.nudge(ang, ang === NUDGE.back ? 2.0 : NUDGE.force)
 				}
 			}
 		}
 
-		try {
-			canvas.releasePointerCapture(e.pointerId)
-		} catch {}
+		canvas.releasePointerCapture(e.pointerId)
 	}
 
 	canvas.addEventListener('pointerup', end as any, { signal })
@@ -497,25 +445,17 @@ export function attachKeyboard(viewer: any): () => void {
 	const ctrl = new AbortController()
 
 	if (viewer._keyboardCtrl) {
-		try {
-			viewer._keyboardCtrl.abort()
-		} catch {}
+		viewer._keyboardCtrl.abort()
 	}
 	viewer._keyboardCtrl = ctrl
 
 	attachKeyboardHost(host, ctrl.signal)
 
-	try {
-		viewer.dom?.canvas?.focus?.()
-	} catch {}
-	try {
-		if (viewer.dom?.canvas) viewer.dom.canvas.tabIndex = 0
-	} catch {}
+	viewer.dom?.canvas?.focus?.()
+	if (viewer.dom?.canvas) viewer.dom.canvas.tabIndex = 0
 
 	return () => {
-		try {
-			ctrl.abort()
-		} catch {}
+		ctrl.abort()
 		if (viewer._keyboardCtrl === ctrl) viewer._keyboardCtrl = null
 	}
 }
@@ -525,22 +465,16 @@ export function attachPointerTouch(viewer: any): () => void {
 	const ctrl = new AbortController()
 
 	if (viewer._pointerCtrl) {
-		try {
-			viewer._pointerCtrl.abort()
-		} catch {}
+		viewer._pointerCtrl.abort()
 	}
 	viewer._pointerCtrl = ctrl
 
 	attachPointerHost(host, ctrl.signal)
 
 	return () => {
-		try {
-			ctrl.abort()
-		} catch {}
+		ctrl.abort()
 		if (viewer._pointerCtrl === ctrl) viewer._pointerCtrl = null
-		try {
-			viewer._touchCleanup = null
-		} catch {}
+		viewer._touchCleanup = null
 	}
 }
 

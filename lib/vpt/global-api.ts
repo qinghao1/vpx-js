@@ -293,46 +293,44 @@ export class GlobalApi extends VbsApi {
 		const material = this.table.getMaterial(name)
 		if (!material) return
 		material.baseColor = color
-		try {
-			const g = globalThis as any
-			const target = name.toLowerCase()
-			for (const grp of [g.tableGroup, g.scene, g.viewer?.tableGroup, g.viewer?.scene].filter(Boolean)) {
-				grp.traverse((o: any) => {
-					for (const m of o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : []) {
-						if (!m?.color) continue
-						const n = (m.name ?? '').toLowerCase()
-						if (n === `material:${target}` || n === target || n.includes(target)) {
-							const isBaked = !!(m as any).userData?.__isBaked || !!(m as any).emissiveMap
-							if (isBaked) {
-								// baked tint via emissive
-								if ((m as any).emissive) (m as any).emissive.set(color)
-								else (m as any).emissive = new (m as any).color.constructor(color)
-								;(m as any).emissiveIntensity = 1.0
-								;(m as any).color?.set(0x000000)
-							} else {
-								m.color.set(color)
-							}
-							m.needsUpdate = true
+		const g = globalThis as any
+		const target = name.toLowerCase()
+		for (const grp of [g.tableGroup, g.scene, g.viewer?.tableGroup, g.viewer?.scene].filter(Boolean)) {
+			grp.traverse((o: any) => {
+				for (const m of o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : []) {
+					if (!m?.color) continue
+					const n = (m.name ?? '').toLowerCase()
+					if (n === `material:${target}` || n === target || n.includes(target)) {
+						const isBaked = !!(m as any).userData?.__isBaked || !!(m as any).emissiveMap
+						if (isBaked) {
+							// baked tint via emissive
+							if ((m as any).emissive) (m as any).emissive.set(color)
+							else (m as any).emissive = new (m as any).color.constructor(color)
+							;(m as any).emissiveIntensity = 1.0
+							;(m as any).color?.set(0x000000)
+						} else {
+							m.color.set(color)
 						}
+						m.needsUpdate = true
 					}
-				})
-			}
-			const gen = g.renderApi?.getMaterialGenerator?.() ?? g.viewer?.renderApi?.getMaterialGenerator?.()
-			for (const [k, m] of Object.entries(gen?.cachedMaterials ?? {})) {
-				if (k.split(':')[0].toLowerCase() === target) {
-					const isBaked = !!(m as any).userData?.__isBaked || !!(m as any).emissiveMap
-					if (isBaked) {
-						if ((m as any).emissive) (m as any).emissive.set(color)
-						else (m as any).emissive = new (m as any).color.constructor(color)
-						;(m as any).emissiveIntensity = 1.0
-						;(m as any).color?.set(0x000000)
-					} else {
-						;(m as any).color?.set(color)
-					}
-					;(m as any).needsUpdate = true
 				}
+			})
+		}
+		const gen = g.renderApi?.getMaterialGenerator?.() ?? g.viewer?.renderApi?.getMaterialGenerator?.()
+		for (const [k, m] of Object.entries(gen?.cachedMaterials ?? {})) {
+			if (k.split(':')[0].toLowerCase() === target) {
+				const isBaked = !!(m as any).userData?.__isBaked || !!(m as any).emissiveMap
+				if (isBaked) {
+					if ((m as any).emissive) (m as any).emissive.set(color)
+					else (m as any).emissive = new (m as any).color.constructor(color)
+					;(m as any).emissiveIntensity = 1.0
+					;(m as any).color?.set(0x000000)
+				} else {
+					;(m as any).color?.set(color)
+				}
+				;(m as any).needsUpdate = true
 			}
-		} catch {}
+		}
 	}
 
 	public Nudge(angle: number, force: number): void {

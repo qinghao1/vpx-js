@@ -59,9 +59,7 @@ export class VpmController {
 			n => this.dipCache.get(n) ?? this.emulator.getDipSwitchByte(n),
 			(n, v) => {
 				this.dipCache.set(n, v & 0xff)
-				try {
-					this.emulator.setDipSwitchByte(v & 0xff, n)
-				} catch {}
+				this.emulator.setDipSwitchByte(v & 0xff, n)
 				return true
 			},
 		)
@@ -69,11 +67,7 @@ export class VpmController {
 			i => this.solMaskCache.get(i) ?? this.emulator.getSolMask?.(i) ?? 0,
 			(n, v) => {
 				this.solMaskCache.set(n, v)
-				try {
-					this.emulator.setSolMask?.(n, v)
-				} catch (e) {
-					logger().debug('SolMask set failed', e)
-				}
+				this.emulator.setSolMask?.(n, v)
 				return true
 			},
 		)
@@ -159,47 +153,26 @@ export class VpmController {
 	}
 
 	private replay(emu: IEmulator): void {
-		for (const [k, v] of this.dipCache)
-			try {
-				emu.setDipSwitchByte(v & 0xff, k)
-			} catch (e) {
-				logger().debug('replay Dip failed', e)
-			}
-		for (const [k, v] of this.solMaskCache)
-			try {
-				emu.setSolMask?.(k, v)
-			} catch (e) {
-				logger().debug('replay SolMask failed', e)
-			}
-		for (const [k, v] of this.switchCache)
-			try {
-				emu.setSwitchInput(k, v)
-			} catch (e) {
-				logger().debug('replay Switch failed', e)
-			}
+		for (const [k, v] of this.dipCache) emu.setDipSwitchByte(v & 0xff, k)
+		for (const [k, v] of this.solMaskCache) emu.setSolMask?.(k, v)
+		for (const [k, v] of this.switchCache) emu.setSwitchInput(k, v)
 	}
 
 	private async fetchRom(name: string): Promise<Uint8Array> {
-		try {
-			const w = globalThis as unknown as {
-				__pendingRom?: Uint8Array
-				__pendingRomName?: string
-				__pendingRomUrl?: string
-			}
-			if (w.__pendingRom?.length && (!w.__pendingRomName || w.__pendingRomName === name)) return w.__pendingRom
-			const romParam = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('rom') : null
-			if (romParam) {
-				try {
-					const r = await fetch(romParam)
-					if (r.ok) return new Uint8Array(await r.arrayBuffer())
-				} catch {}
-			}
-		} catch {}
+		const w = globalThis as unknown as {
+			__pendingRom?: Uint8Array
+			__pendingRomName?: string
+			__pendingRomUrl?: string
+		}
+		if (w.__pendingRom?.length && (!w.__pendingRomName || w.__pendingRomName === name)) return w.__pendingRom
+		const romParam = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('rom') : null
+		if (romParam) {
+			const r = await fetch(romParam)
+			if (r.ok) return new Uint8Array(await r.arrayBuffer())
+		}
 		for (const url of [`/pinmame/roms/${name}.zip`, `/roms/${name}.zip`]) {
-			try {
-				const r = await fetch(url)
-				if (r.ok) return new Uint8Array(await r.arrayBuffer())
-			} catch {}
+			const r = await fetch(url)
+			if (r.ok) return new Uint8Array(await r.arrayBuffer())
 		}
 		logger().warn(`[pinmame] no ROM for ${name} — mock`)
 		return new Uint8Array()
@@ -225,9 +198,7 @@ export class VpmController {
 	}
 	set TimeFence(v: number) {
 		this.timeFence = v
-		try {
-			;(this.emulator as unknown as { setTimeFence?: (t: number) => void }).setTimeFence?.(v)
-		} catch {}
+		;(this.emulator as unknown as { setTimeFence?: (t: number) => void }).setTimeFence?.(v)
 	}
 	Run(nMinVersion = 0, hParentWnd = 0): void {
 		if (!this.gameName) {
@@ -240,9 +211,7 @@ export class VpmController {
 	}
 	Stop(): void {
 		logger().debug('STOP')
-		try {
-			this.emulator.setPaused(true)
-		} catch {}
+		this.emulator.setPaused(true)
 	}
 
 	get WPCNumbering(): number {

@@ -230,10 +230,8 @@ export async function getWasmKernels(): Promise<Mod> {
 			candidates.push('/wasm/dist/kernels.js')
 		}
 		for (const rel of ['../../../wasm/dist/kernels.js', '../../../../wasm/dist/kernels.js']) {
-			try {
-				const u = new URL(rel, import.meta.url).href
-				if (!candidates.includes(u)) candidates.push(u)
-			} catch {}
+			const u = new URL(rel, import.meta.url).href
+			if (!candidates.includes(u)) candidates.push(u)
 		}
 		let lastErr: unknown
 		for (const url of candidates) {
