@@ -1106,8 +1106,9 @@ export const isDeferred = (tx: DeferredTexture, table: { getPlayfieldMap(): stri
 	const n = tx.getName().toLowerCase()
 	const pf = table.getPlayfieldMap().toLowerCase()
 	if (n === pf) return false
-	if (RE_BAKE_MAP.test(n) || n.includes('playfield')) return false
 	const p = (tx.szPath ?? '').toLowerCase()
 	if (p.endsWith('.exr') || p.endsWith('.hdr') || tx.isHdr?.()) return true
-	return tx.width * tx.height > LARGE_TEXTURE_PIXELS
+	if (tx.width * tx.height > LARGE_TEXTURE_PIXELS) return true
+	if (RE_BAKE_MAP.test(n) || n.includes('playfield')) return false
+	return false
 }

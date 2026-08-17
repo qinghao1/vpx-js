@@ -1745,13 +1745,18 @@ export class Viewer {
 			await this._cleanupReader(reader)
 			return mounted
 		}
-		const ok = await this._waitForPinmame(5000)
-		if (_loadGen !== this._loadId) {
-			await this._cleanupReader(reader)
-			return mounted
+		const streamIdle = () => {
+			if (_loadGen !== this._loadId) {
+				void this._cleanupReader(reader).catch(() => {})
+				return
+			}
+			this._streamTextures(table, textures, reader)
 		}
-		this.log(`[wait] done ok=${ok} streaming ${textures.length}`)
-		this._streamTextures(table, textures, reader)
+		if (typeof (globalThis as any).requestIdleCallback === 'function') {
+			;(globalThis as any).requestIdleCallback(streamIdle, { timeout: 2000 })
+		} else {
+			setTimeout(streamIdle, 32)
+		}
 		return mounted
 	}
 	async load() {
