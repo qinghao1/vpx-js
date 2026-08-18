@@ -549,13 +549,9 @@ export class Viewer {
 			if (this.viewerMode !== 'viewer' || !this.tableGroup) return
 			const t = e.changedTouches?.[0]
 			if (!t) return
-			if (window.matchMedia?.('(pointer: coarse)')?.matches) {
-				this._switchToPlay()
-				e.preventDefault()
-				return
-			}
 			if (!hovered && !hitTest(t.clientX, t.clientY)) return
 			this._switchToPlay()
+			e.preventDefault()
 		}
 		canvas.addEventListener('touchend', onViewerTouchEnd, { passive: false })
 		this._eventCleanups.push(() => canvas.removeEventListener('touchend', onViewerTouchEnd))
