@@ -505,22 +505,19 @@ export class Viewer {
 			this._raycaster.setFromCamera(this._mouse, this.camera)
 			return this._raycaster.intersectObject(this.tableGroup, true)
 		}
-		const isOuter = (n: string) => RE_OUTER.test(n || '') || RE_CAB.test(n || '')
-		const hitIsOuter = (o: any) => {
-			for (let c: any = o; c && c !== this.tableGroup; c = c.parent) if (isOuter(c.name || '')) return true
-			return false
-		}
-		const hitIsPlayfield = (o: any) => {
+		const isTableHit = (o: any) => {
 			for (let c: any = o; c && c !== this.tableGroup; c = c.parent) {
-				const n = String(c.name || '').toLowerCase()
-				if (n.includes('playfield') || n.includes('apron')) return true
+				const n = String(c.name || '')
+				if (RE_CAB.test(n) || RE_OUTER.test(n)) return true
+				const ln = n.toLowerCase()
+				if (ln.includes('playfield') || ln.includes('apron')) return true
 			}
 			return false
 		}
 		const hitTest = (x, y) => {
 			if (this.controls?.state !== -1) return hovered
 			const hits = getHits(x, y)
-			return hits.length ? hits.some((h: any) => hitIsOuter(h.object) || hitIsPlayfield(h.object)) : false
+			return hits.some((h: any) => isTableHit(h.object))
 		}
 		let hoverRaf = 0
 		let hoverX = 0,
