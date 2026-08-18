@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import { keyEventToDirectInputKey } from '../../../dist-esm/lib/game/key-code.js'
 import { pushInput } from '../../../dist-esm/lib/game/shared/physics-buffer.js'
 import { swipeNudge } from '../../../dist-esm/lib/render/threejs/three-scene-postprocess.js'
-import { CONTROL_SCHEME, NUDGE } from '../config.js'
+import { CONTROL_SCHEME, NUDGE, RE_CAB, RE_OUTER } from '../config.js'
 import { ensureBvh } from '../env.js'
 
 // Generic helpers used by any table: map physical code → logical key + location.
@@ -355,7 +355,16 @@ function attachPointerHost(host: InputHost, signal: AbortSignal): void {
 				ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1)
 				raycaster.setFromCamera(ndc, host.camera)
 				const hits = raycaster.intersectObject(host.tableGroup, true)
-				if (!hits.length) return
+				const hitTable = hits.some((h: any) => {
+					for (let o: any = h.object; o; o = o.parent) {
+						const n = String(o.name || '')
+						const ln = n.toLowerCase()
+						if (ln.includes('playfield') || ln.includes('bm_') || ln.includes('apron')) return true
+						if (RE_CAB.test(n) || RE_OUTER.test(n)) return true
+					}
+					return false
+				})
+				if (!hitTable) return
 				host.enterPlayMode()
 			}
 			const isRightClick = e.button === 2

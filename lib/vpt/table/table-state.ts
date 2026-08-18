@@ -20,13 +20,6 @@ export class TableState extends ItemState {
 		return TableState.claim(this.name, this.material, this.isVisible)
 	}
 
-	public override copyFrom(state: ItemState): void {
-		const s = state as TableState
-		this.name = s.name
-		this.material = s.material
-		this.isVisible = s.isVisible
-	}
-
 	public diff(state: TableState): TableState {
 		const diff = this.clone()
 		omitEqual(diff, state, 'material')

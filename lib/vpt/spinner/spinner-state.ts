@@ -33,16 +33,6 @@ export class SpinnerState extends ItemState {
 		return SpinnerState.claim(this.name, this.angle, this.texture, this.material, this.showBracket, this.isVisible)
 	}
 
-	public override copyFrom(state: ItemState): void {
-		const s = state as SpinnerState
-		this.name = s.name
-		this.angle = s.angle
-		this.texture = s.texture
-		this.material = s.material
-		this.showBracket = s.showBracket
-		this.isVisible = s.isVisible
-	}
-
 	public diff(state: SpinnerState): SpinnerState {
 		const diff = this.clone()
 		omitEqual(diff, state, 'angle')

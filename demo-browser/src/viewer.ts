@@ -505,9 +505,22 @@ export class Viewer {
 			this._raycaster.setFromCamera(this._mouse, this.camera)
 			return this._raycaster.intersectObject(this.tableGroup, true)
 		}
+		const isOuter = (n: string) => RE_OUTER.test(n || '') || RE_CAB.test(n || '')
+		const hitIsOuter = (o: any) => {
+			for (let c: any = o; c; c = c.parent) if (isOuter(c.name || '')) return true
+			return false
+		}
+		const hitIsPlayfield = (o: any) => {
+			for (let c: any = o; c; c = c.parent) {
+				const n = String(c.name || '').toLowerCase()
+				if (n.includes('playfield') || n.includes('bm_') || n.includes('apron')) return true
+			}
+			return false
+		}
 		const hitTest = (x, y) => {
 			if (this.controls?.state !== -1) return hovered
-			return getHits(x, y).length > 0
+			const hits = getHits(x, y)
+			return hits.length ? hits.some((h: any) => hitIsOuter(h.object) || hitIsPlayfield(h.object)) : false
 		}
 		let hoverRaf = 0
 		let hoverX = 0,

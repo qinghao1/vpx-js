@@ -208,26 +208,6 @@ export class RampState extends ItemState {
 		)
 	}
 
-	public override copyFrom(state: ItemState): void {
-		const s = state as RampState
-		this.name = s.name
-		this.heightBottom = s.heightBottom
-		this.heightTop = s.heightTop
-		this.widthBottom = s.widthBottom
-		this.widthTop = s.widthTop
-		this.leftWallHeight = s.leftWallHeight
-		this.rightWallHeight = s.rightWallHeight
-		this.leftWallHeightVisible = s.leftWallHeightVisible
-		this.rightWallHeightVisible = s.rightWallHeightVisible
-		this.type = s.type
-		this.material = s.material
-		this.texture = s.texture
-		this.textureAlignment = s.textureAlignment
-		this.hasWallImage = s.hasWallImage
-		this.depthBias = s.depthBias
-		this.isVisible = s.isVisible
-	}
-
 	public diff(state: RampState): RampState {
 		const d = this.clone()
 		omitEqual(d, state, 'heightBottom')

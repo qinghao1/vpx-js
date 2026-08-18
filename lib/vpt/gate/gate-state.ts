@@ -31,15 +31,6 @@ export class GateState extends ItemState {
 		return GateState.claim(this.name, this.angle, this.material, this.showBracket, this.isVisible)
 	}
 
-	public override copyFrom(state: ItemState): void {
-		const s = state as GateState
-		this.name = s.name
-		this.angle = s.angle
-		this.material = s.material
-		this.showBracket = s.showBracket
-		this.isVisible = s.isVisible
-	}
-
 	public diff(state: GateState): GateState {
 		const d = this.clone()
 		omitEqual(d, state, 'angle')

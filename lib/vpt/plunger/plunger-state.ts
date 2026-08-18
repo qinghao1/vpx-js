@@ -19,12 +19,6 @@ export class PlungerState extends ItemState {
 		return PlungerState.claim(this.name, this.frame)
 	}
 
-	public override copyFrom(state: ItemState): void {
-		const s = state as PlungerState
-		this.name = s.name
-		this.frame = s.frame
-	}
-
 	public diff(state: PlungerState): PlungerState {
 		const diff = this.clone()
 		omitEqual(diff, state, 'frame')
