@@ -16,16 +16,18 @@ const CANDIDATES = [
 export async function createPinmameModule(): Promise<{ module: PinmameModule; isMock: boolean }> {
 	if (cached) return cached
 	for (const path of CANDIDATES) {
-		const mod = (await import(/* @vite-ignore */ path)) as {
-			default: () => Promise<PinmameModule>
-			isMock?: boolean
-		}
-		const m = await mod.default()
-		if (!m?.cwrap) continue
-		const isMock = mod.isMock === true
-		if (isMock) logger().warn('[pinmame] mock — run npm run build:wasm')
-		cached = { module: m, isMock }
-		return cached
+		try {
+			const mod = (await import(/* @vite-ignore */ path)) as {
+				default: () => Promise<PinmameModule>
+				isMock?: boolean
+			}
+			const m = await mod.default()
+			if (!m?.cwrap) continue
+			const isMock = mod.isMock === true
+			if (isMock) logger().warn('[pinmame] mock — run npm run build:wasm')
+			cached = { module: m, isMock }
+			return cached
+		} catch {}
 	}
 	throw new Error('PinMAME module not found — build wasm or mock')
 }
