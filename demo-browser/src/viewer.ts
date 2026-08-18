@@ -482,15 +482,6 @@ export class Viewer {
 		const tip = this.dom.playTip
 		const canvas = this.dom.canvas
 		let hovered = false
-		const isOuter = n => RE_OUTER.test(n || '') || RE_CAB.test(n || '')
-		const hitIsOuter = o => {
-			for (let c = o; c; c = c.parent) if (isOuter(c.name || '')) return true
-			return false
-		}
-		const hitIsPlayfield = o => {
-			const n = (o.name || '').toLowerCase()
-			return n.includes('playfield') || n.includes('bm_') || n.includes('apron')
-		}
 		const hideTip = () => {
 			hovered = false
 			if (tip) tip.hidden = true
@@ -516,8 +507,7 @@ export class Viewer {
 		}
 		const hitTest = (x, y) => {
 			if (this.controls?.state !== -1) return hovered
-			const hits = getHits(x, y)
-			return hits.length ? hits.some(h => hitIsOuter(h.object) || hitIsPlayfield(h.object)) : false
+			return getHits(x, y).length > 0
 		}
 		let hoverRaf = 0
 		let hoverX = 0,

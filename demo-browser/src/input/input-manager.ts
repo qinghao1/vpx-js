@@ -355,16 +355,7 @@ function attachPointerHost(host: InputHost, signal: AbortSignal): void {
 				ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1)
 				raycaster.setFromCamera(ndc, host.camera)
 				const hits = raycaster.intersectObject(host.tableGroup, true)
-				const hitTable = hits.some((h: any) => {
-					for (let o: any = h.object; o; o = o.parent) {
-						const n = String(o.name || '').toLowerCase()
-						if (n.includes('playfield') || n.includes('bm_') || n.includes('apron')) return true
-						if (/vrcab|cabinet|lockbar|pincab/i.test(o.name || '')) return true
-						if (/VRCab_(Cabinet|Backbox|LegsFront|LegsBack)/.test(o.name || '')) return true
-					}
-					return false
-				})
-				if (!hitTable) return
+				if (!hits.length) return
 				host.enterPlayMode()
 			}
 			const isRightClick = e.button === 2
