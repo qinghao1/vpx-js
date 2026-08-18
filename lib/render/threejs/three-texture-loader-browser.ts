@@ -84,15 +84,16 @@ export function effectiveMax(_isFloat: boolean, name?: string): number {
 	const isVlm = !!name && /vlm/i.test(name)
 	const low = isLowQuality()
 	const caps = low ? QUALITY_CAPS.low : getEffectiveCaps()
+	const highCaps = QUALITY_CAPS.high
 	let cap: number
 	if (isVlm) cap = 1024
-	else if (isPlayfield) cap = caps.playfield
+	else if (isPlayfield) cap = low ? highCaps.playfield : caps.playfield
 	else if (swift) cap = 1024
 	else cap = caps.other
 	const budget = viewportBudget()
 	const factor = low ? (isPlayfield ? 0.75 : 0.5) : 1
 	const viewport = Math.max(caps.floor, Math.ceil(budget * factor))
-	const viewportClamped = low ? Math.min(viewport, isPlayfield ? caps.playfield : caps.other) : viewport
+	const viewportClamped = low ? Math.min(viewport, isPlayfield ? highCaps.playfield : caps.other) : viewport
 	return Math.min(hw, cap, viewportClamped)
 }
 
