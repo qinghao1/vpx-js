@@ -26,6 +26,17 @@ export class BallState extends ItemState {
 		return s
 	}
 
+	public override copyFrom(state: ItemState): void {
+		const s = state as BallState
+		this.name = s.name
+		this.isVisible = s.isVisible
+		if (!this.pos) this.pos = Vertex3D.claim()
+		this.pos.set(s.pos)
+		if (!this.orientation) this.orientation = Matrix2D.claim()
+		else this.orientation.set(s.orientation)
+		this.isFrozen = s.isFrozen
+	}
+
 	public diff(state: BallState): BallState {
 		const d = this.clone()
 		if (d.pos.equals(state.pos)) {

@@ -23,6 +23,12 @@ export abstract class ItemState {
 		return Object.assign(copy, this)
 	}
 
+	public copyFrom(state: ItemState): void {
+		for (const k of this._keys()) {
+			;(this as any)[k] = (state as any)[k]
+		}
+	}
+
 	public equals(state: ItemState): boolean {
 		if (!state) return false
 		for (const k of this._keys()) {

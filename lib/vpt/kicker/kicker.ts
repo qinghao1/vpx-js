@@ -108,6 +108,13 @@ export class KickerState extends ItemState {
 		return KickerState.claim(this.name, this.type, this.material)
 	}
 
+	public override copyFrom(state: ItemState): void {
+		const s = state as KickerState
+		this.name = s.name
+		this.type = s.type
+		this.material = s.material
+	}
+
 	public diff(state: KickerState): KickerState {
 		const d = this.clone()
 		omitEqual(d, state, 'type')

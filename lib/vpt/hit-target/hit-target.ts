@@ -157,6 +157,16 @@ export class HitTargetState extends ItemState {
 		)
 	}
 
+	public override copyFrom(state: ItemState): void {
+		const s = state as HitTargetState
+		this.name = s.name
+		this.zOffset = s.zOffset
+		this.xRotation = s.xRotation
+		this.material = s.material
+		this.texture = s.texture
+		this.isVisible = s.isVisible
+	}
+
 	public diff(state: HitTargetState): HitTargetState {
 		const d = this.clone()
 		omitEqual(d, state, 'zOffset')

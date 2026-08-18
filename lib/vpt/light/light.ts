@@ -187,6 +187,15 @@ export class LightState extends ItemState {
 		return s
 	}
 
+	public override copyFrom(state: ItemState): void {
+		const s = state as LightState
+		this.name = s.name
+		this.intensity = s.intensity
+		this.color = s.color
+		this.colorFull = s.colorFull
+		this.isVisible = s.isVisible
+	}
+
 	public diff(state: LightState): LightState {
 		const d = this.clone()
 		omitEqual(d, state, 'intensity')

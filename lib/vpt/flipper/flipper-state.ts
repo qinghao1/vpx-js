@@ -45,6 +45,18 @@ export class FlipperState extends ItemState {
 		)
 	}
 
+	public override copyFrom(state: ItemState): void {
+		const s = state as FlipperState
+		this.name = s.name
+		this.angle = s.angle
+		if (!this.center) this.center = Vertex2D.claim()
+		if (s.center) this.center.set(s.center.x, s.center.y)
+		this.isVisible = s.isVisible
+		this.material = s.material
+		this.texture = s.texture
+		this.rubberMaterial = s.rubberMaterial
+	}
+
 	public diff(state: FlipperState): FlipperState {
 		const d = this.clone()
 		if (d.angle === state.angle) delete (d as unknown as Record<string, unknown>).angle

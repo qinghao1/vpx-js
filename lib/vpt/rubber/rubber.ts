@@ -152,6 +152,18 @@ export class RubberState extends ItemState {
 		)
 	}
 
+	public override copyFrom(state: ItemState): void {
+		const s = state as RubberState
+		this.name = s.name
+		this.height = s.height
+		this.rotX = s.rotX
+		this.rotY = s.rotY
+		this.rotZ = s.rotZ
+		this.material = s.material
+		this.texture = s.texture
+		this.isVisible = s.isVisible
+	}
+
 	public diff(state: RubberState): RubberState {
 		const d = this.clone()
 		omitEqual(d, state, 'height')

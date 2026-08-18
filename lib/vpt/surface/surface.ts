@@ -196,6 +196,18 @@ export class SurfaceState extends ItemState {
 		)
 	}
 
+	public override copyFrom(state: ItemState): void {
+		const s = state as SurfaceState
+		this.name = s.name
+		this.isDropped = s.isDropped
+		this.isTopVisible = s.isTopVisible
+		this.topMaterial = s.topMaterial
+		this.topTexture = s.topTexture
+		this.isSideVisible = s.isSideVisible
+		this.sideMaterial = s.sideMaterial
+		this.sideTexture = s.sideTexture
+	}
+
 	public diff(state: SurfaceState): SurfaceState {
 		const d = this.clone()
 		omitEqual(d, state, 'isDropped')

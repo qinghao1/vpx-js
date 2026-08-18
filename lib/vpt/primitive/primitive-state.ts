@@ -109,6 +109,30 @@ export class PrimitiveState extends ItemState {
 		)
 	}
 
+	public override copyFrom(state: ItemState): void {
+		const s = state as PrimitiveState
+		this.name = s.name
+		if (!this.position) this.position = Vertex3D.claim()
+		this.position.set(s.position)
+		if (!this.size) this.size = Vertex3D.claim()
+		this.size.set(s.size)
+		if (!this.rotation) this.rotation = Vertex3D.claim()
+		this.rotation.set(s.rotation)
+		if (!this.translation) this.translation = Vertex3D.claim()
+		this.translation.set(s.translation)
+		if (!this.objectRotation) this.objectRotation = Vertex3D.claim()
+		this.objectRotation.set(s.objectRotation)
+		this.material = s.material
+		this.map = s.map
+		this.normalMap = s.normalMap
+		this.isVisible = s.isVisible
+		this.color = s.color
+		this.alpha = s.alpha
+		this.disableLightingTop = s.disableLightingTop
+		this.disableLightingBelow = s.disableLightingBelow
+		this.currentFrame = s.currentFrame
+	}
+
 	public diff(state: PrimitiveState): PrimitiveState {
 		const diff = this.clone()
 		if (diff.position.equals(state.position)) {

@@ -184,6 +184,22 @@ export class BumperState extends ItemState {
 		)
 	}
 
+	public override copyFrom(state: ItemState): void {
+		const s = state as BumperState
+		this.name = s.name
+		this.ringOffset = s.ringOffset
+		this.skirtRotX = s.skirtRotX
+		this.skirtRotY = s.skirtRotY
+		this.isCapVisible = s.isCapVisible
+		this.isRingVisible = s.isRingVisible
+		this.isBaseVisible = s.isBaseVisible
+		this.isSkirtVisible = s.isSkirtVisible
+		this.capMaterial = s.capMaterial
+		this.ringMaterial = s.ringMaterial
+		this.baseMaterial = s.baseMaterial
+		this.skirtMaterial = s.skirtMaterial
+	}
+
 	public diff(state: BumperState): BumperState {
 		const d = this.clone()
 		omitEqual(d, state, 'ringOffset')

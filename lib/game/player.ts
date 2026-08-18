@@ -221,8 +221,7 @@ export class Player extends EventEmitter {
 			if (!next || !prev) continue
 			if (!next.equals(prev)) {
 				changed.setState(name, next.diff(prev))
-				prev.release()
-				this.previousStates[name] = next.clone()
+				prev.copyFrom(next)
 			}
 		}
 		this.dirtySet.clear()

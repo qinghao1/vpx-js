@@ -27,6 +27,14 @@ export class TriggerState extends ItemState {
 		return TriggerState.claim(this.name, this.heightOffset, this.material, this.isVisible)
 	}
 
+	public override copyFrom(state: ItemState): void {
+		const s = state as TriggerState
+		this.name = s.name
+		this.heightOffset = s.heightOffset
+		this.material = s.material
+		this.isVisible = s.isVisible
+	}
+
 	public diff(state: TriggerState): TriggerState {
 		const diff = this.clone()
 		omitEqual(diff, state, 'heightOffset')
