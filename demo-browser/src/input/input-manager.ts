@@ -223,38 +223,18 @@ function attachPointerHost(host: InputHost, signal: AbortSignal): void {
 	const raycaster = new THREE.Raycaster()
 	const ndc = new THREE.Vector2()
 	;(raycaster as any).firstHitOnly = true
-	let rect: DOMRect | null = null
 	let hoverRaf = 0
 	let hoverX = 0
 	let hoverY = 0
 	const swipeStart = new Map<number, { x: number; y: number; t: number }>()
 
-	let ro: ResizeObserver | null = null
-	ro = new ResizeObserver(() => {
-		rect = canvas.getBoundingClientRect()
-	})
-	ro.observe(canvas)
-	signal.addEventListener('abort', () => ro?.disconnect(), { once: true })
-
-	window.addEventListener(
-		'scroll',
-		() => {
-			rect = null
-		},
-		{ signal, passive: true } as any,
-	)
-
 	canvas.tabIndex = 0
-	const onCanvasClick = (): void => {
-		canvas.focus()
-	}
-	canvas.addEventListener('click', onCanvasClick, { signal })
+	canvas.addEventListener('click', () => canvas.focus(), { signal })
 
-	const zoneFor = (x: number, y: number): string => {
-		const r = rect ?? (rect = canvas.getBoundingClientRect())
-		if (!r || !r.width || !r.height) return 'ShiftLeft'
-		const nx = (x - r.left) / r.width
-		return nx < FALLBACK_ZONES.flipperSplit ? 'ShiftLeft' : 'ShiftRight'
+	const zoneFor = (x: number, _y: number): string => {
+		const r = canvas.getBoundingClientRect()
+		if (!r.width) return 'ShiftLeft'
+		return (x - r.left) / r.width < FALLBACK_ZONES.flipperSplit ? 'ShiftLeft' : 'ShiftRight'
 	}
 
 	const send = (code: string, down: boolean): void => {
@@ -278,8 +258,8 @@ function attachPointerHost(host: InputHost, signal: AbortSignal): void {
 		if (opts.hover && typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)')?.matches)
 			return null
 		if (!host.tableGroup || !host.camera || host.viewerMode !== 'play' || !host.player) return null
-		const r = rect ?? (rect = canvas.getBoundingClientRect())
-		if (!r || !r.width || !r.height) return null
+		const r = canvas.getBoundingClientRect()
+		if (!r.width || !r.height) return null
 		if (x < r.left || x > r.right || y < r.top || y > r.bottom) return null
 		ndc.set(((x - r.left) / r.width) * 2 - 1, -((y - r.top) / r.height) * 2 + 1)
 		raycaster.setFromCamera(ndc, host.camera)

@@ -189,7 +189,7 @@ export class Viewer {
 		this.player = null
 		this.renderApi = null
 		this.nodeCache = new Map()
-		this._lightmapMap = null
+		this._lightmapMap = new Map()
 		this.isPaused = false
 		this._boundKeyDown = null
 		this._boundKeyUp = null
@@ -329,48 +329,37 @@ export class Viewer {
 				return false
 			}
 		})()
-		const lowQuality = isLowQuality()
-		const useAA = wantAA && !isSwiftShader && !lowQuality
+		const low = isLowQuality()
+		const useAA = wantAA && !isSwiftShader && !low
 		if (!renderer) {
-			let ctx = null
+			const alpha = !low
+			const baseOpts: any = {
+				canvas,
+				antialias: useAA,
+				stencil: false,
+				preserveDrawingBuffer: false,
+				powerPreference: 'high-performance',
+				alpha,
+			}
+			let ctx: any = null
 			try {
-				const attrs: any = {
-					alpha: lowQuality ? false : true,
+				const ctxAttrs: any = {
+					alpha,
 					antialias: useAA,
 					depth: true,
 					stencil: false,
 					preserveDrawingBuffer: false,
 					powerPreference: 'high-performance',
 					premultipliedAlpha: true,
-					failIfMajorPerformanceCaveat: false,
 					desynchronized: true,
 				}
-				ctx = canvas.getContext('webgl2', attrs) || canvas.getContext('webgl', attrs)
+				ctx = (canvas.getContext('webgl2', ctxAttrs) as any) ?? canvas.getContext('webgl', ctxAttrs)
 			} catch {}
-			if (ctx) {
-				renderer = new THREE.WebGLRenderer({
-					canvas,
-					context: ctx as any,
-					antialias: useAA,
-					stencil: false,
-					preserveDrawingBuffer: false,
-					powerPreference: 'high-performance',
-					alpha: lowQuality ? false : true,
-				})
-			} else {
-				renderer = new THREE.WebGLRenderer({
-					canvas,
-					antialias: useAA,
-					stencil: false,
-					preserveDrawingBuffer: false,
-					powerPreference: 'high-performance',
-					alpha: lowQuality ? false : true,
-				})
-			}
+			renderer = new THREE.WebGLRenderer(ctx ? { ...baseOpts, context: ctx } : baseOpts)
 			backend = 'webgl'
 		}
 		renderer.setPixelRatio(getTargetPixelRatio(this.viewerMode))
-		renderer.sortObjects = lowQuality ? false : true
+		renderer.sortObjects = !low
 		renderer.shadowMap.enabled = false
 		if (p.has('shadows')) {
 			this.log(
@@ -394,28 +383,23 @@ export class Viewer {
 			if (tm === 5) return THREE.LinearToneMapping ?? THREE.AgXToneMapping ?? THREE.ACESFilmicToneMapping
 			return THREE.ReinhardToneMapping ?? THREE.AgXToneMapping ?? THREE.ACESFilmicToneMapping
 		}
-		const exposureFor = ex => {
-			const v = Number.isFinite(ex) ? ex : 1
-			return Math.max(0.1, Math.min(2, v))
+		const exposureFor = ex => Math.max(0.1, Math.min(2, Number.isFinite(ex) ? ex : 1))
+		const applyTone = (r, data) => {
+			if (low) {
+				r.toneMapping = THREE.NoToneMapping
+				r.toneMappingExposure = 1
+			} else {
+				r.toneMapping = toneMapFor(data?.toneMapper)
+				r.toneMappingExposure = exposureFor(data?.exposure)
+			}
 		}
-		const t = this.table?.data ?? null
-		if (lowQuality) {
-			renderer.toneMapping = THREE.NoToneMapping
-			renderer.toneMappingExposure = 1
-		} else {
-			renderer.toneMapping = toneMapFor(t?.toneMapper)
-			renderer.toneMappingExposure = exposureFor(t?.exposure)
-		}
-		this._globalEmissionScale = Number.isFinite(t?.globalEmissionScale) ? t.globalEmissionScale : 1
+		applyTone(renderer, this.table?.data)
+		this._globalEmissionScale = Number.isFinite(this.table?.data?.globalEmissionScale)
+			? this.table.data.globalEmissionScale
+			: 1
 		this._applyTableToneMapping = tbl => {
 			if (!this.renderer || !tbl?.data) return
-			if (lowQuality) {
-				this.renderer.toneMapping = THREE.NoToneMapping
-				this.renderer.toneMappingExposure = 1
-			} else {
-				this.renderer.toneMapping = toneMapFor(tbl.data.toneMapper)
-				this.renderer.toneMappingExposure = exposureFor(tbl.data.exposure)
-			}
+			applyTone(this.renderer, tbl.data)
 			this._globalEmissionScale = Number.isFinite(tbl.data.globalEmissionScale) ? tbl.data.globalEmissionScale : 1
 		}
 		this.renderer = renderer
@@ -425,7 +409,7 @@ export class Viewer {
 		// Generic fix: HDR EffectComposer (HalfFloat) + OutputPass so additive HDR (alpha/100) sums linear then tonemaps once.
 		// Matches primitive.cpp:1171 convertColor(alpha/100) premul and fs_unshaded.sc result*tex, then fb tonemap.
 		this.composer = null
-		if (backend.startsWith('webgl') && !lowQuality) {
+		if (!low && backend.startsWith('webgl')) {
 			try {
 				const { EffectComposer } = await import('three/addons/postprocessing/EffectComposer.js')
 				const { RenderPass } = await import('three/addons/postprocessing/RenderPass.js')
@@ -438,8 +422,7 @@ export class Viewer {
 				console.warn('EffectComposer init failed, falling back to direct render', e)
 				this.composer = null
 			}
-		} else if (lowQuality) {
-			this.composer = null
+		} else if (low) {
 			console.log('[renderer] low quality: EffectComposer disabled for memory/perf')
 		}
 		this.controls?.dispose?.()
@@ -457,7 +440,7 @@ export class Viewer {
 				THREE,
 			})
 		this._onResize()
-		this.log(`Renderer ready: ${backend} (three r${THREE.REVISION})${lowQuality ? ' [low]' : ''}`)
+		this.log(`Renderer ready: ${backend} (three r${THREE.REVISION})${low ? ' [low]' : ''}`)
 		return renderer
 	}
 	async _ensureRenderer() {
@@ -582,7 +565,7 @@ export class Viewer {
 		this.viewerMode = 'play'
 		if (this.renderer) {
 			this.renderer.setPixelRatio(getTargetPixelRatio('play'))
-			this.renderer.sortObjects = isLowQuality() ? false : true
+			this.renderer.sortObjects = !isLowQuality()
 		}
 		this._hidePlayTip?.()
 		hideCabFlippers(this.tableGroup)
@@ -840,7 +823,7 @@ export class Viewer {
 	}
 	buildNodeCache() {
 		this.nodeCache.clear()
-		this._lightmapMap = null
+		this._lightmapMap = new Map()
 		if (!this.tableGroup || !this.table) return
 		for (const name of Object.keys(this.table.items)) {
 			if (
@@ -851,11 +834,14 @@ export class Viewer {
 				continue
 			const item = this.table.items[name]
 			const node = this.tableGroup.getObjectByName(name) || this.tableGroup.getObjectByName(name.toLowerCase())
-			if (item?.getUpdater && node)
-				this.nodeCache.set(name, {
-					item,
-					node,
-				})
+			if (item?.getUpdater && node) this.nodeCache.set(name, { item, node })
+		}
+		for (const [primName, prim] of Object.entries(this.table.primitives ?? {})) {
+			const lm = prim?.data?.szLightmap
+			if (!lm) continue
+			const list = this._lightmapMap.get(lm)
+			if (list) list.push(primName)
+			else this._lightmapMap.set(lm, [primName])
 		}
 	}
 	handleBallLifecycle(ball, created) {
@@ -916,19 +902,6 @@ export class Viewer {
 			entry.item.getUpdater().applyState(entry.node, state, this.renderApi, this.table)
 		}
 		if (changedLightNames.size) {
-			if (!this._lightmapMap) {
-				this._lightmapMap = new Map()
-				for (const primName of Object.keys(this.table.primitives || {})) {
-					const lm = this.table.primitives[primName]?.data?.szLightmap
-					if (!lm) continue
-					let list = this._lightmapMap.get(lm)
-					if (!list) {
-						list = []
-						this._lightmapMap.set(lm, list)
-					}
-					list.push(primName)
-				}
-			}
 			for (const lm of changedLightNames) {
 				const primNames = this._lightmapMap.get(lm)
 				if (!primNames) continue
@@ -1981,9 +1954,6 @@ export class Viewer {
 				lastTimeMsec = cur
 			}
 		}
-		const hasPendingInput = () =>
-			typeof navigator !== 'undefined' &&
-			(navigator as any).scheduling?.isInputPending?.({ includeContinuous: true }) === true
 		;(this as any)._tickPhysicsImmediate = () => {
 			if (!this.player || this.isPaused || this.viewerMode !== 'play') return
 			tickPhysics()
@@ -2021,7 +1991,6 @@ export class Viewer {
 				renderSkip = (renderSkip + 1) % 3
 				if (renderSkip !== 0) return
 			}
-			if (hasPendingInput()) return
 			if (this.controls?.enabled) this.controls.update()
 			this._applyNudgeVisual()
 			if (this.composer) this.composer.render()
