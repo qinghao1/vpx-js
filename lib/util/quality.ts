@@ -3,7 +3,7 @@
 export type Quality = 'low' | 'high'
 
 export const QUALITY_CAPS = {
-	low: { playfield: 2048, other: 1024, floor: 512, aniso: 1 },
+	low: { playfield: 1024, other: 512, floor: 256, aniso: 1 },
 	high: { playfield: 4096, other: 4096, floor: 1024, aniso: 16 },
 } as const
 
@@ -91,7 +91,12 @@ export function getMaxLights(): number {
 }
 
 export function getTargetPixelRatio(mode?: string): number {
-	if (isLowQuality()) return 1
+	if (isLowQuality()) {
+		try {
+			if (typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches) return 0.75
+		} catch {}
+		return 1
+	}
 	const dpr = typeof devicePixelRatio !== 'undefined' ? devicePixelRatio : 1
 	return Math.min(dpr, mode === 'play' ? 1 : 1.5)
 }

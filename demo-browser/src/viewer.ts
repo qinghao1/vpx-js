@@ -906,21 +906,7 @@ export class Viewer {
 				const primNames = this._lightmapMap.get(lm)
 				if (!primNames) continue
 				for (const primName of primNames) {
-					let node = this.tableGroup.getObjectByName(primName)
-					if (!node) {
-						this.tableGroup.traverse(o => {
-							if (o.name === primName) node = o
-						})
-					}
-					if (!node) continue
-					let entry = this.nodeCache.get(primName)
-					if (!entry) {
-						const it = this.table.items[primName]
-						if (it?.getUpdater && node) {
-							entry = { item: it, node }
-							this.nodeCache.set(primName, entry)
-						}
-					}
+					const entry = this.nodeCache.get(primName)
 					if (!entry) continue
 					entry.item.getUpdater().applyState(entry.node, {}, this.renderApi, this.table)
 				}
@@ -1944,9 +1930,6 @@ export class Viewer {
 			if (this._physicsSab && this._physicsScratch) trySnap(this._physicsSab, this._physicsScratch)
 			this.player.setPhysicsEnabled(this.viewerMode === 'play')
 			this.player.updatePhysics()
-			this.player.updateAnimations(this.player.getGameTime())
-			const changed = this.player.popStates()
-			if (changed.keys.length) this.applyChangedStates(changed)
 			if (performance.now() - lastHeartbeat > 2000) {
 				lastHeartbeat = performance.now()
 				const cur = this.player.getPhysics().timeMsec
@@ -1958,11 +1941,22 @@ export class Viewer {
 		}
 		;(this as any)._tickPhysicsImmediate = () => {
 			if (!this.player || this.isPaused || this.viewerMode !== 'play') return
-			tickPhysics()
+			if (this._physicsSab && this._physicsScratch) trySnap(this._physicsSab, this._physicsScratch)
+			this.player.setPhysicsEnabled(true)
+			this.player.updatePhysics()
+			this.player.updateAnimations(this.player.getGameTime())
+			const changed = this.player.popStates()
+			if (changed.keys.length) {
+				this.applyChangedStates(changed)
+				if (!this._disposed && !isPinLoading()) {
+					if (this.composer) this.composer.render()
+					else this.renderer.render(this.scene, this.camera)
+				}
+			} else changed.release?.()
 		}
 		const physicsLoop = () => {
 			if (this._disposed) return
-			;(this as any)._physicsTimeout = setTimeout(physicsLoop, 8)
+			;(this as any)._physicsTimeout = setTimeout(physicsLoop, isLowQuality() ? 16 : 8)
 			this._animTimeout = (this as any)._physicsTimeout
 			const pinLoading = isPinLoading()
 			if (pinLoading !== pinLoadingLogged) {
@@ -1989,6 +1983,12 @@ export class Viewer {
 			}
 			if (this.controls?.enabled) this.controls.update()
 			this._applyNudgeVisual()
+			if (this.player && this.viewerMode === 'play' && !this.isPaused) {
+				this.player.updateAnimations(this.player.getGameTime())
+				const changed = this.player.popStates()
+				if (changed.keys.length) this.applyChangedStates(changed)
+				else changed.release?.()
+			}
 			if (this.composer) this.composer.render()
 			else this.renderer.render(this.scene, this.camera)
 			const now = performance.now()

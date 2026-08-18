@@ -31,7 +31,7 @@ import type { PinInput } from './pin-input.js'
 import type { IBallCreationPosition, Player } from './player.js'
 
 const CLOCK_INIT_THRESHOLD_USEC = 1_000_000
-const MAX_CATCHUP_USEC = 100 * PHYSICS_STEPTIME
+const MAX_CATCHUP_USEC = 50 * PHYSICS_STEPTIME
 
 /** Core physics loop — 1 kHz collision, timers, movers.
  * @see https://github.com/vpinball/vpinball/blob/master/player.cpp */
