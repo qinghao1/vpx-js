@@ -1925,6 +1925,17 @@ export class Viewer {
 		} else if (this._physicsSab) {
 			this.log(`[physics] reusing SAB ${this._physicsSab.byteLength}`, 'debug')
 		}
+		const flushAnimations = (): boolean => {
+			if (!this.player || this.isPaused || this.viewerMode !== 'play') return false
+			this.player.updateAnimations(this.player.getGameTime())
+			const changed = this.player.popStates()
+			if (changed.keys.length) {
+				this.applyChangedStates(changed)
+				return true
+			}
+			changed.release?.()
+			return false
+		}
 		const tickPhysics = () => {
 			if (!this.player || this.isPaused) return
 			if (this._physicsSab && this._physicsScratch) trySnap(this._physicsSab, this._physicsScratch)
@@ -1944,15 +1955,10 @@ export class Viewer {
 			if (this._physicsSab && this._physicsScratch) trySnap(this._physicsSab, this._physicsScratch)
 			this.player.setPhysicsEnabled(true)
 			this.player.updatePhysics()
-			this.player.updateAnimations(this.player.getGameTime())
-			const changed = this.player.popStates()
-			if (changed.keys.length) {
-				this.applyChangedStates(changed)
-				if (!this._disposed && !isPinLoading()) {
-					if (this.composer) this.composer.render()
-					else this.renderer.render(this.scene, this.camera)
-				}
-			} else changed.release?.()
+			if (flushAnimations() && !this._disposed && !isPinLoading()) {
+				if (this.composer) this.composer.render()
+				else this.renderer.render(this.scene, this.camera)
+			}
 		}
 		const physicsLoop = () => {
 			if (this._disposed) return
@@ -1983,12 +1989,7 @@ export class Viewer {
 			}
 			if (this.controls?.enabled) this.controls.update()
 			this._applyNudgeVisual()
-			if (this.player && this.viewerMode === 'play' && !this.isPaused) {
-				this.player.updateAnimations(this.player.getGameTime())
-				const changed = this.player.popStates()
-				if (changed.keys.length) this.applyChangedStates(changed)
-				else changed.release?.()
-			}
+			flushAnimations()
 			if (this.composer) this.composer.render()
 			else this.renderer.render(this.scene, this.camera)
 			const now = performance.now()

@@ -91,12 +91,7 @@ export function getMaxLights(): number {
 }
 
 export function getTargetPixelRatio(mode?: string): number {
-	if (isLowQuality()) {
-		try {
-			if (typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches) return 0.75
-		} catch {}
-		return 1
-	}
+	if (isLowQuality()) return 1
 	const dpr = typeof devicePixelRatio !== 'undefined' ? devicePixelRatio : 1
 	return Math.min(dpr, mode === 'play' ? 1 : 1.5)
 }
