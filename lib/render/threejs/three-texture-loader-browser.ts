@@ -37,6 +37,8 @@ const imageMap: Record<string, string> = {
 	kickerWilliams: new URL('../../../res/maps/kickerWilliams.png', import.meta.url).href,
 }
 
+const RE_PLAYFIELD = /playfield|nestmap|bake|vlm/i
+
 let hwMax: number | undefined
 let isSwiftShaderCache: boolean | undefined
 function isSwiftShader(): boolean {
@@ -79,21 +81,19 @@ function viewportBudget(): number {
 
 export function effectiveMax(_isFloat: boolean, name?: string): number {
 	const hw = getHardwareMax()
-	const swift = isSwiftShader()
-	const isPlayfield = !!name && /playfield|nestmap|bake/i.test(name)
-	const isVlm = !!name && /vlm/i.test(name)
+	const isPlayfield = !!name && RE_PLAYFIELD.test(name)
 	const low = isLowQuality()
 	const caps = low ? QUALITY_CAPS.low : getEffectiveCaps()
 	const highCaps = QUALITY_CAPS.high
+	if (isPlayfield) return Math.min(hw, low ? highCaps.playfield : caps.playfield)
+	const swift = isSwiftShader()
 	let cap: number
-	if (isVlm) cap = 1024
-	else if (isPlayfield) cap = low ? highCaps.playfield : caps.playfield
-	else if (swift) cap = 1024
+	if (swift) cap = 1024
 	else cap = caps.other
 	const budget = viewportBudget()
-	const factor = low ? (isPlayfield ? 0.75 : 0.5) : 1
+	const factor = low ? 0.5 : 1
 	const viewport = Math.max(caps.floor, Math.ceil(budget * factor))
-	const viewportClamped = low ? Math.min(viewport, isPlayfield ? highCaps.playfield : caps.other) : viewport
+	const viewportClamped = low ? Math.min(viewport, caps.other) : viewport
 	return Math.min(hw, cap, viewportClamped)
 }
 
@@ -103,18 +103,20 @@ export function _testResetTextureLimits(): void {
 	_resetQualityCache()
 }
 
-function tune(tex: any): void {
+function tune(tex: any, name?: string): void {
 	const caps = getEffectiveCaps()
+	const n = name ?? (tex as any)?.name ?? ''
+	const isPlayfield = RE_PLAYFIELD.test(String(n))
 	tex.generateMipmaps = true
 	tex.minFilter = LinearMipMapLinearFilter
 	tex.magFilter = LinearFilter
-	tex.anisotropy = caps.aniso
+	tex.anisotropy = isPlayfield ? Math.max(caps.aniso, isLowQuality() ? 4 : 16) : caps.aniso
 }
 
 function nameAndTune(tex: any, name: string): void {
 	tex.name = `texture:${name}`
 	tex.needsUpdate = true
-	tune(tex)
+	tune(tex, name)
 }
 
 function bitmapToCanvasTexture(bitmap: any, name: string): any {
@@ -133,8 +135,8 @@ function bitmapToCanvasTexture(bitmap: any, name: string): any {
 		tex.colorSpace = SRGBColorSpace
 		tex.flipY = false
 		tex.needsUpdate = true
-		tune(tex)
 		tex.name = `texture:${name}`
+		tune(tex, name)
 		return tex
 	} catch {
 		return null
@@ -224,8 +226,8 @@ async function loadRegularWorker(name: string, mime: string, data: Uint8Array): 
 		tex.colorSpace = SRGBColorSpace
 		tex.flipY = false
 		tex.needsUpdate = true
-		tune(tex)
 		tex.name = `texture:${name}`
+		tune(tex, name)
 		return tex as ThreeTexture
 	} catch {
 		return null
@@ -382,8 +384,8 @@ async function tryCreateBitmap(data: Uint8Array, mime: string, name: string): Pr
 		tex.colorSpace = SRGBColorSpace
 		tex.flipY = false
 		tex.needsUpdate = true
-		tune(tex)
 		tex.name = `texture:${name}`
+		tune(tex, name)
 		return tex
 	} catch {
 		return null
@@ -480,7 +482,7 @@ async function loadRegular(name: string, mime: string, data: Uint8Array): Promis
 					const cTex: any = new CanvasTexture(canvas as any)
 					cTex.colorSpace = SRGBColorSpace
 					cTex.name = `texture:${name}`
-					tune(cTex)
+					tune(cTex, name)
 					try {
 						tex.dispose?.()
 					} catch {}
@@ -543,7 +545,7 @@ function downsampleData(texture: any, maxSize: number, name?: string): any {
 	const yRatio = h / nh
 	const isHalf = src instanceof Uint16Array && texture.type === HalfFloatType
 	const isFloat = src instanceof Float32Array
-	const isPlayfield = !!name && /playfield|nestmap|bake/i.test(name)
+	const isPlayfield = !!name && RE_PLAYFIELD.test(name)
 	const fast = !isPlayfield && w * h > 4 * 1024 * 1024
 	if (fast) {
 		for (let y = 0; y < nh; y++) {
@@ -587,7 +589,7 @@ function downsampleData(texture: any, maxSize: number, name?: string): any {
 	tex.format = texture.format ?? tex.format
 	tex.needsUpdate = true
 	tex.name = texture.name
-	tune(tex)
+	tune(tex, String(texture.name ?? '').replace(/^texture:/, ''))
 	tex.flipY = texture.flipY ?? false
 	texture.dispose?.()
 	texture.image.data = null

@@ -4,7 +4,7 @@ export type Quality = 'low' | 'high'
 
 export const QUALITY_CAPS = {
 	low: { playfield: 2048, other: 512, floor: 256, aniso: 1 },
-	high: { playfield: 4096, other: 4096, floor: 1024, aniso: 8 },
+	high: { playfield: 4096, other: 4096, floor: 1024, aniso: 16 },
 } as const
 
 export const QUALITY_MAX_LIGHTS = {
