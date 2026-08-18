@@ -15,24 +15,17 @@ const CANDIDATES = [
 
 export async function createPinmameModule(): Promise<{ module: PinmameModule; isMock: boolean }> {
 	if (cached) return cached
-	const isUnisolated = (globalThis as { crossOriginIsolated?: boolean }).crossOriginIsolated === false
-	if (isUnisolated) {
-		logger().warn('[pinmame] crossOriginIsolated=false — PinMAME requires HTTPS or localhost; falling back to mock')
-	}
 	for (const path of CANDIDATES) {
-		if (isUnisolated && !path.includes('mock')) continue
-		try {
-			const mod = (await import(/* @vite-ignore */ path)) as {
-				default: () => Promise<PinmameModule>
-				isMock?: boolean
-			}
-			const m = await mod.default()
-			if (!m?.cwrap) continue
-			const isMock = mod.isMock === true
-			if (isMock) logger().warn('[pinmame] mock — run npm run build:wasm')
-			cached = { module: m, isMock }
-			return cached
-		} catch {}
+		const mod = (await import(/* @vite-ignore */ path)) as {
+			default: () => Promise<PinmameModule>
+			isMock?: boolean
+		}
+		const m = await mod.default()
+		if (!m?.cwrap) continue
+		const isMock = mod.isMock === true
+		if (isMock) logger().warn('[pinmame] mock — run npm run build:wasm')
+		cached = { module: m, isMock }
+		return cached
 	}
 	throw new Error('PinMAME module not found — build wasm or mock')
 }

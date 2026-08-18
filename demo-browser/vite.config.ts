@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path, { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import basicSsl from '@vitejs/plugin-basic-ssl'
 import { defineConfig } from 'vite'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -125,6 +126,7 @@ export default defineConfig({
 		},
 	},
 	plugins: [
+		basicSsl(),
 		rawLoader(),
 		{
 			name: 'static-fs',
