@@ -199,12 +199,13 @@ export class Player extends EventEmitter {
 		return this.popStates()
 	}
 	public updateAnimations(timeMs: number): void {
-		for (const a of this.getAnimatables() as unknown as Array<{
+		for (const animatable of this.getAnimatables() as unknown as Array<{
 			getAnimation(): { updateAnimation(n: number, t: Table): boolean | void }
 			getName(): string
 		}>) {
-			const changed = a.getAnimation().updateAnimation(timeMs, this.table)
-			if (changed) this.markDirty(a.getName())
+			if (animatable.getAnimation().updateAnimation(timeMs, this.table)) {
+				this.markDirty(animatable.getName())
+			}
 		}
 	}
 	public popStates(): ChangedStates<ItemState> {

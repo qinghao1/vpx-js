@@ -8,6 +8,16 @@ export abstract class ItemState {
 
 	private static readonly _keysCache = new WeakMap<Function, string[]>()
 
+	private _keys(): string[] {
+		const ctor = this.constructor as Function
+		let keys = ItemState._keysCache.get(ctor)
+		if (!keys) {
+			keys = Object.keys(this)
+			ItemState._keysCache.set(ctor, keys)
+		}
+		return keys
+	}
+
 	public clone(): ItemState {
 		const copy = new (this.constructor as new () => any)()
 		return Object.assign(copy, this)
@@ -15,27 +25,15 @@ export abstract class ItemState {
 
 	public equals(state: ItemState): boolean {
 		if (!state) return false
-		const ctor = this.constructor as Function
-		let keys = ItemState._keysCache.get(ctor) as (keyof this)[] | undefined
-		if (!keys) {
-			keys = Object.keys(this) as (keyof this)[]
-			ItemState._keysCache.set(ctor, keys as unknown as string[])
-		}
-		for (const k of keys) {
-			if (this[k] !== (state as any)[k]) return false
+		for (const k of this._keys()) {
+			if ((this as any)[k] !== (state as any)[k]) return false
 		}
 		return true
 	}
 
 	public diff(state: ItemState): ItemState {
 		const result = this.clone()
-		const ctor = this.constructor as Function
-		let keys = ItemState._keysCache.get(ctor) as (keyof this)[] | undefined
-		if (!keys) {
-			keys = Object.keys(this) as (keyof this)[]
-			ItemState._keysCache.set(ctor, keys as unknown as string[])
-		}
-		for (const k of keys) {
+		for (const k of this._keys()) {
 			if ((result as any)[k] === (state as any)[k] && k !== 'name') {
 				delete (result as any)[k]
 			}
