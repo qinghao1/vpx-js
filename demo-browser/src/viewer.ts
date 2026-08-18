@@ -40,17 +40,7 @@ import {
 import { ThreeTextureLoaderBrowser } from '../../dist-esm/lib/render/threejs/three-texture-loader-browser.js'
 import { AnimationGate } from '../../dist-esm/lib/util/animation-gate.js'
 import { Table } from '../../dist-esm/lib/vpt/table/table.js'
-import {
-	CAM,
-	CAM_ANIM,
-	LIGHT_AMBIENT,
-	LIGHT_DIR,
-	LIGHT_HEMI,
-	RE_BAKE_MAP,
-	RE_CAB,
-	RE_OUTER,
-	TABLE_OPTS,
-} from './config.js'
+import { CAM, CAM_ANIM, isTableHit, LIGHT_AMBIENT, LIGHT_DIR, LIGHT_HEMI, RE_BAKE_MAP, TABLE_OPTS } from './config.js'
 import { DmdController } from './dmd.js'
 import {
 	isDev as _isDev,
@@ -505,26 +495,14 @@ export class Viewer {
 			this._raycaster.setFromCamera(this._mouse, this.camera)
 			return this._raycaster.intersectObject(this.tableGroup, true)
 		}
-		const isTableHit = (o: any) => {
-			for (let c: any = o; c && c !== this.tableGroup; c = c.parent) {
-				const n = String(c.name || '')
-				if (RE_CAB.test(n) || RE_OUTER.test(n)) return true
-				const ln = n.toLowerCase()
-				if (ln.includes('playfield') || ln.includes('apron')) return true
-			}
-			return false
-		}
-		const hitTest = (x, y) => {
-			if (this.controls?.state !== -1) return hovered
-			const hits = getHits(x, y)
-			return hits.some((h: any) => isTableHit(h.object))
-		}
+		const hitTest = (x, y) => getHits(x, y).some((h: any) => isTableHit(h.object, this.tableGroup))
 		let hoverRaf = 0
 		let hoverX = 0,
 			hoverY = 0
 		const flushHover = () => {
 			hoverRaf = 0
 			if (this.viewerMode !== 'viewer' || !this.tableGroup) return hideTip()
+			if (this.controls?.state !== -1) return hideTip()
 			if (!hitTest(hoverX, hoverY)) return hideTip()
 			showTipAt(hoverX, hoverY)
 		}

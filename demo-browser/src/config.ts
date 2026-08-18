@@ -20,6 +20,16 @@ export const RE_OUTER = /VRCab_(Cabinet|Backbox|LegsFront|LegsBack)$/i
 export const RE_GLASS = /glass/i
 export const RE_LM = /lm_/i
 
+export function isTableHit(object, root) {
+	for (let c = object; c && c !== root; c = c.parent) {
+		const n = String(c.name || '')
+		if (RE_CAB.test(n) || RE_OUTER.test(n)) return true
+		const ln = n.toLowerCase()
+		if (ln.includes('playfield') || ln.includes('apron')) return true
+	}
+	return false
+}
+
 export const NUDGE = { left: 75, right: 285, forward: 0, back: 180, force: 2.6 }
 
 export const CONTROL_SCHEME = [
