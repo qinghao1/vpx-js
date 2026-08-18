@@ -542,14 +542,14 @@ export class Viewer {
 		})
 		canvas.addEventListener('click', e => {
 			if (this.viewerMode !== 'viewer' || !this.tableGroup || e.button !== 0) return
-			if (!hovered && !hitTest(e.clientX, e.clientY)) return
+			if (!hitTest(e.clientX, e.clientY)) return
 			this._switchToPlay()
 		})
 		const onViewerTouchEnd = e => {
 			if (this.viewerMode !== 'viewer' || !this.tableGroup) return
 			const t = e.changedTouches?.[0]
 			if (!t) return
-			if (!hovered && !hitTest(t.clientX, t.clientY)) return
+			if (!hitTest(t.clientX, t.clientY)) return
 			this._switchToPlay()
 			e.preventDefault()
 		}
