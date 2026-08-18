@@ -52,7 +52,15 @@ import {
 	TABLE_OPTS,
 } from './config.js'
 import { DmdController } from './dmd.js'
-import { getMaxLights, isDev as _isDev, ensureBvh, ensureGlobals, getTargetPixelRatio, isLowQuality, QUALITY_CAPS } from './env.js'
+import {
+	isDev as _isDev,
+	ensureBvh,
+	ensureGlobals,
+	getMaxLights,
+	getTargetPixelRatio,
+	isLowQuality,
+	QUALITY_CAPS,
+} from './env.js'
 import { attachInput } from './input.js'
 import { createHarness } from './log-overlay.js'
 import { renderModeHint, renderStats } from './stats-panel.js'
@@ -181,6 +189,7 @@ export class Viewer {
 		this.player = null
 		this.renderApi = null
 		this.nodeCache = new Map()
+		this._lightmapMap = null
 		this.isPaused = false
 		this._boundKeyDown = null
 		this._boundKeyUp = null
@@ -323,17 +332,45 @@ export class Viewer {
 		const lowQuality = isLowQuality()
 		const useAA = wantAA && !isSwiftShader && !lowQuality
 		if (!renderer) {
-			renderer = new THREE.WebGLRenderer({
-				canvas,
-				antialias: useAA,
-				stencil: false,
-				preserveDrawingBuffer: false,
-				powerPreference: 'high-performance',
-			})
+			let ctx = null
+			try {
+				const attrs: any = {
+					alpha: lowQuality ? false : true,
+					antialias: useAA,
+					depth: true,
+					stencil: false,
+					preserveDrawingBuffer: false,
+					powerPreference: 'high-performance',
+					premultipliedAlpha: true,
+					failIfMajorPerformanceCaveat: false,
+					desynchronized: true,
+				}
+				ctx = canvas.getContext('webgl2', attrs) || canvas.getContext('webgl', attrs)
+			} catch {}
+			if (ctx) {
+				renderer = new THREE.WebGLRenderer({
+					canvas,
+					context: ctx as any,
+					antialias: useAA,
+					stencil: false,
+					preserveDrawingBuffer: false,
+					powerPreference: 'high-performance',
+					alpha: lowQuality ? false : true,
+				})
+			} else {
+				renderer = new THREE.WebGLRenderer({
+					canvas,
+					antialias: useAA,
+					stencil: false,
+					preserveDrawingBuffer: false,
+					powerPreference: 'high-performance',
+					alpha: lowQuality ? false : true,
+				})
+			}
 			backend = 'webgl'
 		}
 		renderer.setPixelRatio(getTargetPixelRatio(this.viewerMode))
-		renderer.sortObjects = true
+		renderer.sortObjects = lowQuality ? false : true
 		renderer.shadowMap.enabled = false
 		if (p.has('shadows')) {
 			this.log(
@@ -362,13 +399,23 @@ export class Viewer {
 			return Math.max(0.1, Math.min(2, v))
 		}
 		const t = this.table?.data ?? null
-		renderer.toneMapping = toneMapFor(t?.toneMapper)
-		renderer.toneMappingExposure = exposureFor(t?.exposure)
+		if (lowQuality) {
+			renderer.toneMapping = THREE.NoToneMapping
+			renderer.toneMappingExposure = 1
+		} else {
+			renderer.toneMapping = toneMapFor(t?.toneMapper)
+			renderer.toneMappingExposure = exposureFor(t?.exposure)
+		}
 		this._globalEmissionScale = Number.isFinite(t?.globalEmissionScale) ? t.globalEmissionScale : 1
 		this._applyTableToneMapping = tbl => {
 			if (!this.renderer || !tbl?.data) return
-			this.renderer.toneMapping = toneMapFor(tbl.data.toneMapper)
-			this.renderer.toneMappingExposure = exposureFor(tbl.data.exposure)
+			if (lowQuality) {
+				this.renderer.toneMapping = THREE.NoToneMapping
+				this.renderer.toneMappingExposure = 1
+			} else {
+				this.renderer.toneMapping = toneMapFor(tbl.data.toneMapper)
+				this.renderer.toneMappingExposure = exposureFor(tbl.data.exposure)
+			}
 			this._globalEmissionScale = Number.isFinite(tbl.data.globalEmissionScale) ? tbl.data.globalEmissionScale : 1
 		}
 		this.renderer = renderer
@@ -535,7 +582,7 @@ export class Viewer {
 		this.viewerMode = 'play'
 		if (this.renderer) {
 			this.renderer.setPixelRatio(getTargetPixelRatio('play'))
-			this.renderer.sortObjects = true
+			this.renderer.sortObjects = isLowQuality() ? false : true
 		}
 		this._hidePlayTip?.()
 		hideCabFlippers(this.tableGroup)
@@ -793,6 +840,7 @@ export class Viewer {
 	}
 	buildNodeCache() {
 		this.nodeCache.clear()
+		this._lightmapMap = null
 		if (!this.tableGroup || !this.table) return
 		for (const name of Object.keys(this.table.items)) {
 			if (
@@ -868,27 +916,41 @@ export class Viewer {
 			entry.item.getUpdater().applyState(entry.node, state, this.renderApi, this.table)
 		}
 		if (changedLightNames.size) {
-			for (const primName of Object.keys(this.table.primitives || {})) {
-				const prim = this.table.primitives[primName]
-				const lm = prim?.data?.szLightmap
-				if (!lm || !changedLightNames.has(lm)) continue
-				let node = this.tableGroup.getObjectByName(primName)
-				if (!node) {
-					this.tableGroup.traverse(o => {
-						if (o.name === primName) node = o
-					})
-				}
-				if (!node) continue
-				let entry = this.nodeCache.get(primName)
-				if (!entry) {
-					const it = this.table.items[primName]
-					if (it?.getUpdater && node) {
-						entry = { item: it, node }
-						this.nodeCache.set(primName, entry)
+			if (!this._lightmapMap) {
+				this._lightmapMap = new Map()
+				for (const primName of Object.keys(this.table.primitives || {})) {
+					const lm = this.table.primitives[primName]?.data?.szLightmap
+					if (!lm) continue
+					let list = this._lightmapMap.get(lm)
+					if (!list) {
+						list = []
+						this._lightmapMap.set(lm, list)
 					}
+					list.push(primName)
 				}
-				if (!entry) continue
-				entry.item.getUpdater().applyState(entry.node, {}, this.renderApi, this.table)
+			}
+			for (const lm of changedLightNames) {
+				const primNames = this._lightmapMap.get(lm)
+				if (!primNames) continue
+				for (const primName of primNames) {
+					let node = this.tableGroup.getObjectByName(primName)
+					if (!node) {
+						this.tableGroup.traverse(o => {
+							if (o.name === primName) node = o
+						})
+					}
+					if (!node) continue
+					let entry = this.nodeCache.get(primName)
+					if (!entry) {
+						const it = this.table.items[primName]
+						if (it?.getUpdater && node) {
+							entry = { item: it, node }
+							this.nodeCache.set(primName, entry)
+						}
+					}
+					if (!entry) continue
+					entry.item.getUpdater().applyState(entry.node, {}, this.renderApi, this.table)
+				}
 			}
 		}
 		changed.release()
@@ -1046,7 +1108,8 @@ export class Viewer {
 		if (isLowQuality()) {
 			const maxLights = getMaxLights()
 			const culled = cullExcessLights(node, maxLights)
-			if (culled) this.log(`[quality] low — lights ${culled.before} → ${culled.after} (culled ${culled.culled})`, 'info')
+			if (culled)
+				this.log(`[quality] low — lights ${culled.before} → ${culled.after} (culled ${culled.culled})`, 'info')
 		}
 		{
 			const pfLower = table.getPlayfieldMap()?.toLowerCase()
@@ -1918,6 +1981,9 @@ export class Viewer {
 				lastTimeMsec = cur
 			}
 		}
+		const hasPendingInput = () =>
+			typeof navigator !== 'undefined' &&
+			(navigator as any).scheduling?.isInputPending?.({ includeContinuous: true }) === true
 		;(this as any)._tickPhysicsImmediate = () => {
 			if (!this.player || this.isPaused || this.viewerMode !== 'play') return
 			tickPhysics()
@@ -1955,6 +2021,7 @@ export class Viewer {
 				renderSkip = (renderSkip + 1) % 3
 				if (renderSkip !== 0) return
 			}
+			if (hasPendingInput()) return
 			if (this.controls?.enabled) this.controls.update()
 			this._applyNudgeVisual()
 			if (this.composer) this.composer.render()

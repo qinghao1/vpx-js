@@ -275,7 +275,8 @@ function attachPointerHost(host: InputHost, signal: AbortSignal): void {
 		y: number,
 		opts: { hover?: boolean } = {},
 	): { code: string; obj: THREE.Object3D } | null => {
-		if (opts.hover && typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)')?.matches) return null
+		if (opts.hover && typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)')?.matches)
+			return null
 		if (!host.tableGroup || !host.camera || host.viewerMode !== 'play' || !host.player) return null
 		const r = rect ?? (rect = canvas.getBoundingClientRect())
 		if (!r || !r.width || !r.height) return null
@@ -353,10 +354,7 @@ function attachPointerHost(host: InputHost, signal: AbortSignal): void {
 		'pointerdown',
 		(e: PointerEvent) => {
 			if (e.button !== 0 && e.button !== 2) return
-			if (host.viewerMode !== 'play') {
-				host.enterPlayMode()
-				return
-			}
+			if (host.viewerMode !== 'play') host.enterPlayMode()
 			const isRightClick = e.button === 2
 			const code = isRightClick ? '__nudge' : zoneFor(e.clientX, e.clientY)
 			active.set(e.pointerId, code)
