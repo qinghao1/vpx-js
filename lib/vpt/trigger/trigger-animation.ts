@@ -31,10 +31,11 @@ export class TriggerAnimation implements IAnimation {
 		this.unhitEvent = true
 	}
 
-	public updateAnimation(newTimeMsec: number, table: Table) {
+	public updateAnimation(newTimeMsec: number, table: Table): boolean {
 		const oldTimeMsec = this.timeMsec < newTimeMsec ? this.timeMsec : newTimeMsec
 		this.timeMsec = newTimeMsec
 		const diffTimeMsec = newTimeMsec - oldTimeMsec
+		const prevOffset = this.state.heightOffset
 		let animLimit = this.data.shape === Enums.TriggerShape.TriggerStar ? this.data.radius * (1 / 5) : 32
 		if (this.data.shape === Enums.TriggerShape.TriggerButton) animLimit = this.data.radius * (1 / 10)
 		if (this.data.shape === Enums.TriggerShape.TriggerWireC) animLimit = 60
@@ -71,5 +72,6 @@ export class TriggerAnimation implements IAnimation {
 				}
 			}
 		}
+		return this.state.heightOffset !== prevOffset
 	}
 }

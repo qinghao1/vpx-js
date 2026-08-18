@@ -21,6 +21,7 @@ import { Item } from '../item.js'
 import { ItemApi } from '../item-api.js'
 import { type IPhysicalData, ItemData } from '../item-data.js'
 import { ItemState } from '../item-state.js'
+import { omitEqual } from '../state-helpers.js'
 import type { Table } from '../table/table.js'
 import { HitTargetAnimation, HitTargetHitGenerator } from './hit-target-physics.js'
 import { HitTargetMeshGenerator, HitTargetUpdater } from './hit-target-view.js'
@@ -143,6 +144,40 @@ export class HitTargetState extends ItemState {
 		s.texture = texture
 		s.isVisible = isVisible
 		return s
+	}
+
+	public clone(): HitTargetState {
+		return HitTargetState.claim(
+			this.name,
+			this.zOffset,
+			this.xRotation,
+			this.material,
+			this.texture,
+			this.isVisible,
+		)
+	}
+
+	public diff(state: HitTargetState): HitTargetState {
+		const d = this.clone()
+		omitEqual(d, state, 'zOffset')
+		omitEqual(d, state, 'xRotation')
+		omitEqual(d, state, 'material')
+		omitEqual(d, state, 'texture')
+		omitEqual(d, state, 'isVisible')
+		return d
+	}
+
+	public release(): void {}
+
+	public equals(state: HitTargetState): boolean {
+		if (!state) return false
+		return (
+			state.zOffset === this.zOffset &&
+			state.xRotation === this.xRotation &&
+			state.material === this.material &&
+			state.texture === this.texture &&
+			state.isVisible === this.isVisible
+		)
 	}
 }
 

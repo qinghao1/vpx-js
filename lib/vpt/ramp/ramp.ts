@@ -18,6 +18,7 @@ import { ItemApi } from '../item-api.js'
 import { type IPhysicalData, ItemData } from '../item-data.js'
 import { ItemState } from '../item-state.js'
 import { Mesh } from '../mesh.js'
+import { omitEqual } from '../state-helpers.js'
 import type { Table } from '../table/table.js'
 import { RampHitGenerator } from './ramp-physics.js'
 import { RampMeshGenerator, RampUpdater } from './ramp-view.js'
@@ -184,6 +185,70 @@ export class RampState extends ItemState {
 		state.depthBias = depthBias
 		state.isVisible = isVisible
 		return state
+	}
+
+	public clone(): RampState {
+		return RampState.claim(
+			this.name,
+			this.heightBottom,
+			this.heightTop,
+			this.widthBottom,
+			this.widthTop,
+			this.leftWallHeight,
+			this.rightWallHeight,
+			this.leftWallHeightVisible,
+			this.rightWallHeightVisible,
+			this.type,
+			this.material,
+			this.texture,
+			this.textureAlignment,
+			this.hasWallImage,
+			this.depthBias,
+			this.isVisible,
+		)
+	}
+
+	public diff(state: RampState): RampState {
+		const d = this.clone()
+		omitEqual(d, state, 'heightBottom')
+		omitEqual(d, state, 'heightTop')
+		omitEqual(d, state, 'widthBottom')
+		omitEqual(d, state, 'widthTop')
+		omitEqual(d, state, 'leftWallHeight')
+		omitEqual(d, state, 'rightWallHeight')
+		omitEqual(d, state, 'leftWallHeightVisible')
+		omitEqual(d, state, 'rightWallHeightVisible')
+		omitEqual(d, state, 'depthBias')
+		omitEqual(d, state, 'material')
+		omitEqual(d, state, 'texture')
+		omitEqual(d, state, 'textureAlignment')
+		omitEqual(d, state, 'hasWallImage')
+		omitEqual(d, state, 'type')
+		omitEqual(d, state, 'isVisible')
+		return d
+	}
+
+	public release(): void {}
+
+	public equals(state: RampState): boolean {
+		if (!state) return false
+		return (
+			state.heightBottom === this.heightBottom &&
+			state.heightTop === this.heightTop &&
+			state.widthBottom === this.widthBottom &&
+			state.widthTop === this.widthTop &&
+			state.leftWallHeight === this.leftWallHeight &&
+			state.rightWallHeight === this.rightWallHeight &&
+			state.leftWallHeightVisible === this.leftWallHeightVisible &&
+			state.rightWallHeightVisible === this.rightWallHeightVisible &&
+			state.depthBias === this.depthBias &&
+			state.material === this.material &&
+			state.texture === this.texture &&
+			state.textureAlignment === this.textureAlignment &&
+			state.hasWallImage === this.hasWallImage &&
+			state.type === this.type &&
+			state.isVisible === this.isVisible
+		)
 	}
 }
 

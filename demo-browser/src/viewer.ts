@@ -56,11 +56,10 @@ import {
 	isDev as _isDev,
 	ensureBvh,
 	ensureGlobals,
-	getEffectiveCaps,
 	getMaxLights,
 	getTargetPixelRatio,
 	isLowQuality,
-	isPlayMode,
+	QUALITY_CAPS,
 } from './env.js'
 import { attachInput } from './input.js'
 import { createHarness } from './log-overlay.js'
@@ -331,8 +330,7 @@ export class Viewer {
 			}
 		})()
 		const low = isLowQuality()
-		const isPlay = this.viewerMode === 'play'
-		const useAA = wantAA && !isSwiftShader && !low && !isPlay
+		const useAA = wantAA && !isSwiftShader && !low
 		if (!renderer) {
 			const alpha = !low
 			const baseOpts: any = {
@@ -361,7 +359,7 @@ export class Viewer {
 			backend = 'webgl'
 		}
 		renderer.setPixelRatio(getTargetPixelRatio(this.viewerMode))
-		renderer.sortObjects = !low && !isPlay
+		renderer.sortObjects = false
 		renderer.shadowMap.enabled = false
 		if (p.has('shadows')) {
 			this.log(
@@ -387,7 +385,7 @@ export class Viewer {
 		}
 		const exposureFor = ex => Math.max(0.1, Math.min(2, Number.isFinite(ex) ? ex : 1))
 		const applyTone = (r, data) => {
-			if (low || isPlay) {
+			if (low) {
 				r.toneMapping = THREE.NoToneMapping
 				r.toneMappingExposure = 1
 			} else {
@@ -411,7 +409,7 @@ export class Viewer {
 		// Generic fix: HDR EffectComposer (HalfFloat) + OutputPass so additive HDR (alpha/100) sums linear then tonemaps once.
 		// Matches primitive.cpp:1171 convertColor(alpha/100) premul and fs_unshaded.sc result*tex, then fb tonemap.
 		this.composer = null
-		if (!low && !isPlay && backend.startsWith('webgl')) {
+		if (!low && backend.startsWith('webgl')) {
 			try {
 				const { EffectComposer } = await import('three/addons/postprocessing/EffectComposer.js')
 				const { RenderPass } = await import('three/addons/postprocessing/RenderPass.js')
@@ -568,17 +566,9 @@ export class Viewer {
 		if (this.renderer) {
 			this.renderer.setPixelRatio(getTargetPixelRatio('play'))
 			this.renderer.sortObjects = false
-			this.renderer.toneMapping = THREE.NoToneMapping
-			this.renderer.toneMappingExposure = 1
 		}
 		this._hidePlayTip?.()
-		hideCab(this.tableGroup)
-		{
-			const maxLights = getMaxLights()
-			const culled = cullExcessLights(this.tableGroup, maxLights)
-			if (culled)
-				this.log(`[quality] play — lights ${culled.before} → ${culled.after} (culled ${culled.culled})`, 'info')
-		}
+		hideCabFlippers(this.tableGroup)
 		this._syncChrome()
 		if (this.player) {
 			this.player.setPhysicsEnabled(true)
@@ -608,11 +598,7 @@ export class Viewer {
 	async _switchToViewer() {
 		if (this.viewerMode !== 'play' || !this.tableGroup) return
 		this.viewerMode = 'viewer'
-		if (this.renderer) {
-			this.renderer.setPixelRatio(getTargetPixelRatio('viewer'))
-			this.renderer.sortObjects = !isLowQuality()
-			this._applyTableToneMapping?.(this.table)
-		}
+		if (this.renderer) this.renderer.setPixelRatio(getTargetPixelRatio('viewer'))
 		this._hidePlayTip?.()
 		showCab(this.tableGroup)
 		this._syncChrome()
@@ -790,7 +776,7 @@ export class Viewer {
 		if (this.renderer) this.renderer.shadowMap.enabled = false
 		if (this.controls) this.controls.enabled = false
 		this._ensurePhysicsWorker()
-		if (this.tableGroup) hideCab(this.tableGroup)
+		if (this.tableGroup) hideCabFlippers(this.tableGroup)
 		{
 			const framing = this.tableGroup ? computePlayFraming(this.tableGroup) : null
 			const center = framing?.center ?? new THREE.Vector3()
@@ -1083,7 +1069,7 @@ export class Viewer {
 			const culled = cullExcessLights(node, maxLights)
 			if (culled)
 				this.log(
-					`[quality] ${isLowQuality() ? 'low' : isPlayMode() ? 'play' : 'high'} — lights ${culled.before} → ${culled.after} (culled ${culled.culled})`,
+					`[quality] ${isLowQuality() ? 'low' : 'high'} — lights ${culled.before} → ${culled.after} (culled ${culled.culled})`,
 					'info',
 				)
 		}
@@ -1254,7 +1240,7 @@ export class Viewer {
 			harnessLog: this.harnessLog,
 			table,
 		})
-		if (this.viewerMode === 'play') hideCab(node)
+		if (this.viewerMode === 'play') hideCabFlippers(node)
 		const params = new URLSearchParams(location.search)
 		const useBatch = !params.has('nobatched')
 		if (useBatch && table && this.renderApi) {
@@ -1567,7 +1553,7 @@ export class Viewer {
 											tex.generateMipmaps = true
 											tex.minFilter = THREE.LinearMipmapLinearFilter
 											tex.magFilter = THREE.LinearFilter
-											tex.anisotropy = getEffectiveCaps().aniso
+											tex.anisotropy = isLowQuality() ? QUALITY_CAPS.low.aniso : 8
 											tex.needsUpdate = true
 										}
 										m.needsUpdate = true
@@ -1942,17 +1928,6 @@ export class Viewer {
 		} else if (this._physicsSab) {
 			this.log(`[physics] reusing SAB ${this._physicsSab.byteLength}`, 'debug')
 		}
-		const flushAnimations = (): boolean => {
-			if (!this.player || this.isPaused || this.viewerMode !== 'play') return false
-			this.player.updateAnimations(this.player.getGameTime())
-			const changed = this.player.popStates()
-			if (changed.keys.length) {
-				this.applyChangedStates(changed)
-				return true
-			}
-			changed.release?.()
-			return false
-		}
 		const tickPhysics = () => {
 			if (!this.player || this.isPaused) return
 			if (this._physicsSab && this._physicsScratch) trySnap(this._physicsSab, this._physicsScratch)
@@ -1972,17 +1947,19 @@ export class Viewer {
 			if (this._physicsSab && this._physicsScratch) trySnap(this._physicsSab, this._physicsScratch)
 			this.player.setPhysicsEnabled(true)
 			this.player.updatePhysics()
-			if (flushAnimations() && !this._disposed && !isPinLoading()) {
-				if (this.composer) this.composer.render()
-				else this.renderer.render(this.scene, this.camera)
-			}
+			this.player.updateAnimations(this.player.getGameTime())
+			const changed = this.player.popStates()
+			if (changed.keys.length) {
+				this.applyChangedStates(changed)
+				if (!this._disposed && !isPinLoading()) {
+					if (this.composer) this.composer.render()
+					else this.renderer.render(this.scene, this.camera)
+				}
+			} else changed.release?.()
 		}
 		const physicsLoop = () => {
 			if (this._disposed) return
-			;(this as any)._physicsTimeout = setTimeout(
-				physicsLoop,
-				isLowQuality() || this.viewerMode === 'play' ? 16 : 8,
-			)
+			;(this as any)._physicsTimeout = setTimeout(physicsLoop, isLowQuality() ? 16 : 8)
 			this._animTimeout = (this as any)._physicsTimeout
 			const pinLoading = isPinLoading()
 			if (pinLoading !== pinLoadingLogged) {
@@ -2009,7 +1986,12 @@ export class Viewer {
 			}
 			if (this.controls?.enabled) this.controls.update()
 			this._applyNudgeVisual()
-			flushAnimations()
+			if (this.player && this.viewerMode === 'play' && !this.isPaused) {
+				this.player.updateAnimations(this.player.getGameTime())
+				const changed = this.player.popStates()
+				if (changed.keys.length) this.applyChangedStates(changed)
+				else changed.release?.()
+			}
 			if (this.composer) this.composer.render()
 			else this.renderer.render(this.scene, this.camera)
 			const now = performance.now()

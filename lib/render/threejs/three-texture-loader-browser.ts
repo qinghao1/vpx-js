@@ -21,7 +21,7 @@ import {
 	type Texture as ThreeTexture,
 } from '../../refs.browser.js'
 import { exrCacheKey, idbGet, idbSet } from '../../util/idb-cache.js'
-import { _resetQualityCache, getEffectiveCaps, isLowQuality, isPlayMode, QUALITY_CAPS } from '../../util/quality.js'
+import { _resetQualityCache, getEffectiveCaps, isLowQuality, QUALITY_CAPS } from '../../util/quality.js'
 import type { ITextureLoader } from '../irender-api.js'
 import { decodeInWorker, hasImageWorker } from './image-worker-pool.js'
 
@@ -85,7 +85,7 @@ export function effectiveMax(_isFloat: boolean, name?: string): number {
 	const low = isLowQuality()
 	const caps = low ? QUALITY_CAPS.low : getEffectiveCaps()
 	let cap: number
-	if (isVlm && isPlayMode()) cap = 1024
+	if (isVlm) cap = 1024
 	else if (isPlayfield) cap = caps.playfield
 	else if (swift) cap = 1024
 	else cap = caps.other

@@ -20,6 +20,7 @@ import { Item } from '../item.js'
 import { ItemApi } from '../item-api.js'
 import { ItemData } from '../item-data.js'
 import { ItemState } from '../item-state.js'
+import { omitEqual } from '../state-helpers.js'
 import type { Table } from '../table/table.js'
 import { Texture } from '../texture.js'
 import { KickerHit } from './kicker-physics.js'
@@ -101,6 +102,24 @@ export class KickerState extends ItemState {
 		s.type = type
 		s.material = material
 		return s
+	}
+
+	public clone(): KickerState {
+		return KickerState.claim(this.name, this.type, this.material)
+	}
+
+	public diff(state: KickerState): KickerState {
+		const d = this.clone()
+		omitEqual(d, state, 'type')
+		omitEqual(d, state, 'material')
+		return d
+	}
+
+	public release(): void {}
+
+	public equals(state: KickerState): boolean {
+		if (!state) return false
+		return state.type === this.type && state.material === this.material
 	}
 }
 

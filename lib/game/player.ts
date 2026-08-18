@@ -200,11 +200,11 @@ export class Player extends EventEmitter {
 	}
 	public updateAnimations(timeMs: number): void {
 		for (const a of this.getAnimatables() as unknown as Array<{
-			getAnimation(): { updateAnimation(n: number, t: Table): void }
+			getAnimation(): { updateAnimation(n: number, t: Table): boolean | void }
 			getName(): string
 		}>) {
-			a.getAnimation().updateAnimation(timeMs, this.table)
-			this.markDirty(a.getName())
+			const changed = a.getAnimation().updateAnimation(timeMs, this.table)
+			if (changed) this.markDirty(a.getName())
 		}
 	}
 	public popStates(): ChangedStates<ItemState> {

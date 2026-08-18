@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import * as THREE from 'three'
-import { getEffectiveCaps, isLowQuality, isPlayMode } from '../../util/quality.js'
+import { getEffectiveCaps, isLowQuality } from '../../util/quality.js'
 import { getGlobalEmissionScale } from './three-material-generator.js'
 
 export const BAKED_EMISSIVE = 1.0
@@ -156,7 +156,7 @@ function fixVr(mat: THREE.MeshStandardMaterial): void {
 		tex.generateMipmaps = true
 		tex.minFilter = THREE.LinearMipmapLinearFilter
 		tex.magFilter = THREE.LinearFilter
-		tex.anisotropy = isLowQuality() ? 1 : isPlayMode() ? 4 : ANISOTROPY_VR
+		tex.anisotropy = isLowQuality() ? 1 : getEffectiveCaps().aniso
 		tex.needsUpdate = true
 	}
 	apply(mat.map as THREE.Texture | undefined)

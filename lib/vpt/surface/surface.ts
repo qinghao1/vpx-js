@@ -17,6 +17,7 @@ import { ItemApi } from '../item-api.js'
 import { type IPhysicalData, ItemData } from '../item-data.js'
 import { ItemState } from '../item-state.js'
 import type { Material } from '../material.js'
+import { omitEqual } from '../state-helpers.js'
 import type { Table } from '../table/table.js'
 import { SurfaceHitGenerator } from './surface-physics.js'
 import { SurfaceMeshGenerator, SurfaceUpdater } from './surface-view.js'
@@ -180,6 +181,46 @@ export class SurfaceState extends ItemState {
 		state.sideMaterial = sideMaterial
 		state.sideTexture = sideTexture
 		return state
+	}
+
+	public clone(): SurfaceState {
+		return SurfaceState.claim(
+			this.name,
+			this.isDropped,
+			this.isTopVisible,
+			this.topMaterial,
+			this.topTexture,
+			this.isSideVisible,
+			this.sideMaterial,
+			this.sideTexture,
+		)
+	}
+
+	public diff(state: SurfaceState): SurfaceState {
+		const d = this.clone()
+		omitEqual(d, state, 'isDropped')
+		omitEqual(d, state, 'isTopVisible')
+		omitEqual(d, state, 'topMaterial')
+		omitEqual(d, state, 'topTexture')
+		omitEqual(d, state, 'isSideVisible')
+		omitEqual(d, state, 'sideMaterial')
+		omitEqual(d, state, 'sideTexture')
+		return d
+	}
+
+	public release(): void {}
+
+	public equals(state: SurfaceState): boolean {
+		if (!state) return false
+		return (
+			state.isDropped === this.isDropped &&
+			state.isTopVisible === this.isTopVisible &&
+			state.topMaterial === this.topMaterial &&
+			state.topTexture === this.topTexture &&
+			state.isSideVisible === this.isSideVisible &&
+			state.sideMaterial === this.sideMaterial &&
+			state.sideTexture === this.sideTexture
+		)
 	}
 }
 

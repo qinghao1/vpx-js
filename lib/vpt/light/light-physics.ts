@@ -61,8 +61,9 @@ export class LightAnimation implements IAnimation {
 		this.timerDurationEndTime = timeMsec + this.duration
 	}
 
-	public updateAnimation(newTimeMsec: number, _table: Table): void {
-		if (!this.data.isVisible) return
+	public updateAnimation(newTimeMsec: number, _table: Table): boolean {
+		if (!this.data.isVisible) return false
+		const prevIntensity = this.state.intensity
 		const diff = Math.max(0, newTimeMsec - this.timeMsec)
 		this.timeMsec = newTimeMsec
 		if (this.duration > 0 && this.timerDurationEndTime < this.timeMsec) {
@@ -95,6 +96,7 @@ export class LightAnimation implements IAnimation {
 				this.state.intensity = Math.max(target, this.state.intensity - s * diff)
 			}
 		}
+		return this.state.intensity !== prevIntensity
 	}
 
 	private updateBlinker(timeMsec: number) {

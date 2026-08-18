@@ -17,6 +17,7 @@ import { Item } from '../item.js'
 import { ItemApi } from '../item-api.js'
 import { ItemData } from '../item-data.js'
 import { ItemState } from '../item-state.js'
+import { omitEqual } from '../state-helpers.js'
 import type { Table } from '../table/table.js'
 import { Texture } from '../texture.js'
 import { BumperAnimation, BumperHit } from './bumper-physics.js'
@@ -164,6 +165,58 @@ export class BumperState extends ItemState {
 		s.baseMaterial = baseMaterial
 		s.skirtMaterial = skirtMaterial
 		return s
+	}
+
+	public clone(): BumperState {
+		return BumperState.claim(
+			this.name,
+			this.ringOffset,
+			this.skirtRotX,
+			this.skirtRotY,
+			this.isCapVisible,
+			this.isRingVisible,
+			this.isBaseVisible,
+			this.isSkirtVisible,
+			this.capMaterial,
+			this.ringMaterial,
+			this.baseMaterial,
+			this.skirtMaterial,
+		)
+	}
+
+	public diff(state: BumperState): BumperState {
+		const d = this.clone()
+		omitEqual(d, state, 'ringOffset')
+		omitEqual(d, state, 'skirtRotX')
+		omitEqual(d, state, 'skirtRotY')
+		omitEqual(d, state, 'isCapVisible')
+		omitEqual(d, state, 'isRingVisible')
+		omitEqual(d, state, 'isBaseVisible')
+		omitEqual(d, state, 'isSkirtVisible')
+		omitEqual(d, state, 'capMaterial')
+		omitEqual(d, state, 'ringMaterial')
+		omitEqual(d, state, 'baseMaterial')
+		omitEqual(d, state, 'skirtMaterial')
+		return d
+	}
+
+	public release(): void {}
+
+	public equals(state: BumperState): boolean {
+		if (!state) return false
+		return (
+			state.ringOffset === this.ringOffset &&
+			state.skirtRotX === this.skirtRotX &&
+			state.skirtRotY === this.skirtRotY &&
+			state.isCapVisible === this.isCapVisible &&
+			state.isRingVisible === this.isRingVisible &&
+			state.isBaseVisible === this.isBaseVisible &&
+			state.isSkirtVisible === this.isSkirtVisible &&
+			state.capMaterial === this.capMaterial &&
+			state.ringMaterial === this.ringMaterial &&
+			state.baseMaterial === this.baseMaterial &&
+			state.skirtMaterial === this.skirtMaterial
+		)
 	}
 }
 

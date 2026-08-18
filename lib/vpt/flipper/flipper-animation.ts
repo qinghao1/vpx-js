@@ -32,11 +32,12 @@ export class FlipperAnimation implements IAnimation {
 
 	public init(_timeMsec: number): void {}
 
-	public updateAnimation(_timeMsec: number, _table: Table): void {
+	public updateAnimation(_timeMsec: number, _table: Table): boolean {
 		const cur = this.mover?.angle ?? this.state.angle
 		if (cur !== this.lastAngle && this.events) {
 			this.lastAngle = cur
 			this.events.fireGroupEvent(Event.AnimateEventsAnimate)
 		}
+		return false
 	}
 }

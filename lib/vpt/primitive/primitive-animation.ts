@@ -25,7 +25,7 @@ export class PrimitiveAnimation implements IAnimation {
 		this.timeMsec = timeMsec
 	}
 
-	public updateAnimation(newTimeMsec: number, _table: Table): void {
+	public updateAnimation(newTimeMsec: number, _table: Table): boolean {
 		if (
 			this.currentFrame === -1 ||
 			!this.doAnimation ||
@@ -33,11 +33,11 @@ export class PrimitiveAnimation implements IAnimation {
 			this.data.staticRendering
 		) {
 			this.timeMsec = newTimeMsec
-			return
+			return false
 		}
 		const diff = Math.max(0, newTimeMsec - this.timeMsec)
 		this.timeMsec = newTimeMsec
-		if (diff === 0) return
+		if (diff === 0) return false
 		const prev = this.currentFrame
 		this.currentFrame += this.speed * (diff * (60 / 1000))
 		const maxFrame = this.mesh.animationFrames.length - 1
@@ -49,7 +49,11 @@ export class PrimitiveAnimation implements IAnimation {
 				this.doAnimation = false
 			}
 		}
-		if (this.currentFrame !== prev) this.state.currentFrame = this.currentFrame
+		if (this.currentFrame !== prev) {
+			this.state.currentFrame = this.currentFrame
+			return true
+		}
+		return false
 	}
 
 	public playAnim(startFrame: number, speed: number): void {

@@ -16,6 +16,7 @@ import { Item } from '../item.js'
 import { ItemApi } from '../item-api.js'
 import { type IPhysicalData, ItemData } from '../item-data.js'
 import { ItemState } from '../item-state.js'
+import { omitEqual } from '../state-helpers.js'
 import type { Table } from '../table/table.js'
 import { RubberHitGenerator } from './rubber-physics.js'
 import { RubberMeshGenerator, RubberUpdater } from './rubber-view.js'
@@ -136,6 +137,46 @@ export class RubberState extends ItemState {
 		state.texture = texture
 		state.isVisible = isVisible
 		return state
+	}
+
+	public clone(): RubberState {
+		return RubberState.claim(
+			this.name,
+			this.height,
+			this.rotX,
+			this.rotY,
+			this.rotZ,
+			this.material,
+			this.texture,
+			this.isVisible,
+		)
+	}
+
+	public diff(state: RubberState): RubberState {
+		const d = this.clone()
+		omitEqual(d, state, 'height')
+		omitEqual(d, state, 'rotX')
+		omitEqual(d, state, 'rotY')
+		omitEqual(d, state, 'rotZ')
+		omitEqual(d, state, 'material')
+		omitEqual(d, state, 'texture')
+		omitEqual(d, state, 'isVisible')
+		return d
+	}
+
+	public release(): void {}
+
+	public equals(state: RubberState): boolean {
+		if (!state) return false
+		return (
+			state.height === this.height &&
+			state.rotX === this.rotX &&
+			state.rotY === this.rotY &&
+			state.rotZ === this.rotZ &&
+			state.material === this.material &&
+			state.texture === this.texture &&
+			state.isVisible === this.isVisible
+		)
 	}
 }
 

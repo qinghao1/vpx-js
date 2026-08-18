@@ -19,11 +19,12 @@ export class GateAnimation implements IAnimation {
 		this.events = events
 	}
 	public init(_timeMsec: number): void {}
-	public updateAnimation(_timeMsec: number, _table: Table): void {
+	public updateAnimation(_timeMsec: number, _table: Table): boolean {
 		const cur = this.state.angle
 		if (cur !== this.lastAngle && this.events) {
 			this.lastAngle = cur
 			this.events.fireGroupEvent(Event.AnimateEventsAnimate)
 		}
+		return false
 	}
 }

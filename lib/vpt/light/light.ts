@@ -19,6 +19,7 @@ import { ItemApi } from '../item-api.js'
 import { ItemData } from '../item-data.js'
 import { ItemState } from '../item-state.js'
 import { Material } from '../material.js'
+import { omitEqual } from '../state-helpers.js'
 import type { Table } from '../table/table.js'
 import { LightAnimation } from './light-physics.js'
 import { LightMeshGenerator, LightUpdater } from './light-view.js'
@@ -178,6 +179,33 @@ export class LightState extends ItemState {
 		state.color = color
 		state.colorFull = colorFull
 		return state
+	}
+
+	public clone(): LightState {
+		const s = LightState.claim(this.name, this.intensity, this.color, this.colorFull)
+		s.isVisible = this.isVisible
+		return s
+	}
+
+	public diff(state: LightState): LightState {
+		const d = this.clone()
+		omitEqual(d, state, 'intensity')
+		omitEqual(d, state, 'color')
+		omitEqual(d, state, 'colorFull')
+		omitEqual(d, state, 'isVisible')
+		return d
+	}
+
+	public release(): void {}
+
+	public equals(state: LightState): boolean {
+		if (!state) return false
+		return (
+			state.intensity === this.intensity &&
+			state.color === this.color &&
+			state.colorFull === this.colorFull &&
+			state.isVisible === this.isVisible
+		)
 	}
 }
 

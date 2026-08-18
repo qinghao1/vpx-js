@@ -96,7 +96,7 @@ export type { IAnimatable as Animatable }
 
 export interface IAnimation {
 	init(timeMsec: number): void
-	updateAnimation(timeMsec: number, table: Table): void
+	updateAnimation(timeMsec: number, table: Table): boolean | void
 }
 export type { IAnimation as Animation }
 

@@ -6,13 +6,21 @@ export abstract class ItemState {
 	public name = ''
 	public isVisible = true
 
+	private static readonly _keysCache = new WeakMap<Function, string[]>()
+
 	public clone(): ItemState {
 		const copy = new (this.constructor as new () => any)()
 		return Object.assign(copy, this)
 	}
 
 	public equals(state: ItemState): boolean {
-		const keys = Object.keys(this) as (keyof this)[]
+		if (!state) return false
+		const ctor = this.constructor as Function
+		let keys = ItemState._keysCache.get(ctor) as (keyof this)[] | undefined
+		if (!keys) {
+			keys = Object.keys(this) as (keyof this)[]
+			ItemState._keysCache.set(ctor, keys as unknown as string[])
+		}
 		for (const k of keys) {
 			if (this[k] !== (state as any)[k]) return false
 		}
@@ -21,7 +29,12 @@ export abstract class ItemState {
 
 	public diff(state: ItemState): ItemState {
 		const result = this.clone()
-		const keys = Object.keys(this) as (keyof this)[]
+		const ctor = this.constructor as Function
+		let keys = ItemState._keysCache.get(ctor) as (keyof this)[] | undefined
+		if (!keys) {
+			keys = Object.keys(this) as (keyof this)[]
+			ItemState._keysCache.set(ctor, keys as unknown as string[])
+		}
 		for (const k of keys) {
 			if ((result as any)[k] === (state as any)[k] && k !== 'name') {
 				delete (result as any)[k]

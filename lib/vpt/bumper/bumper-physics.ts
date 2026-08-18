@@ -47,12 +47,20 @@ export class BumperAnimation implements IAnimation {
 		this.timeMsec = timeMsec
 	}
 
-	public updateAnimation(newTimeMsec: number, table: Table): void {
+	public updateAnimation(newTimeMsec: number, table: Table): boolean {
 		const diff = Math.max(0, newTimeMsec - this.timeMsec)
 		this.timeMsec = newTimeMsec
+		const prevRingOffset = this.state.ringOffset
+		const prevSkirtRotX = this.state.skirtRotX
+		const prevSkirtRotY = this.state.skirtRotY
 		const state = this.hitEvent ? 1 : 0
 		this.updateRingAnimation(state, diff, table)
 		this.updateSkirtAnimation(state, diff)
+		return (
+			this.state.ringOffset !== prevRingOffset ||
+			this.state.skirtRotX !== prevSkirtRotX ||
+			this.state.skirtRotY !== prevSkirtRotY
+		)
 	}
 
 	private updateRingAnimation(state: number, diff: number, table: Table) {

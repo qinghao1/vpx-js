@@ -39,10 +39,12 @@ export class HitTargetAnimation implements IAnimation {
 		this.timeMsec = timeMsec
 	}
 
-	public updateAnimation(newTimeMsec: number, table: Table): void {
+	public updateAnimation(newTimeMsec: number, table: Table): boolean {
 		const oldTimeMsec = this.timeMsec < newTimeMsec ? this.timeMsec : newTimeMsec
 		this.timeMsec = newTimeMsec
 		const diffTimeMsec = newTimeMsec - oldTimeMsec
+		const prevZOffset = this.state.zOffset
+		const prevXRotation = this.state.xRotation
 		if (this.hitEvent) {
 			if (!this.data.isDropped) this.moveDown = true
 			this.moveAnimation = true
@@ -92,6 +94,7 @@ export class HitTargetAnimation implements IAnimation {
 				}
 			}
 		}
+		return this.state.zOffset !== prevZOffset || this.state.xRotation !== prevXRotation
 	}
 }
 
