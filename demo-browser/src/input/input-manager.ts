@@ -356,10 +356,10 @@ function attachPointerHost(host: InputHost, signal: AbortSignal): void {
 				raycaster.setFromCamera(ndc, host.camera)
 				const hits = raycaster.intersectObject(host.tableGroup, true)
 				const hitTable = hits.some((h: any) => {
-					for (let o: any = h.object; o; o = o.parent) {
+					for (let o: any = h.object; o && o !== host.tableGroup; o = o.parent) {
 						const n = String(o.name || '')
 						const ln = n.toLowerCase()
-						if (ln.includes('playfield') || ln.includes('bm_') || ln.includes('apron')) return true
+						if (ln.includes('playfield') || ln.includes('apron')) return true
 						if (RE_CAB.test(n) || RE_OUTER.test(n)) return true
 					}
 					return false

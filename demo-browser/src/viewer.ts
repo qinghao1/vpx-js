@@ -507,13 +507,13 @@ export class Viewer {
 		}
 		const isOuter = (n: string) => RE_OUTER.test(n || '') || RE_CAB.test(n || '')
 		const hitIsOuter = (o: any) => {
-			for (let c: any = o; c; c = c.parent) if (isOuter(c.name || '')) return true
+			for (let c: any = o; c && c !== this.tableGroup; c = c.parent) if (isOuter(c.name || '')) return true
 			return false
 		}
 		const hitIsPlayfield = (o: any) => {
-			for (let c: any = o; c; c = c.parent) {
+			for (let c: any = o; c && c !== this.tableGroup; c = c.parent) {
 				const n = String(c.name || '').toLowerCase()
-				if (n.includes('playfield') || n.includes('bm_') || n.includes('apron')) return true
+				if (n.includes('playfield') || n.includes('apron')) return true
 			}
 			return false
 		}
