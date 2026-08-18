@@ -9,7 +9,7 @@ export const QUALITY_CAPS = {
 
 export const QUALITY_MAX_LIGHTS = {
 	low: 8,
-	high: 128,
+	high: 32,
 } as const
 
 export function isPlayMode(): boolean {

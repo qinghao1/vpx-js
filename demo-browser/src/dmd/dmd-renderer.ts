@@ -413,7 +413,11 @@ export class DmdRenderer {
 		if (this.offCtx) {
 			const ctx = this.offCtx
 			ctx.imageSmoothingEnabled = false
-			const img = ctx.createImageData(w, h)
+			let img = (this as any)._imageData
+			if (!img || img.width !== w || img.height !== h) {
+				img = ctx.createImageData(w, h)
+				;(this as any)._imageData = img
+			}
 			for (let i = 0; i < w * h; i++) {
 				const v = frame[i] ?? 0
 				const lvl = is2bit ? v * 85 : isNibble ? Math.round((v / 15) * 255) : v

@@ -1367,7 +1367,8 @@ export class Viewer {
 				tableGroup: node,
 				player: this.player,
 			})
-		buildBvhIdle(node)
+		if (!isLowQuality()) buildBvhIdle(node)
+		else this.log('[bvh] low quality: skip idle BVH for perf', 'debug')
 		this._buttonMeshes = []
 		node.traverse(o => {
 			if (o.isMesh && o.userData?.isCabinetButton) this._buttonMeshes.push(o)
@@ -1686,7 +1687,8 @@ export class Viewer {
 					const bakedRes = _batchStaticOpaques(this.tableGroup, table, this.renderApi)
 					if (bakedRes) {
 						this.log(`[batch] Post-stream baked ${bakedRes} BatchedMesh`, 'info')
-						buildBvhIdle(this.tableGroup)
+						if (!isLowQuality()) buildBvhIdle(this.tableGroup)
+						else this.log('[bvh] low quality: skip post-batch BVH', 'debug')
 					}
 				}
 			}
@@ -1969,24 +1971,18 @@ export class Viewer {
 					pinLoading ? '[loop] PinMAME loading — pausing render' : '[loop] PinMAME ready — resuming render',
 				)
 			}
-			if (pinLoading) {
-				this.animFrame = this._animTimeout
-			}
+			if (pinLoading) this.animFrame = this._animTimeout
 			tickPhysics()
-			this._pollPinmame()
 		}
 		physicsLoop()
 		let renderSkip = 0
+		let lastDmd = 0
 		const renderLoop = () => {
 			if (this._disposed) return
 			this._animRaf = requestAnimationFrame(renderLoop)
 			const pinLoading = isPinLoading()
-			if (!pinLoading) {
-				this.animFrame = this._animRaf
-			}
-			if (pinLoading) {
-				return
-			}
+			if (!pinLoading) this.animFrame = this._animRaf
+			if (pinLoading) return
 			if (swiftShader) {
 				renderSkip = (renderSkip + 1) % 3
 				if (renderSkip !== 0) return
@@ -1995,6 +1991,11 @@ export class Viewer {
 			this._applyNudgeVisual()
 			if (this.composer) this.composer.render()
 			else this.renderer.render(this.scene, this.camera)
+			const now = performance.now()
+			if (now - lastDmd > 32) {
+				lastDmd = now
+				this._pollPinmame()
+			}
 			frames++
 			const now2 = performance.now()
 			if (now2 - last > 500) {

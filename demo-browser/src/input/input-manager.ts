@@ -330,6 +330,21 @@ function attachPointerHost(host: InputHost, signal: AbortSignal): void {
 
 	attachMobileControls()
 
+	if ('onpointerrawupdate' in window) {
+		canvas.addEventListener(
+			'pointerrawupdate' as any,
+			(e: PointerEvent) => {
+				if (host.viewerMode !== 'play') return
+				if (e.button !== 0) return
+				const code = zoneFor(e.clientX, e.clientY)
+				if (!active.has(e.pointerId)) {
+					active.set(e.pointerId, code)
+					send(code, true)
+				}
+			},
+			{ signal } as any,
+		)
+	}
 	canvas.addEventListener(
 		'pointerdown',
 		(e: PointerEvent) => {
@@ -337,10 +352,11 @@ function attachPointerHost(host: InputHost, signal: AbortSignal): void {
 			if (host.viewerMode !== 'play') host.enterPlayMode()
 			const isRightClick = e.button === 2
 			const code = isRightClick ? '__nudge' : zoneFor(e.clientX, e.clientY)
+			const already = active.has(e.pointerId)
 			active.set(e.pointerId, code)
 			swipeStart.set(e.pointerId, { x: e.clientX, y: e.clientY, t: performance.now() })
 
-			if (!isRightClick) send(code, true)
+			if (!isRightClick && !already) send(code, true)
 
 			canvas.setAttribute('data-pressed', code)
 			if (host.controls) {
