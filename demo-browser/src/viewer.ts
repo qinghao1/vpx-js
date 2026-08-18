@@ -52,7 +52,7 @@ import {
 	TABLE_OPTS,
 } from './config.js'
 import { DmdController } from './dmd.js'
-import { isDev as _isDev, ensureBvh, ensureGlobals, getTargetPixelRatio, isLowQuality, QUALITY_CAPS } from './env.js'
+import { getMaxLights, isDev as _isDev, ensureBvh, ensureGlobals, getTargetPixelRatio, isLowQuality, QUALITY_CAPS } from './env.js'
 import { attachInput } from './input.js'
 import { createHarness } from './log-overlay.js'
 import { renderModeHint, renderStats } from './stats-panel.js'
@@ -93,6 +93,23 @@ function syncRoom(
 	const room = ensureProceduralRoom(scene, center, size, { hasVr })
 	scene.background = getPrerenderedBackground() as any
 	return room
+}
+
+function cullExcessLights(root: any, maxLights: number) {
+	const lights: any[] = []
+	root.traverse((o: any) => {
+		if (o.isPointLight) lights.push(o)
+	})
+	if (lights.length <= maxLights) return null
+	lights.sort((a: any, b: any) => (b.intensity || 0) - (a.intensity || 0))
+	let culled = 0
+	for (const light of lights.slice(maxLights)) {
+		light.visible = false
+		light.intensity = 0
+		light.parent?.remove(light)
+		culled++
+	}
+	return { before: lights.length, after: maxLights, culled }
 }
 
 export {
@@ -523,7 +540,12 @@ export class Viewer {
 		this._hidePlayTip?.()
 		hideCabFlippers(this.tableGroup)
 		this._syncChrome()
-		this.hookInput()
+		if (this.player) {
+			this.player.setPhysicsEnabled(true)
+			this.enterPlayMode()
+		} else {
+			this.hookInput()
+		}
 		this.dom.canvas?.focus()
 		const target = computePlayFraming(this.tableGroup)
 		await this._animateCameraTo(target, CAM_ANIM.durationMode)
@@ -538,11 +560,10 @@ export class Viewer {
 			const framing = computePlayFraming(this.tableGroup)
 			syncRoom(this.scene, this.tableGroup, framing.center, framing.size)
 		}
-		if (this.player) {
-			this.player.setPhysicsEnabled(true)
-			this.enterPlayMode()
-		} else if (this.table) await this._createPlayer()
-		else this.load().catch(e => this.log(`Play load failed: ${e.message}`, 'error'))
+		if (!this.player) {
+			if (this.table) await this._createPlayer()
+			else this.load().catch(e => this.log(`Play load failed: ${e.message}`, 'error'))
+		}
 	}
 	async _switchToViewer() {
 		if (this.viewerMode !== 'play' || !this.tableGroup) return
@@ -1022,6 +1043,11 @@ export class Viewer {
 			...TABLE_OPTS,
 			preloadTextures: false,
 		})
+		if (isLowQuality()) {
+			const maxLights = getMaxLights()
+			const culled = cullExcessLights(node, maxLights)
+			if (culled) this.log(`[quality] low — lights ${culled.before} → ${culled.after} (culled ${culled.culled})`, 'info')
+		}
 		{
 			const pfLower = table.getPlayfieldMap()?.toLowerCase()
 			const hasPfTex = pfLower ? !!table.getTexture(pfLower) : false
@@ -1892,9 +1918,13 @@ export class Viewer {
 				lastTimeMsec = cur
 			}
 		}
+		;(this as any)._tickPhysicsImmediate = () => {
+			if (!this.player || this.isPaused || this.viewerMode !== 'play') return
+			tickPhysics()
+		}
 		const physicsLoop = () => {
 			if (this._disposed) return
-			;(this as any)._physicsTimeout = setTimeout(physicsLoop, 16)
+			;(this as any)._physicsTimeout = setTimeout(physicsLoop, 8)
 			this._animTimeout = (this as any)._physicsTimeout
 			const pinLoading = isPinLoading()
 			if (pinLoading !== pinLoadingLogged) {

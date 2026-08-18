@@ -41,6 +41,7 @@ export interface InputHost {
 	readonly buttonMeshes: readonly THREE.Object3D[] | null
 	readonly physicsSab: SharedArrayBuffer | null
 	readonly enableMotionButton?: HTMLButtonElement | null
+	readonly tickImmediate?: () => void
 	log?(msg: string, level?: string): void
 	enterPlayMode(): void
 	exitPlayMode(): void
@@ -51,15 +52,7 @@ export interface InputHost {
 
 const PLAY_CODES = new Set(CONTROL_SCHEME.flatMap(c => c.keys))
 
-// Generic screen zones for touch fallback when no cabinet mesh is hit.
-// These are not walking_dead-specific: left/right halves are flipper zones on any table,
-// bottom-right quadrant is the conventional plunger/launch zone. Tables that provide real
-// cabinet button meshes (via viewer._buttonMeshes / isCabinetButton) bypass this entirely
-// through raycasting — this is only the low-cost fallback for VR-less or minimal tables.
-const FALLBACK_ZONES = {
-	plunger: { xMin: 0.65, yMin: 0.55 },
-	flipperSplit: 0.5,
-} as const
+const FALLBACK_ZONES = { flipperSplit: 0.5 } as const
 
 function toHost(viewer: any): InputHost {
 	return {
@@ -87,6 +80,9 @@ function toHost(viewer: any): InputHost {
 		get physicsSab() {
 			return (viewer._physicsSab ?? null) as SharedArrayBuffer | null
 		},
+		get tickImmediate() {
+			return (viewer._tickPhysicsImmediate as (() => void) | undefined) ?? undefined
+		},
 		get enableMotionButton() {
 			return typeof document !== 'undefined'
 				? (document.getElementById('enable-motion') as HTMLButtonElement | null)
@@ -96,10 +92,13 @@ function toHost(viewer: any): InputHost {
 			viewer.log?.(msg, level)
 		},
 		enterPlayMode() {
-			viewer.viewerMode = 'play'
-			viewer.player?.setPhysicsEnabled?.(true)
-			viewer.enterPlayMode?.()
-			viewer._switchToPlay?.()
+			if (viewer._switchToPlay) {
+				viewer._switchToPlay()
+			} else {
+				viewer.viewerMode = 'play'
+				viewer.player?.setPhysicsEnabled?.(true)
+				viewer.enterPlayMode?.()
+			}
 		},
 		exitPlayMode() {
 			viewer._switchToViewer?.()
@@ -183,6 +182,7 @@ function attachKeyboardHost(host: InputHost, signal: AbortSignal): void {
 			} else {
 				host.player.onKeyUp(ev)
 			}
+			host.tickImmediate?.()
 		}
 
 		if (host.physicsSab && dik) {
@@ -254,10 +254,20 @@ function attachPointerHost(host: InputHost, signal: AbortSignal): void {
 		const r = rect ?? (rect = canvas.getBoundingClientRect())
 		if (!r || !r.width || !r.height) return 'ShiftLeft'
 		const nx = (x - r.left) / r.width
-		const ny = (y - r.top) / r.height
-		// Generic fallback zones: works for any table orientation; real cabinet meshes take precedence
-		if (nx > FALLBACK_ZONES.plunger.xMin && ny > FALLBACK_ZONES.plunger.yMin) return 'Enter'
 		return nx < FALLBACK_ZONES.flipperSplit ? 'ShiftLeft' : 'ShiftRight'
+	}
+
+	const send = (code: string, down: boolean): void => {
+		const key = keyForCode(code)
+		const loc = locationForCode(code)
+		const ev = { code, key, location: loc, ts: Date.now() } as any
+		if (down) host.player?.onKeyDown(ev)
+		else host.player?.onKeyUp(ev)
+		if (host.physicsSab) {
+			const dik = keyEventToDirectInputKey(ev)
+			if (dik) pushInput(host.physicsSab, down ? 1 : 0, dik, Date.now())
+		}
+		host.tickImmediate?.()
 	}
 
 	const hitFor = (
@@ -265,6 +275,7 @@ function attachPointerHost(host: InputHost, signal: AbortSignal): void {
 		y: number,
 		opts: { hover?: boolean } = {},
 	): { code: string; obj: THREE.Object3D } | null => {
+		if (opts.hover && typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)')?.matches) return null
 		if (!host.tableGroup || !host.camera || host.viewerMode !== 'play' || !host.player) return null
 		const r = rect ?? (rect = canvas.getBoundingClientRect())
 		if (!r || !r.width || !r.height) return null
@@ -281,26 +292,12 @@ function attachPointerHost(host: InputHost, signal: AbortSignal): void {
 					if (code) return { code, obj: cur as THREE.Object3D }
 				}
 			}
-			if (opts.hover) return null
-		}
-		if (opts.hover) return null
-		// Generic fallback for any table: if no cabinet mesh list (or hit misses), walk the scene
-		// once on pointerdown (rare) — not on hover (60 Hz). This catches tables where buttons are
-		// plain primitives grouped under a cabinet node without isCabinetButton flag.
-		const hits = raycaster.intersectObject(host.tableGroup, true)
-		for (const h of hits) {
-			for (let cur: any = (h as any).object; cur; cur = cur.parent) {
-				const code: string | null =
-					cur.userData?.buttonCode ??
-					cur.userData?.__buttonCode ??
-					(cur.userData?.isCabinetButton ? cur.userData.buttonCode : null)
-				if (code) return { code, obj: (h as any).object as THREE.Object3D }
-			}
 		}
 		return null
 	}
 
 	const scheduleHover = (x: number, y: number): void => {
+		if (typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)')?.matches) return
 		hoverX = x
 		hoverY = y
 		if (hoverRaf) return
@@ -313,42 +310,73 @@ function attachPointerHost(host: InputHost, signal: AbortSignal): void {
 		})
 	}
 
+	function attachMobileControls(): void {
+		const wrap = document.getElementById('mobile-controls') as HTMLElement | null
+		if (!wrap) return
+		for (const btn of wrap.querySelectorAll('button[data-code]')) {
+			const code = (btn as HTMLElement).getAttribute('data-code')!
+			const onDown = (e: PointerEvent) => {
+				if (host.viewerMode !== 'play') {
+					host.enterPlayMode()
+					return
+				}
+				e.preventDefault()
+				e.stopPropagation()
+				if ((btn as HTMLElement).hasAttribute('data-pressed')) return
+				;(btn as HTMLElement).setAttribute('data-pressed', code)
+				send(code, true)
+				try {
+					;(btn as HTMLElement).setPointerCapture((e as any).pointerId)
+				} catch {}
+			}
+			const onUp = (e: PointerEvent) => {
+				if (!(btn as HTMLElement).hasAttribute('data-pressed')) return
+				;(btn as HTMLElement).removeAttribute('data-pressed')
+				e.preventDefault()
+				e.stopPropagation()
+				send(code, false)
+				try {
+					;(btn as HTMLElement).releasePointerCapture((e as any).pointerId)
+				} catch {}
+			}
+			btn.addEventListener('pointerdown', onDown as any, { signal, passive: false } as any)
+			btn.addEventListener('pointerup', onUp as any, { signal } as any)
+			btn.addEventListener('pointercancel', onUp as any, { signal } as any)
+			btn.addEventListener('pointerleave', onUp as any, { signal } as any)
+			btn.addEventListener('contextmenu', (e: Event) => e.preventDefault(), { signal } as any)
+		}
+	}
+
+	attachMobileControls()
+
 	canvas.addEventListener(
 		'pointerdown',
 		(e: PointerEvent) => {
 			if (e.button !== 0 && e.button !== 2) return
+			if (host.viewerMode !== 'play') {
+				host.enterPlayMode()
+				return
+			}
 			const isRightClick = e.button === 2
-			const hit = hitFor(e.clientX, e.clientY, { hover: false })
-			const code = isRightClick ? '__nudge' : (hit?.code ?? zoneFor(e.clientX, e.clientY))
+			const code = isRightClick ? '__nudge' : zoneFor(e.clientX, e.clientY)
 			active.set(e.pointerId, code)
 			swipeStart.set(e.pointerId, { x: e.clientX, y: e.clientY, t: performance.now() })
 
-			if (!isRightClick) {
-				const key = keyForCode(code)
-				const location = locationForCode(code)
-				const ev = { code, key, location, ts: Date.now() } as any
-				host.player?.onKeyDown(ev)
-				if (host.physicsSab) {
-					const dik = keyEventToDirectInputKey(ev)
-					if (dik) pushInput(host.physicsSab, 1, dik, Date.now())
-				}
-			}
+			if (!isRightClick) send(code, true)
 
-			if (hit) {
-				canvas.setAttribute('data-pressed', code)
-				e.stopPropagation()
-				if (host.controls) {
-					const c: any = host.controls
-					if (c._inputPrevEnabled == null) c._inputPrevEnabled = c.enabled
-					c.enabled = false
-				}
+			canvas.setAttribute('data-pressed', code)
+			if (host.controls) {
+				const c: any = host.controls
+				if (c._inputPrevEnabled == null) c._inputPrevEnabled = c.enabled
+				c.enabled = false
 			}
-
-			canvas.setPointerCapture(e.pointerId)
-			if (host.viewerMode === 'play') e.preventDefault()
-			if (isRightClick) e.preventDefault()
+			try {
+				canvas.setPointerCapture(e.pointerId)
+			} catch {}
+			e.preventDefault()
+			e.stopPropagation()
 		},
-		{ signal },
+		{ signal, passive: false } as any,
 	)
 
 	const end = (e: PointerEvent): void => {
@@ -356,16 +384,7 @@ function attachPointerHost(host: InputHost, signal: AbortSignal): void {
 		if (!code) return
 		active.delete(e.pointerId)
 
-		if (code !== '__nudge') {
-			const key = keyForCode(code)
-			const location = locationForCode(code)
-			const ev = { code, key, location, ts: Date.now() } as any
-			host.player?.onKeyUp(ev)
-			if (host.physicsSab) {
-				const dik = keyEventToDirectInputKey(ev)
-				if (dik) pushInput(host.physicsSab, 0, dik, Date.now())
-			}
-		}
+		if (code !== '__nudge') send(code, false)
 
 		if (active.size === 0) canvas.removeAttribute('data-pressed')
 
@@ -391,11 +410,13 @@ function attachPointerHost(host: InputHost, signal: AbortSignal): void {
 			}
 		}
 
-		canvas.releasePointerCapture(e.pointerId)
+		try {
+			canvas.releasePointerCapture(e.pointerId)
+		} catch {}
 	}
 
-	canvas.addEventListener('pointerup', end as any, { signal })
-	canvas.addEventListener('pointercancel', end as any, { signal })
+	canvas.addEventListener('pointerup', end as any, { signal, passive: false } as any)
+	canvas.addEventListener('pointercancel', end as any, { signal, passive: false } as any)
 	canvas.addEventListener('pointermove', (e: PointerEvent) => scheduleHover(e.clientX, e.clientY), {
 		signal,
 		passive: true,
