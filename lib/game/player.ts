@@ -356,6 +356,10 @@ export class ChangedStates<STATE extends ItemState = ItemState> {
 	get states(): STATE[] {
 		return Object.values(this.changedStates)
 	}
+	get isEmpty(): boolean {
+		for (const _ in this.changedStates) return false
+		return true
+	}
 
 	public static claim(): ChangedStates {
 		return new ChangedStates()
@@ -367,7 +371,7 @@ export class ChangedStates<STATE extends ItemState = ItemState> {
 		return this.changedStates[name] as S
 	}
 	public release(): void {
-		for (const k of this.keys) {
+		for (const k in this.changedStates) {
 			this.changedStates[k]?.release()
 			delete this.changedStates[k]
 		}

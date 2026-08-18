@@ -876,27 +876,13 @@ export class Viewer {
 			changed?.release?.()
 			return
 		}
+		const states = changed.changedStates
 		const changedLightNames = new Set()
-		for (const name of changed.keys || Object.keys(changed.changedStates || {})) {
-			const state = changed.getState ? changed.getState(name) : changed.changedStates[name]
+		for (const name in states) {
+			const state = states[name]
 			if (!state) continue
-			if (this.table.lights && this.table.lights[name]) changedLightNames.add(name)
-			let entry = this.nodeCache.get(name)
-			if (!entry) {
-				let node = null
-				this.tableGroup.traverse(o => {
-					if (!node && o.name === name) node = o
-				})
-				if (!node) node = this.tableGroup.getObjectByName(name)
-				const item = this.table.items[name] || this.player?.balls.find(b => b.getName() === name)
-				if (item?.getUpdater && node) {
-					entry = {
-						item,
-						node,
-					}
-					this.nodeCache.set(name, entry)
-				}
-			}
+			if (this.table.lights?.[name]) changedLightNames.add(name)
+			const entry = this.nodeCache.get(name)
 			if (!entry) continue
 			entry.item.getUpdater().applyState(entry.node, state, this.renderApi, this.table)
 		}
@@ -1948,13 +1934,13 @@ export class Viewer {
 			this.player.updatePhysics()
 			this.player.updateAnimations(this.player.getGameTime())
 			const changed = this.player.popStates()
-			if (changed.keys.length) {
+			if (!changed.isEmpty) {
 				this.applyChangedStates(changed)
 				if (!this._disposed && !isPinLoading()) {
 					if (this.composer) this.composer.render()
 					else this.renderer.render(this.scene, this.camera)
 				}
-			} else changed.release?.()
+			} else changed.release()
 		}
 		const physicsLoop = () => {
 			if (this._disposed) return
@@ -1988,8 +1974,8 @@ export class Viewer {
 			if (this.player && this.viewerMode === 'play' && !this.isPaused) {
 				this.player.updateAnimations(this.player.getGameTime())
 				const changed = this.player.popStates()
-				if (changed.keys.length) this.applyChangedStates(changed)
-				else changed.release?.()
+				if (!changed.isEmpty) this.applyChangedStates(changed)
+				else changed.release()
 			}
 			if (this.composer) this.composer.render()
 			else this.renderer.render(this.scene, this.camera)
