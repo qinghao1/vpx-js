@@ -14,6 +14,8 @@ export const QUALITY_MAX_LIGHTS = {
 
 export function isPlayMode(): boolean {
 	try {
+		if (typeof document !== 'undefined' && document.body?.classList?.contains('is-play')) return true
+		if (typeof window !== 'undefined' && (window as any).viewer?.viewerMode === 'play') return true
 		if (typeof location === 'undefined') return false
 		const p = new URLSearchParams(location.search)
 		if (p.get('mode') === 'play') return true
@@ -26,7 +28,7 @@ export function isPlayMode(): boolean {
 
 export function getEffectiveCaps(): { playfield: number; other: number; floor: number; aniso: number } {
 	if (isLowQuality()) return QUALITY_CAPS.low
-	if (isPlayMode()) return { playfield: 4096, other: 2048, floor: 1024, aniso: 4 }
+	if (isPlayMode()) return { playfield: 2048, other: 1024, floor: 512, aniso: 1 }
 	return QUALITY_CAPS.high
 }
 
@@ -87,7 +89,9 @@ export function getQuality(): Quality {
 }
 
 export function getMaxLights(): number {
-	return isLowQuality() ? QUALITY_MAX_LIGHTS.low : QUALITY_MAX_LIGHTS.high
+	if (isLowQuality()) return QUALITY_MAX_LIGHTS.low
+	if (isPlayMode()) return 16
+	return QUALITY_MAX_LIGHTS.high
 }
 
 export function getTargetPixelRatio(mode?: string): number {

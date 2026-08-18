@@ -29,10 +29,12 @@ export const ensureGlobals = () => {
 }
 
 export {
+	getEffectiveCaps,
 	getMaxLights,
 	getQuality,
 	getTargetPixelRatio,
 	isLowQuality,
+	isPlayMode,
 	QUALITY_CAPS,
 	QUALITY_MAX_LIGHTS,
 } from '../../dist-esm/lib/util/quality.js'

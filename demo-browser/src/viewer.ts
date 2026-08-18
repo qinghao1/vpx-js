@@ -56,10 +56,11 @@ import {
 	isDev as _isDev,
 	ensureBvh,
 	ensureGlobals,
+	getEffectiveCaps,
 	getMaxLights,
 	getTargetPixelRatio,
 	isLowQuality,
-	QUALITY_CAPS,
+	isPlayMode,
 } from './env.js'
 import { attachInput } from './input.js'
 import { createHarness } from './log-overlay.js'
@@ -330,7 +331,8 @@ export class Viewer {
 			}
 		})()
 		const low = isLowQuality()
-		const useAA = wantAA && !isSwiftShader && !low
+		const isPlay = this.viewerMode === 'play'
+		const useAA = wantAA && !isSwiftShader && !low && !isPlay
 		if (!renderer) {
 			const alpha = !low
 			const baseOpts: any = {
@@ -359,7 +361,7 @@ export class Viewer {
 			backend = 'webgl'
 		}
 		renderer.setPixelRatio(getTargetPixelRatio(this.viewerMode))
-		renderer.sortObjects = !low
+		renderer.sortObjects = !low && !isPlay
 		renderer.shadowMap.enabled = false
 		if (p.has('shadows')) {
 			this.log(
@@ -385,7 +387,7 @@ export class Viewer {
 		}
 		const exposureFor = ex => Math.max(0.1, Math.min(2, Number.isFinite(ex) ? ex : 1))
 		const applyTone = (r, data) => {
-			if (low) {
+			if (low || isPlay) {
 				r.toneMapping = THREE.NoToneMapping
 				r.toneMappingExposure = 1
 			} else {
@@ -409,7 +411,7 @@ export class Viewer {
 		// Generic fix: HDR EffectComposer (HalfFloat) + OutputPass so additive HDR (alpha/100) sums linear then tonemaps once.
 		// Matches primitive.cpp:1171 convertColor(alpha/100) premul and fs_unshaded.sc result*tex, then fb tonemap.
 		this.composer = null
-		if (!low && backend.startsWith('webgl')) {
+		if (!low && !isPlay && backend.startsWith('webgl')) {
 			try {
 				const { EffectComposer } = await import('three/addons/postprocessing/EffectComposer.js')
 				const { RenderPass } = await import('three/addons/postprocessing/RenderPass.js')
@@ -565,10 +567,18 @@ export class Viewer {
 		this.viewerMode = 'play'
 		if (this.renderer) {
 			this.renderer.setPixelRatio(getTargetPixelRatio('play'))
-			this.renderer.sortObjects = !isLowQuality()
+			this.renderer.sortObjects = false
+			this.renderer.toneMapping = THREE.NoToneMapping
+			this.renderer.toneMappingExposure = 1
 		}
 		this._hidePlayTip?.()
-		hideCabFlippers(this.tableGroup)
+		hideCab(this.tableGroup)
+		{
+			const maxLights = getMaxLights()
+			const culled = cullExcessLights(this.tableGroup, maxLights)
+			if (culled)
+				this.log(`[quality] play — lights ${culled.before} → ${culled.after} (culled ${culled.culled})`, 'info')
+		}
 		this._syncChrome()
 		if (this.player) {
 			this.player.setPhysicsEnabled(true)
@@ -598,7 +608,11 @@ export class Viewer {
 	async _switchToViewer() {
 		if (this.viewerMode !== 'play' || !this.tableGroup) return
 		this.viewerMode = 'viewer'
-		if (this.renderer) this.renderer.setPixelRatio(getTargetPixelRatio('viewer'))
+		if (this.renderer) {
+			this.renderer.setPixelRatio(getTargetPixelRatio('viewer'))
+			this.renderer.sortObjects = !isLowQuality()
+			this._applyTableToneMapping?.(this.table)
+		}
 		this._hidePlayTip?.()
 		showCab(this.tableGroup)
 		this._syncChrome()
@@ -776,7 +790,7 @@ export class Viewer {
 		if (this.renderer) this.renderer.shadowMap.enabled = false
 		if (this.controls) this.controls.enabled = false
 		this._ensurePhysicsWorker()
-		if (this.tableGroup) hideCabFlippers(this.tableGroup)
+		if (this.tableGroup) hideCab(this.tableGroup)
 		{
 			const framing = this.tableGroup ? computePlayFraming(this.tableGroup) : null
 			const center = framing?.center ?? new THREE.Vector3()
@@ -1064,11 +1078,14 @@ export class Viewer {
 			...TABLE_OPTS,
 			preloadTextures: false,
 		})
-		if (isLowQuality()) {
+		{
 			const maxLights = getMaxLights()
 			const culled = cullExcessLights(node, maxLights)
 			if (culled)
-				this.log(`[quality] low — lights ${culled.before} → ${culled.after} (culled ${culled.culled})`, 'info')
+				this.log(
+					`[quality] ${isLowQuality() ? 'low' : isPlayMode() ? 'play' : 'high'} — lights ${culled.before} → ${culled.after} (culled ${culled.culled})`,
+					'info',
+				)
 		}
 		{
 			const pfLower = table.getPlayfieldMap()?.toLowerCase()
@@ -1237,7 +1254,7 @@ export class Viewer {
 			harnessLog: this.harnessLog,
 			table,
 		})
-		if (this.viewerMode === 'play') hideCabFlippers(node)
+		if (this.viewerMode === 'play') hideCab(node)
 		const params = new URLSearchParams(location.search)
 		const useBatch = !params.has('nobatched')
 		if (useBatch && table && this.renderApi) {
@@ -1550,7 +1567,7 @@ export class Viewer {
 											tex.generateMipmaps = true
 											tex.minFilter = THREE.LinearMipmapLinearFilter
 											tex.magFilter = THREE.LinearFilter
-											tex.anisotropy = isLowQuality() ? QUALITY_CAPS.low.aniso : 8
+											tex.anisotropy = getEffectiveCaps().aniso
 											tex.needsUpdate = true
 										}
 										m.needsUpdate = true
@@ -1962,7 +1979,10 @@ export class Viewer {
 		}
 		const physicsLoop = () => {
 			if (this._disposed) return
-			;(this as any)._physicsTimeout = setTimeout(physicsLoop, isLowQuality() ? 16 : 8)
+			;(this as any)._physicsTimeout = setTimeout(
+				physicsLoop,
+				isLowQuality() || this.viewerMode === 'play' ? 16 : 8,
+			)
 			this._animTimeout = (this as any)._physicsTimeout
 			const pinLoading = isPinLoading()
 			if (pinLoading !== pinLoadingLogged) {
