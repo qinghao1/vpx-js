@@ -187,7 +187,11 @@ export function batchStaticOpaques(root: Group, table: Table, _renderApi: ThreeR
 			instanced.computeBoundingSphere()
 			;(instanced.geometry as any).computeBoundsTree?.({ includeInstances: true } as any)
 			root.add(instanced)
-			for (const mesh of meshes) mesh.visible = false
+			for (let i = 0; i < meshes.length; i++) {
+				const mesh = meshes[i] as unknown as { visible: boolean; userData: Record<string, unknown> }
+				mesh.visible = false
+				mesh.userData.__batched = { batched: instanced, instanceId: i, isInstanced: true }
+			}
 			count++
 			continue
 		}
@@ -206,7 +210,11 @@ export function batchStaticOpaques(root: Group, table: Table, _renderApi: ThreeR
 		batched.computeBoundingSphere()
 		;(batched.geometry as any).computeBoundsTree?.({ includeInstances: true } as any)
 		root.add(batched)
-		for (const mesh of meshes) mesh.visible = false
+		for (let i = 0; i < meshes.length; i++) {
+			const mesh = meshes[i] as unknown as { visible: boolean; userData: Record<string, unknown> }
+			mesh.visible = false
+			mesh.userData.__batched = { batched, instanceId: i }
+		}
 		count++
 	}
 	return count

@@ -112,8 +112,45 @@ export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, Poin
 		node.remove(...node.children)
 	}
 
+	private unbatchForTransform(obj: Object3D): void {
+		if (!obj) return
+		const traverse = (o: any): void => {
+			const info = o.userData?.__batched
+			if (info?.batched && typeof info.instanceId === 'number') {
+				try {
+					info.batched.setVisibleAt?.(info.instanceId, false)
+				} catch {}
+				o.visible = true
+				let anc: any = o.parent
+				while (anc && anc !== obj.parent) {
+					if (!anc.visible) anc.visible = true
+					if (anc === obj) break
+					anc = anc.parent
+				}
+				delete o.userData.__batched
+			}
+			if (o.children) for (const c of o.children) traverse(c)
+		}
+		traverse(obj)
+	}
+
+	private syncBatchedVisibility(obj: Object3D, isVisible: boolean): void {
+		if (!obj) return
+		const traverse = (o: any): void => {
+			const info = o.userData?.__batched
+			if (info?.batched && typeof info.instanceId === 'number') {
+				try {
+					info.batched.setVisibleAt?.(info.instanceId, !!isVisible)
+				} catch {}
+			}
+			if (o.children) for (const c of o.children) traverse(c)
+		}
+		traverse(obj)
+	}
+
 	public applyMatrixToNode(matrix: Matrix3D, obj: Object3D): void {
 		if (!obj) return
+		this.unbatchForTransform(obj)
 		const e = matrix.elements
 		ThreeRenderApi._scratchM4.set(
 			e[0],
@@ -141,6 +178,7 @@ export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, Poin
 
 	public applyVisibility(isVisible: boolean | number, obj: Object3D): void {
 		if (!obj) return
+		this.syncBatchedVisibility(obj, !!isVisible)
 		obj.visible = !!isVisible
 		for (const child of obj.children ?? []) child.visible = !!isVisible
 	}

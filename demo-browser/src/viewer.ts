@@ -875,26 +875,6 @@ export class Viewer {
 				}
 			}
 		}
-		if (this.viewerMode === 'play' && this.tableGroup) {
-			for (const mover of this.table.getMovables()) {
-				const name = mover.getName()
-				const dataVisible = (mover as unknown as { data?: { isVisible?: boolean } }).data?.isVisible
-				if (dataVisible === false) continue
-				const entry = this.nodeCache.get(name)
-				if (!entry) continue
-				const node = entry.node as unknown as THREE.Group
-				if (node && !node.visible) {
-					node.visible = true
-					node.traverse((o: any) => {
-						if (o.isMesh) o.visible = true
-					})
-				} else if (node) {
-					node.traverse((o: any) => {
-						if (o.isMesh && !o.visible && o.name.toLowerCase().includes('flipper')) o.visible = true
-					})
-				}
-			}
-		}
 		changed.release()
 	}
 	_emitModeChange() {
