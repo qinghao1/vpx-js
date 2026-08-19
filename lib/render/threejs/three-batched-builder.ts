@@ -90,10 +90,16 @@ export function batchStaticOpaques(root: Group, table: Table, _renderApi: ThreeR
 
 	const low = isLowQuality()
 	const isAnimated = (o: any): boolean => {
+		const isMovableOrAnim = (name: string): boolean => {
+			if (!name) return false
+			if (movables.has(name)) return true
+			if (animatables.has(name) && !primitives.has(name)) return true
+			return false
+		}
+		if (isMovableOrAnim(o.name)) return true
 		for (let p = o.parent; p && p !== root; p = p.parent) {
+			if (isMovableOrAnim(p.name)) return true
 			if (low) {
-				if (movables.has(p.name)) return true
-				if (animatables.has(p.name) && !primitives.has(p.name)) return true
 				if (primitives.has(p.name)) {
 					const prim: any = (table as any).primitives?.[p.name]
 					const frames = prim?.data?.mesh?.animationFrames?.length ?? 0
@@ -105,7 +111,6 @@ export function batchStaticOpaques(root: Group, table: Table, _renderApi: ThreeR
 				continue
 			}
 			if (primitives.has(p.name) || rubbers.has(p.name)) return true
-			if (movables.has(p.name) || animatables.has(p.name)) return true
 		}
 		return false
 	}
