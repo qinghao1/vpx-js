@@ -91,9 +91,9 @@ export function getMaxLights(): number {
 
 export function getTargetPixelRatio(_mode?: string): number {
 	if (isLowQuality()) {
-		if (_mode === 'play') return 0.5
+		if (_mode === 'play') return 0.4
 		try {
-			if (typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches) return 0.5
+			if (typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches) return 0.4
 		} catch {}
 		return 0.75
 	}

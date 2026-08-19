@@ -344,7 +344,7 @@ export class Viewer {
 					preserveDrawingBuffer: false,
 					powerPreference: 'high-performance',
 					premultipliedAlpha: true,
-					desynchronized: true,
+					desynchronized: !low,
 				}
 				ctx = (canvas.getContext('webgl2', ctxAttrs) as any) ?? canvas.getContext('webgl', ctxAttrs)
 			} catch {}
@@ -1641,6 +1641,15 @@ export class Viewer {
 						this.log(`[batch] Post-stream baked ${bakedRes} BatchedMesh`, 'info')
 						if (!isLowQuality()) buildBvhIdle(this.tableGroup)
 						else this.log('[bvh] low quality: skip post-batch BVH', 'debug')
+					} else {
+						setTimeout(() => {
+							if (this._disposed || !this.tableGroup) return
+							const retry = _batchStaticOpaques(this.tableGroup, table, this.renderApi)
+							if (retry) {
+								this.log(`[batch] Post-stream retry baked ${retry} BatchedMesh`, 'info')
+								if (!isLowQuality()) buildBvhIdle(this.tableGroup)
+							}
+						}, 600)
 					}
 				}
 			}
@@ -1907,6 +1916,7 @@ export class Viewer {
 		}
 		;(this as any)._tickPhysicsImmediate = () => {
 			if (!this.player || this.isPaused || this.viewerMode !== 'play') return
+			if (isLowQuality()) return
 			if (this._physicsSab && this._physicsScratch) trySnap(this._physicsSab, this._physicsScratch)
 			this.player.setPhysicsEnabled(true)
 			this.player.updatePhysics()
@@ -1920,10 +1930,13 @@ export class Viewer {
 				}
 			} else changed.release()
 		}
-		const physicsLoop = () => {
+		let renderSkip = 0
+		let lastDmd = 0
+		let lastRender = 0
+		const loop = () => {
 			if (this._disposed) return
-			;(this as any)._physicsTimeout = setTimeout(physicsLoop, isLowQuality() ? 16 : 8)
-			this._animTimeout = (this as any)._physicsTimeout
+			this._animRaf = requestAnimationFrame(loop)
+			this.animFrame = this._animRaf
 			const pinLoading = isPinLoading()
 			if (pinLoading !== pinLoadingLogged) {
 				pinLoadingLogged = pinLoading
@@ -1931,24 +1944,30 @@ export class Viewer {
 					pinLoading ? '[loop] PinMAME loading — pausing render' : '[loop] PinMAME ready — resuming render',
 				)
 			}
-			if (pinLoading) this.animFrame = this._animTimeout
-			tickPhysics()
-		}
-		physicsLoop()
-		let renderSkip = 0
-		let lastDmd = 0
-		const renderLoop = () => {
-			if (this._disposed) return
-			this._animRaf = requestAnimationFrame(renderLoop)
-			const pinLoading = isPinLoading()
-			if (!pinLoading) this.animFrame = this._animRaf
-			if (pinLoading) return
+			if (pinLoading) {
+				if (swiftShader) {
+					renderSkip = (renderSkip + 1) % 3
+					if (renderSkip !== 0) return
+				}
+				tickPhysics()
+				return
+			}
 			if (swiftShader) {
 				renderSkip = (renderSkip + 1) % 3
-				if (renderSkip !== 0) return
+				if (renderSkip !== 0) {
+					tickPhysics()
+					return
+				}
 			}
+			const nowRender = performance.now()
+			if (isLowQuality() && nowRender - lastRender < 15) {
+				tickPhysics()
+				return
+			}
+			lastRender = nowRender
 			if (this.controls?.enabled) this.controls.update()
 			this._applyNudgeVisual()
+			tickPhysics()
 			if (this.player && this.viewerMode === 'play' && !this.isPaused) {
 				this.player.updateAnimations(this.player.getGameTime())
 				const changed = this.player.popStates()
@@ -2020,8 +2039,9 @@ export class Viewer {
 				}
 			}
 		}
-		renderLoop()
+		loop()
 	}
+
 	_pollPinmame() {
 		if (!this._emuStartLogged) {
 			const emu = this.player?.getPhysics()?.emu

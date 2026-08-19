@@ -16,6 +16,7 @@ import type { HitPlane } from '../physics/hit-plane.js'
 import { HitQuadtree } from '../physics/hit-quadtree.js'
 import type { MoverObject } from '../physics/mover-object.js'
 import { logger } from '../util/logger.js'
+import { isLowQuality } from '../util/quality.js'
 import { type Vertex2D, Vertex3D } from '../util/vector.js'
 import { Ball } from '../vpt/ball/ball.js'
 import { BallData } from '../vpt/ball/ball-data.js'
@@ -32,6 +33,8 @@ import type { IBallCreationPosition, Player } from './player.js'
 
 const CLOCK_INIT_THRESHOLD_USEC = 1_000_000
 const MAX_CATCHUP_USEC = 50 * PHYSICS_STEPTIME
+const MAX_CATCHUP_USEC_LOW = 16 * PHYSICS_STEPTIME
+const MAX_ITER_LOW = 16
 
 /** Core physics loop — 1 kHz collision, timers, movers.
  * @see https://github.com/vpinball/vpinball/blob/master/player.cpp */
@@ -196,8 +199,9 @@ export class PlayerPhysics {
 			this.nextPhysicsFrameTime += delta
 			this.curPhysicsFrameTime = initial
 		}
-		if (time === undefined && initial - this.curPhysicsFrameTime > MAX_CATCHUP_USEC) {
-			const drift = initial - this.curPhysicsFrameTime - MAX_CATCHUP_USEC
+		const catchUpMax = isLowQuality() ? MAX_CATCHUP_USEC_LOW : MAX_CATCHUP_USEC
+		if (time === undefined && initial - this.curPhysicsFrameTime > catchUpMax) {
+			const drift = initial - this.curPhysicsFrameTime - catchUpMax
 			this.startTimeUsec += drift
 			this.curPhysicsFrameTime += drift
 			this.nextPhysicsFrameTime += drift
@@ -214,6 +218,13 @@ export class PlayerPhysics {
 		this.scriptPeriod = 0
 		let iterations = 0
 		while (this.curPhysicsFrameTime < initial) {
+			if (isLowQuality() && iterations >= MAX_ITER_LOW) {
+				const drift = initial - this.curPhysicsFrameTime
+				this.startTimeUsec += drift
+				this.curPhysicsFrameTime = initial
+				this.nextPhysicsFrameTime = initial + PHYSICS_STEPTIME
+				break
+			}
 			this.timeMsec = Math.floor((this.curPhysicsFrameTime - this.startTimeUsec) / 1000)
 			iterations++
 			const dt = (this.nextPhysicsFrameTime - this.curPhysicsFrameTime) * (1 / DEFAULT_STEPTIME)
