@@ -118,7 +118,13 @@ export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, Poin
 			const info = o.userData?.__batched
 			if (info?.batched && typeof info.instanceId === 'number') {
 				try {
-					info.batched.setVisibleAt?.(info.instanceId, false)
+					if (info.isInstanced) {
+						const m = new Matrix4().makeScale(0, 0, 0)
+						info.batched.setMatrixAt(info.instanceId, m)
+						info.batched.instanceMatrix.needsUpdate = true
+					} else {
+						info.batched.setVisibleAt?.(info.instanceId, false)
+					}
 				} catch {}
 				o.visible = true
 				let anc: any = o.parent
@@ -140,7 +146,15 @@ export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, Poin
 			const info = o.userData?.__batched
 			if (info?.batched && typeof info.instanceId === 'number') {
 				try {
-					info.batched.setVisibleAt?.(info.instanceId, !!isVisible)
+					if (info.isInstanced) {
+						if (!isVisible) {
+							const m = new Matrix4().makeScale(0, 0, 0)
+							info.batched.setMatrixAt(info.instanceId, m)
+							info.batched.instanceMatrix.needsUpdate = true
+						}
+					} else {
+						info.batched.setVisibleAt?.(info.instanceId, !!isVisible)
+					}
 				} catch {}
 			}
 			if (o.children) for (const c of o.children) traverse(c)
