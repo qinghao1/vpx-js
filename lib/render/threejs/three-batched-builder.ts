@@ -9,6 +9,7 @@ import {
 	type Mesh,
 	type MeshStandardMaterial,
 } from 'three'
+import { isLowQuality } from '../../util/quality.js'
 import { loadMesh } from '../../vpt/mesh-loader.js'
 import type { Table } from '../../vpt/table/table.js'
 import { ThreeMeshGenerator } from './three-mesh-generator.js'
@@ -87,8 +88,22 @@ export function batchStaticOpaques(root: Group, table: Table, _renderApi: ThreeR
 	const rubbers = new Set(Object.values(table.rubbers).map(r => r.getName()))
 	const animatables = new Set(table.getAnimatables().map(a => a.getName()))
 
+	const low = isLowQuality()
 	const isAnimated = (o: any): boolean => {
 		for (let p = o.parent; p && p !== root; p = p.parent) {
+			if (low) {
+				if (movables.has(p.name)) return true
+				if (animatables.has(p.name) && !primitives.has(p.name)) return true
+				if (primitives.has(p.name)) {
+					const prim: any = (table as any).primitives?.[p.name]
+					const frames = prim?.data?.mesh?.animationFrames?.length ?? 0
+					if (frames > 0) return true
+					if (prim?.data?.isCollidable) return false
+					continue
+				}
+				if (rubbers.has(p.name)) return true
+				continue
+			}
 			if (primitives.has(p.name) || rubbers.has(p.name)) return true
 			if (movables.has(p.name) || animatables.has(p.name)) return true
 		}
@@ -149,7 +164,7 @@ export function batchStaticOpaques(root: Group, table: Table, _renderApi: ThreeR
 				hasIndex = true
 			}
 		}
-		if (totalVerts < VERTEX_THRESHOLD) continue
+		if (totalVerts < VERTEX_THRESHOLD && !low) continue
 		const uniqueGeos = new Set(meshes.map(m => geoHash(m.geometry as BufferGeometry)))
 		if (uniqueGeos.size === 1 && meshes.length >= 3) {
 			const baseGeo = meshes[0].geometry as BufferGeometry

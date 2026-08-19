@@ -545,7 +545,7 @@ export class Viewer {
 			this.renderer.sortObjects = false
 		}
 		this._hidePlayTip?.()
-		hideCabFlippers(this.tableGroup)
+		;(isLowQuality() ? hideCab : hideCabFlippers)(this.tableGroup)
 		this._syncChrome()
 		if (this.player) {
 			this.player.setPhysicsEnabled(true)
@@ -753,7 +753,7 @@ export class Viewer {
 		if (this.renderer) this.renderer.shadowMap.enabled = false
 		if (this.controls) this.controls.enabled = false
 		this._ensurePhysicsWorker()
-		if (this.tableGroup) hideCabFlippers(this.tableGroup)
+		if (this.tableGroup) (isLowQuality() ? hideCab : hideCabFlippers)(this.tableGroup)
 		{
 			const framing = this.tableGroup ? computePlayFraming(this.tableGroup) : null
 			const center = framing?.center ?? new THREE.Vector3()
@@ -1203,7 +1203,7 @@ export class Viewer {
 			harnessLog: this.harnessLog,
 			table,
 		})
-		if (this.viewerMode === 'play') hideCabFlippers(node)
+		if (this.viewerMode === 'play') (isLowQuality() ? hideCab : hideCabFlippers)(node)
 		const params = new URLSearchParams(location.search)
 		const useBatch = !params.has('nobatched')
 		if (useBatch && table && this.renderApi) {

@@ -713,6 +713,10 @@ export function postProcessScene(
 				mesh.geometry?.computeBoundingSphere?.()
 				mesh.geometry?.computeBoundingBox?.()
 				stats.vlmFixed++
+				if (isLowQuality() && mat.transparent && mat.opacity === 0) {
+					hideMesh(mesh, null, stats)
+					break
+				}
 				continue
 			}
 			const pendingGeneric =

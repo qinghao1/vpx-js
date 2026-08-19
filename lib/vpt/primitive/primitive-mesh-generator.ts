@@ -3,6 +3,7 @@
 
 import { MathUtils } from 'three'
 import { Matrix3D } from '../../util/matrix.js'
+import { isLowQuality } from '../../util/quality.js'
 import { Vertex3DNoTex2 } from '../../util/vertex.js'
 import { Mesh } from '../mesh.js'
 import type { Table } from '../table/table.js'
@@ -19,7 +20,16 @@ export class PrimitiveMeshGenerator {
 		const mesh = this.data.use3DMesh
 			? this.data.mesh.clone(`primitive-${this.data.getName()}`)
 			: this.calculateBuiltinOriginal()
-		return mesh.transform(this.getMatrix(vpTable))
+		const transformed = mesh.transform(this.getMatrix(vpTable))
+		if (isLowQuality() && transformed.indices.length > 3000) {
+			const half: number[] = []
+			for (let i = 0; i < transformed.indices.length; i += 3) {
+				if ((i / 3) % 2 === 0)
+					half.push(transformed.indices[i]!, transformed.indices[i + 1]!, transformed.indices[i + 2]!)
+			}
+			if (half.length >= 3) transformed.indices = half
+		}
+		return transformed
 	}
 
 	private calculateBuiltinOriginal(): Mesh {
