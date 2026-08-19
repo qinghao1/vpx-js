@@ -404,7 +404,7 @@ function attachPointerHost(host: InputHost, signal: AbortSignal): void {
 			const dx = e.clientX - s.x
 			const dy = e.clientY - s.y
 			const dt = performance.now() - s.t
-			if (dt < 600 && Math.hypot(dx, dy) > 50) {
+			if (dt < 400 && Math.hypot(dx, dy) > 80) {
 				const ang = swipeNudge(dx, dy, NUDGE as any)
 				if (ang !== null) {
 					host.player?.nudge(ang, ang === NUDGE.back ? 2.0 : NUDGE.force)
