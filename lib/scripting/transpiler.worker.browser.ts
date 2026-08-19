@@ -35,8 +35,14 @@ if (typeof (globalThis as any).localStorage === 'undefined') {
 ;(self as any).localStorage = (globalThis as any).localStorage
 
 let transpileInWorker: ((p: any) => Promise<string>) | undefined
+const preload = import('./transpiler-worker-core.js')
+	.then((mod: any) => {
+		transpileInWorker = mod.transpileInWorker
+	})
+	.catch(() => {})
 
 self.onmessage = async (e: MessageEvent) => {
+	if (!transpileInWorker) await preload
 	if (!transpileInWorker) {
 		try {
 			const mod: any = await import('./transpiler-worker-core.js')

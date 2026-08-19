@@ -163,6 +163,12 @@ function getBrowserWorker(): Worker {
 	return browserWorker
 }
 
+export function warmTranspilerWorker(): void {
+	try {
+		if (typeof window !== 'undefined' && typeof document !== 'undefined') getBrowserWorker()
+	} catch {}
+}
+
 export async function transpileWithWorker(
 	vbs: string,
 	gf?: string,
@@ -171,19 +177,34 @@ export async function transpileWithWorker(
 ): Promise<string> {
 	const key = cacheKey(vbs, gf, go, td)
 	const mem = vbsMemCache.get(key)
-	if (mem) return mem
+	if (mem) {
+		try {
+			console.log(`[vbs] mem hit ${key.slice(0, 32)}… ${mem.length} chars`)
+		} catch {}
+		return mem
+	}
 
 	if (typeof indexedDB !== 'undefined') {
+		const t0 = Date.now()
 		const hit = await idbGet(key)
+		const dt = Date.now() - t0
 		if (typeof hit === 'string' && hit.length) {
+			try {
+				console.log(`[vbs] idb hit ${key.slice(0, 32)}… ${hit.length} chars in ${dt}ms`)
+			} catch {}
 			vbsMemCache.set(key, hit)
 			return hit
+		} else {
+			try {
+				console.log(`[vbs] idb miss ${key.slice(0, 32)}… (${dt}ms)`)
+			} catch {}
 		}
 	}
 	const isBrowser = typeof window !== 'undefined' && typeof document !== 'undefined'
 	let js: string
 	if (isBrowser) {
 		const w = getBrowserWorker()
+		const t1 = Date.now()
 		js = await new Promise<string>((resolve, reject) => {
 			const id = browserNextId++
 			browserPending.set(id, { resolve, reject })
@@ -195,6 +216,9 @@ export async function transpileWithWorker(
 				}
 			}, 20000)
 		})
+		try {
+			console.log(`[vbs] worker transpile ${js.length} chars in ${Date.now() - t1}ms`)
+		} catch {}
 	} else {
 		const w = await getNodeWorker()
 		js = await new Promise<string>((resolve, reject) => {

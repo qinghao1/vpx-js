@@ -225,6 +225,9 @@ export class Viewer {
 		this._setupModeSwitch()
 		this._setupDebugToggle()
 		this._syncChrome()
+		try {
+			void import('../../dist-esm/lib/scripting/transpiler-worker-pool.js').then(m => m.warmTranspilerWorker?.())
+		} catch {}
 	}
 	destroy() {
 		if (this._disposed) return

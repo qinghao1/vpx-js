@@ -347,7 +347,7 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 		if (opts.preloadTextures !== false) {
 			await renderApi.preloadTextures(Object.values(this.textures), this)
 		}
-		return this.meshGenerator?.generateTableNode(renderApi, opts)
+		return (await this.meshGenerator?.generateTableNode(renderApi, opts)) as NODE
 	}
 
 	public prepareToPlay(): void {

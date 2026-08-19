@@ -27,7 +27,7 @@ export class TableExporter {
 
 	private async export<T>(opts: TableExportOptions): Promise<T> {
 		const renderApi = new ThreeRenderApi(opts)
-		const group = this.meshGenerator.generateTableNode(renderApi, opts)
+		const group = await this.meshGenerator.generateTableNode(renderApi, opts)
 		const scene = new Scene()
 		scene.name = 'table'
 		scene.add(group)

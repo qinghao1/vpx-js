@@ -3,6 +3,7 @@
 
 import { CatmullCurve2D } from './catmull-curve.js'
 import { DragPoint } from './dragpoint.js'
+import { isLowQuality } from './quality.js'
 import { Vertex2D } from './vector.js'
 import { RenderVertex } from './vertex.js'
 
@@ -67,7 +68,8 @@ export class SplineVertex {
 		acc: number,
 		staticRendering = true,
 	): RenderVertex[] {
-		const accuracy = acc !== -1 ? acc : 4 * 10 ** ((10 - (staticRendering ? 10 : detail)) / 1.5)
+		const effDetail = isLowQuality() ? Math.min(detail, 6) : detail
+		const accuracy = acc !== -1 ? acc : 4 * 10 ** ((10 - (staticRendering ? 10 : effDetail)) / 1.5)
 		return DragPoint.getRgVertex(dragPoints, () => new RenderVertex(), CatmullCurve2D.fromVertex2D, true, accuracy)
 	}
 }

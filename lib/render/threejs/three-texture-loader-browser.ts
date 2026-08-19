@@ -84,8 +84,7 @@ export function effectiveMax(_isFloat: boolean, name?: string): number {
 	const isPlayfield = !!name && RE_PLAYFIELD.test(name)
 	const low = isLowQuality()
 	const caps = low ? QUALITY_CAPS.low : getEffectiveCaps()
-	const highCaps = QUALITY_CAPS.high
-	if (isPlayfield) return Math.min(hw, low ? highCaps.playfield : caps.playfield)
+	if (isPlayfield) return Math.min(hw, caps.playfield)
 	const swift = isSwiftShader()
 	let cap: number
 	if (swift) cap = 1024
@@ -105,12 +104,10 @@ export function _testResetTextureLimits(): void {
 
 function tune(tex: any, name?: string): void {
 	const caps = getEffectiveCaps()
-	const n = name ?? (tex as any)?.name ?? ''
-	const isPlayfield = RE_PLAYFIELD.test(String(n))
 	tex.generateMipmaps = true
 	tex.minFilter = LinearMipMapLinearFilter
 	tex.magFilter = LinearFilter
-	tex.anisotropy = isPlayfield ? Math.max(caps.aniso, isLowQuality() ? 4 : 16) : caps.aniso
+	tex.anisotropy = caps.aniso
 }
 
 function nameAndTune(tex: any, name: string): void {

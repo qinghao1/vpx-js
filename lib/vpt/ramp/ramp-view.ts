@@ -5,6 +5,7 @@ import type { Meshes, RenderInfo } from '../../game/irenderable.js'
 import type { IRenderApi } from '../../render/irender-api.js'
 import { CatmullCurve3D } from '../../util/catmull-curve.js'
 import { Matrix3D } from '../../util/matrix.js'
+import { isLowQuality } from '../../util/quality.js'
 import { Vertex2D, Vertex3D } from '../../util/vector.js'
 import { RenderVertex3D, Vertex3DNoTex2 } from '../../util/vertex.js'
 import { DragPoint } from '../dragpoint.js'
@@ -185,11 +186,12 @@ export class RampMeshGenerator {
 
 	private generateWireMeshes(table: Table): Mesh[] {
 		let accuracy: number
-		if (table.getDetailLevel() < 5) accuracy = 6
+		if (isLowQuality()) accuracy = 4
+		else if (table.getDetailLevel() < 5) accuracy = 6
 		else if (table.getDetailLevel() < 8) accuracy = 8
 		else accuracy = Math.floor(table.getDetailLevel() * 1.3)
 		const mat = table.getMaterial(this.state.material)
-		if (!mat?.isOpacityActive) accuracy = 12
+		if (!mat?.isOpacityActive && !isLowQuality()) accuracy = 12
 
 		const rv = this.getRampVertex(table, -1, false)
 		const n = rv.pcvertex
@@ -396,6 +398,7 @@ export class RampMeshGenerator {
 		} else {
 			const mat = table.getMaterial(this.state.material)
 			accuracy = !mat?.isOpacityActive ? 10 : table.getDetailLevel()
+			if (isLowQuality()) accuracy = Math.min(accuracy, 6)
 		}
 		accuracy = 4 * 10 ** ((10 - accuracy) * (1 / 1.5))
 		return DragPoint.getRgVertex(

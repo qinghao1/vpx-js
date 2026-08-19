@@ -4,6 +4,7 @@
 import type { IRenderable } from '../../game/irenderable.js'
 import type { IRenderApi } from '../../render/irender-api.js'
 import { progress } from '../../util/logger.js'
+import { isLowQuality } from '../../util/quality.js'
 import type { Bumper } from '../bumper/bumper.js'
 import type { Flipper } from '../flipper/flipper.js'
 import type { ItemState } from '../item-state.js'
@@ -21,10 +22,10 @@ export class TableMeshGenerator {
 		this.table = table
 	}
 
-	public generateTableNode<NODE, GEOMETRY, POINT_LIGHT>(
+	public async generateTableNode<NODE, GEOMETRY, POINT_LIGHT>(
 		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
 		opts: TableGenerateOptions = {},
-	): NODE {
+	): Promise<NODE> {
 		progress().show('Generating table nodes')
 		opts = Object.assign({}, defaultOptions, opts)
 		const tableNode = renderApi.createParentNode('playfield')
@@ -59,7 +60,9 @@ export class TableMeshGenerator {
 			{ name: 'plungers', meshes: Object.values(this.table.plungers), enabled: !!opts.exportPlungers },
 		]
 
-		for (const group of renderGroups.filter(g => g.enabled)) {
+		const enabledGroups = renderGroups.filter(g => g.enabled)
+		for (let gi = 0; gi < enabledGroups.length; gi++) {
+			const group = enabledGroups[gi]!
 			progress().details(group.name)
 			const itemTypeGroup = renderApi.createParentNode(group.name)
 			for (const renderable of group.meshes) {
@@ -67,6 +70,9 @@ export class TableMeshGenerator {
 				renderApi.addChildToParent(itemTypeGroup, itemGroup)
 			}
 			renderApi.addChildToParent(tableNode, itemTypeGroup)
+			if (isLowQuality() && gi < enabledGroups.length - 1) {
+				await new Promise<void>(r => setTimeout(r, 0))
+			}
 		}
 
 		// light bulb lights

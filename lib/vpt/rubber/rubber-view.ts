@@ -5,6 +5,7 @@ import { MathUtils } from 'three'
 import type { IRenderApi } from '../../render/irender-api.js'
 import { HIT_SHAPE_DETAIL_LEVEL } from '../../util/dragpoint.js'
 import { Matrix3D } from '../../util/matrix.js'
+import { isLowQuality } from '../../util/quality.js'
 import { SplineVertex } from '../../util/spline-vertex.js'
 import { Vertex3D } from '../../util/vector.js'
 import { Vertex3DNoTex2 } from '../../util/vertex.js'
@@ -25,20 +26,16 @@ export class RubberMeshGenerator {
 
 	public getMeshes(table: Table, acc = -1, createHitShape = false): Mesh {
 		const mesh = new Mesh(`rubber-${this.data.getName()}`)
-		let accuracy =
-			acc !== -1
-				? acc
-				: table.getDetailLevel() < 5
-					? 6
-					: table.getDetailLevel() < 8
-						? 8
-						: Math.floor(table.getDetailLevel() * 1.3)
-		if (acc === -1) accuracy = Math.floor(10 * 1.2)
+		let accuracy: number
+		if (acc !== -1) accuracy = acc
+		else if (isLowQuality()) accuracy = 4
+		else accuracy = Math.floor(10 * 1.2)
 
+		const detail = isLowQuality() ? Math.min(table.getDetailLevel(), 6) : table.getDetailLevel()
 		const sv = SplineVertex.getInstance(
 			this.data.dragPoints,
 			this.data.thickness,
-			table.getDetailLevel(),
+			detail,
 			acc !== -1 ? 4 * 10 ** ((10 - HIT_SHAPE_DETAIL_LEVEL) * (1 / 1.5)) : -1,
 		)
 		const numRings = sv.pcvertex - 1
