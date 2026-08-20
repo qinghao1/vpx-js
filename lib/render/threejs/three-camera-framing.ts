@@ -1,15 +1,15 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import * as THREE from 'three'
+import { Box3, type Mesh, type Object3D, type PerspectiveCamera, Vector3 } from 'three'
 
 const RE_CAB = /vrcab|cabinet|lockbar|pincab/i
 const RE_VR = /vr_/i
 
 type FramingBox = {
-	box: THREE.Box3
-	center: THREE.Vector3
-	size: THREE.Vector3
+	box: Box3
+	center: Vector3
+	size: Vector3
 	maxDim: number
 }
 
@@ -24,11 +24,11 @@ type FramingConfig = {
 }
 
 type FramingState = {
-	center: THREE.Vector3
-	size: THREE.Vector3
+	center: Vector3
+	size: Vector3
 	maxDim: number
-	target: THREE.Vector3
-	position: THREE.Vector3
+	target: Vector3
+	position: Vector3
 	near: number
 	far: number
 }
@@ -36,18 +36,18 @@ type FramingState = {
 // vpinball: ViewSetup.cpp FitCameraToVertices() frames table via bounding vertices + FOV.
 // Demo heuristic mimics that without ViewSetup table data: use THREE.Box3 of visible meshes.
 // Center on playfield/apron/button cluster (excludeNonPlayfield), size from cabinet-excluded box.
-function framingBox(node: THREE.Object3D, exclude?: (name: string) => boolean): FramingBox {
+function framingBox(node: Object3D, exclude?: (name: string) => boolean): FramingBox {
 	node.updateMatrixWorld(true)
-	const box = new THREE.Box3().makeEmpty()
-	node.traverse((obj: THREE.Object3D) => {
-		const mesh = obj as THREE.Mesh
+	const box = new Box3().makeEmpty()
+	node.traverse((obj: Object3D) => {
+		const mesh = obj as Mesh
 		if (!mesh.isMesh || !mesh.visible || !mesh.geometry?.attributes?.position) return
 		if (exclude?.((obj.name ?? '').toLowerCase())) return
 		box.expandByObject(obj)
 	})
 	if (box.isEmpty() || !Number.isFinite(box.min.x)) box.setFromObject(node)
-	const center = box.getCenter(new THREE.Vector3())
-	const size = box.getSize(new THREE.Vector3())
+	const center = box.getCenter(new Vector3())
+	const size = box.getSize(new Vector3())
 	return { box, center, size, maxDim: Math.max(size.x, size.y, size.z) }
 }
 
@@ -73,7 +73,7 @@ const PLAY: FramingConfig = {
 }
 
 function framingState(
-	node: THREE.Object3D,
+	node: Object3D,
 	targetExclude: (name: string) => boolean,
 	sizeExclude: (name: string) => boolean,
 	cfg: FramingConfig,
@@ -87,13 +87,13 @@ function framingState(
 		size,
 		maxDim,
 		target: target.clone(),
-		position: new THREE.Vector3(target.x, target.y + dist * cfg.elev, target.z + dist * cfg.azim),
+		position: new Vector3(target.x, target.y + dist * cfg.elev, target.z + dist * cfg.azim),
 		near: Math.max(1, maxDim * cfg.near),
 		far: Math.max(cfg.farMin, maxDim * cfg.farScale),
 	}
 }
 
-export const computeViewerFraming = (node: THREE.Object3D): FramingState =>
+export const computeViewerFraming = (node: Object3D): FramingState =>
 	framingState(node, excludeNonPlayfield, excludeVrNonCab, VIEWER)
 
 const excludeLegsForPlay = (name: string): boolean =>
@@ -104,12 +104,12 @@ const excludeLegsForPlay = (name: string): boolean =>
 	name.includes('vr_mega') ||
 	name.includes('vr_mini')
 
-export const computePlayFraming = (node: THREE.Object3D): FramingState =>
+export const computePlayFraming = (node: Object3D): FramingState =>
 	framingState(node, excludeNonPlayfield, excludeLegsForPlay, PLAY)
 
 export function applyCameraState(
-	camera: THREE.PerspectiveCamera,
-	controls: { target: THREE.Vector3; update: () => void },
+	camera: PerspectiveCamera,
+	controls: { target: Vector3; update: () => void },
 	state: FramingState,
 ): void {
 	controls.target.copy(state.target)
@@ -122,9 +122,9 @@ export function applyCameraState(
 }
 
 export function frameCamera(
-	node: THREE.Object3D,
-	camera: THREE.PerspectiveCamera,
-	controls: { target: THREE.Vector3; update: () => void },
+	node: Object3D,
+	camera: PerspectiveCamera,
+	controls: { target: Vector3; update: () => void },
 ): Pick<FramingState, 'center' | 'size' | 'maxDim'> {
 	const state = computeViewerFraming(node)
 	applyCameraState(camera, controls, state)
