@@ -8,7 +8,7 @@ import {
 	RedFormat,
 	UnsignedByteType,
 } from 'three'
-import { color, Fn, float, fract, length, smoothstep, texture, uniform, uv, vec2, vec4 } from 'three/tsl'
+import { Fn, float, fract, length, smoothstep, texture, uniform, uv, vec2, vec4 } from 'three/tsl'
 import { MeshBasicNodeMaterial } from 'three/webgpu'
 
 export class GpuDmdNodeController {
