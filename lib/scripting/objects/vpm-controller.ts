@@ -46,10 +46,9 @@ export class VpmController {
 				if (v === true) this.switchCache.set(n, true)
 				else if (v === false) this.switchCache.set(n, false)
 				else if (v === undefined) this.switchCache.delete(n)
-				const f = (VpmController.FLIPTRONICS as Record<number, string>)[n]
+				const f = VpmController.FLIPTRONICS[n]
 				if (f && this.emulator instanceof Emulator) {
-					const key = f
-					this.emulator.setFliptronicsInput(key, v)
+					this.emulator.setFliptronicsInput(f, v)
 					return true
 				}
 				return this.emulator.setSwitchInput(n, v)

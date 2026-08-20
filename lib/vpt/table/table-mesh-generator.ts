@@ -4,7 +4,6 @@
 import type { IRenderable } from '../../game/irenderable.js'
 import type { IRenderApi } from '../../render/irender-api.js'
 import { progress } from '../../util/logger.js'
-import { isLowQuality } from '../../util/quality.js'
 import type { Bumper } from '../bumper/bumper.js'
 import type { Flipper } from '../flipper/flipper.js'
 import type { ItemState } from '../item-state.js'
@@ -71,9 +70,6 @@ export class TableMeshGenerator {
 				renderApi.addChildToParent(itemTypeGroup, itemGroup)
 			}
 			renderApi.addChildToParent(tableNode, itemTypeGroup)
-			if (isLowQuality() && gi < enabledGroups.length - 1) {
-				// yield to event loop in low quality mode (sync fallback for tests)
-			}
 		}
 
 		// light bulb lights
