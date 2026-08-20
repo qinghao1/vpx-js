@@ -60,6 +60,12 @@ export class VpxRenderPipeline {
 		;(this.renderer as any).toneMapping = resolveToneMapping(tm)
 	}
 
+	public updateBloomStrength(strength: number): void {
+		if (this.uBloomStrength && typeof this.uBloomStrength.value === 'number') {
+			this.uBloomStrength.value = strength
+		}
+	}
+
 	public render(): void {
 		this.pipeline.render()
 	}

@@ -1,7 +1,7 @@
 import type { Texture as ThreeTexture } from 'three'
 import * as THREE from 'three'
 import { AdditiveBlending, DoubleSide } from 'three'
-import { color, Fn, texture, uniform, uv, vec4 } from 'three/tsl'
+import { Fn, texture, uniform, uv, vec4 } from 'three/tsl'
 import { MeshBasicNodeMaterial } from 'three/webgpu'
 
 export function createAdditiveOverlayNodeMaterial(

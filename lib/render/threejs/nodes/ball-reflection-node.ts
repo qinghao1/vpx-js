@@ -2,6 +2,7 @@ import type { Texture as ThreeTexture } from 'three'
 import * as THREE from 'three'
 import { DoubleSide, EquirectangularReflectionMapping } from 'three'
 import { MeshStandardNodeMaterial } from 'three/webgpu'
+import { BALL_METALNESS, BALL_ROUGHNESS } from '../material-shared.js'
 
 export function createDynamicBallNodeMaterial(
 	envTexture: ThreeTexture,
@@ -11,8 +12,8 @@ export function createDynamicBallNodeMaterial(
 	envTexture.mapping = EquirectangularReflectionMapping
 	mat.envMap = envTexture
 	mat.envMapIntensity = 1.5
-	mat.metalness = 1.0
-	mat.roughness = 0.08
+	mat.metalness = BALL_METALNESS
+	mat.roughness = BALL_ROUGHNESS
 	mat.color = new THREE.Color(tintColor)
 	mat.side = DoubleSide
 	mat.depthWrite = true

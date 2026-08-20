@@ -52,12 +52,7 @@ export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, Poin
 		this.meshConvertOpts = opts ?? { applyMaterials: false }
 		this.mapGenerator = new ThreeMapGenerator(this.meshConvertOpts.applyTextures, gate)
 		this.nodeMaterialGenerator = new ThreeNodeMaterialGenerator(this.mapGenerator)
-		this.converter = new ThreeConverter(
-			this.meshGenerator,
-			this.mapGenerator,
-			this.nodeMaterialGenerator,
-			this.meshConvertOpts,
-		)
+		this.converter = new ThreeConverter(this.meshGenerator, this.nodeMaterialGenerator, this.meshConvertOpts)
 	}
 
 	public async preloadTextures(
