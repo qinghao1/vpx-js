@@ -47,9 +47,9 @@ const STRING_MAP: Record<string, string> = { MATR: 'szMaterial', IMAG: 'szImage'
 /** Rubber data.
  * @see https://github.com/vpinball/vpinball/blob/master/rubber.cpp */
 export class RubberData extends ItemData implements IPhysicalData {
-	public height: number = 25
-	public hitHeight: number = 25
-	public thickness: number = 8
+	public height = 25
+	public hitHeight = 25
+	public thickness = 8
 	public hitEvent = false
 	public szMaterial?: string
 	public szImage?: string

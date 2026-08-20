@@ -61,7 +61,7 @@ export class RampData extends ItemData implements IPhysicalData {
 	public hitEvent = false
 	public heightBottom = 0
 	public heightTop = 50
-	public imageAlignment: number = Enums.RampImageAlignment.ImageModeWorld
+	public imageAlignment = Enums.RampImageAlignment.ImageModeWorld
 	public imageWalls = true
 	public isCollidable = true
 	public isReflectionEnabled = true
@@ -69,7 +69,7 @@ export class RampData extends ItemData implements IPhysicalData {
 	public leftWallHeight = 62
 	public leftWallHeightVisible = 30
 	public overwritePhysics = true
-	public rampType: number = Enums.RampType.RampTypeFlat
+	public rampType = Enums.RampType.RampTypeFlat
 	public rightWallHeight = 62
 	public rightWallHeightVisible = 30
 	public scatter = 0
