@@ -6,6 +6,9 @@ import { SplineVertex } from '../../util/spline-vertex.js'
 import type { LightData } from '../../vpt/light/light-data.js'
 import type { Table } from '../../vpt/table/table.js'
 
+const ZERO_VEC2 = new Vector2(0, 0)
+const ZERO_SIDE_UVS = [ZERO_VEC2, ZERO_VEC2, ZERO_VEC2, ZERO_VEC2]
+
 /** Generates light insert meshes. */
 export class ThreeLightMeshGenerator {
 	public createLight(lightData: LightData, table: Table, depth = 5, bevel = 0.5): ExtrudeGeometry {
@@ -22,7 +25,7 @@ export class ThreeLightMeshGenerator {
 			bevelThickness: bevel,
 			UVGenerator: {
 				generateSideWallUV(): Vector2[] {
-					return [new Vector2(0, 0), new Vector2(0, 0), new Vector2(0, 0), new Vector2(0, 0)]
+					return ZERO_SIDE_UVS
 				},
 				generateTopUV(_g: ExtrudeGeometry, vertices: number[], a: number, b: number, c: number): Vector2[] {
 					const ax = vertices[a * 3]!,
@@ -55,8 +58,8 @@ export class ThreeLightMeshGenerator {
 
 	private getPathFromPoints<T extends Path>(points: Vector2[], path: T): T {
 		if (points.length === 0) throw new Error('Cannot get path from no points.')
-		path.moveTo(points[0]?.x, points[0]?.y)
-		for (const v of points.slice(1)) path.lineTo(v.x, v.y)
+		path.moveTo(points[0]!.x, points[0]!.y)
+		for (let i = 1; i < points.length; i++) path.lineTo(points[i]!.x, points[i]!.y)
 		return path
 	}
 }
