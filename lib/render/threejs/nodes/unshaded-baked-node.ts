@@ -1,6 +1,4 @@
-import type { Texture as ThreeTexture } from 'three'
-import * as THREE from 'three'
-import { DoubleSide, FrontSide } from 'three'
+import { Color, DoubleSide, FrontSide, type Texture as ThreeTexture } from 'three'
 import { Fn, texture, uniform, uv, vec4 } from 'three/tsl'
 import { MeshBasicNodeMaterial } from 'three/webgpu'
 
@@ -17,7 +15,7 @@ export interface BakedNodeMaterialOptions {
 export function createUnshadedBakedNodeMaterial(options: BakedNodeMaterialOptions): MeshBasicNodeMaterial {
 	const mat = new MeshBasicNodeMaterial()
 	const uEmissionScale = uniform(options.emissionScale ?? 1.0)
-	const uTintColor = uniform(new THREE.Color(options.tint ?? 0xffffff))
+	const uTintColor = uniform(new Color(options.tint ?? 0xffffff))
 	const texNode = texture(options.map, uv())
 
 	mat.colorNode = Fn(() => {

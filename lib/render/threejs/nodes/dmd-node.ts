@@ -1,12 +1,13 @@
-import * as THREE from 'three'
 import {
 	ClampToEdgeWrapping,
+	Color,
 	DataTexture,
 	DoubleSide,
 	NearestFilter,
 	NoColorSpace,
 	RedFormat,
 	UnsignedByteType,
+	Vector2,
 } from 'three'
 import { Fn, float, fract, length, smoothstep, texture, uniform, uv, vec2, vec4 } from 'three/tsl'
 import { MeshBasicNodeMaterial } from 'three/webgpu'
@@ -33,8 +34,8 @@ export class GpuDmdNodeController {
 		this.dataTexture.colorSpace = NoColorSpace
 		this.dataTexture.needsUpdate = true
 
-		this.uResolution = uniform(new THREE.Vector2(width, height))
-		this.uLedColor = uniform(new THREE.Color(0xff8800))
+		this.uResolution = uniform(new Vector2(width, height))
+		this.uLedColor = uniform(new Color(0xff8800))
 		this.uDotRadius = uniform(0.42)
 		this.uGlowIntensity = uniform(0.18)
 		this.uDynamicScale = uniform(1.0)
@@ -99,12 +100,12 @@ export class GpuDmdNodeController {
 			const newBuf = new Uint8Array(width * height)
 			newBuf.set(rawFrame.subarray(0, width * height))
 			this.dataTexture = new DataTexture(newBuf, width, height, RedFormat, UnsignedByteType)
-			this.dataTexture.magFilter = THREE.NearestFilter
-			this.dataTexture.minFilter = THREE.NearestFilter
+			this.dataTexture.magFilter = NearestFilter
+			this.dataTexture.minFilter = NearestFilter
 			this.dataTexture.generateMipmaps = false
-			this.dataTexture.wrapS = THREE.ClampToEdgeWrapping
-			this.dataTexture.wrapT = THREE.ClampToEdgeWrapping
-			this.dataTexture.colorSpace = THREE.NoColorSpace
+			this.dataTexture.wrapS = ClampToEdgeWrapping
+			this.dataTexture.wrapT = ClampToEdgeWrapping
+			this.dataTexture.colorSpace = NoColorSpace
 			this.dataTexture.needsUpdate = true
 			this.material.map = this.dataTexture
 			if (this.texNode) this.texNode.value = this.dataTexture

@@ -1,6 +1,4 @@
-import type { Texture as ThreeTexture } from 'three'
-import * as THREE from 'three'
-import { AdditiveBlending, DoubleSide } from 'three'
+import { AdditiveBlending, Color, DoubleSide, type Texture as ThreeTexture } from 'three'
 import { Fn, texture, uniform, uv, vec4 } from 'three/tsl'
 import { MeshBasicNodeMaterial } from 'three/webgpu'
 
@@ -11,7 +9,7 @@ export function createAdditiveOverlayNodeMaterial(
 ): MeshBasicNodeMaterial {
 	const mat = new MeshBasicNodeMaterial()
 	const uIntensity = uniform(initialIntensity)
-	const uTint = uniform(new THREE.Color(tint))
+	const uTint = uniform(new Color(tint))
 	const texNode = texture(map, uv())
 
 	mat.colorNode = Fn(() => {
