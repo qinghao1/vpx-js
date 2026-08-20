@@ -4,6 +4,13 @@
 import { VbsError } from './stdlib/err.js'
 import { UNDEF, VbsUndefined } from './vbs-undefined.js'
 
+function normalizeKey(key: string | symbol): string | symbol {
+	if (typeof key === 'symbol') return key
+	if (key === 'undefined' || key === 'null' || key == null) return '0'
+	if (typeof key === 'object' && (key as any)?.[UNDEF] === true) return '0'
+	return key
+}
+
 /** VBS array — returns VbsUndefined for missing indices. */
 export class VbsArray<T> implements ProxyHandler<VbsArray<T>> {
 	[key: number]: T
@@ -12,13 +19,11 @@ export class VbsArray<T> implements ProxyHandler<VbsArray<T>> {
 		return new Proxy<VbsArray<T>>((items ?? []) as unknown as VbsArray<T>, this)
 	}
 
-	public get(target: unknown, key: string | symbol): T | VbsUndefined {
-		if (key === UNDEF || typeof key === 'symbol') {
-			return (target as Record<string | symbol, unknown>)[key] as T
+	public get(target: unknown, rawKey: string | symbol): T | VbsUndefined {
+		if (rawKey === UNDEF || typeof rawKey === 'symbol') {
+			return (target as Record<string | symbol, unknown>)[rawKey] as T
 		}
-		if (key === 'undefined' || key === 'null') key = '0'
-		else if (key != null && typeof key === 'object' && (key as Record<symbol, unknown>)[UNDEF] === true) key = '0'
-		else if (key == null) key = '0'
+		const key = normalizeKey(rawKey)
 		if (typeof key === 'string' && /^-?\d+$/.test(key)) {
 			const n = Number(key)
 			const t = target as unknown as Record<number, unknown>
@@ -33,10 +38,8 @@ export class VbsArray<T> implements ProxyHandler<VbsArray<T>> {
 				)
 	}
 
-	public set(target: unknown, key: string | symbol, value: unknown): boolean {
-		if (key === 'undefined' || key === 'null') key = '0'
-		else if (key != null && typeof key === 'object' && (key as Record<symbol, unknown>)[UNDEF] === true) key = '0'
-		else if (key == null) key = '0'
+	public set(target: unknown, rawKey: string | symbol, value: unknown): boolean {
+		const key = normalizeKey(rawKey)
 		if (typeof key === 'string' && /^-?\d+$/.test(key)) {
 			const n = Number(key)
 			;(target as Record<number, unknown>)[n] = value

@@ -51,7 +51,6 @@ export class VbsUndefined implements ProxyHandler<any> {
 	}
 
 	public has(_target: any, p: string | number | symbol): boolean {
-		if (p === Symbol.iterator || p === UNDEF) return true
-		return false
+		return p === Symbol.iterator || p === UNDEF
 	}
 }
