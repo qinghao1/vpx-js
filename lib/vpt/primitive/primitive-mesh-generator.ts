@@ -10,10 +10,7 @@ import type { PrimitiveData } from './primitive-data.js'
 
 /** Generates primitive built-in mesh. @see https://github.com/vpinball/vpinball/blob/master/primitive.cpp */
 export class PrimitiveMeshGenerator {
-	private readonly data: PrimitiveData
-	constructor(data: PrimitiveData) {
-		this.data = data
-	}
+	constructor(private readonly data: PrimitiveData) {}
 
 	public getMesh(vpTable: Table): Mesh {
 		const mesh = this.data.use3DMesh
