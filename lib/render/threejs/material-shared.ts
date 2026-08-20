@@ -1,3 +1,5 @@
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
+
 import { DoubleSide, FrontSide } from 'three'
 
 export const BALL_METALNESS = 1
@@ -56,7 +58,5 @@ export function materialSide(
 	isBall: boolean,
 	backfacesEnabled?: boolean,
 ): typeof DoubleSide | typeof FrontSide {
-	if (isBall || isTransparent) return DoubleSide
-	if (backfacesEnabled === false) return FrontSide
-	return DoubleSide
+	return isBall || isTransparent || backfacesEnabled !== false ? DoubleSide : FrontSide
 }

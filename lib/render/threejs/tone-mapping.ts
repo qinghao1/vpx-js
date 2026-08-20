@@ -1,18 +1,24 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import * as THREE from 'three'
+import {
+	ACESFilmicToneMapping,
+	AgXToneMapping,
+	LinearToneMapping,
+	NeutralToneMapping,
+	ReinhardToneMapping,
+} from 'three'
 
 const TONE_TABLE: number[] = [
-	THREE.ReinhardToneMapping,
-	THREE.AgXToneMapping,
-	THREE.ACESFilmicToneMapping,
-	THREE.NeutralToneMapping,
-	THREE.AgXToneMapping,
-	THREE.LinearToneMapping,
+	ReinhardToneMapping,
+	AgXToneMapping,
+	ACESFilmicToneMapping,
+	NeutralToneMapping,
+	AgXToneMapping,
+	LinearToneMapping,
 ]
 
 export function resolveToneMapping(tm?: number): number {
-	return TONE_TABLE[tm ?? -1] ?? THREE.ACESFilmicToneMapping
+	return TONE_TABLE[tm ?? -1] ?? ACESFilmicToneMapping
 }
 
 export function clampExposure(value: unknown, max = 2.5): number {
