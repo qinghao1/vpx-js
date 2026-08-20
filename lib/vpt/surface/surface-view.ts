@@ -4,7 +4,6 @@
 import type { IRenderApi } from '../../render/irender-api.js'
 import { CatmullCurve2D } from '../../util/catmull-curve.js'
 import { Matrix3D } from '../../util/matrix.js'
-import { Vertex2D } from '../../util/vector.js'
 import { RenderVertex, Vertex3DNoTex2 } from '../../util/vertex.js'
 import { DragPoint } from '../dragpoint.js'
 import { ItemUpdater } from '../item-updater.js'
@@ -22,11 +21,10 @@ export class SurfaceMeshGenerator {
 		const texCoords = DragPoint.getTextureCoords(data.dragPoints, verts)
 		const n = verts.length
 		if (!n) return {}
-		const normals = this.computeNormals(verts)
 		const bottom = data.heightBottom * table.getScaleZ() + table.getTableHeight()
 		const top = data.heightTop * table.getScaleZ() + table.getTableHeight()
 
-		this.buildSide(sideMesh, verts, texCoords, normals, bottom, top, !!data.szSideImage)
+		this.buildSide(sideMesh, verts, texCoords, bottom, top, !!data.szSideImage)
 		this.buildTop(topMesh, verts, table, top)
 		const meshes: { top?: Mesh; side?: Mesh } = {}
 		if (topMesh.vertices.length) meshes.top = topMesh
@@ -34,25 +32,10 @@ export class SurfaceMeshGenerator {
 		return meshes
 	}
 
-	private computeNormals(verts: RenderVertex[]): Vertex2D[] {
-		const n = verts.length
-		const out: Vertex2D[] = []
-		for (let i = 0; i < n; i++) {
-			const a = verts[i]!
-			const b = verts[i < n - 1 ? i + 1 : 0]!
-			const dx = a.x - b.x
-			const dy = a.y - b.y
-			const inv = 1 / Math.hypot(dx, dy)
-			out[i] = new Vertex2D(dy * inv, dx * inv)
-		}
-		return out
-	}
-
 	private buildSide(
 		mesh: Mesh,
 		verts: RenderVertex[],
 		texCoords: number[],
-		_normals: Vertex2D[],
 		bottom: number,
 		top: number,
 		textured: boolean,

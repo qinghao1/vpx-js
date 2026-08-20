@@ -23,7 +23,7 @@ export class FlipperMesh {
 		base.transform(m, undefined, z => z * data.height * table.getScaleZ() + height)
 		if (data.rubberThickness <= 0) return { base }
 		const rubber = flipperBaseMesh.clone(`flipper.rubber-${data.getName()}`)
-		this.applyScale(rubber, data, data.baseRadius, data.endRadius, baseScale, true)
+		this.applyScale(rubber, data, data.baseRadius, data.endRadius, baseScale)
 		rubber.transform(m, undefined, z => z * data.rubberWidth * table.getScaleZ() + (height + data.rubberHeight))
 		return { base, rubber }
 	}
