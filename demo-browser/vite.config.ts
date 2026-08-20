@@ -83,7 +83,7 @@ export default defineConfig({
 			},
 			{
 				find: /^.*binary-reader\.node\.js(\?.*)?$/,
-				replacement: resolve(repoRoot, 'dist-esm/lib/io/binary-reader.browser.js'),
+				replacement: resolve(repoRoot, 'dist-esm/lib/io/binary-reader.js'),
 			},
 			{
 				find: /^.*three-texture-loader-node\.js(\?.*)?$/,

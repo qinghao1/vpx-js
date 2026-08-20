@@ -12,7 +12,7 @@ import {
 	pushInput,
 	trySnap,
 } from '../../dist-esm/lib/game/shared/physics-buffer.js'
-import { BrowserBinaryReader } from '../../dist-esm/lib/io/binary-reader.browser.js'
+import { BrowserBinaryReader } from '../../dist-esm/lib/io/binary-reader.js'
 import { isWasmReady } from '../../dist-esm/lib/physics/wasm/kernels.js'
 import { setGlobalEmissionScale } from '../../dist-esm/lib/render/threejs/material-shared.js'
 import {

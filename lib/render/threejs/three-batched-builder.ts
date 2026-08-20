@@ -96,56 +96,9 @@ export function batchStaticOpaques(root: Group, table: Table, _renderApi: ThreeR
 	const animatables = new Set(table.getAnimatables().map(a => a.getName()))
 	const dynamicPrimitives = (() => {
 		const s = new Set<string>()
-		const script = (table as unknown as { tableScript?: string }).tableScript
-		if (!script) return s
-		const primitivesLower = new Set([...primitives].map(n => n.toLowerCase()))
-		const arrayMap = new Map<string, string[]>()
-		const arrayRe = /(\w+)\s*=\s*Array\s*\(([^)]+)\)/gi
-		let m: RegExpExecArray | null
-		while ((m = arrayRe.exec(script))) {
-			const name = m[1]!.toLowerCase()
-			const content = m[2]!
-			const parts = content
-				.split(',')
-				.map(p => p.trim())
-				.filter(Boolean)
-			if (parts.length)
-				arrayMap.set(
-					name,
-					parts.map(p => p.toLowerCase()),
-				)
-		}
-		const forEachRe = /For\s+Each\s+(\w+)\s+in\s+(\w+)/gi
-		while ((m = forEachRe.exec(script))) {
-			const loopVar = m[1]!
-			const arrName = m[2]!.toLowerCase()
-			const arr = arrayMap.get(arrName)
-			if (!arr) continue
-			const start = m.index + m[0].length
-			const windowText = script.slice(start, start + 600)
-			const nextIdx = windowText.search(/\bNext\b/i)
-			const sub = nextIdx >= 0 ? windowText.slice(0, nextIdx) : windowText
-			const nextFor = sub.search(/\bFor\s+Each\b/i)
-			const limited = nextFor >= 0 ? sub.slice(0, nextFor) : sub
-			const propRe = new RegExp(
-				loopVar +
-					'\\s*\\.\\s*(RotX|RotY|RotZ|ObjRotX|ObjRotY|ObjRotZ|X|Y|Z|TransX|TransY|TransZ|Size_X|Size_Y|Size_Z|RotAndTra\\d?)\\s*=',
-				'i',
-			)
-			if (propRe.test(limited)) for (const n of arr) if (primitivesLower.has(n)) s.add(n)
-		}
-		const directPropRe =
-			/(?:^|[^.\w])(\w+)\s*\.\s*(RotX|RotY|RotZ|ObjRotX|ObjRotY|ObjRotZ|X|Y|Z|TransX|TransY|TransZ|Size_X|Size_Y|Size_Z|RotAndTra\d?)\s*=/gm
-		while ((m = directPropRe.exec(script))) {
-			const obj = m[1]!.toLowerCase()
-			if (primitivesLower.has(obj) && !s.has(obj)) {
-				const isLoopVar = [...arrayMap.keys()].some(k => k === obj) || /^(nrx|nr|x|visbl|obj)$/i.test(obj)
-				if (!isLoopVar) s.add(obj)
-			}
-		}
-		for (const p of Object.values(table.primitives)) {
-			if (p.data.mesh.animationFrames.length) s.add(p.getName().toLowerCase())
-		}
+		for (const p of Object.values(table.primitives))
+			if ((p as any).data?.mesh?.animationFrames?.length) s.add(p.getName().toLowerCase())
+		for (const name of animatables) if (primitives.has(name)) s.add(name.toLowerCase())
 		return s
 	})()
 	const low = isLowQuality()

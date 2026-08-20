@@ -21,7 +21,7 @@ import {
 	type Texture as ThreeTexture,
 } from '../../refs.browser.js'
 import { exrCacheKey, idbGet, idbSet } from '../../util/idb-cache.js'
-import { _resetQualityCache, getEffectiveCaps, isLowQuality, QUALITY_CAPS } from '../../util/quality.js'
+import { _resetQualityCache, getEffectiveCaps } from '../../util/quality.js'
 import type { ITextureLoader } from '../irender-api.js'
 import { decodeInWorker, hasImageWorker } from './image-worker-pool.js'
 
@@ -39,66 +39,12 @@ const imageMap: Record<string, string> = {
 
 const RE_PLAYFIELD = /playfield|nestmap|bake|vlm/i
 
-let hwMax: number | undefined
-let isSwiftShaderCache: boolean | undefined
-function isSwiftShader(): boolean {
-	if (isSwiftShaderCache !== undefined) return isSwiftShaderCache
-	try {
-		if (typeof document === 'undefined') return (isSwiftShaderCache = false)
-		const c = document.createElement('canvas')
-		const gl = (c.getContext('webgl2') ?? c.getContext('webgl') ?? c.getContext('experimental-webgl')) as any
-		if (!gl) return (isSwiftShaderCache = false)
-		const ext = gl.getExtension('WEBGL_debug_renderer_info')
-		const renderer = ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : ''
-		const s = String(renderer || '').toLowerCase()
-		return (isSwiftShaderCache = s.includes('swiftshader') || s.includes('swift shader'))
-	} catch {
-		return (isSwiftShaderCache = false)
-	}
-}
-function getHardwareMax(): number {
-	if (hwMax !== undefined) return hwMax
-	try {
-		if (typeof document === 'undefined') return (hwMax = 4096)
-		const c = document.createElement('canvas')
-		const gl = (c.getContext('webgl2') ?? c.getContext('webgl')) as any
-		const v = gl?.getParameter(gl?.MAX_TEXTURE_SIZE)
-		return (hwMax = typeof v === 'number' && v >= 1024 ? v : 4096)
-	} catch {
-		return (hwMax = 4096)
-	}
-}
-
-function viewportBudget(): number {
-	try {
-		if (typeof window === 'undefined' || !window.innerWidth) return getHardwareMax()
-		const dpr = window.devicePixelRatio || 1
-		return Math.max(window.innerWidth, window.innerHeight) * dpr
-	} catch {
-		return getHardwareMax()
-	}
-}
-
 export function effectiveMax(_isFloat: boolean, name?: string): number {
-	const hw = getHardwareMax()
-	const isPlayfield = !!name && RE_PLAYFIELD.test(name)
-	const low = isLowQuality()
-	const caps = low ? QUALITY_CAPS.low : getEffectiveCaps()
-	if (isPlayfield) return Math.min(hw, caps.playfield)
-	const swift = isSwiftShader()
-	let cap: number
-	if (swift) cap = 1024
-	else cap = caps.other
-	const budget = viewportBudget()
-	const factor = low ? 0.5 : 1
-	const viewport = Math.max(caps.floor, Math.ceil(budget * factor))
-	const viewportClamped = low ? Math.min(viewport, caps.other) : viewport
-	return Math.min(hw, cap, viewportClamped)
+	const caps = getEffectiveCaps()
+	return name && RE_PLAYFIELD.test(name) ? caps.playfield : caps.other
 }
 
 export function _testResetTextureLimits(): void {
-	hwMax = undefined
-	isSwiftShaderCache = undefined
 	_resetQualityCache()
 }
 
