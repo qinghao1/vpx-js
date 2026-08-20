@@ -10,7 +10,6 @@ import { ItemUpdater } from '../item-updater.js'
 import type { Mesh } from '../mesh.js'
 import { loadMesh } from '../mesh-loader.js'
 import type { Table } from '../table/table.js'
-import type { HitTarget } from './hit-target.js'
 import type { HitTargetData } from './hit-target-data.js'
 import type { HitTargetState } from './hit-target-state.js'
 
