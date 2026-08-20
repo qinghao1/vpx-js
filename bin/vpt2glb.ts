@@ -10,6 +10,12 @@ import { Logger } from '../lib/util/logger.js'
 import { Table } from '../lib/vpt/table/table.js'
 import { TableExporter } from '../lib/vpt/table/table-exporter.js'
 
+// Headless Node export: ThreeRenderApi here uses MeshStandardMaterial (three) and GLTFExporter.
+// three/webgpu and three/tsl node materials (ThreeNodeMaterialGenerator, VpxRenderPipeline) are
+// browser-only (WebGPU). This CLI intentionally stays on the classic material path so it
+// works without a GPU. If TSL is imported in future, guard it with a fallback, e.g.:
+//   let tsl: any = null; try { tsl = await import('three/tsl') } catch { /* fallback to MeshStandardMaterial */ }
+// so vpt2glb remains headless-compatible.
 ;(async () => {
 	try {
 		const argSrc = process.argv[2]

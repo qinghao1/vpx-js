@@ -63,12 +63,12 @@ const define = {
 export default defineConfig({
 	define,
 	optimizeDeps: {
-		include: ['three', 'three-mesh-bvh', 'wpc-emu'],
+		include: ['three', 'three/webgpu', 'three/tsl', 'three-mesh-bvh', 'wpc-emu'],
 	},
 	root,
 	base: './',
 	resolve: {
-		dedupe: ['three', 'three-mesh-bvh'],
+		dedupe: ['three', 'three/webgpu', 'three/tsl', 'three-mesh-bvh'],
 		alias: [
 			{ find: 'node:buffer', replacement: resolve(__dirname, 'node_modules/buffer/index.js') },
 			{ find: /^node:assert(\/strict)?$/, replacement: resolve(repoRoot, 'dist-esm/lib/util/assert.js') },

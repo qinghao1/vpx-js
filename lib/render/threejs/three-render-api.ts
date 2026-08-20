@@ -22,6 +22,7 @@ import type { Mesh } from '../../vpt/mesh.js'
 import type { Table, TableGenerateOptions } from '../../vpt/table/table.js'
 import type { Texture } from '../../vpt/texture.js'
 import type { IRenderApi, MeshConvertOptions } from '../irender-api.js'
+import type { IMaterialGenerator } from './imaterial-generator.js'
 import { installBvh } from './three-bvh.js'
 import { ThreeConverter } from './three-converter.js'
 import { ThreeLightGenerator } from './three-light-generator.js'
@@ -29,6 +30,7 @@ import { ThreeLightMeshGenerator } from './three-light-mesh-generator.js'
 import { ThreeMapGenerator } from './three-map-generator.js'
 import { ThreeMaterialGenerator } from './three-material-generator.js'
 import { releaseGeometry, ThreeMeshGenerator } from './three-mesh-generator.js'
+import { ThreeNodeMaterialGenerator } from './three-node-material-generator.js'
 import { ThreePlayfieldMeshGenerator } from './three-playfield-mesh-generator.js'
 
 /** Three.js render backend.
@@ -44,6 +46,7 @@ export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, Poin
 	private readonly meshGenerator = new ThreeMeshGenerator()
 	private readonly mapGenerator: ThreeMapGenerator
 	private readonly materialGenerator: ThreeMaterialGenerator
+	private readonly nodeMaterialGenerator: ThreeNodeMaterialGenerator
 	private readonly lightGenerator = new ThreeLightGenerator()
 
 	constructor(opts?: MeshConvertOptions, gate: AnimationGate = animationGate) {
@@ -51,10 +54,11 @@ export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, Poin
 		this.meshConvertOpts = opts ?? { applyMaterials: false }
 		this.mapGenerator = new ThreeMapGenerator(this.meshConvertOpts.applyTextures, gate)
 		this.materialGenerator = new ThreeMaterialGenerator(this.mapGenerator)
+		this.nodeMaterialGenerator = new ThreeNodeMaterialGenerator(this.mapGenerator)
 		this.converter = new ThreeConverter(
 			this.meshGenerator,
 			this.mapGenerator,
-			this.materialGenerator,
+			this.nodeMaterialGenerator,
 			this.meshConvertOpts,
 		)
 	}
@@ -74,6 +78,10 @@ export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, Poin
 
 	public getMaterialGenerator(): ThreeMaterialGenerator {
 		return this.materialGenerator
+	}
+
+	public getNodeMaterialGenerator(): ThreeNodeMaterialGenerator {
+		return this.nodeMaterialGenerator
 	}
 
 	public transformScene(scene: Group, table: Table): void {
@@ -254,11 +262,12 @@ export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, Poin
 		const targets = obj.children?.length ? (obj.children as Object3D[]) : [obj]
 		for (const child of targets) {
 			const mat = (child as ThreeMesh).material as MeshStandardMaterial
-			if (material) this.materialGenerator.applyMaterial(mat, material)
-			this.materialGenerator.applyMap(mat, map)
-			this.materialGenerator.applyNormalMap(mat, normalMap)
-			this.materialGenerator.applyEnvMap(mat, envMap)
-			this.materialGenerator.applyEmissiveMap(mat, material, emissiveMap)
+			const gen: any = (mat as any).isNodeMaterial ? this.nodeMaterialGenerator : this.materialGenerator
+			if (material) gen.applyMaterial(mat, material)
+			gen.applyMap(mat, map)
+			gen.applyNormalMap(mat, normalMap)
+			gen.applyEnvMap(mat, envMap)
+			gen.applyEmissiveMap(mat, material, emissiveMap)
 		}
 	}
 

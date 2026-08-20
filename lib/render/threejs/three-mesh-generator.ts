@@ -8,14 +8,20 @@ export class ThreeMeshGenerator {
 	public convertToBufferGeometry(mesh: Mesh): BufferGeometry {
 		const vc = mesh.vertices.length
 		const ic = mesh.indices.length
-		if (!vc) return new BufferGeometry()
+		if (!vc) {
+			const emptyBg = new BufferGeometry()
+			emptyBg.name = mesh.name
+			emptyBg.setAttribute('position', new Float32BufferAttribute([], 3))
+			emptyBg.setAttribute('normal', new Float32BufferAttribute([], 3))
+			emptyBg.setAttribute('uv', new Float32BufferAttribute([], 2))
+			return emptyBg
+		}
 		const bg = new BufferGeometry()
 		bg.name = mesh.name
 		const positions = new Float32Array(vc * 3)
 		const normals = new Float32Array(vc * 3)
 		const uvs = new Float32Array(vc * 2)
 		let hasNormal = false
-		let hasUV = false
 		for (let i = 0; i < vc; i++) {
 			const v = mesh.vertices[i]
 			if (!v) continue
@@ -30,7 +36,6 @@ export class ThreeMeshGenerator {
 			const o2 = i * 2
 			uvs[o2] = v.tu
 			uvs[o2 + 1] = 1 - v.tv
-			if (v.tu || v.tv) hasUV = true
 		}
 		bg.setAttribute('position', new Float32BufferAttribute(positions, 3))
 		if (ic) {
@@ -39,7 +44,7 @@ export class ThreeMeshGenerator {
 		}
 		if (hasNormal) bg.setAttribute('normal', new Float32BufferAttribute(normals, 3))
 		else bg.computeVertexNormals()
-		if (hasUV) bg.setAttribute('uv', new Float32BufferAttribute(uvs, 2))
+		bg.setAttribute('uv', new Float32BufferAttribute(uvs, 2))
 		return bg
 	}
 }

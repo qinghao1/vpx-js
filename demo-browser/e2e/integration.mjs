@@ -17,9 +17,11 @@ import {
 	waitReady,
 } from './helpers.mjs'
 
-const url =
+const url = (
 	process.argv.find(a => a.startsWith('--url='))?.slice(6) ||
-	(process.argv[2]?.startsWith('http') ? process.argv[2] : null)
+	(process.argv[2]?.startsWith('http') ? process.argv[2] : null) ||
+	''
+).replace('http://localhost:3000', 'https://localhost:3000')
 const out = process.argv.find(a => a.startsWith('--out='))?.slice(6) || '/tmp'
 const useSwift = process.env.USE_SWIFTSHADER === '1'
 
@@ -59,6 +61,14 @@ const _forceKillChrome = () => {
 }
 
 async function ensureServer() {
+	process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
+	try {
+		const res = await fetch('https://localhost:3000', { signal: AbortSignal.timeout(1000) })
+		if (res.ok || res.status === 404) return
+	} catch (e) {
+		const msg = String(e?.message || e)
+		if (msg.includes('self-signed') || msg.includes('CERT') || msg.includes('certificate')) return
+	}
 	try {
 		const res = await fetch('http://localhost:3000', { signal: AbortSignal.timeout(1000) })
 		if (res.ok || res.status === 404) return
@@ -73,6 +83,13 @@ async function ensureServer() {
 	viteProc.unref()
 	for (let i = 0; i < 30; i++) {
 		await new Promise(r => setTimeout(r, 200))
+		try {
+			const res = await fetch('https://localhost:3000', { signal: AbortSignal.timeout(500) })
+			if (res.ok || res.status === 404) break
+		} catch (e) {
+			const msg = String(e?.message || e)
+			if (msg.includes('self-signed') || msg.includes('CERT') || msg.includes('certificate')) break
+		}
 		try {
 			const res = await fetch('http://localhost:3000', { signal: AbortSignal.timeout(500) })
 			if (res.ok || res.status === 404) break
@@ -106,6 +123,7 @@ process.on('unhandledRejection', e => {
 })
 
 async function runOne(targetUrl, label) {
+	targetUrl = targetUrl.replace('http://localhost:3000', 'https://localhost:3000')
 	const page = await newPage(browser)
 	const logs = attachLogging(page, {
 		filter: /Ready|Failed|Parsed|filter|Skipped|VLM|VR|cabinet|glass|mem|heap|THREE|Texture|DMD|emu|PinMAME/i,

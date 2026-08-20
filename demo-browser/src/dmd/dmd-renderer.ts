@@ -1,6 +1,10 @@
 // @ts-nocheck
 import * as THREE from 'three'
+import { GpuDmdNodeController } from '../../../dist-esm/lib/render/threejs/nodes/dmd-node.js'
 import { DMD } from '../config.js'
+
+// vpinball: flasher.cpp:1306 ZWRITEENABLE false, DrawMesh depthBias -10000 (flasher.cpp:1306, DrawMesh depthBias -10000)
+// depthTest: true, depthWrite: false, polygonOffsetFactor: -4, polygonOffsetUnits: -8, renderOrder: 20, DoubleSide
 
 const VISIBLE_WEIGHT = 1e6
 const DUP_MAX = 600
@@ -12,35 +16,50 @@ export class DmdRenderer {
 		this.viewer = viewer
 		this.w = DMD.w
 		this.h = DMD.h
-		this.texture = null
-		this.offscreen = null
-		this.offCtx = null
 		this.meshes = []
 		this.lastHash = -1
-		this._ensureTexture()
+		// compatibility stubs for legacy Canvas2D path - kept as null for API compat
+		this.offscreen = null
+		this.offCtx = null
+		this._imageData = null
+		this._controller = new GpuDmdNodeController(this.w, this.h)
+		this.dataTexture = this._controller.getTexture()
+		this.material = this._controller.material
+		this.texture = this.dataTexture
+		// expose uniform handles for backward compat (proxied from controller)
+		this.uResolution = (this._controller as any).uResolution ?? null
+		this.uLedColor = (this._controller as any).uLedColor ?? null
+		this.uDotRadius = (this._controller as any).uDotRadius ?? null
+		this.uGlowIntensity = (this._controller as any).uGlowIntensity ?? null
+		this.uDynamicScale = (this._controller as any).uDynamicScale ?? null
+		this._texNode = null
+		this._syncViewerTexture()
+	}
+
+	_syncViewerTexture() {
+		this.viewer.dmdTexture = this.texture
+		this.viewer._dmdOffscreen = null
+		this.viewer._dmdOffCtx = null
+		this.viewer.dmdMeshes = this.meshes
 	}
 
 	_ensureTexture() {
-		if (this.offscreen && this.texture) return
-		const c = document.createElement('canvas')
-		c.width = DMD.w
-		c.height = DMD.h
-		this.offscreen = c
-		this.offCtx = c.getContext('2d', { alpha: false })
-		const tex = new THREE.CanvasTexture(c)
-		tex.colorSpace = THREE.SRGBColorSpace
-		tex.magFilter = THREE.NearestFilter
-		tex.minFilter = THREE.NearestFilter
-		tex.generateMipmaps = false
-		tex.wrapS = THREE.ClampToEdgeWrapping
-		tex.wrapT = THREE.ClampToEdgeWrapping
-		tex.needsUpdate = true
-		this.texture = tex
-		this.viewer.dmdTexture = tex
-		this.viewer._dmdOffscreen = c
-		this.viewer._dmdOffCtx = this.offCtx
+		if (this.dataTexture && this.material && this.texture) {
+			this._syncViewerTexture()
+			return
+		}
+		// re-create controller if lost
+		if (!this._controller) this._controller = new GpuDmdNodeController(this.w, this.h)
+		this.dataTexture = this._controller.getTexture()
+		this.material = this._controller.material
+		this.texture = this.dataTexture
+		this.uResolution = (this._controller as any).uResolution ?? null
+		this.uLedColor = (this._controller as any).uLedColor ?? null
+		this.uDotRadius = (this._controller as any).uDotRadius ?? null
+		this.uGlowIntensity = (this._controller as any).uGlowIntensity ?? null
+		this.uDynamicScale = (this._controller as any).uDynamicScale ?? null
+		this._syncViewerTexture()
 	}
-
 	findMeshes() {
 		this.meshes = []
 		const { tableGroup, table } = this.viewer
@@ -156,9 +175,7 @@ export class DmdRenderer {
 			String(n || '')
 				.toLowerCase()
 				.includes('vr')
-		// generic: prefer VR DMD when a VR cabinet exists (VRCab_*), otherwise desktop DMD.
-		// References vpinball LoadVRRoom / VR_Cab collections — walking_dead has VRCab_Backbox etc.
-		// Detecting cabinet presence via tableGroup is table-agnostic and avoids viewerMode hack.
+		const RE_CAB = /vrcab|cabinet/i
 		const hasCab = (() => {
 			try {
 				let found = false
@@ -192,7 +209,6 @@ export class DmdRenderer {
 				}
 			}
 		}
-		// use filteredReps for subsequent logic
 		const finalReps = filteredReps
 		if (clusters.some(c => c.length > 1)) {
 			this.viewer.log(
@@ -201,7 +217,6 @@ export class DmdRenderer {
 			)
 		}
 
-		// Remove previous procedural planes
 		const oldProcedural = []
 		tableGroup.traverse(o => {
 			if (o.userData?.isProceduralDMD) oldProcedural.push(o)
@@ -219,29 +234,7 @@ export class DmdRenderer {
 		for (const m of candidates) m.visible = true
 
 		const applyMat = m => {
-			for (const mat of Array.isArray(m.material) ? m.material : [m.material]) {
-				if (!mat || !this.texture) continue
-				mat.map = this.texture
-				mat.needsUpdate = true
-				mat.side = THREE.DoubleSide
-				mat.toneMapped = false
-				if ('emissive' in mat) {
-					mat.emissiveMap = this.texture
-					mat.emissive = new THREE.Color(0xff8800)
-					mat.emissiveIntensity = 1
-					mat.color?.set?.(0xffffff)
-				}
-				mat.transparent = false
-				// vpinball: flasher.cpp:1306 ZWRITEENABLE false, DrawMesh depthBias -10000 (1212 pos height, 1188 tempMatrix Translate(center,height)*RotX/Y/Z)
-				// THREE generic: depthTest true, depthWrite false, strong polygonOffset to emulate -10000 bias without overlay show-through
-				// (overlay depthTest false caused apron show-through; true+offset keeps correct occlusion vs playfield while surfacing DMD forward through backbox thickness).
-				mat.depthTest = true
-				mat.depthWrite = false
-				mat.polygonOffset = true
-				mat.polygonOffsetFactor = -4
-				mat.polygonOffsetUnits = -8
-			}
-			// vpinball -10000 bias: strong forward bias in THREE is polygonOffset -4/-8 plus renderOrder 20 (after cab/backglass at 0, before overlay 1000)
+			m.material = this.material
 			m.renderOrder = 20
 			m.frustumCulled = false
 		}
@@ -343,24 +336,10 @@ export class DmdRenderer {
 				}
 			}
 			const geom = new THREE.PlaneGeometry(w, h)
-			const mat = new THREE.MeshBasicMaterial({
-				map: this.texture,
-				side: THREE.DoubleSide,
-				depthTest: true,
-				depthWrite: false,
-				polygonOffset: true,
-				polygonOffsetFactor: -4,
-				polygonOffsetUnits: -8,
-				transparent: false,
-			})
-			const mesh = new THREE.Mesh(geom, mat)
+			const mesh = new THREE.Mesh(geom, this.material)
 			mesh.name = `DMD_${fl.getName()}`
 			mesh.renderOrder = 20
 			mesh.frustumCulled = false
-			// vpinball: flasher.cpp FlasherData.m_height/m_rotX/Y/Z define DMD quad in playfield XY at positive Z up
-			// (MatrixTranslate(center,height) * RotX/Y/Z). ThreeRenderApi.transformScene maps LH Z up → RH Y up
-			// via scene.rotateX(π/2) (Y = -Z), so positive height must be negated locally to appear above
-			// playfield in world space. Generic fallback 24 keeps DMD just above playfield for any table.
 			mesh.position.set(d.center?.x ?? 470, d.center?.y ?? 40, -(d.height ?? 24))
 			mesh.rotation.set(
 				THREE.MathUtils.degToRad(d.rotX ?? 0),
@@ -381,6 +360,27 @@ export class DmdRenderer {
 		this.viewer.dmdMeshes = this.meshes
 	}
 
+	updateFrame(rawFrame, width, height) {
+		if (!rawFrame || rawFrame.length < width * height) return
+		// delegate bit-depth hashing & texture upload to shared controller
+		const prevW = this.w,
+			prevH = this.h
+		this._controller.updateFrame(rawFrame, width, height)
+		// sync handles if controller reallocated (mutates in place so usually no change)
+		this.dataTexture = this._controller.getTexture()
+		this.texture = this.dataTexture
+		this.material = this._controller.material
+		this.w = width
+		this.h = height
+		// keep viewer mirrors in sync
+		this.viewer.dmdTexture = this.texture
+		this.viewer.dmdW = width
+		this.viewer.dmdH = height
+		// mirror hash for dedup check
+		this.lastHash = (this._controller as any).lastHash ?? this.lastHash
+		if (prevW !== width || prevH !== height) this._syncViewerTexture()
+	}
+
 	render() {
 		if (!this.viewer.player) return
 		const frame = this.viewer.player.getDmdFrame?.()
@@ -389,48 +389,17 @@ export class DmdRenderer {
 		const w = Math.round(dims?.x ?? DMD.w) || DMD.w
 		const h = Math.round(dims?.y ?? DMD.h) || DMD.h
 		if (!w || !h || frame.length < w * h) return
+		this.updateFrame(frame, w, h)
+	}
 
-		let hash = 0
-		for (let i = 0; i < frame.length; i++) hash = (hash * 31 + frame[i]) | 0
-		if (hash === this.lastHash && this.w === w && this.h === h) return
-		this.lastHash = hash
-		this.w = w
-		this.h = h
-		this.viewer.dmdW = w
-		this.viewer.dmdH = h
-		this.viewer._dmdLastHash = hash
+	update() {
+		return this.render()
+	}
+
+	getTexture() {
 		this._ensureTexture()
-		if (this.offscreen.width !== w || this.offscreen.height !== h) {
-			this.offscreen.width = w
-			this.offscreen.height = h
-		}
-
-		let max = 0
-		for (let i = 0; i < frame.length; i++) if (frame[i] > max) max = frame[i]
-		const is2bit = max <= 3,
-			isNibble = max <= 15 && max > 3
-
-		if (this.offCtx) {
-			const ctx = this.offCtx
-			ctx.imageSmoothingEnabled = false
-			let img = (this as any)._imageData
-			if (!img || img.width !== w || img.height !== h) {
-				img = ctx.createImageData(w, h)
-				;(this as any)._imageData = img
-			}
-			for (let i = 0; i < w * h; i++) {
-				const v = frame[i] ?? 0
-				const lvl = is2bit ? v * 85 : isNibble ? Math.round((v / 15) * 255) : v
-				const o = i * 4
-				img.data[o] = lvl
-				img.data[o + 1] = Math.round(lvl * 0.55)
-				img.data[o + 2] = 0
-				img.data[o + 3] = 255
-			}
-			ctx.putImageData(img, 0, 0)
-		}
-		if (this.texture) this.texture.needsUpdate = true
+		return this.texture
 	}
 }
 
-export { DmdRenderer as DmdController }
+export { DmdRenderer as DmdController, DmdRenderer as GpuDmdNodeController }

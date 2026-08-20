@@ -12,29 +12,30 @@ import {
 import type { RenderInfo } from '../../game/irenderable.js'
 import type { Material } from '../../vpt/material.js'
 import type { MeshConvertOptions } from '../irender-api.js'
+import {
+	applyDepthBias,
+	BALL_METALNESS,
+	BALL_ROUGHNESS,
+	DISABLE_LIGHTING_THRESHOLD,
+	getGlobalEmissionScale,
+	isBaked,
+	pendingKeyFor,
+	RE_BAKE_MAP,
+	RE_BAKE_MAT,
+	setGlobalEmissionScale,
+} from './material-shared.js'
+
+export { getGlobalEmissionScale, setGlobalEmissionScale } from './material-shared.js'
+
+import type { IMaterialGenerator } from './imaterial-generator.js'
 import type { ThreeMapGenerator } from './three-map-generator.js'
 
-const BALL_METALNESS = 1
-const BALL_ROUGHNESS = 0.08
-
-const RE_BAKE_MAT = /bake/i
-const RE_BAKE_MAP = /bake|nestmap/i
 const BAKED_EMISSIVE = 1.0 // baked is unlit
 const BAKED_ROUGH = 0.75
 const BAKED_METAL = 0.1
-const DISABLE_LIGHTING_THRESHOLD = 0.5
-
-let _globalEmissionScale = 1
-export const setGlobalEmissionScale = (v: number) => {
-	_globalEmissionScale = Number.isFinite(v) ? Math.max(0.15, Math.min(1, v)) : 1
-}
-export const getGlobalEmissionScale = () => _globalEmissionScale
-
-const pendingKeyFor = (key: 'map' | 'normalMap' | 'envMap' | 'emissiveMap'): string =>
-	`pending${key.charAt(0).toUpperCase()}${key.slice(1)}`
 
 /** Generates/caches Three.js materials. */
-export class ThreeMaterialGenerator {
+export class ThreeMaterialGenerator implements IMaterialGenerator {
 	private readonly cachedMaterials: Record<string, ThreeMaterial> = {}
 
 	constructor(private readonly mapGenerator: ThreeMapGenerator) {}
@@ -88,7 +89,7 @@ export class ThreeMaterialGenerator {
 		this.applyEmissiveMap(m, material, emissiveMap)
 		m.transparent = isTransparent
 		m.depthWrite = !isTransparent
-		const baked = this.isBaked(material, map, disableLighting)
+		const baked = isBaked(material, map, disableLighting)
 		if (baked) {
 			this.applyBaked(m, (m as any).map, backfacesEnabled)
 			;(m.userData as any).__isBaked = true
@@ -206,7 +207,7 @@ export class ThreeMaterialGenerator {
 				if (texKey === 'map') {
 					const m = mat as MeshStandardMaterial
 					const isBakedPending =
-						ud.__isBaked || this.isBaked(undefined, name) || (m.name && RE_BAKE_MAT.test(m.name))
+						ud.__isBaked || isBaked(undefined, name) || (m.name && RE_BAKE_MAT.test(m.name))
 					if (isBakedPending) this.applyBaked(m, tex, ud.__backfacesEnabled)
 				}
 				delete ud[pendingKey]
@@ -238,7 +239,7 @@ export class ThreeMaterialGenerator {
 					: new Color(0xffffff) // tint via baseColor
 			if (!mat.emissive) (mat as any).emissive = tint
 			else mat.emissive.copy(tint)
-			mat.emissiveIntensity = BAKED_EMISSIVE * _globalEmissionScale
+			mat.emissiveIntensity = BAKED_EMISSIVE * getGlobalEmissionScale()
 			mat.color.set(0x000000)
 		} else {
 			mat.color.set(0xffffff)

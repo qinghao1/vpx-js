@@ -1,7 +1,8 @@
 // @ts-nocheck
 // Viewer coordinator - delegates to subsystems
-import * as THREE from 'three'
+
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
+import * as THREE from 'three/webgpu'
 import { keyEventToDirectInputKey } from '../../dist-esm/lib/game/key-code.js'
 import { Player } from '../../dist-esm/lib/game/player.js'
 import {
@@ -26,6 +27,7 @@ import {
 } from '../../dist-esm/lib/render/threejs/three-camera-framing.js'
 import { setGlobalEmissionScale } from '../../dist-esm/lib/render/threejs/three-material-generator.js'
 import { ThreeRenderApi } from '../../dist-esm/lib/render/threejs/three-render-api.js'
+import { VpxRenderPipeline } from '../../dist-esm/lib/render/threejs/three-render-pipeline.js'
 import {
 	applyBakedMaterial,
 	ensureProceduralRoom,
@@ -38,6 +40,11 @@ import {
 	showCabFlippers,
 } from '../../dist-esm/lib/render/threejs/three-scene-postprocess.js'
 import { ThreeTextureLoaderBrowser } from '../../dist-esm/lib/render/threejs/three-texture-loader-browser.js'
+import {
+	applyRendererToneMapping,
+	clampExposure,
+	resolveToneMapping,
+} from '../../dist-esm/lib/render/threejs/tone-mapping.js'
 import { AnimationGate } from '../../dist-esm/lib/util/animation-gate.js'
 import { Table } from '../../dist-esm/lib/vpt/table/table.js'
 import { CAM, CAM_ANIM, isTableHit, LIGHT_AMBIENT, LIGHT_DIR, LIGHT_HEMI, RE_BAKE_MAP, TABLE_OPTS } from './config.js'
@@ -200,7 +207,8 @@ export class Viewer {
 		this._nudgeCleanup = null
 		this._touchCleanup = null
 		this._hasPinmame = false
-		this._rendererBackend = 'webgl'
+		this._rendererBackend = 'webgpu'
+		this.renderPipeline = null
 		this.renderer = null
 		this.controls = null
 		this._eventCleanups = []
@@ -260,7 +268,8 @@ export class Viewer {
 		if (this._boundKeyDown) removeEventListener('keydown', this._boundKeyDown)
 		if (this._boundKeyUp) removeEventListener('keyup', this._boundKeyUp)
 		this.controls?.dispose?.()
-		this.composer?.dispose?.()
+		this.renderPipeline?.dispose?.()
+		this.renderer?.setAnimationLoop(null)
 		this.renderer?.dispose?.()
 		this.scene?.clear?.()
 	}
@@ -290,134 +299,46 @@ export class Viewer {
 	async _createRenderer() {
 		const canvas = this.dom.canvas
 		const p = new URLSearchParams(location.search)
-		const wantWebGPU = p.has('webgpu') || p.get('renderer')?.startsWith('webgpu')
 		const wantAA = !p.has('noaa')
-		let renderer = null
-		let backend = 'webgl'
-		if (wantWebGPU) {
-			try {
-				const { WebGPURenderer } = await import('three/webgpu')
-				renderer = new WebGPURenderer({
-					canvas,
-					antialias: wantAA,
-				})
-				await renderer.init()
-				const fallback = !!renderer.backend?.isWebGLBackend
-				backend = fallback ? 'webgl-fallback' : 'webgpu'
-				if (fallback) console.warn('WebGPURenderer fallback to WebGLBackend')
-			} catch (e) {
-				console.warn('WebGPURenderer init failed, falling back to WebGLRenderer', e)
-				renderer = null
-			}
-		}
-		const isSwiftShader = (() => {
-			try {
-				const c = document.createElement('canvas')
-				const gl = c.getContext('webgl2') ?? c.getContext('webgl')
-				if (!gl) return false
-				const ext = gl.getExtension('WEBGL_debug_renderer_info')
-				const r = ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : ''
-				return String(r).toLowerCase().includes('swiftshader')
-			} catch {
-				return false
-			}
-		})()
-		const low = isLowQuality()
-		const useAA = wantAA && !isSwiftShader && !low
-		if (!renderer) {
-			const alpha = !low
-			const baseOpts: any = {
-				canvas,
-				antialias: useAA,
-				stencil: false,
-				preserveDrawingBuffer: false,
-				powerPreference: 'high-performance',
-				alpha,
-			}
-			let ctx: any = null
-			try {
-				const ctxAttrs: any = {
-					alpha,
-					antialias: useAA,
-					depth: true,
-					stencil: false,
-					preserveDrawingBuffer: false,
-					powerPreference: 'high-performance',
-					premultipliedAlpha: true,
-					desynchronized: !low,
-				}
-				ctx = (canvas.getContext('webgl2', ctxAttrs) as any) ?? canvas.getContext('webgl', ctxAttrs)
-			} catch {}
-			renderer = new THREE.WebGLRenderer(ctx ? { ...baseOpts, context: ctx } : baseOpts)
-			backend = 'webgl'
-		}
+
+		const renderer = new THREE.WebGPURenderer({
+			canvas,
+			antialias: wantAA,
+			powerPreference: 'high-performance',
+		})
+		await renderer.init()
+
 		renderer.setPixelRatio(getTargetPixelRatio(this.viewerMode))
+		renderer.outputColorSpace = THREE.SRGBColorSpace
 		renderer.sortObjects = false
 		renderer.shadowMap.enabled = false
-		if (p.has('shadows')) {
-			this.log(
-				`[renderer] shadows disabled for perf (was ${p.get('shadows') || '1'}) — add ?shadows=force to override in viewer mode`,
-				'info',
-			)
-			if (p.get('shadows') === 'force' && !isLowQuality() && this.viewerMode !== 'play') {
-				renderer.shadowMap.enabled = true
-				renderer.shadowMap.type = THREE.PCFSoftShadowMap
-			}
-		}
-		renderer.outputColorSpace = THREE.SRGBColorSpace
-		// vpinball: Renderer.cpp:53 m_toneMapper from TableSettings (typedefs3D.h:56 TM_* enums), :56 m_exposure from Table (0..2, Settings_properties.inl:725), pintable.cpp:2279 defaults TM_REINHARD/exposure 1, Renderer.cpp:2373 fb_*tonemap
-		// Keep exposure and emissionScale separate (Renderer.cpp:56 m_exposure, :398 m_emissionScale). EmissionScale modulates baked/light, not tonemap.
-		const toneMapFor = tm => {
-			if (tm === 0) return THREE.ReinhardToneMapping ?? THREE.ACESFilmicToneMapping
-			if (tm === 1) return THREE.AgXToneMapping ?? THREE.ACESFilmicToneMapping
-			if (tm === 2) return THREE.ACESFilmicToneMapping ?? THREE.ReinhardToneMapping
-			if (tm === 3) return THREE.NeutralToneMapping ?? THREE.LinearToneMapping ?? THREE.ACESFilmicToneMapping
-			if (tm === 4) return THREE.AgXToneMapping ?? THREE.ACESFilmicToneMapping
-			if (tm === 5) return THREE.LinearToneMapping ?? THREE.AgXToneMapping ?? THREE.ACESFilmicToneMapping
-			return THREE.ReinhardToneMapping ?? THREE.AgXToneMapping ?? THREE.ACESFilmicToneMapping
-		}
-		const exposureFor = ex => Math.max(0.1, Math.min(2, Number.isFinite(ex) ? ex : 1))
-		const applyTone = (r, data) => {
-			if (low) {
-				r.toneMapping = THREE.NoToneMapping
-				r.toneMappingExposure = 1
-			} else {
-				r.toneMapping = toneMapFor(data?.toneMapper)
-				r.toneMappingExposure = exposureFor(data?.exposure)
-			}
-		}
-		applyTone(renderer, this.table?.data)
+
+		applyRendererToneMapping(renderer, this.table?.data, isLowQuality())
 		this._globalEmissionScale = Number.isFinite(this.table?.data?.globalEmissionScale)
 			? this.table.data.globalEmissionScale
 			: 1
 		this._applyTableToneMapping = tbl => {
 			if (!this.renderer || !tbl?.data) return
-			applyTone(this.renderer, tbl.data)
+			applyRendererToneMapping(this.renderer, tbl.data, isLowQuality())
 			this._globalEmissionScale = Number.isFinite(tbl.data.globalEmissionScale) ? tbl.data.globalEmissionScale : 1
+			if (this.renderPipeline) {
+				this.renderPipeline.updateExposure(clampExposure(tbl.data.exposure, 2))
+				this.renderPipeline.updateToneMapper(tbl.data.toneMapper ?? 2)
+			}
 		}
 		this.renderer = renderer
-		this._rendererBackend = backend
-		// vpinball: Renderer.cpp:2373 single HDR tonemap after scene (exposure*), not per-material LDR sum.
-		// Three's per-material tonemap with AdditiveBlending (SRC_ALPHA ONE) summed LDR -> blown (TWD 8% white at 1.0).
-		// Generic fix: HDR EffectComposer (HalfFloat) + OutputPass so additive HDR (alpha/100) sums linear then tonemaps once.
-		// Matches primitive.cpp:1171 convertColor(alpha/100) premul and fs_unshaded.sc result*tex, then fb tonemap.
-		this.composer = null
-		if (!low && backend.startsWith('webgl')) {
-			try {
-				const { EffectComposer } = await import('three/addons/postprocessing/EffectComposer.js')
-				const { RenderPass } = await import('three/addons/postprocessing/RenderPass.js')
-				const { OutputPass } = await import('three/addons/postprocessing/OutputPass.js')
-				const composer = new EffectComposer(renderer)
-				composer.addPass(new RenderPass(this.scene, this.camera))
-				composer.addPass(new OutputPass())
-				this.composer = composer
-			} catch (e) {
-				console.warn('EffectComposer init failed, falling back to direct render', e)
-				this.composer = null
-			}
-		} else if (low) {
-			console.log('[renderer] low quality: EffectComposer disabled for memory/perf')
+		this._rendererBackend = 'webgpu'
+		try {
+			this.renderPipeline = new VpxRenderPipeline(renderer, this.scene, this.camera, {
+				toneMapper: this.table?.data?.toneMapper,
+				exposure: this.table?.data?.exposure,
+				bloomEnabled: !isLowQuality(),
+			})
+		} catch (e) {
+			console.warn('VpxRenderPipeline init failed, falling back to direct render', e)
+			this.renderPipeline = null
 		}
+		this._setupDeviceLifecycle(renderer)
 		this.controls?.dispose?.()
 		this.controls = new OrbitControls(this.camera, this.renderer.domElement)
 		this.controls.enableDamping = true
@@ -433,8 +354,52 @@ export class Viewer {
 				THREE,
 			})
 		this._onResize()
-		this.log(`Renderer ready: ${backend} (three r${THREE.REVISION})${low ? ' [low]' : ''}`)
+		this.log(`WebGPURenderer ready (three r${String(THREE.REVISION)})`)
 		return renderer
+	}
+
+	private _setupDeviceLifecycle(renderer) {
+		try {
+			const device = (renderer as any).backend?.device as GPUDevice | undefined
+			if (!device?.lost) return
+			device.lost.then((info: any) => {
+				console.warn(`[WebGPU] Device lost: reason=${info.reason}, message=${info.message}`)
+				if (info.reason !== 'destroyed' && !this._disposed) void this._createRenderer()
+			})
+		} catch {}
+	}
+
+	async precompilePipelines() {
+		if (!this.renderer || !this.scene || !this.camera) return
+		try {
+			this.log('[renderer] pre-compiling WebGPU shader pipelines...', 'info')
+			const startTime = performance.now()
+			await this.renderer.compileAsync(this.scene, this.camera)
+			const duration = (performance.now() - startTime).toFixed(1)
+			this.log(`[renderer] WebGPU pipelines compiled in ${duration}ms`, 'info')
+		} catch (e) {
+			console.warn('[renderer] compileAsync non-fatal warning:', e)
+		}
+	}
+
+	private _syncPhysicsTransforms(_timestamp) {
+		if (!this.player) return
+		if (this._physicsSab && this._physicsScratch) trySnap(this._physicsSab, this._physicsScratch)
+		this.player.setPhysicsEnabled(this.viewerMode === 'play')
+		this.player.updatePhysics()
+		if (this.player && this.viewerMode === 'play' && !this.isPaused) {
+			this.player.updateAnimations(this.player.getGameTime())
+			const changed = this.player.popStates()
+			if (!changed.isEmpty) this.applyChangedStates(changed)
+			else changed.release()
+		}
+	}
+
+	get composer() {
+		return this.renderPipeline
+	}
+	stopLoop() {
+		this.renderer?.setAnimationLoop(null)
 	}
 	async _ensureRenderer() {
 		await this._rendererReady
@@ -457,8 +422,6 @@ export class Viewer {
 		const pr = getTargetPixelRatio(this.viewerMode)
 		if (this.renderer) this.renderer.setPixelRatio(pr)
 		this.renderer?.setSize(w, h)
-		this.composer?.setSize(w, h)
-		this.composer?.setPixelRatio(pr)
 	}
 	_setupModeSwitch() {
 		const onOrbitToggle = e => {
@@ -1859,10 +1822,13 @@ export class Viewer {
 	}
 	async startLoop() {
 		await this._ensureRenderer()
-		if (this._disposed) return
+		if (this._disposed || !this.renderer) return
+		await this.precompilePipelines()
+		if (this._disposed || !this.renderer) return
 		if (this.animFrame) {
 			cancelAnimationFrame(this.animFrame)
 			clearTimeout(this.animFrame)
+			this.animFrame = null
 		}
 		if (this._animRaf) {
 			cancelAnimationFrame(this._animRaf)
@@ -1879,41 +1845,15 @@ export class Viewer {
 		let last = performance.now(),
 			frames = 0,
 			fps = 0
-		let pinLoadingLogged = false
-		let lastHeartbeat = performance.now()
-		let lastTimeMsec = 0
-		let swiftShader = false
-		const gl = (this.renderer as any)?.getContext?.()
-		const rstr = gl?.getParameter?.(gl.RENDERER) ?? ''
-		if (String(rstr).toLowerCase().includes('swiftshader') || String(rstr).toLowerCase().includes('software'))
-			swiftShader = true
-		if (swiftShader) this.log('[render] SwiftShader detected — throttling render for physics', 'warn')
-		const isPinLoading = () => {
-			if (!this._hasPinmame) return false
-			const emu = this.player?.getPhysics?.()?.emu
-			if (!emu || emu.isMock || !emu.isInitialized?.()) return false
-			return emu.api?.isRunning?.() === 0
-		}
+		let lastFpsUpdate = performance.now()
+		let lastDmd = 0
 		if (this.player && (!this._physicsSab || !this._physicsWorker)) {
 			const res = this._createPhysicsWorker()
 			if (res) this.log(`[physics] SAB ${res.sab.byteLength} worker started`, 'info')
 		} else if (this._physicsSab) {
 			this.log(`[physics] reusing SAB ${this._physicsSab.byteLength}`, 'debug')
 		}
-		const tickPhysics = () => {
-			if (!this.player || this.isPaused) return
-			if (this._physicsSab && this._physicsScratch) trySnap(this._physicsSab, this._physicsScratch)
-			this.player.setPhysicsEnabled(this.viewerMode === 'play')
-			this.player.updatePhysics()
-			if (performance.now() - lastHeartbeat > 2000) {
-				lastHeartbeat = performance.now()
-				const cur = this.player.getPhysics().timeMsec
-				if (cur === lastTimeMsec && this.viewerMode === 'play' && !this.isPaused) {
-					console.warn('[physics] stalled at', cur, 'swiftShader', swiftShader)
-				}
-				lastTimeMsec = cur
-			}
-		}
+		// expose immediate physics tick for tests
 		;(this as any)._tickPhysicsImmediate = () => {
 			if (!this.player || this.isPaused || this.viewerMode !== 'play') return
 			if (isLowQuality()) return
@@ -1924,106 +1864,64 @@ export class Viewer {
 			const changed = this.player.popStates()
 			if (!changed.isEmpty) {
 				this.applyChangedStates(changed)
-				if (!this._disposed && !isPinLoading()) {
-					if (this.composer) this.composer.render()
+				if (!this._disposed) {
+					if (this.renderPipeline) this.renderPipeline.render()
 					else this.renderer.render(this.scene, this.camera)
 				}
 			} else changed.release()
 		}
-		let renderSkip = 0
-		let lastDmd = 0
-		let lastRender = 0
-		const loop = () => {
-			if (this._disposed) return
-			this._animRaf = requestAnimationFrame(loop)
-			this.animFrame = this._animRaf
-			const pinLoading = isPinLoading()
-			if (pinLoading !== pinLoadingLogged) {
-				pinLoadingLogged = pinLoading
-				this.log(
-					pinLoading ? '[loop] PinMAME loading — pausing render' : '[loop] PinMAME ready — resuming render',
-				)
-			}
-			if (pinLoading) {
-				if (swiftShader) {
-					renderSkip = (renderSkip + 1) % 3
-					if (renderSkip !== 0) return
-				}
-				tickPhysics()
-				return
-			}
-			if (swiftShader) {
-				renderSkip = (renderSkip + 1) % 3
-				if (renderSkip !== 0) {
-					tickPhysics()
-					return
-				}
-			}
-			const nowRender = performance.now()
-			if (isLowQuality() && nowRender - lastRender < 15) {
-				tickPhysics()
-				return
-			}
-			lastRender = nowRender
+		this.renderer.setAnimationLoop((timestamp, frame) => {
+			if (this._disposed || this.isPaused) return
+			this._syncPhysicsTransforms(timestamp)
 			if (this.controls?.enabled) this.controls.update()
 			this._applyNudgeVisual()
-			tickPhysics()
-			if (this.player && this.viewerMode === 'play' && !this.isPaused) {
-				this.player.updateAnimations(this.player.getGameTime())
-				const changed = this.player.popStates()
-				if (!changed.isEmpty) this.applyChangedStates(changed)
-				else changed.release()
-			}
-			if (this.composer) this.composer.render()
-			else this.renderer.render(this.scene, this.camera)
-			const now = performance.now()
-			if (now - lastDmd > 32) {
-				lastDmd = now
+			if (timestamp - lastDmd > 32) {
+				lastDmd = timestamp
 				this._pollPinmame()
+			} else {
+				this.dmd?.update?.()
 			}
+			if (this.renderPipeline) this.renderPipeline.render()
+			else this.renderer.render(this.scene, this.camera)
 			frames++
-			const now2 = performance.now()
-			if (now2 - last > 500) {
-				fps = Math.round((frames * 1000) / (now2 - last))
-				last = now2
+			if (timestamp - lastFpsUpdate > 500) {
+				fps = Math.round((frames * 1000) / (timestamp - lastFpsUpdate))
+				lastFpsUpdate = timestamp
 				frames = 0
-			}
-			if (this.dom.stats) {
-				const balls = this.player?.balls.length ?? 0
-				const t = this.player?.getPhysics()?.timeMsec ?? 0
-				const mode = this.viewerMode === 'play' ? (this.isPaused ? 'PLAY PAUSED' : 'PLAY') : 'VIEWER'
-				const emu = this.player?.getPhysics()?.emu
-				const emuRaw = emu ? emu.constructor.name : '—'
-				const emuStat = !emu ? '' : emu.isInitialized?.() ? 'ok' : 'loading'
-				const draws = this.renderer?.info?.render?.calls ?? 0
-				const tris = this.renderer?.info?.render?.triangles ?? 0
-				const trisFmt =
-					tris >= 1e6
-						? `${(tris / 1e6).toFixed(1)}M`
-						: tris >= 1e3
-							? `${(tris / 1e3).toFixed(1)}k`
-							: `${tris}`
-				const tFmt = t ? `${(t / 1000).toFixed(1)}s` : '—'
-				const emuLabel = emuStat ? `${emuRaw} · ${emuStat}` : emuRaw
-				let wasmReady = false
-				wasmReady = isWasmReady()
-				const wasmLabel = wasmReady ? 'Ready' : 'Loading…'
-				renderStats(this.dom.stats, {
-					fps,
-					draws,
-					trisFmt,
-					balls,
-					tFmt,
-					tHasValue: !!t,
-					emuLabel,
-					emuRaw,
-					wasmLabel,
-					wasmReady,
-					backend: this._rendererBackend,
-					mode,
-				})
-			}
-			{
+				if (this.dom.stats) {
+					const balls = this.player?.balls.length ?? 0
+					const t = this.player?.getPhysics()?.timeMsec ?? 0
+					const mode = this.viewerMode === 'play' ? (this.isPaused ? 'PLAY PAUSED' : 'PLAY') : 'VIEWER'
+					const emu = this.player?.getPhysics()?.emu
+					const emuRaw = emu ? emu.constructor.name : '—'
+					const emuStat = !emu ? '' : emu.isInitialized?.() ? 'ok' : 'loading'
+					const draws = this.renderer?.info?.render?.calls ?? 0
+					const tris = this.renderer?.info?.render?.triangles ?? 0
+					const trisFmt =
+						tris >= 1e6
+							? `${(tris / 1e6).toFixed(1)}M`
+							: tris >= 1e3
+								? `${(tris / 1e3).toFixed(1)}k`
+								: `${tris}`
+					const tFmt = t ? `${(t / 1000).toFixed(1)}s` : '—'
+					const emuLabel = emuStat ? `${emuRaw} · ${emuStat}` : emuRaw
+					const wasmReady = isWasmReady()
+					const wasmLabel = wasmReady ? 'Ready' : 'Loading…'
+					renderStats(this.dom.stats, {
+						fps,
+						draws,
+						trisFmt,
+						balls,
+						tFmt,
+						tHasValue: !!t,
+						emuLabel,
+						emuRaw,
+						wasmLabel,
+						wasmReady,
+						backend: this._rendererBackend,
+						mode,
+					})
+				}
 				const hud = this.dom.fpsHud || document.getElementById('fps-hud')
 				if (hud) {
 					let el = hud.querySelector('.fps')
@@ -2038,8 +1936,16 @@ export class Viewer {
 					el.className = `fps ${cls}`.trim()
 				}
 			}
-		}
-		loop()
+		})
+	}
+
+	render() {
+		if (this.renderPipeline) this.renderPipeline.render()
+		else this.renderer?.render(this.scene, this.camera)
+	}
+
+	_updateStatsOverlay(fps) {
+		if (!this.dom.stats) return
 	}
 
 	_pollPinmame() {

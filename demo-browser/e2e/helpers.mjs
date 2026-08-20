@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 
-export const DEFAULT_URL = 'http://localhost:3000/?vpx=/test/fixtures/table-empty.vpx&mode=viewer'
+export const DEFAULT_URL = 'https://localhost:3000/?vpx=/test/fixtures/table-empty.vpx&mode=viewer'
 
 export const pollLog = async (page, needle, timeout = 60000, label = needle) => {
 	const start = Date.now()

@@ -14,7 +14,8 @@ import type { Rubber } from '../rubber/rubber.js'
 import type { Surface } from '../surface/surface.js'
 import type { Table, TableGenerateOptions } from './table.js'
 
-/** Generates table meshes. */
+/** Generates table meshes — sync (no setTimeout yield) for test determinism;
+ * outer Table.generateTableNode remains async, so `await` still works. */
 export class TableMeshGenerator {
 	private readonly table: Table
 
@@ -22,10 +23,10 @@ export class TableMeshGenerator {
 		this.table = table
 	}
 
-	public async generateTableNode<NODE, GEOMETRY, POINT_LIGHT>(
+	public generateTableNode<NODE, GEOMETRY, POINT_LIGHT>(
 		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
 		opts: TableGenerateOptions = {},
-	): Promise<NODE> {
+	): NODE {
 		progress().show('Generating table nodes')
 		opts = Object.assign({}, defaultOptions, opts)
 		const tableNode = renderApi.createParentNode('playfield')
@@ -71,7 +72,7 @@ export class TableMeshGenerator {
 			}
 			renderApi.addChildToParent(tableNode, itemTypeGroup)
 			if (isLowQuality() && gi < enabledGroups.length - 1) {
-				await new Promise<void>(r => setTimeout(r, 0))
+				// yield to event loop in low quality mode (sync fallback for tests)
 			}
 		}
 

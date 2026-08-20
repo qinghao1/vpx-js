@@ -46,10 +46,15 @@ function materialKey(mat: MeshStandardMaterial): string {
 	return `${mat.name ?? 'noname'}|${map}|${pending}|${mat.transparent ? 't' : 'o'}|${mat.blending ?? 1}|${mat.depthWrite ? 'w' : 'n'}|${mat.polygonOffset ? `${mat.polygonOffsetFactor}/${mat.polygonOffsetUnits}` : '0'}|${ud.__addBlend ? 'a' : 'o'}|${ud.__isBaked ? 'b' : 'o'}`
 }
 
-function canBatch(mat: MeshStandardMaterial): boolean {
+export function canBatchWebGpu(mat: any): boolean {
 	if (!mat) return false
-	if ((mat.userData as any).__addBlend) return false
+	if ((mat.userData as any)?.__addBlend) return false
 	if (mat.transparent && !isLowQuality()) return false
+	return true
+}
+
+export function canBatch(mat: MeshStandardMaterial): boolean {
+	if (!canBatchWebGpu(mat as any)) return false
 	const ud = mat.userData as any
 	if (ud.pendingMap || ud.pendingmap || ud.pendingNormalMap || ud.pendingEnvMap || ud.pendingEmissiveMap) return false
 	return true

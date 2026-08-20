@@ -6,8 +6,8 @@ import type { IRenderable, RenderInfo } from '../../game/irenderable.js'
 import type { ItemState } from '../../vpt/item-state.js'
 import type { Table, TableGenerateOptions } from '../../vpt/table/table.js'
 import type { IRenderApi, MeshConvertOptions } from '../irender-api.js'
+import type { IMaterialGenerator } from './imaterial-generator.js'
 import type { ThreeMapGenerator } from './three-map-generator.js'
-import type { ThreeMaterialGenerator } from './three-material-generator.js'
 import type { ThreeMeshGenerator } from './three-mesh-generator.js'
 
 /** Converts renderables to Three.js groups/meshes. */
@@ -15,7 +15,7 @@ export class ThreeConverter {
 	constructor(
 		private readonly meshGenerator: ThreeMeshGenerator,
 		readonly _mapGenerator: ThreeMapGenerator,
-		private readonly materialGenerator: ThreeMaterialGenerator,
+		private readonly materialGenerator: IMaterialGenerator,
 		private readonly meshConvertOpts: MeshConvertOptions,
 	) {}
 

@@ -3,7 +3,7 @@
 
 import * as THREE from 'three'
 import { getEffectiveCaps, isLowQuality } from '../../util/quality.js'
-import { getGlobalEmissionScale } from './three-material-generator.js'
+import { getGlobalEmissionScale } from './material-shared.js'
 
 export const BAKED_EMISSIVE = 1.0
 export const BAKED_ROUGH = 0.75
