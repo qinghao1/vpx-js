@@ -133,7 +133,7 @@ export class PrimitiveMeshGenerator {
 		rt.multiply(new Matrix3D().rotateXMatrix(MathUtils.degToRad(this.data.rotAndTra[6]!)))
 		const scale = new Matrix3D().setScaling(this.data.size.x, this.data.size.y, this.data.size.z)
 		const trans = new Matrix3D().setTranslation(this.data.position.x, this.data.position.y, this.data.position.z)
-		const full = scale.clone().multiply(rt).multiply(trans)
+		const full = scale.multiply(rt).multiply(trans)
 		const sz = table.getScaleZ()
 		if (sz !== 1) full.multiply(new Matrix3D().setScaling(1, 1, sz))
 		return full

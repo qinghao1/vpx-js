@@ -28,52 +28,22 @@ export class FlipperMesh {
 		return { base, rubber }
 	}
 
-	private applyScale(
-		mesh: Mesh,
-		data: FlipperData,
-		baseR: number,
-		endR: number,
-		scale: number,
-		isRubber = false,
-	): void {
+	private applyScale(mesh: Mesh, data: FlipperData, baseR: number, endR: number, scale: number): void {
+		const baseFactor = baseR * scale
+		const endFactor = endR * scale
+		const tipOffsetY = data.flipperRadius - endR * 7.9
 		for (let t = 0; t < 13; t++) {
+			const baseBottom = FlipperMesh.vertsBaseBottom[t]!
+			const tipBottom = FlipperMesh.vertsTipBottom[t]!
+			const baseTop = FlipperMesh.vertsBaseTop[t]!
+			const tipTop = FlipperMesh.vertsTipTop[t]!
 			for (const v of mesh.vertices) {
-				if (this.match(v, FlipperMesh.vertsBaseBottom[t]!)) {
-					if (isRubber) {
-						v.x = v.x * baseR * scale
-						v.y = v.y * baseR * scale
-					} else {
-						v.x *= baseR * scale
-						v.y *= baseR * scale
-					}
-				} else if (this.match(v, FlipperMesh.vertsTipBottom[t]!)) {
-					if (isRubber) {
-						v.x = v.x * endR * scale
-						v.y = v.y * endR * scale
-						v.y = v.y + data.flipperRadius - endR * 7.9
-					} else {
-						v.x *= endR * scale
-						v.y *= endR * scale
-						v.y += data.flipperRadius - endR * 7.9
-					}
-				} else if (this.match(v, FlipperMesh.vertsBaseTop[t]!)) {
-					if (isRubber) {
-						v.x = v.x * baseR * scale
-						v.y = v.y * baseR * scale
-					} else {
-						v.x *= baseR * scale
-						v.y *= baseR * scale
-					}
-				} else if (this.match(v, FlipperMesh.vertsTipTop[t]!)) {
-					if (isRubber) {
-						v.x = v.x * endR * scale
-						v.y = v.y * endR * scale
-						v.y = v.y + data.flipperRadius - endR * 7.9
-					} else {
-						v.x *= endR * scale
-						v.y *= endR * scale
-						v.y += data.flipperRadius - endR * 7.9
-					}
+				if (this.match(v, baseBottom) || this.match(v, baseTop)) {
+					v.x *= baseFactor
+					v.y *= baseFactor
+				} else if (this.match(v, tipBottom) || this.match(v, tipTop)) {
+					v.x *= endFactor
+					v.y = v.y * endFactor + tipOffsetY
 				}
 			}
 		}
