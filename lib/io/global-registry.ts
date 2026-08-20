@@ -26,9 +26,8 @@ export class GlobalRegistry {
 	}
 
 	public regRead(path: string): string | number | undefined {
-		path = this.normalize(path)
-		if (this.store.has(path)) return this.store.get(path)
-		return GlobalRegistry.defaults[path]
+		const key = this.normalize(path)
+		return this.store.get(key) ?? GlobalRegistry.defaults[key]
 	}
 
 	public regWrite(key: string, value: string | number): void {
