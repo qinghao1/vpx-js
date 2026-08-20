@@ -56,6 +56,11 @@ export class PinMameEmulator implements IEmulator {
 	private readonly pendingSwitches = new Map<number, number>()
 	private dmdW = FALLBACK_DMD.x
 	private dmdH = FALLBACK_DMD.y
+	private _pullPtr = 0
+	private _pullCap = 0
+	private _dmdPtr = 0
+	private _dmdCap = 0
+	private _dmdFrameBuf: Uint8Array | null = null
 
 	async init(): Promise<void> {
 		if (this.mod) return
@@ -226,6 +231,22 @@ export class PinMameEmulator implements IEmulator {
 		this.pullDmd()
 	}
 
+	private _ensurePullPtr(bytes: number): number {
+		if (this._pullPtr && this._pullCap >= bytes) return this._pullPtr
+		if (this._pullPtr && this.mod) this.mod._free(this._pullPtr)
+		this._pullCap = Math.max(1024, bytes)
+		this._pullPtr = this.mod ? this.mod._malloc(this._pullCap) : 0
+		return this._pullPtr
+	}
+
+	private _ensureDmdPtr(bytes: number): number {
+		if (this._dmdPtr && this._dmdCap >= bytes) return this._dmdPtr
+		if (this._dmdPtr && this.mod) this.mod._free(this._dmdPtr)
+		this._dmdCap = Math.max(4096, bytes)
+		this._dmdPtr = this.mod ? this.mod._malloc(this._dmdCap) : 0
+		return this._dmdPtr
+	}
+
 	private pullDmd(): void {
 		if (!this.mod || !this.api) return
 		const w = this.api.getDmdWidth()
@@ -234,35 +255,33 @@ export class PinMameEmulator implements IEmulator {
 		this.dmdW = w
 		this.dmdH = h
 		const n = w * h
-		const ptr = this.mod._malloc(n)
-		try {
-			if (this.api.getDmdFrame(ptr) > 0) {
-				this.emulatorState.setDmd(this.mod.HEAPU8.subarray(ptr, ptr + n).slice())
+		const ptr = this._ensureDmdPtr(n)
+		if (ptr && this.api.getDmdFrame(ptr) > 0) {
+			if (!this._dmdFrameBuf || this._dmdFrameBuf.length !== n) {
+				this._dmdFrameBuf = new Uint8Array(n)
 			}
-		} finally {
-			this.mod._free(ptr)
+			this._dmdFrameBuf.set(this.mod.HEAPU8.subarray(ptr, ptr + n))
+			this.emulatorState.setDmd(this._dmdFrameBuf)
 		}
 	}
 
 	private pull(fn: (p: number) => number, buf: Uint8Array): void {
 		const m = this.mod
 		if (!m) return
-		const ptr = m._malloc(buf.length * 8)
+		const reqBytes = buf.length * 8
+		const ptr = this._ensurePullPtr(reqBytes)
+		if (!ptr) return
+		let n = 0
 		try {
-			let n = 0
-			try {
-				n = fn(ptr)
-			} catch (e) {
-				if (String(e) !== 'unwind') throw e
-				n = 0
-			}
-			for (let i = 0; i < n; i++) {
-				const idx = m.getValue(ptr + i * 8, 'i32')
-				const val = m.getValue(ptr + i * 8 + 4, 'i32')
-				if (idx >= 0 && idx < buf.length) buf[idx] = Math.max(0, Math.min(255, val))
-			}
-		} finally {
-			m._free(ptr)
+			n = fn(ptr)
+		} catch (e) {
+			if (String(e) !== 'unwind') throw e
+			n = 0
+		}
+		for (let i = 0; i < n; i++) {
+			const idx = m.getValue(ptr + i * 8, 'i32')
+			const val = m.getValue(ptr + i * 8 + 4, 'i32')
+			if (idx >= 0 && idx < buf.length) buf[idx] = Math.max(0, Math.min(255, val))
 		}
 	}
 

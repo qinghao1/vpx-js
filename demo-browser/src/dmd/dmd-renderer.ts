@@ -18,28 +18,15 @@ export class DmdRenderer {
 		this.h = DMD.h
 		this.meshes = []
 		this.lastHash = -1
-		// compatibility stubs for legacy Canvas2D path - kept as null for API compat
-		this.offscreen = null
-		this.offCtx = null
-		this._imageData = null
 		this._controller = new GpuDmdNodeController(this.w, this.h)
 		this.dataTexture = this._controller.getTexture()
 		this.material = this._controller.material
 		this.texture = this.dataTexture
-		// expose uniform handles for backward compat (proxied from controller)
-		this.uResolution = (this._controller as any).uResolution ?? null
-		this.uLedColor = (this._controller as any).uLedColor ?? null
-		this.uDotRadius = (this._controller as any).uDotRadius ?? null
-		this.uGlowIntensity = (this._controller as any).uGlowIntensity ?? null
-		this.uDynamicScale = (this._controller as any).uDynamicScale ?? null
-		this._texNode = null
 		this._syncViewerTexture()
 	}
 
 	_syncViewerTexture() {
 		this.viewer.dmdTexture = this.texture
-		this.viewer._dmdOffscreen = null
-		this.viewer._dmdOffCtx = null
 		this.viewer.dmdMeshes = this.meshes
 	}
 
@@ -53,11 +40,6 @@ export class DmdRenderer {
 		this.dataTexture = this._controller.getTexture()
 		this.material = this._controller.material
 		this.texture = this.dataTexture
-		this.uResolution = (this._controller as any).uResolution ?? null
-		this.uLedColor = (this._controller as any).uLedColor ?? null
-		this.uDotRadius = (this._controller as any).uDotRadius ?? null
-		this.uGlowIntensity = (this._controller as any).uGlowIntensity ?? null
-		this.uDynamicScale = (this._controller as any).uDynamicScale ?? null
 		this._syncViewerTexture()
 	}
 	findMeshes() {
@@ -401,5 +383,3 @@ export class DmdRenderer {
 		return this.texture
 	}
 }
-
-export { DmdRenderer as DmdController, DmdRenderer as GpuDmdNodeController }

@@ -14,6 +14,7 @@ import {
 } from '../../dist-esm/lib/game/shared/physics-buffer.js'
 import { BrowserBinaryReader } from '../../dist-esm/lib/io/binary-reader.browser.js'
 import { isWasmReady } from '../../dist-esm/lib/physics/wasm/kernels.js'
+import { setGlobalEmissionScale } from '../../dist-esm/lib/render/threejs/material-shared.js'
 import {
 	batchStaticOpaques as _batchStaticOpaques,
 	optimizeScene as _optimizeScene,
@@ -25,7 +26,6 @@ import {
 	computeViewerFraming,
 	frameCamera,
 } from '../../dist-esm/lib/render/threejs/three-camera-framing.js'
-import { setGlobalEmissionScale } from '../../dist-esm/lib/render/threejs/three-material-generator.js'
 import { ThreeRenderApi } from '../../dist-esm/lib/render/threejs/three-render-api.js'
 import { VpxRenderPipeline } from '../../dist-esm/lib/render/threejs/three-render-pipeline.js'
 import {
@@ -48,7 +48,7 @@ import {
 import { AnimationGate } from '../../dist-esm/lib/util/animation-gate.js'
 import { Table } from '../../dist-esm/lib/vpt/table/table.js'
 import { CAM, CAM_ANIM, isTableHit, LIGHT_AMBIENT, LIGHT_DIR, LIGHT_HEMI, RE_BAKE_MAP, TABLE_OPTS } from './config.js'
-import { DmdController } from './dmd.js'
+import { DmdRenderer } from './dmd/dmd-renderer.js'
 import {
 	isDev as _isDev,
 	ensureBvh,
@@ -215,7 +215,7 @@ export class Viewer {
 		this._boundResize = () => this._onResize()
 		this._disposed = false
 		this._rendererReady = this._createRenderer()
-		this.dmd = new DmdController(this)
+		this.dmd = new DmdRenderer(this)
 		if (_isDev)
 			Object.assign(window, {
 				scene: this.scene,
@@ -395,9 +395,6 @@ export class Viewer {
 		}
 	}
 
-	get composer() {
-		return this.renderPipeline
-	}
 	stopLoop() {
 		this.renderer?.setAnimationLoop(null)
 	}
@@ -1875,11 +1872,9 @@ export class Viewer {
 			this._syncPhysicsTransforms(timestamp)
 			if (this.controls?.enabled) this.controls.update()
 			this._applyNudgeVisual()
-			if (timestamp - lastDmd > 32) {
+			if (timestamp - lastDmd >= 32) {
 				lastDmd = timestamp
 				this._pollPinmame()
-			} else {
-				this.dmd?.update?.()
 			}
 			if (this.renderPipeline) this.renderPipeline.render()
 			else this.renderer.render(this.scene, this.camera)

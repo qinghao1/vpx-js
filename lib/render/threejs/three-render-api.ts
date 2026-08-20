@@ -28,7 +28,6 @@ import { ThreeConverter } from './three-converter.js'
 import { ThreeLightGenerator } from './three-light-generator.js'
 import { ThreeLightMeshGenerator } from './three-light-mesh-generator.js'
 import { ThreeMapGenerator } from './three-map-generator.js'
-import { ThreeMaterialGenerator } from './three-material-generator.js'
 import { releaseGeometry, ThreeMeshGenerator } from './three-mesh-generator.js'
 import { ThreeNodeMaterialGenerator } from './three-node-material-generator.js'
 import { ThreePlayfieldMeshGenerator } from './three-playfield-mesh-generator.js'
@@ -45,7 +44,6 @@ export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, Poin
 	private readonly lightMeshGenerator = new ThreeLightMeshGenerator()
 	private readonly meshGenerator = new ThreeMeshGenerator()
 	private readonly mapGenerator: ThreeMapGenerator
-	private readonly materialGenerator: ThreeMaterialGenerator
 	private readonly nodeMaterialGenerator: ThreeNodeMaterialGenerator
 	private readonly lightGenerator = new ThreeLightGenerator()
 
@@ -53,7 +51,6 @@ export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, Poin
 		installBvh()
 		this.meshConvertOpts = opts ?? { applyMaterials: false }
 		this.mapGenerator = new ThreeMapGenerator(this.meshConvertOpts.applyTextures, gate)
-		this.materialGenerator = new ThreeMaterialGenerator(this.mapGenerator)
 		this.nodeMaterialGenerator = new ThreeNodeMaterialGenerator(this.mapGenerator)
 		this.converter = new ThreeConverter(
 			this.meshGenerator,
@@ -76,8 +73,8 @@ export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, Poin
 		return this.mapGenerator
 	}
 
-	public getMaterialGenerator(): ThreeMaterialGenerator {
-		return this.materialGenerator
+	public getMaterialGenerator(): IMaterialGenerator {
+		return this.nodeMaterialGenerator
 	}
 
 	public getNodeMaterialGenerator(): ThreeNodeMaterialGenerator {
@@ -262,7 +259,7 @@ export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, Poin
 		const targets = obj.children?.length ? (obj.children as Object3D[]) : [obj]
 		for (const child of targets) {
 			const mat = (child as ThreeMesh).material as MeshStandardMaterial
-			const gen: any = (mat as any).isNodeMaterial ? this.nodeMaterialGenerator : this.materialGenerator
+			const gen = this.nodeMaterialGenerator
 			if (material) gen.applyMaterial(mat, material)
 			gen.applyMap(mat, map)
 			gen.applyNormalMap(mat, normalMap)

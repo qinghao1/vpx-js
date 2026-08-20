@@ -70,13 +70,25 @@ export class GpuDmdNodeController {
 		let hash = 0
 		let maxVal = 0
 		const len = width * height
-		for (let i = 0; i < len; i++) {
+		const u32Len = len >> 2
+		const u32 = new Uint32Array(rawFrame.buffer, rawFrame.byteOffset, u32Len)
+		for (let i = 0; i < u32Len; i++) {
+			const word = u32[i]!
+			hash = (hash * 31 + word) | 0
+			const b0 = word & 0xff
+			const b1 = (word >> 8) & 0xff
+			const b2 = (word >> 16) & 0xff
+			const b3 = (word >> 24) & 0xff
+			const m01 = b0 > b1 ? b0 : b1
+			const m23 = b2 > b3 ? b2 : b3
+			const mw = m01 > m23 ? m01 : m23
+			if (mw > maxVal) maxVal = mw
+		}
+		for (let i = u32Len << 2; i < rawFrame.length; i++) {
 			const v = rawFrame[i]!
 			hash = (hash * 31 + v) | 0
 			if (v > maxVal) maxVal = v
 		}
-		// include tail beyond w*h in hash for padded frames
-		for (let i = len; i < rawFrame.length; i++) hash = (hash * 31 + rawFrame[i]!) | 0
 		if (hash === this.lastHash) return
 		this.lastHash = hash
 		this.uDynamicScale.value = maxVal <= 3 ? 85.0 : maxVal <= 15 ? 17.0 : 1.0
