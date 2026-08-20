@@ -37,14 +37,14 @@ export function createDynamicBallNodeMaterial(
 	const uPlayfieldOrigin = uniform(new THREE.Vector3(0.0, 0.0, 0.0))
 
 	mat.colorNode = Fn(() => {
-		// 1. Upstream fs_ball.sc spherical environment map reflection
+		// 1. Upstream fs_ball.sc spherical environment map reflection adapted to Three.js view space
 		const V_view = normalize(positionView.negate())
 		const N_view = normalize(normalView)
 		const R_view = reflect(V_view.negate(), N_view)
 
-		// Spherical map reflection UV (fs_ball.sc:125-127)
-		const m = float(0.35355339).div(sqrt(max(float(0.0001), float(1.0).sub(R_view.z))))
-		const envUv = vec2(float(0.5).sub(m.mul(R_view.x)), float(0.5).sub(m.mul(R_view.y)))
+		// Spherical map reflection UV for Three.js (camera looks down -Z, so R.z is positive towards camera)
+		const m = float(0.35355339).div(sqrt(max(float(0.0001), float(1.0).add(R_view.z))))
+		const envUv = vec2(float(0.5).add(m.mul(R_view.x)), float(0.5).add(m.mul(R_view.y)))
 		const envSample = texture(envTexture, envUv)
 		let ballColor: any = envSample.rgb
 
@@ -64,7 +64,10 @@ export function createDynamicBallNodeMaterial(
 			ballColor = mix(ballColor, playfieldColor.rgb, hitValid.mul(0.75))
 		}
 
-		const finalRgb = ballColor.mul(uTint).mul(uEnvIntensity)
+		// Subtle chrome Fresnel rim for realistic 3D specular depth
+		const NdotV = max(float(0.0), dot(N_view, V_view))
+		const fresnel = float(1.0).sub(NdotV).pow(float(3.0)).mul(float(0.35))
+		const finalRgb = ballColor.add(fresnel).mul(uTint).mul(uEnvIntensity)
 		return vec4(finalRgb, float(1.0))
 	})()
 
