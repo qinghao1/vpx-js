@@ -186,7 +186,7 @@ export class RampMeshGenerator {
 
 	private generateWireMeshes(table: Table): Mesh[] {
 		let accuracy: number
-		if (isLowQuality()) accuracy = 4
+		if (isLowQuality()) accuracy = 6
 		else if (table.getDetailLevel() < 5) accuracy = 6
 		else if (table.getDetailLevel() < 8) accuracy = 8
 		else accuracy = Math.floor(table.getDetailLevel() * 1.3)
@@ -398,7 +398,7 @@ export class RampMeshGenerator {
 		} else {
 			const mat = table.getMaterial(this.state.material)
 			accuracy = !mat?.isOpacityActive ? 10 : table.getDetailLevel()
-			if (isLowQuality()) accuracy = Math.min(accuracy, 6)
+			if (isLowQuality()) accuracy = Math.min(accuracy, 8)
 		}
 		accuracy = 4 * 10 ** ((10 - accuracy) * (1 / 1.5))
 		return DragPoint.getRgVertex(

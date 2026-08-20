@@ -5,7 +5,6 @@ import { MeshStandardNodeMaterial } from 'three/webgpu'
 
 export function createDynamicBallNodeMaterial(
 	envTexture: ThreeTexture,
-	_playfieldTexture?: ThreeTexture,
 	tintColor = 0xc0c0c0,
 ): MeshStandardNodeMaterial {
 	const mat = new MeshStandardNodeMaterial()

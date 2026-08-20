@@ -28,10 +28,10 @@ export class RubberMeshGenerator {
 		const mesh = new Mesh(`rubber-${this.data.getName()}`)
 		let accuracy: number
 		if (acc !== -1) accuracy = acc
-		else if (isLowQuality()) accuracy = 4
+		else if (isLowQuality()) accuracy = 6
 		else accuracy = Math.floor(10 * 1.2)
 
-		const detail = isLowQuality() ? Math.min(table.getDetailLevel(), 6) : table.getDetailLevel()
+		const detail = isLowQuality() ? Math.min(table.getDetailLevel(), 8) : table.getDetailLevel()
 		const sv = SplineVertex.getInstance(
 			this.data.dragPoints,
 			this.data.thickness,

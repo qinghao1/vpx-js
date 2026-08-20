@@ -68,7 +68,7 @@ export class SplineVertex {
 		acc: number,
 		staticRendering = true,
 	): RenderVertex[] {
-		const effDetail = isLowQuality() ? Math.min(detail, 6) : detail
+		const effDetail = isLowQuality() ? Math.min(detail, 8) : detail
 		const accuracy = acc !== -1 ? acc : 4 * 10 ** ((10 - (staticRendering ? 10 : effDetail)) / 1.5)
 		return DragPoint.getRgVertex(dragPoints, () => new RenderVertex(), CatmullCurve2D.fromVertex2D, true, accuracy)
 	}

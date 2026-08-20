@@ -332,7 +332,8 @@ export class Viewer {
 			this.renderPipeline = new VpxRenderPipeline(renderer, this.scene, this.camera, {
 				toneMapper: this.table?.data?.toneMapper,
 				exposure: this.table?.data?.exposure,
-				bloomEnabled: !isLowQuality(),
+				bloomEnabled: true,
+				bloomStrength: isLowQuality() ? 0.3 : 0.35,
 			})
 		} catch (e) {
 			console.warn('VpxRenderPipeline init failed, falling back to direct render', e)

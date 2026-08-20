@@ -131,9 +131,8 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 
 		if (isBall && envMap && this.mapGenerator.hasTexture(envMap)) {
 			const envTex = this.mapGenerator.getTexture(envMap)
-			const playTex = map && this.mapGenerator.hasTexture(map) ? this.mapGenerator.getTexture(map) : undefined
 			const tint = material?.baseColor ? new Color(material.baseColor).getHex() : 0xc0c0c0
-			mat = createDynamicBallNodeMaterial(envTex, playTex as any, tint)
+			mat = createDynamicBallNodeMaterial(envTex, tint)
 			mat.name = `material:${material!.name}`
 			applyDepthBias(mat, depthBias)
 			this.cachedMaterials[key] = mat
