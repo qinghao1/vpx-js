@@ -178,8 +178,16 @@ export class DragPoint extends BiffParser {
 	}
 
 	private static flatWithAccuracy3(v1: Vertex3D, v2: Vertex3D, vMid: Vertex3D, accuracy: number): boolean {
-		const cross = vMid.clone().sub(v1).cross(v2.clone().sub(v1))
-		return cross.lengthSq() < accuracy
+		const ax = vMid.x - v1.x
+		const ay = vMid.y - v1.y
+		const az = vMid.z - v1.z
+		const bx = v2.x - v1.x
+		const by = v2.y - v1.y
+		const bz = v2.z - v1.z
+		const cx = ay * bz - az * by
+		const cy = az * bx - ax * bz
+		const cz = ax * by - ay * bx
+		return cx * cx + cy * cy + cz * cz < accuracy
 	}
 
 	public async fromTag(buffer: Uint8Array, tag: string): Promise<number> {

@@ -27,7 +27,7 @@ export class TextboxData extends ItemData {
 	public fontColor = 0xffffff
 	public intensityScale = 1
 	public text = '0'
-	public align: number = Enums.TextAlignment.TextAlignRight
+	public align = Enums.TextAlignment.TextAlignRight
 	public isTransparent = false
 	public isDMD = false
 	public isVisible = true

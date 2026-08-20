@@ -33,8 +33,8 @@ export class PlungerMeshGenerator {
 	private readonly springMinSpacing = 2.2
 	private lathePoints!: number
 	private desc!: PlungerDesc
-	private vtsPerFrame: number = 0
-	private indicesPerFrame: number = 0
+	private vtsPerFrame = 0
+	private indicesPerFrame = 0
 
 	constructor(private readonly data: PlungerData) {
 		this.stroke = data.stroke!
