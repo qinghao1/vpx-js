@@ -5,6 +5,15 @@ import { swipeNudge } from '../../../dist-esm/lib/render/threejs/three-scene-pos
 import { CONTROL_SCHEME, isTableHit, NUDGE } from '../config.js'
 import { ensureBvh } from '../env.js'
 
+function isTouchFlipperEnabled(e?: PointerEvent): boolean {
+	try {
+		if (e && (e.pointerType === 'touch' || e.pointerType === 'pen')) return true
+		if (typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)')?.matches) return true
+		if (typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0) return true
+	} catch {}
+	return false
+}
+
 // Generic helpers used by any table: map physical code → logical key + location.
 // Covers all codes from CONTROL_SCHEME and BUTTON_CODE_PATTERNS (Digit*/Key*/Shift*/Control*/Alt*).
 export const keyForCode = (c: string): string =>
@@ -336,6 +345,7 @@ function attachPointerHost(host: InputHost, signal: AbortSignal): void {
 			(e: PointerEvent) => {
 				if (host.viewerMode !== 'play') return
 				if (e.button !== 0) return
+				if (!isTouchFlipperEnabled(e)) return
 				const code = zoneFor(e.clientX, e.clientY)
 				if (!active.has(e.pointerId)) {
 					active.set(e.pointerId, code)
@@ -359,6 +369,35 @@ function attachPointerHost(host: InputHost, signal: AbortSignal): void {
 				host.enterPlayMode()
 			}
 			const isRightClick = e.button === 2
+			if (!isRightClick) {
+				const buttonHit = hitFor(e.clientX, e.clientY)
+				if (buttonHit) {
+					const code = buttonHit.code
+					const already = active.has(e.pointerId)
+					active.set(e.pointerId, code)
+					swipeStart.set(e.pointerId, { x: e.clientX, y: e.clientY, t: performance.now() })
+					if (!already) send(code, true)
+					canvas.setAttribute('data-pressed', code)
+					if (host.controls) {
+						const c: any = host.controls
+						if (c._inputPrevEnabled == null) c._inputPrevEnabled = c.enabled
+						c.enabled = false
+					}
+					try {
+						canvas.setPointerCapture(e.pointerId)
+					} catch {}
+					e.preventDefault()
+					e.stopPropagation()
+					return
+				}
+				if (!isTouchFlipperEnabled(e)) {
+					swipeStart.set(e.pointerId, { x: e.clientX, y: e.clientY, t: performance.now() })
+					try {
+						canvas.setPointerCapture(e.pointerId)
+					} catch {}
+					return
+				}
+			}
 			const code = isRightClick ? '__nudge' : zoneFor(e.clientX, e.clientY)
 			const already = active.has(e.pointerId)
 			active.set(e.pointerId, code)
@@ -383,7 +422,25 @@ function attachPointerHost(host: InputHost, signal: AbortSignal): void {
 
 	const end = (e: PointerEvent): void => {
 		const code = active.get(e.pointerId)
-		if (!code) return
+		if (!code) {
+			const s = swipeStart.get(e.pointerId)
+			if (s) swipeStart.delete(e.pointerId)
+			try {
+				canvas.releasePointerCapture(e.pointerId)
+			} catch {}
+			if (s) {
+				const dx = e.clientX - s.x
+				const dy = e.clientY - s.y
+				const dt = performance.now() - s.t
+				if (dt < 400 && Math.hypot(dx, dy) > 80) {
+					const ang = swipeNudge(dx, dy, NUDGE as any)
+					if (ang !== null) {
+						host.player?.nudge(ang, ang === NUDGE.back ? 2.0 : NUDGE.force)
+					}
+				}
+			}
+			return
+		}
 		active.delete(e.pointerId)
 
 		if (code !== '__nudge') send(code, false)
