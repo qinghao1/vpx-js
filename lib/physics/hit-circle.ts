@@ -90,8 +90,8 @@ export class HitCircle extends HitObject {
 			isUnhit = false,
 			isContact = false
 		if (isKicker && bnd <= 0 && bnd >= -this.radius && a < C_CONTACTVEL * C_CONTACTVEL && ball.hit.isRealBall()) {
-			if (ball.hit.vpVolObjs.includes(this.obj!))
-				ball.hit.vpVolObjs.splice(ball.hit.vpVolObjs.indexOf(this.obj!), 1)
+			const idx = ball.hit.vpVolObjs.indexOf(this.obj!)
+			if (idx !== -1) ball.hit.vpVolObjs.splice(idx, 1)
 		}
 		if (rigid && bnd < PHYS_TOUCH) {
 			if (bnd < -br) return -1

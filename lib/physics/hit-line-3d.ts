@@ -11,7 +11,7 @@ import { HitKind } from './hit-object.js'
 /** 3D cylinder hit shape.
  * @see https://github.com/vpinball/vpinball/blob/master/collide.cpp */
 export class HitLine3D extends HitLineZ {
-	public override hitKind: HitKind = HitKind.Line3D
+	public override hitKind = HitKind.Line3D
 	public readonly matrix = new Matrix2D()
 	public zLow!: number
 	public zHigh!: number
@@ -68,7 +68,7 @@ export class HitLine3D extends HitLineZ {
 		this.hitBBox.zlow = saveZlow
 		this.hitBBox.zhigh = saveZhigh
 		if (hitTime >= 0) {
-			const e = (this.matrix as any).elements as number[]
+			const e = this.matrix.elements
 			const nx = coll.hitNormal.x,
 				ny = coll.hitNormal.y,
 				nz = coll.hitNormal.z

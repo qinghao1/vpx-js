@@ -52,9 +52,8 @@ export class HitPlane extends HitObject {
 			this.scatter,
 		)
 		const bnd = this.normal.dot(coll.ball.state.pos) - coll.ball.data.radius - this.d
-		if (bnd >= 0) return
-		coll.ball.state.pos.x -= this.normal.x * bnd
-		coll.ball.state.pos.y -= this.normal.y * bnd
-		coll.ball.state.pos.z -= this.normal.z * bnd
+		if (bnd < 0) {
+			coll.ball.state.pos.addScaledVector(this.normal, -bnd)
+		}
 	}
 }
