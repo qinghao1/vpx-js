@@ -72,9 +72,8 @@ describe('regression: transpiler browser worker must polyfill process (ball miss
 		expect(src, 'pool must throw if worker unavailable').toContain('transpiler worker not available')
 	})
 
-	it('player must log stack on table script failure (diagnostics for ball missing)', () => {
+	it('player must execute table script without swallowing errors', () => {
 		const src = fs.readFileSync('lib/game/player.ts', 'utf-8')
-		expect(src).toContain("Table script failed %s\\n%s")
-		expect(src).toContain('Error).stack')
+		expect(src).toContain('this.runScript(scope, false)')
 	})
 })

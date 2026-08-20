@@ -257,6 +257,17 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 						return vec4(t.rgb.mul(uTint).mul(uEmissionScale), t.a)
 					})()
 					;(mat.userData as any).__uEmissionScale = uEmissionScale
+				} else if (texKey === 'map' && ud.__addBlend) {
+					const tint = (mat as any).color ? ((mat as any).color as Color).getHex() : 0xffffff
+					const uIntensity = (mat.userData as any).__uIntensity ?? uniform(1.0)
+					const uTint = color(tint)
+					const texNode = texture(tex, uv())
+					mat.colorNode = Fn(() => {
+						const base = texNode
+						const rgb = base.rgb.mul(uTint).mul(uIntensity)
+						return vec4((rgb as any).rgb, base.a.mul(uIntensity))
+					})()
+					;(mat.userData as any).__uIntensity = uIntensity
 				}
 				if (texKey === 'envMap') (mat as any).envMapIntensity = 1
 				delete ud[pendingKey]

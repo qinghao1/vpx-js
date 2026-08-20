@@ -14,6 +14,7 @@ import { MeshBasicNodeMaterial } from 'three/webgpu'
 export class GpuDmdNodeController {
 	public readonly material: MeshBasicNodeMaterial
 	private dataTexture: DataTexture
+	private readonly texNode: any
 	private readonly uResolution: any
 	private readonly uLedColor: any
 	private readonly uDotRadius: any
@@ -39,11 +40,11 @@ export class GpuDmdNodeController {
 		this.uDynamicScale = uniform(1.0)
 
 		this.material = new MeshBasicNodeMaterial()
-		const texNode = texture(this.dataTexture)
+		this.texNode = texture(this.dataTexture)
 
 		this.material.colorNode = Fn(() => {
 			const currentUv = vec2(uv().x, float(1.0).sub(uv().y))
-			const sample = texNode.sample(currentUv)
+			const sample = this.texNode.sample(currentUv)
 			const brightness = sample.r.mul(this.uDynamicScale)
 			const gridCoord = fract(currentUv.mul(this.uResolution)).sub(vec2(0.5, 0.5))
 			const distFromCenter = length(gridCoord)
@@ -106,6 +107,7 @@ export class GpuDmdNodeController {
 			this.dataTexture.colorSpace = THREE.NoColorSpace
 			this.dataTexture.needsUpdate = true
 			this.material.map = this.dataTexture
+			if (this.texNode) this.texNode.value = this.dataTexture
 			this.uResolution.value.set(width, height)
 		} else {
 			const buf = this.dataTexture.image.data as Uint8Array

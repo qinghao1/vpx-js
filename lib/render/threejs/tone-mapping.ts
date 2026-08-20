@@ -26,11 +26,6 @@ export function applyRendererToneMapping(
 	data: { toneMapper?: number; exposure?: number } | undefined,
 	isLowQuality: boolean,
 ): void {
-	if (isLowQuality) {
-		renderer.toneMapping = THREE.NoToneMapping
-		renderer.toneMappingExposure = 1
-		return
-	}
 	renderer.toneMapping = resolveToneMapping(data?.toneMapper)
-	renderer.toneMappingExposure = clampExposure(data?.exposure, 2)
+	renderer.toneMappingExposure = clampExposure(data?.exposure, isLowQuality ? 1.5 : 2)
 }
