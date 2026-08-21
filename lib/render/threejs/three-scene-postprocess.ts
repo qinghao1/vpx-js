@@ -547,6 +547,17 @@ export function postProcessScene(
 		return cloned
 	}
 
+	const forkMaterial = (
+		mesh: THREE.Mesh,
+		index: number,
+		base: THREE.MeshStandardMaterial,
+	): THREE.MeshStandardMaterial => {
+		const clone = base.clone() as THREE.MeshStandardMaterial
+		if (Array.isArray(mesh.material)) (mesh.material as THREE.Material[])[index] = clone
+		else mesh.material = clone
+		return clone
+	}
+
 	node.traverse(o => {
 		const mesh = o as THREE.Mesh
 		const n = (mesh.name ?? '').toLowerCase()
@@ -607,10 +618,11 @@ export function postProcessScene(
 			mesh.frustumCulled = false
 			mesh.geometry?.computeBoundingSphere?.()
 			mesh.geometry?.computeBoundingBox?.()
-			const mats = (
+			const matsBtn = (
 				mesh.material ? (Array.isArray(mesh.material) ? mesh.material : [mesh.material]) : []
 			) as THREE.MeshStandardMaterial[]
-			for (const mat of mats) {
+			for (let matIdx = 0; matIdx < matsBtn.length; matIdx++) {
+				const mat = forkMaterial(mesh, matIdx, matsBtn[matIdx] as THREE.MeshStandardMaterial)
 				mat.side = THREE.DoubleSide
 				mat.polygonOffset = true
 				mat.polygonOffsetFactor = -1
@@ -659,6 +671,13 @@ export function postProcessScene(
 		}
 		for (let i = 0; i < mats.length; i++) {
 			let mat = mats[i] as THREE.MeshStandardMaterial
+			let didFork = false
+			const ensureFork = (): THREE.MeshStandardMaterial => {
+				if (didFork) return mat
+				mat = forkMaterial(mesh, i, mat)
+				didFork = true
+				return mat
+			}
 			const mName = (mat.name ?? '').toLowerCase()
 			const mp = ((mat.map as THREE.Texture | undefined)?.name ?? '').toLowerCase()
 			const mc = classify(
@@ -670,12 +689,14 @@ export function postProcessScene(
 			)
 			if (n.includes('flipper')) {
 				if (mc.isBakedMat && !mat.map) {
-					;(mat.color as THREE.Color).set(0xffffff)
-					mat.emissive = new THREE.Color(0x444444) as unknown as THREE.Color
-					mat.emissiveIntensity = BAKED_EMISSIVE
-					mat.roughness = 0.45
-					mat.metalness = 0
-					mat.side = THREE.DoubleSide
+					const m = ensureFork()
+					;(m.color as THREE.Color).set(0xffffff)
+					m.emissive = new THREE.Color(0x444444) as unknown as THREE.Color
+					m.emissiveIntensity = BAKED_EMISSIVE
+					m.roughness = 0.45
+					m.metalness = 0
+					m.side = THREE.DoubleSide
+					m.needsUpdate = true
 				}
 				if (mat.map && (mat.map as THREE.Texture).colorSpace !== THREE.SRGBColorSpace) {
 					;(mat.map as THREE.Texture).colorSpace = THREE.SRGBColorSpace
@@ -738,31 +759,34 @@ export function postProcessScene(
 				)
 			})()
 			if (pendingGeneric && !mat.map && !mat.emissiveMap && isInsertPending) {
-				mat.transparent = true
-				mat.opacity = 0
-				mat.depthWrite = false
-				mat.alphaTest = 0
-				mat.blending = THREE.NormalBlending
-				if (mat.emissive) (mat.emissive as THREE.Color).set(0x000000)
-				mat.emissiveIntensity = 0
-				mat.needsUpdate = true
+				const m = ensureFork()
+				m.transparent = true
+				m.opacity = 0
+				m.depthWrite = false
+				m.alphaTest = 0
+				m.blending = THREE.NormalBlending
+				if (m.emissive) (m.emissive as THREE.Color).set(0x000000)
+				m.emissiveIntensity = 0
+				m.needsUpdate = true
 				continue
 			}
 			if ((mat.metalness > 0.3 || mat.roughness < 0.4) && !mat.name.toLowerCase().includes('ball')) {
-				mat.roughness = Math.max(mat.roughness, 0.75)
-				mat.metalness = Math.min(mat.metalness, 0.1)
-				mat.needsUpdate = true
+				const m = ensureFork()
+				m.roughness = Math.max(m.roughness, 0.75)
+				m.metalness = Math.min(m.metalness, 0.1)
+				m.needsUpdate = true
 				stats.metalFixed++
 			}
 			if (n.includes('plastic') && !mat.map && !pendingOf(mat)) {
-				mat.side = THREE.DoubleSide
-				mat.transparent = false
-				mat.depthWrite = true
-				mat.alphaTest = 0
-				mat.opacity = 1
-				mat.roughness = Math.max((mat.roughness ?? 0.6) as number, 0.6)
-				mat.metalness = Math.min((mat.metalness ?? 0) as number, 0.05)
-				mat.needsUpdate = true
+				const m = ensureFork()
+				m.side = THREE.DoubleSide
+				m.transparent = false
+				m.depthWrite = true
+				m.alphaTest = 0
+				m.opacity = 1
+				m.roughness = Math.max((m.roughness ?? 0.6) as number, 0.6)
+				m.metalness = Math.min((m.metalness ?? 0) as number, 0.05)
+				m.needsUpdate = true
 			}
 			if (mat.map && (mat.map as THREE.Texture).colorSpace !== THREE.SRGBColorSpace) {
 				;(mat.map as THREE.Texture).colorSpace = THREE.SRGBColorSpace
@@ -775,11 +799,19 @@ export function postProcessScene(
 			mesh.geometry?.computeBoundingSphere?.()
 			mesh.geometry?.computeBoundingBox?.()
 		}
-		if (n.includes('plastic') || n.includes('ramp'))
-			for (const mat of (Array.isArray(mesh.material)
-				? mesh.material
-				: [mesh.material]) as THREE.MeshStandardMaterial[])
-				mat.side = THREE.DoubleSide
+		if (n.includes('plastic') || n.includes('ramp')) {
+			const rMats = (
+				Array.isArray(mesh.material) ? mesh.material : [mesh.material]
+			) as THREE.MeshStandardMaterial[]
+			for (let pi = 0; pi < rMats.length; pi++) {
+				const base = rMats[pi] as THREE.MeshStandardMaterial
+				if (base.side !== THREE.DoubleSide) {
+					const m = forkMaterial(mesh, pi, base)
+					m.side = THREE.DoubleSide
+					m.needsUpdate = true
+				}
+			}
+		}
 	})
 
 	let hasBakedPlayfield = false
