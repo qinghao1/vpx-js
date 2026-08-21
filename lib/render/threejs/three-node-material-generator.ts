@@ -269,6 +269,11 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 					;(mat.userData as any).__uIntensity = uIntensity
 				}
 				if (texKey === 'envMap') (mat as any).envMapIntensity = 1
+				if (texKey === 'map' && !ud.__isBaked && !ud.__addBlend) {
+					;(mat as any).polygonOffset = true
+					;(mat as any).polygonOffsetFactor = 0
+					;(mat as any).polygonOffsetUnits = -1
+				}
 				delete ud[pendingKey]
 				;(mat as any).needsUpdate = true
 				fixed++

@@ -9,6 +9,8 @@ export const BAKED_EMISSIVE = 1.0
 export const BAKED_ROUGH = 0.75
 export const BAKED_METAL = 0.1
 
+const LARGE_TEXTURE_PIXELS = 1_048_576
+
 const RE_BAKE_MAT = /bake/i
 const RE_BAKE_MAP = /bake|nestmap/i
 const RE_ALPHA_MESH = /armp|ramp|bat_|non[_-]?opaque|plastic|gate/i
@@ -19,6 +21,10 @@ const RE_LM = /lm_/i
 const RE_GI = /gi0|gi1|_gi|gi_/i
 const RE_RAMP_FAMILY = /armp|ramp|botramp|rampscrw/i
 const RE_NON_OPAQUE = /non[_-]?opaque/i
+const RE_KEEP_WHITE =
+	/playfield|ball|flipper|bumper|light|dmd|vr_|vrcab|cabinet|lockbar|pincab|ramp|plastic|gate|kicker|target|spinner|button|coin|plunger|bm_/i
+const RE_KEEP_DARK =
+	/playfield|ball|flipper|bumper|light|dmd|vr_|vrcab|cabinet|lockbar|pincab|ramp|plastic|gate|kicker|target|spinner|button|coin|plunger/i
 
 export const BUTTON_CODE_PATTERNS: { regex: RegExp; code: string }[] = [
 	{ regex: /coin/i, code: 'Digit5' },
@@ -144,7 +150,7 @@ function fixBaked(mat: THREE.MeshStandardMaterial, map?: THREE.Texture | null): 
 	mat.needsUpdate = true
 }
 
-function fixVr(mat: THREE.MeshStandardMaterial): void {
+function fixVr(mat: THREE.MeshStandardMaterial, isCab = false): void {
 	const apply = (tex: THREE.Texture | null | undefined) => {
 		if (!tex) return
 		tex.wrapS = THREE.ClampToEdgeWrapping
@@ -161,7 +167,7 @@ function fixVr(mat: THREE.MeshStandardMaterial): void {
 	mat.toneMapped = false
 	mat.roughness = BAKED_ROUGH
 	mat.metalness = BAKED_METAL
-	if (mat.map) {
+	if (mat.map || isCab) {
 		mat.polygonOffset = true
 		mat.polygonOffsetFactor = 0
 		mat.polygonOffsetUnits = -1
@@ -273,9 +279,6 @@ export function showCabFlippers(root: THREE.Object3D): number {
 	})
 	return shown
 }
-
-export const hideCab = hideCabFlippers
-export const showCab = showCabFlippers
 
 function makeParentsVisible(mesh: THREE.Object3D, root: THREE.Object3D, stats: Record<string, number>): void {
 	for (let p: THREE.Object3D | null = mesh.parent; p && p !== root; p = p.parent) {
@@ -429,7 +432,7 @@ export function postProcessScene(
 		const cached = vrCache.get(key)
 		if (cached) return cached
 		const cloned = base.clone() as THREE.MeshStandardMaterial
-		fixVr(cloned)
+		fixVr(cloned, isCab)
 		const hasPending = !!pending && !base.map
 		if (hasPending) {
 			if (isCab) {
@@ -854,33 +857,7 @@ export function postProcessScene(
 	if (stats.glass) harnessLog?.(`[glass] Hid ${stats.glass}`, 'info')
 
 	let whiteWallsHidden = 0
-	const keepWhite = (name: string): boolean => {
-		const n = name.toLowerCase()
-		return (
-			n.includes('playfield') ||
-			n.includes('ball') ||
-			n.includes('flipper') ||
-			n.includes('bumper') ||
-			n.includes('light') ||
-			n.includes('dmd') ||
-			n.includes('vr_') ||
-			n.includes('vrcab') ||
-			n.includes('cabinet') ||
-			n.includes('lockbar') ||
-			n.includes('pincab') ||
-			n.includes('ramp') ||
-			n.includes('plastic') ||
-			n.includes('gate') ||
-			n.includes('kicker') ||
-			n.includes('target') ||
-			n.includes('spinner') ||
-			n.includes('button') ||
-			n.includes('coin') ||
-			n.includes('plunger') ||
-			n.includes('primitive-bm') ||
-			n.includes('bm_')
-		)
-	}
+	const keepWhite = (name: string): boolean => RE_KEEP_WHITE.test(name)
 	node.traverse(o => {
 		const mesh = o as THREE.Mesh
 		if (!mesh.isMesh || !mesh.visible) return
@@ -915,29 +892,7 @@ export function postProcessScene(
 			const mesh = o as THREE.Mesh
 			if (!mesh.isMesh || !mesh.visible) return
 			const n = (mesh.name ?? '').toLowerCase()
-			if (
-				n.includes('playfield') ||
-				n.includes('ball') ||
-				n.includes('flipper') ||
-				n.includes('bumper') ||
-				n.includes('light') ||
-				n.includes('dmd') ||
-				n.includes('vr_') ||
-				n.includes('vrcab') ||
-				n.includes('cabinet') ||
-				n.includes('lockbar') ||
-				n.includes('pincab') ||
-				n.includes('ramp') ||
-				n.includes('plastic') ||
-				n.includes('gate') ||
-				n.includes('kicker') ||
-				n.includes('target') ||
-				n.includes('spinner') ||
-				n.includes('button') ||
-				n.includes('coin') ||
-				n.includes('plunger')
-			)
-				return
+			if (RE_KEEP_DARK.test(n)) return
 			const mats = (
 				Array.isArray(mesh.material) ? mesh.material : [mesh.material]
 			) as THREE.MeshStandardMaterial[]

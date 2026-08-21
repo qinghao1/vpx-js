@@ -31,12 +31,10 @@ import { VpxRenderPipeline } from '../../dist-esm/lib/render/threejs/three-rende
 import {
 	applyBakedMaterial,
 	ensureProceduralRoom,
-	hideCab,
 	hideCabFlippers,
 	isBakedMeshByNames,
 	isDeferred,
 	postProcessScene,
-	showCab,
 	showCabFlippers,
 } from '../../dist-esm/lib/render/threejs/three-scene-postprocess.js'
 import { ThreeTextureLoaderBrowser } from '../../dist-esm/lib/render/threejs/three-texture-loader-browser.js'
@@ -555,7 +553,7 @@ export class Viewer {
 		}
 		if (this.renderer) this.renderer.setPixelRatio(getTargetPixelRatio('viewer'))
 		this._hidePlayTip?.()
-		showCab(this.tableGroup)
+		showCabFlippers(this.tableGroup)
 		this._syncChrome()
 		const target = computeViewerFraming(this.tableGroup)
 		await this._animateCameraTo(target, CAM_ANIM.durationMode)
@@ -771,7 +769,7 @@ export class Viewer {
 		this.player?.onKeyUp({ code: 'ShiftLeft', key: 'Shift', ts: Date.now(), location: 1 })
 		this.player?.onKeyUp({ code: 'ShiftRight', key: 'Shift', ts: Date.now(), location: 2 })
 		if (this.controls) this.controls.enabled = true
-		if (this.tableGroup) showCab(this.tableGroup)
+		if (this.tableGroup) showCabFlippers(this.tableGroup)
 		const bg = this.tableGroup?.getObjectByName('balls')
 		if (bg) bg.visible = false
 		this._emitModeChange()
@@ -1482,6 +1480,9 @@ export class Viewer {
 										for (let p = o.parent; p && p !== this.tableGroup; p = p.parent)
 											if (p.visible === false) p.visible = true
 									}
+									m.polygonOffset = true
+									m.polygonOffsetFactor = 0
+									m.polygonOffsetUnits = -1
 									if (m.transparent && m.opacity === 0) {
 										m.transparent = false
 										m.opacity = 1
@@ -1499,6 +1500,7 @@ export class Viewer {
 										}
 										m.needsUpdate = true
 									}
+									m.needsUpdate = true
 								} else {
 									const texName = String(tex?.name ?? name ?? '').toLowerCase()
 									const isRoundInsert = texName.includes('round') && !texName.includes('ground')
