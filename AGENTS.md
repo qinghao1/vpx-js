@@ -11,7 +11,7 @@ npm run build:esm          # tsc → dist-esm only (required before demo-browser
 npx tsc --noEmit           # typecheck
 npx biome check .          # lint/format (tabs, width 120)
 npm test                   # vitest --coverage
-npx tsx test/harness/verify-all.ts   # E2E 1..7: wasm → table → pinmame → player → gameplay → browser → vpinball-compat
+npx tsx test/harness/verify-all.ts   # E2E 1..8: wasm → table → pinmame → player → gameplay → browser → vpinball-compat → discrepancies
 
 # Native VPinball debugging (requires VPinballX standalone)
 npm run vpinball:setup     # Tier A build or Tier B prebuilt → ~/.cache/vpinball/
@@ -22,6 +22,7 @@ npm run vpinball -- "http://localhost:3000/?vpx=/@fs/...&rom=/@fs/..."  # play v
 npm run compare -- --vpx=table-flipper   # dual window: browser left 0,0 + native right 1280,0
 npm run verify:vpinball -- --all-fixtures   # script & table structure parity across 25 fixtures
 npm run verify:audit       # table structure & physics constants audit across 25 fixtures
+npm run verify:discrepancies # web vs native gap report → ~/docs/vpx-js-web-vs-native-discrepancies.md (20 checks, TAP + markdown)
 ```
 
 Node via `fnm` — `.nvmrc` `24`, `.node-version` `24.19.0`. Activate with `eval "$(fnm env --use-on-cd --shell bash)"`.
@@ -46,7 +47,7 @@ Node via `fnm` — `.nvmrc` `24`, `.node-version` `24.19.0`. Activate with `eval
 ## Testing
 
 - `vitest` on `lib/**/*.spec.ts` (`pool:forks`, `fileParallelism:false`, 10s timeout).
-- `test/harness/` is the single E2E entry: `verify-all.ts` (TAP 1..7) → `verify-browser.ts` → `demo-browser/e2e/integration.mjs` (+ `verify-vpinball-compat.ts` optional # SKIP if native missing). Keep it unified.
+- `test/harness/` is the single E2E entry: `verify-all.ts` (TAP 1..8) → `verify-browser.ts` → `demo-browser/e2e/integration.mjs` (+ `verify-vpinball-compat.ts` + `capture-discrepancies.ts` optional # SKIP if native missing). Keep it unified.
 
 ## Gotchas
 

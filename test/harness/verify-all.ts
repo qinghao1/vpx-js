@@ -10,6 +10,7 @@ const checks = [
 	{ name: 'gameplay', script: 'test/harness/harness-gameplay.ts' },
 	{ name: 'browser', script: 'test/harness/verify-browser.ts', optional: true },
 	{ name: 'vpinball-compat', script: 'test/harness/verify-vpinball-compat.ts', optional: true },
+	{ name: 'discrepancies', script: 'test/harness/capture-discrepancies.ts', optional: true },
 ]
 
 async function run(script: string): Promise<boolean> {
@@ -48,7 +49,12 @@ for (let index = 0; index < checks.length; index++) {
 			console.log(`ok ${index + 1} - ${check.name}`)
 		} else if (check.optional) {
 			pass++
-			const skipReason = check.name === 'vpinball-compat' ? 'native vpinball not found' : 'browser not ready'
+			const skipReason =
+				check.name === 'vpinball-compat'
+					? 'native vpinball not found'
+					: check.name === 'discrepancies'
+						? 'known gaps (see ~/docs/vpx-js-web-vs-native-discrepancies.md)'
+						: 'browser not ready'
 			console.log(`ok ${index + 1} - ${check.name} # SKIP ${skipReason}`)
 		} else {
 			console.log(`not ok ${index + 1} - ${check.name}`)
