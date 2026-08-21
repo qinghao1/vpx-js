@@ -82,9 +82,7 @@
 		"compare": "tsx test/harness/compare-side-by-side.ts",
 		"verify:vpinball": "tsx test/harness/verify-vpinball-compat.ts",
 		"verify:audit": "tsx test/harness/verify-vpinball-compat.ts --audit",
-		"verify:discrepancies": "tsx test/harness/capture-discrepancies.ts",
-		"discrepancies": "tsx test/harness/capture-discrepancies.ts",
-		"capture-discrepancies": "tsx test/harness/capture-discrepancies.ts"
+		"verify:discrepancies": "tsx test/harness/capture-discrepancies.ts"
 	},
 	"dependencies": {
 		"dash-ast": "^2.0.0",
