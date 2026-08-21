@@ -16,11 +16,11 @@ export interface ResolvedVpxSession {
 const HOME = os.homedir()
 const REPO_ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../..')
 
-function expandTilde(p: string): string {
-	if (p === '~') return HOME
-	if (p.startsWith('~/')) return path.join(HOME, p.slice(2))
-	if (p.startsWith('~')) return p.replace(/^~(?=\/)/, HOME)
-	return p
+function expandTilde(targetPath: string): string {
+	if (targetPath === '~') return HOME
+	if (targetPath.startsWith('~/')) return path.join(HOME, targetPath.slice(2))
+	if (targetPath.startsWith('~')) return targetPath.replace(/^~(?=\/)/, HOME)
+	return targetPath
 }
 
 function decodeViteFsParam(param: string): string {
@@ -34,9 +34,9 @@ function decodeViteFsParam(param: string): string {
 	return expandTilde(param)
 }
 
-function existsFile(p: string): boolean {
+function existsFile(filePath: string): boolean {
 	try {
-		return fs.existsSync(p) && fs.statSync(p).isFile()
+		return fs.existsSync(filePath) && fs.statSync(filePath).isFile()
 	} catch {
 		return false
 	}
@@ -226,41 +226,57 @@ export interface VpinballDiscovery {
 }
 
 export function discoverVpinball(): VpinballDiscovery {
-	const candidates: Array<{ p: string; source: string }> = []
+	const candidates: Array<{ candidatePath: string; source: string }> = []
 	if (process.env.VPINBALL_BIN) {
-		const v = expandTilde(process.env.VPINBALL_BIN)
-		candidates.push({ p: v, source: 'VPINBALL_BIN' })
-		if (fs.existsSync(v) && fs.statSync(v).isDirectory()) {
-			candidates.push({ p: path.join(v, 'VPinballX_GL'), source: 'VPINBALL_BIN dir' })
-			candidates.push({ p: path.join(v, 'VPinballX_BGFX'), source: 'VPINBALL_BIN dir' })
+		const binEnv = expandTilde(process.env.VPINBALL_BIN)
+		candidates.push({ candidatePath: binEnv, source: 'VPINBALL_BIN' })
+		if (fs.existsSync(binEnv) && fs.statSync(binEnv).isDirectory()) {
+			candidates.push({ candidatePath: path.join(binEnv, 'VPinballX_GL'), source: 'VPINBALL_BIN dir' })
+			candidates.push({ candidatePath: path.join(binEnv, 'VPinballX_BGFX'), source: 'VPINBALL_BIN dir' })
 		}
 	}
 	if (process.env.VPINBALL_DIR) {
-		const d = expandTilde(process.env.VPINBALL_DIR)
-		candidates.push({ p: path.join(d, 'VPinballX_GL'), source: 'VPINBALL_DIR' })
-		candidates.push({ p: path.join(d, 'VPinballX_BGFX'), source: 'VPINBALL_DIR' })
+		const dirEnv = expandTilde(process.env.VPINBALL_DIR)
+		candidates.push({ candidatePath: path.join(dirEnv, 'VPinballX_GL'), source: 'VPINBALL_DIR' })
+		candidates.push({ candidatePath: path.join(dirEnv, 'VPinballX_BGFX'), source: 'VPINBALL_DIR' })
 	}
 	const homeProjects = path.join(HOME, 'projects/vpinball')
-	candidates.push({ p: path.join(homeProjects, 'build/VPinballX_GL'), source: 'sister build' })
-	candidates.push({ p: path.join(homeProjects, 'build/VPinballX_BGFX'), source: 'sister build' })
-	candidates.push({ p: path.join(homeProjects, 'bin/VPinballX_GL'), source: 'sister bin' })
-	candidates.push({ p: path.join(homeProjects, 'bin/VPinballX_BGFX'), source: 'sister bin' })
-	candidates.push({ p: path.join(REPO_ROOT, 'external/vpinball/build/VPinballX_GL'), source: 'submodule build' })
-	candidates.push({ p: path.join(REPO_ROOT, 'external/vpinball/build/VPinballX_BGFX'), source: 'submodule build' })
-	candidates.push({ p: path.join(REPO_ROOT, 'external/vpinball/bin/VPinballX_GL'), source: 'submodule bin' })
-	candidates.push({ p: path.join(REPO_ROOT, 'external/vpinball/bin/VPinballX_BGFX'), source: 'submodule bin' })
-	candidates.push({ p: path.join(HOME, '.cache/vpinball/VPinballX_GL'), source: 'cache' })
-	candidates.push({ p: path.join(HOME, '.cache/vpinball/VPinballX_BGFX'), source: 'cache' })
-	candidates.push({ p: path.join(REPO_ROOT, '.cache/vpinball/VPinballX_GL'), source: 'cache local' })
-	candidates.push({ p: path.join(REPO_ROOT, '.cache/vpinball/VPinballX_BGFX'), source: 'cache local' })
+	candidates.push({ candidatePath: path.join(homeProjects, 'build/VPinballX_GL'), source: 'sister build' })
+	candidates.push({ candidatePath: path.join(homeProjects, 'build/VPinballX_BGFX'), source: 'sister build' })
+	candidates.push({ candidatePath: path.join(homeProjects, 'bin/VPinballX_GL'), source: 'sister bin' })
+	candidates.push({ candidatePath: path.join(homeProjects, 'bin/VPinballX_BGFX'), source: 'sister bin' })
+	candidates.push({
+		candidatePath: path.join(REPO_ROOT, 'external/vpinball/build/VPinballX_GL'),
+		source: 'submodule build',
+	})
+	candidates.push({
+		candidatePath: path.join(REPO_ROOT, 'external/vpinball/build/VPinballX_BGFX'),
+		source: 'submodule build',
+	})
+	candidates.push({
+		candidatePath: path.join(REPO_ROOT, 'external/vpinball/bin/VPinballX_GL'),
+		source: 'submodule bin',
+	})
+	candidates.push({
+		candidatePath: path.join(REPO_ROOT, 'external/vpinball/bin/VPinballX_BGFX'),
+		source: 'submodule bin',
+	})
+	candidates.push({ candidatePath: path.join(HOME, '.cache/vpinball/VPinballX_GL'), source: 'cache' })
+	candidates.push({ candidatePath: path.join(HOME, '.cache/vpinball/VPinballX_BGFX'), source: 'cache' })
+	candidates.push({ candidatePath: path.join(REPO_ROOT, '.cache/vpinball/VPinballX_GL'), source: 'cache local' })
+	candidates.push({ candidatePath: path.join(REPO_ROOT, '.cache/vpinball/VPinballX_BGFX'), source: 'cache local' })
 
-	for (const c of candidates) {
+	for (const candidate of candidates) {
 		try {
-			if (fs.existsSync(c.p) && fs.statSync(c.p).isFile()) {
+			if (fs.existsSync(candidate.candidatePath) && fs.statSync(candidate.candidatePath).isFile()) {
 				try {
-					fs.accessSync(c.p, fs.constants.X_OK)
+					fs.accessSync(candidate.candidatePath, fs.constants.X_OK)
 				} catch {}
-				return { binPath: path.resolve(c.p), binDir: path.dirname(path.resolve(c.p)), source: c.source }
+				return {
+					binPath: path.resolve(candidate.candidatePath),
+					binDir: path.dirname(path.resolve(candidate.candidatePath)),
+					source: candidate.source,
+				}
 			}
 		} catch {}
 	}
@@ -278,12 +294,12 @@ export function discoverVpinball(): VpinballDiscovery {
 						stdio: 'ignore',
 						timeout: 15000,
 					})
-					for (const c of candidates) {
-						if (fs.existsSync(c.p) && fs.statSync(c.p).isFile()) {
+					for (const candidate of candidates) {
+						if (fs.existsSync(candidate.candidatePath) && fs.statSync(candidate.candidatePath).isFile()) {
 							return {
-								binPath: path.resolve(c.p),
-								binDir: path.dirname(path.resolve(c.p)),
-								source: `${c.source} (after init)`,
+								binPath: path.resolve(candidate.candidatePath),
+								binDir: path.dirname(path.resolve(candidate.candidatePath)),
+								source: `${candidate.source} (after init)`,
 							}
 						}
 					}
@@ -318,21 +334,15 @@ export function createSessionIni(
 	const height = opts.height ?? 900
 	const x = opts.x ?? 1280
 	const y = opts.y ?? 0
-	let pinmamePath = path.join(HOME, '.pinmame')
+	let pinmamePath = path.join(HOME, '.pinmame/roms')
 	if (romPath) {
 		try {
-			const absRom = path.resolve(romPath)
-			const parent = path.dirname(absRom)
-			if (path.basename(parent).toLowerCase() === 'roms') {
-				pinmamePath = path.dirname(parent)
-			} else {
-				pinmamePath = parent
-			}
+			pinmamePath = path.dirname(path.resolve(romPath))
 		} catch {}
 	} else if (vpxPath) {
 		const tableDir = path.dirname(path.resolve(vpxPath))
-		const tablePinmame = path.join(tableDir, 'pinmame')
-		if (fs.existsSync(path.join(tablePinmame, 'roms'))) pinmamePath = tablePinmame
+		const tablePinmameRoms = path.join(tableDir, 'pinmame/roms')
+		if (fs.existsSync(tablePinmameRoms)) pinmamePath = tablePinmameRoms
 	}
 	const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'vpinball-'))
 	const iniPath = path.join(tmpDir, 'VPinballX.ini')
