@@ -470,8 +470,10 @@ export async function verifyVpinballCompat(
 			if (scriptToTranspile.trim().length > 0) {
 				try {
 					const { Grammar } = await import('../../lib/scripting/grammar/grammar.js')
+					const { normalizeNewCall } = await import('../../lib/scripting/transpiler.js')
 					const grammar = new Grammar()
-					const js = grammar.vbsToJs(scriptToTranspile)
+					const processedScript = normalizeNewCall(scriptToTranspile)
+					const js = grammar.vbsToJs(processedScript)
 					if (typeof js !== 'string') {
 						console.log('  not ok — vbsToJs did not return a string')
 						fail++

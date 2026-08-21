@@ -28,7 +28,7 @@ declare function play(
 	player: Player,
 ): void
 
-function normalizeNewCall(vbs: string): string {
+export function normalizeNewCall(vbs: string): string {
 	let out = vbs.replace(/Set\s+(\w+)\s*=\s*\(\s*New\s+(\w+)\s*\)\s*\(([^)]*)\)/gi, (_, v, c, a) => {
 		const args = (a as string).trim()
 		return args ? `Set ${v} = New ${c}\n${v}.init ${args}` : `Set ${v} = New ${c}`

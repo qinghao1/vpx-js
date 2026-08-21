@@ -125,6 +125,27 @@ async function runDoctor(): Promise<boolean> {
 		}
 	}
 	if (!shaderFound) {
+		for (const dir of [binDir, path.join(binDir, '..')]) {
+			try {
+				for (const entry of fs.readdirSync(dir)) {
+					if (!entry.toLowerCase().startsWith('shader')) continue
+					const full = path.join(dir, entry)
+					try {
+						if (
+							fs.statSync(full).isDirectory() &&
+							fs.readdirSync(full).some(f => f.endsWith('.glfx') || f.endsWith('.fxh'))
+						) {
+							console.log(`  shaders: ${full} (${fs.readdirSync(full).length} files)`)
+							shaderFound = true
+							break
+						}
+					} catch {}
+				}
+			} catch {}
+			if (shaderFound) break
+		}
+	}
+	if (!shaderFound) {
 		ok = false
 		console.log('  shaders: NOT FOUND (expected shaders-10.8.1/ with SMAA.glfx etc.)')
 	}
