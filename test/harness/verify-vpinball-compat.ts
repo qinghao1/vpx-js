@@ -208,6 +208,122 @@ export function auditTableStructure(table: any): TableStructureAudit {
 			physicsIssues.push(`Spinner '${name}' negative elasticity: ${spinnerData.elasticity}`)
 	}
 
+	// Ramps validation
+	for (const [name, ramp] of Object.entries(table.ramps ?? {})) {
+		const rampData = (ramp as any).data
+		if (!rampData) continue
+		if (typeof rampData.topWidth === 'number' && rampData.topWidth < 0)
+			physicsIssues.push(`Ramp '${name}' negative topWidth: ${rampData.topWidth}`)
+		if (typeof rampData.bottomWidth === 'number' && rampData.bottomWidth < 0)
+			physicsIssues.push(`Ramp '${name}' negative bottomWidth: ${rampData.bottomWidth}`)
+		if (typeof rampData.wireDiameter === 'number' && rampData.wireDiameter < 0)
+			physicsIssues.push(`Ramp '${name}' negative wireDiameter: ${rampData.wireDiameter}`)
+	}
+
+	// Surfaces (walls) validation
+	for (const [name, surface] of Object.entries(table.surfaces ?? {})) {
+		const surfaceData = (surface as any).data
+		if (!surfaceData) continue
+		if (typeof surfaceData.elasticity === 'number' && surfaceData.elasticity < 0)
+			physicsIssues.push(`Surface '${name}' negative elasticity: ${surfaceData.elasticity}`)
+		if (typeof surfaceData.friction === 'number' && surfaceData.friction < 0)
+			physicsIssues.push(`Surface '${name}' negative friction: ${surfaceData.friction}`)
+		if (
+			typeof surfaceData.topHeight === 'number' &&
+			typeof surfaceData.bottomHeight === 'number' &&
+			surfaceData.bottomHeight > surfaceData.topHeight
+		)
+			warnings.push(
+				`Surface '${name}' bottomHeight (${surfaceData.bottomHeight}) > topHeight (${surfaceData.topHeight})`,
+			)
+	}
+
+	// Kickers validation
+	for (const [name, kicker] of Object.entries(table.kickers ?? {})) {
+		const kickerData = (kicker as any).data
+		if (!kickerData) continue
+		if (typeof kickerData.radius === 'number' && kickerData.radius <= 0)
+			physicsIssues.push(`Kicker '${name}' invalid radius: ${kickerData.radius}`)
+		if (typeof kickerData.hitHeight === 'number' && kickerData.hitHeight < 0)
+			physicsIssues.push(`Kicker '${name}' negative hitHeight: ${kickerData.hitHeight}`)
+		if (kickerData.center && (Number.isNaN(kickerData.center.x) || Number.isNaN(kickerData.center.y)))
+			physicsIssues.push(`Kicker '${name}' center coordinate is NaN`)
+	}
+
+	// HitTargets validation
+	for (const [name, hitTarget] of Object.entries(table.hitTargets ?? {})) {
+		const hitTargetData = (hitTarget as any).data
+		if (!hitTargetData) continue
+		if (typeof hitTargetData.depth === 'number' && hitTargetData.depth < 0)
+			physicsIssues.push(`HitTarget '${name}' negative depth: ${hitTargetData.depth}`)
+		if (typeof hitTargetData.elasticity === 'number' && hitTargetData.elasticity < 0)
+			physicsIssues.push(`HitTarget '${name}' negative elasticity: ${hitTargetData.elasticity}`)
+		if (typeof hitTargetData.friction === 'number' && hitTargetData.friction < 0)
+			physicsIssues.push(`HitTarget '${name}' negative friction: ${hitTargetData.friction}`)
+	}
+
+	// Triggers validation
+	for (const [name, trigger] of Object.entries(table.triggers ?? {})) {
+		const triggerData = (trigger as any).data
+		if (!triggerData) continue
+		if (typeof triggerData.hitHeight === 'number' && triggerData.hitHeight < 0)
+			physicsIssues.push(`Trigger '${name}' negative hitHeight: ${triggerData.hitHeight}`)
+		if (typeof triggerData.radius === 'number' && triggerData.radius < 0)
+			physicsIssues.push(`Trigger '${name}' negative radius: ${triggerData.radius}`)
+	}
+
+	// Plungers validation
+	for (const [name, plunger] of Object.entries(table.plungers ?? {})) {
+		const plungerData = (plunger as any).data
+		if (!plungerData) continue
+		if (typeof plungerData.speedPull === 'number' && plungerData.speedPull < 0)
+			physicsIssues.push(`Plunger '${name}' negative speedPull: ${plungerData.speedPull}`)
+		if (typeof plungerData.speedFire === 'number' && plungerData.speedFire < 0)
+			physicsIssues.push(`Plunger '${name}' negative speedFire: ${plungerData.speedFire}`)
+		if (typeof plungerData.stroke === 'number' && plungerData.stroke < 0)
+			physicsIssues.push(`Plunger '${name}' negative stroke: ${plungerData.stroke}`)
+	}
+
+	// Primitives validation
+	for (const [name, primitive] of Object.entries(table.primitives ?? {})) {
+		const primitiveData = (primitive as any).data
+		if (!primitiveData) continue
+		if (
+			primitiveData.position &&
+			(Number.isNaN(primitiveData.position.x) || Number.isNaN(primitiveData.position.y))
+		)
+			physicsIssues.push(`Primitive '${name}' position coordinate is NaN`)
+		if (primitiveData.size && (Number.isNaN(primitiveData.size.x) || Number.isNaN(primitiveData.size.y)))
+			physicsIssues.push(`Primitive '${name}' size dimension is NaN`)
+	}
+
+	// Flashers validation
+	for (const [name, flasher] of Object.entries(table.flashers ?? {})) {
+		const flasherData = (flasher as any).data
+		if (!flasherData) continue
+		if (typeof flasherData.opacity === 'number' && flasherData.opacity < 0)
+			physicsIssues.push(`Flasher '${name}' negative opacity: ${flasherData.opacity}`)
+	}
+
+	// Textboxes validation
+	for (const [name, textbox] of Object.entries(table.textboxes ?? {})) {
+		const textboxData = (textbox as any).data
+		if (!textboxData) continue
+		if (textboxData.isDMD || /dmd/i.test(textboxData.text ?? '')) {
+			warnings.push(`Legacy Textbox '${name}' is used for DMD rendering (recommend Flasher)`)
+		}
+	}
+
+	// Materials validation
+	for (const mat of table.data?.materials ?? []) {
+		if (typeof mat.elasticity === 'number' && mat.elasticity < 0)
+			physicsIssues.push(`Material '${mat.name}' negative elasticity: ${mat.elasticity}`)
+		if (typeof mat.friction === 'number' && mat.friction < 0)
+			physicsIssues.push(`Material '${mat.name}' negative friction: ${mat.friction}`)
+		if (typeof mat.scatterAngle === 'number' && mat.scatterAngle < 0)
+			physicsIssues.push(`Material '${mat.name}' negative scatterAngle: ${mat.scatterAngle}`)
+	}
+
 	// Timers frame-pacing check (< 17ms below 60fps)
 	for (const [name, timer] of Object.entries(table.timers ?? {})) {
 		const timerData = (timer as any).data
