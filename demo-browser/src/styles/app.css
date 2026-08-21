@@ -621,7 +621,6 @@ body.show-debug .debug-panel {
 		0 20px 60px rgba(0, 0, 0, 0.5),
 		0 1px 0 var(--border-subtle) inset;
 	margin: 0;
-	inset: auto;
 }
 #help[hidden],
 .help[hidden] {
@@ -840,13 +839,20 @@ dialog.help::backdrop {
 		0 1px 0 rgba(255, 255, 255, 0.9) inset;
 	white-space: nowrap;
 }
-body.is-play #brand,
+body.is-play #brand {
+	display: none !important;
+}
 body.is-play #actions {
 	opacity: 0.55;
 }
-body.is-play #brand:hover,
 body.is-play #actions:hover {
 	opacity: 1;
+}
+@media (pointer: coarse), (max-width: 768px) {
+	body.is-play #brand,
+	body.is-play #actions {
+		display: none !important;
+	}
 }
 
 /* Debug toggle */
@@ -1005,27 +1011,27 @@ body.is-play #mobile-controls {
 	color: #fff;
 	transform: scale(0.97);
 }
-#mobile-controls button[data-code='Digit5'] {
+#mobile-controls button[data-code="Digit5"] {
 	top: max(14px, env(safe-area-inset-top));
 	left: max(14px, env(safe-area-inset-left));
 }
-#mobile-controls button[data-code='Digit1'] {
+#mobile-controls button[data-code="Digit1"] {
 	top: max(14px, env(safe-area-inset-top));
 	right: max(14px, env(safe-area-inset-right));
 }
-#mobile-controls button[data-code='Enter'] {
+#mobile-controls button[data-code="Enter"] {
 	bottom: max(14px, env(safe-area-inset-bottom));
 	right: max(14px, env(safe-area-inset-right));
 	min-height: 48px;
 	padding: 12px 18px;
 }
-#mobile-controls button[data-code='AltLeft'] {
+#mobile-controls button[data-code="AltLeft"] {
 	bottom: max(14px, env(safe-area-inset-bottom));
 	left: 50%;
 	transform: translateX(-50%);
 }
-#mobile-controls button[data-code='AltLeft']:active,
-#mobile-controls button[data-code='AltLeft'][data-pressed] {
+#mobile-controls button[data-code="AltLeft"]:active,
+#mobile-controls button[data-code="AltLeft"][data-pressed] {
 	transform: translateX(-50%) scale(0.97);
 }
 @media (max-width: 480px) {
@@ -1034,7 +1040,7 @@ body.is-play #mobile-controls {
 		padding: 9px 12px;
 		min-height: 36px;
 	}
-	#mobile-controls button[data-code='Enter'] {
+	#mobile-controls button[data-code="Enter"] {
 		min-height: 44px;
 		padding: 10px 14px;
 	}

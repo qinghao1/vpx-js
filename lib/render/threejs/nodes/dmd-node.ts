@@ -9,7 +9,23 @@ import {
 	UnsignedByteType,
 	Vector2,
 } from 'three'
-import { Fn, float, fract, length, smoothstep, texture, uniform, uv, vec2, vec4 } from 'three/tsl'
+import {
+	clamp,
+	Fn,
+	float,
+	floor,
+	fract,
+	fwidth,
+	length,
+	max,
+	mix,
+	smoothstep,
+	texture,
+	uniform,
+	uv,
+	vec2,
+	vec4,
+} from 'three/tsl'
 import { MeshBasicNodeMaterial } from 'three/webgpu'
 
 export class GpuDmdNodeController {
@@ -44,14 +60,30 @@ export class GpuDmdNodeController {
 		this.texNode = texture(this.dataTexture)
 
 		this.material.colorNode = Fn(() => {
-			const currentUv = vec2(uv().x, float(1.0).sub(uv().y))
-			const sample = this.texNode.sample(currentUv)
+			const currentUv = clamp(vec2(uv().x, float(1.0).sub(uv().y)), vec2(0.0, 0.0), vec2(0.99999, 0.99999))
+			const cellUv = floor(currentUv.mul(this.uResolution)).add(vec2(0.5, 0.5)).div(this.uResolution)
+			const sample = this.texNode.sample(cellUv)
 			const brightness = sample.r.mul(this.uDynamicScale)
+
+			// Screen-space cell derivative: smoothly blend from round LED dots (close) to solid cells (distant) to eliminate Moiré and moving black bars
+			const cellDeriv = fwidth(currentUv.mul(this.uResolution))
+			const cellScale = max(cellDeriv.x, cellDeriv.y)
+			const blendToSquare = clamp(cellScale.mul(float(3.0)).sub(float(0.3)), float(0.0), float(1.0))
+
 			const gridCoord = fract(currentUv.mul(this.uResolution)).sub(vec2(0.5, 0.5))
 			const distFromCenter = length(gridCoord)
-			const dotShape = smoothstep(this.uDotRadius, this.uDotRadius.sub(float(0.06)), distFromCenter)
-			const glow = smoothstep(float(0.5), float(0.0), distFromCenter).mul(this.uGlowIntensity)
-			const intensity = dotShape.add(glow).mul(brightness)
+			const aa = cellScale.mul(float(0.5)).max(float(0.02))
+
+			const edge0 = this.uDotRadius.sub(aa.mul(float(0.5)))
+			const edge1 = this.uDotRadius.add(aa.mul(float(0.5)))
+			const roundDot = float(1.0).sub(smoothstep(edge0, edge1, distFromCenter))
+
+			const glow = float(1.0)
+				.sub(smoothstep(float(0.0), float(0.5), distFromCenter))
+				.mul(this.uGlowIntensity)
+
+			const shapeWithGlow = roundDot.add(glow.mul(float(1.0).sub(blendToSquare)))
+			const intensity = mix(shapeWithGlow, float(1.0), blendToSquare).mul(brightness)
 			const rgb = this.uLedColor.mul(intensity)
 			return vec4(rgb, float(1.0))
 		})()
@@ -72,24 +104,32 @@ export class GpuDmdNodeController {
 		let hash = 0
 		let maxVal = 0
 		const len = width * height
-		const u32Len = len >> 2
-		const u32 = new Uint32Array(rawFrame.buffer, rawFrame.byteOffset, u32Len)
-		for (let i = 0; i < u32Len; i++) {
-			const word = u32[i]!
-			hash = (hash * 31 + word) | 0
-			const b0 = word & 0xff
-			const b1 = (word >> 8) & 0xff
-			const b2 = (word >> 16) & 0xff
-			const b3 = (word >> 24) & 0xff
-			const m01 = b0 > b1 ? b0 : b1
-			const m23 = b2 > b3 ? b2 : b3
-			const mw = m01 > m23 ? m01 : m23
-			if (mw > maxVal) maxVal = mw
-		}
-		for (let i = u32Len << 2; i < rawFrame.length; i++) {
-			const v = rawFrame[i]!
-			hash = (hash * 31 + v) | 0
-			if (v > maxVal) maxVal = v
+		if (rawFrame.byteOffset % 4 === 0) {
+			const u32Len = len >> 2
+			const u32 = new Uint32Array(rawFrame.buffer, rawFrame.byteOffset, u32Len)
+			for (let i = 0; i < u32Len; i++) {
+				const word = u32[i]!
+				hash = (hash * 31 + word) | 0
+				const b0 = word & 0xff
+				const b1 = (word >> 8) & 0xff
+				const b2 = (word >> 16) & 0xff
+				const b3 = (word >> 24) & 0xff
+				const m01 = b0 > b1 ? b0 : b1
+				const m23 = b2 > b3 ? b2 : b3
+				const mw = m01 > m23 ? m01 : m23
+				if (mw > maxVal) maxVal = mw
+			}
+			for (let i = u32Len << 2; i < len; i++) {
+				const v = rawFrame[i]!
+				hash = (hash * 31 + v) | 0
+				if (v > maxVal) maxVal = v
+			}
+		} else {
+			for (let i = 0; i < len; i++) {
+				const v = rawFrame[i]!
+				hash = (hash * 31 + v) | 0
+				if (v > maxVal) maxVal = v
+			}
 		}
 		if (hash === this.lastHash) return
 		this.lastHash = hash
