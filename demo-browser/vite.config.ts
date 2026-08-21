@@ -97,7 +97,7 @@ export default defineConfig({
 		hmr: { overlay: false },
 		port: 3000,
 		host: true,
-		watch: { ignored: ['**/dist/**', '**/node_modules/**', '**/.git/**'] },
+		watch: { ignored: ['**/dist/**', '**/dist-esm/**', '**/node_modules/**', '**/.git/**'] },
 		fs: {
 			allow: [
 				root,
