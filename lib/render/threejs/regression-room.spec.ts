@@ -81,7 +81,7 @@ describe('regression: room must remain visible', () => {
 		const cabMat = new THREE.MeshStandardMaterial({ color: 0x111111 })
 		cabMat.name = 'material:cabinet'
 		const cab = makeMesh('primitive-vrcab_cabinet', new THREE.BoxGeometry(10, 10, 10), cabMat)
-		// blackbox (should stay now, not hidden)
+		// blackbox (should be hidden as dark occluder)
 		const bbMat = new THREE.MeshStandardMaterial({ color: 0x010101 })
 		bbMat.name = 'black'
 		const bb = makeMesh('primitive-blackbox', new THREE.BoxGeometry(100, 100, 10), bbMat)
@@ -96,7 +96,7 @@ describe('regression: room must remain visible', () => {
 		expect(bm.visible, 'BM_Playfield must stay visible').toEqual(true)
 		expect(vr.visible, 'VR room must remain visible').toEqual(true)
 		expect(cab.visible, 'cabinet must remain visible').toEqual(true)
-		expect(bb.visible, 'blackbox cabinet interior must remain visible (retained)').toEqual(true)
+		expect(bb.visible, 'blackbox large dark occluder must be hidden').toEqual(false)
 	})
 
 	it('without BM, base playfield must stay visible', () => {

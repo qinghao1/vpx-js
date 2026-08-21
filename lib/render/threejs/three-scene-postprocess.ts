@@ -519,18 +519,25 @@ export function postProcessScene(
 		return cloned
 	}
 
-	const getVr = (base: THREE.MeshStandardMaterial): THREE.MeshStandardMaterial => {
+	const getVr = (base: THREE.MeshStandardMaterial, meshLower = ''): THREE.MeshStandardMaterial => {
 		const pending = pendingOf(base)
-		const key = `${base.name}|${(base.map as THREE.Texture | undefined)?.name ?? pending}|${base.polygonOffset ? `${base.polygonOffsetFactor}/${base.polygonOffsetUnits}` : '0'}`
+		const isCab = RE_CAB.test(meshLower)
+		const key = `${base.name}|${(base.map as THREE.Texture | undefined)?.name ?? pending}|${base.polygonOffset ? `${base.polygonOffsetFactor}/${base.polygonOffsetUnits}` : '0'}|${isCab ? 'cab' : 'vr'}`
 		const cached = vrCache.get(key)
 		if (cached) return cached
 		const cloned = base.clone() as THREE.MeshStandardMaterial
 		fixVr(cloned)
 		const hasPending = !!pending && !base.map
 		if (hasPending) {
-			cloned.transparent = true
-			cloned.opacity = 0
-			cloned.depthWrite = false
+			if (isCab) {
+				cloned.transparent = false
+				cloned.opacity = 1
+				cloned.depthWrite = true
+			} else {
+				cloned.transparent = true
+				cloned.opacity = 0
+				cloned.depthWrite = false
+			}
 			cloned.alphaTest = 0
 			cloned.blending = THREE.NormalBlending
 			if (cloned.emissive) (cloned.emissive as THREE.Color).set(0x000000)
@@ -707,7 +714,7 @@ export function postProcessScene(
 				continue
 			}
 			if (c.isVr || c.isCab) {
-				const v = getVr(mat)
+				const v = getVr(mat, n)
 				if (v !== mat) {
 					if (Array.isArray(mesh.material)) (mesh.material as THREE.Material[])[i] = v
 					else mesh.material = v
@@ -1017,11 +1024,6 @@ export function postProcessScene(
 				n.includes('cabinet') ||
 				n.includes('lockbar') ||
 				n.includes('pincab') ||
-				n.includes('blackbox') ||
-				n.includes('box') ||
-				n.includes('bottom') ||
-				n.includes('tub') ||
-				n.includes('blocker') ||
 				n.includes('ramp') ||
 				n.includes('plastic') ||
 				n.includes('gate') ||

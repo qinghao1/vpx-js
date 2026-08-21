@@ -79,7 +79,7 @@ describe('regression: dark occluder side artifact', () => {
 		root.updateMatrixWorld(true)
 		postProcessScene(root, { harnessLog, viewerMode: 'viewer' })
 
-		expect(blackbox.visible, 'primitive-blackbox large dark must remain visible (cabinet interior)').to.equal(true)
+		expect(blackbox.visible, 'primitive-blackbox large dark occluder must be hidden').to.equal(false)
 		expect(small.visible, 'small dark LM should remain visible (size <25 threshold)').to.equal(true)
 		expect(cabinet.visible, 'textured VR cabinet must stay visible').to.equal(true)
 		const cabMatAfter = Array.isArray(cabinet.material)
@@ -101,7 +101,7 @@ describe('regression: dark occluder side artifact', () => {
 		expect(vrMatAfter.polygonOffset, 'untextured VR should have polygonOffset false').to.equal(false)
 
 		const logText = logs.join(' ')
-		// blackbox now retained, may have 0 dark occluders
+		// blackbox now hidden as dark occluder
 		expect(logText).to.include('white untextured')
 	})
 
@@ -144,6 +144,6 @@ describe('regression: dark occluder side artifact', () => {
 		}
 		postProcessScene(root, { harnessLog: () => {} })
 		const hidden = root.children.filter((c: any) => c.isMesh && !c.visible).length
-		expect(hidden, 'large dark untextured generics must be hidden (excluding cabinet box)').to.equal(2)
+		expect(hidden, 'all large dark untextured generics must be hidden').to.equal(3)
 	})
 })
