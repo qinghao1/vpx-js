@@ -258,33 +258,6 @@ function isInCabFlipper(obj: THREE.Object3D): boolean {
 
 const isCabOrVrName = (n: string): boolean => RE_VR.test(n) || RE_CAB.test(n)
 
-function hasCabAncestor(mesh: THREE.Object3D, root: THREE.Object3D): boolean {
-	for (let p: THREE.Object3D | null = mesh.parent; p && p !== root; p = p.parent) {
-		const pn = (p.name ?? '').toLowerCase()
-		if (isCabOrVrName(pn) || RE_OUTER.test(p.name) || RE_CAB.test(pn) || RE_VR.test(pn)) return true
-	}
-	return false
-}
-
-function isKeepInPlay(mesh: THREE.Object3D, root: THREE.Object3D): boolean {
-	for (let cur: THREE.Object3D | null = mesh; cur && cur !== root; cur = cur.parent) {
-		const n = (cur.name ?? '').toLowerCase()
-		if (n.includes('dmd')) return true
-		if ((cur as any).userData?.isProceduralDMD) return true
-		if (cur.name.startsWith('DMD_')) return true
-		if (n.includes('cabinet')) return true
-		if (n.includes('backbox')) return true
-	}
-	const m = (mesh as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined
-	if (m) {
-		const mn = (m.name ?? '').toLowerCase()
-		if (mn.includes('dmd')) return true
-		const tn = (m.map as THREE.Texture | undefined)?.name?.toLowerCase() ?? ''
-		if (tn.includes('dmd')) return true
-	}
-	return false
-}
-
 export function hideCabFlippers(root: THREE.Object3D): number {
 	let hidden = 0
 	root.traverse(o => {
@@ -307,72 +280,8 @@ export function showCabFlippers(root: THREE.Object3D): number {
 	return shown
 }
 
-export function hideCabOuter(root: THREE.Object3D): number {
-	let hidden = 0
-	root.traverse(o => {
-		const mesh = o as THREE.Mesh
-		if (!mesh.isMesh) return
-		if (isKeepInPlay(mesh, root)) return
-		const n = (mesh.name ?? '').toLowerCase()
-		if (
-			n.includes('playfield') ||
-			n.includes('apron') ||
-			n.includes('button') ||
-			n.includes('coin') ||
-			n.includes('plunger') ||
-			resolveButtonCode(n)
-		)
-			return
-		const isCabAncestor = hasCabAncestor(mesh, root)
-		const mat = mesh.material as THREE.Material | undefined as THREE.MeshStandardMaterial | undefined
-		const c = classify(
-			n,
-			(mat?.name ?? '').toLowerCase(),
-			((mat?.map as THREE.Texture | undefined)?.name ?? '').toLowerCase(),
-			!!(mat?.userData as unknown as Record<string, unknown>)?.__isBaked,
-		)
-		if (c.isCab || c.isVr || RE_OUTER.test(mesh.name) || isCabOrVrName(n) || isCabAncestor) {
-			if (mesh.visible !== false) {
-				mesh.visible = false
-				hidden++
-			}
-		}
-	})
-	return hidden
-}
-
-export function showCabOuter(root: THREE.Object3D): number {
-	let shown = 0
-	root.traverse(o => {
-		const mesh = o as THREE.Mesh
-		if (!mesh.isMesh) return
-		const n = (mesh.name ?? '').toLowerCase()
-		if (n.includes('playfield') || n.includes('apron')) return
-		const isCabAncestor = hasCabAncestor(mesh, root)
-		const mat = mesh.material as THREE.Material | undefined as THREE.MeshStandardMaterial | undefined
-		const c = classify(
-			n,
-			(mat?.name ?? '').toLowerCase(),
-			((mat?.map as THREE.Texture | undefined)?.name ?? '').toLowerCase(),
-			!!(mat?.userData as unknown as Record<string, unknown>)?.__isBaked,
-		)
-		if (c.isCab || c.isVr || RE_OUTER.test(mesh.name) || isCabOrVrName(n) || isCabAncestor) {
-			if (mesh.visible === false) {
-				mesh.visible = true
-				shown++
-			}
-		}
-	})
-	return shown
-}
-
-export function hideCab(root: THREE.Object3D): number {
-	return hideCabFlippers(root) + hideCabOuter(root)
-}
-
-export function showCab(root: THREE.Object3D): number {
-	return showCabFlippers(root) + showCabOuter(root)
-}
+export const hideCab = hideCabFlippers
+export const showCab = showCabFlippers
 
 function makeParentsVisible(mesh: THREE.Object3D, root: THREE.Object3D, stats: Record<string, number>): void {
 	for (let p: THREE.Object3D | null = mesh.parent; p && p !== root; p = p.parent) {
