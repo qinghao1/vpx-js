@@ -73,9 +73,11 @@ import {
 	resolveVpxCandidates,
 } from './utils.js'
 
-const BACKGROUND = new THREE.Color(0x121a2b)
+let _prerenderedBackground: THREE.Color | null = null
 function getPrerenderedBackground(): THREE.Color {
-	return BACKGROUND
+	if (_prerenderedBackground) return _prerenderedBackground
+	_prerenderedBackground = new THREE.Color(0x121a2b)
+	return _prerenderedBackground
 }
 
 function syncRoom(
@@ -224,6 +226,15 @@ export class Viewer {
 			})
 		addEventListener('resize', this._boundResize)
 		this._eventCleanups.push(() => removeEventListener('resize', this._boundResize))
+		{
+			const onPopState = () => {
+				if (this.viewerMode === 'play') {
+					this._switchToViewer()
+				}
+			}
+			addEventListener('popstate', onPopState)
+			this._eventCleanups.push(() => removeEventListener('popstate', onPopState))
+		}
 		{
 			const onReset = () => this._onResetView()
 			this.dom.resetBtn?.addEventListener('click', onReset)
@@ -501,12 +512,15 @@ export class Viewer {
 	async _switchToPlay() {
 		if (this.viewerMode === 'play' || !this.tableGroup) return
 		this.viewerMode = 'play'
+		if (typeof history !== 'undefined' && history.state?.mode !== 'play') {
+			history.pushState({ mode: 'play' }, '')
+		}
 		if (this.renderer) {
 			this.renderer.setPixelRatio(getTargetPixelRatio('play'))
 			this.renderer.sortObjects = false
 		}
 		this._hidePlayTip?.()
-		;(isLowQuality() ? hideCab : hideCabFlippers)(this.tableGroup)
+		hideCabFlippers(this.tableGroup)
 		this._syncChrome()
 		if (this.player) {
 			this.player.setPhysicsEnabled(true)
@@ -536,6 +550,9 @@ export class Viewer {
 	async _switchToViewer() {
 		if (this.viewerMode !== 'play' || !this.tableGroup) return
 		this.viewerMode = 'viewer'
+		if (typeof history !== 'undefined' && history.state?.mode === 'play') {
+			history.back()
+		}
 		if (this.renderer) this.renderer.setPixelRatio(getTargetPixelRatio('viewer'))
 		this._hidePlayTip?.()
 		showCab(this.tableGroup)
@@ -714,7 +731,7 @@ export class Viewer {
 		if (this.renderer) this.renderer.shadowMap.enabled = false
 		if (this.controls) this.controls.enabled = false
 		this._ensurePhysicsWorker()
-		if (this.tableGroup) (isLowQuality() ? hideCab : hideCabFlippers)(this.tableGroup)
+		if (this.tableGroup) hideCabFlippers(this.tableGroup)
 		{
 			const framing = this.tableGroup ? computePlayFraming(this.tableGroup) : null
 			const center = framing?.center ?? new THREE.Vector3()
@@ -1164,7 +1181,7 @@ export class Viewer {
 			harnessLog: this.harnessLog,
 			table,
 		})
-		if (this.viewerMode === 'play') (isLowQuality() ? hideCab : hideCabFlippers)(node)
+		if (this.viewerMode === 'play') hideCabFlippers(node)
 		const params = new URLSearchParams(location.search)
 		const useBatch = !params.has('nobatched')
 		if (useBatch && table && this.renderApi) {
