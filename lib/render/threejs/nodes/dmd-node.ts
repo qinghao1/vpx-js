@@ -61,16 +61,17 @@ export class GpuDmdNodeController {
 
 		this.material.colorNode = Fn(() => {
 			const currentUv = clamp(vec2(uv().x, float(1.0).sub(uv().y)), vec2(0.0, 0.0), vec2(0.99999, 0.99999))
-			const cellUv = floor(currentUv.mul(this.uResolution)).add(vec2(0.5, 0.5)).div(this.uResolution)
+			const gridPos = currentUv.mul(this.uResolution)
+			const cellUv = floor(gridPos).add(vec2(0.5, 0.5)).div(this.uResolution)
 			const sample = this.texNode.sample(cellUv)
 			const brightness = sample.r.mul(this.uDynamicScale)
 
-			// Screen-space cell derivative: smoothly blend from round LED dots (close) to solid cells (distant) to eliminate Moiré and moving black bars
-			const cellDeriv = fwidth(currentUv.mul(this.uResolution))
+			// Screen-space cell derivative: smoothly blend from circular dots (close-up) to solid cells (distant/play mode)
+			const cellDeriv = fwidth(gridPos)
 			const cellScale = max(cellDeriv.x, cellDeriv.y)
 			const blendToSquare = clamp(cellScale.mul(float(3.0)).sub(float(0.3)), float(0.0), float(1.0))
 
-			const gridCoord = fract(currentUv.mul(this.uResolution)).sub(vec2(0.5, 0.5))
+			const gridCoord = fract(gridPos).sub(vec2(0.5, 0.5))
 			const distFromCenter = length(gridCoord)
 			const aa = cellScale.mul(float(0.5)).max(float(0.02))
 
@@ -96,6 +97,22 @@ export class GpuDmdNodeController {
 		this.material.polygonOffset = true
 		this.material.polygonOffsetFactor = -4
 		this.material.polygonOffsetUnits = -8
+	}
+
+	public setLedColor(color: Color | number): void {
+		if (typeof color === 'number') {
+			this.uLedColor.value.setHex(color)
+		} else {
+			this.uLedColor.value.copy(color)
+		}
+	}
+
+	public setDotRadius(radius: number): void {
+		this.uDotRadius.value = radius
+	}
+
+	public setGlowIntensity(intensity: number): void {
+		this.uGlowIntensity.value = intensity
 	}
 
 	public updateFrame(rawFrame: Uint8Array, width: number, height: number): void {
@@ -148,7 +165,7 @@ export class GpuDmdNodeController {
 			this.dataTexture.colorSpace = NoColorSpace
 			this.dataTexture.needsUpdate = true
 			this.material.map = this.dataTexture
-			if (this.texNode) this.texNode.value = this.dataTexture
+			this.texNode.value = this.dataTexture
 			this.uResolution.value.set(width, height)
 		} else {
 			const buf = this.dataTexture.image.data as Uint8Array
