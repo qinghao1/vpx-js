@@ -89,7 +89,7 @@ async function runDoctor(): Promise<boolean> {
 			if (missing.length) {
 				ok = false
 				console.log('  MISSING:')
-				for (const m of missing) console.log(`    ${m.trim()}`)
+				for (const missingDep of missing) console.log(`    ${missingDep.trim()}`)
 				console.log(
 					'  Hint: sudo apt update && sudo apt install libsdl3-0 libsdl3-image0 libsdl3-ttf0 libfreeimage3 libhidapi-hidraw0 libopenal1 || sudo apt install libSDL3* libfreeimage*',
 				)
@@ -97,16 +97,16 @@ async function runDoctor(): Promise<boolean> {
 				console.log('  all deps resolved (ldd)')
 			}
 			const lines = ldd.split('\n').slice(0, 12)
-			for (const l of lines) if (l.trim()) console.log(`    ${l.trim()}`)
-		} catch (e: unknown) {
-			console.log(`  ldd failed: ${(e as Error).message}`)
+			for (const line of lines) if (line.trim()) console.log(`    ${line.trim()}`)
+		} catch (err: unknown) {
+			console.log(`  ldd failed: ${(err as Error).message}`)
 		}
 	} else if (process.platform === 'darwin') {
 		try {
 			const otool = execSync(`otool -L "${binPath}" 2>&1`, { encoding: 'utf-8' })
 			console.log(otool.split('\n').slice(0, 20).join('\n'))
-		} catch (e: unknown) {
-			console.log(`  otool failed: ${(e as Error).message}`)
+		} catch (err: unknown) {
+			console.log(`  otool failed: ${(err as Error).message}`)
 		}
 	}
 	console.log('\n[layout] shaders / scripts / plugins')
@@ -116,10 +116,10 @@ async function runDoctor(): Promise<boolean> {
 		path.join(binDir, '../shaders-10.8.1'),
 	]
 	let shaderFound = false
-	for (const s of shaderCandidates) {
-		if (fs.existsSync(s)) {
-			const count = fs.readdirSync(s).length
-			console.log(`  shaders: ${s} (${count} files)`)
+	for (const candidate of shaderCandidates) {
+		if (fs.existsSync(candidate)) {
+			const count = fs.readdirSync(candidate).length
+			console.log(`  shaders: ${candidate} (${count} files)`)
 			shaderFound = true
 			break
 		}
@@ -328,11 +328,12 @@ async function main() {
 				),
 			]
 			let found: string | null = null
-			for (const c of candidates)
-				if (fs.existsSync(c)) {
-					found = c
+			for (const candidate of candidates) {
+				if (fs.existsSync(candidate)) {
+					found = candidate
 					break
 				}
+			}
 			if (found) {
 				const size = fs.statSync(found).size
 				console.log(`[vpinball] extracted: ${found} (${(size / 1024).toFixed(1)} KB)`)
@@ -350,8 +351,8 @@ async function main() {
 	// Interactive GUI — spawn and pipe tagged
 	const child = spawn(cmd, args, { stdio: ['inherit', 'pipe', 'pipe'], env })
 
-	child.stdout.on('data', (d: Buffer) => process.stdout.write(`[vpx-native] ${d}`))
-	child.stderr.on('data', (d: Buffer) => process.stderr.write(`[vpx-native] ${d}`))
+	child.stdout.on('data', (chunk: Buffer) => process.stdout.write(`[vpx-native] ${chunk}`))
+	child.stderr.on('data', (chunk: Buffer) => process.stderr.write(`[vpx-native] ${chunk}`))
 
 	child.on('close', code => {
 		console.log(`[vpinball] native exited with code ${code}`)
@@ -365,7 +366,7 @@ async function main() {
 	})
 }
 
-main().catch(e => {
-	console.error('[vpinball] fatal', e)
+main().catch(fatalError => {
+	console.error('[vpinball] fatal', fatalError)
 	process.exit(1)
 })

@@ -13,10 +13,10 @@ const checks = [
 ]
 
 async function run(script: string): Promise<boolean> {
-	return new Promise(res => {
-		const p = spawn('npx', ['tsx', script], { stdio: 'inherit' })
-		p.on('close', c => res(c === 0))
-		p.on('error', () => res(false))
+	return new Promise(resolve => {
+		const child = spawn('npx', ['tsx', script], { stdio: 'inherit' })
+		child.on('close', exitCode => resolve(exitCode === 0))
+		child.on('error', () => resolve(false))
 	})
 }
 
@@ -28,8 +28,8 @@ const killStale = () => {
 process.once('exit', killStale)
 process.once('SIGINT', killStale)
 process.once('SIGTERM', killStale)
-process.on('uncaughtException', e => {
-	console.error('[verify-all] uncaught', e)
+process.on('uncaughtException', err => {
+	console.error('[verify-all] uncaught', err)
 	killStale()
 	process.exit(1)
 })
@@ -37,24 +37,24 @@ process.on('uncaughtException', e => {
 console.log(`TAP version 13\n# vpx-js E2E — ${new Date().toISOString()}`)
 console.log(`1..${checks.length}`)
 let pass = 0
-for (let i = 0; i < checks.length; i++) {
-	const c = checks[i]
-	if (!c) continue
-	console.log(`\n# --- ${c.name} ---`)
+for (let index = 0; index < checks.length; index++) {
+	const check = checks[index]
+	if (!check) continue
+	console.log(`\n# --- ${check.name} ---`)
 	try {
-		const ok = await run(path.resolve(c.script))
+		const ok = await run(path.resolve(check.script))
 		if (ok) {
 			pass++
-			console.log(`ok ${i + 1} - ${c.name}`)
-		} else if (c.optional) {
+			console.log(`ok ${index + 1} - ${check.name}`)
+		} else if (check.optional) {
 			pass++
-			const skipReason = c.name === 'vpinball-compat' ? 'native vpinball not found' : 'browser not ready'
-			console.log(`ok ${i + 1} - ${c.name} # SKIP ${skipReason}`)
+			const skipReason = check.name === 'vpinball-compat' ? 'native vpinball not found' : 'browser not ready'
+			console.log(`ok ${index + 1} - ${check.name} # SKIP ${skipReason}`)
 		} else {
-			console.log(`not ok ${i + 1} - ${c.name}`)
+			console.log(`not ok ${index + 1} - ${check.name}`)
 		}
-	} catch (e) {
-		console.log(`not ok ${i + 1} - ${c.name} — ${(e as Error).message}`)
+	} catch (err) {
+		console.log(`not ok ${index + 1} - ${check.name} — ${(err as Error).message}`)
 	}
 }
 console.log(`\n# pass ${pass}/${checks.length}`)

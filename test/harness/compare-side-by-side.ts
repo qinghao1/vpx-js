@@ -121,17 +121,17 @@ async function main() {
 			cwd: process.cwd(),
 			stdio: ['ignore', 'pipe', 'pipe'],
 		})
-		viteProc.stdout.on('data', (d: Buffer) => process.stdout.write(`[vite] ${d}`))
-		viteProc.stderr.on('data', (d: Buffer) => process.stderr.write(`[vite] ${d}`))
+		viteProc.stdout.on('data', (chunk: Buffer) => process.stdout.write(`[vite] ${chunk}`))
+		viteProc.stderr.on('data', (chunk: Buffer) => process.stderr.write(`[vite] ${chunk}`))
 		// wait for ready
-		for (let i = 0; i < 30; i++) {
-			await new Promise(r => setTimeout(r, 500))
+		for (let attempt = 0; attempt < 30; attempt++) {
+			await new Promise(resolve => setTimeout(resolve, 500))
 			try {
-				const res = await fetch('http://localhost:3000/', {
+				const response = await fetch('http://localhost:3000/', {
 					method: 'HEAD',
 					signal: AbortSignal.timeout(1000),
 				} as any)
-				if (res.ok || res.status === 404) break
+				if (response.ok || response.status === 404) break
 			} catch {}
 		}
 	}
@@ -167,21 +167,21 @@ async function main() {
 		await page.setViewport({ width, height })
 		// Attempt to set window bounds via CDP for headed mode
 		try {
-			const session = await page.createCDPSession()
-			await session.send('Browser.setWindowBounds', {
+			const cdpSession = await page.createCDPSession()
+			await cdpSession.send('Browser.setWindowBounds', {
 				windowId: 1,
 				bounds: { left: 0, top: 0, width, height, windowState: 'normal' },
 			} as any)
 		} catch {}
-		page.on('console', (m: any) => {
-			const t = m.text()
-			if (t) console.log(`[vpx-browser] ${t.slice(0, 800)}`)
+		page.on('console', (msg: any) => {
+			const msgText = msg.text()
+			if (msgText) console.log(`[vpx-browser] ${msgText.slice(0, 800)}`)
 		})
-		page.on('pageerror', (e: any) => console.log(`[vpx-browser:pageerror] ${e.message.slice(0, 800)}`))
+		page.on('pageerror', (pageErr: any) => console.log(`[vpx-browser:pageerror] ${pageErr.message.slice(0, 800)}`))
 		await page.goto(session.browserUrl, { waitUntil: 'domcontentloaded', timeout: 30000 })
 		console.log('[compare] browser navigated')
-	} catch (e: unknown) {
-		console.error('[compare] browser launch failed', (e as Error).message)
+	} catch (err: unknown) {
+		console.error('[compare] browser launch failed', (err as Error).message)
 		if (!disc.binPath) process.exit(1)
 	}
 
@@ -204,8 +204,8 @@ async function main() {
 			console.log(fs.readFileSync(iniPath, 'utf-8'))
 		} catch {}
 		nativeProc = spawn(binPath, nativeArgs, { stdio: ['inherit', 'pipe', 'pipe'], env })
-		nativeProc.stdout.on('data', (d: Buffer) => process.stdout.write(`[vpx-native] ${d}`))
-		nativeProc.stderr.on('data', (d: Buffer) => process.stderr.write(`[vpx-native] ${d}`))
+		nativeProc.stdout.on('data', (chunk: Buffer) => process.stdout.write(`[vpx-native] ${chunk}`))
+		nativeProc.stderr.on('data', (chunk: Buffer) => process.stderr.write(`[vpx-native] ${chunk}`))
 		nativeProc.on('close', (code: number | null) => {
 			console.log(`[compare] native exited with code ${code}`)
 		})

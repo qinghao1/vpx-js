@@ -78,8 +78,10 @@
 		"vpinball:setup": "bash scripts/setup-vpinball.sh",
 		"vpinball:doctor": "tsx bin/vpinball-runner.ts --doctor",
 		"vpinball:extract": "tsx bin/vpinball-runner.ts --extractvbs",
+		"vpinball:audit": "tsx bin/vpinball-runner.ts --audit",
 		"compare": "tsx test/harness/compare-side-by-side.ts",
-		"verify:vpinball": "tsx test/harness/verify-vpinball-compat.ts"
+		"verify:vpinball": "tsx test/harness/verify-vpinball-compat.ts",
+		"verify:audit": "tsx test/harness/verify-vpinball-compat.ts --audit"
 	},
 	"dependencies": {
 		"dash-ast": "^2.0.0",

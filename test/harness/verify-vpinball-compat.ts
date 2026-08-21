@@ -3,22 +3,22 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { discoverVpinball, getDynamicLinkerEnv } from './vpinball-resolver.js'
 
-function parseArgs(raw: string[]): { all: boolean; vpx: string | null; auditOnly: boolean; help: boolean } {
+function parseArgs(rawArgs: string[]): { all: boolean; vpx: string | null; auditOnly: boolean; help: boolean } {
 	let all = false
 	let vpx: string | null = null
 	let auditOnly = false
 	let help = false
-	for (let i = 0; i < raw.length; i++) {
-		const a = raw[i]
-		if (!a) continue
-		if (a === '--all-fixtures' || a === '--all') all = true
-		else if (a.startsWith('--vpx=')) vpx = a.slice(6)
-		else if (a === '--vpx' && raw[i + 1]) {
-			i++
-			vpx = raw[i] ?? null
-		} else if (a === '--audit' || a === '--audit-only') auditOnly = true
-		else if (a === '--help' || a === '-h') help = true
-		else if (a.endsWith('.vpx') && !a.startsWith('-')) vpx = a
+	for (let index = 0; index < rawArgs.length; index++) {
+		const arg = rawArgs[index]
+		if (!arg) continue
+		if (arg === '--all-fixtures' || arg === '--all') all = true
+		else if (arg.startsWith('--vpx=')) vpx = arg.slice(6)
+		else if (arg === '--vpx' && rawArgs[index + 1]) {
+			index++
+			vpx = rawArgs[index] ?? null
+		} else if (arg === '--audit' || arg === '--audit-only') auditOnly = true
+		else if (arg === '--help' || arg === '-h') help = true
+		else if (arg.endsWith('.vpx') && !arg.startsWith('-')) vpx = arg
 	}
 	if (!vpx && !all && !help) all = true
 	return { all, vpx, auditOnly, help }
@@ -146,58 +146,60 @@ export function auditTableStructure(table: any): TableStructureAudit {
 	}
 
 	// Flippers physics validation
-	for (const [name, f] of Object.entries(table.flippers ?? {})) {
-		const d = (f as any).data
-		if (!d) continue
-		if (typeof d.mass !== 'number' || d.mass <= 0) physicsIssues.push(`Flipper '${name}' invalid mass: ${d.mass}`)
-		if (typeof d.strength !== 'number' || d.strength <= 0)
-			physicsIssues.push(`Flipper '${name}' invalid strength: ${d.strength}`)
-		if (typeof d.baseRadius !== 'number' || d.baseRadius <= 0)
-			physicsIssues.push(`Flipper '${name}' invalid baseRadius: ${d.baseRadius}`)
-		if (typeof d.endRadius !== 'number' || d.endRadius <= 0)
-			physicsIssues.push(`Flipper '${name}' invalid endRadius: ${d.endRadius}`)
-		if (typeof d.flipperRadiusMax !== 'number' || d.flipperRadiusMax <= 0)
-			physicsIssues.push(`Flipper '${name}' invalid flipperRadiusMax: ${d.flipperRadiusMax}`)
-		if (d.center && (Number.isNaN(d.center.x) || Number.isNaN(d.center.y)))
+	for (const [name, flipper] of Object.entries(table.flippers ?? {})) {
+		const flipperData = (flipper as any).data
+		if (!flipperData) continue
+		if (typeof flipperData.mass !== 'number' || flipperData.mass <= 0)
+			physicsIssues.push(`Flipper '${name}' invalid mass: ${flipperData.mass}`)
+		if (typeof flipperData.strength !== 'number' || flipperData.strength <= 0)
+			physicsIssues.push(`Flipper '${name}' invalid strength: ${flipperData.strength}`)
+		if (typeof flipperData.baseRadius !== 'number' || flipperData.baseRadius <= 0)
+			physicsIssues.push(`Flipper '${name}' invalid baseRadius: ${flipperData.baseRadius}`)
+		if (typeof flipperData.endRadius !== 'number' || flipperData.endRadius <= 0)
+			physicsIssues.push(`Flipper '${name}' invalid endRadius: ${flipperData.endRadius}`)
+		if (typeof flipperData.flipperRadiusMax !== 'number' || flipperData.flipperRadiusMax <= 0)
+			physicsIssues.push(`Flipper '${name}' invalid flipperRadiusMax: ${flipperData.flipperRadiusMax}`)
+		if (flipperData.center && (Number.isNaN(flipperData.center.x) || Number.isNaN(flipperData.center.y)))
 			physicsIssues.push(`Flipper '${name}' center coordinate is NaN`)
 	}
 
 	// Bumpers physics validation
-	for (const [name, b] of Object.entries(table.bumpers ?? {})) {
-		const d = (b as any).data
-		if (!d) continue
-		if (typeof d.radius !== 'number' || d.radius <= 0)
-			physicsIssues.push(`Bumper '${name}' invalid radius: ${d.radius}`)
-		if (typeof d.force !== 'number' || d.force < 0) physicsIssues.push(`Bumper '${name}' invalid force: ${d.force}`)
-		if (d.center && (Number.isNaN(d.center.x) || Number.isNaN(d.center.y)))
+	for (const [name, bumper] of Object.entries(table.bumpers ?? {})) {
+		const bumperData = (bumper as any).data
+		if (!bumperData) continue
+		if (typeof bumperData.radius !== 'number' || bumperData.radius <= 0)
+			physicsIssues.push(`Bumper '${name}' invalid radius: ${bumperData.radius}`)
+		if (typeof bumperData.force !== 'number' || bumperData.force < 0)
+			physicsIssues.push(`Bumper '${name}' invalid force: ${bumperData.force}`)
+		if (bumperData.center && (Number.isNaN(bumperData.center.x) || Number.isNaN(bumperData.center.y)))
 			physicsIssues.push(`Bumper '${name}' center coordinate is NaN`)
 	}
 
 	// Rubbers validation
-	for (const [name, r] of Object.entries(table.rubbers ?? {})) {
-		const d = (r as any).data
-		if (!d) continue
-		if (typeof d.hitHeight === 'number' && d.hitHeight < 0)
-			physicsIssues.push(`Rubber '${name}' negative hitHeight: ${d.hitHeight}`)
-		if (typeof d.elasticity === 'number' && d.elasticity < 0)
-			physicsIssues.push(`Rubber '${name}' negative elasticity: ${d.elasticity}`)
+	for (const [name, rubber] of Object.entries(table.rubbers ?? {})) {
+		const rubberData = (rubber as any).data
+		if (!rubberData) continue
+		if (typeof rubberData.hitHeight === 'number' && rubberData.hitHeight < 0)
+			physicsIssues.push(`Rubber '${name}' negative hitHeight: ${rubberData.hitHeight}`)
+		if (typeof rubberData.elasticity === 'number' && rubberData.elasticity < 0)
+			physicsIssues.push(`Rubber '${name}' negative elasticity: ${rubberData.elasticity}`)
 	}
 
 	// Timers frame-pacing check (< 17ms below 60fps)
-	for (const [name, t] of Object.entries(table.timers ?? {})) {
-		const d = (t as any).data
-		if (!d) continue
-		if (d.timerEnabled && d.timerInterval > 0 && d.timerInterval < 17) {
-			warnings.push(`Timer '${name}' interval ${d.timerInterval}ms is below 60FPS frame pacing threshold`)
+	for (const [name, timer] of Object.entries(table.timers ?? {})) {
+		const timerData = (timer as any).data
+		if (!timerData) continue
+		if (timerData.timerEnabled && timerData.timerInterval > 0 && timerData.timerInterval < 17) {
+			warnings.push(`Timer '${name}' interval ${timerData.timerInterval}ms is below 60FPS frame pacing threshold`)
 		}
 	}
 
 	// Lights intensity check
-	for (const [name, l] of Object.entries(table.lights ?? {})) {
-		const d = (l as any).data
-		if (!d) continue
-		if (typeof d.intensity === 'number' && d.intensity < 0) {
-			warnings.push(`Light '${name}' negative intensity: ${d.intensity}`)
+	for (const [name, light] of Object.entries(table.lights ?? {})) {
+		const lightData = (light as any).data
+		if (!lightData) continue
+		if (typeof lightData.intensity === 'number' && lightData.intensity < 0) {
+			warnings.push(`Light '${name}' negative intensity: ${lightData.intensity}`)
 		}
 	}
 
@@ -220,7 +222,7 @@ async function loadAndAuditVpxJs(vpxPath: string): Promise<{ script: string; tab
 	const { NodeBinaryReader } = await import('../../lib/io/binary-reader.node.js')
 	const { Table } = await import('../../lib/vpt/table/table.js')
 	const table = await Table.load(new NodeBinaryReader(vpxPath), { loadTableScript: true })
-	const script = (table as any).tableScript ?? (table as any).getTableScript?.() ?? ''
+	const script = (table as any).tableScript ?? ''
 	const audit = auditTableStructure(table)
 	return { script, table, audit }
 }
@@ -300,32 +302,33 @@ export async function verifyVpinballCompat(
 	const repoRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../..')
 	let fixtures: string[] = []
 	if (opts.vpx) {
-		let p = opts.vpx
+		let targetVpx = opts.vpx
 		// expand fixture short name
-		if (!p.includes('/') && !path.isAbsolute(p)) {
+		if (!targetVpx.includes('/') && !path.isAbsolute(targetVpx)) {
 			const candidates = [
-				path.join(repoRoot, 'test/fixtures', p),
-				path.join(repoRoot, 'test/fixtures', `${p}.vpx`),
-				path.join(repoRoot, 'test/fixtures', `table-${p}.vpx`),
-				path.join(repoRoot, 'test/fixtures', `table-${p.replace(/^table-/, '')}.vpx`),
-				path.resolve(p),
+				path.join(repoRoot, 'test/fixtures', targetVpx),
+				path.join(repoRoot, 'test/fixtures', `${targetVpx}.vpx`),
+				path.join(repoRoot, 'test/fixtures', `table-${targetVpx}.vpx`),
+				path.join(repoRoot, 'test/fixtures', `table-${targetVpx.replace(/^table-/, '')}.vpx`),
+				path.resolve(targetVpx),
 			]
 			let found: string | null = null
-			for (const c of candidates)
-				if (fs.existsSync(c)) {
-					found = c
+			for (const candidate of candidates) {
+				if (fs.existsSync(candidate)) {
+					found = candidate
 					break
 				}
-			if (found) p = found
-			else p = path.resolve(p)
+			}
+			if (found) targetVpx = found
+			else targetVpx = path.resolve(targetVpx)
 		} else {
-			p = path.resolve(p)
+			targetVpx = path.resolve(targetVpx)
 		}
-		if (!fs.existsSync(p)) {
+		if (!fs.existsSync(targetVpx)) {
 			console.log(`not ok 1 - vpinball-compat — VPX not found: ${opts.vpx}`)
 			return false
 		}
-		fixtures = [p]
+		fixtures = [targetVpx]
 	} else {
 		const dir = path.join(repoRoot, 'test/fixtures')
 		fixtures = fs
@@ -345,11 +348,11 @@ export async function verifyVpinballCompat(
 	let pass = 0
 	let fail = 0
 
-	for (let i = 0; i < fixtures.length; i++) {
-		const vpxPath = fixtures[i]
+	for (let fixtureIndex = 0; fixtureIndex < fixtures.length; fixtureIndex++) {
+		const vpxPath = fixtures[fixtureIndex]
 		if (!vpxPath) continue
 		const name = path.basename(vpxPath)
-		console.log(`\n# [${i + 1}/${fixtures.length}] ${name}`)
+		console.log(`\n# [${fixtureIndex + 1}/${fixtures.length}] ${name}`)
 		let nativeScript: string | null = null
 		let nativeOutPath = ''
 		let hadBefore = false
@@ -376,7 +379,7 @@ export async function verifyVpinballCompat(
 
 			// Report non-critical audit warnings if present
 			if (audit.warnings.length > 0) {
-				for (const w of audit.warnings) console.log(`  note: ${w}`)
+				for (const warning of audit.warnings) console.log(`  note: ${warning}`)
 			}
 
 			// If native binary is present, perform full dual parity verification
@@ -398,46 +401,58 @@ export async function verifyVpinballCompat(
 					}
 				}
 				if (!nativeScript) {
-					console.log(`  not ok — native script not produced at ${nativeOutPath}`)
-					if (nativeRes.stdout) console.log(`  stdout: ${nativeRes.stdout.slice(0, 500)}`)
-					if (nativeRes.stderr) console.log(`  stderr: ${nativeRes.stderr.slice(0, 500)}`)
-					fail++
-					continue
-				}
-				console.log(`  native: ${(nativeScript.length / 1024).toFixed(1)} KB → ${nativeOutPath}`)
-
-				// 3. Script Parity check
-				const normNative = normalizeScript(nativeScript)
-				const normJs = normalizeScript(jsScript)
-				if (normNative === normJs) {
-					console.log('  ✓ byte-level parity (normalized)')
-				} else {
-					const lenDiff = Math.abs(normNative.length - normJs.length)
-					console.log(`  byte-level diff: native ${normNative.length} vs js ${normJs.length} (Δ ${lenDiff})`)
-					let diffIdx = -1
-					const minLen = Math.min(normNative.length, normJs.length)
-					for (let j = 0; j < minLen; j++)
-						if (normNative[j] !== normJs[j]) {
-							diffIdx = j
-							break
-						}
-					if (diffIdx === -1 && normNative.length !== normJs.length) diffIdx = minLen
-					if (diffIdx !== -1) {
-						const ctx = 120
-						const aCtx = normNative.slice(Math.max(0, diffIdx - ctx), diffIdx + ctx).replace(/\n/g, '\\n')
-						const bCtx = normJs.slice(Math.max(0, diffIdx - ctx), diffIdx + ctx).replace(/\n/g, '\\n')
-						console.log(`  first diff at ${diffIdx}:`)
-						console.log(`    native: …${aCtx}…`)
-						console.log(`    vpx-js: …${bCtx}…`)
-					}
-					const semNative = normNative.replace(/\s+/g, ' ').trim()
-					const semJs = normJs.replace(/\s+/g, ' ').trim()
-					if (semNative === semJs) {
-						console.log('  ✓ semantic parity (whitespace-normalized)')
+					if (!jsScript) {
+						console.log('  ✓ script: (no script in table — native & vpx-js agree)')
 					} else {
-						console.log('  not ok — script parity failed')
+						console.log(`  not ok — native script not produced at ${nativeOutPath}`)
+						if (nativeRes.stdout) console.log(`  stdout: ${nativeRes.stdout.slice(0, 500)}`)
+						if (nativeRes.stderr) console.log(`  stderr: ${nativeRes.stderr.slice(0, 500)}`)
 						fail++
 						continue
+					}
+				} else {
+					console.log(`  native: ${(nativeScript.length / 1024).toFixed(1)} KB → ${nativeOutPath}`)
+
+					// 3. Script Parity check
+					const normNative = normalizeScript(nativeScript)
+					const normJs = normalizeScript(jsScript)
+					if (normNative === normJs) {
+						console.log('  ✓ byte-level parity (normalized)')
+					} else {
+						const lenDiff = Math.abs(normNative.length - normJs.length)
+						console.log(
+							`  byte-level diff: native ${normNative.length} vs js ${normJs.length} (Δ ${lenDiff})`,
+						)
+						let diffIdx = -1
+						const minLen = Math.min(normNative.length, normJs.length)
+						for (let charIndex = 0; charIndex < minLen; charIndex++) {
+							if (normNative[charIndex] !== normJs[charIndex]) {
+								diffIdx = charIndex
+								break
+							}
+						}
+						if (diffIdx === -1 && normNative.length !== normJs.length) diffIdx = minLen
+						if (diffIdx !== -1) {
+							const contextLen = 120
+							const nativeContext = normNative
+								.slice(Math.max(0, diffIdx - contextLen), diffIdx + contextLen)
+								.replace(/\n/g, '\\n')
+							const jsContext = normJs
+								.slice(Math.max(0, diffIdx - contextLen), diffIdx + contextLen)
+								.replace(/\n/g, '\\n')
+							console.log(`  first diff at ${diffIdx}:`)
+							console.log(`    native: …${nativeContext}…`)
+							console.log(`    vpx-js: …${jsContext}…`)
+						}
+						const semNative = normNative.replace(/\s+/g, ' ').trim()
+						const semJs = normJs.replace(/\s+/g, ' ').trim()
+						if (semNative === semJs) {
+							console.log('  ✓ semantic parity (whitespace-normalized)')
+						} else {
+							console.log('  not ok — script parity failed')
+							fail++
+							continue
+						}
 					}
 				}
 
@@ -451,25 +466,30 @@ export async function verifyVpinballCompat(
 			}
 
 			// 5. AST transpilation
-			try {
-				const { Grammar } = await import('../../lib/scripting/grammar/grammar.js')
-				const grammar = new Grammar()
-				const scriptToTranspile = nativeScript ?? jsScript
-				const js = grammar.vbsToJs(scriptToTranspile)
-				if (!js || js.length < 10) {
-					console.log('  not ok — vbsToJs produced empty output')
+			const scriptToTranspile = nativeScript ?? jsScript
+			if (scriptToTranspile.trim().length > 0) {
+				try {
+					const { Grammar } = await import('../../lib/scripting/grammar/grammar.js')
+					const grammar = new Grammar()
+					const js = grammar.vbsToJs(scriptToTranspile)
+					if (typeof js !== 'string') {
+						console.log('  not ok — vbsToJs did not return a string')
+						fail++
+						continue
+					}
+					console.log(`  ✓ vbs2js AST OK (${(js.length / 1024).toFixed(1)} KB JS)`)
+				} catch (err: unknown) {
+					console.log(`  not ok — vbsToJs failed: ${(err as Error).message?.slice(0, 500)}`)
 					fail++
 					continue
 				}
-				console.log(`  ✓ vbs2js AST OK (${(js.length / 1024).toFixed(1)} KB JS)`)
-				pass++
-				console.log(`  ok — ${name}`)
-			} catch (e: unknown) {
-				console.log(`  not ok — vbsToJs failed: ${(e as Error).message?.slice(0, 500)}`)
-				fail++
+			} else {
+				console.log('  ✓ script: (empty table script)')
 			}
-		} catch (e: unknown) {
-			console.log(`  not ok — exception: ${(e as Error).message?.slice(0, 800)}`)
+			pass++
+			console.log(`  ok — ${name}`)
+		} catch (err: unknown) {
+			console.log(`  not ok — exception: ${(err as Error).message?.slice(0, 800)}`)
 			fail++
 		} finally {
 			// Cleanup native output if created

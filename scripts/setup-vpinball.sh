@@ -30,9 +30,9 @@ find_existing() {
 		"$LOCAL_CACHE/VPinballX_GL"
 		"$LOCAL_CACHE/VPinballX_BGFX"
 	)
-	for p in "${candidates[@]}"; do
-		if [[ -x "$p" && -f "$p" ]]; then
-			printf '%s' "$p"
+	for candidate in "${candidates[@]}"; do
+		if [[ -x "$candidate" && -f "$candidate" ]]; then
+			printf '%s' "$candidate"
 			return 0
 		fi
 	done

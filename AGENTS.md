@@ -17,9 +17,11 @@ npx tsx test/harness/verify-all.ts   # E2E 1..7: wasm → table → pinmame → 
 npm run vpinball:setup     # Tier A build or Tier B prebuilt → ~/.cache/vpinball/
 npm run vpinball:doctor    # ldd/otool, shaders, PinMAMEPath checks
 npm run vpinball -- --vpx=table-flipper --extractvbs   # authoritative script extract
+npm run vpinball:audit -- --vpx=table-flipper          # native table audit
 npm run vpinball -- "http://localhost:3000/?vpx=/@fs/...&rom=/@fs/..."  # play via URL
 npm run compare -- --vpx=table-flipper   # dual window: browser left 0,0 + native right 1280,0
-npm run verify:vpinball -- --all-fixtures   # script parity across 25 fixtures
+npm run verify:vpinball -- --all-fixtures   # script & table structure parity across 25 fixtures
+npm run verify:audit       # table structure & physics constants audit across 25 fixtures
 ```
 
 Node via `fnm` — `.nvmrc` `24`, `.node-version` `24.19.0`. Activate with `eval "$(fnm env --use-on-cd --shell bash)"`.
