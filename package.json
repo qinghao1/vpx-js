@@ -73,7 +73,13 @@
 		"bench:walking-dead:vitest": "vitest bench test/bench/walking-dead.bench.ts --run",
 		"bench:walking-dead:breakdown": "tsx test/harness/bench-node.ts --vpx=/home/qinghao1/Downloads/walking_dead.vpx --ticks=5 --breakdown",
 		"profile:walking-dead": "tsx test/harness/ranked-profile.ts --vpx=/home/qinghao1/Downloads/walking_dead.vpx",
-		"bench:walking-dead:ranked": "tsx test/harness/ranked-profile.ts --vpx=/home/qinghao1/Downloads/walking_dead.vpx"
+		"bench:walking-dead:ranked": "tsx test/harness/ranked-profile.ts --vpx=/home/qinghao1/Downloads/walking_dead.vpx",
+		"vpinball": "tsx bin/vpinball-runner.ts",
+		"vpinball:setup": "bash scripts/setup-vpinball.sh",
+		"vpinball:doctor": "tsx bin/vpinball-runner.ts --doctor",
+		"vpinball:extract": "tsx bin/vpinball-runner.ts --extractvbs",
+		"compare": "tsx test/harness/compare-side-by-side.ts",
+		"verify:vpinball": "tsx test/harness/verify-vpinball-compat.ts"
 	},
 	"dependencies": {
 		"dash-ast": "^2.0.0",

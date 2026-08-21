@@ -1,3 +1,6 @@
 [submodule "external/pinmame"]
 	path = external/pinmame
 	url = https://github.com/vpinball/pinmame.git
+[submodule "external/vpinball"]
+	path = external/vpinball
+	url = https://github.com/vpinball/vpinball.git

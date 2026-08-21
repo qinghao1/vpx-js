@@ -11,7 +11,15 @@ npm run build:esm          # tsc → dist-esm only (required before demo-browser
 npx tsc --noEmit           # typecheck
 npx biome check .          # lint/format (tabs, width 120)
 npm test                   # vitest --coverage
-npx tsx test/harness/verify-all.ts   # E2E 1..5: wasm → table → pinmame → player → browser
+npx tsx test/harness/verify-all.ts   # E2E 1..7: wasm → table → pinmame → player → gameplay → browser → vpinball-compat
+
+# Native VPinball debugging (requires VPinballX standalone)
+npm run vpinball:setup     # Tier A build or Tier B prebuilt → ~/.cache/vpinball/
+npm run vpinball:doctor    # ldd/otool, shaders, PinMAMEPath checks
+npm run vpinball -- --vpx=table-flipper --extractvbs   # authoritative script extract
+npm run vpinball -- "http://localhost:3000/?vpx=/@fs/...&rom=/@fs/..."  # play via URL
+npm run compare -- --vpx=table-flipper   # dual window: browser left 0,0 + native right 1280,0
+npm run verify:vpinball -- --all-fixtures   # script parity across 25 fixtures
 ```
 
 Node via `fnm` — `.nvmrc` `24`, `.node-version` `24.19.0`. Activate with `eval "$(fnm env --use-on-cd --shell bash)"`.
@@ -22,8 +30,10 @@ Node via `fnm` — `.nvmrc` `24`, `.node-version` `24.19.0`. Activate with `eval
 - `lib/refs.node.ts` / `lib/refs.browser.ts` — explicit env split; demo-browser aliases `refs.node` → `refs.browser`
 - `test/fixtures/*.vpx` + `test/harness/` + `lib/**/*.spec.ts`
 - `wasm/` + `external/pinmame` (submodule) → `wasm/dist/` (`wasm/build.sh`, `--mock` fallback)
+- `external/vpinball` (submodule, `https://github.com/vpinball/vpinball.git`) → native `VPinballX_GL`/`VPinballX_BGFX` + `libSDL3.so` + `shaders-10.8.1/` + `plugins/`
+- `bin/vpinball-runner.ts` + `test/harness/vpinball-resolver.ts` + `test/harness/compare-side-by-side.ts` + `test/harness/verify-vpinball-compat.ts` — vpinball debugging & parity
 - `demo-browser/` — local browser demo, **untracked** (`/.gitignore:demo-browser/`)
-- `dist/`, `dist-esm/`, `coverage/`, `node_modules/`, `*.vpx`, `lib/scripting/grammar/rules.ts` — ignored, do not commit
+- `dist/`, `dist-esm/`, `coverage/`, `node_modules/`, `*.vpx`, `lib/scripting/grammar/rules.ts`, `external/vpinball/build/`, `.cache/vpinball/` — ignored, do not commit
 
 ## Conventions
 
@@ -34,9 +44,11 @@ Node via `fnm` — `.nvmrc` `24`, `.node-version` `24.19.0`. Activate with `eval
 ## Testing
 
 - `vitest` on `lib/**/*.spec.ts` (`pool:forks`, `fileParallelism:false`, 10s timeout).
-- `test/harness/` is the single E2E entry: `verify-all.ts` (TAP 1..5) → `verify-browser.ts` → `demo-browser/e2e/integration.mjs`. Keep it unified.
+- `test/harness/` is the single E2E entry: `verify-all.ts` (TAP 1..7) → `verify-browser.ts` → `demo-browser/e2e/integration.mjs` (+ `verify-vpinball-compat.ts` optional # SKIP if native missing). Keep it unified.
 
 ## Gotchas
 
 - `Failed to resolve import ../dist-esm/...` → run `npm run build:esm`.
 - `external/pinmame` showing dirty after build is normal — `git submodule foreach 'git reset --hard'` to clean.
+- `external/vpinball` showing dirty after `npm run vpinball:setup` is normal; `VPINBALL_BIN` overrides discovery.
+- `verify-vpinball-compat` requires native `VPinballX` — CI emits `ok 7 # SKIP` when not provisioned.

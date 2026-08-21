@@ -21,3 +21,8 @@ demo-browser/.vite/
 wasm/build/
 wasm/dist/*.wasm
 profile_harness*.mjs
+external/vpinball/build/
+external/vpinball/bin/
+external/vpinball/external/
+external/vpinball/third-party/
+.cache/vpinball/

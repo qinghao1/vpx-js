@@ -9,6 +9,7 @@ const checks = [
 	{ name: 'player', script: 'test/harness/verify-player.ts' },
 	{ name: 'gameplay', script: 'test/harness/harness-gameplay.ts' },
 	{ name: 'browser', script: 'test/harness/verify-browser.ts', optional: true },
+	{ name: 'vpinball-compat', script: 'test/harness/verify-vpinball-compat.ts', optional: true },
 ]
 
 async function run(script: string): Promise<boolean> {
@@ -37,7 +38,8 @@ console.log(`TAP version 13\n# vpx-js E2E — ${new Date().toISOString()}`)
 console.log(`1..${checks.length}`)
 let pass = 0
 for (let i = 0; i < checks.length; i++) {
-	const c = checks[i]!
+	const c = checks[i]
+	if (!c) continue
 	console.log(`\n# --- ${c.name} ---`)
 	try {
 		const ok = await run(path.resolve(c.script))
@@ -46,7 +48,8 @@ for (let i = 0; i < checks.length; i++) {
 			console.log(`ok ${i + 1} - ${c.name}`)
 		} else if (c.optional) {
 			pass++
-			console.log(`ok ${i + 1} - ${c.name} # SKIP browser not ready`)
+			const skipReason = c.name === 'vpinball-compat' ? 'native vpinball not found' : 'browser not ready'
+			console.log(`ok ${i + 1} - ${c.name} # SKIP ${skipReason}`)
 		} else {
 			console.log(`not ok ${i + 1} - ${c.name}`)
 		}
