@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
+import * as vm from 'node:vm'
 import { discoverVpinball, getDynamicLinkerEnv } from './vpinball-resolver.js'
 
 function parseArgs(rawArgs: string[]): { all: boolean; vpx: string | null; auditOnly: boolean; help: boolean } {
@@ -185,6 +186,28 @@ export function auditTableStructure(table: any): TableStructureAudit {
 			physicsIssues.push(`Rubber '${name}' negative elasticity: ${rubberData.elasticity}`)
 	}
 
+	// Gates validation
+	for (const [name, gate] of Object.entries(table.gates ?? {})) {
+		const gateData = (gate as any).data
+		if (!gateData) continue
+		if (typeof gateData.damping === 'number' && gateData.damping < 0)
+			physicsIssues.push(`Gate '${name}' negative damping: ${gateData.damping}`)
+		if (typeof gateData.friction === 'number' && gateData.friction < 0)
+			physicsIssues.push(`Gate '${name}' negative friction: ${gateData.friction}`)
+		if (typeof gateData.elasticity === 'number' && gateData.elasticity < 0)
+			physicsIssues.push(`Gate '${name}' negative elasticity: ${gateData.elasticity}`)
+	}
+
+	// Spinners validation
+	for (const [name, spinner] of Object.entries(table.spinners ?? {})) {
+		const spinnerData = (spinner as any).data
+		if (!spinnerData) continue
+		if (typeof spinnerData.damping === 'number' && spinnerData.damping < 0)
+			physicsIssues.push(`Spinner '${name}' negative damping: ${spinnerData.damping}`)
+		if (typeof spinnerData.elasticity === 'number' && spinnerData.elasticity < 0)
+			physicsIssues.push(`Spinner '${name}' negative elasticity: ${spinnerData.elasticity}`)
+	}
+
 	// Timers frame-pacing check (< 17ms below 60fps)
 	for (const [name, timer] of Object.entries(table.timers ?? {})) {
 		const timerData = (timer as any).data
@@ -200,6 +223,25 @@ export function auditTableStructure(table: any): TableStructureAudit {
 		if (!lightData) continue
 		if (typeof lightData.intensity === 'number' && lightData.intensity < 0) {
 			warnings.push(`Light '${name}' negative intensity: ${lightData.intensity}`)
+		}
+	}
+
+	// Script keyword diagnostics (matches native AuditTable)
+	const script = (table as any).tableScript ?? ''
+	if (script) {
+		const lowerScript = script.toLowerCase()
+		if (/\bexecute\b/.test(lowerScript)) {
+			warnings.push("Script uses 'Execute' command (may trigger security/performance checks)")
+		}
+		const hasLoadVpm = lowerScript.includes('loadvpm')
+		const hasPinMameTimer = Boolean(table.timers?.pinmametimer || table.timers?.PinMAMETimer)
+		if (hasLoadVpm && !hasPinMameTimer) {
+			warnings.push("VPM controller is used but table is missing a Timer object named 'PinMAMETimer'")
+		}
+		const hasVpmTimer = lowerScript.includes('vpmtimer')
+		const hasPulseTimer = Boolean(table.timers?.pulsetimer || table.timers?.PulseTimer)
+		if (hasVpmTimer && !hasPulseTimer) {
+			warnings.push("Script references 'vpmTimer' but table is missing a Timer object named 'PulseTimer'")
 		}
 	}
 
@@ -479,7 +521,15 @@ export async function verifyVpinballCompat(
 						fail++
 						continue
 					}
-					console.log(`  ✓ vbs2js AST OK (${(js.length / 1024).toFixed(1)} KB JS)`)
+					// Validate JS syntax in V8 engine
+					try {
+						new vm.Script(js)
+					} catch (v8Err: unknown) {
+						console.log(`  not ok — transpiled JS failed V8 syntax validation: ${(v8Err as Error).message}`)
+						fail++
+						continue
+					}
+					console.log(`  ✓ vbs2js AST & V8 syntax OK (${(js.length / 1024).toFixed(1)} KB JS)`)
 				} catch (err: unknown) {
 					console.log(`  not ok — vbsToJs failed: ${(err as Error).message?.slice(0, 500)}`)
 					fail++
