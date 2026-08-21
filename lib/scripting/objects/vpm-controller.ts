@@ -158,20 +158,53 @@ export class VpmController {
 	}
 
 	private async fetchRom(name: string): Promise<Uint8Array> {
-		const w = globalThis as unknown as {
+		const pendingWindow = globalThis as unknown as {
 			__pendingRom?: Uint8Array
 			__pendingRomName?: string
 			__pendingRomUrl?: string
 		}
-		if (w.__pendingRom?.length && (!w.__pendingRomName || w.__pendingRomName === name)) return w.__pendingRom
+		if (
+			pendingWindow.__pendingRom?.length &&
+			(!pendingWindow.__pendingRomName || pendingWindow.__pendingRomName === name)
+		) {
+			return pendingWindow.__pendingRom
+		}
+		if (typeof process !== 'undefined' && process.versions?.node) {
+			try {
+				const fs = await import('node:fs')
+				const path = await import('node:path')
+				const os = await import('node:os')
+				const candidates = [
+					path.join(os.homedir(), '.pinmame', 'roms', `${name}.zip`),
+					path.join(process.cwd(), 'test', 'fixtures', `${name}.zip`),
+					path.join(os.homedir(), 'Downloads', `${name}.zip`),
+					path.join(process.cwd(), 'pinmame', 'roms', `${name}.zip`),
+				]
+				for (const candidate of candidates) {
+					if (fs.existsSync(candidate)) {
+						return new Uint8Array(fs.readFileSync(candidate))
+					}
+				}
+			} catch {}
+		}
 		const romParam = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('rom') : null
 		if (romParam) {
-			const r = await fetch(romParam)
-			if (r.ok) return new Uint8Array(await r.arrayBuffer())
+			try {
+				const response = await fetch(romParam)
+				if (response.ok) return new Uint8Array(await response.arrayBuffer())
+			} catch {}
 		}
-		for (const url of [`/pinmame/roms/${name}.zip`, `/roms/${name}.zip`]) {
-			const r = await fetch(url)
-			if (r.ok) return new Uint8Array(await r.arrayBuffer())
+		if (typeof location !== 'undefined') {
+			for (const url of [
+				`/@fs${location.pathname.startsWith('/home') ? '' : '/home/qinghao1'}/.pinmame/roms/${name}.zip`,
+				`/pinmame/roms/${name}.zip`,
+				`/roms/${name}.zip`,
+			]) {
+				try {
+					const response = await fetch(url)
+					if (response.ok) return new Uint8Array(await response.arrayBuffer())
+				} catch {}
+			}
 		}
 		logger().warn(`[pinmame] no ROM for ${name} — mock`)
 		return new Uint8Array()

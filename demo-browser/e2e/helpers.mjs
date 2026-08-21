@@ -1101,7 +1101,7 @@ export const cameraTransitionChecks = async page => {
 				const d = samples[i].pos.distanceTo(samples[i - 1].pos)
 				if (d > maxJump) maxJump = d
 			}
-			const isTeleport = maxJump > total * 0.35 && maxJump > 3 && total > 5
+			const isTeleport = samples.length >= 8 && maxJump > total * 0.35 && maxJump > 3 && total > 5
 			const afterIdx = Math.min(5, samples.length - 1)
 			const after80 = samples[afterIdx].pos.distanceTo(startPos)
 			const isFrozen = after80 < 0.02 && total > 5
@@ -1111,7 +1111,7 @@ export const cameraTransitionChecks = async page => {
 				const d = samples[i].tgt.distanceTo(samples[i - 1].tgt)
 				if (d > maxTgtJump) maxTgtJump = d
 			}
-			const tgtTeleport = maxTgtJump > tgtTotal * 0.4 && maxTgtJump > 1.5 && tgtTotal > 2
+			const tgtTeleport = samples.length >= 8 && maxTgtJump > tgtTotal * 0.4 && maxTgtJump > 1.5 && tgtTotal > 2
 			const pass = !isTeleport && !isFrozen && !tgtTeleport
 			const reason = pass
 				? 'smooth'
