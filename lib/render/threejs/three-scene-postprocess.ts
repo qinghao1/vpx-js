@@ -9,15 +9,11 @@ export const BAKED_EMISSIVE = 1.0
 export const BAKED_ROUGH = 0.75
 export const BAKED_METAL = 0.1
 
-const ANISOTROPY_VR = 8
-const LARGE_TEXTURE_PIXELS = 1_048_576
-
 const RE_BAKE_MAT = /bake/i
 const RE_BAKE_MAP = /bake|nestmap/i
 const RE_ALPHA_MESH = /armp|ramp|bat_|non[_-]?opaque|plastic|gate/i
 const RE_VR = /vr_/i
 const RE_CAB = /vrcab|cabinet|lockbar|pincab/i
-const RE_OUTER = /VRCab_(Cabinet|Backbox|LegsFront|LegsBack)$/i
 const RE_GLASS = /glass/i
 const RE_LM = /lm_/i
 const RE_GI = /gi0|gi1|_gi|gi_/i
@@ -255,8 +251,6 @@ function isInCabFlipper(obj: THREE.Object3D): boolean {
 	}
 	return false
 }
-
-const isCabOrVrName = (n: string): boolean => RE_VR.test(n) || RE_CAB.test(n)
 
 export function hideCabFlippers(root: THREE.Object3D): number {
 	let hidden = 0
