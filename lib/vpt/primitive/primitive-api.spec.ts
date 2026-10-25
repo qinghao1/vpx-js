@@ -215,4 +215,34 @@ describe('The VPinball primitive API', () => {
 
 		state.release()
 	})
+
+	it('should allow setting non-existent image names without throwing and reject HDR textures', async () => {
+		const table = await Table.load(new NodeBinaryReader(three.fixturePath('table-primitive.vpx')))
+		new Player(table).init()
+		const primitive = table.primitives.Cube.getApi()
+
+		// Setting non-existent texture should not throw (matches native VPX Primitive::put_Image / put_NormalMap)
+		expect(() => {
+			primitive.Image = 'does_not_exist_in_table'
+		}).not.to.throw()
+		expect(primitive.Image).to.equal('does_not_exist_in_table')
+
+		expect(() => {
+			primitive.NormalMap = 'does_not_exist_in_table'
+		}).not.to.throw()
+		expect(primitive.NormalMap).to.equal('does_not_exist_in_table')
+
+		// Mock HDR texture
+		table.textures.hdr_tex = {
+			isHdr: () => true,
+		} as any
+
+		expect(() => {
+			primitive.Image = 'hdr_tex'
+		}).to.throw('Cannot use a HDR image (.exr/.hdr) here')
+
+		expect(() => {
+			primitive.NormalMap = 'hdr_tex'
+		}).to.throw('Cannot use a HDR image (.exr/.hdr) here')
+	})
 })

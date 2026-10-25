@@ -17,6 +17,7 @@ export interface IMaterialGenerator {
 		disableLighting?: number,
 		addBlend?: boolean,
 		backfacesEnabled?: boolean,
+		alphaTestValue?: number,
 	): ThreeMaterial
 	applyMaterial(threeMaterial: ThreeMaterial, material?: Material, isTransparent?: boolean): void
 	applyMap(threeMaterial: ThreeMaterial, map?: string): void
@@ -35,5 +36,6 @@ export interface IMaterialGenerator {
 		disableLighting?: number,
 		addBlend?: boolean,
 		backfacesEnabled?: boolean,
+		alphaTestValue?: number,
 	): string
 }

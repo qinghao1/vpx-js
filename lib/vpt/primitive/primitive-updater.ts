@@ -3,6 +3,15 @@
 import { Color, MathUtils } from 'three'
 
 import type { IRenderApi } from '../../render/irender-api.js'
+import { cloneMaterialForWrite, getGlobalEmissionScale } from '../../render/threejs/material-shared.js'
+import {
+	getPrimitiveKind,
+	isPrimitiveNodeMaterial,
+	PRIMITIVE_ADDITIVE_KIND,
+	PRIMITIVE_BDL_KIND,
+	updatePrimitiveAdditive,
+	updatePrimitiveBdl,
+} from '../../render/threejs/nodes/primitive-bdl-node.js'
 import { Matrix3D } from '../../util/matrix.js'
 import { Vertex3DNoTex2 } from '../../util/vertex.js'
 import { ItemUpdater } from '../item-updater.js'
@@ -11,8 +20,6 @@ import type { Table } from '../table/table.js'
 import type { PrimitiveData } from './primitive-data.js'
 import type { PrimitiveState } from './primitive-state.js'
 
-const DISABLE_THRESHOLD = 0.001
-const DISABLE_SCALE = 0.01
 // vpinball: src/parts/primitive.cpp:107/1171 convertColor(c, alpha*(1/100)) — alpha 0..100 maps 0..1,
 // 250 => 2.5 HDR, 3000 => 30 HDR (TWD inserts). ALPHA_SCALE 0.01 is the 1/100 factor, not a hand-tuned 0.3.
 const ALPHA_SCALE = 0.01
@@ -67,7 +74,7 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 			state.material !== undefined ||
 			!!this.data.szLightmap
 		if (needsColor) this.applyColor(obj, table)
-		if (state.alpha !== undefined) this.applyAlpha(obj)
+		if (needsColor || state.alpha !== undefined) this.applyAlpha(obj)
 		if (state.position || state.size || state.rotation || state.translation || state.objectRotation) {
 			this.applyTransformation(obj, renderApi, table)
 		}
@@ -75,12 +82,17 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 	}
 
 	private ensureCloned<NODE>(obj: NODE): void {
-		for (const m of this.meshes(obj)) {
-			const mat = m.material as unknown as { userData: Record<string, unknown>; clone: () => unknown } | undefined
+		for (const mesh of this.meshes(obj)) {
+			const mat = mesh.material as unknown as
+				| { userData: Record<string, unknown>; clone: () => unknown }
+				| undefined
 			if (!mat?.clone || mat.userData.__primitiveCloned) continue
-			const cloned = mat.clone() as typeof mat
+			// Node materials stash TSL uniforms in userData, which three.js clone() would
+			// reduce to plain JSON; rebuild them so per-primitive script state (color/BDL)
+			// never leaks between inserts nor dies on first write.
+			const cloned = cloneMaterialForWrite(mat) as typeof mat
 			;(cloned.userData as Record<string, unknown>).__primitiveCloned = true
-			m.material = cloned as unknown as typeof m.material
+			mesh.material = cloned as unknown as typeof mesh.material
 		}
 	}
 
@@ -150,139 +162,103 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 	}
 
 	private applyColor<NODE>(obj: NODE, table: Table): void {
+		// Native (primitive.cpp + material.sh): albedo = map * material.base * primitive.color,
+		// out = mix(lit, albedo, BlendDisableLighting) * alpha-state; addBlend renders the unlit
+		// albedo additively with intensity alpha/100. All inputs are file/script flags — names,
+		// depthBias windows, and on/off substrings play no role.
 		const prim = this.state.color ?? this.data.color
 		const dlTop = this.state.disableLightingTop ?? this.data.disableLightingTop
-		const dlBelow = this.state.disableLightingBelow ?? this.data.disableLightingBelow
-		const topIntensity = dlTop > DISABLE_THRESHOLD ? dlTop * DISABLE_SCALE : 0
-		const belowIntensity = dlBelow < 1 - DISABLE_THRESHOLD ? (1 - dlBelow) * DISABLE_SCALE * 0.5 : 0
 		const rawAlpha = this.state.alpha ?? this.data.alpha
-		const rawAlphaClamped = Math.max(0, rawAlpha)
-		const alphaIntensity = this.data.addBlend ? Math.min(MAX_EMISSIVE, rawAlphaClamped * ALPHA_SCALE) : 0
-		const nonBakedIntensity = Math.min(MAX_EMISSIVE, topIntensity + belowIntensity + alphaIntensity)
-		const nonBakedEmissive = nonBakedIntensity > 0
-		const matName = this.state.material ?? this.data.szMaterial
-		const mapName = this.state.map ?? this.data.szImage
-		const isBakedByName =
-			/bake/i.test(matName ?? '') ||
-			(/bake|nestmap/i.test(mapName ?? '') && !mapName.toLowerCase().startsWith('vr_'))
-		const base = table.getMaterial(matName)?.baseColor ?? 0xffffff
-		const hex = new Color(base).multiply(new Color(prim)).getHex() // unlit: emissive = base*prim, intensity = alpha/100
-		const lightName = this.data.szLightmap
-		let lightFactor = 1
-		if (lightName) {
-			try {
-				const l = (table as any).lights?.[lightName] ?? (table as any).getLight?.(lightName)
-				const st = (l as any)?.getState?.() ?? (l as any)?.state
-				const dataInt = (l as any)?.data?.intensity ?? (l as any)?.intensity ?? 1
-				const scale = (l as any)?.data?.intensityScale ?? (l as any)?.animation?.intensityScale ?? 1
-				const cur = st?.intensity ?? dataInt
-				const denom = dataInt * scale
-				let rawFactor: number
-				if (denom !== 0) {
-					rawFactor = cur / denom
-					if (cur >= 0 && cur <= 1 && denom > 1) rawFactor = cur
-				} else rawFactor = 0
-				lightFactor = Math.max(0, Math.min(1, Number.isFinite(rawFactor) ? rawFactor : 0))
-			} catch {
-				lightFactor = 1
+		const matObj = table.getMaterial(this.state.material ?? this.data.szMaterial ?? '')
+		const base = matObj?.baseColor ?? 0xffffff
+		const matOpacity = matObj?.isOpacityActive ? Math.min(1, Math.max(0, matObj.opacity)) : 1
+		const hex = new Color(base).multiply(new Color(prim)).getHex()
+		const lightFactor = this.lightmapAlphaFactor(table)
+		const effectiveAlpha = Math.max(0, rawAlpha) * lightFactor
+		const bdl = Math.max(0, dlTop)
+		for (const mesh of this.meshes(obj)) {
+			const mat = mesh.material as any
+			if (!mat) continue
+			const kind = getPrimitiveKind(mat)
+			if (kind === PRIMITIVE_ADDITIVE_KIND) {
+				const intensity = Math.min(MAX_EMISSIVE, effectiveAlpha * ALPHA_SCALE)
+				updatePrimitiveAdditive(mat, { tint: hex, intensity })
+				mat.transparent = true
+				mat.depthWrite = false
+				mat.depthTest = true
+				mat.blending = 2
+				mat.toneMapped = true
+				// Native (primitive.cpp:1037,1088): visible=false skips the draw, and
+				// additive is also skipped when there is nothing to add.
+				const scriptVisible = this.state.isVisible ?? this.data.isVisible ?? true
+				;(mesh as any).visible = !!scriptVisible && prim !== 0 && effectiveAlpha > 0
+				continue
 			}
+			if (kind === PRIMITIVE_BDL_KIND) {
+				const opacity = Math.min(1, Math.max(0, effectiveAlpha * ALPHA_SCALE * matOpacity))
+				const below = this.state.disableLightingBelow ?? this.data.disableLightingBelow ?? 0
+				// The bulb buffer is sampled per-pixel from the fragment's own
+				// playfield UV (see primitive-bdl-node.ts), mirroring the native
+				// per-pixel lookup (fs_basic.sc) with no per-primitive anchor.
+				updatePrimitiveBdl(mat, {
+					albedo: hex,
+					opacity,
+					bdl,
+					below,
+				})
+				const transparent = opacity < 0.999
+				if (mat.transparent !== transparent || mat.depthWrite === transparent) {
+					mat.transparent = transparent
+					mat.depthWrite = !transparent
+					mat.needsUpdate = true
+				}
+				// Native (primitive.cpp:1037): script visible=false skips the draw.
+				// Visibility is owned by applyVisibility; never force it here or
+				// script-hidden wells (e.g. insert flare when the lamp is off) cover
+				// the playfield with dark sockets.
+				continue
+			}
+			if (mat.userData?.__uTintColor?.value?.set) mat.userData.__uTintColor.value.set(hex)
+			if (mat.userData?.__uTint?.value?.set) mat.userData.__uTint.value.set(hex)
 		}
-		const effectiveAlpha = rawAlphaClamped * lightFactor
-		const effectiveIntensity = Math.min(MAX_EMISSIVE, effectiveAlpha * ALPHA_SCALE)
-		for (const m of this.meshes(obj)) {
-			const mat = m.material as unknown as
-				| {
-						color: { set: (v: number) => void }
-						emissive: { set: (v: number) => void }
-						emissiveIntensity: number
-						emissiveMap?: unknown
-						map?: unknown
-						userData?: Record<string, unknown>
-						needsUpdate: boolean
-				  }
-				| undefined
-			if (!mat?.color || !mat?.emissive) continue
-			const isBaked =
-				dlTop > 0.5 || isBakedByName || !!(mat as any).userData?.__isBaked || !!(mat as any).emissiveMap
-			if (isBaked) {
-				const hasMap = !!(mat as any).emissiveMap || !!(mat as any).map
-				const pending =
-					(mat as any).userData?.pendingMap ||
-					(mat as any).userData?.pendingmap ||
-					(mat as any).userData?.pendingEmissiveMap
-				const isBakedByCache = isBakedByName || !!(mat as any).userData?.__isBaked || !!(mat as any).emissiveMap
-				if (!hasMap && pending && isBakedByCache) {
-					mat.color.set(0x000000)
-					mat.emissive.set(0xffffff)
-					mat.emissiveIntensity = 0
-					continue
-				}
-				if (this.data.addBlend) {
-					// unlit additive
-					mat.color.set(0x000000)
-					mat.emissive.set(hex)
-					mat.emissiveIntensity = effectiveIntensity
-				} else {
-					mat.color.set(0x000000)
-					if (!mat.emissive) (mat as any).emissive = new Color(hex)
-					else mat.emissive.set(hex)
-					mat.emissiveIntensity = 1.0
-				}
-			} else {
-				mat.color.set(hex)
-				if (nonBakedEmissive) {
-					mat.emissive.set(hex)
-					mat.emissiveIntensity = nonBakedIntensity
-				} else {
-					mat.emissive.set(0x000000)
-					mat.emissiveIntensity = 0
-				}
-			}
-			mat.needsUpdate = true
+	}
+
+	private lightmapAlphaFactor(table: Table): number {
+		// Native convolutes lightmap primitives with the lamp shadow (primitive.cpp:1080);
+		// the lamp scales the primitive alpha, never its color.
+		const lightName = this.data.szLightmap
+		if (!lightName) return 1
+		try {
+			const light = (table as any).lights?.[lightName] ?? (table as any).getLight?.(lightName)
+			const lightState = (light as any)?.getState?.() ?? (light as any)?.state
+			const dataInt = (light as any)?.data?.intensity ?? (light as any)?.intensity ?? 1
+			const scale = (light as any)?.data?.intensityScale ?? (light as any)?.animation?.intensityScale ?? 1
+			const currentIntensity = lightState?.intensity ?? dataInt
+			const denom = dataInt * scale
+			let rawFactor: number
+			if (denom !== 0) {
+				rawFactor = currentIntensity / denom
+				if (currentIntensity >= 0 && currentIntensity <= 1 && denom > 1) rawFactor = currentIntensity
+			} else rawFactor = 0
+			return Math.max(0, Math.min(1, Number.isFinite(rawFactor) ? rawFactor : 0))
+		} catch {
+			return 1
 		}
 	}
 
 	private applyAlpha<NODE>(obj: NODE): void {
-		const rawAlpha = this.state.alpha ?? this.data.alpha
-		const opacity = Math.min(1, Math.max(0, rawAlpha * ALPHA_SCALE))
-		const isAdditive = !!this.data.addBlend
-		for (const m of this.meshes(obj)) {
-			const mat = m.material as unknown as
-				| {
-						opacity: number
-						transparent: boolean
-						depthWrite: boolean
-						blending: number
-						needsUpdate: boolean
-						userData: Record<string, unknown>
-						map?: unknown
-						emissiveMap?: unknown
-				  }
-				| undefined
-			if (!mat) continue
-			const isBakedPending =
-				!!(mat as any).userData?.__isBaked &&
-				!mat.map &&
-				!mat.emissiveMap &&
-				((mat as any).userData?.pendingMap || (mat as any).userData?.pendingEmissiveMap)
-			if (isBakedPending) {
-				mat.opacity = 0
-				mat.transparent = true
-				mat.depthWrite = false
-				mat.needsUpdate = true
-				continue
-			}
-			if (isAdditive) {
-				mat.opacity = opacity
-				mat.transparent = true
-				mat.depthWrite = false
-				mat.blending = 2
-			} else {
-				mat.opacity = opacity
-				mat.transparent = opacity < 0.999
-				mat.depthWrite = !mat.transparent
-			}
-			mat.needsUpdate = true
+		// Opacity lives in applyColor (albedo/BDL/intensity uniforms); this only keeps the
+		// classic-material flags consistent for alpha-only updates.
+		for (const mesh of this.meshes(obj)) {
+			const mat = mesh.material as any
+			if (!mat || isPrimitiveNodeMaterial(mat)) continue
+			const rawAlpha = this.state.alpha ?? this.data.alpha
+			const opacity = Math.min(1, Math.max(0, rawAlpha * ALPHA_SCALE))
+			mat.opacity = opacity
+			mat.transparent = opacity < 0.999
+			mat.depthWrite = !mat.transparent
+			mat.depthTest = true
+			if (mat.blending !== 1 && !mat.userData?.__addBlend) mat.blending = 1
 		}
 	}
 
@@ -298,20 +274,40 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
 		table: Table,
 	): void {
-		const d = this.data
-		const s = this.state
+		const primitiveData = this.data
+		const primitiveState = this.state
 		const scaleZ = table.getScaleZ()
-		const oldPos = d.position
-		const oldSize = d.size
-		const oldRot = { x: d.rotAndTra[0]!, y: d.rotAndTra[1]!, z: d.rotAndTra[2]! }
-		const oldTrans = { x: d.rotAndTra[3]!, y: d.rotAndTra[4]!, z: d.rotAndTra[5]! }
-		const oldObj = { x: d.rotAndTra[6]!, y: d.rotAndTra[7]!, z: d.rotAndTra[8]! }
-		const newPos = s.position ?? oldPos
-		const newSize = s.size ?? oldSize
-		const newRot = s.rotation ? { x: s.rotation.x, y: s.rotation.y, z: s.rotation.z } : oldRot
-		const newTrans = s.translation ? { x: s.translation.x, y: s.translation.y, z: s.translation.z } : oldTrans
-		const newObj = s.objectRotation
-			? { x: s.objectRotation.x, y: s.objectRotation.y, z: s.objectRotation.z }
+		const oldPos = primitiveData.position
+		const oldSize = primitiveData.size
+		const oldRot = {
+			x: primitiveData.rotAndTra[0]!,
+			y: primitiveData.rotAndTra[1]!,
+			z: primitiveData.rotAndTra[2]!,
+		}
+		const oldTrans = {
+			x: primitiveData.rotAndTra[3]!,
+			y: primitiveData.rotAndTra[4]!,
+			z: primitiveData.rotAndTra[5]!,
+		}
+		const oldObj = {
+			x: primitiveData.rotAndTra[6]!,
+			y: primitiveData.rotAndTra[7]!,
+			z: primitiveData.rotAndTra[8]!,
+		}
+		const newPos = primitiveState.position ?? oldPos
+		const newSize = primitiveState.size ?? oldSize
+		const newRot = primitiveState.rotation
+			? { x: primitiveState.rotation.x, y: primitiveState.rotation.y, z: primitiveState.rotation.z }
+			: oldRot
+		const newTrans = primitiveState.translation
+			? { x: primitiveState.translation.x, y: primitiveState.translation.y, z: primitiveState.translation.z }
+			: oldTrans
+		const newObj = primitiveState.objectRotation
+			? {
+					x: primitiveState.objectRotation.x,
+					y: primitiveState.objectRotation.y,
+					z: primitiveState.objectRotation.z,
+				}
 			: oldObj
 		const buildFull = (
 			pos: { x: number; y: number; z: number },

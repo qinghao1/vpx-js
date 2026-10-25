@@ -36,18 +36,24 @@ export class PrimitiveApi extends ItemApi<PrimitiveData> {
 	get Image() {
 		return this._state.map ?? this.data.szImage ?? ''
 	}
-	set Image(v) {
-		this._assertNonHdrImage(v)
-		this._state.map = v
-		this.data.szImage = v
+	set Image(value) {
+		if (value) {
+			const tex = this.table.getTexture(value)
+			if (tex?.isHdr()) throw new Error('Cannot use a HDR image (.exr/.hdr) here')
+		}
+		this._state.map = value
+		this.data.szImage = value
 	}
 	get NormalMap() {
 		return this._state.normalMap ?? this.data.szNormalMap ?? ''
 	}
-	set NormalMap(v) {
-		this._assertNonHdrImage(v)
-		this._state.normalMap = v
-		this.data.szNormalMap = v
+	set NormalMap(value) {
+		if (value) {
+			const tex = this.table.getTexture(value)
+			if (tex?.isHdr()) throw new Error('Cannot use a HDR image (.exr/.hdr) here')
+		}
+		this._state.normalMap = value
+		this.data.szNormalMap = value
 	}
 	get Material() {
 		return this._state.material ?? this.data.szMaterial ?? ''

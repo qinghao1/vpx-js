@@ -56,7 +56,9 @@ export function canBatchWebGpu(mat: any): boolean {
 export function canBatch(mat: MeshStandardMaterial): boolean {
 	if (!canBatchWebGpu(mat as any)) return false
 	const ud = mat.userData as any
+	if (!ud) return true
 	if (ud.pendingMap || ud.pendingmap || ud.pendingNormalMap || ud.pendingEnvMap || ud.pendingEmissiveMap) return false
+	if (ud.__primitiveCloned) return false
 	return true
 }
 
@@ -97,7 +99,8 @@ export function batchStaticOpaques(root: Group, table: Table, _renderApi: ThreeR
 	const dynamicPrimitives = (() => {
 		const s = new Set<string>()
 		for (const p of Object.values(table.primitives))
-			if ((p as any).data?.mesh?.animationFrames?.length) s.add(p.getName().toLowerCase())
+			if ((p as any).data?.mesh?.animationFrames?.length || (p as any).data?.staticRendering === false)
+				s.add(p.getName().toLowerCase())
 		for (const name of animatables) if (primitives.has(name)) s.add(name.toLowerCase())
 		return s
 	})()

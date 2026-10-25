@@ -148,6 +148,15 @@ export interface IRenderApi<NODE, GEOMETRY, POINT_LIGHT> {
 	createLightGeometry(lightData: LightData, table: Table): GEOMETRY
 
 	/**
+	 * Creates a flat additive glow polygon for a bulb light.
+	 *
+	 * Native renders every light with drag-point vertices as a lightmap glow
+	 * quad (`m_lightmapMeshBuffer` in `light.cpp`, `fs_light.sc` bulb blend),
+	 * independent of the bulb-mesh and surface-light paths.
+	 */
+	createBulbGlowGeometry(lightData: LightData, table: Table): GEOMETRY
+
+	/**
 	 * Creates the playfield geometry.
 	 *
 	 * @param table The table object

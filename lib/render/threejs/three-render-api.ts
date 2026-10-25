@@ -276,6 +276,9 @@ export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, Poin
 	public createLightGeometry(lightData: LightData, table: Table): BufferGeometry {
 		return this.lightMeshGenerator.createLight(lightData, table)
 	}
+	public createBulbGlowGeometry(lightData: LightData, table: Table): BufferGeometry {
+		return this.lightMeshGenerator.createBulbGlowGeometry(lightData, table)
+	}
 	public createPlayfieldGeometry(table: Table, opts: TableGenerateOptions): BufferGeometry {
 		return this.playfieldGenerator.createPlayfieldGeometry(table, opts)
 	}

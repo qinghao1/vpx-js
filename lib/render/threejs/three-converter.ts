@@ -42,10 +42,13 @@ export class ThreeConverter {
 		mesh.name = (obj.geometry ?? obj.mesh!)?.name
 		mesh.matrixAutoUpdate = false
 		mesh.visible = obj.isVisible
-		if (obj.depthBias) {
-			const scaled = obj.depthBias / 500
-			const clamped = Math.max(-100, Math.min(100, scaled))
-			mesh.renderOrder = Math.round(clamped)
+		if (obj.bulbGlow) {
+			mesh.renderOrder = 10
+		} else if (obj.depthBias) {
+			mesh.renderOrder = Math.round(Math.max(-10000, Math.min(15, -obj.depthBias)))
+		}
+		if (obj.depthWrite !== undefined) {
+			;(mesh.material as any).depthWrite = obj.depthWrite
 		}
 		if (obj.material?.name === 'ball') {
 			mesh.renderOrder = 1
