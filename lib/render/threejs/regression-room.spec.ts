@@ -1,7 +1,14 @@
 import * as fs from 'node:fs'
 import * as THREE from 'three'
 import { describe, expect, it } from 'vitest'
-import { classify, isBasePlayfield, postProcessScene } from './three-scene-postprocess.js'
+import {
+	classify,
+	isBasePlayfield,
+	isDeferred,
+	postProcessScene,
+	resolveButtonCode,
+	swipeNudge,
+} from './three-scene-postprocess.js'
 
 function makeMesh(name: string, geom: THREE.BufferGeometry, mat: THREE.Material): THREE.Mesh {
 	const m = new THREE.Mesh(geom as any, mat as any)
@@ -129,5 +136,45 @@ describe('regression: room must remain visible', () => {
 		postProcessScene(root, { harnessLog: () => {} })
 		expect(a.visible, 'playfield_mesh hidden').toEqual(false)
 		expect(b.visible, 'playfield_wall should be hidden via isBasePlayfield (contains playfield)').toEqual(false)
+	})
+
+	it('isDeferred correctly prioritizes playfield and bake maps over large assets', () => {
+		const table = { getPlayfieldMap: () => 'playfield_image.png' }
+
+		// Exact playfield map is never deferred
+		expect(isDeferred({ getName: () => 'playfield_image.png', width: 4096, height: 4096 }, table)).toBe(false)
+
+		// Large bake/nestmap textures are never deferred
+		expect(isDeferred({ getName: () => 'vlm_bake_01.png', width: 2048, height: 2048 }, table)).toBe(false)
+		expect(isDeferred({ getName: () => 'nestmap_playfield.png', width: 2048, height: 2048 }, table)).toBe(false)
+
+		// HDR/EXR textures are always deferred
+		expect(isDeferred({ getName: () => 'env.hdr', szPath: 'env.hdr', width: 512, height: 256 }, table)).toBe(true)
+		expect(isDeferred({ getName: () => 'env.exr', szPath: 'env.exr', width: 512, height: 256 }, table)).toBe(true)
+
+		// Large non-bake textures (> 1MP) are deferred
+		expect(isDeferred({ getName: () => 'plastic_artwork.png', width: 2048, height: 1024 }, table)).toBe(true)
+
+		// Small textures (<= 1MP) are not deferred
+		expect(isDeferred({ getName: () => 'button.png', width: 512, height: 512 }, table)).toBe(false)
+	})
+
+	it('resolveButtonCode maps button names to direct input codes', () => {
+		expect(resolveButtonCode('coin_door_coin1')).toBe('Digit5')
+		expect(resolveButtonCode('start_button')).toBe('Digit1')
+		expect(resolveButtonCode('plunger_launch_btn')).toBe('Enter')
+		expect(resolveButtonCode('fire_lockbar')).toBe('AltLeft')
+		expect(resolveButtonCode('magna_left')).toBe('ControlLeft')
+		expect(resolveButtonCode('magna_right')).toBe('ControlRight')
+		expect(resolveButtonCode('unknown_primitive')).toBeNull()
+	})
+
+	it('swipeNudge determines nudge direction from swipe deltas', () => {
+		const NUDGE = { left: 1, right: 2, forward: 3, back: 4 }
+		expect(swipeNudge(-50, 5, NUDGE)).toBe(NUDGE.left)
+		expect(swipeNudge(50, 5, NUDGE)).toBe(NUDGE.right)
+		expect(swipeNudge(5, -50, NUDGE)).toBe(NUDGE.forward)
+		expect(swipeNudge(5, 50, NUDGE)).toBe(NUDGE.back)
+		expect(swipeNudge(20, 20, NUDGE)).toBeNull()
 	})
 })

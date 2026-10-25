@@ -157,7 +157,7 @@ function parseWorker(buffer: ArrayBuffer, kind: 'exr' | 'hdr', max?: number, nam
 				pending.delete(id)
 				reject(new Error('exr worker timeout'))
 			}
-		}, 30000)
+		}, 120000)
 	})
 }
 

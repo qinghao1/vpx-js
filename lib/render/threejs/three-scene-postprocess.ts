@@ -1,9 +1,12 @@
-// Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
-// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
-
 import * as THREE from 'three'
 import { getEffectiveCaps, isLowQuality } from '../../util/quality.js'
-import { getGlobalEmissionScale } from './material-shared.js'
+import { cloneMaterialForWrite, getGlobalEmissionScale } from './material-shared.js'
+import {
+	isPrimitiveNodeMaterial,
+	PRIMITIVE_ADDITIVE_KIND,
+	updatePrimitiveAdditive,
+} from './nodes/primitive-bdl-node.js'
+import { isBakedNodeMaterial, setBakedMap } from './nodes/unshaded-baked-node.js'
 
 export const BAKED_EMISSIVE = 1.0
 export const BAKED_ROUGH = 0.75
@@ -38,12 +41,14 @@ export const BUTTON_CODE_PATTERNS: { regex: RegExp; code: string }[] = [
 ]
 
 export const resolveButtonCode = (name: string): string | null => {
-	const n = String(name ?? '').toLowerCase()
-	for (const { regex, code } of BUTTON_CODE_PATTERNS) if (regex.test(n)) return code
+	const nameLower = String(name ?? '').toLowerCase()
+	for (const { regex, code } of BUTTON_CODE_PATTERNS) {
+		if (regex.test(nameLower)) return code
+	}
 	return null
 }
 
-type ClassifyResult = {
+export type ClassifyResult = {
 	isGlass: boolean
 	isLm: boolean
 	isVr: boolean
@@ -55,15 +60,34 @@ type ClassifyResult = {
 	isRampFamily: boolean
 }
 
-const pendingOf = (mat: THREE.Material): string => {
-	const ud = (mat as unknown as Record<string, unknown>).userData as Record<string, unknown> | undefined
-	const v = (ud?.pendingMap ?? ud?.pendingmap ?? '') as unknown
-	return String(v ?? '').toLowerCase()
+interface CustomMaterialUserData {
+	__primitiveKind?: string
+	__addBlend?: boolean
+	__isBaked?: boolean
+	__bakedNode?: boolean
+	__mapName?: string
+	__map?: unknown
+	__uAlbedo?: { value?: THREE.Color }
+	__uTint?: { value?: THREE.Color }
+	isCabinetButton?: boolean
+	buttonCode?: string
+	pendingMap?: string
+	pendingmap?: string
+	pendingNormalMap?: string
+	pendingEnvMap?: string
+	pendingEmissiveMap?: string
+	[key: string]: unknown
+}
+
+const pendingOf = (material: THREE.Material): string => {
+	const userData = material.userData as CustomMaterialUserData | undefined
+	const pending = userData?.pendingMap ?? userData?.pendingmap ?? ''
+	return String(pending).toLowerCase()
 }
 
 const emissionScale = (): number => {
-	const v = getGlobalEmissionScale()
-	return Math.max(0.15, Math.min(1, Number.isFinite(v) ? v : 1))
+	const scale = getGlobalEmissionScale()
+	return Math.max(0.15, Math.min(1, Number.isFinite(scale) ? scale : 1))
 }
 
 const isGiOverlay = (name: string): boolean => RE_GI.test(name.toLowerCase())
@@ -73,33 +97,33 @@ const isGiOverlay = (name: string): boolean => RE_GI.test(name.toLowerCase())
 // (RE_BAKE_MAT/RE_BAKE_MAP). Overlay vs main is engine contract addBlend (primitive.cpp:102
 // addBlend true => additive unlit via SRC_ALPHA ONE, primitive.cpp:107/1171 alpha/100 HDR).
 export const classify = (mesh: string, mat: string, map: string, baked = false, addBlend = false): ClassifyResult => {
-	const m = mat.toLowerCase()
-	const mp = map.toLowerCase()
-	const me = mesh.toLowerCase()
+	const matLower = mat.toLowerCase()
+	const mapLower = map.toLowerCase()
+	const meshLower = mesh.toLowerCase()
 	const isBakedMat =
 		baked ||
-		RE_BAKE_MAT.test(m) ||
-		(RE_BAKE_MAP.test(mp) && !mp.startsWith('vr_')) ||
-		(RE_BAKE_MAP.test(me) && !me.startsWith('vr_') && !me.includes('vr_'))
-	const isRampFamily = RE_RAMP_FAMILY.test(me)
+		RE_BAKE_MAT.test(matLower) ||
+		(RE_BAKE_MAP.test(mapLower) && !mapLower.startsWith('vr_')) ||
+		(RE_BAKE_MAP.test(meshLower) && !meshLower.startsWith('vr_') && !meshLower.includes('vr_'))
+	const isRampFamily = RE_RAMP_FAMILY.test(meshLower)
 	const isMainBake = isBakedMat && !addBlend
 	const isVlmBake = isBakedMat && addBlend
 	return {
-		isGlass: RE_GLASS.test(me) || RE_GLASS.test(m),
-		isLm: RE_LM.test(me),
-		isVr: RE_VR.test(me) && !RE_CAB.test(me),
-		isCab: RE_CAB.test(me),
+		isGlass: RE_GLASS.test(meshLower) || RE_GLASS.test(matLower),
+		isLm: RE_LM.test(meshLower),
+		isVr: RE_VR.test(meshLower) && !RE_CAB.test(meshLower),
+		isCab: RE_CAB.test(meshLower),
 		isVlmBake,
 		isMainBake,
 		isBakedMat,
-		needsAlpha: RE_ALPHA_MESH.test(me),
+		needsAlpha: RE_ALPHA_MESH.test(meshLower),
 		isRampFamily,
 	}
 }
 
 export const isBasePlayfield = (n: string, c: { isBakedMat: boolean }): boolean =>
 	n.includes('playfield') && !c.isBakedMat
-export const isBakedMesh = (c: { isBakedMat: boolean }): boolean => !!c.isBakedMat
+export const isBakedMesh = (info: { isBakedMat: boolean }): boolean => !!info.isBakedMat
 
 export const isBakedMeshByNames = (
 	meshName?: string,
@@ -108,8 +132,8 @@ export const isBakedMeshByNames = (
 	baked?: boolean,
 	addBlend?: boolean,
 ) => {
-	const c = classify(meshName ?? '', matName ?? '', mapName ?? '', baked ?? false, addBlend ?? false)
-	return { ...c, isVrCab: !!c.isCab || !!c.isVr, isBaked: isBakedMesh(c) }
+	const info = classify(meshName ?? '', matName ?? '', mapName ?? '', baked ?? false, addBlend ?? false)
+	return { ...info, isVrCab: !!info.isCab || !!info.isVr, isBaked: isBakedMesh(info) }
 }
 
 function wrapTexBaked(tex: THREE.Texture | null | undefined): void {
@@ -125,6 +149,18 @@ function wrapTexBaked(tex: THREE.Texture | null | undefined): void {
 
 function fixBaked(mat: THREE.MeshStandardMaterial, map?: THREE.Texture | null): void {
 	const tex = (map as THREE.Texture | undefined) ?? (mat.map as THREE.Texture | undefined)
+	if (isBakedNodeMaterial(mat)) {
+		if (tex) {
+			setBakedMap(mat, tex, tex.name)
+			wrapTexBaked(tex)
+		}
+		mat.needsUpdate = true
+		return
+	}
+	if (isPrimitiveNodeMaterial(mat)) {
+		if (tex) wrapTexBaked(tex)
+		return
+	}
 	if (tex) {
 		mat.map = tex
 		mat.emissiveMap = tex
@@ -187,19 +223,34 @@ export const applyBakedMaterial = (
 	info: ClassifyResult,
 	meshName?: string,
 ): void => {
-	const nl = (meshName ?? '').toLowerCase()
+	if (isBakedNodeMaterial(mat)) {
+		setBakedMap(mat, tex, tex.name)
+		wrapTexBaked(tex)
+		mat.needsUpdate = true
+		return
+	}
+	const userData = mat.userData as CustomMaterialUserData | undefined
+	if (userData?.__primitiveKind === PRIMITIVE_ADDITIVE_KIND) {
+		const nameLower = (meshName ?? '').toLowerCase()
+		const isLit = isGiOverlay(nameLower)
+		updatePrimitiveAdditive(mat, { intensity: isLit ? 1.0 * emissionScale() : 0 })
+		mat.opacity = isLit ? 1.0 : 0
+		wrapTexBaked(tex)
+		mat.needsUpdate = true
+		return
+	}
+	const nameLower = (meshName ?? '').toLowerCase()
 	mat.emissiveMap = tex
-	const cur = (mat.color as THREE.Color | undefined)?.getHex() ?? 0xffffff
-	const tint = cur !== 0x000000 ? new THREE.Color(cur) : new THREE.Color(0xffffff)
+	const currentHex = (mat.color as THREE.Color | undefined)?.getHex() ?? 0xffffff
+	const tint = currentHex !== 0x000000 ? new THREE.Color(currentHex) : new THREE.Color(0xffffff)
 	if (mat.emissive) (mat.emissive as THREE.Color).copy(tint)
 	else mat.emissive = tint as unknown as THREE.Color
-	const isOverlay =
-		!!(mat.userData as unknown as Record<string, unknown>)?.__addBlend || (info.isVlmBake && !info.isMainBake)
+	const isOverlay = !!userData?.__addBlend || (info.isVlmBake && !info.isMainBake)
 	const isMain = !!(info.isMainBake || (info.isBakedMat && !isOverlay))
-	const isApron = RE_NON_OPAQUE.test(nl)
-	const isRamp = RE_RAMP_FAMILY.test(nl)
+	const isApron = RE_NON_OPAQUE.test(nameLower)
+	const isRamp = RE_RAMP_FAMILY.test(nameLower)
 	if (isOverlay) {
-		const isLit = isGiOverlay(nl)
+		const isLit = isGiOverlay(nameLower)
 		mat.emissiveIntensity = isLit ? 1.0 * emissionScale() : 0
 		mat.transparent = true
 		mat.opacity = isLit ? 1.0 : 0
@@ -252,28 +303,28 @@ export const swipeNudge = (
 
 function isInCabFlipper(obj: THREE.Object3D): boolean {
 	for (let cur: THREE.Object3D | null = obj; cur; cur = cur.parent) {
-		const n = (cur.name ?? '').toLowerCase()
-		if (n.includes('vrcab') && n.includes('flipper')) return true
+		const nameLower = (cur.name ?? '').toLowerCase()
+		if (nameLower.includes('vrcab') && nameLower.includes('flipper')) return true
 	}
 	return false
 }
 
 export function hideCabFlippers(root: THREE.Object3D): number {
 	let hidden = 0
-	root.traverse(o => {
-		if (!isInCabFlipper(o)) return
-		if (o.visible !== false) hidden++
-		o.visible = false
+	root.traverse(child => {
+		if (!isInCabFlipper(child)) return
+		if (child.visible !== false) hidden++
+		child.visible = false
 	})
 	return hidden
 }
 
 export function showCabFlippers(root: THREE.Object3D): number {
 	let shown = 0
-	root.traverse(o => {
-		if (!isInCabFlipper(o)) return
-		if (o.visible === false) {
-			o.visible = true
+	root.traverse(child => {
+		if (!isInCabFlipper(child)) return
+		if (child.visible === false) {
+			child.visible = true
 			shown++
 		}
 	})
@@ -281,28 +332,30 @@ export function showCabFlippers(root: THREE.Object3D): number {
 }
 
 function makeParentsVisible(mesh: THREE.Object3D, root: THREE.Object3D, stats: Record<string, number>): void {
-	for (let p: THREE.Object3D | null = mesh.parent; p && p !== root; p = p.parent) {
-		if (p.visible === false && !isInCabFlipper(p)) {
-			p.visible = true
+	for (let parent: THREE.Object3D | null = mesh.parent; parent && parent !== root; parent = parent.parent) {
+		if (parent.visible === false && !isInCabFlipper(parent)) {
+			parent.visible = true
 			stats.cabForced++
 		}
 	}
 }
 
 function sanitizeNaN(node: THREE.Object3D, stats: Record<string, number>): void {
-	node.traverse(o => {
-		const mesh = o as THREE.Mesh
+	node.traverse(child => {
+		const mesh = child as THREE.Mesh
 		const pos = mesh.geometry?.attributes?.position as THREE.BufferAttribute | undefined
 		if (!mesh.isMesh || !pos?.array) return
 		let bad = false
-		for (let i = 0; i < pos.array.length; i++)
+		for (let i = 0; i < pos.array.length; i++) {
 			if (!Number.isFinite((pos.array as unknown as number[])[i])) {
 				bad = true
 				break
 			}
+		}
 		if (!bad) return
-		for (let i = 0; i < pos.array.length; i++)
+		for (let i = 0; i < pos.array.length; i++) {
 			if (!Number.isFinite((pos.array as unknown as number[])[i])) (pos.array as unknown as number[])[i] = 0
+		}
 		pos.needsUpdate = true
 		mesh.geometry.computeBoundingSphere()
 		mesh.geometry.computeBoundingBox()
@@ -348,28 +401,31 @@ export function postProcessScene(
 		const matName = (base.name ?? '').toLowerCase()
 		const pending = pendingOf(base)
 		const mapPre = ((base.map as THREE.Texture | undefined)?.name ?? pending ?? '').toLowerCase()
-		const bakedFlag = !!(base.userData as unknown as Record<string, unknown>)?.__isBaked
-		const addBlend = !!(base.userData as unknown as Record<string, unknown>)?.__addBlend
+		const baseUserData = base.userData as CustomMaterialUserData | undefined
+		const bakedFlag = !!baseUserData?.__isBaked
+		const addBlend = !!baseUserData?.__addBlend
 		const { isMainBake, isVlmBake, needsAlpha } = classify(meshLower, matName, mapPre, bakedFlag, addBlend)
 		const isOverlay = isVlmBake
 		const isApron = RE_NON_OPAQUE.test(meshLower)
 		const isRamp = RE_RAMP_FAMILY.test(meshLower)
 		const alpha = !isMainBake && !isRamp && !isApron && needsAlpha
 		const isGI = isOverlay && isGiOverlay(meshLower)
-		const key = `${base.name}|${(base.map as THREE.Texture | undefined)?.name ?? ''}|${pending}|${isMainBake ? 'main' : isOverlay ? (isGI ? 'overlay_gi' : 'overlay_off') : alpha ? 'alpha' : 'opaque'}|${base.polygonOffset ? `${base.polygonOffsetFactor}/${base.polygonOffsetUnits}` : '0'}`
+		const role = `${RE_NON_OPAQUE.test(meshLower) ? 'a' : 'x'}|${RE_RAMP_FAMILY.test(meshLower) ? 'r' : 'x'}|${needsAlpha ? 'n' : 'x'}`
+		const key = `${base.name}|${(base.map as THREE.Texture | undefined)?.name ?? ''}|${pending}|${isMainBake ? 'main' : isOverlay ? (isGI ? 'overlay_gi' : 'overlay_off') : alpha ? 'alpha' : 'opaque'}|${base.polygonOffset ? `${base.polygonOffsetFactor}/${base.polygonOffsetUnits}` : '0'}|${role}`
 		const cached = bakedCache.get(key)
 		if (cached) return cached
-		const cloned = base.clone() as THREE.MeshStandardMaterial
+		const cloned = cloneMaterialForWrite(base) as THREE.MeshStandardMaterial
+		const clonedUserData = cloned.userData as CustomMaterialUserData | undefined
 		if (isMainBake) {
 			fixBaked(cloned, cloned.map as THREE.Texture | undefined)
-			if (!cloned.map && pending) {
+			if (!isBakedNodeMaterial(cloned) && !cloned.map && pending) {
 				;(cloned.color as THREE.Color).set(0x000000)
 				if (!cloned.emissive) cloned.emissive = new THREE.Color(0xffffff) as unknown as THREE.Color
 				else (cloned.emissive as THREE.Color).set(0xffffff)
 				cloned.emissiveIntensity = BAKED_EMISSIVE
 			}
 			cloned.transparent = false
-			cloned.alphaTest = 0
+			if (!(cloned.alphaTest > 0)) cloned.alphaTest = 0
 			cloned.depthWrite = true
 			cloned.opacity = 1
 			if (!isApron && !isRamp) {
@@ -386,7 +442,11 @@ export function postProcessScene(
 		} else if (isOverlay) {
 			fixBaked(cloned, cloned.map as THREE.Texture | undefined)
 			const isLit = isGI
-			cloned.emissiveIntensity = isLit ? 1.0 : 0
+			if (clonedUserData?.__primitiveKind === PRIMITIVE_ADDITIVE_KIND) {
+				updatePrimitiveAdditive(cloned, { intensity: isLit ? 1.0 : 0 })
+			} else {
+				cloned.emissiveIntensity = isLit ? 1.0 : 0
+			}
 			cloned.transparent = true
 			cloned.opacity = isLit ? 1.0 : 0
 			cloned.blending = THREE.AdditiveBlending
@@ -395,7 +455,7 @@ export function postProcessScene(
 			cloned.polygonOffset = true
 			cloned.polygonOffsetFactor = -2
 			cloned.polygonOffsetUnits = -4
-			cloned.toneMapped = false
+			cloned.toneMapped = clonedUserData?.__primitiveKind === PRIMITIVE_ADDITIVE_KIND
 			cloned.needsUpdate = true
 		} else {
 			fixVr(cloned)
@@ -431,7 +491,7 @@ export function postProcessScene(
 		const key = `${base.name}|${(base.map as THREE.Texture | undefined)?.name ?? pending}|${base.polygonOffset ? `${base.polygonOffsetFactor}/${base.polygonOffsetUnits}` : '0'}|${isCab ? 'cab' : 'vr'}`
 		const cached = vrCache.get(key)
 		if (cached) return cached
-		const cloned = base.clone() as THREE.MeshStandardMaterial
+		const cloned = cloneMaterialForWrite(base) as THREE.MeshStandardMaterial
 		fixVr(cloned, isCab)
 		const hasPending = !!pending && !base.map
 		if (hasPending) {
@@ -465,15 +525,15 @@ export function postProcessScene(
 		index: number,
 		base: THREE.MeshStandardMaterial,
 	): THREE.MeshStandardMaterial => {
-		const clone = base.clone() as THREE.MeshStandardMaterial
+		const clone = cloneMaterialForWrite(base) as THREE.MeshStandardMaterial
 		if (Array.isArray(mesh.material)) (mesh.material as THREE.Material[])[index] = clone
 		else mesh.material = clone
 		return clone
 	}
 
-	node.traverse(o => {
-		const mesh = o as THREE.Mesh
-		const n = (mesh.name ?? '').toLowerCase()
+	node.traverse(child => {
+		const mesh = child as THREE.Mesh
+		const nameLower = (mesh.name ?? '').toLowerCase()
 		if (isInCabFlipper(mesh) && viewerMode === 'play') {
 			if (mesh.visible !== false) stats.cabFlipperHidden++
 			mesh.visible = false
@@ -481,11 +541,11 @@ export function postProcessScene(
 		}
 		if (!mesh.isMesh) {
 			if (
-				n &&
-				(RE_CAB.test(n) || RE_VR.test(n) || resolveButtonCode(n)) &&
-				(o as THREE.Object3D).visible === false
+				nameLower &&
+				(RE_CAB.test(nameLower) || RE_VR.test(nameLower) || resolveButtonCode(nameLower)) &&
+				(child as THREE.Object3D).visible === false
 			) {
-				;(o as THREE.Object3D).visible = true
+				;(child as THREE.Object3D).visible = true
 				stats.cabForced++
 			}
 			return
@@ -494,33 +554,45 @@ export function postProcessScene(
 		const firstMat = Array.isArray(matForClassify)
 			? (matForClassify[0] as THREE.MeshStandardMaterial | undefined)
 			: (matForClassify as THREE.MeshStandardMaterial | undefined)
+		const firstUserData = firstMat?.userData as CustomMaterialUserData | undefined
 		const matName = (firstMat?.name ?? '').toLowerCase()
-		const mapName = ((firstMat?.map as THREE.Texture | undefined)?.name ?? '').toLowerCase()
-		const c = classify(
-			n,
-			matName,
-			mapName,
-			!!(firstMat?.userData as unknown as Record<string, unknown>)?.__isBaked,
-			!!(firstMat?.userData as unknown as Record<string, unknown>)?.__addBlend,
-		)
-		if (c.isGlass) {
+		const mapName =
+			((firstMat?.map as THREE.Texture | undefined)?.name ?? '').toLowerCase() ||
+			String(firstUserData?.__mapName ?? '').toLowerCase() ||
+			(firstMat ? pendingOf(firstMat) : '')
+		const info = classify(nameLower, matName, mapName, !!firstUserData?.__isBaked, !!firstUserData?.__addBlend)
+		if (info.isGlass) {
 			hideMesh(mesh, 'glass', stats)
 			return
 		}
-		if (c.isLm || (c.isVlmBake && !c.isMainBake)) {
+		if (info.isLm || (info.isVlmBake && !info.isMainBake)) {
 			stats.lightmaps++
-			if (n.includes('bumper')) stats.bumperLM++
+			if (nameLower.includes('bumper')) stats.bumperLM++
 		}
-		if (n.includes('playfield') && !n.includes('underwall') && !n.includes('wall') && mesh.visible === false) {
+		if (
+			nameLower.includes('playfield') &&
+			!info.isLm &&
+			!nameLower.startsWith('primitive-lm_') &&
+			!nameLower.startsWith('lm_') &&
+			!nameLower.includes('underwall') &&
+			!nameLower.includes('wall') &&
+			mesh.visible === false
+		) {
 			mesh.visible = true
 			makeParentsVisible(mesh, node, stats)
 		}
-		if (c.isCab && !mesh.visible) {
+		if (info.isCab && !mesh.visible) {
 			mesh.visible = true
 			stats.cabForced++
 			makeParentsVisible(mesh, node, stats)
+		} else if (info.isVr) {
+			if (!mesh.visible) {
+				mesh.visible = true
+				makeParentsVisible(mesh, node, stats)
+			}
+			stats.vrKept++
 		}
-		const buttonCode = resolveButtonCode(n)
+		const buttonCode = resolveButtonCode(nameLower)
 		const isButtonMesh = !!buttonCode
 		if (isButtonMesh) {
 			if (!mesh.visible) {
@@ -544,24 +616,35 @@ export function postProcessScene(
 				mat.needsUpdate = true
 			}
 			mesh.renderOrder = 100
-			;(mesh.userData as unknown as Record<string, unknown>).isCabinetButton = true
-			;(mesh.userData as unknown as Record<string, unknown>).buttonCode = buttonCode
+			const meshUserData = mesh.userData as CustomMaterialUserData
+			meshUserData.isCabinetButton = true
+			meshUserData.buttonCode = buttonCode
 			makeParentsVisible(mesh, node, stats)
 		}
-		if (!mesh.visible && !n.includes('underwall') && !n.includes('wall')) {
+		if (
+			!mesh.visible &&
+			(info.isMainBake || info.isVlmBake) &&
+			!nameLower.includes('underwall') &&
+			!nameLower.includes('wall')
+		) {
 			const matsForGen = (
 				mesh.material ? (Array.isArray(mesh.material) ? mesh.material : [mesh.material]) : []
 			) as THREE.MeshStandardMaterial[]
-			const hasMap = matsForGen.some(mm => !!(mm?.map as unknown) || !!pendingOf(mm))
+			const hasMap = matsForGen.some(candidateMat => {
+				const candidateUserData = candidateMat?.userData as CustomMaterialUserData | undefined
+				return !!(candidateMat?.map as unknown) || !!candidateUserData?.__map || !!pendingOf(candidateMat)
+			})
 			const isWhite =
 				matsForGen.length > 0 &&
-				matsForGen.every(
-					mm =>
-						((mm?.color as unknown as THREE.Color)?.getHexString?.()?.toLowerCase() === 'ffffff' ||
-							(mm?.color as unknown as THREE.Color)?.getHex?.() === 0xffffff) &&
-						!mm?.map &&
-						!pendingOf(mm),
-				)
+				matsForGen.every(candidateMat => {
+					const candidateUserData = candidateMat?.userData as CustomMaterialUserData | undefined
+					const colObj = (candidateMat?.color ??
+						candidateUserData?.__uAlbedo?.value ??
+						candidateUserData?.__uTint?.value) as THREE.Color | undefined
+					const hex = colObj?.getHexString?.()?.toLowerCase()
+					const isW = hex === 'ffffff' || colObj?.getHex?.() === 0xffffff
+					return isW && !candidateMat?.map && !candidateUserData?.__map && !pendingOf(candidateMat)
+				})
 			if (hasMap && !isWhite) {
 				mesh.visible = true
 				stats.cabForced++
@@ -573,43 +656,41 @@ export function postProcessScene(
 			mesh.material ? (Array.isArray(mesh.material) ? mesh.material : [mesh.material]) : []
 		) as THREE.MeshStandardMaterial[]
 		if (
-			mats.some(mm => {
-				const mn = (mm?.name ?? '').toLowerCase()
-				const col = (mm?.color as unknown as THREE.Color)?.getHexString?.()?.toLowerCase()
+			mats.some(material => {
+				const mn = (material?.name ?? '').toLowerCase()
+				const col = (material?.color as unknown as THREE.Color)?.getHexString?.()?.toLowerCase()
 				return mn.includes('green') || col === '00ff00'
 			})
 		) {
 			hideMesh(mesh, 'greenHidden', stats)
 			return
 		}
-		for (let i = 0; i < mats.length; i++) {
-			let mat = mats[i] as THREE.MeshStandardMaterial
+		for (let matIdx = 0; matIdx < mats.length; matIdx++) {
+			let mat = mats[matIdx] as THREE.MeshStandardMaterial
 			let didFork = false
 			const ensureFork = (): THREE.MeshStandardMaterial => {
 				if (didFork) return mat
-				mat = forkMaterial(mesh, i, mat)
+				mat = forkMaterial(mesh, matIdx, mat)
 				didFork = true
 				return mat
 			}
+			const matUserData = mat.userData as CustomMaterialUserData | undefined
 			const mName = (mat.name ?? '').toLowerCase()
-			const mp = ((mat.map as THREE.Texture | undefined)?.name ?? '').toLowerCase()
-			const mc = classify(
-				n,
-				mName,
-				mp,
-				!!(mat.userData as unknown as Record<string, unknown>)?.__isBaked,
-				!!(mat.userData as unknown as Record<string, unknown>)?.__addBlend,
-			)
-			if (n.includes('flipper')) {
-				if (mc.isBakedMat && !mat.map) {
-					const m = ensureFork()
-					;(m.color as THREE.Color).set(0xffffff)
-					m.emissive = new THREE.Color(0x444444) as unknown as THREE.Color
-					m.emissiveIntensity = BAKED_EMISSIVE
-					m.roughness = 0.45
-					m.metalness = 0
-					m.side = THREE.DoubleSide
-					m.needsUpdate = true
+			const mapPath =
+				((mat.map as THREE.Texture | undefined)?.name ?? '').toLowerCase() ||
+				String(matUserData?.__mapName ?? '').toLowerCase() ||
+				pendingOf(mat)
+			const matInfo = classify(nameLower, mName, mapPath, !!matUserData?.__isBaked, !!matUserData?.__addBlend)
+			if (nameLower.includes('flipper')) {
+				if (matInfo.isBakedMat && !mat.map) {
+					const flipperMat = ensureFork()
+					;(flipperMat.color as THREE.Color).set(0xffffff)
+					flipperMat.emissive = new THREE.Color(0x444444) as unknown as THREE.Color
+					flipperMat.emissiveIntensity = BAKED_EMISSIVE
+					flipperMat.roughness = 0.45
+					flipperMat.metalness = 0
+					flipperMat.side = THREE.DoubleSide
+					flipperMat.needsUpdate = true
 				}
 				if (mat.map && (mat.map as THREE.Texture).colorSpace !== THREE.SRGBColorSpace) {
 					;(mat.map as THREE.Texture).colorSpace = THREE.SRGBColorSpace
@@ -619,27 +700,46 @@ export function postProcessScene(
 				mesh.receiveShadow = false
 				continue
 			}
-			if (c.isVr || c.isCab) {
-				const v = getVr(mat, n)
-				if (v !== mat) {
-					if (Array.isArray(mesh.material)) (mesh.material as THREE.Material[])[i] = v
-					else mesh.material = v
-					mat = v
+			if (info.isVr || info.isCab) {
+				if (isPrimitiveNodeMaterial(mat) && !info.isLm && !info.isVlmBake) {
+					mesh.castShadow = false
+					mesh.receiveShadow = false
+					mesh.frustumCulled = true
+					mesh.geometry?.computeBoundingSphere?.()
+					mesh.geometry?.computeBoundingBox?.()
+					stats.vlmFixed++
+					continue
 				}
-				mesh.castShadow = false
-				mesh.receiveShadow = false
-				mesh.frustumCulled = true
-				mesh.geometry?.computeBoundingSphere?.()
-				mesh.geometry?.computeBoundingBox?.()
-				stats.vlmFixed++
-				continue
+				if (!info.isLm && !info.isVlmBake) {
+					const vrMat = getVr(mat, nameLower)
+					if (vrMat !== mat) {
+						if (Array.isArray(mesh.material)) (mesh.material as THREE.Material[])[matIdx] = vrMat
+						else mesh.material = vrMat
+						mat = vrMat
+					}
+					mesh.castShadow = false
+					mesh.receiveShadow = false
+					mesh.frustumCulled = true
+					mesh.geometry?.computeBoundingSphere?.()
+					mesh.geometry?.computeBoundingBox?.()
+					stats.vlmFixed++
+					continue
+				}
 			}
-			if (mc.isBakedMat || c.isVlmBake) {
-				const v = getBaked(mat, n)
-				if (v !== mat) {
-					if (Array.isArray(mesh.material)) (mesh.material as THREE.Material[])[i] = v
-					else mesh.material = v
-					mat = v
+			if (matInfo.isBakedMat || info.isVlmBake) {
+				const bakedMat = getBaked(mat, nameLower)
+				if (bakedMat !== mat) {
+					if (Array.isArray(mesh.material)) (mesh.material as THREE.Material[])[matIdx] = bakedMat
+					else mesh.material = bakedMat
+					mat = bakedMat
+				}
+				if (
+					nameLower.includes('bm_playfield') &&
+					matInfo.isMainBake &&
+					!RE_NON_OPAQUE.test(nameLower) &&
+					!RE_RAMP_FAMILY.test(nameLower)
+				) {
+					mesh.renderOrder = -1
 				}
 				mesh.castShadow = false
 				mesh.receiveShadow = false
@@ -655,51 +755,51 @@ export function postProcessScene(
 			}
 			const pendingGeneric =
 				pendingOf(mat) ||
-				((mat.userData as unknown as Record<string, unknown>)?.pendingNormalMap as string) ||
-				((mat.userData as unknown as Record<string, unknown>)?.pendingEnvMap as string) ||
-				((mat.userData as unknown as Record<string, unknown>)?.pendingEmissiveMap as string)
+				matUserData?.pendingNormalMap ||
+				matUserData?.pendingEnvMap ||
+				matUserData?.pendingEmissiveMap
 			const isInsertPending = (() => {
-				const p = String(pendingGeneric).toLowerCase()
-				const isRoundInsert = p.includes('round') && !p.includes('ground')
+				const pendingLower = String(pendingGeneric).toLowerCase()
+				const isRoundInsert = pendingLower.includes('round') && !pendingLower.includes('ground')
 				return (
-					p.includes('insert') ||
-					p.includes('rect') ||
+					pendingLower.includes('insert') ||
+					pendingLower.includes('rect') ||
 					isRoundInsert ||
-					p.includes('dot') ||
-					p.includes('triangle') ||
-					p.includes('flasher') ||
-					p.includes('vrlight')
+					pendingLower.includes('dot') ||
+					pendingLower.includes('triangle') ||
+					pendingLower.includes('flasher') ||
+					pendingLower.includes('vrlight')
 				)
 			})()
-			if (pendingGeneric && !mat.map && !mat.emissiveMap && isInsertPending) {
-				const m = ensureFork()
-				m.transparent = true
-				m.opacity = 0
-				m.depthWrite = false
-				m.alphaTest = 0
-				m.blending = THREE.NormalBlending
-				if (m.emissive) (m.emissive as THREE.Color).set(0x000000)
-				m.emissiveIntensity = 0
-				m.needsUpdate = true
+			if (pendingGeneric && !mat.map && !mat.emissiveMap && isInsertPending && !isPrimitiveNodeMaterial(mat)) {
+				const insertMat = ensureFork()
+				insertMat.transparent = true
+				insertMat.opacity = 0
+				insertMat.depthWrite = false
+				insertMat.alphaTest = 0
+				insertMat.blending = THREE.NormalBlending
+				if (insertMat.emissive) (insertMat.emissive as THREE.Color).set(0x000000)
+				insertMat.emissiveIntensity = 0
+				insertMat.needsUpdate = true
 				continue
 			}
 			if ((mat.metalness > 0.3 || mat.roughness < 0.4) && !mat.name.toLowerCase().includes('ball')) {
-				const m = ensureFork()
-				m.roughness = Math.max(m.roughness, 0.75)
-				m.metalness = Math.min(m.metalness, 0.1)
-				m.needsUpdate = true
+				const metalMat = ensureFork()
+				metalMat.roughness = Math.max(metalMat.roughness, 0.75)
+				metalMat.metalness = Math.min(metalMat.metalness, 0.1)
+				metalMat.needsUpdate = true
 				stats.metalFixed++
 			}
-			if (n.includes('plastic') && !mat.map && !pendingOf(mat)) {
-				const m = ensureFork()
-				m.side = THREE.DoubleSide
-				m.transparent = false
-				m.depthWrite = true
-				m.alphaTest = 0
-				m.opacity = 1
-				m.roughness = Math.max((m.roughness ?? 0.6) as number, 0.6)
-				m.metalness = Math.min((m.metalness ?? 0) as number, 0.05)
-				m.needsUpdate = true
+			if (nameLower.includes('plastic') && !mat.map && !pendingOf(mat)) {
+				const plasticMat = ensureFork()
+				plasticMat.side = THREE.DoubleSide
+				plasticMat.transparent = false
+				plasticMat.depthWrite = true
+				plasticMat.alphaTest = 0
+				plasticMat.opacity = 1
+				plasticMat.roughness = Math.max((plasticMat.roughness ?? 0.6) as number, 0.6)
+				plasticMat.metalness = Math.min((plasticMat.metalness ?? 0) as number, 0.05)
+				plasticMat.needsUpdate = true
 			}
 			if (mat.map && (mat.map as THREE.Texture).colorSpace !== THREE.SRGBColorSpace) {
 				;(mat.map as THREE.Texture).colorSpace = THREE.SRGBColorSpace
@@ -707,137 +807,140 @@ export function postProcessScene(
 			}
 		}
 		mesh.receiveShadow = false
-		if (c.isVr || c.isCab) {
+		if (info.isVr || info.isCab) {
 			mesh.frustumCulled = true
 			mesh.geometry?.computeBoundingSphere?.()
 			mesh.geometry?.computeBoundingBox?.()
 		}
-		if (n.includes('plastic') || n.includes('ramp')) {
-			const rMats = (
+		if (nameLower.includes('plastic') || nameLower.includes('ramp')) {
+			const rampMats = (
 				Array.isArray(mesh.material) ? mesh.material : [mesh.material]
 			) as THREE.MeshStandardMaterial[]
-			for (let pi = 0; pi < rMats.length; pi++) {
-				const base = rMats[pi] as THREE.MeshStandardMaterial
+			for (let rampIdx = 0; rampIdx < rampMats.length; rampIdx++) {
+				const base = rampMats[rampIdx] as THREE.MeshStandardMaterial
 				if (base.side !== THREE.DoubleSide) {
-					const m = forkMaterial(mesh, pi, base)
-					m.side = THREE.DoubleSide
-					m.needsUpdate = true
+					const rampMat = forkMaterial(mesh, rampIdx, base)
+					rampMat.side = THREE.DoubleSide
+					rampMat.needsUpdate = true
 				}
 			}
 		}
 	})
 
 	let hasBakedPlayfield = false
-	node.traverse(o => {
-		if ((o as THREE.Mesh).isMesh && (o.name ?? '').toLowerCase().includes('bm_playfield')) hasBakedPlayfield = true
+	node.traverse(child => {
+		if ((child as THREE.Mesh).isMesh && (child.name ?? '').toLowerCase().includes('bm_playfield'))
+			hasBakedPlayfield = true
 	})
 	if (hasBakedPlayfield) {
-		node.traverse(o => {
-			const mesh = o as THREE.Mesh
+		node.traverse(child => {
+			const mesh = child as THREE.Mesh
 			if (!mesh.isMesh) return
-			const n = (mesh.name ?? '').toLowerCase()
+			const meshName = (mesh.name ?? '').toLowerCase()
 			const mat = (
 				Array.isArray(mesh.material)
 					? (mesh.material as THREE.Material[])[0]
 					: (mesh.material as THREE.Material | undefined)
 			) as THREE.MeshStandardMaterial | undefined
+			const matUserData = mat?.userData as CustomMaterialUserData | undefined
 			const matName = (mat?.name ?? '').toLowerCase()
 			const mapName = ((mat?.map as THREE.Texture | undefined)?.name ?? '').toLowerCase()
 			const pending = mat ? pendingOf(mat) : ''
-			const eff = mapName || pending
-			const c = classify(
-				n,
-				matName,
-				eff,
-				!!(mat?.userData as unknown as Record<string, unknown>)?.__isBaked,
-				!!(mat?.userData as unknown as Record<string, unknown>)?.__addBlend,
-			)
-			const isBase = isBasePlayfield(n, c) || n === 'primitive-playfield_mesh'
+			const effectiveMap = mapName || pending
+			const info = classify(meshName, matName, effectiveMap, !!matUserData?.__isBaked, !!matUserData?.__addBlend)
+			const isBase = isBasePlayfield(meshName, info) || meshName === 'primitive-playfield_mesh'
 			if (isBase && mesh.visible) hideMesh(mesh, 'playfieldHidden', stats)
-			if (n.includes('bm_playfield') && mesh.visible === false) {
+			if (meshName.includes('bm_playfield') && mesh.visible === false) {
 				mesh.visible = true
 				makeParentsVisible(mesh, node, stats)
+			}
+			if (
+				meshName.includes('bm_playfield') &&
+				info.isMainBake &&
+				!RE_NON_OPAQUE.test(meshName) &&
+				!RE_RAMP_FAMILY.test(meshName)
+			) {
+				mesh.renderOrder = -1
 			}
 		})
 	}
 
 	let hasBakedDuplicate = false
-	node.traverse(o => {
-		if ((o as THREE.Mesh).isMesh && (o as THREE.Mesh).visible && (o.name ?? '').toLowerCase().includes('bm_'))
+	node.traverse(child => {
+		if (
+			(child as THREE.Mesh).isMesh &&
+			(child as THREE.Mesh).visible &&
+			(child.name ?? '').toLowerCase().includes('bm_')
+		)
 			hasBakedDuplicate = true
 	})
 	if (hasBakedDuplicate) {
-		node.traverse(o => {
-			const mesh = o as THREE.Mesh
+		node.traverse(child => {
+			const mesh = child as THREE.Mesh
 			if (!mesh.isMesh) return
-			const nn = (mesh.name ?? '').toLowerCase()
-			const isBaked = nn.includes('bm_')
-			const isDynamicFlipper = nn.includes('flipper') && !isBaked
-			const isBakedFlipper = isBaked && (nn.includes('bat') || nn.includes('flipper'))
+			const nameLower = (mesh.name ?? '').toLowerCase()
+			const isBaked = nameLower.includes('bm_')
+			const isDynamicFlipper = nameLower.includes('flipper') && !isBaked
+			const isBakedFlipper = isBaked && (nameLower.includes('bat') || nameLower.includes('flipper'))
 			if (viewerMode === 'play' && isBakedFlipper && mesh.visible) mesh.visible = false
 			else if (viewerMode !== 'play' && isDynamicFlipper && mesh.visible) mesh.visible = false
 		})
 	}
 
-	node.traverse(o => {
-		const mesh = o as THREE.Mesh
+	node.traverse(child => {
+		const mesh = child as THREE.Mesh
 		if (!mesh.isMesh || mesh.visible) return
-		const n = (mesh.name ?? '').toLowerCase()
-		const isSling = n.includes('sling') || /su[0-9]/i.test(n) || n.includes('_su') || n.includes('su_')
+		const meshName = (mesh.name ?? '').toLowerCase()
+		const isSling =
+			meshName.includes('sling') ||
+			/su[0-9]/i.test(meshName) ||
+			meshName.includes('_su') ||
+			meshName.includes('su_')
 		if (!isSling) return
 		const mat = (
 			Array.isArray(mesh.material)
 				? (mesh.material as THREE.Material[])[0]
 				: (mesh.material as THREE.Material | undefined)
 		) as THREE.MeshStandardMaterial | undefined
-		const c = mat
+		const matUserData = mat?.userData as CustomMaterialUserData | undefined
+		const info = mat
 			? classify(
-					n,
+					meshName,
 					(mat.name ?? '').toLowerCase(),
 					((mat.map as THREE.Texture | undefined)?.name ?? '').toLowerCase(),
-					!!(mat.userData as unknown as Record<string, unknown>)?.__isBaked,
-					!!(mat.userData as unknown as Record<string, unknown>)?.__addBlend,
+					!!matUserData?.__isBaked,
+					!!matUserData?.__addBlend,
 				)
 			: ({ isGlass: false, isLm: false, isVlmBake: false, isMainBake: false } as unknown as ClassifyResult)
-		if (c.isGlass || c.isLm || (c.isVlmBake && !c.isMainBake)) return
+		if (info.isGlass || info.isLm || (info.isVlmBake && !info.isMainBake)) return
 		if (mat && (mat.name ?? '').toLowerCase().includes('green')) return
 		mesh.visible = true
 		makeParentsVisible(mesh, node, stats)
 	})
 
-	node.traverse(o => {
-		const mesh = o as THREE.Mesh
+	node.traverse(child => {
+		const mesh = child as THREE.Mesh
 		if (!mesh.isMesh || !mesh.visible) return
-		const n = (mesh.name ?? '').toLowerCase()
-		const c = classify(
-			n,
-			((mesh.material as THREE.MeshStandardMaterial | undefined)?.name ?? '').toLowerCase(),
-			(
-				((mesh.material as THREE.MeshStandardMaterial | undefined)?.map as THREE.Texture | undefined)?.name ??
-				''
-			).toLowerCase(),
-			!!(
-				(mesh.material as THREE.MeshStandardMaterial | undefined)?.userData as unknown as Record<
-					string,
-					unknown
-				>
-			)?.__isBaked,
-			!!(
-				(mesh.material as THREE.MeshStandardMaterial | undefined)?.userData as unknown as Record<
-					string,
-					unknown
-				>
-			)?.__addBlend,
+		const meshName = (mesh.name ?? '').toLowerCase()
+		const meshMat = mesh.material as THREE.MeshStandardMaterial | undefined
+		const matUserData = meshMat?.userData as CustomMaterialUserData | undefined
+		const info = classify(
+			meshName,
+			(meshMat?.name ?? '').toLowerCase(),
+			((meshMat?.map as THREE.Texture | undefined)?.name ?? '').toLowerCase(),
+			!!matUserData?.__isBaked,
+			!!matUserData?.__addBlend,
 		)
-		if (c.isBakedMat || c.isVr || c.isCab) return
+		if (info.isBakedMat || info.isVr || info.isCab) return
 		if (mesh.geometry?.attributes?.position) {
 			const pos = mesh.geometry.attributes.position as THREE.BufferAttribute
 			let hasNaN = false
-			for (let i = 0; i < pos.count * pos.itemSize; i++)
+			for (let i = 0; i < pos.count * pos.itemSize; i++) {
 				if (!Number.isFinite((pos.array as unknown as number[])[i])) {
 					hasNaN = true
 					break
 				}
+			}
 			if (hasNaN) {
 				hideMesh(mesh, 'nanHidden', stats)
 				return
@@ -858,14 +961,19 @@ export function postProcessScene(
 
 	let whiteWallsHidden = 0
 	const keepWhite = (name: string): boolean => RE_KEEP_WHITE.test(name)
-	node.traverse(o => {
-		const mesh = o as THREE.Mesh
+	node.traverse(child => {
+		const mesh = child as THREE.Mesh
 		if (!mesh.isMesh || !mesh.visible) return
-		const n = (mesh.name ?? '').toLowerCase()
-		if (keepWhite(n)) return
+		const meshName = (mesh.name ?? '').toLowerCase()
+		if (keepWhite(meshName)) return
 		const mats = (Array.isArray(mesh.material) ? mesh.material : [mesh.material]) as THREE.MeshStandardMaterial[]
-		if (mats.some(m => !!(m?.map as unknown) || !!pendingOf(m))) return
-		if (!mats.every(m => (m?.color as unknown as THREE.Color)?.getHexString?.()?.toLowerCase() === 'ffffff')) return
+		if (mats.some(material => !!(material?.map as unknown) || !!pendingOf(material))) return
+		if (
+			!mats.every(
+				material => (material?.color as unknown as THREE.Color)?.getHexString?.()?.toLowerCase() === 'ffffff',
+			)
+		)
+			return
 		hideMesh(mesh, null, stats)
 		whiteWallsHidden++
 	})
@@ -876,32 +984,32 @@ export function postProcessScene(
 	{
 		let darkOccludersHidden = 0
 		node.updateMatrixWorld(true)
-		const isDarkMat = (mat: THREE.MeshStandardMaterial): boolean => {
-			if (!mat || !(mat as unknown as Record<string, unknown>).color) return false
-			const hex = (mat.color as THREE.Color).getHex()
-			const r = (hex >> 16) & 0xff
-			const g = (hex >> 8) & 0xff
-			const b = hex & 0xff
-			const lum = 0.299 * r + 0.587 * g + 0.114 * b
-			const mapName = ((mat.map as THREE.Texture | undefined)?.name ?? '').toLowerCase()
-			const pending = pendingOf(mat).toLowerCase()
+		const isDarkMat = (material: THREE.MeshStandardMaterial): boolean => {
+			if (!material || !(material as unknown as Record<string, unknown>).color) return false
+			const hex = (material.color as THREE.Color).getHex()
+			const red = (hex >> 16) & 0xff
+			const green = (hex >> 8) & 0xff
+			const blue = hex & 0xff
+			const lum = 0.299 * red + 0.587 * green + 0.114 * blue
+			const mapName = ((material.map as THREE.Texture | undefined)?.name ?? '').toLowerCase()
+			const pending = pendingOf(material).toLowerCase()
 			const isBlackMap = mapName.includes('black') || pending.includes('black')
 			return lum < 36 || isBlackMap
 		}
-		node.traverse(o => {
-			const mesh = o as THREE.Mesh
+		node.traverse(child => {
+			const mesh = child as THREE.Mesh
 			if (!mesh.isMesh || !mesh.visible) return
-			const n = (mesh.name ?? '').toLowerCase()
-			if (RE_KEEP_DARK.test(n)) return
+			const meshName = (mesh.name ?? '').toLowerCase()
+			if (RE_KEEP_DARK.test(meshName)) return
 			const mats = (
 				Array.isArray(mesh.material) ? mesh.material : [mesh.material]
 			) as THREE.MeshStandardMaterial[]
 			if (mats.length === 0) return
 			if (
 				mats.some(
-					m =>
-						(m.map as THREE.Texture | undefined) &&
-						!((m.map as THREE.Texture).name ?? '').toLowerCase().includes('black'),
+					material =>
+						(material.map as THREE.Texture | undefined) &&
+						!((material.map as THREE.Texture).name ?? '').toLowerCase().includes('black'),
 				)
 			)
 				return
@@ -921,27 +1029,24 @@ export function postProcessScene(
 		if (darkOccludersHidden) harnessLog?.(`[wall] Hid ${darkOccludersHidden} dark large occluders`, 'info')
 	}
 
-	node.traverse(o => {
-		const mesh = o as THREE.Mesh
+	node.traverse(child => {
+		const mesh = child as THREE.Mesh
 		if (!mesh.isMesh) return
-		if ((mesh.userData as unknown as Record<string, unknown>).isCabinetButton) return
+		const meshUserData = mesh.userData as CustomMaterialUserData
+		if (meshUserData.isCabinetButton) return
 		for (let cur: THREE.Object3D | null = mesh.parent; cur && cur !== node; cur = cur.parent) {
-			if (
-				(cur.userData as unknown as Record<string, unknown>)?.isCabinetButton &&
-				(cur.userData as unknown as Record<string, unknown>).buttonCode
-			) {
-				;(mesh.userData as unknown as Record<string, unknown>).isCabinetButton = true
-				;(mesh.userData as unknown as Record<string, unknown>).buttonCode = (
-					cur.userData as unknown as Record<string, unknown>
-				).buttonCode
+			const curUserData = cur.userData as CustomMaterialUserData | undefined
+			if (curUserData?.isCabinetButton && curUserData.buttonCode) {
+				meshUserData.isCabinetButton = true
+				meshUserData.buttonCode = curUserData.buttonCode
 				mesh.frustumCulled = false
 				mesh.renderOrder = 100
 				break
 			}
 			const ancCode = resolveButtonCode((cur.name ?? '').toLowerCase())
 			if (ancCode) {
-				;(mesh.userData as unknown as Record<string, unknown>).isCabinetButton = true
-				;(mesh.userData as unknown as Record<string, unknown>).buttonCode = ancCode
+				meshUserData.isCabinetButton = true
+				meshUserData.buttonCode = ancCode
 				mesh.frustumCulled = false
 				mesh.renderOrder = 100
 				break
@@ -961,25 +1066,25 @@ export function ensureProceduralRoom(
 	if (existing) scene.remove(existing)
 	if (opts.hasVr) return null
 	const maxDim = Math.max(size.x, size.y, size.z)
-	const W = Math.max(1600, maxDim * 8)
-	const D = Math.max(1600, maxDim * 8)
-	const H = Math.max(900, maxDim * 6)
+	const roomWidth = Math.max(1600, maxDim * 8)
+	const roomDepth = Math.max(1600, maxDim * 8)
+	const roomHeight = Math.max(900, maxDim * 6)
 	const group = new THREE.Group()
 	group.name = 'vr_procedural_room'
 	const floorY = center.z - size.z * 0.6 - 200
 	const box = new THREE.Mesh(
-		new THREE.BoxGeometry(W, D, H),
+		new THREE.BoxGeometry(roomWidth, roomDepth, roomHeight),
 		new THREE.MeshStandardMaterial({ color: 0x1c222e, roughness: 0.95, side: THREE.BackSide }),
 	)
-	box.position.set(center.x, center.y, floorY + H * 0.5)
+	box.position.set(center.x, center.y, floorY + roomHeight * 0.5)
 	group.add(box)
 	const floor = new THREE.Mesh(
-		new THREE.PlaneGeometry(W * 0.98, D * 0.98),
+		new THREE.PlaneGeometry(roomWidth * 0.98, roomDepth * 0.98),
 		new THREE.MeshStandardMaterial({ color: 0x232a3a, roughness: 0.92, side: THREE.DoubleSide }),
 	)
 	floor.position.set(center.x, center.y, floorY + 0.6)
 	group.add(floor)
-	const grid = new THREE.GridHelper(Math.min(W, D) * 0.96, 16, 0x2f3a5a, 0x1e2535)
+	const grid = new THREE.GridHelper(Math.min(roomWidth, roomDepth) * 0.96, 16, 0x2f3a5a, 0x1e2535)
 	grid.position.set(center.x, center.y, floorY + 1.2)
 	grid.rotation.x = Math.PI / 2
 	group.add(grid)
@@ -990,7 +1095,7 @@ export function ensureProceduralRoom(
 	return group
 }
 
-type DeferredTexture = {
+export type DeferredTexture = {
 	getName(): string
 	szPath?: string
 	width: number
@@ -999,12 +1104,11 @@ type DeferredTexture = {
 }
 
 export const isDeferred = (tx: DeferredTexture, table: { getPlayfieldMap(): string }): boolean => {
-	const n = tx.getName().toLowerCase()
-	const pf = table.getPlayfieldMap().toLowerCase()
-	if (n === pf) return false
-	const p = (tx.szPath ?? '').toLowerCase()
-	if (p.endsWith('.exr') || p.endsWith('.hdr') || tx.isHdr?.()) return true
-	if (tx.width * tx.height > LARGE_TEXTURE_PIXELS) return true
-	if (RE_BAKE_MAP.test(n) || n.includes('playfield')) return false
-	return false
+	const texName = tx.getName().toLowerCase()
+	const playfieldMap = table.getPlayfieldMap().toLowerCase()
+	if (texName === playfieldMap) return false
+	if (RE_BAKE_MAP.test(texName) || texName.includes('playfield')) return false
+	const filePath = (tx.szPath ?? '').toLowerCase()
+	if (filePath.endsWith('.exr') || filePath.endsWith('.hdr') || tx.isHdr?.()) return true
+	return tx.width * tx.height > LARGE_TEXTURE_PIXELS
 }
