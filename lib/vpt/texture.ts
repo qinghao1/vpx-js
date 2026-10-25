@@ -24,6 +24,7 @@ export class Texture extends BiffParser {
 	public width!: number
 	public height!: number
 	public alphaTestValue?: number
+	public isOpaque?: boolean
 	public rgbTransparent?: number
 	public binary?: Binary
 	public pdsBuffer?: BaseTexture
@@ -136,7 +137,8 @@ export class Texture extends BiffParser {
 				this.height = this.getInt(buffer)
 				break
 			case 'ALTV':
-				this.alphaTestValue = this.getFloat(buffer)
+				// Native stores 0..255 on disk and normalizes on load (Texture.cpp: AsFloat() * (1/255)).
+				this.alphaTestValue = this.getFloat(buffer) / 255
 				break
 			case 'BITS': {
 				let compressedLen: number
@@ -167,7 +169,7 @@ export class Texture extends BiffParser {
 				this.getInt(buffer)
 				break
 			case 'OPAQ':
-				this.getInt(buffer)
+				this.isOpaque = this.getBool(buffer)
 				break
 			/* istanbul ignore next */
 			default:

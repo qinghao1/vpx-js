@@ -7,6 +7,7 @@ import { NodeBinaryReader } from '../../lib/io/binary-reader.node.js'
 import { ThreeTextureLoaderNode } from '../../lib/render/threejs/three-texture-loader-node.js'
 import { Table } from '../../lib/vpt/table/table.js'
 import { ThreeHelper } from '../../test/three.helper'
+import { Texture } from './texture.js'
 
 const three = new ThreeHelper()
 
@@ -67,5 +68,13 @@ describe('The VPinball texture parser', () => {
 		const tex = await vpt.kickers.Kicker1.getMeshes(vpt).kicker.map!.loadTexture(loader, vpt)
 		expect((tex as any).image).to.exist
 		expect((tex as any).name).to.match(/kicker/i)
+	})
+
+	it('should normalize ALTV from raw 0..255 to 0..1 like native', async () => {
+		const cutout = new (Texture as any)()
+		const buffer = new Uint8Array(4)
+		new DataView(buffer.buffer).setFloat32(0, 1.0, true)
+		await cutout.fromTag(buffer, 'ALTV', 0, 4, null, 'test')
+		expect(cutout.alphaTestValue).to.be.closeTo(1 / 255, 1e-6)
 	})
 })

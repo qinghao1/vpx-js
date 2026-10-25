@@ -50,7 +50,8 @@ export class ThreeMapGenerator {
 
 	private setPlayfieldHint(table: Table): void {
 		const loader = this.textureLoader as unknown as { playfieldMap?: string }
-		if (loader && 'playfieldMap' in loader) loader.playfieldMap = table.getPlayfieldMap()
+		if (loader && typeof loader === 'object' && 'playfieldMap' in loader)
+			loader.playfieldMap = table.getPlayfieldMap()
 	}
 
 	private pickConcurrency(): number {
@@ -98,7 +99,17 @@ export class ThreeMapGenerator {
 	private async loadOne(texture: Texture, table: Table): Promise<boolean> {
 		try {
 			const tex = await texture.loadTexture(this.textureLoader!, table)
+			try {
+				const rawCutout = !texture.isOpaque ? (texture.alphaTestValue ?? 0) : 0
+				;(tex as any).userData = {
+					...((tex as any).userData ?? {}),
+					alphaTestValue: rawCutout > 0 && rawCutout <= 1 ? rawCutout : 0,
+				}
+			} catch {
+				// Expected: TypeError if texture object is frozen — alphaTest fallback stays in material userData.
+			}
 			this.textureCache.set(texture.getName(), tex)
+			this.textureCache.set(texture.getName().toLowerCase(), tex)
 			progress().details(texture.getName())
 			this.clearTextureSource(texture)
 			return true
@@ -127,11 +138,11 @@ export class ThreeMapGenerator {
 	}
 
 	public getTexture(name: string): ThreeTexture {
-		return this.textureCache.get(name)!
+		return this.textureCache.get(name) ?? this.textureCache.get(name.toLowerCase())!
 	}
 
 	public hasTexture(name: string): boolean {
-		return this.textureCache.has(name)
+		return this.textureCache.has(name) || this.textureCache.has(name.toLowerCase())
 	}
 
 	public getCache(): Map<string, ThreeTexture> {
