@@ -195,7 +195,7 @@ export async function launchBrowser(puppeteer, opts = {}) {
 				stdio: 'ignore',
 			})
 		} catch {}
-	}, 90_000)
+	}, opts.autoKillMs ?? 90_000)
 	if (autoKill.unref) autoKill.unref()
 	const origClose = browser.close.bind(browser)
 	browser.close = async (...a) => {

@@ -16,6 +16,12 @@ import { BrowserBinaryReader } from '../../dist-esm/lib/io/binary-reader.js'
 import { isWasmReady } from '../../dist-esm/lib/physics/wasm/kernels.js'
 import { setGlobalEmissionScale } from '../../dist-esm/lib/render/threejs/material-shared.js'
 import {
+	isPrimitiveNodeMaterial,
+	setPrimitiveMap,
+	setPrimitiveTransmissionArea,
+} from '../../dist-esm/lib/render/threejs/nodes/primitive-bdl-node.js'
+import { isBakedNodeMaterial, setBakedMap } from '../../dist-esm/lib/render/threejs/nodes/unshaded-baked-node.js'
+import {
 	batchStaticOpaques as _batchStaticOpaques,
 	optimizeScene as _optimizeScene,
 } from '../../dist-esm/lib/render/threejs/three-batched-builder.js'
@@ -43,6 +49,10 @@ import {
 	clampExposure,
 	resolveToneMapping,
 } from '../../dist-esm/lib/render/threejs/tone-mapping.js'
+import {
+	getTransmissionDebug,
+	updateTransmissionBuffer,
+} from '../../dist-esm/lib/render/threejs/transmission-buffer.js'
 import { AnimationGate } from '../../dist-esm/lib/util/animation-gate.js'
 import { Table } from '../../dist-esm/lib/vpt/table/table.js'
 import { CAM, CAM_ANIM, isTableHit, LIGHT_AMBIENT, LIGHT_DIR, LIGHT_HEMI, RE_BAKE_MAP, TABLE_OPTS } from './config.js'
@@ -127,10 +137,10 @@ export {
 	resolveVpxCandidates,
 }
 
-const cGameName = t => t?.tableScript?.match(/cGameName\s*=\s*["']([^"']+)["']/i)?.[1] || ''
-const setTitle = s => {
+const cGameName = table => table?.tableScript?.match(/cGameName\s*=\s*["']([^"']+)["']/i)?.[1] || ''
+const setTitle = title => {
 	const el = document.getElementById('title')
-	if (el && s) el.textContent = s
+	if (el && title) el.textContent = title
 }
 export class Viewer {
 	constructor(opts = {}) {
@@ -253,8 +263,10 @@ export class Viewer {
 		if (this._cameraTimeout) clearTimeout(this._cameraTimeout)
 		if (this._animRaf) cancelAnimationFrame(this._animRaf)
 		if (this._animTimeout) clearTimeout(this._animTimeout)
-		if (this.animFrame) cancelAnimationFrame(this.animFrame)
-		if (this.animFrame) clearTimeout(this.animFrame)
+		if (this.animFrame) {
+			cancelAnimationFrame(this.animFrame)
+			this.animFrame = null
+		}
 		if ((this as any)._physicsTimeout) clearTimeout((this as any)._physicsTimeout)
 		this._inputCleanup?.()
 		this._inputCleanup = null
@@ -263,9 +275,9 @@ export class Viewer {
 		this._touchCleanup?.()
 		this._touchCleanup = null
 		if (this._cameraTimeoutResolver) {
-			const _r = this._cameraTimeoutResolver
+			const resolver = this._cameraTimeoutResolver
 			this._cameraTimeoutResolver = null
-			_r()
+			resolver()
 		}
 		if (this._loadAbort) {
 			this._loadAbort.abort()
@@ -319,7 +331,7 @@ export class Viewer {
 
 		renderer.setPixelRatio(getTargetPixelRatio(this.viewerMode))
 		renderer.outputColorSpace = THREE.SRGBColorSpace
-		renderer.sortObjects = false
+		renderer.sortObjects = true
 		renderer.shadowMap.enabled = false
 
 		applyRendererToneMapping(renderer, this.table?.data, isLowQuality())
@@ -333,6 +345,9 @@ export class Viewer {
 			if (this.renderPipeline) {
 				this.renderPipeline.updateExposure(clampExposure(tbl.data.exposure, 2))
 				this.renderPipeline.updateToneMapper(tbl.data.toneMapper ?? 2)
+				if (Number.isFinite(tbl.data.bloomStrength)) {
+					this.renderPipeline.updateBloomStrength(tbl.data.bloomStrength)
+				}
 			}
 		}
 		this.renderer = renderer
@@ -342,7 +357,11 @@ export class Viewer {
 				toneMapper: this.table?.data?.toneMapper,
 				exposure: this.table?.data?.exposure,
 				bloomEnabled: true,
-				bloomStrength: isLowQuality() ? 0.3 : 0.35,
+				bloomStrength: Number.isFinite(this.table?.data?.bloomStrength)
+					? this.table.data.bloomStrength
+					: isLowQuality()
+						? 0.2
+						: 0.22,
 			})
 		} catch (e) {
 			console.warn('VpxRenderPipeline init failed, falling back to direct render', e)
@@ -397,7 +416,7 @@ export class Viewer {
 		if (this._physicsSab && this._physicsScratch) trySnap(this._physicsSab, this._physicsScratch)
 		this.player.setPhysicsEnabled(this.viewerMode === 'play')
 		this.player.updatePhysics()
-		if (this.player && this.viewerMode === 'play' && !this.isPaused) {
+		if (this.viewerMode !== 'play' || !this.isPaused) {
 			this.player.updateAnimations(this.player.getGameTime())
 			const changed = this.player.popStates()
 			if (!changed.isEmpty) this.applyChangedStates(changed)
@@ -422,13 +441,13 @@ export class Viewer {
 		this._animateCameraTo(state, CAM_ANIM.durationReset)
 	}
 	_onResize() {
-		const w = typeof window !== 'undefined' ? window.innerWidth : 800
-		const h = typeof window !== 'undefined' ? window.innerHeight : 600
-		this.camera.aspect = w / h
+		const width = typeof window !== 'undefined' ? window.innerWidth : 800
+		const height = typeof window !== 'undefined' ? window.innerHeight : 600
+		this.camera.aspect = width / height
 		this.camera.updateProjectionMatrix()
-		const pr = getTargetPixelRatio(this.viewerMode)
-		if (this.renderer) this.renderer.setPixelRatio(pr)
-		this.renderer?.setSize(w, h)
+		const pixelRatio = getTargetPixelRatio(this.viewerMode)
+		if (this.renderer) this.renderer.setPixelRatio(pixelRatio)
+		this.renderer?.setSize(width, height)
 	}
 	_setupModeSwitch() {
 		const onOrbitToggle = e => {
@@ -462,13 +481,13 @@ export class Viewer {
 		if (!canvas) return
 		const getHits = (x, y) => {
 			if (this.viewerMode !== 'viewer' || !this.tableGroup) return []
-			const r = canvas.getBoundingClientRect()
-			this._mouse.x = ((x - r.left) / r.width) * 2 - 1
-			this._mouse.y = -((y - r.top) / r.height) * 2 + 1
+			const rect = canvas.getBoundingClientRect()
+			this._mouse.x = ((x - rect.left) / rect.width) * 2 - 1
+			this._mouse.y = -((y - rect.top) / rect.height) * 2 + 1
 			this._raycaster.setFromCamera(this._mouse, this.camera)
 			return this._raycaster.intersectObject(this.tableGroup, true)
 		}
-		const hitTest = (x, y) => getHits(x, y).some((h: any) => isTableHit(h.object, this.tableGroup))
+		const hitTest = (x, y) => getHits(x, y).some((hit: any) => isTableHit(hit.object, this.tableGroup))
 		let hoverRaf = 0
 		let hoverX = 0,
 			hoverY = 0
@@ -479,9 +498,9 @@ export class Viewer {
 			if (!hitTest(hoverX, hoverY)) return hideTip()
 			showTipAt(hoverX, hoverY)
 		}
-		const onHover = e => {
-			hoverX = e.clientX
-			hoverY = e.clientY
+		const onHover = event => {
+			hoverX = event.clientX
+			hoverY = event.clientY
 			if (hoverRaf) return
 			hoverRaf = requestAnimationFrame(flushHover)
 		}
@@ -491,18 +510,18 @@ export class Viewer {
 			hoverRaf = 0
 			hideTip()
 		})
-		canvas.addEventListener('click', e => {
-			if (this.viewerMode !== 'viewer' || !this.tableGroup || e.button !== 0) return
-			if (!hitTest(e.clientX, e.clientY)) return
+		canvas.addEventListener('click', event => {
+			if (this.viewerMode !== 'viewer' || !this.tableGroup || event.button !== 0) return
+			if (!hitTest(event.clientX, event.clientY)) return
 			this._switchToPlay()
 		})
-		const onViewerTouchEnd = e => {
+		const onViewerTouchEnd = event => {
 			if (this.viewerMode !== 'viewer' || !this.tableGroup) return
-			const t = e.changedTouches?.[0]
-			if (!t) return
-			if (!hitTest(t.clientX, t.clientY)) return
+			const touch = event.changedTouches?.[0]
+			if (!touch) return
+			if (!hitTest(touch.clientX, touch.clientY)) return
 			this._switchToPlay()
-			e.preventDefault()
+			event.preventDefault()
 		}
 		canvas.addEventListener('touchend', onViewerTouchEnd, { passive: false })
 		this._eventCleanups.push(() => canvas.removeEventListener('touchend', onViewerTouchEnd))
@@ -515,7 +534,7 @@ export class Viewer {
 		}
 		if (this.renderer) {
 			this.renderer.setPixelRatio(getTargetPixelRatio('play'))
-			this.renderer.sortObjects = false
+			this.renderer.sortObjects = true
 		}
 		this._hidePlayTip?.()
 		hideCabFlippers(this.tableGroup)
@@ -598,9 +617,9 @@ export class Viewer {
 			this._cameraTimeout = null
 		}
 		if (this._cameraTimeoutResolver) {
-			const _r = this._cameraTimeoutResolver
+			const resolver = this._cameraTimeoutResolver
 			this._cameraTimeoutResolver = null
-			_r()
+			resolver()
 		}
 		const fromPos = this.camera.position.clone()
 		const fromTarget = this.controls.target.clone()
@@ -736,8 +755,8 @@ export class Viewer {
 			const size = framing?.size ?? new THREE.Vector3(1000, 2000, 500)
 			syncRoom(this.scene, this.tableGroup ?? this.scene, center, size)
 		}
-		const bg = this.tableGroup?.getObjectByName('balls')
-		if (bg) bg.visible = true
+		const ballsNode = this.tableGroup?.getObjectByName('balls')
+		if (ballsNode) ballsNode.visible = true
 		this.player?.setPhysicsEnabled(true)
 		this._emitModeChange()
 		if (this.dom.canvas) {
@@ -770,8 +789,8 @@ export class Viewer {
 		this.player?.onKeyUp({ code: 'ShiftRight', key: 'Shift', ts: Date.now(), location: 2 })
 		if (this.controls) this.controls.enabled = true
 		if (this.tableGroup) showCabFlippers(this.tableGroup)
-		const bg = this.tableGroup?.getObjectByName('balls')
-		if (bg) bg.visible = false
+		const ballsNode = this.tableGroup?.getObjectByName('balls')
+		if (ballsNode) ballsNode.visible = false
 		this._emitModeChange()
 	}
 	buildNodeCache() {
@@ -880,17 +899,17 @@ export class Viewer {
 		if (this.dom.streamText) this.dom.streamText.textContent = total ? `${done}/${total} · ${pct}%` : `${pct}%`
 	}
 	_showStream() {
-		const w = this.dom.streamWrap
-		if (!w) return
-		w.hidden = false
-		requestAnimationFrame(() => w.classList.add('show'))
+		const wrap = this.dom.streamWrap
+		if (!wrap) return
+		wrap.hidden = false
+		requestAnimationFrame(() => wrap.classList.add('show'))
 	}
 	_hideStream() {
-		const w = this.dom.streamWrap
-		if (!w) return
-		w.classList.remove('show')
+		const wrap = this.dom.streamWrap
+		if (!wrap) return
+		wrap.classList.remove('show')
 		setTimeout(() => {
-			if (!w.classList.contains('show')) w.hidden = true
+			if (!wrap.classList.contains('show')) wrap.hidden = true
 		}, 400)
 	}
 	_showCanvas() {
@@ -924,11 +943,23 @@ export class Viewer {
 		filterTextures(table, this.log.bind(this))
 		return table
 	}
+	_setupEnvironment(table) {
+		try {
+			if (!this.scene) return
+			if ((this as any)._envTexture && this.scene.environment === (this as any)._envTexture)
+				this.scene.environment = null
+		} catch {}
+	}
 	async _buildScene(table) {
 		this._setStatus('')
 		this._loading(70, 'Building playfield…', 'Preparing visuals…')
-		const g = table.data.globalEmissionScale
-		if (Number.isFinite(g)) setGlobalEmissionScale(g)
+		const emissionScale = table.data.globalEmissionScale
+		if (Number.isFinite(emissionScale)) setGlobalEmissionScale(emissionScale)
+		this._setupEnvironment(table)
+		try {
+			const dim = table.getDimensions?.()
+			if (dim) setPrimitiveTransmissionArea(dim.width, dim.height, ThreeRenderApi.SCALE)
+		} catch {}
 		const texLoader = new ThreeTextureLoaderBrowser()
 		const renderApi = new ThreeRenderApi(
 			{
@@ -955,11 +986,11 @@ export class Viewer {
 				'kickerHoleWood.png',
 				'kickerT1.png',
 				'kickerWilliams.png',
-			].map(async nm => {
-				const t = await texLoader.loadDefaultTexture(nm, '.png', nm)
-				renderApi.getMapGenerator().getCache().set(nm, t)
-				t.name = `texture:${nm}`
-				renderApi.getMapGenerator().getCache().set(nm.toLowerCase(), t)
+			].map(async defaultTexName => {
+				const defaultTex = await texLoader.loadDefaultTexture(defaultTexName, '.png', defaultTexName)
+				renderApi.getMapGenerator().getCache().set(defaultTexName, defaultTex)
+				defaultTex.name = `texture:${defaultTexName}`
+				renderApi.getMapGenerator().getCache().set(defaultTexName.toLowerCase(), defaultTex)
 			}),
 		)
 		let textures = []
@@ -981,8 +1012,8 @@ export class Viewer {
 					if (best) {
 						const fIdx = textures.indexOf(best)
 						if (fIdx > 0) {
-							const [f] = textures.splice(fIdx, 1)
-							textures.unshift(f)
+							const [bestTex] = textures.splice(fIdx, 1)
+							textures.unshift(bestTex)
 						}
 						this.log(
 							`[stream] Playfield map "${pf}" missing — fallback to largest "${best.getName()}"`,
@@ -1062,15 +1093,15 @@ export class Viewer {
 				const n = (o.name || '').toLowerCase()
 				const isMainBake = n.includes('playfield') && (n.includes('bm_') || RE_BAKE_MAP.test(n))
 				const mats = Array.isArray(o.material) ? o.material : [o.material]
-				for (const m of mats) {
-					for (const k of ['map', 'normalMap', 'envMap', 'emissiveMap']) {
-						const pending = m.userData?.[`pending${k[0].toUpperCase()}${k.slice(1)}`]
+				for (const material of mats) {
+					for (const mapProp of ['map', 'normalMap', 'envMap', 'emissiveMap']) {
+						const pending = material.userData?.[`pending${mapProp[0].toUpperCase()}${mapProp.slice(1)}`]
 						if (pending) {
 							const key = String(pending).toLowerCase()
 							used.add(key)
 							if (isMainBake) mainBakeUsed.add(key)
 						}
-						const tex = m[k]
+						const tex = material[mapProp]
 						if (tex?.name) {
 							const key = String(tex.name)
 								.replace(/^texture:/, '')
@@ -1083,22 +1114,22 @@ export class Viewer {
 			})
 			const pf2 = table.getPlayfieldMap()?.toLowerCase()
 			const before = textures.length
-			const keepAllInserts = n =>
-				n.includes('insert') ||
-				n.includes('round') ||
-				n.includes('rect') ||
-				n.includes('switc') ||
-				n.includes('vrlight') ||
-				n.includes('flasher') ||
-				n.includes('scratches') ||
-				n.includes('ball_') ||
-				n.includes('bumper') ||
-				n.includes('kicker') ||
-				n.includes('bump')
+			const keepAllInserts = texName =>
+				texName.includes('insert') ||
+				texName.includes('round') ||
+				texName.includes('rect') ||
+				texName.includes('switc') ||
+				texName.includes('vrlight') ||
+				texName.includes('flasher') ||
+				texName.includes('scratches') ||
+				texName.includes('ball_') ||
+				texName.includes('bumper') ||
+				texName.includes('kicker') ||
+				texName.includes('bump')
 			textures = textures.filter(tx => {
-				const n = tx.getName().toLowerCase()
-				if (used.has(n) || (pf2 && n === pf2)) return true
-				if (keepAllInserts(n)) return true
+				const texName = tx.getName().toLowerCase()
+				if (used.has(texName) || (pf2 && texName === pf2)) return true
+				if (keepAllInserts(texName)) return true
 				return false
 			})
 			if (textures.length !== before)
@@ -1107,8 +1138,8 @@ export class Viewer {
 				const keepSet = new Set(textures.map(tx => tx.getName().toLowerCase()))
 				let cleared = 0
 				for (const tx of Object.values(table.textures) as any[]) {
-					const n = tx.getName().toLowerCase()
-					if (!keepSet.has(n)) {
+					const texName = tx.getName().toLowerCase()
+					if (!keepSet.has(texName)) {
 						if (tx.binary || tx.pdsBuffer) cleared++
 						tx.binary = undefined
 						tx.pdsBuffer = undefined
@@ -1119,26 +1150,32 @@ export class Viewer {
 					if (typeof (window as any).gc === 'function') (window as any).gc()
 				}
 			}
-			textures.sort((a, b) => {
-				const aN = a.getName().toLowerCase(),
-					bN = b.getName().toLowerCase()
-				if (aN === pf2 && bN !== pf2) return -1
-				if (bN === pf2 && aN !== pf2) return 1
-				const aMain = mainBakeUsed.has(aN) ? 0 : 1,
-					bMain = mainBakeUsed.has(bN) ? 0 : 1
+			textures.sort((texA, texB) => {
+				const nameA = texA.getName().toLowerCase()
+				const nameB = texB.getName().toLowerCase()
+				if (nameA === pf2 && nameB !== pf2) return -1
+				if (nameB === pf2 && nameA !== pf2) return 1
+				const aMain = mainBakeUsed.has(nameA) ? 0 : 1
+				const bMain = mainBakeUsed.has(nameB) ? 0 : 1
 				if (aMain !== bMain) return aMain - bMain
 				const aCab =
-					aN.includes('vrcab') || aN.includes('vr_') || aN.includes('lockbar') || aN.includes('cabinet')
+					nameA.includes('vrcab') ||
+					nameA.includes('vr_') ||
+					nameA.includes('lockbar') ||
+					nameA.includes('cabinet')
 						? 0
 						: 1
 				const bCab =
-					bN.includes('vrcab') || bN.includes('vr_') || bN.includes('lockbar') || bN.includes('cabinet')
+					nameB.includes('vrcab') ||
+					nameB.includes('vr_') ||
+					nameB.includes('lockbar') ||
+					nameB.includes('cabinet')
 						? 0
 						: 1
 				if (aCab !== bCab) return aCab - bCab
-				if (aMain === 0) return b.width * b.height - a.width * a.height
-				if (aCab === 0) return b.width * b.height - a.width * a.height
-				return a.width * a.height - b.width * b.height
+				if (aMain === 0) return texB.width * texB.height - texA.width * texA.height
+				if (aCab === 0) return texB.width * texB.height - texA.width * texA.height
+				return texA.width * texA.height - texB.width * texB.height
 			})
 			if (mainBakeUsed.size)
 				this.log(
@@ -1160,18 +1197,21 @@ export class Viewer {
 		logMem(this.harnessLog, 'after reader release')
 	}
 	_clearRawTextures() {
-		let n = 0
+		let clearedCount = 0
 		if (!this.table?.textures) return
-		for (const k of Object.keys(this.table.textures)) {
-			this.table.textures[k].binary = undefined
-			this.table.textures[k].pdsBuffer = undefined
-			n++
+		for (const key of Object.keys(this.table.textures)) {
+			this.table.textures[key].binary = undefined
+			this.table.textures[key].pdsBuffer = undefined
+			clearedCount++
 		}
-		if (n) this.harnessLog?.(`[mem] Cleared ${n} raw texture buffers`, 'info')
+		if (clearedCount) this.harnessLog?.(`[mem] Cleared ${clearedCount} raw texture buffers`, 'info')
 	}
 	async _mount(table, node, opts = {}, source = null) {
 		if (this.tableGroup) this.scene.remove(this.tableGroup)
 		this.tableGroup = node
+		;(globalThis as any).tableGroup = node
+		;(globalThis as any).viewer = this
+		;(globalThis as any).renderApi = this.renderApi
 		this._tableBasePos = node.position.clone()
 		this.scene.add(node)
 		const pp = postProcessScene(node, {
@@ -1244,7 +1284,7 @@ export class Viewer {
 		)
 		logMem(this.harnessLog, 'Ready — streaming textures')
 		this._emitModeChange()
-		const gn = cGameName(table)
+		const gameName = cGameName(table)
 		const src =
 			(opts && typeof opts.source === 'string' ? opts.source : null) ?? (typeof source === 'string' ? source : '')
 		const basename =
@@ -1265,13 +1305,13 @@ export class Viewer {
 			infoName.toLowerCase() !== 'table name'
 		)
 			vpxName = infoName
-		else if (basename) vpxName = basename.replace(/[_-]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+		else if (basename) vpxName = basename.replace(/[_-]+/g, ' ').replace(/\b\w/g, char => char.toUpperCase())
 		if (vpxName) setTitle(vpxName)
-		else if (gn) setTitle(gn)
-		if (gn) {
+		else if (gameName) setTitle(gameName)
+		if (gameName) {
 			const romParam = new URLSearchParams(location.search).get('rom')
-			const candidates = romParam ? resolveRomCandidates(romParam) : [`/pinmame/roms/${gn}.zip`]
-			this.log(`PinMAME GameName: ${gn} — trying ${candidates.join(', ')}`)
+			const candidates = romParam ? resolveRomCandidates(romParam) : [`/pinmame/roms/${gameName}.zip`]
+			this.log(`PinMAME GameName: ${gameName} — trying ${candidates.join(', ')}`)
 		}
 		if (this.dom.subtitle) this.dom.subtitle.textContent = ''
 		if (!opts.skipPlayer) {
@@ -1326,8 +1366,8 @@ export class Viewer {
 		if (this.player) this.player.removeAllListeners?.()
 		this.player = new Player(this.table, (this.gate ??= new AnimationGate()))
 		this.player.setPhysicsEnabled(this.viewerMode === 'play')
-		const p = this.player
-		if (typeof p.initAsync === 'function') await p.initAsync()
+		const activePlayer = this.player
+		if (typeof activePlayer.initAsync === 'function') await activePlayer.initAsync()
 		else this.player.init()
 		this.nodeCache.clear()
 		this.buildNodeCache()
@@ -1336,15 +1376,15 @@ export class Viewer {
 			ballsGroup = this.renderApi.createParentNode('balls')
 			this.tableGroup.add(ballsGroup)
 		}
-		for (const b of this.player.balls) this.handleBallLifecycle(b, true)
+		for (const ball of this.player.balls) this.handleBallLifecycle(ball, true)
 		if (ballsGroup) ballsGroup.visible = this.viewerMode === 'play'
 		this.player.updateAnimations(this.player.getGameTime() ?? this.player.getPhysics().timeMsec ?? 0)
 		const init = this.player.popStates()
 		this.applyChangedStates(init)
 		this.dmd._ensureTexture()
 		this.dmd.findMeshes()
-		this.player.on('ballCreated', b => this.handleBallLifecycle(b, true))
-		this.player.on('ballDestroyed', b => this.handleBallLifecycle(b, false))
+		this.player.on('ballCreated', ball => this.handleBallLifecycle(ball, true))
+		this.player.on('ballDestroyed', ball => this.handleBallLifecycle(ball, false))
 		this.player.on('emuStarted', () => {
 			this._emuStartLogged = true
 			this.log(`PinMAME emu ready: ${this.player.getPhysics().emu?.constructor.name}`)
@@ -1369,13 +1409,13 @@ export class Viewer {
 					setTimeout(fallback, 1000)
 					return
 				}
-				const gn = cGameName(this.table)
-				if (!gn) return
-				this.log(`PinMAME: no emu yet for ${gn} — trying manual fallback`, 'warn')
+				const gameName = cGameName(this.table)
+				if (!gameName) return
+				this.log(`PinMAME: no emu yet for ${gameName} — trying manual fallback`, 'warn')
 				const { VpmController } = await import('../../dist-esm/lib/scripting/objects/vpm-controller.js')
 				if (this.player.getPhysics().emu) return
 				const vpm = new VpmController(this.player)
-				vpm.GameName = gn
+				vpm.GameName = gameName
 				await vpm.whenReady()
 				emu = this.player.getPhysics().emu
 				if (emu) {
@@ -1384,8 +1424,8 @@ export class Viewer {
 					this.dmd._ensureTexture()
 					this.dmd.findMeshes()
 				}
-			} catch (e) {
-				this.log(`PinMAME fallback failed: ${e.message}`, 'warn')
+			} catch (err) {
+				this.log(`PinMAME fallback failed: ${err.message}`, 'warn')
 			}
 		}
 		setTimeout(fallback, 3000)
@@ -1434,6 +1474,71 @@ export class Viewer {
 									}
 							}
 							if (!tex) continue
+							if (isBakedNodeMaterial(m)) {
+								if (k !== 'map') {
+									delete m.userData[pk]
+									continue
+								}
+								const changed = setBakedMap(m, tex, String(name))
+								delete m.userData[pk]
+								let cut = false
+								if (!(m.userData as any)?.__addBlend && !((m as any).alphaTest > 0)) {
+									const cutout =
+										(m.userData as any)?.__alphaTestValue ??
+										(tex as any)?.userData?.alphaTestValue ??
+										0
+									if (cutout > 0 && cutout <= 1) {
+										;(m as any).alphaTest = cutout
+										m.needsUpdate = true
+										cut = true
+									}
+								}
+								if (changed || cut) fixed++
+								continue
+							}
+							if (isPrimitiveNodeMaterial(m)) {
+								if (k === 'map') {
+									const changed = setPrimitiveMap(m, tex, String(name))
+									delete m.userData[pk]
+									let cut = false
+									if (!(m.userData as any)?.__addBlend && !((m as any).alphaTest > 0)) {
+										const cutout =
+											(m.userData as any)?.__alphaTestValue ??
+											(tex as any)?.userData?.alphaTestValue ??
+											0
+										if (cutout > 0 && cutout <= 1) {
+											;(m as any).alphaTest = cutout
+											m.needsUpdate = true
+											cut = true
+										}
+									}
+									if (m.userData?.pendingEmissiveMap) delete m.userData.pendingEmissiveMap
+									if (changed || cut) fixed++
+									continue
+								}
+								if (k === 'normalMap' || k === 'envMap') {
+									if ((m as any)[k] === tex) {
+										delete m.userData[pk]
+										continue
+									}
+									m[k] = tex
+									tex.name = String(name)
+									if (k === 'envMap') m.envMapIntensity = 1
+									m.needsUpdate = true
+									fixed++
+									continue
+								}
+								delete m.userData[pk]
+								if (m.userData?.pendingEmissiveMap) delete m.userData.pendingEmissiveMap
+								continue
+							}
+							if ((m as any)[k] === tex) {
+								delete m.userData[pk]
+								if (k === 'map' && m.userData?.pendingEmissiveMap) {
+									delete (m.userData as any).pendingEmissiveMap
+								}
+								continue
+							}
 							m[k] = tex
 							tex.name = name
 							delete m.userData[pk]
@@ -1528,16 +1633,17 @@ export class Viewer {
 				})
 				if (fixed) {
 					let hasReadyBake = false
+					const effMap = (mm: any) => mm?.map ?? (mm?.userData?.__map as any) ?? null
 					this.tableGroup.traverse(o2 => {
 						if (!o2.isMesh) return
 						const n2 = o2.name || '',
 							m2 = Array.isArray(o2.material) ? o2.material[0] : o2.material
-						if (!m2?.map) return
+						if (!effMap(m2)) return
 						if (!n2.toLowerCase().includes('playfield') && !n2.toLowerCase().includes('bm_')) return
 						const info = isBakedMeshByNames(
 							n2,
 							m2.name || '',
-							m2.map?.name || '',
+							effMap(m2)?.name || '',
 							!!m2.userData?.__isBaked,
 							!!m2.userData?.__addBlend,
 						)
@@ -1552,7 +1658,7 @@ export class Viewer {
 							const info = isBakedMeshByNames(
 								o2.name || '',
 								m2.name || '',
-								m2.map?.name || '',
+								effMap(m2)?.name || '',
 								!!m2.userData?.__isBaked,
 								!!m2.userData?.__addBlend,
 							)
@@ -1567,12 +1673,12 @@ export class Viewer {
 						const n2 = (o2.name || '').toLowerCase()
 						if (!n2.includes('playfield') && !n2.includes('bm_')) return
 						const m2 = Array.isArray(o2.material) ? o2.material[0] : o2.material
-						if (!m2?.map) return
-						const isBaked = !!(m2.userData && m2.userData.__isBaked)
+						if (!effMap(m2)) return
+						const isBaked = !!(m2.userData && (m2.userData.__isBaked || m2.userData.__bakedNode))
 						const info2 = isBakedMeshByNames(
 							n2,
 							m2.name || '',
-							m2.map?.name || '',
+							effMap(m2)?.name || '',
 							!!m2.userData?.__isBaked,
 							!!m2.userData?.__addBlend,
 						)
@@ -1889,6 +1995,12 @@ export class Viewer {
 		}
 		this.renderer.setAnimationLoop((timestamp, frame) => {
 			if (this._disposed || this.isPaused) return
+			if (this.table && !(this as any)._skipTrans) {
+				try {
+					updateTransmissionBuffer(this.table as never)
+					;(window as unknown as Record<string, unknown>).__transDebug = getTransmissionDebug()
+				} catch {}
+			}
 			this._syncPhysicsTransforms(timestamp)
 			if (this.controls?.enabled) this.controls.update()
 			this._applyNudgeVisual()
@@ -1959,10 +2071,6 @@ export class Viewer {
 		else this.renderer?.render(this.scene, this.camera)
 	}
 
-	_updateStatsOverlay(fps) {
-		if (!this.dom.stats) return
-	}
-
 	_pollPinmame() {
 		if (!this._emuStartLogged) {
 			const emu = this.player?.getPhysics()?.emu
@@ -2029,23 +2137,24 @@ export class Viewer {
 		this._flashNudge(angle)
 	}
 	_sendKey(code, down) {
-		const keyForCode = c =>
-			c === 'Enter'
+		const keyForCode = inputCode =>
+			inputCode === 'Enter'
 				? 'Enter'
-				: c.startsWith('Digit')
-					? c.slice(5)
-					: c.startsWith('Key')
-						? c.slice(3).toLowerCase()
-						: c.startsWith('Shift')
+				: inputCode.startsWith('Digit')
+					? inputCode.slice(5)
+					: inputCode.startsWith('Key')
+						? inputCode.slice(3).toLowerCase()
+						: inputCode.startsWith('Shift')
 							? 'Shift'
-							: c.startsWith('Control')
+							: inputCode.startsWith('Control')
 								? 'Control'
-								: c.startsWith('Alt')
+								: inputCode.startsWith('Alt')
 									? 'Alt'
-									: c === 'Space'
+									: inputCode === 'Space'
 										? ' '
-										: c
-		const locationForCode = c => (c.endsWith('Left') ? 1 : c.endsWith('Right') ? 2 : undefined)
+										: inputCode
+		const locationForCode = inputCode =>
+			inputCode.endsWith('Left') ? 1 : inputCode.endsWith('Right') ? 2 : undefined
 		const key = keyForCode(code)
 		const location = locationForCode(code)
 		const ev = { code, key, location, ts: Date.now() }
