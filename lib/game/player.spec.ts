@@ -32,4 +32,29 @@ describe('The VPinball player', () => {
 		player.simulateTime(1400)
 		expect(ball.getState().pos.y).to.be.below(650)
 	})
+
+	it('should broadcast OptionEvent(0) on finishInit', async () => {
+		const table = await Table.load(new NodeBinaryReader(three.fixturePath('table-kicker.vpx')))
+		let receivedEventId: number | undefined
+		const player = new Player(table)
+		player.prepareTable()
+		table.getApi().on('OptionEvent', (eventId: number) => {
+			receivedEventId = eventId
+		})
+		player.init()
+		expect(receivedEventId).to.equal(0)
+	})
+
+	it('should wrap collection items so mutating collection elements marks items dirty', async () => {
+		const table = await Table.load(new NodeBinaryReader(three.fixturePath('table-collection.vpx')))
+		new Player(table).init()
+
+		const collection = table.collections.FireSurpress
+		expect(collection).to.exist
+		expect(collection.items.length).to.be.above(0)
+
+		const firstItemApi = collection.items[0] as unknown as { __isDirtyProxy?: boolean; Enabled?: boolean }
+		expect(firstItemApi).to.exist
+		expect(firstItemApi.__isDirtyProxy).to.equal(true)
+	})
 })

@@ -10,6 +10,7 @@ export enum Event {
 	GameEventsExit = 1004,
 	GameEventsPaused = 1005,
 	GameEventsUnPaused = 1006,
+	GameEventsOptionEvent = 1007,
 
 	SurfaceEventsSlingshot = 1101,
 

@@ -58,16 +58,17 @@ export class Player extends EventEmitter {
 	}
 
 	private runScript(scope: Record<string, unknown>, async: boolean): Promise<void> | void {
-		const t = this.table as unknown as {
-			runTableScriptAsync?: (p: Player, s: Record<string, unknown>) => Promise<void>
+		const asyncTable = this.table as unknown as {
+			runTableScriptAsync?: (player: Player, scriptScope: Record<string, unknown>) => Promise<void>
 		}
-		return async && t.runTableScriptAsync
-			? t.runTableScriptAsync(this, scope)
+		return async && asyncTable.runTableScriptAsync
+			? asyncTable.runTableScriptAsync(this, scope)
 			: this.table.runTableScript(this, scope)
 	}
 
 	private finishInit(): void {
 		this.table.broadcastInit()
+		this.table.broadcastOptionEvent(0)
 		this.isInitialized = true
 	}
 	public init(scope: Record<string, unknown> = {}): this {
@@ -78,22 +79,22 @@ export class Player extends EventEmitter {
 	}
 	public async initAsync(scope: Record<string, unknown> = {}): Promise<this> {
 		this.prepareTable()
-		await new Promise(r => setTimeout(r, 0))
+		await new Promise(resolve => setTimeout(resolve, 0))
 		await this.runScript(scope, true)
 		this.finishInit()
 		return this
 	}
 
 	private setupTableElements(): void {
-		for (const p of this.table.getPlayables()) p.setupPlayer(this, this.table)
+		for (const playable of this.table.getPlayables()) playable.setupPlayer(this, this.table)
 	}
 
 	private setupStates(): void {
-		for (const r of this.table.getRenderables()) {
-			const s = r.getState() as ItemState
-			this.currentStates[s.getName()] = s
-			this.previousStates[s.getName()] = s.clone()
-			this.dirtySet.add(s.getName())
+		for (const renderable of this.table.getRenderables()) {
+			const state = renderable.getState() as ItemState
+			this.currentStates[state.getName()] = state
+			this.previousStates[state.getName()] = state.clone()
+			this.dirtySet.add(state.getName())
 		}
 		this.allStateNames = Object.keys(this.currentStates)
 	}
@@ -164,6 +165,15 @@ export class Player extends EventEmitter {
 			const wrapped = this.wrapSingleApi(api, name)
 			if (wrapped !== api) (item as any).api = wrapped
 		}
+		for (const collection of Object.values(this.table.collections ?? {})) {
+			for (let i = 0; i < collection.items.length; i++) {
+				const itemName = collection.getItemNames()[i]
+				if (!itemName) continue
+				const item = this.table.items[itemName] as unknown as { getApi?: () => unknown } | undefined
+				const wrapped = item?.getApi?.()
+				if (wrapped) collection.items[i] = wrapped as (typeof collection.items)[number]
+			}
+		}
 	}
 
 	private getAnimatables(): Array<{ getName(): string }> {
@@ -187,12 +197,12 @@ export class Player extends EventEmitter {
 	}
 
 	public updatePhysics(dTime?: number): number {
-		const it = this.physics.updatePhysics(dTime)
-		for (const b of this.physics.balls) this.markDirty(b.getName())
-		for (const m of this.getMovables()) {
-			this.markDirty(m.getName())
+		const iterations = this.physics.updatePhysics(dTime)
+		for (const ball of this.physics.balls) this.markDirty(ball.getName())
+		for (const movable of this.getMovables()) {
+			this.markDirty(movable.getName())
 		}
-		return it
+		return iterations
 	}
 	public onFrame(): ChangedStates<ItemState> {
 		this.updateAnimations(this.physics.timeMsec)
@@ -200,7 +210,7 @@ export class Player extends EventEmitter {
 	}
 	public updateAnimations(timeMs: number): void {
 		for (const animatable of this.getAnimatables() as unknown as Array<{
-			getAnimation(): { updateAnimation(n: number, t: Table): boolean | void }
+			getAnimation(): { updateAnimation(timeMsec: number, table: Table): boolean }
 			getName(): string
 		}>) {
 			if (animatable.getAnimation().updateAnimation(timeMs, this.table)) {

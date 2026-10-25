@@ -16,6 +16,7 @@ const EVENT_NAMES: Record<Event, string> = {
 	[Event.GameEventsMusicDone]: 'MusicDone',
 	[Event.GameEventsPaused]: 'Paused',
 	[Event.GameEventsUnPaused]: 'UnPaused',
+	[Event.GameEventsOptionEvent]: 'OptionEvent',
 	[Event.HitEventsHit]: 'Hit',
 	[Event.HitEventsUnhit]: 'Unhit',
 	[Event.LightSeqEventsPlayDone]: 'PlayDone',

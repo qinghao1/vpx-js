@@ -8,6 +8,7 @@ import type { ItemApi } from '../vpt/item-api.js'
 import type { ItemData } from '../vpt/item-data.js'
 import type { ItemState } from '../vpt/item-state.js'
 import type { ItemUpdater } from '../vpt/item-updater.js'
+import type { BulbGlowParams } from '../vpt/light/light-data.js'
 import type { Material } from '../vpt/material.js'
 import type { Mesh } from '../vpt/mesh.js'
 import type { Table, TableGenerateOptions } from '../vpt/table/table.js'
@@ -64,6 +65,8 @@ export interface RenderInfo<GEOMETRY> {
 	disableLighting?: number
 	addBlend?: boolean
 	backfacesEnabled?: boolean
+	depthWrite?: boolean
+	bulbGlow?: BulbGlowParams
 }
 
 /** Collidable table element. */
@@ -96,7 +99,7 @@ export type { IAnimatable as Animatable }
 
 export interface IAnimation {
 	init(timeMsec: number): void
-	updateAnimation(timeMsec: number, table: Table): boolean | void
+	updateAnimation(timeMsec: number, table: Table): boolean
 }
 export type { IAnimation as Animation }
 
