@@ -157,6 +157,7 @@ export abstract class ItemApi<DATA extends ItemData> extends EventEmitter {
 	}
 
 	protected _assertNonHdrImage(imageName?: string): void {
+		if (!imageName) return
 		const tex = this.table.getTexture(imageName)
 		if (!tex) throw new Error(`Texture "${imageName}" not found.`)
 		if (tex.isHdr()) throw new Error('Cannot use a HDR image (.exr/.hdr) here')

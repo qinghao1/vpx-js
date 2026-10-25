@@ -295,40 +295,55 @@ export class GlobalApi extends VbsApi {
 		material.baseColor = color
 		const g = globalThis as any
 		const target = name.toLowerCase()
-		for (const grp of [g.tableGroup, g.scene, g.viewer?.tableGroup, g.viewer?.scene].filter(Boolean)) {
-			grp.traverse((o: any) => {
+		const updateMaterial = (m: any) => {
+			if (!m) return
+			const n = (m.name ?? '').toLowerCase()
+			if (n === `material:${target}` || n === target || n.includes(target)) {
+				const ud = m.userData as any
+				if (ud?.__isBaked) {
+					// Baked lightmap plates are pre-lit unshaded textures; do not tint with material albedo color
+					return
+				}
+				if (ud?.__uTint?.value?.set) ud.__uTint.value.set(color)
+				if (ud?.__uTintColor?.value?.set) ud.__uTintColor.value.set(color)
+				if (ud?.__uAlbedo?.value?.set) ud.__uAlbedo.value.set(color)
+				if (ud?.__uFlat?.value?.set) ud.__uFlat.value.set(color)
+				const isNodeMat = !!ud?.__primitiveKind || !!ud?.__isBaked
+				if (isNodeMat) {
+					// Node materials manage live parameters via uniform values
+				} else if (m.emissiveMap) {
+					if (m.emissive?.set) m.emissive.set(color)
+					m.emissiveIntensity = 1.0
+				} else if (m.color?.set) {
+					m.color.set(color)
+				}
+				m.needsUpdate = true
+			}
+		}
+		const groups = [
+			(this.table as any).tableNode,
+			g.tableGroup,
+			g.scene,
+			g.viewer?.tableGroup,
+			g.viewer?.scene,
+		].filter(Boolean)
+		for (const grp of groups) {
+			grp.traverse?.((o: any) => {
 				for (const m of o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : []) {
-					if (!m?.color) continue
-					const n = (m.name ?? '').toLowerCase()
-					if (n === `material:${target}` || n === target || n.includes(target)) {
-						const isBaked = !!(m as any).userData?.__isBaked || !!(m as any).emissiveMap
-						if (isBaked) {
-							// baked tint via emissive
-							if ((m as any).emissive) (m as any).emissive.set(color)
-							else (m as any).emissive = new (m as any).color.constructor(color)
-							;(m as any).emissiveIntensity = 1.0
-							;(m as any).color?.set(0x000000)
-						} else {
-							m.color.set(color)
-						}
-						m.needsUpdate = true
-					}
+					updateMaterial(m)
 				}
 			})
 		}
-		const gen = g.renderApi?.getMaterialGenerator?.() ?? g.viewer?.renderApi?.getMaterialGenerator?.()
-		for (const [k, m] of Object.entries(gen?.cachedMaterials ?? {})) {
-			if (k.split(':')[0].toLowerCase() === target) {
-				const isBaked = !!(m as any).userData?.__isBaked || !!(m as any).emissiveMap
-				if (isBaked) {
-					if ((m as any).emissive) (m as any).emissive.set(color)
-					else (m as any).emissive = new (m as any).color.constructor(color)
-					;(m as any).emissiveIntensity = 1.0
-					;(m as any).color?.set(0x000000)
-				} else {
-					;(m as any).color?.set(color)
+		const generators = [
+			(this.table as any).renderApi?.getMaterialGenerator?.(),
+			g.renderApi?.getMaterialGenerator?.(),
+			g.viewer?.renderApi?.getMaterialGenerator?.(),
+		].filter(Boolean)
+		for (const gen of generators) {
+			for (const [k, m] of Object.entries((gen as any).cachedMaterials ?? {})) {
+				if (k.split(':')[0]!.toLowerCase() === target) {
+					updateMaterial(m)
 				}
-				;(m as any).needsUpdate = true
 			}
 		}
 	}
