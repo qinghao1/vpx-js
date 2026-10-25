@@ -23,7 +23,6 @@ export default defineConfig({
 		include: ['lib/**/*.spec.ts'],
 		bench: { include: ['test/bench/**/*.bench.ts', 'lib/**/*.bench.ts'] },
 		setupFiles: ['./test/setup.ts'],
-		fileParallelism: false,
 		pool: 'forks',
 		coverage: {
 			provider: 'v8',
