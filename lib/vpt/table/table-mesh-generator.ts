@@ -44,7 +44,11 @@ export class TableMeshGenerator {
 			{ name: 'ramps', meshes: Object.values<Ramp>(this.table.ramps), enabled: !!opts.exportRamps },
 			{
 				name: 'lightBulbs',
-				meshes: Object.values(this.table.lights).filter(l => l.isBulbLight()),
+				meshes: Object.values(this.table.lights).filter(
+					l =>
+						l.isBulbLight() ||
+						(l.hasBulbGlow ? l.hasBulbGlow() : !!(l.data?.bulbLight && l.data?.dragPoints?.length > 2)),
+				),
 				enabled: !!opts.exportLightBulbs,
 			},
 			{
@@ -72,14 +76,20 @@ export class TableMeshGenerator {
 			renderApi.addChildToParent(tableNode, itemTypeGroup)
 		}
 
-		// light bulb lights
+		// Fallback dynamic lights for bulb lights without a glow polygon.
+		// Lights with drag-point vertices render as an additive glow quad instead
+		// (native `Light::RenderSetup` lightmap pass in `light.cpp`); they must never
+		// become scene lights — native scenes use 2 fixed lights (`Renderer.cpp`).
+		// Creating 165 point lights (e.g. TWD) blows out the playfield and kills FPS.
 		if (opts.exportLightBulbLights) {
 			let lightGroup = renderApi.findInGroup(tableNode, 'lightBulbs')
 			if (!lightGroup) {
 				lightGroup = renderApi.createParentNode('lightBulbs')
 				renderApi.addChildToParent(tableNode, lightGroup)
 			}
-			for (const lightInfo of Object.values(this.table.lights).filter(l => l.data.bulbLight)) {
+			for (const lightInfo of Object.values(this.table.lights).filter(
+				l => l.data.bulbLight && l.data.dragPoints.length <= 2,
+			)) {
 				let itemGroup = renderApi.findInGroup(lightGroup, lightInfo.getName())
 				if (!itemGroup) {
 					itemGroup = renderApi.createParentNode(lightInfo.getName())

@@ -51,6 +51,25 @@ const BOOL_MAP: Record<string, string> = {
 }
 const STRING_MAP: Record<string, string> = { IMG1: 'szOffImage', BPAT: 'rgBlinkPattern', SURF: 'szSurface' }
 
+/** Additive glow parameters for a bulb light polygon.
+ *
+ * Mirrors the native lightmap pass: any light with drag-point vertices renders
+ * an additive glow polygon (`Light::RenderSetup` builds `m_lightmapMeshBuffer`
+ * from `GetRgVertex`, `light.cpp` renders it with ONE/ONE blending driven by
+ * the live intensity). This is the generic insert-glow mechanism, not a
+ * per-table effect.
+ * @see https://github.com/vpinball/vpinball/blob/master/src/parts/light.cpp */
+export interface BulbGlowParams {
+	color: number
+	color2: number
+	centerX: number
+	centerY: number
+	falloff: number
+	falloffPower: number
+	intensity: number
+	modulateVsAdd: number
+}
+
 /** Light data.
  * @see https://github.com/vpinball/vpinball/blob/master/light.cpp */
 export class LightData extends ItemData {
@@ -86,19 +105,19 @@ export class LightData extends ItemData {
 	public isVisible = true
 
 	public static async fromStorage(storage: Storage, itemName: string): Promise<LightData> {
-		const d = new LightData(itemName)
-		await storage.streamFiltered(itemName, 4, LightData.createStreamHandler(d))
-		return d
+		const lightData = new LightData(itemName)
+		await storage.streamFiltered(itemName, 4, LightData.createStreamHandler(lightData))
+		return lightData
 	}
 
-	private static createStreamHandler(d: LightData) {
-		d.dragPoints = []
-		return BiffParser.stream(d.fromTag.bind(d), {
+	private static createStreamHandler(lightData: LightData) {
+		lightData.dragPoints = []
+		return BiffParser.stream(lightData.fromTag.bind(lightData), {
 			nestedTags: {
 				DPNT: {
 					onStart: () => new DragPoint(),
 					onTag: dp => dp.fromTag.bind(dp),
-					onEnd: dp => d.dragPoints.push(dp),
+					onEnd: dp => lightData.dragPoints.push(dp),
 				},
 			},
 		})
@@ -116,6 +135,10 @@ export class LightData extends ItemData {
 
 	public isBulbLight(): boolean {
 		return this.showBulbMesh && this.meshRadius > 0
+	}
+
+	public hasBulbGlow(): boolean {
+		return this.bulbLight && this.dragPoints.length > 2
 	}
 
 	public isPlayfieldLight(table: Table): boolean {
@@ -182,18 +205,18 @@ export class LightState extends ItemState {
 	}
 
 	public clone(): LightState {
-		const s = LightState.claim(this.name, this.intensity, this.color, this.colorFull)
-		s.isVisible = this.isVisible
-		return s
+		const state = LightState.claim(this.name, this.intensity, this.color, this.colorFull)
+		state.isVisible = this.isVisible
+		return state
 	}
 
 	public diff(state: LightState): LightState {
-		const d = this.clone()
-		omitEqual(d, state, 'intensity')
-		omitEqual(d, state, 'color')
-		omitEqual(d, state, 'colorFull')
-		omitEqual(d, state, 'isVisible')
-		return d
+		const diffState = this.clone()
+		omitEqual(diffState, state, 'intensity')
+		omitEqual(diffState, state, 'color')
+		omitEqual(diffState, state, 'colorFull')
+		omitEqual(diffState, state, 'isVisible')
+		return diffState
 	}
 
 	public release(): void {}
@@ -498,6 +521,26 @@ export class Light extends Item<LightData> implements IRenderable<LightState>, I
 			}
 		}
 		const meshes: Meshes<GEOMETRY> = {}
+		if (this.data.bulbLight && this.data.dragPoints.length > 2) {
+			const glowMaterial = new Material()
+			glowMaterial.name = `bulb.glow:${this.getName()}`
+			meshes.glow = {
+				isVisible: this.data.isVisible,
+				geometry: renderApi.createBulbGlowGeometry(this.data, table),
+				material: glowMaterial,
+				bulbGlow: {
+					color: this.data.color,
+					color2: this.data.color2,
+					centerX: this.data.center ? this.data.center.x : 0,
+					centerY: this.data.center ? this.data.center.y : 0,
+					falloff: this.data.falloff,
+					falloffPower: this.data.falloffPower,
+					intensity: this.data.isOn() ? this.data.intensity : 0,
+					modulateVsAdd: this.data.bulbModulateVsAdd,
+				},
+				depthBias: this.data.depthBias ?? -1,
+			}
+		}
 		if (light.light) {
 			const lightMaterial = new Material()
 			lightMaterial.name = `bulb.light:${this.getName()}`
@@ -556,6 +599,10 @@ export class Light extends Item<LightData> implements IRenderable<LightState>, I
 
 	public isBulbLight() {
 		return this.data.isBulbLight()
+	}
+
+	public hasBulbGlow() {
+		return this.data.hasBulbGlow()
 	}
 
 	public isSurfaceLight(table: Table) {

@@ -6,6 +6,7 @@ import { Enums } from '../../vpt/enums.js'
 import type { LightData } from '../../vpt/light/light-data.js'
 import type { LightState } from '../../vpt/light/light-state.js'
 import type { Table } from '../../vpt/table/table.js'
+import { setBulbGlowState } from './nodes/bulb-glow-node.js'
 import { ThreeRenderApi } from './three-render-api.js'
 
 /** Generates and updates Three.js lights. */
@@ -43,6 +44,21 @@ export class ThreeLightGenerator {
 					if (state.color !== undefined) {
 						m.color.set(state.color)
 						m.emissive.set(state.color)
+					}
+				}
+				break
+			}
+			case 'bulb.glow': {
+				const glow = (child as ThreeMesh).material as MeshStandardMaterial
+				if (glow) {
+					// Native drives the lightmap glow from the live lamp state
+					// (lightColor_intensity + colors in fs_classic_light.sc).
+					if (state.intensity !== undefined || state.color !== undefined || state.colorFull !== undefined) {
+						setBulbGlowState(glow, {
+							intensity: state.intensity,
+							color: state.color,
+							color2: (state as { colorFull?: number }).colorFull,
+						})
 					}
 				}
 				break

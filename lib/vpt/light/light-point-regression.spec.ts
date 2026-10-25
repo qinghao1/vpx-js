@@ -1,15 +1,54 @@
 import { describe, expect, it } from 'vitest'
 import { TableBuilder } from '../../../test/table-builder.js'
+import { DragPoint } from '../dragpoint.js'
+import { Light, LightData } from './light.js'
 
-describe('regression: TWD bulbLight without showBulbMesh still emits point light', () => {
-	it('should generate point lights for bulbLight=true even when showBulbMesh=false', async () => {
+describe('regression: bulb lights with glow polygons are not scene lights', () => {
+	it('should return true for hasBulbGlow and generate glow mesh with BulbGlowParams', () => {
+		const lightData = new LightData('GlowLight')
+		lightData.bulbLight = true
+		lightData.dragPoints = [new DragPoint(), new DragPoint(), new DragPoint(), new DragPoint()]
+		lightData.color = 0xff2211
+		lightData.color2 = 0x1122ff
+		lightData.falloff = 60
+		lightData.falloffPower = 1.5
+		lightData.bulbModulateVsAdd = 0.75
+		lightData.state = 1
+		lightData.intensity = 2
+		lightData.center = { x: 50, y: 80 } as any
+
+		expect(lightData.hasBulbGlow()).toBe(true)
+
+		const light = new Light(lightData)
+		expect(light.hasBulbGlow()).toBe(true)
+
+		const mockRenderApi: any = {
+			createBulbGlowGeometry: () => ({ isMock: true }),
+		}
 		const table = new TableBuilder().build()
-		// Inject two lights: one with bulbLight true show false (TWD case), one with bulbLight true show true (normal)
-		// Use raw light datas without needing Light class; test the filter directly
-		const t = table as any
-		t.lights = {
+		const meshes = light.getMeshes(table, mockRenderApi, {})
+		expect(meshes.glow).toBeDefined()
+		expect(meshes.glow!.bulbGlow).toBeDefined()
+		expect(meshes.glow!.bulbGlow!.color).toBe(0xff2211)
+		expect(meshes.glow!.bulbGlow!.color2).toBe(0x1122ff)
+		expect(meshes.glow!.bulbGlow!.falloff).toBe(60)
+		expect(meshes.glow!.bulbGlow!.falloffPower).toBe(1.5)
+		expect(meshes.glow!.bulbGlow!.modulateVsAdd).toBe(0.75)
+		expect(meshes.glow!.bulbGlow!.intensity).toBe(2)
+	})
+
+	it('should not generate point lights for bulbLight=true with drag-point polygons', async () => {
+		const table = new TableBuilder().build()
+		const targetTable = table as any
+		targetTable.lights = {
 			TWD_Light: {
-				data: { bulbLight: true, showBulbMesh: false, meshRadius: 20 },
+				data: {
+					bulbLight: true,
+					showBulbMesh: false,
+					meshRadius: 20,
+					dragPoints: [{}, {}, {}, {}],
+					center: { x: 0, y: 0 },
+				},
 				isBulbLight() {
 					return (this as any).data.showBulbMesh && (this as any).data.meshRadius > 0
 				},
@@ -19,10 +58,16 @@ describe('regression: TWD bulbLight without showBulbMesh still emits point light
 				getName() {
 					return 'TWD_Light'
 				},
+				getMeshes() {
+					return {}
+				},
+				getState() {
+					return { isVisible: true }
+				},
 				center: { x: 0, y: 0 },
 			},
-			TWD_Light2: {
-				data: { bulbLight: true, showBulbMesh: false, meshRadius: 20 },
+			RoundLight: {
+				data: { bulbLight: true, showBulbMesh: false, meshRadius: 20, dragPoints: [], center: { x: 0, y: 0 } },
 				isBulbLight() {
 					return (this as any).data.showBulbMesh && (this as any).data.meshRadius > 0
 				},
@@ -30,39 +75,52 @@ describe('regression: TWD bulbLight without showBulbMesh still emits point light
 					return false
 				},
 				getName() {
-					return 'TWD_Light2'
+					return 'RoundLight'
+				},
+				getMeshes() {
+					return {}
+				},
+				getState() {
+					return { isVisible: true }
 				},
 				center: { x: 0, y: 0 },
 			},
 		} as any
-		// Verify filters
-		const isBulbCount = Object.values(t.lights).filter((l: any) => (l as any).isBulbLight()).length
-		expect(isBulbCount).toBe(0)
-		const bulbLightCount = Object.values(t.lights).filter((l: any) => l.data.bulbLight).length
-		expect(bulbLightCount).toBe(2)
-		// The bug was that TableMeshGenerator filtered point lights by isBulbLight (0) instead of bulbLight (2).
-		// This test ensures the correct filter (data.bulbLight) would give 2, while isBulbLight gives 0.
-		// The integration test below verifies the actual scene generation yields 165 for TWD.
+		const { ThreeRenderApi } = await import('../../render/threejs/three-render-api.js')
+		const { TableMeshGenerator } = await import('../table/table-mesh-generator.js')
+		const api = new ThreeRenderApi({ applyMaterials: true } as any)
+		const gen = new TableMeshGenerator(table)
+		const scene = gen.generateTableNode(api, { exportLightBulbLights: true }) as any
+		const names: string[] = []
+		scene.traverse((childNode: any) => {
+			if (childNode.isPointLight) names.push(childNode.parent?.name ?? '?')
+		})
+		// Polygon light renders as a glow quad (native lightmap pass), never as a scene
+		// light; only the polygon-less fallback keeps a point light.
+		expect(names).toEqual(['RoundLight'])
 	})
 
-	it('should generate 165 point lights for walking_dead.vpx fixture if available', async () => {
+	it('should generate no point lights but glow meshes for walking_dead.vpx if available', async () => {
 		try {
 			const { NodeBinaryReader } = await import('../../io/binary-reader.node.js')
 			const { Table } = await import('../table/table.js')
 			const { ThreeRenderApi } = await import('../../render/threejs/three-render-api.js')
 			const { TableMeshGenerator } = await import('../table/table-mesh-generator.js')
-			const table = await Table.load(new NodeBinaryReader('walking_dead.vpx'))
+			const table = await Table.load(new NodeBinaryReader('/home/qinghao1/Downloads/walking_dead.vpx'))
 			const api = new ThreeRenderApi({ applyMaterials: true } as any)
 			const gen = new TableMeshGenerator(table)
 			const scene = gen.generateTableNode(api, { exportLightBulbLights: true }) as any
-			let count = 0
-			scene.traverse((o: any) => {
-				if (o.isPointLight) count++
+			let points = 0
+			let glows = 0
+			scene.traverse((childNode: any) => {
+				if (childNode.isPointLight) points++
+				if (childNode.name === 'bulb.glow') glows++
 			})
-			expect(count).toBe(165)
-		} catch (e) {
-			// Skip if walking_dead not present
-			console.warn('skip walking_dead 165 test', (e as Error).message)
+			// All 165 TWD lights have drag-point polygons: zero scene lights, 165 glow quads.
+			expect(points).toBe(0)
+			expect(glows).toBe(165)
+		} catch (error) {
+			console.warn('skip walking_dead glow test', (error as Error).message)
 		}
 	})
 })

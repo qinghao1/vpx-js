@@ -195,7 +195,7 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 		return this.updater!
 	}
 	public getEventNames(): string[] {
-		return ['Exit', 'Init', 'KeyDown', 'KeyUp', 'MusicDone', 'Paused', 'UnPaused']
+		return ['Exit', 'Init', 'KeyDown', 'KeyUp', 'MusicDone', 'Paused', 'UnPaused', 'OptionEvent']
 	}
 
 	public setupPlayer(player: Player, _table: Table): void {
@@ -339,15 +339,21 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 		}
 	}
 
+	public tableNode?: unknown
+	public renderApi?: IRenderApi<any, any, any>
+
 	/** Generates top-most scene node containing the entire table. */
 	public async generateTableNode<NODE, GEOMETRY, POINT_LIGHT>(
 		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
 		opts: TableExportOptions & { preloadTextures?: boolean } = {},
 	): Promise<NODE> {
+		this.renderApi = renderApi as unknown as IRenderApi<any, any, any>
 		if (opts.preloadTextures !== false) {
 			await renderApi.preloadTextures(Object.values(this.textures), this)
 		}
-		return (await this.meshGenerator?.generateTableNode(renderApi, opts)) as NODE
+		const node = (await this.meshGenerator?.generateTableNode(renderApi, opts)) as NODE
+		this.tableNode = node
+		return node
 	}
 
 	public prepareToPlay(): void {
@@ -383,6 +389,9 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 			proxy?.fireVoidEvent(Event.GameEventsInit)
 		}
 	}
+	public broadcastOptionEvent(eventType = 0): void {
+		this.events?.fireVoidEventParm(Event.GameEventsOptionEvent, eventType)
+	}
 	public fireVoidEvent(event: Event): this {
 		this.events?.fireVoidEvent(event)
 		return this
@@ -397,7 +406,7 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 				const item = this.items[name]
 				if (!item) {
 					logger().warn('Non-existent item "%s" in collection "%s", skipping.', name, col.getName())
-					break
+					continue
 				}
 				if (isScriptable(item as unknown)) {
 					;(item as unknown as IScriptable<ItemApi<ItemData>>).getApi()._addCollection(col, col.items.length)

@@ -1,7 +1,7 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { ExtrudeGeometry, type Path, Shape, Vector2 } from 'three'
+import { ExtrudeGeometry, type Path, Shape, ShapeGeometry, Vector2 } from 'three'
 import { SplineVertex } from '../../util/spline-vertex.js'
 import type { LightData } from '../../vpt/light/light-data.js'
 import type { Table } from '../../vpt/table/table.js'
@@ -45,6 +45,26 @@ export class ThreeLightMeshGenerator {
 		if (lightData.szSurface)
 			geo.translate(0, 0, -table.getSurfaceHeight(lightData.szSurface, lightData.center.x, lightData.center.y))
 		geo.name = 'surface.light'
+		return geo
+	}
+
+	/**
+	 * Flat additive glow polygon for bulb lights.
+	 *
+	 * Mirrors the native lightmap pass (`Light::UpdateMeshBuffer`: triangulated
+	 * drag-point polygon lifted to `surfaceHeight + bulbHaloHeight + 0.1`, rendered
+	 * additive in `light.cpp`). Flat, because the glow is a light composite, not
+	 * solid geometry — unlike the extruded surface-light mesh above.
+	 * @see https://github.com/vpinball/vpinball/blob/master/src/parts/light.cpp
+	 */
+	public createBulbGlowGeometry(lightData: LightData, table: Table): ShapeGeometry {
+		const geo = new ShapeGeometry(this.getShape(lightData, table))
+		let surfaceHeight = 0
+		if (lightData.szSurface) {
+			surfaceHeight = table.getSurfaceHeight(lightData.szSurface, lightData.center.x, lightData.center.y)
+		}
+		geo.translate(0, 0, surfaceHeight + (lightData.bulbLight ? lightData.bulbHaloHeight : 0) + 0.1)
+		geo.name = 'bulb.glow'
 		return geo
 	}
 

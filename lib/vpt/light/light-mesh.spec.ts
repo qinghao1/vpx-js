@@ -1,8 +1,6 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { expect } from 'chai'
-import type { SpotLight } from 'three'
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { ThreeHelper } from '../../../test/three.helper'
 import { NodeBinaryReader } from '../../io/binary-reader.node.js'
@@ -10,7 +8,6 @@ import { Table } from '../table/table.js'
 import { TableExporter } from '../table/table-exporter.js'
 
 const three = new ThreeHelper()
-const scale = 0.05
 
 describe('The VPinball lights generator', () => {
 	let gltf: GLTF
@@ -47,24 +44,16 @@ describe('The VPinball lights generator', () => {
 		three.expectNoObject(gltf, 'lightBulbs', 'lightNoBulb')
 	})
 
-	it('should generate a light with default parameters', async () => {
-		const light = three.find<SpotLight>(gltf, 'lightBulbs', 'StaticBulb', 'light')
-		expect(light.decay).to.equal(2)
-		expect(light.intensity).to.equal(1)
-		expect(light.distance).to.equal(scale * 50)
-		expect(light.color.r).to.equal(1)
-		expect(light.color.g).to.equal(1)
-		expect(light.color.b).to.equal(0)
+	it('should generate a glow quad instead of a scene light', async () => {
+		// Polygon lights render through the native lightmap pass, never as scene
+		// lights, so the export carries a `bulb.glow` mesh and no punctual light.
+		three.expectObject(gltf, 'lightBulbs', 'StaticBulb', 'bulbglow')
+		three.expectNoObject(gltf, 'lightBulbs', 'StaticBulb', 'light')
 	})
 
-	it('should generate a light with custom parameters', async () => {
-		const light = three.find<SpotLight>(gltf, 'lightBulbs', 'CustomParams', 'light')
-		expect(light.decay).to.equal(2)
-		expect(light.intensity).to.be.closeTo(5.2, 0.0001)
-		expect(light.distance).to.be.closeTo(scale * 64.1, 0.0001)
-		expect(light.color.r).to.be.closeTo(0.09989872823822872, 0.0001)
-		expect(light.color.g).to.be.closeTo(0.8549925389174139, 0.0001)
-		expect(light.color.b).to.be.closeTo(0.005605384252731635, 0.0001)
+	it('should generate a glow quad for custom parameters', async () => {
+		three.expectObject(gltf, 'lightBulbs', 'CustomParams', 'bulbglow')
+		three.expectNoObject(gltf, 'lightBulbs', 'CustomParams', 'light')
 	})
 
 	it('should generate a mesh for a light with the same texture as the playfield', async () => {
