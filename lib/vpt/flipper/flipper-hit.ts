@@ -55,11 +55,18 @@ export class FlipperHit extends HitObject {
 				data.baseRadius - data.endRadius + 0.05,
 			)
 		} else data.flipperRadius = data.flipperRadiusMax
+		const baseRadius = Math.max(data.baseRadius, 0.01)
+		const endRadius = Math.max(data.endRadius, 0.01)
+		// One circle inside the other has no tangent faces (NaN normals/inertia):
+		// lengthen just enough (i.e. for broken tables only).
+		if (Math.abs(baseRadius - endRadius) >= data.flipperRadius) {
+			data.flipperRadius = Math.abs(baseRadius - endRadius) + 0.05
+		}
 		return new FlipperHit(
 			{
 				center: data.center,
-				baseRadius: Math.max(data.baseRadius, 0.01),
-				endRadius: Math.max(data.endRadius, 0.01),
+				baseRadius,
+				endRadius,
 				flipperRadius: Math.max(data.flipperRadius, 0.01),
 				angleStart: MathUtils.degToRad(data.startAngle),
 				angleEnd: MathUtils.degToRad(data.endAngle),

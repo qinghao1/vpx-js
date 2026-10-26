@@ -6,6 +6,7 @@ import { expect } from 'chai'
 import sinonChai from 'sinon-chai'
 import { MathUtils } from 'three'
 import { createBall } from '../../../test/physics.helper'
+import { TableBuilder } from '../../../test/table-builder.js'
 import { ThreeHelper } from '../../../test/three.helper'
 import { Player } from '../../game/player.js'
 import { NodeBinaryReader } from '../../io/binary-reader.node.js'
@@ -134,6 +135,17 @@ describe('The VPinball flipper collision', () => {
 		player.updatePhysics(150)
 		expect(ball.getState().pos.x).to.be.within(350, 354)
 		expect(ball.getState().pos.y).to.be.within(1617, 1621)
+	})
+
+	it('should lengthen a degenerate flipper whose circles swallow each other', () => {
+		// Upstream Flipper::PhysicSetup lengthens the flipper when one circle
+		// sits inside the other (no tangent faces: NaN normals/inertia).
+		const brokenTable = new TableBuilder()
+			.addFlipper('Broken', { baseRadius: 10, endRadius: 25, flipperRadiusMax: 5 })
+			.build()
+		new Player(brokenTable).init()
+		const hit = brokenTable.flippers.Broken.getHitShapes()[0] as FlipperHit
+		expect(hit.getMoverObject().flipperRadius).to.be.closeTo(15.05, 1e-9)
 	})
 
 	it('should apply upstream static friction in flipper contact', () => {
