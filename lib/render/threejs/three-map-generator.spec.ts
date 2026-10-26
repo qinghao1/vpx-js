@@ -138,7 +138,10 @@ describe('ThreeMapGenerator.loadTextures', () => {
 			hasTexture: (name: string) => textures.has(name.toLowerCase()),
 			getTexture: (name: string) => textures.get(name.toLowerCase()),
 		} as any)
-		const mat: any = (generator as any).getMaterial({ name: 'VLM.Bake', baseColor: 0xffffff } as any)
+		// A referenced (still streaming) bake texture keeps the material on the
+		// unlit baked path; a bake name with no texture reference at all renders
+		// lit instead (upstream lit live-part parity).
+		const mat: any = (generator as any).getMaterial({ name: 'VLM.Bake', baseColor: 0xffffff } as any, 'bakemap')
 		expect(mat.userData.__isBaked).toBe(true)
 		generator.applyNormalMap(mat, 'bakenormal')
 		generator.applyEnvMap(mat, 'bakeenv')

@@ -68,12 +68,17 @@ describe('material arrival: BDL uniforms survive streaming', () => {
 		expect(mat.alphaTest, 'cutout must be restored on arrival').to.be.closeTo(1 / 255, 1e-6)
 	})
 
-	it('tints baked node materials with the authored baseColor (classic fixBaked parity)', () => {
+	it('lights mapless bake-named materials with the authored baseColor as albedo (upstream lit parity)', () => {
+		// A bake name without a referenced texture has no bake texels to show;
+		// the unlit baked path would render the raw author tint flat (near-black
+		// for dark bake materials such as VLM.Bake.Active). Upstream renders those
+		// live parts lit (src/parts/flipper.cpp Flipper::Render draws through the
+		// lit basic shader), so they take the lit primitive path instead.
 		const textures = new Map<string, DataTexture>()
 		const generator = makeGenerator(textures)
 		const mat: any = generator.getMaterial({ name: 'VLM.Bake', baseColor: 0xff0000 } as any)
-		expect(mat.userData.__isBaked, 'bake name must take the baked path').toBe(true)
-		expect(mat.userData.__uTint.value.getHex(), 'baked tint must carry baseColor').toEqual(0xff0000)
+		expect(mat.userData.__primitiveKind, 'mapless bake must take the lit BDL path').toEqual('bdl')
+		expect(mat.userData.__uAlbedo.value.getHex(), 'lit albedo must carry baseColor').toEqual(0xff0000)
 	})
 
 	it('threads file metalness/roughness into BDL materials on the creation path', () => {

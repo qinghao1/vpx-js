@@ -130,7 +130,14 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 		// Native classifies purely by file flags (primitive.cpp): addBlend selects the unlit
 		// additive path, everything else renders lit with a BlendDisableLighting mix. Names,
 		// depthBias windows, and on/off substrings must not change the branch.
-		const baked = isBaked(material, map)
+		// The unlit bake path additionally needs bake texels (present or still
+		// streaming): without any referenced texture it would render the raw
+		// author tint flat and unlit — near-black for dark bake materials such
+		// as VLM.Bake.Active (Walking Dead flipper bats). Upstream renders those
+		// live parts lit (src/parts/flipper.cpp Flipper::Render draws the bat
+		// and rubber through the lit basic shader), so fall through to the lit
+		// primitive path with the authored color as albedo instead.
+		const baked = isBaked(material, map) && !!(map ?? emissiveMap)
 		const isBall = material?.name === 'ball'
 		const baseHex = material ? new Color(material.baseColor).getHex() : 0xffffff
 		const mapName = map ?? emissiveMap
