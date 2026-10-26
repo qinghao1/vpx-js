@@ -15,8 +15,7 @@ import {
 	bulbFilamentTemperatureToEmission,
 	bulbHeatUp,
 } from './bulb.js'
-import type { LightData } from './light-data.js'
-import type { LightState } from './light-state.js'
+import type { LightData, LightState } from './light.js'
 
 /** Clamps light state according to VPinball rules (0..1, 2 for blinking, -1/255 -> 1). */
 export function clampLightState(state: number): number {

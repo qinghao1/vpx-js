@@ -3,9 +3,8 @@
 
 import { type MeshStandardMaterial, type Object3D, PointLight, type Mesh as ThreeMesh } from 'three'
 import { Enums } from '../../vpt/enums.js'
-import type { LightData } from '../../vpt/light/light-data.js'
+import type { LightData, LightState } from '../../vpt/light/light.js'
 import { clampLightState } from '../../vpt/light/light-physics.js'
-import type { LightState } from '../../vpt/light/light-state.js'
 import type { Table } from '../../vpt/table/table.js'
 import { setBulbGlowState } from './nodes/bulb-glow-node.js'
 import { ThreeRenderApi } from './three-render-api.js'

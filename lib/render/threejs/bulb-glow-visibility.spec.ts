@@ -1,6 +1,6 @@
 import { Group, Mesh, MeshBasicMaterial, MeshStandardMaterial, PlaneGeometry } from 'three'
 import { describe, expect, it } from 'vitest'
-import { LightState } from '../../vpt/light/light-state.js'
+import { LightState } from '../../vpt/light/light.js'
 import { createBulbGlowNodeMaterial } from './nodes/bulb-glow-node.js'
 import { createPrimitiveAdditiveMaterial } from './nodes/primitive-bdl-node.js'
 import { ThreeConverter } from './three-converter.js'

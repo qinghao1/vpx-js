@@ -9,7 +9,7 @@ import { Player } from '../../game/player.js'
 import { NodeBinaryReader } from '../../io/binary-reader.node.js'
 import { Enums } from '../enums.js'
 import { Table } from '../table/table.js'
-import type { LightState } from './light-state.js'
+import type { LightState } from './light.js'
 
 chai.use((sinonChai as any).default ?? sinonChai)
 const three = new ThreeHelper()

@@ -3,7 +3,7 @@
 
 import { ExtrudeGeometry, type Path, Shape, ShapeGeometry, Vector2 } from 'three'
 import { SplineVertex } from '../../util/spline-vertex.js'
-import type { LightData } from '../../vpt/light/light-data.js'
+import type { LightData } from '../../vpt/light/light.js'
 import type { Table } from '../../vpt/table/table.js'
 import { playfieldUvGenerator } from './three-mesh-generator.js'
 

@@ -6,8 +6,7 @@ import { ItemUpdater } from '../item-updater.js'
 import type { Mesh } from '../mesh.js'
 import { loadMesh } from '../mesh-loader.js'
 import type { Table } from '../table/table.js'
-import type { LightData } from './light-data.js'
-import type { LightState } from './light-state.js'
+import type { LightData, LightState } from './light.js'
 
 const bulbLightMesh = loadMesh('bulb-light-mesh')
 const bulbSocketMesh = loadMesh('bulb-socket-mesh')
