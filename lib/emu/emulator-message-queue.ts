@@ -62,6 +62,15 @@ export enum MessageType {
 	SetTimeFence,
 }
 
+/** Queue message for a switch write: set, clear, or toggle when `enable` is omitted. */
+export function switchMessageType(enable?: boolean): MessageType {
+	return enable === true
+		? MessageType.SetSwitchInput
+		: enable === false
+			? MessageType.ClearSwitchInput
+			: MessageType.ToggleSwitchInput
+}
+
 interface QueueItem {
 	cacheType: MessageType
 	value: number

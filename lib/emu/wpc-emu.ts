@@ -7,8 +7,8 @@ import { logger } from '../util/logger.js'
 
 const WpcEmuApi = (wpcEmuPkg as any)?.WpcEmuApi ?? (wpcEmuPkg as any)?.default?.WpcEmuApi ?? wpcEmuPkg
 
-import { Vertex2D } from '../util/vector.js'
-import { EmulatorMessageQueue, MessageType } from './emulator-message-queue.js'
+import { Vertex2D } from '../math/vector.js'
+import { EmulatorMessageQueue, MessageType, switchMessageType } from './emulator-message-queue.js'
 import { EmulatorState } from './emulator-state.js'
 import { OffsetIndex } from './offset-index.js'
 
@@ -75,13 +75,7 @@ export class Emulator implements IEmulator {
 
 	setSwitchInput(nr: number, enable?: boolean): boolean {
 		if (!this.emulator) {
-			const type =
-				enable === true
-					? MessageType.SetSwitchInput
-					: enable === false
-						? MessageType.ClearSwitchInput
-						: MessageType.ToggleSwitchInput
-			this.queue.addMessage(type, nr)
+			this.queue.addMessage(switchMessageType(enable), nr)
 			return true
 		}
 		this.emulator.setSwitchInput(nr, enable)

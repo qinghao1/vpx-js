@@ -5,7 +5,7 @@ import * as chai from 'chai'
 import { expect } from 'chai'
 import sinonChai from 'sinon-chai'
 import type { IEmulator } from '../game/iemulator.js'
-import type { Vertex2D } from '../util/vector.js'
+import type { Vertex2D } from '../math/vector.js'
 import { EmulatorMessageQueue, MessageType } from './emulator-message-queue.js'
 import { EmulatorState } from './emulator-state.js'
 
@@ -88,8 +88,38 @@ describe('The WPC-EMU message queue', () => {
 		expect(queue).to.deep.equal([
 			{
 				dipSwitch: 21,
+				bank: 0,
 			},
 		])
+	})
+
+	it('should roundtrip the dip bank through SetDipByte', () => {
+		messageQueue.addMessage(MessageType.SetDipByte, (2 << 8) | 0x55)
+		messageQueue.replayMessages(mockEmulator)
+		expect(queue).to.deep.equal([
+			{
+				dipSwitch: 0x55,
+				bank: 2,
+			},
+		])
+	})
+
+	it('should replay SetTimeFence to the emulator', () => {
+		messageQueue.addMessage(MessageType.SetTimeFence, 1234)
+		messageQueue.replayMessages(mockEmulator)
+		expect(queue).to.deep.equal([
+			{
+				timeFence: 1234,
+			},
+		])
+	})
+
+	it('should tolerate replaying SetTimeFence without emulator support', () => {
+		const bare = new MockEmulator(queue)
+		bare.setTimeFence = undefined as any
+		messageQueue.addMessage(MessageType.SetTimeFence, 1234)
+		expect(() => messageQueue.replayMessages(bare)).to.not.throw()
+		expect(queue).to.deep.equal([])
 	})
 })
 
@@ -140,7 +170,10 @@ class MockEmulator implements IEmulator {
 	getDipSwitchByte(): number {
 		return 0
 	}
-	setDipSwitchByte(dipSwitch: number): void {
-		this.messages.push({ dipSwitch })
+	setDipSwitchByte(dipSwitch: number, bank = 0): void {
+		this.messages.push({ dipSwitch, bank })
+	}
+	setTimeFence(time: number): void {
+		this.messages.push({ timeFence: time })
 	}
 }
