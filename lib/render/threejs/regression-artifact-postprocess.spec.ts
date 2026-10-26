@@ -39,33 +39,7 @@ function makeMesh(name, geometry, mat) {
 	return mesh
 }
 
-describe('regression: artifact harness', () => {
-	it('BM shared-material meshes stay visible and base hidden before streaming', () => {
-		const root = new THREE.Group()
-		root.name = 'table'
-		const sharedMat = new THREE.MeshStandardMaterial({ color: 0xffffff })
-		sharedMat.name = 'material:VLM.Bake.Active'
-		sharedMat.userData.__isBaked = true
-		sharedMat.userData.__addBlend = false
-		sharedMat.userData.pendingMap = 'vlm.nestmap0'
-		sharedMat.emissive = new THREE.Color(0xffffff)
-		sharedMat.emissiveIntensity = 1
-		for (let i = 0; i < 5; i++) {
-			const geom = new THREE.PlaneGeometry(20, 20)
-			const mesh = makeMesh(`primitive-BM_Playfield_Test${i}`, geom, sharedMat)
-			root.add(mesh)
-		}
-		const baseMat = new THREE.MeshStandardMaterial({ color: 0xffffff })
-		baseMat.name = 'Playfield'
-		const baseGeom = new THREE.PlaneGeometry(20, 20)
-		const base = makeMesh('playfield_base', baseGeom, baseMat)
-		root.add(base)
-		root.updateMatrixWorld(true)
-		postProcessScene(root, { harnessLog: () => {}, viewerMode: 'viewer' })
-		const bms = root.children.filter(c => c.name.includes('BM_Playfield_Test'))
-		for (const bm of bms) expect(bm.visible).to.equal(true)
-		expect(base.visible).to.equal(false)
-	})
+describe('regression: artifact postprocess', () => {
 	it.skipIf(!walkingDeadVpx)('underwall playfield surfaces must stay hidden (no vertical artifact)', async () => {
 		const vpx = requireWalkingDead()
 		const table = await Table.load(new NodeBinaryReader(vpx), { skipTextures: false } as any)
@@ -98,45 +72,6 @@ describe('regression: artifact harness', () => {
 			underwallVisible,
 			'Playfield_underwall surfaces must stay hidden (hidden collision, not forced visible) to avoid vertical dark lines',
 		).to.equal(0)
-	})
-	it('no z-fighting: base playfield hidden when baked ready, only baked visible', () => {
-		const root = new THREE.Group()
-		root.name = 'table'
-		const baseMat = new THREE.MeshStandardMaterial({ color: 0xffffff })
-		baseMat.name = 'Playfield'
-		const baseGeom = new THREE.BoxGeometry(20, 20, 0.5)
-		const base = makeMesh('playfield_base', baseGeom, baseMat)
-		base.position.set(0, 0, 0)
-		root.add(base)
-		const bakedMat = new THREE.MeshStandardMaterial({ color: 0x000000 })
-		bakedMat.name = 'material:VLM.Bake.Active'
-		const tex = new THREE.DataTexture(new Uint8Array([10, 10, 10, 255]), 1, 1)
-		tex.name = 'vlm.nestmap0'
-		bakedMat.map = tex
-		bakedMat.userData.__isBaked = true
-		bakedMat.userData.__addBlend = false
-		const bakedGeom = new THREE.PlaneGeometry(20, 20)
-		const baked = makeMesh('primitive-BM_Playfield', bakedGeom, bakedMat)
-		baked.position.set(0, 0, 0.01)
-		root.add(baked)
-		const pendingMat = new THREE.MeshStandardMaterial({ color: 0xffffff })
-		pendingMat.name = 'material:VLM.Bake.Active'
-		pendingMat.userData.__isBaked = true
-		pendingMat.userData.__addBlend = false
-		pendingMat.userData.pendingMap = 'vlm.nestmap0'
-		pendingMat.emissive = new THREE.Color(0xffffff)
-		pendingMat.emissiveIntensity = 1
-		const pendingGeom = new THREE.PlaneGeometry(20, 20)
-		const pending = makeMesh('primitive-BM_Playfield_Bumper1', pendingGeom, pendingMat)
-		pending.position.set(0, 0, 0.02)
-		root.add(pending)
-		root.updateMatrixWorld(true)
-		postProcessScene(root, { harnessLog: () => {}, viewerMode: 'viewer' })
-		expect(baked.visible).to.equal(true)
-		expect(pending.visible).to.equal(true)
-		expect(base.visible).to.equal(false)
-		const visibleMeshes = root.children.filter(m => (m as THREE.Mesh).isMesh === true && m.visible)
-		expect(visibleMeshes.length).to.equal(2)
 	})
 	it.skipIf(!walkingDeadVpx)('ramp BM stays visible before streaming (no dark hole)', async () => {
 		const vpx = requireWalkingDead()

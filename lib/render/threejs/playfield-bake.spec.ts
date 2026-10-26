@@ -167,4 +167,31 @@ describe('regression: playfield baked hide', () => {
 		expect(outMat.transparent, 'large non-insert must not be hidden via generic pending').to.equal(false)
 		expect(outMat.opacity, 'large non-insert must stay opaque').to.equal(1)
 	})
+
+	it('BM shared-material meshes stay visible and base hidden before streaming', () => {
+		const root = new THREE.Group()
+		root.name = 'table'
+		const sharedMat = new THREE.MeshStandardMaterial({ color: 0xffffff })
+		sharedMat.name = 'material:VLM.Bake.Active'
+		sharedMat.userData.__isBaked = true
+		sharedMat.userData.__addBlend = false
+		sharedMat.userData.pendingMap = 'vlm.nestmap0'
+		sharedMat.emissive = new THREE.Color(0xffffff)
+		sharedMat.emissiveIntensity = 1
+		for (let i = 0; i < 5; i++) {
+			const geom = new THREE.PlaneGeometry(20, 20)
+			const mesh = makeMesh(`primitive-BM_Playfield_Test${i}`, geom, sharedMat)
+			root.add(mesh)
+		}
+		const baseMat = new THREE.MeshStandardMaterial({ color: 0xffffff })
+		baseMat.name = 'Playfield'
+		const baseGeom = new THREE.PlaneGeometry(20, 20)
+		const base = makeMesh('playfield_base', baseGeom, baseMat)
+		root.add(base)
+		root.updateMatrixWorld(true)
+		postProcessScene(root, { harnessLog: () => {}, viewerMode: 'viewer' })
+		const bms = root.children.filter(c => c.name.includes('BM_Playfield_Test'))
+		for (const bm of bms) expect(bm.visible).to.equal(true)
+		expect(base.visible).to.equal(false)
+	})
 })

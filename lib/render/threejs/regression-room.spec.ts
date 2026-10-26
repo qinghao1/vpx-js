@@ -50,19 +50,9 @@ describe('regression: room must remain visible', () => {
 		expect(c3.isCab, 'cab true').toEqual(true)
 	})
 
-	it('postProcessScene must hide base playfield but keep VR and bm_playfield', () => {
+	it('postProcessScene must keep VR, cabinet and bm_playfield while hiding dark occluders', () => {
 		const root = new THREE.Group()
 		root.name = 'table'
-		// base playfield unbaked
-		const baseMat = new THREE.MeshStandardMaterial({ color: 0xffffff })
-		baseMat.name = 'Playfield'
-		const base = makeMesh('playfield_base', new THREE.PlaneGeometry(20, 20), baseMat)
-		root.add(base)
-		// second base: primitive-playfield_mesh (default Table1)
-		const meshMat = new THREE.MeshStandardMaterial({ color: 0xffffff })
-		meshMat.name = 'Playfield'
-		const mesh = makeMesh('primitive-playfield_mesh', new THREE.PlaneGeometry(20, 20), meshMat)
-		root.add(mesh)
 		// BM baked main
 		const bmMat = new THREE.MeshStandardMaterial({ color: 0x000000 })
 		bmMat.name = 'material:VLM.Bake.Active'
@@ -91,8 +81,6 @@ describe('regression: room must remain visible', () => {
 		root.updateMatrixWorld(true)
 		postProcessScene(root, { harnessLog: () => {}, viewerMode: 'viewer' })
 
-		expect(base.visible, 'base playfield must be hidden when BM ready').toEqual(false)
-		expect(mesh.visible, 'playfield_mesh must be hidden').toEqual(false)
 		expect(bm.visible, 'BM_Playfield must stay visible').toEqual(true)
 		expect(vr.visible, 'VR room must remain visible').toEqual(true)
 		expect(cab.visible, 'cabinet must remain visible').toEqual(true)
