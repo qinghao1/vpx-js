@@ -41,6 +41,10 @@ const preload = import('./transpiler-worker-core.js')
 	})
 	.catch(() => {})
 
+function errorText(err: any): string {
+	return err?.message ?? String(err) + (err?.stack ? '\n' + err.stack : '')
+}
+
 self.onmessage = async (e: MessageEvent) => {
 	if (!transpileInWorker) await preload
 	if (!transpileInWorker) {
@@ -48,11 +52,7 @@ self.onmessage = async (e: MessageEvent) => {
 			const mod: any = await import('./transpiler-worker-core.js')
 			transpileInWorker = mod.transpileInWorker
 		} catch (err: any) {
-			;(self as any).postMessage({
-				id: (e as any).data?.id,
-				ok: false,
-				error: err?.message ?? String(err) + (err?.stack ? '\n' + err.stack : ''),
-			})
+			;(self as any).postMessage({ id: (e as any).data?.id, ok: false, error: errorText(err) })
 			return
 		}
 	}
@@ -61,10 +61,6 @@ self.onmessage = async (e: MessageEvent) => {
 		const js = await transpileInWorker!({ vbs, globalFunction, globalObject, tableData })
 		;(self as any).postMessage({ id, ok: true, js })
 	} catch (err: any) {
-		;(self as any).postMessage({
-			id,
-			ok: false,
-			error: err?.message ?? String(err) + (err?.stack ? '\n' + err.stack : ''),
-		})
+		;(self as any).postMessage({ id, ok: false, error: errorText(err) })
 	}
 }

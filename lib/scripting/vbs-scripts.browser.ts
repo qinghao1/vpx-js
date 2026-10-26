@@ -6,7 +6,6 @@ import core from '../../res/scripts/core.vbs?raw'
 import sam from '../../res/scripts/sam.vbs?raw'
 import VPMKeys from '../../res/scripts/VPMKeys.vbs?raw'
 import WPC from '../../res/scripts/WPC.vbs?raw'
-import grammar from './grammar/grammar.bnf?raw'
 
 import { ERR } from './stdlib/err.js'
 
@@ -16,7 +15,6 @@ const MAP: Record<string, string> = {
 	'sam.vbs': sam,
 	'vpmkeys.vbs': VPMKeys,
 	'wpc.vbs': WPC,
-	'grammar.bnf': grammar,
 }
 
 /** Whether a bundled text file exists without fallback. */

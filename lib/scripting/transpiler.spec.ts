@@ -75,4 +75,13 @@ describe('The VBScript transpiler', () => {
 
 		expect(scope.MyVariable).to.equal(13)
 	})
+
+	it('should define globals via ExecuteGlobal', () => {
+		const scope = {} as any
+		const vbs = `ExecuteGlobal "z = 42"`
+		const transpiler = new Transpiler(table, player)
+		transpiler.execute(vbs, scope, 'global')
+
+		expect(scope.z).to.equal(42)
+	})
 })

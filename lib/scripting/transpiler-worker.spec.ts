@@ -37,4 +37,31 @@ describe('Transpiler worker parity', () => {
 		const asyncJs = await new Transpiler(table, player).transpileAsync(vbs, 'play', 'global')
 		expect(asyncJs).to.equal(sync)
 	})
+
+	it('should match sync for class, With and Select', async () => {
+		const table = new TableBuilder().addFlipper('MyFlipper').build()
+		const player = new Player(table)
+		const vbs = [
+			'Class BallPos',
+			'Public X',
+			'Public Y',
+			'End Class',
+			'Set b = New BallPos',
+			'With b',
+			'.X = 5',
+			'.Y = 7',
+			'End With',
+			'Select Case b.X',
+			'Case 5',
+			'y = 1',
+			'Case Else',
+			'y = 2',
+			'End Select',
+		].join('\n')
+		const sync = new Transpiler(table, player).transpile(vbs, 'play', 'global')
+		const td = getTableDataForWorker(table, player)
+		expect(
+			await transpileInWorker({ vbs, globalFunction: 'play', globalObject: 'global', tableData: td }),
+		).to.equal(sync)
+	})
 })

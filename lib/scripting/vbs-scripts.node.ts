@@ -8,8 +8,6 @@ import { fileURLToPath } from 'node:url'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 
-import { ERR } from './stdlib/err.js'
-
 /* istanbul ignore next: We don't test VB's core library. */
 /** Whether a bundled text file exists without fallback. */
 export function hasTextFile(fileName: string): boolean {
@@ -32,10 +30,6 @@ export function hasTextFile(fileName: string): boolean {
 /** getTextFile. */
 export function getTextFile(fileName: string): string {
 	return readFileSync(getLocalPath(fileName)).toString('utf8')
-	const base = fileName.replace(/.*[\\/]/, '')
-	return readFileSync(getLocalPath(base)).toString('utf8')
-	ERR.Raise(53, 'GetTextFile', `Unable to open ${fileName}`)
-	return ''
 }
 
 /* istanbul ignore next: We don't test VB's core library. */
@@ -51,8 +45,6 @@ function getLocalPath(fileName: string): string {
 			return resolve(__dirname, '../../res/scripts/VPMKeys.vbs')
 		case 'wpc.vbs':
 			return resolve(__dirname, '../../res/scripts/WPC.vbs')
-		case 'grammar.bnf':
-			return resolve(__dirname, './grammar/grammar.bnf')
 	}
 	// Unknown VBS: try res/scripts/<name> then vpinball/scripts/<name> before falling back
 	const lower = fileName.toLowerCase()

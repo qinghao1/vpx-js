@@ -3,24 +3,7 @@ import { Enums } from '../vpt/enums.js'
 import { GlobalApi } from '../vpt/global-api.js'
 import { Grammar } from './grammar/grammar.js'
 import { Stdlib } from './stdlib/index.js'
-import { AmbiguityTransformer } from './transformer/ambiguity-transformer.js'
-import { ClassTransformer } from './transformer/class-transformer.js'
-import { ErrorTransformer } from './transformer/error-transformer.js'
-import { EventTransformer } from './transformer/event-transformer.js'
-import { FunctionHoistTransformer } from './transformer/function-hoist-transformer.js'
-import { ReferenceTransformer } from './transformer/reference-transformer.js'
-import { ScopeTransformer } from './transformer/scope-transformer.js'
-import { WrapTransformer } from './transformer/wrap-transformer.js'
-function normalizeNewCall(vbs: string): string {
-	let out = vbs.replace(/Set\s+(\w+)\s*=\s*\(\s*New\s+(\w+)\s*\)\s*\(([^)]*)\)/gi, (_, v, c, a) => {
-		const args = (a as string).trim()
-		return args ? `Set ${v} = New ${c}\n${v}.init ${args}` : `Set ${v} = New ${c}`
-	})
-	out = out.replace(/\(\s*New\s+(\w+)\s*\)\s*\(/gi, '(New $1).init(')
-	out = out.replace(/\.Option\b/gi, '._Option')
-	out = out.replace(/(?<!\.)\bswitch\b/gi, 'aSwitch')
-	return out
-}
+import { buildPipeline, normalizeNewCall } from './transpiler-pipeline.js'
 
 export interface TableDataPayload {
 	elementNames: string[]
@@ -32,6 +15,19 @@ export interface TableDataPayload {
 	globalUndefined?: string[]
 }
 
+/** Case-insensitive name mock: functions as no-ops, undefined props as undefined, the rest as 0. */
+function makeApiMock(props: string[], funcs: Set<string>, undef: Set<string>): any {
+	const map = new Map<string, string>()
+	const mock: any = {}
+	for (const prop of props) {
+		const key = prop.toLowerCase()
+		map.set(key, prop)
+		mock[prop] = funcs.has(key) ? () => {} : undef.has(key) ? undefined : 0
+	}
+	mock._getPropertyName = (name: string) => map.get(name.toLowerCase())
+	return mock
+}
+
 export async function transpileInWorker(payload: {
 	vbs: string
 	globalFunction?: string
@@ -39,7 +35,8 @@ export async function transpileInWorker(payload: {
 	tableData?: TableDataPayload | null
 }): Promise<string> {
 	const escodegenModule: any = await import('escodegen')
-	const generate = escodegenModule.generate ?? escodegenModule.default?.generate ?? escodegenModule.default?.default?.generate
+	const generate =
+		escodegenModule.generate ?? escodegenModule.default?.generate ?? escodegenModule.default?.default?.generate
 	const { vbs, globalFunction, globalObject, tableData } = payload
 	const grammar = new Grammar()
 	let ast: Program = grammar.transpile(normalizeNewCall(vbs))
@@ -59,30 +56,16 @@ export async function transpileInWorker(payload: {
 				return els
 			},
 		}
-		const funcs = tableData.elementApiFuncs ?? {}
-		const undef = tableData.elementApiUndefined ?? {}
+		const apiFuncs = tableData.elementApiFuncs ?? {}
+		const apiUndef = tableData.elementApiUndefined ?? {}
 		for (const [name, props] of Object.entries(tableData.elementApis)) {
-			const map = new Map<string, string>()
-			const mock: any = {}
-			const f = new Set((funcs[name] ?? []).map(s => s.toLowerCase()))
-			const u = new Set((undef[name] ?? []).map(s => s.toLowerCase()))
-			for (const p of props) {
-				map.set(p.toLowerCase(), p)
-				mock[p] = f.has(p.toLowerCase()) ? () => {} : u.has(p.toLowerCase()) ? undefined : 0
-			}
-			mock._getPropertyName = (n: string) => map.get(n.toLowerCase())
-			itemApis[name] = mock
+			const funcs = new Set((apiFuncs[name] ?? []).map(s => s.toLowerCase()))
+			const undef = new Set((apiUndef[name] ?? []).map(s => s.toLowerCase()))
+			itemApis[name] = makeApiMock(props, funcs, undef)
 		}
-		const gf = new Set((tableData.globalFuncs ?? []).map(s => s.toLowerCase()))
-		const gu = new Set((tableData.globalUndefined ?? []).map(s => s.toLowerCase()))
-		const gMap = new Map<string, string>()
-		const gMock: any = {}
-		for (const p of Object.getOwnPropertyNames(GlobalApi.prototype)) {
-			gMap.set(p.toLowerCase(), p)
-			gMock[p] = gf.has(p.toLowerCase()) ? () => {} : gu.has(p.toLowerCase()) ? undefined : 0
-		}
-		gMock._getPropertyName = (n: string) => gMap.get(n.toLowerCase())
-		globalMock = gMock
+		const globalFuncs = new Set((tableData.globalFuncs ?? []).map(s => s.toLowerCase()))
+		const globalUndef = new Set((tableData.globalUndefined ?? []).map(s => s.toLowerCase()))
+		globalMock = makeApiMock(Object.getOwnPropertyNames(GlobalApi.prototype), globalFuncs, globalUndef)
 	} else {
 		tableMock = { getElementApiName: () => undefined, getElements: () => ({}) }
 		globalMock = {
@@ -93,18 +76,16 @@ export async function transpileInWorker(payload: {
 			},
 		}
 	}
-	const pipeline = [
-		(a: Program) => new FunctionHoistTransformer(a).transform(),
-		(a: Program) => new EventTransformer(a, tableMock.getElements()).transform(),
-		(a: Program) => new ErrorTransformer(a).transform(),
-		(a: Program) =>
-			new ReferenceTransformer(a, tableMock, itemApis, Enums as any, globalMock, stdlibMock).transform(),
-		(a: Program) => new ScopeTransformer(a).transform(),
-		(a: Program) => new ClassTransformer(a).transformThisIdentifiers(),
-		(a: Program) => new AmbiguityTransformer(a, itemApis, Enums as any, globalMock, stdlibMock).transform(),
-		(a: Program) => new ClassTransformer(a).transform(),
-		(a: Program) => new WrapTransformer(a).transform(globalFunction, globalObject),
-	]
+	const pipeline = buildPipeline({
+		table: tableMock,
+		elements: tableMock.getElements(),
+		itemApis,
+		enumApis: Enums as any,
+		globalApi: globalMock,
+		stdlib: stdlibMock,
+		globalFunction,
+		globalObject,
+	})
 	for (const fn of pipeline) ast = fn(ast)
 	return generate(ast)
 }
