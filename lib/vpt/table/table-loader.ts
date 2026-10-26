@@ -12,6 +12,7 @@ import type { TableLoadOptions } from './table.js'
 import { TableData } from './table-data.js'
 
 const decoder = new TextDecoder()
+const tableInfoDecoder = new TextDecoder('utf-16le')
 
 // Yield every N entries during bulk OLE parsing so large tables (1000+ items) don't block the UI.
 // Uses scheduler.yield() when available, otherwise setTimeout.
@@ -53,9 +54,11 @@ export class TableLoader {
 					await this.loadCollections(out, gameStg, out.data.numCollections)
 				}
 				if (opts.loadTableScript) {
-					const script = await gameStg.read('GameData', out.data.scriptPos, out.data.scriptLen)
-					out.tableScript = decoder.decode(script)
-					if (out.tableScript.endsWith('ENDB')) out.tableScript = out.tableScript.slice(0, -8)
+					// CODE framing is exact (cchar bytes); upstream AsScript reads exactly cchar with no trim.
+					// A zero cchar is an empty script — read() treats len 0 as "to end", so don't call it.
+					const { scriptPos, scriptLen } = out.data
+					out.tableScript =
+						scriptLen > 0 ? decoder.decode(await gameStg.read('GameData', scriptPos, scriptLen)) : ''
 				}
 			}
 			if (opts.tableInfoOnly || !opts.tableDataOnly) await this.loadTableInfo(out)
@@ -96,26 +99,18 @@ export class TableLoader {
 		progress().show('Loading game items')
 		if (numItems === 0) return
 		const concurrency = Math.min(MAX_CONCURRENCY_GAME_ITEMS, hardwareConcurrency())
-		const results: Array<Item<ItemData> | null> = new Array(numItems)
 		const types = new Int32Array(numItems)
-		let next = 0
-		const workers = Array.from({ length: Math.min(concurrency, numItems) }, async () => {
-			while (true) {
-				const i = next++
-				if (i >= numItems) break
-				const name = `GameItem${i}`
-				const data = await storage.read(name, 0, 4)
-				const type = new DataView(data.buffer, data.byteOffset, data.byteLength).getInt32(0, true)
-				types[i] = type
-				results[i] = await loadItemByType(storage, name, type, opts)
-				if ((i + 1) % YIELD_EVERY_GAME_ITEMS === 0) await this.yield()
-			}
+		const results = await this.loadConcurrent(numItems, concurrency, YIELD_EVERY_GAME_ITEMS, async index => {
+			const name = `GameItem${index}`
+			const data = await storage.read(name, 0, 4)
+			const type = new DataView(data.buffer, data.byteOffset, data.byteLength).getInt32(0, true)
+			types[index] = type
+			return loadItemByType(storage, name, type, opts)
 		})
-		await Promise.all(workers)
-		for (let i = 0; i < numItems; i++) {
-			const item = results[i]
+		for (let index = 0; index < numItems; index++) {
+			const item = results[index]
 			if (!item) continue
-			const type = types[i]!
+			const type = types[index]!
 			const key = ITEM_REGISTRY[type]?.key
 			if (key && ((key !== 'textBoxes' && key !== 'timers') || opts.loadInvisibleItems)) {
 				;((out as unknown as Record<string, Item<ItemData>[] | undefined>)[key] ??= []).push(item)
@@ -130,19 +125,11 @@ export class TableLoader {
 		out.textures = []
 		if (numItems === 0) return
 		const concurrency = Math.min(MAX_CONCURRENCY_TEXTURES, hardwareConcurrency())
-		const results: Texture[] = new Array(numItems)
-		let next = 0
-		const workers = Array.from({ length: Math.min(concurrency, numItems) }, async () => {
-			while (true) {
-				const i = next++
-				if (i >= numItems) break
-				results[i] = await Texture.fromStorage(storage, `Image${i}`)
-				if ((i + 1) % YIELD_EVERY_TEXTURES === 0) await this.yield()
-			}
-		})
-		await Promise.all(workers)
-		for (let i = 0; i < numItems; i++) {
-			const tex = results[i]!
+		const results = await this.loadConcurrent(numItems, concurrency, YIELD_EVERY_TEXTURES, index =>
+			Texture.fromStorage(storage, `Image${index}`),
+		)
+		for (let index = 0; index < numItems; index++) {
+			const tex = results[index]!
 			out.textures.push(tex)
 			progress().details(tex.getName())
 		}
@@ -152,8 +139,12 @@ export class TableLoader {
 		const stg = this.doc.storage('TableInfo')
 		out.info = {}
 		for (const key of stg.getStreams()) {
+			// Screenshot is raw image bytes, not text (upstream PinTable::LoadInfo reads it as binary).
+			if (key === 'Screenshot') continue
 			const data = await stg.read(key)
-			if (data) out.info[key] = decoder.decode(data).replace(/\0/g, '')
+			// TableInfo values are stored as UTF-16LE (upstream PinTable::ReadInfoValue
+			// truncates at the first NUL via null-terminated WCHAR*).
+			if (data) out.info[key] = tableInfoDecoder.decode(data).split('\0', 1)[0]!
 		}
 	}
 
@@ -161,22 +152,34 @@ export class TableLoader {
 		out.collections = []
 		if (numItems === 0) return
 		const concurrency = Math.min(MAX_CONCURRENCY_COLLECTIONS, hardwareConcurrency())
-		const results: Collection[] = new Array(numItems)
-		let next = 0
-		const workers = Array.from({ length: Math.min(concurrency, numItems) }, async () => {
-			while (true) {
-				const i = next++
-				if (i >= numItems) break
-				results[i] = await Collection.fromStorage(storage, `Collection${i}`)
-				if ((i + 1) % YIELD_EVERY_COLLECTIONS === 0) await this.yield()
-			}
-		})
-		await Promise.all(workers)
-		for (let i = 0; i < numItems; i++) {
-			const col = results[i]!
+		const results = await this.loadConcurrent(numItems, concurrency, YIELD_EVERY_COLLECTIONS, index =>
+			Collection.fromStorage(storage, `Collection${index}`),
+		)
+		for (let index = 0; index < numItems; index++) {
+			const col = results[index]!
 			out.collections.push(col)
 			out.items[col.getName()] = col
 		}
+	}
+
+	private async loadConcurrent<Entry>(
+		count: number,
+		maxConcurrency: number,
+		yieldEvery: number,
+		loadOne: (index: number) => Promise<Entry>,
+	): Promise<Entry[]> {
+		const results: Entry[] = new Array(count)
+		let next = 0
+		const workers = Array.from({ length: Math.min(maxConcurrency, count) }, async () => {
+			while (true) {
+				const index = next++
+				if (index >= count) break
+				results[index] = await loadOne(index)
+				if ((index + 1) % yieldEvery === 0) await this.yield()
+			}
+		})
+		await Promise.all(workers)
+		return results
 	}
 
 	private async yield(): Promise<void> {

@@ -1,7 +1,7 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import type { IRenderable } from '../../game/irenderable.js'
+import type { IRenderable } from '../../game/interfaces.js'
 import type { IRenderApi } from '../../render/irender-api.js'
 import { progress } from '../../util/logger.js'
 import type { Bumper } from '../bumper/bumper.js'
@@ -27,7 +27,7 @@ export class TableMeshGenerator {
 		opts: TableGenerateOptions = {},
 	): NODE {
 		progress().show('Generating table nodes')
-		opts = Object.assign({}, defaultOptions, opts)
+		opts = Object.assign({}, defaultTableGenerateOptions, opts)
 		const tableNode = renderApi.createParentNode('playfield')
 		renderApi.transformScene(tableNode, this.table)
 		const renderGroups: IRenderGroup[] = [
@@ -65,8 +65,7 @@ export class TableMeshGenerator {
 		]
 
 		const enabledGroups = renderGroups.filter(g => g.enabled)
-		for (let gi = 0; gi < enabledGroups.length; gi++) {
-			const group = enabledGroups[gi]!
+		for (const group of enabledGroups) {
 			progress().details(group.name)
 			const itemTypeGroup = renderApi.createParentNode(group.name)
 			for (const renderable of group.meshes) {
@@ -78,9 +77,10 @@ export class TableMeshGenerator {
 
 		// Fallback dynamic lights for bulb lights without a glow polygon.
 		// Lights with drag-point vertices render as an additive glow quad instead
-		// (native `Light::RenderSetup` lightmap pass in `light.cpp`); they must never
-		// become scene lights — native scenes use 2 fixed lights (`Renderer.cpp`).
-		// Creating 165 point lights (e.g. TWD) blows out the playfield and kills FPS.
+		// (native `Light::RenderSetup` lightmap pass in `src/parts/light.cpp`); only
+		// glowless bulbs become scene lights, and only when exportLightBulbLights is
+		// set. Native scenes use 2 fixed lights, so unbounded point lights (e.g. 165
+		// on TWD) still blow out the playfield and kill FPS — keep this fallback narrow.
 		if (opts.exportLightBulbLights) {
 			let lightGroup = renderApi.findInGroup(tableNode, 'lightBulbs')
 			if (!lightGroup) {
@@ -119,7 +119,7 @@ interface IRenderGroup {
 	enabled: boolean
 }
 
-const defaultOptions: TableGenerateOptions = {
+export const defaultTableGenerateOptions: TableGenerateOptions = {
 	exportPlayfield: true,
 	exportPrimitives: true,
 	exportRubbers: true,

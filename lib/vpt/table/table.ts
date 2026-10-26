@@ -4,21 +4,30 @@ import { MathUtils } from 'three'
 
 import { Event } from '../../game/event.js'
 import { EventProxy } from '../../game/event-proxy.js'
-import { type IAnimatable, isAnimatable } from '../../game/ianimatable.js'
-import { type IHittable, isHittable } from '../../game/ihittable.js'
-import { type IMovable, isMovable } from '../../game/imovable.js'
-import { type IPlayable, isPlayable } from '../../game/iplayable.js'
-import { type IRenderable, isRenderable, type Meshes } from '../../game/irenderable.js'
-import { type IScriptable, isScriptable } from '../../game/iscriptable.js'
+import {
+	type IAnimatable,
+	type IHittable,
+	type IMovable,
+	type IPlayable,
+	type IRenderable,
+	type IScriptable,
+	isAnimatable,
+	isHittable,
+	isMovable,
+	isPlayable,
+	isRenderable,
+	isScriptable,
+	type Meshes,
+} from '../../game/interfaces.js'
 import type { Player } from '../../game/player.js'
 import type { IBinaryReader, Storage } from '../../io/ole-doc.js'
+import { FRect3D } from '../../math/bounds.js'
+import { Vertex3D } from '../../math/vector.js'
 import type { HitObject } from '../../physics/hit-object.js'
 import { HitPlane } from '../../physics/hit-plane.js'
 import type { IRenderApi } from '../../render/irender-api.js'
 import { Transpiler } from '../../scripting/transpiler.js'
-import { FRect3D } from '../../util/frect3d.js'
 import { logger, progress } from '../../util/logger.js'
-import { Vertex3D } from '../../util/vector.js'
 import type { Bumper } from '../bumper/bumper.js'
 import type { Collection } from '../collection/collection.js'
 import type { Decal } from '../decal/decal.js'
@@ -134,32 +143,6 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 				(this as unknown as Record<string, unknown>)[tableKey] as Record<string, unknown>,
 			)
 		}
-		this.fixFlipperBats()
-	}
-
-	private fixFlipperBats(): void {
-		const PROXIMITY = 15
-		const TOLERANCE = 0.6
-		const flippers = Object.values(this.flippers)
-		if (!flippers.length) return
-		for (const prim of Object.values(this.primitives)) {
-			const d = prim.data.rotAndTra
-			if (prim.data.staticRendering) continue
-			if (d[2] !== 0 || !d[8] || d[0] !== 0 || d[1] !== 0) continue
-			for (const f of flippers) {
-				const c = f.data.center
-				if (Math.hypot(prim.data.position.x - c.x, prim.data.position.y - c.y) > PROXIMITY) continue
-				const angle = d[8] as number
-				if (Math.abs(angle - f.data.startAngle) > TOLERANCE) continue
-				// Bat stored in ObjRotZ but driven via RotZ → double without remap.
-				d[8] = 0
-				d[2] = angle
-				const s = prim.getState()
-				s.objectRotation.z = 0
-				s.rotation.z = angle
-				break
-			}
-		}
 	}
 
 	private populateFromLoaded(loaded: Record<string, unknown>, key: string, dict: Record<string, unknown>): void {
@@ -174,16 +157,15 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 	public getTexture(name?: string): Texture | undefined {
 		return name ? this.textures[name.toLowerCase()] : undefined
 	}
+	/** Case-insensitive, last wins (upstream `PinTable::GetMaterial` uses a case-insensitive map during playback, where later entries overwrite earlier ones). */
 	public getMaterial(name?: string): Material | undefined {
 		if (!name || !this.data) return undefined
 		const mats = this.data.materials
 		const lc = name.toLowerCase()
-		return (
-			mats.find(m => m.name === name) ??
-			mats.find(m => m.name.toLowerCase() === lc) ??
-			mats.find(m => m.name.toLowerCase() === `_${lc}`) ??
-			(name.startsWith('_') ? mats.find(m => m.name.toLowerCase() === lc.slice(1)) : undefined)
-		)
+		for (let i = mats.length - 1; i >= 0; i--) {
+			if (mats[i]!.name.toLowerCase() === lc) return mats[i]
+		}
+		return undefined
 	}
 	public getApi(): TableApi {
 		return this.api!
@@ -209,7 +191,7 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 			this.data?.right,
 			this.data?.top,
 			this.data?.bottom,
-			this.getTableHeight(),
+			0,
 			this.data?.glassHeight,
 		)
 	}
@@ -241,13 +223,21 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 	}
 
 	public generatePlayfieldHit(): HitPlane {
-		return new HitPlane(new Vertex3D(0, 0, 1), this.data?.tableHeight ?? 0)
+		return new HitPlane(new Vertex3D(0, 0, 1), 0)
 			.setFriction(this.data?.getFriction())
 			.setElasticity(this.data?.getElasticity(), this.data?.getElasticityFalloff())
 			.setScatter(MathUtils.degToRad(this.data?.getScatter()))
 	}
 	public generateGlassHit(): HitPlane {
-		return new HitPlane(new Vertex3D(0, 0, -1), this.data?.glassHeight ?? 0).setElasticity(0.2)
+		const glassSlope = new Vertex3D(
+			0,
+			(this.data?.bottom ?? 0) - (this.data?.top ?? 0),
+			(this.data?.glassBottomHeight ?? 0) - (this.data?.glassHeight ?? 0),
+		)
+		glassSlope.normalize()
+		return new HitPlane(new Vertex3D(0, glassSlope.z, -glassSlope.y), -(this.data?.glassHeight ?? 0)).setElasticity(
+			0.2,
+		)
 	}
 
 	public getElementApis(): Record<string, ItemApi<ItemData>> {
@@ -280,13 +270,9 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 	public getGlobalDifficulty(): number {
 		return this.data?.globalDifficulty ?? 0.2
 	}
-	private get baseHeight(): number {
-		if (!this.data) throw new Error('Table data not loaded')
-		return this.data.tableHeight ?? 0
-	}
-
+	/** Deprecated upstream (`get_TableHeight` returns 0): the playfield sits at z=0. */
 	public getTableHeight(): number {
-		return this.baseHeight
+		return 0
 	}
 
 	public getDimensions(): { width: number; height: number } {
@@ -301,14 +287,13 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 
 	public getSurfaceHeight(surface: string | undefined, x: number, y: number): number {
 		if (!this.data) throw new Error('Table data not loaded')
-		const base = this.baseHeight
-		if (!surface) return base
-		const s = this.surfaces[surface]
-		if (s) return base + s.heightTop
-		const r = this.ramps[surface]
-		if (r) return base + r.getSurfaceHeight(x, y, this)
+		if (!surface) return 0
+		const surf = findByName(this.surfaces, surface)
+		if (surf) return surf.heightTop
+		const ramp = findByName(this.ramps, surface)
+		if (ramp) return ramp.getSurfaceHeight(x, y, this)
 		logger().warn('[Table.getSurfaceHeight] Unknown surface %s.', surface)
-		return base
+		return 0
 	}
 
 	public async streamStorage<T>(name: string, streamer: (stg: Storage) => Promise<T>): Promise<T> {
@@ -403,7 +388,7 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 				(item as unknown as IScriptable<ItemApi<ItemData>>).getApi()._resetCollections()
 		for (const col of Object.values(this.collections))
 			for (const name of col.getItemNames()) {
-				const item = this.items[name]
+				const item = this.getItemByName(name)
 				if (!item) {
 					logger().warn('Non-existent item "%s" in collection "%s", skipping.', name, col.getName())
 					continue
@@ -418,6 +403,19 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 	public getItems(): Array<Item<ItemData>> {
 		return Object.values(this.items)
 	}
+
+	/** Case-insensitive item lookup — upstream compares names with `StrCompareNoCase`. */
+	public getItemByName(name: string): Item<ItemData> | undefined {
+		return findByName(this.items, name)
+	}
+}
+
+/** Exact match first, then case-insensitive fallback (dict keys are exact names). */
+function findByName<Entry extends { getName(): string }>(dict: Record<string, Entry>, name: string): Entry | undefined {
+	const exact = dict[name]
+	if (exact) return exact
+	const lowered = name.toLowerCase()
+	return Object.values(dict).find(entry => entry.getName().toLowerCase() === lowered)
 }
 
 const defaultTableLoadOptions: TableLoadOptions = {

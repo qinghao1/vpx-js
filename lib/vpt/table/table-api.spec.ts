@@ -3,11 +3,16 @@
 
 import * as chai from 'chai'
 import { expect } from 'chai'
+import { type SinonSpy, spy } from 'sinon'
 import sinonChai from 'sinon-chai'
 import { ThreeHelper } from '../../../test/three.helper'
 import { Player } from '../../game/player.js'
+import { VP_VERSION_MAJOR, VP_VERSION_MINOR, VP_VERSION_REV } from '../../index.js'
 import { NodeBinaryReader } from '../../io/binary-reader.node.js'
+import { DEFAULT_TABLE_GRAVITY, GRAVITYCONST } from '../../physics/constants.js'
+import { Enums } from '../enums.js'
 import { Table } from '../table/table.js'
+import { BG_DESKTOP, BG_FSS, BG_FULLSCREEN } from './table-data.js'
 
 chai.use((sinonChai as any).default ?? sinonChai)
 const three = new ThreeHelper()
@@ -168,8 +173,8 @@ describe('The VPinball table API', () => {
 		api.PhysicsLoopTime = 120
 		expect(api.PhysicsLoopTime).to.equal(120)
 
-		api.BackglassMode = 2
-		expect(api.BackglassMode).to.equal(2)
+		api.BackglassMode = Enums.BackglassIndex.FULL_SINGLE_SCREEN
+		expect(api.BackglassMode).to.equal(112)
 		api.FieldOfView = 35
 		expect(api.FieldOfView).to.equal(35)
 		api.Inclination = 21
@@ -191,7 +196,7 @@ describe('The VPinball table API', () => {
 		api.Xlatez = 4
 		expect(api.Xlatez).to.equal(4)
 
-		api.BackglassMode = 1
+		api.BackglassMode = Enums.BackglassIndex.FULLSCREEN
 		api.FieldOfView = 135
 		expect(api.FieldOfView).to.equal(135)
 		api.Inclination = 121
@@ -213,7 +218,7 @@ describe('The VPinball table API', () => {
 		api.Xlatez = 14
 		expect(api.Xlatez).to.equal(14)
 
-		api.BackglassMode = 2
+		api.BackglassMode = Enums.BackglassIndex.FULL_SINGLE_SCREEN
 		expect(api.FieldOfView).to.equal(35)
 		expect(api.Inclination).to.equal(21)
 		expect(api.Layback).to.equal(59)
@@ -240,9 +245,9 @@ describe('The VPinball table API', () => {
 		expect(() => api.YieldTime).to.throw('Not supported in play.')
 		api.EnableAntialiasing = 1.335
 		expect(api.EnableAntialiasing).to.equal(1.335)
-		api.EnableSSR = 12312
+		api.EnableSSR = 12312 as unknown as boolean
 		expect(api.EnableSSR).to.equal(12312)
-		api.EnableAO = 51
+		api.EnableAO = 51 as unknown as boolean
 		expect(api.EnableAO).to.equal(51)
 		api.EnableFXAA = 521
 		expect(api.EnableFXAA).to.equal(521)
@@ -277,18 +282,77 @@ describe('The VPinball table API', () => {
 		api.Accelerometer = true
 		expect(api.Accelerometer).to.equal(false) // no acc/ support
 		api.AccelNormalMount = true
-		expect(api.AccelNormalMount).to.equal(false) // no acc/ support
+		expect(api.AccelNormalMount).to.equal(false)
 		api.AccelerometerAngle = 1
-		expect(api.AccelerometerAngle).to.equal(0.0) // no acc/ support
+		expect(api.AccelerometerAngle).to.equal(0.0)
 		api.DeadZone = 1
-		expect(api.DeadZone).to.equal(0) // no acc/ support
+		expect(api.DeadZone).to.equal(0)
 		api.BallFrontDecal = 'test_pattern_xrgb'
 		expect(api.BallFrontDecal).to.equal('test_pattern_xrgb')
-		expect(api.Version).to.equal(10801)
-		expect(api.VPBuildVersion).to.equal(10801)
-		expect(api.VersionMajor).to.equal(10)
-		expect(api.VersionMinor).to.equal(8)
-		expect(api.VersionRevision).to.equal(1)
+		const buildVersion = VP_VERSION_MAJOR * 1000 + VP_VERSION_MINOR * 100 + VP_VERSION_REV
+		expect(api.Version).to.equal(buildVersion)
+		expect(api.VPBuildVersion).to.equal(buildVersion)
+		expect(api.VersionMajor).to.equal(VP_VERSION_MAJOR)
+		expect(api.VersionMinor).to.equal(VP_VERSION_MINOR)
+		expect(api.VersionRevision).to.equal(VP_VERSION_REV)
+	})
+
+	it('should use 110-based BackglassIndex values consistent with BackglassMode', () => {
+		const api = table.getApi()
+		expect(Enums.BackglassIndex.DESKTOP).to.equal(110)
+		expect(Enums.BackglassIndex.FULLSCREEN).to.equal(111)
+		expect(Enums.BackglassIndex.FULL_SINGLE_SCREEN).to.equal(112)
+		api.BackglassMode = Enums.BackglassIndex.DESKTOP
+		expect(api.BackglassMode).to.equal(Enums.BackglassIndex.DESKTOP)
+		expect(api.FieldOfView).to.equal(table.data?.bgFov[0])
+	})
+
+	it('should report desktop and FSS modes as ShowDT', () => {
+		const api = table.getApi()
+		const data = table.data
+		if (!data) throw new Error('table data not loaded')
+		data.bgCurrentSet = BG_DESKTOP
+		expect(api.ShowDT).to.equal(true)
+		data.bgCurrentSet = BG_FSS
+		expect(api.ShowDT).to.equal(true)
+		data.bgCurrentSet = BG_FULLSCREEN
+		expect(api.ShowDT).to.equal(false)
+	})
+
+	it('should select the desktop or FSS view when ShowDT is enabled', () => {
+		const api = table.getApi()
+		const data = table.data
+		if (!data) throw new Error('table data not loaded')
+		data.bgEnableFss = false
+		api.ShowDT = true
+		expect(data.bgCurrentSet).to.equal(BG_DESKTOP)
+		data.bgEnableFss = true
+		api.ShowDT = true
+		expect(data.bgCurrentSet).to.equal(BG_FSS)
+		expect(api.ShowDT).to.equal(true)
+		api.ShowDT = false
+		expect(data.bgCurrentSet).to.equal(BG_FULLSCREEN)
+		expect(api.ShowDT).to.equal(false)
+	})
+
+	it('should clamp negative volumes to silence and oversized ones to full', () => {
+		// Upstream converts through unsigned (negatives wrap to full volume); vpx-js clamps instead.
+		const api = table.getApi()
+		api.TableSoundVolume = -10
+		expect(api.TableSoundVolume).to.equal(0)
+		api.TableSoundVolume = 250
+		expect(api.TableSoundVolume).to.equal(100)
+		api.TableMusicVolume = -10
+		expect(api.TableMusicVolume).to.equal(0)
+		api.TableMusicVolume = 250
+		expect(api.TableMusicVolume).to.equal(100)
+	})
+
+	it('should reject HDR images but store unknown names as-is', () => {
+		const api = table.getApi()
+		expect(() => (api.Image = 'test_pattern_hdr')).to.throw('Cannot use a HDR image (.exr/.hdr) here')
+		api.Image = 'missing-texture-xyz'
+		expect(api.Image).to.equal('missing-texture-xyz')
 	})
 
 	it('should not crash when executing unused APIs', () => {
@@ -296,5 +360,76 @@ describe('The VPinball table API', () => {
 		api.ImportPhysics()
 		api.ExportPhysics()
 		api.FireKnocker(1)
+	})
+
+	it('should return the default value from Option, not the step', () => {
+		const api = table.getApi()
+		expect(api.Option('opt', 0, 100, 10, 80, 0)).to.equal(80)
+		expect(api.Option('opt', 0, 100, 10, 80, 0, [0, 50, 100])).to.equal(80)
+		expect(api._Option('opt', 0, 100, 10, 80, 0)).to.equal(80)
+	})
+})
+
+describe('Table gravity coupling', () => {
+	let table: Table
+	let player: Player
+
+	beforeEach(async () => {
+		table = await Table.load(new NodeBinaryReader(three.fixturePath('table-texture.vpx')))
+		player = new Player(table).init()
+		const data = table.data
+		if (!data) throw new Error('table data not loaded')
+		data.angletiltMin = 2
+		data.angleTiltMax = 8
+		data.globalDifficulty = 0.25
+	})
+
+	function lastGravityCall(setGravity: SinonSpy<[number, number], void>): [number, number] {
+		expect(setGravity).to.have.been.calledOnce
+		return setGravity.firstCall.args
+	}
+
+	it('should push the difficulty-lerped slope and gravity on Gravity set', () => {
+		const setGravity = spy(player, 'setGravity')
+		try {
+			table.getApi().Gravity = 1
+			const [slope, strength] = lastGravityCall(setGravity)
+			expect(slope).to.be.closeTo(3.5, 1e-9)
+			expect(strength).to.be.closeTo(GRAVITYCONST, 1e-9)
+		} finally {
+			setGravity.restore()
+		}
+	})
+
+	it('should re-push gravity when a slope bound changes', () => {
+		const setGravity = spy(player, 'setGravity')
+		try {
+			table.getApi().SlopeMax = 10
+			expect(lastGravityCall(setGravity)[0]).to.be.closeTo(4, 1e-9)
+		} finally {
+			setGravity.restore()
+		}
+		const setGravity2 = spy(player, 'setGravity')
+		try {
+			table.getApi().SlopeMin = 4
+			expect(lastGravityCall(setGravity2)[0]).to.be.closeTo(5.5, 1e-9)
+		} finally {
+			setGravity2.restore()
+		}
+	})
+
+	it('should use the override constants when overridePhysics is set', () => {
+		const data = table.data
+		if (!data) throw new Error('table data not loaded')
+		data.overridePhysics = 1
+		const setGravity = spy(player, 'setGravity')
+		try {
+			table.getApi().Gravity = 0.5
+			const [slope, strength] = lastGravityCall(setGravity)
+			expect(slope).to.be.closeTo(6, 1e-9)
+			expect(strength).to.be.closeTo(DEFAULT_TABLE_GRAVITY, 1e-9)
+		} finally {
+			setGravity.restore()
+		}
 	})
 })

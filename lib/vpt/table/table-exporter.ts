@@ -7,7 +7,7 @@ import type { MeshConvertOptions } from '../../render/irender-api.js'
 import { ensureNodeCanvasPolyfill } from '../../render/threejs/node-canvas-polyfill.js'
 import { ThreeRenderApi } from '../../render/threejs/three-render-api.js'
 import type { Table, TableGenerateOptions } from './table.js'
-import { TableMeshGenerator } from './table-mesh-generator.js'
+import { defaultTableGenerateOptions, TableMeshGenerator } from './table-mesh-generator.js'
 
 export class TableExporter {
 	private readonly meshGenerator: TableMeshGenerator
@@ -48,21 +48,6 @@ export interface TableExportOptions extends TableGenerateOptions, MeshConvertOpt
 
 const defaultOptions: TableExportOptions = {
 	applyMaterials: true,
-	exportPlayfield: true,
-	exportPrimitives: true,
-	exportRubbers: true,
-	exportSurfaces: true,
-	exportFlippers: true,
-	exportBumpers: true,
-	exportRamps: true,
-	exportPlayfieldLights: false,
-	exportLightBulbs: true,
-	exportLightBulbLights: true,
-	exportHitTargets: true,
-	exportGates: true,
-	exportKickers: true,
-	exportTriggers: true,
-	exportSpinners: true,
-	exportPlungers: true,
-	gltfOptions: {},
+	...defaultTableGenerateOptions,
+	gltfOptions: { ...defaultTableGenerateOptions.gltfOptions },
 }

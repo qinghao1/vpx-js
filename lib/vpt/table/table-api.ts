@@ -12,10 +12,9 @@ import {
 	DEFAULT_TABLE_MIN_SLOPE,
 	GRAVITYCONST,
 } from '../../physics/constants.js'
-import { Enums } from '../enums.js'
 import { dequantizeUnsignedPercent, ItemApi, quantizeUnsignedPercent } from '../item-api.js'
 import type { Table } from './table.js'
-import { TableData } from './table-data.js'
+import { BG_DESKTOP, BG_FSS, BG_FULLSCREEN, TableData } from './table-data.js'
 
 /** Table API — VBS surface for `Table`. @see https://github.com/vpinball/vpinball/blob/master/pintable.cpp */
 export class TableApi extends ItemApi<TableData> {
@@ -31,6 +30,13 @@ export class TableApi extends ItemApi<TableData> {
 	constructor(data: TableData, events: EventProxy, player: Player, table: Table) {
 		super(data, events, player, table)
 		this.currentBackglassMode = data.bgCurrentSet
+	}
+
+	private _refreshGravity(): void {
+		const minSlope = this.data.overridePhysics ? this.overrideMinSlope : this.data.angletiltMin
+		const maxSlope = this.data.overridePhysics ? this.overrideMaxSlope : this.data.angleTiltMax
+		const slope = minSlope + (maxSlope - minSlope) * (this.data.globalDifficulty ?? 0.2)
+		this.player.setGravity(slope, this.data.overridePhysics ? this.overrideGravityConstant : this.data.gravity)
 	}
 
 	get FileName() {
@@ -271,22 +277,22 @@ export class TableApi extends ItemApi<TableData> {
 		this.data.bgEnableFss = v
 	}
 	get BackdropImage_DT() {
-		return this.data.bgImage[Enums.BackglassIndex.DESKTOP]
+		return this.data.bgImage[BG_DESKTOP]
 	}
 	set BackdropImage_DT(v) {
-		this.data.bgImage[Enums.BackglassIndex.DESKTOP] = v
+		this.data.bgImage[BG_DESKTOP] = v
 	}
 	get BackdropImage_FS() {
-		return this.data.bgImage[Enums.BackglassIndex.FULLSCREEN]
+		return this.data.bgImage[BG_FULLSCREEN]
 	}
 	set BackdropImage_FS(v) {
-		this.data.bgImage[Enums.BackglassIndex.FULLSCREEN] = v
+		this.data.bgImage[BG_FULLSCREEN] = v
 	}
 	get BackdropImage_FSS() {
-		return this.data.bgImage[Enums.BackglassIndex.FULL_SINGLE_SCREEN]
+		return this.data.bgImage[BG_FSS]
 	}
 	set BackdropImage_FSS(v) {
-		this.data.bgImage[Enums.BackglassIndex.FULL_SINGLE_SCREEN] = v
+		this.data.bgImage[BG_FSS] = v
 	}
 	get ColorGradeImage() {
 		return this.data.szImageColorGrade
@@ -302,10 +308,7 @@ export class TableApi extends ItemApi<TableData> {
 	}
 	set Gravity(v) {
 		this.data.gravity = v * GRAVITYCONST
-		const minSlope = this.data.overridePhysics ? this.overrideMinSlope : this.data.angletiltMin
-		const maxSlope = this.data.overridePhysics ? this.overrideMaxSlope : this.data.angleTiltMax
-		const slope = minSlope + (maxSlope - minSlope) * (this.data.globalDifficulty ?? 0.2)
-		this.player.setGravity(slope, this.data.overridePhysics ? this.overrideGravityConstant : this.data.gravity)
+		this._refreshGravity()
 	}
 	get Friction() {
 		return this.data.friction
@@ -432,20 +435,14 @@ export class TableApi extends ItemApi<TableData> {
 	}
 	set SlopeMax(v) {
 		this.data.angleTiltMax = v
-		const minSlope = this.data.overridePhysics ? this.overrideMinSlope : this.data.angletiltMin
-		const maxSlope = this.data.overridePhysics ? this.overrideMaxSlope : this.data.angleTiltMax
-		const slope = minSlope + (maxSlope - minSlope) * (this.data.globalDifficulty ?? 0.2)
-		this.player.setGravity(slope, this.data.overridePhysics ? this.overrideGravityConstant : this.data.gravity)
+		this._refreshGravity()
 	}
 	get SlopeMin() {
 		return this.data.angletiltMin
 	}
 	set SlopeMin(v) {
 		this.data.angletiltMin = v
-		const minSlope = this.data.overridePhysics ? this.overrideMinSlope : this.data.angletiltMin
-		const maxSlope = this.data.overridePhysics ? this.overrideMaxSlope : this.data.angleTiltMax
-		const slope = minSlope + (maxSlope - minSlope) * (this.data.globalDifficulty ?? 0.2)
-		this.player.setGravity(slope, this.data.overridePhysics ? this.overrideGravityConstant : this.data.gravity)
+		this._refreshGravity()
 	}
 	get BallImage() {
 		return this.data.szBallImage
@@ -511,17 +508,10 @@ export class TableApi extends ItemApi<TableData> {
 		this.data.renderDecals = v
 	}
 	get ShowDT() {
-		return (
-			this.data.bgCurrentSet === Enums.BackglassIndex.DESKTOP ||
-			this.data.bgCurrentSet === Enums.BackglassIndex.FULL_SINGLE_SCREEN
-		)
+		return this.data.bgCurrentSet === BG_DESKTOP || this.data.bgCurrentSet === BG_FSS
 	}
 	set ShowDT(v) {
-		this.data.bgCurrentSet = v
-			? this.data.bgEnableFss
-				? Enums.BackglassIndex.FULL_SINGLE_SCREEN
-				: Enums.BackglassIndex.DESKTOP
-			: Enums.BackglassIndex.FULLSCREEN
+		this.data.bgCurrentSet = v ? (this.data.bgEnableFss ? BG_FSS : BG_DESKTOP) : BG_FULLSCREEN
 	}
 	get ReflectElementsOnPlayfield() {
 		return this.data.reflectElementsOnPlayfield
@@ -568,7 +558,7 @@ export class TableApi extends ItemApi<TableData> {
 		return VP_VERSION_MAJOR * 1000 + VP_VERSION_MINOR * 100 + VP_VERSION_REV
 	}
 	get VPBuildVersion() {
-		return VP_VERSION_MAJOR * 1000 + VP_VERSION_MINOR * 100 + VP_VERSION_REV
+		return this.Version
 	}
 	get VersionMajor() {
 		return VP_VERSION_MAJOR
@@ -601,15 +591,11 @@ export class TableApi extends ItemApi<TableData> {
 	public ExportPhysics(): void {}
 	public FireKnocker(_count: number): void {}
 	public QuitPlayer(_closeType: number): void {}
-	public Option(_name: string, _a: number, _b: number, def: number, ..._rest: unknown[]): number {
+	public Option(_name: string, _min: number, _max: number, _step: number, def: number, ..._rest: unknown[]): number {
 		return def
 	}
 	/** Alias for VB keyword `Option` (renamed to `_Option` in transpiler). */
-	public _Option(name: string, a: number, b: number, def: number, ...rest: unknown[]): number {
-		return this.Option(name, a, b, def, ...rest)
-	}
-
-	protected _getPropertyNames(): string[] {
-		return Object.getOwnPropertyNames(TableApi.prototype)
+	public _Option(name: string, min: number, max: number, step: number, def: number, ...rest: unknown[]): number {
+		return this.Option(name, min, max, step, def, ...rest)
 	}
 }

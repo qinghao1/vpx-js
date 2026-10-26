@@ -38,27 +38,26 @@ describe('Table integration', () => {
 		expect(table.tableScript).toBe(vbs)
 	})
 
-	it('loads example VPX and extracts metadata — generic GameName check (skipped if missing)', async () => {
-		if (!fs.existsSync(EXAMPLE_VPX)) {
-			console.warn('[integration] example-table.vpx not found — skip (symlink any .vpx with GameName)')
-			return
-		}
-		const table = await Table.load(new NodeBinaryReader(EXAMPLE_VPX))
-		expect(table.tableScript).toBeDefined()
-		expect(table.tableScript?.length).toBeGreaterThan(100_000)
-		expect(table.info?.TableName).toBeDefined()
-		expect(table.info?.TableName.length).toBeGreaterThan(2)
-		expect(table.info?.AuthorName).toBeDefined()
-		const gameName = table.tableScript?.match(/cGameName\s*=\s*["']([^"']+)["']/i)?.[1]
-		expect(gameName?.length).toBeGreaterThan(2) // generic: any GameName, twd_160h is just the example ROM
-		expect(Object.keys(table.items).length).toBeGreaterThan(500)
-		expect(Object.keys(table.lights).length).toBeGreaterThan(100)
-		expect(Object.keys(table.flippers).length).toBeGreaterThanOrEqual(2)
-		expect(Object.keys(table.textures).length).toBeGreaterThan(10)
-		expect(Object.keys(table.collections).length).toBeGreaterThanOrEqual(0)
-		expect(table.data?.right).toBeGreaterThan(900)
-		expect(table.data?.bottom).toBeGreaterThan(2000)
-	})
+	it.skipIf(!fs.existsSync(EXAMPLE_VPX))(
+		'loads example VPX and extracts metadata — generic GameName check (skipped if missing)',
+		async () => {
+			const table = await Table.load(new NodeBinaryReader(EXAMPLE_VPX))
+			expect(table.tableScript).toBeDefined()
+			expect(table.tableScript?.length).toBeGreaterThan(100_000)
+			expect(table.info?.TableName).toBeDefined()
+			expect(table.info?.TableName.length).toBeGreaterThan(2)
+			expect(table.info?.AuthorName).toBeDefined()
+			const gameName = table.tableScript?.match(/cGameName\s*=\s*["']([^"']+)["']/i)?.[1]
+			expect(gameName?.length).toBeGreaterThan(2) // generic: any GameName, twd_160h is just the example ROM
+			expect(Object.keys(table.items).length).toBeGreaterThan(500)
+			expect(Object.keys(table.lights).length).toBeGreaterThan(100)
+			expect(Object.keys(table.flippers).length).toBeGreaterThanOrEqual(2)
+			expect(Object.keys(table.textures).length).toBeGreaterThan(10)
+			expect(Object.keys(table.collections).length).toBeGreaterThanOrEqual(0)
+			expect(table.data?.right).toBeGreaterThan(900)
+			expect(table.data?.bottom).toBeGreaterThan(2000)
+		},
+	)
 
 	it('Table.load handles empty script gracefully', async () => {
 		const table = await Table.load(new NodeBinaryReader(EMPTY_FIXTURE))
