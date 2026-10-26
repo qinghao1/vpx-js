@@ -2,16 +2,17 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { EventProxy } from '../../game/event-proxy.js'
-import type { IScriptable } from '../../game/iscriptable.js'
+import type { IAnimatable, IAnimation, IScriptable } from '../../game/interfaces.js'
 import type { Player } from '../../game/player.js'
 import { BiffParser } from '../../io/biff-parser.js'
 import type { Storage } from '../../io/ole-doc.js'
-import { Vertex2D } from '../../util/vector.js'
+import { Vertex2D } from '../../math/vector.js'
 import { handleBiffTag } from '../biff-helper.js'
 import { Item } from '../item.js'
 import { ItemApi } from '../item-api.js'
 import { ItemData } from '../item-data.js'
 import type { Table } from '../table/table.js'
+import { LightSeqAnimation } from './lightseq-animation.js'
 
 /** LightSeq data.
  * @see https://github.com/vpinball/vpinball/blob/master/lightseq.cpp */
@@ -21,9 +22,9 @@ export class LightSeqData extends ItemData {
 	public updateInterval = 25
 
 	public static async fromStorage(storage: Storage, itemName: string): Promise<LightSeqData> {
-		const d = new LightSeqData(itemName)
-		await storage.streamFiltered(itemName, 4, BiffParser.stream(d.fromTag.bind(d), { streamedTags: ['FONT'] }))
-		return d
+		const data = new LightSeqData(itemName)
+		await storage.streamFiltered(itemName, 4, BiffParser.stream(data.fromTag.bind(data)))
+		return data
 	}
 
 	private constructor(itemName: string) {
@@ -60,6 +61,16 @@ export class LightSeqData extends ItemData {
 
 /** LightSeq API — VBS surface for `LightSeq`. @see https://github.com/vpinball/vpinball/blob/master/lightseq.cpp */
 export class LightSeqApi extends ItemApi<LightSeqData> {
+	constructor(
+		data: LightSeqData,
+		events: EventProxy,
+		player: Player,
+		table: Table,
+		private readonly animation: LightSeqAnimation,
+	) {
+		super(data, events, player, table)
+	}
+
 	get Collection() {
 		return this.data.collection
 	}
@@ -70,32 +81,34 @@ export class LightSeqApi extends ItemApi<LightSeqData> {
 		return this.data.center.x
 	}
 	set CenterX(v) {
-		this.data.center.x = v
+		this.animation.setCenterX(v)
 	}
 	get CenterY() {
 		return this.data.center.y
 	}
 	set CenterY(v) {
-		this.data.center.y = v
+		this.animation.setCenterY(v)
 	}
 	get UpdateInterval() {
 		return this.data.updateInterval
 	}
 	set UpdateInterval(v) {
-		this.data.updateInterval = v
+		const rate = Math.trunc(v)
+		this.data.updateInterval = rate >= 1 ? rate : 1
 	}
 
-	public Play(_animation: number, _tailLength: number, _repeat: number, _pause: number): void {}
-	public StopPlay(): void {}
-
-	protected _getPropertyNames(): string[] {
-		return Object.getOwnPropertyNames(LightSeqApi.prototype)
+	public Play(animation: number, tailLength: number, repeat: number, pause: number): void {
+		this.animation.play(animation, tailLength, repeat, pause)
+	}
+	public StopPlay(): void {
+		this.animation.stopPlay()
 	}
 }
 
 /** Runtime light sequencer. */
-export class LightSeq extends Item<LightSeqData> implements IScriptable<LightSeqApi> {
+export class LightSeq extends Item<LightSeqData> implements IAnimatable, IScriptable<LightSeqApi> {
 	private api?: LightSeqApi
+	private animation?: LightSeqAnimation
 
 	public static async fromStorage(storage: Storage, itemName: string): Promise<LightSeq> {
 		const data = await LightSeqData.fromStorage(storage, itemName)
@@ -108,11 +121,16 @@ export class LightSeq extends Item<LightSeqData> implements IScriptable<LightSeq
 
 	public setupPlayer(player: Player, table: Table): void {
 		this.events = new EventProxy(this)
-		this.api = new LightSeqApi(this.data, this.events, player, table)
+		this.animation = new LightSeqAnimation(this.data, this.events, player, table)
+		this.api = new LightSeqApi(this.data, this.events, player, table, this.animation)
 	}
 
 	public getApi(): LightSeqApi {
 		return this.api!
+	}
+
+	public getAnimation(): IAnimation {
+		return this.animation!
 	}
 
 	public getEventNames(): string[] {

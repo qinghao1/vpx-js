@@ -2,17 +2,18 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { EventProxy } from '../../game/event-proxy.js'
-import type { IScriptable } from '../../game/iscriptable.js'
+import type { IAnimatable, IScriptable } from '../../game/interfaces.js'
 import type { Player } from '../../game/player.js'
 import { BiffParser } from '../../io/biff-parser.js'
 import type { Storage } from '../../io/ole-doc.js'
+import { Vertex2D } from '../../math/vector.js'
 import { MAX_REELS } from '../../physics/constants.js'
-import { Vertex2D } from '../../util/vector.js'
 import { handleBiffTag } from '../biff-helper.js'
 import { Item } from '../item.js'
 import { ItemApi } from '../item-api.js'
 import { ItemData } from '../item-data.js'
 import type { Table } from '../table/table.js'
+import { DispReelAnimation } from './dispreel-animation.js'
 
 const FLOAT_MAP: Record<string, string> = { WDTH: 'width', HIGH: 'height', RSPC: 'reelSpacing' }
 const INT_MAP: Record<string, string> = { GIPR: 'imagesPerGridRow', UPTM: 'updateInterval' }
@@ -20,7 +21,7 @@ const BOOL_MAP: Record<string, string> = { TRNS: 'isTransparent', VISI: 'isVisib
 const STRING_MAP: Record<string, string> = { IMAG: 'szImage', SOUN: 'szSound' }
 
 /** DispReel data.
- * @see https://github.com/vpinball/vpinball/blob/master/dispreel.cpp */
+ * @see https://github.com/vpinball/vpinball/blob/master/src/parts/dispreel.cpp */
 export class DispReelData extends ItemData {
 	public v1!: Vertex2D
 	public v2!: Vertex2D
@@ -40,9 +41,9 @@ export class DispReelData extends ItemData {
 	public updateInterval = 50
 
 	public static async fromStorage(storage: Storage, itemName: string): Promise<DispReelData> {
-		const d = new DispReelData(itemName)
-		await storage.streamFiltered(itemName, 4, BiffParser.stream(d.fromTag.bind(d), { streamedTags: ['FONT'] }))
-		return d
+		const data = new DispReelData(itemName)
+		await storage.streamFiltered(itemName, 4, BiffParser.stream(data.fromTag.bind(data)))
+		return data
 	}
 
 	private constructor(itemName: string) {
@@ -97,8 +98,18 @@ export class DispReelData extends ItemData {
 	}
 }
 
-/** DispReel API — VBS surface for `Reel`. @see https://github.com/vpinball/vpinball/blob/master/dispreel.cpp */
+/** DispReel API — VBS surface for `Reel`. @see https://github.com/vpinball/vpinball/blob/master/src/parts/dispreel.cpp */
 export class DispReelApi extends ItemApi<DispReelData> {
+	constructor(
+		data: DispReelData,
+		events: EventProxy,
+		player: Player,
+		table: Table,
+		private readonly animation: DispReelAnimation,
+	) {
+		super(data, events, player, table)
+	}
+
 	get BackColor() {
 		return this.data.backColor
 	}
@@ -131,23 +142,27 @@ export class DispReelApi extends ItemApi<DispReelData> {
 		return this.data.v1.x
 	}
 	set X(v) {
-		const delta = v - this.data.v1.x
-		this.data.v1.x += delta
-		this.data.v2.x = this.data.v1.x + this.data.getBoxWidth()
+		this.data.v1.x = v
+		this.data.v2.x = v + this.data.getBoxWidth()
 	}
 	get Y() {
 		return this.data.v1.y
 	}
 	set Y(v) {
-		const delta = v - this.data.v1.y
-		this.data.v1.y += delta
-		this.data.v2.y = this.data.v1.y + this.data.getBoxHeight()
+		this.data.v1.y = v
+		this.data.v2.y = v + this.data.getBoxHeight()
 	}
 	get IsTransparent() {
 		return this.data.isTransparent
 	}
 	set IsTransparent(v) {
 		this.data.isTransparent = v
+	}
+	get Visible() {
+		return this.data.isVisible
+	}
+	set Visible(v) {
+		this.data.isVisible = v
 	}
 	get Image() {
 		return this.data.szImage
@@ -172,8 +187,7 @@ export class DispReelApi extends ItemApi<DispReelData> {
 		return this.data.digitRange
 	}
 	set Range(v) {
-		this.data.digitRange = Math.max(0, v)
-		if (this.data.digitRange > 511) this.data.digitRange = 511
+		this.data.digitRange = Math.min(511, Math.max(0, v))
 	}
 	get Spacing() {
 		return this.data.reelSpacing
@@ -193,33 +207,38 @@ export class DispReelApi extends ItemApi<DispReelData> {
 		return this.data.imagesPerGridRow
 	}
 	set ImagesPerGridRow(v) {
-		this.data.imagesPerGridRow = v
+		this.data.imagesPerGridRow = Math.max(1, v)
 	}
 	get ImagesPerRow() {
 		return this.data.imagesPerGridRow
 	}
 	set ImagesPerRow(v) {
-		this.data.imagesPerGridRow = v
+		this.data.imagesPerGridRow = Math.max(1, v)
 	}
 	get UpdateInterval() {
 		return this.data.updateInterval
 	}
 	set UpdateInterval(v) {
 		this.data.updateInterval = Math.max(5, v)
+		this.animation.resetSchedule(this.player.getGameTime())
 	}
-	public ResetToZero(): void {}
-	public AddValue(_v: number): void {}
-	public SetValue(_v: number): void {}
-	public SpinReel(_reelNumber: number, _pulseCount: number): void {}
-
-	protected _getPropertyNames(): string[] {
-		return Object.getOwnPropertyNames(DispReelApi.prototype)
+	public ResetToZero(): void {
+		this.animation.resetToZero()
+	}
+	public AddValue(value: number): void {
+		this.animation.addValue(value)
+	}
+	public SetValue(value: number): void {
+		this.animation.setValue(value, this.player.getGameTime())
+	}
+	public SpinReel(reelNumber: number, pulseCount: number): void {
+		this.animation.spinReel(reelNumber, pulseCount)
 	}
 }
 
-/** Runtime disp reel. */
-export class DispReel extends Item<DispReelData> implements IScriptable<DispReelApi> {
+export class DispReel extends Item<DispReelData> implements IScriptable<DispReelApi>, IAnimatable {
 	private api?: DispReelApi
+	private animation?: DispReelAnimation
 
 	public static async fromStorage(storage: Storage, itemName: string): Promise<DispReel> {
 		const data = await DispReelData.fromStorage(storage, itemName)
@@ -232,14 +251,19 @@ export class DispReel extends Item<DispReelData> implements IScriptable<DispReel
 
 	public setupPlayer(player: Player, table: Table): void {
 		this.events = new EventProxy(this)
-		this.api = new DispReelApi(this.data, this.events, player, table)
+		this.animation = new DispReelAnimation(this.data, this.events)
+		this.api = new DispReelApi(this.data, this.events, player, table, this.animation)
 	}
 
 	public getApi(): DispReelApi {
 		return this.api!
 	}
 
+	public getAnimation(): DispReelAnimation {
+		return this.animation!
+	}
+
 	public getEventNames(): string[] {
-		return ['Init', 'Timer']
+		return ['Init', 'Timer', 'Animate']
 	}
 }
