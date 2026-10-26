@@ -9,7 +9,7 @@ export * from './refs-three.js'
 export { ThreeTextureLoaderNode as ThreeTextureLoader } from './render/threejs/three-texture-loader-node.js'
 export { getTextFile, hasTextFile } from './scripting/vbs-scripts.node.js'
 
-// Allow FileLoader.load to accept ArrayBuffer directly for in-memory GLTF.
+// Allow FileLoader.load to accept ArrayBuffer directly for in-memory GLTF. Call explicitly; importing this module must not mutate globals.
 export function patchFileLoader(): () => void {
 	const proto = FileLoader.prototype as unknown as { __vpxPatched?: boolean }
 	if (proto.__vpxPatched) return () => {}
@@ -29,5 +29,3 @@ export function patchFileLoader(): () => void {
 		proto.__vpxPatched = false
 	}
 }
-
-patchFileLoader()
