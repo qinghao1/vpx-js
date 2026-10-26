@@ -9,6 +9,12 @@ type BvhGeometry = BufferGeometry & {
 	disposeBoundsTree?: () => void
 }
 
+const RE_BUTTON = /button|coin|plunger|tour|start|fire/i
+
+function isButtonLike(name?: string, userData?: Record<string, unknown>): boolean {
+	return !!userData?.isCabinetButton || (!!name && RE_BUTTON.test(name))
+}
+
 let installed = false
 
 export function installBvh(): void {
@@ -29,7 +35,7 @@ export function buildBvhForGeometry(geom: BufferGeometry, force = false): void {
 	if (g.boundsTree) return
 	const tris = g.index ? g.index.count / 3 : g.attributes.position.count / 3
 	if (!force && tris < 200) return
-	g.computeBoundsTree?.({ includeInstances: true } as any)
+	g.computeBoundsTree?.({})
 }
 
 export function buildBvhForNode(root: { traverse(cb: (o: unknown) => void): void }, forceButton = false): number {
@@ -45,28 +51,16 @@ export function buildBvhForNode(root: { traverse(cb: (o: unknown) => void): void
 			name?: string
 		}
 		if ((!m.isMesh && !m.isInstancedMesh && !m.isBatchedMesh) || !m.geometry) return
-		const isButton = !!(
-			m.userData?.isCabinetButton ||
-			(m.name && /button|coin|plunger|tour|start|fire/i.test(m.name))
-		)
-		if (isButton) {
-			buildBvhForGeometry(m.geometry, true)
-			if ((m.geometry as BvhGeometry).boundsTree) built++
-			return
-		}
-		const g = m.geometry as BvhGeometry
-		if (g.boundsTree) return
-		buildBvhForGeometry(m.geometry, forceButton)
+		const isButton = isButtonLike(m.name, m.userData)
+		if (!isButton && (m.geometry as BvhGeometry).boundsTree) return
+		// Buttons always build (even tiny ones); buildBvhForGeometry skips existing trees.
+		buildBvhForGeometry(m.geometry, isButton || forceButton)
 		if ((m.geometry as BvhGeometry).boundsTree) built++
 	})
 	return built
 }
 
-export function buildBvhIdle(
-	root: { traverse(cb: (o: unknown) => void): void },
-	chunkSize = 30,
-	forceButton = true,
-): void {
+export function buildBvhIdle(root: { traverse(cb: (o: unknown) => void): void }, chunkSize = 30): void {
 	installBvh()
 	const queue: BvhGeometry[] = []
 	root.traverse((o: unknown) => {
@@ -79,12 +73,8 @@ export function buildBvhIdle(
 			name?: string
 		}
 		if ((m.isMesh || m.isInstancedMesh || m.isBatchedMesh) && m.geometry && !m.geometry.boundsTree) {
-			const isButton = !!(
-				m.userData?.isCabinetButton ||
-				(m.name && /button|coin|plunger|tour|start|fire/i.test(m.name))
-			)
-			if (isButton) {
-				;(m.geometry as BvhGeometry).computeBoundsTree?.({ includeInstances: true } as any)
+			if (isButtonLike(m.name, m.userData)) {
+				m.geometry.computeBoundsTree?.({})
 				return
 			}
 			queue.push(m.geometry)

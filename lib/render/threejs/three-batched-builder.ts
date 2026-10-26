@@ -10,15 +10,11 @@ import {
 	type MeshStandardMaterial,
 } from 'three'
 import { isLowQuality } from '../../util/quality.js'
-import { loadMesh } from '../../vpt/mesh-loader.js'
 import type { Table } from '../../vpt/table/table.js'
-import { ThreeMeshGenerator } from './three-mesh-generator.js'
+import { RE_CAB, RE_VR } from './scene-classify.js'
 import type { ThreeRenderApi } from './three-render-api.js'
 
 const VERTEX_THRESHOLD = 100
-
-const RE_VR = /vr_/i
-const RE_CAB = /vrcab|cabinet|lockbar|pincab/i
 
 function isVrCabName(n: string): boolean {
 	return RE_VR.test(n) || RE_CAB.test(n)
@@ -33,23 +29,33 @@ function signature(geo: BufferGeometry): string {
 	return `${hasIndex ? 'i' : 'n'}:${hasUv ? 'uv' : 'nou'}:${hasNormal ? 'n' : 'non'}:${hasColor ? 'c' : 'nc'}:${hasTangent ? 't' : 'nt'}`
 }
 
-function geoHash(geo: BufferGeometry): string {
-	const pos = geo.getAttribute('position')
-	const idx = geo.getIndex()
-	return `${pos.count}:${idx ? idx.count : 0}:${signature(geo)}`
-}
-
 function materialKey(mat: MeshStandardMaterial): string {
 	const ud = mat.userData as any
 	const map = (mat.map as any)?.name ?? 'nomap'
 	const pending = ud.pendingMap ?? ud.pendingmap ?? ''
-	return `${mat.name ?? 'noname'}|${map}|${pending}|${mat.transparent ? 't' : 'o'}|${mat.blending ?? 1}|${mat.depthWrite ? 'w' : 'n'}|${mat.polygonOffset ? `${mat.polygonOffsetFactor}/${mat.polygonOffsetUnits}` : '0'}|${ud.__addBlend ? 'a' : 'o'}|${ud.__isBaked ? 'b' : 'o'}`
+	const color = (mat.color as { getHex?: () => number } | undefined)?.getHex?.() ?? ''
+	const emissive = (mat.emissive as { getHex?: () => number } | undefined)?.getHex?.() ?? ''
+	// Node materials carry live appearance in uniforms (classic color/opacity/
+	// emissive are overridden by colorNode/opacityNode/emissiveNode), so the tint
+	// + BDL state join the key alongside the classic props. Post-process forks
+	// (plastic DoubleSide, flipper white+emissive) preserve base.name, so every
+	// live prop must be keyed or same-name materials merge and one renders wrong.
+	const tint =
+		(
+			ud.__uAlbedo ??
+			ud.__uTint ??
+			(ud.__uTintColor as { value?: { getHex?: () => number } } | undefined)
+		)?.value?.getHex?.() ?? ''
+	const bdl = ud.__uBDL?.value ?? ''
+	const below = ud.__below ?? ''
+	const alpha = ud.__uAlpha?.value ?? ''
+	return `${mat.name ?? 'noname'}|${map}|${pending}|${mat.transparent ? 't' : 'o'}|${mat.blending ?? 1}|${mat.depthWrite ? 'w' : 'n'}|${mat.polygonOffset ? `${mat.polygonOffsetFactor}/${mat.polygonOffsetUnits}` : '0'}|${ud.__addBlend ? 'a' : 'o'}|${ud.__isBaked ? 'b' : 'o'}|side${mat.side}|c${color}|e${emissive}:${mat.emissiveIntensity ?? ''}|m${mat.metalness ?? ''}:r${mat.roughness ?? ''}|a${mat.alphaTest ?? ''}:o${mat.opacity ?? ''}|u${tint}:${bdl}:${below}:${alpha}`
 }
 
 export function canBatchWebGpu(mat: any): boolean {
 	if (!mat) return false
 	if ((mat.userData as any)?.__addBlend) return false
-	if (mat.transparent && !isLowQuality()) return false
+	if (mat.transparent) return false
 	return true
 }
 
@@ -68,25 +74,23 @@ function isEffectiveVisible(o: any, root: Group): boolean {
 	return true
 }
 
-function isInLightBulbs(o: any, root: Group): boolean {
-	for (let p = o.parent; p && p !== root; p = p.parent) if (p.name === 'lightBulbs') return true
+function isUnder(o: any, root: Group, match: (name: string) => boolean, includeSelf = false): boolean {
+	for (let p = includeSelf ? o : o.parent; p && p !== root; p = p.parent) {
+		if (match((p.name || '').toLowerCase())) return true
+	}
 	return false
+}
+
+function isInLightBulbs(o: any, root: Group): boolean {
+	return isUnder(o, root, name => name === 'lightbulbs')
 }
 
 function isInVrCab(o: any, root: Group): boolean {
-	for (let p = o; p && p !== root; p = p.parent) {
-		const n = (p.name || '').toLowerCase()
-		if (isVrCabName(n)) return true
-	}
-	return false
+	return isUnder(o, root, isVrCabName, true)
 }
 
 function isInBalls(o: any, root: Group): boolean {
-	for (let p = o; p && p !== root; p = p.parent) {
-		const n = (p.name || '').toLowerCase()
-		if (n === 'balls' || n.startsWith('ball')) return true
-	}
-	return false
+	return isUnder(o, root, name => name.startsWith('ball'), true)
 }
 
 export function batchStaticOpaques(root: Group, table: Table, _renderApi: ThreeRenderApi): number {
@@ -121,13 +125,11 @@ export function batchStaticOpaques(root: Group, table: Table, _renderApi: ThreeR
 	}
 
 	const dmdNames = new Set<string>()
-	for (const k in (table as any).flashers) {
-		const fl = (table as any).flashers[k]
-		if (fl?.data?.isDMD) dmdNames.add(fl.getName().toLowerCase())
-	}
-	for (const k in (table as any).textboxes) {
-		const tb = (table as any).textboxes[k]
-		if (tb?.data?.isDMD) dmdNames.add(tb.getName().toLowerCase())
+	for (const group of [(table as any).flashers, (table as any).textboxes]) {
+		for (const k in group) {
+			const item = group[k]
+			if (item?.data?.isDMD) dmdNames.add(item.getName().toLowerCase())
+		}
 	}
 
 	const buckets = new Map<string, { material: MeshStandardMaterial; meshes: Mesh[] }>()
@@ -175,16 +177,22 @@ export function batchStaticOpaques(root: Group, table: Table, _renderApi: ThreeR
 			}
 		}
 		if (totalVerts < VERTEX_THRESHOLD && !low) continue
-		const uniqueGeos = new Set(meshes.map(m => geoHash(m.geometry as BufferGeometry)))
+		// Instance only identical geometry references: counts-only identity aliased
+		// same-tessellation different-shape meshes (mirrored slings/posts) into
+		// copies of meshes[0]. Anything else takes the BatchedMesh path below,
+		// which keeps each mesh's own geometry.
+		const uniqueGeos = new Set(meshes.map(m => m.geometry))
 		if (uniqueGeos.size === 1 && meshes.length >= 3) {
 			const baseGeo = meshes[0].geometry as BufferGeometry
 			const instanced = new InstancedMesh(baseGeo, material, meshes.length)
 			instanced.name = `instanced:generic:${material.name || 'opaque'}:${meshes.length}`
 			instanced.frustumCulled = true
+			const locals: Matrix4[] = []
 			for (let i = 0; i < meshes.length; i++) {
 				const mesh = meshes[i]
 				mesh.updateMatrixWorld(true)
 				const local = new Matrix4().multiplyMatrices(invRoot, mesh.matrixWorld)
+				locals.push(local)
 				instanced.setMatrixAt(i, local)
 			}
 			instanced.instanceMatrix.needsUpdate = true
@@ -195,7 +203,15 @@ export function batchStaticOpaques(root: Group, table: Table, _renderApi: ThreeR
 			for (let i = 0; i < meshes.length; i++) {
 				const mesh = meshes[i] as unknown as { visible: boolean; userData: Record<string, unknown> }
 				mesh.visible = false
-				mesh.userData.__batched = { batched: instanced, instanceId: i, isInstanced: true }
+				// The pre-batch matrix is saved so applyVisibility can restore the
+				// instance after a zero-scale hide (InstancedMesh has no per-instance
+				// visibility flag; without this the hide is one-way).
+				mesh.userData.__batched = {
+					batched: instanced,
+					instanceId: i,
+					isInstanced: true,
+					matrix: locals[i]!.clone(),
+				}
 			}
 			count++
 			continue
@@ -225,100 +241,24 @@ export function batchStaticOpaques(root: Group, table: Table, _renderApi: ThreeR
 	return count
 }
 
-export function instancedBulbs(root: Group, table: Table, _renderApi: ThreeRenderApi): number {
-	for (const c of (root as any).children as any[]) if (String(c.name).startsWith('instanced:bulb')) return 0
-	root.updateMatrixWorld(true)
-	const invRoot = new Matrix4().copy(root.matrixWorld).invert()
-	const group = root.getObjectByName('lightBulbs') as Group | undefined
-	if (!group) return 0
-	const bulbs = Object.values(table.lights).filter(l => (l as any).isBulbLight?.() || (l as any).data?.bulbLight)
-	if (bulbs.length < 2) return 0
-
-	const socketMeshes: Mesh[] = []
-	const lightMeshes: Mesh[] = []
-	group.traverse((o: any) => {
-		if (!o.isMesh) return
-		const n = (o.name || '').toLowerCase()
-		if (n.includes('socket')) socketMeshes.push(o)
-		else if (n.includes('light') || n.includes('bulb')) lightMeshes.push(o)
-	})
-
-	let instancedCount = 0
-	const tryInstanced = (meshes: Mesh[], baseName: string, kind: string): boolean => {
-		if (meshes.length < 2) return false
-		try {
-			const mg = new ThreeMeshGenerator()
-			const baseMesh = loadMesh(baseName)
-			const baseGeo = mg.convertToBufferGeometry(baseMesh.clone(`${kind}.instanced`))
-			const mat = meshes[0].material as MeshStandardMaterial
-			if (!mat) return false
-			const instanced = new InstancedMesh(baseGeo, mat, bulbs.length)
-			instanced.name = `instanced:${kind}:${bulbs.length}`
-			instanced.frustumCulled = false
-			for (let i = 0; i < bulbs.length; i++) {
-				if (i < meshes.length) {
-					meshes[i].updateMatrixWorld(true)
-					const local = new Matrix4().multiplyMatrices(invRoot, meshes[i].matrixWorld)
-					instanced.setMatrixAt(i, local)
-				} else {
-					const data: any = (bulbs[i] as any).data
-					const s = data.meshRadius ?? 20
-					const h = table.getSurfaceHeight(data.szSurface, data.center.x, data.center.y) * table.getScaleZ()
-					const m = new Matrix4().makeScale(s, s, s * table.getScaleZ())
-					m.setPosition(data.center.x, data.center.y, h)
-					instanced.setMatrixAt(i, m)
-				}
-			}
-			instanced.instanceMatrix.needsUpdate = true
-			instanced.computeBoundingBox()
-			instanced.computeBoundingSphere()
-			try {
-				;(instanced.geometry as any).computeBoundsTree?.({ includeInstances: true } as any)
-			} catch {}
-			for (const m of meshes) m.visible = false
-			root.add(instanced)
-			return true
-		} catch {
-			return false
-		}
-	}
-
-	if (socketMeshes.length >= 2 && tryInstanced(socketMeshes, 'bulb-socket-mesh', 'bulb-socket')) instancedCount++
-	if (lightMeshes.length >= 2 && tryInstanced(lightMeshes, 'bulb-light-mesh', 'bulb-light')) instancedCount++
-
-	if (instancedCount === 0 && socketMeshes.length >= 2) {
-		const mg = new ThreeMeshGenerator()
-		const baseSocket = loadMesh('bulb-socket-mesh')
-		const socketGeo = mg.convertToBufferGeometry(baseSocket.clone('bulb.socket'))
-		const mat = socketMeshes[0].material as MeshStandardMaterial
-		const instanced = new InstancedMesh(socketGeo, mat, bulbs.length)
-		instanced.name = `instanced:bulb-socket:${bulbs.length}`
-		instanced.frustumCulled = false
-		for (let i = 0; i < bulbs.length; i++) {
-			if (i < socketMeshes.length) {
-				socketMeshes[i].updateMatrixWorld(true)
-				const local = new Matrix4().multiplyMatrices(invRoot, socketMeshes[i].matrixWorld)
-				instanced.setMatrixAt(i, local)
-			} else {
-				const data: any = (bulbs[i] as any).data
-				const s = data.meshRadius ?? 20
-				const h = table.getSurfaceHeight(data.szSurface, data.center.x, data.center.y) * table.getScaleZ()
-				const m = new Matrix4().makeScale(s, s, s * table.getScaleZ())
-				m.setPosition(data.center.x, data.center.y, h)
-				instanced.setMatrixAt(i, m)
-			}
-		}
-		instanced.instanceMatrix.needsUpdate = true
-		instanced.computeBoundingBox()
-		instanced.computeBoundingSphere()
-		;(instanced.geometry as any).computeBoundsTree?.({ includeInstances: true } as any)
-		for (const m of socketMeshes) m.visible = false
-		root.add(instanced)
-		instancedCount++
-	}
-	return instancedCount
+export function instancedBulbs(_root: Group, _table: Table, _renderApi: ThreeRenderApi): number {
+	// Disabled: every branch was wrong. Instance matrices came from identity node
+	// transforms while per-bulb center+radius live in baked vertices (all bulbs
+	// piled at the origin at unit scale), glow quads matched the 'bulb' name filter
+	// and were replaced by 3D hull geometry, and one shared material collapsed
+	// per-light (`bulb.light:${name}` / `bulb.glow:${name}`) uniforms. Bulb meshes
+	// are few and render correctly uninstanced; a rewrite would need per-light
+	// matrices built from bulb data, glow exclusion, and identical-material grouping.
+	return 0
 }
 
+/**
+ * Draw-call reduction: fold static opaque meshes into BatchedMesh buckets (bulb
+ * instancing is disabled — see instancedBulbs). Runs after postProcessScene
+ * (hidden meshes are skipped) and ideally after textures arrive (meshes with
+ * pending textures are skipped — safe to retry). Dynamic apply* calls unbatch
+ * their mesh first.
+ */
 export function optimizeScene(
 	root: Group,
 	table: Table,

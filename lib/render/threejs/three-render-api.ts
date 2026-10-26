@@ -10,10 +10,10 @@ import {
 	type PointLight,
 	type Mesh as ThreeMesh,
 } from 'three'
-import type { IRenderable, RenderInfo } from '../../game/irenderable.js'
+import type { IRenderable, RenderInfo } from '../../game/interfaces.js'
+import type { Matrix3D } from '../../math/matrix.js'
 import { type AnimationGate, animationGate } from '../../util/animation-gate.js'
 import { progress } from '../../util/logger.js'
-import type { Matrix3D } from '../../util/matrix.js'
 import type { ItemState } from '../../vpt/item-state.js'
 import type { LightData } from '../../vpt/light/light-data.js'
 import type { LightState } from '../../vpt/light/light-state.js'
@@ -32,9 +32,10 @@ import { releaseGeometry, ThreeMeshGenerator } from './three-mesh-generator.js'
 import { ThreeNodeMaterialGenerator } from './three-node-material-generator.js'
 import { ThreePlayfieldMeshGenerator } from './three-playfield-mesh-generator.js'
 
-/** Three.js render backend.
- * @see https://github.com/vpinball/vpinball/blob/master/RenderDevice.cpp */
+/** Three.js render backend (retained scene-graph; upstream is immediate-mode).
+ * @see https://github.com/vpinball/vpinball/blob/master/src/renderer/RenderDevice.cpp */
 export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, PointLight> {
+	/** VPX table units → world units, applied once at the scene root (see transformScene). */
 	public static readonly SCALE = 0.05
 	private static readonly _scratchM4 = new Matrix4()
 
@@ -76,6 +77,9 @@ export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, Poin
 		return this.nodeMaterialGenerator
 	}
 
+	// Lays the table flat (rotateX 90°: table +Y becomes world depth), centers it
+	// about the origin, and scales VPX units to world units — all once, here,
+	// so every generated mesh can keep raw table-unit vertices.
 	public transformScene(scene: Group, table: Table): void {
 		const dim = table.getDimensions()
 		scene.rotateX(Math.PI / 2)
@@ -112,59 +116,88 @@ export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, Poin
 		node.remove(...node.children)
 	}
 
-	private unbatchForTransform(obj: Object3D): void {
-		if (!obj) return
-		const traverse = (o: any): void => {
-			const info = o.userData?.__batched
-			if (info?.batched && typeof info.instanceId === 'number') {
-				try {
-					if (info.isInstanced) {
-						const m = new Matrix4().makeScale(0, 0, 0)
-						info.batched.setMatrixAt(info.instanceId, m)
-						info.batched.instanceMatrix.needsUpdate = true
-					} else {
-						info.batched.setVisibleAt?.(info.instanceId, false)
-					}
-				} catch {}
-				o.visible = true
-				let anc: any = o.parent
-				while (anc && anc !== obj.parent) {
-					if (!anc.visible) anc.visible = true
-					if (anc === obj) break
-					anc = anc.parent
-				}
-				delete o.userData.__batched
-			}
-			if (o.children) for (const c of o.children) traverse(c)
+	private forEachBatched(
+		obj: Object3D,
+		apply: (
+			target: any,
+			info: { batched: any; instanceId: number; isInstanced?: boolean; matrix?: Matrix4 },
+		) => void,
+	): void {
+		const traverse = (current: any): void => {
+			const info = current.userData?.__batched
+			if (info?.batched && typeof info.instanceId === 'number') apply(current, info)
+			if (current.children) for (const child of current.children) traverse(child)
 		}
 		traverse(obj)
+	}
+
+	private hideBatchedInstance(info: {
+		batched: any
+		instanceId: number
+		isInstanced?: boolean
+		matrix?: Matrix4
+	}): void {
+		try {
+			if (info.isInstanced) {
+				info.batched.setMatrixAt(info.instanceId, new Matrix4().makeScale(0, 0, 0))
+				info.batched.instanceMatrix.needsUpdate = true
+			} else {
+				info.batched.setVisibleAt?.(info.instanceId, false)
+			}
+		} catch {}
+	}
+
+	private unbatch(obj: Object3D): void {
+		if (!obj) return
+		this.forEachBatched(obj, (current, info) => {
+			this.hideBatchedInstance(info)
+			current.visible = true
+			let anc: any = current.parent
+			while (anc && anc !== obj.parent) {
+				if (!anc.visible) anc.visible = true
+				if (anc === obj) break
+				anc = anc.parent
+			}
+			delete current.userData.__batched
+		})
 	}
 
 	private syncBatchedVisibility(obj: Object3D, isVisible: boolean): void {
 		if (!obj) return
-		const traverse = (o: any): void => {
-			const info = o.userData?.__batched
-			if (info?.batched && typeof info.instanceId === 'number') {
+		this.forEachBatched(obj, (current, info) => {
+			if (info.isInstanced) {
+				if (!isVisible) {
+					this.hideBatchedInstance(info)
+					return
+				}
+				// InstancedMesh has no per-instance visibility flag: hide zero-scales
+				// the slot, so show must restore the pre-batch matrix saved at batch
+				// time. Without a saved matrix, unbatch the mesh so it can never
+				// disappear (hidden instance + hidden original).
 				try {
-					if (info.isInstanced) {
-						if (!isVisible) {
-							const m = new Matrix4().makeScale(0, 0, 0)
-							info.batched.setMatrixAt(info.instanceId, m)
-							info.batched.instanceMatrix.needsUpdate = true
-						}
+					if (info.matrix) {
+						info.batched.setMatrixAt(info.instanceId, info.matrix)
+						info.batched.instanceMatrix.needsUpdate = true
 					} else {
-						info.batched.setVisibleAt?.(info.instanceId, !!isVisible)
+						this.hideBatchedInstance(info)
+						current.visible = true
+						delete current.userData.__batched
 					}
 				} catch {}
+				return
 			}
-			if (o.children) for (const c of o.children) traverse(c)
-		}
-		traverse(obj)
+			try {
+				info.batched.setVisibleAt?.(info.instanceId, !!isVisible)
+			} catch {}
+		})
 	}
 
 	public applyMatrixToNode(matrix: Matrix3D, obj: Object3D): void {
 		if (!obj) return
-		this.unbatchForTransform(obj)
+		this.unbatch(obj)
+		// VPX Matrix3D is row-major (v·M) while THREE.Matrix4.set takes
+		// row-major args into column-major storage, so the element shuffle
+		// below is the transpose mapping VPX rows onto three.js columns.
 		const e = matrix.elements
 		ThreeRenderApi._scratchM4.set(
 			e[0],
@@ -192,13 +225,19 @@ export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, Poin
 
 	public applyVisibility(isVisible: boolean | number, obj: Object3D): void {
 		if (!obj) return
-		this.syncBatchedVisibility(obj, !!isVisible)
-		obj.visible = !!isVisible
-		for (const child of obj.children ?? []) child.visible = !!isVisible
+		const visible = !!isVisible
+		this.syncBatchedVisibility(obj, visible)
+		// A batched original stays hidden while its batch slot carries the pixels:
+		// unhiding it on the show path would double-render (original + instance
+		// with identical transforms, z-fighting at 2x cost).
+		obj.visible = visible && !(obj as { userData?: { __batched?: unknown } }).userData?.__batched
+		for (const child of obj.children ?? [])
+			child.visible = visible && !(child as { userData?: { __batched?: unknown } }).userData?.__batched
 	}
 
 	public applyMeshToNode(mesh: Mesh, obj: Object3D): void {
 		if (!obj) return
+		this.unbatch(obj)
 		const destGeo = (obj as ThreeMesh).geometry as BufferGeometry
 		const srcGeo = this.meshGenerator.convertToBufferGeometry(mesh)
 		if (srcGeo.attributes.position.array.length !== destGeo.attributes.position.array.length)
@@ -251,6 +290,7 @@ export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, Poin
 		emissiveMap?: string,
 	): void {
 		if (!obj) return
+		this.unbatch(obj)
 		const targets = obj.children?.length ? (obj.children as Object3D[]) : [obj]
 		for (const child of targets) {
 			const mat = (child as ThreeMesh).material as MeshStandardMaterial
