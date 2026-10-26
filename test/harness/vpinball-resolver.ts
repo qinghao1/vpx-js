@@ -19,7 +19,6 @@ const REPO_ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), 
 function expandTilde(targetPath: string): string {
 	if (targetPath === '~') return HOME
 	if (targetPath.startsWith('~/')) return path.join(HOME, targetPath.slice(2))
-	if (targetPath.startsWith('~')) return targetPath.replace(/^~(?=\/)/, HOME)
 	return targetPath
 }
 
@@ -40,6 +39,60 @@ function existsFile(filePath: string): boolean {
 	} catch {
 		return false
 	}
+}
+
+function firstExisting(paths: string[]): string | null {
+	const found = paths.find(existsFile)
+	return found ? path.resolve(found) : null
+}
+
+// Canonical CLI arg parsing for test/harness/* (`--name=value` only; no space form).
+// Rule: last occurrence wins, so a later flag overrides an earlier one — the
+// same rule as parseVpxArgs below. See vpinball-resolver.spec.ts.
+export function getArg(args: string[], name: string, def: string | null): string | null {
+	const prefix = `--${name}=`
+	let found: string | null = null
+	for (const token of args) {
+		if (token.startsWith(prefix)) found = token.slice(prefix.length)
+	}
+	return found ?? def
+}
+
+export function hasFlag(args: string[], name: string): boolean {
+	return args.includes(`--${name}`)
+}
+
+export interface VpxArgs {
+	vpx: string | null
+	rom: string | null
+	url: string | null
+	rest: string[]
+}
+
+// Canonical --vpx/--rom/--url extraction (accepts `--flag=value` and `--flag value`).
+// Rule: last occurrence wins — same rule as getArg above. Unknown tokens go to rest.
+// See vpinball-resolver.spec.ts.
+export function parseVpxArgs(rawArgs: string[]): VpxArgs {
+	let vpx: string | null = null
+	let rom: string | null = null
+	let url: string | null = null
+	const rest: string[] = []
+	for (let index = 0; index < rawArgs.length; index++) {
+		const token = rawArgs[index]
+		if (!token) continue
+		if (token.startsWith('--vpx=')) vpx = token.slice(6)
+		else if (token === '--vpx' && rawArgs[index + 1]) {
+			index++
+			vpx = rawArgs[index] ?? null
+		} else if (token.startsWith('--rom=')) rom = token.slice(6)
+		else if (token === '--rom' && rawArgs[index + 1]) {
+			index++
+			rom = rawArgs[index] ?? null
+		} else if (token.startsWith('--url=')) url = token.slice(6)
+		else if (token.startsWith('http://') || token.startsWith('https://')) url = token
+		else rest.push(token)
+	}
+	return { vpx, rom, url, rest }
 }
 
 export function expandFixture(input: string): string | null {
@@ -70,9 +123,8 @@ export function expandFixture(input: string): string | null {
 			candidates.push(path.join(REPO_ROOT, 'test/fixtures', path.basename(raw)))
 		}
 	}
-	for (const c of candidates) {
-		if (existsFile(c)) return path.resolve(c)
-	}
+	const found = firstExisting(candidates)
+	if (found) return found
 	// If input was already an absolute existing path, return it
 	const tildeExpanded = expandTilde(raw)
 	if (existsFile(tildeExpanded)) return path.resolve(tildeExpanded)
@@ -96,7 +148,6 @@ export function resolveVpxPath(input: string): string | null {
 	}
 	const tilde = expandTilde(decoded)
 	if (existsFile(tilde)) return path.resolve(tilde)
-	if (path.isAbsolute(tilde) && existsFile(tilde)) return path.resolve(tilde)
 	// fixture expansion
 	const fixture = expandFixture(decoded)
 	if (fixture) return fixture
@@ -140,7 +191,7 @@ export function resolvePathToUrl(
 	return url
 }
 
-function extractGameNameFromScript(script: string): string | null {
+export function extractGameName(script: string): string | null {
 	const clean = script.replace(/^\uFEFF/, '')
 	const patterns = [
 		/cGameName\s*=\s*["']([^"']+)["']/i,
@@ -165,7 +216,7 @@ export async function detectGameName(vpxPath: string): Promise<string | null> {
 		} as any)
 		const script = (table as any).tableScript ?? (table as any).getTableScript?.() ?? ''
 		if (script) {
-			const name = extractGameNameFromScript(script)
+			const name = extractGameName(script)
 			if (name) return name
 		}
 	} catch {}
@@ -194,10 +245,7 @@ export function getRomCandidates(gameName: string, tableDir: string): string[] {
 }
 
 export function findRomForGameName(gameName: string, tableDir: string): string | null {
-	for (const c of getRomCandidates(gameName, tableDir)) {
-		if (existsFile(c)) return path.resolve(c)
-	}
-	return null
+	return firstExisting(getRomCandidates(gameName, tableDir))
 }
 
 export async function resolveRomPath(
@@ -227,59 +275,45 @@ export interface VpinballDiscovery {
 
 export function discoverVpinball(): VpinballDiscovery {
 	const candidates: Array<{ candidatePath: string; source: string }> = []
+	const pushDir = (dir: string, source: string): void => {
+		for (const name of ['VPinballX_GL', 'VPinballX_BGFX']) {
+			candidates.push({ candidatePath: path.join(dir, name), source })
+		}
+	}
 	if (process.env.VPINBALL_BIN) {
 		const binEnv = expandTilde(process.env.VPINBALL_BIN)
 		candidates.push({ candidatePath: binEnv, source: 'VPINBALL_BIN' })
 		if (fs.existsSync(binEnv) && fs.statSync(binEnv).isDirectory()) {
-			candidates.push({ candidatePath: path.join(binEnv, 'VPinballX_GL'), source: 'VPINBALL_BIN dir' })
-			candidates.push({ candidatePath: path.join(binEnv, 'VPinballX_BGFX'), source: 'VPINBALL_BIN dir' })
+			pushDir(binEnv, 'VPINBALL_BIN dir')
 		}
 	}
 	if (process.env.VPINBALL_DIR) {
-		const dirEnv = expandTilde(process.env.VPINBALL_DIR)
-		candidates.push({ candidatePath: path.join(dirEnv, 'VPinballX_GL'), source: 'VPINBALL_DIR' })
-		candidates.push({ candidatePath: path.join(dirEnv, 'VPinballX_BGFX'), source: 'VPINBALL_DIR' })
+		pushDir(expandTilde(process.env.VPINBALL_DIR), 'VPINBALL_DIR')
 	}
 	const homeProjects = path.join(HOME, 'projects/vpinball')
-	candidates.push({ candidatePath: path.join(homeProjects, 'build/VPinballX_GL'), source: 'sister build' })
-	candidates.push({ candidatePath: path.join(homeProjects, 'build/VPinballX_BGFX'), source: 'sister build' })
-	candidates.push({ candidatePath: path.join(homeProjects, 'bin/VPinballX_GL'), source: 'sister bin' })
-	candidates.push({ candidatePath: path.join(homeProjects, 'bin/VPinballX_BGFX'), source: 'sister bin' })
-	candidates.push({
-		candidatePath: path.join(REPO_ROOT, 'external/vpinball/build/VPinballX_GL'),
-		source: 'submodule build',
-	})
-	candidates.push({
-		candidatePath: path.join(REPO_ROOT, 'external/vpinball/build/VPinballX_BGFX'),
-		source: 'submodule build',
-	})
-	candidates.push({
-		candidatePath: path.join(REPO_ROOT, 'external/vpinball/bin/VPinballX_GL'),
-		source: 'submodule bin',
-	})
-	candidates.push({
-		candidatePath: path.join(REPO_ROOT, 'external/vpinball/bin/VPinballX_BGFX'),
-		source: 'submodule bin',
-	})
-	candidates.push({ candidatePath: path.join(HOME, '.cache/vpinball/VPinballX_GL'), source: 'cache' })
-	candidates.push({ candidatePath: path.join(HOME, '.cache/vpinball/VPinballX_BGFX'), source: 'cache' })
-	candidates.push({ candidatePath: path.join(REPO_ROOT, '.cache/vpinball/VPinballX_GL'), source: 'cache local' })
-	candidates.push({ candidatePath: path.join(REPO_ROOT, '.cache/vpinball/VPinballX_BGFX'), source: 'cache local' })
+	pushDir(path.join(homeProjects, 'build'), 'sister build')
+	pushDir(path.join(homeProjects, 'bin'), 'sister bin')
+	pushDir(path.join(REPO_ROOT, 'external/vpinball/build'), 'submodule build')
+	pushDir(path.join(REPO_ROOT, 'external/vpinball/bin'), 'submodule bin')
+	pushDir(path.join(HOME, '.cache/vpinball'), 'cache')
+	pushDir(path.join(REPO_ROOT, '.cache/vpinball'), 'cache local')
 
-	for (const candidate of candidates) {
-		try {
-			if (fs.existsSync(candidate.candidatePath) && fs.statSync(candidate.candidatePath).isFile()) {
-				try {
-					fs.accessSync(candidate.candidatePath, fs.constants.X_OK)
-				} catch {}
-				return {
-					binPath: path.resolve(candidate.candidatePath),
-					binDir: path.dirname(path.resolve(candidate.candidatePath)),
-					source: candidate.source,
-				}
-			}
-		} catch {}
+	const toDiscovery = (candidatePath: string, source: string): VpinballDiscovery => ({
+		binPath: path.resolve(candidatePath),
+		binDir: path.dirname(path.resolve(candidatePath)),
+		source,
+	})
+	const scan = (suffix: string): VpinballDiscovery | null => {
+		for (const candidate of candidates) {
+			try {
+				if (existsFile(candidate.candidatePath))
+					return toDiscovery(candidate.candidatePath, candidate.source + suffix)
+			} catch {}
+		}
+		return null
 	}
+	const found = scan('')
+	if (found) return found
 	// on-demand submodule init attempt (non-blocking, best-effort)
 	try {
 		if (
@@ -294,15 +328,7 @@ export function discoverVpinball(): VpinballDiscovery {
 						stdio: 'ignore',
 						timeout: 15000,
 					})
-					for (const candidate of candidates) {
-						if (fs.existsSync(candidate.candidatePath) && fs.statSync(candidate.candidatePath).isFile()) {
-							return {
-								binPath: path.resolve(candidate.candidatePath),
-								binDir: path.dirname(path.resolve(candidate.candidatePath)),
-								source: `${candidate.source} (after init)`,
-							}
-						}
-					}
+					return scan(' (after init)') ?? { binPath: null, binDir: null, source: null }
 				} catch {}
 			}
 		}
@@ -384,42 +410,26 @@ export function getNativeArgs(
 }
 
 export async function resolveVpxSession(args: string[] | string): Promise<ResolvedVpxSession> {
-	const rawArgs: string[] = typeof args === 'string' ? [args] : [...args]
-	let vpxInput: string | null = null
-	let romInput: string | null = null
-	let explicitUrl: string | null = null
-
-	for (let i = 0; i < rawArgs.length; i++) {
-		const a = rawArgs[i]
-		if (!a) continue
-		if (a.startsWith('http://') || a.startsWith('https://')) {
-			explicitUrl = a
-			const parsed = resolveUrlToPath(a)
-			if (parsed.vpxPath) vpxInput = parsed.vpxPath
-			if (parsed.romPath) romInput = parsed.romPath
-		} else if (a.startsWith('--url=')) {
-			explicitUrl = a.slice(6)
-			const parsed = resolveUrlToPath(explicitUrl)
-			if (parsed.vpxPath) vpxInput = parsed.vpxPath
-			if (parsed.romPath) romInput = parsed.romPath
-		} else if (a.startsWith('--vpx=')) {
-			vpxInput = a.slice(6)
-		} else if (a === '--vpx' && rawArgs[i + 1]) {
-			i++
-			vpxInput = rawArgs[i] ?? null
-		} else if (a.startsWith('--rom=')) {
-			romInput = a.slice(6)
-		} else if (a === '--rom' && rawArgs[i + 1]) {
-			i++
-			romInput = rawArgs[i] ?? null
-		} else if (!a.startsWith('-') && /\.vp[xt]$/i.test(a)) {
-			if (!vpxInput) vpxInput = a
-		} else if (!a.startsWith('-') && a.length < 80 && !a.includes('/') && !a.includes('\\')) {
+	const rawArgs: string[] = typeof args === 'string' ? [args] : args
+	const parsedArgs = parseVpxArgs(rawArgs)
+	let vpxInput: string | null = parsedArgs.vpx
+	let romInput: string | null = parsedArgs.rom
+	const explicitUrl: string | null = parsedArgs.url
+	if (explicitUrl) {
+		// Explicit --vpx/--rom flags win over the URL parts; single-source inputs are unchanged.
+		const parsed = resolveUrlToPath(explicitUrl)
+		vpxInput ??= parsed.vpxPath
+		romInput ??= parsed.romPath
+	}
+	for (const token of parsedArgs.rest) {
+		if (!token.startsWith('-') && /\.vp[xt]$/i.test(token)) {
+			if (!vpxInput) vpxInput = token
+		} else if (!token.startsWith('-') && token.length < 80 && !token.includes('/') && !token.includes('\\')) {
 			// treat as fixture short name if not already set and not a flag
 			if (!vpxInput) {
-				const maybe = expandFixture(a)
+				const maybe = expandFixture(token)
 				if (maybe) vpxInput = maybe
-				else vpxInput = a
+				else vpxInput = token
 			}
 		}
 	}
@@ -452,9 +462,7 @@ export async function resolveVpxSession(args: string[] | string): Promise<Resolv
 		romPath = await resolveRomPath(romInput, null, tableDir)
 		if (!romPath) {
 			const decoded = decodeViteFsParam(romInput)
-			const tryPath = resolveVpxPath(decoded) ?? path.resolve(decoded)
-			if (existsFile(tryPath)) romPath = tryPath
-			else romPath = tryPath
+			romPath = resolveVpxPath(decoded) ?? path.resolve(decoded)
 		}
 	} else if (gameName) {
 		romPath = findRomForGameName(gameName, tableDir)
