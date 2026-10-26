@@ -54,6 +54,23 @@ export {
 export const uTransArea = uniform(new Vector2(1, 1))
 
 /**
+ * World-space height of the playfield surface (the table z=0 plane after the
+ * scene-root transform). Fragments below it share the playfield's x/z
+ * footprint (cabinet bottom, under-table grates), so the 2D footprint mask
+ * alone cannot tell them apart from the playfield itself.
+ */
+export const uPlayfieldSurfaceY = uniform(0)
+
+/**
+ * How far below the playfield surface the bulb-buffer lift still applies, in
+ * world units. Extruded playfield overlays (VLM bakes, additive lightmaps)
+ * hang about one unit below the surface, while the cabinet body and the room
+ * sit several units down; the cutoff sits between so the playfield keeps its
+ * lamp response and below-table geometry stays dark.
+ */
+export const BULB_LIFT_BELOW_EPS = 1.5
+
+/**
  * Masks bulb-buffer lookups to the playfield itself. Room geometry (VR floor,
  * walls) extends far beyond the playfield, and out-of-range UVs would sample
  * the clamped edge texel (ClampToEdgeWrapping), smearing live lamp energy
@@ -66,11 +83,29 @@ export const inPlayfieldBounds = (playfieldUv: ReturnType<typeof vec2>): ReturnT
 		.mul(step(0, playfieldUv.y))
 		.mul(step(playfieldUv.y, 1)) as ReturnType<typeof float>
 
-export function setPrimitiveTransmissionArea(width: number, height: number, scale = 1): void {
+/**
+ * Full bulb-lift volume: the playfield footprint plus a height gate. The 2D
+ * mask above still passes fragments BELOW the playfield that share its x/z
+ * footprint (cabinet bottom faces, under-table grates and floors), lighting
+ * them with live lamp energy that shines through the cabinet bottom onto the
+ * floor. Native samples its bulb buffer in screen space
+ * (fs_basic.sc transmission tail), which never reaches occluded below-table
+ * pixels, so gate the lookup to at/above-surface fragments here.
+ */
+export const inLiftVolume = (
+	playfieldUv: ReturnType<typeof vec2>,
+	worldY: (typeof positionWorld)['y'],
+): ReturnType<typeof float> =>
+	inPlayfieldBounds(playfieldUv).mul(step(uPlayfieldSurfaceY.sub(BULB_LIFT_BELOW_EPS), worldY)) as ReturnType<
+		typeof float
+	>
+
+export function setPrimitiveTransmissionArea(width: number, height: number, scale = 1, surfaceY = 0): void {
 	const safeWidth = Number.isFinite(width) && width > 0 ? width : 1
 	const safeHeight = Number.isFinite(height) && height > 0 ? height : 1
 	const safeScale = Number.isFinite(scale) && scale > 0 ? scale : 1
 	uTransArea.value.set(safeWidth * safeScale, safeHeight * safeScale)
+	uPlayfieldSurfaceY.value = Number.isFinite(surfaceY) ? surfaceY : 0
 }
 
 export interface PrimitiveBdlOptions {
@@ -168,7 +203,7 @@ export function createPrimitiveBdlMaterial(opts: PrimitiveBdlOptions): MeshStand
 					.mul(uBelowF)
 					.mul(alphaBelow)
 					.mul(gate)
-					.mul(inPlayfieldBounds(pfUv))
+					.mul(inLiftVolume(pfUv, positionWorld.y))
 				return carry.add(lift)
 			})()
 		} else if (userData.__mapName != null) {

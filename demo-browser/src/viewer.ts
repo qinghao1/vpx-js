@@ -1165,6 +1165,17 @@ export class Viewer {
 			...TABLE_OPTS,
 			preloadTextures: false,
 		})
+		try {
+			// Anchor the bulb-lift height gate to the built playfield plane:
+			// the table z=0 plane in world units, so below-table geometry
+			// sharing the playfield footprint stays dark.
+			const dim = table.getDimensions?.()
+			if (dim) {
+				node.updateWorldMatrix(true, false)
+				const surfaceY = node.localToWorld(new THREE.Vector3(0, 0, 0)).y
+				setPrimitiveTransmissionArea(dim.width, dim.height, ThreeRenderApi.SCALE, surfaceY)
+			}
+		} catch {}
 		{
 			const maxLights = getMaxLights()
 			const culled = cullExcessLights(node, maxLights)

@@ -13,7 +13,7 @@ import { Fn, float, positionWorld, sqrt, step, texture, uniform, uv, vec2, vec4 
 import { MeshBasicNodeMaterial } from 'three/webgpu'
 import { copyPendingKeys, setNodeMapSlot } from '../material-shared.js'
 import { getLightBufferTexture, getTransmissionTexture, TRANSMISSION_OPAQUE_CUTOFF } from '../transmission-buffer.js'
-import { inPlayfieldBounds, uTransArea } from './primitive-bdl-node.js'
+import { inLiftVolume, uTransArea } from './primitive-bdl-node.js'
 
 // Pending-texture placeholder alpha: 0 so the quad emits nothing under the
 // SrcAlpha blend state below. WebGPU applies CustomBlending even with
@@ -25,7 +25,6 @@ export interface BakedNodeMaterialOptions {
 	map?: ThreeTexture
 	mapName?: string
 	tint?: number
-	emissionScale?: number
 	alphaTestValue?: number
 	doubleSided?: boolean
 	polygonOffset?: boolean
@@ -37,11 +36,6 @@ export interface BakedNodeMaterialOptions {
 export function createUnshadedBakedNodeMaterial(options: BakedNodeMaterialOptions): MeshBasicNodeMaterial {
 	const mat = new MeshBasicNodeMaterial()
 	const uTintColor = uniform(new Color(options.tint ?? 0xffffff))
-	const uEmissionScale = uniform(
-		typeof options.emissionScale === 'number' && Number.isFinite(options.emissionScale)
-			? Math.max(0.15, Math.min(1, options.emissionScale))
-			: 1,
-	)
 	const useTransmission = options.transmission !== false
 	const transTex = useTransmission ? getTransmissionTexture() : null
 	const lightTex = useTransmission ? getLightBufferTexture() : null
@@ -53,15 +47,23 @@ export function createUnshadedBakedNodeMaterial(options: BakedNodeMaterialOption
 			const texNode = texture(map, uv())
 			mat.colorNode = Fn(() => {
 				const texColor = texNode
-				const baseRgb = texColor.rgb.mul(uTintColor).mul(uEmissionScale)
+				// Upstream never dims the diffuse albedo: the global emission
+				// scale only weights the light terms (Renderer.cpp SetupShaders
+				// scales fenvEmissionScale/cAmbient_LightRange/point-light
+				// emission; fs_basic.sc lightLoop and fs_unshaded.sc multiply
+				// the unscaled diffuse). Dimming the albedo here starved every
+				// lamp-free baked area (e.g. the TWD apron at scale 0.25) and
+				// halved the sqrt transmission lift below with it.
+				const baseRgb = texColor.rgb.mul(uTintColor)
 				// Upstream `lightLoop` multiplies the diffuse by the live bulb
 				// field; without it the bake stays at its (dark) authored albedo
 				// no matter how many lamps are on. The +1 floor keeps unlit
-				// tables exactly as before. Both terms stay inside the
-				// playfield: out-of-range room fragments must not sample the
-				// clamped edge texel.
+				// tables exactly as before. Both terms stay inside the lift
+				// volume (playfield footprint plus height gate): out-of-range
+				// room fragments must not sample the clamped edge texel, and
+				// below-table geometry sharing the footprint must stay dark.
 				const bulbUv = lightUv()
-				const inBounds = inPlayfieldBounds(bulbUv)
+				const inBounds = inLiftVolume(bulbUv, positionWorld.y)
 				const finalRgb = lightTex
 					? baseRgb.mul(texture(lightTex, bulbUv).rgb.mul(inBounds).add(float(1)))
 					: baseRgb
@@ -83,7 +85,7 @@ export function createUnshadedBakedNodeMaterial(options: BakedNodeMaterialOption
 			mat.colorNode = Fn(() => vec4(0, 0, 0, BAKED_PLACEHOLDER_ALPHA))()
 		} else {
 			// No texture by design (untextured solid): render the tint directly.
-			mat.colorNode = Fn(() => vec4(uTintColor.mul(uEmissionScale), 1))()
+			mat.colorNode = Fn(() => vec4(uTintColor, 1))()
 		}
 	}
 	const userData = mat.userData as Record<string, unknown>
@@ -118,7 +120,6 @@ export function createUnshadedBakedNodeMaterial(options: BakedNodeMaterialOption
 
 	userData.__uTint = uTintColor
 	userData.__uTintColor = uTintColor
-	userData.__uEmissionScale = uEmissionScale
 	return mat
 }
 
@@ -138,15 +139,10 @@ export function cloneBakedNodeMaterial<T>(mat: T): T {
 		(userData.__uTintColor as { value?: { getHex?: () => number } })?.value?.getHex?.() ??
 		(userData.__uTint as { value?: { getHex?: () => number } })?.value?.getHex?.() ??
 		0xffffff
-	const emissionScale =
-		typeof (userData.__uEmissionScale as { value?: number })?.value === 'number'
-			? (userData.__uEmissionScale as { value: number }).value
-			: 1
 	const cloned = createUnshadedBakedNodeMaterial({
 		map: (userData.__map as ThreeTexture | null) ?? (sourceMaterial.map as ThreeTexture | undefined) ?? undefined,
 		mapName: (userData.__mapName as string) ?? undefined,
 		tint,
-		emissionScale,
 		alphaTestValue: (userData.__alphaTestValue as number) ?? sourceMaterial.alphaTest ?? 0,
 		doubleSided: sourceMaterial.side === DoubleSide,
 		polygonOffset: !!sourceMaterial.polygonOffset,
