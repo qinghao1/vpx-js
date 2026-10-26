@@ -9,6 +9,7 @@ import {
 	getNativeArgs,
 	resolveVpxSession,
 } from '../test/harness/vpinball-resolver.js'
+import { runDoctor } from './vpinball-doctor.js'
 
 function printHelp() {
 	console.log(`vpinball-runner — bridge browser URLs / CLI flags to native VPinballX
@@ -27,10 +28,9 @@ Modes:
   --audit                   -Audit
   --pov                     -Pov
   --doctor                  Pre-flight diagnostics only (no launch)
-  --headless                Force xvfb-run wrapper if DISPLAY unset
 
 Options:
-  --headless                Wrap in xvfb-run for CI
+  --headless                Wrap in xvfb-run for CI (also auto-used when DISPLAY is unset)
   --help, -h                Show this help
   --vpx=<p> --rom=<p>       Override resolver
   --ini <path>              Use existing INI instead of generating session one
@@ -50,143 +50,6 @@ function hasCmd(cmd: string): boolean {
 	} catch {
 		return false
 	}
-}
-
-async function runDoctor(): Promise<boolean> {
-	console.log('# vpinball doctor — pre-flight diagnostics')
-	const disc = discoverVpinball()
-	console.log(`\n[discovery] ${disc.binPath ? `found ${disc.binPath} (${disc.source})` : 'NOT FOUND'}`)
-	if (!disc.binPath || !disc.binDir) {
-		console.log('  → run: npm run vpinball:setup  or  bash scripts/setup-vpinball.sh')
-		console.log('  → or set VPINBALL_BIN=/path/to/VPinballX_GL')
-		console.log('  → or clone: git clone https://github.com/vpinball/vpinball.git ~/projects/vpinball')
-		return false
-	}
-	let ok = true
-	const binPath = disc.binPath
-	const binDir = disc.binDir
-	const stat = fs.statSync(binPath)
-	console.log(`\n[perm] ${binPath}`)
-	console.log(
-		`  size: ${(stat.size / 1024 / 1024).toFixed(2)} MB  mode: ${(stat.mode & 0o777).toString(8)}  x_ok: ${(() => {
-			try {
-				fs.accessSync(binPath, fs.constants.X_OK)
-				return 'yes'
-			} catch {
-				return 'no'
-			}
-		})()}`,
-	)
-	try {
-		const fileOut = execSync(`file "${binPath}" 2>&1`, { encoding: 'utf-8' }).trim()
-		console.log(`  file: ${fileOut}`)
-	} catch {}
-	console.log('\n[linker] shared deps')
-	if (process.platform === 'linux') {
-		try {
-			const ldd = execSync(`ldd "${binPath}" 2>&1`, { encoding: 'utf-8' })
-			const missing = ldd.split('\n').filter(l => l.includes('not found'))
-			if (missing.length) {
-				ok = false
-				console.log('  MISSING:')
-				for (const missingDep of missing) console.log(`    ${missingDep.trim()}`)
-				console.log(
-					'  Hint: sudo apt update && sudo apt install libsdl3-0 libsdl3-image0 libsdl3-ttf0 libfreeimage3 libhidapi-hidraw0 libopenal1 || sudo apt install libSDL3* libfreeimage*',
-				)
-			} else {
-				console.log('  all deps resolved (ldd)')
-			}
-			const lines = ldd.split('\n').slice(0, 12)
-			for (const line of lines) if (line.trim()) console.log(`    ${line.trim()}`)
-		} catch (err: unknown) {
-			console.log(`  ldd failed: ${(err as Error).message}`)
-		}
-	} else if (process.platform === 'darwin') {
-		try {
-			const otool = execSync(`otool -L "${binPath}" 2>&1`, { encoding: 'utf-8' })
-			console.log(otool.split('\n').slice(0, 20).join('\n'))
-		} catch (err: unknown) {
-			console.log(`  otool failed: ${(err as Error).message}`)
-		}
-	}
-	console.log('\n[layout] shaders / scripts / plugins')
-	const shaderCandidates = [
-		path.join(binDir, 'shaders-10.8.1'),
-		path.join(binDir, 'shaders'),
-		path.join(binDir, '../shaders-10.8.1'),
-	]
-	let shaderFound = false
-	for (const candidate of shaderCandidates) {
-		if (fs.existsSync(candidate)) {
-			const count = fs.readdirSync(candidate).length
-			console.log(`  shaders: ${candidate} (${count} files)`)
-			shaderFound = true
-			break
-		}
-	}
-	if (!shaderFound) {
-		for (const dir of [binDir, path.join(binDir, '..')]) {
-			try {
-				for (const entry of fs.readdirSync(dir)) {
-					if (!entry.toLowerCase().startsWith('shader')) continue
-					const full = path.join(dir, entry)
-					try {
-						if (
-							fs.statSync(full).isDirectory() &&
-							fs.readdirSync(full).some(f => f.endsWith('.glfx') || f.endsWith('.fxh'))
-						) {
-							console.log(`  shaders: ${full} (${fs.readdirSync(full).length} files)`)
-							shaderFound = true
-							break
-						}
-					} catch {}
-				}
-			} catch {}
-			if (shaderFound) break
-		}
-	}
-	if (!shaderFound) {
-		ok = false
-		console.log('  shaders: NOT FOUND (expected shaders-10.8.1/ with SMAA.glfx etc.)')
-	}
-	const scriptCandidates = [
-		path.join(binDir, 'scripts/core.vbs'),
-		path.join(binDir, '../scripts/core.vbs'),
-		path.join(binDir, 'scripts/vpmkeys.vbs'),
-	]
-	let scriptFound = false
-	for (const s of scriptCandidates) {
-		if (fs.existsSync(s)) {
-			console.log(`  scripts: ${s}`)
-			scriptFound = true
-			break
-		}
-	}
-	if (!scriptFound) console.log('  scripts: not found (optional — scripts/core.vbs)')
-	const pluginCandidates = [path.join(binDir, 'plugins'), path.join(binDir, '../plugins')]
-	for (const p of pluginCandidates) {
-		if (fs.existsSync(p)) {
-			const entries = fs.readdirSync(p)
-			console.log(`  plugins: ${p} (${entries.join(', ')})`)
-			break
-		}
-	}
-	console.log('\n[pinmame] ROM search')
-	const pinmamePaths = [
-		path.join(os.homedir(), '.pinmame/roms'),
-		path.join(os.homedir(), 'pinmame/roms'),
-		path.join(os.homedir(), 'Downloads'),
-	]
-	for (const r of pinmamePaths) {
-		const exists = fs.existsSync(r)
-		const count = exists ? fs.readdirSync(r).filter(f => f.endsWith('.zip')).length : 0
-		console.log(`  ${r}: ${exists ? `${count} zips` : 'not found'}`)
-	}
-	console.log('\n[env] dynamic linker')
-	const env = getDynamicLinkerEnv(binDir)
-	for (const [k, v] of Object.entries(env)) console.log(`  ${k}=${v}`)
-	console.log(`\n[result] ${ok ? 'PASS' : 'FAIL — see hints above'}`)
-	return ok
 }
 
 function buildSpawnArgs(
@@ -226,20 +89,32 @@ async function main() {
 	const pov = raw.includes('--pov')
 
 	// Filter out flags that are not vpx/rom/url inputs for resolver
-	const resolverArgs = raw.filter(
-		a =>
-			![
-				'--headless',
-				'--doctor',
-				'--help',
-				'-h',
-				'--extractvbs',
-				'--extractVBS',
-				'--extract',
-				'--audit',
-				'--pov',
-			].includes(a),
-	)
+	const skipFlags = new Set([
+		'--headless',
+		'--doctor',
+		'--help',
+		'-h',
+		'--extractvbs',
+		'--extractVBS',
+		'--extract',
+		'--audit',
+		'--pov',
+	])
+	let iniArg: string | undefined
+	const resolverArgs: string[] = []
+	for (let i = 0; i < raw.length; i++) {
+		const a = raw[i]
+		if (a === '--ini' && raw[i + 1]) {
+			iniArg = raw[++i]
+			continue
+		}
+		if (a.startsWith('--ini=')) {
+			iniArg = a.slice('--ini='.length)
+			continue
+		}
+		if (a === '--ini' || skipFlags.has(a)) continue
+		resolverArgs.push(a)
+	}
 
 	if (resolverArgs.length === 0) {
 		printHelp()
@@ -250,8 +125,8 @@ async function main() {
 	let session
 	try {
 		session = await resolveVpxSession(resolverArgs)
-	} catch (e: unknown) {
-		console.error(`[vpinball] resolve failed: ${(e as Error).message}`)
+	} catch (error: unknown) {
+		console.error(`[vpinball] resolve failed: ${(error as Error).message}`)
 		process.exit(1)
 	}
 
@@ -277,26 +152,27 @@ async function main() {
 
 	let nativeArgs: string[]
 	let iniPath = session.iniPath
+	if (iniArg) {
+		const customIni = path.resolve(iniArg)
+		if (!fs.existsSync(customIni)) {
+			console.warn(`[vpinball] --ini not found, falling back to session INI: ${iniArg}`)
+		} else {
+			iniPath = customIni
+		}
+	}
 	if (extract) {
+		if (iniArg) console.log('[vpinball] note: --ini ignored in -ExtractVBS mode (no -Ini flag)')
 		nativeArgs = getNativeArgs(session.vpxPath, iniPath, 'extractvbs')
 		console.log(`[vpinball] mode: -ExtractVBS (headless, lazy video init)`)
 	} else if (audit) {
+		if (iniArg) console.log('[vpinball] note: --ini ignored in -Audit mode (no -Ini flag)')
 		nativeArgs = getNativeArgs(session.vpxPath, iniPath, 'audit')
 	} else if (pov) {
+		if (iniArg) console.log('[vpinball] note: --ini ignored in -Pov mode (no -Ini flag)')
 		nativeArgs = getNativeArgs(session.vpxPath, iniPath, 'pov')
 	} else {
 		// Play mode — keep session INI (windowed 1280x900)
-		nativeArgs = session.nativeArgs
-		// Allow --ini override
-		const iniIdx = raw.indexOf('--ini')
-		const iniArg = iniIdx !== -1 ? raw[iniIdx + 1] : undefined
-		if (iniArg) {
-			const customIni = path.resolve(iniArg)
-			if (fs.existsSync(customIni)) {
-				iniPath = customIni
-				nativeArgs = getNativeArgs(session.vpxPath, iniPath, 'play')
-			}
-		}
+		nativeArgs = getNativeArgs(session.vpxPath, iniPath, 'play')
 		console.log(`[vpinball] mode: -Play + -Ini ${iniPath}`)
 		console.log(`[vpinball] ini:   ${iniPath}`)
 		try {
@@ -340,7 +216,7 @@ async function main() {
 		}
 		// For extract, check output file
 		if (extract) {
-			const expected = session.vpxPath.replace(/\.vpx$/i, '.vbs')
+			const expected = session.vpxPath.replace(/\.(vpx|vpt)$/i, '.vbs')
 			const candidates = [
 				expected,
 				path.join(

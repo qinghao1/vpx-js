@@ -1,124 +1,102 @@
 # Command Line Tools
 
-VPX-JS comes with command line tools. Make sure to run `npm run build` first, then change to the compiled output directory (`dist/cjs/bin`) when you use Node.js. Another option is transpile the TypeScript file on the fly and execute it using `npx ts-node bin/vptscript.ts`.
+Run from source with `npx tsx bin/<tool>.ts`, or build first (`npm run build`)
+and use the compiled output in `dist/bin/` (`vbs2js`, `vpt2glb`, `vptscript` are
+also linked as package binaries). Exit code is 0 on success, 1 on error
+(`vptscript` keeps going after a per-file error and still exits 1).
 
-### Extract Table Script
-
-To print the table script via CLI:
+## vptscript — extract table script
 
 ```bash
-vptscript <source.vpx>
+npx tsx bin/vptscript.ts <source.vpx | folder> [--save]
 ```
 
-Using the API:
+Prints the table script to stdout, or with `--save` writes a sibling `.vbs` per
+table (folder mode processes every `.vpx`/`.vpt` in the directory).
+
+API equivalent:
 
 ```js
-const { Table } = require(`vpx-toolbox`);
+import { Table } from 'vpx-js';
+import { BinaryReader } from 'vpx-js/lib/refs.node.js';
 
-(async () => {
-
-	// parse the table
-	const vpt = await Table.load('my-table.vpx');
-
-	// read script
-	const script = vpt.getTableScript();
-	console.log(script);
-})();
+const vpt = await Table.load(new BinaryReader('my-table.vpx'), {
+	loadTableScript: true,
+	tableDataOnly: true,
+});
+console.log(vpt.getTableScript());
 ```
 
-### Convert to GLTF
-
-CLI:
+## vpt2glb — convert table to GLB
 
 ```bash
-vpt2glb <source.vpx> [<destination.glb>]
+npx tsx bin/vpt2glb.ts <source.vpx> [<dest.glb>] [--no-textures] [--no-materials] [--no-lights] [--no-<item>...]
 ```
 
-Additional options are `--no-textures`,
-`--no-materials` and `--no-lights`. You can also skip generation of individual
-item types by using `--no-primitives`, `--no-triggers`, `--no-kickers`, `--no-gates`,
-`--no-targets`, `--no-flippers`, `--no-bumpers`, `--no-ramps`, `--no-surfaces`,
-`--no-rubbers`, `--no-bulbs`, `--no-surface-lights` and `--no-playfield`.
+Item flags (all default on): `--no-primitives`, `--no-triggers`, `--no-kickers`,
+`--no-gates`, `--no-targets`, `--no-flippers`, `--no-bumpers`, `--no-ramps`,
+`--no-surfaces`, `--no-rubbers`, `--no-bulbs`, `--no-surface-lights`,
+`--no-playfield`, `--no-plungers`, `--no-spinners`.
+(`--compress-vertices` / `--skip-optimize` are accepted but deprecated no-ops.)
+Headless-safe: uses classic `MeshStandardMaterial` export, no GPU needed.
 
-Otherwise, the API is quite simple:
+API equivalent:
 
 ```js
-const { writeFileSync } = require('fs');
-const { Table } = require(`vpx-toolbox`);
+import { writeFileSync } from 'node:fs';
+import { Table, TableExporter } from 'vpx-js';
+import { BinaryReader } from 'vpx-js/lib/refs.node.js';
 
-(async () => {
+const table = await Table.load(new BinaryReader('my-table.vpx'));
+const glb = await new TableExporter(table).exportGlb({
+	applyTextures: new ThreeTextureLoaderNode(), // or undefined with --no-textures (see bin/vpt2glb.ts)
+	applyMaterials: true,
+	exportLightBulbLights: true,
+	gltfOptions: { binary: true },
+});
 
-	// parse the table
-	const vpt = await Table.load('my-table.vpx');
-
-	// export the table to GLB
-	const glb = await vpt.exportGlb({
-		applyTextures: true,
-		applyMaterials: true,
-		exportLightBulbLights: true,
-		gltfOptions: { compressVertices: true, forcePowerOfTwoTextures: true },
-		exportPrimitives: true,
-		exportTriggers: true,
-		exportKickers: true,
-		exportGates: true,
-		exportHitTargets: true,
-		exportFlippers: true,
-		exportBumpers: true,
-		exportRamps: true,
-		exportSurfaces: true,
-		exportRubbers: true,
-		exportLightBulbs: true,
-		exportPlayfieldLights: true,
-		exportPlayfield: true,
-	});
-
-	// write to disk
-	writeFileSync('my-table.glb', glb);
-})();
+// write to disk
+writeFileSync('my-table.glb', glb);
 ```
 
-## Result
+Check the result in any GLTF viewer
+([babylon.js](https://sandbox.babylonjs.com/),
+[three.js](https://threejs.org/editor/),
+[donmccurdy](https://gltf-viewer.donmccurdy.com/)).
 
-For a quick check you can use one of the [various](https://sandbox.babylonjs.com/)
-[online](https://threejs.org/editor/) [viewers](https://gltf-viewer.donmccurdy.com/).
-The default Windows [3D Viewer](https://en.wikipedia.org/wiki/Microsoft_3D_Viewer) comes
-with GLTF support as well, however it doesn't support the Dracos extensions, so
-you'll need to disable mesh compression if you want to open it with 3D Viewer.
-
-VPDB uses this to display 3D models in the browser:
-
-![image](https://user-images.githubusercontent.com/70426/56841267-0419fc00-688d-11e9-9996-6d84070da392.png)
-
-[Live version](https://vpdb.io/games/dk/releases/pkvazc1pw) (click on *3D View*)
-
-## Tests
-
-Run tests with:
+## vbs2js — transpile VBScript
 
 ```bash
-npm run test
+npx tsx bin/vbs2js.ts [--format-only] <script.vbs>
 ```
 
-Most of the tests are related to the mesh generation. We basically take Visual
-Pinball's OBJ export as a base line and verify that the vertices in the GLTF file
-are the same. We do that for every playfield item and their variations. We also
-apply transformations to test the matrices. We test textures by feeding multiple
-formats into VPX and comparing the exported result using [looks-same](https://github.com/gemini-testing/looks-same).
-What's currently not tested are:
+Prints the transpiled JS to stdout; `--format-only` (any position) prints the
+formatted VBS instead.
 
-- Vertex indices
-- Texture UVs
-- Materials
+## vbs-benchmark — time a transpile
 
-Those are all easily verifiable by looking at the result though. Materials are
-still being tweaked because they obviously depend on the engine and the shaders.
-We're currently using the metalness/shininess model which seems to work well.
+```bash
+npx tsx bin/vbs-benchmark.ts <script.vbs>
+```
+
+Prints the transpiled JS to stdout and `transpiled <in> chars -> <out> chars in
+<ms>ms` to stderr (transpile-only; no execution timing).
+
+## vpinball-runner — native VPinballX driver (tsx-only, not in `dist/`)
+
+```bash
+npx tsx bin/vpinball-runner.ts --vpx=table-flipper                 # play natively
+npx tsx bin/vpinball-runner.ts --vpx=/path/to/table.vpx --extractvbs
+npx tsx bin/vpinball-runner.ts --doctor                            # pre-flight diagnostics only
+npm run vpinball:setup   # provision native binary first (or set VPINBALL_BIN)
+```
+
+Flags: `--vpx=<path|fixture|url>`, `--rom=<path>`, `--url=<url>`,
+`--extractvbs` (headless `-ExtractVBS`, writes sibling `.vbs`), `--audit`,
+`--pov`, `--doctor` (ldd/otool, shaders, `PinMAMEPath` checks via
+`bin/vpinball-doctor.ts`), `--headless` (xvfb wrapper when `DISPLAY` is unset),
+`--ini <path>` (reuse an INI instead of a generated session one), `--help`.
 
 ## License
 
-GPLv2, see [LICENSE](LICENSE).
-
-[travis-image]: https://img.shields.io/travis/vpdb/vpx-toolbox.svg?style=flat-square
-[travis-url]: https://travis-ci.org/vpdb/vpx-toolbox
-[dependencies-image]: https://david-dm.org/vpdb/vpx-toolbox.svg?style=flat-square
-[dependencies-url]: https://david-dm.org/vpdb/vpx-toolbox
+GPLv2, see [LICENSE](../LICENSE).
