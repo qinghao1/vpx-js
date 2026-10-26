@@ -23,7 +23,7 @@ export class SpinnerUpdater extends ItemUpdater<SpinnerState> {
 		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
 		table: Table,
 	): void {
-		Object.assign(this.state, state)
+		this.state.mergeFrom(state)
 		this.applyVisibility(obj, state, renderApi)
 		this.applyMaterial(obj, state.material, state.texture, renderApi, table)
 		if (state.showBracket !== undefined) {

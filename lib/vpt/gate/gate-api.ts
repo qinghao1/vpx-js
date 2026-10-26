@@ -122,7 +122,7 @@ export class GateApi extends ItemApi<GateData> {
 		return this.mover.gravityFactor
 	}
 	set GravityFactor(v) {
-		this.mover.gravityFactor = MathUtils.clamp(v, 0, 1)
+		this.mover.gravityFactor = MathUtils.clamp(v, 0, 100)
 	}
 	get Visible() {
 		return this._state.isVisible
@@ -134,8 +134,7 @@ export class GateApi extends ItemApi<GateData> {
 		return this.data.twoWay
 	}
 	set TwoWay(v) {
-		if (this.hitGate) this.hitGate.twoWay = v
-		else this.data.twoWay = v
+		this.hitGate.twoWay = v
 		this.data.twoWay = v
 	}
 	get ReflectionEnabled() {
@@ -166,6 +165,8 @@ export class GateApi extends ItemApi<GateData> {
 		if (!isOpen && this._state.angle > this.mover.angleMin) this.mover.angleSpeed = -0.2
 	}
 
+	// Intentional divergence: upstream coerces collidable angles (Close to 0, Open to PI/2 fed back through ANGTORAD,
+	// i.e. ~1.57, not 90) behind a blocking MessageBox and continues; with no dialog here, fail fast with the same message.
 	private setCloseAngle(deg: number): void {
 		if (this.data.isCollidable) throw new Error("Gate is collidable! closing angles other than 0 aren't possible!")
 		const a = MathUtils.clamp(MathUtils.degToRad(deg), this.data.angleMin, this.data.angleMax)
@@ -189,7 +190,7 @@ export class GateApi extends ItemApi<GateData> {
 		if (v) this.mover.angleMin = 0
 	}
 
-	public move(dir: number, speed: number, angle: number): void {
+	public move(dir: number, speed = 0, angle = 0): void {
 		this.mover.hitDirection = false
 		this.mover.forcedMove = true
 		this.mover.open = true
@@ -198,10 +199,10 @@ export class GateApi extends ItemApi<GateData> {
 		if (speed <= 0) speed = 0.2
 		else speed *= Math.PI / 180
 
+		let angleRad: number
 		if (!dir || angle !== 0) {
-			angle *= Math.PI / 180
-			angle = MathUtils.clamp(angle, this.data.angleMin, this.data.angleMax)
-			const da = angle - this._state.angle
+			angleRad = MathUtils.clamp((angle * Math.PI) / 180, this.data.angleMin, this.data.angleMax)
+			const da = angleRad - this._state.angle
 			if (da > 1e-5) dir = 1
 			else if (da < -1e-5) dir = -1
 			else {
@@ -209,19 +210,15 @@ export class GateApi extends ItemApi<GateData> {
 				this.mover.angleSpeed = 0
 			}
 		} else {
-			angle = dir < 0 ? this.data.angleMin : this.data.angleMax
+			angleRad = dir < 0 ? this.data.angleMin : this.data.angleMax
 		}
 
 		if (dir > 0) {
-			this.mover.angleMax = angle
+			this.mover.angleMax = angleRad
 			if (this._state.angle < this.mover.angleMax) this.mover.angleSpeed = speed
 		} else if (dir < 0) {
-			this.mover.angleMin = angle
+			this.mover.angleMin = angleRad
 			if (this._state.angle > this.mover.angleMin) this.mover.angleSpeed = -speed
 		}
-	}
-
-	protected _getPropertyNames(): string[] {
-		return Object.getOwnPropertyNames(GateApi.prototype)
 	}
 }

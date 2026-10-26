@@ -8,7 +8,10 @@ import { MathUtils } from 'three'
 import { ThreeHelper } from '../../../test/three.helper'
 import { Player } from '../../game/player.js'
 import { NodeBinaryReader } from '../../io/binary-reader.node.js'
+import type { ReadResult, Storage } from '../../io/ole-doc.js'
+import { Enums } from '../enums.js'
 import { Table } from '../table/table.js'
+import { GateData } from './gate-data.js'
 
 chai.use((sinonChai as any).default ?? sinonChai)
 const three = new ThreeHelper()
@@ -71,8 +74,11 @@ describe('The VPinball gate API', () => {
 		expect(twoWay.Friction).to.equal(0)
 		twoWay.Damping = 0.9987
 		expect(Math.round(twoWay.Damping * 1e5)).to.equal(Math.round(0.9987 * 1e5))
+		// Upstream Gate::put_GravityFactor clamps to [0,100], not [0,1] (gate.cpp).
 		twoWay.GravityFactor = 1.226
-		expect(twoWay.GravityFactor).to.equal(1)
+		expect(twoWay.GravityFactor).to.equal(1.226)
+		twoWay.GravityFactor = 150
+		expect(twoWay.GravityFactor).to.equal(100)
 		twoWay.GravityFactor = 0.226
 		expect(twoWay.GravityFactor).to.equal(0.226)
 		twoWay.GravityFactor = -1.226
@@ -107,7 +113,6 @@ describe('The VPinball gate API', () => {
 	})
 
 	it('should correctly set the opening and closing angles', () => {
-		// note: what a shite api!
 		const gate = table.gates.Plate.getApi()
 		gate.Collidable = false
 
@@ -148,8 +153,6 @@ describe('The VPinball gate API', () => {
 		gate.Collidable = true
 		expect(() => (gate.CloseAngle = 0)).to.throw("Gate is collidable! closing angles other than 0 aren't possible!")
 		expect(() => (gate.OpenAngle = 90)).to.throw("Gate is collidable! open angles other than 90 aren't possible!")
-
-		// todo test actual functionality
 	})
 
 	it('should correctly move manually on a two-way gate', () => {
@@ -190,10 +193,52 @@ describe('The VPinball gate API', () => {
 
 		player.updatePhysics(500)
 		expect(Math.round(MathUtils.radToDeg(plate.getState().angle))).to.equal(50)
+	})
 
-		// for (let i = 0; i < 200; i++) {
-		// 	player.updatePhysics(i * 10);
-		// 	console.log(i * 10, MathUtils.radToDeg(plate.getState().angle));
-		// }
+	it('should default omitted speed and angle to 0 per IDL', () => {
+		// vpinball.idl: Move(int dir, [defaultvalue(0)] float speed, [defaultvalue(0)] float angle)
+		const plate = table.gates.Plate
+		plate.getApi().move(1)
+
+		player.updatePhysics(500)
+		const angle = MathUtils.radToDeg(plate.getState().angle)
+		expect(angle).not.to.be.NaN
+		expect(Math.round(angle)).to.be.greaterThan(0)
+	})
+})
+
+describe('The legacy gate type tag', () => {
+	async function loadWithGaty(value: number): Promise<GateData> {
+		const record = new Uint8Array(20)
+		const view = new DataView(record.buffer)
+		view.setInt32(0, 8, true)
+		record.set([0x47, 0x41, 0x54, 0x59], 4) // GATY
+		view.setInt32(8, value, true)
+		view.setInt32(12, 4, true)
+		record.set([0x45, 0x4e, 0x44, 0x42], 16) // ENDB
+		const storage = {
+			async streamFiltered(
+				_name: string,
+				_offset: number,
+				next: (result: ReadResult) => Promise<number | null>,
+			): Promise<void> {
+				let pos = 0
+				while (pos < record.length) {
+					const consumed = await next({ data: record.subarray(pos), storageOffset: pos })
+					if (consumed === null) break
+					pos += consumed
+				}
+			},
+		}
+		return GateData.fromStorage(storage as unknown as Storage, 'Gate')
+	}
+
+	it('should clamp out-of-range GATY values to wire like upstream', async () => {
+		expect((await loadWithGaty(99)).gateType).to.equal(Enums.GateType.GateWireW)
+		expect((await loadWithGaty(0)).gateType).to.equal(Enums.GateType.GateWireW)
+	})
+
+	it('should keep in-range GATY values', async () => {
+		expect((await loadWithGaty(Enums.GateType.GateLongPlate)).gateType).to.equal(Enums.GateType.GateLongPlate)
 	})
 })

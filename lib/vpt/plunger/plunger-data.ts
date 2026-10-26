@@ -3,7 +3,7 @@
 
 import { BiffParser } from '../../io/biff-parser.js'
 import type { Storage } from '../../io/ole-doc.js'
-import { Vertex2D } from '../../util/vector.js'
+import { Vertex2D } from '../../math/vector.js'
 import { handleBiffTag } from '../biff-helper.js'
 import { Enums } from '../enums.js'
 import { ItemData } from '../item-data.js'
@@ -28,6 +28,7 @@ const FLOAT_MAP: Record<string, string> = {
 	SPRL: 'springLoops',
 	SPRE: 'springEndLoops',
 }
+const INT_MAP: Record<string, string> = { TYPE: 'type', ANFR: 'animFrames' }
 const BOOL_MAP: Record<string, string> = {
 	MECH: 'mechPlunger',
 	APLG: 'autoPlunger',
@@ -90,17 +91,10 @@ export class PlungerData extends ItemData {
 			this.center = Vertex2D.get(buffer)
 			return 0
 		}
-		if (tag === 'TYPE') {
-			this.type = this.getInt(buffer)
-			return 0
-		}
-		if (tag === 'ANFR') {
-			this.animFrames = this.getInt(buffer)
-			return 0
-		}
 		if (
 			handleBiffTag(this, tag, buffer, len, {
 				float: FLOAT_MAP,
+				int: INT_MAP,
 				bool: BOOL_MAP,
 				string: STRING_MAP,
 			})

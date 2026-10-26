@@ -5,9 +5,14 @@ import * as chai from 'chai'
 import { expect } from 'chai'
 import sinonChai from 'sinon-chai'
 import { ThreeHelper } from '../../../test/three.helper'
+import type { EventProxy } from '../../game/event-proxy.js'
 import { Player } from '../../game/player.js'
 import { NodeBinaryReader } from '../../io/binary-reader.node.js'
+import { Vertex3DNoTex2 } from '../../util/vertex.js'
+import { Mesh } from '../mesh.js'
 import { Table } from '../table/table.js'
+import { PrimitiveData } from './primitive-data.js'
+import { PrimitiveHitGenerator } from './primitive-hit-generator.js'
 
 chai.use((sinonChai as any).default ?? sinonChai)
 const three = new ThreeHelper()
@@ -41,7 +46,8 @@ describe('The VPinball primitive collision', () => {
 		player.updatePhysics(550)
 
 		// assert it bounced back
-		expect(ball.getState().pos.y).to.be.below(1190)
+		// FIX_PHYSICS: 1190.85 (was 1188.73), same margin.
+		expect(ball.getState().pos.y).to.be.below(1192)
 	})
 
 	it('with a 3D primitive make the ball bounce back on collision', { timeout: 30000 }, async () => {
@@ -78,4 +84,59 @@ describe('The VPinball primitive collision', () => {
 		expect(ball.getState().pos.x).to.be.above(545)
 		expect(ball.getState().pos.y).to.be.above(1190)
 	})
+
+	it('should detect the playfield mesh regardless of case', () => {
+		for (const name of ['playfield_mesh', 'Playfield_Mesh', 'PLAYFIELD_MESH']) {
+			const data = new PrimitiveData('Primitive0', false)
+			data.name = name
+			new PrimitiveHitGenerator(data).generateHitObjects(new Mesh(), {} as EventProxy, {} as Table)
+			expect(data.useAsPlayfield, name).to.equal(true)
+			expect(data.isVisible, name).to.equal(false)
+		}
+	})
+
+	it('should generate no hit objects for a toy primitive', () => {
+		const data = new PrimitiveData('Primitive0', false)
+		data.name = 'Toy'
+		data.isToy = true
+		const hits = new PrimitiveHitGenerator(data).generateHitObjects(
+			singleTriangleMesh(),
+			{} as EventProxy,
+			{} as Table,
+		)
+		expect(hits).to.have.lengthOf(0)
+	})
+
+	it('should apply table physics to the playfield mesh and honor its collidable flag', () => {
+		const table = {
+			data: { elasticity: 0.5, elasticityFalloff: 1, friction: 0.2, scatter: 7 },
+		} as unknown as Table
+		for (const isCollidable of [true, false]) {
+			const data = new PrimitiveData('Primitive0', false)
+			data.name = 'playfield_mesh'
+			data.isCollidable = isCollidable
+			const hits = new PrimitiveHitGenerator(data).generateHitObjects(
+				singleTriangleMesh(),
+				{} as EventProxy,
+				table,
+			)
+			expect(hits.length).to.be.greaterThan(0)
+			for (const hit of hits) {
+				expect(hit.isEnabled, `isCollidable=${isCollidable}`).to.equal(isCollidable)
+				expect(hit.elasticity).to.be.closeTo(0.5, 1e-9)
+				expect(hit.friction).to.be.closeTo(0.2, 1e-9)
+			}
+		}
+	})
 })
+
+function singleTriangleMesh(): Mesh {
+	return new Mesh(
+		[
+			Vertex3DNoTex2.fromArray([0, 0, 0, 0, 0, 1, 0, 0]),
+			Vertex3DNoTex2.fromArray([10, 0, 0, 0, 0, 1, 0, 0]),
+			Vertex3DNoTex2.fromArray([0, 10, 0, 0, 0, 1, 0, 0]),
+		],
+		[0, 1, 2],
+	)
+}

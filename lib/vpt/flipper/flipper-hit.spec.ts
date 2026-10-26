@@ -9,7 +9,11 @@ import { createBall } from '../../../test/physics.helper'
 import { ThreeHelper } from '../../../test/three.helper'
 import { Player } from '../../game/player.js'
 import { NodeBinaryReader } from '../../io/binary-reader.node.js'
+import { Vertex3D } from '../../math/vector.js'
+import { CollisionEvent } from '../../physics/collision-event.js'
+import { C_CONTACTVEL, C_PRECISION } from '../../physics/constants.js'
 import { Table } from '../table/table.js'
+import type { FlipperHit } from './flipper-hit.js'
 
 chai.use((sinonChai as any).default ?? sinonChai)
 const three = new ThreeHelper()
@@ -130,6 +134,74 @@ describe('The VPinball flipper collision', () => {
 		player.updatePhysics(150)
 		expect(ball.getState().pos.x).to.be.within(350, 354)
 		expect(ball.getState().pos.y).to.be.within(1617, 1621)
+	})
+
+	it('should apply upstream static friction in flipper contact', () => {
+		// Ball at rest against a tilted contact normal: zero slip velocity but nonzero
+		// tangential slip acceleration (gravity), i.e. the static-friction regime of
+		// upstream HitFlipper::Contact (src/physics/hitflipper.cpp).
+		const flipperHit = table.flippers.DefaultFlipper.getHitShapes()[0] as FlipperHit
+		const mover = flipperHit.getMoverObject()
+		const baseCenter = mover.hitCircleBase.center
+		const ball = createBall(player, baseCenter.x + 70, baseCenter.y + 10, 25)
+		ball.hit.vel.set(0, 0, 0)
+		ball.hit.angularVelocity.set(0, 0, 0)
+		ball.hit.angularMomentum.set(0, 0, 0)
+		const physics = player.getPhysics()
+		const normal = new Vertex3D(0, -0.35, 1).normalize()
+		const stepTime = 0.001
+		const ballArm = normal.clone().multiplyScalar(-ball.data.radius)
+		const pivotPoint = new Vertex3D(baseCenter.x, baseCenter.y, ball.getState().pos.z)
+		const flipperArm = ball.getState().pos.clone().add(ballArm).sub(pivotPoint)
+		const relVel = ball.hit.surfaceVelocity(ballArm).sub(mover.surfaceVelocity(flipperArm))
+		const normalVel = relVel.dot(normal)
+		const slip = relVel.clone().sub(normal.clone().multiplyScalar(normalVel))
+		const relAcc = ball.hit.surfaceAcceleration(ballArm, physics).sub(mover.surfaceAcceleration(flipperArm))
+		const normalDeriv = Vertex3D.crossZ(mover.angleSpeed, normal)
+		const normalAcc = relAcc.dot(normal) + 2 * normalDeriv.dot(relVel)
+		const slipAcc = relAcc.clone().sub(normal.clone().multiplyScalar(relAcc.dot(normal)))
+		expect(normalVel).to.be.below(C_CONTACTVEL)
+		expect(slip.length()).to.be.below(C_PRECISION)
+		expect(slipAcc.lengthSq()).to.be.above(1e-6)
+		expect(normalAcc).to.be.below(0)
+		// Upstream normal impulse.
+		const normalResponse = Vertex3D.crossProduct(flipperArm, normal.clone().multiplyScalar(-1))
+		const flipperContactAcc = Vertex3D.crossProduct(normalResponse.clone().divideScalar(mover.inertia), flipperArm)
+		const contactAcc = normal.dot(normal.clone().multiplyScalar(ball.hit.invMass).sub(flipperContactAcc))
+		const normalImpulse = contactAcc > 1e-7 ? -normalAcc / contactAcc : 0
+		// Upstream static friction: flipper inertia enters with a positive sign.
+		const slipDir = slipAcc.clone().normalize()
+		const numer = -slipDir.dot(relAcc)
+		const frictionArmFlipper = Vertex3D.crossProduct(flipperArm, slipDir)
+		const denomFlipper = slipDir.dot(
+			Vertex3D.crossProduct(frictionArmFlipper.clone().divideScalar(mover.inertia), flipperArm),
+		)
+		const frictionArmBall = Vertex3D.crossProduct(ballArm, slipDir)
+		const denomBall =
+			ball.hit.invMass +
+			slipDir.dot(Vertex3D.crossProduct(frictionArmBall.clone().divideScalar(ball.hit.inertia), ballArm))
+		const maxFriction = Math.abs(normalImpulse * flipperHit.friction)
+		const friction =
+			denomBall + denomFlipper > 1e-7
+				? MathUtils.clamp(numer / (denomBall + denomFlipper), -maxFriction, maxFriction)
+				: 0
+		const expectedVel = normal
+			.clone()
+			.multiplyScalar(normalImpulse * stepTime * ball.hit.invMass)
+			.add(slipDir.clone().multiplyScalar(stepTime * friction * ball.hit.invMass))
+		const expectedFlipperSpeed =
+			(normalResponse.z * normalImpulse * stepTime - frictionArmFlipper.z * stepTime * friction) / mover.inertia
+
+		const coll = new CollisionEvent(ball)
+		coll.hitNormal.set(normal.x, normal.y, normal.z)
+		coll.hitDistance = 0
+		coll.hitOrgNormalVelocity = 0
+		flipperHit.contact(coll, stepTime, physics)
+
+		expect(ball.hit.vel.x).to.be.closeTo(expectedVel.x, 1e-9)
+		expect(ball.hit.vel.y).to.be.closeTo(expectedVel.y, 1e-9)
+		expect(ball.hit.vel.z).to.be.closeTo(expectedVel.z, 1e-9)
+		expect(mover.angleSpeed).to.be.closeTo(expectedFlipperSpeed, 1e-9)
 	})
 
 	it('should move the flipper up when hit from below', () => {

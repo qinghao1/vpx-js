@@ -1,9 +1,8 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { Vertex3D } from '../../util/vector.js'
+import { Vertex3D } from '../../math/vector.js'
 import { ItemState } from '../item-state.js'
-import { omitEqual } from '../state-helpers.js'
 
 /** Primitive state. @see https://github.com/vpinball/vpinball/blob/master/primitive.cpp */
 export class PrimitiveState extends ItemState {
@@ -17,6 +16,10 @@ export class PrimitiveState extends ItemState {
 	public normalMap?: string
 	public color: number = 0xffffff
 	public alpha: number = 100
+	/** Sequencer lock. @see Primitive::m_lockedByLS in src/parts/primitive.h */
+	public lockedByLS = false
+	/** Sequencer-driven on/off; script Visible keeps flowing to isVisible. @see Primitive::m_inPlayState in src/parts/primitive.h */
+	public inPlayState = true
 	public disableLightingTop: number = 0
 	public disableLightingBelow: number = 1
 	public currentFrame: number = -1
@@ -86,117 +89,7 @@ export class PrimitiveState extends ItemState {
 		state.disableLightingTop = disableLightingTop
 		state.disableLightingBelow = disableLightingBelow
 		state.currentFrame = currentFrame
+		state.inPlayState = isVisible
 		return state
-	}
-
-	public clone(): PrimitiveState {
-		return PrimitiveState.claim(
-			this.name,
-			this.position.clone(true),
-			this.size.clone(true),
-			this.rotation.clone(true),
-			this.translation.clone(true),
-			this.objectRotation.clone(true),
-			this.material,
-			this.map,
-			this.normalMap,
-			this.isVisible,
-			this.color,
-			this.disableLightingTop,
-			this.disableLightingBelow,
-			this.alpha,
-			this.currentFrame,
-		)
-	}
-
-	public override copyFrom(state: ItemState): void {
-		const s = state as PrimitiveState
-		this.name = s.name
-		if (!this.position) this.position = Vertex3D.claim()
-		this.position.set(s.position)
-		if (!this.size) this.size = Vertex3D.claim()
-		this.size.set(s.size)
-		if (!this.rotation) this.rotation = Vertex3D.claim()
-		this.rotation.set(s.rotation)
-		if (!this.translation) this.translation = Vertex3D.claim()
-		this.translation.set(s.translation)
-		if (!this.objectRotation) this.objectRotation = Vertex3D.claim()
-		this.objectRotation.set(s.objectRotation)
-		this.material = s.material
-		this.map = s.map
-		this.normalMap = s.normalMap
-		this.isVisible = s.isVisible
-		this.color = s.color
-		this.alpha = s.alpha
-		this.disableLightingTop = s.disableLightingTop
-		this.disableLightingBelow = s.disableLightingBelow
-		this.currentFrame = s.currentFrame
-	}
-
-	public diff(state: PrimitiveState): PrimitiveState {
-		const diff = this.clone()
-		if (diff.position.equals(state.position)) {
-			Vertex3D.release(diff.position)
-			// biome-ignore lint/performance/noDelete: partial diff requires deletion
-			delete diff.position
-		}
-		if (diff.size.equals(state.size)) {
-			Vertex3D.release(diff.size)
-			// biome-ignore lint/performance/noDelete: partial diff requires deletion
-			delete diff.size
-		}
-		if (diff.rotation.equals(state.rotation)) {
-			Vertex3D.release(diff.rotation)
-			// biome-ignore lint/performance/noDelete: partial diff requires deletion
-			delete diff.rotation
-		}
-		if (diff.translation.equals(state.translation)) {
-			Vertex3D.release(diff.translation)
-			// biome-ignore lint/performance/noDelete: partial diff requires deletion
-			delete diff.translation
-		}
-		if (diff.objectRotation.equals(state.objectRotation)) {
-			Vertex3D.release(diff.objectRotation)
-			// biome-ignore lint/performance/noDelete: partial diff requires deletion
-			delete diff.objectRotation
-		}
-		omitEqual(diff, state, 'material')
-		omitEqual(diff, state, 'map')
-		omitEqual(diff, state, 'normalMap')
-		omitEqual(diff, state, 'isVisible')
-		omitEqual(diff, state, 'color')
-		omitEqual(diff, state, 'alpha')
-		omitEqual(diff, state, 'disableLightingTop')
-		omitEqual(diff, state, 'disableLightingBelow')
-		omitEqual(diff, state, 'currentFrame')
-		return diff
-	}
-
-	public release(): void {
-		if (!this.position) this.position = Vertex3D.claim()
-		if (!this.size) this.size = Vertex3D.claim()
-		if (!this.rotation) this.rotation = Vertex3D.claim()
-		if (!this.translation) this.translation = Vertex3D.claim()
-		if (!this.objectRotation) this.objectRotation = Vertex3D.claim()
-	}
-
-	public equals(state: PrimitiveState): boolean {
-		if (!state) return false
-		return (
-			state.position.equals(this.position) &&
-			state.size.equals(this.size) &&
-			state.rotation.equals(this.rotation) &&
-			state.translation.equals(this.translation) &&
-			state.objectRotation.equals(this.objectRotation) &&
-			state.material === this.material &&
-			state.map === this.map &&
-			state.normalMap === this.normalMap &&
-			state.isVisible === this.isVisible &&
-			state.color === this.color &&
-			state.alpha === this.alpha &&
-			state.disableLightingTop === this.disableLightingTop &&
-			state.disableLightingBelow === this.disableLightingBelow &&
-			state.currentFrame === this.currentFrame
-		)
 	}
 }

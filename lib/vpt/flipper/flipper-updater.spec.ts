@@ -8,6 +8,7 @@ import sinonChai from 'sinon-chai'
 import { TableBuilder } from '../../../test/table-builder.js'
 import { TestRenderApi } from '../../../test/test-render-api.js'
 import { Player } from '../../game/player.js'
+import type { IRenderApi } from '../../render/irender-api.js'
 import type { Table } from '../table/table.js'
 import type { FlipperState } from './flipper-state.js'
 
@@ -35,21 +36,42 @@ describe('The VPinball flipper updater', () => {
 	it('should apply visibility', async () => {
 		const renderApi = new TestRenderApi()
 		spy(renderApi, 'applyVisibility')
-		table.flippers.flipper.getUpdater().applyState(null, { isVisible: true } as FlipperState, renderApi, table)
+		table.flippers.flipper
+			.getUpdater()
+			.applyState(
+				null,
+				{ isVisible: true } as FlipperState,
+				renderApi as unknown as IRenderApi<null, unknown, unknown>,
+				table,
+			)
 		expect(renderApi.applyVisibility).to.have.been.calledOnceWith(true)
 	})
 
 	it('should apply the material', async () => {
 		const renderApi = new TestRenderApi()
 		spy(renderApi, 'applyMaterial')
-		table.flippers.flipper.getUpdater().applyState(null, { material: 'opaque' } as FlipperState, renderApi, table)
+		table.flippers.flipper
+			.getUpdater()
+			.applyState(
+				null,
+				{ material: 'opaque' } as FlipperState,
+				renderApi as unknown as IRenderApi<null, unknown, unknown>,
+				table,
+			)
 		expect(renderApi.applyMaterial).to.have.been.calledOnce
 	})
 
 	it('should apply the transformation', async () => {
 		const renderApi = new TestRenderApi()
 		spy(renderApi, 'applyMatrixToNode')
-		table.flippers.flipper.getUpdater().applyState(null, { angle: 1 } as FlipperState, renderApi, table)
+		table.flippers.flipper
+			.getUpdater()
+			.applyState(
+				null,
+				{ angle: 1 } as FlipperState,
+				renderApi as unknown as IRenderApi<null, unknown, unknown>,
+				table,
+			)
 		expect(renderApi.applyMatrixToNode).to.have.been.calledOnce
 	})
 })

@@ -5,11 +5,11 @@ import { MathUtils } from 'three'
 import { Event } from '../../game/event.js'
 import type { EventProxy } from '../../game/event-proxy.js'
 import type { PlayerPhysics } from '../../game/player-physics.js'
+import { Vertex2D, Vertex3D } from '../../math/vector.js'
 import { PHYS_FACTOR } from '../../physics/constants.js'
 import { HitCircle } from '../../physics/hit-circle.js'
 import type { MoverObject } from '../../physics/mover-object.js'
 import { logger } from '../../util/logger.js'
-import { Vertex2D, Vertex3D } from '../../util/vector.js'
 import type { TableData } from '../table/table-data.js'
 import type { FlipperConfig } from './flipper.js'
 import type { FlipperData } from './flipper-data.js'
@@ -169,11 +169,6 @@ export class FlipperMover implements MoverObject {
 		return !Number.isFinite(hitTime) || hitTime < 0 ? -1 : hitTime
 	}
 
-	/** @deprecated Use {@link #applyImpulseAndRelease()} */
-	public applyImpulse(rotI: Vertex3D): void {
-		this.angularMomentum += rotI.z
-		this.angleSpeed = this.angularMomentum / this.inertia
-	}
 	public applyImpulseAndRelease(rotI: Vertex3D): void {
 		this.angularMomentum += rotI.z
 		this.angleSpeed = this.angularMomentum / this.inertia

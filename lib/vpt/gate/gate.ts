@@ -2,19 +2,23 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 import { MathUtils } from 'three'
 import { EventProxy } from '../../game/event-proxy.js'
-import type { IAnimatable, IAnimation } from '../../game/ianimatable.js'
-import type { IHittable } from '../../game/ihittable.js'
-import type { IMovable } from '../../game/imovable.js'
-import type { IPlayable } from '../../game/iplayable.js'
-import type { IRenderable, Meshes } from '../../game/irenderable.js'
-import type { IScriptable } from '../../game/iscriptable.js'
+import type {
+	IAnimatable,
+	IAnimation,
+	IHittable,
+	IMovable,
+	IPlayable,
+	IRenderable,
+	IScriptable,
+	Meshes,
+} from '../../game/interfaces.js'
 import type { Player } from '../../game/player.js'
 import type { Storage } from '../../io/ole-doc.js'
+import { Matrix3D } from '../../math/matrix.js'
+import { Vertex2D } from '../../math/vector.js'
 import type { HitCircle } from '../../physics/hit-circle.js'
 import type { HitObject } from '../../physics/hit-object.js'
 import type { LineSeg } from '../../physics/line-seg.js'
-import { Matrix3D } from '../../util/matrix.js'
-import { Vertex2D } from '../../util/vector.js'
 import { Item } from '../item.js'
 import type { Table } from '../table/table.js'
 import { GateAnimation } from './gate-animation.js'

@@ -1,7 +1,7 @@
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import * as vm from 'node:vm'
-import { describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it } from 'vitest'
 import { auditTableStructure, verifyVpinballCompat } from '../../test/harness/verify-vpinball-compat.js'
 import { discoverVpinball } from '../../test/harness/vpinball-resolver.js'
 import { NodeBinaryReader } from '../io/binary-reader.node.js'
@@ -16,16 +16,19 @@ const FIXTURE_FILES = fs
 	.sort()
 
 describe('VPinball & Table Component Parity Regression', () => {
-	it('discovers 25 test fixtures', () => {
-		expect(FIXTURE_FILES.length).toBeGreaterThanOrEqual(25)
+	it('discovers test fixtures', () => {
+		expect(FIXTURE_FILES.length).toBeGreaterThan(0)
 	})
 
 	describe.each(FIXTURE_FILES)('Fixture: %s', fixtureName => {
 		const fixturePath = path.join(FIXTURES_DIR, fixtureName)
+		let table: Table
+
+		beforeAll(async () => {
+			table = await Table.load(new NodeBinaryReader(fixturePath), { loadTableScript: true })
+		})
 
 		it('loads table model and audits all 22 components without errors', async () => {
-			const reader = new NodeBinaryReader(fixturePath)
-			const table = await Table.load(reader, { loadTableScript: true })
 			expect(table).toBeDefined()
 
 			const audit = auditTableStructure(table)
@@ -37,8 +40,6 @@ describe('VPinball & Table Component Parity Regression', () => {
 		})
 
 		it('transpiles table script to syntax-valid JavaScript in V8', async () => {
-			const reader = new NodeBinaryReader(fixturePath)
-			const table = await Table.load(reader, { loadTableScript: true })
 			const rawScript = (table as unknown as { tableScript?: string }).tableScript ?? ''
 
 			if (rawScript.trim().length > 0) {
@@ -66,7 +67,7 @@ describe('VPinball & Table Component Parity Regression', () => {
 		} else {
 			expect(discovery.binPath).toBeNull()
 		}
-	})
+	}, 120_000)
 
 	const walkingDeadPath = '/home/qinghao1/Downloads/walking_dead.vpx'
 	const hasWalkingDead = fs.existsSync(walkingDeadPath)

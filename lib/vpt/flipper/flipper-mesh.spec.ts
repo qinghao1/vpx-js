@@ -5,8 +5,13 @@ import type { Mesh } from 'three'
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { ThreeHelper } from '../../../test/three.helper'
 import { NodeBinaryReader } from '../../io/binary-reader.node.js'
+import { Matrix3D } from '../../math/matrix.js'
+import { Vertex2D } from '../../math/vector.js'
+import type { Mesh as VpxMesh } from '../mesh.js'
 import { Table } from '../table/table.js'
 import { TableExporter } from '../table/table-exporter.js'
+import { FlipperData } from './flipper-data.js'
+import { FlipperMesh } from './flipper-mesh.js'
 
 const three = new ThreeHelper()
 
@@ -577,8 +582,8 @@ describe('The VPinball flipper generator', () => {
 		const flipperRubberMesh = three.find<Mesh>(gltf, 'flippers', 'FatFlipper', 'flipperrubber-FatFlipper')
 		const flipperRubberMeshVertices = three.vertices(flipperRubberMesh)
 		expectedVertices = [
-			[386.49649, 1395.26416, -19.090073],
-			[386.49649, 1395.26416, -43.102074],
+			[388.440125, 1396.047607, -19.090073],
+			[388.440125, 1396.047607, -43.102074],
 			[391.352631, 1397.37561, -43.102074],
 			[391.352631, 1397.37561, -19.090073],
 			[406.778259, 1395.618164, -19.090073],
@@ -597,8 +602,8 @@ describe('The VPinball flipper generator', () => {
 			[416.626404, 1372.969116, -19.090073],
 			[414.685669, 1368.042114, -19.090073],
 			[411.535736, 1363.785278, -19.090073],
-			[407.391602, 1360.488892, -19.090073],
-			[284.568878, 1275.088989, -19.090073],
+			[408.995819, 1361.83728, -19.090073],
+			[286.131104, 1276.372314, -19.090073],
 			[277.332214, 1271.942383, -19.090073],
 			[269.527649, 1270.775879, -19.090073],
 			[261.686981, 1271.669067, -19.090073],
@@ -610,15 +615,15 @@ describe('The VPinball flipper generator', () => {
 			[239.669113, 1308.312988, -19.090073],
 			[242.561386, 1315.655273, -19.090073],
 			[247.255341, 1321.998657, -19.090073],
-			[253.431122, 1326.911011, -19.090073],
-			[386.49649, 1395.26416, -19.090073],
+			[255.297562, 1327.687866, -19.090073],
+			[388.440125, 1396.047607, -19.090073],
 			[391.352631, 1397.37561, -19.090073],
 			[396.589905, 1398.158447, -19.090073],
 			[401.851379, 1397.558838, -19.090073],
 			[396.589905, 1398.158447, -43.102074],
 			[391.352631, 1397.37561, -43.102074],
-			[386.49649, 1395.26416, -43.102074],
-			[253.431122, 1326.911011, -43.102074],
+			[388.440125, 1396.047607, -43.102074],
+			[255.297562, 1327.687866, -43.102074],
 			[247.255341, 1321.998657, -43.102074],
 			[242.561386, 1315.655273, -43.102074],
 			[239.669113, 1308.312988, -43.102074],
@@ -630,8 +635,8 @@ describe('The VPinball flipper generator', () => {
 			[261.686981, 1271.669067, -43.102074],
 			[269.527649, 1270.775879, -43.102074],
 			[277.332214, 1271.942383, -43.102074],
-			[284.568878, 1275.088989, -43.102074],
-			[407.391602, 1360.488892, -43.102074],
+			[286.131104, 1276.372314, -43.102074],
+			[408.995819, 1361.83728, -43.102074],
 			[411.535736, 1363.785278, -43.102074],
 			[414.685669, 1368.042114, -43.102074],
 			[416.626404, 1372.969116, -43.102074],
@@ -651,10 +656,10 @@ describe('The VPinball flipper generator', () => {
 			[401.851379, 1397.558838, -19.090073],
 			[416.443237, 1383.467773, -19.090073],
 			[416.443237, 1383.467773, -43.102074],
-			[284.568878, 1275.088989, -43.102074],
+			[286.131104, 1276.372314, -43.102074],
 			[277.332214, 1271.942383, -43.102074],
 			[277.332214, 1271.942383, -19.090073],
-			[284.568878, 1275.088989, -19.090073],
+			[286.131104, 1276.372314, -19.090073],
 			[238.775864, 1300.472412, -19.090073],
 			[238.775864, 1300.472412, -43.102074],
 			[239.669113, 1308.312988, -43.102074],
@@ -665,8 +670,8 @@ describe('The VPinball flipper generator', () => {
 			[269.527649, 1270.775879, -19.090073],
 			[414.331665, 1388.324097, -19.090073],
 			[414.331665, 1388.324097, -43.102074],
-			[407.391602, 1360.488892, -19.090073],
-			[407.391602, 1360.488892, -43.102074],
+			[408.995819, 1361.83728, -19.090073],
+			[408.995819, 1361.83728, -43.102074],
 			[411.535736, 1363.785278, -19.090073],
 			[411.535736, 1363.785278, -43.102074],
 			[239.942322, 1292.667725, -19.090073],
@@ -677,8 +682,8 @@ describe('The VPinball flipper generator', () => {
 			[261.686981, 1271.669067, -43.102074],
 			[247.255341, 1321.998657, -19.090073],
 			[247.255341, 1321.998657, -43.102074],
-			[253.431122, 1326.911011, -43.102074],
-			[253.431122, 1326.911011, -19.090073],
+			[255.297562, 1327.687866, -43.102074],
+			[255.297562, 1327.687866, -19.090073],
 			[414.685669, 1368.042114, -19.090073],
 			[414.685669, 1368.042114, -43.102074],
 		]
@@ -1249,5 +1254,114 @@ describe('The VPinball flipper generator', () => {
 			[495.553619, 753.316101, -93.102074],
 		]
 		three.expectVerticesInArray(expectedVertices, flipperRubberMeshVertices)
+	})
+})
+
+describe('The VPinball flipper arc reconstruction', () => {
+	const table = { getSurfaceHeight: () => 0, getScaleZ: () => 1 } as unknown as Table
+
+	function generateMeshes() {
+		const data = new FlipperData('ArcFlipper')
+		data.center = new Vertex2D(0, 0)
+		return new FlipperMesh().generateMeshes(data, table)
+	}
+
+	function hasVertexNear(mesh: VpxMesh, x: number, y: number, tolerance: number): boolean {
+		return mesh.vertices.some(vertex => Math.hypot(vertex.x - x, vertex.y - y) < tolerance)
+	}
+
+	it('should reconstruct the tip arc at exactly the end radius', () => {
+		const { base } = generateMeshes()
+		const minY = Math.min(...base.vertices.map(vertex => vertex.y))
+		// upstream ApplyFix (src/parts/flipper.cpp) places the tip apex at flipperRadius + endRadius - rubberThickness
+		expect(minY).toBeCloseTo(-(130 + 13 - 7), 6)
+	})
+
+	it('should reconstruct the base arc at exactly the base radius', () => {
+		const { base } = generateMeshes()
+		const maxY = Math.max(...base.vertices.map(vertex => vertex.y))
+		expect(maxY).toBeCloseTo(21.5 - 7, 6)
+	})
+
+	it('should reconstruct rubber arcs at exactly the outer radii', () => {
+		const { rubber } = generateMeshes()
+		if (!rubber) throw new Error('Expected rubber mesh for default flipper.')
+		const ys = rubber.vertices.map(vertex => vertex.y)
+		expect(Math.min(...ys)).toBeCloseTo(-(130 + 13), 6)
+		expect(Math.max(...ys)).toBeCloseTo(21.5, 6)
+	})
+
+	it('should shift arc endpoints by the taper correction', () => {
+		const { base } = generateMeshes()
+		// oracle values from upstream ApplyFix for default geometry (baseRadius 21.5, endRadius 13, length 130)
+		expect(hasVertexNear(base, 5.987161, -130.392308, 1e-3)).toBe(true)
+		expect(hasVertexNear(base, 14.468972, -0.948077, 1e-3)).toBe(true)
+	})
+})
+
+type Row4 = number[][]
+
+const rowIdentity = (): Row4 => [
+	[1, 0, 0, 0],
+	[0, 1, 0, 0],
+	[0, 0, 1, 0],
+	[0, 0, 0, 1],
+]
+const rowTranslate = (x: number, y: number, z: number): Row4 => [
+	[1, 0, 0, 0],
+	[0, 1, 0, 0],
+	[0, 0, 1, 0],
+	[x, y, z, 1],
+]
+const rowRotateZ = (a: number): Row4 => {
+	const c = Math.cos(a),
+		s = Math.sin(a)
+	return [
+		[c, s, 0, 0],
+		[-s, c, 0, 0],
+		[0, 0, 1, 0],
+		[0, 0, 0, 1],
+	]
+}
+const rowMul = (A: Row4, B: Row4): Row4 => {
+	const C = rowIdentity()
+	for (let i = 0; i < 4; i++)
+		for (let j = 0; j < 4; j++) {
+			let s = 0
+			for (let k = 0; k < 4; k++) s += A[i][k] * B[k][j]
+			C[i][j] = s
+		}
+	return C
+}
+const toRow = (m: Matrix3D): Row4 => [
+	[m._11, m._12, m._13, m._14],
+	[m._21, m._22, m._23, m._24],
+	[m._31, m._32, m._33, m._34],
+	[m._41, m._42, m._43, m._44],
+]
+const rowClose = (a: Row4, b: Row4, eps = 1e-5): boolean => {
+	for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) if (Math.abs(a[i][j] - b[i][j]) > eps) return false
+	return true
+}
+
+describe('flipper bat matrix order', () => {
+	it('composes m0*Mr*m1*Mt around the flipper center', () => {
+		const center = { x: 100, y: 200 }
+		const dx = 5,
+			dy = -3,
+			h = 10
+		const m0 = new Matrix3D().setTranslation(-center.x, -center.y, h)
+		const m1 = new Matrix3D().setTranslation(center.x, center.y, -h)
+		const mr = new Matrix3D().rotateZMatrix(0.5)
+		const mt = new Matrix3D().setTranslation(dx, dy, 0)
+		const row = rowMul(
+			rowMul(
+				rowMul(rowTranslate(-center.x, -center.y, h), rowRotateZ(0.5)),
+				rowTranslate(center.x, center.y, -h),
+			),
+			rowTranslate(dx, dy, 0),
+		)
+		const m = m0.clone().multiply(mr).multiply(m1).multiply(mt)
+		expect(rowClose(toRow(m), row)).toBe(true)
 	})
 })

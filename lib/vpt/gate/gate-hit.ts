@@ -4,12 +4,12 @@ import { MathUtils } from 'three'
 
 import type { EventProxy } from '../../game/event-proxy.js'
 import type { PlayerPhysics } from '../../game/player-physics.js'
+import { Vertex2D } from '../../math/vector.js'
 import type { CollisionEvent } from '../../physics/collision-event.js'
 import { CollisionType } from '../../physics/collision-type.js'
 import { PHYS_SKIN } from '../../physics/constants.js'
 import { HitObject } from '../../physics/hit-object.js'
 import { LineSeg } from '../../physics/line-seg.js'
-import { Vertex2D } from '../../util/vector.js'
 import type { Ball } from '../ball/ball.js'
 import type { GateData } from './gate-data.js'
 import { GateMover } from './gate-mover.js'
@@ -49,8 +49,9 @@ export class GateHit extends HitObject {
 	}
 
 	public override calcHitBBox(): void {
-		this.lineSeg[0]?.calcHitBBox()
-		this.hitBBox = this.lineSeg[0]?.hitBBox
+		const seg = this.lineSeg[0]
+		seg?.calcHitBBox()
+		if (seg) this.hitBBox.copy(seg.hitBBox)
 	}
 
 	public override hitTest(ball: Ball, dTime: number, coll: CollisionEvent, _physics: PlayerPhysics): number {

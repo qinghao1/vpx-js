@@ -3,7 +3,7 @@
 
 import { BiffParser } from '../../io/biff-parser.js'
 import type { Storage } from '../../io/ole-doc.js'
-import { Vertex2D } from '../../util/vector.js'
+import { Vertex2D } from '../../math/vector.js'
 import { handleBiffTag } from '../biff-helper.js'
 import { ItemData } from '../item-data.js'
 
@@ -38,9 +38,9 @@ export class SpinnerData extends ItemData {
 	public isReflectionEnabled = true
 
 	public static async fromStorage(storage: Storage, itemName: string): Promise<SpinnerData> {
-		const d = new SpinnerData(itemName)
-		await storage.streamFiltered(itemName, 4, BiffParser.stream(d.fromTag.bind(d)))
-		return d.correctAngles()
+		const data = new SpinnerData(itemName)
+		await storage.streamFiltered(itemName, 4, BiffParser.stream(data.fromTag.bind(data)))
+		return data.correctAngles()
 	}
 
 	private correctAngles(): this {

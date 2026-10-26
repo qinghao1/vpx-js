@@ -1,7 +1,7 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { Matrix3D } from '../../util/matrix.js'
+import { Matrix3D } from '../../math/matrix.js'
 import { Vertex3DNoTex2 } from '../../util/vertex.js'
 import { Enums } from '../enums.js'
 import { Mesh } from '../mesh.js'
@@ -33,8 +33,6 @@ export class PlungerMeshGenerator {
 	private readonly springMinSpacing = 2.2
 	private lathePoints!: number
 	private desc!: PlungerDesc
-	private vtsPerFrame = 0
-	private indicesPerFrame = 0
 
 	constructor(private readonly data: PlungerData) {
 		this.stroke = data.stroke!
@@ -50,21 +48,23 @@ export class PlungerMeshGenerator {
 	}
 
 	public generateMeshes(frame: number, table: Table): { rod?: Mesh; spring?: Mesh; flat?: Mesh } {
-		if (this.cache[frame]) return this.cache[frame]!
+		const cached = this.cache[frame]
+		if (cached) return cached
 		this.zHeight =
 			table.getSurfaceHeight(this.data.szSurface, this.data.center.x, this.data.center.y) + this.data.zAdjust
 		this.zScale = table.getScaleZ()
 		this.desc = this.getDesc()
 		this.lathePoints = this.desc.n
-		this.calcFrameDetails()
+		let meshes: { rod?: Mesh; spring?: Mesh; flat?: Mesh }
 		if (this.data.type === Enums.PlungerType.PlungerTypeFlat) {
-			this.cache[frame] = { flat: this.buildFlat(frame).transform(Matrix3D.RIGHT_HANDED) }
+			meshes = { flat: this.buildFlat(frame).transform(Matrix3D.RIGHT_HANDED) }
 		} else {
 			const rod = this.buildRod(frame).transform(Matrix3D.RIGHT_HANDED)
-			const spring = this.buildSpring(frame, rod.vertices).transform(Matrix3D.RIGHT_HANDED)
-			this.cache[frame] = { rod, spring }
+			const spring = this.buildSpring(rod.vertices).transform(Matrix3D.RIGHT_HANDED)
+			meshes = { rod, spring }
 		}
-		return this.cache[frame]!
+		this.cache[frame] = meshes
+		return meshes
 	}
 
 	private getDesc(): PlungerDesc {
@@ -85,20 +85,6 @@ export class PlungerMeshGenerator {
 			default:
 				throw new Error(`Unknown plunger type ${this.data.type}`)
 		}
-	}
-
-	private calcFrameDetails(): void {
-		if (this.data.type === Enums.PlungerType.PlungerTypeFlat) {
-			this.vtsPerFrame = 4
-			this.indicesPerFrame = 6
-			return
-		}
-		const latheVts = this.lathePoints * this.circlePoints
-		const springVts = Math.floor((this.springLoops + this.springEndLoops) * this.circlePoints) * 3
-		this.vtsPerFrame = latheVts + springVts
-		const latheIdx = 6 * this.circlePoints * (this.lathePoints - 1)
-		const springIdx = this.data.type === Enums.PlungerType.PlungerTypeCustom ? Math.max(0, 4 * springVts - 12) : 0
-		this.indicesPerFrame = latheIdx + springIdx
 	}
 
 	private buildRod(i: number): Mesh {
@@ -150,7 +136,7 @@ export class PlungerMeshGenerator {
 		return mesh
 	}
 
-	private buildSpring(_i: number, rodVertices: Vertex3DNoTex2[]): Mesh {
+	private buildSpring(rodVertices: Vertex3DNoTex2[]): Mesh {
 		const mesh = new Mesh('spring')
 		const gaugeRel = this.springGauge / this.data.width
 		const off = this.circlePoints * this.lathePoints
@@ -173,42 +159,19 @@ export class PlungerMeshGenerator {
 				zs = this.zScale,
 				sr = this.springRadius,
 				sg = this.springGauge
-			mesh.vertices.push(
-				Object.assign(new Vertex3DNoTex2(), {
-					x: sr * (sn * w) + cx,
-					y: y - sg,
-					z: (sr * (cs * w) + w + zh) * zs,
-					nx: 0,
-					ny: -1,
-					nz: 0,
-					tu: (sn + 1) * 0.5,
-					tv: 0.76,
-				}),
-			)
-			mesh.vertices.push(
-				Object.assign(new Vertex3DNoTex2(), {
-					x: (sr + gaugeRel / 1.5) * (sn * w) + cx,
-					y,
-					z: ((sr + gaugeRel / 1.5) * (cs * w) + w + zh) * zs,
-					nx: sn,
-					ny: 0,
-					nz: -cs,
-					tu: (sn + 1) * 0.5,
-					tv: 0.85,
-				}),
-			)
-			mesh.vertices.push(
-				Object.assign(new Vertex3DNoTex2(), {
-					x: sr * (sn * w) + cx,
-					y: y + sg,
-					z: (sr * (cs * w) + w + zh) * zs,
-					nx: 0,
-					ny: 1,
-					nz: 0,
-					tu: (sn + 1) * 0.5,
-					tv: 0.98,
-				}),
-			)
+			const coilX = sr * (sn * w) + cx
+			const coilZ = (sr * (cs * w) + w + zh) * zs
+			const edgeX = (sr + gaugeRel / 1.5) * (sn * w) + cx
+			const edgeZ = ((sr + gaugeRel / 1.5) * (cs * w) + w + zh) * zs
+			const tu = (sn + 1) * 0.5
+			const coil: Array<[number, number, number, number, number, number, number]> = [
+				[coilX, y - sg, coilZ, 0, -1, 0, 0.76],
+				[edgeX, y, edgeZ, sn, 0, -cs, 0.85],
+				[coilX, y + sg, coilZ, 0, 1, 0, 0.98],
+			]
+			for (const [x, vy, z, nx, ny, nz, tv] of coil) {
+				mesh.vertices.push(Object.assign(new Vertex3DNoTex2(), { x, y: vy, z, nx, ny, nz, tu, tv }))
+			}
 		}
 		for (let idx = 0, k = 0; idx < mesh.vertices.length - 3; idx += 3) {
 			const nz = mesh.vertices[idx + 1]?.nz
@@ -250,8 +213,7 @@ export class PlungerMeshGenerator {
 		const yTop = yTip,
 			yBot = this.beginY + this.data.height
 		const z = (this.zHeight + this.data.width * 1.25) * this.zScale
-		let idx = this.srcCells - 1 - Math.floor((i * this.srcCells) / this.cFrames + 0.5)
-		if (idx < 0) idx = 0
+		const idx = Math.max(0, this.srcCells - 1 - Math.floor((i * this.srcCells) / this.cFrames + 0.5))
 		const tu = this.cellWid * idx,
 			tv = (yBot - yTop) / (this.beginY + this.data.height - this.endY)
 		const mesh = new Mesh('flat')

@@ -2,14 +2,15 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import type { EventProxy } from '../../game/event-proxy.js'
+import { Vertex2D, Vertex3D } from '../../math/vector.js'
 import { CollisionType } from '../../physics/collision-type.js'
 import { PHYS_SKIN } from '../../physics/constants.js'
 import { Hit3DPoly } from '../../physics/hit-3dpoly.js'
 import type { HitObject } from '../../physics/hit-object.js'
 import { CatmullCurve2D } from '../../util/catmull-curve.js'
-import { DragPoint } from '../../util/dragpoint.js'
-import { Vertex2D, Vertex3D } from '../../util/vector.js'
 import { RenderVertex } from '../../util/vertex.js'
+import { DragPoint } from '../dragpoint.js'
+import { normalizeWindingOrder } from '../surface/surface-physics.js'
 import type { Table } from '../table/table.js'
 import type { TriggerAnimation } from './trigger-animation.js'
 import type { TriggerData } from './trigger-data.js'
@@ -25,6 +26,8 @@ export class TriggerHitGenerator {
 			() => new RenderVertex(),
 			CatmullCurve2D.fromVertex2D,
 		)
+		// Inside/outside derives from winding-dependent normals; a reversed order swaps Hit/UnHit.
+		normalizeWindingOrder(vVertex)
 		const n = vVertex.length
 		const rgv3D = vVertex.map(v => new Vertex3D(v.x, v.y, h + PHYS_SKIN * 2))
 		const hits: HitObject[] = []

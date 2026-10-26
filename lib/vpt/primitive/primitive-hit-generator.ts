@@ -3,11 +3,12 @@
 import { MathUtils } from 'three'
 
 import type { EventProxy } from '../../game/event-proxy.js'
+import type { Vertex3D } from '../../math/vector.js'
 import { CollisionType } from '../../physics/collision-type.js'
+import { EdgeSet } from '../../physics/edge-set.js'
 import type { HitObject } from '../../physics/hit-object.js'
 import { HitPoint } from '../../physics/hit-point.js'
 import { HitTriangle } from '../../physics/hit-triangle.js'
-import { EdgeSet } from '../../util/edge-set.js'
 import {
 	ProgMeshFloat3,
 	ProgMeshTriData,
@@ -15,7 +16,6 @@ import {
 	progressiveMesh,
 	remapIndices,
 } from '../../util/progressive-mesh.js'
-import type { Vertex3D } from '../../util/vector.js'
 import { Vertex3DNoTex2 } from '../../util/vertex.js'
 import { Mesh } from '../mesh.js'
 import type { Table } from '../table/table.js'
@@ -23,14 +23,15 @@ import type { PrimitiveData } from './primitive-data.js'
 
 /** Primitive hit generator. @see https://github.com/vpinball/vpinball/blob/master/primitive.cpp */
 export class PrimitiveHitGenerator {
-	constructor(private readonly data: PrimitiveData) {}
-
-	public generateHitObjects(mesh: Mesh, events: EventProxy, table: Table): HitObject[] {
-		const hitObjects: HitObject[] = []
-		if (this.data.getName() === 'playfield_mesh') {
+	constructor(private readonly data: PrimitiveData) {
+		if (this.data.getName().toLowerCase() === 'playfield_mesh') {
 			this.data.isVisible = false
 			this.data.useAsPlayfield = true
 		}
+	}
+
+	public generateHitObjects(mesh: Mesh, events: EventProxy, table: Table): HitObject[] {
+		const hitObjects: HitObject[] = []
 		if (this.data.isToy && !this.data.useAsPlayfield) return []
 		const reducedVertices = Math.floor(
 			Math.max(
@@ -61,10 +62,9 @@ export class PrimitiveHitGenerator {
 	public getReducedMesh(mesh: Mesh, reducedVertices: number): Mesh {
 		const progVertices = mesh.vertices.map(v => new ProgMeshFloat3(v.x, v.y, v.z))
 		const progIndices: ProgMeshTriData[] = []
-		let i2 = 0
 		for (let i = 0; i < mesh.indices.length; i += 3) {
 			const t = new ProgMeshTriData([mesh.indices[i]!, mesh.indices[i + 1]!, mesh.indices[i + 2]!])
-			if (t.v[0] !== t.v[1] && t.v[1] !== t.v[2] && t.v[2] !== t.v[0]) progIndices[i2++] = t
+			if (t.v[0] !== t.v[1] && t.v[1] !== t.v[2] && t.v[2] !== t.v[0]) progIndices.push(t)
 		}
 		const [progMap, progPerm] = progressiveMesh(progVertices, progIndices)
 		permuteVertices(progPerm, progVertices, progIndices)
@@ -83,8 +83,8 @@ export class PrimitiveHitGenerator {
 			obj.setElasticity(table.data?.elasticity, table.data?.elasticityFalloff)
 			obj.setFriction(table.data?.friction)
 			obj.setScatter(MathUtils.degToRad(table.data?.scatter))
-			obj.setEnabled(true)
 		}
+		obj.setEnabled(this.data.isCollidable)
 		obj.threshold = this.data.threshold
 		obj.setType(CollisionType.Primitive)
 		obj.obj = events

@@ -1,7 +1,7 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import type { IAnimation } from '../../game/ianimatable.js'
+import type { IAnimation } from '../../game/interfaces.js'
 import { Enums } from '../enums.js'
 import type { Table } from '../table/table.js'
 import type { TriggerData } from './trigger-data.js'
@@ -39,7 +39,8 @@ export class TriggerAnimation implements IAnimation {
 		let animLimit = this.data.shape === Enums.TriggerShape.TriggerStar ? this.data.radius * (1 / 5) : 32
 		if (this.data.shape === Enums.TriggerShape.TriggerButton) animLimit = this.data.radius * (1 / 10)
 		if (this.data.shape === Enums.TriggerShape.TriggerWireC) animLimit = 60
-		if (this.data.shape === Enums.TriggerShape.TriggerWireD) animLimit = 25
+		if (this.data.shape === Enums.TriggerShape.TriggerWireD || this.data.shape === Enums.TriggerShape.TriggerInder)
+			animLimit = 25
 		const limit = animLimit * table.getScaleZ()
 		if (this.hitEvent) {
 			this.doAnimation = true

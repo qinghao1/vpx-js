@@ -70,6 +70,24 @@ describe('The VPinball plunger physics', () => {
 		expect(plungerState.frame).to.equal(parkFrame)
 	})
 
+	it('should fire LimitBOS when pulled back and LimitEOS when fired', async () => {
+		const plunger = table.plungers.CustomPlunger
+		const api = plunger.getApi()
+		let bosCount = 0
+		let eosCount = 0
+		api.on('LimitBOS', () => bosCount++)
+		api.on('LimitEOS', () => eosCount++)
+
+		plunger.pullBack()
+		player.simulateTime(1000)
+		expect(bosCount).to.be.greaterThan(0)
+		expect(eosCount).to.equal(0)
+
+		plunger.fire()
+		player.simulateTime(2000)
+		expect(eosCount).to.be.greaterThan(0)
+	})
+
 	it('should only fire a little when auto-fire is disabled', async () => {
 		const plunger = table.plungers.CustomPlunger
 		const plungerMover = plunger.getMover() as PlungerMover

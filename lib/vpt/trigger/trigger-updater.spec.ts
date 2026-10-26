@@ -8,6 +8,7 @@ import sinonChai from 'sinon-chai'
 import { TableBuilder } from '../../../test/table-builder.js'
 import { TestRenderApi } from '../../../test/test-render-api.js'
 import { Player } from '../../game/player.js'
+import type { IRenderApi } from '../../render/irender-api.js'
 import type { Table } from '../table/table.js'
 import type { TriggerState } from './trigger-state.js'
 
@@ -35,21 +36,42 @@ describe('The VPinball trigger updater', () => {
 	it('should apply visibility', async () => {
 		const renderApi = new TestRenderApi()
 		spy(renderApi, 'applyVisibility')
-		table.triggers.trigger.getUpdater().applyState(null, { isVisible: true } as TriggerState, renderApi, table)
+		table.triggers.trigger
+			.getUpdater()
+			.applyState(
+				null,
+				{ isVisible: true } as TriggerState,
+				renderApi as unknown as IRenderApi<null, unknown, unknown>,
+				table,
+			)
 		expect(renderApi.applyVisibility).to.have.been.calledOnce
 	})
 
 	it('should apply the material', async () => {
 		const renderApi = new TestRenderApi()
 		spy(renderApi, 'applyMaterial')
-		table.triggers.trigger.getUpdater().applyState(null, { material: 'mat' } as TriggerState, renderApi, table)
+		table.triggers.trigger
+			.getUpdater()
+			.applyState(
+				null,
+				{ material: 'mat' } as TriggerState,
+				renderApi as unknown as IRenderApi<null, unknown, unknown>,
+				table,
+			)
 		expect(renderApi.applyMaterial).to.have.been.calledOnce
 	})
 
 	it('should apply the transformation', async () => {
 		const renderApi = new TestRenderApi()
 		spy(renderApi, 'applyMatrixToNode')
-		table.triggers.trigger.getUpdater().applyState(null, { heightOffset: 99 } as TriggerState, renderApi, table)
+		table.triggers.trigger
+			.getUpdater()
+			.applyState(
+				null,
+				{ heightOffset: 99 } as TriggerState,
+				renderApi as unknown as IRenderApi<null, unknown, unknown>,
+				table,
+			)
 		expect(renderApi.applyMatrixToNode).to.have.been.calledOnce
 	})
 })

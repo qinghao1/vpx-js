@@ -87,7 +87,7 @@ export class GateMover implements MoverObject {
 			this.angleSpeed = 0
 			return
 		}
-		if (Math.abs(this.angleSpeed) !== 0 && this.state.angle !== this.angleMin) {
+		if (this.angleSpeed !== 0 && this.state.angle !== this.angleMin) {
 			this.angleSpeed -= Math.sin(this.state.angle) * this.gravityFactor * (PHYS_FACTOR / 100)
 			this.angleSpeed *= this.damping
 		}

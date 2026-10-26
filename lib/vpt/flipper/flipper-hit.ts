@@ -5,6 +5,8 @@ import { MathUtils } from 'three'
 import { Event } from '../../game/event.js'
 import type { EventProxy } from '../../game/event-proxy.js'
 import type { PlayerPhysics } from '../../game/player-physics.js'
+import { FRect3D } from '../../math/bounds.js'
+import { Vertex2D, Vertex3D } from '../../math/vector.js'
 import type { CollisionEvent } from '../../physics/collision-event.js'
 import {
 	C_CONTACTVEL,
@@ -20,8 +22,6 @@ import {
 } from '../../physics/constants.js'
 import { elasticityWithFalloff } from '../../physics/functions.js'
 import { HitObject } from '../../physics/hit-object.js'
-import { FRect3D } from '../../util/frect3d.js'
-import { Vertex2D, Vertex3D } from '../../util/vector.js'
 import type { Ball } from '../ball/ball.js'
 import type { Table } from '../table/table.js'
 import type { TableData } from '../table/table-data.js'
@@ -50,9 +50,10 @@ export class FlipperHit extends HitObject {
 		data.updatePhysicsSettings(table)
 		const h = table.getSurfaceHeight(data.szSurface, data.center.x, data.center.y)
 		if (data.flipperRadiusMin > 0 && data.flipperRadiusMax > data.flipperRadiusMin) {
-			data.flipperRadius =
-				data.flipperRadiusMax - (data.flipperRadiusMax - data.flipperRadiusMin) * table.data!.globalDifficulty!
-			data.flipperRadius = Math.max(data.flipperRadius, data.baseRadius - data.endRadius + 0.05)
+			data.flipperRadius = Math.max(
+				data.flipperRadiusMax - (data.flipperRadiusMax - data.flipperRadiusMin) * table.data!.globalDifficulty!,
+				data.baseRadius - data.endRadius + 0.05,
+			)
 		} else data.flipperRadius = data.flipperRadiusMax
 		return new FlipperHit(
 			{
@@ -124,7 +125,7 @@ export class FlipperHit extends HitObject {
 		return -1
 	}
 
-	public contact(coll: CollisionEvent, dTime: number, physics: PlayerPhysics): void {
+	public override contact(coll: CollisionEvent, dTime: number, physics: PlayerPhysics): void {
 		const ball = coll.ball,
 			n = coll.hitNormal
 		if (coll.hitDistance < -C_EMBEDDED) ball.hit.vel.addAndRelease(n.clone(true).multiplyScalar(0.1))
@@ -157,7 +158,7 @@ export class FlipperHit extends HitObject {
 				const slip = vRel.clone(true).subAndRelease(n.clone(true).multiplyScalar(normVel)),
 					absMaxF = Math.abs(j * this.friction),
 					slipSpeed = slip.length()
-				let slipDir: Vertex3D, crossF: Vertex3D, numer: number, denomF: number, pv13: Vertex3D
+				let slipDir: Vertex3D, numer: number
 				if (slipSpeed < C_PRECISION) {
 					const slipAcc = aRel.clone(true).subAndRelease(n.clone(true).multiplyScalar(aRel.dot(n)))
 					if (slipAcc.lengthSq() < 1e-6) {
@@ -166,18 +167,14 @@ export class FlipperHit extends HitObject {
 					}
 					slipDir = slipAcc.normalize()
 					numer = -slipDir.dot(aRel)
-					crossF = Vertex3D.crossProduct(rF, slipDir, true)
-					pv13 =
-						this.mover.inertia > 0 ? crossF.clone(true).divideScalar(-this.mover.inertia) : Vertex3D.claim()
-					denomF = slipDir.dotAndRelease(Vertex3D.crossProduct(pv13, rF, true))
 				} else {
 					slipDir = slip.clone(true).divideScalar(slipSpeed)
 					numer = -slipDir.dot(vRel)
-					crossF = Vertex3D.crossProduct(rF, slipDir, true)
-					pv13 =
-						this.mover.inertia > 0 ? crossF.clone(true).divideScalar(this.mover.inertia) : Vertex3D.claim()
-					denomF = slipDir.dotAndRelease(Vertex3D.crossProduct(pv13, rF, true))
 				}
+				const crossF = Vertex3D.crossProduct(rF, slipDir, true)
+				const pv13 =
+					this.mover.inertia > 0 ? crossF.clone(true).divideScalar(this.mover.inertia) : Vertex3D.claim()
+				const denomF = slipDir.dotAndRelease(Vertex3D.crossProduct(pv13, rF, true))
 				Vertex3D.release(aRel, vRel, rF, slip, pv13)
 				const crossB = Vertex3D.crossProduct(rB, slipDir, true),
 					pv12 = crossB.clone(true).divideScalar(ball.hit.inertia)
@@ -185,9 +182,10 @@ export class FlipperHit extends HitObject {
 				const denom = denomB + denomF
 				const friction = denom > 1e-7 ? MathUtils.clamp(numer / denom, -absMaxF, absMaxF) : 0
 				Vertex3D.release(rB, pv12)
-				ball.hit.applySurfaceImpulseAndRelease(
+				ball.hit.applySurfaceImpulse(
 					crossB.clone(true).multiplyScalar(dTime * friction),
 					slipDir.clone(true).multiplyScalar(dTime * friction),
+					true,
 				)
 				this.mover.applyImpulseAndRelease(crossF.clone(true).multiplyScalar(-dTime * friction))
 				Vertex3D.release(crossF, slipDir, crossB)
@@ -264,9 +262,10 @@ export class FlipperHit extends HitObject {
 			kt += tangent.dotAndRelease(Vertex3D.crossProduct(pv13, rF, true))
 			const absMaxF = Math.abs(this.friction * impulse)
 			const jt = kt > 1e-7 ? MathUtils.clamp(-vt / kt, -absMaxF, absMaxF) : 0
-			ball.hit.applySurfaceImpulseAndRelease(
+			ball.hit.applySurfaceImpulse(
 				crossB.clone(true).multiplyScalar(jt),
 				tangent.clone(true).multiplyScalar(jt),
+				true,
 			)
 			this.mover.applyImpulseAndRelease(crossF.clone(true).multiplyScalar(-jt))
 			Vertex3D.release(crossB, pv12, crossF, pv13)
@@ -288,12 +287,12 @@ export class FlipperHit extends HitObject {
 		const td = this.tableData
 		const useOverride = !!(this.data.overridePhysics || (td.overridePhysicsFlipper && td.overridePhysics))
 		this.elasticityFalloff = useOverride
-			? (this.data.overrideElasticityFalloff ?? this.data.elasticityFalloff!)
-			: this.data.elasticityFalloff!
-		this.elasticity = useOverride ? (this.data.overrideElasticity ?? this.data.elasticity!) : this.data.elasticity!
-		this.setFriction(useOverride ? (this.data.overrideFriction ?? this.data.friction!) : this.data.friction!)
+			? (this.data.overrideElasticityFalloff ?? this.data.elasticityFalloff)
+			: this.data.elasticityFalloff
+		this.elasticity = useOverride ? (this.data.overrideElasticity ?? this.data.elasticity) : this.data.elasticity
+		this.setFriction(useOverride ? (this.data.overrideFriction ?? this.data.friction) : this.data.friction)
 		this.scatter = MathUtils.degToRad(
-			useOverride ? (this.data.overrideScatterAngle ?? this.data.scatter!) : this.data.scatter!,
+			useOverride ? (this.data.overrideScatterAngle ?? this.data.scatter) : this.data.scatter,
 		)
 	}
 

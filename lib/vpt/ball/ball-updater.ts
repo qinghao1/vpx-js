@@ -1,7 +1,8 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
+
+import { Matrix3D } from '../../math/matrix.js'
 import type { IRenderApi } from '../../render/irender-api.js'
-import { Matrix3D } from '../../util/matrix.js'
 import { ItemUpdater } from '../item-updater.js'
 import type { Table } from '../table/table.js'
 import type { BallData } from './ball-data.js'
@@ -24,7 +25,7 @@ export class BallUpdater extends ItemUpdater<BallState> {
 		api: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
 		_table: Table,
 	): void {
-		Object.assign(this.state, state)
+		this.state.mergeFrom(state)
 		const pos = this.state.pos
 		const z = this.state.isFrozen ? pos.z - this.data.radius : pos.z
 		const m = this.state.orientation.matrix as unknown as number[][]

@@ -108,10 +108,10 @@ export class TriggerApi extends ItemApi<TriggerData> {
 	public DestroyBall(): number {
 		let cnt = 0
 		for (const ball of this.player.balls) {
-			const j = ball.hit.isRealBall() ? ball.hit.vpVolObjs.indexOf(this.events) : -1
-			if (j >= 0) {
+			const index = ball.hit.isRealBall() ? ball.hit.vpVolObjs.indexOf(this.events) : -1
+			if (index >= 0) {
 				++cnt
-				ball.hit.vpVolObjs.splice(j, 1)
+				ball.hit.vpVolObjs.splice(index, 1)
 				this.player.destroyBall(ball)
 			}
 		}
@@ -120,13 +120,5 @@ export class TriggerApi extends ItemApi<TriggerData> {
 
 	get BallCntOver(): number {
 		return super._ballCountOver(this.events)
-	}
-
-	public InterfaceSupportsErrorInfo(_riid: unknown): boolean {
-		return false
-	}
-
-	protected _getPropertyNames(): string[] {
-		return Object.getOwnPropertyNames(TriggerApi.prototype)
 	}
 }

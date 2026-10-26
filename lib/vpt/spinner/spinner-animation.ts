@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 import { Event } from '../../game/event.js'
 import type { EventProxy } from '../../game/event-proxy.js'
-import type { IAnimation } from '../../game/ianimatable.js'
+import type { IAnimation } from '../../game/interfaces.js'
 import type { Table } from '../table/table.js'
 import type { SpinnerState } from './spinner-state.js'
 

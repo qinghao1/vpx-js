@@ -1438,7 +1438,7 @@ describe('The VPinball spinner generator', () => {
 		three.expectVerticesInArray(expectedVertices, bracketMeshVertices)
 	})
 
-	it('should not generate an invisible ramp', async () => {
+	it('should not generate an invisible spinner', async () => {
 		three.expectNoObject(gltf, 'spinners', 'Invisible')
 	})
 })

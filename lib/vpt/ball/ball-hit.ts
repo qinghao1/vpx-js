@@ -4,6 +4,7 @@
 import { MathUtils } from 'three'
 import type { EventProxy } from '../../game/event-proxy.js'
 import type { PlayerPhysics } from '../../game/player-physics.js'
+import { Vertex3D } from '../../math/vector.js'
 import { CollisionEvent } from '../../physics/collision-event.js'
 import {
 	C_CONTACTVEL,
@@ -11,14 +12,13 @@ import {
 	C_DISP_LIMIT,
 	C_EMBEDDED,
 	C_EMBEDSHOT,
-	C_EMBEDVELLIMIT,
 	C_LOWNORMVEL,
 	C_PRECISION,
+	PHYS_FACTOR,
 	PHYS_TOUCH,
 } from '../../physics/constants.js'
 import { elasticityWithFalloff, HARD_SCATTER } from '../../physics/functions.js'
 import { HitObject } from '../../physics/hit-object.js'
-import { Vertex3D } from '../../util/vector.js'
 
 import type { TableData } from '../table/table-data.js'
 import type { Ball } from './ball.js'
@@ -34,7 +34,11 @@ function solveQuadraticEq(a: number, b: number, c: number): [number, number] | u
 	return [(b + sqrt) * inv, (b - sqrt) * inv]
 }
 
-/** Ball collision shape — separated from {@code ball.cpp}. @see https://github.com/vpinball/vpinball/blob/master/ball.cpp */
+// Steel-on-steel Coulomb friction between two balls (C_BALL_BALL_FRICTION,
+// src/physics/physconst.h) — ball/ball contacts only.
+const BALL_BALL_FRICTION = 0.1
+
+/** Ball collision shape. @see https://github.com/vpinball/vpinball/blob/master/ball.cpp */
 
 export class BallHit extends HitObject {
 	public readonly coll: CollisionEvent
@@ -49,12 +53,15 @@ export class BallHit extends HitObject {
 
 	public readonly vel: Vertex3D
 	public readonly angularMomentum = new Vertex3D()
+	// Velocity change the contacts resolved before this ball's in the current
+	// pass applied (hitball.cpp, FIX_PHYSICS): static contacts add it to the
+	// hit-test velocity they work from. Reset each cycle by PlayerPhysics.
+	public readonly contactDeltaV = new Vertex3D()
 	public invMass: number
 	public inertia: number
 	public eventPos = new Vertex3D(-1, -1, -1)
 	public angularVelocity = new Vertex3D()
 	public isVisible = true
-	private defaultZ = 25
 
 	constructor(ball: Ball, data: BallData, state: BallState, initialVelocity: Vertex3D, tableData: TableData) {
 		super()
@@ -68,8 +75,9 @@ export class BallHit extends HitObject {
 		this.inertia = (2 / 5) * data.radius * data.radius * data.mass
 		this.state.isFrozen = false
 		this.coll = new CollisionEvent(ball)
-		if (initialVelocity) this.calcHitBBox()
-		this.defaultZ = this.state.pos.z
+		// FIX_PHYSICS: ball/ball contacts use steel-on-steel friction.
+		this.setFriction(BALL_BALL_FRICTION)
+		this.calcHitBBox()
 	}
 
 	public isRealBall(): boolean {
@@ -86,7 +94,6 @@ export class BallHit extends HitObject {
 		this.hitBBox.zlow = p.z - vl
 		this.hitBBox.zhigh = p.z + vl
 		this.rcHitRadiusSqr = vl * vl
-		if (p.z === this.data.radius + this.tableData.tableHeight) this.defaultZ = p.z
 	}
 
 	public getMoverObject(): BallMover {
@@ -112,9 +119,11 @@ export class BallHit extends HitObject {
 		let isContact = false
 		if (bnd <= PHYS_TOUCH) {
 			if (bnd < ball.data.radius * -2) return -1
-			if (Math.abs(bnv) > C_CONTACTVEL || bnd <= -PHYS_TOUCH) hitTime = 0
-			else hitTime = bnd * (1 / (2 * PHYS_TOUCH)) + 0.5
-			if (Math.abs(bnv) <= C_CONTACTVEL) isContact = true
+			hitTime = 0
+			// A slow pair inside the touch layer is a steady contact, for deeper
+			// overlap too: a resting stack hovers inside -PHYS_TOUCH, and losing
+			// the contact there turns into a bounce-and-pop jitter (hitball.cpp).
+			isContact = Math.abs(bnv) <= C_CONTACTVEL && bnd > -0.5
 		} else {
 			const a = dvx * dvx + dvy * dvy + dvz * dvz
 			if (a < 1e-8) return -1
@@ -124,12 +133,10 @@ export class BallHit extends HitObject {
 			hitTime = t1 * t2 < 0 ? Math.max(t1, t2) : Math.min(t1, t2)
 		}
 		if (!Number.isFinite(hitTime) || hitTime < 0 || hitTime > dTime) return -1
-		const hx = ball.state.pos.x + dvx * hitTime
-		const hy = ball.state.pos.y + dvy * hitTime
-		const hz = ball.state.pos.z + dvz * hitTime
-		const nx = hx - this.state.pos.x
-		const ny = hy - this.state.pos.y
-		const nz = hz - this.state.pos.z
+		// Separation of the centers at contact: -(d + t·dv), cf. HitBall::HitTest.
+		const nx = -(dx + dvx * hitTime)
+		const ny = -(dy + dvy * hitTime)
+		const nz = -(dz + dvz * hitTime)
 		if (nx === 0 && ny === 0 && nz === 0) return -1
 		const len = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1
 		coll.hitNormal.set(nx / len, ny / len, nz / len)
@@ -161,29 +168,39 @@ export class BallHit extends HitObject {
 			dvy = bvy - tvy,
 			dvz = bvz - tvz
 		let dot = dvx * nx + dvy * ny + dvz * nz
+		// Approach speed before the embedded kick below (hitball.cpp).
+		const impactSpeed = -dot
 		if (dot >= -C_LOWNORMVEL) {
 			if (dot > C_LOWNORMVEL) return
 			if (coll.hitDistance < -C_EMBEDDED) dot = -C_EMBEDSHOT
 			else return
 		}
-		let eDist = -C_DISP_GAIN * coll.hitDistance
-		if (eDist > 1e-4) {
-			if (eDist > C_DISP_LIMIT) eDist = C_DISP_LIMIT
-			if (!this.state.isFrozen) eDist *= 0.5
-			ball.state.pos.x += nx * eDist
-			ball.state.pos.y += ny * eDist
-			ball.state.pos.z += nz * eDist
-		}
-		eDist = -C_DISP_GAIN * this.coll.hitDistance
-		if (!this.state.isFrozen && eDist > 1e-4) {
-			if (eDist > C_DISP_LIMIT) eDist = C_DISP_LIMIT
-			eDist *= 0.5
-			this.state.pos.x -= nx * eDist
-			this.state.pos.y -= ny * eDist
-			this.state.pos.z -= nz * eDist
+		// Resting-scale impacts on shallow overlap skip displacement: it would pop
+		// the pair apart into a new collision every step while contacts drain the
+		// residual instead. Deep embeds and real impacts keep it (hitball.cpp).
+		if (impactSpeed > 0.25 || coll.hitDistance < -0.5) {
+			let eDist = -C_DISP_GAIN * coll.hitDistance
+			if (eDist > 1e-4) {
+				if (eDist > C_DISP_LIMIT) eDist = C_DISP_LIMIT
+				if (!this.state.isFrozen) eDist *= 0.5
+				ball.state.pos.x += nx * eDist
+				ball.state.pos.y += ny * eDist
+				ball.state.pos.z += nz * eDist
+			}
+			eDist = -C_DISP_GAIN * this.coll.hitDistance
+			if (!this.state.isFrozen && eDist > 1e-4) {
+				if (eDist > C_DISP_LIMIT) eDist = C_DISP_LIMIT
+				eDist *= 0.5
+				this.state.pos.x -= nx * eDist
+				this.state.pos.y -= ny * eDist
+				this.state.pos.z -= nz * eDist
+			}
 		}
 		const myInv = this.state.isFrozen ? 0 : this.invMass
-		const impulse = (-(1 + 0.8) * dot) / (myInv + ball.hit.invMass)
+		// Low speed impacts stay inelastic: a restitution bounce would kick a
+		// resting stack apart into a bounce-again-forever jitter (hitball.cpp).
+		const restitution = dot < -0.25 ? 0.8 : 0
+		const impulse = (-(1 + restitution) * dot) / (myInv + ball.hit.invMass)
 		if (!this.state.isFrozen) {
 			this.vel.x -= nx * impulse * myInv
 			this.vel.y -= ny * impulse * myInv
@@ -316,41 +333,86 @@ export class BallHit extends HitObject {
 		if (recycle) Vertex3D.release(rotI, impulse)
 	}
 
-	public applySurfaceImpulseAndRelease(rotI: Vertex3D, impulse: Vertex3D): void {
-		this.vel.x += impulse.x * this.invMass
-		this.vel.y += impulse.y * this.invMass
-		this.vel.z += impulse.z * this.invMass
-		this.angularMomentum.x += rotI.x
-		this.angularMomentum.y += rotI.y
-		this.angularMomentum.z += rotI.z
-		const inv = 1 / this.inertia
-		this.angularVelocity.x = this.angularMomentum.x * inv
-		this.angularVelocity.y = this.angularMomentum.y * inv
-		this.angularVelocity.z = this.angularMomentum.z * inv
-		Vertex3D.release(rotI, impulse)
+	// Ball/ball contact: coll.ball touches this ball, so resolve against the
+	// supporting ball instead of a static surface (hitball.cpp Contact).
+	public override contact(coll: CollisionEvent, dTime: number, physics: PlayerPhysics): void {
+		coll.ball.hit.handleStaticContact(coll, this.friction, dTime, physics, this)
 	}
 
-	public handleStaticContact(coll: CollisionEvent, friction: number, dTime: number, physics: PlayerPhysics): void {
+	public handleStaticContact(
+		coll: CollisionEvent,
+		friction: number,
+		dTime: number,
+		physics: PlayerPhysics,
+		other?: BallHit,
+	): void {
 		const nx = coll.hitNormal.x,
 			ny = coll.hitNormal.y,
 			nz = coll.hitNormal.z
 		const normVel = this.vel.x * nx + this.vel.y * ny + this.vel.z * nz
-		if (normVel > C_CONTACTVEL) return
-		const gdot = physics.gravity.x * nx + physics.gravity.y * ny + physics.gravity.z * nz
-		const normalForce = Math.max(0, -(gdot * this.data.mass * dTime + coll.hitOrgNormalVelocity!))
+		const velBeforeX = this.vel.x,
+			velBeforeY = this.vel.y,
+			velBeforeZ = this.vel.z
+		// Against another ball the approach is relative to the support, which may
+		// itself move; a static surface keeps the ball's own normal velocity.
+		const approach = other
+			? (other.vel.x - this.vel.x) * nx + (other.vel.y - this.vel.y) * ny + (other.vel.z - this.vel.z) * nz
+			: -normVel
+		// If a collision already changed the velocity, there may be nothing to do.
+		if (approach <= -C_CONTACTVEL) return
+		let normalForce: number
+		if (other) {
+			// Resting on another ball: cancel at most a contact-scale approach (plus
+			// the step of gravity a resting stack carries). A faster one comes from
+			// a collision earlier in this cycle and must reach the other ball
+			// through their collision instead of being absorbed here.
+			const gravityNormal = -(physics.gravity.x * nx + physics.gravity.y * ny + physics.gravity.z * nz)
+			const maxCancel = C_CONTACTVEL + Math.max(gravityNormal, 0) * PHYS_FACTOR
+			normalForce = Math.max(0, Math.min(-normVel, maxCancel))
+		} else {
+			const gdot = physics.gravity.x * nx + physics.gravity.y * ny + physics.gravity.z * nz
+			// Cancel what the contacts resolved before this one did to the ball, on
+			// top of the hit-test velocity: stopping the spin of a ball pressed
+			// against a wall pushes it up, and left alone it climbs off its support.
+			const hitNormVel = coll.hitOrgNormalVelocity! + this.contactDeltaV.dot(coll.hitNormal)
+			normalForce = Math.max(0, -(gdot * dTime + hitNormVel))
+		}
 		this.vel.x += nx * normalForce
 		this.vel.y += ny * normalForce
 		this.vel.z += nz * normalForce
-		if (coll.hitDistance <= PHYS_TOUCH) {
-			const push = Math.max(Math.min(C_EMBEDVELLIMIT, -coll.hitDistance), PHYS_TOUCH)
-			this.vel.x += nx * push
-			this.vel.y += ny * push
-			this.vel.z += nz * push
+		// Drain residual overlap with a small capped positional nudge, quiet enough
+		// to stay below the collision threshold (hitball.cpp).
+		if (!this.state.isFrozen && coll.hitDistance < 0) {
+			const nudge = Math.min(-0.5 * coll.hitDistance, 0.02)
+			this.state.pos.x += nx * nudge
+			this.state.pos.y += ny * nudge
+			this.state.pos.z += nz * nudge
 		}
-		this.applyFriction(coll.hitNormal, dTime, friction, physics)
+		this.applyFriction(coll.hitNormal, dTime, friction, physics, normalForce, other)
+		// Pass the applied change on to later contacts in this pass: all of it for
+		// ball/ball contacts (resolved first), the friction part for static ones.
+		let deltaX = this.vel.x - velBeforeX,
+			deltaY = this.vel.y - velBeforeY,
+			deltaZ = this.vel.z - velBeforeZ
+		if (!other) {
+			const normalPart = deltaX * nx + deltaY * ny + deltaZ * nz
+			deltaX -= normalPart * nx
+			deltaY -= normalPart * ny
+			deltaZ -= normalPart * nz
+		}
+		this.contactDeltaV.x += deltaX
+		this.contactDeltaV.y += deltaY
+		this.contactDeltaV.z += deltaZ
 	}
 
-	public applyFriction(hitNormal: Vertex3D, dtime: number, fricCoeff: number, physics: PlayerPhysics): void {
+	public applyFriction(
+		hitNormal: Vertex3D,
+		dtime: number,
+		fricCoeff: number,
+		physics: PlayerPhysics,
+		normalImpulse: number,
+		other?: BallHit,
+	): void {
 		const nx = hitNormal.x,
 			ny = hitNormal.y,
 			nz = hitNormal.z
@@ -364,18 +426,41 @@ export class BallHit extends HitObject {
 		const cx = avy * sz - avz * sy,
 			cy = avz * sx - avx * sz,
 			cz = avx * sy - avy * sx
-		const svx = this.vel.x + cx,
+		let svx = this.vel.x + cx,
 			svy = this.vel.y + cy,
 			svz = this.vel.z + cz
+		// Against another ball: slip relative to its contact point, plus its
+		// effective inverse mass along the tangent so the pair never overshoots.
+		let otherInvMassT = 0
+		if (other) {
+			const otherRadius = other.data.radius
+			const qx = nx * otherRadius,
+				qy = ny * otherRadius,
+				qz = nz * otherRadius
+			const oavx = other.angularVelocity.x,
+				oavy = other.angularVelocity.y,
+				oavz = other.angularVelocity.z
+			svx -= other.vel.x + (oavy * qz - oavz * qy)
+			svy -= other.vel.y + (oavz * qx - oavx * qz)
+			svz -= other.vel.z + (oavx * qy - oavy * qx)
+			if (!other.state.isFrozen) otherInvMassT = other.invMass + (otherRadius * otherRadius) / other.inertia
+		}
 		const dot = svx * nx + svy * ny + svz * nz
 		const slipX = svx - dot * nx,
 			slipY = svy - dot * ny,
 			slipZ = svz - dot * nz
-		const maxFric =
-			fricCoeff * this.data.mass * -(physics.gravity.x * nx + physics.gravity.y * ny + physics.gravity.z * nz)
+		// Coulomb cone from the normal impulse the contact applied this step,
+		// instead of the gravity component alone which collapses on walls and on
+		// the top glass (hitball.cpp ApplyFriction, FIX_PHYSICS).
+		const maxImpulse = Math.max(fricCoeff, 0) * this.data.mass * normalImpulse
 		const slipspeed = Math.sqrt(slipX * slipX + slipY * slipY + slipZ * slipZ)
 		let slipDirX: number, slipDirY: number, slipDirZ: number, numer: number
-		if (this.vel.x * nx + this.vel.y * ny + this.vel.z * nz <= 0.025 || slipspeed < C_PRECISION) {
+		let numerScale: number
+		// After the contact impulse above, the residual normVel is ~ -m(g.n)dtime:
+		// an accidental test of the normal orientation that always selected the
+		// static branch on walls. Limit it to support-like contacts (FIX_PHYSICS).
+		const normVel = this.vel.x * nx + this.vel.y * ny + this.vel.z * nz
+		if ((normVel <= 0.025 && hitNormal.z > 0.5) || slipspeed < C_PRECISION) {
 			const gx = physics.gravity.x * this.invMass,
 				gy = physics.gravity.y * this.invMass,
 				gz = physics.gravity.z * this.invMass
@@ -398,12 +483,17 @@ export class BallHit extends HitObject {
 			slipDirY = sAy * inv
 			slipDirZ = sAz * inv
 			numer = -(slipDirX * ax + slipDirY * ay + slipDirZ * az)
+			numerScale = dtime
+			// This ball's own (gravity) slip acceleration: the other ball holds it
+			// like a static surface (hitball.cpp).
+			otherInvMassT = 0
 		} else {
 			const inv = 1 / slipspeed
 			slipDirX = slipX * inv
 			slipDirY = slipY * inv
 			slipDirZ = slipZ * inv
 			numer = -(slipDirX * svx + slipDirY * svy + slipDirZ * svz)
+			numerScale = 1
 		}
 		const cpX = sy * slipDirZ - sz * slipDirY,
 			cpY = sz * slipDirX - sx * slipDirZ,
@@ -414,15 +504,17 @@ export class BallHit extends HitObject {
 		const crossX = p1y * sz - p1z * sy,
 			crossY = p1z * sx - p1x * sz,
 			crossZ = p1x * sy - p1y * sx
-		const denom = this.invMass + slipDirX * crossX + slipDirY * crossY + slipDirZ * crossZ
-		const friction = MathUtils.clamp(numer / denom, -maxFric, maxFric)
-		if (Number.isFinite(friction)) {
-			const jx = slipDirX * dtime * friction,
-				jy = slipDirY * dtime * friction,
-				jz = slipDirZ * dtime * friction
-			const rotX = cpX * dtime * friction,
-				rotY = cpY * dtime * friction,
-				rotZ = cpZ * dtime * friction
+		const denom = this.invMass + slipDirX * crossX + slipDirY * crossY + slipDirZ * crossZ + otherInvMassT
+		// The full slip-removing impulse; the legacy dtime factor made sliding
+		// friction depend on the step length (FIX_PHYSICS).
+		const impulse = MathUtils.clamp((numerScale * numer) / denom, -maxImpulse, maxImpulse)
+		if (Number.isFinite(impulse)) {
+			const jx = slipDirX * impulse,
+				jy = slipDirY * impulse,
+				jz = slipDirZ * impulse
+			const rotX = cpX * impulse,
+				rotY = cpY * impulse,
+				rotZ = cpZ * impulse
 			this.vel.x += jx * this.invMass
 			this.vel.y += jy * this.invMass
 			this.vel.z += jz * this.invMass
@@ -436,7 +528,7 @@ export class BallHit extends HitObject {
 		}
 	}
 
-	public surfaceAcceleration(surfP: Vertex3D, physics: PlayerPhysics, _recycle = false): Vertex3D {
+	public surfaceAcceleration(surfP: Vertex3D, physics: PlayerPhysics, recycle = false): Vertex3D {
 		const avx = this.angularVelocity.x,
 			avy = this.angularVelocity.y,
 			avz = this.angularVelocity.z
@@ -447,11 +539,10 @@ export class BallHit extends HitObject {
 			crossY = avz * p2x - avx * p2z,
 			crossZ = avx * p2y - avy * p2x
 		const inv = this.invMass
-		return new Vertex3D(
-			physics.gravity.x * inv + crossX,
-			physics.gravity.y * inv + crossY,
-			physics.gravity.z * inv + crossZ,
-		)
+		const x = physics.gravity.x * inv + crossX,
+			y = physics.gravity.y * inv + crossY,
+			z = physics.gravity.z * inv + crossZ
+		return recycle ? Vertex3D.claim(x, y, z) : new Vertex3D(x, y, z)
 	}
 
 	public setMass(mass: number): void {

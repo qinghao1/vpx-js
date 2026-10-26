@@ -5,6 +5,7 @@ import * as chai from 'chai'
 import { expect } from 'chai'
 import sinonChai from 'sinon-chai'
 import { MathUtils } from 'three'
+import { TableBuilder } from '../../../test/table-builder.js'
 import { ThreeHelper } from '../../../test/three.helper'
 import { Player } from '../../game/player.js'
 import { NodeBinaryReader } from '../../io/binary-reader.node.js'
@@ -53,6 +54,25 @@ describe('The VPinball flipper physics', () => {
 		expect(flipperState.angle).to.equal(startAngleRad)
 	})
 
+	it('should fire LimitEOS at the end and LimitBOS at the start', async () => {
+		const flipper = table.flippers.FlipperR
+		const api = flipper.getApi()
+		let eosCount = 0
+		let bosCount = 0
+		api.on('LimitEOS', () => eosCount++)
+		api.on('LimitBOS', () => bosCount++)
+
+		api.RotateToEnd()
+		player.simulateTime(100)
+		expect(eosCount).to.equal(1)
+		expect(bosCount).to.equal(0)
+
+		api.RotateToStart()
+		player.simulateTime(400)
+		expect(eosCount).to.equal(1)
+		expect(bosCount).to.equal(1)
+	})
+
 	it('should move back to end when pressed while moving', async () => {
 		const flipper = table.flippers.FlipperR
 		const flipperState = flipper.getState()
@@ -80,6 +100,13 @@ describe('The VPinball flipper physics', () => {
 		expect(flipperState.angle).to.equal(endAngleRad)
 	})
 
+	it('should claim the angle in radians before setup', () => {
+		const table = new TableBuilder().addFlipper('flipper').build()
+		const flipper = table.flippers.flipper
+
+		expect(flipper.getState().angle).to.equal(MathUtils.degToRad(flipper.getFlipperData().startAngle))
+	})
+
 	it('should return the proper state', () => {
 		const flipper = table.flippers.FlipperR
 
@@ -94,7 +121,6 @@ describe('The VPinball flipper physics', () => {
 
 		expect(flipperState.name).to.eql(poppedState.name)
 		expect(flipperState.angle).to.eql(poppedState.angle)
-		expect(flipperState.equals(undefined as unknown as FlipperState)).to.equal(false)
 		states.release()
 	})
 })

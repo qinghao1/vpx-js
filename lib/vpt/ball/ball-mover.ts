@@ -2,10 +2,10 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import type { PlayerPhysics } from '../../game/player-physics.js'
+import { Matrix2D } from '../../math/matrix.js'
+import { Vertex3D } from '../../math/vector.js'
 import { PHYS_FACTOR } from '../../physics/constants.js'
 import type { MoverObject } from '../../physics/mover-object.js'
-import { Matrix2D } from '../../util/matrix.js'
-import { Vertex3D } from '../../util/vector.js'
 import type { BallData } from './ball-data.js'
 import type { BallHit } from './ball-hit.js'
 import type { BallState } from './ball-state.js'
@@ -70,8 +70,8 @@ export class BallMover implements MoverObject {
 				const acc = physics.getCabinetAcceleration?.()
 				if (acc && (acc.x !== 0 || acc.y !== 0)) {
 					const strength = Math.hypot(physics.gravity.y, physics.gravity.z) || 1
-					const cosSlope = strength ? -physics.gravity.z / strength : 1
-					const sinSlope = strength ? physics.gravity.y / strength : 0
+					const cosSlope = -physics.gravity.z / strength
+					const sinSlope = physics.gravity.y / strength
 					this.hit.vel.x -= PHYS_FACTOR * MS2TOVPUVPT2(acc.x)
 					this.hit.vel.y -= PHYS_FACTOR * MS2TOVPUVPT2(acc.y) * cosSlope
 					this.hit.vel.z -= PHYS_FACTOR * MS2TOVPUVPT2(acc.y) * sinSlope

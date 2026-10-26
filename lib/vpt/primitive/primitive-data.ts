@@ -3,7 +3,7 @@
 
 import { BiffParser } from '../../io/biff-parser.js'
 import type { Storage } from '../../io/ole-doc.js'
-import { Vertex3D } from '../../util/vector.js'
+import { Vertex3D } from '../../math/vector.js'
 import { Vertex3DNoTex2 } from '../../util/vertex.js'
 import { FrameData } from '../animation.js'
 import { handleBiffTag } from '../biff-helper.js'
@@ -24,7 +24,7 @@ const FLOAT_MAP: Record<string, string> = {
 	DILB: 'disableLightingBelow',
 	FALP: 'alpha',
 }
-const INT_MAP: Record<string, string> = { COLR: 'color' }
+const INT_MAP: Record<string, string> = { COLR: 'color', SIDS: 'sides', SCOL: 'sideColor' }
 const BOOL_MAP: Record<string, string> = {
 	DTXI: 'drawTexturesInside',
 	HTEV: 'hitEvent',
@@ -38,6 +38,8 @@ const BOOL_MAP: Record<string, string> = {
 	OSNM: 'objectSpaceNormalMap',
 	ADDB: 'addBlend',
 	ZMSK: 'useDepthMask',
+	TVIS: 'isVisible',
+	REEN: 'isReflectionEnabled',
 }
 const STRING_MAP: Record<string, string> = {
 	IMAG: 'szImage',
@@ -46,6 +48,7 @@ const STRING_MAP: Record<string, string> = {
 	MAPH: 'szPhysicsMaterial',
 	LMAP: 'szLightmap',
 }
+const WIDE_STRING_MAP: Record<string, string> = { M3DN: 'meshFileName' }
 
 /** Primitive data.
  * @see https://github.com/vpinball/vpinball/blob/master/primitive.cpp */
@@ -119,9 +122,9 @@ export class PrimitiveData extends ItemData implements IPhysicalData {
 		storage: Storage,
 		itemName: string,
 	): Promise<number> {
-		if (RTV_TAGS.includes(tag)) {
-			const idx = RTV_TAGS.indexOf(tag)
-			this.rotAndTra[idx] = this.getFloat(buffer)
+		const rtvIndex = RTV_TAGS.indexOf(tag)
+		if (rtvIndex !== -1) {
+			this.rotAndTra[rtvIndex] = this.getFloat(buffer)
 			return 0
 		}
 		if (
@@ -130,6 +133,7 @@ export class PrimitiveData extends ItemData implements IPhysicalData {
 				int: INT_MAP,
 				bool: BOOL_MAP,
 				string: STRING_MAP,
+				wideString: WIDE_STRING_MAP,
 			})
 		)
 			return 0
@@ -139,21 +143,6 @@ export class PrimitiveData extends ItemData implements IPhysicalData {
 				break
 			case 'VSIZ':
 				this.size = Vertex3D.get(buffer)
-				break
-			case 'SIDS':
-				this.sides = this.getInt(buffer)
-				break
-			case 'SCOL':
-				this.sideColor = this.getInt(buffer)
-				break
-			case 'TVIS':
-				this.isVisible = this.getBool(buffer)
-				break
-			case 'REEN':
-				this.isReflectionEnabled = this.getBool(buffer)
-				break
-			case 'M3DN':
-				this.meshFileName = this.getWideString(buffer, len)
 				break
 			case 'M3VN':
 				this.numVertices = this.getInt(buffer)

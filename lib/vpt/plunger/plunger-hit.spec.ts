@@ -8,6 +8,7 @@ import { createBall } from '../../../test/physics.helper'
 import { ThreeHelper } from '../../../test/three.helper'
 import { Player } from '../../game/player.js'
 import { NodeBinaryReader } from '../../io/binary-reader.node.js'
+import { CollisionEvent } from '../../physics/collision-event.js'
 import { Table } from '../table/table.js'
 
 chai.use((sinonChai as any).default ?? sinonChai)
@@ -83,6 +84,30 @@ describe('The VPinball plunger collision', () => {
 		plunger.Fire()
 		player.updatePhysics(2800)
 
-		expect(ball.getState().pos.y).to.be.below(100)
+		// FIX_PHYSICS: 100.64 (was 90.69), same margin.
+		expect(ball.getState().pos.y).to.be.below(110)
+	})
+
+	it('should not stamp lastPlungerHit on a miss', () => {
+		const physics = player.getPhysics()
+		physics.timeMsec = 4242
+		const hit = table.plungers.ModernPlunger.getHitShapes()[0]
+		const ball = createBall(player, 100, 100, 0)
+
+		const coll = CollisionEvent.claim(ball)
+		const hitTime = hit.hitTest(ball, 1, coll, physics)
+		CollisionEvent.release(coll)
+
+		expect(hitTime).to.equal(-1)
+		expect(physics.lastPlungerHit).to.equal(0)
+	})
+
+	it('should stamp lastPlungerHit when the ball hits the plunger', () => {
+		createBall(player, 333, 1700, 0, 0, 2)
+
+		player.updatePhysics(0)
+		player.updatePhysics(700)
+
+		expect(player.getPhysics().lastPlungerHit).to.be.above(0)
 	})
 })

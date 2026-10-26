@@ -2,11 +2,44 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { MathUtils } from 'three'
-import { Matrix3D } from '../../util/matrix.js'
+import { Matrix3D } from '../../math/matrix.js'
 import { Vertex3DNoTex2 } from '../../util/vertex.js'
 import { Mesh } from '../mesh.js'
 import type { Table } from '../table/table.js'
 import type { PrimitiveData } from './primitive-data.js'
+
+/** Minimal x/y/z triple (Vertex3D or plain state object). */
+export interface PrimitiveVector {
+	x: number
+	y: number
+	z: number
+}
+
+/**
+ * Full primitive placement matrix: rotAndTra translation, XYZ/object rotations,
+ * size scale, position, table Z scale. Shared by the mesh generator and the updater's delta.
+ */
+export function buildPrimitiveMatrix(
+	position: PrimitiveVector,
+	size: PrimitiveVector,
+	rotation: PrimitiveVector,
+	translation: PrimitiveVector,
+	objectRotation: PrimitiveVector,
+	scaleZ: number,
+): Matrix3D {
+	const rotTrans = new Matrix3D().setTranslation(translation.x, translation.y, translation.z)
+	rotTrans.multiply(new Matrix3D().rotateZMatrix(MathUtils.degToRad(rotation.z)))
+	rotTrans.multiply(new Matrix3D().rotateYMatrix(MathUtils.degToRad(rotation.y)))
+	rotTrans.multiply(new Matrix3D().rotateXMatrix(MathUtils.degToRad(rotation.x)))
+	rotTrans.multiply(new Matrix3D().rotateZMatrix(MathUtils.degToRad(objectRotation.z)))
+	rotTrans.multiply(new Matrix3D().rotateYMatrix(MathUtils.degToRad(objectRotation.y)))
+	rotTrans.multiply(new Matrix3D().rotateXMatrix(MathUtils.degToRad(objectRotation.x)))
+	const scale = new Matrix3D().setScaling(size.x, size.y, size.z)
+	const positionMatrix = new Matrix3D().setTranslation(position.x, position.y, position.z)
+	const full = scale.multiply(rotTrans).multiply(positionMatrix)
+	if (scaleZ !== 1) full.multiply(new Matrix3D().setScaling(1, 1, scaleZ))
+	return full
+}
 
 /** Generates primitive built-in mesh. @see https://github.com/vpinball/vpinball/blob/master/primitive.cpp */
 export class PrimitiveMeshGenerator {
@@ -73,12 +106,15 @@ export class PrimitiveMeshGenerator {
 		}
 
 		mesh.indices = []
-		if (this.data.drawTexturesInside) {
-			for (let i = 0; i < sides; i++) {
-				const nxt = i === sides - 1 ? 1 : i + 2
-				const nxt2 = nxt + 1
-				mesh.indices.push(0, i + 1, nxt, 0, nxt, i + 1)
-				mesh.indices.push(sides + 1, sides + nxt2, sides + 2 + i, sides + 1, sides + 2 + i, sides + nxt2)
+		const inside = this.data.drawTexturesInside
+		for (let i = 0; i < sides; i++) {
+			const nxt = i === sides - 1 ? 1 : i + 2
+			const nxt2 = nxt + 1
+			if (inside) mesh.indices.push(0, i + 1, nxt)
+			mesh.indices.push(0, nxt, i + 1)
+			if (inside) mesh.indices.push(sides + 1, sides + nxt2, sides + 2 + i)
+			mesh.indices.push(sides + 1, sides + 2 + i, sides + nxt2)
+			if (inside) {
 				mesh.indices.push(
 					sides * 2 + nxt2,
 					sides * 2 + 2 + i,
@@ -86,53 +122,30 @@ export class PrimitiveMeshGenerator {
 					sides * 2 + nxt2,
 					sides * 3 + 2 + i,
 					sides * 3 + nxt2,
-				)
-				mesh.indices.push(
-					sides * 2 + nxt2,
-					sides * 3 + 2 + i,
-					sides * 2 + 2 + i,
-					sides * 2 + nxt2,
-					sides * 3 + nxt2,
-					sides * 3 + 2 + i,
 				)
 			}
-		} else {
-			for (let i = 0; i < sides; i++) {
-				const nxt = i === sides - 1 ? 1 : i + 2
-				const nxt2 = nxt + 1
-				mesh.indices.push(0, nxt, i + 1)
-				mesh.indices.push(sides + 1, sides + 2 + i, sides + nxt2)
-				mesh.indices.push(
-					sides * 2 + nxt2,
-					sides * 3 + 2 + i,
-					sides * 2 + 2 + i,
-					sides * 2 + nxt2,
-					sides * 3 + nxt2,
-					sides * 3 + 2 + i,
-				)
-			}
+			mesh.indices.push(
+				sides * 2 + nxt2,
+				sides * 3 + 2 + i,
+				sides * 2 + 2 + i,
+				sides * 2 + nxt2,
+				sides * 3 + nxt2,
+				sides * 3 + 2 + i,
+			)
 		}
 		Mesh.computeNormals(mesh.vertices, mesh.vertices.length, mesh.indices, mesh.indices.length)
 		return mesh
 	}
 
 	private getMatrix(table: Table): Matrix3D {
-		const rt = new Matrix3D().setTranslation(
-			this.data.rotAndTra[3]!,
-			this.data.rotAndTra[4]!,
-			this.data.rotAndTra[5]!,
+		const rotAndTra = this.data.rotAndTra
+		return buildPrimitiveMatrix(
+			this.data.position,
+			this.data.size,
+			{ x: rotAndTra[0]!, y: rotAndTra[1]!, z: rotAndTra[2]! },
+			{ x: rotAndTra[3]!, y: rotAndTra[4]!, z: rotAndTra[5]! },
+			{ x: rotAndTra[6]!, y: rotAndTra[7]!, z: rotAndTra[8]! },
+			table.getScaleZ(),
 		)
-		rt.multiply(new Matrix3D().rotateZMatrix(MathUtils.degToRad(this.data.rotAndTra[2]!)))
-		rt.multiply(new Matrix3D().rotateYMatrix(MathUtils.degToRad(this.data.rotAndTra[1]!)))
-		rt.multiply(new Matrix3D().rotateXMatrix(MathUtils.degToRad(this.data.rotAndTra[0]!)))
-		rt.multiply(new Matrix3D().rotateZMatrix(MathUtils.degToRad(this.data.rotAndTra[8]!)))
-		rt.multiply(new Matrix3D().rotateYMatrix(MathUtils.degToRad(this.data.rotAndTra[7]!)))
-		rt.multiply(new Matrix3D().rotateXMatrix(MathUtils.degToRad(this.data.rotAndTra[6]!)))
-		const scale = new Matrix3D().setScaling(this.data.size.x, this.data.size.y, this.data.size.z)
-		const trans = new Matrix3D().setTranslation(this.data.position.x, this.data.position.y, this.data.position.z)
-		const full = scale.multiply(rt).multiply(trans)
-		const sz = table.getScaleZ()
-		if (sz !== 1) full.multiply(new Matrix3D().setScaling(1, 1, sz))
-		return full
 	}
 }

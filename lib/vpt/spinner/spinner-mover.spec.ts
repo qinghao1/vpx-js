@@ -6,12 +6,12 @@ import { expect } from 'chai'
 import sinonChai from 'sinon-chai'
 import { MathUtils } from 'three'
 import { createBall } from '../../../test/physics.helper'
+import { TableBuilder } from '../../../test/table-builder.js'
 import { ThreeHelper } from '../../../test/three.helper'
 import { Player } from '../../game/player.js'
-import type { PlayerPhysics } from '../../game/player-physics.js'
 import { NodeBinaryReader } from '../../io/binary-reader.node.js'
+import { HitCircle } from '../../physics/hit-circle.js'
 import { Table } from '../table/table.js'
-import type { Spinner } from './spinner.js'
 import type { SpinnerState } from './spinner-state.js'
 
 chai.use((sinonChai as any).default ?? sinonChai)
@@ -90,23 +90,34 @@ describe('The VPinball spinner collision', () => {
 		const state = player.popStates().getState<SpinnerState>('Transformed')
 		expect(state.angle).to.equal(spinner.getState().angle)
 	})
+
+	it('should fire Spin while a free spinner turns', () => {
+		const spinner = table.spinners.Transformed
+		let spins = 0
+		spinner.getApi().on('Spin', () => spins++)
+
+		createBall(player, 400, 1000, 0, 0, 10)
+
+		player.updatePhysics(0)
+		player.updatePhysics(160)
+		expect(spinner.getState().angle).to.be.above(5)
+		player.updatePhysics(600)
+		expect(spins).to.be.greaterThan(0)
+	})
 })
 
-/**
- * Let time pass while logging the spinner rotation.
- * @param physics
- * @param spinner
- * @param numCycles How many cycles to run
- * @param cycleLength Duration of each cycle
- */
-export function debugSpinner(physics: PlayerPhysics, spinner: Spinner, numCycles = 300, cycleLength = 5) {
-	for (let i = 0; i <= numCycles; i++) {
-		physics.updatePhysics(i * cycleLength)
-		console.log(
-			'[%sms] %s (%s°)',
-			i * cycleLength,
-			spinner.getState().angle,
-			MathUtils.radToDeg(spinner.getState().angle),
-		)
+describe('The VPinball spinner bracket hits', () => {
+	function bracketCircles(showBracket: boolean): HitCircle[] {
+		const table = new TableBuilder().addSpinner('spin', { showBracket }).build()
+		new Player(table).init()
+		return table.spinners.spin.getHitShapes().filter((hit): hit is HitCircle => hit instanceof HitCircle)
 	}
-}
+
+	it('should add two bracket hit circles when the bracket shows', () => {
+		expect(bracketCircles(true)).to.have.lengthOf(2)
+	})
+
+	it('should add no bracket hit circles when the bracket hides', () => {
+		expect(bracketCircles(false)).to.have.lengthOf(0)
+	})
+})

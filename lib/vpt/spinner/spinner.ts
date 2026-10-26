@@ -2,18 +2,22 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { EventProxy } from '../../game/event-proxy.js'
-import type { IAnimatable, IAnimation } from '../../game/ianimatable.js'
-import type { IHittable } from '../../game/ihittable.js'
-import type { IMovable } from '../../game/imovable.js'
-import type { IPlayable } from '../../game/iplayable.js'
-import type { IRenderable, Meshes } from '../../game/irenderable.js'
-import type { IScriptable } from '../../game/iscriptable.js'
+import type {
+	IAnimatable,
+	IAnimation,
+	IHittable,
+	IMovable,
+	IPlayable,
+	IRenderable,
+	IScriptable,
+	Meshes,
+} from '../../game/interfaces.js'
 import type { Player } from '../../game/player.js'
 import type { Storage } from '../../io/ole-doc.js'
+import { Matrix3D } from '../../math/matrix.js'
 import type { HitCircle } from '../../physics/hit-circle.js'
 import type { HitObject } from '../../physics/hit-object.js'
 import type { MoverObject } from '../../physics/mover-object.js'
-import { Matrix3D } from '../../util/matrix.js'
 import { Item } from '../item.js'
 import type { Table } from '../table/table.js'
 import { SpinnerAnimation } from './spinner-animation.js'
@@ -25,7 +29,7 @@ import { SpinnerMeshGenerator } from './spinner-mesh-generator.js'
 import { SpinnerState } from './spinner-state.js'
 import { SpinnerUpdater } from './spinner-updater.js'
 
-/** Spinner item. @see https://github.com/vpinball/vpinball/blob/master/spinner.cpp */
+/** Spinner item. @see https://github.com/vpinball/vpinball/blob/master/src/parts/spinner.cpp */
 export class Spinner
 	extends Item<SpinnerData>
 	implements IRenderable<SpinnerState>, IPlayable, IMovable, IHittable, IScriptable<SpinnerApi>, IAnimatable
@@ -40,11 +44,9 @@ export class Spinner
 	private api?: SpinnerApi
 
 	// public props
-	/** Get angleMin. */
 	get angleMin() {
 		return this.data.angleMin
 	}
-	/** Get angleMax. */
 	get angleMax() {
 		return this.data.angleMax
 	}
@@ -76,7 +78,6 @@ export class Spinner
 
 	public getMeshes<GEOMETRY>(table: Table): Meshes<GEOMETRY> {
 		const spinner = this.meshGenerator.generateMeshes(table)
-		const _meshes: Meshes<GEOMETRY> = {}
 
 		return {
 			plate: {
@@ -98,7 +99,7 @@ export class Spinner
 		const height = table.getSurfaceHeight(this.data.szSurface, this.data.center.x, this.data.center.y)
 		this.events = new EventProxy(this)
 		this.hit = new SpinnerHit(this.data, this.state, this.events, height)
-		this.hitCircles = this.hitGenerator.getHitShapes(this.state, height)
+		this.hitCircles = this.hitGenerator.getHitShapes(height)
 		this.api = new SpinnerApi(this.state, this.hit.getMoverObject(), this.data, this.events, player, table)
 		this.animation.setEvents(this.events)
 	}

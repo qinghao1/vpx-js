@@ -65,9 +65,10 @@ describe('The VPinball ball API', () => {
 		expect(api.VelX).to.equal(198)
 		expect(api.VelY).to.equal(0.5)
 		expect(api.VelZ).to.equal(20)
-		expect(api.AngVelX).to.equal(165)
-		expect(api.AngVelY).to.equal(-45)
-		expect(api.AngVelZ).to.equal(17)
+		// AngVel setters are upstream no-ops; getters derive from momentum.
+		expect(api.AngVelX).be.closeTo(22 / ball.hit.inertia, 0.0001)
+		expect(api.AngVelY).be.closeTo(6.5 / ball.hit.inertia, 0.0001)
+		expect(api.AngVelZ).be.closeTo(1.65 / ball.hit.inertia, 0.0001)
 		expect(api.AngMomX).to.equal(22)
 		expect(api.AngMomY).to.equal(6.5)
 		expect(api.AngMomZ).be.closeTo(1.65, 0.0001)
@@ -83,6 +84,22 @@ describe('The VPinball ball API', () => {
 		expect(api.PlayfieldReflectionScale).to.equal(3.5)
 		expect(api.ForceReflection).to.equal(false)
 		expect(api.Visible).to.equal(false)
+	})
+
+	it('should treat angular velocity setters as no-ops and derive getters from momentum', () => {
+		const ball = createBall(player, 500, 2100, 0)
+		const api = ball.getApi()
+
+		api.AngMomX = 10
+		expect(api.AngVelX).be.closeTo(10 / ball.hit.inertia, 0.0001)
+
+		api.AngVelX = 165
+		api.AngVelY = -45
+		api.AngVelZ = 17
+		expect(api.AngMomX).to.equal(10)
+		expect(api.AngVelX).be.closeTo(10 / ball.hit.inertia, 0.0001)
+		expect(api.AngVelY).to.equal(0)
+		expect(api.AngVelZ).to.equal(0)
 	})
 
 	it('should destroy the ball', () => {

@@ -58,7 +58,6 @@ export class PlungerHit extends HitObject {
 	public override hitTest(ball: Ball, dTime: number, coll: CollisionEvent, physics: PlayerPhysics): number {
 		let hitTime = dTime
 		let isHit = false
-		physics.lastPlungerHit = physics.timeMsec
 		const hit = CollisionEvent.claim(ball)
 		const test = (
 			seg: { hitTest(ball: Ball, hitTime: number, hit: CollisionEvent): number },
@@ -72,21 +71,25 @@ export class PlungerHit extends HitObject {
 				coll.hitVel.set(vel.x, vel.y)
 			}
 		}
-		test(this.mover.lineSegBase, { x: 0, y: 0 })
+		const zeroVel = { x: 0, y: 0 }
+		test(this.mover.lineSegBase, zeroVel)
 		for (let i = 0; i < 2; i++) {
-			test(this.mover.lineSegSide[i]!, { x: 0, y: 0 })
-			test(this.mover.jointBase[i]!, { x: 0, y: 0 })
+			test(this.mover.lineSegSide[i]!, zeroVel)
+			test(this.mover.jointBase[i]!, zeroVel)
 		}
 		const oldVy = ball.hit.vel.y
 		ball.hit.vel.y -= this.mover.speed
 		const ballMass = Math.max(ball.data.mass, 0.05)
 		const xfer = this.data.momentumXfer / ballMass
 		const deltaY = this.mover.speed * xfer
-		test(this.mover.lineSegEnd, { x: 0, y: deltaY })
-		for (let i = 0; i < 2; i++) test(this.mover.jointEnd[i]!, { x: 0, y: deltaY })
+		const tipVel = { x: 0, y: deltaY }
+		test(this.mover.lineSegEnd, tipVel)
+		for (let i = 0; i < 2; i++) test(this.mover.jointEnd[i]!, tipVel)
 		ball.hit.vel.y = oldVy
 		CollisionEvent.release(hit)
-		if (!isHit) return -1
+		if (isHit) physics.lastPlungerHit = physics.timeMsec
+		// no collision during the controlled retract motion
+		if (!isHit || this.mover.retractMotion) return -1
 		if (this.mover.travelLimit < this.mover.pos) this.mover.travelLimit = this.mover.pos
 		if (coll.hitDistance <= 0 && coll.hitVel?.y === deltaY && Math.abs(deltaY) < Math.abs(coll.hitDistance))
 			coll.hitVel!.y = -Math.abs(coll.hitDistance)

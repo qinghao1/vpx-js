@@ -1,12 +1,13 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
+import { MathUtils } from 'three'
 import { describe, expect, it } from 'vitest'
 import { TableBuilder } from '../../../test/table-builder.js'
 import { TestRenderApi } from '../../../test/test-render-api.js'
 import { Player } from '../../game/player.js'
-import type { Matrix3D } from '../../util/matrix.js'
-import { Vertex3D } from '../../util/vector.js'
+import { Matrix3D } from '../../math/matrix.js'
+import { Vertex3D } from '../../math/vector.js'
 import type { PrimitiveState } from './primitive-state.js'
 
 describe('regression: primitive script-animated transforms stay generic and data-immutable', () => {
@@ -215,5 +216,116 @@ describe('regression: primitive script-animated transforms stay generic and data
 		expect(diff.objectRotation!.y).toBeCloseTo(8, 0.001)
 		expect(diff.objectRotation!.z).toBeCloseTo(9, 0.001)
 		diff.release()
+	})
+})
+
+type Row4 = number[][]
+
+const rowIdentity = (): Row4 => [
+	[1, 0, 0, 0],
+	[0, 1, 0, 0],
+	[0, 0, 1, 0],
+	[0, 0, 0, 1],
+]
+const rowTranslate = (x: number, y: number, z: number): Row4 => [
+	[1, 0, 0, 0],
+	[0, 1, 0, 0],
+	[0, 0, 1, 0],
+	[x, y, z, 1],
+]
+const rowScale = (sx: number, sy: number, sz: number): Row4 => [
+	[sx, 0, 0, 0],
+	[0, sy, 0, 0],
+	[0, 0, sz, 0],
+	[0, 0, 0, 1],
+]
+const rowRotateX = (a: number): Row4 => {
+	const c = Math.cos(a),
+		s = Math.sin(a)
+	return [
+		[1, 0, 0, 0],
+		[0, c, s, 0],
+		[0, -s, c, 0],
+		[0, 0, 0, 1],
+	]
+}
+const rowRotateY = (a: number): Row4 => {
+	const c = Math.cos(a),
+		s = Math.sin(a)
+	return [
+		[c, 0, -s, 0],
+		[0, 1, 0, 0],
+		[s, 0, c, 0],
+		[0, 0, 0, 1],
+	]
+}
+const rowRotateZ = (a: number): Row4 => {
+	const c = Math.cos(a),
+		s = Math.sin(a)
+	return [
+		[c, s, 0, 0],
+		[-s, c, 0, 0],
+		[0, 0, 1, 0],
+		[0, 0, 0, 1],
+	]
+}
+const rowMul = (A: Row4, B: Row4): Row4 => {
+	const C = rowIdentity()
+	for (let i = 0; i < 4; i++)
+		for (let j = 0; j < 4; j++) {
+			let s = 0
+			for (let k = 0; k < 4; k++) s += A[i][k] * B[k][j]
+			C[i][j] = s
+		}
+	return C
+}
+const toRow = (m: Matrix3D): Row4 => [
+	[m._11, m._12, m._13, m._14],
+	[m._21, m._22, m._23, m._24],
+	[m._31, m._32, m._33, m._34],
+	[m._41, m._42, m._43, m._44],
+]
+const rowClose = (a: Row4, b: Row4, eps = 1e-5): boolean => {
+	for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) if (Math.abs(a[i][j] - b[i][j]) > eps) return false
+	return true
+}
+
+describe('primitive RecalculateMatrices composition', () => {
+	it('matches upstream scale * rotTrans * translation order', () => {
+		const size = { x: 2, y: 3, z: 4 }
+		const pos = { x: 10, y: 20, z: 5 }
+		// Packed transform: rotation XYZ (degrees), translation XYZ, second rotation XYZ (degrees).
+		const [rx1 = 0, ry1 = 0, rz1 = 0, tx = 0, ty = 0, tz = 0, rx2 = 0, ry2 = 0, rz2 = 0] = [
+			10, 20, 30, 1, 2, 3, 40, 50, 60,
+		]
+		const rotTrans = new Matrix3D().setTranslation(tx, ty, tz)
+		rotTrans.multiply(new Matrix3D().rotateZMatrix(MathUtils.degToRad(rz1)))
+		rotTrans.multiply(new Matrix3D().rotateYMatrix(MathUtils.degToRad(ry1)))
+		rotTrans.multiply(new Matrix3D().rotateXMatrix(MathUtils.degToRad(rx1)))
+		rotTrans.multiply(new Matrix3D().rotateZMatrix(MathUtils.degToRad(rz2)))
+		rotTrans.multiply(new Matrix3D().rotateYMatrix(MathUtils.degToRad(ry2)))
+		rotTrans.multiply(new Matrix3D().rotateXMatrix(MathUtils.degToRad(rx2)))
+		const full = new Matrix3D()
+			.setScaling(size.x, size.y, size.z)
+			.multiply(rotTrans)
+			.multiply(new Matrix3D().setTranslation(pos.x, pos.y, pos.z))
+		const RT = rowMul(
+			rowMul(
+				rowMul(
+					rowMul(
+						rowMul(
+							rowMul(rowTranslate(tx, ty, tz), rowRotateZ(MathUtils.degToRad(rz1))),
+							rowRotateY(MathUtils.degToRad(ry1)),
+						),
+						rowRotateX(MathUtils.degToRad(rx1)),
+					),
+					rowRotateZ(MathUtils.degToRad(rz2)),
+				),
+				rowRotateY(MathUtils.degToRad(ry2)),
+			),
+			rowRotateX(MathUtils.degToRad(rx2)),
+		)
+		const ref = rowMul(rowMul(rowScale(size.x, size.y, size.z), RT), rowTranslate(pos.x, pos.y, pos.z))
+		expect(rowClose(toRow(full), ref)).toBe(true)
 	})
 })

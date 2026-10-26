@@ -152,9 +152,4 @@ describe('The VPinball trigger API', () => {
 		player.updatePhysics(1110)
 		expect(eventSpy).to.have.been.calledOnce
 	})
-
-	it('should not crash when executing unused APIs', () => {
-		const trigger = table.triggers.WireB.getApi()
-		expect(trigger.InterfaceSupportsErrorInfo({})).to.equal(false)
-	})
 })

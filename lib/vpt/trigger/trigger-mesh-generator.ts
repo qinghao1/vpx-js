@@ -1,12 +1,11 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 import { MathUtils } from 'three'
-
+import { Matrix3D } from '../../math/matrix.js'
+import { Vertex3D } from '../../math/vector.js'
 import { logger } from '../../util/logger.js'
-import { Matrix3D } from '../../util/matrix.js'
-import { Vertex3D } from '../../util/vector.js'
 import { Enums } from '../enums.js'
-import type { Mesh } from '../mesh.js'
+import { Mesh } from '../mesh.js'
 import { loadMesh } from '../mesh-loader.js'
 import type { Table } from '../table/table.js'
 import type { TriggerData } from './trigger-data.js'
@@ -32,6 +31,12 @@ export class TriggerMeshGenerator {
 		const mesh = this.getBaseMesh()
 		const isRound =
 			this.data.shape === Enums.TriggerShape.TriggerButton || this.data.shape === Enums.TriggerShape.TriggerStar
+		const isWire =
+			this.data.shape === Enums.TriggerShape.TriggerWireA ||
+			this.data.shape === Enums.TriggerShape.TriggerWireB ||
+			this.data.shape === Enums.TriggerShape.TriggerWireC ||
+			this.data.shape === Enums.TriggerShape.TriggerWireD ||
+			this.data.shape === Enums.TriggerShape.TriggerInder
 		for (const v of mesh.vertices) {
 			const vert = Vertex3D.claim(v.x, v.y, v.z).multiplyMatrix(fullMatrix)
 			if (isRound) {
@@ -47,6 +52,11 @@ export class TriggerMeshGenerator {
 			v.nx = n.x
 			v.ny = n.y
 			v.nz = n.z
+			if (isWire) {
+				v.x += n.x * this.data.wireThickness
+				v.y += n.y * this.data.wireThickness
+				v.z += n.z * this.data.wireThickness
+			}
 			Vertex3D.release(vert, n)
 		}
 		return mesh
@@ -61,12 +71,12 @@ export class TriggerMeshGenerator {
 	private getFullMatrix(): Matrix3D {
 		const m = new Matrix3D()
 		if (this.data.shape === Enums.TriggerShape.TriggerWireB) {
-			m.rotateZMatrix(MathUtils.degToRad(this.data.rotation))
-			const tmp = new Matrix3D().rotateXMatrix(MathUtils.degToRad(-23))
+			m.rotateXMatrix(MathUtils.degToRad(-23))
+			const tmp = new Matrix3D().rotateZMatrix(MathUtils.degToRad(this.data.rotation))
 			m.multiply(tmp)
 		} else if (this.data.shape === Enums.TriggerShape.TriggerWireC) {
-			m.rotateZMatrix(MathUtils.degToRad(this.data.rotation))
-			const tmp = new Matrix3D().rotateXMatrix(MathUtils.degToRad(140))
+			m.rotateXMatrix(MathUtils.degToRad(140))
+			const tmp = new Matrix3D().rotateZMatrix(MathUtils.degToRad(this.data.rotation))
 			m.multiply(tmp)
 		} else {
 			m.rotateZMatrix(MathUtils.degToRad(this.data.rotation))
@@ -90,7 +100,7 @@ export class TriggerMeshGenerator {
 			case Enums.TriggerShape.TriggerStar:
 				return triggerStarMesh.clone(name)
 			case Enums.TriggerShape.TriggerNone:
-				return triggerSimpleMesh.clone(name)
+				return new Mesh(name)
 			default:
 				logger().warn('[TriggerMeshGenerator] Unknown shape "%s".', this.data.shape)
 				return triggerSimpleMesh.clone(name)

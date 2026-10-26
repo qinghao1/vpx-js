@@ -2,16 +2,12 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { EventProxy } from '../../game/event-proxy.js'
-import type { IHittable } from '../../game/ihittable.js'
-import type { IMovable } from '../../game/imovable.js'
-import type { IPlayable } from '../../game/iplayable.js'
-import type { IRenderable, Meshes } from '../../game/irenderable.js'
-import type { IScriptable } from '../../game/iscriptable.js'
+import type { IHittable, IMovable, IPlayable, IRenderable, IScriptable, Meshes } from '../../game/interfaces.js'
 import type { IBallCreationPosition, Player } from '../../game/player.js'
 import type { PlayerPhysics } from '../../game/player-physics.js'
 import type { Storage } from '../../io/ole-doc.js'
+import { Vertex3D } from '../../math/vector.js'
 import type { HitObject } from '../../physics/hit-object.js'
-import { Vertex3D } from '../../util/vector.js'
 import type { Ball } from '../ball/ball.js'
 import { Item } from '../item.js'
 import type { Table } from '../table/table.js'
@@ -44,12 +40,12 @@ export class Plunger
 	public constructor(_itemName: string, data: PlungerData) {
 		super(data)
 		this.meshGenerator = new PlungerMeshGenerator(data)
-		this.state = PlungerState.claim(this.getName(), 0)
+		this.state = PlungerState.claim(this.getName(), 0, data.isVisible)
 		this.updater = new PlungerUpdater(this.state, this.meshGenerator)
 	}
 
 	public getState(): PlungerState {
-		return this.state!
+		return this.state
 	}
 
 	public getMeshes<GEOMETRY>(table: Table): Meshes<GEOMETRY> {
@@ -70,7 +66,7 @@ export class Plunger
 	public setupPlayer(player: Player, table: Table): void {
 		this.events = new EventProxy(this)
 		this.hit = new PlungerHit(this.data, this.state, this.events, this.meshGenerator.cFrames, player, table)
-		this.api = new PlungerApi(this.data, this.hit, this.events, this, player, table)
+		this.api = new PlungerApi(this.data, this.state, this.hit, this.events, this, player, table)
 	}
 
 	public getApi(): PlungerApi {
@@ -94,8 +90,7 @@ export class Plunger
 	}
 
 	public fire(): void {
-		if (this.data.autoPlunger) this.getMover().fire(1)
-		else this.getMover().fire()
+		this.getMover().fire(this.data.autoPlunger ? 1 : 0)
 	}
 
 	public getUpdater(): PlungerUpdater {
@@ -103,14 +98,15 @@ export class Plunger
 	}
 
 	public getBallCreationPosition(table: Table): Vertex3D {
-		const x = (this.getMover().x + this.getMover().x2) * 0.5
-		const y = this.getMover().pos - 25.01
+		const mover = this.getMover()
+		const x = (mover.x + mover.x2) * 0.5
+		const y = mover.pos - 25.01
 		const height = table.getSurfaceHeight(this.data.szSurface, x, y)
 		return new Vertex3D(x, y, height)
 	}
 
 	public getBallCreationVelocity(_table: Table): Vertex3D {
-		return new Vertex3D(0, 0, 0)
+		return new Vertex3D()
 	}
 
 	public onBallCreated(_physics: PlayerPhysics, _ball: Ball): void {}

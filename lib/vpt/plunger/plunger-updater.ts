@@ -22,10 +22,14 @@ export class PlungerUpdater extends ItemUpdater<PlungerState> {
 		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
 		table: Table,
 	): void {
-		const mesh = this.meshGenerator.generateMeshes(state.frame, table)
+		this.state.mergeFrom(state)
+		this.applyVisibility(obj, state, renderApi)
+		const mesh = this.meshGenerator.generateMeshes(this.state.frame, table)
 		const rod = renderApi.findInGroup(obj, 'rod')
 		if (rod) renderApi.applyMeshToNode(mesh.rod!, rod)
 		const spring = renderApi.findInGroup(obj, 'spring')
 		if (spring) renderApi.applyMeshToNode(mesh.spring!, spring)
+		const flat = renderApi.findInGroup(obj, 'flat')
+		if (flat) renderApi.applyMeshToNode(mesh.flat!, flat)
 	}
 }

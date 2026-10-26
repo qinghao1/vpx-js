@@ -4,7 +4,7 @@
 import { BiffParser } from '../../io/biff-parser.js'
 import { registry } from '../../io/global-registry.js'
 import type { Storage } from '../../io/ole-doc.js'
-import { Vertex2D } from '../../util/vector.js'
+import { Vertex2D } from '../../math/vector.js'
 import { handleBiffTag } from '../biff-helper.js'
 import { ItemData } from '../item-data.js'
 import type { Table } from '../table/table.js'
@@ -114,15 +114,15 @@ export class FlipperData extends ItemData {
 			return v < 0 ? fallback : v
 		}
 		this.overrideMass = get('FlipperPhysicsMass', this.mass, 1)
-		this.overrideStrength = get('FlipperPhysicsStrength', this.strength!, 2200)
-		this.overrideElasticity = get('FlipperPhysicsElasticity', this.elasticity!, 0.8)
-		this.overrideScatterAngle = get('FlipperPhysicsScatter', this.scatter!, 0)
-		this.overrideReturnStrength = get('FlipperPhysicsReturnStrength', this.return!, 0.058)
-		this.overrideElasticityFalloff = get('FlipperPhysicsElasticityFalloff', this.elasticityFalloff!, 0.43)
-		this.overrideFriction = get('FlipperPhysicsFriction', this.friction!, 0.6)
-		this.overrideCoilRampUp = get('FlipperPhysicsCoilRampUp', this.rampUp!, 3.0)
-		this.overrideTorqueDamping = get('FlipperPhysicsEOSTorque', this.torqueDamping!, 0.75)
-		this.overrideTorqueDampingAngle = get('FlipperPhysicsEOSTorqueAngle', this.torqueDampingAngle!, 6.0)
+		this.overrideStrength = get('FlipperPhysicsStrength', this.strength, 2200)
+		this.overrideElasticity = get('FlipperPhysicsElasticity', this.elasticity, 0.8)
+		this.overrideScatterAngle = get('FlipperPhysicsScatter', this.scatter, 0)
+		this.overrideReturnStrength = get('FlipperPhysicsReturnStrength', this.return, 0.058)
+		this.overrideElasticityFalloff = get('FlipperPhysicsElasticityFalloff', this.elasticityFalloff, 0.43)
+		this.overrideFriction = get('FlipperPhysicsFriction', this.friction, 0.6)
+		this.overrideCoilRampUp = get('FlipperPhysicsCoilRampUp', this.rampUp, 3.0)
+		this.overrideTorqueDamping = get('FlipperPhysicsEOSTorque', this.torqueDamping, 0.75)
+		this.overrideTorqueDampingAngle = get('FlipperPhysicsEOSTorqueAngle', this.torqueDampingAngle, 6.0)
 	}
 
 	public doOverridePhysics(table: Table): boolean {

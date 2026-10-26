@@ -2,15 +2,12 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { EventProxy } from '../../game/event-proxy.js'
-import type { IMovable } from '../../game/imovable.js'
-import type { IPlayable } from '../../game/iplayable.js'
-import type { IRenderable, Meshes } from '../../game/irenderable.js'
-import type { IScriptable } from '../../game/iscriptable.js'
+import type { IMovable, IPlayable, IRenderable, IScriptable, Meshes } from '../../game/interfaces.js'
 import type { Player } from '../../game/player.js'
+import { Matrix3D } from '../../math/matrix.js'
+import { Vertex3D } from '../../math/vector.js'
 import type { HitObject } from '../../physics/hit-object.js'
 import type { IRenderApi } from '../../render/irender-api.js'
-import { Matrix3D } from '../../util/matrix.js'
-import { Vertex3D } from '../../util/vector.js'
 import { Material } from '../material.js'
 import type { Table } from '../table/table.js'
 import { Texture } from '../texture.js'

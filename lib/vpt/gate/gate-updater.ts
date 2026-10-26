@@ -21,7 +21,7 @@ export class GateUpdater extends ItemUpdater<GateState> {
 		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
 		table: Table,
 	): void {
-		Object.assign(this.state, state)
+		this.state.mergeFrom(state)
 		this.applyVisibility(obj, state, renderApi)
 		this.applyMaterial(obj, state.material, undefined, renderApi, table)
 		if (state.showBracket !== undefined)

@@ -44,18 +44,16 @@ export class FlipperApi extends ItemApi<FlipperData> {
 		this.data.flipperRadiusMax = v
 	}
 	get EOSTorque() {
-		return this.data.doOverridePhysics(this.table) ? this.data.overrideTorqueDamping : this.data.torqueDamping
+		return this.useOverride() ? this.data.overrideTorqueDamping : this.data.torqueDamping
 	}
 	set EOSTorque(v) {
-		if (!this.data.doOverridePhysics(this.table)) this.data.torqueDamping = v
+		if (!this.useOverride()) this.data.torqueDamping = v
 	}
 	get EOSTorqueAngle() {
-		return this.data.doOverridePhysics(this.table)
-			? this.data.overrideTorqueDampingAngle
-			: this.data.torqueDampingAngle
+		return this.useOverride() ? this.data.overrideTorqueDampingAngle : this.data.torqueDampingAngle
 	}
 	set EOSTorqueAngle(v) {
-		if (!this.data.doOverridePhysics(this.table)) this.data.torqueDampingAngle = v
+		if (!this.useOverride()) this.data.torqueDampingAngle = v
 	}
 	get X() {
 		return this._state.center.x
@@ -167,10 +165,10 @@ export class FlipperApi extends ItemApi<FlipperData> {
 		if (!this.data.doOverridePhysics(this.table)) this.hit.elasticityFalloff = v
 	}
 	get Scatter() {
-		return this.hit.scatter
+		return MathUtils.radToDeg(this.hit.scatter)
 	}
 	set Scatter(v) {
-		if (!this.data.doOverridePhysics(this.table)) this.hit.scatter = v
+		if (!this.data.doOverridePhysics(this.table)) this.hit.scatter = MathUtils.degToRad(v)
 	}
 	get Friction() {
 		return this.hit.friction
@@ -179,10 +177,10 @@ export class FlipperApi extends ItemApi<FlipperData> {
 		this.hit.setFriction(v)
 	}
 	get RampUp() {
-		return this.data.doOverridePhysics(this.table) ? this.data.overrideCoilRampUp : this.data.rampUp
+		return this.useOverride() ? this.data.overrideCoilRampUp : this.data.rampUp
 	}
 	set RampUp(v) {
-		if (!this.data.doOverridePhysics(this.table)) this.data.rampUp = v
+		if (!this.useOverride()) this.data.rampUp = v
 	}
 	get Height() {
 		return this.data.height
@@ -227,11 +225,7 @@ export class FlipperApi extends ItemApi<FlipperData> {
 		this.mover.setSolenoidState(false)
 	}
 
-	public InterfaceSupportsErrorInfo(_riid: unknown): boolean {
-		return false
-	}
-
-	protected _getPropertyNames(): string[] {
-		return Object.getOwnPropertyNames(FlipperApi.prototype)
+	private useOverride(): boolean {
+		return this.data.doOverridePhysics(this.table)
 	}
 }

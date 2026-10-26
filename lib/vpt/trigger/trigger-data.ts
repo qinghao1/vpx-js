@@ -3,9 +3,9 @@
 
 import { BiffParser } from '../../io/biff-parser.js'
 import type { Storage } from '../../io/ole-doc.js'
-import { DragPoint } from '../../util/dragpoint.js'
-import { Vertex2D } from '../../util/vector.js'
+import { Vertex2D } from '../../math/vector.js'
 import { handleBiffTag } from '../biff-helper.js'
+import { type DragPoint, dragPointNestedTag } from '../dragpoint.js'
 import { Enums } from '../enums.js'
 import { ItemData } from '../item-data.js'
 
@@ -18,6 +18,7 @@ const FLOAT_MAP: Record<string, string> = {
 	THOT: 'hitHeight',
 	ANSP: 'animSpeed',
 }
+const INT_MAP: Record<string, string> = { SHAP: 'shape' }
 const BOOL_MAP: Record<string, string> = { VSBL: 'isVisible', EBLD: 'isEnabled', REEN: 'isReflectionEnabled' }
 const STRING_MAP: Record<string, string> = { MATR: 'szMaterial', SURF: 'szSurface' }
 
@@ -41,21 +42,15 @@ export class TriggerData extends ItemData {
 	public isReflectionEnabled = true
 
 	public static async fromStorage(storage: Storage, itemName: string): Promise<TriggerData> {
-		const d = new TriggerData(itemName)
-		await storage.streamFiltered(itemName, 4, TriggerData.createStreamHandler(d))
-		return d
+		const data = new TriggerData(itemName)
+		await storage.streamFiltered(itemName, 4, TriggerData.createStreamHandler(data))
+		return data
 	}
 
-	private static createStreamHandler(d: TriggerData) {
-		d.dragPoints = []
-		return BiffParser.stream(d.fromTag.bind(d), {
-			nestedTags: {
-				DPNT: {
-					onStart: () => new DragPoint(),
-					onTag: dp => dp.fromTag.bind(dp),
-					onEnd: dp => d.dragPoints.push(dp),
-				},
-			},
+	private static createStreamHandler(data: TriggerData) {
+		data.dragPoints = []
+		return BiffParser.stream(data.fromTag.bind(data), {
+			nestedTags: { DPNT: dragPointNestedTag(data) },
 		})
 	}
 
@@ -64,13 +59,10 @@ export class TriggerData extends ItemData {
 			this.center = Vertex2D.get(buffer)
 			return 0
 		}
-		if (tag === 'SHAP') {
-			this.shape = this.getInt(buffer)
-			return 0
-		}
 		if (
 			handleBiffTag(this, tag, buffer, len, {
 				float: FLOAT_MAP,
+				int: INT_MAP,
 				bool: BOOL_MAP,
 				string: STRING_MAP,
 			})

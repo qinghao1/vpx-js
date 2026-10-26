@@ -9,13 +9,13 @@ import * as THREE from 'three'
 import { TableBuilder } from '../../../test/table-builder.js'
 import { TestRenderApi } from '../../../test/test-render-api.js'
 import { Player } from '../../game/player.js'
+import { Vertex3D } from '../../math/vector.js'
 import {
 	createPrimitiveAdditiveMaterial,
 	createPrimitiveBdlMaterial,
 	setPrimitiveMap,
 } from '../../render/threejs/nodes/primitive-bdl-node.js'
 import { createUnshadedBakedNodeMaterial } from '../../render/threejs/nodes/unshaded-baked-node.js'
-import { Vertex3D } from '../../util/vector.js'
 import type { Table } from '../table/table.js'
 import type { PrimitiveState } from './primitive-state.js'
 
@@ -48,6 +48,19 @@ describe('The VPinball primitive updater', () => {
 		const states = player.popStates()
 		expect(states.getState<PrimitiveState>('pDynamic').isVisible).to.equal(false)
 		states.getState<PrimitiveState>('pDynamic').release()
+	})
+
+	it('should hide a sequencer-locked primitive with inPlayState off and reveal it on unlock', () => {
+		const renderApi = new TestRenderApi()
+		const visibility = spy(renderApi, 'applyVisibility')
+		const updater = table.primitives.pDynamic.getUpdater()
+		const mesh: any = { name: 'cube', visible: true }
+
+		updater.applyState(mesh, { lockedByLS: true, inPlayState: false } as PrimitiveState, renderApi, table)
+		expect(visibility).to.have.been.calledWith(false, mesh)
+
+		updater.applyState(mesh, { lockedByLS: false } as PrimitiveState, renderApi, table)
+		expect(visibility).to.have.been.calledWith(true, mesh)
 	})
 
 	it('should update the material', () => {
@@ -89,8 +102,9 @@ describe('The VPinball primitive updater', () => {
 
 	it('should carry HDR lamp overdrive on emissive, never subtracting lit (no black inserts)', () => {
 		// TWD drives lit flares at BDL 130..8500. Native evaluates mix(lit, diffuse, BDL)
-		// per light (~BDL x diffuse into the tonemapper). The composite keeps diffuse
-		// only below BDL 1 and puts the overdrive on emissive, which can only add light.
+		// per light and lightLoop sums TWO lights (~2*BDL x diffuse into the
+		// tonemapper). The composite keeps diffuse only below BDL 1 and puts the
+		// overdrive on emissive, which can only add light.
 		table = new TableBuilder()
 			.addMaterial('insertonledwhite1', { baseColor: 0xffffff })
 			.addPrimitive('well', {
@@ -113,7 +127,7 @@ describe('The VPinball primitive updater', () => {
 		const mat = mesh.material as any
 		expect(mat.userData.__uBDL.value, 'HDR overdrive rides the emissive uniform').to.equal(875)
 		expect(mat.userData.__uDim.value, 'overdriven diffuse is fully dimmed').to.equal(0)
-		expect(mat.userData.__uCarry.value, 'overdrive carry equals BDL for BDL >> 1').to.equal(875)
+		expect(mat.userData.__uCarry.value, 'overdrive carry equals 2xBDL (two lights)').to.equal(1750)
 		expect(mat.emissiveNode, 'unlit travels on emissive, never outputNode mix').to.not.equal(null)
 		expect(mat.outputNode, 'no outputNode mix to drive negative').to.equal(null)
 		table.primitives.well
@@ -232,6 +246,37 @@ describe('The VPinball primitive updater', () => {
 			.applyState(mesh, { disableLightingTop: 1 } as PrimitiveState, renderApi, table)
 		const mat = mesh.material as any
 		expect(mat.alphaTest, 'BDL pass must keep the lens cutout').to.be.closeTo(1 / 255, 1e-6)
+	})
+
+	it('should force below lighting off for static primitives (native primitive.cpp static rule)', () => {
+		// Native forces disableLightingBelow to 1.0 for static-marked primitives: there is
+		// no bulb light during the static pre-render pass, so static objects never receive
+		// the transmission lift even when authored at 0. Dynamic primitives keep the value.
+		table = new TableBuilder()
+			.addMaterial('mat')
+			.addPrimitive('staticPrim', { staticRendering: true, disableLightingBelow: 0, szMaterial: 'mat' })
+			.addPrimitive('dynamicPrim', { staticRendering: false, disableLightingBelow: 0, szMaterial: 'mat' })
+			.build()
+		const renderApi = new TestRenderApi()
+		const staticMesh: any = {
+			name: 'staticPrim',
+			material: createPrimitiveBdlMaterial({ albedo: 0xffffff, opacity: 1, bdl: 0 }),
+		}
+		table.primitives.staticPrim
+			.getUpdater()
+			.applyState(staticMesh, { disableLightingBelow: 0 } as PrimitiveState, renderApi, table)
+		expect(
+			(staticMesh.material as any).userData.__below,
+			'static primitive must ignore authored below lighting',
+		).to.equal(1)
+		const dynamicMesh: any = {
+			name: 'dynamicPrim',
+			material: createPrimitiveBdlMaterial({ albedo: 0xffffff, opacity: 1, bdl: 0 }),
+		}
+		table.primitives.dynamicPrim
+			.getUpdater()
+			.applyState(dynamicMesh, { disableLightingBelow: 0 } as PrimitiveState, renderApi, table)
+		expect((dynamicMesh.material as any).userData.__below, 'dynamic primitive keeps authored below').to.equal(0)
 	})
 
 	it('should shade baked surfaces with their base tint, not full white', () => {

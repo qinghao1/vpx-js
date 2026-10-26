@@ -4,11 +4,11 @@ import { Event } from '../../game/event.js'
 import type { EventProxy } from '../../game/event-proxy.js'
 import { AssignKey } from '../../game/key-code.js'
 import type { Player } from '../../game/player.js'
+import { Vertex2D } from '../../math/vector.js'
 import { HitLineZ } from '../../physics/hit-line-z.js'
 import { LineSeg } from '../../physics/line-seg.js'
 import type { MoverObject } from '../../physics/mover-object.js'
 import { logger } from '../../util/logger.js'
-import { Vertex2D } from '../../util/vector.js'
 import type { TableApi } from '../table/table-api.js'
 import { Plunger, type PlungerConfig } from './plunger.js'
 import type { PlungerData } from './plunger-data.js'
@@ -44,8 +44,12 @@ export class PlungerMover implements MoverObject {
 	reverseImpulse = 0
 	fireBounce = 0
 	scatterVelocity = 0
+	retractMotion = false
 
 	private pullForce = 0
+	private initialSpeed = 0
+	private retractWaitLoop = 0
+	private addRetractMotion = false
 	private fireTimer = 0
 	private fireSpeed = 0
 	private autoFireTimer = 0
@@ -112,14 +116,16 @@ export class PlungerMover implements MoverObject {
 		const dx = dTime * this.speed
 		const limit = this.frameLen / 50
 		const hyst = limit * 2
-		if (this.fStrokeEventsArmed && this.pos + dx > this.frameStart - limit) {
-			logger().debug('[%s] Pulled back.', this.data.getName())
-			this.events.fireVoidEventParm(Event.LimitEventsBOS, Math.abs(this.speed))
-			this.fStrokeEventsArmed = false
-		} else if (this.fStrokeEventsArmed && this.pos + dx < this.frameEnd + limit) {
-			logger().debug('[%s] Fired.', this.data.getName())
-			this.events.fireVoidEventParm(Event.LimitEventsEOS, Math.abs(this.speed))
-			this.fStrokeEventsArmed = false
+		if (this.fStrokeEventsArmed) {
+			if (this.pos + dx > this.frameStart - limit) {
+				logger().debug('[%s] Pulled back.', this.data.getName())
+				this.events.fireVoidEventParm(Event.LimitEventsBOS, Math.abs(this.speed))
+				this.fStrokeEventsArmed = false
+			} else if (this.pos + dx < this.frameEnd + limit) {
+				logger().debug('[%s] Fired.', this.data.getName())
+				this.events.fireVoidEventParm(Event.LimitEventsEOS, Math.abs(this.speed))
+				this.fStrokeEventsArmed = false
+			}
 		} else if (this.pos > this.frameEnd + hyst && this.pos < this.frameStart - hyst) {
 			this.fStrokeEventsArmed = true
 		}
@@ -136,9 +142,12 @@ export class PlungerMover implements MoverObject {
 				this.tableApi.fireKeyEvent(Event.GameEventsKeyUp, this.player.getKey(AssignKey.PlungerKey))
 			}
 		} else if (this.pullForce !== 0) {
-			// headless: no m_addRetractMotion loop — pullForce is keyboard-driven
 			this.speed += this.pullForce / this.mass
-			if (this.pos >= this.frameStart) this.speed = 0
+			if (!this.addRetractMotion) {
+				if (this.pos >= this.frameStart) this.speed = 0
+			} else {
+				this.updateRetractMotion()
+			}
 		} else {
 			// headless: no mech sensor (hitplunger.cpp: isMech + GetPosition) — spring to rest
 			const pos = (this.pos - this.frameEnd) / this.frameLen
@@ -160,8 +169,19 @@ export class PlungerMover implements MoverObject {
 	}
 
 	pullBack(speed: number): void {
+		this.setPull(speed, false)
+	}
+
+	pullBackandRetract(speed: number): void {
+		this.setPull(speed, !this.data.autoPlunger)
+	}
+
+	private setPull(speed: number, retract: boolean): void {
 		this.speed = 0
 		this.pullForce = speed
+		this.addRetractMotion = retract
+		this.retractMotion = false
+		this.initialSpeed = speed
 	}
 
 	fire(startPos = 0): void {
@@ -175,6 +195,29 @@ export class PlungerMover implements MoverObject {
 		const bounce = dx < 0.5 ? dx / 0.5 : 1
 		this.fireBounce = -bounce * this.restPos
 		this.fireTimer = 200
+		this.retractMotion = false
+	}
+
+	private updateRetractMotion(): void {
+		const minPos = this.frameEnd + this.restPos * this.frameLen
+		if (this.pos >= this.frameStart && this.pullForce > 0) {
+			this.speed = 0
+			this.pos = this.frameStart
+			if (++this.retractWaitLoop > 1000) {
+				this.pullForce = -this.initialSpeed
+				this.retractMotion = true
+				this.retractWaitLoop = 0
+			}
+		}
+		if (this.pos <= minPos && this.pullForce <= 0) {
+			this.speed = 0
+			this.pullForce = this.initialSpeed
+			this.pos = minPos
+		}
+		if (this.pos > 1 + minPos && this.pullForce > 0) {
+			this.retractMotion = false
+			this.speed = 3 * this.pullForce // 3 = magic
+		}
 	}
 
 	private setObjects(len: number): void {
@@ -192,6 +235,6 @@ export class PlungerMover implements MoverObject {
 		const f = Math.floor(
 			((this.pos - this.frameStart) / (this.frameEnd - this.frameStart)) * (this.cFrames - 1) + 0.5,
 		)
-		return f < 0 ? 0 : f >= this.cFrames ? this.cFrames - 1 : f
+		return Math.max(0, Math.min(this.cFrames - 1, f))
 	}
 }

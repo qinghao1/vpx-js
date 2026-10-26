@@ -1,12 +1,18 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
+import { expect } from 'chai'
 import type { Mesh } from 'three'
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import { TableBuilder } from '../../../test/table-builder.js'
 import { ThreeHelper } from '../../../test/three.helper'
 import { NodeBinaryReader } from '../../io/binary-reader.node.js'
+import type { ReadResult, Storage } from '../../io/ole-doc.js'
+import { Vertex3D } from '../../math/vector.js'
 import { Table } from '../table/table.js'
 import { TableExporter } from '../table/table-exporter.js'
+import { PrimitiveData } from './primitive-data.js'
+import { PrimitiveMeshGenerator } from './primitive-mesh-generator.js'
 
 const three = new ThreeHelper()
 
@@ -73,7 +79,48 @@ describe('The VPinball primitive generator', () => {
 		three.expectVerticesInArray(expectedVertices, triangleMeshVertices)
 	})
 
-	it('should generate an uncompressed mesh')
+	it('should generate an uncompressed mesh', async () => {
+		// M3VN + M3DX carry plain vertices (M3CX/M3CI carry zlib-compressed ones).
+		const verts = new Float32Array([1, 2, 3, 0, 0, 1, 0.25, 0.75, 4, 5, 6, 0, 1, 0, 0.5, 1])
+		const record = new Uint8Array(12 + 72 + 8)
+		const view = new DataView(record.buffer)
+		view.setInt32(0, 8, true)
+		record.set([0x4d, 0x33, 0x56, 0x4e], 4) // M3VN
+		view.setInt32(8, 2, true)
+		view.setInt32(12, 68, true)
+		record.set([0x4d, 0x33, 0x44, 0x58], 16) // M3DX
+		record.set(new Uint8Array(verts.buffer), 20)
+		view.setInt32(84, 4, true)
+		record.set([0x45, 0x4e, 0x44, 0x42], 88) // ENDB
+		const storage = {
+			async streamFiltered(
+				_name: string,
+				_offset: number,
+				next: (result: ReadResult) => Promise<number | null>,
+			): Promise<void> {
+				let pos = 0
+				while (pos < record.length) {
+					const consumed = await next({ data: record.subarray(pos), storageOffset: pos })
+					if (consumed === null) break
+					pos += consumed
+				}
+			},
+		}
+		const data = await PrimitiveData.fromStorage(storage as unknown as Storage, 'Prim', false)
+		expect(data.compressedVertices).to.equal(undefined)
+		expect(data.mesh.vertices.length).to.equal(2)
+		expect(data.mesh.vertices[0]).to.deep.include({ x: 1, y: 2, z: 3, nx: 0, ny: 0, nz: 1, tu: 0.25, tv: 0.75 })
+		expect(data.mesh.vertices[1]).to.deep.include({ x: 4, y: 5, z: 6, nx: 0, ny: 1, nz: 0, tu: 0.5, tv: 1 })
+
+		// the decoded vertices feed mesh generation (identity placement)
+		data.use3DMesh = true
+		data.position = new Vertex3D(0, 0, 0)
+		data.size = new Vertex3D(1, 1, 1)
+		const mesh = new PrimitiveMeshGenerator(data).getMesh(new TableBuilder().build())
+		expect(mesh.vertices.length).to.equal(2)
+		expect(mesh.vertices[0]).to.deep.include({ x: 1, y: 2, z: 3 })
+		expect(mesh.vertices[1]).to.deep.include({ x: 4, y: 5, z: 6 })
+	})
 
 	it('should generate a compressed mesh', async () => {
 		const vptSink = await Table.load(new NodeBinaryReader(three.fixturePath('table-sink.vpx')))
@@ -144,5 +191,8 @@ describe('The VPinball primitive generator', () => {
 		three.expectVerticesInArray(expectedVertices, sinkMeshVertices)
 	})
 
-	it('should assign the correct material')
+	it('should assign the correct material', () => {
+		const table = new TableBuilder().addMaterial('mat').addPrimitive('p', { szMaterial: 'mat' }).build()
+		expect(table.primitives.p.getMeshes(table).primitive.material?.name).to.equal('mat')
+	})
 })

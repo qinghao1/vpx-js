@@ -176,6 +176,23 @@ describe('The VPinball primitive API', () => {
 		expect(primitive.UserValue).to.equal('uzzrrrrvaluuuue')
 	})
 
+	it('should read and write additive blending and the depth mask', () => {
+		const table = new TableBuilder().addPrimitive('p').build()
+		new Player(table).init()
+		const primitive = table.primitives.p.getApi()
+
+		expect(primitive.AddBlend).to.equal(false)
+		primitive.AddBlend = true
+		expect(primitive.AddBlend).to.equal(true)
+		expect(table.primitives.p.getMeshes(table).primitive.addBlend).to.equal(true)
+
+		expect(primitive.EnableDepthMask).to.equal(true)
+		primitive.EnableDepthMask = false
+		expect(primitive.EnableDepthMask).to.equal(false)
+		primitive.EnableDepthMask = true
+		expect(primitive.EnableDepthMask).to.equal(true)
+	})
+
 	it('should update the state when static rendering is disabled', () => {
 		const table = new TableBuilder().addMaterial('mat').addPrimitive('p', { staticRendering: false }).build()
 
@@ -244,5 +261,30 @@ describe('The VPinball primitive API', () => {
 		expect(() => {
 			primitive.NormalMap = 'hdr_tex'
 		}).to.throw('Cannot use a HDR image (.exr/.hdr) here')
+	})
+
+	it('should persist Collidable to data', () => {
+		const table = new TableBuilder().addPrimitive('prim').build()
+		new Player(table).init()
+		const item = table.primitives.prim
+
+		item.getApi().Collidable = false
+		expect(item.data.isCollidable).to.equal(false)
+		expect(item.getApi().Collidable).to.equal(false)
+		for (const hit of item.getHitShapes()) expect(hit.isEnabled).to.equal(false)
+
+		item.getApi().Collidable = true
+		expect(item.data.isCollidable).to.equal(true)
+	})
+
+	it('should keep the Collidable toggle for toys without hit shapes', () => {
+		const table = new TableBuilder().addPrimitive('toy', { isToy: true }).build()
+		new Player(table).init()
+		const item = table.primitives.toy
+		expect(item.getHitShapes()).to.have.lengthOf(0)
+
+		item.getApi().Collidable = false
+		expect(item.data.isCollidable).to.equal(false)
+		expect(item.getApi().Collidable).to.equal(false)
 	})
 })

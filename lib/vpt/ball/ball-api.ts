@@ -64,31 +64,29 @@ export class BallApi extends ItemApi<BallData> {
 		this.hit.calcHitBBox()
 	}
 	get AngVelX() {
-		return this.hit.angularVelocity.x
+		return this.hit.angularMomentum.x / this.hit.inertia
 	}
-	set AngVelX(v) {
-		this.hit.angularVelocity.x = v
-		this.hit.calcHitBBox()
+	set AngVelX(_v) {
+		// No-op to not break tables.
 	}
 	get AngVelY() {
-		return this.hit.angularVelocity.y
+		return this.hit.angularMomentum.y / this.hit.inertia
 	}
-	set AngVelY(v) {
-		this.hit.angularVelocity.y = v
-		this.hit.calcHitBBox()
+	set AngVelY(_v) {
+		// No-op to not break tables.
 	}
 	get AngVelZ() {
-		return this.hit.angularVelocity.z
+		return this.hit.angularMomentum.z / this.hit.inertia
 	}
-	set AngVelZ(v) {
-		this.hit.angularVelocity.z = v
-		this.hit.calcHitBBox()
+	set AngVelZ(_v) {
+		// No-op to not break tables.
 	}
 	get AngMomX() {
 		return this.hit.angularMomentum.x
 	}
 	set AngMomX(v) {
 		this.hit.angularMomentum.x = v
+		this.hit.angularVelocity.x = v / this.hit.inertia
 		this.hit.calcHitBBox()
 	}
 	get AngMomY() {
@@ -96,6 +94,7 @@ export class BallApi extends ItemApi<BallData> {
 	}
 	set AngMomY(v) {
 		this.hit.angularMomentum.y = v
+		this.hit.angularVelocity.y = v / this.hit.inertia
 		this.hit.calcHitBBox()
 	}
 	get AngMomZ() {
@@ -103,6 +102,7 @@ export class BallApi extends ItemApi<BallData> {
 	}
 	set AngMomZ(v) {
 		this.hit.angularMomentum.z = v
+		this.hit.angularVelocity.z = v / this.hit.inertia
 		this.hit.calcHitBBox()
 	}
 	get Color() {
@@ -182,9 +182,5 @@ export class BallApi extends ItemApi<BallData> {
 	public DestroyBall(): number {
 		this.player.destroyBall(this.ball)
 		return 1
-	}
-
-	protected _getPropertyNames(): string[] {
-		return Object.getOwnPropertyNames(BallApi.prototype)
 	}
 }

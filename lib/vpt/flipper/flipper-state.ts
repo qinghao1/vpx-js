@@ -1,7 +1,7 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { Vertex2D } from '../../util/vector.js'
+import type { Vertex2D } from '../../math/vector.js'
 import { ItemState } from '../item-state.js'
 
 /** Flipper state — angle and appearance.
@@ -31,59 +31,5 @@ export class FlipperState extends ItemState {
 		s.rubberMaterial = rubberMaterial
 		s.isVisible = isVisible
 		return s
-	}
-
-	public clone(): FlipperState {
-		return FlipperState.claim(
-			this.name,
-			this.angle,
-			this.center.clone(true),
-			this.isVisible,
-			this.material,
-			this.texture,
-			this.rubberMaterial,
-		)
-	}
-
-	public override copyFrom(state: ItemState): void {
-		const s = state as FlipperState
-		this.name = s.name
-		this.angle = s.angle
-		if (!this.center) this.center = Vertex2D.claim()
-		if (s.center) this.center.set(s.center.x, s.center.y)
-		this.isVisible = s.isVisible
-		this.material = s.material
-		this.texture = s.texture
-		this.rubberMaterial = s.rubberMaterial
-	}
-
-	public diff(state: FlipperState): FlipperState {
-		const d = this.clone()
-		if (d.angle === state.angle) delete (d as unknown as Record<string, unknown>).angle
-		if (d.center?.equals(state.center)) {
-			Vertex2D.release(d.center)
-			delete (d as unknown as Record<string, unknown>).center
-		}
-		if (d.material === state.material) delete (d as unknown as Record<string, unknown>).material
-		if (d.texture === state.texture) delete (d as unknown as Record<string, unknown>).texture
-		if (d.rubberMaterial === state.rubberMaterial) delete (d as unknown as Record<string, unknown>).rubberMaterial
-		if (d.isVisible === state.isVisible) delete (d as unknown as Record<string, unknown>).isVisible
-		return d
-	}
-
-	public release(): void {
-		if (!this.center) this.center = Vertex2D.claim()
-	}
-
-	public equals(state: FlipperState): boolean {
-		if (!state) return false
-		return (
-			state.angle === this.angle &&
-			state.center.equals(this.center) &&
-			state.material === this.material &&
-			state.texture === this.texture &&
-			state.rubberMaterial === this.rubberMaterial &&
-			state.isVisible === this.isVisible
-		)
 	}
 }

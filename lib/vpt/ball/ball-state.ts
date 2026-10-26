@@ -1,8 +1,8 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { Matrix2D } from '../../util/matrix.js'
-import { Vertex3D } from '../../util/vector.js'
+import { Matrix2D } from '../../math/matrix.js'
+import { Vertex3D } from '../../math/vector.js'
 import { ItemState } from '../item-state.js'
 
 /** Ball state — pos/orientation/frozen. @see https://github.com/vpinball/vpinball/blob/master/ball.cpp */
@@ -17,50 +17,5 @@ export class BallState extends ItemState {
 		s.pos.set(pos)
 		s.isFrozen = false
 		return s
-	}
-
-	public clone(): BallState {
-		const s = BallState.claim(this.name, this.pos)
-		s.orientation.set(this.orientation)
-		s.isFrozen = this.isFrozen
-		return s
-	}
-
-	public override copyFrom(state: ItemState): void {
-		const s = state as BallState
-		this.name = s.name
-		this.isVisible = s.isVisible
-		if (!this.pos) this.pos = Vertex3D.claim()
-		this.pos.set(s.pos)
-		if (!this.orientation) this.orientation = Matrix2D.claim()
-		else this.orientation.set(s.orientation)
-		this.isFrozen = s.isFrozen
-	}
-
-	public diff(state: BallState): BallState {
-		const d = this.clone()
-		if (d.pos.equals(state.pos)) {
-			Vertex3D.release(d.pos)
-			delete (d as unknown as Record<string, unknown>).pos
-		}
-		if (d.orientation.equals(state.orientation)) {
-			Matrix2D.release(d.orientation)
-			delete (d as unknown as Record<string, unknown>).orientation
-		}
-		if (d.isFrozen === state.isFrozen) delete (d as unknown as Record<string, unknown>).isFrozen
-		return d
-	}
-
-	public release(): void {
-		if (!this.pos) this.pos = Vertex3D.claim()
-		if (!this.orientation) this.orientation = Matrix2D.claim()
-		else this.orientation.setIdentity()
-	}
-
-	public equals(state: BallState): boolean {
-		if (!state) return false
-		return (
-			this.pos.equals(state.pos) && this.orientation.equals(state.orientation) && this.isFrozen === state.isFrozen
-		)
 	}
 }

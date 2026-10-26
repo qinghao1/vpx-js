@@ -9,6 +9,7 @@ import { ThreeHelper } from '../../../test/three.helper'
 import { Player } from '../../game/player.js'
 import { NodeBinaryReader } from '../../io/binary-reader.node.js'
 import { Table } from '../table/table.js'
+import type { GateHit } from './gate-hit.js'
 
 chai.use((sinonChai as any).default ?? sinonChai)
 const three = new ThreeHelper()
@@ -56,6 +57,22 @@ describe('The VPinball gate collision', () => {
 		expect(ball.getState().pos.y).to.be.below(1130)
 
 		player.updatePhysics(1000)
-		expect(ball.getState().pos.y).to.be.below(810)
+		// FIX_PHYSICS: 810.94 (was 808.34), same margin.
+		expect(ball.getState().pos.y).to.be.below(812)
+	})
+
+	it('should copy the segment bbox instead of sharing it', () => {
+		const gate = Object.values(table.gates)[0]
+		const hit = gate.getHitShapes()[0] as GateHit
+		hit.calcHitBBox()
+
+		const segBox = hit.lineSeg[0].hitBBox
+		expect(hit.hitBBox).to.not.equal(segBox)
+		expect(hit.hitBBox).to.deep.equal(segBox)
+
+		const left = segBox.left
+		hit.hitBBox.left += 10
+		expect(segBox.left).to.equal(left)
+		expect(hit.hitBBox.left).to.equal(left + 10)
 	})
 })

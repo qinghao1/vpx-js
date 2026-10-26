@@ -90,9 +90,9 @@ export class SpinnerApi extends ItemApi<SpinnerData> {
 	}
 	set AngleMax(v) {
 		if (this.data.angleMin !== this.data.angleMax) {
-			v = clampAngleToRad(v, this.data.angleMin, this.data.angleMax)
-			if (this.mover.angleMin < v) this.mover.angleMax = v
-			else this.mover.angleMin = v
+			const angle = clampAngleToRad(v, this.data.angleMin, this.data.angleMax)
+			if (this.mover.angleMin < angle) this.mover.angleMax = angle
+			else this.mover.angleMin = angle
 		}
 	}
 	get AngleMin() {
@@ -100,9 +100,9 @@ export class SpinnerApi extends ItemApi<SpinnerData> {
 	}
 	set AngleMin(v) {
 		if (this.data.angleMin !== this.data.angleMax) {
-			v = clampAngleToRad(v, this.data.angleMin, this.data.angleMax)
-			if (this.mover.angleMax > v) this.mover.angleMin = v
-			else this.mover.angleMax = v
+			const angle = clampAngleToRad(v, this.data.angleMin, this.data.angleMax)
+			if (this.mover.angleMax > angle) this.mover.angleMin = angle
+			else this.mover.angleMax = angle
 		}
 	}
 	get Elasticity() {
@@ -125,10 +125,6 @@ export class SpinnerApi extends ItemApi<SpinnerData> {
 	}
 	get CurrentAngle() {
 		return MathUtils.radToDeg(this._state.angle)
-	}
-
-	protected _getPropertyNames(): string[] {
-		return Object.getOwnPropertyNames(SpinnerApi.prototype)
 	}
 }
 

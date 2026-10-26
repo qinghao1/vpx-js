@@ -6,10 +6,9 @@ import { expect } from 'chai'
 import sinonChai from 'sinon-chai'
 import { ThreeHelper } from '../../../test/three.helper'
 import { Player } from '../../game/player.js'
-import type { PlayerPhysics } from '../../game/player-physics.js'
 import { NodeBinaryReader } from '../../io/binary-reader.node.js'
 import { Table } from '../table/table.js'
-import type { PlungerApi } from './plunger-api.js'
+import type { PlungerState } from './plunger-state.js'
 
 chai.use((sinonChai as any).default ?? sinonChai)
 const three = new ThreeHelper()
@@ -110,10 +109,15 @@ describe('The VPinball plunger API', () => {
 
 	it('should correctly handle image attribution', () => {
 		const plunger = table.plungers.ModernPlunger.getApi()
-		expect(() => (plunger.Image = 'some-image')).to.throw('Texture "some-image" not found.')
-		//expect(() => plunger.Image = 'hdr-texture').to.throw('Cannot use a HDR image (.exr/.hdr) here');
+		// Unknown names are stored without throwing, like native Plunger::put_Image.
+		plunger.Image = 'some-image'
+		expect(plunger.Image).to.equal('some-image')
 		plunger.Image = 'texture'
 		expect(plunger.Image).to.equal('texture')
+		table.textures.hdr_tex = { isHdr: () => true } as any
+		expect(() => {
+			plunger.Image = 'hdr_tex'
+		}).to.throw('Cannot use a HDR image (.exr/.hdr) here')
 	})
 
 	it('should create a ball', () => {
@@ -142,6 +146,25 @@ describe('The VPinball plunger API', () => {
 		expect(plunger.Position()).to.equal(25)
 	})
 
+	it('should pull back and retract the plunger', () => {
+		const plunger = table.plungers.ModernPlunger.getApi()
+
+		plunger.PullBackandRetract()
+		player.updatePhysics(0)
+		player.updatePhysics(100)
+		expect(plunger.Position()).to.equal(25)
+
+		// dwells at full pull for ~1s, then retracts toward rest on its own
+		player.updatePhysics(900)
+		expect(plunger.Position()).to.equal(25)
+		player.updatePhysics(1100)
+		expect(plunger.Position()).to.be.below(25)
+
+		plunger.Fire()
+		player.updatePhysics(1500)
+		expect(plunger.Position()).to.equal(0)
+	})
+
 	it('should fire the plunger when pulled back', () => {
 		const plunger = table.plungers.ModernPlunger.getApi()
 		expect(table.plungers.ModernPlunger.getState().frame).to.equal(21)
@@ -168,16 +191,23 @@ describe('The VPinball plunger API', () => {
 		expect(plunger.Position()).to.be.within(5, 6)
 	})
 
-	it('should not crash when executing unused APIs', () => {
+	it('should return 0 for the MotionDevice stub', () => {
 		const plunger = table.plungers.ModernPlunger.getApi()
 		expect(plunger.MotionDevice()).to.equal(0)
-		expect(plunger.InterfaceSupportsErrorInfo({})).to.equal(false)
+	})
+
+	it('should sync Visible between state and data', () => {
+		const item = table.plungers.ModernPlunger
+		const api = item.getApi()
+
+		api.Visible = false
+		expect(item.getState().isVisible).to.equal(false)
+		expect(item.data.isVisible).to.equal(false)
+		const states = player.popStates()
+		expect(states.getState<PlungerState>('ModernPlunger').isVisible).to.equal(false)
+		states.release()
+
+		api.Visible = true
+		expect(item.getState().isVisible).to.equal(true)
 	})
 })
-
-function _debugPlunger(plunger: PlungerApi, physics: PlayerPhysics, table: Table, t = 0) {
-	for (let i = 0; i < 300; i++) {
-		physics.updatePhysics(t + i * 10)
-		console.log(t + i * 10, table.plungers.ModernPlunger.getState().frame, plunger.Position())
-	}
-}

@@ -1,8 +1,8 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 import { MathUtils } from 'three'
-import { Matrix3D } from '../../util/matrix.js'
-import { Vertex3D } from '../../util/vector.js'
+import { Matrix3D } from '../../math/matrix.js'
+import { Vertex3D } from '../../math/vector.js'
 import type { Mesh } from '../mesh.js'
 import { loadMesh } from '../mesh-loader.js'
 import type { Table } from '../table/table.js'
@@ -13,40 +13,74 @@ const flipperBaseMesh = loadMesh('flipper-base-mesh')
 /** Flipper mesh. @see https://github.com/vpinball/vpinball/blob/master/flipper.cpp */
 export class FlipperMesh {
 	public generateMeshes(data: FlipperData, table: Table): { base: Mesh; rubber?: Mesh } {
-		const m = new Matrix3D().rotateZMatrix(MathUtils.degToRad(180))
+		const rotation = new Matrix3D().rotateZMatrix(MathUtils.degToRad(180))
 		const height = table.getSurfaceHeight(data.szSurface, data.center.x, data.center.y)
 		const baseRadius = data.baseRadius - data.rubberThickness
 		const endRadius = data.endRadius - data.rubberThickness
-		const baseScale = 10
 		const base = flipperBaseMesh.clone(`flipper.base-${data.getName()}`)
-		this.applyScale(base, data, baseRadius, endRadius, baseScale)
-		base.transform(m, undefined, z => z * data.height * table.getScaleZ() + height)
+		this.applyScale(base, data, baseRadius, endRadius)
+		base.transform(rotation, undefined, z => z * data.height * table.getScaleZ() + height)
 		if (data.rubberThickness <= 0) return { base }
 		const rubber = flipperBaseMesh.clone(`flipper.rubber-${data.getName()}`)
-		this.applyScale(rubber, data, data.baseRadius, data.endRadius, baseScale)
-		rubber.transform(m, undefined, z => z * data.rubberWidth * table.getScaleZ() + (height + data.rubberHeight))
+		this.applyScale(rubber, data, data.baseRadius, data.endRadius)
+		rubber.transform(
+			rotation,
+			undefined,
+			z => z * data.rubberWidth * table.getScaleZ() + (height + data.rubberHeight),
+		)
 		return { base, rubber }
 	}
 
-	private applyScale(mesh: Mesh, data: FlipperData, baseR: number, endR: number, scale: number): void {
-		const baseFactor = baseR * scale
-		const endFactor = endR * scale
-		const tipOffsetY = data.flipperRadius - endR * 7.9
-		for (let t = 0; t < 13; t++) {
-			const baseBottom = FlipperMesh.vertsBaseBottom[t]!
-			const tipBottom = FlipperMesh.vertsTipBottom[t]!
-			const baseTop = FlipperMesh.vertsBaseTop[t]!
-			const tipTop = FlipperMesh.vertsTipTop[t]!
-			for (const v of mesh.vertices) {
-				if (this.match(v, baseBottom) || this.match(v, baseTop)) {
-					v.x *= baseFactor
-					v.y *= baseFactor
-				} else if (this.match(v, tipBottom) || this.match(v, tipTop)) {
-					v.x *= endFactor
-					v.y = v.y * endFactor + tipOffsetY
-				}
+	private applyScale(mesh: Mesh, data: FlipperData, baseRadius: number, endRadius: number): void {
+		// taper correction, see Flipper::GenerateBaseMesh in upstream src/parts/flipper.cpp
+		const fixAngle = Math.asin(MathUtils.clamp((data.baseRadius - data.endRadius) / data.flipperRadius, -1, 1))
+		const fixAngleScale = fixAngle / (Math.PI * 0.5)
+		const baseCenterX = FlipperMesh.vertsBaseBottom[6]!.x
+		const baseCenterY = FlipperMesh.vertsBaseBottom[0]!.y
+		const tipCenterX = FlipperMesh.vertsTipBottom[6]!.x
+		const tipCenterY = FlipperMesh.vertsTipBottom[0]!.y
+		// Each vertex matches at most one arc point, so one pass over both arcs fixes each vertex once.
+		const baseArc = FlipperMesh.vertsBaseBottom.concat(FlipperMesh.vertsBaseTop)
+		const tipArc = FlipperMesh.vertsTipBottom.concat(FlipperMesh.vertsTipTop)
+		for (const vertex of mesh.vertices) {
+			if (baseArc.some(arc => this.match(vertex, arc))) {
+				this.applyFix(vertex, baseCenterX, baseCenterY, -Math.PI * 0.5, baseRadius, 0, 0, fixAngleScale)
+			} else if (tipArc.some(arc => this.match(vertex, arc))) {
+				this.applyFix(
+					vertex,
+					tipCenterX,
+					tipCenterY,
+					Math.PI * 0.5,
+					endRadius,
+					0,
+					data.flipperRadius,
+					fixAngleScale,
+				)
 			}
 		}
+	}
+
+	// Reconstructs arc vertices at the exact radius with the taper correction. Upstream ApplyFix also adjusts
+	// normals, but GenerateBaseMesh discards them (it keeps the base mesh normals), so only positions are ported.
+	private applyFix(
+		vertex: { x: number; y: number },
+		centerX: number,
+		centerY: number,
+		midAngle: number,
+		radius: number,
+		newCenterX: number,
+		newCenterY: number,
+		fixAngleScale: number,
+	): void {
+		let vertexAngle = Math.atan2(vertex.y - centerY, vertex.x - centerX)
+		if (midAngle < 0) {
+			if (vertexAngle > 0) vertexAngle -= Math.PI * 2
+		} else if (vertexAngle < 0) {
+			vertexAngle += Math.PI * 2
+		}
+		vertexAngle -= (vertexAngle - midAngle) * fixAngleScale * Math.sign(midAngle)
+		vertex.x = Math.cos(vertexAngle) * radius + newCenterX
+		vertex.y = Math.sin(vertexAngle) * radius + newCenterY
 	}
 
 	private match(a: { x: number; y: number; z: number }, b: Vertex3D): boolean {

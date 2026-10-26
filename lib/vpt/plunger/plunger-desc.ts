@@ -4,6 +4,8 @@
 import { PlungerCoord } from './plunger-coord.js'
 import type { PlungerData } from './plunger-data.js'
 
+const whitespacePattern = /\s/
+
 /** Plunger 3D shape descriptor. @see https://github.com/vpinball/vpinball/blob/master/plunger.cpp */
 export class PlungerDesc {
 	constructor(
@@ -38,10 +40,7 @@ export class PlungerDesc {
 		for (i = 0; i < nn; i++) desc.c.push(new PlungerCoord(0, 0, 0, 0, 1))
 		let tipLen = 0
 		for (i = 0; i < tipShapes.length; i++) {
-			const tipShape = tipShapes[i]!
-			const ts = tipShape.trim().split(' ')
-			const yOffset = parseInt(ts[0]!, 10)
-			const diam = parseFloat(ts[1]!)
+			const [yOffset, diam] = PlungerDesc.parseTipEntry(tipShapes[i]!)
 			const c = desc.c[i]!
 			c.y = yOffset
 			c.r = diam / 2
@@ -51,7 +50,7 @@ export class PlungerDesc {
 		let cprv = new PlungerCoord(0, 0, 0, 0, 1)
 		for (i = 0; i < tipShapes.length; i++) {
 			const c = desc.c[i]!
-			c.tv = (0.24 * c.y) / tipLen
+			c.tv = tipLen > 0 ? (0.24 * c.y) / tipLen : 0
 			const cnxt = desc.c[i + 1 < nTip ? i + 1 : i]!
 			const x0 = cprv.r
 			const y0 = cprv.y
@@ -85,6 +84,31 @@ export class PlungerDesc {
 		const rody = beginY + y + springMin
 		desc.c[i].set(rRod, rody, 0.74, 1.0, 0.0)
 		return { desc, springRadius, springGauge, springLoops, springEndLoops, rody }
+	}
+
+	/**
+	 * Parse one `yOffset diam` tip entry, mirroring upstream `nextTipToken()` + `atof()`:
+	 * values end at commas or whitespace, the scan never advances past a comma (so a
+	 * value starting at `,` reads as 0, e.g. `0,.34`), and anything unparseable reads
+	 * as 0 — never NaN.
+	 */
+	private static parseTipEntry(entry: string): [number, number] {
+		let cursor = 0
+		const readValue = (): number => {
+			while (cursor < entry.length && whitespacePattern.test(entry.charAt(cursor))) cursor++
+			const start = cursor
+			while (
+				cursor < entry.length &&
+				entry.charAt(cursor) !== ',' &&
+				!whitespacePattern.test(entry.charAt(cursor))
+			)
+				cursor++
+			while (cursor < entry.length && whitespacePattern.test(entry.charAt(cursor))) cursor++
+			const value = parseFloat(entry.substring(start, cursor))
+			return Number.isNaN(value) ? 0 : value
+		}
+		const yOffset = readValue()
+		return [yOffset, readValue()]
 	}
 }
 

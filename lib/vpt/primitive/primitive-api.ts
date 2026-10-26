@@ -37,10 +37,7 @@ export class PrimitiveApi extends ItemApi<PrimitiveData> {
 		return this._state.map ?? this.data.szImage ?? ''
 	}
 	set Image(value) {
-		if (value) {
-			const tex = this.table.getTexture(value)
-			if (tex?.isHdr()) throw new Error('Cannot use a HDR image (.exr/.hdr) here')
-		}
+		this._assertNonHdrImage(value)
 		this._state.map = value
 		this.data.szImage = value
 	}
@@ -48,10 +45,7 @@ export class PrimitiveApi extends ItemApi<PrimitiveData> {
 		return this._state.normalMap ?? this.data.szNormalMap ?? ''
 	}
 	set NormalMap(value) {
-		if (value) {
-			const tex = this.table.getTexture(value)
-			if (tex?.isHdr()) throw new Error('Cannot use a HDR image (.exr/.hdr) here')
-		}
+		this._assertNonHdrImage(value)
 		this._state.normalMap = value
 		this.data.szNormalMap = value
 	}
@@ -84,6 +78,8 @@ export class PrimitiveApi extends ItemApi<PrimitiveData> {
 		return this._state.isVisible
 	}
 	set Visible(v) {
+		// Upstream put_Visible writes m_d only; the sequencer lock lives in
+		// PrimitiveState and is never touched here, so mid-run script writes survive unlock.
 		this._state.isVisible = !!v
 		this.data.isVisible = !!v
 	}
@@ -403,6 +399,18 @@ export class PrimitiveApi extends ItemApi<PrimitiveData> {
 	set DepthBias(v) {
 		this.data.depthBias = v
 	}
+	get AddBlend() {
+		return this.data.addBlend
+	}
+	set AddBlend(v) {
+		this.data.addBlend = !!v
+	}
+	get EnableDepthMask() {
+		return this.data.useDepthMask
+	}
+	set EnableDepthMask(v) {
+		this.data.useDepthMask = !!v
+	}
 
 	public PlayAnim(startFrame: number, speed: number): void {
 		this.animation?.playAnim(num(startFrame), num(speed))
@@ -423,9 +431,5 @@ export class PrimitiveApi extends ItemApi<PrimitiveData> {
 	public _getTimers(): TimerHit[] {
 		this._beginPlay()
 		return []
-	}
-
-	protected _getPropertyNames(): string[] {
-		return Object.getOwnPropertyNames(PrimitiveApi.prototype)
 	}
 }

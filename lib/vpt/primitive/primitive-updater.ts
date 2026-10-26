@@ -1,7 +1,7 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
-import { Color, MathUtils } from 'three'
-
+import { Color } from 'three'
+import { Matrix3D } from '../../math/matrix.js'
 import type { IRenderApi } from '../../render/irender-api.js'
 import { cloneMaterialForWrite, getGlobalEmissionScale } from '../../render/threejs/material-shared.js'
 import {
@@ -12,12 +12,12 @@ import {
 	updatePrimitiveAdditive,
 	updatePrimitiveBdl,
 } from '../../render/threejs/nodes/primitive-bdl-node.js'
-import { Matrix3D } from '../../util/matrix.js'
 import { Vertex3DNoTex2 } from '../../util/vertex.js'
 import { ItemUpdater } from '../item-updater.js'
 import { Mesh } from '../mesh.js'
 import type { Table } from '../table/table.js'
 import type { PrimitiveData } from './primitive-data.js'
+import { buildPrimitiveMatrix } from './primitive-mesh-generator.js'
 import type { PrimitiveState } from './primitive-state.js'
 
 // vpinball: src/parts/primitive.cpp:107/1171 convertColor(c, alpha*(1/100)) — alpha 0..100 maps 0..1,
@@ -53,8 +53,16 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
 		table: Table,
 	): void {
-		Object.assign(this.state, state)
-		this.applyVisibility(obj, state, renderApi)
+		this.state.mergeFrom(state)
+		if (this.state.lockedByLS && !this.state.inPlayState) {
+			// Sequencer hide: locked with inPlayState off. @see Primitive::Render in src/parts/primitive.cpp
+			renderApi.applyVisibility(false, obj)
+		} else if (state.lockedByLS !== undefined || state.inPlayState !== undefined) {
+			// Lock-only diff: re-apply the merged script visibility (unlock must reveal again).
+			renderApi.applyVisibility(this.state.isVisible, obj)
+		} else {
+			this.applyVisibility(obj, state, renderApi)
+		}
 		const needsClone =
 			state.material !== undefined ||
 			state.map !== undefined ||
@@ -107,32 +115,20 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 		if (frame === undefined || frame === -1) return
 		const frames = mesh.animationFrames
 		const num = frames.length
-		if (num === 0) return
 		const clamped = Math.max(0, Math.min(frame, num - 1))
 		const iFrame = Math.floor(clamped)
 		const fract = clamped - iFrame
 		const interp = new Mesh(mesh.name)
 		interp.indices = mesh.indices.slice()
 		interp.vertices = mesh.vertices.map((base, idx) => {
-			let x: number, y: number, z: number, nx: number, ny: number, nz: number
-			if (iFrame + 1 < num) {
-				const v0 = frames[iFrame]!.frameVerts[idx]!
-				const v1 = frames[iFrame + 1]!.frameVerts[idx]!
-				x = v0.x + (v1.x - v0.x) * fract
-				y = v0.y + (v1.y - v0.y) * fract
-				z = v0.z + (v1.z - v0.z) * fract
-				nx = v0.nx + (v1.nx - v0.nx) * fract
-				ny = v0.ny + (v1.ny - v0.ny) * fract
-				nz = v0.nz + (v1.nz - v0.nz) * fract
-			} else {
-				const v0 = frames[iFrame]!.frameVerts[idx]!
-				x = v0.x
-				y = v0.y
-				z = v0.z
-				nx = v0.nx
-				ny = v0.ny
-				nz = v0.nz
-			}
+			const v0 = frames[iFrame]!.frameVerts[idx]!
+			const v1 = iFrame + 1 < num ? frames[iFrame + 1]!.frameVerts[idx]! : v0
+			const x = v0.x + (v1.x - v0.x) * fract
+			const y = v0.y + (v1.y - v0.y) * fract
+			const z = v0.z + (v1.z - v0.z) * fract
+			const nx = v0.nx + (v1.nx - v0.nx) * fract
+			const ny = v0.ny + (v1.ny - v0.ny) * fract
+			const nz = v0.nz + (v1.nz - v0.nz) * fract
 			const v = new Vertex3DNoTex2()
 			v.x = x
 			v.y = y
@@ -162,10 +158,7 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 	}
 
 	private applyColor<NODE>(obj: NODE, table: Table): void {
-		// Native (primitive.cpp + material.sh): albedo = map * material.base * primitive.color,
-		// out = mix(lit, albedo, BlendDisableLighting) * alpha-state; addBlend renders the unlit
-		// albedo additively with intensity alpha/100. All inputs are file/script flags — names,
-		// depthBias windows, and on/off substrings play no role.
+		// Native albedo/BDL mix (see primitive-bdl-node.ts for the canonical explanation).
 		const prim = this.state.color ?? this.data.color
 		const dlTop = this.state.disableLightingTop ?? this.data.disableLightingTop
 		const rawAlpha = this.state.alpha ?? this.data.alpha
@@ -185,18 +178,29 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 				updatePrimitiveAdditive(mat, { tint: hex, intensity })
 				mat.transparent = true
 				mat.depthWrite = false
+				// Overlay light splats sit coplanar with the opaque bake below;
+				// the offset wins that tie while nearer toys still occlude them
+				// (same overlay convention as the classic baked path).
 				mat.depthTest = true
+				mat.polygonOffset = true
+				mat.polygonOffsetFactor = -2
+				mat.polygonOffsetUnits = -4
+				;(mesh as any).renderOrder = 2
 				mat.blending = 2
 				mat.toneMapped = true
 				// Native (primitive.cpp:1037,1088): visible=false skips the draw, and
 				// additive is also skipped when there is nothing to add.
 				const scriptVisible = this.state.isVisible ?? this.data.isVisible ?? true
-				;(mesh as any).visible = !!scriptVisible && prim !== 0 && effectiveAlpha > 0
+				const sequencerOff = this.state.lockedByLS && !this.state.inPlayState
+				;(mesh as any).visible = !!scriptVisible && !sequencerOff && prim !== 0 && effectiveAlpha > 0
 				continue
 			}
 			if (kind === PRIMITIVE_BDL_KIND) {
 				const opacity = Math.min(1, Math.max(0, effectiveAlpha * ALPHA_SCALE * matOpacity))
-				const below = this.state.disableLightingBelow ?? this.data.disableLightingBelow ?? 0
+				// Native (primitive.cpp:1135): static-marked objects force below to 1.0 — no bulb light in the static prepass.
+				const below = this.data.staticRendering
+					? 1
+					: (this.state.disableLightingBelow ?? this.data.disableLightingBelow ?? 0)
 				// The bulb buffer is sampled per-pixel from the fragment's own
 				// playfield UV (see primitive-bdl-node.ts), mirroring the native
 				// per-pixel lookup (fs_basic.sc) with no per-primitive anchor.
@@ -309,40 +313,8 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 					z: primitiveState.objectRotation.z,
 				}
 			: oldObj
-		const buildFull = (
-			pos: { x: number; y: number; z: number },
-			sz: { x: number; y: number; z: number },
-			rot: { x: number; y: number; z: number },
-			trans: { x: number; y: number; z: number },
-			obj: { x: number; y: number; z: number },
-		): Matrix3D => {
-			const rt = Matrix3D.claim().setTranslation(trans.x, trans.y, trans.z)
-			const tmp = Matrix3D.claim()
-			tmp.rotateZMatrix(MathUtils.degToRad(rot.z))
-			rt.multiply(tmp)
-			tmp.rotateYMatrix(MathUtils.degToRad(rot.y))
-			rt.multiply(tmp)
-			tmp.rotateXMatrix(MathUtils.degToRad(rot.x))
-			rt.multiply(tmp)
-			tmp.rotateZMatrix(MathUtils.degToRad(obj.z))
-			rt.multiply(tmp)
-			tmp.rotateYMatrix(MathUtils.degToRad(obj.y))
-			rt.multiply(tmp)
-			tmp.rotateXMatrix(MathUtils.degToRad(obj.x))
-			rt.multiply(tmp)
-			const scale = Matrix3D.claim().setScaling(sz.x, sz.y, sz.z)
-			const tpos = Matrix3D.claim().setTranslation(pos.x, pos.y, pos.z)
-			const full = scale.clone().multiply(rt).multiply(tpos)
-			if (scaleZ !== 1) {
-				const zs = Matrix3D.claim().setScaling(1, 1, scaleZ)
-				full.multiply(zs)
-				Matrix3D.release(zs)
-			}
-			Matrix3D.release(rt, tmp, scale, tpos)
-			return full
-		}
-		const oldFull = buildFull(oldPos, oldSize, oldRot, oldTrans, oldObj)
-		const newFull = buildFull(newPos, newSize, newRot, newTrans, newObj)
+		const oldFull = buildPrimitiveMatrix(oldPos, oldSize, oldRot, oldTrans, oldObj, scaleZ)
+		const newFull = buildPrimitiveMatrix(newPos, newSize, newRot, newTrans, newObj, scaleZ)
 		const rh = Matrix3D.claim().setScaling(1, 1, -1)
 		const oldRH = oldFull.clone().multiply(rh)
 		const newRH = newFull.clone().multiply(rh)

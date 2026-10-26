@@ -2,14 +2,11 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { EventProxy } from '../../game/event-proxy.js'
-import type { IAnimatable, IAnimation } from '../../game/ianimatable.js'
-import type { IHittable } from '../../game/ihittable.js'
-import type { IRenderable, Meshes } from '../../game/irenderable.js'
-import type { IScriptable } from '../../game/iscriptable.js'
+import type { IAnimatable, IAnimation, IHittable, IRenderable, IScriptable, Meshes } from '../../game/interfaces.js'
 import type { Player } from '../../game/player.js'
 import type { Storage } from '../../io/ole-doc.js'
+import { Matrix3D } from '../../math/matrix.js'
 import type { HitObject } from '../../physics/hit-object.js'
-import { Matrix3D } from '../../util/matrix.js'
 import type { Ball } from '../ball/ball.js'
 import { Item } from '../item.js'
 import { Mesh } from '../mesh.js'
@@ -89,7 +86,7 @@ export class Primitive
 		}
 	}
 
-	public clearMesh() {
+	public clearMesh(): void {
 		this.data.mesh = new Mesh()
 	}
 
@@ -106,7 +103,7 @@ export class Primitive
 		const base = this.getMesh(table)
 		this.hits = this.hitGenerator.generateHitObjects(base, this.events, table)
 		const display = base.clone().transform(Matrix3D.RIGHT_HANDED)
-		this.updater.setMesh(display.clone())
+		this.updater.setMesh(display)
 		this.animation = new PrimitiveAnimation(this.data, this.state, display.clone())
 		this.api = new PrimitiveApi(this, this.state, this.data, this.hits!, this.events, player, table, this.animation)
 	}
@@ -135,7 +132,8 @@ export class Primitive
 		this.data.sides = num
 	}
 
-	public setCollidable(isCollidable: boolean) {
+	public setCollidable(isCollidable: boolean): void {
+		this.data.isCollidable = isCollidable
 		if (this.hits?.length > 0 && this.hits?.[0].isEnabled !== isCollidable) {
 			for (const hit of this.hits!) {
 				// !! costly

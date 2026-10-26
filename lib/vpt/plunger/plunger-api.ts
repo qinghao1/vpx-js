@@ -1,6 +1,8 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
+import { MathUtils } from 'three'
+
 import type { EventProxy } from '../../game/event-proxy.js'
 import type { IBallCreationPosition, Player } from '../../game/player.js'
 import type { Ball } from '../ball/ball.js'
@@ -8,11 +10,13 @@ import { ItemApi } from '../item-api.js'
 import type { Table } from '../table/table.js'
 import type { PlungerData } from './plunger-data.js'
 import type { PlungerHit } from './plunger-hit.js'
+import type { PlungerState } from './plunger-state.js'
 
 /** Plunger API — VBS surface for `Plunger`. @see https://github.com/vpinball/vpinball/blob/master/plunger.cpp */
 export class PlungerApi extends ItemApi<PlungerData> {
 	constructor(
 		data: PlungerData,
+		private readonly _state: PlungerState,
 		private readonly hit: PlungerHit,
 		events: EventProxy,
 		private readonly ballCreator: IBallCreationPosition,
@@ -71,10 +75,11 @@ export class PlungerApi extends ItemApi<PlungerData> {
 		this.data.autoPlunger = v
 	}
 	get Visible() {
-		return this.data.isVisible
+		return this._state.isVisible
 	}
 	set Visible(v) {
-		this.data.isVisible = v
+		this._state.isVisible = !!v
+		this.data.isVisible = !!v
 	}
 	get ParkPosition() {
 		return this.data.parkPosition
@@ -203,9 +208,12 @@ export class PlungerApi extends ItemApi<PlungerData> {
 		this.hit.getMoverObject().pullBack(this.data.speedPull)
 	}
 
+	public PullBackandRetract(): void {
+		this.hit.getMoverObject().pullBackandRetract(this.data.speedPull)
+	}
+
 	public Fire(): void {
-		if (this.data.autoPlunger) this.hit.getMoverObject().fire(1)
-		else this.hit.getMoverObject().fire()
+		this.hit.getMoverObject().fire(this.data.autoPlunger ? 1 : 0)
 	}
 
 	public CreateBall(): Ball {
@@ -213,25 +221,12 @@ export class PlungerApi extends ItemApi<PlungerData> {
 	}
 
 	public Position(): number {
-		const frame =
-			(this.hit.getMoverObject().pos - this.hit.getMoverObject().frameStart) /
-			(this.hit.getMoverObject().frameEnd - this.hit.getMoverObject().frameStart)
-		return 25 - saturate(frame) * 25
+		const mover = this.hit.getMoverObject()
+		const frame = (mover.pos - mover.frameStart) / (mover.frameEnd - mover.frameStart)
+		return 25 - MathUtils.clamp(frame, 0, 1) * 25
 	}
 
 	public MotionDevice(): number {
 		return 0
 	}
-
-	public InterfaceSupportsErrorInfo(_riid: unknown): boolean {
-		return false
-	}
-
-	protected _getPropertyNames(): string[] {
-		return Object.getOwnPropertyNames(PlungerApi.prototype)
-	}
-}
-
-function saturate(n: number) {
-	return Math.min(Math.max(n, 0), 1)
 }

@@ -76,7 +76,7 @@ describe('The VPinball flipper API', () => {
 		flipper.ElasticityFalloff = 0.0054
 		expect(flipper.ElasticityFalloff).to.equal(0.0054)
 		flipper.Scatter = 1.658
-		expect(flipper.Scatter).to.equal(1.658)
+		expect(flipper.Scatter).to.be.closeTo(1.658, 1e-9)
 		flipper.Friction = 5.3354
 		expect(flipper.Friction).to.equal(5.3354)
 		flipper.RampUp = 6654
@@ -143,8 +143,11 @@ describe('The VPinball flipper API', () => {
 		expect(flipper.Friction).to.equal(100)
 	})
 
-	it('should not crash when executing unused APIs', () => {
-		const flipper = table.flippers.DefaultFlipper.getApi()
-		expect(flipper.InterfaceSupportsErrorInfo({})).to.equal(false)
+	it('should expose Scatter in degrees while physics stores radians', () => {
+		const item = table.flippers.DefaultFlipper
+		const flipper = item.getApi()
+		flipper.Scatter = 5
+		expect(flipper.Scatter).to.be.closeTo(5, 1e-9)
+		expect(item.getHitShapes()[0].scatter).to.be.closeTo((5 * Math.PI) / 180, 1e-9)
 	})
 })

@@ -1,7 +1,7 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import type { IAnimation } from '../../game/ianimatable.js'
+import type { IAnimation } from '../../game/interfaces.js'
 import type { Mesh } from '../mesh.js'
 import type { Table } from '../table/table.js'
 import type { PrimitiveData } from './primitive-data.js'
@@ -60,7 +60,7 @@ export class PrimitiveAnimation implements IAnimation {
 		if (!this.mesh.animationFrames.length || this.data.staticRendering) return
 		if (startFrame >= this.mesh.animationFrames.length) startFrame = 0
 		this.currentFrame = startFrame
-		this.speed = speed < 0 ? -speed : speed
+		this.speed = Math.abs(speed)
 		this.doAnimation = true
 		this.endless = false
 		this.state.currentFrame = this.currentFrame
@@ -68,11 +68,8 @@ export class PrimitiveAnimation implements IAnimation {
 
 	public playAnimEndless(speed: number): void {
 		if (!this.mesh.animationFrames.length || this.data.staticRendering) return
-		this.currentFrame = 0
-		this.speed = speed < 0 ? -speed : speed
-		this.doAnimation = true
+		this.playAnim(0, speed)
 		this.endless = true
-		this.state.currentFrame = this.currentFrame
 	}
 
 	public stopAnim(): void {
@@ -81,7 +78,7 @@ export class PrimitiveAnimation implements IAnimation {
 
 	public continueAnim(speed: number): void {
 		if (this.currentFrame <= 0 || this.data.staticRendering) return
-		this.speed = speed < 0 ? -speed : speed
+		this.speed = Math.abs(speed)
 		this.doAnimation = true
 	}
 
