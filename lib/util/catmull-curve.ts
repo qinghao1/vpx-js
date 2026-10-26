@@ -1,17 +1,20 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import type { Vertex3D } from './vector.js'
+import type { Vertex3D } from '../math/vector.js'
 import type { IRenderVertex, Vertex } from './vertex.js'
 import { RenderVertex, RenderVertex3D } from './vertex.js'
+
+/** Cubic polynomial coefficients [c0, c1, c2, c3]. */
+type CubicCoeffs = [number, number, number, number]
 
 export abstract class CatmullCurve {
 	abstract getPointAt(t: number): IRenderVertex
 
 	protected static dt(v0: Vertex, v1: Vertex, v2: Vertex, v3: Vertex): [number, number, number] {
-		let dt0 = Math.sqrt(v1.clone().sub(v0).length())
-		let dt1 = Math.sqrt(v2.clone().sub(v1).length())
-		let dt2 = Math.sqrt(v3.clone().sub(v2).length())
+		let dt0 = Math.sqrt(v1.distanceTo(v0))
+		let dt1 = Math.sqrt(v2.distanceTo(v1))
+		let dt2 = Math.sqrt(v3.distanceTo(v2))
 		if (dt1 < 1e-4) dt1 = 1
 		if (dt0 < 1e-4) dt0 = dt1
 		if (dt2 < 1e-4) dt2 = dt1
@@ -26,7 +29,7 @@ export abstract class CatmullCurve {
 		dt0: number,
 		dt1: number,
 		dt2: number,
-	): number[] {
+	): CubicCoeffs {
 		let t1 = (x1 - x0) / dt0 - (x2 - x0) / (dt0 + dt1) + (x2 - x1) / dt1
 		let t2 = (x2 - x1) / dt1 - (x3 - x1) / (dt1 + dt2) + (x3 - x2) / dt2
 		t1 *= dt1
@@ -34,19 +37,19 @@ export abstract class CatmullCurve {
 		return CatmullCurve.coeffs(x1, x2, t1, t2)
 	}
 
-	private static coeffs(x0: number, x1: number, t0: number, t1: number): number[] {
+	private static coeffs(x0: number, x1: number, t0: number, t1: number): CubicCoeffs {
 		return [x0, t0, -3 * x0 + 3 * x1 - 2 * t0 - t1, 2 * x0 - 2 * x1 + t0 + t1]
 	}
 
-	protected static evalCubic(c: number[], t: number): number {
+	protected static evalCubic(c: CubicCoeffs, t: number): number {
 		const t2 = t * t
 		const t3 = t2 * t
-		return c[3]! * t3 + c[2]! * t2 + c[1]! * t + c[0]!
+		return c[3] * t3 + c[2] * t2 + c[1] * t + c[0]
 	}
 }
 
 export class CatmullCurve2D extends CatmullCurve {
-	private readonly c: { x: number[]; y: number[] }
+	private readonly c: { x: CubicCoeffs; y: CubicCoeffs }
 
 	static fromVertex2D(v0: Vertex, v1: Vertex, v2: Vertex, v3: Vertex): CatmullCurve2D {
 		const [dt0, dt1, dt2] = CatmullCurve.dt(v0, v1, v2, v3)
@@ -71,7 +74,7 @@ export class CatmullCurve2D extends CatmullCurve {
 }
 
 export class CatmullCurve3D extends CatmullCurve {
-	private readonly c: { x: number[]; y: number[]; z: number[] }
+	private readonly c: { x: CubicCoeffs; y: CubicCoeffs; z: CubicCoeffs }
 
 	static fromVertex3D(v0: Vertex, v1: Vertex, v2: Vertex, v3: Vertex): CatmullCurve3D {
 		const [dt0, dt1, dt2] = CatmullCurve.dt(v0, v1, v2, v3)

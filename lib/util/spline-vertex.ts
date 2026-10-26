@@ -1,10 +1,10 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
+import { Vertex2D } from '../math/vector.js'
+import { DragPoint } from '../vpt/dragpoint.js'
 import { CatmullCurve2D } from './catmull-curve.js'
-import { DragPoint } from './dragpoint.js'
 import { isLowQuality } from './quality.js'
-import { Vertex2D } from './vector.js'
 import { RenderVertex } from './vertex.js'
 
 /** Thickened spline for wall/rubber. */
