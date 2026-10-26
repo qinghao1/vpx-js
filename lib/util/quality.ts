@@ -12,6 +12,15 @@ export const QUALITY_MAX_LIGHTS = {
 	high: 16,
 } as const
 
+/**
+ * Float (HDR/EXR) payloads above this are rejected before decode. EXR/HDR
+ * decoders expand to a full-res half-float frame first (8192x8192 RGBA16F is
+ * 512MB) and downsample only afterwards, so an uncapped worker decode OOMs
+ * or stalls the tab. Regular images have their own 16MB worker cap in the
+ * texture loader; this keeps the float path symmetric with it.
+ */
+export const MAX_FLOAT_TEXTURE_BYTES = 16 * 1024 * 1024
+
 export function isPlayMode(): boolean {
 	try {
 		if (typeof location === 'undefined') return false
@@ -25,8 +34,7 @@ export function isPlayMode(): boolean {
 }
 
 export function getEffectiveCaps(): { playfield: number; other: number; floor: number; aniso: number } {
-	if (isLowQuality()) return QUALITY_CAPS.low
-	return QUALITY_CAPS.high
+	return QUALITY_CAPS[getQuality()]
 }
 
 let cachedLow: boolean | undefined
@@ -86,16 +94,17 @@ export function getQuality(): Quality {
 }
 
 export function getMaxLights(): number {
-	return isLowQuality() ? QUALITY_MAX_LIGHTS.low : QUALITY_MAX_LIGHTS.high
+	return QUALITY_MAX_LIGHTS[getQuality()]
 }
 
-export function getTargetPixelRatio(_mode?: string): number {
+// Render resolution as a fraction of device pixels (1 = native sharpness). Values are vpx-js tuned, not upstream.
+export function getTargetPixelRatio(mode?: string): number {
 	if (isLowQuality()) {
-		if (_mode === 'play') return 0.65
+		if (mode === 'play') return 0.65 // play mode: fewer pixels for FPS
 		try {
 			if (typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches) return 0.65
 		} catch {}
-		return 0.9
+		return 0.9 // low-quality desktop: near-native
 	}
 	const dpr = typeof devicePixelRatio !== 'undefined' ? devicePixelRatio : 1
 	try {
@@ -104,5 +113,5 @@ export function getTargetPixelRatio(_mode?: string): number {
 			if (area > 1920 * 1080) return Math.min(dpr, 1)
 		}
 	} catch {}
-	return Math.min(dpr, 1.5)
+	return Math.min(dpr, 1.5) // cap DPR: above 1.5x costs GPU with no visible gain
 }
