@@ -1,21 +1,9 @@
-import fs from 'node:fs'
-import path from 'node:path'
 import { bench, describe } from 'vitest'
 import { NodeBinaryReader } from '../../lib/io/binary-reader.node.js'
 import { Table } from '../../lib/vpt/table/table.js'
+import { findWalkingDead } from '../harness/bench-shared.js'
 
-const home = process.env.HOME ?? '/home/qinghao1'
-const candidates = [path.resolve('walking_dead.vpx'), path.join(home, 'Downloads/walking_dead.vpx')]
-
-function exists(p: string): boolean {
-	try {
-		return fs.existsSync(p) && fs.statSync(p).size > 1024 * 1024
-	} catch {
-		return false
-	}
-}
-
-const vpx = candidates.find(exists) ?? null
+const vpx = findWalkingDead()
 const isWalkingDead = !!vpx && vpx.includes('walking_dead')
 
 describe.skipIf(!isWalkingDead)('walking_dead loading', () => {
