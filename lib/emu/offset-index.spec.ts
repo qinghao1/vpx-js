@@ -41,7 +41,20 @@ describe('The Offset Index calculator', () => {
 		expect(result.zeroBasedIndex).to.equal(8)
 	})
 
+	it('should convert 88 -> 63', () => {
+		const result: OffsetIndex = OffsetIndex.fromWpcMatrix(88)
+		expect(result.wpcMatrixIndex).to.equal(88)
+		expect(result.zeroBasedIndex).to.equal(63)
+	})
+
+	it('should reject matrix numbers outside 1-8 per digit', () => {
+		for (const bad of [0, 10, 19, 20, 99, 11.5, -11]) {
+			expect(() => OffsetIndex.fromWpcMatrix(bad)).to.throw(/INVALID_WPC_MATRIX_INDEX/)
+		}
+	})
+
 	it('should detect invalid index', () => {
-		expect(() => OffsetIndex.fromWpcMatrix(0)).to.throw(/NEGATIVE_INDEX_DETECTED/)
+		expect(() => OffsetIndex.fromWpcMatrix(0)).to.throw(/INVALID_WPC_MATRIX_INDEX/)
+		expect(() => OffsetIndex.fromZeroBased(-1)).to.throw(/NEGATIVE_INDEX_DETECTED/)
 	})
 })

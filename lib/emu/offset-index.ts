@@ -19,8 +19,16 @@ export class OffsetIndex {
 		return 10 * Math.floor(index / 8) + 11 + (index % 8)
 	}
 
-	/** WPC matrix → 0-based (11→0, 21→8). */
+	/**
+	 * WPC matrix → 0-based (11→0, 21→8). Both digits must be 1–8; anything
+	 * else (e.g. 19, 20, 99) is rejected instead of aliasing a valid lamp.
+	 */
 	public static mapMatrixIndexToIndex(index: number): number {
+		const tens = Math.floor(index / 10)
+		const units = index % 10
+		if (!Number.isInteger(index) || tens < 1 || tens > 8 || units < 1 || units > 8) {
+			throw new Error(`INVALID_WPC_MATRIX_INDEX: ${index}`)
+		}
 		return 8 * Math.floor((index - 11) / 10) + ((index - 11) % 10)
 	}
 
