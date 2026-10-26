@@ -9,7 +9,6 @@ const UNDEF_SYM = Symbol.for('vbs.undefined')
 
 export class Vertex2D extends Vector2 {
 	static readonly _pooled = pooled(Vertex2D)
-	static readonly POOL = Vertex2D._pooled.pool
 	readonly isVector2 = true as const
 	readonly isVector3 = false as const
 	constructor(x?: number, y?: number) {
@@ -50,7 +49,6 @@ export class Vertex2D extends Vector2 {
 /** 3D single-precision vector, three.js based with pooling. */
 export class Vertex3D extends Vector3 {
 	static readonly _pooled = pooled(Vertex3D)
-	static readonly POOL = Vertex3D._pooled.pool
 	readonly isVector2 = false as const
 	readonly isVector3 = true as const
 	constructor(x?: number, y?: number, z?: number) {
@@ -121,8 +119,10 @@ export class Vertex3D extends Vector3 {
 		return this.x === 0 && this.y === 0 && this.z === 0
 	}
 	static crossProduct(a: Vertex3D, b: Vertex3D, recycle = false): Vertex3D {
-		const out = new Vector3().crossVectors(a, b)
-		return recycle ? Vertex3D.claim(out.x, out.y, out.z) : new Vertex3D(out.x, out.y, out.z)
+		const crossX = a.y * b.z - a.z * b.y
+		const crossY = a.z * b.x - a.x * b.z
+		const crossZ = a.x * b.y - a.y * b.x
+		return recycle ? Vertex3D.claim(crossX, crossY, crossZ) : new Vertex3D(crossX, crossY, crossZ)
 	}
 	static crossZ(rz: number, v: Vertex3D, recycle = false): Vertex3D {
 		return recycle ? Vertex3D.claim(-rz * v.y, rz * v.x, 0) : new Vertex3D(-rz * v.y, rz * v.x, 0)

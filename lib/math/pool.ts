@@ -8,7 +8,28 @@ export interface IPoolable<T> {
 	reset?(obj: T): void
 }
 
-/** Bounded GC-reducing object pool (max 4096). */
+/**
+ * Bounded GC-reducing object pool (max 4096).
+ *
+ * Pooling contract (claim/release discipline):
+ * - `claim()` transfers ownership to the caller; every claimed instance must be
+ *   returned exactly once via `release()`.
+ * - `*AndRelease` / `setAndRelease` / `dotAndRelease` consume their argument: the
+ *   caller must not touch the passed instance afterwards.
+ * - `clone(true)`, `crossProduct(..., true)`, `crossZ(..., true)` and
+ *   `multiplyVectorT(..., true)` return pooled instances the caller owns and must
+ *   release; the default `false` variants return fresh instances that need no release
+ *   (releasing one is harmless).
+ * - Never release the same instance twice and never use an instance after release:
+ *   double-release aliases two claims to one mutable object, and use-after-release
+ *   observes whatever the next claimant wrote. The pool guards against neither;
+ *   violations corrupt silently.
+ * - Do not store pooled instances in long-lived state unless that state's lifecycle
+ *   provably brackets the claim; a stale alias observes later claims' writes.
+ * - `reset` runs on release, not on claim: a claimed instance keeps whatever the
+ *   previous owner left unless the `claim` wrapper re-initializes it (all
+ *   `Vertex*` / `Matrix*` claim wrappers do).
+ */
 export class Pool<T> {
 	private static readonly MAX = 4096
 	private readonly items: T[] = []
@@ -34,8 +55,6 @@ export class Pool<T> {
 		this.items.push(obj)
 	}
 }
-
-export { Pool as ObjectPool }
 
 /** Helper to create idiomatic pooled statics without repeating boilerplate. */
 export function pooled<T>(ctor: IPoolable<T>) {

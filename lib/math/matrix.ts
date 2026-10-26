@@ -1,7 +1,7 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { Matrix3, Matrix4, Vector3 } from 'three'
+import { Matrix3, Matrix4 } from 'three'
 import { pooled } from './pool.js'
 import { Vertex3D } from './vector.js'
 
@@ -25,7 +25,7 @@ export class Matrix2D extends Matrix3 {
 		]
 	}
 	set matrix(m: number[][]) {
-		this.set(m[0][0], m[1][0], m[2][0], m[0][1], m[1][1], m[2][1], m[0][2], m[1][2], m[2][2])
+		this.set(m[0][0], m[0][1], m[0][2], m[1][0], m[1][1], m[1][2], m[2][0], m[2][1], m[2][2])
 	}
 	setIdentity(): this {
 		return this.identity()
@@ -127,7 +127,26 @@ export class Matrix2D extends Matrix3 {
 	}
 }
 
-/** 4×4 D3D row-major matrix (v' = v*M) stored row-major in `elements`. */
+/**
+ * 4×4 D3D row-major matrix (v' = v*M) stored row-major in `elements`.
+ *
+ * Row-major contract: rows are contiguous (`_11` at `elements[0]`, translation at
+ * `elements[12..14]`), `set(n11, ...)` takes row order, and `multiply` /
+ * `multiplyMatrices` / `premultiply` compose row-vector transforms, so
+ * `scale.clone().multiply(rot).multiply(pos)` applies scale, then rotation, then
+ * position. Both operands of `multiply`/`multiplyMatrices` must be row-major.
+ * `Vertex3D.multiplyMatrix` feeds this storage straight into three's `applyMatrix4`,
+ * which is element-identical for row-vector × row-major; the render layer transposes
+ * on upload (`ThreeRenderApi.applyMatrixToNode`).
+ *
+ * Inherited three.js helpers that assume column-major storage throw (see the disabled
+ * block below); use the `set*` / `rotate*Matrix` builders instead. `transpose` and
+ * `invert` are kept: inversion intentionally goes through a transpose sandwich
+ * (`clone().transpose().invert().transpose()`), because three's `invert` inverts the
+ * column-major reading of the same elements. `copy`, `equals`, `determinant`
+ * (transpose-invariant), `multiplyScalar`, `toArray` / `fromArray` are storage-agnostic
+ * and safe.
+ */
 export class Matrix3D extends Matrix4 {
 	private static readonly _pooled = pooled(Matrix3D)
 	static claim(): Matrix3D {
@@ -305,6 +324,69 @@ export class Matrix3D extends Matrix4 {
 		e[10] *= -1
 		e[14] *= -1
 		return this
+	}
+	private static throwColumnMajor(name: string): never {
+		throw new Error(`Matrix3D is row-major (D3D); three.js column-major helper "${name}" is disabled.`)
+	}
+	// Disabled: every method below assumes column-major storage and would silently
+	// produce a transposed matrix. Zero call sites (verified); kept as loud errors so
+	// future three.js-fluent code fails fast instead of corrupting transforms.
+	override makeTranslation(..._args: never[]): never {
+		return Matrix3D.throwColumnMajor('makeTranslation')
+	}
+	override makeRotationX(..._args: never[]): never {
+		return Matrix3D.throwColumnMajor('makeRotationX')
+	}
+	override makeRotationY(..._args: never[]): never {
+		return Matrix3D.throwColumnMajor('makeRotationY')
+	}
+	override makeRotationZ(..._args: never[]): never {
+		return Matrix3D.throwColumnMajor('makeRotationZ')
+	}
+	override makeRotationFromEuler(..._args: never[]): never {
+		return Matrix3D.throwColumnMajor('makeRotationFromEuler')
+	}
+	override makeRotationFromQuaternion(..._args: never[]): never {
+		return Matrix3D.throwColumnMajor('makeRotationFromQuaternion')
+	}
+	override makeScale(..._args: never[]): never {
+		return Matrix3D.throwColumnMajor('makeScale')
+	}
+	override makeShear(..._args: never[]): never {
+		return Matrix3D.throwColumnMajor('makeShear')
+	}
+	override makePerspective(..._args: never[]): never {
+		return Matrix3D.throwColumnMajor('makePerspective')
+	}
+	override makeOrthographic(..._args: never[]): never {
+		return Matrix3D.throwColumnMajor('makeOrthographic')
+	}
+	override makeBasis(..._args: never[]): never {
+		return Matrix3D.throwColumnMajor('makeBasis')
+	}
+	override extractBasis(..._args: never[]): never {
+		return Matrix3D.throwColumnMajor('extractBasis')
+	}
+	override extractRotation(..._args: never[]): never {
+		return Matrix3D.throwColumnMajor('extractRotation')
+	}
+	override compose(..._args: never[]): never {
+		return Matrix3D.throwColumnMajor('compose')
+	}
+	override decompose(..._args: never[]): never {
+		return Matrix3D.throwColumnMajor('decompose')
+	}
+	override lookAt(..._args: never[]): never {
+		return Matrix3D.throwColumnMajor('lookAt')
+	}
+	override setPosition(..._args: never[]): never {
+		return Matrix3D.throwColumnMajor('setPosition')
+	}
+	override copyPosition(..._args: never[]): never {
+		return Matrix3D.throwColumnMajor('copyPosition')
+	}
+	override scale(..._args: never[]): never {
+		return Matrix3D.throwColumnMajor('scale')
 	}
 	override clone(): this {
 		return new Matrix3D().copy(this) as unknown as this
