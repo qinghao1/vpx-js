@@ -5,17 +5,13 @@ import { ExtrudeGeometry, type Path, Shape, ShapeGeometry, Vector2 } from 'three
 import { SplineVertex } from '../../util/spline-vertex.js'
 import type { LightData } from '../../vpt/light/light-data.js'
 import type { Table } from '../../vpt/table/table.js'
-
-const ZERO_VEC2 = new Vector2(0, 0)
-const ZERO_SIDE_UVS = [ZERO_VEC2, ZERO_VEC2, ZERO_VEC2, ZERO_VEC2]
+import { playfieldUvGenerator } from './three-mesh-generator.js'
 
 /** Generates light insert meshes. */
 export class ThreeLightMeshGenerator {
 	public createLight(lightData: LightData, table: Table, depth = 5, bevel = 0.5): ExtrudeGeometry {
 		const shape = this.getShape(lightData, table)
 		const dim = table.getDimensions()
-		const invW = 1 / dim.width
-		const invH = 1 / dim.height
 		const geo = new ExtrudeGeometry(shape, {
 			depth,
 			bevelEnabled: bevel > 0,
@@ -23,24 +19,7 @@ export class ThreeLightMeshGenerator {
 			steps: 1,
 			bevelSize: bevel,
 			bevelThickness: bevel,
-			UVGenerator: {
-				generateSideWallUV(): Vector2[] {
-					return ZERO_SIDE_UVS
-				},
-				generateTopUV(_g: ExtrudeGeometry, vertices: number[], a: number, b: number, c: number): Vector2[] {
-					const ax = vertices[a * 3]!,
-						ay = vertices[a * 3 + 1]!
-					const bx = vertices[b * 3]!,
-						by = vertices[b * 3 + 1]!
-					const cx = vertices[c * 3]!,
-						cy = vertices[c * 3 + 1]!
-					return [
-						new Vector2(ax * invW, 1 - ay * invH),
-						new Vector2(bx * invW, 1 - by * invH),
-						new Vector2(cx * invW, 1 - cy * invH),
-					]
-				},
-			},
+			UVGenerator: playfieldUvGenerator(1 / dim.width, 1 / dim.height),
 		})
 		if (lightData.szSurface)
 			geo.translate(0, 0, -table.getSurfaceHeight(lightData.szSurface, lightData.center.x, lightData.center.y))
@@ -63,7 +42,11 @@ export class ThreeLightMeshGenerator {
 		if (lightData.szSurface) {
 			surfaceHeight = table.getSurfaceHeight(lightData.szSurface, lightData.center.x, lightData.center.y)
 		}
-		geo.translate(0, 0, surfaceHeight + (lightData.bulbLight ? lightData.bulbHaloHeight : 0) + 0.1)
+		// Negated like createLight above: scene space maps local +z to world
+		// -y (transformScene rotateX), so table-up must be built as local -z.
+		// The +0.1 epsilon (table units) floats the quad just off the insert
+		// surface to avoid z-fighting; upstream needs none (separate lightmap pass).
+		geo.translate(0, 0, -(surfaceHeight + (lightData.bulbLight ? lightData.bulbHaloHeight : 0) + 0.1))
 		geo.name = 'bulb.glow'
 		return geo
 	}

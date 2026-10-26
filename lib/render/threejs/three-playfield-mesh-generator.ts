@@ -1,8 +1,9 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { type BufferGeometry, ExtrudeGeometry, Shape, Vector2 } from 'three'
+import { type BufferGeometry, ExtrudeGeometry, Shape } from 'three'
 import { Table, type TableGenerateOptions } from '../../vpt/table/table.js'
+import { playfieldUvGenerator } from './three-mesh-generator.js'
 
 /** Generates playfield mesh. */
 export class ThreePlayfieldMeshGenerator {
@@ -16,30 +17,18 @@ export class ThreePlayfieldMeshGenerator {
 		shape.lineTo(table.data.left, table.data.bottom)
 		shape.lineTo(table.data.left, table.data.top)
 
-		const invW = 1 / dim.width
-		const invH = 1 / dim.height
-		return new ExtrudeGeometry(shape, {
+		const geometry = new ExtrudeGeometry(shape, {
 			depth: Table.playfieldThickness,
 			bevelEnabled: false,
 			steps: 1,
-			UVGenerator: {
-				generateSideWallUV(): Vector2[] {
-					return [new Vector2(0, 0), new Vector2(0, 0), new Vector2(0, 0), new Vector2(0, 0)]
-				},
-				generateTopUV(_g: ExtrudeGeometry, vertices: number[], a: number, b: number, c: number): Vector2[] {
-					const ax = vertices[a * 3]!,
-						ay = vertices[a * 3 + 1]!
-					const bx = vertices[b * 3]!,
-						by = vertices[b * 3 + 1]!
-					const cx = vertices[c * 3]!,
-						cy = vertices[c * 3 + 1]!
-					return [
-						new Vector2(ax * invW, 1 - ay * invH),
-						new Vector2(bx * invW, 1 - by * invH),
-						new Vector2(cx * invW, 1 - cy * invH),
-					]
-				},
-			},
+			UVGenerator: playfieldUvGenerator(1 / dim.width, 1 / dim.height, table.data.left, table.data.top),
 		})
+		// ExtrudeGeometry spans z 0..depth; sink it so the top lid lands on the
+		// physics playfield plane (z=0, see Table.generatePlayfieldHit and
+		// upstream PhysicsEngine m_hitPlayfield d=0). The slab then hangs below
+		// like the cabinet body instead of burying balls and parts.
+		geometry.translate(0, 0, -Table.playfieldThickness)
+		geometry.name = 'playfield_base'
+		return geometry
 	}
 }

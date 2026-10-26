@@ -1,8 +1,37 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { BufferAttribute, BufferGeometry, Float32BufferAttribute } from 'three'
+import { BufferAttribute, BufferGeometry, type ExtrudeGeometry, Float32BufferAttribute, Vector2 } from 'three'
 import type { Mesh } from '../../vpt/mesh.js'
+
+const ZERO_SIDE_UV = new Vector2(0, 0)
+const ZERO_SIDE_UVS = [ZERO_SIDE_UV, ZERO_SIDE_UV, ZERO_SIDE_UV, ZERO_SIDE_UV]
+
+/**
+ * ExtrudeGeometry UVs in playfield space: top faces map vertex (x, y) through
+ * the inverse dimensions, side walls collapse to zero. Shared by the playfield
+ * and light-insert generators.
+ */
+export function playfieldUvGenerator(invW: number, invH: number, originX = 0, originY = 0) {
+	return {
+		generateSideWallUV(): Vector2[] {
+			return ZERO_SIDE_UVS
+		},
+		generateTopUV(_g: ExtrudeGeometry, vertices: number[], a: number, b: number, c: number): Vector2[] {
+			const ax = vertices[a * 3]
+			const ay = vertices[a * 3 + 1]
+			const bx = vertices[b * 3]
+			const by = vertices[b * 3 + 1]
+			const cx = vertices[c * 3]
+			const cy = vertices[c * 3 + 1]
+			return [
+				new Vector2((ax - originX) * invW, 1 - (ay - originY) * invH),
+				new Vector2((bx - originX) * invW, 1 - (by - originY) * invH),
+				new Vector2((cx - originX) * invW, 1 - (cy - originY) * invH),
+			]
+		},
+	}
+}
 
 export class ThreeMeshGenerator {
 	public convertToBufferGeometry(mesh: Mesh): BufferGeometry {
@@ -35,6 +64,7 @@ export class ThreeMeshGenerator {
 			if (v.nx || v.ny || v.nz) hasNormal = true
 			const o2 = i * 2
 			uvs[o2] = v.tu
+			// VPX v counts from the texture top, WebGL from the bottom.
 			uvs[o2 + 1] = 1 - v.tv
 		}
 		bg.setAttribute('position', new Float32BufferAttribute(positions, 3))

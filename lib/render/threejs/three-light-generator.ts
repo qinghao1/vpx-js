@@ -4,6 +4,7 @@
 import { type MeshStandardMaterial, type Object3D, PointLight, type Mesh as ThreeMesh } from 'three'
 import { Enums } from '../../vpt/enums.js'
 import type { LightData } from '../../vpt/light/light-data.js'
+import { clampLightState } from '../../vpt/light/light-physics.js'
 import type { LightState } from '../../vpt/light/light-state.js'
 import type { Table } from '../../vpt/table/table.js'
 import { setBulbGlowState } from './nodes/bulb-glow-node.js'
@@ -12,43 +13,55 @@ import { ThreeRenderApi } from './three-render-api.js'
 /** Generates and updates Three.js lights. */
 export class ThreeLightGenerator {
 	public createPointLight(d: LightData, table?: Table): PointLight {
-		const intensity = d.state !== Enums.LightStatus.LightStateOff ? d.intensity : 0
+		// Bake-time live level mirrors native RenderSetup (m_currentIntensity =
+		// m_intensity * m_intensity_scale * state at blink frame 0): fractional
+		// states scale linearly and blinking starts on the first pattern frame.
+		// The transient intensity scale is 1 here (worker-side animation default,
+		// matching upstream SetDefaults), so only the resolved state applies.
+		const clamped = clampLightState(d.state)
+		const level = clamped === Enums.LightStatus.LightStateBlinking ? (d.isOn() ? 1 : 0) : clamped
+		const intensity = d.intensity * level
 		const light = new PointLight(d.color, intensity, d.falloff * ThreeRenderApi.SCALE, 2)
 		light.name = 'light'
-		light.color.set(d.color)
+		// Negated: scene space maps local +z to world -y (transformScene
+		// rotateX), so table-up is local -z — same as the extruded light mesh.
 		const z = table ? table.getSurfaceHeight(d.szSurface, d.center.x, d.center.y) + d.height : d.height
-		light.position.set(d.center.x, d.center.y, z)
+		light.position.set(d.center.x, d.center.y, -z)
 		light.updateMatrixWorld()
 		return light
 	}
 
-	public applyLighting(state: LightState, initial: number, obj?: Object3D): void {
+	public applyLighting(state: LightState, _initial: number, obj?: Object3D): void {
 		if (!obj) return
-		this._applyLightToTarget(obj, state, initial)
+		this.applyLightToTarget(obj, state)
 		const children = obj.children
 		for (let i = 0; i < children.length; i++) {
-			this._applyLightToTarget(children[i]!, state, initial)
+			this.applyLightToTarget(children[i]!, state)
 		}
 	}
 
-	private _applyLightToTarget(child: Object3D, state: LightState, initial: number): void {
+	private applyLightToTarget(child: Object3D, state: LightState): void {
+		// 'bulb.light'/'surface.light' are intentionally static: they convert to
+		// BDL node materials whose emissiveNode overrides the classic slots, so
+		// classic emissive writes are no-ops — lamp state rides the 'light'
+		// point light and the 'bulb.glow' uniforms instead.
 		switch (child.name) {
 			case 'light':
 				if (state.intensity !== undefined) (child as PointLight).intensity = state.intensity
 				if (state.color !== undefined) (child as PointLight).color.set(state.color)
 				break
-			case 'bulb.light': {
-				const m = (child as ThreeMesh).material as MeshStandardMaterial
-				if (m) {
-					if (state.intensity !== undefined) m.emissiveIntensity = state.intensity / (initial || 1)
-					if (state.color !== undefined) {
-						m.color.set(state.color)
-						m.emissive.set(state.color)
-					}
-				}
-				break
-			}
 			case 'bulb.glow': {
+				// Visibility follows the live lamp state (an off lamp adds no
+				// light, so its quad stays out of the draw list); intensity 0
+				// already renders nothing, this just skips the draw call.
+				// Quads built before the createMesh stamp predate the flag and
+				// default to visible; authored-invisible lights stay hidden
+				// (upstream gates bulb/glow rendering on m_d.m_visible).
+				if (state.intensity !== undefined) {
+					const authoredVisible =
+						(child.userData as { __authoredVisible?: boolean }).__authoredVisible ?? true
+					child.visible = state.intensity > 0 && authoredVisible
+				}
 				const glow = (child as ThreeMesh).material as MeshStandardMaterial
 				if (glow) {
 					// Native drives the lightmap glow from the live lamp state
@@ -60,14 +73,6 @@ export class ThreeLightGenerator {
 							color2: (state as { colorFull?: number }).colorFull,
 						})
 					}
-				}
-				break
-			}
-			case 'surface.light': {
-				const m = (child as ThreeMesh).material as MeshStandardMaterial
-				if (m) {
-					if (state.intensity !== undefined) m.emissiveIntensity = state.intensity / (initial || 1)
-					if (state.color !== undefined) m.emissive.set(state.color)
 				}
 				break
 			}
