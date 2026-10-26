@@ -28,7 +28,9 @@ export class LoadingBar {
 		const w = this.dom.streamWrap
 		if (!w) return
 		w.classList.remove('show')
-		setTimeout(() => { if (!w.classList.contains('show')) w.hidden = true }, 400)
+		setTimeout(() => {
+			if (!w.classList.contains('show')) w.hidden = true
+		}, 400)
 	}
 	showCanvas(canvas) {
 		if (this.dom.dropzone) this.dom.dropzone.hidden = true

@@ -4,9 +4,13 @@ export const resolveVpxCandidates = ({ defaultName = null, queryParam = 'vpx' } 
 	let name = (q.get(queryParam) || q.get('table') || defaultName || '').trim()
 	if (!name) return []
 	if (/^https?:\/\//i.test(name) || name.startsWith('/@fs/')) return [name]
-	if (name.includes('/') && !name.includes('@fs')) return [name, `/${name.split('/').pop()}`]
 	if (!name.toLowerCase().endsWith('.vpx')) name += '.vpx'
-	return [`/${name.split('/').pop()}`]
+	if (name.includes('/')) {
+		const abs = name.startsWith('/') ? name : `/${name}`
+		const base = `/${name.split('/').pop()}`
+		return abs === base ? [abs] : [abs, base]
+	}
+	return [`/${name}`]
 }
 
 export const resolveRomCandidates = romParam => (romParam?.trim() ? [romParam.trim()] : [])

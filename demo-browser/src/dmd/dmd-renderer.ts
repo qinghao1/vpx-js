@@ -3,13 +3,55 @@ import * as THREE from 'three'
 import { GpuDmdNodeController } from '../../../dist-esm/lib/render/threejs/nodes/dmd-node.js'
 import { DMD } from '../config.js'
 
-// vpinball: flasher.cpp:1306 ZWRITEENABLE false, DrawMesh depthBias -10000 (flasher.cpp:1306, DrawMesh depthBias -10000)
+// vpinball flasher.cpp:1306: ZWRITEENABLE false, DrawMesh depthBias -10000
 // depthTest: true, depthWrite: false, polygonOffsetFactor: -4, polygonOffsetUnits: -8, renderOrder: 20, DoubleSide
 
 const VISIBLE_WEIGHT = 1e6
 const DUP_MAX = 600
 const DUP_FACTOR = 0.3
 const SIZE_TOL = 0.4
+
+// Production FlasherData anchors the DMD at getCenter() (bbox midpoint of the
+// drag points); TextboxData anchors at the v1/v2 midpoint. Neither exposes a
+// `.center` property, so never read one and never hardcode a table point here.
+export function getFlasherCenter(fl, fallback) {
+	const d = fl?.data
+	if (d && typeof d.getCenter === 'function') {
+		try {
+			const c = d.getCenter()
+			if (c && Number.isFinite(+c.x) && Number.isFinite(+c.y)) return { x: +c.x, y: +c.y }
+		} catch {
+			// fall through to the geometric fallbacks below
+		}
+	}
+	const raw = d?.dragPoints ?? d?._dragPoints ?? []
+	if (Array.isArray(raw) && raw.length) {
+		const xs = []
+		const ys = []
+		for (const p of raw) {
+			const px = p?.vertex?.x ?? p?.x
+			const py = p?.vertex?.y ?? p?.y
+			if (typeof px === 'number' && Number.isFinite(px)) xs.push(px)
+			if (typeof py === 'number' && Number.isFinite(py)) ys.push(py)
+		}
+		if (xs.length && ys.length)
+			return { x: (Math.min(...xs) + Math.max(...xs)) / 2, y: (Math.min(...ys) + Math.max(...ys)) / 2 }
+	}
+	const v1 = d?.v1
+	const v2 = d?.v2
+	if (
+		v1 &&
+		v2 &&
+		Number.isFinite(+v1.x) &&
+		Number.isFinite(+v1.y) &&
+		Number.isFinite(+v2.x) &&
+		Number.isFinite(+v2.y)
+	)
+		return { x: (+v1.x + +v2.x) / 2, y: (+v1.y + +v2.y) / 2 }
+	if (fallback && Number.isFinite(+fallback.x) && Number.isFinite(+fallback.y))
+		return { x: +fallback.x, y: +fallback.y }
+	return { x: 0, y: 0 }
+}
 
 export class DmdRenderer {
 	constructor(viewer) {
@@ -89,7 +131,7 @@ export class DmdRenderer {
 			return { x: 470, y: 600 }
 		})()
 		const distToCenter = (x, y) => Math.hypot(x - tableCenter.x, y - tableCenter.y)
-		const getPos = fl => ({ x: fl.data?.center?.x ?? 0, y: fl.data?.center?.y ?? 0 })
+		const getPos = fl => getFlasherCenter(fl, tableCenter)
 		const getSize = fl => {
 			const raw = fl.data?.dragPoints ?? fl.data?._dragPoints ?? []
 			const pts = Array.isArray(raw) ? raw : []
@@ -157,7 +199,6 @@ export class DmdRenderer {
 			String(n || '')
 				.toLowerCase()
 				.includes('vr')
-		const RE_CAB = /vrcab|cabinet/i
 		const hasCab = (() => {
 			try {
 				let found = false
@@ -322,7 +363,8 @@ export class DmdRenderer {
 			mesh.name = `DMD_${fl.getName()}`
 			mesh.renderOrder = 20
 			mesh.frustumCulled = false
-			mesh.position.set(d.center?.x ?? 470, d.center?.y ?? 40, -(d.height ?? 24))
+			const center = getFlasherCenter(fl, tableCenter)
+			mesh.position.set(center.x, center.y, -(d.height ?? 24))
 			mesh.rotation.set(
 				THREE.MathUtils.degToRad(d.rotX ?? 0),
 				THREE.MathUtils.degToRad(d.rotY ?? 0),

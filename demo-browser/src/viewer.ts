@@ -6,8 +6,13 @@ import * as THREE from 'three/webgpu'
 import { keyEventToDirectInputKey } from '../../dist-esm/lib/game/key-code.js'
 import { Player } from '../../dist-esm/lib/game/player.js'
 import {
+	BALL_FROZEN,
+	BALL_POS,
 	BALL_STRIDE,
+	BALL_VEL,
 	createPhysicsSAB,
+	INPUT_KEY_DOWN,
+	INPUT_KEY_UP,
 	MAX_BALLS,
 	pushInput,
 	trySnap,
@@ -142,6 +147,12 @@ const setTitle = title => {
 	const el = document.getElementById('title')
 	if (el && title) el.textContent = title
 }
+// Worker/main drift budgets per frame (VPX units, units/ms): below these the main
+// thread mirrors worker balls; above them a script-side discrete (kick, capture,
+// teleport) is forwarded to the worker instead. Tight on purpose: the mirror
+// re-syncs every frame, so residuals stay far below while script edits stand out.
+const WORKER_POS_DRIFT = 2
+const WORKER_VEL_DRIFT = 0.5
 export class Viewer {
 	constructor(opts = {}) {
 		ensureGlobals()
@@ -299,6 +310,8 @@ export class Viewer {
 		this._physicsWorker = null
 		this._physicsSab = null
 		this._physicsScratch = null
+		this._physicsReady = false
+		this._physicsPaused = false
 	}
 	_setupDebugToggle() {
 		const btn = document.getElementById('debug-toggle')
@@ -413,9 +426,7 @@ export class Viewer {
 
 	private _syncPhysicsTransforms(_timestamp) {
 		if (!this.player) return
-		if (this._physicsSab && this._physicsScratch) trySnap(this._physicsSab, this._physicsScratch)
-		this.player.setPhysicsEnabled(this.viewerMode === 'play')
-		this.player.updatePhysics()
+		this._stepPhysicsWithWorker()
 		if (this.viewerMode !== 'play' || !this.isPaused) {
 			this.player.updateAnimations(this.player.getGameTime())
 			const changed = this.player.popStates()
@@ -702,25 +713,38 @@ export class Viewer {
 	}
 	_createPhysicsWorker() {
 		try {
-			if (this._physicsWorker) this._physicsWorker.terminate()
+			if (!this._vpxBytes) {
+				this.log('physics worker needs table bytes — staying single-threaded', 'warn')
+				return null
+			}
+			this._terminatePhysicsWorker()
 			const sab = createPhysicsSAB()
 			const scratch = new Float32Array(MAX_BALLS * BALL_STRIDE)
-			const workerUrl = new URL('../../dist-esm/lib/game/physics.worker.js', import.meta.url)
-			const worker = new Worker(workerUrl, {
+			// NB: `new URL` must stay inline so vite bundles the worker (bare three/escodegen imports).
+			const worker = new Worker(new URL('../../dist-esm/lib/game/physics.worker.js', import.meta.url), {
 				type: 'module',
 			})
+			worker.onmessage = e => {
+				const data = e.data ?? {}
+				if (data.type === 'ready') {
+					this._physicsReady = true
+					this._syncWorkerBalls()
+					worker.postMessage({ type: 'start' })
+					this.log(`[physics] worker ready (${data.balls ?? 0} balls)`, 'info')
+				} else if (data.type === 'error') {
+					this.log(`physics worker failed: ${data.message} — staying single-threaded`, 'warn')
+					if (data.stack && _isDev) console.warn(data.stack)
+					if (this._physicsWorker === worker) this._terminatePhysicsWorker()
+				}
+			}
 			worker.postMessage({
 				type: 'init',
 				sab,
-			})
-			worker.postMessage({
-				type: 'start',
+				vpx: this._vpxBytes,
 			})
 			worker.onerror = e => {
 				this.log(`worker error ${e.message}`, 'warn')
-				this._physicsSab = null
-				worker.terminate()
-				if (this._physicsWorker === worker) this._physicsWorker = null
+				if (this._physicsWorker === worker) this._terminatePhysicsWorker()
 			}
 			this._physicsSab = sab
 			this._physicsScratch = scratch
@@ -738,16 +762,80 @@ export class Viewer {
 	}
 	_ensurePhysicsWorker() {
 		if (this._physicsSab && this._physicsWorker) return true
-		if (!this.player) return false
+		if (!this.player || !this._vpxBytes) return false
 		const res = this._createPhysicsWorker()
 		if (!res) return false
 		this.log(`[physics] SAB ${res.sab.byteLength} worker started`, 'info')
 		return true
 	}
+	// Full ball-list snapshot main→worker; sent on lifecycle changes and worker ready.
+	_syncWorkerBalls() {
+		const worker = this._physicsWorker
+		if (!worker || !this._physicsReady || !this.player) return
+		worker.postMessage({
+			type: 'syncBalls',
+			balls: this.player.balls.map(ball => ({
+				pos: [ball.state.pos.x, ball.state.pos.y, ball.state.pos.z],
+				vel: [ball.hit.vel.x, ball.hit.vel.y, ball.hit.vel.z],
+				radius: ball.data.radius,
+				frozen: ball.state.isFrozen,
+			})),
+		})
+	}
+	// Steps game logic on the main thread while ball kinematics come from the
+	// worker. The full main-thread step (movers, timers, hit events, script
+	// kicks/captures) runs first and the worker frame is mirrored last, so the
+	// mirrored balls are never re-integrated by the main thread in the same
+	// frame (that double-step applied every impulse twice). Worker frames stay
+	// authoritative; discrete script-side jumps still teleport back to the
+	// worker via the drift check below.
+	_stepPhysicsWithWorker() {
+		this.player.setPhysicsEnabled(this.viewerMode === 'play')
+		this.player.updatePhysics()
+		const sab = this._physicsSab
+		const scratch = this._physicsScratch
+		const frame = sab && scratch && this._physicsReady ? trySnap(sab, scratch) : null
+		const mainBalls = this.player?.balls ?? []
+		if (frame && frame.count > 0 && frame.count === mainBalls.length && !this.isPaused) {
+			for (let i = 0; i < frame.count; i++) {
+				const ball = mainBalls[i]
+				const off = i * BALL_STRIDE
+				const pos = ball.state.pos
+				const vel = ball.hit.vel
+				const dx = pos.x - scratch[off + BALL_POS]
+				const dy = pos.y - scratch[off + BALL_POS + 1]
+				const dz = pos.z - scratch[off + BALL_POS + 2]
+				const dvx = vel.x - scratch[off + BALL_VEL]
+				const dvy = vel.y - scratch[off + BALL_VEL + 1]
+				const dvz = vel.z - scratch[off + BALL_VEL + 2]
+				if (Math.hypot(dx, dy, dz) > WORKER_POS_DRIFT || Math.hypot(dvx, dvy, dvz) > WORKER_VEL_DRIFT) {
+					this._physicsWorker?.postMessage({
+						type: 'teleportBall',
+						index: i,
+						pos: [pos.x, pos.y, pos.z],
+						vel: [vel.x, vel.y, vel.z],
+						frozen: ball.state.isFrozen,
+					})
+				} else {
+					pos.x = scratch[off + BALL_POS]
+					pos.y = scratch[off + BALL_POS + 1]
+					pos.z = scratch[off + BALL_POS + 2]
+					vel.x = scratch[off + BALL_VEL]
+					vel.y = scratch[off + BALL_VEL + 1]
+					vel.z = scratch[off + BALL_VEL + 2]
+					ball.state.isFrozen = scratch[off + BALL_FROZEN] !== 0
+				}
+			}
+		}
+	}
 	enterPlayMode() {
 		if (this.renderer) this.renderer.shadowMap.enabled = false
 		if (this.controls) this.controls.enabled = false
 		this._ensurePhysicsWorker()
+		if (this._physicsWorker && this._physicsPaused) {
+			this._physicsWorker.postMessage({ type: 'resume' })
+			this._physicsPaused = false
+		}
 		if (this.tableGroup) hideCabFlippers(this.tableGroup)
 		{
 			const framing = this.tableGroup ? computePlayFraming(this.tableGroup) : null
@@ -766,9 +854,14 @@ export class Viewer {
 		this.hookInput()
 		if (!this._blurHandler) {
 			this._blurHandler = () => {
-				this.player?.onKeyUp({ code: 'ShiftLeft', key: 'Shift', ts: Date.now(), location: 1 })
-				this.player?.onKeyUp({ code: 'ShiftRight', key: 'Shift', ts: Date.now(), location: 2 })
-				this.player?.onKeyUp({ code: 'Shift', key: 'Shift', ts: Date.now() })
+				for (const code of ['ShiftLeft', 'ShiftRight', 'Shift']) {
+					const ev = { code, key: 'Shift', ts: Date.now(), location: code === 'ShiftRight' ? 2 : 1 }
+					this.player?.onKeyUp(ev)
+					if (this._physicsSab) {
+						const dik = keyEventToDirectInputKey(ev as any)
+						if (dik) pushInput(this._physicsSab, INPUT_KEY_UP, dik, Date.now())
+					}
+				}
 			}
 			window.addEventListener('blur', this._blurHandler)
 			document.addEventListener('visibilitychange', () => {
@@ -777,16 +870,16 @@ export class Viewer {
 		}
 	}
 	exitPlayMode() {
-		for (const code of this._touchMap.values()) {
-			this.player?.onKeyUp({
-				code,
-				key: code === 'Enter' ? 'Enter' : 'Shift',
-				ts: Date.now(),
-			})
+		if (this.player) {
+			for (const code of this._touchMap.values()) this._sendKey(code, false)
+			this._touchMap.clear()
+			this._sendKey('ShiftLeft', false)
+			this._sendKey('ShiftRight', false)
+		} else this._touchMap.clear()
+		if (this._physicsWorker && !this._physicsPaused) {
+			this._physicsWorker.postMessage({ type: 'pause' })
+			this._physicsPaused = true
 		}
-		this._touchMap.clear()
-		this.player?.onKeyUp({ code: 'ShiftLeft', key: 'Shift', ts: Date.now(), location: 1 })
-		this.player?.onKeyUp({ code: 'ShiftRight', key: 'Shift', ts: Date.now(), location: 2 })
 		if (this.controls) this.controls.enabled = true
 		if (this.tableGroup) showCabFlippers(this.tableGroup)
 		const ballsNode = this.tableGroup?.getObjectByName('balls')
@@ -871,6 +964,44 @@ export class Viewer {
 			}
 		}
 		changed.release()
+		this._demandPendingSoon()
+	}
+
+	/**
+	 * Demand-loads textures for materials whose pending key missed the cache
+	 * (script assigned an image mid-game that never streamed). Fire-and-forget,
+	 * reentrancy-guarded; misses with no loadable source warn once instead of
+	 * failing silently into transparent-black meshes.
+	 */
+	_demandPendingSoon() {
+		if (this._demandQueued || !this.tableGroup || !this.table || !this.renderApi) return
+		this._demandQueued = true
+		queueMicrotask(async () => {
+			this._demandQueued = false
+			if (this._disposed || !this.tableGroup || !this.table || !this.renderApi) return
+			try {
+				const mapGen = this.renderApi.getMapGenerator?.()
+				if (!mapGen) return
+				const { loaded, missing } = await mapGen.demandPendingMaps(this.tableGroup, this.table)
+				if (loaded.length) {
+					const matGen = this.renderApi.getMaterialGenerator?.()
+					matGen?.resolvePendingInScene(this.tableGroup)
+					matGen?.resolvePendingTextures?.()
+					this._patchCloned?.()
+				}
+				this._demandWarned ??= new Set()
+				for (const name of missing) {
+					if (this._demandWarned.has(name)) continue
+					this._demandWarned.add(name)
+					this.log(
+						`[stream] Material references unloadable texture "${name}" (unknown name or cleared source)`,
+						'warn',
+					)
+				}
+			} catch {
+				// best effort only; streaming resolve already covered init-time refs
+			}
+		})
 	}
 	_emitModeChange() {
 		document.dispatchEvent(
@@ -1134,22 +1265,12 @@ export class Viewer {
 			})
 			if (textures.length !== before)
 				this.log(`[stream] Filtered ${before} → ${textures.length} used textures (kept inserts)`)
-			{
-				const keepSet = new Set(textures.map(tx => tx.getName().toLowerCase()))
-				let cleared = 0
-				for (const tx of Object.values(table.textures) as any[]) {
-					const texName = tx.getName().toLowerCase()
-					if (!keepSet.has(texName)) {
-						if (tx.binary || tx.pdsBuffer) cleared++
-						tx.binary = undefined
-						tx.pdsBuffer = undefined
-					}
-				}
-				if (cleared) {
-					this.log(`[mem] Eagerly cleared ${cleared} unused raw texture buffers`, 'info')
-					if (typeof (window as any).gc === 'function') (window as any).gc()
-				}
-			}
+			// NOTE: filtered-out textures keep their raw binaries until the
+			// post-stream demand pass below: table script (e.g. Table1_Init
+			// assigning VRCab_Backbox.image) routinely references textures
+			// no generate-time material names. Clearing here strands those
+			// materials mapless forever (transparent-black meshes). Binaries
+			// are bulk-cleared after streaming instead (_clearRawTextures).
 			textures.sort((texA, texB) => {
 				const nameA = texA.getName().toLowerCase()
 				const nameB = texB.getName().toLowerCase()
@@ -1364,6 +1485,7 @@ export class Viewer {
 	}
 	async _createPlayer() {
 		if (this.player) this.player.removeAllListeners?.()
+		this._terminatePhysicsWorker()
 		this.player = new Player(this.table, (this.gate ??= new AnimationGate()))
 		this.player.setPhysicsEnabled(this.viewerMode === 'play')
 		const activePlayer = this.player
@@ -1383,8 +1505,14 @@ export class Viewer {
 		this.applyChangedStates(init)
 		this.dmd._ensureTexture()
 		this.dmd.findMeshes()
-		this.player.on('ballCreated', ball => this.handleBallLifecycle(ball, true))
-		this.player.on('ballDestroyed', ball => this.handleBallLifecycle(ball, false))
+		this.player.on('ballCreated', ball => {
+			this.handleBallLifecycle(ball, true)
+			this._syncWorkerBalls()
+		})
+		this.player.on('ballDestroyed', ball => {
+			this.handleBallLifecycle(ball, false)
+			this._syncWorkerBalls()
+		})
 		this.player.on('emuStarted', () => {
 			this._emuStartLogged = true
 			this.log(`PinMAME emu ready: ${this.player.getPhysics().emu?.constructor.name}`)
@@ -1441,6 +1569,8 @@ export class Viewer {
 			// generic: free raw texture binaries after streaming regardless of mode; keeps GPU textures only
 			this._clearRawTextures?.()
 			if (typeof (globalThis as any).gc === 'function') (globalThis as any).gc()
+			// The e2e stream-Done wait relies on this: the lifecycle always closes.
+			this.log('[stream] Done 0/0 — nothing to stream')
 			return
 		}
 		this._showStream()
@@ -1453,7 +1583,8 @@ export class Viewer {
 			const t0 = performance.now()
 			this.log(`[stream] Streaming ${total} textures…`)
 			let scheduled = false
-			const patchCloned = () => {
+			// Exposed for the demand hook below (mid-game script image swaps).
+			const patchCloned = (this._patchCloned = () => {
 				const cache = this.renderApi.getMapGenerator?.().getCache?.()
 				if (!cache || !this.tableGroup) return 0
 				let fixed = 0
@@ -1691,14 +1822,16 @@ export class Viewer {
 					})
 				}
 				return fixed
-			}
+			})
 			const schedulePatch = () => {
 				if (scheduled) return
 				scheduled = true
 				queueMicrotask(() => {
 					scheduled = false
 					if (this._streamId !== streamId) return
-					this.renderApi.getMaterialGenerator?.().resolvePendingTextures?.()
+					const matGen = this.renderApi.getMaterialGenerator?.()
+					if (this.tableGroup) matGen?.resolvePendingInScene(this.tableGroup)
+					matGen?.resolvePendingTextures?.()
 					patchCloned()
 				})
 			}
@@ -1715,10 +1848,36 @@ export class Viewer {
 				}
 				return
 			}
-			const fixed = this.renderApi.getMaterialGenerator?.().resolvePendingTextures?.() ?? 0
+			const matGen = this.renderApi.getMaterialGenerator?.()
+			const fixedScene = this.tableGroup ? (matGen?.resolvePendingInScene(this.tableGroup) ?? 0) : 0
+			const fixed = fixedScene + (matGen?.resolvePendingTextures?.() ?? 0)
 			const fixed2 = patchCloned()
 			if (fixed || fixed2)
-				this.log(`[stream] Patched ${fixed + fixed2} materials (${fixed} cached + ${fixed2} cloned)`)
+				this.log(`[stream] Patched ${fixed + fixed2} materials (${fixed} resolved + ${fixed2} cloned)`)
+			// Demand pass: script-assigned images (set after the used-texture
+			// filter ran) reference textures that never streamed. Load + bind
+			// them now, before batching, so no material stays mapless.
+			if (this.tableGroup && table && this._streamId === streamId) {
+				const mapGenerator = this.renderApi.getMapGenerator()
+				const { loaded, missing } = await mapGenerator.demandPendingMaps(this.tableGroup, table)
+				if (loaded.length) {
+					const demandMatGen = this.renderApi.getMaterialGenerator?.()
+					const fixed3 =
+						(this.tableGroup ? (demandMatGen?.resolvePendingInScene(this.tableGroup) ?? 0) : 0) +
+						(demandMatGen?.resolvePendingTextures?.() ?? 0)
+					const fixed4 = patchCloned()
+					this.log(
+						`[stream] Demand-loaded ${loaded.length} script-referenced textures (${loaded.join(', ')})`,
+					)
+					if (fixed3 + fixed4 === 0)
+						this.log('[stream] Demand-loaded textures but no material took them', 'warn')
+				}
+				for (const name of missing)
+					this.log(
+						`[stream] Material references unloadable texture "${name}" (unknown name or cleared source)`,
+						'warn',
+					)
+			}
 			if (this.tableGroup && table && this.renderApi) {
 				const params = new URLSearchParams(location.search)
 				if (!params.has('nobatched')) {
@@ -1848,7 +2007,8 @@ export class Viewer {
 					const cached = await idbGet(cand.split('/').pop())
 					if (cached && cached.byteLength > 1_000_000) {
 						this.log(`[IDB] hit ${cand.split('/').pop()} ${fmtBytes(cached.byteLength)} — using cached`)
-						const reader = new BrowserBinaryReader(new Uint8Array(cached))
+						this._vpxBytes = new Uint8Array(cached)
+						const reader = new BrowserBinaryReader(this._vpxBytes)
 						await reader.open()
 						if (_loadGen !== this._loadId) {
 							try {
@@ -1883,6 +2043,7 @@ export class Viewer {
 					)
 				} catch {}
 				if (_loadGen !== this._loadId) return
+				this._vpxBytes = data
 				const reader = new BrowserBinaryReader(data)
 				await reader.open()
 				if (_loadGen !== this._loadId) {
@@ -1911,7 +2072,8 @@ export class Viewer {
 		this._streamId++
 		this._loading(5, 'Reading file…', `Reading ${file.name}…`)
 		this.log(`Reading ${file.name}…`)
-		const reader = new BrowserBinaryReader(file)
+		this._vpxBytes = new Uint8Array(await file.arrayBuffer())
+		const reader = new BrowserBinaryReader(this._vpxBytes)
 		await reader.open()
 		if (_loadGen !== this._loadId) {
 			await this._cleanupReader(reader)
@@ -1970,7 +2132,7 @@ export class Viewer {
 			fps = 0
 		let lastFpsUpdate = performance.now()
 		let lastDmd = 0
-		if (this.player && (!this._physicsSab || !this._physicsWorker)) {
+		if (this.player && this.viewerMode === 'play' && (!this._physicsSab || !this._physicsWorker)) {
 			const res = this._createPhysicsWorker()
 			if (res) this.log(`[physics] SAB ${res.sab.byteLength} worker started`, 'info')
 		} else if (this._physicsSab) {
@@ -1980,9 +2142,7 @@ export class Viewer {
 		;(this as any)._tickPhysicsImmediate = () => {
 			if (!this.player || this.isPaused || this.viewerMode !== 'play') return
 			if (isLowQuality()) return
-			if (this._physicsSab && this._physicsScratch) trySnap(this._physicsSab, this._physicsScratch)
-			this.player.setPhysicsEnabled(true)
-			this.player.updatePhysics()
+			this._stepPhysicsWithWorker()
 			this.player.updateAnimations(this.player.getGameTime())
 			const changed = this.player.popStates()
 			if (!changed.isEmpty) {
@@ -2162,7 +2322,7 @@ export class Viewer {
 		else this.player.onKeyUp(ev)
 		if (this._physicsSab) {
 			const dik = keyEventToDirectInputKey(ev as any)
-			if (dik) pushInput(this._physicsSab, down ? 1 : 0, dik, Date.now())
+			if (dik) pushInput(this._physicsSab, down ? INPUT_KEY_DOWN : INPUT_KEY_UP, dik, Date.now())
 		}
 	}
 	_flashNudge(angle) {
