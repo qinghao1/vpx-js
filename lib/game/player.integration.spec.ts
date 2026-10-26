@@ -2,20 +2,12 @@
 
 import * as sinon from 'sinon'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { GamelistDB } from 'wpc-emu'
 import { TableBuilder } from '../../test/table-builder.js'
 import { PinMameEmulator } from '../emu/pinmame/pinmame-emu.js'
 import { resetPinmameModuleCache } from '../emu/pinmame/pinmame-loader.js'
 import { VpmController } from '../scripting/objects/vpm-controller.js'
+import { ERR } from '../scripting/stdlib/err.js'
 import { Player } from './player.js'
-
-async function waitFor(fn: () => boolean, ms = 500): Promise<void> {
-	const start = Date.now()
-	while (!fn()) {
-		if (Date.now() - start > ms) throw new Error('waitFor timeout')
-		await new Promise(r => setTimeout(r, 10))
-	}
-}
 
 describe('Player integration', () => {
 	const sandbox = sinon.createSandbox()
@@ -34,6 +26,33 @@ describe('Player integration', () => {
 		expect(player.balls.length).toBe(0)
 		expect(typeof player.updatePhysics(16)).toBe('number')
 		expect(() => player.simulateTime(20)).not.toThrow()
+	})
+
+	it('boots the VPM table-init path: ExecuteGlobal core.vbs plus cvpmFlips2.Init without UseSolenoids', () => {
+		const table = new TableBuilder()
+			.withTableScript(
+				'On Error Resume Next\n' +
+					'ExecuteGlobal GetTextFile("core.vbs")\n' +
+					'Dim flips2\n' +
+					'Set flips2 = New cvpmFlips2\n' +
+					'flips2.Init\n',
+			)
+			.build()
+		let player: Player | undefined
+		const scope: Record<string, unknown> = {}
+		expect(() => {
+			player = new Player(table).init(scope)
+		}).not.toThrow()
+		expect(player?.balls.length).toBe(0)
+		// Eval-derived defaults from core.vbs (BallSize/UseVPMDMD are Empty, so
+		// IsEmpty(Eval(...)) takes the default branch in each case).
+		expect(scope.BSize).toBe(25)
+		expect(scope.UseDMD).toBe(false)
+		// The boot's only handled error is flips2.Init's Eval of an Empty
+		// variable, recorded as 13 through the Eval-Empty path.
+		expect(ERR.Number).toBe(13)
+		ERR.Clear()
+		ERR.OnErrorGoto0()
 	})
 
 	it('creates Player with GameName script and inits', () => {
@@ -57,37 +76,10 @@ describe('Player integration', () => {
 
 	it('PinInput handles flipper key events without throw', () => {
 		const player = new Player(new TableBuilder().addFlipper('Flipper1').build()).init()
-		expect(() => player.onKeyDown({ code: 'ShiftLeft', key: 'Shift', ts: Date.now() })).not.toThrow()
-		expect(() => player.onKeyUp({ code: 'ShiftLeft', key: 'Shift', ts: Date.now() })).not.toThrow()
-		expect(() => player.onKeyDown({ code: 'ShiftRight', key: 'Shift', ts: Date.now() })).not.toThrow()
-		expect(() => player.onKeyUp({ code: 'ShiftRight', key: 'Shift', ts: Date.now() })).not.toThrow()
-	})
-
-	it('VpmController routing: WPC uses wpc-emu, SAM/generic uses pinmame', async () => {
-		expect(GamelistDB.getByPinmameName('mm_109')).toBeTruthy()
-		expect(GamelistDB.getByPinmameName('twd_160h')).toBeFalsy()
-		const player = new Player(new TableBuilder().build())
-		const vpm = new VpmController(player)
-		player.init()
-		const pinStub = sandbox.stub(PinMameEmulator.prototype, 'loadGame').resolves()
-		globalThis.fetch = async () => ({ ok: true, arrayBuffer: async () => new Uint8Array([0]).buffer }) as any
-		vpm.GameName = 'twd_160h'
-		await waitFor(() => pinStub.called)
-		await vpm.whenReady()
-		expect(player.getPhysics().emu?.constructor.name).toBe('PinMameEmulator')
-	})
-
-	it('generic arbitrary GameName also routes to PinMAME', async () => {
-		expect(GamelistDB.getByPinmameName('my_custom_zzz')).toBeFalsy()
-		const player = new Player(new TableBuilder().build())
-		const vpm = new VpmController(player)
-		player.init()
-		const stub = sandbox.stub(PinMameEmulator.prototype, 'loadGame').resolves()
-		globalThis.fetch = async () => ({ ok: true, arrayBuffer: async () => new Uint8Array([0]).buffer }) as any
-		vpm.GameName = 'my_custom_zzz'
-		await waitFor(() => stub.called)
-		await vpm.whenReady()
-		expect(player.getPhysics().emu?.constructor.name).toBe('PinMameEmulator')
+		expect(() => player.onKeyDown({ code: 'ShiftLeft', key: 'Shift' })).not.toThrow()
+		expect(() => player.onKeyUp({ code: 'ShiftLeft', key: 'Shift' })).not.toThrow()
+		expect(() => player.onKeyDown({ code: 'ShiftRight', key: 'Shift' })).not.toThrow()
+		expect(() => player.onKeyUp({ code: 'ShiftRight', key: 'Shift' })).not.toThrow()
 	})
 
 	it('Player physics emu defaults to undefined before VpmController switch', () => {

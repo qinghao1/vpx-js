@@ -1,10 +1,11 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
+import type { Vertex2D, Vertex3D } from '../math/vector.js'
 import type { NudgeHandler } from '../physics/cabinet/nudge-handler.js'
+import { DEFAULT_BALL_SIZE } from '../physics/constants.js'
 import { type AnimationGate, animationGate } from '../util/animation-gate.js'
 import { EventEmitter } from '../util/event-emitter.js'
-import type { Vertex2D, Vertex3D } from '../util/vector.js'
 import type { Ball } from '../vpt/ball/ball.js'
 import type { ItemState } from '../vpt/item-state.js'
 import type { Table } from '../vpt/table/table.js'
@@ -13,6 +14,15 @@ import type { IEmulator } from './iemulator.js'
 import { type AssignKey, keyEventToDirectInputKey } from './key-code.js'
 import { PinInput } from './pin-input.js'
 import { PlayerPhysics } from './player-physics.js'
+
+/** DOM-style key event accepted by {@link Player.onKeyDown} / {@link Player.onKeyUp}. */
+export interface DomKeyEvent {
+	code: string
+	key: string
+	location?: number
+	keyCode?: number
+	which?: number
+}
 
 /** Host-facing game controller: input, physics, animations and state diffing. */
 export class Player extends EventEmitter {
@@ -24,8 +34,6 @@ export class Player extends EventEmitter {
 	private simulatedTimeMs = 0
 	private dirtySet = new Set<string>()
 	private allStateNames: string[] = []
-	private cachedAnimatables: Array<{ getName(): string }> | null = null
-	private cachedMovables: Array<{ getName(): string }> | null = null
 	private frameCount = 0
 
 	public width = 0
@@ -124,7 +132,7 @@ export class Player extends EventEmitter {
 				) {
 					return Reflect.get(target, prop, receiver)
 				}
-				if (typeof prop === 'string' && prop.startsWith('_')) {
+				if (prop.startsWith('_')) {
 					return Reflect.get(target, prop, receiver)
 				}
 				const val = Reflect.get(target, prop, receiver)
@@ -133,16 +141,7 @@ export class Player extends EventEmitter {
 					if (cached) return cached
 					cached = (...args: any[]): unknown => {
 						const res = val.apply(target, args)
-						const key = String(prop)
-						if (
-							!key.startsWith('get') &&
-							!key.startsWith('is') &&
-							!key.startsWith('has') &&
-							key !== '_getPropertyNames' &&
-							key !== '_getTimers'
-						) {
-							player.markDirty(name)
-						}
+						player.markDirty(name)
 						return res
 					}
 					methodCache.set(prop, cached)
@@ -166,40 +165,31 @@ export class Player extends EventEmitter {
 			if (wrapped !== api) (item as any).api = wrapped
 		}
 		for (const collection of Object.values(this.table.collections ?? {})) {
-			for (let i = 0; i < collection.items.length; i++) {
-				const itemName = collection.getItemNames()[i]
+			const itemNames = collection.getItemNames()
+			for (let index = 0; index < collection.items.length; index++) {
+				const itemName = itemNames[index]
 				if (!itemName) continue
 				const item = this.table.items[itemName] as unknown as { getApi?: () => unknown } | undefined
 				const wrapped = item?.getApi?.()
-				if (wrapped) collection.items[i] = wrapped as (typeof collection.items)[number]
+				if (wrapped) collection.items[index] = wrapped as (typeof collection.items)[number]
 			}
 		}
 	}
 
-	private getAnimatables(): Array<{ getName(): string }> {
-		if (this.cachedAnimatables) return this.cachedAnimatables
-		this.cachedAnimatables = (this.table as any).getAnimatables?.() ?? []
-		return this.cachedAnimatables!
-	}
-
-	private getMovables(): Array<{ getName(): string }> {
-		if (this.cachedMovables) return this.cachedMovables
-		this.cachedMovables = (this.table as any).getMovables?.() ?? []
-		return this.cachedMovables!
-	}
-
-	public simulateTime(dTime: number): void {
+	/** Headless driver: steps physics + animations at 60 Hz up to absolute `endMs` (ms, not a delta). */
+	public simulateTime(endMs: number): void {
 		if (!this.isInitialized) throw new Error('Player must be initialized before simulating time!')
-		for (const dt = 1000 / 60; this.simulatedTimeMs <= dTime; this.simulatedTimeMs += dt) {
+		for (const dt = 1000 / 60; this.simulatedTimeMs <= endMs; this.simulatedTimeMs += dt) {
 			this.updatePhysics(this.simulatedTimeMs)
 			this.updateAnimations(this.simulatedTimeMs)
 		}
 	}
 
-	public updatePhysics(dTime?: number): number {
-		const iterations = this.physics.updatePhysics(dTime)
+	/** Advances physics to absolute `timeMs` (ms, not a delta); omitted = real clock. Returns iterations run. */
+	public updatePhysics(timeMs?: number): number {
+		const iterations = this.physics.updatePhysics(timeMs)
 		for (const ball of this.physics.balls) this.markDirty(ball.getName())
-		for (const movable of this.getMovables()) {
+		for (const movable of this.table.getMovables()) {
 			this.markDirty(movable.getName())
 		}
 		return iterations
@@ -209,17 +199,14 @@ export class Player extends EventEmitter {
 		return this.popStates()
 	}
 	public updateAnimations(timeMs: number): void {
-		for (const animatable of this.getAnimatables() as unknown as Array<{
-			getAnimation(): { updateAnimation(timeMsec: number, table: Table): boolean }
-			getName(): string
-		}>) {
+		for (const animatable of this.table.getAnimatables()) {
 			if (animatable.getAnimation().updateAnimation(timeMs, this.table)) {
 				this.markDirty(animatable.getName())
 			}
 		}
 	}
 	public popStates(): ChangedStates<ItemState> {
-		const changed = ChangedStates.claim()
+		const changed = new ChangedStates<ItemState>()
 		this.frameCount++
 		const useFull = this.frameCount % 300 === 0 && this.dirtySet.size < this.allStateNames.length * 0.5
 		if (useFull) {
@@ -238,49 +225,37 @@ export class Player extends EventEmitter {
 		return changed
 	}
 
-	public onKeyUp(e: {
-		code: string
-		key: string
-		ts: number
-		location?: number
-		keyCode?: number
-		which?: number
-	}): void {
-		this.pinInput.onKeyUp(keyEventToDirectInputKey(e as any), e.ts)
+	public onKeyUp(e: DomKeyEvent): void {
+		this.pinInput.onKeyUp(keyEventToDirectInputKey(e))
 	}
-	public onKeyDown(e: {
-		code: string
-		key: string
-		ts: number
-		location?: number
-		keyCode?: number
-		which?: number
-	}): void {
-		this.pinInput.onKeyDown(keyEventToDirectInputKey(e as any), e.ts)
+	public onKeyDown(e: DomKeyEvent): void {
+		this.pinInput.onKeyDown(keyEventToDirectInputKey(e))
 	}
 
-	public createBall(creator: IBallCreationPosition, radius = 25, mass = 1): Ball {
+	public createBall(creator: IBallCreationPosition, radius = DEFAULT_BALL_SIZE, mass = 1): Ball {
 		const ball = this.physics.createBall(creator, this, radius, mass)
+		const name = ball.getName()
 		const api: any = (ball as any).getApi?.()
-		const wrapped = this.wrapSingleApi(api, ball.getName())
+		const wrapped = this.wrapSingleApi(api, name)
 		if (wrapped !== api) (ball as any).api = wrapped
-		this.currentStates[ball.getName()] = ball.getState()
-		this.previousStates[ball.getName()] = ball.getState().clone()
-		this.allStateNames.push(ball.getName())
-		this.markDirty(ball.getName())
+		this.currentStates[name] = ball.getState()
+		this.previousStates[name] = ball.getState().clone()
+		this.allStateNames.push(name)
+		this.markDirty(name)
 		this.emit('ballCreated', ball)
 		return ball
 	}
 
 	public destroyBall(ball: Ball): void {
 		if (!ball) return
+		const name = ball.getName()
 		this.physics.destroyBall(ball)
-		this.currentStates[ball.getName()].release()
-		this.previousStates[ball.getName()].release()
-		delete this.currentStates[ball.getName()]
-		delete this.previousStates[ball.getName()]
-		this.dirtySet.delete(ball.getName())
-		this.allStateNames = this.allStateNames.filter(n => n !== ball.getName())
+		this.currentStates[name].release()
+		this.previousStates[name].release()
+		delete this.currentStates[name]
+		delete this.previousStates[name]
+		this.dirtySet.delete(name)
+		this.allStateNames = this.allStateNames.filter(stateName => stateName !== name)
 		this.emit('ballDestroyed', ball)
 	}
 
@@ -371,9 +346,6 @@ export class ChangedStates<STATE extends ItemState = ItemState> {
 		return true
 	}
 
-	public static claim(): ChangedStates {
-		return new ChangedStates()
-	}
 	public setState(name: string, state: STATE): void {
 		this.changedStates[name] = state
 	}

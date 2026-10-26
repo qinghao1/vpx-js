@@ -1,7 +1,10 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
+
+import { type Vertex2D, Vertex3D } from '../math/vector.js'
 import { CollisionEvent } from '../physics/collision-event.js'
 import {
+	DEFAULT_BALL_SIZE,
 	DEFAULT_STEPTIME,
 	DEFAULT_TABLE_GRAVITY,
 	DEFAULT_TABLE_MAX_SLOPE,
@@ -17,9 +20,9 @@ import { HitQuadtree } from '../physics/hit-quadtree.js'
 import type { MoverObject } from '../physics/mover-object.js'
 import { logger } from '../util/logger.js'
 import { isLowQuality } from '../util/quality.js'
-import { type Vertex2D, Vertex3D } from '../util/vector.js'
 import { Ball } from '../vpt/ball/ball.js'
 import { BallData } from '../vpt/ball/ball-data.js'
+import { BallHit } from '../vpt/ball/ball-hit.js'
 import { BallState } from '../vpt/ball/ball-state.js'
 import type { FlipperMover } from '../vpt/flipper/flipper-mover.js'
 import type { Table } from '../vpt/table/table.js'
@@ -32,12 +35,16 @@ import type { PinInput } from './pin-input.js'
 import type { IBallCreationPosition, Player } from './player.js'
 
 const CLOCK_INIT_THRESHOLD_USEC = 1_000_000
+// Deliberate divergence from upstream: VPinball has no backlog clamp (its 200 ms is an in-loop
+// anti-hang guard on wall time burned, PhysicsEngine.cpp). vpx-js caps catch-up per wall-clock
+// frame instead so a heavy frame cannot spiral into 1 kHz catch-up jank. Explicit-time callers
+// still run full catch-up like upstream.
 const MAX_CATCHUP_USEC = 50 * PHYSICS_STEPTIME
 const MAX_CATCHUP_USEC_LOW = 16 * PHYSICS_STEPTIME
 const MAX_ITER_LOW = 16
 
 /** Core physics loop — 1 kHz collision, timers, movers.
- * @see https://github.com/vpinball/vpinball/blob/master/player.cpp */
+ * @see https://github.com/vpinball/vpinball/blob/master/src/physics/PhysicsEngine.cpp (PhysicsEngine::UpdatePhysics) */
 export class PlayerPhysics {
 	public readonly balls: Ball[] = []
 	public gravity = new Vertex3D()
@@ -46,6 +53,13 @@ export class PlayerPhysics {
 	public contacts: CollisionEvent[] = []
 	public activeBall?: Ball
 	public activeBallBC?: Ball
+	// Intentional divergence from upstream PhysicsEngine.cpp: upstream draws two
+	// independent randoms per cycle (hit-test order ~L679, contact order ~L803/812)
+	// plus a deterministic toggle for ball-ball dedupe (L868). This port drives all
+	// three sites from one deterministic toggle so physics stays reproducible; the
+	// toggle still alternates every substep, preserving upstream's anti-bias intent
+	// (see BallHit.collide). Do not "fix" by adding Math.random() — it would break
+	// determinism with no proven correctness gain.
 	public swapBallCollisionHandling = false
 	public lastPlungerHit = 0
 	public ballControl = false
@@ -133,7 +147,6 @@ export class PlayerPhysics {
 				const t = f.getHitTime()
 				if (Number.isFinite(t) && t > 0 && t < hitTime) hitTime = t
 			}
-			hitTime = Number.isFinite(hitTime) && hitTime > 0 ? hitTime : Number.EPSILON
 			this.recordContacts = true
 			this.contacts.length = 0
 			try {
@@ -176,11 +189,19 @@ export class PlayerPhysics {
 					else ball.hit.calcHitBBox()
 				}
 			}
-			if (this.swapBallCollisionHandling) {
-				for (let i = this.contacts.length - 1; i >= 0; i--)
-					this.contacts[i]?.obj?.contact(this.contacts[i]!, hitTime, this)
-			} else {
-				for (const c of this.contacts) c.obj?.contact(c, hitTime, this)
+			// FIX_PHYSICS (PhysicsEngine.cpp): ball/ball contacts first, then static
+			// ones — each contact cancels what the earlier ones applied to its ball,
+			// so a ball pressed against another ball or a wall cannot climb off.
+			// Deliberate divergence: traversal direction alternates deterministically
+			// each cycle; upstream picks it randomly per cycle (rand_mt_01).
+			for (const ball of this.balls) ball.hit.contactDeltaV.set(0, 0, 0)
+			const lastContact = this.contacts.length - 1
+			for (let pass = 0; pass < 2; pass++) {
+				for (let index = 0; index < this.contacts.length; index++) {
+					const contact = this.contacts[this.swapBallCollisionHandling ? lastContact - index : index]!
+					const isBallContact = contact.obj instanceof BallHit
+					if (isBallContact === (pass === 0)) contact.obj?.contact(contact, hitTime, this)
+				}
 			}
 			for (const c of this.contacts) CollisionEvent.releaseOne(c)
 			this.contacts.length = 0
@@ -194,10 +215,14 @@ export class PlayerPhysics {
 		const initial = time !== undefined ? time * 1000 : Math.floor(this.now() * 1000)
 		if (this.ensureInitialTime(initial, time)) return 0
 		if (this.isPaused) {
+			// Upstream PhysicsEngine only shifts forward (initial > cur): explicit
+			// time going backwards while paused must not rewind the clocks.
 			const delta = initial - this.curPhysicsFrameTime
-			this.startTimeUsec += delta
-			this.nextPhysicsFrameTime += delta
-			this.curPhysicsFrameTime = initial
+			if (delta > 0) {
+				this.startTimeUsec += delta
+				this.nextPhysicsFrameTime += delta
+				this.curPhysicsFrameTime = initial
+			}
 		}
 		const catchUpMax = isLowQuality() ? MAX_CATCHUP_USEC_LOW : MAX_CATCHUP_USEC
 		if (time === undefined && initial - this.curPhysicsFrameTime > catchUpMax) {
@@ -217,7 +242,9 @@ export class PlayerPhysics {
 		}
 		this.scriptPeriod = 0
 		let iterations = 0
-		while (this.curPhysicsFrameTime < initial) {
+		// Stay behind the wall clock by up to one step, like upstream: run a step only once its end reached real time
+		// (`<=` advances explicit-ms callers exactly to the requested time instead of stopping one step short).
+		while (this.nextPhysicsFrameTime <= initial) {
 			if (isLowQuality() && iterations >= MAX_ITER_LOW) {
 				const drift = initial - this.curPhysicsFrameTime
 				this.startTimeUsec += drift
@@ -248,7 +275,8 @@ export class PlayerPhysics {
 		}
 		this.timeMsec = Math.floor((initial - this.startTimeUsec) / 1000)
 		this.fireTimers(TimerMode.OnNewFrame)
-		this.fireTimers(TimerMode.OnGameSync)
+		// Upstream fires -2 only while playing, but -1 on every frame incl. paused.
+		if (!this.isPaused) this.fireTimers(TimerMode.OnGameSync)
 		return iterations
 	}
 
@@ -329,7 +357,7 @@ export class PlayerPhysics {
 		for (const m of this.movers) m.updateVelocities(this)
 	}
 
-	public createBall(ballCreator: IBallCreationPosition, player: Player, radius = 25, mass = 1): Ball {
+	public createBall(ballCreator: IBallCreationPosition, player: Player, radius = DEFAULT_BALL_SIZE, mass = 1): Ball {
 		const data = new BallData(radius, mass, this.table.data?.defaultBulbIntensityScaleOnBall)
 		const id = Ball.idCounter++
 		const state = BallState.claim(`Ball${id}`, ballCreator.getBallCreationPosition(this.table))
