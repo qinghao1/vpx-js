@@ -1,10 +1,14 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
+import { expect } from 'chai'
 import type { Mesh } from 'three'
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import { TableBuilder } from '../../../test/table-builder.js'
 import { ThreeHelper } from '../../../test/three.helper'
 import { NodeBinaryReader } from '../../io/binary-reader.node.js'
+import { Enums } from '../enums.js'
+import type { Mesh as VptMesh } from '../mesh.js'
 import { Table } from '../table/table.js'
 import { TableExporter } from '../table/table-exporter.js'
 
@@ -1703,5 +1707,27 @@ describe('The VPinball kicker generator', () => {
 			[529.690247, 1516.437378, 15.4329],
 		]
 		three.expectVerticesInArray(expectedVertices, kickerMeshVertices, 6)
+	})
+
+	it('should rotate gottlieb and cup2 kicker meshes by orientation', () => {
+		for (const kickerType of [Enums.KickerType.KickerGottlieb, Enums.KickerType.KickerCup2]) {
+			const flatTable = new TableBuilder().addKicker('kicker', { kickerType, orientation: 0 }).build()
+			const rotatedTable = new TableBuilder().addKicker('kicker', { kickerType, orientation: 45 }).build()
+			const flat = flatTable.kickers.kicker.getMeshes<VptMesh>(flatTable).kicker.mesh.vertices[0]
+			const rotated = rotatedTable.kickers.kicker.getMeshes<VptMesh>(rotatedTable).kicker.mesh.vertices[0]
+			expect([rotated.x, rotated.y]).to.not.deep.equal([flat.x, flat.y])
+		}
+	})
+
+	it('should not rotate hole kicker meshes by orientation', () => {
+		const flatTable = new TableBuilder()
+			.addKicker('kicker', { kickerType: Enums.KickerType.KickerHole, orientation: 0 })
+			.build()
+		const rotatedTable = new TableBuilder()
+			.addKicker('kicker', { kickerType: Enums.KickerType.KickerHole, orientation: 45 })
+			.build()
+		const flat = flatTable.kickers.kicker.getMeshes<VptMesh>(flatTable).kicker.mesh.vertices[0]
+		const rotated = rotatedTable.kickers.kicker.getMeshes<VptMesh>(rotatedTable).kicker.mesh.vertices[0]
+		expect([rotated.x, rotated.y]).to.deep.equal([flat.x, flat.y])
 	})
 })

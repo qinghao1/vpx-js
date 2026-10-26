@@ -7,7 +7,9 @@ import sinonChai from 'sinon-chai'
 import { ThreeHelper } from '../../../test/three.helper'
 import { Player } from '../../game/player.js'
 import { NodeBinaryReader } from '../../io/binary-reader.node.js'
+import type { ReadResult, Storage } from '../../io/ole-doc.js'
 import { Table } from '../table/table.js'
+import { BumperData } from './bumper.js'
 
 chai.use((sinonChai as any).default ?? sinonChai)
 const three = new ThreeHelper()
@@ -100,20 +102,66 @@ describe('The VPinball bumper API', () => {
 		expect(bumper.getState().ringOffset).to.be.closeTo(-8.33, 0.01)
 	})
 
-	it('should not animate the bumper when the ring is invisible', () => {
+	it('should animate the bumper even when the ring is invisible', () => {
 		const bumper = table.bumpers.Bumper1
 
 		bumper.getApi().RingVisible = false
 		bumper.getApi().PlayHit()
 
-		player.updatePhysics(10)
+		player.simulateTime(10)
 		expect(bumper.getState().ringOffset).to.equal(0)
-		player.updatePhysics(20)
-		expect(bumper.getState().ringOffset).to.equal(0)
+
+		player.simulateTime(20)
+		expect(bumper.getState().ringOffset).to.be.closeTo(-8.33, 0.01)
 	})
 
-	it('should not crash when executing unused APIs', () => {
+	it('should expose the shared ItemApi contract', () => {
+		// Single contract test for ItemApi.InterfaceSupportsErrorInfo — the shared
+		// base implementation applies to every item API, so no per-item copies.
 		const bumper = table.bumpers.Bumper1.getApi()
 		expect(bumper.InterfaceSupportsErrorInfo({})).to.equal(false)
+	})
+})
+
+describe('The legacy bumper visibility tags', () => {
+	async function loadWithTag(tag: string, value: number): Promise<BumperData> {
+		const record = new Uint8Array(20)
+		const view = new DataView(record.buffer)
+		view.setInt32(0, 8, true)
+		for (let i = 0; i < 4; i++) record[4 + i] = tag.charCodeAt(i)
+		view.setInt32(8, value, true)
+		view.setInt32(12, 4, true)
+		record.set([0x45, 0x4e, 0x44, 0x42], 16) // ENDB
+		const storage = {
+			async streamFiltered(
+				_name: string,
+				_offset: number,
+				next: (result: ReadResult) => Promise<number | null>,
+			): Promise<void> {
+				let pos = 0
+				while (pos < record.length) {
+					const consumed = await next({ data: record.subarray(pos), storageOffset: pos })
+					if (consumed === null) break
+					pos += consumed
+				}
+			},
+		}
+		return BumperData.fromStorage(storage as unknown as Storage, 'Bumper')
+	}
+
+	it('should apply BVIS to all four visibilities like upstream', async () => {
+		const data = await loadWithTag('BVIS', 0)
+		expect(data.isCapVisible).to.equal(false)
+		expect(data.isBaseVisible).to.equal(false)
+		expect(data.isRingVisible).to.equal(false)
+		expect(data.isSkirtVisible).to.equal(false)
+	})
+
+	it('should apply BSVS to base, ring and skirt but not the cap', async () => {
+		const data = await loadWithTag('BSVS', 0)
+		expect(data.isCapVisible).to.equal(true)
+		expect(data.isBaseVisible).to.equal(false)
+		expect(data.isRingVisible).to.equal(false)
+		expect(data.isSkirtVisible).to.equal(false)
 	})
 })

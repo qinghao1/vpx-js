@@ -1,20 +1,25 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import type { Meshes, RenderInfo } from '../../game/irenderable.js'
+import type { Meshes, RenderInfo } from '../../game/interfaces.js'
+import { Matrix3D } from '../../math/matrix.js'
+import { Vertex2D, Vertex3D } from '../../math/vector.js'
 import type { IRenderApi } from '../../render/irender-api.js'
 import { CatmullCurve3D } from '../../util/catmull-curve.js'
-import { Matrix3D } from '../../util/matrix.js'
 import { isLowQuality } from '../../util/quality.js'
-import { Vertex2D, Vertex3D } from '../../util/vector.js'
 import { RenderVertex3D, Vertex3DNoTex2 } from '../../util/vertex.js'
 import { DragPoint } from '../dragpoint.js'
 import { Enums } from '../enums.js'
 import { ItemUpdater } from '../item-updater.js'
+import type { Material } from '../material.js'
 import { Mesh } from '../mesh.js'
 import type { Table } from '../table/table.js'
-import type { RampData } from './ramp-data.js'
-import type { RampState } from './ramp-state.js'
+import type { RampData, RampState } from './ramp.js'
+
+/** Single source for ramp transparent-mesh selection (initial build and Type-change path). */
+export function isTransparentRampMaterial(m?: Material): boolean {
+	return !m || (m.isOpacityActive && m.opacity < 0.999)
+}
 
 export interface RampMeshes {
 	wire1?: Mesh
@@ -34,6 +39,14 @@ export interface RampVertexResult {
 	pMiddlePoints: Vertex2D[]
 	rgvLocal: Vertex2D[]
 }
+
+const HABITRAIL_TYPES: ReadonlyArray<number | undefined> = [
+	Enums.RampType.RampType4Wire,
+	Enums.RampType.RampType1Wire,
+	Enums.RampType.RampType2Wire,
+	Enums.RampType.RampType3WireLeft,
+	Enums.RampType.RampType3WireRight,
+]
 
 /** Ramp mesh generator. */
 export class RampMeshGenerator {
@@ -218,14 +231,8 @@ export class RampMeshGenerator {
 				const quad = [
 					i * numSegments + j,
 					j !== numSegments - 1 ? i * numSegments + j + 1 : i * numSegments,
-					i !== numRings - 1
-						? j !== numSegments - 1
-							? (i + 1) * numSegments + j + 1
-							: (i + 1) * numSegments
-						: j !== numSegments - 1
-							? j + 1
-							: 0,
-					i !== numRings - 1 ? (i + 1) * numSegments + j : j,
+					j !== numSegments - 1 ? (i + 1) * numSegments + j + 1 : (i + 1) * numSegments,
+					(i + 1) * numSegments + j,
 				]
 				const offs = (i * numSegments + j) * 6
 				indices[offs] = quad[0]!
@@ -335,7 +342,8 @@ export class RampMeshGenerator {
 			const dy = vprev.y - vmiddle.y
 			currentLength = currentLength + Math.sqrt(dx * dx + dy * dy)
 
-			const percentage = currentLength / totalLength
+			// Degenerate curves (all drag points coincident) have zero length; pin to the ramp start.
+			const percentage = totalLength !== 0 ? currentLength / totalLength : 0
 			let currentWidth = percentage * (this.state.widthTop - this.state.widthBottom) + this.state.widthBottom
 			const height = vmiddle.z + percentage * (topHeight - bottomHeight) + bottomHeight
 			ppheight[i] = height
@@ -411,13 +419,7 @@ export class RampMeshGenerator {
 	}
 
 	private isHabitrail(): boolean {
-		return [
-			Enums.RampType.RampType4Wire,
-			Enums.RampType.RampType1Wire,
-			Enums.RampType.RampType2Wire,
-			Enums.RampType.RampType3WireLeft,
-			Enums.RampType.RampType3WireRight,
-		].includes(this.state.type)
+		return HABITRAIL_TYPES.includes(this.state.type)
 	}
 
 	private assignHeightToControlPoint(v: RenderVertex3D, height: number): void {
@@ -442,7 +444,7 @@ export class RampUpdater extends ItemUpdater<RampState> {
 		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
 		table: Table,
 	): void {
-		Object.assign(this.state, state)
+		this.state.mergeFrom(state)
 		this.applyVisibility(obj, state, renderApi)
 		this.applyMaterial(obj, state.material, state.texture, renderApi, table)
 		if (this.mustUpdateGeometry(state)) {
@@ -456,11 +458,11 @@ export class RampUpdater extends ItemUpdater<RampState> {
 		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
 		table: Table,
 	): void {
-		const r = this.meshGenerator.generateMeshes(table)
-		for (const k of ['wire1', 'wire2', 'wire3', 'wire4', 'floor', 'left', 'right'] as const) {
-			const mesh = r[k]
+		const generated = this.meshGenerator.generateMeshes(table)
+		for (const key of ['wire1', 'wire2', 'wire3', 'wire4', 'floor', 'left', 'right'] as const) {
+			const mesh = generated[key]
 			if (!mesh) continue
-			const node = renderApi.findInGroup(obj, `ramp.${k}-${this.state.getName()}`)
+			const node = renderApi.findInGroup(obj, `ramp.${key}-${this.state.getName()}`)
 			renderApi.applyMeshToNode(mesh.transform(Matrix3D.RIGHT_HANDED), node)
 		}
 	}
@@ -471,22 +473,22 @@ export class RampUpdater extends ItemUpdater<RampState> {
 		table: Table,
 	): void {
 		const mat = table.getMaterial(this.state.material)
-		const meshes = this.meshGenerator.getMeshes<GEOMETRY>(!mat || mat.isOpacityActive, table)
+		const meshes = this.meshGenerator.getMeshes<GEOMETRY>(isTransparentRampMaterial(mat), table)
 		renderApi.removeChildren(group)
 		for (const info of Object.values<RenderInfo<GEOMETRY>>(meshes)) {
 			renderApi.addChildToParent(group, renderApi.createMesh(info))
 		}
 	}
 
-	private mustUpdateGeometry(s: RampState): boolean {
+	private mustUpdateGeometry(state: RampState): boolean {
 		return (
-			s.type !== undefined ||
-			s.leftWallHeightVisible !== undefined ||
-			s.rightWallHeightVisible !== undefined ||
-			s.heightBottom !== undefined ||
-			s.heightTop !== undefined ||
-			s.widthTop !== undefined ||
-			s.widthBottom !== undefined
+			state.type !== undefined ||
+			state.leftWallHeightVisible !== undefined ||
+			state.rightWallHeightVisible !== undefined ||
+			state.heightBottom !== undefined ||
+			state.heightTop !== undefined ||
+			state.widthTop !== undefined ||
+			state.widthBottom !== undefined
 		)
 	}
 }

@@ -4,14 +4,13 @@
 import { MathUtils } from 'three'
 import { Event } from '../../game/event.js'
 import type { EventProxy } from '../../game/event-proxy.js'
-import type { IAnimation } from '../../game/ianimatable.js'
+import type { IAnimation } from '../../game/interfaces.js'
 import type { PlayerPhysics } from '../../game/player-physics.js'
+import { Vertex3D } from '../../math/vector.js'
 import type { CollisionEvent } from '../../physics/collision-event.js'
 import { HitCircle } from '../../physics/hit-circle.js'
-import { Vertex3D } from '../../util/vector.js'
 import type { Table } from '../table/table.js'
-import type { BumperData } from './bumper-data.js'
-import type { BumperState } from './bumper-state.js'
+import type { BumperData, BumperState } from './bumper.js'
 
 /** Bumper animation. @see https://github.com/vpinball/vpinball/blob/master/bumper.cpp */
 export class BumperAnimation implements IAnimation {
@@ -37,9 +36,7 @@ export class BumperAnimation implements IAnimation {
 	}
 
 	set enableSkirtAnimation(value: boolean) {
-		if (this._enableSkirtAnimation !== value && !value) {
-			this.updateSkirt = true
-		}
+		if (this._enableSkirtAnimation && !value) this.updateSkirt = true
 		this._enableSkirtAnimation = value
 	}
 
@@ -53,9 +50,8 @@ export class BumperAnimation implements IAnimation {
 		const prevRingOffset = this.state.ringOffset
 		const prevSkirtRotX = this.state.skirtRotX
 		const prevSkirtRotY = this.state.skirtRotY
-		const state = this.hitEvent ? 1 : 0
-		this.updateRingAnimation(state, diff, table)
-		this.updateSkirtAnimation(state, diff)
+		this.updateRingAnimation(this.hitEvent, diff, table)
+		this.updateSkirtAnimation(this.hitEvent, diff)
 		return (
 			this.state.ringOffset !== prevRingOffset ||
 			this.state.skirtRotX !== prevSkirtRotX ||
@@ -63,9 +59,9 @@ export class BumperAnimation implements IAnimation {
 		)
 	}
 
-	private updateRingAnimation(state: number, diff: number, table: Table) {
+	private updateRingAnimation(hit: boolean, diff: number, table: Table) {
 		const limit = this.data.ringDropOffset + this.data.heightScale * 0.5 * table.getScaleZ()
-		if (state === 1) {
+		if (hit) {
 			this.ringAnimate = true
 			this.ringDown = true
 			this.hitEvent = false
@@ -89,9 +85,9 @@ export class BumperAnimation implements IAnimation {
 		}
 	}
 
-	private updateSkirtAnimation(state: number, diff: number) {
+	private updateSkirtAnimation(hit: boolean, diff: number) {
 		if (this._enableSkirtAnimation) {
-			if (state === 1) {
+			if (hit) {
 				this.doSkirtAnimation = true
 				this.updateSkirtState()
 				this.skirtCounter = 0

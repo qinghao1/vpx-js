@@ -2,8 +2,7 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { EventProxy } from '../../game/event-proxy.js'
-import type { IPlayable } from '../../game/iplayable.js'
-import type { IScriptable } from '../../game/iscriptable.js'
+import type { IPlayable, IScriptable } from '../../game/interfaces.js'
 import type { Player } from '../../game/player.js'
 import { BiffParser } from '../../io/biff-parser.js'
 import type { Storage } from '../../io/ole-doc.js'
@@ -15,6 +14,7 @@ import type { Table } from '../table/table.js'
 import type { TimerHit } from '../timer/timer-hit.js'
 
 const BOOL_MAP: Record<string, string> = { EVNT: 'fireEvents', SSNG: 'stopSingleEvents', GREL: 'groupElements' }
+const INDEX_PATTERN = /^\d+$/
 
 /** Collection data.
  * @see https://github.com/vpinball/vpinball/blob/master/collection.cpp */
@@ -25,9 +25,9 @@ export class CollectionData extends ItemData {
 	public stopSingleEvents = false
 
 	public static async fromStorage(storage: Storage, itemName: string): Promise<CollectionData> {
-		const d = new CollectionData(itemName)
-		await storage.streamFiltered(itemName, 0, BiffParser.stream(d.fromTag.bind(d)))
-		return d
+		const data = new CollectionData(itemName)
+		await storage.streamFiltered(itemName, 0, BiffParser.stream(data.fromTag.bind(data)))
+		return data
 	}
 
 	private constructor(itemName: string) {
@@ -58,9 +58,8 @@ export class CollectionApi extends ItemApi<CollectionData> implements Iterable<I
 		return new Proxy<CollectionApi>(new CollectionApi(data, items, events, player, table), {
 			get: (api, prop) => {
 				if (typeof prop === 'symbol') return Reflect.get(api, prop)
-				if (prop === 'length') return api.items[prop as unknown as number]
-				const intProp = parseInt(prop as string, 10)
-				if (!Number.isNaN(intProp)) return api.items[intProp]
+				if (prop === 'length') return api.items.length
+				if (INDEX_PATTERN.test(prop)) return api.items[Number(prop)]
 				return Reflect.get(api, prop)
 			},
 			set: (api, prop, value) => {
@@ -68,9 +67,8 @@ export class CollectionApi extends ItemApi<CollectionData> implements Iterable<I
 					Reflect.set(api, prop, value)
 					return true
 				}
-				const intProp = parseInt(prop as string, 10)
 				/* istanbul ignore next */
-				if (!Number.isNaN(intProp))
+				if (INDEX_PATTERN.test(prop))
 					throw new Error('Setting a new child of a collection by property is not supported.')
 				Reflect.set(api, prop, value)
 				return true
@@ -92,12 +90,19 @@ export class CollectionApi extends ItemApi<CollectionData> implements Iterable<I
 		return []
 	}
 
-	public [Symbol.iterator](): IterableIterator<ItemApi<ItemData>> {
-		return this.items[Symbol.iterator]()
+	get Count(): number {
+		return this.items.length
 	}
 
-	protected _getPropertyNames(): string[] {
-		return Object.getOwnPropertyNames(CollectionApi.prototype)
+	public Item(index: number): ItemApi<ItemData> {
+		if (!Number.isInteger(index) || index < 0 || index >= this.items.length) {
+			throw new RangeError(`Collection index out of bounds: ${index}`)
+		}
+		return this.items[index]
+	}
+
+	public [Symbol.iterator](): IterableIterator<ItemApi<ItemData>> {
+		return this.items[Symbol.iterator]()
 	}
 }
 

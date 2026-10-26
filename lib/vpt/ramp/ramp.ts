@@ -2,26 +2,23 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { EventProxy } from '../../game/event-proxy.js'
-import type { IHittable } from '../../game/ihittable.js'
-import type { IRenderable, Meshes } from '../../game/irenderable.js'
-import type { IScriptable } from '../../game/iscriptable.js'
+import type { IHittable, IRenderable, IScriptable, Meshes } from '../../game/interfaces.js'
 import type { Player } from '../../game/player.js'
 import { BiffParser } from '../../io/biff-parser.js'
 import type { Storage } from '../../io/ole-doc.js'
+import { Vertex2D } from '../../math/vector.js'
 import type { HitObject } from '../../physics/hit-object.js'
-import { Vertex2D } from '../../util/vector.js'
 import { handleBiffTag } from '../biff-helper.js'
-import { DragPoint } from '../dragpoint.js'
+import { type DragPoint, dragPointNestedTag } from '../dragpoint.js'
 import { Enums } from '../enums.js'
 import { Item } from '../item.js'
 import { ItemApi } from '../item-api.js'
 import { type IPhysicalData, ItemData } from '../item-data.js'
 import { ItemState } from '../item-state.js'
 import { Mesh } from '../mesh.js'
-import { omitEqual } from '../state-helpers.js'
 import type { Table } from '../table/table.js'
 import { RampHitGenerator } from './ramp-physics.js'
-import { RampMeshGenerator, RampUpdater } from './ramp-view.js'
+import { isTransparentRampMaterial, RampMeshGenerator, RampUpdater } from './ramp-view.js'
 
 const FLOAT_MAP: Record<string, string> = {
 	HTBT: 'heightBottom',
@@ -41,6 +38,7 @@ const FLOAT_MAP: Record<string, string> = {
 	RADX: 'wireDistanceX',
 	RADY: 'wireDistanceY',
 }
+const INT_MAP: Record<string, string> = { TYPE: 'rampType', ALGN: 'imageAlignment' }
 const BOOL_MAP: Record<string, string> = {
 	IMGW: 'imageWalls',
 	HTEV: 'hitEvent',
@@ -84,23 +82,15 @@ export class RampData extends ItemData implements IPhysicalData {
 	public wireDistanceY = 88
 
 	public static async fromStorage(storage: Storage, itemName: string): Promise<RampData> {
-		const d = new RampData(itemName)
-		await storage.streamFiltered(itemName, 4, RampData.createStreamHandler(d))
-		if (d.widthTop === 0 && d.widthBottom > 0) d.widthTop = 0.1
-		if (d.widthBottom === 0 && d.widthTop > 0) d.widthBottom = 0.1
-		return d
+		const data = new RampData(itemName)
+		await storage.streamFiltered(itemName, 4, RampData.createStreamHandler(data))
+		return data
 	}
 
-	private static createStreamHandler(d: RampData) {
-		d.dragPoints = []
-		return BiffParser.stream(d.fromTag.bind(d), {
-			nestedTags: {
-				DPNT: {
-					onStart: () => new DragPoint(),
-					onTag: dp => dp.fromTag.bind(dp),
-					onEnd: dp => d.dragPoints.push(dp),
-				},
-			},
+	private static createStreamHandler(data: RampData) {
+		data.dragPoints = []
+		return BiffParser.stream(data.fromTag.bind(data), {
+			nestedTags: { DPNT: dragPointNestedTag(data) },
 		})
 	}
 
@@ -109,17 +99,10 @@ export class RampData extends ItemData implements IPhysicalData {
 	}
 
 	private async fromTag(buffer: Uint8Array, tag: string, _offset: number, len: number): Promise<number> {
-		if (tag === 'TYPE') {
-			this.rampType = this.getInt(buffer)
-			return 0
-		}
-		if (tag === 'ALGN') {
-			this.imageAlignment = this.getInt(buffer)
-			return 0
-		}
 		if (
 			handleBiffTag(this, tag, buffer, len, {
 				float: FLOAT_MAP,
+				int: INT_MAP,
 				bool: BOOL_MAP,
 				string: STRING_MAP,
 			})
@@ -185,70 +168,6 @@ export class RampState extends ItemState {
 		state.depthBias = depthBias
 		state.isVisible = isVisible
 		return state
-	}
-
-	public clone(): RampState {
-		return RampState.claim(
-			this.name,
-			this.heightBottom,
-			this.heightTop,
-			this.widthBottom,
-			this.widthTop,
-			this.leftWallHeight,
-			this.rightWallHeight,
-			this.leftWallHeightVisible,
-			this.rightWallHeightVisible,
-			this.type,
-			this.material,
-			this.texture,
-			this.textureAlignment,
-			this.hasWallImage,
-			this.depthBias,
-			this.isVisible,
-		)
-	}
-
-	public diff(state: RampState): RampState {
-		const d = this.clone()
-		omitEqual(d, state, 'heightBottom')
-		omitEqual(d, state, 'heightTop')
-		omitEqual(d, state, 'widthBottom')
-		omitEqual(d, state, 'widthTop')
-		omitEqual(d, state, 'leftWallHeight')
-		omitEqual(d, state, 'rightWallHeight')
-		omitEqual(d, state, 'leftWallHeightVisible')
-		omitEqual(d, state, 'rightWallHeightVisible')
-		omitEqual(d, state, 'depthBias')
-		omitEqual(d, state, 'material')
-		omitEqual(d, state, 'texture')
-		omitEqual(d, state, 'textureAlignment')
-		omitEqual(d, state, 'hasWallImage')
-		omitEqual(d, state, 'type')
-		omitEqual(d, state, 'isVisible')
-		return d
-	}
-
-	public release(): void {}
-
-	public equals(state: RampState): boolean {
-		if (!state) return false
-		return (
-			state.heightBottom === this.heightBottom &&
-			state.heightTop === this.heightTop &&
-			state.widthBottom === this.widthBottom &&
-			state.widthTop === this.widthTop &&
-			state.leftWallHeight === this.leftWallHeight &&
-			state.rightWallHeight === this.rightWallHeight &&
-			state.leftWallHeightVisible === this.leftWallHeightVisible &&
-			state.rightWallHeightVisible === this.rightWallHeightVisible &&
-			state.depthBias === this.depthBias &&
-			state.material === this.material &&
-			state.texture === this.texture &&
-			state.textureAlignment === this.textureAlignment &&
-			state.hasWallImage === this.hasWallImage &&
-			state.type === this.type &&
-			state.isVisible === this.isVisible
-		)
 	}
 }
 
@@ -380,10 +299,12 @@ export class RampApi extends ItemApi<RampData> {
 		this.data.scatter = v
 	}
 	get Collidable() {
-		return this.hits[0].isEnabled
+		const firstHit = this.hits[0]
+		return firstHit ? firstHit.isEnabled : this.data.isCollidable
 	}
 	set Collidable(v) {
-		if (v !== this.Collidable) for (const hit of this.hits) hit.isEnabled = v
+		if (this.hits.length === 0) this.data.isCollidable = v
+		else if (v !== this.Collidable) for (const hit of this.hits) hit.isEnabled = v
 	}
 	get HasHitEvent() {
 		return this.data.hitEvent
@@ -447,14 +368,6 @@ export class RampApi extends ItemApi<RampData> {
 	set OverwritePhysics(v) {
 		this.data.overwritePhysics = v
 	}
-
-	public InterfaceSupportsErrorInfo(_riid: unknown): boolean {
-		return false
-	}
-
-	protected _getPropertyNames(): string[] {
-		return Object.getOwnPropertyNames(RampApi.prototype)
-	}
 }
 
 /** Ramp item. @see https://github.com/vpinball/vpinball/blob/master/ramp.cpp */
@@ -490,7 +403,8 @@ export class Ramp extends Item<RampData> implements IRenderable<RampState>, IHit
 			data.imageAlignment,
 			data.imageWalls,
 			data.depthBias,
-			data.isVisible && data.widthTop > 0 && data.widthBottom > 0,
+			// Upstream skips rendering only when both widths are exactly 0 (Render: widthbottom == 0 && widthtop == 0).
+			data.isVisible && (data.widthTop !== 0 || data.widthBottom !== 0),
 		)
 		this.meshGenerator = new RampMeshGenerator(data, this.state)
 		this.hitGenerator = new RampHitGenerator(data, this.meshGenerator)
@@ -503,8 +417,7 @@ export class Ramp extends Item<RampData> implements IRenderable<RampState>, IHit
 
 	public getMeshes<GEOMETRY>(table: Table): Meshes<GEOMETRY> {
 		const material = table.getMaterial(this.data.szMaterial)
-		const isTransparent = !material || (material.isOpacityActive && material.opacity < 0.999)
-		return this.meshGenerator.getMeshes(isTransparent, table)
+		return this.meshGenerator.getMeshes(isTransparentRampMaterial(material), table)
 	}
 
 	public setupPlayer(player: Player, table: Table): void {
@@ -535,9 +448,7 @@ export class Ramp extends Item<RampData> implements IRenderable<RampState>, IHit
 
 	public getSurfaceHeight(x: number, y: number, table: Table): number {
 		const vVertex = this.meshGenerator.getCentralCurve(table)
-		let iSeg: number
-		let vOut: Vertex2D
-		;[vOut, iSeg] = Mesh.closestPointOnPolygon(vVertex, new Vertex2D(x, y), false)
+		const [vOut, iSeg] = Mesh.closestPointOnPolygon(vVertex, new Vertex2D(x, y), false)
 		if (iSeg === -1) return 0
 		let totalLength = 0
 		let startLength = 0
@@ -546,15 +457,16 @@ export class Ramp extends Item<RampData> implements IRenderable<RampState>, IHit
 			const vDx = vVertex[i2]!.x - vVertex[i2 - 1]!.x
 			const vDy = vVertex[i2]!.y - vVertex[i2 - 1]!.y
 			const vLen = Math.sqrt(vDx * vDx + vDy * vDy)
-			if (i2 <= iSeg) startLength = startLength + vLen
-			totalLength = totalLength + vLen
+			if (i2 <= iSeg) startLength += vLen
+			totalLength += vLen
 		}
 		const dx = vOut.x - vVertex[iSeg]!.x
 		const dy = vOut.y - vVertex[iSeg]!.y
 		const len = Math.sqrt(dx * dx + dy * dy)
-		startLength = startLength + len
+		startLength += len
 		const topHeight = this.data.heightTop + table.getTableHeight()
 		const bottomHeight = this.data.heightBottom + table.getTableHeight()
-		return (vVertex[iSeg]?.z ?? 0) + (startLength / totalLength) * (topHeight - bottomHeight) + bottomHeight
+		const ratio = totalLength !== 0 ? startLength / totalLength : 0
+		return (vVertex[iSeg]?.z ?? 0) + ratio * (topHeight - bottomHeight) + bottomHeight
 	}
 }

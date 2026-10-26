@@ -6,11 +6,13 @@ import { expect } from 'chai'
 import sinonChai from 'sinon-chai'
 import { TableBuilder } from '../../../test/table-builder.js'
 import { ThreeHelper } from '../../../test/three.helper'
+import { EventProxy } from '../../game/event-proxy.js'
 import { Player } from '../../game/player.js'
 import { NodeBinaryReader } from '../../io/binary-reader.node.js'
 import { Enums } from '../enums.js'
 import { Table } from '../table/table.js'
-import type { RampState } from './ramp-state.js'
+import type { RampState } from './ramp.js'
+import { RampApi } from './ramp.js'
 
 chai.use((sinonChai as any).default ?? sinonChai)
 const three = new ThreeHelper()
@@ -136,10 +138,75 @@ describe('The VPinball ramp API', () => {
 		expect(state.isVisible).to.equal(false)
 	})
 
-	it('should not crash when executing unused APIs', () => {
+	it('should toggle hit objects when setting Collidable', () => {
+		const table = new TableBuilder().addMaterial('mat').addRamp('ramp').build()
+		new Player(table).init()
+		const item = table.ramps.ramp
+		const ramp = item.getApi()
+
+		expect(item.getHitShapes().length).to.be.above(0)
+		ramp.Collidable = false
+		expect(ramp.Collidable).to.equal(false)
+		expect(item.getHitShapes().every(hit => !hit.isEnabled)).to.equal(true)
+
+		ramp.Collidable = true
+		expect(ramp.Collidable).to.equal(true)
+		expect(item.getHitShapes().every(hit => hit.isEnabled)).to.equal(true)
+	})
+
+	it('should fall back to data when there are no hit objects', () => {
+		const table = new TableBuilder().addMaterial('mat').addRamp('ramp').build()
+		const player = new Player(table).init()
+		const item = table.ramps.ramp
+		const api = new RampApi(item.getState(), [], item.data, new EventProxy(item), player, table)
+
+		expect(api.Collidable).to.equal(true)
+		api.Collidable = false
+		expect(api.Collidable).to.equal(false)
+		expect(item.data.isCollidable).to.equal(false)
+	})
+
+	it('should allow unknown image names but reject HDR textures', () => {
 		const table = new TableBuilder().addMaterial('mat').addRamp('ramp').build()
 		new Player(table).init()
 		const ramp = table.ramps.ramp.getApi()
-		expect(ramp.InterfaceSupportsErrorInfo({})).to.equal(false)
+
+		expect(() => {
+			ramp.Image = 'does_not_exist_in_table'
+		}).not.to.throw()
+		expect(ramp.Image).to.equal('does_not_exist_in_table')
+
+		table.textures.hdr_tex = {
+			isHdr: () => true,
+		} as any
+		expect(() => {
+			ramp.Image = 'hdr_tex'
+		}).to.throw('Cannot use a HDR image (.exr/.hdr) here')
+	})
+
+	it('should stay visible with a single zero width and hide only when both are zero', () => {
+		const tapered = new TableBuilder().addRamp('ramp', { widthTop: 0, widthBottom: 75 }).build()
+		new Player(tapered).init()
+		expect(tapered.ramps.ramp.getState().isVisible).to.equal(true)
+		expect(tapered.ramps.ramp.getApi().WidthTop).to.equal(0)
+
+		const flat = new TableBuilder().addRamp('ramp', { widthTop: 0, widthBottom: 0 }).build()
+		new Player(flat).init()
+		expect(flat.ramps.ramp.getState().isVisible).to.equal(false)
+	})
+
+	it('should generate finite meshes for a zero width without clamping data', () => {
+		const table = new TableBuilder().addRamp('ramp', { widthTop: 0, widthBottom: 75 }).build()
+		new Player(table).init()
+		for (const info of Object.values(table.ramps.ramp.getMeshes(table))) {
+			for (const v of info.mesh!.vertices) {
+				expect(v.x).to.be.finite
+				expect(v.y).to.be.finite
+				expect(v.z).to.be.finite
+				expect(v.nx).to.be.finite
+				expect(v.ny).to.be.finite
+				expect(v.nz).to.be.finite
+			}
+		}
 	})
 })

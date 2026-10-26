@@ -2,22 +2,20 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { EventProxy } from '../../game/event-proxy.js'
-import type { IHittable } from '../../game/ihittable.js'
-import type { IRenderable, Meshes } from '../../game/irenderable.js'
-import type { IScriptable } from '../../game/iscriptable.js'
+import type { IHittable, IRenderable, IScriptable, Meshes } from '../../game/interfaces.js'
 import type { Player } from '../../game/player.js'
 import { BiffParser } from '../../io/biff-parser.js'
 import type { Storage } from '../../io/ole-doc.js'
+import { Matrix3D } from '../../math/matrix.js'
 import type { HitObject } from '../../physics/hit-object.js'
-import { Matrix3D } from '../../util/matrix.js'
 import { handleBiffTag } from '../biff-helper.js'
-import { DragPoint } from '../dragpoint.js'
+import { type DragPoint, dragPointNestedTag } from '../dragpoint.js'
+import { Enums } from '../enums.js'
 import { Item } from '../item.js'
 import { ItemApi } from '../item-api.js'
 import { type IPhysicalData, ItemData } from '../item-data.js'
 import { ItemState } from '../item-state.js'
 import type { Material } from '../material.js'
-import { omitEqual } from '../state-helpers.js'
 import type { Table } from '../table/table.js'
 import { SurfaceHitGenerator } from './surface-physics.js'
 import { SurfaceMeshGenerator, SurfaceUpdater } from './surface-view.js'
@@ -46,7 +44,6 @@ const FLOAT_MAP: Record<string, string> = {
 	ELFO: 'elasticityFalloff',
 	WFCT: 'friction',
 	WSCT: 'scatter',
-	DILI: 'disableLightingTop',
 	DILT: 'disableLightingTop',
 	DILB: 'disableLightingBelow',
 }
@@ -54,10 +51,13 @@ const STRING_MAP: Record<string, string> = {
 	IMAG: 'szImage',
 	SIMG: 'szSideImage',
 	MAPH: 'szPhysicsMaterial',
+	MATR: 'szTopMaterial',
+	TMTR: 'szSideMaterial',
+	SMAT: 'szSlingShotMaterial',
 }
 
 /** Surface data.
- * @see https://github.com/vpinball/vpinball/blob/master/surface.cpp */
+ * @see https://github.com/vpinball/vpinball/blob/master/src/parts/surface.cpp */
 export class SurfaceData extends ItemData implements IPhysicalData {
 	public hitEvent = false
 	public isDroppable = false
@@ -92,21 +92,15 @@ export class SurfaceData extends ItemData implements IPhysicalData {
 	public isDisabled = false
 
 	public static async fromStorage(storage: Storage, itemName: string): Promise<SurfaceData> {
-		const d = new SurfaceData(itemName)
-		await storage.streamFiltered(itemName, 4, SurfaceData.createStreamHandler(d))
-		return d
+		const data = new SurfaceData(itemName)
+		await storage.streamFiltered(itemName, 4, SurfaceData.createStreamHandler(data))
+		return data
 	}
 
-	private static createStreamHandler(d: SurfaceData) {
-		d.dragPoints = []
-		return BiffParser.stream(d.fromTag.bind(d), {
-			nestedTags: {
-				DPNT: {
-					onStart: () => new DragPoint(),
-					onTag: dp => dp.fromTag.bind(dp),
-					onEnd: dp => d.dragPoints.push(dp),
-				},
-			},
+	private static createStreamHandler(data: SurfaceData) {
+		data.dragPoints = []
+		return BiffParser.stream(data.fromTag.bind(data), {
+			nestedTags: { DPNT: dragPointNestedTag(data) },
 		})
 	}
 
@@ -115,6 +109,14 @@ export class SurfaceData extends ItemData implements IPhysicalData {
 	}
 
 	private async fromTag(buffer: Uint8Array, tag: string, _offset: number, len: number): Promise<number> {
+		if (tag === 'DILI') {
+			// Pre-10.8 int encoding: 1 means fully on, else an 8-bit dequantized level.
+			// Matches upstream dequantizeUnsigned<8>: min(tmp/255, 1) with no lower
+			// clamp (surface.cpp:1043, math.h:80-84); negatives stay negative.
+			const tmp = this.getInt(buffer)
+			this.disableLightingTop = tmp === 1 ? 1 : Math.min(tmp / 255, 1)
+			return 0
+		}
 		if (
 			handleBiffTag(this, tag, buffer, len, {
 				float: FLOAT_MAP,
@@ -123,24 +125,12 @@ export class SurfaceData extends ItemData implements IPhysicalData {
 			})
 		)
 			return 0
-		if (tag === 'MATR') {
-			this.szTopMaterial = this.getString(buffer, len)
-			return 0
-		}
-		if (tag === 'TMTR') {
-			this.szSideMaterial = this.getString(buffer, len)
-			return 0
-		}
-		if (tag === 'SMAT') {
-			this.szSlingShotMaterial = this.getString(buffer, len)
-			return 0
-		}
 		this.getCommonBlock(buffer, tag, len)
 		return 0
 	}
 }
 
-/** Surface state. @see https://github.com/vpinball/vpinball/blob/master/surface.cpp */
+/** Surface state. @see https://github.com/vpinball/vpinball/blob/master/src/parts/surface.cpp */
 export class SurfaceState extends ItemState {
 	public isDropped = false
 
@@ -156,7 +146,6 @@ export class SurfaceState extends ItemState {
 	get isVisible(): boolean {
 		return this.isTopVisible || this.isSideVisible
 	}
-	/** Set isVisible. */
 	set isVisible(_v) {
 		/* not used in abstract */
 	}
@@ -182,49 +171,9 @@ export class SurfaceState extends ItemState {
 		state.sideTexture = sideTexture
 		return state
 	}
-
-	public clone(): SurfaceState {
-		return SurfaceState.claim(
-			this.name,
-			this.isDropped,
-			this.isTopVisible,
-			this.topMaterial,
-			this.topTexture,
-			this.isSideVisible,
-			this.sideMaterial,
-			this.sideTexture,
-		)
-	}
-
-	public diff(state: SurfaceState): SurfaceState {
-		const d = this.clone()
-		omitEqual(d, state, 'isDropped')
-		omitEqual(d, state, 'isTopVisible')
-		omitEqual(d, state, 'topMaterial')
-		omitEqual(d, state, 'topTexture')
-		omitEqual(d, state, 'isSideVisible')
-		omitEqual(d, state, 'sideMaterial')
-		omitEqual(d, state, 'sideTexture')
-		return d
-	}
-
-	public release(): void {}
-
-	public equals(state: SurfaceState): boolean {
-		if (!state) return false
-		return (
-			state.isDropped === this.isDropped &&
-			state.isTopVisible === this.isTopVisible &&
-			state.topMaterial === this.topMaterial &&
-			state.topTexture === this.topTexture &&
-			state.isSideVisible === this.isSideVisible &&
-			state.sideMaterial === this.sideMaterial &&
-			state.sideTexture === this.sideTexture
-		)
-	}
 }
 
-/** Surface API — VBS surface for `Surface`/`Wall`. @see https://github.com/vpinball/vpinball/blob/master/surface.cpp */
+/** Surface API — VBS surface for `Surface`/`Wall`. @see https://github.com/vpinball/vpinball/blob/master/src/parts/surface.cpp */
 export class SurfaceApi extends ItemApi<SurfaceData> {
 	private isDynamic = false
 
@@ -240,12 +189,12 @@ export class SurfaceApi extends ItemApi<SurfaceData> {
 		super(data, events, player, table)
 		this.isDynamic = this.data.isDroppable
 		if (!this.isDynamic && this.data.isSideVisible) {
-			const m = table.getMaterial(this.data.szSideMaterial)
-			if (m?.isOpacityActive) this.isDynamic = true
+			const material = table.getMaterial(this.data.szSideMaterial)
+			if (material?.isOpacityActive) this.isDynamic = true
 		}
 		if (!this.isDynamic && this.data.isTopBottomVisible) {
-			const m = table.getMaterial(this.data.szTopMaterial)
-			if (m?.isOpacityActive) this.isDynamic = true
+			const material = table.getMaterial(this.data.szTopMaterial)
+			if (material?.isOpacityActive) this.isDynamic = true
 		}
 	}
 
@@ -265,6 +214,7 @@ export class SurfaceApi extends ItemApi<SurfaceData> {
 		return this.data.szImage
 	}
 	set Image(v) {
+		this._assertNonHdrImage(v)
 		if (this.isDynamic) this._state.topTexture = v
 		this.data.szImage = v
 	}
@@ -281,8 +231,13 @@ export class SurfaceApi extends ItemApi<SurfaceData> {
 	set SlingshotMaterial(v) {
 		this.data.szSlingShotMaterial = v
 	}
-	/** @deprecated */
-	public ImageAlignment: unknown = null
+	/** @deprecated Not used upstream; always returns ImageAlignCenter and ignores writes. */
+	get ImageAlignment() {
+		return Enums.ImageAlignment.ImageAlignCenter
+	}
+	set ImageAlignment(_v) {
+		/* not used (anymore?) */
+	}
 	get HeightBottom() {
 		return this.data.heightBottom
 	}
@@ -447,22 +402,21 @@ export class SurfaceApi extends ItemApi<SurfaceData> {
 		if (!this.data.isDroppable) throw new Error(`Surface "${this.Name}" is not droppable.`)
 		if (this._state.isDropped !== isDropped) {
 			this._state.isDropped = isDropped
-			const b = !this._state.isDropped && this.data.isCollidable
-			if (this.hits.length > 0 && this.hits[0]!.isEnabled !== b) for (const drop of this.hits) drop.setEnabled(b)
+			const enabled = !this._state.isDropped && this.data.isCollidable
+			if (this.hits.length > 0 && this.hits[0]!.isEnabled !== enabled)
+				for (const drop of this.hits) drop.setEnabled(enabled)
 		}
 	}
 
 	private _setCollidable(isCollidable: boolean): void {
-		const b = this.data.isDroppable ? isCollidable && !this._state.isDropped : isCollidable
-		if (this.hits.length > 0 && this.hits[0]!.isEnabled !== b) for (const hit of this.hits) hit.isEnabled = b
-	}
-
-	protected _getPropertyNames(): string[] {
-		return Object.getOwnPropertyNames(SurfaceApi.prototype)
+		this.data.isCollidable = isCollidable
+		const enabled = this.data.isDroppable ? isCollidable && !this._state.isDropped : isCollidable
+		if (this.hits.length > 0 && this.hits[0]!.isEnabled !== enabled)
+			for (const hit of this.hits) hit.isEnabled = enabled
 	}
 }
 
-/** Surface item. @see https://github.com/vpinball/vpinball/blob/master/surface.cpp */
+/** Surface item. @see https://github.com/vpinball/vpinball/blob/master/src/parts/surface.cpp */
 export class Surface
 	extends Item<SurfaceData>
 	implements IRenderable<SurfaceState>, IHittable, IScriptable<SurfaceApi>
@@ -472,14 +426,10 @@ export class Surface
 	private readonly hitGenerator: SurfaceHitGenerator
 	private readonly updater: SurfaceUpdater
 	private hits: HitObject[] = []
-	private drops: HitObject[] = []
 	private api?: SurfaceApi
 
 	get heightTop() {
 		return this.data.heightTop
-	}
-	get image() {
-		return this.data.szImage
 	}
 
 	public static async fromStorage(storage: Storage, itemName: string): Promise<Surface> {
@@ -547,8 +497,7 @@ export class Surface
 
 	public setupPlayer(player: Player, table: Table): void {
 		this.events = new EventProxy(this)
-		this.hits = this.hitGenerator.generateHitObjects(this.events, player.getPhysics(), table)
-		this.drops = this.data.isCollidable ? this.hits : []
+		this.hits = this.hitGenerator.generateHitObjects(this.events, table)
 		this.api = new SurfaceApi(this.state, this.data, this.hits, this.hitGenerator, this.events, player, table)
 	}
 

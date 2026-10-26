@@ -2,11 +2,11 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { EventProxy } from '../../game/event-proxy.js'
-import type { IScriptable } from '../../game/iscriptable.js'
+import type { IScriptable } from '../../game/interfaces.js'
 import type { Player } from '../../game/player.js'
 import { BiffParser } from '../../io/biff-parser.js'
 import type { Storage } from '../../io/ole-doc.js'
-import { Vertex2D } from '../../util/vector.js'
+import { Vertex2D } from '../../math/vector.js'
 import { handleBiffTag } from '../biff-helper.js'
 import { Enums } from '../enums.js'
 import { Item } from '../item.js'
@@ -19,23 +19,23 @@ const INT_MAP: Record<string, string> = { ALGN: 'align' }
 const BOOL_MAP: Record<string, string> = { TRNS: 'isTransparent', IDMD: 'isDMD' }
 const STRING_MAP: Record<string, string> = { TEXT: 'text' }
 
-/** Textbox data. @see https://github.com/vpinball/vpinball/blob/master/textbox.cpp */
+/** @see https://github.com/vpinball/vpinball/blob/master/src/parts/textbox.cpp */
 export class TextboxData extends ItemData {
 	public v1!: Vertex2D
 	public v2!: Vertex2D
 	public backColor = 0x000000
 	public fontColor = 0xffffff
 	public intensityScale = 1
-	public text = '0'
+	public text = ''
 	public align = Enums.TextAlignment.TextAlignRight
 	public isTransparent = false
 	public isDMD = false
 	public isVisible = true
 
 	public static async fromStorage(storage: Storage, itemName: string): Promise<TextboxData> {
-		const d = new TextboxData(itemName)
-		await storage.streamFiltered(itemName, 4, BiffParser.stream(d.fromTag.bind(d), { streamedTags: ['FONT'] }))
-		return d
+		const data = new TextboxData(itemName)
+		await storage.streamFiltered(itemName, 4, BiffParser.stream(data.fromTag.bind(data)))
+		return data
 	}
 
 	private constructor(itemName: string) {
@@ -74,7 +74,7 @@ export class TextboxData extends ItemData {
 	}
 }
 
-/** Textbox API — VBS surface for `Textbox`. @see https://github.com/vpinball/vpinball/blob/master/textbox.cpp */
+/** Textbox API — VBS surface for `Textbox`. @see https://github.com/vpinball/vpinball/blob/master/src/parts/textbox.cpp */
 export class TextboxApi extends ItemApi<TextboxData> {
 	get BackColor() {
 		return this.data.backColor
@@ -111,7 +111,7 @@ export class TextboxApi extends ItemApi<TextboxData> {
 	}
 	set X(v) {
 		const delta = v - this.data.v1.x
-		this.data.v1.x += delta
+		this.data.v1.x = v
 		this.data.v2.x += delta
 	}
 	get Y() {
@@ -119,7 +119,7 @@ export class TextboxApi extends ItemApi<TextboxData> {
 	}
 	set Y(v) {
 		const delta = v - this.data.v1.y
-		this.data.v1.y += delta
+		this.data.v1.y = v
 		this.data.v2.y += delta
 	}
 	get IntensityScale() {
@@ -152,17 +152,8 @@ export class TextboxApi extends ItemApi<TextboxData> {
 	set DMD(v) {
 		this.data.isDMD = v
 	}
-
-	public InterfaceSupportsErrorInfo(_riid: unknown): boolean {
-		return false
-	}
-
-	protected _getPropertyNames(): string[] {
-		return Object.getOwnPropertyNames(TextboxApi.prototype)
-	}
 }
 
-/** Runtime textbox. */
 export class Textbox extends Item<TextboxData> implements IScriptable<TextboxApi> {
 	private api?: TextboxApi
 

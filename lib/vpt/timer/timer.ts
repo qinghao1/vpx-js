@@ -2,12 +2,11 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { EventProxy } from '../../game/event-proxy.js'
-import type { IPlayable } from '../../game/iplayable.js'
-import type { IScriptable } from '../../game/iscriptable.js'
+import type { IPlayable, IScriptable } from '../../game/interfaces.js'
 import type { Player } from '../../game/player.js'
 import { BiffParser } from '../../io/biff-parser.js'
 import type { Storage } from '../../io/ole-doc.js'
-import { Vertex2D } from '../../util/vector.js'
+import { Vertex2D } from '../../math/vector.js'
 import { handleBiffTag } from '../biff-helper.js'
 import { Item } from '../item.js'
 import { ItemApi } from '../item-api.js'
@@ -23,14 +22,16 @@ export {
 export { TimerHit } from './timer-hit.js'
 export { TimerOnOff } from './timer-on-off.js'
 
-/** VPinball timer data. @see https://github.com/vpinball/vpinball/blob/master/timer.cpp */
+/** VPinball timer data. @see https://github.com/vpinball/vpinball/blob/master/src/parts/timer.cpp */
 export class TimerData extends ItemData {
 	public vCenter!: Vertex2D
+	/** Backglass placement flag (upstream `m_desktopBackdrop`, `BGLS` tag). */
+	public isBackglass = false
 
 	public static async fromStorage(storage: Storage, itemName: string): Promise<TimerData> {
-		const d = new TimerData(itemName)
-		await storage.streamFiltered(itemName, 4, BiffParser.stream(d.fromTag.bind(d)))
-		return d
+		const data = new TimerData(itemName)
+		await storage.streamFiltered(itemName, 4, BiffParser.stream(data.fromTag.bind(data)))
+		return data
 	}
 
 	private constructor(itemName: string) {
@@ -57,7 +58,7 @@ export class TimerData extends ItemData {
 	}
 }
 
-/** Timer API — VBS surface for `Timer`. @see https://github.com/vpinball/vpinball/blob/master/timer.cpp */
+/** Timer API — VBS surface for `Timer`. @see https://github.com/vpinball/vpinball/blob/master/src/parts/timer.cpp */
 export class TimerApi extends ItemApi<TimerData> {
 	get X() {
 		return this.data.vCenter.x
@@ -83,13 +84,8 @@ export class TimerApi extends ItemApi<TimerData> {
 	set Enabled(v) {
 		this._setTimerEnabled(v)
 	}
-
-	protected _getPropertyNames(): string[] {
-		return Object.getOwnPropertyNames(TimerApi.prototype)
-	}
 }
 
-/** Runtime timer. */
 export class Timer extends Item<TimerData> implements IPlayable, IScriptable<TimerApi> {
 	private api?: TimerApi
 

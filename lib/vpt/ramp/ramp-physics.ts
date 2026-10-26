@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import type { EventProxy } from '../../game/event-proxy.js'
+import { Vertex2D, Vertex3D } from '../../math/vector.js'
 import { CollisionType } from '../../physics/collision-type.js'
 import { HIT_SHAPE_DETAIL_LEVEL, PHYS_SKIN } from '../../physics/constants.js'
 import { HitLine3D } from '../../physics/hit-line-3d.js'
@@ -9,10 +10,9 @@ import { HitLineZ } from '../../physics/hit-line-z.js'
 import type { HitObject } from '../../physics/hit-object.js'
 import { HitTriangle } from '../../physics/hit-triangle.js'
 import { LineSeg } from '../../physics/line-seg.js'
-import { Vertex2D, Vertex3D } from '../../util/vector.js'
 import { Enums } from '../enums.js'
 import type { Table } from '../table/table.js'
-import type { RampData } from './ramp-data.js'
+import type { RampData } from './ramp.js'
 import type { RampMeshGenerator } from './ramp-view.js'
 
 /** Ramp hit generator. @see https://github.com/vpinball/vpinball/blob/master/ramp.cpp */
@@ -124,8 +124,8 @@ export class RampHitGenerator {
 			}
 		}
 		if (cVertex >= 2) {
-			const v1 = new Vertex3D(pv4?.x, pv4?.y, rgHeight1[cVertex - 1]!)
-			const v2 = new Vertex3D(pv3?.x, pv3?.y, rgHeight1[cVertex - 1]!)
+			const v1 = new Vertex3D(pv4.x, pv4.y, rgHeight1[cVertex - 1]!)
+			const v2 = new Vertex3D(pv3.x, pv3.y, rgHeight1[cVertex - 1]!)
 			hitObjects.push(this.generateJoint(v1, v2))
 		}
 		for (let i = 0; i < cVertex - 1; i++) {

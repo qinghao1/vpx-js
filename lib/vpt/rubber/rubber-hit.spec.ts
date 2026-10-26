@@ -4,9 +4,11 @@
 import * as chai from 'chai'
 import { expect } from 'chai'
 import sinonChai from 'sinon-chai'
+import { TableBuilder } from '../../../test/table-builder.js'
 import { ThreeHelper } from '../../../test/three.helper'
 import { Player } from '../../game/player.js'
 import { NodeBinaryReader } from '../../io/binary-reader.node.js'
+import { HitTriangle } from '../../physics/hit-triangle.js'
 import { Table } from '../table/table.js'
 
 chai.use((sinonChai as any).default ?? sinonChai)
@@ -45,5 +47,23 @@ describe('The VPinball rubber collision', () => {
 		// assert it bounced back (allow 1px tolerance for primitive sides default)
 		expect(ball.getState().pos.x).to.be.below(401)
 		expect(ball.getState().pos.y).to.be.below(401)
+	})
+})
+
+describe('The VPinball rubber hit height', () => {
+	it('should bake hit shapes at hit height, not visual height', () => {
+		const table = new TableBuilder().addRubber('r1', { height: 50, hitHeight: 25 }).build()
+		new Player(table).init()
+		const tris = table.rubbers.r1.getHitShapes().filter(h => h instanceof HitTriangle) as HitTriangle[]
+		expect(tris.length).to.be.above(0)
+		let minZ = Infinity
+		let maxZ = -Infinity
+		for (const tri of tris) {
+			for (const v of tri.rgv) {
+				minZ = Math.min(minZ, v.z)
+				maxZ = Math.max(maxZ, v.z)
+			}
+		}
+		expect((minZ + maxZ) / 2).to.be.closeTo(25, 0.5)
 	})
 })

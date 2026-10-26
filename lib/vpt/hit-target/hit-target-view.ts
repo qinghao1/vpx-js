@@ -2,16 +2,15 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { MathUtils } from 'three'
+import { Matrix3D } from '../../math/matrix.js'
+import { Vertex3D } from '../../math/vector.js'
 import type { IRenderApi } from '../../render/irender-api.js'
-import { Matrix3D } from '../../util/matrix.js'
-import { Vertex3D } from '../../util/vector.js'
 import { Enums } from '../enums.js'
 import { ItemUpdater } from '../item-updater.js'
 import type { Mesh } from '../mesh.js'
 import { loadMesh } from '../mesh-loader.js'
 import type { Table } from '../table/table.js'
-import type { HitTargetData } from './hit-target-data.js'
-import type { HitTargetState } from './hit-target-state.js'
+import type { HitTargetData, HitTargetState } from './hit-target.js'
 
 const hitTargetT2Mesh = loadMesh('drop-target-t2-mesh')
 const hitTargetT3Mesh = loadMesh('drop-target-t3-mesh')
@@ -28,11 +27,10 @@ export class HitTargetMeshGenerator {
 	constructor(private readonly data: HitTargetData) {}
 
 	public getMesh(table: Table): Mesh {
-		const drop = this.data.isDropTarget() && this.data.isDropped ? -(52 * table.getScaleZ()) : 0
-		return this.generateMesh(table, drop)
+		return this.generateMesh(table)
 	}
 
-	public generateMesh(table: Table, dropOffset = 0): Mesh {
+	public generateMesh(table: Table): Mesh {
 		const mesh = this.getBaseMesh()
 		mesh.name = `hit.target-${this.data.getName()}`
 		const m = new Matrix3D().rotateZMatrix(MathUtils.degToRad(this.data.rotZ))
@@ -48,7 +46,7 @@ export class HitTargetMeshGenerator {
 			const vert = Vertex3D.claim(v.x * sx, v.y * sy, v.z * sz).multiplyMatrix(m)
 			v.x = vert.x + px
 			v.y = vert.y + py
-			v.z = vert.z * scaleZ + pz + tableH + dropOffset
+			v.z = vert.z * scaleZ + pz + tableH
 			const n = Vertex3D.claim(v.nx, v.ny, v.nz).multiplyMatrixNoTranslate(m)
 			v.nx = n.x
 			v.ny = n.y
@@ -99,7 +97,7 @@ export class HitTargetUpdater extends ItemUpdater<HitTargetState> {
 		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
 		table: Table,
 	): void {
-		Object.assign(this.state, state)
+		this.state.mergeFrom(state)
 		this.applyVisibility(obj, state, renderApi)
 		this.applyMaterial(obj, state.material, state.texture, renderApi, table)
 		if (state.zOffset !== undefined || state.xRotation !== undefined) this.applyAnimation(obj, state, renderApi)

@@ -2,21 +2,18 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { EventProxy } from '../../game/event-proxy.js'
-import type { IHittable } from '../../game/ihittable.js'
-import type { IRenderable, Meshes } from '../../game/irenderable.js'
-import type { IScriptable } from '../../game/iscriptable.js'
+import type { IHittable, IRenderable, IScriptable, Meshes } from '../../game/interfaces.js'
 import type { Player } from '../../game/player.js'
 import { BiffParser } from '../../io/biff-parser.js'
 import type { Storage } from '../../io/ole-doc.js'
+import { Matrix3D } from '../../math/matrix.js'
 import type { HitObject } from '../../physics/hit-object.js'
-import { Matrix3D } from '../../util/matrix.js'
 import { handleBiffTag } from '../biff-helper.js'
-import { DragPoint } from '../dragpoint.js'
+import { type DragPoint, dragPointNestedTag } from '../dragpoint.js'
 import { Item } from '../item.js'
 import { ItemApi } from '../item-api.js'
 import { type IPhysicalData, ItemData } from '../item-data.js'
 import { ItemState } from '../item-state.js'
-import { omitEqual } from '../state-helpers.js'
 import type { Table } from '../table/table.js'
 import { RubberHitGenerator } from './rubber-physics.js'
 import { RubberMeshGenerator, RubberUpdater } from './rubber-view.js'
@@ -70,21 +67,15 @@ export class RubberData extends ItemData implements IPhysicalData {
 	public dragPoints: DragPoint[] = []
 
 	public static async fromStorage(storage: Storage, itemName: string): Promise<RubberData> {
-		const d = new RubberData(itemName)
-		await storage.streamFiltered(itemName, 4, RubberData.createStreamHandler(d))
-		return d
+		const data = new RubberData(itemName)
+		await storage.streamFiltered(itemName, 4, RubberData.createStreamHandler(data))
+		return data
 	}
 
-	private static createStreamHandler(d: RubberData) {
-		d.dragPoints = []
-		return BiffParser.stream(d.fromTag.bind(d), {
-			nestedTags: {
-				DPNT: {
-					onStart: () => new DragPoint(),
-					onTag: dp => dp.fromTag.bind(dp),
-					onEnd: dp => d.dragPoints.push(dp),
-				},
-			},
+	private static createStreamHandler(data: RubberData) {
+		data.dragPoints = []
+		return BiffParser.stream(data.fromTag.bind(data), {
+			nestedTags: { DPNT: dragPointNestedTag(data) },
 		})
 	}
 
@@ -138,46 +129,6 @@ export class RubberState extends ItemState {
 		state.isVisible = isVisible
 		return state
 	}
-
-	public clone(): RubberState {
-		return RubberState.claim(
-			this.name,
-			this.height,
-			this.rotX,
-			this.rotY,
-			this.rotZ,
-			this.material,
-			this.texture,
-			this.isVisible,
-		)
-	}
-
-	public diff(state: RubberState): RubberState {
-		const d = this.clone()
-		omitEqual(d, state, 'height')
-		omitEqual(d, state, 'rotX')
-		omitEqual(d, state, 'rotY')
-		omitEqual(d, state, 'rotZ')
-		omitEqual(d, state, 'material')
-		omitEqual(d, state, 'texture')
-		omitEqual(d, state, 'isVisible')
-		return d
-	}
-
-	public release(): void {}
-
-	public equals(state: RubberState): boolean {
-		if (!state) return false
-		return (
-			state.height === this.height &&
-			state.rotX === this.rotX &&
-			state.rotY === this.rotY &&
-			state.rotZ === this.rotZ &&
-			state.material === this.material &&
-			state.texture === this.texture &&
-			state.isVisible === this.isVisible
-		)
-	}
 }
 
 /** Rubber API — VBS surface for `Rubber`. @see https://github.com/vpinball/vpinball/blob/master/rubber.cpp */
@@ -197,8 +148,8 @@ export class RubberApi extends ItemApi<RubberData> {
 		return this._state.height ?? this.data.height
 	}
 	set Height(v) {
+		// State-only: data keeps the baked mesh values so the updater can map baked→current.
 		this._state.height = v
-		this.data.height = v
 	}
 	get HitHeight() {
 		return this.data.hitHeight
@@ -258,10 +209,12 @@ export class RubberApi extends ItemApi<RubberData> {
 		this.data.scatter = v
 	}
 	get Collidable() {
-		return this.hits[0]?.isEnabled ?? false
+		const firstHit = this.hits[0]
+		return firstHit ? firstHit.isEnabled : this.data.isCollidable
 	}
 	set Collidable(v) {
-		if (v !== this.Collidable) for (const hit of this.hits) hit.isEnabled = v
+		if (this.hits.length === 0) this.data.isCollidable = v
+		else if (v !== this.Collidable) for (const hit of this.hits) hit.isEnabled = v
 	}
 	get Visible() {
 		return this._state.isVisible
@@ -292,22 +245,22 @@ export class RubberApi extends ItemApi<RubberData> {
 		return this._state.rotX
 	}
 	set RotX(v) {
+		// State-only: data keeps the baked mesh values so the updater can map baked→current.
 		this._state.rotX = v
-		this.data.rotX = v
 	}
 	get RotY() {
 		return this._state.rotY
 	}
 	set RotY(v) {
+		// State-only: data keeps the baked mesh values so the updater can map baked→current.
 		this._state.rotY = v
-		this.data.rotY = v
 	}
 	get RotZ() {
 		return this._state.rotZ
 	}
 	set RotZ(v) {
+		// State-only: data keeps the baked mesh values so the updater can map baked→current.
 		this._state.rotZ = v
-		this.data.rotZ = v
 	}
 	get PhysicsMaterial() {
 		return this.data.szPhysicsMaterial
@@ -320,14 +273,6 @@ export class RubberApi extends ItemApi<RubberData> {
 	}
 	set OverwritePhysics(v) {
 		this.data.overwritePhysics = v
-	}
-
-	public InterfaceSupportsErrorInfo(_riid: unknown): boolean {
-		return false
-	}
-
-	protected _getPropertyNames(): string[] {
-		return Object.getOwnPropertyNames(RubberApi.prototype)
 	}
 }
 

@@ -2,16 +2,15 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { MathUtils } from 'three'
+import { Matrix3D } from '../../math/matrix.js'
+import { Vertex3D } from '../../math/vector.js'
 import type { IRenderApi } from '../../render/irender-api.js'
-import { Matrix3D } from '../../util/matrix.js'
-import { Vertex3D } from '../../util/vector.js'
 import { Enums } from '../enums.js'
 import { ItemUpdater } from '../item-updater.js'
 import type { Mesh } from '../mesh.js'
 import { loadMesh } from '../mesh-loader.js'
 import type { Table } from '../table/table.js'
-import type { KickerData } from './kicker-data.js'
-import type { KickerState } from './kicker-state.js'
+import type { KickerData, KickerState } from './kicker.js'
 
 const kickerCupMesh = loadMesh('kicker-cup-mesh')
 const kickerGottliebMesh = loadMesh('kicker-gottlieb-mesh')
@@ -58,6 +57,9 @@ export class KickerMeshGenerator {
 				return { zOffset: -0.18, zRot: this.data.orientation }
 			case Enums.KickerType.KickerWilliams:
 				return { zOffset: 0, zRot: this.data.orientation + 90 }
+			case Enums.KickerType.KickerGottlieb:
+			case Enums.KickerType.KickerCup2:
+				return { zOffset: 0, zRot: this.data.orientation }
 			default:
 				return { zOffset: 0, zRot: 0 }
 		}
@@ -90,7 +92,7 @@ export class KickerUpdater extends ItemUpdater<KickerState> {
 		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
 		table: Table,
 	): void {
-		Object.assign(this.state, state)
+		this.state.mergeFrom(state)
 		if (state.type !== undefined) renderApi.applyVisibility(this.state.isVisible, obj)
 		this.applyMaterial(obj, state.material, undefined, renderApi, table)
 	}

@@ -7,8 +7,10 @@ import sinonChai from 'sinon-chai'
 import { ThreeHelper } from '../../../test/three.helper'
 import { Player } from '../../game/player.js'
 import { NodeBinaryReader } from '../../io/binary-reader.node.js'
+import type { ReadResult, Storage } from '../../io/ole-doc.js'
 import { Enums } from '../enums.js'
 import { Table } from '../table/table.js'
+import { TextboxData } from './textbox.js'
 
 chai.use((sinonChai as any).default ?? sinonChai)
 const three = new ThreeHelper()
@@ -72,8 +74,38 @@ describe('The VPinball textbox API', () => {
 		expect(textbox.Visible).to.equal(false)
 	})
 
-	it('should not crash when executing unused APIs', () => {
+	it('should fire the Timer event when enabled', async () => {
 		const textbox = table.textboxes.TextBox1.getApi()
-		expect(textbox.InterfaceSupportsErrorInfo({})).to.equal(false)
+		let timerCount = 0
+		textbox.on('Timer', () => timerCount++)
+
+		textbox.TimerEnabled = true
+		textbox.TimerInterval = 100
+		_player.updatePhysics(150)
+		expect(timerCount).to.be.greaterThan(0)
+	})
+})
+
+describe('The VPinball textbox defaults', () => {
+	it('should default to an empty text when the TEXT tag is missing', async () => {
+		const record = new Uint8Array(8)
+		new DataView(record.buffer).setInt32(0, 4, true)
+		record.set([0x45, 0x4e, 0x44, 0x42], 4) // ENDB
+		const storage = {
+			async streamFiltered(
+				_name: string,
+				_offset: number,
+				next: (result: ReadResult) => Promise<number | null>,
+			): Promise<void> {
+				let pos = 0
+				while (pos < record.length) {
+					const consumed = await next({ data: record.subarray(pos), storageOffset: pos })
+					if (consumed === null) break
+					pos += consumed
+				}
+			},
+		}
+		const data = await TextboxData.fromStorage(storage as unknown as Storage, 'TextBox1')
+		expect(data.text).to.equal('')
 	})
 })

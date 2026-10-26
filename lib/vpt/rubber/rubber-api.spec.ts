@@ -6,10 +6,12 @@ import { expect } from 'chai'
 import sinonChai from 'sinon-chai'
 import { TableBuilder } from '../../../test/table-builder.js'
 import { ThreeHelper } from '../../../test/three.helper'
+import { EventProxy } from '../../game/event-proxy.js'
 import { Player } from '../../game/player.js'
 import { NodeBinaryReader } from '../../io/binary-reader.node.js'
 import { Table } from '../table/table.js'
-import type { RubberState } from './rubber-state.js'
+import type { RubberState } from './rubber.js'
+import { RubberApi } from './rubber.js'
 
 chai.use((sinonChai as any).default ?? sinonChai)
 const three = new ThreeHelper()
@@ -99,14 +101,52 @@ describe('The VPinball rubber API', () => {
 		expect(state.rotZ).to.equal(4)
 	})
 
-	it('should not crash when executing unused APIs', () => {
-		const table = new TableBuilder()
-			.addMaterial('mat', { isOpacityActive: true })
-			.addMaterial('mat2')
-			.addRubber('rubber')
-			.build()
+	it('should toggle hit objects when setting Collidable', () => {
+		const table = new TableBuilder().addMaterial('mat').addRubber('rubber').build()
 		new Player(table).init()
-		const rubber = table.rubbers.rubber.getApi()
-		expect(rubber.InterfaceSupportsErrorInfo({})).to.equal(false)
+		const item = table.rubbers.rubber
+		const rubber = item.getApi()
+
+		expect(item.getHitShapes().length).to.be.above(0)
+		rubber.Collidable = false
+		expect(rubber.Collidable).to.equal(false)
+		expect(item.getHitShapes().every(hit => !hit.isEnabled)).to.equal(true)
+
+		rubber.Collidable = true
+		expect(rubber.Collidable).to.equal(true)
+		expect(item.getHitShapes().every(hit => hit.isEnabled)).to.equal(true)
+	})
+
+	it('should fall back to data when there are no hit objects', () => {
+		const table = new TableBuilder().addMaterial('mat').addRubber('rubber').build()
+		const player = new Player(table).init()
+		const item = table.rubbers.rubber
+		const api = new RubberApi(item.getState(), [], item.data, new EventProxy(item), player, table)
+
+		expect(api.Collidable).to.equal(true)
+		api.Collidable = false
+		expect(api.Collidable).to.equal(false)
+		expect(item.data.isCollidable).to.equal(false)
+	})
+
+	it('should keep data at baked values when transforming via the API', () => {
+		const table = new TableBuilder().addMaterial('mat').addRubber('rubber').build()
+		new Player(table).init()
+		const item = table.rubbers.rubber
+		const rubber = item.getApi()
+
+		rubber.RotX = 30
+		rubber.RotY = 15
+		rubber.RotZ = 45
+		rubber.Height = 60
+
+		expect(rubber.RotX).to.equal(30)
+		expect(rubber.RotY).to.equal(15)
+		expect(rubber.RotZ).to.equal(45)
+		expect(rubber.Height).to.equal(60)
+		expect(item.data.rotX).to.equal(0)
+		expect(item.data.rotY).to.equal(0)
+		expect(item.data.rotZ).to.equal(0)
+		expect(item.data.height).to.equal(25)
 	})
 })

@@ -3,7 +3,6 @@
 
 import type { EventProxy } from '../../game/event-proxy.js'
 
-/** Timer hit. */
 export class TimerHit {
 	public readonly pfe: EventProxy
 	public nextFire: number

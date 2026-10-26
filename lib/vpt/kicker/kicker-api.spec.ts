@@ -7,7 +7,10 @@ import sinonChai from 'sinon-chai'
 import { ThreeHelper } from '../../../test/three.helper'
 import { Player } from '../../game/player.js'
 import { NodeBinaryReader } from '../../io/binary-reader.node.js'
+import type { ReadResult, Storage } from '../../io/ole-doc.js'
+import { Enums } from '../enums.js'
 import { Table } from '../table/table.js'
+import { KickerData } from './kicker.js'
 
 chai.use((sinonChai as any).default ?? sinonChai)
 const three = new ThreeHelper()
@@ -56,7 +59,7 @@ describe('The VPinball kicker API', () => {
 		kicker.Legacy = false
 		expect(kicker.Legacy).to.equal(false)
 		kicker.DrawStyle = 99
-		expect(kicker.DrawStyle).to.equal(99)
+		expect(kicker.DrawStyle).to.equal(Enums.KickerType.KickerInvisible)
 		kicker.Material = 'doesntexist'
 		expect(kicker.Material).to.equal('doesntexist')
 
@@ -74,6 +77,24 @@ describe('The VPinball kicker API', () => {
 
 		// reset table for next tests
 		table = await Table.load(new NodeBinaryReader(three.fixturePath('table-kicker.vpx')))
+	})
+
+	it('should clamp the draw style and sync the kicker type', () => {
+		const item = table.kickers.Williams
+		const kicker = item.getApi()
+		const originalType = item.data.kickerType
+
+		kicker.DrawStyle = 99
+		expect(kicker.DrawStyle).to.equal(Enums.KickerType.KickerInvisible)
+		expect(item.data.kickerType).to.equal(Enums.KickerType.KickerInvisible)
+		expect(item.getMeshes(table).kicker.isVisible).to.equal(false)
+
+		kicker.KickerType = Enums.KickerType.KickerCup
+		expect(kicker.KickerType).to.equal(Enums.KickerType.KickerCup)
+		expect(item.data.kickerType).to.equal(Enums.KickerType.KickerCup)
+		expect(item.getMeshes(table).kicker.isVisible).to.equal(true)
+
+		kicker.DrawStyle = originalType
 	})
 
 	it('should create a ball', () => {
@@ -169,7 +190,13 @@ describe('The VPinball kicker API', () => {
 
 		expect(ball.getState().pos.x).to.equal(kicker.X + 25)
 		expect(ball.getState().pos.y).to.be.above(kicker.Y + 300)
-		expect(ball.getState().pos.z).to.be.above(200)
+		// The +200 z offset lands the ball (top z=250) inside the fixture's slanted
+		// glass (z≈245.5 at the landing y), so the first step takes a genuine glass
+		// bounce per upstream PhysicsEngine::AddCabinetBoundingHitShapes (slanted
+		// Hit3DPoly) + Hit3DPoly::HitTest/Collide3DWall, settling at z≈193.13 rather
+		// than the flat-glass free-flight value ≈202.5. 150 still proves the offset
+		// (rest height without it is 25; a half offset would land ≈103).
+		expect(ball.getState().pos.z).to.be.above(150)
 	})
 
 	it('should retrieve last captured ball', () => {
@@ -224,5 +251,40 @@ describe('The VPinball kicker API', () => {
 		player.updatePhysics(10)
 
 		expect(kicker.BallCntOver).to.equal(1)
+	})
+})
+
+describe('The legacy kicker type tag', () => {
+	async function loadWithType(value: number): Promise<KickerData> {
+		const record = new Uint8Array(20)
+		const view = new DataView(record.buffer)
+		view.setInt32(0, 8, true)
+		record.set([0x54, 0x59, 0x50, 0x45], 4) // TYPE
+		view.setInt32(8, value, true)
+		view.setInt32(12, 4, true)
+		record.set([0x45, 0x4e, 0x44, 0x42], 16) // ENDB
+		const storage = {
+			async streamFiltered(
+				_name: string,
+				_offset: number,
+				next: (result: ReadResult) => Promise<number | null>,
+			): Promise<void> {
+				let pos = 0
+				while (pos < record.length) {
+					const consumed = await next({ data: record.subarray(pos), storageOffset: pos })
+					if (consumed === null) break
+					pos += consumed
+				}
+			},
+		}
+		return KickerData.fromStorage(storage as unknown as Storage, 'Kicker')
+	}
+
+	it('should clamp out-of-range TYPE values to invisible like upstream', async () => {
+		expect((await loadWithType(99)).kickerType).to.equal(Enums.KickerType.KickerInvisible)
+	})
+
+	it('should keep in-range TYPE values', async () => {
+		expect((await loadWithType(Enums.KickerType.KickerCup2)).kickerType).to.equal(Enums.KickerType.KickerCup2)
 	})
 })

@@ -7,7 +7,7 @@ import sinonChai from 'sinon-chai'
 import { ThreeHelper } from '../../../test/three.helper'
 import { NodeBinaryReader } from '../../io/binary-reader.node.js'
 import { Table } from '../table/table.js'
-import type { CollectionData } from './collection-data.js'
+import type { CollectionData } from './collection.js'
 
 chai.use((sinonChai as any).default ?? sinonChai)
 const three = new ThreeHelper()

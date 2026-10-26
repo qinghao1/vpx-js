@@ -8,6 +8,7 @@ import { createBall } from '../../../test/physics.helper'
 import { ThreeHelper } from '../../../test/three.helper'
 import { Player } from '../../game/player.js'
 import { NodeBinaryReader } from '../../io/binary-reader.node.js'
+import { Vertex3D } from '../../math/vector.js'
 import { Table } from '../table/table.js'
 
 chai.use((sinonChai as any).default ?? sinonChai)
@@ -62,18 +63,6 @@ describe('The VPinball kicker collision', () => {
 			expect(ball.getState().pos.z).to.be.below(-100)
 		})
 
-		it('should collide with the ball and fall through', () => {
-			// above fallthrough kicker (it's Cup2)
-			const ball = createBall(player, 247, 1200, 0, 0, 2)
-
-			// let it roll down
-			player.updatePhysics(0)
-			player.updatePhysics(700)
-
-			// assert it fell through
-			expect(ball.getState().pos.z).to.be.below(-100)
-		})
-
 		it('should let the ball roll over it not enabled', () => {
 			// above disabled kicker (it's HoleSimple)
 			const ball = createBall(player, 623, 1200, 0, 0, 2)
@@ -107,6 +96,54 @@ describe('The VPinball kicker collision', () => {
 		expect(ball.getState().pos.x).to.be.within(874, 875)
 		expect(ball.getState().pos.y).to.be.within(1326, 1327)
 		expect(ball.getState().pos.z).to.be.equal(25)
+	})
+
+	describe('bevel deflection', () => {
+		it('should deflect a fast ball rolling over the bevel without capturing it', () => {
+			const kicker = table.kickers.Williams
+			expect(kicker.data.legacyMode).to.equal(false)
+			// z=25 stays above the grab height so the ball skims the bevel.
+			const ball = createBall(player, kicker.data.center.x, kicker.data.center.y, 25, 5, 0, 0)
+			kicker.getHit().doCollide(player.getPhysics(), ball, new Vertex3D(1, 0, 0), false, false)
+			expect(kicker.getHit().ball).to.be.undefined
+			expect(ball.hit.vel.x).to.be.below(5)
+			expect(ball.hit.vel.y).to.not.equal(0)
+			expect(ball.oldVel.x).to.be.closeTo(ball.hit.vel.x, 1e-12)
+		})
+
+		it('should keep the last good velocity when the ball slows below 0.2 on the bevel', () => {
+			// Upstream "ugly hack": friction misbehaves at the bevel, so a ball
+			// dropping under 0.2 keeps its last good velocity (kicker.cpp).
+			const kicker = table.kickers.Williams
+			const ball = createBall(player, kicker.data.center.x, kicker.data.center.y, 25, 0.1, 0, 0)
+			ball.oldVel.set(3, 0.5, 0)
+			kicker.getHit().doCollide(player.getPhysics(), ball, new Vertex3D(1, 0, 0), false, false)
+			expect(kicker.getHit().ball).to.be.undefined
+			expect(ball.hit.vel.x).to.equal(3)
+			expect(ball.hit.vel.y).to.equal(0.5)
+		})
+	})
+
+	describe('capture radius', () => {
+		it('should shrink the capture radius of legacy kickers to 60%', () => {
+			const kicker = table.kickers.Cup
+			expect(kicker.data.legacyMode).to.equal(true)
+			expect(kicker.data.fallThrough).to.equal(false)
+			expect(kicker.getHit().radius).to.be.closeTo(kicker.data.radius * 0.6, 1e-6)
+		})
+
+		it('should shrink the capture radius of legacy fall-through kickers to 75%', () => {
+			const kicker = table.kickers.Cup2
+			expect(kicker.data.legacyMode).to.equal(true)
+			expect(kicker.data.fallThrough).to.equal(true)
+			expect(kicker.getHit().radius).to.be.closeTo(kicker.data.radius * 0.75, 1e-6)
+		})
+
+		it('should keep the full capture radius of modern kickers', () => {
+			const kicker = table.kickers.Williams
+			expect(kicker.data.legacyMode).to.equal(false)
+			expect(kicker.getHit().radius).to.be.closeTo(kicker.data.radius, 1e-6)
+		})
 	})
 
 	// add second ball

@@ -127,4 +127,24 @@ describe('The VPinball collection', () => {
 		expect(coll[0].Name).to.equal('SuppressEventsTimer1')
 		expect(coll[1].Name).to.equal('SuppressEventsTimer2')
 	})
+
+	it('should expose Count and Item(i) like upstream ICollection', () => {
+		const coll = table.collections.SuppressEvents.getApi()
+		expect(coll.Count).to.equal(2)
+		expect(coll.Item(0).Name).to.equal('SuppressEventsTimer1')
+		expect(coll.Item(1).Name).to.equal('SuppressEventsTimer2')
+		expect(() => coll.Item(2)).to.throw(RangeError)
+		expect(() => coll.Item(-1)).to.throw(RangeError)
+	})
+
+	it('should resolve member names case-insensitively like upstream', () => {
+		const collection = table.collections.SuppressEvents
+		collection.getItemNames().push('suppresseventstimer1')
+		// setupCollections runs once per table in production; reset and re-run it.
+		collection.items.length = 0
+		table.setupCollections()
+		const coll = collection.getApi()
+		expect(coll.Count).to.equal(3)
+		expect(coll.Item(2).Name).to.equal('SuppressEventsTimer1')
+	})
 })

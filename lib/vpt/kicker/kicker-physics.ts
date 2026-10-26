@@ -6,15 +6,15 @@ import { kickerHitVertices } from '../../../res/meshes/kicker-hit-mesh.js'
 import { Event } from '../../game/event.js'
 import type { EventProxy } from '../../game/event-proxy.js'
 import type { PlayerPhysics } from '../../game/player-physics.js'
+import { Vertex3D } from '../../math/vector.js'
 import type { CollisionEvent } from '../../physics/collision-event.js'
 import { CollisionType } from '../../physics/collision-type.js'
 import { STATICTIME } from '../../physics/constants.js'
 import { HARD_SCATTER } from '../../physics/functions.js'
 import { HitCircle } from '../../physics/hit-circle.js'
-import { Vertex3D } from '../../util/vector.js'
 import type { Ball } from '../ball/ball.js'
 import type { Table } from '../table/table.js'
-import type { KickerData } from './kicker-data.js'
+import type { KickerData } from './kicker.js'
 
 /** Kicker hit — captures and ejects balls. @see https://github.com/vpinball/vpinball/blob/master/kicker.cpp */
 export class KickerHit extends HitCircle {
@@ -33,13 +33,10 @@ export class KickerHit extends HitCircle {
 		super(data.center.clone(), radius, height, height + data.hitHeight)
 		if (!this.data.legacyMode) {
 			const rad = this.radius * 0.8
-			for (let t = 0; t < kickerHitVertices.length; t++) {
-				const vPos = new Vertex3D(kickerHitVertices[t]?.x, kickerHitVertices[t]?.y, kickerHitVertices[t]?.z)
-				vPos.x = vPos.x * rad + this.data.center.x
-				vPos.y = vPos.y * rad + this.data.center.y
-				vPos.z = vPos.z * rad * table.getScaleZ() + height
-				this.hitMesh[t] = vPos
-			}
+			const scaleZ = table.getScaleZ()
+			this.hitMesh = kickerHitVertices.map(
+				v => new Vertex3D(v.x * rad + data.center.x, v.y * rad + data.center.y, v.z * rad * scaleZ + height),
+			)
 		}
 		this.isEnabled = this.data.isEnabled
 		this.objType = CollisionType.Kicker
@@ -57,6 +54,7 @@ export class KickerHit extends HitCircle {
 	public doCollide(physics: PlayerPhysics, ball: Ball, hitNormal: Vertex3D, hitBit: boolean, newBall: boolean) {
 		if (this.ball) return
 		const i = ball.hit.vpVolObjs.indexOf(this.obj)
+		// New or (Hit && !Vol || UnHit && Vol)
 		if (newBall || hitBit !== i < 0) {
 			if (this.data.legacyMode || newBall)
 				ball.state.pos.addAndRelease(ball.hit.vel.clone(true).multiplyScalar(STATICTIME))
@@ -83,6 +81,7 @@ export class KickerHit extends HitCircle {
 						if (ball === physics.activeBallBC) physics.activeBallBC = undefined
 					}
 					if (!newBall) this.obj.fireGroupEvent(Event.HitEventsHit)
+					// script may have unfrozen the ball
 					if (ball.state.isFrozen || this.data.fallThrough) {
 						ball.hit.vel.setZero()
 						ball.hit.angularMomentum.setZero()
@@ -104,9 +103,9 @@ export class KickerHit extends HitCircle {
 
 	private doChangeBallVelocity(ball: Ball, hitNormal: Vertex3D): void {
 		let minDistSqr = Infinity
-		let idx = 3435973836
-		for (let t = 0; t < this.hitMesh.length; t++) {
-			const dist = ball.state.pos.clone(true).sub(this.hitMesh[t]!)
+		let idx = -1
+		for (const [t, v] of this.hitMesh.entries()) {
+			const dist = ball.state.pos.clone(true).sub(v)
 			const lengthSqr = dist.lengthSq()
 			Vertex3D.release(dist)
 			if (lengthSqr < minDistSqr) {
@@ -114,7 +113,7 @@ export class KickerHit extends HitCircle {
 				idx = t
 			}
 		}
-		if (idx !== 3435973836) {
+		if (idx !== -1) {
 			const hitNorm = Vertex3D.claim(
 				kickerHitVertices[idx]?.nx,
 				kickerHitVertices[idx]?.ny,
@@ -139,9 +138,10 @@ export class KickerHit extends HitCircle {
 				const kt = ball.hit.invMass + tangent.dotAndRelease(Vertex3D.crossProduct(pv1, surfP, true))
 				const maxFriction = friction * reactionImpulse
 				const jt = MathUtils.clamp(-vt / kt, -maxFriction, maxFriction)
-				ball.hit.applySurfaceImpulseAndRelease(
+				ball.hit.applySurfaceImpulse(
 					cross.clone(true).multiplyScalar(jt),
 					tangent.clone(true).multiplyScalar(jt),
+					true,
 				)
 				Vertex3D.release(cross, pv1)
 			}

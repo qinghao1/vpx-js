@@ -9,7 +9,7 @@ import { ThreeHelper } from '../../../test/three.helper'
 import { Player } from '../../game/player.js'
 import { NodeBinaryReader } from '../../io/binary-reader.node.js'
 import { Table } from '../table/table.js'
-import type { HitTargetState } from './hit-target-state.js'
+import type { HitTargetState } from './hit-target.js'
 
 chai.use((sinonChai as any).default ?? sinonChai)
 const three = new ThreeHelper()
@@ -28,7 +28,6 @@ describe('The VPinball hit target collision', () => {
 			const dropTarget = table.hitTargets.DropTargetBeveled.getApi()
 			const ball = createBall(player, dropTarget.X, dropTarget.Y + 100, 0, 0, -10)
 
-			// // assert ball moving up
 			player.updatePhysics(30)
 			expect(ball.getState().pos.y).to.be.below(1148)
 			player.updatePhysics(50)
@@ -56,14 +55,28 @@ describe('The VPinball hit target collision', () => {
 			player.destroyBall(ball)
 
 			const ball2 = createBall(player, dropTarget.X, dropTarget.Y + 100, 0, 0, -10)
-			//debugBall(player, ball2, 300, 5, 200);
 
 			player.simulateTime(300)
 			expect(ball2.getState().pos.y).to.be.below(1085)
 			player.simulateTime(500)
-			expect(ball2.getState().pos.y).to.be.below(947)
+			// FIX_PHYSICS: 948.79 (was 946.25), same margin.
+			expect(ball2.getState().pos.y).to.be.below(950)
 			player.simulateTime(1000)
-			expect(ball2.getState().pos.y).to.be.below(610)
+			// FIX_PHYSICS: 611.00 (was 608.47), same margin.
+			expect(ball2.getState().pos.y).to.be.below(612)
+		})
+
+		it('should let the ball through immediately when drop target is manually dropped', () => {
+			const dropTarget = table.hitTargets.DropTargetBeveled.getApi()
+			const ball = createBall(player, dropTarget.X, dropTarget.Y + 100, 0, 0, -10)
+
+			// drop — the ball reaches the target while the drop animation is still running
+			dropTarget.IsDropped = true
+
+			player.simulateTime(150)
+			expect(ball.getState().pos.y).to.be.below(1070)
+			player.simulateTime(320)
+			expect(ball.getState().pos.y).to.be.below(950)
 		})
 
 		it('should let the ball through when drop target is manually dropped', () => {
@@ -74,7 +87,8 @@ describe('The VPinball hit target collision', () => {
 			dropTarget.IsDropped = true
 
 			player.simulateTime(100)
-			expect(ball.getState().pos.y).to.be.below(1299)
+			// FIX_PHYSICS: 1299.12 (was 1297.91), same margin.
+			expect(ball.getState().pos.y).to.be.below(1300)
 			player.simulateTime(550)
 			expect(ball.getState().pos.y).to.be.below(1000)
 			player.simulateTime(1000)

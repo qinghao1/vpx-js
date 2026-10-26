@@ -3,17 +3,14 @@
 
 import { MathUtils } from 'three'
 import { EventProxy } from '../../game/event-proxy.js'
-import type { IAnimatable } from '../../game/ianimatable.js'
-import type { IHittable } from '../../game/ihittable.js'
-import type { IRenderable, Meshes } from '../../game/irenderable.js'
-import type { IScriptable } from '../../game/iscriptable.js'
+import type { IAnimatable, IHittable, IRenderable, IScriptable, Meshes } from '../../game/interfaces.js'
 import type { Player } from '../../game/player.js'
 import type { PlayerPhysics } from '../../game/player-physics.js'
 import { BiffParser } from '../../io/biff-parser.js'
 import type { Storage } from '../../io/ole-doc.js'
+import { Matrix3D } from '../../math/matrix.js'
+import { Vertex3D } from '../../math/vector.js'
 import type { HitObject } from '../../physics/hit-object.js'
-import { Matrix3D } from '../../util/matrix.js'
-import { Vertex3D } from '../../util/vector.js'
 import type { Ball } from '../ball/ball.js'
 import { handleBiffTag } from '../biff-helper.js'
 import { Enums } from '../enums.js'
@@ -21,9 +18,8 @@ import { Item } from '../item.js'
 import { ItemApi } from '../item-api.js'
 import { type IPhysicalData, ItemData } from '../item-data.js'
 import { ItemState } from '../item-state.js'
-import { omitEqual } from '../state-helpers.js'
 import type { Table } from '../table/table.js'
-import { HitTargetAnimation, HitTargetHitGenerator } from './hit-target-physics.js'
+import { DROP_TARGET_LIMIT, HitTargetAnimation, HitTargetHitGenerator } from './hit-target-physics.js'
 import { HitTargetMeshGenerator, HitTargetUpdater } from './hit-target-view.js'
 
 const FLOAT_MAP: Record<string, string> = {
@@ -34,7 +30,6 @@ const FLOAT_MAP: Record<string, string> = {
 	ELFO: 'elasticityFalloff',
 	RFCT: 'friction',
 	RSCT: 'scatter',
-	DILI: 'disableLightingTop',
 	DILT: 'disableLightingTop',
 	DILB: 'disableLightingBelow',
 	PIDB: 'depthBias',
@@ -106,6 +101,12 @@ export class HitTargetData extends ItemData implements IPhysicalData {
 			this.vSize = Vertex3D.get(buffer)
 			return 0
 		}
+		if (tag === 'DILI') {
+			// Pre-10.8 files store this as a quantized int, with 1 meaning fully on.
+			const legacy = this.getInt(buffer)
+			this.disableLightingTop = legacy === 1 ? 1 : Math.min(legacy / 255, 1)
+			return 0
+		}
 		if (
 			handleBiffTag(this, tag, buffer, len, {
 				float: FLOAT_MAP,
@@ -145,40 +146,6 @@ export class HitTargetState extends ItemState {
 		s.isVisible = isVisible
 		return s
 	}
-
-	public clone(): HitTargetState {
-		return HitTargetState.claim(
-			this.name,
-			this.zOffset,
-			this.xRotation,
-			this.material,
-			this.texture,
-			this.isVisible,
-		)
-	}
-
-	public diff(state: HitTargetState): HitTargetState {
-		const d = this.clone()
-		omitEqual(d, state, 'zOffset')
-		omitEqual(d, state, 'xRotation')
-		omitEqual(d, state, 'material')
-		omitEqual(d, state, 'texture')
-		omitEqual(d, state, 'isVisible')
-		return d
-	}
-
-	public release(): void {}
-
-	public equals(state: HitTargetState): boolean {
-		if (!state) return false
-		return (
-			state.zOffset === this.zOffset &&
-			state.xRotation === this.xRotation &&
-			state.material === this.material &&
-			state.texture === this.texture &&
-			state.isVisible === this.isVisible
-		)
-	}
 }
 
 /** Hit target API — VBS surface for `HitTarget`. @see https://github.com/vpinball/vpinball/blob/master/hittarget.cpp */
@@ -213,6 +180,7 @@ export class HitTargetApi extends ItemApi<HitTargetData> {
 	}
 	set Visible(v) {
 		this._state.isVisible = v
+		this.data.isVisible = v
 	}
 	get X() {
 		return this.data.position.x
@@ -292,6 +260,30 @@ export class HitTargetApi extends ItemApi<HitTargetData> {
 	set Scatter(v) {
 		this.data.scatter = v
 	}
+	get DisableLighting() {
+		return !!this.data.disableLightingTop
+	}
+	set DisableLighting(v) {
+		this.data.disableLightingTop = v ? 1 : 0
+	}
+	get BlendDisableLighting() {
+		return this.data.disableLightingTop
+	}
+	set BlendDisableLighting(v) {
+		this.data.disableLightingTop = v
+	}
+	get BlendDisableLightingFromBelow() {
+		return this.data.disableLightingBelow
+	}
+	set BlendDisableLightingFromBelow(v) {
+		this.data.disableLightingBelow = v
+	}
+	get ReflectionEnabled() {
+		return this.data.isReflectionEnabled
+	}
+	set ReflectionEnabled(v) {
+		this.data.isReflectionEnabled = v
+	}
 	get Collidable() {
 		return this.data.isCollidable
 	}
@@ -310,16 +302,19 @@ export class HitTargetApi extends ItemApi<HitTargetData> {
 	set DropSpeed(v) {
 		this.data.dropSpeed = v
 	}
-	get TargetType() {
+	get CurrentAnimOffset() {
+		return this._state.zOffset
+	}
+	get DrawStyle() {
 		return this.data.targetType
 	}
-	set TargetType(v) {
+	set DrawStyle(v) {
 		this.data.targetType = v
 	}
-	get Legacy() {
+	get LegacyMode() {
 		return this.data.legacy
 	}
-	set Legacy(v) {
+	set LegacyMode(v) {
 		this.data.legacy = v
 	}
 	get PhysicsMaterial() {
@@ -351,32 +346,28 @@ export class HitTargetApi extends ItemApi<HitTargetData> {
 	}
 
 	public Hit(): void {
-		if (this.animation) this.animation.hitEvent = true
+		this.animation.hitEvent = true
 	}
 
 	private _setCollidable(isCollidable: boolean): void {
-		if (this.hits?.length && this.hits[0].isEnabled !== isCollidable)
+		if (this.hits.length && this.hits[0].isEnabled !== isCollidable)
 			for (const hit of this.hits) hit.isEnabled = isCollidable
 		this.data.isCollidable = isCollidable
 	}
 
 	private _setDropped(val: boolean, table: Table, physics: PlayerPhysics): void {
-		if (this.data.isDropped !== val && this.animation) {
+		if (this.data.isDropped !== val) {
+			this.data.isDropped = val
+			this.animation.moveAnimation = true
 			if (val) {
-				this.animation.moveAnimation = true
 				this._state.zOffset = 0
 				this.animation.moveDown = true
 			} else {
-				this.animation.moveAnimation = true
-				this._state.zOffset = -HitTarget.DROP_TARGET_LIMIT * table.getScaleZ()
+				this._state.zOffset = -DROP_TARGET_LIMIT * table.getScaleZ()
 				this.animation.moveDown = false
 				this.animation.timeStamp = physics.timeMsec
 			}
-		} else this.data.isDropped = val
-	}
-
-	protected _getPropertyNames(): string[] {
-		return Object.getOwnPropertyNames(HitTargetApi.prototype)
+		}
 	}
 }
 
@@ -385,8 +376,6 @@ export class HitTarget
 	extends Item<HitTargetData>
 	implements IRenderable<HitTargetState>, IHittable, IAnimatable, IScriptable<HitTargetApi>
 {
-	public static DROP_TARGET_LIMIT = 52.0
-
 	private readonly state: HitTargetState
 	private readonly meshGenerator: HitTargetMeshGenerator
 	private readonly hitGenerator: HitTargetHitGenerator
@@ -437,10 +426,12 @@ export class HitTarget
 				obj.fireHitEvent(ball)
 			}
 		}
-		this.events.abortHitTest = () => {
-			return this.data.isDropped
-		}
+		this.events.abortHitTest = () => this.data.isDropped
 		this.animation = new HitTargetAnimation(this.data, this.state, this.events)
+		if (this.data.isDropTarget() && this.data.isDropped) {
+			this.animation.moveDown = false
+			this.state.zOffset = -DROP_TARGET_LIMIT * table.getScaleZ()
+		}
 		this.hits = this.hitGenerator.generateHitObjects(this.events, table)
 		this.api = new HitTargetApi(this.state, this.data, this.hits, this.animation, this.events, player, table)
 	}
@@ -450,7 +441,7 @@ export class HitTarget
 	}
 
 	public getEventNames(): string[] {
-		return ['Dropped', 'Hit', 'Init', 'Raised', 'Timer']
+		return ['Animate', 'Dropped', 'Hit', 'Init', 'Raised', 'Timer']
 	}
 
 	public getHitShapes(): HitObject[] {

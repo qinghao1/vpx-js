@@ -8,7 +8,10 @@ import sinonChai from 'sinon-chai'
 import { ThreeHelper } from '../../../test/three.helper'
 import { Player } from '../../game/player.js'
 import { NodeBinaryReader } from '../../io/binary-reader.node.js'
+import type { ReadResult, Storage } from '../../io/ole-doc.js'
+import { Enums } from '../enums.js'
 import { Table } from '../table/table.js'
+import { SurfaceData } from './surface.js'
 
 chai.use((sinonChai as any).default ?? sinonChai)
 const three = new ThreeHelper()
@@ -35,7 +38,7 @@ describe('The VPinball surface API', () => {
 		surface.Image = 'imgzz'
 		surface.SideMaterial = 'sidemat'
 		surface.SlingshotMaterial = 'slingmat'
-		surface.ImageAlignment = 'duh'
+		surface.ImageAlignment = Enums.ImageAlignment.ImageAlignTopLeft
 		surface.HeightBottom = 332.128
 		surface.HeightTop = 554.96598
 		surface.TopMaterial = 'topmat'
@@ -72,7 +75,7 @@ describe('The VPinball surface API', () => {
 		expect(surface.SideVisible).to.equal(false)
 		surface.SideVisible = true
 		surface.Collidable = false
-		expect(surface.Collidable).to.equal(true) // this is weird (same in VP)!
+		expect(surface.Collidable).to.equal(false)
 		surface.Collidable = true
 		surface.SlingshotThreshold = 0.239578
 		surface.SlingshotAnimation = false
@@ -92,7 +95,7 @@ describe('The VPinball surface API', () => {
 		expect(surface.Image).to.equal('imgzz')
 		expect(surface.SideMaterial).to.equal('sidemat')
 		expect(surface.SlingshotMaterial).to.equal('slingmat')
-		expect(surface.ImageAlignment).to.equal('duh')
+		expect(surface.ImageAlignment).to.equal(Enums.ImageAlignment.ImageAlignCenter)
 		expect(surface.HeightBottom).to.equal(332.128)
 		expect(surface.HeightTop).to.equal(554.96598)
 		expect(surface.TopMaterial).to.equal('topmat')
@@ -135,10 +138,15 @@ describe('The VPinball surface API', () => {
 
 	it('should correctly handle side image attribution', () => {
 		const surface = table.surfaces.Wall.getApi()
-		expect(() => (surface.SideImage = 'some-image')).to.throw('Texture "some-image" not found.')
-		//expect(() => surface.SideImage = 'hdr').to.throw('Cannot use a HDR image (.exr/.hdr) here');
+		// Unknown names are stored without throwing, like native Surface::put_SideImage.
+		surface.SideImage = 'some-image'
+		expect(surface.SideImage).to.equal('some-image')
 		surface.SideImage = 'ldr'
 		expect(surface.SideImage).to.equal('ldr')
+		table.textures.hdr_tex = { isHdr: () => true } as any
+		expect(() => {
+			surface.SideImage = 'hdr_tex'
+		}).to.throw('Cannot use a HDR image (.exr/.hdr) here')
 	})
 
 	it('should trigger an Init event', () => {
@@ -150,9 +158,67 @@ describe('The VPinball surface API', () => {
 		expect(eventSpy).to.have.been.calledOnce
 	})
 
+	it('should return ImageAlignCenter and ignore writes for deprecated ImageAlignment', () => {
+		const surface = table.surfaces.Wall.getApi()
+		expect(surface.ImageAlignment).to.equal(Enums.ImageAlignment.ImageAlignCenter)
+		surface.ImageAlignment = Enums.ImageAlignment.ImageAlignTopLeft
+		expect(surface.ImageAlignment).to.equal(Enums.ImageAlignment.ImageAlignCenter)
+	})
+
 	it('should throw an error when dropping a non-droppable wall', () => {
 		const surface = table.surfaces.Wall.getApi()
 		surface.CanDrop = false
 		expect(() => (surface.IsDropped = true)).to.throw('Surface "Wall" is not droppable.')
+	})
+
+	it('should update data and hit objects when setting Collidable', () => {
+		const wall = table.surfaces.Wall
+		const surface = wall.getApi()
+
+		surface.Collidable = false
+		expect(surface.Collidable).to.equal(false)
+		expect(wall.isCollidable()).to.equal(false)
+		expect(wall.getHitShapes().length).to.be.above(0)
+		expect(wall.getHitShapes().every(hit => !hit.isEnabled)).to.equal(true)
+
+		surface.Collidable = true
+		expect(surface.Collidable).to.equal(true)
+		expect(wall.isCollidable()).to.equal(true)
+		expect(wall.getHitShapes().every(hit => hit.isEnabled)).to.equal(true)
+	})
+})
+
+describe('The VPinball surface legacy tags', () => {
+	it('should read the legacy DILI tag as an int level', async () => {
+		async function loadWith(value: number): Promise<SurfaceData> {
+			const record = new Uint8Array(20)
+			const view = new DataView(record.buffer)
+			view.setInt32(0, 8, true)
+			record.set([0x44, 0x49, 0x4c, 0x49], 4) // DILI
+			view.setInt32(8, value, true)
+			view.setInt32(12, 4, true)
+			record.set([0x45, 0x4e, 0x44, 0x42], 16) // ENDB
+			const storage = {
+				async streamFiltered(
+					_name: string,
+					_offset: number,
+					next: (result: ReadResult) => Promise<number | null>,
+				): Promise<void> {
+					let pos = 0
+					while (pos < record.length) {
+						const consumed = await next({ data: record.subarray(pos), storageOffset: pos })
+						if (consumed === null) break
+						pos += consumed
+					}
+				},
+			}
+			return SurfaceData.fromStorage(storage as unknown as Storage, 'Wall')
+		}
+		expect((await loadWith(0)).disableLightingTop).to.equal(0)
+		expect((await loadWith(1)).disableLightingTop).to.equal(1)
+		expect((await loadWith(255)).disableLightingTop).to.equal(1)
+		expect((await loadWith(128)).disableLightingTop).to.be.closeTo(128 / 255, 1e-6)
+		// Upstream dequantizeUnsigned has no lower clamp: negatives stay negative.
+		expect((await loadWith(-255)).disableLightingTop).to.equal(-1)
 	})
 })

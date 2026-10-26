@@ -8,7 +8,10 @@ import sinonChai from 'sinon-chai'
 import { ThreeHelper } from '../../../test/three.helper'
 import { Player } from '../../game/player.js'
 import { NodeBinaryReader } from '../../io/binary-reader.node.js'
+import type { ReadResult, Storage } from '../../io/ole-doc.js'
+import { TimerDataRoot } from '../item-data.js'
 import { Table } from '../table/table.js'
+import { TimerData } from './timer.js'
 
 chai.use((sinonChai as any).default ?? sinonChai)
 const three = new ThreeHelper()
@@ -69,5 +72,75 @@ describe('The VPinball timer API', () => {
 		timer.on('Timer', eventSpy)
 		player.updatePhysics(120)
 		expect(eventSpy).to.have.been.not.called
+	})
+
+	it('should alias Interval/Enabled to TimerInterval/TimerEnabled', async () => {
+		const timer = table.timers.Timer1.getApi()
+
+		timer.Interval = 321
+		expect(timer.TimerInterval).to.equal(321)
+		timer.TimerInterval = 123
+		expect(timer.Interval).to.equal(123)
+
+		timer.Enabled = false
+		expect(timer.TimerEnabled).to.equal(false)
+		timer.TimerEnabled = true
+		expect(timer.Enabled).to.equal(true)
+	})
+
+	it('should default timers to enabled with a 100ms interval', async () => {
+		const root = new TimerDataRoot()
+		expect(root.enabled).to.equal(true)
+		expect(root.interval).to.equal(100)
+
+		// Missing TMON/TMIN tags keep the default.
+		const record = new Uint8Array(8)
+		new DataView(record.buffer).setInt32(0, 4, true)
+		record.set([0x45, 0x4e, 0x44, 0x42], 4) // ENDB
+		const storage = {
+			async streamFiltered(
+				_name: string,
+				_offset: number,
+				next: (result: ReadResult) => Promise<number | null>,
+			): Promise<void> {
+				let pos = 0
+				while (pos < record.length) {
+					const consumed = await next({ data: record.subarray(pos), storageOffset: pos })
+					if (consumed === null) break
+					pos += consumed
+				}
+			},
+		}
+		const data = await TimerData.fromStorage(storage as unknown as Storage, 'Timer1')
+		expect(data.timer.enabled).to.equal(true)
+		expect(data.timer.interval).to.equal(100)
+	})
+})
+
+describe('The VPinball timer backglass flag', () => {
+	it('should parse the backglass flag into a declared field', async () => {
+		const record = new Uint8Array(20)
+		const view = new DataView(record.buffer)
+		view.setInt32(0, 8, true)
+		record.set([0x42, 0x47, 0x4c, 0x53], 4) // BGLS
+		view.setInt32(8, 1, true)
+		view.setInt32(12, 4, true)
+		record.set([0x45, 0x4e, 0x44, 0x42], 16) // ENDB
+		const storage = {
+			async streamFiltered(
+				_name: string,
+				_offset: number,
+				next: (result: ReadResult) => Promise<number | null>,
+			): Promise<void> {
+				let pos = 0
+				while (pos < record.length) {
+					const consumed = await next({ data: record.subarray(pos), storageOffset: pos })
+					if (consumed === null) break
+					pos += consumed
+				}
+			},
+		}
+		const data = await TimerData.fromStorage(storage as unknown as Storage, 'Timer1')
+		expect(data.isBackglass).to.equal(true)
 	})
 })

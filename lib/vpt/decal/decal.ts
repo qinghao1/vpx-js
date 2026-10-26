@@ -2,11 +2,11 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { EventProxy } from '../../game/event-proxy.js'
-import type { IScriptable } from '../../game/iscriptable.js'
+import type { IScriptable } from '../../game/interfaces.js'
 import type { Player } from '../../game/player.js'
 import { BiffParser } from '../../io/biff-parser.js'
 import type { Storage } from '../../io/ole-doc.js'
-import { Vertex2D } from '../../util/vector.js'
+import { Vertex2D } from '../../math/vector.js'
 import { handleBiffTag } from '../biff-helper.js'
 import { Enums } from '../enums.js'
 import { Item } from '../item.js'
@@ -16,11 +16,11 @@ import type { Table } from '../table/table.js'
 
 const FLOAT_MAP: Record<string, string> = { WDTH: 'width', HIGH: 'height', ROTA: 'rotation' }
 const INT_MAP: Record<string, string> = { TYPE: 'decalType', SIZE: 'sizingType' }
-const BOOL_MAP: Record<string, string> = { VERT: 'verticalText', BGLS: 'backglass' }
+const BOOL_MAP: Record<string, string> = { VERT: 'verticalText', BGLS: 'isBackglass' }
 const STRING_MAP: Record<string, string> = { IMAG: 'szImage', SURF: 'szSurface', TEXT: 'text', MATR: 'szMaterial' }
 
 /** Decal data.
- * @see https://github.com/vpinball/vpinball/blob/master/decal.cpp */
+ * @see https://github.com/vpinball/vpinball/blob/master/src/parts/decal.cpp */
 export class DecalData extends ItemData {
 	public center!: Vertex2D
 	public width = 100
@@ -35,11 +35,13 @@ export class DecalData extends ItemData {
 	public szMaterial?: string
 	public verticalText = false
 	public font = ''
+	/** Backglass placement flag (upstream `m_desktopBackdrop`, `BGLS` tag). */
+	public isBackglass = false
 
 	public static async fromStorage(storage: Storage, itemName: string): Promise<DecalData> {
-		const d = new DecalData(itemName)
-		await storage.streamFiltered(itemName, 4, BiffParser.stream(d.fromTag.bind(d), { streamedTags: ['FONT'] }))
-		return d
+		const data = new DecalData(itemName)
+		await storage.streamFiltered(itemName, 4, BiffParser.stream(data.fromTag.bind(data)))
+		return data
 	}
 
 	private constructor(itemName: string) {
@@ -55,6 +57,8 @@ export class DecalData extends ItemData {
 			this.color = BiffParser.bgrToRgb(this.getInt(buffer))
 			return 0
 		}
+		// Deliberately skipped: no renderer consumes decal fonts yet, so there is no
+		// font-object model to parse the descriptor into (upstream keeps an IFontDisp).
 		if (tag === 'FONT') return 0
 		if (
 			handleBiffTag(this, tag, buffer, len, {
@@ -70,7 +74,7 @@ export class DecalData extends ItemData {
 	}
 }
 
-/** Decal API — VBS surface for `Decal`. @see https://github.com/vpinball/vpinball/blob/master/decal.cpp */
+/** Decal API — VBS surface for `Decal`. @see https://github.com/vpinball/vpinball/blob/master/src/parts/decal.cpp */
 export class DecalApi extends ItemApi<DecalData> {
 	get Rotation() {
 		return this.data.rotation
@@ -139,6 +143,12 @@ export class DecalApi extends ItemApi<DecalData> {
 	set FontColor(v) {
 		this.data.color = v
 	}
+	get Font() {
+		return this.data.font
+	}
+	set Font(v) {
+		this.data.font = v
+	}
 	get HasVerticalText() {
 		return this.data.verticalText
 	}
@@ -151,13 +161,8 @@ export class DecalApi extends ItemApi<DecalData> {
 	set Material(v) {
 		this.data.szMaterial = v
 	}
-
-	protected _getPropertyNames(): string[] {
-		return Object.getOwnPropertyNames(DecalApi.prototype)
-	}
 }
 
-/** Decal item. */
 export class Decal extends Item<DecalData> implements IScriptable<DecalApi> {
 	private api?: DecalApi
 

@@ -2,22 +2,18 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { EventProxy } from '../../game/event-proxy.js'
-import type { IAnimatable } from '../../game/ianimatable.js'
-import type { IHittable } from '../../game/ihittable.js'
-import type { IRenderable, Meshes } from '../../game/irenderable.js'
-import type { IScriptable } from '../../game/iscriptable.js'
+import type { IAnimatable, IHittable, IRenderable, IScriptable, Meshes } from '../../game/interfaces.js'
 import type { Player } from '../../game/player.js'
 import { BiffParser } from '../../io/biff-parser.js'
 import type { Storage } from '../../io/ole-doc.js'
+import { Matrix3D } from '../../math/matrix.js'
+import { Vertex2D } from '../../math/vector.js'
 import type { HitObject } from '../../physics/hit-object.js'
-import { Matrix3D } from '../../util/matrix.js'
-import { Vertex2D } from '../../util/vector.js'
 import { handleBiffTag } from '../biff-helper.js'
 import { Item } from '../item.js'
 import { ItemApi } from '../item-api.js'
 import { ItemData } from '../item-data.js'
 import { ItemState } from '../item-state.js'
-import { omitEqual } from '../state-helpers.js'
 import type { Table } from '../table/table.js'
 import { Texture } from '../texture.js'
 import { BumperAnimation, BumperHit } from './bumper-physics.js'
@@ -131,11 +127,13 @@ export class BumperState extends ItemState {
 	public baseMaterial?: string
 	public skirtMaterial?: string
 
-	// @ts-expect-error
+	// @ts-expect-error — derived visibility from part flags
 	get isVisible(): boolean {
 		return this.isCapVisible || this.isRingVisible || this.isBaseVisible || this.isSkirtVisible
 	}
-	set isVisible(_v: boolean) {}
+	set isVisible(visible: boolean) {
+		this.isCapVisible = this.isRingVisible = this.isBaseVisible = this.isSkirtVisible = visible
+	}
 
 	public static claim(
 		name: string,
@@ -165,58 +163,6 @@ export class BumperState extends ItemState {
 		s.baseMaterial = baseMaterial
 		s.skirtMaterial = skirtMaterial
 		return s
-	}
-
-	public clone(): BumperState {
-		return BumperState.claim(
-			this.name,
-			this.ringOffset,
-			this.skirtRotX,
-			this.skirtRotY,
-			this.isCapVisible,
-			this.isRingVisible,
-			this.isBaseVisible,
-			this.isSkirtVisible,
-			this.capMaterial,
-			this.ringMaterial,
-			this.baseMaterial,
-			this.skirtMaterial,
-		)
-	}
-
-	public diff(state: BumperState): BumperState {
-		const d = this.clone()
-		omitEqual(d, state, 'ringOffset')
-		omitEqual(d, state, 'skirtRotX')
-		omitEqual(d, state, 'skirtRotY')
-		omitEqual(d, state, 'isCapVisible')
-		omitEqual(d, state, 'isRingVisible')
-		omitEqual(d, state, 'isBaseVisible')
-		omitEqual(d, state, 'isSkirtVisible')
-		omitEqual(d, state, 'capMaterial')
-		omitEqual(d, state, 'ringMaterial')
-		omitEqual(d, state, 'baseMaterial')
-		omitEqual(d, state, 'skirtMaterial')
-		return d
-	}
-
-	public release(): void {}
-
-	public equals(state: BumperState): boolean {
-		if (!state) return false
-		return (
-			state.ringOffset === this.ringOffset &&
-			state.skirtRotX === this.skirtRotX &&
-			state.skirtRotY === this.skirtRotY &&
-			state.isCapVisible === this.isCapVisible &&
-			state.isRingVisible === this.isRingVisible &&
-			state.isBaseVisible === this.isBaseVisible &&
-			state.isSkirtVisible === this.isSkirtVisible &&
-			state.capMaterial === this.capMaterial &&
-			state.ringMaterial === this.ringMaterial &&
-			state.baseMaterial === this.baseMaterial &&
-			state.skirtMaterial === this.skirtMaterial
-		)
 	}
 }
 
@@ -411,13 +357,6 @@ export class BumperApi extends ItemApi<BumperData> {
 
 	public PlayHit(): void {
 		this.animation.hitEvent = true
-	}
-	public InterfaceSupportsErrorInfo(_riid: unknown): boolean {
-		return false
-	}
-
-	protected _getPropertyNames(): string[] {
-		return Object.getOwnPropertyNames(BumperApi.prototype)
 	}
 }
 

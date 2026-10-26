@@ -1,10 +1,14 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
+import { expect } from 'chai'
 import type { Mesh } from 'three'
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import { TableBuilder } from '../../../test/table-builder.js'
 import { ThreeHelper } from '../../../test/three.helper'
 import { NodeBinaryReader } from '../../io/binary-reader.node.js'
+import { Vertex3D } from '../../math/vector.js'
+import { DragPoint } from '../dragpoint.js'
 import { Table } from '../table/table.js'
 import { TableExporter } from '../table/table-exporter.js'
 
@@ -7667,5 +7671,26 @@ describe('The VPinball ramp generator', () => {
 			[551.863831, 1735.925781, -157.043625],
 		]
 		three.expectVerticesInArray(expectedVertices, flipperBaseMeshVertices)
+	})
+
+	it('should generate finite vertices for coincident drag points', () => {
+		const makeDragPoint = (): DragPoint => {
+			const dragPoint = new DragPoint()
+			dragPoint.vertex = new Vertex3D(500, 500, 50)
+			return dragPoint
+		}
+		const table = new TableBuilder()
+			.addRamp('Degenerate', { dragPoints: [makeDragPoint(), makeDragPoint()] })
+			.build()
+		const meshes = table.ramps.Degenerate!.getMeshes(table)
+		expect(Object.keys(meshes)).to.not.be.empty
+		for (const info of Object.values(meshes)) {
+			for (const vertex of info.mesh!.vertices) {
+				expect(vertex.x, 'x').to.be.finite
+				expect(vertex.y, 'y').to.be.finite
+				expect(vertex.z, 'z').to.be.finite
+			}
+		}
+		expect(table.ramps.Degenerate!.getSurfaceHeight(500, 500, table)).to.be.finite
 	})
 })

@@ -7,8 +7,10 @@ import sinonChai from 'sinon-chai'
 import { ThreeHelper } from '../../../test/three.helper'
 import { Player } from '../../game/player.js'
 import { NodeBinaryReader } from '../../io/binary-reader.node.js'
+import type { ReadResult, Storage } from '../../io/ole-doc.js'
 import { Enums } from '../enums.js'
 import { Table } from '../table/table.js'
+import { DecalData } from './decal.js'
 
 chai.use((sinonChai as any).default ?? sinonChai)
 const three = new ThreeHelper()
@@ -60,5 +62,43 @@ describe('The VPinball decal API', () => {
 		expect(decal.Material).to.equal('Material')
 		expect(decal.Font).to.equal('Font')
 		expect(decal.HasVerticalText).to.equal(false)
+	})
+
+	it('should bind Font to the item data instead of a shadow property', async () => {
+		const decalItem = table.decals.Decal001
+		const api = decalItem.getApi()
+
+		expect(api.Font).to.equal('')
+		api.Font = 'Font'
+		expect(decalItem.data.font).to.equal('Font')
+		expect(api.Font).to.equal('Font')
+	})
+})
+
+describe('The VPinball decal backglass flag', () => {
+	it('should parse the backglass flag into a declared field', async () => {
+		const record = new Uint8Array(20)
+		const view = new DataView(record.buffer)
+		view.setInt32(0, 8, true)
+		record.set([0x42, 0x47, 0x4c, 0x53], 4) // BGLS
+		view.setInt32(8, 1, true)
+		view.setInt32(12, 4, true)
+		record.set([0x45, 0x4e, 0x44, 0x42], 16) // ENDB
+		const storage = {
+			async streamFiltered(
+				_name: string,
+				_offset: number,
+				next: (result: ReadResult) => Promise<number | null>,
+			): Promise<void> {
+				let pos = 0
+				while (pos < record.length) {
+					const consumed = await next({ data: record.subarray(pos), storageOffset: pos })
+					if (consumed === null) break
+					pos += consumed
+				}
+			},
+		}
+		const data = await DecalData.fromStorage(storage as unknown as Storage, 'Decal1')
+		expect(data.isBackglass).to.equal(true)
 	})
 })

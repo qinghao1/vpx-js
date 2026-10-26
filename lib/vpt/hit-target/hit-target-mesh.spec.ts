@@ -1842,7 +1842,8 @@ describe('The VPinball hit target generator', () => {
 			[442.866699, 803.400024, 5.273632],
 			[442.866699, 814.599976, -4.326368],
 		]
-		expectedVertices.forEach(v => (v[2] += 52.0)) // drop status is not exported when dumping obj in vpx
+		// The mesh is static: upstream keeps the vertex buffer at the raised pose and applies the drop
+		// offset through the object transform, so a dropped target exports the same verts as a raised one.
 		three.expectVerticesInArray(expectedVertices, targetMeshVertices)
 	})
 })

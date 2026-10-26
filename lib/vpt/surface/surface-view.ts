@@ -1,16 +1,15 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
+import { Matrix3D } from '../../math/matrix.js'
 import type { IRenderApi } from '../../render/irender-api.js'
 import { CatmullCurve2D } from '../../util/catmull-curve.js'
-import { Matrix3D } from '../../util/matrix.js'
 import { RenderVertex, Vertex3DNoTex2 } from '../../util/vertex.js'
 import { DragPoint } from '../dragpoint.js'
 import { ItemUpdater } from '../item-updater.js'
 import { Mesh } from '../mesh.js'
 import type { Table } from '../table/table.js'
-import type { SurfaceData } from './surface-data.js'
-import type { SurfaceState } from './surface-state.js'
+import type { SurfaceData, SurfaceState } from './surface.js'
 
 /** Generates surface top/side meshes. @see https://github.com/vpinball/vpinball/blob/master/surface.cpp */
 export class SurfaceMeshGenerator {
@@ -50,27 +49,27 @@ export class SurfaceMeshGenerator {
 			mesh.vertices[off + 2] = Object.assign(new Vertex3DNoTex2(), { x: p2.x, y: p2.y, z: top })
 			mesh.vertices[off + 3] = Object.assign(new Vertex3DNoTex2(), { x: p2.x, y: p2.y, z: bottom })
 			if (textured) {
-				const c = i < n - 1 ? i + 1 : 0
+				const next = i < n - 1 ? i + 1 : 0
 				mesh.vertices[off]!.tu = texCoords[i]!
 				mesh.vertices[off]!.tv = 1
 				mesh.vertices[off + 1]!.tu = texCoords[i]!
 				mesh.vertices[off + 1]!.tv = 0
-				mesh.vertices[off + 2]!.tu = texCoords[c] ?? texCoords[0]!
+				mesh.vertices[off + 2]!.tu = texCoords[next] ?? texCoords[0]!
 				mesh.vertices[off + 2]!.tv = 0
-				mesh.vertices[off + 3]!.tu = texCoords[c] ?? texCoords[0]!
+				mesh.vertices[off + 3]!.tu = texCoords[next] ?? texCoords[0]!
 				mesh.vertices[off + 3]!.tv = 1
 			}
 			off += 4
 		}
 		for (let i = 0; i < n; i++) {
-			const o = i * 6,
-				b = i * 4
-			mesh.indices[o] = b
-			mesh.indices[o + 1] = b + 1
-			mesh.indices[o + 2] = b + 2
-			mesh.indices[o + 3] = b
-			mesh.indices[o + 4] = b + 2
-			mesh.indices[o + 5] = b + 3
+			const offset = i * 6,
+				base = i * 4
+			mesh.indices[offset] = base
+			mesh.indices[offset + 1] = base + 1
+			mesh.indices[offset + 2] = base + 2
+			mesh.indices[offset + 3] = base
+			mesh.indices[offset + 4] = base + 2
+			mesh.indices[offset + 5] = base + 3
 		}
 	}
 
@@ -86,13 +85,13 @@ export class SurfaceMeshGenerator {
 		const invW = 1 / dim.width,
 			invH = 1 / dim.height
 		for (let i = 0; i < n; i++) {
-			const p = verts[i]!
+			const point = verts[i]!
 			mesh.vertices[i] = Object.assign(new Vertex3DNoTex2(), {
-				x: p.x,
-				y: p.y,
+				x: point.x,
+				y: point.y,
 				z: zTop,
-				tu: p.x * invW,
-				tv: p.y * invH,
+				tu: point.x * invW,
+				tv: point.y * invH,
 			})
 		}
 	}
@@ -113,21 +112,39 @@ export class SurfaceUpdater extends ItemUpdater<SurfaceState> {
 		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
 		table: Table,
 	): void {
-		this.applyDropState(obj, state, renderApi)
+		Object.assign(this.state, state)
 		this.applySideState(obj, state, renderApi, table)
 		this.applyTopState(obj, state, renderApi, table)
+		this.applyDropState(obj, state, renderApi, table)
 	}
 
 	private applyDropState<NODE, GEOMETRY, POINT_LIGHT>(
 		obj: NODE,
 		state: SurfaceState,
 		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
+		table: Table,
 	): void {
 		if (state.isDropped === undefined) return
-		const m = Matrix3D.claim()
-		if (state.isDropped) m.setTranslation(0, 0, this.data.heightTop - 0.01)
-		renderApi.applyMatrixToNode(m, obj)
-		Matrix3D.release(m)
+		// Dropped walls smash to a pancake: sides hidden, top at heightBottom+0.1.
+		// Flipbook walls render nothing at all when dropped.
+		// @see https://github.com/vpinball/vpinball/blob/master/src/parts/surface.cpp (Render, RenderWallsAtHeight)
+		const side = renderApi.findInGroup(obj, `surface.side-${this.state.getName()}`)
+		const top = renderApi.findInGroup(obj, `surface.top-${this.state.getName()}`)
+		const matrix = Matrix3D.claim()
+		if (state.isDropped) {
+			renderApi.applyVisibility(false, side)
+			if (this.data.isFlipbook) {
+				renderApi.applyVisibility(false, top)
+			} else {
+				matrix.setTranslation(0, 0, (this.data.heightTop - this.data.heightBottom - 0.1) * table.getScaleZ())
+				renderApi.applyMatrixToNode(matrix, top)
+			}
+		} else {
+			renderApi.applyVisibility(this.state.isSideVisible, side)
+			renderApi.applyVisibility(this.state.isTopVisible, top)
+			renderApi.applyMatrixToNode(matrix, top)
+		}
+		Matrix3D.release(matrix)
 	}
 
 	private applyTopState<NODE, GEOMETRY, POINT_LIGHT>(

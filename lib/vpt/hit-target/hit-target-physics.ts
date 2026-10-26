@@ -4,19 +4,18 @@
 import { MathUtils } from 'three'
 import { Event } from '../../game/event.js'
 import type { EventProxy } from '../../game/event-proxy.js'
-import type { IAnimation } from '../../game/ianimatable.js'
+import type { IAnimation } from '../../game/interfaces.js'
+import { Matrix3D } from '../../math/matrix.js'
+import { Vertex3D } from '../../math/vector.js'
 import { CollisionType } from '../../physics/collision-type.js'
 import { EdgeSet } from '../../physics/edge-set.js'
 import type { HitObject } from '../../physics/hit-object.js'
 import { HitPoint } from '../../physics/hit-point.js'
 import { HitTriangle } from '../../physics/hit-triangle.js'
-import { Matrix3D } from '../../util/matrix.js'
-import { Vertex3D } from '../../util/vector.js'
 import { Enums } from '../enums.js'
 import type { Mesh } from '../mesh.js'
 import type { Table } from '../table/table.js'
-import type { HitTargetData } from './hit-target-data.js'
-import type { HitTargetState } from './hit-target-state.js'
+import type { HitTargetData, HitTargetState } from './hit-target.js'
 import type { HitTargetMeshGenerator } from './hit-target-view.js'
 
 export const DROP_TARGET_LIMIT = 52.0
@@ -40,8 +39,10 @@ export class HitTargetAnimation implements IAnimation {
 	}
 
 	public updateAnimation(newTimeMsec: number, table: Table): boolean {
-		const oldTimeMsec = this.timeMsec < newTimeMsec ? this.timeMsec : newTimeMsec
+		const oldTimeMsec = Math.min(this.timeMsec, newTimeMsec)
 		this.timeMsec = newTimeMsec
+		// Do not animate invisible targets: old tables rely on hidden drop targets never dropping.
+		if (!this.data.isVisible) return false
 		const diffTimeMsec = newTimeMsec - oldTimeMsec
 		const prevZOffset = this.state.zOffset
 		const prevXRotation = this.state.xRotation
@@ -74,6 +75,7 @@ export class HitTargetAnimation implements IAnimation {
 						if (this.data.useHitEvent) this.events.fireGroupEvent(Event.TargetEventsRaised)
 					}
 				}
+				this.events.fireGroupEvent(Event.AnimateEventsAnimate)
 			}
 		} else {
 			if (this.moveAnimation) {
@@ -92,6 +94,7 @@ export class HitTargetAnimation implements IAnimation {
 						this.moveAnimation = false
 					}
 				}
+				this.events.fireGroupEvent(Event.AnimateEventsAnimate)
 			}
 		}
 		return this.state.zOffset !== prevZOffset || this.state.xRotation !== prevXRotation
@@ -139,28 +142,25 @@ export class HitTargetHitGenerator {
 		const addedEdges = new EdgeSet()
 		const hitMesh = this.meshGenerator.generateMesh(table)
 		const hitObjects = this.generateCollidables(hitMesh, addedEdges, this.data.legacy, events, table)
-		const tempMatrix = new Matrix3D().rotateZMatrix(MathUtils.degToRad(this.data.rotZ))
-		const fullMatrix = new Matrix3D().multiply(tempMatrix)
+		const fullMatrix = new Matrix3D().rotateZMatrix(MathUtils.degToRad(this.data.rotZ))
 		if (!this.data.legacy) {
 			const rgv3D: Vertex3D[] = []
 			let hitShapeOffset = 0.18
 			if (this.data.targetType === Enums.TargetType.DropTargetBeveled) hitShapeOffset = 0.25
 			if (this.data.targetType === Enums.TargetType.DropTargetFlatSimple) hitShapeOffset = 0.13
-			for (const dropTargetHitPlaneVertex of dropTargetHitPlaneVertices) {
+			const tableHeight = table.getTableHeight()
+			const scaleZ = table.getScaleZ()
+			for (const planeVertex of dropTargetHitPlaneVertices) {
 				const vert = new Vertex3D(
-					dropTargetHitPlaneVertex.x,
-					dropTargetHitPlaneVertex.y + hitShapeOffset,
-					dropTargetHitPlaneVertex.z,
-				)
-				vert.x *= this.data.vSize.x
-				vert.y *= this.data.vSize.y
-				vert.z *= this.data.vSize.z
-				vert.multiplyMatrix(fullMatrix)
+					planeVertex.x * this.data.vSize.x,
+					(planeVertex.y + hitShapeOffset) * this.data.vSize.y,
+					planeVertex.z * this.data.vSize.z,
+				).multiplyMatrix(fullMatrix)
 				rgv3D.push(
 					new Vertex3D(
 						vert.x + this.data.position.x,
 						vert.y + this.data.position.y,
-						vert.z * table.getScaleZ() + this.data.position.z + table.getTableHeight(),
+						vert.z * scaleZ + this.data.position.z + tableHeight,
 					),
 				)
 			}
@@ -171,19 +171,9 @@ export class HitTargetHitGenerator {
 				const rgv3D2: Vertex3D[] = [rgv3D[i0]!, rgv3D[i2]!, rgv3D[i1]!]
 				hitObjects.push(this.setupHitObject(new HitTriangle(rgv3D2), events, true, table))
 				hitObjects.push(
-					...addedEdges
-						.addHitEdge(i0, i1, rgv3D2[0]!, rgv3D2[2]!)
-						.map(obj => this.setupHitObject(obj, events, true, table)),
-				)
-				hitObjects.push(
-					...addedEdges
-						.addHitEdge(i1, i2, rgv3D2[2]!, rgv3D2[1]!)
-						.map(obj => this.setupHitObject(obj, events, true, table)),
-				)
-				hitObjects.push(
-					...addedEdges
-						.addHitEdge(i2, i0, rgv3D2[1]!, rgv3D2[0]!)
-						.map(obj => this.setupHitObject(obj, events, true, table)),
+					...this.triangleEdges(addedEdges, i0, i1, i2, rgv3D2).map(obj =>
+						this.setupHitObject(obj, events, true, table),
+					),
 				)
 			}
 			for (let i = 0; i < dropTargetHitPlaneVertices.length; ++i) {
@@ -218,25 +208,23 @@ export class HitTargetHitGenerator {
 			]
 			hitObjects.push(this.setupHitObject(new HitTriangle(rgv3D), events, setHitObject, table))
 			hitObjects.push(
-				...addedEdges
-					.addHitEdge(i0, i1, rgv3D[0]!, rgv3D[2]!)
-					.map(obj => this.setupHitObject(obj, events, setHitObject, table)),
-			)
-			hitObjects.push(
-				...addedEdges
-					.addHitEdge(i1, i2, rgv3D[2]!, rgv3D[1]!)
-					.map(obj => this.setupHitObject(obj, events, setHitObject, table)),
-			)
-			hitObjects.push(
-				...addedEdges
-					.addHitEdge(i2, i0, rgv3D[1]!, rgv3D[0]!)
-					.map(obj => this.setupHitObject(obj, events, setHitObject, table)),
+				...this.triangleEdges(addedEdges, i0, i1, i2, rgv3D).map(obj =>
+					this.setupHitObject(obj, events, setHitObject, table),
+				),
 			)
 		}
 		for (const vertex of hitMesh.vertices) {
 			hitObjects.push(this.setupHitObject(new HitPoint(vertex.getVertex()), events, setHitObject, table))
 		}
 		return hitObjects
+	}
+
+	private triangleEdges(addedEdges: EdgeSet, i0: number, i1: number, i2: number, verts: Vertex3D[]) {
+		return [
+			...addedEdges.addHitEdge(i0, i1, verts[0]!, verts[2]!),
+			...addedEdges.addHitEdge(i1, i2, verts[2]!, verts[1]!),
+			...addedEdges.addHitEdge(i2, i0, verts[1]!, verts[0]!),
+		]
 	}
 
 	private setupHitObject(obj: HitObject, events: EventProxy, setHitObject: boolean, table: Table): HitObject {

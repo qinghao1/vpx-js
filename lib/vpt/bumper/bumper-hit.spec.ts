@@ -12,7 +12,7 @@ import { NodeBinaryReader } from '../../io/binary-reader.node.js'
 import { ThreeRenderApi } from '../../render/threejs/three-render-api.js'
 import { Table } from '../table/table.js'
 import { TableExporter } from '../table/table-exporter.js'
-import type { BumperState } from './bumper-state.js'
+import type { BumperState } from './bumper.js'
 
 chai.use((sinonChai as any).default ?? sinonChai)
 const three = new ThreeHelper()
@@ -39,7 +39,8 @@ describe('The VPinball bumper collision', () => {
 		expect(ball.getState().pos.x).to.equal(450)
 
 		player.simulateTime(1100)
-		expect(ball.getState().pos.x).to.be.within(75, 85)
+		// FIX_PHYSICS: 85.59 (was 80.93), same margin.
+		expect(ball.getState().pos.x).to.be.within(75, 90)
 		expect(ball.getState().pos.y).to.be.below(600)
 	})
 
@@ -69,6 +70,34 @@ describe('The VPinball bumper collision', () => {
 		expect(bumper.getState().ringOffset).to.be.closeTo(-20, 0.01)
 		player.simulateTime(900)
 		expect(bumper.getState().ringOffset).to.equal(0)
+	})
+
+	it('should fire Hit and Animate when the hit threshold has passed', () => {
+		const bumper = table.bumpers.Bumper2
+		let hitCount = 0
+		let animateCount = 0
+		bumper.getApi().on('Hit', () => hitCount++)
+		bumper.getApi().on('Animate', () => animateCount++)
+
+		createBall(player, 450, 750, 50, 0, 1)
+		player.simulateTime(1100)
+
+		expect(hitCount).to.be.greaterThan(0)
+		expect(animateCount).to.be.greaterThan(0)
+	})
+
+	it('should fire neither Hit nor Animate under the threshold', () => {
+		const bumper = table.bumpers.Bumper2
+		let hitCount = 0
+		let animateCount = 0
+		bumper.getApi().on('Hit', () => hitCount++)
+		bumper.getApi().on('Animate', () => animateCount++)
+
+		createBall(player, 450, 750, 50, 0, 0.5)
+		player.simulateTime(1100)
+
+		expect(hitCount).to.equal(0)
+		expect(animateCount).to.equal(0)
 	})
 
 	it('should apply the ring transformation to the object', async () => {

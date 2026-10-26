@@ -2,15 +2,15 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import type { EventProxy } from '../../game/event-proxy.js'
+import { Vertex3D } from '../../math/vector.js'
 import { CollisionType } from '../../physics/collision-type.js'
+import { EdgeSet } from '../../physics/edge-set.js'
 import type { HitObject } from '../../physics/hit-object.js'
 import { HitPoint } from '../../physics/hit-point.js'
 import { HitTriangle } from '../../physics/hit-triangle.js'
-import { EdgeSet } from '../../util/edge-set.js'
-import { Vertex3D } from '../../util/vector.js'
 import type { Mesh } from '../mesh.js'
 import type { Table } from '../table/table.js'
-import type { RubberData } from './rubber-data.js'
+import type { RubberData } from './rubber.js'
 import type { RubberMeshGenerator } from './rubber-view.js'
 
 /** Generates rubber hit shapes. @see https://github.com/vpinball/vpinball/blob/master/rubber.cpp */
@@ -40,7 +40,7 @@ export class RubberHitGenerator {
 			hits.push(...RubberHitGenerator.edge(mesh, addedEdges, mesh.indices[i + 1]!, mesh.indices[i]!))
 		}
 		for (const mv of mesh.vertices) hits.push(new HitPoint(new Vertex3D(mv.x, mv.y, mv.z)))
-		return hits.map(o => this.setup(o, events, table))
+		return hits.map(hit => this.setup(hit, events, table))
 	}
 
 	private setup(obj: HitObject, events: EventProxy, table: Table): HitObject {

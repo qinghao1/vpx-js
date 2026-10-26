@@ -2,17 +2,15 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { EventProxy } from '../../game/event-proxy.js'
-import type { IHittable } from '../../game/ihittable.js'
-import type { IRenderable, Meshes } from '../../game/irenderable.js'
-import type { IScriptable } from '../../game/iscriptable.js'
+import type { IHittable, IRenderable, IScriptable, Meshes } from '../../game/interfaces.js'
 import type { IBallCreationPosition, Player } from '../../game/player.js'
 import type { PlayerPhysics } from '../../game/player-physics.js'
 import { BiffParser } from '../../io/biff-parser.js'
 import type { Storage } from '../../io/ole-doc.js'
+import { Matrix3D } from '../../math/matrix.js'
+import { Vertex2D, Vertex3D } from '../../math/vector.js'
 import type { HitObject } from '../../physics/hit-object.js'
 import { logger } from '../../util/logger.js'
-import { Matrix3D } from '../../util/matrix.js'
-import { Vertex2D, Vertex3D } from '../../util/vector.js'
 import type { Ball } from '../ball/ball.js'
 import { handleBiffTag } from '../biff-helper.js'
 import { Enums } from '../enums.js'
@@ -20,7 +18,6 @@ import { Item } from '../item.js'
 import { ItemApi } from '../item-api.js'
 import { ItemData } from '../item-data.js'
 import { ItemState } from '../item-state.js'
-import { omitEqual } from '../state-helpers.js'
 import type { Table } from '../table/table.js'
 import { Texture } from '../texture.js'
 import { KickerHit } from './kicker-physics.js'
@@ -102,24 +99,6 @@ export class KickerState extends ItemState {
 		s.type = type
 		s.material = material
 		return s
-	}
-
-	public clone(): KickerState {
-		return KickerState.claim(this.name, this.type, this.material)
-	}
-
-	public diff(state: KickerState): KickerState {
-		const d = this.clone()
-		omitEqual(d, state, 'type')
-		omitEqual(d, state, 'material')
-		return d
-	}
-
-	public release(): void {}
-
-	public equals(state: KickerState): boolean {
-		if (!state) return false
-		return state.type === this.type && state.material === this.material
 	}
 }
 
@@ -208,7 +187,7 @@ export class KickerApi extends ItemApi<KickerData> {
 		return this._state.type
 	}
 	set KickerType(v) {
-		this._state.type = v
+		this.setType(v)
 	}
 	get Material() {
 		return this._state.material
@@ -220,19 +199,18 @@ export class KickerApi extends ItemApi<KickerData> {
 		return this._state.type
 	}
 	set DrawStyle(v) {
-		this._state.type = v
+		this.setType(v)
+	}
+
+	private setType(v: number): void {
+		const type = v > Enums.KickerType.KickerCup2 ? Enums.KickerType.KickerInvisible : v
+		this._state.type = type
+		this.data.kickerType = type
 	}
 
 	get LastCapturedBall(): Ball | null {
 		if (!this.hit.lastCapturedBall) return null
-		let ballFound = false
-		for (const ball of this.player.getBalls()) {
-			if (ball === this.hit.lastCapturedBall) {
-				ballFound = true
-				break
-			}
-		}
-		if (!ballFound) {
+		if (!this.player.getBalls().includes(this.hit.lastCapturedBall)) {
 			logger().error('LastCapturedBall was called but ball is already destroyed!')
 			return null
 		}
@@ -276,10 +254,6 @@ export class KickerApi extends ItemApi<KickerData> {
 
 	get BallCntOver(): number {
 		return super._ballCountOver(this.events)
-	}
-
-	protected _getPropertyNames(): string[] {
-		return Object.getOwnPropertyNames(KickerApi.prototype)
 	}
 }
 
@@ -338,7 +312,9 @@ export class Kicker
 		this.events = new EventProxy(this)
 		const height =
 			table.getSurfaceHeight(this.data.szSurface, this.data.center.x, this.data.center.y) * table.getScaleZ()
-		this.hit = new KickerHit(this.data, this.events, table, this.data.radius, height)
+		// In legacy mode only the kicker's inner circle captures the ball.
+		const radius = this.data.radius * (this.data.legacyMode ? (this.data.fallThrough ? 0.75 : 0.6) : 1)
+		this.hit = new KickerHit(this.data, this.events, table, radius, height)
 		this.api = new KickerApi(this.state, this.data, this.hit, this.events, this, player, table)
 	}
 
@@ -376,8 +352,6 @@ export class Kicker
 				return Texture.fromFilesystem('kickerGottlieb.png')
 			case Enums.KickerType.KickerCup2:
 				return Texture.fromFilesystem('kickerT1.png')
-			case Enums.KickerType.KickerHole:
-				return Texture.fromFilesystem('kickerHoleWood.png')
 			default:
 				return Texture.fromFilesystem('kickerHoleWood.png')
 		}

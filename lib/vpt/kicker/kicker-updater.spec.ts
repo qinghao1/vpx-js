@@ -8,9 +8,10 @@ import sinonChai from 'sinon-chai'
 import { TableBuilder } from '../../../test/table-builder.js'
 import { TestRenderApi } from '../../../test/test-render-api.js'
 import { Player } from '../../game/player.js'
+import type { IRenderApi } from '../../render/irender-api.js'
 import { Enums } from '../enums.js'
 import type { Table } from '../table/table.js'
-import type { KickerState } from './kicker-state.js'
+import type { KickerState } from './kicker.js'
 
 chai.use((sinonChai as any).default ?? sinonChai)
 
@@ -38,14 +39,26 @@ describe('The VPinball kicker updater', () => {
 		spy(renderApi, 'applyVisibility')
 		table.kickers.kicker
 			.getUpdater()
-			.applyState(null, { type: Enums.KickerType.KickerInvisible } as KickerState, renderApi, table)
+			.applyState(
+				null,
+				{ type: Enums.KickerType.KickerInvisible } as KickerState,
+				renderApi as unknown as IRenderApi<null, unknown, unknown>,
+				table,
+			)
 		expect(renderApi.applyVisibility).to.have.been.calledOnceWith(false)
 	})
 
 	it('should apply the material', async () => {
 		const renderApi = new TestRenderApi()
 		spy(renderApi, 'applyMaterial')
-		table.kickers.kicker.getUpdater().applyState(null, { material: 'opaque' } as KickerState, renderApi, table)
+		table.kickers.kicker
+			.getUpdater()
+			.applyState(
+				null,
+				{ material: 'opaque' } as KickerState,
+				renderApi as unknown as IRenderApi<null, unknown, unknown>,
+				table,
+			)
 		expect(renderApi.applyMaterial).to.have.been.calledOnce
 	})
 })
