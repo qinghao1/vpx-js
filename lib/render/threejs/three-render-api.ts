@@ -22,6 +22,7 @@ import type { Table, TableGenerateOptions } from '../../vpt/table/table.js'
 import type { Texture } from '../../vpt/texture.js'
 import type { IRenderApi, MeshConvertOptions } from '../irender-api.js'
 import type { IMaterialGenerator } from './imaterial-generator.js'
+import { cloneMaterialForWrite } from './material-shared.js'
 import { installBvh } from './three-bvh.js'
 import { ThreeConverter } from './three-converter.js'
 import { ThreeLightGenerator } from './three-light-generator.js'
@@ -300,6 +301,10 @@ export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, Poin
 			gen.applyEnvMap(mat, envMap)
 			gen.applyEmissiveMap(mat, material, emissiveMap)
 		}
+	}
+
+	public cloneMaterialForWrite<MATERIAL>(mat: MATERIAL): MATERIAL {
+		return cloneMaterialForWrite(mat)
 	}
 
 	public createObjectFromRenderable(

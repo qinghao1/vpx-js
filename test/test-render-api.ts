@@ -20,6 +20,7 @@
 import type { IRenderable, RenderInfo } from '../lib/game/interfaces'
 import type { Matrix3D } from '../lib/math/matrix.js'
 import type { IRenderApi } from '../lib/render/irender-api'
+import { cloneMaterialForWrite } from '../lib/render/threejs/material-shared.js'
 import type { ItemState } from '../lib/vpt/item-state'
 import type { LightData, LightState } from '../lib/vpt/light/light'
 import type { Material } from '../lib/vpt/material'
@@ -40,6 +41,10 @@ export class TestRenderApi implements IRenderApi<any, any, any> {
 		_envMap?: string,
 		_emissiveMap?: string,
 	): void {}
+
+	public cloneMaterialForWrite<MATERIAL>(mat: MATERIAL): MATERIAL {
+		return cloneMaterialForWrite(mat)
+	}
 
 	public applyMatrixToNode(_matrix: Matrix3D, _node: any | undefined): void {}
 

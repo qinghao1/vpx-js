@@ -135,6 +135,20 @@ export interface IRenderApi<NODE, GEOMETRY, POINT_LIGHT> {
 	): void
 
 	/**
+	 * Fork-safe material clone for script writes.
+	 *
+	 * Backends whose materials stash live state outside the classic clone path
+	 * (three.js TSL node materials keep uniform objects in `userData`, which a
+	 * plain `.clone()` flattens into inert JSON) rebuild an equivalent material
+	 * here so per-item script state never leaks between items nor dies on first
+	 * write. Optional for backward compatibility with custom backends: updaters
+	 * fall back to a plain `.clone()` when the backend does not provide it.
+	 *
+	 * @param mat Material to fork for exclusive write access
+	 */
+	cloneMaterialForWrite?<MATERIAL>(mat: MATERIAL): MATERIAL
+
+	/**
 	 * Creates a new node based on a renderable.
 	 *
 	 * @param renderable The renderable from the VPX file

@@ -3,7 +3,11 @@
 import { Color } from 'three'
 import { Matrix3D } from '../../math/matrix.js'
 import type { IRenderApi } from '../../render/irender-api.js'
-import { cloneMaterialForWrite, getGlobalEmissionScale } from '../../render/threejs/material-shared.js'
+import { Vertex3DNoTex2 } from '../../util/vertex.js'
+import { ItemUpdater } from '../item-updater.js'
+import { Mesh } from '../mesh.js'
+import type { Table } from '../table/table.js'
+import type { PrimitiveData } from './primitive-data.js'
 import {
 	getPrimitiveKind,
 	isPrimitiveNodeMaterial,
@@ -11,12 +15,7 @@ import {
 	PRIMITIVE_BDL_KIND,
 	updatePrimitiveAdditive,
 	updatePrimitiveBdl,
-} from '../../render/threejs/nodes/primitive-bdl-node.js'
-import { Vertex3DNoTex2 } from '../../util/vertex.js'
-import { ItemUpdater } from '../item-updater.js'
-import { Mesh } from '../mesh.js'
-import type { Table } from '../table/table.js'
-import type { PrimitiveData } from './primitive-data.js'
+} from './primitive-material-protocol.js'
 import { buildPrimitiveMatrix } from './primitive-mesh-generator.js'
 import type { PrimitiveState } from './primitive-state.js'
 
@@ -70,7 +69,7 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 			state.alpha !== undefined ||
 			state.disableLightingTop !== undefined ||
 			state.disableLightingBelow !== undefined
-		if (needsClone) this.ensureCloned(obj)
+		if (needsClone) this.ensureCloned(obj, renderApi)
 		if (state.material !== undefined || state.map !== undefined || state.normalMap !== undefined) {
 			this.applyMaterial(obj, state.material, state.map, renderApi, table)
 		}
@@ -89,7 +88,10 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 		if (state.currentFrame !== undefined) this.applyAnimationFrame(obj, state, renderApi)
 	}
 
-	private ensureCloned<NODE>(obj: NODE): void {
+	private ensureCloned<NODE, GEOMETRY, POINT_LIGHT>(
+		obj: NODE,
+		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
+	): void {
 		for (const mesh of this.meshes(obj)) {
 			const mat = mesh.material as unknown as
 				| { userData: Record<string, unknown>; clone: () => unknown }
@@ -97,8 +99,11 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 			if (!mat?.clone || mat.userData.__primitiveCloned) continue
 			// Node materials stash TSL uniforms in userData, which three.js clone() would
 			// reduce to plain JSON; rebuild them so per-primitive script state (color/BDL)
-			// never leaks between inserts nor dies on first write.
-			const cloned = cloneMaterialForWrite(mat) as typeof mat
+			// never leaks between inserts nor dies on first write. The fork itself is the
+			// backend's job (IRenderApi seam); plain .clone() is only the fallback for
+			// custom backends that do not provide it.
+			const forkClone = renderApi.cloneMaterialForWrite
+			const cloned = (forkClone ? forkClone(mat) : mat.clone()) as typeof mat
 			;(cloned.userData as Record<string, unknown>).__primitiveCloned = true
 			mesh.material = cloned as unknown as typeof mesh.material
 		}

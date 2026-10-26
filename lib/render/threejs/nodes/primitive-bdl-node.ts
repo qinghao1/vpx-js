@@ -13,11 +13,35 @@ import {
 } from 'three'
 import { Fn, float, positionWorld, sqrt, step, texture, uniform, uv, vec2, vec4 } from 'three/tsl'
 import { MeshBasicNodeMaterial, MeshStandardNodeMaterial } from 'three/webgpu'
+import {
+	bdlDiffuseFactor,
+	bdlEmissiveCarry,
+	belowFactor,
+	getPrimitiveKind,
+	isPrimitiveNodeMaterial,
+	PRIMITIVE_ADDITIVE_KIND,
+	PRIMITIVE_BDL_KIND,
+	type PrimitiveAdditiveUpdate,
+	type PrimitiveBdlUpdate,
+	type ProtocolColor,
+	updatePrimitiveAdditive,
+	updatePrimitiveBdl,
+} from '../../../vpt/primitive/primitive-material-protocol.js'
 import { copyPendingKeys, defineEmissiveIntensityCompat, setNodeMapSlot } from '../material-shared.js'
 import { getTransmissionTexture, TRANSMISSION_OPAQUE_CUTOFF } from '../transmission-buffer.js'
 
-export const PRIMITIVE_BDL_KIND = 'bdl'
-export const PRIMITIVE_ADDITIVE_KIND = 'additive'
+export type { PrimitiveAdditiveUpdate, PrimitiveBdlUpdate, ProtocolColor }
+export {
+	bdlDiffuseFactor,
+	bdlEmissiveCarry,
+	belowFactor,
+	getPrimitiveKind,
+	isPrimitiveNodeMaterial,
+	PRIMITIVE_ADDITIVE_KIND,
+	PRIMITIVE_BDL_KIND,
+	updatePrimitiveAdditive,
+	updatePrimitiveBdl,
+}
 
 // Scaled playfield extents for the bulb-light buffer lookup, shared by every BDL
 // fork. Native (fs_basic.sc) samples its bulb buffer per-pixel in screen space;
@@ -75,31 +99,6 @@ export interface PrimitiveAdditiveOptions {
 
 function sideFor(doubleSided?: boolean): typeof DoubleSide | typeof BackSide {
 	return doubleSided !== false ? DoubleSide : BackSide
-}
-
-// Native (material.sh DoPointLight tail + lightLoop): each point light returns
-// mix(litResult, diffuse, BDL) for BDL outside {0, 1}, and lightLoop SUMS TWO
-// such lights (NUM_LIGHTS=2), so the composite carries 2*BDL x diffuse while
-// the summed lit result scales by (1-BDL). Only exactly 1.0 takes the
-// kept-for-compat 2x diffuse path, which equals 2*BDL at BDL=1, so upstream is
-// continuous through 1.0 and the composite must be too (a 1x carry would pop
-// 2x on script fades through 1.0 and render HDR inserts half-bright).
-// Past 1 the composite does NOT extrapolate the mix: native's flare regime is
-// dominated by 2*BDL*diffuse because its per-light result is ~0 in the dark
-// cabinet, while the composite's lit input is three.js scene lighting on another
-// scale — scaling it by (1-BDL) would subtract scene light and blacken inserts
-// that render as bright HDR flares upstream. Diffuse clamps at 0; the overdrive
-// rides emissive only, which can only add light.
-export function bdlDiffuseFactor(bdl: number): number {
-	return bdl >= 1 ? 0 : 1 - bdl
-}
-
-export function bdlEmissiveCarry(bdl: number): number {
-	return bdl === 1 ? 2 : 2 * bdl
-}
-
-export function belowFactor(below: number): number {
-	return Math.max(0, 1 - below)
 }
 
 export function createPrimitiveBdlMaterial(opts: PrimitiveBdlOptions): MeshStandardNodeMaterial {
@@ -260,56 +259,8 @@ export function createPrimitiveAdditiveMaterial(opts: PrimitiveAdditiveOptions):
 	return mat
 }
 
-export function isPrimitiveNodeMaterial(mat: unknown): boolean {
-	const kind = (mat as { userData?: { __primitiveKind?: string } })?.userData?.__primitiveKind
-	return kind === PRIMITIVE_BDL_KIND || kind === PRIMITIVE_ADDITIVE_KIND
-}
-
-export function getPrimitiveKind(mat: unknown): string | undefined {
-	return (mat as { userData?: { __primitiveKind?: string } })?.userData?.__primitiveKind
-}
-
 export function setPrimitiveMap(mat: unknown, map: ThreeTexture | null, name?: string): boolean {
 	return setNodeMapSlot(mat, map, name, isPrimitiveNodeMaterial)
-}
-
-export function updatePrimitiveBdl(
-	mat: unknown,
-	opts: {
-		albedo?: number
-		opacity?: number
-		bdl?: number
-		below?: number
-	},
-): void {
-	const targetMaterial = mat as { userData?: Record<string, unknown> } | null | undefined
-	if (!targetMaterial || targetMaterial.userData?.__primitiveKind !== PRIMITIVE_BDL_KIND) return
-	const userData = targetMaterial.userData as Record<string, unknown>
-	if (opts.albedo !== undefined) (userData.__uAlbedo as { value: Color }).value.set(opts.albedo)
-	if (opts.opacity !== undefined) (userData.__uAlpha as { value: number }).value = opts.opacity
-	if (opts.bdl !== undefined) {
-		;(userData.__uBDL as { value: number }).value = opts.bdl
-		;(userData.__uDim as { value: number }).value = bdlDiffuseFactor(opts.bdl)
-		;(userData.__uLitF as { value: number }).value = bdlDiffuseFactor(opts.bdl)
-		;(userData.__uCarry as { value: number }).value = bdlEmissiveCarry(opts.bdl)
-	}
-	if (opts.below !== undefined && userData.__uBelowF) {
-		;(userData.__uBelowF as { value: number }).value = belowFactor(opts.below)
-		userData.__below = opts.below
-	}
-}
-
-export function updatePrimitiveAdditive(mat: unknown, opts: { tint?: number; intensity?: number }): void {
-	const targetMaterial = mat as { userData?: Record<string, unknown> } | null | undefined
-	if (!targetMaterial || targetMaterial.userData?.__primitiveKind !== PRIMITIVE_ADDITIVE_KIND) return
-	const userData = targetMaterial.userData as Record<string, unknown>
-	if (opts.tint !== undefined) (userData.__uTint as { value: Color }).value.set(opts.tint)
-	if (opts.intensity !== undefined) (userData.__uIntensity as { value: number }).value = opts.intensity
-	if (opts.tint !== undefined || opts.intensity !== undefined) {
-		const tint = ((userData.__uTint as { value: Color }).value.getHex?.() ?? 0xffffff) as number
-		const intensity = (userData.__uIntensity as { value: number }).value as number
-		;((userData.__uFlat as { value: Color }).value as Color).set(tint).multiplyScalar(intensity)
-	}
 }
 
 function uniformHex(value: unknown, fallback: number): number {
