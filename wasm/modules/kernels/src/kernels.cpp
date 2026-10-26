@@ -7,7 +7,6 @@ constexpr float C_CONTACTVEL = 0.099f;
 constexpr float C_LOWNORMVEL = 0.0001f;
 constexpr float PHYS_TOUCH = 0.05f;
 constexpr float C_TOL_ENDPNTS = 0.0f;
-constexpr float C_TOL_RADIUS = 0.005f;
 
 struct Hit {
 	float t = -1;
@@ -27,15 +26,19 @@ inline Hit testPlane(float bx, float by, float bz, float vx, float vy, float vz,
 	if (bnv > C_CONTACTVEL) return h;
 	float bnd = nx * bx + ny * by + nz * bz - r - d;
 	if (bnd < r * -2) return h;
-	if (std::fabs(bnv) <= C_CONTACTVEL) {
-		if (std::fabs(bnd) > PHYS_TOUCH) return h;
-		h.t = 0; h.contact = 1; h.nx = nx; h.ny = ny; h.nz = nz; h.dist = bnd; h.bnv = bnv;
-		return h;
-	}
-	float t = bnd / -bnv;
-	if (t < 0) t = 0;
+	// FIX_PHYSICS (upstream collideex.cpp HitPlane::HitTest, mirrored by
+	// HitPlane.hitTest): a slow touch is a contact at time 0; a slow ball
+	// embedded deeper than PHYS_TOUCH collides at time 0 instead of sinking.
+	float t = 0;
+	int contact = 0;
+	if (bnd <= PHYS_TOUCH) {
+		if (std::fabs(bnv) <= C_CONTACTVEL && bnd >= -PHYS_TOUCH) contact = 1;
+		else if (bnd <= 0) t = 0;
+		else t = bnd / -bnv;
+	} else if (std::fabs(bnv) > C_LOWNORMVEL) t = bnd / -bnv;
+	else return h;
 	if (!std::isfinite(t) || t < 0 || t > dTime) return h;
-	h.t = t; h.nx = nx; h.ny = ny; h.nz = nz; h.dist = bnd;
+	h.t = t; h.contact = contact; h.nx = nx; h.ny = ny; h.nz = nz; h.dist = bnd; h.bnv = contact ? bnv : 0;
 	return h;
 }
 
@@ -120,9 +123,7 @@ inline Hit testPoint(float bx, float by, float bz, float vx, float vy, float vz,
 		float disc = 4.f*b*b - 4.f*a*(bcddsq - r*r);
 		if (disc < 0) return h;
 		float s = std::sqrt(disc), inv = -0.5f / a;
-		float t0 = (2.f*b + s) * inv;
-		float t1 = (2.f*b - s) * inv;
-		t = t0 * t1 < 0 ? std::fmax(t0, t1) : std::fmin(t0, t1);
+		t = pickTime((2.f*b + s) * inv, (2.f*b - s) * inv);
 	}
 	if (!std::isfinite(t) || t < 0 || t > dTime) return h;
 	float hx = bx + vx*t, hy = by + vy*t, hz = bz + vz*t;
@@ -175,13 +176,14 @@ inline Hit testLineSeg(float bx, float by, float bz, float vx, float vy, float v
 	if (bnv > C_LOWNORMVEL) return h;
 	float bcpd = (bx - v1x)*nx + (by - v1y)*ny;
 	float bnd = bcpd - r;
-	bool inside = bnd <= 0;
 	float t = 0;
 	if (bnd < -r || bcpd < 0) return h;
-	if (bnd <= PHYS_TOUCH) {
-		if (inside || std::fabs(bnv) > C_CONTACTVEL || bnd <= -PHYS_TOUCH) t = 0;
-		else t = bnd * (0.5f / PHYS_TOUCH) + 0.5f;
-	} else if (std::fabs(bnv) > C_LOWNORMVEL) t = bnd / -bnv;
+	// FIX_PHYSICS (upstream collide.cpp LineSeg::HitTestBasic, mirrored by
+	// LineSeg.hitTestBasic): the whole touch band reports time 0 — the legacy
+	// bnd-remapped time never fit the step, so the band dropped contacts until
+	// actual penetration. The contact flag is set below.
+	if (bnd <= PHYS_TOUCH) t = 0;
+	else if (std::fabs(bnv) > C_LOWNORMVEL) t = bnd / -bnv;
 	else return h;
 	if (!std::isfinite(t) || t < 0 || t > dTime) return h;
 	float btv = vx*ny - vy*nx;
@@ -234,6 +236,7 @@ __attribute__((visibility("default"))) void batchHitTestPlane(int n, float bx, f
 	const v128_t bx4 = wasm_f32x4_splat(bx), by4 = wasm_f32x4_splat(by), bz4 = wasm_f32x4_splat(bz);
 	const v128_t r4 = wasm_f32x4_splat(r), dt4 = wasm_f32x4_splat(dTime);
 	const v128_t cv4 = wasm_f32x4_splat(C_CONTACTVEL), touch4 = wasm_f32x4_splat(PHYS_TOUCH);
+	const v128_t lownorm4 = wasm_f32x4_splat(C_LOWNORMVEL);
 	const v128_t m2r = wasm_f32x4_splat(r * -2), zero = wasm_f32x4_splat(0), mone = wasm_f32x4_splat(-1);
 	const v128_t zeroI = wasm_i32x4_splat(0), oneI = wasm_i32x4_splat(1);
 	for (; i + 4 <= n; i += 4) {
@@ -245,13 +248,24 @@ __attribute__((visibility("default"))) void batchHitTestPlane(int n, float bx, f
 		v128_t isContact = wasm_f32x4_le(absBnv, cv4);
 		v128_t contactHit = wasm_v128_and(isContact, wasm_f32x4_le(absBnd, touch4));
 		contactHit = wasm_v128_and(contactHit, wasm_v128_not(reject));
+		// FIX_PHYSICS (matches the scalar testPlane above): a slow ball
+		// embedded deeper than PHYS_TOUCH collides at t=0 ...
+		v128_t embedHit = wasm_v128_and(isContact, wasm_f32x4_lt(bnd, wasm_f32x4_neg(touch4)));
+		embedHit = wasm_v128_and(embedHit, wasm_v128_not(reject));
 		v128_t t = wasm_f32x4_div(bnd, wasm_f32x4_neg(bnv));
 		t = wasm_f32x4_max(t, zero);
 		v128_t tValid = wasm_f32x4_le(t, dt4);
 		tValid = wasm_v128_and(tValid, wasm_v128_not(isContact));
 		tValid = wasm_v128_and(tValid, wasm_v128_not(reject));
-		v128_t hit = wasm_v128_or(contactHit, tValid);
-		v128_t outT = wasm_v128_bitselect(wasm_v128_bitselect(zero, t, isContact), mone, hit);
+		// ... and a slow ball beyond the touch band still approaches on the
+		// bnd/-bnv line (here bnd > 0 and -bnv > 0, so t needs no clamp).
+		v128_t slowFar = wasm_v128_and(isContact, wasm_f32x4_gt(bnd, touch4));
+		slowFar = wasm_v128_and(slowFar, wasm_f32x4_lt(bnv, wasm_f32x4_neg(lownorm4)));
+		slowFar = wasm_v128_and(slowFar, wasm_f32x4_le(t, dt4));
+		slowFar = wasm_v128_and(slowFar, wasm_v128_not(reject));
+		v128_t hit = wasm_v128_or(wasm_v128_or(contactHit, embedHit), wasm_v128_or(tValid, slowFar));
+		v128_t tIsZero = wasm_v128_or(contactHit, embedHit);
+		v128_t outT = wasm_v128_bitselect(wasm_v128_bitselect(zero, t, tIsZero), mone, hit);
 		wasm_v128_store(oT + i, outT);
 		wasm_v128_store(oDist + i, wasm_v128_bitselect(bnd, mone, hit));
 		wasm_v128_store(oNx + i, wasm_v128_bitselect(vnx, zero, hit));
@@ -325,6 +339,7 @@ __attribute__((visibility("default"))) void batchHitTestLine3D(int n, float bx, 
 }
 
 
+// Must stay in sync with POLY_MAX_VERTS in lib/physics/wasm/kernels.ts (i*32 vert stride).
 constexpr int POLY_MAX_VERTS = 32;
 
 inline Hit testPoly(float bx, float by, float bz, float vx, float vy, float vz, float r,
@@ -338,10 +353,14 @@ inline Hit testPoly(float bx, float by, float bz, float vx, float vy, float vz, 
 	float bnd = nx*(hx0 - r0x) + ny*(hy0 - r0y) + nz*(hz0 - r0z);
 	bool inside = bnd <= 0;
 	float hitTime = 0;
+	int contact = 0;
 	if (bnd < -r) return h;
 	if (bnd <= PHYS_TOUCH) {
-		if (inside || std::fabs(bnv) > C_CONTACTVEL || bnd <= -PHYS_TOUCH) hitTime = 0;
-		else hitTime = bnd * (0.5f / PHYS_TOUCH) + 0.5f;
+		// FIX_PHYSICS (upstream collideex.cpp Hit3DPoly::HitTest, mirrored by
+		// Hit3DPoly.hitTest): a slow touch is a contact at time 0. Deeper
+		// embeds stay collisions so the embed corrections push the ball out.
+		if (std::fabs(bnv) <= C_CONTACTVEL && bnd > -PHYS_TOUCH) contact = 1;
+		else if (!inside) hitTime = bnd / -bnv;
 	} else if (std::fabs(bnv) > C_LOWNORMVEL) hitTime = bnd / -bnv;
 	else return h;
 	if (!std::isfinite(hitTime) || hitTime < 0 || hitTime > dTime) return h;
@@ -360,7 +379,7 @@ inline Hit testPoly(float bx, float by, float bz, float vx, float vy, float vz, 
 		if (x2 - ((y2 - hpy)*(x1 - x2))/(y1 - y2) > hpx) cross ^= 1;
 	}
 	if (!(cross & 1)) return h;
-	h.t = hitTime; h.nx = nx; h.ny = ny; h.nz = nz; h.dist = bnd;
+	h.t = hitTime; h.contact = contact; h.nx = nx; h.ny = ny; h.nz = nz; h.dist = bnd; h.bnv = contact ? bnv : 0;
 	return h;
 }
 

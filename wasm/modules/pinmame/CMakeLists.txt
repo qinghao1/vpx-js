@@ -4,8 +4,7 @@ project(wasm-pinmame LANGUAGES C CXX)
 # PinMAME source lives at repo root: <repo>/external/pinmame
 set(PINMAME_ROOT "${CMAKE_SOURCE_DIR}/../external/pinmame" CACHE PATH "PinMAME source root")
 
-option(PINMAME_WASM_PTHREADS "Enable pthreads (needs COOP/COEP)" ON)
-
+# PINMAME_WASM_PTHREADS is declared once by the umbrella project (wasm/CMakeLists.txt).
 add_library(pinmame_config INTERFACE)
 target_compile_definitions(pinmame_config INTERFACE
   HAS_M6809=1 HAS_M6808=1 HAS_M6800=1 HAS_M6803=1 HAS_M6802=1

@@ -11,7 +11,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const bnfGrammar = readFileSync(resolve(__dirname, '../lib/scripting/grammar/grammar.bnf')).toString()
 const fileDest = resolve(__dirname, '../lib/scripting/grammar/rules.ts')
 const rules = Grammars.Custom.getRules(bnfGrammar)
-const rulesExport = `import type { IRule } from 'ebnf';
+const rulesExport = `// GENERATED — do not hand-edit. Source: grammar.bnf via \`npm run build:pre\` (build/compile-rules.ts).
+import type { IRule } from 'ebnf';
 export const RULES: IRule[] = ${inspect(rules, { depth: 20, maxArrayLength: null })} as IRule[];
 `
 writeFileSync(fileDest, rulesExport)

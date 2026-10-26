@@ -5,9 +5,10 @@ add_executable(kernels src/kernels.cpp)
 
 target_compile_features(kernels PRIVATE cxx_std_20)
 target_compile_options(kernels PRIVATE
-  -O3 -flto -msimd128
+  -msimd128
   -ffast-math -fno-exceptions -fno-rtti
   $<$<CONFIG:Debug>:-O0 -g3>
+  $<$<NOT:$<CONFIG:Debug>>:-O3 -flto>
 )
 
 set(KERNELS_EXPORTS
@@ -19,7 +20,9 @@ set(KERNELS_EXPORTS
 list(JOIN KERNELS_EXPORTS "," KERNELS_EXPORTS_JOIN)
 
 target_link_options(kernels PRIVATE
-  -O3 -flto -msimd128
+  -msimd128
+  $<$<CONFIG:Debug>:-O0>
+  $<$<NOT:$<CONFIG:Debug>>:-O3 -flto>
   -sWASM=1 -sMODULARIZE=1 -sEXPORT_ES6=1 -sEXPORT_NAME=createKernelsModule
   "-sEXPORTED_FUNCTIONS=${KERNELS_EXPORTS_JOIN}"
   -sEXPORTED_RUNTIME_METHODS=HEAPF32,HEAP32
