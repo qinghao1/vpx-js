@@ -339,7 +339,7 @@ export class VBSHelper {
 	private invokeOrTraverse(value: unknown, receiver: object, params: unknown[]): unknown {
 		if (typeof value === 'function') {
 			if (value === Array) return Array.of(...params)
-			return (value as (...a: unknown[]) => unknown).bind(receiver)(...params)
+			return Reflect.apply(value as (...a: unknown[]) => unknown, receiver, params)
 		}
 		return this.traverse(value, params)
 	}

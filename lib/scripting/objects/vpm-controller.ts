@@ -48,7 +48,8 @@ export class VpmController {
 				// Upstream get_Switch returns VARIANT_BOOL (-1/0, never 1/0), and
 				// table scripts compare against True (-1), so normalize both the
 				// script-written cache and the raw emulator value here.
-				if (this.switchCache.get(i) !== undefined) return this.switchCache.get(i) ? -1 : 0
+				const cached = this.switchCache.get(i)
+				if (cached !== undefined) return cached ? -1 : 0
 				return this.emulator.getSwitchInput(i) ? -1 : 0
 			},
 			(n, raw) => {

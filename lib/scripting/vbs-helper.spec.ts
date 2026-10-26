@@ -278,6 +278,17 @@ describe('The scripting VBS Helper', () => {
 		expect(value).to.equal(23)
 	})
 
+	it('should bind the parent as receiver for late-bound method calls using "getOrCallBound"', () => {
+		const parent = {
+			prefix: 'Test',
+			suffix(this: { prefix: string }, value: string) {
+				return this.prefix + value
+			},
+		}
+		const value = vbsHelper.getOrCallBound(parent, 'suffix', '!')
+		expect(value).to.equal('Test!')
+	})
+
 	it('should rethrow script errors from functions invoked with "getOrCall"', () => {
 		expect(() =>
 			vbsHelper.getOrCall(() => {
