@@ -19,9 +19,13 @@ describe('The ROM Fetcher', () => {
 	})
 
 	it('should not find a rom entry', async () => {
-		await downloadGameEntry('XXX').catch(error => {
-			expect(error.message).match(/GAME_ENTRY_NOT_FOUND_XXX/)
-		})
+		try {
+			await downloadGameEntry('XXX')
+			expect.fail('expected downloadGameEntry to reject')
+		} catch (error) {
+			if (error instanceof chai.AssertionError) throw error
+			expect((error as Error).message).match(/GAME_ENTRY_NOT_FOUND_XXX/)
+		}
 	})
 
 	it('should successful download ROM', async () => {
@@ -46,9 +50,13 @@ describe('The ROM Fetcher', () => {
 			return new Response(JSON.stringify({ foo: 'bar' }), { status: 200 })
 		}) as any
 
-		await downloadGameEntry('mm_109c').catch(error => {
-			expect(error.message).match(/VPDB_INVALID_ANSWER/)
-		})
+		try {
+			await downloadGameEntry('mm_109c')
+			expect.fail('expected downloadGameEntry to reject')
+		} catch (error) {
+			if (error instanceof chai.AssertionError) throw error
+			expect((error as Error).message).match(/VPDB_INVALID_ANSWER/)
+		}
 	})
 
 	it('should handle invalid rom list, option 2', async () => {
@@ -56,9 +64,13 @@ describe('The ROM Fetcher', () => {
 			return new Response(JSON.stringify([{ foo: 'bar' }]), { status: 200 })
 		}) as any
 
-		await downloadGameEntry('mm_109c').catch(error => {
-			expect(error.message).match(/VPDB_GAME_ENTRY_NOT_FOUND/)
-		})
+		try {
+			await downloadGameEntry('mm_109c')
+			expect.fail('expected downloadGameEntry to reject')
+		} catch (error) {
+			if (error instanceof chai.AssertionError) throw error
+			expect((error as Error).message).match(/VPDB_GAME_ENTRY_NOT_FOUND/)
+		}
 	})
 
 	it('should fail to download Gameset', async () => {
@@ -66,9 +78,13 @@ describe('The ROM Fetcher', () => {
 			return new Response('Not found', { status: 404 })
 		}) as any
 
-		await downloadGameEntry('mm_109c').catch(error => {
-			expect(error.message).match(/VPDB_FETCH_FAILED_WITH_ERROR_404/)
-		})
+		try {
+			await downloadGameEntry('mm_109c')
+			expect.fail('expected downloadGameEntry to reject')
+		} catch (error) {
+			if (error instanceof chai.AssertionError) throw error
+			expect((error as Error).message).match(/VPDB_FETCH_FAILED_WITH_ERROR_404/)
+		}
 	})
 
 	it('should fail to download ROM', async () => {
@@ -80,8 +96,12 @@ describe('The ROM Fetcher', () => {
 			return new Response('Not found', { status: 404 })
 		}) as any
 
-		await downloadGameEntry('mm_109c').catch(error => {
-			expect(error.message).match(/VPDB_FETCH_FAILED_WITH_ERROR_404/)
-		})
+		try {
+			await downloadGameEntry('mm_109c')
+			expect.fail('expected downloadGameEntry to reject')
+		} catch (error) {
+			if (error instanceof chai.AssertionError) throw error
+			expect((error as Error).message).match(/VPDB_FETCH_FAILED_WITH_ERROR_404/)
+		}
 	})
 })

@@ -16,9 +16,8 @@ export async function downloadGameEntry(pinmameGameName: string): Promise<Loaded
 		logger().error('VPDB Fetch failed for url', url)
 		throw new Error(`VPDB_INVALID_ANSWER_FOR_${pinmameGameName}`)
 	}
-	if (!sets.find(e => e.id === pinmameGameName)) throw new Error(`VPDB_GAME_ENTRY_NOT_FOUND_${pinmameGameName}`)
 	const romSet = sets.find(e => e.id === pinmameGameName)
-	if (!romSet) throw new Error(`VPDB_ROMSET_ENTRY_NOT_FOUND_${pinmameGameName}`)
+	if (!romSet) throw new Error(`VPDB_GAME_ENTRY_NOT_FOUND_${pinmameGameName}`)
 	const romName = romSet.rom_files.find(e => e.type === 'main')?.filename ?? ''
 	if (!romName) throw new Error(`VPDB_ROM_TYPE_NOT_FOUND_${pinmameGameName}`)
 	const romUrl = `${romSet.file.url}/${romName}`
@@ -27,22 +26,21 @@ export async function downloadGameEntry(pinmameGameName: string): Promise<Loaded
 	return { wpcDbEntry: entry, romFile }
 }
 
-async function fetchJson<T>(url: string): Promise<T> {
+async function fetchOk(url: string, what: string): Promise<Response> {
 	const r = await fetch(url)
 	if (!r.ok) {
-		logger().error('VPDB Fetch JSON failed for url', url)
+		logger().error(`VPDB Fetch ${what} failed for url`, url)
 		throw new Error(`VPDB_FETCH_FAILED_WITH_ERROR_${r.status}`)
 	}
-	return r.json()
+	return r
+}
+
+async function fetchJson<T>(url: string): Promise<T> {
+	return (await fetchOk(url, 'JSON')).json()
 }
 
 async function fetchBytes(url: string): Promise<Uint8Array> {
-	const r = await fetch(url)
-	if (!r.ok) {
-		logger().error('VPDB Fetch ROM failed for url', url)
-		throw new Error(`VPDB_FETCH_FAILED_WITH_ERROR_${r.status}`)
-	}
-	return new Uint8Array(await r.arrayBuffer())
+	return new Uint8Array(await (await fetchOk(url, 'ROM')).arrayBuffer())
 }
 
 export interface LoadedGameEntry {
