@@ -1,15 +1,13 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { Vertex2D, Vertex3D } from './vector.js'
+import { Vertex2D, Vertex3D } from '../math/vector.js'
 
 /** Minimal vector contract. */
 export interface Vertex {
 	x: number
 	y: number
-	clone(): Vertex
-	sub(v: any): this
-	length(): number
+	distanceTo(other: { x: number; y: number }): number
 }
 
 /** Vertex with editor flags. */
@@ -36,27 +34,17 @@ export class Vertex3DNoTex2 {
 
 	static get(buffer: Uint8Array, pos: number): Vertex3DNoTex2 {
 		const off = pos * Vertex3DNoTex2.size
-		const v = new Vertex3DNoTex2()
-		const f32 = new Float32Array(buffer.buffer, buffer.byteOffset + off, 8)
-		v.x = f32[0]!
-		v.y = f32[1]!
-		v.z = f32[2]!
-		v.nx = f32[3]!
-		v.ny = f32[4]!
-		v.nz = f32[5]!
-		v.tu = f32[6]!
-		v.tv = f32[7]!
-		return v
-		const d = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength)
-		v.x = d.getFloat32(off, true)
-		v.y = d.getFloat32(off + 4, true)
-		v.z = d.getFloat32(off + 8, true)
-		v.nx = d.getFloat32(off + 12, true)
-		v.ny = d.getFloat32(off + 16, true)
-		v.nz = d.getFloat32(off + 20, true)
-		v.tu = d.getFloat32(off + 24, true)
-		v.tv = d.getFloat32(off + 28, true)
-		return v
+		const vertex = new Vertex3DNoTex2()
+		const data = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength)
+		vertex.x = data.getFloat32(off, true)
+		vertex.y = data.getFloat32(off + 4, true)
+		vertex.z = data.getFloat32(off + 8, true)
+		vertex.nx = data.getFloat32(off + 12, true)
+		vertex.ny = data.getFloat32(off + 16, true)
+		vertex.nz = data.getFloat32(off + 20, true)
+		vertex.tu = data.getFloat32(off + 24, true)
+		vertex.tv = data.getFloat32(off + 28, true)
+		return vertex
 	}
 
 	getVertex(): Vertex3D {
@@ -65,10 +53,6 @@ export class Vertex3DNoTex2 {
 
 	clone(): Vertex3DNoTex2 {
 		return Object.assign(new Vertex3DNoTex2(), this)
-	}
-
-	hasTextureCoordinates(): boolean {
-		return this.tu !== undefined && this.tv !== undefined
 	}
 
 	static from(data: Record<string, unknown> | Vertex3DNoTex2): Vertex3DNoTex2 {
