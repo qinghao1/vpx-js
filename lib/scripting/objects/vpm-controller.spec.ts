@@ -1,6 +1,7 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
+import os from 'node:os'
 import * as chai from 'chai'
 import { expect } from 'chai'
 import type { SinonStub } from 'sinon'
@@ -10,12 +11,29 @@ import { TableBuilder } from '../../../test/table-builder.js'
 import { Emulator } from '../../emu/wpc-emu.js'
 import { Player } from '../../game/player.js'
 import type { Table } from '../../vpt/table/table.js'
+import { vbsEquals, vbsNot } from '../vbs-values.js'
 import { VpmController } from './vpm-controller.js'
+
+/** Display/debug stubs defined on VpmController at runtime via Object.defineProperty in its static block. */
+interface VpmControllerDisplayStubs {
+	ShowDMDOnly: boolean
+	HandleKeyboard: boolean
+	ShowTitle: boolean
+	LockDisplay: boolean
+	Hidden: boolean
+	DoubleSize: boolean
+	Antialias: boolean
+	ShowFrame: boolean
+	BorderSizeX: number
+	BorderSizeY: number
+	WindowPosX: number
+	WindowPosY: number
+}
 
 chai.use((sinonChai as any).default ?? sinonChai)
 describe('The VpmController - VISUAL PINMAME COM OBJECT', () => {
 	const sandbox = sinon.createSandbox()
-	let vpmController: VpmController
+	let vpmController: VpmController & VpmControllerDisplayStubs
 	let setSwitchInputSpy: SinonStub<[number, boolean?]>
 	let setFliptronicsInputSpy: SinonStub<[string, boolean?]>
 	let setDipSwitchByteSpy: SinonStub<[number, number?]>
@@ -29,7 +47,7 @@ describe('The VpmController - VISUAL PINMAME COM OBJECT', () => {
 
 		const table: Table = new TableBuilder().build()
 		const player: Player = new Player(table)
-		vpmController = new VpmController(player)
+		vpmController = new VpmController(player) as VpmController & VpmControllerDisplayStubs
 	})
 
 	afterEach(() => {
@@ -71,6 +89,77 @@ describe('The VpmController - VISUAL PINMAME COM OBJECT', () => {
 		expect(vpmController.Dip[0]).to.equal(VALUE)
 	})
 
+	it('should set and get SolMask from the cache', () => {
+		vpmController.SolMask[3] = 5
+		expect(vpmController.SolMask[3]).to.equal(5)
+	})
+
+	it('should forward SolMask to an emulator that supports masks', () => {
+		const calls: Array<[number, number]> = []
+		;(vpmController as any).emulator = {
+			getSolMask: (_low: number) => 7,
+			setSolMask: (low: number, mask: number) => {
+				calls.push([low, mask])
+			},
+		}
+		vpmController.SolMask[4] = 9
+		expect(calls).to.deep.equal([[4, 9]])
+		expect(vpmController.SolMask[4]).to.equal(9)
+		expect(vpmController.SolMask[6]).to.equal(7)
+	})
+
+	it('should set and get TimeFence, forwarding to the emulator', () => {
+		const seen: number[] = []
+		;(vpmController as any).emulator = {
+			setTimeFence: (t: number) => {
+				seen.push(t)
+			},
+		}
+		vpmController.TimeFence = 1234
+		expect(vpmController.TimeFence).to.equal(1234)
+		expect(seen).to.deep.equal([1234])
+	})
+
+	it('should tolerate an emulator without setTimeFence', () => {
+		vpmController.TimeFence = 42
+		expect(vpmController.TimeFence).to.equal(42)
+	})
+
+	it('should fetch ROMs from shaped URLs without leaking the home dir', async () => {
+		const name = 'testgame-shape-09'
+		const urls: string[] = []
+		const g = globalThis as any
+		const origFetch = globalThis.fetch
+		const origLocation = g.location
+		const origPendingRom = g.__pendingRom
+		const origPendingRomName = g.__pendingRomName
+		g.__pendingRom = undefined
+		g.__pendingRomName = undefined
+		VpmController.setRomBaseUrls(['https://roms.example.com/base'])
+		g.location = { search: '' }
+		globalThis.fetch = (async (url: any) => {
+			urls.push(String(url))
+			return { ok: false, status: 404 }
+		}) as any
+		try {
+			const rom = await (vpmController as any).fetchRom(name)
+			expect(rom).to.be.an.instanceof(Uint8Array)
+			const mine = urls.filter(u => u.includes(name))
+			expect(mine).to.deep.equal([
+				`https://roms.example.com/base/${name}.zip`,
+				`/pinmame/roms/${name}.zip`,
+				`/roms/${name}.zip`,
+			])
+			for (const u of mine) expect(u).to.not.contain(os.homedir())
+		} finally {
+			globalThis.fetch = origFetch
+			g.location = origLocation
+			g.__pendingRom = origPendingRom
+			g.__pendingRomName = origPendingRomName
+			VpmController.setRomBaseUrls([])
+		}
+	})
+
 	it('no changed lamps detected', () => {
 		const result = vpmController.ChangedLamps
 		expect(result).to.deep.equal([])
@@ -107,9 +196,28 @@ describe('The VpmController - VISUAL PINMAME COM OBJECT', () => {
 		expect(foo).to.equal(undefined)
 	})
 
+	it('should ignore calls to B2SSetData (B2S backglass data)', () => {
+		const result = vpmController.B2SSetData(1, 1)
+		expect(result).to.equal(undefined)
+	})
+
 	it('get Switch 0 (offset 11)', () => {
 		const result = vpmController.Switch[11]
 		expect(result).to.deep.equal(0)
+	})
+
+	it('should return VARIANT_BOOL -1/0 from Switch so `= True` guards work', () => {
+		vpmController.Switch[11] = 1
+		expect(vpmController.Switch[11]).to.equal(-1)
+		vpmController.Switch[11] = 0
+		expect(vpmController.Switch[11]).to.equal(0)
+	})
+
+	it('should keep the plunger fire-button guard closed when the lane switch is set', () => {
+		// walking_dead KeyDown guard: `NOT Controller.Switch(23) = True`.
+		vpmController.Switch[23] = 1
+		const guard = vbsNot(vbsEquals(vpmController.Switch[23], true))
+		expect(guard).to.equal(false)
 	})
 
 	it('validate setSwitchInput is called with the correct settings, using 1 as input', () => {
@@ -243,7 +351,7 @@ describe('The VpmController - VISUAL PINMAME COM OBJECT', () => {
 		expect(result).to.equal(false)
 	})
 
-	it('dummy Customization function: DoubleSize', () => {
+	it('dummy Customization function: BorderSizeX', () => {
 		vpmController.BorderSizeX = 5
 		const result: number = vpmController.BorderSizeX
 		expect(result).to.equal(0)

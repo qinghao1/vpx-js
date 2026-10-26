@@ -101,6 +101,13 @@ describe('The VBScript file system object', () => {
 		expect(fso.GetFileName('c:\\a\\folder\\')).to.equal('folder')
 	})
 
+	it('should return empty strings for an empty path', () => {
+		const fso = new FileSystemObject()
+		expect(fso.GetBaseName('')).to.equal('')
+		expect(fso.GetExtensionName('')).to.equal('')
+		expect(fso.GetFileName('')).to.equal('')
+	})
+
 	it('should open a bundled text file', () => {
 		const fso = new FileSystemObject()
 		expect(fso.OpenTextFile('controller.vbs')).to.be.ok

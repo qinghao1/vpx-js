@@ -97,4 +97,47 @@ describe('VpmController integration', () => {
 		vpm.GameName = 'any_game_xyz'
 		await expect(vpm.whenReady()).resolves.toBeUndefined()
 	})
+
+	it('browser ROM lookup uses no personal absolute paths by default', async () => {
+		const seen: string[] = []
+		const origLocation = (globalThis as any).location
+		;(globalThis as any).location = { pathname: '/play', search: '' }
+		globalThis.fetch = async (url: any) => {
+			seen.push(String(url))
+			return { ok: false, arrayBuffer: async () => new ArrayBuffer(0) } as any
+		}
+		try {
+			const vpm = new VpmController(new Player(new TableBuilder().build()))
+			sandbox.stub(PinMameEmulator.prototype, 'loadGame').resolves()
+			vpm.GameName = 'zz_no_such_rom_456'
+			await vpm.whenReady()
+			expect(seen.length).toBeGreaterThan(0)
+			expect(seen.every(url => !url.includes('/home/'))).toBe(true)
+		} finally {
+			if (origLocation === undefined) (globalThis as any).location = undefined
+			else (globalThis as any).location = origLocation
+		}
+	})
+
+	it('custom ROM base URLs are configurable', async () => {
+		const seen: string[] = []
+		const origLocation = (globalThis as any).location
+		;(globalThis as any).location = { pathname: '/play', search: '' }
+		globalThis.fetch = async (url: any) => {
+			seen.push(String(url))
+			return { ok: false, arrayBuffer: async () => new ArrayBuffer(0) } as any
+		}
+		VpmController.setRomBaseUrls(['/custom/roms'])
+		try {
+			const vpm = new VpmController(new Player(new TableBuilder().build()))
+			sandbox.stub(PinMameEmulator.prototype, 'loadGame').resolves()
+			vpm.GameName = 'zz_no_such_rom_789'
+			await vpm.whenReady()
+			expect(seen[0]).toBe('/custom/roms/zz_no_such_rom_789.zip')
+		} finally {
+			VpmController.setRomBaseUrls([])
+			if (origLocation === undefined) (globalThis as any).location = undefined
+			else (globalThis as any).location = origLocation
+		}
+	})
 })

@@ -9,28 +9,19 @@ import { FileSystemObject } from './file-system-object.js'
 import { VpmController } from './vpm-controller.js'
 import { WshShell } from './wsh-shell.js'
 
+const factories: Record<string, (player: Player) => object> = {
+	'scripting.dictionary': () => new Dictionary(),
+	'scripting.filesystemobject': () => new FileSystemObject(),
+	'vpinmame.controller': player => new VpmController(player),
+	'wscript.shell': () => new WshShell(),
+}
+
 /** getObject. */
 export function getObject<T>(name: string, player: Player): T | undefined {
-	switch (name.toLowerCase()) {
-		case 'scripting.dictionary': {
-			const dictionary = new Dictionary()
-			return new Proxy(dictionary, new VbsProxyHandler(dictionary, Dictionary.prototype))
-		}
-
-		case 'scripting.filesystemobject': {
-			const fso = new FileSystemObject()
-			return new Proxy(fso, new VbsProxyHandler(fso, FileSystemObject.prototype))
-		}
-
-		case 'vpinmame.controller': {
-			const vpc = new VpmController(player)
-			return new Proxy(vpc, new VbsProxyHandler(vpc, VpmController.prototype))
-		}
-
-		case 'wscript.shell': {
-			const wss = new WshShell()
-			return new Proxy(wss, new VbsProxyHandler(wss, WshShell.prototype))
-		}
+	const create = factories[name.toLowerCase()]
+	if (!create) {
+		return ERR.Raise(429, undefined, "ActiveX component can't create object")
 	}
-	ERR.Raise(429, undefined, "ActiveX component can't create object")
+	const obj = create(player)
+	return new Proxy(obj, new VbsProxyHandler(obj, Object.getPrototypeOf(obj))) as T
 }

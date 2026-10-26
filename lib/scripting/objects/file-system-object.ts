@@ -18,10 +18,17 @@ import { TextStream } from './text-stream.js'
 export class FileSystemObject {
 	private readonly SEP = `\\`
 
-	/**
-	 * Returns a Drives collection consisting of all Drive objects available on the local machine.
-	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/drives-property
-	 */
+	private lastComponent(path: string): string {
+		return (
+			path
+				.replace(/\\+/g, '/')
+				.split('/')
+				.filter(part => !!part)
+				.at(-1) ?? ''
+		)
+	}
+
+	/** Returns a Drives collection of all Drive objects on the local machine. (Not implemented.) */
 	public get Drives(): Drive[] {
 		throw new VbsNotImplementedError()
 	}
@@ -36,35 +43,19 @@ export class FileSystemObject {
 		return `${path}${path.endsWith(this.SEP) ? '' : this.SEP}${name}`
 	}
 
-	/**
-	 * Copies one or more files from one location to another.
-	 * @param source Character string file specification, which can include wildcard characters, for one or more files to be copied.
-	 * @param destination Character string destination where the file or files from source are to be copied. Wildcard characters are not allowed.
-	 * @param overwrite Boolean value that indicates if existing files are to be overwritten. If True, files are overwritten; if False, they are not. The default is True. Note that CopyFile will fail if destination has the read-only attribute set, regardless of the value of overwrite.
-	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/copyfile-method
-	 */
+	/** Copies one or more files from one location to another. (Not implemented.) */
 	public CopyFile(_source: string, _destination: string, _overwrite = true): void {
 		// only used in NVOffset(), which doesn't seem to be used very often.
 		throw new VbsNotImplementedError()
 	}
 
-	/**
-	 * Recursively copies a folder from one location to another.
-	 * @param source Character string folder specification, which can include wildcard characters, for one or more folders to be copied.
-	 * @param destination Character string destination where the folder and subfolders from source are to be copied. Wildcard characters are not allowed.
-	 * @param overwrite Boolean value that indicates if existing folders are to be overwritten. If True, files are overwritten; if False, they are not. The default is True.
-	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/copyfolder-method
-	 */
+	/** Recursively copies a folder from one location to another. (Not implemented.) */
 	public CopyFolder(_source: string, _destination: string, _overwrite = true): void {
 		// no usages found
 		throw new VbsNotImplementedError()
 	}
 
-	/**
-	 * Creates a folder.
-	 * @param foldername String expression that identifies the folder to create.
-	 * @https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/createfolder-method
-	 */
+	/** Creates a folder. (Not implemented.) */
 	public CreateFolder(_foldername: string): void {
 		// no usages found
 		throw new VbsNotImplementedError()
@@ -100,22 +91,13 @@ export class FileSystemObject {
 		FS.deleteFile(filespec)
 	}
 
-	/**
-	 * Deletes a specified folder and its contents.
-	 * @param folderspec The name of the folder to delete. The folderspec can contain wildcard characters in the last path component.
-	 * @param force Boolean value that is True if folders with the read-only attribute set are to be deleted; False (default) if they are not.
-	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/deletefolder-method
-	 */
+	/** Deletes a specified folder and its contents. (Not implemented.) */
 	public DeleteFolder(_folderspec: string, _force = false): void {
 		// no usages found
 		throw new VbsNotImplementedError()
 	}
 
-	/**
-	 * Returns True if the specified drive exists; False if it does not.
-	 * @param drivespec A drive letter or a path specification for the root of the drive.
-	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/driveexists-method
-	 */
+	/** Returns True if the specified drive exists; False if it does not. (Not implemented.) */
 	public DriveExists(_drivespec: string): boolean {
 		// no usages found
 		throw new VbsNotImplementedError()
@@ -155,32 +137,20 @@ export class FileSystemObject {
 	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/getbasename-method
 	 */
 	public GetBaseName(path: string): string {
-		const last = path
-			.replace(/\\+/g, '/')
-			.split('/')
-			.filter(p => !!p)
-			.reverse()[0]
+		const last = this.lastComponent(path)
 		if (last.indexOf('.') >= 0) {
 			return last.substr(0, last.lastIndexOf('.'))
 		}
 		return last
 	}
 
-	/**
-	 * Returns a {@link Drive} object corresponding to the drive in a specified path.
-	 * @param drivespec The drivespec argument can be a drive letter (c), a drive letter with a colon appended (c:), a drive letter with a colon and path separator appended (c:), or any network share specification (\computer2\share1).
-	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/getdrive-method
-	 */
+	/** Returns a {@link Drive} object for the drive in a specified path. (Not implemented.) */
 	public GetDrive(_drivespec: string): Drive {
 		// no usages found
 		throw new VbsNotImplementedError()
 	}
 
-	/**
-	 * Returns a string containing the name of the drive for a specified path.
-	 * @param path The path specification for the component whose drive name is to be returned.
-	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/getdrivename-method
-	 */
+	/** Returns the drive name for a specified path. (Not implemented.) */
 	public GetDriveName(_path: string): string {
 		// no usages found
 		throw new VbsNotImplementedError()
@@ -192,11 +162,7 @@ export class FileSystemObject {
 	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/getextensionname-method
 	 */
 	public GetExtensionName(path: string): string {
-		const last = path
-			.replace(/\\+/g, '/')
-			.split('/')
-			.filter(p => !!p)
-			.reverse()[0]
+		const last = this.lastComponent(path)
 		if (last.indexOf('.') >= 0) {
 			return last.substr(last.lastIndexOf('.') + 1)
 		}
@@ -221,70 +187,40 @@ export class FileSystemObject {
 	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/getfilename-method-visual-basic-for-applications
 	 */
 	public GetFileName(pathspec: string): string {
-		const last = pathspec
-			.replace(/\\+/g, '/')
-			.split('/')
-			.filter(p => !!p)
-			.reverse()[0]
-		return last
+		return this.lastComponent(pathspec)
 	}
 
-	/**
-	 * Returns a Folder object corresponding to the folder in a specified path.
-	 * @param folderspec The folderspec is the path (absolute or relative) to a specific folder.
-	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/getfolder-method
-	 */
+	/** Returns a Folder object for the folder in a specified path. (Not implemented.) */
 	public GetFolder(_folderspec: string): string {
 		// no usages found
 		throw new VbsNotImplementedError()
 	}
 
-	/**
-	 * Returns a string containing the name of the parent folder of the last component in a specified path.
-	 * @param path The path specification for the component whose parent folder name is to be returned.
-	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/getparentfoldername-method
-	 */
+	/** Returns the parent folder name of the last path component. (Not implemented.) */
 	public GetParentFolderName(_path: string): string {
 		// no usages found
 		throw new VbsNotImplementedError()
 	}
 
-	/**
-	 * Returns the special folder specified.
-	 * @param folderspec The name of the special folder to be returned. Can be any of the constants shown in the Settings section.
-	 * @constructor
-	 */
+	/** Returns the special folder specified. (Not implemented.) */
 	public GetSpecialFolder(_folderspec: number): {} {
 		// no usages found
 		throw new VbsNotImplementedError()
 	}
 
-	/**
-	 * Returns a randomly generated temporary file or folder name that is useful for performing operations that require a temporary file or folder.
-	 * @https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/gettempname-method
-	 */
+	/** Returns a randomly generated temporary file or folder name. (Not implemented.) */
 	public GetTempName(): string {
 		// no usages found
 		throw new VbsNotImplementedError()
 	}
 
-	/**
-	 * Moves one or more files from one location to another.
-	 * @param source The path to the file or files to be moved. The source argument string can contain wildcard characters in the last path component only.
-	 * @param destination The path where the file or files are to be moved. The destination argument can't contain wildcard characters.
-	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/movefile-method
-	 */
+	/** Moves one or more files from one location to another. (Not implemented.) */
 	public MoveFile(_source: string, _destination: string): void {
 		// only used in NVOffset(), which doesn't seem to be used very often.
 		throw new VbsNotImplementedError()
 	}
 
-	/**
-	 * Moves one or more folders from one location to another.
-	 * @param source The path to the folder or folders to be moved. The source argument string can contain wildcard characters in the last path component only.
-	 * @param destination The path where the folder or folders are to be moved. The destination argument can't contain wildcard characters.
-	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/movefolder-method
-	 */
+	/** Moves one or more folders from one location to another. (Not implemented.) */
 	public MoveFolder(_source: string, _destination: string): void {
 		// no usages found
 		throw new VbsNotImplementedError()

@@ -90,6 +90,29 @@ describe('The VBScript native text stream object', () => {
 		expect(ts.ReadAll()).to.equal('Line1\r\nLine2\r\n')
 	})
 
+	it('should start reading a fresh OpenTextFile stream at the beginning', () => {
+		const fso = new FileSystemObject()
+		fso.CreateTextFile('cursor-start.txt')
+		const f = fso.GetFile('cursor-start.txt') as File
+
+		let ts = f.OpenAsTextStream(TextStream.MODE_WRITE, -2)
+		ts.Write('Hello World')
+		ts.Close()
+
+		ts = fso.OpenTextFile('cursor-start.txt') as TextStream
+		expect(ts.AtEndOfStream).to.equal(false)
+		expect(ts.Read(5)).to.equal('Hello')
+		expect(ts.Read(6)).to.equal(' World')
+		expect(ts.AtEndOfStream).to.equal(true)
+	})
+
+	it('should report AtEndOfStream for an empty file', () => {
+		const fso = new FileSystemObject()
+		fso.CreateTextFile('cursor-empty.txt')
+		const ts = fso.OpenTextFile('cursor-empty.txt') as TextStream
+		expect(ts.AtEndOfStream).to.equal(true)
+	})
+
 	it('should fail reading when mode is write', () => {
 		const fs = new FileSystemObject()
 		fs.CreateTextFile('test1.txt')

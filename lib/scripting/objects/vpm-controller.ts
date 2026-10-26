@@ -15,6 +15,12 @@ import type { VbsArray } from '../vbs-array.js'
 
 export class VpmController {
 	private static readonly FLIPTRONICS: Record<number, string> = { 112: 'F2', 114: 'F4', 116: 'F6', 118: 'F8' }
+	private static romBaseUrls: string[] = []
+
+	/** Prepend custom ROM base URLs (e.g. a Vite `/@fs/...` dev prefix) to the browser ROM lookup. */
+	static setRomBaseUrls(urls: string[]): void {
+		VpmController.romBaseUrls = [...urls]
+	}
 
 	private emulator: IEmulator = new Emulator()
 	private gameName = ''
@@ -37,12 +43,16 @@ export class VpmController {
 	readonly GetMech: Record<number, number>
 
 	constructor(private readonly player: Player) {
-		this.Switch = this.boolProxy(
+		this.Switch = this.indexProxy(
 			i => {
-				const cached = this.switchCache.get(i)
-				return cached !== undefined ? (cached ? 1 : 0) : this.emulator.getSwitchInput(i)
+				// Upstream get_Switch returns VARIANT_BOOL (-1/0, never 1/0), and
+				// table scripts compare against True (-1), so normalize both the
+				// script-written cache and the raw emulator value here.
+				if (this.switchCache.get(i) !== undefined) return this.switchCache.get(i) ? -1 : 0
+				return this.emulator.getSwitchInput(i) ? -1 : 0
 			},
-			(n, v) => {
+			(n, raw) => {
+				const v = raw === 1 || raw === true ? true : raw === 0 || raw === false ? false : undefined
 				if (v === true) this.switchCache.set(n, true)
 				else if (v === false) this.switchCache.set(n, false)
 				else if (v === undefined) this.switchCache.delete(n)
@@ -54,42 +64,43 @@ export class VpmController {
 				return this.emulator.setSwitchInput(n, v)
 			},
 		)
-		this.Dip = this.numProxy(
+		this.Dip = this.indexProxy(
 			n => this.dipCache.get(n) ?? this.emulator.getDipSwitchByte(n),
 			(n, v) => {
-				this.dipCache.set(n, v & 0xff)
-				this.emulator.setDipSwitchByte(v & 0xff, n)
+				const byte = (v as number) & 0xff
+				this.dipCache.set(n, byte)
+				this.emulator.setDipSwitchByte(byte, n)
 				return true
 			},
 		)
-		this.SolMask = this.numProxy(
+		this.SolMask = this.indexProxy(
 			i => this.solMaskCache.get(i) ?? this.emulator.getSolMask?.(i) ?? 0,
 			(n, v) => {
-				this.solMaskCache.set(n, v)
-				this.emulator.setSolMask?.(n, v)
+				this.solMaskCache.set(n, v as number)
+				this.emulator.setSolMask?.(n, v as number)
 				return true
 			},
 		)
-		this.Lamp = this.numProxy(
+		this.Lamp = this.indexProxy(
 			i => this.emulator.getLampState(i),
 			() => true,
 		)
-		this.Solenoid = this.numProxy(
+		this.Solenoid = this.indexProxy(
 			i => this.emulator.getSolenoidState(i),
 			() => true,
 		)
-		this.GIString = this.numProxy(
+		this.GIString = this.indexProxy(
 			i => this.emulator.getGIState(i),
 			() => true,
 		)
-		this.Mech = this.numProxy(
+		this.Mech = this.indexProxy(
 			() => 0,
 			(n, v) => {
 				this.stub('Mech', { n, v })
 				return true
 			},
 		)
-		this.GetMech = this.numProxy(
+		this.GetMech = this.indexProxy(
 			i => {
 				this.stub('GetMech', i)
 				return 0
@@ -138,12 +149,12 @@ export class VpmController {
 		}
 		const existing = this.player.getPhysics().emu
 		if (existing?.isInitialized() && existing instanceof PinMameEmulator) {
-			this.replay(existing as unknown as IEmulator)
+			this.replay(existing)
 			this.emulator = existing
 			return
 		}
 		const emu = new PinMameEmulator()
-		this.replay(emu as unknown as IEmulator)
+		this.replay(emu)
 		this.emulator = emu
 		const rom = await this.fetchRom(name)
 		await emu.loadGame(name, rom)
@@ -155,6 +166,14 @@ export class VpmController {
 		for (const [k, v] of this.dipCache) emu.setDipSwitchByte(v & 0xff, k)
 		for (const [k, v] of this.solMaskCache) emu.setSolMask?.(k, v)
 		for (const [k, v] of this.switchCache) emu.setSwitchInput(k, v)
+	}
+
+	private async fetchBytes(url: string): Promise<Uint8Array | null> {
+		try {
+			const response = await fetch(url)
+			if (response.ok) return new Uint8Array(await response.arrayBuffer())
+		} catch {}
+		return null
 	}
 
 	private async fetchRom(name: string): Promise<Uint8Array> {
@@ -189,21 +208,18 @@ export class VpmController {
 		}
 		const romParam = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('rom') : null
 		if (romParam) {
-			try {
-				const response = await fetch(romParam)
-				if (response.ok) return new Uint8Array(await response.arrayBuffer())
-			} catch {}
+			const bytes = await this.fetchBytes(romParam)
+			if (bytes) return bytes
 		}
 		if (typeof location !== 'undefined') {
-			for (const url of [
-				`/@fs${location.pathname.startsWith('/home') ? '' : '/home/qinghao1'}/.pinmame/roms/${name}.zip`,
+			const urls = [
+				...VpmController.romBaseUrls.map(base => `${base}/${name}.zip`),
 				`/pinmame/roms/${name}.zip`,
 				`/roms/${name}.zip`,
-			]) {
-				try {
-					const response = await fetch(url)
-					if (response.ok) return new Uint8Array(await response.arrayBuffer())
-				} catch {}
+			]
+			for (const url of urls) {
+				const bytes = await this.fetchBytes(url)
+				if (bytes) return bytes
 			}
 		}
 		logger().warn(`[pinmame] no ROM for ${name} — mock`)
@@ -302,6 +318,9 @@ export class VpmController {
 	SetDisplayPosition(x: number, y: number, hWnd: unknown): void {
 		this.stub('SetDisplayPosition', { x, y, hWnd })
 	}
+	B2SSetData(data: number, value: number): void {
+		this.stub('B2SSetData', { data, value })
+	}
 	ShowOptsDialog(hWnd: unknown): void {
 		this.stub('ShowOptsDialog', hWnd)
 	}
@@ -333,37 +352,23 @@ export class VpmController {
 		logger().debug(name, v)
 	}
 
-	private numProxy(get: (n: number) => number, set: (n: number, v: number) => boolean): Record<number, number> {
+	private indexProxy(
+		get: (index: number) => number,
+		set: (index: number, value: unknown) => boolean,
+	): Record<number, number> {
+		const toIndex = (key: string | symbol): number | null => {
+			if (typeof key === 'symbol') return null
+			const index = Number(key)
+			return Number.isNaN(index) ? null : index
+		}
 		return new Proxy({} as Record<number, number>, {
-			get: (_, p) => {
-				if (typeof p === 'symbol') return undefined as any
-				const n = Number(p)
-				if (Number.isNaN(n)) return undefined as any
-				return get(n)
+			get: (_target, key) => {
+				const index = toIndex(key)
+				return index === null ? (undefined as any) : get(index)
 			},
-			set: (_, p, v) => {
-				if (typeof p === 'symbol') return false
-				const n = Number(p)
-				if (Number.isNaN(n)) return false
-				return set(n, v as number)
-			},
-		})
-	}
-	private boolProxy(get: (n: number) => number, set: (n: number, v?: boolean) => boolean): Record<number, number> {
-		return new Proxy({} as Record<number, number>, {
-			get: (_, p) => {
-				if (typeof p === 'symbol') return undefined as any
-				const n = Number(p)
-				if (Number.isNaN(n)) return undefined as any
-				return get(n)
-			},
-			set: (_, p, v) => {
-				if (typeof p === 'symbol') return false
-				const n = Number(p)
-				if (Number.isNaN(n)) return false
-				if (v === 1 || v === true) return set(n, true)
-				if (v === 0 || v === false) return set(n, false)
-				return set(n)
+			set: (_target, key, value) => {
+				const index = toIndex(key)
+				return index === null ? false : set(index, value)
 			},
 		})
 	}

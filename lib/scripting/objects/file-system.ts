@@ -15,9 +15,9 @@ export class FileSystem {
 
 	public getStream(fileName: string, iomode: number = 1): TextStream {
 		if (!this.files.has(this.normalizePath(fileName))) {
-			return new TextStream(fileName, true, iomode).setContent(getTextFile(fileName))
+			return new TextStream(fileName, true, iomode).setContent(getTextFile(fileName)).cursorToStart()
 		}
-		return this.files.get(this.normalizePath(fileName))?.setMode(iomode)
+		return this.files.get(this.normalizePath(fileName))?.setMode(iomode).cursorToStart()
 	}
 
 	public deleteFile(fileName: string) {

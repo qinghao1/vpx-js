@@ -69,8 +69,17 @@ export class Dictionary<V> {
 	public Add(key: string | number | symbol, item: V): void {
 		if (this.d.has(key)) {
 			ERR.Raise(457, undefined, 'This key is already associated with an element of this collection')
+			return
 		}
 		this.d.set(key, item)
+	}
+
+	/**
+	 * Iterates the keys in insertion order, so `For Each k In dict` visits keys.
+	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/for-eachnext-statement
+	 */
+	public [Symbol.iterator](): IterableIterator<string | number | symbol> {
+		return this.d.keys()
 	}
 
 	/**

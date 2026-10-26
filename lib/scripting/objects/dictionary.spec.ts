@@ -113,6 +113,24 @@ describe('The VBScript dictionary', () => {
 		expect(ERR.Number).to.equal(457)
 	})
 
+	it('should keep the original item when adding an existing key', () => {
+		const d = new Dictionary()
+		d.Add('b', 'Belgrade')
+		d.Add('b', 'Cairo')
+
+		expect(d.Item.b).to.equal('Belgrade')
+		expect(d.Count).to.equal(1)
+		expect(ERR.Number).to.equal(457)
+	})
+
+	it('should iterate keys in insertion order', () => {
+		const d = new Dictionary()
+		d.Add('a', 'Athens')
+		d.Add('b', 'Belgrade')
+
+		expect([...d]).to.eql(['a', 'b'])
+	})
+
 	it('should fail changing a non-existing key', () => {
 		const d = new Dictionary()
 		d.Add('a', 'Athens')

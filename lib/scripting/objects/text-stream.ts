@@ -27,10 +27,7 @@ export class TextStream {
 		this.mode = mode
 	}
 
-	/**
-	 * Read-only property that returns True if the file pointer immediately precedes the end-of-line marker in a TextStream file; False if it does not.
-	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/atendofline-property
-	 */
+	/** True if the file pointer immediately precedes the end-of-line marker. (Not implemented.) */
 	public get AtEndOfLine() {
 		// no usages found
 		throw new VbsNotImplementedError()
@@ -41,22 +38,16 @@ export class TextStream {
 	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/atendofstream-property
 	 */
 	public get AtEndOfStream(): boolean {
-		return this.cursor === this.buffer.length - 1
+		return this.cursor >= this.buffer.length - 1
 	}
 
-	/**
-	 * Read-only property that returns the column number of the current character position in a TextStream file.
-	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/column-property-visual-basic-for-applications
-	 */
+	/** Read-only column number of the current character position. (Not implemented.) */
 	public get Column() {
 		// no usages found
 		throw new VbsNotImplementedError()
 	}
 
-	/**
-	 * Read-only property that returns the current line number in a TextStream file.
-	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/line-property
-	 */
+	/** Read-only current line number in the file. (Not implemented.) */
 	public get Line() {
 		// no usages found
 		throw new VbsNotImplementedError()
@@ -77,12 +68,11 @@ export class TextStream {
 	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/read-method
 	 */
 	public Read(characters: number): string | undefined {
-		if (this.mode !== TextStream.MODE_READ) {
-			return ERR.Raise(54, undefined, 'Bad file mode')
-		}
-		return new TextDecoder(this.unicode ? 'utf-8' : 'ascii').decode(
-			this.buffer.subarray(this.cursor, this.cursor + characters),
-		)
+		if (!this.ensureReadMode()) return
+		const text = this.decode(this.buffer.subarray(this.cursor, this.cursor + characters))
+		this.cursor += characters
+		this.clampCursor()
+		return text
 	}
 
 	/**
@@ -90,10 +80,8 @@ export class TextStream {
 	 * @see f
 	 */
 	public ReadAll(): string | undefined {
-		if (this.mode !== TextStream.MODE_READ) {
-			return ERR.Raise(54, undefined, 'Bad file mode')
-		}
-		return new TextDecoder(this.unicode ? 'utf-8' : 'ascii').decode(this.buffer)
+		if (!this.ensureReadMode()) return
+		return this.decode(this.buffer)
 	}
 
 	/**
@@ -101,24 +89,18 @@ export class TextStream {
 	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/readline-method
 	 */
 	public ReadLine(): string | undefined {
-		if (this.mode !== TextStream.MODE_READ) {
-			return ERR.Raise(54, undefined, 'Bad file mode')
-		}
+		if (!this.ensureReadMode()) return
 		const start = this.cursor
 		let end = this.cursor
 		do {
 			this.cursor++
 			end++
-			if (this.buffer[this.cursor] === 0x0d) {
-				if (this.cursor < this.buffer.length - 2 && this.buffer[this.cursor + 1] === 0x0a) {
-					this.cursor++
-				}
-				this.cursor++
+			if (this.skipLineBreak()) {
 				end--
 				break
 			}
 		} while (this.cursor < this.buffer.length - 1)
-		return new TextDecoder(this.unicode ? 'utf-8' : 'ascii').decode(this.buffer.subarray(start, end + 1))
+		return this.decode(this.buffer.subarray(start, end + 1))
 	}
 
 	/**
@@ -127,9 +109,7 @@ export class TextStream {
 	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/skip-method
 	 */
 	public Skip(characters: number): void {
-		if (this.mode !== TextStream.MODE_READ) {
-			return ERR.Raise(54, undefined, 'Bad file mode')
-		}
+		if (!this.ensureReadMode()) return
 		this.cursor += characters
 		this.clampCursor()
 	}
@@ -139,18 +119,10 @@ export class TextStream {
 	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/skipline-method
 	 */
 	public SkipLine(): void {
-		if (this.mode !== TextStream.MODE_READ) {
-			return ERR.Raise(54, undefined, 'Bad file mode')
-		}
+		if (!this.ensureReadMode()) return
 		do {
 			this.cursor++
-			if (this.buffer[this.cursor] === 0x0d) {
-				if (this.cursor < this.buffer.length - 2 && this.buffer[this.cursor + 1] === 0x0a) {
-					this.cursor++
-				}
-				this.cursor++
-				return
-			}
+			if (this.skipLineBreak()) return
 		} while (this.cursor < this.buffer.length - 1)
 	}
 
@@ -164,11 +136,7 @@ export class TextStream {
 		this.cursorToEnd()
 	}
 
-	/**
-	 * Writes a specified number of newline characters to a TextStream file.
-	 * @param lines Number of newline characters you want to write to the file.
-	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/writeblanklines-method
-	 */
+	/** Writes a specified number of newline characters. (Not implemented.) */
 	public WriteBlankLines(_lines: number): void {
 		// no usages found
 		throw new VbsNotImplementedError()
@@ -192,6 +160,25 @@ export class TextStream {
 	public setMode(mode: number): this {
 		this.mode = mode
 		return this
+	}
+
+	private ensureReadMode(): boolean {
+		if (this.mode === TextStream.MODE_READ) return true
+		ERR.Raise(54, undefined, 'Bad file mode')
+		return false
+	}
+
+	private decode(bytes: Uint8Array): string {
+		return new TextDecoder(this.unicode ? 'utf-8' : 'ascii').decode(bytes)
+	}
+
+	private skipLineBreak(): boolean {
+		if (this.buffer[this.cursor] !== 0x0d) return false
+		if (this.cursor < this.buffer.length - 2 && this.buffer[this.cursor + 1] === 0x0a) {
+			this.cursor++
+		}
+		this.cursor++
+		return true
 	}
 
 	private clampCursor() {
