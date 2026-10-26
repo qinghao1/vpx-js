@@ -17,9 +17,9 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import type { IRenderable, RenderInfo } from '../lib/game/irenderable'
+import type { IRenderable, RenderInfo } from '../lib/game/interfaces'
+import type { Matrix3D } from '../lib/math/matrix.js'
 import type { IRenderApi } from '../lib/render/irender-api'
-import type { Matrix3D } from '../lib/util/matrix.js'
 import type { ItemState } from '../lib/vpt/item-state'
 import type { LightData } from '../lib/vpt/light/light-data'
 import type { LightState } from '../lib/vpt/light/light-state'
@@ -28,7 +28,6 @@ import type { Mesh } from '../lib/vpt/mesh'
 import type { Table, TableGenerateOptions } from '../lib/vpt/table/table'
 import type { Texture } from '../lib/vpt/texture'
 
-// tslint:disable:no-empty
 export class TestRenderApi implements IRenderApi<any, any, any> {
 	public addChildToParent(_parent: any, _child: any): void {}
 
@@ -50,6 +49,10 @@ export class TestRenderApi implements IRenderApi<any, any, any> {
 	public applyVisibility(_isVisible: boolean, _node: any | undefined): void {}
 
 	public createLightGeometry(_lightData: LightData, _table: Table): any {
+		return {}
+	}
+
+	public createBulbGlowGeometry(_lightData: LightData, _table: Table): any {
 		return {}
 	}
 

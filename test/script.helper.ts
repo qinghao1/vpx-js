@@ -36,7 +36,7 @@ export class ScriptHelper {
 		return this.grammar.transpile(vbs)
 	}
 
-	public astToVbs(ast: Program): string {
+	public astToJs(ast: Program): string {
 		return generate(ast)
 	}
 }

@@ -19,53 +19,38 @@
 
 import type { Player } from '../lib/game/player'
 import type { PlayerPhysics } from '../lib/game/player-physics'
-import { Vertex3D } from '../lib/util/vector.js'
+import { Vertex3D } from '../lib/math/vector.js'
 import type { Ball } from '../lib/vpt/ball/ball'
 import type { Table } from '../lib/vpt/table/table'
 
 /**
- * Creates a ball at the given position
- * @param player
- * @param x Position at x
- * @param y Position at y
- * @param z Position at z
- * @param vx Velocity for x
- * @param vy Velocity for y
- * @param vz Velocity for z
- * @returns Created ball
+ * Creates a ball at (x, y, z) with velocity (vx, vy, vz).
+ * @param opts Ball radius and mass (defaults match Player.createBall)
  */
-export function createBall(player: Player, x: number, y: number, z: number, vx = 0, vy = 0, vz = 0): Ball {
-	return player.createBall({
-		getBallCreationPosition(_t: Table): Vertex3D {
-			return new Vertex3D(x, y, z)
+export function createBall(
+	player: Player,
+	x: number,
+	y: number,
+	z: number,
+	vx = 0,
+	vy = 0,
+	vz = 0,
+	opts: { radius?: number; mass?: number } = {},
+): Ball {
+	const { radius = 25, mass = 1 } = opts
+	return player.createBall(
+		{
+			getBallCreationPosition(_t: Table): Vertex3D {
+				return new Vertex3D(x, y, z)
+			},
+			getBallCreationVelocity(_t: Table): Vertex3D {
+				return new Vertex3D(vx, vy, vz)
+			},
+			onBallCreated(_p: PlayerPhysics, _b: Ball): void {
+				// do nothing
+			},
 		},
-		getBallCreationVelocity(_t: Table): Vertex3D {
-			return new Vertex3D(vx, vy, vz)
-		},
-		onBallCreated(_p: PlayerPhysics, _b: Ball): void {
-			// do nothing
-		},
-	})
-}
-
-/**
- * Let time pass while logging the ball position.
- * @param player
- * @param ball
- * @param numCycles How many cycles to run
- * @param cycleLength Duration of each cycle
- * @param t Where to start
- */
-export function debugBall(player: PlayerPhysics, ball: Ball, numCycles = 300, cycleLength = 5, t = 0) {
-	for (let i = 0; i <= numCycles; i++) {
-		player.updatePhysics(t + i * cycleLength)
-		// tslint:disable-next-line:no-console
-		console.log(
-			'[%sms] (%s, %s, %s)',
-			t + i * cycleLength,
-			ball.getState().pos.x,
-			ball.getState().pos.y,
-			ball.getState().pos.z,
-		)
-	}
+		radius,
+		mass,
+	)
 }

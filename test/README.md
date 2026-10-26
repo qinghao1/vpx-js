@@ -1,7 +1,6 @@
 # Tests
 
-Most of the code is covered in unit tests. You can check the latest run [here](https://travis-ci.org/vpdb/vpx-js)
-and the coverage [here](https://codecov.io/gh/vpdb/vpx-js).
+Most of the code is covered in unit tests. You can check the latest run [here](https://github.com/qinghao1/vpx-js/actions).
 
 There are different types of tests.
 

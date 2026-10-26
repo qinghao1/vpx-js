@@ -17,10 +17,10 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { DragPoint } from '../lib/util/dragpoint.js'
-import { Vertex2D, Vertex3D } from '../lib/util/vector.js'
+import { Vertex2D, Vertex3D } from '../lib/math/vector.js'
 import { Bumper } from '../lib/vpt/bumper/bumper'
 import { BumperData } from '../lib/vpt/bumper/bumper-data'
+import { DragPoint } from '../lib/vpt/dragpoint.js'
 import { Flipper } from '../lib/vpt/flipper/flipper'
 import { FlipperData } from '../lib/vpt/flipper/flipper-data'
 import { Gate } from '../lib/vpt/gate/gate'
@@ -46,6 +46,8 @@ import { type LoadedTable, TableLoader } from '../lib/vpt/table/table-loader'
 import { Trigger } from '../lib/vpt/trigger/trigger'
 import { TriggerData } from '../lib/vpt/trigger/trigger-data'
 
+// Minimal table for specs: TableData + name (set in ctor) is enough for build(); items are optional.
+// add*() defaults are mesh-safe: 2 drag points for line items (ramp, rubber), 3 for polygon items (surface, trigger).
 export class TableBuilder {
 	private readonly table: LoadedTable = { items: {} }
 

@@ -1,11 +1,9 @@
-import { afterAll, afterEach, beforeAll, beforeEach } from 'vitest'
+import { afterAll, beforeAll } from 'vitest'
 
-// Alias mocha globals to vitest
-// @ts-expect-error
+// Alias mocha globals to vitest (beforeEach/afterEach already come from vitest globals)
+declare global {
+	var before: typeof beforeAll
+	var after: typeof afterAll
+}
 globalThis.before = beforeAll
-// @ts-expect-error
 globalThis.after = afterAll
-// @ts-expect-error
-globalThis.beforeEach = beforeEach
-// @ts-expect-error
-globalThis.afterEach = afterEach
