@@ -32,5 +32,5 @@ function transform(vbs: string): string {
 	const scriptHelper = new ScriptHelper()
 	const ast = scriptHelper.vbsToAst(vbs)
 	const eventAst = new FunctionHoistTransformer(ast).transform()
-	return scriptHelper.astToVbs(eventAst)
+	return scriptHelper.astToJs(eventAst)
 }

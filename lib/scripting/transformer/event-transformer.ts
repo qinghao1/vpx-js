@@ -3,8 +3,9 @@
 
 import { replace } from 'estraverse'
 import type { FunctionDeclaration, Program } from 'estree'
-import type { IScriptable } from '../../game/iscriptable.js'
+import type { IScriptable } from '../../game/interfaces.js'
 import {
+	assignmentExpression,
 	callExpression,
 	expressionStatement,
 	functionExpression,
@@ -17,7 +18,11 @@ import { Transformer } from './transformer.js'
 /**
  * This transforms event subs into proper JavaScript event listeners.
  *
- * Example: `function Plunger_Init() {}` would become: `Plunger.on('Init', () => {})`.
+ * Example: `function Plunger_Init() {}` would become:
+ * `Plunger.on('Init', Plunger_Init = function () {})`.
+ *
+ * The handler stays assigned under its own name so a manual `Plunger_Init()`
+ * call from table script keeps working (VBS runs the handler body).
  */
 export class EventTransformer extends Transformer {
 	private readonly itemMap: Map<string, { key: string; item: IScriptable<any> }>
@@ -62,7 +67,11 @@ export class EventTransformer extends Transformer {
 				return expressionStatement(
 					callExpression(memberExpression(identifier(entry.key), identifier('on')), [
 						literal(existingEventName),
-						functionExpression(functionNode.body, functionNode.params),
+						assignmentExpression(
+							identifier(functionNode.id.name),
+							'=',
+							functionExpression(functionNode.body, functionNode.params),
+						),
 					]),
 				)
 			},
@@ -71,9 +80,5 @@ export class EventTransformer extends Transformer {
 }
 
 function matchEventName(eventNames: string[], nameToMatch: string): string | undefined {
-	for (const eventName of eventNames) {
-		if (eventName.toLowerCase() === nameToMatch.toLowerCase()) {
-			return eventName
-		}
-	}
+	return eventNames.find(eventName => eventName.toLowerCase() === nameToMatch.toLowerCase())
 }

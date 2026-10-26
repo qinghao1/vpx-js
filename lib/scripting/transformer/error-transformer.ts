@@ -11,11 +11,18 @@ export class ErrorTransformer extends Transformer {
 	public transform(): Program {
 		return replace(this.ast, {
 			enter: (node, parent: any) => {
+				if (node.type !== 'Identifier' || node.name !== 'Err' || !parent) {
+					return
+				}
+				if (parent.type === 'IfStatement' || parent.type === 'LogicalExpression') {
+					return memberExpression(node, identifier('Number'))
+				}
+				// A bare `Err` object is always truthy and never `===` anything, so
+				// loop tests and switch discriminants must read `Err.Number` instead.
 				if (
-					node.type === 'Identifier' &&
-					node.name === 'Err' &&
-					parent &&
-					(parent.type === 'IfStatement' || parent.type === 'LogicalExpression')
+					((parent.type === 'WhileStatement' || parent.type === 'DoWhileStatement') &&
+						parent.test === node) ||
+					(parent.type === 'SwitchStatement' && parent.discriminant === node)
 				) {
 					return memberExpression(node, identifier('Number'))
 				}

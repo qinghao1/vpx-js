@@ -2,12 +2,14 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 const lowerCache = new Map<string, string>()
-function lower(s: string): string {
-	let r = lowerCache.get(s)
-	if (r !== undefined) return r
-	r = s.toLowerCase()
-	if (lowerCache.size < 4096) lowerCache.set(s, r)
-	return r
+
+/** Lowercase with a bounded memo cache (hot path for case-insensitive lookup). */
+export function toLowerCached(text: string): string {
+	let result = lowerCache.get(text)
+	if (result !== undefined) return result
+	result = text.toLowerCase()
+	if (lowerCache.size < 4096) lowerCache.set(text, result)
+	return result
 }
 
 /** Base for VBS-exposed APIs. */
@@ -20,10 +22,10 @@ export abstract class VbsApi {
 		if (!this.propertyMap) {
 			this.propertyMap = {}
 			for (const name of this._getPropertyNames()) {
-				this.propertyMap[lower(name)] = name
+				this.propertyMap[toLowerCached(name)] = name
 			}
 		}
-		return this.propertyMap[lower(vbScriptName)]
+		return this.propertyMap[toLowerCached(vbScriptName)]
 	}
 }
 

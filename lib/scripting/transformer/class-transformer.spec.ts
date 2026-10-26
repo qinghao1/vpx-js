@@ -24,10 +24,12 @@ describe('The scripting class transformer', () => {
 		)
 	})
 
-	it.skip('should convert getters to lower case', () => {
+	it('should convert getters to lower case', () => {
 		const vbs = `Class Foo\nPublic Property Get Bar : Bar = 1 : End Property\nEnd Class\n`
 		const js = transform(vbs)
-		expect(js).to.equal(``)
+		expect(js).to.equal(
+			`class Foo {\n    constructor() {\n        ${proxy}\n    }\n    get bar() {\n        let Bar = undefined;\n        Bar = 1;\n        return Bar;\n    }\n}`,
+		)
 	})
 
 	it('should convert methods to lower case', () => {
@@ -42,5 +44,5 @@ function transform(vbs: string): string {
 	let ast = scriptHelper.vbsToAst(vbs)
 	ast = new ClassTransformer(ast).transform()
 	ast = new ClassTransformer(ast).transformThisIdentifiers()
-	return scriptHelper.astToVbs(ast)
+	return scriptHelper.astToJs(ast)
 }

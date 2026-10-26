@@ -35,5 +35,5 @@ function transform(vbs: string, fctName: string, _table: Table): string {
 	const ast = scriptHelper.vbsToAst(vbs)
 	const scriptTransformer = new WrapTransformer(ast)
 	const eventAst = scriptTransformer.transform(fctName, 'window')
-	return scriptHelper.astToVbs(eventAst)
+	return scriptHelper.astToJs(eventAst)
 }

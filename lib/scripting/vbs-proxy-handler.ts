@@ -1,40 +1,29 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-const lowerCache = new Map<string, string>()
-function lc(s: string): string {
-	let r = lowerCache.get(s)
-	if (r !== undefined) return r
-	r = s.toLowerCase()
-	if (lowerCache.size < 4096) lowerCache.set(s, r)
-	return r
-}
+import { toLowerCached } from './vbs-api.js'
 
-/**
- * A proxy handler that provides case-insensitive access to
- * properties and functions.
- */
-/** Proxy handler for VBS late binding. */
+/** Proxy handler providing case-insensitive access for VBS late binding. */
 export class VbsProxyHandler implements ProxyHandler<any> {
 	private readonly __names: { [key: string]: string | number | symbol } = {}
 
 	constructor(obj?: any, proto?: any) {
 		if (proto) {
 			for (const name of Object.getOwnPropertyNames(proto)) {
-				this.__names[lc(name)] = name
+				this.__names[toLowerCached(name)] = name
 			}
 		}
 		if (obj) {
 			for (const name of Object.getOwnPropertyNames(obj)) {
-				const k = lc(name)
-				if (!this.__names[k]) this.__names[k] = name
+				const key = toLowerCached(name)
+				if (!this.__names[key]) this.__names[key] = name
 			}
 		}
 	}
 
 	public get(target: any, name: string | number | symbol, _receiver: any): any {
 		if (typeof name === 'symbol') return target[name]
-		const norm = lc(name as string)
+		const norm = toLowerCached(name as string)
 		const real = this.__names[norm] ?? (this.__names[norm] = name)
 		return target[real]
 	}
@@ -44,7 +33,7 @@ export class VbsProxyHandler implements ProxyHandler<any> {
 			target[name] = value
 			return true
 		}
-		const norm = lc(name as string)
+		const norm = toLowerCached(name as string)
 		const real = this.__names[norm] ?? (this.__names[norm] = name)
 		target[real] = value
 		return true
