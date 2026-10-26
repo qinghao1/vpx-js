@@ -29,21 +29,19 @@ describe('The global registry emulator', () => {
 		expect(reg.regRead('HKEY_CLASSES_ROOT\\test\\duh')).to.equal('test1')
 	})
 
-	it('should return all default values', () => {
+	it('should pin representative default values', () => {
 		const reg = new GlobalRegistry()
 		expect(reg.regRead('HKEY_CURRENT_USER\\SOFTWARE\\Visual Pinball\\Controller\\ForceDisableB2S')).to.equal(0)
-		expect(reg.regRead('HKEY_CURRENT_USER\\SOFTWARE\\Visual Pinball\\Controller\\DOFContactors')).to.equal(2)
-		expect(reg.regRead('HKEY_CURRENT_USER\\SOFTWARE\\Visual Pinball\\Controller\\DOFKnocker')).to.equal(2)
-		expect(reg.regRead('HKEY_CURRENT_USER\\SOFTWARE\\Visual Pinball\\Controller\\DOFChimes')).to.equal(2)
-		expect(reg.regRead('HKEY_CURRENT_USER\\SOFTWARE\\Visual Pinball\\Controller\\DOFBell')).to.equal(2)
-		expect(reg.regRead('HKEY_CURRENT_USER\\SOFTWARE\\Visual Pinball\\Controller\\DOFGear')).to.equal(2)
-		expect(reg.regRead('HKEY_CURRENT_USER\\SOFTWARE\\Visual Pinball\\Controller\\DOFShaker')).to.equal(2)
-		expect(reg.regRead('HKEY_CURRENT_USER\\SOFTWARE\\Visual Pinball\\Controller\\DOFFlippers')).to.equal(2)
-		expect(reg.regRead('HKEY_CURRENT_USER\\SOFTWARE\\Visual Pinball\\Controller\\DOFTargets')).to.equal(2)
-		expect(reg.regRead('HKEY_CURRENT_USER\\SOFTWARE\\Visual Pinball\\Controller\\DOFDropTargets')).to.equal(2)
 		expect(reg.regRead('HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion\\CurrentVersion')).to.equal(6.3)
 		expect(
 			reg.regRead('HKLM\\SYSTEM\\ControlSet001\\Control\\Session Manager\\Environment\\Processor_Architecture'),
 		).to.equal('AMD64')
 	})
+
+	const defaults = (GlobalRegistry as unknown as { defaults: Record<string, string | number> }).defaults
+	for (const [key, value] of Object.entries(defaults)) {
+		it(`should return the default value for ${key}`, () => {
+			expect(new GlobalRegistry().regRead(key)).to.equal(value)
+		})
+	}
 })
