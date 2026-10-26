@@ -16,7 +16,6 @@ export function concatUint8Arrays(...arrays: Uint8Array[]): Uint8Array {
 	return out
 }
 
-/** Creates a DataView for the given Uint8Array. */
 export function getDataView(buf: Uint8Array): DataView {
 	return new DataView(buf.buffer, buf.byteOffset, buf.byteLength)
 }
@@ -28,22 +27,22 @@ export function decodeUtf8(buf: Uint8Array): string {
 	return textDecoder.decode(buf)
 }
 
+const strictUtf8Decoder = new TextDecoder('utf-8', { fatal: true })
+const cp1252Decoder = new TextDecoder('windows-1252')
+
+/**
+ * Decodes bytes as UTF-8, falling back to CP1252 for legacy ANSI text.
+ * @see string_from_utf8_or_cp1252 in vpinball src/core/def.cpp
+ */
+export function decodeUtf8OrCp1252(buf: Uint8Array): string {
+	try {
+		return strictUtf8Decoder.decode(buf)
+	} catch {
+		return cp1252Decoder.decode(buf)
+	}
+}
+
 /** Reads a little-endian int32 at `off`. */
 export function readInt32LE(buf: Uint8Array, off: number): number {
 	return getDataView(buf).getInt32(off, true)
-}
-
-/** Reads a little-endian uint16 at `off`. */
-export function readUInt16LE(buf: Uint8Array, off: number): number {
-	return getDataView(buf).getUint16(off, true)
-}
-
-/** Reads a little-endian uint32 at `off`. */
-export function readUInt32LE(buf: Uint8Array, off: number): number {
-	return getDataView(buf).getUint32(off, true)
-}
-
-/** Reads a little-endian float32 at `off`. */
-export function readFloatLE(buf: Uint8Array, off: number): number {
-	return getDataView(buf).getFloat32(off, true)
 }

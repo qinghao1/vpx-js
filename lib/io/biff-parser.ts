@@ -1,10 +1,10 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { decodeUtf8, getDataView, readInt32LE } from './binary-helpers.js'
+import { concatUint8Arrays, decodeUtf8, decodeUtf8OrCp1252, getDataView, readInt32LE } from './binary-helpers.js'
 import type { ReadResult } from './ole-doc.js'
 
-/** BIFF record parser. @see https://github.com/vpinball/vpinball/blob/master/BiffReader.cpp */
+/** BIFF record parser. @see https://github.com/vpinball/vpinball/blob/master/src/utils/BiffReader.cpp */
 export class BiffParser {
 	/** Creates a streaming BIFF handler. */
 	static stream(cb: OnBiffResult, opts: BiffStreamOptions = {}): (r: ReadResult) => Promise<number | null> {
@@ -16,6 +16,10 @@ export class BiffParser {
 			if (data.length < 4) return null
 
 			let len = readInt32LE(data, 0)
+			// Corrupt size guard: a record holds at least its 4-byte tag; len=-4 would
+			// return (0)+4=0 and hang streamFiltered with pos+=0 (upstream ValidateLength
+			// rejects len<0; port needs len>=4 to stay aligned).
+			if (len < 4) return null
 			if (len > data.length - 4) return -(len + 4)
 			const tag = decodeUtf8(data.subarray(4, 8))
 
@@ -25,21 +29,37 @@ export class BiffParser {
 				return len + 4
 			}
 
-			let chunk: Uint8Array
-			let relStart = 8,
-				relEnd = -4
-			if (opts.streamedTags?.includes(tag)) {
-				len += readInt32LE(data, 8) + 4
-				chunk = new Uint8Array(0)
-				relStart += 4
-				relEnd -= 4
-			} else {
-				chunk = data.subarray(8, 8 + len - 4)
+			if (tag === 'FONT') {
+				// WriteFontDescriptor writes size=4 plus an uncounted 11+nameLen blob
+				// (BiffWriter.cpp); nameLen sits at payload+10, so the generic streamed
+				// cchar math does not apply. Total record = 8 header + 11 + nameLen.
+				if (data.length < 19) return -19
+				const nameLen = data[18]!
+				const total = 19 + nameLen
+				if (total > data.length) return -total
+				const fontChunk = data.subarray(8, total)
+				const fontFn = nested ? nested.onTag(nestedItem) : cb
+				const fontSkip = await fontFn(fontChunk, tag, result.storageOffset + 8, 11 + nameLen)
+				return (fontSkip || total - 4) + 4
 			}
 
-			// ENDB terminates a BIFF stream; FONT is an unrelated OLE directory entry that
-			// appears after the BIFF data in some VPX files and must also terminate parsing.
-			if (!tag || tag === 'ENDB' || tag === 'FONT') {
+			const streamed = opts.streamedTags?.includes(tag) ?? false
+			if (streamed) {
+				// The cchar int lives at payload offset 4; ask for more bytes
+				// instead of reading past the end on a truncated record.
+				if (data.length < 12) return -12
+				const cchar = readInt32LE(data, 8)
+				// Upstream ValidateLength rejects negative lengths; without this a
+				// corrupt cchar drives the advance negative and stalls the stream.
+				if (cchar < 0) return null
+				len += cchar + 4
+			}
+			const chunk = streamed ? new Uint8Array(0) : data.subarray(8, 8 + len - 4)
+			const relStart = streamed ? 12 : 8
+			const relEnd = streamed ? -8 : -4
+
+			// ENDB terminates a BIFF stream.
+			if (!tag || tag === 'ENDB') {
 				if (nested) {
 					nested.onEnd(nestedItem)
 					nested = nestedItem = null
@@ -49,7 +69,7 @@ export class BiffParser {
 			}
 
 			const fn = nested ? nested.onTag(nestedItem) : cb
-			const skip = await fn(chunk!, tag, result.storageOffset + relStart, len + relEnd)
+			const skip = await fn(chunk, tag, result.storageOffset + relStart, len + relEnd)
 			return (skip || len) + 4
 		}
 	}
@@ -68,15 +88,7 @@ export class BiffParser {
 				if (done) break
 				if (value) chunks.push(value)
 			}
-			if (chunks.length === 1) return chunks[0]
-			const total = chunks.reduce((sum, c) => sum + c.length, 0)
-			const out = new Uint8Array(total)
-			let offset = 0
-			for (const chunk of chunks) {
-				out.set(chunk, offset)
-				offset += chunk.length
-			}
-			return out
+			return concatUint8Arrays(...chunks)
 		}
 		const pako = await import('pako')
 		const inflate =
@@ -102,10 +114,9 @@ export class BiffParser {
 		return ((bgr & 0xff) << 16) + (bgr & 0xff00) + ((bgr & 0xff0000) >> 16)
 	}
 
-	/** Reads string at offset 4. */
-	public getString(buf: Uint8Array, len: number, dropIfNotAscii = false): string {
-		const s = decodeUtf8(buf.subarray(4, len))
-		return !dropIfNotAscii || this.isAscii(s) ? s : ''
+	/** Reads string at offset 4 (UTF-8, legacy CP1252 fallback like upstream). */
+	public getString(buf: Uint8Array, len: number): string {
+		return decodeUtf8OrCp1252(buf.subarray(4, len))
 	}
 
 	/** Reads UTF-16LE string at offset 4. */
@@ -138,10 +149,6 @@ export class BiffParser {
 	protected getUnsignedInt4s(buf: Uint8Array, n: number): number[] {
 		const dv = getDataView(buf)
 		return Array.from({ length: n }, (_, i) => dv.getUint32(i * 4, true))
-	}
-
-	private isAscii(s: string): boolean {
-		return /^[\x00-\x7F]*$/.test(s)
 	}
 }
 
