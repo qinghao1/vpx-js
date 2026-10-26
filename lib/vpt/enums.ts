@@ -45,9 +45,9 @@ export class LightStatus extends VbsApi {
 
 /** Backglass view index. */
 export class BackglassIndex extends VbsApi {
-	public readonly DESKTOP = 0
-	public readonly FULLSCREEN = 1
-	public readonly FULL_SINGLE_SCREEN = 2
+	public readonly DESKTOP = 110
+	public readonly FULLSCREEN = 111
+	public readonly FULL_SINGLE_SCREEN = 112
 
 	protected _getPropertyNames(): string[] {
 		return ['DESKTOP', 'FULLSCREEN', 'FULL_SINGLE_SCREEN']

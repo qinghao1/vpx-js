@@ -5,7 +5,12 @@ import { BiffParser } from '../io/biff-parser.js'
 import { getDataView } from '../io/binary-helpers.js'
 import type { Texture } from './texture.js'
 
-/** VPinball material. @see https://github.com/vpinball/vpinball/blob/master/Material.h */
+/** Dequantizes a legacy n-bit unsigned value to 0..1. @see upstream src/math/math.h dequantizeUnsigned */
+function dequantizeUnsigned(value: number, bits: number): number {
+	return Math.min(value / ((1 << bits) - 1), 1)
+}
+
+/** VPinball material. @see https://github.com/vpinball/vpinball/blob/master/src/parts/Material.h */
 export class Material {
 	public name!: string
 	public wrapLighting?: number
@@ -30,22 +35,22 @@ export class Material {
 	public friction = 0.0
 	public scatterAngle = 0.0
 
-	public static fromSaved(s: SaveMaterial): Material {
-		const m = new Material()
-		m.name = s.szName
-		m.baseColor = BiffParser.bgrToRgb(s.baseColor)
-		m.glossiness = BiffParser.bgrToRgb(s.glossiness)
-		m.clearCoat = BiffParser.bgrToRgb(s.clearCoat)
-		m.wrapLighting = s.wrapLighting
-		m.roughness = s.roughness
-		m.glossyImageLerp = 0
-		m.thickness = 0
-		m.edge = s.edge
-		m.opacity = s.opacity
-		m.isMetal = s.isMetal
-		m.isOpacityActive = !!(s.opacityActiveEdgeAlpha & 1)
-		m.edgeAlpha = 0
-		return m
+	public static fromSaved(saved: SaveMaterial): Material {
+		const material = new Material()
+		material.name = saved.szName
+		material.baseColor = BiffParser.bgrToRgb(saved.baseColor)
+		material.glossiness = BiffParser.bgrToRgb(saved.glossiness)
+		material.clearCoat = BiffParser.bgrToRgb(saved.clearCoat)
+		material.wrapLighting = saved.wrapLighting
+		material.roughness = saved.roughness
+		material.glossyImageLerp = 1 - dequantizeUnsigned(saved.glossyImageLerp, 8)
+		material.thickness = saved.thickness === 0 ? 0.05 : dequantizeUnsigned(saved.thickness, 8)
+		material.edge = saved.edge
+		material.opacity = saved.opacity
+		material.isMetal = saved.isMetal
+		material.isOpacityActive = !!(saved.opacityActiveEdgeAlpha & 1)
+		material.edgeAlpha = dequantizeUnsigned(saved.opacityActiveEdgeAlpha >> 1, 7)
+		return material
 	}
 
 	public static fromSerialized(blob: Record<string, unknown>): Material {
@@ -87,11 +92,11 @@ export class SaveMaterial {
 		this.wrapLighting = dv.getFloat32(off + 44, true)
 		this.isMetal = dv.getInt8(off + 48) > 0
 		this.roughness = dv.getFloat32(off + 52, true)
-		this.glossyImageLerp = dv.getInt32(off + 56, true)
+		this.glossyImageLerp = dv.getUint8(off + 56)
 		this.edge = dv.getFloat32(off + 60, true)
-		this.thickness = dv.getInt32(off + 64, true)
+		this.thickness = dv.getUint8(off + 64)
 		this.opacity = dv.getFloat32(off + 68, true)
-		this.opacityActiveEdgeAlpha = dv.getInt32(off + 72, true)
+		this.opacityActiveEdgeAlpha = dv.getUint8(off + 72)
 	}
 }
 

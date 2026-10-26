@@ -1,6 +1,7 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
+import { isScriptable } from '../game/interfaces.js'
 import {
 	AssignKey,
 	DIK_0,
@@ -18,11 +19,13 @@ import {
 	DIK_PRIOR,
 } from '../game/key-code.js'
 import type { Player } from '../game/player.js'
+import { BiffParser } from '../io/biff-parser.js'
 import { storage } from '../io/storage.js'
+import { ERR } from '../scripting/stdlib/err.js'
 import { VbsApi } from '../scripting/vbs-api.js'
 import { getTextFile } from '../scripting/vbs-scripts.node.js'
 import type { BallApi } from './ball/ball-api.js'
-import type { Item } from './item.js'
+import type { ItemApi } from './item-api.js'
 import type { ItemData } from './item-data.js'
 import type { Table } from './table/table.js'
 
@@ -277,22 +280,53 @@ export class GlobalApi extends VbsApi {
 
 	public QuitPlayer(_closeType: number) {}
 
+	// Upstream gates serial IO on VPX_HAS_WIN32_SDK: without it OpenSerial fails and
+	// every other call succeeds without effect, so port that branch (no serial here).
+	public OpenSerial(device: string): void {
+		ERR.Raise(68, 'OpenSerial', `Serial device ${device} unavailable: this platform has no serial ports.`)
+	}
+
+	public CloseSerial(): void {}
+
+	public FlushSerial(): void {}
+
+	public SetupSerial(
+		_baud: number,
+		_bits: number,
+		_parity: number,
+		_stopbit: number,
+		_rts: boolean,
+		_dtr: boolean,
+	): void {}
+
+	public ReadSerial(_size: number): void {}
+
+	public WriteSerial(_value: unknown): void {}
+
+	public GetSerialDevices(): void {}
+
 	public GetBalls(): BallApi[] {
 		return this.player.getBalls().map(b => b.getApi())
 	}
 
-	public GetElements(): Array<Item<ItemData>> {
-		return this.table.getItems()
+	public GetElements(): Array<ItemApi<ItemData>> {
+		return this.table.getItems().flatMap(item => (isScriptable(item) ? [item.getApi()] : []))
 	}
 
-	public GetElementByName(name: string): Item<ItemData> | undefined {
-		return this.table.items[name]
+	public GetElementByName(name: string): ItemApi<ItemData> | undefined {
+		const item = this.table.getItemByName(name)
+		if (!item || !isScriptable(item)) {
+			return undefined
+		}
+		return item.getApi()
 	}
 
 	public MaterialColor(name: string, color: number): void {
 		const material = this.table.getMaterial(name)
 		if (!material) return
-		material.baseColor = color
+		// Script colors are OLE_COLOR (BGR); baseColor and three.js use RGB.
+		const rgb = BiffParser.bgrToRgb(color)
+		material.baseColor = rgb
 		const g = globalThis as any
 		const target = name.toLowerCase()
 		const updateMaterial = (m: any) => {
@@ -304,18 +338,18 @@ export class GlobalApi extends VbsApi {
 					// Baked lightmap plates are pre-lit unshaded textures; do not tint with material albedo color
 					return
 				}
-				if (ud?.__uTint?.value?.set) ud.__uTint.value.set(color)
-				if (ud?.__uTintColor?.value?.set) ud.__uTintColor.value.set(color)
-				if (ud?.__uAlbedo?.value?.set) ud.__uAlbedo.value.set(color)
-				if (ud?.__uFlat?.value?.set) ud.__uFlat.value.set(color)
+				if (ud?.__uTint?.value?.set) ud.__uTint.value.set(rgb)
+				if (ud?.__uTintColor?.value?.set) ud.__uTintColor.value.set(rgb)
+				if (ud?.__uAlbedo?.value?.set) ud.__uAlbedo.value.set(rgb)
+				if (ud?.__uFlat?.value?.set) ud.__uFlat.value.set(rgb)
 				const isNodeMat = !!ud?.__primitiveKind || !!ud?.__isBaked
 				if (isNodeMat) {
 					// Node materials manage live parameters via uniform values
 				} else if (m.emissiveMap) {
-					if (m.emissive?.set) m.emissive.set(color)
+					if (m.emissive?.set) m.emissive.set(rgb)
 					m.emissiveIntensity = 1.0
 				} else if (m.color?.set) {
-					m.color.set(color)
+					m.color.set(rgb)
 				}
 				m.needsUpdate = true
 			}

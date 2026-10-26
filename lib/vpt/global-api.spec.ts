@@ -23,7 +23,10 @@ import {
 } from '../game/key-code.js'
 import { Player } from '../game/player.js'
 import { NodeBinaryReader } from '../io/binary-reader.node.js'
+import { ERR } from '../scripting/stdlib/err.js'
+import { Transpiler } from '../scripting/transpiler.js'
 import { GlobalApi } from './global-api.js'
+import { ItemApi } from './item-api.js'
 import { Table } from './table/table.js'
 
 chai.use((sinonChai as any).default ?? sinonChai)
@@ -60,6 +63,7 @@ describe('The VPinball global API', () => {
 		expect(api.ActiveBall).to.equal(undefined)
 		expect(api.GameTime).to.be.equal(0)
 		expect(api.SystemTime).to.be.above(0)
+		// 0–100 day/night percent from the table-kicker.vpx fixture (globalEmissionScale 0.52; float32 load explains the ...9998 tail).
 		expect(api.NightDay).to.be.equal(51.99999809265137)
 		expect(api.ShowDT).to.be.equal(true)
 		expect(api.ShowFSS).to.be.equal(false)
@@ -95,7 +99,7 @@ describe('The VPinball global API', () => {
 	it('should correctly return the playfield elements', () => {
 		const api = new GlobalApi(table, player)
 		const elements = api.GetElements()
-		expect(elements.find(e => e.getName() === 'Williams')).to.be.ok
+		expect(elements.find(e => e.Name === 'Williams')).to.be.ok
 		expect(elements).to.have.lengthOf(13)
 	})
 
@@ -103,7 +107,22 @@ describe('The VPinball global API', () => {
 		const api = new GlobalApi(table, player)
 		const element = api.GetElementByName('Williams')
 		expect(element).to.be.ok
-		expect(element?.getName()).to.equal('Williams')
+		expect(element?.Name).to.equal('Williams')
+	})
+
+	it('should return script APIs from GetElements', () => {
+		const api = new GlobalApi(table, player)
+		for (const element of api.GetElements()) {
+			expect(element).to.be.instanceOf(ItemApi)
+		}
+	})
+
+	it('should return the script API from GetElementByName', () => {
+		const api = new GlobalApi(table, player)
+		expect(api.GetElementByName('Williams')).to.be.instanceOf(ItemApi)
+		expect(api.GetElementByName('williams')).to.be.instanceOf(ItemApi)
+		expect(api.GetElementByName('WILLIAMS')?.Name).to.equal('Williams')
+		expect(api.GetElementByName('NoSuchElement')).to.equal(undefined)
 	})
 
 	it('should apply the color of a material', () => {
@@ -112,13 +131,57 @@ describe('The VPinball global API', () => {
 		expect(material).to.be.ok
 		expect(material?.baseColor).to.equal(0xb4b4b4)
 
-		api.MaterialColor('Playfield', 0xff0000)
+		// Script colors are OLE_COLOR (BGR); baseColor stores RGB.
+		api.MaterialColor('Playfield', 0x0000ff)
 		expect(material?.baseColor).to.equal(0xff0000)
+		api.MaterialColor('Playfield', 0x123456)
+		expect(material?.baseColor).to.equal(0x563412)
 	})
 
 	it('should correctly save and load values', () => {
 		const api = new GlobalApi(table, player)
 		api.SaveValue('myTable', 'myValueName', 'myValue')
 		expect(api.LoadValue('myTable', 'myValueName')).to.equal('myValue')
+	})
+
+	it('should resolve the serial API names case-insensitively', () => {
+		const api = new GlobalApi(table, player)
+		expect(api._getPropertyName('openserial')).to.equal('OpenSerial')
+		expect(api._getPropertyName('closeserial')).to.equal('CloseSerial')
+		expect(api._getPropertyName('flushserial')).to.equal('FlushSerial')
+		expect(api._getPropertyName('setupserial')).to.equal('SetupSerial')
+		expect(api._getPropertyName('readserial')).to.equal('ReadSerial')
+		expect(api._getPropertyName('writeserial')).to.equal('WriteSerial')
+		expect(api._getPropertyName('getserialdevices')).to.equal('GetSerialDevices')
+	})
+
+	it('should raise a trappable error when opening a serial device', () => {
+		const api = new GlobalApi(table, player)
+		expect(() => api.OpenSerial('COM1')).to.throw(/COM1/)
+		ERR.OnErrorResumeNext()
+		try {
+			expect(() => api.OpenSerial('COM1')).to.not.throw()
+			expect(ERR.Number).to.equal(68)
+			expect(ERR.Source).to.equal('OpenSerial')
+		} finally {
+			ERR.Clear()
+			ERR.OnErrorGoto0()
+		}
+	})
+
+	it('should ignore serial port operations on platforms without serial hardware', () => {
+		const api = new GlobalApi(table, player)
+		expect(api.CloseSerial()).to.equal(undefined)
+		expect(api.FlushSerial()).to.equal(undefined)
+		expect(api.SetupSerial(9600, 8, 0, 1, false, false)).to.equal(undefined)
+		expect(api.WriteSerial([1, 2, 3])).to.equal(undefined)
+		expect(api.ReadSerial(4)).to.equal(undefined)
+		expect(api.GetSerialDevices()).to.equal(undefined)
+	})
+
+	it('should route serial calls from table scripts to the global API', () => {
+		const transpiler = new Transpiler(table, player)
+		expect(() => transpiler.execute('OpenSerial "COM1"', {})).to.throw(/COM1/)
+		expect(() => transpiler.execute('CloseSerial', {})).to.not.throw()
 	})
 })

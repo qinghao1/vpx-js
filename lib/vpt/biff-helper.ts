@@ -25,23 +25,23 @@ export function handleBiffTag<T extends BiffParser>(
 	maps: BiffMaps,
 ): boolean {
 	const t = target as BiffParser & Record<string, unknown>
-	if (maps.float && tag in maps.float) {
+	if (maps.float && Object.hasOwn(maps.float, tag)) {
 		t[maps.float[tag]] = target.getFloat(buffer)
 		return true
 	}
-	if (maps.int && tag in maps.int) {
+	if (maps.int && Object.hasOwn(maps.int, tag)) {
 		t[maps.int[tag]] = target.getInt(buffer)
 		return true
 	}
-	if (maps.bool && tag in maps.bool) {
+	if (maps.bool && Object.hasOwn(maps.bool, tag)) {
 		t[maps.bool[tag]] = target.getBool(buffer)
 		return true
 	}
-	if (maps.string && tag in maps.string) {
+	if (maps.string && Object.hasOwn(maps.string, tag)) {
 		t[maps.string[tag]] = target.getString(buffer, len)
 		return true
 	}
-	if (maps.wideString && tag in maps.wideString) {
+	if (maps.wideString && Object.hasOwn(maps.wideString, tag)) {
 		t[maps.wideString[tag]] = target.getWideString(buffer, len)
 		return true
 	}

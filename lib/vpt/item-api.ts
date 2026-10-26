@@ -11,24 +11,28 @@ import type { Table } from './table/table.js'
 import { MAX_TIMER_MSEC_INTERVAL, TimerMode } from './timer/timer-const.js'
 import { TimerHit } from './timer/timer-hit.js'
 
-const INTERNAL: Record<string, boolean> = {
-	data: true,
-	events: true,
-	player: true,
-	table: true,
-	collections: true,
-	collectionsItemPos: true,
-	propertyMap: true,
-	hitTimer: true,
-	UserValue: true,
-	animation: true,
-	constructor: true,
-	prototype: true,
-	__proto__: true,
-	_events: true,
-	_eventsCount: true,
-	_maxListeners: true,
-	_e: true,
+const INTERNAL = new Set([
+	'data',
+	'events',
+	'player',
+	'table',
+	'collections',
+	'collectionsItemPos',
+	'propertyMap',
+	'hitTimer',
+	'animation',
+	'constructor',
+	'prototype',
+	'__proto__',
+	'_events',
+	'_eventsCount',
+	'_maxListeners',
+	'_e',
+])
+
+/** Script-visible property: a string that is neither private nor internal. */
+function isExposed(prop: string | symbol): prop is string {
+	return typeof prop === 'string' && !prop.startsWith('_') && !INTERNAL.has(prop)
 }
 
 const lowerCache = new Map<string, string>()
@@ -46,9 +50,17 @@ export abstract class ItemApi<DATA extends ItemData> extends EventEmitter {
 	protected readonly collectionsItemPos: number[] = []
 	private propertyMap?: Record<string, string>
 	private hitTimer?: TimerHit
-	public UserValue: unknown
+	// Explicit initializer: with useDefineForClassFields=false a bare declaration emits no
+	// own property, which would hide UserValue from case-insensitive lookup below.
+	public UserValue: unknown = undefined
 
-	protected abstract _getPropertyNames(): string[]
+	protected _getPropertyNames(): string[] {
+		return Object.getOwnPropertyNames(Object.getPrototypeOf(this))
+	}
+
+	public InterfaceSupportsErrorInfo(_riid: unknown): boolean {
+		return false
+	}
 
 	get Name() {
 		return this.data.getName()
@@ -78,7 +90,7 @@ export abstract class ItemApi<DATA extends ItemData> extends EventEmitter {
 		super()
 		return new Proxy(this, {
 			get(target: unknown, prop: string | symbol, receiver: unknown) {
-				if (typeof prop === 'string' && !prop.startsWith('_') && !INTERNAL[prop]) {
+				if (isExposed(prop)) {
 					const mapped = (target as ItemApi<DATA>)._getPropertyName(prop)
 					if (mapped) {
 						const v = Reflect.get(target as object, mapped, receiver)
@@ -87,17 +99,17 @@ export abstract class ItemApi<DATA extends ItemData> extends EventEmitter {
 					}
 				}
 				const v = Reflect.get(target as object, prop, receiver)
-				return typeof v === 'function' && typeof prop === 'string' && !INTERNAL[prop] ? v.bind(target) : v
+				return typeof v === 'function' && typeof prop === 'string' && !INTERNAL.has(prop) ? v.bind(target) : v
 			},
 			set(target: unknown, prop: string | symbol, value: unknown, receiver: unknown) {
-				if (typeof prop === 'string' && !prop.startsWith('_') && !INTERNAL[prop]) {
+				if (isExposed(prop)) {
 					const mapped = (target as ItemApi<DATA>)._getPropertyName(prop)
 					if (mapped) return Reflect.set(target as object, mapped, value)
 				}
 				return Reflect.set(target as object, prop as string, value)
 			},
 			has(target: unknown, prop: string | symbol) {
-				if (typeof prop === 'string' && !prop.startsWith('_') && !INTERNAL[prop]) {
+				if (isExposed(prop)) {
 					const mapped = (target as ItemApi<DATA>)._getPropertyName(prop)
 					if (mapped) return mapped in (target as object)
 				}
@@ -138,8 +150,25 @@ export abstract class ItemApi<DATA extends ItemData> extends EventEmitter {
 				const key = lc(name)
 				if (!(key in this.propertyMap)) this.propertyMap[key] = name
 			}
+			this._addOwnPropertyNames(this.propertyMap)
 		}
-		return this.propertyMap[lc(vbScriptName)]
+		const key = lc(vbScriptName)
+		let mapped = this.propertyMap[key]
+		if (mapped === undefined) {
+			// Subclass constructors assign instance fields through this proxy, so the map
+			// may predate some of them; merge any new names before giving up.
+			this._addOwnPropertyNames(this.propertyMap)
+			mapped = this.propertyMap[key]
+		}
+		return mapped
+	}
+
+	private _addOwnPropertyNames(map: Record<string, string>): void {
+		for (const name of Object.getOwnPropertyNames(this)) {
+			if (!isExposed(name)) continue
+			const key = lc(name)
+			if (!(key in map)) map[key] = name
+		}
 	}
 
 	protected _beginPlay(): void {
@@ -158,9 +187,8 @@ export abstract class ItemApi<DATA extends ItemData> extends EventEmitter {
 
 	protected _assertNonHdrImage(imageName?: string): void {
 		if (!imageName) return
-		const tex = this.table.getTexture(imageName)
-		if (!tex) throw new Error(`Texture "${imageName}" not found.`)
-		if (tex.isHdr()) throw new Error('Cannot use a HDR image (.exr/.hdr) here')
+		// Unknown names are stored as-is, like native put_Image; only HDR textures are rejected.
+		if (this.table.getTexture(imageName)?.isHdr()) throw new Error('Cannot use a HDR image (.exr/.hdr) here')
 	}
 
 	protected _ballCountOver(events: EventProxy): number {

@@ -4,7 +4,7 @@
 import { BiffParser } from '../io/biff-parser.js'
 import { logger } from '../util/logger.js'
 
-/** Embedded binary (image data). @see https://github.com/vpinball/vpinball/blob/master/Image.cpp */
+/** Embedded binary (image data). @see https://github.com/vpinball/vpinball/blob/master/src/parts/pinbinary.cpp */
 export class Binary extends BiffParser {
 	public szName!: string
 	public szInternalName!: string

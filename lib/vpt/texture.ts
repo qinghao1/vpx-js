@@ -2,7 +2,6 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { BiffParser } from '../io/biff-parser.js'
-import { concatUint8Arrays } from '../io/binary-helpers.js'
 import { LzwReader } from '../io/lzw-reader.js'
 import type { Storage } from '../io/ole-doc.js'
 import type { ITextureLoader } from '../render/irender-api.js'
@@ -12,7 +11,7 @@ import type { Table } from './table/table.js'
 
 /**
  * VPinball texture — `Image*` storage entry.
- * @see https://github.com/vpinball/vpinball/blob/master/Texture.cpp
+ * @see https://github.com/vpinball/vpinball/blob/master/src/renderer/Texture.cpp
  */
 export class Texture extends BiffParser {
 	public localFileName?: string // either localPath or storageName is set
@@ -65,51 +64,39 @@ export class Texture extends BiffParser {
 	public getName(): string {
 		return this.localFileName
 			? this.localFileName.split(/[\\/]/).pop() || ''
-			: (this.szInternalName || this.szName || '').toLowerCase()
+			: (this.szName || this.szInternalName || '').toLowerCase()
 	}
 
 	/** Loads texture via renderer loader. */
 	public async loadTexture<TEXTURE>(loader: ITextureLoader<TEXTURE>, table: Table): Promise<TEXTURE> {
-		let texture: TEXTURE
-		const fileName = (this.szPath || this.localFileName)!
-		const ext = fileName.substr(fileName.lastIndexOf('.')).toLowerCase()
 		if (this.isRaw()) {
-			texture = await loader.loadRawTexture(this.getName(), this.pdsBuffer?.getData(), this.width, this.height)
-			this.pdsBuffer = undefined
-		} else if (this.localFileName) {
-			texture = await loader.loadDefaultTexture(this.getName(), ext, this.localFileName)
-		} else {
-			const data = await table.streamStorage<Uint8Array>('GameStg', storage =>
-				this.streamImage(storage, this.storageName, this.binary),
-			)
-			if (!data?.length) {
-				throw new Error(`Cannot load image data for texture ${this.getName()}`)
-			}
-			texture = await loader.loadTexture(this.getName(), ext, data)
+			return loader.loadRawTexture(this.getName(), this.pdsBuffer?.getData(), this.width, this.height)
 		}
-		return texture
+		// Upstream extension_from_path returns "" for dotless names; ext includes the dot per ITextureLoader.
+		const fileName = this.szPath || this.localFileName || ''
+		const dot = fileName.lastIndexOf('.')
+		const ext = (dot >= 0 ? fileName.substring(dot) : '').toLowerCase()
+		if (this.localFileName) {
+			return loader.loadDefaultTexture(this.getName(), ext, this.localFileName)
+		}
+		const data = await table.streamStorage<Uint8Array>('GameStg', storage =>
+			storage.read(this.storageName!, this.binary?.pos, this.binary?.len),
+		)
+		if (!data?.length) {
+			throw new Error(`Cannot load image data for texture ${this.getName()}`)
+		}
+		return loader.loadTexture(this.getName(), ext, data)
 	}
 
 	public isRaw(): boolean {
 		return this.pdsBuffer !== undefined
 	}
 
-	public isHdr() {
-		return this.pdsBuffer && this.pdsBuffer.format === BaseTexture.RGB_FP
-	}
-
-	private async streamImage(storage: Storage, storageName?: string, binary?: Binary): Promise<Uint8Array> {
-		const strm = storage.stream(storageName!, binary?.pos, binary?.len)
-		return new Promise<Uint8Array>((resolve, reject) => {
-			const bufs: Uint8Array[] = []
-			/* istanbul ignore if */
-			if (!strm) {
-				return reject(new Error(`No such stream "${storageName}".`))
-			}
-			strm.on('error', reject)
-			strm.on('data', (buf: Uint8Array) => bufs.push(buf))
-			strm.on('end', () => resolve(concatUint8Arrays(...bufs)))
-		})
+	/** Upstream `Texture::IsHDR` checks the decoded buffer format, else the file extension. */
+	public isHdr(): boolean {
+		if (this.pdsBuffer?.format === BaseTexture.RGB_FP) return true
+		const fileName = (this.szPath || this.localFileName || '').toLowerCase()
+		return fileName.endsWith('.exr') || fileName.endsWith('.hdr')
 	}
 
 	private async fromTag(
@@ -184,13 +171,11 @@ class BaseTexture {
 	public static readonly RGB_FP = 1
 
 	private width: number
-	private height: number
 	public format: number = BaseTexture.RGBA
 	private data!: Uint8Array
 
-	constructor(width: number, height: number) {
+	constructor(width: number) {
 		this.width = width
-		this.height = height
 	}
 
 	public getData(): Uint8Array {
@@ -204,7 +189,7 @@ class BaseTexture {
 		width: number,
 		height: number,
 	): Promise<[BaseTexture, number]> {
-		const pdsBuffer = new BaseTexture(width, height)
+		const pdsBuffer = new BaseTexture(width)
 		const compressed = await storage.read(itemName, pos)
 
 		const lzw = new LzwReader(compressed, width * 4, height, pdsBuffer.pitch())

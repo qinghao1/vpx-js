@@ -82,14 +82,11 @@ const cache = new Map<string, Mesh>()
 
 /** Loads a static mesh from built-in mesh registry, cached. */
 export function loadMesh(name: string): Mesh {
-	let mesh = cache.get(name)
-	if (!mesh) {
-		const json = MESH_REGISTRY[name]
-		if (!json) {
-			throw new Error(`Mesh '${name}' not found in mesh registry`)
-		}
-		mesh = Mesh.fromJson(json as any)
-		cache.set(name, mesh)
-	}
+	const cached = cache.get(name)
+	if (cached) return cached
+	const json = MESH_REGISTRY[name]
+	if (!json) throw new Error(`Mesh '${name}' not found in mesh registry`)
+	const mesh = Mesh.fromJson(json as any)
+	cache.set(name, mesh)
 	return mesh
 }

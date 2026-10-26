@@ -1,12 +1,19 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { BiffParser } from '../io/biff-parser.js'
+import { BiffParser, type OnBiffResultStream } from '../io/biff-parser.js'
+import { Vertex3D } from '../math/vector.js'
 import type { CatmullCurve } from '../util/catmull-curve.js'
-import { Vertex3D } from '../util/vector.js'
 import type { IRenderVertex, RenderVertex, Vertex } from '../util/vertex.js'
 
-export const HIT_SHAPE_DETAIL_LEVEL = 7.0
+/** Nested BIFF handler for DPNT drag-point sub-records. */
+export function dragPointNestedTag(data: { dragPoints: DragPoint[] }): OnBiffResultStream<DragPoint> {
+	return {
+		onStart: () => new DragPoint(),
+		onTag: dp => dp.fromTag.bind(dp),
+		onEnd: dp => data.dragPoints.push(dp),
+	}
+}
 
 /** Editable spline point. */
 export class DragPoint extends BiffParser {
@@ -94,14 +101,8 @@ export class DragPoint extends BiffParser {
 		for (let i = 0; i < vitexpoints.length - 1; i++) {
 			const startrenderpoint = virenderpoints[i] % cpoints
 			let endrenderpoint = virenderpoints[i < cpoints - 1 ? i + 1 : 0] % cpoints
-			let startTexCoord: number, endtexcoord: number
-			if (fNoCoords) {
-				startTexCoord = 0
-				endtexcoord = 1
-			} else {
-				startTexCoord = dragPoints[vitexpoints[i] % dragPoints.length].texturecoord
-				endtexcoord = dragPoints[vitexpoints[i + 1] % dragPoints.length].texturecoord
-			}
+			const startTexCoord = fNoCoords ? 0 : dragPoints[vitexpoints[i] % dragPoints.length].texturecoord
+			const endtexcoord = fNoCoords ? 1 : dragPoints[vitexpoints[i + 1] % dragPoints.length].texturecoord
 			const deltacoord = endtexcoord - startTexCoord
 			if (endrenderpoint <= startrenderpoint) endrenderpoint += cpoints
 

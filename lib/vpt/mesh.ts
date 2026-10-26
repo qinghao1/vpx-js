@@ -1,12 +1,22 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import type { Matrix3D } from '../util/matrix.js'
-import { Vertex2D, Vertex3D } from '../util/vector.js'
-import { type RenderVertex, RenderVertex3D, Vertex3DNoTex2 } from '../util/vertex.js'
+import type { Matrix3D } from '../math/matrix.js'
+import { Vertex2D, Vertex3D } from '../math/vector.js'
+import { type RenderVertex, type RenderVertex3D, Vertex3DNoTex2 } from '../util/vertex.js'
 import type { FrameData } from './animation.js'
 
-/** VPinball mesh. @see https://github.com/vpinball/vpinball/blob/master/mesh.h */
+/** Mutable position + normal shared by mesh and animation vertices. */
+interface MutableVertex {
+	x: number
+	y: number
+	z: number
+	nx: number
+	ny: number
+	nz: number
+}
+
+/** VPinball mesh. @see https://github.com/vpinball/vpinball/blob/master/src/math/Mesh.h */
 export class Mesh {
 	private static exportPrecision = 6
 
@@ -46,31 +56,38 @@ export class Mesh {
 
 	/** Transforms vertices and normals. */
 	public transform(matrix: Matrix3D, normalMatrix?: Matrix3D, getZ?: (x: number) => number): this {
-		for (const v of this.vertices) {
-			const vert = Vertex3D.claim(v.x, v.y, v.z).multiplyMatrix(matrix)
-			v.x = vert.x
-			v.y = vert.y
-			v.z = getZ ? getZ(vert.z) : vert.z
-			const n = Vertex3D.claim(v.nx, v.ny, v.nz).multiplyMatrixNoTranslate(normalMatrix || matrix)
-			v.nx = n.x
-			v.ny = n.y
-			v.nz = n.z
-			Vertex3D.release(vert, n)
+		const elements = matrix.elements
+		const normalElements = (normalMatrix || matrix).elements
+		for (const vert of this.vertices) {
+			Mesh.transformPoint(vert, elements, getZ)
+			Mesh.transformNormal(vert, normalElements)
 		}
 		for (const frame of this.animationFrames) {
-			for (const v of frame.frameVerts) {
-				const vert = Vertex3D.claim(v.x, v.y, v.z).multiplyMatrix(matrix)
-				;(v as unknown as Record<string, number>).x = vert.x
-				;(v as unknown as Record<string, number>).y = vert.y
-				;(v as unknown as Record<string, number>).z = getZ ? getZ(vert.z) : vert.z
-				const n = Vertex3D.claim(v.nx, v.ny, v.nz).multiplyMatrixNoTranslate(normalMatrix || matrix)
-				;(v as unknown as Record<string, number>).nx = n.x
-				;(v as unknown as Record<string, number>).ny = n.y
-				;(v as unknown as Record<string, number>).nz = n.z
-				Vertex3D.release(vert, n)
+			for (const frameVert of frame.frameVerts) {
+				const vert = frameVert as unknown as MutableVertex
+				Mesh.transformPoint(vert, elements, getZ)
+				Mesh.transformNormal(vert, normalElements)
 			}
 		}
 		return this
+	}
+
+	/** Applies a 4x4 transform to a vertex position (same arithmetic as Vector3.applyMatrix4). */
+	private static transformPoint(vert: MutableVertex, elements: number[], getZ?: (x: number) => number): void {
+		const { x, y, z } = vert
+		const invW = 1 / (elements[3] * x + elements[7] * y + elements[11] * z + elements[15])
+		vert.x = (elements[0] * x + elements[4] * y + elements[8] * z + elements[12]) * invW
+		vert.y = (elements[1] * x + elements[5] * y + elements[9] * z + elements[13]) * invW
+		const transformedZ = (elements[2] * x + elements[6] * y + elements[10] * z + elements[14]) * invW
+		vert.z = getZ ? getZ(transformedZ) : transformedZ
+	}
+
+	/** Applies the 3x3 rotation part of a matrix to a vertex normal (no translation). */
+	private static transformNormal(vert: MutableVertex, elements: number[]): void {
+		const { nx, ny, nz } = vert
+		vert.nx = elements[0] * nx + elements[4] * ny + elements[8] * nz
+		vert.ny = elements[1] * nx + elements[5] * ny + elements[9] * nz
+		vert.nz = elements[2] * nx + elements[6] * ny + elements[10] * nz
 	}
 
 	/** Translates mesh. */
@@ -121,7 +138,7 @@ export class Mesh {
 				C = vertices[indices[i + 2]]
 			const e0 = Vertex3D.claim(B.x - A.x, B.y - A.y, B.z - A.z)
 			const e1 = Vertex3D.claim(C.x - A.x, C.y - A.y, C.z - A.z)
-			const n = e0.clone(true).cross(e1).normalize()
+			const n = Vertex3D.crossProduct(e0, e1, true).normalize()
 			A.nx += n.x
 			A.ny += n.y
 			A.nz += n.z
@@ -177,37 +194,33 @@ export class Mesh {
 		for (let i = 0; i < cloop; ++i) {
 			const p2 = i < count - 1 ? i + 1 : 0
 
-			const rgvi = new RenderVertex3D()
-			rgvi.set(rgv[i].x, rgv[i].y, rgv[i].z)
-			const rgvp2 = new RenderVertex3D()
-			rgvp2.set(rgv[p2].x, rgv[p2].y, rgv[p2].z)
-			const A = rgvi.y - rgvp2.y
-			const B = rgvp2.x - rgvi.x
-			const C = -(A * rgvi.x + B * rgvi.y)
+			const start = rgv[i]
+			const end = rgv[p2]
+			const lineA = start.y - end.y
+			const lineB = end.x - start.x
+			const lineC = -(lineA * start.x + lineB * start.y)
 
-			const dist = Math.abs(A * pvin.x + B * pvin.y + C) / Math.sqrt(A * A + B * B)
+			const dist = Math.abs(lineA * pvin.x + lineB * pvin.y + lineC) / Math.sqrt(lineA * lineA + lineB * lineB)
 
 			if (dist < mindist) {
-				const D = -B
-				const F = -(D * pvin.x + A * pvin.y)
+				const perpA = -lineB
+				const perpC = -(perpA * pvin.x + lineA * pvin.y)
 
-				const det = A * A - B * D
+				const det = lineA * lineA - lineB * perpA
 				const invDet = det !== 0.0 ? 1.0 / det : 0.0
-				const intersectX = (B * F - A * C) * invDet
-				const intersectY = (C * D - A * F) * invDet
+				const intersectX = (lineB * perpC - lineA * lineC) * invDet
+				const intersectY = (lineC * perpA - lineA * perpC) * invDet
 
 				if (
-					intersectX >= Math.min(rgvi.x, rgvp2.x) - 0.1 &&
-					intersectX <= Math.max(rgvi.x, rgvp2.x) + 0.1 &&
-					intersectY >= Math.min(rgvi.y, rgvp2.y) - 0.1 &&
-					intersectY <= Math.max(rgvi.y, rgvp2.y) + 0.1
+					intersectX >= Math.min(start.x, end.x) - 0.1 &&
+					intersectX <= Math.max(start.x, end.x) + 0.1 &&
+					intersectY >= Math.min(start.y, end.y) - 0.1 &&
+					intersectY <= Math.max(start.y, end.y) + 0.1
 				) {
 					mindist = dist
-					const seg = i
-
 					pvOut.x = intersectX
 					pvOut.y = intersectY
-					piSeg = seg
+					piSeg = i
 				}
 			}
 		}
@@ -253,29 +266,30 @@ export class Mesh {
 	public static polygonToTriangles(rgv: RenderVertex[], pvpoly: number[]): number[] {
 		const pvtri: number[] = []
 		if (pvpoly.length < 3) return pvtri
-		if (pvpoly.length > 3) {
-			const polyVerts: Vertex2D[] = pvpoly.map(i => rgv[i]! as unknown as Vertex2D)
-			if (Mesh.determineWindingOrder(polyVerts) === 'Clockwise') pvpoly.reverse()
+		const poly = pvpoly.slice()
+		if (poly.length > 3) {
+			const polyVerts: Vertex2D[] = poly.map(i => rgv[i]! as unknown as Vertex2D)
+			if (Mesh.determineWindingOrder(polyVerts) === 'Clockwise') poly.reverse()
 		}
-		while (pvpoly.length > 3) {
+		while (poly.length > 3) {
 			let found = false
-			for (let i = 0; i < pvpoly.length; i++) {
-				const s = pvpoly.length
-				const a = pvpoly[i]!,
-					b = pvpoly[(i + 1) % s]!,
-					c = pvpoly[(i + 2) % s]!
-				const pre = pvpoly[(i - 1 + s) % s]!,
-					post = pvpoly[(i + 3) % s]!
-				if (Mesh.advancePoint(rgv, pvpoly, a, b, c, pre, post)) {
+			for (let i = 0; i < poly.length; i++) {
+				const s = poly.length
+				const a = poly[i]!,
+					b = poly[(i + 1) % s]!,
+					c = poly[(i + 2) % s]!
+				const pre = poly[(i - 1 + s) % s]!,
+					post = poly[(i + 3) % s]!
+				if (Mesh.advancePoint(rgv, poly, a, b, c, pre, post)) {
 					pvtri.push(a, c, b)
-					pvpoly.splice((i + 1) % s, 1)
+					poly.splice((i + 1) % s, 1)
 					found = true
 					break
 				}
 			}
 			if (!found) break
 		}
-		if (pvpoly.length === 3) pvtri.push(pvpoly[0], pvpoly[2], pvpoly[1])
+		if (poly.length === 3) pvtri.push(poly[0], poly[2], poly[1])
 		return pvtri
 	}
 
@@ -303,6 +317,8 @@ export class Mesh {
 		for (let i = 0; i < pvpoly.length; i++) {
 			const c1 = rgv[pvpoly[i]],
 				c2 = rgv[pvpoly[i < pvpoly.length - 1 ? i + 1 : 0]]
+			// Deliberate divergence: upstream tests pvCross2->y <= maxx (MeshUtils.h AdvancePoint),
+			// a copy-paste typo mixing y against the x bound; port tests c2.x (strictly more correct).
 			if (
 				c1 !== pv1 &&
 				c2 !== pv1 &&
@@ -351,34 +367,25 @@ export class Mesh {
 	private _writeVertexInfo(out: string[]): void {
 		for (const v of this.vertices)
 			out.push(
-				`v ${(v.x).toFixed(Mesh.exportPrecision)} ${(v.y).toFixed(Mesh.exportPrecision)} ${(v.z).toFixed(Mesh.exportPrecision)}`,
+				`v ${v.x.toFixed(Mesh.exportPrecision)} ${v.y.toFixed(Mesh.exportPrecision)} ${v.z.toFixed(Mesh.exportPrecision)}`,
 			)
 		for (const v of this.vertices)
-			if (v.hasTextureCoordinates())
-				out.push(`vt ${(v.tu).toFixed(Mesh.exportPrecision)} ${(1 - v.tv).toFixed(Mesh.exportPrecision)}`)
+			out.push(
+				`vt ${(v.tu ?? 0).toFixed(Mesh.exportPrecision)} ${(1 - (v.tv ?? 0)).toFixed(Mesh.exportPrecision)}`,
+			)
 		for (const v of this.vertices)
 			out.push(
-				`vn ${(v.nx).toFixed(Mesh.exportPrecision)} ${(v.ny).toFixed(Mesh.exportPrecision)} ${(v.nz).toFixed(Mesh.exportPrecision)}`,
+				`vn ${v.nx.toFixed(Mesh.exportPrecision)} ${v.ny.toFixed(Mesh.exportPrecision)} ${v.nz.toFixed(Mesh.exportPrecision)}`,
 			)
 	}
 
 	private _writeFaceInfoLong(out: string[]): void {
 		for (let i = 0; i < this.indices.length; i += 3) {
-			const f = this.indices
-			const v = [
-				[
-					f[i + 2] + 1 + this.faceIndexOffset,
-					f[i + 2] + 1 + this.faceIndexOffset,
-					f[i + 2] + 1 + this.faceIndexOffset,
-				],
-				[
-					f[i + 1] + 1 + this.faceIndexOffset,
-					f[i + 1] + 1 + this.faceIndexOffset,
-					f[i + 1] + 1 + this.faceIndexOffset,
-				],
-				[f[i] + 1 + this.faceIndexOffset, f[i] + 1 + this.faceIndexOffset, f[i] + 1 + this.faceIndexOffset],
-			]
-			out.push(`f ${v.map(x => x.join('/')).join(' ')}`)
+			const corners = [this.indices[i + 2], this.indices[i + 1], this.indices[i]].map(index => {
+				const oneBased = index + 1 + this.faceIndexOffset
+				return `${oneBased}/${oneBased}/${oneBased}`
+			})
+			out.push(`f ${corners.join(' ')}`)
 		}
 	}
 }
