@@ -82,6 +82,11 @@ export class Gate
 
 	public setupPlayer(player: Player, table: Table): void {
 		const height = table.getSurfaceHeight(this.data.szSurface, this.data.center.x, this.data.center.y)
+		// correct angle inversions like upstream PhysicSetup (gate.cpp) — unconditional, incl. twoWay
+		const angleMin = Math.min(this.data.angleMin, this.data.angleMax)
+		const angleMax = Math.max(this.data.angleMin, this.data.angleMax)
+		this.data.angleMin = angleMin
+		this.data.angleMax = angleMax
 		const radAngle = MathUtils.degToRad(this.data.rotation)
 		const tangent = new Vertex2D(Math.cos(radAngle), Math.sin(radAngle))
 		this.events = new EventProxy(this)

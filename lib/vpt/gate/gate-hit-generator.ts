@@ -17,10 +17,6 @@ export class GateHitGenerator {
 	public generateLineSegs(_events: EventProxy, height: number, tangent: Vertex2D): LineSeg[] {
 		if (this.data.twoWay) return []
 		const halfLength = this.data.length * 0.5
-		const angleMin = Math.min(this.data.angleMin, this.data.angleMax)
-		const angleMax = Math.max(this.data.angleMin, this.data.angleMax)
-		this.data.angleMin = angleMin
-		this.data.angleMax = angleMax
 		const reach = halfLength + PHYS_SKIN
 		const v1 = this.data.center.clone().addAndRelease(tangent.clone(true).multiplyScalar(reach))
 		const v2 = this.data.center.clone().subAndRelease(tangent.clone(true).multiplyScalar(reach))
