@@ -9,12 +9,12 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [10.x, 12.x, 14.x]
+        node-version: [24.x]
 
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v4
       - name: Setup node ${{ matrix.node-version }}
-        uses: actions/setup-node@v1
+        uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
       - run: npm ci
@@ -27,5 +27,29 @@ jobs:
         env:
           CI: true
       - run: npm run build
+        env:
+          CI: true
+
+  harness:
+    # Node-only verifies that pass with no GPU, no ROM, no native binary, and
+    # no emscripten toolchain. Deliberately NOT verify-all: verify-player and
+    # harness-gameplay currently fail (transpiler errors, under fix), and the
+    # browser/vpinball/discrepancies/twd legs need chrome, a native binary, or
+    # a large VPX+ROM that CI does not have.
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup node 24.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.x
+      - run: npm ci
+        env:
+          CI: true
+      - run: npm run verify:table
+        env:
+          CI: true
+      - run: npm run verify:play-room
         env:
           CI: true
