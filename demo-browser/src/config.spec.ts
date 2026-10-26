@@ -3,7 +3,7 @@ import * as chai from 'chai'
 import { expect } from 'chai'
 import sinonChai from 'sinon-chai'
 import * as THREE from 'three'
-import { isTableHit } from '../../../demo-browser/src/config.js'
+import { isTableHit } from './config.js'
 
 chai.use((sinonChai as any).default ?? sinonChai)
 
