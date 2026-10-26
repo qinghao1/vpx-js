@@ -24,7 +24,7 @@ export class ProgMeshTriangle {
 		const [a, b, c] = this.vertices.map(v => v.position)
 		this.normal = cross(b!.sub(a!), c!.sub(b!))
 		const len = magnitude(this.normal)
-		if (len) this.normal = this.normal.divideScalar(len)
+		if (len > 1e-38) this.normal = this.normal.divideScalar(len)
 	}
 
 	public hasVertex(v: ProgMeshVertex): boolean {
