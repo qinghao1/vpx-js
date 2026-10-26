@@ -1,7 +1,10 @@
+import { existsSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { TableBuilder } from '../../../test/table-builder.js'
 import { DragPoint } from '../dragpoint.js'
 import { Light, LightData } from './light.js'
+
+const TWD_VPX = '/home/qinghao1/Downloads/walking_dead.vpx'
 
 describe('regression: bulb lights with glow polygons are not scene lights', () => {
 	it('should return true for hasBulbGlow and generate glow mesh with BulbGlowParams', () => {
@@ -26,7 +29,7 @@ describe('regression: bulb lights with glow polygons are not scene lights', () =
 			createBulbGlowGeometry: () => ({ isMock: true }),
 		}
 		const table = new TableBuilder().build()
-		const meshes = light.getMeshes(table, mockRenderApi, {})
+		const meshes = light.getMeshes(table, mockRenderApi)
 		expect(meshes.glow).toBeDefined()
 		expect(meshes.glow!.bulbGlow).toBeDefined()
 		expect(meshes.glow!.bulbGlow!.color).toBe(0xff2211)
@@ -100,13 +103,14 @@ describe('regression: bulb lights with glow polygons are not scene lights', () =
 		expect(names).toEqual(['RoundLight'])
 	})
 
-	it('should generate no point lights but glow meshes for walking_dead.vpx if available', async () => {
-		try {
+	it.skipIf(!existsSync(TWD_VPX))(
+		'should generate no point lights but glow meshes for walking_dead.vpx if available',
+		async () => {
 			const { NodeBinaryReader } = await import('../../io/binary-reader.node.js')
 			const { Table } = await import('../table/table.js')
 			const { ThreeRenderApi } = await import('../../render/threejs/three-render-api.js')
 			const { TableMeshGenerator } = await import('../table/table-mesh-generator.js')
-			const table = await Table.load(new NodeBinaryReader('/home/qinghao1/Downloads/walking_dead.vpx'))
+			const table = await Table.load(new NodeBinaryReader(TWD_VPX))
 			const api = new ThreeRenderApi({ applyMaterials: true } as any)
 			const gen = new TableMeshGenerator(table)
 			const scene = gen.generateTableNode(api, { exportLightBulbLights: true }) as any
@@ -119,8 +123,6 @@ describe('regression: bulb lights with glow polygons are not scene lights', () =
 			// All 165 TWD lights have drag-point polygons: zero scene lights, 165 glow quads.
 			expect(points).toBe(0)
 			expect(glows).toBe(165)
-		} catch (error) {
-			console.warn('skip walking_dead glow test', (error as Error).message)
-		}
-	})
+		},
+	)
 })

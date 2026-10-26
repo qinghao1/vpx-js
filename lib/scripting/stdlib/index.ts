@@ -5,9 +5,57 @@ import type { Player } from '../../game/player.js'
 import { logger } from '../../util/logger.js'
 import { getObject } from '../objects/index.js'
 import { VbsApi } from '../vbs-api.js'
-import { UNDEF } from '../vbs-undefined.js'
-import { ERR } from './err.js'
+import { UNDEF, VbsUndefined } from '../vbs-undefined.js'
+import { bankersRound, parseNumericText } from '../vbs-values.js'
+import { ERR, VbsError } from './err.js'
 import { VbsMath } from './math.js'
+
+/**
+ * The `Nothing` singleton. Reads of `Empty`/uninitialized variables collapse to
+ * the `VbsUndefined` sentinel inside `getOrCall`, so `Nothing` needs a distinct
+ * identity for `IsObject`/`TypeName`/`IsEmpty`/`Is` to tell them apart. Numeric
+ * and string coercions mimic the old undefined behavior (0/`''`); member access
+ * raises 91 like VBScript instead of silently succeeding.
+ */
+function createNothing(): object {
+	const target = {
+		valueOf(): number {
+			return 0
+		},
+		toString(): string {
+			return ''
+		},
+	}
+	return new Proxy(target, {
+		get(t, p, _receiver): unknown {
+			if (p === 'valueOf' || p === 'toString' || typeof p === 'symbol') {
+				return Reflect.get(t, p)
+			}
+			ERR.Raise(new VbsError('Object variable not set.', 91))
+			return new VbsUndefined()
+		},
+		set(): boolean {
+			ERR.Raise(new VbsError('Object variable not set.', 91))
+			return true
+		},
+	})
+}
+
+const NOTHING = createNothing()
+
+/**
+ * Whether a value counts as `Nothing` for the `Is` operator: the singleton
+ * itself, or an unassigned variable (`undefined`/the `VbsUndefined` sentinel —
+ * VBS `Dim c: c Is Nothing` is True). `Null` is deliberately excluded: it is a
+ * distinct value, not an unassigned variable.
+ */
+export function isNothing(value: unknown): boolean {
+	return (
+		value === undefined ||
+		value === NOTHING ||
+		(value as unknown as Record<symbol, unknown> | null | undefined)?.[UNDEF] === true
+	)
+}
 
 /** VBS stdlib. */
 export class Stdlib extends VbsApi {
@@ -17,7 +65,7 @@ export class Stdlib extends VbsApi {
 		return undefined
 	}
 	get Nothing() {
-		return undefined
+		return NOTHING
 	}
 	get Null() {
 		return null
@@ -76,71 +124,173 @@ export class Stdlib extends VbsApi {
 	}
 
 	public CBool(v: any): boolean {
-		if (v == null || (v as any)?.[UNDEF] === true) return false
+		if (v === null) {
+			ERR.Raise(new VbsError('Invalid use of Null', 94))
+			return false
+		}
+		if (this.isUndef(v)) return false
+		if (v === NOTHING) {
+			ERR.Raise(new VbsError('Object variable not set', 91))
+			return false
+		}
 		if (typeof v === 'boolean') return v
 		if (typeof v === 'number') return v !== 0
 		if (typeof v === 'string') {
 			const trimmed = v.trim().toLowerCase()
 			if (trimmed === 'true') return true
 			if (trimmed === 'false' || trimmed === '') return false
-			const numeric = Number(v)
-			if (!isNaN(numeric)) return numeric !== 0
-			return !!v
+			const numeric = parseNumericText(v)
+			if (!Number.isNaN(numeric)) return numeric !== 0
+			ERR.Raise(new VbsError('Type mismatch', 13))
+			return false
 		}
 		return !!v
 	}
 
-	private bankersRound(value: number): number {
-		const truncated = Math.trunc(value)
-		if (Math.abs(value - truncated) !== 0.5) return Math.round(value)
-		return truncated % 2 === 0 ? truncated : truncated + (value >= 0 ? 1 : -1)
+	private isUndef(value: unknown): boolean {
+		return value == null || (value as unknown as Record<symbol, unknown>)[UNDEF] === true
+	}
+
+	private text(value: unknown, fallback = ''): string {
+		return this.isUndef(value) ? fallback : this.CStr(value)
+	}
+
+	/**
+	 * Coerces a numeric-conversion operand: True is -1, strings parse like
+	 * VBScript numbers. NaN means the caller raises type mismatch (13).
+	 */
+	private toConverterNumber(v: unknown): number {
+		if (typeof v === 'boolean') return v ? -1 : 0
+		if (typeof v === 'number') return v
+		if (typeof v === 'string') return parseNumericText(v)
+		return Number(v)
+	}
+
+	/** Range-checks a rounded integer conversion, raising Overflow (6). */
+	private checkOverflow(rounded: number, min: number, max: number): boolean {
+		if (rounded < min || rounded > max) {
+			ERR.Raise(new VbsError('Overflow', 6))
+			return false
+		}
+		return true
 	}
 
 	public CByte(v: any): number {
-		if (v == null || (v as any)?.[UNDEF] === true) return 0
-		const n = Number(v)
-		if (isNaN(n)) return 0
-		const rounded = this.bankersRound(n)
-		return Math.max(0, Math.min(255, rounded))
+		if (v === null) {
+			ERR.Raise(new VbsError('Invalid use of Null', 94))
+			return 0
+		}
+		if (this.isUndef(v)) return 0
+		if (v === NOTHING) {
+			ERR.Raise(new VbsError('Object variable not set', 91))
+			return 0
+		}
+		const n = this.toConverterNumber(v)
+		if (Number.isNaN(n)) {
+			ERR.Raise(new VbsError('Type mismatch', 13))
+			return 0
+		}
+		const rounded = bankersRound(n)
+		if (!this.checkOverflow(rounded, 0, 255)) return 0
+		return rounded
 	}
 
 	public CInt(v: any): number {
-		if (v == null || (v as any)?.[UNDEF] === true) return 0
-		const n = Number(v)
-		if (isNaN(n)) return 0
-		const rounded = this.bankersRound(n)
-		return Math.max(-32768, Math.min(32767, rounded)) | 0
+		if (v === null) {
+			ERR.Raise(new VbsError('Invalid use of Null', 94))
+			return 0
+		}
+		if (this.isUndef(v)) return 0
+		if (v === NOTHING) {
+			ERR.Raise(new VbsError('Object variable not set', 91))
+			return 0
+		}
+		const n = this.toConverterNumber(v)
+		if (Number.isNaN(n)) {
+			ERR.Raise(new VbsError('Type mismatch', 13))
+			return 0
+		}
+		const rounded = bankersRound(n)
+		if (!this.checkOverflow(rounded, -32768, 32767)) return 0
+		return rounded | 0
 	}
 
 	public CLng(v: any): number {
-		if (v == null || (v as any)?.[UNDEF] === true) return 0
-		const n = Number(v)
-		if (isNaN(n)) return 0
-		const rounded = this.bankersRound(n)
-		return Math.max(-2147483648, Math.min(2147483647, rounded)) | 0
+		if (v === null) {
+			ERR.Raise(new VbsError('Invalid use of Null', 94))
+			return 0
+		}
+		if (this.isUndef(v)) return 0
+		if (v === NOTHING) {
+			ERR.Raise(new VbsError('Object variable not set', 91))
+			return 0
+		}
+		const n = this.toConverterNumber(v)
+		if (Number.isNaN(n)) {
+			ERR.Raise(new VbsError('Type mismatch', 13))
+			return 0
+		}
+		const rounded = bankersRound(n)
+		if (!this.checkOverflow(rounded, -2147483648, 2147483647)) return 0
+		return rounded | 0
 	}
 
 	public CSng(v: any): number {
-		if (v == null || (v as any)?.[UNDEF] === true) return 0
-		const n = Number(v)
-		return isNaN(n) ? 0 : Math.fround(n)
+		if (v === null) {
+			ERR.Raise(new VbsError('Invalid use of Null', 94))
+			return 0
+		}
+		if (this.isUndef(v)) return 0
+		if (v === NOTHING) {
+			ERR.Raise(new VbsError('Object variable not set', 91))
+			return 0
+		}
+		const n = this.toConverterNumber(v)
+		if (Number.isNaN(n)) {
+			ERR.Raise(new VbsError('Type mismatch', 13))
+			return 0
+		}
+		if (!Number.isFinite(n) || Math.abs(n) > 3.402823567e38) {
+			ERR.Raise(new VbsError('Overflow', 6))
+			return 0
+		}
+		return Math.fround(n)
 	}
 
 	public CDbl(v: any): number {
-		if (v == null || (v as any)?.[UNDEF] === true) return 0
-		const n = Number(v)
-		return isNaN(n) ? 0 : n
+		if (v === null) {
+			ERR.Raise(new VbsError('Invalid use of Null', 94))
+			return 0
+		}
+		if (this.isUndef(v)) return 0
+		if (v === NOTHING) {
+			ERR.Raise(new VbsError('Object variable not set', 91))
+			return 0
+		}
+		const n = this.toConverterNumber(v)
+		if (Number.isNaN(n)) {
+			ERR.Raise(new VbsError('Type mismatch', 13))
+			return 0
+		}
+		if (!Number.isFinite(n)) {
+			ERR.Raise(new VbsError('Overflow', 6))
+			return 0
+		}
+		return n
 	}
 
 	public CStr(v: any): string {
-		if (v == null || (v as any)?.[UNDEF] === true) return ''
+		// NB: Null maps to '' instead of raising 94 because `&` concatenates
+		// via CStr; VBS `"a" & Null` is Null (and explicit CStr(Null) is error
+		// 94), both of which need a dedicated concat helper at the call site.
+		if (this.isUndef(v)) return ''
 		if (typeof v === 'string') return v
 		if (typeof v === 'boolean') return v ? 'True' : 'False'
 		return String(v)
 	}
 
 	public CDate(v: any): Date | string {
-		if (v == null || (v as any)?.[UNDEF] === true) return ''
+		if (this.isUndef(v)) return ''
 		try {
 			const input = String(v).trim().replace(/^#|#$/g, '')
 			const date = new Date(input)
@@ -151,10 +301,30 @@ export class Stdlib extends VbsApi {
 	}
 
 	public CCur(v: any): number {
-		if (v == null || (v as any)?.[UNDEF] === true) return 0
-		const n = Number(v)
-		if (isNaN(n)) return 0
+		if (v === null) {
+			ERR.Raise(new VbsError('Invalid use of Null', 94))
+			return 0
+		}
+		if (this.isUndef(v)) return 0
+		if (v === NOTHING) {
+			ERR.Raise(new VbsError('Object variable not set', 91))
+			return 0
+		}
+		const n = this.toConverterNumber(v)
+		if (Number.isNaN(n)) {
+			ERR.Raise(new VbsError('Type mismatch', 13))
+			return 0
+		}
+		if (!Number.isFinite(n) || Math.abs(n) > 922337203685477.5807) {
+			ERR.Raise(new VbsError('Overflow', 6))
+			return 0
+		}
 		return Math.round(n * 10000) / 10000
+	}
+
+	public Round(value: number, decimals = 0): number {
+		const factor = 10 ** Math.trunc(Number(decimals) || 0)
+		return bankersRound(Number(value) * factor) / factor
 	}
 
 	public Cos(n: number): number {
@@ -173,10 +343,32 @@ export class Stdlib extends VbsApi {
 		return Math.sqrt(n)
 	}
 
-	public UBound(a: unknown, _dimension?: number): number {
-		if (a == null || (a as any)?.[UNDEF] === true) return -1
+	public UBound(a: unknown, dimension?: unknown): number {
+		if (this.isUndef(a)) return -1
+		if (dimension === null) {
+			ERR.Raise(new VbsError('Invalid use of Null', 94))
+			return -1
+		}
+		const dim = this.isUndef(dimension) ? 1 : bankersRound(Number(dimension))
+		if (Number.isNaN(dim)) {
+			ERR.Raise(new VbsError('Type mismatch', 13))
+			return -1
+		}
+		if (!Number.isFinite(dim) || dim < 1) {
+			ERR.Raise(new VbsError('Subscript out of range', 9))
+			return -1
+		}
+		let current: unknown = a
+		for (let level = 1; level < dim; level++) {
+			const nested: unknown = (current as Record<number, unknown>)[0]
+			if (!Array.isArray(nested)) {
+				ERR.Raise(new VbsError('Subscript out of range', 9))
+				return -1
+			}
+			current = nested
+		}
 		try {
-			const len = (a as any).length
+			const len = (current as any).length
 			return typeof len === 'number' ? len - 1 : -1
 		} catch {
 			return -1
@@ -192,11 +384,26 @@ export class Stdlib extends VbsApi {
 	}
 
 	public IsEmpty(v: any): boolean {
-		return typeof v === 'undefined' || v === null || (v as any)?.[UNDEF] === true
+		return v === undefined || (v as any)?.[UNDEF] === true
 	}
 
 	public IsObject(v: any): boolean {
-		return typeof v === 'object'
+		return v !== null && typeof v === 'object' && (v as any)?.[UNDEF] !== true
+	}
+
+	public IsNull(v: any): boolean {
+		return v === null
+	}
+
+	public IsNumeric(value: unknown): boolean {
+		if (this.isUndef(value)) return false
+		if (typeof value === 'boolean') return true
+		if (typeof value === 'number') return !Number.isNaN(value)
+		if (value instanceof Date) return false
+		if (typeof value !== 'string') return false
+		const text = value.trim()
+		if (text === '') return false
+		return Number.isFinite(parseNumericText(text))
 	}
 
 	public Randomize(): void {
@@ -228,7 +435,7 @@ export class Stdlib extends VbsApi {
 	}
 
 	public Fix(n: number): number {
-		return n >= 0 ? Math.floor(n) : Math.ceil(n)
+		return Math.trunc(n)
 	}
 
 	public Hex(n: number): string {
@@ -246,17 +453,18 @@ export class Stdlib extends VbsApi {
 	}
 
 	public TypeName(obj: any): string {
-		if ((obj as any)?.[UNDEF] === true) {
+		// NB: the Nothing check reads no properties; member access on it raises 91.
+		if (obj === NOTHING) {
 			return 'Nothing'
-		}
-		if (typeof obj === 'string') {
-			return 'String'
 		}
 		if (obj === null) {
 			return 'Null'
 		}
-		if (typeof obj === 'undefined') {
-			return 'Nothing'
+		if (typeof obj === 'undefined' || (obj as any)?.[UNDEF] === true) {
+			return 'Empty'
+		}
+		if (typeof obj === 'string') {
+			return 'String'
 		}
 		if (Number.isInteger(obj)) {
 			return 'Integer'
@@ -272,10 +480,7 @@ export class Stdlib extends VbsApi {
 				return 'IBall'
 			}
 			if (obj.constructor.name.endsWith('Api')) {
-				return obj.constructor.name.slice(0, obj.constructor.name.length - 3)
-			}
-			if (obj.constructor.name === 'VbsUndefined') {
-				return 'Nothing'
+				return obj.constructor.name.slice(0, -3)
 			}
 			return obj.constructor.name
 		}
@@ -289,48 +494,180 @@ export class Stdlib extends VbsApi {
 		return (r << 16) + (g << 8) + b
 	}
 
-	public InStrRev(string1: string, string2: string, start: number = -1): any {
-		if (string1 === '') return 0
-		if (string1 === null) return null
-		if (string2 === '') return start === -1 ? string1.length : start
-		if (string2 === null) return null
-		if (start > string1.length) return 0
-		const pos = start === -1 ? string1.lastIndexOf(string2) : string1.substring(0, start).lastIndexOf(string2)
+	public InStr(first: unknown, second: unknown, third?: unknown, compare?: unknown): number | null {
+		let start = 1
+		let searched: unknown = first
+		let sought: unknown = second
+		let textCompare: unknown = compare
+		if (third !== undefined) {
+			if (compare !== undefined || typeof first === 'number' || typeof first === 'boolean') {
+				start = Math.trunc(Number(first))
+				searched = second
+				sought = third
+			} else {
+				// InStr(string1, string2, compare): a non-numeric first argument
+				// means the start was omitted.
+				textCompare = third
+			}
+		}
+		if (searched === null || sought === null) return null
+		const haystack = this.text(searched)
+		const needle = this.text(sought)
+		if (haystack === '') return 0
+		if (needle === '') return start
+		if (start < 1 || start > haystack.length) return 0
+		const position =
+			Number(textCompare) === 1
+				? haystack.toLowerCase().indexOf(needle.toLowerCase(), start - 1)
+				: haystack.indexOf(needle, start - 1)
+		return position === -1 ? 0 : position + 1
+	}
+
+	public InStrRev(string1: unknown, string2: unknown, start: unknown = -1): number | null {
+		if (string1 === null || string2 === null || start === null) return null
+		const s1 = this.isUndef(string1) ? '' : this.CStr(string1)
+		const s2 = this.isUndef(string2) ? '' : this.CStr(string2)
+		if (s1 === '') return 0
+		const from = start === undefined ? -1 : Math.trunc(Number(start))
+		if (s2 === '') return from === -1 ? s1.length : from
+		if (from > s1.length) return 0
+		const pos = from === -1 ? s1.lastIndexOf(s2) : s1.substring(0, from).lastIndexOf(s2)
 		return pos === -1 ? 0 : pos + 1
 	}
 
-	public Len(str: unknown): number {
-		if (str == null || (str as any)?.[UNDEF] === true) return 0
+	public Len(str: unknown): number | null {
+		if (str === null) return null
+		if (this.isUndef(str)) return 0
 		try {
-			return String(str).length
+			return this.CStr(str).length
 		} catch {
 			return 0
 		}
 	}
 
-	public Left(str: unknown, length: number): string {
-		if (str == null || (str as any)?.[UNDEF] === true) return ''
-		const s = String(str)
+	public Left(str: unknown, length: number): string | null {
+		if (str === null || length === null) return null
+		if (this.isUndef(str)) return ''
+		const s = this.CStr(str)
 		if (length <= 0) return ''
 		if (length >= s.length) return s
 		return s.slice(0, length)
 	}
 
-	public Right(str: unknown, length: number): string {
-		if (str == null || (str as any)?.[UNDEF] === true) return ''
-		const s = String(str)
+	public Right(str: unknown, length: number): string | null {
+		if (str === null || length === null) return null
+		if (this.isUndef(str)) return ''
+		const s = this.CStr(str)
 		if (length <= 0) return ''
 		if (length >= s.length) return s
 		return s.slice(s.length - length)
 	}
 
-	public Mid(str: unknown, start: number, length?: number): string {
-		if (str == null || (str as any)?.[UNDEF] === true) return ''
-		const s = String(str)
+	public Mid(str: unknown, start: number, length?: number): string | null {
+		if (str === null || start === null || length === null) return null
+		if (this.isUndef(str)) return ''
+		const s = this.CStr(str)
 		const i = Math.max(0, start - 1)
 		if (length == null) return s.slice(i)
 		if (length <= 0) return ''
 		return s.slice(i, i + length)
+	}
+
+	public UCase(value: unknown): string | null {
+		if (value === null) return null
+		return this.text(value).toUpperCase()
+	}
+
+	public LCase(value: unknown): string | null {
+		if (value === null) return null
+		return this.text(value).toLowerCase()
+	}
+
+	public Trim(value: unknown): string | null {
+		if (value === null) return null
+		return this.text(value).replace(/^ +| +$/g, '')
+	}
+
+	public Split(expression: unknown, delimiter: unknown = ' ', count?: unknown, compare?: unknown): string[] | null {
+		if (expression === null || delimiter === null || count === null || compare === null) return null
+		if (this.isUndef(expression)) return []
+		const text = this.CStr(expression)
+		if (text === '') return []
+		const separator = this.text(delimiter, ' ')
+		if (separator === '') return [text]
+		const textual = Number(compare) === 1
+		const limit = this.isUndef(count) ? -1 : Math.trunc(Number(count))
+		const source = textual ? text.toLowerCase() : text
+		const pattern = textual ? separator.toLowerCase() : separator
+		const parts: string[] = []
+		let begin = 0
+		while (limit < 0 || parts.length < limit - 1) {
+			const at = source.indexOf(pattern, begin)
+			if (at === -1) break
+			parts.push(text.slice(begin, at))
+			begin = at + pattern.length
+		}
+		parts.push(text.slice(begin))
+		return parts
+	}
+
+	public Join(list: unknown, delimiter: unknown = ' '): string | null {
+		if (list === null || delimiter === null) return null
+		if (this.isUndef(list)) return ''
+		const separator = this.text(delimiter, ' ')
+		if (!Array.isArray(list)) return this.CStr(list)
+		return list.map(entry => this.text(entry)).join(separator)
+	}
+
+	public Replace(
+		expression: unknown,
+		find: unknown,
+		replacement: unknown,
+		start?: unknown,
+		count?: unknown,
+		compare?: unknown,
+	): string | null {
+		if (
+			expression === null ||
+			find === null ||
+			replacement === null ||
+			start === null ||
+			count === null ||
+			compare === null
+		)
+			return null
+		if (this.isUndef(expression)) return ''
+		const text = this.CStr(expression)
+		const sought = this.text(find)
+		if (text === '' || sought === '') return text
+		const substitute = this.text(replacement)
+		const from = this.isUndef(start) ? 1 : Math.trunc(Number(start))
+		if (from < 1 || from > text.length) return ''
+		let remaining = this.isUndef(count) ? -1 : Math.trunc(Number(count))
+		if (remaining === 0) return text
+		const textual = Number(compare) === 1
+		const source = textual ? text.toLowerCase() : text
+		const pattern = textual ? sought.toLowerCase() : sought
+		let result = ''
+		let begin = from - 1
+		for (;;) {
+			if (remaining === 0) break
+			const at = source.indexOf(pattern, begin)
+			if (at === -1) break
+			result += text.slice(begin, at) + substitute
+			begin = at + pattern.length
+			if (remaining > 0) remaining -= 1
+		}
+		return result + text.slice(begin)
+	}
+
+	public Chr(charcode: number): string {
+		return String.fromCharCode(charcode)
+	}
+
+	public Asc(value: unknown): number {
+		const text = this.text(value)
+		return text === '' ? 0 : text.charCodeAt(0)
 	}
 
 	public CreateObject(name: string, player: Player): any {

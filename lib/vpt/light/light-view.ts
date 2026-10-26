@@ -34,19 +34,19 @@ export class LightMeshGenerator {
 	private getBulbMeshes<GEOMETRY>(table: Table): LightMeshes<GEOMETRY> {
 		const h =
 			table.getSurfaceHeight(this.data.szSurface, this.data.center.x, this.data.center.y) * table.getScaleZ()
-		const s = this.data.meshRadius,
-			scZ = (v: number) => v * s * table.getScaleZ() + h
+		const radius = this.data.meshRadius
+		const scaleZ = (value: number): number => value * radius * table.getScaleZ() + h
 		const light = bulbLightMesh.clone('bulb.light'),
 			socket = bulbSocketMesh.clone('bulb.socket')
 		for (const v of light.vertices) {
-			v.x = v.x * s + this.data.center.x
-			v.y = v.y * s + this.data.center.y
-			v.z = scZ(v.z)
+			v.x = v.x * radius + this.data.center.x
+			v.y = v.y * radius + this.data.center.y
+			v.z = scaleZ(v.z)
 		}
 		for (const v of socket.vertices) {
-			v.x = v.x * s + this.data.center.x
-			v.y = v.y * s + this.data.center.y
-			v.z = scZ(v.z)
+			v.x = v.x * radius + this.data.center.x
+			v.y = v.y * radius + this.data.center.y
+			v.z = scaleZ(v.z)
 		}
 		return { light, socket }
 	}
@@ -67,7 +67,7 @@ export class LightUpdater extends ItemUpdater<LightState> {
 		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
 		_table: Table,
 	): void {
-		Object.assign(this.state, state)
+		this.state.mergeFrom(state)
 		renderApi.applyLighting(this.state, this.data.intensity, obj)
 	}
 }

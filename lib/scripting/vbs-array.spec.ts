@@ -4,7 +4,7 @@
 import * as chai from 'chai'
 import { expect } from 'chai'
 import sinonChai from 'sinon-chai'
-import { ERR } from './stdlib/err.js'
+import { ERR, VbsError } from './stdlib/err.js'
 import { VbsArray } from './vbs-array.js'
 import { VbsUndefined } from './vbs-undefined.js'
 
@@ -74,5 +74,40 @@ describe('The VBScript array', () => {
 		expect(() => (none.foo = 10)).not.to.throw()
 		expect(() => (none.foo.bar = 10)).not.to.throw()
 		expect(ERR.Number).to.equal(9)
+	})
+
+	it('should read index 0 for an Empty subscript', () => {
+		const arr = new VbsArray<number | string>([1, 'two', 3]) as any
+		ERR.Clear()
+		expect(arr[undefined as any]).to.equal(1)
+		expect(ERR.Number).to.equal(0)
+	})
+
+	it('should record error 94 for a Null subscript under On Error Resume Next', () => {
+		const arr = new VbsArray<number | string>([1, 'two', 3]) as any
+		ERR.Clear()
+		expect(arr[null as any]).to.be.an.instanceof(VbsUndefined)
+		expect(ERR.Number).to.equal(94)
+		ERR.Clear()
+		arr[null as any] = 10
+		expect(ERR.Number).to.equal(94)
+		expect(arr[0]).to.equal(1)
+	})
+
+	it('should throw error 94 for a Null subscript without On Error Resume Next', () => {
+		const arr = new VbsArray<number | string>([1, 'two', 3]) as any
+		ERR.OnErrorGoto0()
+		try {
+			expect(() => arr[null as any]).to.throw(VbsError)
+			try {
+				arr[null as any] = 10
+				expect.fail('should have raised error 94')
+			} catch (e) {
+				expect(e).to.be.an.instanceof(VbsError)
+				expect((e as VbsError).code).to.equal(94)
+			}
+		} finally {
+			ERR.OnErrorResumeNext()
+		}
 	})
 })

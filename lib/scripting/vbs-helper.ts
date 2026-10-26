@@ -1,11 +1,36 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { logger } from '../util/logger.js'
-import { ERR } from './stdlib/err.js'
+import { ERR, VbsError } from './stdlib/err.js'
+import { isNothing } from './stdlib/index.js'
 import type { Transpiler } from './transpiler.js'
 import { VbsArray } from './vbs-array.js'
 import { UNDEF, VbsUndefined } from './vbs-undefined.js'
+import {
+	bankersRound,
+	type VbsLogicResult,
+	vbsAdd,
+	vbsAnd,
+	vbsDiv,
+	vbsEquals,
+	vbsEqv,
+	vbsIntDiv,
+	vbsMod,
+	vbsMul,
+	vbsNot,
+	vbsNotEquals,
+	vbsOr,
+	vbsSub,
+	vbsXor,
+} from './vbs-values.js'
+
+/**
+ * Scratch assignment target for the `Eval` expression fallback. VBScript only
+ * parses statements, so a bare expression (`Eval("1+2")`) is retried wrapped
+ * as an assignment; `eval` yields the assigned value. The name is scoped to
+ * generated code and never referenced by table scripts.
+ */
+const EVAL_SCRATCH = '__vbsEvalResult'
 
 /** VBS runtime helpers. */
 export class VBSHelper {
@@ -18,8 +43,8 @@ export class VBSHelper {
 		this.transpiler = transpiler
 	}
 
-	private isUndef(v: unknown): boolean {
-		return !!v && typeof v === 'object' && (v as any)[UNDEF] === true
+	private isUndef(value: unknown): boolean {
+		return value == null || (value as unknown as Record<symbol, unknown>)[UNDEF] === true
 	}
 
 	private sourcePrefix(vbs: string, filename?: string): string {
@@ -29,70 +54,180 @@ export class VBSHelper {
 	}
 
 	public dim(dimensions: number[], pos = 0): any[] {
-		const n = dimensions?.length ? dimensions[pos] + 1 : 0
-		const arr = new VbsArray(new Array(n).fill(VBSHelper.UNDEFINED))
-		if (++pos < dimensions.length)
-			for (let i = 0; i < n; i++) (arr as unknown as unknown[])[i] = this.dim(dimensions, pos)
+		if (!dimensions?.length) return new VbsArray<any>([]) as any
+		const bound = this.coerceBound(dimensions[pos])
+		if (bound === undefined) return new VbsArray<any>([]) as any
+		const n = bound + 1
+		const arr = new VbsArray<any>(new Array(n).fill(VBSHelper.UNDEFINED))
+		if (++pos < dimensions.length) for (let i = 0; i < n; i++) arr[i] = this.dim(dimensions, pos)
 		return arr as any
 	}
 
-	public redim(array: any[], dimensions: number[], preserve = false): any[] {
-		let tmp: unknown = array
-		for (let i = 0; i < dimensions.length - 1; i++) {
-			if ((tmp as unknown as unknown[]).length !== dimensions[i] + 1)
-				throw new Error('Only last dimension can be changed')
-			tmp = (tmp as unknown as unknown[])[0]
+	/**
+	 * Coerces a Dim/ReDim bound to a VBS integer: numeric strings numerically,
+	 * floats via banker's rounding (like CInt), True as -1, Empty as 0.
+	 * Failures route through ERR (13 type mismatch, 94 Null, 9 negative, 7 too
+	 * large) so On Error Resume Next records them; returns undefined then.
+	 */
+	private coerceBound(value: unknown): number | undefined {
+		if (value === null) {
+			ERR.Raise(new VbsError('Invalid use of Null', 94))
+			return undefined
 		}
-		return preserve ? this.redimResize(array as any, dimensions) : this.dim(dimensions)
+		if (this.isUndef(value)) return 0
+		const numeric = typeof value === 'boolean' ? (value ? -1 : 0) : Number(value)
+		if (Number.isNaN(numeric)) {
+			ERR.Raise(new VbsError('Type mismatch', 13))
+			return undefined
+		}
+		const bound = bankersRound(numeric)
+		if (bound < 0) {
+			ERR.Raise(new VbsError('Subscript out of range', 9))
+			return undefined
+		}
+		if (!Number.isFinite(bound) || bound > 0x7fffffff) {
+			ERR.Raise(new VbsError('Out of memory', 7))
+			return undefined
+		}
+		return bound
 	}
 
-	public transpileInline(vbs: string, filename?: string): string {
-		const key = filename ?? vbs
-		const cached = this.inlineCache.get(key)
-		if (cached) return cached
-		const js = this.sourcePrefix(vbs, filename) + this.transpiler.transpile(vbs)
-		if (key.length < 50000) this.inlineCache.set(key, js)
+	public redim(array: any[], dimensions: number[], preserve = false): any[] {
+		const bounds: number[] = []
+		for (const raw of dimensions) {
+			const bound = this.coerceBound(raw)
+			if (bound === undefined) return array
+			bounds.push(bound)
+		}
+		let tmp: any = array
+		for (let i = 0; i < bounds.length - 1; i++) {
+			if (tmp.length !== bounds[i] + 1) {
+				ERR.Raise(new VbsError('Subscript out of range', 9))
+				return array
+			}
+			tmp = tmp[0]
+		}
+		return preserve ? this.redimResize(array, bounds) : this.dim(bounds)
+	}
+
+	public transpileInline(vbs: unknown, filename?: string): string {
+		const prep = this.prepareInline(vbs, filename)
+		if (prep === undefined) return 'undefined'
+		if (prep.cached) return prep.cached
+		let js: string
+		try {
+			js = this.sourcePrefix(prep.text, filename) + this.transpiler.transpile(prep.text)
+		} catch {
+			try {
+				js =
+					this.sourcePrefix(prep.text, filename) +
+					this.transpiler.transpile(`${EVAL_SCRATCH} = (${prep.text})`)
+			} catch (error) {
+				this.raiseInline(error)
+				return 'undefined'
+			}
+		}
+		this.storeInline(prep.key, js)
 		return js
 	}
 
-	public async transpileInlineAsync(vbs: string, filename?: string): Promise<string> {
-		const key = filename ?? vbs
-		const cached = this.inlineCache.get(key)
-		if (cached) return cached
-		const js = this.sourcePrefix(vbs, filename) + (await this.transpiler.transpileAsync(vbs))
-		if (key.length < 50000) this.inlineCache.set(key, js)
+	public async transpileInlineAsync(vbs: unknown, filename?: string): Promise<string> {
+		const prep = this.prepareInline(vbs, filename)
+		if (prep === undefined) return 'undefined'
+		if (prep.cached) return prep.cached
+		let js: string
+		try {
+			js = this.sourcePrefix(prep.text, filename) + (await this.transpiler.transpileAsync(prep.text))
+		} catch {
+			try {
+				js =
+					this.sourcePrefix(prep.text, filename) +
+					(await this.transpiler.transpileAsync(`${EVAL_SCRATCH} = (${prep.text})`))
+			} catch (error) {
+				this.raiseInline(error)
+				return 'undefined'
+			}
+		}
+		this.storeInline(prep.key, js)
 		return js
+	}
+
+	/** Shared coerce → cache-lookup head of transpileInline/transpileInlineAsync. */
+	private prepareInline(
+		vbs: unknown,
+		filename?: string,
+	): { text: string; key: string; cached: string | undefined } | undefined {
+		const text = this.coerceInline(vbs)
+		if (text === undefined) return undefined
+		const key = filename ?? text
+		return { text, key, cached: this.inlineCache.get(key) }
+	}
+
+	/** Shared cache-store tail of transpileInline/transpileInlineAsync. */
+	private storeInline(key: string, js: string): void {
+		if (key.length < 50000) this.inlineCache.set(key, js)
+	}
+
+	/**
+	 * Coerces an `Execute`/`Eval` argument to source text. VBScript converts
+	 * scalars implicitly (`Eval(2)` works); Empty is a type mismatch (13),
+	 * Null is invalid use (94).
+	 * Raises through `ERR` so `On Error Resume Next` records it instead of
+	 * throwing, and returns `undefined` in that case.
+	 */
+	private coerceInline(vbs: unknown): string | undefined {
+		if (vbs === null) {
+			ERR.Raise(new VbsError('Invalid use of Null', 94))
+			return undefined
+		}
+		if (this.isUndef(vbs)) {
+			ERR.Raise(new VbsError('Eval requires a string expression, got Empty.', 13))
+			return undefined
+		}
+		const text = typeof vbs === 'string' ? vbs : String(vbs)
+		if (text.trim() === '') {
+			ERR.Raise(new VbsError('Eval requires a non-empty expression.', 1002))
+			return undefined
+		}
+		return text
+	}
+
+	/** Routes an inline-transpile failure through `ERR` (throw or record). */
+	private raiseInline(error: unknown): void {
+		ERR.Raise(
+			error instanceof VbsError
+				? error
+				: new VbsError(`Cannot evaluate inline script: ${(error as Error).message}`, 1002),
+		)
 	}
 
 	private redimResize(array: any[], dimensions: number[], pos = 0): any[] {
 		const n = dimensions[pos] + 1
-		if (pos === dimensions.length - 1) (array as unknown as unknown[]).length = n
+		if (pos === dimensions.length - 1) array.length = n
 		if (++pos < dimensions.length)
-			for (let i = 0; i < n; i++) (array as any[])[i] = this.redimResize((array as any[])[i], dimensions, pos)
+			for (let i = 0; i < n; i++) array[i] = this.redimResize(array[i], dimensions, pos)
 		return array
 	}
 
 	public erase(array: any[]): any[] {
 		const dims: number[] = []
-		let cur: unknown = array
+		let cur: any = array
 		for (;;) {
-			dims.push((cur as unknown as unknown[]).length - 1)
-			if (!Array.isArray((cur as unknown as unknown[])[0])) break
-			cur = (cur as unknown as unknown[])[0]
+			dims.push(cur.length - 1)
+			if (!Array.isArray(cur[0])) break
+			cur = cur[0]
 		}
 		return this.dim(dims)
 	}
 
 	public toIterable(obj: unknown): Iterable<unknown> {
-		if (obj == null || this.isUndef(obj)) return []
+		if (this.isUndef(obj)) return []
 		if (typeof (obj as any)[Symbol.iterator] === 'function') {
-			const arr = [...(obj as Iterable<unknown>)]
-			return arr.filter(x => x != null && !this.isUndef(x))
+			return [...(obj as Iterable<unknown>)]
 		}
-		if (typeof obj === 'object' && 'length' in (obj as any) && typeof (obj as any).length === 'number') {
+		if (typeof obj === 'object' && typeof (obj as any).length === 'number') {
 			try {
-				const arr = Array.from(obj as ArrayLike<unknown>)
-				return arr.filter(x => x != null && !this.isUndef(x))
+				return Array.from(obj as ArrayLike<unknown>)
 			} catch {
 				return []
 			}
@@ -100,62 +235,86 @@ export class VBSHelper {
 		return []
 	}
 
-	public intDiv(a: number, b: number): number {
-		return Math.floor(Math.floor(a) / Math.floor(b))
+	public intDiv(left: number, right: number): number {
+		return vbsIntDiv(left, right)
 	}
+
 	public exponent(b: number, e: number): number {
 		return b ** e
 	}
 
-	public equals(a: unknown, b: unknown): boolean {
-		// biome-ignore lint/suspicious/noDoubleEquals: VBS equals semantics
-		if (a == b) return true
-		const u1 = this.isUndef(a),
-			u2 = this.isUndef(b)
-		if (u1 || u2) {
-			if (u1 && u2) return true
-			if (u1 && (b === undefined || b === '')) return true
-			if (u2 && (a === undefined || a === '')) return true
-		}
-		return false
+	public add(left: unknown, right: unknown): unknown {
+		return vbsAdd(left, right)
+	}
+
+	public sub(left: unknown, right: unknown): number | null | undefined {
+		return vbsSub(left, right)
+	}
+
+	public mul(left: unknown, right: unknown): number | null | undefined {
+		return vbsMul(left, right)
+	}
+
+	public div(left: unknown, right: unknown): number | null | undefined {
+		return vbsDiv(left, right)
+	}
+
+	public mod(left: unknown, right: unknown): number | null | undefined {
+		return vbsMod(left, right)
+	}
+
+	public equals(left: unknown, right: unknown): boolean | null {
+		return vbsEquals(left, right)
+	}
+
+	public notEquals(left: unknown, right: unknown): boolean | null {
+		return vbsNotEquals(left, right)
 	}
 
 	public is(a: unknown, b: unknown): boolean {
-		return a === b
+		if (a === b) return true
+		// Unassigned variables read as undefined/VbsUndefined but VBS treats
+		// them as Nothing (`Dim c: c Is Nothing` is True).
+		return isNothing(a) && isNothing(b)
 	}
 
-	private arrayOf(params: unknown[]): unknown {
-		try {
-			return (Array as unknown as { of: (...a: unknown[]) => unknown[] }).of(...params)
-		} catch {
-			return VBSHelper.UNDEFINED
-		}
+	public and(left: unknown, right: unknown): VbsLogicResult {
+		return vbsAnd(left, right)
+	}
+	public or(left: unknown, right: unknown): VbsLogicResult {
+		return vbsOr(left, right)
+	}
+	public xor(left: unknown, right: unknown): VbsLogicResult {
+		return vbsXor(left, right)
+	}
+	public eqv(left: unknown, right: unknown): VbsLogicResult {
+		return vbsEqv(left, right)
+	}
+	public not(value: unknown): VbsLogicResult {
+		return vbsNot(value)
 	}
 
 	private traverse(obj: unknown, params: unknown[]): unknown {
-		for (const p of params) {
-			if (obj == null || this.isUndef(obj)) return VBSHelper.UNDEFINED
-			try {
-				obj = (obj as Record<string | number, unknown>)[p as string] as unknown
-			} catch {
+		for (const param of params) {
+			// Dereferencing Null is error 94; a merely unread (Empty) target
+			// yields Empty. A terminal Null read keeps collapsing to Empty.
+			if (obj === null) {
+				ERR.Raise(new VbsError('Invalid use of Null', 94))
 				return VBSHelper.UNDEFINED
 			}
 			if (this.isUndef(obj)) return VBSHelper.UNDEFINED
+			obj = (obj as Record<string | number, unknown>)[param as string] as unknown
 		}
-		return this.isUndef(obj) ? VBSHelper.UNDEFINED : (obj ?? VBSHelper.UNDEFINED)
+		return this.isUndef(obj) ? VBSHelper.UNDEFINED : obj
 	}
 
 	public getOrCall(obj: unknown, ...params: unknown[]): unknown {
-		if (obj == null || this.isUndef(obj)) return VBSHelper.UNDEFINED
-		if (typeof obj === 'function') {
-			if (obj === Array) return this.arrayOf(params)
-			try {
-				return (obj as (...a: unknown[]) => unknown).bind(obj as object)(...params)
-			} catch {
-				return VBSHelper.UNDEFINED
-			}
+		if (obj === null) {
+			ERR.Raise(new VbsError('Invalid use of Null', 94))
+			return VBSHelper.UNDEFINED
 		}
-		return this.traverse(obj, params)
+		if (this.isUndef(obj)) return VBSHelper.UNDEFINED
+		return this.invokeOrTraverse(obj, obj as object, params)
 	}
 
 	public getOrCallBound(
@@ -163,30 +322,32 @@ export class VBSHelper {
 		prop: string,
 		...params: unknown[]
 	): unknown {
-		if (parent == null || this.isUndef(parent)) return VBSHelper.UNDEFINED
-		let o: unknown
-		try {
-			o = (parent as Record<string, unknown>)[prop]
-		} catch {
+		if (parent === null) {
+			ERR.Raise(new VbsError('Invalid use of Null', 94))
 			return VBSHelper.UNDEFINED
 		}
-		if (o == null || this.isUndef(o)) return VBSHelper.UNDEFINED
-		if (typeof o === 'function') {
-			if (o === Array) return this.arrayOf(params)
-			try {
-				return (o as (...a: unknown[]) => unknown).bind(parent as object)(...params)
-			} catch {
-				return VBSHelper.UNDEFINED
-			}
+		if (this.isUndef(parent)) return VBSHelper.UNDEFINED
+		const value: unknown = (parent as Record<string, unknown>)[prop]
+		if (value === null && params.length > 0) {
+			ERR.Raise(new VbsError('Invalid use of Null', 94))
+			return VBSHelper.UNDEFINED
 		}
-		return this.traverse(o, params)
+		if (this.isUndef(value)) return VBSHelper.UNDEFINED
+		return this.invokeOrTraverse(value, parent as object, params)
+	}
+
+	private invokeOrTraverse(value: unknown, receiver: object, params: unknown[]): unknown {
+		if (typeof value === 'function') {
+			if (value === Array) return Array.of(...params)
+			return (value as (...a: unknown[]) => unknown).bind(receiver)(...params)
+		}
+		return this.traverse(value, params)
 	}
 
 	public onErrorResumeNext(): void {
 		ERR.OnErrorResumeNext()
 	}
-	public onErrorGoto(n: number): void {
-		if (n === 0) ERR.OnErrorGoto0()
-		else logger().warn('Cannot go to %s on error...', n)
+	public onErrorGoto(): void {
+		ERR.OnErrorGoto0()
 	}
 }

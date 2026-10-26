@@ -1,17 +1,26 @@
 import { describe, expect, it } from 'vitest'
 import { TableBuilder } from '../../../test/table-builder.js'
 import { TestRenderApi } from '../../../test/test-render-api.js'
-import { Vertex2D } from '../../util/vector.js'
+import { Vertex2D } from '../../math/vector.js'
+import type { IRenderApi } from '../../render/irender-api.js'
 import { DragPoint } from '../dragpoint.js'
-import { Flasher, FlasherData } from './flasher.js'
+import { Enums } from '../enums.js'
+import type { Mesh } from '../mesh.js'
+import { FlasherData } from './flasher-data.js'
 import { FlasherMeshGenerator } from './flasher-mesh-generator.js'
 import { FlasherState } from './flasher-state.js'
 import { FlasherUpdater } from './flasher-updater.js'
 
+/** FlasherData's constructor is private; construct fixtures through a minimal cast. */
+function createFlasherData(name: string): FlasherData {
+	const ctor = FlasherData as unknown as new (itemName: string) => FlasherData
+	return new ctor(name)
+}
+
 describe('The VPinball flasher mesh generator and updater', () => {
 	it('should generate a quad mesh from 4 drag points', () => {
 		const table = new TableBuilder().build()
-		const data = new FlasherData('Flasher1')
+		const data = createFlasherData('Flasher1')
 		data.dragPoints = [
 			Object.assign(new DragPoint(), { vertex: new Vertex2D(0, 0) }),
 			Object.assign(new DragPoint(), { vertex: new Vertex2D(100, 0) }),
@@ -34,8 +43,8 @@ describe('The VPinball flasher mesh generator and updater', () => {
 		table.data.top = 0
 		table.data.right = 500
 		table.data.bottom = 1000
-		const dataWrap = new FlasherData('WrapFlasher')
-		dataWrap.imageAlignment = 0
+		const dataWrap = createFlasherData('WrapFlasher')
+		dataWrap.imageAlignment = Enums.RampImageAlignment.ImageModeWrap
 		dataWrap.dragPoints = [
 			Object.assign(new DragPoint(), { vertex: new Vertex2D(50, 50) }),
 			Object.assign(new DragPoint(), { vertex: new Vertex2D(150, 50) }),
@@ -49,19 +58,118 @@ describe('The VPinball flasher mesh generator and updater', () => {
 		expect(meshWrap!.vertices[0]!.tu).toBeCloseTo(0, 1e-4)
 		expect(meshWrap!.vertices[0]!.tv).toBeCloseTo(0, 1e-4)
 
-		const dataWorld = new FlasherData('WorldFlasher')
-		dataWorld.imageAlignment = 1
+		const dataWorld = createFlasherData('WorldFlasher')
+		dataWorld.imageAlignment = Enums.RampImageAlignment.ImageModeWorld
 		dataWorld.dragPoints = dataWrap.dragPoints
 		const meshWorld = generator.generateMesh(dataWorld, table)
 		expect(meshWorld).toBeDefined()
 		const tableDimensions = table.getDimensions()
 		const expectedTu = (50 - table.data.left) / tableDimensions.width
 		expect(meshWorld!.vertices[0]!.tu).toBeCloseTo(expectedTu, 1e-4)
+		const expectedTv = (50 - table.data.top) / tableDimensions.height
+		expect(meshWorld!.vertices[0]!.tv).toBeCloseTo(expectedTv, 1e-4)
+	})
+
+	it('should bake rotated unit normals into the flasher mesh', () => {
+		const table = new TableBuilder().build()
+		const data = createFlasherData('NormalFlasher')
+		data.dragPoints = [
+			Object.assign(new DragPoint(), { vertex: new Vertex2D(0, 0) }),
+			Object.assign(new DragPoint(), { vertex: new Vertex2D(100, 0) }),
+			Object.assign(new DragPoint(), { vertex: new Vertex2D(100, 100) }),
+			Object.assign(new DragPoint(), { vertex: new Vertex2D(0, 100) }),
+		]
+		data.height = 50
+
+		const generator = new FlasherMeshGenerator()
+		const flat = generator.generateMesh(data, table)
+		expect(flat).toBeDefined()
+		for (const vertex of flat!.vertices) {
+			expect(vertex.nx).toBeCloseTo(0, 5)
+			expect(vertex.ny).toBeCloseTo(0, 5)
+			expect(vertex.nz).toBeCloseTo(-1, 5)
+		}
+
+		data.rotX = 90
+		const tilted = generator.generateMesh(data, table)
+		expect(tilted).toBeDefined()
+		for (const vertex of tilted!.vertices) {
+			expect(vertex.nx).toBeCloseTo(0, 5)
+			expect(vertex.ny).toBeCloseTo(-1, 5)
+			expect(vertex.nz).toBeCloseTo(0, 5)
+		}
+	})
+
+	it('should regenerate the mesh node when rot/height state changes', () => {
+		const table = new TableBuilder().build()
+		const data = createFlasherData('SpinFlasher')
+		data.dragPoints = [
+			Object.assign(new DragPoint(), { vertex: new Vertex2D(0, 0) }),
+			Object.assign(new DragPoint(), { vertex: new Vertex2D(100, 0) }),
+			Object.assign(new DragPoint(), { vertex: new Vertex2D(100, 100) }),
+			Object.assign(new DragPoint(), { vertex: new Vertex2D(0, 100) }),
+		]
+		data.height = 50
+		const state = FlasherState.claim('SpinFlasher', true, 0xffffff, 100, 0, 0, 0, 50)
+		const updater = new FlasherUpdater(state, data)
+
+		const applied: Mesh[] = []
+		const found: string[] = []
+		const renderApi = new TestRenderApi() as unknown as IRenderApi<any, any, any>
+		renderApi.applyMeshToNode = (mesh: Mesh) => {
+			applied.push(mesh)
+		}
+		renderApi.findInGroup = ((_parent: unknown, name: string) => {
+			found.push(name)
+			return {}
+		}) as typeof renderApi.findInGroup
+		const node = { visible: true, traverse: () => {} }
+
+		const generator = new FlasherMeshGenerator()
+		const before = generator.generateMesh(data, table)!.vertices.map(vertex => [vertex.x, vertex.y, vertex.z])
+
+		const moved = state.clone()
+		moved.rotZ = 45
+		moved.height = 120
+		updater.applyState(node, moved, renderApi, table)
+
+		expect(found).toEqual(['flasher-SpinFlasher'])
+		expect(applied.length).toBe(1)
+		const after = applied[0]!.vertices.map(vertex => [vertex.x, vertex.y, vertex.z])
+		expect(after).not.toEqual(before)
+
+		const tinted = moved.clone()
+		tinted.color = 0x112233
+		updater.applyState(node, tinted, renderApi, table)
+		expect(applied.length).toBe(1)
+	})
+
+	it('should derive the flasher center from the drag-point outline', () => {
+		const data = createFlasherData('CenterFlasher')
+		data.dragPoints = [
+			Object.assign(new DragPoint(), { vertex: new Vertex2D(0, 0) }),
+			Object.assign(new DragPoint(), { vertex: new Vertex2D(100, 0) }),
+			Object.assign(new DragPoint(), { vertex: new Vertex2D(100, 100) }),
+			Object.assign(new DragPoint(), { vertex: new Vertex2D(0, 100) }),
+		]
+
+		const center = data.getCenter()
+		expect(center.x).toBeCloseTo(50, 5)
+		expect(center.y).toBeCloseTo(50, 5)
+	})
+
+	it('should return the origin as center when there are no drag points', () => {
+		const data = createFlasherData('EmptyFlasher')
+		data.dragPoints = []
+
+		const center = data.getCenter()
+		expect(center.x).toBe(0)
+		expect(center.y).toBe(0)
 	})
 
 	it('should return undefined if drag points cannot form a valid polygon', () => {
 		const table = new TableBuilder().build()
-		const data = new FlasherData('InvalidFlasher')
+		const data = createFlasherData('InvalidFlasher')
 		data.dragPoints = [
 			Object.assign(new DragPoint(), { vertex: { x: 0, y: 0 } }),
 			Object.assign(new DragPoint(), { vertex: { x: 10, y: 10 } }),
@@ -72,14 +180,13 @@ describe('The VPinball flasher mesh generator and updater', () => {
 	})
 
 	it('should apply additive blending uniforms in FlasherUpdater', () => {
-		const data = new FlasherData('AddFlasher')
+		const data = createFlasherData('AddFlasher')
 		data.addBlend = true
 		data.intensityScale = 2
 		const state = FlasherState.claim('AddFlasher', true, 0xff8844, 80)
 		const updater = new FlasherUpdater(state, data)
 
 		let tintColor = 0
-		const intensityVal = 0
 		const targetMesh = {
 			isMesh: true,
 			material: {
@@ -101,7 +208,7 @@ describe('The VPinball flasher mesh generator and updater', () => {
 			traverse: (callback: (child: unknown) => void) => callback(targetMesh),
 		}
 
-		const renderApi = new TestRenderApi()
+		const renderApi = new TestRenderApi() as unknown as IRenderApi<any, any, any>
 		const table = new TableBuilder().build()
 		updater.applyState(node, state, renderApi, table)
 
@@ -112,7 +219,7 @@ describe('The VPinball flasher mesh generator and updater', () => {
 	})
 
 	it('should hide flasher if alpha is zero or additive color is black (native VPX)', () => {
-		const data = new FlasherData('AddFlasher')
+		const data = createFlasherData('AddFlasher')
 		data.addBlend = true
 		const state = FlasherState.claim('AddFlasher', true, 0x000000, 100)
 		const updater = new FlasherUpdater(state, data)
@@ -121,7 +228,7 @@ describe('The VPinball flasher mesh generator and updater', () => {
 			visible: true,
 			traverse: () => {},
 		}
-		const renderApi = new TestRenderApi()
+		const renderApi = new TestRenderApi() as unknown as IRenderApi<any, any, any>
 		const table = new TableBuilder().build()
 
 		updater.applyState(node, state, renderApi, table)
@@ -134,7 +241,7 @@ describe('The VPinball flasher mesh generator and updater', () => {
 	})
 
 	it('should apply standard opacity when addBlend is false', () => {
-		const data = new FlasherData('NormalFlasher')
+		const data = createFlasherData('NormalFlasher')
 		data.addBlend = false
 		const state = FlasherState.claim('NormalFlasher', true, 0x112233, 50)
 		const updater = new FlasherUpdater(state, data)
@@ -161,7 +268,7 @@ describe('The VPinball flasher mesh generator and updater', () => {
 			traverse: (callback: (child: unknown) => void) => callback(targetMesh),
 		}
 
-		const renderApi = new TestRenderApi()
+		const renderApi = new TestRenderApi() as unknown as IRenderApi<any, any, any>
 		const table = new TableBuilder().build()
 		updater.applyState(node, state, renderApi, table)
 
@@ -170,6 +277,91 @@ describe('The VPinball flasher mesh generator and updater', () => {
 		expect(material.opacity).toBeCloseTo(0.5, 1e-5)
 		expect(material.transparent).toBe(true)
 		expect(material.needsUpdate).toBe(true)
+	})
+
+	it('should hide a sequencer-locked flasher with inPlayState off and reveal it on unlock', () => {
+		const table = new TableBuilder().build()
+		const data = createFlasherData('SeqFlasher')
+		data.addBlend = false
+		const state = FlasherState.claim('SeqFlasher', true, 0x112233, 50)
+		const updater = new FlasherUpdater(state, data)
+
+		const material: {
+			color?: { set: (hexColor: number) => void }
+			opacity?: number
+			transparent?: boolean
+			needsUpdate?: boolean
+		} = {
+			color: { set: () => {} },
+			opacity: 1,
+			transparent: false,
+			needsUpdate: false,
+		}
+		const targetMesh = { isMesh: true, material }
+		const node = {
+			visible: false,
+			traverse: (callback: (child: unknown) => void) => callback(targetMesh),
+		}
+		const renderApi = new TestRenderApi() as unknown as IRenderApi<any, any, any>
+
+		updater.applyState(node, state, renderApi, table)
+		expect(node.visible).toBe(true)
+
+		const lockedOff = state.clone()
+		lockedOff.lockedByLS = true
+		lockedOff.inPlayState = false
+		updater.applyState(node, lockedOff, renderApi, table)
+		expect(node.visible).toBe(false)
+
+		// Locked-on but script-hidden stays hidden like upstream (m_d.m_isVisible gate).
+		const lockedHidden = state.clone()
+		lockedHidden.lockedByLS = true
+		lockedHidden.inPlayState = true
+		lockedHidden.isVisible = false
+		updater.applyState(node, lockedHidden, renderApi, table)
+		expect(node.visible).toBe(false)
+
+		const unlocked = lockedHidden.clone()
+		unlocked.lockedByLS = false
+		unlocked.isVisible = true
+		updater.applyState(node, unlocked, renderApi, table)
+		expect(node.visible).toBe(true)
+	})
+
+	it('should modulate alpha by the LMAP-linked light intensity', () => {
+		const table = new TableBuilder().build()
+		const data = createFlasherData('LmFlasher')
+		data.addBlend = false
+		data.szLightmap = 'L1'
+		const state = FlasherState.claim('LmFlasher', true, 0x112233, 100)
+		const updater = new FlasherUpdater(state, data)
+
+		let currentIntensity = 10
+		;(table as any).lights = {
+			L1: {
+				data: { intensity: 10 },
+				getAnimation: () => ({ intensityScale: 1 }),
+				getState: () => ({ intensity: currentIntensity }),
+			},
+		}
+		const material: { opacity?: number; transparent?: boolean; needsUpdate?: boolean } = { opacity: 1 }
+		const node: any = {
+			visible: false,
+			traverse: (callback: (child: unknown) => void) => callback({ isMesh: true, material }),
+		}
+		const renderApi = new TestRenderApi() as unknown as IRenderApi<any, any, any>
+
+		updater.applyState(node, state, renderApi, table)
+		expect(node.visible).toBe(true)
+		expect(material.opacity).toBeCloseTo(1, 1e-5)
+
+		currentIntensity = 5
+		updater.applyState(node, state, renderApi, table)
+		expect(material.opacity).toBeCloseTo(0.5, 1e-5)
+
+		currentIntensity = 0
+		updater.applyState(node, state, renderApi, table)
+		expect(node.visible).toBe(false)
 	})
 
 	it('should synchronize FlasherApi property updates to FlasherState', async () => {

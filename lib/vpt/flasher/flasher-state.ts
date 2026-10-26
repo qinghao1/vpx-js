@@ -1,3 +1,6 @@
+// Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
+
 import { ItemState } from '../item-state.js'
 
 export class FlasherState extends ItemState {
@@ -7,6 +10,10 @@ export class FlasherState extends ItemState {
 	public rotY = 0
 	public rotZ = 0
 	public height = 50
+	/** Sequencer lock. @see Flasher::m_lockedByLS in src/parts/flasher.h */
+	public lockedByLS = false
+	/** Sequencer-driven on/off; script Visible keeps flowing to isVisible. @see Flasher::m_inPlayState in src/parts/flasher.h */
+	public inPlayState = true
 
 	public static claim(
 		name: string,
@@ -27,19 +34,7 @@ export class FlasherState extends ItemState {
 		state.rotY = rotY
 		state.rotZ = rotZ
 		state.height = height
+		state.inPlayState = isVisible
 		return state
-	}
-
-	public clone(): FlasherState {
-		return FlasherState.claim(
-			this.name,
-			this.isVisible,
-			this.color,
-			this.alpha,
-			this.rotX,
-			this.rotY,
-			this.rotZ,
-			this.height,
-		)
 	}
 }

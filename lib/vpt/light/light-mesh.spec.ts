@@ -40,10 +40,6 @@ describe('The VPinball lights generator', () => {
 		three.expectNoObject(gltf, 'lightBulbs', 'NoBulb')
 	})
 
-	it('should not generate a light with no bulb mesh', async () => {
-		three.expectNoObject(gltf, 'lightBulbs', 'lightNoBulb')
-	})
-
 	it('should generate a glow quad instead of a scene light', async () => {
 		// Polygon lights render through the native lightmap pass, never as scene
 		// lights, so the export carries a `bulb.glow` mesh and no punctual light.

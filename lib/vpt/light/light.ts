@@ -2,15 +2,13 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { EventProxy } from '../../game/event-proxy.js'
-import type { IAnimatable, IAnimation } from '../../game/ianimatable.js'
-import type { IRenderable, Meshes } from '../../game/irenderable.js'
-import type { IScriptable } from '../../game/iscriptable.js'
+import type { IAnimatable, IAnimation, IRenderable, IScriptable, Meshes } from '../../game/interfaces.js'
 import type { Player } from '../../game/player.js'
 import { BiffParser } from '../../io/biff-parser.js'
 import type { Storage } from '../../io/ole-doc.js'
+import { Matrix3D } from '../../math/matrix.js'
+import { Vertex2D } from '../../math/vector.js'
 import type { IRenderApi } from '../../render/irender-api.js'
-import { Matrix3D } from '../../util/matrix.js'
-import { Vertex2D } from '../../util/vector.js'
 import { handleBiffTag } from '../biff-helper.js'
 import { DragPoint } from '../dragpoint.js'
 import { Enums } from '../enums.js'
@@ -19,9 +17,8 @@ import { ItemApi } from '../item-api.js'
 import { ItemData } from '../item-data.js'
 import { ItemState } from '../item-state.js'
 import { Material } from '../material.js'
-import { omitEqual } from '../state-helpers.js'
 import type { Table } from '../table/table.js'
-import { LightAnimation } from './light-physics.js'
+import { clampLightState, LightAnimation } from './light-physics.js'
 import { LightMeshGenerator, LightUpdater } from './light-view.js'
 
 const FLOAT_MAP: Record<string, string> = {
@@ -36,9 +33,8 @@ const FLOAT_MAP: Record<string, string> = {
 	BMSC: 'meshRadius',
 	BMVA: 'bulbModulateVsAdd',
 	BHHI: 'bulbHaloHeight',
-	STTF: 'state',
 }
-const INT_MAP: Record<string, string> = { STAT: 'state', BINT: 'blinkInterval', SHDW: 'shadows', FADE: 'fader' }
+const INT_MAP: Record<string, string> = { BINT: 'blinkInterval', SHDW: 'shadows', FADE: 'fader' }
 const BOOL_MAP: Record<string, string> = {
 	SHAP: 'roundLight',
 	BGLS: 'isBackglass',
@@ -49,7 +45,12 @@ const BOOL_MAP: Record<string, string> = {
 	SHRB: 'showReflectionOnBall',
 	VSBL: 'isVisible',
 }
-const STRING_MAP: Record<string, string> = { IMG1: 'szOffImage', BPAT: 'rgBlinkPattern', SURF: 'szSurface' }
+const STRING_MAP: Record<string, string> = {
+	IMG1: 'szOffImage',
+	BPAT: 'rgBlinkPattern',
+	SURF: 'szSurface',
+	LINK: 'stateSrcLink',
+}
 
 /** Additive glow parameters for a bulb light polygon.
  *
@@ -86,6 +87,8 @@ export class LightData extends ItemData {
 	public intensity = 10
 	public transmissionScale = 0
 	public szSurface?: string
+	/** Optional controller state source (resuri) driving the in-play state. @see Light::m_stateSrcLink in src/parts/light.h */
+	public stateSrcLink = ''
 	public isBackglass = false
 	public depthBias?: number
 	public fadeSpeedUp = 0.05
@@ -138,6 +141,7 @@ export class LightData extends ItemData {
 	}
 
 	public hasBulbGlow(): boolean {
+		// Glow needs a polygon: 3+ drag points (>2); 2 points is just a line with no area to shade.
 		return this.bulbLight && this.dragPoints.length > 2
 	}
 
@@ -175,6 +179,15 @@ export class LightData extends ItemData {
 			this.color2 = BiffParser.bgrToRgb(this.getInt(buffer))
 			return 0
 		}
+		if (tag === 'STAT') {
+			// Pre-10.8 tables only had 0 (off), 1 (on), 2 (blinking).
+			this.state = clampLightState(this.getInt(buffer))
+			return 0
+		}
+		if (tag === 'STTF') {
+			this.state = clampLightState(this.getFloat(buffer))
+			return 0
+		}
 		if (
 			handleBiffTag(this, tag, buffer, len, {
 				float: FLOAT_MAP,
@@ -202,33 +215,6 @@ export class LightState extends ItemState {
 		state.color = color
 		state.colorFull = colorFull
 		return state
-	}
-
-	public clone(): LightState {
-		const state = LightState.claim(this.name, this.intensity, this.color, this.colorFull)
-		state.isVisible = this.isVisible
-		return state
-	}
-
-	public diff(state: LightState): LightState {
-		const diffState = this.clone()
-		omitEqual(diffState, state, 'intensity')
-		omitEqual(diffState, state, 'color')
-		omitEqual(diffState, state, 'colorFull')
-		omitEqual(diffState, state, 'isVisible')
-		return diffState
-	}
-
-	public release(): void {}
-
-	public equals(state: LightState): boolean {
-		if (!state) return false
-		return (
-			state.intensity === this.intensity &&
-			state.color === this.color &&
-			state.colorFull === this.colorFull &&
-			state.isVisible === this.isVisible
-		)
 	}
 }
 
@@ -258,9 +244,11 @@ export class LightApi extends ItemApi<LightData> {
 		this.data.falloffPower = v
 	}
 	get State() {
-		return this.animation.lockedByLS ? this.data.state : this.animation.realState
+		const v = this.animation.lockedByLS ? this.data.state : this.animation.realState
+		return clampLightState(v)
 	}
 	set State(v) {
+		v = clampLightState(v)
 		/* istanbul ignore next: No light sequences yet */
 		if (!this.animation.lockedByLS) this.animation.setState(v, this.player.getPhysics())
 		this.data.state = v
@@ -421,29 +409,34 @@ export class LightApi extends ItemApi<LightData> {
 		this.animation.setDuration(startState, duration, endState, this.player.getPhysics().timeMsec)
 	}
 
-	protected _getPropertyNames(): string[] {
-		return Object.getOwnPropertyNames(LightApi.prototype)
+	/** Live state, including blink/duration overrides. @see Light::GetInPlayState in src/parts/light.cpp */
+	public GetInPlayState(): number {
+		return this.animation.realState
+	}
+
+	/** Live state as on/off, resolved through the blink pattern. @see Light::GetInPlayStateBool in src/parts/light.cpp */
+	public GetInPlayStateBool(): boolean {
+		return this.animation.isInPlayOn()
+	}
+
+	/** Live intensity, mid-fade included. @see Light::GetInPlayIntensity in src/parts/light.cpp */
+	public GetInPlayIntensity(): number {
+		return this._state.intensity
+	}
+
+	get FilamentTemperature() {
+		return this.animation.getFilamentTemperature()
+	}
+	get Shadows() {
+		return this.data.shadows
+	}
+	set Shadows(v) {
+		this.data.shadows = v
 	}
 }
 
 /** Light item. @see https://github.com/vpinball/vpinball/blob/master/light.cpp */
 export class Light extends Item<LightData> implements IRenderable<LightState>, IAnimatable, IScriptable<LightApi> {
-	get color() {
-		return this.data.color
-	}
-	get intensity() {
-		return this.data.intensity
-	}
-	get falloff() {
-		return this.data.falloff
-	}
-	get vCenter() {
-		return this.data.center
-	}
-	get offImage() {
-		return this.data.szOffImage
-	}
-
 	public declare readonly data: LightData
 	private readonly state: LightState
 	private readonly meshGenerator: LightMeshGenerator
@@ -458,16 +451,11 @@ export class Light extends Item<LightData> implements IRenderable<LightState>, I
 
 	public constructor(data: LightData) {
 		super(data)
-		const initialIntensity = (() => {
-			const st = data.state
-			if (st === 0) return 0
-			if (st === 2) {
-				const pat = data.rgBlinkPattern
-				return pat && pat[0] === '1' ? data.intensity : 0
-			}
-			const clamped = Math.max(0, Math.min(1, st as number))
-			return data.intensity * clamped
-		})()
+		const clampedState = clampLightState(data.state)
+		let initialIntensity = data.intensity * clampedState
+		if (clampedState === Enums.LightStatus.LightStateBlinking) {
+			initialIntensity = data.isOn() ? data.intensity : 0
+		}
 		this.state = LightState.claim(this.getName(), initialIntensity, data.color, data.color2)
 		this.data = data
 		this.meshGenerator = new LightMeshGenerator(data)
@@ -480,7 +468,7 @@ export class Light extends Item<LightData> implements IRenderable<LightState>, I
 
 	public setupPlayer(player: Player, table: Table): void {
 		this.events = new EventProxy(this)
-		this.animation = new LightAnimation(this.data, this.state)
+		this.animation = new LightAnimation(this.data, this.state, () => player.getPhysics().emu)
 		this.api = new LightApi(this.state, this.animation, this.data, this.events, player, table)
 	}
 
@@ -521,6 +509,7 @@ export class Light extends Item<LightData> implements IRenderable<LightState>, I
 			}
 		}
 		const meshes: Meshes<GEOMETRY> = {}
+		// >2: glow quad needs a 3+ point polygon (see hasBulbGlow); fewer points fall back to a point light.
 		if (this.data.bulbLight && this.data.dragPoints.length > 2) {
 			const glowMaterial = new Material()
 			glowMaterial.name = `bulb.glow:${this.getName()}`

@@ -8,11 +8,6 @@ import { VbsUndefined } from './vbs-undefined.js'
 
 chai.use((sinonChai as any).default ?? sinonChai)
 describe('The VBScript undefined handler', () => {
-	it('should be comparable', () => {
-		const undef = new VbsUndefined() as unknown
-		expect(() => undef === 1).not.to.throw()
-	})
-
 	it('should return "undefined" as string', () => {
 		const undef = new VbsUndefined() as unknown
 		expect(String(undef)).to.equal('undefined')

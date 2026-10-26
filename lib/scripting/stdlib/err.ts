@@ -81,7 +81,6 @@ export class Err extends VbsApi {
 		this.Number = 0
 		this.Description = ''
 		this.Source = ''
-		this.Description = ''
 		this.HelpFile = ''
 		this.HelpContext = ''
 	}

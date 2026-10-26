@@ -53,6 +53,42 @@ describe('The VPinball light animation', () => {
 		expect(light.getState().intensity).to.equal(0)
 	})
 
+	it('should scale steady intensity by IntensityScale', () => {
+		const light = table.lights.Surface
+		const api = light.getApi()
+
+		api.Intensity = 10
+		api.State = Enums.LightStatus.LightStateOn
+
+		api.IntensityScale = 0.5
+		player.simulateTime(20)
+		expect(light.getState().intensity).to.equal(5)
+
+		api.IntensityScale = 2
+		player.simulateTime(40)
+		expect(light.getState().intensity).to.equal(20)
+
+		api.IntensityScale = 0
+		player.simulateTime(60)
+		expect(light.getState().intensity).to.equal(0)
+	})
+
+	it('should apply IntensityScale immediately and clamp negatives', () => {
+		const light = table.lights.Surface
+		const api = light.getApi()
+
+		api.Intensity = 10
+		api.State = Enums.LightStatus.LightStateOn
+		player.simulateTime(20)
+		expect(light.getState().intensity).to.equal(10)
+
+		api.IntensityScale = 0.5
+		expect(light.getState().intensity).to.equal(5)
+
+		api.IntensityScale = -2
+		expect(light.getState().intensity).to.equal(0)
+	})
+
 	it('should go from off to on', () => {
 		const light = table.lights.Surface
 		const api = light.getApi()

@@ -1,11 +1,15 @@
+// Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
+
 import { MathUtils } from 'three'
+import { Matrix3D } from '../../math/matrix.js'
 import { CatmullCurve2D } from '../../util/catmull-curve.js'
-import { Matrix3D } from '../../util/matrix.js'
 import { RenderVertex, Vertex3DNoTex2 } from '../../util/vertex.js'
 import { DragPoint } from '../dragpoint.js'
+import { Enums } from '../enums.js'
 import { Mesh } from '../mesh.js'
 import type { Table } from '../table/table.js'
-import type { FlasherData } from './flasher.js'
+import type { FlasherData } from './flasher-data.js'
 
 export class FlasherMeshGenerator {
 	public generateMesh(data: FlasherData, table: Table): Mesh | undefined {
@@ -67,7 +71,7 @@ export class FlasherMeshGenerator {
 			const vert = verts[i]!
 			let tu = 0
 			let tv = 0
-			if (data.imageAlignment === 0) {
+			if (data.imageAlignment === Enums.RampImageAlignment.ImageModeWrap) {
 				tu = (vert.x - minx) * invW
 				tv = (vert.y - miny) * invH
 			} else {
@@ -78,6 +82,9 @@ export class FlasherMeshGenerator {
 				x: vert.x,
 				y: vert.y,
 				z: 0,
+				nx: 0,
+				ny: 0,
+				nz: 1,
 				tu,
 				tv,
 			})
