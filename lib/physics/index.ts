@@ -2,8 +2,6 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 /** Barrel for lib/physics/index.ts — re-exports domain modules. */
-export * from './anim-object.js'
-export * from './anim-slingshot.js'
 export * from './collision-event.js'
 export * from './collision-type.js'
 export * from './constants.js'
