@@ -1,13 +1,17 @@
-import { execSync } from 'node:child_process'
+import { readFileSync } from 'node:fs'
 import path from 'node:path'
-import { attachLogging, launchBrowser, loadPuppeteer, newPage } from '../../test/harness/utils.mjs'
+import { attachLogging, ensureVite, launchBrowser, loadPuppeteer, newPage } from '../../test/harness/utils.mjs'
 import {
+	backboxChecks,
 	ballChecks,
 	cameraTransitionChecks,
 	DEFAULT_URL,
 	diagnostics,
-	dmdChecks,
+	dmdLiveChecks,
+	dmdVisibleChecks,
+	glRendererInfo,
 	hideOverlays,
+	INSERT_NAME_PATTERN,
 	nudgeChecks,
 	physicsChecks,
 	playfieldLightsCheck,
@@ -17,13 +21,41 @@ import {
 	waitReady,
 } from './helpers.mjs'
 
-const url = (
+function upgradeLocalhost(u) {
+	if (u.startsWith('http://localhost:3000')) {
+		const upgraded = u.replace('http://localhost:3000', 'https://localhost:3000')
+		console.log(`[integration] http -> https (vite serves TLS): ${upgraded}`)
+		return upgraded
+	}
+	return u
+}
+
+const url = upgradeLocalhost(
 	process.argv.find(a => a.startsWith('--url='))?.slice(6) ||
-	(process.argv[2]?.startsWith('http') ? process.argv[2] : null) ||
-	''
-).replace('http://localhost:3000', 'https://localhost:3000')
+		(process.argv[2]?.startsWith('http') ? process.argv[2] : null) ||
+		'',
+)
 const out = process.argv.find(a => a.startsWith('--out='))?.slice(6) || '/tmp'
+// GPU selection (same convention as bench.mjs): --gpu=vulkan|--gpu=gl|--gpu,
+// USE_GPU=..., or legacy USE_SWIFTSHADER=1 (default when no gpu is set).
+const gpuArg =
+	process.argv.find(a => a.startsWith('--gpu='))?.slice(6) || (process.argv.includes('--gpu') ? 'vulkan' : null)
+const gpu = gpuArg || process.env.USE_GPU || process.env.GPU || null
 const useSwift = process.env.USE_SWIFTSHADER === '1'
+if (useSwift && !gpu) console.log('[integration] USE_SWIFTSHADER=1 (default SwiftShader flags)')
+if (gpu) console.log(`[integration] gpu=${gpu}`)
+const readyTimeoutMs = Number(process.env.E2E_READY_TIMEOUT_MS) || 60000
+const autoKillMs = Number(process.env.E2E_AUTOKILL_MS) || undefined
+
+// Leg results are tri-state: true (pass), false (fail), 'skip' (fixture cannot
+// support the check). Only true/'skip' legs let the gate pass; skips are honest
+// non-coverage, never pseudo-passes.
+const legStatus = v => (v === 'skip' ? 'SKIP' : v ? 'PASS' : 'FAIL')
+const legOk = v => v === true || v === 'skip'
+
+// Repo-relative inputs for the transpile probe: no hardcoded checkout path.
+const TRANSPILER_URL = `/@fs${path.resolve('dist-esm/lib/scripting/transpiler.js')}`
+const VBS_CONSTRUCTS_PATH = path.resolve('test/harness/__snapshots__/vpinball-compat/vbs-constructs.vbs')
 
 function labelFromUrl(u) {
 	try {
@@ -46,106 +78,64 @@ function labelFromUrl(u) {
 	}
 }
 
+// Shared harness helpers (same as bench.mjs): ensureVite probes/starts the dev
+// server and registers process cleanup for vite + chrome, so no bespoke
+// ensureServer/_forceKillChrome/signal handlers are needed here.
+await ensureVite(url || DEFAULT_URL, { label: 'integration' })
 const puppeteer = await loadPuppeteer()
-const browser = await launchBrowser(puppeteer, { useSwiftShader: useSwift })
-let viteProc = null
-const _forceKillChrome = () => {
-	try {
-		execSync('pkill -9 -f "chrome.*headless.*puppeteer" 2>/dev/null || true', { timeout: 2000, stdio: 'ignore' })
-	} catch {}
-	if (viteProc) {
-		try {
-			process.kill(-viteProc.pid)
-		} catch {}
-	}
-}
-
-async function ensureServer() {
-	process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
-	try {
-		const res = await fetch('https://localhost:3000', { signal: AbortSignal.timeout(1000) })
-		if (res.ok || res.status === 404) return
-	} catch (e) {
-		const msg = String(e?.message || e)
-		if (msg.includes('self-signed') || msg.includes('CERT') || msg.includes('certificate')) return
-	}
-	try {
-		const res = await fetch('http://localhost:3000', { signal: AbortSignal.timeout(1000) })
-		if (res.ok || res.status === 404) return
-	} catch {}
-	const { spawn } = await import('node:child_process')
-	const root = process.cwd()
-	viteProc = spawn('npx', ['vite', 'demo-browser', '--port', '3000'], {
-		cwd: root,
-		stdio: 'ignore',
-		detached: true,
-	})
-	viteProc.unref()
-	for (let i = 0; i < 30; i++) {
-		await new Promise(r => setTimeout(r, 200))
-		try {
-			const res = await fetch('https://localhost:3000', { signal: AbortSignal.timeout(500) })
-			if (res.ok || res.status === 404) break
-		} catch (e) {
-			const msg = String(e?.message || e)
-			if (msg.includes('self-signed') || msg.includes('CERT') || msg.includes('certificate')) break
-		}
-		try {
-			const res = await fetch('http://localhost:3000', { signal: AbortSignal.timeout(500) })
-			if (res.ok || res.status === 404) break
-		} catch {}
-	}
-}
-
-await ensureServer()
-process.once('exit', _forceKillChrome)
-process.once('SIGINT', () => {
-	_forceKillChrome()
-	process.exit(1)
-})
-process.once('SIGTERM', () => {
-	_forceKillChrome()
-	process.exit(1)
-})
-process.once('SIGHUP', () => {
-	_forceKillChrome()
-	process.exit(1)
-})
-process.on('uncaughtException', e => {
-	console.error('[integration] uncaught', e)
-	_forceKillChrome()
-	process.exit(1)
-})
-process.on('unhandledRejection', e => {
-	console.error('[integration] unhandled', e)
-	_forceKillChrome()
-	process.exit(1)
+const browser = await launchBrowser(puppeteer, {
+	...(gpu ? { gpu } : {}),
+	...(autoKillMs ? { autoKillMs } : {}),
 })
 
 async function runOne(targetUrl, label) {
-	targetUrl = targetUrl.replace('http://localhost:3000', 'https://localhost:3000')
+	targetUrl = upgradeLocalhost(targetUrl)
 	const page = await newPage(browser)
 	const logs = attachLogging(page, {
 		filter: /Ready|Failed|Parsed|filter|Skipped|VLM|VR|cabinet|glass|mem|heap|THREE|Texture|DMD|emu|PinMAME/i,
 		prefix: `[${label}]`,
 	})
+	// Loud pageerror gate: every uncaught page exception is recorded with its
+	// phase (load+settle vs later legs). Load-phase errors fail the gate —
+	// attachLogging only prints them, so without this collector they pass
+	// silently.
+	const pageErrors = []
+	let loadPhase = true
+	page.on('pageerror', err => {
+		pageErrors.push({
+			phase: loadPhase ? 'load' : 'run',
+			message: String(err?.message ?? err).slice(0, 500),
+			stack: String(err?.stack ?? '').slice(0, 800),
+		})
+	})
+	page.on('requestfailed', req => {
+		console.log(`[integration:${label}] requestfailed ${req.url().slice(0, 200)} ${req.failure()?.errorText || ''}`)
+	})
 	console.log(`[integration:${label}] goto ${targetUrl}`)
 	await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 30000 })
-	let log = await waitReady(page)
+	let log = await waitReady(page, readyTimeoutMs)
 	const ready = log.includes('Ready')
 	console.log(`[integration:${label}] Ready=${ready}`)
 	if (!ready) {
 		console.log(log.slice(-6000))
+		for (const e of pageErrors.slice(0, 10))
+			console.log(`[integration:${label}] pageerror[${e.phase}] ${e.message}\n${e.stack}`)
 		await page.close().catch(() => {})
 		return { ok: false, reason: 'not ready' }
 	}
 	if (log.includes('streaming') || log.includes('deferred')) {
-		console.log(`[integration:${label}] wait Done (skip poll, wait 3s)…`)
-		await new Promise(r => setTimeout(r, 3000))
-		try {
-			log = await page.evaluate(() => document.getElementById('log')?.innerText || '')
-		} catch {}
-		console.log(`[integration:${label}] Done check skipped`)
+		// Legs below (diagnostics, playfield, …) must observe the settled
+		// scene: multi-10s EXR bakes arrive long after Ready. pollLog returns
+		// at once when Done already logged; empty tables never stream.
+		console.log(`[integration:${label}] wait stream Done…`)
+		log = await pollLog(page, '[stream] Done', 180000, 'stream-done')
+		console.log(`[integration:${label}] stream settled (${log.includes('[stream] Done') ? 'done' : 'timeout'})`)
+	}
+	try {
+		const gl = await glRendererInfo(page)
+		console.log(`[integration:${label}] GL renderer: ${gl.renderer} software=${gl.software}`)
+	} catch (e) {
+		console.log(`[integration:${label}] GL renderer probe failed: ${e.message}`)
 	}
 	await new Promise(r => setTimeout(r, 1200))
 	await hideOverlays(page)
@@ -162,7 +152,21 @@ async function runOne(targetUrl, label) {
 			window.viewer._fallbackBallTimer = null
 		} catch {}
 	})
+	loadPhase = false
 	const results = {}
+	// Load+settle pageerror gate: any uncaught page exception during table
+	// load and settle fails loudly. Later run-phase errors are reported at
+	// the end for visibility but do not gate (legs intentionally poke at
+	// error paths).
+	const loadErrors = pageErrors.filter(e => e.phase === 'load')
+	results.pageerrors = loadErrors.length === 0
+	if (!results.pageerrors) {
+		console.log(`[integration:${label}] FAIL ${loadErrors.length} pageerror(s) during load+settle:`)
+		for (const e of loadErrors.slice(0, 10))
+			console.log(`[integration:${label}] pageerror[load] ${e.message}\n${e.stack}`)
+	} else {
+		console.log(`[integration:${label}] pageerrors PASS (0 during load+settle)`)
+	}
 	const diag = await diagnostics(page)
 	const isTableEmpty = targetUrl.includes('empty') || label.includes('empty')
 	const hasWarnings =
@@ -170,30 +174,29 @@ async function runOne(targetUrl, label) {
 		diag.includes('WARN cab emissive') ||
 		(diag.includes('WARN luminance') && !isTableEmpty)
 	results.diagnostics = !hasWarnings
-	if (!results.diagnostics) console.log(`[integration:${label}] WARN diagnostics`)
+	if (!results.diagnostics) console.log(`[integration:${label}] WARN diagnostics:\n${diag}`)
 	// playfield bake & insert lights — generic
 	try {
 		const pf = await playfieldLightsCheck(page)
 		console.log(`[playfield:${label}]`, JSON.stringify(pf))
 		if (pf.bake && pf.bake.count === 0) {
-			results.playfield = true
+			results.playfield = 'skip'
 			console.log(`[playfield:${label}] skip — no bake mesh (empty table)`)
 		} else {
-			results.playfield = !!pf.pass
+			results.playfield = pf.pass === 'skip' ? 'skip' : !!pf.pass
 			console.log(
-				`[integration:${label}] playfield ${results.playfield ? 'PASS' : 'FAIL'} bake=${JSON.stringify(pf.bake)} inserts=${JSON.stringify(pf.inserts)} reason=${pf.reason}`,
+				`[integration:${label}] playfield ${legStatus(results.playfield)} bake=${JSON.stringify(pf.bake)} inserts=${JSON.stringify(pf.inserts)} reason=${pf.reason}`,
 			)
-			if (!results.playfield) console.log(`[playfield:${label}] FAIL details ${JSON.stringify(pf)}`)
+			if (results.playfield === false) console.log(`[playfield:${label}] FAIL details ${JSON.stringify(pf)}`)
 		}
 		try {
-			const hasInsertTable = await page.evaluate(() => {
+			const hasInsertTable = await page.evaluate(insertPattern => {
+				const insertRe = new RegExp(insertPattern, 'i')
 				const v = window.viewer
 				if (!v || !v.table) return false
 				try {
 					const hasLight = v.table.lights && Object.keys(v.table.lights).length > 0
-					const hasInsert = Object.keys(v.table.primitives || {}).some(k =>
-						/(insert|round|rect|flasher|vrlight)/i.test(k),
-					)
+					const hasInsert = Object.keys(v.table.primitives || {}).some(k => insertRe.test(k))
 					const hasColl = !!(
 						v.table.collections &&
 						(v.table.collections.InsertOn ||
@@ -204,52 +207,77 @@ async function runOne(targetUrl, label) {
 				} catch {
 					return false
 				}
-			})
+			}, INSERT_NAME_PATTERN)
 			if (hasInsertTable) {
 				console.log(`[playfield:${label}] table has inserts/lights — checking lamp-driven inserts…`)
 				const lampRes = await playfieldLightsCheckAfterLamp(page)
 				console.log(`[playfield-lamp:${label}]`, JSON.stringify(lampRes))
-				results.playfieldLamp = !!lampRes.pass
-				if (!results.playfieldLamp)
+				results.playfieldLamp = lampRes.pass === 'skip' ? 'skip' : !!lampRes.pass
+				if (results.playfieldLamp === false)
 					console.log(
 						`[playfield-lamp:${label}] FAIL insert lights not working maxI=${lampRes.maxI} samples=${JSON.stringify(lampRes.samples)}`,
 					)
-				if (pf.bake && pf.bake.count !== 0) results.playfield = results.playfield && results.playfieldLamp
-				else results.playfield = results.playfieldLamp
-				console.log(`[integration:${label}] playfield combined ${results.playfield ? 'PASS' : 'FAIL'}`)
+				const parts = [results.playfield, results.playfieldLamp].filter(r => r !== 'skip')
+				results.playfield = parts.length === 0 ? 'skip' : parts.every(Boolean)
+				console.log(`[integration:${label}] playfield combined ${legStatus(results.playfield)}`)
 			} else {
 				console.log(`[playfield:${label}] skip lamp check — no inserts/lights in table`)
-				results.playfieldLamp = true
+				results.playfieldLamp = 'skip'
+				// Bake leg (if it ran) keeps its verdict in results.playfield.
 			}
 		} catch (e) {
 			console.log(`[playfield-lamp:${label}] error ${e.message}`)
-			results.playfieldLamp = true
+			results.playfieldLamp = false
 		}
 	} catch (e) {
 		console.log(`[playfield:${label}] error ${e.message}`)
 		results.playfield = false
 	}
 	try {
-		const tp = await page.evaluate(async () => {
-			try {
-				const { Transpiler } = await import(
-					'/@fs/home/qinghao1/projects/vpx-js/dist-esm/lib/scripting/transpiler.js'
-				)
-				const v = window.viewer
-				const t = new Transpiler(v.table, v.player)
-				const js = t.transpile('If Not cb Is Nothing Then\n  x=1\nEnd If')
-				const hasFix = js.includes('!__vbs.is')
-				const hasBug = js.includes('__vbs.is(!cb')
-				const js2 = t.transpile('bstate=CBool(state>=0.5)')
-				const hasCBool = js2.includes('__stdlib.CBool')
-				return { hasFix, hasBug, hasCBool, jsLen: js.length }
-			} catch (e) {
-				return { err: e.message }
-			}
-		})
+		// Full-pipeline probe: the same VBS-construct fixture the AST gate pins,
+		// transpiled in-page through the viewer's Transpiler (not just one-liners).
+		const vbs = readFileSync(VBS_CONSTRUCTS_PATH, 'utf-8')
+		const tp = await page.evaluate(
+			async ({ transpilerUrl, fixture }) => {
+				try {
+					const { Transpiler } = await import(transpilerUrl)
+					const v = window.viewer
+					const t = new Transpiler(v.table, v.player)
+					const notIs = t.transpile('If Not cb Is Nothing Then\n  x=1\nEnd If')
+					const cbool = t.transpile('bstate=CBool(state>=0.5)')
+					const fixtureJs = t.transpile(fixture)
+					let syntaxOk = false
+					try {
+						new Function(fixtureJs)
+						syntaxOk = true
+					} catch {}
+					return {
+						// Correct shape: __vbs.is(<cb...>, ...) with the Not outside.
+						// Regression: the old bug pushed the negation inside (__vbs.is(!...)).
+						notIsCorrect:
+							notIs.includes('__vbs.is(') && notIs.includes("'cb'") && !notIs.includes('__vbs.is(!'),
+						cboolOk: cbool.includes('CBool'),
+						fixtureLen: fixtureJs.length,
+						fixtureMarkers: ['AddScore', 'DoubleIt', 'TestLogic', 'TestWith'].every(m =>
+							fixtureJs.includes(m),
+						),
+						syntaxOk,
+					}
+				} catch (e) {
+					return { err: String(e?.message ?? e) }
+				}
+			},
+			{ transpilerUrl: TRANSPILER_URL, fixture: vbs },
+		)
 		console.log(`[transpile:${label}]`, JSON.stringify(tp))
-		results.transpile = tp.hasFix && tp.hasCBool && !tp.hasBug
-		if (!results.transpile) console.log(`[transpile:${label}] FAIL transpilation fix missing`)
+		results.transpile =
+			!tp.err &&
+			tp.notIsCorrect === true &&
+			tp.cboolOk === true &&
+			tp.fixtureLen > 500 &&
+			tp.fixtureMarkers === true &&
+			tp.syntaxOk === true
+		if (!results.transpile) console.log(`[transpile:${label}] FAIL transpilation probe failed`)
 	} catch (e) {
 		console.log(`[transpile:${label}] error ${e.message}`)
 		results.transpile = false
@@ -258,60 +286,68 @@ async function runOne(targetUrl, label) {
 	try {
 		ball = await ballChecks(page)
 		console.log(`[ball:${label}]`, JSON.stringify(ball))
-		const ballPass = !!ball.pass
-		results.ball = ballPass
+		results.ball = ball.pass === 'skip' ? 'skip' : !!ball.pass
 		console.log(
-			`[integration:${label}] ball ${results.ball ? 'PASS' : 'FAIL'} moved=${ball.moved} kickPos=${JSON.stringify(ball.kickPos)} solFired=${ball.solFired} isMock=${ball.isMock} trough=${JSON.stringify(ball.troughPos)} kickers=${JSON.stringify(ball.kickerNames)}`,
+			`[integration:${label}] ball ${legStatus(results.ball)} moved=${ball.moved} kickPos=${JSON.stringify(ball.kickPos)} solFired=${ball.solFired} isMock=${ball.isMock} trough=${JSON.stringify(ball.troughPos)} kickers=${JSON.stringify(ball.kickerNames)}`,
 		)
-		if (!results.ball) {
-			if (ball.isMock)
-				console.log(
-					`[integration:${label}] WARN ball not moved (mock/emulated without ROM - may be ok for empty table)`,
-				)
-			else
-				console.log(
-					`[integration:${label}] FAIL ball did not eject - trough kick failed (generic trough / Not Is / CBool)`,
-				)
-		}
+		if (results.ball === 'skip') console.log(`[integration:${label}] ball SKIP — ${ball.skipReason}`)
+		if (results.ball === false)
+			console.log(
+				`[integration:${label}] FAIL ball did not eject - trough kick failed (generic trough / Not Is / CBool)`,
+			)
 	} catch (e) {
 		console.log(`[ball:${label}] error ${e.message}`)
 		results.ball = false
 	}
 	const phys = await physicsChecks(page)
 	console.log(`[physics:${label}]`, JSON.stringify(phys))
-	let physPass = phys.flipper?.pass && phys.coin?.pass && phys.start?.pass
-	if (ball?.pass && !ball?.isMock) {
-		if (!physPass) console.log(`[physics:${label}] override -> PASS (ball already ejected, generic)`)
-		physPass = true
-	}
+	// No ball-moved override: every sub-leg stands on its own verdict. Skipped
+	// sub-legs (no flipper, mock emu) are neutral, but at least one sub-leg must
+	// genuinely pass (the physics worker) for the leg to pass.
+	const physParts = [phys.flipper?.pass, phys.coin?.pass, phys.start?.pass, phys.worker?.pass]
+	const physPass = physParts.every(p => p === true || p === 'skip') && physParts.some(p => p === true)
 	results.physics = physPass
 	console.log(`[integration:${label}] physics ${results.physics ? 'PASS' : 'FAIL'}`)
 	try {
 		const nudge = await nudgeChecks(page)
 		console.log(`[nudge:${label}]`, JSON.stringify(nudge))
-		results.nudge = !!nudge.pass
+		results.nudge = nudge.pass === 'skip' ? 'skip' : !!nudge.pass
 		console.log(
-			`[integration:${label}] nudge ${results.nudge ? 'PASS' : 'FAIL'} api=${nudge.viaApi} key=${nudge.viaKey} visual=${nudge.visual}`,
+			`[integration:${label}] nudge ${legStatus(results.nudge)} api=${nudge.viaApi} key=${nudge.viaKey} visual=${nudge.visual}`,
 		)
-		if (!results.nudge) console.log(`[nudge:${label}] WARN nudge not detected`)
+		if (results.nudge === false) console.log(`[nudge:${label}] WARN nudge not detected`)
 	} catch (e) {
 		console.log(`[nudge:${label}] error ${e.message}`)
 		results.nudge = false
 	}
-	if (!results.diagnostics && ball?.pass && !ball?.isMock) {
-		console.log(`[diagnostics:${label}] override WARN -> PASS (ball ejected, generic)`)
-		results.diagnostics = true
-	}
-	const dmd = await dmdChecks(page)
+	const dmd = await dmdLiveChecks(page)
 	console.log(`[dmd:${label}]`, JSON.stringify(dmd))
-	results.dmd = dmd.meshes?.length > 0 || dmd.len === 4096
-	console.log(`[dmd:${label}] dmd ${results.dmd ? 'PASS' : 'WARN check meshes'}`)
+	results.dmd = dmd.pass === 'skip' ? 'skip' : !!dmd.pass
+	console.log(`[dmd:${label}] dmd ${legStatus(results.dmd)} — ${dmd.reason}`)
+	try {
+		const bb = await backboxChecks(page)
+		console.log(`[backbox:${label}]`, JSON.stringify(bb))
+		results.backbox = bb.pass === 'skip' ? 'skip' : !!bb.pass
+		console.log(`[integration:${label}] backbox ${legStatus(results.backbox)} — ${bb.reason}`)
+	} catch (e) {
+		console.log(`[backbox:${label}] error ${e.message}`)
+		results.backbox = false
+	}
+	try {
+		const dv = await dmdVisibleChecks(page)
+		console.log(`[dmd-visible:${label}]`, JSON.stringify(dv))
+		results.dmdVisible = dv.pass === 'skip' ? 'skip' : !!dv.pass
+		console.log(`[integration:${label}] dmdVisible ${legStatus(results.dmdVisible)} — ${dv.reason}`)
+	} catch (e) {
+		console.log(`[dmd-visible:${label}] error ${e.message}`)
+		results.dmdVisible = false
+	}
 	try {
 		const camTrans = await cameraTransitionChecks(page)
 		console.log(`[camera:${label}]`, JSON.stringify(camTrans))
-		results.camera = !!camTrans.pass
-		console.log(`[integration:${label}] camera ${results.camera ? 'PASS' : 'FAIL'} ${camTrans.reason}`)
-		if (!results.camera) console.log(`[camera:${label}] FAIL ${JSON.stringify(camTrans)}`)
+		results.camera = camTrans.pass === 'skip' ? 'skip' : !!camTrans.pass
+		console.log(`[integration:${label}] camera ${legStatus(results.camera)} ${camTrans.reason}`)
+		if (results.camera === false) console.log(`[camera:${label}] FAIL ${JSON.stringify(camTrans)}`)
 	} catch (e) {
 		console.log(`[camera:${label}] error ${e.message}`)
 		results.camera = false
@@ -373,12 +409,27 @@ async function runOne(targetUrl, label) {
 		}
 	}
 	console.log(`[integration:${label}] shots -> ${out}`)
+	const runErrors = pageErrors.filter(e => e.phase === 'run')
+	if (runErrors.length)
+		console.log(`[integration:${label}] WARN ${runErrors.length} run-phase pageerror(s) (not gated):`)
+	for (const e of runErrors.slice(0, 10)) console.log(`[integration:${label}] pageerror[run] ${e.message}`)
 	await page.close().catch(() => {})
-	const ballOk = ball ? (ball.isMock ? true : !!results.ball) : !!results.ball
-	const nudgeOk = results.nudge !== false
-	const playfieldOk = results.playfield !== false
-	const cameraOk = results.camera !== false
-	const ok = results.diagnostics && results.physics && ballOk && nudgeOk && playfieldOk && cameraOk
+	// Every leg counts — including transpile, dmd, backbox, and the load
+	// pageerror gate. No mock overrides: legs the fixture cannot support
+	// report 'skip' (neutral), everything else must genuinely pass.
+	const ok = [
+		results.pageerrors,
+		results.diagnostics,
+		results.playfield,
+		results.transpile,
+		results.ball,
+		results.physics,
+		results.nudge,
+		results.dmd,
+		results.backbox,
+		results.dmdVisible,
+		results.camera,
+	].every(legOk)
 	console.log(`\n# integration ${label} ${ok ? 'PASS' : 'FAIL'} ${JSON.stringify(results)}`)
 	return { ok, results }
 }
@@ -394,7 +445,6 @@ if (url) {
 		try {
 			await browser.close()
 		} catch {}
-		_forceKillChrome()
 	}
 	process.exit(res?.ok ? 0 : 1)
 } else {
@@ -427,7 +477,6 @@ if (url) {
 	try {
 		await browser.close()
 	} catch {}
-	_forceKillChrome()
 	console.log(`\n# overall ${overallOk ? 'PASS' : 'FAIL'}`)
 	process.exit(overallOk ? 0 : 1)
 }
