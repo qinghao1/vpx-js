@@ -69,7 +69,8 @@ async function runLeg(mode) {
 				new Promise(resolve => {
 					const r = window.viewer?.renderer
 					// WebGPURenderer (current backend): counters live on info.frame /
-					// info.render.{calls,triangles}; legacy WebGLRenderer nests frame under
+					// info.render.{drawCalls,triangles}; info.render.calls counts render
+					// contexts, not draws. Legacy WebGLRenderer nests frame under
 					// info.render.frame. Support both.
 					const frameOf = () => r?.info?.frame ?? r?.info?.render?.frame ?? null
 					const f0 = frameOf()
@@ -87,7 +88,7 @@ async function runLeg(mode) {
 								elapsedMs: Math.round(elapsed),
 								f0,
 								f1,
-								calls: ren.calls ?? r?.info?.calls ?? 0,
+								calls: ren.drawCalls ?? ren.calls ?? r?.info?.calls ?? 0,
 								tris: ren.triangles ?? 0,
 							})
 						}

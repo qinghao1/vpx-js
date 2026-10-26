@@ -2168,8 +2168,11 @@ export class Viewer {
 			if (this._disposed || this.isPaused) return
 			if (this.table && !(this as any)._skipTrans) {
 				try {
-					updateTransmissionBuffer(this.table as never)
-					;(window as unknown as Record<string, unknown>).__transDebug = getTransmissionDebug()
+					// updateTransmissionBuffer reports whether anything changed; the
+					// full-buffer half-float debug scan only runs on change.
+					if (updateTransmissionBuffer(this.table as never)) {
+						;(window as unknown as Record<string, unknown>).__transDebug = getTransmissionDebug()
+					}
 				} catch {}
 			}
 			this._syncPhysicsTransforms(timestamp)

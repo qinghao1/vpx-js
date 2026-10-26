@@ -188,9 +188,13 @@ export function updateTransmissionBuffer(table: Table): boolean {
 	return true
 }
 
+/** Module-scope scratch: per-rebuild allocs showed up as GC churn on profiles. */
+const scratchAcc = new Float32Array(TRANSMISSION_WIDTH * TRANSMISSION_HEIGHT * 4)
+
 /** Splats one lamp list into a half-float playfield-UV buffer. */
 function fillBuffer(data: Uint16Array, list: TransmissionSplat[], right: number, bottom: number): void {
-	const acc = new Float32Array(TRANSMISSION_WIDTH * TRANSMISSION_HEIGHT * 4)
+	const acc = scratchAcc
+	acc.fill(0)
 	for (const splat of list) {
 		const minPx = Math.max(0, Math.floor(((splat.x - splat.falloff) / right) * TRANSMISSION_WIDTH))
 		const maxPx = Math.min(
