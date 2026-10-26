@@ -32,7 +32,9 @@ export class LzwReader {
 	private byteBuff = new Uint8Array(257) /* Current block */
 	private pBytes!: BufferPtr /* points to byte_buff - Pointer to next byte in block */
 
-	private stack = new Uint8Array(MAX_CODES + 1) /* Stack for storing pixels */
+	private stack = new Uint8Array(
+		MAX_CODES + 2,
+	) /* Stack for storing pixels (worst case expansion is MAX_CODES+2 pushes per code) */
 	private suffix = new Uint8Array(MAX_CODES + 1) /* Suffix table */
 	private prefix: number[] = [] /* Prefix linked list */
 
@@ -88,6 +90,7 @@ export class LzwReader {
 		sp = new BufferPtr(this.stack)
 		bufPtr = BufferPtr.fromPtr(buf)
 		bufCnt = this.width
+		const outLen = this.pbBitsOutCur.getBuffer().length
 
 		/* This is the main loop.  For each code we get we pass through the
 		 * linked list of prefix codes, pushing the corresponding "character" for
@@ -151,6 +154,7 @@ export class LzwReader {
 					bufPtr = BufferPtr.fromPtr(buf)
 					bufCnt = this.width
 				}
+				if (bufPtr.getPos() >= outLen) break // corrupt stream emitting more pixels than the declared size
 			} else {
 				/* In this case, it's not a clear code or an ending code, so
 				 * it must be a code code...  So we can now decode the code into
@@ -209,7 +213,7 @@ export class LzwReader {
 				 * buffer...  And when the decode buffer is full, write another
 				 * line...
 				 */
-				while (sp.getPos() > 0) {
+				while (sp.getPos() > 0 && bufPtr.getPos() < outLen) {
 					sp.decr()
 					bufPtr.set(sp.get())
 					bufPtr.incr()
@@ -219,6 +223,7 @@ export class LzwReader {
 						bufCnt = this.width
 					}
 				}
+				if (bufPtr.getPos() >= outLen) break // corrupt stream emitting more pixels than the declared size
 			}
 			c = this.getNextCode()
 		}
@@ -236,7 +241,7 @@ export class LzwReader {
 
 	private NextLine(): BufferPtr {
 		const pbRet = BufferPtr.fromPtr(this.pbBitsOutCur)
-		this.pbBitsOutCur.incr(this.cbStride) // fucking upside down dibs!
+		this.pbBitsOutCur.incr(this.cbStride) // rows are stored bottom-up, so step one stride per line
 		this.linesLeft--
 		return pbRet
 	}
@@ -245,20 +250,9 @@ export class LzwReader {
 		let ret: number
 		if (this.numBitsLeft === 0) {
 			if (this.numAvailBytes <= 0) {
-				/* Out of bytes in current block, so read next block
-				 */
-				this.pBytes = new BufferPtr(this.byteBuff)
-				this.numAvailBytes = this.getByte()
-				if (this.numAvailBytes < 0) {
-					return this.numAvailBytes
-				} else if (this.numAvailBytes) {
-					for (let i = 0; i < this.numAvailBytes; ++i) {
-						const x = this.getByte()
-						if (x < 0) {
-							return x
-						}
-						this.byteBuff[i] = x
-					}
+				const filled = this.fillBlock()
+				if (filled < 0) {
+					return filled
 				}
 			}
 			this.b1 = this.pBytes.get()
@@ -270,20 +264,9 @@ export class LzwReader {
 		ret = this.b1 >> (8 - this.numBitsLeft)
 		while (this.currSize > this.numBitsLeft) {
 			if (this.numAvailBytes <= 0) {
-				/* Out of bytes in current block, so read next block
-				 */
-				this.pBytes = new BufferPtr(this.byteBuff)
-				this.numAvailBytes = this.getByte()
-				if (this.numAvailBytes < 0) {
-					return this.numAvailBytes
-				} else if (this.numAvailBytes) {
-					for (let i = 0; i < this.numAvailBytes; ++i) {
-						const x = this.getByte()
-						if (x < 0) {
-							return x
-						}
-						this.byteBuff[i] = x
-					}
+				const filled = this.fillBlock()
+				if (filled < 0) {
+					return filled
 				}
 			}
 			this.b1 = this.pBytes.get()
@@ -295,6 +278,23 @@ export class LzwReader {
 		this.numBitsLeft -= this.currSize
 		ret &= CODE_MASK[this.currSize]
 		return ret
+	}
+
+	/** Reads the next block into the byte buffer; returns bytes available, or -1 at EOF. */
+	private fillBlock(): number {
+		this.pBytes = new BufferPtr(this.byteBuff)
+		this.numAvailBytes = this.getByte()
+		if (this.numAvailBytes < 0) {
+			return this.numAvailBytes
+		}
+		for (let blockIndex = 0; blockIndex < this.numAvailBytes; ++blockIndex) {
+			const byteValue = this.getByte()
+			if (byteValue < 0) {
+				return byteValue
+			}
+			this.byteBuff[blockIndex] = byteValue
+		}
+		return this.numAvailBytes
 	}
 
 	private getByte(): number {
@@ -332,6 +332,9 @@ class BufferPtr {
 	}
 
 	public next(): number {
+		if (this.pos >= this.buf.length) {
+			return -1
+		}
 		return this.buf[this.pos++]
 	}
 
