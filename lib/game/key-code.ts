@@ -143,113 +143,134 @@ export function keyEventToDirectInputKey(event: {
 	key: string
 	code: string
 	location?: number
+	keyLocation?: number
 	keyCode?: number
 	which?: number
 }): number {
-	const loc = (event as any).location ?? (event as any).keyLocation ?? 0
-	const kc = (event as any).keyCode ?? (event as any).which ?? 0
+	const loc = event.location ?? event.keyLocation ?? 0
+	const kc = event.keyCode ?? event.which ?? 0
 	const keyLower = String(event.key ?? '').toLowerCase()
 	const codeStr = String(event.code ?? '')
-	if (codeStr === 'ShiftLeft' || (keyLower === 'shift' && loc === 1)) return DIK_LSHIFT
-	if (codeStr === 'ShiftRight' || (keyLower === 'shift' && loc === 2)) return DIK_RSHIFT
-	if (keyLower === 'shift' && !codeStr) {
-		if (loc === 2) return DIK_RSHIFT
-		if (loc === 1 || kc === 16) return DIK_LSHIFT
-		return DIK_LSHIFT
-	}
-	if (kc === 16) {
-		if (loc === 2) return DIK_RSHIFT
-		return DIK_LSHIFT
-	}
-	const codeDi = KEY_JS2DI[keyLower]
-	if (codeDi) {
-		return codeDi
-	}
-	switch (codeStr) {
-		case 'ControlLeft':
-			return DIK_LCONTROL
-		case 'ControlRight':
-			return DIK_RCONTROL
-		case 'ShiftLeft':
-			return DIK_LSHIFT
-		case 'ShiftRight':
-			return DIK_RSHIFT
-		case 'NumpadMultiply':
-			return DIK_MULTIPLY
-		case 'NumpadDivide':
-			return DIK_DIVIDE
-		case 'NumpadEnter':
-			return DIK_NUMPADENTER
-		case 'AltLeft':
-			return DIK_LALT
-		case 'AltRight':
-			return DIK_RALT
-		case 'Numpad7':
-			return DIK_NUMPAD7
-		case 'Numpad8':
-			return DIK_NUMPAD8
-		case 'Numpad9':
-			return DIK_NUMPAD9
-		case 'NumpadSubtract':
-			return DIK_SUBTRACT
-		case 'Numpad4':
-			return DIK_NUMPAD4
-		case 'Numpad5':
-			return DIK_NUMPAD5
-		case 'Numpad6':
-			return DIK_NUMPAD6
-		case 'NumpadAdd':
-			return DIK_ADD
-		case 'Numpad1':
-			return DIK_NUMPAD1
-		case 'Numpad2':
-			return DIK_NUMPAD2
-		case 'Numpad3':
-			return DIK_NUMPAD3
-		case 'Numpad0':
-			return DIK_NUMPAD0
-		case 'NumpadDecimal':
-			return DIK_DECIMAL
-		case 'MetaLeft':
-			return DIK_LWIN
-		case 'MetaRight':
-			return DIK_RWIN
-	}
+	// DirectInput codes are scancodes, so map by physical key first. This keeps
+	// shifted punctuation (key "!" on Digit1) and non-US layouts working.
+	const codeDi = KEY_CODE2DI[codeStr]
+	if (codeDi) return codeDi
+	// legacy fallback for events without `code`
+	if (keyLower === 'shift' || kc === 16) return loc === 2 ? DIK_RSHIFT : DIK_LSHIFT
+	return KEY_JS2DI[keyLower] ?? 0
+}
 
-	// main keyboard keys that weren't covered above by numpad
-	switch (event.key.toLowerCase()) {
-		case '1':
-			return DIK_1
-		case '2':
-			return DIK_2
-		case '3':
-			return DIK_3
-		case '4':
-			return DIK_4
-		case '5':
-			return DIK_5
-		case '6':
-			return DIK_6
-		case '7':
-			return DIK_7
-		case '8':
-			return DIK_8
-		case '9':
-			return DIK_9
-		case '0':
-			return DIK_0
-		case '-':
-			return DIK_MINUS
-		case '=':
-			return DIK_EQUALS
-		case '.':
-			return DIK_PERIOD
-		case '/':
-			return DIK_SLASH
-		case 'enter':
-			return DIK_RETURN
-	}
-	return 0
+/**
+ * Maps layout-independent `KeyboardEvent.code` (physical key) to DirectInput
+ * key codes. Primary map: unlike `key`, it is unaffected by shift state and
+ * keyboard layout.
+ */
+const KEY_CODE2DI: { [key: string]: number } = {
+	Escape: DIK_ESCAPE,
+	Digit1: DIK_1,
+	Digit2: DIK_2,
+	Digit3: DIK_3,
+	Digit4: DIK_4,
+	Digit5: DIK_5,
+	Digit6: DIK_6,
+	Digit7: DIK_7,
+	Digit8: DIK_8,
+	Digit9: DIK_9,
+	Digit0: DIK_0,
+	Minus: DIK_MINUS,
+	Equal: DIK_EQUALS,
+	Backspace: DIK_BACK,
+	Tab: DIK_TAB,
+	KeyQ: DIK_Q,
+	KeyW: DIK_W,
+	KeyE: DIK_E,
+	KeyR: DIK_R,
+	KeyT: DIK_T,
+	KeyY: DIK_Y,
+	KeyU: DIK_U,
+	KeyI: DIK_I,
+	KeyO: DIK_O,
+	KeyP: DIK_P,
+	BracketLeft: DIK_LBRACKET,
+	BracketRight: DIK_RBRACKET,
+	Enter: DIK_RETURN,
+	ControlLeft: DIK_LCONTROL,
+	KeyA: DIK_A,
+	KeyS: DIK_S,
+	KeyD: DIK_D,
+	KeyF: DIK_F,
+	KeyG: DIK_G,
+	KeyH: DIK_H,
+	KeyJ: DIK_J,
+	KeyK: DIK_K,
+	KeyL: DIK_L,
+	Semicolon: DIK_SEMICOLON,
+	Quote: DIK_APOSTROPHE,
+	Backquote: DIK_GRAVE,
+	ShiftLeft: DIK_LSHIFT,
+	Backslash: DIK_BACKSLASH,
+	KeyZ: DIK_Z,
+	KeyX: DIK_X,
+	KeyC: DIK_C,
+	KeyV: DIK_V,
+	KeyB: DIK_B,
+	KeyN: DIK_N,
+	KeyM: DIK_M,
+	Comma: DIK_COMMA,
+	Period: DIK_PERIOD,
+	Slash: DIK_SLASH,
+	ShiftRight: DIK_RSHIFT,
+	NumpadMultiply: DIK_MULTIPLY,
+	AltLeft: DIK_LALT,
+	Space: DIK_SPACE,
+	CapsLock: DIK_CAPITAL,
+	F1: DIK_F1,
+	F2: DIK_F2,
+	F3: DIK_F3,
+	F4: DIK_F4,
+	F5: DIK_F5,
+	F6: DIK_F6,
+	F7: DIK_F7,
+	F8: DIK_F8,
+	F9: DIK_F9,
+	F10: DIK_F10,
+	NumLock: DIK_NUMLOCK,
+	ScrollLock: DIK_SCROLL,
+	Numpad7: DIK_NUMPAD7,
+	Numpad8: DIK_NUMPAD8,
+	Numpad9: DIK_NUMPAD9,
+	NumpadSubtract: DIK_SUBTRACT,
+	Numpad4: DIK_NUMPAD4,
+	Numpad5: DIK_NUMPAD5,
+	Numpad6: DIK_NUMPAD6,
+	NumpadAdd: DIK_ADD,
+	Numpad1: DIK_NUMPAD1,
+	Numpad2: DIK_NUMPAD2,
+	Numpad3: DIK_NUMPAD3,
+	Numpad0: DIK_NUMPAD0,
+	NumpadDecimal: DIK_DECIMAL,
+	F11: DIK_F11,
+	F12: DIK_F12,
+	F13: DIK_F13,
+	F14: DIK_F14,
+	F15: DIK_F15,
+	NumpadEnter: DIK_NUMPADENTER,
+	ControlRight: DIK_RCONTROL,
+	NumpadDivide: DIK_DIVIDE,
+	AltRight: DIK_RALT,
+	Pause: DIK_PAUSE,
+	Home: DIK_HOME,
+	ArrowUp: DIK_UP,
+	PageUp: DIK_PRIOR,
+	ArrowLeft: DIK_LEFT,
+	ArrowRight: DIK_RIGHT,
+	End: DIK_END,
+	ArrowDown: DIK_DOWN,
+	PageDown: DIK_NEXT,
+	Insert: DIK_INSERT,
+	Delete: DIK_DELETE,
+	MetaLeft: DIK_LWIN,
+	MetaRight: DIK_RWIN,
 }
 
 /**
@@ -262,6 +283,21 @@ const KEY_JS2DI: { [key: string]: number } = {
 	escape: DIK_ESCAPE,
 	backspace: DIK_BACK,
 	tab: DIK_TAB,
+	'1': DIK_1,
+	'2': DIK_2,
+	'3': DIK_3,
+	'4': DIK_4,
+	'5': DIK_5,
+	'6': DIK_6,
+	'7': DIK_7,
+	'8': DIK_8,
+	'9': DIK_9,
+	'0': DIK_0,
+	'-': DIK_MINUS,
+	'=': DIK_EQUALS,
+	'.': DIK_PERIOD,
+	'/': DIK_SLASH,
+	enter: DIK_RETURN,
 	q: DIK_Q,
 	w: DIK_W,
 	e: DIK_E,
@@ -325,47 +361,4 @@ const KEY_JS2DI: { [key: string]: number } = {
 	pagedown: DIK_NEXT,
 	insert: DIK_INSERT,
 	delete: DIK_DELETE,
-
-	// other DirectInput codes we don't really care about
-	// --------------------------------------------------
-	// export const DIK_OEM_102 = 0x56;    /* <> or \| on RT 102-key keyboard (Non-U.S.) */
-	// export const DIK_KANA = 0x70;    /* (Japanese keyboard)            */
-	// export const DIK_ABNT_C1 = 0x73;    /* /? on Brazilian keyboard */
-	// export const DIK_CONVERT = 0x79;    /* (Japanese keyboard)            */
-	// export const DIK_NOCONVERT = 0x7B;    /* (Japanese keyboard)            */
-	// export const DIK_YEN = 0x7D;    /* (Japanese keyboard)            */
-	// export const DIK_ABNT_C2 = 0x7E;    /* Numpad . on Brazilian keyboard */
-	// export const DIK_NUMPADEQUALS = 0x8D;    /* = on numeric keypad (NEC PC98) */
-	// export const DIK_PREVTRACK = 0x90;    /* Previous Track (DIK_CIRCUMFLEX on Japanese keyboard) */
-	// export const DIK_AT = 0x91;    /*                     (NEC PC98) */
-	// export const DIK_COLON = 0x92;    /*                     (NEC PC98) */
-	// export const DIK_UNDERLINE = 0x93;    /*                     (NEC PC98) */
-	// export const DIK_KANJI = 0x94;    /* (Japanese keyboard)            */
-	// export const DIK_STOP = 0x95;    /*                     (NEC PC98) */
-	// export const DIK_AX = 0x96;    /*                     (Japan AX) */
-	// export const DIK_UNLABELED = 0x97;    /*                        (J3100) */
-	// export const DIK_NEXTTRACK = 0x99;    /* Next Track */
-	// export const DIK_MUTE = 0xA0;    /* Mute */
-	// export const DIK_CALCULATOR = 0xA1;    /* Calculator */
-	// export const DIK_PLAYPAUSE = 0xA2;    /* Play / Pause */
-	// export const DIK_MEDIASTOP = 0xA4;    /* Media Stop */
-	// export const DIK_VOLUMEDOWN = 0xAE;    /* Volume - */
-	// export const DIK_VOLUMEUP = 0xB0;    /* Volume + */
-	// export const DIK_WEBHOME = 0xB2;    /* Web home */
-	// export const DIK_NUMPADCOMMA = 0xB3;    /* , on numeric keypad (NEC PC98) */
-	// export const DIK_DIVIDE = 0xB5;    /* / on numeric keypad */
-	// export const DIK_SYSRQ = 0xB7;
-	// export const DIK_APPS = 0xDD;    /* AppMenu key */
-	// export const DIK_POWER = 0xDE;    /* System Power */
-	// export const DIK_SLEEP = 0xDF;    /* System Sleep */
-	// export const DIK_WAKE = 0xE3;    /* System Wake */
-	// export const DIK_WEBSEARCH = 0xE5;    /* Web Search */
-	// export const DIK_WEBFAVORITES = 0xE6;    /* Web Favorites */
-	// export const DIK_WEBREFRESH = 0xE7;    /* Web Refresh */
-	// export const DIK_WEBSTOP = 0xE8;    /* Web Stop */
-	// export const DIK_WEBFORWARD = 0xE9;    /* Web Forward */
-	// export const DIK_WEBBACK = 0xEA;    /* Web Back */
-	// export const DIK_MYCOMPUTER = 0xEB;    /* My Computer */
-	// export const DIK_MAIL = 0xEC;    /* Mail */
-	// export const DIK_MEDIASELECT = 0xED;    /* Media Select */
 }

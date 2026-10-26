@@ -13,6 +13,7 @@ import {
 	DIK_7,
 	DIK_8,
 	DIK_9,
+	DIK_A,
 	DIK_ADD,
 	DIK_BACK,
 	DIK_COMMA,
@@ -53,6 +54,7 @@ import {
 	DIK_RIGHT,
 	DIK_RSHIFT,
 	DIK_RWIN,
+	DIK_SEMICOLON,
 	DIK_SLASH,
 	DIK_SPACE,
 	DIK_SUBTRACT,
@@ -63,7 +65,7 @@ import {
 } from './key-code.js'
 
 describe('The VPinball keyboard scan codes', () => {
-	it('should correctly map control keys', async () => {
+	it('should correctly map control keys', () => {
 		expect(keyEventToDirectInputKey({ key: 'Control', code: 'ControlLeft' } as any)).to.equal(DIK_LCONTROL)
 		expect(keyEventToDirectInputKey({ key: 'Control', code: 'ControlRight' } as any)).to.equal(DIK_RCONTROL)
 		expect(keyEventToDirectInputKey({ key: 'Shift', code: 'ShiftLeft' } as any)).to.equal(DIK_LSHIFT)
@@ -87,7 +89,7 @@ describe('The VPinball keyboard scan codes', () => {
 		expect(keyEventToDirectInputKey({ key: 'Tab', code: 'Tab' } as any)).to.equal(DIK_TAB)
 	})
 
-	it('should correctly map numpad keys', async () => {
+	it('should correctly map numpad keys', () => {
 		expect(keyEventToDirectInputKey({ key: '/', code: 'NumpadDivide' } as any)).to.equal(DIK_DIVIDE)
 		expect(keyEventToDirectInputKey({ key: '*', code: 'NumpadMultiply' } as any)).to.equal(DIK_MULTIPLY)
 		expect(keyEventToDirectInputKey({ key: '-', code: 'NumpadSubtract' } as any)).to.equal(DIK_SUBTRACT)
@@ -106,7 +108,7 @@ describe('The VPinball keyboard scan codes', () => {
 		expect(keyEventToDirectInputKey({ key: 'Enter', code: 'NumpadEnter' } as any)).to.equal(DIK_NUMPADENTER)
 	})
 
-	it('should correctly map numeric keys', async () => {
+	it('should correctly map numeric keys', () => {
 		expect(keyEventToDirectInputKey({ key: '0', code: 'Digit0' } as any)).to.equal(DIK_0)
 		expect(keyEventToDirectInputKey({ key: '1', code: 'Digit1' } as any)).to.equal(DIK_1)
 		expect(keyEventToDirectInputKey({ key: '2', code: 'Digit2' } as any)).to.equal(DIK_2)
@@ -125,10 +127,26 @@ describe('The VPinball keyboard scan codes', () => {
 		expect(keyEventToDirectInputKey({ key: 'Enter', code: 'Enter' } as any)).to.equal(DIK_RETURN)
 	})
 
-	it('should correctly map other keys', async () => {
+	it('should correctly map other keys', () => {
 		expect(keyEventToDirectInputKey({ key: ' ', code: 'Space' } as any)).to.equal(DIK_SPACE)
 		expect(keyEventToDirectInputKey({ key: 'q', code: 'KeyQ' } as any)).to.equal(DIK_Q)
 		expect(keyEventToDirectInputKey({ key: 'Q', code: 'KeyQ' } as any)).to.equal(DIK_Q)
 		expect(keyEventToDirectInputKey({ key: 'z', code: 'KeyZ' } as any)).to.equal(DIK_Z)
+	})
+
+	it('should map shifted punctuation by physical key', () => {
+		expect(keyEventToDirectInputKey({ key: '!', code: 'Digit1' } as any)).to.equal(DIK_1)
+		expect(keyEventToDirectInputKey({ key: ':', code: 'Semicolon' } as any)).to.equal(DIK_SEMICOLON)
+		expect(keyEventToDirectInputKey({ key: '_', code: 'Minus' } as any)).to.equal(DIK_MINUS)
+	})
+
+	it('should map by physical position on non-US layouts', () => {
+		expect(keyEventToDirectInputKey({ key: 'a', code: 'KeyQ' } as any)).to.equal(DIK_Q)
+		expect(keyEventToDirectInputKey({ key: 'q', code: 'KeyA' } as any)).to.equal(DIK_A)
+	})
+
+	it('should fall back to key when code is missing', () => {
+		expect(keyEventToDirectInputKey({ key: 'q', code: '' } as any)).to.equal(DIK_Q)
+		expect(keyEventToDirectInputKey({ key: '5', code: '' } as any)).to.equal(DIK_5)
 	})
 })
