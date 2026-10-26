@@ -5,6 +5,7 @@ export function ok(value: unknown, message?: string): asserts value {
 }
 
 export function equal(actual: unknown, expected: unknown, message?: string): void {
+	// biome-ignore lint/suspicious/noDoubleEquals: intentional loose equality, mirrors node:assert behavior
 	if (actual != expected) throw new Error(message || `${actual} != ${expected}`)
 }
 
@@ -13,6 +14,7 @@ export function strictEqual(actual: unknown, expected: unknown, message?: string
 }
 
 export function notEqual(actual: unknown, expected: unknown, message?: string): void {
+	// biome-ignore lint/suspicious/noDoubleEquals: intentional loose equality, mirrors node:assert behavior
 	if (actual == expected) throw new Error(message || `${actual} == ${expected}`)
 }
 
