@@ -14,7 +14,7 @@ export class BinaryReader implements IBinaryReader {
 		if (!this.data) throw new Error('BinaryReader not open')
 		const slice = this.data.subarray(position, position + length)
 		target.set(slice, offset)
-		return Promise.resolve([length, target.subarray(offset, offset + length)])
+		return Promise.resolve([slice.length, target.subarray(offset, offset + slice.length)])
 	}
 
 	public close(): Promise<void> {
@@ -33,6 +33,11 @@ export class BinaryReader implements IBinaryReader {
 		return this._isOpen || !!this.data
 	}
 
+	/** In-memory image for zero-copy sector reads; retained after close. */
+	public getData(): Uint8Array | undefined {
+		return this.data
+	}
+
 	public async open(): Promise<void> {
 		if (this._isOpen && this.data) return
 		if (this.data && !this.blob) {
@@ -41,31 +46,13 @@ export class BinaryReader implements IBinaryReader {
 		}
 		if (!this.blob) throw new Error('BinaryReader: data already consumed and not available')
 		const src: any = this.blob
-		if (src instanceof Uint8Array) {
-			this.data = src
-			this.blob = undefined
-			this._isOpen = true
-			return
-		}
-		if (src instanceof ArrayBuffer) {
-			this.data = new Uint8Array(src)
-			this.blob = undefined
-			this._isOpen = true
-			return
-		}
-		if (src instanceof DataView) {
-			this.data = new Uint8Array(src.buffer, src.byteOffset, src.byteLength)
-			this.blob = undefined
-			this._isOpen = true
-			return
-		}
-		if (typeof Blob !== 'undefined' && src instanceof Blob) {
-			this.data = new Uint8Array(await src.arrayBuffer())
-			this.blob = undefined
-			this._isOpen = true
-			return
-		}
-		throw new Error('Unsupported binary data source')
+		if (src instanceof Uint8Array) this.data = src
+		else if (src instanceof ArrayBuffer) this.data = new Uint8Array(src)
+		else if (src instanceof DataView) this.data = new Uint8Array(src.buffer, src.byteOffset, src.byteLength)
+		else if (typeof Blob !== 'undefined' && src instanceof Blob) this.data = new Uint8Array(await src.arrayBuffer())
+		else throw new Error('Unsupported binary data source')
+		this.blob = undefined
+		this._isOpen = true
 	}
 }
 

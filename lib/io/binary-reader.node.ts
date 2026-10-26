@@ -41,4 +41,9 @@ export class NodeBinaryReader implements IBinaryReader {
 	public isOpen(): boolean {
 		return this._isOpen || !!this.data
 	}
+
+	/** In-memory image for zero-copy sector reads; retained after close. */
+	public getData(): Uint8Array | undefined {
+		return this.data
+	}
 }
