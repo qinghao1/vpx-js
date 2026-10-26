@@ -159,21 +159,37 @@ describe('The EmulatorState - handle state changes', () => {
 		expect(emulatorState.getChangedSolenoids()).to.deep.equal([])
 	})
 
-	it('should scale wpc-emu GI (0-7) to VPM GI (0-8, 8 = full on)', () => {
+	it('should scale wpc-emu GI (0-217, normalized by 31) to VPM GI (0-8, 8 = full on)', () => {
 		emulatorState.updateState(stateOne)
 		expect(emulatorState.getChangedGI()).to.deep.equal([
-			[1, 3],
 			[6, 8],
-			[7, 8],
-			[8, 8],
+			[7, 4],
+			[8, 4],
 		])
 	})
 
 	it('should read full-on wpc-emu GI as 8 via getGIState', () => {
-		const wpc = { ...wpcState2, generalIlluminationState: new Uint8Array([0, 7, 0, 3]) }
+		const wpc = { ...wpcState2, generalIlluminationState: new Uint8Array([0, 217, 0, 93]) }
 		emulatorState.updateState({ ram: new Uint8Array(), sound: soundState, wpc, dmd: dmdState })
 		expect(emulatorState.getGIState(0)).to.equal(8)
 		expect(emulatorState.getGIState(2)).to.equal(3)
+	})
+
+	it('should preserve GI fade steps from production normalized values', () => {
+		const wpc = {
+			...wpcState2,
+			generalIlluminationState: new Uint8Array([217, 186, 155, 124, 93, 62, 31, 0]),
+		}
+		emulatorState.updateState({ ram: new Uint8Array(), sound: soundState, wpc, dmd: dmdState })
+		expect(emulatorState.getChangedGI()).to.deep.equal([
+			[1, 8],
+			[2, 6],
+			[3, 5],
+			[4, 4],
+			[5, 3],
+			[6, 2],
+			[7, 1],
+		])
 	})
 
 	it('should pass pinmame sols (0/1) and GI (0-8) through unchanged', () => {

@@ -123,7 +123,7 @@ describe('WPC-EMU', () => {
 		expect(emulator.getLampState(11)).to.equal(1)
 		expect(emulator.getLampState(12)).to.equal(0)
 		// solenoids/GIs are stored with 1-based offset (internal dummy at 0) — see EmulatorState
-		// sols thresholded to VPM 0/1 (255 -> 1, 127 -> 0), GI scaled to VPM 0-8 (7 -> 8)
+		// sols thresholded to VPM 0/1 (255 -> 1, 127 -> 0), GI scaled to VPM 0-8 (217 -> 8)
 		expect(emulator.getSolenoidState(0)).to.equal(1)
 		expect(emulator.getSolenoidState(1)).to.equal(0)
 		expect(emulator.getGIState(0)).to.equal(8)
@@ -153,7 +153,7 @@ class MockWpcEmulator implements WpcEmuApi.Emulator {
 				},
 				wpc: {
 					diagnosticLed: 6,
-					generalIlluminationState: new Uint8Array([8, 7, 3, 0]),
+					generalIlluminationState: new Uint8Array([217, 217, 93, 0]),
 					diagnosticLedToggleCount: 7,
 					lampState: new Uint8Array([255, 0]),
 					solenoidState: new Uint8Array([11, 255, 127, 0]),

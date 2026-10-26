@@ -28,9 +28,13 @@ export class EmulatorState {
 		if (s.wpc.lampState) this.lamps = Uint8Array.from(s.wpc.lampState, x => (x > 127 ? 1 : 0))
 		// wpc-emu drives 0x00/0xFF with >>1 decay; VPM ChangedSols currStat is 0/1 (vpintf.c)
 		if (s.wpc.solenoidState) this.sols = Uint8Array.from(s.wpc.solenoidState, x => (x > 127 ? 1 : 0))
-		// wpc-emu GI fades 0-7; pinmame/VPM GI is 0-8 with 8 = full on (wpc.c)
+		// wpc-emu exposes GI normalized by 31 (internal fade 0-7 becomes 0-217);
+		// pinmame/VPM GI is 0-8 with 8 = full on (wpc.c)
 		if (s.wpc.generalIlluminationState)
-			this.gis = Uint8Array.from(s.wpc.generalIlluminationState, x => (x >= 7 ? 8 : x))
+			this.gis = Uint8Array.from(s.wpc.generalIlluminationState, x => {
+				const v = Math.round(x / 31)
+				return v >= 7 ? 8 : v
+			})
 		if (s.dmd.dmdShadedBuffer) this.dmd = s.dmd.dmdShadedBuffer.slice()
 		if (s.wpc.inputSwitchMatrixActiveColumn) this.switches = s.wpc.inputSwitchMatrixActiveColumn.slice()
 	}
