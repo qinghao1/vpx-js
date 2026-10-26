@@ -17,7 +17,6 @@ import type { Storage } from '../../io/ole-doc.js'
 import { Matrix3D } from '../../math/matrix.js'
 import type { HitCircle } from '../../physics/hit-circle.js'
 import type { HitObject } from '../../physics/hit-object.js'
-import type { MoverObject } from '../../physics/mover-object.js'
 import { Item } from '../item.js'
 import type { Table } from '../table/table.js'
 import { SpinnerAnimation } from './spinner-animation.js'
@@ -26,6 +25,7 @@ import { SpinnerData } from './spinner-data.js'
 import { SpinnerHit } from './spinner-hit.js'
 import { SpinnerHitGenerator } from './spinner-hit-generator.js'
 import { SpinnerMeshGenerator } from './spinner-mesh-generator.js'
+import type { SpinnerMover } from './spinner-mover.js'
 import { SpinnerState } from './spinner-state.js'
 import { SpinnerUpdater } from './spinner-updater.js'
 
@@ -121,7 +121,7 @@ export class Spinner
 		return [this.hit!, ...this.hitCircles]
 	}
 
-	public getMover(): MoverObject {
+	public getMover(): SpinnerMover {
 		return this.hit?.getMoverObject()
 	}
 
