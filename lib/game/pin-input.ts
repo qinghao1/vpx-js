@@ -1,8 +1,8 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
+import type { Vertex2D } from '../math/vector.js'
 import { NudgeHandler } from '../physics/cabinet/nudge-handler.js'
-import type { Vertex2D } from '../util/vector.js'
 import type { Table } from '../vpt/table/table.js'
 import { Event } from './event.js'
 import {
@@ -37,6 +37,7 @@ import {
 import type { Player } from './player.js'
 
 type KeyEvent = { code: number; down: boolean }
+type ScheduledAction = { due: number; run: () => void }
 
 const DEFAULT_KEYS: Record<number, number> = {
 	[AssignKey.LeftFlipperKey]: DIK_LSHIFT,
@@ -62,7 +63,8 @@ const DEFAULT_KEYS: Record<number, number> = {
 	[AssignKey.Escape]: DIK_ESCAPE,
 }
 
-// Cabinet switches from vpinball InputManager.cpp; free-play coin search mirrors
+// Cabinet switch ids for the emu (VPM-style numbers, vpx-js-defined — upstream
+// InputManager.cpp holds no such tables); free-play coin search mirrors
 // Jakobud/freeplay MAME plugin (init.lua: search ioport fields by name "Free Play"):
 // we search tableScript for "Const swCoin* = N" by name (driver-agnostic) and use the
 // script's AddCreditKey path (vpmKeyDown -> PulseSw) plus a tiny direct pulse for timing.
@@ -77,21 +79,33 @@ const SWITCH_FLIPPER_R = [82, 86, 112, 116] as const
 const TROUGH_KICK_ANGLE = 60
 const TROUGH_KICK_SPEED = 10
 
-function isLeftCode(code: number, leftKey: number): boolean {
-	return code === leftKey || code === DIK_LEFT
-}
-
-function isRightCode(code: number, rightKey: number): boolean {
-	return code === rightKey || code === DIK_RIGHT
-}
+// Free-play schedule in physics ms: pulse width, stagger between credits,
+// and the 3+2+2 auto-credit batches after emu start.
+const CREDIT_PULSE_MS = 120
+const CREDIT_STAGGER_MS = 250
+const FREE_PLAY_BATCHES = [
+	{ delay: 0, count: 3 },
+	{ delay: 1500, count: 2 },
+	{ delay: 3500, count: 2 },
+]
 
 export class PinInput {
+	/**
+	 * Default for freePlay. Set to false before creating the Player to disable the
+	 * vpx-js-only free-play helpers (none exists upstream): auto-credits when the emu
+	 * starts, coin-switch pulses on Start, and mock trough eject. All run on the
+	 * physics clock, so pausing the game pauses them.
+	 */
+	public static freePlayDefault = true
+
 	private readonly queue: KeyEvent[] = []
 	private readonly pressed = new Set<number>()
 	private readonly nudgeHandler = new NudgeHandler()
+	private scheduled: ScheduledAction[] = []
+	private freePlayScheduled = false
 
 	readonly rgKeys: Record<number, number> = { ...DEFAULT_KEYS }
-	public freePlay = true
+	public freePlay = PinInput.freePlayDefault
 	private cachedCoinSwitches: number[] | null = null
 
 	constructor(
@@ -127,17 +141,34 @@ export class PinInput {
 		this.nudgeHandler.applyImpulse(angle, force)
 	}
 
+	private now(): number {
+		return this.player.getGameTime()
+	}
+
+	private schedule(delayMs: number, run: () => void): void {
+		this.scheduled.push({ due: this.now() + delayMs, run })
+	}
+
+	private runDue(): void {
+		if (!this.scheduled.length) return
+		const now = this.now()
+		const due = this.scheduled.filter(action => action.due <= now)
+		if (!due.length) return
+		this.scheduled = this.scheduled.filter(action => action.due > now)
+		for (const action of due) action.run()
+	}
+
 	private pulseSwitches(switches: readonly number[]): void {
 		const emu = this.player.getPhysics().emu
 		if (!emu) return
 		for (const sw of switches) {
 			emu.setSwitchInput(sw, true)
 		}
-		setTimeout(() => {
+		this.schedule(CREDIT_PULSE_MS, () => {
 			for (const sw of switches) {
 				emu.setSwitchInput(sw, false)
 			}
-		}, 120)
+		})
 	}
 
 	private discoverCoinSwitches(): number[] {
@@ -154,52 +185,47 @@ export class PinInput {
 				out.push(v)
 			}
 		}
-		if (out.length) {
-			this.cachedCoinSwitches = out
-			return out
-		}
-		return [65, 1, 2]
+		this.cachedCoinSwitches = out.length ? out : [65, 1, 2]
+		return this.cachedCoinSwitches
 	}
 
 	public addCredit(count = 1): void {
 		const key = this.getKey(AssignKey.AddCreditKey)
 		const direct = this.discoverCoinSwitches().slice(0, 3)
-		for (let i = 0; i < count; i++) {
-			setTimeout(() => {
+		for (let index = 0; index < count; index++) {
+			this.schedule(index * CREDIT_STAGGER_MS, () => {
 				this.onKeyDown(key)
-				setTimeout(() => {
-					this.onKeyUp(key)
-				}, 120)
+				this.schedule(CREDIT_PULSE_MS, () => this.onKeyUp(key))
 				this.pulseSwitches(direct)
-			}, i * 250)
+			})
 		}
 	}
 
 	public ensureFreePlay(): void {
-		if (!this.freePlay) return
-		this.addCredit(3)
-		setTimeout(() => this.addCredit(2), 1500)
-		setTimeout(() => this.addCredit(2), 3500)
+		if (!this.freePlay || this.freePlayScheduled) return
+		this.freePlayScheduled = true
+		for (const batch of FREE_PLAY_BATCHES) {
+			this.schedule(batch.delay, () => this.addCredit(batch.count))
+		}
 	}
 
-	onKeyDown(code: number, _ts?: number): void {
+	onKeyDown(code: number): void {
 		this.queue.push({ code, down: true })
 	}
 
-	onKeyUp(code: number, _ts?: number): void {
+	onKeyUp(code: number): void {
 		this.queue.push({ code, down: false })
 	}
 
 	processKeys(): void {
+		this.runDue()
 		if (!this.queue.length) return
 		const queued = this.queue.splice(0, this.queue.length)
+		// Upstream parity (InputManager::PushButtonEvent): every keyboard key reaches
+		// script KeyDown/KeyUp, including FrameCount/Enable3D/DBGBalls — nothing is swallowed.
 		for (const ev of queued) {
-			if (
-				ev.code === this.rgKeys[AssignKey.FrameCount] ||
-				ev.code === this.rgKeys[AssignKey.Enable3D] ||
-				ev.code === this.rgKeys[AssignKey.DBGBalls]
-			)
-				continue
+			// Upstream PushButtonEvent drops unmapped keys (dik == 0, InputManager.cpp).
+			if (ev.code === 0) continue
 			if (ev.down) {
 				if (this.pressed.has(ev.code)) continue
 				this.pressed.add(ev.code)
@@ -214,58 +240,15 @@ export class PinInput {
 		const prevNudgeIndex = this.nudgeHandler.getIndex()
 		this.table.getApi().fireKeyEvent(dispId, code)
 		const isDown = dispId === Event.GameEventsKeyDown
-		this.syncFlippers(isDown, code)
-		this.syncPlunger(isDown, code)
+		// Script-only contract (C-P1-1, upstream parity): flipper and plunger keys
+		// only reach the table script via KeyDown/KeyUp. Upstream InputManager::
+		// PushButtonEvent merely FireDispID()s DISPID_GameEvents_KeyDown/KeyUp
+		// (src/input/InputManager.cpp); rotation/pull/fire happen only when the
+		// script calls Flipper::RotateToEnd/Start or Plunger PullBack/Fire
+		// (src/parts/flipper.cpp). Never drive them directly from input here.
 		this.syncNudge(isDown, code, prevNudgeIndex)
 		this.syncCabinet(isDown, code)
 		this.tryMockTroughEject(isDown, code)
-	}
-
-	private isRightFlipper(flipper: { getName(): string; data: { center: { x: number } } }): boolean {
-		const name = flipper.getName().toLowerCase()
-		if (name.includes('right') || name === 'flipperr') return true
-		if (name.includes('left')) return false
-		const d = this.table.data
-		if (d && typeof d.left === 'number' && typeof d.right === 'number') {
-			const mid = (d.left + d.right) / 2
-			return flipper.data.center.x > mid
-		}
-		return false
-	}
-
-	private syncFlippers(isDown: boolean, code: number): void {
-		const isLeft = isLeftCode(code, this.getKey(AssignKey.LeftFlipperKey))
-		const isRight = isRightCode(code, this.getKey(AssignKey.RightFlipperKey))
-		if (!isLeft && !isRight) return
-		const flippers = Object.values(this.table.flippers) as Array<{
-			getName(): string
-			data: { center: { x: number } }
-			getApi(): { RotateToEnd(): void; RotateToStart(): void }
-		}>
-		if (!flippers.length) return
-		for (const flipper of flippers) {
-			if (flippers.length > 1) {
-				const isRightFlipper = this.isRightFlipper(flipper)
-				if (isLeft && isRightFlipper) continue
-				if (isRight && !isRightFlipper) continue
-			}
-			const api = flipper.getApi()
-			if (isDown) api.RotateToEnd()
-			else api.RotateToStart()
-		}
-	}
-
-	private syncPlunger(isDown: boolean, code: number): void {
-		if (code !== this.getKey(AssignKey.PlungerKey)) return
-		const plungers = Object.values(this.table.plungers) as Array<{
-			getApi(): { PullBack(): void; Fire(): void }
-		}>
-		if (!plungers.length) return
-		for (const plunger of plungers) {
-			const api = plunger.getApi()
-			if (isDown) api.PullBack()
-			else api.Fire()
-		}
 	}
 
 	private syncNudge(isDown: boolean, code: number, prevIndex: number): void {
@@ -286,7 +269,7 @@ export class PinInput {
 	}
 
 	private tryMockTroughEject(isDown: boolean, code: number): void {
-		if (!isDown) return
+		if (!isDown || !this.freePlay) return
 		if (code !== DIK_1 && code !== this.getKey(AssignKey.StartGameKey)) return
 		const emu = this.player.getPhysics().emu as unknown as {
 			isMock?: boolean
@@ -299,7 +282,7 @@ export class PinInput {
 			getName(): string
 			data: { center: { x: number } }
 		}>
-		const withBall = kickers.filter(k => (k as unknown as { hit?: { ball?: unknown } }).hit?.ball)
+		const withBall = kickers.filter(kicker => kicker.hit?.ball)
 		if (!withBall.length) {
 			const plunger = Object.values(this.table.plungers)[0] as unknown as
 				| { getApi(): { CreateBall(): unknown } }
@@ -310,7 +293,7 @@ export class PinInput {
 			return
 		}
 		withBall.sort((a, b) => b.data.center.x - a.data.center.x)
-		const exit = withBall[0] as (typeof withBall)[number]
+		const exit = withBall[0]
 		if (!exit) return
 		exit.getApi().Kick(TROUGH_KICK_ANGLE, TROUGH_KICK_SPEED)
 	}
@@ -334,8 +317,10 @@ export class PinInput {
 		if (code === DIK_4 || code === this.getKey(AssignKey.AddCreditKey2)) return SWITCH_CREDIT_4
 		if (code === DIK_5 || code === this.getKey(AssignKey.AddCreditKey)) return SWITCH_CREDIT_5
 		if (code === DIK_6) return SWITCH_CREDIT_6
-		if (isLeftCode(code, this.getKey(AssignKey.LeftFlipperKey))) return SWITCH_FLIPPER_L
-		if (isRightCode(code, this.getKey(AssignKey.RightFlipperKey))) return SWITCH_FLIPPER_R
+		const leftKey = this.getKey(AssignKey.LeftFlipperKey)
+		const rightKey = this.getKey(AssignKey.RightFlipperKey)
+		if (code === leftKey || code === DIK_LEFT) return SWITCH_FLIPPER_L
+		if (code === rightKey || code === DIK_RIGHT) return SWITCH_FLIPPER_R
 		return undefined
 	}
 }
