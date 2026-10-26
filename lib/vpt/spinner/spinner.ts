@@ -97,6 +97,11 @@ export class Spinner
 
 	public setupPlayer(player: Player, table: Table): void {
 		const height = table.getSurfaceHeight(this.data.szSurface, this.data.center.x, this.data.center.y)
+		// correct angle inversions like upstream PhysicSetup (spinner.cpp) — parse keeps raw values
+		const angleMin = Math.min(this.data.angleMin, this.data.angleMax)
+		const angleMax = Math.max(this.data.angleMin, this.data.angleMax)
+		this.data.angleMin = angleMin
+		this.data.angleMax = angleMax
 		this.events = new EventProxy(this)
 		this.hit = new SpinnerHit(this.data, this.state, this.events, height)
 		this.hitCircles = this.hitGenerator.getHitShapes(height)

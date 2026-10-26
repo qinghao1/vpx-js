@@ -40,15 +40,7 @@ export class SpinnerData extends ItemData {
 	public static async fromStorage(storage: Storage, itemName: string): Promise<SpinnerData> {
 		const data = new SpinnerData(itemName)
 		await storage.streamFiltered(itemName, 4, BiffParser.stream(data.fromTag.bind(data)))
-		return data.correctAngles()
-	}
-
-	private correctAngles(): this {
-		const lo = Math.min(this.angleMin, this.angleMax)
-		const hi = Math.max(this.angleMin, this.angleMax)
-		this.angleMin = lo
-		this.angleMax = hi
-		return this
+		return data
 	}
 
 	private async fromTag(buffer: Uint8Array, tag: string, _offset: number, len: number): Promise<number> {
