@@ -56,7 +56,10 @@ wasm/build.sh --debug
 wasm/build.sh --mock
 ```
 
-Without `emcc`, the build copies the PinMAME mock so `npm run build` still works. Build intermediates are in `wasm/build/wasm` and `wasm/build/wasm-debug` (gitignored).
+Without `emcc` (or on build failure) the script exits 1 and leaves `dist/`
+untouched — pass `--allow-mock` to fall back to the PinMAME mock with exit 0
+instead. `--mock` copies the mock unconditionally (physics-only, no emulation).
+Build intermediates are in `wasm/build/wasm` and `wasm/build/wasm-debug` (gitignored).
 
 
 ## Outputs
@@ -83,13 +86,59 @@ Adapter: `lib/emu/pinmame/` (`PinMameEmulator` + `pinmame-loader.ts` handles was
 ### Kernels
 
 ```ts
-import { getWasmKernels } from './lib/physics/wasm/kernels.js'
-const mod = await getWasmKernels()
-// SoA batch APIs: _batchHitTestCircle, _batchHitTestPlane, _batchHitTestTriangle, …
-mod._batchHitTestCircle(n, bx, by, bz, vx, vy, vz, br, cxPtr, cyPtr, ...)
+import { getWasmKernels, tryGetWasmBatchHitViewsOutCircle, warmWasmPools } from './lib/physics/wasm/kernels.js'
+await getWasmKernels()
+// counts per kind: circle, plane, lineZ, point, triangle, lineSeg, line3D, poly
+warmWasmPools(nCircle, 0, 0, 0, 0, 0, 0, 0)
+const v = tryGetWasmBatchHitViewsOutCircle(nCircle) // null until warmed — run scalar instead
+if (v) {
+	v.cx.set(cxs) // …fill one Float32Array per input field
+	v.run(bx, by, bz, vx, vy, vz, r, dt)
+	// read v.oT[i], v.oContact[i], v.oNx/oNy/oNz[i], v.oDist[i], v.oBnv[i]
+}
 ```
 
-Loader uses `wasm/dist/kernels.js`. Pure-JS fallbacks exist if WASM is unavailable.
+Never call `mod._batchHitTest*` directly: the `getViews`/`tryGet*` wrappers in
+`lib/physics/wasm/kernels.ts` own the SoA pools. Loader uses `wasm/dist/kernels.js`.
+Pure-JS fallbacks exist if WASM is unavailable.
+
+## Kernels ABI contract
+
+Every `_batchHitTest*` export shares one shape (see `BATCH_SPECS` in
+`lib/physics/wasm/kernels.ts` — key order IS the WASM argument order):
+
+```
+(n, bx,by,bz, vx,vy,vz, r, *floatIns, *intIns, *extraIns, dt, *outs)
+```
+
+- Inputs are struct-of-arrays: one `float*`/`int*` per field, `n` lanes each.
+  Per-kind field lists live only in `BATCH_SPECS` (e.g. circle: `cx,cy,cr,zl,zh`);
+  the C++ parameter names in `kernels.cpp` mirror them.
+- Outputs are always 7 arrays in this order:
+  `oT: float*`, `oContact: int*`, `oNx,oNy,oNz,oDist,oBnv: float*`.
+  NOTE `oContact` is int32 — read it via `HEAP32`/`Int32Array`, not `HEAPF32`.
+- Miss encoding: `oT[i] = -1` (default `Hit.t`) means "no hit this step".
+  Replay treats `t >= -0.5 && t <= coll.hitTime` as a hit.
+- Poly stride: vertex blobs are strided `vertsX[i*32+j]` / `vertsY[i*32+j]`
+  (`POLY_MAX_VERTS = 32`). The constant is defined twice — `kernels.cpp` and
+  `POLY_MAX_VERTS` in `lib/physics/wasm/kernels.ts` — and the two must stay in
+  sync; JS polys with `rgv.length > 32` never enter the batch (`isBatchPoly`).
+- NO BOUNDS CHECKS: the C++ loops `for (i < n)` over raw pointers. Writing past
+  `count` (or past `count*32` for poly verts) silently corrupts the WASM heap.
+  Always allocate through `getViews`/`tryGet*` + `warmWasmPools` and never write
+  past the count you requested.
+
+### Replay semantics (`lib/physics/wasm/batched-hittest.ts`)
+
+- `WASM_THRESHOLD = 64`: batches with fewer than 64 total hit objects run scalar —
+  below that, pool fill + FFI costs more than it saves.
+- `BatchCollector.run()` acquires views with `tryGet*` (null when pools are cold,
+  too small, or the heap grew). On null it calls `warmWasmPools(...)`, returns
+  false, and the caller runs scalar for that step; the NEXT step uses WASM.
+  First-frame slowness is warmup, not a bug.
+- `dt` is frozen: every lane runs with the `coll.hitTime` captured before the
+  batch. Replay then walks hits in collection order, tightening with
+  `t <= coll.hitTime`, so earlier wins still narrow later ones.
 
 ## Notes
 

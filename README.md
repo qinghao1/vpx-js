@@ -26,7 +26,7 @@ This is a maintained **fork of [`vpdb/vpx-js`](https://github.com/vpdb/vpx-js)**
 ## Requirements
 
 - Node `>=24` (ES2024, `"type": "module"`)
-- Browser with ESM + WebGL2
+- Browser with ESM + WebGPU (`THREE.WebGPURenderer`, no WebGL fallback)
 - Rebuilding WASM needs Emscripten `>=4.0`, CMake `>=3.28`, Ninja `>=1.11` (otherwise a mock fallback is used)
 
 ## Installation

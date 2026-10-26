@@ -35,12 +35,12 @@ Node via `fnm` — `.nvmrc` `24`, `.node-version` `24.19.0`. Activate with `eval
 - `wasm/` + `external/pinmame` (submodule) → `wasm/dist/` (`wasm/build.sh`, `--mock` fallback)
 - `external/vpinball` (submodule, `https://github.com/vpinball/vpinball.git`) → native `VPinballX_GL`/`VPinballX_BGFX` + `libSDL3.so` + `shaders-10.8.1/` + `plugins/`
 - `bin/vpinball-runner.ts` + `test/harness/vpinball-resolver.ts` + `test/harness/compare-side-by-side.ts` + `test/harness/verify-vpinball-compat.ts` — vpinball debugging & parity
-- `demo-browser/` — local browser demo, **untracked** (`/.gitignore:demo-browser/`)
+- `demo-browser/` — local browser demo (tracked; only `dist/`, `node_modules/`, `.vite/` ignored)
 - `dist/`, `dist-esm/`, `coverage/`, `node_modules/`, `*.vpx`, `lib/scripting/grammar/rules.ts`, `external/vpinball/build/`, `.cache/vpinball/` — ignored, do not commit
 
 ## Conventions
 
-- Fix root cause; keep it simple, elegant, idiomatic. No one-letter vars, no copyright headers.
+- Fix root cause; keep it simple, elegant, idiomatic. Keep the one-line GPL copyright header on every source file; prefer descriptive names (single letters only for conventional math locals).
 - ESM only (`es2024`), Biome (tabs, 120, `organizeImports`). Minimal code; comments only for non-obvious.
 - Rebuild `dist-esm` before running `demo-browser` (vite imports from `../dist-esm/lib/...`).
 
