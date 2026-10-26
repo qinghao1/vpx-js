@@ -160,6 +160,38 @@ describe('The VPinball primitive updater', () => {
 		expect(mat.userData.__uAlbedo.value.getHex(), 'undriven bevel keeps its diffuse').to.equal(0xc8e1ff)
 	})
 
+	it('should flip transparent/depthWrite on alpha fade without a program rebuild', () => {
+		table = new TableBuilder()
+			.addMaterial('insertrectangle1off', { baseColor: 0xc8e1ff })
+			.addPrimitive('bevel', {
+				szMaterial: 'insertrectangle1off',
+				szImage: 'insertrectangle1off',
+				depthBias: 500,
+				alpha: 100,
+			})
+			.build()
+		const renderApi = new TestRenderApi()
+		const map = new THREE.DataTexture(new Uint8Array([10, 10, 10, 255]), 1, 1)
+		const mesh = {
+			name: '015_Primitive011',
+			visible: true,
+			material: createPrimitiveBdlMaterial({ map, albedo: 0xffffff, opacity: 1, bdl: 0 }),
+		}
+		const mat = mesh.material as any
+		table.primitives.bevel
+			.getUpdater()
+			.applyState(mesh, { disableLightingTop: 0, alpha: 100 } as PrimitiveState, renderApi, table)
+		expect(mat.transparent, 'full alpha stays opaque').to.equal(false)
+		const version = mat.version
+		table.primitives.bevel
+			.getUpdater()
+			.applyState(mesh, { disableLightingTop: 0, alpha: 50 } as PrimitiveState, renderApi, table)
+		const faded = (mesh.material ?? {}) as any
+		expect(faded.transparent, 'faded insert turns transparent').to.equal(true)
+		expect(faded.depthWrite, 'faded insert stops writing depth').to.equal(false)
+		expect(faded.version, 'transparent flip is render state, not a program rebuild').to.equal(version)
+	})
+
 	it('should hold BDL intent in uniforms while the insert map is still streaming', () => {
 		table = new TableBuilder()
 			.addMaterial('inserttriangle3on', { baseColor: 0xffffff })

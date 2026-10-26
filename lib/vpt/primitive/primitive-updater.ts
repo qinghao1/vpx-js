@@ -219,7 +219,8 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 				if (mat.transparent !== transparent || mat.depthWrite === transparent) {
 					mat.transparent = transparent
 					mat.depthWrite = !transparent
-					mat.needsUpdate = true
+					// Render state only: transparent/depthWrite are not part of the
+					// program cache key, so no rebuild is needed (see WebGLPrograms).
 				}
 				// Native (primitive.cpp:1037): script visible=false skips the draw.
 				// Visibility is owned by applyVisibility; never force it here or
