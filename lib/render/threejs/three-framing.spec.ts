@@ -126,6 +126,13 @@ describe('regression: framing keeps DMD and full playfield visible', () => {
 		expect(play.position.z, 'play camera more forward (bias)').to.be.lessThan(viewer.position.z)
 	})
 
+	it('viewer <-> play transition does not teleport the target (no snap)', () => {
+		const group = buildWalkingDeadGroup()
+		const play = computePlayFraming(group)
+		const viewer = computeViewerFraming(group)
+		expect(play.target.distanceTo(viewer.target), 'target should not teleport').to.be.lessThan(20)
+	})
+
 	it('viewer framing keeps playfield and DMD inside NDC at all aspects (FOV 45)', () => {
 		const group = buildWalkingDeadGroup()
 		const state = computeViewerFraming(group)
