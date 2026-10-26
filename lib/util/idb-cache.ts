@@ -3,22 +3,31 @@ const DB_NAME = 'vpx-js-cache'
 const DB_VERSION = 4
 const STORE = 'cache'
 
+let cachedDb: Promise<IDBDatabase> | null = null
+
 function openDB(): Promise<IDBDatabase> {
-	return new Promise((resolve, reject) => {
-		const req = indexedDB.open(DB_NAME, DB_VERSION)
-		req.onupgradeneeded = () => {
-			const db = req.result
-			if (db.objectStoreNames.contains('textures')) {
-				db.deleteObjectStore('textures')
+	if (!cachedDb) {
+		const fresh = new Promise<IDBDatabase>((resolve, reject) => {
+			const req = indexedDB.open(DB_NAME, DB_VERSION)
+			req.onupgradeneeded = () => {
+				const db = req.result
+				if (db.objectStoreNames.contains('textures')) {
+					db.deleteObjectStore('textures')
+				}
+				if (db.objectStoreNames.contains(STORE)) {
+					db.deleteObjectStore(STORE)
+				}
+				db.createObjectStore(STORE)
 			}
-			if (db.objectStoreNames.contains(STORE)) {
-				db.deleteObjectStore(STORE)
-			}
-			db.createObjectStore(STORE)
-		}
-		req.onsuccess = () => resolve(req.result)
-		req.onerror = () => reject(req.error)
-	})
+			req.onsuccess = () => resolve(req.result)
+			req.onerror = () => reject(req.error)
+		})
+		cachedDb = fresh
+		fresh.then(undefined, () => {
+			if (cachedDb === fresh) cachedDb = null
+		})
+	}
+	return cachedDb
 }
 
 export async function idbGet(key: string): Promise<any | undefined> {
