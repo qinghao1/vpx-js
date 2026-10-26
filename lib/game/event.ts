@@ -12,6 +12,7 @@ export enum Event {
 	GameEventsUnPaused = 1006,
 	GameEventsOptionEvent = 1007,
 
+	/** Fired by slingshot wall segments on a hard kick (`line-seg-slingshot.ts`); script name `Slingshot`. */
 	SurfaceEventsSlingshot = 1101,
 
 	FlipperEventsCollide = 1200,
@@ -20,6 +21,7 @@ export enum Event {
 	SpinnerEventsSpin = 1301,
 	TargetEventsDropped = 1302,
 	TargetEventsRaised = 1303,
+	/** Fired when a light sequencer drains its play queue (`lightseq-animation.ts`); script name `PlayDone`. */
 	LightSeqEventsPlayDone = 1320,
 
 	HitEventsHit = 1400,

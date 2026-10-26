@@ -4,9 +4,10 @@
 import type { HitObject } from '../physics/hit-object.js'
 import type { Ball } from '../vpt/ball/ball.js'
 import { Event } from './event.js'
-import type { IPlayable } from './iplayable.js'
-import { isScriptable } from './iscriptable.js'
+import type { IPlayable } from './interfaces.js'
+import { isScriptable } from './interfaces.js'
 
+/** DISPID → script event name (`fireDispID` emits these on the item api). */
 const EVENT_NAMES: Record<Event, string> = {
 	[Event.FlipperEventsCollide]: 'Collide',
 	[Event.GameEventsExit]: 'Exit',
@@ -50,14 +51,15 @@ export class EventProxy {
 	}
 
 	public fireGroupEvent(e: Event): void {
-		for (let i = 0; i < this.eventCollection.length; i++) {
-			this.eventCollection[i].fireVoidEventParm(e, this.eventCollectionItemPos[i])
+		for (const [index, proxy] of this.eventCollection.entries()) {
+			proxy.fireVoidEventParm(e, this.eventCollectionItemPos[index])
 		}
 		if (this.singleEvents) this.fireDispID(e)
 	}
 
 	private fireDispID(e: Event, ...params: unknown[]): void {
 		if (!isScriptable(this.playable)) return
-		this.playable.getApi().emit.call(this.playable.getApi(), EVENT_NAMES[e] ?? `UnknownEvent${e}`, ...params)
+		const api = this.playable.getApi()
+		api.emit(EVENT_NAMES[e] ?? `UnknownEvent${e}`, ...params)
 	}
 }
