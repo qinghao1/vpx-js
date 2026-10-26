@@ -1,11 +1,12 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { Vertex2D } from '../../util/vector.js'
+import { MathUtils } from 'three'
+
+import { Vertex2D } from '../../math/vector.js'
 import { CabinetPhysics } from './cabinet-physics.js'
 
-function degToRad(d: number): number {
-	return (d * Math.PI) / 180
-}
+/** Keyboard-nudge scale: strong-nudge acceleration over core script strength. */
+const NUDGE_BASE_SCALE = (0.7 * 9.80665) / 2
 
 export class CabNudge {
 	private readonly cabinet = new CabinetPhysics()
@@ -26,14 +27,12 @@ export class CabNudge {
 	}
 
 	nudge(angle: number, force: number): void {
-		const g = 9.80665
-		const baseScale = (0.5 * g) / 2
-		const actual = force * this.strength * baseScale
-		const a = degToRad(angle)
+		const actual = force * this.strength * NUDGE_BASE_SCALE
+		const radians = MathUtils.degToRad(angle)
 		this.impulses.push({
 			elapsed: 0,
 			length: 25,
-			impulse: new Vertex2D(Math.sin(a) * actual, -Math.cos(a) * actual),
+			impulse: new Vertex2D(Math.sin(radians) * actual, -Math.cos(radians) * actual),
 		})
 		this.deactivationDelay = 10000
 	}
@@ -44,7 +43,8 @@ export class CabNudge {
 		this.scratch.y = 0
 		let write = 0
 		for (let read = 0; read < this.impulses.length; read++) {
-			const it = this.impulses[read]!
+			const it = this.impulses[read]
+			if (it === undefined) continue
 			it.elapsed++
 			if (it.elapsed <= it.length) {
 				const t = it.elapsed / it.length

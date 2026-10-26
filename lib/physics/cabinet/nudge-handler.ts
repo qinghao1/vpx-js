@@ -1,5 +1,5 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
-import type { Vertex2D } from '../../util/vector.js'
+import type { Vertex2D } from '../../math/vector.js'
 import { CabNudge } from './keyboard-nudge.js'
 
 export class NudgeHandler {
