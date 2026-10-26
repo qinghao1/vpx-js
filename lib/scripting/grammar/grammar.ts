@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import dashAstImport from 'dash-ast'
-import { Grammars, type IToken, Parser } from 'ebnf'
+import { type IToken, Parser } from 'ebnf'
 import { generate } from 'escodegen'
 import type { Program, Statement } from 'estree'
 import { logger, progress } from '../../util/logger.js'
@@ -22,11 +22,125 @@ import { ppLoop } from '../post-process/loop.js'
 import { ppMethod } from '../post-process/method.js'
 import { ppVarDecl } from '../post-process/vardecl.js'
 import { ppWith } from '../post-process/with.js'
-import { getTextFile } from '../vbs-scripts.node.js'
+import { renameReservedWords } from '../transformer/reference-transformer.js'
 import { RULES } from './rules.js'
 
 // dash-ast is CJS, handle both default and direct export
 const dashAst: (ast: any, opts: any) => void = (dashAstImport as any)?.default ?? (dashAstImport as any)
+
+const isAlphaChar = (char: string): boolean => /[A-Za-z_]/.test(char)
+const isAlNumChar = (char: string): boolean => /[A-Za-z0-9_]/.test(char)
+
+/** True when `line[colonIdx]` starts a `: Rem comment` tail (docs: Rem after other statements needs a colon). */
+const isColonRemComment = (line: string, colonIdx: number): boolean => {
+	let j = colonIdx + 1
+	while (j < line.length && (line[j] === ' ' || line[j] === '\t')) j++
+	if (line.slice(j, j + 3).toLowerCase() !== 'rem') return false
+	const after = line[j + 3]
+	return after === undefined || after === ' ' || after === '\t' || after === ':'
+}
+
+const isWordChar = (char: string | undefined): boolean => char !== undefined && /[A-Za-z0-9_]/.test(char)
+
+/**
+ * Rewrite canonical `Call Name(a, b)` / `Call obj.Name(a, b)` to the equivalent
+ * `Call Name a, b`, which the grammar already accepts with identical semantics.
+ * Only single paren groups holding a top-level comma are rewritten; those never
+ * parse today, so previously accepted lines are byte-identical afterwards.
+ */
+const stripCallParens = (line: string): string => {
+	let result = ''
+	let i = 0
+	while (i < line.length) {
+		const ch = line[i] ?? ''
+		if (ch === '"') {
+			let j = i + 1
+			while (j < line.length) {
+				if (line[j] === '"') {
+					if (j + 1 < line.length && line[j + 1] === '"') {
+						j += 2
+						continue
+					}
+					j++
+					break
+				}
+				j++
+			}
+			result += line.slice(i, j)
+			i = j
+			continue
+		}
+		if (
+			(ch === 'C' || ch === 'c') &&
+			line.slice(i, i + 4).toLowerCase() === 'call' &&
+			!isWordChar(line[i - 1]) &&
+			!isWordChar(line[i + 4])
+		) {
+			const m = matchCallParenGroup(line, i + 4)
+			if (m) {
+				result += `${line.slice(i, m.open).trimEnd()} ${line.slice(m.open + 1, m.close)}`
+				i = m.close + 1
+				continue
+			}
+		}
+		result += ch
+		i++
+	}
+	return result
+}
+
+/** Locate the single multi-arg paren group of a `Call` target, or null to leave the text untouched. */
+const matchCallParenGroup = (line: string, from: number): { open: number; close: number } | null => {
+	let j = from
+	while (j < line.length && (line[j] === ' ' || line[j] === '\t')) j++
+	if (!isAlphaChar(line[j] ?? '')) return null
+	while (j < line.length && isAlNumChar(line[j] ?? '')) j++
+	for (;;) {
+		let k = j
+		while (k < line.length && (line[k] === ' ' || line[k] === '\t')) k++
+		if (line[k] !== '.') break
+		k++
+		while (k < line.length && (line[k] === ' ' || line[k] === '\t')) k++
+		if (!isAlphaChar(line[k] ?? '')) return null
+		while (k < line.length && isAlNumChar(line[k] ?? '')) k++
+		j = k
+	}
+	while (j < line.length && (line[j] === ' ' || line[j] === '\t')) j++
+	if (line[j] !== '(') return null
+	const open = j
+	let depth = 0
+	let hasTopComma = false
+	j++
+	while (j < line.length) {
+		const c = line[j] ?? ''
+		if (c === '"') {
+			j++
+			while (j < line.length) {
+				if (line[j] === '"') {
+					if (j + 1 < line.length && line[j + 1] === '"') {
+						j += 2
+						continue
+					}
+					j++
+					break
+				}
+				j++
+			}
+			continue
+		}
+		if (c === '(') depth++
+		else if (c === ')') {
+			if (depth === 0) break
+			depth--
+		} else if (c === ',' && depth === 0) hasTopComma = true
+		j++
+	}
+	if (j >= line.length || !hasTopComma) return null
+	let k = j + 1
+	while (k < line.length && (line[k] === ' ' || line[k] === '\t')) k++
+	if (k < line.length && line[k] !== ':') return null
+	return { open, close: j }
+}
 
 export interface ESIToken extends IToken {
 	estree: any
@@ -34,7 +148,12 @@ export interface ESIToken extends IToken {
 	children: ESIToken[]
 }
 
-/** VBS grammar parser. */
+/**
+ * VBS grammar parser: `format` (strip comments, join `_` continuations,
+ * normalize keyword case) → `ebnf` parse with generated `RULES` → post-process
+ * (`post-process/pp*`, token tree → ESTree). AST transformers run later in
+ * `Transpiler` via `buildPipeline`, not here. See `../README.md`.
+ */
 export class Grammar {
 	private readonly GRAMMAR_KEYWORDS: string[] = [
 		'And',
@@ -97,7 +216,6 @@ export class Grammar {
 
 	private readonly GRAMMAR_IDENTIFIERS: string[] = ['Me']
 
-	private readonly GRAMMAR_TARGET_FORMAT = 'Format'
 	private readonly GRAMMAR_TARGET_PROGRAM = 'Program'
 
 	private readonly parser: Parser
@@ -137,20 +255,10 @@ export class Grammar {
 			this.identifiersMap[key.toLowerCase()] = key
 		}
 
-		// toggle between real-time compilation and pre-compiled rules
-		if (false) {
-			const grammar = getTextFile('grammar.bnf')
-			this.parser = new Parser(Grammars.Custom.getRules(grammar), {})
-		} else {
-			this.parser = new Parser(RULES, {})
-		}
+		this.parser = new Parser(RULES, {})
 	}
 
 	public format(script: string): string {
-		return this.fastFormat(script)
-	}
-
-	private fastFormat(script: string): string {
 		const lines = script.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n')
 		const joined: string[] = []
 		let buffer = ''
@@ -158,7 +266,6 @@ export class Grammar {
 			const line = lines[li]!
 			let out = ''
 			let inStr = false
-			let commentPos = -1
 			for (let ci = 0; ci < line.length; ci++) {
 				const ch = line[ci]!
 				if (ch === '"') {
@@ -172,12 +279,14 @@ export class Grammar {
 					continue
 				}
 				if (!inStr && ch === "'") {
-					commentPos = ci
+					break
+				}
+				if (!inStr && ch === ':' && isColonRemComment(line, ci)) {
 					break
 				}
 				out += ch
 			}
-			let content = commentPos >= 0 ? out.slice(0, commentPos) : out
+			let content = out
 			const trimmed = content.trimStart()
 			if (
 				trimmed.length >= 3 &&
@@ -208,7 +317,7 @@ export class Grammar {
 					content = buffer + ' ' + content
 					buffer = ''
 				}
-				joined.push(content)
+				joined.push(stripCallParens(content))
 			}
 		}
 		const outLines: string[] = []
@@ -219,8 +328,6 @@ export class Grammar {
 			let hadSep = false
 			let i = 0
 			const n = raw.length
-			const isAlpha = (c: string) => /[A-Za-z_]/.test(c)
-			const isAlNum = (c: string) => /[A-Za-z0-9_]/.test(c)
 			while (i < n) {
 				const ch = raw[i]!
 				if (ch === '"') {
@@ -424,9 +531,9 @@ export class Grammar {
 					hadSep = false
 					continue
 				}
-				if (isAlpha(ch)) {
+				if (isAlphaChar(ch)) {
 					let word = ''
-					while (i < n && isAlNum(raw[i]!)) {
+					while (i < n && isAlNumChar(raw[i]!)) {
 						word += raw[i]!
 						i++
 					}
@@ -480,174 +587,15 @@ export class Grammar {
 		return outLines.join('\n') + '\n'
 	}
 
-	private legacyFormat(script: string): string {
-		let output = ''
-
-		let hasLine: boolean = false
-		let prevToken: IToken | undefined
-		let separator = false
-
-		let now = Date.now()
-
-		progress().details('formatting')
-		const ast = this.parser.getAST(`${script.trim()}\n`, this.GRAMMAR_TARGET_FORMAT)
-		if (ast === null) {
-			throw new Error('Unable to format script.')
-		} else if (ast.rest?.length) {
-			const start = script.length - ast.rest.length
-			throw new Error(
-				`Unable to format script. Syntax error at: ${script.substr(start, script.indexOf('\n', start))}`,
-			)
-		}
-		logger().debug('[Grammar.format] Parsed in %sms', Date.now() - now)
-
-		/**
-		 * Reformat the script by parsing into logical lines and tokens.
-		 * This will remove comments and REM statements, case correct keywords,
-		 * join lines that use line continuation (_), and remove all unnecessary
-		 * whitespace. Removing whitespace significantly improves performance.
-		 * Rules for including whitespace are commented inline below.
-		 */
-
-		now = Date.now()
-		progress().details('standardizing')
-
-		const keywordsMap = this.keywordsMap
-		const identifiersMap = this.identifiersMap
-
-		dashAst(ast, {
-			enter(node: IToken, _parent: IToken) {
-				switch (node.type) {
-					case 'LogicalLine':
-						hasLine = false
-						prevToken = undefined
-						separator = false
-						break
-				}
-			},
-			leave(node: IToken, _parent: IToken) {
-				switch (node.type) {
-					case 'LogicalLine':
-						if (hasLine) {
-							output += '\n'
-						}
-						break
-					case 'LogicalLineElement':
-						if (node.text === ' ') {
-							separator = true
-						}
-						break
-					case 'Identifier':
-						/**
-						 * Standardize Me identifier when it isn't after a dot
-						 */
-						if (prevToken?.text !== '.') {
-							if (identifiersMap[node.text.toLowerCase()]) {
-								node.text = identifiersMap[node.text.toLowerCase()]
-							}
-						}
-						break
-					case 'Keyword':
-						/**
-						 * Standardize keywords
-						 */
-						node.text = keywordsMap[node.text.toLowerCase()]
-						break
-					case 'Token': {
-						const token = node.children[0]
-						if (prevToken) {
-							switch (token.type) {
-								case 'Keyword':
-									/**
-									 * Add spaces for the following:
-									 * 1) Keyword Keyword - End Sub
-									 * 2) Identifier Keyword - For j=x To 20
-									 * 3) Literal Keyword - For j=1 To 20
-									 * 4) ) Keyword - Function MyFunction(value) End Function
-									 */
-									if (
-										prevToken.type === 'Keyword' ||
-										prevToken.type === 'Identifier' ||
-										prevToken.type === 'Literal' ||
-										prevToken.text === ')'
-									) {
-										output += ' '
-									}
-									break
-								case 'Identifier':
-									/**
-									 * Add spaces for the following:
-									 * 1) Keyword Identifier - Sub BallRelease()
-									 * 2) Identifier Identifier - PlaySound SoundFX("fx_flipperup", ...
-									 * 3) ) Identifier - Sub BallRelease_Hit() BallRelease.CreateBall
-									 * 4) Literal Identifier - For j=1 To 20 step x
-									 */
-									if (
-										prevToken.type === 'Keyword' ||
-										prevToken.type === 'Identifier' ||
-										prevToken.type === 'Literal' ||
-										prevToken.text === ')'
-									) {
-										output += ' '
-									}
-									break
-								case 'Literal':
-									/**
-									 * Add spaces for the following:
-									 * 1) Keyword Literal - For j=1 To 20
-									 * 2) Identifier Literal - BallRelease 5, -2
-									 */
-									if (prevToken.type === 'Keyword' || prevToken.type === 'Identifier') {
-										output += ' '
-									}
-									break
-								default:
-									switch (token.text) {
-										case '(':
-										case '-':
-											/**
-											 * Add spaces for the following:
-											 * 1) Keyword '(' - For ii=(oldSize*2)+1 To(newSize*2):mSlot(ii)=0:Next
-											 * 2) Keyword '-' - For ii=UBound(mSlot) To 0 Step -1:str=str&mSlot(ii):Next
-											 */
-											if (prevToken.type === 'Keyword') {
-												output += ' '
-											}
-											break
-										case '.':
-											/**
-											 * Add space for the following:
-											 * 1) <Space>. - case keyReset .Stop
-											 * Do not add a space for the following:
-											 * 1) :<Space>. - Case keyDown swCopy=swDown: .Switch(swCopy)=False
-											 * 2) =<Space>. - If .Exists(aBall) Then .Item(aBall)=.Item(aBall)+1
-											 * 3) +<Space>. - dips(0)=.Dip(0)+.Dip(1)*256+ .Dip(2)*65536+(.Dip(3) And &H7f)*&H1000000
-											 */
-											if (separator && prevToken.type !== 'Operator' && prevToken.text !== ':') {
-												output += ' '
-											}
-											break
-									}
-									break
-							}
-						}
-						output += token.text
-						hasLine = true
-						prevToken = token
-						separator = false
-						break
-					}
-				}
-			},
-		})
-		logger().debug('[Grammar.format] Standardized in %sms', Date.now() - now)
-		return output
-	}
-
 	public transpile(script: string): Program {
 		const stmts: Statement[] = []
 
 		const formattedScript = this.format(script)
+
+		// An empty (or comment-only) script is a valid no-op in VBScript.
+		if (!formattedScript.trim()) {
+			return program(stmts)
+		}
 
 		let now = Date.now()
 
@@ -708,6 +656,8 @@ export class Grammar {
 	}
 
 	public vbsToJs(script: string): string {
-		return generate(this.transpile(script))
+		const ast = this.transpile(script)
+		renameReservedWords(ast)
+		return generate(ast)
 	}
 }

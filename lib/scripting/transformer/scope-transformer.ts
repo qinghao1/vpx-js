@@ -59,19 +59,10 @@ export class ScopeTransformer extends Transformer {
 		replace(this.ast, {
 			enter: (node, parent: any) => {
 				if (node.type !== 'Identifier' || node.name === 'undefined') return node
-				if (
-					[
-						Transformer.STDLIB_NAME,
-						Transformer.SCOPE_NAME,
-						Transformer.ENUMS_NAME,
-						Transformer.GLOBAL_NAME,
-						Transformer.ITEMS_NAME,
-						Transformer.PLAYER_NAME,
-						Transformer.VBSHELPER_NAME,
-					].includes(node.name)
-				)
-					return node
+				if (Transformer.isReservedName(node.name)) return node
 				if (parent?.type === 'MemberExpression' && parent.property === node) return node
+				if ((parent?.type === 'LabeledStatement' || parent?.type === 'BreakStatement') && parent.label === node)
+					return node
 				if (this.getTopParentNode(parent)?.type === 'ThisExpression') return node
 
 				const varScope = this.findScope(this.getVarName(node, parent), (node as any).__scope)
@@ -81,15 +72,15 @@ export class ScopeTransformer extends Transformer {
 					return node
 				}
 				if (!this.isKnown(node, parent) && (!varScope || varScope === this.rootScope)) {
+					// Binding positions declare a name and must keep it bare; every other
+					// position reads a name. A declarator id declares, but its init reads
+					// (`let __vbsSelect = brpos` must scope the `brpos` read).
 					if (
 						parent &&
-						[
-							'FunctionDeclaration',
-							'FunctionExpression',
-							'ClassDeclaration',
-							'MethodDefinition',
-							'VariableDeclarator',
-						].includes(parent.type)
+						(['FunctionDeclaration', 'FunctionExpression', 'ClassDeclaration', 'MethodDefinition'].includes(
+							parent.type,
+						) ||
+							(parent.type === 'VariableDeclarator' && parent.id === node))
 					)
 						return node
 					return memberExpression(identifier(Transformer.SCOPE_NAME, node), node, false, node)

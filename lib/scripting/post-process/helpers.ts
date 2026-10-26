@@ -1,10 +1,9 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import type { CallExpression, Expression, Statement } from 'estree'
-import { blockStatement, callExpression, identifier, memberExpression, thisExpression } from '../estree.js'
+import type { BlockStatement, Expression, Statement } from 'estree'
+import { blockStatement, identifier, thisExpression } from '../estree.js'
 import type { ESIToken } from '../grammar/grammar.js'
-import { Transformer } from '../transformer/transformer.js'
 
 /** Generic post-processors for shared grammar nodes. */
 export function ppHelpers(node: ESIToken): unknown {
@@ -30,15 +29,38 @@ export function ppHelpers(node: ESIToken): unknown {
 }
 
 function ppStatements(node: ESIToken): Statement[] {
+	return flattenChildren(node)
+}
+
+function ppBlock(node: ESIToken): Statement {
+	return blockStatement(flattenChildren(node))
+}
+
+function flattenChildren(node: ESIToken): Statement[] {
 	const stmts: Statement[] = []
 	for (const child of node.children) stmts.push(...(Array.isArray(child.estree) ? child.estree : [child.estree]))
 	return stmts
 }
 
-function ppBlock(node: ESIToken): Statement {
-	const stmts: Statement[] = []
-	for (const child of node.children) stmts.push(...(Array.isArray(child.estree) ? child.estree : [child.estree]))
-	return blockStatement(stmts)
+/** ESTrees of all direct children of a given grammar type. */
+export function collectChildren<T = unknown>(node: ESIToken, type: string): T[] {
+	const out: T[] = []
+	for (const child of node.children) if (child.type === type) out.push(child.estree)
+	return out
+}
+
+/** Last `Block` child's ESTree, if any. */
+export function findChildBlock(node: ESIToken): BlockStatement | undefined {
+	let block: BlockStatement | undefined
+	for (const child of node.children) if (child.type === 'Block') block = child.estree
+	return block
+}
+
+/** Last `StatementsInline` child wrapped as a block, if any. */
+export function findInlineBlock(node: ESIToken): BlockStatement | undefined {
+	let inline: ESIToken | undefined
+	for (const child of node.children) if (child.type === 'StatementsInline') inline = child
+	return inline ? blockStatement(inline.estree) : undefined
 }
 
 function ppIdentifier(node: ESIToken): Expression {
@@ -77,15 +99,5 @@ function ppArraySizeInitializationModifier(node: ESIToken): unknown {
 }
 
 function ppBoundList(node: ESIToken): Expression[] {
-	const exprs: Expression[] = []
-	for (const expr of node.children) if (expr.type === 'Bound') exprs.push(expr.estree)
-	return exprs
-}
-
-/** Wraps a callee with `__vbs.getOrCall`. */
-export function getOrCall(callee: Expression, arg?: Expression): CallExpression {
-	return callExpression(
-		memberExpression(identifier(Transformer.VBSHELPER_NAME), identifier('getOrCall')),
-		arg ? [callee, arg] : [callee],
-	)
+	return collectChildren<Expression>(node, 'Bound')
 }

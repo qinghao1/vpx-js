@@ -12,6 +12,7 @@ import {
 } from '../estree.js'
 import type { ESIToken } from '../grammar/grammar.js'
 import { Transformer } from '../transformer/transformer.js'
+import { collectChildren } from './helpers.js'
 
 /** ppVarDecl. */
 export function ppVarDecl(node: ESIToken): unknown {
@@ -33,13 +34,7 @@ function ppVariableMemberDeclaration(node: ESIToken): unknown {
 }
 
 function ppVariableIdentifiers(node: ESIToken): unknown {
-	const estree = []
-	for (const child of node.children) {
-		if (child.type === 'VariableIdentifier') {
-			estree.push(child.estree)
-		}
-	}
-	return estree
+	return collectChildren(node, 'VariableIdentifier')
 }
 
 function ppVariableIdentifier(node: ESIToken): unknown {

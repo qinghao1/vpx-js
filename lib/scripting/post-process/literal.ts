@@ -3,6 +3,7 @@
 
 import { identifier, literal, newExpression } from '../estree.js'
 import type { ESIToken } from '../grammar/grammar.js'
+import { DATE_LITERAL_PLACEHOLDER } from '../transformer/date-literal-transformer.js'
 
 /** ppLiteral. */
 export function ppLiteral(node: ESIToken): unknown {
@@ -65,7 +66,8 @@ function ppStringLiteral(node: ESIToken): unknown {
 
 function ppDateLiteral(node: ESIToken): unknown {
 	const value = node.text.slice(1, -1)
-	return newExpression(identifier('Date'), [literal(value)])
+	// Placeholder: rewritten to `Date` by DateLiteralTransformer after scope-wrapping.
+	return newExpression(identifier(DATE_LITERAL_PLACEHOLDER), [literal(value)])
 }
 
 function ppNothingLiteral(_node: ESIToken): unknown {

@@ -30,7 +30,15 @@ describe('The VBScript transpiler - Branch', () => {
 		const vbs = `For j = 1 To 20 Step x\nIf j = 10 Then Exit For\nNext`
 		const js = grammar.vbsToJs(vbs)
 		expect(js).to.equal(
-			`for (j = 1; x < 0 ? j >= 20 : j <= 20; j += x) {\n    if (${Transformer.VBSHELPER_NAME}.equals(j, 10)) {\n        break;\n    }\n}`,
+			`__exitFor:\n    for (j = 1; x < 0 ? j >= 20 : j <= 20; j += x) {\n        if (${Transformer.VBSHELPER_NAME}.equals(j, 10)) {\n            break __exitFor;\n        }\n    }`,
+		)
+	})
+
+	it('should transpile an Exit Do', () => {
+		const vbs = `Do\nIf x = 1 Then Exit Do\nLoop`
+		const js = grammar.vbsToJs(vbs)
+		expect(js).to.equal(
+			`__exitDo:\n    do {\n        if (${Transformer.VBSHELPER_NAME}.equals(x, 1)) {\n            break __exitDo;\n        }\n    } while (true);`,
 		)
 	})
 })

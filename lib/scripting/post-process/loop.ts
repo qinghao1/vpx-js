@@ -1,7 +1,7 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import type { BlockStatement, Expression, Identifier } from 'estree'
+import type { BlockStatement, Expression, Identifier, LabeledStatement, Statement } from 'estree'
 import {
 	assignmentExpression,
 	binaryExpression,
@@ -20,6 +20,67 @@ import {
 } from '../estree.js'
 import type { ESIToken } from '../grammar/grammar.js'
 import { Transformer } from '../transformer/transformer.js'
+import { findChildBlock, findInlineBlock } from './helpers.js'
+
+/** Statement labels binding `Exit Do` / `Exit For` to the nearest same-kind loop. */
+export const EXIT_DO_LABEL = '__exitDo'
+export const EXIT_FOR_LABEL = '__exitFor'
+
+const DO_LOOP_TYPES = ['WhileStatement', 'DoTopLoopStatement', 'DoBottomLoopStatement']
+const FOR_LOOP_TYPES = ['ForStatement', 'ForStatementInline', 'ForEachStatement', 'ForEachStatementInline']
+
+/** Label for a `Do` loop token: same-kind nesting depth keeps nested labels unique (duplicates are a SyntaxError). */
+export function doLabelForLoop(node: ESIToken): string {
+	return exitLabel(EXIT_DO_LABEL, loopDepth(node, DO_LOOP_TYPES))
+}
+
+/** Label for a `For` loop token: same-kind nesting depth keeps nested labels unique (duplicates are a SyntaxError). */
+export function forLabelForLoop(node: ESIToken): string {
+	return exitLabel(EXIT_FOR_LABEL, loopDepth(node, FOR_LOOP_TYPES))
+}
+
+/**
+ * Label for an `Exit Do` token: the label of the nearest enclosing `Do` loop,
+ * so the break binds that loop and not an inner `For` loop. Without an
+ * enclosing loop (invalid VBS) falls back to the depth-0 label.
+ */
+export function doLabelForExit(node: ESIToken): string {
+	return exitLabelForExit(node, EXIT_DO_LABEL, DO_LOOP_TYPES)
+}
+
+/**
+ * Label for an `Exit For` token: the label of the nearest enclosing `For`
+ * loop, so the break binds that loop and not an inner `Do` loop. Without an
+ * enclosing loop (invalid VBS) falls back to the depth-0 label.
+ */
+export function forLabelForExit(node: ESIToken): string {
+	return exitLabelForExit(node, EXIT_FOR_LABEL, FOR_LOOP_TYPES)
+}
+
+function exitLabelForExit(node: ESIToken, baseLabel: string, loopTypes: string[]): string {
+	let current: ESIToken | undefined = node.parent
+	while (current) {
+		if (loopTypes.includes(current.type)) {
+			return exitLabel(baseLabel, loopDepth(current, loopTypes))
+		}
+		current = current.parent
+	}
+	return baseLabel
+}
+
+function exitLabel(baseLabel: string, depth: number): string {
+	return depth === 0 ? baseLabel : `${baseLabel}${depth}`
+}
+
+function loopDepth(node: ESIToken, loopTypes: string[]): number {
+	let depth = 0
+	let current: ESIToken | undefined = node.parent
+	while (current) {
+		if (loopTypes.includes(current.type)) depth++
+		current = current.parent
+	}
+	return depth
+}
 
 /** ppLoop. */
 export function ppLoop(node: ESIToken): unknown {
@@ -43,30 +104,22 @@ export function ppLoop(node: ESIToken): unknown {
 function ppWhileStatement(node: ESIToken): unknown {
 	const expr = node.children[0].estree
 	const block = node.children[2].type === 'Block' ? node.children[2].estree : null
-	return whileStatement(expr, block ? block : blockStatement([]))
+	return labeledLoop(doLabelForLoop(node), whileStatement(expr, block ? block : blockStatement([])))
 }
 
 function ppDoTopLoopStatement(node: ESIToken): unknown {
-	let block: BlockStatement | undefined
-	for (const child of node.children) {
-		if (child.type === 'Block') {
-			block = child.estree
-		}
-	}
-	if (!block) {
-		block = blockStatement([])
-	}
+	const block = findChildBlock(node) ?? blockStatement([])
 	if (node.children[0].type === 'WhileOrUntil') {
 		if (node.children[0].text === 'While') {
 			const expr = node.children[1].estree
-			return whileStatement(expr, block)
+			return labeledLoop(doLabelForLoop(node), whileStatement(expr, block))
 		} else {
 			const expr = node.children[1].estree
 			block.body.unshift(ifStatement(expr, breakStatement(), null))
-			return doWhileStatement(block, literal(true))
+			return labeledLoop(doLabelForLoop(node), doWhileStatement(block, literal(true)))
 		}
 	} else {
-		return doWhileStatement(block, literal(true))
+		return labeledLoop(doLabelForLoop(node), doWhileStatement(block, literal(true)))
 	}
 }
 
@@ -82,14 +135,18 @@ function ppDoBottomLoopStatement(node: ESIToken): unknown {
 		expr = node.children[2].estree
 	}
 	if (whileOrUntil === 'While') {
-		return doWhileStatement(block ? block : blockStatement([]), expr)
+		return labeledLoop(doLabelForLoop(node), doWhileStatement(block ? block : blockStatement([]), expr))
 	} else {
 		if (block === null) {
 			block = blockStatement([])
 		}
 		block.body.push(ifStatement(expr, breakStatement(), null))
-		return doWhileStatement(block, literal(true))
+		return labeledLoop(doLabelForLoop(node), doWhileStatement(block, literal(true)))
 	}
+}
+
+function labeledLoop(label: string, loop: Statement): LabeledStatement {
+	return { type: 'LabeledStatement', label: identifier(label), body: loop }
 }
 
 function ppForStatement(node: ESIToken): unknown {
@@ -100,28 +157,21 @@ function ppForStatement(node: ESIToken): unknown {
 	if (node.children[4].type === 'ForStep') {
 		step = node.children[5].estree
 	}
-	let block: BlockStatement | undefined
-	for (const child of node.children) {
-		switch (child.type) {
-			case 'Block':
-				block = child.estree
-				break
-			case 'StatementsInline':
-				block = blockStatement(child.estree)
-				break
-		}
-	}
-	return forStatement(
-		assignmentExpression(id, '=', expr),
-		step
-			? conditionalExpression(
-					binaryExpression('<', step, literal(0)),
-					binaryExpression('>=', id, expr2),
-					binaryExpression('<=', id, expr2),
-				)
-			: binaryExpression('<=', id, expr2),
-		assignmentExpression(id, '+=', step ? step : literal(1)),
-		block ? block : blockStatement([]),
+	const block = findChildBlock(node) ?? findInlineBlock(node)
+	return labeledLoop(
+		forLabelForLoop(node),
+		forStatement(
+			assignmentExpression(id, '=', expr),
+			step
+				? conditionalExpression(
+						binaryExpression('<', step, literal(0)),
+						binaryExpression('>=', id, expr2),
+						binaryExpression('<=', id, expr2),
+					)
+				: binaryExpression('<=', id, expr2),
+			assignmentExpression(id, '+=', step ? step : literal(1)),
+			block ? block : blockStatement([]),
+		),
 	)
 }
 
@@ -149,5 +199,5 @@ function ppForEachStatement(node: ESIToken): unknown {
 		memberExpression(identifier(Transformer.VBSHELPER_NAME), identifier('toIterable')),
 		[expr],
 	)
-	return forOfStatement(id, safeExpr, block ? block : blockStatement([]))
+	return labeledLoop(forLabelForLoop(node), forOfStatement(id, safeExpr, block ? block : blockStatement([])))
 }

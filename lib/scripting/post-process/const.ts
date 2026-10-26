@@ -3,6 +3,7 @@
 
 import { variableDeclaration, variableDeclarator } from '../estree.js'
 import type { ESIToken } from '../grammar/grammar.js'
+import { collectChildren } from './helpers.js'
 
 /** ppConst. */
 export function ppConst(node: ESIToken): unknown {
@@ -25,13 +26,7 @@ function ppConstantMemberDeclaration(node: ESIToken): unknown {
 }
 
 function ppConstantDeclarators(node: ESIToken): unknown {
-	const estree = []
-	for (const child of node.children) {
-		if (child.type === 'ConstantDeclarator') {
-			estree.push(child.estree)
-		}
-	}
-	return estree
+	return collectChildren(node, 'ConstantDeclarator')
 }
 
 function ppConstantDeclarator(node: ESIToken): unknown {

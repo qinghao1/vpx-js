@@ -4,15 +4,24 @@
 import * as chai from 'chai'
 import { expect } from 'chai'
 import sinonChai from 'sinon-chai'
+import { TableBuilder } from '../../../test/table-builder.js'
+import { Player } from '../../game/player.js'
 import { getTextFile } from '../../scripting/vbs-scripts.node.js'
+import type { Table } from '../../vpt/table/table.js'
+import { Transformer } from '../transformer/transformer.js'
+import { Transpiler } from '../transpiler.js'
 import { Grammar } from './grammar.js'
 
 chai.use((sinonChai as any).default ?? sinonChai)
 
 let grammar: Grammar
+let table: Table
+let player: Player
 
 before(async () => {
 	grammar = new Grammar()
+	table = new TableBuilder().addFlipper('Flipper').build()
+	player = new Player(table)
 })
 
 describe('The scripting grammar - format', () => {
@@ -48,9 +57,10 @@ describe('The scripting grammar - format', () => {
 })
 
 describe('The scripting grammar - transpile', () => {
-	it('should throw an exception for an empty script', () => {
-		const vbs = ``
-		expect(() => grammar.transpile(vbs)).to.throw(Error)
+	it('should transpile an empty script to an empty program', () => {
+		for (const vbs of [``, `   \n`, `' just a comment\n`, `Rem just a comment\n`]) {
+			expect(grammar.transpile(vbs).body, JSON.stringify(vbs)).to.deep.equal([])
+		}
 	})
 
 	it('should throw an exception for invalid syntax', () => {
@@ -63,20 +73,10 @@ describe('The scripting grammar - transpile', () => {
 		const js = grammar.vbsToJs(vbs)
 		expect(js).to.equal(`SLLPos = 0;\nthis.TimerEnabled = 1;`)
 	})
-
-	// it('should transpile controller.vbs successfully', () => {
-	// 	const vbs = getTextFile('controller.vbs');
-	// 	expect(() => grammar.transpile(vbs)).not.to.throw(Error);
-	// });
-	//
-	// it('should transpile core.vbs successfully', () => {
-	// 	const vbs = getTextFile('core.vbs');
-	// 	expect(() => grammar.transpile(vbs)).not.to.throw(Error);
-	// });
 })
 
-describe('The scripting grammar - fastFormat parity', () => {
-	it('should match legacyFormat for bundled scripts', () => {
+describe('The scripting grammar - real-world scripts', () => {
+	it('should transpile bundled scripts', () => {
 		const names = ['controller.vbs', 'core.vbs', 'sam.vbs', 'WPC.vbs', 'VPMKeys.vbs']
 		for (const n of names) {
 			let vbs: string
@@ -85,14 +85,11 @@ describe('The scripting grammar - fastFormat parity', () => {
 			} catch {
 				continue
 			}
-			const fast = (grammar as any).fastFormat.call(grammar, vbs)
-			const leg = (grammar as any).legacyFormat.call(grammar, vbs)
-			expect(fast).to.equal(leg, n)
 			expect(() => grammar.transpile(vbs)).not.to.throw(Error, n)
 		}
 	})
 
-	it('should match legacyFormat for walking_dead when available', { timeout: 30000 }, async () => {
+	it('should transpile walking_dead when available', { timeout: 30000 }, async () => {
 		const fs = await import('node:fs')
 		const path = '/home/qinghao1/Downloads/walking_dead.vpx'
 		if (!fs.existsSync(path)) return
@@ -103,27 +100,121 @@ describe('The scripting grammar - fastFormat parity', () => {
 		const table = await Table.load(new NodeBinaryReader(path), { skipTextures: true } as any)
 		const vbs = (table as any).tableScript as string
 		expect(vbs.length).to.be.greaterThan(10000)
-		const fast = (grammar as any).fastFormat.call(grammar, vbs)
-		const leg = (grammar as any).legacyFormat.call(grammar, vbs)
-		expect(fast).to.equal(leg)
 		const player = new Player(table)
 		const transpiler = new Transpiler(table, player)
-		let jsFast: string
+		let js: string
 		expect(() => {
-			jsFast = transpiler.transpile(vbs)
+			js = transpiler.transpile(vbs)
 		}).not.to.throw()
-		expect(jsFast!.length).to.be.greaterThan(10000)
-		const orig = Grammar.prototype.format
-		const legacy = (grammar as any).legacyFormat.bind(grammar)
-		;(Grammar.prototype as any).format = (s: string) => legacy(s)
-		let jsLeg: string
-		try {
-			jsLeg = new Transpiler(table, player).transpile(vbs)
-		} finally {
-			;(Grammar.prototype as any).format = orig
-		}
-		expect(jsFast!).to.equal(jsLeg!)
+		expect(js!.length).to.be.greaterThan(10000)
 		const prog = grammar.transpile('Dim x\n')
 		expect(prog.body.length).to.equal(1)
+	})
+})
+
+describe('The scripting grammar - block Else If (two words)', () => {
+	it('should transpile a block "If/Then...Else If/Then...End If" statement', () => {
+		const vbs = `If x = 1 Then\ny = 1\nElse If x = 2 Then\ny = 2\nEnd If`
+		const js = grammar.vbsToJs(vbs)
+		expect(js).to.equal(
+			`if (${Transformer.VBSHELPER_NAME}.equals(x, 1)) {\n    y = 1;\n} else if (${Transformer.VBSHELPER_NAME}.equals(x, 2)) {\n    y = 2;\n}`,
+		)
+	})
+
+	it('should transpile two-word "Else If" with mixed case and extra spaces', () => {
+		const vbs = `If x = 1 Then\ny = 1\nelse  If x = 2 Then\ny = 2\nElse\ny = 3\nEnd If`
+		const js = grammar.vbsToJs(vbs)
+		expect(js).to.equal(
+			`if (${Transformer.VBSHELPER_NAME}.equals(x, 1)) {\n    y = 1;\n} else if (${Transformer.VBSHELPER_NAME}.equals(x, 2)) {\n    y = 2;\n} else {\n    y = 3;\n}`,
+		)
+	})
+
+	it('should transpile chained two-word "Else If" with inline statements', () => {
+		const vbs = `If x = 1 Then\ny = 1\nElse If x = 2 Then y = 2\nElse If x = 3 Then\ny = 3\nEnd If`
+		const js = grammar.vbsToJs(vbs)
+		expect(js).to.equal(
+			`if (${Transformer.VBSHELPER_NAME}.equals(x, 1)) {\n    y = 1;\n} else if (${Transformer.VBSHELPER_NAME}.equals(x, 2)) {\n    y = 2;\n} else if (${Transformer.VBSHELPER_NAME}.equals(x, 3)) {\n    y = 3;\n}`,
+		)
+	})
+
+	it('should execute the matching two-word "Else If" branch', () => {
+		const scope = {} as any
+		const vbs = `x = 2\nIf x = 1 Then\ny = 1\nElse If x = 2 Then\ny = 2\nElse\ny = 3\nEnd If`
+		new Transpiler(table, player).execute(vbs, scope, 'global')
+		expect(scope.y).to.equal(2)
+	})
+
+	it('should execute "Else" when no two-word "Else If" matches', () => {
+		const scope = {} as any
+		const vbs = `x = 9\nIf x = 1 Then\ny = 1\nElse If x = 2 Then\ny = 2\nElse\ny = 3\nEnd If`
+		new Transpiler(table, player).execute(vbs, scope, 'global')
+		expect(scope.y).to.equal(3)
+	})
+})
+
+describe('The scripting grammar - Call with parenthesized arguments', () => {
+	it('should transpile "Call" with parenthesized args', () => {
+		expect(grammar.vbsToJs(`Call Foo(1, 2)`)).to.equal('Foo(1, 2);')
+	})
+
+	it('should transpile member "Call" with parenthesized args', () => {
+		expect(grammar.vbsToJs(`Call obj.Method(1, 2)`)).to.equal('obj.Method(1, 2);')
+	})
+
+	it('should transpile "Call" with nested and string args', () => {
+		expect(grammar.vbsToJs(`Call Foo(Bar(1), "a(b")`)).to.equal(`Foo(Bar(1), 'a(b');`)
+	})
+
+	it('should leave single-arg parenthesized "Call" untouched', () => {
+		expect(grammar.vbsToJs(`Call Foo(Bar)`)).to.equal('Foo(Bar);')
+	})
+
+	it('should keep rejecting parenthesized args without "Call"', () => {
+		expect(() => grammar.transpile(`Foo(1, 2)`)).to.throw(Error)
+	})
+
+	it('should execute "Call" with parenthesized args', () => {
+		const scope = {} as any
+		const vbs = `Sub Foo(a, b)\nSum = a + b\nEnd Sub\nCall Foo(20, 22)`
+		new Transpiler(table, player).execute(vbs, scope, 'global')
+		expect(scope.Sum).to.equal(42)
+	})
+
+	it('should execute member "Call" with parenthesized args', () => {
+		const scope = {
+			total: 0,
+			calc: {
+				add: (a: number, b: number) => {
+					scope.total = a + b
+				},
+			},
+		} as any
+		new Transpiler(table, player).execute(`Call calc.add(20, 22)`, scope, 'global')
+		expect(scope.total).to.equal(42)
+	})
+})
+
+describe('The scripting grammar - colon Rem comments', () => {
+	it('should strip a ": Rem" comment', () => {
+		expect(grammar.format(`x = 1 : Rem fix the lights`)).to.equal(`x=1\n`)
+	})
+
+	it('should strip ":Rem" without spaces', () => {
+		expect(grammar.format(`x = 1:Rem fix`)).to.equal(`x=1\n`)
+	})
+
+	it('should not treat identifiers containing "rem" as comments', () => {
+		expect(grammar.format(`x = 1 : remedy = 2`)).to.equal(`x=1:remedy=2\n`)
+	})
+
+	it('should transpile a statement followed by ": Rem" without emitting a call', () => {
+		expect(grammar.vbsToJs(`x = 1 : Rem fix`)).to.equal(`x = 1;`)
+		expect(grammar.vbsToJs(`x = 1 : REM fix the lights`)).to.equal(`x = 1;`)
+	})
+
+	it('should execute the statement before ": Rem"', () => {
+		const scope = {} as any
+		new Transpiler(table, player).execute(`Answer = 40 + 2 : Rem the answer`, scope, 'global')
+		expect(scope.Answer).to.equal(42)
 	})
 })

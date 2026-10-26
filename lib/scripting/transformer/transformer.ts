@@ -21,6 +21,19 @@ export class Transformer {
 	public static VBSHELPER_NAME = '__vbs'
 	public static PLAYER_NAME = '__player'
 
+	/** Whether a name is one of the injected namespace objects (`__scope`, `__items`, ...). */
+	public static isReservedName(name: string): boolean {
+		return (
+			name === Transformer.SCOPE_NAME ||
+			name === Transformer.ITEMS_NAME ||
+			name === Transformer.ENUMS_NAME ||
+			name === Transformer.GLOBAL_NAME ||
+			name === Transformer.STDLIB_NAME ||
+			name === Transformer.VBSHELPER_NAME ||
+			name === Transformer.PLAYER_NAME
+		)
+	}
+
 	protected readonly ast: Program
 
 	private readonly scopeManager: any
@@ -59,15 +72,7 @@ export class Transformer {
 		if (parent.type !== 'MemberExpression') {
 			return false
 		}
-		return [
-			Transformer.SCOPE_NAME,
-			Transformer.ITEMS_NAME,
-			Transformer.ENUMS_NAME,
-			Transformer.GLOBAL_NAME,
-			Transformer.STDLIB_NAME,
-			Transformer.VBSHELPER_NAME,
-			Transformer.PLAYER_NAME,
-		].includes(this.getTopMemberName(parent as MemberExpression))
+		return Transformer.isReservedName(this.getTopMemberName(parent as MemberExpression))
 	}
 
 	protected isLocalVariable(node: any): boolean {
@@ -150,30 +155,22 @@ export class Transformer {
 	}
 
 	protected getTopMemberName(node: any): string {
-		const obj = node.object as any
+		const obj = (node?.type === 'MemberExpression' ? node.object : node) as any
+		if (!obj) {
+			return ''
+		}
 		if (obj.type === 'MemberExpression') {
 			return this.getTopMemberName(obj)
 		}
 		if (obj.type === 'Identifier') {
 			return obj.name
 		}
-		if (obj.type === 'CallExpression') {
-			if (obj.callee.type === 'MemberExpression') {
-				return this.getTopMemberName(obj.callee)
-			}
-			if (obj.callee.type === 'Identifier') {
-				return obj.callee.name
-			}
-			if (obj.callee.type === 'CallExpression') {
-				return this.getTopMemberName(obj.callee.callee)
-			}
-			throw new Error(
-				`Unknown callee type "${obj.callee.type}" when looking for top member name: ${JSON.stringify(obj, null, 2)}`,
-			)
+		if (obj.type === 'CallExpression' || obj.type === 'NewExpression') {
+			return this.getTopMemberName(obj.callee)
 		}
 		if (obj.type === 'ThisExpression') {
 			return 'this'
 		}
-		throw new Error(`Unknown node "${obj.type}" when looking for top member name.`)
+		return ''
 	}
 }

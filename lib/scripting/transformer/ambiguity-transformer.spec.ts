@@ -120,7 +120,15 @@ describe('The scripting ambiguity transformer', () => {
 			const vbs = `For each xx in GI:xx.State = 1: Next\n`
 			const js = transpiler.transpile(vbs)
 			expect(js).to.equal(
-				`for (${Transformer.SCOPE_NAME}.xx of ${Transformer.VBSHELPER_NAME}.toIterable(${Transformer.VBSHELPER_NAME}.getOrCallBound(${Transformer.SCOPE_NAME}, 'GI'))) {\n    ${Transformer.VBSHELPER_NAME}.getOrCallBound(${Transformer.SCOPE_NAME}, 'xx').State = 1;\n}`,
+				`__exitFor:\n    for (${Transformer.SCOPE_NAME}.xx of ${Transformer.VBSHELPER_NAME}.toIterable(${Transformer.VBSHELPER_NAME}.getOrCallBound(${Transformer.SCOPE_NAME}, 'GI'))) {\n        ${Transformer.VBSHELPER_NAME}.getOrCallBound(${Transformer.SCOPE_NAME}, 'xx').State = 1;\n    }`,
+			)
+		})
+
+		it('should not throw on deeply nested calls with a member', () => {
+			const vbs = `x = f(1)(2)(3).g(4)\n`
+			const js = transpiler.transpile(vbs)
+			expect(js).to.equal(
+				`${Transformer.SCOPE_NAME}.x = ${Transformer.VBSHELPER_NAME}.getOrCallBound(${Transformer.VBSHELPER_NAME}.getOrCall(${Transformer.VBSHELPER_NAME}.getOrCall(${Transformer.VBSHELPER_NAME}.getOrCallBound(${Transformer.SCOPE_NAME}, 'f', 1), 2), 3), 'g', 4);`,
 			)
 		})
 

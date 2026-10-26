@@ -13,6 +13,7 @@ import {
 } from '../estree.js'
 import type { ESIToken } from '../grammar/grammar.js'
 import { Transformer } from '../transformer/transformer.js'
+import { collectChildren } from './helpers.js'
 
 /** ppArray. */
 export function ppArray(node: ESIToken): unknown {
@@ -36,8 +37,9 @@ export function ppArray(node: ESIToken): unknown {
 function ppRedimStatement(node: ESIToken): unknown {
 	const stmts: Statement[] = []
 	const exprs: AssignmentExpression[] = node.children[0].estree
+	const preserve = node.text.startsWith('ReDim Preserve ')
 	for (const expr of exprs) {
-		if (node.text.startsWith('ReDim Preserve ')) {
+		if (preserve) {
 			;(expr.right as CallExpression).arguments.push(literal(true))
 		}
 		stmts.push(expressionStatement(expr))
@@ -46,13 +48,7 @@ function ppRedimStatement(node: ESIToken): unknown {
 }
 
 function ppRedimClauses(node: ESIToken): unknown {
-	const estree = []
-	for (const child of node.children) {
-		if (child.type === 'RedimClause') {
-			estree.push(child.estree)
-		}
-	}
-	return estree
+	return collectChildren(node, 'RedimClause')
 }
 
 function ppRedimClause(node: ESIToken): unknown {
@@ -69,12 +65,7 @@ function ppRedimClause(node: ESIToken): unknown {
 }
 
 function ppEraseStatement(node: ESIToken): unknown {
-	const estree = []
-	const exprs = node.children[0].estree as Expression[]
-	for (const expr of exprs) {
-		estree.push(expressionStatement(expr))
-	}
-	return estree
+	return (node.children[0].estree as Expression[]).map(expr => expressionStatement(expr))
 }
 
 function ppEraseExpressions(node: ESIToken): unknown {

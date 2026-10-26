@@ -41,25 +41,25 @@ describe('The VBScript transpiler - Call', () => {
 		expect(js).to.equal('BallRelease.CreateBall();')
 	})
 
-	it('should transpile an object.property subcall statement with params', () => {
+	it('should transpile an object.property subcall statement with plain params', () => {
 		const vbs = `BallRelease.KickBall 0, -2`
 		const js = grammar.vbsToJs(vbs)
 		expect(js).to.equal('BallRelease.KickBall(0, -2);')
 	})
 
-	it('should transpile an object.property subcall statement with params', () => {
+	it('should transpile an object.property subcall statement with parenthesized first param', () => {
 		const vbs = `BallRelease.KickBall (0), -2`
 		const js = grammar.vbsToJs(vbs)
 		expect(js).to.equal('BallRelease.KickBall(0, -2);')
 	})
 
-	it('should transpile an object.property subcall statement with params', () => {
+	it('should transpile an object.property subcall statement with parenthesized second param', () => {
 		const vbs = `BallRelease.KickBall 0, (-2)`
 		const js = grammar.vbsToJs(vbs)
 		expect(js).to.equal('BallRelease.KickBall(0, -2);')
 	})
 
-	it('should transpile an object.property subcall statement with params', () => {
+	it('should transpile an object.property subcall statement with parenthesized params', () => {
 		const vbs = `BallRelease.KickBall (0), (-2)`
 		const js = grammar.vbsToJs(vbs)
 		expect(js).to.equal('BallRelease.KickBall(0, -2);')

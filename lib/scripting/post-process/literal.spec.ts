@@ -65,11 +65,13 @@ describe('The VBScript transpiler - Literal', () => {
 		expect(js).to.equal('test1 = Empty;')
 	})
 
+	// Date literals keep a placeholder here; DateLiteralTransformer rewrites it
+	// to a real `Date` after scope-wrapping (which would otherwise break it).
 	it('should transpile "Date" assignments', () => {
 		const vbs = `test1 = #11/5/2019#\ntest2 = #11-5-2019#\ntest3 = #11-05-2019#`
 		const js = grammar.vbsToJs(vbs)
 		expect(js).to.equal(
-			"test1 = new Date('11/5/2019');\ntest2 = new Date('11-5-2019');\ntest3 = new Date('11-05-2019');",
+			"test1 = new __vbsDate('11/5/2019');\ntest2 = new __vbsDate('11-5-2019');\ntest3 = new __vbsDate('11-05-2019');",
 		)
 	})
 
@@ -77,13 +79,13 @@ describe('The VBScript transpiler - Literal', () => {
 		const vbs = `test1 = #1:31AM#\ntest2 = #1:31 AM#\ntest3 = #1:32:00PM#\ntest4 = #1:00#\ntest5 = #1 AM#`
 		const js = grammar.vbsToJs(vbs)
 		expect(js).to.equal(
-			"test1 = new Date('1:31AM');\ntest2 = new Date('1:31 AM');\ntest3 = new Date('1:32:00PM');\ntest4 = new Date('1:00');\ntest5 = new Date('1 AM');",
+			"test1 = new __vbsDate('1:31AM');\ntest2 = new __vbsDate('1:31 AM');\ntest3 = new __vbsDate('1:32:00PM');\ntest4 = new __vbsDate('1:00');\ntest5 = new __vbsDate('1 AM');",
 		)
 	})
 
 	it('should transpile "Date" and "Time" assignments', () => {
 		const vbs = `test1 = #11/5/2019 1:31AM#\ntest3 = #11-5-2019 1 PM#`
 		const js = grammar.vbsToJs(vbs)
-		expect(js).to.equal("test1 = new Date('11/5/2019 1:31AM');\ntest3 = new Date('11-5-2019 1 PM');")
+		expect(js).to.equal("test1 = new __vbsDate('11/5/2019 1:31AM');\ntest3 = new __vbsDate('11-5-2019 1 PM');")
 	})
 })

@@ -191,6 +191,57 @@ describe('The scripting reference transformer', () => {
 		})
 	})
 
+	describe('for JS-reserved words', () => {
+		it('should rename an unresolved `switch` variable', () => {
+			const vbs = `Dim switch\nswitch = 1\n`
+			const js = transform(vbs, table, player)
+			expect(js).to.equal(`let aSwitch;\naSwitch = 1;`)
+		})
+
+		it('should rename other unresolved reserved words', () => {
+			const vbs = `Dim var\nvar = 1\nDim this\nthis = 2\nDim typeof\ntypeof = 3\n`
+			const js = transform(vbs, table, player)
+			expect(js).to.equal(`let aVar;\naVar = 1;\nlet aThis;\naThis = 2;\nlet aTypeof;\naTypeof = 3;`)
+		})
+
+		it('should prefer a table element named `Switch` over the rename', () => {
+			const switchTable = new TableBuilder().addFlipper('Switch').build()
+			const vbs = `Switch.Hit\n`
+			const js = transform(vbs, switchTable, player)
+			expect(js).to.equal(`${Transformer.ITEMS_NAME}.Switch.Hit();`)
+		})
+
+		it('should not rename member names', () => {
+			const vbs = `x = foo.switch\n`
+			const js = transform(vbs, table, player)
+			expect(js).to.equal(`x = foo.switch;`)
+		})
+	})
+
+	describe('for CreateObject without a call', () => {
+		it('should not throw on a bare CreateObject reference', () => {
+			const vbs = `x = CreateObject\n`
+			const js = transform(vbs, table, player)
+			expect(js).to.equal(`x = ${Transformer.STDLIB_NAME}.CreateObject;`)
+		})
+
+		it('should not push the player object into an unrelated call', () => {
+			const vbs = `If IsEmpty(CreateObject) Then x = 1 End If\n`
+			const js = transform(vbs, table, player)
+			expect(js).to.equal(
+				`if (${Transformer.STDLIB_NAME}.IsEmpty(${Transformer.STDLIB_NAME}.CreateObject)) {\n    x = 1;\n}`,
+			)
+		})
+
+		it('should still push the player object into a direct call', () => {
+			const vbs = `Set d = CreateObject("Scripting.Dictionary")\n`
+			const js = transform(vbs, table, player)
+			expect(js).to.equal(
+				`d = ${Transformer.STDLIB_NAME}.CreateObject('Scripting.Dictionary', ${Transformer.PLAYER_NAME});`,
+			)
+		})
+	})
+
 	it('should not convert global to local if object does not exist', () => {
 		const vbs = `NoExisto.SomeFunct\n`
 		const js = transform(vbs, table, player)
@@ -234,5 +285,5 @@ function transform(vbs: string, table: Table, player: Player): string {
 		new Stdlib(),
 	)
 	const eventAst = referenceTransformer.transform()
-	return scriptHelper.astToVbs(eventAst)
+	return scriptHelper.astToJs(eventAst)
 }

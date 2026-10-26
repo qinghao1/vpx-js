@@ -28,10 +28,8 @@ function ppSetAssignmentStatement(node: ESIToken): unknown {
 	const expr = node.children[0].estree
 	const rightExpr = node.children[2].estree
 	stmts.push(expressionStatement(assignmentExpression(expr, '=', rightExpr)))
-	if (rightExpr.type === 'NewExpression' && node.children.length > 3) {
-		if (node.children[3].type === 'NothingLiteral') {
-			stmts.push(expressionStatement(assignmentExpression(expr, '=', node.children[3].estree)))
-		}
+	if (rightExpr.type === 'NewExpression' && node.children[3]?.type === 'NothingLiteral') {
+		stmts.push(expressionStatement(assignmentExpression(expr, '=', node.children[3].estree)))
 	}
 	return stmts
 }

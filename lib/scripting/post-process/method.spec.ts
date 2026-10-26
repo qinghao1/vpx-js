@@ -2,8 +2,12 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { expect } from 'chai'
+import { TableBuilder } from '../../../test/table-builder.js'
+import { Player } from '../../game/player.js'
+import type { Table } from '../../vpt/table/table.js'
 import { Grammar } from '../grammar/grammar.js'
 import { Transformer } from '../transformer/transformer.js'
+import { Transpiler } from '../transpiler.js'
 
 let grammar: Grammar
 
@@ -126,5 +130,26 @@ describe('The VBScript transpiler - Method - Function', () => {
 		expect(js).to.equal(
 			'function BallRelease_Hit() {\n    let BallRelease_Hit = undefined;\n    BallRelease_Hit = BallRelease.CreateBall;\n    return BallRelease_Hit;\n}',
 		)
+	})
+})
+
+describe('The VBScript transpiler - Method behavior', () => {
+	let table: Table
+	let player: Player
+
+	before(async () => {
+		table = new TableBuilder().build()
+		player = new Player(table)
+	})
+
+	function execute(vbs: string): any {
+		const scope = {} as any
+		new Transpiler(table, player).execute(vbs, scope, 'global')
+		return scope
+	}
+
+	it('should pass ByRef params without write-back (known divergence)', () => {
+		// Known divergence: ByRef behaves like ByVal; the caller's variable is unchanged.
+		expect(execute('Sub Inc(ByRef v)\nv = v + 1\nEnd Sub\nx = 10\nInc x').x).to.equal(10)
 	})
 })

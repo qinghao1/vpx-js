@@ -28,6 +28,7 @@ import {
 	variableDeclarator,
 } from '../estree.js'
 import type { ESIToken } from '../grammar/grammar.js'
+import { findChildBlock } from './helpers.js'
 
 /** ppClass. */
 export function ppClass(node: ESIToken): unknown {
@@ -41,9 +42,8 @@ export function ppClass(node: ESIToken): unknown {
 		case 'PropertyGetDeclaration':
 			return ppPropertyGetDeclaration(node)
 		case 'PropertyLetDeclaration':
-			return ppPropertyLetDeclaration(node)
 		case 'PropertySetDeclaration':
-			return ppPropertySetDeclaration(node)
+			return ppPropertyLetSetDeclaration(node)
 	}
 	return null
 }
@@ -125,11 +125,11 @@ function ppClassDeclaration(node: ESIToken): unknown {
 		const fn = md.value as unknown as FunctionExpression
 		const locals = new Set<string>()
 		locals.add(key)
-		for (const p of fn.params as Identifier[]) locals.add((p.name as string).toLowerCase())
+		for (const p of fn.params as Identifier[]) locals.add(p.name.toLowerCase())
 		replace(fn.body as unknown as any, {
 			enter: (n: any) => {
 				if (n.type === 'VariableDeclarator' && n.id?.type === 'Identifier') {
-					locals.add((n.id.name as string).toLowerCase())
+					locals.add(n.id.name.toLowerCase())
 				}
 			},
 		})
@@ -171,24 +171,19 @@ function ppClassDeclaration(node: ESIToken): unknown {
 }
 
 function ppConstructorMemberDeclaration(node: ESIToken): unknown {
-	let block: BlockStatement | undefined
-	for (const child of node.children) {
-		if (child.type === 'Block') {
-			block = child.estree
-		}
-	}
-	return methodDefinition(
-		identifier('constructor'),
-		'constructor',
-		functionExpression(block ? block : blockStatement([]), []),
-	)
+	const block = findChildBlock(node) ?? blockStatement([])
+	return methodDefinition(identifier('constructor'), 'constructor', functionExpression(block, []))
 }
 
 function ppRegularPropertyMemberDeclaration(node: ESIToken): unknown {
 	return node.children[1].estree
 }
 
-function ppPropertyGetDeclaration(node: ESIToken): unknown {
+function propertyParts(node: ESIToken): {
+	id: Identifier
+	params: Identifier[]
+	block: BlockStatement | undefined
+} {
 	let id: Identifier = identifier('undefined')
 	let params: Identifier[] = []
 	let block: BlockStatement | undefined
@@ -205,6 +200,12 @@ function ppPropertyGetDeclaration(node: ESIToken): unknown {
 				break
 		}
 	}
+	return { id, params, block }
+}
+
+function ppPropertyGetDeclaration(node: ESIToken): unknown {
+	const { id, params, block: rawBlock } = propertyParts(node)
+	let block = rawBlock
 	if (block) {
 		block = replace(block, {
 			enter: blockNode => {
@@ -225,44 +226,8 @@ function ppPropertyGetDeclaration(node: ESIToken): unknown {
 	return methodDefinition(id, kind as any, functionExpression(block, params))
 }
 
-function ppPropertyLetDeclaration(node: ESIToken): unknown {
-	let id: Identifier = identifier('undefined')
-	let params: Identifier[] = []
-	let block: BlockStatement | undefined
-	for (const child of node.children) {
-		switch (child.type) {
-			case 'Identifier':
-				id = child.estree
-				break
-			case 'ParameterList':
-				params = child.estree
-				break
-			case 'Block':
-				block = child.estree
-				break
-		}
-	}
-	const kind = params.length === 1 ? ('set' as const) : ('method' as const)
-	return methodDefinition(id, kind as any, functionExpression(block ? block : blockStatement([]), params))
-}
-
-function ppPropertySetDeclaration(node: ESIToken): unknown {
-	let id: Identifier = identifier('undefined')
-	let params: Identifier[] = []
-	let block: BlockStatement | undefined
-	for (const child of node.children) {
-		switch (child.type) {
-			case 'Identifier':
-				id = child.estree
-				break
-			case 'ParameterList':
-				params = child.estree
-				break
-			case 'Block':
-				block = child.estree
-				break
-		}
-	}
+function ppPropertyLetSetDeclaration(node: ESIToken): unknown {
+	const { id, params, block } = propertyParts(node)
 	const kind = params.length === 1 ? ('set' as const) : ('method' as const)
 	return methodDefinition(id, kind as any, functionExpression(block ? block : blockStatement([]), params))
 }

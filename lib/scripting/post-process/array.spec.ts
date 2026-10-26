@@ -2,8 +2,12 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { expect } from 'chai'
+import { TableBuilder } from '../../../test/table-builder.js'
+import { Player } from '../../game/player.js'
+import type { Table } from '../../vpt/table/table.js'
 import { Grammar } from '../grammar/grammar.js'
 import { Transformer } from '../transformer/transformer.js'
+import { Transpiler } from '../transpiler.js'
 
 let grammar: Grammar
 
@@ -66,5 +70,27 @@ describe('The VBScript transpiler - Array', () => {
 		expect(js).to.equal(
 			`myarray = ${Transformer.VBSHELPER_NAME}.erase(myarray);\nmyarray2 = ${Transformer.VBSHELPER_NAME}.erase(myarray2);`,
 		)
+	})
+})
+
+describe('The VBScript transpiler - Array behavior', () => {
+	let table: Table
+	let player: Player
+
+	before(async () => {
+		table = new TableBuilder().build()
+		player = new Player(table)
+	})
+
+	function execute(vbs: string): any {
+		const scope = {} as any
+		new Transpiler(table, player).execute(vbs, scope, 'global')
+		return scope
+	}
+
+	it('should reshape and clear without Preserve', () => {
+		const scope = execute('Dim a(2)\na(0) = "x"\nReDim a(5)\nn = UBound(a)\ne = IsEmpty(a(0))')
+		expect(scope.n).to.equal(5)
+		expect(scope.e).to.equal(true)
 	})
 })

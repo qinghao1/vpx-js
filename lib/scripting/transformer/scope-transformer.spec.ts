@@ -28,7 +28,7 @@ describe('The scripting scope transformer', () => {
 		const vbs = `Dim Ballsize\nSub Table1_Init\nEnd Sub\n`
 		const js = transpiler.transpile(vbs)
 		expect(js).to.equal(
-			`${Transformer.ITEMS_NAME}.Table1.on('Init', function () {\n});\n${Transformer.SCOPE_NAME}.Ballsize = null;`,
+			`${Transformer.ITEMS_NAME}.Table1.on('Init', ${Transformer.SCOPE_NAME}.Table1_Init = function () {\n});\n${Transformer.SCOPE_NAME}.Ballsize = null;`,
 		)
 	})
 
@@ -56,7 +56,7 @@ describe('The scripting scope transformer', () => {
 		expect(js).to.equal(`${Transformer.SCOPE_NAME}.func();`)
 	})
 
-	it('should add the scope to a function call', () => {
+	it('should add the scope to an indexed call', () => {
 		const vbs = `BallShadow(b).visible = 0\n`
 		const js = transform(vbs)
 		expect(js).to.equal(`${Transformer.SCOPE_NAME}.BallShadow(${Transformer.SCOPE_NAME}.b).visible = 0;`)
@@ -66,7 +66,15 @@ describe('The scripting scope transformer', () => {
 		const vbs = `For each xx in GI:xx.State = 1: Next\n`
 		const js = transform(vbs)
 		expect(js).to.equal(
-			`for (${Transformer.SCOPE_NAME}.xx of ${Transformer.VBSHELPER_NAME}.toIterable(${Transformer.SCOPE_NAME}.GI)) {\n    ${Transformer.SCOPE_NAME}.xx.State = 1;\n}`,
+			`__exitFor:\n    for (${Transformer.SCOPE_NAME}.xx of ${Transformer.VBSHELPER_NAME}.toIterable(${Transformer.SCOPE_NAME}.GI)) {\n        ${Transformer.SCOPE_NAME}.xx.State = 1;\n    }`,
+		)
+	})
+
+	it('should not wrap loop labels or labeled breaks in the scope', () => {
+		const vbs = `For j = 1 To 20\nIf j = 10 Then Exit For\nNext\n`
+		const js = transform(vbs)
+		expect(js).to.equal(
+			`__exitFor:\n    for (${Transformer.SCOPE_NAME}.j = 1; ${Transformer.SCOPE_NAME}.j <= 20; ${Transformer.SCOPE_NAME}.j += 1) {\n        if (${Transformer.VBSHELPER_NAME}.equals(${Transformer.SCOPE_NAME}.j, 10)) {\n            break __exitFor;\n        }\n    }`,
 		)
 	})
 
@@ -82,11 +90,11 @@ describe('The scripting scope transformer', () => {
 		expect(js).to.equal(`${Transformer.SCOPE_NAME}.Foo = class {\n    constructor() {\n    }\n};`)
 	})
 
-	it('should not the scope to a member call in a function', () => {
+	it('should not add the scope to a member call in a function', () => {
 		const vbs = `Function AudioPan(tableobj)\nDim tmp\ntmp = tableobj.x * 2 / table1.width-1\nEnd Function`
 		const js = transform(vbs)
 		expect(js).to.equal(
-			`${Transformer.SCOPE_NAME}.AudioPan = function (tableobj) {\n    let AudioPan = undefined;\n    let tmp;\n    tmp = tableobj.x * 2 / ${Transformer.SCOPE_NAME}.table1.width - 1;\n    return AudioPan;\n};`,
+			`${Transformer.SCOPE_NAME}.AudioPan = function (tableobj) {\n    let AudioPan = undefined;\n    let tmp;\n    tmp = ${Transformer.VBSHELPER_NAME}.sub(${Transformer.VBSHELPER_NAME}.div(${Transformer.VBSHELPER_NAME}.mul(tableobj.x, 2), ${Transformer.SCOPE_NAME}.table1.width), 1);\n    return AudioPan;\n};`,
 		)
 	})
 
@@ -94,6 +102,14 @@ describe('The scripting scope transformer', () => {
 		const vbs = `Sub X\n	Dim x\nEnd Sub`
 		const js = transform(vbs)
 		expect(js).to.equal(`${Transformer.SCOPE_NAME}.X = function () {\n    let x;\n};`)
+	})
+
+	it('should add the scope to a Select Case discriminant (declarator init, not id)', () => {
+		const vbs = `Dim brpos\nSub Bottom_Ramp_Timer()\n\tSelect Case brpos\n\t\tCase 1:\n\tEnd Select\nEnd Sub\n`
+		const js = transform(vbs)
+		expect(js).to.equal(
+			`${Transformer.SCOPE_NAME}.brpos = null;\n${Transformer.SCOPE_NAME}.Bottom_Ramp_Timer = function () {\n    {\n        let __vbsSelect = ${Transformer.SCOPE_NAME}.brpos;\n        if (${Transformer.VBSHELPER_NAME}.equals(__vbsSelect, 1)) {\n        }\n    }\n};`,
+		)
 	})
 
 	it('should reference the stdlib when used in a class', () => {
@@ -109,5 +125,5 @@ function transform(vbs: string): string {
 	const scriptHelper = new ScriptHelper()
 	let ast = scriptHelper.vbsToAst(vbs)
 	ast = new ScopeTransformer(ast).transform()
-	return scriptHelper.astToVbs(ast)
+	return scriptHelper.astToJs(ast)
 }

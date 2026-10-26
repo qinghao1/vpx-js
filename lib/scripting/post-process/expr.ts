@@ -2,12 +2,11 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { replace } from 'estraverse'
-import type { BinaryOperator, Expression, Identifier, LogicalOperator, UnaryOperator } from 'estree'
+import type { BinaryOperator, Expression, Identifier, UnaryOperator } from 'estree'
 import {
 	binaryExpression,
 	callExpression,
 	identifier,
-	logicalExpression,
 	memberExpression,
 	newExpression,
 	unaryExpression,
@@ -73,10 +72,30 @@ function ppBinaryExpression(node: ESIToken): Expression {
 	let index = node.children[0].text.length
 	for (const child of node.children.slice(1)) {
 		const operator = node.text.charAt(index) as BinaryOperator
-		expr = binaryExpression(operator, expr, child.estree)
+		// VBS `+` concatenates numeric strings only when both are numeric (and
+		// propagates Null/Empty), `-`/`*` coerce Empty to 0 and propagate
+		// Null, and `/` raises on divide-by-zero, so all four go through
+		// `__vbs` instead of raw JS operators (raw `-`/`*` on undefined
+		// yields NaN, which then mistriggers the next `+` as type mismatch).
+		if (operator === '+') {
+			expr = vbsCall('add', [expr, child.estree])
+		} else if (operator === '-') {
+			expr = vbsCall('sub', [expr, child.estree])
+		} else if (operator === '*') {
+			expr = vbsCall('mul', [expr, child.estree])
+		} else if (operator === '/') {
+			expr = vbsCall('div', [expr, child.estree])
+		} else {
+			expr = binaryExpression(operator, expr, child.estree)
+		}
 		index += child.text.length + 1
 	}
 	return expr
+}
+
+/** Emits a `__vbs.<name>(...args)` call. */
+function vbsCall(name: string, args: Expression[]): Expression {
+	return callExpression(memberExpression(identifier(Transformer.VBSHELPER_NAME), identifier(name)), args)
 }
 
 function ppIntegerDivisionExpression(node: ESIToken): Expression {
@@ -93,7 +112,8 @@ function ppIntegerDivisionExpression(node: ESIToken): Expression {
 export function ppModuloExpression(node: ESIToken): Expression {
 	let expr = node.children[0].estree
 	for (const child of node.children.slice(1)) {
-		expr = binaryExpression('%', expr, child.estree)
+		// VBS `Mod` banker's-rounds both operands and raises on a zero divisor.
+		expr = vbsCall('mod', [expr, child.estree])
 	}
 	return expr
 }
@@ -110,18 +130,26 @@ export function ppExponentExpression(node: ESIToken): Expression {
 }
 
 export function ppConcatExpression(node: ESIToken): Expression {
-	let expr = node.children[0].estree
+	if (node.children.length < 2) {
+		return node.children[0].estree
+	}
+	let expr = toConcatString(node.children[0].estree)
 	for (const child of node.children.slice(1)) {
-		expr = binaryExpression('+', expr, child.estree)
+		expr = binaryExpression('+', expr, toConcatString(child.estree))
 	}
 	return expr
 }
 
+/** VBS `&` always string-concatenates, so stringify each operand instead of adding. */
+function toConcatString(operand: Expression): Expression {
+	return callExpression(memberExpression(identifier(Transformer.STDLIB_NAME), identifier('CStr')), [operand])
+}
+
 const LOGICAL_OPERATORS: Record<string, string> = {
-	And: '&&',
-	Or: '||',
-	Eqv: 'Eqv',
-	Xor: 'Xor',
+	And: 'and',
+	Or: 'or',
+	Eqv: 'eqv',
+	Xor: 'xor',
 }
 
 function ppLogicalExpression(node: ESIToken): Expression {
@@ -131,21 +159,10 @@ function ppLogicalExpression(node: ESIToken): Expression {
 		const text = node.text.substr(index)
 		for (const key in LOGICAL_OPERATORS) {
 			if (text.startsWith(` ${key} `)) {
-				switch (LOGICAL_OPERATORS[key]) {
-					case 'Eqv':
-						expr = unaryExpression('~', binaryExpression('^', expr, child.estree))
-						break
-					case 'Xor':
-						expr = logicalExpression(
-							'||',
-							logicalExpression('&&', expr, unaryExpression('!', child.estree)),
-							logicalExpression('&&', unaryExpression('!', expr), child.estree),
-						)
-						break
-					default:
-						expr = logicalExpression(LOGICAL_OPERATORS[key] as LogicalOperator, expr, child.estree)
-						break
-				}
+				expr = callExpression(
+					memberExpression(identifier(Transformer.VBSHELPER_NAME), identifier(LOGICAL_OPERATORS[key])),
+					[expr, child.estree],
+				)
 				index += child.text.length + key.length + 2
 				break
 			}
@@ -166,29 +183,40 @@ const RELATIONAL_OPERATORS: Record<string, string> = {
 	'=': '==',
 }
 
-function ppRelationalExpression(node: ESIToken): Expression {
-	// VBScript: Not binds to whole comparison (Not a = b → !(a==b))
-	let expr: Expression = node.children[0].estree as Expression
+/** Strips leading `__vbs.not(...)` calls, tracking parity so callers can re-apply once. */
+function unwrapLeadingNots(first: Expression, strip: boolean): { expr: Expression; isNot: boolean } {
+	let expr = first
 	let isNot = false
-	while (node.children.length > 1 && (expr as any)?.type === 'UnaryExpression' && (expr as any).operator === '!') {
-		isNot = !isNot
-		expr = (expr as any).argument as Expression
+	if (strip) {
+		for (;;) {
+			const inner = unwrapVbsNot(expr)
+			if (inner === null) {
+				break
+			}
+			isNot = !isNot
+			expr = inner
+		}
 	}
+	return { expr, isNot }
+}
+
+function ppRelationalExpression(node: ESIToken): Expression {
+	// VBScript: Not binds to whole comparison (Not a = b → Not(a==b))
+	const leading = unwrapLeadingNots(node.children[0].estree as Expression, node.children.length > 1)
+	let expr = leading.expr
 	let index = node.children[0].text.length
 	for (const child of node.children.slice(1)) {
 		const text = node.text.substr(index)
 		for (const key in RELATIONAL_OPERATORS) {
 			if (text.startsWith(key)) {
 				switch (RELATIONAL_OPERATORS[key]) {
+					// `<>` is not `!(=)`: any Null comparison yields Null
+					// (falsy), while `!Null` is True in JS.
 					case '==':
+						expr = vbsCall('equals', [expr, child.estree])
+						break
 					case '!=':
-						expr = callExpression(
-							memberExpression(identifier(Transformer.VBSHELPER_NAME), identifier('equals')),
-							[expr, child.estree],
-						)
-						if (RELATIONAL_OPERATORS[key] === '!=') {
-							expr = unaryExpression('!', expr)
-						}
+						expr = vbsCall('notEquals', [expr, child.estree])
 						break
 					default:
 						expr = binaryExpression(RELATIONAL_OPERATORS[key] as BinaryOperator, expr, child.estree)
@@ -199,18 +227,14 @@ function ppRelationalExpression(node: ESIToken): Expression {
 			}
 		}
 	}
-	if (isNot) expr = unaryExpression('!', expr)
+	if (leading.isNot) expr = vbsNotCall(expr)
 	return expr
 }
 
 function ppTypeExpression(node: ESIToken): Expression {
 	// Like ppRelationalExpression: Not binds to whole Is check
-	let expr: Expression = node.children[0].estree as Expression
-	let isNot = false
-	while (node.children.length > 1 && (expr as any)?.type === 'UnaryExpression' && (expr as any).operator === '!') {
-		isNot = !isNot
-		expr = (expr as any).argument as Expression
-	}
+	const leading = unwrapLeadingNots(node.children[0].estree as Expression, node.children.length > 1)
+	let expr = leading.expr
 	let index = node.children[0].text.length
 	for (const child of node.children.slice(1)) {
 		if (node.text.substr(index).startsWith(' Is ')) {
@@ -221,7 +245,7 @@ function ppTypeExpression(node: ESIToken): Expression {
 			index += child.text.length + 4
 		}
 	}
-	if (isNot) expr = unaryExpression('!', expr)
+	if (leading.isNot) expr = vbsNotCall(expr)
 	return expr
 }
 
@@ -230,7 +254,29 @@ function ppUnaryExpression(node: ESIToken): Expression {
 }
 
 function ppLogicalNotExpression(node: ESIToken): Expression {
-	return unaryExpression('!', node.children[0].estree)
+	return vbsNotCall(node.children[0].estree)
+}
+
+function vbsNotCall(operand: Expression): Expression {
+	return callExpression(memberExpression(identifier(Transformer.VBSHELPER_NAME), identifier('not')), [operand])
+}
+
+/** Unwraps one `__vbs.not(...)` call, returning its operand or null. */
+function unwrapVbsNot(expr: Expression): Expression | null {
+	if (expr.type !== 'CallExpression') {
+		return null
+	}
+	const callee = expr.callee
+	if (
+		callee.type !== 'MemberExpression' ||
+		callee.object.type !== 'Identifier' ||
+		callee.object.name !== Transformer.VBSHELPER_NAME ||
+		callee.property.type !== 'Identifier' ||
+		callee.property.name !== 'not'
+	) {
+		return null
+	}
+	return expr.arguments[0] as Expression
 }
 
 function ppParenthesizedExpression(node: ESIToken): unknown {

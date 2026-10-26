@@ -27,48 +27,32 @@ export function ppMethod(node: ESIToken): unknown {
 }
 
 function ppSubDeclaration(node: ESIToken): unknown {
-	let id: Identifier = identifier('undefined')
-	let params: Identifier[] = []
-	let block: BlockStatement | undefined
-	for (const child of node.children) {
-		switch (child.type) {
-			case 'SubSignature':
-				id = child.estree
-				for (const subChild of child.children) {
-					if (subChild.type === 'ParameterList') {
-						params = subChild.estree
-						break
-					}
-				}
-				break
-			case 'Block':
-				block = child.estree
-				break
-		}
-	}
+	const { id, params, block } = signatureParts(node)
 	return functionDeclaration(id, params, block ? block : blockStatement([]))
 }
 
-function ppFunctionDeclaration(node: ESIToken): unknown {
+function signatureParts(node: ESIToken): {
+	id: Identifier
+	params: Identifier[]
+	block: BlockStatement | undefined
+} {
 	let id: Identifier = identifier('undefined')
 	let params: Identifier[] = []
 	let block: BlockStatement | undefined
 	for (const child of node.children) {
-		switch (child.type) {
-			case 'FunctionSignature':
-				id = child.estree
-				for (const subChild of child.children) {
-					if (subChild.type === 'ParameterList') {
-						params = subChild.estree
-						break
-					}
-				}
-				break
-			case 'Block':
-				block = child.estree
-				break
+		if (child.type === 'Block') {
+			block = child.estree
+		} else if (child.type === 'SubSignature' || child.type === 'FunctionSignature') {
+			id = child.estree
+			params = child.children.find(sub => sub.type === 'ParameterList')?.estree ?? []
 		}
 	}
+	return { id, params, block }
+}
+
+function ppFunctionDeclaration(node: ESIToken): unknown {
+	const { id, params, block: rawBlock } = signatureParts(node)
+	let block = rawBlock
 	if (block) {
 		block = replace(block, {
 			enter: blockNode => {
