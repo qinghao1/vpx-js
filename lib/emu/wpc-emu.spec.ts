@@ -6,7 +6,7 @@ import { expect } from 'chai'
 import * as sinon from 'sinon'
 import sinonChai from 'sinon-chai'
 import { type GamelistDB, WpcEmuApi, type WpcEmuWebWorkerApi } from 'wpc-emu'
-import type { Vertex2D } from '../util/vector.js'
+import type { Vertex2D } from '../math/vector.js'
 import { Emulator } from './wpc-emu.js'
 
 const mockGameEntry: GamelistDB.GameEntry = {
@@ -123,8 +123,11 @@ describe('WPC-EMU', () => {
 		expect(emulator.getLampState(11)).to.equal(1)
 		expect(emulator.getLampState(12)).to.equal(0)
 		// solenoids/GIs are stored with 1-based offset (internal dummy at 0) — see EmulatorState
-		expect(emulator.getSolenoidState(0)).to.equal(2)
-		expect(emulator.getGIState(0)).to.equal(2)
+		// sols thresholded to VPM 0/1 (255 -> 1, 127 -> 0), GI scaled to VPM 0-8 (7 -> 8)
+		expect(emulator.getSolenoidState(0)).to.equal(1)
+		expect(emulator.getSolenoidState(1)).to.equal(0)
+		expect(emulator.getGIState(0)).to.equal(8)
+		expect(emulator.getGIState(1)).to.equal(3)
 		expect(emulator.getDipSwitchByte()).to.equal(23)
 	})
 })
@@ -150,10 +153,10 @@ class MockWpcEmulator implements WpcEmuApi.Emulator {
 				},
 				wpc: {
 					diagnosticLed: 6,
-					generalIlluminationState: new Uint8Array([8, 2, 3, 4]),
+					generalIlluminationState: new Uint8Array([8, 7, 3, 0]),
 					diagnosticLedToggleCount: 7,
 					lampState: new Uint8Array([255, 0]),
-					solenoidState: new Uint8Array([11, 2, 3, 4]),
+					solenoidState: new Uint8Array([11, 255, 127, 0]),
 					inputState: new Uint8Array([1, 2, 3, 4]),
 					midnightModeEnabled: true,
 					irqEnabled: true,

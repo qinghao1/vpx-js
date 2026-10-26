@@ -132,6 +132,61 @@ describe('The EmulatorState - handle state changes', () => {
 		expect(emulatorState.getChangedLamps()).to.deep.equal([])
 	})
 
+	it('should threshold wpc-emu solenoids (0x00/0xFF) to VPM 0/1', () => {
+		emulatorState.updateState(stateOne)
+		expect(emulatorState.getChangedSolenoids()).to.deep.equal([
+			[6, 1],
+			[8, 1],
+		])
+	})
+
+	it('should use the same >127 boundary for solenoids as for lamps', () => {
+		const wpc = { ...wpcState2, solenoidState: new Uint8Array([128, 127]) }
+		emulatorState.updateState({ ram: new Uint8Array(), sound: soundState, wpc, dmd: dmdState })
+		expect(emulatorState.getChangedSolenoids()).to.deep.equal([[1, 1]])
+	})
+
+	it('should not report solenoid decay that stays within one threshold band', () => {
+		const mk = (solenoidState: Uint8Array) => ({
+			ram: new Uint8Array(),
+			sound: soundState,
+			wpc: { ...wpcState2, solenoidState },
+			dmd: dmdState,
+		})
+		emulatorState.updateState(mk(new Uint8Array([255, 63])))
+		emulatorState.getChangedSolenoids()
+		emulatorState.updateState(mk(new Uint8Array([128, 31])))
+		expect(emulatorState.getChangedSolenoids()).to.deep.equal([])
+	})
+
+	it('should scale wpc-emu GI (0-7) to VPM GI (0-8, 8 = full on)', () => {
+		emulatorState.updateState(stateOne)
+		expect(emulatorState.getChangedGI()).to.deep.equal([
+			[1, 3],
+			[6, 8],
+			[7, 8],
+			[8, 8],
+		])
+	})
+
+	it('should read full-on wpc-emu GI as 8 via getGIState', () => {
+		const wpc = { ...wpcState2, generalIlluminationState: new Uint8Array([0, 7, 0, 3]) }
+		emulatorState.updateState({ ram: new Uint8Array(), sound: soundState, wpc, dmd: dmdState })
+		expect(emulatorState.getGIState(0)).to.equal(8)
+		expect(emulatorState.getGIState(2)).to.equal(3)
+	})
+
+	it('should pass pinmame sols (0/1) and GI (0-8) through unchanged', () => {
+		emulatorState.applyPinmame(new Uint8Array([1, 0]), new Uint8Array([0, 1]), new Uint8Array([8, 5]))
+		expect(emulatorState.getSolenoidState(1)).to.equal(1)
+		expect(emulatorState.getGIState(0)).to.equal(8)
+		expect(emulatorState.getChangedSolenoids()).to.deep.equal([[1, 1]])
+		expect(emulatorState.getChangedGI()).to.deep.equal([
+			[0, 8],
+			[1, 5],
+		])
+	})
+
 	it('should return empty array after fetching getChangedLEDs - not implemented used for Alphanumeric displays only', () => {
 		const result: number[][] = emulatorState.getChangedLEDs()
 		expect(result).to.deep.equal([])

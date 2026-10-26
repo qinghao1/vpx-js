@@ -19,13 +19,18 @@ export class EmulatorState {
 
 	private lampMap: (i: number) => number = OffsetIndex.mapIndexToMatrixIndex
 	private solMap: (i: number) => number = i => i + 1
+	private giMap: (i: number) => number = i => i + 1
 
 	updateState(s: WpcEmuWebWorkerApi.EmuStateAsic): void {
 		this.lampMap = OffsetIndex.mapIndexToMatrixIndex
 		this.solMap = i => i + 1
+		this.giMap = i => i + 1
 		if (s.wpc.lampState) this.lamps = Uint8Array.from(s.wpc.lampState, x => (x > 127 ? 1 : 0))
-		if (s.wpc.solenoidState) this.sols = s.wpc.solenoidState.slice()
-		if (s.wpc.generalIlluminationState) this.gis = s.wpc.generalIlluminationState.slice()
+		// wpc-emu drives 0x00/0xFF with >>1 decay; VPM ChangedSols currStat is 0/1 (vpintf.c)
+		if (s.wpc.solenoidState) this.sols = Uint8Array.from(s.wpc.solenoidState, x => (x > 127 ? 1 : 0))
+		// wpc-emu GI fades 0-7; pinmame/VPM GI is 0-8 with 8 = full on (wpc.c)
+		if (s.wpc.generalIlluminationState)
+			this.gis = Uint8Array.from(s.wpc.generalIlluminationState, x => (x >= 7 ? 8 : x))
 		if (s.dmd.dmdShadedBuffer) this.dmd = s.dmd.dmdShadedBuffer.slice()
 		if (s.wpc.inputSwitchMatrixActiveColumn) this.switches = s.wpc.inputSwitchMatrixActiveColumn.slice()
 	}
@@ -33,6 +38,7 @@ export class EmulatorState {
 	applyPinmame(lamps: Uint8Array, sols: Uint8Array, gis: Uint8Array): void {
 		this.lampMap = i => i
 		this.solMap = i => i
+		this.giMap = i => i
 		this.lamps = lamps.slice()
 		this.sols = sols.slice()
 		this.gis = gis.slice()
@@ -55,7 +61,7 @@ export class EmulatorState {
 		return this.sols[this.solMap(i)] ?? 0
 	}
 	getGIState(i: number): number {
-		return this.gis[this.solMap(i)] ?? 0
+		return this.gis[this.giMap(i)] ?? 0
 	}
 
 	getChangedLamps(): VbsArray<number[]> {
@@ -69,7 +75,7 @@ export class EmulatorState {
 		return d
 	}
 	getChangedGI(): number[][] {
-		const d = this.diff(this.lastGis, this.gis, this.solMap)
+		const d = this.diff(this.lastGis, this.gis, this.giMap)
 		this.lastGis = this.gis.slice()
 		return d
 	}
