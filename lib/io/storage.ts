@@ -1,23 +1,23 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-class MemoryStorage {
-	private readonly map = new Map<string, unknown>()
-	public setItem(name: string, value: unknown): void {
-		this.map.set(name, value)
-	}
-	public getItem(name: string): unknown {
-		return this.map.get(name)
-	}
+/** Minimal key-value store. */
+export interface KeyValueStorage {
+	setItem(name: string, value: unknown): void
+	getItem(name: string): unknown
 }
 
-class BrowserStorage {
-	public setItem(name: string, value: unknown): void {
-		localStorage.setItem(name, JSON.stringify(value))
-	}
-	public getItem(name: string): unknown {
-		return JSON.parse(localStorage.getItem(name) || '""')
-	}
+const map = new Map<string, unknown>()
+const memoryStorage: KeyValueStorage = {
+	setItem(name, value) {
+		map.set(name, value)
+	},
+	getItem: name => map.get(name),
 }
 
-export const storage = typeof localStorage !== 'undefined' ? new BrowserStorage() : new MemoryStorage()
+const browserStorage: KeyValueStorage = {
+	setItem: (name, value) => localStorage.setItem(name, JSON.stringify(value)),
+	getItem: name => JSON.parse(localStorage.getItem(name) || '""'),
+}
+
+export const storage: KeyValueStorage = typeof localStorage !== 'undefined' ? browserStorage : memoryStorage
