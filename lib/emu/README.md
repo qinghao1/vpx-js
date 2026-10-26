@@ -1,3 +1,69 @@
+# Emu overview
+
+`lib/emu/` runs the pinball machine's CPU (ROM emulation) behind the
+`IEmulator` interface (`emulator.ts`). Table scripts talk to it through
+`Controller` (`lib/scripting/objects/vpm-controller.ts`), never directly.
+
+## Backend selection
+
+`VpmController._loadGame(name)` picks one backend per `GameName`:
+
+- `GamelistDB.getByPinmameName(name)` hits → **wpc-emu** (`wpc-emu.ts`, pure
+  JS/TS, WPC machines only). ROM fetched via `rom-fetcher.ts`.
+- Otherwise → **PinMAME** (`pinmame/pinmame-emu.ts`, Emscripten build of
+  libPinMAME 3.7, everything else: SAM, Whitestar, Data East, ...).
+  Without `npm run build:wasm` it degrades to a mock (`wasm/mock/`) that
+  accepts input but emulates nothing — physics-only tables still run.
+
+Both adapters feed the same `EmulatorState`, so `ChangedLamps` etc. behave
+identically regardless of backend.
+
+## Why the message queue exists
+
+ROM load is async (`fetch` + `initVMwithRom`), but table scripts set switches
+synchronously during `Table_Init`. `EmulatorMessageQueue`
+(`emulator-message-queue.ts`) buffers `setSwitchInput` / `setCabinetInput` /
+`emuSimulateCycle` / DIP calls made before the backend is ready and replays
+them once `loadGame` completes. After replay, `addMessage` warns and drops —
+a post-init queue write is always a bug in the caller.
+
+## Changed* polling contract
+
+`EmulatorState` (`emulator-state.ts`) keeps `cur` + `last` snapshots of lamps,
+solenoids, and GI. Each `getChangedX()` call diffs, latches `last = cur`, and
+returns `[[number, state], ...]` (VBS 2-D array shape). Consequences:
+
+- Polling is destructive: a second call with no intervening simulation returns
+  empty. Poll once per frame and fan out.
+- Numbers are backend-native: WPC matrix numbers under wpc-emu (see below),
+  PinMAME indices under PinMAME (`applyPinmame` switches the map to identity).
+- `getChangedLEDs` always returns `[]` (unimplemented).
+
+## WPC matrix numbering
+
+WPC hardware wires lamps/switches as an 8×8 matrix addressed
+`column*10 + row` (11–18, 21–28, ..., 81–88). `OffsetIndex`
+(`offset-index.ts`) converts: `fromWpcMatrix(11).zeroBasedIndex === 0`,
+`fromZeroBased(8).wpcMatrixIndex === 21`. Scripts always use matrix numbers;
+state arrays are 0-based. PinMAME games are not WPC-numbered.
+
+## DMD flow
+
+Per simulated tick the adapter copies the shaded DMD buffer into
+`EmulatorState` (`updateState` for wpc-emu, `pullDmd` for PinMAME).
+`getDmdFrame()` returns that snapshot (`Uint8Array`, 128×32 default;
+PinMAME reports real dimensions via `getDmdDimensions`). Renderers poll; the
+emu never pushes.
+
+## WASM build
+
+PinMAME ships as Emscripten output in `wasm/dist/` (gitignored). See
+`wasm/README.md`: `npm run build:wasm` (release), `:debug`, `:mock`.
+`pinmame-loader.ts` resolves real-vs-mock at runtime; `isMock === true`
+means "input accepted, nothing emulated".
+
+---
+
 # API
 
 ## Visual PinMAME Control
@@ -143,3 +209,24 @@ May not be supported in all scripting environments!
 
 - OnSolenoid(solenoidNo, isActive), Called whenever a solenoid changes state
 - OnStateChange(newState), Called whenever the emulation is started or stopped (not called on Pause)
+
+---
+
+## Implementation gaps
+
+`VpmController` logs-and-ignores (`stub()`) anything below; scripts calling
+them run but get no emulation effect. Ordered by real-world usage (STATS
+survey of 357 VBS files above):
+
+| API | Status | Note |
+|---|---|---|
+| `B2SSetData` (505 uses) | stub | Backglass data; no B2S renderer exists |
+| `ChangedLEDs` (56 uses) | returns `[]` | Alphanumeric segments not modeled |
+| `GetMech` / `Mech` (38 uses) | stub | Mechanical toys (TZ clock, gumball) |
+| `HandleMechanics` (292 uses) | stub, accepts value | Same — nothing dispatches on it |
+| `ShowOpts/ShowPathes/ShowAboutDialog`, `CheckROMS`, `SetDisplayPosition` | stubs | Desktop-UI concepts; no window exists |
+| `SampleRate` | fixed `22050`, no setter | Stored nowhere; audio path ignores it |
+| WPC DIP bank ≠ 0 | ignored | `wpc-emu.ts` only models bank 0 |
+
+`GetSwitchInput` on PinMAME reflects the mock map until a real ROM loads.
+When closing a gap, update this table and the STATS counts if re-surveyed.
