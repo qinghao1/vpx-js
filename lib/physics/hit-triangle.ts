@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import type { PlayerPhysics } from '../game/player-physics.js'
-import { Vertex3D } from '../util/vector.js'
+import { Vertex3D } from '../math/vector.js'
 import type { Ball } from '../vpt/ball/ball.js'
 import type { CollisionEvent } from './collision-event.js'
 import { C_CONTACTVEL, C_LOWNORMVEL, PHYS_TOUCH } from './constants.js'
@@ -28,8 +28,14 @@ export class HitTriangle extends HitObject {
 		const nx = e0y * e1z - e0z * e1y,
 			ny = e0z * e1x - e0x * e1z,
 			nz = e0x * e1y - e0y * e1x
-		const len = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1
-		this.normal = new Vertex3D(nx / len, ny / len, nz / len)
+		// Thin triangles lose hit precision, so upstream zeroes the normal below LengthSquared 0.01.
+		const lenSq = nx * nx + ny * ny + nz * nz
+		if (lenSq < 0.01) {
+			this.normal = new Vertex3D(0, 0, 0)
+		} else {
+			const len = Math.sqrt(lenSq)
+			this.normal = new Vertex3D(nx / len, ny / len, nz / len)
+		}
 		this.elasticity = 0.3
 		this.setFriction(0.3)
 		this.scatter = 0
@@ -45,7 +51,7 @@ export class HitTriangle extends HitObject {
 		b.zhigh = Math.max(this.rgv[0].z, this.rgv[1].z, this.rgv[2].z)
 	}
 
-	public override hitTest(ball: Ball, dTime: number, coll: CollisionEvent, _physics?: PlayerPhysics): number {
+	public override hitTest(ball: Ball, dTime: number, coll: CollisionEvent): number {
 		if (!this.isEnabled) return -1
 		const nx = this.normal.x,
 			ny = this.normal.y,
@@ -68,11 +74,8 @@ export class HitTriangle extends HitObject {
 		let isContact = false,
 			hitTime = 0
 		if (bnd <= PHYS_TOUCH) {
-			if (Math.abs(bnv) <= C_CONTACTVEL) {
-				hitTime = 0
-				isContact = true
-			} else if (bnd <= 0) hitTime = 0
-			else hitTime = bnd / -bnv
+			if (Math.abs(bnv) <= C_CONTACTVEL) isContact = true
+			else if (bnd > 0) hitTime = bnd / -bnv
 		} else if (Math.abs(bnv) > C_LOWNORMVEL) hitTime = bnd / -bnv
 		else return -1
 		if (!Number.isFinite(hitTime) || hitTime < 0 || hitTime > dTime) return -1

@@ -11,3 +11,19 @@ export function elasticityWithFalloff(elasticity: number, falloff: number, vel: 
 }
 
 export const HARD_SCATTER = 0.0
+
+/**
+ * Collision-relevant root of a·t² + b·t + c = 0, or NaN when the
+ * discriminant is negative. Roots straddling zero yield the later (exit)
+ * root, otherwise the earlier (entry) root wins.
+ * @see https://github.com/vpinball/vpinball/blob/master/collide.cpp
+ */
+export function solveQuadratic(a: number, b: number, c: number): number {
+	const discr = b * b - 4 * a * c
+	if (discr < 0) return NaN
+	const s = Math.sqrt(discr)
+	const inv = -0.5 / a
+	const t1 = (b + s) * inv
+	const t2 = (b - s) * inv
+	return t1 * t2 < 0 ? Math.max(t1, t2) : Math.min(t1, t2)
+}

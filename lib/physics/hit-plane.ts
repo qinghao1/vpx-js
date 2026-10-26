@@ -2,10 +2,10 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import type { PlayerPhysics } from '../game/player-physics.js'
-import type { Vertex3D } from '../util/vector.js'
+import type { Vertex3D } from '../math/vector.js'
 import type { Ball } from '../vpt/ball/ball.js'
 import type { CollisionEvent } from './collision-event.js'
-import { C_CONTACTVEL, PHYS_TOUCH } from './constants.js'
+import { C_CONTACTVEL, C_LOWNORMVEL, PHYS_TOUCH } from './constants.js'
 import { HitKind, HitObject } from './hit-object.js'
 
 /** Infinite plane (playfield / glass).
@@ -21,25 +21,29 @@ export class HitPlane extends HitObject {
 
 	public override calcHitBBox(): void {}
 
-	public override hitTest(ball: Ball, dTime: number, coll: CollisionEvent, _physics?: PlayerPhysics): number {
+	public override hitTest(ball: Ball, dTime: number, coll: CollisionEvent): number {
 		if (!this.isEnabled) return -1
 		const bnv = this.normal.dot(ball.hit.vel)
 		if (bnv > C_CONTACTVEL) return -1
 		const bnd = this.normal.dot(ball.state.pos) - ball.data.radius - this.d
 		if (bnd < ball.data.radius * -2) return -1
-		if (Math.abs(bnv) <= C_CONTACTVEL) {
-			if (Math.abs(bnd) > PHYS_TOUCH) return -1
-			coll.isContact = true
-			coll.hitNormal.set(this.normal)
-			coll.hitOrgNormalVelocity = bnv
-			coll.hitDistance = bnd
-			return 0
-		}
-		let hitTime = bnd / -bnv
-		if (hitTime < 0) hitTime = 0
+		// FIX_PHYSICS (physconst.h): a slow touch is a contact at time 0; a slow
+		// ball embedded deeper than PHYS_TOUCH collides instead of sinking through.
+		let hitTime: number
+		let isContact = false
+		if (bnd <= PHYS_TOUCH) {
+			if (Math.abs(bnv) <= C_CONTACTVEL && bnd >= -PHYS_TOUCH) {
+				hitTime = 0
+				isContact = true
+			} else if (bnd <= 0) hitTime = 0
+			else hitTime = bnd / -bnv
+		} else if (Math.abs(bnv) > C_LOWNORMVEL) hitTime = bnd / -bnv
+		else return -1
 		if (!Number.isFinite(hitTime) || hitTime < 0 || hitTime > dTime) return -1
 		coll.hitNormal.set(this.normal)
 		coll.hitDistance = bnd
+		coll.isContact = isContact
+		if (isContact) coll.hitOrgNormalVelocity = bnv
 		return hitTime
 	}
 
@@ -51,6 +55,7 @@ export class HitPlane extends HitObject {
 			this.friction,
 			this.scatter,
 		)
+		// Upstream C_EMBEDSHOT_PLANE is defined (ON): a penetrated ball is pushed out.
 		const bnd = this.normal.dot(coll.ball.state.pos) - coll.ball.data.radius - this.d
 		if (bnd < 0) {
 			coll.ball.state.pos.addScaledVector(this.normal, -bnd)

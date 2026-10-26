@@ -1,10 +1,11 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import type { Vertex2D } from '../util/vector.js'
+import type { Vertex2D } from '../math/vector.js'
 import type { Ball } from '../vpt/ball/ball.js'
 import type { CollisionEvent } from './collision-event.js'
 import { C_CONTACTVEL, PHYS_TOUCH } from './constants.js'
+import { solveQuadratic } from './functions.js'
 import { HitKind, HitObject } from './hit-object.js'
 
 /** Vertical line (Z) hit shape.
@@ -59,13 +60,8 @@ export class HitLineZ extends HitObject {
 			else hitTime = -bnd / bnv
 		} else {
 			if (a < 1e-8) return -1
-			const discr = 4 * b * b - 4 * a * (bcddsq - ball.data.radius * ball.data.radius)
-			if (discr < 0) return -1
-			const s = Math.sqrt(discr)
-			const inv = -0.5 / a
-			const t1 = (2 * b + s) * inv
-			const t2 = (2 * b - s) * inv
-			hitTime = t1 * t2 < 0 ? Math.max(t1, t2) : Math.min(t1, t2)
+			hitTime = solveQuadratic(a, 2 * b, bcddsq - ball.data.radius * ball.data.radius)
+			if (Number.isNaN(hitTime)) return -1
 		}
 		if (!Number.isFinite(hitTime) || hitTime < 0 || hitTime > dTime) return -1
 		const hitZ = bz + vz * hitTime

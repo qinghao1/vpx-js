@@ -2,17 +2,13 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { Event } from '../game/event.js'
-import type { PlayerPhysics } from '../game/player-physics.js'
-import { Vertex2D, Vertex3D } from '../util/vector.js'
+import { Vertex2D, Vertex3D } from '../math/vector.js'
 import type { Surface } from '../vpt/surface/surface.js'
 import type { SurfaceData } from '../vpt/surface/surface-data.js'
-import { SlingshotAnimObject } from './anim-slingshot.js'
 import type { CollisionEvent } from './collision-event.js'
 import { LineSeg } from './line-seg.js'
 
-/** Slingshot line segment. */
 export class LineSegSlingshot extends LineSeg {
-	private slingshotAnim = new SlingshotAnimObject()
 	public force = 0
 	public doHitEvent = false
 
@@ -23,7 +19,6 @@ export class LineSegSlingshot extends LineSeg {
 		p2: Vertex2D,
 		zLow: number,
 		zHigh: number,
-		private readonly physics: PlayerPhysics,
 	) {
 		super(p1, p2, zLow, zHigh)
 	}
@@ -41,11 +36,8 @@ export class LineSegSlingshot extends LineSeg {
 			)
 			const btd = (hp.x - this.v1.x) * n.y - (hp.y - this.v1.y) * n.x
 			Vertex2D.release(hp)
-			let force = Math.abs(len) > 1e-6 ? (btd + btd) / len - 1 : -1
-			force = 0.5 * (1 - force * force) * this.force
-			const f = n.clone(true).multiplyScalar(force)
-			ball.hit.vel.sub(f)
-			Vertex3D.release(f)
+			const edge = Math.abs(len) > 1e-6 ? (btd + btd) / len - 1 : -1
+			ball.hit.vel.addScaledVector(n, -0.5 * (1 - edge * edge) * this.force)
 		}
 
 		ball.hit.collide3DWall(n, this.elasticity, this.elasticityFalloff, this.friction, this.scatter)
@@ -57,7 +49,6 @@ export class LineSegSlingshot extends LineSeg {
 			ball.hit.eventPos.set(ball.state.pos)
 			if (distSq > 0.25) {
 				this.obj.fireGroupEvent(Event.SurfaceEventsSlingshot)
-				this.slingshotAnim.timeReset = this.physics.timeMsec + 100
 			}
 		}
 	}

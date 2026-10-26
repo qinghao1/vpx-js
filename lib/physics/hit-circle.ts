@@ -2,15 +2,16 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import type { PlayerPhysics } from '../game/player-physics.js'
-import type { Vertex2D } from '../util/vector.js'
+import type { Vertex2D } from '../math/vector.js'
 import type { Ball } from '../vpt/ball/ball.js'
 import type { CollisionEvent } from './collision-event.js'
 import { CollisionType } from './collision-type.js'
 import { C_CONTACTVEL, C_LOWNORMVEL, PHYS_TOUCH } from './constants.js'
+import { solveQuadratic } from './functions.js'
 import { HitKind, HitObject } from './hit-object.js'
 
 /** Vertical cylinder hit shape.
- * @see https://github.com/vpinball/vpinball/blob/master/hitcircle.cpp */
+ * @see https://github.com/vpinball/vpinball/blob/master/src/physics/collide.h (HitCircle) */
 export class HitCircle extends HitObject {
 	public override hitKind = HitKind.Circle
 	constructor(
@@ -93,23 +94,22 @@ export class HitCircle extends HitObject {
 			const idx = ball.hit.vpVolObjs.indexOf(this.obj!)
 			if (idx !== -1) ball.hit.vpVolObjs.splice(idx, 1)
 		}
+		const insideTarget = bnd < 0
+		const insideVolume = ball.hit.vpVolObjs.includes(this.obj!)
 		if (rigid && bnd < PHYS_TOUCH) {
 			if (bnd < -br) return -1
 			if (Math.abs(bnv) <= C_CONTACTVEL) isContact = true
 			else hitTime = Math.max(0, -bnd / bnv)
-		} else if (isKickerOrTrigger && ball.hit.isRealBall() && bnd < 0 !== ball.hit.vpVolObjs.includes(this.obj!)) {
+		} else if (isKickerOrTrigger && ball.hit.isRealBall() && insideTarget !== insideVolume) {
 			if (Math.abs(bnd - this.radius) < 0.05) ball.hit.vpVolObjs.push(this.obj!)
 			else isUnhit = bnd > 0
 		} else {
 			if ((!rigid && bnd * bnv > 0) || a < 1e-8) return -1
-			const discr = 4 * b * b - 4 * a * (bcddsq - targetR * targetR)
-			if (discr < 0) return -1
-			const s = Math.sqrt(discr)
-			const inv = -0.5 / a
-			const t1 = (2 * b + s) * inv
-			const t2 = (2 * b - s) * inv
-			isUnhit = t1 * t2 < 0
-			hitTime = isUnhit ? Math.max(t1, t2) : Math.min(t1, t2)
+			const constTerm = bcddsq - targetR * targetR
+			hitTime = solveQuadratic(a, 2 * b, constTerm)
+			if (Number.isNaN(hitTime)) return -1
+			// Roots straddle zero exactly when the constant term is negative (a > 0 here).
+			isUnhit = constTerm < 0
 		}
 		if (!Number.isFinite(hitTime) || hitTime < 0 || hitTime > dTime) return -1
 		const hitZ = bz + vz * hitTime

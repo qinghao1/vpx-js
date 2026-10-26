@@ -36,19 +36,12 @@ export const C_CONTACTVEL = 0.099
 
 /** Contact handling. */
 export const C_EMBEDVELLIMIT = 5
-export const C_EMBEDSHOT_PLANE = 0
 export const C_EMBEDDED = 0.0
 export const C_EMBEDSHOT = 0.05
 export const C_DISP_GAIN = 0.9875
 export const C_DISP_LIMIT = 5.0
-export const C_BALL_SPIN_HACK = 0
 
 export const STATICTIME = 0.02
 export const STATICCNTS = 10
 
 export const C_INTERATIONS = 20
-
-export const VELOCITY_EPSILON = 0.05
-
-export const JOYRANGEMN = -65536
-export const JOYRANGEMX = 65536

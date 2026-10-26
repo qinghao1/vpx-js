@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { Event } from '../game/event.js'
-import { Vertex3D } from '../util/vector.js'
+import { Vertex3D } from '../math/vector.js'
 import type { Ball } from '../vpt/ball/ball.js'
 import type { CollisionEvent } from './collision-event.js'
 import { CollisionType } from './collision-type.js'
@@ -68,7 +68,8 @@ export class Hit3DPoly extends HitObject {
 		} else {
 			if (!ball.hit.isRealBall()) return
 			const i = ball.hit.vpVolObjs.indexOf(this.obj!)
-			if (!coll.hitFlag !== i < 0) return
+			const insideVolume = i >= 0
+			if (coll.hitFlag !== insideVolume) return
 			ball.state.pos.x += ball.hit.vel.x * STATICTIME
 			ball.state.pos.y += ball.hit.vel.y * STATICTIME
 			ball.state.pos.z += ball.hit.vel.z * STATICTIME
@@ -104,13 +105,16 @@ export class Hit3DPoly extends HitObject {
 		let bUnHit = bnv > C_LOWNORMVEL
 		const inside = bnd <= 0,
 			rigid = this.objType !== CollisionType.Trigger
-		let hitTime = 0
+		let hitTime = 0,
+			isContact = false
 		if (rigid) {
 			if (bnd < -r) return -1
-			if (bnd <= PHYS_TOUCH)
-				hitTime =
-					inside || Math.abs(bnv) > C_CONTACTVEL || bnd <= -PHYS_TOUCH ? 0 : bnd * (0.5 / PHYS_TOUCH) + 0.5
-			else if (Math.abs(bnv) > C_LOWNORMVEL) hitTime = bnd / -bnv
+			if (bnd <= PHYS_TOUCH) {
+				// FIX_PHYSICS (physconst.h): a slow touch is a contact at time 0.
+				// Deeper embeds stay collisions so the embed corrections push out.
+				if (Math.abs(bnv) <= C_CONTACTVEL && bnd > -PHYS_TOUCH) isContact = true
+				else if (!inside) hitTime = bnd / -bnv
+			} else if (Math.abs(bnv) > C_LOWNORMVEL) hitTime = bnd / -bnv
 			else return -1
 		} else {
 			if (bnv * bnd >= 0) {
@@ -126,8 +130,7 @@ export class Hit3DPoly extends HitObject {
 		}
 		if (!Number.isFinite(hitTime) || hitTime < 0 || hitTime > dTime) return -1
 		const hpx = hx0 + vx * hitTime,
-			hpy = hy0 + vy * hitTime,
-			hpz = hz0 + vz * hitTime
+			hpy = hy0 + vy * hitTime
 		let x2 = r0.x,
 			y2 = r0.y,
 			hx2 = hpx >= x2,
@@ -160,6 +163,8 @@ export class Hit3DPoly extends HitObject {
 		coll.hitNormal.z = nz
 		if (!rigid) coll.hitFlag = bUnHit
 		coll.hitDistance = bnd
+		coll.isContact = isContact
+		if (isContact) coll.hitOrgNormalVelocity = bnv
 		return hitTime
 	}
 }
