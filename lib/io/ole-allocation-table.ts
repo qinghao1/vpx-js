@@ -23,8 +23,11 @@ export class AllocationTable {
 
 	public getSecIdChain(start: number): number[] {
 		const ids: number[] = []
+		const seen = new Set<number>()
 		let id = start
 		while (id !== AllocationTable.SecIdEndOfChain) {
+			if (seen.has(id)) throw new Error(`Corrupt file: cycle detected at secId ${id} in allocation table.`)
+			seen.add(id)
 			ids.push(id)
 			const next = this.table[id]
 			if (next === undefined) throw new Error(`Corrupt file: secId ${id} missing in allocation table.`)

@@ -33,9 +33,13 @@ export class DirectoryTree {
 		const decoder = new TextDecoder('utf-16le')
 		const entries: StorageEntry[] = []
 		for (let off = 0; off < buf.length; off += 128) {
-			const len = Math.max(view.getInt16(off + 64, true) - 2, 0)
+			// Name length is bytes incl. terminator in a 64-byte field; clamp it
+			// and stop at the first NUL, like pole's DirTree::load.
+			const nameBytes = Math.min(view.getUint16(off + 64, true), 64) & ~1
+			const rawName = decoder.decode(buf.subarray(off, off + nameBytes))
+			const nul = rawName.indexOf('\0')
 			entries.push({
-				name: decoder.decode(buf.subarray(off, off + len)),
+				name: nul < 0 ? rawName : rawName.slice(0, nul),
 				type: view.getInt8(off + 66),
 				nodeColor: view.getInt8(off + 67),
 				left: view.getInt32(off + 68, true),
@@ -61,32 +65,40 @@ export class DirectoryTree {
 		this.buildHierarchy(root)
 	}
 
-	private buildHierarchy(e: StorageEntry): void {
-		const ids = this.getChildIds(e)
-		e.storages = {}
-		e.streams = {}
+	private buildHierarchy(entry: StorageEntry, seen: Set<StorageEntry> = new Set()): void {
+		if (seen.has(entry)) throw new Error('Corrupt file: cycle detected in directory storage hierarchy.')
+		seen.add(entry)
+		const ids = this.getChildIds(entry)
+		entry.storages = {}
+		entry.streams = {}
 		for (const id of ids) {
-			const c = this.entries[id]
-			if (c.type === DirectoryTree.EntryTypeStorage) e.storages[c.name] = c
-			if (c.type === DirectoryTree.EntryTypeStream) e.streams[c.name] = c
+			const child = this.entries[id]
+			if (child.type === DirectoryTree.EntryTypeStorage) entry.storages[child.name] = child
+			if (child.type === DirectoryTree.EntryTypeStream) entry.streams[child.name] = child
 		}
-		for (const c of Object.values(e.storages)) this.buildHierarchy(c)
+		for (const child of Object.values(entry.storages)) this.buildHierarchy(child, seen)
 	}
 
-	private getChildIds(e: StorageEntry): number[] {
-		if (e.storageDirId <= -1) return []
-		return this.visit(this.entries[e.storageDirId], [e.storageDirId])
+	private getChildIds(entry: StorageEntry): number[] {
+		if (entry.storageDirId <= -1) return []
+		this.assertIndex(entry.storageDirId)
+		return this.visit(this.entries[entry.storageDirId], [entry.storageDirId], new Set([entry.storageDirId]))
 	}
 
-	private visit(e: StorageEntry, ids: number[] = []): number[] {
-		if (e.left !== DirectoryTree.Leaf) {
-			ids.push(e.left)
-			this.visit(this.entries[e.left], ids)
-		}
-		if (e.right !== DirectoryTree.Leaf) {
-			ids.push(e.right)
-			this.visit(this.entries[e.right], ids)
+	private visit(entry: StorageEntry, ids: number[], seen: Set<number>): number[] {
+		for (const next of [entry.left, entry.right]) {
+			if (next === DirectoryTree.Leaf) continue
+			this.assertIndex(next)
+			if (seen.has(next)) throw new Error(`Corrupt file: cycle detected at directory index ${next}.`)
+			seen.add(next)
+			ids.push(next)
+			this.visit(this.entries[next], ids, seen)
 		}
 		return ids
+	}
+
+	private assertIndex(index: number): void {
+		if (!Number.isInteger(index) || index < 0 || index >= this.entries.length)
+			throw new Error(`Corrupt file: directory index ${index} out of range.`)
 	}
 }

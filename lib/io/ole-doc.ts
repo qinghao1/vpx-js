@@ -21,8 +21,8 @@ export class OleCompoundDoc extends EventEmitter {
 	SSAT!: AllocationTable
 
 	private readonly reader: IBinaryReader
-	private skipBytes = 0
 	private rootStorage!: Storage
+	private loaded = false
 	private MSAT: number[] = []
 	private shortStreamSecIds: number[] = []
 	private directoryTree?: DirectoryTree
@@ -37,11 +37,7 @@ export class OleCompoundDoc extends EventEmitter {
 		const doc = new OleCompoundDoc(reader)
 		try {
 			await doc.openFile()
-			await doc.readHeader()
-			await doc.readMSAT()
-			await doc.readSAT()
-			await doc.readSSAT()
-			await doc.readDirectoryTree()
+			await doc.readAll()
 		} catch (err) {
 			await doc.close()
 			throw err
@@ -49,17 +45,13 @@ export class OleCompoundDoc extends EventEmitter {
 		return doc
 	}
 
-	/** Reads with custom leading header. */
-	async readWithCustomHeader(size: number): Promise<Uint8Array> {
-		this.skipBytes = size
-		await this.openFile()
-		const buffer = await this.readCustomHeader()
+	private async readAll(): Promise<void> {
 		await this.readHeader()
 		await this.readMSAT()
 		await this.readSAT()
 		await this.readSSAT()
 		await this.readDirectoryTree()
-		return buffer
+		this.loaded = true
 	}
 
 	/** Reopens underlying reader. */
@@ -74,72 +66,33 @@ export class OleCompoundDoc extends EventEmitter {
 	}
 
 	/** Reads one sector. */
-	async readSector(secId: number, offset = 0, bytesToRead = 0): Promise<Uint8Array> {
+	async readSector(secId: number, offset = 0, bytesToRead?: number): Promise<Uint8Array> {
 		return this.readSectors([secId], offset, bytesToRead)
 	}
 
 	/** Reads sectors (coalesces contiguous runs for I/O efficiency). */
-	async readSectors(secIds: number[], offset = 0, bytesToRead = 0): Promise<Uint8Array> {
-		const secSize = this.header.secSize
-		bytesToRead = Math.min(secIds.length * secSize, bytesToRead || secIds.length * secSize)
-		this.assertLoaded()
-		const browserData = (this.reader as unknown as { data?: Uint8Array }).data
-		if (browserData)
-			return this.copyFromBrowser(browserData, secIds, secSize, offset, bytesToRead, id =>
-				this.getFileOffsetForSec(id),
-			)
-
-		const out = new Uint8Array(bytesToRead)
-		let i = 0,
-			outOff = 0,
-			off = offset,
-			remaining = bytesToRead
-		while (i < secIds.length && remaining > 0) {
-			if (off >= secSize) {
-				off -= secSize
-				i++
-				continue
-			}
-			const firstLen = Math.min(secSize - off, remaining)
-			let runLen = 1,
-				runBytes = firstLen
-			while (i + runLen < secIds.length && remaining - runBytes > 0) {
-				if (
-					this.getFileOffsetForSec(secIds[i + runLen - 1]) + secSize !==
-					this.getFileOffsetForSec(secIds[i + runLen])
-				)
-					break
-				const next = Math.min(secSize, remaining - runBytes)
-				runBytes += next
-				runLen++
-				if (next < secSize) break
-			}
-			const fileOff = off + this.getFileOffsetForSec(secIds[i])
-			const toRead = Math.min(runBytes, remaining)
-			await this.reader.read(out, outOff, toRead, fileOff)
-			outOff += toRead
-			remaining -= toRead
-			off = 0
-			i += runLen
-		}
-		return out
-	}
-
-	/** Reads one short sector. */
-	async readShortSector(secId: number, offset = 0, bytesToRead = 0): Promise<Uint8Array> {
-		return this.readShortSectors([secId], offset, bytesToRead)
+	async readSectors(secIds: number[], offset = 0, bytesToRead?: number): Promise<Uint8Array> {
+		return this.readSectorIds(secIds, offset, bytesToRead, this.header.secSize, id => this.getFileOffsetForSec(id))
 	}
 
 	/** Reads short sectors. */
-	async readShortSectors(secIds: number[], offset = 0, bytesToRead = 0): Promise<Uint8Array> {
-		const secSize = this.header.shortSecSize
-		bytesToRead = Math.min(secIds.length * secSize, bytesToRead || secIds.length * secSize)
+	async readShortSectors(secIds: number[], offset = 0, bytesToRead?: number): Promise<Uint8Array> {
+		return this.readSectorIds(secIds, offset, bytesToRead, this.header.shortSecSize, id =>
+			this.getFileOffsetForShortSec(id),
+		)
+	}
+
+	private async readSectorIds(
+		secIds: number[],
+		offset: number,
+		bytesToRead: number | undefined,
+		secSize: number,
+		getOff: (id: number) => number,
+	): Promise<Uint8Array> {
+		// An explicit 0 is an empty read; only an omitted length reads everything.
+		bytesToRead = Math.min(secIds.length * secSize, bytesToRead ?? secIds.length * secSize)
 		this.assertLoaded()
-		const browserData = (this.reader as unknown as { data?: Uint8Array }).data
-		if (browserData)
-			return this.copyFromBrowser(browserData, secIds, secSize, offset, bytesToRead, id =>
-				this.getFileOffsetForShortSec(id),
-			)
+		const mem = this.reader.getData?.()
 
 		const out = new Uint8Array(bytesToRead)
 		let i = 0,
@@ -156,19 +109,18 @@ export class OleCompoundDoc extends EventEmitter {
 			let runLen = 1,
 				runBytes = firstLen
 			while (i + runLen < secIds.length && remaining - runBytes > 0) {
-				if (
-					this.getFileOffsetForShortSec(secIds[i + runLen - 1]) + secSize !==
-					this.getFileOffsetForShortSec(secIds[i + runLen])
-				)
-					break
+				if (getOff(secIds[i + runLen - 1]) + secSize !== getOff(secIds[i + runLen])) break
 				const next = Math.min(secSize, remaining - runBytes)
 				runBytes += next
 				runLen++
 				if (next < secSize) break
 			}
-			const fileOff = off + this.getFileOffsetForShortSec(secIds[i])
+			const fileOff = off + getOff(secIds[i])
 			const toRead = Math.min(runBytes, remaining)
-			await this.reader.read(out, outOff, toRead, fileOff)
+			// Short reads past EOF leave the zero-initialized tail in place,
+			// matching pole's zeroed buffers.
+			if (mem) out.set(mem.subarray(fileOff, fileOff + toRead), outOff)
+			else await this.reader.read(out, outOff, toRead, fileOff)
 			outOff += toRead
 			remaining -= toRead
 			off = 0
@@ -182,70 +134,54 @@ export class OleCompoundDoc extends EventEmitter {
 		await this.reader.close()
 	}
 
-	private copyFromBrowser(
-		data: Uint8Array,
-		ids: number[],
-		secSize: number,
-		offset: number,
-		bytesToRead: number,
-		getOff: (id: number) => number,
-	): Uint8Array {
-		const out = new Uint8Array(bytesToRead)
-		let i = 0,
-			outOff = 0,
-			off = offset,
-			remaining = bytesToRead
-		while (i < ids.length && remaining > 0) {
-			if (off >= secSize) {
-				off -= secSize
-				i++
-				continue
-			}
-			const len = Math.min(secSize - off, remaining)
-			const fileOff = off + getOff(ids[i])
-			out.set(data.subarray(fileOff, fileOff + len), outOff)
-			remaining -= len
-			outOff += len
-			off = 0
-			i++
-		}
-		return out
-	}
-
 	private assertLoaded(): void {
-		if (!this.reader.isOpen()) throw new Error('Document must be loaded first.')
+		// Loadedness outlives the reader: memory-backed readers retain their
+		// bytes after close so post-load streaming keeps working.
+		if (!this.loaded && !this.reader.isOpen()) throw new Error('Document must be loaded first.')
 	}
 
 	private async openFile(): Promise<void> {
 		await this.reader.open()
 	}
 
-	private async readCustomHeader(): Promise<Uint8Array> {
-		const buf = new Uint8Array(this.skipBytes)
-		const [n, data] = await this.reader.read(buf, 0, this.skipBytes, 0)
-		return data.slice(0, n)
-	}
-
 	private async readHeader(): Promise<void> {
 		const buf = new Uint8Array(512)
-		const [n, data] = await this.reader.read(buf, 0, 512, this.skipBytes)
+		const [n, data] = await this.reader.read(buf, 0, 512, 0)
 		this.header = Header.load(data.slice(0, n))
 	}
 
 	private async readMSAT(): Promise<void> {
 		this.MSAT = this.header.partialMSAT.slice(0)
 		this.MSAT.length = this.header.SATSize
-		if (this.header.SATSize <= 109 || !this.header.MSATSize) return
+		if (this.header.SATSize <= 109 || !this.header.MSATSize) {
+			this.assertMSATComplete()
+			return
+		}
+		const seenSectors = new Set<number>()
 		let secId = this.header.MSATSecId
 		let idx = 109
-		for (let i = 0; i < this.header.MSATSize; i++) {
+		for (let difatIndex = 0; difatIndex < this.header.MSATSize; difatIndex++) {
+			if (!Number.isInteger(secId) || secId < 0)
+				throw new Error(`Corrupt file: invalid DIFAT sector id ${secId}.`)
+			if (seenSectors.has(secId))
+				throw new Error(`Corrupt file: cycle detected in DIFAT chain at sector ${secId}.`)
+			seenSectors.add(secId)
 			const sector = await this.readSector(secId)
 			const view = getDataView(sector)
-			for (let s = 0; s < this.header.secSize - 4; s += 4) {
+			for (let offset = 0; offset < this.header.secSize - 4; offset += 4) {
 				if (idx >= this.header.SATSize) break
-				this.MSAT[idx++] = view.getInt32(s, true)
+				this.MSAT[idx++] = view.getInt32(offset, true)
 			}
 			secId = view.getInt32(this.header.secSize - 4, true)
+		}
+		this.assertMSATComplete()
+	}
+
+	private assertMSATComplete(): void {
+		for (let entryIndex = 0; entryIndex < this.header.SATSize; entryIndex++) {
+			const entry = this.MSAT[entryIndex]
+			if (!Number.isInteger(entry) || entry < 0)
+				throw new Error(`Corrupt file: invalid MSAT entry ${String(entry)} at index ${entryIndex}.`)
 		}
 	}
 
@@ -267,7 +203,7 @@ export class OleCompoundDoc extends EventEmitter {
 	}
 
 	private getFileOffsetForSec(secId: number): number {
-		return this.skipBytes + (secId + 1) * this.header.secSize
+		return (secId + 1) * this.header.secSize
 	}
 
 	private getFileOffsetForShortSec(id: number): number {
@@ -292,4 +228,6 @@ export interface IBinaryReader {
 	open(): Promise<void>
 	close(): Promise<void>
 	isOpen(): boolean
+	/** In-memory image for readers that hold all bytes; lets the doc copy without I/O. */
+	getData?(): Uint8Array | undefined
 }
