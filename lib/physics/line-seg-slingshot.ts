@@ -3,8 +3,7 @@
 
 import { Event } from '../game/event.js'
 import { Vertex2D, Vertex3D } from '../math/vector.js'
-import type { Surface } from '../vpt/surface/surface.js'
-import type { SurfaceData } from '../vpt/surface/surface-data.js'
+import type { Surface, SurfaceData } from '../vpt/surface/surface.js'
 import type { CollisionEvent } from './collision-event.js'
 import { LineSeg } from './line-seg.js'
 
