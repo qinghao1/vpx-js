@@ -1,4 +1,4 @@
-import { DoubleSide, FrontSide } from 'three'
+import type { Texture as ThreeTexture } from 'three'
 import { clonePrimitiveNodeMaterial, isPrimitiveNodeMaterial } from './nodes/primitive-bdl-node.js'
 import { cloneBakedNodeMaterial, isBakedNodeMaterial } from './nodes/unshaded-baked-node.js'
 
@@ -7,7 +7,11 @@ export const BALL_ROUGHNESS = 0.08
 
 export const RE_BAKE_MAT = /bake/i
 export const RE_BAKE_MAP = /bake|nestmap/i
-export const DISABLE_LIGHTING_THRESHOLD = 0.5
+
+// Playfield lightmap family: base playfields, VLM/nestmap bakes, and pre-baked
+// overlays all take the playfield size cap. Workers keep a local copy (they
+// cannot share module imports); keep them in sync with this definition.
+export const RE_PLAYFIELD = /playfield|nestmap|bake|vlm/i
 
 let _globalEmissionScale = 1
 const _emissionListeners = new Set<(scale: number) => void>()
@@ -26,22 +30,27 @@ export const getGlobalEmissionScale = () => _globalEmissionScale
 export const pendingKeyFor = (key: 'map' | 'normalMap' | 'envMap' | 'emissiveMap'): string =>
 	`pending${key.charAt(0).toUpperCase()}${key.slice(1)}`
 
-// Native (primitive.cpp:1166) selects the additive overlay path purely by the file addBlend
+// Native (Primitive::Render) selects the additive overlay path purely by the file addBlend
 // flag. DepthBias is a transparent sort key (RenderDevice::DrawMesh), not a polygon offset,
-// and BlendDisableLighting mixes lit/unlit in-shader — so classification by material/map name
-// substrings or depthBias windows is intentionally absent here.
-export function isBaked(material?: { name: string }, map?: string, _disableLighting?: number): boolean {
+// and BlendDisableLighting mixes lit/unlit in-shader. Baked-lightmap detection below is a
+// vpx-js fallback by material/map name substring for tables whose maps carry no other signal.
+export function isBaked(material?: { name: string }, map?: string): boolean {
 	if (material && RE_BAKE_MAT.test(material.name)) return true
 	if (map && RE_BAKE_MAP.test(map) && !map.toLowerCase().startsWith('vr_')) return true
 	return false
 }
 
-export function materialSide(
-	isTransparent: boolean,
-	isBall: boolean,
-	backfacesEnabled?: boolean,
-): typeof DoubleSide | typeof FrontSide {
-	return isBall || isTransparent || backfacesEnabled !== false ? DoubleSide : FrontSide
+/**
+ * Fork-safe clone must carry the streaming keys: the texture may arrive after the
+ * first script write forks the material, and the streamer/arrival paths match on
+ * these names. Dropping them strands the fork mapless forever.
+ */
+export function copyPendingKeys(from: Record<string, unknown>, to: Record<string, unknown>): void {
+	for (const texKey of ['map', 'normalMap', 'envMap', 'emissiveMap'] as const) {
+		const pendingKey = pendingKeyFor(texKey)
+		const value = from[pendingKey]
+		if (typeof value === 'string' && value.length > 0) to[pendingKey] = value
+	}
 }
 
 /**
@@ -55,4 +64,47 @@ export function cloneMaterialForWrite<T>(mat: T): T {
 	if (isPrimitiveNodeMaterial(material)) return clonePrimitiveNodeMaterial(material) as T
 	if (isBakedNodeMaterial(material)) return cloneBakedNodeMaterial(material) as T
 	return material.clone() as T
+}
+
+/**
+ * Shared map-slot swap for TSL node materials (baked + primitive): stashes the
+ * map, rebuilds the node graph, and reports whether anything actually changed.
+ * No-op unless `isKind` accepts the material and map or name differs.
+ */
+export function setNodeMapSlot(
+	mat: unknown,
+	map: ThreeTexture | null,
+	name: string | undefined,
+	isKind: (mat: unknown) => boolean,
+): boolean {
+	const target = mat as { userData?: Record<string, unknown>; needsUpdate?: boolean } | null | undefined
+	if (!target || !isKind(target)) return false
+	const userData = target.userData as Record<string, unknown>
+	const nextMap = map ?? null
+	if (userData.__map === nextMap && (name === undefined || userData.__mapName === name)) return false
+	userData.__map = nextMap
+	if (name !== undefined) userData.__mapName = name
+	if (typeof userData.__rebuild === 'function') (userData.__rebuild as (next: ThreeTexture | null) => void)(nextMap)
+	target.needsUpdate = true
+	return true
+}
+
+/**
+ * Legacy `emissiveIntensity` accessor over the `__uIntensity` uniform, for
+ * readers that probe additive overlays like classic materials (VLM lightmaps).
+ */
+export function defineEmissiveIntensityCompat(mat: object): void {
+	const getUniform = (host: unknown): { value?: number } | undefined =>
+		(host as { userData?: { __uIntensity?: { value?: number } } })?.userData?.__uIntensity
+	Object.defineProperty(mat, 'emissiveIntensity', {
+		get(this: unknown) {
+			return getUniform(this)?.value ?? 1
+		},
+		set(this: unknown, intensityValue: number) {
+			const uniformRef = getUniform(this)
+			if (uniformRef) uniformRef.value = intensityValue
+		},
+		configurable: true,
+		enumerable: false,
+	})
 }

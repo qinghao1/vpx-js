@@ -13,6 +13,7 @@ import {
 } from 'three'
 import { Fn, float, positionWorld, sqrt, step, texture, uniform, uv, vec2, vec4 } from 'three/tsl'
 import { MeshBasicNodeMaterial, MeshStandardNodeMaterial } from 'three/webgpu'
+import { copyPendingKeys, defineEmissiveIntensityCompat, setNodeMapSlot } from '../material-shared.js'
 import { getTransmissionTexture, TRANSMISSION_OPAQUE_CUTOFF } from '../transmission-buffer.js'
 
 export const PRIMITIVE_BDL_KIND = 'bdl'
@@ -28,6 +29,19 @@ export const PRIMITIVE_ADDITIVE_KIND = 'additive'
 // Hence u = x/(w*s)+0.5 and v = 0.5-z/(h*s) with the scaled extents stored here.
 export const uTransArea = uniform(new Vector2(1, 1))
 
+/**
+ * Masks bulb-buffer lookups to the playfield itself. Room geometry (VR floor,
+ * walls) extends far beyond the playfield, and out-of-range UVs would sample
+ * the clamped edge texel (ClampToEdgeWrapping), smearing live lamp energy
+ * across the whole floor. Native has no such contribution: its bulb buffer is
+ * sampled per-pixel in screen space with projected bounds.
+ */
+export const inPlayfieldBounds = (playfieldUv: ReturnType<typeof vec2>): ReturnType<typeof float> =>
+	step(0, playfieldUv.x)
+		.mul(step(playfieldUv.x, 1))
+		.mul(step(0, playfieldUv.y))
+		.mul(step(playfieldUv.y, 1)) as ReturnType<typeof float>
+
 export function setPrimitiveTransmissionArea(width: number, height: number, scale = 1): void {
 	const safeWidth = Number.isFinite(width) && width > 0 ? width : 1
 	const safeHeight = Number.isFinite(height) && height > 0 ? height : 1
@@ -42,6 +56,8 @@ export interface PrimitiveBdlOptions {
 	opacity?: number
 	bdl?: number
 	below?: number
+	metalness?: number
+	roughness?: number
 	alphaTestValue?: number
 	doubleSided?: boolean
 	depthBias?: number
@@ -61,13 +77,25 @@ function sideFor(doubleSided?: boolean): typeof DoubleSide | typeof BackSide {
 	return doubleSided !== false ? DoubleSide : BackSide
 }
 
+// Native (material.sh DoPointLight tail + lightLoop): each point light returns
+// mix(litResult, diffuse, BDL) for BDL outside {0, 1}, and lightLoop SUMS TWO
+// such lights (NUM_LIGHTS=2), so the composite carries 2*BDL x diffuse while
+// the summed lit result scales by (1-BDL). Only exactly 1.0 takes the
+// kept-for-compat 2x diffuse path, which equals 2*BDL at BDL=1, so upstream is
+// continuous through 1.0 and the composite must be too (a 1x carry would pop
+// 2x on script fades through 1.0 and render HDR inserts half-bright).
+// Past 1 the composite does NOT extrapolate the mix: native's flare regime is
+// dominated by 2*BDL*diffuse because its per-light result is ~0 in the dark
+// cabinet, while the composite's lit input is three.js scene lighting on another
+// scale — scaling it by (1-BDL) would subtract scene light and blacken inserts
+// that render as bright HDR flares upstream. Diffuse clamps at 0; the overdrive
+// rides emissive only, which can only add light.
 export function bdlDiffuseFactor(bdl: number): number {
-	return bdl >= 1 ? 0 : 1
+	return bdl >= 1 ? 0 : 1 - bdl
 }
 
 export function bdlEmissiveCarry(bdl: number): number {
-	if (bdl < 1) return 0
-	return bdl === 1 ? 2 : bdl
+	return bdl === 1 ? 2 : 2 * bdl
 }
 
 export function belowFactor(below: number): number {
@@ -99,13 +127,16 @@ export function createPrimitiveBdlMaterial(opts: PrimitiveBdlOptions): MeshStand
 	userData.__doubleSided = opts.doubleSided !== false
 	const rebuild = (map: ThreeTexture | null): void => {
 		// Native (material.sh DoPointLight tail + lightLoop): each light returns
-		// mix(litResult, diffuse, BDL), and BDL == 1.0 swaps the point lights for the
-		// kept-for-compat 2x diffuse bug. BDL < 1 (including fractional values) takes
-		// the lit path with no dimming, so the diffuse factor is boolean, never a
-		// (1-BDL) ramp. For BDL >> 1 (TWD drives 130..8500) the mix evaluates to
-		// ~BDL x diffuse tonemapped, carried here on emissive so the composite can
-		// never subtract scene light and go black. Matches native at BDL 0 (fully
-		// lit) and BDL 1 (2x fullbright).
+		// mix(litResult, diffuse, BDL) summed over TWO point lights, and BDL == 1.0
+		// swaps the point lights for the kept-for-compat 2x diffuse bug. Fractional
+		// BDL is a linear ramp: BDL 0.5 yields half lit result plus 1x diffuse
+		// (2*0.5, one BDL share per light). For BDL >> 1 (TWD drives 130..8500)
+		// diffuse stays fully dimmed and ~2*BDL x diffuse rides emissive: native's
+		// flare regime is dominated by 2*BDL*diffuse (its per-light result is ~0
+		// there), while extrapolating (1-BDL) against three.js scene lighting
+		// would subtract light and blacken inserts that render bright upstream.
+		// The lit scale rides the color slot and the unlit carry rides emissive.
+		// Matches native at BDL 0 (fully lit) and BDL 1 (2x fullbright).
 		// Keep one texture node per slot: sharing a single texture node across
 		// color/opacity/emissive slots breaks the TSL graph on some drivers, while
 		// separate fetches stay correct.
@@ -133,28 +164,31 @@ export function createPrimitiveBdlMaterial(opts: PrimitiveBdlOptions): MeshStand
 					positionWorld.x.div(uTransArea.x).add(float(0.5)),
 					float(0.5).sub(positionWorld.z.div(uTransArea.y)),
 				)
-				const lift = sqrt(diffuse).mul(texture(uTransTex, pfUv).rgb).mul(uBelowF).mul(alphaBelow).mul(gate)
+				const lift = sqrt(diffuse)
+					.mul(texture(uTransTex, pfUv).rgb)
+					.mul(uBelowF)
+					.mul(alphaBelow)
+					.mul(gate)
+					.mul(inPlayfieldBounds(pfUv))
 				return carry.add(lift)
 			})()
-			mat.outputNode = null
 		} else if (userData.__mapName != null) {
 			mat.colorNode = Fn(() => float(0))()
 			mat.opacityNode = Fn(() => float(0))()
 			mat.emissiveNode = Fn(() => float(0))()
-			mat.outputNode = null
 		} else {
 			mat.colorNode = Fn(() => uAlbedo.mul(uLitF))()
 			mat.opacityNode = Fn(() => uAlpha)()
 			mat.emissiveNode = Fn(() => uAlbedo.mul(uCarry))()
-			mat.outputNode = null
 		}
+		mat.outputNode = null
 	}
 	userData.__rebuild = rebuild
 	const map = opts.map ?? null
 	userData.__map = map
 	rebuild(map)
-	mat.metalness = 0
-	mat.roughness = 0.4
+	mat.metalness = opts.metalness ?? 0
+	mat.roughness = opts.roughness ?? 0.4
 	mat.side = sideFor(opts.doubleSided)
 	mat.alphaTest = opts.alphaTestValue && opts.alphaTestValue > 0 && opts.alphaTestValue <= 1 ? opts.alphaTestValue : 0
 	mat.blending = CustomBlending
@@ -192,9 +226,8 @@ export function createPrimitiveAdditiveMaterial(opts: PrimitiveAdditiveOptions):
 			// SRC_ALPHA,ONE, so the framebuffer receives tint * tex * alpha^2. The rgb
 			// term carries intensity to reproduce the native quadratic falloff.
 			mat.colorNode = Fn(() => {
-				const base = tex
-				const rgb = base.rgb.mul(uTint).mul(uIntensity)
-				return vec4(rgb, base.a.mul(uIntensity))
+				const rgb = tex.rgb.mul(uTint).mul(uIntensity)
+				return vec4(rgb, tex.a.mul(uIntensity))
 			})()
 		} else if (userData.__mapName != null) {
 			// The file references a texture that has not streamed in yet. Native loads
@@ -214,20 +247,15 @@ export function createPrimitiveAdditiveMaterial(opts: PrimitiveAdditiveOptions):
 	mat.transparent = true
 	mat.depthWrite = false
 	mat.depthTest = true
+	// Coplanar with the opaque bake below; the offset wins that tie while
+	// nearer toys still occlude (same overlay convention as the classic path).
+	mat.polygonOffset = true
+	mat.polygonOffsetFactor = -2
+	mat.polygonOffsetUnits = -4
 	mat.toneMapped = true
 	mat.side = sideFor(opts.doubleSided)
 	// Compat: legacy readers probe emissiveIntensity on overlays (VLM.Bake lightmaps).
-	Object.defineProperty(mat, 'emissiveIntensity', {
-		get() {
-			return (this.userData as { __uIntensity?: { value?: number } })?.__uIntensity?.value ?? 1
-		},
-		set(intensityValue: number) {
-			const uniformRef = (this.userData as { __uIntensity?: { value?: number } })?.__uIntensity
-			if (uniformRef) uniformRef.value = intensityValue
-		},
-		configurable: true,
-		enumerable: false,
-	})
+	defineEmissiveIntensityCompat(mat)
 	;(mat as unknown as { emissiveIntensity: number }).emissiveIntensity = opts.intensity ?? 1
 	return mat
 }
@@ -242,18 +270,7 @@ export function getPrimitiveKind(mat: unknown): string | undefined {
 }
 
 export function setPrimitiveMap(mat: unknown, map: ThreeTexture | null, name?: string): boolean {
-	const targetMaterial = mat as { userData?: Record<string, unknown>; needsUpdate?: boolean } | null | undefined
-	if (!targetMaterial || !isPrimitiveNodeMaterial(targetMaterial)) return false
-	const userData = targetMaterial.userData as Record<string, unknown>
-	const nextMap = map ?? null
-	const sameMap = userData.__map === nextMap
-	const sameName = name === undefined || userData.__mapName === name
-	if (sameMap && sameName) return false
-	userData.__map = nextMap
-	if (name !== undefined) userData.__mapName = name
-	if (typeof userData.__rebuild === 'function') (userData.__rebuild as (next: ThreeTexture | null) => void)(nextMap)
-	targetMaterial.needsUpdate = true
-	return true
+	return setNodeMapSlot(mat, map, name, isPrimitiveNodeMaterial)
 }
 
 export function updatePrimitiveBdl(
@@ -318,36 +335,43 @@ function uniformNumber(value: unknown, fallback: number): number {
 	return typeof value === 'number' && Number.isFinite(value) ? value : fallback
 }
 
-export function clonePrimitiveNodeMaterial<T>(mat: T): T {
-	const sourceMaterial = mat as unknown as (MeshStandardNodeMaterial | MeshBasicNodeMaterial) & {
-		userData: Record<string, unknown>
-		normalMap?: ThreeTexture | null
-		envMap?: ThreeTexture | null
+type CloneablePrimitiveMaterial = (MeshStandardNodeMaterial | MeshBasicNodeMaterial) & {
+	userData: Record<string, unknown>
+	normalMap?: ThreeTexture | null
+	envMap?: ThreeTexture | null
+	metalness?: number
+	roughness?: number
+}
+
+function commonCloneOptions(
+	userData: Record<string, unknown>,
+	sourceMaterial: { alphaTest: number },
+): Pick<
+	PrimitiveBdlOptions & PrimitiveAdditiveOptions,
+	'map' | 'mapName' | 'alphaTestValue' | 'doubleSided' | 'depthBias'
+> {
+	return {
+		map: (userData.__map as ThreeTexture | null) ?? undefined,
+		mapName: (userData.__mapName as string) ?? undefined,
+		alphaTestValue: uniformNumber(userData.__alphaTestValue ?? sourceMaterial.alphaTest, 0),
+		doubleSided: (userData.__doubleSided as boolean) !== false,
+		depthBias: uniformNumber(userData.__depthBias, 0),
 	}
-	if (!sourceMaterial || !isPrimitiveNodeMaterial(sourceMaterial)) {
-		return typeof (sourceMaterial as { clone?: () => unknown })?.clone === 'function'
-			? ((sourceMaterial as { clone: () => unknown }).clone() as T)
-			: mat
-	}
-	const userData = sourceMaterial.userData
-	if (userData.__primitiveKind === PRIMITIVE_BDL_KIND) {
-		const cloned = createPrimitiveBdlMaterial({
-			map: (userData.__map as ThreeTexture | null) ?? undefined,
-			mapName: (userData.__mapName as string) ?? undefined,
-			albedo: uniformHex((userData.__uAlbedo as { value: unknown })?.value, 0xffffff),
-			opacity: uniformNumber((userData.__uAlpha as { value: unknown })?.value, 1),
-			bdl: uniformNumber((userData.__uBDL as { value: unknown })?.value, 0),
-			below: uniformNumber(userData.__below, 0),
-			alphaTestValue: uniformNumber(userData.__alphaTestValue ?? sourceMaterial.alphaTest, 0),
-			doubleSided: (userData.__doubleSided as boolean) !== false,
-			depthBias: uniformNumber(userData.__depthBias, 0),
-		})
-		cloned.name = sourceMaterial.name
-		cloned.transparent = sourceMaterial.transparent
+}
+
+function finishPrimitiveClone(
+	sourceMaterial: CloneablePrimitiveMaterial,
+	cloned: CloneablePrimitiveMaterial,
+	blend: 'custom' | 'simple',
+): void {
+	cloned.name = sourceMaterial.name
+	cloned.transparent = sourceMaterial.transparent
+	cloned.depthWrite = sourceMaterial.depthWrite
+	cloned.depthTest = sourceMaterial.depthTest
+	cloned.blending = sourceMaterial.blending
+	cloned.side = sourceMaterial.side
+	if (blend === 'custom') {
 		cloned.opacity = sourceMaterial.opacity
-		cloned.depthWrite = sourceMaterial.depthWrite
-		cloned.depthTest = sourceMaterial.depthTest
-		cloned.blending = sourceMaterial.blending
 		cloned.blendSrc = sourceMaterial.blendSrc
 		cloned.blendDst = sourceMaterial.blendDst
 		cloned.blendEquation = sourceMaterial.blendEquation
@@ -355,45 +379,43 @@ export function clonePrimitiveNodeMaterial<T>(mat: T): T {
 		cloned.blendDstAlpha = sourceMaterial.blendDstAlpha
 		cloned.blendEquationAlpha = sourceMaterial.blendEquationAlpha
 		cloned.alphaTest = sourceMaterial.alphaTest
-		cloned.side = sourceMaterial.side
-		copyPendingKeys(userData, cloned.userData as Record<string, unknown>)
-		for (const slot of ['normalMap', 'envMap'] as const) {
-			if (sourceMaterial[slot]) cloned[slot] = sourceMaterial[slot]
-		}
+	} else {
+		cloned.toneMapped = sourceMaterial.toneMapped
+	}
+	copyPendingKeys(sourceMaterial.userData, cloned.userData)
+	for (const slot of ['normalMap', 'envMap'] as const) {
+		if (sourceMaterial[slot]) cloned[slot] = sourceMaterial[slot]
+	}
+}
+
+export function clonePrimitiveNodeMaterial<T>(mat: T): T {
+	const sourceMaterial = mat as unknown as CloneablePrimitiveMaterial
+	if (!sourceMaterial || !isPrimitiveNodeMaterial(sourceMaterial)) {
+		return typeof (sourceMaterial as { clone?: () => unknown })?.clone === 'function'
+			? ((sourceMaterial as { clone: () => unknown }).clone() as T)
+			: mat
+	}
+	const userData = sourceMaterial.userData
+	const common = commonCloneOptions(userData, sourceMaterial)
+	if (userData.__primitiveKind === PRIMITIVE_BDL_KIND) {
+		const cloned = createPrimitiveBdlMaterial({
+			...common,
+			albedo: uniformHex((userData.__uAlbedo as { value: unknown })?.value, 0xffffff),
+			opacity: uniformNumber((userData.__uAlpha as { value: unknown })?.value, 1),
+			bdl: uniformNumber((userData.__uBDL as { value: unknown })?.value, 0),
+			below: uniformNumber(userData.__below, 0),
+			metalness: uniformNumber(sourceMaterial.metalness, 0),
+			roughness: uniformNumber(sourceMaterial.roughness, 0.4),
+		})
+		finishPrimitiveClone(sourceMaterial, cloned as unknown as CloneablePrimitiveMaterial, 'custom')
 		return cloned as unknown as T
 	}
 	const cloned = createPrimitiveAdditiveMaterial({
-		map: (userData.__map as ThreeTexture | null) ?? undefined,
-		mapName: (userData.__mapName as string) ?? undefined,
+		...common,
 		tint: uniformHex((userData.__uTint as { value: unknown })?.value, 0xffffff),
 		intensity: uniformNumber((userData.__uIntensity as { value: unknown })?.value, 1),
-		alphaTestValue: uniformNumber(userData.__alphaTestValue ?? sourceMaterial.alphaTest, 0),
-		doubleSided: (userData.__doubleSided as boolean) !== false,
-		depthBias: uniformNumber(userData.__depthBias, 0),
 	})
-	cloned.name = sourceMaterial.name
-	copyPendingKeys(userData, cloned.userData as Record<string, unknown>)
-	cloned.transparent = sourceMaterial.transparent
-	cloned.depthWrite = sourceMaterial.depthWrite
-	cloned.depthTest = sourceMaterial.depthTest
-	cloned.blending = sourceMaterial.blending
-	cloned.toneMapped = sourceMaterial.toneMapped
-	cloned.side = sourceMaterial.side
+	finishPrimitiveClone(sourceMaterial, cloned as unknown as CloneablePrimitiveMaterial, 'simple')
 	;(cloned.userData as Record<string, unknown>).__addBlend = true
-	for (const slot of ['normalMap', 'envMap'] as const) {
-		if (sourceMaterial[slot]) (cloned as unknown as Record<string, unknown>)[slot] = sourceMaterial[slot]
-	}
 	return cloned as unknown as T
-}
-
-/**
- * Fork-safe clone must carry the streaming keys: the texture may arrive after the
- * first script write forks the material, and the streamer/arrival paths match on
- * these names. Dropping them strands the fork mapless forever.
- */
-function copyPendingKeys(from: Record<string, unknown>, to: Record<string, unknown>): void {
-	for (const key of ['pendingMap', 'pendingNormalMap', 'pendingEnvMap', 'pendingEmissiveMap'] as const) {
-		const value = from[key]
-		if (typeof value === 'string' && value.length > 0) to[key] = value
-	}
 }

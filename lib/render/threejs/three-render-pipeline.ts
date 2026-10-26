@@ -53,7 +53,7 @@ export class VpxRenderPipeline {
 	}
 
 	public updateExposure(value: number): void {
-		;(this.renderer as any).toneMappingExposure = clampExposure(value, 2.5)
+		;(this.renderer as any).toneMappingExposure = clampExposure(value, 2)
 	}
 
 	public updateToneMapper(tm: number): void {

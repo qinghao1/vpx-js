@@ -1,6 +1,7 @@
 import { AdditiveBlending, Color, DoubleSide, type Texture as ThreeTexture } from 'three'
 import { Fn, texture, uniform, uv, vec4 } from 'three/tsl'
 import { MeshBasicNodeMaterial } from 'three/webgpu'
+import { defineEmissiveIntensityCompat } from '../material-shared.js'
 
 export function createAdditiveOverlayNodeMaterial(
 	map: ThreeTexture,
@@ -13,9 +14,11 @@ export function createAdditiveOverlayNodeMaterial(
 	const texNode = texture(map, uv())
 
 	mat.colorNode = Fn(() => {
-		const base = texNode
-		const rgb = base.rgb.mul(uTint).mul(uIntensity)
-		return vec4(rgb, base.a.mul(uIntensity)) // alpha ignored for AdditiveBlending (ONE,ONE)
+		const rgb = texNode.rgb.mul(uTint).mul(uIntensity)
+		// three.js AdditiveBlending is (SRC_ALPHA, ONE), so texel alpha scales the
+		// contribution (upstream D3D additive is (ONE, ONE); kept as-is: the
+		// overlays author their falloff in alpha and e2e brightness is calibrated).
+		return vec4(rgb, texNode.a.mul(uIntensity))
 	})()
 
 	mat.blending = AdditiveBlending
@@ -30,16 +33,7 @@ export function createAdditiveOverlayNodeMaterial(
 
 	;(mat.userData as any).__uIntensity = uIntensity
 	// Compat for regression test that checks emissiveIntensity on overlay (VLM.Bake lightmap)
-	Object.defineProperty(mat, 'emissiveIntensity', {
-		get() {
-			return (this.userData as any).__uIntensity?.value ?? 1
-		},
-		set(v) {
-			if ((this.userData as any).__uIntensity) (this.userData as any).__uIntensity.value = v
-		},
-		configurable: true,
-		enumerable: false,
-	})
+	defineEmissiveIntensityCompat(mat)
 	// Ensure initial value syncs
 	;(mat as any).emissiveIntensity = initialIntensity
 	return mat

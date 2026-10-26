@@ -11,8 +11,15 @@ import {
 } from 'three'
 import { Fn, float, positionWorld, sqrt, step, texture, uniform, uv, vec2, vec4 } from 'three/tsl'
 import { MeshBasicNodeMaterial } from 'three/webgpu'
-import { getTransmissionTexture, TRANSMISSION_OPAQUE_CUTOFF } from '../transmission-buffer.js'
-import { uTransArea } from './primitive-bdl-node.js'
+import { copyPendingKeys, setNodeMapSlot } from '../material-shared.js'
+import { getLightBufferTexture, getTransmissionTexture, TRANSMISSION_OPAQUE_CUTOFF } from '../transmission-buffer.js'
+import { inPlayfieldBounds, uTransArea } from './primitive-bdl-node.js'
+
+// Pending-texture placeholder alpha: 0 so the quad emits nothing under the
+// SrcAlpha blend state below. WebGPU applies CustomBlending even with
+// transparent=false, so 1 would render an opaque black quad until the texture
+// streams in. Must stay 0.
+export const BAKED_PLACEHOLDER_ALPHA = 0
 
 export interface BakedNodeMaterialOptions {
 	map?: ThreeTexture
@@ -37,19 +44,34 @@ export function createUnshadedBakedNodeMaterial(options: BakedNodeMaterialOption
 	)
 	const useTransmission = options.transmission !== false
 	const transTex = useTransmission ? getTransmissionTexture() : null
+	const lightTex = useTransmission ? getLightBufferTexture() : null
+	// Playfield-UV lookup shared by the bulb-field multiply and the lift.
+	const lightUv = () =>
+		vec2(positionWorld.x.div(uTransArea.x).add(float(0.5)), float(0.5).sub(positionWorld.z.div(uTransArea.y)))
 	const rebuild = (map: ThreeTexture | null): void => {
 		if (map) {
 			const texNode = texture(map, uv())
 			mat.colorNode = Fn(() => {
 				const texColor = texNode
-				const finalRgb = texColor.rgb.mul(uTintColor).mul(uEmissionScale)
+				const baseRgb = texColor.rgb.mul(uTintColor).mul(uEmissionScale)
+				// Upstream `lightLoop` multiplies the diffuse by the live bulb
+				// field; without it the bake stays at its (dark) authored albedo
+				// no matter how many lamps are on. The +1 floor keeps unlit
+				// tables exactly as before. Both terms stay inside the
+				// playfield: out-of-range room fragments must not sample the
+				// clamped edge texel.
+				const bulbUv = lightUv()
+				const inBounds = inPlayfieldBounds(bulbUv)
+				const finalRgb = lightTex
+					? baseRgb.mul(texture(lightTex, bulbUv).rgb.mul(inBounds).add(float(1)))
+					: baseRgb
 				if (transTex) {
-					const pfUv = vec2(
-						positionWorld.x.div(uTransArea.x).add(float(0.5)),
-						float(0.5).sub(positionWorld.z.div(uTransArea.y)),
-					)
 					const gate = step(texColor.a, TRANSMISSION_OPAQUE_CUTOFF)
-					const lift = sqrt(finalRgb).mul(texture(transTex, pfUv).rgb).mul(texColor.a).mul(gate)
+					const lift = sqrt(finalRgb)
+						.mul(texture(transTex, bulbUv).rgb)
+						.mul(texColor.a)
+						.mul(gate)
+						.mul(inBounds)
 					return vec4(finalRgb.add(lift), texColor.a)
 				}
 				return vec4(finalRgb, texColor.a)
@@ -58,7 +80,7 @@ export function createUnshadedBakedNodeMaterial(options: BakedNodeMaterialOption
 			// The file references a texture that has not streamed in yet. Native
 			// loads synchronously so it has no placeholder state; emit nothing
 			// until arrival to avoid a full-strength flat quad flashing in place.
-			mat.colorNode = Fn(() => vec4(0, 0, 0, 1))()
+			mat.colorNode = Fn(() => vec4(0, 0, 0, BAKED_PLACEHOLDER_ALPHA))()
 		} else {
 			// No texture by design (untextured solid): render the tint directly.
 			mat.colorNode = Fn(() => vec4(uTintColor.mul(uEmissionScale), 1))()
@@ -74,7 +96,7 @@ export function createUnshadedBakedNodeMaterial(options: BakedNodeMaterialOption
 
 	userData.__isBaked = true
 	userData.__bakedNode = true
-	mat.side = options.doubleSided ? DoubleSide : BackSide
+	mat.side = options.doubleSided !== false ? DoubleSide : BackSide
 	mat.depthWrite = true
 	mat.transparent = false
 	mat.blending = CustomBlending
@@ -105,18 +127,7 @@ export function isBakedNodeMaterial(mat: unknown): boolean {
 }
 
 export function setBakedMap(mat: unknown, map: ThreeTexture | null, name?: string): boolean {
-	const targetMaterial = mat as { userData?: Record<string, unknown>; needsUpdate?: boolean } | null | undefined
-	if (!targetMaterial || !isBakedNodeMaterial(targetMaterial)) return false
-	const userData = targetMaterial.userData as Record<string, unknown>
-	const nextMap = map ?? null
-	const sameMap = userData.__map === nextMap
-	const sameName = name === undefined || userData.__mapName === name
-	if (sameMap && sameName) return false
-	userData.__map = nextMap
-	if (name !== undefined) userData.__mapName = name
-	if (typeof userData.__rebuild === 'function') (userData.__rebuild as (next: ThreeTexture | null) => void)(nextMap)
-	targetMaterial.needsUpdate = true
-	return true
+	return setNodeMapSlot(mat, map, name, isBakedNodeMaterial)
 }
 
 export function cloneBakedNodeMaterial<T>(mat: T): T {
@@ -159,11 +170,4 @@ export function cloneBakedNodeMaterial<T>(mat: T): T {
 	cloned.side = sourceMaterial.side
 	copyPendingKeys(userData, cloned.userData as Record<string, unknown>)
 	return cloned as unknown as T
-}
-
-function copyPendingKeys(from: Record<string, unknown>, to: Record<string, unknown>): void {
-	for (const key of ['pendingMap', 'pendingNormalMap', 'pendingEnvMap', 'pendingEmissiveMap'] as const) {
-		const value = from[key]
-		if (typeof value === 'string' && value.length > 0) to[key] = value
-	}
 }

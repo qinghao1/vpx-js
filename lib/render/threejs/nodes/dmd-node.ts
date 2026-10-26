@@ -28,6 +28,16 @@ import {
 } from 'three/tsl'
 import { MeshBasicNodeMaterial } from 'three/webgpu'
 
+function configureDmdTexture(tex: DataTexture): void {
+	tex.magFilter = NearestFilter
+	tex.minFilter = NearestFilter
+	tex.generateMipmaps = false
+	tex.wrapS = ClampToEdgeWrapping
+	tex.wrapT = ClampToEdgeWrapping
+	tex.colorSpace = NoColorSpace
+	tex.needsUpdate = true
+}
+
 export class GpuDmdNodeController {
 	public readonly material: MeshBasicNodeMaterial
 	private dataTexture: DataTexture
@@ -42,13 +52,7 @@ export class GpuDmdNodeController {
 	constructor(width = 128, height = 32) {
 		const buffer = new Uint8Array(width * height)
 		this.dataTexture = new DataTexture(buffer, width, height, RedFormat, UnsignedByteType)
-		this.dataTexture.magFilter = NearestFilter
-		this.dataTexture.minFilter = NearestFilter
-		this.dataTexture.generateMipmaps = false
-		this.dataTexture.wrapS = ClampToEdgeWrapping
-		this.dataTexture.wrapT = ClampToEdgeWrapping
-		this.dataTexture.colorSpace = NoColorSpace
-		this.dataTexture.needsUpdate = true
+		configureDmdTexture(this.dataTexture)
 
 		this.uResolution = uniform(new Vector2(width, height))
 		this.uLedColor = uniform(new Color(0xff8800))
@@ -91,7 +95,9 @@ export class GpuDmdNodeController {
 
 		this.material.side = DoubleSide
 		this.material.depthWrite = false
-		this.material.depthTest = true
+		// Overlay: the backbox art behind the window is opaque, so a depth-tested
+		// DMD always loses (upstream composites the DMD on top for the same reason).
+		this.material.depthTest = false
 		this.material.toneMapped = false
 		this.material.transparent = false
 		this.material.polygonOffset = true
@@ -121,6 +127,7 @@ export class GpuDmdNodeController {
 		let hash = 0
 		let maxVal = 0
 		const len = width * height
+		let start = 0
 		if (rawFrame.byteOffset % 4 === 0) {
 			const u32Len = len >> 2
 			const u32 = new Uint32Array(rawFrame.buffer, rawFrame.byteOffset, u32Len)
@@ -136,17 +143,12 @@ export class GpuDmdNodeController {
 				const mw = m01 > m23 ? m01 : m23
 				if (mw > maxVal) maxVal = mw
 			}
-			for (let i = u32Len << 2; i < len; i++) {
-				const v = rawFrame[i]!
-				hash = (hash * 31 + v) | 0
-				if (v > maxVal) maxVal = v
-			}
-		} else {
-			for (let i = 0; i < len; i++) {
-				const v = rawFrame[i]!
-				hash = (hash * 31 + v) | 0
-				if (v > maxVal) maxVal = v
-			}
+			start = u32Len << 2
+		}
+		for (let i = start; i < len; i++) {
+			const v = rawFrame[i]!
+			hash = (hash * 31 + v) | 0
+			if (v > maxVal) maxVal = v
 		}
 		if (hash === this.lastHash) return
 		this.lastHash = hash
@@ -157,14 +159,7 @@ export class GpuDmdNodeController {
 			const newBuf = new Uint8Array(width * height)
 			newBuf.set(rawFrame.subarray(0, width * height))
 			this.dataTexture = new DataTexture(newBuf, width, height, RedFormat, UnsignedByteType)
-			this.dataTexture.magFilter = NearestFilter
-			this.dataTexture.minFilter = NearestFilter
-			this.dataTexture.generateMipmaps = false
-			this.dataTexture.wrapS = ClampToEdgeWrapping
-			this.dataTexture.wrapT = ClampToEdgeWrapping
-			this.dataTexture.colorSpace = NoColorSpace
-			this.dataTexture.needsUpdate = true
-			this.material.map = this.dataTexture
+			configureDmdTexture(this.dataTexture)
 			this.texNode.value = this.dataTexture
 			this.uResolution.value.set(width, height)
 		} else {
