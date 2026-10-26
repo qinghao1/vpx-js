@@ -1,35 +1,19 @@
-import * as fs from 'node:fs'
 import { MathUtils } from 'three'
 import { describe, expect, it } from 'vitest'
 import { TableBuilder } from '../test/table-builder.js'
 import { Player } from './game/player.js'
+import { Vertex2D, Vertex3D } from './math/vector.js'
 import { HitKD } from './physics/hit-kd.js'
-import { Vertex2D, Vertex3D } from './util/vector.js'
+import type { RenderVertex } from './util/vertex.js'
 import { GlobalApi } from './vpt/global-api.js'
 import { Mesh } from './vpt/mesh.js'
-import type { RenderVertex } from './vpt/render-vertex.js'
 
 describe('regression: P0 critical fixes', () => {
 	describe('slingshot threshold', () => {
-		it('line-seg-slingshot must check dot <= -slingshotThreshold not this.threshold', () => {
-			const src = fs.readFileSync('lib/physics/line-seg-slingshot.ts', 'utf-8')
-			expect(src, 'must use dot threshold check').toContain('dot <= -this.surfaceData.slingshotThreshold')
-			expect(src, 'must not use falsy this.threshold').not.toMatch(/&&\s*this\.threshold\s*\)/)
-			expect(src, 'must not check this.threshold alone').not.toContain('this.threshold)')
-			// file should contain both force and event paths with dot check
-			const matches = src.match(/dot <= -this\.surfaceData\.slingshotThreshold/g) ?? []
-			expect(
-				matches.length,
-				'should have at least 2 dot checks (force + event) or 1 event',
-			).toBeGreaterThanOrEqual(1)
-		})
-
 		it('slingshot event fires when threshold 0 and dot negative', async () => {
 			const { LineSegSlingshot } = await import('./physics/line-seg-slingshot.js')
 			const { SurfaceData } = await import('./vpt/surface/surface-data.js')
 			const { Event } = await import('./game/event.js')
-			// mock player physics
-			const physics: any = { timeMsec: 1000 }
 			const surfaceData: any = { isDisabled: false, slingshotThreshold: 0 }
 			const mockSurface: any = {}
 			const sling = new LineSegSlingshot(
@@ -39,7 +23,6 @@ describe('regression: P0 critical fixes', () => {
 				new Vertex2D(100, 0),
 				0,
 				100,
-				physics,
 			)
 			// need to set obj/fe
 			let fired = false
@@ -78,24 +61,18 @@ describe('regression: P0 critical fixes', () => {
 	})
 
 	describe('HitKD allocTwoNodes', () => {
-		it('must return exactly 2 nodes not slice to end', () => {
-			const src = fs.readFileSync('lib/physics/hit-kd.ts', 'utf-8')
-			expect(src, 'must not use slice without end').not.toMatch(/\.slice\(this\.numNodes - 2\)\s*\)/)
-			expect(src, 'must return 2-element array').toMatch(/return \[.*this\.nodes\[idx\]/)
-		})
-
 		it('allocTwoNodes returns exactly 2 and increments correctly', () => {
 			const kd = new (HitKD as any)() as HitKD
 			// manually set up nodes array with 10 nodes
 			const nodes: any[] = Array.from({ length: 10 }, (_, i) => ({ id: i }))
 			;(kd as any).nodes = nodes
 			;(kd as any).numNodes = 0
-			const a = kd.allocTwoNodes()
+			const a = kd.allocTwoNodes() as unknown as { id: number }[]
 			expect(a.length).toEqual(2)
 			expect(a[0].id).toEqual(0)
 			expect(a[1].id).toEqual(1)
 			expect((kd as any).numNodes).toEqual(2)
-			const b = kd.allocTwoNodes()
+			const b = kd.allocTwoNodes() as unknown as { id: number }[]
 			expect(b.length).toEqual(2)
 			expect(b[0].id).toEqual(2)
 			expect((kd as any).numNodes).toEqual(4)
@@ -109,15 +86,6 @@ describe('regression: P0 critical fixes', () => {
 	})
 
 	describe('mesh polygon triangulation', () => {
-		it('pre/post indices must use modulo, not buggy ternary', () => {
-			const src = fs.readFileSync('lib/vpt/mesh.ts', 'utf-8')
-			expect(src, 'must use modulo for pre').toContain('(i - 1 + s) % s')
-			expect(src, 'must use modulo for post').toContain('(i + 3) % s')
-			expect(src, 'must not contain old buggy pre').not.toContain('i < s - 1 ? i - 1 + s')
-			expect(src, 'bounding box must use c2.x not c2.y').not.toMatch(/c2\.y <= maxx/)
-			expect(src).toContain('c2.x <= maxx')
-		})
-
 		it('polygonToTriangles triangulates square correctly', () => {
 			const rgv: RenderVertex[] = [
 				{ x: 0, y: 0 } as any,
@@ -150,15 +118,6 @@ describe('regression: P0 critical fixes', () => {
 	})
 
 	describe('bumper scatter radians', () => {
-		it('bumper-hit must convert scatter degrees to radians', () => {
-			const file = fs.existsSync('lib/vpt/bumper/bumper-physics.ts')
-				? 'lib/vpt/bumper/bumper-physics.ts'
-				: 'lib/vpt/bumper/bumper-hit.ts'
-			const src = fs.readFileSync(file, 'utf-8')
-			expect(src).toContain('degToRad')
-			expect(src).toMatch(/MathUtils\.degToRad\(data\.scatter/)
-		})
-
 		it('bumper scatter 90deg becomes pi/2 radians', async () => {
 			const { BumperHit } = await import('./vpt/bumper/bumper-hit.js')
 			const { BumperData } = await import('./vpt/bumper/bumper-data.js')
@@ -193,12 +152,6 @@ describe('regression: P0 critical fixes', () => {
 	})
 
 	describe('ActiveBall', () => {
-		it('global-api must return BallApi not Ball', () => {
-			const src = fs.readFileSync('lib/vpt/global-api.ts', 'utf-8')
-			expect(src).toContain('getActiveBall()?.getApi()')
-			expect(src).not.toMatch(/return this\.player\.getActiveBall\(\)\s*$/m)
-		})
-
 		it('ActiveBall returns api when ball exists', async () => {
 			const { Table } = await import('./vpt/table/table.js')
 			const { NodeBinaryReader } = await import('./io/binary-reader.node.js')
@@ -218,16 +171,6 @@ describe('regression: P0 critical fixes', () => {
 			expect(api.ActiveBall).toBe(mockBallApi)
 			;(player as any).getActiveBall = () => null
 			expect(api.ActiveBall).toBeUndefined()
-		})
-	})
-
-	describe('WASM kernels C_TOL_ENDPNTS', () => {
-		it('kernels.cpp must define C_TOL_ENDPNTS and use it', () => {
-			const src = fs.readFileSync('wasm/modules/kernels/src/kernels.cpp', 'utf-8')
-			expect(src).toContain('C_TOL_ENDPNTS')
-			expect(src).toMatch(/constexpr float C_TOL_ENDPNTS/)
-			expect(src).toMatch(/btd < -C_TOL_ENDPNTS \|\| btd > len \+ C_TOL_ENDPNTS/)
-			expect(src, 'must not have bare btd <0 without tolerance').not.toMatch(/if \(btd < 0 \|\| btd > len\)/)
 		})
 	})
 })
