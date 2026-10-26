@@ -1,42 +1,28 @@
 import fs from 'node:fs'
-import path from 'node:path'
 import { performance } from 'node:perf_hooks'
 import { Player } from '../../lib/game/player.js'
 import { NodeBinaryReader } from '../../lib/io/binary-reader.node.js'
+import { Vertex3D } from '../../lib/math/vector.js'
 import { getWasmKernels, isWasmReady } from '../../lib/physics/wasm/kernels.js'
-import { Vertex3D } from '../../lib/util/vector.js'
 import { Table } from '../../lib/vpt/table/table.js'
+import { stats, timedSync } from './bench-shared.js'
+import { extractGameName, getArg, hasFlag } from './vpinball-resolver.js'
 
 const args = process.argv.slice(2)
-const getArg = (n: string, d: string | null) => args.find(a => a.startsWith(`--${n}=`))?.slice(n.length + 3) ?? d
-const hasFlag = (n: string) => args.includes(`--${n}`)
 
 const vpx =
-	getArg('vpx', null) ?? (fs.existsSync('walking_dead.vpx') ? 'walking_dead.vpx' : 'test/fixtures/table-empty.vpx')
-const ballsArg = Number(getArg('balls', vpx.includes('walking_dead') ? '5' : '10') ?? '5')
-const ticks = Number(getArg('ticks', '1000') ?? '1000')
-const warmup = Number(getArg('warmup', '100') ?? '100')
-
-function stats(arr: number[]) {
-	if (!arr.length) return null
-	const s = [...arr].sort((a, b) => a - b)
-	const avg = s.reduce((a, b) => a + b, 0) / s.length
-	return {
-		avg: +avg.toFixed(3),
-		p50: +s[(s.length * 0.5) | 0].toFixed(3),
-		p95: +s[(s.length * 0.95) | 0].toFixed(3),
-		p99: +s[(s.length * 0.99) | 0].toFixed(3),
-		min: +Math.min(...s).toFixed(3),
-		max: +Math.max(...s).toFixed(3),
-	}
-}
+	getArg(args, 'vpx', null) ??
+	(fs.existsSync('walking_dead.vpx') ? 'walking_dead.vpx' : 'test/fixtures/table-empty.vpx')
+const ballsArg = Number(getArg(args, 'balls', vpx.includes('walking_dead') ? '5' : '10') ?? '5')
+const ticks = Number(getArg(args, 'ticks', '1000') ?? '1000')
+const warmup = Number(getArg(args, 'warmup', '100') ?? '100')
 
 const reader = new NodeBinaryReader(vpx)
 console.log(`[profile] load ${vpx}`)
 const t0 = performance.now()
 const table = await Table.load(reader)
 console.log(
-	`[profile] Table.load ${(performance.now() - t0).toFixed(0)}ms  Game=${(table as any).tableScript?.match(/cGameName\s*=\s*["']([^"']+)["']/i)?.[1] ?? 'n/a'}`,
+	`[profile] Table.load ${(performance.now() - t0).toFixed(0)}ms  Game=${extractGameName((table as any).tableScript ?? '') ?? 'n/a'}`,
 )
 let wasmReady = false
 try {
@@ -67,12 +53,29 @@ for (let i = 0; i < ballsArg; i++) {
 }
 console.log(`[profile] balls=${player.balls.length}`)
 
-let hitCalls = 0,
-	wasmCalls = 0,
-	scalarCalls = 0,
-	totalOrderLen = 0
+let hitCalls = 0
+let wasmCalls = 0
+let scalarCalls = 0
+let totalOrderLen = 0
 let maxOrderLen = 0
 const orderHist = new Map<string, number>()
+
+function resetCounters(): void {
+	hitCalls = 0
+	wasmCalls = 0
+	scalarCalls = 0
+	totalOrderLen = 0
+	maxOrderLen = 0
+	orderHist.clear()
+}
+
+function orderBucket(len: number): string {
+	if (len < 16) return '<16'
+	if (len < 64) return '16-63'
+	if (len < 128) return '64-127'
+	if (len < 256) return '128-255'
+	return '256+'
+}
 const HitQuadtree = (await import('../../lib/physics/hit-quadtree.js')).HitQuadtree
 
 const origQT = HitQuadtree.prototype.hitTestBall
@@ -84,7 +87,7 @@ HitQuadtree.prototype.hitTestBall = function (ball: any, coll: any, physics: any
 	if (len > 0) {
 		totalOrderLen += len
 		maxOrderLen = Math.max(maxOrderLen, len)
-		const bucket = len < 16 ? '<16' : len < 64 ? '16-63' : len < 128 ? '64-127' : len < 256 ? '128-255' : '256+'
+		const bucket = orderBucket(len)
 		orderHist.set(bucket, (orderHist.get(bucket) ?? 0) + 1)
 		if (len >= 64 && isWasmReady()) wasmCalls++
 		else scalarCalls++
@@ -106,38 +109,24 @@ for (let i = 0; i < warmup; i++) {
 	player.updatePhysics(curMs)
 }
 
-hitCalls = 0
-wasmCalls = 0
-scalarCalls = 0
-totalOrderLen = 0
-maxOrderLen = 0
-orderHist.clear()
+resetCounters()
 
-const origSim = phys.physicsSimulateCycle.bind(phys)
+const origSim = phys.physicsSimulateCycle
 let innerHitMs = 0
-phys.physicsSimulateCycle = (dTime: number) => {
-	const a = performance.now()
-	const r = origSim(dTime)
-	innerHitMs += performance.now() - a
-	return r
-}
+phys.physicsSimulateCycle = timedSync(origSim, ms => {
+	innerHitMs += ms
+})
 
-const origVel = phys.updateVelocities.bind(phys)
-phys.updateVelocities = () => {
-	const a = performance.now()
-	const r = origVel()
-	moverTimes.push(performance.now() - a)
-	return r
-}
+const origVel = phys.updateVelocities
+phys.updateVelocities = timedSync(origVel, ms => {
+	moverTimes.push(ms)
+})
 
-const origFire = (phys as any).fireTimers?.bind(phys)
+const origFire = (phys as any).fireTimers
 if (origFire) {
-	;(phys as any).fireTimers = (mode: any) => {
-		const a = performance.now()
-		const r = origFire(mode)
-		timerTimes.push(performance.now() - a)
-		return r
-	}
+	;(phys as any).fireTimers = timedSync(origFire, ms => {
+		timerTimes.push(ms)
+	})
 }
 
 console.log(`[profile] running ${ticks} ticks @16ms monotonic, ${player.balls.length} balls…`)
@@ -150,7 +139,9 @@ for (let i = 0; i < ticks; i++) {
 	physTimes.push(dt)
 	player.updateAnimations(player.getGameTime())
 	if (i % 200 === 0 && i > 0)
-		console.log(`  ${i}/${ticks}  avg ${(physTimes.slice(-200).reduce((a, b) => a + b, 0) / 200).toFixed(3)}ms`)
+		console.log(
+			`  ${i}/${ticks}  avg ${(physTimes.slice(-200).reduce((sum, value) => sum + value, 0) / 200).toFixed(3)}ms`,
+		)
 }
 const totalMs = performance.now() - tStart
 
@@ -158,9 +149,9 @@ const hitAvg = hitCalls ? totalOrderLen / hitCalls : 0
 console.log(
 	`\n[results] ticks=${ticks} total=${totalMs.toFixed(0)}ms  avgTick=${(totalMs / ticks).toFixed(3)}ms  throughput=${Math.round((ticks * 1000) / totalMs)} ticks/sec`,
 )
-console.log(`  phys updatePhysics stats`, stats(physTimes))
-console.log(`  mover updateVelocities stats`, stats(moverTimes))
-console.log(`  timer stats`, stats(timerTimes))
+console.log(`  phys updatePhysics stats`, stats(physTimes, 3))
+console.log(`  mover updateVelocities stats`, stats(moverTimes, 3))
+console.log(`  timer stats`, stats(timerTimes, 3))
 console.log(
 	`  inner physicsSimulateCycle total ${innerHitMs.toFixed(1)}ms avg ${(innerHitMs / ticks).toFixed(3)}ms/tick`,
 )
@@ -172,19 +163,14 @@ console.log(
 )
 
 console.log(`\n[micro] physicsSimulateCycle(0.016) x500 isolated`)
-hitCalls = 0
-wasmCalls = 0
-scalarCalls = 0
-totalOrderLen = 0
-maxOrderLen = 0
-orderHist.clear()
+resetCounters()
 const microArr: number[] = []
 for (let i = 0; i < 500; i++) {
 	const a = performance.now()
 	phys.physicsSimulateCycle(0.016)
 	microArr.push(performance.now() - a)
 }
-console.log(`  micro stats`, stats(microArr))
+console.log(`  micro stats`, stats(microArr, 3))
 console.log(
 	`  micro hitCalls=${hitCalls} wasm~${wasmCalls} scalar~${scalarCalls} avgOrder=${hitCalls ? (totalOrderLen / hitCalls).toFixed(1) : 0}`,
 )
@@ -222,18 +208,18 @@ for (const n of [1, 5, 10, 20]) {
 		arr.push(performance.now() - a)
 	}
 	console.log(
-		`  balls=${n}  avg=${(arr.reduce((a, b) => a + b, 0) / arr.length).toFixed(3)}ms  p95=${stats(arr)?.p95}ms`,
+		`  balls=${n}  avg=${(arr.reduce((sum, value) => sum + value, 0) / arr.length).toFixed(3)}ms  p95=${stats(arr, 3)?.p95}ms`,
 	)
 }
 
-if (hasFlag('json')) {
+if (hasFlag(args, 'json')) {
 	const out = {
 		vpx,
 		balls: ballsArg,
 		ticks,
 		wasmReady,
-		physStats: stats(physTimes),
-		moverStats: stats(moverTimes),
+		physStats: stats(physTimes, 3),
+		moverStats: stats(moverTimes, 3),
 		hitCalls,
 		wasmCalls,
 		scalarCalls,

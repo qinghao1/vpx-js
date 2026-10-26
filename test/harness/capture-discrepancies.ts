@@ -2,6 +2,9 @@
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
+import { findWalkingDead } from './bench-shared.js'
+import { firstDiffIndex } from './parity-script.js'
+import { tapHeader, tapNotOk, tapOk, tapPlan, tapSkip } from './tap.js'
 
 type Severity = 'major' | 'minor' | 'info'
 type Status = 'pass' | 'fail' | 'warn' | 'skip'
@@ -16,17 +19,7 @@ interface DiscrepancyCheck {
 	check: () => Promise<{ status: Status; detail: string; evidence?: string }>
 }
 
-interface CheckResult {
-	id: string
-	category: string
-	title: string
-	severity: Severity
-	description: string
-	impact: string
-	status: Status
-	detail: string
-	evidence?: string
-}
+type CheckResult = Omit<DiscrepancyCheck, 'check'> & { status: Status; detail: string; evidence?: string }
 
 const HOME = os.homedir()
 const REPO_ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../..')
@@ -99,16 +92,56 @@ const checks: DiscrepancyCheck[] = [
 		description: 'Per-frame allocations in collision and input at 1000 Hz cause GC pauses (seen in 5-ball spikes).',
 		impact: 'Frame-time spikes / p99 latency; not a correctness gap but parity risk under GC.',
 		check: async () => {
-			const playerSrc = readFileSafe(path.join(REPO_ROOT, 'lib/game/player.ts'))
+			const poolSrc = readFileSafe(path.join(REPO_ROOT, 'lib/physics/collision-event.ts'))
 			const hasPool =
-				playerSrc.includes('CollisionEvent') ||
-				fileExists(path.join(REPO_ROOT, 'lib/physics/collision-event.ts'))
+				poolSrc.includes('new Pool(CollisionEvent)') &&
+				poolSrc.includes('static claim(') &&
+				poolSrc.includes('releaseOne(')
+			const physicsSrc = readFileSafe(path.join(REPO_ROOT, 'lib/game/player-physics.ts'))
+			const releasesContacts = physicsSrc.includes('CollisionEvent.releaseOne(')
+			// `new CollisionEvent` is allowed only in the one-per-ball BallHit
+			// constructor; any other construction site is per-step churn.
+			const allowed = new Set(['lib/physics/collision-event.ts', 'lib/vpt/ball/ball-hit.ts'])
+			const offenders: string[] = []
+			const walk = (dir: string): void => {
+				for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+					const full = path.join(dir, entry.name)
+					if (entry.isDirectory()) {
+						if (entry.name !== 'node_modules') walk(full)
+					} else if (entry.name.endsWith('.ts') && !entry.name.endsWith('.spec.ts')) {
+						const rel = path.relative(REPO_ROOT, full)
+						if (!allowed.has(rel) && readFileSafe(full).includes('new CollisionEvent(')) {
+							offenders.push(rel)
+						}
+					}
+				}
+			}
+			walk(path.join(REPO_ROOT, 'lib'))
+			if (!hasPool) {
+				return {
+					status: 'fail',
+					detail: 'CollisionEvent pool (Pool+claim+releaseOne) missing from collision-event.ts',
+					evidence: 'lib/physics/collision-event.ts',
+				}
+			}
+			if (offenders.length > 0) {
+				return {
+					status: 'fail',
+					detail: `per-step 'new CollisionEvent' outside pool/ball-hit: ${offenders.join(', ')}`,
+					evidence: offenders.join(', '),
+				}
+			}
+			if (!releasesContacts) {
+				return {
+					status: 'warn',
+					detail: 'pool exists but player-physics.ts never releases contacts back to it',
+					evidence: 'lib/game/player-physics.ts',
+				}
+			}
 			return {
-				status: 'warn',
-				detail: hasPool
-					? 'CollisionEvent pool exists but still allocates per step — verify with bench'
-					: 'No pool detected',
-				evidence: 'lib/physics/collision-event.ts, lib/game/player.ts',
+				status: 'pass',
+				detail: 'CollisionEvent pool wired (claim/releaseOne) and contacts released; no stray constructions',
+				evidence: 'lib/physics/collision-event.ts, lib/game/player-physics.ts',
 			}
 		},
 	},
@@ -326,14 +359,28 @@ const checks: DiscrepancyCheck[] = [
 		description: 'Native maps roughness via exponential gloss; web uses linear 1-r for some paths.',
 		impact: 'Playfield / plastics look too matte vs native (see Walking Dead screenshot).',
 		check: async () => {
-			const matSrc = readFileSafe(path.join(REPO_ROOT, 'lib/vpt/material.ts'))
-			const hasRoughness = matSrc.includes('roughness')
+			const genPath = 'lib/render/threejs/three-node-material-generator.ts'
+			const genSrc = readFileSafe(path.join(REPO_ROOT, genPath))
+			const hasLinear = genSrc.includes('1 - material.roughness')
+			const hasExp = /Math\.pow\s*\(\s*2|2\s*\*\*/.test(genSrc)
+			if (hasExp && !hasLinear) {
+				return {
+					status: 'pass',
+					detail: 'roughness uses exponential native-style curve (no linear 1-r mapping)',
+					evidence: genPath,
+				}
+			}
+			if (hasLinear) {
+				return {
+					status: 'fail',
+					detail: "linear '1 - material.roughness' in three-node-material-generator.ts (native: 2^(10r+1))",
+					evidence: genPath,
+				}
+			}
 			return {
 				status: 'warn',
-				detail: hasRoughness
-					? 'Roughness present but curve not verified vs native 2^(10r+1)'
-					: 'No roughness mapping',
-				evidence: 'lib/vpt/material.ts, lib/render/threejs/',
+				detail: 'no recognized roughness mapping in three-node-material-generator.ts',
+				evidence: genPath,
 			}
 		},
 	},
@@ -354,16 +401,41 @@ const checks: DiscrepancyCheck[] = [
 					detail: 'postProcessScene or BAKED constants missing',
 					evidence: 'lib/render/threejs/three-scene-postprocess.ts',
 				}
-			const twdPath = '/home/qinghao1/Downloads/walking_dead.vpx'
-			if (!fileExists(twdPath)) return { status: 'skip', detail: `skip: ${twdPath} not present` }
+			const twdPath = findWalkingDead()
+			if (!twdPath) return { status: 'skip', detail: 'skip: walking_dead.vpx not present' }
 			try {
 				const { NodeBinaryReader } = await import('../../lib/io/binary-reader.node.js')
 				const { Table } = await import('../../lib/vpt/table/table.js')
 				const table = await Table.load(new NodeBinaryReader(twdPath) as any, { loadTableScript: false } as any)
-				const hasPrimitives = Object.keys((table as any).primitives ?? {}).length > 0
+				// The bake heuristic keys on the BM_Playfield/playfield_mesh pair plus the
+				// playfield map: assert the reference table still carries all three inputs.
+				const primNames = Object.keys((table as any).primitives ?? {}).map(name => name.toLowerCase())
+				const hasBmPlayfield = primNames.includes('bm_playfield')
+				const hasPfMesh = primNames.includes('playfield_mesh')
+				let playfieldMap = ''
+				try {
+					playfieldMap = ((table as any).getPlayfieldMap?.() ?? '').toLowerCase()
+				} catch {}
+				const bakeMats = ((table as any).data?.materials ?? []).filter((mat: any) =>
+					/bake|nestmap|playfield/i.test(mat?.name ?? ''),
+				).length
+				if (!hasBmPlayfield || !hasPfMesh) {
+					return {
+						status: 'fail',
+						detail: `bake pair incomplete on reference table (BM_Playfield=${hasBmPlayfield} playfield_mesh=${hasPfMesh}, ${primNames.length} primitives)`,
+						evidence: 'walking_dead.vpx primitives',
+					}
+				}
+				if (!playfieldMap) {
+					return {
+						status: 'fail',
+						detail: 'reference table exposes no playfield map for the bake heuristic',
+						evidence: 'Table.getPlayfieldMap()',
+					}
+				}
 				return {
-					status: hasPrimitives ? 'pass' : 'warn',
-					detail: hasPrimitives ? 'table has primitives (scene sanity)' : 'no primitives found',
+					status: 'pass',
+					detail: `bake inputs present (BM_Playfield + playfield_mesh, playfieldMap=${playfieldMap}, ${bakeMats} bake materials)`,
 					evidence: 'lib/render/threejs/three-scene-postprocess.ts',
 				}
 			} catch (error: unknown) {
@@ -457,8 +529,8 @@ const checks: DiscrepancyCheck[] = [
 		description: 'Byte-level script equality is ground truth; walking_dead 197.9 KB should match.',
 		impact: 'Any delta means OLE/BIFF parsing divergence shipped to player.',
 		check: async () => {
-			const twdPath = '/home/qinghao1/Downloads/walking_dead.vpx'
-			if (!fileExists(twdPath)) return { status: 'skip', detail: 'skip: walking_dead.vpx not present' }
+			const twdPath = findWalkingDead()
+			if (!twdPath) return { status: 'skip', detail: 'skip: walking_dead.vpx not present' }
 			try {
 				const { discoverVpinball, getDynamicLinkerEnv } = await import('./vpinball-resolver.js')
 				const disc = discoverVpinball()
@@ -479,19 +551,15 @@ const checks: DiscrepancyCheck[] = [
 						.replace(/^\uFEFF/, '')
 						.replace(/\r\n/g, '\n')
 						.trim()
-				const ok = norm(nativeScript) === norm(jsScript)
+				const normNative = norm(nativeScript)
+				const normJs = norm(jsScript)
+				const ok = normNative === normJs
 				return {
 					status: ok ? 'pass' : 'fail',
 					detail: ok
 						? `byte parity OK (197.9 KB)`
-						: `mismatch: native ${nativeScript.length} vs js ${jsScript.length}, first diff at ${(() => {
-								const a = norm(nativeScript)
-								const b = norm(jsScript)
-								for (let index = 0; index < Math.min(a.length, b.length); index++)
-									if (a[index] !== b[index]) return index
-								return Math.min(a.length, b.length)
-							})()}`,
-					evidence: 'test/harness/verify-vpinball-compat.ts: normalizeScript',
+						: `mismatch: native ${nativeScript.length} vs js ${jsScript.length}, first diff at ${firstDiffIndex(normNative, normJs)}`,
+					evidence: 'test/harness/parity-script.ts: normalizeScript',
 				}
 			} catch (error: unknown) {
 				return { status: 'warn', detail: `parity check error: ${(error as Error).message}` }
@@ -500,33 +568,29 @@ const checks: DiscrepancyCheck[] = [
 	},
 ]
 
+function checkMeta(item: DiscrepancyCheck): Omit<DiscrepancyCheck, 'check'> {
+	return {
+		id: item.id,
+		category: item.category,
+		title: item.title,
+		severity: item.severity,
+		description: item.description,
+		impact: item.impact,
+	}
+}
+
+function countBy(results: CheckResult[], status: Status): number {
+	return results.filter(result => result.status === status).length
+}
+
 async function runAll(): Promise<CheckResult[]> {
 	const results: CheckResult[] = []
 	for (const item of checks) {
 		try {
 			const res = await item.check()
-			results.push({
-				id: item.id,
-				category: item.category,
-				title: item.title,
-				severity: item.severity,
-				description: item.description,
-				impact: item.impact,
-				status: res.status,
-				detail: res.detail,
-				evidence: res.evidence,
-			})
+			results.push({ ...checkMeta(item), status: res.status, detail: res.detail, evidence: res.evidence })
 		} catch (error: unknown) {
-			results.push({
-				id: item.id,
-				category: item.category,
-				title: item.title,
-				severity: item.severity,
-				description: item.description,
-				impact: item.impact,
-				status: 'warn',
-				detail: `exception: ${(error as Error).message}`,
-			})
+			results.push({ ...checkMeta(item), status: 'warn', detail: `exception: ${(error as Error).message}` })
 		}
 	}
 	return results
@@ -541,10 +605,10 @@ function renderMarkdown(results: CheckResult[]): string {
 		byCategory.set(result.category, arr)
 	}
 	const total = results.length
-	const pass = results.filter(r => r.status === 'pass').length
-	const fail = results.filter(r => r.status === 'fail').length
-	const warn = results.filter(r => r.status === 'warn').length
-	const skip = results.filter(r => r.status === 'skip').length
+	const pass = countBy(results, 'pass')
+	const fail = countBy(results, 'fail')
+	const warn = countBy(results, 'warn')
+	const skip = countBy(results, 'skip')
 	const majorFail = results.filter(r => r.status === 'fail' && r.severity === 'major').length
 
 	let out = `# vpx-js — Web vs Native Discrepancy Report\n\n`
@@ -563,11 +627,7 @@ function renderMarkdown(results: CheckResult[]): string {
 	out += `| Category | Pass | Fail | Warn | Skip |\n`
 	out += `|---|---:|---:|---:|---:|\n`
 	for (const [category, list] of byCategory) {
-		const cPass = list.filter(r => r.status === 'pass').length
-		const cFail = list.filter(r => r.status === 'fail').length
-		const cWarn = list.filter(r => r.status === 'warn').length
-		const cSkip = list.filter(r => r.status === 'skip').length
-		out += `| ${category} | ${cPass} | ${cFail} | ${cWarn} | ${cSkip} |\n`
+		out += `| ${category} | ${countBy(list, 'pass')} | ${countBy(list, 'fail')} | ${countBy(list, 'warn')} | ${countBy(list, 'skip')} |\n`
 	}
 	out += `\n`
 
@@ -578,12 +638,13 @@ function renderMarkdown(results: CheckResult[]): string {
 	out += `4. **Render sanity** — reuses \`verify-twd-render.ts\` logic: generates Three.js scene, runs \`postProcessScene\`, asserts \`BM_Playfield\` visibility.\n`
 	out += `5. **Markdown + TAP** — harness emits TAP to console and writes this file to \`${DOCS_OUT}\` on every run. CI with no native/ROM auto-skips those checks.\n\n`
 
+	const STATUS_ICON: Record<Status, string> = { pass: '✅', fail: '❌', warn: '⚠️', skip: '⏭️' }
+	const SEVERITY_LABEL: Record<Severity, string> = { major: '**major**', minor: '*minor*', info: 'info' }
 	for (const [category, list] of byCategory) {
 		out += `## ${category}\n\n`
 		for (const result of list) {
-			const icon =
-				result.status === 'pass' ? '✅' : result.status === 'fail' ? '❌' : result.status === 'warn' ? '⚠️' : '⏭️'
-			const sev = result.severity === 'major' ? '**major**' : result.severity === 'minor' ? '*minor*' : 'info'
+			const icon = STATUS_ICON[result.status]
+			const sev = SEVERITY_LABEL[result.severity]
 			out += `### ${icon} ${result.id} — ${result.title} (${sev}, ${result.status})\n\n`
 			out += `${result.description}\n\n`
 			out += `**Impact:** ${result.impact}\n\n`
@@ -599,11 +660,6 @@ function renderMarkdown(results: CheckResult[]): string {
 		out += `| ${result.id} | ${result.severity} | ${result.status} | ${result.title} |\n`
 	}
 	out += `\n`
-
-	out += `## What Your Screenshot Shows\n\n`
-	out += `- **Clipped High Score / playfield** → **R3/R4/V1**: windowed \`1280×900 @ 1280,0\` via transient INI, but GNOME mutter recenters to ~743,407 and decorates. Web \`ThreeCameraFraming\` auto-frames differently than native F6 POV (inclination/layback/FOV). Press \`F6\` in native to tune, or use \`npm run compare -- --vpx=walking_dead.vpx\` for deterministic side-by-side.\n`
-	out += `- **Flat / swapped colors** → **S4/D2/R2**: \`RGB\` BBGGRR swap + zeroed \`glossyImageLerp/thickness\` + linear roughness make plastics/wood flat vs native.\n`
-	out += `- **Mask bugs not visible but divergent** → **S1/S2**: \`sw And 7\` / \`1 & 2\` silently change game logic; harness now fails these explicitly.\n\n`
 
 	out += `## How to Reproduce\n\n`
 	out += `\`\`\`bash\n`
@@ -631,30 +687,38 @@ async function main(): Promise<void> {
 	const wantMarkdown = raw.includes('--markdown') || raw.includes('--md') || raw.length === 0
 	const results = await runAll()
 
-	console.log(`TAP version 13\n# capture-discrepancies — ${new Date().toISOString()}`)
-	console.log(`1..${results.length}`)
+	tapHeader('capture-discrepancies')
+	tapPlan(results.length)
 	let passCount = 0
 	for (const [index, result] of results.entries()) {
 		const num = index + 1
 		const sev = result.severity
+		const name = `${result.id} ${result.title}`
 		if (result.status === 'pass') {
 			passCount++
-			console.log(`ok ${num} - ${result.id} ${result.title} # ${sev}`)
+			tapOk(num, name, sev)
 		} else if (result.status === 'skip') {
 			passCount++
-			console.log(`ok ${num} - ${result.id} ${result.title} # SKIP ${sev}: ${result.detail}`)
+			tapSkip(num, name, `${sev}: ${result.detail}`)
 		} else if (result.status === 'warn') {
-			console.log(`ok ${num} - ${result.id} ${result.title} # TODO warn (${sev}): ${result.detail}`)
+			tapOk(num, name, `TODO warn (${sev}): ${result.detail}`)
 		} else {
-			console.log(`not ok ${num} - ${result.id} ${result.title} # ${sev}: ${result.detail}`)
+			tapNotOk(num, name, `# ${sev}: ${result.detail}`)
 		}
 		if (result.evidence) console.log(`  # evidence: ${result.evidence}`)
 	}
 	console.log(
-		`\n# pass ${passCount}/${results.length} (fail=${results.filter(r => r.status === 'fail').length}, warn=${results.filter(r => r.status === 'warn').length}, skip=${results.filter(r => r.status === 'skip').length})`,
+		`\n# pass ${passCount}/${results.length} (fail=${countBy(results, 'fail')}, warn=${countBy(results, 'warn')}, skip=${countBy(results, 'skip')})`,
 	)
-	const hasMajorFail = results.some(r => r.status === 'fail' && r.severity === 'major')
-	console.log(hasMajorFail ? '# Result: FAIL (major discrepancies present)' : '# Result: PASS')
+	// Every `not ok` line fails the gate: minor/info failures used to exit 0,
+	// so verify-all mapped them to pass.
+	const failCount = countBy(results, 'fail')
+	const majorFail = results.filter(r => r.status === 'fail' && r.severity === 'major').length
+	console.log(
+		failCount > 0
+			? `# Result: FAIL (${failCount} failing checks${majorFail > 0 ? `, ${majorFail} major` : ''})`
+			: '# Result: PASS',
+	)
 
 	if (wantMarkdown) {
 		const markdown = renderMarkdown(results)
@@ -667,7 +731,7 @@ async function main(): Promise<void> {
 		}
 	}
 
-	if (hasMajorFail) process.exitCode = 1
+	if (failCount > 0) process.exitCode = 1
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

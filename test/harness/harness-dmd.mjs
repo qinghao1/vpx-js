@@ -1,156 +1,34 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { attachLogging, launchBrowser, loadPuppeteer, newPage } from './utils.mjs'
+import { attachLogging, injectDmdPattern, launchBrowser, loadPuppeteer, openTablePage, sleep } from './utils.mjs'
+import { getArg } from './vpinball-resolver.ts'
 
 const puppeteer = await loadPuppeteer()
-const url =
-	process.argv.find(a => a.startsWith('--url='))?.split('=')[1] ||
-	'http://localhost:3000/?vpx=/test/fixtures/table-empty.vpx'
-const out = process.argv.find(a => a.startsWith('--out='))?.split('=')[1] || '/tmp'
+const args = process.argv.slice(2)
+const url = getArg(args, 'url', 'http://localhost:3000/?vpx=/test/fixtures/table-empty.vpx')
+const out = getArg(args, 'out', '/tmp')
 console.log(`[harness-dmd] url=${url} out=${out}`)
 const browser = await launchBrowser(puppeteer)
-const page = await newPage(browser)
-const _logs = attachLogging(page, {
-	filter: /PinMAME|GameName|DMD|Ready|Parsed|Framed|created|emu|Player/,
-	prefix: '[browser]',
+const { page } = await openTablePage(browser, url, {
+	label: 'harness-dmd',
+	onPage: async target => {
+		attachLogging(target, {
+			filter: /PinMAME|GameName|DMD|Ready|Parsed|Framed|created|emu|Player/,
+			prefix: '[browser]',
+		})
+	},
 })
-console.log('[harness-dmd] goto')
-await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 })
-console.log('[harness-dmd] waiting for viewer Ready (up to 30s)')
-let viewerReady = false
-for (let i = 0; i < 30; i++) {
-	await new Promise(r => setTimeout(r, 1000))
-	const s = await page.evaluate(() => ({
-		title: document.getElementById('load-title')?.innerText || '',
-		log: document.getElementById('log')?.innerText || '',
-		stats: document.getElementById('stats')?.innerText || '',
-		dmdMeshes: window.viewer?.dmdMeshes?.length || 0,
-	}))
-	if (s.title === 'Ready' || s.stats.includes('Ready')) {
-		console.log(
-			`[harness-dmd] viewer Ready at ${i}s dmdMeshes=${s.dmdMeshes} stats=${s.stats.slice(0, 120).replace(/\n/g, ' | ')}`,
-		)
-		viewerReady = true
-		break
-	}
-	if (i % 5 === 0)
-		console.log(
-			`[harness-dmd] ${i}s title=${s.title} dmd=${s.dmdMeshes} stats=${s.stats.slice(0, 80).replace(/\n/g, ' | ')}`,
-		)
-}
-if (!viewerReady) console.log('[harness-dmd] viewer not ready, continuing anyway')
-console.log('[harness-dmd] switching to play mode')
-await page.evaluate(() => {
-	const sel = document.getElementById('mode')
-	if (sel) {
-		sel.value = 'play'
-		sel.dispatchEvent(new Event('change', { bubbles: true }))
-	}
-	if (window.viewer) window.viewer.viewerMode = 'play'
-})
-await new Promise(r => setTimeout(r, 2000))
-console.log('[harness-dmd] waiting for play emu (up to 20s)')
-let _playReady = false
-for (let i = 0; i < 20; i++) {
-	await new Promise(r => setTimeout(r, 1000))
-	const s = await page.evaluate(() => ({
-		stats: document.getElementById('stats')?.innerText || '',
-		log: document.getElementById('log')?.innerText || '',
-		dmdMeshes: window.viewer?.dmdMeshes?.length || 0,
-		emu: (window.viewer?.player || window.player)?.getPhysics?.()?.emu?.constructor.name || 'none',
-		emuInit: (window.viewer?.player || window.player)?.getPhysics?.()?.emu?.isInitialized?.(),
-	}))
-	if (s.stats.includes('PLAY') && s.emu !== 'none') {
-		console.log(
-			`[harness-dmd] play Ready at ${i}s emu=${s.emu} init=${s.emuInit} dmd=${s.dmdMeshes} stats=${s.stats.slice(0, 120).replace(/\n/g, ' | ')}`,
-		)
-		_playReady = true
-		break
-	}
-	if (i % 5 === 0)
-		console.log(
-			`[harness-dmd] ${i}s play waiting emu=${s.emu} dmd=${s.dmdMeshes} stats=${s.stats.slice(0, 80).replace(/\n/g, ' | ')}`,
-		)
-}
 console.log('[harness-dmd] injecting DMD test pattern')
-const inject = await page.evaluate(() => {
-	try {
-		const viewer = window.viewer
-		const emu = (window.viewer?.player || window.player)?.getPhysics?.()?.emu
-		if (!viewer) return 'no viewer'
-		if (!emu) return 'no emu'
-		const W = 128,
-			H = 32
-		const frame = new Uint8Array(W * H)
-		// Create visible amber pattern: border + diagonal + central block
-		for (let y = 0; y < H; y++) {
-			for (let x = 0; x < W; x++) {
-				let v = 0
-				if (x < 1 || x >= W - 1 || y < 1 || y >= H - 1)
-					v = 15 // border
-				else if (Math.abs(x - y * 4) < 1)
-					v = 10 // diagonal
-				else if (x > 20 && x < 108 && y > 8 && y < 24) {
-					// checker + text area
-					if ((Math.floor(x / 8) + Math.floor(y / 8)) % 2 === 0) v = 15
-					else v = 6
-					// make "DMD" letters via simple block font (approx)
-					// Draw a simple "VPX" pattern in center
-					// For visibility, create 3 vertical bars for "III" effect
-					if (y > 12 && y < 20) {
-						if ((x > 30 && x < 38) || (x > 50 && x < 58) || (x > 70 && x < 78) || (x > 90 && x < 98)) v = 15
-					}
-				} else if (x % 16 === 0 || y % 8 === 0) v = 2
-				frame[y * W + x] = v
-			}
-		}
-		// Also try emulatorState.setDmd if available
-		try {
-			if (emu.emulatorState?.setDmd) emu.emulatorState.setDmd(frame)
-			else if (emu.emulatorState)
-				emu.emulatorState.applyPinmame?.(new Uint8Array(64), new Uint8Array(8), new Uint8Array(4))
-			// fallback: directly set viewer's dmdFallback override? we can monkey patch getDmdFrame
-			const _orig = emu.getDmdFrame?.bind(emu)
-			// monkey patch to return our frame
-			emu.getDmdFrame = () => frame
-			emu.getDmdDimensions = () => ({ x: W, y: H, isVector2: true })
-		} catch (e) {
-			console.log('setDmd monkey err', e.message)
-		}
-		// Also force dimensions
-		try {
-			viewer.dmdW = W
-			viewer.dmdH = H
-			viewer._dmdLastHash = -1
-		} catch {}
-		// Force render
-		try {
-			viewer._ensureDmdTexture()
-			viewer._renderDmd()
-			viewer._pollPinmame()
-			if (viewer._renderDmd) viewer._renderDmd()
-		} catch (e) {
-			console.log('render err', e.message)
-		}
-		// Ensure texture update
-		if (viewer.dmdTexture) viewer.dmdTexture.needsUpdate = true
-		// Check frame via player
-		const got = (window.viewer?.player || window.player)?.getDmdFrame?.()
-		return `injected ${frame.length} got=${got?.length} max=${Math.max(...frame)} emu=${emu.constructor.name} dmdMeshes=${viewer.dmdMeshes?.length} texture=${!!viewer.dmdTexture} canvas=${!!viewer.dmdCanvas}`
-	} catch (e) {
-		return `inject err ${e.stack?.slice(0, 2000)}`
-	}
-})
-console.log('[harness-dmd] inject result', inject)
-await new Promise(r => setTimeout(r, 800))
+const inject = await injectDmdPattern(page)
+console.log('[harness-dmd] inject result', JSON.stringify(inject))
+await sleep(800)
 const afterRender = await page.evaluate(() => {
 	const v = window.viewer
-	const _emu = (window.viewer?.player || window.player)?.getPhysics?.()?.emu
+	const wrap = document.getElementById('dmd-wrap')
+	const canvas = document.getElementById('dmd')
 	return {
-		dmdDisplay: getComputedStyle(document.getElementById('dmd-wrap')).display,
-		dmdCanvasDisplay: document.getElementById('dmd')
-			? getComputedStyle(document.getElementById('dmd')).display
-			: 'no-canvas',
+		dmdDisplay: wrap ? getComputedStyle(wrap).display : 'no-wrap',
+		dmdCanvasDisplay: canvas ? getComputedStyle(canvas).display : 'no-canvas',
 		dmdStatus: document.getElementById('dmd-status')?.innerText || '',
 		stats: document.getElementById('stats')?.innerText || '',
 		dmdMeshes: v?.dmdMeshes?.map(m => ({
@@ -203,7 +81,6 @@ const camInfo = await page.evaluate(() => {
 		const controls = window.controls
 		// Save original
 		const origPos = cam.position.clone()
-		const _origTarget = controls.target.clone()
 		// Offset south (+Z) and up (+Y)
 		const offset = new THREE.Vector3(0, 18, 45)
 		// For DMD at north end, south is positive Z, so add to worldPos
@@ -219,11 +96,11 @@ const camInfo = await page.evaluate(() => {
 	}
 })
 console.log('[harness-dmd] camInfo', camInfo)
-await new Promise(r => setTimeout(r, 600))
+await sleep(600)
 const shotPath = path.join(out, 'dmd_on_table.png')
 await page.screenshot({ path: shotPath })
 console.log(`[harness-dmd] screenshot 1 -> ${shotPath} ${fs.statSync(shotPath).size} bytes`)
-await new Promise(r => setTimeout(r, 400))
+await sleep(400)
 // Also take a second shot from slightly different angle: overview
 const camInfo2 = await page.evaluate(() => {
 	try {
@@ -245,7 +122,7 @@ const camInfo2 = await page.evaluate(() => {
 	}
 })
 console.log('[harness-dmd] camInfo2', camInfo2)
-await new Promise(r => setTimeout(r, 600))
+await sleep(600)
 const shotPath2 = path.join(out, 'dmd_overview.png')
 await page.screenshot({ path: shotPath2 })
 console.log(`[harness-dmd] screenshot 2 -> ${shotPath2} ${fs.statSync(shotPath2).size} bytes`)
@@ -260,9 +137,40 @@ await page.evaluate(() => {
 		if (window.renderer && window.scene && window.camera) window.renderer.render(window.scene, window.camera)
 	} catch {}
 })
-await new Promise(r => setTimeout(r, 600))
+await sleep(600)
 const shotPath3 = path.join(out, 'dmd_play_cam.png')
 await page.screenshot({ path: shotPath3 })
 console.log(`[harness-dmd] screenshot 3 (play cam) -> ${shotPath3} ${fs.statSync(shotPath3).size} bytes`)
+// Pixel-count assert: the injected pattern must actually reach the 2D DMD
+// canvas (lit pixels) and the 3D DMD meshes (bound maps). This is a gate, not
+// a screenshot script — it exits nonzero when the DMD pipeline is dark.
+const verdict = await page.evaluate(() => {
+	try {
+		const canvas = document.getElementById('dmd')
+		let lit = 0,
+			total = 0
+		if (canvas && canvas.width > 0 && canvas.height > 0) {
+			const ctx = canvas.getContext('2d')
+			const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data
+			total = canvas.width * canvas.height
+			for (let index = 0; index < data.length; index += 4) {
+				if (data[index] + data[index + 1] + data[index + 2] > 0) lit++
+			}
+		}
+		const meshes = window.viewer?.dmdMeshes || []
+		const mapped = meshes.filter(mesh => !!mesh.material?.map).length
+		return { lit, total, meshes: meshes.length, mapped }
+	} catch (err) {
+		return { lit: 0, total: 0, meshes: 0, mapped: 0, error: err.message }
+	}
+})
+console.log('[harness-dmd] verdict', JSON.stringify(verdict))
+const dmdPass = verdict.lit > 100 && verdict.mapped > 0
 await browser.close()
-console.log('[harness-dmd] done')
+if (!dmdPass) {
+	console.error(
+		`[harness-dmd] FAIL: expected >100 lit DMD pixels + mapped meshes (lit=${verdict.lit}/${verdict.total} meshes=${verdict.meshes} mapped=${verdict.mapped})`,
+	)
+	process.exit(1)
+}
+console.log(`[harness-dmd] PASS: DMD pipeline live (lit=${verdict.lit}/${verdict.total} mapped=${verdict.mapped})`)

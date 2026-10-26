@@ -27,15 +27,15 @@ function parseArgs(raw: string[]): CompareOptions {
 	let nativeX = 1280
 	let nativeY = 0
 	const vpxArgs: string[] = []
-	for (const a of raw) {
-		if (a === '--headless') headed = false
-		else if (a === '--headed') headed = true
-		else if (a === '--help' || a === '-h') help = true
-		else if (a.startsWith('--width=')) width = Number.parseInt(a.slice(8), 10) || 1280
-		else if (a.startsWith('--height=')) height = Number.parseInt(a.slice(9), 10) || 900
-		else if (a.startsWith('--x=')) nativeX = Number.parseInt(a.slice(4), 10) || 1280
-		else if (a.startsWith('--y=')) nativeY = Number.parseInt(a.slice(4), 10) || 0
-		else vpxArgs.push(a)
+	for (const token of raw) {
+		if (token === '--headless') headed = false
+		else if (token === '--headed') headed = true
+		else if (token === '--help' || token === '-h') help = true
+		else if (token.startsWith('--width=')) width = Number.parseInt(token.slice(8), 10) || 1280
+		else if (token.startsWith('--height=')) height = Number.parseInt(token.slice(9), 10) || 900
+		else if (token.startsWith('--x=')) nativeX = Number.parseInt(token.slice(4), 10) || 1280
+		else if (token.startsWith('--y=')) nativeY = Number.parseInt(token.slice(4), 10) || 0
+		else vpxArgs.push(token)
 	}
 	return { vpxArgs, headed, help, width, height, nativeX, nativeY }
 }
@@ -67,28 +67,29 @@ async function ensureDistEsm() {
 	console.log('[compare] dist-esm missing, building…')
 	try {
 		execSync('npm run build:esm', { stdio: 'inherit', timeout: 120000 })
-	} catch (e) {
-		console.warn('[compare] build:esm failed, continuing anyway', e)
+	} catch (error) {
+		console.warn('[compare] build:esm failed, continuing anyway', error)
 	}
 }
 
 async function main() {
 	const raw = process.argv.slice(2)
 	const { vpxArgs, headed, help, width, height, nativeX, nativeY } = parseArgs(raw)
-	if (help || vpxArgs.length === 0) {
+	if (help) {
 		printHelp()
-		if (help) process.exit(0)
-		if (vpxArgs.length === 0) {
-			console.error('\nerror: provide --vpx=<path|fixture> or browser URL')
-			process.exit(1)
-		}
+		process.exit(0)
+	}
+	if (vpxArgs.length === 0) {
+		printHelp()
+		console.error('\nerror: provide --vpx=<path|fixture> or browser URL')
+		process.exit(1)
 	}
 
 	let session
 	try {
 		session = await resolveVpxSession(vpxArgs)
-	} catch (e: unknown) {
-		console.error(`[compare] resolve failed: ${(e as Error).message}`)
+	} catch (error: unknown) {
+		console.error(`[compare] resolve failed: ${(error as Error).message}`)
 		process.exit(1)
 	}
 	console.log(`[compare] table: ${session.vpxPath}`)
@@ -107,33 +108,10 @@ async function main() {
 
 	// Start vite
 	console.log('[compare] ensuring vite dev server on :3000…')
+	const utils: any = await import('./utils.mjs')
 	let viteProc: any = null
-	try {
-		const utils: any = await import('./utils.mjs')
-		if (utils.ensureVite) {
-			viteProc = await utils.ensureVite(session.browserUrl, { label: 'vite' })
-		}
-	} catch (e: unknown) {
-		console.warn('[compare] ensureVite import failed, trying fallback', (e as Error).message)
-		// fallback: manual spawn
-		const { spawn: sp } = await import('node:child_process')
-		viteProc = sp('npx', ['vite', '--host', '--port', '3000', '--clearScreen', 'false'], {
-			cwd: process.cwd(),
-			stdio: ['ignore', 'pipe', 'pipe'],
-		})
-		viteProc.stdout.on('data', (chunk: Buffer) => process.stdout.write(`[vite] ${chunk}`))
-		viteProc.stderr.on('data', (chunk: Buffer) => process.stderr.write(`[vite] ${chunk}`))
-		// wait for ready
-		for (let attempt = 0; attempt < 30; attempt++) {
-			await new Promise(resolve => setTimeout(resolve, 500))
-			try {
-				const response = await fetch('http://localhost:3000/', {
-					method: 'HEAD',
-					signal: AbortSignal.timeout(1000),
-				} as any)
-				if (response.ok || response.status === 404) break
-			} catch {}
-		}
+	if (utils.ensureVite) {
+		viteProc = await utils.ensureVite(session.browserUrl, { label: 'vite' })
 	}
 
 	// Launch browser
@@ -143,7 +121,6 @@ async function main() {
 	let browser: any = null
 	let page: any = null
 	try {
-		const utils: any = await import('./utils.mjs')
 		const puppeteer = await utils.loadPuppeteer()
 		const launchOpts: any = headed
 			? {
@@ -225,6 +202,18 @@ async function main() {
 	console.log(`\n[compare] side-by-side ready — Left: Browser (0,0)  Right: Native (${nativeX},${nativeY})`)
 	console.log('[compare] press Ctrl+C to terminate both\n')
 
+	const terminate = (proc: any, escalationMs: number) => {
+		try {
+			if (proc && !proc.killed) {
+				proc.kill('SIGTERM')
+				setTimeout(() => {
+					try {
+						proc.kill('SIGKILL')
+					} catch {}
+				}, escalationMs)
+			}
+		} catch {}
+	}
 	const cleanup = async () => {
 		console.log('\n[compare] shutting down…')
 		try {
@@ -233,38 +222,17 @@ async function main() {
 		try {
 			if (browser) await browser.close().catch(() => {})
 		} catch {}
-		try {
-			if (nativeProc && !nativeProc.killed) {
-				nativeProc.kill('SIGTERM')
-				setTimeout(() => {
-					try {
-						nativeProc.kill('SIGKILL')
-					} catch {}
-				}, 2000)
-			}
-		} catch {}
-		try {
-			if (viteProc && !viteProc.killed) {
-				viteProc.kill('SIGTERM')
-				setTimeout(() => {
-					try {
-						viteProc.kill('SIGKILL')
-					} catch {}
-				}, 1000)
-			}
-		} catch {}
+		terminate(nativeProc, 2000)
+		terminate(viteProc, 1000)
 		// also ensure stale kills
 		try {
-			execSync('pkill -9 -f "chrome.*headless.*puppeteer" 2>/dev/null || true', {
-				stdio: 'ignore',
-				timeout: 2000,
-			})
+			utils.killStaleChromeSync()
 		} catch {}
 		process.exit(0)
 	}
 	process.once('SIGINT', cleanup)
 	process.once('SIGTERM', cleanup)
-	process.once('SIGHUP', cleanup as any)
+	process.once('SIGHUP', cleanup)
 
 	// Keep alive until one side exits
 	if (nativeProc) {
@@ -287,7 +255,7 @@ async function main() {
 	}
 }
 
-main().catch(e => {
-	console.error('[compare] fatal', e)
+main().catch(error => {
+	console.error('[compare] fatal', error)
 	process.exit(1)
 })

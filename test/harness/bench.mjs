@@ -1,34 +1,13 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { attachLogging, ensureVite, launchBrowser, loadPuppeteer, newPage } from './utils.mjs'
+import { exists, VPX_CANDIDATES } from './bench-shared.ts'
+import { attachLogging, ensureVite, launchBrowser, loadPuppeteer, newPage, sleep } from './utils.mjs'
+import { findRomForGameName, getArg, hasFlag } from './vpinball-resolver.ts'
 
 const args = process.argv.slice(2)
-const getArg = (name, def) => args.find(a => a.startsWith(`--${name}=`))?.slice(name.length + 3) ?? def
-const hasFlag = name => args.includes(`--${name}`)
 
 const DEFAULT_EMPTY = '/test/fixtures/table-empty.vpx'
-const exists = p => {
-	try {
-		return fs.existsSync(p) && fs.statSync(p).size > 1024
-	} catch (error) {
-		// Expected: fs throws ENOENT/EACCES/EPERM for missing or unreadable VPX/ROM — treat as not found.
-		void error
-		return false
-	}
-}
-
-const home = process.env.HOME ?? '/home/qinghao1'
-const vpxCandidates = [
-	path.join(home, 'Downloads/walking_dead.vpx'),
-	path.resolve('walking_dead.vpx'),
-	path.resolve('test/fixtures/table-empty.vpx'),
-]
-const romCandidates = [
-	path.join(home, '.pinmame/roms/twd_160h.zip'),
-	path.join(home, 'Downloads/twd_160h.zip'),
-	path.resolve('twd_160h.zip'),
-]
 
 function resolvePathToParam(filePath) {
 	const abs = path.resolve(filePath)
@@ -38,9 +17,8 @@ function resolvePathToParam(filePath) {
 		if (exists(pubLink) && fs.realpathSync(pubLink) === fs.realpathSync(abs)) {
 			return `/${path.basename(abs)}`
 		}
-	} catch (error) {
+	} catch {
 		// Expected: fs.realpathSync throws ENOENT when public symlink not present — fall through to /@fs.
-		void error
 	}
 	if (abs.includes('/test/fixtures/')) return abs.slice(path.resolve('.').length)
 	return `/@fs${abs}`
@@ -63,24 +41,26 @@ function resolveUrl(vpxPath, romPath) {
 	return `${u}&mode=play`
 }
 
-let url = getArg('url', null)
-const vpxArg = getArg('vpx', null)
-const romArg = getArg('rom', null)
+let url = getArg(args, 'url', null)
+const vpxArg = getArg(args, 'vpx', null)
+const romArg = getArg(args, 'rom', null)
+const autoVpx = VPX_CANDIDATES.find(candidate => exists(candidate)) ?? null
 if (!url) {
-	const vpxPath = vpxArg ?? vpxCandidates.find(exists) ?? DEFAULT_EMPTY
-	const romPath = romArg ?? (vpxPath.includes('walking_dead') ? romCandidates.find(exists) : null)
+	const vpxPath = vpxArg ?? autoVpx ?? DEFAULT_EMPTY
+	const romPath =
+		romArg ?? (vpxPath.includes('walking_dead') ? findRomForGameName('twd_160h', path.dirname(vpxPath)) : null)
 	url = resolveUrl(vpxPath, romPath)
-	if (!vpxArg && vpxCandidates.find(exists)) console.log(`[bench] auto-detected table: ${vpxPath}`)
+	if (!vpxArg && autoVpx) console.log(`[bench] auto-detected table: ${vpxPath}`)
 }
 
-const balls = Number(getArg('balls', '-1'))
-const duration = Number(getArg('duration', '3000'))
-const warmup = Number(getArg('warmup', url.includes('walking_dead') ? '2000' : '800'))
-const outPath = getArg('out', null)
-const profile = hasFlag('profile') || hasFlag('breakdown') || !hasFlag('no-profile')
-const interactive = !hasFlag('no-interact') && !hasFlag('passive')
-const headed = hasFlag('headed')
-const gpu = getArg('gpu', hasFlag('gpu') ? 'vulkan' : null)
+const balls = Number(getArg(args, 'balls', '-1'))
+const duration = Number(getArg(args, 'duration', '3000'))
+const warmup = Number(getArg(args, 'warmup', url.includes('walking_dead') ? '2000' : '800'))
+const outPath = getArg(args, 'out', null)
+const profile = hasFlag(args, 'profile') || hasFlag(args, 'breakdown') || !hasFlag(args, 'no-profile')
+const interactive = !hasFlag(args, 'no-interact') && !hasFlag(args, 'passive')
+const headed = hasFlag(args, 'headed')
+const gpu = getArg(args, 'gpu', hasFlag(args, 'gpu') ? 'vulkan' : null)
 
 console.log(
 	`[bench] url=${url} balls=${balls} duration=${duration} warmup=${warmup} interactive=${interactive} profile=${profile} gpu=${gpu ?? false} headed=${headed}`,
@@ -101,10 +81,14 @@ page.setDefaultTimeout(180000)
 
 const logs = attachLogging(page, { filter: /./, prefix: '[c]' })
 
+let exitCode = 0
+// biome-ignore format: file-spanning try/finally kept flat so the tracing block stays byte-identical
+try {
+
 // === TRACING (optional, enabled with --trace) ===
 let tracePath = null
 let tracingClient = null
-const doTrace = hasFlag('trace')
+const doTrace = hasFlag(args, 'trace')
 if (doTrace) {
 	tracePath = path.resolve(`trace-${Date.now()}.json`)
 	try {
@@ -136,39 +120,34 @@ try {
 							startTime: e.startTime,
 						})
 				}).observe({ entryTypes: ['measure', 'mark'] })
-			} catch (error) {
+			} catch {
 				// Expected: ReferenceError if PerformanceObserver missing or TypeError for unsupported entryTypes — bench can run without observer.
-				void error
 			}
 		}
 	})
-} catch (error) {
+} catch {
 	// Expected: Puppeteer may throw if page closed before script injected — bench continues without user-timing observer.
-	void error
 }
 
 // === 1. LOAD JOURNEY ===
 console.log(`[bench] === 1. LOAD JOURNEY ===`)
 const tNavStart = performance.now()
-let metricsBefore = null
-try {
-	metricsBefore = await page.metrics().catch(error => {
-		// Expected: CDP Metrics error if target detached — return null.
-		void error
+async function safeMetrics() {
+	try {
+		return await page.metrics()
+	} catch {
+		// Expected: CDP Metrics error if target detached or session closed — no metrics.
 		return null
-	})
-} catch (error) {
-	// Expected: page.metrics throws if session closed — treat as no metrics.
-	void error
-	metricsBefore = null
+	}
 }
+const metricsBefore = await safeMetrics()
 await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 120000 })
 const navMs = Math.round(performance.now() - tNavStart)
 
 let readyMs = null
 let readyHeap = null
 for (let i = 0; i < 90; i++) {
-	await new Promise(r => setTimeout(r, 1000))
+	await sleep(1000)
 	const s = await page.evaluate(() => {
 		const txt = document.getElementById('log')?.innerText ?? ''
 		const v = window.viewer
@@ -188,9 +167,8 @@ for (let i = 0; i < 90; i++) {
 					.slice(-10)
 					.map(m => `${m.name}:${Math.round(m.duration)}ms`)
 					.join(' | ')
-			} catch (error) {
+			} catch {
 				// Expected: TypeError if Performance API unavailable in this context.
-				void error
 				return ''
 			}
 		})()
@@ -207,12 +185,10 @@ for (let i = 0; i < 90; i++) {
 		break
 	}
 }
-if (readyMs == null) {
+if (readyMs === null) {
 	console.error('[bench] not Ready within 90s')
-	await browser.close()
-	vite?.kill()
-	process.exit(1)
-}
+	exitCode = 1
+} else {
 
 // Await background texture streaming / pre-loading if present
 let streamMs = 0
@@ -235,7 +211,7 @@ for (let i = 0; i < 80; i++) {
 	}
 	if (!status.isStreaming && i > 4) break
 	if (i % 5 === 0 && status.isStreaming) console.log(`[bench] streaming ${i * 0.5}s… heap ${pollHeap}MB`)
-	await new Promise(r => setTimeout(r, 500))
+	await sleep(500)
 }
 if (!streamDone) console.log(`[bench] streaming not done within timeout — partial ${pollHeap}MB`)
 
@@ -248,31 +224,18 @@ const userTiming = await page
 			for (const e of performance.getEntriesByType('mark')) out[`mark:${e.name}`] = Math.round(e.startTime)
 			if (window.__benchMarks?.length) out.__observer = window.__benchMarks.slice(-20)
 			return out
-		} catch (error) {
+		} catch {
 			// Expected: TypeError if Performance API unavailable — bench continues without measures.
-			void error
 			return {}
 		}
 	})
-	.catch(error => {
+	.catch(() => {
 		// Expected: page.evaluate CDP error if page detached mid-evaluate — bench can continue without user timing.
-		void error
 		return {}
 	})
 
 // Collect CDP metrics
-let metricsAfterLoad = null
-try {
-	metricsAfterLoad = await page.metrics().catch(error => {
-		// Expected: CDP Metrics domain not enabled or target closed — no metrics.
-		void error
-		return null
-	})
-} catch (error) {
-	// Expected: CDP error if page closed before metrics — ignore.
-	void error
-	metricsAfterLoad = null
-}
+const metricsAfterLoad = await safeMetrics()
 let perfEntries = []
 try {
 	perfEntries = await page.evaluate(() => {
@@ -280,15 +243,13 @@ try {
 			return performance
 				.getEntriesByType('navigation')
 				.map(n => ({ type: n.entryType, duration: Math.round(n.duration), transferSize: n.transferSize }))
-		} catch (error) {
+		} catch {
 			// Expected: TypeError if Performance API unavailable or ReferenceError if performance undefined — bench continues without navigation entries.
-			void error
 			return []
 		}
 	})
-} catch (error) {
+} catch {
 	// Expected: Puppeteer may throw if page closed before script injected — bench continues without user-timing observer.
-	void error
 }
 
 // Collect complete table & WebGL state
@@ -304,9 +265,8 @@ const loadState = await page.evaluate(() => {
 				meshes++
 			}
 		})
-	} catch (error) {
+	} catch {
 		// Expected: TypeError if tableGroup not yet mounted.
-		void error
 	}
 	const info = v.renderer?.info?.render ?? {}
 	const prog = v.renderer?.info?.programs ?? null
@@ -322,34 +282,24 @@ const loadState = await page.evaluate(() => {
 			glVendor = gl.getParameter(gl.VENDOR) ?? '?'
 			glRenderer = gl.getParameter(gl.RENDERER) ?? '?'
 			glVersion = gl.getParameter(gl.VERSION) ?? '?'
+			const unmasked = key => {
+				try {
+					const ext = gl.getExtension('WEBGL_debug_renderer_info')
+					return ext ? gl.getParameter(ext[key]) : null
+				} catch {
+					// Expected: SecurityError if WEBGL_debug_renderer_info blocked or TypeError if WebGL context lost — renderer info is optional.
+					return null
+				}
+			}
 			glParams = {
 				MAX_TEXTURE_SIZE: gl.getParameter(gl.MAX_TEXTURE_SIZE),
 				MAX_VERTEX_ATTRIBS: gl.getParameter(gl.MAX_VERTEX_ATTRIBS),
-				UNMASKED_VENDOR: (() => {
-					try {
-						const e = gl.getExtension('WEBGL_debug_renderer_info')
-						return e ? gl.getParameter(e.UNMASKED_VENDOR_WEBGL) : null
-					} catch (error) {
-						// Expected: SecurityError if WEBGL_debug_renderer_info blocked or TypeError if WebGL context lost — renderer info is optional.
-						void error
-						return null
-					}
-				})(),
-				UNMASKED_RENDERER: (() => {
-					try {
-						const e = gl.getExtension('WEBGL_debug_renderer_info')
-						return e ? gl.getParameter(e.UNMASKED_RENDERER_WEBGL) : null
-					} catch (error) {
-						// Expected: SecurityError if WEBGL_debug_renderer_info blocked or TypeError if WebGL context lost — renderer info is optional.
-						void error
-						return null
-					}
-				})(),
+				UNMASKED_VENDOR: unmasked('UNMASKED_VENDOR_WEBGL'),
+				UNMASKED_RENDERER: unmasked('UNMASKED_RENDERER_WEBGL'),
 			}
 		}
-	} catch (error) {
+	} catch {
 		// Expected: TypeError/InvalidStateError if WebGL context lost or getContext returns null — GL diagnostics are optional.
-		void error
 	}
 
 	return {
@@ -386,9 +336,8 @@ const loadState = await page.evaluate(() => {
 							),
 						}
 					: null
-			} catch (error) {
+			} catch {
 				// Expected: TypeError if performance.timing is unavailable (deprecated) or navigation entry missing — timing is optional.
-				void error
 				return null
 			}
 		})(),
@@ -471,9 +420,8 @@ const journeyResult = await page.evaluate(
 				p.nudge(75, 2.5)
 				const acc = p.getPhysics()?.getCabinetAcceleration?.() ?? { x: 0, y: 0 }
 				play.nudge = { pass: true, mag: +Math.hypot(acc.x, acc.y).toFixed(3) }
-			} catch (error) {
+			} catch {
 				// Expected: TypeError if getPhysics is undefined (player not ready) or Error if nudge called before emu start — interactive test is best-effort.
-				void error
 				play.nudge = { pass: false, mag: 0 }
 			}
 		}
@@ -492,26 +440,22 @@ const journeyResult = await page.evaluate(
 		let startFrame = 0
 		try {
 			startFrame = r?.info?.render?.frame ?? 0
-		} catch (error) {
+		} catch {
 			// Expected: TypeError if renderer info not initialised (e.g., before first frame) — frame delta is optional.
-			void error
 		}
 
+		const timeInto = (target, method, samples) => {
+			const orig = target[method].bind(target)
+			target[method] = (...args) => {
+				const start = performance.now()
+				const result = orig(...args)
+				samples.push(performance.now() - start)
+				return result
+			}
+		}
 		if (opt.profile && p) {
-			const origPhys = p.updatePhysics.bind(p)
-			const origAnim = p.updateAnimations.bind(p)
-			p.updatePhysics = (...a) => {
-				const t = performance.now()
-				const res = origPhys(...a)
-				physicsMs.push(performance.now() - t)
-				return res
-			}
-			p.updateAnimations = (...a) => {
-				const t = performance.now()
-				const res = origAnim(...a)
-				animMs.push(performance.now() - t)
-				return res
-			}
+			timeInto(p, 'updatePhysics', physicsMs)
+			timeInto(p, 'updateAnimations', animMs)
 		}
 
 		const targetRenderer = v?.composer ?? r
@@ -532,17 +476,17 @@ const journeyResult = await page.evaluate(
 			actorTimer = setInterval(() => {
 				const now = Date.now()
 				cycle++
-				const code = cycle % 2 === 1 ? 'ShiftLeft' : 'ShiftRight'
-				const loc = cycle % 2 === 1 ? 1 : 2
+				const left = cycle % 2 === 1
+				const code = left ? 'ShiftLeft' : 'ShiftRight'
+				const loc = left ? 1 : 2
 				p.onKeyDown({ code, key: 'Shift', ts: now, location: loc })
 				setTimeout(() => p.onKeyUp({ code, key: 'Shift', ts: Date.now(), location: loc }), 160)
 				flipsCount++
 				if (cycle % 4 === 0) {
 					try {
 						p.nudge(45, 1.8)
-					} catch (error) {
+					} catch {
 						// Expected: TypeError if physics not ready mid-profiling — nudge is best-effort, profiling continues.
-						void error
 					}
 				}
 			}, 500)
@@ -588,9 +532,8 @@ const journeyResult = await page.evaluate(
 			v?.tableGroup?.traverse(o => {
 				if (o.isMesh && o.geometry?.attributes?.position) tris += o.geometry.attributes.position.count / 3
 			})
-		} catch (error) {
+		} catch {
 			// Expected: TypeError if tableGroup not mounted or geometry missing — tris remains 0, not fatal.
-			void error
 		}
 		const endFrame = r?.info?.render?.frame ?? 0
 		const delta = endFrame - startFrame
@@ -623,23 +566,61 @@ const journeyResult = await page.evaluate(
 )
 
 const parsed = {}
-for (const l of logs) {
-	const a = l.match(/Parsed in (\d+)ms/)
-	if (a) parsed.parseMs = Number(a[1])
-	const c = l.match(/Scene generated in (\d+)ms/)
-	if (c) parsed.sceneGenMs = Number(c[1])
-	const e = l.match(/Textures in scene:\s*(\d+)\s*~([\d.]+)\s*MB/)
-	if (e) parsed.texScene = { count: Number(e[1]), mb: Number(e[2]) }
-	const f = l.match(/Fetched .* in ([\d.]+)s/)
-	if (f) parsed.fetchMs = Math.round(Number(f[1]) * 1000)
-	const t = l.match(/Table script transpiled and executed in (\d+)ms/)
-	if (t) parsed.transpileMs = Number(t[1])
-	const s = l.match(/\[stream\] Done .* in (\d+)ms/)
-	if (s) parsed.streamLogMs = Number(s[1])
-	const s2 = l.match(/Pre-loading .* (\d+) textures/)
-	if (s2) parsed.streamTextures = Number(s2[1])
-	const idb = l.match(/\[IDB\] hit/)
-	if (idb) parsed.idbHit = true
+const logPatterns = [
+	[
+		/Parsed in (\d+)ms/,
+		match => {
+			parsed.parseMs = Number(match[1])
+		},
+	],
+	[
+		/Scene generated in (\d+)ms/,
+		match => {
+			parsed.sceneGenMs = Number(match[1])
+		},
+	],
+	[
+		/Textures in scene:\s*(\d+)\s*~([\d.]+)\s*MB/,
+		match => {
+			parsed.texScene = { count: Number(match[1]), mb: Number(match[2]) }
+		},
+	],
+	[
+		/Fetched .* in ([\d.]+)s/,
+		match => {
+			parsed.fetchMs = Math.round(Number(match[1]) * 1000)
+		},
+	],
+	[
+		/Table script transpiled and executed in (\d+)ms/,
+		match => {
+			parsed.transpileMs = Number(match[1])
+		},
+	],
+	[
+		/\[stream\] Done .* in (\d+)ms/,
+		match => {
+			parsed.streamLogMs = Number(match[1])
+		},
+	],
+	[
+		/Pre-loading .* (\d+) textures/,
+		match => {
+			parsed.streamTextures = Number(match[1])
+		},
+	],
+	[
+		/\[IDB\] hit/,
+		() => {
+			parsed.idbHit = true
+		},
+	],
+]
+for (const line of logs) {
+	for (const [pattern, apply] of logPatterns) {
+		const match = line.match(pattern)
+		if (match) apply(match)
+	}
 }
 
 // try to get streaming final mem
@@ -652,35 +633,34 @@ const streamMem = await page
 						total: Math.round(performance.memory.totalJSHeapSize / 1048576),
 					}
 				: null
-		} catch (error) {
+		} catch {
 			// Expected: ReferenceError if performance.memory unavailable (non-Chrome) or TypeError if memory API blocked — heap info optional.
-			void error
 			return null
 		}
 	})
-	.catch(error => {
+	.catch(() => {
 		// Expected: page.evaluate fails if execution context destroyed (navigation) — treat as no memory.
-		void error
 		return null
 	})
 
-let metricsAfterPlay = null
-try {
-	metricsAfterPlay = await page.metrics().catch(error => {
-		// Expected: CDP Metrics domain error after page close.
-		void error
-		return null
-	})
-} catch (error) {
-	// Expected: ProtocolError if CDP Metrics domain detached after page close — metrics are optional.
-	void error
-}
+const metricsAfterPlay = await safeMetrics()
 
-// stop tracing if started
+// stop tracing if started; Tracing.start used ReturnAsStream, so drain the
+// stream from Tracing.tracingComplete into the trace file.
 if (tracingClient) {
 	try {
+		const completed = new Promise(resolve => tracingClient.once('Tracing.tracingComplete', resolve))
 		await tracingClient.send('Tracing.end')
-		// puppeteer streams trace as base64 chunks; simplest: just note path, don't fetch
+		const { stream } = await completed
+		let data = ''
+		let eof = false
+		while (!eof) {
+			const chunk = await tracingClient.send('IO.read', { handle: stream, size: 1_048_576 })
+			data += Buffer.from(chunk.data ?? '', 'base64').toString('utf8')
+			eof = chunk.eof
+		}
+		await tracingClient.send('IO.close', { handle: stream }).catch(() => {})
+		fs.writeFileSync(tracePath, data)
 		console.log(`[bench] tracing ended -> ${tracePath}`)
 	} catch (error) {
 		console.warn(`[bench] tracing end failed: ${error.message}`)
@@ -689,7 +669,7 @@ if (tracingClient) {
 
 const payload = {
 	url,
-	vpx: vpxArg ?? vpxCandidates.find(exists) ?? DEFAULT_EMPTY,
+	vpx: vpxArg ?? autoVpx ?? DEFAULT_EMPTY,
 	rom: romArg ?? (url.includes('rom=') ? decodeURIComponent(url.match(/rom=([^&]+)/)?.[1] ?? '') : null),
 	loadJourney: {
 		navMs,
@@ -780,12 +760,12 @@ console.log(`\n[bench] === ANALYSIS & SUGGESTIONS ===`)
 			`- STREAMING BOTTLENECK: ${lj.streamMs}ms for ~${payload.metrics.meshes} meshes. Decodes on main thread with concurrency 16, EXR/HDR worker timeouts, no Worker ImageDecoder, IDB cache broken (deleteObjectStore without exists check).`,
 		)
 		console.log(
-			`  Suggestion: defer large bakes >1M px, cap effectiveMax to 1024 for VLM/nestmap already but still 259MB; reduce concurrency to 4, yield via scheduler.yield(), use OffscreenCanvas/ImageDecoder in workers, fix IDB (exist check), stream only playfield+inserts first, lazy-load cab/VR after play start, cache decoded textures via createImageBitmap cache + idbSet(texCacheKey).`,
+			`  Suggestion: defer large bakes >1M px, cap effectiveMax to 1024 for VLM/nestmap already but still ${lj.textures?.mb ?? '?'}MB; reduce concurrency to 4, yield via scheduler.yield(), use OffscreenCanvas/ImageDecoder in workers, fix IDB (exist check), stream only playfield+inserts first, lazy-load cab/VR after play start, cache decoded textures via createImageBitmap cache + idbSet(texCacheKey).`,
 		)
 	}
 	if (lj.parseMs && lj.parseMs > 800) {
 		console.log(
-			`- PARSE: ${lj.parseMs}ms for 1124 items. LZW decompression on main thread per texture, OLE reads via copyFromBrowser still copies Uint8Array.`,
+			`- PARSE: ${lj.parseMs}ms. LZW decompression on main thread per texture, OLE reads via copyFromBrowser still copies Uint8Array.`,
 		)
 		console.log(
 			`  Suggestion: increase GameItems concurrency 4->8, use streaming OLE parser, skip invisible items already optional, parallelize Texture LZW via Workers, zero-copy where possible (avoid subarray copies in ole-doc).`,
@@ -796,7 +776,7 @@ console.log(`\n[bench] === ANALYSIS & SUGGESTIONS ===`)
 			`- SCENE GEN: ${lj.sceneGenMs}ms for ${payload.metrics.tris} tris. ThreeMeshGenerator creates BufferGeometry per mesh synchronously, postProcess traverses scene multiple times.`,
 		)
 		console.log(
-			`  Suggestion: generate meshes in workers (via Comlink), batchStaticOpaques only 1 BatchedMesh currently—extend to all opaques, instance rubbers/primitives, dispose hidden geometries earlier (postProcess hides 326 lightmaps but keeps geometry).`,
+			`  Suggestion: generate meshes in workers (via Comlink), batchStaticOpaques only 1 BatchedMesh currently—extend to all opaques, instance rubbers/primitives, dispose hidden geometries earlier (postProcess hides lightmaps but keeps geometry).`,
 		)
 	}
 	if (lj.transpileMs && lj.transpileMs > 1500) {
@@ -809,15 +789,19 @@ console.log(`\n[bench] === ANALYSIS & SUGGESTIONS ===`)
 	}
 	if (pf.fps && pf.fps < 50) {
 		console.log(
-			`- FPS: ${pf.fps} (target 60) — SwiftShader (${payload.glInfo?.renderer?.includes('SwiftShader') || payload.glInfo?.renderer?.includes('WebKit')}) + 488k tris + 259MB textures + per-frame updateAnimations for all animatables + popStates diff + applyChangedStates matrix decomposes.`,
+			`- FPS: ${pf.fps} (target 60) — SwiftShader (${payload.glInfo?.renderer?.includes('SwiftShader') || payload.glInfo?.renderer?.includes('WebKit')}) + ${payload.metrics.tris} tris + ${lj.textures?.mb ?? '?'}MB textures + per-frame updateAnimations for all animatables + popStates diff + applyChangedStates matrix decomposes.`,
 		)
 		console.log(
 			`  Suggestion: ensure GPU acceleration (--gpu=vulkan or --gpu=gl) not SwiftShader, reduce texture resolution (effectiveMax already 1024 for VLM but still high), lower DPR to 1 in play mode already done, throttle controls.update, batch / instance more, frustum cull (three-mesh-bvh already installed but buildBvhIdle idle—make eager), avoid full state sync every 300 frames (frameCount%300), use CSS nudge transform not mesh translate, separate physicsLoop (setTimeout 16ms) and renderLoop (rAF) already decoupled but both still on main thread—consider moving physics to dedicated worker via SAB already started but not yet offloaded (worker just tics dummy scratch, not real physics). Wire real PlayerPhysics into worker.`,
 		)
 	}
 	if (payload.metrics.memory?.used && payload.metrics.memory.used > 1200) {
+		const vpxMb =
+			payload.vpx && fs.existsSync(payload.vpx) ? (fs.statSync(payload.vpx).size / 1048576).toFixed(1) : '?'
+		const romMb =
+			payload.rom && fs.existsSync(payload.rom) ? (fs.statSync(payload.rom).size / 1048576).toFixed(1) : '?'
 		console.log(
-			`- MEMORY: heap ${payload.metrics.memory.used}MB / ${payload.metrics.memory.limit}MB — 212MB VPX + 76MB ROM + 259MB GPU textures + retained Uint8Arrays before _clearRawTextures.`,
+			`- MEMORY: heap ${payload.metrics.memory.used}MB / ${payload.metrics.memory.limit}MB — ${vpxMb}MB VPX + ${romMb}MB ROM + ${lj.textures?.mb ?? '?'}MB GPU textures + retained Uint8Arrays before _clearRawTextures.`,
 		)
 		console.log(
 			`  Suggestion: eagerly clear raw binaries already done but heap still high -> dispose hidden geometries, limit concurrency to 4, call gc() after stream, consider texture compression (KTX2/Basis) to halve GPU memory.`,
@@ -833,7 +817,16 @@ console.log(`\n[bench] === ANALYSIS & SUGGESTIONS ===`)
 	)
 }
 if (tracePath) console.log(`[bench] trace at ${tracePath} — open in chrome://tracing or about://tracing`)
-
-await browser.close()
-vite?.kill()
-process.exit(0)
+}
+} catch (error) {
+	exitCode = 1
+	console.error('[bench] failed:', error?.message ?? error)
+} finally {
+	try {
+		await browser.close()
+	} catch {}
+	try {
+		vite?.kill()
+	} catch {}
+	process.exit(exitCode)
+}

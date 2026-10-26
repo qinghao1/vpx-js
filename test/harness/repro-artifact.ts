@@ -1,26 +1,14 @@
 // Harness to reproduce walking_dead artifacts generically
 // Run: npx tsx test/harness/repro-artifact.ts
 import * as fs from 'node:fs'
-import * as path from 'node:path'
 import type * as THREE from 'three'
 import { postProcessScene } from '../../demo-browser/src/scene.js'
 import { NodeBinaryReader } from '../../lib/io/binary-reader.node.js'
 import { ThreeRenderApi } from '../../lib/render/threejs/three-render-api.js'
 import { Table } from '../../lib/vpt/table/table.js'
+import { exists, VPX_CANDIDATES } from './bench-shared.js'
 
-const candidates = [
-	path.resolve('walking_dead.vpx'),
-	path.join(process.env.HOME ?? '/home/qinghao1', 'Downloads/walking_dead.vpx'),
-	path.resolve('test/fixtures/table-empty.vpx'),
-]
-function exists(p) {
-	try {
-		return fs.existsSync(p) && fs.statSync(p).size > 1024 * 1024
-	} catch {
-		return false
-	}
-}
-const vpx = candidates.find(exists)
+const vpx = VPX_CANDIDATES.find(candidate => exists(candidate, 1024 * 1024))
 if (!vpx) {
 	console.error('No VPX found')
 	process.exit(1)
@@ -47,39 +35,41 @@ const group = (await table.generateTableNode(api, {
 	preloadTextures: false,
 })) as THREE.Group
 group.updateMatrixWorld(true)
-const logs = []
-postProcessScene(group, { harnessLog: m => logs.push(m), viewerMode: 'viewer' })
+const logs: string[] = []
+postProcessScene(group, { harnessLog: (message: string) => logs.push(message), viewerMode: 'viewer' })
 console.log(logs.join(' | '))
-function isEff(o, root) {
-	if (!o.visible) return false
-	for (let p = o.parent; p && p !== root; p = p.parent) if (!p.visible) return false
+function isEffectivelyVisible(node: THREE.Object3D, root: THREE.Object3D): boolean {
+	if (!node.visible) return false
+	for (let parent = node.parent; parent && parent !== root; parent = parent.parent) {
+		if (!parent.visible) return false
+	}
 	return true
 }
+function isMesh(node: THREE.Object3D): node is THREE.Mesh {
+	return (node as unknown as { isMesh?: unknown }).isMesh === true
+}
 let underwallEff = 0
-group.traverse(o => {
-	if (o.isMesh && (o.name || '').toLowerCase().includes('playfield_underwall') && isEff(o, group)) underwallEff++
+let pendingBMVisible = 0
+let surfaceVisible = 0
+group.traverse(node => {
+	if (!isMesh(node)) return
+	const lower = (node.name || '').toLowerCase()
+	const effective = isEffectivelyVisible(node, group)
+	// check su/sling surface not incorrectly forced
+	if (node.name.includes('Playfield_underwall') && node.visible) surfaceVisible++
+	if (lower.includes('playfield_underwall') && effective) underwallEff++
+	if (!effective) return
+	if (!lower.includes('bm_') && !lower.includes('playfield')) return
+	const material = Array.isArray(node.material) ? node.material[0] : node.material
+	if (!material) return
+	if (material.userData.pendingMap || material.userData.pendingmap) pendingBMVisible++
 })
 console.log(
 	`underwall effective visible: ${underwallEff} => ${underwallEff === 0 ? 'PASS' : 'FAIL (vertical artifact)'}`,
 )
-let pendingBMVisible = 0
-group.traverse(o => {
-	if (!o.isMesh || !isEff(o, group)) return
-	const n = (o.name || '').toLowerCase()
-	if (!n.includes('bm_') && !n.includes('playfield')) return
-	const m = Array.isArray(o.material) ? o.material[0] : o.material
-	if (!m) return
-	const pending = m.userData.pendingMap || m.userData.pendingmap
-	if (pending) pendingBMVisible++
-})
 console.log(
 	`pending BM visible (should be 0 after postProcess for BM): ${pendingBMVisible} => ${pendingBMVisible === 0 ? 'PASS' : 'FAIL'}`,
 )
-// check su/sling surface not incorrectly forced
-let surfaceVisible = 0
-group.traverse(o => {
-	if (o.isMesh && o.name.includes('Playfield_underwall') && o.visible) surfaceVisible++
-})
 console.log(`underwall mesh visible (should be 0): ${surfaceVisible} => ${surfaceVisible === 0 ? 'PASS' : 'FAIL'}`)
 console.log('Harness done — all checks should be PASS for artifact fix')
 if (underwallEff !== 0 || pendingBMVisible !== 0 || surfaceVisible !== 0) process.exit(1)

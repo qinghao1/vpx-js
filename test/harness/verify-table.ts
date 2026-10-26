@@ -7,6 +7,7 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { NodeBinaryReader } from '../../lib/io/binary-reader.node.js'
 import { Table } from '../../lib/vpt/table/table.js'
+import { extractGameName } from './vpinball-resolver.js'
 
 const VPX_EXAMPLE = path.resolve('example-table.vpx') // any VPX; example-table is just an example
 const EMPTY = path.resolve('test/fixtures/table-empty.vpx')
@@ -30,35 +31,43 @@ async function verifyEmpty() {
 
 async function verifyExampleVpx() {
 	console.log('\n=== Table: example VPX ===')
-	if (!fs.existsSync(VPX_EXAMPLE)) {
-		console.log(`  SKIP — ${VPX_EXAMPLE} not found (any VPX with GameName works)`)
-		return true
-	}
-	const stat = fs.statSync(VPX_EXAMPLE)
-	console.log(`  File: ${(stat.size / 1024 / 1024).toFixed(1)} MB`)
-	const table = await Table.load(new NodeBinaryReader(VPX_EXAMPLE))
-	const script = table.tableScript ?? ''
-	const gameName = script.match(/cGameName\s*=\s*["']([^"']+)["']/i)?.[1] ?? 'n/a'
-	console.log(`  Table: ${table.info?.TableName} (${table.info?.AuthorName})`)
-	console.log(`  GameName: ${gameName}, script: ${(script.length / 1024).toFixed(0)} KB`)
+	// Prefer a user-provided example table, but fall back to an in-repo
+	// fixture so this leg always exercises a full VPX load (never a bare SKIP).
+	const fallback = path.resolve('test/fixtures/table-light.vpx')
+	const target = fs.existsSync(VPX_EXAMPLE) ? VPX_EXAMPLE : fallback
 	console.log(
-		`  Items: ${Object.keys(table.items).length}, Lights: ${Object.keys(table.lights).length}, Flippers: ${Object.keys(table.flippers).length}, Bumpers: ${Object.keys(table.bumpers).length}`,
+		`  Source: ${target === VPX_EXAMPLE ? 'example-table.vpx' : 'test/fixtures/table-light.vpx (fallback)'}`,
 	)
-	console.log(`  Textures: ${Object.keys(table.textures).length}, Materials: ${table.data?.materials.length ?? 0}`)
-	console.log(`  Collections: ${Object.keys(table.collections).length}`)
-	if (!script.includes('GameName')) {
-		console.log('  FAIL — script missing GameName')
+	const stat = fs.statSync(target)
+	console.log(`  File: ${(stat.size / 1024 / 1024).toFixed(1)} MB`)
+	const table = await Table.load(new NodeBinaryReader(target))
+	const script = table.tableScript ?? ''
+	const gameName = extractGameName(script)
+	console.log(`  Table: ${table.info?.TableName} (${table.info?.AuthorName})`)
+	console.log(`  GameName: ${gameName ?? '(none — generic table)'}, script: ${(script.length / 1024).toFixed(0)} KB`)
+	const counts = {
+		items: Object.keys(table.items).length,
+		lights: Object.keys(table.lights).length,
+		flippers: Object.keys(table.flippers).length,
+		bumpers: Object.keys(table.bumpers).length,
+		textures: Object.keys(table.textures).length,
+		materials: table.data?.materials.length ?? 0,
+		collections: Object.keys(table.collections).length,
+	}
+	console.log(
+		`  Items: ${counts.items}, Lights: ${counts.lights}, Flippers: ${counts.flippers}, Bumpers: ${counts.bumpers}`,
+	)
+	console.log(`  Textures: ${counts.textures}, Materials: ${counts.materials}`)
+	console.log(`  Collections: ${counts.collections}`)
+	if (counts.items === 0) {
+		console.log('  FAIL — no items parsed')
 		return false
 	}
-	if (!gameName) {
-		console.log('  FAIL — GameName missing in script')
+	if (script.includes('GameName') && !gameName) {
+		console.log('  FAIL — script mentions GameName but extraction failed')
 		return false
 	}
-	if (Object.keys(table.lights).length < 50) {
-		console.log('  FAIL — expected many lights for TWD')
-		return false
-	}
-	console.log(`  ✓ example VPX loaded (GameName=${gameName})`)
+	console.log(`  ✓ example VPX loaded (GameName=${gameName ?? 'n/a'})`)
 	return true
 }
 
@@ -70,7 +79,7 @@ async function main() {
 	if (!a || !b) process.exit(1)
 }
 
-main().catch(e => {
-	console.error(e)
+main().catch(error => {
+	console.error(error)
 	process.exit(1)
 })

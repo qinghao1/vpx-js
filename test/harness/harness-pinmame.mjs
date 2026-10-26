@@ -1,59 +1,49 @@
-import { launchBrowser, loadPuppeteer, newPage } from './utils.mjs'
+import { injectDmdPattern, launchBrowser, loadPuppeteer, openTablePage, sleep } from './utils.mjs'
+import { getArg } from './vpinball-resolver.ts'
 
-const url =
-	process.argv.find(a => a.startsWith('--url='))?.slice(6) ||
-	'http://127.0.0.1:3000/?vpx=/test/fixtures/table-empty.vpx&mode=play'
+async function tapKey(page, code, key, holdMs) {
+	await page.evaluate(
+		async (keyCode, keyName, hold) => {
+			const p = window.viewer?.player
+			if (!p) return
+			p.onKeyDown({ code: keyCode, key: keyName })
+			await new Promise(resolve => setTimeout(resolve, hold))
+			p.onKeyUp({ code: keyCode, key: keyName })
+		},
+		code,
+		key,
+		holdMs,
+	)
+}
+
+const args = process.argv.slice(2)
+const url = getArg(args, 'url', 'http://127.0.0.1:3000/?vpx=/test/fixtures/table-empty.vpx&mode=play')
 const puppeteer = await loadPuppeteer()
 const browser = await launchBrowser(puppeteer)
-const page = await newPage(browser)
-
-const logs = []
-page.on('console', m => {
-	const t = m.text()
-	logs.push(t)
-	if (/PinMAME|DMD|Ready|emu/i.test(t)) console.log(`[browser] ${t.slice(0, 600)}`)
+const { page, viewerReady } = await openTablePage(browser, url, {
+	readyTimeoutMs: 45000,
+	playTimeoutMs: 0,
+	label: 'harness-pinmame',
+	onPage: async target => {
+		target.on('console', message => {
+			const text = message.text()
+			if (/PinMAME|DMD|Ready|emu/i.test(text)) console.log(`[browser] ${text.slice(0, 600)}`)
+		})
+		target.on('pageerror', err => console.log('[pageerror]', err.message))
+	},
 })
-page.on('pageerror', e => console.log('[pageerror]', e.message))
-
-console.log(`[harness-pinmame] goto ${url}`)
-await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 })
-
-let ready = false
-for (let i = 0; i < 45; i++) {
-	await new Promise(r => setTimeout(r, 1000))
-	const s = await page.evaluate(() => ({
-		title: document.getElementById('load-title')?.innerText || '',
-		hasPlayer: !!window.viewer?.player,
-		emu: window.viewer?.player?.getPhysics?.()?.emu?.constructor.name || 'none',
-		init: window.viewer?.player?.getPhysics?.()?.emu?.isInitialized?.() ?? null,
-		mock: window.viewer?.player?.getPhysics?.()?.emu?.isMock ?? null,
-	}))
-	console.log(`[${i}s] title="${s.title.slice(0, 50)}" emu=${s.emu} init=${s.init} mock=${s.mock}`)
-	if (s.title.includes('Ready') && s.hasPlayer) {
-		ready = true
-		console.log(`READY at ${i}s`)
-		break
-	}
-}
-if (!ready) console.log('not ready after 45s — continuing')
-
-await page.evaluate(() => {
-	const sel = document.getElementById('mode')
-	if (sel) {
-		sel.value = 'play'
-		sel.dispatchEvent(new Event('change', { bubbles: true }))
-	}
-	if (window.viewer) window.viewer.viewerMode = 'play'
-})
-await new Promise(r => setTimeout(r, 2000))
+if (!viewerReady) console.log('not ready after 45s — continuing')
 
 let pinOk = false,
-	dmdOk = false,
-	finalMax = 0
+	realDmdOk = false,
+	pipelineOk = false,
+	pipelineAttempted = false,
+	finalMax = 0,
+	finalPipelineMax = 0
 
 for (let i = 0; i < 30; i++) {
-	await new Promise(r => setTimeout(r, 1000))
-	const s = await page.evaluate(() => {
+	await sleep(1000)
+	const state = await page.evaluate(() => {
 		const emu = window.viewer?.player?.getPhysics?.()?.emu
 		const d = window.viewer?.player?.getDmdFrame?.()
 		const dims = window.viewer?.player?.getDmdDimensions?.()
@@ -76,35 +66,25 @@ for (let i = 0; i < 30; i++) {
 		}
 	})
 	console.log(
-		`[poll ${i}] emu=${s.emu} init=${s.init} mock=${s.mock} DMD ${s.w}x${s.h} len=${s.len} max=${s.max} sum=${s.sum}`,
+		`[poll ${i}] emu=${state.emu} init=${state.init} mock=${state.mock} DMD ${state.w}x${state.h} len=${state.len} max=${state.max} sum=${state.sum}`,
 	)
-	if (s.emu === 'PinMameEmulator' && s.init && !s.mock && s.w === 128 && s.h === 32 && s.len === 4096) pinOk = true
-	if (pinOk && s.max > 0) {
-		dmdOk = true
-		finalMax = s.max
-		console.log(`DMD ACTIVE max=${s.max} at poll ${i}`)
+	// Any self-consistent DMD geometry counts — never hardcode one table's 128x32.
+	const dimsValid = state.w > 0 && state.h > 0 && state.len === state.w * state.h
+	if (state.emu === 'PinMameEmulator' && state.init && !state.mock && dimsValid) pinOk = true
+	if (pinOk && state.max > 0) {
+		realDmdOk = true
+		finalMax = state.max
+		console.log(`DMD ACTIVE max=${state.max} at poll ${i}`)
 		break
 	}
 
 	if (i === 6) {
 		console.log('>>> coin Digit5')
-		await page.evaluate(async () => {
-			const p = window.viewer?.player
-			if (!p) return
-			p.onKeyDown({ code: 'Digit5', key: '5' })
-			await new Promise(r => setTimeout(r, 250))
-			p.onKeyUp({ code: 'Digit5', key: '5' })
-		})
+		await tapKey(page, 'Digit5', '5', 250)
 	}
 	if (i === 10) {
 		console.log('>>> start Digit1')
-		await page.evaluate(async () => {
-			const p = window.viewer?.player
-			if (!p) return
-			p.onKeyDown({ code: 'Digit1', key: '1' })
-			await new Promise(r => setTimeout(r, 350))
-			p.onKeyUp({ code: 'Digit1', key: '1' })
-		})
+		await tapKey(page, 'Digit1', '1', 350)
 	}
 	if (i === 13) {
 		console.log('>>> switch 16 pulse')
@@ -119,55 +99,28 @@ for (let i = 0; i < 30; i++) {
 	}
 }
 
-if (pinOk && !dmdOk) {
+if (pinOk && !realDmdOk) {
 	console.log('ROM DMD idle (max 0) — verifying display pipeline via injected pattern...')
-	const injected = await page.evaluate(() => {
-		try {
-			const viewer = window.viewer,
-				emu = viewer?.player?.getPhysics?.()?.emu
-			const W = 128,
-				H = 32,
-				frame = new Uint8Array(W * H)
-			for (let y = 0; y < H; y++)
-				for (let x = 0; x < W; x++) {
-					let v = 0
-					if (x < 1 || x >= W - 1 || y < 1 || y >= H - 1) v = 15
-					else if (Math.abs(x - y * 4) < 1) v = 10
-					else if (x > 20 && x < 108 && y > 8 && y < 24) {
-						v = (Math.floor(x / 8) + Math.floor(y / 8)) % 2 === 0 ? 15 : 6
-					}
-					frame[y * W + x] = v
-				}
-			if (emu) {
-				emu.getDmdFrame = () => frame
-				try {
-					emu.emulatorState.setDmd(frame)
-				} catch {}
-			}
-			try {
-				viewer.dmd.render()
-			} catch (e) {
-				return { ok: false, err: `render ${e.message}` }
-			}
-			const c = document.getElementById('dmd')
-			let canvasSum = 0
-			if (c) {
-				try {
-					const ctx = c.getContext('2d')
-					const d = ctx.getImageData(0, 0, Math.min(32, c.width), Math.min(32, c.height)).data
-					for (let i = 0; i < d.length; i++) canvasSum += d[i]
-				} catch {}
-			}
-			const meshes = (viewer?.dmdMeshes || []).map(m => ({ name: m.name, hasMap: !!m.material?.map }))
-			return { ok: true, canvasSum, meshes, max: Math.max(...frame) }
-		} catch (e) {
-			return { ok: false, err: e.message }
-		}
-	})
+	pipelineAttempted = true
+	const injected = await injectDmdPattern(page)
 	console.log('injected', JSON.stringify(injected, null, 2))
-	if (injected.ok && injected.canvasSum > 0 && injected.meshes.length > 0) {
-		dmdOk = true
-		finalMax = injected.max
+	const pipeline = await page.evaluate(() => {
+		const viewer = window.viewer
+		const canvas = document.getElementById('dmd')
+		let canvasSum = 0
+		if (canvas) {
+			try {
+				const ctx = canvas.getContext('2d')
+				const data = ctx.getImageData(0, 0, Math.min(32, canvas.width), Math.min(32, canvas.height)).data
+				for (let index = 0; index < data.length; index++) canvasSum += data[index]
+			} catch {}
+		}
+		const meshes = (viewer?.dmdMeshes || []).map(mesh => ({ name: mesh.name, hasMap: !!mesh.material?.map }))
+		return { canvasSum, meshes }
+	})
+	if (injected.ok && pipeline.canvasSum > 0 && pipeline.meshes.length > 0) {
+		pipelineOk = true
+		finalPipelineMax = injected.max
 	}
 	try {
 		await page.screenshot({ path: '/tmp/harness-pinmame.png' })
@@ -175,9 +128,16 @@ if (pinOk && !dmdOk) {
 	} catch {}
 }
 
+// Split verdict: the synthetic pipeline must never masquerade as a live ROM DMD.
+const dmdOk = realDmdOk || pipelineOk
 console.log('\n=== RESULT ===')
 console.log(`PinMAME running: ${pinOk ? 'PASS' : 'FAIL'}`)
-console.log(`DMD display: ${dmdOk ? 'PASS' : 'FAIL'}${!dmdOk ? ' (max 0)' : ` (max ${finalMax})`}`)
+console.log(
+	`DMD display (real ROM): ${realDmdOk ? 'PASS' : 'FAIL'}${realDmdOk ? ` (max ${finalMax})` : ' (max 0 — idle or blank)'}`,
+)
+console.log(
+	`DMD pipeline (synthetic pattern): ${pipelineOk ? 'PASS' : pipelineAttempted ? 'FAIL' : 'SKIP (not attempted)'}${pipelineOk ? ` (max ${finalPipelineMax})` : ''}`,
+)
 
 await browser.close()
 if (!pinOk) {
@@ -188,4 +148,4 @@ if (!dmdOk) {
 	console.error('FAIL DMD')
 	process.exit(1)
 }
-console.log('PASS PinMAME and DMD')
+console.log(`PASS PinMAME and DMD (${realDmdOk ? 'real ROM' : 'synthetic pipeline only'})`)
