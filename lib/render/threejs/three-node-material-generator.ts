@@ -4,14 +4,7 @@ import type { RenderInfo } from '../../game/interfaces.js'
 import type { Material } from '../../vpt/material.js'
 import type { MeshConvertOptions } from '../irender-api.js'
 import type { IMaterialGenerator } from './imaterial-generator.js'
-import {
-	BALL_METALNESS,
-	BALL_ROUGHNESS,
-	getGlobalEmissionScale,
-	isBaked,
-	pendingKeyFor,
-	setGlobalEmissionScale,
-} from './material-shared.js'
+import { BALL_METALNESS, BALL_ROUGHNESS, isBaked, pendingKeyFor, setGlobalEmissionScale } from './material-shared.js'
 import { createDynamicBallNodeMaterial } from './nodes/ball-reflection-node.js'
 import { createBulbGlowNodeMaterial } from './nodes/bulb-glow-node.js'
 import {
@@ -174,7 +167,6 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 				map: tex ?? undefined,
 				mapName: pendingName ?? undefined,
 				tint: baseHex,
-				emissionScale: getGlobalEmissionScale(),
 				alphaTestValue,
 				doubleSided: backfacesEnabled !== false,
 			})

@@ -12,6 +12,7 @@ import {
 	SrcAlphaFactor,
 } from 'three'
 import { cloneMaterialForWrite } from '../material-shared.js'
+import { setGlobalEmissionScale, ThreeNodeMaterialGenerator } from '../three-node-material-generator.js'
 import {
 	bdlDiffuseFactor,
 	bdlEmissiveCarry,
@@ -203,7 +204,6 @@ describe('unshaded baked node material', () => {
 	it('configures baked unshaded material properties', () => {
 		const material = createUnshadedBakedNodeMaterial({
 			tint: 0x808080,
-			emissionScale: 0.75,
 			alphaTestValue: 0.2,
 		})
 		expect(material.depthWrite).to.equal(true)
@@ -237,6 +237,41 @@ describe('unshaded baked node material', () => {
 		const tex = new DataTexture(new Uint8Array([10, 20, 30, 255]), 1, 1)
 		expect(setBakedMap(material, tex, 'tex.png')).to.equal(true)
 		expect(material.colorNode).to.not.equal(placeholderNode)
+	})
+
+	it('keeps baked albedo full-bright without an emission-scale slot', () => {
+		// Upstream never dims the diffuse albedo: the global emission scale only
+		// weights the light terms (Renderer.cpp SetupShaders scales
+		// fenvEmissionScale/cAmbient_LightRange/point-light emission, while
+		// fs_basic.sc lightLoop and fs_unshaded.sc multiply the unscaled
+		// diffuse). Scaling the baked albedo starved lamp-free areas such as
+		// the Walking Dead apron at scale 0.25 to near-black.
+		const material = createUnshadedBakedNodeMaterial({ tint: 0x808080, mapName: 'tex.png' })
+		const userData = material.userData as Record<string, { value?: { getHex?: () => number } }>
+		expect(userData.__uTintColor?.value?.getHex?.()).to.equal(0x808080)
+		expect(userData.__uEmissionScale).to.equal(undefined)
+	})
+
+	it('ignores the global emission scale for baked materials from the generator', () => {
+		setGlobalEmissionScale(0.25)
+		try {
+			const generator = new ThreeNodeMaterialGenerator({ hasTexture: () => false } as any)
+			const material = generator.getMaterial(
+				{ name: 'VLM.Bake.Active', baseColor: 0x808080 } as any,
+				'VLM.Nestmap0',
+			)
+			expect(isBakedNodeMaterial(material)).to.equal(true)
+			const userData = (material as any).userData as Record<string, { value?: { getHex?: () => number } }>
+			expect(userData.__uTintColor?.value?.getHex?.()).to.equal(0x808080)
+			expect(userData.__uEmissionScale).to.equal(undefined)
+		} finally {
+			setGlobalEmissionScale(1)
+		}
+	})
+
+	it('cloned baked materials carry no emission-scale slot', () => {
+		const cloned = cloneBakedNodeMaterial(createUnshadedBakedNodeMaterial({ tint: 0xffffff }))
+		expect((cloned as any).userData.__uEmissionScale).to.equal(undefined)
 	})
 })
 
