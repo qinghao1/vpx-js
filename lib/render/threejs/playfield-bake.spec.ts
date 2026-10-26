@@ -14,7 +14,7 @@ function makeMesh(name: string, geometry: THREE.BufferGeometry, mat: THREE.Mater
 }
 
 describe('regression: playfield baked hide', () => {
-	it('hides pending BM when hasReadyBake (bright artifact)', () => {
+	it('shows baked BMs and hides base when hasReadyBake', () => {
 		const root = new THREE.Group()
 		root.name = 'table'
 
@@ -37,7 +37,7 @@ describe('regression: playfield baked hide', () => {
 		const readyBM = makeMesh('primitive-BM_Playfield', readyGeom, readyMat)
 		root.add(readyBM)
 
-		// pending BM (same bake, no map yet) — should be hidden to avoid bright white
+		// pending BM (same bake, no map yet) — stays visible; streaming reveals the map
 		const pendingMat = new THREE.MeshStandardMaterial({ color: 0xffffff })
 		pendingMat.name = 'material:VLM.Bake.Active'
 		;(pendingMat.userData as any).__isBaked = true
@@ -55,9 +55,11 @@ describe('regression: playfield baked hide', () => {
 		expect(readyBM.visible, 'ready BM must remain visible').to.equal(true)
 		expect(pendingBM.visible, 'pending BM must remain visible (streaming will show)').to.equal(true)
 		expect(base.visible, 'base playfield must be hidden when baked ready').to.equal(false)
+		const visibleMeshes = root.children.filter(m => (m as THREE.Mesh).isMesh && m.visible)
+		expect(visibleMeshes.length, 'only baked meshes visible, no z-fighting pair').to.equal(2)
 	})
 
-	it('hides pending BM and keeps base visible when only pending (no ready)', () => {
+	it('keeps pending BM visible and hides base when only pending (no ready)', () => {
 		const root = new THREE.Group()
 		const baseMat = new THREE.MeshStandardMaterial({ color: 0xffffff })
 		baseMat.name = 'Playfield'
@@ -106,6 +108,7 @@ describe('regression: playfield baked hide', () => {
 		root.updateMatrixWorld(true)
 		postProcessScene(root, { harnessLog: () => {} })
 
+		expect(readyBM.visible, 'ready custom bake must remain visible generically').to.equal(true)
 		expect(pendingBM.visible, 'pending custom bake must remain visible generically').to.equal(true)
 	})
 

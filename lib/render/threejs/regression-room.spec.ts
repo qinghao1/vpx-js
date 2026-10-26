@@ -1,14 +1,15 @@
-import * as fs from 'node:fs'
 import * as THREE from 'three'
 import { describe, expect, it } from 'vitest'
 import {
 	classify,
+	isBakedPlayfield,
 	isBasePlayfield,
 	isDeferred,
 	postProcessScene,
 	resolveButtonCode,
 	swipeNudge,
 } from './three-scene-postprocess.js'
+import { hasBakedPlayfield } from './visibility-heuristics.js'
 
 function makeMesh(name: string, geom: THREE.BufferGeometry, mat: THREE.Material): THREE.Mesh {
 	const m = new THREE.Mesh(geom as any, mat as any)
@@ -22,16 +23,13 @@ describe('regression: room must remain visible', () => {
 		const unbaked = { isBakedMat: false } as any
 		expect(isBasePlayfield('playfield_base', unbaked), 'playfield unbaked is base').toEqual(true)
 		expect(isBasePlayfield('primitive-playfield_mesh', unbaked), 'playfield_mesh is base').toEqual(true)
-		expect(
-			isBasePlayfield('primitive-bm_playfield', unbaked),
-			'bm_playfield contains playfield but also baked? check baked flag',
-		)
-		// bm_playfield is baked, so !isBakedMat false => not base
+		// bm_playfield is never the base: it is the baked overlay (or an unbaked
+		// author mesh) — only the two engine base names count.
 		expect(isBasePlayfield('primitive-bm_playfield', bakedClass), 'baked bm should NOT be base').toEqual(false)
-		expect(
-			isBasePlayfield('primitive-bm_playfield', unbaked),
-			'unbaked bm with playfield name currently counts as base - but postProcess hides via primitive-playfield_mesh check',
-		)
+		expect(isBasePlayfield('primitive-bm_playfield', unbaked), 'unbaked bm is NOT base either').toEqual(false)
+		// Narrowed: author meshes merely containing `playfield` are not the base.
+		expect(isBasePlayfield('primitive-playfield_wall', unbaked), 'playfield_wall is NOT base').toEqual(false)
+		expect(isBasePlayfield('Playfield_Base', unbaked), 'match is case-insensitive').toEqual(true)
 		// Room must NOT be base
 		expect(isBasePlayfield('primitive-vr_megawall005', unbaked), 'VR room must not be base').toEqual(false)
 		expect(isBasePlayfield('primitive-vrcab_cabinet', unbaked), 'cabinet must not be base').toEqual(false)
@@ -39,11 +37,6 @@ describe('regression: room must remain visible', () => {
 		expect(isBasePlayfield('table', unbaked), 'table not playfield').toEqual(false)
 		// old bug: matName includes playfield or parentName includes table would hide room
 		expect(isBasePlayfield('some_wall', unbaked), 'wall not base').toEqual(false)
-		// file guard: ensure old loose check not present
-		const src = fs.readFileSync('lib/render/threejs/three-scene-postprocess.ts', 'utf-8')
-		expect(src, 'isBasePlayfield must not check parentName/table').not.toContain('parentName')
-		expect(src, 'must not check matName.includes(playfield)').not.toMatch(/matName\.includes\('playfield'\)/)
-		expect(src).toContain("n.includes('playfield') && !c.isBakedMat")
 	})
 
 	it('classify must correctly mark baked vs not', () => {
@@ -135,7 +128,44 @@ describe('regression: room must remain visible', () => {
 		root.add(bm)
 		postProcessScene(root, { harnessLog: () => {} })
 		expect(a.visible, 'playfield_mesh hidden').toEqual(false)
-		expect(b.visible, 'playfield_wall should be hidden via isBasePlayfield (contains playfield)').toEqual(false)
+		expect(b.visible, 'playfield_wall is author content and must stay visible').toEqual(true)
+		expect(bm.visible, 'bm_playfield baked overlay must stay visible').toEqual(true)
+	})
+
+	it('hasBakedPlayfield honors engine bake flags, not the mesh name', () => {
+		const unbakedMat = () => {
+			const mat = new THREE.MeshStandardMaterial({ color: 0xffffff })
+			mat.name = 'Playfield'
+			return mat
+		}
+		const bakedMat = () => {
+			const mat = new THREE.MeshStandardMaterial({ color: 0x000000 })
+			mat.name = 'material:VLM.Bake.Active'
+			;(mat.userData as any).__isBaked = true
+			return mat
+		}
+		// Name alone is not a bake: an unbaked mesh called bm_playfield does not
+		// trigger the playfield pass, so the base stays visible.
+		const impostor = makeMesh('primitive-bm_playfield', new THREE.PlaneGeometry(5, 5), unbakedMat())
+		expect(hasBakedPlayfield([impostor]), 'unbaked bm_playfield is not a bake').toEqual(false)
+		const base = makeMesh('playfield_base', new THREE.PlaneGeometry(5, 5), unbakedMat())
+		const root = new THREE.Group()
+		root.add(base)
+		root.add(impostor)
+		postProcessScene(root, { harnessLog: () => {} })
+		expect(base.visible, 'base stays when the only bm_playfield is unbaked').toEqual(true)
+		// Engine flag makes it a bake even with a custom (non-bm_) playfield name.
+		const custom = makeMesh('primitive-playfield_custom', new THREE.PlaneGeometry(5, 5), bakedMat())
+		expect(hasBakedPlayfield([custom]), 'flagged playfield bake counts').toEqual(true)
+	})
+
+	it('isBakedPlayfield unifies the bake-side name checks', () => {
+		const main = { isMainBake: true } as any
+		const overlay = { isMainBake: false } as any
+		expect(isBakedPlayfield('primitive-bm_playfield', main), 'bm bake is baked playfield').toEqual(true)
+		expect(isBakedPlayfield('primitive-BM_Playfield_Custom', main), 'custom bake name counts').toEqual(true)
+		expect(isBakedPlayfield('primitive-bm_playfield', overlay), 'additive overlay is not main bake').toEqual(false)
+		expect(isBakedPlayfield('primitive-vr_megawall005', main), 'non-playfield bake is not playfield').toEqual(false)
 	})
 
 	it('isDeferred correctly prioritizes playfield and bake maps over large assets', () => {

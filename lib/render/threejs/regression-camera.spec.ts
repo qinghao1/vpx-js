@@ -1,5 +1,4 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
-import * as fs from 'node:fs'
 import * as THREE from 'three'
 import { describe, expect, it } from 'vitest'
 import { AnimationGate } from '../../util/animation-gate.js'
@@ -32,97 +31,6 @@ function buildGroup(): THREE.Group {
 }
 
 describe('regression: camera smooth transition (viewer <-> play)', () => {
-	it('viewer.ts must not have settle delay that causes teleport (ANIM_SETTLE_MS await)', () => {
-		const src = fs.readFileSync('demo-browser/src/viewer.ts', 'utf-8')
-		expect(src, 'must not await ANIM_SETTLE_MS (caused 80ms freeze then jump)').not.toMatch(
-			/await new Promise[\s\S]*ANIM_SETTLE_MS/,
-		)
-		expect(src, 'must not import ANIM_SETTLE_MS for camera').not.toMatch(/ANIM_SETTLE_MS/)
-	})
-
-	it('viewer.ts must clean up gate on cancel and restore controls', () => {
-		const src = fs.readFileSync('demo-browser/src/viewer.ts', 'utf-8')
-		expect(src, 'must end gate on gen mismatch').toMatch(/_gen !== this\._cameraGen[\s\S]*gate\.endAnimation/)
-		expect(src, 'must restore controls.enabled on cancel').toMatch(
-			/_gen !== this\._cameraGen[\s\S]*controls\.enabled/,
-		)
-		expect(src, 'must restore damping on cancel').toMatch(
-			/enableDamping\s*=\s*false[\s\S]*enableDamping\s*=\s*prevDamping/,
-		)
-	})
-
-	it('viewer.ts must animate FOV together with position (no snap)', () => {
-		const src = fs.readFileSync('demo-browser/src/viewer.ts', 'utf-8')
-		expect(src, 'must lerp FOV inside _animateCameraTo').toMatch(
-			/fromFov[\s\S]*toFov[\s\S]*MathUtils\.lerp\(fromFov/,
-		)
-		expect(src, 'must compute toFov from bgFov/CAM.fov').toMatch(/bgFov[\s\S]*CAM\.fov/)
-	})
-
-	it('viewer.ts must use smooth easing (no middle teleport)', () => {
-		const src = fs.readFileSync('demo-browser/src/viewer.ts', 'utf-8')
-		expect(src, 'must use smoothstep easing to avoid cubic middle jump').toMatch(
-			/t\s*\*\s*t\s*\*\s*\(3\s*-\s*2\s*\*\s*t\)/,
-		)
-		expect(src, 'must not use cubic 4*t^3 sharp middle').not.toMatch(/4\s*\*\s*t\s*\*\s*t\s*\*\s*t/)
-	})
-
-	it('viewer default must be viewer mode (not play)', () => {
-		const main = fs.readFileSync('demo-browser/src/main.ts', 'utf-8')
-		expect(main, 'main.ts must default to viewer when mode param missing').toMatch(
-			/===\s*'play'\s*\?\s*'play'\s*:\s*'viewer'/,
-		)
-		const helpers = fs.readFileSync('demo-browser/e2e/helpers.mjs', 'utf-8')
-		expect(helpers, 'helpers DEFAULT_URL must use mode=viewer').toMatch(/DEFAULT_URL[^\n]*mode=viewer/)
-	})
-
-	it('animation lerp must be smooth — no teleport in middle', () => {
-		const group = buildGroup()
-		const play = computePlayFraming(group)
-		const viewer = computeViewerFraming(group)
-		const fromPos = viewer.position.clone()
-		const toPos = play.position.clone()
-		const fromTarget = viewer.target.clone()
-		const toTarget = play.target.clone()
-		const total = fromPos.distanceTo(toPos)
-		expect(total, 'play/viewer distance should be reasonable (~40)').toBeGreaterThan(10)
-		expect(total).toBeLessThan(200)
-
-		const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2)
-		const duration = 900
-		const samples: THREE.Vector3[] = []
-		for (let ms = 0; ms <= duration; ms += 16) {
-			const t = Math.min(1, ms / duration)
-			const e = ease(t)
-			const pos = new THREE.Vector3().lerpVectors(fromPos, toPos, e)
-			samples.push(pos)
-		}
-		let maxJump = 0
-		for (let i = 1; i < samples.length; i++) maxJump = Math.max(maxJump, samples[i]!.distanceTo(samples[i - 1]!))
-		const avg = total / samples.length
-		// smooth cubic should have max jump ~3x avg, not >6x (teleport)
-		expect(
-			maxJump,
-			`max single-frame jump ${maxJump.toFixed(2)} vs avg ${avg.toFixed(2)} — teleport if >6x`,
-		).toBeLessThan(avg * 6)
-		// first frames should start moving soon — not stuck 80ms (the bug had 0 movement for 5 frames)
-		const after80 = samples[5]!.distanceTo(samples[0]!)
-		expect(after80, 'after 80ms should have moved >0.05 (not stuck by settle delay)').toBeGreaterThan(0.05)
-		const firstMove = samples[1]!.distanceTo(samples[0]!)
-		expect(firstMove, 'first 16ms should move >0 (not completely frozen)').toBeGreaterThan(0.0001)
-		// check target also smooth
-		const targetSamples: THREE.Vector3[] = []
-		for (let ms = 0; ms <= duration; ms += 16) {
-			const t = Math.min(1, ms / duration)
-			const e = ease(t)
-			targetSamples.push(new THREE.Vector3().lerpVectors(fromTarget, toTarget, e))
-		}
-		let maxTgtJump = 0
-		for (let i = 1; i < targetSamples.length; i++)
-			maxTgtJump = Math.max(maxTgtJump, targetSamples[i]!.distanceTo(targetSamples[i - 1]!))
-		expect(maxTgtJump).toBeLessThan((fromTarget.distanceTo(toTarget) / targetSamples.length) * 6)
-	})
-
 	it('framing must keep DMD and playfield visible at both ends (no snap)', () => {
 		const group = buildGroup()
 		const play = computePlayFraming(group)

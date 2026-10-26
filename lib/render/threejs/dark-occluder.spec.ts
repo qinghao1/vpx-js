@@ -16,7 +16,16 @@ function makeMesh(name: string, geometry: THREE.BufferGeometry, mat: THREE.Mater
 }
 
 describe('regression: dark occluder side artifact', () => {
-	it('hides large dark untextured occluder (blackbox) but keeps VR cabinet, small dark, and playfield', () => {
+	function setupOccluderScene(): {
+		blackbox: THREE.Mesh
+		cabinet: THREE.Mesh
+		small: THREE.Mesh
+		whiteWall: THREE.Mesh
+		playfield: THREE.Mesh
+		gate: THREE.Mesh
+		vrDark: THREE.Mesh
+		logText: string
+	} {
 		const root = new THREE.Group()
 		root.name = 'table'
 
@@ -74,35 +83,58 @@ describe('regression: dark occluder side artifact', () => {
 		root.add(vrDark)
 
 		const logs: string[] = []
-		const harnessLog = (msg: string) => logs.push(msg)
-
 		root.updateMatrixWorld(true)
-		postProcessScene(root, { harnessLog, viewerMode: 'viewer' })
+		postProcessScene(root, { harnessLog: (msg: string) => logs.push(msg), viewerMode: 'viewer' })
+		return { blackbox, cabinet, small, whiteWall, playfield, gate, vrDark, logText: logs.join(' ') }
+	}
 
+	function singleMaterial(mesh: THREE.Mesh): THREE.MeshStandardMaterial {
+		return Array.isArray(mesh.material)
+			? (mesh.material[0] as THREE.MeshStandardMaterial)
+			: (mesh.material as THREE.MeshStandardMaterial)
+	}
+
+	it('hides the large dark untextured occluder (blackbox)', () => {
+		const { blackbox } = setupOccluderScene()
 		expect(blackbox.visible, 'primitive-blackbox large dark occluder must be hidden').to.equal(false)
+	})
+
+	it('keeps small dark meshes visible (size <25 threshold)', () => {
+		const { small } = setupOccluderScene()
 		expect(small.visible, 'small dark LM should remain visible (size <25 threshold)').to.equal(true)
+	})
+
+	it('keeps the textured VR cabinet visible and pushes it forward', () => {
+		const { cabinet } = setupOccluderScene()
 		expect(cabinet.visible, 'textured VR cabinet must stay visible').to.equal(true)
-		const cabMatAfter = Array.isArray(cabinet.material)
-			? (cabinet.material[0] as THREE.MeshStandardMaterial)
-			: (cabinet.material as THREE.MeshStandardMaterial)
+		const cabMatAfter = singleMaterial(cabinet)
 		expect(cabMatAfter.polygonOffset, 'textured VR cabinet should be pushed forward with polygonOffset').to.equal(
 			true,
 		)
 		expect(cabMatAfter.polygonOffsetFactor).to.equal(0)
 		expect(cabMatAfter.polygonOffsetUnits).to.equal(-1)
+	})
 
+	it('hides the white untextured stray and logs it', () => {
+		const { whiteWall, logText } = setupOccluderScene()
 		expect(whiteWall.visible, 'white untextured stray must be hidden').to.equal(false)
-		expect(playfield.visible, 'playfield must remain visible despite white').to.equal(true)
-		expect(gate.visible, 'gate large dark must NOT be hidden (excluded by name)').to.equal(true)
-		expect(vrDark.visible, 'VR dark without map must remain visible (excluded)').to.equal(true)
-		const vrMatAfter = Array.isArray(vrDark.material)
-			? (vrDark.material[0] as THREE.MeshStandardMaterial)
-			: (vrDark.material as THREE.MeshStandardMaterial)
-		expect(vrMatAfter.polygonOffset, 'untextured VR should have polygonOffset false').to.equal(false)
-
-		const logText = logs.join(' ')
-		// blackbox now hidden as dark occluder
 		expect(logText).to.include('white untextured')
+	})
+
+	it('keeps the playfield visible despite white', () => {
+		const { playfield } = setupOccluderScene()
+		expect(playfield.visible, 'playfield must remain visible despite white').to.equal(true)
+	})
+
+	it('keeps large dark gate meshes visible (excluded by name)', () => {
+		const { gate } = setupOccluderScene()
+		expect(gate.visible, 'gate large dark must NOT be hidden (excluded by name)').to.equal(true)
+	})
+
+	it('keeps untextured VR dark planes visible without polygon offset', () => {
+		const { vrDark } = setupOccluderScene()
+		expect(vrDark.visible, 'VR dark without map must remain visible (excluded)').to.equal(true)
+		expect(singleMaterial(vrDark).polygonOffset, 'untextured VR should have polygonOffset false').to.equal(false)
 	})
 
 	it('does not hide dark mesh with non-black texture', () => {

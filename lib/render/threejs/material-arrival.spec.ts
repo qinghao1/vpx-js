@@ -68,6 +68,28 @@ describe('material arrival: BDL uniforms survive streaming', () => {
 		expect(mat.alphaTest, 'cutout must be restored on arrival').to.be.closeTo(1 / 255, 1e-6)
 	})
 
+	it('tints baked node materials with the authored baseColor (classic fixBaked parity)', () => {
+		const textures = new Map<string, DataTexture>()
+		const generator = makeGenerator(textures)
+		const mat: any = generator.getMaterial({ name: 'VLM.Bake', baseColor: 0xff0000 } as any)
+		expect(mat.userData.__isBaked, 'bake name must take the baked path').toBe(true)
+		expect(mat.userData.__uTint.value.getHex(), 'baked tint must carry baseColor').toEqual(0xff0000)
+	})
+
+	it('threads file metalness/roughness into BDL materials on the creation path', () => {
+		const textures = new Map<string, DataTexture>()
+		const generator = makeGenerator(textures)
+		const mat: any = generator.getMaterial({
+			name: 'chromeRail',
+			baseColor: 0xc0c0c0,
+			isMetal: true,
+			roughness: 0.2,
+		} as any)
+		expect(mat.userData.__primitiveKind, 'must take the BDL path').toEqual('bdl')
+		expect(mat.metalness, 'file isMetal must survive creation').toEqual(1)
+		expect(mat.roughness, 'file roughness must survive creation as 1 - roughness').toBeCloseTo(0.8, 10)
+	})
+
 	it('leaves emissiveMap alone without fullbright intent', () => {
 		const textures = new Map<string, DataTexture>([['somewall', makeTex()]])
 		const generator = makeGenerator(textures)
@@ -75,5 +97,26 @@ describe('material arrival: BDL uniforms survive streaming', () => {
 		generator.applyMap(mat, 'somewall')
 		expect(mat.map).toBe(textures.get('somewall'))
 		expect(mat.emissiveMap, 'no intent, no mirror').toBeNull()
+	})
+
+	it('skips dead classic color/opacity writes on BDL node materials', () => {
+		const generator = makeGenerator(new Map())
+		const mat = createPrimitiveBdlMaterial({ albedo: 0x112233, opacity: 0.5 }) as any
+		generator.applyMaterial(mat, {
+			name: 'scriptMat',
+			baseColor: 0xff0000,
+			isMetal: true,
+			roughness: 0.25,
+			isOpacityActive: true,
+			opacity: 0.9,
+		} as any)
+		expect(mat.name).toBe('material:scriptMat')
+		expect(mat.metalness, 'metalness is live').toBe(1)
+		expect(mat.roughness, 'roughness is live').toBeCloseTo(0.75, 10)
+		expect(mat.userData.__baseColor, 'baseColor stash kept').toBe(0xff0000)
+		expect(mat.color.getHex(), 'classic color is shader-dead on BDL').toBe(0xffffff)
+		expect(mat.opacity, 'classic opacity is shader-dead on BDL').toBe(1)
+		expect(mat.userData.__uAlbedo.value.getHex(), 'albedo uniform untouched').toBe(0x112233)
+		expect(mat.userData.__uAlpha.value, 'alpha uniform untouched').toBe(0.5)
 	})
 })

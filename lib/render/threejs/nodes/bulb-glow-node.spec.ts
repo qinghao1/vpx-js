@@ -55,8 +55,13 @@ describe('bulb glow node material', () => {
 			falloffPower: 2,
 			intensity: 0,
 		})
+		const uniforms = mat.userData as any
+		expect(uniforms.__uIntensity.value).toBe(0)
+		expect(uniforms.__uColor.value.getHex()).toBe(0xff0000)
 		setBulbGlowState(mat, { intensity: 12, color: 0x00ff00 })
+		expect(uniforms.__uIntensity.value).toBe(12)
+		expect(uniforms.__uColor.value.getHex()).toBe(0x00ff00)
 		expect(isBulbGlowMaterial(mat)).toBe(true)
-		setBulbGlowState({}, { intensity: 5 })
+		expect(() => setBulbGlowState({}, { intensity: 5 })).not.toThrow()
 	})
 })

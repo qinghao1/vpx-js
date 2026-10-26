@@ -3,21 +3,9 @@ import * as chai from 'chai'
 import { expect } from 'chai'
 import sinonChai from 'sinon-chai'
 import * as THREE from 'three'
+import { isTableHit } from '../../../demo-browser/src/config.js'
 
 chai.use((sinonChai as any).default ?? sinonChai)
-
-const RE_CAB = /vrcab|cabinet|lockbar|pincab/i
-const RE_OUTER = /VRCab_(Cabinet|Backbox|LegsFront|LegsBack)$/i
-
-function isTableHit(object: THREE.Object3D, root: THREE.Object3D): boolean {
-	for (let c: any = object; c && c !== root; c = c.parent) {
-		const n = String(c.name || '')
-		if (RE_CAB.test(n) || RE_OUTER.test(n)) return true
-		const ln = n.toLowerCase()
-		if (ln.includes('playfield') || ln.includes('apron')) return true
-	}
-	return false
-}
 
 function makeGroup(name: string): THREE.Group {
 	const g = new THREE.Group()

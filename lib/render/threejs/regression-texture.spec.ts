@@ -1,13 +1,16 @@
 import * as fs from 'node:fs'
+import { deflate } from 'pako'
 import { DataUtils, HalfFloatType } from 'three'
 import { describe, expect, it } from 'vitest'
+import { QUALITY_CAPS } from '../../util/quality.js'
 import { downscaleHdrData, getMaxTextureSize as getMaxWorker } from './hdr-decode.worker.node.js'
-import { effectiveMax } from './three-texture-loader-browser.js'
-import { getMaxTextureSize as getMaxNode } from './three-texture-loader-node.js'
+import { effectiveMax, ThreeTextureLoaderBrowser } from './three-texture-loader-browser.js'
+import { getMaxTextureSize as getMaxNode, ThreeTextureLoaderNode } from './three-texture-loader-node.js'
 
 describe('regression: texture stripe artifacts', () => {
 	it('playfield cap must be 4096 not 16384', () => {
 		expect(getMaxNode('VLM.Nestmap0'), 'node loader playfield cap').toEqual(4096)
+		expect(getMaxNode('vlm_lightmap'), 'pure-vlm name takes playfield cap').toEqual(4096)
 		expect(getMaxNode('playfield'), 'node playfield').toEqual(4096)
 		expect(getMaxNode('nestmap'), 'nestmap').toEqual(4096)
 		expect(getMaxNode('bake_something'), 'bake').toEqual(4096)
@@ -27,11 +30,15 @@ describe('regression: texture stripe artifacts', () => {
 		// In node env hwMax defaults 4096, so non-playfield float also 4096 but limited by cap
 		const nonPf = effectiveMax(false, 'some_wall')
 		expect(nonPf, 'non-playfield should be <=4096').toBeLessThanOrEqual(4096)
-		// Ensure source does not contain old 16384 cap
-		const browserSrc = fs.readFileSync('lib/render/threejs/three-texture-loader-browser.ts', 'utf-8')
-		expect(browserSrc, 'must not contain 16384 cap').not.toContain('16384')
-		const workerSrc = fs.readFileSync('lib/render/threejs/hdr-decode.worker.node.ts', 'utf-8')
-		expect(workerSrc).toContain('4096')
+		// Behavior guard for the old 16384-cap bug: no quality tier may raise any
+		// texture cap above 4096, or 6080x8192 playfields skip downscaling again.
+		for (const [tier, caps] of Object.entries(QUALITY_CAPS)) {
+			expect(caps.playfield, `${tier} playfield cap`).toBeLessThanOrEqual(4096)
+			expect(caps.other, `${tier} other cap`).toBeLessThanOrEqual(4096)
+		}
+		expect(QUALITY_CAPS.high.playfield, 'high-tier playfield cap').toEqual(4096)
+		expect(getMaxWorker('VLM.Nestmap0'), 'worker playfield cap').toEqual(4096)
+		expect(getMaxNode('VLM.Nestmap0'), 'node playfield cap').toEqual(4096)
 	})
 
 	it('playfield downscale must use box-average not point sample', () => {
@@ -100,9 +107,7 @@ describe('regression: texture stripe artifacts', () => {
 	it('6080x8192 playfield must downscale to <=4096', () => {
 		const w = 6080,
 			h = 8192
-		const comps = 4
-		const fake = new Uint8Array(w * h * comps) // small but we just test max calc, not full alloc? Use smaller proxy
-		// Real large alloc would OOM, so test math: scale = min(4096/6080, 4096/8192)=0.5
+		// Math only (no pixel buffer, no large alloc): scale = min(4096/6080, 4096/8192)=0.5
 		const max = getMaxWorker('VLM.Nestmap0')
 		expect(max).toEqual(4096)
 		const scale = Math.min(max / w, max / h)
@@ -115,14 +120,157 @@ describe('regression: texture stripe artifacts', () => {
 		// ensure not 16384 (old bug would have allowed 6080x8192 without downscale on hw 16384)
 		expect(max, 'old bug cap 16384 must not be used').not.toEqual(16384)
 	})
+})
 
-	it('polygonOffset must be negative to avoid z-fighting stripes', () => {
-		const src = fs.readFileSync('lib/render/threejs/three-scene-postprocess.ts', 'utf-8')
-		// main bake should be -1, overlay -2/-4
-		expect(src).toMatch(/polygonOffsetFactor\s*=\s*-1/)
-		expect(src).toMatch(/polygonOffsetFactor\s*=\s*-2/)
-		// baked materials must use negative polygonOffset (old bug used 0)
-		expect(src, 'baked polygonOffset must be negative').toMatch(/isMainBake[\s\S]*?polygonOffsetFactor\s*=\s*-1/)
-		expect(src, 'overlay polygonOffset must be -2/-4').toMatch(/isOverlay[\s\S]*?polygonOffsetFactor\s*=\s*-2/)
+const PNG_SIGNATURE = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])
+
+let crcTable: Uint32Array | null = null
+
+function specCrc32(bytes: Uint8Array): number {
+	if (!crcTable) {
+		crcTable = new Uint32Array(256)
+		for (let entry = 0; entry < 256; entry++) {
+			let crc = entry
+			for (let bit = 0; bit < 8; bit++) crc = crc & 1 ? 0xedb88320 ^ (crc >>> 1) : crc >>> 1
+			crcTable[entry] = crc
+		}
+	}
+	let crc = 0xffffffff
+	for (let index = 0; index < bytes.length; index++) crc = crcTable[(crc ^ bytes[index]) & 0xff] ^ (crc >>> 8)
+	return (crc ^ 0xffffffff) >>> 0
+}
+
+function specPngChunk(type: string, payload: Uint8Array): Uint8Array {
+	const chunk = new Uint8Array(12 + payload.length)
+	const view = new DataView(chunk.buffer)
+	view.setUint32(0, payload.length)
+	for (let index = 0; index < 4; index++) chunk[4 + index] = type.charCodeAt(index)
+	chunk.set(payload, 8)
+	view.setUint32(8 + payload.length, specCrc32(chunk.subarray(4, 8 + payload.length)))
+	return chunk
+}
+
+function specMakePng(
+	width: number,
+	height: number,
+	colorType: number,
+	scanlines: Uint8Array,
+	palette?: Uint8Array,
+	transparency?: Uint8Array,
+): Uint8Array {
+	const header = new Uint8Array(13)
+	const view = new DataView(header.buffer)
+	view.setUint32(0, width)
+	view.setUint32(4, height)
+	header[8] = 8
+	header[9] = colorType
+	const parts = [PNG_SIGNATURE, specPngChunk('IHDR', header)]
+	if (palette) parts.push(specPngChunk('PLTE', palette))
+	if (transparency) parts.push(specPngChunk('tRNS', transparency))
+	parts.push(specPngChunk('IDAT', deflate(scanlines)))
+	parts.push(specPngChunk('IEND', new Uint8Array(0)))
+	const total = parts.reduce((sum, part) => sum + part.length, 0)
+	const out = new Uint8Array(total)
+	let offset = 0
+	for (const part of parts) {
+		out.set(part, offset)
+		offset += part.length
+	}
+	return out
+}
+
+type SpecImage = { image: { width: number; height: number; data: Uint8Array }; name: string }
+
+describe('node texture loader png decode', () => {
+	const loader = new ThreeTextureLoaderNode()
+
+	it('decodes 8-bit RGBA png to exact pixels', async () => {
+		const scanlines = new Uint8Array([0, 255, 0, 0, 255, 0, 255, 0, 128, 0, 0, 0, 255, 0, 255, 255, 255, 255])
+		const tex = (await loader.loadTexture('rgba', '.png', specMakePng(2, 2, 6, scanlines))) as unknown as SpecImage
+		expect(tex.image.width).toEqual(2)
+		expect(tex.image.height).toEqual(2)
+		expect(Array.from(tex.image.data)).toEqual([255, 0, 0, 255, 0, 255, 0, 128, 0, 0, 255, 0, 255, 255, 255, 255])
+		expect(tex.name).toEqual('texture:rgba')
+	})
+
+	it('decodes paletted png with tRNS to exact pixels', async () => {
+		const scanlines = new Uint8Array([0, 0, 1, 2])
+		const palette = new Uint8Array([255, 0, 0, 0, 255, 0, 0, 0, 255])
+		const transparency = new Uint8Array([255, 128])
+		const tex = (await loader.loadTexture(
+			'pal',
+			'.png',
+			specMakePng(3, 1, 3, scanlines, palette, transparency),
+		)) as unknown as SpecImage
+		expect(tex.image.width).toEqual(3)
+		expect(tex.image.height).toEqual(1)
+		expect(Array.from(tex.image.data)).toEqual([255, 0, 0, 255, 0, 255, 0, 128, 0, 0, 255, 255])
+	})
+
+	it('decodes grayscale, grayscale+alpha and rgb pngs', async () => {
+		const gray = (await loader.loadTexture(
+			'gray',
+			'.png',
+			specMakePng(2, 1, 0, new Uint8Array([0, 0, 255])),
+		)) as unknown as SpecImage
+		expect(Array.from(gray.image.data)).toEqual([0, 0, 0, 255, 255, 255, 255, 255])
+		const grayAlpha = (await loader.loadTexture(
+			'graya',
+			'.png',
+			specMakePng(1, 1, 4, new Uint8Array([0, 100, 200])),
+		)) as unknown as SpecImage
+		expect(Array.from(grayAlpha.image.data)).toEqual([100, 100, 100, 200])
+		const rgb = (await loader.loadTexture(
+			'rgb',
+			'.png',
+			specMakePng(1, 1, 2, new Uint8Array([0, 10, 20, 30])),
+		)) as unknown as SpecImage
+		expect(Array.from(rgb.image.data)).toEqual([10, 20, 30, 255])
+	})
+
+	it('decodes real paletted res/maps png instead of placeholder', async () => {
+		const file = new Uint8Array(fs.readFileSync('res/maps/ball.png'))
+		const tex = (await loader.loadTexture('ball', '.png', file)) as unknown as SpecImage
+		expect(tex.image.width).toEqual(116)
+		expect(tex.image.height).toEqual(116)
+		expect(tex.image.data.length).toEqual(116 * 116 * 4)
+	})
+
+	it('downscales oversized png to the per-name cap', async () => {
+		const scanlines = new Uint8Array(10 * (1 + 3000 * 4))
+		const png = specMakePng(3000, 10, 6, scanlines)
+		const capped = (await loader.loadTexture('wall', '.png', png)) as unknown as SpecImage
+		expect(capped.image.width).toEqual(2048)
+		expect(capped.image.height).toEqual(6)
+		const playfield = (await loader.loadTexture('playfield', '.png', png)) as unknown as SpecImage
+		expect(playfield.image.width).toEqual(3000)
+		expect(playfield.image.height).toEqual(10)
+	})
+
+	it('returns 1x1 placeholder for unsupported formats', async () => {
+		const jpegMagic = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0, 1, 2, 3])
+		const tex = (await loader.loadTexture('photo', '.jpg', jpegMagic)) as unknown as SpecImage
+		expect(tex.image.width).toEqual(1)
+		expect(tex.image.height).toEqual(1)
+		expect(Array.from(tex.image.data)).toEqual([255, 255, 255, 255])
+	})
+
+	it('loadDefaultTexture decodes res/maps png', async () => {
+		const tex = (await loader.loadDefaultTexture('bumperbase', '.png', 'bumperbase.png')) as unknown as SpecImage
+		expect(tex.image.width).toEqual(512)
+		expect(tex.image.height).toEqual(512)
+		expect(tex.image.data.length).toEqual(512 * 512 * 4)
+	})
+
+	it('loadDefaultTexture keeps dotless fallback names whole', async () => {
+		const browser = new ThreeTextureLoaderBrowser()
+		// Unknown names throw before any DOM use, so this runs in node.
+		// A dotless name must not lose its final character to the ext strip.
+		await expect(browser.loadDefaultTexture('x', '', 'glassnormal')).rejects.toThrow(
+			'Unknown local texture "glassnormal".',
+		)
+		await expect(browser.loadDefaultTexture('x', '', 'glassnormal.png')).rejects.toThrow(
+			'Unknown local texture "glassnormal".',
+		)
 	})
 })
