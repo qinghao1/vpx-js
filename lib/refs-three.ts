@@ -23,7 +23,6 @@ export {
 	EquirectangularReflectionMapping,
 	EquirectangularRefractionMapping,
 	ExtrudeGeometry,
-	ExtrudeGeometry as ExtrudeBufferGeometry,
 	Float32BufferAttribute,
 	FloatType,
 	FrontSide,
@@ -42,7 +41,6 @@ export {
 	LinearSRGBColorSpace,
 	LoadingManager,
 	Material,
-	MathUtils as Math,
 	Matrix3,
 	Matrix4,
 	Mesh,
@@ -73,9 +71,4 @@ export {
 } from 'three'
 
 export const RGBFormat = 1022
-export const RGBEFormat = 1023
-export const RGBEEncoding = 3000
-export const LinearEncoding = 3000
-export const sRGBEncoding = 3001
-export const GammaEncoding = 3007
 export type { PixelFormat, TextureDataType } from 'three'
