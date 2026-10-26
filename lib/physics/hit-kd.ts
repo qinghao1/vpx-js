@@ -4,23 +4,10 @@
 import type { PlayerPhysics } from '../game/player-physics.js'
 import type { Ball } from '../vpt/ball/ball.js'
 import type { CollisionEvent } from './collision-event.js'
-import { CollisionType } from './collision-type.js'
-import type { Hit3DPoly } from './hit-3dpoly.js'
-import { HitCircle } from './hit-circle.js'
 import { HitKDNode } from './hit-kd-node.js'
-import { HitLine3D } from './hit-line-3d.js'
-import { HitLineZ } from './hit-line-z.js'
-import { HitKind, type HitObject } from './hit-object.js'
-import { HitPlane } from './hit-plane.js'
-import { HitPoint } from './hit-point.js'
-import { HitTriangle } from './hit-triangle.js'
-import { LineSeg } from './line-seg.js'
+import type { HitObject } from './hit-object.js'
+import { countBatchables } from './wasm/batched-hittest.js'
 import { getWasmKernels, isWasmReady, warmWasmPools } from './wasm/kernels.js'
-
-const isBatchCircle = (h: HitObject): boolean =>
-	h.hitKind === HitKind.Circle && h.hitTest === HitCircle.prototype.hitTest
-const isBatchLineSeg = (h: HitObject): boolean =>
-	h.hitKind === HitKind.LineSeg && h.hitTest === LineSeg.prototype.hitTest
 
 // Ball-ball KD vs brute cutoff — empirical sweep (Node 24, heavy table 58k hitObjects):
 //  empty 10 balls: thr0 0.024ms thr8 0.018 thr16 0.013 thr32 0.012 thr64 0.011
@@ -76,64 +63,10 @@ export class HitKD {
 	}
 
 	private warmPools(vho: HitObject[]): void {
-		let circleCount = 0,
-			planeCount = 0,
-			lineZCount = 0,
-			pointCount = 0,
-			triangleCount = 0,
-			lineSegCount = 0,
-			line3DCount = 0,
-			polyCount = 0
-		for (const h of vho) {
-			if (isBatchCircle(h)) circleCount++
-			else if (h.hitKind === HitKind.Plane) planeCount++
-			else if (h.hitKind === HitKind.LineZ) lineZCount++
-			else if (h.hitKind === HitKind.Point) pointCount++
-			else if (h.hitKind === HitKind.Triangle) triangleCount++
-			else if (h.hitKind === HitKind.Line3D) line3DCount++
-			else if (
-				h.hitKind === HitKind.Poly &&
-				(h as Hit3DPoly).objType !== CollisionType.Trigger &&
-				(h as Hit3DPoly).rgv.length <= 32
-			)
-				polyCount++
-			else if (isBatchLineSeg(h)) lineSegCount++
-		}
-		if (
-			circleCount ||
-			planeCount ||
-			lineZCount ||
-			pointCount ||
-			triangleCount ||
-			lineSegCount ||
-			line3DCount ||
-			polyCount
-		) {
-			if (isWasmReady())
-				warmWasmPools(
-					circleCount,
-					planeCount,
-					lineZCount,
-					pointCount,
-					triangleCount,
-					lineSegCount,
-					line3DCount,
-					polyCount,
-				)
-			else
-				void getWasmKernels().then(() =>
-					warmWasmPools(
-						circleCount,
-						planeCount,
-						lineZCount,
-						pointCount,
-						triangleCount,
-						lineSegCount,
-						line3DCount,
-						polyCount,
-					),
-				)
-		}
+		const counts = countBatchables(vho)
+		if (!counts.some(count => count)) return
+		if (isWasmReady()) warmWasmPools(...counts)
+		else void getWasmKernels().then(() => warmWasmPools(...counts))
 	}
 
 	public update(): void {
