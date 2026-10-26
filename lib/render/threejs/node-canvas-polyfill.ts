@@ -35,11 +35,16 @@ class NodeFileReader {
 	readAsDataURL(blob: Blob): void {
 		blob.arrayBuffer().then(
 			buf => {
-				const bytes = new Uint8Array(buf)
-				let binary = ''
-				for (let idx = 0; idx < bytes.byteLength; idx++) binary += String.fromCharCode(bytes[idx])
-				const b64 = typeof Buffer !== 'undefined' ? Buffer.from(buf).toString('base64') : btoa(binary)
-				this.result = `data:${(blob as Blob).type || 'application/octet-stream'};base64,${b64}`
+				let b64: string
+				if (typeof Buffer !== 'undefined') {
+					b64 = Buffer.from(buf).toString('base64')
+				} else {
+					const bytes = new Uint8Array(buf)
+					let binary = ''
+					for (let idx = 0; idx < bytes.byteLength; idx++) binary += String.fromCharCode(bytes[idx])
+					b64 = btoa(binary)
+				}
+				this.result = `data:${blob.type || 'application/octet-stream'};base64,${b64}`
 				this.onloadend?.()
 			},
 			err => this.onerror?.(err),

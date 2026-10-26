@@ -1,8 +1,8 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import type { IRenderable, RenderInfo } from '../game/irenderable.js'
-import type { Matrix3D } from '../util/matrix.js'
+import type { IRenderable, RenderInfo } from '../game/interfaces.js'
+import type { Matrix3D } from '../math/matrix.js'
 import type { ItemState } from '../vpt/item-state.js'
 import type { LightData } from '../vpt/light/light-data.js'
 import type { LightState } from '../vpt/light/light-state.js'
@@ -11,10 +11,19 @@ import type { Mesh } from '../vpt/mesh.js'
 import type { Table, TableGenerateOptions } from '../vpt/table/table.js'
 import type { Texture } from '../vpt/texture.js'
 
+/**
+ * Backend-agnostic scene vocabulary: NODE is a scene-graph node, GEOMETRY a
+ * GPU-ready mesh payload, POINT_LIGHT a dynamic light. Three.js binds them to
+ * Object3D, BufferGeometry, PointLight.
+ */
 export interface IRenderApi<NODE, GEOMETRY, POINT_LIGHT> {
 	/**
 	 * Pre-loads all the table's textures into the renderer's texture format
 	 * so they can be loaded and swapped synchronously later.
+	 *
+	 * Never rejects for bad image data: per-texture outcome arrives via
+	 * onTexture(tex, ok) and the promise still resolves, so one corrupt
+	 * texture cannot abort the table load.
 	 * @param textures
 	 * @param table
 	 * @param onTexture optional per-texture progress callback (streaming)
@@ -70,6 +79,9 @@ export interface IRenderApi<NODE, GEOMETRY, POINT_LIGHT> {
 
 	/**
 	 * Applies a matrix transformation to a node.
+	 *
+	 * The matrix arrives in VPX row-major (v·M) convention; each backend maps
+	 * it into its own storage (three.js transposes into column-major).
 	 *
 	 * @param matrix The transformation matrix
 	 * @param node The node to transform. Does nothing if not set.
@@ -151,7 +163,7 @@ export interface IRenderApi<NODE, GEOMETRY, POINT_LIGHT> {
 	 * Creates a flat additive glow polygon for a bulb light.
 	 *
 	 * Native renders every light with drag-point vertices as a lightmap glow
-	 * quad (`m_lightmapMeshBuffer` in `light.cpp`, `fs_light.sc` bulb blend),
+	 * quad (`m_lightmapMeshBuffer` in `src/parts/light.cpp`, `fs_light.sc` bulb blend),
 	 * independent of the bulb-mesh and surface-light paths.
 	 */
 	createBulbGlowGeometry(lightData: LightData, table: Table): GEOMETRY
@@ -201,6 +213,15 @@ export interface ITextureLoader<TEXTURE> {
 	 * @param fileName Filename without path
 	 */
 	loadDefaultTexture(name: string, ext: string, fileName: string): Promise<TEXTURE>
+
+	/**
+	 * Whether an engine-shipped default texture exists for this name, without loading it.
+	 * Lets callers skip doomed load attempts for table-missing names that are no default.
+	 * Optional for backward compatibility with custom loaders.
+	 *
+	 * @param name Texture name as referenced by the scene
+	 */
+	hasDefaultTexture?(name: string): boolean
 }
 
 export interface MeshConvertOptions {

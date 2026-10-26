@@ -21,9 +21,17 @@ import {
 	type Texture as ThreeTexture,
 } from '../../refs.browser.js'
 import { exrCacheKey, idbGet, idbSet } from '../../util/idb-cache.js'
-import { _resetQualityCache, getEffectiveCaps } from '../../util/quality.js'
+import { logger } from '../../util/logger.js'
+import { _resetQualityCache, getEffectiveCaps, MAX_FLOAT_TEXTURE_BYTES } from '../../util/quality.js'
 import type { ITextureLoader } from '../irender-api.js'
 import { decodeInWorker, hasImageWorker } from './image-worker-pool.js'
+import { RE_PLAYFIELD } from './material-shared.js'
+
+/** Engine-default lookup key: filename without path or extension (dotless names stay whole). */
+function defaultKeyFor(fileName: string): string {
+	const dot = fileName.lastIndexOf('.')
+	return dot >= 0 ? fileName.slice(0, dot) : fileName
+}
 
 const imageMap: Record<string, string> = {
 	bumperbase: new URL('../../../res/maps/bumperbase.png', import.meta.url).href,
@@ -37,7 +45,10 @@ const imageMap: Record<string, string> = {
 	kickerWilliams: new URL('../../../res/maps/kickerWilliams.png', import.meta.url).href,
 }
 
-const RE_PLAYFIELD = /playfield|nestmap|bake|vlm/i
+/** Worker OOM-bound rejections (fail-fast size guard), as opposed to genuine decode failures. */
+function isFloatSizeRejection(e: unknown): boolean {
+	return /too large to decode/.test((e as Error)?.message ?? String(e))
+}
 
 export function effectiveMax(_isFloat: boolean, name?: string): number {
 	const caps = getEffectiveCaps()
@@ -48,7 +59,7 @@ export function _testResetTextureLimits(): void {
 	_resetQualityCache()
 }
 
-function tune(tex: any, name?: string): void {
+function tune(tex: any): void {
 	const caps = getEffectiveCaps()
 	tex.generateMipmaps = true
 	tex.minFilter = LinearMipMapLinearFilter
@@ -59,7 +70,24 @@ function tune(tex: any, name?: string): void {
 function nameAndTune(tex: any, name: string): void {
 	tex.name = `texture:${name}`
 	tex.needsUpdate = true
-	tune(tex, name)
+	tune(tex)
+}
+
+function textureFromBitmap(bitmap: any, name: string): any {
+	const tex: any = new Texture(bitmap as any)
+	tex.colorSpace = SRGBColorSpace
+	tex.flipY = false
+	tex.needsUpdate = true
+	tex.name = `texture:${name}`
+	tune(tex)
+	return tex
+}
+
+/** Zero-copy blob part: slice only when the view does not span its buffer. */
+function toBlobPart(data: Uint8Array): Uint8Array | ArrayBufferLike {
+	return data.byteOffset === 0 && data.byteLength === data.buffer.byteLength
+		? data
+		: data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength)
 }
 
 function bitmapToCanvasTexture(bitmap: any, name: string): any {
@@ -79,7 +107,7 @@ function bitmapToCanvasTexture(bitmap: any, name: string): any {
 		tex.flipY = false
 		tex.needsUpdate = true
 		tex.name = `texture:${name}`
-		tune(tex, name)
+		tune(tex)
 		return tex
 	} catch {
 		return null
@@ -165,13 +193,7 @@ async function loadRegularWorker(name: string, mime: string, data: Uint8Array): 
 	const max = effectiveMax(false, name)
 	try {
 		const bitmap: any = await decodeInWorker(data, mime, max, name)
-		const tex: any = new Texture(bitmap as any)
-		tex.colorSpace = SRGBColorSpace
-		tex.flipY = false
-		tex.needsUpdate = true
-		tex.name = `texture:${name}`
-		tune(tex, name)
-		return tex as ThreeTexture
+		return textureFromBitmap(bitmap, name) as ThreeTexture
 	} catch {
 		return null
 	}
@@ -180,10 +202,17 @@ async function loadRegularWorker(name: string, mime: string, data: Uint8Array): 
 export class ThreeTextureLoaderBrowser implements ITextureLoader<ThreeTexture> {
 	public playfieldMap?: string
 
+	public hasDefaultTexture(name: string): boolean {
+		const key = defaultKeyFor(name).toLowerCase()
+		if (key === 'ball') return true
+		return Object.keys(imageMap).some(k => k.toLowerCase() === key)
+	}
+
 	public async loadDefaultTexture(_name: string, _ext: string, fileName: string): Promise<ThreeTexture> {
-		const keyLc = fileName.slice(0, fileName.lastIndexOf('.')).toLowerCase()
-		if (keyLc === 'ball') return createBallEnvTexture(_name || fileName)
-		const key = fileName.slice(0, fileName.lastIndexOf('.'))
+		// Dotless names (engine fallbacks) have no extension to strip; slicing
+		// to lastIndexOf('.') === -1 would eat the final character instead.
+		const key = defaultKeyFor(fileName)
+		if (key.toLowerCase() === 'ball') return createBallEnvTexture(_name || fileName)
 		const url = imageMap[key]
 		if (!url) throw new Error(`Unknown local texture "${key}".`)
 		const tex: any = await new TextureLoader().loadAsync(url)
@@ -222,9 +251,12 @@ export class ThreeTextureLoaderBrowser implements ITextureLoader<ThreeTexture> {
 		const mime = getMimeType(data, ext) ?? 'image/png'
 		const isHdr = mime === 'image/hdr' || ext === '.hdr'
 		const isExr = mime === 'image/exr' || ext === '.exr'
+		// Worker decode is skipped for huge payloads (transfer/parse cost),
+		// but the main-thread bitmap path still runs: it resizes down to the
+		// effective cap, while loadRegular would attempt a full-size upload.
 		const tooLarge = data.byteLength > 16 * 1024 * 1024
-		if (!isHdr && !isExr && !tooLarge) {
-			if (hasImageWorker()) {
+		if (!isHdr && !isExr) {
+			if (!tooLarge && hasImageWorker()) {
 				const workerTex = await loadRegularWorker(name, mime, data).catch(() => null)
 				if (workerTex) return workerTex
 			}
@@ -235,8 +267,23 @@ export class ThreeTextureLoaderBrowser implements ITextureLoader<ThreeTexture> {
 		}
 		if (isHdr || isExr) {
 			const kind = isExr ? ('exr' as const) : ('hdr' as const)
-			const viaWorker = await tryLoadViaWorker(name, kind, data)
-			if (viaWorker) return viaWorker
+			try {
+				const viaWorker = await tryLoadViaWorker(name, kind, data)
+				if (viaWorker) return viaWorker
+			} catch (e) {
+				// The worker OOM bound rejects huge payloads before decode, but
+				// playfield lightmap bakes gate playfield brightness: a missing
+				// nestmap leaves the GI overlays mapless and the playfield dark.
+				// Let those fall through to the slow main-thread decode with a
+				// single warning; every other worker failure still throws.
+				if (!isFloatSizeRejection(e) || !RE_PLAYFIELD.test(name)) throw e
+				logger().warn(
+					'[ThreeTextureLoaderBrowser.loadTexture] Float texture %s is %sMB (> %sMB worker cap): slow main-thread decode',
+					name,
+					(data.byteLength / 1048576).toFixed(1),
+					(MAX_FLOAT_TEXTURE_BYTES / 1048576).toFixed(0),
+				)
+			}
 			return loadFloatFallback(name, ext, mime, data)
 		}
 		return loadRegular(name, mime, data)
@@ -292,14 +339,7 @@ function createBallEnvTexture(name: string): ThreeTexture {
 
 async function tryCreateBitmap(data: Uint8Array, mime: string, name: string): Promise<ThreeTexture | null> {
 	try {
-		const blob = new Blob(
-			[
-				data.byteOffset === 0 && data.byteLength === data.buffer.byteLength
-					? (data as any)
-					: (data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as any),
-			],
-			{ type: mime as any },
-		)
+		const blob = new Blob([toBlobPart(data) as any], { type: mime as any })
 		let bitmap: any = await createImageBitmap(blob as any, { imageOrientation: 'flipY' } as any)
 		const max = effectiveMax(false, name)
 		if (bitmap.width > max || bitmap.height > max) {
@@ -323,13 +363,7 @@ async function tryCreateBitmap(data: Uint8Array, mime: string, name: string): Pr
 				return null
 			}
 		}
-		const tex: any = new Texture(bitmap as any)
-		tex.colorSpace = SRGBColorSpace
-		tex.flipY = false
-		tex.needsUpdate = true
-		tex.name = `texture:${name}`
-		tune(tex, name)
-		return tex
+		return textureFromBitmap(bitmap, name)
 	} catch {
 		return null
 	}
@@ -346,8 +380,20 @@ async function tryLoadViaWorker(name: string, kind: 'exr' | 'hdr', data: Uint8Ar
 			true,
 		)
 	}
+	// Bound the worst case before touching the worker: EXR/HDR decoders expand
+	// to a full-res half-float frame first (8192x8192 RGBA16F is 512MB) and
+	// downsample only afterwards, so an uncapped decode OOMs or stalls. Fail
+	// fast with 'too large' so the map generator skips the texture on its
+	// debug path and the failure cooldown absorbs demand retries.
+	if (data.byteLength > MAX_FLOAT_TEXTURE_BYTES) {
+		throw new Error(
+			`Float texture "${name}" is too large to decode ` +
+				`(${(data.byteLength / 1048576).toFixed(1)}MB > ${MAX_FLOAT_TEXTURE_BYTES / 1048576}MB cap): ` +
+				`skipped before worker decode`,
+		)
+	}
 	const buf = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer
-	const parsed: any = await parseWorker(buf.slice(0) as ArrayBuffer, kind, max, name)
+	const parsed: any = await parseWorker(buf, kind, max, name)
 	if (parsed?.width && parsed?.data) {
 		idbSet(key, {
 			width: parsed.width,
@@ -393,11 +439,7 @@ function loadFloatFallback(name: string, ext: string, mime: string, data: Uint8A
 }
 
 async function loadRegular(name: string, mime: string, data: Uint8Array): Promise<ThreeTexture> {
-	const blobPart: any =
-		data.byteOffset === 0 && data.byteLength === data.buffer.byteLength
-			? data
-			: data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength)
-	const url = URL.createObjectURL(new Blob([blobPart as any], { type: mime as any }))
+	const url = URL.createObjectURL(new Blob([toBlobPart(data) as any], { type: mime as any }))
 	try {
 		const tex: any = await new TextureLoader().loadAsync(url)
 		tex.colorSpace = SRGBColorSpace
@@ -425,7 +467,7 @@ async function loadRegular(name: string, mime: string, data: Uint8Array): Promis
 					const cTex: any = new CanvasTexture(canvas as any)
 					cTex.colorSpace = SRGBColorSpace
 					cTex.name = `texture:${name}`
-					tune(cTex, name)
+					tune(cTex)
 					try {
 						tex.dispose?.()
 					} catch {}
@@ -532,7 +574,7 @@ function downsampleData(texture: any, maxSize: number, name?: string): any {
 	tex.format = texture.format ?? tex.format
 	tex.needsUpdate = true
 	tex.name = texture.name
-	tune(tex, String(texture.name ?? '').replace(/^texture:/, ''))
+	tune(tex)
 	tex.flipY = texture.flipY ?? false
 	texture.dispose?.()
 	texture.image.data = null

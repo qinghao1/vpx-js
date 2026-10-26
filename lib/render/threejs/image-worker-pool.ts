@@ -1,4 +1,8 @@
-let pool: Worker[] = []
+// Browser-only pool (Node decodes inline): image decode + resize runs off the
+// main thread so texture preload does not jank the first frames. Capped at 4
+// workers; round-robin dispatch with a 30s per-image timeout and main-thread
+// fallback when workers are unavailable.
+const pool: Worker[] = []
 let next = 0
 let seq = 0
 const pending = new Map<
@@ -71,15 +75,4 @@ export async function decodeInWorker(data: Uint8Array, mime: string, max: number
 			reject(e)
 		}
 	})
-}
-
-export function terminateImageWorkers(): void {
-	for (const w of pool)
-		try {
-			w.terminate()
-		} catch {}
-	pool = []
-	pending.clear()
-	next = 0
-	seq = 0
 }
