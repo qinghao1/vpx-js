@@ -2,9 +2,9 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import type { IEmulator } from '../../game/iemulator.js'
+import { Vertex2D } from '../../math/vector.js'
 import { logger } from '../../util/logger.js'
-import { Vertex2D } from '../../util/vector.js'
-import { EmulatorMessageQueue, MessageType } from '../emulator-message-queue.js'
+import { EmulatorMessageQueue, MessageType, switchMessageType } from '../emulator-message-queue.js'
 import { EmulatorState } from '../emulator-state.js'
 import { createPinmameModule } from './pinmame-loader.js'
 import type { PinmameModule } from './pinmame-module.js'
@@ -56,10 +56,10 @@ export class PinMameEmulator implements IEmulator {
 	private readonly pendingSwitches = new Map<number, number>()
 	private dmdW = FALLBACK_DMD.x
 	private dmdH = FALLBACK_DMD.y
-	private _pullPtr = 0
-	private _pullCap = 0
-	private _dmdPtr = 0
-	private _dmdCap = 0
+	private readonly wasmBufs: Record<'pull' | 'dmd', { ptr: number; cap: number; min: number }> = {
+		pull: { ptr: 0, cap: 0, min: 1024 },
+		dmd: { ptr: 0, cap: 0, min: 4096 },
+	}
 	private _dmdFrameBuf: Uint8Array | null = null
 
 	async init(): Promise<void> {
@@ -71,30 +71,25 @@ export class PinMameEmulator implements IEmulator {
 			logger().warn('[pinmame] mock — physics only, run npm run build:wasm')
 			return
 		}
-		const c = module.cwrap.bind(module) as (
-			id: string,
-			rt: string | null,
-			at: string[],
-		) => (...a: unknown[]) => unknown
-		const b = (id: string, rt: string | null, at: string[]) => c(id, rt, at) as unknown
+		const wrap = (id: string, ret: string | null, args: string[]): any => module.cwrap(id, ret, args)
 		this.api = {
-			setConfig: b('PinmameSetConfig', null, ['number']) as Api['setConfig'],
-			run: b('PinmameRun', 'number', ['number']) as Api['run'],
-			isRunning: b('PinmameIsRunning', 'number', []) as Api['isRunning'],
-			setSwitch: b('PinmameSetSwitch', null, ['number', 'number']) as Api['setSwitch'],
-			getSwitch: b('PinmameGetSwitch', 'number', ['number']) as Api['getSwitch'],
-			getChangedLamps: b('PinmameGetChangedLamps', 'number', ['number']) as Api['getChangedLamps'],
-			getChangedSols: b('PinmameGetChangedSolenoids', 'number', ['number']) as Api['getChangedSols'],
-			getChangedGIs: b('PinmameGetChangedGIs', 'number', ['number']) as Api['getChangedGIs'],
-			getDIP: b('PinmameGetDIP', 'number', ['number']) as Api['getDIP'],
-			setDIP: b('PinmameSetDIP', null, ['number', 'number']) as Api['setDIP'],
-			getDmdWidth: b('PinmameGetDmdWidth', 'number', []) as Api['getDmdWidth'],
-			getDmdHeight: b('PinmameGetDmdHeight', 'number', []) as Api['getDmdHeight'],
-			getDmdDepth: b('PinmameGetDmdDepth', 'number', []) as Api['getDmdDepth'],
-			getDmdFrame: b('PinmameGetDmdFrame', 'number', ['number']) as Api['getDmdFrame'],
-			getSolMask: b('PinmameGetSolenoidMask', 'number', ['number']) as Api['getSolMask'],
-			setSolMask: b('PinmameSetSolenoidMask', null, ['number', 'number']) as Api['setSolMask'],
-			setTimeFence: b('PinmameSetTimeFence', null, ['number']) as Api['setTimeFence'],
+			setConfig: wrap('PinmameSetConfig', null, ['number']),
+			run: wrap('PinmameRun', 'number', ['number']),
+			isRunning: wrap('PinmameIsRunning', 'number', []),
+			setSwitch: wrap('PinmameSetSwitch', null, ['number', 'number']),
+			getSwitch: wrap('PinmameGetSwitch', 'number', ['number']),
+			getChangedLamps: wrap('PinmameGetChangedLamps', 'number', ['number']),
+			getChangedSols: wrap('PinmameGetChangedSolenoids', 'number', ['number']),
+			getChangedGIs: wrap('PinmameGetChangedGIs', 'number', ['number']),
+			getDIP: wrap('PinmameGetDIP', 'number', ['number']),
+			setDIP: wrap('PinmameSetDIP', null, ['number', 'number']),
+			getDmdWidth: wrap('PinmameGetDmdWidth', 'number', []),
+			getDmdHeight: wrap('PinmameGetDmdHeight', 'number', []),
+			getDmdDepth: wrap('PinmameGetDmdDepth', 'number', []),
+			getDmdFrame: wrap('PinmameGetDmdFrame', 'number', ['number']),
+			getSolMask: wrap('PinmameGetSolenoidMask', 'number', ['number']),
+			setSolMask: wrap('PinmameSetSolenoidMask', null, ['number', 'number']),
+			setTimeFence: wrap('PinmameSetTimeFence', null, ['number']),
 		}
 	}
 
@@ -212,10 +207,11 @@ export class PinMameEmulator implements IEmulator {
 	}
 
 	setTimeFence(time: number): void {
-		if (!this.ready || this.isMock || !this.api) {
+		if (!this.ready) {
 			this.queue.addMessage(MessageType.SetTimeFence, time)
 			return
 		}
+		if (this.isMock || !this.api) return
 		this.api.setTimeFence(time)
 	}
 
@@ -231,20 +227,13 @@ export class PinMameEmulator implements IEmulator {
 		this.pullDmd()
 	}
 
-	private _ensurePullPtr(bytes: number): number {
-		if (this._pullPtr && this._pullCap >= bytes) return this._pullPtr
-		if (this._pullPtr && this.mod) this.mod._free(this._pullPtr)
-		this._pullCap = Math.max(1024, bytes)
-		this._pullPtr = this.mod ? this.mod._malloc(this._pullCap) : 0
-		return this._pullPtr
-	}
-
-	private _ensureDmdPtr(bytes: number): number {
-		if (this._dmdPtr && this._dmdCap >= bytes) return this._dmdPtr
-		if (this._dmdPtr && this.mod) this.mod._free(this._dmdPtr)
-		this._dmdCap = Math.max(4096, bytes)
-		this._dmdPtr = this.mod ? this.mod._malloc(this._dmdCap) : 0
-		return this._dmdPtr
+	private ensureWasmBuf(slot: 'pull' | 'dmd', bytes: number): number {
+		const buf = this.wasmBufs[slot]
+		if (buf.ptr && buf.cap >= bytes) return buf.ptr
+		if (buf.ptr) this.mod?._free(buf.ptr)
+		buf.cap = Math.max(buf.min, bytes)
+		buf.ptr = this.mod ? this.mod._malloc(buf.cap) : 0
+		return buf.ptr
 	}
 
 	private pullDmd(): void {
@@ -255,7 +244,7 @@ export class PinMameEmulator implements IEmulator {
 		this.dmdW = w
 		this.dmdH = h
 		const n = w * h
-		const ptr = this._ensureDmdPtr(n)
+		const ptr = this.ensureWasmBuf('dmd', n)
 		if (ptr && this.api.getDmdFrame(ptr) > 0) {
 			if (!this._dmdFrameBuf || this._dmdFrameBuf.length !== n) {
 				this._dmdFrameBuf = new Uint8Array(n)
@@ -269,7 +258,7 @@ export class PinMameEmulator implements IEmulator {
 		const m = this.mod
 		if (!m) return
 		const reqBytes = buf.length * 8
-		const ptr = this._ensurePullPtr(reqBytes)
+		const ptr = this.ensureWasmBuf('pull', reqBytes)
 		if (!ptr) return
 		let n = 0
 		try {
@@ -286,10 +275,10 @@ export class PinMameEmulator implements IEmulator {
 	}
 
 	getSwitchInput(n: number): number {
-		return this.pendingSwitches.get(n) ?? (this.isMock ? this.mockSwitches.get(n) : this.api?.getSwitch(n)) ?? 0
+		return this.readSwitch(n)
 	}
 	getLampState(n: number): number {
-		return this.emulatorState.getLampStateDirect(n) ?? this.lamps[n] ?? 0
+		return this.emulatorState.getLampStateDirect(n)
 	}
 	getSolenoidState(n: number): number {
 		return this.emulatorState.getSolenoidState(n)
@@ -298,19 +287,16 @@ export class PinMameEmulator implements IEmulator {
 		return this.emulatorState.getGIState(n)
 	}
 
+	private readSwitch(n: number): number {
+		return this.pendingSwitches.get(n) ?? (this.isMock ? this.mockSwitches.get(n) : this.api?.getSwitch(n)) ?? 0
+	}
+
 	setSwitchInput(n: number, enable?: boolean): boolean {
 		if (!this.ready) {
-			const t =
-				enable === true
-					? MessageType.SetSwitchInput
-					: enable === false
-						? MessageType.ClearSwitchInput
-						: MessageType.ToggleSwitchInput
-			this.queue.addMessage(t, n)
+			this.queue.addMessage(switchMessageType(enable), n)
 			return true
 		}
-		const cur =
-			this.pendingSwitches.get(n) ?? (this.isMock ? this.mockSwitches.get(n) : this.api?.getSwitch(n)) ?? 0
+		const cur = this.readSwitch(n)
 		const next = enable === undefined ? (cur ? 0 : 1) : enable ? 1 : 0
 		if (this.isMock) {
 			this.mockSwitches.set(n, next)
