@@ -34,8 +34,10 @@ describe('transmission light buffer', () => {
 
 		// Native (Light::Render LIGHT_BUFFER): only bulb lights with a nonzero
 		// transmission scale join the below-light buffer; plain lamps never do.
-		// The full-field light buffer (upstream main-pass `light.cpp:701`)
-		// still tracks them at full level for the diffuse multiply.
+		// The full-field light buffer still tracks them at full level (it is
+		// currently unsampled: the baked/BDL lifts model upstream's single
+		// bulb-buffer use, the fs_basic.sc additive tail, from the gated
+		// buffer above).
 		const plain = {
 			data: { right: 1000, bottom: 2000 },
 			lights: {

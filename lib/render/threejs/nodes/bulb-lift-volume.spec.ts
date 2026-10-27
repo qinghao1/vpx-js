@@ -109,10 +109,14 @@ describe('bulb-lift volume (below-cabinet light leak)', () => {
 		expect(graphReferences(emissive, uPlayfieldSurfaceY)).toBe(false)
 	})
 
-	it('gates the baked bulb-field multiply and lift on the lift volume', () => {
+	it('gates the baked bulb lift on the lift volume (no diffuse multiply)', () => {
+		// Upstream consumes the bulb buffer exactly once, as the fs_basic.sc
+		// additive sqrt(diffuse) tail: the baked base stays the unlit albedo
+		// and only the lift reads a buffer, so the full-field light buffer
+		// must be absent from the graph entirely.
 		const mat = createUnshadedBakedNodeMaterial({ map: whiteTex() })
 		const color = materialize(mat.colorNode)
-		expect(graphReferences(color, getLightBufferTexture())).toBe(true)
+		expect(graphReferences(color, getLightBufferTexture())).toBe(false)
 		expect(graphReferences(color, getTransmissionTexture())).toBe(true)
 		expect(graphReferences(color, uPlayfieldSurfaceY)).toBe(true)
 	})

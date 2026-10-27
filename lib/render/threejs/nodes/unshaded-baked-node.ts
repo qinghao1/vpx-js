@@ -12,7 +12,7 @@ import {
 import { Fn, float, positionWorld, sqrt, step, texture, uniform, uv, vec2, vec4 } from 'three/tsl'
 import { MeshBasicNodeMaterial } from 'three/webgpu'
 import { copyPendingKeys, setNodeMapSlot } from '../material-shared.js'
-import { getLightBufferTexture, getTransmissionTexture, TRANSMISSION_OPAQUE_CUTOFF } from '../transmission-buffer.js'
+import { getTransmissionTexture, TRANSMISSION_OPAQUE_CUTOFF } from '../transmission-buffer.js'
 import { inLiftVolume, uTransArea } from './primitive-bdl-node.js'
 
 // Pending-texture placeholder alpha: 0 so the quad emits nothing under the
@@ -38,8 +38,7 @@ export function createUnshadedBakedNodeMaterial(options: BakedNodeMaterialOption
 	const uTintColor = uniform(new Color(options.tint ?? 0xffffff))
 	const useTransmission = options.transmission !== false
 	const transTex = useTransmission ? getTransmissionTexture() : null
-	const lightTex = useTransmission ? getLightBufferTexture() : null
-	// Playfield-UV lookup shared by the bulb-field multiply and the lift.
+	// Playfield-UV lookup for the bulb lift below.
 	const lightUv = () =>
 		vec2(positionWorld.x.div(uTransArea.x).add(float(0.5)), float(0.5).sub(positionWorld.z.div(uTransArea.y)))
 	const rebuild = (map: ThreeTexture | null): void => {
@@ -55,28 +54,31 @@ export function createUnshadedBakedNodeMaterial(options: BakedNodeMaterialOption
 				// lamp-free baked area (e.g. the TWD apron at scale 0.25) and
 				// halved the sqrt transmission lift below with it.
 				const baseRgb = texColor.rgb.mul(uTintColor)
-				// Upstream `lightLoop` multiplies the diffuse by the live bulb
-				// field; without it the bake stays at its (dark) authored albedo
-				// no matter how many lamps are on. The +1 floor keeps unlit
-				// tables exactly as before. Both terms stay inside the lift
-				// volume (playfield footprint plus height gate): out-of-range
-				// room fragments must not sample the clamped edge texel, and
-				// below-table geometry sharing the footprint must stay dark.
-				const bulbUv = lightUv()
-				const inBounds = inLiftVolume(bulbUv, positionWorld.y)
-				const finalRgb = lightTex
-					? baseRgb.mul(texture(lightTex, bulbUv).rgb.mul(inBounds).add(float(1)))
-					: baseRgb
+				// Upstream consumes the bulb buffer exactly once, as an additive
+				// tail (fs_basic.sc: color.rgb += sqrt(diffuse) * bulb * color.a
+				// with diffuse = the unlit texel, gated on color.a < 1.0 and
+				// mixed by the below flag fDisableLighting_top_below.y). The
+				// unlit diffuse is never scaled by the bulb field: lightLoop
+				// only sums the scene point lights and env (material.sh), while
+				// the buffer itself is filled by the LIGHT_BUFFER pass
+				// (light.cpp: bulb halo intensity x transmissionScale). The lift
+				// stays inside the lift volume (playfield footprint plus height
+				// gate): out-of-range room fragments must not sample the clamped
+				// edge texel, and below-table geometry sharing the footprint
+				// must stay dark. With the buffer black (lamps off) the lift is
+				// zero and the bake renders its albedo unchanged.
 				if (transTex) {
+					const bulbUv = lightUv()
+					const inBounds = inLiftVolume(bulbUv, positionWorld.y)
 					const gate = step(texColor.a, TRANSMISSION_OPAQUE_CUTOFF)
-					const lift = sqrt(finalRgb)
+					const lift = sqrt(baseRgb)
 						.mul(texture(transTex, bulbUv).rgb)
 						.mul(texColor.a)
 						.mul(gate)
 						.mul(inBounds)
-					return vec4(finalRgb.add(lift), texColor.a)
+					return vec4(baseRgb.add(lift), texColor.a)
 				}
-				return vec4(finalRgb, texColor.a)
+				return vec4(baseRgb, texColor.a)
 			})()
 		} else if ((mat.userData as Record<string, unknown>).__mapName != null) {
 			// The file references a texture that has not streamed in yet. Native

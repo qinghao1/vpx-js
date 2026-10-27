@@ -40,9 +40,11 @@ function makeBuffer(): DataTexture {
 	return tex
 }
 
-// Full bulb field for the diffuse multiply (upstream `lightLoop`: every bulb
-// lamp at full intensity, no transmissionScale gate). The transmission texture
-// above only carries the below-light subset for the translucent lift.
+// Full bulb field: every bulb lamp at full level, with no transmissionScale
+// gate. No node currently samples it: both the baked and BDL lifts model
+// upstream's single bulb-buffer use — the fs_basic.sc additive sqrt(diffuse)
+// tail — from the transmission-gated buffer above. (Upstream `lightLoop`
+// only sums scene lights; it never scales the diffuse by the bulb field.)
 let lightTexture: DataTexture | null = null
 let lastLightSplatCount = 0
 
@@ -134,8 +136,8 @@ export function updateTransmissionBuffer(table: Table): boolean {
 	// buffer. Infinite-support Gaussians over every lamp washed the whole playfield,
 	// so support here ends exactly at the falloff radius.
 	const splats: TransmissionSplat[] = []
-	// Full bulb field for the diffuse multiply: same lamps at full level
-	// (upstream `light.cpp:701`, no transmissionScale gate).
+	// Full bulb field: same lamps at full level (no transmissionScale gate).
+	// Currently unsampled; see the note on the module-level buffer above.
 	const lightSplats: TransmissionSplat[] = []
 	for (const light of lights) {
 		const lamp = light as LampLike
