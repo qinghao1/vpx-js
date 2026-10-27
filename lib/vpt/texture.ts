@@ -67,7 +67,15 @@ export class Texture extends BiffParser {
 			: (this.szName || this.szInternalName || '').toLowerCase()
 	}
 
-	/** Loads texture via renderer loader. */
+	/**
+	 * Loads texture via renderer loader.
+	 *
+	 * Call-site note: `ext` is advisory (derived from szPath, empty when
+	 * unset). The Node loader (`ThreeTextureLoaderNode`) only decodes
+	 * PNG/HDR/EXR payloads — JPEG/WebP/GIF/BMP data resolves to a white 1x1
+	 * placeholder there (documented at the loader), while the browser loader
+	 * decodes them for real. Non-PNG exports therefore differ by platform.
+	 */
 	public async loadTexture<TEXTURE>(loader: ITextureLoader<TEXTURE>, table: Table): Promise<TEXTURE> {
 		if (this.isRaw()) {
 			return loader.loadRawTexture(this.getName(), this.pdsBuffer?.getData(), this.width, this.height)

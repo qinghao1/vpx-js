@@ -102,6 +102,13 @@ export class ThreeTextureLoaderNode implements ITextureLoader<ThreeTexture> {
 			const capped = downscaleRgba(decoded.data, decoded.width, decoded.height, getMaxTextureSize(name))
 			return tex(capped.data, capped.width, capped.height, name)
 		}
+		// LIMITATION (documented, not silent): Node has no JPEG/WebP/GIF/BMP
+		// decoder and this package ships none, so any non-PNG payload (VPX
+		// stores JPEGs under the nested "JPEG" tag) resolves to a white 1x1
+		// placeholder instead of throwing. The browser loader
+		// (three-texture-loader-browser.ts) decodes those via
+		// createImageBitmap/ImageDecoder, so exports differ by platform for
+		// non-PNG textures — see Texture.loadTexture.
 		logger().warn(
 			'[Texture] unsupported image format – returning 1x1 placeholder for %s (%s, %s bytes)',
 			name,

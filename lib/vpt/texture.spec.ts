@@ -35,6 +35,15 @@ describe('The VPinball texture parser', () => {
 		expect((tex as any).image).to.exist
 	})
 
+	it('should return a documented white 1x1 placeholder for non-PNG data in Node', async () => {
+		// Node has no JPEG/WebP/GIF/BMP decoder (see ThreeTextureLoaderNode.loadTexture):
+		// non-PNG payloads resolve to white 1x1 instead of throwing.
+		const tex = (await vpt.getTexture('test_pattern_jpg')!.loadTexture(loader, vpt)) as any
+		expect(tex.image.width).to.equal(1)
+		expect(tex.image.height).to.equal(1)
+		expect(Array.from(tex.image.data)).to.deep.equal([255, 255, 255, 255])
+	})
+
 	it('should correctly export an lzw-compressed bitmap', async () => {
 		const tex = await vpt.getTexture('test_pattern_xrgb')!.loadTexture(loader, vpt)
 		expect((tex as any).image).to.exist
