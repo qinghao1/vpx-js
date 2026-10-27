@@ -5,7 +5,7 @@ import { getDataView } from './binary-helpers.js'
 import type { OleCompoundDoc } from './ole-doc.js'
 
 /** Sector allocation table (SAT/SSAT).
- * @see https://github.com/vpinball/vpinball/blob/master/ole-doc.cpp */
+ * @see https://github.com/vpinball/vpinball/blob/master/third-party/include/pole/pole.cpp */
 export class AllocationTable {
 	private static SecIdEndOfChain = -2
 
@@ -25,14 +25,24 @@ export class AllocationTable {
 		const ids: number[] = []
 		const seen = new Set<number>()
 		let id = start
+		if (id !== AllocationTable.SecIdEndOfChain) this.assertValidSecId(id)
 		while (id !== AllocationTable.SecIdEndOfChain) {
 			if (seen.has(id)) throw new Error(`Corrupt file: cycle detected at secId ${id} in allocation table.`)
 			seen.add(id)
 			ids.push(id)
 			const next = this.table[id]
-			if (next === undefined) throw new Error(`Corrupt file: secId ${id} missing in allocation table.`)
+			if (next === undefined || (next !== AllocationTable.SecIdEndOfChain && !this.isValidSecId(next)))
+				throw new Error(`Corrupt file: invalid secId ${String(next)} after secId ${id} in allocation table.`)
 			id = next
 		}
 		return ids
+	}
+
+	private isValidSecId(id: number): boolean {
+		return Number.isInteger(id) && id >= 0 && id < this.table.length
+	}
+
+	private assertValidSecId(id: number): void {
+		if (!this.isValidSecId(id)) throw new Error(`Corrupt file: invalid secId ${String(id)} in allocation table.`)
 	}
 }

@@ -20,6 +20,21 @@ export function getDataView(buf: Uint8Array): DataView {
 	return new DataView(buf.buffer, buf.byteOffset, buf.byteLength)
 }
 
+/** Shared in-memory read: copies `data[position..position+length]` into `target`. */
+export function readFromMemory(
+	data: Uint8Array | undefined,
+	notOpenMessage: string,
+	target: Uint8Array,
+	offset: number,
+	length: number,
+	position: number,
+): Promise<[number, Uint8Array]> {
+	if (!data) throw new Error(notOpenMessage)
+	const slice = data.subarray(position, position + length)
+	target.set(slice, offset)
+	return Promise.resolve([slice.length, target.subarray(offset, offset + slice.length)])
+}
+
 export const textDecoder = new TextDecoder('utf-8')
 
 /** Decodes a Uint8Array as UTF-8. */

@@ -38,6 +38,48 @@ function buildHeader(overrides: HeaderOverrides = {}): Uint8Array {
 	return header
 }
 
+function buildNamedDirEntry(name: string, type: number, child: number, secId: number, size: number): Uint8Array {
+	const entry = new Uint8Array(128)
+	const view = new DataView(entry.buffer)
+	for (let i = 0; i < name.length; i++) {
+		view.setUint16(i * 2, name.charCodeAt(i), true)
+	}
+	view.setUint16(64, (name.length + 1) * 2, true)
+	view.setInt8(66, type)
+	view.setInt32(68, -1, true)
+	view.setInt32(72, -1, true)
+	view.setInt32(76, child, true)
+	view.setInt32(116, secId, true)
+	view.setUint32(120, size, true)
+	return entry
+}
+
+/** Short stream 'T' (640 bytes = 10 mini-sectors) in storage 'S', but the root
+ * short-stream container holds a single sector (8 mini-sectors). */
+function buildShortStreamOverrunFile(): Uint8Array {
+	const sat = new Uint8Array(512).fill(0xff)
+	const satView = new DataView(sat.buffer)
+	satView.setInt32(0, -3, true)
+	for (const secId of [1, 2, 3]) satView.setInt32(secId * 4, -2, true)
+	const dir = concatBytes(
+		buildNamedDirEntry('', 5, 1, 3, 512),
+		buildNamedDirEntry('S', 1, 2, -2, 0),
+		buildNamedDirEntry('T', 2, -1, 0, 640),
+		new Uint8Array(128),
+	)
+	const ssat = new Uint8Array(512).fill(0xff)
+	const ssatView = new DataView(ssat.buffer)
+	for (let i = 0; i < 9; i++) ssatView.setInt32(i * 4, i + 1, true)
+	ssatView.setInt32(9 * 4, -2, true)
+	return concatBytes(
+		buildHeader({ satSize: 1, dirSecId: 1, ssatSecId: 2, ssatSize: 1, partialFirst: 0 }),
+		sat,
+		dir,
+		ssat,
+		new Uint8Array(512).fill(0xab),
+	)
+}
+
 function buildDirEntry(type: number, left: number, right: number, storageDirId: number): Uint8Array {
 	const entry = new Uint8Array(128)
 	const view = new DataView(entry.buffer)
@@ -132,6 +174,43 @@ describe('The OLE compound document reader', () => {
 		expect(() => Header.load(buildHeader({ satSize: -5 }))).to.throw(/size|negative|corrupt/i)
 	})
 
+	it('rejects a zero SAT size like pole', () => {
+		expect(() => Header.load(buildHeader({ satSize: 0 }))).to.throw(/size|corrupt|invalid/i)
+	})
+
+	it('names invalid sentinel links instead of reporting them missing', async () => {
+		const tableWith = async (first: number): Promise<AllocationTable> => {
+			const bytes = new Uint8Array(16)
+			const view = new DataView(bytes.buffer)
+			view.setInt32(0, first, true)
+			for (let entryIndex = 1; entryIndex < 4; entryIndex++) {
+				view.setInt32(entryIndex * 4, -2, true)
+			}
+			const fakeDoc = { readSectors: async () => bytes } as unknown as OleCompoundDoc
+			return AllocationTable.load(fakeDoc, [0])
+		}
+		for (const sentinel of [-1, -3, -4]) {
+			const table = await tableWith(sentinel)
+			expect(() => table.getSecIdChain(0)).to.throw(new RegExp(`invalid secId ${sentinel}`))
+		}
+	})
+
+	it('names an out-of-range start sector instead of reporting it missing', async () => {
+		const table = await AllocationTable.load(
+			{ readSectors: async () => endlessTable() } as unknown as OleCompoundDoc,
+			[0],
+		)
+		expect(() => table.getSecIdChain(999)).to.throw(/invalid secId 999/)
+	})
+
+	it('treats EndOfChain as an empty chain', async () => {
+		const table = await AllocationTable.load(
+			{ readSectors: async () => endlessTable() } as unknown as OleCompoundDoc,
+			[0],
+		)
+		expect(table.getSecIdChain(-2)).to.deep.equal([])
+	})
+
 	it('fails fast on cyclic allocation chains', async () => {
 		const bytes = new Uint8Array(16)
 		const view = new DataView(bytes.buffer)
@@ -192,6 +271,20 @@ describe('The OLE compound document reader', () => {
 	it('rejects MSAT entries that are not real sectors', async () => {
 		const fileData = concatBytes(buildHeader({ satSize: 1, partialFirst: -1 }), endlessTable())
 		await expectRejection(OleCompoundDoc.load(new MemoryReader(fileData)), /MSAT/)
+	})
+
+	it('rejects a short stream that overruns its short-stream container', async () => {
+		for (const reader of [
+			new BinaryReader(buildShortStreamOverrunFile()),
+			new MemoryReader(buildShortStreamOverrunFile()),
+		]) {
+			const doc = await OleCompoundDoc.load(reader)
+			try {
+				await expectRejection(doc.storage('S').read('T'), /Corrupt/)
+			} finally {
+				await doc.close()
+			}
+		}
 	})
 
 	it('loads a minimal valid document', async () => {
@@ -261,6 +354,7 @@ describe('The OLE compound document against real files', () => {
 		const view = new DataView(buf.buffer)
 		view.setUint16(30, 9, true)
 		view.setUint16(32, 6, true)
+		view.setInt32(44, 1, true)
 		const header = Header.load(buf)
 		expect(header.secSize).to.equal(512) // 2^9
 		expect(header.shortSecSize).to.equal(64) // 2^6

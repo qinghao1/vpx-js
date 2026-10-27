@@ -6,7 +6,7 @@ import type { StorageEntry } from './ole-directory-tree.js'
 import type { OleCompoundDoc, ReadResult } from './ole-doc.js'
 
 /** OLE storage/stream accessor.
- * @see https://github.com/vpinball/vpinball/blob/master/ole-doc.cpp */
+ * @see https://github.com/vpinball/vpinball/blob/master/third-party/include/pole/pole.cpp */
 export class Storage {
 	constructor(
 		private readonly doc: OleCompoundDoc,

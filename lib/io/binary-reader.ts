@@ -1,6 +1,7 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
+import { readFromMemory } from './binary-helpers.js'
 import type { IBinaryReader } from './ole-doc.js'
 
 /** Isomorphic in-memory binary reader for VPX — works in Node 24+ and modern browsers. */
@@ -11,10 +12,7 @@ export class BinaryReader implements IBinaryReader {
 	constructor(private blob?: Blob | Uint8Array | ArrayBuffer | DataView) {}
 
 	public read(target: Uint8Array, offset: number, length: number, position: number): Promise<[number, Uint8Array]> {
-		if (!this.data) throw new Error('BinaryReader not open')
-		const slice = this.data.subarray(position, position + length)
-		target.set(slice, offset)
-		return Promise.resolve([slice.length, target.subarray(offset, offset + slice.length)])
+		return readFromMemory(this.data, 'BinaryReader not open', target, offset, length, position)
 	}
 
 	public close(): Promise<void> {

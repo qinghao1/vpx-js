@@ -36,12 +36,12 @@ export class GlobalRegistry {
 
 	private normalize(path: string): string {
 		return path
-			.replace('HKEY_CURRENT_USER\\', 'HKCU\\')
-			.replace('HKEY_CLASSES_ROOT\\', 'HKCR\\')
-			.replace('HKEY_LOCAL_MACHINE\\', 'HKLM\\')
-			.replace('HKEY_USERS\\', 'HKU\\')
-			.replace('HKEY_CURRENT_CONFIG\\', 'HKCC\\')
 			.toLowerCase()
+			.replace('hkey_current_user\\', 'hkcu\\')
+			.replace('hkey_classes_root\\', 'hkcr\\')
+			.replace('hkey_local_machine\\', 'hklm\\')
+			.replace('hkey_users\\', 'hku\\')
+			.replace('hkey_current_config\\', 'hkcc\\')
 	}
 }
 

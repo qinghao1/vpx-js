@@ -50,4 +50,11 @@ describe('The global registry emulator', () => {
 	it('should return undefined for unknown keys', () => {
 		expect(new GlobalRegistry().regRead('HKCU\\Software\\Nope\\Missing')).to.equal(undefined)
 	})
+
+	it('should match long-form hives regardless of case', () => {
+		const reg = new GlobalRegistry()
+		reg.regWrite('hkey_current_user\\software\\mykey\\val', 'x')
+		expect(reg.regRead('HKCU\\software\\mykey\\val')).to.equal('x')
+		expect(reg.regRead('HKEY_CURRENT_USER\\SOFTWARE\\MYKEY\\VAL')).to.equal('x')
+	})
 })

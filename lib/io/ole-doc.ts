@@ -214,7 +214,13 @@ export class OleCompoundDoc extends EventEmitter {
 		const off = id * shortSize
 		const secSize = this.header.secSize
 		const idx = Math.floor(off / secSize)
+		if (!Number.isInteger(id) || id < 0 || idx < 0 || idx >= this.shortStreamSecIds.length)
+			throw new Error(
+				`Corrupt file: mini sector ${id} beyond short stream of ${this.shortStreamSecIds.length} sectors.`,
+			)
 		const secId = this.shortStreamSecIds[idx]
+		if (!Number.isInteger(secId) || secId < 0)
+			throw new Error(`Corrupt file: invalid short-stream sector id ${String(secId)}.`)
 		return this.getFileOffsetForSec(secId) + (off % secSize)
 	}
 }

@@ -18,7 +18,7 @@ export interface StorageEntry {
 }
 
 /** OLE directory tree.
- * @see https://github.com/vpinball/vpinball/blob/master/ole-doc.cpp */
+ * @see https://github.com/vpinball/vpinball/blob/master/third-party/include/pole/pole.cpp */
 export class DirectoryTree {
 	private static EntryTypeStorage = 1
 	private static EntryTypeStream = 2

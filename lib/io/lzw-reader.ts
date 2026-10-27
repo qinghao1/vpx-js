@@ -23,9 +23,7 @@ export class LzwReader {
 	private topSlot: number = 0 /* Highest code for current size */
 	private slot: number = 0 /* Last read code */
 
-	/* The following static variables are used
-	 * for separating out codes
-	 */
+	/* Bit-stream state for separating out codes. */
 	private numAvailBytes: number = 0 /* # bytes left in block */
 	private numBitsLeft: number = 0 /* # bits left in current byte */
 	private b1: number = 0 /* Current byte */
@@ -76,9 +74,7 @@ export class LzwReader {
 		size = 8
 		this.initExp(size)
 
-		/* Initialize in case they forgot to put in a clear code.
-		 * (This shouldn't happen, but we'll try and decode it anyway...)
-		 */
+		/* Initialize in case the stream lacks a leading clear code. */
 		oc = fc = 0
 
 		/* Allocate space for the decode buffer
@@ -115,37 +111,25 @@ export class LzwReader {
 				this.slot = this.newCodes
 				this.topSlot = 1 << this.currSize
 
-				/* Continue reading codes until we get a non-clear code
-				 * (Another unlikely, but possible case...)
-				 */
+				/* Skip repeated clear codes. */
 				c = this.getNextCode()
 				while (c === this.clear) {
 					c = this.getNextCode()
 				}
 
-				/* If we get an ending code immediately after a clear code
-				 * (Yet another unlikely case), then break out of the loop.
-				 */
+				/* An ending code right after a clear code ends the image. */
 				if (c === this.ending) {
 					break
 				}
 
-				/* Finally, if the code is beyond the range of already set codes,
-				 * (This one had better NOT happen...  I have no idea what will
-				 * result from this, but I doubt it will look good...) then set it
-				 * to color zero.
-				 */
+				/* Clamp an out-of-range code after a clear to color zero. */
 				if (c >= this.slot) {
 					c = 0
 				}
 
 				oc = fc = c
 
-				/* And let us not forget to put the char into the buffer... And
-				 * if, on the off chance, we were exactly one pixel from the end
-				 * of the line, we have to send the buffer to the out_line()
-				 * routine...
-				 */
+				/* Emit the pixel, advancing to the next line at the row end. */
 				bufPtr.set(c)
 				bufPtr.incr()
 
@@ -156,18 +140,10 @@ export class LzwReader {
 				}
 				if (bufPtr.getPos() >= outLen) break // corrupt stream emitting more pixels than the declared size
 			} else {
-				/* In this case, it's not a clear code or an ending code, so
-				 * it must be a code code...  So we can now decode the code into
-				 * a stack of character codes. (Clear as mud, right?)
-				 */
+				/* Otherwise this is a data code: decode it into a stack of pixels. */
 				code = c
 
-				/* Here we go again with one of those off chances...  If, on the
-				 * off chance, the code we got is beyond the range of those already
-				 * set up (Another thing which had better NOT happen...) we trick
-				 * the decoder into thinking it actually got the last code read.
-				 * (Hmmn... I'm not sure why this works...  But it does...)
-				 */
+				/* Handle a code beyond the current slot (KwKwK case) by reusing the last code. */
 				if (code >= this.slot) {
 					if (code > this.slot) {
 						++this.badCodeCount
@@ -177,27 +153,21 @@ export class LzwReader {
 					sp.incr()
 				}
 
-				/* Here we scan back along the linked list of prefixes, pushing
-				 * helpless characters (ie. suffixes) onto the stack as we do so.
-				 */
+				/* Walk the prefix chain, pushing suffixes onto the stack. */
 				while (code >= this.newCodes) {
 					sp.set(this.suffix[code])
 					sp.incr()
 					code = this.prefix[code]
 				}
 
-				/* Push the last character on the stack, and set up the new
-				 * prefix and suffix, and if the required slot number is greater
-				 * than that allowed by the current bit size, increase the bit
-				 * size.  (NOTE - If we are all full, we *don't* save the new
-				 * suffix and prefix...  I'm not certain if this is correct...
-				 * it might be more proper to overwrite the last code...
+				/* Push the final suffix, extend the prefix table, and grow the code
+				 * size when the slot no longer fits. A full table keeps its codes.
 				 */
 				sp.set(code)
 				sp.incr()
 				if (this.slot < this.topSlot) {
 					fc = code
-					this.suffix[this.slot] = fc // = code;
+					this.suffix[this.slot] = fc
 					this.prefix[this.slot++] = oc
 					oc = c
 				}
@@ -208,11 +178,7 @@ export class LzwReader {
 					}
 				}
 
-				/* Now that we've pushed the decoded string (in reverse order)
-				 * onto the stack, lets pop it off and put it into our decode
-				 * buffer...  And when the decode buffer is full, write another
-				 * line...
-				 */
+				/* Pop the decoded pixels into the output buffer, advancing lines as rows fill. */
 				while (sp.getPos() > 0 && bufPtr.getPos() < outLen) {
 					sp.decr()
 					bufPtr.set(sp.get())
