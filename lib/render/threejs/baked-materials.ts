@@ -45,6 +45,10 @@ function fixBaked(mat: THREE.MeshStandardMaterial, map?: THREE.Texture | null): 
 			setBakedMap(mat, tex, tex.name)
 			wrapTexBaked(tex)
 		}
+		// Baked surfaces render double-sided (mirrors the classic path below):
+		// a single-sided baked floor writes no depth from underneath, so
+		// depth-tested inserts/glow/DMD leak through it from below.
+		mat.side = THREE.DoubleSide
 		mat.needsUpdate = true
 		return
 	}
@@ -105,6 +109,9 @@ export const applyBakedMaterial = (
 	if (isBakedNodeMaterial(mat)) {
 		setBakedMap(mat, tex, tex.name)
 		wrapTexBaked(tex)
+		// Same floor-occluder rule as fixBaked above: baked node materials
+		// arriving late must also end up double-sided.
+		mat.side = THREE.DoubleSide
 		mat.needsUpdate = true
 		return
 	}
@@ -196,6 +203,11 @@ export const createBakedMaterialResolver = (): ((
 			cloned.transparent = false
 			if (!(cloned.alphaTest > 0)) cloned.alphaTest = 0
 			cloned.depthWrite = true
+			// Opaque baked surfaces occlude from both sides, whatever the
+			// authored backfaces flag says: a single-sided baked floor writes
+			// no depth from underneath, so depth-tested inserts/glow/DMD leak
+			// through it when the camera moves below the table.
+			cloned.side = THREE.DoubleSide
 			cloned.opacity = 1
 			if (!isApron && !isRamp) {
 				cloned.polygonOffset = true

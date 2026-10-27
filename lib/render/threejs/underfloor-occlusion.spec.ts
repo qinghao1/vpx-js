@@ -1,11 +1,18 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
+// Underfloor occlusion is a baked-material invariant, not a playfield
+// special-case: every opaque baked main surface resolves to a double-sided
+// depth writer (see baked-materials.ts), so the baked playfield — the only
+// floor between a below-table camera and the lights/DMD on VR tables —
+// occludes from underneath whatever the authored backfaces flag says.
 import * as fs from 'node:fs'
 import * as THREE from 'three'
 import { describe, expect, it } from 'vitest'
+import { applyBakedMaterial, createBakedMaterialResolver } from './baked-materials.js'
 import { GpuDmdNodeController } from './nodes/dmd-node.js'
+import { createPrimitiveAdditiveMaterial, createPrimitiveBdlMaterial } from './nodes/primitive-bdl-node.js'
 import { createUnshadedBakedNodeMaterial } from './nodes/unshaded-baked-node.js'
+import { classify } from './scene-classify.js'
 import { postProcessScene } from './three-scene-postprocess.js'
-import { applyUnderfloorOcclusionPass, ensureFloorOccluder } from './underfloor-occlusion.js'
 
 const walkingDeadVpx = ['walking_dead.vpx', '/home/qinghao1/Downloads/walking_dead.vpx'].find(p => {
 	try {
@@ -15,78 +22,60 @@ const walkingDeadVpx = ['walking_dead.vpx', '/home/qinghao1/Downloads/walking_de
 	}
 })
 
-function bakedPlayfieldMesh(material: THREE.Material): THREE.Mesh {
-	const mesh = new THREE.Mesh(new THREE.PlaneGeometry(100, 200), material)
-	mesh.name = 'primitive-BM_Playfield'
-	mesh.rotation.x = -Math.PI / 2
-	mesh.visible = true
-	mesh.updateMatrixWorld(true)
-	return mesh
-}
-
-function markBaked(mat: THREE.Material): void {
-	;(mat.userData as Record<string, unknown>).__isBaked = true
-}
-
-describe('underfloor occlusion: baked playfield occludes from below', () => {
-	it('forks a single-sided baked playfield into a double-sided depth writer', () => {
-		const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, side: THREE.FrontSide, depthWrite: true })
-		markBaked(mat)
-		const mesh = bakedPlayfieldMesh(mat)
-		expect(ensureFloorOccluder(mesh)).toBe(true)
-		expect(mesh.material).not.toBe(mat)
-		expect(mat.side, 'shared source material must not be mutated').toBe(THREE.FrontSide)
-		const fork = mesh.material as THREE.MeshStandardMaterial
-		expect(fork.side, 'floor needs its underneath faces').toBe(THREE.DoubleSide)
-		expect(fork.depthWrite, 'floor must fail depth closed').toBe(true)
+describe('underfloor occlusion: opaque baked materials occlude from both sides', () => {
+	it('resolves a single-sided primitive-lit main bake into a double-sided depth writer', () => {
+		// Production shape (walking_dead BM_Playfield): the VLM.Bake material
+		// has no texture at generation time, so it starts life as a lit
+		// primitive node material honoring backfacesEnabled=false (FrontSide).
+		const base = createPrimitiveBdlMaterial({ doubleSided: false })
+		base.name = 'material:VLM.Bake.Active'
+		const resolve = createBakedMaterialResolver()
+		const out = resolve(base as never, 'primitive-bm_playfield') as unknown as THREE.MeshStandardMaterial
+		expect(out.side, 'floor needs its underneath faces').toBe(THREE.DoubleSide)
+		expect(out.depthWrite, 'floor must fail depth closed').toBe(true)
+		expect(out.transparent, 'floor stays opaque').toBe(false)
+		expect(base.side, 'shared source material must not be mutated').toBe(THREE.FrontSide)
 	})
 
-	it('keeps the baked node-material graph across the fork', () => {
+	it('resolves a single-sided baked node main bake into a double-sided depth writer', () => {
+		const base = createUnshadedBakedNodeMaterial({ doubleSided: false })
+		;(base.userData as Record<string, unknown>).__isBaked = true
+		base.name = 'material:Playfield'
+		const resolve = createBakedMaterialResolver()
+		const out = resolve(base as never, 'primitive-bm_playfield') as unknown as {
+			side?: number
+			depthWrite?: boolean
+			transparent?: boolean
+			colorNode?: unknown
+		}
+		expect(out.side, 'floor needs its underneath faces').toBe(THREE.DoubleSide)
+		expect(out.depthWrite, 'floor must fail depth closed').toBe(true)
+		expect(out.transparent, 'floor stays opaque').toBe(false)
+		expect(out.colorNode, 'node graph must survive the resolve').toBeDefined()
+		expect(base.side, 'shared source material must not be mutated').toBe(THREE.FrontSide)
+	})
+
+	it('keeps a late texture arrival double-sided', () => {
 		const mat = createUnshadedBakedNodeMaterial({ doubleSided: false })
-		markBaked(mat)
-		const mesh = bakedPlayfieldMesh(mat as unknown as THREE.Material)
-		expect(ensureFloorOccluder(mesh)).toBe(true)
-		const fork = mesh.material as unknown as { side?: number; depthWrite?: boolean; colorNode?: unknown }
-		expect(fork.side).toBe(THREE.DoubleSide)
-		expect(fork.depthWrite).toBe(true)
-		expect(fork.colorNode, 'node graph must survive the fork').toBeDefined()
+		;(mat.userData as Record<string, unknown>).__isBaked = true
+		const tex = new THREE.Texture()
+		tex.name = 'playfield.png'
+		const info = classify('primitive-bm_playfield', 'material:playfield', 'playfield.png', true, false)
+		applyBakedMaterial(mat as never, tex, info, 'primitive-BM_Playfield')
+		expect((mat as unknown as { side?: number }).side, 'arrived floor keeps its underneath faces').toBe(
+			THREE.DoubleSide,
+		)
 	})
 
-	it('leaves non-floor meshes alone', () => {
-		const plain = new THREE.MeshStandardMaterial({ color: 0xffffff, side: THREE.FrontSide })
-		markBaked(plain)
-		// Production lightmap overlays carry the additive flag (never main bakes).
-		;(plain.userData as Record<string, unknown>).__addBlend = true
-		const insert = new THREE.Mesh(new THREE.PlaneGeometry(10, 10), plain)
-		insert.name = 'primitive-LM_insrt01_Playfield'
-		expect(ensureFloorOccluder(insert)).toBe(false)
-		expect(insert.material).toBe(plain)
-
-		const rampMat = new THREE.MeshStandardMaterial({ color: 0xffffff, side: THREE.FrontSide })
-		markBaked(rampMat)
-		const ramp = new THREE.Mesh(new THREE.PlaneGeometry(10, 10), rampMat)
-		ramp.name = 'primitive-BM_Playfield_Ramp'
-		expect(ensureFloorOccluder(ramp)).toBe(false)
-
-		const hiddenMat = new THREE.MeshStandardMaterial({ color: 0xffffff, side: THREE.FrontSide })
-		markBaked(hiddenMat)
-		const hidden = bakedPlayfieldMesh(hiddenMat)
-		hidden.visible = false
-		expect(ensureFloorOccluder(hidden)).toBe(false)
-
-		const doneMat = new THREE.MeshStandardMaterial({ color: 0xffffff, side: THREE.DoubleSide })
-		markBaked(doneMat)
-		const done = bakedPlayfieldMesh(doneMat)
-		expect(ensureFloorOccluder(done)).toBe(false)
-		expect(done.material).toBe(doneMat)
-	})
-
-	it('counts fixed meshes in stats', () => {
-		const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, side: THREE.FrontSide })
-		markBaked(mat)
-		const stats: Record<string, number> = {}
-		expect(applyUnderfloorOcclusionPass([bakedPlayfieldMesh(mat)], stats)).toBe(1)
-		expect(stats.underfloorFixed).toBe(1)
+	it('leaves overlays non-occluding', () => {
+		// Lightmap overlays must never become depth writers, or unlit inserts
+		// would punch opaque holes in the playfield from the front.
+		const overlay = createPrimitiveAdditiveMaterial({})
+		overlay.name = 'material:VLM.Bake.GI'
+		const resolve = createBakedMaterialResolver()
+		const out = resolve(overlay as never, 'primitive-lm_insrt01_playfield') as unknown as THREE.MeshStandardMaterial
+		expect(out.transparent, 'overlay stays blended').toBe(true)
+		expect(out.depthWrite, 'overlay must not occlude').toBe(false)
 	})
 })
 
@@ -269,6 +258,7 @@ describe.skipIf(!walkingDeadVpx)('underfloor occlusion: settled walking_dead fro
 			if (!blocker || !t.testsDepth) unoccluded.push(`${t.name} (blocker=${blocker?.object.name ?? 'none'})`)
 		}
 		expect(unoccluded, 'lights/DMD must hide behind the floor from below').toEqual([])
-		expect(stats.underfloorFixed, 'pass must fix the baked playfield').toBeGreaterThan(0)
+		// No playfield-specific pass remains: the baked-material resolver owns this.
+		expect(stats).not.toHaveProperty('underfloorFixed')
 	})
 })
