@@ -301,6 +301,7 @@ export class FlipperHit extends HitObject {
 		this.scatter = MathUtils.degToRad(
 			useOverride ? (this.data.overrideScatterAngle ?? this.data.scatter) : this.data.scatter,
 		)
+		this.mover.updateInertia()
 	}
 
 	public hitTestFlipperFace(ball: Ball, dTime: number, coll: CollisionEvent, face1: boolean): number {

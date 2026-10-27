@@ -108,8 +108,10 @@ describe('The VPinball flipper collision', () => {
 		player.updatePhysics(0)
 		player.updatePhysics(280)
 
-		// should be moving up
-		expect(ball.getState().pos.y).to.be.below(830)
+		// should be moving up. With the shape-accurate inertia the flipper takes more
+		// angular momentum, so the active-flip kick is ~8% weaker than the old rod model
+		// (y 882.6 vs 827.0 for this 21.5/13/130 flipper, I_new/I_rod = 0.897).
+		expect(ball.getState().pos.y).to.be.within(850, 920)
 
 		// now, flip
 		flipper.RotateToEnd()
@@ -232,9 +234,15 @@ describe('The VPinball flipper collision', () => {
 		expect(MathUtils.radToDeg(flipper.getState().angle)).to.be.below(110)
 
 		player.updatePhysics(150)
-		expect(MathUtils.radToDeg(flipper.getState().angle)).to.be.above(110)
+		// The shape-accurate inertia (I_new/I_rod = 0.897 for this 21.5/13/130 flipper)
+		// recoils deeper, so the return runs ~50 ms behind the old rod model (109.2 vs 111.7).
+		expect(MathUtils.radToDeg(flipper.getState().angle)).to.be.within(108, 111)
 
 		player.updatePhysics(200)
+		expect(MathUtils.radToDeg(flipper.getState().angle)).to.be.above(115)
+
+		// ...but it still settles back fully, one step later.
+		player.updatePhysics(250)
 		expect(MathUtils.radToDeg(flipper.getState().angle)).to.equal(121)
 	})
 })

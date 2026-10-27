@@ -31,6 +31,9 @@ export class FlipperMover implements MoverObject {
 	public angleStart: number
 	public angleEnd: number
 	public inertia: number
+	public inertiaShape = 0
+	public torqueScale = 1
+	private readonly backwardsCompatibility = true // !! TODO: matches upstream m_backwards_compatibility
 	public zeroAngNorm = new Vertex2D()
 	public enableRotateEvent = 0
 	private readonly direction: boolean
@@ -54,10 +57,80 @@ export class FlipperMover implements MoverObject {
 		this.angleStart = config.angleStart
 		this.angleEnd = config.angleEnd
 		this.state.angle = config.angleStart
-		const ratio = (config.baseRadius - config.endRadius) / config.flipperRadius
-		this.inertia = (1 / 3) * this.getFlipperMass() * (config.flipperRadius * config.flipperRadius)
-		this.zeroAngNorm.x = Math.sqrt(1 - ratio * ratio)
+		this.updateInertia()
+	}
+
+	/**
+	 * Recomputes {@link zeroAngNorm}, {@link inertiaShape}, {@link torqueScale} and {@link inertia}
+	 * from the current geometry and mass. Faithful port of upstream
+	 * `FlipperMoverObject::UpdateInertia` (src/physics/hitflipper.cpp, unconditional under
+	 * `FIX_PHYSICS` — see src/physics/physconst.h): the flipper is modeled as the convex hull of
+	 * the base and end circles (an isosceles trapezoid plus two circular segments) with uniform
+	 * area mass density, instead of a rod of length flipperRadius around its end. Coil torque is
+	 * rescaled by the same ratio (when {@link backwardsCompatibility} is set, as upstream), so
+	 * the empty swing keeps the per-Strength angular acceleration the rod model was tuned for,
+	 * while ball-flipper collision response uses the accurate inertia.
+	 */
+	public updateInertia(): void {
+		const baser = this.hitCircleBase.radius
+		const endr = this.endRadius
+		const flipr = this.flipperRadius
+
+		const ratio = (baser - endr) / flipr
+		const fa = Math.asin(ratio) // face-to-centerline angle (center to center)
+		const cosFa = Math.sqrt(1 - ratio * ratio) // = cos(fa)
+
+		this.zeroAngNorm.x = cosFa
 		this.zeroAngNorm.y = -ratio
+
+		// Moment of inertia: trapezoid plus two circular segments, polar second
+		// moments about the rotation axis (base-circle center).
+		const twoFa = fa + fa
+		const etheta = Math.PI - twoFa // end segment central angle (minor)
+		const btheta = Math.PI + twoFa // base segment central angle (major)
+		const sin2Fa = Math.sin(twoFa)
+		const sinE = sin2Fa // sin(pi - 2fa)
+		const sinB = -sin2Fa // sin(pi + 2fa)
+		const cosFa2 = cosFa * cosFa // sin^2(theta/2) for both segments
+
+		// Trapezoid: parallel sides b (base end) and a (flipper end), height ht.
+		const a = endr * (2 * cosFa)
+		const b = baser * (2 * cosFa)
+		const ht = flipr - Math.sin(fa) * (baser - endr) // = flipr * cos^2(fa)
+		const aT = 0.5 * ht * (a + b)
+		const iTC =
+			(ht *
+				(16 * ht * ht * a * b +
+					4 * ht * ht * (a * a + b * b) +
+					3 * a * a * a * a +
+					6 * a * a * b * b +
+					6 * a * b * (a * a + b * b) +
+					3 * b * b * b * b)) /
+			(144 * (a + b))
+		const xcT = baser * Math.sin(fa) + (ht * (2 * a + b)) / (3 * (a + b))
+		const iT = iTC + aT * xcT * xcT
+
+		// Base segment (major): polar moment about the base-circle center,
+		// which already coincides with the rotation axis.
+		const aB = 0.5 * baser * baser * (btheta - sinB)
+		const iB = 0.25 * baser * baser * baser * baser * (btheta - sinB + (2 / 3) * sinB * cosFa2)
+
+		// End segment (minor): translate from end-circle center, through the
+		// segment centroid, out to the rotation axis.
+		const aE = 0.5 * endr * endr * (etheta - sinE)
+		const iELocal = 0.25 * endr * endr * endr * endr * (etheta - sinE + (2 / 3) * sinE * cosFa2)
+		const dE = ((4 / 3) * endr * cosFa * cosFa2) / (etheta - sinE)
+		const iE = iELocal + aE * ((flipr + dE) * (flipr + dE) - dE * dE)
+
+		const aTotal = aT + aB + aE
+		this.inertiaShape = (iT + iB + iE) / aTotal
+
+		this.inertia = this.getFlipperMass() * this.inertiaShape
+		this.angularMomentum = this.angleSpeed * this.inertia // keep the angular speed if the mass changes at runtime
+
+		// Same ratio as upstream: shape inertia over the rod approximation
+		// (mass * flipr^2 / 3), so empty-swing angular acceleration is unchanged.
+		this.torqueScale = this.backwardsCompatibility ? (3 * this.inertiaShape) / (flipr * flipr) : 1
 	}
 
 	public updateDisplacements(dtime: number): void {
@@ -87,7 +160,7 @@ export class FlipperMover implements MoverObject {
 	}
 
 	public updateVelocities(): void {
-		let desiredTorque = this.getStrength()
+		let desiredTorque = this.getStrength() * this.torqueScale
 		if (!this.solState) desiredTorque *= -this.getReturnRatio()
 		const eosAngle = MathUtils.degToRad(this.getTorqueDampingAngle())
 		if (Math.abs(this.state.angle - this.angleEnd) < eosAngle) {
@@ -99,7 +172,7 @@ export class FlipperMover implements MoverObject {
 		if (!this.direction) desiredTorque = -desiredTorque
 
 		let ramp = this.getRampUpSpeed()
-		ramp = ramp <= 0 ? 1e6 : Math.min(this.getStrength() / ramp, 1e6)
+		ramp = ramp <= 0 ? 1e6 : Math.min((this.getStrength() * this.torqueScale) / ramp, 1e6)
 		if (desiredTorque >= this.curTorque)
 			this.curTorque = Math.min(this.curTorque + ramp * PHYS_FACTOR, desiredTorque)
 		else this.curTorque = Math.max(this.curTorque - ramp * PHYS_FACTOR, desiredTorque)
@@ -198,9 +271,9 @@ export class FlipperMover implements MoverObject {
 	}
 
 	public getMass(): number {
-		return (3 * this.inertia) / (this.flipperRadius * this.flipperRadius)
+		return this.inertia / this.inertiaShape
 	}
 	public setMass(m: number): void {
-		this.inertia = (1 / 3) * m * (this.flipperRadius * this.flipperRadius)
+		this.inertia = m * this.inertiaShape
 	}
 }

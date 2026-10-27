@@ -76,7 +76,7 @@ describe('regression: flipper physics must launch ball (walking_dead tip bug)', 
 		// this test would catch that: at diff 0, buggy gives 80 not 130
 	})
 
-	it('flipper inertia must be (1/3)*m*r^2', async () => {
+	it('flipper inertia must be the shape-accurate k^2, not (1/3)*m*r^2', async () => {
 		const { FlipperMover } = await import('../vpt/flipper/flipper-mover.js')
 		const config: any = {
 			center: { x: 0, y: 0 },
@@ -104,7 +104,9 @@ describe('regression: flipper physics must launch ball (walking_dead tip bug)', 
 			scatter: 0,
 		}
 		const tableData: any = { globalDifficulty: 0.2, overridePhysics: false, overridePhysicsFlipper: false }
-		// mock mass 1, radius 130 => inertia 1/3*1*16900 = 5633.33
+		// shape-accurate inertia per upstream FlipperMoverObject::UpdateInertia
+		// (src/physics/hitflipper.cpp:85-176, FIX_PHYSICS unconditional): for this
+		// 21.5/13/130 flipper with mass 1, k^2 = 5055.117, not the rod 1/3*1*16900 = 5633.33
 		const mover: any = new (FlipperMover as any)(
 			config,
 			data,
@@ -113,10 +115,11 @@ describe('regression: flipper physics must launch ball (walking_dead tip bug)', 
 			{},
 			tableData,
 		)
-		expect(mover.inertia).toBeCloseTo((1 / 3) * 1 * 130 * 130, 1)
-		// check getFlipperMass inverse
-		const massViaInertia = (3 * mover.inertia) / (130 * 130)
-		expect(massViaInertia).toBeCloseTo(1, 2)
+		expect(mover.inertiaShape).toBeCloseTo(5055.11695, 2)
+		expect(mover.inertia).toBeCloseTo(5055.11695, 2)
+		expect(mover.torqueScale).toBeCloseTo(0.89735804, 7)
+		// check mass round-trips through the shape inertia (upstream GetMass/SetMass)
+		expect(mover.getMass()).toBeCloseTo(1, 6)
 	})
 
 	it('clock init must adopt wall-clock starts above 1_000_000 usec, not 10_000_000', async () => {
@@ -267,9 +270,10 @@ describe('regression: comprehensive audit (flipper EOS, bumper, collider sync)',
 		state.angle = 1 - 0.5 * eosAngle
 		mover.setSolenoidState(true)
 		for (let i = 0; i < 200; i++) mover.updateVelocities()
-		// u = 0.5: correct u^4 = 0.0625, buggy 4th root = 0.8409
+		// u = 0.5: correct u^4 = 0.0625, buggy 4th root = 0.8409. Coil torque is scaled by
+		// torqueScale (upstream hitflipper.cpp:433) so the scaled swing keeps rod-tuned timing.
 		const lerp = 0.5 * 0.5 * (0.5 * 0.5)
-		expect(mover.curTorque).toBeCloseTo(2200 * (lerp + 0.75 * (1 - lerp)), 6)
+		expect(mover.curTorque).toBeCloseTo(2200 * mover.torqueScale * (lerp + 0.75 * (1 - lerp)), 6)
 	})
 
 	it('bumper skirt must use Math.atan not Math.tan', async () => {
