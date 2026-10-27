@@ -448,6 +448,37 @@ describe('The VPinball primitive updater', () => {
 		expect(mesh.visible, 'script-hidden overlay must stay hidden even with content').to.equal(false)
 	})
 
+	it('should keep additive overlays depth-tested so opaque walls occlude them (no side-wall wash)', () => {
+		// Cabinet side-wall wash investigation (TWD settled side view): the GI
+		// light overlays sit behind opaque, depth-writing cabinet walls and
+		// stay occluded only while depth-tested. Flipping depthTest off (as
+		// the shared DMD material once did) would smear playfield light over
+		// the side art from outside views.
+		table = new TableBuilder()
+			.addMaterial('VLM.Bake', { baseColor: 0xffffff })
+			.addPrimitive('gi', {
+				szMaterial: 'VLM.Bake',
+				szImage: 'gi_overlay',
+				addBlend: true,
+				alpha: 250,
+				color: 0xffffff,
+			})
+			.build()
+		const renderApi = new TestRenderApi()
+		const map = new THREE.DataTexture(new Uint8Array([10, 10, 10, 255]), 1, 1)
+		const mesh: any = {
+			name: 'LM_GI0_Playfield',
+			visible: true,
+			material: createPrimitiveAdditiveMaterial({ map, tint: 0xffffff, intensity: 0 }),
+		}
+		table.primitives.gi.getUpdater().applyState(mesh, { alpha: 250 } as PrimitiveState, renderApi, table)
+		const mat = mesh.material as any
+		expect(mat.depthTest, 'additive overlay must stay depth-tested (walls occlude it)').to.equal(true)
+		expect(mat.depthWrite, 'additive overlay must not write depth').to.equal(false)
+		expect(mesh.renderOrder, 'additive overlay draws in the overlay pass').to.equal(2)
+		expect(mat.blending, 'additive overlay blends additively').to.equal(THREE.AdditiveBlending)
+	})
+
 	it('should update the transformation matrix', () => {
 		const renderApi = new TestRenderApi()
 		spy(renderApi, 'applyMatrixToNode')
