@@ -3,14 +3,11 @@ name: VPX Build Validation
 on: [push]
 
 jobs:
-  build:
-
+  test:
     runs-on: ubuntu-latest
-
     strategy:
       matrix:
         node-version: [24.x]
-
     steps:
       - uses: actions/checkout@v4
       - name: Setup node ${{ matrix.node-version }}
@@ -23,7 +20,34 @@ jobs:
       - run: npm test
         env:
           CI: true
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup node 24.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.x
+      - run: npm ci
+        env:
+          CI: true
       - run: npm run lint
+        env:
+          CI: true
+
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [24.x]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup node ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+      - run: npm ci
         env:
           CI: true
       - run: npm run build
@@ -37,7 +61,6 @@ jobs:
     # browser/vpinball/discrepancies/twd legs need chrome, a native binary, or
     # a large VPX+ROM that CI does not have.
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
       - name: Setup node 24.x

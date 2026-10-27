@@ -92,7 +92,8 @@ done
 
 mkdir -p "$DIST_DIR"
 log "building $preset (kernels + pinmame) — $(emcc --version 2>/dev/null | head -n1) — $(cmake --version 2>/dev/null | head -n1)"
-if ! (cd "$WASM_DIR" && emcmake cmake --preset "$preset" && cmake --build --preset "$preset"); then
+JOBS="${JOBS:-$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)}"
+if ! (cd "$WASM_DIR" && emcmake cmake --preset "$preset" && cmake --build --preset "$preset" --parallel "$JOBS"); then
   if (( allow_mock )); then
     log "build failed — using mock fallback (--allow-mock)"
     copy_mock

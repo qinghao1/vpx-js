@@ -1,5 +1,14 @@
 import fs from 'node:fs'
+import { availableParallelism } from 'node:os'
 import { defineConfig } from 'vitest/config'
+
+function cpuCount() {
+	try {
+		return Math.max(1, availableParallelism())
+	} catch {
+		return 4
+	}
+}
 
 function rawLoader() {
 	return {
@@ -15,6 +24,8 @@ function rawLoader() {
 	}
 }
 
+const cores = process.env.VITEST_MAX_WORKERS ? Number(process.env.VITEST_MAX_WORKERS) || cpuCount() : cpuCount()
+
 export default defineConfig({
 	plugins: [rawLoader()],
 	test: {
@@ -24,6 +35,9 @@ export default defineConfig({
 		bench: { include: ['test/bench/**/*.bench.ts', 'lib/**/*.bench.ts'] },
 		setupFiles: ['./test/setup.ts'],
 		pool: 'forks',
+		fileParallelism: true,
+		maxWorkers: cores,
+		minWorkers: 1,
 		coverage: {
 			provider: 'v8',
 			include: ['lib/**/*.ts'],

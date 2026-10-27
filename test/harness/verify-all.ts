@@ -4,6 +4,7 @@
 // are reported as SKIP). Child convention: 0 pass, 77 skip, anything else fail.
 import { execSync, spawn } from 'node:child_process'
 import * as fs from 'node:fs'
+import { availableParallelism } from 'node:os'
 import path from 'node:path'
 import { tapComment, tapHeader, tapNotOk, tapOk, tapPlan, tapSkip } from './tap.js'
 
@@ -15,6 +16,32 @@ function exitCodeToStatus(exitCode: number | null): CheckStatus {
 	if (exitCode === 0) return 'pass'
 	if (exitCode === SKIP_EXIT) return 'skip'
 	return 'fail'
+}
+
+function cpuCount(): number {
+	try {
+		return Math.max(1, availableParallelism())
+	} catch {
+		return 4
+	}
+}
+
+function resolveJobs(): number {
+	const argv = process.argv.slice(2)
+	let flag: string | undefined
+	for (let i = 0; i < argv.length; i++) {
+		if (argv[i] === '--jobs' && argv[i + 1]) flag = argv[++i]
+		else if (argv[i].startsWith('--jobs=')) flag = argv[i].slice(7)
+	}
+	const raw = flag ?? process.env.JOBS ?? 'auto'
+	if (raw === 'auto') return cpuCount()
+	if (raw.trim().endsWith('%')) {
+		const pct = Number.parseFloat(raw) / 100
+		if (Number.isFinite(pct) && pct > 0) return Math.max(1, Math.round(cpuCount() * pct))
+		return cpuCount()
+	}
+	const n = Number.parseInt(String(raw), 10)
+	return Number.isFinite(n) && n > 0 ? n : cpuCount()
 }
 
 const killStale = () => {
@@ -105,6 +132,39 @@ const checks: E2ECheck[] = [
 	},
 ]
 
+// Node-only checks safe for parallel spawn (no shared chrome/display).
+const PARALLEL_NAMES = new Set(['wasm', 'table', 'pinmame', 'player', 'gameplay', 'play-room'])
+
+interface CheckResult {
+	status: CheckStatus
+	output: string
+}
+
+async function runCheckCaptured(check: E2ECheck): Promise<CheckResult> {
+	if (check.run) {
+		try {
+			const status = await check.run()
+			return { status, output: '' }
+		} catch {
+			return { status: 'fail', output: '' }
+		}
+	}
+	const scriptPath = path.resolve(check.script ?? '')
+	if (!fs.existsSync(scriptPath)) return { status: 'skip', output: '' }
+	return new Promise(resolve => {
+		const child = spawn('npx', ['tsx', scriptPath], { stdio: ['ignore', 'pipe', 'pipe'] })
+		let out = ''
+		child.stdout?.on('data', d => {
+			out += d.toString()
+		})
+		child.stderr?.on('data', d => {
+			out += d.toString()
+		})
+		child.on('close', exitCode => resolve({ status: exitCodeToStatus(exitCode), output: out }))
+		child.on('error', err => resolve({ status: 'fail', output: out + String(err) }))
+	})
+}
+
 async function runCheck(check: E2ECheck): Promise<CheckStatus> {
 	if (check.run) {
 		try {
@@ -122,42 +182,84 @@ async function runCheck(check: E2ECheck): Promise<CheckStatus> {
 	})
 }
 
+function report(index: number, check: E2ECheck, status: CheckStatus, passCount: { n: number }): void {
+	if (status === 'pass') {
+		passCount.n++
+		tapOk(index + 1, check.name)
+	} else if (status === 'skip') {
+		if (check.optional) {
+			passCount.n++
+			tapSkip(index + 1, check.name, check.skipReason ?? 'not run')
+		} else {
+			tapSkip(index + 1, check.name, 'required gate did not run')
+		}
+	} else if (check.optional) {
+		tapNotOk(index + 1, `${check.name} (optional, ran and failed)`)
+	} else {
+		tapNotOk(index + 1, check.name)
+	}
+}
+
 async function main(): Promise<void> {
+	const jobs = Math.max(1, resolveJobs())
+	const serial = process.argv.includes('--serial') || jobs === 1
 	tapHeader('vpx-js E2E')
 	tapPlan(checks.length)
-	let pass = 0
-	for (const [index, check] of checks.entries()) {
-		console.log('')
-		tapComment(`--- ${check.name} ---`)
-		try {
-			const status = await runCheck(check)
-			if (status === 'pass') {
-				pass++
-				tapOk(index + 1, check.name)
-			} else if (status === 'skip') {
-				if (check.optional) {
-					// Not run (missing prerequisite) — the only honest SKIP.
-					pass++
-					tapSkip(index + 1, check.name, check.skipReason ?? 'not run')
-				} else {
-					// A required gate that never ran cannot pass.
-					tapSkip(index + 1, check.name, 'required gate did not run')
-				}
-			} else if (check.optional) {
-				// Ran and failed: optional softens nothing — report the failure.
-				tapNotOk(index + 1, `${check.name} (optional, ran and failed)`)
-			} else {
-				tapNotOk(index + 1, check.name)
+	tapComment(`jobs=${serial ? 1 : jobs} cpus=${cpuCount()}`)
+	const pass = { n: 0 }
+	if (serial) {
+		for (const [index, check] of checks.entries()) {
+			console.log('')
+			tapComment(`--- ${check.name} ---`)
+			try {
+				report(index, check, await runCheck(check), pass)
+			} catch (err) {
+				tapNotOk(index + 1, check.name, `— ${(err as Error).message}`)
 			}
-		} catch (err) {
-			tapNotOk(index + 1, check.name, `— ${(err as Error).message}`)
+		}
+	} else {
+		const parallel = checks.filter(c => PARALLEL_NAMES.has(c.name))
+		const serialTail = checks.filter(c => !PARALLEL_NAMES.has(c.name))
+		const results = new Array<CheckResult | undefined>(checks.length)
+		let next = 0
+		async function worker(): Promise<void> {
+			for (;;) {
+				const i = next++
+				if (i >= parallel.length) return
+				const globalIndex = checks.indexOf(parallel[i])
+				try {
+					results[globalIndex] = await runCheckCaptured(parallel[i])
+				} catch {
+					results[globalIndex] = { status: 'fail', output: '' }
+				}
+			}
+		}
+		tapComment(`phase 1: ${parallel.length} node checks in parallel (jobs=${Math.min(jobs, parallel.length)})`)
+		await Promise.all(Array.from({ length: Math.min(jobs, parallel.length) }, worker))
+		for (const check of parallel) {
+			const index = checks.indexOf(check)
+			const r = results[index] ?? { status: 'fail' as CheckStatus, output: '' }
+			console.log('')
+			tapComment(`--- ${check.name} ---`)
+			if (r.output) process.stdout.write(r.output.endsWith('\n') ? r.output : `${r.output}\n`)
+			report(index, check, r.status, pass)
+		}
+		for (const check of serialTail) {
+			const index = checks.indexOf(check)
+			console.log('')
+			tapComment(`--- ${check.name} --- (serial: shares chrome/display)`)
+			try {
+				report(index, check, await runCheck(check), pass)
+			} catch (err) {
+				tapNotOk(index + 1, check.name, `— ${(err as Error).message}`)
+			}
 		}
 	}
 	console.log('')
-	tapComment(`pass ${pass}/${checks.length}`)
-	tapComment(pass === checks.length ? 'Result: PASS' : 'Result: FAIL')
+	tapComment(`pass ${pass.n}/${checks.length}`)
+	tapComment(pass.n === checks.length ? 'Result: PASS' : 'Result: FAIL')
 	killStale()
-	process.exit(pass === checks.length ? 0 : 1)
+	process.exit(pass.n === checks.length ? 0 : 1)
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

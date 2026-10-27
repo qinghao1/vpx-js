@@ -42,10 +42,10 @@
 		"vptscript": "./dist/bin/vptscript.js"
 	},
 	"scripts": {
-		"build": "npm run build:pre && tsup && npm run build:cp && npm run build:esm",
-		"build:pre": "tsx build/compile-rules.ts && tsx build/write-info.ts",
+		"build": "npm run build:rules && node build/parallel.mjs -- \"npm run build:js\" \"npm run build:esm:tsc\" && node build/parallel.mjs -- \"npm run build:info\" \"npm run build:cp\" \"npm run build:esm:cp\"",
+		"build:pre": "node build/parallel.mjs -- \"tsx build/compile-rules.ts\" \"tsx build/write-info.ts\"",
 		"build:cp": "cp -r res dist/ && mkdir -p dist/lib/scripting/grammar && cp lib/scripting/grammar/grammar.bnf dist/lib/scripting/grammar/",
-		"build:esm": "npm run build:pre && tsc --outDir dist-esm --rootDir . --module ESNext --target ES2024 --moduleResolution bundler --esModuleInterop --allowSyntheticDefaultImports --resolveJsonModule --skipLibCheck --declaration false --declarationMap false --sourceMap true || true; cp -r res dist-esm/; mkdir -p dist-esm/lib/scripting/grammar; cp lib/scripting/grammar/grammar.bnf dist-esm/lib/scripting/grammar/ 2>/dev/null; echo 'dist-esm built'; touch demo-browser/vite.config.ts 2>/dev/null || true",
+		"build:esm": "npm run build:rules && node build/parallel.mjs -- \"npm run build:esm:tsc\" \"npm run build:esm:cp\"",
 		"build:wasm": "wasm/build.sh",
 		"build:wasm:mock": "wasm/build.sh --mock",
 		"typecheck": "tsc --noEmit",
@@ -57,7 +57,7 @@
 		"dev": "tsup --watch",
 		"verify:pinmame": "tsx test/harness/verify-pinmame.ts",
 		"verify:wasm": "tsx test/harness/verify-wasm.ts",
-		"verify": "npm run verify:wasm && npm run verify:table && npm run verify:pinmame && npm run verify:player",
+		"verify": "node build/parallel.mjs -- \"npm run verify:wasm\" \"npm run verify:table\" \"npm run verify:pinmame\" \"npm run verify:player\"",
 		"verify:table": "tsx test/harness/verify-table.ts",
 		"verify:player": "tsx test/harness/verify-player.ts",
 		"verify:browser": "tsx test/harness/verify-browser.ts",
@@ -85,7 +85,14 @@
 		"compare": "tsx test/harness/compare-side-by-side.ts",
 		"verify:vpinball": "tsx test/harness/verify-vpinball-compat.ts",
 		"verify:audit": "tsx test/harness/verify-vpinball-compat.ts --audit",
-		"verify:discrepancies": "tsx test/harness/capture-discrepancies.ts"
+		"verify:discrepancies": "tsx test/harness/capture-discrepancies.ts",
+		"build:rules": "tsx build/compile-rules.ts",
+		"build:info": "tsx build/write-info.ts",
+		"build:js": "tsup",
+		"build:esm:tsc": "tsc --outDir dist-esm --rootDir . --module ESNext --target ES2024 --moduleResolution bundler --esModuleInterop --allowSyntheticDefaultImports --resolveJsonModule --skipLibCheck --declaration false --declarationMap false --sourceMap true || true",
+		"build:esm:cp": "cp -r res dist-esm/; mkdir -p dist-esm/lib/scripting/grammar; cp lib/scripting/grammar/grammar.bnf dist-esm/lib/scripting/grammar/ 2>/dev/null; echo 'dist-esm built'; touch demo-browser/vite.config.ts 2>/dev/null || true",
+		"check": "node build/parallel.mjs -- \"npm run lint\" \"npm run typecheck\" \"npm run typecheck:tests\" \"npm run test\"",
+		"check:fast": "node build/parallel.mjs -- \"npm run lint\" \"npm run typecheck\" \"npm run typecheck:tests\""
 	},
 	"dependencies": {
 		"dash-ast": "^2.0.0",
