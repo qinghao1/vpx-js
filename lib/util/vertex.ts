@@ -69,7 +69,10 @@ export class Vertex3DNoTex2 {
 	}
 
 	static fromArray(a: number[]): Vertex3DNoTex2 {
-		if (a.length < 8) throw new RangeError(`Vertex3DNoTex2.fromArray needs 8 numbers, got ${a.length}`)
+		// Meshes may omit UVs (6 numbers); anything else is corrupt input.
+		if (a.length !== 6 && a.length !== 8) {
+			throw new RangeError(`Vertex3DNoTex2.fromArray needs 6 or 8 numbers, got ${a.length}`)
+		}
 		const v = new Vertex3DNoTex2()
 		v.x = a[0]!
 		v.y = a[1]!
@@ -77,8 +80,8 @@ export class Vertex3DNoTex2 {
 		v.nx = a[3]!
 		v.ny = a[4]!
 		v.nz = a[5]!
-		v.tu = a[6]!
-		v.tv = a[7]!
+		v.tu = a[6] ?? 0
+		v.tv = a[7] ?? 0
 		return v
 	}
 }

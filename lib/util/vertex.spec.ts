@@ -38,7 +38,13 @@ describe('Vertex3DNoTex2.fromArray', () => {
 		expect([v.x, v.y, v.z, v.nx, v.ny, v.nz, v.tu, v.tv]).toEqual([1, 2, 3, 4, 5, 6, 7, 8])
 	})
 
-	it('fails fast on short arrays instead of storing undefined', () => {
+	it('pads missing UVs with zero', () => {
+		const v = Vertex3DNoTex2.fromArray([1, 2, 3, 4, 5, 6])
+		expect([v.x, v.y, v.z, v.nx, v.ny, v.nz, v.tu, v.tv]).toEqual([1, 2, 3, 4, 5, 6, 0, 0])
+	})
+
+	it('fails fast on corrupt lengths instead of storing undefined', () => {
 		expect(() => Vertex3DNoTex2.fromArray([1, 2])).toThrow(RangeError)
+		expect(() => Vertex3DNoTex2.fromArray([1, 2, 3, 4, 5, 6, 7])).toThrow(RangeError)
 	})
 })
