@@ -62,6 +62,20 @@ export const uTransArea = uniform(new Vector2(1, 1))
 export const uPlayfieldSurfaceY = uniform(0)
 
 /**
+ * Enables the playfield-footprint mask on bulb-glow quads. Bulb halos are
+ * authored drag-point polygons (`Light::UpdateMeshBuffer`) that routinely
+ * extend past the cabinet walls (giant GI discs, flasher sheets); their
+ * overhanging fragments are closer to an outside camera than the wall, so
+ * they composite additively OVER the side art as red wash and edge-on
+ * streak lines. Masking them to the playfield footprint confines the halo to
+ * the playfield the lamp actually lights, mirroring the transmission-buffer
+ * lookup mask below. Defaults to 0 (unmasked) so glow renders unchanged
+ * until the viewer configures the playfield area; setPrimitiveTransmissionArea
+ * flips it on alongside the area it gates on.
+ */
+export const uBulbGlowFootprintClip = uniform(0)
+
+/**
  * How far below the playfield surface the bulb-buffer lift still applies, in
  * world units. Extruded playfield overlays (VLM bakes, additive lightmaps)
  * hang about one unit below the surface, while the cabinet body and the room
@@ -106,6 +120,7 @@ export function setPrimitiveTransmissionArea(width: number, height: number, scal
 	const safeScale = Number.isFinite(scale) && scale > 0 ? scale : 1
 	uTransArea.value.set(safeWidth * safeScale, safeHeight * safeScale)
 	uPlayfieldSurfaceY.value = Number.isFinite(surfaceY) ? surfaceY : 0
+	uBulbGlowFootprintClip.value = 1
 }
 
 export interface PrimitiveBdlOptions {

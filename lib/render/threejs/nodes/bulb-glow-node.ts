@@ -1,6 +1,21 @@
 import { AdditiveBlending, Color, DoubleSide, Vector2 } from 'three'
-import { clamp, Fn, float, length, max, mix, positionLocal, pow, sqrt, uniform, vec4 } from 'three/tsl'
+import {
+	clamp,
+	Fn,
+	float,
+	length,
+	max,
+	mix,
+	positionLocal,
+	positionWorld,
+	pow,
+	sqrt,
+	uniform,
+	vec2,
+	vec4,
+} from 'three/tsl'
 import { MeshBasicNodeMaterial } from 'three/webgpu'
+import { inPlayfieldBounds, uBulbGlowFootprintClip, uTransArea } from './primitive-bdl-node.js'
 
 export interface BulbGlowOptions {
 	color: number
@@ -38,7 +53,18 @@ export function createBulbGlowNodeMaterial(options: BulbGlowOptions): MeshBasicN
 		const len = length(positionLocal.xy.sub(uCenter)).mul(uInvFalloff)
 		const atten = pow(max(float(1).sub(clamp(len, float(0), float(1))), float(0.0001)), uFalloffPower)
 		const glowColor = mix(uColor2, uColor, sqrt(len))
-		const rgb = glowColor.mul(atten).mul(uIntensity).mul(uAddScale)
+		// Authored halo polygons routinely extend past the cabinet walls
+		// (giant GI discs, flasher sheets); from outside, those overhanging
+		// fragments sit in front of the side art and wash it with playfield
+		// light. Confine the halo to the playfield footprint (same mask as
+		// the transmission lift); disabled until the viewer configures the
+		// playfield area, so unconfigured renders are unchanged.
+		const pfUv = vec2(
+			positionWorld.x.div(uTransArea.x).add(float(0.5)),
+			float(0.5).sub(positionWorld.z.div(uTransArea.y)),
+		)
+		const footprint = mix(float(1), inPlayfieldBounds(pfUv), uBulbGlowFootprintClip)
+		const rgb = glowColor.mul(atten).mul(uIntensity).mul(uAddScale).mul(footprint)
 		return vec4(rgb, float(1))
 	})()
 

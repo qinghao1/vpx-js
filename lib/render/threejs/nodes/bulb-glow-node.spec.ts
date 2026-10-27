@@ -1,5 +1,24 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { createBulbGlowNodeMaterial, isBulbGlowMaterial, setBulbGlowState } from './bulb-glow-node.js'
+import {
+	setPrimitiveTransmissionArea,
+	uBulbGlowFootprintClip,
+	uPlayfieldSurfaceY,
+	uTransArea,
+} from './primitive-bdl-node.js'
+import { graphReferences, materialize } from './tsl-test-harness.js'
+
+// setPrimitiveTransmissionArea mutates shared playfield-area module state;
+// restore it so this file stays order-independent.
+const savedArea = uTransArea.value.clone()
+const savedSurfaceY = uPlayfieldSurfaceY.value
+const savedClip = uBulbGlowFootprintClip.value
+
+afterEach(() => {
+	uTransArea.value.copy(savedArea)
+	uPlayfieldSurfaceY.value = savedSurfaceY
+	uBulbGlowFootprintClip.value = savedClip
+})
 
 describe('bulb glow node material', () => {
 	it('should create a flagged additive material', () => {
@@ -63,5 +82,37 @@ describe('bulb glow node material', () => {
 		expect(uniforms.__uColor.value.getHex()).toBe(0x00ff00)
 		expect(isBulbGlowMaterial(mat)).toBe(true)
 		expect(() => setBulbGlowState({}, { intensity: 5 })).not.toThrow()
+	})
+
+	it('masks the halo to the playfield footprint (cabinet side-wall light leak)', () => {
+		// Regression: authored halo polygons routinely extend past the
+		// cabinet walls (giant GI discs stick 6-9 units past; flasher sheets
+		// reach ±26 out at halo height). Their overhanging fragments sit in
+		// front of the side art from outside views and composite additively
+		// over it as red wash plus edge-on streak lines. The shader must
+		// reference the playfield area so those fragments can be masked out.
+		const mat = createBulbGlowNodeMaterial({
+			color: 0xff0000,
+			color2: 0xffffff,
+			centerX: 0,
+			centerY: 0,
+			falloff: 100,
+			falloffPower: 2,
+			intensity: 10,
+		})
+		const colorNode = materialize(mat.colorNode)
+		expect(graphReferences(colorNode, uTransArea), 'halo must sample the playfield area').toBe(true)
+		expect(graphReferences(colorNode, uBulbGlowFootprintClip), 'halo must gate on the footprint clip').toBe(true)
+	})
+
+	it('leaves the halo unmasked until the playfield area is configured', () => {
+		// Safe default: library consumers that never call
+		// setPrimitiveTransmissionArea render glow exactly as before.
+		expect(uBulbGlowFootprintClip.value).toBe(0)
+	})
+
+	it('enables the halo footprint mask with the playfield area', () => {
+		setPrimitiveTransmissionArea(952, 2247, 0.05)
+		expect(uBulbGlowFootprintClip.value).toBe(1)
 	})
 })
