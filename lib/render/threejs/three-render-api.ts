@@ -230,9 +230,15 @@ export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, Poin
 		// A batched original stays hidden while its batch slot carries the pixels:
 		// unhiding it on the show path would double-render (original + instance
 		// with identical transforms, z-fighting at 2x cost).
-		obj.visible = visible && !(obj as { userData?: { __batched?: unknown } }).userData?.__batched
-		for (const child of obj.children ?? [])
-			child.visible = visible && !(child as { userData?: { __batched?: unknown } }).userData?.__batched
+		// A child stamped __authoredVisible: false (e.g. a cabinet/backbox bulb
+		// glow quad, see ThreeConverter.createMesh) must survive the show path:
+		// the lamp updater gates it on authored visibility, so a blanket show
+		// here would unhide what the author hid.
+		const authoredVisible = (o: Object3D) =>
+			(o as { userData?: { __authoredVisible?: boolean } }).userData?.__authoredVisible ?? true
+		const batched = (o: Object3D) => (o as { userData?: { __batched?: unknown } }).userData?.__batched
+		obj.visible = visible && authoredVisible(obj) && !batched(obj)
+		for (const child of obj.children ?? []) child.visible = visible && authoredVisible(child) && !batched(child)
 	}
 
 	public applyMeshToNode(mesh: Mesh, obj: Object3D): void {

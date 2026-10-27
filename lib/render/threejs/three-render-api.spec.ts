@@ -190,6 +190,24 @@ describe('ThreeRenderApi batched visibility', () => {
 		expect(new Vector3().setFromMatrixScale(m4).length()).toBe(0)
 	})
 
+	it('keeps authored-invisible children hidden on the show path', () => {
+		const api = new ThreeRenderApi()
+		const group = new Group()
+		const authoredHidden = new Mesh(new BoxGeometry(1, 1, 1), new MeshStandardMaterial())
+		authoredHidden.name = 'bulb.glow'
+		authoredHidden.userData.__authoredVisible = false
+		const normal = new Mesh(new BoxGeometry(1, 1, 1), new MeshStandardMaterial())
+		group.add(authoredHidden, normal)
+		api.applyVisibility(false, group)
+		expect(group.visible).toBe(false)
+		expect(authoredHidden.visible).toBe(false)
+		expect(normal.visible).toBe(false)
+		api.applyVisibility(true, group)
+		expect(group.visible).toBe(true)
+		expect(normal.visible).toBe(true)
+		expect(authoredHidden.visible, 'authored-invisible child must survive the show path').toBe(false)
+	})
+
 	it('still toggles non-batched children normally', () => {
 		const { groupB, meshB, batched } = batchPair()
 		const glassMat = new MeshStandardMaterial({ color: 0x88ccff, transparent: true, opacity: 0.5 })
