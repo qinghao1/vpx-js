@@ -104,13 +104,12 @@ export class VBSHelper {
 			if (bound === undefined) return array
 			bounds.push(bound)
 		}
-		// ReDim declares the variable when it holds no array yet (never Dim'd
-		// or a bare `Dim`); there is nothing to preserve then.
-		if (array === null) {
-			ERR.Raise(new VbsError('Invalid use of Null', 94))
-			return array
-		}
-		if (this.isUndef(array)) {
+		// ReDim redeclares the variable anew: a prior Null holds no array
+		// (like Empty from a never-Dim'd variable or a bare `Dim`), so
+		// declare one instead of raising 94. There is nothing to preserve
+		// then. Genuine Null misuse (Null bounds, CStr(Null), ...) still
+		// raises 94 at its own site.
+		if (array === null || this.isUndef(array)) {
 			return this.dim(bounds)
 		}
 		let tmp: any = array

@@ -157,14 +157,46 @@ describe('The scripting VBS Helper', () => {
 		expect(js[0][0]).to.equal('Test')
 	})
 
-	it('should raise error 94 when redimming Null', () => {
-		try {
-			vbsHelper.redim(null as unknown as any[], [2])
-			expect.fail('should have raised error 94')
-		} catch (e) {
-			expect(e).to.be.an.instanceof(VbsError)
-			expect((e as VbsError).code).to.equal(94)
-		}
+	it('should declare anew when redimming a Null-valued variable, like Empty', () => {
+		// ReDim reallocates the variable rather than consuming its value,
+		// so a prior Null must not raise 94 (walking_dead.vpx regression).
+		const single = vbsHelper.redim(null as unknown as any[], [2])
+		expect(single.length).to.equal(3)
+		single[1] = 'Test'
+		expect(single[1]).to.equal('Test')
+
+		const multi = vbsHelper.redim(null as unknown as any[], [1, 1])
+		expect(multi.length).to.equal(2)
+		expect(multi[0].length).to.equal(2)
+	})
+
+	it('should declare anew when redimming a Null-valued variable with Preserve', () => {
+		const js = vbsHelper.redim(null as unknown as any[], [2], true)
+		expect(js.length).to.equal(3)
+	})
+
+	it('should not record an error when redimming Null under On Error Resume Next', () => {
+		ERR.OnErrorResumeNext()
+		const js = vbsHelper.redim(null as unknown as any[], [2])
+		expect(js.length).to.equal(3)
+		expect(ERR.Number).to.equal(0)
+	})
+
+	it('should redim a Null-valued variable through the table-script play path', () => {
+		// Regression: walking_dead.vpx failed to load with
+		// 'Error: Invalid use of Null' at VBSHelper.redim via
+		// globalThis.play. Exercise the same path the table script takes
+		// (Transpiler.execute assigns and invokes globalThis.play), not
+		// just the helper in isolation.
+		const scope: Record<string, unknown> = {}
+		new Transpiler(table, new Player(table)).execute(
+			'Dim x\nx = Null\nReDim x(2)\nx(0) = "ok"\nn = UBound(x)\nv = x(0)\n',
+			scope,
+			'globalThis',
+		)
+		expect(typeof (globalThis as any).play).to.equal('function')
+		expect(scope.n).to.equal(2)
+		expect(scope.v).to.equal('ok')
 	})
 
 	it('should raise error 9 when redimming Preserve with a grown outer dimension', () => {

@@ -25,4 +25,14 @@ describe('player surfaces table-script errors', () => {
 		const table = new TableBuilder().withTableScript('Dim x\nx = 1\n').build('Table1')
 		expect(() => new Player(table).init({})).not.toThrow()
 	})
+
+	it('Player.initAsync succeeds when the table script redims a Null-valued variable', async () => {
+		// Regression: walking_dead.vpx failed to load with
+		// 'Error: Invalid use of Null' at VBSHelper.redim via
+		// Transpiler.evalAndPlay -> Table.runTableScriptAsync ->
+		// Player.initAsync. ReDim reallocates the variable anew, so a
+		// prior Null must not raise 94.
+		const table = new TableBuilder().withTableScript('Dim x\nx = Null\nReDim x(2)\nx(0) = "ok"\n').build('Table1')
+		await expect(new Player(table).initAsync({})).resolves.toBeInstanceOf(Player)
+	})
 })
