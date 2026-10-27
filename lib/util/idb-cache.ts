@@ -1,4 +1,9 @@
 // Minimal IndexedDB cache for textures and transpiled VBS.
+//
+// NOTE: bumping DB_VERSION wipes the whole cache on upgrade (both stores are
+// dropped and recreated below). That is intentional: cached payloads are
+// version-sensitive (transpiler output, float texture blobs), so a bump must
+// invalidate old entries rather than serve stale bytes.
 const DB_NAME = 'vpx-js-cache'
 const DB_VERSION = 4
 const STORE = 'cache'
@@ -48,13 +53,20 @@ export async function idbGet(key: string): Promise<any | undefined> {
 }
 
 export async function idbSet(key: string, val: any): Promise<void> {
-	const db = await openDB()
-	await new Promise<void>((resolve, reject) => {
-		const tx = db.transaction(STORE, 'readwrite')
-		tx.objectStore(STORE).put(val, key)
-		tx.oncomplete = () => resolve()
-		tx.onerror = () => reject(tx.error)
-	})
+	try {
+		const db = await openDB()
+		await new Promise<void>((resolve, reject) => {
+			const tx = db.transaction(STORE, 'readwrite')
+			tx.objectStore(STORE).put(val, key)
+			tx.oncomplete = () => resolve()
+			tx.onerror = () => reject(tx.error)
+		})
+	} catch (error) {
+		// Same contract as idbGet: the cache is optional, so a write failure
+		// (private mode, quota, missing indexedDB) resolves instead of
+		// rejecting. Callers must not rely on the write having happened.
+		void error
+	}
 }
 
 export function texCacheKey(name: string, w: number, h: number, mtime = ''): string {
