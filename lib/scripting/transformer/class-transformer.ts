@@ -9,6 +9,7 @@ import {
 	conditionalExpression,
 	identifier,
 	literal,
+	logicalExpression,
 	memberExpression,
 	newExpression,
 	objectExpression,
@@ -57,9 +58,22 @@ export class ClassTransformer extends Transformer {
 	}
 }
 
-function lower(prop: string): Expression {
+/**
+ * Maps an instance-proxy key for case-insensitive VBS member lookup. All
+ * string keys lowercase — except the JS primitive-conversion protocol
+ * (`valueOf`/`toString`): lowercasing those removes them, so every coercion
+ * (`+`, computed keys, `Number()`, ...) throws a raw TypeError instead of a
+ * VbsError. Symbols already pass through untouched (see the `typeof` guard).
+ */
+function instanceKey(prop: string): Expression {
+	const isString = binaryExpression('===', unaryExpression('typeof', identifier(prop)), literal('string'))
+	const passthrough = logicalExpression(
+		'||',
+		binaryExpression('===', identifier(prop), literal('valueOf')),
+		binaryExpression('===', identifier(prop), literal('toString')),
+	)
 	return conditionalExpression(
-		binaryExpression('===', unaryExpression('typeof', identifier(prop)), literal('string')),
+		logicalExpression('&&', isString, unaryExpression('!', passthrough)),
 		callExpression(memberExpression(identifier(prop), identifier('toLowerCase')), []),
 		identifier(prop),
 	)
@@ -80,9 +94,13 @@ function proxyReturn(): ReturnStatement {
 		newExpression(identifier('Proxy'), [
 			thisExpression(),
 			objectExpression([
-				trap('get', ['t', 'p', 'r'], [identifier('t'), lower('p'), identifier('r')]),
-				trap('set', ['t', 'p', 'v', 'r'], [identifier('t'), lower('p'), identifier('v'), identifier('r')]),
-				trap('has', ['t', 'p'], [identifier('t'), lower('p')]),
+				trap('get', ['t', 'p', 'r'], [identifier('t'), instanceKey('p'), identifier('r')]),
+				trap(
+					'set',
+					['t', 'p', 'v', 'r'],
+					[identifier('t'), instanceKey('p'), identifier('v'), identifier('r')],
+				),
+				trap('has', ['t', 'p'], [identifier('t'), instanceKey('p')]),
 			]),
 		]),
 	)

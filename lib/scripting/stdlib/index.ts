@@ -157,13 +157,18 @@ export class Stdlib extends VbsApi {
 
 	/**
 	 * Coerces a numeric-conversion operand: True is -1, strings parse like
-	 * VBScript numbers. NaN means the caller raises type mismatch (13).
+	 * VBScript numbers. NaN means the caller raises type mismatch (13), as
+	 * does an object without primitive conversion (whose Number throws).
 	 */
 	private toConverterNumber(v: unknown): number {
 		if (typeof v === 'boolean') return v ? -1 : 0
 		if (typeof v === 'number') return v
 		if (typeof v === 'string') return parseNumericText(v)
-		return Number(v)
+		try {
+			return Number(v)
+		} catch {
+			return NaN
+		}
 	}
 
 	/** Range-checks a rounded integer conversion, raising Overflow (6). */
@@ -289,13 +294,26 @@ export class Stdlib extends VbsApi {
 		if (this.isUndef(v)) return ''
 		if (typeof v === 'string') return v
 		if (typeof v === 'boolean') return v ? 'True' : 'False'
-		return String(v)
+		// Objects without primitive conversion make String throw a raw
+		// TypeError; those raise type mismatch (13) instead of leaking.
+		try {
+			return String(v)
+		} catch {
+			ERR.Raise(new VbsError('Type mismatch', 13))
+			return ''
+		}
 	}
 
 	public CDate(v: any): Date | string {
 		if (this.isUndef(v)) return ''
+		let input: string
 		try {
-			const input = String(v).trim().replace(/^#|#$/g, '')
+			input = String(v).trim().replace(/^#|#$/g, '')
+		} catch {
+			ERR.Raise(new VbsError('Type mismatch', 13))
+			return ''
+		}
+		try {
 			const date = new Date(input)
 			return isNaN(date.getTime()) ? String(v) : date
 		} catch {

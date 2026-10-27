@@ -7,7 +7,7 @@ import { ClassTransformer } from './class-transformer.js'
 
 chai.use((sinonChai as any).default ?? sinonChai)
 
-const proxy = `return new Proxy(this, {\n            get: (t, p, r) => Reflect.get(t, typeof p === 'string' ? p.toLowerCase() : p, r),\n            set: (t, p, v, r) => Reflect.set(t, typeof p === 'string' ? p.toLowerCase() : p, v, r),\n            has: (t, p) => Reflect.has(t, typeof p === 'string' ? p.toLowerCase() : p)\n        });`
+const proxy = `return new Proxy(this, {\n            get: (t, p, r) => Reflect.get(t, typeof p === 'string' && !(p === 'valueOf' || p === 'toString') ? p.toLowerCase() : p, r),\n            set: (t, p, v, r) => Reflect.set(t, typeof p === 'string' && !(p === 'valueOf' || p === 'toString') ? p.toLowerCase() : p, v, r),\n            has: (t, p) => Reflect.has(t, typeof p === 'string' && !(p === 'valueOf' || p === 'toString') ? p.toLowerCase() : p)\n        });`
 
 describe('The scripting class transformer', () => {
 	it('should return the proxy in the constructor', () => {

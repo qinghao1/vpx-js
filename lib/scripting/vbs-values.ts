@@ -57,7 +57,14 @@ function toInt32Operand(value: unknown): number {
 	if (typeof value === 'symbol') {
 		return 0
 	}
-	const numeric = typeof value === 'number' ? value : Number(value)
+	// Objects with no primitive conversion make Number throw a raw TypeError;
+	// those coerce as NaN (0) instead of leaking, like other garbage operands.
+	let numeric: number
+	try {
+		numeric = typeof value === 'number' ? value : Number(value)
+	} catch {
+		return 0
+	}
 	if (Number.isNaN(numeric)) {
 		return 0
 	}
@@ -151,7 +158,13 @@ function toVbsNumber(value: unknown): number {
 	if (typeof value === 'string') {
 		return parseNumericText(value)
 	}
-	return Number(value)
+	// Objects with no primitive conversion make Number throw a raw TypeError;
+	// those coerce as NaN so the caller raises type mismatch (13) instead.
+	try {
+		return Number(value)
+	} catch {
+		return NaN
+	}
 }
 
 /**
@@ -165,12 +178,22 @@ export function vbsIntDiv(left: number | null, right: number | null): number | n
 	if (left === null || right === null) {
 		return null
 	}
-	const divisor = bankersRound(right)
+	// Operands without primitive conversion make bankersRound throw a raw
+	// TypeError; those raise type mismatch (13) instead of leaking.
+	let divisor = 0
+	let dividend = 0
+	try {
+		divisor = bankersRound(right)
+		dividend = bankersRound(left)
+	} catch {
+		ERR.Raise(new VbsError('Type mismatch', 13))
+		return undefined
+	}
 	if (divisor === 0) {
 		ERR.Raise(new VbsError('Division by zero.', 11))
 		return undefined
 	}
-	return Math.trunc(bankersRound(left) / divisor)
+	return Math.trunc(dividend / divisor)
 }
 
 function isVbsUndef(value: unknown): boolean {
@@ -328,8 +351,17 @@ export function vbsEquals(left: unknown, right: unknown): boolean | null {
 	}
 	const normalizedLeft = typeof left === 'boolean' ? (left ? -1 : 0) : left
 	const normalizedRight = typeof right === 'boolean' ? (right ? -1 : 0) : right
-	// biome-ignore lint/suspicious/noDoubleEquals: VBS equals semantics
-	if (normalizedLeft == normalizedRight) {
+	// Loose equality coerces operands; objects without primitive conversion
+	// make it throw a raw TypeError, which surfaces as type mismatch (13).
+	let loose = false
+	try {
+		// biome-ignore lint/suspicious/noDoubleEquals: VBS equals semantics
+		loose = normalizedLeft == normalizedRight
+	} catch {
+		ERR.Raise(new VbsError('Type mismatch', 13))
+		return false
+	}
+	if (loose) {
 		return true
 	}
 	const leftUndef = isVbsUndef(normalizedLeft)
@@ -381,7 +413,14 @@ function toConcatText(value: unknown): string {
 	if (typeof value === 'boolean') {
 		return value ? 'True' : 'False'
 	}
-	return String(value)
+	// Objects without primitive conversion make String throw a raw TypeError;
+	// those raise type mismatch (13) instead of leaking.
+	try {
+		return String(value)
+	} catch {
+		ERR.Raise(new VbsError('Type mismatch', 13))
+		return ''
+	}
 }
 
 /**
