@@ -44,13 +44,21 @@ export function downscaleArray<T extends DownscaleArray>(
 	const out = new (src.constructor as any)(nw * nh * comps) as T
 	const isHalf = src instanceof Uint16Array && type === HalfFloatType
 	const isFloat = src instanceof Float32Array
+	// Integer-factor fast path: exact 2x/4x/... box windows tile the source
+	// with no per-pixel floor/ceil/min/div. Window bounds and accumulation
+	// order match the generic loop below, so output bytes are identical.
+	const qx = Math.round(width / nw)
+	const qy = Math.round(height / nh)
+	const exactBox = qx >= 1 && qy >= 1 && qx * nw === width && qy * nh === height
 	if (isPlayfieldCap(name)) {
 		for (let y = 0; y < nh; y++) {
-			const y0 = Math.floor((y / nh) * height)
-			const y1 = Math.min(height, Math.ceil(((y + 1) / nh) * height))
+			// Exact-factor windows tile the source (y0 + qy <= height always),
+			// so the generic floor/ceil/min/div per pixel is skipped.
+			const y0 = exactBox ? y * qy : Math.floor((y / nh) * height)
+			const y1 = exactBox ? y0 + qy : Math.min(height, Math.ceil(((y + 1) / nh) * height))
 			for (let x = 0; x < nw; x++) {
-				const x0 = Math.floor((x / nw) * width)
-				const x1 = Math.min(width, Math.ceil(((x + 1) / nw) * width))
+				const x0 = exactBox ? x * qx : Math.floor((x / nw) * width)
+				const x1 = exactBox ? x0 + qx : Math.min(width, Math.ceil(((x + 1) / nw) * width))
 				const count = (x1 - x0) * (y1 - y0)
 				const dBase = (y * nw + x) * comps
 				for (let c = 0; c < comps; c++) {

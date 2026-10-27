@@ -3,6 +3,7 @@
 
 import { readdirSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
+import { availableParallelism } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { DataTexture, LinearSRGBColorSpace, RGBAFormat, SRGBColorSpace, type Texture as ThreeTexture } from 'three'
@@ -20,7 +21,21 @@ let hdrReady: Promise<any[]> | null = null
 const hdrPending = new Map<number, { resolve: (v: any) => void; reject: (e: any) => void }>()
 let hdrNextId = 1
 let hdrNextWorker = 0
-const HDR_POOL_SIZE = 2
+/**
+ * HDR/EXR decode workers. DWAA-compressed 8192px playfield bakes decode for
+ * ~15s each on one thread, so a 2-worker pool serializes the third float
+ * texture behind them (round-robin FIFO per worker). Size with CPU count —
+ * floor 2 (past behavior on unknown hardware), cap 4 (each 8192px decode
+ * peaks near 1GB, matching the map generator's concurrency cap).
+ */
+const HDR_POOL_SIZE = (() => {
+	try {
+		const n = typeof availableParallelism === 'function' ? availableParallelism() : 2
+		return Math.min(4, Math.max(2, n))
+	} catch {
+		return 2
+	}
+})()
 
 async function getHdrWorkers(): Promise<any[]> {
 	if (hdrWorkers.length) return hdrWorkers
