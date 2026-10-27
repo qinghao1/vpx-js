@@ -26,7 +26,7 @@ describe('The VPinball table API', () => {
 		_player = new Player(table).init()
 	})
 
-	it('should correctly read and write the properties', async () => {
+	it('should read the file name and stereo3D overrides', () => {
 		const api = table.getApi()
 
 		expect(api.FileName).to.equal(api.Name)
@@ -48,6 +48,10 @@ describe('The VPinball table API', () => {
 		expect(api.ZPD).to.equal(0.55)
 		api.Offset = 1.6
 		expect(api.Offset).to.equal(1.6)
+	})
+
+	it('should read and write playfield image and grid flags', () => {
+		const api = table.getApi()
 
 		api.Image = 'test_pattern_png'
 		expect(api.Image).to.equal('test_pattern_png')
@@ -59,14 +63,25 @@ describe('The VPinball table API', () => {
 		expect(api.DisplayBackdrop).to.equal(true)
 		api.DisplayBackdrop = false
 		expect(api.DisplayBackdrop).to.equal(false)
+	})
+
+	it('should read glass height and dimensions, and no-op TableHeight back to 0', () => {
+		const api = table.getApi()
+
 		api.GlassHeight = 55.6
 		expect(api.GlassHeight).to.equal(55.6)
+		// Deprecated upstream: the setter is a no-op and the getter reads back 0.
 		api.TableHeight = 98.1
-		expect(api.TableHeight).to.equal(98.1)
+		expect(api.TableHeight).to.equal(0)
 		api.Width = 580
 		expect(api.Width).to.equal(580)
 		api.Height = 1500
 		expect(api.Height).to.equal(1500)
+	})
+
+	it('should read and write playfield material and lights', () => {
+		const api = table.getApi()
+
 		api.PlayfieldMaterial = 'pfmat'
 		expect(api.PlayfieldMaterial).to.equal('pfmat')
 		api.LightAmbient = 3.2
@@ -77,6 +92,11 @@ describe('The VPinball table API', () => {
 		expect(api.LightRange).to.equal(5.4)
 		api.LightEmissionScale = 0.8
 		expect(api.LightEmissionScale).to.equal(0.8)
+	})
+
+	it('should read and write night-day and ambient occlusion scales', () => {
+		const api = table.getApi()
+
 		api.NightDay = 80
 		expect(api.NightDay).to.equal(80)
 		api.NightDay = 200
@@ -89,6 +109,11 @@ describe('The VPinball table API', () => {
 		expect(api.SSRScale).to.equal(1.6)
 		api.EnvironmentEmissionScale = 0.2
 		expect(api.EnvironmentEmissionScale).to.equal(0.2)
+	})
+
+	it('should read and write ball reflection and trail strengths', () => {
+		const api = table.getApi()
+
 		api.BallReflection = 4
 		expect(api.BallReflection).to.equal(4)
 		api.PlayfieldReflectionStrength = 41
@@ -99,12 +124,21 @@ describe('The VPinball table API', () => {
 		expect(api.TrailStrength).to.equal(89)
 		api.BallPlayfieldReflectionScale = 5.12
 		expect(api.BallPlayfieldReflectionScale).to.equal(5.12)
+	})
+
+	it('should read and write bulb intensity, bloom, and sound volume', () => {
+		const api = table.getApi()
+
 		api.DefaultBulbIntensityScale = 2314
 		expect(api.DefaultBulbIntensityScale).to.equal(2314)
 		api.BloomStrength = 13
 		expect(api.BloomStrength).to.equal(13)
 		api.TableSoundVolume = 10
 		expect(api.TableSoundVolume).to.equal(10)
+	})
+
+	it('should toggle detail level through GlobalAlphaAcc', () => {
+		const api = table.getApi()
 
 		api.GlobalAlphaAcc = true
 		expect(api.GlobalAlphaAcc).to.equal(true)
@@ -114,6 +148,10 @@ describe('The VPinball table API', () => {
 		expect(api.DetailLevel).to.equal(10)
 		api.DetailLevel = 11
 		expect(api.DetailLevel).to.equal(10)
+	})
+
+	it('should read and write day-night, decals, music, vsync, and backdrop', () => {
+		const api = table.getApi()
 
 		api.GlobalDayNight = false
 		expect(api.GlobalDayNight).to.equal(false)
@@ -133,6 +171,11 @@ describe('The VPinball table API', () => {
 		expect(api.BackdropImageApplyNightDay).to.equal(false)
 		api.BackdropImageApplyNightDay = true
 		expect(api.BackdropImageApplyNightDay).to.equal(true)
+	})
+
+	it('should read and write FSS and backdrop images', () => {
+		const api = table.getApi()
+
 		api.ShowFSS = true
 		expect(api.ShowFSS).to.equal(true)
 		api.ShowFSS = false
@@ -146,8 +189,15 @@ describe('The VPinball table API', () => {
 		expect(() => (api.ColorGradeImage = 'test_pattern_jpg')).to.throw(
 			'Wrong image size, needs to be 256x16 resolution',
 		)
+	})
+
+	it('should read and write gravity and surface physics', () => {
+		const api = table.getApi()
+
 		api.Gravity = 1
 		expect(api.Gravity).to.equal(1)
+		api.Gravity = -5
+		expect(api.Gravity).to.equal(0)
 		api.Friction = 0.6
 		expect(api.Friction).to.equal(0.6)
 		api.Friction = -1
@@ -162,6 +212,11 @@ describe('The VPinball table API', () => {
 		expect(api.Scatter).to.equal(22.65)
 		api.DefaultScatter = 2
 		expect(api.DefaultScatter).to.equal(2)
+	})
+
+	it('should read and write nudge, plunger, and physics loop settings', () => {
+		const api = table.getApi()
+
 		api.NudgeTime = 0.22
 		expect(api.NudgeTime).to.equal(0.22)
 		api.PlungerNormalize = 98165
@@ -172,6 +227,10 @@ describe('The VPinball table API', () => {
 		expect(api.PlungerFilter).to.equal(true)
 		api.PhysicsLoopTime = 120
 		expect(api.PhysicsLoopTime).to.equal(120)
+	})
+
+	it('should read and write backglass-mode views', () => {
+		const api = table.getApi()
 
 		api.BackglassMode = Enums.BackglassIndex.FULL_SINGLE_SCREEN
 		expect(api.BackglassMode).to.equal(112)
@@ -229,6 +288,10 @@ describe('The VPinball table API', () => {
 		expect(api.Xlatex).to.equal(8)
 		expect(api.Xlatey).to.equal(9)
 		expect(api.Xlatez).to.equal(4)
+	})
+
+	it('should read and write slopes, ball images, and reject YieldTime', () => {
+		const api = table.getApi()
 
 		api.SlopeMax = 0.2
 		expect(api.SlopeMax).to.equal(0.2)
@@ -243,6 +306,11 @@ describe('The VPinball table API', () => {
 		)
 		expect(() => (api.YieldTime = 10)).to.throw('Not supported in play.')
 		expect(() => api.YieldTime).to.throw('Not supported in play.')
+	})
+
+	it('should read and write antialiasing and physics overrides', () => {
+		const api = table.getApi()
+
 		api.EnableAntialiasing = 1.335
 		expect(api.EnableAntialiasing).to.equal(1.335)
 		api.EnableSSR = 12312 as unknown as boolean
@@ -257,6 +325,11 @@ describe('The VPinball table API', () => {
 		expect(api.OverridePhysicsFlippers).to.equal(false)
 		api.OverridePhysicsFlippers = true
 		expect(api.OverridePhysicsFlippers).to.equal(true)
+	})
+
+	it('should read and write decals, ShowDT, and EM reels', () => {
+		const api = table.getApi()
+
 		api.EnableDecals = false
 		expect(api.EnableDecals).to.equal(false)
 		api.EnableDecals = true
@@ -273,6 +346,11 @@ describe('The VPinball table API', () => {
 		expect(api.EnableEMReels).to.equal(false)
 		api.EnableEMReels = true
 		expect(api.EnableEMReels).to.equal(true)
+	})
+
+	it('should read and write difficulty, accelerometer, and ball decals', () => {
+		const api = table.getApi()
+
 		api.GlobalDifficulty = 50
 		expect(api.GlobalDifficulty).to.equal(50)
 		api.GlobalDifficulty = 200
@@ -289,6 +367,11 @@ describe('The VPinball table API', () => {
 		expect(api.DeadZone).to.equal(0)
 		api.BallFrontDecal = 'test_pattern_xrgb'
 		expect(api.BallFrontDecal).to.equal('test_pattern_xrgb')
+	})
+
+	it('should report the build version', () => {
+		const api = table.getApi()
+
 		const buildVersion = VP_VERSION_MAJOR * 1000 + VP_VERSION_MINOR * 100 + VP_VERSION_REV
 		expect(api.Version).to.equal(buildVersion)
 		expect(api.VPBuildVersion).to.equal(buildVersion)

@@ -86,11 +86,10 @@ export class TableApi extends ItemApi<TableData> {
 		this.data.glassHeight = v
 	}
 	get TableHeight() {
-		return this.data.tableHeight
+		return 0
 	}
-	set TableHeight(v) {
-		this.data.tableHeight = v
-	}
+	// Deprecated upstream (`put_TableHeight` is a no-op); the setter keeps the shape but changes nothing.
+	set TableHeight(_v: number) {}
 	get Width() {
 		return this.data.right - this.data.left
 	}
@@ -307,7 +306,7 @@ export class TableApi extends ItemApi<TableData> {
 		return this.data.gravity / GRAVITYCONST
 	}
 	set Gravity(v) {
-		this.data.gravity = v * GRAVITYCONST
+		this.data.gravity = Math.max(v, 0) * GRAVITYCONST
 		this._refreshGravity()
 	}
 	get Friction() {
@@ -510,6 +509,7 @@ export class TableApi extends ItemApi<TableData> {
 	get ShowDT() {
 		return this.data.bgCurrentSet === BG_DESKTOP || this.data.bgCurrentSet === BG_FSS
 	}
+	// Deliberate vpx-js extension: upstream exposes ShowDT as getter-only (no put_ShowDT in pintable.cpp).
 	set ShowDT(v) {
 		this.data.bgCurrentSet = v ? (this.data.bgEnableFss ? BG_FSS : BG_DESKTOP) : BG_FULLSCREEN
 	}

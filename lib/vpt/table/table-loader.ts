@@ -30,6 +30,36 @@ function hardwareConcurrency(): number {
 	)
 }
 
+/** Load defaults applied by `Table.load` (direct `TableLoader` users pass raw flags). */
+const defaultTableLoadOptions: TableLoadOptions = {
+	tableDataOnly: false,
+	tableInfoOnly: false,
+	loadInvisibleItems: true,
+	loadTableScript: true,
+}
+
+/** Merges `Table.load` options over the defaults; tableInfoOnly stays authoritative unless loadTableScript is explicit. */
+export function resolveLoadOptions(opts: TableLoadOptions = {}): TableLoadOptions {
+	const merged = { ...defaultTableLoadOptions, ...opts }
+	// tableInfoOnly is authoritative: the loadTableScript default (true) must not defeat it.
+	// An explicit loadTableScript:true still opts into script+info.
+	if (opts.tableInfoOnly && opts.loadTableScript === undefined) {
+		merged.loadTableScript = false
+	}
+	return merged
+}
+
+/** Upstream `PinTable::GetUniqueName`: root plus a 3-digit suffix from 001. */
+function getUniqueName(used: Set<string>, root: string): string {
+	let suffix = 1
+	let name = `${root}${String(suffix).padStart(3, '0')}`
+	while (used.has(name.toLowerCase()) && suffix < 1000) {
+		suffix++
+		name = `${root}${String(suffix).padStart(3, '0')}`
+	}
+	return name
+}
+
 /** Loads VPX OLE storage into table model. */
 export class TableLoader {
 	private doc!: OleCompoundDoc
@@ -45,13 +75,14 @@ export class TableLoader {
 				const gameStg = this.doc.storage('GameStg')
 				out.data = await TableData.fromStorage(gameStg, 'GameData')
 				if (!opts.tableDataOnly) {
+					// Collections first: part names yield to collection names upstream.
+					await this.loadCollections(out, gameStg, out.data.numCollections)
 					await this.loadGameItems(out, gameStg, out.data.numGameItems, opts)
 					if (!opts.skipTextures) await this.loadTextures(out, gameStg, out.data.numTextures)
 					else {
 						out.textures = []
 						logger().debug('[Table.load] Skipped %s textures (play without textures)', out.data.numTextures)
 					}
-					await this.loadCollections(out, gameStg, out.data.numCollections)
 				}
 				if (opts.loadTableScript) {
 					// CODE is exactly cchar bytes with no trim (upstream AsScript); 0 means empty script.
@@ -106,6 +137,7 @@ export class TableLoader {
 			types[index] = type
 			return loadItemByType(storage, name, type, opts)
 		})
+		const used = new Set((out.collections ?? []).map(collection => collection.getName().toLowerCase()))
 		for (let index = 0; index < numItems; index++) {
 			const item = results[index]
 			if (!item) continue
@@ -114,6 +146,13 @@ export class TableLoader {
 			if (key && ((key !== 'textBoxes' && key !== 'timers') || opts.loadInvisibleItems)) {
 				;((out as unknown as Record<string, Item<ItemData>[] | undefined>)[key] ??= []).push(item)
 			}
+			const oldName = item.getName()
+			if (used.has(oldName.toLowerCase())) {
+				const name = getUniqueName(used, oldName)
+				logger().warn('[Table.load] Duplicate part name "%s", renamed to "%s".', oldName, name)
+				item.data.name = name
+			}
+			used.add(item.getName().toLowerCase())
 			out.items[item.getName()] = item
 			progress().details(item.getName())
 		}

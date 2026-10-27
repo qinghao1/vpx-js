@@ -6,12 +6,4 @@ import { ItemState } from '../item-state.js'
 /** Table render state. @see https://github.com/vpinball/vpinball/blob/master/src/parts/pintable.cpp */
 export class TableState extends ItemState {
 	public material?: string
-
-	public static claim(name: string, material: string | undefined, isVisible: boolean): TableState {
-		const state = new TableState()
-		state.name = name
-		state.material = material
-		state.isVisible = isVisible
-		return state
-	}
 }

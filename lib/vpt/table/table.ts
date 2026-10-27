@@ -59,7 +59,7 @@ import { TableApi } from './table-api.js'
 import type { TableData } from './table-data.js'
 import type { TableExportOptions } from './table-exporter.js'
 import { TableHitGenerator } from './table-hit-generator.js'
-import { type LoadedTable, TableLoader } from './table-loader.js'
+import { type LoadedTable, resolveLoadOptions, TableLoader } from './table-loader.js'
 import { TableMeshGenerator } from './table-mesh-generator.js'
 import { TableState } from './table-state.js'
 import { TableUpdater } from './table-updater.js'
@@ -75,7 +75,7 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 	private readonly updater?: TableUpdater
 	private events?: EventProxy
 	private api?: TableApi
-	private itemIndex?: Record<string, string>
+	private readonly itemIndex = new Map<string, string>()
 
 	public readonly textures: Record<string, Texture> = {}
 	public readonly collections: Record<string, Collection> = {}
@@ -104,13 +104,8 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 
 	public static playfieldThickness = 20.0
 
-	public static async load(reader: IBinaryReader, opts: TableLoadOptions = defaultTableLoadOptions): Promise<Table> {
-		const merged = { ...defaultTableLoadOptions, ...opts }
-		// tableInfoOnly is authoritative: the loadTableScript default (true) must not defeat it.
-		// An explicit loadTableScript:true still opts into script+info.
-		if (opts.tableInfoOnly && opts.loadTableScript === undefined) {
-			merged.loadTableScript = false
-		}
+	public static async load(reader: IBinaryReader, opts: TableLoadOptions = {}): Promise<Table> {
+		const merged = resolveLoadOptions(opts)
 		const l = new TableLoader()
 		return new Table(l, await l.load(reader, merged))
 	}
@@ -124,7 +119,9 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 			this.data = loaded.data
 			this.meshGenerator = new TableMeshGenerator(this)
 			this.hitGenerator = new TableHitGenerator(loaded.data)
-			this.state = TableState.claim(this.data.getName(), this.data.szPlayfieldMaterial, true)
+			this.state = new TableState()
+			this.state.name = this.data.getName()
+			this.state.material = this.data.szPlayfieldMaterial
 			this.updater = new TableUpdater(this.state)
 		}
 		if (loaded.info) this.info = loaded.info
@@ -139,14 +136,16 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 			'collections',
 			this.collections as unknown as Record<string, unknown>,
 		)
-		for (const [_type, entry] of Object.entries(ITEM_REGISTRY)) {
-			const loadedKey = entry.key as keyof typeof loaded
-			const tableKey = loadedKey === 'textBoxes' ? 'textboxes' : loadedKey
+		for (const [, entry] of Object.entries(ITEM_REGISTRY)) {
 			this.populateFromLoaded(
 				loaded as unknown as Record<string, unknown>,
-				loadedKey as unknown as string,
-				(this as unknown as Record<string, unknown>)[tableKey] as Record<string, unknown>,
+				entry.key,
+				(this as unknown as Record<string, unknown>)[entry.tableKey ?? entry.key] as Record<string, unknown>,
 			)
+		}
+		for (const el of this.getScriptables()) {
+			const name = el.getName()
+			if (name !== undefined) this.itemIndex.set(name.toLowerCase(), name)
 		}
 	}
 
@@ -159,10 +158,17 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 	public getName(): string {
 		return this.data?.getName()
 	}
+	/** Case-insensitive, last wins (upstream resolves names through a case-insensitive map during playback). */
 	public getTexture(name?: string): Texture | undefined {
-		return name ? this.textures[name.toLowerCase()] : undefined
+		if (!name) return undefined
+		const lc = name.toLowerCase()
+		const entries = Object.entries(this.textures)
+		for (let i = entries.length - 1; i >= 0; i--) {
+			const [key, texture] = entries[i]!
+			if (key.toLowerCase() === lc || texture.getName?.().toLowerCase() === lc) return texture
+		}
+		return undefined
 	}
-	/** Case-insensitive, last wins (upstream `PinTable::GetMaterial` uses a case-insensitive map during playback, where later entries overwrite earlier ones). */
 	public getMaterial(name?: string): Material | undefined {
 		if (!name || !this.data) return undefined
 		const mats = this.data.materials
@@ -252,11 +258,7 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 	}
 
 	public getElementApiName(vbsName: string): string {
-		if (!this.itemIndex) {
-			this.itemIndex = {}
-			for (const el of this.getScriptables()) this.itemIndex[el.getName().toLowerCase()] = el.getName()
-		}
-		return this.itemIndex[vbsName.toLowerCase()]!
+		return this.itemIndex.get(vbsName.toLowerCase())!
 	}
 
 	public getElements(): Record<string, IScriptable<ItemApi<ItemData>>> {
@@ -275,7 +277,7 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 	public getGlobalDifficulty(): number {
 		return this.data?.globalDifficulty ?? 0.2
 	}
-	/** Deprecated upstream (`get_TableHeight` returns 0): the playfield sits at z=0. */
+	/** Deprecated upstream; always 0. */
 	public getTableHeight(): number {
 		return 0
 	}
@@ -421,13 +423,6 @@ function findByName<Entry extends { getName(): string }>(dict: Record<string, En
 	if (exact) return exact
 	const lowered = name.toLowerCase()
 	return Object.values(dict).find(entry => entry.getName().toLowerCase() === lowered)
-}
-
-const defaultTableLoadOptions: TableLoadOptions = {
-	tableDataOnly: false,
-	tableInfoOnly: false,
-	loadInvisibleItems: true,
-	loadTableScript: true,
 }
 
 /** Options for loading a table. */

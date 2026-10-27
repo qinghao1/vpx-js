@@ -138,6 +138,14 @@ describe('Table P1 load regressions', () => {
 		expect(warnings.some(w => /decal/i.test(w))).toBe(true)
 	})
 
+	it('resolves textures case-insensitively like materials', async () => {
+		const table = await Table.load(new BinaryReader(bytesOf(TEXTURE_FIXTURE)))
+		expect(table.getTexture('TEST_PATTERN_PNG')?.getName()).toBe('test_pattern_png')
+		expect(table.getTexture('Test_Pattern_Png')).toBe(table.getTexture('test_pattern_png'))
+		expect(table.getTexture('no-such-texture')).toBeUndefined()
+		expect(table.getTexture()).toBeUndefined()
+	})
+
 	it('does not warn about decals when the table has none', async () => {
 		captureWarnings()
 		const table = await Table.load(new BinaryReader(bytesOf(EMPTY_FIXTURE)), { loadTableScript: false })

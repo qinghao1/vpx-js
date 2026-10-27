@@ -17,9 +17,9 @@ interface BytePatch {
 	replacement: Buffer
 }
 
-/** Applies same-length in-place patches to a copy of the empty fixture. Each anchor must occur exactly once. */
-function patchedFixtureBytes(patches: BytePatch[]): Uint8Array {
-	const bytes = Buffer.from(readFileSync(EMPTY_FIXTURE))
+/** Applies same-length in-place patches to a copy of a fixture. Each anchor must occur exactly once. */
+function patchedFixtureBytes(patches: BytePatch[], fixture: string = EMPTY_FIXTURE): Uint8Array {
+	const bytes = Buffer.from(readFileSync(fixture))
 	for (const patch of patches) {
 		const needle = Buffer.from(patch.anchor, 'utf16le')
 		if (patch.replacement.length !== needle.length) {
@@ -169,6 +169,25 @@ describe('TableLoader options matrix', () => {
 		expect((cube?.data as unknown as { numIndices: number } | undefined)?.numIndices).toBe(36)
 		expect(cube?.data.mesh.vertices).toHaveLength(0)
 		expect(cube?.data.mesh.indices).toHaveLength(0)
+	})
+})
+
+describe('TableLoader duplicate part names', () => {
+	it('renames the second of two same-named items instead of dropping it (upstream GetUniqueName)', async () => {
+		const bytes = patchedFixtureBytes(
+			[{ anchor: 'Primitive2', replacement: Buffer.from('Primitive1', 'utf16le') }],
+			TEXTURE_FIXTURE,
+		)
+		const table = await Table.load(new BinaryReader(bytes), { loadTableScript: false })
+		expect(Object.keys(table.items)).toHaveLength(8)
+		expect(table.items.Primitive1).toBeDefined()
+		const renamed = Object.keys(table.items).find(name => /^Primitive1\d{3}$/.test(name))
+		expect(renamed).toBeDefined()
+		expect(
+			Object.values(table.primitives)
+				.map(primitive => primitive.getName())
+				.sort(),
+		).toEqual(['Primitive1', 'Primitive1001', 'Primitive3', 'Primitive4', 'Primitive5', 'Primitive6'])
 	})
 })
 

@@ -11,12 +11,14 @@ import type { Table } from './table/table.js'
 export abstract class ItemUpdater<STATE extends ItemState> {
 	protected readonly state: STATE
 
-	public abstract applyState<NODE, GEOMETRY, POINT_LIGHT>(
-		obj: NODE,
-		state: STATE,
-		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
-		table: Table,
-	): void
+	public applyState<NODE, GEOMETRY, POINT_LIGHT>(
+		_obj: NODE,
+		_state: STATE,
+		_renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
+		_table: Table,
+	): void {
+		// Items without visual state keep the default no-op.
+	}
 
 	constructor(state: STATE) {
 		this.state = state

@@ -30,13 +30,11 @@ export type ItemFactory = (storage: Storage, name: string, opts: TableLoadOption
 
 type RegistryEntry = {
 	key: string // LoadedTable key, e.g. 'bumpers'
+	tableKey?: string // Table dict key when it differs from key, e.g. 'textboxes'
 	factory: ItemFactory
 }
 
-/**
- * Central registry for all game items.
- * Maps ItemType to its storage key and loader. Reduces duplication in TableLoader/Table.
- */
+/** Central registry: ItemType to storage key and loader for TableLoader/Table. */
 export const ITEM_REGISTRY: Record<number, RegistryEntry> = {
 	[ItemType.Surface]: { key: 'surfaces', factory: (s, n) => Surface.fromStorage(s, n) },
 	[ItemType.Primitive]: {
@@ -56,7 +54,7 @@ export const ITEM_REGISTRY: Record<number, RegistryEntry> = {
 	[ItemType.Spinner]: { key: 'spinners', factory: (s, n) => Spinner.fromStorage(s, n) },
 	[ItemType.Timer]: { key: 'timers', factory: (s, n) => Timer.fromStorage(s, n) },
 	[ItemType.Plunger]: { key: 'plungers', factory: (s, n) => Plunger.fromStorage(s, n) },
-	[ItemType.Textbox]: { key: 'textBoxes', factory: (s, n) => Textbox.fromStorage(s, n) },
+	[ItemType.Textbox]: { key: 'textBoxes', tableKey: 'textboxes', factory: (s, n) => Textbox.fromStorage(s, n) },
 	[ItemType.Decal]: { key: 'decals', factory: (s, n) => Decal.fromStorage(s, n) },
 	[ItemType.LightSeq]: { key: 'lightSeqs', factory: (s, n) => LightSeq.fromStorage(s, n) },
 	[ItemType.DispReel]: { key: 'dispReels', factory: (s, n) => DispReel.fromStorage(s, n) },
