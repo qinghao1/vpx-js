@@ -273,15 +273,16 @@ describe('keyboard nudge guard', () => {
 		const player = new Player(table).init({})
 		const handler = player.getNudgeHandler()
 		const spy = sinon.spy(handler, 'applyImpulse')
+		// Deterministic impulse: stub the two Math.random draws (angle variance,
+		// force scale) instead of asserting implementation-constant ranges.
+		const random = sinon.stub(Math, 'random').returns(0.5)
 		try {
 			player.onKeyDown({ code: 'KeyZ', key: 'z' })
 			player.updatePhysics(20)
-			expect(spy).to.have.been.calledOnce
-			const [angle, force] = spy.args[0] as [number, number]
-			expect(angle).to.be.within(60, 90)
-			expect(force).to.be.within(1.2, 2.8)
+			expect(spy).to.have.been.calledOnceWithExactly(75, (0.6 + 0.5 * 0.8) * 2)
 		} finally {
 			spy.restore()
+			random.restore()
 		}
 	})
 

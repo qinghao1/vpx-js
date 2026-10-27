@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { TableBuilder } from '../../test/table-builder.js'
 import { PinMameEmulator } from '../emu/pinmame/pinmame-emu.js'
 import { resetPinmameModuleCache } from '../emu/pinmame/pinmame-loader.js'
+import { Vertex3D } from '../math/vector.js'
 import { VpmController } from '../scripting/objects/vpm-controller.js'
 import { ERR } from '../scripting/stdlib/err.js'
 import { Player } from './player.js'
@@ -61,16 +62,26 @@ describe('Player integration', () => {
 		expect(new Player(table).init()).toBeDefined()
 	})
 
-	it('Player popStates diffs after ball creation', () => {
-		const states = new Player(new TableBuilder().build()).init().popStates()
-		expect(states).toBeDefined()
+	it('Player popStates tracks created balls across frames', () => {
+		const player = new Player(new TableBuilder().build()).init()
+		expect(player.popStates().isEmpty).toBe(true)
+		const ball = player.createBall({
+			getBallCreationPosition: () => new Vertex3D(1000, 1000, 100),
+			getBallCreationVelocity: () => new Vertex3D(0, 0, 0),
+			onBallCreated: () => {},
+		})
+		player.updatePhysics(16)
+		const changed = player.popStates()
+		expect(changed.isEmpty).toBe(false)
+		expect(changed.keys).toContain(ball.getName())
+		changed.release?.()
 	})
 
-	it('updatePhysics and onFrame work together', () => {
+	it('updatePhysics and onFrame advance an empty frame with no diff', () => {
 		const player = new Player(new TableBuilder().build()).init()
 		player.updatePhysics(16)
 		const changed = player.onFrame()
-		expect(changed).toBeDefined()
+		expect(changed.isEmpty).toBe(true)
 		changed.release?.()
 	})
 

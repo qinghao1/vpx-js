@@ -9,6 +9,11 @@ import { Vertex3D } from '../math/vector.js'
 import { Table } from '../vpt/table/table.js'
 import { type IBallCreationPosition, Player } from './player.js'
 
+/** Read-only view of the player's pending-dirty set (no monkey-patching). */
+function dirtyOf(player: Player): Set<string> {
+	return (player as unknown as { dirtySet: Set<string> }).dirtySet
+}
+
 describe('The VPinball player', () => {
 	const three = new ThreeHelper()
 
@@ -146,15 +151,42 @@ describe('The VPinball player', () => {
 		const player = new Player(table).init()
 		player.popStates()
 
-		const marked: string[] = []
-		const origMarkDirty = player.markDirty.bind(player)
-		player.markDirty = (name: string): void => {
-			marked.push(name)
-			origMarkDirty(name)
-		}
+		// Mutating through the collection entry must mark the item dirty
+		// (set-only dirty marking, no monkey-patching). Assert the dirty
+		// contract itself: popStates may still filter the diff when the
+		// mutation leaves the diffed state equal.
 		const itemApi = table.collections.FireSurpress.items[0] as unknown as { Enabled: boolean; Name: string }
 		itemApi.Enabled = !itemApi.Enabled
-		expect(marked).to.include(itemApi.Name)
+		expect(dirtyOf(player).has(itemApi.Name)).to.equal(true)
+	})
+
+	it('should not dirty state on reads', async () => {
+		const table = await Table.load(new NodeBinaryReader(three.fixturePath('table-collection.vpx')))
+		const player = new Player(table).init()
+		player.popStates()
+
+		const itemApi = table.collections.FireSurpress.items[0] as unknown as { Enabled: boolean; Name: string }
+		void itemApi.Name
+		void itemApi.Enabled
+		expect(dirtyOf(player).size).to.equal(0)
+	})
+
+	it('should fire frame-sync timers once per updatePhysics call', async () => {
+		// One-call-one-frame: each updatePhysics call is one headless frame, so
+		// a repeated same-timestamp call fires -1/-2 again (upstream fires -1
+		// per render frame and -2 per game-logic frame instead).
+		const table = await Table.load(new NodeBinaryReader(three.fixturePath('table-timer.vpx')))
+		const player = new Player(table).init()
+		const timer = table.timers.Timer1.getApi()
+		timer.Enabled = true
+		timer.Interval = -1
+		let fires = 0
+		timer.on('Timer', () => fires++)
+
+		player.updatePhysics(100)
+		expect(fires).to.equal(1)
+		player.updatePhysics(100)
+		expect(fires).to.equal(2)
 	})
 
 	it('should run zero iterations at time zero and one per millisecond after', async () => {

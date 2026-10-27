@@ -114,40 +114,15 @@ export class Player extends EventEmitter {
 	private wrapSingleApi(api: any, name: string): any {
 		if (!api || !name || api.__isDirtyProxy) return api
 		const player = this
-		const methodCache = new Map<string | symbol, (...args: any[]) => unknown>()
+		// Mark-dirty on set-only: a property read or a non-mutating method call
+		// must not dirty the state — script mutations go through property sets
+		// (mover/physics mutations are re-dirtied every updatePhysics anyway).
 		const proxy = new Proxy(api, {
 			set(target: any, prop: string | symbol, value: any, receiver: any): boolean {
 				if (typeof prop === 'symbol') return Reflect.set(target, prop, value, receiver)
 				const ok = Reflect.set(target, prop, value, receiver)
 				player.markDirty(name)
 				return ok
-			},
-			get(target: any, prop: string | symbol, receiver: any): any {
-				if (typeof prop === 'symbol') return Reflect.get(target, prop, receiver)
-				if (
-					prop === 'constructor' ||
-					prop === '__proto__' ||
-					prop === 'prototype' ||
-					prop === '__isDirtyProxy'
-				) {
-					return Reflect.get(target, prop, receiver)
-				}
-				if (prop.startsWith('_')) {
-					return Reflect.get(target, prop, receiver)
-				}
-				const val = Reflect.get(target, prop, receiver)
-				if (typeof val === 'function') {
-					let cached = methodCache.get(prop)
-					if (cached) return cached
-					cached = (...args: any[]): unknown => {
-						const res = val.apply(target, args)
-						player.markDirty(name)
-						return res
-					}
-					methodCache.set(prop, cached)
-					return cached
-				}
-				return val
 			},
 		})
 		;(proxy as any).__isDirtyProxy = true
@@ -164,16 +139,9 @@ export class Player extends EventEmitter {
 			const wrapped = this.wrapSingleApi(api, name)
 			if (wrapped !== api) (item as any).api = wrapped
 		}
-		for (const collection of Object.values(this.table.collections ?? {})) {
-			const itemNames = collection.getItemNames()
-			for (let index = 0; index < collection.items.length; index++) {
-				const itemName = itemNames[index]
-				if (!itemName) continue
-				const item = this.table.items[itemName] as unknown as { getApi?: () => unknown } | undefined
-				const wrapped = item?.getApi?.()
-				if (wrapped) collection.items[index] = wrapped as (typeof collection.items)[number]
-			}
-		}
+		// No collection fix-up here: at construction time collection.items is still
+		// empty (Table.setupCollections runs later in init and pushes the
+		// already-wrapped item apis), so a wrap pass over it would be dead code.
 	}
 
 	/** Headless driver: steps physics + animations at 60 Hz up to absolute `endMs` (ms, not a delta). */
@@ -250,6 +218,9 @@ export class Player extends EventEmitter {
 		if (!ball) return
 		const name = ball.getName()
 		this.physics.destroyBall(ball)
+		// Guard: destroying an unknown (or already-destroyed) ball must not throw
+		// on the state release below — physics cleanup above is idempotent.
+		if (!(name in this.currentStates) || !(name in this.previousStates)) return
 		this.currentStates[name].release()
 		this.previousStates[name].release()
 		delete this.currentStates[name]

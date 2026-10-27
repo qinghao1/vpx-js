@@ -176,33 +176,39 @@ export class PlayerPhysics {
 			}
 			if (hitTime > STATICTIME) staticCnts = STATICCNTS
 			for (const m of this.movers) m.updateDisplacements(hitTime)
-			for (let i = 0; i < this.balls.length; i++) {
-				const ball = this.balls[i]!
-				const pho = ball.coll.obj
-				if (pho && ball.coll.hitTime <= hitTime) {
-					this.activeBall = ball
-					pho.collide(ball.coll, this)
-					ball.coll.clear()
-					if (this.balls[i] !== ball) --i
-					else ball.hit.calcHitBBox()
+			// A throwing collide/contact must not leak pooled contacts: the release
+			// loop below is the only return path to the pool, and the next cycle's
+			// `contacts.length = 0` reset drops entries without releasing them.
+			try {
+				for (let i = 0; i < this.balls.length; i++) {
+					const ball = this.balls[i]!
+					const pho = ball.coll.obj
+					if (pho && ball.coll.hitTime <= hitTime) {
+						this.activeBall = ball
+						pho.collide(ball.coll, this)
+						ball.coll.clear()
+						if (this.balls[i] !== ball) --i
+						else ball.hit.calcHitBBox()
+					}
 				}
-			}
-			// FIX_PHYSICS (PhysicsEngine.cpp): ball/ball contacts first, then static
-			// ones — each contact cancels what the earlier ones applied to its ball,
-			// so a ball pressed against another ball or a wall cannot climb off.
-			// Deliberate divergence: traversal direction alternates deterministically
-			// each cycle; upstream picks it randomly per cycle (rand_mt_01).
-			for (const ball of this.balls) ball.hit.contactDeltaV.set(0, 0, 0)
-			const lastContact = this.contacts.length - 1
-			for (let pass = 0; pass < 2; pass++) {
-				for (let index = 0; index < this.contacts.length; index++) {
-					const contact = this.contacts[this.swapBallCollisionHandling ? lastContact - index : index]!
-					const isBallContact = contact.obj instanceof BallHit
-					if (isBallContact === (pass === 0)) contact.obj?.contact(contact, hitTime, this)
+				// FIX_PHYSICS (PhysicsEngine.cpp): ball/ball contacts first, then static
+				// ones — each contact cancels what the earlier ones applied to its ball,
+				// so a ball pressed against another ball or a wall cannot climb off.
+				// Deliberate divergence: traversal direction alternates deterministically
+				// each cycle; upstream picks it randomly per cycle (rand_mt_01).
+				for (const ball of this.balls) ball.hit.contactDeltaV.set(0, 0, 0)
+				const lastContact = this.contacts.length - 1
+				for (let pass = 0; pass < 2; pass++) {
+					for (let index = 0; index < this.contacts.length; index++) {
+						const contact = this.contacts[this.swapBallCollisionHandling ? lastContact - index : index]!
+						const isBallContact = contact.obj instanceof BallHit
+						if (isBallContact === (pass === 0)) contact.obj?.contact(contact, hitTime, this)
+					}
 				}
+			} finally {
+				for (const c of this.contacts) CollisionEvent.releaseOne(c)
+				this.contacts.length = 0
 			}
-			for (const c of this.contacts) CollisionEvent.releaseOne(c)
-			this.contacts.length = 0
 			dTime = Math.max(0, dTime - hitTime)
 			this.swapBallCollisionHandling = !this.swapBallCollisionHandling
 		}
@@ -240,8 +246,16 @@ export class PlayerPhysics {
 		}
 		this.scriptPeriod = 0
 		let iterations = 0
-		// Stay behind the wall clock by up to one step, like upstream: run a step only once its end reached real time
-		// (`<=` advances explicit-ms callers exactly to the requested time instead of stopping one step short).
+		// Deliberate divergence from upstream PhysicsEngine.cpp
+		// (`while (m_nextPhysicsFrameTime < initial_time_usec)`): run a step once
+		// its end reaches the target time, so explicit-ms callers advance exactly
+		// to the requested time (updatePhysics(16) runs 16 steps). Upstream stops
+		// one step short to stay behind the wall clock; the port favors exact
+		// explicit-time stepping because the physics corpus and headless
+		// determinism depend on it — adopting `<` shifts collection, gate,
+		// hit-target and timer expectations. Pinned by the player.spec loop-bound
+		// specs ("keep physics behind wall clock", "zero iterations", "clamp
+		// wall-clock catch-up").
 		while (this.nextPhysicsFrameTime <= initial) {
 			if (isLowQuality() && iterations >= MAX_ITER_LOW) {
 				const drift = initial - this.curPhysicsFrameTime
@@ -258,7 +272,10 @@ export class PlayerPhysics {
 			this.pinInput.tickNudge()
 			const oldBall = this.activeBall
 			this.activeBall = undefined
-			if (this.scriptPeriod <= 1000 * MAX_TIMERS_MSEC_OVERALL) {
+			// Wall-clock-only budget (upstream MAX_TIMERS_MSEC_OVERALL anti-spiral
+			// guard): explicit-time callers always fire so headless sims stay
+			// deterministic no matter how slow the wall clock runs.
+			if (time !== undefined || this.scriptPeriod <= 1000 * MAX_TIMERS_MSEC_OVERALL) {
 				this.fireTimers(TimerMode.Update)
 				this.scriptPeriod += Math.floor(performance.now() - t0)
 			}
@@ -272,6 +289,12 @@ export class PlayerPhysics {
 			this.nextPhysicsFrameTime += PHYSICS_STEPTIME
 		}
 		this.timeMsec = Math.floor((initial - this.startTimeUsec) / 1000)
+		// One-call-one-frame: headless callers own no render/game-logic frame, so
+		// each updatePhysics call IS one frame — -1 fires once per call (even
+		// paused, even for a repeated timestamp) and -2 once per call while
+		// playing. Upstream splits this across Player::Render (-1, every frame)
+		// and UpdateGameLogic (-2, only while playing); the port collapses both
+		// onto the physics-frame call. Do not "fix" repeats into once-per-ms.
 		this.fireTimers(TimerMode.OnNewFrame)
 		// Upstream fires -2 only while playing, but -1 on every frame incl. paused.
 		if (!this.isPaused) this.fireTimers(TimerMode.OnGameSync)
