@@ -3,7 +3,7 @@
 
 export type Listener = (...args: any[]) => void
 
-/** Isomorphic zero-dependency EventEmitter for Node.js and Browser. */
+/** Zero-dependency EventEmitter subset for Node.js and browsers. */
 export class EventEmitter {
 	private _events: Record<string, Listener | Listener[]> = Object.create(null)
 	private _eventsCount = 0
@@ -50,9 +50,7 @@ export class EventEmitter {
 				list.splice(idx, 1)
 				if (list.length === 1) this._events[event] = list[0]
 				else if (list.length === 0) {
-					// Last listener removed through the array path: drop the
-					// key entirely so emit() reports false instead of
-					// dispatching to (and returning true for) an empty list.
+					// Drop emptied keys so emit() reports false instead of dispatching an empty list.
 					delete this._events[event]
 					this._eventsCount--
 					this._maxWarned.delete(event)
@@ -117,11 +115,7 @@ export class EventEmitter {
 		return this._maxListeners ?? 10
 	}
 
-	/**
-	 * Warns once per event when listeners exceed the max (Node parity: 0 or
-	 * Infinity means unlimited). Previously the limit was stored but never
-	 * enforced, so leaks grew silently.
-	 */
+	// Warn once per event past max (Node parity: 0/Infinity means unlimited).
 	private _checkMaxListeners(event: string): void {
 		const max = this.getMaxListeners()
 		if (!(max > 0) || max === Infinity) return

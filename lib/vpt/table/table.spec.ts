@@ -140,7 +140,7 @@ describe('The VPinball table generator', () => {
 			tableHeight,
 			0,
 		]
-		expect(compareArray(playfieldVertices, expectedVertices)).to.equal(true)
+		expect(Array.from(playfieldVertices)).to.deep.equal(expectedVertices)
 	})
 
 	it('should read the table script correctly', () => {
@@ -166,7 +166,7 @@ describe('The VPinball table generator', () => {
 			await Table.load(new NodeBinaryReader(three.fixturePath('table-corrupt.vpx')))
 			expect.fail('Exception expected.')
 		} catch (_err) {
-			// we're good in here
+			// expected
 		}
 	})
 })
@@ -262,15 +262,3 @@ describe('TableData load fidelity regressions', () => {
 		expect(data.bgInclination).to.deep.equal([0.25, 0.25, 0.25])
 	})
 })
-
-function compareArray(arr1: any[], arr2: any[]) {
-	if (arr1.length !== arr2.length) {
-		return false
-	}
-	for (let i = 0; i < arr1.length; i++) {
-		if (arr1[i] !== arr2[i]) {
-			return false
-		}
-	}
-	return true
-}

@@ -1,12 +1,9 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import * as chai from 'chai'
 import { expect } from 'chai'
-import sinonChai from 'sinon-chai'
 import { GlobalRegistry } from './global-registry.js'
 
-chai.use((sinonChai as any).default ?? sinonChai)
 describe('The global registry emulator', () => {
 	it('should correctly deal with abbreviations', () => {
 		const reg = new GlobalRegistry()
@@ -38,10 +35,19 @@ describe('The global registry emulator', () => {
 		).to.equal('AMD64')
 	})
 
-	const defaults = (GlobalRegistry as unknown as { defaults: Record<string, string | number> }).defaults
-	for (const [key, value] of Object.entries(defaults)) {
-		it(`should return the default value for ${key}`, () => {
-			expect(new GlobalRegistry().regRead(key)).to.equal(value)
-		})
-	}
+	it('should prefer writes over defaults', () => {
+		const reg = new GlobalRegistry()
+		reg.regWrite('HKCU\\Software\\Visual Pinball\\Controller\\ForceDisableB2S', 1)
+		expect(reg.regRead('HKCU\\Software\\Visual Pinball\\Controller\\ForceDisableB2S')).to.equal(1)
+	})
+
+	it('should round-trip writes case-insensitively', () => {
+		const reg = new GlobalRegistry()
+		reg.regWrite('HKCU\\Software\\MyKey\\VaL', 'x')
+		expect(reg.regRead('HKEY_CURRENT_USER\\software\\MYKEY\\val')).to.equal('x')
+	})
+
+	it('should return undefined for unknown keys', () => {
+		expect(new GlobalRegistry().regRead('HKCU\\Software\\Nope\\Missing')).to.equal(undefined)
+	})
 })

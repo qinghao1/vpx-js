@@ -14,12 +14,12 @@ import { TableData } from './table-data.js'
 const decoder = new TextDecoder()
 const tableInfoDecoder = new TextDecoder('utf-16le')
 
-// Yield every N entries during bulk OLE parsing so large tables (1000+ items) don't block the UI.
-// Uses scheduler.yield() when available, otherwise setTimeout.
+// Yield during bulk OLE parsing so 1000+ item tables don't block the UI.
 const YIELD_EVERY_GAME_ITEMS = 32
 const YIELD_EVERY_TEXTURES = 16
 const YIELD_EVERY_COLLECTIONS = 16
 
+// Cap parallel OLE reads to bound I/O contention (each load also min()s with hardwareConcurrency).
 const MAX_CONCURRENCY_GAME_ITEMS = 4
 const MAX_CONCURRENCY_TEXTURES = 6
 const MAX_CONCURRENCY_COLLECTIONS = 4
@@ -54,8 +54,7 @@ export class TableLoader {
 					await this.loadCollections(out, gameStg, out.data.numCollections)
 				}
 				if (opts.loadTableScript) {
-					// CODE framing is exact (cchar bytes); upstream AsScript reads exactly cchar with no trim.
-					// A zero cchar is an empty script — read() treats len 0 as "to end", so don't call it.
+					// CODE is exactly cchar bytes with no trim (upstream AsScript); 0 means empty script.
 					const { scriptPos, scriptLen } = out.data
 					out.tableScript =
 						scriptLen > 0 ? decoder.decode(await gameStg.read('GameData', scriptPos, scriptLen)) : ''
@@ -139,11 +138,10 @@ export class TableLoader {
 		const stg = this.doc.storage('TableInfo')
 		out.info = {}
 		for (const key of stg.getStreams()) {
-			// Screenshot is raw image bytes, not text (upstream PinTable::LoadInfo reads it as binary).
+			// Screenshot is binary, not text (upstream PinTable::LoadInfo).
 			if (key === 'Screenshot') continue
 			const data = await stg.read(key)
-			// TableInfo values are stored as UTF-16LE (upstream PinTable::ReadInfoValue
-			// truncates at the first NUL via null-terminated WCHAR*).
+			// TableInfo values are NUL-truncated UTF-16LE (upstream ReadInfoValue).
 			if (data) out.info[key] = tableInfoDecoder.decode(data).split('\0', 1)[0]!
 		}
 	}

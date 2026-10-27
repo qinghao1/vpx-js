@@ -4,9 +4,10 @@
 import { expect } from 'chai'
 import { TableBuilder } from '../../test/table-builder.js'
 import { ThreeHelper } from '../../test/three.helper'
-import { ChangedStates, Player } from '../game/player.js'
 import { NodeBinaryReader } from '../io/binary-reader.node.js'
+import { Vertex3D } from '../math/vector.js'
 import { Table } from '../vpt/table/table.js'
+import { type IBallCreationPosition, Player } from './player.js'
 
 describe('The VPinball player', () => {
 	const three = new ThreeHelper()
@@ -82,7 +83,7 @@ describe('The VPinball player', () => {
 		player.updatePhysics(50)
 
 		player.resume()
-		// Grid must still sit at 100ms: resuming to 150 runs 50 steps, not 100.
+		// Clock must still sit at 100ms, so resuming to 150 runs 50 steps.
 		expect(player.updatePhysics(150)).to.equal(50)
 		expect(player.getGameTime()).to.equal(150)
 	})
@@ -91,8 +92,7 @@ describe('The VPinball player', () => {
 		const table = await Table.load(new NodeBinaryReader(three.fixturePath('table-timer.vpx')))
 		const player = new Player(table).init()
 
-		// Like upstream PhysicsEngine, a step runs only once its end reached the wall
-		// clock, so physics never runs ahead of real time (at most one step behind).
+		// Steps run only once their end reached the wall clock (upstream: never ahead of real time).
 		expect(player.updatePhysics(0.5)).to.equal(0)
 		expect(player.updatePhysics(1)).to.equal(1)
 		expect(player.updatePhysics(1.5)).to.equal(0)
@@ -104,8 +104,7 @@ describe('The VPinball player', () => {
 		const player = new Player(table).init()
 		player.updatePhysics(10)
 
-		// Wall-clock path only: a huge gap runs MAX_CATCHUP steps instead of
-		// spiralling through 1 kHz catch-up (explicit times run full catch-up).
+		// Wall-clock gaps clamp to MAX_CATCHUP steps instead of a 1 kHz catch-up spiral.
 		const realNow = performance.now.bind(performance)
 		performance.now = () => 10_000
 		try {
@@ -142,17 +141,20 @@ describe('The VPinball player', () => {
 		expect(receivedEventId).to.equal(0)
 	})
 
-	it('should wrap collection items so mutating collection elements marks items dirty', async () => {
+	it('should mark items dirty when collection elements are mutated', async () => {
 		const table = await Table.load(new NodeBinaryReader(three.fixturePath('table-collection.vpx')))
-		new Player(table).init()
+		const player = new Player(table).init()
+		player.popStates()
 
-		const collection = table.collections.FireSurpress
-		expect(collection).to.exist
-		expect(collection.items.length).to.be.above(0)
-
-		const firstItemApi = collection.items[0] as unknown as { __isDirtyProxy?: boolean; Enabled?: boolean }
-		expect(firstItemApi).to.exist
-		expect(firstItemApi.__isDirtyProxy).to.equal(true)
+		const marked: string[] = []
+		const origMarkDirty = player.markDirty.bind(player)
+		player.markDirty = (name: string): void => {
+			marked.push(name)
+			origMarkDirty(name)
+		}
+		const itemApi = table.collections.FireSurpress.items[0] as unknown as { Enabled: boolean; Name: string }
+		itemApi.Enabled = !itemApi.Enabled
+		expect(marked).to.include(itemApi.Name)
 	})
 
 	it('should run zero iterations at time zero and one per millisecond after', async () => {
@@ -165,17 +167,25 @@ describe('The VPinball player', () => {
 		expect(player2.updatePhysics(16)).to.equal(16)
 	})
 
-	it('should return an empty ChangedStates shape on first popStates', async () => {
+	it('should report no changes on first popStates and track new balls after', async () => {
 		const table = await Table.load(new NodeBinaryReader(three.fixturePath('table-timer.vpx')))
 		const player = new Player(table).init()
 		expect(player.balls.length).to.equal(0)
 
-		const states = player.popStates()
-		expect(states).to.be.an.instanceof(ChangedStates)
-		expect(states.isEmpty).to.equal(true)
-		expect(states.keys).to.deep.equal([])
-		expect(states.states).to.deep.equal([])
-		expect(states.changedStates).to.deep.equal({})
-		expect(states.getState('no-such-item')).to.equal(undefined)
+		const first = player.popStates()
+		expect(first.isEmpty).to.equal(true)
+		expect(first.keys).to.deep.equal([])
+		expect(first.getState('no-such-item')).to.equal(undefined)
+
+		const creator: IBallCreationPosition = {
+			getBallCreationPosition: (): Vertex3D => new Vertex3D(1000, 1000, 100),
+			getBallCreationVelocity: (): Vertex3D => new Vertex3D(0, 0, 0),
+			onBallCreated: (): void => {},
+		}
+		const ball = player.createBall(creator)
+		player.updatePhysics(10)
+		const second = player.popStates()
+		expect(second.isEmpty).to.equal(false)
+		expect(second.getState(ball.getName())).to.not.equal(undefined)
 	})
 })

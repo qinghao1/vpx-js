@@ -43,6 +43,7 @@ export class Storage {
 			if (slice.length < 4) break
 			const result: ReadResult = { data: slice, storageOffset: offset + pos }
 			let len = await next(result)
+			// Negative len requests more bytes: refill across sector boundaries, then retry.
 			if (len !== null && len < 0) {
 				const remaining = -len - slice.length
 				const need = Math.ceil(remaining / secSize)
@@ -65,8 +66,7 @@ export class Storage {
 	public async read(key: string, offset = 0, bytesToRead?: number): Promise<Uint8Array> {
 		const e = this.dirEntry.streams[key]
 		if (!e) throw new Error(`No such stream "${key}".`)
-		// An explicit 0 is an empty read (e.g. a BIFF cchar of 0); only an
-		// omitted length reads to the end of the stream.
+		// Explicit 0 reads nothing (e.g. empty CODE cchar); omitted length reads to end.
 		bytesToRead ??= e.size - offset
 		if (bytesToRead <= 0) return new Uint8Array(0)
 		const { shortStream, secSize, secIds, secOffset, innerOffset } = this.sectorInfo(e, offset)

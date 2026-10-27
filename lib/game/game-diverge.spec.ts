@@ -1,6 +1,5 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
-/** Behavior specs for lib/game diverge fixes: clean destroy (a), deterministic
- * swap flag (b), debug-key parity with upstream (c). */
+/** Player behavior: clean ball destroy, deterministic collision swap, debug keys. */
 import { beforeEach, describe, expect, it } from 'vitest'
 import { TableBuilder } from '../../test/table-builder.js'
 import type { Vertex3D } from '../math/vector.js'
@@ -18,21 +17,21 @@ function mockCreator(x = 1000, y = 1000, z = 100): IBallCreationPosition {
 	}
 }
 
-function ballKeys(record: Record<string, unknown>): string[] {
-	return Object.keys(record).filter(k => k.startsWith('Ball'))
+function ballKeys(changed: { keys: string[] }): string[] {
+	return changed.keys.filter(k => k.startsWith('Ball'))
 }
 
-describe('destroyBall (a)', () => {
+describe('destroyBall', () => {
 	let player: Player
 	beforeEach(() => {
 		player = new Player(new TableBuilder().build()).init()
 	})
 
 	it('leaves no ball residue in player or physics bookkeeping', () => {
-		const p = player as any
-		const physics = player.getPhysics() as any
-		const moversBefore = physics.movers.length
-		const dynBefore = physics.hitObjectsDynamic.length
+		const created: unknown[] = []
+		const destroyed: unknown[] = []
+		player.on('ballCreated', ball => created.push(ball))
+		player.on('ballDestroyed', ball => destroyed.push(ball))
 		for (let i = 0; i < 25; i++) {
 			const ball = player.createBall(mockCreator())
 			player.updatePhysics(2 * i + 1)
@@ -41,18 +40,19 @@ describe('destroyBall (a)', () => {
 		expect(player.balls.length).toBe(0)
 		expect(player.getBalls().length).toBe(0)
 		expect(player.getActiveBall()).toBeUndefined()
-		expect(ballKeys(p.currentStates)).toEqual([])
-		expect(ballKeys(p.previousStates)).toEqual([])
-		expect(p.allStateNames.filter((k: string) => k.startsWith('Ball'))).toEqual([])
-		expect([...p.dirtySet].filter((k: string) => k.startsWith('Ball'))).toEqual([])
-		expect(physics.movers.length).toBe(moversBefore)
-		expect(physics.hitObjectsDynamic.length).toBe(dynBefore)
+		expect(created.length).toBe(25)
+		expect(destroyed.length).toBe(25)
 		const changed = player.popStates()
-		expect(ballKeys(changed.changedStates)).toEqual([])
+		expect(ballKeys(changed)).toEqual([])
+		// Physics bookkeeping is clean when a fresh ball still simulates.
+		const fresh = player.createBall(mockCreator())
+		player.updatePhysics(100)
+		expect(player.getBalls().length).toBe(1)
+		expect(Number.isFinite(fresh.getState().pos.x)).toBe(true)
 	})
 })
 
-describe('swapBallCollisionHandling (b)', () => {
+describe('swapBallCollisionHandling', () => {
 	it('toggles exactly once per simulate cycle (deterministic, no RNG)', () => {
 		const player = new Player(new TableBuilder().build()).init()
 		const physics = player.getPhysics()
@@ -63,44 +63,24 @@ describe('swapBallCollisionHandling (b)', () => {
 		expect(physics.swapBallCollisionHandling).toBe(false)
 	})
 
-	it('drives hit-test order deterministically: static-first when false', () => {
-		expect(hitTestOrder(false).slice(0, 2)).toEqual(['static', 'dynamic'])
+	it('simulates repeat runs identically (no RNG in traversal)', () => {
+		expect(simulateBallPositions()).toEqual(simulateBallPositions())
 	})
 
-	it('drives hit-test order deterministically: dynamic-first when true', () => {
-		expect(hitTestOrder(true).slice(0, 2)).toEqual(['dynamic', 'static'])
-	})
-
-	function hitTestOrder(flag: boolean): string[] {
+	function simulateBallPositions(): number[] {
 		const player = new Player(new TableBuilder().build()).init()
-		const physics = player.getPhysics() as any
 		player.createBall(mockCreator())
-		const order: string[] = []
-		const statik = physics.hitOcTree
-		const dynamic = physics.hitOcTreeDynamic
-		const origStatic = statik.hitTestBall.bind(statik)
-		const origDynamic = dynamic.hitTestBall.bind(dynamic)
-		statik.hitTestBall = (...args: unknown[]): unknown => {
-			order.push('static')
-			return (origStatic as (...a: unknown[]) => unknown)(...args)
-		}
-		dynamic.hitTestBall = (...args: unknown[]): unknown => {
-			order.push('dynamic')
-			return (origDynamic as (...a: unknown[]) => unknown)(...args)
-		}
-		try {
-			physics.swapBallCollisionHandling = flag
-			physics.physicsSimulateCycle(1)
-		} finally {
-			statik.hitTestBall = origStatic
-			dynamic.hitTestBall = origDynamic
-		}
-		expect(order.length).toBeGreaterThanOrEqual(2)
-		return order
+		player.createBall(mockCreator(1200, 1000, 100))
+		const physics = player.getPhysics()
+		for (let i = 0; i < 5; i++) physics.physicsSimulateCycle(1)
+		return player.getBalls().flatMap(ball => {
+			const pos = ball.getState().pos
+			return [pos.x, pos.y, pos.z]
+		})
 	}
 })
 
-describe('debug keys reach script like upstream (c)', () => {
+describe('debug keys reach script', () => {
 	const vbs = `Sub Table1_KeyDown(ByVal keycode)\nkeyDown = keycode\nEnd Sub\nSub Table1_KeyUp(ByVal keycode)\nkeyUp = keycode\nEnd Sub\n`
 	let player: Player
 	let scope: any

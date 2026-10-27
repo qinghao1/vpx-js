@@ -8,7 +8,7 @@ import { LineSeg } from '../../physics/line-seg.js'
 import { logger } from '../../util/logger.js'
 import type { TableData } from './table-data.js'
 
-/** Generates table hit shapes. @see https://github.com/vpinball/vpinball/blob/master/src/parts/pintable.cpp */
+/** Table enclosure hit shapes: 4 wall LineSegs + sloped glass Hit3DPoly. @see https://github.com/vpinball/vpinball/blob/master/src/parts/pintable.cpp */
 export class TableHitGenerator {
 	constructor(private readonly data: TableData) {}
 

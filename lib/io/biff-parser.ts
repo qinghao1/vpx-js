@@ -16,9 +16,7 @@ export class BiffParser {
 			if (data.length < 4) return null
 
 			let len = readInt32LE(data, 0)
-			// Corrupt size guard: a record holds at least its 4-byte tag; len=-4 would
-			// return (0)+4=0 and hang streamFiltered with pos+=0 (upstream ValidateLength
-			// rejects len<0; port needs len>=4 to stay aligned).
+			// len<4 would advance pos by 0 and hang streamFiltered (upstream ValidateLength rejects len<0).
 			if (len < 4) return null
 			if (len > data.length - 4) return -(len + 4)
 			const tag = decodeUtf8(data.subarray(4, 8))
@@ -30,9 +28,7 @@ export class BiffParser {
 			}
 
 			if (tag === 'FONT') {
-				// WriteFontDescriptor writes size=4 plus an uncounted 11+nameLen blob
-				// (BiffWriter.cpp); nameLen sits at payload+10, so the generic streamed
-				// cchar math does not apply. Total record = 8 header + 11 + nameLen.
+				// FONT size omits its 11+nameLen blob, so total = 8 header + 11 + nameLen.
 				if (data.length < 19) return -19
 				const nameLen = data[18]!
 				const total = 19 + nameLen
@@ -45,16 +41,15 @@ export class BiffParser {
 
 			const streamed = opts.streamedTags?.includes(tag) ?? false
 			if (streamed) {
-				// The cchar int lives at payload offset 4; ask for more bytes
-				// instead of reading past the end on a truncated record.
+				// cchar sits at payload offset 4; request more bytes on truncated records.
 				if (data.length < 12) return -12
 				const cchar = readInt32LE(data, 8)
-				// Upstream ValidateLength rejects negative lengths; without this a
-				// corrupt cchar drives the advance negative and stalls the stream.
+				// Reject negative cchar or the advance goes negative and stalls the stream.
 				if (cchar < 0) return null
 				len += cchar + 4
 			}
 			const chunk = streamed ? new Uint8Array(0) : data.subarray(8, 8 + len - 4)
+			// Streamed CODE carries no payload chunk: offsets skip the extra cchar int.
 			const relStart = streamed ? 12 : 8
 			const relEnd = streamed ? -8 : -4
 

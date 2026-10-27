@@ -5,6 +5,7 @@ import { type Matrix3, Vector2, Vector3 } from 'three'
 import type { Matrix2D, Matrix3D } from './matrix.js'
 import { pooled } from './pool.js'
 
+// VBS undefined coerces to 0 so unset script values never poison vectors with NaN.
 const UNDEF_SYM = Symbol.for('vbs.undefined')
 
 export class Vertex2D extends Vector2 {

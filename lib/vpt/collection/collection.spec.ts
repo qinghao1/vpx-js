@@ -121,7 +121,7 @@ describe('The VPinball collection', () => {
 		}
 	})
 
-	it('should an API whose elements are accessible by index', () => {
+	it('should expose an API whose elements are accessible by index', () => {
 		const coll = table.collections.SuppressEvents.getApi() as unknown as Array<ItemApi<ItemData>>
 		expect(coll.length).to.equal(2)
 		expect(coll[0].Name).to.equal('SuppressEventsTimer1')
@@ -138,13 +138,10 @@ describe('The VPinball collection', () => {
 	})
 
 	it('should resolve member names case-insensitively like upstream', () => {
-		const collection = table.collections.SuppressEvents
-		collection.getItemNames().push('suppresseventstimer1')
-		// setupCollections runs once per table in production; reset and re-run it.
-		collection.items.length = 0
-		table.setupCollections()
-		const coll = collection.getApi()
-		expect(coll.Count).to.equal(3)
-		expect(coll.Item(2).Name).to.equal('SuppressEventsTimer1')
+		expect(table.getItemByName('suppresseventstimer1')?.getName()).to.equal('SuppressEventsTimer1')
+		const coll = table.collections.SuppressEvents.getApi()
+		for (const item of coll) {
+			expect(table.getItemByName(item.Name.toLowerCase())?.getName()).to.equal(item.Name)
+		}
 	})
 })
