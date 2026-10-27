@@ -40,21 +40,6 @@ function makeBuffer(): DataTexture {
 	return tex
 }
 
-// Full bulb field: every bulb lamp at full level, with no transmissionScale
-// gate. No node currently samples it: both the baked and BDL lifts model
-// upstream's single bulb-buffer use — the fs_basic.sc additive sqrt(diffuse)
-// tail — from the transmission-gated buffer above. (Upstream `lightLoop`
-// only sums scene lights; it never scales the diffuse by the bulb field.)
-let lightTexture: DataTexture | null = null
-let lastLightSplatCount = 0
-
-export function getLightBufferTexture(): DataTexture {
-	if (!lightTexture) {
-		lightTexture = makeBuffer()
-	}
-	return lightTexture
-}
-
 interface LampLike {
 	getState?: () => { intensity?: number; color?: number; colorFull?: number }
 	data?: {
@@ -136,9 +121,6 @@ export function updateTransmissionBuffer(table: Table): boolean {
 	// buffer. Infinite-support Gaussians over every lamp washed the whole playfield,
 	// so support here ends exactly at the falloff radius.
 	const splats: TransmissionSplat[] = []
-	// Full bulb field: same lamps at full level (no transmissionScale gate).
-	// Currently unsampled; see the note on the module-level buffer above.
-	const lightSplats: TransmissionSplat[] = []
 	for (const light of lights) {
 		const lamp = light as LampLike
 		if (lamp.data?.bulbLight !== true) continue
@@ -168,7 +150,6 @@ export function updateTransmissionBuffer(table: Table): boolean {
 			const [red2, green2, blue2] = splitTransmissionRgb(color2, amount)
 			return { x: centerX, y: centerY, falloff, power, red, green, blue, red2, green2, blue2 }
 		}
-		lightSplats.push(entry(level))
 		if (transmissionScale > 0) splats.push(entry(level * transmissionScale))
 		parts.push(
 			`${Math.round(centerX)},${Math.round(centerY)},${Math.round(level * 10)},${color.toString(16)},${color2.toString(16)},${Math.round(transmissionScale * 100)},${Math.round(falloff * 10)},${power}`,
@@ -178,15 +159,11 @@ export function updateTransmissionBuffer(table: Table): boolean {
 	if (signature === lastSignature) return false
 	lastSignature = signature
 	lastSplatCount = splats.length
-	lastLightSplatCount = lightSplats.length
 	// Accumulate in float and quantize once per texel: per-splat half-float
 	// round-trips cost milliseconds once attract lights dozens of wide
 	// (falloff 1500) splats, enough to collapse the frame rate on their own.
 	fillBuffer(data, splats, right, bottom)
 	tex.needsUpdate = true
-	const lightTex = getLightBufferTexture()
-	fillBuffer(lightTex.image.data as Uint16Array, lightSplats, right, bottom)
-	lightTex.needsUpdate = true
 	return true
 }
 
@@ -234,28 +211,20 @@ function fillBuffer(data: Uint16Array, list: TransmissionSplat[], right: number,
 export function resetTransmissionBuffer(): void {
 	lastSignature = '\0'
 	lastSplatCount = 0
-	lastLightSplatCount = 0
 }
 
 export function getTransmissionDebug(): {
 	signature: string
 	splats: number
 	peak: number
-	lightSplats: number
-	lightPeak: number
 } {
 	const tex = getTransmissionTexture()
 	const data = (tex.image.data as Uint16Array | undefined) ?? new Uint16Array(0)
 	let peak = 0
 	for (let i = 0; i < data.length; i++) peak = Math.max(peak, DataUtils.fromHalfFloat(data[i]))
-	const lightData = (getLightBufferTexture().image.data as Uint16Array | undefined) ?? new Uint16Array(0)
-	let lightPeak = 0
-	for (let i = 0; i < lightData.length; i++) lightPeak = Math.max(lightPeak, DataUtils.fromHalfFloat(lightData[i]))
 	return {
 		signature: lastSignature.slice(0, 200),
 		splats: lastSplatCount,
 		peak,
-		lightSplats: lastLightSplatCount,
-		lightPeak,
 	}
 }

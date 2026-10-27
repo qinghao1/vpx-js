@@ -1,6 +1,6 @@
 import { DataTexture } from 'three'
 import { afterEach, describe, expect, it } from 'vitest'
-import { getLightBufferTexture, getTransmissionTexture } from '../transmission-buffer.js'
+import { getTransmissionTexture } from '../transmission-buffer.js'
 import {
 	BULB_LIFT_BELOW_EPS,
 	createPrimitiveBdlMaterial,
@@ -112,11 +112,9 @@ describe('bulb-lift volume (below-cabinet light leak)', () => {
 	it('gates the baked bulb lift on the lift volume (no diffuse multiply)', () => {
 		// Upstream consumes the bulb buffer exactly once, as the fs_basic.sc
 		// additive sqrt(diffuse) tail: the baked base stays the unlit albedo
-		// and only the lift reads a buffer, so the full-field light buffer
-		// must be absent from the graph entirely.
+		// and only the lift reads the single transmission buffer.
 		const mat = createUnshadedBakedNodeMaterial({ map: whiteTex() })
 		const color = materialize(mat.colorNode)
-		expect(graphReferences(color, getLightBufferTexture())).toBe(false)
 		expect(graphReferences(color, getTransmissionTexture())).toBe(true)
 		expect(graphReferences(color, uPlayfieldSurfaceY)).toBe(true)
 	})
@@ -124,7 +122,6 @@ describe('bulb-lift volume (below-cabinet light leak)', () => {
 	it('leaves untextured baked solids out of the buffer path entirely', () => {
 		const mat = createUnshadedBakedNodeMaterial({})
 		const color = materialize(mat.colorNode)
-		expect(graphReferences(color, getLightBufferTexture())).toBe(false)
 		expect(graphReferences(color, getTransmissionTexture())).toBe(false)
 		expect(graphReferences(color, uPlayfieldSurfaceY)).toBe(false)
 	})

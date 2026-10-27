@@ -1,7 +1,7 @@
 import { expect } from 'chai'
 import { DataUtils } from 'three'
+import * as transmissionBufferModule from './transmission-buffer.js'
 import {
-	getLightBufferTexture,
 	getTransmissionDebug,
 	getTransmissionTexture,
 	resetTransmissionBuffer,
@@ -33,11 +33,12 @@ describe('transmission light buffer', () => {
 		expect(data[0]).to.equal(0)
 
 		// Native (Light::Render LIGHT_BUFFER): only bulb lights with a nonzero
-		// transmission scale join the below-light buffer; plain lamps never do.
-		// The full-field light buffer still tracks them at full level (it is
-		// currently unsampled: the baked/BDL lifts model upstream's single
-		// bulb-buffer use, the fs_basic.sc additive tail, from the gated
-		// buffer above).
+		// transmission scale join the bulb buffer; plain lamps never do.
+		// Upstream keeps exactly one such buffer (the bloom target reused by
+		// DrawBulbLightBuffer): the baked/BDL lifts model its single use, the
+		// fs_basic.sc additive sqrt(diffuse) tail, from the gated buffer, so
+		// no second full-field buffer exists here.
+		expect('getLightBufferTexture' in transmissionBufferModule, 'dead second buffer removed').to.equal(false)
 		const plain = {
 			data: { right: 1000, bottom: 2000 },
 			lights: {
@@ -57,11 +58,6 @@ describe('transmission light buffer', () => {
 		let peak = 0
 		for (let index = 0; index < data.length; index += 4) peak = Math.max(peak, data[index] ?? 0)
 		expect(peak, 'zero transmission scale contributes nothing').to.equal(0)
-		const lightData = getLightBufferTexture().image.data as Uint16Array
-		let lightPeak = 0
-		for (let index = 0; index < lightData.length; index += 4)
-			lightPeak = Math.max(lightPeak, DataUtils.fromHalfFloat(lightData[index] ?? 0))
-		expect(lightPeak, 'full-field buffer tracks the lamp at full level').to.be.greaterThan(0)
 
 		const lit = {
 			data: { right: 1000, bottom: 2000 },

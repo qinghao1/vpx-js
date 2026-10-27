@@ -1,7 +1,6 @@
 import { DataTexture } from 'three'
 import { describe, expect, it } from 'vitest'
 import {
-	getLightBufferTexture,
 	getTransmissionDebug,
 	getTransmissionTexture,
 	resetTransmissionBuffer,
@@ -91,7 +90,6 @@ describe('unshaded baked bulb math (upstream fs_basic.sc tail)', () => {
 		expect(operand, 'sqrt has an operand').not.toBe(null)
 		expect(graphReferences(operand, tintUniformOf(mat)), 'sqrt feeds on the tinted albedo').toBe(true)
 		expect(graphReferences(operand, getTransmissionTexture()), 'sqrt input reads no buffer').toBe(false)
-		expect(graphReferences(operand, getLightBufferTexture()), 'sqrt input reads no buffer').toBe(false)
 	})
 
 	it('adds the buffer-gated lift onto the unmodified albedo', () => {
@@ -102,7 +100,6 @@ describe('unshaded baked bulb math (upstream fs_basic.sc tail)', () => {
 		const mat = createUnshadedBakedNodeMaterial({ map: whiteTex() })
 		const color = materialize(mat.colorNode)
 		const transTex = getTransmissionTexture()
-		const lightTex = getLightBufferTexture()
 		const splits = collectNodes(color).filter(
 			node =>
 				(node as { constructor?: { name?: string } }).constructor?.name === 'OperatorNode' &&
@@ -115,7 +112,6 @@ describe('unshaded baked bulb math (upstream fs_basic.sc tail)', () => {
 		const base = lift === split.aNode ? split.bNode : split.aNode
 		expect(graphReferences(base, tintUniformOf(mat)), 'base keeps the tinted albedo').toBe(true)
 		expect(graphReferences(base, transTex), 'base reads no bulb buffer').toBe(false)
-		expect(graphReferences(base, lightTex), 'base has no diffuse multiply').toBe(false)
 		expect(graphReferences(lift, transTex), 'lift reads the transmission buffer').toBe(true)
 		expect(
 			collectNodes(lift).some(node => node.isMathNode === true && node.method === 'sqrt'),

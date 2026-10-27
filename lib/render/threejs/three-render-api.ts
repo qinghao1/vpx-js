@@ -234,11 +234,19 @@ export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, Poin
 		// glow quad, see ThreeConverter.createMesh) must survive the show path:
 		// the lamp updater gates it on authored visibility, so a blanket show
 		// here would unhide what the author hid.
+		// The flags run to every depth, not just the direct children: nested
+		// item groups (light groups, ramp assemblies) keep meshes below the
+		// first level, and a shallow show/hide left those flags stale — the
+		// subtree then renders (or stays dark) against the author's intent
+		// once an ancestor toggles.
 		const authoredVisible = (o: Object3D) =>
 			(o as { userData?: { __authoredVisible?: boolean } }).userData?.__authoredVisible ?? true
 		const batched = (o: Object3D) => (o as { userData?: { __batched?: unknown } }).userData?.__batched
-		obj.visible = visible && authoredVisible(obj) && !batched(obj)
-		for (const child of obj.children ?? []) child.visible = visible && authoredVisible(child) && !batched(child)
+		const apply = (node: Object3D): void => {
+			node.visible = visible && authoredVisible(node) && !batched(node)
+			for (const child of node.children ?? []) apply(child)
+		}
+		apply(obj)
 	}
 
 	public applyMeshToNode(mesh: Mesh, obj: Object3D): void {

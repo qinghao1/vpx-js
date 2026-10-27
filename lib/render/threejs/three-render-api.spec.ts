@@ -225,4 +225,66 @@ describe('ThreeRenderApi batched visibility', () => {
 		expect(batched.getVisibleAt(slot)).toBe(true)
 		expect(meshB.visible).toBe(false)
 	})
+
+	it('syncs batched slots from an ancestor without unhiding nested originals', () => {
+		// batchPair nests originals one level below the table root; hiding
+		// and showing from the root must drive the batch slot while the
+		// nested original stays hidden (or it double-renders).
+		const { root, groupB, meshB, batched } = batchPair()
+		const slot = (meshB.userData as any).__batched.instanceId as number
+		const api = new ThreeRenderApi()
+		api.applyVisibility(false, root)
+		expect(root.visible).toBe(false)
+		expect(groupB.visible).toBe(false)
+		expect(meshB.visible).toBe(false)
+		expect(batched.getVisibleAt(slot)).toBe(false)
+		api.applyVisibility(true, root)
+		expect(root.visible).toBe(true)
+		expect(groupB.visible).toBe(true)
+		expect(batched.getVisibleAt(slot)).toBe(true)
+		expect(meshB.visible, 'nested batched original must stay hidden or it double-renders').toBe(false)
+	})
+})
+
+describe('ThreeRenderApi deep visibility', () => {
+	function nestedGroup(): { root: Group; mid: Group; leaf: Mesh; authoredHidden: Mesh } {
+		const root = new Group()
+		const mid = new Group()
+		mid.name = 'mid'
+		const leaf = new Mesh(new BoxGeometry(1, 1, 1), new MeshStandardMaterial())
+		leaf.name = 'leaf'
+		const authoredHidden = new Mesh(new BoxGeometry(1, 1, 1), new MeshStandardMaterial())
+		authoredHidden.name = 'bulb.glow'
+		authoredHidden.userData.__authoredVisible = false
+		mid.add(leaf, authoredHidden)
+		root.add(mid)
+		return { root, mid, leaf, authoredHidden }
+	}
+
+	it('toggles nested descendants, not just direct children', () => {
+		// Nested item groups (light groups, ramp assemblies) keep meshes
+		// below the first level; a shallow hide left their flags stale, so
+		// the subtree rendered against intent once an ancestor toggled.
+		const api = new ThreeRenderApi()
+		const { root, mid, leaf } = nestedGroup()
+		api.applyVisibility(false, root)
+		expect(root.visible).toBe(false)
+		expect(mid.visible).toBe(false)
+		expect(leaf.visible, 'grandchild mesh hides with its ancestor').toBe(false)
+		api.applyVisibility(true, root)
+		expect(root.visible).toBe(true)
+		expect(mid.visible).toBe(true)
+		expect(leaf.visible, 'grandchild mesh shows with its ancestor').toBe(true)
+	})
+
+	it('keeps authored-invisible descendants hidden on the deep show path', () => {
+		const api = new ThreeRenderApi()
+		const { root, leaf, authoredHidden } = nestedGroup()
+		api.applyVisibility(false, root)
+		expect(authoredHidden.visible).toBe(false)
+		api.applyVisibility(true, root)
+		expect(root.visible).toBe(true)
+		expect(leaf.visible).toBe(true)
+		expect(authoredHidden.visible, 'authored-invisible grandchild must survive the show path').toBe(false)
+	})
 })
