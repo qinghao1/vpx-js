@@ -155,9 +155,9 @@ async function runOne(targetUrl, label) {
 	loadPhase = false
 	const results = {}
 	// Load+settle pageerror gate: any uncaught page exception during table
-	// load and settle fails loudly. Later run-phase errors are reported at
-	// the end for visibility but do not gate (legs intentionally poke at
-	// error paths).
+	// load and settle fails loudly. Run-phase errors gate at the end too
+	// (see runErrors below): uncaught script errors during play are never
+	// intentional.
 	const loadErrors = pageErrors.filter(e => e.phase === 'load')
 	results.pageerrors = loadErrors.length === 0
 	if (!results.pageerrors) {
@@ -410,9 +410,23 @@ async function runOne(targetUrl, label) {
 	}
 	console.log(`[integration:${label}] shots -> ${out}`)
 	const runErrors = pageErrors.filter(e => e.phase === 'run')
-	if (runErrors.length)
-		console.log(`[integration:${label}] WARN ${runErrors.length} run-phase pageerror(s) (not gated):`)
-	for (const e of runErrors.slice(0, 10)) console.log(`[integration:${label}] pageerror[run] ${e.message}`)
+	// Run-phase gate: an uncaught exception or script error during play legs
+	// fails loudly. Real tables (walking_dead timers, GI, cannon capture)
+	// execute script on every frame; warn-and-continue hid live breakage.
+	const runScriptErrors = logs.filter(t =>
+		/Uncaught (VbsError|Error)|VbsError: (Invalid use of Null|Type mismatch)/.test(t),
+	)
+	results.runErrors = runErrors.length === 0 && runScriptErrors.length === 0
+	if (!results.runErrors) {
+		console.log(
+			`[integration:${label}] FAIL ${runErrors.length} run-phase pageerror(s), ${runScriptErrors.length} console script error(s):`,
+		)
+		for (const e of runErrors.slice(0, 10)) console.log(`[integration:${label}] pageerror[run] ${e.message}`)
+		for (const t of runScriptErrors.slice(0, 10))
+			console.log(`[integration:${label}] console[run] ${t.slice(0, 300)}`)
+	} else {
+		console.log(`[integration:${label}] runErrors PASS (0 run-phase page/script errors)`)
+	}
 	await page.close().catch(() => {})
 	// Every leg counts — including transpile, dmd, backbox, and the load
 	// pageerror gate. No mock overrides: legs the fixture cannot support
@@ -429,6 +443,7 @@ async function runOne(targetUrl, label) {
 		results.backbox,
 		results.dmdVisible,
 		results.camera,
+		results.runErrors,
 	].every(legOk)
 	console.log(`\n# integration ${label} ${ok ? 'PASS' : 'FAIL'} ${JSON.stringify(results)}`)
 	return { ok, results }
