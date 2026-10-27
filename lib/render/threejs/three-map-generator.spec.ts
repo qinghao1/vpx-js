@@ -173,4 +173,54 @@ describe('ThreeMapGenerator.loadShared', () => {
 		expect(calls).toEqual(1)
 		expect(generator.hasTexture('Bad.png')).toBe(false)
 	})
+
+	it('serves a repeat pass over a source-cleared texture from cache', async () => {
+		const payload = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])
+		const stream = new Uint8Array(16 + payload.length)
+		stream.set(payload, 16)
+		const reads: Array<[number, number]> = []
+		const table = {
+			streamStorage: async (_name: string, next: (storage: unknown) => Promise<Uint8Array>) =>
+				next({
+					read: async (_key: string, offset = 0, len?: number) => {
+						len ??= stream.length - offset
+						reads.push([offset, len])
+						return stream.slice(offset, offset + len)
+					},
+				}),
+		} as any
+		let calls = 0
+		const loader = {
+			loadTexture: async () => {
+				calls++
+				return new Texture()
+			},
+			loadRawTexture: async () => new Texture(),
+			loadDefaultTexture: async () => new Texture(),
+		}
+		const generator = new ThreeMapGenerator(loader as any)
+		const tex = new (VptTexture as any)()
+		tex.storageName = 'Image105'
+		tex.szName = 'Clearedtex'
+		tex.szPath = 'cleared.png'
+		tex.isOpaque = true
+		tex.binary = { pos: 16, len: payload.length }
+		const outcomes: Array<[string, boolean]> = []
+		const onTexture = (loaded: { getName(): string }, ok: boolean) => {
+			outcomes.push([loaded.getName(), ok])
+		}
+		await generator.loadTextures([tex], table, onTexture)
+		// The first pass consumes the source by design; the repeat pass over
+		// the same object must hit the cache instead of re-reading a
+		// source-less whole stream into the image decoder.
+		expect(tex.binary).toBeUndefined()
+		await generator.loadTextures([tex], table, onTexture)
+
+		expect(calls).toEqual(1)
+		expect(reads).toEqual([[16, payload.length]])
+		expect(outcomes).toEqual([
+			['clearedtex', true],
+			['clearedtex', true],
+		])
+	})
 })

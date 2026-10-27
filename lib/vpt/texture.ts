@@ -87,6 +87,14 @@ export class Texture extends BiffParser {
 		if (this.localFileName) {
 			return loader.loadDefaultTexture(this.getName(), ext, this.localFileName)
 		}
+		// A table texture without a source range was already consumed (the map
+		// generator clears binary/pdsBuffer after a successful load) or never
+		// parsed one. Reading without pos/len would fetch the whole OLE stream
+		// — BIFF headers plus payload — which no image decoder accepts (it
+		// surfaces as a message-less DOM error event). Fail fast instead.
+		if (this.storageName && (this.binary?.pos === undefined || this.binary?.len === undefined)) {
+			throw new Error(`Cannot load image data for texture ${this.getName()} (source cleared or missing)`)
+		}
 		const data = await table.streamStorage<Uint8Array>('GameStg', storage =>
 			storage.read(this.storageName!, this.binary?.pos, this.binary?.len),
 		)

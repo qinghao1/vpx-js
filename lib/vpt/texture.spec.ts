@@ -169,4 +169,35 @@ describe('The VPinball texture parser', () => {
 		await tex.loadTexture(mock, table)
 		expect(seen).to.equal('')
 	})
+
+	it('should fail fast on a cleared source instead of reading the whole stream', async () => {
+		const tex = new (Texture as any)()
+		tex.storageName = 'Image105'
+		tex.szName = 'clearedtex'
+		tex.szPath = 'cleared.webp'
+		tex.binary = undefined
+		let reads = 0
+		let loaderCalls = 0
+		const table = {
+			streamStorage: async (_name: string, next: (storage: unknown) => Promise<Uint8Array>) => {
+				reads++
+				return next({ read: async () => new Uint8Array([1, 2, 3]) })
+			},
+		} as any
+		const mock = {
+			loadTexture: async () => {
+				loaderCalls++
+				return {}
+			},
+		} as any
+		try {
+			await tex.loadTexture(mock, table)
+		} catch (error) {
+			expect((error as Error).message).to.match(/clearedtex.*source cleared or missing/)
+			expect(reads).to.equal(0)
+			expect(loaderCalls).to.equal(0)
+			return
+		}
+		expect.fail('expected loadTexture to throw')
+	})
 })

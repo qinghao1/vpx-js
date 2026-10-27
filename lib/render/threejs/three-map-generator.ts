@@ -116,6 +116,13 @@ export class ThreeMapGenerator {
 	 */
 	private loadShared(texture: Texture, table: Table): Promise<boolean> {
 		const key = texture.getName().toLowerCase()
+		// Repeat passes over the same objects (scene rebuilds, duplicate
+		// entries) must not re-read sources the first pass cleared: a
+		// source-less re-read fetches the whole OLE stream, which the image
+		// decoder rejects with a message-less DOM error event.
+		if (this.hasTexture(texture.getName())) {
+			return Promise.resolve(true)
+		}
 		const running = this.inFlight.get(key)
 		if (running) return running
 		if (Date.now() - (this.lastFailureAt.get(key) ?? 0) < LOAD_FAILURE_COOLDOWN_MS) {
