@@ -256,8 +256,13 @@ export const physicsChecks = async page => {
 
 // Plunger leg: hold Enter ~800ms (the viewer's plunger key), release, and
 // assert the script actually pulled the plunger or launched the ball.
-// Skips honestly when there is no live script/physics to drive it
-// (mock emu) or when the table has no plunger (e.g. table-empty).
+// Tables can carry several plungers (e.g. Walking Dead parses the ROM-fired
+// auto `Plunger1` first and the script-driven manual `Plunger` second), so
+// measure every plunger and judge the manual (non-auto) ones when the table
+// has any — an auto plungers[0] never moves on Enter. Falls back to all
+// plungers on auto-only tables. Skips honestly when there is no live
+// script/physics to drive it (mock emu) or when the table has no plunger
+// (e.g. table-empty).
 export const plungerChecks = async page => {
 	await ensurePlayMode(page)
 	return page.evaluate(async () => {
@@ -276,7 +281,28 @@ export const plungerChecks = async page => {
 				out.reason = 'no plunger in table'
 				return out
 			}
-			const api = plungers[0].getApi()
+			const named = plungers.map((p, i) => {
+				let name = `plunger${i}`
+				try {
+					name = p.getName?.() ?? p.data?.name ?? name
+				} catch {}
+				let auto = false
+				try {
+					auto = !!p.getApi().AutoPlunger
+				} catch {}
+				return { p, name, auto }
+			})
+			const manual = named.filter(n => !n.auto)
+			const candidates = manual.length ? manual : named
+			const readPos = n => {
+				try {
+					const pos = n.p.getApi().Position()
+					return typeof pos === 'number' ? pos : NaN
+				} catch {
+					return NaN
+				}
+			}
+			const snap = () => Object.fromEntries(candidates.map(n => [n.name, readPos(n)]))
 			const maxBallSpeed = () => {
 				let m = 0
 				for (const b of v.player.balls) {
@@ -285,27 +311,42 @@ export const plungerChecks = async page => {
 				}
 				return m
 			}
-			const posBefore = api.Position()
+			const beforeAll = snap()
 			const speedBefore = maxBallSpeed()
 			v.player.onKeyDown({ code: 'Enter', key: 'Enter', ts: Date.now() })
 			await new Promise(r => setTimeout(r, 800))
-			const posHeld = api.Position()
+			const heldAll = snap()
 			v.player.onKeyUp({ code: 'Enter', key: 'Enter', ts: Date.now() })
 			await new Promise(r => setTimeout(r, 800))
-			const posAfter = api.Position()
+			const afterAll = snap()
 			const speedAfter = maxBallSpeed()
-			const travel = Math.max(Math.abs(posHeld - posBefore), Math.abs(posAfter - posBefore))
+			let best = null,
+				bestTravel = 0
+			for (const n of candidates) {
+				const b = beforeAll[n.name],
+					h = heldAll[n.name],
+					a = afterAll[n.name]
+				if (!Number.isFinite(b) || !Number.isFinite(h) || !Number.isFinite(a)) continue
+				const travel = Math.max(Math.abs(h - b), Math.abs(a - b))
+				if (!best || travel > bestTravel) {
+					best = n
+					bestTravel = travel
+				}
+			}
 			const launched = speedAfter > speedBefore + 10
-			out.before = posBefore
-			out.held = posHeld
-			out.after = posAfter
-			out.travel = +travel.toFixed(2)
+			out.measured = candidates.map(n => n.name)
+			out.best = best?.name ?? null
+			out.plungers = { before: beforeAll, held: heldAll, after: afterAll }
+			out.before = best ? beforeAll[best.name] : NaN
+			out.held = best ? heldAll[best.name] : NaN
+			out.after = best ? afterAll[best.name] : NaN
+			out.travel = +bestTravel.toFixed(2)
 			out.speedBefore = Math.round(speedBefore)
 			out.speedAfter = Math.round(speedAfter)
-			out.pass = travel > 0.5 || launched
+			out.pass = bestTravel > 0.5 || launched
 			out.reason = out.pass
-				? `plunger travel ${travel.toFixed(2)} launched=${launched}`
-				: `no plunger motion (travel ${travel.toFixed(2)}) and no launch`
+				? `plunger ${best?.name} travel ${bestTravel.toFixed(2)} launched=${launched}`
+				: `no plunger motion (travel ${bestTravel.toFixed(2)}) and no launch`
 			return out
 		} catch (e) {
 			out.pass = false
