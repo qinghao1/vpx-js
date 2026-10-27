@@ -112,6 +112,11 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 			obj.addBlendMode,
 			(obj as { disableLightingBelow?: number }).disableLightingBelow ?? 0,
 			obj.depthWrite,
+			// File-level alpha for the base image (VPT Texture.isOpaque), so an
+			// alpha-carrying image blends from the first frame — upstream
+			// primitive.cpp blends on `!img->IsOpaque()` regardless of the file
+			// opacity value.
+			(opts.applyTextures ? (obj.map as { isOpaque?: boolean } | undefined) : undefined) ?? null,
 		)
 	}
 
@@ -149,6 +154,10 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 		addBlendMode?: number,
 		disableLightingBelow = 0,
 		depthWrite?: boolean,
+		// File-level alpha signal for the base image. Textures stream after
+		// materials are created, so the bound three.js texture is usually null
+		// here and carries no isOpaque flag anyway — the VPT record does.
+		vptMap?: { isOpaque?: boolean } | null,
 	): any {
 		const key = this.getKey(
 			material,
@@ -253,7 +262,13 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 		const tex = (mapName && this.mapGenerator.hasTexture(mapName) && this.mapGenerator.getTexture(mapName)) || null
 		// Shared with the updater (see resolveTransparency): the fresh material must already
 		// carry the file-level blend state or the first frame disagrees with script updates.
-		const { opacity: matOpacity, transparent: matTransparent } = resolveTransparency(material, tex)
+		// Upstream blends when the image carries alpha (primitive.cpp SetMaterial
+		// `!img->IsOpaque()`), even at file opacity ~1 — the VPT record carries that
+		// signal before the texture streams in.
+		const { opacity: matOpacity, transparent: matTransparent } = resolveTransparency(
+			material,
+			vptMap ?? tex ?? null,
+		)
 		mat = createPrimitiveBdlMaterial({
 			map: tex ?? undefined,
 			mapName,

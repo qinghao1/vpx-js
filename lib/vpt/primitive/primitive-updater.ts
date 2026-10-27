@@ -231,10 +231,15 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 					below,
 				})
 				// Shared with creation (see resolveTransparency): the file-level rule
-				// plus the lamp/slnk-scaled dynamic fade.
+				// plus the lamp/slnk-scaled dynamic fade. The bound three.js
+				// texture carries no isOpaque flag, so consult the VPT record for
+				// the file-level image alpha (upstream blends on `!img->IsOpaque()`).
+				const vptMap = table.getTexture(this.data.szImage ?? '')
 				const { transparent } = resolveTransparency(
 					matObj,
-					(mat as { userData?: { __map?: { isOpaque?: boolean } | null } }).userData?.__map ?? null,
+					(vptMap as { isOpaque?: boolean } | undefined) ??
+						(mat as { userData?: { __map?: { isOpaque?: boolean } | null } }).userData?.__map ??
+						null,
 					dynamicOpacity,
 				)
 				if (mat.transparent !== transparent || mat.depthWrite === transparent) {
