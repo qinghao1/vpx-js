@@ -49,6 +49,8 @@ export type FrameSnapshot = {
 	tPrev: number
 	tNext: number
 	timeMsec: number
+	// Sampled after the snapshot claim, so gen is >= the snapshotted frame's own generation (a racing write may
+	// advance it): use it for staleness heuristics, never for equality with the frame contents.
 	gen: number
 	snapIdx: number
 }
@@ -58,7 +60,9 @@ export type FrameSnapshot = {
  * flag (`0` = unread frame in c, `SENTINEL` = consumed). `writeFrame` fills w
  * then rotates w<-c, c<-w, d<-0; `trySnap` returns null when d is the sentinel,
  * else snapshots c and rotates c<-s, s<-c, d<-sentinel — reader and writer never
- * share a slot, and an unread frame is simply overwritten (latest wins). */
+ * share a slot, and an unread frame is simply overwritten (latest wins).
+ * Rotation invariant: w/c/s stay distinct across every rotation, so the published
+ * slot is never concurrently written. */
 const pack = (w: number, d: number, c: number, s: number) =>
 	((w & MASK) << 0) | ((d & MASK) << 2) | ((c & MASK) << 4) | ((s & MASK) << 6)
 
@@ -153,7 +157,7 @@ export function writeFrame(
 	times[tb] = tPrev
 	times[tb + 1] = tNext
 	times[tb + 2] = timeMsec
-	h[COUNT_BASE + w] = count
+	Atomics.store(h, COUNT_BASE + w, count)
 	if (isSAB(sab)) Atomics.add(h, GEN_IDX, 1)
 	else h[GEN_IDX]++
 	while (true) {

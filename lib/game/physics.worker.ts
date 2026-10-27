@@ -23,6 +23,7 @@ import {
 	INPUT_KEY_UP,
 	type InputEvent,
 	MAX_BALLS,
+	SAB_SIZE,
 	writeFrame,
 } from './shared/physics-buffer.js'
 
@@ -270,6 +271,8 @@ export async function loadWorkerTable(source: Uint8Array | ArrayBuffer): Promise
 	return Table.load(reader, { skipTextures: true, loadTableScript: false })
 }
 
+/** Best-effort warmup: compiles the WASM physics kernels and pre-sizes their pools off the critical path.
+ * Failures are ignored because the kernels lazy-initialize on first use. */
 async function ensureWasm(): Promise<void> {
 	const mod = await import('../physics/wasm/kernels.js')
 	await mod.getWasmKernels?.()
@@ -299,6 +302,7 @@ export function startHost(host: WorkerHost): void {
 	let timer: ReturnType<typeof setTimeout> | null = null
 	let prevMsec = 0
 	let stepCount = 0
+	// Latest-wins: a newer pre-init syncBalls replaces any still-pending snapshot.
 	let pendingSync: WorkerBallState[] | null = null
 	const scratch = new Float32Array(MAX_BALLS * BALL_STRIDE)
 
@@ -341,12 +345,21 @@ export function startHost(host: WorkerHost): void {
 
 	function startLoop(): void {
 		if (running) return
+		if (!sab || !sim) {
+			// No live tick is possible yet: stay parked and let the init-completion path kick the loop once sim
+			// and sab are both present, instead of reporting started with a stalled loop.
+			wantStart = true
+			return
+		}
 		running = true
 		loop()
-		host.postMessage({ type: 'started', timeMsec: sim?.physics.timeMsec ?? 0 })
+		if (!running) return
+		host.postMessage({ type: 'started', timeMsec: sim.physics.timeMsec })
 	}
 
 	function stopLoop(): void {
+		// Ack only the real running -> stopped transition; a stop for an idle worker is a no-op.
+		if (!running) return
 		running = false
 		wantStart = false
 		if (timer !== null) {
@@ -361,6 +374,16 @@ export function startHost(host: WorkerHost): void {
 			host.postMessage({ type: 'error', message: 'init requires vpx bytes' })
 			return
 		}
+		// A (re-)init replaces the simulation: halt the loop so no tick observes the swap, then reset frame
+		// bookkeeping before loading. (A parked wantStart survives: it kicks below once the new sim lands.)
+		running = false
+		if (timer !== null) {
+			clearTimeout(timer)
+			timer = null
+		}
+		prevMsec = 0
+		stepCount = 0
+		pendingSync = null
 		const bytes = message.vpx
 		void ensureWasm().catch(() => {})
 		loadWorkerTable(bytes).then(
@@ -371,7 +394,7 @@ export function startHost(host: WorkerHost): void {
 					pendingSync = null
 				}
 				host.postMessage({ type: 'ready', balls: sim.physics.balls.length, timeMsec: sim.physics.timeMsec })
-				if (wantStart) {
+				if (wantStart && sab) {
 					wantStart = false
 					startLoop()
 				}
@@ -389,34 +412,66 @@ export function startHost(host: WorkerHost): void {
 
 	host.onmessage = (event: MessageEvent) => {
 		const data = event.data as HostMessage
-		if (data?.sab) sab = data.sab
 		if (!data?.type) return
 		switch (data.type) {
-			case 'init':
+			case 'init': {
+				// The SAB is accepted only here so its lifetime matches the loaded sim; anything attached to
+				// another message is ignored. A missing or misshapen buffer errors instead of stalling the loop.
+				const candidate = data.sab
+				if (
+					typeof SharedArrayBuffer === 'undefined' ||
+					!(candidate instanceof SharedArrayBuffer) ||
+					candidate.byteLength < SAB_SIZE
+				) {
+					host.postMessage({
+						type: 'error',
+						message: `init requires a SharedArrayBuffer of at least ${SAB_SIZE} bytes`,
+					})
+					break
+				}
+				sab = candidate
 				handleInit(data)
 				break
+			}
 			case 'start':
-				if (sim) startLoop()
-				else wantStart = true
+				startLoop()
 				break
 			case 'stop':
 				stopLoop()
 				break
-			case 'pause':
-				if (sim) sim.physics.isPaused = true
-				host.postMessage({ type: 'paused', timeMsec: sim?.physics.timeMsec ?? 0 })
+			case 'pause': {
+				const pausable = sim?.physics
+				if (pausable && !pausable.isPaused) {
+					pausable.isPaused = true
+					host.postMessage({ type: 'paused', timeMsec: pausable.timeMsec })
+				}
 				break
-			case 'resume':
-				if (sim) sim.physics.isPaused = false
-				host.postMessage({ type: 'resumed', timeMsec: sim?.physics.timeMsec ?? 0 })
+			}
+			case 'resume': {
+				const resumable = sim?.physics
+				if (resumable?.isPaused) {
+					resumable.isPaused = false
+					host.postMessage({ type: 'resumed', timeMsec: resumable.timeMsec })
+				}
 				break
+			}
 			case 'syncBalls':
-				if (!Array.isArray(data.balls)) return
+				if (!Array.isArray(data.balls)) {
+					host.postMessage({ type: 'error', message: 'syncBalls requires a balls array' })
+					break
+				}
 				if (sim) sim.syncBalls(data.balls)
 				else pendingSync = data.balls
 				break
-			case 'teleportBall':
-				if (!sim || data.index === undefined || !data.pos || !data.vel) return
+			case 'teleportBall': {
+				if (!sim) {
+					host.postMessage({ type: 'error', message: 'teleportBall requires a loaded table' })
+					break
+				}
+				if (data.index === undefined || !data.pos || !data.vel) {
+					host.postMessage({ type: 'error', message: 'teleportBall requires index, pos, and vel' })
+					break
+				}
 				sim.teleportBall(data.index, {
 					pos: data.pos,
 					vel: data.vel,
@@ -424,6 +479,7 @@ export function startHost(host: WorkerHost): void {
 					frozen: data.frozen ?? false,
 				})
 				break
+			}
 			case 'ping':
 				host.postMessage({
 					type: 'pong',
@@ -432,6 +488,9 @@ export function startHost(host: WorkerHost): void {
 					balls: sim?.physics.balls.length ?? 0,
 					steps: stepCount,
 				})
+				break
+			default:
+				host.postMessage({ type: 'error', message: `unknown message type: ${String(data.type)}` })
 				break
 		}
 	}

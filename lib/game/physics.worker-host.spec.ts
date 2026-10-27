@@ -111,3 +111,136 @@ describe('physics worker host wiring', () => {
 		expect(Math.abs(ball.state.pos.z - workerBall.state.pos.z)).toBeLessThan(1e-6)
 	})
 })
+
+describe('physics worker protocol hardening', () => {
+	const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms))
+
+	const loadVpx = (): Uint8Array => new Uint8Array(readFileSync('test/fixtures/table-empty.vpx'))
+
+	const pongSteps = (posted: Posted[], id: number): number | undefined =>
+		posted.find(m => m.type === 'pong' && m.id === id)?.steps
+
+	it('rejects init with an invalid SAB instead of stalling later', async () => {
+		const { host, posted, send } = makeHost()
+		startHost(host)
+		send({ type: 'init', sab: new ArrayBuffer(8) as unknown as SharedArrayBuffer, vpx: loadVpx() })
+		await waitFor(() => posted.some(m => m.type === 'error'), 'init sab error')
+		expect(posted.some(m => m.type === 'ready')).toBe(false)
+	}, 30000)
+
+	it('ignores a SAB smuggled on non-init messages', async () => {
+		const { host, posted, send } = makeHost()
+		startHost(host)
+		const sab = createPhysicsSAB()
+		send({ type: 'init', sab, vpx: loadVpx() })
+		await waitFor(() => posted.some(m => m.type === 'ready'), 'ready')
+		send({ type: 'start' })
+		await waitFor(() => posted.some(m => m.type === 'started'), 'started')
+		const out = new Float32Array(MAX_BALLS * BALL_STRIDE)
+		await waitFor(() => (trySnap(sab, out)?.timeMsec ?? 0) >= 30, 'advancing frames')
+
+		send({ type: 'ping', id: 101, sab: new ArrayBuffer(8) as unknown as SharedArrayBuffer })
+		await waitFor(() => pongSteps(posted, 101) !== undefined, 'pong 101')
+		const before = pongSteps(posted, 101) ?? 0
+		await sleep(500)
+		send({ type: 'ping', id: 102 })
+		await waitFor(() => pongSteps(posted, 102) !== undefined, 'pong 102')
+		expect(pongSteps(posted, 102)).toBeGreaterThan(before)
+		expect(posted.some(m => m.type === 'error')).toBe(false)
+
+		send({ type: 'stop' })
+		await waitFor(() => posted.some(m => m.type === 'stopped'), 'stopped')
+	}, 30000)
+
+	it('re-init stops the loop and resets counters before reloading', async () => {
+		const { host, posted, send } = makeHost()
+		startHost(host)
+		const sab = createPhysicsSAB()
+		send({ type: 'init', sab, vpx: loadVpx() })
+		await waitFor(() => posted.some(m => m.type === 'ready'), 'ready')
+		send({ type: 'start' })
+		await waitFor(() => posted.some(m => m.type === 'started'), 'started')
+		const out = new Float32Array(MAX_BALLS * BALL_STRIDE)
+		await waitFor(() => (trySnap(sab, out)?.timeMsec ?? 0) >= 30, 'advancing frames')
+
+		const readies = (): number => posted.filter(m => m.type === 'ready').length
+		const readiesBefore = readies()
+		send({ type: 'init', sab, vpx: loadVpx() })
+		await waitFor(() => readies() > readiesBefore, 'second ready')
+		send({ type: 'ping', id: 201 })
+		await waitFor(() => pongSteps(posted, 201) !== undefined, 'pong 201')
+		expect(pongSteps(posted, 201)).toBe(0)
+		await sleep(300)
+		send({ type: 'ping', id: 202 })
+		await waitFor(() => pongSteps(posted, 202) !== undefined, 'pong 202')
+		expect(pongSteps(posted, 202)).toBe(0)
+		expect(posted.some(m => m.type === 'error')).toBe(false)
+
+		send({ type: 'start' })
+		await waitFor(() => posted.filter(m => m.type === 'started').length >= 2, 'restarted')
+		await waitFor(() => (trySnap(sab, out)?.timeMsec ?? 0) >= 30, 'frames after restart')
+		send({ type: 'stop' })
+		await waitFor(() => posted.some(m => m.type === 'stopped'), 'stopped')
+	}, 60000)
+
+	it('withholds started until a live tick, then kicks a parked start', async () => {
+		const { host, posted, send } = makeHost()
+		startHost(host)
+		send({ type: 'init', vpx: loadVpx() })
+		await waitFor(() => posted.some(m => m.type === 'error'), 'init sab error')
+		expect(posted.some(m => m.type === 'ready')).toBe(false)
+		send({ type: 'start' })
+		await sleep(400)
+		expect(posted.some(m => m.type === 'started')).toBe(false)
+
+		const sab = createPhysicsSAB()
+		send({ type: 'init', sab, vpx: loadVpx() })
+		await waitFor(() => posted.some(m => m.type === 'ready'), 'ready')
+		await waitFor(() => posted.some(m => m.type === 'started'), 'started')
+		const out = new Float32Array(MAX_BALLS * BALL_STRIDE)
+		await waitFor(() => (trySnap(sab, out)?.timeMsec ?? 0) >= 30, 'advancing frames')
+		expect(posted.filter(m => m.type === 'error').length).toBe(1)
+		send({ type: 'stop' })
+		await waitFor(() => posted.some(m => m.type === 'stopped'), 'stopped')
+	}, 60000)
+
+	it('reports unknown and malformed messages instead of dropping them', async () => {
+		const { host, posted, send } = makeHost()
+		startHost(host)
+		send({ type: 'init', sab: createPhysicsSAB(), vpx: loadVpx() })
+		await waitFor(() => posted.some(m => m.type === 'ready'), 'ready')
+		send({ type: 'frobnicate' })
+		send({ type: 'syncBalls' })
+		send({ type: 'syncBalls', balls: 'nope' })
+		send({ type: 'teleportBall', index: 0 })
+		send({ type: 'teleportBall' })
+		await waitFor(() => posted.filter(m => m.type === 'error').length >= 5, 'five errors')
+	}, 30000)
+
+	it('acks stop/pause/resume only on real transitions', async () => {
+		const { host, posted, send } = makeHost()
+		startHost(host)
+		send({ type: 'stop' })
+		send({ type: 'pause' })
+		send({ type: 'resume' })
+		await sleep(300)
+		expect(posted.map(m => m.type)).toEqual(['worker-ready'])
+
+		send({ type: 'init', sab: createPhysicsSAB(), vpx: loadVpx() })
+		await waitFor(() => posted.some(m => m.type === 'ready'), 'ready')
+		const count = (type: string): number => posted.filter(m => m.type === type).length
+		send({ type: 'pause' })
+		send({ type: 'pause' })
+		send({ type: 'resume' })
+		send({ type: 'resume' })
+		expect(count('paused')).toBe(1)
+		expect(count('resumed')).toBe(1)
+		send({ type: 'stop' })
+		expect(count('stopped')).toBe(0)
+		send({ type: 'start' })
+		await waitFor(() => posted.some(m => m.type === 'started'), 'started')
+		send({ type: 'stop' })
+		await waitFor(() => posted.some(m => m.type === 'stopped'), 'stopped')
+		expect(count('stopped')).toBe(1)
+	}, 30000)
+})
