@@ -104,6 +104,7 @@ export class Primitive
 		this.hits = this.hitGenerator.generateHitObjects(base, this.events, table)
 		const display = base.clone().transform(Matrix3D.RIGHT_HANDED)
 		this.updater.setMesh(display)
+		this.updater.setEmuProvider(() => player.getPhysics().emu)
 		this.animation = new PrimitiveAnimation(this.data, this.state, display.clone())
 		this.api = new PrimitiveApi(this, this.state, this.data, this.hits!, this.events, player, table, this.animation)
 	}

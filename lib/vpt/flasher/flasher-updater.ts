@@ -1,13 +1,30 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import type { Object3D } from 'three'
+import { AddEquation, CustomBlending, type Object3D, OneFactor, OneMinusSrcAlphaFactor } from 'three'
 import type { IRenderApi } from '../../render/irender-api.js'
 import { ItemUpdater } from '../item-updater.js'
 import type { Light } from '../light/light.js'
 import type { LightAnimation } from '../light/light-physics.js'
 import type { Table } from '../table/table.js'
-import type { FlasherData } from './flasher-data.js'
+import { FlasherAddBlend, type FlasherData } from './flasher-data.js'
+
+/**
+ * Upstream per-draw blend state for AB_ABSORB (flasher.cpp SetupAddBlendState):
+ * premultiplied alpha 'over', dst' = src + dst * (1 - srcAlpha). Stamped per
+ * frame so forked material clones (rebuilt as plain additive) keep absorbing.
+ */
+function applyAbsorbBlendState(mat: any): void {
+	mat.blending = CustomBlending
+	mat.blendSrc = OneFactor
+	mat.blendDst = OneMinusSrcAlphaFactor
+	mat.blendEquation = AddEquation
+	mat.blendSrcAlpha = OneFactor
+	mat.blendDstAlpha = OneMinusSrcAlphaFactor
+	mat.blendEquationAlpha = AddEquation
+	;((mat.userData ??= {}) as Record<string, unknown>).__absorbBlend = true
+}
+
 import { FlasherMeshGenerator } from './flasher-mesh-generator.js'
 import type { FlasherState } from './flasher-state.js'
 
@@ -62,6 +79,9 @@ export class FlasherUpdater extends ItemUpdater<FlasherState> {
 		if (!visible) return
 
 		const intensity = (alpha * this.data.intensityScale) / 100
+		// Both additive modes share the tint/intensity uniform path upstream (the
+		// absorb sign flip lives in the shader encoding); blending differs.
+		const absorb = this.data.addBlendMode === FlasherAddBlend.Absorb
 		target.traverse((child: any) => {
 			if (!child.isMesh || !child.material) return
 			const mats = Array.isArray(child.material) ? child.material : [child.material]
@@ -72,6 +92,7 @@ export class FlasherUpdater extends ItemUpdater<FlasherState> {
 					if (userData?.__uIntensity) userData.__uIntensity.value = intensity
 					if (userData?.__uFlat?.value?.set)
 						userData.__uFlat.value.set(this.state.color).multiplyScalar(intensity)
+					if (absorb) applyAbsorbBlendState(mat)
 				} else {
 					if (mat.color?.set) mat.color.set(this.state.color)
 					mat.opacity = Math.min(1, Math.max(0, alpha / 100))
@@ -88,12 +109,14 @@ export class FlasherUpdater extends ItemUpdater<FlasherState> {
 	}
 
 	/**
-	 * Opacity modulated by the linked light or controller state.
+	 * Opacity modulated by the controller link or the linked light, never both.
 	 * @see Flasher::Render in src/parts/flasher.cpp:1007-1020
 	 */
 	private effectiveAlpha(table: Table): number {
-		// The controller link (if any) is already folded into state.alpha by
-		// FlasherAnimation; only the lightmap fallback applies here.
+		// The controller link (if resolved) is already folded into state.alpha by
+		// FlasherAnimation, which then suppresses this lightmap fallback — upstream
+		// applies `linkState` *or* the lightmap ratio, exclusively.
+		if (this.state.slnkResolved) return this.state.alpha
 		const alpha = this.state.alpha
 		const light = this.linkedLight ?? (this.data.szLightmap ? table.lights[this.data.szLightmap] : undefined)
 		if (light) {

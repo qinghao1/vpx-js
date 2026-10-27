@@ -64,6 +64,12 @@ export interface RenderInfo<GEOMETRY> {
 	depthBias?: number
 	disableLighting?: number
 	addBlend?: boolean
+	/**
+	 * Tri-state additive blend mode (upstream FlasherData::AddBlendMode: 0 plain,
+	 * 1 additive, 2 absorb). Generic number so non-flasher renderables can reuse
+	 * it; absent means "derive from {@link addBlend}" (additive when true).
+	 */
+	addBlendMode?: number
 	backfacesEnabled?: boolean
 	depthWrite?: boolean
 	bulbGlow?: BulbGlowParams

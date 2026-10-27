@@ -7,8 +7,9 @@ import type { FlasherState } from './flasher-state.js'
 
 /**
  * Flasher animation — controller link modulation of opacity.
- * Mirrors upstream render logic (`alpha *= linkState` when `SLNK` resolves, plain script
- * opacity otherwise; vpx-js has no lightmaps so the lightmap fallback does not apply).
+ * Mirrors upstream render logic: a resolved `SLNK` link scales the opacity and
+ * suppresses the lightmap fallback, otherwise the lightmap (or plain script opacity)
+ * applies (@see Flasher::Render in src/parts/flasher.cpp).
  * @see https://github.com/vpinball/vpinball/blob/master/src/parts/flasher.cpp
  */
 export class FlasherAnimation implements IAnimation {
@@ -25,8 +26,11 @@ export class FlasherAnimation implements IAnimation {
 		if (!this.data.stateSrcLink || this.state.lockedByLS) return false
 		const linked = tryGetFloatState(this.emuProvider?.(), this.data.stateSrcLink)
 		const alpha = linked.ok ? this.data.alpha * linked.value : this.data.alpha
-		if (this.state.alpha === alpha) return false
+		// A resolution flip alone (same alpha, link now resolving or not) still changes
+		// the rendered result: the updater applies the lightmap only while unresolved.
+		if (this.state.alpha === alpha && this.state.slnkResolved === linked.ok) return false
 		this.state.alpha = alpha
+		this.state.slnkResolved = linked.ok
 		return true
 	}
 }

@@ -14,6 +14,12 @@ export class FlasherState extends ItemState {
 	public lockedByLS = false
 	/** Sequencer-driven on/off; script Visible keeps flowing to isVisible. @see Flasher::m_inPlayState in src/parts/flasher.h */
 	public inPlayState = true
+	/**
+	 * Whether the SLNK controller link resolved on the last animation tick.
+	 * Piped to the updater so it can apply the link *or* the lightmap, never both
+	 * (@see Flasher::Render in src/parts/flasher.cpp).
+	 */
+	public slnkResolved = false
 
 	public static claim(
 		name: string,

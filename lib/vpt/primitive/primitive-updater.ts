@@ -1,6 +1,8 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 import { Color } from 'three'
+import { tryGetFloatState } from '../../emu/res-uri.js'
+import type { IEmulator } from '../../game/iemulator.js'
 import { Matrix3D } from '../../math/matrix.js'
 import type { IRenderApi } from '../../render/irender-api.js'
 import { Vertex3DNoTex2 } from '../../util/vertex.js'
@@ -36,6 +38,13 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 		state: PrimitiveState,
 	) {
 		super(state)
+	}
+
+	private emuProvider?: () => IEmulator | undefined
+
+	/** Controller-state source for SLNK modulation, wired in setupPlayer like the light/flasher animations. */
+	public setEmuProvider(provider: () => IEmulator | undefined): void {
+		this.emuProvider = provider
 	}
 
 	public setMesh(mesh: Mesh): void {
@@ -79,7 +88,8 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 			state.disableLightingTop !== undefined ||
 			state.disableLightingBelow !== undefined ||
 			state.material !== undefined ||
-			!!this.data.szLightmap
+			!!this.data.szLightmap ||
+			!!this.data.stateSrcLink
 		if (needsColor) this.applyColor(obj, table)
 		if (needsColor || state.alpha !== undefined) this.applyAlpha(obj)
 		if (state.position || state.size || state.rotation || state.translation || state.objectRotation) {
@@ -171,8 +181,12 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 		const base = matObj?.baseColor ?? 0xffffff
 		const matOpacity = matObj?.isOpacityActive ? Math.min(1, Math.max(0, matObj.opacity)) : 1
 		const hex = new Color(base).multiply(new Color(prim)).getHex()
-		const lightFactor = this.lightmapAlphaFactor(table)
-		const effectiveAlpha = Math.max(0, rawAlpha) * lightFactor
+		// Upstream applies the controller link *or* the lightmap, never both
+		// (primitive.cpp:932-940): a resolved SLNK link scales the alpha and
+		// suppresses the lamp modulation; otherwise the lightmap ratio applies.
+		const slnk = this.slnkLinkState()
+		const lightFactor = slnk === undefined ? this.lightmapAlphaFactor(table) : 1
+		const effectiveAlpha = Math.max(0, rawAlpha) * (slnk ?? 1) * lightFactor
 		const bdl = Math.max(0, dlTop)
 		for (const mesh of this.meshes(obj)) {
 			const mat = mesh.material as any
@@ -231,6 +245,18 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 			if (mat.userData?.__uTintColor?.value?.set) mat.userData.__uTintColor.value.set(hex)
 			if (mat.userData?.__uTint?.value?.set) mat.userData.__uTint.value.set(hex)
 		}
+	}
+
+	/**
+	 * Resolved SLNK controller value, or undefined when no link is set, no
+	 * emulator is wired, or the link does not resolve (upstream then falls back
+	 * to the lightmap). @see Primitive::Render in src/parts/primitive.cpp
+	 */
+	private slnkLinkState(): number | undefined {
+		const link = this.data.stateSrcLink
+		if (!link || !this.emuProvider) return undefined
+		const linked = tryGetFloatState(this.emuProvider(), link)
+		return linked.ok ? linked.value : undefined
 	}
 
 	private lightmapAlphaFactor(table: Table): number {

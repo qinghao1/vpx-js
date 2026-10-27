@@ -66,8 +66,10 @@ export class Flasher
 			isVisible: this.data.isVisible,
 			mesh,
 			map: this.data.szImageA ? table.getTexture(this.data.szImageA) : undefined,
-			// Absorb has no local shader support yet, so it renders as plain additive.
 			addBlend: this.data.addBlend,
+			// Tri-state blend mode; absorb renders premultiplied-over downstream.
+			// @see FlasherData::AddBlendMode in src/parts/flasher.h
+			addBlendMode: this.data.addBlendMode,
 			depthBias: this.data.depthBias,
 			isTransparent: true,
 			depthWrite: false,

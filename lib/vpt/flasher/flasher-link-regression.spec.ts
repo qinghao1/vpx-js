@@ -1,12 +1,17 @@
 import { describe, expect, it } from 'vitest'
+import { TableBuilder } from '../../../test/table-builder.js'
+import { TestRenderApi } from '../../../test/test-render-api.js'
 import { ThreeHelper } from '../../../test/three.helper'
 import type { IEmulator } from '../../emu/emulator.js'
 import { Player } from '../../game/player.js'
 import { NodeBinaryReader } from '../../io/binary-reader.node.js'
 import type { ReadResult, Storage } from '../../io/ole-doc.js'
+import type { IRenderApi } from '../../render/irender-api.js'
 import { Table } from '../table/table.js'
+import { FlasherAnimation } from './flasher-animation.js'
 import { FlasherData } from './flasher-data.js'
-import type { FlasherState } from './flasher-state.js'
+import { FlasherState } from './flasher-state.js'
+import { FlasherUpdater } from './flasher-updater.js'
 
 const three = new ThreeHelper()
 
@@ -118,5 +123,69 @@ describe('The VPinball flasher controller link', () => {
 		expect(flasher.data.stateSrcLink).toBeUndefined()
 		expect(flasher.getAnimation().updateAnimation(100, table)).toBe(false)
 		expect(flasher.getState().alpha).toBe(45)
+	})
+
+	describe('SLNK vs lightmap exclusivity (upstream flasher.cpp:1010-1016)', () => {
+		const ctor = FlasherData as unknown as new (itemName: string) => FlasherData
+
+		function slnkFixture(lamp: number | undefined) {
+			const table = new TableBuilder().build()
+			const data = new ctor('SlnkFlasher')
+			data.alpha = 100
+			data.color = 0x112233
+			data.addBlend = false
+			data.szLightmap = 'L1'
+			data.stateSrcLink = 'ctrl://pinmame/state?group=10&mapping=11'
+			const state = FlasherState.claim('SlnkFlasher', true, 0x112233, 100)
+			const emu = lamp === undefined ? undefined : stubEmulator({ 11: lamp })
+			const animation = new FlasherAnimation(data, state, emu ? () => emu : undefined)
+			// Lightmap lamp at half intensity: the fallback ratio is 0.5.
+			;(table as any).lights = {
+				L1: {
+					data: { intensity: 10 },
+					getAnimation: () => ({ intensityScale: 1 }),
+					getState: () => ({ intensity: 5 }),
+				},
+			}
+			const updater = new FlasherUpdater(state, data)
+			const material: { opacity?: number; transparent?: boolean; needsUpdate?: boolean } = {
+				opacity: 1,
+			}
+			const node: any = {
+				visible: false,
+				traverse: (callback: (child: unknown) => void) => callback({ isMesh: true, material }),
+			}
+			const renderApi = new TestRenderApi() as unknown as IRenderApi<any, any, any>
+			return { table, data, state, animation, updater, material, node, renderApi }
+		}
+
+		it('should apply a resolved SLNK link instead of the lightmap (never both)', () => {
+			const { table, state, animation, updater, material, node, renderApi } = slnkFixture(0.25)
+			expect(animation.updateAnimation(100, table)).toBe(true)
+			expect(state.alpha).toBe(25)
+			expect(state.slnkResolved).toBe(true)
+			updater.applyState(node, state, renderApi, table)
+			// Upstream: 100 * 0.25 with the lightmap suppressed — not 100 * 0.25 * 0.5.
+			expect(material.opacity).toBeCloseTo(0.25, 1e-5)
+		})
+
+		it('should fall back to the lightmap when SLNK does not resolve', () => {
+			const { table, state, animation, updater, material, node, renderApi } = slnkFixture(undefined)
+			expect(animation.updateAnimation(100, table)).toBe(false)
+			expect(state.alpha).toBe(100)
+			expect(state.slnkResolved).toBe(false)
+			updater.applyState(node, state, renderApi, table)
+			expect(material.opacity).toBeCloseTo(0.5, 1e-5)
+		})
+
+		it('should push a state change when only SLNK resolution flips', () => {
+			const { table, state, animation, updater, material, node, renderApi } = slnkFixture(1)
+			// Same alpha as script opacity, but the link now resolves: the updater must
+			// re-render to drop the lightmap fallback (opacity 1, not 0.5).
+			expect(animation.updateAnimation(100, table)).toBe(true)
+			expect(state.alpha).toBe(100)
+			updater.applyState(node, state, renderApi, table)
+			expect(material.opacity).toBeCloseTo(1, 1e-5)
+		})
 	})
 })

@@ -47,6 +47,7 @@ const STRING_MAP: Record<string, string> = {
 	MATR: 'szMaterial',
 	MAPH: 'szPhysicsMaterial',
 	LMAP: 'szLightmap',
+	SLNK: 'stateSrcLink',
 }
 const WIDE_STRING_MAP: Record<string, string> = { M3DN: 'meshFileName' }
 
@@ -67,6 +68,8 @@ export class PrimitiveData extends ItemData implements IPhysicalData {
 	public szMaterial?: string
 	public szPhysicsMaterial?: string
 	public szLightmap?: string
+	/** Optional controller state source (resuri) modulating alpha, overriding the lightmap. @see PrimitiveData::m_stateSrcLink in src/parts/primitive.h */
+	public stateSrcLink?: string
 	public sides = 4
 	public isVisible = true
 	public drawTexturesInside = false

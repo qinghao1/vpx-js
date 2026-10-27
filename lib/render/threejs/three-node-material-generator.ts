@@ -1,4 +1,14 @@
-import { BackSide, Color, DoubleSide, FrontSide, type Object3D } from 'three'
+import {
+	AddEquation,
+	BackSide,
+	Color,
+	CustomBlending,
+	DoubleSide,
+	FrontSide,
+	type Object3D,
+	OneFactor,
+	OneMinusSrcAlphaFactor,
+} from 'three'
 import { Fn, texture, uniform, uv, vec4 } from 'three/tsl'
 import type { RenderInfo } from '../../game/interfaces.js'
 import type { Material } from '../../vpt/material.js'
@@ -17,6 +27,14 @@ import { createUnshadedBakedNodeMaterial, isBakedNodeMaterial, setBakedMap } fro
 import type { ThreeMapGenerator } from './three-map-generator.js'
 
 export { getGlobalEmissionScale, setGlobalEmissionScale } from './material-shared.js'
+
+/**
+ * Tri-state additive blend mode mirrored from FlasherData::AddBlendMode
+ * (src/parts/flasher.h) without importing the vpt layer: 0 plain alpha,
+ * 1 additive, 2 absorb. Only absorb needs distinct handling here — plain and
+ * additive both take the established material paths.
+ */
+export const ADD_BLEND_ABSORB = 2
 
 type PendingTexKey = 'map' | 'normalMap' | 'envMap' | 'emissiveMap'
 
@@ -76,6 +94,7 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 			!!obj.addBlend,
 			obj.backfacesEnabled,
 			alphaTestValue,
+			obj.addBlendMode,
 		)
 	}
 
@@ -110,6 +129,7 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 		addBlend = false,
 		backfacesEnabled?: boolean,
 		alphaTestValue = 0,
+		addBlendMode?: number,
 	): any {
 		const key = this.getKey(
 			material,
@@ -123,6 +143,7 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 			addBlend,
 			backfacesEnabled,
 			alphaTestValue,
+			addBlendMode,
 		)
 		const cached = this.cachedMaterials[key]
 		if (cached) return cached
@@ -145,6 +166,9 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 		let mat: any
 
 		if (addBlend) {
+			// Absent mode derives from the legacy boolean (additive), matching
+			// every pre-existing caller. Only absorb takes its own blend setup.
+			const absorb = (addBlendMode ?? 1) === ADD_BLEND_ABSORB
 			const tex =
 				(mapName && this.mapGenerator.hasTexture(mapName) && this.mapGenerator.getTexture(mapName)) || null
 			mat = createPrimitiveAdditiveMaterial({
@@ -158,6 +182,19 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 			})
 			mat.name = material ? `material:${material.name}` : 'material:additive'
 			;(mat.userData as any).__addBlend = true
+			if (absorb) {
+				// Upstream AB_ABSORB (flasher.cpp SetupAddBlendState): premultiplied
+				// alpha 'over', dst' = src + dst * (1 - srcAlpha), absorbing the
+				// background instead of amplifying it like the additive path.
+				mat.blending = CustomBlending
+				mat.blendSrc = OneFactor
+				mat.blendDst = OneMinusSrcAlphaFactor
+				mat.blendEquation = AddEquation
+				mat.blendSrcAlpha = OneFactor
+				mat.blendDstAlpha = OneMinusSrcAlphaFactor
+				mat.blendEquationAlpha = AddEquation
+				;(mat.userData as any).__absorbBlend = true
+			}
 			this.stashCutout(mat, alphaTestValue, depthBias, true)
 			if (!tex && mapName) (mat.userData as any)[pendingKeyFor('map')] = mapName
 			this.cachedMaterials[key] = mat
@@ -466,7 +503,8 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 		addBlend = false,
 		backfacesEnabled?: boolean,
 		alphaTestValue = 0,
+		addBlendMode?: number,
 	): string {
-		return `${material?.name ?? 'none'}:${map ?? 'none'}:${normalMap ?? 'none'}:${envMap ?? 'none'}:${emissiveMap ?? 'none'}:${isTransparent ? 't' : 'o'}:${depthBias}:${disableLighting ?? 'x'}:${addBlend ? 'a' : 'o'}:${backfacesEnabled ?? 'x'}:${alphaTestValue}`
+		return `${material?.name ?? 'none'}:${map ?? 'none'}:${normalMap ?? 'none'}:${envMap ?? 'none'}:${emissiveMap ?? 'none'}:${isTransparent ? 't' : 'o'}:${depthBias}:${disableLighting ?? 'x'}:${addBlend ? 'a' : 'o'}:${backfacesEnabled ?? 'x'}:${alphaTestValue}:${addBlendMode ?? 'x'}`
 	}
 }
