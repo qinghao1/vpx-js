@@ -8,6 +8,7 @@ import {
 	uPlayfieldSurfaceY,
 	uTransArea,
 } from './primitive-bdl-node.js'
+import { graphReferences, materialize } from './tsl-test-harness.js'
 import { createUnshadedBakedNodeMaterial } from './unshaded-baked-node.js'
 
 const savedArea = uTransArea.value.clone()
@@ -22,48 +23,6 @@ function whiteTex(): DataTexture {
 	const tex = new DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1)
 	tex.needsUpdate = true
 	return tex
-}
-
-/**
- * Eagerly runs a lazy TSL Fn body (three keeps `Fn()()` closures unbuilt
- * until backend compile: VarNode -> call -> jsFunc) so the spec can inspect
- * the real node DAG. Falls back to the raw node if internals change, which
- * fails the gate tests loudly instead of passing silently.
- */
-function materialize(node: unknown): unknown {
-	let current = node as Record<string, unknown> | null | undefined
-	if (current && typeof current === 'object' && current.node && typeof current.node === 'object') {
-		current = current.node as Record<string, unknown>
-	}
-	if (current && typeof current === 'object' && current.shaderNode && typeof current.shaderNode === 'object') {
-		current = current.shaderNode as Record<string, unknown>
-	}
-	if (current && typeof current === 'object' && typeof current.jsFunc === 'function') {
-		return (current.jsFunc as () => unknown)()
-	}
-	return node
-}
-
-/**
- * Structural check: does the TSL node DAG under `root` reference `target`
- * (by identity)? The lift gates live inside Fn closures, so the spec
- * materializes them and pins gate presence by the shared uniform/texture
- * instance instead of pixels.
- */
-function graphReferences(root: unknown, target: unknown): boolean {
-	const seen = new Set<unknown>()
-	const stack: unknown[] = [root]
-	while (stack.length > 0) {
-		const node = stack.pop()
-		if (!node || typeof node !== 'object' || seen.has(node)) continue
-		seen.add(node)
-		if (node === target) return true
-		for (const key of Object.keys(node)) {
-			const value = (node as Record<string, unknown>)[key]
-			if (value && typeof value === 'object') stack.push(value)
-		}
-	}
-	return false
 }
 
 describe('bulb-lift volume (below-cabinet light leak)', () => {

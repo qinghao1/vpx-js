@@ -149,7 +149,6 @@ export function createPrimitiveBdlMaterial(opts: PrimitiveBdlOptions): MeshStand
 	userData.__primitiveKind = PRIMITIVE_BDL_KIND
 	userData.__uAlbedo = uAlbedo
 	userData.__uBDL = uBDL
-	userData.__uDim = uLitF
 	userData.__uLitF = uLitF
 	userData.__uCarry = uCarry
 	userData.__uAlpha = uAlpha
@@ -160,25 +159,11 @@ export function createPrimitiveBdlMaterial(opts: PrimitiveBdlOptions): MeshStand
 	userData.__alphaTestValue = opts.alphaTestValue ?? 0
 	userData.__doubleSided = opts.doubleSided !== false
 	const rebuild = (map: ThreeTexture | null): void => {
-		// Native (material.sh DoPointLight tail + lightLoop): each light returns
-		// mix(litResult, diffuse, BDL) summed over TWO point lights, and BDL == 1.0
-		// swaps the point lights for the kept-for-compat 2x diffuse bug. Fractional
-		// BDL is a linear ramp: BDL 0.5 yields half lit result plus 1x diffuse
-		// (2*0.5, one BDL share per light). For BDL >> 1 (TWD drives 130..8500)
-		// diffuse stays fully dimmed and ~2*BDL x diffuse rides emissive: native's
-		// flare regime is dominated by 2*BDL*diffuse (its per-light result is ~0
-		// there), while extrapolating (1-BDL) against three.js scene lighting
-		// would subtract light and blacken inserts that render bright upstream.
-		// The lit scale rides the color slot and the unlit carry rides emissive.
-		// Matches native at BDL 0 (fully lit) and BDL 1 (2x fullbright).
+		// Composite BDL + transmission math: see the canonical explanation in
+		// primitive-material-protocol.ts (bdlDiffuseFactor/bdlEmissiveCarry/belowFactor).
 		// Keep one texture node per slot: sharing a single texture node across
 		// color/opacity/emissive slots breaks the TSL graph on some drivers, while
 		// separate fetches stay correct.
-		// Native (fs_basic.sc transmission tail): sqrt(diffuse) * bulbBuffer * alpha
-		// is mixed in by (1 - below): script fades below from -1 (2x lift, lamp off)
-		// to +1 (none, lamp on), and only lands on non-opaque pixels (color.a < 1).
-		// The buffer lives in playfield-UV space and is sampled per-pixel from the
-		// fragment's own table location, mirroring the native per-pixel lookup.
 		if (map) {
 			const texColor = texture(map, uv())
 			const texAlpha = texture(map, uv())
@@ -245,7 +230,6 @@ export function createPrimitiveAdditiveMaterial(opts: PrimitiveAdditiveOptions):
 	userData.__primitiveKind = PRIMITIVE_ADDITIVE_KIND
 	userData.__addBlend = true
 	userData.__uTint = uTint
-	userData.__uTintColor = uTint
 	userData.__uIntensity = uIntensity
 	userData.__uFlat = uFlat
 	userData.__mapName = opts.mapName

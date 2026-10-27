@@ -3,7 +3,6 @@
 
 export * from './imaterial-generator.js'
 export * from './material-shared.js'
-export * from './nodes/additive-overlay-node.js'
 export * from './nodes/ball-reflection-node.js'
 export * from './nodes/dmd-node.js'
 export * from './nodes/unshaded-baked-node.js'

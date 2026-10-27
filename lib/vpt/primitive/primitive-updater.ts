@@ -15,6 +15,7 @@ import {
 	isPrimitiveNodeMaterial,
 	PRIMITIVE_ADDITIVE_KIND,
 	PRIMITIVE_BDL_KIND,
+	resolveTransparency,
 	updatePrimitiveAdditive,
 	updatePrimitiveBdl,
 } from './primitive-material-protocol.js'
@@ -173,7 +174,7 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 	}
 
 	private applyColor<NODE>(obj: NODE, table: Table): void {
-		// Native albedo/BDL mix (see primitive-bdl-node.ts for the canonical explanation).
+		// Native albedo/BDL mix (see primitive-material-protocol.ts for the canonical explanation).
 		const prim = this.state.color ?? this.data.color
 		const dlTop = this.state.disableLightingTop ?? this.data.disableLightingTop
 		const rawAlpha = this.state.alpha ?? this.data.alpha
@@ -215,7 +216,7 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 				continue
 			}
 			if (kind === PRIMITIVE_BDL_KIND) {
-				const opacity = Math.min(1, Math.max(0, effectiveAlpha * ALPHA_SCALE * matOpacity))
+				const dynamicOpacity = Math.min(1, Math.max(0, effectiveAlpha * ALPHA_SCALE * matOpacity))
 				// Native (primitive.cpp:1135): static-marked objects force below to 1.0 — no bulb light in the static prepass.
 				const below = this.data.staticRendering
 					? 1
@@ -225,11 +226,17 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 				// per-pixel lookup (fs_basic.sc) with no per-primitive anchor.
 				updatePrimitiveBdl(mat, {
 					albedo: hex,
-					opacity,
+					opacity: dynamicOpacity,
 					bdl,
 					below,
 				})
-				const transparent = opacity < 0.999
+				// Shared with creation (see resolveTransparency): the file-level rule
+				// plus the lamp/slnk-scaled dynamic fade.
+				const { transparent } = resolveTransparency(
+					matObj,
+					(mat as { userData?: { __map?: { isOpaque?: boolean } | null } }).userData?.__map ?? null,
+					dynamicOpacity,
+				)
 				if (mat.transparent !== transparent || mat.depthWrite === transparent) {
 					mat.transparent = transparent
 					mat.depthWrite = !transparent
@@ -242,7 +249,6 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 				// the playfield with dark sockets.
 				continue
 			}
-			if (mat.userData?.__uTintColor?.value?.set) mat.userData.__uTintColor.value.set(hex)
 			if (mat.userData?.__uTint?.value?.set) mat.userData.__uTint.value.set(hex)
 		}
 	}
@@ -291,9 +297,12 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 			const mat = mesh.material as any
 			if (!mat || isPrimitiveNodeMaterial(mat)) continue
 			const rawAlpha = this.state.alpha ?? this.data.alpha
-			const opacity = Math.min(1, Math.max(0, rawAlpha * ALPHA_SCALE))
+			const dynamicOpacity = Math.min(1, Math.max(0, rawAlpha * ALPHA_SCALE))
+			// Same shared rule as creation/BDL (file part is empty here, so this only
+			// centralizes the 0.999 cutout with the fade term).
+			const { opacity, transparent } = resolveTransparency(undefined, null, dynamicOpacity)
 			mat.opacity = opacity
-			mat.transparent = opacity < 0.999
+			mat.transparent = transparent
 			mat.depthWrite = !mat.transparent
 			mat.depthTest = true
 			if (mat.blending !== 1 && !mat.userData?.__addBlend) mat.blending = 1

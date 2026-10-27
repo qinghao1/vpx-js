@@ -12,9 +12,17 @@ import {
 import { Fn, texture, uniform, uv, vec4 } from 'three/tsl'
 import type { RenderInfo } from '../../game/interfaces.js'
 import type { Material } from '../../vpt/material.js'
+import { resolveTransparency } from '../../vpt/primitive/primitive-material-protocol.js'
 import type { MeshConvertOptions } from '../irender-api.js'
 import type { IMaterialGenerator } from './imaterial-generator.js'
-import { BALL_METALNESS, BALL_ROUGHNESS, isBaked, pendingKeyFor, setGlobalEmissionScale } from './material-shared.js'
+import {
+	BALL_METALNESS,
+	BALL_ROUGHNESS,
+	isBaked,
+	normalizePendingKeys,
+	pendingKeyFor,
+	setGlobalEmissionScale,
+} from './material-shared.js'
 import { createDynamicBallNodeMaterial } from './nodes/ball-reflection-node.js'
 import { createBulbGlowNodeMaterial } from './nodes/bulb-glow-node.js'
 import {
@@ -38,14 +46,29 @@ export const ADD_BLEND_ABSORB = 2
 
 type PendingTexKey = 'map' | 'normalMap' | 'envMap' | 'emissiveMap'
 
-const PENDING_KEYS_BY_KIND = {
-	// Baked map rides the baked node slot but normal/env/emissive maps bind via
-	// the classic slots (see applyArrivedTexture), so all four must resolve here
-	// or a script-applied map that arrives via stream/demand strands forever.
-	baked: ['map', 'normalMap', 'envMap', 'emissiveMap'],
-	primitive: ['map', 'normalMap', 'envMap'],
-	classic: ['map', 'normalMap', 'envMap', 'emissiveMap'],
-} as const satisfies Record<string, readonly PendingTexKey[]>
+type MaterialKind = 'baked' | 'primitive' | 'classic'
+
+/** Where one texture slot binds for one material kind. */
+type SlotRoute = 'node-map' | 'classic' | 'ignore'
+
+/**
+ * Single kind×key routing table replacing the three parallel kind×key
+ * dispatches (pending-key enumeration, `applyTexture`, `applyArrivedTexture`).
+ * Baked maps ride the baked node slot; normal/env maps ride the classic slots
+ * on every kind. Primitives carry no emissive path (native has no primitive
+ * emissive slot), so `emissiveMap` on primitives is `ignore`: never stashed,
+ * so `demandPendingMaps` loads no texture nobody binds.
+ */
+const SLOT_ROUTES: Record<MaterialKind, Record<PendingTexKey, SlotRoute>> = {
+	baked: { map: 'node-map', normalMap: 'classic', envMap: 'classic', emissiveMap: 'classic' },
+	primitive: { map: 'node-map', normalMap: 'classic', envMap: 'classic', emissiveMap: 'ignore' },
+	classic: { map: 'classic', normalMap: 'classic', envMap: 'classic', emissiveMap: 'classic' },
+}
+
+const PENDING_TEX_KEYS: readonly PendingTexKey[] = ['map', 'normalMap', 'envMap', 'emissiveMap']
+
+const kindOf = (mat: unknown): MaterialKind =>
+	isBakedNodeMaterial(mat) ? 'baked' : isPrimitiveNodeMaterial(mat) ? 'primitive' : 'classic'
 
 export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 	private readonly cachedMaterials: Record<string, any> = {}
@@ -95,6 +118,7 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 			obj.backfacesEnabled,
 			alphaTestValue,
 			obj.addBlendMode,
+			(obj as { disableLightingBelow?: number }).disableLightingBelow ?? 0,
 		)
 	}
 
@@ -130,6 +154,7 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 		backfacesEnabled?: boolean,
 		alphaTestValue = 0,
 		addBlendMode?: number,
+		disableLightingBelow = 0,
 	): any {
 		const key = this.getKey(
 			material,
@@ -144,6 +169,7 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 			backfacesEnabled,
 			alphaTestValue,
 			addBlendMode,
+			disableLightingBelow,
 		)
 		const cached = this.cachedMaterials[key]
 		if (cached) return cached
@@ -234,20 +260,26 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 		}
 
 		const tex = (mapName && this.mapGenerator.hasTexture(mapName) && this.mapGenerator.getTexture(mapName)) || null
-		const matOpacity = material?.isOpacityActive ? Math.min(1, Math.max(0, material.opacity)) : 1
+		// Shared with the updater (see resolveTransparency): the fresh material must already
+		// carry the file-level blend state or the first frame disagrees with script updates.
+		const { opacity: matOpacity, transparent: matTransparent } = resolveTransparency(material, tex)
 		mat = createPrimitiveBdlMaterial({
 			map: tex ?? undefined,
 			mapName,
 			albedo: baseHex,
 			opacity: matOpacity,
 			bdl: Math.max(0, disableLighting ?? 0),
+			below: Math.max(0, disableLightingBelow),
 			metalness: isBall ? BALL_METALNESS : material?.isMetal ? 1 : 0,
+			// Upstream roughness is exp2(10*r+1) shininess; three.js takes 0..1 roughness, so the file value is inverted.
 			roughness: isBall ? BALL_ROUGHNESS : material ? Math.max(0, Math.min(1, 1 - material.roughness)) : 0.4,
 			alphaTestValue,
 			doubleSided: backfacesEnabled !== false || isTransparent,
 			depthBias,
 		})
 		mat.name = material ? `material:${material.name}` : 'material:primitive'
+		mat.transparent = matTransparent
+		mat.depthWrite = !matTransparent
 		this.stashCutout(mat, alphaTestValue, depthBias, false)
 		if (!tex && mapName) (mat.userData as any)[pendingKeyFor('map')] = mapName
 		this.applyNormalMap(mat, normalMap)
@@ -278,6 +310,7 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 			threeMaterial.roughness = BALL_ROUGHNESS
 		} else {
 			threeMaterial.metalness = material.isMetal ? 1 : 0
+			// Same inversion as creation: upstream exp2 shininess vs three.js 0..1 roughness.
 			threeMaterial.roughness = Math.max(0, Math.min(1, 1 - material.roughness))
 		}
 		try {
@@ -350,51 +383,29 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 		init?: (material: any) => void,
 	): void {
 		if (!name) return
+		// Single kind×key dispatch (see SLOT_ROUTES): `ignore` drops the key
+		// unbound so demandPendingMaps loads no texture nobody binds, `node-map`
+		// rebuilds the node graph, `classic` assigns the classic texture slot.
+		const route = SLOT_ROUTES[kindOf(mat)][key]
+		if (route === 'ignore') {
+			delete (mat.userData as any)[pendingKeyFor(key)]
+			return
+		}
 		if (!this.mapGenerator.hasTexture(name)) {
-			// Primitives carry no emissive path (the arrival branch below
-			// deletes this key unbound and no resolver consumes it), so never
-			// stash it: demandPendingMaps would load a texture nobody binds.
-			if (key === 'emissiveMap' && isPrimitiveNodeMaterial(mat)) {
-				delete (mat.userData as any)[pendingKeyFor(key)]
-				return
-			}
 			;(mat.userData as any)[pendingKeyFor(key)] = name
-			if (key === 'map') {
-				if (isBakedNodeMaterial(mat)) {
-					if (setBakedMap(mat, null, name)) mat.needsUpdate = true
-				} else if (isPrimitiveNodeMaterial(mat)) {
-					if (setPrimitiveMap(mat, null, name)) mat.needsUpdate = true
-				}
+			if (route === 'node-map') {
+				const changed =
+					kindOf(mat) === 'baked' ? setBakedMap(mat, null, name) : setPrimitiveMap(mat, null, name)
+				if (changed) mat.needsUpdate = true
 			}
 			return
 		}
 		const tex = this.mapGenerator.getTexture(name)
-		if (isBakedNodeMaterial(mat)) {
-			if (key === 'map') {
-				const changed = setBakedMap(mat, tex, name)
-				const cut = this.restoreCutout(mat, tex)
-				if (changed || cut) mat.needsUpdate = true
-				delete (mat as any).userData[pendingKeyFor(key)]
-			} else {
-				this.assignClassicSlot(mat, key, tex, name, init)
-			}
-			return
-		}
-		if (isPrimitiveNodeMaterial(mat)) {
-			// Native primitives carry a single albedo map; normal/env maps ride the classic
-			// slots so lighting stays intact. EmissiveMap is intentionally ignored here (no
-			// native primitive emissive path), so applyEmissiveMap is a no-op on these
-			// materials even though IMaterialGenerator requires the method.
-			if (key === 'map') {
-				const changed = setPrimitiveMap(mat, tex, name)
-				const cut = this.restoreCutout(mat, tex)
-				if (changed || cut) mat.needsUpdate = true
-				delete (mat as any).userData[pendingKeyFor(key)]
-			} else if (key === 'normalMap' || key === 'envMap') {
-				this.assignClassicSlot(mat, key, tex, name, init)
-			} else {
-				delete (mat as any).userData[pendingKeyFor(key)]
-			}
+		if (route === 'node-map') {
+			const changed = kindOf(mat) === 'baked' ? setBakedMap(mat, tex, name) : setPrimitiveMap(mat, tex, name)
+			const cut = this.restoreCutout(mat, tex)
+			if (changed || cut) mat.needsUpdate = true
+			delete (mat as any).userData[pendingKeyFor(key)]
 			return
 		}
 		if (!this.assignClassicSlot(mat, key, tex, name, init)) return
@@ -432,63 +443,71 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 
 	private resolvePendingOnMaterial(mat: any): number {
 		const userData = (mat as any).userData as any
-		const keys = isBakedNodeMaterial(mat)
-			? PENDING_KEYS_BY_KIND.baked
-			: isPrimitiveNodeMaterial(mat)
-				? PENDING_KEYS_BY_KIND.primitive
-				: PENDING_KEYS_BY_KIND.classic
+		normalizePendingKeys(userData)
+		const kind = kindOf(mat)
 		let fixed = 0
-		for (const texKey of keys) {
+		for (const texKey of PENDING_TEX_KEYS) {
+			const route = SLOT_ROUTES[kind][texKey]
 			const pendingKey = pendingKeyFor(texKey)
+			if (route === 'ignore') {
+				// Legacy userData may still carry the key; drop it unbound (see SLOT_ROUTES).
+				delete userData[pendingKey]
+				continue
+			}
 			const name = userData[pendingKey]
 			if (!name || !this.mapGenerator.hasTexture(name)) continue
 			const tex = this.mapGenerator.getTexture(name)
-			if (this.applyArrivedTexture(mat, userData, texKey, tex, name)) fixed++
+			if (this.applyArrivedTexture(mat, userData, texKey, tex, name, route)) fixed++
 			delete userData[pendingKey]
 		}
 		return fixed
 	}
 
-	private applyArrivedTexture(mat: any, userData: any, texKey: PendingTexKey, tex: any, name: string): boolean {
-		if (isBakedNodeMaterial(mat)) {
-			if (texKey !== 'map') {
-				return this.assignClassicSlot(mat, texKey, tex, name, (target: any) => {
-					if (texKey === 'envMap') target.envMapIntensity = 1
-				})
-			}
-			const changed = setBakedMap(mat, tex, name)
+	private applyArrivedTexture(
+		mat: any,
+		userData: any,
+		texKey: PendingTexKey,
+		tex: any,
+		name: string,
+		route: SlotRoute = SLOT_ROUTES[kindOf(mat)][texKey],
+	): boolean {
+		if (route === 'ignore') return false
+		if (route === 'node-map') {
+			// Short-circuit preserved: a remapped map already flags the program change,
+			// so the cutout restore only runs when the map did not change.
+			const changed = kindOf(mat) === 'baked' ? setBakedMap(mat, tex, name) : setPrimitiveMap(mat, tex, name)
 			const cut = this.restoreCutout(mat, tex)
 			if (changed || cut) (mat as any).needsUpdate = true
 			return changed || cut
 		}
-		if (isPrimitiveNodeMaterial(mat)) {
-			// Short-circuit preserved: a remapped map already flags the program change,
-			// so the cutout restore only runs when the map did not change.
-			if (texKey === 'map') return setPrimitiveMap(mat, tex, name) || this.restoreCutout(mat, tex)
-			if ((mat as any)[texKey] === tex) return false
-			;(mat as any)[texKey] = tex
-			;(tex as any).name = name
-			if (texKey === 'envMap') (mat as any).envMapIntensity = 1
-			;(mat as any).needsUpdate = true
-			return true
+		const changed = this.assignClassicSlot(mat, texKey, tex, name, (target: any) => {
+			if (texKey === 'envMap') target.envMapIntensity = 1
+		})
+		if (texKey === 'map') {
+			if (userData.__isBaked) {
+				this.refreshBakedMapTint(mat, tex, userData)
+				;(mat as any).needsUpdate = true
+			} else {
+				this.restoreCutout(mat, tex)
+				;(mat as any).needsUpdate = true
+			}
 		}
-		;(mat as any)[texKey] = tex
-		;(tex as any).name = name
-		if (texKey === 'map' && userData.__isBaked) this.refreshBakedMapTint(mat, tex, userData)
-		if (texKey === 'envMap') (mat as any).envMapIntensity = 1
-		if (texKey === 'map') this.restoreCutout(mat, tex)
-		;(mat as any).needsUpdate = true
-		return true
+		return changed
 	}
 
-	private refreshBakedMapTint(mat: any, tex: any, userData: any): void {
+	private refreshBakedMapTint(mat: any, tex: any, userData: any): boolean {
+		if (isBakedNodeMaterial(mat)) {
+			// Node materials refresh through the authored factory rebuild, which keeps
+			// the transmission bulb lift. Hand-building colorNode here would drop it.
+			return setBakedMap(mat, tex ?? null, (tex as { name?: string } | null)?.name)
+		}
 		const uTint = (userData.__uTint as any) ?? uniform(new Color(0xffffff))
 		if ((uTint as any).value) (uTint as any).value.set(0xffffff)
 		const texNode = texture(tex, uv())
 		mat.colorNode = Fn(() => vec4(texNode.rgb.mul(uTint), texNode.a))()
 		userData.__uTint = uTint
-		userData.__uTintColor = uTint
 		mat.side = DoubleSide
+		return false
 	}
 
 	public getKey(
@@ -504,7 +523,8 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 		backfacesEnabled?: boolean,
 		alphaTestValue = 0,
 		addBlendMode?: number,
+		disableLightingBelow = 0,
 	): string {
-		return `${material?.name ?? 'none'}:${map ?? 'none'}:${normalMap ?? 'none'}:${envMap ?? 'none'}:${emissiveMap ?? 'none'}:${isTransparent ? 't' : 'o'}:${depthBias}:${disableLighting ?? 'x'}:${addBlend ? 'a' : 'o'}:${backfacesEnabled ?? 'x'}:${alphaTestValue}:${addBlendMode ?? 'x'}`
+		return `${material?.name ?? 'none'}:${map ?? 'none'}:${normalMap ?? 'none'}:${envMap ?? 'none'}:${emissiveMap ?? 'none'}:${isTransparent ? 't' : 'o'}:${depthBias}:${disableLighting ?? 'x'}:${addBlend ? 'a' : 'o'}:${backfacesEnabled ?? 'x'}:${alphaTestValue}:${addBlendMode ?? 'x'}:${disableLightingBelow}`
 	}
 }

@@ -30,6 +30,28 @@ export const getGlobalEmissionScale = () => _globalEmissionScale
 export const pendingKeyFor = (key: 'map' | 'normalMap' | 'envMap' | 'emissiveMap'): string =>
 	`pending${key.charAt(0).toUpperCase()}${key.slice(1)}`
 
+/** Legacy lowercase streaming key. Canonical is `pendingMap`; normalize once at ingestion. */
+const LEGACY_PENDING_MAP = 'pendingmap'
+
+/**
+ * Normalize the legacy `pendingmap` spelling to the canonical `pendingMap` once,
+ * at ingestion. External/table userData may carry either spelling; in-tree writers
+ * only ever stash the canonical key (see `pendingKeyFor`).
+ */
+export function normalizePendingKeys(userData: Record<string, unknown>): void {
+	if (typeof userData[LEGACY_PENDING_MAP] === 'string' && typeof userData.pendingMap !== 'string') {
+		userData.pendingMap = userData[LEGACY_PENDING_MAP]
+	}
+	delete userData[LEGACY_PENDING_MAP]
+}
+
+/** Single tolerant read of the pending diffuse-map name (normalizes the legacy spelling). */
+export function pendingMapOf(userData: Record<string, unknown> | undefined): string {
+	if (!userData) return ''
+	normalizePendingKeys(userData)
+	return typeof userData.pendingMap === 'string' ? userData.pendingMap : ''
+}
+
 // Native (Primitive::Render) selects the additive overlay path purely by the file addBlend
 // flag. DepthBias is a transparent sort key (RenderDevice::DrawMesh), not a polygon offset,
 // and BlendDisableLighting mixes lit/unlit in-shader. Baked-lightmap detection below is a

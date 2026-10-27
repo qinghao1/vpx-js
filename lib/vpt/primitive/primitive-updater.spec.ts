@@ -126,14 +126,14 @@ describe('The VPinball primitive updater', () => {
 			.applyState(mesh, { disableLightingTop: 875 } as PrimitiveState, renderApi, table)
 		const mat = mesh.material as any
 		expect(mat.userData.__uBDL.value, 'HDR overdrive rides the emissive uniform').to.equal(875)
-		expect(mat.userData.__uDim.value, 'overdriven diffuse is fully dimmed').to.equal(0)
+		expect(mat.userData.__uLitF.value, 'overdriven diffuse is fully dimmed').to.equal(0)
 		expect(mat.userData.__uCarry.value, 'overdrive carry equals 2xBDL (two lights)').to.equal(1750)
 		expect(mat.emissiveNode, 'unlit travels on emissive, never outputNode mix').to.not.equal(null)
 		expect(mat.outputNode, 'no outputNode mix to drive negative').to.equal(null)
 		table.primitives.well
 			.getUpdater()
 			.applyState(mesh, { disableLightingTop: 0 } as PrimitiveState, renderApi, table)
-		expect(mat.userData.__uDim.value, 'undriven diffuse stays fully lit').to.equal(1)
+		expect(mat.userData.__uLitF.value, 'undriven diffuse stays fully lit').to.equal(1)
 	})
 
 	it('should keep an undriven insert (BDL=0) scene-lit with no unlit bias', () => {
@@ -330,7 +330,7 @@ describe('The VPinball primitive updater', () => {
 			.getUpdater()
 			.applyState(mesh, { disableLightingTop: 1 } as PrimitiveState, renderApi, table)
 		const mat = mesh.material as any
-		expect(mat.userData.__uTintColor?.value.getHex(), 'baked tint must carry the dark base').to.equal(0x323232)
+		expect(mat.userData.__uTint?.value.getHex(), 'baked tint must carry the dark base').to.equal(0x323232)
 	})
 
 	it('should keep script HDR on additive overlays (alpha 250 => 2.5x, not clamped to 1)', () => {

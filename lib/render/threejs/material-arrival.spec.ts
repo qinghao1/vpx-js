@@ -2,7 +2,10 @@ import { BoxGeometry, DataTexture, Group, Mesh, MeshStandardMaterial } from 'thr
 import { describe, expect, it } from 'vitest'
 import { cloneMaterialForWrite } from './material-shared.js'
 import { createPrimitiveBdlMaterial } from './nodes/primitive-bdl-node.js'
+import { graphReferences, materialize } from './nodes/tsl-test-harness.js'
+import { isBakedNodeMaterial } from './nodes/unshaded-baked-node.js'
 import { ThreeNodeMaterialGenerator } from './three-node-material-generator.js'
+import { getTransmissionTexture } from './transmission-buffer.js'
 
 function makeGenerator(textures: Map<string, DataTexture>) {
 	return new ThreeNodeMaterialGenerator({
@@ -137,6 +140,35 @@ describe('material arrival: BDL uniforms survive streaming', () => {
 		const mat: any = createPrimitiveBdlMaterial({ albedo: 0xffffff, opacity: 1, bdl: 0 })
 		generator.applyEmissiveMap(mat, { name: 'p', baseColor: 0xffffff } as any, 'emissiveonly')
 		expect(mat.userData.pendingEmissiveMap).toBeUndefined()
+	})
+
+	it('drops legacy pendingEmissiveMap on primitive node materials instead of binding it', () => {
+		// The immediate path ignores primitive emissiveMap (no native slot), so the
+		// arrival path must agree: purge the key unbound rather than binding it.
+		const tex = makeTex()
+		const textures = new Map<string, DataTexture>([['emissiveonly', tex]])
+		const generator = makeGenerator(textures)
+		const mat: any = createPrimitiveBdlMaterial({ albedo: 0xffffff, opacity: 1, bdl: 0 })
+		mat.userData.pendingEmissiveMap = 'emissiveonly'
+		const fixed = (generator as any).resolvePendingOnMaterial(mat)
+		expect(fixed).toEqual(0)
+		expect(mat.emissiveMap ?? null).toBeNull()
+		expect(mat.userData.pendingEmissiveMap).toBeUndefined()
+	})
+
+	it('routes baked tint refresh through the node rebuild so the bulb lift survives arrival', () => {
+		// Hand-building colorNode here would drop the transmission lift; the node
+		// branch must rebuild the authored graph (tint uniform + bulb tail) instead.
+		const generator = makeGenerator(new Map())
+		const mat: any = (generator as any).getMaterial({ name: 'VLM.Bake', baseColor: 0xffffff } as any, 'bakemap')
+		expect(isBakedNodeMaterial(mat)).toBe(true)
+		const tex = makeTex()
+		;(tex as any).name = 'bakemap'
+		const changed = (generator as any).refreshBakedMapTint(mat, tex, mat.userData)
+		expect(changed).toBe(true)
+		expect(mat.userData.__map).toBe(tex)
+		const color = materialize(mat.colorNode)
+		expect(graphReferences(color, getTransmissionTexture()), 'arrived bake keeps the bulb lift').toBe(true)
 	})
 
 	it('resolves script-applied normal/env/emissive maps on baked materials', () => {

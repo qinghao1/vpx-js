@@ -13,7 +13,8 @@ export interface IMaterialGenerator {
 	 * lit, 1 = 2× fullbright, >1 = HDR multiples); alphaTestValue in (0, 1]
 	 * enables cutout, anything else disables it. Trailing addBlendMode is the
 	 * tri-state additive mode (0 plain, 1 additive, 2 absorb); absent derives
-	 * from addBlend.
+	 * from addBlend. Trailing disableLightingBelow seeds the bulb-lift gate
+	 * (0 = full lift, 1 = none); absent keeps the legacy full-lift default.
 	 */
 	getMaterial(
 		material?: Material,
@@ -28,6 +29,7 @@ export interface IMaterialGenerator {
 		backfacesEnabled?: boolean,
 		alphaTestValue?: number,
 		addBlendMode?: number,
+		disableLightingBelow?: number,
 	): ThreeMaterial
 	applyMaterial(threeMaterial: ThreeMaterial, material?: Material, isTransparent?: boolean): void
 	applyMap(threeMaterial: ThreeMaterial, map?: string): void
@@ -55,5 +57,6 @@ export interface IMaterialGenerator {
 		backfacesEnabled?: boolean,
 		alphaTestValue?: number,
 		addBlendMode?: number,
+		disableLightingBelow?: number,
 	): string
 }

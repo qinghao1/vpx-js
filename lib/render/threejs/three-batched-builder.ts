@@ -11,6 +11,7 @@ import {
 } from 'three'
 import { isLowQuality } from '../../util/quality.js'
 import type { Table } from '../../vpt/table/table.js'
+import { normalizePendingKeys, pendingMapOf } from './material-shared.js'
 import { RE_CAB, RE_VR } from './scene-classify.js'
 import type { ThreeRenderApi } from './three-render-api.js'
 
@@ -32,7 +33,7 @@ function signature(geo: BufferGeometry): string {
 function materialKey(mat: MeshStandardMaterial): string {
 	const ud = mat.userData as any
 	const map = (mat.map as any)?.name ?? 'nomap'
-	const pending = ud.pendingMap ?? ud.pendingmap ?? ''
+	const pending = pendingMapOf(ud)
 	const color = (mat.color as { getHex?: () => number } | undefined)?.getHex?.() ?? ''
 	const emissive = (mat.emissive as { getHex?: () => number } | undefined)?.getHex?.() ?? ''
 	// Node materials carry live appearance in uniforms (classic color/opacity/
@@ -40,12 +41,7 @@ function materialKey(mat: MeshStandardMaterial): string {
 	// + BDL state join the key alongside the classic props. Post-process forks
 	// (plastic DoubleSide, flipper white+emissive) preserve base.name, so every
 	// live prop must be keyed or same-name materials merge and one renders wrong.
-	const tint =
-		(
-			ud.__uAlbedo ??
-			ud.__uTint ??
-			(ud.__uTintColor as { value?: { getHex?: () => number } } | undefined)
-		)?.value?.getHex?.() ?? ''
+	const tint = (ud.__uAlbedo ?? ud.__uTint)?.value?.getHex?.() ?? ''
 	const bdl = ud.__uBDL?.value ?? ''
 	const below = ud.__below ?? ''
 	const alpha = ud.__uAlpha?.value ?? ''
@@ -63,7 +59,8 @@ export function canBatch(mat: MeshStandardMaterial): boolean {
 	if (!canBatchWebGpu(mat as any)) return false
 	const ud = mat.userData as any
 	if (!ud) return true
-	if (ud.pendingMap || ud.pendingmap || ud.pendingNormalMap || ud.pendingEnvMap || ud.pendingEmissiveMap) return false
+	normalizePendingKeys(ud)
+	if (pendingMapOf(ud) || ud.pendingNormalMap || ud.pendingEnvMap || ud.pendingEmissiveMap) return false
 	if (ud.__primitiveCloned) return false
 	return true
 }

@@ -1,5 +1,5 @@
 import type * as THREE from 'three'
-import { RE_BAKE_MAP, RE_BAKE_MAT } from './material-shared.js'
+import { isBaked, normalizePendingKeys, RE_BAKE_MAP, RE_BAKE_MAT } from './material-shared.js'
 
 export { RE_BAKE_MAP, RE_BAKE_MAT }
 export const RE_ALPHA_MESH = /armp|ramp|bat_|non[_-]?opaque|plastic|gate/i
@@ -35,6 +35,7 @@ export interface CustomMaterialUserData {
 	isCabinetButton?: boolean
 	buttonCode?: string
 	pendingMap?: string
+	/** Legacy lowercase spelling, normalized to `pendingMap` once at ingestion (see `normalizePendingKeys`). */
 	pendingmap?: string
 	pendingNormalMap?: string
 	pendingEnvMap?: string
@@ -44,8 +45,8 @@ export interface CustomMaterialUserData {
 
 export const pendingOf = (material: THREE.Material): string => {
 	const userData = material.userData as CustomMaterialUserData | undefined
-	const pending = userData?.pendingMap ?? userData?.pendingmap ?? ''
-	return String(pending).toLowerCase()
+	if (userData) normalizePendingKeys(userData)
+	return String(userData?.pendingMap ?? '').toLowerCase()
 }
 
 export const isGiOverlay = (name: string): boolean => RE_GI.test(name.toLowerCase())
@@ -56,12 +57,12 @@ export const isGiOverlay = (name: string): boolean => RE_GI.test(name.toLowerCas
 // addBlend true => additive unlit via SRC_ALPHA ONE, primitive.cpp:107/1171 alpha/100 HDR).
 export const classify = (mesh: string, mat: string, map: string, baked = false, addBlend = false): ClassifyResult => {
 	const matLower = mat.toLowerCase()
-	const mapLower = map.toLowerCase()
 	const meshLower = mesh.toLowerCase()
+	// Name-based bake detection is the single `isBaked` definition; only the
+	// mesh-name fallback (which needs mesh context `isBaked` lacks) stays here.
 	const isBakedMat =
 		baked ||
-		RE_BAKE_MAT.test(matLower) ||
-		(RE_BAKE_MAP.test(mapLower) && !mapLower.startsWith('vr_')) ||
+		isBaked({ name: mat }, map) ||
 		(RE_BAKE_MAP.test(meshLower) && !meshLower.startsWith('vr_') && !meshLower.includes('vr_'))
 	const isRampFamily = RE_RAMP_FAMILY.test(meshLower)
 	const isMainBake = isBakedMat && !addBlend

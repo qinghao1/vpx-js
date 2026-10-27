@@ -121,7 +121,6 @@ export function createUnshadedBakedNodeMaterial(options: BakedNodeMaterialOption
 	}
 
 	userData.__uTint = uTintColor
-	userData.__uTintColor = uTintColor
 	return mat
 }
 
@@ -137,10 +136,7 @@ export function cloneBakedNodeMaterial<T>(mat: T): T {
 	const sourceMaterial = mat as unknown as MeshBasicNodeMaterial & { userData: Record<string, unknown> }
 	if (!sourceMaterial?.userData?.__bakedNode || typeof sourceMaterial.clone !== 'function') return mat
 	const userData = sourceMaterial.userData
-	const tint =
-		(userData.__uTintColor as { value?: { getHex?: () => number } })?.value?.getHex?.() ??
-		(userData.__uTint as { value?: { getHex?: () => number } })?.value?.getHex?.() ??
-		0xffffff
+	const tint = (userData.__uTint as { value?: { getHex?: () => number } })?.value?.getHex?.() ?? 0xffffff
 	const cloned = createUnshadedBakedNodeMaterial({
 		map: (userData.__map as ThreeTexture | null) ?? (sourceMaterial.map as ThreeTexture | undefined) ?? undefined,
 		mapName: (userData.__mapName as string) ?? undefined,

@@ -59,6 +59,32 @@ export function belowFactor(below: number): number {
 	return Math.max(0, 1 - below)
 }
 
+/**
+ * Upstream alpha-blend enable rule (Shader.cpp `SetMaterial`, primitive.cpp callers):
+ * blend only when the file enables opacity AND (the map carries alpha — VPT
+ * `Texture::IsOpaque() == false` — OR the effective opacity is meaningfully
+ * below 1). The script-fade term additionally flips dynamic fades transparent
+ * even for file-opaque materials, matching the updater's long-standing rule.
+ * Single definition used by creation (`ThreeNodeMaterialGenerator`) and script
+ * updates (`PrimitiveUpdater`) so the first frame agrees with later frames.
+ * Lives here (not in render/material-shared) so both layers share it without
+ * the vpt layer depending on render.
+ */
+export function resolveTransparency(
+	material: { isOpacityActive?: boolean; opacity?: number } | undefined,
+	// VPT Texture (carries isOpaque) or three texture (no alpha signal: conservative false).
+	tex: unknown,
+	effectiveOpacity?: number,
+): { opacity: number; transparent: boolean } {
+	const active = !!material?.isOpacityActive
+	const fileOpacity = active ? Math.min(1, Math.max(0, material?.opacity ?? 1)) : 1
+	const opacity =
+		effectiveOpacity === undefined ? fileOpacity : Math.min(1, Math.max(0, Math.min(fileOpacity, effectiveOpacity)))
+	const hasAlpha = !!tex && (tex as { isOpaque?: unknown }).isOpaque === false
+	const transparent = (active && (hasAlpha || fileOpacity < 0.999)) || opacity < Math.min(fileOpacity, 0.999)
+	return { opacity, transparent }
+}
+
 export function isPrimitiveNodeMaterial(mat: unknown): boolean {
 	const kind = (mat as { userData?: { __primitiveKind?: string } })?.userData?.__primitiveKind
 	return kind === PRIMITIVE_BDL_KIND || kind === PRIMITIVE_ADDITIVE_KIND
@@ -76,7 +102,6 @@ export function updatePrimitiveBdl(mat: unknown, opts: PrimitiveBdlUpdate): void
 	if (opts.opacity !== undefined) (userData.__uAlpha as { value: number }).value = opts.opacity
 	if (opts.bdl !== undefined) {
 		;(userData.__uBDL as { value: number }).value = opts.bdl
-		;(userData.__uDim as { value: number }).value = bdlDiffuseFactor(opts.bdl)
 		;(userData.__uLitF as { value: number }).value = bdlDiffuseFactor(opts.bdl)
 		;(userData.__uCarry as { value: number }).value = bdlEmissiveCarry(opts.bdl)
 	}

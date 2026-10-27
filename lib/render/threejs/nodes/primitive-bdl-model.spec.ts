@@ -142,7 +142,6 @@ describe('primitive BDL node material', () => {
 		updatePrimitiveBdl(material, { bdl: 0.5 })
 		expect(userData.__uBDL.value).to.equal(0.5)
 		expect(userData.__uLitF.value).to.equal(0.5)
-		expect(userData.__uDim.value).to.equal(0.5)
 		expect(userData.__uCarry.value).to.equal(1)
 		updatePrimitiveBdl(material, { bdl: 130 })
 		// Overdrive dims diffuse fully; the HDR carry rides emissive (see above).
@@ -248,7 +247,7 @@ describe('unshaded baked node material', () => {
 		// the Walking Dead apron at scale 0.25 to near-black.
 		const material = createUnshadedBakedNodeMaterial({ tint: 0x808080, mapName: 'tex.png' })
 		const userData = material.userData as Record<string, { value?: { getHex?: () => number } }>
-		expect(userData.__uTintColor?.value?.getHex?.()).to.equal(0x808080)
+		expect(userData.__uTint?.value?.getHex?.()).to.equal(0x808080)
 		expect(userData.__uEmissionScale).to.equal(undefined)
 	})
 
@@ -262,7 +261,7 @@ describe('unshaded baked node material', () => {
 			)
 			expect(isBakedNodeMaterial(material)).to.equal(true)
 			const userData = (material as any).userData as Record<string, { value?: { getHex?: () => number } }>
-			expect(userData.__uTintColor?.value?.getHex?.()).to.equal(0x808080)
+			expect(userData.__uTint?.value?.getHex?.()).to.equal(0x808080)
 			expect(userData.__uEmissionScale).to.equal(undefined)
 		} finally {
 			setGlobalEmissionScale(1)

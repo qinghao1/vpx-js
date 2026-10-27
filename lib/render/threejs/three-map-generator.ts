@@ -7,6 +7,7 @@ import { logger, progress } from '../../util/logger.js'
 import type { Table } from '../../vpt/table/table.js'
 import { Texture } from '../../vpt/texture.js'
 import type { ITextureLoader } from '../irender-api.js'
+import { normalizePendingKeys } from './material-shared.js'
 
 /** `userData` slot keys holding not-yet-arrived texture names (see `MaterialSlots`). */
 const PENDING_KEYS = ['pendingMap', 'pendingmap', 'pendingNormalMap', 'pendingEnvMap', 'pendingEmissiveMap']
@@ -203,8 +204,10 @@ export class ThreeMapGenerator {
 			const mesh = o as Mesh
 			if (!mesh.isMesh || !mesh.material) return
 			for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
+				const userData = (material as Material & { userData?: Record<string, unknown> }).userData
+				if (userData) normalizePendingKeys(userData)
 				for (const key of PENDING_KEYS) {
-					const name = (material as Material & { userData?: Record<string, unknown> }).userData?.[key]
+					const name = userData?.[key]
 					if (typeof name === 'string' && name && !this.hasTexture(name)) wanted.add(name)
 				}
 			}

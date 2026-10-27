@@ -90,7 +90,7 @@ describe('The VPinball primitive updater regression net', () => {
 			const mat = mesh.material as any
 			expect(mat.userData.__uAlbedo.value.getHex(), `${c.name} BDL=${c.bdl} albedo`).to.equal(c.albedo)
 			expect(mat.userData.__uBDL.value, `${c.name} BDL uniform`).to.equal(c.bdl)
-			expect(mat.userData.__uDim.value, `${c.name} lit factor`).to.equal(c.lit)
+			expect(mat.userData.__uLitF.value, `${c.name} lit factor`).to.equal(c.lit)
 			expect(mat.userData.__uCarry.value, `${c.name} emissive carry`).to.equal(c.carry)
 			expect(mat.transparent, `${c.name} stays opaque at alpha 100`).to.equal(false)
 			expect(mat.depthWrite, `${c.name} keeps writing depth`).to.equal(true)

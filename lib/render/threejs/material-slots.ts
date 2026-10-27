@@ -32,13 +32,13 @@ export interface MaterialSlots {
 	__baseColor?: number
 	__uAlbedo?: SlotUniform<Color>
 	__uBDL?: SlotUniform<number>
-	__uDim?: SlotUniform<number>
+	/** Canonical BDL lit-factor uniform. The legacy `__uDim` alias was removed; read this. */
 	__uLitF?: SlotUniform<number>
 	__uCarry?: SlotUniform<number>
 	__uAlpha?: SlotUniform<number>
 	__uBelowF?: SlotUniform<number>
+	/** Canonical tint uniform (BDL `__uFlat` source, baked albedo). The legacy `__uTintColor` alias was removed; read this. */
 	__uTint?: SlotUniform<Color>
-	__uTintColor?: SlotUniform<Color>
 	__uIntensity?: SlotUniform<number>
 	__uFlat?: SlotUniform<Color>
 	__uEmissionScale?: SlotUniform<number>
@@ -47,6 +47,7 @@ export interface MaterialSlots {
 	__uAddScale?: SlotUniform<number>
 	__rebuild?: (next: Texture | null) => void
 	pendingMap?: string
+	/** Legacy lowercase spelling, normalized to `pendingMap` once at ingestion (see `normalizePendingKeys`). Never written in-tree. */
 	pendingmap?: string
 	pendingNormalMap?: string
 	pendingEnvMap?: string

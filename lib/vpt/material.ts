@@ -10,7 +10,16 @@ function dequantizeUnsigned(value: number, bits: number): number {
 	return Math.min(value / ((1 << bits) - 1), 1)
 }
 
-/** VPinball material. @see https://github.com/vpinball/vpinball/blob/master/src/parts/Material.h */
+/**
+ * VPinball material. @see https://github.com/vpinball/vpinball/blob/master/src/parts/Material.h
+ *
+ * Accepted render gap (upstream Shader.cpp `SetMaterial` consumes more than we do):
+ * `thickness`/`edge`/`edgeAlpha` (edge falloff + alpha), `wrapLighting` (diffuse
+ * wrap), `glossiness`/`glossyImageLerp` (clearcoat-ish lobe), and `clearCoat`
+ * have no three.js-side uniforms — threading them would need new BDL shader
+ * mixes for a mostly-subtle payoff, so files carrying them render with
+ * baseColor/metalness/roughness/opacity only. Revisit if a table visibly needs one.
+ */
 export class Material {
 	public name!: string
 	public wrapLighting?: number
