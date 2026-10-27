@@ -226,6 +226,30 @@ describe('ThreeRenderApi batched visibility', () => {
 		expect(meshB.visible).toBe(false)
 	})
 
+	it('counts failed batched-visibility writes into a debug stat instead of warning', () => {
+		const api = new ThreeRenderApi()
+		const mesh = new Mesh(new BoxGeometry(1, 1, 1), new MeshStandardMaterial())
+		const userData = mesh.userData as any
+		userData.__batched = {
+			batched: {
+				setMatrixAt: () => {
+					throw new Error('lost context')
+				},
+				setVisibleAt: () => {
+					throw new Error('lost context')
+				},
+			},
+			instanceId: 0,
+			isInstanced: true,
+			matrix: new Matrix4(),
+		}
+		mesh.name = 'kicker-k0'
+		expect(() => api.applyVisibility(false, mesh)).not.toThrow()
+		expect(api.batchVisibilityStats.hideFailed).to.equal(1)
+		expect(() => api.applyVisibility(true, mesh)).not.toThrow()
+		expect(api.batchVisibilityStats.restoreFailed).to.equal(1)
+	})
+
 	it('syncs batched slots from an ancestor without unhiding nested originals', () => {
 		// batchPair nests originals one level below the table root; hiding
 		// and showing from the root must drive the batch slot while the

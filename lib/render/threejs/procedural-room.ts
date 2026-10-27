@@ -1,5 +1,7 @@
 import * as THREE from 'three'
 
+// See the PMVM-deviation note on postProcessScene: upstream gates the room
+// on VR mode, this viewer always builds one unless the table ships VR meshes.
 export function ensureProceduralRoom(
 	scene: THREE.Scene,
 	center: THREE.Vector3,

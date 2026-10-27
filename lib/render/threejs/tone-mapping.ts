@@ -11,10 +11,15 @@ export function resolveToneMapping(tm?: number): number {
 	return TONE_TABLE[tm ?? -1] ?? AgXToneMapping
 }
 
-export function clampExposure(value: unknown, max = 2): number {
+/**
+ * Single owner of the exposure cap: the native 0..2 range, tightened to 1.5
+ * on the low-quality perf path (mirrors the low-q branch that used to live
+ * in applyRendererToneMapping).
+ */
+export function clampExposure(value: unknown, lowQuality = false): number {
 	const v = typeof value === 'number' ? value : Number(value)
 	if (!Number.isFinite(v)) return 1
-	return Math.max(0.1, Math.min(max, v))
+	return Math.max(0.1, Math.min(lowQuality ? 1.5 : 2, v))
 }
 
 export function applyRendererToneMapping(
@@ -23,5 +28,5 @@ export function applyRendererToneMapping(
 	isLowQuality: boolean,
 ): void {
 	renderer.toneMapping = resolveToneMapping(data?.toneMapper)
-	renderer.toneMappingExposure = clampExposure(data?.exposure, isLowQuality ? 1.5 : 2)
+	renderer.toneMappingExposure = clampExposure(data?.exposure, isLowQuality)
 }

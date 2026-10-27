@@ -181,6 +181,87 @@ describe('regression: artifact postprocess', () => {
 		expect(m.opacity, 'Overlay lightmap opacity must be 0 until activated').to.equal(0)
 		expect(m.emissiveIntensity, 'Overlay lightmap emissiveIntensity must be 0 until activated').to.equal(0)
 	})
+	it('hides only untextured green materials (textured green ramps stay visible)', () => {
+		const root = new THREE.Group()
+		root.name = 'table'
+		const greenMat = new THREE.MeshStandardMaterial({ color: 0xffffff })
+		greenMat.name = 'material:green plastic'
+		const greenMesh = makeMesh('primitive-rampflap', new THREE.BoxGeometry(200, 200, 200), greenMat)
+		root.add(greenMesh)
+
+		const texturedGreenMat = new THREE.MeshStandardMaterial({ color: 0xffffff })
+		texturedGreenMat.name = 'material:green plastic'
+		texturedGreenMat.map = new THREE.Texture()
+		texturedGreenMat.map.name = 'green_tex'
+		const texturedGreenMesh = makeMesh(
+			'primitive-rampright',
+			new THREE.BoxGeometry(200, 200, 200),
+			texturedGreenMat,
+		)
+		root.add(texturedGreenMesh)
+
+		const controlMat = new THREE.MeshStandardMaterial({ color: 0x888888 })
+		controlMat.name = 'material:screw'
+		const controlMesh = makeMesh('primitive-screw', new THREE.BoxGeometry(200, 200, 200), controlMat)
+		root.add(controlMesh)
+
+		root.updateMatrixWorld(true)
+		const stats = postProcessScene(root, { harnessLog: () => {}, viewerMode: 'viewer' })
+
+		expect(greenMesh.visible, 'untextured green ramp must still hide').to.equal(false)
+		expect(texturedGreenMesh.visible, 'textured green ramp must stay visible').to.equal(true)
+		expect(controlMesh.visible, 'non-green control must stay visible').to.equal(true)
+		expect(stats.greenHidden, 'only the untextured green offender hides').to.equal(1)
+	})
+
+	it('exempts only the exact ball material from the metal flattening pass', () => {
+		const root = new THREE.Group()
+		root.name = 'table'
+		const ballMat = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 1, roughness: 0.08 })
+		ballMat.name = 'material:ball'
+		const ballMesh = makeMesh('primitive-ball', new THREE.BoxGeometry(200, 200, 200), ballMat)
+		root.add(ballMesh)
+
+		const fireballMat = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 1, roughness: 0.1 })
+		fireballMat.name = 'material:fireball'
+		const fireballMesh = makeMesh('primitive-playfieldtoy', new THREE.BoxGeometry(200, 200, 200), fireballMat)
+		root.add(fireballMesh)
+
+		root.updateMatrixWorld(true)
+		const stats = postProcessScene(root, { harnessLog: () => {}, viewerMode: 'viewer' })
+
+		expect(ballMat.metalness, 'exact ball material keeps its metalness').to.equal(1)
+		const fixedFireball = fireballMesh.material as THREE.MeshStandardMaterial
+		expect(fixedFireball.metalness, 'ball-substring material must flatten like other metals').to.be.lessThan(1)
+		expect(stats.metalFixed, 'only the non-ball metal flattens').to.equal(1)
+	})
+
+	it('classify keeps vr/cab flags on the mesh name (no per-material disagreement)', () => {
+		// isVr/isCab derive from the mesh name alone, so OR-reducing classify
+		// across a multi-material mesh cannot disagree: this locks that
+		// semantic instead of adding a no-op reduction.
+		const vr = makeMesh(
+			'primitive-vr_wall',
+			new THREE.BoxGeometry(10, 10, 10),
+			new THREE.MeshStandardMaterial({ color: 0xffffff }),
+		)
+		vr.visible = false
+		const cab = makeMesh(
+			'primitive-vrcab_flipper',
+			new THREE.BoxGeometry(10, 10, 10),
+			new THREE.MeshStandardMaterial({ color: 0xffffff }),
+		)
+		cab.visible = false
+		const root = new THREE.Group()
+		root.name = 'table'
+		root.add(vr, cab)
+		root.updateMatrixWorld(true)
+		const stats = postProcessScene(root, { harnessLog: () => {}, viewerMode: 'viewer' })
+		expect(vr.visible, 'vr mesh forces visible in viewer mode').to.equal(true)
+		expect(stats.vrKept).to.be.greaterThan(0)
+		expect(cab.visible, 'vrcab flipper forces visible in viewer mode').to.equal(true)
+	})
+
 	it('VR room meshes and VR cabinet meshes must remain available in play and viewer modes', () => {
 		const root = new THREE.Group()
 		root.name = 'table'

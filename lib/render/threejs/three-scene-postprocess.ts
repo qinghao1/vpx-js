@@ -23,6 +23,7 @@ import {
 	applySlingVisibilityPass,
 	applyWhiteWallPass,
 	collectPostProcessNodes,
+	finishStatic,
 	firstMaterial,
 	hasBakedPlayfield,
 	hasVisibleBakedDuplicate,
@@ -68,6 +69,14 @@ function ensureSrgb(map: THREE.Texture | null | undefined): void {
 	}
 }
 
+// The pinball itself (VPX material exactly `ball`, generated as
+// `material:ball`) keeps its authored metalness; anything merely containing
+// the substring (fireball, balloon, ...) flattens like the rest.
+function isBallMaterial(matName: string | undefined): boolean {
+	const n = (matName ?? '').toLowerCase()
+	return n === 'ball' || n === 'material:ball'
+}
+
 // Insert/flasher textures stream in after generation; while pending, the mesh
 // hides (transparent black) instead of flashing its untextured fallback color.
 function isInsertPendingName(pending: unknown): boolean {
@@ -89,6 +98,13 @@ function isInsertPendingName(pending: unknown): boolean {
  * VR/cabinet visibility, glass/green-ramp/white-wall hiding, NaN sanitation.
  * Runs after generation (it classifies finished meshes by name/material) and
  * before batching (hidden meshes must not be batched). Returns per-pass stats.
+ *
+ * PMVM deviation (documented, not gated): upstream hides VR-room/cabinet
+ * groups outside VR mode via PartGroupData::PlayerModeVisibilityMask
+ * (PartGroup.h; Renderer.cpp picks PMVM_VIRTUAL_REALITY/CABINET/FSS/DESKTOP
+ * per player mode). This viewer always forces those meshes visible here and
+ * always builds a procedural room in ensureProceduralRoom so flat-screen
+ * tables look complete. Threading the real player mode through is a follow-up.
  */
 export function postProcessScene(
 	node: THREE.Object3D,
@@ -242,6 +258,9 @@ export function postProcessScene(
 			mats.some(material => {
 				const mn = (material?.name ?? '').toLowerCase()
 				const col = (material?.color as unknown as THREE.Color)?.getHexString?.()?.toLowerCase()
+				// Textured green (ramp art, playfield details) is authored
+				// content: only untextured flat-green offender meshes hide here.
+				if (material?.map || pendingOf(material)) return false
 				return mn.includes('green') || col === '00ff00'
 			})
 		) {
@@ -276,18 +295,12 @@ export function postProcessScene(
 					flipperMat.needsUpdate = true
 				}
 				ensureSrgb(mat.map)
-				mesh.castShadow = false
-				mesh.receiveShadow = false
+				finishStatic(mesh, undefined, false)
 				continue
 			}
 			if (info.isVr || info.isCab) {
 				if (isPrimitiveNodeMaterial(mat) && !info.isLm && !info.isVlmBake) {
-					mesh.castShadow = false
-					mesh.receiveShadow = false
-					mesh.frustumCulled = true
-					mesh.geometry?.computeBoundingSphere?.()
-					mesh.geometry?.computeBoundingBox?.()
-					stats.vlmFixed++
+					finishStatic(mesh, stats)
 					continue
 				}
 				if (!info.isLm && !info.isVlmBake) {
@@ -297,12 +310,7 @@ export function postProcessScene(
 						else mesh.material = vrMat
 						mat = vrMat
 					}
-					mesh.castShadow = false
-					mesh.receiveShadow = false
-					mesh.frustumCulled = true
-					mesh.geometry?.computeBoundingSphere?.()
-					mesh.geometry?.computeBoundingBox?.()
-					stats.vlmFixed++
+					finishStatic(mesh, stats)
 					continue
 				}
 			}
@@ -320,12 +328,7 @@ export function postProcessScene(
 				) {
 					mesh.renderOrder = -1
 				}
-				mesh.castShadow = false
-				mesh.receiveShadow = false
-				mesh.frustumCulled = true
-				mesh.geometry?.computeBoundingSphere?.()
-				mesh.geometry?.computeBoundingBox?.()
-				stats.vlmFixed++
+				finishStatic(mesh, stats)
 				if (isLowQuality() && mat.transparent && mat.opacity === 0) {
 					hideMesh(mesh, null, stats)
 					break
@@ -350,23 +353,12 @@ export function postProcessScene(
 				insertMat.needsUpdate = true
 				continue
 			}
-			if ((mat.metalness > 0.3 || mat.roughness < 0.4) && !mat.name.toLowerCase().includes('ball')) {
+			if ((mat.metalness > 0.3 || mat.roughness < 0.4) && !isBallMaterial(mat.name)) {
 				const metalMat = ensureFork()
 				metalMat.roughness = Math.max(metalMat.roughness, 0.75)
 				metalMat.metalness = Math.min(metalMat.metalness, 0.1)
 				metalMat.needsUpdate = true
 				stats.metalFixed++
-			}
-			if (nameLower.includes('plastic') && !mat.map && !pendingOf(mat)) {
-				const plasticMat = ensureFork()
-				plasticMat.side = THREE.DoubleSide
-				plasticMat.transparent = false
-				plasticMat.depthWrite = true
-				plasticMat.alphaTest = 0
-				plasticMat.opacity = 1
-				plasticMat.roughness = Math.max((plasticMat.roughness ?? 0.6) as number, 0.6)
-				plasticMat.metalness = Math.min((plasticMat.metalness ?? 0) as number, 0.05)
-				plasticMat.needsUpdate = true
 			}
 			ensureSrgb(mat.map)
 		}
@@ -376,16 +368,29 @@ export function postProcessScene(
 			mesh.geometry?.computeBoundingSphere?.()
 			mesh.geometry?.computeBoundingBox?.()
 		}
+		// Single plastic/ramp surface pass: untextured plastic goes opaque
+		// first, then every plastic/ramp surface ensures DoubleSide.
 		if (nameLower.includes('plastic') || nameLower.includes('ramp')) {
-			const rampMats = (
+			const surfaceMats = (
 				Array.isArray(mesh.material) ? mesh.material : [mesh.material]
 			) as THREE.MeshStandardMaterial[]
-			for (let rampIdx = 0; rampIdx < rampMats.length; rampIdx++) {
-				const base = rampMats[rampIdx] as THREE.MeshStandardMaterial
-				if (base.side !== THREE.DoubleSide) {
-					const rampMat = forkMaterial(mesh, rampIdx, base)
-					rampMat.side = THREE.DoubleSide
-					rampMat.needsUpdate = true
+			for (let surfaceIdx = 0; surfaceIdx < surfaceMats.length; surfaceIdx++) {
+				let surfaceMat = surfaceMats[surfaceIdx] as THREE.MeshStandardMaterial
+				if (nameLower.includes('plastic') && !surfaceMat.map && !pendingOf(surfaceMat)) {
+					surfaceMat = forkMaterial(mesh, surfaceIdx, surfaceMat)
+					surfaceMat.side = THREE.DoubleSide
+					surfaceMat.transparent = false
+					surfaceMat.depthWrite = true
+					surfaceMat.alphaTest = 0
+					surfaceMat.opacity = 1
+					surfaceMat.roughness = Math.max((surfaceMat.roughness ?? 0.6) as number, 0.6)
+					surfaceMat.metalness = Math.min((surfaceMat.metalness ?? 0) as number, 0.05)
+					surfaceMat.needsUpdate = true
+				}
+				if (surfaceMat.side !== THREE.DoubleSide) {
+					surfaceMat = forkMaterial(mesh, surfaceIdx, surfaceMat)
+					surfaceMat.side = THREE.DoubleSide
+					surfaceMat.needsUpdate = true
 				}
 			}
 		}

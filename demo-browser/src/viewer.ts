@@ -354,8 +354,10 @@ export class Viewer {
 			applyRendererToneMapping(this.renderer, tbl.data, isLowQuality())
 			this._globalEmissionScale = Number.isFinite(tbl.data.globalEmissionScale) ? tbl.data.globalEmissionScale : 1
 			if (this.renderPipeline) {
-				this.renderPipeline.updateExposure(clampExposure(tbl.data.exposure, 2))
-				this.renderPipeline.updateToneMapper(tbl.data.toneMapper ?? 2)
+				// resolveToneMapping owns the AgX default: pass the table value
+				// through instead of falling back to ACES (2) here.
+				this.renderPipeline.updateExposure(clampExposure(tbl.data.exposure, isLowQuality()))
+				this.renderPipeline.updateToneMapper(tbl.data.toneMapper)
 				if (Number.isFinite(tbl.data.bloomStrength)) {
 					this.renderPipeline.updateBloomStrength(tbl.data.bloomStrength)
 				}
@@ -367,6 +369,7 @@ export class Viewer {
 			this.renderPipeline = new VpxRenderPipeline(renderer, this.scene, this.camera, {
 				toneMapper: this.table?.data?.toneMapper,
 				exposure: this.table?.data?.exposure,
+				lowQuality: isLowQuality(),
 				bloomEnabled: true,
 				bloomStrength: Number.isFinite(this.table?.data?.bloomStrength)
 					? this.table.data.bloomStrength
@@ -1370,9 +1373,7 @@ export class Viewer {
 		const pp = postProcessScene(node, {
 			viewerMode: this.viewerMode,
 			harnessLog: this.harnessLog,
-			table,
 		})
-		if (this.viewerMode === 'play') hideCabFlippers(node)
 		const params = new URLSearchParams(location.search)
 		const useBatch = !params.has('nobatched')
 		if (useBatch && table && this.renderApi) {

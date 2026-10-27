@@ -32,6 +32,18 @@ describe('tone mapping', () => {
 		expect(clampExposure(1)).to.equal(1)
 	})
 
+	it('caps low-quality exposure at 1.5 through the quality flag (single owner)', () => {
+		expect(clampExposure(9, true)).to.equal(1.5)
+		expect(clampExposure(9, false)).to.equal(2)
+		expect(clampExposure(1.2, true)).to.equal(1.2)
+	})
+
+	it('caps low-quality exposure at 1.5 when applying table data', () => {
+		const renderer: { toneMapping?: number; toneMappingExposure?: number } = {}
+		applyRendererToneMapping(renderer, { exposure: 9 }, true)
+		expect(renderer.toneMappingExposure).to.equal(1.5)
+	})
+
 	it('applies the AgX default when table data is missing', () => {
 		const renderer: { toneMapping?: number; toneMappingExposure?: number } = {}
 		applyRendererToneMapping(renderer, undefined, false)

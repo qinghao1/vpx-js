@@ -34,6 +34,21 @@ export function hideCabFlippers(root: THREE.Object3D): number {
 	return hidden
 }
 
+/**
+ * Shared static-mesh stamp: drop dynamic shadow flags, freeze frustum culling
+ * on the precomputed bounds, and count the bake. The flipper call site opts
+ * out of the frustum freeze (animated bats must not cull on static bounds).
+ */
+export function finishStatic(mesh: THREE.Mesh, stats?: Record<string, number>, freezeFrustum = true): void {
+	mesh.castShadow = false
+	mesh.receiveShadow = false
+	if (!freezeFrustum) return
+	mesh.frustumCulled = true
+	mesh.geometry?.computeBoundingSphere?.()
+	mesh.geometry?.computeBoundingBox?.()
+	if (stats) stats.vlmFixed++
+}
+
 export function showCabFlippers(root: THREE.Object3D): number {
 	let shown = 0
 	root.traverse(child => {

@@ -34,6 +34,7 @@ type FramingState = {
 // vpinball: ViewSetup.cpp FitCameraToVertices() frames table via bounding vertices + FOV.
 // Demo heuristic mimics that without ViewSetup table data: use THREE.Box3 of visible meshes.
 // Center on playfield/apron/button cluster (excludeNonPlayfield), size from cabinet-excluded box.
+// Threading the live table data (inclination/rotation/FOV via ComputeMVP) through is a follow-up.
 function framingBox(node: Object3D, exclude?: (name: string) => boolean): FramingBox {
 	node.updateMatrixWorld(true)
 	const box = new Box3().makeEmpty()

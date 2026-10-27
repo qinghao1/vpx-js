@@ -38,6 +38,8 @@ import { ThreePlayfieldMeshGenerator } from './three-playfield-mesh-generator.js
 export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, PointLight> {
 	/** VPX table units → world units, applied once at the scene root (see transformScene). */
 	public static readonly SCALE = 0.05
+	/** Debug counters for batched-visibility fallback paths (warn-free by design). */
+	public readonly batchVisibilityStats = { hideFailed: 0, restoreFailed: 0, setFailed: 0 }
 	private static readonly _scratchM4 = new Matrix4()
 
 	private readonly converter: ThreeConverter
@@ -145,7 +147,11 @@ export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, Poin
 			} else {
 				info.batched.setVisibleAt?.(info.instanceId, false)
 			}
-		} catch {}
+		} catch {
+			// Count-and-continue: a failed hide leaves the stale instance visible,
+			// which unbatch below repairs by restoring the original mesh.
+			this.batchVisibilityStats.hideFailed++
+		}
 	}
 
 	private unbatch(obj: Object3D): void {
@@ -184,12 +190,20 @@ export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, Poin
 						current.visible = true
 						delete current.userData.__batched
 					}
-				} catch {}
+				} catch {
+					// Count-and-continue: the instance slot keeps its last matrix;
+					// the source mesh keeps its own visibility flag.
+					this.batchVisibilityStats.restoreFailed++
+				}
 				return
 			}
 			try {
 				info.batched.setVisibleAt?.(info.instanceId, !!isVisible)
-			} catch {}
+			} catch {
+				// Count-and-continue: BatchedMesh visibility stays stale for this
+				// slot; the source mesh keeps its own visibility flag.
+				this.batchVisibilityStats.setFailed++
+			}
 		})
 	}
 

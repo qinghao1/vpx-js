@@ -13,6 +13,7 @@ export interface PipelineConfig {
 	bloomStrength?: number
 	bloomRadius?: number
 	bloomThreshold?: number
+	lowQuality?: boolean
 }
 
 export class VpxRenderPipeline {
@@ -20,6 +21,7 @@ export class VpxRenderPipeline {
 	public readonly scenePass: any
 	public readonly sceneColor: any
 	private readonly uBloomStrength: any
+	private readonly lowQuality: boolean
 
 	constructor(
 		private readonly renderer: THREE.WebGPURenderer,
@@ -31,14 +33,22 @@ export class VpxRenderPipeline {
 		this.scenePass = pass(scene, camera)
 		this.sceneColor = this.scenePass.getTextureNode('output')
 
+		// resolveToneMapping owns the AgX default (upstream GetValidToneMapper);
+		// callers pass the table value through, never their own fallback.
 		;(this.renderer as any).toneMapping = resolveToneMapping(config.toneMapper)
-		;(this.renderer as any).toneMappingExposure = clampExposure(config.exposure, 2)
+		this.lowQuality = config.lowQuality ?? false
+		;(this.renderer as any).toneMappingExposure = clampExposure(config.exposure, this.lowQuality)
 
-		this.uBloomStrength = uniform(config.bloomStrength ?? 0.35)
+		const bloomStrength = config.bloomStrength ?? 0.35
+		this.uBloomStrength = uniform(bloomStrength)
 
 		let compositeNode: any = this.sceneColor
 
-		if (config.bloomEnabled !== false) {
+		// Upstream IsBloomEnabled (Renderer.cpp): bloom runs only while the
+		// table strength is positive (!m_bloomOff && m_bloom_strength > 0).
+		// The 0.85 cutoff below is a vpx-js guess: upstream has no threshold
+		// constant, UpdateBloom derives the cutoff from framebuffer luminance.
+		if (config.bloomEnabled !== false && bloomStrength > 0) {
 			const bloomNode = bloom(
 				this.sceneColor,
 				this.uBloomStrength,
@@ -53,7 +63,7 @@ export class VpxRenderPipeline {
 	}
 
 	public updateExposure(value: number): void {
-		;(this.renderer as any).toneMappingExposure = clampExposure(value, 2)
+		;(this.renderer as any).toneMappingExposure = clampExposure(value, this.lowQuality)
 	}
 
 	public updateToneMapper(tm: number): void {

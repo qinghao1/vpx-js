@@ -12,4 +12,19 @@ describe('resolveButtonCode', () => {
 		expect(resolveButtonCode('magna_right')).toBe('ControlRight')
 		expect(resolveButtonCode('unknown_primitive')).toBeNull()
 	})
+
+	it('keeps camel-case cabinet spellings resolving', () => {
+		expect(resolveButtonCode('StartButton')).toBe('Digit1')
+		expect(resolveButtonCode('CoinDoor')).toBe('Digit5')
+		expect(resolveButtonCode('LaunchButton')).toBe('Enter')
+		expect(resolveButtonCode('FireButton')).toBe('AltLeft')
+		expect(resolveButtonCode('MagnaLeft')).toBe('ControlLeft')
+	})
+
+	it('rejects playfield words that merely contain a keyword', () => {
+		expect(resolveButtonCode('starburst')).toBeNull()
+		expect(resolveButtonCode('contour')).toBeNull()
+		expect(resolveButtonCode('campfire')).toBeNull()
+		expect(resolveButtonCode('button_holder')).toBeNull()
+	})
 })
