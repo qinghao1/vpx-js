@@ -84,4 +84,17 @@ describe('The VBScript transpiler', () => {
 
 		expect(scope.z).to.equal(42)
 	})
+
+	it('should throw instead of silently succeeding when the script defines no play function', () => {
+		const stalePlay = sinon.spy()
+		const prevPlay = (globalThis as any).play
+		;(globalThis as any).play = stalePlay
+		try {
+			const transpiler = new Transpiler(table, player)
+			expect(() => (transpiler as any).evalAndPlay('null;', {})).to.throw(Error)
+			expect(stalePlay).to.not.have.been.called
+		} finally {
+			;(globalThis as any).play = prevPlay
+		}
+	})
 })

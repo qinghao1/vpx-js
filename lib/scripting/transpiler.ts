@@ -13,16 +13,6 @@ import { VbsProxyHandler } from './vbs-proxy-handler.js'
 
 export { normalizeNewCall }
 
-declare function play(
-	scope: unknown,
-	table: Record<string, unknown>,
-	enums: EnumsApi,
-	globalApi: GlobalApi,
-	stdlib: Stdlib,
-	vbsHelper: VBSHelper,
-	player: Player,
-): void
-
 export class Transpiler {
 	private readonly itemApis: Record<string, unknown>
 	private readonly enumApis: EnumsApi = Enums
@@ -56,19 +46,32 @@ export class Transpiler {
 	}
 
 	private evalAndPlay(js: string, scope: Record<string, unknown>): void {
-		eval(`//@ sourceURL=game:///tablescript.vbs.js\n${js}`)
-		const playFn = (globalThis as any).play ?? (typeof play === 'function' ? play : undefined)
-		if (typeof playFn === 'function') {
-			playFn(
-				new Proxy(scope, new VbsProxyHandler()),
-				this.itemApis,
-				this.enumApis,
-				this.globalApi,
-				this.stdlib,
-				new VBSHelper(this),
-				this.player,
-			)
+		// eval() returns the completion value, which for the wrapped
+		// `...play = (...) => {...}` assignment is the play function itself.
+		// Reading it back instead of the global namespace avoids running a
+		// stale globalThis.play, and throwing here turns a codegen regression
+		// into a loud failure instead of an execute() that runs nothing.
+		const playFn = eval(`//@ sourceURL=game:///tablescript.vbs.js\n${js}`) as (
+			scope: unknown,
+			table: Record<string, unknown>,
+			enums: EnumsApi,
+			globalApi: GlobalApi,
+			stdlib: Stdlib,
+			vbsHelper: VBSHelper,
+			player: Player,
+		) => void
+		if (typeof playFn !== 'function') {
+			throw new Error('Transpiled table script did not evaluate to a play function.')
 		}
+		playFn(
+			new Proxy(scope, new VbsProxyHandler()),
+			this.itemApis,
+			this.enumApis,
+			this.globalApi,
+			this.stdlib,
+			new VBSHelper(this),
+			this.player,
+		)
 	}
 
 	public transpile(vbs: string, gf?: string, go?: string): string {
