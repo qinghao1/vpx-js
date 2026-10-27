@@ -61,6 +61,24 @@ const browserPending = new Map<number, { resolve: (s: string) => void; reject: (
 let browserNextId = 1
 
 const vbsMemCache = new Map<string, string>()
+/**
+ * Bound on cached transpiles: entries hold whole scripts, so cap the count
+ * and evict oldest-first (Map preserves insertion order). Without this the
+ * 32-bit hash keys above would let the map grow without limit.
+ */
+export const MAX_VBS_MEM_CACHE_ENTRIES = 50
+
+export function setVbsMemCache(key: string, js: string): void {
+	if (!vbsMemCache.has(key) && vbsMemCache.size >= MAX_VBS_MEM_CACHE_ENTRIES) {
+		const oldest = vbsMemCache.keys().next()
+		if (!oldest.done) vbsMemCache.delete(oldest.value)
+	}
+	vbsMemCache.set(key, js)
+}
+
+export function getVbsMemCache(key: string): string | undefined {
+	return vbsMemCache.get(key)
+}
 
 export function tdHash(td: TableDataPayload | null | undefined): string {
 	if (!td) return 'notd'
@@ -177,7 +195,7 @@ export async function transpileWithWorker(
 	td?: TableDataPayload | null,
 ): Promise<string> {
 	const key = cacheKey(vbs, gf, go, td)
-	const mem = vbsMemCache.get(key)
+	const mem = getVbsMemCache(key)
 	if (mem) {
 		vbsLog(`[vbs] mem hit ${key.slice(0, 32)}… ${mem.length} chars`)
 		return mem
@@ -189,7 +207,7 @@ export async function transpileWithWorker(
 		const dt = Date.now() - t0
 		if (typeof hit === 'string' && hit.length) {
 			vbsLog(`[vbs] idb hit ${key.slice(0, 32)}… ${hit.length} chars in ${dt}ms`)
-			vbsMemCache.set(key, hit)
+			setVbsMemCache(key, hit)
 			return hit
 		}
 		vbsLog(`[vbs] idb miss ${key.slice(0, 32)}… (${dt}ms)`)
@@ -205,7 +223,7 @@ export async function transpileWithWorker(
 		const w = await getNodeWorker()
 		js = await requestTranspile(message, nodePending, nodeNextId++, m => w.postMessage(m))
 	}
-	vbsMemCache.set(key, js)
+	setVbsMemCache(key, js)
 	if (typeof indexedDB !== 'undefined') void idbSet(key, js).catch(() => {})
 	return js
 }
@@ -250,7 +268,11 @@ export function getTableDataForWorker(table: any, player?: any): TableDataPayloa
 				if (isMethod(proto, p)) funcs.push(p)
 				else {
 					try {
-						if (typeof (api as any)[p] === 'undefined') undef.push(p)
+						// Prototype walk misses instance fields (e.g. arrow-function props), so
+						// fall back to the runtime value: functions are funcs, matching the main thread.
+						const value = (api as any)[p]
+						if (typeof value === 'undefined') undef.push(p)
+						else if (typeof value === 'function') funcs.push(p)
 					} catch {
 						undef.push(p)
 					}
