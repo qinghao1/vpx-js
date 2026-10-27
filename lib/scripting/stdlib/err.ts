@@ -62,7 +62,7 @@ export class Err extends VbsApi {
 	): never | undefined {
 		if (this.doThrow) {
 			if (typeof codeOrError === 'number') {
-				throw new Error(`Error ${codeOrError}: ${description}`)
+				throw new VbsError(`Error ${codeOrError}: ${description}`, codeOrError)
 			}
 			throw codeOrError
 		}

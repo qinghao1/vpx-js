@@ -4,7 +4,7 @@
 import * as chai from 'chai'
 import { expect } from 'chai'
 import sinonChai from 'sinon-chai'
-import { Err } from './err.js'
+import { Err, VbsError } from './err.js'
 
 chai.use((sinonChai as any).default ?? sinonChai)
 
@@ -37,5 +37,17 @@ describe('The VBScript error object', () => {
 	it('should throw an exception', () => {
 		const err = new Err()
 		expect(() => err.Raise(1, undefined, 'duh')).to.throw(`Error 1: duh`)
+	})
+
+	it('should throw a VbsError carrying the code when raising by number', () => {
+		const err = new Err()
+		try {
+			err.Raise(513, 'test', 'boom')
+			expect.fail('expected Raise to throw')
+		} catch (e) {
+			expect(e).to.be.an.instanceof(VbsError)
+			expect((e as VbsError).code).to.equal(513)
+			expect((e as Error).message).to.equal('Error 513: boom')
+		}
 	})
 })
