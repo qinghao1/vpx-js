@@ -309,14 +309,17 @@ describe('The VBScript transpiler - Ordering comparison behavior', () => {
 		expect(execute('If "6" >= "12" Then x = 1 Else x = 2').x).to.equal(1)
 	})
 
-	it('should raise type mismatch for non-numeric strings against numbers', () => {
-		expect(() => execute('If "a" < 1 Then x = 1 Else x = 2')).to.throw(VbsError)
+	it('should not raise for a number against a non-numeric string (numeric side is less)', () => {
+		// Documented Variant rule, not a type mismatch: the numeric expression
+		// is unconditionally less than the string expression.
+		expect(execute('If "a" < 1 Then x = 1 Else x = 2').x).to.equal(2)
+		expect(execute('If 1 < "a" Then x = 1 Else x = 2').x).to.equal(1)
 	})
 
-	it('should record type mismatch for non-numeric strings under On Error Resume Next', () => {
+	it('should record no error for mixed comparisons under On Error Resume Next', () => {
 		const scope = execute('On Error Resume Next\nIf "a" < 1 Then x = 1 Else x = 2\ny = Err.Number')
 		expect(scope.x).to.equal(2)
-		expect(scope.y).to.equal(13)
+		expect(scope.y).to.equal(0)
 	})
 
 	it('should evaluate Not over an ordering comparison as a whole', () => {

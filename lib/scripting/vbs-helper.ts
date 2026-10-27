@@ -353,9 +353,10 @@ export class VBSHelper {
 	private traverse(obj: unknown, params: unknown[]): unknown {
 		for (const param of params) {
 			// Dereferencing Null is error 94; a merely unread (Empty) target
-			// yields Empty. A terminal Null read yields Null.
+			// yields Empty. A terminal Null read yields Null. The member
+			// name is included so a real-table failure pinpoints the site.
 			if (obj === null) {
-				ERR.Raise(new VbsError('Invalid use of Null', 94))
+				ERR.Raise(new VbsError(`Invalid use of Null: ${String(param)}`, 94))
 				return VBSHelper.UNDEFINED
 			}
 			if (this.isUndef(obj)) return VBSHelper.UNDEFINED
@@ -368,7 +369,7 @@ export class VBSHelper {
 
 	public getOrCall(obj: unknown, ...params: unknown[]): unknown {
 		if (obj === null) {
-			ERR.Raise(new VbsError('Invalid use of Null', 94))
+			ERR.Raise(new VbsError(`Invalid use of Null: ${params.map(String).join(', ')}`, 94))
 			return VBSHelper.UNDEFINED
 		}
 		if (this.isUndef(obj)) return VBSHelper.UNDEFINED
@@ -381,13 +382,13 @@ export class VBSHelper {
 		...params: unknown[]
 	): unknown {
 		if (parent === null) {
-			ERR.Raise(new VbsError('Invalid use of Null', 94))
+			ERR.Raise(new VbsError(`Invalid use of Null: ${prop}`, 94))
 			return VBSHelper.UNDEFINED
 		}
 		if (this.isUndef(parent)) return VBSHelper.UNDEFINED
 		const value: unknown = (parent as Record<string, unknown>)[prop]
 		if (value === null && params.length > 0) {
-			ERR.Raise(new VbsError('Invalid use of Null', 94))
+			ERR.Raise(new VbsError(`Invalid use of Null: ${prop}`, 94))
 			return VBSHelper.UNDEFINED
 		}
 		// A Null variable reads back as Null (not Empty); only unassigned

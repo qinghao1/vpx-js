@@ -400,11 +400,30 @@ function normalizeOrderOperand(value: unknown, otherIsString: boolean): unknown 
 }
 
 /**
- * VBS `<`, `<=`, `>`, `>=`: Null yields Null; two strings compare textually,
- * otherwise both sides coerce numerically (True is -1, Empty is 0 or `''`).
- * Garbage against a number raises type mismatch (13), like the arithmetic
- * operators. Under `On Error Resume Next` the error is recorded and the
- * result is undefined (see vbsIntDiv).
+ * Numeric Variant subtypes for ordering-comparison dispatch: numbers and
+ * Dates (booleans already normalize to -1/0 above; Empty normalizes to `''`
+ * against a string, else 0). Strings — even numeric text — are not numeric
+ * here; whether their text coerces is decided via parseNumericText below.
+ */
+function isNumericVariant(value: unknown): boolean {
+	return typeof value === 'number' || value instanceof Date
+}
+
+/**
+ * VBS `<`, `<=`, `>`, `>=`: Null yields Null; two strings compare textually.
+ * A numeric Variant against a string never raises: numeric text still coerces
+ * and compares numerically, otherwise the numeric expression is
+ * unconditionally less than the string expression (documented Variant rule,
+ * not a type mismatch). Empty and booleans normalize before dispatch (Empty
+ * to `''` against a string, else 0; True to -1). Non-numeric, non-string
+ * operands (objects without coercion, ...) still coerce numerically and
+ * garbage raises type mismatch (13), like the arithmetic operators. Under
+ * `On Error Resume Next` the error is recorded and the result is undefined
+ * (see vbsIntDiv).
+ *
+ * @see https://learn.microsoft.com/en-us/office/vba/Language/Reference/user-interface-help/comparison-operators
+ * ("One Variant expression is numeric and the other is a string: The numeric
+ * expression is less than the string expression.")
  */
 function vbsCompare(
 	left: unknown,
@@ -414,14 +433,21 @@ function vbsCompare(
 	if (left === null || right === null) {
 		return null
 	}
-	const otherIsString =
-		(typeof left === 'string' || left === undefined || isVbsUndef(left)) &&
-		(typeof right === 'string' || right === undefined || isVbsUndef(right)) &&
-		(typeof left === 'string' || typeof right === 'string')
 	const normalizedLeft = normalizeOrderOperand(left, typeof right === 'string')
 	const normalizedRight = normalizeOrderOperand(right, typeof left === 'string')
-	if (otherIsString) {
-		return cmp(normalizedLeft as string, normalizedRight as string)
+	const leftIsString = typeof normalizedLeft === 'string'
+	const rightIsString = typeof normalizedRight === 'string'
+	if (leftIsString && rightIsString) {
+		return cmp(normalizedLeft, normalizedRight)
+	}
+	if (leftIsString !== rightIsString) {
+		const stringSide = (leftIsString ? normalizedLeft : normalizedRight) as string
+		const numericSide = leftIsString ? normalizedRight : normalizedLeft
+		if (isNumericVariant(numericSide) && Number.isNaN(parseNumericText(stringSide))) {
+			// Non-numeric text: no coercion, no error — the numeric side is less.
+			const leftIsLess = !leftIsString
+			return leftIsLess ? cmp(0, 1) : cmp(1, 0)
+		}
 	}
 	const leftNumeric = toVbsNumber(normalizedLeft)
 	const rightNumeric = toVbsNumber(normalizedRight)

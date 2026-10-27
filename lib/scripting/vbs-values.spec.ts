@@ -372,10 +372,17 @@ describe('vbs-values ordering comparisons', () => {
 		[2, 1, false],
 		['10', '9', true],
 		['10', 9, false],
+		['9', 10, true],
+		['a', 1, false],
+		[1, 'a', true],
+		['', 0, false],
+		[0, '', true],
 		[true, 0, true],
 		[true, -1, false],
 		[true, -2, false],
 		[false, 1, true],
+		[true, 'a', true],
+		['a', true, false],
 		[undefined, 1, true],
 		[new VbsUndefined(), 0, false],
 		[undefined, 'a', true],
@@ -388,7 +395,11 @@ describe('vbs-values ordering comparisons', () => {
 	it.each([
 		[1, 1, true],
 		[2, 1, false],
+		['a', 1, false],
+		[1, 'a', true],
+		['10', 9, false],
 		[true, -1, true],
+		[true, 'a', true],
 		[undefined, 0, true],
 	] as Array<[unknown, unknown, unknown]>)('lte(%s, %s) is %s', (left, right, expected) => {
 		expect(vbsLte(left, right)).to.equal(expected)
@@ -397,8 +408,14 @@ describe('vbs-values ordering comparisons', () => {
 	it.each([
 		[2, 1, true],
 		[1, 2, false],
+		['a', 1, true],
+		[1, 'a', false],
+		['10', 9, true],
+		['9', 10, false],
 		[true, 0, false],
 		[true, -2, true],
+		[true, 'a', false],
+		['a', true, true],
 		[undefined, -1, true],
 	] as Array<[unknown, unknown, unknown]>)('gt(%s, %s) is %s', (left, right, expected) => {
 		expect(vbsGt(left, right)).to.equal(expected)
@@ -407,6 +424,8 @@ describe('vbs-values ordering comparisons', () => {
 	it.each([
 		[1, 1, true],
 		[1, 2, false],
+		['a', 1, true],
+		[1, 'a', false],
 		[true, -1, true],
 		[undefined, 0, true],
 	] as Array<[unknown, unknown, unknown]>)('gte(%s, %s) is %s', (left, right, expected) => {
@@ -421,10 +440,32 @@ describe('vbs-values ordering comparisons', () => {
 		expect(vbsGte(1, null)).to.equal(null)
 	})
 
-	it('raises type mismatch for garbage against a number', () => {
+	it('treats a number as less than a non-numeric string without raising', () => {
+		// Documented Variant rule: one numeric + one string needs no coercion
+		// and never raises — the numeric side is unconditionally less.
 		ERR.OnErrorResumeNext()
-		expect(vbsLt('a', 1)).to.equal(undefined)
-		expect(ERR.Number).to.equal(13)
+		expect(vbsLt('a', 1)).to.equal(false)
+		expect(vbsGt('a', 1)).to.equal(true)
+		expect(vbsLt(1, 'a')).to.equal(true)
+		expect(vbsGt(1, 'a')).to.equal(false)
+		expect(ERR.Number).to.equal(0)
+	})
+
+	it('still coerces numeric text against a number', () => {
+		ERR.OnErrorResumeNext()
+		expect(vbsLt('9', 10)).to.equal(true)
+		expect(vbsGt('9', 10)).to.equal(false)
+		expect(vbsLt('10', 9)).to.equal(false)
+		expect(ERR.Number).to.equal(0)
+	})
+
+	it('treats booleans and dates as numeric against a non-numeric string', () => {
+		ERR.OnErrorResumeNext()
+		expect(vbsLt(true, 'a')).to.equal(true)
+		expect(vbsGt('a', false)).to.equal(true)
+		expect(vbsLt(new Date(0), 'a')).to.equal(true)
+		expect(vbsGt('a', new Date(0))).to.equal(true)
+		expect(ERR.Number).to.equal(0)
 	})
 })
 
