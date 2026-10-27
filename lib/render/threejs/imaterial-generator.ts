@@ -15,6 +15,8 @@ export interface IMaterialGenerator {
 	 * tri-state additive mode (0 plain, 1 additive, 2 absorb); absent derives
 	 * from addBlend. Trailing disableLightingBelow seeds the bulb-lift gate
 	 * (0 = full lift, 1 = none); absent keeps the legacy full-lift default.
+	 * Trailing depthWrite overrides the transparent-derived default (opaque
+	 * writes, transparent doesn't); absent keeps the derived value.
 	 */
 	getMaterial(
 		material?: Material,
@@ -30,6 +32,7 @@ export interface IMaterialGenerator {
 		alphaTestValue?: number,
 		addBlendMode?: number,
 		disableLightingBelow?: number,
+		depthWrite?: boolean,
 	): ThreeMaterial
 	applyMaterial(threeMaterial: ThreeMaterial, material?: Material, isTransparent?: boolean): void
 	applyMap(threeMaterial: ThreeMaterial, map?: string): void
@@ -58,5 +61,6 @@ export interface IMaterialGenerator {
 		alphaTestValue?: number,
 		addBlendMode?: number,
 		disableLightingBelow?: number,
+		depthWrite?: boolean,
 	): string
 }

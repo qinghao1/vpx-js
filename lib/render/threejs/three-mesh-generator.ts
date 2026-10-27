@@ -58,9 +58,12 @@ export class ThreeMeshGenerator {
 			positions[o3] = v.x
 			positions[o3 + 1] = v.y
 			positions[o3 + 2] = v.z
-			normals[o3] = v.nx
-			normals[o3 + 1] = v.ny
-			normals[o3 + 2] = v.nz
+			// Normals mirror with the winding (three.js negated them at shade
+			// time under BackSide — see negateOnBackSide — while FrontSide uses
+			// them as-is, so the stored values flip too).
+			normals[o3] = -v.nx
+			normals[o3 + 1] = -v.ny
+			normals[o3 + 2] = -v.nz
 			if (v.nx || v.ny || v.nz) hasNormal = true
 			const o2 = i * 2
 			uvs[o2] = v.tu
@@ -70,7 +73,18 @@ export class ThreeMeshGenerator {
 		bg.setAttribute('position', new Float32BufferAttribute(positions, 3))
 		if (ic) {
 			const IndexArray = vc > 65535 ? Uint32Array : Uint16Array
-			bg.setIndex(new BufferAttribute(new IndexArray(mesh.indices), 1))
+			// VPX table space projects mirrored on screen (the scene-root rotateX
+			// turns table +z away from the top-down camera), so stored triplets are
+			// CW and FrontSide would cull them: store each triplet reversed to
+			// restore CCW fronts.
+			const reversed = new IndexArray(ic)
+			for (let t = 0; t + 2 < ic; t += 3) {
+				reversed[t] = mesh.indices[t]!
+				reversed[t + 1] = mesh.indices[t + 2]!
+				reversed[t + 2] = mesh.indices[t + 1]!
+			}
+			for (let t = ic - (ic % 3); t < ic; t++) reversed[t] = mesh.indices[t]!
+			bg.setIndex(new BufferAttribute(reversed, 1))
 		}
 		if (hasNormal) bg.setAttribute('normal', new Float32BufferAttribute(normals, 3))
 		else bg.computeVertexNormals()

@@ -23,11 +23,11 @@ export class ThreePlayfieldMeshGenerator {
 			steps: 1,
 			UVGenerator: playfieldUvGenerator(1 / dim.width, 1 / dim.height, table.data.left, table.data.top),
 		})
-		// ExtrudeGeometry spans z 0..depth; sink it so the top lid lands on the
-		// physics playfield plane (z=0, see Table.generatePlayfieldHit and
-		// upstream PhysicsEngine m_hitPlayfield d=0). The slab then hangs below
-		// like the cabinet body instead of burying balls and parts.
-		geometry.translate(0, 0, -Table.playfieldThickness)
+		// ExtrudeGeometry spans z 0..depth with its -z lid at z=0; the scene root
+		// turns table -z toward the top-down camera, so that lid is the visible
+		// surface and already sits on the physics plane (z=0, see
+		// Table.generatePlayfieldHit). No translate: sinking the slab would drop
+		// the visible surface 20 units under the flippers.
 		geometry.name = 'playfield_base'
 		return geometry
 	}

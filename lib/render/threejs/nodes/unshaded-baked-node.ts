@@ -1,6 +1,5 @@
 import {
 	AddEquation,
-	BackSide,
 	Color,
 	CustomBlending,
 	DoubleSide,
@@ -13,7 +12,7 @@ import { Fn, float, positionWorld, sqrt, step, texture, uniform, uv, vec2, vec4 
 import { MeshBasicNodeMaterial } from 'three/webgpu'
 import { copyPendingKeys, setNodeMapSlot } from '../material-shared.js'
 import { getTransmissionTexture, TRANSMISSION_OPAQUE_CUTOFF } from '../transmission-buffer.js'
-import { inLiftVolume, uTransArea } from './primitive-bdl-node.js'
+import { inLiftVolume, sideFor, uTransArea } from './primitive-bdl-node.js'
 
 // Pending-texture placeholder alpha: 0 so the quad emits nothing under the
 // SrcAlpha blend state below. WebGPU applies CustomBlending even with
@@ -100,7 +99,7 @@ export function createUnshadedBakedNodeMaterial(options: BakedNodeMaterialOption
 
 	userData.__isBaked = true
 	userData.__bakedNode = true
-	mat.side = options.doubleSided !== false ? DoubleSide : BackSide
+	mat.side = sideFor(options.doubleSided)
 	mat.depthWrite = true
 	mat.transparent = false
 	mat.blending = CustomBlending

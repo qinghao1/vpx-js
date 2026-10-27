@@ -2,6 +2,7 @@
 
 import { BufferGeometry, Mesh } from 'three'
 import { acceleratedRaycast, computeBoundsTree, disposeBoundsTree } from 'three-mesh-bvh'
+import { type CustomMaterialUserData, isButtonLike } from './scene-classify.js'
 
 type BvhGeometry = BufferGeometry & {
 	boundsTree?: unknown
@@ -9,14 +10,9 @@ type BvhGeometry = BufferGeometry & {
 	disposeBoundsTree?: () => void
 }
 
-const RE_BUTTON = /button|coin|plunger|tour|start|fire/i
-
-function isButtonLike(name?: string, userData?: Record<string, unknown>): boolean {
-	return !!userData?.isCabinetButton || (!!name && RE_BUTTON.test(name))
-}
-
 let installed = false
 
+// Patch the three.js prototypes once so every geometry can grow a BVH on demand.
 export function installBvh(): void {
 	if (installed) return
 	;(BufferGeometry.prototype as unknown as Record<string, unknown>).computeBoundsTree ??=
@@ -29,37 +25,7 @@ export function installBvh(): void {
 	installed = true
 }
 
-export function buildBvhForGeometry(geom: BufferGeometry, force = false): void {
-	installBvh()
-	const g = geom as BvhGeometry
-	if (g.boundsTree) return
-	const tris = g.index ? g.index.count / 3 : g.attributes.position.count / 3
-	if (!force && tris < 200) return
-	g.computeBoundsTree?.({})
-}
-
-export function buildBvhForNode(root: { traverse(cb: (o: unknown) => void): void }, forceButton = false): number {
-	installBvh()
-	let built = 0
-	root.traverse((o: unknown) => {
-		const m = o as {
-			isMesh?: boolean
-			isInstancedMesh?: boolean
-			isBatchedMesh?: boolean
-			geometry?: BufferGeometry
-			userData?: Record<string, unknown>
-			name?: string
-		}
-		if ((!m.isMesh && !m.isInstancedMesh && !m.isBatchedMesh) || !m.geometry) return
-		const isButton = isButtonLike(m.name, m.userData)
-		if (!isButton && (m.geometry as BvhGeometry).boundsTree) return
-		// Buttons always build (even tiny ones); buildBvhForGeometry skips existing trees.
-		buildBvhForGeometry(m.geometry, isButton || forceButton)
-		if ((m.geometry as BvhGeometry).boundsTree) built++
-	})
-	return built
-}
-
+// Idle-time BVH rollout: 30 geometries or ~8ms per slice so first paint isn't blocked.
 export function buildBvhIdle(root: { traverse(cb: (o: unknown) => void): void }, chunkSize = 30): void {
 	installBvh()
 	const queue: BvhGeometry[] = []
@@ -69,10 +35,11 @@ export function buildBvhIdle(root: { traverse(cb: (o: unknown) => void): void },
 			isInstancedMesh?: boolean
 			isBatchedMesh?: boolean
 			geometry?: BvhGeometry
-			userData?: Record<string, unknown>
+			userData?: CustomMaterialUserData
 			name?: string
 		}
 		if ((m.isMesh || m.isInstancedMesh || m.isBatchedMesh) && m.geometry && !m.geometry.boundsTree) {
+			// Buttons build eagerly (tiny but raycast often); the rest queue below.
 			if (isButtonLike(m.name, m.userData)) {
 				m.geometry.computeBoundsTree?.({})
 				return
@@ -102,7 +69,10 @@ export function buildBvhIdle(root: { traverse(cb: (o: unknown) => void): void },
 			if (performance.now() - start > 8) break
 			for (let n = 0; n < chunkSize && idx < queue.length; n++, idx++) {
 				const geom = queue[idx]
-				if (geom) buildBvhForGeometry(geom)
+				if (!geom) continue
+				// Skip tiny geometries: BVH build cost exceeds raycast savings below 200 tris.
+				const tris = geom.index ? geom.index.count / 3 : geom.attributes.position.count / 3
+				if (tris >= 200) geom.computeBoundsTree?.({})
 			}
 		}
 		if (idx < queue.length) schedule(step)

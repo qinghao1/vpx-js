@@ -1,14 +1,4 @@
-import {
-	AddEquation,
-	BackSide,
-	Color,
-	CustomBlending,
-	DoubleSide,
-	FrontSide,
-	type Object3D,
-	OneFactor,
-	OneMinusSrcAlphaFactor,
-} from 'three'
+import { AddEquation, Color, CustomBlending, DoubleSide, type Object3D, OneFactor, OneMinusSrcAlphaFactor } from 'three'
 import { Fn, texture, uniform, uv, vec4 } from 'three/tsl'
 import type { RenderInfo } from '../../game/interfaces.js'
 import type { Material } from '../../vpt/material.js'
@@ -30,6 +20,7 @@ import {
 	createPrimitiveBdlMaterial,
 	isPrimitiveNodeMaterial,
 	setPrimitiveMap,
+	sideFor,
 } from './nodes/primitive-bdl-node.js'
 import { createUnshadedBakedNodeMaterial, isBakedNodeMaterial, setBakedMap } from './nodes/unshaded-baked-node.js'
 import type { ThreeMapGenerator } from './three-map-generator.js'
@@ -119,6 +110,7 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 			alphaTestValue,
 			obj.addBlendMode,
 			(obj as { disableLightingBelow?: number }).disableLightingBelow ?? 0,
+			obj.depthWrite,
 		)
 	}
 
@@ -155,6 +147,7 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 		alphaTestValue = 0,
 		addBlendMode?: number,
 		disableLightingBelow = 0,
+		depthWrite?: boolean,
 	): any {
 		const key = this.getKey(
 			material,
@@ -170,6 +163,7 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 			alphaTestValue,
 			addBlendMode,
 			disableLightingBelow,
+			depthWrite,
 		)
 		const cached = this.cachedMaterials[key]
 		if (cached) return cached
@@ -208,6 +202,8 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 			})
 			mat.name = material ? `material:${material.name}` : 'material:additive'
 			;(mat.userData as any).__addBlend = true
+			// Explicit RenderInfo.depthWrite wins over the non-writing additive default.
+			mat.depthWrite = depthWrite ?? false
 			if (absorb) {
 				// Upstream AB_ABSORB (flasher.cpp SetupAddBlendState): premultiplied
 				// alpha 'over', dst' = src + dst * (1 - srcAlpha), absorbing the
@@ -245,6 +241,8 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 				(mat.userData as any)[pendingKeyFor('map')] = (map ?? emissiveMap) as string
 			;(mat.userData as any).__isBaked = true
 			;(mat.userData as any).__backfacesEnabled = backfacesEnabled
+			// Explicit RenderInfo.depthWrite wins over the opaque-bake default.
+			mat.depthWrite = depthWrite ?? true
 			this.stashCutout(mat, alphaTestValue, depthBias, false)
 			this.cachedMaterials[key] = mat
 			return mat
@@ -279,7 +277,8 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 		})
 		mat.name = material ? `material:${material.name}` : 'material:primitive'
 		mat.transparent = matTransparent
-		mat.depthWrite = !matTransparent
+		// Explicit RenderInfo.depthWrite wins over the transparent-derived default.
+		mat.depthWrite = depthWrite ?? !matTransparent
 		this.stashCutout(mat, alphaTestValue, depthBias, false)
 		if (!tex && mapName) (mat.userData as any)[pendingKeyFor('map')] = mapName
 		this.applyNormalMap(mat, normalMap)
@@ -301,7 +300,7 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 				threeMaterial.roughness = 0
 				threeMaterial.opacity = 1
 			}
-			threeMaterial.side = isTransparent ? DoubleSide : FrontSide
+			threeMaterial.side = sideFor(isTransparent)
 			return
 		}
 		threeMaterial.name = `material:${material.name}`
@@ -322,13 +321,15 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 			// colorNode/opacityNode/emissiveNode override the classic slots, so
 			// classic color/opacity/emissive writes are dead here — script tint
 			// must go through updatePrimitiveBdl/updatePrimitiveAdditive instead.
-			const doubleSided = (threeMaterial.userData as Record<string, unknown>)?.__doubleSided
-			threeMaterial.side = doubleSided !== false || isTransparent ? DoubleSide : BackSide
+			const doubleSided = (threeMaterial.userData as Record<string, unknown>)?.__doubleSided as
+				| boolean
+				| undefined
+			threeMaterial.side = sideFor(isTransparent ? true : doubleSided)
 			return
 		}
 		threeMaterial.color = new Color(material.baseColor)
 		threeMaterial.opacity = material.isOpacityActive ? Math.min(1, Math.max(0, material.opacity)) : 1
-		threeMaterial.side = material.name === 'ball' || isTransparent ? DoubleSide : FrontSide
+		threeMaterial.side = sideFor(material.name === 'ball' || isTransparent)
 		if (material.emissiveIntensity > 0) {
 			threeMaterial.emissive = new Color(material.emissiveColor)
 			threeMaterial.emissiveIntensity = material.emissiveIntensity
@@ -524,7 +525,8 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 		alphaTestValue = 0,
 		addBlendMode?: number,
 		disableLightingBelow = 0,
+		depthWrite?: boolean,
 	): string {
-		return `${material?.name ?? 'none'}:${map ?? 'none'}:${normalMap ?? 'none'}:${envMap ?? 'none'}:${emissiveMap ?? 'none'}:${isTransparent ? 't' : 'o'}:${depthBias}:${disableLighting ?? 'x'}:${addBlend ? 'a' : 'o'}:${backfacesEnabled ?? 'x'}:${alphaTestValue}:${addBlendMode ?? 'x'}:${disableLightingBelow}`
+		return `${material?.name ?? 'none'}:${map ?? 'none'}:${normalMap ?? 'none'}:${envMap ?? 'none'}:${emissiveMap ?? 'none'}:${isTransparent ? 't' : 'o'}:${depthBias}:${disableLighting ?? 'x'}:${addBlend ? 'a' : 'o'}:${backfacesEnabled ?? 'x'}:${alphaTestValue}:${addBlendMode ?? 'x'}:${disableLightingBelow}:${depthWrite ?? 'x'}`
 	}
 }

@@ -1,10 +1,10 @@
 import {
 	AddEquation,
 	AdditiveBlending,
-	BackSide,
 	Color,
 	CustomBlending,
 	DoubleSide,
+	FrontSide,
 	OneFactor,
 	OneMinusSrcAlphaFactor,
 	SrcAlphaFactor,
@@ -132,8 +132,11 @@ export interface PrimitiveAdditiveOptions {
 	depthBias?: number
 }
 
-function sideFor(doubleSided?: boolean): typeof DoubleSide | typeof BackSide {
-	return doubleSided !== false ? DoubleSide : BackSide
+// Single-sided fallback shared by every material path: converted VPX meshes are
+// stored winding-reversed (see ThreeMeshGenerator), so their fronts are CCW on
+// screen and single-sided rendering takes FrontSide, not BackSide.
+export function sideFor(doubleSided?: boolean): typeof DoubleSide | typeof FrontSide {
+	return doubleSided !== false ? DoubleSide : FrontSide
 }
 
 export function createPrimitiveBdlMaterial(opts: PrimitiveBdlOptions): MeshStandardNodeMaterial {

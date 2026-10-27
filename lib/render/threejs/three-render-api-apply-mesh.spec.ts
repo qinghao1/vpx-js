@@ -36,7 +36,7 @@ describe('ThreeRenderApi.applyMeshToNode geometry paths', () => {
 			5, 5, 5, 6, 5, 5, 6, 6, 5, 5, 6, 5,
 		])
 		expect(Array.from((dest.geometry.getAttribute('normal') as THREE.BufferAttribute).array)).to.deep.equal([
-			1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0,
+			-1, -0, -0, -1, -0, -0, -1, -0, -0, -1, -0, -0,
 		])
 	})
 
@@ -56,7 +56,7 @@ describe('ThreeRenderApi.applyMeshToNode geometry paths', () => {
 		api.applyMeshToNode(Mesh.fromArray(quadB, []), dest)
 		const normal = dest.geometry.getAttribute('normal') as THREE.BufferAttribute
 		expect(normal, 'normal attribute must be added').to.not.equal(undefined)
-		expect(Array.from(normal.array)).to.deep.equal([1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0])
+		expect(Array.from(normal.array)).to.deep.equal([-1, -0, -0, -1, -0, -0, -1, -0, -0, -1, -0, -0])
 	})
 
 	it('recomputes normals when the destination normal count disagrees', () => {

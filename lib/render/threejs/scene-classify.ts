@@ -1,4 +1,5 @@
 import type * as THREE from 'three'
+import { resolveButtonCode } from './cabinet-buttons.js'
 import { isBaked, normalizePendingKeys, RE_BAKE_MAP, RE_BAKE_MAT } from './material-shared.js'
 
 export { RE_BAKE_MAP, RE_BAKE_MAT }
@@ -42,6 +43,12 @@ export interface CustomMaterialUserData {
 	pendingEmissiveMap?: string
 	[key: string]: unknown
 }
+
+// Single cabinet-button predicate: authored button code mapping (coin/start/tour/
+// plunger/launch/fire/lockbar/magna/button spellings) plus the post-process flag
+// inherited by button children. Batching and BVH both exclude buttons through this.
+export const isButtonLike = (name?: string, userData?: CustomMaterialUserData): boolean =>
+	!!userData?.isCabinetButton || resolveButtonCode(name ?? '') !== null
 
 export const pendingOf = (material: THREE.Material): string => {
 	const userData = material.userData as CustomMaterialUserData | undefined

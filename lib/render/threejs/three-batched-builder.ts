@@ -12,9 +12,12 @@ import {
 import { isLowQuality } from '../../util/quality.js'
 import type { Table } from '../../vpt/table/table.js'
 import { normalizePendingKeys, pendingMapOf } from './material-shared.js'
-import { RE_CAB, RE_VR } from './scene-classify.js'
+import { isButtonLike, RE_CAB, RE_VR } from './scene-classify.js'
 import type { ThreeRenderApi } from './three-render-api.js'
 
+// Buckets below this vertex count cost more in BatchedMesh bookkeeping than one
+// extra draw call saves; low-quality mode batches regardless because draw calls
+// dominate fill rate on weak GPUs.
 const VERTEX_THRESHOLD = 100
 
 function isVrCabName(n: string): boolean {
@@ -30,6 +33,10 @@ function signature(geo: BufferGeometry): string {
 	return `${hasIndex ? 'i' : 'n'}:${hasUv ? 'uv' : 'nou'}:${hasNormal ? 'n' : 'non'}:${hasColor ? 'c' : 'nc'}:${hasTangent ? 't' : 'nt'}`
 }
 
+// Batch identity cannot be derived from the material cache getKey: updaters mutate
+// live render state (tint/BDL/alpha uniforms, pending maps, depthWrite, side) after
+// creation without changing the file-level getKey inputs, so getKey would merge
+// materials that diverge at runtime. Every live prop joins this key instead.
 function materialKey(mat: MeshStandardMaterial): string {
 	const ud = mat.userData as any
 	const map = (mat.map as any)?.name ?? 'nomap'
@@ -48,15 +55,13 @@ function materialKey(mat: MeshStandardMaterial): string {
 	return `${mat.name ?? 'noname'}|${map}|${pending}|${mat.transparent ? 't' : 'o'}|${mat.blending ?? 1}|${mat.depthWrite ? 'w' : 'n'}|${mat.polygonOffset ? `${mat.polygonOffsetFactor}/${mat.polygonOffsetUnits}` : '0'}|${ud.__addBlend ? 'a' : 'o'}|${ud.__isBaked ? 'b' : 'o'}|side${mat.side}|c${color}|e${emissive}:${mat.emissiveIntensity ?? ''}|m${mat.metalness ?? ''}:r${mat.roughness ?? ''}|a${mat.alphaTest ?? ''}:o${mat.opacity ?? ''}|u${tint}:${bdl}:${below}:${alpha}`
 }
 
-export function canBatchWebGpu(mat: any): boolean {
+// Single batch gate: transparent/additive materials need their own draws, pending
+// textures would bake a placeholder into the batch, and fork-cloned materials
+// carry per-mesh state that must not merge.
+export function canBatch(mat: MeshStandardMaterial): boolean {
 	if (!mat) return false
 	if ((mat.userData as any)?.__addBlend) return false
 	if (mat.transparent) return false
-	return true
-}
-
-export function canBatch(mat: MeshStandardMaterial): boolean {
-	if (!canBatchWebGpu(mat as any)) return false
 	const ud = mat.userData as any
 	if (!ud) return true
 	normalizePendingKeys(ud)
@@ -86,8 +91,20 @@ function isInVrCab(o: any, root: Group): boolean {
 	return isUnder(o, root, isVrCabName, true)
 }
 
-function isInBalls(o: any, root: Group): boolean {
-	return isUnder(o, root, name => name.startsWith('ball'), true)
+// Balls (group, mesh, or material) never batch: dynamic and few.
+function isBallLike(o: any, root: Group, mat: MeshStandardMaterial): boolean {
+	const n = (o.name || '').toLowerCase()
+	return (
+		isUnder(o, root, name => name.startsWith('ball'), true) ||
+		n.includes('ball') ||
+		!!(mat.name && mat.name.toLowerCase().includes('ball'))
+	)
+}
+
+// Procedural DMD quads stream their texture per frame and must stay live.
+function isDmdLike(o: any, dmdNames: Set<string>): boolean {
+	const n = (o.name || '').toLowerCase()
+	return !!o.userData?.isProceduralDMD || o.name.startsWith('DMD_') || n.includes('dmd') || dmdNames.has(n)
 }
 
 export function batchStaticOpaques(root: Group, table: Table, _renderApi: ThreeRenderApi): number {
@@ -137,16 +154,12 @@ export function batchStaticOpaques(root: Group, table: Table, _renderApi: ThreeR
 		if (!isEffectiveVisible(o, root)) return
 		if (isInLightBulbs(o, root)) return
 		if (isInVrCab(o, root)) return
-		if (isInBalls(o, root)) return
 		const mat = o.material as MeshStandardMaterial
+		if (isBallLike(o, root, mat)) return
 		if (!canBatch(mat)) return
 		if (isAnimated(o)) return
-		const n = (o.name || '').toLowerCase()
-		if (mat.name && mat.name.toLowerCase().includes('ball')) return
-		if (o.userData?.isProceduralDMD || o.name.startsWith('DMD_') || n.includes('dmd') || dmdNames.has(n)) return
-		if (o.userData?.isCabinetButton || /button|coin|plunger|tour|start|fire|magna/i.test(o.name)) return
-		if (n.includes('ball')) return
-		if (isVrCabName(n)) return
+		if (isDmdLike(o, dmdNames)) return
+		if (isButtonLike(o.name, o.userData)) return
 		const geo = o.geometry as BufferGeometry
 		if (!geo.getAttribute('position')) return
 		const key = `${materialKey(mat)}:${signature(geo)}:${o.renderOrder ?? 0}:${o.castShadow ? 1 : 0}:${o.receiveShadow ? 1 : 0}`

@@ -6,6 +6,7 @@ import {
 	CustomBlending,
 	DataTexture,
 	DoubleSide,
+	FrontSide,
 	MeshStandardMaterial,
 	OneFactor,
 	OneMinusSrcAlphaFactor,
@@ -85,12 +86,12 @@ describe('native BDL composite factors', () => {
 })
 
 describe('primitive BDL node material', () => {
-	it('preserves mat.side = DoubleSide / BackSide based on doubleSided flag', () => {
+	it('preserves mat.side = DoubleSide / FrontSide based on doubleSided flag', () => {
 		const doubleSidedMaterial = createPrimitiveBdlMaterial({ doubleSided: true })
 		expect(doubleSidedMaterial.side).to.equal(DoubleSide)
 
-		const backSideMaterial = createPrimitiveBdlMaterial({ doubleSided: false })
-		expect(backSideMaterial.side).to.equal(BackSide)
+		const singleSidedMaterial = createPrimitiveBdlMaterial({ doubleSided: false })
+		expect(singleSidedMaterial.side).to.equal(FrontSide)
 
 		const defaultSideMaterial = createPrimitiveBdlMaterial({})
 		expect(defaultSideMaterial.side).to.equal(DoubleSide)
@@ -159,12 +160,12 @@ describe('primitive BDL node material', () => {
 })
 
 describe('primitive additive node material', () => {
-	it('preserves mat.side = DoubleSide / BackSide based on doubleSided flag', () => {
+	it('preserves mat.side = DoubleSide / FrontSide based on doubleSided flag', () => {
 		const doubleSidedMaterial = createPrimitiveAdditiveMaterial({ doubleSided: true })
 		expect(doubleSidedMaterial.side).to.equal(DoubleSide)
 
-		const backSideMaterial = createPrimitiveAdditiveMaterial({ doubleSided: false })
-		expect(backSideMaterial.side).to.equal(BackSide)
+		const singleSidedMaterial = createPrimitiveAdditiveMaterial({ doubleSided: false })
+		expect(singleSidedMaterial.side).to.equal(FrontSide)
 	})
 
 	it('configures additive blending and unlit properties matching native primitive.cpp', () => {
@@ -192,12 +193,12 @@ describe('primitive additive node material', () => {
 })
 
 describe('unshaded baked node material', () => {
-	it('preserves mat.side = DoubleSide / BackSide based on doubleSided flag', () => {
+	it('preserves mat.side = DoubleSide / FrontSide based on doubleSided flag', () => {
 		const doubleSidedMaterial = createUnshadedBakedNodeMaterial({ doubleSided: true })
 		expect(doubleSidedMaterial.side).to.equal(DoubleSide)
 
-		const backSideMaterial = createUnshadedBakedNodeMaterial({ doubleSided: false })
-		expect(backSideMaterial.side).to.equal(BackSide)
+		const singleSidedMaterial = createUnshadedBakedNodeMaterial({ doubleSided: false })
+		expect(singleSidedMaterial.side).to.equal(FrontSide)
 	})
 
 	it('configures baked unshaded material properties', () => {
@@ -287,7 +288,7 @@ describe('material cloning parity and fork-safety', () => {
 		const clonedMaterial = clonePrimitiveNodeMaterial(originalMaterial)
 
 		expect(isPrimitiveNodeMaterial(clonedMaterial)).to.equal(true)
-		expect(clonedMaterial.side).to.equal(BackSide)
+		expect(clonedMaterial.side).to.equal(FrontSide)
 		expect(clonedMaterial.userData.pendingMap).to.equal('test_map')
 		const clonedUserData = clonedMaterial.userData as Record<string, { value: unknown }>
 		expect(clonedUserData.__uBDL.value).to.equal(1.0)
@@ -329,7 +330,7 @@ describe('material cloning parity and fork-safety', () => {
 		const clonedMaterial = cloneBakedNodeMaterial(originalMaterial)
 
 		expect(isBakedNodeMaterial(clonedMaterial)).to.equal(true)
-		expect(clonedMaterial.side).to.equal(BackSide)
+		expect(clonedMaterial.side).to.equal(FrontSide)
 		expect(clonedMaterial.userData.pendingMap).to.equal('baked_playfield')
 	})
 
@@ -347,7 +348,7 @@ describe('material cloning parity and fork-safety', () => {
 		expect(clonedBdl.side).to.equal(DoubleSide)
 
 		expect(isBakedNodeMaterial(clonedBaked)).to.equal(true)
-		expect(clonedBaked.side).to.equal(BackSide)
+		expect(clonedBaked.side).to.equal(FrontSide)
 
 		expect(clonedStandard.side).to.equal(BackSide)
 		expect(clonedStandard).to.not.equal(standardMaterial)

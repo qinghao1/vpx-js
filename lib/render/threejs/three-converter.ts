@@ -56,6 +56,7 @@ export class ThreeConverter {
 			// (cabinet/backbox) must stay hidden — see applyLightToTarget.
 			setAuthoredVisible(mesh, obj.isVisible)
 		} else if (obj.depthBias) {
+			// depthBias is a transparent sort key: clamp it into the DMD-safe band.
 			mesh.renderOrder = Math.round(Math.max(-10000, Math.min(15, -obj.depthBias)))
 		}
 		if (obj.depthWrite !== undefined) {
