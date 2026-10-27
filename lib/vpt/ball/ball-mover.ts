@@ -28,9 +28,16 @@ export class BallMover implements MoverObject {
 		if (!Number.isFinite(this.hit.vel.x)) this.hit.vel.x = 0
 		if (!Number.isFinite(this.hit.vel.y)) this.hit.vel.y = 0
 		if (!Number.isFinite(this.hit.vel.z)) this.hit.vel.z = 0
-		this.state.pos.x += this.hit.vel.x * dtime
-		this.state.pos.y += this.hit.vel.y * dtime
-		this.state.pos.z += this.hit.vel.z * dtime
+		const dx = this.hit.vel.x * dtime,
+			dy = this.hit.vel.y * dtime,
+			dz = this.hit.vel.z * dtime
+		this.state.pos.x += dx
+		this.state.pos.y += dy
+		this.state.pos.z += dz
+		// Upstream HitBall::UpdateDisplacements (hitball.cpp): travel since the
+		// last hit event; FireHitEvent bypasses its same-place filter once the
+		// ball really moved.
+		this.hit.lastEventSqrDist += dx * dx + dy * dy + dz * dz
 		if (!Number.isFinite(this.state.pos.x)) this.state.pos.x = 0
 		if (!Number.isFinite(this.state.pos.y)) this.state.pos.y = 0
 		if (!Number.isFinite(this.state.pos.z)) this.state.pos.z = this._data.radius

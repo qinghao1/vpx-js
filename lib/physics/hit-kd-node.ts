@@ -36,10 +36,18 @@ export class HitKDNode {
 	}
 
 	private hitTestBallScalar(ball: Ball, coll: CollisionEvent, physics: PlayerPhysics): void {
+		// Only this node's straddling items live in [start, start + count);
+		// children recurse below.
 		const count = this.items & COUNT_MASK
+		const ballBox = ball.hit.hitBBox,
+			ballPos = ball.state.pos,
+			hitRadiusSqr = ball.hit.rcHitRadiusSqr
 		for (let i = this.start; i < this.start + count; i++) {
 			const h = this.hitOct.getItemAt(i)
-			if (h !== ball.hit && h.isEnabled) h.doHitTest(ball, coll, physics)
+			if (h === ball.hit || !h.isEnabled) continue
+			if (!h.hitBBox.intersectRect(ballBox)) continue
+			if (!h.hitBBox.intersectSphere(ballPos, hitRadiusSqr)) continue
+			h.doHitTest(ball, coll, physics)
 		}
 		if (this.children.length === 0) return
 		const axis = this.items >> AXIS_SHIFT,

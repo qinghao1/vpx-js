@@ -17,7 +17,7 @@ class TestHit extends HitObject {
 
 function makeBall(x: number): Ball {
 	return {
-		hit: { eventPos: new Vertex3D(-1, -1, -1) },
+		hit: { eventPos: new Vertex3D(-1, -1, -1), lastEventSqrDist: 0 },
 		state: { pos: new Vertex3D(x, 0, 0) },
 	} as unknown as Ball
 }
@@ -77,6 +77,20 @@ describe('HitObject.fireHitEvent', () => {
 		plainBall.state.pos.set(0.1, 0, 0)
 		plain.fireHitEvent(plainBall)
 		expect(plainCounter.count).toBe(1)
+	})
+
+	it('fires after real travel even at the same place (upstream m_lastEventSqrDist)', () => {
+		const counter = { count: 0 }
+		const target = makeTarget(counter)
+		const ball = makeBall(0)
+		target.fireHitEvent(ball)
+		expect(counter.count).toBe(1)
+		// Ball travelled (accumulated by BallMover) and came back: the
+		// same-place filter is bypassed and the accumulator resets.
+		ball.hit.lastEventSqrDist = 0.6
+		target.fireHitEvent(ball)
+		expect(counter.count).toBe(2)
+		expect(ball.hit.lastEventSqrDist).toBe(0)
 	})
 
 	it('does not fire when disabled', () => {

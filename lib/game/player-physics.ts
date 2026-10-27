@@ -53,13 +53,11 @@ export class PlayerPhysics {
 	public contacts: CollisionEvent[] = []
 	public activeBall?: Ball
 	public activeBallBC?: Ball
-	// Intentional divergence from upstream PhysicsEngine.cpp: upstream draws two
-	// independent randoms per cycle (hit-test order ~L679, contact order ~L803/812)
-	// plus a deterministic toggle for ball-ball dedupe (L868). This port drives all
-	// three sites from one deterministic toggle so physics stays reproducible; the
-	// toggle still alternates every substep, preserving upstream's anti-bias intent
-	// (see BallHit.collide). Do not "fix" by adding Math.random() — it would break
-	// determinism with no proven correctness gain.
+	// Intentional divergence from upstream PhysicsEngine.cpp: upstream draws one
+	// random per ball for hit-test order (~L679) and one per substep for contact
+	// order (~L803/812), plus a deterministic per-substep toggle for ball-ball
+	// dedupe (L868). This port drives all three from the toggle so physics stays
+	// reproducible. Do not "fix" with Math.random().
 	public swapBallCollisionHandling = false
 	public lastPlungerHit = 0
 	public ballControl = false

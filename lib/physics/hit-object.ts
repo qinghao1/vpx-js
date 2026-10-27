@@ -61,14 +61,22 @@ export abstract class HitObject {
 	}
 	fireHitEvent(ball: Ball): void {
 		if (this.obj && this.fe && this.isEnabled) {
-			const posDiff = ball.hit.eventPos.clone(true).sub(ball.state.pos)
-			const distLs = posDiff.lengthSq()
-			Vertex3D.release(posDiff)
-			const normalDist = this.objType === CollisionType.HitTarget ? 0 : 0.25
-			if (distLs > normalDist) {
-				ball.hit.eventPos.set(ball.state.pos.x, ball.state.pos.y, ball.state.pos.z)
-				this.obj.fireGroupEvent(Event.HitEventsHit)
+			// Upstream HitObject::FireHitEvent (collide.cpp): hits while the
+			// ball barely travelled since the last event are rest-contact noise
+			// and only re-fire from a new place; hits after real travel always
+			// fire. Suppressed hits keep the anchor so slow drift still
+			// re-fires once it leaves the spot; the accumulator (fed by
+			// BallMover) resets on every fire.
+			if (ball.hit.lastEventSqrDist < 0.5) {
+				const posDiff = ball.hit.eventPos.clone(true).sub(ball.state.pos)
+				const distLs = posDiff.lengthSq()
+				Vertex3D.release(posDiff)
+				const normalDist = this.objType === CollisionType.HitTarget ? 0 : 0.25
+				if (distLs <= normalDist) return
 			}
+			ball.hit.lastEventSqrDist = 0
+			ball.hit.eventPos.set(ball.state.pos.x, ball.state.pos.y, ball.state.pos.z)
+			this.obj.fireGroupEvent(Event.HitEventsHit)
 		}
 	}
 	setElasticity(elasticity: number, elasticityFalloff?: number): this {

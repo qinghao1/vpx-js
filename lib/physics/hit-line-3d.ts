@@ -44,29 +44,26 @@ export class HitLine3D extends HitLineZ {
 
 	public override hitTest(ball: Ball, dTime: number, coll: CollisionEvent): number {
 		if (!this.isEnabled) return -1
-		const pos = ball.state.pos,
-			vel = ball.hit.vel
-		const ox = pos.x,
-			oy = pos.y,
-			oz = pos.z
-		const ovx = vel.x,
-			ovy = vel.y,
-			ovz = vel.z
-		pos.applyMatrix2D(this.matrix)
-		vel.applyMatrix2D(this.matrix)
+		// Upstream (collideex.cpp) copies the ball onto the stack, transforms
+		// the copy, and transforms the normal back — the live ball is never
+		// touched. Same here with pooled locals: mutating ball.state.pos /
+		// ball.hit.vel in place leaks transformed values to nested hit tests
+		// and to callers on early returns.
+		const localPos = ball.state.pos.clone(true).applyMatrix2D(this.matrix)
+		const localVel = ball.hit.vel.clone(true).applyMatrix2D(this.matrix)
+		const probe = { state: { pos: localPos }, hit: { vel: localVel }, data: ball.data } as Ball
 		const saveZlow = this.hitBBox.zlow,
 			saveZhigh = this.hitBBox.zhigh
 		this.hitBBox.zlow = this.zLow
 		this.hitBBox.zhigh = this.zHigh
-		const hitTime = super.hitTest(ball, dTime, coll)
-		pos.x = ox
-		pos.y = oy
-		pos.z = oz
-		vel.x = ovx
-		vel.y = ovy
-		vel.z = ovz
-		this.hitBBox.zlow = saveZlow
-		this.hitBBox.zhigh = saveZhigh
+		let hitTime: number
+		try {
+			hitTime = super.hitTest(probe, dTime, coll)
+		} finally {
+			this.hitBBox.zlow = saveZlow
+			this.hitBBox.zhigh = saveZhigh
+		}
+		Vertex3D.release(localPos, localVel)
 		if (hitTime >= 0) {
 			const e = this.matrix.elements
 			const nx = coll.hitNormal.x,

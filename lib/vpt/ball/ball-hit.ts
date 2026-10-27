@@ -60,6 +60,9 @@ export class BallHit extends HitObject {
 	public invMass: number
 	public inertia: number
 	public eventPos = new Vertex3D(-1, -1, -1)
+	// Squared distance travelled since the last fired hit event, accumulated
+	// by BallMover.updateDisplacements (hitball.cpp m_lastEventSqrDist).
+	public lastEventSqrDist = 0
 	public angularVelocity = new Vertex3D()
 	public isVisible = true
 
