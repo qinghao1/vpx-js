@@ -92,17 +92,73 @@ describe('regression: playfield lights via szLightmap', () => {
 		expect(mat.emissiveIntensity, 'half intensity => 0.5').toBeCloseTo(0.5, 0.01)
 	})
 
-	it('Viewer.applyChangedStates must propagate to szLightmap primitives (file guard)', async () => {
-		let viewerCore = ''
-		viewerCore = fs.readFileSync('demo-browser/viewer-core.js', 'utf-8')
-		if (!viewerCore.includes('changedLightNames')) {
-			viewerCore = fs.readFileSync('demo-browser/src/viewer.ts', 'utf-8')
+	it('Viewer.applyChangedStates propagates light changes to szLightmap primitives', async () => {
+		const { Viewer } = await import('../../../demo-browser/src/viewer.js')
+		const table: any = new TableBuilder()
+			.addMaterial('VLM.Bake', { baseColor: 0xffffff })
+			.addPrimitive('TestPrim', {
+				szMaterial: 'VLM.Bake',
+				szLightmap: 'L1',
+				addBlend: true,
+				alpha: 100,
+				color: 0xffffff,
+				isVisible: true,
+				disableLightingTop: 1,
+			})
+			.build()
+		const origGetMat = table.getMaterial.bind(table)
+		table.getMaterial = (n: string) => {
+			if (n === 'VLM.Bake') return { baseColor: 0xffffff }
+			return origGetMat(n)
 		}
-		expect(viewerCore, 'viewer-core must collect changedLightNames').toContain('changedLightNames')
-		expect(viewerCore, 'must iterate primitives with szLightmap').toContain('szLightmap')
-		expect(viewerCore, 'must call primitive applyState for lightmaps').toMatch(
-			/entry\.item\.getUpdater\(\)\.applyState\(entry\.node,\s*\{\}/,
-		)
+		const api = new ThreeRenderApi({ applyMaterials: true } as any) as any
+		const scene = new TableMeshGenerator(table).generateTableNode(api, {}) as THREE.Group
+		let curIntensity = 10
+		table.lights = {
+			L1: {
+				data: { intensity: 10, intensityScale: 1 },
+				getState: () => ({ intensity: curIntensity, color: 0xffffff, colorFull: 0xffffff }),
+				state: {
+					get intensity() {
+						return curIntensity
+					},
+					set intensity(v) {
+						curIntensity = v
+					},
+				},
+			},
+		}
+		table.getLight = (n: string) => table.lights[n]
+		// Drive the real Viewer method on a DOM-free stub: only the fields
+		// applyChangedStates touches (tableGroup/table/renderApi/nodeCache).
+		const viewer: any = Object.create(Viewer.prototype)
+		viewer.viewerMode = 'viewer'
+		viewer.tableGroup = scene
+		viewer.table = table
+		viewer.renderApi = api
+		viewer.nodeCache = new Map()
+		viewer._lightmapMap = new Map()
+		viewer._demandPendingSoon = () => {}
+		viewer.buildNodeCache()
+		const primNode = scene.getObjectByName('TestPrim') as any
+		expect(primNode, 'TestPrim node must exist').toBeTruthy()
+		curIntensity = 10
+		table.primitives.TestPrim.getUpdater().applyState(primNode, {}, api, table)
+		let mat = (primNode.children[0]?.material ?? primNode.material) as any
+		expect(mat.emissiveIntensity, 'light on => emissive 1').toBeCloseTo(1, 0.01)
+		// A light-only state change (no primitive entry) must still reach the
+		// lightmapped primitive through the changedLightNames fan-out.
+		curIntensity = 0
+		let released = false
+		viewer.applyChangedStates({
+			changedStates: { L1: { intensity: 0, color: 0xffffff, colorFull: 0xffffff } },
+			release() {
+				released = true
+			},
+		})
+		expect(released, 'changed states must be released').toBe(true)
+		mat = (primNode.children[0]?.material ?? primNode.material) as any
+		expect(mat.emissiveIntensity, 'light off must propagate to szLightmap primitive').toEqual(0)
 	})
 
 	it.skipIf(!walkingDeadVpx)('walking_dead lightmap primitives should exist and be addBlend', async () => {
