@@ -3,9 +3,9 @@ const MaxBalls = 5;
 let score, bonus, playerName;
 let balls = __vbs.dim([4]);
 score = 0;
-playerName = __stdlib.CStr('Player') + __stdlib.CStr('1');
+playerName = __vbs.concat('Player', '1');
 function AddScore(points) {
-    if (points > 0) {
+    if (__vbs.gt(points, 0)) {
         score = __vbs.add(score, points);
     } else if (__vbs.equals(points, 0)) {
         score = score;
@@ -22,13 +22,13 @@ function TestLoop() {
     let i, total;
     total = 0;
     __exitFor:
-        for (i = 1; 2 < 0 ? i >= 10 : i <= 10; i += 2) {
+        for (i = 1; __vbs.lt(2, 0) ? __vbs.gte(i, 10) : __vbs.lte(i, 10); i = __vbs.add(i, 2)) {
             total = __vbs.add(total, i);
         }
     let k;
     k = 0;
     __exitDo:
-        while (k < 3) {
+        while (__vbs.lt(k, 3)) {
             k = __vbs.add(k, 1);
         }
     {
@@ -48,7 +48,7 @@ function TestLogic(a, b) {
     if (__vbs.not(__vbs.is(a, Nothing))) {
         f = __vbs.add(f, 1);
     }
-    if (__vbs.or(__vbs.and(__vbs.equals(a, 1), __vbs.equals(b, 2)), f > 0)) {
+    if (__vbs.or(__vbs.and(__vbs.equals(a, 1), __vbs.equals(b, 2)), __vbs.gt(f, 0))) {
         f = __vbs.mul(f, 2);
     }
 }
