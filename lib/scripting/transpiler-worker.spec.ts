@@ -29,6 +29,23 @@ describe('Transpiler worker parity', () => {
 		).to.equal(sync)
 	})
 
+	it('should match sync for instance function props', async () => {
+		const table = new TableBuilder().addFlipper('MyFlipper').build()
+		const player = new Player(table)
+		const api = table.getElementApis().MyFlipper as any
+		// Instance arrow-function prop, reported via the (virtual) _getPropertyNames.
+		api.SpinNow = () => {}
+		const protoNames = Object.getOwnPropertyNames(Object.getPrototypeOf(api))
+		api._getPropertyNames = () => [...protoNames, 'SpinNow']
+		const td = getTableDataForWorker(table, player)
+		expect(td?.elementApiFuncs?.MyFlipper ?? []).to.contain('SpinNow')
+		const vbs = 'MyFlipper.SpinNow()\n'
+		const sync = new Transpiler(table, player).transpile(vbs, 'play', 'global')
+		expect(
+			await transpileInWorker({ vbs, globalFunction: 'play', globalObject: 'global', tableData: td }),
+		).to.equal(sync)
+	})
+
 	it('should match via worker thread', async () => {
 		const table = new TableBuilder().addFlipper('MyFlipper').build()
 		const player = new Player(table)
