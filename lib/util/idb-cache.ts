@@ -79,7 +79,11 @@ export function exrCacheKey(name: string, byteLength: number, kind: string, max?
 }
 
 export function vbsCacheKey(vbs: string): string {
+	// The vbs7 prefix versions the TRANSPILER, not the script: cached JS from
+	// an older pipeline must never run against a newer runtime (stale line
+	// numbers, stale codegen). Bump the prefix whenever a change alters
+	// transpiled output or its runtime contract.
 	let h = 5381
 	for (let i = 0; i < vbs.length; i++) h = ((h << 5) + h) ^ vbs.charCodeAt(i)
-	return `vbs6:${(h >>> 0).toString(36)}:${vbs.length}`
+	return `vbs7:${(h >>> 0).toString(36)}:${vbs.length}`
 }
