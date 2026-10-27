@@ -1,10 +1,11 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
+import { crc32 as nodeCrc32 } from 'node:zlib'
 import * as chai from 'chai'
 import { expect } from 'chai'
 import sinonChai from 'sinon-chai'
-import { downloadGameEntry } from './rom-fetcher.js'
+import { crc32, downloadGameEntry } from './rom-fetcher.js'
 
 chai.use((sinonChai as any).default ?? sinonChai)
 describe('The ROM Fetcher', () => {
@@ -29,10 +30,15 @@ describe('The ROM Fetcher', () => {
 	})
 
 	it('should successful download ROM', async () => {
+		const body = new TextEncoder().encode(MOCK_ROM)
 		globalThis.fetch = (async (url: string | URL) => {
 			const urlStr = url.toString()
 			if (urlStr.includes('/v1/games/mm/roms/')) {
-				return new Response(JSON.stringify(VPDB_GAME_ENTRY_JSON), { status: 200 })
+				// Serve a manifest matching the mocked body (size + crc).
+				const json = JSON.parse(JSON.stringify(VPDB_GAME_ENTRY_JSON))
+				json[0].rom_files[0].bytes = body.length
+				json[0].rom_files[0].crc = crc32(body)
+				return new Response(JSON.stringify(json), { status: 200 })
 			}
 			if (urlStr.includes('mm_1_09c.bin')) {
 				return new Response(MOCK_ROM, { status: 200 })
@@ -43,6 +49,52 @@ describe('The ROM Fetcher', () => {
 		const answer = await downloadGameEntry('mm_109c')
 		expect(answer.romFile).to.deep.equal(new Uint8Array([77, 79, 67, 75, 82, 79, 77]))
 		expect(answer.wpcDbEntry.name).to.equal('WPC-95: Medieval Madness')
+	})
+
+	it('crc32 matches zlib', () => {
+		for (const text of ['', 'MOCKROM', 'The quick brown fox jumps over the lazy dog']) {
+			const body = new TextEncoder().encode(text)
+			expect(crc32(body)).to.equal(nodeCrc32(body) >>> 0)
+		}
+	})
+
+	it('should reject a truncated ROM', async () => {
+		globalThis.fetch = (async (url: string | URL) => {
+			const urlStr = url.toString()
+			if (urlStr.includes('/v1/games/mm/roms/')) {
+				return new Response(JSON.stringify(VPDB_GAME_ENTRY_JSON), { status: 200 })
+			}
+			return new Response(MOCK_ROM, { status: 200 })
+		}) as any
+
+		try {
+			await downloadGameEntry('mm_109c')
+			expect.fail('expected downloadGameEntry to reject')
+		} catch (error) {
+			if (error instanceof chai.AssertionError) throw error
+			expect((error as Error).message).match(/VPDB_ROM_SIZE_MISMATCH/)
+		}
+	})
+
+	it('should reject a corrupt ROM of the right size', async () => {
+		globalThis.fetch = (async (url: string | URL) => {
+			const urlStr = url.toString()
+			if (urlStr.includes('/v1/games/mm/roms/')) {
+				const json = JSON.parse(JSON.stringify(VPDB_GAME_ENTRY_JSON))
+				json[0].rom_files[0].bytes = MOCK_ROM.length
+				json[0].rom_files[0].crc = 1
+				return new Response(JSON.stringify(json), { status: 200 })
+			}
+			return new Response(MOCK_ROM, { status: 200 })
+		}) as any
+
+		try {
+			await downloadGameEntry('mm_109c')
+			expect.fail('expected downloadGameEntry to reject')
+		} catch (error) {
+			if (error instanceof chai.AssertionError) throw error
+			expect((error as Error).message).match(/VPDB_ROM_CRC_MISMATCH/)
+		}
 	})
 
 	it('should handle invalid rom list, option 1', async () => {

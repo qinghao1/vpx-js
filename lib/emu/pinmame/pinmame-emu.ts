@@ -6,12 +6,16 @@ import { Vertex2D } from '../../math/vector.js'
 import { logger } from '../../util/logger.js'
 import { EmulatorMessageQueue, MessageType, switchMessageType } from '../emulator-message-queue.js'
 import { EmulatorState } from '../emulator-state.js'
+import { warnOnce } from '../warn-once.js'
 import { createPinmameModule } from './pinmame-loader.js'
 import type { PinmameModule } from './pinmame-module.js'
 
+// VPM default DMD size, used until the core reports real dimensions.
 const FALLBACK_DMD = new Vertex2D(128, 32)
+// PinMAME reads a fixed 1 KiB config struct from the given pointer.
 const CONFIG_SIZE = 1024
 const VPM_DIR = '/pinmame'
+// Hz — the mixer rate PinMAME resamples its audio to.
 const SAMPLE_RATE = 44100
 
 type Api = {
@@ -32,10 +36,19 @@ type Api = {
 	getSolMask(low: number): number
 	setSolMask(low: number, mask: number): void
 	setTimeFence(t: number): void
+	// Optional: only present when the wasm build exports PinmameSetCabinetInput.
+	setCabinetInput?(v: number): void
 }
 
 const gameName = (v: string | { name?: string; pinmame?: { name?: string } }) =>
 	typeof v === 'string' ? v : (v.pinmame?.name ?? v.name ?? '')
+
+// Byte identity for same-length cached ROM zips.
+function romBytesEqual(a: Uint8Array, b: Uint8Array): boolean {
+	if (a.length !== b.length) return false
+	for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false
+	return true
+}
 
 export class PinMameEmulator implements IEmulator {
 	readonly emulatorState = new EmulatorState()
@@ -57,6 +70,7 @@ export class PinMameEmulator implements IEmulator {
 	private dmdW = FALLBACK_DMD.x
 	private dmdH = FALLBACK_DMD.y
 	private readonly wasmBufs: Record<'pull' | 'dmd', { ptr: number; cap: number; min: number }> = {
+		// 1024 covers one pull page of lamp/sol/GI change pairs; 4096 one full 128x32 DMD frame.
 		pull: { ptr: 0, cap: 0, min: 1024 },
 		dmd: { ptr: 0, cap: 0, min: 4096 },
 	}
@@ -91,6 +105,11 @@ export class PinMameEmulator implements IEmulator {
 			setSolMask: wrap('PinmameSetSolenoidMask', null, ['number', 'number']),
 			setTimeFence: wrap('PinmameSetTimeFence', null, ['number']),
 		}
+		// PinmameSetCabinetInput is not in PINMAME_EXPORTS yet — wire it only
+		// when a (future) wasm build provides it, so cwrap never wraps a hole.
+		if (typeof (module as unknown as Record<string, unknown>)._PinmameSetCabinetInput === 'function') {
+			this.api.setCabinetInput = wrap('PinmameSetCabinetInput', null, ['number'])
+		}
 	}
 
 	async loadGame(name: string | { name?: string; pinmame?: { name?: string } }, rom: Uint8Array): Promise<void> {
@@ -99,20 +118,34 @@ export class PinMameEmulator implements IEmulator {
 		if (!game) throw new Error('PINMAME_GAME_NAME_MISSING')
 		if (this.isMock || !this.mod || !this.api) return this.markReady()
 		if (this.api.isRunning()) {
-			if (this.game !== game) logger().warn(`[pinmame] already running ${this.game}, refusing second run ${game}`)
+			// Silently staying on the old game here leaves callers believing
+			// the new game is ready — fail loudly so they stop the emu first.
+			if (this.game !== game) throw new Error(`PINMAME_ALREADY_RUNNING_${this.game}`)
 			return this.markReady()
 		}
 		const m = this.mod
 		for (const dir of ['/pinmame/roms', '/pinmame/nvram', '/pinmame/cfg']) m.FS.mkdirTree(dir)
+		const zipPath = `/pinmame/roms/${game}.zip`
 		if (rom.length) {
 			let reuse = false
 			try {
-				reuse = m.FS.stat(`/pinmame/roms/${game}.zip`).size === rom.length
+				// Size match alone is not identity — compare bytes too, so a
+				// same-length but different ROM is never silently reused.
+				reuse = m.FS.stat(zipPath).size === rom.length && romBytesEqual(m.FS.readFile(zipPath), rom)
+			} catch (e) {
+				const errno = (e as unknown as { errno?: number })?.errno
+				// 44 is ENOENT from the Emscripten FS — no cached zip yet.
+				if (errno !== 44) throw e
+			}
+			if (!reuse) m.FS.writeFile(zipPath, rom)
+		} else {
+			// An empty ROM must not leave a stale zip behind for this game.
+			try {
+				m.FS.unlink(zipPath)
 			} catch (e) {
 				const errno = (e as unknown as { errno?: number })?.errno
 				if (errno !== 44) throw e
 			}
-			if (!reuse) m.FS.writeFile(`/pinmame/roms/${game}.zip`, rom)
 		}
 		this.writeConfig(m)
 		const ptr = m._malloc(m.lengthBytesUTF8(game) + 1)
@@ -173,6 +206,7 @@ export class PinMameEmulator implements IEmulator {
 	}
 	setDipSwitchByte(v: number, bank = 0): void {
 		if (!this.ready) {
+			// Pack bank into the high byte so replay can split value/bank apart.
 			this.queue.addMessage(MessageType.SetDipByte, (bank << 8) | (v & 0xff))
 			return
 		}
@@ -183,11 +217,8 @@ export class PinMameEmulator implements IEmulator {
 		const cached = this.solMasks.get(low)
 		if (cached !== undefined) return cached
 		if (this.isMock || !this.api) return 0
-		try {
-			return this.api.getSolMask(low) ?? 0
-		} catch {
-			return 0
-		}
+		// Real backend errors propagate — a catch-all 0 would hide a dead core.
+		return this.api.getSolMask(low) ?? 0
 	}
 	setSolMask(low: number, mask: number): void {
 		this.solMasks.set(low, mask)
@@ -211,7 +242,11 @@ export class PinMameEmulator implements IEmulator {
 			this.queue.addMessage(MessageType.SetTimeFence, time)
 			return
 		}
-		if (this.isMock || !this.api) return
+		if (this.isMock || !this.api) {
+			// No backend to fence against — warn once per process, not per frame.
+			warnOnce('pinmame:time-fence', '[pinmame] setTimeFence without a backend — input ignored')
+			return
+		}
 		this.api.setTimeFence(time)
 	}
 
@@ -268,6 +303,7 @@ export class PinMameEmulator implements IEmulator {
 			n = 0
 		}
 		for (let i = 0; i < n; i++) {
+			// 8-byte stride: each change is an (i32 index, i32 value) pair; 255 is the VPM lamp ceiling.
 			const idx = m.getValue(ptr + i * 8, 'i32')
 			const val = m.getValue(ptr + i * 8 + 4, 'i32')
 			if (idx >= 0 && idx < buf.length) buf[idx] = Math.max(0, Math.min(255, val))
@@ -334,7 +370,16 @@ export class PinMameEmulator implements IEmulator {
 	}
 
 	setCabinetInput(v: number): void {
-		if (!this.ready) this.queue.addMessage(MessageType.CabinetInput, v)
+		if (!this.ready) {
+			this.queue.addMessage(MessageType.CabinetInput, v)
+			return
+		}
+		if (!this.isMock && this.api?.setCabinetInput) {
+			this.api.setCabinetInput(v)
+			return
+		}
+		// No PinmameSetCabinetInput export to forward to — warn once per process.
+		warnOnce('pinmame:cabinet-input', '[pinmame] setCabinetInput without a backend — input ignored')
 	}
 	setFliptronicsInput(): void {}
 }

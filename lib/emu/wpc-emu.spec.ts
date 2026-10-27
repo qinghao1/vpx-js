@@ -7,6 +7,8 @@ import * as sinon from 'sinon'
 import sinonChai from 'sinon-chai'
 import { type GamelistDB, WpcEmuApi, type WpcEmuWebWorkerApi } from 'wpc-emu'
 import type { Vertex2D } from '../math/vector.js'
+import { Logger } from '../util/logger.js'
+import { resetWarnOnce } from './warn-once.js'
 import { Emulator } from './wpc-emu.js'
 
 const mockGameEntry: GamelistDB.GameEntry = {
@@ -26,6 +28,7 @@ describe('WPC-EMU', () => {
 		mockEmu = new MockWpcEmulator()
 		sandbox.stub(WpcEmuApi, 'initVMwithRom').resolves(mockEmu)
 		emulator = new Emulator()
+		resetWarnOnce()
 	})
 
 	afterEach(() => {
@@ -44,7 +47,55 @@ describe('WPC-EMU', () => {
 
 	it('should get getDmdFrame', () => {
 		const result: Uint8Array = emulator.getDmdFrame()
-		expect(result.length).to.equal(0)
+		expect(result.length).to.equal(128 * 32)
+	})
+
+	it('should return a zeroed w*h DMD frame before init', () => {
+		const dims: Vertex2D = emulator.getDmdDimensions()
+		const result: Uint8Array = emulator.getDmdFrame()
+		expect(result.length).to.equal(dims.x * dims.y)
+		expect([...result].every(v => v === 0)).to.equal(true)
+	})
+
+	it('should warn once for non-zero DIP banks', () => {
+		const warns: unknown[][] = []
+		const orig = Logger.logger()
+		const noop = () => {}
+		Logger.setLogger({
+			wtf: noop,
+			error: noop,
+			warn: (...a: unknown[]) => void warns.push(a),
+			info: noop,
+			debug: noop,
+		})
+		try {
+			expect(emulator.getDipSwitchByte(1)).to.equal(0)
+			emulator.setDipSwitchByte(0xff, 1)
+			emulator.getDipSwitchByte(2)
+			expect(warns.length).to.equal(1)
+		} finally {
+			Logger.setLogger(orig)
+		}
+	})
+
+	it('should warn once for setTimeFence', () => {
+		const warns: unknown[][] = []
+		const orig = Logger.logger()
+		const noop = () => {}
+		Logger.setLogger({
+			wtf: noop,
+			error: noop,
+			warn: (...a: unknown[]) => void warns.push(a),
+			info: noop,
+			debug: noop,
+		})
+		try {
+			emulator.setTimeFence(100)
+			emulator.setTimeFence(200)
+			expect(warns.length).to.equal(1)
+		} finally {
+			Logger.setLogger(orig)
+		}
 	})
 
 	it('should ignore registerAudioConsumer when emu is not initialized', () => {

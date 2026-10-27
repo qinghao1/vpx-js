@@ -8,6 +8,8 @@ import type { SinonStub } from 'sinon'
 import * as sinon from 'sinon'
 import sinonChai from 'sinon-chai'
 import { TableBuilder } from '../../../test/table-builder.js'
+import { PinMameEmulator } from '../../emu/pinmame/pinmame-emu.js'
+import { crc32 } from '../../emu/rom-fetcher.js'
 import { Emulator } from '../../emu/wpc-emu.js'
 import { Player } from '../../game/player.js'
 import type { Table } from '../../vpt/table/table.js'
@@ -123,6 +125,61 @@ describe('The VpmController - VISUAL PINMAME COM OBJECT', () => {
 	it('should tolerate an emulator without setTimeFence', () => {
 		vpmController.TimeFence = 42
 		expect(vpmController.TimeFence).to.equal(42)
+	})
+
+	it('WPC branch builds a fresh wpc Emulator even with a PinMAME emulator installed', async () => {
+		const installed = new PinMameEmulator()
+		;(vpmController as any).emulator = installed
+		const body = new TextEncoder().encode('ABCD')
+		const entry = [
+			{
+				id: 'mm_109c',
+				rom_files: [
+					{ filename: 'mm_1_09c.bin', bytes: body.length, crc: crc32(body), type: 'main', system: 'wpc' },
+				],
+				file: {
+					id: 'x',
+					name: 'mm_109c.zip',
+					bytes: 4,
+					mime_type: 'application/zip',
+					url: 'https://storage.vpdb.io/files/x.zip',
+					is_protected: true,
+					counter: { downloads: 1 },
+					variations: {},
+				},
+			},
+		]
+		const origFetch = globalThis.fetch
+		globalThis.fetch = (async (url: any) => {
+			const s = String(url)
+			if (s.includes('/v1/games/mm/roms/')) return { ok: true, json: async () => entry }
+			return { ok: true, arrayBuffer: async () => body.buffer }
+		}) as any
+		const loadGame = sandbox.stub(Emulator.prototype, 'loadGame').resolves()
+		try {
+			vpmController.GameName = 'mm_109c'
+			await vpmController.whenReady()
+			expect(loadGame.calledOnce).to.equal(true)
+			const emu = (vpmController as any).emulator
+			expect(emu).to.be.an.instanceof(Emulator)
+			expect(emu).to.not.equal(installed)
+			expect(loadGame.firstCall.args[1]).to.deep.equal(new Uint8Array([65, 66, 67, 68]))
+		} finally {
+			globalThis.fetch = origFetch
+		}
+	})
+
+	it('RawDmdPixels falls back to a zeroed w*h buffer when the emulator throws', () => {
+		;(vpmController as any).emulator = {
+			getDmdDimensions: () => ({ x: 128, y: 32 }),
+			getDmdFrame: () => {
+				throw new Error('dead core')
+			},
+		}
+		const pixels = vpmController.RawDmdPixels
+		expect(pixels).to.be.an.instanceof(Uint8Array)
+		expect(pixels.length).to.equal(128 * 32)
+		expect([...pixels].every(v => v === 0)).to.equal(true)
 	})
 
 	it('should fetch ROMs from shaped URLs without leaking the home dir', async () => {

@@ -4,6 +4,7 @@ export interface PinmameModule {
 		writeFile(p: string, d: Uint8Array): void
 		readFile(p: string): Uint8Array
 		stat(p: string): { size: number }
+		unlink(p: string): void
 	}
 	HEAPU8: Uint8Array
 	HEAPU32: Uint32Array

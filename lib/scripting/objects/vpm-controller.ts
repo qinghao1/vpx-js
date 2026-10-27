@@ -143,9 +143,14 @@ export class VpmController {
 	private async _loadGame(name: string): Promise<void> {
 		if (GamelistDB.getByPinmameName(name)) {
 			const { wpcDbEntry, romFile } = await downloadGameEntry(name)
-			await (this.emulator as Emulator).loadGame(wpcDbEntry, romFile)
-			this.replay(this.emulator)
-			this.player.setEmulator(this.emulator)
+			// Fresh wpc Emulator, symmetric with the PinMAME branch below —
+			// this.emulator may hold a PinMAME instance from an earlier load.
+			const emu = new Emulator()
+			this.replay(emu)
+			this.emulator = emu
+			await emu.loadGame(wpcDbEntry, romFile)
+			this.player.setEmulator(emu)
+			this.replay(emu as unknown as IEmulator)
 			return
 		}
 		const existing = this.player.getPhysics().emu
@@ -309,7 +314,8 @@ export class VpmController {
 		try {
 			return this.emulator.getDmdFrame()
 		} catch {
-			return new Uint8Array()
+			// Standardize on a zeroed w*h buffer — never a 0-length one.
+			return new Uint8Array(this.RawDmdWidth * this.RawDmdHeight)
 		}
 	}
 	get RawDmdColoredPixels(): Uint32Array {

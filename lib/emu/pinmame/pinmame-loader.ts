@@ -22,12 +22,18 @@ export async function createPinmameModule(): Promise<{ module: PinmameModule; is
 				isMock?: boolean
 			}
 			const m = await mod.default()
-			if (!m?.cwrap) continue
+			if (!m?.cwrap) {
+				logger().debug('[pinmame] WASM candidate has no cwrap:', path)
+				continue
+			}
 			const isMock = mod.isMock === true
 			if (isMock) logger().warn('[pinmame] mock — run npm run build:wasm')
 			cached = { module: m, isMock }
 			return cached
-		} catch {}
+		} catch (e) {
+			// Log each miss at debug so a wrong candidate order is diagnosable.
+			logger().debug('[pinmame] WASM candidate failed:', path, e)
+		}
 	}
 	throw new Error('PinMAME module not found — build wasm or mock')
 }

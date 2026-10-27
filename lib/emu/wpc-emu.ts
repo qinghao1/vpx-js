@@ -11,6 +11,7 @@ import { Vertex2D } from '../math/vector.js'
 import { EmulatorMessageQueue, MessageType, switchMessageType } from './emulator-message-queue.js'
 import { EmulatorState } from './emulator-state.js'
 import { OffsetIndex } from './offset-index.js'
+import { warnOnce } from './warn-once.js'
 
 const INCLUDE_RAM = false
 
@@ -98,18 +99,31 @@ export class Emulator implements IEmulator {
 		return this.dmdSize
 	}
 	getDmdFrame(): Uint8Array {
-		return this.emulatorState.getDmdScreen()
+		const frame = this.emulatorState.getDmdScreen()
+		// Standardize on a zeroed w*h buffer — never a 0-length one.
+		return frame.length ? frame : new Uint8Array(this.dmdSize.x * this.dmdSize.y)
 	}
 	getDipSwitchByte(bank = 0): number {
-		if (bank !== 0) return 0
+		// WPC hardware exposes a single DIP bank — other banks have no meaning.
+		if (bank !== 0) {
+			warnOnce('wpc:dip-bank', '[wpc] DIP bank %d unsupported — only bank 0 exists', bank)
+			return 0
+		}
 		return this.emulator?.getDipSwitchByte() ?? 0
 	}
 	setDipSwitchByte(v: number, bank = 0): void {
-		if (bank !== 0) return
+		if (bank !== 0) {
+			warnOnce('wpc:dip-bank', '[wpc] DIP bank %d unsupported — only bank 0 exists', bank)
+			return
+		}
 		if (!this.emulator) {
 			this.queue.addMessage(MessageType.SetDipByte, v)
 			return
 		}
 		this.emulator.setDipSwitchByte(v)
+	}
+	setTimeFence(_time: number): void {
+		// wpc-emu has no time fence — warn once per process, not per frame.
+		warnOnce('wpc:time-fence', '[wpc] setTimeFence unsupported — input ignored')
 	}
 }
