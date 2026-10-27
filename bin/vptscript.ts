@@ -56,7 +56,8 @@ run(async () => {
 				futimesSync(destFs, srcStat.atime, srcStat.mtime)
 				closeSync(destFs)
 			} else {
-				// Scriptless tables print empty (getTableScript throws when unset).
+				// Scriptless tables print empty: tableScript is undefined unless
+				// loaded (here via loadTableScript), so fall back to ''.
 				console.log(vpt.tableScript ?? '')
 			}
 		} catch (error) {
