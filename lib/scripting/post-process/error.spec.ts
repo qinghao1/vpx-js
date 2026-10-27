@@ -16,7 +16,7 @@ before(async () => {
 })
 
 describe('The VBScript transpiler - Error', () => {
-	const cases: Array<[string, string]> = [
+	const cases: Array<[string, string, string]> = [
 		[
 			'an On Error Resume Next statement',
 			'On Error Resume Next',
