@@ -7,7 +7,6 @@ import {
 	CanvasTexture,
 	ClampToEdgeWrapping,
 	DataTexture,
-	DataUtils,
 	EquirectangularReflectionMapping,
 	HalfFloatType,
 	LinearFilter,
@@ -26,6 +25,7 @@ import { _resetQualityCache, getEffectiveCaps, MAX_FLOAT_TEXTURE_BYTES } from '.
 import type { ITextureLoader } from '../irender-api.js'
 import { decodeInWorker, hasImageWorker } from './image-worker-pool.js'
 import { RE_PLAYFIELD } from './material-shared.js'
+import { downscaleArray } from './texture-downscale.js'
 
 /** Engine-default lookup key: filename without path or extension (dotless names stay whole). */
 function defaultKeyFor(fileName: string): string {
@@ -521,53 +521,7 @@ function getMimeType(data: Uint8Array, ext: string): string | null {
 function downsampleData(texture: any, maxSize: number, name?: string): any {
 	const { width: w, height: h, data: src } = texture.image
 	if (w <= maxSize && h <= maxSize) return texture
-	const scale = Math.min(maxSize / w, maxSize / h)
-	const nw = Math.max(1, Math.floor(w * scale))
-	const nh = Math.max(1, Math.floor(h * scale))
-	const channels = Math.round(src.length / (w * h)) || 4
-	const dst: any = new (src.constructor as any)(nw * nh * channels)
-	const xRatio = w / nw
-	const yRatio = h / nh
-	const isHalf = src instanceof Uint16Array && texture.type === HalfFloatType
-	const isFloat = src instanceof Float32Array
-	const isPlayfield = !!name && RE_PLAYFIELD.test(name)
-	const fast = !isPlayfield && w * h > 4 * 1024 * 1024
-	if (fast) {
-		for (let y = 0; y < nh; y++) {
-			const sy = Math.min(h - 1, Math.floor(y * yRatio))
-			const srcRow = sy * w * channels
-			const dstRow = y * nw * channels
-			for (let x = 0; x < nw; x++) {
-				const sx = Math.min(w - 1, Math.floor(x * xRatio))
-				const sBase = srcRow + sx * channels
-				const dBase = dstRow + x * channels
-				for (let c = 0; c < channels; c++) dst[dBase + c] = (src as any)[sBase + c]
-			}
-		}
-	} else {
-		for (let y = 0; y < nh; y++) {
-			const y0 = Math.floor(y * yRatio)
-			const y1 = Math.min(h, Math.ceil((y + 1) * yRatio))
-			for (let x = 0; x < nw; x++) {
-				const x0 = Math.floor(x * xRatio)
-				const x1 = Math.min(w, Math.ceil((x + 1) * xRatio))
-				const count = (x1 - x0) * (y1 - y0)
-				const dBase = (y * nw + x) * channels
-				for (let c = 0; c < channels; c++) {
-					let sum = 0
-					for (let sy = y0; sy < y1; sy++) {
-						const row = sy * w * channels
-						for (let sx = x0; sx < x1; sx++)
-							sum += isHalf
-								? DataUtils.fromHalfFloat(src[row + sx * channels + c] as any)
-								: (src as any)[row + sx * channels + c]
-					}
-					const avg = sum / count
-					dst[dBase + c] = isHalf ? DataUtils.toHalfFloat(avg) : isFloat ? avg : Math.round(avg)
-				}
-			}
-		}
-	}
+	const { data: dst, width: nw, height: nh } = downscaleArray(src, w, h, maxSize, name, texture.type)
 	const tex: any = new DataTexture(dst as any, nw, nh, texture.format ?? RGBAFormat)
 	tex.colorSpace = texture.colorSpace ?? SRGBColorSpace
 	tex.type = texture.type ?? tex.type

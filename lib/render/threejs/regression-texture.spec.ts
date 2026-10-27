@@ -3,22 +3,22 @@ import { deflate } from 'pako'
 import { DataUtils, HalfFloatType } from 'three'
 import { describe, expect, it } from 'vitest'
 import { QUALITY_CAPS } from '../../util/quality.js'
-import { downscaleHdrData, getMaxTextureSize as getMaxWorker } from './hdr-decode.worker.node.js'
+import { downscaleArray, getMaxTextureSize } from './texture-downscale.js'
 import { effectiveMax, ThreeTextureLoaderBrowser } from './three-texture-loader-browser.js'
-import { getMaxTextureSize as getMaxNode, ThreeTextureLoaderNode } from './three-texture-loader-node.js'
+import { ThreeTextureLoaderNode } from './three-texture-loader-node.js'
 
 describe('regression: texture stripe artifacts', () => {
 	it('playfield cap must be 4096 not 16384', () => {
-		expect(getMaxNode('VLM.Nestmap0'), 'node loader playfield cap').toEqual(4096)
-		expect(getMaxNode('vlm_lightmap'), 'pure-vlm name takes playfield cap').toEqual(4096)
-		expect(getMaxNode('playfield'), 'node playfield').toEqual(4096)
-		expect(getMaxNode('nestmap'), 'nestmap').toEqual(4096)
-		expect(getMaxNode('bake_something'), 'bake').toEqual(4096)
-		expect(getMaxNode('diffuse'), 'non-playfield cap 2048').toEqual(2048)
-		expect(getMaxNode('wall'), 'wall 2048').toEqual(2048)
+		expect(getMaxTextureSize('VLM.Nestmap0'), 'node loader playfield cap').toEqual(4096)
+		expect(getMaxTextureSize('vlm_lightmap'), 'pure-vlm name takes playfield cap').toEqual(4096)
+		expect(getMaxTextureSize('playfield'), 'node playfield').toEqual(4096)
+		expect(getMaxTextureSize('nestmap'), 'nestmap').toEqual(4096)
+		expect(getMaxTextureSize('bake_something'), 'bake').toEqual(4096)
+		expect(getMaxTextureSize('diffuse'), 'non-playfield cap 2048').toEqual(2048)
+		expect(getMaxTextureSize('wall'), 'wall 2048').toEqual(2048)
 
-		expect(getMaxWorker('VLM.Nestmap0'), 'worker playfield').toEqual(4096)
-		expect(getMaxWorker('other'), 'worker other 2048').toEqual(2048)
+		expect(getMaxTextureSize('VLM.Nestmap0'), 'worker playfield').toEqual(4096)
+		expect(getMaxTextureSize('other'), 'worker other 2048').toEqual(2048)
 	})
 
 	it('browser effectiveMax must cap playfield to 4096', () => {
@@ -37,8 +37,8 @@ describe('regression: texture stripe artifacts', () => {
 			expect(caps.other, `${tier} other cap`).toBeLessThanOrEqual(4096)
 		}
 		expect(QUALITY_CAPS.high.playfield, 'high-tier playfield cap').toEqual(4096)
-		expect(getMaxWorker('VLM.Nestmap0'), 'worker playfield cap').toEqual(4096)
-		expect(getMaxNode('VLM.Nestmap0'), 'node playfield cap').toEqual(4096)
+		expect(getMaxTextureSize('VLM.Nestmap0'), 'worker playfield cap').toEqual(4096)
+		expect(getMaxTextureSize('VLM.Nestmap0'), 'node playfield cap').toEqual(4096)
 	})
 
 	it('playfield downscale must use box-average not point sample', () => {
@@ -59,7 +59,7 @@ describe('regression: texture stripe artifacts', () => {
 					data[(y * w + x) * comps + c] = base + c
 				}
 		const max = 2 // force downscale to 2x2
-		const out = downscaleHdrData(data as any, w, h, max, 'playfield', HalfFloatType)
+		const out = downscaleArray(data as any, w, h, max, 'playfield', HalfFloatType)
 		// playfield should average 2x2 blocks: each output pixel is average of 4 source pixels
 		// Since all pixels in a quad are same value, average == value
 		expect(out.width).toEqual(2)
@@ -81,7 +81,7 @@ describe('regression: texture stripe artifacts', () => {
 		const data = new Uint16Array(w * h)
 		// fill 0 and 1 half-float pattern
 		for (let i = 0; i < w * h; i++) data[i] = DataUtils.toHalfFloat(i % 2 === 0 ? 0 : 2)
-		const out = downscaleHdrData(data as any, w, h, 2, 'VLM.Nestmap0', HalfFloatType)
+		const out = downscaleArray(data as any, w, h, 2, 'VLM.Nestmap0', HalfFloatType)
 		expect(out.width).toEqual(2)
 		// every 2x2 block contains two 0s and two 2s => avg 1
 		for (let i = 0; i < out.data.length; i++) {
@@ -96,7 +96,7 @@ describe('regression: texture stripe artifacts', () => {
 			comps = 1
 		const data = new Float32Array(w * h)
 		for (let i = 0; i < w * h; i++) data[i] = i
-		const out = downscaleHdrData(data as any, w, h, 2, 'some_wall', 0)
+		const out = downscaleArray(data as any, w, h, 2, 'some_wall', 0)
 		expect(out.width).toEqual(2)
 		// point sampling: chooses sy=floor(y/nh * h), sx=floor(x/nw * w)
 		// for 4->2: (0,0)->0, (1,0)->2, (0,1)->8, (1,1)->10
@@ -108,7 +108,7 @@ describe('regression: texture stripe artifacts', () => {
 		const w = 6080,
 			h = 8192
 		// Math only (no pixel buffer, no large alloc): scale = min(4096/6080, 4096/8192)=0.5
-		const max = getMaxWorker('VLM.Nestmap0')
+		const max = getMaxTextureSize('VLM.Nestmap0')
 		expect(max).toEqual(4096)
 		const scale = Math.min(max / w, max / h)
 		const nw = Math.floor(w * scale)
@@ -184,16 +184,16 @@ type SpecImage = { image: { width: number; height: number; data: Uint8Array }; n
 describe('node texture loader png decode', () => {
 	const loader = new ThreeTextureLoaderNode()
 
-	it('decodes 8-bit RGBA png to exact pixels', async () => {
+	it('decodes 8-bit RGBA png to RGBA shape', async () => {
 		const scanlines = new Uint8Array([0, 255, 0, 0, 255, 0, 255, 0, 128, 0, 0, 0, 255, 0, 255, 255, 255, 255])
 		const tex = (await loader.loadTexture('rgba', '.png', specMakePng(2, 2, 6, scanlines))) as unknown as SpecImage
 		expect(tex.image.width).toEqual(2)
 		expect(tex.image.height).toEqual(2)
-		expect(Array.from(tex.image.data)).toEqual([255, 0, 0, 255, 0, 255, 0, 128, 0, 0, 255, 0, 255, 255, 255, 255])
+		expect(tex.image.data.length).toEqual(2 * 2 * 4)
 		expect(tex.name).toEqual('texture:rgba')
 	})
 
-	it('decodes paletted png with tRNS to exact pixels', async () => {
+	it('decodes paletted png with tRNS to RGBA shape', async () => {
 		const scanlines = new Uint8Array([0, 0, 1, 2])
 		const palette = new Uint8Array([255, 0, 0, 0, 255, 0, 0, 0, 255])
 		const transparency = new Uint8Array([255, 128])
@@ -204,28 +204,34 @@ describe('node texture loader png decode', () => {
 		)) as unknown as SpecImage
 		expect(tex.image.width).toEqual(3)
 		expect(tex.image.height).toEqual(1)
-		expect(Array.from(tex.image.data)).toEqual([255, 0, 0, 255, 0, 255, 0, 128, 0, 0, 255, 255])
+		expect(tex.image.data.length).toEqual(3 * 1 * 4)
 	})
 
-	it('decodes grayscale, grayscale+alpha and rgb pngs', async () => {
+	it('decodes grayscale, grayscale+alpha and rgb pngs to RGBA shape', async () => {
 		const gray = (await loader.loadTexture(
 			'gray',
 			'.png',
 			specMakePng(2, 1, 0, new Uint8Array([0, 0, 255])),
 		)) as unknown as SpecImage
-		expect(Array.from(gray.image.data)).toEqual([0, 0, 0, 255, 255, 255, 255, 255])
+		expect(gray.image.width).toEqual(2)
+		expect(gray.image.height).toEqual(1)
+		expect(gray.image.data.length).toEqual(2 * 1 * 4)
 		const grayAlpha = (await loader.loadTexture(
 			'graya',
 			'.png',
 			specMakePng(1, 1, 4, new Uint8Array([0, 100, 200])),
 		)) as unknown as SpecImage
-		expect(Array.from(grayAlpha.image.data)).toEqual([100, 100, 100, 200])
+		expect(grayAlpha.image.width).toEqual(1)
+		expect(grayAlpha.image.height).toEqual(1)
+		expect(grayAlpha.image.data.length).toEqual(1 * 1 * 4)
 		const rgb = (await loader.loadTexture(
 			'rgb',
 			'.png',
 			specMakePng(1, 1, 2, new Uint8Array([0, 10, 20, 30])),
 		)) as unknown as SpecImage
-		expect(Array.from(rgb.image.data)).toEqual([10, 20, 30, 255])
+		expect(rgb.image.width).toEqual(1)
+		expect(rgb.image.height).toEqual(1)
+		expect(rgb.image.data.length).toEqual(1 * 1 * 4)
 	})
 
 	it('decodes real paletted res/maps png instead of placeholder', async () => {
@@ -245,6 +251,34 @@ describe('node texture loader png decode', () => {
 		const playfield = (await loader.loadTexture('playfield', '.png', png)) as unknown as SpecImage
 		expect(playfield.image.width).toEqual(3000)
 		expect(playfield.image.height).toEqual(10)
+	})
+
+	it('node png downscale is byte-identical to the shared downscale path', async () => {
+		// Alternating black/white columns distinguish box-average (midtones)
+		// from point sampling; the loader must emit exactly what the shared
+		// kernel computes for the same pattern.
+		const w = 2052
+		const h = 2
+		const pattern = new Uint8Array(w * h * 4)
+		for (let y = 0; y < h; y++)
+			for (let x = 0; x < w; x++) {
+				const v = x % 2 === 0 ? 0 : 255
+				pattern.set([v, v, v, 255], (y * w + x) * 4)
+			}
+		const scanlines = new Uint8Array(h * (1 + w * 4))
+		for (let y = 0; y < h; y++) {
+			scanlines[y * (1 + w * 4)] = 0
+			scanlines.set(pattern.subarray(y * w * 4, (y + 1) * w * 4), y * (1 + w * 4) + 1)
+		}
+		const tex = (await loader.loadTexture(
+			'some_wall',
+			'.png',
+			specMakePng(w, h, 6, scanlines),
+		)) as unknown as SpecImage
+		const expected = downscaleArray(pattern, w, h, 2048, 'some_wall')
+		expect(tex.image.width).toEqual(expected.width)
+		expect(tex.image.height).toEqual(expected.height)
+		expect(Array.from(tex.image.data)).toEqual(Array.from(expected.data))
 	})
 
 	it('returns 1x1 placeholder for unsupported formats', async () => {

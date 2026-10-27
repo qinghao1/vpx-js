@@ -98,7 +98,7 @@ export class ThreeMapGenerator {
 	}
 
 	private clearTextureSource(texture: Texture): void {
-		// Expected: TypeError if property non-writable or object frozen — best-effort cleanup.
+		// Best-effort cleanup: the source buffer simply stays referenced if unset fails.
 		for (const field of ['binary', 'pdsBuffer'] as const) {
 			try {
 				;(texture as any)[field] = undefined
@@ -137,7 +137,7 @@ export class ThreeMapGenerator {
 					alphaTestValue: rawCutout > 0 && rawCutout <= 1 ? rawCutout : 0,
 				}
 			} catch {
-				// Expected: TypeError if texture object is frozen — alphaTest fallback stays in material userData.
+				// Best-effort cleanup: alphaTest fallback stays in material userData if the texture is frozen.
 			}
 			this.textureCache.set(texture.getName(), tex)
 			this.textureCache.set(texture.getName().toLowerCase(), tex)
@@ -146,7 +146,8 @@ export class ThreeMapGenerator {
 			return true
 		} catch (error) {
 			this.lastFailureAt.set(texture.getName().toLowerCase(), Date.now())
-			// Expected: Error from texture.loadTexture (e.g., "too large" for oversized textures, ImageDecoder/EXR decode failures, or abort) — per-texture failure, logged and returns false so remaining textures can still load, not reraised.
+			// Per-texture failure ("too large", decode failure, abort): log and return false
+			// so remaining textures can still load, never reraise.
 			// The source is intentionally NOT cleared here: demand retries re-read it, and clearing would turn a transient decode failure into a permanent one.
 			// Image-decode rejections surface as DOM events with no message, so describe those instead of logging "[object Event]".
 			const msg =
@@ -176,8 +177,8 @@ export class ThreeMapGenerator {
 		}
 	}
 
-	public getTexture(name: string): ThreeTexture {
-		return this.textureCache.get(name) ?? this.textureCache.get(name.toLowerCase())!
+	public getTexture(name: string): ThreeTexture | undefined {
+		return this.textureCache.get(name) ?? this.textureCache.get(name.toLowerCase())
 	}
 
 	public hasTexture(name: string): boolean {
@@ -248,7 +249,12 @@ export class ThreeMapGenerator {
 	}
 
 	public clear(): void {
-		for (const tex of this.textureCache.values()) this.disposeTexture(tex)
+		const seen = new Set<ThreeTexture>()
+		for (const tex of this.textureCache.values()) {
+			if (seen.has(tex)) continue
+			seen.add(tex)
+			this.disposeTexture(tex)
+		}
 		this.textureCache.clear()
 	}
 

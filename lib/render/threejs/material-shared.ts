@@ -9,9 +9,9 @@ export const RE_BAKE_MAT = /bake/i
 export const RE_BAKE_MAP = /bake|nestmap/i
 
 // Playfield lightmap family: base playfields, VLM/nestmap bakes, and pre-baked
-// overlays all take the playfield size cap. Workers keep a local copy (they
-// cannot share module imports); keep them in sync with this definition.
-export const RE_PLAYFIELD = /playfield|nestmap|bake|vlm/i
+// overlays all take the playfield size cap. Canonical definition lives in
+// texture-downscale.ts, shared by the loaders and both decode workers.
+export { RE_PLAYFIELD } from './texture-downscale.js'
 
 let _globalEmissionScale = 1
 const _emissionListeners = new Set<(scale: number) => void>()

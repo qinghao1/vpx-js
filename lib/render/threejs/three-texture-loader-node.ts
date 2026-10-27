@@ -6,9 +6,12 @@ import { readFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { DataTexture, LinearSRGBColorSpace, RGBAFormat, SRGBColorSpace, type Texture as ThreeTexture } from 'three'
+import { EXRLoader } from 'three/examples/jsm/loaders/EXRLoader.js'
+import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js'
 import { logger } from '../../util/logger.js'
+import { MAX_FLOAT_TEXTURE_BYTES } from '../../util/quality.js'
 import type { ITextureLoader } from '../irender-api.js'
-import { RE_PLAYFIELD } from './material-shared.js'
+import { downscaleArray, getMaxTextureSize, isPlayfieldCap } from './texture-downscale.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -60,6 +63,8 @@ async function getHdrWorkers(): Promise<any[]> {
 			w.on('exit', () => {
 				hdrWorkers = hdrWorkers.filter(x => x !== w)
 				if (!hdrWorkers.length) hdrReady = null
+				for (const [, p] of hdrPending) p.reject(new Error('hdr worker exited'))
+				hdrPending.clear()
 			})
 			;(w as any).unref?.()
 			workers.push(w)
@@ -95,11 +100,25 @@ export class ThreeTextureLoaderNode implements ITextureLoader<ThreeTexture> {
 	async loadTexture(name: string, ext: string, data: Uint8Array): Promise<ThreeTexture> {
 		const lowerExt = ext.toLowerCase()
 		if (lowerExt === '.hdr' || lowerExt === '.exr') {
-			return this.loadHdrViaWorker(name, lowerExt as '.hdr' | '.exr', data)
+			// Mirror the browser pre-decode bound: fail fast on huge non-playfield
+			// payloads so the map generator skips them on its debug path, while
+			// playfield lightmaps still route to the slow decode below.
+			if (data.byteLength > MAX_FLOAT_TEXTURE_BYTES && !isPlayfieldCap(name)) {
+				throw new Error(
+					`Float texture "${name}" is too large to decode ` +
+						`(${(data.byteLength / 1048576).toFixed(1)}MB > ${MAX_FLOAT_TEXTURE_BYTES / 1048576}MB cap): ` +
+						`skipped before worker decode`,
+				)
+			}
+			try {
+				return await this.loadHdrViaWorker(name, lowerExt as '.hdr' | '.exr', data)
+			} catch {
+				return this.loadHdrFallback(name, lowerExt as '.hdr' | '.exr', data)
+			}
 		}
 		const decoded = await decodePng(data)
 		if (decoded) {
-			const capped = downscaleRgba(decoded.data, decoded.width, decoded.height, getMaxTextureSize(name))
+			const capped = downscaleArray(decoded.data, decoded.width, decoded.height, getMaxTextureSize(name), name)
 			return tex(capped.data, capped.width, capped.height, name)
 		}
 		// LIMITATION (documented, not silent): Node has no JPEG/WebP/GIF/BMP
@@ -160,10 +179,32 @@ export class ThreeTextureLoaderNode implements ITextureLoader<ThreeTexture> {
 		t.name = `texture:${name}`
 		return t as ThreeTexture
 	}
-}
 
-export function getMaxTextureSize(name: string): number {
-	return RE_PLAYFIELD.test(name) ? 4096 : 2048
+	private loadHdrFallback(name: string, ext: '.hdr' | '.exr', data: Uint8Array): ThreeTexture {
+		try {
+			const buffer = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer
+			const Loader = ext === '.exr' ? EXRLoader : HDRLoader
+			const texData: any = new (Loader as any)().parse(buffer)
+			let out = texData.data
+			let width: number = texData.width
+			let height: number = texData.height
+			const max = getMaxTextureSize(name)
+			if (width > max || height > max) {
+				const scaled = downscaleArray(out, width, height, max, name, texData.type)
+				out = scaled.data
+				width = scaled.width
+				height = scaled.height
+			}
+			const t: any = new DataTexture(out, width, height, texData.format, texData.type)
+			t.colorSpace = texData.colorSpace ?? LinearSRGBColorSpace
+			t.flipY = false
+			t.needsUpdate = true
+			t.name = `texture:${name}`
+			return t as ThreeTexture
+		} catch (e: any) {
+			throw new Error(`HDR/EXR parse failed for "${name}" (${ext}): ${e.message}`)
+		}
+	}
 }
 
 function tex(data: Uint8Array, w: number, h: number, name: string): ThreeTexture {
@@ -383,42 +424,4 @@ function isTransparentRgb(red: number, green: number, blue: number, transparency
 
 function isTransparentGray(gray: number, transparency: Uint8Array | null): boolean {
 	return !!transparency && transparency.length >= 2 && transparency[1] === gray
-}
-
-function downscaleRgba(src: Uint8Array, width: number, height: number, max: number): DecodedImage {
-	if (width <= max && height <= max) {
-		return { data: src, width, height }
-	}
-	const scale = Math.min(max / width, max / height)
-	const outWidth = Math.max(1, Math.floor(width * scale))
-	const outHeight = Math.max(1, Math.floor(height * scale))
-	const out = new Uint8Array(outWidth * outHeight * 4)
-	for (let outRow = 0; outRow < outHeight; outRow++) {
-		const rowStart = Math.floor((outRow * height) / outHeight)
-		const rowEnd = Math.max(rowStart + 1, Math.floor(((outRow + 1) * height) / outHeight))
-		for (let outCol = 0; outCol < outWidth; outCol++) {
-			const colStart = Math.floor((outCol * width) / outWidth)
-			const colEnd = Math.max(colStart + 1, Math.floor(((outCol + 1) * width) / outWidth))
-			let sumRed = 0
-			let sumGreen = 0
-			let sumBlue = 0
-			let sumAlpha = 0
-			for (let srcRow = rowStart; srcRow < rowEnd; srcRow++) {
-				for (let srcCol = colStart; srcCol < colEnd; srcCol++) {
-					const base = (srcRow * width + srcCol) * 4
-					sumRed += src[base]
-					sumGreen += src[base + 1]
-					sumBlue += src[base + 2]
-					sumAlpha += src[base + 3]
-				}
-			}
-			const count = (rowEnd - rowStart) * (colEnd - colStart)
-			const dst = (outRow * outWidth + outCol) * 4
-			out[dst] = Math.round(sumRed / count)
-			out[dst + 1] = Math.round(sumGreen / count)
-			out[dst + 2] = Math.round(sumBlue / count)
-			out[dst + 3] = Math.round(sumAlpha / count)
-		}
-	}
-	return { data: out, width: outWidth, height: outHeight }
 }

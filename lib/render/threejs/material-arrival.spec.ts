@@ -1,5 +1,6 @@
-import { DataTexture, MeshStandardMaterial } from 'three'
+import { BoxGeometry, DataTexture, Group, Mesh, MeshStandardMaterial } from 'three'
 import { describe, expect, it } from 'vitest'
+import { cloneMaterialForWrite } from './material-shared.js'
 import { createPrimitiveBdlMaterial } from './nodes/primitive-bdl-node.js'
 import { ThreeNodeMaterialGenerator } from './three-node-material-generator.js'
 
@@ -102,6 +103,68 @@ describe('material arrival: BDL uniforms survive streaming', () => {
 		generator.applyMap(mat, 'somewall')
 		expect(mat.map).toBe(textures.get('somewall'))
 		expect(mat.emissiveMap, 'no intent, no mirror').toBeNull()
+	})
+
+	it('resolves pending maps on forked scene materials the cache never sees', () => {
+		// Forked scene materials never enter the cache, so cache-only resolve
+		// misses them; stream/demand resolve must go through
+		// resolvePendingInScene(tableGroup) (plus cache-only for detached mats).
+		const textures = new Map<string, DataTexture>()
+		const generator = makeGenerator(textures)
+		const mat: any = (generator as any).getMaterial(
+			{ name: 'Some_Primitive', baseColor: 0xffffff } as any,
+			'scriptimage',
+		)
+		expect(mat.userData.pendingMap).toEqual('scriptimage')
+		const fork: any = cloneMaterialForWrite(mat)
+		expect(Object.values((generator as any).cachedMaterials)).not.toContain(fork)
+		const group = new Group()
+		group.add(new Mesh(new BoxGeometry(1, 1, 1), fork))
+		textures.set('scriptimage', makeTex())
+		generator.resolvePendingTextures()
+		expect(fork.userData.pendingMap, 'cache-only resolve misses the fork').toEqual('scriptimage')
+		expect(generator.resolvePendingInScene(group), 'scene resolve binds the fork').toEqual(1)
+		expect(fork.userData.pendingMap).toBeUndefined()
+		expect(fork.userData.__map).toBe(textures.get('scriptimage'))
+	})
+
+	it('never stashes pendingEmissiveMap on primitive node materials', () => {
+		// Primitives carry no emissive path: the arrival branch deletes this
+		// key unbound and no resolver consumes it, so stashing it only makes
+		// demandPendingMaps load a texture nobody binds.
+		const textures = new Map<string, DataTexture>()
+		const generator = makeGenerator(textures)
+		const mat: any = createPrimitiveBdlMaterial({ albedo: 0xffffff, opacity: 1, bdl: 0 })
+		generator.applyEmissiveMap(mat, { name: 'p', baseColor: 0xffffff } as any, 'emissiveonly')
+		expect(mat.userData.pendingEmissiveMap).toBeUndefined()
+	})
+
+	it('resolves script-applied normal/env/emissive maps on baked materials', () => {
+		// The arrival path binds these via the classic slots, so resolve must
+		// too — otherwise a baked material whose script-applied map arrives via
+		// stream/demand stays stranded with its pending key forever.
+		const textures = new Map<string, DataTexture>()
+		const generator = makeGenerator(textures)
+		// A referenced (still streaming) bake texture keeps the material on the
+		// unlit baked path; a bake name with no texture reference at all renders
+		// lit instead (upstream lit live-part parity).
+		const mat: any = (generator as any).getMaterial({ name: 'VLM.Bake', baseColor: 0xffffff } as any, 'bakemap')
+		expect(mat.userData.__isBaked).toBe(true)
+		generator.applyNormalMap(mat, 'bakenormal')
+		generator.applyEnvMap(mat, 'bakeenv')
+		generator.applyEmissiveMap(mat, { name: 'VLM.Bake', baseColor: 0xffffff } as any, 'bakeemissive')
+		expect(mat.userData.pendingNormalMap).toEqual('bakenormal')
+		const tex = makeTex()
+		textures.set('bakenormal', tex)
+		textures.set('bakeenv', tex)
+		textures.set('bakeemissive', tex)
+		expect(generator.resolvePendingTextures()).toEqual(3)
+		expect(mat.userData.pendingNormalMap).toBeUndefined()
+		expect(mat.userData.pendingEnvMap).toBeUndefined()
+		expect(mat.userData.pendingEmissiveMap).toBeUndefined()
+		expect(mat.normalMap).toBe(tex)
+		expect(mat.envMap).toBe(tex)
+		expect(mat.emissiveMap).toBe(tex)
 	})
 
 	it('skips dead classic color/opacity writes on BDL node materials', () => {
