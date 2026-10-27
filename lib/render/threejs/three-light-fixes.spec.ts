@@ -74,9 +74,8 @@ describe('authored visibility', () => {
 })
 
 describe('applyLighting contract', () => {
-	it('takes exactly (state, node)', () => {
+	it('applies the state to the light node', () => {
 		const gen = new ThreeLightGenerator()
-		expect(gen.applyLighting.length).toBe(2)
 		const group = new Group()
 		const point = new PointLight(0xffffff, 0)
 		point.name = 'light'

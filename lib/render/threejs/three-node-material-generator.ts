@@ -1,4 +1,4 @@
-import { AddEquation, Color, CustomBlending, DoubleSide, type Object3D, OneFactor, OneMinusSrcAlphaFactor } from 'three'
+import { Color, DoubleSide, type Object3D } from 'three'
 import { Fn, texture, uniform, uv, vec4 } from 'three/tsl'
 import type { RenderInfo } from '../../game/interfaces.js'
 import type { Material } from '../../vpt/material.js'
@@ -16,6 +16,7 @@ import {
 import { createDynamicBallNodeMaterial } from './nodes/ball-reflection-node.js'
 import { createBulbGlowNodeMaterial } from './nodes/bulb-glow-node.js'
 import {
+	applyAbsorbBlendState,
 	createPrimitiveAdditiveMaterial,
 	createPrimitiveBdlMaterial,
 	isPrimitiveNodeMaterial,
@@ -205,17 +206,9 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 			// Explicit RenderInfo.depthWrite wins over the non-writing additive default.
 			mat.depthWrite = depthWrite ?? false
 			if (absorb) {
-				// Upstream AB_ABSORB (flasher.cpp SetupAddBlendState): premultiplied
-				// alpha 'over', dst' = src + dst * (1 - srcAlpha), absorbing the
-				// background instead of amplifying it like the additive path.
-				mat.blending = CustomBlending
-				mat.blendSrc = OneFactor
-				mat.blendDst = OneMinusSrcAlphaFactor
-				mat.blendEquation = AddEquation
-				mat.blendSrcAlpha = OneFactor
-				mat.blendDstAlpha = OneMinusSrcAlphaFactor
-				mat.blendEquationAlpha = AddEquation
-				;(mat.userData as any).__absorbBlend = true
+				// AB_ABSORB only: AB_ADD stays plain additive (upstream's
+				// reverse-subtract is not matched yet — see applyAbsorbBlendState).
+				applyAbsorbBlendState(mat)
 			}
 			this.stashCutout(mat, alphaTestValue, depthBias, true)
 			if (!tex && mapName) (mat.userData as any)[pendingKeyFor('map')] = mapName

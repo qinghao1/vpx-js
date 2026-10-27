@@ -341,6 +341,8 @@ describe('The VBScript stdlib', () => {
 			['CInt(40000)', 6],
 			['CInt(-40000)', 6],
 			['CInt(Null)', 94],
+			['CInt(Nothing)', 91],
+			['CLng(Nothing)', 91],
 			['CByte(300)', 6],
 			['CByte(-5)', 6],
 			['CByte("abc")', 13],

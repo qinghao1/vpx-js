@@ -49,7 +49,7 @@ export function bankersRoundClamped(value: number, min: number, max: number): nu
  * Raises a coercion failure through ERR (throwing, or recording under
  * `On Error Resume Next`); the undefined return is the record-mode result.
  */
-function raiseCoercion(code: 6 | 11 | 13 | 91 | 94, message: string): undefined {
+function raiseCoercion(code: 5 | 6 | 11 | 13 | 91 | 94, message: string): undefined {
 	ERR.Raise(new VbsError(message, code))
 	return undefined
 }
@@ -422,10 +422,10 @@ export function vbsMul(left: unknown, right: unknown): number | null | undefined
 /**
  * VBS `^`: a Null operand yields Null; operands coerce like the other
  * arithmetic operators (True is -1, Empty is 0, `&H` hex included). Garbage
- * raises type mismatch (13) — including a NaN result such as a negative base
- * to a fractional exponent — and a non-finite result raises Overflow (6).
- * Under `On Error Resume Next` the error is recorded and the result is
- * undefined (see vbsIntDiv).
+ * operands raise type mismatch (13), but a NaN result — a negative base to
+ * a fractional exponent — raises Invalid procedure call (5) like VBScript,
+ * and a non-finite result raises Overflow (6). Under `On Error Resume Next`
+ * the error is recorded and the result is undefined (see vbsIntDiv).
  */
 export function vbsExponent(base: unknown, exp: unknown): number | null | undefined {
 	if (base === null || exp === null) {
@@ -441,7 +441,7 @@ export function vbsExponent(base: unknown, exp: unknown): number | null | undefi
 	}
 	const result = baseNumeric ** expNumeric
 	if (Number.isNaN(result)) {
-		return raiseCoercion(13, 'Type mismatch')
+		return raiseCoercion(5, 'Invalid procedure call or argument')
 	}
 	if (!Number.isFinite(result)) {
 		return raiseCoercion(6, 'Overflow')

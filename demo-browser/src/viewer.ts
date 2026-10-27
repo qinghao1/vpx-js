@@ -217,7 +217,6 @@ export class Viewer {
 		this._animRaf = null
 		this._animTimeout = null
 		this._emuStartLogged = false
-		this._physicsError = null
 		this._streamId = 0
 		this._loadId = 0
 		this._cameraGen = 0
@@ -732,11 +731,11 @@ export class Viewer {
 			this._cameraRaf = requestAnimationFrame(tick)
 		})
 	}
-	// Single loud failure path for the physics worker: records the cause and
-	// surfaces it in-page at error level instead of warn-and-continue.
+	// Single loud failure path for the physics worker: surfaces the cause
+	// in-page at error level instead of warn-and-continue.
 	_physicsFailed(message, detail) {
-		this._physicsError = String(message ?? 'unknown')
-		this.log(`physics worker failed: ${this._physicsError} — running single-threaded`, 'error')
+		const physicsError = String(message ?? 'unknown')
+		this.log(`physics worker failed: ${physicsError} — running single-threaded`, 'error')
 		if (detail && _isDev) console.warn(detail)
 	}
 	_createPhysicsWorker() {

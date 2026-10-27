@@ -224,6 +224,26 @@ export function createPrimitiveBdlMaterial(opts: PrimitiveBdlOptions): MeshStand
 	return mat
 }
 
+/**
+ * Upstream per-draw blend state for AB_ABSORB (flasher.cpp SetupAddBlendState):
+ * premultiplied alpha 'over', dst' = src + dst * (1 - srcAlpha). Shared by
+ * the material generator (fresh absorb materials) and the flasher updater
+ * (stamped per frame onto forked clones rebuilt as plain additive).
+ *
+ * Note: AB_ADD is still plain AdditiveBlending here, not upstream's
+ * reverse-subtract — matching REVSUBTRACT needs golden review.
+ */
+export function applyAbsorbBlendState(mat: any): void {
+	mat.blending = CustomBlending
+	mat.blendSrc = OneFactor
+	mat.blendDst = OneMinusSrcAlphaFactor
+	mat.blendEquation = AddEquation
+	mat.blendSrcAlpha = OneFactor
+	mat.blendDstAlpha = OneMinusSrcAlphaFactor
+	mat.blendEquationAlpha = AddEquation
+	;((mat.userData ??= {}) as Record<string, unknown>).__absorbBlend = true
+}
+
 export function createPrimitiveAdditiveMaterial(opts: PrimitiveAdditiveOptions): MeshBasicNodeMaterial {
 	const mat = new MeshBasicNodeMaterial()
 	const uTint = uniform(new Color(opts.tint ?? 0xffffff))

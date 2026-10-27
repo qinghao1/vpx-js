@@ -146,7 +146,9 @@ export class VpmController {
 			// Fresh wpc Emulator, symmetric with the PinMAME branch below —
 			// this.emulator may hold a PinMAME instance from an earlier load.
 			const emu = new Emulator()
-			this.replay(emu)
+			// No pre-loadGame replay: pre-init setter calls queue inside the
+			// adapter and loadGame drains that queue, while the post-loadGame
+			// replay below re-applies these same caches.
 			this.emulator = emu
 			await emu.loadGame(wpcDbEntry, romFile)
 			this.player.setEmulator(emu)

@@ -237,9 +237,9 @@ describe('regression: artifact postprocess', () => {
 	})
 
 	it('classify keeps vr/cab flags on the mesh name (no per-material disagreement)', () => {
-		// isVr/isCab derive from the mesh name alone, so OR-reducing classify
-		// across a multi-material mesh cannot disagree: this locks that
-		// semantic instead of adding a no-op reduction.
+		// isVr/isCab currently derive from the mesh name alone, so OR-reducing
+		// classify across a multi-material mesh cannot disagree: this documents
+		// the current semantic rather than adding a no-op reduction.
 		const vr = makeMesh(
 			'primitive-vr_wall',
 			new THREE.BoxGeometry(10, 10, 10),

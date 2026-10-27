@@ -110,10 +110,11 @@ describe('transmission light buffer', () => {
 		for (let index = 0; index < data.length; index += 4) {
 			peak = Math.max(peak, DataUtils.fromHalfFloat(data[index] ?? 0))
 		}
-		// Native (light.cpp:698-700): halo buffer = level * transmissionScale at
-		// the hub. The peak never exceeds the hub amount (attenuation <= 1, hub
-		// and rim share the amount), and the hub texel center lands within ~22
-		// units of the lamp, so attenuation there stays above (1-22/200)^2.
+		// Native (Light::Render LIGHT_BUFFER halo block): halo buffer = level *
+		// transmissionScale at the hub. The peak never exceeds the hub amount
+		// (attenuation <= 1, hub and rim share the amount), and the hub texel
+		// center lands within ~22 units of the lamp, so attenuation there
+		// stays above (1-22/200)^2.
 		expect(peak).to.be.lessThan(51)
 		expect(peak).to.be.greaterThan(30)
 	})

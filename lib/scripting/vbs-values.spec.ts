@@ -402,6 +402,19 @@ describe('vbs-values exponent and unary negation', () => {
 		expect(ERR.Number).to.equal(6)
 	})
 
+	it('raises Invalid procedure call for a negative base to a fractional exponent', () => {
+		try {
+			vbsExponent(-1, 0.5)
+			expect.unreachable('should have raised error 5')
+		} catch (e) {
+			expect(e).to.be.an.instanceof(VbsError)
+			expect((e as VbsError).code).to.equal(5)
+		}
+		ERR.OnErrorResumeNext()
+		expect(vbsExponent(-8, 1 / 3)).to.equal(undefined)
+		expect(ERR.Number).to.equal(5)
+	})
+
 	it.each([
 		[5, -5],
 		[true, 1],

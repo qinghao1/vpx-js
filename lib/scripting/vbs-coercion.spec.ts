@@ -1,6 +1,6 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { expect } from 'chai'
+import { describe, expect, it } from 'vitest'
 import { TableBuilder } from '../../test/table-builder.js'
 import { Player } from '../game/player.js'
 import type { Table } from '../vpt/table/table.js'

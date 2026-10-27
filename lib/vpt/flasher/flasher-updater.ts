@@ -1,29 +1,14 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { AddEquation, CustomBlending, type Object3D, OneFactor, OneMinusSrcAlphaFactor } from 'three'
+import type { Object3D } from 'three'
 import type { IRenderApi } from '../../render/irender-api.js'
+import { applyAbsorbBlendState } from '../../render/threejs/nodes/primitive-bdl-node.js'
 import { ItemUpdater } from '../item-updater.js'
 import type { Light } from '../light/light.js'
 import type { LightAnimation } from '../light/light-physics.js'
 import type { Table } from '../table/table.js'
 import { FlasherAddBlend, type FlasherData } from './flasher-data.js'
-
-/**
- * Upstream per-draw blend state for AB_ABSORB (flasher.cpp SetupAddBlendState):
- * premultiplied alpha 'over', dst' = src + dst * (1 - srcAlpha). Stamped per
- * frame so forked material clones (rebuilt as plain additive) keep absorbing.
- */
-function applyAbsorbBlendState(mat: any): void {
-	mat.blending = CustomBlending
-	mat.blendSrc = OneFactor
-	mat.blendDst = OneMinusSrcAlphaFactor
-	mat.blendEquation = AddEquation
-	mat.blendSrcAlpha = OneFactor
-	mat.blendDstAlpha = OneMinusSrcAlphaFactor
-	mat.blendEquationAlpha = AddEquation
-	;((mat.userData ??= {}) as Record<string, unknown>).__absorbBlend = true
-}
 
 import { FlasherMeshGenerator } from './flasher-mesh-generator.js'
 import type { FlasherState } from './flasher-state.js'

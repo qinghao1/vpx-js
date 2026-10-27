@@ -428,9 +428,7 @@ async function runOne(targetUrl, label) {
 	// Run-phase gate: an uncaught exception or script error during play legs
 	// fails loudly. Real tables (walking_dead timers, GI, cannon capture)
 	// execute script on every frame; warn-and-continue hid live breakage.
-	const runScriptErrors = logs.filter(t =>
-		/Uncaught (VbsError|Error)|VbsError: (Invalid use of Null|Type mismatch)/.test(t),
-	)
+	const runScriptErrors = logs.filter(t => /Uncaught (VbsError|Error)|VbsError:/.test(t))
 	results.runErrors = runErrors.length === 0 && runScriptErrors.length === 0
 	if (!results.runErrors) {
 		console.log(

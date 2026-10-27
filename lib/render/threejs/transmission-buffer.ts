@@ -130,10 +130,10 @@ export function updateTransmissionBuffer(table: Table): boolean {
 		const color2 = lampColor2(light)
 		if ((color & 0xffffff) === 0 && (color2 & 0xffffff) === 0) continue
 		const transmissionScale = lamp.data?.transmissionScale ?? 0
-		// Native (Light::Render LIGHT_BUFFER, light.cpp:698-700): the halo lands
-		// in the buffer at full m_currentIntensity * transmissionScale. The 0.02
-		// term (light.cpp:675) belongs to the main-pass bulb hull, which is
-		// explicitly excluded from the light buffer (light.cpp:660, !isLightBuffer).
+		// Native (Light::Render LIGHT_BUFFER halo block): the halo lands in the
+		// buffer at full m_currentIntensity * transmissionScale. The 0.02 term
+		// belongs to the main-pass bulb-hull block, which is explicitly
+		// excluded from the light buffer (!isLightBuffer).
 		// Upstream then applies a normalized 19px Gaussian on an RGBA16F buffer,
 		// which conserves energy, so its transmitted energy matches this exactly.
 		// vpx-js omits the blur: its sigma is screen-space (view-dependent) while

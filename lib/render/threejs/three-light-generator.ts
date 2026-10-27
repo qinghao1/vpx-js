@@ -40,8 +40,8 @@ export class ThreeLightGenerator {
 		// upstream: the base glass/socket draw uses a fixed material
 		// ("Glass is always static", src/parts/light.cpp bulb-model block —
 		// the values baked in getMeshes mirror that block exactly). Upstream
-		// live modulation (bulb hull at intensity*0.02, light.cpp:675, plus
-		// the lightmap pass at m_currentIntensity, light.cpp:698) rides the
+		// live modulation (bulb hull at intensity*0.02 plus the lightmap pass
+		// at m_currentIntensity, both in the Light::Render body) rides the
 		// 'light' point light and the 'bulb.glow' uniforms instead, both
 		// driven below. Surface inserts have no live path: their node
 		// materials expose no generic emissive uniform to scale, so their

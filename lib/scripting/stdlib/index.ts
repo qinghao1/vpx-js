@@ -13,9 +13,10 @@ import { VbsMath } from './math.js'
 /**
  * The `Nothing` singleton. Reads of `Empty`/uninitialized variables collapse to
  * the `VbsUndefined` sentinel inside `getOrCall`, so `Nothing` needs a distinct
- * identity for `IsObject`/`TypeName`/`IsEmpty`/`Is` to tell them apart. Numeric
- * and string coercions mimic the old undefined behavior (0/`''`); member access
- * raises 91 like VBScript instead of silently succeeding.
+ * identity for `IsObject`/`TypeName`/`IsEmpty`/`Is` to tell them apart. The
+ * `valueOf`/`toString` stubs exist only for JS interop; the VBScript
+ * converters (`CStr`, `CInt`, …) and member access raise 91 like VBScript
+ * instead of coercing to 0/`''` or silently succeeding.
  */
 function createNothing(): object {
 	const target = {
@@ -158,10 +159,16 @@ export class Stdlib extends VbsApi {
 
 	/**
 	 * Coerces a numeric-conversion operand: True is -1, strings parse like
-	 * VBScript numbers. NaN means the caller raises type mismatch (13), as
-	 * does an object without primitive conversion (whose Number throws).
+	 * VBScript numbers. `Nothing` (any value carrying the tag, like CStr)
+	 * raises 91; the 0 return only feeds record mode, where Raise records
+	 * instead of throwing. NaN means the caller raises type mismatch (13),
+	 * as does an object without primitive conversion (whose Number throws).
 	 */
 	private toConverterNumber(v: unknown): number {
+		if ((v as Record<symbol, unknown> | null | undefined)?.[NOTHING_TAG] === true) {
+			ERR.Raise(new VbsError('Object variable not set', 91))
+			return 0
+		}
 		if (typeof v === 'boolean') return v ? -1 : 0
 		if (typeof v === 'number') return v
 		if (typeof v === 'string') return parseNumericText(v)

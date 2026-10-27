@@ -13,6 +13,7 @@ import type { Table } from '../vpt/table/table.js'
 import { ERR, VbsError } from './stdlib/err.js'
 import { Stdlib } from './stdlib/index.js'
 import { Transpiler } from './transpiler.js'
+import { NOTHING_TAG } from './vbs-undefined.js'
 import { vbsAdd, vbsConcat, vbsDiv, vbsEquals, vbsIntDiv, vbsLt, vbsMod, vbsMul, vbsSub } from './vbs-values.js'
 
 afterEach(() => {
@@ -96,6 +97,30 @@ describe('vbs arithmetic with a non-convertible object', () => {
 		const stdlib = new Stdlib()
 		expect(() => stdlib.CInt(exotic())).toThrow(VbsError)
 		expect(() => stdlib.CStr(exotic())).toThrow(VbsError)
+	})
+
+	it('numeric converters raise 91 for any Nothing-tagged value, like CStr', () => {
+		// assertNotNothing treats every tag carrier as Nothing, so the
+		// converters must too — not just the `Nothing` singleton identity.
+		const stdlib = new Stdlib()
+		const nothingLike = { [NOTHING_TAG]: true }
+		for (const convert of [
+			(v: unknown) => stdlib.CInt(v),
+			(v: unknown) => stdlib.CLng(v),
+			(v: unknown) => stdlib.CStr(v),
+		]) {
+			let error: unknown
+			try {
+				convert(nothingLike)
+			} catch (e) {
+				error = e
+			}
+			expect(error).toBeInstanceOf(VbsError)
+			expect((error as VbsError).code).toBe(91)
+		}
+		ERR.OnErrorResumeNext()
+		expect(stdlib.CInt(nothingLike)).toBe(0)
+		expect(ERR.Number).toBe(91)
 	})
 })
 

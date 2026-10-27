@@ -4,6 +4,7 @@ import { TableBuilder } from '../../../test/table-builder.js'
 import { TestRenderApi } from '../../../test/test-render-api.js'
 import { Vertex2D } from '../../math/vector.js'
 import type { IRenderApi } from '../../render/irender-api.js'
+import { applyAbsorbBlendState } from '../../render/threejs/nodes/primitive-bdl-node.js'
 import { ThreeNodeMaterialGenerator } from '../../render/threejs/three-node-material-generator.js'
 import { DragPoint } from '../dragpoint.js'
 import { Flasher } from './flasher.js'
@@ -41,7 +42,7 @@ function makeGenerator(): ThreeNodeMaterialGenerator {
 	} as any)
 }
 
-describe('Flasher blend-mode parity (upstream flasher.cpp SetupAddBlendState)', () => {
+describe('Flasher absorb parity (upstream flasher.cpp SetupAddBlendState; AB_ADD still approximate)', () => {
 	it('threads the tri-state mode through getMeshes instead of collapsing absorb to additive', () => {
 		const table = new TableBuilder().build()
 		const renderApi = new TestRenderApi() as unknown as IRenderApi<any, any, any>
@@ -94,6 +95,42 @@ describe('Flasher blend-mode parity (upstream flasher.cpp SetupAddBlendState)', 
 		expect(absorb.blendDstAlpha, 'absorb alpha dst factor').toBe(OneMinusSrcAlphaFactor)
 		expect(absorb.userData.__addBlend, 'absorb stays an overlay').toBe(true)
 		expect(absorb.userData.__absorbBlend, 'absorb marker').toBe(true)
+	})
+
+	it('stamps absorb state through the shared helper, matching the generator', () => {
+		// The generator and the per-frame updater stamp must not drift into a
+		// byte-copy again: both go through applyAbsorbBlendState. AB_ADD is
+		// deliberately excluded — it stays plain additive, not upstream's
+		// reverse-subtract, pending golden review.
+		const generator = makeGenerator()
+		const fromGenerator = (generator as any).getMaterial(
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			true,
+			0,
+			undefined,
+			true,
+			undefined,
+			0,
+			FlasherAddBlend.Absorb,
+		)
+		const stub: Record<string, any> = { userData: {} }
+		applyAbsorbBlendState(stub)
+		for (const key of [
+			'blending',
+			'blendSrc',
+			'blendDst',
+			'blendEquation',
+			'blendSrcAlpha',
+			'blendDstAlpha',
+			'blendEquationAlpha',
+		] as const) {
+			expect(stub[key], `shared helper ${key} must match the generator`).toBe(fromGenerator[key])
+		}
+		expect(stub.userData.__absorbBlend, 'shared helper absorb marker').toBe(true)
 	})
 
 	it('caches add and absorb materials separately', () => {
