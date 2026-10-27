@@ -3,7 +3,7 @@
 
 import type { IRenderable } from '../../game/interfaces.js'
 import type { IRenderApi } from '../../render/irender-api.js'
-import { progress } from '../../util/logger.js'
+import { logger, progress } from '../../util/logger.js'
 import type { Bumper } from '../bumper/bumper.js'
 import type { Flipper } from '../flipper/flipper.js'
 import type { ItemState } from '../item-state.js'
@@ -28,6 +28,11 @@ export class TableMeshGenerator {
 	): NODE {
 		progress().show('Generating table nodes')
 		opts = Object.assign({}, defaultTableGenerateOptions, opts)
+		// Decals are loaded but have no renderer yet: say so instead of dropping them silently.
+		const decalNames = Object.keys(this.table.decals)
+		if (decalNames.length > 0 && this.table.data?.renderDecals !== false) {
+			logger().warn('[TableMeshGenerator] Decals are not rendered; skipping %s decal(s).', decalNames.length)
+		}
 		const tableNode = renderApi.createParentNode('playfield')
 		renderApi.transformScene(tableNode, this.table)
 		const renderGroups: IRenderGroup[] = [

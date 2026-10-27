@@ -56,8 +56,11 @@ it with dedicated length math and continues to `ENDB`.
 
 - `tableDataOnly` — parse `GameData` only; skips items, textures,
   collections, and `TableInfo`.
-- `tableInfoOnly` — skip `GameStg` entirely; read `TableInfo` only.
-- `loadTableScript` (default true) — decode the `CODE` script.
+- `tableInfoOnly` — skip `GameStg` entirely; read `TableInfo` only. Authoritative:
+  `Table.load` suppresses the `loadTableScript` default when it is set, so pass
+  `loadTableScript: true` explicitly to decode the script alongside the info.
+- `loadTableScript` (default true) — decode the `CODE` script; forced off by
+  `tableInfoOnly` unless explicitly set.
 - `skipTextures` — leave `textures` empty (play without images).
 - `skipMeshes` — skip embedded primitive mesh data.
 - `loadInvisibleItems` (default true) — also parse invisible items (timers).

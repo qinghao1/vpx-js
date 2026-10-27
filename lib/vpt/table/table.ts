@@ -106,6 +106,11 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 
 	public static async load(reader: IBinaryReader, opts: TableLoadOptions = defaultTableLoadOptions): Promise<Table> {
 		const merged = { ...defaultTableLoadOptions, ...opts }
+		// tableInfoOnly is authoritative: the loadTableScript default (true) must not defeat it.
+		// An explicit loadTableScript:true still opts into script+info.
+		if (opts.tableInfoOnly && opts.loadTableScript === undefined) {
+			merged.loadTableScript = false
+		}
 		const l = new TableLoader()
 		return new Table(l, await l.load(reader, merged))
 	}
@@ -429,11 +434,11 @@ const defaultTableLoadOptions: TableLoadOptions = {
 export interface TableLoadOptions {
 	/** Only parse game data, skip items (faster). */
 	tableDataOnly?: boolean
-	/** Only parse table info, skip storage. */
+	/** Only parse table info, skip storage (authoritative: suppresses the loadTableScript default unless explicitly set). */
 	tableInfoOnly?: boolean
 	/** Also parse invisible items (timers, etc.). */
 	loadInvisibleItems?: boolean
-	/** Read table script. */
+	/** Read table script (default true; forced off by tableInfoOnly unless explicitly set). */
 	loadTableScript?: boolean
 	/** Skip primitive mesh data. */
 	skipMeshes?: boolean

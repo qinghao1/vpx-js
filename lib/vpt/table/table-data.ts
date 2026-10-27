@@ -352,9 +352,10 @@ export class TableData extends ItemData {
 				break
 			case 'BTRA':
 			case 'BTST':
-				// legacy user tweaks: upstream forwards these to player settings, never
-				// stores them on the table (the script BallTrail/TrailStrength API is
-				// runtime state, kept on the data fields only so scripts can read it back)
+				// Upstream forwards these to player settings, never storing them on the
+				// table; the port has no player-settings layer, so the values are consumed
+				// and dropped. The trail fields below stay runtime-only script state
+				// (written via TableApi BallTrail/TrailStrength, never parsed from file).
 				this.getInt(buffer)
 				break
 			case 'TMAP':
