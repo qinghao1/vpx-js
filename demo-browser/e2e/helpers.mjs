@@ -254,6 +254,67 @@ export const physicsChecks = async page => {
 	})
 }
 
+// Plunger leg: hold Enter ~800ms (the viewer's plunger key), release, and
+// assert the script actually pulled the plunger or launched the ball.
+// Skips honestly when there is no live script/physics to drive it
+// (mock emu) or when the table has no plunger (e.g. table-empty).
+export const plungerChecks = async page => {
+	await ensurePlayMode(page)
+	return page.evaluate(async () => {
+		const v = window.viewer
+		const out = {}
+		try {
+			const emu = v.player?.getPhysics?.()?.emu
+			if (!emu || emu.isMock) {
+				out.pass = 'skip'
+				out.reason = 'mock emu (no ROM): plunger impulse needs live script/physics'
+				return out
+			}
+			const plungers = Object.values(v.table?.plungers || {})
+			if (!plungers.length) {
+				out.pass = 'skip'
+				out.reason = 'no plunger in table'
+				return out
+			}
+			const api = plungers[0].getApi()
+			const maxBallSpeed = () => {
+				let m = 0
+				for (const b of v.player.balls) {
+					const vel = b.hit?.vel
+					if (vel) m = Math.max(m, Math.hypot(vel.x || 0, vel.y || 0, vel.z || 0))
+				}
+				return m
+			}
+			const posBefore = api.Position()
+			const speedBefore = maxBallSpeed()
+			v.player.onKeyDown({ code: 'Enter', key: 'Enter', ts: Date.now() })
+			await new Promise(r => setTimeout(r, 800))
+			const posHeld = api.Position()
+			v.player.onKeyUp({ code: 'Enter', key: 'Enter', ts: Date.now() })
+			await new Promise(r => setTimeout(r, 800))
+			const posAfter = api.Position()
+			const speedAfter = maxBallSpeed()
+			const travel = Math.max(Math.abs(posHeld - posBefore), Math.abs(posAfter - posBefore))
+			const launched = speedAfter > speedBefore + 10
+			out.before = posBefore
+			out.held = posHeld
+			out.after = posAfter
+			out.travel = +travel.toFixed(2)
+			out.speedBefore = Math.round(speedBefore)
+			out.speedAfter = Math.round(speedAfter)
+			out.pass = travel > 0.5 || launched
+			out.reason = out.pass
+				? `plunger travel ${travel.toFixed(2)} launched=${launched}`
+				: `no plunger motion (travel ${travel.toFixed(2)}) and no launch`
+			return out
+		} catch (e) {
+			out.pass = false
+			out.error = String(e)
+			return out
+		}
+	})
+}
+
 export const nudgeChecks = async page => {
 	await new Promise(r => setTimeout(r, 600))
 	return page.evaluate(async () => {
@@ -1166,11 +1227,11 @@ export const playfieldLightsCheckAfterLamp = async page => {
 				} catch {}
 				if (!hasInsert) {
 					out.reason = 'no insert found — skip (table has no inserts)'
-					out.pass = true
+					out.pass = 'skip'
 					return out
 				}
-				out.reason = 'no visible insert found'
-				out.pass = true
+				out.reason = 'no visible insert found — skip (nothing lit to measure)'
+				out.pass = 'skip'
 				return out
 			}
 			if (maxI < 0.15) {

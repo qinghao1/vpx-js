@@ -1,8 +1,6 @@
 // Play-room harness — cabinet/DMD visibility, procedural room, static batching.
 // Run: npx tsx test/harness/verify-play-room.ts
 // Exit: 0 pass, 1 failure.
-import * as fs from 'node:fs'
-import * as path from 'node:path'
 import * as THREE from 'three'
 import { batchStaticOpaques } from '../../lib/render/threejs/three-batched-builder.js'
 import { ThreeRenderApi } from '../../lib/render/threejs/three-render-api.js'
@@ -149,17 +147,24 @@ function makeMesh(name: string, matName: string, withMap = false): THREE.Mesh {
 	tap.assert(screw.visible === true, 'child screw inside cabinet must stay visible')
 }
 
-// 5. getPrerenderedBackground should be cached
+// 5. Procedural-room lifecycle the viewer relies on: repeat calls replace
+// (never duplicate) the room, and a VR table (hasVr) removes it instead of
+// leaving a stale room behind.
 {
-	const viewerPath = path.resolve('demo-browser/src/viewer.ts')
-	const content = fs.readFileSync(viewerPath, 'utf8')
+	const scene = new THREE.Scene()
+	const center = new THREE.Vector3(0, 0, 0)
+	const size = new THREE.Vector3(1000, 2000, 500)
+	ensureProceduralRoom(scene, center, size, { hasVr: false })
+	const second = ensureProceduralRoom(scene, center, size, { hasVr: false })
+	const rooms = scene.children.filter(c => c.name === 'vr_procedural_room')
 	tap.assert(
-		content.includes('_prerenderedBackground') && content.includes('if (_prerenderedBackground) return'),
-		'getPrerenderedBackground is cached',
+		rooms.length === 1 && rooms[0] === second,
+		`repeat ensureProceduralRoom replaces the room instead of duplicating (rooms=${rooms.length})`,
 	)
+	const gone = ensureProceduralRoom(scene, center, size, { hasVr: true })
 	tap.assert(
-		content.includes('ensureProceduralRoom') && content.includes('scene.background'),
-		'play ensures room as in viewer (ensureProceduralRoom + background handling)',
+		gone === null && !scene.getObjectByName('vr_procedural_room'),
+		'hasVr true removes the procedural room (no stale room)',
 	)
 }
 

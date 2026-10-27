@@ -16,6 +16,7 @@ import {
 	physicsChecks,
 	playfieldLightsCheck,
 	playfieldLightsCheckAfterLamp,
+	plungerChecks,
 	pollLog,
 	shot,
 	waitReady,
@@ -299,6 +300,18 @@ async function runOne(targetUrl, label) {
 		console.log(`[ball:${label}] error ${e.message}`)
 		results.ball = false
 	}
+	try {
+		const plunger = await plungerChecks(page)
+		console.log(`[plunger:${label}]`, JSON.stringify(plunger))
+		results.plunger = plunger.pass === 'skip' ? 'skip' : !!plunger.pass
+		console.log(`[integration:${label}] plunger ${legStatus(results.plunger)} — ${plunger.reason}`)
+		if (results.plunger === 'skip') console.log(`[integration:${label}] plunger SKIP — ${plunger.reason}`)
+		if (results.plunger === false)
+			console.log(`[integration:${label}] FAIL plunger did not move or launch (travel=${plunger.travel})`)
+	} catch (e) {
+		console.log(`[plunger:${label}] error ${e.message}`)
+		results.plunger = false
+	}
 	const phys = await physicsChecks(page)
 	console.log(`[physics:${label}]`, JSON.stringify(phys))
 	// No ball-moved override: every sub-leg stands on its own verdict. Skipped
@@ -396,6 +409,8 @@ async function runOne(targetUrl, label) {
 	const isPlay = cam?.mode === 'play'
 	const hasVisibleRoomOrCab = roomExists || cab.vis > 0
 	console.log(`[generic:${label}] mode play=${isPlay} room/cab visible=${hasVisibleRoomOrCab}`)
+	// Screenshots below are review artifacts for humans, not assertions: shot()
+	// never feeds a leg verdict and its failures never fail the gate.
 	for (const [n, cp, tg] of [
 		[`framed_${label}`, null, null],
 		[`playfield_top_${label}`, [0, 190, 300], [0, -3, 6]],
@@ -437,6 +452,7 @@ async function runOne(targetUrl, label) {
 		results.playfield,
 		results.transpile,
 		results.ball,
+		results.plunger,
 		results.physics,
 		results.nudge,
 		results.dmd,

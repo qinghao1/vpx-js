@@ -191,7 +191,9 @@ function report(index: number, check: E2ECheck, status: CheckStatus, passCount: 
 			passCount.n++
 			tapSkip(index + 1, check.name, check.skipReason ?? 'not run')
 		} else {
-			tapSkip(index + 1, check.name, 'required gate did not run')
+			// A required gate that never ran is a fail-fast breach, not an
+			// honest skip: report not-ok so the gate fails loudly.
+			tapNotOk(index + 1, check.name, '— required gate did not run')
 		}
 	} else if (check.optional) {
 		tapNotOk(index + 1, `${check.name} (optional, ran and failed)`)

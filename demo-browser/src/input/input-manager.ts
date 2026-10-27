@@ -36,6 +36,22 @@ export const keyForCode = (c: string): string =>
 export const locationForCode = (code: string): number | undefined =>
 	code.endsWith('Left') ? 1 : code.endsWith('Right') ? 2 : undefined
 
+// Every gameplay code that must never stick down across blur/hide/exit-play:
+// modifiers plus plunger (Enter) and nudge keys. Blur/hide/exit-play release
+// this whole list so a key held during focus loss cannot stay logically down.
+export const RELEASE_CODES = [
+	'ShiftLeft',
+	'ShiftRight',
+	'ControlLeft',
+	'ControlRight',
+	'AltLeft',
+	'AltRight',
+	'Enter',
+	'KeyZ',
+	'Slash',
+	'Space',
+]
+
 export interface InputHost {
 	readonly canvas: HTMLCanvasElement
 	readonly player: {
@@ -209,15 +225,14 @@ function attachKeyboardHost(host: InputHost, signal: AbortSignal): void {
 		'blur',
 		() => {
 			pressed.clear()
-			host.releaseKeys(['ShiftLeft', 'ShiftRight', 'ControlLeft', 'ControlRight', 'AltLeft', 'AltRight'])
+			host.releaseKeys(RELEASE_CODES)
 		},
 		{ signal },
 	)
 	document.addEventListener(
 		'visibilitychange',
 		() => {
-			if (document.hidden)
-				host.releaseKeys(['ShiftLeft', 'ShiftRight', 'ControlLeft', 'ControlRight', 'AltLeft', 'AltRight'])
+			if (document.hidden) host.releaseKeys(RELEASE_CODES)
 		},
 		{ signal },
 	)

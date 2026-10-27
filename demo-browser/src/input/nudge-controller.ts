@@ -1,7 +1,11 @@
 import { NUDGE } from '../config.js'
 import type { InputHost } from './input-manager.js'
 
-function toNudgeHost(viewer: any): InputHost {
+// The nudge host only shakes the cabinet: it never switches modes, pauses,
+// or releases keys, so it carries the InputHost subset it actually uses.
+type NudgeHost = Omit<InputHost, 'enterPlayMode' | 'exitPlayMode' | 'togglePause' | 'releaseKeys'>
+
+function toNudgeHost(viewer: any): NudgeHost {
 	return {
 		get canvas() {
 			return viewer.dom?.canvas as HTMLCanvasElement
@@ -35,10 +39,6 @@ function toNudgeHost(viewer: any): InputHost {
 		log(msg: string, level?: string) {
 			viewer.log?.(msg, level)
 		},
-		enterPlayMode() {},
-		exitPlayMode() {},
-		togglePause() {},
-		releaseKeys() {},
 		requestMotionPermission:
 			typeof DeviceMotionEvent !== 'undefined' && 'requestPermission' in (DeviceMotionEvent as any)
 				? async () => {
@@ -53,7 +53,7 @@ function toNudgeHost(viewer: any): InputHost {
 	}
 }
 
-function attachNudgeHost(host: InputHost, signal: AbortSignal): void {
+function attachNudgeHost(host: NudgeHost, signal: AbortSignal): void {
 	const trigger = (angle: number, force = NUDGE.force): void => {
 		if (!host.player || host.viewerMode !== 'play') return
 		host.player.nudge(angle, force)

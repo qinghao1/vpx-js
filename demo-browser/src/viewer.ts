@@ -71,6 +71,7 @@ import {
 	isLowQuality,
 	QUALITY_CAPS,
 } from './env.js'
+import { keyForCode, locationForCode, RELEASE_CODES } from './input/input-manager.js'
 import { attachInput } from './input.js'
 import { createHarness } from './log-overlay.js'
 import { renderModeHint, renderStats } from './stats-panel.js'
@@ -209,8 +210,6 @@ export class Viewer {
 		this.nodeCache = new Map()
 		this._lightmapMap = new Map()
 		this.isPaused = false
-		this._boundKeyDown = null
-		this._boundKeyUp = null
 		this._playCameraApplied = false
 		this._cameraTimeout = null
 		this._cameraRaf = null
@@ -218,6 +217,7 @@ export class Viewer {
 		this._animRaf = null
 		this._animTimeout = null
 		this._emuStartLogged = false
+		this._physicsError = null
 		this._streamId = 0
 		this._loadId = 0
 		this._cameraGen = 0
@@ -297,8 +297,6 @@ export class Viewer {
 		this._terminatePhysicsWorker()
 		for (const fn of this._eventCleanups) fn()
 		this._eventCleanups = []
-		if (this._boundKeyDown) removeEventListener('keydown', this._boundKeyDown)
-		if (this._boundKeyUp) removeEventListener('keyup', this._boundKeyUp)
 		this.controls?.dispose?.()
 		this.renderPipeline?.dispose?.()
 		this.renderer?.setAnimationLoop(null)
@@ -414,11 +412,11 @@ export class Viewer {
 	async precompilePipelines() {
 		if (!this.renderer || !this.scene || !this.camera) return
 		try {
-			this.log('[renderer] pre-compiling WebGPU shader pipelines...', 'info')
+			this.log('[renderer] pre-compiling WebGPU shader pipelines...', 'debug')
 			const startTime = performance.now()
 			await this.renderer.compileAsync(this.scene, this.camera)
 			const duration = (performance.now() - startTime).toFixed(1)
-			this.log(`[renderer] WebGPU pipelines compiled in ${duration}ms`, 'info')
+			this.log(`[renderer] WebGPU pipelines compiled in ${duration}ms`, 'debug')
 		} catch (e) {
 			console.warn('[renderer] compileAsync non-fatal warning:', e)
 		}
@@ -571,9 +569,29 @@ export class Viewer {
 			syncRoom(this.scene, this.tableGroup, framing.center, framing.size)
 		}
 		if (!this.player) {
-			if (this.table) await this._createPlayer()
-			else this.load().catch(e => this.log(`Play load failed: ${e.message}`, 'error'))
+			if (this.table) {
+				try {
+					await this._createPlayer()
+				} catch (e) {
+					this.log(`Play load failed: ${e.message}`, 'error')
+					this._revertFailedPlay()
+				}
+			} else {
+				this.load().catch(e => {
+					this.log(`Play load failed: ${e.message}`, 'error')
+					this._revertFailedPlay()
+				})
+			}
 		}
+	}
+	// A failed play-load must not strand the viewer in play mode with no
+	// player: drop back to viewer chrome instead of warn-and-continue.
+	_revertFailedPlay() {
+		if (this.viewerMode !== 'play' || this.player) return
+		this.viewerMode = 'viewer'
+		if (typeof history !== 'undefined' && history.state?.mode === 'play') history.back()
+		if (this.controls) this.controls.enabled = true
+		this._syncChrome()
 	}
 	async _switchToViewer() {
 		if (this.viewerMode !== 'play' || !this.tableGroup) return
@@ -711,6 +729,13 @@ export class Viewer {
 			this._cameraRaf = requestAnimationFrame(tick)
 		})
 	}
+	// Single loud failure path for the physics worker: records the cause and
+	// surfaces it in-page at error level instead of warn-and-continue.
+	_physicsFailed(message, detail) {
+		this._physicsError = String(message ?? 'unknown')
+		this.log(`physics worker failed: ${this._physicsError} — running single-threaded`, 'error')
+		if (detail && _isDev) console.warn(detail)
+	}
 	_createPhysicsWorker() {
 		try {
 			if (!this._vpxBytes) {
@@ -730,11 +755,10 @@ export class Viewer {
 					this._physicsReady = true
 					this._syncWorkerBalls()
 					worker.postMessage({ type: 'start' })
-					this.log(`[physics] worker ready (${data.balls ?? 0} balls)`, 'info')
+					this.log(`[physics] worker ready (${data.balls ?? 0} balls)`, 'debug')
 				} else if (data.type === 'error') {
-					this.log(`physics worker failed: ${data.message} — staying single-threaded`, 'warn')
-					if (data.stack && _isDev) console.warn(data.stack)
 					if (this._physicsWorker === worker) this._terminatePhysicsWorker()
+					this._physicsFailed(data.message, data.stack)
 				}
 			}
 			worker.postMessage({
@@ -743,8 +767,8 @@ export class Viewer {
 				vpx: this._vpxBytes,
 			})
 			worker.onerror = e => {
-				this.log(`worker error ${e.message}`, 'warn')
 				if (this._physicsWorker === worker) this._terminatePhysicsWorker()
+				this._physicsFailed(e.message ?? String(e))
 			}
 			this._physicsSab = sab
 			this._physicsScratch = scratch
@@ -755,8 +779,7 @@ export class Viewer {
 				worker,
 			}
 		} catch (e) {
-			this.log(`physics worker init failed ${e.message}`, 'warn')
-			if (_isDev) console.warn(e)
+			this._physicsFailed(e.message ?? String(e), e)
 			return null
 		}
 	}
@@ -765,7 +788,7 @@ export class Viewer {
 		if (!this.player || !this._vpxBytes) return false
 		const res = this._createPhysicsWorker()
 		if (!res) return false
-		this.log(`[physics] SAB ${res.sab.byteLength} worker started`, 'info')
+		this.log(`[physics] SAB ${res.sab.byteLength} worker started`, 'debug')
 		return true
 	}
 	// Full ball-list snapshot main→worker; sent on lifecycle changes and worker ready.
@@ -854,14 +877,7 @@ export class Viewer {
 		this.hookInput()
 		if (!this._blurHandler) {
 			this._blurHandler = () => {
-				for (const code of ['ShiftLeft', 'ShiftRight', 'Shift']) {
-					const ev = { code, key: 'Shift', ts: Date.now(), location: code === 'ShiftRight' ? 2 : 1 }
-					this.player?.onKeyUp(ev)
-					if (this._physicsSab) {
-						const dik = keyEventToDirectInputKey(ev as any)
-						if (dik) pushInput(this._physicsSab, INPUT_KEY_UP, dik, Date.now())
-					}
-				}
+				for (const code of RELEASE_CODES) this._sendKey(code, false)
 			}
 			window.addEventListener('blur', this._blurHandler)
 			document.addEventListener('visibilitychange', () => {
@@ -873,8 +889,7 @@ export class Viewer {
 		if (this.player) {
 			for (const code of this._touchMap.values()) this._sendKey(code, false)
 			this._touchMap.clear()
-			this._sendKey('ShiftLeft', false)
-			this._sendKey('ShiftRight', false)
+			for (const code of RELEASE_CODES) this._sendKey(code, false)
 		} else this._touchMap.clear()
 		if (this._physicsWorker && !this._physicsPaused) {
 			this._physicsWorker.postMessage({ type: 'pause' })
@@ -998,8 +1013,10 @@ export class Viewer {
 						'warn',
 					)
 				}
-			} catch {
-				// best effort only; streaming resolve already covered init-time refs
+			} catch (e) {
+				// Demand pass is best effort, but unexpected failures must not
+				// vanish silently: streaming resolve covered init-time refs.
+				this.log(`[stream] Demand-pending pass failed: ${e?.message ?? e}`, 'warn')
 			}
 		})
 	}
@@ -1069,6 +1086,7 @@ export class Viewer {
 		const dt = performance.now() - t0
 		this.log(
 			`Parsed in ${dt.toFixed(0)}ms — ${Object.keys(table.items).length} items, ${Object.keys(table.textures).length} textures`,
+			'debug',
 		)
 		logMem(this.harnessLog, 'after parse')
 		filterTextures(table, this.log.bind(this))
@@ -1156,6 +1174,7 @@ export class Viewer {
 			if (textures.length) {
 				this.log(
 					`[stream] ${high.length} high-prio + ${deferred.length} deferred — streaming ${textures.length}`,
+					'debug',
 				)
 			}
 		}
@@ -1182,7 +1201,7 @@ export class Viewer {
 			if (culled)
 				this.log(
 					`[quality] ${isLowQuality() ? 'low' : 'high'} — lights ${culled.before} → ${culled.after} (culled ${culled.culled})`,
-					'info',
+					'debug',
 				)
 		}
 		{
@@ -1222,9 +1241,10 @@ export class Viewer {
 		})
 		this.log(
 			`Scene generated in ${dt.toFixed(0)}ms — ${countObjects(node)} objects, ${Math.round(tris)} tris, ${draws} draws`,
+			'debug',
 		)
 		const { texCount, texMemMB } = computeTexMem(node)
-		this.log(`Textures in scene: ${texCount} ~${texMemMB} MB`)
+		this.log(`Textures in scene: ${texCount} ~${texMemMB} MB`, 'debug')
 		this._loading(88, 'Finishing up…', 'Final touches…')
 		logMem(this.harnessLog, 'after generateTableNode')
 		if (textures.length) {
@@ -1275,7 +1295,7 @@ export class Viewer {
 				return false
 			})
 			if (textures.length !== before)
-				this.log(`[stream] Filtered ${before} → ${textures.length} used textures (kept inserts)`)
+				this.log(`[stream] Filtered ${before} → ${textures.length} used textures (kept inserts)`, 'debug')
 			// NOTE: filtered-out textures keep their raw binaries until the
 			// post-stream demand pass below: table script (e.g. Table1_Init
 			// assigning VRCab_Backbox.image) routinely references textures
@@ -1312,8 +1332,9 @@ export class Viewer {
 			if (mainBakeUsed.size)
 				this.log(
 					`[stream] Prioritized ${mainBakeUsed.size} main-bake: ${[...mainBakeUsed].slice(0, 10).join(', ')}`,
+					'debug',
 				)
-			this.log(`[stream] ${textures.length} textures pending — streaming`)
+			this.log(`[stream] ${textures.length} textures pending — streaming`, 'debug')
 		}
 		return {
 			node,
@@ -1366,7 +1387,7 @@ export class Viewer {
 				})()
 				this.harnessLog(
 					`[batch] BatchedMesh ${res.batched} + Instanced ${res.instanced} — meshes ${before}`,
-					'info',
+					'debug',
 				)
 			}
 		}
@@ -1398,7 +1419,7 @@ export class Viewer {
 			}
 			this.harnessLog?.(
 				`[mount] play cam ${state.position.x.toFixed(0)},${state.position.y.toFixed(0)},${state.position.z.toFixed(0)} tgt ${state.target.x.toFixed(0)},${state.target.y.toFixed(0)},${state.target.z.toFixed(0)} maxDim ${state.maxDim.toFixed(0)}`,
-				'info',
+				'debug',
 			)
 		} else {
 			framed = frameCamera(this.tableGroup, this.camera, this.controls)
@@ -1413,6 +1434,7 @@ export class Viewer {
 		this._showCanvas()
 		this.log(
 			`Framed ${pp.lightmaps ? `(hid ${pp.lightmaps} lm)` : ''} — ${this.tableGroup ? countObjects(this.tableGroup) : 0} objs`.trim(),
+			'debug',
 		)
 		logMem(this.harnessLog, 'Ready — streaming textures')
 		this._emitModeChange()
@@ -1443,7 +1465,7 @@ export class Viewer {
 		if (gameName) {
 			const romParam = new URLSearchParams(location.search).get('rom')
 			const candidates = romParam ? resolveRomCandidates(romParam) : [`/pinmame/roms/${gameName}.zip`]
-			this.log(`PinMAME GameName: ${gameName} — trying ${candidates.join(', ')}`)
+			this.log(`PinMAME GameName: ${gameName} — trying ${candidates.join(', ')}`, 'debug')
 		}
 		if (this.dom.subtitle) this.dom.subtitle.textContent = ''
 		if (!opts.skipPlayer) {
@@ -1474,7 +1496,7 @@ export class Viewer {
 			if (o.isMesh && o.userData?.isCabinetButton) this._buttonMeshes.push(o)
 		})
 		if (this._buttonMeshes.length)
-			this.harnessLog?.(`[input] ${this._buttonMeshes.length} cabinet button meshes (BVH)`, 'info')
+			this.harnessLog?.(`[input] ${this._buttonMeshes.length} cabinet button meshes (BVH)`, 'debug')
 		this.startLoop()
 		if (this.viewerMode === 'viewer') {
 			const p = new URLSearchParams(location.search)
@@ -1541,6 +1563,7 @@ export class Viewer {
 								return '?'
 							}
 						})()}`,
+						'debug',
 					)
 					return
 				}
@@ -1592,7 +1615,7 @@ export class Viewer {
 			const total = textures.length
 			let done = 0
 			const t0 = performance.now()
-			this.log(`[stream] Streaming ${total} textures…`)
+			this.log(`[stream] Streaming ${total} textures…`, 'debug')
 			let scheduled = false
 			// Exposed for the demand hook below (mid-game script image swaps).
 			const patchCloned = (this._patchCloned = () => {
@@ -1864,7 +1887,7 @@ export class Viewer {
 			const fixed = fixedScene + (matGen?.resolvePendingTextures?.() ?? 0)
 			const fixed2 = patchCloned()
 			if (fixed || fixed2)
-				this.log(`[stream] Patched ${fixed + fixed2} materials (${fixed} resolved + ${fixed2} cloned)`)
+				this.log(`[stream] Patched ${fixed + fixed2} materials (${fixed} resolved + ${fixed2} cloned)`, 'debug')
 			// Demand pass: script-assigned images (set after the used-texture
 			// filter ran) reference textures that never streamed. Load + bind
 			// them now, before batching, so no material stays mapless.
@@ -1879,6 +1902,7 @@ export class Viewer {
 					const fixed4 = patchCloned()
 					this.log(
 						`[stream] Demand-loaded ${loaded.length} script-referenced textures (${loaded.join(', ')})`,
+						'debug',
 					)
 					if (fixed3 + fixed4 === 0)
 						this.log('[stream] Demand-loaded textures but no material took them', 'warn')
@@ -1894,7 +1918,7 @@ export class Viewer {
 				if (!params.has('nobatched')) {
 					const bakedRes = _batchStaticOpaques(this.tableGroup, table, this.renderApi)
 					if (bakedRes) {
-						this.log(`[batch] Post-stream baked ${bakedRes} BatchedMesh`, 'info')
+						this.log(`[batch] Post-stream baked ${bakedRes} BatchedMesh`, 'debug')
 						if (!isLowQuality()) buildBvhIdle(this.tableGroup)
 						else this.log('[bvh] low quality: skip post-batch BVH', 'debug')
 					} else {
@@ -1902,7 +1926,7 @@ export class Viewer {
 							if (this._disposed || !this.tableGroup) return
 							const retry = _batchStaticOpaques(this.tableGroup, table, this.renderApi)
 							if (retry) {
-								this.log(`[batch] Post-stream retry baked ${retry} BatchedMesh`, 'info')
+								this.log(`[batch] Post-stream retry baked ${retry} BatchedMesh`, 'debug')
 								if (!isLowQuality()) buildBvhIdle(this.tableGroup)
 							}
 						}, 600)
@@ -1927,13 +1951,13 @@ export class Viewer {
 	}
 	async _waitForPinmame(timeout = 45000) {
 		if (!this._hasPinmame) return true
-		this.log(`[wait] PinMAME wait up to ${timeout}ms — throttling render`)
+		this.log(`[wait] PinMAME wait up to ${timeout}ms — throttling render`, 'debug')
 		const start = performance.now()
 		while (performance.now() - start < timeout) {
 			const emu = this.player?.getPhysics?.()?.emu
 			if (emu?.isMock) return true
 			if (emu?.api?.isRunning?.() === 1) {
-				this.log(`[wait] isRunning=1 after ${(performance.now() - start) | 0}ms`)
+				this.log(`[wait] isRunning=1 after ${(performance.now() - start) | 0}ms`, 'debug')
 				return true
 			}
 			await new Promise(r => setTimeout(r, 200))
@@ -2008,7 +2032,7 @@ export class Viewer {
 			this.log('No VPX candidate (pass ?vpx=name)', 'warn')
 			return
 		}
-		this.log(`Trying ${candidates.join(', ')}`)
+		this.log(`Trying ${candidates.join(', ')}`, 'debug')
 		for (const cand of candidates) {
 			if (_loadGen !== this._loadId) return
 			if (_signal.aborted) throw new DOMException('Aborted', 'AbortError')
@@ -2017,7 +2041,10 @@ export class Viewer {
 					const { idbGet } = await import('../../dist-esm/lib/util/idb-cache.js')
 					const cached = await idbGet(cand.split('/').pop())
 					if (cached && cached.byteLength > 1_000_000) {
-						this.log(`[IDB] hit ${cand.split('/').pop()} ${fmtBytes(cached.byteLength)} — using cached`)
+						this.log(
+							`[IDB] hit ${cand.split('/').pop()} ${fmtBytes(cached.byteLength)} — using cached`,
+							'debug',
+						)
 						this._vpxBytes = new Uint8Array(cached)
 						const reader = new BrowserBinaryReader(this._vpxBytes)
 						await reader.open()
@@ -2034,7 +2061,7 @@ export class Viewer {
 				} catch {}
 				if (_loadGen !== this._loadId) return
 				if (_signal.aborted) throw new DOMException('Aborted', 'AbortError')
-				this.log(`Fetching ${cand}…`)
+				this.log(`Fetching ${cand}…`, 'debug')
 				this._loading(5, 'Downloading…', 'Downloading table…')
 				const t0 = performance.now()
 				const vpxKey = cand.split('/').pop()
@@ -2046,7 +2073,10 @@ export class Viewer {
 					},
 					{ signal: _signal },
 				)
-				this.log(`Fetched ${fmtBytes(data.length)} in ${((performance.now() - t0) / 1000).toFixed(1)}s`)
+				this.log(
+					`Fetched ${fmtBytes(data.length)} in ${((performance.now() - t0) / 1000).toFixed(1)}s`,
+					'debug',
+				)
 				try {
 					const { idbSet } = await import('../../dist-esm/lib/util/idb-cache.js')
 					idbSet(vpxKey, data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength)).catch(
@@ -2082,7 +2112,7 @@ export class Viewer {
 		this._loadAbort = new AbortController()
 		this._streamId++
 		this._loading(5, 'Reading file…', `Reading ${file.name}…`)
-		this.log(`Reading ${file.name}…`)
+		this.log(`Reading ${file.name}…`, 'debug')
 		this._vpxBytes = new Uint8Array(await file.arrayBuffer())
 		const reader = new BrowserBinaryReader(this._vpxBytes)
 		await reader.open()
@@ -2098,11 +2128,11 @@ export class Viewer {
 		const buf = new Uint8Array(await file.arrayBuffer())
 		window.__pendingRom = buf
 		window.__pendingRomName = file.name.replace(/\.zip$/i, '')
-		this.log(`ROM file ${file.name} ${fmtBytes(buf.length)} — stored`)
+		this.log(`ROM file ${file.name} ${fmtBytes(buf.length)} — stored`, 'debug')
 		return buf
 	}
 	async preloadRom(url) {
-		this.log(`Preloading ROM ${url}…`)
+		this.log(`Preloading ROM ${url}…`, 'debug')
 		const data = await fetchWithProgress(url, p => this.setBar(5 + p * 40, `ROM ${(p * 100).toFixed(0)}%`), {
 			signal: this._loadAbort?.signal,
 		})
@@ -2113,7 +2143,7 @@ export class Viewer {
 				.pop()
 				?.replace(/\.zip$/i, '') || ''
 		window.__pendingRomUrl = url
-		this.log(`ROM preload OK ${fmtBytes(data.length)}`)
+		this.log(`ROM preload OK ${fmtBytes(data.length)}`, 'debug')
 		return data
 	}
 	async startLoop() {
@@ -2145,7 +2175,7 @@ export class Viewer {
 		let lastDmd = 0
 		if (this.player && this.viewerMode === 'play' && (!this._physicsSab || !this._physicsWorker)) {
 			const res = this._createPhysicsWorker()
-			if (res) this.log(`[physics] SAB ${res.sab.byteLength} worker started`, 'info')
+			if (res) this.log(`[physics] SAB ${res.sab.byteLength} worker started`, 'debug')
 		} else if (this._physicsSab) {
 			this.log(`[physics] reusing SAB ${this._physicsSab.byteLength}`, 'debug')
 		}
@@ -2311,24 +2341,7 @@ export class Viewer {
 		this._flashNudge(angle)
 	}
 	_sendKey(code, down) {
-		const keyForCode = inputCode =>
-			inputCode === 'Enter'
-				? 'Enter'
-				: inputCode.startsWith('Digit')
-					? inputCode.slice(5)
-					: inputCode.startsWith('Key')
-						? inputCode.slice(3).toLowerCase()
-						: inputCode.startsWith('Shift')
-							? 'Shift'
-							: inputCode.startsWith('Control')
-								? 'Control'
-								: inputCode.startsWith('Alt')
-									? 'Alt'
-									: inputCode === 'Space'
-										? ' '
-										: inputCode
-		const locationForCode = inputCode =>
-			inputCode.endsWith('Left') ? 1 : inputCode.endsWith('Right') ? 2 : undefined
+		if (!this.player) return
 		const key = keyForCode(code)
 		const location = locationForCode(code)
 		const ev = { code, key, location, ts: Date.now() }
