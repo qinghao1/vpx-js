@@ -24,23 +24,7 @@ function rawLoader() {
 	}
 }
 
-function defaultWorkers() {
-	return Math.max(1, cpuCount() - 1)
-}
-
-function resolveWorkers() {
-	const raw = process.env.VITEST_MAX_WORKERS
-	if (raw == null || raw === '') return defaultWorkers()
-	if (raw.trim().endsWith('%')) {
-		const pct = Number.parseFloat(raw) / 100
-		if (Number.isFinite(pct) && pct > 0) return Math.max(1, Math.round(cpuCount() * pct))
-		return defaultWorkers()
-	}
-	const n = Number.parseInt(raw, 10)
-	return Number.isFinite(n) && n > 0 ? n : defaultWorkers()
-}
-
-const workers = resolveWorkers()
+const cores = process.env.VITEST_MAX_WORKERS ? Number(process.env.VITEST_MAX_WORKERS) || cpuCount() : cpuCount()
 
 export default defineConfig({
 	plugins: [rawLoader()],
@@ -52,7 +36,7 @@ export default defineConfig({
 		setupFiles: ['./test/setup.ts'],
 		pool: 'forks',
 		fileParallelism: true,
-		maxWorkers: workers,
+		maxWorkers: cores,
 		minWorkers: 1,
 		coverage: {
 			provider: 'v8',
