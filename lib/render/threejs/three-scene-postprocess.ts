@@ -15,6 +15,7 @@ import {
 	RE_RAMP_FAMILY,
 	RE_VR,
 } from './scene-classify.js'
+import { applyUnderfloorOcclusionPass } from './underfloor-occlusion.js'
 import {
 	applyButtonInheritPass,
 	applyDarkOccluderPass,
@@ -399,6 +400,10 @@ export function postProcessScene(
 
 	if (hasBakedPlayfield(nodes)) {
 		applyPlayfieldPass(nodes, node, stats)
+		// The baked playfield replaces the extruded slab as the floor: it must
+		// occlude from below or lights/inserts/DMD leak through from underneath.
+		const underfloorFixed = applyUnderfloorOcclusionPass(nodes, stats)
+		if (underfloorFixed) harnessLog?.(`[floor] ${underfloorFixed} baked playfield(s) double-sided`, 'info')
 	}
 
 	if (hasVisibleBakedDuplicate(nodes)) {

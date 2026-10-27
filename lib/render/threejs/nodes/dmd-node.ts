@@ -95,9 +95,13 @@ export class GpuDmdNodeController {
 
 		this.material.side = DoubleSide
 		this.material.depthWrite = false
-		// Overlay: the backbox art behind the window is opaque, so a depth-tested
-		// DMD always loses (upstream composites the DMD on top for the same reason).
-		this.material.depthTest = false
+		// Overlay: renderOrder 20 + polygonOffset pull the DMD in front of the
+		// opaque backbox art behind it, exactly like upstream (vpinball
+		// flasher.cpp: ZWRITEENABLE false, depthBias -10000, depthTest true,
+		// depthWrite false). Depth testing must stay ON: with it off the DMD
+		// draws through every occluder, including the playfield/room floor when
+		// the camera moves underneath the table.
+		this.material.depthTest = true
 		this.material.toneMapped = false
 		this.material.transparent = false
 		this.material.polygonOffset = true

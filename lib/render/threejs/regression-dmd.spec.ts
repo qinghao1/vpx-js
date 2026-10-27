@@ -120,8 +120,8 @@ describe('regression: DMD placement and VR selection (walking_dead)', () => {
 		expect(mesh.name, 'VR_DMD must be chosen when VRCab exists (even in play mode)').toMatch(/VR_DMD/)
 		expect(
 			(mesh.material as THREE.MeshBasicMaterial).depthTest,
-			'overlay DMD skips depth (opaque art behind)',
-		).toEqual(false)
+			'DMD depth-tests like upstream flasher.cpp so the floor occludes it from below',
+		).toEqual(true)
 		expect((mesh.material as THREE.MeshBasicMaterial).depthWrite, 'depthWrite false').toEqual(false)
 		expect((mesh.material as THREE.MeshBasicMaterial).polygonOffset, 'polygonOffset true').toEqual(true)
 		expect((mesh.material as THREE.MeshBasicMaterial).polygonOffsetFactor, 'factor -4').toEqual(-4)
