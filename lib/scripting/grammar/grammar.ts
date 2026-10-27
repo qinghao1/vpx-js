@@ -600,7 +600,7 @@ export class Grammar {
 		let now = Date.now()
 
 		progress().details('transpiling')
-		const ast = this.parser.getAST(formattedScript, this.GRAMMAR_TARGET_PROGRAM)
+		const ast = this.parseFast(formattedScript)
 		if (ast === null) {
 			throw new Error('Unable to transpile script.')
 		} else if (ast.rest?.length) {
@@ -615,6 +615,41 @@ export class Grammar {
 		const postProcessors = this.postProcessors
 		now = Date.now()
 		progress().details('post-processing')
+		/**
+		 * Per-call winner memo: token types are handled by a stable post
+		 * processor (each `pp*` switches on `node.type`), so after the first
+		 * node of a type, try the winner first. On a miss the full ordered
+		 * loop still runs (skipping only the call just made), which is exactly
+		 * today's behavior — the memo can only skip calls, never change which
+		 * processor handles a node.
+		 */
+		const winners = new Map<string, number>()
+		const runPostProcessors = (node: ESIToken): unknown => {
+			const winner = winners.get(node.type)
+			if (winner !== undefined) {
+				const estree = postProcessors[winner]!(node)
+				if (estree) {
+					return estree
+				}
+				for (let i = 0; i < postProcessors.length; i++) {
+					if (i === winner) continue
+					const fallback = postProcessors[i]!(node)
+					if (fallback) {
+						winners.set(node.type, i)
+						return fallback
+					}
+				}
+				return null
+			}
+			for (let i = 0; i < postProcessors.length; i++) {
+				const estree = postProcessors[i]!(node)
+				if (estree) {
+					winners.set(node.type, i)
+					return estree
+				}
+			}
+			return null
+		}
 		dashAst(ast, {
 			leave(node: ESIToken, _parent: ESIToken) {
 				if (node.type === 'Program') {
@@ -628,7 +663,6 @@ export class Grammar {
 						}
 					}
 				} else {
-					let estree: any = null
 					/**
 					 * Loop through all registered post processors until an estree
 					 * is returned. If no post processors can handle the node, and
@@ -636,12 +670,7 @@ export class Grammar {
 					 * to get propagated to parents, and we wont need to have
 					 * post-processors for every single rule in the grammar.
 					 */
-					for (const postProcessor of postProcessors) {
-						estree = postProcessor(node)
-						if (estree) {
-							break
-						}
-					}
+					const estree = runPostProcessors(node)
 					if (estree !== null) {
 						node.estree = estree
 					} else if (node.children[0]) {
@@ -660,4 +689,56 @@ export class Grammar {
 		renameReservedWords(ast)
 		return generate(ast)
 	}
+
+	/**
+	 * Faster `parser.getAST`: the library tail (`agregateErrors`,
+	 * `fixPositions`, two `stripRules` walks, `fixRest`) costs ~20% of the
+	 * parse on table-size scripts, and none of it is observable downstream —
+	 * only the root `rest` is read (syntax-error check above), while `errors`,
+	 * `start`/`end` and child `rest`s are never consumed. So parse directly
+	 * and strip rule helpers in a single walk instead.
+	 */
+	private parseFast(formattedScript: string): ESIToken | null {
+		const ast = this.parser.parse(formattedScript, this.GRAMMAR_TARGET_PROGRAM) as ESIToken | null
+		if (ast) {
+			stripTokenRules(ast)
+		}
+		return ast
+	}
 }
+
+/**
+ * Single-pass equivalent of the ebnf `getAST` rule stripping (first `/^%/`
+ * tags, then `UPPER_SNAKE` helpers): drops matching children with their
+ * subtrees, recursing only into survivors. Removal is monotonic, so one
+ * combined walk yields the same tree as the two sequential walks. Nodes are
+ * kept by identity, preserving their `parent` links; non-root `rest`s are
+ * cleared like the library `fixRest` (the root `rest` stays for the
+ * syntax-error check).
+ */
+function stripTokenRules(root: ESIToken): void {
+	const stack: ESIToken[] = [root]
+	while (stack.length > 0) {
+		const node = stack.pop()!
+		const children = node.children
+		if (!children?.length) {
+			continue
+		}
+		let write = 0
+		for (let read = 0; read < children.length; read++) {
+			const child = children[read]!
+			if (child.type && STRIPPED_TOKEN_RE.test(child.type)) {
+				continue
+			}
+			// Every visited child is a non-root node: clear like `fixRest`
+			// (the root `rest` is left intact for the syntax-error check).
+			child.rest = ''
+			children[write++] = child
+			stack.push(child)
+		}
+		children.length = write
+	}
+}
+
+/** Token types the ebnf `getAST` strips (`/^%/` tags and `UPPER_SNAKE` helpers). */
+const STRIPPED_TOKEN_RE = /^(?:%|[A-Z0-9_]+$)/

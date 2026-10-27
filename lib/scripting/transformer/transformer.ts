@@ -11,6 +11,36 @@ const escopePkg = escope as unknown as {
 }
 const analyze: (ast: any) => any = (escopePkg.analyze ?? escopePkg.default?.analyze ?? escopePkg) as (ast: any) => any
 
+/**
+ * Lowercased scope-variable index. `find` over `scope.variables` is linear,
+ * and these lookups run per identifier per transformer pass, so index each
+ * scope once. First declaration wins, matching `Array.find` semantics for
+ * same-scope duplicates differing only by case.
+ */
+const scopeVarCache = new WeakMap<object, Map<string, unknown>>()
+
+/** Variables of `scope` by lowercase name (first wins), built once per scope. */
+export function getScopeVars(scope: { variables: Array<{ name: string }> }): Map<string, unknown> {
+	let cached = scopeVarCache.get(scope)
+	if (!cached) {
+		cached = new Map<string, unknown>()
+		for (const variable of scope.variables) {
+			const key = variable.name.toLowerCase()
+			if (!cached.has(key)) cached.set(key, variable)
+		}
+		scopeVarCache.set(scope, cached)
+	}
+	return cached
+}
+
+/** Nearest scope at or above `currentScope` declaring `lowerName`, or null. */
+export function findDeclaringScope(currentScope: any, lowerName: string): any {
+	for (let scope = currentScope; scope; scope = scope.upper) {
+		if (getScopeVars(scope).has(lowerName)) return scope
+	}
+	return null
+}
+
 /** Base AST transformer with scope analysis. */
 export class Transformer {
 	public static SCOPE_NAME = '__scope'
@@ -57,7 +87,7 @@ export class Transformer {
 		}
 		const n = (node as Identifier).name
 		const low = n.toLowerCase()
-		if (['eval', 'constructor', 'array', Transformer.PLAYER_NAME.toLowerCase()].includes(low)) {
+		if (KNOWN_NAMES.has(low)) {
 			if (low === 'array') (node as Identifier).name = 'Array'
 			else if (low === 'eval') (node as Identifier).name = 'eval'
 			return true
@@ -82,7 +112,7 @@ export class Transformer {
 		if (!node.__scope) {
 			throw new Error('No scope to check!')
 		}
-		return !!node.__scope.variables.find((v: any) => v.name.toLowerCase() === node.name.toLowerCase())
+		return getScopeVars(node.__scope).has(node.name.toLowerCase())
 	}
 
 	/**
@@ -174,3 +204,6 @@ export class Transformer {
 		return ''
 	}
 }
+
+/** `isKnownNode` literals, hoisted: allocated once instead of per identifier. */
+const KNOWN_NAMES = new Set(['eval', 'constructor', 'array', Transformer.PLAYER_NAME.toLowerCase()])

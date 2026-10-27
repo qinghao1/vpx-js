@@ -27,6 +27,7 @@ import type { HitObject } from '../../physics/hit-object.js'
 import { HitPlane } from '../../physics/hit-plane.js'
 import type { IRenderApi } from '../../render/irender-api.js'
 import { Transpiler } from '../../scripting/transpiler.js'
+import { toLowerCached } from '../../scripting/vbs-api.js'
 import { logger, progress } from '../../util/logger.js'
 import type { Bumper } from '../bumper/bumper.js'
 import type { Collection } from '../collection/collection.js'
@@ -258,7 +259,7 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 	}
 
 	public getElementApiName(vbsName: string): string {
-		return this.itemIndex.get(vbsName.toLowerCase())!
+		return this.itemIndex.get(toLowerCached(vbsName))!
 	}
 
 	public getElements(): Record<string, IScriptable<ItemApi<ItemData>>> {

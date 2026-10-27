@@ -11,7 +11,7 @@ import {
 	identifier,
 	memberExpression,
 } from '../estree.js'
-import { Transformer } from './transformer.js'
+import { findDeclaringScope, getScopeVars, Transformer } from './transformer.js'
 
 /** Wraps root-scope vars into __scope so ExecuteGlobal persists across eval (strict-mode safe). */
 export class ScopeTransformer extends Transformer {
@@ -69,7 +69,9 @@ export class ScopeTransformer extends Transformer {
 
 				const varScope = this.findScope(this.getVarName(node, parent), (node as any).__scope)
 				if (varScope && varScope !== this.rootScope) {
-					const v = this.findVariable(node.name, varScope)
+					// findScope already located the nearest declaring scope, so the
+					// variable is that scope's own match — no second chain walk.
+					const v = getScopeVars(varScope).get(node.name.toLowerCase()) as { name: string } | undefined
 					if (v && v.name !== node.name) node.name = v.name
 					return node
 				}
@@ -112,18 +114,6 @@ export class ScopeTransformer extends Transformer {
 	}
 
 	private findScope(name: string, currentScope: any): any {
-		if (!currentScope) {
-			return null
-		}
-		const lower = name.toLowerCase()
-		const variable = currentScope.variables.find((v: any) => v.name.toLowerCase() === lower)
-		return variable ? currentScope : this.findScope(name, currentScope.upper)
-	}
-
-	private findVariable(name: string, currentScope: any): any {
-		if (!currentScope) return null
-		const lower = name.toLowerCase()
-		const v = currentScope.variables.find((v: any) => v.name.toLowerCase() === lower)
-		return v ?? this.findVariable(name, currentScope.upper)
+		return findDeclaringScope(currentScope, name.toLowerCase())
 	}
 }
