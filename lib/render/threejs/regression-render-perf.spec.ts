@@ -57,7 +57,7 @@ describe('regression: render hotpath zero-allocation', () => {
 		group.add(point)
 		group.add(bulb)
 		group.add(surface)
-		gen.applyLighting(LightState.claim('testLight', 2, 0xff0000, 0xff0000), 1, group)
+		gen.applyLighting(LightState.claim('testLight', 2, 0xff0000, 0xff0000), group)
 		expect(point.intensity).toBe(2)
 		expect(point.color.getHex()).toBe(0xff0000)
 		const bulbUd = bulbMat.userData as Record<string, { value: any }>
@@ -71,7 +71,7 @@ describe('regression: render hotpath zero-allocation', () => {
 		const soloLight = new THREE.PointLight(0x00ff00, 5, 100, 2)
 		soloLight.name = 'light'
 		solo.add(soloLight)
-		gen.applyLighting(LightState.claim('solo', 10, 0x00ff00, 0x00ff00), 1, solo)
+		gen.applyLighting(LightState.claim('solo', 10, 0x00ff00, 0x00ff00), solo)
 		expect(soloLight.intensity).toBe(10)
 	})
 })

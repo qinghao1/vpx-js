@@ -25,6 +25,24 @@ export function clampLightState(state: number): number {
 	return state
 }
 
+/**
+ * Bake-time intensity: base intensity × resolved state.
+ *
+ * Mirrors the bake in upstream `Light::RenderSetup`
+ * (`m_currentIntensity = m_d.m_intensity * m_d.m_intensity_scale * state`,
+ * `src/parts/light.cpp`): fractional states scale linearly and blinking
+ * resolves on the first pattern frame. The transient intensity scale is 1
+ * here (worker-side animation default, matching upstream `SetDefaults`),
+ * so only the resolved state applies.
+ * @see https://github.com/vpinball/vpinball/blob/master/src/parts/light.cpp
+ */
+export function bakedIntensity(data: Pick<LightData, 'intensity' | 'state' | 'rgBlinkPattern'>): number {
+	const clamped = clampLightState(data.state)
+	const level =
+		clamped === Enums.LightStatus.LightStateBlinking ? (data.rgBlinkPattern?.[0] === '1' ? 1 : 0) : clamped
+	return data.intensity * level
+}
+
 /** Light animation. @see https://github.com/vpinball/vpinball/blob/master/light.cpp */
 export class LightAnimation implements IAnimation {
 	public realState: number = Enums.LightStatus.LightStateOff

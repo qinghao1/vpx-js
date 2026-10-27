@@ -21,6 +21,7 @@ import type { Mesh } from '../../vpt/mesh.js'
 import type { Table, TableGenerateOptions } from '../../vpt/table/table.js'
 import type { Texture } from '../../vpt/texture.js'
 import type { IRenderApi, MeshConvertOptions } from '../irender-api.js'
+import { getAuthoredVisible } from './authored-visible.js'
 import type { IMaterialGenerator } from './imaterial-generator.js'
 import { cloneMaterialForWrite } from './material-shared.js'
 import { installBvh } from './three-bvh.js'
@@ -239,11 +240,9 @@ export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, Poin
 		// first level, and a shallow show/hide left those flags stale — the
 		// subtree then renders (or stays dark) against the author's intent
 		// once an ancestor toggles.
-		const authoredVisible = (o: Object3D) =>
-			(o as { userData?: { __authoredVisible?: boolean } }).userData?.__authoredVisible ?? true
 		const batched = (o: Object3D) => (o as { userData?: { __batched?: unknown } }).userData?.__batched
 		const apply = (node: Object3D): void => {
-			node.visible = visible && authoredVisible(node) && !batched(node)
+			node.visible = visible && getAuthoredVisible(node) && !batched(node)
 			for (const child of node.children ?? []) apply(child)
 		}
 		apply(obj)
@@ -291,8 +290,8 @@ export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, Poin
 		releaseGeometry(srcGeo)
 	}
 
-	public applyLighting(state: LightState, initialIntensity: number, obj: Object3D | undefined): void {
-		this.lightGenerator.applyLighting(state, initialIntensity, obj)
+	public applyLighting(state: LightState, obj: Object3D | undefined): void {
+		this.lightGenerator.applyLighting(state, obj)
 	}
 
 	public applyMaterial(

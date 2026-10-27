@@ -1,5 +1,5 @@
 import { AdditiveBlending, Color, DoubleSide, Vector2 } from 'three'
-import { clamp, Fn, float, length, mix, positionLocal, pow, sqrt, uniform, vec4 } from 'three/tsl'
+import { clamp, Fn, float, length, max, mix, positionLocal, pow, sqrt, uniform, vec4 } from 'three/tsl'
 import { MeshBasicNodeMaterial } from 'three/webgpu'
 
 export interface BulbGlowOptions {
@@ -31,10 +31,13 @@ export function createBulbGlowNodeMaterial(options: BulbGlowOptions): MeshBasicN
 	const uAddScale = uniform(1 - clampedModulate)
 
 	mat.colorNode = Fn(() => {
-		const dist = length(positionLocal.xy.sub(uCenter)).mul(uInvFalloff)
-		const t = clamp(dist, float(0), float(1))
-		const atten = pow(float(1).sub(t), uFalloffPower)
-		const glowColor = mix(uColor2, uColor, sqrt(t))
+		// Matches fs_light.sc: atten = pow(max(1 - saturate(len), 0.0001),
+		// falloff_power) with the color ramp on the unclamped sqrt(len) —
+		// the floor keeps a fully covered pixel from going exactly 0 and
+		// the ramp extrapolates past the rim instead of clamping.
+		const len = length(positionLocal.xy.sub(uCenter)).mul(uInvFalloff)
+		const atten = pow(max(float(1).sub(clamp(len, float(0), float(1))), float(0.0001)), uFalloffPower)
+		const glowColor = mix(uColor2, uColor, sqrt(len))
 		const rgb = glowColor.mul(atten).mul(uIntensity).mul(uAddScale)
 		return vec4(rgb, float(1))
 	})()

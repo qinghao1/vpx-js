@@ -6,6 +6,7 @@ import type { IRenderable, RenderInfo } from '../../game/interfaces.js'
 import type { ItemState } from '../../vpt/item-state.js'
 import type { Table, TableGenerateOptions } from '../../vpt/table/table.js'
 import type { IRenderApi, MeshConvertOptions } from '../irender-api.js'
+import { setAuthoredVisible } from './authored-visible.js'
 import type { IMaterialGenerator } from './imaterial-generator.js'
 import type { ThreeMeshGenerator } from './three-mesh-generator.js'
 
@@ -53,7 +54,7 @@ export class ThreeConverter {
 			// Snapshot of the authored visibility: the lamp updater toggles
 			// this quad with the live state, but a light authored invisible
 			// (cabinet/backbox) must stay hidden — see applyLightToTarget.
-			mesh.userData.__authoredVisible = obj.isVisible
+			setAuthoredVisible(mesh, obj.isVisible)
 		} else if (obj.depthBias) {
 			mesh.renderOrder = Math.round(Math.max(-10000, Math.min(15, -obj.depthBias)))
 		}

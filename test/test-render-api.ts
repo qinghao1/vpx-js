@@ -31,7 +31,7 @@ import type { Texture } from '../lib/vpt/texture'
 export class TestRenderApi implements IRenderApi<any, any, any> {
 	public addChildToParent(_parent: any, _child: any): void {}
 
-	public applyLighting(_state: LightState, _initialIntensity: number, _node: any | undefined): void {}
+	public applyLighting(_state: LightState, _node: any | undefined): void {}
 
 	public applyMaterial(
 		_node: any | undefined,

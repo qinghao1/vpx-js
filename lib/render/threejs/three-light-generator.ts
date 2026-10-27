@@ -2,25 +2,21 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { type MeshStandardMaterial, type Object3D, PointLight, type Mesh as ThreeMesh } from 'three'
-import { Enums } from '../../vpt/enums.js'
 import type { LightData, LightState } from '../../vpt/light/light.js'
-import { clampLightState } from '../../vpt/light/light-physics.js'
+import { bakedIntensity } from '../../vpt/light/light-physics.js'
 import type { Table } from '../../vpt/table/table.js'
+import { getAuthoredVisible } from './authored-visible.js'
 import { setBulbGlowState } from './nodes/bulb-glow-node.js'
 import { ThreeRenderApi } from './three-render-api.js'
 
 /** Generates and updates Three.js lights. */
 export class ThreeLightGenerator {
 	public createPointLight(d: LightData, table?: Table): PointLight {
-		// Bake-time live level mirrors native RenderSetup (m_currentIntensity =
-		// m_intensity * m_intensity_scale * state at blink frame 0): fractional
-		// states scale linearly and blinking starts on the first pattern frame.
-		// The transient intensity scale is 1 here (worker-side animation default,
-		// matching upstream SetDefaults), so only the resolved state applies.
-		const clamped = clampLightState(d.state)
-		const level = clamped === Enums.LightStatus.LightStateBlinking ? (d.isOn() ? 1 : 0) : clamped
-		const intensity = d.intensity * level
-		const light = new PointLight(d.color, intensity, d.falloff * ThreeRenderApi.SCALE, 2)
+		// Bake-time live level mirrors native RenderSetup; the authored
+		// falloff power rides decay as the closest physical analog of the
+		// native lightmap falloff (1 - d/range)^falloffPower — an
+		// approximation, three.js has no such curve. Distance is unchanged.
+		const light = new PointLight(d.color, bakedIntensity(d), d.falloff * ThreeRenderApi.SCALE, d.falloffPower)
 		light.name = 'light'
 		// Negated: scene space maps local +z to world -y (transformScene
 		// rotateX), so table-up is local -z — same as the extruded light mesh.
@@ -30,7 +26,7 @@ export class ThreeLightGenerator {
 		return light
 	}
 
-	public applyLighting(state: LightState, _initial: number, obj?: Object3D): void {
+	public applyLighting(state: LightState, obj?: Object3D): void {
 		if (!obj) return
 		this.applyLightToTarget(obj, state)
 		const children = obj.children
@@ -40,10 +36,17 @@ export class ThreeLightGenerator {
 	}
 
 	private applyLightToTarget(child: Object3D, state: LightState): void {
-		// 'bulb.light'/'surface.light' are intentionally static: they convert to
-		// BDL node materials whose emissiveNode overrides the classic slots, so
-		// classic emissive writes are no-ops — lamp state rides the 'light'
-		// point light and the 'bulb.glow' uniforms instead.
+		// 'bulb.light'/'surface.light' are intentionally static, matching
+		// upstream: the base glass/socket draw uses a fixed material
+		// ("Glass is always static", src/parts/light.cpp bulb-model block —
+		// the values baked in getMeshes mirror that block exactly). Upstream
+		// live modulation (bulb hull at intensity*0.02, light.cpp:675, plus
+		// the lightmap pass at m_currentIntensity, light.cpp:698) rides the
+		// 'light' point light and the 'bulb.glow' uniforms instead, both
+		// driven below. Surface inserts have no live path: their node
+		// materials expose no generic emissive uniform to scale, so their
+		// bake stays at the authored state (live animation reaches
+		// referencing primitives through the szLightmap fan-out).
 		switch (child.name) {
 			case 'light':
 				if (state.intensity !== undefined) (child as PointLight).intensity = state.intensity
@@ -57,9 +60,7 @@ export class ThreeLightGenerator {
 				// default to visible; authored-invisible lights stay hidden
 				// (upstream gates bulb/glow rendering on m_d.m_visible).
 				if (state.intensity !== undefined) {
-					const authoredVisible =
-						(child.userData as { __authoredVisible?: boolean }).__authoredVisible ?? true
-					child.visible = state.intensity > 0 && authoredVisible
+					child.visible = state.intensity > 0 && getAuthoredVisible(child)
 				}
 				const glow = (child as ThreeMesh).material as MeshStandardMaterial
 				if (glow) {

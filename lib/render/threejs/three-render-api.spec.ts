@@ -56,7 +56,7 @@ describe('ThreeRenderApi null-node no-ops', () => {
 			expect(() => api.removeChildren(node)).not.toThrow()
 			expect(() => api.applyMatrixToNode(matrix, node)).not.toThrow()
 			expect(() => api.applyMeshToNode({} as any, node)).not.toThrow()
-			expect(() => api.applyLighting({} as any, 100, node)).not.toThrow()
+			expect(() => api.applyLighting({} as any, node)).not.toThrow()
 			expect(() => api.applyVisibility(true, node)).not.toThrow()
 			expect(() => api.applyMaterial(node, {} as any, 'map')).not.toThrow()
 		})

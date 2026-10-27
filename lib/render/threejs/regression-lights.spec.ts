@@ -245,7 +245,10 @@ describe('direct getMeshes unit tests (no GLB)', () => {
 		expect(meshes.glow).toBeDefined()
 		expect(meshes.glow?.bulbGlow?.color).toBe(0xff2211)
 		expect(meshes.glow?.bulbGlow?.intensity).toBe(2)
-		expect(meshes.glow?.depthBias).toBe(-1)
+		// No depthBias stamp: the converter pins glow quads to the overlay
+		// layer (renderOrder 10) and the glow material ignores depthBias,
+		// so a stamp would be dead data.
+		expect(meshes.glow?.depthBias).toBeUndefined()
 		const glowGeometry = meshes.glow?.geometry as THREE.BufferGeometry
 		for (const z of glowZs(glowGeometry)) expect(z).toBe(Math.fround(-(60 + 28 + 0.1)))
 	})

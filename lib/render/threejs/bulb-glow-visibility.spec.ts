@@ -56,11 +56,11 @@ describe('bulb glow visibility', () => {
 		group.add(glow)
 		const on = new LightState()
 		on.intensity = 707
-		gen.applyLighting(on, 0, group as any)
+		gen.applyLighting(on, group as any)
 		expect(glow.visible).toBe(true)
 		const off = new LightState()
 		off.intensity = 0
-		gen.applyLighting(off, 0, group as any)
+		gen.applyLighting(off, group as any)
 		expect(glow.visible).toBe(false)
 		// Plain material without the glow flag is untouched by the updater.
 		const plain = new Mesh(new PlaneGeometry(10, 10), new MeshBasicMaterial())
@@ -68,7 +68,7 @@ describe('bulb glow visibility', () => {
 		plain.visible = false
 		const group2 = new Group()
 		group2.add(plain)
-		gen.applyLighting(on, 0, group2 as any)
+		gen.applyLighting(on, group2 as any)
 		expect(plain.visible).toBe(true)
 	})
 
@@ -81,13 +81,13 @@ describe('bulb glow visibility', () => {
 		group.add(glow)
 		const on = new LightState()
 		on.intensity = 707
-		gen.applyLighting(on, 0, group as any)
+		gen.applyLighting(on, group as any)
 		expect(glow.visible).toBe(false)
 		// Lamp state still reaches the shader uniforms; only visibility is gated.
 		expect((glow.material as any).userData.__uIntensity.value).toBe(707)
 		const off = new LightState()
 		off.intensity = 0
-		gen.applyLighting(off, 0, group as any)
+		gen.applyLighting(off, group as any)
 		expect(glow.visible).toBe(false)
 	})
 
@@ -100,11 +100,11 @@ describe('bulb glow visibility', () => {
 		group.add(glow)
 		const on = new LightState()
 		on.intensity = 707
-		gen.applyLighting(on, 0, group as any)
+		gen.applyLighting(on, group as any)
 		expect(glow.visible).toBe(true)
 		const off = new LightState()
 		off.intensity = 0
-		gen.applyLighting(off, 0, group as any)
+		gen.applyLighting(off, group as any)
 		expect(glow.visible).toBe(false)
 	})
 
@@ -137,7 +137,7 @@ describe('bulb glow visibility', () => {
 		const gen = new ThreeLightGenerator()
 		const on = new LightState()
 		on.intensity = 707
-		gen.applyLighting(on, 0, group as any)
+		gen.applyLighting(on, group as any)
 		expect(quad.visible).toBe(false)
 	})
 })

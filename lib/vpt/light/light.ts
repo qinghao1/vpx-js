@@ -18,7 +18,7 @@ import { ItemData } from '../item-data.js'
 import { ItemState } from '../item-state.js'
 import { Material } from '../material.js'
 import type { Table } from '../table/table.js'
-import { clampLightState, LightAnimation } from './light-physics.js'
+import { bakedIntensity, clampLightState, LightAnimation } from './light-physics.js'
 import { LightMeshGenerator, LightUpdater } from './light-view.js'
 
 const FLOAT_MAP: Record<string, string> = {
@@ -451,15 +451,10 @@ export class Light extends Item<LightData> implements IRenderable<LightState>, I
 
 	public constructor(data: LightData) {
 		super(data)
-		const clampedState = clampLightState(data.state)
-		let initialIntensity = data.intensity * clampedState
-		if (clampedState === Enums.LightStatus.LightStateBlinking) {
-			initialIntensity = data.isOn() ? data.intensity : 0
-		}
-		this.state = LightState.claim(this.getName(), initialIntensity, data.color, data.color2)
+		this.state = LightState.claim(this.getName(), bakedIntensity(data), data.color, data.color2)
 		this.data = data
 		this.meshGenerator = new LightMeshGenerator(data)
-		this.updater = new LightUpdater(this.data, this.state)
+		this.updater = new LightUpdater(this.state)
 	}
 
 	public isVisible(_table: Table): boolean {
@@ -524,10 +519,9 @@ export class Light extends Item<LightData> implements IRenderable<LightState>, I
 					centerY: this.data.center ? this.data.center.y : 0,
 					falloff: this.data.falloff,
 					falloffPower: this.data.falloffPower,
-					intensity: this.data.isOn() ? this.data.intensity : 0,
+					intensity: bakedIntensity(this.data),
 					modulateVsAdd: this.data.bulbModulateVsAdd,
 				},
-				depthBias: this.data.depthBias ?? -1,
 			}
 		}
 		if (light.light) {

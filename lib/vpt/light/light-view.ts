@@ -53,10 +53,7 @@ export class LightMeshGenerator {
 
 /** Light updater — intensity and color. */
 export class LightUpdater extends ItemUpdater<LightState> {
-	constructor(
-		private readonly data: LightData,
-		state: LightState,
-	) {
+	constructor(state: LightState) {
 		super(state)
 	}
 
@@ -67,6 +64,6 @@ export class LightUpdater extends ItemUpdater<LightState> {
 		_table: Table,
 	): void {
 		this.state.mergeFrom(state)
-		renderApi.applyLighting(this.state, this.data.intensity, obj)
+		renderApi.applyLighting(this.state, obj)
 	}
 }
