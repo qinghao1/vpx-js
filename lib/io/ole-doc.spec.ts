@@ -199,6 +199,27 @@ describe('The OLE compound document reader', () => {
 		expect(doc.header.secSize).to.equal(512)
 		await doc.close()
 	})
+
+	it('rejects reads after close when the reader retains no bytes', async () => {
+		const doc = await OleCompoundDoc.load(new MemoryReader(buildValidFile()))
+		await doc.close()
+		await expectRejection(doc.readSector(0), /closed/i)
+	})
+
+	it('keeps serving reads after close when the reader retains its bytes', async () => {
+		const doc = await OleCompoundDoc.load(new BinaryReader(buildValidFile()))
+		const before = await doc.readSector(0)
+		await doc.close()
+		const after = await doc.readSector(0)
+		expect(Array.from(after)).to.deep.equal(Array.from(before))
+	})
+
+	it('serves reads again after reopen', async () => {
+		const doc = await OleCompoundDoc.load(new MemoryReader(buildValidFile()))
+		await doc.close()
+		await doc.reopen()
+		expect((await doc.readSector(0)).length).to.equal(512)
+	})
 })
 
 /** In-memory reader with the same single-subarray-copy contract as BinaryReader. */

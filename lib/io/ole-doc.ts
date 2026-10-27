@@ -138,6 +138,9 @@ export class OleCompoundDoc extends EventEmitter {
 		// Loadedness outlives the reader: memory-backed readers retain their
 		// bytes after close so post-load streaming keeps working.
 		if (!this.loaded && !this.reader.isOpen()) throw new Error('Document must be loaded first.')
+		// A closed reader without retained bytes cannot serve reads: fail here
+		// instead of taking the reader.read path on a closed reader.
+		if (this.loaded && !this.reader.isOpen() && !this.reader.getData?.()) throw new Error('Document is closed.')
 	}
 
 	private async openFile(): Promise<void> {
