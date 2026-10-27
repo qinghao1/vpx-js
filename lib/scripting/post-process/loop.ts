@@ -6,7 +6,6 @@ import {
 	assignmentExpression,
 	blockStatement,
 	breakStatement,
-	callExpression,
 	conditionalExpression,
 	doWhileStatement,
 	forOfStatement,
@@ -14,57 +13,49 @@ import {
 	identifier,
 	ifStatement,
 	literal,
-	memberExpression,
 	whileStatement,
 } from '../estree.js'
 import type { ESIToken } from '../grammar/grammar.js'
-import { Transformer } from '../transformer/transformer.js'
-import { findChildBlock, findInlineBlock } from './helpers.js'
+import { findChildBlock, findInlineBlock, vbsCall } from './helpers.js'
 
 /** Statement labels binding `Exit Do` / `Exit For` to the nearest same-kind loop. */
 export const EXIT_DO_LABEL = '__exitDo'
 export const EXIT_FOR_LABEL = '__exitFor'
 
-const DO_LOOP_TYPES = ['WhileStatement', 'DoTopLoopStatement', 'DoBottomLoopStatement']
-const FOR_LOOP_TYPES = ['ForStatement', 'ForStatementInline', 'ForEachStatement', 'ForEachStatementInline']
-
-/** Label for a `Do` loop token: same-kind nesting depth keeps nested labels unique (duplicates are a SyntaxError). */
-export function doLabelForLoop(node: ESIToken): string {
-	return exitLabel(EXIT_DO_LABEL, loopDepth(node, DO_LOOP_TYPES))
-}
-
-/** Label for a `For` loop token: same-kind nesting depth keeps nested labels unique (duplicates are a SyntaxError). */
-export function forLabelForLoop(node: ESIToken): string {
-	return exitLabel(EXIT_FOR_LABEL, loopDepth(node, FOR_LOOP_TYPES))
+/** Loop kinds by VBS keyword: base label plus the grammar node types that carry it. */
+const LOOP_LABELS: Record<string, { base: string; types: string[] }> = {
+	Do: { base: EXIT_DO_LABEL, types: ['WhileStatement', 'DoTopLoopStatement', 'DoBottomLoopStatement'] },
+	For: {
+		base: EXIT_FOR_LABEL,
+		types: ['ForStatement', 'ForStatementInline', 'ForEachStatement', 'ForEachStatementInline'],
+	},
 }
 
 /**
- * Label for an `Exit Do` token: the label of the nearest enclosing `Do` loop,
- * so the break binds that loop and not an inner `For` loop. Without an
- * enclosing loop (invalid VBS) falls back to the depth-0 label.
+ * Label for a loop token: same-kind nesting depth keeps nested labels unique
+ * (duplicates are a SyntaxError).
  */
-export function doLabelForExit(node: ESIToken): string {
-	return exitLabelForExit(node, EXIT_DO_LABEL, DO_LOOP_TYPES)
+export function labelForLoop(node: ESIToken, kind: string): string {
+	const { base, types } = LOOP_LABELS[kind]
+	return exitLabel(base, loopDepth(node, types))
 }
 
 /**
- * Label for an `Exit For` token: the label of the nearest enclosing `For`
- * loop, so the break binds that loop and not an inner `Do` loop. Without an
- * enclosing loop (invalid VBS) falls back to the depth-0 label.
+ * Label for an `Exit Do` / `Exit For` token: the label of the nearest
+ * enclosing loop of the matching kind, so the break binds that loop and not
+ * an inner loop of the other kind. Without an enclosing loop (invalid VBS)
+ * falls back to the depth-0 label.
  */
-export function forLabelForExit(node: ESIToken): string {
-	return exitLabelForExit(node, EXIT_FOR_LABEL, FOR_LOOP_TYPES)
-}
-
-function exitLabelForExit(node: ESIToken, baseLabel: string, loopTypes: string[]): string {
+export function labelForExit(node: ESIToken, kind: string): string {
+	const { base, types } = LOOP_LABELS[kind]
 	let current: ESIToken | undefined = node.parent
 	while (current) {
-		if (loopTypes.includes(current.type)) {
-			return exitLabel(baseLabel, loopDepth(current, loopTypes))
+		if (types.includes(current.type)) {
+			return exitLabel(base, loopDepth(current, types))
 		}
 		current = current.parent
 	}
-	return baseLabel
+	return base
 }
 
 function exitLabel(baseLabel: string, depth: number): string {
@@ -81,7 +72,7 @@ function loopDepth(node: ESIToken, loopTypes: string[]): number {
 	return depth
 }
 
-/** ppLoop. */
+/** Maps `While`/`Do`/`For`/`For Each` statements to labeled JS loops. */
 export function ppLoop(node: ESIToken): unknown {
 	switch (node.type) {
 		case 'WhileStatement':
@@ -103,7 +94,7 @@ export function ppLoop(node: ESIToken): unknown {
 function ppWhileStatement(node: ESIToken): unknown {
 	const expr = node.children[0].estree
 	const block = node.children[2].type === 'Block' ? node.children[2].estree : null
-	return labeledLoop(doLabelForLoop(node), whileStatement(expr, block ? block : blockStatement([])))
+	return labeledLoop(labelForLoop(node, 'Do'), whileStatement(expr, block ? block : blockStatement([])))
 }
 
 function ppDoTopLoopStatement(node: ESIToken): unknown {
@@ -111,14 +102,14 @@ function ppDoTopLoopStatement(node: ESIToken): unknown {
 	if (node.children[0].type === 'WhileOrUntil') {
 		if (node.children[0].text === 'While') {
 			const expr = node.children[1].estree
-			return labeledLoop(doLabelForLoop(node), whileStatement(expr, block))
+			return labeledLoop(labelForLoop(node, 'Do'), whileStatement(expr, block))
 		} else {
 			const expr = node.children[1].estree
 			block.body.unshift(ifStatement(expr, breakStatement(), null))
-			return labeledLoop(doLabelForLoop(node), doWhileStatement(block, literal(true)))
+			return labeledLoop(labelForLoop(node, 'Do'), doWhileStatement(block, literal(true)))
 		}
 	} else {
-		return labeledLoop(doLabelForLoop(node), doWhileStatement(block, literal(true)))
+		return labeledLoop(labelForLoop(node, 'Do'), doWhileStatement(block, literal(true)))
 	}
 }
 
@@ -134,13 +125,13 @@ function ppDoBottomLoopStatement(node: ESIToken): unknown {
 		expr = node.children[2].estree
 	}
 	if (whileOrUntil === 'While') {
-		return labeledLoop(doLabelForLoop(node), doWhileStatement(block ? block : blockStatement([]), expr))
+		return labeledLoop(labelForLoop(node, 'Do'), doWhileStatement(block ? block : blockStatement([]), expr))
 	} else {
 		if (block === null) {
 			block = blockStatement([])
 		}
 		block.body.push(ifStatement(expr, breakStatement(), null))
-		return labeledLoop(doLabelForLoop(node), doWhileStatement(block, literal(true)))
+		return labeledLoop(labelForLoop(node, 'Do'), doWhileStatement(block, literal(true)))
 	}
 }
 
@@ -157,12 +148,10 @@ function ppForStatement(node: ESIToken): unknown {
 		step = node.children[5].estree
 	}
 	const block = findChildBlock(node) ?? findInlineBlock(node)
-	// Loop bounds are VBS values, so the direction check and the bound test
-	// go through `__vbs` like any other `<`/`<=`/`>=` (raw JS mishandles
-	// Null, Empty, and True-as-minus-one there too). The counter update uses
-	// `__vbs.add` for the same reason (`Step True` means -1, not +1).
+	// Bound, direction, and counter go through `__vbs` (see vbsCall) like any
+	// other comparison; `Step True` means -1, not +1.
 	return labeledLoop(
-		forLabelForLoop(node),
+		labelForLoop(node, 'For'),
 		forStatement(
 			assignmentExpression(id, '=', expr),
 			step
@@ -176,11 +165,6 @@ function ppForStatement(node: ESIToken): unknown {
 			block ? block : blockStatement([]),
 		),
 	)
-}
-
-/** Emits a `__vbs.<name>(...args)` call. */
-function vbsCall(name: string, args: Expression[]): Expression {
-	return callExpression(memberExpression(identifier(Transformer.VBSHELPER_NAME), identifier(name)), args)
 }
 
 function ppForEachStatement(node: ESIToken): unknown {
@@ -203,9 +187,6 @@ function ppForEachStatement(node: ESIToken): unknown {
 				break
 		}
 	}
-	const safeExpr = callExpression(
-		memberExpression(identifier(Transformer.VBSHELPER_NAME), identifier('toIterable')),
-		[expr],
-	)
-	return labeledLoop(forLabelForLoop(node), forOfStatement(id, safeExpr, block ? block : blockStatement([])))
+	const safeExpr = vbsCall('toIterable', [expr])
+	return labeledLoop(labelForLoop(node, 'For'), forOfStatement(id, safeExpr, block ? block : blockStatement([])))
 }

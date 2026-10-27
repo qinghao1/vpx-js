@@ -10,6 +10,22 @@ describe('normalizeNewCall', () => {
 		expect(normalizeNewCall('Set x = (New Foo)()')).to.equal('Set x = New Foo')
 	})
 
+	it('keeps nested call parens inside Set New args', () => {
+		expect(normalizeNewCall('Set x = (New Foo)(f(1), 2)')).to.equal('Set x = New Foo\nx.init f(1), 2')
+	})
+
+	it('keeps parens inside string args of Set New', () => {
+		expect(normalizeNewCall('Set x = (New Foo)("a)b")')).to.equal('Set x = New Foo\nx.init "a)b"')
+	})
+
+	it('keeps escaped quotes inside string args of Set New', () => {
+		expect(normalizeNewCall('Set x = (New Foo)("a""b", 1)')).to.equal('Set x = New Foo\nx.init "a""b", 1')
+	})
+
+	it('leaves unbalanced Set New args untouched', () => {
+		expect(normalizeNewCall('Set x = (New Foo)(1, 2')).to.equal('Set x = (New Foo)(1, 2')
+	})
+
 	it('rewrites bare inline New calls to init', () => {
 		expect(normalizeNewCall('y = (New Foo)(3)')).to.equal('y = (New Foo).init(3)')
 	})

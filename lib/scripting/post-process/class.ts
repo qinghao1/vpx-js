@@ -30,7 +30,7 @@ import {
 import type { ESIToken } from '../grammar/grammar.js'
 import { findChildBlock } from './helpers.js'
 
-/** ppClass. */
+/** Maps class declarations and constructors/properties to ESTree classes. */
 export function ppClass(node: ESIToken): unknown {
 	switch (node.type) {
 		case 'ClassDeclaration':

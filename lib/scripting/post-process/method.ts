@@ -13,7 +13,7 @@ import {
 } from '../estree.js'
 import type { ESIToken } from '../grammar/grammar.js'
 
-/** ppMethod. */
+/** Maps `Sub`/`Function` declarations to functions with return-value plumbing. */
 export function ppMethod(node: ESIToken): unknown {
 	switch (node.type) {
 		case 'SubDeclaration':

@@ -63,23 +63,77 @@ function rewriteOptionOutsideStrings(text: string): string {
 }
 
 const NEW_FORM_PATTERN =
-	/(?<literal>"[^\r\n"]*(?:""[^\r\n"]*)*")|Set\s+(?<setName>\w+)\s*=\s*\(\s*New\s+(?<setClass>\w+)\s*\)\s*\((?<setArgs>[^)]*)\)|\(\s*New\s+(?<bareClass>\w+)\s*\)\s*\(/gi
+	/(?<literal>"[^\r\n"]*(?:""[^\r\n"]*)*")|Set\s+(?<setName>\w+)\s*=\s*\(\s*New\s+(?<setClass>\w+)\s*\)\s*\(|\(\s*New\s+(?<bareClass>\w+)\s*\)\s*\(/gi
+
+/**
+ * Scans the balanced argument list starting at `openParenEnd` (the index just
+ * past its opening paren), string-aware (`""` escapes a quote). Returns the
+ * argument text and the index past the closing paren, or null when the input
+ * ends first (invalid VBS: leave the text untouched).
+ */
+function scanBalancedArgs(vbs: string, openParenEnd: number): { text: string; end: number } | null {
+	let depth = 1
+	let inString = false
+	let index = openParenEnd
+	while (index < vbs.length) {
+		const char = vbs[index]
+		if (inString) {
+			if (char === '"') {
+				if (vbs[index + 1] === '"') {
+					index += 2
+					continue
+				}
+				inString = false
+			} else if (char === '\r' || char === '\n') {
+				inString = false // VBS strings cannot span lines; the quote was unterminated.
+			}
+		} else if (char === '"') {
+			inString = true
+		} else if (char === '(') {
+			depth++
+		} else if (char === ')') {
+			depth--
+			if (depth === 0) {
+				return { text: vbs.slice(openParenEnd, index), end: index + 1 }
+			}
+		}
+		index++
+	}
+	return null
+}
 
 /** Desugars inline `(New Class)(args)` construction, leaving string literals untouched. */
 function rewriteNewForms(vbs: string): string {
-	return vbs.replace(NEW_FORM_PATTERN, (...replaceArgs: unknown[]) => {
-		const groups = (replaceArgs.at(-1) ?? {}) as Record<string, string | undefined>
+	NEW_FORM_PATTERN.lastIndex = 0
+	let result = ''
+	let cursor = 0
+	let match: RegExpExecArray | null
+	while ((match = NEW_FORM_PATTERN.exec(vbs)) !== null) {
+		const groups = match.groups ?? {}
 		if (groups.literal !== undefined) {
-			return groups.literal
+			continue // string literals pass through; copied verbatim below.
 		}
 		if (groups.setName !== undefined && groups.setClass !== undefined) {
-			const args = rewriteOptionOutsideStrings((groups.setArgs ?? '').trim())
-			return args
-				? `Set ${groups.setName} = New ${groups.setClass}\n${groups.setName}.init ${args}`
+			// `[^)]*` cannot match nested calls or parens inside strings
+			// (`(f(1), 2)` split after `f(1`), so scan the balanced list.
+			const args = scanBalancedArgs(vbs, NEW_FORM_PATTERN.lastIndex)
+			if (args === null) {
+				continue // unbalanced: leave the text untouched.
+			}
+			result += vbs.slice(cursor, match.index)
+			const initArgs = rewriteOptionOutsideStrings(args.text.trim())
+			result += initArgs
+				? `Set ${groups.setName} = New ${groups.setClass}\n${groups.setName}.init ${initArgs}`
 				: `Set ${groups.setName} = New ${groups.setClass}`
+			cursor = args.end
+			NEW_FORM_PATTERN.lastIndex = args.end
+			continue
 		}
-		return `(New ${groups.bareClass}).init(`
-	})
+		result += vbs.slice(cursor, match.index)
+		cursor = NEW_FORM_PATTERN.lastIndex
+		result += `(New ${groups.bareClass}).init(`
+	}
+	return result + vbs.slice(cursor)
 }
 
 /**
@@ -115,6 +169,11 @@ export function buildPipeline(deps: TranspilerPipelineDeps): Array<(ast: Program
 		ast => new ReferenceTransformer(ast, table, itemApis, enumApis, globalApi, stdlib).transform(),
 		ast => new ScopeTransformer(ast).transform(),
 		ast => new DateLiteralTransformer(ast).transform(),
+		// The two ClassTransformer passes straddle AmbiguityTransformer on
+		// purpose and must not merge into one pass: the proxy constructor is
+		// appended after ambiguity (which would otherwise wrap `Reflect.*`
+		// in `getOrCall`), while `this.*` lowering runs before it (ambiguity
+		// captures the lowered names in `getOrCallBound` literals).
 		ast => new ClassTransformer(ast).transformThisIdentifiers(),
 		ast => new AmbiguityTransformer(ast, itemApis, enumApis, globalApi, stdlib).transform(),
 		ast => new ClassTransformer(ast).transform(),

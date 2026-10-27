@@ -2,8 +2,20 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import type { BlockStatement, Expression, Statement } from 'estree'
-import { blockStatement, identifier, thisExpression } from '../estree.js'
+import { blockStatement, callExpression, identifier, memberExpression, thisExpression } from '../estree.js'
 import type { ESIToken } from '../grammar/grammar.js'
+import { Transformer } from '../transformer/transformer.js'
+
+/**
+ * Emits a `__vbs.<name>(...args)` call. All VBS value semantics (Null/Empty
+ * propagation, True-as-minus-one, banker's rounding) live in `__vbs`, so
+ * operator and coercion sites route through here: raw JS operators mistreat
+ * those values (raw `-`/`*` on undefined yields NaN, raw `<`/`==` mishandle
+ * Null and Empty, `&` must propagate Null instead of stringifying).
+ */
+export function vbsCall(name: string, args: Expression[]): Expression {
+	return callExpression(memberExpression(identifier(Transformer.VBSHELPER_NAME), identifier(name)), args)
+}
 
 /** Generic post-processors for shared grammar nodes. */
 export function ppHelpers(node: ESIToken): unknown {

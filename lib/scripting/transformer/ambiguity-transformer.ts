@@ -18,8 +18,8 @@ import { Transformer } from './transformer.js'
  *   In VBScript you can't tell if `someIdentifier(1)` is a function call with
  *   parameter `1` or access to the 2nd element of the `someIdentifier` array.
  *
- *   The {@link #transformCallExpressions()} method replaces ambiguous
- *   occurrences with a function call that determines this at runtime.
+ *   Such calls are replaced with a function call that determines this at
+ *   runtime.
  *
  * 2. Property accessors that potentially are function calls
  *
@@ -27,8 +27,12 @@ import { Transformer } from './transformer.js'
  *   compile time if it's a sub or a property. For example, `foo.Bar` could be
  *   an access to `foo`'s `Bar` property or a call to its `Bar` sub.
  *
- *   The {@link #transformProperty()} method replaces ambiguous occurrences with
- *   a function call that determines this at runtime.
+ *   Such accessors are replaced with a function call that determines this at
+ *   runtime.
+ *
+ * Both cases resolve in a single traversal: a `CallExpression` is entered
+ * before its callee, so the call case marks the callee first and the property
+ * case then sees the same flags a second pass would.
  */
 /** Resolves VBScript call vs array ambiguity. */
 export class AmbiguityTransformer extends Transformer {
@@ -52,128 +56,57 @@ export class AmbiguityTransformer extends Transformer {
 	}
 
 	public transform(): Program {
-		this.transformCallExpressions()
-		this.transformProperty()
-		return this.ast
-	}
-
-	private transformCallExpressions(): Program {
 		return replace(this.ast, {
 			enter: (node, parent: any) => {
 				if (node.type === 'CallExpression') {
-					if (node.callee.type === 'Identifier' && node.callee.name.toLowerCase() === 'eval') {
-						return node
-					}
-
-					// if it's an assignment where its left is the node, it's definitely not a function call
-					if (parent && parent.type === 'AssignmentExpression' && node === parent.left) {
-						let arrayNode: (MemberExpression & { __isProperty?: boolean }) | null = null
-						for (const argument of node.arguments) {
-							arrayNode = memberExpression(
-								arrayNode !== null ? arrayNode : node.callee,
-								argument as Expression,
-								true,
-							) as any
-
-							arrayNode.__isProperty = true // so we don't transform it below
-						}
-						return arrayNode
-					}
-
-					// if it's a member, then check if we exclude objects we know don't contain arrays
-					if (node.callee.type === 'MemberExpression') {
-						const topMemberName = this.getTopMemberName(node.callee)
-						if (
-							[
-								Transformer.ITEMS_NAME,
-								Transformer.ENUMS_NAME,
-								Transformer.GLOBAL_NAME,
-								Transformer.STDLIB_NAME,
-								Transformer.VBSHELPER_NAME,
-								Transformer.PLAYER_NAME,
-							].includes(topMemberName)
-						) {
-							// zero-arg call on a property getter (e.g. __global.FrameIndex()) should be property, not call
-							if (node.arguments.length === 0) {
-								let api: unknown
-								switch (topMemberName) {
-									case Transformer.GLOBAL_NAME:
-										api = this.globalApi
-										break
-									case Transformer.ITEMS_NAME:
-										api = this.itemApis
-										break
-									case Transformer.STDLIB_NAME:
-										api = this.stdlib
-										break
-									case Transformer.ENUMS_NAME:
-										return node
-								}
-								const obj = getValue(api, node.callee as MemberExpression)
-								if (typeof obj !== 'function' && typeof obj !== 'undefined') {
-									return node.callee as unknown as typeof node
-								}
-							}
-							return node
-						}
-					}
-					// otherwise, we don't know, so use getOrCall
-					;(node.callee as unknown as { __isProperty?: boolean }).__isProperty = true // need to eval that on runtime, not compile time
-					return getOrCall(node.callee as Expression, ...(node.arguments as Expression[]))
+					return this.transformCallExpression(node, parent)
+				}
+				if (node.type === 'MemberExpression') {
+					return this.transformMemberExpression(node, parent)
 				}
 				return node
 			},
 		}) as Program
 	}
 
-	private transformProperty(): Program {
-		return replace(this.ast, {
-			enter: (node, parent: any) => {
-				if (node.type === 'MemberExpression') {
-					// if it's already a call, ignore
-					if (parent && parent.type === 'CallExpression' && parent.callee === node) {
-						return node
-					}
+	/** Whether a name is a known namespace object (`__items`, `__enums`, ...) rather than a VBS value. */
+	private isNamespaced(name: string): boolean {
+		return (
+			name === Transformer.ITEMS_NAME ||
+			name === Transformer.ENUMS_NAME ||
+			name === Transformer.GLOBAL_NAME ||
+			name === Transformer.STDLIB_NAME ||
+			name === Transformer.VBSHELPER_NAME ||
+			name === Transformer.PLAYER_NAME
+		)
+	}
 
-					// if it's an assignment where its left is the node, it's definitely not a function call
-					if (
-						parent &&
-						['AssignmentExpression', 'ForOfStatement'].includes(parent.type) &&
-						node === parent.left
-					) {
-						return node
-					}
+	private transformCallExpression(node: CallExpression, parent: any): Expression {
+		if (node.callee.type === 'Identifier' && node.callee.name.toLowerCase() === 'eval') {
+			return node
+		}
 
-					// if we previously determined that this isn't a function, return.
-					if ((parent as unknown as { __isProperty?: boolean }).__isProperty) {
-						return node
-					}
+		// if it's an assignment where its left is the node, it's definitely not a function call
+		if (parent && parent.type === 'AssignmentExpression' && node === parent.left) {
+			let arrayNode: (MemberExpression & { __isProperty?: boolean }) | null = null
+			for (const argument of node.arguments) {
+				arrayNode = memberExpression(
+					arrayNode !== null ? arrayNode : node.callee,
+					argument as Expression,
+					true,
+				) as any
 
-					// if it's a variable declaration, ignore
-					if (parent && parent.type === 'VariableDeclaration') {
-						return node
-					}
+				arrayNode.__isProperty = true // so we don't transform it below
+			}
+			return arrayNode as unknown as Expression
+		}
 
-					// if it's a class instantiation, ignore
-					if (parent && parent.type === 'NewExpression') {
-						return node
-					}
-
-					// if it's within a redim call, ignore
-					if (
-						parent &&
-						parent.type === 'CallExpression' &&
-						parent.callee.type === 'MemberExpression' &&
-						parent.callee.object.type === 'Identifier' &&
-						parent.callee.object.name === Transformer.VBSHELPER_NAME &&
-						parent.callee.property.type === 'Identifier' &&
-						parent.callee.property.name === 'redim'
-					) {
-						return node
-					}
-
-					// now, if it's a prop of something we already know, check if it's a function.
-					const topMemberName = this.getTopMemberName(node)
+		// if it's a member, then check if we exclude objects we know don't contain arrays
+		if (node.callee.type === 'MemberExpression') {
+			const topMemberName = this.getTopMemberName(node.callee)
+			if (this.isNamespaced(topMemberName)) {
+				// zero-arg call on a property getter (e.g. __global.FrameIndex()) should be property, not call
+				if (node.arguments.length === 0) {
 					let api: unknown
 					switch (topMemberName) {
 						case Transformer.GLOBAL_NAME:
@@ -185,42 +118,102 @@ export class AmbiguityTransformer extends Transformer {
 						case Transformer.STDLIB_NAME:
 							api = this.stdlib
 							break
-						case Transformer.ENUMS_NAME: // enums ain't no functions either
+						case Transformer.ENUMS_NAME:
 							return node
 					}
-
-					const obj = getValue(api, node)
-					// if it's a function, render it as such
-					if (
-						typeof obj === 'function' &&
-						(node as unknown as { __isProperty?: boolean }).__isProperty !== true
-					) {
-						return callExpression(node, [])
+					const obj = getValue(api, node.callee as MemberExpression)
+					if (typeof obj !== 'function' && typeof obj !== 'undefined') {
+						return node.callee as unknown as Expression
 					}
-					// otherwise, if we got something, that means it's a property
-					if (typeof obj !== 'undefined') {
-						return node
-					}
-
-					// already replaced?
-					if (
-						parent &&
-						parent.type === 'CallExpression' &&
-						parent.callee.type === 'MemberExpression' &&
-						parent.callee.object.name === Transformer.VBSHELPER_NAME &&
-						parent.callee.property.type === 'Identifier' &&
-						(parent.callee.property.name === 'getOrCall' ||
-							parent.callee.property.name === 'getOrCallBound')
-					) {
-						return node
-					}
-
-					// otherwise we don't know. so eval runtime
-					return getOrCall(node)
 				}
 				return node
-			},
-		}) as Program
+			}
+		}
+		// otherwise, we don't know, so use getOrCall
+		;(node.callee as unknown as { __isProperty?: boolean }).__isProperty = true // need to eval that on runtime, not compile time
+		return getOrCall(node.callee as Expression, ...(node.arguments as Expression[]))
+	}
+
+	private transformMemberExpression(node: MemberExpression, parent: any): Expression {
+		// if it's already a call, ignore
+		if (parent && parent.type === 'CallExpression' && parent.callee === node) {
+			return node
+		}
+
+		// if it's an assignment where its left is the node, it's definitely not a function call
+		if (parent && ['AssignmentExpression', 'ForOfStatement'].includes(parent.type) && node === parent.left) {
+			return node
+		}
+
+		// if we previously determined that this isn't a function, return.
+		if ((parent as unknown as { __isProperty?: boolean }).__isProperty) {
+			return node
+		}
+
+		// if it's a variable declaration, ignore
+		if (parent && parent.type === 'VariableDeclaration') {
+			return node
+		}
+
+		// if it's a class instantiation, ignore
+		if (parent && parent.type === 'NewExpression') {
+			return node
+		}
+
+		// if it's within a redim call, ignore
+		if (
+			parent &&
+			parent.type === 'CallExpression' &&
+			parent.callee.type === 'MemberExpression' &&
+			parent.callee.object.type === 'Identifier' &&
+			parent.callee.object.name === Transformer.VBSHELPER_NAME &&
+			parent.callee.property.type === 'Identifier' &&
+			parent.callee.property.name === 'redim'
+		) {
+			return node
+		}
+
+		// now, if it's a prop of something we already know, check if it's a function.
+		const topMemberName = this.getTopMemberName(node)
+		let api: unknown
+		switch (topMemberName) {
+			case Transformer.GLOBAL_NAME:
+				api = this.globalApi
+				break
+			case Transformer.ITEMS_NAME:
+				api = this.itemApis
+				break
+			case Transformer.STDLIB_NAME:
+				api = this.stdlib
+				break
+			case Transformer.ENUMS_NAME: // enums ain't no functions either
+				return node
+		}
+
+		const obj = getValue(api, node)
+		// if it's a function, render it as such
+		if (typeof obj === 'function' && (node as unknown as { __isProperty?: boolean }).__isProperty !== true) {
+			return callExpression(node, [])
+		}
+		// otherwise, if we got something, that means it's a property
+		if (typeof obj !== 'undefined') {
+			return node
+		}
+
+		// already replaced?
+		if (
+			parent &&
+			parent.type === 'CallExpression' &&
+			parent.callee.type === 'MemberExpression' &&
+			parent.callee.object.name === Transformer.VBSHELPER_NAME &&
+			parent.callee.property.type === 'Identifier' &&
+			(parent.callee.property.name === 'getOrCall' || parent.callee.property.name === 'getOrCallBound')
+		) {
+			return node
+		}
+
+		// otherwise we don't know. so eval runtime
+		return getOrCall(node)
 	}
 }
 

@@ -15,7 +15,7 @@ import type { ESIToken } from '../grammar/grammar.js'
 import { Transformer } from '../transformer/transformer.js'
 import { collectChildren } from './helpers.js'
 
-/** ppArray. */
+/** Maps `Redim`/`Erase` statements to `__vbs.redim` / `__vbs.erase` calls. */
 export function ppArray(node: ESIToken): unknown {
 	switch (node.type) {
 		case 'RedimStatement':

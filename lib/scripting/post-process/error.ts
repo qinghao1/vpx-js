@@ -6,7 +6,7 @@ import { callExpression, expressionStatement, identifier, memberExpression } fro
 import type { ESIToken } from '../grammar/grammar.js'
 import { Transformer } from '../transformer/transformer.js'
 
-/** ppError. */
+/** Maps `On Error` statements to `__vbs.onErrorResumeNext` / `onErrorGoto` calls. */
 export function ppError(node: ESIToken): unknown {
 	switch (node.type) {
 		case 'OnErrorStatement':
@@ -16,14 +16,14 @@ export function ppError(node: ESIToken): unknown {
 }
 
 function ppOnErrorStatement(node: ESIToken): unknown {
-	let expr: Expression
-	if (node.text.includes('GoTo')) {
-		expr = callExpression(memberExpression(identifier(Transformer.VBSHELPER_NAME), identifier('onErrorGoto')), [])
-	} else {
-		expr = callExpression(
-			memberExpression(identifier(Transformer.VBSHELPER_NAME), identifier('onErrorResumeNext')),
-			[],
-		)
-	}
+	// Match the `ErrorClause` child (`GoTo 0` vs `Resume Next`), not the whole
+	// statement text: text-sniffing only worked because `format()` happens to
+	// canonicalize keyword case upstream.
+	const clause = node.children.find(child => child.type === 'ErrorClause')
+	const name = (clause?.text.startsWith('GoTo') ?? false) ? 'onErrorGoto' : 'onErrorResumeNext'
+	const expr: Expression = callExpression(
+		memberExpression(identifier(Transformer.VBSHELPER_NAME), identifier(name)),
+		[],
+	)
 	return expressionStatement(expr)
 }

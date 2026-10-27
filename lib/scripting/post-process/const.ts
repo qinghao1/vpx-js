@@ -5,7 +5,7 @@ import { variableDeclaration, variableDeclarator } from '../estree.js'
 import type { ESIToken } from '../grammar/grammar.js'
 import { collectChildren } from './helpers.js'
 
-/** ppConst. */
+/** Maps constant declarators to `const` declarations. */
 export function ppConst(node: ESIToken): unknown {
 	switch (node.type) {
 		case 'ConstantMemberDeclaration':

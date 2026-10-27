@@ -4,9 +4,9 @@
 import type { BreakStatement } from 'estree'
 import { identifier, returnStatement } from '../estree.js'
 import type { ESIToken } from '../grammar/grammar.js'
-import { doLabelForExit, forLabelForExit } from './loop.js'
+import { labelForExit } from './loop.js'
 
-/** ppBranch. */
+/** Maps `Exit Do/For` to labeled breaks and `Exit Sub/Function/Property` to bare returns. */
 export function ppBranch(node: ESIToken): unknown {
 	switch (node.type) {
 		case 'ExitStatement':
@@ -23,11 +23,15 @@ function ppExitStatement(node: ESIToken): unknown {
 	// loop carries its kind's label (see loop.ts), so this always binds the
 	// nearest enclosing loop of the matching kind.
 	if (kind === 'Do') {
-		return labeledBreak(doLabelForExit(node))
+		return labeledBreak(labelForExit(node, 'Do'))
 	}
 	if (kind === 'For') {
-		return labeledBreak(forLabelForExit(node))
+		return labeledBreak(labelForExit(node, 'For'))
 	}
+	// `Exit Function`/`Exit Property` emit a bare `return`: the enclosing
+	// Function/Property-Get rewrite fills in the function-name value (see
+	// `ppFunctionDeclaration` / `ppPropertyGetDeclaration`), while `Exit Sub`
+	// intentionally stays a bare `return;`.
 	return returnStatement(null)
 }
 

@@ -16,19 +16,25 @@ before(async () => {
 })
 
 describe('The VBScript transpiler - Error', () => {
-	it('should transpile an On Error Resume Next statement', () => {
-		const vbs = `On Error Resume Next`
-		const js = grammar.vbsToJs(vbs)
-		expect(js).to.equal(`${Transformer.VBSHELPER_NAME}.onErrorResumeNext();`)
-	})
-})
-
-describe('The VBScript transpiler - Error', () => {
-	it('should transpile an On Error GoTo statement', () => {
-		const vbs = `On Error Goto 0`
-		const js = grammar.vbsToJs(vbs)
-		expect(js).to.equal(`${Transformer.VBSHELPER_NAME}.onErrorGoto();`)
-	})
+	const cases: Array<[string, string]> = [
+		[
+			'an On Error Resume Next statement',
+			'On Error Resume Next',
+			`${Transformer.VBSHELPER_NAME}.onErrorResumeNext();`,
+		],
+		[
+			'an On Error Resume Next statement in upper case',
+			'On Error RESUME NEXT',
+			`${Transformer.VBSHELPER_NAME}.onErrorResumeNext();`,
+		],
+		['an On Error GoTo statement', 'On Error Goto 0', `${Transformer.VBSHELPER_NAME}.onErrorGoto();`],
+		['an On Error GoTo statement in upper case', 'On Error GOTO 0', `${Transformer.VBSHELPER_NAME}.onErrorGoto();`],
+	]
+	for (const [name, vbs, expected] of cases) {
+		it(`should transpile ${name}`, () => {
+			expect(grammar.vbsToJs(vbs)).to.equal(expected)
+		})
+	}
 })
 
 describe('The VBScript transpiler - Error behavior', () => {

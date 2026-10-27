@@ -5,7 +5,7 @@ import { identifier, literal, newExpression } from '../estree.js'
 import type { ESIToken } from '../grammar/grammar.js'
 import { DATE_LITERAL_PLACEHOLDER } from '../transformer/date-literal-transformer.js'
 
-/** ppLiteral. */
+/** Maps VBS literals (numbers, strings, dates, `Nothing`/`Empty`/`Null`) to ESTree literals. */
 export function ppLiteral(node: ESIToken): unknown {
 	switch (node.type) {
 		case 'BooleanLiteral':

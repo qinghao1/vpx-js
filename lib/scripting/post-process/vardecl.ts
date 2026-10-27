@@ -14,7 +14,7 @@ import type { ESIToken } from '../grammar/grammar.js'
 import { Transformer } from '../transformer/transformer.js'
 import { collectChildren } from './helpers.js'
 
-/** ppVarDecl. */
+/** Maps `Dim` variable declarators to `let` declarations. */
 export function ppVarDecl(node: ESIToken): unknown {
 	switch (node.type) {
 		case 'VariableMemberDeclaration':
