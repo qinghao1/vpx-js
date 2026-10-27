@@ -15,7 +15,7 @@ describe('The scripting error transformer', () => {
 		const vbs = `If Err Then MsgBox "Can't start Game" & cGameName & vbNewLine & Err.Description:Exit Sub`
 		const js = transform(vbs)
 		expect(js).to.equal(
-			`if (Err.Number) {\n    MsgBox(__stdlib.CStr('Can\\'t start Game') + __stdlib.CStr(cGameName) + __stdlib.CStr(vbNewLine) + __stdlib.CStr(Err.Description));\n    return;\n}`,
+			`if (Err.Number) {\n    MsgBox(__vbs.concat(__vbs.concat(__vbs.concat('Can\\'t start Game', cGameName), vbNewLine), Err.Description));\n    return;\n}`,
 		)
 	})
 

@@ -4,7 +4,6 @@
 import type { BlockStatement, Expression, Identifier, LabeledStatement, Statement } from 'estree'
 import {
 	assignmentExpression,
-	binaryExpression,
 	blockStatement,
 	breakStatement,
 	callExpression,
@@ -158,21 +157,30 @@ function ppForStatement(node: ESIToken): unknown {
 		step = node.children[5].estree
 	}
 	const block = findChildBlock(node) ?? findInlineBlock(node)
+	// Loop bounds are VBS values, so the direction check and the bound test
+	// go through `__vbs` like any other `<`/`<=`/`>=` (raw JS mishandles
+	// Null, Empty, and True-as-minus-one there too). The counter update uses
+	// `__vbs.add` for the same reason (`Step True` means -1, not +1).
 	return labeledLoop(
 		forLabelForLoop(node),
 		forStatement(
 			assignmentExpression(id, '=', expr),
 			step
 				? conditionalExpression(
-						binaryExpression('<', step, literal(0)),
-						binaryExpression('>=', id, expr2),
-						binaryExpression('<=', id, expr2),
+						vbsCall('lt', [step, literal(0)]),
+						vbsCall('gte', [id, expr2]),
+						vbsCall('lte', [id, expr2]),
 					)
-				: binaryExpression('<=', id, expr2),
-			assignmentExpression(id, '+=', step ? step : literal(1)),
+				: vbsCall('lte', [id, expr2]),
+			assignmentExpression(id, '=', vbsCall('add', [id, step ? step : literal(1)])),
 			block ? block : blockStatement([]),
 		),
 	)
+}
+
+/** Emits a `__vbs.<name>(...args)` call. */
+function vbsCall(name: string, args: Expression[]): Expression {
+	return callExpression(memberExpression(identifier(Transformer.VBSHELPER_NAME), identifier(name)), args)
 }
 
 function ppForEachStatement(node: ESIToken): unknown {

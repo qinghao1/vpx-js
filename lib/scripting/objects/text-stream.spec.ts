@@ -86,8 +86,22 @@ describe('The VBScript native text stream object', () => {
 		ts.WriteLine('Line2')
 
 		ts = f.OpenAsTextStream(TextStream.MODE_READ, -2)
-		ts.SkipLine()
 		expect(ts.ReadAll()).to.equal('Line1\r\nLine2\r\n')
+	})
+
+	it('should read from the cursor position and advance it to the end', () => {
+		const fs = new FileSystemObject()
+		fs.CreateTextFile('test1.txt')
+		const f = fs.GetFile('test1.txt') as File
+
+		let ts = f.OpenAsTextStream(TextStream.MODE_WRITE, -2)
+		ts.WriteLine('Line1')
+		ts.WriteLine('Line2')
+
+		ts = f.OpenAsTextStream(TextStream.MODE_READ, -2)
+		ts.SkipLine()
+		expect(ts.ReadAll()).to.equal('Line2\r\n')
+		expect(ts.AtEndOfStream).to.equal(true)
 	})
 
 	it('should start reading a fresh OpenTextFile stream at the beginning', () => {

@@ -84,7 +84,7 @@ describe('The VBScript transpiler - Conditional', () => {
 		const vbs = `If Lampstate(130)=0 Then\nColorGradeImage="ColorGrade_off"\nElseIf LampState(130)>0 Then ColorGradeImage="ColorGrade_red"\nElseIf LampState(130)=0 Then ColorGradeImage="ColorGrade_blue":x=5\nElse\nColorGradeImage="ColorGrade_on"\nEnd If`
 		const js = grammar.vbsToJs(vbs)
 		expect(js).to.equal(
-			`if (${Transformer.VBSHELPER_NAME}.equals(Lampstate(130), 0)) {\n    ColorGradeImage = 'ColorGrade_off';\n} else if (LampState(130) > 0) {\n    ColorGradeImage = 'ColorGrade_red';\n} else if (${Transformer.VBSHELPER_NAME}.equals(LampState(130), 0)) {\n    ColorGradeImage = 'ColorGrade_blue';\n    x = 5;\n} else {\n    ColorGradeImage = 'ColorGrade_on';\n}`,
+			`if (${Transformer.VBSHELPER_NAME}.equals(Lampstate(130), 0)) {\n    ColorGradeImage = 'ColorGrade_off';\n} else if (${Transformer.VBSHELPER_NAME}.gt(LampState(130), 0)) {\n    ColorGradeImage = 'ColorGrade_red';\n} else if (${Transformer.VBSHELPER_NAME}.equals(LampState(130), 0)) {\n    ColorGradeImage = 'ColorGrade_blue';\n    x = 5;\n} else {\n    ColorGradeImage = 'ColorGrade_on';\n}`,
 		)
 	})
 

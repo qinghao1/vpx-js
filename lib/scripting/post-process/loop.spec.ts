@@ -20,21 +20,23 @@ describe('The VBScript transpiler - Loop', () => {
 		const vbs = `For j = 1 To 20\ntotal = total + 1\nNext`
 		const js = grammar.vbsToJs(vbs)
 		expect(js).to.equal(
-			`__exitFor:\n    for (j = 1; j <= 20; j += 1) {\n        total = ${Transformer.VBSHELPER_NAME}.add(total, 1);\n    }`,
+			`__exitFor:\n    for (j = 1; ${Transformer.VBSHELPER_NAME}.lte(j, 20); j = ${Transformer.VBSHELPER_NAME}.add(j, 1)) {\n        total = ${Transformer.VBSHELPER_NAME}.add(total, 1);\n    }`,
 		)
 	})
 
 	it('should transpile an empty "For...Next" statement', () => {
 		const vbs = `For j = 1 To 20\nNext`
 		const js = grammar.vbsToJs(vbs)
-		expect(js).to.equal('__exitFor:\n    for (j = 1; j <= 20; j += 1) {\n    }')
+		expect(js).to.equal(
+			`__exitFor:\n    for (j = 1; ${Transformer.VBSHELPER_NAME}.lte(j, 20); j = ${Transformer.VBSHELPER_NAME}.add(j, 1)) {\n    }`,
+		)
 	})
 
 	it('should transpile an inline "For...Next" statement', () => {
 		const vbs = `If mBalls Then For ii = 1 to mBalls : x = 5 : Next`
 		const js = grammar.vbsToJs(vbs)
 		expect(js).to.equal(
-			'if (mBalls) {\n    __exitFor:\n        for (ii = 1; ii <= mBalls; ii += 1) {\n            x = 5;\n        }\n}',
+			`if (mBalls) {\n    __exitFor:\n        for (ii = 1; ${Transformer.VBSHELPER_NAME}.lte(ii, mBalls); ii = ${Transformer.VBSHELPER_NAME}.add(ii, 1)) {\n            x = 5;\n        }\n}`,
 		)
 	})
 
@@ -42,7 +44,7 @@ describe('The VBScript transpiler - Loop', () => {
 		const vbs = `If BallsInPlay>=1 Then For Each x In BulbP:x.image="Bulb_On":x.TriggerSingleUpdate:Next`
 		const js = grammar.vbsToJs(vbs)
 		expect(js).to.equal(
-			"if (BallsInPlay >= 1) {\n    __exitFor:\n        for (x of __vbs.toIterable(BulbP)) {\n            x.image = 'Bulb_On';\n            x.TriggerSingleUpdate();\n        }\n}",
+			`if (${Transformer.VBSHELPER_NAME}.gte(BallsInPlay, 1)) {\n    __exitFor:\n        for (x of __vbs.toIterable(BulbP)) {\n            x.image = 'Bulb_On';\n            x.TriggerSingleUpdate();\n        }\n}`,
 		)
 	})
 
@@ -50,7 +52,7 @@ describe('The VBScript transpiler - Loop', () => {
 		const vbs = `For j = 1 To 20 Step 3\ntotal = total + 1\nNext`
 		const js = grammar.vbsToJs(vbs)
 		expect(js).to.equal(
-			`__exitFor:\n    for (j = 1; 3 < 0 ? j >= 20 : j <= 20; j += 3) {\n        total = ${Transformer.VBSHELPER_NAME}.add(total, 1);\n    }`,
+			`__exitFor:\n    for (j = 1; ${Transformer.VBSHELPER_NAME}.lt(3, 0) ? ${Transformer.VBSHELPER_NAME}.gte(j, 20) : ${Transformer.VBSHELPER_NAME}.lte(j, 20); j = ${Transformer.VBSHELPER_NAME}.add(j, 3)) {\n        total = ${Transformer.VBSHELPER_NAME}.add(total, 1);\n    }`,
 		)
 	})
 
@@ -58,7 +60,7 @@ describe('The VBScript transpiler - Loop', () => {
 		const vbs = `For j = 1 To 20 Step -3\ntotal = total + 1\nNext`
 		const js = grammar.vbsToJs(vbs)
 		expect(js).to.equal(
-			`__exitFor:\n    for (j = 1; -3 < 0 ? j >= 20 : j <= 20; j += -3) {\n        total = ${Transformer.VBSHELPER_NAME}.add(total, 1);\n    }`,
+			`__exitFor:\n    for (j = 1; ${Transformer.VBSHELPER_NAME}.lt(-3, 0) ? ${Transformer.VBSHELPER_NAME}.gte(j, 20) : ${Transformer.VBSHELPER_NAME}.lte(j, 20); j = ${Transformer.VBSHELPER_NAME}.add(j, -3)) {\n        total = ${Transformer.VBSHELPER_NAME}.add(total, 1);\n    }`,
 		)
 	})
 
@@ -80,14 +82,14 @@ describe('The VBScript transpiler - Loop', () => {
 		const vbs = `Dim x\nx = 1\nDo While x < 5\nx = x + 1\nLoop`
 		const js = grammar.vbsToJs(vbs)
 		expect(js).to.equal(
-			`let x;\nx = 1;\n__exitDo:\n    while (x < 5) {\n        x = ${Transformer.VBSHELPER_NAME}.add(x, 1);\n    }`,
+			`let x;\nx = 1;\n__exitDo:\n    while (${Transformer.VBSHELPER_NAME}.lt(x, 5)) {\n        x = ${Transformer.VBSHELPER_NAME}.add(x, 1);\n    }`,
 		)
 	})
 
 	it('should transpile an empty "Do While...Loop" statement', () => {
 		const vbs = `Dim x\nx = 1\nDo While x < 5\nLoop`
 		const js = grammar.vbsToJs(vbs)
-		expect(js).to.equal('let x;\nx = 1;\n__exitDo:\n    while (x < 5) {\n    }')
+		expect(js).to.equal(`let x;\nx = 1;\n__exitDo:\n    while (${Transformer.VBSHELPER_NAME}.lt(x, 5)) {\n    }`)
 	})
 
 	it('should transpile a "Do Until...Loop" statement', () => {
@@ -110,21 +112,23 @@ describe('The VBScript transpiler - Loop', () => {
 		const vbs = `Dim x\nx = 7\nDo\nx = x + 1\nLoop While x < 5`
 		const js = grammar.vbsToJs(vbs)
 		expect(js).to.equal(
-			`let x;\nx = 7;\n__exitDo:\n    do {\n        x = ${Transformer.VBSHELPER_NAME}.add(x, 1);\n    } while (x < 5);`,
+			`let x;\nx = 7;\n__exitDo:\n    do {\n        x = ${Transformer.VBSHELPER_NAME}.add(x, 1);\n    } while (${Transformer.VBSHELPER_NAME}.lt(x, 5));`,
 		)
 	})
 
 	it('should transpile an empty "Do...Loop While" statement', () => {
 		const vbs = `Dim x\nx = 7\nDo\nLoop While x < 5`
 		const js = grammar.vbsToJs(vbs)
-		expect(js).to.equal('let x;\nx = 7;\n__exitDo:\n    do {\n    } while (x < 5);')
+		expect(js).to.equal(
+			`let x;\nx = 7;\n__exitDo:\n    do {\n    } while (${Transformer.VBSHELPER_NAME}.lt(x, 5));`,
+		)
 	})
 
 	it('should transpile a "Do...Loop Until" statement', () => {
 		const vbs = `Dim i\ni = 10\nDo\ni = i + 1\nLoop Until i < 15`
 		const js = grammar.vbsToJs(vbs)
 		expect(js).to.equal(
-			`let i;\ni = 10;\n__exitDo:\n    do {\n        i = ${Transformer.VBSHELPER_NAME}.add(i, 1);\n        if (i < 15)\n            break;\n    } while (true);`,
+			`let i;\ni = 10;\n__exitDo:\n    do {\n        i = ${Transformer.VBSHELPER_NAME}.add(i, 1);\n        if (${Transformer.VBSHELPER_NAME}.lt(i, 15))\n            break;\n    } while (true);`,
 		)
 	})
 
@@ -132,7 +136,7 @@ describe('The VBScript transpiler - Loop', () => {
 		const vbs = `Dim i\ni = 10\nDo\nLoop Until i < 15`
 		const js = grammar.vbsToJs(vbs)
 		expect(js).to.equal(
-			'let i;\ni = 10;\n__exitDo:\n    do {\n        if (i < 15)\n            break;\n    } while (true);',
+			`let i;\ni = 10;\n__exitDo:\n    do {\n        if (${Transformer.VBSHELPER_NAME}.lt(i, 15))\n            break;\n    } while (true);`,
 		)
 	})
 
@@ -148,14 +152,14 @@ describe('The VBScript transpiler - Loop', () => {
 		const vbs = `Dim x\nx = 1\nWhile x < 5\nx = x + 1\nWEnd`
 		const js = grammar.vbsToJs(vbs)
 		expect(js).to.equal(
-			`let x;\nx = 1;\n__exitDo:\n    while (x < 5) {\n        x = ${Transformer.VBSHELPER_NAME}.add(x, 1);\n    }`,
+			`let x;\nx = 1;\n__exitDo:\n    while (${Transformer.VBSHELPER_NAME}.lt(x, 5)) {\n        x = ${Transformer.VBSHELPER_NAME}.add(x, 1);\n    }`,
 		)
 	})
 
 	it('should transpile an empty "While...WEnd" statement', () => {
 		const vbs = `Dim x\nx = 1\nWhile x < 5\nWEnd`
 		const js = grammar.vbsToJs(vbs)
-		expect(js).to.equal('let x;\nx = 1;\n__exitDo:\n    while (x < 5) {\n    }')
+		expect(js).to.equal(`let x;\nx = 1;\n__exitDo:\n    while (${Transformer.VBSHELPER_NAME}.lt(x, 5)) {\n    }`)
 	})
 
 	it('should bind "Exit Do" to the outer loop in mixed nesting', () => {
@@ -222,5 +226,20 @@ describe('The VBScript transpiler - Loop behavior', () => {
 		const scope = execute(vbs)
 		expect(scope.n).to.equal(3)
 		expect(scope.m).to.equal(3)
+	})
+
+	it('should skip a For loop with a Null upper bound', () => {
+		const vbs = `s = 0\nFor i = 1 To Null\ns = s + 1\nNext\nx = s`
+		expect(execute(vbs).x).to.equal(0)
+	})
+
+	it('should treat a Step of True as -1 (descending)', () => {
+		const vbs = `s = 0\nFor i = 3 To 1 Step True\ns = s + 1\nNext\nx = s`
+		expect(execute(vbs).x).to.equal(3)
+	})
+
+	it('should not enter a For loop with an Empty upper bound below the start', () => {
+		const vbs = `Dim m\ns = 0\nFor i = 1 To m\ns = s + 1\nNext\nx = s`
+		expect(execute(vbs).x).to.equal(0)
 	})
 })

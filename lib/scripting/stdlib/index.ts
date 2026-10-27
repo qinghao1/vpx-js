@@ -280,9 +280,12 @@ export class Stdlib extends VbsApi {
 	}
 
 	public CStr(v: any): string {
-		// NB: Null maps to '' instead of raising 94 because `&` concatenates
-		// via CStr; VBS `"a" & Null` is Null (and explicit CStr(Null) is error
-		// 94), both of which need a dedicated concat helper at the call site.
+		// NB: explicit CStr(Null) is error 94; `&` no longer routes through
+		// here but through `__vbs.concat`, which propagates Null instead.
+		if (v === null) {
+			ERR.Raise(new VbsError('Invalid use of Null', 94))
+			return ''
+		}
 		if (this.isUndef(v)) return ''
 		if (typeof v === 'string') return v
 		if (typeof v === 'boolean') return v ? 'True' : 'False'

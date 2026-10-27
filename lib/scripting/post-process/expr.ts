@@ -133,16 +133,13 @@ export function ppConcatExpression(node: ESIToken): Expression {
 	if (node.children.length < 2) {
 		return node.children[0].estree
 	}
-	let expr = toConcatString(node.children[0].estree)
+	// VBS `&` propagates Null (`"a" & Null` is Null, not `"a"`), so route
+	// through `__vbs.concat` instead of stringifying operands with `CStr`.
+	let expr = node.children[0].estree
 	for (const child of node.children.slice(1)) {
-		expr = binaryExpression('+', expr, toConcatString(child.estree))
+		expr = vbsCall('concat', [expr, child.estree])
 	}
 	return expr
-}
-
-/** VBS `&` always string-concatenates, so stringify each operand instead of adding. */
-function toConcatString(operand: Expression): Expression {
-	return callExpression(memberExpression(identifier(Transformer.STDLIB_NAME), identifier('CStr')), [operand])
 }
 
 const LOGICAL_OPERATORS: Record<string, string> = {
@@ -172,15 +169,15 @@ function ppLogicalExpression(node: ESIToken): Expression {
 }
 
 const RELATIONAL_OPERATORS: Record<string, string> = {
-	'<>': '!=',
-	'><': '!=',
-	'<=': '<=',
-	'=<': '<=',
-	'>=': '>=',
-	'=>': '>=',
-	'>': '>',
-	'<': '<',
-	'=': '==',
+	'<>': 'notEquals',
+	'><': 'notEquals',
+	'<=': 'lte',
+	'=<': 'lte',
+	'>=': 'gte',
+	'=>': 'gte',
+	'>': 'gt',
+	'<': 'lt',
+	'=': 'equals',
 }
 
 /** Strips leading `__vbs.not(...)` calls, tracking parity so callers can re-apply once. */
@@ -209,19 +206,11 @@ function ppRelationalExpression(node: ESIToken): Expression {
 		const text = node.text.substr(index)
 		for (const key in RELATIONAL_OPERATORS) {
 			if (text.startsWith(key)) {
-				switch (RELATIONAL_OPERATORS[key]) {
-					// `<>` is not `!(=)`: any Null comparison yields Null
-					// (falsy), while `!Null` is True in JS.
-					case '==':
-						expr = vbsCall('equals', [expr, child.estree])
-						break
-					case '!=':
-						expr = vbsCall('notEquals', [expr, child.estree])
-						break
-					default:
-						expr = binaryExpression(RELATIONAL_OPERATORS[key] as BinaryOperator, expr, child.estree)
-						break
-				}
+				// Every relational operator routes through `__vbs`: raw JS
+				// `==`/`<`/`>` mishandle Null (falsy in VBS, truthy quirks in
+				// JS), Empty, and True-as-minus-one. `<>` is not `!(=)` since
+				// any Null comparison yields Null instead of True.
+				expr = vbsCall(RELATIONAL_OPERATORS[key], [expr, child.estree])
 				index += child.text.length + key.length
 				break
 			}

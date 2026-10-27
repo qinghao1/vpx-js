@@ -239,7 +239,7 @@ export class FileSystemObject {
 			return ERR.Raise(53, undefined, 'File not found')
 		}
 		return FS.fileExists(filename)
-			? FS.getStream(filename)
+			? FS.getStream(filename, mode)
 			: FS.addStream(filename, new TextStream(filename, false, mode))
 	}
 }

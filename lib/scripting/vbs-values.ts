@@ -357,3 +357,97 @@ export function vbsNotEquals(left: unknown, right: unknown): boolean | null {
 	}
 	return !vbsEquals(left, right)
 }
+
+/**
+ * VBS `&`: Null propagates (any Null operand yields Null), Empty stringifies
+ * to `''`, booleans to `True`/`False`, mirroring `CStr` without its Null
+ * error so the operator — not the conversion — owns Null.
+ */
+export function vbsConcat(left: unknown, right: unknown): string | null {
+	if (left === null || right === null) {
+		return null
+	}
+	return toConcatText(left) + toConcatText(right)
+}
+
+/** Stringifies one `&` operand: Empty is `''`, like `Stdlib.CStr` without the Null error. */
+function toConcatText(value: unknown): string {
+	if (value === undefined || isVbsUndef(value)) {
+		return ''
+	}
+	if (typeof value === 'string') {
+		return value
+	}
+	if (typeof value === 'boolean') {
+		return value ? 'True' : 'False'
+	}
+	return String(value)
+}
+
+/**
+ * Normalizes one ordering operand: booleans to -1/0, Empty to `''` against a
+ * string (string context) or 0 otherwise (numeric context). Null is handled
+ * by the caller; non-conforming values fall through for numeric coercion.
+ */
+function normalizeOrderOperand(value: unknown, otherIsString: boolean): unknown {
+	if (value === undefined || isVbsUndef(value)) {
+		return otherIsString ? '' : 0
+	}
+	if (typeof value === 'boolean') {
+		return value ? -1 : 0
+	}
+	return value
+}
+
+/**
+ * VBS `<`, `<=`, `>`, `>=`: Null yields Null; two strings compare textually,
+ * otherwise both sides coerce numerically (True is -1, Empty is 0 or `''`).
+ * Garbage against a number raises type mismatch (13), like the arithmetic
+ * operators. Under `On Error Resume Next` the error is recorded and the
+ * result is undefined (see vbsIntDiv).
+ */
+function vbsCompare(
+	left: unknown,
+	right: unknown,
+	cmp: (a: number | string, b: number | string) => boolean,
+): boolean | null | undefined {
+	if (left === null || right === null) {
+		return null
+	}
+	const otherIsString =
+		(typeof left === 'string' || left === undefined || isVbsUndef(left)) &&
+		(typeof right === 'string' || right === undefined || isVbsUndef(right)) &&
+		(typeof left === 'string' || typeof right === 'string')
+	const normalizedLeft = normalizeOrderOperand(left, typeof right === 'string')
+	const normalizedRight = normalizeOrderOperand(right, typeof left === 'string')
+	if (otherIsString) {
+		return cmp(normalizedLeft as string, normalizedRight as string)
+	}
+	const leftNumeric = toVbsNumber(normalizedLeft)
+	const rightNumeric = toVbsNumber(normalizedRight)
+	if (Number.isNaN(leftNumeric) || Number.isNaN(rightNumeric)) {
+		ERR.Raise(new VbsError('Type mismatch', 13))
+		return undefined
+	}
+	return cmp(leftNumeric, rightNumeric)
+}
+
+/** VBS `<`; Null yields Null (falsy). */
+export function vbsLt(left: unknown, right: unknown): boolean | null | undefined {
+	return vbsCompare(left, right, (a, b) => a < b)
+}
+
+/** VBS `<=`; Null yields Null (falsy). */
+export function vbsLte(left: unknown, right: unknown): boolean | null | undefined {
+	return vbsCompare(left, right, (a, b) => a <= b)
+}
+
+/** VBS `>`; Null yields Null (falsy). */
+export function vbsGt(left: unknown, right: unknown): boolean | null | undefined {
+	return vbsCompare(left, right, (a, b) => a > b)
+}
+
+/** VBS `>=`; Null yields Null (falsy). */
+export function vbsGte(left: unknown, right: unknown): boolean | null | undefined {
+	return vbsCompare(left, right, (a, b) => a >= b)
+}

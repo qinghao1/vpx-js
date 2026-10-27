@@ -111,6 +111,19 @@ describe('The VBScript stdlib', () => {
 		expect(scope.result4).to.equal(false)
 	})
 
+	it('should initialize bare Dim variables to Empty, not Null', () => {
+		const scope = {} as any
+		const vbs = `dim v1\nresult1 = IsEmpty(v1)\nresult2 = (v1 = "")\nresult3 = v1 & "a"\nresult4 = TypeName(v1)`
+		const transpiler = new Transpiler(table, player)
+		transpiler.execute(vbs, scope, 'global')
+
+		expect(scope.v1).to.be.undefined
+		expect(scope.result1).to.equal(true)
+		expect(scope.result2).to.equal(true)
+		expect(scope.result3).to.equal('a')
+		expect(scope.result4).to.equal('Empty')
+	})
+
 	it('should provide the MsgBox function', () => {
 		const vbs = `MsgBox "duh"`
 		const transpiler = new Transpiler(table, player)
@@ -345,6 +358,7 @@ describe('The VBScript stdlib', () => {
 			['CCur(Null)', 94],
 			['CBool("abc")', 13],
 			['CBool(Null)', 94],
+			['CStr(Null)', 94],
 		]
 		for (const [expr, code] of rows) {
 			const scope = {} as any

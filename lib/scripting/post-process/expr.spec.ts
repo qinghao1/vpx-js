@@ -6,6 +6,7 @@ import { TableBuilder } from '../../../test/table-builder.js'
 import { Player } from '../../game/player.js'
 import type { Table } from '../../vpt/table/table.js'
 import { Grammar } from '../grammar/grammar.js'
+import { ERR, VbsError } from '../stdlib/err.js'
 import { Transformer } from '../transformer/transformer.js'
 import { Transpiler } from '../transpiler.js'
 
@@ -101,16 +102,14 @@ describe('The VBScript transpiler - Expressions', () => {
 	it('should transpile a "&" concat expression', () => {
 		const vbs = `EnableBallControl = "ENABLE" & "OFF"`
 		const js = grammar.vbsToJs(vbs)
-		expect(js).to.equal(
-			`EnableBallControl = ${Transformer.STDLIB_NAME}.CStr('ENABLE') + ${Transformer.STDLIB_NAME}.CStr('OFF');`,
-		)
+		expect(js).to.equal(`EnableBallControl = ${Transformer.VBSHELPER_NAME}.concat('ENABLE', 'OFF');`)
 	})
 
 	it('should bind "+" tighter than "&"', () => {
 		const vbs = `EnableBallControl = "a" & 1 + 2`
 		const js = grammar.vbsToJs(vbs)
 		expect(js).to.equal(
-			`EnableBallControl = ${Transformer.STDLIB_NAME}.CStr('a') + ${Transformer.STDLIB_NAME}.CStr(${Transformer.VBSHELPER_NAME}.add(1, 2));`,
+			`EnableBallControl = ${Transformer.VBSHELPER_NAME}.concat('a', ${Transformer.VBSHELPER_NAME}.add(1, 2));`,
 		)
 	})
 
@@ -118,7 +117,7 @@ describe('The VBScript transpiler - Expressions', () => {
 		const vbs = `x = "Rollover_" & Int(Rnd * 4) + 1`
 		const js = grammar.vbsToJs(vbs)
 		expect(js).to.equal(
-			`x = ${Transformer.STDLIB_NAME}.CStr('Rollover_') + ${Transformer.STDLIB_NAME}.CStr(${Transformer.VBSHELPER_NAME}.add(Int(${Transformer.VBSHELPER_NAME}.mul(Rnd, 4)), 1));`,
+			`x = ${Transformer.VBSHELPER_NAME}.concat('Rollover_', ${Transformer.VBSHELPER_NAME}.add(Int(${Transformer.VBSHELPER_NAME}.mul(Rnd, 4)), 1));`,
 		)
 	})
 
@@ -131,37 +130,37 @@ describe('The VBScript transpiler - Expressions', () => {
 	it('should transpile a ">=" expression', () => {
 		const vbs = `EnableBallControl = EnableBallControl >= 2`
 		const js = grammar.vbsToJs(vbs)
-		expect(js).to.equal('EnableBallControl = EnableBallControl >= 2;')
+		expect(js).to.equal(`EnableBallControl = ${Transformer.VBSHELPER_NAME}.gte(EnableBallControl, 2);`)
 	})
 
 	it('should transpile a "=>" expression', () => {
 		const vbs = `EnableBallControl = EnableBallControl => 2`
 		const js = grammar.vbsToJs(vbs)
-		expect(js).to.equal('EnableBallControl = EnableBallControl >= 2;')
+		expect(js).to.equal(`EnableBallControl = ${Transformer.VBSHELPER_NAME}.gte(EnableBallControl, 2);`)
 	})
 
 	it('should transpile a "<=" expression', () => {
 		const vbs = `EnableBallControl = EnableBallControl <= 2`
 		const js = grammar.vbsToJs(vbs)
-		expect(js).to.equal('EnableBallControl = EnableBallControl <= 2;')
+		expect(js).to.equal(`EnableBallControl = ${Transformer.VBSHELPER_NAME}.lte(EnableBallControl, 2);`)
 	})
 
 	it('should transpile a "=<" expression', () => {
 		const vbs = `EnableBallControl = EnableBallControl =< 2`
 		const js = grammar.vbsToJs(vbs)
-		expect(js).to.equal('EnableBallControl = EnableBallControl <= 2;')
+		expect(js).to.equal(`EnableBallControl = ${Transformer.VBSHELPER_NAME}.lte(EnableBallControl, 2);`)
 	})
 
 	it('should transpile a ">" expression', () => {
 		const vbs = `EnableBallControl = EnableBallControl > 2`
 		const js = grammar.vbsToJs(vbs)
-		expect(js).to.equal('EnableBallControl = EnableBallControl > 2;')
+		expect(js).to.equal(`EnableBallControl = ${Transformer.VBSHELPER_NAME}.gt(EnableBallControl, 2);`)
 	})
 
 	it('should transpile a "<" expression', () => {
 		const vbs = `EnableBallControl = EnableBallControl < 2`
 		const js = grammar.vbsToJs(vbs)
-		expect(js).to.equal('EnableBallControl = EnableBallControl < 2;')
+		expect(js).to.equal(`EnableBallControl = ${Transformer.VBSHELPER_NAME}.lt(EnableBallControl, 2);`)
 	})
 
 	it('should transpile a "<>" expression', () => {
@@ -234,6 +233,95 @@ describe('The VBScript transpiler - Concatenation behavior', () => {
 
 	it('should build numbered sound names without a type mismatch', () => {
 		expect(execute('x = "Rollover_" & 0 + 1').x).to.equal('Rollover_1')
+	})
+
+	it('should propagate Null through "&"', () => {
+		expect(execute('x = "a" & Null').x).to.be.null
+		expect(execute('x = Null & "a"').x).to.be.null
+		expect(execute('x = Null & Null').x).to.be.null
+		expect(execute('x = "a" & Null & "b"').x).to.be.null
+	})
+
+	it('should read a variable holding Null back as Null in "&"', () => {
+		expect(execute('n = Null\nx = "a" & n').x).to.be.null
+		expect(execute('n = Null\nx = IsNull(n)').x).to.equal(true)
+	})
+
+	it('should raise error 94 for CStr(Null)', () => {
+		expect(() => execute('x = CStr(Null)')).to.throw(VbsError)
+	})
+
+	it('should record error 94 for CStr(Null) under On Error Resume Next', () => {
+		const scope = execute('On Error Resume Next\nx = CStr(Null)\ny = Err.Number')
+		expect(scope.x).to.equal('')
+		expect(scope.y).to.equal(94)
+		expect(ERR.Number).to.equal(94)
+		ERR.Clear()
+		ERR.OnErrorGoto0()
+	})
+})
+
+describe('The VBScript transpiler - Ordering comparison behavior', () => {
+	let table: Table
+	let player: Player
+
+	before(async () => {
+		table = new TableBuilder().build()
+		player = new Player(table)
+	})
+
+	afterEach(() => {
+		ERR.Clear()
+		ERR.OnErrorGoto0()
+	})
+
+	function execute(vbs: string): any {
+		const scope = {} as any
+		new Transpiler(table, player).execute(vbs, scope, 'global')
+		return scope
+	}
+
+	it('should yield Null (falsy) for any Null ordering comparison', () => {
+		expect(execute('If Null < 1 Then x = 1 Else x = 2').x).to.equal(2)
+		expect(execute('If Null <= 1 Then x = 1 Else x = 2').x).to.equal(2)
+		expect(execute('If Null > 1 Then x = 1 Else x = 2').x).to.equal(2)
+		expect(execute('If Null >= 1 Then x = 1 Else x = 2').x).to.equal(2)
+		expect(execute('If 1 < Null Then x = 1 Else x = 2').x).to.equal(2)
+	})
+
+	it('should compare True as -1 in ordering comparisons', () => {
+		expect(execute('If True > 0 Then x = 1 Else x = 2').x).to.equal(2)
+		expect(execute('If True < 0 Then x = 1 Else x = 2').x).to.equal(1)
+		expect(execute('If True <= -1 Then x = 1 Else x = 2').x).to.equal(1)
+		expect(execute('If False < 1 Then x = 1 Else x = 2').x).to.equal(1)
+	})
+
+	it('should coerce Empty to 0 or "" depending on context', () => {
+		expect(execute('Dim e\nIf e < 1 Then x = 1 Else x = 2').x).to.equal(1)
+		expect(execute('Dim e\nIf e > -1 Then x = 1 Else x = 2').x).to.equal(1)
+		expect(execute('Dim e\nIf e < "a" Then x = 1 Else x = 2').x).to.equal(1)
+		expect(execute('Dim e\nIf e >= "" Then x = 1 Else x = 2').x).to.equal(1)
+	})
+
+	it('should compare two strings textually and numeric strings numerically against numbers', () => {
+		expect(execute('If "10" < "9" Then x = 1 Else x = 2').x).to.equal(1)
+		expect(execute('If "10" < 9 Then x = 1 Else x = 2').x).to.equal(2)
+		expect(execute('If "6" >= "12" Then x = 1 Else x = 2').x).to.equal(1)
+	})
+
+	it('should raise type mismatch for non-numeric strings against numbers', () => {
+		expect(() => execute('If "a" < 1 Then x = 1 Else x = 2')).to.throw(VbsError)
+	})
+
+	it('should record type mismatch for non-numeric strings under On Error Resume Next', () => {
+		const scope = execute('On Error Resume Next\nIf "a" < 1 Then x = 1 Else x = 2\ny = Err.Number')
+		expect(scope.x).to.equal(2)
+		expect(scope.y).to.equal(13)
+	})
+
+	it('should evaluate Not over an ordering comparison as a whole', () => {
+		expect(execute('If Not 1 < 2 Then x = 1 Else x = 2').x).to.equal(2)
+		expect(execute('If Not Null < 1 Then x = 1 Else x = 2').x).to.equal(2)
 	})
 })
 

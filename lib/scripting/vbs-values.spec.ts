@@ -6,10 +6,15 @@ import {
 	parseNumericText,
 	vbsAdd,
 	vbsAnd,
+	vbsConcat,
 	vbsDiv,
 	vbsEquals,
 	vbsEqv,
+	vbsGt,
+	vbsGte,
 	vbsIntDiv,
+	vbsLt,
+	vbsLte,
 	vbsMod,
 	vbsMul,
 	vbsNot,
@@ -338,6 +343,88 @@ describe('vbs-values subtraction and multiplication', () => {
 		ERR.Clear()
 		expect(vbsMul(1e308, 10)).to.equal(undefined)
 		expect(ERR.Number).to.equal(6)
+	})
+})
+
+describe('vbs-values concatenation', () => {
+	it.each([
+		['a', 'b', 'ab'],
+		[1, 2, '12'],
+		['Score: ', 100, 'Score: 100'],
+		[true, false, 'TrueFalse'],
+		[undefined, 'x', 'x'],
+		['x', new VbsUndefined(), 'x'],
+		[new VbsUndefined(), new VbsUndefined(), ''],
+	] as Array<[unknown, unknown, unknown]>)('concat(%s, %s) is %s', (left, right, expected) => {
+		expect(vbsConcat(left, right)).to.equal(expected)
+	})
+
+	it('yields Null when an operand is Null', () => {
+		expect(vbsConcat(null, 'a')).to.equal(null)
+		expect(vbsConcat('a', null)).to.equal(null)
+		expect(vbsConcat(null, null)).to.equal(null)
+	})
+})
+
+describe('vbs-values ordering comparisons', () => {
+	it.each([
+		[1, 2, true],
+		[2, 1, false],
+		['10', '9', true],
+		['10', 9, false],
+		[true, 0, true],
+		[true, -1, false],
+		[true, -2, false],
+		[false, 1, true],
+		[undefined, 1, true],
+		[new VbsUndefined(), 0, false],
+		[undefined, 'a', true],
+		[undefined, '', false],
+		['&H10', 17, true],
+	] as Array<[unknown, unknown, unknown]>)('lt(%s, %s) is %s', (left, right, expected) => {
+		expect(vbsLt(left, right)).to.equal(expected)
+	})
+
+	it.each([
+		[1, 1, true],
+		[2, 1, false],
+		[true, -1, true],
+		[undefined, 0, true],
+	] as Array<[unknown, unknown, unknown]>)('lte(%s, %s) is %s', (left, right, expected) => {
+		expect(vbsLte(left, right)).to.equal(expected)
+	})
+
+	it.each([
+		[2, 1, true],
+		[1, 2, false],
+		[true, 0, false],
+		[true, -2, true],
+		[undefined, -1, true],
+	] as Array<[unknown, unknown, unknown]>)('gt(%s, %s) is %s', (left, right, expected) => {
+		expect(vbsGt(left, right)).to.equal(expected)
+	})
+
+	it.each([
+		[1, 1, true],
+		[1, 2, false],
+		[true, -1, true],
+		[undefined, 0, true],
+	] as Array<[unknown, unknown, unknown]>)('gte(%s, %s) is %s', (left, right, expected) => {
+		expect(vbsGte(left, right)).to.equal(expected)
+	})
+
+	it('yields Null when an operand is Null', () => {
+		expect(vbsLt(null, 1)).to.equal(null)
+		expect(vbsLt(1, null)).to.equal(null)
+		expect(vbsLte(null, null)).to.equal(null)
+		expect(vbsGt(null, 1)).to.equal(null)
+		expect(vbsGte(1, null)).to.equal(null)
+	})
+
+	it('raises type mismatch for garbage against a number', () => {
+		ERR.OnErrorResumeNext()
+		expect(vbsLt('a', 1)).to.equal(undefined)
+		expect(ERR.Number).to.equal(13)
 	})
 })
 

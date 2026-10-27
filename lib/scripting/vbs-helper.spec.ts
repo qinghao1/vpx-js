@@ -142,6 +142,68 @@ describe('The scripting VBS Helper', () => {
 		}
 	})
 
+	it('should declare a one-dimension array when redimming an unassigned variable', () => {
+		const js = vbsHelper.redim(undefined as unknown as any[], [2])
+		expect(js.length).to.equal(3)
+		js[1] = 'Test'
+		expect(js[1]).to.equal('Test')
+	})
+
+	it('should declare a multi-dimension array when redimming an unassigned variable', () => {
+		const js = vbsHelper.redim(undefined as unknown as any[], [1, 1])
+		expect(js.length).to.equal(2)
+		expect(js[0].length).to.equal(2)
+		js[0][0] = 'Test'
+		expect(js[0][0]).to.equal('Test')
+	})
+
+	it('should raise error 94 when redimming Null', () => {
+		try {
+			vbsHelper.redim(null as unknown as any[], [2])
+			expect.fail('should have raised error 94')
+		} catch (e) {
+			expect(e).to.be.an.instanceof(VbsError)
+			expect((e as VbsError).code).to.equal(94)
+		}
+	})
+
+	it('should raise error 9 when redimming Preserve with a grown outer dimension', () => {
+		// VBS only allows resizing the last dimension with Preserve.
+		const js = vbsHelper.dim([1, 1])
+		try {
+			vbsHelper.redim(js, [2, 1], true)
+			expect.fail('should have raised error 9')
+		} catch (e) {
+			expect(e).to.be.an.instanceof(VbsError)
+			expect((e as VbsError).code).to.equal(9)
+		}
+	})
+
+	it('should reshape a clobbered row instead of crashing when redimming Preserve', () => {
+		let js = vbsHelper.dim([1, 1])
+		js[0][0] = 'Test'
+		js[1] = 'clobbered'
+		js = vbsHelper.redim(js, [1, 2], true)
+		expect(js[0][0]).to.equal('Test')
+		expect(js[1].length).to.equal(3)
+	})
+
+	it('should raise error 9 when redimming Preserve with a changed rank', () => {
+		const js = vbsHelper.dim([1, 1])
+		try {
+			vbsHelper.redim(js, [2], true)
+			expect.fail('should have raised error 9')
+		} catch (e) {
+			expect(e).to.be.an.instanceof(VbsError)
+			expect((e as VbsError).code).to.equal(9)
+		}
+	})
+
+	it('should read a variable holding Null back as Null, not Empty', () => {
+		expect(vbsHelper.getOrCallBound({ n: null }, 'n')).to.be.null
+		expect(vbsHelper.getOrCall({ n: null }, 'n')).to.be.null
+	})
+
 	it('should visit Empty elements in For Each', () => {
 		const scope: Record<string, unknown> = {}
 		new Transpiler(table, new Player(table)).execute(

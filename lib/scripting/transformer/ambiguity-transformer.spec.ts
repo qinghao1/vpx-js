@@ -166,7 +166,7 @@ describe('The scripting ambiguity transformer', () => {
 			const vbs = `Dim objShell\nSet objShell = CreateObject("WScript.Shell")\nSub LoadController(TableType)\nobjShell.RegRead("")\nEnd Sub`
 			const js = transpiler.transpile(vbs)
 			expect(js).to.equal(
-				`${Transformer.SCOPE_NAME}.objShell = null;\n${Transformer.SCOPE_NAME}.objShell = ${Transformer.SCOPE_NAME}.CreateObject('WScript.Shell');\n${Transformer.SCOPE_NAME}.LoadController = function (TableType) {\n    ${Transformer.SCOPE_NAME}.objShell.RegRead('');\n};`,
+				`${Transformer.SCOPE_NAME}.objShell = undefined;\n${Transformer.SCOPE_NAME}.objShell = ${Transformer.SCOPE_NAME}.CreateObject('WScript.Shell');\n${Transformer.SCOPE_NAME}.LoadController = function (TableType) {\n    ${Transformer.SCOPE_NAME}.objShell.RegRead('');\n};`,
 			)
 		})
 	})

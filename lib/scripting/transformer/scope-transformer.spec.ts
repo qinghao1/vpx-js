@@ -21,14 +21,14 @@ describe('The scripting scope transformer', () => {
 	it('should add the scope to a top-level variable declaration', () => {
 		const vbs = `Dim x\n`
 		const js = transform(vbs)
-		expect(js).to.equal(`${Transformer.SCOPE_NAME}.x = null;`)
+		expect(js).to.equal(`${Transformer.SCOPE_NAME}.x = undefined;`)
 	})
 
 	it('should add the scope even if there is a defined function with a different scope', () => {
 		const vbs = `Dim Ballsize\nSub Table1_Init\nEnd Sub\n`
 		const js = transpiler.transpile(vbs)
 		expect(js).to.equal(
-			`${Transformer.ITEMS_NAME}.Table1.on('Init', ${Transformer.SCOPE_NAME}.Table1_Init = function () {\n});\n${Transformer.SCOPE_NAME}.Ballsize = null;`,
+			`${Transformer.ITEMS_NAME}.Table1.on('Init', ${Transformer.SCOPE_NAME}.Table1_Init = function () {\n});\n${Transformer.SCOPE_NAME}.Ballsize = undefined;`,
 		)
 	})
 
@@ -74,7 +74,7 @@ describe('The scripting scope transformer', () => {
 		const vbs = `For j = 1 To 20\nIf j = 10 Then Exit For\nNext\n`
 		const js = transform(vbs)
 		expect(js).to.equal(
-			`__exitFor:\n    for (${Transformer.SCOPE_NAME}.j = 1; ${Transformer.SCOPE_NAME}.j <= 20; ${Transformer.SCOPE_NAME}.j += 1) {\n        if (${Transformer.VBSHELPER_NAME}.equals(${Transformer.SCOPE_NAME}.j, 10)) {\n            break __exitFor;\n        }\n    }`,
+			`__exitFor:\n    for (${Transformer.SCOPE_NAME}.j = 1; ${Transformer.VBSHELPER_NAME}.lte(${Transformer.SCOPE_NAME}.j, 20); ${Transformer.SCOPE_NAME}.j = ${Transformer.VBSHELPER_NAME}.add(${Transformer.SCOPE_NAME}.j, 1)) {\n        if (${Transformer.VBSHELPER_NAME}.equals(${Transformer.SCOPE_NAME}.j, 10)) {\n            break __exitFor;\n        }\n    }`,
 		)
 	})
 
@@ -108,7 +108,7 @@ describe('The scripting scope transformer', () => {
 		const vbs = `Dim brpos\nSub Bottom_Ramp_Timer()\n\tSelect Case brpos\n\t\tCase 1:\n\tEnd Select\nEnd Sub\n`
 		const js = transform(vbs)
 		expect(js).to.equal(
-			`${Transformer.SCOPE_NAME}.brpos = null;\n${Transformer.SCOPE_NAME}.Bottom_Ramp_Timer = function () {\n    {\n        let __vbsSelect = ${Transformer.SCOPE_NAME}.brpos;\n        if (${Transformer.VBSHELPER_NAME}.equals(__vbsSelect, 1)) {\n        }\n    }\n};`,
+			`${Transformer.SCOPE_NAME}.brpos = undefined;\n${Transformer.SCOPE_NAME}.Bottom_Ramp_Timer = function () {\n    {\n        let __vbsSelect = ${Transformer.SCOPE_NAME}.brpos;\n        if (${Transformer.VBSHELPER_NAME}.equals(__vbsSelect, 1)) {\n        }\n    }\n};`,
 		)
 	})
 

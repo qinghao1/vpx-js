@@ -7,6 +7,7 @@ import sinonChai from 'sinon-chai'
 import { VbsNotImplementedError } from '../vbs-api.js'
 import { FS } from './file-system.js'
 import { FileSystemObject } from './file-system-object.js'
+import { TextStream } from './text-stream.js'
 
 chai.use((sinonChai as any).default ?? sinonChai)
 describe('The VBScript file system object', () => {
@@ -127,6 +128,39 @@ describe('The VBScript file system object', () => {
 	it('should fail with a non-existing file', () => {
 		const fso = new FileSystemObject()
 		expect(() => fso.OpenTextFile('test.txt', 1, false)).to.throw('Error 53: File not found')
+	})
+
+	it('should honor the open mode for existing files', () => {
+		const fso = new FileSystemObject()
+		;(fso.CreateTextFile('mode.txt') as TextStream).Write('Hello')
+		const writer = fso.OpenTextFile('mode.txt', TextStream.MODE_WRITE) as TextStream
+		expect(() => writer.Read(1)).to.throw('Error 54: Bad file mode')
+	})
+
+	it('should truncate when opening an existing file ForWriting', () => {
+		const fso = new FileSystemObject()
+		;(fso.CreateTextFile('truncate.txt') as TextStream).Write('Hello')
+		const writer = fso.OpenTextFile('truncate.txt', TextStream.MODE_WRITE) as TextStream
+		writer.Write('AB')
+		const reader = fso.OpenTextFile('truncate.txt', TextStream.MODE_READ) as TextStream
+		expect(reader.ReadAll()).to.equal('AB')
+	})
+
+	it('should position at the end when opening ForAppending', () => {
+		const fso = new FileSystemObject()
+		;(fso.CreateTextFile('append.txt') as TextStream).Write('Hello')
+		const appender = fso.OpenTextFile('append.txt', TextStream.MODE_APPEND) as TextStream
+		expect(appender.AtEndOfStream).to.equal(true)
+		expect(() => appender.Read(1)).to.throw('Error 54: Bad file mode')
+		appender.Write('!')
+		expect((fso.OpenTextFile('append.txt', TextStream.MODE_READ) as TextStream).ReadAll()).to.equal('Hello!')
+	})
+
+	it('should fail writing when mode is read', () => {
+		const fso = new FileSystemObject()
+		fso.CreateTextFile('readonly.txt')
+		const reader = fso.OpenTextFile('readonly.txt', TextStream.MODE_READ) as TextStream
+		expect(() => reader.Write('x')).to.throw('Error 54: Bad file mode')
 	})
 
 	it('should throw an exception when using non-implemented APIs', () => {

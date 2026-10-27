@@ -77,11 +77,15 @@ export class TextStream {
 
 	/**
 	 * Reads an entire TextStream file and returns the resulting string.
+	 * Reading starts at the current position, so a prior Read/Skip narrows
+	 * the result; the cursor ends at the end of the stream.
 	 * @see f
 	 */
 	public ReadAll(): string | undefined {
 		if (!this.ensureReadMode()) return
-		return this.decode(this.buffer)
+		const text = this.decode(this.buffer.subarray(Math.max(0, this.cursor)))
+		this.cursorToEnd()
+		return text
 	}
 
 	/**
@@ -132,6 +136,7 @@ export class TextStream {
 	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/write-method
 	 */
 	public Write(data: string): void {
+		if (!this.ensureWriteMode()) return
 		this.buffer = concatUint8Arrays(this.buffer, new TextEncoder().encode(data))
 		this.cursorToEnd()
 	}
@@ -162,8 +167,21 @@ export class TextStream {
 		return this
 	}
 
+	/** Empties the stream, as opening a file ForWriting does. */
+	public truncate(): this {
+		this.buffer = new Uint8Array(0)
+		this.cursor = 0
+		return this
+	}
+
 	private ensureReadMode(): boolean {
 		if (this.mode === TextStream.MODE_READ) return true
+		ERR.Raise(54, undefined, 'Bad file mode')
+		return false
+	}
+
+	private ensureWriteMode(): boolean {
+		if (this.mode === TextStream.MODE_WRITE || this.mode === TextStream.MODE_APPEND) return true
 		ERR.Raise(54, undefined, 'Bad file mode')
 		return false
 	}
@@ -185,8 +203,9 @@ export class TextStream {
 		this.cursor = Math.min(Math.max(-1, this.cursor), this.buffer.length - 1)
 	}
 
-	private cursorToEnd() {
+	public cursorToEnd(): this {
 		this.cursor = this.buffer.length - 1
+		return this
 	}
 
 	public cursorToStart(): this {

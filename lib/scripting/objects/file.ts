@@ -23,6 +23,6 @@ export class File {
 	 * @see https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/openastextstream-method
 	 */
 	public OpenAsTextStream(mode: number, _tristate?: number): TextStream {
-		return FS.getStream(this.path, mode).cursorToStart()
+		return FS.getStream(this.path, mode)
 	}
 }

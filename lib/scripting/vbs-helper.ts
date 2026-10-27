@@ -11,10 +11,15 @@ import {
 	type VbsLogicResult,
 	vbsAdd,
 	vbsAnd,
+	vbsConcat,
 	vbsDiv,
 	vbsEquals,
 	vbsEqv,
+	vbsGt,
+	vbsGte,
 	vbsIntDiv,
+	vbsLt,
+	vbsLte,
 	vbsMod,
 	vbsMul,
 	vbsNot,
@@ -99,15 +104,39 @@ export class VBSHelper {
 			if (bound === undefined) return array
 			bounds.push(bound)
 		}
+		// ReDim declares the variable when it holds no array yet (never Dim'd
+		// or a bare `Dim`); there is nothing to preserve then.
+		if (array === null) {
+			ERR.Raise(new VbsError('Invalid use of Null', 94))
+			return array
+		}
+		if (this.isUndef(array)) {
+			return this.dim(bounds)
+		}
 		let tmp: any = array
 		for (let i = 0; i < bounds.length - 1; i++) {
-			if (tmp.length !== bounds[i] + 1) {
+			if (!Array.isArray(tmp) || tmp.length !== bounds[i] + 1) {
 				ERR.Raise(new VbsError('Subscript out of range', 9))
 				return array
 			}
 			tmp = tmp[0]
 		}
+		if (preserve && this.rankOf(array) !== bounds.length) {
+			ERR.Raise(new VbsError('Subscript out of range', 9))
+			return array
+		}
 		return preserve ? this.redimResize(array, bounds) : this.dim(bounds)
+	}
+
+	/** Array rank (nesting depth); 0 for non-arrays. */
+	private rankOf(array: any): number {
+		let rank = 0
+		let cur: any = array
+		while (Array.isArray(cur)) {
+			rank++
+			cur = cur[0]
+		}
+		return rank
 	}
 
 	public transpileInline(vbs: unknown, filename?: string): string {
@@ -202,10 +231,18 @@ export class VBSHelper {
 	}
 
 	private redimResize(array: any[], dimensions: number[], pos = 0): any[] {
+		// New slots from a grown outer dimension hold no array yet; shape them.
+		if (!Array.isArray(array)) {
+			return this.dim(dimensions.slice(pos))
+		}
 		const n = dimensions[pos] + 1
-		if (pos === dimensions.length - 1) array.length = n
-		if (++pos < dimensions.length)
-			for (let i = 0; i < n; i++) array[i] = this.redimResize(array[i], dimensions, pos)
+		if (pos === dimensions.length - 1) {
+			const oldLength = array.length
+			array.length = n
+			for (let i = oldLength; i < n; i++) array[i] = VBSHelper.UNDEFINED
+			return array
+		}
+		for (let i = 0; i < n; i++) array[i] = this.redimResize(array[i], dimensions, pos + 1)
 		return array
 	}
 
@@ -271,6 +308,26 @@ export class VBSHelper {
 		return vbsNotEquals(left, right)
 	}
 
+	public concat(left: unknown, right: unknown): string | null {
+		return vbsConcat(left, right)
+	}
+
+	public lt(left: unknown, right: unknown): boolean | null | undefined {
+		return vbsLt(left, right)
+	}
+
+	public lte(left: unknown, right: unknown): boolean | null | undefined {
+		return vbsLte(left, right)
+	}
+
+	public gt(left: unknown, right: unknown): boolean | null | undefined {
+		return vbsGt(left, right)
+	}
+
+	public gte(left: unknown, right: unknown): boolean | null | undefined {
+		return vbsGte(left, right)
+	}
+
 	public is(a: unknown, b: unknown): boolean {
 		if (a === b) return true
 		// Unassigned variables read as undefined/VbsUndefined but VBS treats
@@ -297,7 +354,7 @@ export class VBSHelper {
 	private traverse(obj: unknown, params: unknown[]): unknown {
 		for (const param of params) {
 			// Dereferencing Null is error 94; a merely unread (Empty) target
-			// yields Empty. A terminal Null read keeps collapsing to Empty.
+			// yields Empty. A terminal Null read yields Null.
 			if (obj === null) {
 				ERR.Raise(new VbsError('Invalid use of Null', 94))
 				return VBSHelper.UNDEFINED
@@ -305,7 +362,9 @@ export class VBSHelper {
 			if (this.isUndef(obj)) return VBSHelper.UNDEFINED
 			obj = (obj as Record<string | number, unknown>)[param as string] as unknown
 		}
-		return this.isUndef(obj) ? VBSHelper.UNDEFINED : obj
+		return obj === undefined || (obj as unknown as Record<symbol, unknown>)?.[UNDEF] === true
+			? VBSHelper.UNDEFINED
+			: obj
 	}
 
 	public getOrCall(obj: unknown, ...params: unknown[]): unknown {
@@ -332,7 +391,11 @@ export class VBSHelper {
 			ERR.Raise(new VbsError('Invalid use of Null', 94))
 			return VBSHelper.UNDEFINED
 		}
-		if (this.isUndef(value)) return VBSHelper.UNDEFINED
+		// A Null variable reads back as Null (not Empty); only unassigned
+		// (undefined) and already-Empty reads collapse to the sentinel.
+		if (value === undefined || (value as unknown as Record<symbol, unknown>)?.[UNDEF] === true) {
+			return VBSHelper.UNDEFINED
+		}
 		return this.invokeOrTraverse(value, parent as object, params)
 	}
 

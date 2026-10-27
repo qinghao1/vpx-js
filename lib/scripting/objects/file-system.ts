@@ -15,9 +15,28 @@ export class FileSystem {
 
 	public getStream(fileName: string, iomode: number = 1): TextStream {
 		if (!this.files.has(this.normalizePath(fileName))) {
-			return new TextStream(fileName, true, iomode).setContent(getTextFile(fileName)).cursorToStart()
+			const stream = new TextStream(fileName, true, iomode)
+			// ForWriting truncates (existing content is discarded).
+			if (iomode !== TextStream.MODE_WRITE) {
+				stream.setContent(getTextFile(fileName))
+			}
+			return this.positionStream(stream, iomode)
 		}
-		return this.files.get(this.normalizePath(fileName))?.setMode(iomode).cursorToStart()
+		return this.positionStream(this.files.get(this.normalizePath(fileName))?.setMode(iomode), iomode)
+	}
+
+	/**
+	 * Positions a stream for its open mode: ForReading starts at the
+	 * beginning, ForWriting truncates, ForAppending starts at the end.
+	 */
+	private positionStream(stream: TextStream, iomode: number): TextStream {
+		if (iomode === TextStream.MODE_WRITE) {
+			return stream.truncate()
+		}
+		if (iomode === TextStream.MODE_APPEND) {
+			return stream.cursorToEnd()
+		}
+		return stream.cursorToStart()
 	}
 
 	public deleteFile(fileName: string) {

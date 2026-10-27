@@ -31,7 +31,7 @@ describe('The scripting date literal transformer', () => {
 	it('should leave a user variable named Date alone', () => {
 		const table = new TableBuilder().build()
 		const js = new Transpiler(table, new Player(table)).transpile(`Dim Date\nDate = 5\n`)
-		expect(js).to.equal(`${Transformer.SCOPE_NAME}.Date = null;\n${Transformer.SCOPE_NAME}.Date = 5;`)
+		expect(js).to.equal(`${Transformer.SCOPE_NAME}.Date = undefined;\n${Transformer.SCOPE_NAME}.Date = 5;`)
 	})
 
 	it('should produce a working Date through the full pipeline', () => {

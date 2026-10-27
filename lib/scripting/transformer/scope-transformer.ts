@@ -9,7 +9,6 @@ import {
 	expressionStatement,
 	functionExpression,
 	identifier,
-	literal,
 	memberExpression,
 } from '../estree.js'
 import { Transformer } from './transformer.js'
@@ -40,7 +39,10 @@ export class ScopeTransformer extends Transformer {
 						const decls = (node as VariableDeclaration).declarations
 						const nodes = decls.map(d => {
 							const name = (d.id as Identifier).name
-							const init = (d.init as Expression | null) ?? literal(null, undefined, node)
+							// A bare `Dim x` is Empty (undefined), not Null: Null
+							// propagates through `&`/comparisons while Empty
+							// coerces, so `null` here breaks `IsEmpty` and `= ""`.
+							const init = (d.init as Expression | null) ?? identifier('undefined', node)
 							return this.wrapAssignment(identifier(name, node), init, node)
 						})
 						return this.replaceMany(nodes, node)
