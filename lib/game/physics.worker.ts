@@ -289,7 +289,9 @@ type HostMessage = {
 	frozen?: boolean
 }
 
-function startHost(host: WorkerHost): void {
+/** Starts the worker message loop on `host`. Exported so the host protocol
+ * (init/start/frames/ping/stop) stays drivable and testable in-process. */
+export function startHost(host: WorkerHost): void {
 	let sab: SharedArrayBuffer | null = null
 	let sim: WorkerSim | null = null
 	let running = false
@@ -313,7 +315,27 @@ function startHost(host: WorkerHost): void {
 
 	function loop(): void {
 		if (!running || !sab || !sim) return
-		tick()
+		try {
+			tick()
+		} catch (error) {
+			// A fault in the off-thread step must be explicit: without this the
+			// loop would stop rescheduling and the main thread would keep
+			// mirroring stale frames with no signal. Report and halt instead;
+			// the host already terminates on { type: 'error' }.
+			running = false
+			wantStart = false
+			if (timer !== null) {
+				clearTimeout(timer)
+				timer = null
+			}
+			const failure = error as Error
+			host.postMessage({
+				type: 'error',
+				message: failure?.message ?? String(error),
+				stack: failure?.stack,
+			})
+			return
+		}
 		timer = setTimeout(loop, 1)
 	}
 
