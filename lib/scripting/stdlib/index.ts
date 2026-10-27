@@ -5,7 +5,7 @@ import type { Player } from '../../game/player.js'
 import { logger } from '../../util/logger.js'
 import { getObject } from '../objects/index.js'
 import { VbsApi } from '../vbs-api.js'
-import { UNDEF, VbsUndefined } from '../vbs-undefined.js'
+import { NOTHING_TAG, UNDEF, VbsUndefined } from '../vbs-undefined.js'
 import { bankersRound, parseNumericText } from '../vbs-values.js'
 import { ERR, VbsError } from './err.js'
 import { VbsMath } from './math.js'
@@ -25,6 +25,7 @@ function createNothing(): object {
 		toString(): string {
 			return ''
 		},
+		[NOTHING_TAG]: true,
 	}
 	return new Proxy(target, {
 		get(t, p, _receiver): unknown {
@@ -292,6 +293,10 @@ export class Stdlib extends VbsApi {
 			return ''
 		}
 		if (this.isUndef(v)) return ''
+		if ((v as Record<symbol, unknown> | null | undefined)?.[NOTHING_TAG] === true) {
+			ERR.Raise(new VbsError('Object variable not set', 91))
+			return ''
+		}
 		if (typeof v === 'string') return v
 		if (typeof v === 'boolean') return v ? 'True' : 'False'
 		// Objects without primitive conversion make String throw a raw

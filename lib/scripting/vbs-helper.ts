@@ -15,6 +15,7 @@ import {
 	vbsDiv,
 	vbsEquals,
 	vbsEqv,
+	vbsExponent,
 	vbsGt,
 	vbsGte,
 	vbsIntDiv,
@@ -22,6 +23,7 @@ import {
 	vbsLte,
 	vbsMod,
 	vbsMul,
+	vbsNeg,
 	vbsNot,
 	vbsNotEquals,
 	vbsOr,
@@ -265,18 +267,24 @@ export class VBSHelper {
 			try {
 				return Array.from(obj as ArrayLike<unknown>)
 			} catch {
-				return []
+				// An exotic length or getter threw a raw TypeError below; fall
+				// through to the type mismatch raise.
 			}
 		}
+		ERR.Raise(new VbsError('Type mismatch', 13))
 		return []
 	}
 
-	public intDiv(left: number, right: number): number {
+	public intDiv(left: unknown, right: unknown): number | null | undefined {
 		return vbsIntDiv(left, right)
 	}
 
-	public exponent(b: number, e: number): number {
-		return b ** e
+	public exponent(base: unknown, exp: unknown): number | null | undefined {
+		return vbsExponent(base, exp)
+	}
+
+	public neg(value: unknown): number | null | undefined {
+		return vbsNeg(value)
 	}
 
 	public add(left: unknown, right: unknown): unknown {
@@ -328,10 +336,13 @@ export class VBSHelper {
 	}
 
 	public is(a: unknown, b: unknown): boolean {
-		if (a === b) return true
 		// Unassigned variables read as undefined/VbsUndefined but VBS treats
 		// them as Nothing (`Dim c: c Is Nothing` is True).
-		return isNothing(a) && isNothing(b)
+		if (isNothing(a) && isNothing(b)) return true
+		// `Is` compares object identity; equal primitives (`5 Is 5`) are not
+		// objects and must not compare as True.
+		if (a === b && a !== null && (typeof a === 'object' || typeof a === 'function')) return true
+		return false
 	}
 
 	public and(left: unknown, right: unknown): VbsLogicResult {

@@ -66,9 +66,11 @@ export class Err extends VbsApi {
 			}
 			throw codeOrError
 		}
+		// A raised VbsError carries its description in the message; keep it so
+		// record mode preserves what throw mode would report.
 		this.Number = typeof codeOrError === 'number' ? codeOrError : codeOrError.code
+		this.Description = description || (typeof codeOrError === 'number' ? '' : codeOrError.message)
 		this.Source = source
-		this.Description = description
 		this.HelpFile = helpfile
 		this.HelpContext = helpcontext
 	}

@@ -356,7 +356,21 @@ describe('The VBScript transpiler - Arithmetic operator behavior', () => {
 
 	it('should propagate Null and Empty through "+"', () => {
 		expect(execute('x = Null + 1').x).to.be.null
-		expect(execute('x = Empty + "a"').x).to.equal('a')
+		expect(execute('x = Empty + 1').x).to.equal(1)
+		expect(execute('x = Empty + True').x).to.equal(-1)
+	})
+
+	it('should raise error 13 for Empty plus non-numeric text', () => {
+		try {
+			execute('x = Empty + "a"')
+			expect.fail('should have raised error 13')
+		} catch (e) {
+			expect(e).to.be.an.instanceof(VbsError)
+			expect((e as VbsError).code).to.equal(13)
+			expect((e as Error).message).to.equal('Type mismatch')
+		}
+		const scope = execute('On Error Resume Next\nx = Empty + "a"\ny = Err.Number')
+		expect(scope.y).to.equal(13)
 	})
 
 	it('should subtract and multiply with VBScript semantics', () => {

@@ -431,9 +431,15 @@ describe('The scripting VBS Helper', () => {
 		expect(vbsHelper.equals(false, 0)).to.equal(true)
 	})
 
-	it('should compare object equals using "is"', () => {
-		const value = vbsHelper.is(5, 5)
-		expect(value).to.equal(true)
+	it('should not treat equal primitives as identical using "is"', () => {
+		expect(vbsHelper.is(5, 5)).to.equal(false)
+		expect(vbsHelper.is('a', 'a')).to.equal(false)
+	})
+
+	it('should treat the same object reference as identical using "is"', () => {
+		const obj = { n: 1 }
+		expect(vbsHelper.is(obj, obj)).to.equal(true)
+		expect(vbsHelper.is(obj, { n: 1 })).to.equal(false)
 	})
 
 	it('should compare object not equal using "is"', () => {

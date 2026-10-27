@@ -13,6 +13,7 @@ import {
 } from '../estree.js'
 import type { ESIToken } from '../grammar/grammar.js'
 import { Transformer } from '../transformer/transformer.js'
+import { vbsCall } from './helpers.js'
 
 /** Transforms VBS expressions into ESTree. */
 export function ppExpr(node: ESIToken): unknown {
@@ -72,11 +73,9 @@ function ppBinaryExpression(node: ESIToken): Expression {
 	let index = node.children[0].text.length
 	for (const child of node.children.slice(1)) {
 		const operator = node.text.charAt(index) as BinaryOperator
-		// VBS `+` concatenates numeric strings only when both are numeric (and
-		// propagates Null/Empty), `-`/`*` coerce Empty to 0 and propagate
-		// Null, and `/` raises on divide-by-zero, so all four go through
-		// `__vbs` instead of raw JS operators (raw `-`/`*` on undefined
-		// yields NaN, which then mistriggers the next `+` as type mismatch).
+		// Via `__vbs` (see vbsCall): VBS `+` concatenates numeric strings
+		// only when both are numeric, `-`/`*` coerce Empty to 0, and `/`
+		// raises on divide-by-zero.
 		if (operator === '+') {
 			expr = vbsCall('add', [expr, child.estree])
 		} else if (operator === '-') {
@@ -93,18 +92,10 @@ function ppBinaryExpression(node: ESIToken): Expression {
 	return expr
 }
 
-/** Emits a `__vbs.<name>(...args)` call. */
-function vbsCall(name: string, args: Expression[]): Expression {
-	return callExpression(memberExpression(identifier(Transformer.VBSHELPER_NAME), identifier(name)), args)
-}
-
 function ppIntegerDivisionExpression(node: ESIToken): Expression {
 	let expr = node.children[0].estree
 	for (const child of node.children.slice(1)) {
-		expr = callExpression(memberExpression(identifier(Transformer.VBSHELPER_NAME), identifier('intDiv')), [
-			expr,
-			child.estree,
-		])
+		expr = vbsCall('intDiv', [expr, child.estree])
 	}
 	return expr
 }
@@ -121,10 +112,7 @@ export function ppModuloExpression(node: ESIToken): Expression {
 export function ppExponentExpression(node: ESIToken): Expression {
 	let expr = node.children[0].estree
 	for (const child of node.children.slice(1)) {
-		expr = callExpression(memberExpression(identifier(Transformer.VBSHELPER_NAME), identifier('exponent')), [
-			expr,
-			child.estree,
-		])
+		expr = vbsCall('exponent', [expr, child.estree])
 	}
 	return expr
 }
@@ -133,8 +121,7 @@ export function ppConcatExpression(node: ESIToken): Expression {
 	if (node.children.length < 2) {
 		return node.children[0].estree
 	}
-	// VBS `&` propagates Null (`"a" & Null` is Null, not `"a"`), so route
-	// through `__vbs.concat` instead of stringifying operands with `CStr`.
+	// Via `__vbs.concat` (see vbsCall): `"a" & Null` is Null, not `"a"`.
 	let expr = node.children[0].estree
 	for (const child of node.children.slice(1)) {
 		expr = vbsCall('concat', [expr, child.estree])
@@ -156,10 +143,7 @@ function ppLogicalExpression(node: ESIToken): Expression {
 		const text = node.text.substr(index)
 		for (const key in LOGICAL_OPERATORS) {
 			if (text.startsWith(` ${key} `)) {
-				expr = callExpression(
-					memberExpression(identifier(Transformer.VBSHELPER_NAME), identifier(LOGICAL_OPERATORS[key])),
-					[expr, child.estree],
-				)
+				expr = vbsCall(LOGICAL_OPERATORS[key], [expr, child.estree])
 				index += child.text.length + key.length + 2
 				break
 			}
@@ -206,10 +190,8 @@ function ppRelationalExpression(node: ESIToken): Expression {
 		const text = node.text.substr(index)
 		for (const key in RELATIONAL_OPERATORS) {
 			if (text.startsWith(key)) {
-				// Every relational operator routes through `__vbs`: raw JS
-				// `==`/`<`/`>` mishandle Null (falsy in VBS, truthy quirks in
-				// JS), Empty, and True-as-minus-one. `<>` is not `!(=)` since
-				// any Null comparison yields Null instead of True.
+				// Via `__vbs` (see vbsCall); `<>` is not `!(=)` since any
+				// Null comparison yields Null instead of True.
 				expr = vbsCall(RELATIONAL_OPERATORS[key], [expr, child.estree])
 				index += child.text.length + key.length
 				break
@@ -227,10 +209,7 @@ function ppTypeExpression(node: ESIToken): Expression {
 	let index = node.children[0].text.length
 	for (const child of node.children.slice(1)) {
 		if (node.text.substr(index).startsWith(' Is ')) {
-			expr = callExpression(memberExpression(identifier(Transformer.VBSHELPER_NAME), identifier('is')), [
-				expr,
-				child.estree,
-			])
+			expr = vbsCall('is', [expr, child.estree])
 			index += child.text.length + 4
 		}
 	}
@@ -239,7 +218,18 @@ function ppTypeExpression(node: ESIToken): Expression {
 }
 
 function ppUnaryExpression(node: ESIToken): Expression {
-	return unaryExpression(node.text.charAt(0) as UnaryOperator, node.children[0].estree)
+	const operator = node.text.charAt(0) as UnaryOperator
+	const operand = node.children[0].estree as Expression
+	if (
+		operator === '-' &&
+		(operand.type !== 'Literal' || typeof (operand as { value?: unknown }).value !== 'number')
+	) {
+		// VBS unary `-` coerces like the other arithmetic operators: Null
+		// yields Null and Empty yields 0, where raw JS `-` would leak 0/NaN.
+		// Numeric literals keep their raw form (`-2` negates exactly).
+		return vbsCall('neg', [operand])
+	}
+	return unaryExpression(operator, operand)
 }
 
 function ppLogicalNotExpression(node: ESIToken): Expression {
@@ -247,7 +237,7 @@ function ppLogicalNotExpression(node: ESIToken): Expression {
 }
 
 function vbsNotCall(operand: Expression): Expression {
-	return callExpression(memberExpression(identifier(Transformer.VBSHELPER_NAME), identifier('not')), [operand])
+	return vbsCall('not', [operand])
 }
 
 /** Unwraps one `__vbs.not(...)` call, returning its operand or null. */

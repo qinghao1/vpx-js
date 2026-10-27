@@ -5,6 +5,13 @@ import { ERR, VbsError } from './stdlib/err.js'
 
 export const UNDEF = Symbol.for('vbs.undefined')
 
+/**
+ * Brand tag identifying the `Nothing` singleton. Symbol-keyed reads pass
+ * through `Nothing`'s member-access proxy untouched, so coercion sites can
+ * detect it without triggering its error-91 trap.
+ */
+export const NOTHING_TAG = Symbol('vpxjs.nothing')
+
 /** VBS undefined sentinel. */
 export class VbsUndefined implements ProxyHandler<any> {
 	private readonly __errSet?: VbsError

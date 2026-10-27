@@ -1,9 +1,9 @@
 /** Pure VBScript value semantics: bitwise logic, True is -1, Null propagates, banker's rounding. */
 
 import { ERR, VbsError } from './stdlib/err.js'
-import { UNDEF } from './vbs-undefined.js'
+import { NOTHING_TAG, UNDEF } from './vbs-undefined.js'
 
-export type VbsLogicResult = number | boolean | null
+export type VbsLogicResult = number | boolean | null | undefined
 
 /**
  * Parses a conversion-function string operand: surrounding whitespace is ignored
@@ -46,27 +46,55 @@ export function bankersRoundClamped(value: number, min: number, max: number): nu
 }
 
 /**
- * Coerces a value to a 32-bit operand: booleans to -1/0, numbers via banker's
- * rounding with CLng clamping, numeric strings numerically, objects via Number
- * (honoring valueOf, so Err reads as Err.Number); anything else is 0.
+ * Raises a coercion failure through ERR (throwing, or recording under
+ * `On Error Resume Next`); the undefined return is the record-mode result.
  */
-function toInt32Operand(value: unknown): number {
+function raiseCoercion(code: 6 | 11 | 13 | 91 | 94, message: string): undefined {
+	ERR.Raise(new VbsError(message, code))
+	return undefined
+}
+
+/**
+ * Whether a value is usable in a coercion position. `Nothing` has no
+ * numeric/string coercion: like the conversion functions, using it as a
+ * value raises "Object variable not set" (91). Returns false in record mode.
+ */
+function assertNotNothing(value: unknown): boolean {
+	if ((value as Record<symbol, unknown> | null | undefined)?.[NOTHING_TAG] === true) {
+		ERR.Raise(new VbsError('Object variable not set', 91))
+		return false
+	}
+	return true
+}
+
+/**
+ * Coerces a value to a 32-bit operand: booleans to -1/0, Empty to 0, numbers
+ * via banker's rounding with CLng clamping, numeric strings numerically,
+ * objects via Number (honoring valueOf, so Err reads as Err.Number).
+ * Garbage (non-numeric text, NaN, symbols, objects without primitive
+ * conversion) raises type mismatch (13); Nothing raises 91. Returns
+ * undefined when the error was recorded instead of thrown.
+ */
+function toInt32Operand(value: unknown): number | undefined {
 	if (typeof value === 'boolean') {
 		return value ? -1 : 0
 	}
-	if (typeof value === 'symbol') {
+	if (value === undefined || isVbsUndef(value)) {
 		return 0
 	}
-	// Objects with no primitive conversion make Number throw a raw TypeError;
-	// those coerce as NaN (0) instead of leaking, like other garbage operands.
+	if (!assertNotNothing(value)) {
+		return undefined
+	}
+	// Objects with no primitive conversion (and symbols) make Number throw a
+	// raw TypeError; those raise type mismatch (13) instead of leaking.
 	let numeric: number
 	try {
 		numeric = typeof value === 'number' ? value : Number(value)
 	} catch {
-		return 0
+		return raiseCoercion(13, 'Type mismatch')
 	}
 	if (Number.isNaN(numeric)) {
-		return 0
+		return raiseCoercion(13, 'Type mismatch')
 	}
 	return bankersRoundClamped(numeric, -2147483648, 2147483647) | 0
 }
@@ -84,9 +112,21 @@ export function vbsAnd(left: unknown, right: unknown): VbsLogicResult {
 		if (typeof other === 'boolean') {
 			return other ? null : false
 		}
-		return toInt32Operand(other) === 0 ? false : null
+		const operand = toInt32Operand(other)
+		if (operand === undefined) {
+			return undefined
+		}
+		return operand === 0 ? false : null
 	}
-	return toInt32Operand(left) & toInt32Operand(right)
+	const leftOperand = toInt32Operand(left)
+	if (leftOperand === undefined) {
+		return undefined
+	}
+	const rightOperand = toInt32Operand(right)
+	if (rightOperand === undefined) {
+		return undefined
+	}
+	return leftOperand & rightOperand
 }
 
 /** VBS Or: bitwise; True wins over Null, otherwise Null propagates. */
@@ -102,9 +142,21 @@ export function vbsOr(left: unknown, right: unknown): VbsLogicResult {
 		if (typeof other === 'boolean') {
 			return other ? true : null
 		}
-		return toInt32Operand(other) === 0 ? null : true
+		const operand = toInt32Operand(other)
+		if (operand === undefined) {
+			return undefined
+		}
+		return operand === 0 ? null : true
 	}
-	return toInt32Operand(left) | toInt32Operand(right)
+	const leftOperand = toInt32Operand(left)
+	if (leftOperand === undefined) {
+		return undefined
+	}
+	const rightOperand = toInt32Operand(right)
+	if (rightOperand === undefined) {
+		return undefined
+	}
+	return leftOperand | rightOperand
 }
 
 /** VBS Xor: bitwise; Null always propagates. */
@@ -115,7 +167,15 @@ export function vbsXor(left: unknown, right: unknown): VbsLogicResult {
 	if (typeof left === 'boolean' && typeof right === 'boolean') {
 		return left !== right
 	}
-	return toInt32Operand(left) ^ toInt32Operand(right)
+	const leftOperand = toInt32Operand(left)
+	if (leftOperand === undefined) {
+		return undefined
+	}
+	const rightOperand = toInt32Operand(right)
+	if (rightOperand === undefined) {
+		return undefined
+	}
+	return leftOperand ^ rightOperand
 }
 
 /** VBS Eqv: bitwise equivalence; Null always propagates. */
@@ -126,7 +186,15 @@ export function vbsEqv(left: unknown, right: unknown): VbsLogicResult {
 	if (typeof left === 'boolean' && typeof right === 'boolean') {
 		return left === right
 	}
-	return ~(toInt32Operand(left) ^ toInt32Operand(right))
+	const leftOperand = toInt32Operand(left)
+	if (leftOperand === undefined) {
+		return undefined
+	}
+	const rightOperand = toInt32Operand(right)
+	if (rightOperand === undefined) {
+		return undefined
+	}
+	return ~(leftOperand ^ rightOperand)
 }
 
 /** VBS Not: bitwise complement; Null propagates. */
@@ -137,7 +205,11 @@ export function vbsNot(value: unknown): VbsLogicResult {
 	if (typeof value === 'boolean') {
 		return !value
 	}
-	return ~toInt32Operand(value)
+	const operand = toInt32Operand(value)
+	if (operand === undefined) {
+		return undefined
+	}
+	return ~operand
 }
 
 /**
@@ -168,32 +240,39 @@ function toVbsNumber(value: unknown): number {
 }
 
 /**
- * VBS `\`: banker's-round both operands, divide, truncate toward zero. A Null
- * operand yields Null; a divisor that rounds to zero raises Division by zero
+ * VBS `\`: coerces both operands like the other arithmetic operators (True
+ * is -1, Empty is 0, `&H` hex included), banker's-rounds them, divides, and
+ * truncates toward zero. A Null operand yields Null; garbage raises type
+ * mismatch (13); a non-finite operand or a result outside the Long range
+ * raises Overflow (6); a divisor that rounds to zero raises Division by zero
  * (11). Under `On Error Resume Next` the error is recorded and the result is
  * undefined (VBScript would leave the assignment target unchanged, which needs
  * statement-level support the callers don't have yet).
  */
-export function vbsIntDiv(left: number | null, right: number | null): number | null | undefined {
+export function vbsIntDiv(left: unknown, right: unknown): number | null | undefined {
 	if (left === null || right === null) {
 		return null
 	}
-	// Operands without primitive conversion make bankersRound throw a raw
-	// TypeError; those raise type mismatch (13) instead of leaking.
-	let divisor = 0
-	let dividend = 0
-	try {
-		divisor = bankersRound(right)
-		dividend = bankersRound(left)
-	} catch {
-		ERR.Raise(new VbsError('Type mismatch', 13))
+	if (!assertNotNothing(left) || !assertNotNothing(right)) {
 		return undefined
 	}
-	if (divisor === 0) {
-		ERR.Raise(new VbsError('Division by zero.', 11))
-		return undefined
+	const dividend = toVbsNumber(left)
+	const divisor = toVbsNumber(right)
+	if (Number.isNaN(dividend) || Number.isNaN(divisor)) {
+		return raiseCoercion(13, 'Type mismatch')
 	}
-	return Math.trunc(dividend / divisor)
+	if (!Number.isFinite(dividend) || !Number.isFinite(divisor)) {
+		return raiseCoercion(6, 'Overflow')
+	}
+	const roundedDivisor = bankersRound(divisor)
+	if (roundedDivisor === 0) {
+		return raiseCoercion(11, 'Division by zero.')
+	}
+	const result = Math.trunc(bankersRound(dividend) / roundedDivisor)
+	if (!Number.isFinite(result) || result < -2147483648 || result > 2147483647) {
+		return raiseCoercion(6, 'Overflow')
+	}
+	return result
 }
 
 function isVbsUndef(value: unknown): boolean {
@@ -209,20 +288,20 @@ export function vbsDiv(left: unknown, right: unknown): number | null | undefined
 	if (left === null || right === null) {
 		return null
 	}
+	if (!assertNotNothing(left) || !assertNotNothing(right)) {
+		return undefined
+	}
 	const dividend = toVbsNumber(left)
 	const divisor = toVbsNumber(right)
 	if (Number.isNaN(dividend) || Number.isNaN(divisor)) {
-		ERR.Raise(new VbsError('Type mismatch', 13))
-		return undefined
+		return raiseCoercion(13, 'Type mismatch')
 	}
 	if (divisor === 0) {
-		ERR.Raise(new VbsError('Division by zero', 11))
-		return undefined
+		return raiseCoercion(11, 'Division by zero')
 	}
 	const result = dividend / divisor
 	if (!Number.isFinite(result)) {
-		ERR.Raise(new VbsError('Overflow', 6))
-		return undefined
+		return raiseCoercion(6, 'Overflow')
 	}
 	return result
 }
@@ -237,45 +316,50 @@ export function vbsMod(left: unknown, right: unknown): number | null | undefined
 	if (left === null || right === null) {
 		return null
 	}
+	if (!assertNotNothing(left) || !assertNotNothing(right)) {
+		return undefined
+	}
 	const dividend = toVbsNumber(left)
 	const divisor = toVbsNumber(right)
 	if (Number.isNaN(dividend) || Number.isNaN(divisor)) {
-		ERR.Raise(new VbsError('Type mismatch', 13))
-		return undefined
+		return raiseCoercion(13, 'Type mismatch')
 	}
 	if (!Number.isFinite(dividend) || !Number.isFinite(divisor)) {
-		ERR.Raise(new VbsError('Overflow', 6))
-		return undefined
+		return raiseCoercion(6, 'Overflow')
 	}
 	const roundedDivisor = bankersRound(divisor)
 	if (roundedDivisor === 0) {
-		ERR.Raise(new VbsError('Division by zero', 11))
-		return undefined
+		return raiseCoercion(11, 'Division by zero')
 	}
 	return bankersRound(dividend) % roundedDivisor
 }
 
 /**
- * VBS `+`: Null yields Null; both Empty yields Integer 0; one Empty returns
- * the other operand unchanged. Two strings add when both are numeric, else
- * concatenate; anything else adds numerically (True is -1, garbage raises
- * type mismatch (13)). Under `On Error Resume Next` the error is recorded
- * and the result is undefined (see vbsIntDiv).
+ * VBS `+`: Null yields Null; Empty coerces to 0 (so `Empty + True` is -1 and
+ * `Empty + "abc"` is a type mismatch (13), not a passthrough). Two strings
+ * add when both are numeric, else concatenate; anything else adds numerically
+ * (True is -1, garbage raises type mismatch (13)). Under `On Error Resume
+ * Next` the error is recorded and the result is undefined (see vbsIntDiv).
  */
 export function vbsAdd(left: unknown, right: unknown): unknown {
 	if (left === null || right === null) {
 		return null
+	}
+	if (!assertNotNothing(left) || !assertNotNothing(right)) {
+		return undefined
 	}
 	const leftEmpty = left === undefined || isVbsUndef(left)
 	const rightEmpty = right === undefined || isVbsUndef(right)
 	if (leftEmpty && rightEmpty) {
 		return 0
 	}
-	if (leftEmpty) {
-		return right
-	}
-	if (rightEmpty) {
-		return left
+	if (leftEmpty || rightEmpty) {
+		const leftNumeric = leftEmpty ? 0 : toVbsNumber(left)
+		const rightNumeric = rightEmpty ? 0 : toVbsNumber(right)
+		if (Number.isNaN(leftNumeric) || Number.isNaN(rightNumeric)) {
+			return raiseCoercion(13, 'Type mismatch')
+		}
+		return vbsCheckedResult(leftNumeric + rightNumeric)
 	}
 	if (typeof left === 'string' && typeof right === 'string') {
 		const leftNumeric = parseNumericText(left)
@@ -288,8 +372,7 @@ export function vbsAdd(left: unknown, right: unknown): unknown {
 	const leftNumeric = toVbsNumber(left)
 	const rightNumeric = toVbsNumber(right)
 	if (Number.isNaN(leftNumeric) || Number.isNaN(rightNumeric)) {
-		ERR.Raise(new VbsError('Type mismatch', 13))
-		return undefined
+		return raiseCoercion(13, 'Type mismatch')
 	}
 	return vbsCheckedResult(leftNumeric + rightNumeric)
 }
@@ -304,11 +387,13 @@ export function vbsSub(left: unknown, right: unknown): number | null | undefined
 	if (left === null || right === null) {
 		return null
 	}
+	if (!assertNotNothing(left) || !assertNotNothing(right)) {
+		return undefined
+	}
 	const leftNumeric = toVbsNumber(left)
 	const rightNumeric = toVbsNumber(right)
 	if (Number.isNaN(leftNumeric) || Number.isNaN(rightNumeric)) {
-		ERR.Raise(new VbsError('Type mismatch', 13))
-		return undefined
+		return raiseCoercion(13, 'Type mismatch')
 	}
 	return vbsCheckedResult(leftNumeric - rightNumeric)
 }
@@ -323,27 +408,89 @@ export function vbsMul(left: unknown, right: unknown): number | null | undefined
 	if (left === null || right === null) {
 		return null
 	}
+	if (!assertNotNothing(left) || !assertNotNothing(right)) {
+		return undefined
+	}
 	const leftNumeric = toVbsNumber(left)
 	const rightNumeric = toVbsNumber(right)
 	if (Number.isNaN(leftNumeric) || Number.isNaN(rightNumeric)) {
-		ERR.Raise(new VbsError('Type mismatch', 13))
-		return undefined
+		return raiseCoercion(13, 'Type mismatch')
 	}
 	return vbsCheckedResult(leftNumeric * rightNumeric)
 }
 
-/** Returns a finite arithmetic result, raising Overflow (6) otherwise. */
-function vbsCheckedResult(result: number): number | undefined {
-	if (!Number.isFinite(result)) {
-		ERR.Raise(new VbsError('Overflow', 6))
+/**
+ * VBS `^`: a Null operand yields Null; operands coerce like the other
+ * arithmetic operators (True is -1, Empty is 0, `&H` hex included). Garbage
+ * raises type mismatch (13) — including a NaN result such as a negative base
+ * to a fractional exponent — and a non-finite result raises Overflow (6).
+ * Under `On Error Resume Next` the error is recorded and the result is
+ * undefined (see vbsIntDiv).
+ */
+export function vbsExponent(base: unknown, exp: unknown): number | null | undefined {
+	if (base === null || exp === null) {
+		return null
+	}
+	if (!assertNotNothing(base) || !assertNotNothing(exp)) {
 		return undefined
+	}
+	const baseNumeric = toVbsNumber(base)
+	const expNumeric = toVbsNumber(exp)
+	if (Number.isNaN(baseNumeric) || Number.isNaN(expNumeric)) {
+		return raiseCoercion(13, 'Type mismatch')
+	}
+	const result = baseNumeric ** expNumeric
+	if (Number.isNaN(result)) {
+		return raiseCoercion(13, 'Type mismatch')
+	}
+	if (!Number.isFinite(result)) {
+		return raiseCoercion(6, 'Overflow')
 	}
 	return result
 }
 
 /**
- * VBS `=`: True compares as -1; undefined equals undefined, missing, or empty
- * string. Any comparison with Null yields Null (falsy).
+ * VBS unary `-`: Null yields Null; Empty coerces to 0 and True to -1 like
+ * the other arithmetic operators. Garbage raises type mismatch (13) and a
+ * non-finite operand raises Overflow (6). Under `On Error Resume Next` the
+ * error is recorded and the result is undefined (see vbsIntDiv).
+ */
+export function vbsNeg(value: unknown): number | null | undefined {
+	if (value === null) {
+		return null
+	}
+	if (!assertNotNothing(value)) {
+		return undefined
+	}
+	const numeric = toVbsNumber(value)
+	if (Number.isNaN(numeric)) {
+		return raiseCoercion(13, 'Type mismatch')
+	}
+	if (!Number.isFinite(numeric)) {
+		return raiseCoercion(6, 'Overflow')
+	}
+	return numeric === 0 ? 0 : -numeric
+}
+
+/** Returns a finite arithmetic result, raising Overflow (6) otherwise. */
+function vbsCheckedResult(result: number): number | undefined {
+	if (!Number.isFinite(result)) {
+		return raiseCoercion(6, 'Overflow')
+	}
+	return result
+}
+
+/**
+ * VBS `=`: True compares as -1; Empty (undefined or the Empty sentinel)
+ * equals Empty, `''`, 0, and False. Any comparison with Null yields Null
+ * (falsy).
+ *
+ * Known deviation: a plain object with a working primitive conversion
+ * compares via JS loose equality (usually false) instead of raising type
+ * mismatch (13) the way objects without primitive conversion do. Real
+ * VBScript rejects `=` on objects (use `Is`); narrowing this would also
+ * reject legitimate `Date`/`Err`/class-instance comparisons that table
+ * scripts rely on, so the loose result stands.
  */
 export function vbsEquals(left: unknown, right: unknown): boolean | null {
 	if (left === null || right === null) {
@@ -358,21 +505,21 @@ export function vbsEquals(left: unknown, right: unknown): boolean | null {
 		// biome-ignore lint/suspicious/noDoubleEquals: VBS equals semantics
 		loose = normalizedLeft == normalizedRight
 	} catch {
-		ERR.Raise(new VbsError('Type mismatch', 13))
+		raiseCoercion(13, 'Type mismatch')
 		return false
 	}
 	if (loose) {
 		return true
 	}
-	const leftUndef = isVbsUndef(normalizedLeft)
-	const rightUndef = isVbsUndef(normalizedRight)
-	if (leftUndef && rightUndef) {
+	const leftEmpty = normalizedLeft === undefined || isVbsUndef(normalizedLeft)
+	const rightEmpty = normalizedRight === undefined || isVbsUndef(normalizedRight)
+	if (leftEmpty && rightEmpty) {
 		return true
 	}
-	if (leftUndef && (normalizedRight === undefined || normalizedRight === '')) {
+	if (leftEmpty && (normalizedRight === '' || normalizedRight === 0)) {
 		return true
 	}
-	if (rightUndef && (normalizedLeft === undefined || normalizedLeft === '')) {
+	if (rightEmpty && (normalizedLeft === '' || normalizedLeft === 0)) {
 		return true
 	}
 	return false
@@ -407,6 +554,9 @@ function toConcatText(value: unknown): string {
 	if (value === undefined || isVbsUndef(value)) {
 		return ''
 	}
+	if (!assertNotNothing(value)) {
+		return ''
+	}
 	if (typeof value === 'string') {
 		return value
 	}
@@ -418,7 +568,7 @@ function toConcatText(value: unknown): string {
 	try {
 		return String(value)
 	} catch {
-		ERR.Raise(new VbsError('Type mismatch', 13))
+		raiseCoercion(13, 'Type mismatch')
 		return ''
 	}
 }
@@ -472,6 +622,9 @@ function vbsCompare(
 	if (left === null || right === null) {
 		return null
 	}
+	if (!assertNotNothing(left) || !assertNotNothing(right)) {
+		return undefined
+	}
 	const normalizedLeft = normalizeOrderOperand(left, typeof right === 'string')
 	const normalizedRight = normalizeOrderOperand(right, typeof left === 'string')
 	const leftIsString = typeof normalizedLeft === 'string'
@@ -491,8 +644,7 @@ function vbsCompare(
 	const leftNumeric = toVbsNumber(normalizedLeft)
 	const rightNumeric = toVbsNumber(normalizedRight)
 	if (Number.isNaN(leftNumeric) || Number.isNaN(rightNumeric)) {
-		ERR.Raise(new VbsError('Type mismatch', 13))
-		return undefined
+		return raiseCoercion(13, 'Type mismatch')
 	}
 	return cmp(leftNumeric, rightNumeric)
 }

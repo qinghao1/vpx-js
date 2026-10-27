@@ -39,6 +39,15 @@ describe('The VBScript error object', () => {
 		expect(() => err.Raise(1, undefined, 'duh')).to.throw(`Error 1: duh`)
 	})
 
+	it('should preserve the error description in record mode', () => {
+		const err = new Err()
+		err.OnErrorResumeNext()
+		err.Raise(new VbsError('boom-desc', 513))
+
+		expect(err.Number).to.equal(513)
+		expect(err.Description).to.equal('boom-desc')
+	})
+
 	it('should throw a VbsError carrying the code when raising by number', () => {
 		const err = new Err()
 		try {

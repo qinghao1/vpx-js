@@ -10,6 +10,7 @@ import {
 	vbsDiv,
 	vbsEquals,
 	vbsEqv,
+	vbsExponent,
 	vbsGt,
 	vbsGte,
 	vbsIntDiv,
@@ -17,6 +18,7 @@ import {
 	vbsLte,
 	vbsMod,
 	vbsMul,
+	vbsNeg,
 	vbsNot,
 	vbsNotEquals,
 	vbsOr,
@@ -93,6 +95,43 @@ describe('vbs-values logical operators', () => {
 	] as Array<[unknown, unknown]>)('not(%s) is %s', (value, expected) => {
 		expect(vbsNot(value)).to.equal(expected)
 	})
+
+	it('coerces Empty to 0 in bitwise operations', () => {
+		expect(vbsAnd(new VbsUndefined(), 1)).to.equal(0)
+		expect(vbsOr(undefined, 1)).to.equal(1)
+	})
+
+	it('raises type mismatch for garbage bitwise operands instead of coercing to 0', () => {
+		const garbage: unknown[] = ['abc', Number.NaN, Symbol('s'), Object.create(null)]
+		for (const g of garbage) {
+			for (const [name, call] of [
+				['and', () => vbsAnd(g, 1)],
+				['or', () => vbsOr(1, g)],
+				['xor', () => vbsXor(g, 1)],
+				['eqv', () => vbsEqv(1, g)],
+				['not', () => vbsNot(g)],
+			] as Array<[string, () => unknown]>) {
+				try {
+					call()
+					expect.unreachable(`${name} should have raised error 13`)
+				} catch (e) {
+					expect(e).to.be.an.instanceof(VbsError)
+					expect((e as VbsError).code).to.equal(13)
+				}
+			}
+		}
+		// A garbage operand next to Null raises instead of short-circuiting.
+		try {
+			vbsAnd('abc', null)
+			expect.unreachable('should have raised error 13')
+		} catch (e) {
+			expect(e).to.be.an.instanceof(VbsError)
+			expect((e as VbsError).code).to.equal(13)
+		}
+		ERR.OnErrorResumeNext()
+		expect(vbsAnd('abc', 1)).to.equal(undefined)
+		expect(ERR.Number).to.equal(13)
+	})
 })
 
 describe('vbs-values equality', () => {
@@ -106,6 +145,10 @@ describe('vbs-values equality', () => {
 		['a', 'a', true],
 		[0, '', true],
 		[5, undefined, false],
+		[undefined, '', true],
+		['', undefined, true],
+		[undefined, 0, true],
+		[new VbsUndefined(), 0, true],
 	] as Array<[unknown, unknown, boolean]>)('equals(%s, %s) is %s', (left, right, expected) => {
 		expect(vbsEquals(left, right)).to.equal(expected)
 	})
@@ -168,6 +211,30 @@ describe('vbs-values integer division', () => {
 	it('yields Null when an operand is Null', () => {
 		expect(vbsIntDiv(null, 2)).to.equal(null)
 		expect(vbsIntDiv(7, null)).to.equal(null)
+	})
+
+	it('coerces operands like the other arithmetic operators', () => {
+		expect(vbsIntDiv(true, 2)).to.equal(0)
+		expect(vbsIntDiv(undefined, 2)).to.equal(0)
+		expect(vbsIntDiv(new VbsUndefined(), 2)).to.equal(0)
+		expect(vbsIntDiv('&H10', 2)).to.equal(8)
+		expect(vbsIntDiv('6', '3')).to.equal(2)
+	})
+
+	it('raises type mismatch for garbage and overflow for out-of-range results', () => {
+		try {
+			vbsIntDiv('abc', 2)
+			expect.unreachable('should have raised error 13')
+		} catch (e) {
+			expect(e).to.be.an.instanceof(VbsError)
+			expect((e as VbsError).code).to.equal(13)
+		}
+		ERR.OnErrorResumeNext()
+		expect(vbsIntDiv('abc', 2)).to.equal(undefined)
+		expect(ERR.Number).to.equal(13)
+		ERR.Clear()
+		expect(vbsIntDiv(1e308, 1)).to.equal(undefined)
+		expect(ERR.Number).to.equal(6)
 	})
 
 	it('raises division by zero for a divisor that rounds to zero', () => {
@@ -259,8 +326,9 @@ describe('vbs-values addition', () => {
 		[true, 1, 0],
 		[1, '2', 3],
 		['&H10', 1, 17],
-		['a', new VbsUndefined(), 'a'],
-		[new VbsUndefined(), 'a', 'a'],
+		[new VbsUndefined(), true, -1],
+		[true, new VbsUndefined(), -1],
+		[new VbsUndefined(), '2', 2],
 		[1, new VbsUndefined(), 1],
 		[new VbsUndefined(), undefined, 0],
 	] as Array<[unknown, unknown, unknown]>)('add(%s, %s) is %s', (left, right, expected) => {
@@ -273,15 +341,86 @@ describe('vbs-values addition', () => {
 	})
 
 	it('raises type mismatch for a non-numeric string plus a number', () => {
+		try {
+			vbsAdd('a', 1)
+			expect.unreachable('should have raised error 13')
+		} catch (e) {
+			expect(e).to.be.an.instanceof(VbsError)
+			expect((e as VbsError).code).to.equal(13)
+		}
+	})
+
+	it('coerces Empty to 0 instead of passing the other operand through', () => {
+		// Empty + True is -1, not True; Empty against non-numeric text raises.
+		expect(vbsAdd(new VbsUndefined(), new VbsUndefined())).to.equal(0)
+		try {
+			vbsAdd('a', new VbsUndefined())
+			expect.unreachable('should have raised error 13')
+		} catch (e) {
+			expect(e).to.be.an.instanceof(VbsError)
+			expect((e as VbsError).code).to.equal(13)
+		}
 		ERR.OnErrorResumeNext()
-		expect(vbsAdd('a', 1)).to.equal(undefined)
+		expect(vbsAdd(new VbsUndefined(), 'a')).to.equal(undefined)
 		expect(ERR.Number).to.equal(13)
+		expect(ERR.Description).to.equal('Type mismatch')
 	})
 
 	it('still raises type mismatch when a NaN operand reaches "+"', () => {
 		ERR.OnErrorResumeNext()
 		expect(vbsAdd(Number.NaN, 1)).to.equal(undefined)
 		expect(ERR.Number).to.equal(13)
+	})
+})
+
+describe('vbs-values exponent and unary negation', () => {
+	it.each([
+		[2, 3, 8],
+		['&H10', 2, 256],
+		[true, 2, 1],
+		[new VbsUndefined(), 2, 0],
+		[2, new VbsUndefined(), 1],
+	] as Array<[unknown, unknown, unknown]>)('exponent(%s, %s) is %s', (base, exp, expected) => {
+		expect(vbsExponent(base, exp)).to.equal(expected)
+	})
+
+	it('yields Null when an exponent operand is Null', () => {
+		expect(vbsExponent(null, 2)).to.equal(null)
+		expect(vbsExponent(2, null)).to.equal(null)
+	})
+
+	it('raises type mismatch for garbage exponent operands and overflow for overflowing results', () => {
+		try {
+			vbsExponent('abc', 2)
+			expect.unreachable('should have raised error 13')
+		} catch (e) {
+			expect(e).to.be.an.instanceof(VbsError)
+			expect((e as VbsError).code).to.equal(13)
+		}
+		ERR.OnErrorResumeNext()
+		expect(vbsExponent(10, 400)).to.equal(undefined)
+		expect(ERR.Number).to.equal(6)
+	})
+
+	it.each([
+		[5, -5],
+		[true, 1],
+		[new VbsUndefined(), 0],
+		[undefined, 0],
+		['2', -2],
+	] as Array<[unknown, unknown]>)('neg(%s) is %s', (value, expected) => {
+		expect(vbsNeg(value)).to.equal(expected)
+	})
+
+	it('yields Null when negating Null and raises for garbage', () => {
+		expect(vbsNeg(null)).to.equal(null)
+		try {
+			vbsNeg('abc')
+			expect.unreachable('should have raised error 13')
+		} catch (e) {
+			expect(e).to.be.an.instanceof(VbsError)
+			expect((e as VbsError).code).to.equal(13)
+		}
 	})
 })
 
