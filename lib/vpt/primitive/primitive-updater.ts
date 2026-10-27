@@ -271,10 +271,12 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 			const scale = (light as any)?.data?.intensityScale ?? (light as any)?.animation?.intensityScale ?? 1
 			const currentIntensity = lightState?.intensity ?? dataInt
 			const denom = dataInt * scale
+			// Upstream divides unconditionally (primitive.cpp:932-940): the live
+			// intensity is full-scale (base x scale x state), so a mid-fade lamp
+			// scales by current/denom, never by the raw current value.
 			let rawFactor: number
 			if (denom !== 0) {
 				rawFactor = currentIntensity / denom
-				if (currentIntensity >= 0 && currentIntensity <= 1 && denom > 1) rawFactor = currentIntensity
 			} else rawFactor = 0
 			return Math.max(0, Math.min(1, Number.isFinite(rawFactor) ? rawFactor : 0))
 		} catch {

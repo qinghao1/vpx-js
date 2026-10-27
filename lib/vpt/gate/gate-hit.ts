@@ -10,6 +10,7 @@ import { CollisionType } from '../../physics/collision-type.js'
 import { PHYS_SKIN } from '../../physics/constants.js'
 import { HitObject } from '../../physics/hit-object.js'
 import { LineSeg } from '../../physics/line-seg.js'
+import { hitTestTwoSided } from '../../physics/two-sided-hit.js'
 import type { Ball } from '../ball/ball.js'
 import type { GateData } from './gate-data.js'
 import { GateMover } from './gate-mover.js'
@@ -56,14 +57,7 @@ export class GateHit extends HitObject {
 
 	public override hitTest(ball: Ball, dTime: number, coll: CollisionEvent, _physics: PlayerPhysics): number {
 		if (!this.isEnabled) return -1
-		for (let i = 0; i < 2; i++) {
-			const t = this.lineSeg[i]?.hitTestBasic(ball, dTime, coll, false, true, false)
-			if (t >= 0) {
-				coll.hitFlag = !!i
-				return t
-			}
-		}
-		return -1
+		return hitTestTwoSided(this.lineSeg, ball, dTime, coll, false)
 	}
 
 	public override collide(coll: CollisionEvent, _physics: PlayerPhysics): void {

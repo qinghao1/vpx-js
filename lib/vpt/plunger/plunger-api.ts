@@ -227,6 +227,7 @@ export class PlungerApi extends ItemApi<PlungerData> {
 	}
 
 	public MotionDevice(): number {
-		return 0
+		// Deprecated upstream, always InputLayout::Generic (plunger.cpp:946).
+		return 6
 	}
 }

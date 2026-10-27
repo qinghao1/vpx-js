@@ -30,11 +30,13 @@ describe('The VPinball plunger collision', () => {
 		// create ball
 		const ball = createBall(player, 333, 1700, 0, 0, 2)
 
-		// let it roll down to the plunger
+		// let it roll down to the plunger. The unfired tip rests at the park
+		// position (no idle spring without a mech sensor), so the ball comes
+		// to rest on the parked tip, lower than the old crept-to-end rest.
 		player.updatePhysics(0)
-		player.updatePhysics(700)
+		player.updatePhysics(2500)
 
-		expect(ball.getState().pos.y).to.be.within(1814, 1817)
+		expect(ball.getState().pos.y).to.be.within(1830, 1833)
 	})
 
 	it('should collide with the side of the plunger', () => {
@@ -105,8 +107,10 @@ describe('The VPinball plunger collision', () => {
 	it('should stamp lastPlungerHit when the ball hits the plunger', () => {
 		createBall(player, 333, 1700, 0, 0, 2)
 
+		// The static parked tip meets the falling ball later than the old
+		// creeping tip did; the ball arrives after ~1500ms.
 		player.updatePhysics(0)
-		player.updatePhysics(700)
+		player.updatePhysics(2000)
 
 		expect(player.getPhysics().lastPlungerHit).to.be.above(0)
 	})

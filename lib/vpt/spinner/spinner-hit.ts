@@ -10,6 +10,7 @@ import { CollisionType } from '../../physics/collision-type.js'
 import { PHYS_SKIN } from '../../physics/constants.js'
 import { HitObject } from '../../physics/hit-object.js'
 import { LineSeg } from '../../physics/line-seg.js'
+import { hitTestTwoSided } from '../../physics/two-sided-hit.js'
 import type { Ball } from '../ball/ball.js'
 import type { SpinnerData } from './spinner-data.js'
 import { SpinnerMover } from './spinner-mover.js'
@@ -62,15 +63,7 @@ export class SpinnerHit extends HitObject {
 		if (!this.isEnabled) {
 			return -1.0
 		}
-		for (let i = 0; i < 2; ++i) {
-			const hitTime = this.lineSegs[i].hitTestBasic(ball, dTime, coll, false, true, false) // any face, lateral, non-rigid
-			if (hitTime >= 0) {
-				// signal the Collide() function that the hit is on the front or back side
-				coll.hitFlag = !i
-				return hitTime
-			}
-		}
-		return -1.0
+		return hitTestTwoSided(this.lineSegs, ball, dTime, coll, true)
 	}
 
 	public override collide(coll: CollisionEvent, _physics: PlayerPhysics): void {

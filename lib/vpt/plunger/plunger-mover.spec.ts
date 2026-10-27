@@ -37,10 +37,44 @@ describe('The VPinball plunger physics', () => {
 		const plunger = table.plungers.CustomPlunger!
 		const plungerMover = plunger.getMover() as PlungerMover
 
-		const parkFrame = plungerMover.cFrames - 1
+		// Park frame for the default park position: an unfired manual plunger
+		// holds park instead of creeping to the frame end (upstream only
+		// springs toward a mech sensor — hitplunger.cpp `else if (isMech)`).
+		const parkFrame = Math.floor((1 - 0.5 / 3) * (plungerMover.cFrames - 1) + 0.5)
+		const parkPos = plungerMover.frameEnd + (0.5 / 3) * (plungerMover.frameStart - plungerMover.frameEnd)
 
-		const plungerState = popState(player, 'CustomPlunger')
-		expect(plungerState.frame).to.equal(parkFrame)
+		// Live state: with no motion, popStates() reports no diff.
+		expect(plunger.getState().frame).to.equal(parkFrame)
+		expect(plungerMover.pos).to.be.closeTo(parkPos, 1e-3)
+	})
+
+	it('should hold the park position while unfired', async () => {
+		const plunger = table.plungers.CustomPlunger
+		const plungerMover = plunger.getMover() as PlungerMover
+		const pos = plungerMover.pos
+		const frame = plunger.getState().frame
+
+		player.simulateTime(2000)
+
+		expect(plungerMover.pos).to.equal(pos)
+		expect(plunger.getState().frame).to.equal(frame)
+	})
+
+	it('should stop a normal pull at the park position', async () => {
+		const plunger = table.plungers.CustomPlunger
+		const plungerMover = plunger.getMover() as PlungerMover
+		const minPos =
+			plungerMover.frameEnd + plunger.data.parkPosition * (plungerMover.frameStart - plungerMover.frameEnd)
+
+		plunger.pullBack()
+		// Tip below park with a pull in effect (e.g. a pull overlapping a
+		// recent fire): upstream clamps back up to the park position.
+		plungerMover.pos = plungerMover.frameEnd
+		plungerMover.speed = 0
+		plungerMover.updateVelocities()
+
+		expect(plungerMover.pos).to.be.closeTo(minPos, 1e-9)
+		expect(plungerMover.speed).to.equal(0)
 	})
 
 	it('should move to the end when pulled back', async () => {
@@ -58,16 +92,15 @@ describe('The VPinball plunger physics', () => {
 
 	it('should move back after being fired', async () => {
 		const plunger = table.plungers.CustomPlunger
-		const plungerMover = plunger.getMover() as PlungerMover
-		const parkFrame = plungerMover.cFrames - 1
 
 		plunger.pullBack()
 		player.simulateTime(50)
 		plunger.fire()
 		player.simulateTime(500)
 
-		const plungerState = popState(player, 'CustomPlunger')
-		expect(plungerState.frame).to.equal(parkFrame)
+		// The fire bounce decays around the park position; with no mech
+		// sensor there is no idle spring pulling past it to the frame end.
+		expect(plunger.getState().frame).to.equal(21)
 	})
 
 	it('should fire LimitBOS when pulled back and LimitEOS when fired', async () => {
@@ -88,10 +121,11 @@ describe('The VPinball plunger physics', () => {
 		expect(eosCount).to.be.greaterThan(0)
 	})
 
-	it('should only fire a little when auto-fire is disabled', async () => {
+	it('should stay parked when fired without a pull', async () => {
+		// A keyboard fire from the park position releases nothing (dx = 0):
+		// without a pull there is no launch, and with no mech sensor there is
+		// no idle spring to drift on (hitplunger.cpp `else if (isMech)`).
 		const plunger = table.plungers.CustomPlunger
-		const plungerMover = plunger.getMover() as PlungerMover
-		const parkFrame = plungerMover.cFrames - 1
 		const plungerState = plunger.getState()
 
 		plunger.fire()
@@ -100,7 +134,7 @@ describe('The VPinball plunger physics', () => {
 		expect(plungerState.frame).to.equal(21)
 
 		player.updatePhysics(300)
-		expect(popState(player, 'CustomPlunger').frame).to.equal(parkFrame)
+		expect(plunger.getState().frame).to.equal(21)
 	})
 
 	it('should fire fully when auto-fire is enabled', async () => {

@@ -40,13 +40,16 @@ export interface RampVertexResult {
 	rgvLocal: Vertex2D[]
 }
 
-const HABITRAIL_TYPES: ReadonlyArray<number | undefined> = [
+const HABITRAIL_TYPES: readonly number[] = [
 	Enums.RampType.RampType4Wire,
 	Enums.RampType.RampType1Wire,
 	Enums.RampType.RampType2Wire,
 	Enums.RampType.RampType3WireLeft,
 	Enums.RampType.RampType3WireRight,
 ]
+
+/** Mesh slots of a generated ramp, iterated by getMeshes and updateMeshes. */
+const RAMP_MESH_KEYS = ['wire1', 'wire2', 'wire3', 'wire4', 'floor', 'left', 'right'] as const
 
 /** Ramp mesh generator. */
 export class RampMeshGenerator {
@@ -63,7 +66,7 @@ export class RampMeshGenerator {
 		const material = table.getMaterial(this.data.szMaterial)
 		const map = table.getTexture(this.data.szImage)
 		const meshes: Meshes<GEOMETRY> = {}
-		for (const key of ['wire1', 'wire2', 'wire3', 'wire4', 'floor', 'left', 'right'] as const) {
+		for (const key of RAMP_MESH_KEYS) {
 			const mesh = ramp[key]
 			if (!mesh) continue
 			meshes[key] = {
@@ -419,7 +422,8 @@ export class RampMeshGenerator {
 	}
 
 	private isHabitrail(): boolean {
-		return HABITRAIL_TYPES.includes(this.state.type)
+		// state.type is optional; an unset type is never a habitrail wire type.
+		return this.state.type !== undefined && HABITRAIL_TYPES.includes(this.state.type)
 	}
 
 	private assignHeightToControlPoint(v: RenderVertex3D, height: number): void {
@@ -459,7 +463,7 @@ export class RampUpdater extends ItemUpdater<RampState> {
 		table: Table,
 	): void {
 		const generated = this.meshGenerator.generateMeshes(table)
-		for (const key of ['wire1', 'wire2', 'wire3', 'wire4', 'floor', 'left', 'right'] as const) {
+		for (const key of RAMP_MESH_KEYS) {
 			const mesh = generated[key]
 			if (!mesh) continue
 			const node = renderApi.findInGroup(obj, `ramp.${key}-${this.state.getName()}`)

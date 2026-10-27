@@ -145,13 +145,23 @@ export class PlungerMover implements MoverObject {
 			this.speed += this.pullForce / this.mass
 			if (!this.addRetractMotion) {
 				if (this.pos >= this.frameStart) this.speed = 0
+				// Minimum-retraction stop (hitplunger.cpp): a normal pull never
+				// drives the tip past the park position.
+				if (this.pos < this.frameEnd + this.restPos * this.frameLen) {
+					this.speed = 0
+					this.pos = this.frameEnd + this.restPos * this.frameLen
+				}
 			} else {
 				this.updateRetractMotion()
 			}
-		} else {
-			// headless: no mech sensor (hitplunger.cpp: isMech + GetPosition) — spring to rest
+		} else if (this.data.mechPlunger) {
+			// Upstream only chases a sensor when a mech plunger exists
+			// (hitplunger.cpp UpdateVelocities ends `else if (isMech)`); a
+			// manual plunger holds still. Headless has no sensor handler, and
+			// upstream defaults the reading to the rest position
+			// (GetPosition(m_restPos)), so the target is the rest position.
 			const pos = (this.pos - this.frameEnd) / this.frameLen
-			const target = this.data.autoPlunger ? this.restPos : 0
+			const target = this.restPos
 			const err = target - pos
 			const norm = this.normalize
 			const FRICTION = 0.95
