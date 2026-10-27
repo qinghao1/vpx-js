@@ -34,7 +34,9 @@ export function isPlayMode(): boolean {
 }
 
 export function getEffectiveCaps(): { playfield: number; other: number; floor: number; aniso: number } {
-	return QUALITY_CAPS[getQuality()]
+	// Return a copy: callers must not mutate the shared table (a leaked write
+	// would silently re-cap every later texture load).
+	return { ...QUALITY_CAPS[getQuality()] }
 }
 
 let cachedLow: boolean | undefined

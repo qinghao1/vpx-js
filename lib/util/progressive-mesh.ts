@@ -176,8 +176,14 @@ export class ProgMeshContext {
 	}
 }
 
-function removeFillWithBack<T>(arr: T[], item: T): void {
+/**
+ * Swap-remove `item` from `arr` in O(1). The item must be present; an absent
+ * item throws instead of corrupting the array (popping the last element and
+ * leaving a stray "-1" property behind).
+ */
+export function removeFillWithBack<T>(arr: T[], item: T): void {
 	const i = arr.indexOf(item)
+	if (i === -1) throw new Error('removeFillWithBack: item not in array')
 	const last = arr.pop()
 	if (i === arr.length) return
 	arr[i] = last!

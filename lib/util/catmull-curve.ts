@@ -76,13 +76,9 @@ export class CatmullCurve2D extends CatmullCurve {
 export class CatmullCurve3D extends CatmullCurve {
 	private readonly c: { x: CubicCoeffs; y: CubicCoeffs; z: CubicCoeffs }
 
-	static fromVertex3D(v0: Vertex, v1: Vertex, v2: Vertex, v3: Vertex): CatmullCurve3D {
+	static fromVertex3D(v0: Vertex3D, v1: Vertex3D, v2: Vertex3D, v3: Vertex3D): CatmullCurve3D {
 		const [dt0, dt1, dt2] = CatmullCurve.dt(v0, v1, v2, v3)
-		const z0 = (v0 as Vertex3D).z ?? 0
-		const z1 = (v1 as Vertex3D).z ?? 0
-		const z2 = (v2 as Vertex3D).z ?? 0
-		const z3 = (v3 as Vertex3D).z ?? 0
-		return new CatmullCurve3D(v0, v1, v2, v3, z0, z1, z2, z3, dt0, dt1, dt2)
+		return new CatmullCurve3D(v0, v1, v2, v3, v0.z, v1.z, v2.z, v3.z, dt0, dt1, dt2)
 	}
 
 	private constructor(

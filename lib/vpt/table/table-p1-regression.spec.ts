@@ -65,7 +65,6 @@ function captureWarnings(): void {
 		error: noop,
 		warn: (f: string) => warnings.push(f),
 		info: noop,
-		verbose: noop,
 		debug: noop,
 	} as ILogger)
 }

@@ -210,7 +210,7 @@ export class PrimitiveData extends ItemData implements IPhysicalData {
 			throw new Error(
 				`Tried to read ${num} vertices for primitive "${this.getName()}" (${this.itemName}), but only ${buf.length} bytes available.`,
 			)
-		return Array.from({ length: num }, (_, i) => Vertex3DNoTex2.get(buf, i))
+		return Vertex3DNoTex2.getAll(buf, num)
 	}
 
 	private async getAnimatedVertices(buf: Uint8Array, num: number): Promise<FrameData> {

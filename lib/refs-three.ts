@@ -70,5 +70,8 @@ export {
 	Vector3,
 } from 'three'
 
+// Pinned to three's historic RGBFormat value (1022, verified against three 0.185.1):
+// three already dropped the sibling legacy aliases (RGBEFormat, *Encoding) and
+// this export may follow, while the opaque-RGB DataTexture path needs the stable enum.
 export const RGBFormat = 1022
 export type { PixelFormat, TextureDataType } from 'three'

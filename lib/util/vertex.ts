@@ -33,9 +33,18 @@ export class Vertex3DNoTex2 {
 	tv = 0
 
 	static get(buffer: Uint8Array, pos: number): Vertex3DNoTex2 {
-		const off = pos * Vertex3DNoTex2.size
-		const vertex = new Vertex3DNoTex2()
 		const data = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength)
+		return Vertex3DNoTex2.read(data, pos * Vertex3DNoTex2.size)
+	}
+
+	/** Read `count` vertices with a single DataView (batch mesh loads). */
+	static getAll(buffer: Uint8Array, count: number, start = 0): Vertex3DNoTex2[] {
+		const data = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength)
+		return Array.from({ length: count }, (_, i) => Vertex3DNoTex2.read(data, (start + i) * Vertex3DNoTex2.size))
+	}
+
+	private static read(data: DataView, off: number): Vertex3DNoTex2 {
+		const vertex = new Vertex3DNoTex2()
 		vertex.x = data.getFloat32(off, true)
 		vertex.y = data.getFloat32(off + 4, true)
 		vertex.z = data.getFloat32(off + 8, true)
@@ -60,6 +69,7 @@ export class Vertex3DNoTex2 {
 	}
 
 	static fromArray(a: number[]): Vertex3DNoTex2 {
+		if (a.length < 8) throw new RangeError(`Vertex3DNoTex2.fromArray needs 8 numbers, got ${a.length}`)
 		const v = new Vertex3DNoTex2()
 		v.x = a[0]!
 		v.y = a[1]!

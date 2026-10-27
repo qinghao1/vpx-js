@@ -20,9 +20,10 @@ export class SplineVertex {
 		detail: number,
 		accuracy: number,
 		staticRendering = true,
+		lowQuality = isLowQuality(),
 	): SplineVertex {
 		const v = new SplineVertex()
-		const spine = SplineVertex.getCentralCurve(dragPoints, detail, accuracy, staticRendering)
+		const spine = SplineVertex.getCentralCurve(dragPoints, detail, accuracy, staticRendering, lowQuality)
 		const n = spine.length
 		for (let i = 0; i < n; i++) {
 			const prev = spine[i ? i - 1 : n - 1]!
@@ -56,7 +57,7 @@ export class SplineVertex {
 				v.rgvLocal[(n + 1) * 2 - n - 1] = v.rgvLocal[(n + 1) * 2 - 1]!
 			}
 		}
-		v.ppfCross[n] = spine[0]?.fControlPoint
+		v.ppfCross[n] = spine[0]?.fControlPoint ?? false
 		v.pMiddlePoints[n] = v.pMiddlePoints[0]!
 		v.pcvertex = n + 1
 		return v
@@ -67,8 +68,9 @@ export class SplineVertex {
 		detail: number,
 		acc: number,
 		staticRendering = true,
+		lowQuality = isLowQuality(),
 	): RenderVertex[] {
-		const effDetail = isLowQuality() ? Math.min(detail, 8) : detail
+		const effDetail = lowQuality ? Math.min(detail, 8) : detail
 		const accuracy = acc !== -1 ? acc : 4 * 10 ** ((10 - (staticRendering ? 10 : effDetail)) / 1.5)
 		return DragPoint.getRgVertex(dragPoints, () => new RenderVertex(), CatmullCurve2D.fromVertex2D, true, accuracy)
 	}

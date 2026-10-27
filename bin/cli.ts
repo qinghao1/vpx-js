@@ -40,5 +40,5 @@ export function silenceProgress(): void {
 }
 
 export function silenceLogger(): void {
-	Logger.setLogger({ debug: noop, error: noop, info: noop, verbose: noop, warn: noop, wtf: noop })
+	Logger.setLogger({ debug: noop, error: noop, info: noop, warn: noop, wtf: noop })
 }

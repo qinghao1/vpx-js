@@ -7,7 +7,6 @@ export interface ILogger {
 	error(f: string, ...a: unknown[]): void
 	warn(f: string, ...a: unknown[]): void
 	info(f: string, ...a: unknown[]): void
-	verbose(f: string, ...a: unknown[]): void
 	debug(f: string, ...a: unknown[]): void
 }
 /** Progress reporter. */
@@ -49,22 +48,12 @@ export class Logger implements ILogger {
 	info(f: string, ...a: unknown[]): void {
 		console.log(f, ...a)
 	}
-	verbose(f: string, ...a: unknown[]): void {
-		if (!Logger.isDebugEnabled) return
-		console.debug(f, ...a)
-	}
 	warn(f: string, ...a: unknown[]): void {
 		console.warn(f, ...a)
 	}
 	wtf(f: string, ...a: unknown[]): void {
 		console.error(f, ...a)
 	}
-}
-
-const orig = console.debug.bind(console)
-console.debug = (...a: unknown[]) => {
-	if (!Logger.isDebugEnabled) return
-	orig(...a)
 }
 
 /** Throttled console progress. */

@@ -15,3 +15,30 @@ describe('Vertex3DNoTex2.get', () => {
 		])
 	})
 })
+
+describe('Vertex3DNoTex2.getAll', () => {
+	it('matches repeated get() with a single view, honoring start', () => {
+		const count = 3
+		const raw = new Uint8Array(Vertex3DNoTex2.size * (count + 1))
+		const writer = new DataView(raw.buffer)
+		for (let i = 0; i < 8 * (count + 1); i++) writer.setFloat32(i * 4, i + 1, true)
+		const all = Vertex3DNoTex2.getAll(raw, count, 1)
+		expect(all.length).toBe(count)
+		const fields = (v: Vertex3DNoTex2) => [v.x, v.y, v.z, v.nx, v.ny, v.nz, v.tu, v.tv]
+		for (let i = 0; i < count; i++) {
+			expect(fields(all[i])).toEqual(fields(Vertex3DNoTex2.get(raw, i + 1)))
+		}
+		expect([all[0].x, all[0].tv]).toEqual([9, 16])
+	})
+})
+
+describe('Vertex3DNoTex2.fromArray', () => {
+	it('reads eight numbers in field order', () => {
+		const v = Vertex3DNoTex2.fromArray([1, 2, 3, 4, 5, 6, 7, 8])
+		expect([v.x, v.y, v.z, v.nx, v.ny, v.nz, v.tu, v.tv]).toEqual([1, 2, 3, 4, 5, 6, 7, 8])
+	})
+
+	it('fails fast on short arrays instead of storing undefined', () => {
+		expect(() => Vertex3DNoTex2.fromArray([1, 2])).toThrow(RangeError)
+	})
+})

@@ -62,7 +62,7 @@ describe('PinMAME WASM emulator (mock)', () => {
 		const orig = Logger.logger()
 		const warn = vi.fn()
 		const noop = () => {}
-		Logger.setLogger({ wtf: noop, error: noop, warn, info: noop, verbose: noop, debug: noop })
+		Logger.setLogger({ wtf: noop, error: noop, warn, info: noop, debug: noop })
 		try {
 			;(emu as any).isMock = true
 			;(emu as any).markReady()

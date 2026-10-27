@@ -371,7 +371,7 @@ async function tryCreateBitmap(data: Uint8Array, mime: string, name: string): Pr
 
 async function tryLoadViaWorker(name: string, kind: 'exr' | 'hdr', data: Uint8Array): Promise<ThreeTexture | null> {
 	const max = effectiveMax(true, name)
-	const key = exrCacheKey(name, data.byteLength, kind, max)
+	const key = exrCacheKey(name, data, kind, max)
 	const cached: any = await idbGet(key)
 	if (cached?.width && cached?.data) {
 		return finalize(

@@ -69,12 +69,13 @@ export async function idbSet(key: string, val: any): Promise<void> {
 	}
 }
 
-export function texCacheKey(name: string, w: number, h: number, mtime = ''): string {
-	return `tex:${name.toLowerCase()}:${w}x${h}:${mtime}`
-}
-
-export function exrCacheKey(name: string, byteLength: number, kind: string, max?: number): string {
-	const base = `exr:${name.toLowerCase()}:${kind}:${byteLength}`
+export function exrCacheKey(name: string, data: Uint8Array, kind: string, max?: number): string {
+	// Content hash (djb2, same style as vbsCacheKey): a byteLength-only key
+	// collides for same-size textures and serves the wrong bytes from cache.
+	// The key format changed with the hash, so pre-hash entries simply miss.
+	let h = 5381
+	for (let i = 0; i < data.length; i++) h = ((h << 5) + h) ^ data[i]
+	const base = `exr:${name.toLowerCase()}:${kind}:${(h >>> 0).toString(36)}:${data.length}`
 	return typeof max === 'number' && max > 0 ? `${base}:${max}` : base
 }
 

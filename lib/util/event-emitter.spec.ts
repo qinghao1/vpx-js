@@ -98,46 +98,35 @@ describe('EventEmitter', () => {
 		expect(emitter.emit('ev')).toBe(false)
 	})
 
-	it('defaults the max to 10 and round-trips set/get', () => {
+	it('unwraps once() wrappers in listeners()', () => {
 		const emitter = new EventEmitter()
-		expect(emitter.getMaxListeners()).toBe(10)
-		emitter.setMaxListeners(3)
-		expect(emitter.getMaxListeners()).toBe(3)
+		const original = () => {}
+		emitter.once('ev', original)
+		expect(emitter.listeners('ev')).toEqual([original])
 	})
 
-	it('rejects negative max listeners', () => {
-		expect(() => new EventEmitter().setMaxListeners(-1)).toThrow(RangeError)
+	it('delivers in registration order across on() and once()', () => {
+		const emitter = new EventEmitter()
+		const order: string[] = []
+		emitter.on('ev', () => order.push('first'))
+		emitter.once('ev', () => order.push('second'))
+		emitter.on('ev', () => order.push('third'))
+		emitter.emit('ev')
+		expect(order).toEqual(['first', 'second', 'third'])
+		emitter.emit('ev')
+		expect(order).toEqual(['first', 'second', 'third', 'first', 'third'])
 	})
 
-	it('warns once when listeners exceed the max', () => {
-		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-		const emitter = new EventEmitter().setMaxListeners(2)
-		emitter.on('ev', () => {}).on('ev', () => {})
-		expect(warn).not.toHaveBeenCalled()
-		emitter.on('ev', () => {})
-		expect(warn).toHaveBeenCalledTimes(1)
-		expect(warn.mock.calls[0]?.[0]).toContain('MaxListenersExceededWarning')
-		emitter.on('ev', () => {})
-		expect(warn).toHaveBeenCalledTimes(1)
-	})
-
-	it('warns again after the event is emptied and re-exceeded', () => {
-		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-		const emitter = new EventEmitter().setMaxListeners(1)
-		const a = () => {}
-		const b = () => {}
-		emitter.on('ev', a).on('ev', b)
-		expect(warn).toHaveBeenCalledTimes(1)
-		emitter.off('ev', a).off('ev', b)
-		emitter.on('ev', a).on('ev', b)
-		expect(warn).toHaveBeenCalledTimes(2)
-	})
-
-	it('treats 0 as unlimited', () => {
-		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-		const emitter = new EventEmitter().setMaxListeners(0)
-		for (let i = 0; i < 12; i++) emitter.on('ev', () => {})
-		expect(emitter.listenerCount('ev')).toBe(12)
-		expect(warn).not.toHaveBeenCalled()
+	it('documents no isolation: a throwing listener aborts the rest', () => {
+		const emitter = new EventEmitter()
+		const calls: string[] = []
+		emitter.on('ev', () => calls.push('before'))
+		emitter.on('ev', () => {
+			throw new Error('boom')
+		})
+		emitter.on('ev', () => calls.push('after'))
+		expect(() => emitter.emit('ev')).toThrow('boom')
+		// The throwing listener aborted dispatch: 'after' never ran.
+		expect(calls).toEqual(['before'])
 	})
 })

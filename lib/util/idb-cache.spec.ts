@@ -1,27 +1,120 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 import { describe, expect, it } from 'vitest'
-import { idbGet, idbSet, vbsCacheKey } from './idb-cache.js'
+import { exrCacheKey, idbGet, idbSet, vbsCacheKey } from './idb-cache.js'
 
-describe('idb-cache without IndexedDB', () => {
-	it('idbGet resolves undefined instead of rejecting', async () => {
-		if (typeof indexedDB !== 'undefined') return
-		await expect(idbGet('any-key')).resolves.toBeUndefined()
+/** Minimal in-memory indexedDB so the cache contract is exercised, not skipped. */
+function installFakeIndexedDB(): void {
+	const stores = new Map<string, Map<unknown, unknown>>()
+	const db = {
+		objectStoreNames: { contains: (name: string) => stores.has(name) },
+		deleteObjectStore: (name: string) => {
+			stores.delete(name)
+		},
+		createObjectStore: (name: string) => {
+			stores.set(name, new Map())
+			return {}
+		},
+		transaction: (_store: string, _mode: string) => {
+			const tx: { objectStore: unknown; oncomplete?: () => void } = {
+				objectStore: (name: string) => {
+					const backing = stores.get(name)
+					if (!backing) throw new Error(`missing store: ${name}`)
+					return {
+						get: (key: unknown) => {
+							const req: { result?: unknown; onsuccess?: () => void } = {}
+							queueMicrotask(() => {
+								req.result = backing.get(key)
+								req.onsuccess?.()
+							})
+							return req
+						},
+						put: (value: unknown, key: unknown) => {
+							backing.set(key, value)
+						},
+					}
+				},
+			}
+			let done: (() => void) | undefined
+			Object.defineProperty(tx, 'oncomplete', {
+				get: () => done,
+				set: (fn: () => void) => {
+					done = fn
+					queueMicrotask(() => done?.())
+				},
+			})
+			return tx
+		},
+	}
+	const fakeIndexedDB = {
+		open: (_name: string, _version: number) => {
+			const req: { result?: unknown; onupgradeneeded?: () => void; onsuccess?: () => void } = {}
+			queueMicrotask(() => {
+				req.result = db
+				req.onupgradeneeded?.()
+				req.onsuccess?.()
+			})
+			return req
+		},
+	}
+	;(globalThis as unknown as { indexedDB?: unknown }).indexedDB = fakeIndexedDB
+}
+
+describe('idb-cache with fake IndexedDB', () => {
+	it('idbGet misses with undefined', async () => {
+		installFakeIndexedDB()
+		await expect(idbGet('missing-key')).resolves.toBeUndefined()
 	})
 
-	it('idbSet resolves instead of rejecting, like idbGet', async () => {
-		if (typeof indexedDB !== 'undefined') return
-		await expect(idbSet('any-key', 'any-value')).resolves.toBeUndefined()
+	it('idbSet/idbGet round-trips a payload', async () => {
+		installFakeIndexedDB()
+		await idbSet('tex-key', { width: 4, height: 4 })
+		await expect(idbGet('tex-key')).resolves.toEqual({ width: 4, height: 4 })
+	})
+})
+
+describe('exrCacheKey', () => {
+	it('distinguishes same-length textures by content', () => {
+		const a = new Uint8Array([1, 2, 3, 4])
+		const b = new Uint8Array([1, 2, 3, 5])
+		expect(exrCacheKey('tex', b, 'exr')).not.toBe(exrCacheKey('tex', a, 'exr'))
 	})
 
-	it('vbs cache keys carry the current transpiler version, never a retired one', () => {
+	it('is deterministic and length-sensitive', () => {
+		const data = new Uint8Array([9, 8, 7])
+		expect(exrCacheKey('tex', data, 'exr')).toBe(exrCacheKey('tex', data, 'exr'))
+		expect(exrCacheKey('tex', data, 'exr')).not.toBe(exrCacheKey('tex', new Uint8Array([9, 8, 7, 6]), 'exr'))
+	})
+
+	it('separates name/kind/max namespaces', () => {
+		const data = new Uint8Array([1])
+		const base = exrCacheKey('tex', data, 'exr')
+		expect(exrCacheKey('TEX', data, 'exr')).toBe(base)
+		expect(exrCacheKey('other', data, 'exr')).not.toBe(base)
+		expect(exrCacheKey('tex', data, 'hdr')).not.toBe(base)
+		expect(exrCacheKey('tex', data, 'exr', 512)).not.toBe(base)
+		expect(exrCacheKey('tex', data, 'exr', 512)).toBe(exrCacheKey('tex', data, 'exr', 512))
+	})
+})
+
+describe('vbsCacheKey', () => {
+	it('is deterministic, content-sensitive, and versioned against retired prefixes', () => {
 		// Stale transpiled JS running against a newer runtime produces
 		// undebuggable crashes (wrong line numbers, old codegen). The prefix
 		// must change whenever transpile output semantics change; retired
 		// prefixes (vbs6 and older) must not be emitted anymore.
+		const retired = ['vbs1:', 'vbs2:', 'vbs3:', 'vbs4:', 'vbs5:', 'vbs6:']
 		const key = vbsCacheKey('Dim x')
-		expect(key.startsWith('vbs7:')).toBe(true)
-		expect(key.startsWith('vbs6:')).toBe(false)
-		expect(vbsCacheKey('Dim x')).to.equal(key)
-		expect(vbsCacheKey('Dim y')).not.to.equal(key)
+		// Deterministic.
+		expect(vbsCacheKey('Dim x')).toBe(key)
+		// Content-sensitive: different scripts key differently, even at equal
+		// content shape, and the length suffix separates longer scripts.
+		expect(vbsCacheKey('Dim y')).not.toBe(key)
+		expect(vbsCacheKey('Dim xx')).not.toBe(key)
+		// Versioned: a vbs<digits>: prefix newer than every retired prefix,
+		// so old cached payloads never validate against a new transpiler.
+		const version = Number(/^vbs(\d+):/.exec(key)?.[1])
+		expect(Number.isInteger(version)).toBe(true)
+		expect(version).toBeGreaterThan(retired.length)
+		for (const prefix of retired) expect(key.startsWith(prefix)).toBe(false)
 	})
 })
