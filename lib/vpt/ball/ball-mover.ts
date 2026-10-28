@@ -75,13 +75,11 @@ export class BallMover implements MoverObject {
 				this.hit.vel.y += physics.gravity.y * PHYS_FACTOR
 				this.hit.vel.z += physics.gravity.z * PHYS_FACTOR
 				const acc = physics.getCabinetAcceleration?.()
-				if (acc && (acc.x !== 0 || acc.y !== 0)) {
-					const strength = Math.hypot(physics.gravity.y, physics.gravity.z) || 1
-					const cosSlope = -physics.gravity.z / strength
-					const sinSlope = physics.gravity.y / strength
+				// Slope frame comes from setGravity; lengthSq gate is equivalent here.
+				if (acc && acc.lengthSq() !== 0) {
 					this.hit.vel.x -= PHYS_FACTOR * MS2TOVPUVPT2(acc.x)
-					this.hit.vel.y -= PHYS_FACTOR * MS2TOVPUVPT2(acc.y) * cosSlope
-					this.hit.vel.z -= PHYS_FACTOR * MS2TOVPUVPT2(acc.y) * sinSlope
+					this.hit.vel.y -= PHYS_FACTOR * MS2TOVPUVPT2(acc.y) * physics.gravityCosSlope
+					this.hit.vel.z -= PHYS_FACTOR * MS2TOVPUVPT2(acc.y) * physics.gravitySinSlope
 				}
 			}
 		}

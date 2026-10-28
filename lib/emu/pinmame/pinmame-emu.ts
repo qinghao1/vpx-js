@@ -284,6 +284,8 @@ export class PinMameEmulator implements IEmulator {
 		}
 		if (this.pendingSwitches.size) this.flushPendingSwitches()
 		if (this.paused || this.isMock) return ms
+		// Zero time pulls nothing; 1 ms → 10 ms decimation lives caller-side.
+		if (ms <= 0) return ms
 		this.sync()
 		return ms
 	}

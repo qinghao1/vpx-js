@@ -34,6 +34,8 @@ import type { IEmulator } from './iemulator.js'
 import type { PinInput } from './pin-input.js'
 import type { IBallCreationPosition, Player } from './player.js'
 
+// Sync emu state once per 10 ms of physics time, not per 1 ms tick.
+const EMU_SYNC_MS = 10
 const CLOCK_INIT_THRESHOLD_USEC = 1_000_000
 // Divergence: upstream has no backlog clamp (its 200 ms is an in-loop anti-hang
 // guard, PhysicsEngine.cpp). vpx-js caps catch-up per wall-clock frame instead.
@@ -46,6 +48,11 @@ const MAX_ITER_LOW = 16
 export class PlayerPhysics {
 	public readonly balls: Ball[] = []
 	public gravity = new Vertex3D()
+	// Slope frame for the BallMover nudge path; derived in setGravity (only writer).
+	public gravityMag = 1
+	// -0 matches hypot(0,0)||1 before the first setGravity call.
+	public gravityCosSlope = -0
+	public gravitySinSlope = 0
 	public timeMsec = 0
 	public recordContacts = false
 	public contacts: CollisionEvent[] = []
@@ -83,6 +90,7 @@ export class PlayerPhysics {
 	private activeBallDebug?: Ball
 	private scriptPeriod = 0
 	private deferTimerChanges = false
+	private emuAccumMs = 0
 
 	constructor(
 		private readonly table: Table,
@@ -263,7 +271,10 @@ export class PlayerPhysics {
 				this.scriptPeriod += Math.floor(performance.now() - t0)
 			}
 			this.activeBall = oldBall
-			if (this.emu) this.emu.emuSimulateCycle(dt * 10)
+			if (this.emu) {
+				this.emuAccumMs += dt * 10
+				if (this.emuAccumMs >= EMU_SYNC_MS) this.flushEmu(this.emu)
+			}
 			if (!this.disablePhysics) {
 				this.updateVelocities()
 				this.physicsSimulateCycle(dt)
@@ -271,6 +282,7 @@ export class PlayerPhysics {
 			this.curPhysicsFrameTime = this.nextPhysicsFrameTime
 			this.nextPhysicsFrameTime += PHYSICS_STEPTIME
 		}
+		if (this.emu && this.emuAccumMs > 0) this.flushEmu(this.emu)
 		this.timeMsec = Math.floor((initial - this.startTimeUsec) / 1000)
 		// One call is one headless frame: -1 fires per call (even paused/repeated),
 		// -2 per call while playing. Upstream splits these across Render/UpdateGameLogic.
@@ -278,6 +290,11 @@ export class PlayerPhysics {
 		// Upstream fires -2 only while playing, but -1 on every frame incl. paused.
 		if (!this.isPaused) this.fireTimers(TimerMode.OnGameSync)
 		return iterations
+	}
+
+	private flushEmu(emu: IEmulator): void {
+		emu.emuSimulateCycle(this.emuAccumMs)
+		this.emuAccumMs = 0
 	}
 
 	private fireTimers(mode: TimerMode): void {
@@ -410,5 +427,8 @@ export class PlayerPhysics {
 		this.gravity.x = 0
 		this.gravity.y = Math.sin((slopeDeg * Math.PI) / 180) * strength
 		this.gravity.z = -Math.cos((slopeDeg * Math.PI) / 180) * strength
+		this.gravityMag = Math.hypot(this.gravity.y, this.gravity.z) || 1
+		this.gravityCosSlope = -this.gravity.z / this.gravityMag
+		this.gravitySinSlope = this.gravity.y / this.gravityMag
 	}
 }

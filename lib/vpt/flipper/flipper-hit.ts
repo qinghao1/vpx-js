@@ -30,6 +30,13 @@ import type { FlipperData } from './flipper-data.js'
 import { FlipperMover } from './flipper-mover.js'
 import type { FlipperState } from './flipper-state.js'
 
+// contact()/collide() never reenter each other, so these module-static
+// temporaries replace three pool claims per call. Never pool-owned: no
+// release() call in this file may name them.
+const scratchVRel = new Vertex3D()
+const scratchRB = new Vertex3D()
+const scratchRF = new Vertex3D()
+
 /** Flipper collision — face/end/center.
  * @see https://github.com/vpinball/vpinball/blob/master/flipper.cpp */
 export class FlipperHit extends HitObject {
@@ -136,9 +143,9 @@ export class FlipperHit extends HitObject {
 		const ball = coll.ball,
 			n = coll.hitNormal
 		if (coll.hitDistance < -C_EMBEDDED) ball.hit.vel.addAndRelease(n.clone(true).multiplyScalar(0.1))
-		const vRel = Vertex3D.claim(),
-			rB = Vertex3D.claim(),
-			rF = Vertex3D.claim()
+		const vRel = scratchVRel,
+			rB = scratchRB,
+			rF = scratchRF
 		this.getRelativeVelocity(n, ball, vRel, rB, rF)
 		const normVel = vRel.dot(n)
 		if (normVel <= C_CONTACTVEL) {
@@ -169,7 +176,7 @@ export class FlipperHit extends HitObject {
 				if (slipSpeed < C_PRECISION) {
 					const slipAcc = aRel.clone(true).subAndRelease(n.clone(true).multiplyScalar(aRel.dot(n)))
 					if (slipAcc.lengthSq() < 1e-6) {
-						Vertex3D.release(aRel, vRel, rB, rF, slip, slipAcc)
+						Vertex3D.release(aRel, slip, slipAcc)
 						return
 					}
 					slipDir = slipAcc.normalize()
@@ -182,13 +189,13 @@ export class FlipperHit extends HitObject {
 				const pv13 =
 					this.mover.inertia > 0 ? crossF.clone(true).divideScalar(this.mover.inertia) : Vertex3D.claim()
 				const denomF = slipDir.dotAndRelease(Vertex3D.crossProduct(pv13, rF, true))
-				Vertex3D.release(aRel, vRel, rF, slip, pv13)
+				Vertex3D.release(aRel, slip, pv13)
 				const crossB = Vertex3D.crossProduct(rB, slipDir, true),
 					pv12 = crossB.clone(true).divideScalar(ball.hit.inertia)
 				const denomB = ball.hit.invMass + slipDir.dotAndRelease(Vertex3D.crossProduct(pv12, rB, true))
 				const denom = denomB + denomF
 				const friction = denom > 1e-7 ? MathUtils.clamp(numer / denom, -absMaxF, absMaxF) : 0
-				Vertex3D.release(rB, pv12)
+				Vertex3D.release(pv12)
 				ball.hit.applySurfaceImpulse(
 					crossB.clone(true).multiplyScalar(dTime * friction),
 					slipDir.clone(true).multiplyScalar(dTime * friction),
@@ -200,25 +207,22 @@ export class FlipperHit extends HitObject {
 			}
 			Vertex3D.release(aRel)
 		}
-		Vertex3D.release(vRel, rB, rF)
 	}
 
 	public override collide(coll: CollisionEvent, physics: PlayerPhysics): void {
 		const ball = coll.ball,
 			n = coll.hitNormal
-		const vRel = Vertex3D.claim(),
-			rB = Vertex3D.claim(),
-			rF = Vertex3D.claim()
+		const vRel = scratchVRel,
+			rB = scratchRB,
+			rF = scratchRF
 		this.getRelativeVelocity(n, ball, vRel, rB, rF)
 		let bnv = n.dot(vRel)
 		if (bnv >= -C_LOWNORMVEL) {
 			if (bnv > C_LOWNORMVEL) {
-				Vertex3D.release(vRel, rB, rF)
 				return
 			}
 			if (coll.hitDistance < -C_EMBEDDED) bnv = -C_EMBEDSHOT
 			else {
-				Vertex3D.release(vRel, rB, rF)
 				return
 			}
 		}
@@ -259,7 +263,8 @@ export class FlipperHit extends HitObject {
 		const tangent = vRel.clone(true).subAndRelease(n.clone(true).multiplyScalar(vRel.dot(n))),
 			tSq = tangent.lengthSq()
 		if (tSq > 1e-6) {
-			tangent.divideScalar(Math.sqrt(tSq))
+			// Float32 normalize, matching upstream.
+			tangent.divideScalar(Math.fround(Math.sqrt(tSq)))
 			const vt = vRel.dot(tangent)
 			const crossB = Vertex3D.crossProduct(rB, tangent, true),
 				pv12 = crossB.clone(true).divideScalar(ball.hit.inertia)
@@ -277,7 +282,7 @@ export class FlipperHit extends HitObject {
 			this.mover.applyImpulseAndRelease(crossF.clone(true).multiplyScalar(-jt))
 			Vertex3D.release(crossB, pv12, crossF, pv13)
 		}
-		Vertex3D.release(vRel, rB, rF, tangent)
+		Vertex3D.release(tangent)
 		if (bnv < -0.25 && physics.timeMsec - this.lastHitTime > 250) {
 			const h = coll.hitMomentBit ? -1 : -bnv
 			if (h < 0) this.events.fireGroupEvent(Event.HitEventsHit)
@@ -334,8 +339,9 @@ export class FlipperHit extends HitObject {
 			contactAng = angleCur + angleSpeed * t
 			if (contactAng >= angleMax) contactAng = angleMax
 			else if (contactAng <= angleMin) contactAng = angleMin
-			const s = Math.sin(contactAng),
-				c = Math.cos(contactAng)
+			this.mover.updateFaceTrig(contactAng)
+			const s = this.mover.trigSin,
+				c = this.mover.trigCos
 			faceN.x = ffnx * c - ffny * s
 			faceN.y = ffny * c + ffnx * s
 			const vt = Vertex2D.claim(vp.x * c - vp.y * s + base.x, vp.y * c + vp.x * s + base.y)
@@ -408,7 +414,8 @@ export class FlipperHit extends HitObject {
 		)
 		Vertex2D.release(faceN)
 		const d = Math.sqrt(dist.x * dist.x + dist.y * dist.y),
-			inv = d > 0 ? 1 / d : 0
+			// Float32 reciprocal, matching upstream.
+			inv = d > 0 ? Math.fround(1 / d) : 0
 		coll.hitVel.set(-dist.y * inv, dist.x * inv)
 		Vertex2D.release(dist)
 		let asp = angleSpeed
@@ -470,8 +477,9 @@ export class FlipperHit extends HitObject {
 			contactAng = angleCur + angleSpeed * t
 			if (contactAng >= aMax) contactAng = aMax
 			else if (contactAng <= aMin) contactAng = aMin
-			const s = Math.sin(contactAng),
-				c = Math.cos(contactAng)
+			this.mover.updateFaceTrig(contactAng)
+			const s = this.mover.trigSin,
+				c = this.mover.trigCos
 			const vt = Vertex2D.claim(vp.x * c - vp.y * s + base.x, vp.y * c + vp.x * s + base.y)
 			bvtx = bx + bvX * t - vt.x
 			bvty = by + bvY * t - vt.y
@@ -524,7 +532,8 @@ export class FlipperHit extends HitObject {
 		)
 		const d = Math.sqrt(dist.x * dist.x + dist.y * dist.y)
 		if ((contactAng >= aMax && angleSpeed > 0) || (contactAng <= aMin && angleSpeed < 0)) angleSpeed = 0
-		const invD = d > 0 ? 1 / d : 0
+		// Float32 reciprocal, matching upstream.
+		const invD = d > 0 ? Math.fround(1 / d) : 0
 		coll.hitVel.set(-dist.y * invD, dist.x * invD)
 		coll.hitMomentBit = d === 0
 		Vertex2D.release(dist)

@@ -35,6 +35,18 @@ export class FlipperMover implements MoverObject {
 	public torqueScale = 1
 	private readonly backwardsCompatibility = true // !! TODO: matches upstream m_backwards_compatibility
 	public zeroAngNorm = new Vertex2D()
+	// Per-mover sin/cos cache keyed by exact contactAng (resting flipper hits).
+	private trigAng = Number.NaN
+	public trigSin = 0
+	public trigCos = 1
+	/** Caches sin/cos for contactAng; recomputes on change. */
+	public updateFaceTrig(contactAng: number): void {
+		if (contactAng !== this.trigAng) {
+			this.trigAng = contactAng
+			this.trigSin = Math.sin(contactAng)
+			this.trigCos = Math.cos(contactAng)
+		}
+	}
 	public enableRotateEvent = 0
 	private readonly direction: boolean
 	private solState = false

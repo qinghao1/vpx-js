@@ -267,7 +267,8 @@ class MockWpcEmulator implements WpcEmuApi.Emulator {
 	}
 	public executeCycleForTime(advanceByMs: number, _tickSteps: number): number {
 		this.executedCyclesMs += advanceByMs
-		return 0
+		// Real backend returns nonzero ticks whenever time advances.
+		return Math.max(1, Math.round(advanceByMs))
 	}
 	public setCabinetInput(value: number): void {
 		this.cabinetInput.push(value)

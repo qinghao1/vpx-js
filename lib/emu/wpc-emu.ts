@@ -66,9 +66,13 @@ export class Emulator implements IEmulator {
 			return 0
 		}
 		if (this.paused) return 0
+		// Zero time/cycles changes nothing: skip the getUiState pull.
+		if (ms <= 0) return 0
 		const cycles = this.emulator.executeCycleForTime(ms, 16)
-		const state: WpcEmuWebWorkerApi.EmuState = this.emulator.getUiState(INCLUDE_RAM)
-		this.emulatorState.updateState(state.asic)
+		if (cycles > 0) {
+			const state: WpcEmuWebWorkerApi.EmuState = this.emulator.getUiState(INCLUDE_RAM)
+			this.emulatorState.updateState(state.asic)
+		}
 		return cycles
 	}
 
