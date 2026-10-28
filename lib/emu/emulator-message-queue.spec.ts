@@ -21,35 +21,17 @@ describe('The WPC-EMU message queue', () => {
 		mockEmulator = new MockEmulator(queue)
 	})
 
-	it('should add switch toggle to queue and replay it', () => {
-		const addedToQueue = messageQueue.addMessage(MessageType.ToggleSwitchInput, 42)
+	it.each([
+		['toggle', MessageType.ToggleSwitchInput, undefined],
+		['set', MessageType.SetSwitchInput, true],
+		['clear', MessageType.ClearSwitchInput, false],
+	] as const)('should add switch %s to queue and replay it', (_label, type, optionalEnableSwitch) => {
+		const addedToQueue = messageQueue.addMessage(type, 42)
 		messageQueue.replayMessages(mockEmulator)
 		expect(addedToQueue).to.equal(true)
 		expect(queue).to.deep.equal([
 			{
-				optionalEnableSwitch: undefined,
-				switchNr: 42,
-			},
-		])
-	})
-
-	it('should add switch set to queue and apply it', () => {
-		messageQueue.addMessage(MessageType.SetSwitchInput, 42)
-		messageQueue.replayMessages(mockEmulator)
-		expect(queue).to.deep.equal([
-			{
-				optionalEnableSwitch: true,
-				switchNr: 42,
-			},
-		])
-	})
-
-	it('should add switch clear to queue and replay it', () => {
-		messageQueue.addMessage(MessageType.ClearSwitchInput, 42)
-		messageQueue.replayMessages(mockEmulator)
-		expect(queue).to.deep.equal([
-			{
-				optionalEnableSwitch: false,
+				optionalEnableSwitch,
 				switchNr: 42,
 			},
 		])

@@ -38,7 +38,7 @@ describe('PinMAME integration', () => {
 		expect(await isPinmameMock()).toBe((await createPinmameModule()).isMock)
 	})
 
-	it('mock lifecycle: init -> load -> initialized', async () => {
+	it('mock lifecycle: init -> load -> initialized with zeroed state', async () => {
 		const emu = new PinMameEmulator()
 		expect(emu.isInitialized()).toBe(false)
 		await emu.loadGame('twd_160h', new Uint8Array())
@@ -46,6 +46,10 @@ describe('PinMAME integration', () => {
 		expect(emu.getVersion()).toMatch(/libpinmame/)
 		expect(emu.getDmdDimensions().x).toBe(128)
 		expect(emu.getDmdDimensions().y).toBe(32)
+		expect(emu.getLampState(0)).toBe(0)
+		expect(emu.getSolenoidState(0)).toBe(0)
+		expect(emu.getGIState(0)).toBe(0)
+		expect(emu.getSwitchInput(11)).toBe(0)
 	})
 
 	it('queues inputs before init and replays after load', async () => {
@@ -122,15 +126,6 @@ describe('PinMAME integration', () => {
 		expect((s.getChangedLamps() as unknown as number[][]).length).toBe(0)
 		expect(s.getChangedSolenoids().length).toBe(0)
 		expect(s.getChangedGI().length).toBe(0)
-	})
-
-	it('getLamp/Sol/GI return 0 when mock', async () => {
-		const emu = new PinMameEmulator()
-		await emu.loadGame('twd_160h', new Uint8Array())
-		expect(emu.getLampState(0)).toBe(0)
-		expect(emu.getSolenoidState(0)).toBe(0)
-		expect(emu.getGIState(0)).toBe(0)
-		expect(emu.getSwitchInput(11)).toBe(0)
 	})
 
 	it('with real ROM loads if available (skipped if mock or missing)', async () => {

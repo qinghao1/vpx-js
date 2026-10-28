@@ -84,16 +84,10 @@ describe('The EmulatorState - handle state changes', () => {
 		emulatorState = new EmulatorState()
 	})
 
-	it('should return empty array for initially unchanged lamps', () => {
+	it('should return empty arrays for initially unchanged lamps, solenoids, and GI strings', () => {
 		expect(emulatorState.getChangedLamps()).to.be.an('array')
 		expect(emulatorState.getChangedLamps()).to.be.empty
-	})
-
-	it('should return empty array for initially unchanged solenoids', () => {
 		expect(emulatorState.getChangedSolenoids()).to.deep.equal([])
-	})
-
-	it('should return empty array for initially unchanged GI strings', () => {
 		expect(emulatorState.getChangedGI()).to.deep.equal([])
 	})
 

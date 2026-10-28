@@ -60,6 +60,10 @@ export class PinMameEmulator implements IEmulator {
 	private ready = false
 	private paused = false
 	private game: string = ''
+	// Single-flight guards: init races the module import, and concurrent
+	// loadGame calls race the isRunning check — serialize both.
+	private initPromise: Promise<void> | null = null
+	private loadPromise: Promise<void> | null = null
 
 	private readonly lamps = new Uint8Array(1024)
 	private readonly sols = new Uint8Array(128)
@@ -69,8 +73,14 @@ export class PinMameEmulator implements IEmulator {
 	private readonly pendingSwitches = new Map<number, number>()
 	private dmdW = FALLBACK_DMD.x
 	private dmdH = FALLBACK_DMD.y
+	// Scratch buffers pooled across frames to avoid per-sync _malloc churn.
+	// The pull slot is shared: lamp/sol/GI pulls run sequentially (never
+	// concurrently), each writing 8-byte (i32 index, i32 value) pairs. Sizes
+	// below are bytes: the slot grows on demand to the largest pull (1024
+	// lamps = 8 KiB). The DMD slot is separate so frame-sized buffers don't
+	// thrash against pull pages when resolutions differ from the 128x32 fallback.
 	private readonly wasmBufs: Record<'pull' | 'dmd', { ptr: number; cap: number; min: number }> = {
-		// 1024 covers one pull page of lamp/sol/GI change pairs; 4096 one full 128x32 DMD frame.
+		// 1024 covers the sol/GI pulls; lamps grow it to 8 KiB. 4096 is one full 128x32 DMD frame.
 		pull: { ptr: 0, cap: 0, min: 1024 },
 		dmd: { ptr: 0, cap: 0, min: 4096 },
 	}
@@ -78,6 +88,16 @@ export class PinMameEmulator implements IEmulator {
 
 	async init(): Promise<void> {
 		if (this.mod) return
+		if (!this.initPromise) {
+			this.initPromise = this.doInit().catch(e => {
+				this.initPromise = null
+				throw e
+			})
+		}
+		await this.initPromise
+	}
+
+	private async doInit(): Promise<void> {
 		const { module, isMock } = await createPinmameModule()
 		this.mod = module
 		this.isMock = isMock
@@ -113,6 +133,19 @@ export class PinMameEmulator implements IEmulator {
 	}
 
 	async loadGame(name: string | { name?: string; pinmame?: { name?: string } }, rom: Uint8Array): Promise<void> {
+		// Serialize loads: the isRunning check below is check-then-act, so two
+		// concurrent loads could both start a run. Failures don't jam the
+		// chain — the catch lets the next load proceed while still rejecting
+		// the caller that failed.
+		const run = (this.loadPromise ?? Promise.resolve()).catch(() => {}).then(() => this.doLoadGame(name, rom))
+		this.loadPromise = run
+		await run
+	}
+
+	private async doLoadGame(
+		name: string | { name?: string; pinmame?: { name?: string } },
+		rom: Uint8Array,
+	): Promise<void> {
 		await this.init()
 		const game = gameName(name)
 		if (!game) throw new Error('PINMAME_GAME_NAME_MISSING')
@@ -160,7 +193,18 @@ export class PinMameEmulator implements IEmulator {
 		this.markReady()
 	}
 
-	private markReady(): void {
+	/**
+	 * Test seam: installs a fake module/API backend without loading WASM.
+	 * Unknown-typed so specs never touch private fields to wire fakes.
+	 */
+	public setBackendForTesting(mod: unknown, api: unknown): void {
+		this.mod = mod as PinmameModule
+		this.api = api as Api
+		this.isMock = false
+	}
+
+	/** Advances to ready (normally called by loadGame; public for tests). */
+	public markReady(): void {
 		this.ready = true
 		this.queue.replayMessages(this)
 		if (this.isMock || !this.api) return
@@ -169,6 +213,8 @@ export class PinMameEmulator implements IEmulator {
 		}
 	}
 
+	// PinMAME's config is a fixed 1 KiB C struct read by pointer: offset 4 is
+	// the mixer sample rate (i32 LE) and offset 8 the VPM install dir string.
 	private writeConfig(m: PinmameModule): void {
 		const ptr = m._malloc(CONFIG_SIZE)
 		try {
@@ -280,6 +326,10 @@ export class PinMameEmulator implements IEmulator {
 		this.dmdH = h
 		const n = w * h
 		const ptr = this.ensureWasmBuf('dmd', n)
+		// getDmdFrame returns bytes written (0 = no display yet). The frame is
+		// copied out of wasm memory twice — HEAPU8 into the reusable
+		// _dmdFrameBuf, then EmulatorState.setDmd slices again — so later pulls
+		// can't mutate a previously published frame.
 		if (ptr && this.api.getDmdFrame(ptr) > 0) {
 			if (!this._dmdFrameBuf || this._dmdFrameBuf.length !== n) {
 				this._dmdFrameBuf = new Uint8Array(n)
@@ -291,15 +341,22 @@ export class PinMameEmulator implements IEmulator {
 
 	private pull(fn: (p: number) => number, buf: Uint8Array): void {
 		const m = this.mod
-		if (!m) return
+		// A null fn is the cwrap-missing-export escape: cwrap returns null when
+		// the wasm build lacks the export instead of throwing at wrap time.
+		if (!m || typeof fn !== 'function') return
 		const reqBytes = buf.length * 8
 		const ptr = this.ensureWasmBuf('pull', reqBytes)
 		if (!ptr) return
 		let n = 0
 		try {
-			n = fn(ptr)
-		} catch (e) {
-			if (String(e) !== 'unwind') throw e
+			// One failing stage must not poison the other two: any throw or
+			// bogus count (null/NaN/negative) degrades to zero changes. A huge
+			// finite count is clamped to the lane count: indexes past it are
+			// ignored anyway, and an unbounded read loop would hang the tick.
+			n = fn(ptr) ?? 0
+			if (!Number.isFinite(n) || n < 0) n = 0
+			n = Math.min(n, buf.length)
+		} catch {
 			n = 0
 		}
 		for (let i = 0; i < n; i++) {

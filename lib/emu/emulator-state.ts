@@ -83,6 +83,10 @@ export class EmulatorState {
 		this.lastGis = this.gis.slice()
 		return d
 	}
+	// Alphanumeric/segment-display LEDs. The wasm link already exports
+	// _PinmameGetChangedLEDs but no TS binding pulls it yet, and wpc-emu has
+	// no LED surface — so this stays a pinned [] stub until that pipeline
+	// is wired (deliberately not implemented here).
 	getChangedLEDs(): number[][] {
 		return []
 	}

@@ -14,15 +14,25 @@ describe('PinMAME loader', () => {
 		const noop = () => {}
 		Logger.setLogger({ wtf: noop, error: noop, warn: noop, info: noop, debug })
 		try {
-			try {
-				await createPinmameModule()
-			} catch {
-				// No usable module here — the candidate misses below are the point.
-			}
+			const loaded = await createPinmameModule().catch(() => null)
 			const misses = debug.mock.calls.filter(c => String(c[0]).includes('WASM candidate'))
-			expect(misses.length).toBeGreaterThan(0)
+			if (!loaded) {
+				// No usable module here — the candidate misses below are the point.
+				expect(misses.length).toBeGreaterThan(0)
+			} else {
+				// A usable module resolves with the loader shape, mock or real.
+				expect(typeof loaded.module.cwrap).toBe('function')
+				expect(typeof loaded.isMock).toBe('boolean')
+			}
 		} finally {
 			Logger.setLogger(orig)
 		}
+	})
+
+	it('caches the module across calls', async () => {
+		const first = await createPinmameModule()
+		const second = await createPinmameModule()
+		expect(second.module).toBe(first.module)
+		expect(second.isMock).toBe(first.isMock)
 	})
 })

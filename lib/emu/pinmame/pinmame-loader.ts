@@ -2,6 +2,7 @@ import { logger } from '../../util/logger.js'
 import type { PinmameModule } from './pinmame-module.js'
 
 let cached: { module: PinmameModule; isMock: boolean } | null = null
+let inflight: Promise<{ module: PinmameModule; isMock: boolean }> | null = null
 
 const CANDIDATES = [
 	'/wasm/libpinmame.js',
@@ -15,6 +16,17 @@ const CANDIDATES = [
 
 export async function createPinmameModule(): Promise<{ module: PinmameModule; isMock: boolean }> {
 	if (cached) return cached
+	// Single-flight: concurrent callers share one import probe sequence.
+	inflight ??= loadModule().catch(e => {
+		inflight = null
+		throw e
+	})
+	const found = await inflight
+	cached = found
+	return found
+}
+
+async function loadModule(): Promise<{ module: PinmameModule; isMock: boolean }> {
 	for (const path of CANDIDATES) {
 		try {
 			const mod = (await import(/* @vite-ignore */ path)) as {
@@ -28,8 +40,7 @@ export async function createPinmameModule(): Promise<{ module: PinmameModule; is
 			}
 			const isMock = mod.isMock === true
 			if (isMock) logger().warn('[pinmame] mock — run npm run build:wasm')
-			cached = { module: m, isMock }
-			return cached
+			return { module: m, isMock }
 		} catch (e) {
 			// Log each miss at debug so a wrong candidate order is diagnosable.
 			logger().debug('[pinmame] WASM candidate failed:', path, e)
@@ -44,4 +55,5 @@ export async function isPinmameMock(): Promise<boolean> {
 
 export function resetPinmameModuleCache(): void {
 	cached = null
+	inflight = null
 }
