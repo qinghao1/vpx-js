@@ -5,12 +5,6 @@ import { type InputHost, makeHost } from './input-manager.js'
 // or releases keys, so it carries the InputHost subset it actually uses.
 type NudgeHost = Omit<InputHost, 'enterPlayMode' | 'exitPlayMode' | 'togglePause' | 'releaseKeys'>
 
-// A full InputHost satisfies the nudge subset — reuse the shared factory
-// instead of maintaining a second copy of the same getters.
-function toNudgeHost(viewer: any): NudgeHost {
-	return makeHost(viewer)
-}
-
 function attachNudgeHost(host: NudgeHost, signal: AbortSignal): void {
 	const trigger = (angle: number, force = NUDGE.force): void => {
 		if (!host.player || host.viewerMode !== 'play') return
@@ -111,7 +105,7 @@ function attachNudgeHost(host: NudgeHost, signal: AbortSignal): void {
 }
 
 export function attachNudgeInput(viewer: any): () => void {
-	const host = toNudgeHost(viewer)
+	const host = makeHost(viewer)
 	const ctrl = new AbortController()
 
 	if (viewer._nudgeCtrl) {
