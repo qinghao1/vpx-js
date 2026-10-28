@@ -30,6 +30,11 @@ export function readFromMemory(
 	position: number,
 ): Promise<[number, Uint8Array]> {
 	if (!data) throw new Error(notOpenMessage)
+	// TypedArray.subarray wraps negative indexes (position -8 reads from 0),
+	// so reject them like a failed IStream seek instead of aliasing bytes.
+	if (!Number.isInteger(position) || position < 0) throw new Error(`Invalid read position ${position}.`)
+	if (!Number.isInteger(offset) || offset < 0 || !Number.isInteger(length) || length < 0)
+		throw new Error(`Invalid read range offset ${offset} length ${length}.`)
 	const slice = data.subarray(position, position + length)
 	target.set(slice, offset)
 	return Promise.resolve([slice.length, target.subarray(offset, offset + slice.length)])

@@ -118,4 +118,14 @@ describe('The LZW reader rewrite guards', () => {
 		reader.decompress()
 		expect(reader.getBadCodeCount()).to.be.greaterThan(0)
 	})
+
+	it('should not consume the block after the ending code', () => {
+		// The ending code lands mid-block; the trailing zero block and junk
+		// belong to the next chunk, so consumed stops at the first block end.
+		const full = encode([CLEAR, 1, 2, END])
+		const input = new Uint8Array([...full, 9, 9, 9])
+		const [out, consumed] = new LzwReader(input, 2, 1, 2).decompress()
+		expect(new Uint8Array(out)).to.deep.equal(new Uint8Array([1, 2]))
+		expect(consumed).to.equal(full.length - 1)
+	})
 })

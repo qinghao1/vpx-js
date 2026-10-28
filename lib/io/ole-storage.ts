@@ -1,7 +1,6 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { concatUint8Arrays } from './binary-helpers.js'
 import type { StorageEntry } from './ole-directory-tree.js'
 import type { OleCompoundDoc, ReadResult } from './ole-doc.js'
 
@@ -42,23 +41,15 @@ export class Storage {
 			const slice = buf.subarray(pos)
 			if (slice.length < 4) break
 			const result: ReadResult = { data: slice, storageOffset: offset + pos }
-			let len = await next(result)
-			// Negative len requests more bytes: refill across sector boundaries, then retry.
-			if (len !== null && len < 0) {
-				const remaining = -len - slice.length
-				const need = Math.ceil(remaining / secSize)
-				if (remaining > e.size - (offset + pos))
-					throw new Error(`Cannot read ${remaining} when only ${e.size - (offset + pos)} remain.`)
-				const missOff = secOffset + Math.floor((innerOffset + pos + slice.length) / secSize)
-				const missIds = secIds.slice(missOff, missOff + need)
-				const miss = shortStream
-					? await this.doc.readShortSectors(missIds, 0, remaining)
-					: await this.doc.readSectors(missIds, 0, remaining)
-				result.data = concatUint8Arrays(result.data, miss)
-				len = await next(result)
-			}
+			const len = await next(result)
+			// buf already spans offset..end of stream, so a record demanding
+			// more bytes overruns the stream (upstream BiffReader fails the
+			// load on a short read): reject instead of re-reading sectors.
+			if (len !== null && len < 0)
+				throw new Error(
+					`Corrupt BIFF record: declares ${-len} bytes but only ${slice.length} remain in stream "${name}".`,
+				)
 			if (len === null) break
-			if (len < 0) throw new Error('Second negative len not supported')
 			pos += len
 			// A streamed record (CODE) sizes itself from its cchar; an advance past
 			// the stream end means the length overran the stream (upstream AsScript

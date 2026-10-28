@@ -111,14 +111,14 @@ export class BiffParser {
 		return ((bgr & 0xff) << 16) + (bgr & 0xff00) + ((bgr & 0xff0000) >> 16)
 	}
 
-	/** Reads string at offset 4 (UTF-8, legacy CP1252 fallback like upstream). */
-	public getString(buf: Uint8Array, len: number): string {
-		return decodeUtf8OrCp1252(buf.subarray(4, len))
+	/** Reads string at offset 4 (UTF-8, legacy CP1252 fallback like upstream). `end` is the payload end index. */
+	public getString(buf: Uint8Array, end: number): string {
+		return decodeUtf8OrCp1252(buf.subarray(4, end))
 	}
 
-	/** Reads UTF-16LE string at offset 4. */
-	public getWideString(buf: Uint8Array, len: number): string {
-		return new TextDecoder('utf-16le').decode(buf.subarray(4, len))
+	/** Reads UTF-16LE string at offset 4. `end` is the payload end index. */
+	public getWideString(buf: Uint8Array, end: number): string {
+		return new TextDecoder('utf-16le').decode(buf.subarray(4, end))
 	}
 
 	/** Reads int32 at 0. */

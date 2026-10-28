@@ -256,7 +256,7 @@ describe('The OLE compound document reader', () => {
 
 	it('keeps last-wins resolution for duplicate sibling names', async () => {
 		// BST: root -> A; A.left = B('Dup', secId 10), A.right = C('Dup', secId 20).
-		// Pre-order visit [A, B, C] assigns B then C, so the right sibling wins.
+		// In-order visit [B, A, C] like pole files B then C, so the right sibling wins.
 		const buf = concatBytes(
 			buildNamedDirEntry('Root', 5, 1, -2, 0),
 			buildNamedDirEntry('A', 2, -1, -2, 0, 2, 3),
@@ -379,6 +379,7 @@ describe('The OLE compound document reader', () => {
 			storageDirId: -1,
 			secId: 0,
 			size,
+			valid: true,
 			storages: {},
 			streams: {},
 		})
@@ -498,5 +499,77 @@ describe('The OLE compound document against real files', () => {
 			await viaBinary.close()
 			await viaMemory.close()
 		}
+	})
+})
+
+describe('The OLE directory in-order walk and validity', () => {
+	it('files a node after its left subtree like pole dirtree_find_siblings', async () => {
+		// BST: root -> A(idx1, secId 10); A.left = B(idx2, also 'A', secId 20).
+		// In-order [B, A] files B then A, so the node itself wins over its left subtree.
+		const buf = concatBytes(
+			buildNamedDirEntry('Root', 5, 1, -2, 0),
+			buildNamedDirEntry('A', 2, -1, 10, 0, 2, -1),
+			buildNamedDirEntry('A', 2, -1, 20, 0),
+		)
+		const fakeDoc = { readSectors: async () => buf } as unknown as OleCompoundDoc
+		const tree = await DirectoryTree.load(fakeDoc, [0])
+		expect(tree.root.streams.A?.secId).to.equal(10)
+	})
+
+	it('skips entries with unknown types like pole validity', async () => {
+		const buf = concatBytes(buildNamedDirEntry('Root', 5, 1, -2, 0), buildNamedDirEntry('Ghost', 0, -1, -2, 0))
+		const fakeDoc = { readSectors: async () => buf } as unknown as OleCompoundDoc
+		const tree = await DirectoryTree.load(fakeDoc, [0])
+		expect(Object.keys(tree.root.streams)).to.deep.equal([])
+		expect(Object.keys(tree.root.storages)).to.deep.equal([])
+	})
+
+	it('ignores a root entry with an empty name like pole validity', async () => {
+		const badRoot = buildDirEntry(5, -1, -1, -1)
+		new DataView(badRoot.buffer).setUint16(64, 0, true)
+		const fakeDoc = { readSectors: async () => badRoot } as unknown as OleCompoundDoc
+		await expectRejection(DirectoryTree.load(fakeDoc, [0]), /root/i)
+	})
+
+	it('rejects a truncated record instead of refilling it from the same sectors', async () => {
+		// Record declares len 8 (tag + 4 payload bytes) but only the tag follows.
+		const partial = new Uint8Array(8)
+		new DataView(partial.buffer).setInt32(0, 8, true)
+		for (let i = 0; i < 4; i++) partial[4 + i] = 'TEST'.charCodeAt(i)
+		const doc = {
+			header: { shortStreamMax: 4096, secSize: 512, shortSecSize: 64 },
+			SAT: { getSecIdChain: () => [0] },
+			SSAT: { getSecIdChain: () => [0] },
+			readSectors: async () => partial,
+			readShortSectors: async () => partial,
+		} as unknown as OleCompoundDoc
+		const entry = (name: string, size: number): StorageEntry => ({
+			name,
+			type: 2,
+			nodeColor: 0,
+			left: -1,
+			right: -1,
+			storageDirId: -1,
+			secId: 0,
+			size,
+			valid: true,
+			storages: {},
+			streams: {},
+		})
+		const dirEntry: StorageEntry = {
+			...entry('', 0),
+			type: 5,
+			storages: {},
+			streams: { GameData: entry('GameData', partial.length) },
+		}
+		const storage = new Storage(doc, dirEntry)
+		await expectRejection(
+			storage.streamFiltered(
+				'GameData',
+				0,
+				BiffParser.stream(async () => 0),
+			),
+			/declares 12 bytes but only 8 remain/,
+		)
 	})
 })

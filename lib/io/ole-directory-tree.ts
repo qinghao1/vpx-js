@@ -13,6 +13,8 @@ export interface StorageEntry {
 	storageDirId: number
 	secId: number
 	size: number
+	/** False for unknown types and empty names, like pole's DirEntry::valid: skipped, never filed. */
+	valid: boolean
 	storages: Record<string, StorageEntry>
 	streams: Record<string, StorageEntry>
 }
@@ -35,12 +37,21 @@ export class DirectoryTree {
 		for (let off = 0; off < buf.length; off += 128) {
 			// Name length is bytes incl. terminator in a 64-byte field; clamp it
 			// and stop at the first NUL, like pole's DirTree::load.
-			const nameBytes = Math.min(view.getUint16(off + 64, true), 64) & ~1
+			const rawNameLen = view.getUint16(off + 64, true)
+			const nameBytes = Math.min(rawNameLen, 64) & ~1
 			const rawName = decoder.decode(buf.subarray(off, off + nameBytes))
 			const nul = rawName.indexOf('\0')
+			const type = view.getInt8(off + 66)
 			entries.push({
 				name: nul < 0 ? rawName : rawName.slice(0, nul),
-				type: view.getInt8(off + 66),
+				type,
+				// pole marks unknown types and empty names invalid; children()
+				// then skips them and Storage never opens them by name.
+				valid:
+					(type === DirectoryTree.EntryTypeStorage ||
+						type === DirectoryTree.EntryTypeStream ||
+						type === DirectoryTree.EntryTypeRoot) &&
+					rawNameLen >= 1,
 				nodeColor: view.getInt8(off + 67),
 				left: view.getInt32(off + 68, true),
 				right: view.getInt32(off + 72, true),
@@ -51,7 +62,7 @@ export class DirectoryTree {
 				streams: {},
 			})
 		}
-		const root = entries.find(e => e.type === DirectoryTree.EntryTypeRoot)
+		const root = entries.find(e => e.type === DirectoryTree.EntryTypeRoot && e.valid)
 		if (!root) throw new Error('No root entry found.')
 		return new DirectoryTree(doc, root, entries)
 	}
@@ -81,6 +92,7 @@ export class DirectoryTree {
 				frame.entry.streams = {}
 				for (const id of ids) {
 					const child = this.entries[id]
+					if (!child.valid) continue
 					if (child.type === DirectoryTree.EntryTypeStorage) frame.entry.storages[child.name] = child
 					if (child.type === DirectoryTree.EntryTypeStream) frame.entry.streams[child.name] = child
 				}
@@ -101,28 +113,31 @@ export class DirectoryTree {
 	private getChildIds(entry: StorageEntry): number[] {
 		if (entry.storageDirId <= -1) return []
 		this.assertIndex(entry.storageDirId)
-		// Iterative pre-order BST walk like pole's dirtree_find_siblings: each
-		// index is visited once, so the walk is bounded by the entry count and
-		// cannot recurse on a crafted deep chain. Indexes land in `ids` in pop
-		// (visit) order — left subtree before right, like the old recursion —
-		// so duplicate child names keep last-wins with the same winner.
+		// Iterative in-order BST walk matching pole's dirtree_find_siblings
+		// (left, self, right): each index is pushed once, so the walk is
+		// bounded by the entry count and cannot recurse on a crafted deep
+		// chain. In-order filing decides the last-wins winner for duplicate
+		// child names, so the order must match upstream, not pre-order.
 		const ids: number[] = []
-		const seen = new Set([entry.storageDirId])
-		const pending = [entry.storageDirId]
-		while (pending.length > 0) {
-			const id = pending.pop()!
-			ids.push(id)
-			const current = this.entries[id]
-			// Push right first so the left subtree still drains first.
-			for (const next of [current.right, current.left]) {
-				if (next === DirectoryTree.Leaf) continue
-				this.assertIndex(next)
-				if (seen.has(next)) throw new Error(`Corrupt file: cycle detected at directory index ${next}.`)
-				seen.add(next)
-				pending.push(next)
+		const seen = new Set<number>()
+		const stack: number[] = []
+		let id: number | undefined = entry.storageDirId
+		while (stack.length > 0 || id !== undefined) {
+			while (id !== undefined) {
+				if (id === DirectoryTree.Leaf) break
+				this.assertIndex(id)
+				if (seen.has(id)) throw new Error(`Corrupt file: cycle detected at directory index ${id}.`)
+				seen.add(id)
+				stack.push(id)
+				id = this.entries[id].left
 			}
+			if (stack.length === 0) break
+			const node = stack.pop()!
+			ids.push(node)
 			if (ids.length > this.entries.length)
 				throw new Error('Corrupt file: directory sibling walk exceeded entry count.')
+			const right = this.entries[node].right
+			id = right === DirectoryTree.Leaf ? undefined : right
 		}
 		return ids
 	}

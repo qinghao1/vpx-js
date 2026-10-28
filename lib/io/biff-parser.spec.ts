@@ -190,3 +190,39 @@ describe('BiffParser decompress and options', () => {
 		expect(offsets).to.deep.equal([108])
 	})
 })
+
+describe('BiffParser string helpers', () => {
+	function prefixed(text: Uint8Array): Uint8Array {
+		const buf = new Uint8Array(4 + text.length)
+		new DataView(buf.buffer).setInt32(0, text.length, true)
+		buf.set(text, 4)
+		return buf
+	}
+
+	it('should skip the 4-byte length prefix', () => {
+		const parser = new BiffParser()
+		const buf = prefixed(new TextEncoder().encode('Hi'))
+		expect(parser.getString(buf, buf.length)).to.equal('Hi')
+	})
+
+	it('should honor the end index', () => {
+		const parser = new BiffParser()
+		const buf = concat([prefixed(new TextEncoder().encode('Hi')), new Uint8Array([0xff, 0xff])])
+		expect(parser.getString(buf, 6)).to.equal('Hi')
+	})
+
+	it('should fall back to CP1252 for legacy bytes', () => {
+		const parser = new BiffParser()
+		const buf = prefixed(new Uint8Array([0xe9]))
+		expect(parser.getString(buf, buf.length)).to.equal('é')
+	})
+
+	it('should read a wide string', () => {
+		const parser = new BiffParser()
+		const text = new Uint8Array([0x48, 0x00, 0x69, 0x00])
+		const buf = new Uint8Array(4 + text.length)
+		new DataView(buf.buffer).setInt32(0, text.length, true)
+		buf.set(text, 4)
+		expect(parser.getWideString(buf, buf.length)).to.equal('Hi')
+	})
+})

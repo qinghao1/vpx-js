@@ -208,7 +208,7 @@ export class LzwReader {
 
 	private NextLine(): BufferPtr {
 		const pbRet = BufferPtr.fromPtr(this.pbBitsOutCur)
-		this.pbBitsOutCur.incr(this.cbStride) // rows are stored bottom-up, so step one stride per line
+		this.pbBitsOutCur.incr(this.cbStride) // step one stride per decoded line, like upstream output += width
 		return pbRet
 	}
 
@@ -293,8 +293,8 @@ class BufferPtr {
 		this.pos -= offset
 	}
 
-	public get(offset: number = -1): number {
-		return this.buf[offset > -1 ? offset : this.pos]
+	public get(offset?: number): number {
+		return this.buf[offset ?? this.pos]
 	}
 
 	public next(): number {
