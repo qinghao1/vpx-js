@@ -7,6 +7,11 @@ export const QUALITY_CAPS = {
 	high: { playfield: 4096, other: 4096, floor: 1024, aniso: 16 },
 } as const
 
+/** 8x ceiling: 16x is invisible at pinball angles; low-tier 4x passes through. */
+export function cappedAniso(aniso: number): number {
+	return Math.min(8, aniso)
+}
+
 export const QUALITY_MAX_LIGHTS = {
 	low: 12,
 	high: 16,

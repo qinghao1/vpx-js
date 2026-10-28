@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { getEffectiveCaps, isLowQuality } from '../../util/quality.js'
+import { cappedAniso, getEffectiveCaps, isLowQuality } from '../../util/quality.js'
 import { cloneMaterialForWrite, getGlobalEmissionScale } from './material-shared.js'
 import {
 	isPrimitiveNodeMaterial,
@@ -34,7 +34,7 @@ function wrapTexBaked(tex: THREE.Texture | null | undefined, aniso = getEffectiv
 	tex.generateMipmaps = true
 	tex.minFilter = THREE.LinearMipmapLinearFilter
 	tex.magFilter = THREE.LinearFilter
-	tex.anisotropy = aniso
+	tex.anisotropy = cappedAniso(aniso)
 	tex.needsUpdate = true
 }
 

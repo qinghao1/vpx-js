@@ -69,13 +69,21 @@ export async function idbSet(key: string, val: any): Promise<void> {
 	}
 }
 
-export function exrCacheKey(name: string, data: Uint8Array, kind: string, max?: number): string {
-	// Content hash (djb2, same style as vbsCacheKey): a byteLength-only key
-	// collides for same-size textures and serves the wrong bytes from cache.
-	// The key format changed with the hash, so pre-hash entries simply miss.
+function djb2(data: Uint8Array): number {
 	let h = 5381
 	for (let i = 0; i < data.length; i++) h = ((h << 5) + h) ^ data[i]
-	const base = `exr:${name.toLowerCase()}:${kind}:${(h >>> 0).toString(36)}:${data.length}`
+	return h >>> 0
+}
+
+export function exrCacheKey(name: string, data: Uint8Array, kind: string, max?: number): string {
+	// Content hash: a byteLength-only key collides for same-size textures.
+	const base = `exr:${name.toLowerCase()}:${kind}:${djb2(data).toString(36)}:${data.length}`
+	return typeof max === 'number' && max > 0 ? `${base}:${max}` : base
+}
+
+/** Content-hash key for decoded bitmaps (`img:` ≠ `exr:` namespace). */
+export function bitmapCacheKey(name: string, data: Uint8Array, mime: string, max?: number): string {
+	const base = `img:${name.toLowerCase()}:${mime}:${djb2(data).toString(36)}:${data.length}`
 	return typeof max === 'number' && max > 0 ? `${base}:${max}` : base
 }
 

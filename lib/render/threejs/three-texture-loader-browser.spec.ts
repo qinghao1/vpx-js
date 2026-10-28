@@ -1,3 +1,5 @@
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
+import { LinearFilter, LinearMipmapLinearFilter } from 'three'
 import { describe, expect, it } from 'vitest'
 import { MAX_FLOAT_TEXTURE_BYTES } from '../../util/quality.js'
 import { ThreeTextureLoaderBrowser } from './three-texture-loader-browser.js'
@@ -21,5 +23,34 @@ describe('ThreeTextureLoaderBrowser float size bound', () => {
 		await expect(loader.loadTexture('vlm.nestmap1', '.hdr', huge)).rejects.toThrow(/HDR\/EXR parse failed/)
 		// Small payloads still reach the worker path (node has none), proving no over-blocking.
 		await expect(loader.loadTexture('nestmap', '.exr', new Uint8Array(1024))).rejects.toThrow(/no worker/)
+	})
+})
+
+describe('ThreeTextureLoaderBrowser tuning', () => {
+	const loader = new ThreeTextureLoaderBrowser()
+	const raw = (name: string, w: number, h: number) =>
+		loader.loadRawTexture(name, new Uint8Array(w * h * 4), w, h) as Promise<any>
+
+	it('caps anisotropy at 8 (high tier requests 16)', async () => {
+		const tex = await raw('some_wall', 512, 512)
+		expect(tex.anisotropy).toBe(8)
+	})
+
+	it('keeps mipmaps on ordinary textures', async () => {
+		const tex = await raw('some_wall', 512, 512)
+		expect(tex.generateMipmaps).toBe(true)
+		expect(tex.minFilter).toBe(LinearMipmapLinearFilter)
+	})
+
+	it('disables mipmaps for DMD maps (always magnified, never minified)', async () => {
+		const tex = await raw('DMD_panel', 128, 32)
+		expect(tex.generateMipmaps).toBe(false)
+		expect(tex.minFilter).toBe(LinearFilter)
+	})
+
+	it('disables mipmaps for icon-class textures (longest edge <= 64)', async () => {
+		const tex = await raw('screw', 32, 32)
+		expect(tex.generateMipmaps).toBe(false)
+		expect(tex.minFilter).toBe(LinearFilter)
 	})
 })

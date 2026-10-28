@@ -19,9 +19,9 @@ import {
 	TextureLoader,
 	type Texture as ThreeTexture,
 } from '../../refs.browser.js'
-import { exrCacheKey, idbGet, idbSet } from '../../util/idb-cache.js'
+import { bitmapCacheKey, exrCacheKey, idbGet, idbSet } from '../../util/idb-cache.js'
 import { logger } from '../../util/logger.js'
-import { _resetQualityCache, getEffectiveCaps, MAX_FLOAT_TEXTURE_BYTES } from '../../util/quality.js'
+import { _resetQualityCache, cappedAniso, getEffectiveCaps, MAX_FLOAT_TEXTURE_BYTES } from '../../util/quality.js'
 import type { ITextureLoader } from '../irender-api.js'
 import { decodeInWorker, hasImageWorker } from './image-worker-pool.js'
 import { RE_PLAYFIELD } from './material-shared.js'
@@ -59,18 +59,25 @@ export function _testResetTextureLimits(): void {
 	_resetQualityCache()
 }
 
-function tune(tex: any): void {
+/** No mip chain for magnified DMD panels or tiny (≤64px) icons: ~33% GPU and upload for nothing. */
+const RE_NOMIPMAP = /dmd/i
+const NOMIPMAP_MAX_EDGE = 64
+
+function tune(tex: any, name?: string): void {
 	const caps = getEffectiveCaps()
-	tex.generateMipmaps = true
-	tex.minFilter = LinearMipMapLinearFilter
+	const img = tex?.image
+	const edge = Math.max(img?.width ?? 0, img?.height ?? 0)
+	const noMips = (!!name && RE_NOMIPMAP.test(name)) || (edge > 0 && edge <= NOMIPMAP_MAX_EDGE)
+	tex.generateMipmaps = !noMips
+	tex.minFilter = noMips ? LinearFilter : LinearMipMapLinearFilter
 	tex.magFilter = LinearFilter
-	tex.anisotropy = caps.aniso
+	tex.anisotropy = cappedAniso(caps.aniso)
 }
 
 function nameAndTune(tex: any, name: string): void {
 	tex.name = `texture:${name}`
 	tex.needsUpdate = true
-	tune(tex)
+	tune(tex, name)
 }
 
 function textureFromBitmap(bitmap: any, name: string): any {
@@ -79,7 +86,7 @@ function textureFromBitmap(bitmap: any, name: string): any {
 	tex.flipY = false
 	tex.needsUpdate = true
 	tex.name = `texture:${name}`
-	tune(tex)
+	tune(tex, name)
 	return tex
 }
 
@@ -90,45 +97,8 @@ function toBlobPart(data: Uint8Array): Uint8Array | ArrayBufferLike {
 		: data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength)
 }
 
-function bitmapToCanvasTexture(bitmap: any, name: string): any {
-	try {
-		if (typeof document === 'undefined' || !bitmap?.width || !bitmap?.height) return null
-		const canvas: any = document.createElement('canvas')
-		canvas.width = bitmap.width
-		canvas.height = bitmap.height
-		const ctx: any = canvas.getContext('2d')
-		if (!ctx) return null
-		ctx.drawImage(bitmap as any, 0, 0, bitmap.width, bitmap.height)
-		try {
-			bitmap.close?.()
-		} catch {}
-		const tex: any = new CanvasTexture(canvas)
-		tex.colorSpace = SRGBColorSpace
-		tex.flipY = false
-		tex.needsUpdate = true
-		tex.name = `texture:${name}`
-		tune(tex)
-		return tex
-	} catch {
-		return null
-	}
-}
-
 function finalize(tex: any, name: string, isFloat: boolean): any {
-	if (tex?.image && typeof (tex.image as any).close === 'function' && (tex.image as any).width) {
-		const img: any = tex.image
-		const isBitmap = typeof ImageBitmap !== 'undefined' ? img instanceof ImageBitmap : false
-		const looksBitmap =
-			isBitmap ||
-			(typeof img.width === 'number' && typeof img.height === 'number' && typeof img.close === 'function')
-		if (looksBitmap) {
-			const conv = bitmapToCanvasTexture(img, name)
-			if (conv) {
-				tex.dispose?.()
-				tex = conv
-			}
-		}
-	}
+	// three@0.185 uploads ImageBitmap directly; the canvas copy only added alloc + upload.
 	const max = effectiveMax(isFloat, name)
 	if (tex.image?.data && tex.image.width && tex.image.height) {
 		const ds = downsampleData(tex, max, name)
@@ -189,10 +159,32 @@ function parseWorker(buffer: ArrayBuffer, kind: 'exr' | 'hdr', max?: number, nam
 	})
 }
 
+/** Cache resized bitmaps ≤4MB in IDB; larger ones re-decode (as EXR-only did before). */
+const MAX_CACHED_BITMAP_BYTES = 4 * 1024 * 1024
+
+/** IDB revivals quack like a bitmap without the realm's prototype. */
+function asCachedBitmap(cached: any): any {
+	const ok =
+		cached &&
+		typeof cached.width === 'number' &&
+		typeof cached.height === 'number' &&
+		(typeof ImageBitmap === 'undefined' || cached instanceof ImageBitmap || typeof cached.close === 'function')
+	return ok ? cached : null
+}
+
 async function loadRegularWorker(name: string, mime: string, data: Uint8Array): Promise<ThreeTexture | null> {
 	const max = effectiveMax(false, name)
+	const key = bitmapCacheKey(name, data, mime, max)
+	try {
+		const hit = asCachedBitmap(await idbGet(key))
+		if (hit) return textureFromBitmap(hit, name) as ThreeTexture
+	} catch {}
 	try {
 		const bitmap: any = await decodeInWorker(data, mime, max, name)
+		if (bitmap?.width > 0 && bitmap?.height > 0 && bitmap.width * bitmap.height * 4 <= MAX_CACHED_BITMAP_BYTES) {
+			// Async persist; the live bitmap stays usable.
+			idbSet(key, bitmap as any).catch(() => {})
+		}
 		return textureFromBitmap(bitmap, name) as ThreeTexture
 	} catch {
 		return null
@@ -467,7 +459,7 @@ async function loadRegular(name: string, mime: string, data: Uint8Array): Promis
 					const cTex: any = new CanvasTexture(canvas as any)
 					cTex.colorSpace = SRGBColorSpace
 					cTex.name = `texture:${name}`
-					tune(cTex)
+					tune(cTex, name)
 					try {
 						tex.dispose?.()
 					} catch {}
@@ -528,7 +520,7 @@ function downsampleData(texture: any, maxSize: number, name?: string): any {
 	tex.format = texture.format ?? tex.format
 	tex.needsUpdate = true
 	tex.name = texture.name
-	tune(tex)
+	tune(tex, name)
 	tex.flipY = texture.flipY ?? false
 	texture.dispose?.()
 	texture.image.data = null

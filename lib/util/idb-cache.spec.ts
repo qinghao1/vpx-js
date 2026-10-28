@@ -1,6 +1,6 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 import { describe, expect, it } from 'vitest'
-import { exrCacheKey, idbGet, idbSet, vbsCacheKey } from './idb-cache.js'
+import { bitmapCacheKey, exrCacheKey, idbGet, idbSet, vbsCacheKey } from './idb-cache.js'
 
 /** Minimal in-memory indexedDB so the cache contract is exercised, not skipped. */
 function installFakeIndexedDB(): void {
@@ -93,6 +93,30 @@ describe('exrCacheKey', () => {
 		expect(exrCacheKey('tex', data, 'hdr')).not.toBe(base)
 		expect(exrCacheKey('tex', data, 'exr', 512)).not.toBe(base)
 		expect(exrCacheKey('tex', data, 'exr', 512)).toBe(exrCacheKey('tex', data, 'exr', 512))
+	})
+})
+
+describe('bitmapCacheKey', () => {
+	it('distinguishes same-length payloads by content', () => {
+		const a = new Uint8Array([1, 2, 3, 4])
+		const b = new Uint8Array([1, 2, 3, 5])
+		expect(bitmapCacheKey('tex', b, 'image/png')).not.toBe(bitmapCacheKey('tex', a, 'image/png'))
+	})
+
+	it('is deterministic and separates name/mime/max namespaces', () => {
+		const data = new Uint8Array([9, 8, 7])
+		const base = bitmapCacheKey('tex', data, 'image/png')
+		expect(bitmapCacheKey('tex', data, 'image/png')).toBe(base)
+		expect(bitmapCacheKey('TEX', data, 'image/png')).toBe(base)
+		expect(bitmapCacheKey('other', data, 'image/png')).not.toBe(base)
+		expect(bitmapCacheKey('tex', data, 'image/jpeg')).not.toBe(base)
+		expect(bitmapCacheKey('tex', data, 'image/png', 512)).not.toBe(base)
+		expect(bitmapCacheKey('tex', data, 'image/png', 512)).toBe(bitmapCacheKey('tex', data, 'image/png', 512))
+	})
+
+	it('never collides with float entries', () => {
+		const data = new Uint8Array([9, 8, 7])
+		expect(bitmapCacheKey('tex', data, 'image/png', 512)).not.toBe(exrCacheKey('tex', data, 'exr', 512))
 	})
 })
 
