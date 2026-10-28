@@ -111,6 +111,11 @@ describe('The VPinball texture parser', () => {
 		expect(tex.getName()).to.equal('fooname')
 	})
 
+	it('should preserve local file name case (lookups lowercase)', () => {
+		expect(Texture.fromFilesystem('/tmp/Sprite.PNG').getName()).to.equal('Sprite.PNG')
+		expect(Texture.fromFilesystem('C:\\games\\DMD.PNG').getName()).to.equal('DMD.PNG')
+	})
+
 	it('should fall back to INME when NAME is missing', () => {
 		const tex = new (Texture as any)()
 		tex.szName = ''

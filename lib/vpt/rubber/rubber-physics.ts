@@ -28,13 +28,13 @@ export class RubberHitGenerator {
 			const a = mesh.vertices[mesh.indices[i]!]!,
 				b = mesh.vertices[mesh.indices[i + 2]!]!,
 				c = mesh.vertices[mesh.indices[i + 1]!]!
-			hits.push(
-				new HitTriangle([
-					new Vertex3D(a.x, a.y, a.z),
-					new Vertex3D(b.x, b.y, b.z),
-					new Vertex3D(c.x, c.y, c.z),
-				]),
-			)
+			// HitTriangle wants CCW vertices; rendering order is CW, cf. Rubber::PhysicSetup.
+			const tri = new HitTriangle([
+				new Vertex3D(a.x, a.y, a.z),
+				new Vertex3D(b.x, b.y, b.z),
+				new Vertex3D(c.x, c.y, c.z),
+			])
+			if (!tri.isDegenerate()) hits.push(tri)
 			hits.push(...RubberHitGenerator.edge(mesh, addedEdges, mesh.indices[i]!, mesh.indices[i + 2]!))
 			hits.push(...RubberHitGenerator.edge(mesh, addedEdges, mesh.indices[i + 2]!, mesh.indices[i + 1]!))
 			hits.push(...RubberHitGenerator.edge(mesh, addedEdges, mesh.indices[i + 1]!, mesh.indices[i]!))

@@ -40,14 +40,56 @@ export class SurfaceMeshGenerator {
 		textured: boolean,
 	): void {
 		const n = verts.length
+		// Per-edge normals, smoothed across fSmooth joints, cf. Surface::GenerateMesh.
+		const edgeNx: number[] = []
+		const edgeNy: number[] = []
+		for (let i = 0; i < n; i++) {
+			const p1 = verts[i]
+			const p2 = verts[i < n - 1 ? i + 1 : 0]
+			const dx = p1.x - p2.x
+			const dy = p1.y - p2.y
+			const inv = 1 / Math.sqrt(dx * dx + dy * dy)
+			edgeNx.push(dy * inv)
+			edgeNy.push(dx * inv)
+		}
 		let off = 0
 		for (let i = 0; i < n; i++) {
-			const p1 = verts[i]!
-			const p2 = verts[i < n - 1 ? i + 1 : 0]!
-			mesh.vertices[off] = Object.assign(new Vertex3DNoTex2(), { x: p1.x, y: p1.y, z: bottom })
-			mesh.vertices[off + 1] = Object.assign(new Vertex3DNoTex2(), { x: p1.x, y: p1.y, z: top })
-			mesh.vertices[off + 2] = Object.assign(new Vertex3DNoTex2(), { x: p2.x, y: p2.y, z: top })
-			mesh.vertices[off + 3] = Object.assign(new Vertex3DNoTex2(), { x: p2.x, y: p2.y, z: bottom })
+			const p1 = verts[i]
+			const p2 = verts[i < n - 1 ? i + 1 : 0]
+			const n0 = SurfaceMeshGenerator.smoothNormal(edgeNx, edgeNy, i, i === 0 ? n - 1 : i - 1, p1.fSmooth)
+			const n1 = SurfaceMeshGenerator.smoothNormal(edgeNx, edgeNy, i, i < n - 1 ? i + 1 : 0, p2.fSmooth)
+			mesh.vertices[off] = Object.assign(new Vertex3DNoTex2(), {
+				x: p1.x,
+				y: p1.y,
+				z: bottom,
+				nx: n0.x,
+				ny: -n0.y,
+				nz: 0,
+			})
+			mesh.vertices[off + 1] = Object.assign(new Vertex3DNoTex2(), {
+				x: p1.x,
+				y: p1.y,
+				z: top,
+				nx: n0.x,
+				ny: -n0.y,
+				nz: 0,
+			})
+			mesh.vertices[off + 2] = Object.assign(new Vertex3DNoTex2(), {
+				x: p2.x,
+				y: p2.y,
+				z: top,
+				nx: n1.x,
+				ny: -n1.y,
+				nz: 0,
+			})
+			mesh.vertices[off + 3] = Object.assign(new Vertex3DNoTex2(), {
+				x: p2.x,
+				y: p2.y,
+				z: bottom,
+				nx: n1.x,
+				ny: -n1.y,
+				nz: 0,
+			})
 			if (textured) {
 				const next = i < n - 1 ? i + 1 : 0
 				mesh.vertices[off]!.tu = texCoords[i]!
@@ -73,6 +115,27 @@ export class SurfaceMeshGenerator {
 		}
 	}
 
+	private static smoothNormal(
+		edgeNx: number[],
+		edgeNy: number[],
+		edge: number,
+		neighbor: number,
+		smooth: boolean,
+	): { x: number; y: number } {
+		let x = edgeNx[edge]
+		let y = edgeNy[edge]
+		if (smooth) {
+			x = (x + edgeNx[neighbor]) * 0.5
+			y = (y + edgeNy[neighbor]) * 0.5
+		}
+		const len = Math.sqrt(x * x + y * y)
+		if (len > 0) {
+			x /= len
+			y /= len
+		}
+		return { x, y }
+	}
+
 	private buildTop(mesh: Mesh, verts: RenderVertex[], table: Table, zTop: number): void {
 		const n = verts.length
 		const indices = Mesh.polygonToTriangles(
@@ -92,6 +155,9 @@ export class SurfaceMeshGenerator {
 				z: zTop,
 				tu: point.x * invW,
 				tv: point.y * invH,
+				nx: 0,
+				ny: 0,
+				nz: 1,
 			})
 		}
 	}

@@ -5,6 +5,7 @@ import * as chai from 'chai'
 import { expect } from 'chai'
 import sinonChai from 'sinon-chai'
 import { createBall } from '../../../test/physics.helper'
+import { TableBuilder } from '../../../test/table-builder.js'
 import { ThreeHelper } from '../../../test/three.helper'
 import { Player } from '../../game/player.js'
 import { NodeBinaryReader } from '../../io/binary-reader.node.js'
@@ -121,6 +122,52 @@ describe('The VPinball kicker collision', () => {
 			expect(kicker.getHit().ball).to.be.undefined
 			expect(ball.hit.vel.x).to.equal(3)
 			expect(ball.hit.vel.y).to.equal(0.5)
+		})
+	})
+
+	describe('volume gating', () => {
+		it('should capture on Hit-outside-volume and release on UnHit-inside-volume only', () => {
+			// Upstream: if (newBall || ((!hitbit) == (i < 0))) — KickerHitCircle::DoCollide.
+			const gated = new TableBuilder()
+				.addKicker('enter', {})
+				.addKicker('exit', {})
+				.addKicker('noopHit', {})
+				.addKicker('noopUnhit', {})
+				.build()
+			const gatedPlayer = new Player(gated).init()
+			const physics = gatedPlayer.getPhysics()
+			const normal = new Vertex3D(1, 0, 0)
+
+			// Hit while outside the volume -> capture.
+			const enter = gated.kickers.enter
+			const entering = createBall(gatedPlayer, enter.data.center.x, enter.data.center.y, 25)
+			enter.getHit().doCollide(physics, entering, normal, false, false)
+			expect(enter.getHit().ball).to.equal(entering)
+			expect(entering.state.isFrozen).to.equal(true)
+			expect(entering.hit.vpVolObjs).to.include(enter.getHit().obj)
+
+			// UnHit while inside the volume -> leave the volume without capturing.
+			const exit = gated.kickers.exit
+			const leaving = createBall(gatedPlayer, exit.data.center.x, exit.data.center.y, 25)
+			leaving.hit.vpVolObjs.push(exit.getHit().obj)
+			exit.getHit().doCollide(physics, leaving, normal, true, false)
+			expect(exit.getHit().ball).to.be.undefined
+			expect(leaving.hit.vpVolObjs).to.not.include(exit.getHit().obj)
+
+			// UnHit while outside the volume -> ignore.
+			const noopUnhit = gated.kickers.noopUnhit
+			const outside = createBall(gatedPlayer, noopUnhit.data.center.x, noopUnhit.data.center.y, 25)
+			noopUnhit.getHit().doCollide(physics, outside, normal, true, false)
+			expect(noopUnhit.getHit().ball).to.be.undefined
+			expect(outside.hit.vpVolObjs).to.be.empty
+
+			// Hit while inside the volume -> ignore.
+			const noopHit = gated.kickers.noopHit
+			const inside = createBall(gatedPlayer, noopHit.data.center.x, noopHit.data.center.y, 25)
+			inside.hit.vpVolObjs.push(noopHit.getHit().obj)
+			noopHit.getHit().doCollide(physics, inside, normal, false, false)
+			expect(noopHit.getHit().ball).to.be.undefined
+			expect(inside.hit.vpVolObjs).to.include(noopHit.getHit().obj)
 		})
 	})
 

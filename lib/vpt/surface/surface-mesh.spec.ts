@@ -2,10 +2,13 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import { expect } from 'vitest'
+import { TableBuilder } from '../../../test/table-builder.js'
 import { ThreeHelper } from '../../../test/three.helper'
 import { NodeBinaryReader } from '../../io/binary-reader.node.js'
 import { Table } from '../table/table.js'
 import { TableExporter } from '../table/table-exporter.js'
+import { SurfaceMeshGenerator } from './surface-view.js'
 
 const three = new ThreeHelper()
 
@@ -467,5 +470,22 @@ describe('The VPinball surface generator', () => {
 
 	it('should not generate a surface mesh with invisible sides and top', async () => {
 		three.expectNoObject(gltf, 'surfaces', 'Invisible')
+	})
+
+	it('should emit upstream side/top normals instead of zero normals', () => {
+		// Surface::GenerateMesh writes smoothed side normals (nz 0) and a flat
+		// top normal (0, 0, 1); zero normals would fall back to flat shading.
+		const table = new TableBuilder().addSurface('Wall', {}).build()
+		const { top, side } = new SurfaceMeshGenerator().generateMeshes(table.surfaces.Wall.data, table)
+		if (!side || !top) throw new Error('expected side and top meshes')
+		for (const v of side.vertices) {
+			expect(v.nz).toBe(0)
+			expect(v.nx * v.nx + v.ny * v.ny).toBeCloseTo(1, 6)
+		}
+		for (const v of top.vertices) {
+			expect(v.nx).toBe(0)
+			expect(v.ny).toBe(0)
+			expect(v.nz).toBe(1)
+		}
 	})
 })
