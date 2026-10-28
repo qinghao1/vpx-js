@@ -45,8 +45,6 @@ export class DirectoryTree {
 			entries.push({
 				name: nul < 0 ? rawName : rawName.slice(0, nul),
 				type,
-				// pole marks unknown types and empty names invalid; children()
-				// then skips them and Storage never opens them by name.
 				valid:
 					(type === DirectoryTree.EntryTypeStorage ||
 						type === DirectoryTree.EntryTypeStream ||
@@ -111,7 +109,7 @@ export class DirectoryTree {
 	}
 
 	private getChildIds(entry: StorageEntry): number[] {
-		if (entry.storageDirId <= -1) return []
+		if (entry.storageDirId === DirectoryTree.Leaf) return []
 		this.assertIndex(entry.storageDirId)
 		// Iterative in-order BST walk matching pole's dirtree_find_siblings
 		// (left, self, right): each index is pushed once, so the walk is
@@ -134,8 +132,6 @@ export class DirectoryTree {
 			if (stack.length === 0) break
 			const node = stack.pop()!
 			ids.push(node)
-			if (ids.length > this.entries.length)
-				throw new Error('Corrupt file: directory sibling walk exceeded entry count.')
 			const right = this.entries[node].right
 			id = right === DirectoryTree.Leaf ? undefined : right
 		}

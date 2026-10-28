@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import { expect } from 'chai'
 import { BiffParser } from './biff-parser.js'
-import { OLE_ID } from './binary-helpers.js'
+import { OLE_ID, readFromMemory } from './binary-helpers.js'
 import { BinaryReader } from './binary-reader.js'
 import { AllocationTable } from './ole-allocation-table.js'
 import { DirectoryTree, type StorageEntry } from './ole-directory-tree.js'
@@ -138,10 +138,7 @@ class MemoryReader implements IBinaryReader {
 		return this.openFlag
 	}
 	async read(target: Uint8Array, offset: number, length: number, position: number): Promise<[number, Uint8Array]> {
-		if (!Number.isInteger(position) || position < 0) throw new Error(`Invalid read position ${position}.`)
-		const slice = this.fileData.subarray(position, position + length)
-		target.set(slice, offset)
-		return [slice.length, target.subarray(offset, offset + slice.length)]
+		return readFromMemory(this.fileData, 'MemoryReader not open', target, offset, length, position)
 	}
 }
 
@@ -161,6 +158,23 @@ function buildValidFile(): Uint8Array {
 	const rootEntry = buildDirEntry(5, -1, -1, -1)
 	const padding = new Uint8Array(512 - 128)
 	return concatBytes(buildHeader(), endlessTable(), rootEntry, padding)
+}
+
+/** Test storage entry with no links and a fixed size. */
+function buildStreamEntry(name: string, size: number): StorageEntry {
+	return {
+		name,
+		type: 2,
+		nodeColor: 0,
+		left: -1,
+		right: -1,
+		storageDirId: -1,
+		secId: 0,
+		size,
+		valid: true,
+		storages: {},
+		streams: {},
+	}
 }
 
 describe('The OLE compound document reader', () => {
@@ -370,24 +384,11 @@ describe('The OLE compound document reader', () => {
 			readSectors: async () => stream,
 			readShortSectors: async () => stream,
 		} as unknown as OleCompoundDoc
-		const streamEntry = (name: string, size: number): StorageEntry => ({
-			name,
-			type: 2,
-			nodeColor: 0,
-			left: -1,
-			right: -1,
-			storageDirId: -1,
-			secId: 0,
-			size,
-			valid: true,
-			storages: {},
-			streams: {},
-		})
 		const dirEntry: StorageEntry = {
-			...streamEntry('', 0),
+			...buildStreamEntry('', 0),
 			type: 5,
 			storages: {},
-			streams: { GameData: streamEntry('GameData', stream.length) },
+			streams: { GameData: buildStreamEntry('GameData', stream.length) },
 		}
 		const storage = new Storage(doc, dirEntry)
 		await expectRejection(
@@ -543,24 +544,11 @@ describe('The OLE directory in-order walk and validity', () => {
 			readSectors: async () => partial,
 			readShortSectors: async () => partial,
 		} as unknown as OleCompoundDoc
-		const entry = (name: string, size: number): StorageEntry => ({
-			name,
-			type: 2,
-			nodeColor: 0,
-			left: -1,
-			right: -1,
-			storageDirId: -1,
-			secId: 0,
-			size,
-			valid: true,
-			storages: {},
-			streams: {},
-		})
 		const dirEntry: StorageEntry = {
-			...entry('', 0),
+			...buildStreamEntry('', 0),
 			type: 5,
 			storages: {},
-			streams: { GameData: entry('GameData', partial.length) },
+			streams: { GameData: buildStreamEntry('GameData', partial.length) },
 		}
 		const storage = new Storage(doc, dirEntry)
 		await expectRejection(

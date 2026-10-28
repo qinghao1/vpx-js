@@ -219,10 +219,7 @@ describe('BiffParser string helpers', () => {
 
 	it('should read a wide string', () => {
 		const parser = new BiffParser()
-		const text = new Uint8Array([0x48, 0x00, 0x69, 0x00])
-		const buf = new Uint8Array(4 + text.length)
-		new DataView(buf.buffer).setInt32(0, text.length, true)
-		buf.set(text, 4)
+		const buf = prefixed(new Uint8Array([0x48, 0x00, 0x69, 0x00]))
 		expect(parser.getWideString(buf, buf.length)).to.equal('Hi')
 	})
 })

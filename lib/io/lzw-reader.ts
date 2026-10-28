@@ -293,8 +293,8 @@ class BufferPtr {
 		this.pos -= offset
 	}
 
-	public get(offset?: number): number {
-		return this.buf[offset ?? this.pos]
+	public get(): number {
+		return this.buf[this.pos]
 	}
 
 	public next(): number {

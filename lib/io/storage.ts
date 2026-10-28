@@ -8,19 +8,17 @@ export interface KeyValueStorage {
 }
 
 /** Missing keys read as "" (like VBS Empty coerced to string) on both backends. */
-const MISSING = ''
-
 const map = new Map<string, unknown>()
 const memoryStorage: KeyValueStorage = {
 	setItem(name, value) {
 		map.set(name, value)
 	},
-	getItem: name => map.get(name) ?? MISSING,
+	getItem: name => map.get(name) ?? '',
 }
 
 const browserStorage: KeyValueStorage = {
 	setItem: (name, value) => localStorage.setItem(name, JSON.stringify(value)),
-	getItem: name => JSON.parse(localStorage.getItem(name) ?? JSON.stringify(MISSING)),
+	getItem: name => JSON.parse(localStorage.getItem(name) ?? JSON.stringify('')),
 }
 
 export const storage: KeyValueStorage = typeof localStorage !== 'undefined' ? browserStorage : memoryStorage
