@@ -184,4 +184,52 @@ describe('The VPinball global API', () => {
 		expect(() => transpiler.execute('OpenSerial "COM1"', {})).to.throw(/COM1/)
 		expect(() => transpiler.execute('CloseSerial', {})).to.not.throw()
 	})
+
+	it('should route PlaySound through the player sound engine', () => {
+		const api = new GlobalApi(table, player)
+		const engine = player.getSoundEngine()
+		expect(api.PlaySound('missing-sample')).to.equal(0)
+		expect(engine.isPlaying('missing-sample')).to.equal(false)
+		api.StopSound('missing-sample')
+	})
+
+	it('should play and stop registered samples', () => {
+		const api = new GlobalApi(table, player)
+		const engine = player.getSoundEngine()
+		engine.registerSample('sling', new Float32Array([0, 0.2, -0.2, 0]), 8000)
+		const voice = api.PlaySound('sling', 1, 0.5, 0, 0, 0, false, true, 0)
+		expect(voice).to.be.above(0)
+		expect(engine.isPlaying('sling')).to.equal(true)
+		api.StopSound('sling')
+		expect(engine.isPlaying('sling')).to.equal(false)
+	})
+
+	it('should fire the knocker and track music', () => {
+		const api = new GlobalApi(table, player)
+		const engine = player.getSoundEngine()
+		const knocks = engine.getKnockCount()
+		api.FireKnocker(2)
+		expect(engine.getKnockCount()).to.equal(knocks + 2)
+		api.PlaySound('knock')
+		expect(engine.getKnockCount()).to.equal(knocks + 3)
+		api.PlayMusic('theme', 0.6)
+		expect(engine.getMusic()).to.deep.equal({ name: 'theme', volume: 0.6 })
+		api.EndMusic()
+		expect(engine.getMusic()).to.equal(null)
+	})
+
+	it('should route PlaySoundAt through the table API', () => {
+		const api = new GlobalApi(table, player)
+		const engine = player.getSoundEngine()
+		engine.registerSample('drain-at', new Float32Array([0, 0.2, -0.2, 0]), 8000)
+		api.PlaySoundAt('drain-at', 10, 20)
+		expect(engine.isPlaying('drain-at')).to.equal(true)
+	})
+
+	it('should store the music volume on the engine', () => {
+		const api = new GlobalApi(table, player)
+		api.MusicVolume = 0.25
+		expect(api.MusicVolume).to.be.closeTo(0.25, 1e-9)
+		expect(player.getSoundEngine().getMusicVolume()).to.be.closeTo(0.25, 1e-9)
+	})
 })

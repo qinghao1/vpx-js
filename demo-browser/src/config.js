@@ -79,6 +79,11 @@ export const CONTROL_SCHEME = [
 		keys: ['KeyZ', 'Slash', 'Space'],
 	},
 	{
+		label: 'Sound',
+		help: '<kbd>M</kbd> mute<span class="sep">·</span>slider for volume',
+		keys: ['KeyM'],
+	},
+	{
 		label: 'View',
 		help: '<kbd>P</kbd> pause<span class="sep">·</span><kbd>O</kbd> orbit<span class="sep">·</span><kbd>R</kbd> reset<span class="sep">·</span><kbd>?</kbd> help<span class="sep">·</span><kbd>Esc</kbd> exit',
 		keys: ['KeyP', 'KeyO', 'KeyR', 'Escape'],

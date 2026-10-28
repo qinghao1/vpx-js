@@ -19,6 +19,7 @@ import {
 	plungerChecks,
 	pollLog,
 	shot,
+	soundChecks,
 	waitReady,
 } from './helpers.mjs'
 
@@ -365,6 +366,17 @@ async function runOne(targetUrl, label) {
 		console.log(`[camera:${label}] error ${e.message}`)
 		results.camera = false
 	}
+	try {
+		const sound = await soundChecks(page)
+		console.log(`[sound:${label}]`, JSON.stringify(sound))
+		results.sound = sound.pass === 'skip' ? 'skip' : !!sound.pass
+		console.log(`[integration:${label}] sound ${legStatus(results.sound)} — ${sound.reason}`)
+		if (results.sound === 'skip') console.log(`[integration:${label}] sound SKIP — ${sound.reason}`)
+		if (results.sound === false) console.log(`[sound:${label}] FAIL ${JSON.stringify(sound)}`)
+	} catch (e) {
+		console.log(`[sound:${label}] error ${e.message}`)
+		results.sound = false
+	}
 	const cam = await page
 		.evaluate(() => {
 			const c = window.camera,
@@ -457,6 +469,7 @@ async function runOne(targetUrl, label) {
 		results.backbox,
 		results.dmdVisible,
 		results.camera,
+		results.sound,
 		results.runErrors,
 	].every(legOk)
 	console.log(`\n# integration ${label} ${ok ? 'PASS' : 'FAIL'} ${JSON.stringify(results)}`)

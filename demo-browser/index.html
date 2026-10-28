@@ -39,6 +39,41 @@
 		<nav id="actions" aria-label="Primary actions">
 			<button id="help-btn" type="button" title="Controls (?)">Controls</button>
 			<button id="reset" type="button" title="Reset camera (R)">Reset view</button>
+			<span class="sound-control" id="sound-control">
+				<button
+					id="sound-btn"
+					type="button"
+					title="Mute/unmute (M)"
+					aria-pressed="false"
+					aria-label="Mute sound"
+				>
+					<svg
+						viewBox="0 0 24 24"
+						width="16"
+						height="16"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						aria-hidden="true"
+					>
+						<path d="M11 5 6 9H3v6h3l5 4z" fill="currentColor" stroke="none"></path>
+						<path d="M15.5 8.5a5 5 0 0 1 0 7"></path>
+						<path d="M18 6a8.5 8.5 0 0 1 0 12"></path>
+					</svg>
+				</button>
+				<input
+					id="sound-volume"
+					type="range"
+					min="0"
+					max="100"
+					value="100"
+					step="1"
+					title="Sound volume"
+					aria-label="Sound volume"
+				>
+			</span>
 		</nav>
 		<main id="loading" aria-live="polite">
 			<section id="loading-card" aria-labelledby="load-title">

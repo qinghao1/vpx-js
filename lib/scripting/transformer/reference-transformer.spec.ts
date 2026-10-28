@@ -172,6 +172,12 @@ describe('The scripting reference transformer', () => {
 			expect(js).to.equal(`${Transformer.GLOBAL_NAME}.PlaySound('test');`)
 		})
 
+		it('should route PlaySoundAt to the global API', () => {
+			const vbs = `PlaySoundAt "test", 100, 200\n`
+			const js = transform(vbs, table, player)
+			expect(js).to.equal(`${Transformer.GLOBAL_NAME}.PlaySoundAt('test', 100, 200);`)
+		})
+
 		it('should not use a global variable for members', () => {
 			const vbs = `vpmFlips.Name = "vpmFlips"\n`
 			const js = transform(vbs, table, player)

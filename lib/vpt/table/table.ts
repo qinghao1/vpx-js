@@ -1,7 +1,8 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 import { MathUtils } from 'three'
-
+import type { ISoundEngine } from '../../audio/sound-engine.js'
+import { warnOnce } from '../../emu/warn-once.js'
 import { Event } from '../../game/event.js'
 import { EventProxy } from '../../game/event-proxy.js'
 import {
@@ -50,6 +51,7 @@ import type { Plunger } from '../plunger/plunger.js'
 import type { Primitive } from '../primitive/primitive.js'
 import type { Ramp } from '../ramp/ramp.js'
 import type { Rubber } from '../rubber/rubber.js'
+import type { Sound } from '../sound.js'
 import type { Spinner } from '../spinner/spinner.js'
 import type { Surface } from '../surface/surface.js'
 import type { Textbox } from '../textbox/textbox.js'
@@ -81,6 +83,7 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 	private textureCache?: { map: Map<string, { key: string; texture: Texture }>; size: number }
 
 	public readonly textures: Record<string, Texture> = {}
+	public readonly sounds: Record<string, Sound> = {}
 	public readonly collections: Record<string, Collection> = {}
 	public readonly bumpers: Record<string, Bumper> = {}
 	public readonly flippers: Record<string, Flipper> = {}
@@ -133,6 +136,11 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 			loaded as unknown as Record<string, unknown>,
 			'textures',
 			this.textures as unknown as Record<string, unknown>,
+		)
+		this.populateFromLoaded(
+			loaded as unknown as Record<string, unknown>,
+			'sounds',
+			this.sounds as unknown as Record<string, unknown>,
 		)
 		this.populateFromLoaded(
 			loaded as unknown as Record<string, unknown>,
@@ -208,6 +216,33 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 	public setupPlayer(player: Player, _table: Table): void {
 		this.events = new EventProxy(this)
 		this.api = new TableApi(this.data!, this.events, player, this)
+		this.registerTableSounds(player.getSoundEngine())
+	}
+
+	/** Case-insensitive, last wins (upstream resolves names through a case-insensitive map). */
+	public getSound(name?: string): Sound | undefined {
+		if (!name) return undefined
+		const lc = name.toLowerCase()
+		let found: Sound | undefined
+		for (const [key, sound] of Object.entries(this.sounds)) {
+			if (key.toLowerCase() === lc || sound.getName().toLowerCase() === lc) found = sound
+		}
+		return found
+	}
+
+	/** Registers every decoded table sound with the engine (re-run on engine swaps). */
+	public registerTableSounds(engine: ISoundEngine): void {
+		if (!engine) return
+		for (const [key, sound] of Object.entries(this.sounds)) {
+			const name = sound.getName() || key
+			if (sound.isPlayable()) engine.registerSample(name, sound.pcm!, sound.sampleRate)
+			else
+				warnOnce(
+					`table-sound:${name.toLowerCase()}`,
+					'[Table] Sound "%s" has no decodable audio and will stay silent.',
+					name,
+				)
+		}
 	}
 
 	public getBoundingBox(): FRect3D {

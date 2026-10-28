@@ -172,7 +172,12 @@ export class GlobalApi extends VbsApi {
 				return 0
 		}
 	}
-	set MusicVolume(_v: number) {}
+	set MusicVolume(v: number) {
+		this.player.getSoundEngine().setMusicVolume(v)
+	}
+	get MusicVolume() {
+		return this.player.getSoundEngine().getMusicVolume()
+	}
 	get UserDirectory() {
 		return '.'
 	}
@@ -259,24 +264,51 @@ export class GlobalApi extends VbsApi {
 	}
 
 	public PlaySound(
-		_sampleName: string,
-		_loopCount: number,
-		_volume: number,
-		_pan: number,
-		_randomPitch: number,
-		_pitch: number,
-		_useSame: boolean,
-		_restart: boolean,
-		_frontRearFade: number,
-	) {}
+		sampleName: string,
+		loopCount = 1,
+		volume = 1,
+		pan = 0,
+		randomPitch = 0,
+		pitch = 0,
+		useSame = false,
+		restart = true,
+		frontRearFade = 0,
+	): number {
+		return this.player
+			.getSoundEngine()
+			.playSound(sampleName, { loopCount, volume, pan, randomPitch, pitch, useSame, restart, frontRearFade })
+	}
 
-	public StopSound(_sampleName: string) {}
+	public PlaySoundAt(
+		bstr: string,
+		x: number,
+		y: number,
+		z = 0,
+		loopCount = 1,
+		volume = 1,
+		randomPitch = 0,
+		pitch = 0,
+		useSame = false,
+		restart = true,
+	): void {
+		this.table.getApi().PlaySoundAt(bstr, x, y, z, loopCount, volume, randomPitch, pitch, useSame, restart)
+	}
 
-	public PlayMusic(_music: string, _volume: number) {}
+	public StopSound(sampleName: string): void {
+		this.player.getSoundEngine().stopSound(sampleName)
+	}
 
-	public EndMusic(_music: string) {}
+	public PlayMusic(music: string, volume = 1): void {
+		this.player.getSoundEngine().playMusic(music, volume)
+	}
 
-	public FireKnocker(_count: number) {}
+	public EndMusic(_music?: string): void {
+		this.player.getSoundEngine().endMusic()
+	}
+
+	public FireKnocker(count = 1): void {
+		this.player.getSoundEngine().fireKnocker(count)
+	}
 
 	public QuitPlayer(_closeType: number) {}
 

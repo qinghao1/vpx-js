@@ -7,6 +7,7 @@ import { Collection } from '../collection/collection.js'
 import type { Item } from '../item.js'
 import type { ItemData } from '../item-data.js'
 import { ITEM_KEYS, ITEM_REGISTRY, loadItemByType } from '../item-registry.js'
+import { Sound } from '../sound.js'
 import { Texture } from '../texture.js'
 import type { TableLoadOptions } from './table.js'
 import { TableData } from './table-data.js'
@@ -17,11 +18,13 @@ const tableInfoDecoder = new TextDecoder('utf-16le')
 // Yield during bulk OLE parsing so 1000+ item tables don't block the UI.
 const YIELD_EVERY_GAME_ITEMS = 32
 const YIELD_EVERY_TEXTURES = 16
+const YIELD_EVERY_SOUNDS = 16
 const YIELD_EVERY_COLLECTIONS = 16
 
 // Cap parallel OLE reads to bound I/O contention (each load also min()s with hardwareConcurrency).
 const MAX_CONCURRENCY_GAME_ITEMS = 4
 const MAX_CONCURRENCY_TEXTURES = 6
+const MAX_CONCURRENCY_SOUNDS = 6
 const MAX_CONCURRENCY_COLLECTIONS = 4
 
 function hardwareConcurrency(): number {
@@ -83,6 +86,7 @@ export class TableLoader {
 						out.textures = []
 						logger().debug('[Table.load] Skipped %s textures (play without textures)', out.data.numTextures)
 					}
+					await this.loadSounds(out, gameStg, out.data.numSounds)
 				}
 				if (opts.loadTableScript) {
 					// CODE is exactly cchar bytes with no trim (upstream AsScript); 0 means empty script.
@@ -184,6 +188,21 @@ export class TableLoader {
 		}
 	}
 
+	private async loadSounds(out: LoadedTable, storage: Storage, numItems: number): Promise<void> {
+		progress().show('Loading sounds')
+		out.sounds = []
+		if (numItems === 0) return
+		const concurrency = Math.min(MAX_CONCURRENCY_SOUNDS, hardwareConcurrency())
+		const results = await this.loadConcurrent(numItems, concurrency, YIELD_EVERY_SOUNDS, index =>
+			Sound.fromStorage(storage, `Sound${index}`),
+		)
+		for (let index = 0; index < numItems; index++) {
+			const sound = results[index]!
+			out.sounds.push(sound)
+			progress().details(sound.getName())
+		}
+	}
+
 	private async loadTableInfo(out: LoadedTable): Promise<void> {
 		const stg = this.doc.storage('TableInfo')
 		out.info = {}
@@ -243,6 +262,7 @@ export interface LoadedTable {
 	items: Record<string, Item<ItemData>>
 	tableScript?: string
 	textures?: Texture[]
+	sounds?: Sound[]
 	collections?: Collection[]
 	surfaces?: import('../surface/surface.js').Surface[]
 	primitives?: import('../primitive/primitive.js').Primitive[]

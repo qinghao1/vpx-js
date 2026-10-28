@@ -1,6 +1,8 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
+import { NullSoundEngine } from '../audio/null-sound-engine.js'
+import type { ISoundEngine } from '../audio/sound-engine.js'
 import type { Vertex2D, Vertex3D } from '../math/vector.js'
 import type { NudgeHandler } from '../physics/cabinet/nudge-handler.js'
 import { DEFAULT_BALL_SIZE } from '../physics/constants.js'
@@ -48,6 +50,7 @@ export class Player extends EventEmitter {
 
 	public width = 0
 	public height = 0
+	private soundEngine: ISoundEngine = new NullSoundEngine()
 
 	get balls(): Ball[] {
 		return this.physics.balls
@@ -279,6 +282,18 @@ export class Player extends EventEmitter {
 	public setGravity(slopeDeg: number, strength: number): void {
 		this.physics.setGravity(slopeDeg, strength)
 	}
+	/** Script sound sink (silent NullSoundEngine until the host attaches a WebAudio engine). */
+	public getSoundEngine(): ISoundEngine {
+		return this.soundEngine
+	}
+
+	public setSoundEngine(engine: ISoundEngine): void {
+		this.soundEngine = engine ?? new NullSoundEngine()
+		// The host may attach its audible engine after construction (demo-browser
+		// does); re-register table samples so they survive the swap.
+		this.table.registerTableSounds(this.soundEngine)
+	}
+
 	public setEmulator(emu: IEmulator): void {
 		this.physics.emu = emu
 		this.emit('emuStarted')

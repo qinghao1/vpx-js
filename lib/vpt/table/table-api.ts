@@ -571,16 +571,55 @@ export class TableApi extends ItemApi<TableData> {
 	}
 
 	public PlaySound(
-		_bstr: string,
-		_loopcount: number,
-		_volume: number,
-		_pan: number,
-		_randompitch: number,
-		_pitch: number,
-		_usesame: boolean,
-		_restart: boolean,
-		_frontRearFade: number,
-	): void {}
+		bstr: string,
+		loopcount = 1,
+		volume = 1,
+		pan = 0,
+		randompitch = 0,
+		pitch = 0,
+		usesame = false,
+		restart = true,
+		frontRearFade = 0,
+	): void {
+		this.player.getSoundEngine().playSound(bstr, {
+			loopCount: loopcount,
+			volume,
+			pan,
+			randomPitch: randompitch,
+			pitch,
+			useSame: usesame,
+			restart,
+			frontRearFade,
+		})
+	}
+	public PlaySoundAt(
+		bstr: string,
+		x: number,
+		y: number,
+		_z = 0,
+		loopcount = 1,
+		volume = 1,
+		randompitch = 0,
+		pitch = 0,
+		usesame = false,
+		restart = true,
+	): void {
+		// Native maps the position to pre-emphasized pan/fade when spatial audio is off.
+		const nx = this.Width > 0 ? Math.max(-1, Math.min(1, (x / this.Width) * 2 - 1)) : 0
+		const ny = this.Height > 0 ? Math.max(-1, Math.min(1, (y / this.Height) * 2 - 1)) : 0
+		const pan = nx < 0 ? -((-nx) ** 10) : nx ** 10
+		const fade = ny < 0 ? -((-ny) ** 10) : ny ** 10
+		this.player.getSoundEngine().playSound(bstr, {
+			loopCount: loopcount,
+			volume,
+			pan,
+			randomPitch: randompitch,
+			pitch,
+			useSame: usesame,
+			restart,
+			frontRearFade: fade,
+		})
+	}
 	public GetPredefinedStrings(_dispID: number): string[] {
 		return []
 	}
@@ -589,7 +628,12 @@ export class TableApi extends ItemApi<TableData> {
 	}
 	public ImportPhysics(): void {}
 	public ExportPhysics(): void {}
-	public FireKnocker(_count: number): void {}
+	public FireKnocker(count = 1): void {
+		this.player.getSoundEngine().fireKnocker(count)
+	}
+	public StopSound(bstr: string): void {
+		this.player.getSoundEngine().stopSound(bstr)
+	}
 	public QuitPlayer(_closeType: number): void {}
 	public Option(_name: string, _min: number, _max: number, _step: number, def: number, ..._rest: unknown[]): number {
 		return def

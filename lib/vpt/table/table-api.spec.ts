@@ -445,6 +445,39 @@ describe('The VPinball table API', () => {
 		api.FireKnocker(1)
 	})
 
+	it('should route PlaySound and FireKnocker through the player sound engine', () => {
+		const api = table.getApi()
+		const engine = _player.getSoundEngine()
+		const knocks = engine.getKnockCount()
+		api.FireKnocker(2)
+		expect(engine.getKnockCount()).to.equal(knocks + 2)
+		engine.registerSample('bumper', new Float32Array([0, 0.3, -0.3, 0]), 8000)
+		api.PlaySound('bumper', 1, 0.7, 0, 0, 0, false, true, 0)
+		expect(engine.isPlaying('bumper')).to.equal(true)
+		api.PlaySound('missing-sample')
+		expect(engine.isPlaying('missing-sample')).to.equal(false)
+	})
+
+	it('should stop sounds through the table API', () => {
+		const api = table.getApi()
+		const engine = _player.getSoundEngine()
+		engine.registerSample('bumper-stop', new Float32Array([0, 0.3, -0.3, 0]), 8000)
+		api.PlaySound('bumper-stop', 1, 0.7, 0, 0, 0, false, true, 0)
+		expect(engine.isPlaying('bumper-stop')).to.equal(true)
+		api.StopSound('bumper-stop')
+		expect(engine.isPlaying('bumper-stop')).to.equal(false)
+	})
+
+	it('should map PlaySoundAt positions to pan and fade', () => {
+		const api = table.getApi()
+		const engine = _player.getSoundEngine()
+		engine.registerSample('bumper-at', new Float32Array([0, 0.3, -0.3, 0]), 8000)
+		api.PlaySoundAt('bumper-at', api.Width / 2, api.Height / 2)
+		expect(engine.isPlaying('bumper-at')).to.equal(true)
+		api.PlaySoundAt('missing-sample', 0, 0)
+		expect(engine.isPlaying('missing-sample')).to.equal(false)
+	})
+
 	it('should return the default value from Option, not the step', () => {
 		const api = table.getApi()
 		expect(api.Option('opt', 0, 100, 10, 80, 0)).to.equal(80)

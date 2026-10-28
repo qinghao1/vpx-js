@@ -1651,3 +1651,62 @@ export const cameraTransitionChecks = async page => {
 		return { pass, res1, res2, reason: pass === true ? 'smooth' : `fail res1:${res1?.reason} res2:${res2?.reason}` }
 	})
 }
+
+// Sound leg: verifies the audible *path* (headless CI cannot hear output).
+// Mute/volume chrome drives the engine, knocker knocks, and a synthetic probe
+// sample plays/stops through the script API surface.
+export const soundChecks = async page => {
+	return page.evaluate(() => {
+		const v = window.viewer
+		if (!v) return { pass: 'skip', reason: 'no viewer' }
+		const s = v.sound
+		if (!s || typeof s.playSound !== 'function') return { pass: 'skip', reason: 'no sound engine' }
+		try {
+			const btn = document.getElementById('sound-btn')
+			const slider = document.getElementById('sound-volume')
+			if (!btn || !slider) return { pass: false, reason: 'missing sound controls' }
+			const wasMuted = !!s.isMuted()
+			s.setMuted(true)
+			const mutedOk = s.isMuted() === true && btn.getAttribute('aria-pressed') !== null
+			// Probe the volume unmuted: getVolume() reports 0 while muted, so a
+			// persisted muted profile would fail the check below on user settings.
+			s.setMuted(false)
+			const volBefore = typeof s.getLevel === 'function' ? s.getLevel() : s.getVolume()
+			s.setVolume(0.5)
+			const volOk = Math.abs(s.getVolume() - 0.5) < 1e-9
+			s.setVolume(volBefore)
+			s.setMuted(wasMuted)
+			const k0 = s.getKnockCount()
+			s.fireKnocker(1)
+			const knockOk = s.getKnockCount() === k0 + 1
+			const probe = new Float32Array([0, 0.1, -0.1, 0.05])
+			s.registerSample('__e2e_probe__', probe, 8000)
+			const voice = s.playSound('__e2e_probe__', { volume: 0.5 })
+			const playOk = voice > 0 && s.isPlaying('__e2e_probe__')
+			s.stopSound('__e2e_probe__')
+			const stopOk = !s.isPlaying('__e2e_probe__')
+			const missingOk = s.playSound('__e2e_missing_xyz__') === 0
+			const tableApi = v.player ? v.table?.getApi?.() : null
+			let scriptOk = true
+			try {
+				if (v.player && tableApi && typeof tableApi.PlaySound === 'function') {
+					tableApi.PlaySound('__e2e_probe__', 1, 0.5, 0, 0, 0, false, true, 0)
+					scriptOk = s.isPlaying('__e2e_probe__')
+					tableApi.FireKnocker?.(1)
+				}
+			} catch {
+				scriptOk = false
+			}
+			try {
+				s.stopSound('__e2e_probe__')
+			} catch {}
+			const pass = mutedOk && volOk && knockOk && playOk && stopOk && missingOk && scriptOk
+			return {
+				pass,
+				reason: `mute=${mutedOk} vol=${volOk} knock=${knockOk} play=${playOk} stop=${stopOk} missing=${missingOk} script=${scriptOk}`,
+			}
+		} catch (e) {
+			return { pass: false, reason: String(e?.message ?? e).slice(0, 200) }
+		}
+	})
+}

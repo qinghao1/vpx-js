@@ -388,6 +388,147 @@ body {
 #actions a.btn:hover {
 	background: #fff;
 }
+/* Sound: one glass pill — icon button + inline expanding slider.
+   YouTube/Jellyflix-style hover-reveal: the slider lives in the DOM
+   (keyboard/focus reachable) but takes no space until the pill is
+   hovered, focused, or tap-expanded. */
+.sound-control {
+	display: inline-flex;
+	align-items: center;
+	background: var(--surface, rgba(16, 20, 30, 0.72));
+	backdrop-filter: blur(16px) saturate(1.2);
+	-webkit-backdrop-filter: blur(16px) saturate(1.2);
+	border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+	border-radius: var(--radius);
+	box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+	padding: 2px;
+	transition:
+		background 0.15s,
+		border-color 0.15s;
+}
+.sound-control:hover {
+	background: rgba(26, 32, 48, 0.88);
+	border-color: var(--border-strong);
+}
+#actions #sound-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 32px;
+	height: 32px;
+	padding: 7px;
+	border-radius: 50%;
+	background: transparent;
+	border-color: transparent;
+	box-shadow: none;
+	backdrop-filter: none;
+	-webkit-backdrop-filter: none;
+	line-height: 0;
+}
+#actions #sound-btn:hover {
+	background: rgba(255, 255, 255, 0.08);
+	border-color: transparent;
+	transform: none;
+}
+#actions #sound-btn:focus-visible {
+	outline: 2px solid var(--accent-2);
+	outline-offset: 1px;
+}
+#sound-btn svg {
+	width: 18px;
+	height: 18px;
+	display: block;
+}
+#actions .sound-control #sound-volume {
+	appearance: none;
+	-webkit-appearance: none;
+	background: transparent;
+	accent-color: var(--accent, #7aa2ff);
+	width: 84px;
+	height: 32px;
+	max-width: 0;
+	margin-left: 0;
+	opacity: 0;
+	transform: translateX(-6px);
+	pointer-events: none;
+	cursor: pointer;
+	transition:
+		opacity 0.22s cubic-bezier(0.2, 0, 0, 1),
+		transform 0.22s cubic-bezier(0.2, 0, 0, 1),
+		max-width 0.22s cubic-bezier(0.2, 0, 0, 1),
+		margin 0.22s cubic-bezier(0.2, 0, 0, 1);
+}
+#actions .sound-control:hover #sound-volume,
+#actions .sound-control:focus-within #sound-volume,
+#actions .sound-control.expanded #sound-volume {
+	max-width: 120px;
+	margin: 0 10px 0 8px;
+	opacity: 1;
+	transform: none;
+	pointer-events: auto;
+}
+#actions .sound-control #sound-volume:focus-visible {
+	outline: 2px solid var(--accent-2);
+	outline-offset: -2px;
+	border-radius: var(--radius);
+}
+/* Slim solid track + round thumb; no fill bar, no gradients. */
+#actions .sound-control #sound-volume::-webkit-slider-runnable-track {
+	height: 4px;
+	border-radius: var(--radius);
+	background: rgba(255, 255, 255, 0.18);
+}
+#actions .sound-control #sound-volume::-webkit-slider-thumb {
+	-webkit-appearance: none;
+	width: 12px;
+	height: 12px;
+	margin-top: -4px;
+	border-radius: 50%;
+	border: none;
+	background: #fff;
+	box-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
+	transition: transform 0.15s;
+}
+#actions .sound-control #sound-volume:hover::-webkit-slider-thumb {
+	transform: scale(1.2);
+}
+#actions .sound-control #sound-volume::-moz-range-track {
+	height: 4px;
+	border-radius: var(--radius);
+	background: rgba(255, 255, 255, 0.18);
+}
+#actions .sound-control #sound-volume::-moz-range-thumb {
+	width: 12px;
+	height: 12px;
+	border-radius: 50%;
+	border: none;
+	background: #fff;
+	box-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
+}
+@media (hover: none) {
+	#actions .sound-control #sound-volume {
+		width: 110px;
+	}
+	#actions .sound-control #sound-volume::-webkit-slider-thumb {
+		width: 16px;
+		height: 16px;
+		margin-top: -6px;
+	}
+	#actions .sound-control #sound-volume::-moz-range-thumb {
+		width: 16px;
+		height: 16px;
+	}
+}
+@media (prefers-reduced-motion: reduce) {
+	.sound-control,
+	#actions .sound-control #sound-volume,
+	#actions .sound-control #sound-volume::-webkit-slider-thumb {
+		transition: none;
+	}
+}
+#actions button[aria-pressed="true"] {
+	opacity: 0.65;
+}
 
 /* Debug panel — bottom-right dock */
 #debug-panel,

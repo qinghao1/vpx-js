@@ -4,6 +4,7 @@
 
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import * as THREE from 'three/webgpu'
+import { WebSoundEngine } from '../../dist-esm/lib/audio/web-sound-engine.js'
 import { Player } from '../../dist-esm/lib/game/player.js'
 import { BrowserBinaryReader } from '../../dist-esm/lib/io/binary-reader.js'
 import { isWasmReady } from '../../dist-esm/lib/physics/wasm/kernels.js'
@@ -131,6 +132,13 @@ export {
 	resolveVpxCandidates,
 }
 
+const SOUND_SPEAKER = '<path d="M11 5 6 9H3v6h3l5 4z" fill="currentColor" stroke="none"></path>'
+const SOUND_SVG_ATTRS =
+	'viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"'
+const SOUND_ICON_HIGH = `<svg ${SOUND_SVG_ATTRS}>${SOUND_SPEAKER}<path d="M15.5 8.5a5 5 0 0 1 0 7"></path><path d="M18.4 5.6a9 9 0 0 1 0 12.8"></path></svg>`
+const SOUND_ICON_LOW = `<svg ${SOUND_SVG_ATTRS}>${SOUND_SPEAKER}<path d="M15.5 8.5a5 5 0 0 1 0 7"></path></svg>`
+const SOUND_ICON_OFF = `<svg ${SOUND_SVG_ATTRS}>${SOUND_SPEAKER}<line x1="16" y1="9" x2="22" y2="15"></line><line x1="22" y1="9" x2="16" y2="15"></line></svg>`
+
 const cGameName = table => table?.tableScript?.match(/cGameName\s*=\s*["']([^"']+)["']/i)?.[1] || ''
 const setTitle = title => {
 	const el = document.getElementById('title')
@@ -161,6 +169,8 @@ export class Viewer {
 			status: dom.status || $('status'),
 			fileInput: dom.fileInput || $('file'),
 			playTip: dom.playTip || document.getElementById('play-tip'),
+			soundBtn: dom.soundBtn || document.getElementById('sound-btn'),
+			soundVolume: dom.soundVolume || document.getElementById('sound-volume'),
 			streamWrap: dom.streamWrap || document.getElementById('stream-progress'),
 			streamFill: dom.streamFill || document.getElementById('stream-fill'),
 			streamText: dom.streamText || document.getElementById('stream-text'),
@@ -242,6 +252,7 @@ export class Viewer {
 			addEventListener('popstate', onPopState)
 			this._eventCleanups.push(() => removeEventListener('popstate', onPopState))
 		}
+		this._setupSoundControls()
 		{
 			const onReset = () => this._onResetView()
 			this.dom.resetBtn?.addEventListener('click', onReset)
@@ -306,6 +317,142 @@ export class Viewer {
 		}
 		addEventListener('keydown', onKey)
 		this._eventCleanups.push(() => removeEventListener('keydown', onKey))
+	}
+	_setupSoundControls() {
+		if (!this.sound) {
+			try {
+				this.sound = new WebSoundEngine()
+			} catch {
+				this.sound = null
+			}
+		}
+		this._applySoundPrefs()
+		this._syncSoundChrome()
+		const btn = this.dom.soundBtn
+		const slider = this.dom.soundVolume
+		const group = btn?.closest?.('.sound-control')
+		const toggle = () => {
+			if (!this.sound) return
+			// Touch (no-hover): the first tap only reveals the slider so the
+			// tap that opens the control never flips mute by accident. Once
+			// revealed, taps toggle as normal. Hover UIs never take this path.
+			if (
+				group &&
+				!group.classList.contains('expanded') &&
+				typeof window.matchMedia === 'function' &&
+				window.matchMedia('(hover: none)').matches
+			) {
+				group.classList.add('expanded')
+				return
+			}
+			this.sound.unlock()
+			this.sound.setMuted(!this.sound.isMuted())
+			this._saveSoundPrefs()
+			this._syncSoundChrome()
+		}
+		if (btn) {
+			btn.addEventListener('click', toggle)
+			this._eventCleanups.push(() => btn.removeEventListener('click', toggle))
+		}
+		// Touch (no-hover) support: tapping the icon reveals the slider until
+		// the next tap outside the control. Desktop hover/:focus-within needs no JS.
+		if (group) {
+			const expand = () => group.classList.add('expanded')
+			if (btn) {
+				btn.addEventListener('click', expand)
+				this._eventCleanups.push(() => btn.removeEventListener('click', expand))
+			}
+			const collapseOutside = e => {
+				if (e.target instanceof Node && !group.contains(e.target)) group.classList.remove('expanded')
+			}
+			document.addEventListener('pointerdown', collapseOutside)
+			this._eventCleanups.push(() => document.removeEventListener('pointerdown', collapseOutside))
+			if (slider) {
+				const collapseEsc = e => {
+					if (e.key === 'Escape') {
+						group.classList.remove('expanded')
+						slider.blur?.()
+					}
+				}
+				slider.addEventListener('keydown', collapseEsc)
+				this._eventCleanups.push(() => slider.removeEventListener('keydown', collapseEsc))
+			}
+		}
+		const onSlider = () => {
+			if (!this.sound || !slider) return
+			this.sound.unlock()
+			this.sound.setVolume(Number(slider.value ?? 100) / 100)
+			if (this.sound.getLevel() > 0 && this.sound.isMuted()) this.sound.setMuted(false)
+			this._saveSoundPrefs()
+			this._syncSoundChrome()
+		}
+		if (slider) {
+			slider.addEventListener('input', onSlider)
+			this._eventCleanups.push(() => slider.removeEventListener('input', onSlider))
+		}
+		const onKey = e => {
+			if ((e.code === 'KeyM' || e.key === 'm' || e.key === 'M') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+				const tag = (document.activeElement?.tagName || '').toLowerCase()
+				if (tag === 'input' || tag === 'textarea' || tag === 'select') return
+				toggle()
+			}
+		}
+		addEventListener('keydown', onKey)
+		this._eventCleanups.push(() => removeEventListener('keydown', onKey))
+	}
+	_applySoundPrefs() {
+		if (!this.sound) return
+		// Persisted user prefs win over the table's SVOL/MVOL defaults (music follows the table only).
+		const tableSound = Number.isFinite(this.table?.data?.tableSoundVolume) ? this.table.data.tableSoundVolume : 1
+		const tableMusic = Number.isFinite(this.table?.data?.tableMusicVolume) ? this.table.data.tableMusicVolume : 1
+		let prefs = null
+		try {
+			prefs = JSON.parse(localStorage.getItem('vpx:sound') ?? 'null')
+		} catch {}
+		this.sound.setVolume(Math.max(0, Math.min(1, prefs?.volume ?? tableSound ?? 1)))
+		this.sound.setMuted(!!prefs?.muted)
+		this.sound.setMusicVolume(Math.max(0, tableMusic ?? 1))
+	}
+	_saveSoundPrefs() {
+		if (!this.sound) return
+		try {
+			localStorage.setItem(
+				'vpx:sound',
+				JSON.stringify({ muted: this.sound.isMuted(), volume: this.sound.getLevel() }),
+			)
+		} catch {}
+	}
+	_syncSoundChrome() {
+		const btn = this.dom.soundBtn
+		const slider = this.dom.soundVolume
+		if (btn && this.sound) {
+			const muted = this.sound.isMuted()
+			const level = this.sound.getLevel()
+			btn.innerHTML = muted || level <= 0 ? SOUND_ICON_OFF : level <= 0.5 ? SOUND_ICON_LOW : SOUND_ICON_HIGH
+			btn.setAttribute('aria-pressed', muted ? 'true' : 'false')
+			btn.setAttribute('aria-label', muted ? 'Unmute sound' : 'Mute sound')
+		}
+		if (slider && this.sound) slider.value = String(Math.round(this.sound.getLevel() * 100))
+	}
+	_attachSoundToPlayer() {
+		if (!this.player || !this.sound) return
+		try {
+			this.player.setSoundEngine(this.sound)
+		} catch {}
+		this._applySoundPrefs()
+		this._syncSoundChrome()
+		this._wireEmuAudio()
+	}
+	_wireEmuAudio() {
+		const emu = this.player?.getPhysics?.()?.emu
+		if (!emu || !this.sound) return
+		try {
+			emu.registerAudioConsumer?.(msg => {
+				try {
+					this.sound?.pushEmuPcm(msg)
+				} catch {}
+			})
+		} catch {}
 	}
 	async _createRenderer() {
 		const canvas = this.dom.canvas
@@ -1403,9 +1550,11 @@ export class Viewer {
 		this.player.on('ballDestroyed', ball => {
 			this.handleBallLifecycle(ball, false)
 		})
+		this._attachSoundToPlayer()
 		this.player.on('emuStarted', () => {
 			this._emuStartLogged = true
 			this.log(`PinMAME emu ready: ${this.player.getPhysics().emu?.constructor.name}`)
+			this._wireEmuAudio()
 		})
 		let tries = 0
 		const fallback = async () => {
@@ -1442,6 +1591,7 @@ export class Viewer {
 					this.log(`PinMAME fallback emu ready: ${emu.constructor.name} init=${emu.isInitialized()}`)
 					this.dmd._ensureTexture()
 					this.dmd.findMeshes()
+					this._wireEmuAudio()
 				}
 			} catch (err) {
 				this.log(`PinMAME fallback failed: ${err.message}`, 'warn')
