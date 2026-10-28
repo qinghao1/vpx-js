@@ -5,7 +5,6 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { TableBuilder } from '../../test/table-builder.js'
 import { PinMameEmulator } from '../emu/pinmame/pinmame-emu.js'
 import { resetPinmameModuleCache } from '../emu/pinmame/pinmame-loader.js'
-import { Vertex3D } from '../math/vector.js'
 import { VpmController } from '../scripting/objects/vpm-controller.js'
 import { ERR } from '../scripting/stdlib/err.js'
 import { Player } from './player.js'
@@ -22,11 +21,15 @@ describe('Player integration', () => {
 		globalThis.fetch = origFetch
 	})
 
-	it('inits empty TableBuilder and simulates physics', () => {
+	it('empty player smoke: init, step, frame, no emu before Vpm switch', () => {
 		const player = new Player(new TableBuilder().build()).init()
 		expect(player.balls.length).toBe(0)
 		expect(typeof player.updatePhysics(16)).toBe('number')
 		expect(() => player.simulateTime(20)).not.toThrow()
+		const changed = player.onFrame()
+		expect(changed.isEmpty).toBe(true)
+		changed.release?.()
+		expect(player.getPhysics().emu).toBeUndefined()
 	})
 
 	it('boots the VPM table-init path: ExecuteGlobal core.vbs plus cvpmFlips2.Init without UseSolenoids', () => {
@@ -62,39 +65,12 @@ describe('Player integration', () => {
 		expect(new Player(table).init()).toBeDefined()
 	})
 
-	it('Player popStates tracks created balls across frames', () => {
-		const player = new Player(new TableBuilder().build()).init()
-		expect(player.popStates().isEmpty).toBe(true)
-		const ball = player.createBall({
-			getBallCreationPosition: () => new Vertex3D(1000, 1000, 100),
-			getBallCreationVelocity: () => new Vertex3D(0, 0, 0),
-			onBallCreated: () => {},
-		})
-		player.updatePhysics(16)
-		const changed = player.popStates()
-		expect(changed.isEmpty).toBe(false)
-		expect(changed.keys).toContain(ball.getName())
-		changed.release?.()
-	})
-
-	it('updatePhysics and onFrame advance an empty frame with no diff', () => {
-		const player = new Player(new TableBuilder().build()).init()
-		player.updatePhysics(16)
-		const changed = player.onFrame()
-		expect(changed.isEmpty).toBe(true)
-		changed.release?.()
-	})
-
 	it('PinInput handles flipper key events without throw', () => {
 		const player = new Player(new TableBuilder().addFlipper('Flipper1').build()).init()
 		expect(() => player.onKeyDown({ code: 'ShiftLeft', key: 'Shift' })).not.toThrow()
 		expect(() => player.onKeyUp({ code: 'ShiftLeft', key: 'Shift' })).not.toThrow()
 		expect(() => player.onKeyDown({ code: 'ShiftRight', key: 'Shift' })).not.toThrow()
 		expect(() => player.onKeyUp({ code: 'ShiftRight', key: 'Shift' })).not.toThrow()
-	})
-
-	it('Player physics emu defaults to undefined before VpmController switch', () => {
-		expect(new Player(new TableBuilder().build()).init().getPhysics().emu).toBeUndefined()
 	})
 
 	it('Player physics steps emu after Vpm load', async () => {

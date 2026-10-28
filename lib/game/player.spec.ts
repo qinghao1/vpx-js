@@ -2,17 +2,13 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { expect } from 'chai'
+import * as sinon from 'sinon'
 import { TableBuilder } from '../../test/table-builder.js'
 import { ThreeHelper } from '../../test/three.helper'
 import { NodeBinaryReader } from '../io/binary-reader.node.js'
 import { Vertex3D } from '../math/vector.js'
 import { Table } from '../vpt/table/table.js'
-import { type IBallCreationPosition, Player } from './player.js'
-
-/** Read-only view of the player's pending-dirty set (no monkey-patching). */
-function dirtyOf(player: Player): Set<string> {
-	return (player as unknown as { dirtySet: Set<string> }).dirtySet
-}
+import { FULL_SWEEP_EVERY, type IBallCreationPosition, Player } from './player.js'
 
 describe('The VPinball player', () => {
 	const three = new ThreeHelper()
@@ -152,12 +148,16 @@ describe('The VPinball player', () => {
 		player.popStates()
 
 		// Mutating through the collection entry must mark the item dirty
-		// (set-only dirty marking, no monkey-patching). Assert the dirty
-		// contract itself: popStates may still filter the diff when the
-		// mutation leaves the diffed state equal.
+		// (set-only dirty marking; popStates may still filter the diff when
+		// the mutation leaves the diffed state equal, so spy the marking).
 		const itemApi = table.collections.FireSurpress.items[0] as unknown as { Enabled: boolean; Name: string }
-		itemApi.Enabled = !itemApi.Enabled
-		expect(dirtyOf(player).has(itemApi.Name)).to.equal(true)
+		const spy = sinon.spy(player, 'markDirty')
+		try {
+			itemApi.Enabled = !itemApi.Enabled
+			expect(spy.calledWithExactly(itemApi.Name)).to.equal(true)
+		} finally {
+			spy.restore()
+		}
 	})
 
 	it('should not dirty state on reads', async () => {
@@ -166,9 +166,63 @@ describe('The VPinball player', () => {
 		player.popStates()
 
 		const itemApi = table.collections.FireSurpress.items[0] as unknown as { Enabled: boolean; Name: string }
-		void itemApi.Name
-		void itemApi.Enabled
-		expect(dirtyOf(player).size).to.equal(0)
+		const spy = sinon.spy(player, 'markDirty')
+		try {
+			void itemApi.Name
+			void itemApi.Enabled
+			expect(spy.callCount).to.equal(0)
+		} finally {
+			spy.restore()
+		}
+	})
+
+	it('should surface script mutations through popStates', () => {
+		const table = new TableBuilder().withTableScript('').addFlipper('LeftFlipper').build('Table1')
+		const player = new Player(table).init({})
+		player.popStates()
+
+		table.flippers.LeftFlipper.getApi().RotateToEnd()
+		player.updatePhysics(20)
+
+		expect(player.popStates().keys).to.include('LeftFlipper')
+	})
+
+	it('should not mark movables dirty when no physics steps run', () => {
+		const table = new TableBuilder().withTableScript('').addFlipper('F1').build('Table1')
+		const player = new Player(table).init({})
+		player.popStates()
+
+		const spy = sinon.spy(player, 'markDirty')
+		try {
+			expect(player.updatePhysics(0.5)).to.equal(0)
+			expect(spy.callCount).to.equal(0)
+		} finally {
+			spy.restore()
+		}
+		expect(player.popStates().isEmpty).to.equal(true)
+	})
+
+	it('should surface unmarked state changes on the periodic full sweep', () => {
+		const table = new TableBuilder().withTableScript('').build('Table1')
+		const player = new Player(table).init({})
+		player.popStates()
+		const creator: IBallCreationPosition = {
+			getBallCreationPosition: (): Vertex3D => new Vertex3D(1000, 1000, 100),
+			getBallCreationVelocity: (): Vertex3D => new Vertex3D(0, 0, 0),
+			onBallCreated: (): void => {},
+		}
+		const ball = player.createBall(creator)
+		player.popStates()
+
+		// Bypass dirty marking: mutate the live state directly.
+		ball.getState().pos.x += 500
+		expect(player.popStates().isEmpty).to.equal(true)
+
+		let surfaced: string[] = []
+		for (let i = 0; i < FULL_SWEEP_EVERY + 1 && !surfaced.length; i++) {
+			surfaced = player.popStates().keys
+		}
+		expect(surfaced).to.include(ball.getName())
 	})
 
 	it('should fire frame-sync timers once per updatePhysics call', async () => {

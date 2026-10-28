@@ -103,6 +103,12 @@ export class PinInput {
 	private readonly nudgeHandler = new NudgeHandler()
 	private scheduled: ScheduledAction[] = []
 	private freePlayScheduled = false
+	private randomSource: () => number = Math.random
+
+	/** Override the RNG for keyboard-nudge variance (tests seed it; default Math.random). */
+	public setRandomSource(random: () => number): void {
+		this.randomSource = random
+	}
 
 	readonly rgKeys: Record<number, number> = { ...DEFAULT_KEYS }
 	public freePlay = PinInput.freePlayDefault
@@ -152,9 +158,11 @@ export class PinInput {
 	private runDue(): void {
 		if (!this.scheduled.length) return
 		const now = this.now()
-		const due = this.scheduled.filter(action => action.due <= now)
+		const pending: ScheduledAction[] = []
+		const due: ScheduledAction[] = []
+		for (const action of this.scheduled) (action.due <= now ? due : pending).push(action)
 		if (!due.length) return
-		this.scheduled = this.scheduled.filter(action => action.due > now)
+		this.scheduled = pending
 		for (const action of due) action.run()
 	}
 
@@ -259,8 +267,8 @@ export class PinInput {
 		const centerKey = this.getKey(AssignKey.CenterTiltKey)
 		if (code !== leftKey && code !== rightKey && code !== centerKey) return
 		const baseForce = 2
-		const angleVariance = (Math.random() - 0.5) * 15 * baseForce
-		const force = (0.6 + Math.random() * 0.8) * baseForce
+		const angleVariance = (this.randomSource() - 0.5) * 15 * baseForce
+		const force = (0.6 + this.randomSource() * 0.8) * baseForce
 		let angle: number
 		if (code === leftKey) angle = 75 + angleVariance
 		else if (code === rightKey) angle = 285 + angleVariance
@@ -270,7 +278,9 @@ export class PinInput {
 
 	private tryMockTroughEject(isDown: boolean, code: number): void {
 		if (!isDown || !this.freePlay) return
-		if (code !== DIK_1 && code !== this.getKey(AssignKey.StartGameKey)) return
+		// Mapped Start key only: a hardcoded DIK_1 here would keep the physical
+		// "1" key acting as Start after the user remaps StartGameKey elsewhere.
+		if (code !== this.getKey(AssignKey.StartGameKey)) return
 		const emu = this.player.getPhysics().emu as unknown as {
 			isMock?: boolean
 			isInitialized?: () => boolean
@@ -301,7 +311,7 @@ export class PinInput {
 	private syncCabinet(isDown: boolean, code: number): void {
 		const emu = this.player.getPhysics().emu
 		if (!emu) return
-		if (this.freePlay && isDown && (code === DIK_1 || code === this.getKey(AssignKey.StartGameKey))) {
+		if (this.freePlay && isDown && code === this.getKey(AssignKey.StartGameKey)) {
 			this.pulseSwitches(this.discoverCoinSwitches())
 		}
 		const switches = this.getCabinetSwitches(code)
@@ -312,7 +322,7 @@ export class PinInput {
 	}
 
 	private getCabinetSwitches(code: number): readonly number[] | undefined {
-		if (code === DIK_1 || code === this.getKey(AssignKey.StartGameKey)) return SWITCH_START
+		if (code === this.getKey(AssignKey.StartGameKey)) return SWITCH_START
 		if (code === DIK_2 || code === DIK_3) return SWITCH_CREDIT_2_3
 		if (code === DIK_4 || code === this.getKey(AssignKey.AddCreditKey2)) return SWITCH_CREDIT_4
 		if (code === DIK_5 || code === this.getKey(AssignKey.AddCreditKey)) return SWITCH_CREDIT_5

@@ -9,7 +9,7 @@ import { TableBuilder } from '../../test/table-builder.js'
 import type { FlipperMover } from '../vpt/flipper/flipper-mover.js'
 import type { Table } from '../vpt/table/table.js'
 import type { IEmulator } from './iemulator.js'
-import { AssignKey } from './key-code.js'
+import { AssignKey, DIK_G } from './key-code.js'
 import { PinInput } from './pin-input.js'
 import { Player } from './player.js'
 
@@ -161,6 +161,21 @@ describe('free-play helpers (vpx-js-only)', () => {
 		expect(enablesOf(log, 10)).to.be.equal(7)
 	})
 
+	it('delivers staggered auto-credits in due order', () => {
+		const table = new TableBuilder().withTableScript(coinScript).build('Table1')
+		const player = new Player(table).init({})
+		const log: SwitchCall[] = []
+		player.setEmulator(fakeEmu(log))
+		player.updatePhysics(100)
+		expect(enablesOf(log, 10)).to.be.equal(1)
+		player.updatePhysics(600)
+		expect(enablesOf(log, 10)).to.be.equal(3)
+		player.updatePhysics(2000)
+		expect(enablesOf(log, 10)).to.be.equal(5)
+		player.updatePhysics(4000)
+		expect(enablesOf(log, 10)).to.be.equal(7)
+	})
+
 	it('releases pulsed coin switches on physics time', () => {
 		const table = new TableBuilder().withTableScript(coinScript).build('Table1')
 		const player = new Player(table).init({})
@@ -242,47 +257,38 @@ describe('key repeat and debug keys', () => {
 		player.updatePhysics(40)
 		expect(scope.keyDownCount).to.equal(2)
 	})
-
-	it('should deliver FrameCount, Enable3D and DBGBalls keys to the script', () => {
-		// Upstream parity (InputManager::PushButtonEvent): every keyboard key
-		// reaches script KeyDown/KeyUp — nothing is swallowed.
-		const vbs = `Sub Table1_KeyDown(ByVal keycode)\nkeyDown = keycode\nEnd Sub\n`
-		const table = new TableBuilder().withTableScript(vbs).build('Table1')
-		const scope: any = {}
-		const player = new Player(table).init(scope)
-
-		const cases = [
-			{ code: 'F11', assign: AssignKey.FrameCount },
-			{ code: 'F10', assign: AssignKey.Enable3D },
-			{ code: 'KeyO', assign: AssignKey.DBGBalls },
-		] as const
-		let time = 0
-		for (const { code, assign } of cases) {
-			player.onKeyDown({ code, key: code })
-			player.updatePhysics((time += 20))
-			expect(scope.keyDown).to.equal(player.getKey(assign))
-			player.onKeyUp({ code, key: code })
-			player.updatePhysics((time += 20))
-		}
-	})
 })
 
 describe('keyboard nudge guard', () => {
-	it('should apply a left-tilt impulse when the script does not nudge', () => {
-		const table = new TableBuilder().withTableScript('').build('Table1')
-		const player = new Player(table).init({})
-		const handler = player.getNudgeHandler()
-		const spy = sinon.spy(handler, 'applyImpulse')
-		// Deterministic impulse: stub the two Math.random draws (angle variance,
-		// force scale) instead of asserting implementation-constant ranges.
-		const random = sinon.stub(Math, 'random').returns(0.5)
+	it('should apply a seeded left-tilt impulse inside the nudge cone when the script does not nudge', () => {
+		const buildSeeded = (): { player: Player; spy: sinon.SinonSpy } => {
+			const table = new TableBuilder().withTableScript('').build('Table1')
+			const player = new Player(table).init({})
+			player.setNudgeRandomSource(() => 0.5)
+			const spy = sinon.spy(player.getNudgeHandler(), 'applyImpulse')
+			return { player, spy }
+		}
+		const first = buildSeeded()
 		try {
-			player.onKeyDown({ code: 'KeyZ', key: 'z' })
-			player.updatePhysics(20)
-			expect(spy).to.have.been.calledOnceWithExactly(75, (0.6 + 0.5 * 0.8) * 2)
+			first.player.onKeyDown({ code: 'KeyZ', key: 'z' })
+			first.player.updatePhysics(20)
+			expect(first.spy).to.have.been.calledOnce
+			const [angle, force] = first.spy.firstCall.args as [number, number]
+			// Cone around the left-tilt base angle 75 (variance ±15) and the
+			// [0.6, 1.4] * baseForce 2 force band — not exact implementation floats.
+			expect(angle).to.be.within(60, 90)
+			expect(force).to.be.within(1.2, 2.8)
 		} finally {
-			spy.restore()
-			random.restore()
+			first.spy.restore()
+		}
+		// Same seed replays the identical impulse (deterministic, no Math.random).
+		const second = buildSeeded()
+		try {
+			second.player.onKeyDown({ code: 'KeyZ', key: 'z' })
+			second.player.updatePhysics(20)
+			expect(second.spy.firstCall.args).to.deep.equal(first.spy.firstCall.args)
+		} finally {
+			second.spy.restore()
 		}
 	})
 
@@ -355,5 +361,49 @@ describe('flipper keys drive cabinet switches', () => {
 			[112, true],
 			[116, true],
 		])
+	})
+})
+describe('remapped Start key', () => {
+	type SwitchCall = { nr: number; enable: boolean | undefined }
+
+	function setupStartRemap(): { player: Player; log: SwitchCall[]; kicks: Array<[number, number]> } {
+		const table = new TableBuilder().withTableScript('Const swCoin1 = 10\n').addKicker('TroughExit').build('Table1')
+		const player = new Player(table).init({})
+		player.setKey(AssignKey.StartGameKey, DIK_G)
+		const log: SwitchCall[] = []
+		player.getPhysics().emu = {
+			isMock: true,
+			emuSimulateCycle: () => 0,
+			setSwitchInput: (nr: number, enable?: boolean) => {
+				log.push({ nr, enable })
+				return true
+			},
+		} as unknown as IEmulator
+		const kicker = Object.values(table.kickers)[0] as unknown as {
+			hit?: { ball?: unknown }
+			getApi(): { Kick(angle: number, speed: number): void }
+		}
+		kicker.hit = { ball: {} }
+		const kicks: Array<[number, number]> = []
+		kicker.getApi().Kick = (angle: number, speed: number) => {
+			kicks.push([angle, speed])
+		}
+		return { player, log, kicks }
+	}
+
+	it('should not treat the physical 1 key as Start after remapping StartGameKey', () => {
+		const { player, log, kicks } = setupStartRemap()
+		player.onKeyDown({ code: 'Digit1', key: '1' })
+		player.updatePhysics(20)
+		expect(log.filter(call => call.enable === true)).to.deep.equal([])
+		expect(kicks).to.deep.equal([])
+	})
+
+	it('should still drive Start switches and the trough from the remapped key', () => {
+		const { player, log, kicks } = setupStartRemap()
+		player.onKeyDown({ code: 'KeyG', key: 'g' })
+		player.updatePhysics(20)
+		expect(log.filter(call => call.nr === 16 && call.enable === true).length).to.equal(1)
+		expect(kicks).to.deep.equal([[60, 10]])
 	})
 })

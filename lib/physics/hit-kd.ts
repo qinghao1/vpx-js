@@ -47,6 +47,21 @@ export class HitKD {
 		this.rootNode.reset(this)
 	}
 
+	private dynamicStale = false
+
+	/**
+	 * Records a dynamic membership change without rebuilding; the next update()
+	 * or hit test rebuilds once, so scripts spawning/destroying several balls
+	 * per frame pay one (bulk) rebuild instead of one full refill per spawn.
+	 * The deferred rebuild is required for correctness too: Hit events fire
+	 * synchronously mid-cycle and may create/destroy balls, so hitTestBall
+	 * must see the post-spawn membership even before the next update().
+	 */
+	public syncCounts(vho: HitObject[]): void {
+		this.init(vho)
+		this.dynamicStale = true
+	}
+
 	public fillFromVector(vho: HitObject[], warm = false): void {
 		this.init(vho)
 		this.rootNode.rectBounds.clear()
@@ -70,6 +85,7 @@ export class HitKD {
 	}
 
 	public update(): void {
+		this.dynamicStale = false
 		if (this.numItems <= BRUTE_FORCE_THRESHOLD) {
 			for (const h of this.orgVho) h.calcHitBBox()
 			return
@@ -81,6 +97,10 @@ export class HitKD {
 	}
 	public hitTestBall(ball: Ball, c: CollisionEvent, p: PlayerPhysics): void {
 		if (this.numItems === 0) return
+		if (this.dynamicStale) {
+			this.dynamicStale = false
+			if (this.numItems > BRUTE_FORCE_THRESHOLD) this.fillFromVector(this.orgVho)
+		}
 		if (this.numItems <= BRUTE_FORCE_THRESHOLD) {
 			for (const h of this.orgVho) {
 				if (h === ball.hit || !h.isEnabled) continue

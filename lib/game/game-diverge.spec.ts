@@ -89,24 +89,16 @@ describe('debug keys reach script', () => {
 		player = new Player(new TableBuilder().withTableScript(vbs).build('Table1')).init(scope)
 	})
 
-	it('delivers FrameCount (F11) to KeyDown/KeyUp', () => {
-		player.onKeyDown({ code: 'F11', key: 'F11' })
+	it.each([
+		['FrameCount (F11)', 'F11', DIK_F11],
+		['Enable3D (F10)', 'F10', DIK_F10],
+		['DBGBalls (O)', 'KeyO', DIK_O],
+	] as const)('delivers %s to KeyDown/KeyUp', (_label, code, dik) => {
+		player.onKeyDown({ code, key: code })
 		player.updatePhysics(20)
-		expect(scope.keyDown).toBe(DIK_F11)
-		player.onKeyUp({ code: 'F11', key: 'F11' })
+		expect(scope.keyDown).toBe(dik)
+		player.onKeyUp({ code, key: code })
 		player.updatePhysics(40)
-		expect(scope.keyUp).toBe(DIK_F11)
-	})
-
-	it('delivers Enable3D (F10) to KeyDown', () => {
-		player.onKeyDown({ code: 'F10', key: 'F10' })
-		player.updatePhysics(20)
-		expect(scope.keyDown).toBe(DIK_F10)
-	})
-
-	it('delivers DBGBalls (O) to KeyDown', () => {
-		player.onKeyDown({ code: 'KeyO', key: 'o' })
-		player.updatePhysics(20)
-		expect(scope.keyDown).toBe(DIK_O)
+		expect(scope.keyUp).toBe(dik)
 	})
 })

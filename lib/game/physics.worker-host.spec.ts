@@ -35,6 +35,14 @@ async function waitFor(pred: () => boolean, what: string, timeoutMs = 20000): Pr
 	}
 }
 
+// Lets an already-scheduled host tick (or its absence) settle: message handling
+// is synchronous, so a bounded macrotask flush proves no stray ack/tick is
+// pending without a fixed 300-500ms sleep. (Fake timers don't fit: the loop's
+// setTimeout chain and the async VPX table load need the real clock.)
+async function flushMacrotasks(rounds = 10): Promise<void> {
+	for (let i = 0; i < rounds; i++) await new Promise(resolve => setTimeout(resolve, 0))
+}
+
 const dropAt = (x: number, y: number, z: number): IBallCreationPosition => ({
 	getBallCreationPosition: () => new Vertex3D(x, y, z),
 	getBallCreationVelocity: () => new Vertex3D(0, 0, 0),
@@ -113,8 +121,6 @@ describe('physics worker host wiring', () => {
 })
 
 describe('physics worker protocol hardening', () => {
-	const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms))
-
 	const loadVpx = (): Uint8Array => new Uint8Array(readFileSync('test/fixtures/table-empty.vpx'))
 
 	const pongSteps = (posted: Posted[], id: number): number | undefined =>
@@ -142,10 +148,15 @@ describe('physics worker protocol hardening', () => {
 		send({ type: 'ping', id: 101, sab: new ArrayBuffer(8) as unknown as SharedArrayBuffer })
 		await waitFor(() => pongSteps(posted, 101) !== undefined, 'pong 101')
 		const before = pongSteps(posted, 101) ?? 0
-		await sleep(500)
-		send({ type: 'ping', id: 102 })
-		await waitFor(() => pongSteps(posted, 102) !== undefined, 'pong 102')
-		expect(pongSteps(posted, 102)).toBeGreaterThan(before)
+		// Poll for a live tick via fresh pings instead of a fixed sleep: each
+		// ping answers synchronously with the current step count (unique ids —
+		// pongSteps reads the first match per id).
+		let probe = 1000
+		await waitFor(() => {
+			probe++
+			send({ type: 'ping', id: probe })
+			return (pongSteps(posted, probe) ?? 0) > before
+		}, 'steps advance past smuggled SAB')
 		expect(posted.some(m => m.type === 'error')).toBe(false)
 
 		send({ type: 'stop' })
@@ -170,7 +181,9 @@ describe('physics worker protocol hardening', () => {
 		send({ type: 'ping', id: 201 })
 		await waitFor(() => pongSteps(posted, 201) !== undefined, 'pong 201')
 		expect(pongSteps(posted, 201)).toBe(0)
-		await sleep(300)
+		// Re-init halted the loop and cleared its timer, so flushing pending
+		// macrotasks settles any stray tick without a fixed sleep.
+		await flushMacrotasks()
 		send({ type: 'ping', id: 202 })
 		await waitFor(() => pongSteps(posted, 202) !== undefined, 'pong 202')
 		expect(pongSteps(posted, 202)).toBe(0)
@@ -190,7 +203,7 @@ describe('physics worker protocol hardening', () => {
 		await waitFor(() => posted.some(m => m.type === 'error'), 'init sab error')
 		expect(posted.some(m => m.type === 'ready')).toBe(false)
 		send({ type: 'start' })
-		await sleep(400)
+		await flushMacrotasks()
 		expect(posted.some(m => m.type === 'started')).toBe(false)
 
 		const sab = createPhysicsSAB()
@@ -223,7 +236,7 @@ describe('physics worker protocol hardening', () => {
 		send({ type: 'stop' })
 		send({ type: 'pause' })
 		send({ type: 'resume' })
-		await sleep(300)
+		await flushMacrotasks()
 		expect(posted.map(m => m.type)).toEqual(['worker-ready'])
 
 		send({ type: 'init', sab: createPhysicsSAB(), vpx: loadVpx() })

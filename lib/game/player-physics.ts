@@ -143,7 +143,7 @@ export class PlayerPhysics {
 			let hitTime = dTime
 			for (const f of this.flipperMovers) {
 				const t = f.getHitTime()
-				if (Number.isFinite(t) && t > 0 && t < hitTime) hitTime = t
+				if (Number.isFinite(t) && t > 0 && t <= hitTime) hitTime = t
 			}
 			this.recordContacts = true
 			this.contacts.length = 0
@@ -214,7 +214,10 @@ export class PlayerPhysics {
 		}
 	}
 
-	/** Advances physics to `time` (ms). Returns iterations run. */
+	/**
+	 * Advances physics to `time` (ms). Returns iterations run.
+	 * @param time absolute physics-clock time in ms (not a delta); omitted follows the wall clock.
+	 */
 	public updatePhysics(time?: number): number {
 		const initial = time !== undefined ? time * 1000 : Math.floor(this.now() * 1000)
 		if (this.ensureInitialTime(initial, time)) return 0
@@ -388,7 +391,7 @@ export class PlayerPhysics {
 		this.balls.push(ball)
 		this.movers.push(ball.getMover())
 		this.hitObjectsDynamic.push(ball.hit)
-		this.hitOcTreeDynamic.fillFromVector(this.hitObjectsDynamic, true)
+		this.hitOcTreeDynamic.syncCounts(this.hitObjectsDynamic)
 		return ball
 	}
 
@@ -405,7 +408,7 @@ export class PlayerPhysics {
 		if (mi >= 0) this.movers.splice(mi, 1)
 		const hi = this.hitObjectsDynamic.indexOf(ball.hit)
 		if (hi >= 0) this.hitObjectsDynamic.splice(hi, 1)
-		this.hitOcTreeDynamic.fillFromVector(this.hitObjectsDynamic, true)
+		this.hitOcTreeDynamic.syncCounts(this.hitObjectsDynamic)
 		if (wasDebug && this.balls.length) this.activeBallDebug = this.balls[0]
 		if (wasActive && this.balls.length) this.activeBall = this.balls[0]
 	}

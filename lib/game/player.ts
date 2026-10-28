@@ -24,6 +24,9 @@ export interface DomKeyEvent {
 	which?: number
 }
 
+/** Full state-sweep cadence: every Nth popStates re-checks all states to catch unmarked mutations. */
+export const FULL_SWEEP_EVERY = 300
+
 /** Host-facing game controller: input, physics, animations and state diffing. */
 export class Player extends EventEmitter {
 	private readonly pinInput: PinInput
@@ -156,9 +159,11 @@ export class Player extends EventEmitter {
 	/** Advances physics to absolute `timeMs` (ms, not a delta); omitted = real clock. Returns iterations run. */
 	public updatePhysics(timeMs?: number): number {
 		const iterations = this.physics.updatePhysics(timeMs)
-		for (const ball of this.physics.balls) this.markDirty(ball.getName())
-		for (const movable of this.table.getMovables()) {
-			this.markDirty(movable.getName())
+		if (iterations > 0) {
+			for (const ball of this.physics.balls) this.markDirty(ball.getName())
+			for (const movable of this.table.getMovables()) {
+				this.markDirty(movable.getName())
+			}
 		}
 		return iterations
 	}
@@ -176,7 +181,7 @@ export class Player extends EventEmitter {
 	public popStates(): ChangedStates<ItemState> {
 		const changed = new ChangedStates<ItemState>()
 		this.frameCount++
-		const useFull = this.frameCount % 300 === 0 && this.dirtySet.size < this.allStateNames.length * 0.5
+		const useFull = this.frameCount % FULL_SWEEP_EVERY === 0 && this.dirtySet.size < this.allStateNames.length * 0.5
 		if (useFull) {
 			for (const name of this.allStateNames) this.dirtySet.add(name)
 		}
@@ -242,8 +247,15 @@ export class Player extends EventEmitter {
 	public getKey(key: AssignKey): number {
 		return this.pinInput.rgKeys[key] ?? 0
 	}
+	public setKey(key: AssignKey, dik: number): void {
+		this.pinInput.setKey(key, dik)
+	}
 	public getNudgeHandler(): NudgeHandler {
 		return this.pinInput.getNudgeHandler()
+	}
+	/** Seed the keyboard-nudge RNG (tests); production default is Math.random. */
+	public setNudgeRandomSource(random: () => number): void {
+		this.pinInput.setRandomSource(random)
 	}
 	public nudge(angle: number, force: number): void {
 		this.pinInput.nudge(angle, force)
@@ -313,8 +325,7 @@ export class ChangedStates<STATE extends ItemState = ItemState> {
 		return Object.values(this.changedStates)
 	}
 	get isEmpty(): boolean {
-		for (const _ in this.changedStates) return false
-		return true
+		return Object.keys(this.changedStates).length === 0
 	}
 
 	public setState(name: string, state: STATE): void {

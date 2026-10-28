@@ -1166,6 +1166,24 @@ describe('physics: HitKD and quadtree build and traversal', () => {
 		for (let i = 10; i < 20; i++) expect(probes[i]?.calls).toBe(0)
 	})
 
+	it('HitKD sees mid-cycle membership changes without waiting for update', () => {
+		const probes: ProbeHit[] = []
+		for (let i = 0; i < 20; i++) {
+			probes.push(new ProbeHit(i * 100, i * 100 + 10, -5, 5, -5, 5, i === 0 ? 0 : -1))
+		}
+		const kd = new HitKD()
+		// Spawn path: membership recorded, tree not rebuilt yet (that happens
+		// on the next update). A hit test here must still see the new members.
+		kd.syncCounts(probes)
+		const ball = treeBall(new FRect3D(0, 10, -5, 5, -5, 5), 5, 0, 0)
+		const coll = new CollisionEvent(ball)
+		coll.hitTime = 1
+		kd.hitTestBall(ball, coll, treePhysics())
+		const [first] = probes
+		expect(first?.calls).toBe(1)
+		expect(coll.obj).toBe(first)
+	})
+
 	it('quadtree split routes a ball to its own quadrant only', () => {
 		const tree = new HitQuadtree()
 		const near: ProbeHit[] = []
