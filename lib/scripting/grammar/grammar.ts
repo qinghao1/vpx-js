@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import dashAstImport from 'dash-ast'
-import { type IToken, Parser } from 'ebnf'
+import { type IRule, type IToken, Parser } from 'ebnf'
 import { generate } from 'escodegen'
 import type { Program, Statement } from 'estree'
 import { logger, progress } from '../../util/logger.js'
@@ -154,66 +154,143 @@ export interface ESIToken extends IToken {
  * (`post-process/pp*`, token tree → ESTree). AST transformers run later in
  * `Transpiler` via `buildPipeline`, not here. See `../README.md`.
  */
-export class Grammar {
-	private readonly GRAMMAR_KEYWORDS: string[] = [
-		'And',
-		'ByVal',
-		'ByRef',
-		'Case',
-		'Call',
-		'Class',
-		'Const',
-		'Default',
-		'Dim',
-		'Do',
-		'Each',
-		'ElseIf',
-		'Else',
-		'Empty',
-		'End',
-		'Erase',
-		'Error',
-		'Eqv',
-		'Exit',
-		'Explicit',
-		'False',
-		'For',
-		'Function',
-		'Get',
-		'GoTo',
-		'If',
-		'In',
-		'Is',
-		'Let',
-		'Loop',
-		'Mod',
-		'New',
-		'Next',
-		'Nothing',
-		'Not',
-		'Null',
-		'On',
-		'Option',
-		'Or',
-		'Preserve',
-		'Private',
-		'Property',
-		'Public',
-		'ReDim',
-		'Resume',
-		'Select',
-		'Set',
-		'Sub',
-		'Then',
-		'To',
-		'True',
-		'Until',
-		'While',
-		'WEnd',
-		'With',
-		'Xor',
-	]
+const GRAMMAR_KEYWORDS: string[] = [
+	'And',
+	'ByVal',
+	'ByRef',
+	'Case',
+	'Call',
+	'Class',
+	'Const',
+	'Default',
+	'Dim',
+	'Do',
+	'Each',
+	'ElseIf',
+	'Else',
+	'Empty',
+	'End',
+	'Erase',
+	'Error',
+	'Eqv',
+	'Exit',
+	'Explicit',
+	'False',
+	'For',
+	'Function',
+	'Get',
+	'GoTo',
+	'If',
+	'In',
+	'Is',
+	'Let',
+	'Loop',
+	'Mod',
+	'New',
+	'Next',
+	'Nothing',
+	'Not',
+	'Null',
+	'On',
+	'Option',
+	'Or',
+	'Preserve',
+	'Private',
+	'Property',
+	'Public',
+	'ReDim',
+	'Resume',
+	'Select',
+	'Set',
+	'Sub',
+	'Then',
+	'To',
+	'True',
+	'Until',
+	'While',
+	'WEnd',
+	'With',
+	'Xor',
+]
 
+/** Per-letter `[Aa]` class (not an `i` flag: no Unicode folding). */
+function keywordCharClass(char: string): string {
+	const upper = char.toUpperCase()
+	const lower = char.toLowerCase()
+	return upper === lower ? char : `[${upper}${lower}]`
+}
+
+interface KeywordTrieNode {
+	children: Map<string, KeywordTrieNode>
+	terminal: boolean
+}
+
+function buildKeywordTrie(words: string[]): KeywordTrieNode {
+	const root: KeywordTrieNode = { children: new Map(), terminal: false }
+	for (const word of words) {
+		let node = root
+		for (const char of word.toLowerCase()) {
+			let next = node.children.get(char)
+			if (!next) {
+				next = { children: new Map(), terminal: false }
+				node.children.set(char, next)
+			}
+			node = next
+		}
+		node.terminal = true
+	}
+	return root
+}
+
+/**
+ * Trie to regex source. Shared prefixes nest into greedy `(?:...)?` groups
+ * (`Else(?:If)?`), which try the longest keyword first, matching bnf order.
+ */
+function emitKeywordTrie(node: KeywordTrieNode): string {
+	const parts: string[] = []
+	for (const [char, child] of node.children) {
+		const head = keywordCharClass(char)
+		const tail = emitKeywordTrie(child)
+		if (!tail) parts.push(head)
+		else if (child.terminal) parts.push(`${head}(?:${tail})?`)
+		else parts.push(`${head}(?:${tail})`)
+	}
+	return parts.join('|')
+}
+
+/** Anchored single-token equivalent of the `%Keyword2` fragment (same language, one regex exec). */
+const KEYWORD_RE = new RegExp(`^(?:${emitKeywordTrie(buildKeywordTrie(GRAMMAR_KEYWORDS))})`)
+
+/**
+ * Anchor a generated regex to the input start. ebnf's `readToken` only
+ * accepts matches at index 0, so anchoring keeps the language identical
+ * while failed matches return immediately instead of scanning the rest.
+ */
+function anchorRegExp(pattern: RegExp): RegExp {
+	return new RegExp(`^(?:${pattern.source})`, pattern.flags)
+}
+
+/** RULES with `%Keyword2` collapsed to KEYWORD_RE and every regex anchored; tree shape unchanged. */
+const OPTIMIZED_RULES: IRule[] = RULES.map(rule => {
+	if (rule.name === '%Keyword2') {
+		return { ...rule, bnf: [[KEYWORD_RE]] }
+	}
+	return {
+		...rule,
+		bnf: rule.bnf.map(alternative =>
+			alternative.map(element => (element instanceof RegExp ? anchorRegExp(element) : element)),
+		),
+	}
+})
+
+let sharedParser: Parser | null = null
+
+/** Process-wide parser (`parse` keeps no per-call state; sequential use only). */
+function getSharedParser(): Parser {
+	return (sharedParser ??= new Parser(OPTIMIZED_RULES, {}))
+}
+
+export class Grammar {
 	private readonly GRAMMAR_IDENTIFIERS: string[] = ['Me']
 
 	private readonly GRAMMAR_TARGET_PROGRAM = 'Program'
@@ -241,21 +318,15 @@ export class Grammar {
 	]
 
 	constructor() {
-		/**
-		 * Create a lookup table of standardized keywords
-		 */
-		for (const key of this.GRAMMAR_KEYWORDS) {
+		for (const key of GRAMMAR_KEYWORDS) {
 			this.keywordsMap[key.toLowerCase()] = key
 		}
 
-		/**
-		 * Create a lookup table of standardized identifiers
-		 */
 		for (const key of this.GRAMMAR_IDENTIFIERS) {
 			this.identifiersMap[key.toLowerCase()] = key
 		}
 
-		this.parser = new Parser(RULES, {})
+		this.parser = getSharedParser()
 	}
 
 	public format(script: string): string {

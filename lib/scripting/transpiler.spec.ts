@@ -10,6 +10,7 @@ import { Player } from '../game/player.js'
 import type { Table } from '../vpt/table/table.js'
 import { Transformer } from './transformer/transformer.js'
 import { Transpiler } from './transpiler.js'
+import { cacheKey, getTableDataForWorker, getVbsMemCache } from './transpiler-worker-pool.js'
 
 chai.use((sinonChai as any).default ?? sinonChai)
 
@@ -38,6 +39,15 @@ describe('The VBScript transpiler', () => {
 		expect(js).to.equal(
 			`window.runTableScript = (${Transformer.SCOPE_NAME}, ${Transformer.ITEMS_NAME}, ${Transformer.ENUMS_NAME}, ${Transformer.GLOBAL_NAME}, ${Transformer.STDLIB_NAME}, ${Transformer.VBSHELPER_NAME}, ${Transformer.PLAYER_NAME}) => {\n        __scope.test = undefined;\n};`,
 		)
+	})
+
+	it('should serve repeat sync transpiles from the memory cache', () => {
+		const vbs = `Dim syncCacheProbe\n`
+		const transpiler = new Transpiler(table, player)
+		const first = transpiler.transpile(vbs, 'play', 'global')
+		const key = cacheKey(vbs, 'play', 'global', getTableDataForWorker(table, player))
+		expect(getVbsMemCache(key)).to.equal(first)
+		expect(transpiler.transpile(vbs, 'play', 'global')).to.equal(first)
 	})
 
 	it('should execute the table script', () => {

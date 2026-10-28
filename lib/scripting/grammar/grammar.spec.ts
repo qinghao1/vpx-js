@@ -1,6 +1,7 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
+import { readFileSync } from 'node:fs'
 import * as chai from 'chai'
 import { expect } from 'chai'
 import sinonChai from 'sinon-chai'
@@ -194,5 +195,41 @@ describe('The scripting grammar - colon Rem comments', () => {
 		const scope = {} as any
 		new Transpiler(table, player).execute(`Answer = 40 + 2 : Rem the answer`, scope, 'global')
 		expect(scope.Answer).to.equal(42)
+	})
+})
+
+describe('The scripting grammar - single-word ElseIf', () => {
+	it('should execute the matching single-word "ElseIf" branch', () => {
+		const scope = {} as any
+		const vbs = `x = 2\nIf x = 1 Then\ny = 1\nElseIf x = 2 Then\ny = 2\nElse\ny = 3\nEnd If`
+		new Transpiler(table, player).execute(vbs, scope, 'global')
+		expect(scope.y).to.equal(2)
+	})
+})
+
+describe('The scripting grammar - keyword fast path', () => {
+	// Keywords straight from grammar.bnf, so a bnf/generator change that the
+	// trie misses fails here instead of silently parsing keywords as identifiers.
+	function bnfKeywords(): string[] {
+		const bnf = readFileSync(new URL('./grammar.bnf', import.meta.url), 'utf8')
+		const line = bnf.split('\n').find(l => l.startsWith('Keyword ::='))
+		const keywords = [...(line ?? '').matchAll(/'([A-Za-z]+)'/g)].map(m => m[1]!)
+		expect(keywords.length).to.be.greaterThan(50)
+		return keywords
+	}
+
+	it('should reject every bnf keyword as an identifier', () => {
+		for (const keyword of bnfKeywords()) {
+			expect(() => grammar.transpile(`Dim ${keyword}\n`), keyword).to.throw(Error)
+			expect(() => grammar.transpile(`Dim ${keyword.toLowerCase()}\n`), keyword).to.throw(Error)
+		}
+	})
+
+	it('should accept keyword-prefixed and keyword-suffixed identifiers', () => {
+		for (const keyword of bnfKeywords()) {
+			expect(() => grammar.transpile(`Dim ${keyword}q\n`), keyword).not.to.throw(Error)
+			expect(() => grammar.transpile(`Dim q${keyword}\n`), keyword).not.to.throw(Error)
+			expect(() => grammar.transpile(`Dim ${keyword}1\n`), keyword).not.to.throw(Error)
+		}
 	})
 })

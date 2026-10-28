@@ -2,12 +2,14 @@ import { generate } from 'escodegen'
 import type { Program } from 'estree'
 import type { Player } from '../game/player.js'
 import { type AnimationGate, animationGate } from '../util/animation-gate.js'
+import { idbSet } from '../util/idb-cache.js'
 import { Enums, type EnumsApi } from '../vpt/enums.js'
 import { GlobalApi } from '../vpt/global-api.js'
 import type { Table } from '../vpt/table/table.js'
 import { Grammar } from './grammar/grammar.js'
 import { Stdlib } from './stdlib/index.js'
 import { buildPipeline, normalizeNewCall } from './transpiler-pipeline.js'
+import { cacheKey, getTableDataForWorker, getVbsMemCache, setVbsMemCache } from './transpiler-worker-pool.js'
 import { VBSHelper } from './vbs-helper.js'
 import { VbsProxyHandler } from './vbs-proxy-handler.js'
 
@@ -75,7 +77,16 @@ export class Transpiler {
 	}
 
 	public transpile(vbs: string, gf?: string, go?: string): string {
-		return generate(this.parseAndTransform(vbs, gf, go))
+		// Share the worker path's mem key (parity in transpiler-worker.spec); write through to IDB, reads stay async-only.
+		const key = cacheKey(vbs, gf, go, getTableDataForWorker(this.table, this.player))
+		const cached = getVbsMemCache(key)
+		if (cached !== undefined) {
+			return cached
+		}
+		const js = generate(this.parseAndTransform(vbs, gf, go))
+		setVbsMemCache(key, js)
+		void idbSet(key, js)
+		return js
 	}
 
 	public async transpileAsync(vbs: string, gf?: string, go?: string): Promise<string> {
