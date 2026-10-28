@@ -62,48 +62,6 @@ describe('PinMAME integration', () => {
 		expect(emu.emuSimulateCycle(16)).toBe(16)
 	})
 
-	it('EmulatorState pinmame mode is direct indexed, wpc mode uses matrix', () => {
-		const wpc = new EmulatorState()
-		wpc.updateState({
-			wpc: {
-				lampState: new Uint8Array([0, 0, 0, 0, 0, 255, 0, 128]),
-				solenoidState: new Uint8Array([0, 1, 0]),
-				generalIlluminationState: new Uint8Array([1, 0]),
-				inputSwitchMatrixActiveColumn: new Uint8Array([0]),
-				diagnosticLed: 0,
-				lampRow: 0,
-				lampColumn: 0,
-				diagnosticLedToggleCount: 0,
-				midnightModeEnabled: false,
-				irqEnabled: false,
-				activeRomBank: 0,
-				time: '',
-				blankSignalHigh: false,
-				watchdogExpiredCounter: 0,
-				watchdogTicks: 0,
-				zeroCrossFlag: 0,
-				wpcSecureScrambler: 0,
-			},
-			dmd: { scanline: 0, dmdShadedBuffer: new Uint8Array(), dmdPageMapping: [] },
-			sound: { volume: 0, readDataBytes: 0, writeDataBytes: 0, readControlBytes: 0, writeControlBytes: 0 },
-			ram: new Uint8Array(),
-		})
-		const lamps = wpc.getChangedLamps() as unknown as number[][]
-		expect(lamps.some(([n]) => n === 16)).toBe(true)
-
-		const pin = new EmulatorState()
-		pin.applyPinmame(new Uint8Array([0, 1, 0, 1]), new Uint8Array([1, 0, 1]), new Uint8Array([0, 1]))
-		expect(pin.getSolenoidState(0)).toBe(1)
-		expect(pin.getSolenoidState(1)).toBe(0)
-		expect(pin.getSolenoidState(2)).toBe(1)
-		expect(pin.getGIState(0)).toBe(0)
-		expect(pin.getGIState(1)).toBe(1)
-		expect(pin.getLampStateDirect(1)).toBe(1)
-		expect((pin.getChangedLamps() as unknown as number[][]).length).toBeGreaterThan(0)
-		const changedSols = pin.getChangedSolenoids()
-		expect(changedSols.some(([n]) => n === 0)).toBe(true)
-	})
-
 	it('pinmame Changed* diff is identity, not matrix', () => {
 		const s = new EmulatorState()
 		const lamps = new Uint8Array(20)

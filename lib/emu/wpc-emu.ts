@@ -1,19 +1,30 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import wpcEmuPkg, { type GamelistDB, type WpcEmuApi as WpcEmuApiType, type WpcEmuWebWorkerApi } from 'wpc-emu'
+import type { GamelistDB, WpcEmuApi as WpcEmuApiType, WpcEmuWebWorkerApi } from 'wpc-emu'
 import type { IEmulator } from '../game/iemulator.js'
-import { logger } from '../util/logger.js'
-
-const WpcEmuApi = (wpcEmuPkg as any)?.WpcEmuApi ?? (wpcEmuPkg as any)?.default?.WpcEmuApi ?? wpcEmuPkg
-
 import { Vertex2D } from '../math/vector.js'
+import { logger } from '../util/logger.js'
 import { EmulatorMessageQueue, MessageType, switchMessageType } from './emulator-message-queue.js'
 import { EmulatorState } from './emulator-state.js'
 import { OffsetIndex } from './offset-index.js'
 import { warnOnce } from './warn-once.js'
+import { resolveWpcEmu } from './wpc-emu-interop.js'
+
+const WpcEmuApi = resolveWpcEmu<{
+	initVMwithRom(rom: { u06: Uint8Array }, entry: GamelistDB.GameEntry): Promise<WpcEmuApiType.Emulator>
+	getVersion(): string
+}>('WpcEmuApi')
 
 const INCLUDE_RAM = false
+// Boot warmup: run the first simulated second so CPU/Fliptronics state
+// settles before table scripts run; 4 tick steps is wpc-emu's recommended
+// granularity (see wpc-emu BENCHMARK.md).
+const WARMUP_MS = 1000
+const WARMUP_TICK_STEPS = 4
+// Initial cabinet-key state replayed after load. wpc-emu autoreleases
+// cabinet keys after 100 ms, so this is a boot pulse, not a held switch.
+const INITIAL_CABINET_KEY = 16
 
 /** WPC-EMU adapter. @see https://github.com/vpinball/wpc-emu */
 export class Emulator implements IEmulator {
@@ -26,8 +37,8 @@ export class Emulator implements IEmulator {
 	async loadGame(entry: GamelistDB.GameEntry, rom: Uint8Array): Promise<void> {
 		this.emulator = await WpcEmuApi.initVMwithRom({ u06: rom }, entry)
 		this.emulator.reset()
-		this.emulator.executeCycleForTime(1000, 4)
-		this.queue.addMessage(MessageType.CabinetInput, 16)
+		this.emulator.executeCycleForTime(WARMUP_MS, WARMUP_TICK_STEPS)
+		this.queue.addMessage(MessageType.CabinetInput, INITIAL_CABINET_KEY)
 		this.queue.replayMessages(this)
 		this.registerAudioConsumer(m => logger().debug('audioCallback', m))
 	}
@@ -100,7 +111,8 @@ export class Emulator implements IEmulator {
 	}
 	getDmdFrame(): Uint8Array {
 		const frame = this.emulatorState.getDmdScreen()
-		// Standardize on a zeroed w*h buffer — never a 0-length one.
+		// Standardize on a zeroed w*h buffer — never a 0-length one. The
+		// non-empty buffer is the live stored frame: read it, don't mutate it.
 		return frame.length ? frame : new Uint8Array(this.dmdSize.x * this.dmdSize.y)
 	}
 	getDipSwitchByte(bank = 0): number {

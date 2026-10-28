@@ -1,10 +1,18 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import wpcEmuPkg, { type GamelistDB as GamelistDBType } from 'wpc-emu'
+import type { GamelistDB as GamelistDBType } from 'wpc-emu'
 import { logger } from '../util/logger.js'
+import { resolveWpcEmu } from './wpc-emu-interop.js'
 
-const GamelistDB = (wpcEmuPkg as any)?.GamelistDB ?? (wpcEmuPkg as any)?.default?.GamelistDB ?? wpcEmuPkg
+const GamelistDB = resolveWpcEmu<{
+	getByPinmameName(name: string): GamelistDBType.ClientGameEntry | undefined
+}>('GamelistDB')
+
+// Whole-request budget for VPDB metadata + ROM downloads. Without a signal
+// a stalled connection hangs loadGame forever; the signal covers headers
+// and body reads alike.
+export const FETCH_TIMEOUT_MS = 30_000
 
 /** Fetches a WPC ROM from VPDB.io. */
 export async function downloadGameEntry(pinmameGameName: string): Promise<LoadedGameEntry> {
@@ -49,13 +57,18 @@ const CRC_TABLE: Uint32Array = (() => {
 	return table
 })()
 
-async function fetchOk(url: string, what: string): Promise<Response> {
-	const r = await fetch(url)
+/** Fetch with a whole-request timeout; the default budget is FETCH_TIMEOUT_MS. Exported for tests. */
+export async function fetchWithTimeout(url: string, what: string, timeoutMs = FETCH_TIMEOUT_MS): Promise<Response> {
+	const r = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) })
 	if (!r.ok) {
 		logger().error(`VPDB Fetch ${what} failed for url`, url)
 		throw new Error(`VPDB_FETCH_FAILED_WITH_ERROR_${r.status}`)
 	}
 	return r
+}
+
+async function fetchOk(url: string, what: string): Promise<Response> {
+	return fetchWithTimeout(url, what)
 }
 
 async function fetchJson<T>(url: string): Promise<T> {

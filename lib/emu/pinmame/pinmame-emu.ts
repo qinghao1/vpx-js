@@ -17,6 +17,10 @@ const CONFIG_SIZE = 1024
 const VPM_DIR = '/pinmame'
 // Hz — the mixer rate PinMAME resamples its audio to.
 const SAMPLE_RATE = 44100
+// Largest DMD frame accepted from the wasm core (1 MiB). Real DMDs are at
+// most a few dozen KiB; anything bigger is a corrupt width/height pair and
+// must not reach _malloc.
+const MAX_DMD_BYTES = 1 << 20
 
 type Api = {
 	setConfig(p: number): void
@@ -31,7 +35,6 @@ type Api = {
 	setDIP(b: number, v: number): void
 	getDmdWidth(): number
 	getDmdHeight(): number
-	getDmdDepth(): number
 	getDmdFrame(p: number): number
 	getSolMask(low: number): number
 	setSolMask(low: number, mask: number): void
@@ -71,8 +74,9 @@ export class PinMameEmulator implements IEmulator {
 	private readonly mockSwitches = new Map<number, number>()
 	private readonly solMasks = new Map<number, number>()
 	private readonly pendingSwitches = new Map<number, number>()
-	private dmdW = FALLBACK_DMD.x
-	private dmdH = FALLBACK_DMD.y
+	// Shared, mutated in place by pullDmd — getDmdDimensions hands out this
+	// instance so per-frame callers don't allocate. Read x/y, don't mutate.
+	private readonly dmdDims = new Vertex2D(FALLBACK_DMD.x, FALLBACK_DMD.y)
 	// Scratch buffers pooled across frames to avoid per-sync _malloc churn.
 	// The pull slot is shared: lamp/sol/GI pulls run sequentially (never
 	// concurrently), each writing 8-byte (i32 index, i32 value) pairs. Sizes
@@ -119,7 +123,6 @@ export class PinMameEmulator implements IEmulator {
 			setDIP: wrap('PinmameSetDIP', null, ['number', 'number']),
 			getDmdWidth: wrap('PinmameGetDmdWidth', 'number', []),
 			getDmdHeight: wrap('PinmameGetDmdHeight', 'number', []),
-			getDmdDepth: wrap('PinmameGetDmdDepth', 'number', []),
 			getDmdFrame: wrap('PinmameGetDmdFrame', 'number', ['number']),
 			getSolMask: wrap('PinmameGetSolenoidMask', 'number', ['number']),
 			setSolMask: wrap('PinmameSetSolenoidMask', null, ['number', 'number']),
@@ -241,14 +244,15 @@ export class PinMameEmulator implements IEmulator {
 	}
 	registerAudioConsumer(): void {}
 	getDmdDimensions(): Vertex2D {
-		return new Vertex2D(this.dmdW, this.dmdH)
+		return this.dmdDims
 	}
 	getDmdFrame(): Uint8Array {
 		const d = this.emulatorState.getDmdScreen()
-		return d.length ? d : new Uint8Array(this.dmdW * this.dmdH)
+		// The non-empty buffer is the live stored frame: read it, don't mutate it.
+		return d.length ? d : new Uint8Array(this.dmdDims.x * this.dmdDims.y)
 	}
 	getDipSwitchByte(bank = 0): number {
-		return this.isMock || !this.api ? 0 : (this.api.getDIP(bank) ?? 0)
+		return this.isMock || !this.api ? 0 : this.api.getDIP(bank)
 	}
 	setDipSwitchByte(v: number, bank = 0): void {
 		if (!this.ready) {
@@ -264,7 +268,7 @@ export class PinMameEmulator implements IEmulator {
 		if (cached !== undefined) return cached
 		if (this.isMock || !this.api) return 0
 		// Real backend errors propagate — a catch-all 0 would hide a dead core.
-		return this.api.getSolMask(low) ?? 0
+		return this.api.getSolMask(low)
 	}
 	setSolMask(low: number, mask: number): void {
 		this.solMasks.set(low, mask)
@@ -309,6 +313,7 @@ export class PinMameEmulator implements IEmulator {
 	}
 
 	private ensureWasmBuf(slot: 'pull' | 'dmd', bytes: number): number {
+		if (!Number.isFinite(bytes) || bytes <= 0) return 0
 		const buf = this.wasmBufs[slot]
 		if (buf.ptr && buf.cap >= bytes) return buf.ptr
 		if (buf.ptr) this.mod?._free(buf.ptr)
@@ -321,10 +326,13 @@ export class PinMameEmulator implements IEmulator {
 		if (!this.mod || !this.api) return
 		const w = this.api.getDmdWidth()
 		const h = this.api.getDmdHeight()
-		if (!w || !h) return
-		this.dmdW = w
-		this.dmdH = h
+		// Width/height come straight from wasm memory: reject non-positive
+		// and absurd pairs (negative dims threw RangeError in Uint8Array;
+		// huge ones OOM in _malloc) and keep the last good dimensions.
+		if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0) return
 		const n = w * h
+		if (n > MAX_DMD_BYTES) return
+		this.dmdDims.set(w, h)
 		const ptr = this.ensureWasmBuf('dmd', n)
 		// getDmdFrame returns bytes written (0 = no display yet). The frame is
 		// copied out of wasm memory twice — HEAPU8 into the reusable

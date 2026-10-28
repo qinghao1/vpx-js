@@ -4,7 +4,13 @@ import type { PinmameModule } from './pinmame-module.js'
 let cached: { module: PinmameModule; isMock: boolean } | null = null
 let inflight: Promise<{ module: PinmameModule; isMock: boolean }> | null = null
 
-const CANDIDATES = [
+/**
+ * Module probe order for the PinMAME wasm build. Served paths first (vite
+ * `/wasm/*`), then source-relative paths for tests and the harness, real
+ * build before mock fallback in each group. Importers may replace the
+ * array contents to point at a custom build; the loader itself is unchanged.
+ */
+export const PINMAME_MODULE_CANDIDATES = [
 	'/wasm/libpinmame.js',
 	'/wasm/libpinmame.mock.js',
 	'/wasm/mock/libpinmame.mock.js',
@@ -27,7 +33,7 @@ export async function createPinmameModule(): Promise<{ module: PinmameModule; is
 }
 
 async function loadModule(): Promise<{ module: PinmameModule; isMock: boolean }> {
-	for (const path of CANDIDATES) {
+	for (const path of PINMAME_MODULE_CANDIDATES) {
 		try {
 			const mod = (await import(/* @vite-ignore */ path)) as {
 				default: () => Promise<PinmameModule>

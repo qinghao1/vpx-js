@@ -194,6 +194,93 @@ describe('PinMAME WASM emulator (mock)', () => {
 		emu.isMock = true
 		expect(emu.getSolMask(0)).toBe(0)
 	})
+	it('writeConfig lays out the 1 KiB struct: sample rate @+4, VPM dir @+8', async () => {
+		const { m, api } = wired(emu)
+		await emu.loadGame('g', new Uint8Array([1, 2, 3, 4]))
+		// wired() mallocs at the constant address 8.
+		expect(api.setConfig).toHaveBeenCalledWith(8)
+		const view = new DataView(m.HEAPU8.buffer)
+		expect(view.getInt32(8 + 4, true)).toBe(44100)
+		expect(new TextDecoder().decode(m.HEAPU8.subarray(8 + 8, 8 + 8 + '/pinmame'.length))).toBe('/pinmame')
+	})
+	it('pullDmd ignores corrupt dimensions and keeps the last good ones', () => {
+		const heap = new Uint8Array(65536)
+		emu.setBackendForTesting(
+			{
+				_malloc: () => 128,
+				_free: () => {},
+				HEAPU8: heap,
+				getValue: () => 0,
+			},
+			{
+				getChangedLamps: () => 0,
+				getChangedSols: () => 0,
+				getChangedGIs: () => 0,
+				getDmdWidth: () => -1,
+				getDmdHeight: () => 32,
+				getDmdFrame: () => 1,
+			},
+		)
+		emu.markReady()
+		expect(() => emu.emuSimulateCycle(16)).not.toThrow()
+		expect(emu.getDmdDimensions().x).toBe(128)
+		expect(emu.getDmdDimensions().y).toBe(32)
+	})
+	it('pullDmd rejects absurd dimensions without allocating', () => {
+		const malloc = vi.fn(() => 128)
+		emu.setBackendForTesting(
+			{
+				_malloc: malloc,
+				_free: () => {},
+				HEAPU8: new Uint8Array(65536),
+				getValue: () => 0,
+			},
+			{
+				getChangedLamps: () => 0,
+				getChangedSols: () => 0,
+				getChangedGIs: () => 0,
+				getDmdWidth: () => 100000,
+				getDmdHeight: () => 100000,
+				getDmdFrame: () => 1,
+			},
+		)
+		emu.markReady()
+		expect(() => emu.emuSimulateCycle(16)).not.toThrow()
+		// The lamp/sol/GI pull slot (1024 lamps x 8 bytes) may allocate; the
+		// 1e10-byte DMD frame must not.
+		const sizes = malloc.mock.calls.map(c => c[0] as number)
+		expect(sizes.length).toBeGreaterThan(0)
+		expect(Math.max(...sizes)).toBe(1024 * 8)
+		expect(emu.getDmdDimensions().x).toBe(128)
+	})
+	it('getDmdDimensions returns a cached instance updated by pulls', () => {
+		const heap = new Uint8Array(65536)
+		emu.setBackendForTesting(
+			{
+				_malloc: () => 128,
+				_free: () => {},
+				HEAPU8: heap,
+				getValue: () => 0,
+			},
+			{
+				getChangedLamps: () => 0,
+				getChangedSols: () => 0,
+				getChangedGIs: () => 0,
+				getDmdWidth: () => 4,
+				getDmdHeight: () => 2,
+				getDmdFrame: (ptr: number) => {
+					heap.set([1, 2, 3, 4, 5, 6, 7, 8], ptr)
+					return 1
+				},
+			},
+		)
+		emu.markReady()
+		const dims = emu.getDmdDimensions()
+		expect([dims.x, dims.y]).toEqual([128, 32])
+		emu.emuSimulateCycle(16)
+		expect(emu.getDmdDimensions()).toBe(dims)
+		expect([dims.x, dims.y]).toEqual([4, 2])
+	})
 	it('pullDmd copies the frame out of wasm memory', () => {
 		const heap = new Uint8Array(65536)
 		const bytes = [1, 2, 3, 4, 5, 6, 7, 8]
