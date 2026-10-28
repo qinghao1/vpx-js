@@ -318,7 +318,7 @@ const loadState = await page.evaluate(() => {
 			hasSAB: typeof SharedArrayBuffer !== 'undefined',
 			isolated: typeof crossOriginIsolated !== 'undefined' ? crossOriginIsolated : false,
 			waitAsync: typeof Atomics !== 'undefined' && typeof Atomics.waitAsync === 'function',
-			threaded: !!v._physicsWorker || !!v._physicsSab,
+			threaded: false,
 		},
 		memory: performance.memory
 			? {
@@ -792,7 +792,7 @@ console.log(`\n[bench] === ANALYSIS & SUGGESTIONS ===`)
 			`- FPS: ${pf.fps} (target 60) — SwiftShader (${payload.glInfo?.renderer?.includes('SwiftShader') || payload.glInfo?.renderer?.includes('WebKit')}) + ${payload.metrics.tris} tris + ${lj.textures?.mb ?? '?'}MB textures + per-frame updateAnimations for all animatables + popStates diff + applyChangedStates matrix decomposes.`,
 		)
 		console.log(
-			`  Suggestion: ensure GPU acceleration (--gpu=vulkan or --gpu=gl) not SwiftShader, reduce texture resolution (effectiveMax already 1024 for VLM but still high), lower DPR to 1 in play mode already done, throttle controls.update, batch / instance more, frustum cull (three-mesh-bvh already installed but buildBvhIdle idle—make eager), avoid full state sync every 300 frames (frameCount%300), use CSS nudge transform not mesh translate, separate physicsLoop (setTimeout 16ms) and renderLoop (rAF) already decoupled but both still on main thread—consider moving physics to dedicated worker via SAB already started but not yet offloaded (worker just tics dummy scratch, not real physics). Wire real PlayerPhysics into worker.`,
+			`  Suggestion: ensure GPU acceleration (--gpu=vulkan or --gpu=gl) not SwiftShader, reduce texture resolution (effectiveMax already 1024 for VLM but still high), lower DPR to 1 in play mode already done, throttle controls.update, batch / instance more, frustum cull (three-mesh-bvh already installed but buildBvhIdle idle—make eager), avoid full state sync every 300 frames (frameCount%300), use CSS nudge transform not mesh translate, separate physicsLoop (setTimeout 16ms) and renderLoop (rAF) already decoupled but both still on main thread.`,
 		)
 	}
 	if (payload.metrics.memory?.used && payload.metrics.memory.used > 1200) {

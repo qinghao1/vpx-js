@@ -236,19 +236,18 @@ export const physicsChecks = async page => {
 			out.start = { before: 0, mid: 0, after: 0, pass: false, error: String(e) }
 		}
 		try {
-			// Worker must step real physics: SAB generation counter advances while playing.
+			// Main-thread physics must advance while playing: the physics clock moves.
 			const deadline = Date.now() + 15000
-			while (Date.now() < deadline && !(v._physicsWorker && v._physicsReady))
+			while (Date.now() < deadline && !(v.player && v.viewerMode === 'play'))
 				await new Promise(r => setTimeout(r, 250))
-			const sab = v._physicsSab
-			const genAt = () => (sab ? new Int32Array(sab, 0, 2)[1] : -1)
-			const genBefore = genAt()
+			const clockAt = () => v.player?.getPhysics?.()?.timeMsec ?? -1
+			const tBefore = clockAt()
 			await new Promise(r => setTimeout(r, 120))
-			const genAfter = genAt()
-			const alive = !!v._physicsWorker && v._physicsReady === true && genAfter > genBefore
-			out.worker = { genBefore, genAfter, pass: alive }
+			const tAfter = clockAt()
+			const alive = tBefore >= 0 && tAfter > tBefore
+			out.clock = { tBefore, tAfter, pass: alive }
 		} catch (e) {
-			out.worker = { genBefore: -1, genAfter: -1, pass: false, error: String(e) }
+			out.clock = { tBefore: -1, tAfter: -1, pass: false, error: String(e) }
 		}
 		return out
 	})

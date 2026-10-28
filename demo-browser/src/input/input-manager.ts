@@ -1,6 +1,5 @@
 import * as THREE from 'three'
 import { keyEventToDirectInputKey } from '../../../dist-esm/lib/game/key-code.js'
-import { pushInput } from '../../../dist-esm/lib/game/shared/physics-buffer.js'
 import { swipeNudge } from '../../../dist-esm/lib/render/threejs/three-scene-postprocess.js'
 import { CONTROL_SCHEME, isTableHit, NUDGE } from '../config.js'
 import { ensureBvh } from '../env.js'
@@ -64,7 +63,6 @@ export interface InputHost {
 	readonly camera: THREE.Camera | null
 	readonly tableGroup: THREE.Group | null
 	readonly buttonMeshes: readonly THREE.Object3D[] | null
-	readonly physicsSab: SharedArrayBuffer | null
 	readonly enableMotionButton?: HTMLButtonElement | null
 	readonly tickImmediate?: () => void
 	log?(msg: string, level?: string): void
@@ -102,9 +100,6 @@ export function makeHost(viewer: any): InputHost {
 		},
 		get buttonMeshes() {
 			return (viewer._buttonMeshes ?? null) as readonly THREE.Object3D[] | null
-		},
-		get physicsSab() {
-			return (viewer._physicsSab ?? null) as SharedArrayBuffer | null
 		},
 		get tickImmediate() {
 			return (viewer._tickPhysicsImmediate as (() => void) | undefined) ?? undefined
@@ -211,10 +206,6 @@ function attachKeyboardHost(host: InputHost, signal: AbortSignal): void {
 			host.tickImmediate?.()
 		}
 
-		if (host.physicsSab && dik) {
-			pushInput(host.physicsSab, down ? 1 : 0, dik, Date.now())
-		}
-
 		if (dik || PLAY_CODES.has(e.code) || PLAY_CODES.has(e.key)) {
 			e.preventDefault()
 		}
@@ -268,10 +259,6 @@ function attachPointerHost(host: InputHost, signal: AbortSignal): void {
 		const ev = { code, key, location: loc, ts: Date.now() } as any
 		if (down) host.player?.onKeyDown(ev)
 		else host.player?.onKeyUp(ev)
-		if (host.physicsSab) {
-			const dik = keyEventToDirectInputKey(ev)
-			if (dik) pushInput(host.physicsSab, down ? 1 : 0, dik, Date.now())
-		}
 		host.tickImmediate?.()
 	}
 

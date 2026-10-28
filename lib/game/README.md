@@ -77,10 +77,3 @@ vpx-js-only — none exists upstream — and default on via the static
 disable). All free-play scheduling runs on the physics clock, so pausing the
 game pauses it.
 
-## Threaded physics (optional)
-
-`shared/physics-buffer.ts` + `physics.worker.ts` run a second `PlayerPhysics`
-off-thread (`WorkerSim`: real table and physics, no scripts/emu) and publish
-ball frames through a `SharedArrayBuffer` triple buffer — see the header
-comment in `physics-buffer.ts` for the layout and slot-rotation protocol.
-`physics.worker.ts` is a full implementation, not a stub.

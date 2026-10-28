@@ -4,25 +4,7 @@
 
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import * as THREE from 'three/webgpu'
-import { keyEventToDirectInputKey } from '../../dist-esm/lib/game/key-code.js'
 import { Player } from '../../dist-esm/lib/game/player.js'
-import {
-	BALL_ID,
-	BALL_STRIDE,
-	createPhysicsSAB,
-	INPUT_KEY_DOWN,
-	INPUT_KEY_UP,
-	INPUT_NUDGE,
-	MAX_BALLS,
-	pushInput,
-	trySnap,
-} from '../../dist-esm/lib/game/shared/physics-buffer.js'
-import {
-	isFreshSyncAck,
-	LOST_SYNC_FRAMES,
-	mirrorWorkerFrame,
-	shouldResyncMirror,
-} from '../../dist-esm/lib/game/shared/worker-mirror.js'
 import { BrowserBinaryReader } from '../../dist-esm/lib/io/binary-reader.js'
 import { isWasmReady } from '../../dist-esm/lib/physics/wasm/kernels.js'
 import { setGlobalEmissionScale } from '../../dist-esm/lib/render/threejs/material-shared.js'
@@ -217,10 +199,6 @@ export class Viewer {
 		this._animRaf = null
 		this._animTimeout = null
 		this._emuStartLogged = false
-		this._syncEpoch = 0
-		this._inflightEpoch = null
-		this._framesSinceSync = 0
-		this._mirrorStreak = 0
 		this._streamId = 0
 		this._loadId = 0
 		this._cameraGen = 0
@@ -304,7 +282,6 @@ export class Viewer {
 			this._loadAbort.abort()
 			this._loadAbort = null
 		}
-		this._terminatePhysicsWorker()
 		for (const fn of this._eventCleanups) fn()
 		this._eventCleanups = []
 		this.controls?.dispose?.()
@@ -312,19 +289,6 @@ export class Viewer {
 		this.renderer?.setAnimationLoop(null)
 		this.renderer?.dispose?.()
 		this.scene?.clear?.()
-	}
-	_terminatePhysicsWorker() {
-		this._physicsWorker?.terminate?.()
-		this._physicsWorker = null
-		this._physicsSab = null
-		this._physicsScratch = null
-		this._physicsReady = false
-		this._physicsPaused = false
-		this._lastWorkerSyncCount = -1
-		this._syncEpoch = 0
-		this._inflightEpoch = null
-		this._framesSinceSync = 0
-		this._mirrorStreak = 0
 	}
 	_setupDebugToggle() {
 		const btn = document.getElementById('debug-toggle')
@@ -451,7 +415,8 @@ export class Viewer {
 
 	private _syncPhysicsTransforms(_timestamp) {
 		if (!this.player) return
-		this._stepPhysicsWithWorker()
+		this.player.setPhysicsEnabled(this.viewerMode === 'play')
+		this.player.updatePhysics()
 		if (this.viewerMode !== 'play' || !this.isPaused) {
 			this.player.updateAnimations(this.player.getGameTime())
 			const changed = this.player.popStates()
@@ -756,159 +721,9 @@ export class Viewer {
 			this._cameraRaf = requestAnimationFrame(tick)
 		})
 	}
-	// Single loud failure path for the physics worker: surfaces the cause
-	// in-page at error level instead of warn-and-continue.
-	_physicsFailed(message, detail) {
-		const physicsError = String(message ?? 'unknown')
-		this.log(`physics worker failed: ${physicsError} — running single-threaded`, 'error')
-		if (detail && _isDev) console.warn(detail)
-	}
-	_createPhysicsWorker() {
-		try {
-			if (!this._vpxBytes) {
-				this.log('physics worker needs table bytes — staying single-threaded', 'warn')
-				return null
-			}
-			this._terminatePhysicsWorker()
-			const sab = createPhysicsSAB()
-			const scratch = new Float32Array(MAX_BALLS * BALL_STRIDE)
-			// NB: `new URL` must stay inline so vite bundles the worker (bare three/escodegen imports).
-			const worker = new Worker(new URL('../../dist-esm/lib/game/physics.worker.js', import.meta.url), {
-				type: 'module',
-			})
-			worker.onmessage = e => {
-				const data = e.data ?? {}
-				if (data.type === 'ready') {
-					this._physicsReady = true
-					this._syncWorkerBalls()
-					worker.postMessage({ type: 'start' })
-					this.log(`[physics] worker ready (${data.balls ?? 0} balls)`, 'debug')
-				} else if (data.type === 'synced') {
-					// Stale acks (a replaced lifecycle sync, or a duplicate) must not
-					// clear the current in-flight gate.
-					if (isFreshSyncAck(this._inflightEpoch, data.epoch)) this._inflightEpoch = null
-				} else if (data.type === 'error') {
-					if (this._physicsWorker === worker) this._terminatePhysicsWorker()
-					this._physicsFailed(data.message, data.stack)
-				}
-			}
-			worker.postMessage({
-				type: 'init',
-				sab,
-				vpx: this._vpxBytes,
-			})
-			worker.onerror = e => {
-				if (this._physicsWorker === worker) this._terminatePhysicsWorker()
-				this._physicsFailed(e.message ?? String(e))
-			}
-			this._physicsSab = sab
-			this._physicsScratch = scratch
-			this._physicsWorker = worker
-			return {
-				sab,
-				scratch,
-				worker,
-			}
-		} catch (e) {
-			this._physicsFailed(e.message ?? String(e), e)
-			return null
-		}
-	}
-	_ensurePhysicsWorker() {
-		if (this._physicsSab && this._physicsWorker) return true
-		if (!this.player || !this._vpxBytes) return false
-		const res = this._createPhysicsWorker()
-		if (!res) return false
-		this.log(`[physics] SAB ${res.sab.byteLength} worker started`, 'debug')
-		return true
-	}
-	// Full ball-list snapshot main→worker; sent on lifecycle changes, worker ready,
-	// and backed-off resync. Every send takes the single epoch/in-flight slot: the
-	// worker acks the epoch after applying, which re-arms the resync gate.
-	_syncWorkerBalls() {
-		const worker = this._physicsWorker
-		if (!worker || !this._physicsReady || !this.player) return
-		this._lastWorkerSyncCount = this.player.balls.length
-		const epoch = (this._syncEpoch ?? 0) + 1
-		this._syncEpoch = epoch
-		this._inflightEpoch = epoch
-		this._framesSinceSync = 0
-		worker.postMessage({
-			type: 'syncBalls',
-			epoch,
-			balls: this.player.balls.map(ball => ({
-				id: ball.id,
-				pos: [ball.state.pos.x, ball.state.pos.y, ball.state.pos.z],
-				vel: [ball.hit.vel.x, ball.hit.vel.y, ball.hit.vel.z],
-				radius: ball.data.radius,
-				frozen: ball.state.isFrozen,
-			})),
-		})
-	}
-	// Steps game logic on the main thread while ball kinematics come from the
-	// worker. The worker frame is claimed first: when the mirror will apply,
-	// the main step skips ball integration (movers, timers, hit events, script
-	// kicks/captures, and emu flushing still run) so mirrored balls are never
-	// double-stepped (that double-step applied every impulse twice). Worker
-	// frames stay authoritative; discrete script-side jumps still teleport back
-	// to the worker via the drift check below.
-	_stepPhysicsWithWorker() {
-		this.player.setPhysicsEnabled(this.viewerMode === 'play')
-		const sab = this._physicsSab
-		const scratch = this._physicsScratch
-		// Claim the worker frame BEFORE the main step: the claim decides which
-		// balls the mirror will cover, so the per-ball integration skip reuses
-		// the exact verified set instead of predicting it.
-		const frame = sab && scratch && this._physicsReady ? trySnap(sab, scratch) : null
-		const canMirror = !!frame && frame.count > 0 && !this.isPaused
-		if (canMirror) {
-			// Pre-step skip from id-verified slots only: a worker slot whose id
-			// matches a live main ball will be overwritten by the mirror below,
-			// so its integration is discarded work. Unmatched main balls (newborn,
-			// never synced) keep their local sim.
-			const preById = new Map((this.player?.balls ?? []).map(ball => [ball.id, ball]))
-			const skip = new Set()
-			for (let slot = 0; slot < frame.count; slot++) {
-				const ball = preById.get(scratch[slot * BALL_STRIDE + BALL_ID])
-				if (ball) skip.add(ball.getMover())
-			}
-			this.player.updatePhysics(undefined, skip)
-		} else {
-			this.player.updatePhysics(undefined, false)
-		}
-		// The step above may run script lifecycle (create/destroy), so the apply
-		// map is built from the post-step list, not the pre-step one.
-		const mainBalls = this.player?.balls ?? []
-		let miss = false
-		if (canMirror) {
-			const mirrored = mirrorWorkerFrame(mainBalls, scratch, frame.count)
-			for (const teleport of mirrored.teleports) {
-				this._physicsWorker?.postMessage({ type: 'teleportBall', ...teleport })
-			}
-			miss = mirrored.miss
-		} else {
-			// No verifiable mirror (empty frame, paused, or no fresh worker
-			// frame): fall back to the count guard — a count the last sync did
-			// not converge still feeds the resync streak.
-			miss = mainBalls.length !== this._lastWorkerSyncCount
-		}
-		this._framesSinceSync = (this._framesSinceSync ?? 0) + 1
-		// A lost ack stops gating resync: without this a dropped `synced`
-		// would wedge the gate shut while frames keep disagreeing.
-		if (this._inflightEpoch != null && this._framesSinceSync >= LOST_SYNC_FRAMES) this._inflightEpoch = null
-		this._mirrorStreak = miss ? (this._mirrorStreak ?? 0) + 1 : 0
-		if (this._physicsWorker && shouldResyncMirror(this._mirrorStreak, this._inflightEpoch, this._framesSinceSync)) {
-			this._syncWorkerBalls()
-		}
-	}
 	enterPlayMode() {
 		if (this.renderer) this.renderer.shadowMap.enabled = false
 		if (this.controls) this.controls.enabled = false
-		this._ensurePhysicsWorker()
-		if (this._physicsWorker && this._physicsPaused) {
-			this._physicsWorker.postMessage({ type: 'resume' })
-			this._physicsPaused = false
-		}
 		if (this.tableGroup) hideCabFlippers(this.tableGroup)
 		{
 			const framing = this.tableGroup ? computePlayFraming(this.tableGroup) : null
@@ -941,10 +756,6 @@ export class Viewer {
 			this._touchMap.clear()
 			for (const code of RELEASE_CODES) this._sendKey(code, false)
 		} else this._touchMap.clear()
-		if (this._physicsWorker && !this._physicsPaused) {
-			this._physicsWorker.postMessage({ type: 'pause' })
-			this._physicsPaused = true
-		}
 		if (this.controls) this.controls.enabled = true
 		if (this.tableGroup) showCabFlippers(this.tableGroup)
 		const ballsNode = this.tableGroup?.getObjectByName('balls')
@@ -1567,7 +1378,6 @@ export class Viewer {
 	}
 	async _createPlayer() {
 		if (this.player) this.player.removeAllListeners?.()
-		this._terminatePhysicsWorker()
 		this.player = new Player(this.table, (this.gate ??= new AnimationGate()))
 		this.player.setPhysicsEnabled(this.viewerMode === 'play')
 		const activePlayer = this.player
@@ -1589,11 +1399,9 @@ export class Viewer {
 		this.dmd.findMeshes()
 		this.player.on('ballCreated', ball => {
 			this.handleBallLifecycle(ball, true)
-			this._syncWorkerBalls()
 		})
 		this.player.on('ballDestroyed', ball => {
 			this.handleBallLifecycle(ball, false)
-			this._syncWorkerBalls()
 		})
 		this.player.on('emuStarted', () => {
 			this._emuStartLogged = true
@@ -2094,8 +1902,7 @@ export class Viewer {
 							`[IDB] hit ${cand.split('/').pop()} ${fmtBytes(cached.byteLength)} — using cached`,
 							'debug',
 						)
-						this._vpxBytes = new Uint8Array(cached)
-						const reader = new BrowserBinaryReader(this._vpxBytes)
+						const reader = new BrowserBinaryReader(new Uint8Array(cached))
 						await reader.open()
 						if (_loadGen !== this._loadId) {
 							try {
@@ -2133,7 +1940,6 @@ export class Viewer {
 					)
 				} catch {}
 				if (_loadGen !== this._loadId) return
-				this._vpxBytes = data
 				const reader = new BrowserBinaryReader(data)
 				await reader.open()
 				if (_loadGen !== this._loadId) {
@@ -2162,8 +1968,7 @@ export class Viewer {
 		this._streamId++
 		this._loading(5, 'Reading file…', `Reading ${file.name}…`)
 		this.log(`Reading ${file.name}…`, 'debug')
-		this._vpxBytes = new Uint8Array(await file.arrayBuffer())
-		const reader = new BrowserBinaryReader(this._vpxBytes)
+		const reader = new BrowserBinaryReader(new Uint8Array(await file.arrayBuffer()))
 		await reader.open()
 		if (_loadGen !== this._loadId) {
 			await this._cleanupReader(reader)
@@ -2222,17 +2027,12 @@ export class Viewer {
 			fps = 0
 		let lastFpsUpdate = performance.now()
 		let lastDmd = 0
-		if (this.player && this.viewerMode === 'play' && (!this._physicsSab || !this._physicsWorker)) {
-			const res = this._createPhysicsWorker()
-			if (res) this.log(`[physics] SAB ${res.sab.byteLength} worker started`, 'debug')
-		} else if (this._physicsSab) {
-			this.log(`[physics] reusing SAB ${this._physicsSab.byteLength}`, 'debug')
-		}
 		// expose immediate physics tick for tests
 		;(this as any)._tickPhysicsImmediate = () => {
 			if (!this.player || this.isPaused || this.viewerMode !== 'play') return
 			if (isLowQuality()) return
-			this._stepPhysicsWithWorker()
+			this.player.setPhysicsEnabled(true)
+			this.player.updatePhysics()
 			this.player.updateAnimations(this.player.getGameTime())
 			const changed = this.player.popStates()
 			if (!changed.isEmpty) {
@@ -2387,13 +2187,6 @@ export class Viewer {
 	_nudge(angle, force = 2.6) {
 		if (!this.player || this.viewerMode !== 'play' || this.isPaused) return
 		this.player.nudge(angle, force)
-		// Same fan-out as _sendKey: the main player stays authoritative for the
-		// single-threaded path, and the worker sim applies the same impulse on
-		// drain so it no longer has to infer nudges from drift.
-		if (this._physicsSab) {
-			const forceKey = Math.max(0, Math.min(65535, Math.round(force * 1000)))
-			pushInput(this._physicsSab, INPUT_NUDGE, forceKey, angle)
-		}
 		this._flashNudge(angle)
 	}
 	_sendKey(code, down) {
@@ -2403,10 +2196,6 @@ export class Viewer {
 		const ev = { code, key, location, ts: Date.now() }
 		if (down) this.player.onKeyDown(ev)
 		else this.player.onKeyUp(ev)
-		if (this._physicsSab) {
-			const dik = keyEventToDirectInputKey(ev as any)
-			if (dik) pushInput(this._physicsSab, down ? INPUT_KEY_DOWN : INPUT_KEY_UP, dik, Date.now())
-		}
 	}
 	_flashNudge(angle) {
 		const el = this.dom.nudgeFlash

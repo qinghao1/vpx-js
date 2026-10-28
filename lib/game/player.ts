@@ -13,7 +13,7 @@ import { Event } from './event.js'
 import type { IEmulator } from './iemulator.js'
 import { type AssignKey, keyEventToDirectInputKey } from './key-code.js'
 import { PinInput } from './pin-input.js'
-import { PlayerPhysics, type SkipBalls } from './player-physics.js'
+import { PlayerPhysics } from './player-physics.js'
 
 /** DOM-style key event accepted by {@link Player.onKeyDown} / {@link Player.onKeyUp}. */
 export interface DomKeyEvent {
@@ -168,8 +168,8 @@ export class Player extends EventEmitter {
 	}
 
 	/** Advances physics to absolute `timeMs` (ms, not a delta); omitted = real clock. Returns iterations run. */
-	public updatePhysics(timeMs?: number, skipBalls: SkipBalls = false): number {
-		const iterations = this.physics.updatePhysics(timeMs, skipBalls)
+	public updatePhysics(timeMs?: number): number {
+		const iterations = this.physics.updatePhysics(timeMs)
 		if (iterations > 0) {
 			for (const ball of this.physics.balls) this.markDirty(ball.getName())
 			for (const movable of this.table.getMovables()) {

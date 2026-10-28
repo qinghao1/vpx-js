@@ -316,8 +316,8 @@ async function runOne(targetUrl, label) {
 	console.log(`[physics:${label}]`, JSON.stringify(phys))
 	// No ball-moved override: every sub-leg stands on its own verdict. Skipped
 	// sub-legs (no flipper, mock emu) are neutral, but at least one sub-leg must
-	// genuinely pass (the physics worker) for the leg to pass.
-	const physParts = [phys.flipper?.pass, phys.coin?.pass, phys.start?.pass, phys.worker?.pass]
+	// genuinely pass (the advancing physics clock) for the leg to pass.
+	const physParts = [phys.flipper?.pass, phys.coin?.pass, phys.start?.pass, phys.clock?.pass]
 	const physPass = physParts.every(p => p === true || p === 'skip') && physParts.some(p => p === true)
 	results.physics = physPass
 	console.log(`[integration:${label}] physics ${results.physics ? 'PASS' : 'FAIL'}`)
