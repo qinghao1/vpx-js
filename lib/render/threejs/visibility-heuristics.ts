@@ -286,7 +286,18 @@ export function applyDarkOccluderPass(
 		if (!mats.every(isDarkMat)) continue
 		const geo = mesh.geometry
 		if (!geo?.attributes?.position) continue
-		const worldBox = new THREE.Box3().setFromObject(mesh)
+		// Geometry bounds through the (already updated) world matrix: identical to
+		// setFromObject for a leaf mesh, without re-walking the subtree per mesh.
+		// Meshes with children keep the exact subtree path below.
+		let worldBox: THREE.Box3
+		if (mesh.children.length === 0) {
+			if (!geo.boundingBox) geo.computeBoundingBox()
+			const localBox = geo.boundingBox
+			if (!localBox || localBox.isEmpty()) continue
+			worldBox = localBox.clone().applyMatrix4(mesh.matrixWorld)
+		} else {
+			worldBox = new THREE.Box3().setFromObject(mesh)
+		}
 		if (worldBox.isEmpty()) continue
 		const wsx = worldBox.max.x - worldBox.min.x
 		const wsy = worldBox.max.y - worldBox.min.y

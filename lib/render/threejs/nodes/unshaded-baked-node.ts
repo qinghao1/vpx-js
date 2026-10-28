@@ -10,7 +10,7 @@ import {
 } from 'three'
 import { Fn, float, positionWorld, sqrt, step, texture, uniform, uv, vec2, vec4 } from 'three/tsl'
 import { MeshBasicNodeMaterial } from 'three/webgpu'
-import { copyPendingKeys, setNodeMapSlot } from '../material-shared.js'
+import { copyForkedRenderState, setNodeMapSlot } from '../material-shared.js'
 import { getTransmissionTexture, TRANSMISSION_OPAQUE_CUTOFF } from '../transmission-buffer.js'
 import { inLiftVolume, sideFor, uTransArea } from './primitive-bdl-node.js'
 
@@ -147,12 +147,8 @@ export function cloneBakedNodeMaterial<T>(mat: T): T {
 		polygonOffsetUnits: sourceMaterial.polygonOffsetUnits ?? -1,
 		transmission: userData.__transmission === true,
 	})
-	cloned.name = sourceMaterial.name
-	cloned.transparent = sourceMaterial.transparent
+	copyForkedRenderState(sourceMaterial, cloned)
 	cloned.opacity = sourceMaterial.opacity
-	cloned.depthWrite = sourceMaterial.depthWrite
-	cloned.depthTest = sourceMaterial.depthTest
-	cloned.blending = sourceMaterial.blending
 	cloned.blendSrc = sourceMaterial.blendSrc
 	cloned.blendDst = sourceMaterial.blendDst
 	cloned.blendEquation = sourceMaterial.blendEquation
@@ -160,7 +156,5 @@ export function cloneBakedNodeMaterial<T>(mat: T): T {
 	cloned.blendDstAlpha = sourceMaterial.blendDstAlpha
 	cloned.blendEquationAlpha = sourceMaterial.blendEquationAlpha
 	cloned.alphaTest = sourceMaterial.alphaTest
-	cloned.side = sourceMaterial.side
-	copyPendingKeys(userData, cloned.userData as Record<string, unknown>)
 	return cloned as unknown as T
 }

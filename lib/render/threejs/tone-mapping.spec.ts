@@ -11,20 +11,12 @@ describe('tone mapping', () => {
 		expect(resolveToneMapping(4)).to.equal(AgXToneMapping)
 	})
 
-	it('defaults a missing tone mapper to AgX like upstream', () => {
-		expect(resolveToneMapping(undefined)).to.equal(AgXToneMapping)
-	})
-
-	it('falls back to AgX for out-of-range ids', () => {
-		expect(resolveToneMapping(99)).to.equal(AgXToneMapping)
-		expect(resolveToneMapping(-1)).to.equal(AgXToneMapping)
-	})
-
-	it('falls back to AgX for legacy and internal ids like upstream GetValidToneMapper', () => {
-		// Upstream maps anything outside 0-3 (including the internal
-		// TM_WCG_SPLINE=256) to AgX; there is no Linear entry.
-		expect(resolveToneMapping(5)).to.equal(AgXToneMapping)
-		expect(resolveToneMapping(256)).to.equal(AgXToneMapping)
+	it('falls back to AgX for missing, out-of-range, legacy, and internal ids', () => {
+		// Upstream GetValidToneMapper maps anything outside 0-3 (including
+		// the internal TM_WCG_SPLINE=256) to AgX; there is no Linear entry.
+		for (const id of [undefined, 99, -1, 5, 256] as const) {
+			expect(resolveToneMapping(id), `id ${String(id)}`).to.equal(AgXToneMapping)
+		}
 	})
 
 	it('clamps exposure to the native 0..2 range by default', () => {

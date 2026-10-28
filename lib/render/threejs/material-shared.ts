@@ -88,6 +88,33 @@ export function cloneMaterialForWrite<T>(mat: T): T {
 	return material.clone() as T
 }
 
+/** Base render state every fork-safe node-material clone carries over. */
+export type ForkRenderState = {
+	name: string
+	transparent: boolean
+	depthWrite: boolean
+	depthTest: boolean
+	blending: number
+	side: unknown
+	userData: Record<string, unknown>
+}
+
+/**
+ * Base render-state copy shared by the node-material fork clones (primitive
+ * BDL/additive, unlit bake): the factories rebuild the node graph, then the
+ * fork keeps the source's draw state plus the streaming keys (see
+ * copyPendingKeys). Blend-equation/opacity extras stay with the callers.
+ */
+export function copyForkedRenderState(source: ForkRenderState, target: ForkRenderState): void {
+	target.name = source.name
+	target.transparent = source.transparent
+	target.depthWrite = source.depthWrite
+	target.depthTest = source.depthTest
+	target.blending = source.blending
+	target.side = source.side
+	copyPendingKeys(source.userData, target.userData)
+}
+
 /**
  * Shared map-slot swap for TSL node materials (baked + primitive): stashes the
  * map, rebuilds the node graph, and reports whether anything actually changed.

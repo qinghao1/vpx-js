@@ -13,6 +13,7 @@ import {
 	pendingKeyFor,
 	setGlobalEmissionScale,
 } from './material-shared.js'
+import { getSlots } from './material-slots.js'
 import { createDynamicBallNodeMaterial } from './nodes/ball-reflection-node.js'
 import { createBulbGlowNodeMaterial } from './nodes/bulb-glow-node.js'
 import {
@@ -68,7 +69,7 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 	constructor(private readonly mapGenerator: ThreeMapGenerator) {}
 
 	private stashCutout(mat: any, alphaTestValue: number, depthBias: number, additive: boolean): void {
-		const userData = ((mat as { userData?: Record<string, unknown> }).userData ??= {})
+		const userData = getSlots(mat)
 		const validCutout = alphaTestValue > 0 && alphaTestValue <= 1 ? alphaTestValue : 0
 		userData.__alphaTestValue = validCutout
 		userData.__depthBias = depthBias
@@ -76,8 +77,9 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 	}
 
 	private restoreCutout(mat: any, tex?: any): boolean {
-		const userData = (mat as { userData?: Record<string, unknown> })?.userData
-		if (!userData || userData.__addBlend || mat.alphaTest > 0) return false
+		if (!mat?.userData) return false
+		const userData = getSlots(mat)
+		if (userData.__addBlend || mat.alphaTest > 0) return false
 		const cutoutValue =
 			(userData.__alphaTestValue as number) ??
 			(tex as { userData?: { alphaTestValue?: number } })?.userData?.alphaTestValue ??
@@ -211,7 +213,7 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 				depthBias,
 			})
 			mat.name = material ? `material:${material.name}` : 'material:additive'
-			;(mat.userData as any).__addBlend = true
+			getSlots(mat).__addBlend = true
 			// Explicit RenderInfo.depthWrite wins over the non-writing additive default.
 			mat.depthWrite = depthWrite ?? false
 			if (absorb) {
@@ -220,7 +222,7 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 				applyAbsorbBlendState(mat)
 			}
 			this.stashCutout(mat, alphaTestValue, depthBias, true)
-			if (!tex && mapName) (mat.userData as any)[pendingKeyFor('map')] = mapName
+			if (!tex && mapName) getSlots(mat)[pendingKeyFor('map')] = mapName
 			this.cachedMaterials[key] = mat
 			return mat
 		}
@@ -239,10 +241,9 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 				doubleSided: backfacesEnabled !== false,
 			})
 			mat.name = material ? `material:${material.name}` : 'material:baked'
-			if (!tex && (map ?? emissiveMap))
-				(mat.userData as any)[pendingKeyFor('map')] = (map ?? emissiveMap) as string
-			;(mat.userData as any).__isBaked = true
-			;(mat.userData as any).__backfacesEnabled = backfacesEnabled
+			if (!tex && (map ?? emissiveMap)) getSlots(mat)[pendingKeyFor('map')] = (map ?? emissiveMap) as string
+			getSlots(mat).__isBaked = true
+			getSlots(mat).__backfacesEnabled = backfacesEnabled
 			// Explicit RenderInfo.depthWrite wins over the opaque-bake default.
 			mat.depthWrite = depthWrite ?? true
 			this.stashCutout(mat, alphaTestValue, depthBias, false)
@@ -288,7 +289,7 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 		// Explicit RenderInfo.depthWrite wins over the transparent-derived default.
 		mat.depthWrite = depthWrite ?? !matTransparent
 		this.stashCutout(mat, alphaTestValue, depthBias, false)
-		if (!tex && mapName) (mat.userData as any)[pendingKeyFor('map')] = mapName
+		if (!tex && mapName) getSlots(mat)[pendingKeyFor('map')] = mapName
 		this.applyNormalMap(mat, normalMap)
 		this.applyEnvMap(mat, envMap)
 		this.cachedMaterials[key] = mat
@@ -321,7 +322,7 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 			threeMaterial.roughness = Math.max(0, Math.min(1, 1 - material.roughness))
 		}
 		try {
-			;(threeMaterial.userData as any).__baseColor = new Color(material.baseColor).getHex()
+			getSlots(threeMaterial).__baseColor = new Color(material.baseColor).getHex()
 		} catch {
 			// Expected: TypeError if userData is frozen — baked tint falls back to white.
 		}
@@ -329,9 +330,7 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 			// colorNode/opacityNode/emissiveNode override the classic slots, so
 			// classic color/opacity/emissive writes are dead here — script tint
 			// must go through updatePrimitiveBdl/updatePrimitiveAdditive instead.
-			const doubleSided = (threeMaterial.userData as Record<string, unknown>)?.__doubleSided as
-				| boolean
-				| undefined
+			const doubleSided = getSlots(threeMaterial).__doubleSided
 			threeMaterial.side = sideFor(isTransparent ? true : doubleSided)
 			return
 		}
@@ -376,7 +375,7 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 		name: string,
 		init?: (material: any) => void,
 	): boolean {
-		delete (mat as any).userData[pendingKeyFor(key)]
+		delete getSlots(mat)[pendingKeyFor(key)]
 		if ((mat as any)[key] === tex) return false
 		;(mat as any)[key] = tex
 		;((mat as any)[key] as { name: string }).name = name
@@ -397,11 +396,11 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 		// rebuilds the node graph, `classic` assigns the classic texture slot.
 		const route = SLOT_ROUTES[kindOf(mat)][key]
 		if (route === 'ignore') {
-			delete (mat.userData as any)[pendingKeyFor(key)]
+			delete getSlots(mat)[pendingKeyFor(key)]
 			return
 		}
 		if (!this.mapGenerator.hasTexture(name)) {
-			;(mat.userData as any)[pendingKeyFor(key)] = name
+			getSlots(mat)[pendingKeyFor(key)] = name
 			if (route === 'node-map') {
 				const changed =
 					kindOf(mat) === 'baked' ? setBakedMap(mat, null, name) : setPrimitiveMap(mat, null, name)
@@ -414,11 +413,11 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 			const changed = kindOf(mat) === 'baked' ? setBakedMap(mat, tex, name) : setPrimitiveMap(mat, tex, name)
 			const cut = this.restoreCutout(mat, tex)
 			if (changed || cut) mat.needsUpdate = true
-			delete (mat as any).userData[pendingKeyFor(key)]
+			delete getSlots(mat)[pendingKeyFor(key)]
 			return
 		}
 		if (!this.assignClassicSlot(mat, key, tex, name, init)) return
-		const userData = (mat as any).userData as any
+		const userData = getSlots(mat)
 		const restoredCutout = key === 'map' ? this.restoreCutout(mat, tex) : false
 		if (key === 'map' && userData?.__isBaked) {
 			this.refreshBakedMapTint(mat, tex, userData)
@@ -451,7 +450,7 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 	}
 
 	private resolvePendingOnMaterial(mat: any): number {
-		const userData = (mat as any).userData as any
+		const userData = getSlots(mat)
 		normalizePendingKeys(userData)
 		const kind = kindOf(mat)
 		let fixed = 0
@@ -464,7 +463,7 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 				continue
 			}
 			const name = userData[pendingKey]
-			if (!name || !this.mapGenerator.hasTexture(name)) continue
+			if (typeof name !== 'string' || !name || !this.mapGenerator.hasTexture(name)) continue
 			const tex = this.mapGenerator.getTexture(name)
 			if (this.applyArrivedTexture(mat, userData, texKey, tex, name, route)) fixed++
 			delete userData[pendingKey]

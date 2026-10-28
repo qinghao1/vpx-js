@@ -48,19 +48,18 @@ describe('ThreeRenderApi null-node no-ops', () => {
 	const api = new ThreeRenderApi()
 	const matrix = new Matrix3D().setTranslation(1, 2, 3)
 
-	for (const missing of [undefined, null]) {
-		const label = missing === undefined ? 'undefined' : 'null'
-		it(`ignores ${label} nodes on every optional-node method`, () => {
-			const node = missing as any
-			expect(() => api.removeFromParent({} as any, node)).not.toThrow()
-			expect(() => api.removeChildren(node)).not.toThrow()
-			expect(() => api.applyMatrixToNode(matrix, node)).not.toThrow()
-			expect(() => api.applyMeshToNode({} as any, node)).not.toThrow()
-			expect(() => api.applyLighting({} as any, node)).not.toThrow()
-			expect(() => api.applyVisibility(true, node)).not.toThrow()
-			expect(() => api.applyMaterial(node, {} as any, 'map')).not.toThrow()
-		})
-	}
+	it('ignores null/undefined nodes on every optional-node method', () => {
+		for (const node of [undefined, null] as const) {
+			const missing = node as any
+			expect(() => api.removeFromParent({} as any, missing), `removeFromParent ${String(node)}`).not.toThrow()
+			expect(() => api.removeChildren(missing), `removeChildren ${String(node)}`).not.toThrow()
+			expect(() => api.applyMatrixToNode(matrix, missing), `applyMatrixToNode ${String(node)}`).not.toThrow()
+			expect(() => api.applyMeshToNode({} as any, missing), `applyMeshToNode ${String(node)}`).not.toThrow()
+			expect(() => api.applyLighting({} as any, missing), `applyLighting ${String(node)}`).not.toThrow()
+			expect(() => api.applyVisibility(true, missing), `applyVisibility ${String(node)}`).not.toThrow()
+			expect(() => api.applyMaterial(missing, {} as any, 'map'), `applyMaterial ${String(node)}`).not.toThrow()
+		}
+	})
 })
 
 describe('ThreeRenderApi batched visibility', () => {
@@ -267,6 +266,17 @@ describe('ThreeRenderApi batched visibility', () => {
 		expect(groupB.visible).toBe(true)
 		expect(batched.getVisibleAt(slot)).toBe(true)
 		expect(meshB.visible, 'nested batched original must stay hidden or it double-renders').toBe(false)
+	})
+
+	it('unbatches the hidden original when a script matrix write lands', () => {
+		const { groupB, meshB, batched } = batchPair()
+		const slot = (meshB.userData as any).__batched.instanceId as number
+		expect(meshB.visible, 'precondition: batched original starts hidden').toBe(false)
+		const api = new ThreeRenderApi()
+		api.applyMatrixToNode(new Matrix3D().setTranslation(5, 5, 5), groupB)
+		expect((meshB.userData as any).__batched).toBe(undefined)
+		expect(meshB.visible, 'script matrix write restores the original').toBe(true)
+		expect(batched.getVisibleAt(slot), 'script matrix write hides the stale slot').toBe(false)
 	})
 })
 

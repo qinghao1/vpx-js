@@ -1,6 +1,6 @@
 import type * as THREE from 'three'
 import { resolveButtonCode } from './cabinet-buttons.js'
-import { isBaked, normalizePendingKeys, RE_BAKE_MAP, RE_BAKE_MAT } from './material-shared.js'
+import { isBaked, pendingMapOf, RE_BAKE_MAP, RE_BAKE_MAT } from './material-shared.js'
 
 export { RE_BAKE_MAP, RE_BAKE_MAT }
 export const RE_ALPHA_MESH = /armp|ramp|bat_|non[_-]?opaque|plastic|gate/i
@@ -50,11 +50,10 @@ export interface CustomMaterialUserData {
 export const isButtonLike = (name?: string, userData?: CustomMaterialUserData): boolean =>
 	!!userData?.isCabinetButton || resolveButtonCode(name ?? '') !== null
 
-export const pendingOf = (material: THREE.Material): string => {
-	const userData = material.userData as CustomMaterialUserData | undefined
-	if (userData) normalizePendingKeys(userData)
-	return String(userData?.pendingMap ?? '').toLowerCase()
-}
+// Single pending-map read: the canonical `pendingMapOf` plus the lowercase
+// fold this classifier needs (map names match case-insensitively below).
+export const pendingOf = (material: THREE.Material): string =>
+	pendingMapOf(material?.userData as Record<string, unknown> | undefined).toLowerCase()
 
 export const isGiOverlay = (name: string): boolean => RE_GI.test(name.toLowerCase())
 

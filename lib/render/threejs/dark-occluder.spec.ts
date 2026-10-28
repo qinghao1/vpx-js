@@ -16,7 +16,14 @@ function makeMesh(name: string, geometry: THREE.BufferGeometry, mat: THREE.Mater
 }
 
 describe('regression: dark occluder side artifact', () => {
-	function setupOccluderScene(): {
+	// One shared scene: postProcessScene is deterministic and every test
+	// below is read-only (visibility/flag asserts), so rebuilding the same
+	// 7-mesh scene per test only burns time.
+	let sharedScene: ReturnType<typeof buildOccluderScene> | undefined
+	function setupOccluderScene(): ReturnType<typeof buildOccluderScene> {
+		return (sharedScene ??= buildOccluderScene())
+	}
+	function buildOccluderScene(): {
 		blackbox: THREE.Mesh
 		cabinet: THREE.Mesh
 		small: THREE.Mesh
@@ -177,5 +184,18 @@ describe('regression: dark occluder side artifact', () => {
 		postProcessScene(root, { harnessLog: () => {} })
 		const hidden = root.children.filter((c: any) => c.isMesh && !c.visible).length
 		expect(hidden, 'all large dark untextured generics must be hidden').to.equal(3)
+	})
+
+	it('measures rotated meshes through the world matrix, not the local box', () => {
+		const root = new THREE.Group()
+		const mat = new THREE.MeshStandardMaterial({ color: 0x020202 })
+		mat.name = 'Black'
+		const mesh = makeMesh('primitive-blackbox-rot', new THREE.BoxGeometry(50, 40, 10), mat)
+		mesh.rotation.z = Math.PI / 4
+		root.add(mesh)
+		postProcessScene(root, { harnessLog: () => {} })
+		// Local z extent is 10 (>= 4 threshold) but the world z extent after a
+		// 45° roll is what must be measured; either way this occluder hides.
+		expect(mesh.visible, 'rotated large dark occluder must be hidden').to.equal(false)
 	})
 })

@@ -27,7 +27,7 @@ import {
 	updatePrimitiveAdditive,
 	updatePrimitiveBdl,
 } from '../../../vpt/primitive/primitive-material-protocol.js'
-import { copyPendingKeys, defineEmissiveIntensityCompat, setNodeMapSlot } from '../material-shared.js'
+import { copyForkedRenderState, defineEmissiveIntensityCompat, setNodeMapSlot } from '../material-shared.js'
 import { getTransmissionTexture, TRANSMISSION_OPAQUE_CUTOFF } from '../transmission-buffer.js'
 
 export type { PrimitiveAdditiveUpdate, PrimitiveBdlUpdate, ProtocolColor }
@@ -372,12 +372,7 @@ function finishPrimitiveClone(
 	cloned: CloneablePrimitiveMaterial,
 	blend: 'custom' | 'simple',
 ): void {
-	cloned.name = sourceMaterial.name
-	cloned.transparent = sourceMaterial.transparent
-	cloned.depthWrite = sourceMaterial.depthWrite
-	cloned.depthTest = sourceMaterial.depthTest
-	cloned.blending = sourceMaterial.blending
-	cloned.side = sourceMaterial.side
+	copyForkedRenderState(sourceMaterial, cloned)
 	if (blend === 'custom') {
 		cloned.opacity = sourceMaterial.opacity
 		cloned.blendSrc = sourceMaterial.blendSrc
@@ -390,7 +385,6 @@ function finishPrimitiveClone(
 	} else {
 		cloned.toneMapped = sourceMaterial.toneMapped
 	}
-	copyPendingKeys(sourceMaterial.userData, cloned.userData)
 	for (const slot of ['normalMap', 'envMap'] as const) {
 		if (sourceMaterial[slot]) cloned[slot] = sourceMaterial[slot]
 	}

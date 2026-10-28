@@ -40,9 +40,16 @@ function makeMesh(name, geometry, mat) {
 }
 
 describe('regression: artifact postprocess', () => {
+	// One shared 222MB table load: Table.load parses the whole OLE stream
+	// plus every texture, while each test below builds its own scene graph
+	// (fresh ThreeRenderApi, fresh generateTableNode) and only reads it.
+	let sharedTable: Table | undefined
+	async function loadWalkingDeadTable(): Promise<Table> {
+		sharedTable ??= await Table.load(new NodeBinaryReader(requireWalkingDead()), { skipTextures: false } as any)
+		return sharedTable
+	}
 	it.skipIf(!walkingDeadVpx)('underwall playfield surfaces must stay hidden (no vertical artifact)', async () => {
-		const vpx = requireWalkingDead()
-		const table = await Table.load(new NodeBinaryReader(vpx), { skipTextures: false } as any)
+		const table = await loadWalkingDeadTable()
 		const api = new ThreeRenderApi({ applyMaterials: true, applyTextures: true, optimizeTextures: false } as any)
 		const group = (await (table as any).generateTableNode(api, {
 			exportPlayfield: true,
@@ -74,8 +81,7 @@ describe('regression: artifact postprocess', () => {
 		).to.equal(0)
 	})
 	it.skipIf(!walkingDeadVpx)('ramp BM stays visible before streaming (no dark hole)', async () => {
-		const vpx = requireWalkingDead()
-		const table = await Table.load(new NodeBinaryReader(vpx), { skipTextures: false } as any)
+		const table = await loadWalkingDeadTable()
 		const api = new ThreeRenderApi({ applyMaterials: true, applyTextures: true, optimizeTextures: false } as any)
 		const group = (await (table as any).generateTableNode(api, {
 			exportPlayfield: true,
@@ -286,8 +292,7 @@ describe('regression: artifact postprocess', () => {
 	it.skipIf(!walkingDeadVpx)(
 		'TWD lightmap overlays on playfield must have opacity 0 initially when loading real table',
 		async () => {
-			const vpx = requireWalkingDead()
-			const table = await Table.load(new NodeBinaryReader(vpx), { skipTextures: false } as any)
+			const table = await loadWalkingDeadTable()
 			const api = new ThreeRenderApi({
 				applyMaterials: true,
 				applyTextures: true,

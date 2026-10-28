@@ -43,6 +43,11 @@ describe('unshaded baked bulb math (upstream fs_basic.sc tail)', () => {
 		const mat = createUnshadedBakedNodeMaterial({ map: whiteTex() })
 		const color = materialize(mat.colorNode)
 		const transTex = getTransmissionTexture()
+		// Implementation-coupled by design: 'OperatorNode' is a three.js
+		// internal class name (three@0.185, see package.json). If a three
+		// upgrade breaks this pin, re-derive the split from the behavior
+		// asserts below (base keeps tint, lift reads the buffer) instead of
+		// weakening them.
 		const splits = collectNodes(color).filter(
 			node =>
 				(node as { constructor?: { name?: string } }).constructor?.name === 'OperatorNode' &&
