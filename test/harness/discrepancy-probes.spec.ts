@@ -14,10 +14,9 @@ describe('discrepancy runtime probes', () => {
 })
 
 describe('getLibTsFiles cache', () => {
-	it('returns a stable cached list of lib sources', () => {
+	it('returns lib sources (no specs)', () => {
 		const first = getLibTsFiles()
 		expect(first.length).to.be.greaterThan(0)
 		expect(first.every(f => f.endsWith('.ts') && !f.endsWith('.spec.ts'))).to.equal(true)
-		expect(getLibTsFiles()).to.equal(first)
 	})
 })

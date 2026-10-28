@@ -317,12 +317,17 @@ export function auditTableStructure(table: any): TableStructureAudit {
 		}
 	}
 
-	// Timers frame-pacing check (< 17ms below 60fps)
+	// Timers frame-pacing check — mirrors native PinTable::AuditTable: fixed
+	// intervals below 17ms warn; -1 (Per Frame) and -2 (Game Logic Sync)
+	// modes are exempt. Timer state lives on the common block
+	// (data.timer.enabled/interval), not flat fields.
 	for (const [name, timer] of Object.entries(table.timers ?? {})) {
 		const timerData = (timer as any).data
 		if (!timerData) continue
-		if (timerData.timerEnabled && timerData.timerInterval > 0 && timerData.timerInterval < 17) {
-			warnings.push(`Timer '${name}' interval ${timerData.timerInterval}ms is below 60FPS frame pacing threshold`)
+		const timerEnabled = timerData.timer?.enabled ?? timerData.timerEnabled
+		const timerInterval = timerData.timer?.interval ?? timerData.timerInterval
+		if (timerEnabled && timerInterval !== -1 && timerInterval !== -2 && timerInterval < 17) {
+			warnings.push(`Timer '${name}' interval ${timerInterval}ms is below 60FPS frame pacing threshold`)
 		}
 	}
 

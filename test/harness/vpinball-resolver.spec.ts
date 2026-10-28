@@ -14,6 +14,7 @@ import {
 	resolveRomPath,
 	resolveVpxPath,
 	resolveVpxSession,
+	spawnTaggedProcess,
 } from './vpinball-resolver.js'
 
 describe('vpinball-resolver arg parsing', () => {
@@ -245,6 +246,38 @@ describe('createSessionIni + getNativeArgs', () => {
 		expect(getNativeArgs(vpx, ini, 'extractvbs')).to.deep.equal(['-ExtractVBS', path.resolve(vpx)])
 		expect(getNativeArgs(vpx, ini, 'audit')).to.deep.equal(['-Audit', path.resolve(vpx)])
 		expect(getNativeArgs(vpx, ini, 'pov')).to.deep.equal(['-Pov', path.resolve(vpx)])
+	})
+})
+
+describe('spawnTaggedProcess', () => {
+	it('prefixes child stdout/stderr with the tag and resolves on close', async () => {
+		const out: string[] = []
+		const err: string[] = []
+		const origOut = process.stdout.write.bind(process.stdout)
+		const origErr = process.stderr.write.bind(process.stderr)
+		;(process.stdout.write as any) = (chunk: any, ...rest: any[]): boolean => {
+			out.push(String(chunk))
+			return true
+		}
+		;(process.stderr.write as any) = (chunk: any, ...rest: any[]): boolean => {
+			err.push(String(chunk))
+			return true
+		}
+		try {
+			const child = spawnTaggedProcess(
+				process.execPath,
+				['-e', `console.log('out-line');console.error('err-line')`],
+				process.env,
+				'vpx-native',
+			)
+			const code = await new Promise<number | null>(resolve => child.on('close', resolve))
+			expect(code).to.equal(0)
+			expect(out.join('')).to.contain('[vpx-native] out-line')
+			expect(err.join('')).to.contain('[vpx-native] err-line')
+		} finally {
+			;(process.stdout.write as any) = origOut
+			;(process.stderr.write as any) = origErr
+		}
 	})
 })
 

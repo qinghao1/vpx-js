@@ -1,4 +1,4 @@
-import { execSync, spawn } from 'node:child_process'
+import { execSync } from 'node:child_process'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import {
@@ -7,6 +7,7 @@ import {
 	getDynamicLinkerEnv,
 	getNativeArgs,
 	resolveVpxSession,
+	spawnTaggedProcess,
 } from './vpinball-resolver.js'
 
 interface CompareOptions {
@@ -180,9 +181,7 @@ async function main() {
 		try {
 			console.log(fs.readFileSync(iniPath, 'utf-8'))
 		} catch {}
-		nativeProc = spawn(binPath, nativeArgs, { stdio: ['inherit', 'pipe', 'pipe'], env })
-		nativeProc.stdout.on('data', (chunk: Buffer) => process.stdout.write(`[vpx-native] ${chunk}`))
-		nativeProc.stderr.on('data', (chunk: Buffer) => process.stderr.write(`[vpx-native] ${chunk}`))
+		nativeProc = spawnTaggedProcess(binPath, nativeArgs, env, 'vpx-native')
 		nativeProc.on('close', (code: number | null) => {
 			console.log(`[compare] native exited with code ${code}`)
 		})

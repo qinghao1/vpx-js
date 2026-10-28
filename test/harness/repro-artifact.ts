@@ -2,9 +2,9 @@
 // Run: npx tsx test/harness/repro-artifact.ts
 import * as fs from 'node:fs'
 import type * as THREE from 'three'
-import { postProcessScene } from '../../demo-browser/src/scene.js'
 import { NodeBinaryReader } from '../../lib/io/binary-reader.node.js'
 import { ThreeRenderApi } from '../../lib/render/threejs/three-render-api.js'
+import { postProcessScene } from '../../lib/render/threejs/three-scene-postprocess.js'
 import { Table } from '../../lib/vpt/table/table.js'
 import { exists, VPX_CANDIDATES } from './bench-shared.js'
 

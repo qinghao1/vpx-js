@@ -1,5 +1,5 @@
 #!/usr/bin/env tsx
-import { execSync, spawn, spawnSync } from 'node:child_process'
+import { execSync, spawnSync } from 'node:child_process'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
@@ -8,6 +8,7 @@ import {
 	getDynamicLinkerEnv,
 	getNativeArgs,
 	resolveVpxSession,
+	spawnTaggedProcess,
 } from '../test/harness/vpinball-resolver.js'
 import { runDoctor } from './vpinball-doctor.js'
 
@@ -246,10 +247,7 @@ async function main() {
 	}
 
 	// Interactive GUI — spawn and pipe tagged
-	const child = spawn(cmd, args, { stdio: ['inherit', 'pipe', 'pipe'], env })
-
-	child.stdout.on('data', (chunk: Buffer) => process.stdout.write(`[vpx-native] ${chunk}`))
-	child.stderr.on('data', (chunk: Buffer) => process.stderr.write(`[vpx-native] ${chunk}`))
+	const child = spawnTaggedProcess(cmd, args, env, 'vpx-native')
 
 	child.on('close', code => {
 		console.log(`[vpinball] native exited with code ${code}`)

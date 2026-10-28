@@ -1,4 +1,4 @@
-import { execSync } from 'node:child_process'
+import { type ChildProcess, execSync, spawn } from 'node:child_process'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
@@ -342,6 +342,19 @@ export function discoverVpinball(): VpinballDiscovery {
 	return { binPath: null, binDir: null, source: null }
 }
 
+/**
+ * Spawn a native GUI child with stdout/stderr piped through a `[tag] ` prefix.
+ * Shared by bin/vpinball-runner.ts and test/harness/compare-side-by-side.ts
+ * so both launchers tag native output identically; exit/error policy stays
+ * with the caller (runner exits the process, compare only logs).
+ */
+export function spawnTaggedProcess(cmd: string, args: string[], env: NodeJS.ProcessEnv, tag: string): ChildProcess {
+	const child = spawn(cmd, args, { stdio: ['inherit', 'pipe', 'pipe'], env })
+	child.stdout?.on('data', (chunk: Buffer) => process.stdout.write(`[${tag}] ${chunk}`))
+	child.stderr?.on('data', (chunk: Buffer) => process.stderr.write(`[${tag}] ${chunk}`))
+	return child
+}
+
 export function getDynamicLinkerEnv(binDir: string | null): NodeJS.ProcessEnv {
 	if (!binDir) return {}
 	const isMac = process.platform === 'darwin'
@@ -411,6 +424,8 @@ export function getNativeArgs(
 		case 'pov':
 			return ['-Pov', absVpx]
 		default:
+			// -DisableTrueFullscreen is a real native option (VPinballX_GL -Help:
+			// "Force-disable True Fullscreen setting") — keeps windowed side-by-side runs honest.
 			return ['-Play', absVpx, '-Ini', iniPath, '-DisableTrueFullscreen']
 	}
 }
