@@ -167,6 +167,20 @@ export const applyBakedMaterial = (
 	if (mat.emissiveMap) wrapTexBaked(mat.emissiveMap)
 }
 
+/** Single role dispatch replacing the three parallel main/overlay/alpha ternaries. */
+export type BakedKind = 'main' | 'overlayGi' | 'overlayOff' | 'alpha' | 'opaque'
+
+export function resolveBakedKind(
+	isMainBake: boolean,
+	isVlmBake: boolean,
+	meshLower: string,
+	alpha: boolean,
+): BakedKind {
+	if (isMainBake) return 'main'
+	if (isVlmBake) return isGiOverlay(meshLower) ? 'overlayGi' : 'overlayOff'
+	return alpha ? 'alpha' : 'opaque'
+}
+
 /** Cached baked-material resolver (one cache per postprocess run). */
 export const createBakedMaterialResolver = (): ((
 	base: THREE.MeshStandardMaterial,
@@ -181,18 +195,17 @@ export const createBakedMaterialResolver = (): ((
 		const bakedFlag = !!baseUserData?.__isBaked
 		const addBlend = !!baseUserData?.__addBlend
 		const { isMainBake, isVlmBake, needsAlpha } = classify(meshLower, matName, mapPre, bakedFlag, addBlend)
-		const isOverlay = isVlmBake
 		const isApron = RE_NON_OPAQUE.test(meshLower)
 		const isRamp = RE_RAMP_FAMILY.test(meshLower)
 		const alpha = !isMainBake && !isRamp && !isApron && needsAlpha
-		const isGI = isOverlay && isGiOverlay(meshLower)
+		const kind = resolveBakedKind(isMainBake, isVlmBake, meshLower, alpha)
 		const role = `${isApron ? 'a' : 'x'}|${isRamp ? 'r' : 'x'}|${needsAlpha ? 'n' : 'x'}`
-		const key = `${base.name}|${(base.map as THREE.Texture | undefined)?.name ?? ''}|${pending}|${isMainBake ? 'main' : isOverlay ? (isGI ? 'overlay_gi' : 'overlay_off') : alpha ? 'alpha' : 'opaque'}|${base.polygonOffset ? `${base.polygonOffsetFactor}/${base.polygonOffsetUnits}` : '0'}|${role}`
+		const key = `${base.name}|${(base.map as THREE.Texture | undefined)?.name ?? ''}|${pending}|${kind === 'overlayGi' ? 'overlay_gi' : kind === 'overlayOff' ? 'overlay_off' : kind}|${base.polygonOffset ? `${base.polygonOffsetFactor}/${base.polygonOffsetUnits}` : '0'}|${role}`
 		const cached = bakedCache.get(key)
 		if (cached) return cached
 		const cloned = cloneMaterialForWrite(base) as THREE.MeshStandardMaterial
 		const clonedUserData = cloned.userData as CustomMaterialUserData | undefined
-		if (isMainBake) {
+		if (kind === 'main') {
 			fixBaked(cloned, cloned.map as THREE.Texture | undefined)
 			if (!isBakedNodeMaterial(cloned) && !cloned.map && pending) {
 				cloned.color.set(0x000000)
@@ -220,15 +233,16 @@ export const createBakedMaterialResolver = (): ((
 			}
 			cloned.toneMapped = false
 			cloned.needsUpdate = true
-		} else if (isOverlay) {
+		} else if (kind === 'overlayGi' || kind === 'overlayOff') {
+			const isLit = kind === 'overlayGi'
 			fixBaked(cloned, cloned.map as THREE.Texture | undefined)
 			if (clonedUserData?.__primitiveKind === PRIMITIVE_ADDITIVE_KIND) {
-				updatePrimitiveAdditive(cloned, { intensity: isGI ? 1.0 : 0 })
+				updatePrimitiveAdditive(cloned, { intensity: isLit ? 1.0 : 0 })
 			} else {
-				cloned.emissiveIntensity = isGI ? 1.0 : 0
+				cloned.emissiveIntensity = isLit ? 1.0 : 0
 			}
 			cloned.transparent = true
-			cloned.opacity = isGI ? 1.0 : 0
+			cloned.opacity = isLit ? 1.0 : 0
 			cloned.blending = THREE.AdditiveBlending
 			cloned.depthWrite = false
 			cloned.alphaTest = 0

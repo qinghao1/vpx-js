@@ -217,8 +217,12 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 			// Explicit RenderInfo.depthWrite wins over the non-writing additive default.
 			mat.depthWrite = depthWrite ?? false
 			if (absorb) {
-				// AB_ABSORB only: AB_ADD stays plain additive (upstream's
-				// reverse-subtract is not matched yet — see applyAbsorbBlendState).
+				// AB_ABSORB only: AB_ADD stays plain additive. Upstream pairs
+				// its REVSUBTRACT blend with a negatively-encoded shader
+				// output (flasher.cpp signs modulateVsAdd negative, fs_flasher
+				// emits -modulate*atten*intensity); this node emits positive
+				// premultiplied color, which REVSUBTRACT would darken instead
+				// of amplifying — see applyAbsorbBlendState.
 				applyAbsorbBlendState(mat)
 			}
 			this.stashCutout(mat, alphaTestValue, depthBias, true)

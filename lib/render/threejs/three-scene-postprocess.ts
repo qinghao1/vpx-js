@@ -69,6 +69,69 @@ function ensureSrgb(map: THREE.Texture | null | undefined): void {
 	}
 }
 
+type ForkMaterial = (mesh: THREE.Mesh, index: number, base: THREE.MeshStandardMaterial) => THREE.MeshStandardMaterial
+
+// Cabinet-button concern of the main pass: force visible, pin to the camera
+// (no frustum cull), and fork a double-sided depth-writing surface.
+function resolveCabinetButton(
+	mesh: THREE.Mesh,
+	buttonCode: string,
+	fork: ForkMaterial,
+	node: THREE.Object3D,
+	stats: Record<string, number>,
+): void {
+	if (!mesh.visible) {
+		mesh.visible = true
+		stats.cabForced++
+		makeParentsVisible(mesh, node, stats)
+	}
+	mesh.frustumCulled = false
+	mesh.geometry?.computeBoundingSphere?.()
+	mesh.geometry?.computeBoundingBox?.()
+	const matsBtn = meshMaterials(mesh)
+	for (let matIdx = 0; matIdx < matsBtn.length; matIdx++) {
+		const mat = fork(mesh, matIdx, matsBtn[matIdx] as THREE.MeshStandardMaterial)
+		mat.side = THREE.DoubleSide
+		mat.polygonOffset = true
+		mat.polygonOffsetFactor = -1
+		mat.polygonOffsetUnits = -1
+		mat.depthWrite = true
+		mat.needsUpdate = true
+	}
+	mesh.renderOrder = 100
+	const meshUserData = mesh.userData as CustomMaterialUserData
+	meshUserData.isCabinetButton = true
+	meshUserData.buttonCode = buttonCode
+	makeParentsVisible(mesh, node, stats)
+}
+
+// Plastic/ramp surface concern of the main pass: untextured plastic goes
+// opaque first, then every plastic/ramp surface ensures DoubleSide.
+function resolvePlasticSurface(mesh: THREE.Mesh, fork: ForkMaterial): void {
+	const nameLower = (mesh.name ?? '').toLowerCase()
+	if (!nameLower.includes('plastic') && !nameLower.includes('ramp')) return
+	const surfaceMats = (Array.isArray(mesh.material) ? mesh.material : [mesh.material]) as THREE.MeshStandardMaterial[]
+	for (let surfaceIdx = 0; surfaceIdx < surfaceMats.length; surfaceIdx++) {
+		let surfaceMat = surfaceMats[surfaceIdx] as THREE.MeshStandardMaterial
+		if (nameLower.includes('plastic') && !surfaceMat.map && !pendingOf(surfaceMat)) {
+			surfaceMat = fork(mesh, surfaceIdx, surfaceMat)
+			surfaceMat.side = THREE.DoubleSide
+			surfaceMat.transparent = false
+			surfaceMat.depthWrite = true
+			surfaceMat.alphaTest = 0
+			surfaceMat.opacity = 1
+			surfaceMat.roughness = Math.max((surfaceMat.roughness ?? 0.6) as number, 0.6)
+			surfaceMat.metalness = Math.min((surfaceMat.metalness ?? 0) as number, 0.05)
+			surfaceMat.needsUpdate = true
+		}
+		if (surfaceMat.side !== THREE.DoubleSide) {
+			surfaceMat = fork(mesh, surfaceIdx, surfaceMat)
+			surfaceMat.side = THREE.DoubleSide
+			surfaceMat.needsUpdate = true
+		}
+	}
+}
+
 // The pinball itself (VPX material exactly `ball`, generated as
 // `material:ball`) keeps its authored metalness; anything merely containing
 // the substring (fireball, balloon, ...) flattens like the rest.
@@ -200,29 +263,7 @@ export function postProcessScene(
 		}
 		const buttonCode = resolveButtonCode(nameLower)
 		if (buttonCode) {
-			if (!mesh.visible) {
-				mesh.visible = true
-				stats.cabForced++
-				makeParentsVisible(mesh, node, stats)
-			}
-			mesh.frustumCulled = false
-			mesh.geometry?.computeBoundingSphere?.()
-			mesh.geometry?.computeBoundingBox?.()
-			const matsBtn = meshMaterials(mesh)
-			for (let matIdx = 0; matIdx < matsBtn.length; matIdx++) {
-				const mat = forkMaterial(mesh, matIdx, matsBtn[matIdx] as THREE.MeshStandardMaterial)
-				mat.side = THREE.DoubleSide
-				mat.polygonOffset = true
-				mat.polygonOffsetFactor = -1
-				mat.polygonOffsetUnits = -1
-				mat.depthWrite = true
-				mat.needsUpdate = true
-			}
-			mesh.renderOrder = 100
-			const meshUserData = mesh.userData as CustomMaterialUserData
-			meshUserData.isCabinetButton = true
-			meshUserData.buttonCode = buttonCode
-			makeParentsVisible(mesh, node, stats)
+			resolveCabinetButton(mesh, buttonCode, forkMaterial, node, stats)
 		}
 		if (
 			!mesh.visible &&
@@ -368,32 +409,7 @@ export function postProcessScene(
 			mesh.geometry?.computeBoundingSphere?.()
 			mesh.geometry?.computeBoundingBox?.()
 		}
-		// Single plastic/ramp surface pass: untextured plastic goes opaque
-		// first, then every plastic/ramp surface ensures DoubleSide.
-		if (nameLower.includes('plastic') || nameLower.includes('ramp')) {
-			const surfaceMats = (
-				Array.isArray(mesh.material) ? mesh.material : [mesh.material]
-			) as THREE.MeshStandardMaterial[]
-			for (let surfaceIdx = 0; surfaceIdx < surfaceMats.length; surfaceIdx++) {
-				let surfaceMat = surfaceMats[surfaceIdx] as THREE.MeshStandardMaterial
-				if (nameLower.includes('plastic') && !surfaceMat.map && !pendingOf(surfaceMat)) {
-					surfaceMat = forkMaterial(mesh, surfaceIdx, surfaceMat)
-					surfaceMat.side = THREE.DoubleSide
-					surfaceMat.transparent = false
-					surfaceMat.depthWrite = true
-					surfaceMat.alphaTest = 0
-					surfaceMat.opacity = 1
-					surfaceMat.roughness = Math.max((surfaceMat.roughness ?? 0.6) as number, 0.6)
-					surfaceMat.metalness = Math.min((surfaceMat.metalness ?? 0) as number, 0.05)
-					surfaceMat.needsUpdate = true
-				}
-				if (surfaceMat.side !== THREE.DoubleSide) {
-					surfaceMat = forkMaterial(mesh, surfaceIdx, surfaceMat)
-					surfaceMat.side = THREE.DoubleSide
-					surfaceMat.needsUpdate = true
-				}
-			}
-		}
+		resolvePlasticSurface(mesh, forkMaterial)
 	}
 	for (const child of nodes) runMainPass(child)
 

@@ -1,3 +1,4 @@
+import { AdditiveBlending } from 'three'
 import { afterEach, describe, expect, it } from 'vitest'
 import { createBulbGlowNodeMaterial, isBulbGlowMaterial, setBulbGlowState } from './bulb-glow-node.js'
 import {
@@ -35,6 +36,11 @@ describe('bulb glow node material', () => {
 		expect(mat.transparent).toBe(true)
 		expect(mat.depthWrite).toBe(false)
 		expect(mat.colorNode).toBeDefined()
+		// Upstream fs_light.sc runs SRC_ALPHA/INVSRC_COLOR/REVSUBTRACT with a
+		// negatively-encoded output that needs framebuffer feedback
+		// (dst-modulated term); a single forward pass cannot provide it, so
+		// the halo stays plain additive carrying only the (1-modulate) term.
+		expect(mat.blending, 'bulb halo stays plain additive without framebuffer feedback').toBe(AdditiveBlending)
 	})
 
 	it('should scale output by (1 - modulateVsAdd)', () => {

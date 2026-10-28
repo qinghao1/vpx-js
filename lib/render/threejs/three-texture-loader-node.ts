@@ -243,6 +243,7 @@ async function decodePng(data: Uint8Array): Promise<DecodedImage | null> {
 	let width = 0
 	let height = 0
 	let colorType = 0
+	let bitDepth = 8
 	let palette: Uint8Array | null = null
 	let transparency: Uint8Array | null = null
 	const idatParts: Uint8Array[] = []
@@ -258,7 +259,19 @@ async function decodePng(data: Uint8Array): Promise<DecodedImage | null> {
 			width = view.getUint32(offset + 8)
 			height = view.getUint32(offset + 12)
 			colorType = data[offset + 17]
-			if (data[offset + 16] !== 8 || data[offset + 20] !== 0 || width === 0 || height === 0) {
+			bitDepth = data[offset + 16]
+			if (data[offset + 20] !== 0 || width === 0 || height === 0) {
+				return null
+			}
+			// 8-bit is the VPX norm; 16-bit samples decode to their high
+			// byte (matching createImageBitmap's downscale). Sub-byte depths
+			// (1/2/4-bit gray and palette) need bit unpacking and stay
+			// unsupported, as does 16-bit palette (invalid per PNG spec).
+			if (bitDepth === 16) {
+				if (colorType !== 0 && colorType !== 2 && colorType !== 4 && colorType !== 6) {
+					return null
+				}
+			} else if (bitDepth !== 8) {
 				return null
 			}
 		} else if (type === 'PLTE') {
@@ -278,7 +291,10 @@ async function decodePng(data: Uint8Array): Promise<DecodedImage | null> {
 	if (colorType !== 0 && colorType !== 2 && colorType !== 3 && colorType !== 4 && colorType !== 6) {
 		return null
 	}
-	const bytesPerPixel = colorType === 0 || colorType === 3 ? 1 : colorType === 4 ? 2 : colorType === 2 ? 3 : 4
+	const channels = colorType === 0 || colorType === 3 ? 1 : colorType === 4 ? 2 : colorType === 2 ? 3 : 4
+	// 16-bit samples are big-endian pairs; the filter distance and stride
+	// count both bytes while expansion below reads the high byte of each.
+	const bytesPerPixel = channels * (bitDepth === 16 ? 2 : 1)
 	const compressedLength = idatParts.reduce((sum, part) => sum + part.length, 0)
 	const compressed = new Uint8Array(compressedLength)
 	let writeOffset = 0
@@ -292,7 +308,11 @@ async function decodePng(data: Uint8Array): Promise<DecodedImage | null> {
 		return null
 	}
 	unfilterScanlines(raw, width, height, bytesPerPixel)
-	return { data: expandToRgba(raw, width, height, bytesPerPixel, colorType, palette, transparency), width, height }
+	return {
+		data: expandToRgba(raw, width, height, bytesPerPixel, colorType, palette, transparency, bitDepth),
+		width,
+		height,
+	}
 }
 
 async function inflateZlib(compressed: Uint8Array): Promise<Uint8Array | null> {
@@ -387,9 +407,13 @@ function expandToRgba(
 	colorType: number,
 	palette: Uint8Array | null,
 	transparency: Uint8Array | null,
+	bitDepth = 8,
 ): Uint8Array {
 	const out = new Uint8Array(width * height * 4)
 	const stride = width * bytesPerPixel
+	// 16-bit samples are big-endian pairs: channels sit `sample` apart and
+	// the high byte (raw[src]) carries the 8-bit value.
+	const sample = bitDepth === 16 ? 2 : 1
 	for (let row = 0; row < height; row++) {
 		const rowStart = row * (stride + 1) + 1
 		for (let col = 0; col < width; col++) {
@@ -397,24 +421,46 @@ function expandToRgba(
 			const dst = (row * width + col) * 4
 			if (colorType === 6) {
 				out[dst] = raw[src]
-				out[dst + 1] = raw[src + 1]
-				out[dst + 2] = raw[src + 2]
-				out[dst + 3] = raw[src + 3]
+				out[dst + 1] = raw[src + sample]
+				out[dst + 2] = raw[src + 2 * sample]
+				out[dst + 3] = raw[src + 3 * sample]
 			} else if (colorType === 2) {
 				out[dst] = raw[src]
-				out[dst + 1] = raw[src + 1]
-				out[dst + 2] = raw[src + 2]
-				out[dst + 3] = isTransparentRgb(raw[src], raw[src + 1], raw[src + 2], transparency) ? 0 : 255
+				out[dst + 1] = raw[src + sample]
+				out[dst + 2] = raw[src + 2 * sample]
+				out[dst + 3] =
+					sample === 1
+						? isTransparentRgb(raw[src], raw[src + 1], raw[src + 2], transparency)
+							? 0
+							: 255
+						: isTransparentRgb16(
+									raw[src],
+									raw[src + 1],
+									raw[src + 2],
+									raw[src + 3],
+									raw[src + 4],
+									raw[src + 5],
+									transparency,
+								)
+							? 0
+							: 255
 			} else if (colorType === 4) {
 				out[dst] = raw[src]
 				out[dst + 1] = raw[src]
 				out[dst + 2] = raw[src]
-				out[dst + 3] = raw[src + 1]
+				out[dst + 3] = raw[src + sample]
 			} else if (colorType === 0) {
 				out[dst] = raw[src]
 				out[dst + 1] = raw[src]
 				out[dst + 2] = raw[src]
-				out[dst + 3] = isTransparentGray(raw[src], transparency) ? 0 : 255
+				out[dst + 3] =
+					sample === 1
+						? isTransparentGray(raw[src], transparency)
+							? 0
+							: 255
+						: isTransparentGray16(raw[src], raw[src + 1], transparency)
+							? 0
+							: 255
 			} else if (palette) {
 				const entry = raw[src] * 3
 				out[dst] = entry + 2 < palette.length ? palette[entry] : 0
@@ -439,4 +485,31 @@ function isTransparentRgb(red: number, green: number, blue: number, transparency
 
 function isTransparentGray(gray: number, transparency: Uint8Array | null): boolean {
 	return !!transparency && transparency.length >= 2 && transparency[1] === gray
+}
+
+// 16-bit tRNS entries are full big-endian sample values (unlike the 8-bit
+// path above, which reads the low byte encoders fill in).
+function isTransparentRgb16(
+	redHi: number,
+	redLo: number,
+	greenHi: number,
+	greenLo: number,
+	blueHi: number,
+	blueLo: number,
+	transparency: Uint8Array | null,
+): boolean {
+	return (
+		!!transparency &&
+		transparency.length >= 6 &&
+		transparency[0] === redHi &&
+		transparency[1] === redLo &&
+		transparency[2] === greenHi &&
+		transparency[3] === greenLo &&
+		transparency[4] === blueHi &&
+		transparency[5] === blueLo
+	)
+}
+
+function isTransparentGray16(hi: number, lo: number, transparency: Uint8Array | null): boolean {
+	return !!transparency && transparency.length >= 2 && transparency[0] === hi && transparency[1] === lo
 }

@@ -7,7 +7,7 @@
 import * as fs from 'node:fs'
 import * as THREE from 'three'
 import { describe, expect, it } from 'vitest'
-import { applyBakedMaterial, createBakedMaterialResolver } from './baked-materials.js'
+import { applyBakedMaterial, createBakedMaterialResolver, resolveBakedKind } from './baked-materials.js'
 import { GpuDmdNodeController } from './nodes/dmd-node.js'
 import { createPrimitiveAdditiveMaterial, createPrimitiveBdlMaterial } from './nodes/primitive-bdl-node.js'
 import { createUnshadedBakedNodeMaterial } from './nodes/unshaded-baked-node.js'
@@ -65,6 +65,18 @@ describe('underfloor occlusion: opaque baked materials occlude from both sides',
 		expect((mat as unknown as { side?: number }).side, 'arrived floor keeps its underneath faces').toBe(
 			THREE.DoubleSide,
 		)
+	})
+
+	it('dispatches one role per input: main, lit/unlit overlay, alpha, opaque', () => {
+		// The resolver key and the material fork must agree on one dispatch;
+		// separate ternaries drifted before (overlay_gi vs overlay_off).
+		expect(resolveBakedKind(true, false, 'primitive-bm_playfield', false)).toBe('main')
+		expect(resolveBakedKind(false, true, 'primitive-lm_gi01_playfield', false)).toBe('overlayGi')
+		expect(resolveBakedKind(false, true, 'primitive-lm_insrt01_playfield', false)).toBe('overlayOff')
+		expect(resolveBakedKind(false, false, 'primitive-ramp_main', true)).toBe('alpha')
+		expect(resolveBakedKind(false, false, 'primitive-post001', false)).toBe('opaque')
+		// Main wins over the overlay flag when both classify true.
+		expect(resolveBakedKind(true, true, 'primitive-lm_gi01_playfield', true)).toBe('main')
 	})
 
 	it('leaves overlays non-occluding', () => {

@@ -21,7 +21,7 @@ import type { Mesh } from '../../vpt/mesh.js'
 import type { Table, TableGenerateOptions } from '../../vpt/table/table.js'
 import type { Texture } from '../../vpt/texture.js'
 import type { IRenderApi, MeshConvertOptions } from '../irender-api.js'
-import { getAuthoredVisible } from './authored-visible.js'
+import { applyBatchedVisibility, unbatchInstances } from './batched-visibility.js'
 import type { IMaterialGenerator } from './imaterial-generator.js'
 import { cloneMaterialForWrite } from './material-shared.js'
 import { installBvh } from './three-bvh.js'
@@ -119,92 +119,9 @@ export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, Poin
 		node.remove(...node.children)
 	}
 
-	private forEachBatched(
-		obj: Object3D,
-		apply: (
-			target: any,
-			info: { batched: any; instanceId: number; isInstanced?: boolean; matrix?: Matrix4 },
-		) => void,
-	): void {
-		const traverse = (current: any): void => {
-			const info = current.userData?.__batched
-			if (info?.batched && typeof info.instanceId === 'number') apply(current, info)
-			if (current.children) for (const child of current.children) traverse(child)
-		}
-		traverse(obj)
-	}
-
-	private hideBatchedInstance(info: {
-		batched: any
-		instanceId: number
-		isInstanced?: boolean
-		matrix?: Matrix4
-	}): void {
-		try {
-			if (info.isInstanced) {
-				info.batched.setMatrixAt(info.instanceId, new Matrix4().makeScale(0, 0, 0))
-				info.batched.instanceMatrix.needsUpdate = true
-			} else {
-				info.batched.setVisibleAt?.(info.instanceId, false)
-			}
-		} catch {
-			// Count-and-continue: a failed hide leaves the stale instance visible,
-			// which unbatch below repairs by restoring the original mesh.
-			this.batchVisibilityStats.hideFailed++
-		}
-	}
-
 	private unbatch(obj: Object3D): void {
 		if (!obj) return
-		this.forEachBatched(obj, (current, info) => {
-			this.hideBatchedInstance(info)
-			current.visible = true
-			let anc: any = current.parent
-			while (anc && anc !== obj.parent) {
-				if (!anc.visible) anc.visible = true
-				if (anc === obj) break
-				anc = anc.parent
-			}
-			delete current.userData.__batched
-		})
-	}
-
-	private syncBatchedVisibility(obj: Object3D, isVisible: boolean): void {
-		if (!obj) return
-		this.forEachBatched(obj, (current, info) => {
-			if (info.isInstanced) {
-				if (!isVisible) {
-					this.hideBatchedInstance(info)
-					return
-				}
-				// InstancedMesh has no per-instance visibility flag: hide zero-scales
-				// the slot, so show must restore the pre-batch matrix saved at batch
-				// time. Without a saved matrix, unbatch the mesh so it can never
-				// disappear (hidden instance + hidden original).
-				try {
-					if (info.matrix) {
-						info.batched.setMatrixAt(info.instanceId, info.matrix)
-						info.batched.instanceMatrix.needsUpdate = true
-					} else {
-						this.hideBatchedInstance(info)
-						current.visible = true
-						delete current.userData.__batched
-					}
-				} catch {
-					// Count-and-continue: the instance slot keeps its last matrix;
-					// the source mesh keeps its own visibility flag.
-					this.batchVisibilityStats.restoreFailed++
-				}
-				return
-			}
-			try {
-				info.batched.setVisibleAt?.(info.instanceId, !!isVisible)
-			} catch {
-				// Count-and-continue: BatchedMesh visibility stays stale for this
-				// slot; the source mesh keeps its own visibility flag.
-				this.batchVisibilityStats.setFailed++
-			}
-		})
+		unbatchInstances(obj, this.batchVisibilityStats)
 	}
 
 	public applyMatrixToNode(matrix: Matrix3D, obj: Object3D): void {
@@ -240,26 +157,8 @@ export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, Poin
 
 	public applyVisibility(isVisible: boolean | number, obj: Object3D): void {
 		if (!obj) return
-		const visible = !!isVisible
-		this.syncBatchedVisibility(obj, visible)
-		// A batched original stays hidden while its batch slot carries the pixels:
-		// unhiding it on the show path would double-render (original + instance
-		// with identical transforms, z-fighting at 2x cost).
-		// A child stamped __authoredVisible: false (e.g. a cabinet/backbox bulb
-		// glow quad, see ThreeConverter.createMesh) must survive the show path:
-		// the lamp updater gates it on authored visibility, so a blanket show
-		// here would unhide what the author hid.
-		// The flags run to every depth, not just the direct children: nested
-		// item groups (light groups, ramp assemblies) keep meshes below the
-		// first level, and a shallow show/hide left those flags stale — the
-		// subtree then renders (or stays dark) against the author's intent
-		// once an ancestor toggles.
-		const batched = (o: Object3D) => (o as { userData?: { __batched?: unknown } }).userData?.__batched
-		const apply = (node: Object3D): void => {
-			node.visible = visible && getAuthoredVisible(node) && !batched(node)
-			for (const child of node.children ?? []) apply(child)
-		}
-		apply(obj)
+		// Single fused walk (slot sync + flag assignment); see batched-visibility.ts.
+		applyBatchedVisibility(obj, !!isVisible, this.batchVisibilityStats)
 	}
 
 	public applyMeshToNode(mesh: Mesh, obj: Object3D): void {

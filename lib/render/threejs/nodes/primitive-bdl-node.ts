@@ -245,8 +245,13 @@ export function createPrimitiveBdlMaterial(opts: PrimitiveBdlOptions): MeshStand
  * the material generator (fresh absorb materials) and the flasher updater
  * (stamped per frame onto forked clones rebuilt as plain additive).
  *
- * Note: AB_ADD is still plain AdditiveBlending here, not upstream's
- * reverse-subtract — matching REVSUBTRACT needs golden review.
+ * Note: AB_ADD deliberately stays plain AdditiveBlending, not upstream's
+ * SRC_ALPHA/INVSRC_COLOR/REVSUBTRACT (flasher.cpp SetupAddBlendState). That
+ * blend only amplifies because the flasher shader encodes its output
+ * negative (signed modulateVsAdd, fs_flasher.sc); this node's output is
+ * positive premultiplied color, so REVSUBTRACT would compute
+ * dst*(1-src) - src*srcAlpha and darken. Matching upstream needs the
+ * negative encoding too — golden-review territory, not a blend flip.
  */
 export function applyAbsorbBlendState(mat: any): void {
 	mat.blending = CustomBlending
