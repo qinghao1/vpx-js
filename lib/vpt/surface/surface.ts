@@ -26,7 +26,6 @@ const BOOL_MAP: Record<string, string> = {
 	FLIP: 'isFlipbook',
 	ISBS: 'isBottomSolid',
 	CLDW: 'isCollidable',
-	INNR: 'inner',
 	DSPT: 'displayTexture',
 	VSBL: 'isTopBottomVisible',
 	OVPH: 'overwritePhysics',
@@ -51,9 +50,9 @@ const STRING_MAP: Record<string, string> = {
 	IMAG: 'szImage',
 	SIMG: 'szSideImage',
 	MAPH: 'szPhysicsMaterial',
-	MATR: 'szTopMaterial',
-	TMTR: 'szSideMaterial',
-	SMAT: 'szSlingShotMaterial',
+	SIMA: 'szSideMaterial',
+	TOMA: 'szTopMaterial',
+	SLMA: 'szSlingShotMaterial',
 }
 
 /** Surface data.
@@ -73,7 +72,6 @@ export class SurfaceData extends ItemData implements IPhysicalData {
 	public szSlingShotMaterial?: string
 	public heightBottom = 0
 	public heightTop = 50
-	public inner = true
 	public displayTexture = true
 	public slingshotForce = 80
 	public slingshotThreshold = 0
@@ -109,6 +107,12 @@ export class SurfaceData extends ItemData implements IPhysicalData {
 	}
 
 	private async fromTag(buffer: Uint8Array, tag: string, _offset: number, len: number): Promise<number> {
+		if (tag === 'INNR') {
+			// Deprecated upstream (surface.cpp:1025-1027): old files still carry it. Upstream
+			// arms a one-shot InitPostLoad outline fixup (surface.cpp:1063+) that closes an
+			// outer wall over the table border; the port has no equivalent, so consume and ignore.
+			return 0
+		}
 		if (tag === 'DILI') {
 			// Pre-10.8 int encoding: 1 means fully on, else an 8-bit dequantized level.
 			// Matches upstream dequantizeUnsigned<8>: min(tmp/255, 1) with no lower

@@ -1,5 +1,5 @@
-import type { IEmulator } from '../../emu/emulator.js'
 import { tryGetFloatState } from '../../emu/res-uri.js'
+import type { IEmulator } from '../../game/iemulator.js'
 import type { IAnimation } from '../../game/interfaces.js'
 import type { Table } from '../table/table.js'
 import type { FlasherData } from './flasher-data.js'

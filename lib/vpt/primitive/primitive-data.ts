@@ -23,6 +23,8 @@ const FLOAT_MAP: Record<string, string> = {
 	DILI: 'disableLightingTop',
 	DILB: 'disableLightingBelow',
 	FALP: 'alpha',
+	RSTR: 'reflectionStrength',
+	RTHI: 'refractionThickness',
 }
 const INT_MAP: Record<string, string> = { COLR: 'color', SIDS: 'sides', SCOL: 'sideColor' }
 const BOOL_MAP: Record<string, string> = {
@@ -48,6 +50,8 @@ const STRING_MAP: Record<string, string> = {
 	MAPH: 'szPhysicsMaterial',
 	LMAP: 'szLightmap',
 	SLNK: 'stateSrcLink',
+	REFL: 'szReflectionProbe',
+	REFR: 'szRefractionProbe',
 }
 const WIDE_STRING_MAP: Record<string, string> = { M3DN: 'meshFileName' }
 
@@ -70,6 +74,14 @@ export class PrimitiveData extends ItemData implements IPhysicalData {
 	public szLightmap?: string
 	/** Optional controller state source (resuri) modulating alpha, overriding the lightmap. @see PrimitiveData::m_stateSrcLink in src/parts/primitive.h */
 	public stateSrcLink?: string
+	/** Reflection probe texture. Parsed and stored. @see PrimitiveData::m_szReflectionProbe in src/parts/primitive.h */
+	public szReflectionProbe?: string
+	/** Reflection strength multiplier. Parsed and stored. @see PrimitiveData::m_reflectionStrength in src/parts/primitive.h */
+	public reflectionStrength = 1
+	/** Refraction probe texture. Parsed and stored. @see PrimitiveData::m_szRefractionProbe in src/parts/primitive.h */
+	public szRefractionProbe?: string
+	/** Refraction thickness. Parsed and stored. @see PrimitiveData::m_refractionThickness in src/parts/primitive.h */
+	public refractionThickness = 10
 	public sides = 4
 	public isVisible = true
 	public drawTexturesInside = false

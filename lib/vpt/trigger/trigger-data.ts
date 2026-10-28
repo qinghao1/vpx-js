@@ -20,7 +20,7 @@ const FLOAT_MAP: Record<string, string> = {
 }
 const INT_MAP: Record<string, string> = { SHAP: 'shape' }
 const BOOL_MAP: Record<string, string> = { VSBL: 'isVisible', EBLD: 'isEnabled', REEN: 'isReflectionEnabled' }
-const STRING_MAP: Record<string, string> = { MATR: 'szMaterial', SURF: 'szSurface' }
+const STRING_MAP: Record<string, string> = { MATR: 'szMaterial', SURF: 'szSurface', LINK: 'stateSrcLink' }
 
 /** Trigger data.
  * @see https://github.com/vpinball/vpinball/blob/master/trigger.cpp */
@@ -33,6 +33,8 @@ export class TriggerData extends ItemData {
 	public scaleY = 1
 	public szMaterial?: string
 	public szSurface?: string
+	/** Optional controller state link (resuri) set on hit/unhit events. @see TriggerData::m_stateSrcLink in src/parts/trigger.h */
+	public stateSrcLink?: string
 	public isVisible = true
 	public isEnabled = true
 	public hitHeight = 50

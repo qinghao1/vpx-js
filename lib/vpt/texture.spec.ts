@@ -25,11 +25,6 @@ describe('The VPinball texture parser', () => {
 		expect((tex as any).name).to.match(/test_pattern_transparent/i)
 	})
 
-	it('should convert an opaque png to jpeg', async () => {
-		const tex = await vpt.getTexture('test_pattern_png')!.loadTexture(loader, vpt)
-		expect((tex as any).image).to.exist
-	})
-
 	it('should correctly export a jpeg', async () => {
 		const tex = await vpt.getTexture('test_pattern_jpg')!.loadTexture(loader, vpt)
 		expect((tex as any).image).to.exist

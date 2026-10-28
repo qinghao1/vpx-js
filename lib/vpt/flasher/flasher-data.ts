@@ -18,14 +18,26 @@ const FLOAT_MAP: Record<string, string> = {
 	FROZ: 'rotZ',
 	MOVA: 'modulateVsAdd',
 	FLDB: 'depthBias',
+	GRGH: 'glassRoughness',
+	GTOP: 'glassPadTop',
+	GBOT: 'glassPadBottom',
+	GLFT: 'glassPadLeft',
+	GRHT: 'glassPadRight',
 }
 const INT_MAP: Record<string, string> = {
 	ALGN: 'imageAlignment',
 	FILT: 'filter',
 	FIAM: 'filterAmount',
 	COLR: 'color',
+	RSTL: 'renderStyle',
+	GAMB: 'glassAmbient',
 }
-const BOOL_MAP: Record<string, string> = { FVIS: 'isVisible', IDMD: 'isDMD', DSPT: 'displayTexture' }
+const BOOL_MAP: Record<string, string> = {
+	FVIS: 'isVisible',
+	IDMD: 'isDMD',
+	DSPT: 'displayTexture',
+	BGLS: 'isBackglass',
+}
 const STRING_MAP: Record<string, string> = {
 	IMAG: 'szImageA',
 	IMAB: 'szImageB',
@@ -60,8 +72,21 @@ export class FlasherData extends ItemData {
 	public szLightmap?: string
 	/** Optional controller state source (resuri) modulating opacity, overriding the lightmap. @see FlasherData::m_stateSrcLink in src/parts/flasher.h */
 	public stateSrcLink?: string
-	/** Optional display-source link (resuri) selecting the flasher image. Parsed and stored; renderer support is separate work. @see FlasherData::m_imageSrcLink in src/parts/flasher.h */
+	/** Optional display-source link (resuri) selecting the flasher image. Parsed and stored. @see FlasherData::m_imageSrcLink in src/parts/flasher.h */
 	public imageSrcLink?: string
+	/** Application-defined style profile reference for display render modes. Parsed and stored. @see FlasherData::m_renderStyle in src/parts/flasher.h */
+	public renderStyle = 0
+	/** Glass roughness/greenhouse tint above DMD/segment displays. Parsed and stored. @see FlasherData::m_glassRoughness in src/parts/flasher.h */
+	public glassRoughness = 0
+	/** Glass ambient tint above DMD/segment displays. Parsed and stored. @see FlasherData::m_glassAmbient in src/parts/flasher.h */
+	public glassAmbient = 0
+	/** Glass padding above DMD/segment displays. Parsed and stored. @see FlasherData::m_glassPadTop (and Bottom/Left/Right) in src/parts/flasher.h */
+	public glassPadTop = 0
+	public glassPadBottom = 0
+	public glassPadLeft = 0
+	public glassPadRight = 0
+	/** Backglass placement flag (upstream `m_desktopBackdrop`, `BGLS` tag). */
+	public isBackglass = false
 	public alpha = 100
 	public modulateVsAdd = 0.9
 	public isVisible = true

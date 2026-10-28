@@ -87,8 +87,19 @@ export class TableLoader {
 				if (opts.loadTableScript) {
 					// CODE is exactly cchar bytes with no trim (upstream AsScript); 0 means empty script.
 					const { scriptPos, scriptLen } = out.data
-					out.tableScript =
-						scriptLen > 0 ? decoder.decode(await gameStg.read('GameData', scriptPos, scriptLen)) : ''
+					if (!Number.isInteger(scriptPos) || scriptPos < 0 || !Number.isInteger(scriptLen) || scriptLen < 0)
+						throw new Error(`Corrupt GameData: invalid script range pos=${scriptPos} len=${scriptLen}.`)
+					if (scriptLen === 0) {
+						out.tableScript = ''
+					} else {
+						const bytes = await gameStg.read('GameData', scriptPos, scriptLen)
+						// Upstream AsScript fails the load on a short script read.
+						if (bytes.length !== scriptLen)
+							throw new Error(
+								`Corrupt GameData: script of ${scriptLen} bytes at ${scriptPos} overruns the stream (got ${bytes.length}).`,
+							)
+						out.tableScript = decoder.decode(bytes)
+					}
 				}
 			}
 			if (opts.tableInfoOnly || !opts.tableDataOnly) await this.loadTableInfo(out)

@@ -3,6 +3,16 @@
 
 import { MathUtils } from 'three'
 import { describe, expect, it } from 'vitest'
+import {
+	rowClose,
+	rowMul,
+	rowRotateX,
+	rowRotateY,
+	rowRotateZ,
+	rowScale,
+	rowTranslate,
+	toRow,
+} from '../../../test/row-matrix.js'
 import { TableBuilder } from '../../../test/table-builder.js'
 import { TestRenderApi } from '../../../test/test-render-api.js'
 import { Player } from '../../game/player.js'
@@ -218,77 +228,6 @@ describe('regression: primitive script-animated transforms stay generic and data
 		diff.release()
 	})
 })
-
-type Row4 = number[][]
-
-const rowIdentity = (): Row4 => [
-	[1, 0, 0, 0],
-	[0, 1, 0, 0],
-	[0, 0, 1, 0],
-	[0, 0, 0, 1],
-]
-const rowTranslate = (x: number, y: number, z: number): Row4 => [
-	[1, 0, 0, 0],
-	[0, 1, 0, 0],
-	[0, 0, 1, 0],
-	[x, y, z, 1],
-]
-const rowScale = (sx: number, sy: number, sz: number): Row4 => [
-	[sx, 0, 0, 0],
-	[0, sy, 0, 0],
-	[0, 0, sz, 0],
-	[0, 0, 0, 1],
-]
-const rowRotateX = (a: number): Row4 => {
-	const c = Math.cos(a),
-		s = Math.sin(a)
-	return [
-		[1, 0, 0, 0],
-		[0, c, s, 0],
-		[0, -s, c, 0],
-		[0, 0, 0, 1],
-	]
-}
-const rowRotateY = (a: number): Row4 => {
-	const c = Math.cos(a),
-		s = Math.sin(a)
-	return [
-		[c, 0, -s, 0],
-		[0, 1, 0, 0],
-		[s, 0, c, 0],
-		[0, 0, 0, 1],
-	]
-}
-const rowRotateZ = (a: number): Row4 => {
-	const c = Math.cos(a),
-		s = Math.sin(a)
-	return [
-		[c, s, 0, 0],
-		[-s, c, 0, 0],
-		[0, 0, 1, 0],
-		[0, 0, 0, 1],
-	]
-}
-const rowMul = (A: Row4, B: Row4): Row4 => {
-	const C = rowIdentity()
-	for (let i = 0; i < 4; i++)
-		for (let j = 0; j < 4; j++) {
-			let s = 0
-			for (let k = 0; k < 4; k++) s += A[i][k] * B[k][j]
-			C[i][j] = s
-		}
-	return C
-}
-const toRow = (m: Matrix3D): Row4 => [
-	[m._11, m._12, m._13, m._14],
-	[m._21, m._22, m._23, m._24],
-	[m._31, m._32, m._33, m._34],
-	[m._41, m._42, m._43, m._44],
-]
-const rowClose = (a: Row4, b: Row4, eps = 1e-5): boolean => {
-	for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) if (Math.abs(a[i][j] - b[i][j]) > eps) return false
-	return true
-}
 
 describe('primitive RecalculateMatrices composition', () => {
 	it('matches upstream scale * rotTrans * translation order', () => {

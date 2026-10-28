@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ThreeHelper } from '../../../test/three.helper'
-import type { IEmulator } from '../../emu/emulator.js'
+import type { IEmulator } from '../../game/iemulator.js'
 import { Player } from '../../game/player.js'
 import { NodeBinaryReader } from '../../io/binary-reader.node.js'
 import type { ReadResult, Storage } from '../../io/ole-doc.js'

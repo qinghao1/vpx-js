@@ -77,6 +77,8 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 	private events?: EventProxy
 	private api?: TableApi
 	private readonly itemIndex = new Map<string, string>()
+	// getTexture is per-frame hot (meshes + script setters); cache the case-insensitive lookup.
+	private textureCache?: { map: Map<string, { key: string; texture: Texture }>; size: number }
 
 	public readonly textures: Record<string, Texture> = {}
 	public readonly collections: Record<string, Collection> = {}
@@ -163,12 +165,23 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 	public getTexture(name?: string): Texture | undefined {
 		if (!name) return undefined
 		const lc = name.toLowerCase()
-		const entries = Object.entries(this.textures)
-		for (let i = entries.length - 1; i >= 0; i--) {
-			const [key, texture] = entries[i]!
-			if (key.toLowerCase() === lc || texture.getName?.().toLowerCase() === lc) return texture
+		const size = Object.keys(this.textures).length
+		if (!this.textureCache || this.textureCache.size !== size) this.rebuildTextureCache(size)
+		const cached = this.textureCache.map.get(lc)
+		if (cached && this.textures[cached.key] === cached.texture) return cached.texture
+		// Stale hit or uncached miss: the dict may have been swapped at equal size, so rebuild once.
+		this.rebuildTextureCache(size)
+		return this.textureCache.map.get(lc)?.texture
+	}
+	private rebuildTextureCache(size: number): void {
+		const map = new Map<string, { key: string; texture: Texture }>()
+		for (const [key, texture] of Object.entries(this.textures)) {
+			const entry = { key, texture }
+			map.set(key.toLowerCase(), entry)
+			const textureName = texture.getName?.()
+			if (textureName) map.set(textureName.toLowerCase(), entry)
 		}
-		return undefined
+		this.textureCache = { map, size }
 	}
 	public getMaterial(name?: string): Material | undefined {
 		if (!name || !this.data) return undefined

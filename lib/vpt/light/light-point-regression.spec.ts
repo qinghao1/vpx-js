@@ -4,7 +4,7 @@ import { TableBuilder } from '../../../test/table-builder.js'
 import { DragPoint } from '../dragpoint.js'
 import { Light, LightData } from './light.js'
 
-const TWD_VPX = '/home/qinghao1/Downloads/walking_dead.vpx'
+const TWD_VPX = 'walking_dead.vpx'
 
 describe('regression: bulb lights with glow polygons are not scene lights', () => {
 	it('should return true for hasBulbGlow and generate glow mesh with BulbGlowParams', () => {

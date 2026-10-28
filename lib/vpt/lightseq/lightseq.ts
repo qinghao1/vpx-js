@@ -20,6 +20,8 @@ export class LightSeqData extends ItemData {
 	public collection?: string
 	public center: Vertex2D = new Vertex2D()
 	public updateInterval = 25
+	/** Backglass placement flag (upstream `m_desktopBackdrop`, `BGLS` tag). */
+	public isBackglass = false
 
 	public static async fromStorage(storage: Storage, itemName: string): Promise<LightSeqData> {
 		const data = new LightSeqData(itemName)
@@ -51,6 +53,7 @@ export class LightSeqData extends ItemData {
 		if (
 			handleBiffTag(this, tag, buffer, len, {
 				int: { UPTM: 'updateInterval' },
+				bool: { BGLS: 'isBackglass' },
 			})
 		)
 			return 0

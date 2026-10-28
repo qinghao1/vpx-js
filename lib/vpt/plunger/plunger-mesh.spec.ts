@@ -12,12 +12,18 @@ import { PlungerDesc } from './plunger-desc.js'
 
 const three = new ThreeHelper()
 
+let plungerTable: Table | undefined
+
+async function loadPlungerTable(): Promise<Table> {
+	plungerTable ??= await Table.load(new NodeBinaryReader(three.fixturePath('table-plunger.vpx')))
+	return plungerTable
+}
+
 describe('The VPinball plunger generator', () => {
 	let gltf: GLTF
 
 	before(async () => {
-		const table = await Table.load(new NodeBinaryReader(three.fixturePath('table-plunger.vpx')))
-		const exporter = new TableExporter(table)
+		const exporter = new TableExporter(await loadPlungerTable())
 		gltf = await three.loadGlb(await exporter.exportGlb({ exportPlayfieldLights: true }))
 	})
 
@@ -40,8 +46,7 @@ describe('The VPinball custom plunger tip parser', () => {
 	let data: PlungerData
 
 	before(async () => {
-		const table = await Table.load(new NodeBinaryReader(three.fixturePath('table-plunger.vpx')))
-		data = table.plungers.CustomPlunger.data
+		data = (await loadPlungerTable()).plungers.CustomPlunger.data
 	})
 
 	function customDesc(tipShape: string): PlungerDesc {

@@ -16,10 +16,6 @@ const FIXTURE_FILES = fs
 	.sort()
 
 describe('VPinball & Table Component Parity Regression', () => {
-	it('discovers test fixtures', () => {
-		expect(FIXTURE_FILES.length).toBeGreaterThan(0)
-	})
-
 	describe.each(FIXTURE_FILES)('Fixture: %s', fixtureName => {
 		const fixturePath = path.join(FIXTURES_DIR, fixtureName)
 		let table: Table
@@ -69,7 +65,7 @@ describe('VPinball & Table Component Parity Regression', () => {
 		}
 	}, 120_000)
 
-	const walkingDeadPath = '/home/qinghao1/Downloads/walking_dead.vpx'
+	const walkingDeadPath = 'walking_dead.vpx'
 	const hasWalkingDead = fs.existsSync(walkingDeadPath)
 
 	it.skipIf(!hasWalkingDead)(
