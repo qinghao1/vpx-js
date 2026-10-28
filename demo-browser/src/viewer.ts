@@ -977,7 +977,8 @@ export class Viewer {
 			return
 		}
 		const states = changed.changedStates
-		const changedLightNames = new Set()
+		const changedLightNames = (this._changedLightNames ??= new Set())
+		changedLightNames.clear()
 		for (const name in states) {
 			const state = states[name]
 			if (!state) continue

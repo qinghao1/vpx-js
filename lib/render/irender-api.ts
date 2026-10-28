@@ -96,6 +96,30 @@ export interface IRenderApi<NODE, GEOMETRY, POINT_LIGHT> {
 	applyMeshToNode(mesh: Mesh, node: NODE | undefined): void
 
 	/**
+	 * Writes prebuilt frame arrays into a node in place.
+	 *
+	 * Allocation-free counterpart to `applyMeshToNode` for animation ticks:
+	 * the caller lerps prebuilt frame data into reused scratch and the backend
+	 * copies it into the live buffers without intermediate meshes, geometries,
+	 * or bound recomputations. Normals arrive in raw mesh coords (the backend
+	 * applies its own winding convention while copying); bounds is the
+	 * [minX, minY, minZ, maxX, maxY, maxZ] union the backend installs directly.
+	 * Optional for backward compatibility: updaters fall back to
+	 * `applyMeshToNode` when the backend does not provide it.
+	 *
+	 * @param positions Interpolated vertex positions (3 per vertex)
+	 * @param normals Interpolated vertex normals (3 per vertex)
+	 * @param bounds Precomputed bounding-box union for this tick
+	 * @param node The node to which the arrays are applied to.
+	 */
+	applyFrameArrays?(
+		positions: Float32Array,
+		normals: Float32Array,
+		bounds: Float32Array,
+		node: NODE | undefined,
+	): void
+
+	/**
 	 * Update's a light's parameters.
 	 *
 	 * @param state New light state

@@ -6,7 +6,7 @@ import type { LightData, LightState } from '../../vpt/light/light.js'
 import { bakedIntensity } from '../../vpt/light/light-physics.js'
 import type { Table } from '../../vpt/table/table.js'
 import { getAuthoredVisible } from './authored-visible.js'
-import { setBulbGlowState } from './nodes/bulb-glow-node.js'
+import { type MergedBulbGlowRef, setBulbGlowState, setMergedBulbGlowRangeState } from './nodes/bulb-glow-node.js'
 import { ThreeRenderApi } from './three-render-api.js'
 
 /** Generates and updates Three.js lights. */
@@ -31,7 +31,7 @@ export class ThreeLightGenerator {
 		this.applyLightToTarget(obj, state)
 		const children = obj.children
 		for (let i = 0; i < children.length; i++) {
-			this.applyLightToTarget(children[i]!, state)
+			this.applyLightToTarget(children[i] as Object3D, state)
 		}
 	}
 
@@ -53,6 +53,22 @@ export class ThreeLightGenerator {
 				if (state.color !== undefined) (child as PointLight).color.set(state.color)
 				break
 			case 'bulb.glow': {
+				// Merged quad: write live state into its vertex range in place.
+				const mergedRef = (child as ThreeMesh).userData?.__mergedGlow as MergedBulbGlowRef | undefined
+				if (mergedRef) {
+					if (state.intensity !== undefined || state.color !== undefined || state.colorFull !== undefined) {
+						setMergedBulbGlowRangeState(
+							mergedRef.mesh,
+							{ start: mergedRef.start, count: mergedRef.count },
+							{
+								intensity: state.intensity,
+								color: state.color,
+								color2: (state as { colorFull?: number }).colorFull,
+							},
+						)
+					}
+					break
+				}
 				// Visibility follows the live lamp state (an off lamp adds no
 				// light, so its quad stays out of the draw list); intensity 0
 				// already renders nothing, this just skips the draw call.

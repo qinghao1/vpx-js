@@ -30,9 +30,19 @@ const ALPHA_SCALE = 0.01
 // Earlier 4 was TWD-specific clamp that dimmed inserts; 1000 is engine-faithful (effectively unclamped).
 const MAX_EMISSIVE = 1000
 
+/** Prebuilt per-frame vertex data: positions/normals plus the frame bounding box. */
+export interface PrebuiltAnimationFrame {
+	positions: Float32Array
+	normals: Float32Array
+	/** [minX, minY, minZ, maxX, maxY, maxZ] in raw mesh coords. */
+	bounds: Float32Array
+}
+
 /** Primitive updater — syncs state to render node. */
 export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 	private animMesh?: Mesh
+	private animFrames: PrebuiltAnimationFrame[] = []
+	private animScratch?: { positions: Float32Array; normals: Float32Array; bounds: Float32Array }
 
 	constructor(
 		private readonly data: PrimitiveData,
@@ -50,6 +60,39 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 
 	public setMesh(mesh: Mesh): void {
 		this.animMesh = mesh
+		// Prebuild frames once so ticks lerp into reused scratch.
+		const count = mesh.vertices.length
+		this.animFrames = mesh.animationFrames.map(frame => {
+			const positions = new Float32Array(count * 3)
+			const normals = new Float32Array(count * 3)
+			const bounds = new Float32Array([Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity])
+			for (let i = 0; i < count; i++) {
+				const v = frame.frameVerts[i]
+				if (!v) continue
+				const o3 = i * 3
+				positions[o3] = v.x
+				positions[o3 + 1] = v.y
+				positions[o3 + 2] = v.z
+				normals[o3] = v.nx
+				normals[o3 + 1] = v.ny
+				normals[o3 + 2] = v.nz
+				if (v.x < (bounds[0] as number)) bounds[0] = v.x
+				if (v.y < (bounds[1] as number)) bounds[1] = v.y
+				if (v.z < (bounds[2] as number)) bounds[2] = v.z
+				if (v.x > (bounds[3] as number)) bounds[3] = v.x
+				if (v.y > (bounds[4] as number)) bounds[4] = v.y
+				if (v.z > (bounds[5] as number)) bounds[5] = v.z
+			}
+			return { positions, normals, bounds }
+		})
+		this.animScratch =
+			count > 0
+				? {
+						positions: new Float32Array(count * 3),
+						normals: new Float32Array(count * 3),
+						bounds: new Float32Array(6),
+					}
+				: undefined
 	}
 
 	public hasMesh(): boolean {
@@ -129,22 +172,65 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 		if (!mesh || mesh.animationFrames.length === 0) return
 		const frame = state.currentFrame
 		if (frame === undefined || frame === -1) return
-		const frames = mesh.animationFrames
-		const num = frames.length
+		const target = this.findMeshNode(obj) as unknown as NODE | undefined
+		if (!target) return
+		const num = mesh.animationFrames.length
 		const clamped = Math.max(0, Math.min(frame, num - 1))
 		const iFrame = Math.floor(clamped)
 		const fract = clamped - iFrame
+		// Fast path: lerp prebuilt frames into reused scratch; backend copies in place.
+		if (renderApi.applyFrameArrays && this.animFrames.length === num && this.animScratch) {
+			const a = this.animFrames[iFrame] as {
+				positions: Float32Array
+				normals: Float32Array
+				bounds: Float32Array
+			}
+			const b = (iFrame + 1 < num ? this.animFrames[iFrame + 1] : a) as {
+				positions: Float32Array
+				normals: Float32Array
+				bounds: Float32Array
+			}
+			const { positions, normals, bounds } = this.animScratch
+			const pa = a.positions
+			const pb = b.positions
+			const na = a.normals
+			const nb = b.normals
+			for (let i = 0; i < positions.length; i++) {
+				const pai = pa[i] as number
+				const nai = na[i] as number
+				positions[i] = pai + ((pb[i] as number) - pai) * fract
+				normals[i] = nai + ((nb[i] as number) - nai) * fract
+			}
+			const ba = a.bounds
+			const bb = b.bounds
+			bounds[0] = Math.min(ba[0] as number, bb[0] as number)
+			bounds[1] = Math.min(ba[1] as number, bb[1] as number)
+			bounds[2] = Math.min(ba[2] as number, bb[2] as number)
+			bounds[3] = Math.max(ba[3] as number, bb[3] as number)
+			bounds[4] = Math.max(ba[4] as number, bb[4] as number)
+			bounds[5] = Math.max(ba[5] as number, bb[5] as number)
+			renderApi.applyFrameArrays(positions, normals, bounds, target)
+			return
+		}
+		const frames = mesh.animationFrames
 		const interp = new Mesh(mesh.name)
 		interp.indices = mesh.indices.slice()
 		interp.vertices = mesh.vertices.map((base, idx) => {
-			const v0 = frames[iFrame]!.frameVerts[idx]!
-			const v1 = iFrame + 1 < num ? frames[iFrame + 1]!.frameVerts[idx]! : v0
-			const x = v0.x + (v1.x - v0.x) * fract
-			const y = v0.y + (v1.y - v0.y) * fract
-			const z = v0.z + (v1.z - v0.z) * fract
-			const nx = v0.nx + (v1.nx - v0.nx) * fract
-			const ny = v0.ny + (v1.ny - v0.ny) * fract
-			const nz = v0.nz + (v1.nz - v0.nz) * fract
+			const f0 = frames[iFrame] as {
+				frameVerts: { x: number; y: number; z: number; nx: number; ny: number; nz: number }[]
+			}
+			const v0 = f0.frameVerts[idx] as { x: number; y: number; z: number; nx: number; ny: number; nz: number }
+			const f1 = iFrame + 1 < num ? frames[iFrame + 1] : undefined
+			const v1 = (f1 ? (f1 as { frameVerts: unknown[] }).frameVerts[idx] : undefined) as
+				| { x: number; y: number; z: number; nx: number; ny: number; nz: number }
+				| undefined
+			const vv = v1 ?? v0
+			const x = v0.x + (vv.x - v0.x) * fract
+			const y = v0.y + (vv.y - v0.y) * fract
+			const z = v0.z + (vv.z - v0.z) * fract
+			const nx = v0.nx + (vv.nx - v0.nx) * fract
+			const ny = v0.ny + (vv.ny - v0.ny) * fract
+			const nz = v0.nz + (vv.nz - v0.nz) * fract
 			const v = new Vertex3DNoTex2()
 			v.x = x
 			v.y = y
@@ -157,8 +243,7 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 			return v
 		})
 		interp.animationFrames = []
-		const target = this.findMeshNode(obj) as unknown as NODE | undefined
-		if (target) renderApi.applyMeshToNode(interp, target)
+		renderApi.applyMeshToNode(interp, target)
 	}
 
 	private findMeshNode<NODE>(obj: NODE): unknown {
@@ -331,20 +416,21 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 		const scaleZ = table.getScaleZ()
 		const oldPos = primitiveData.position
 		const oldSize = primitiveData.size
+		const rotAndTra = primitiveData.rotAndTra as unknown as number[]
 		const oldRot = {
-			x: primitiveData.rotAndTra[0]!,
-			y: primitiveData.rotAndTra[1]!,
-			z: primitiveData.rotAndTra[2]!,
+			x: rotAndTra[0] as number,
+			y: rotAndTra[1] as number,
+			z: rotAndTra[2] as number,
 		}
 		const oldTrans = {
-			x: primitiveData.rotAndTra[3]!,
-			y: primitiveData.rotAndTra[4]!,
-			z: primitiveData.rotAndTra[5]!,
+			x: rotAndTra[3] as number,
+			y: rotAndTra[4] as number,
+			z: rotAndTra[5] as number,
 		}
 		const oldObj = {
-			x: primitiveData.rotAndTra[6]!,
-			y: primitiveData.rotAndTra[7]!,
-			z: primitiveData.rotAndTra[8]!,
+			x: rotAndTra[6] as number,
+			y: rotAndTra[7] as number,
+			z: rotAndTra[8] as number,
 		}
 		const newPos = primitiveState.position ?? oldPos
 		const newSize = primitiveState.size ?? oldSize

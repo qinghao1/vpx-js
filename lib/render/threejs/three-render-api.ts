@@ -2,13 +2,17 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import {
+	Box3,
+	BufferAttribute,
 	type BufferGeometry,
 	Group,
 	Matrix4,
 	type MeshStandardMaterial,
 	type Object3D,
 	type PointLight,
+	Sphere,
 	type Mesh as ThreeMesh,
+	Vector3,
 } from 'three'
 import type { IRenderable, RenderInfo } from '../../game/interfaces.js'
 import type { Matrix3D } from '../../math/matrix.js'
@@ -159,6 +163,54 @@ export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, Poin
 		if (!obj) return
 		// Single fused walk (slot sync + flag assignment); see batched-visibility.ts.
 		applyBatchedVisibility(obj, !!isVisible, this.batchVisibilityStats)
+	}
+
+	public applyFrameArrays(positions: Float32Array, normals: Float32Array, bounds: Float32Array, obj: Object3D): void {
+		if (!obj) return
+		this.unbatch(obj)
+		const destGeo = (obj as ThreeMesh).geometry as BufferGeometry
+		const destPos = destGeo.attributes.position as unknown as { array: Float32Array; needsUpdate: boolean }
+		if (!destPos || destPos.array.length !== positions.length)
+			throw new Error(
+				`Trying to apply geometry of ${positions.length} positions to ${destPos?.array.length ?? 0} positions.`,
+			)
+		destPos.array.set(positions)
+		destPos.needsUpdate = true
+		const destNorm = destGeo.attributes.normal as unknown as
+			| { array: Float32Array; needsUpdate: boolean }
+			| undefined
+		if (destNorm && destNorm.array.length === normals.length) {
+			// Same winding negation as the converter: stored triplets are CW on
+			// screen, so FrontSide reads negated normals.
+			for (let i = 0; i < normals.length; i++) destNorm.array[i] = -(normals[i] as number)
+			destNorm.needsUpdate = true
+		} else if (!destNorm) {
+			const negated = new Float32Array(normals.length)
+			for (let i = 0; i < normals.length; i++) negated[i] = -(normals[i] as number)
+			destGeo.setAttribute('normal', new BufferAttribute(negated, 3))
+		} else {
+			destGeo.computeVertexNormals()
+		}
+		// Precomputed union bounds install directly: no bounding-box scan, and
+		// the sphere covers the union box (conservative, never culls visible).
+		const box = destGeo.boundingBox ?? new Box3()
+		box.min.set(bounds[0] as number, bounds[1] as number, bounds[2] as number)
+		box.max.set(bounds[3] as number, bounds[4] as number, bounds[5] as number)
+		destGeo.boundingBox = box
+		const sphere = destGeo.boundingSphere ?? new Sphere()
+		box.getCenter(sphere.center)
+		sphere.radius = box.getSize(new Vector3()).length() / 2
+		destGeo.boundingSphere = sphere
+		const bvhGeo = destGeo as unknown as {
+			boundsTree?: unknown
+			disposeBoundsTree?: () => void
+			computeBoundsTree?: (o: unknown) => void
+		}
+		if (bvhGeo.boundsTree) {
+			bvhGeo.disposeBoundsTree?.()
+			bvhGeo.boundsTree = undefined
+			bvhGeo.computeBoundsTree?.({})
+		}
 	}
 
 	public applyMeshToNode(mesh: Mesh, obj: Object3D): void {

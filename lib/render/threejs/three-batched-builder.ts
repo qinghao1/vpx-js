@@ -12,6 +12,7 @@ import {
 import { isLowQuality } from '../../util/quality.js'
 import type { Table } from '../../vpt/table/table.js'
 import { normalizePendingKeys, pendingMapOf } from './material-shared.js'
+import { mergeBulbGlowQuads } from './nodes/bulb-glow-node.js'
 import { isButtonLike, RE_CAB, RE_VR } from './scene-classify.js'
 import type { ThreeRenderApi } from './three-render-api.js'
 
@@ -251,20 +252,14 @@ export function batchStaticOpaques(root: Group, table: Table, _renderApi: ThreeR
 	return count
 }
 
-export function instancedBulbs(_root: Group, _table: Table, _renderApi: ThreeRenderApi): number {
-	// Disabled: every branch was wrong. Instance matrices came from identity node
-	// transforms while per-bulb center+radius live in baked vertices (all bulbs
-	// piled at the origin at unit scale), glow quads matched the 'bulb' name filter
-	// and were replaced by 3D hull geometry, and one shared material collapsed
-	// per-light (`bulb.light:${name}` / `bulb.glow:${name}`) uniforms. Bulb meshes
-	// are few and render correctly uninstanced; a rewrite would need per-light
-	// matrices built from bulb data, glow exclusion, and identical-material grouping.
-	return 0
+export function instancedBulbs(root: Group, table: Table, _renderApi: ThreeRenderApi): number {
+	// Bulb halos merge into one composite; hulls stay uninstanced.
+	return mergeBulbGlowQuads(root, table)
 }
 
 /**
  * Draw-call reduction: fold static opaque meshes into BatchedMesh buckets (bulb
- * instancing is disabled — see instancedBulbs). Runs after postProcessScene
+ * halos merge — see instancedBulbs). Runs after postProcessScene
  * (hidden meshes are skipped) and ideally after textures arrive (meshes with
  * pending textures are skipped — safe to retry). Dynamic apply* calls unbatch
  * their mesh first.

@@ -19,6 +19,18 @@ export const TRANSMISSION_OPAQUE_CUTOFF = 0.999
 let texture: DataTexture | null = null
 let lastSignature = '\0'
 let lastSplatCount = 0
+const lastSigNums: number[] = [-1]
+const curSigNums: number[] = []
+const contribScratch: Array<{
+	level: number
+	color: number
+	color2: number
+	transmissionScale: number
+	centerX: number
+	centerY: number
+	falloff: number
+	power: number
+}> = []
 
 export function getTransmissionTexture(): DataTexture {
 	if (!texture) {
@@ -55,37 +67,6 @@ interface LampLike {
 	animation?: { intensityScale?: number }
 }
 
-function lampField(light: unknown): {
-	state: { intensity?: number; color?: number; colorFull?: number }
-	data: LampLike['data']
-	scale: number
-} {
-	try {
-		const lamp = light as LampLike
-		return { state: lamp.getState?.() ?? {}, data: lamp.data, scale: lamp.animation?.intensityScale ?? 1 }
-	} catch {
-		return { state: {}, data: undefined, scale: 1 }
-	}
-}
-
-function lampLevel(light: unknown): number {
-	const { state, data, scale } = lampField(light)
-	const raw = typeof state.intensity === 'number' ? state.intensity : undefined
-	const level = raw ?? data?.intensity ?? 0
-	const scaled = level * (Number.isFinite(scale) ? scale : 1)
-	return Number.isFinite(scaled) ? Math.max(0, scaled) : 0
-}
-
-function lampColor(light: unknown): number {
-	const { state, data } = lampField(light)
-	return state.color ?? data?.color ?? 0xffffff
-}
-
-function lampColor2(light: unknown): number {
-	const { state, data } = lampField(light)
-	return state.colorFull ?? data?.color2 ?? 0xffffff
-}
-
 interface TransmissionSplat {
 	x: number
 	y: number
@@ -110,10 +91,68 @@ function splitTransmissionRgb(color: number, amount: number): [number, number, n
 export function updateTransmissionBuffer(table: Table): boolean {
 	const tex = getTransmissionTexture()
 	const data = tex.image.data as Uint16Array
-	const lights = Object.values((table as unknown as { lights?: Record<string, unknown> }).lights ?? {})
+	const lightMap = (table as unknown as { lights?: Record<string, unknown> }).lights
 	const right = (table as unknown as { data?: { right?: number } }).data?.right || 1
 	const bottom = (table as unknown as { data?: { bottom?: number } }).data?.bottom || 1
-	const parts: string[] = []
+	// Steady-state fast path: numeric pre-check with reused buffers. Static lamp
+	// frames return here with no string/splat allocations; strings + splats are
+	// built only when quantized inputs actually changed.
+	curSigNums.length = 0
+	contribScratch.length = 0
+	if (lightMap) {
+		for (const key in lightMap) {
+			const lamp = lightMap[key] as LampLike
+			if (lamp.data?.bulbLight !== true) continue
+			let level = 0
+			let color = 0xffffff
+			let color2 = 0xffffff
+			try {
+				const s = lamp.getState?.() as { intensity?: number; color?: number; colorFull?: number } | undefined
+				const d = lamp.data
+				const raw = s && typeof s.intensity === 'number' ? s.intensity : (d?.intensity ?? 0)
+				const sc = lamp.animation?.intensityScale ?? 1
+				const scaled = raw * (Number.isFinite(sc) ? sc : 1)
+				level = Number.isFinite(scaled) ? Math.max(0, scaled) : 0
+				if (s && typeof s.color === 'number') color = s.color
+				else if (typeof d?.color === 'number') color = d.color
+				if (s && typeof s.colorFull === 'number') color2 = s.colorFull
+				else if (typeof d?.color2 === 'number') color2 = d.color2
+			} catch {
+				continue
+			}
+			if (level <= 0) continue
+			if ((color & 0xffffff) === 0 && (color2 & 0xffffff) === 0) continue
+			const transmissionScale = lamp.data?.transmissionScale ?? 0
+			const centerX = lamp.data?.center?.x ?? right / 2
+			const centerY = lamp.data?.center?.y ?? bottom / 2
+			const falloff = Math.max(lamp.data?.falloff ?? 50, 0.1)
+			const power = lamp.data?.falloffPower ?? 2
+			curSigNums.push(
+				Math.round(centerX),
+				Math.round(centerY),
+				Math.round(level * 10),
+				color,
+				color2,
+				Math.round(transmissionScale * 100),
+				Math.round(falloff * 10),
+				power,
+			)
+			if (transmissionScale > 0)
+				contribScratch.push({ level, color, color2, transmissionScale, centerX, centerY, falloff, power })
+		}
+	}
+	if (curSigNums.length === lastSigNums.length) {
+		let same = true
+		for (let i = 0; i < curSigNums.length; i++) {
+			if (curSigNums[i] !== lastSigNums[i]) {
+				same = false
+				break
+			}
+		}
+		if (same) return false
+	}
+	lastSigNums.length = 0
+	for (let i = 0; i < curSigNums.length; i++) lastSigNums.push(curSigNums[i] as number)
 	// Native (Renderer::DrawBulbLightBuffer + Light::Render LIGHT_BUFFER + fs_light.sc
 	// bulb_light): only bulb lights with a nonzero transmission scale contribute, each
 	// as a finite disc of its own falloff radius with a (1-r/falloff)^power profile
@@ -121,38 +160,34 @@ export function updateTransmissionBuffer(table: Table): boolean {
 	// buffer. Infinite-support Gaussians over every lamp washed the whole playfield,
 	// so support here ends exactly at the falloff radius.
 	const splats: TransmissionSplat[] = []
-	for (const light of lights) {
-		const lamp = light as LampLike
-		if (lamp.data?.bulbLight !== true) continue
-		const level = lampLevel(light)
-		if (level <= 0) continue
-		const color = lampColor(light)
-		const color2 = lampColor2(light)
-		if ((color & 0xffffff) === 0 && (color2 & 0xffffff) === 0) continue
-		const transmissionScale = lamp.data?.transmissionScale ?? 0
+	for (const c of contribScratch) {
 		// Native (Light::Render LIGHT_BUFFER halo block): the halo lands in the
 		// buffer at full m_currentIntensity * transmissionScale. The 0.02 term
 		// belongs to the main-pass bulb-hull block, which is explicitly
 		// excluded from the light buffer (!isLightBuffer).
-		// Upstream then applies a normalized 19px Gaussian on an RGBA16F buffer,
-		// which conserves energy, so its transmitted energy matches this exactly.
-		// vpx-js omits the blur: its sigma is screen-space (view-dependent) while
-		// this buffer is playfield-UV, and the coarse 96x48 grid plus bilinear
-		// sampling already low-passes near that scale. Open gap: narrow-splat
-		// peaks run hotter and disc edges harder than upstream; wide splats
-		// (falloff >> blur width) match.
-		const centerX = lamp.data?.center?.x ?? right / 2
-		const centerY = lamp.data?.center?.y ?? bottom / 2
-		const falloff = Math.max(lamp.data?.falloff ?? 50, 0.1)
-		const power = lamp.data?.falloffPower ?? 2
 		const entry = (amount: number): TransmissionSplat => {
-			const [red, green, blue] = splitTransmissionRgb(color, amount)
-			const [red2, green2, blue2] = splitTransmissionRgb(color2, amount)
-			return { x: centerX, y: centerY, falloff, power, red, green, blue, red2, green2, blue2 }
+			const [red, green, blue] = splitTransmissionRgb(c.color, amount)
+			const [red2, green2, blue2] = splitTransmissionRgb(c.color2, amount)
+			return {
+				x: c.centerX,
+				y: c.centerY,
+				falloff: c.falloff,
+				power: c.power,
+				red,
+				green,
+				blue,
+				red2,
+				green2,
+				blue2,
+			}
 		}
-		if (transmissionScale > 0) splats.push(entry(level * transmissionScale))
+		splats.push(entry(c.level * c.transmissionScale))
+	}
+	// Signature covers every lit bulb lamp; splats only scale > 0 ones.
+	const parts: string[] = []
+	for (let i = 0; i + 7 < curSigNums.length; i += 8) {
 		parts.push(
-			`${Math.round(centerX)},${Math.round(centerY)},${Math.round(level * 10)},${color.toString(16)},${color2.toString(16)},${Math.round(transmissionScale * 100)},${Math.round(falloff * 10)},${power}`,
+			`${curSigNums[i]},${curSigNums[i + 1]},${curSigNums[i + 2]},${(curSigNums[i + 3] as number).toString(16)},${(curSigNums[i + 4] as number).toString(16)},${curSigNums[i + 5]},${curSigNums[i + 6]},${curSigNums[i + 7]}`,
 		)
 	}
 	const signature = parts.join(';')
@@ -211,6 +246,10 @@ function fillBuffer(data: Uint16Array, list: TransmissionSplat[], right: number,
 export function resetTransmissionBuffer(): void {
 	lastSignature = '\0'
 	lastSplatCount = 0
+	lastSigNums.length = 0
+	lastSigNums.push(-1)
+	curSigNums.length = 0
+	contribScratch.length = 0
 }
 
 export function getTransmissionDebug(): {

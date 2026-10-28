@@ -130,7 +130,20 @@ export function setNodeMapSlot(
 	if (!target || !isKind(target)) return false
 	const userData = target.userData as Record<string, unknown>
 	const nextMap = map ?? null
-	if (userData.__map === nextMap && (name === undefined || userData.__mapName === name)) return false
+	if (userData.__map === nextMap) {
+		// Same texture object (or still unmapped): the compiled program only
+		// depends on the map itself plus, when unmapped, whether a pending name
+		// selects the placeholder or the untextured branch. A rename inside one
+		// branch must not recompile the program — script color/alpha ride
+		// uniforms, and the map slot is untouched.
+		const prevName = userData.__mapName as string | undefined
+		const sameBranch =
+			nextMap !== null || name === undefined || prevName === name || (prevName != null && name != null)
+		if (sameBranch) {
+			if (name !== undefined) userData.__mapName = name
+			return false
+		}
+	}
 	userData.__map = nextMap
 	if (name !== undefined) userData.__mapName = name
 	if (typeof userData.__rebuild === 'function') (userData.__rebuild as (next: ThreeTexture | null) => void)(nextMap)
