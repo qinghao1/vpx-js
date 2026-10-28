@@ -40,7 +40,8 @@ export class SurfaceMeshGenerator {
 		textured: boolean,
 	): void {
 		const n = verts.length
-		// Per-edge normals, smoothed across fSmooth joints, cf. Surface::GenerateMesh.
+		// Per-edge normals, smoothed across fSmooth joints, cf. Surface::GenerateMesh
+		// (which likewise stores (dy, dx)/len and writes side-vertex ny negated).
 		const edgeNx: number[] = []
 		const edgeNy: number[] = []
 		for (let i = 0; i < n; i++) {

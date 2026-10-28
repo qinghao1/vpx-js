@@ -300,13 +300,13 @@ export class PinInput {
 		let exit: (typeof kickers)[string] | undefined
 		for (const name in kickers) {
 			const kicker = kickers[name]
-			if (!kicker?.hit?.ball) continue
+			if (!kicker.hit?.ball) continue
 			if (!exit || kicker.data.center.x > exit.data.center.x) exit = kicker
 		}
 		if (!exit) {
 			for (const name in this.table.plungers) {
 				const plunger = this.table.plungers[name] as unknown as { getApi(): { CreateBall(): unknown } }
-				plunger?.getApi().CreateBall()
+				plunger.getApi().CreateBall()
 				break
 			}
 			return

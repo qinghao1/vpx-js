@@ -32,7 +32,7 @@ export const FULL_SWEEP_EVERY = 300
  * of all states, the incremental diff visits nearly everything anyway, so the
  * periodic full sweep is redundant that frame.
  */
-export const FULL_SWEEP_MIN_COVERAGE = 0.5
+const FULL_SWEEP_MIN_COVERAGE = 0.5
 
 /** Host-facing game controller: input, physics, animations and state diffing. */
 export class Player extends EventEmitter {

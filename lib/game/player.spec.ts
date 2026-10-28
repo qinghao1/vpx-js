@@ -11,6 +11,17 @@ import { _resetQualityCache } from '../util/quality.js'
 import { Table } from '../vpt/table/table.js'
 import { FULL_SWEEP_EVERY, type IBallCreationPosition, Player } from './player.js'
 
+/** Runs fn with performance.now stubbed to `now`; restores the clock afterwards. */
+function withStubbedNow(now: number, fn: () => void): void {
+	const realNow = performance.now.bind(performance)
+	performance.now = () => now
+	try {
+		fn()
+	} finally {
+		performance.now = realNow
+	}
+}
+
 describe('The VPinball player', () => {
 	const three = new ThreeHelper()
 
@@ -107,13 +118,9 @@ describe('The VPinball player', () => {
 		player.updatePhysics(10)
 
 		// Wall-clock gaps clamp to MAX_CATCHUP steps instead of a 1 kHz catch-up spiral.
-		const realNow = performance.now.bind(performance)
-		performance.now = () => 10_000
-		try {
+		withStubbedNow(10_000, () => {
 			expect(player.updatePhysics()).to.equal(50)
-		} finally {
-			performance.now = realNow
-		}
+		})
 	})
 
 	it('should not fire 1ms timers ahead of the wall clock', async () => {
@@ -271,13 +278,9 @@ describe('The VPinball player', () => {
 
 		// First wall-clock frame far past the epoch: clock init consumes the
 		// call (0 iterations) instead of running a 1 kHz catch-up spiral.
-		const realNow = performance.now.bind(performance)
-		performance.now = () => 5_000_000
-		try {
+		withStubbedNow(5_000_000, () => {
 			expect(player.updatePhysics()).to.equal(0)
-		} finally {
-			performance.now = realNow
-		}
+		})
 
 		// Clocks now sit at the wall time, so explicit stepping continues exactly
 		// (game time is relative to sim start, hence 16 rather than 5000016).

@@ -55,7 +55,6 @@ describe('The VPinball rubber collision', () => {
 describe('The VPinball rubber degenerate triangles', () => {
 	it('should skip degenerate triangles but keep healthy ones, like upstream PhysicSetup', () => {
 		const table = new TableBuilder().addRubber('r1', { height: 50, hitHeight: 25 }).build()
-		new Player(table).init()
 		const rubber = table.rubbers.r1
 		const generator = new RubberHitGenerator(rubber.data, {
 			getMeshes: () => ({

@@ -57,6 +57,16 @@ describe('swapBallCollisionHandling', () => {
 		expect(simulateBallPositions(cycles)).toEqual(simulateBallPositions(cycles))
 	})
 
+	it('alternates traversal direction each cycle (pins the swap toggle)', () => {
+		const player = new Player(new TableBuilder().build()).init()
+		const physics = player.getPhysics()
+		expect(physics.swapBallCollisionHandling).to.equal(false)
+		physics.physicsSimulateCycle(1)
+		expect(physics.swapBallCollisionHandling).to.equal(true)
+		physics.physicsSimulateCycle(1)
+		expect(physics.swapBallCollisionHandling).to.equal(false)
+	})
+
 	function simulateBallPositions(cycles: number): number[] {
 		const player = new Player(new TableBuilder().build()).init()
 		player.createBall(mockCreator())
