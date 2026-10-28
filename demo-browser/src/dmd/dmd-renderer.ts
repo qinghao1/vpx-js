@@ -199,25 +199,36 @@ export class DmdRenderer {
 			String(n || '')
 				.toLowerCase()
 				.includes('vr')
-		const hasCab = (() => {
-			try {
-				let found = false
-				tableGroup.traverse(o => {
-					if (found) return
-					const nm = (o.name || '').toLowerCase()
-					if (
-						nm.includes('vrcab') ||
-						nm.includes('cabinet') ||
-						nm.includes('pincab') ||
-						nm.includes('lockbar')
-					)
-						found = true
-				})
-				return found
-			} catch {
-				return false
-			}
-		})()
+		// Single scene walk: the cabinet check, stale procedural-mesh list, and
+		// DMD-mesh candidates share one traverse (predicates unchanged from the
+		// old three-pass version). Stale procedural meshes are removed after
+		// the VR-preference filter below and excluded from candidates there.
+		const dmdNames = new Set([...flasherMap.keys(), 'dmd'])
+		let hasCab = false
+		const oldProcedural: any[] = []
+		const foundCandidates: any[] = []
+		try {
+			tableGroup.traverse(o => {
+				const nm = (o.name || '').toLowerCase()
+				if (
+					!hasCab &&
+					(nm.includes('vrcab') || nm.includes('cabinet') || nm.includes('pincab') || nm.includes('lockbar'))
+				)
+					hasCab = true
+				if (o.userData?.isProceduralDMD) oldProcedural.push(o)
+				if (!o.isMesh) return
+				if (
+					dmdNames.has(nm) ||
+					nm === 'dmd' ||
+					nm.startsWith('dmd_') ||
+					nm.startsWith('dmd.') ||
+					nm.includes('_dmd')
+				)
+					foundCandidates.push(o)
+			})
+		} catch {
+			// keep whatever the partial walk collected
+		}
 		let filteredReps = reps
 		if (reps.length > 1) {
 			const hasVR = reps.some(r => isVRName(r.chosen.getName()))
@@ -240,20 +251,11 @@ export class DmdRenderer {
 			)
 		}
 
-		const oldProcedural = []
-		tableGroup.traverse(o => {
-			if (o.userData?.isProceduralDMD) oldProcedural.push(o)
-		})
+		const removed = new Set(oldProcedural)
 		for (const o of oldProcedural) o.parent?.remove(o)
-
-		const dmdNames = new Set([...flasherMap.keys(), 'dmd'])
-		const candidates = []
-		tableGroup.traverse(o => {
-			if (!o.isMesh) return
-			const n = (o.name || '').toLowerCase()
-			if (dmdNames.has(n) || n === 'dmd' || n.startsWith('dmd_') || n.startsWith('dmd.') || n.includes('_dmd'))
-				candidates.push(o)
-		})
+		// Stale procedural meshes were collected before removal and match the
+		// dmd_ prefix — exclude them exactly as the old post-removal walk did.
+		const candidates = foundCandidates.filter(m => !removed.has(m))
 		for (const m of candidates) m.visible = true
 
 		const applyMat = m => {

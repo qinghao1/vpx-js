@@ -1,4 +1,5 @@
-// @ts-nocheck
+// @ts-nocheck — viewer is a DOM/three coordinator over loosely-typed runtime
+// subsystems (player, controls); strict-typing it is a separate migration.
 // Viewer coordinator - delegates to subsystems
 
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
@@ -73,8 +74,8 @@ import {
 } from './env.js'
 import { keyForCode, locationForCode, RELEASE_CODES } from './input/input-manager.js'
 import { attachInput } from './input.js'
-import { createHarness } from './log-overlay.js'
-import { renderModeHint, renderStats } from './stats-panel.js'
+import { createHarness } from './ui/log-viewer.js'
+import { renderModeHint, renderStats } from './ui/stats-overlay.js'
 import {
 	$,
 	computeTexMem,
@@ -234,7 +235,14 @@ export class Viewer {
 		this._eventCleanups = []
 		this._boundResize = () => this._onResize()
 		this._disposed = false
+		this._deviceLossCount = 0
 		this._rendererReady = this._createRenderer()
+		this._rendererReady.catch(e => {
+			this.log(
+				`WebGPU renderer failed to start (${e?.message ?? e}) — the table cannot render. This usually means broken GPU-driver or browser WebGPU support here; try updating Chrome and GPU drivers, reloading with ?noaa (disables antialiasing), or relaunching Chrome with --use-angle=vulkan.`,
+				'error',
+			)
+		})
 		this.dmd = new DmdRenderer(this)
 		if (_isDev)
 			Object.assign(window, {
@@ -406,7 +414,16 @@ export class Viewer {
 			if (!device?.lost) return
 			device.lost.then((info: any) => {
 				console.warn(`[WebGPU] Device lost: reason=${info.reason}, message=${info.message}`)
-				if (info.reason !== 'destroyed' && !this._disposed) void this._createRenderer()
+				if (info.reason === 'destroyed' || this._disposed) return
+				if (++this._deviceLossCount > 2) {
+					this.log(
+						`WebGPU device keeps failing (${info.reason}) — not retrying. Reload with ?noaa, update Chrome and GPU drivers, or relaunch Chrome with --use-angle=vulkan.`,
+						'error',
+					)
+					return
+				}
+				this._rendererReady = this._createRenderer()
+				this._rendererReady.catch(() => {})
 			})
 		} catch {}
 	}

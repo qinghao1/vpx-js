@@ -1,56 +1,14 @@
 import { NUDGE } from '../config.js'
-import type { InputHost } from './input-manager.js'
+import { type InputHost, makeHost } from './input-manager.js'
 
 // The nudge host only shakes the cabinet: it never switches modes, pauses,
 // or releases keys, so it carries the InputHost subset it actually uses.
 type NudgeHost = Omit<InputHost, 'enterPlayMode' | 'exitPlayMode' | 'togglePause' | 'releaseKeys'>
 
+// A full InputHost satisfies the nudge subset — reuse the shared factory
+// instead of maintaining a second copy of the same getters.
 function toNudgeHost(viewer: any): NudgeHost {
-	return {
-		get canvas() {
-			return viewer.dom?.canvas as HTMLCanvasElement
-		},
-		get player() {
-			return viewer.player ?? null
-		},
-		get viewerMode() {
-			return viewer.viewerMode as 'viewer' | 'play'
-		},
-		get controls() {
-			return viewer.controls ?? null
-		},
-		get camera() {
-			return viewer.camera ?? null
-		},
-		get tableGroup() {
-			return viewer.tableGroup ?? null
-		},
-		get buttonMeshes() {
-			return (viewer._buttonMeshes ?? null) as any
-		},
-		get physicsSab() {
-			return (viewer._physicsSab ?? null) as any
-		},
-		get enableMotionButton() {
-			return typeof document !== 'undefined'
-				? (document.getElementById('enable-motion') as HTMLButtonElement | null)
-				: null
-		},
-		log(msg: string, level?: string) {
-			viewer.log?.(msg, level)
-		},
-		requestMotionPermission:
-			typeof DeviceMotionEvent !== 'undefined' && 'requestPermission' in (DeviceMotionEvent as any)
-				? async () => {
-						try {
-							const perm = await (DeviceMotionEvent as any).requestPermission()
-							return perm === 'granted'
-						} catch {
-							return false
-						}
-					}
-				: undefined,
-	}
+	return makeHost(viewer)
 }
 
 function attachNudgeHost(host: NudgeHost, signal: AbortSignal): void {

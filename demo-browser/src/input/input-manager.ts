@@ -79,7 +79,8 @@ const PLAY_CODES = new Set(CONTROL_SCHEME.flatMap(c => c.keys))
 
 const FALLBACK_ZONES = { flipperSplit: 0.5 } as const
 
-function toHost(viewer: any): InputHost {
+/** Shared viewer → InputHost adapter (used by keyboard, pointer, and nudge attachers). */
+export function makeHost(viewer: any): InputHost {
 	return {
 		get canvas() {
 			return viewer.dom?.canvas as HTMLCanvasElement
@@ -536,7 +537,7 @@ function attachPointerHost(host: InputHost, signal: AbortSignal): void {
 }
 
 export function attachKeyboard(viewer: any): () => void {
-	const host = toHost(viewer)
+	const host = makeHost(viewer)
 	const ctrl = new AbortController()
 
 	if (viewer._keyboardCtrl) {
@@ -556,7 +557,7 @@ export function attachKeyboard(viewer: any): () => void {
 }
 
 export function attachPointerTouch(viewer: any): () => void {
-	const host = toHost(viewer)
+	const host = makeHost(viewer)
 	const ctrl = new AbortController()
 
 	if (viewer._pointerCtrl) {
