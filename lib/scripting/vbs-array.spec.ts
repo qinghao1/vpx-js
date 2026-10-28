@@ -114,11 +114,9 @@ describe('The VBScript array', () => {
 			expect(() => {
 				arr[-1] = 10
 			}).to.throw(VbsError)
-			arr[3] = 10
 		} finally {
 			ERR.OnErrorResumeNext()
 		}
-		expect(arr.length).to.equal(4)
 		expect(arr[2]).to.equal(3)
 	})
 

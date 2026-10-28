@@ -78,27 +78,21 @@ export class Transformer {
 	}
 
 	protected isKnown(node: BaseNode, parent: BaseNode): boolean {
-		return this.normalizeKnownName(node) || this.isKnownParent(parent)
+		return this.isKnownNode(node) || this.isKnownParent(parent)
 	}
 
+	/**
+	 * Whether the node names a known runtime binding, normalizing its JS
+	 * casing inline (`array` in any case to `Array`, `Eval` to `eval`).
+	 */
 	protected isKnownNode(node: BaseNode) {
 		if (node.type !== 'Identifier') {
 			return false
 		}
-		return KNOWN_NAMES.has((node as Identifier).name.toLowerCase())
-	}
-
-	/**
-	 * Applies the canonical JS casing of a known runtime binding (`array`
-	 * from any case to `Array`, `Eval` to `eval`). Returns whether the node
-	 * names one. Split out of the `isKnownNode` predicate so the predicate
-	 * stays side-effect free; both stay consulted together via `isKnown`.
-	 */
-	protected normalizeKnownName(node: BaseNode): boolean {
-		if (!this.isKnownNode(node)) {
+		const low = (node as Identifier).name.toLowerCase()
+		if (!KNOWN_NAMES.has(low)) {
 			return false
 		}
-		const low = (node as Identifier).name.toLowerCase()
 		if (low === 'array') (node as Identifier).name = 'Array'
 		else if (low === 'eval') (node as Identifier).name = 'eval'
 		return true

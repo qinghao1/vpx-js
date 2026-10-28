@@ -198,16 +198,6 @@ export class ReferenceTransformer extends Transformer {
 		})
 	}
 
-	/**
-	 * Replaces global variables that refer to table elements by a member
-	 * expression given by an object name.
-	 */
-	public replaceElementObjectNames(ast: Program): void {
-		replace(ast, {
-			enter: (node, parent: any) => this.replaceElementReference(node, parent),
-		})
-	}
-
 	private replaceElementReference(node: any, parent: any): any {
 		if (!this.isEligible(node, parent)) {
 			return node
@@ -232,12 +222,6 @@ export class ReferenceTransformer extends Transformer {
 			}
 		}
 		return memberExpression(identifier(Transformer.ITEMS_NAME), identifier(elementName))
-	}
-
-	public replaceEnumObjectNames(ast: Program): void {
-		replace(ast, {
-			enter: (node, parent: any) => this.replaceEnumReference(node, parent),
-		})
 	}
 
 	private replaceEnumReference(node: any, parent: any): any {
@@ -266,12 +250,6 @@ export class ReferenceTransformer extends Transformer {
 		return node
 	}
 
-	public replaceGlobalApiNames(ast: Program): void {
-		replace(ast, {
-			enter: (node, parent: any) => this.replaceGlobalApiReference(node, parent),
-		})
-	}
-
 	private replaceGlobalApiReference(node: any, parent: any): any {
 		if (!this.isEligible(node, parent)) {
 			return node
@@ -294,12 +272,6 @@ export class ReferenceTransformer extends Transformer {
 	 */
 	public replaceReservedWords(ast: Program): void {
 		renameReservedWords(ast)
-	}
-
-	public replaceStdlibNames(ast: Program): void {
-		replace(ast, {
-			enter: (node, parent: any) => this.replaceStdlibReference(node, parent),
-		})
 	}
 
 	private replaceStdlibReference(node: any, parent: any): any {

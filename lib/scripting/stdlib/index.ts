@@ -126,24 +126,15 @@ export class Stdlib extends VbsApi {
 	}
 
 	public CBool(v: any): boolean {
-		if (v === null) {
-			ERR.Raise(new VbsError('Invalid use of Null', 94))
-			return false
-		}
-		if (this.isUndef(v)) return false
-		if (v === NOTHING) {
-			ERR.Raise(new VbsError('Object variable not set', 91))
-			return false
-		}
+		const early = this.conversionHead(v, false)
+		if (early !== undefined) return early
 		if (typeof v === 'boolean') return v
 		if (typeof v === 'number') return v !== 0
 		if (typeof v === 'string') {
 			const trimmed = v.trim().toLowerCase()
 			if (trimmed === 'true') return true
 			if (trimmed === 'false') return false
-			// A zero-length (or whitespace-only) string is not a boolean:
-			// parseNumericText rejects it as NaN, raising type mismatch (13)
-			// like the other converters (CInt(""), CDate(""), ...).
+			// Empty text is not a boolean: parseNumericText yields NaN, raising 13 like CInt("").
 			const numeric = parseNumericText(v)
 			if (!Number.isNaN(numeric)) return numeric !== 0
 			ERR.Raise(new VbsError('Type mismatch', 13))
@@ -191,7 +182,7 @@ export class Stdlib extends VbsApi {
 	 * empty value, and Nothing raises 91. Returns undefined when `v` is a real
 	 * value and conversion should proceed.
 	 */
-	private conversionHead<T extends number | string>(v: unknown, empty: T): T | undefined {
+	private conversionHead<T extends number | string | boolean>(v: unknown, empty: T): T | undefined {
 		if (v === null) {
 			ERR.Raise(new VbsError('Invalid use of Null', 94))
 			return empty

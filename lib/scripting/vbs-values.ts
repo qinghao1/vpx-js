@@ -381,9 +381,9 @@ export function vbsAdd(left: unknown, right: unknown): unknown {
 		}
 		return left + right
 	}
-	// Null/Nothing were ruled out above, so the pair is always numbers here.
+	// Null/Nothing were ruled out above, so the pair is either numbers or undefined here.
 	const pair = coerceArithmeticPair(left, right)
-	if (!pair) {
+	if (pair === undefined) {
 		return undefined
 	}
 	return vbsCheckedResult(pair[0] + pair[1])
