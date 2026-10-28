@@ -100,8 +100,11 @@ function installHostShims(): void {
 
 installHostShims()
 
-/** Minimal ball snapshot crossing the thread boundary in either direction. */
+/** Minimal ball snapshot crossing the thread boundary in either direction.
+ * `id` is the main-thread `Ball.id`: the worker mirrors it at creation so frames
+ * match slots back to main-thread balls by id, never by slot index. */
 export type WorkerBallState = {
+	id: number
 	pos: [number, number, number]
 	vel: [number, number, number]
 	radius: number
@@ -191,28 +194,42 @@ export class WorkerSim {
 			getBallCreationVelocity: () => new Vertex3D(state.vel[0], state.vel[1], state.vel[2]),
 			onBallCreated: () => {},
 		}
-		const ball = this.physics.createBall(creator, this.shim as unknown as Player, state.radius)
+		// The id triple (ball.id, the BallHit/BallMover ids, the state name) is
+		// assigned from the message id here at creation only — never reassigned
+		// on a live ball, whose hit/mover cached the id at construct.
+		const ball = this.physics.createBall(creator, this.shim as unknown as Player, state.radius, 1, state.id)
 		ball.state.isFrozen = state.frozen
 		return ball
 	}
 
-	/** Full reconcile with the main thread's ball list: append-only order keeps indices aligned. */
+	/** Full id-verified reconcile with the main thread's ball list: worker balls
+	 * whose id is absent from the snapshot are destroyed, matched ids teleport
+	 * in place (same object, id untouched), and missing ids spawn with the
+	 * message id. A destroy/create shift at the same count therefore swaps
+	 * objects instead of aliasing a newborn onto a stale slot. */
 	public syncBalls(states: WorkerBallState[]): void {
 		const balls = this.physics.balls
-		while (balls.length > states.length) this.destroyBallAt(balls.length - 1)
-		for (let index = 0; index < states.length; index++) {
-			if (index < balls.length) this.teleportBall(index, states[index])
-			else this.spawnBall(states[index])
+		const incoming = new Set<number>()
+		for (const state of states) incoming.add(state.id)
+		for (let index = balls.length - 1; index >= 0; index--) {
+			if (!incoming.has(balls[index].id)) this.destroyBallAt(index)
+		}
+		for (const state of states) {
+			if (!this.teleportBall(state)) this.spawnBall(state)
 		}
 	}
 
-	public teleportBall(index: number, state: WorkerBallState): void {
-		const ball = this.physics.balls[index]
-		if (!ball) return
+	/** Resolves the message id to the live worker ball at apply time; an unknown
+	 * id (destroyed or never synced) is a silent no-op so a teleport racing a
+	 * sync cannot corrupt the list. Never mutates ids. */
+	public teleportBall(state: WorkerBallState): boolean {
+		const ball = this.physics.balls.find(candidate => candidate.id === state.id)
+		if (!ball) return false
 		ball.state.pos.set(state.pos[0], state.pos[1], state.pos[2])
 		ball.hit.vel.set(state.vel[0], state.vel[1], state.vel[2])
 		ball.state.isFrozen = state.frozen
 		ball.coll.clear()
+		return true
 	}
 
 	public destroyBallAt(index: number): void {
@@ -291,7 +308,7 @@ type HostMessage = {
 	sab?: SharedArrayBuffer
 	vpx?: Uint8Array | ArrayBuffer
 	id?: number
-	index?: number
+	epoch?: number
 	balls?: WorkerBallState[]
 	pos?: [number, number, number]
 	vel?: [number, number, number]
@@ -310,7 +327,7 @@ export function startHost(host: WorkerHost): void {
 	let prevMsec = 0
 	let stepCount = 0
 	// Latest-wins: a newer pre-init syncBalls replaces any still-pending snapshot.
-	let pendingSync: WorkerBallState[] | null = null
+	let pendingSync: { states: WorkerBallState[]; epoch: number } | null = null
 	const scratch = new Float32Array(MAX_BALLS * BALL_STRIDE)
 
 	function tick(): void {
@@ -400,7 +417,8 @@ export function startHost(host: WorkerHost): void {
 			loaded => {
 				sim = new WorkerSim(loaded)
 				if (pendingSync) {
-					sim.syncBalls(pendingSync)
+					sim.syncBalls(pendingSync.states)
+					host.postMessage({ type: 'synced', epoch: pendingSync.epoch })
 					pendingSync = null
 				}
 				host.postMessage({ type: 'ready', balls: sim.physics.balls.length, timeMsec: sim.physics.timeMsec })
@@ -465,24 +483,31 @@ export function startHost(host: WorkerHost): void {
 				}
 				break
 			}
-			case 'syncBalls':
+			case 'syncBalls': {
 				if (!Array.isArray(data.balls)) {
 					host.postMessage({ type: 'error', message: 'syncBalls requires a balls array' })
 					break
 				}
-				if (sim) sim.syncBalls(data.balls)
-				else pendingSync = data.balls
+				const epoch = data.epoch ?? 0
+				if (sim) {
+					sim.syncBalls(data.balls)
+					host.postMessage({ type: 'synced', epoch })
+				} else pendingSync = { states: data.balls, epoch }
 				break
+			}
 			case 'teleportBall': {
 				if (!sim) {
 					host.postMessage({ type: 'error', message: 'teleportBall requires a loaded table' })
 					break
 				}
-				if (data.index === undefined || !data.pos || !data.vel) {
-					host.postMessage({ type: 'error', message: 'teleportBall requires index, pos, and vel' })
+				if (typeof data.id !== 'number' || !data.pos || !data.vel) {
+					host.postMessage({ type: 'error', message: 'teleportBall requires id, pos, and vel' })
 					break
 				}
-				sim.teleportBall(data.index, {
+				// Unknown ids are a no-op (no ack, no error): the ball was
+				// destroyed or never synced, and the next sync converges it.
+				sim.teleportBall({
+					id: data.id,
 					pos: data.pos,
 					vel: data.vel,
 					radius: data.radius ?? 25,

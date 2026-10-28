@@ -21,6 +21,7 @@ type Posted = {
 	balls?: number
 	id?: number
 	steps?: number
+	epoch?: number
 }
 
 function makeHost() {
@@ -110,7 +111,13 @@ describe('physics worker host wiring', () => {
 		// pass the bottom to start the center at startZ like spawnBall does.
 		const ball = player.createBall(dropAt(500, 500, startZ - 25), 25)
 		const sim = new WorkerSim(mkTable())
-		const workerBall = sim.spawnBall({ pos: [500, 500, startZ], vel: [0, 0, 0], radius: 25, frozen: false })
+		const workerBall = sim.spawnBall({
+			id: ball.id,
+			pos: [500, 500, startZ],
+			vel: [0, 0, 0],
+			radius: 25,
+			frozen: false,
+		})
 
 		for (let timeMs = 16; timeMs <= 2000; timeMs += 16) {
 			player.updatePhysics(timeMs)
@@ -251,7 +258,9 @@ describe('physics worker protocol hardening', () => {
 			await waitFor(() => posted.some(m => m.type === 'pong' && m.id === id), `pong ${id}`)
 			return posted.find(m => m.type === 'pong' && m.id === id)?.balls ?? -1
 		}
+		let nextId = 1000
 		const ball = (frozen: boolean): WorkerBallState => ({
+			id: nextId++,
 			pos: [0, 0, 50],
 			vel: [0, 0, 0],
 			radius: 25,
@@ -293,6 +302,57 @@ describe('physics worker protocol hardening', () => {
 		await waitFor(() => posted.some(m => m.type === 'stopped'), 'stopped')
 		expect(count('stopped')).toBe(1)
 	}, 30000)
+
+	it('acks syncBalls epochs so the main thread can gate resync', async () => {
+		const { host, posted, send } = makeHost()
+		startHost(host)
+		const sab = createPhysicsSAB()
+		send({ type: 'init', sab, vpx: loadVpx() })
+		await waitFor(() => posted.some(m => m.type === 'ready'), 'ready')
+		const syncedEpochs = (): (number | undefined)[] => posted.filter(m => m.type === 'synced').map(m => m.epoch)
+		const ball = (id: number): WorkerBallState => ({
+			id,
+			pos: [0, 0, 50],
+			vel: [0, 0, 0],
+			radius: 25,
+			frozen: false,
+		})
+		send({ type: 'syncBalls', epoch: 4, balls: [ball(2001)] })
+		await waitFor(() => syncedEpochs().includes(4), 'synced 4')
+		// Latest-wins pre-init coverage is separate; here each applied sync acks its own epoch.
+		send({ type: 'syncBalls', epoch: 5, balls: [ball(2001), ball(2002)] })
+		await waitFor(() => syncedEpochs().includes(5), 'synced 5')
+		expect(syncedEpochs()).toEqual([4, 5])
+		// Unknown-id teleports stay silent: no ack, no error, no corruption.
+		const errorsBefore = posted.filter(m => m.type === 'error').length
+		send({ type: 'teleportBall', id: 9999, pos: [1, 2, 3], vel: [0, 0, 0] })
+		await flushMacrotasks()
+		expect(posted.filter(m => m.type === 'error').length).toBe(errorsBefore)
+		expect(posted.filter(m => m.type === 'synced').length).toBe(2)
+		send({ type: 'teleportBall', id: 2002, pos: [7, 8, 9], vel: [0, 0, 0] })
+		await flushMacrotasks()
+		expect(posted.filter(m => m.type === 'error').length).toBe(errorsBefore)
+	}, 30000)
+
+	it('applies a queued loading-window sync on load and acks its epoch', async () => {
+		const { host, posted, send } = makeHost()
+		startHost(host)
+		const sab = createPhysicsSAB()
+		send({ type: 'init', sab, vpx: loadVpx() })
+		// Sync while the table loads (sim not yet constructed) queues latest-wins;
+		// the ack lands after load applies it.
+		send({
+			type: 'syncBalls',
+			epoch: 9,
+			balls: [{ id: 3001, pos: [0, 0, 50], vel: [0, 0, 0], radius: 25, frozen: false }],
+		})
+		await waitFor(() => posted.some(m => m.type === 'ready'), 'ready')
+		await waitFor(() => posted.some(m => m.type === 'synced' && m.epoch === 9), 'synced 9')
+		send({ type: 'ping', id: 301 })
+		await waitFor(() => posted.some(m => m.type === 'pong' && m.id === 301), 'pong 301')
+		expect(posted.find(m => m.type === 'pong' && m.id === 301)?.balls).toBe(1)
+		expect(posted.some(m => m.type === 'error')).toBe(false)
+	}, 30000)
 })
 
 describe('physics worker script/emu edit propagation', () => {
@@ -300,15 +360,15 @@ describe('physics worker script/emu edit propagation', () => {
 		const table = new TableBuilder().build()
 		table.data.glassHeight = 4000
 		const sim = new WorkerSim(table)
-		sim.syncBalls([{ pos: [100, 200, 300], vel: [0, 0, 0], radius: 25, frozen: false }])
+		sim.syncBalls([{ id: 91, pos: [100, 200, 300], vel: [0, 0, 0], radius: 25, frozen: false }])
 		expect(sim.physics.balls[0].state.isFrozen).toBe(false)
 		// Frozen-only change: identical pos/vel, so no drift budget would ever trip.
-		sim.syncBalls([{ pos: [100, 200, 300], vel: [0, 0, 0], radius: 25, frozen: true }])
+		sim.syncBalls([{ id: 91, pos: [100, 200, 300], vel: [0, 0, 0], radius: 25, frozen: true }])
 		expect(sim.physics.balls.length).toBe(1)
 		expect(sim.physics.balls[0].state.isFrozen).toBe(true)
 		expect(sim.physics.balls[0].state.pos.x).toBe(100)
 		// Same through the discrete teleport op the viewer sends on frozen mismatch.
-		sim.teleportBall(0, { pos: [100, 200, 300], vel: [0, 0, 0], radius: 25, frozen: false })
+		expect(sim.teleportBall({ id: 91, pos: [100, 200, 300], vel: [0, 0, 0], radius: 25, frozen: false })).toBe(true)
 		expect(sim.physics.balls[0].state.isFrozen).toBe(false)
 	})
 
@@ -319,15 +379,15 @@ describe('physics worker script/emu edit propagation', () => {
 			const player = new Player(table).init()
 			return { player, ball: player.createBall(dropAt(500, 500, 975), 25) }
 		}
-		const mkWorker = (): { sim: WorkerSim; ball: ReturnType<WorkerSim['spawnBall']> } => {
+		const mkWorker = (id: number): { sim: WorkerSim; ball: ReturnType<WorkerSim['spawnBall']> } => {
 			const table = new TableBuilder().build()
 			table.data.glassHeight = 4000
 			const sim = new WorkerSim(table)
-			const ball = sim.spawnBall({ pos: [500, 500, 1000], vel: [0, 0, 0], radius: 25, frozen: false })
+			const ball = sim.spawnBall({ id, pos: [500, 500, 1000], vel: [0, 0, 0], radius: 25, frozen: false })
 			return { sim, ball }
 		}
 		const main = mkMain()
-		const worker = mkWorker()
+		const worker = mkWorker(main.ball.id)
 		main.player.nudge(285, 2.6)
 		const sab = createPhysicsSAB()
 		expect(pushInput(sab, INPUT_NUDGE, Math.round(2.6 * 1000), 285)).toBe(true)

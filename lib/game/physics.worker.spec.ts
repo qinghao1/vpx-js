@@ -25,7 +25,7 @@ describe('physics.worker', () => {
 		const table = new TableBuilder().build()
 		table.data.glassHeight = 4000
 		const sim = new WorkerSim(table)
-		const ball = sim.spawnBall({ pos: [500, 500, 1000], vel: [0, 0, 0], radius: 25, frozen: false })
+		const ball = sim.spawnBall({ id: 11, pos: [500, 500, 1000], vel: [0, 0, 0], radius: 25, frozen: false })
 		expect(sim.physics.balls.length).toBe(1)
 		stepSim(sim, 4000)
 		expect(ball.state.pos.z).toBeLessThan(1000)
@@ -37,7 +37,7 @@ describe('physics.worker', () => {
 		const table = new TableBuilder().build()
 		table.data.glassHeight = 4000
 		const sim = new WorkerSim(table)
-		const ball = sim.spawnBall({ pos: [500, 500, 1000], vel: [0, 0, 0], radius: 25, frozen: false })
+		const ball = sim.spawnBall({ id: 12, pos: [500, 500, 1000], vel: [0, 0, 0], radius: 25, frozen: false })
 		stepSim(sim, 3000)
 		const resting = ball.state.pos.z
 		stepSim(sim, 4000)
@@ -49,7 +49,7 @@ describe('physics.worker', () => {
 			const table = new TableBuilder().build()
 			table.data.glassHeight = 4000
 			const sim = new WorkerSim(table)
-			const ball = sim.spawnBall({ pos: [500, 500, 1000], vel: [0, 0, 0], radius: 25, frozen: false })
+			const ball = sim.spawnBall({ id: 13, pos: [500, 500, 1000], vel: [0, 0, 0], radius: 25, frozen: false })
 			return { sim, ball }
 		}
 		const control = build()
@@ -87,8 +87,8 @@ describe('physics.worker', () => {
 
 	it('publishes live balls through the frame buffer', () => {
 		const sim = new WorkerSim(new TableBuilder().build())
-		sim.spawnBall({ pos: [100, 200, 300], vel: [1, 2, 3], radius: 25, frozen: false })
-		sim.spawnBall({ pos: [400, 500, 600], vel: [0, 0, 0], radius: 30, frozen: true })
+		sim.spawnBall({ id: 21, pos: [100, 200, 300], vel: [1, 2, 3], radius: 25, frozen: false })
+		sim.spawnBall({ id: 22, pos: [400, 500, 600], vel: [0, 0, 0], radius: 30, frozen: true })
 		stepSim(sim, 32)
 		const sab = createPhysicsSAB()
 		const scratch = new Float32Array(32 * 12)
@@ -103,28 +103,98 @@ describe('physics.worker', () => {
 		expect(out[1]).toBeCloseTo(live.state.pos.y)
 		expect(out[3]).toBeCloseTo(live.hit.vel.x)
 		expect(out[6]).toBeCloseTo(25)
+		expect(out[7]).toBe(21)
 		expect(out[7]).toBe(live.id)
 		expect(out[8]).toBe(0)
 		expect(out[12 + 6]).toBeCloseTo(30)
+		expect(out[12 + 7]).toBe(22)
 		expect(out[12 + 8]).toBe(1)
 	})
 
 	it('reconciles the ball list with main-thread snapshots', () => {
 		const sim = new WorkerSim(new TableBuilder().build())
 		sim.syncBalls([
-			{ pos: [10, 20, 50], vel: [0, 0, 0], radius: 25, frozen: false },
-			{ pos: [110, 120, 150], vel: [4, 5, 6], radius: 25, frozen: false },
+			{ id: 31, pos: [10, 20, 50], vel: [0, 0, 0], radius: 25, frozen: false },
+			{ id: 32, pos: [110, 120, 150], vel: [4, 5, 6], radius: 25, frozen: false },
 		])
 		expect(sim.physics.balls.length).toBe(2)
 		expect(sim.physics.balls[0].state.pos.z).toBeCloseTo(50)
-		sim.teleportBall(0, { pos: [1, 2, 3], vel: [7, 8, 9], radius: 25, frozen: true })
+		expect(sim.teleportBall({ id: 31, pos: [1, 2, 3], vel: [7, 8, 9], radius: 25, frozen: true })).toBe(true)
 		expect(sim.physics.balls[0].state.pos.x).toBe(1)
 		expect(sim.physics.balls[0].hit.vel.z).toBe(9)
 		expect(sim.physics.balls[0].state.isFrozen).toBe(true)
-		sim.syncBalls([{ pos: [1, 2, 3], vel: [7, 8, 9], radius: 25, frozen: true }])
+		sim.syncBalls([{ id: 31, pos: [1, 2, 3], vel: [7, 8, 9], radius: 25, frozen: true }])
 		expect(sim.physics.balls.length).toBe(1)
 		sim.destroyBallAt(0)
 		expect(sim.physics.balls.length).toBe(0)
+	})
+
+	it('assigns the id triple at spawn and never mutates live ids', () => {
+		const sim = new WorkerSim(new TableBuilder().build())
+		const ball = sim.spawnBall({ id: 41, pos: [100, 200, 300], vel: [1, 2, 3], radius: 25, frozen: false })
+		expect(ball.id).toBe(41)
+		expect(ball.getName()).toBe('Ball41')
+		expect(ball.state.name).toBe('Ball41')
+		const scratch = new Float32Array(32 * 12)
+		expect(sim.packBalls(scratch)).toBe(1)
+		expect(scratch[7]).toBe(41)
+		// A later sync for the same id teleports the same object in place: the
+		// id survives, only pos/vel/frozen move.
+		sim.syncBalls([{ id: 41, pos: [9, 9, 9], vel: [9, 9, 9], radius: 25, frozen: true }])
+		expect(sim.physics.balls.length).toBe(1)
+		expect(sim.physics.balls[0]).toBe(ball)
+		expect(ball.id).toBe(41)
+		expect(ball.getName()).toBe('Ball41')
+		expect(ball.state.pos.x).toBe(9)
+		expect(ball.state.isFrozen).toBe(true)
+	})
+
+	it('reconciles a destroy-first same-count shift with no aliasing', () => {
+		const sim = new WorkerSim(new TableBuilder().build())
+		sim.syncBalls([
+			{ id: 51, pos: [10, 20, 50], vel: [0, 0, 0], radius: 25, frozen: false },
+			{ id: 52, pos: [110, 120, 150], vel: [0, 0, 0], radius: 25, frozen: false },
+		])
+		const survivor = sim.physics.balls.find(ball => ball.id === 52)
+		const retired = sim.physics.balls.find(ball => ball.id === 51)
+		expect(survivor).toBeDefined()
+		// Destroy-first + create at the same count: the surviving id keeps its
+		// object, the retired id is gone, and the newborn is a fresh object
+		// carrying the message id — never the retired object with a new id.
+		sim.syncBalls([
+			{ id: 52, pos: [110, 120, 150], vel: [0, 0, 0], radius: 25, frozen: false },
+			{ id: 53, pos: [210, 220, 250], vel: [0, 0, 0], radius: 25, frozen: false },
+		])
+		expect(sim.physics.balls.map(ball => ball.id).sort((a, b) => a - b)).toEqual([52, 53])
+		expect(sim.physics.balls.find(ball => ball.id === 52)).toBe(survivor)
+		const newborn = sim.physics.balls.find(ball => ball.id === 53)
+		expect(newborn).toBeDefined()
+		expect(newborn).not.toBe(retired)
+		expect(newborn?.getName()).toBe('Ball53')
+		expect(retired && sim.physics.balls.includes(retired)).toBe(false)
+	})
+
+	it('treats an unknown-id teleport as a no-op', () => {
+		const sim = new WorkerSim(new TableBuilder().build())
+		sim.syncBalls([{ id: 61, pos: [10, 20, 50], vel: [0, 0, 0], radius: 25, frozen: false }])
+		const before = sim.physics.balls[0].state.pos.x
+		expect(sim.teleportBall({ id: 62, pos: [1, 2, 3], vel: [4, 5, 6], radius: 25, frozen: true })).toBe(false)
+		expect(sim.physics.balls.length).toBe(1)
+		expect(sim.physics.balls[0].id).toBe(61)
+		expect(sim.physics.balls[0].state.pos.x).toBe(before)
+		expect(sim.physics.balls[0].state.isFrozen).toBe(false)
+	})
+
+	it('resolves a teleport-before-sync post-sync without corruption', () => {
+		const sim = new WorkerSim(new TableBuilder().build())
+		// The teleport races ahead of the sync carrying its ball: dropped, not applied.
+		expect(sim.teleportBall({ id: 71, pos: [1, 2, 3], vel: [4, 5, 6], radius: 25, frozen: false })).toBe(false)
+		expect(sim.physics.balls.length).toBe(0)
+		sim.syncBalls([{ id: 71, pos: [10, 20, 50], vel: [0, 0, 0], radius: 25, frozen: true }])
+		expect(sim.physics.balls.length).toBe(1)
+		expect(sim.physics.balls[0].id).toBe(71)
+		expect(sim.physics.balls[0].state.pos.x).toBe(10)
+		expect(sim.physics.balls[0].state.isFrozen).toBe(true)
 	})
 
 	it('loads a real table from vpx bytes with textures and script skipped', async () => {
@@ -135,7 +205,7 @@ describe('physics.worker', () => {
 		const sim = new WorkerSim(table)
 		stepSim(sim, 64)
 		expect(sim.physics.timeMsec).toBeGreaterThan(0)
-		const ball = sim.spawnBall({ pos: [500, 500, 800], vel: [0, 0, 0], radius: 25, frozen: false })
+		const ball = sim.spawnBall({ id: 81, pos: [500, 500, 800], vel: [0, 0, 0], radius: 25, frozen: false })
 		stepSim(sim, 128)
 		expect(ball.state.pos.z).toBeLessThan(800)
 	}, 30000)

@@ -3,6 +3,7 @@
 
 import { describe, expect, it } from 'vitest'
 import {
+	BALL_ID,
 	BALL_STRIDE,
 	createPhysicsSAB,
 	drainInput,
@@ -26,6 +27,19 @@ describe('physics-buffer', () => {
 		expect(res?.tPrev).toBe(100)
 		for (let i = 0; i < BALL_STRIDE; i++) expect(out[i]).toBeCloseTo(balls[i])
 		expect(trySnap(sab, out)).toBeNull()
+	})
+
+	it('round-trips per-slot ball ids', () => {
+		const sab = createPhysicsSAB()
+		const balls = new Float32Array(MAX_BALLS * BALL_STRIDE)
+		balls[0 * BALL_STRIDE + BALL_ID] = 42
+		balls[1 * BALL_STRIDE + BALL_ID] = 7
+		writeFrame(sab, balls, 2, 0, 1, 0)
+		const out = new Float32Array(MAX_BALLS * BALL_STRIDE)
+		const res = trySnap(sab, out)
+		expect(res?.count).toBe(2)
+		expect(out[0 * BALL_STRIDE + BALL_ID]).toBe(42)
+		expect(out[1 * BALL_STRIDE + BALL_ID]).toBe(7)
 	})
 
 	it('lossy keeps newest', () => {
