@@ -140,7 +140,10 @@ export class Stdlib extends VbsApi {
 		if (typeof v === 'string') {
 			const trimmed = v.trim().toLowerCase()
 			if (trimmed === 'true') return true
-			if (trimmed === 'false' || trimmed === '') return false
+			if (trimmed === 'false') return false
+			// A zero-length (or whitespace-only) string is not a boolean:
+			// parseNumericText rejects it as NaN, raising type mismatch (13)
+			// like the other converters (CInt(""), CDate(""), ...).
 			const numeric = parseNumericText(v)
 			if (!Number.isNaN(numeric)) return numeric !== 0
 			ERR.Raise(new VbsError('Type mismatch', 13))
@@ -159,16 +162,11 @@ export class Stdlib extends VbsApi {
 
 	/**
 	 * Coerces a numeric-conversion operand: True is -1, strings parse like
-	 * VBScript numbers. `Nothing` (any value carrying the tag, like CStr)
-	 * raises 91; the 0 return only feeds record mode, where Raise records
-	 * instead of throwing. NaN means the caller raises type mismatch (13),
-	 * as does an object without primitive conversion (whose Number throws).
+	 * VBScript numbers. Null/Empty/Nothing are handled by `convertNumber`
+	 * before this runs. NaN means the caller raises type mismatch (13), as
+	 * does an object without primitive conversion (whose Number throws).
 	 */
 	private toConverterNumber(v: unknown): number {
-		if ((v as Record<symbol, unknown> | null | undefined)?.[NOTHING_TAG] === true) {
-			ERR.Raise(new VbsError('Object variable not set', 91))
-			return 0
-		}
 		if (typeof v === 'boolean') return v ? -1 : 0
 		if (typeof v === 'number') return v
 		if (typeof v === 'string') return parseNumericText(v)
@@ -188,81 +186,69 @@ export class Stdlib extends VbsApi {
 		return true
 	}
 
-	public CByte(v: any): number {
+	/**
+	 * Shared conversion-function head: Null raises 94, Empty yields the type's
+	 * empty value, and Nothing raises 91. Returns undefined when `v` is a real
+	 * value and conversion should proceed.
+	 */
+	private conversionHead<T extends number | string>(v: unknown, empty: T): T | undefined {
 		if (v === null) {
 			ERR.Raise(new VbsError('Invalid use of Null', 94))
-			return 0
+			return empty
 		}
-		if (this.isUndef(v)) return 0
-		if (v === NOTHING) {
+		if (this.isUndef(v)) return empty
+		// Tag, not singleton identity: any Nothing-tagged value counts, like
+		// `assertNotNothing` in vbs-values.ts and CStr before it.
+		if ((v as Record<symbol, unknown> | null | undefined)?.[NOTHING_TAG] === true) {
 			ERR.Raise(new VbsError('Object variable not set', 91))
-			return 0
+			return empty
 		}
+		return undefined
+	}
+
+	/**
+	 * Shared numeric-conversion head (CByte..CCur): the conversionHead guards
+	 * plus primitive coercion, where garbage raises type mismatch (13).
+	 * Returns undefined when the error was recorded instead of thrown.
+	 */
+	private convertNumber(v: unknown): number | undefined {
+		const early = this.conversionHead(v, 0)
+		if (early !== undefined) return early
 		const n = this.toConverterNumber(v)
 		if (Number.isNaN(n)) {
 			ERR.Raise(new VbsError('Type mismatch', 13))
-			return 0
+			return undefined
 		}
+		return n
+	}
+
+	public CByte(v: any): number {
+		const n = this.convertNumber(v)
+		if (n === undefined) return 0
 		const rounded = bankersRound(n)
 		if (!this.checkOverflow(rounded, 0, 255)) return 0
 		return rounded
 	}
 
 	public CInt(v: any): number {
-		if (v === null) {
-			ERR.Raise(new VbsError('Invalid use of Null', 94))
-			return 0
-		}
-		if (this.isUndef(v)) return 0
-		if (v === NOTHING) {
-			ERR.Raise(new VbsError('Object variable not set', 91))
-			return 0
-		}
-		const n = this.toConverterNumber(v)
-		if (Number.isNaN(n)) {
-			ERR.Raise(new VbsError('Type mismatch', 13))
-			return 0
-		}
+		const n = this.convertNumber(v)
+		if (n === undefined) return 0
 		const rounded = bankersRound(n)
 		if (!this.checkOverflow(rounded, -32768, 32767)) return 0
 		return rounded | 0
 	}
 
 	public CLng(v: any): number {
-		if (v === null) {
-			ERR.Raise(new VbsError('Invalid use of Null', 94))
-			return 0
-		}
-		if (this.isUndef(v)) return 0
-		if (v === NOTHING) {
-			ERR.Raise(new VbsError('Object variable not set', 91))
-			return 0
-		}
-		const n = this.toConverterNumber(v)
-		if (Number.isNaN(n)) {
-			ERR.Raise(new VbsError('Type mismatch', 13))
-			return 0
-		}
+		const n = this.convertNumber(v)
+		if (n === undefined) return 0
 		const rounded = bankersRound(n)
 		if (!this.checkOverflow(rounded, -2147483648, 2147483647)) return 0
 		return rounded | 0
 	}
 
 	public CSng(v: any): number {
-		if (v === null) {
-			ERR.Raise(new VbsError('Invalid use of Null', 94))
-			return 0
-		}
-		if (this.isUndef(v)) return 0
-		if (v === NOTHING) {
-			ERR.Raise(new VbsError('Object variable not set', 91))
-			return 0
-		}
-		const n = this.toConverterNumber(v)
-		if (Number.isNaN(n)) {
-			ERR.Raise(new VbsError('Type mismatch', 13))
-			return 0
-		}
+		const n = this.convertNumber(v)
+		if (n === undefined) return 0
 		if (!Number.isFinite(n) || Math.abs(n) > 3.402823567e38) {
 			ERR.Raise(new VbsError('Overflow', 6))
 			return 0
@@ -271,20 +257,8 @@ export class Stdlib extends VbsApi {
 	}
 
 	public CDbl(v: any): number {
-		if (v === null) {
-			ERR.Raise(new VbsError('Invalid use of Null', 94))
-			return 0
-		}
-		if (this.isUndef(v)) return 0
-		if (v === NOTHING) {
-			ERR.Raise(new VbsError('Object variable not set', 91))
-			return 0
-		}
-		const n = this.toConverterNumber(v)
-		if (Number.isNaN(n)) {
-			ERR.Raise(new VbsError('Type mismatch', 13))
-			return 0
-		}
+		const n = this.convertNumber(v)
+		if (n === undefined) return 0
 		if (!Number.isFinite(n)) {
 			ERR.Raise(new VbsError('Overflow', 6))
 			return 0
@@ -295,15 +269,8 @@ export class Stdlib extends VbsApi {
 	public CStr(v: any): string {
 		// NB: explicit CStr(Null) is error 94; `&` no longer routes through
 		// here but through `__vbs.concat`, which propagates Null instead.
-		if (v === null) {
-			ERR.Raise(new VbsError('Invalid use of Null', 94))
-			return ''
-		}
-		if (this.isUndef(v)) return ''
-		if ((v as Record<symbol, unknown> | null | undefined)?.[NOTHING_TAG] === true) {
-			ERR.Raise(new VbsError('Object variable not set', 91))
-			return ''
-		}
+		const early = this.conversionHead(v, '')
+		if (early !== undefined) return early
 		if (typeof v === 'string') return v
 		if (typeof v === 'boolean') return v ? 'True' : 'False'
 		// Objects without primitive conversion make String throw a raw
@@ -317,15 +284,8 @@ export class Stdlib extends VbsApi {
 	}
 
 	public CDate(v: any): Date | string {
-		if (v === null) {
-			ERR.Raise(new VbsError('Invalid use of Null', 94))
-			return ''
-		}
-		if (this.isUndef(v)) return ''
-		if (v === NOTHING) {
-			ERR.Raise(new VbsError('Object variable not set', 91))
-			return ''
-		}
+		const early = this.conversionHead(v, '')
+		if (early !== undefined) return early
 		let input: string
 		try {
 			input = String(v).trim().replace(/^#|#$/g, '')
@@ -342,20 +302,8 @@ export class Stdlib extends VbsApi {
 	}
 
 	public CCur(v: any): number {
-		if (v === null) {
-			ERR.Raise(new VbsError('Invalid use of Null', 94))
-			return 0
-		}
-		if (this.isUndef(v)) return 0
-		if (v === NOTHING) {
-			ERR.Raise(new VbsError('Object variable not set', 91))
-			return 0
-		}
-		const n = this.toConverterNumber(v)
-		if (Number.isNaN(n)) {
-			ERR.Raise(new VbsError('Type mismatch', 13))
-			return 0
-		}
+		const n = this.convertNumber(v)
+		if (n === undefined) return 0
 		if (!Number.isFinite(n) || Math.abs(n) > 922337203685477.5807) {
 			ERR.Raise(new VbsError('Overflow', 6))
 			return 0

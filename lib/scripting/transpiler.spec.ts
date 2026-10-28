@@ -85,6 +85,72 @@ describe('The VBScript transpiler', () => {
 		expect(scope.z).to.equal(42)
 	})
 
+	it('should fail loudly on Imp instead of silently miscompiling it', () => {
+		const transpiler = new Transpiler(table, player)
+		expect(() => transpiler.transpile(`Dim a\na = True Imp False\n`)).to.throw()
+	})
+
+	it('should fail loudly on On Error GoTo with a label instead of silently ignoring it', () => {
+		const transpiler = new Transpiler(table, player)
+		expect(() => transpiler.transpile(`On Error GoTo Handler\nHandler:\n`)).to.throw()
+	})
+
+	it('should pass ByRef parameters by value like JS, documented as a divergence', () => {
+		const scope = {} as any
+		const vbs = `Sub Inc(ByRef x)\nx = x + 1\nEnd Sub\nDim a\na = 1\nInc a\n`
+		new Transpiler(table, player).execute(vbs, scope, 'global')
+		// Real VBScript would set a to 2; without by-ref support the
+		// caller's variable is untouched.
+		expect(scope.a).to.equal(1)
+	})
+
+	it('should parse Option Explicit without enforcing it, documented as a divergence', () => {
+		const scope = {} as any
+		new Transpiler(table, player).execute(`Option Explicit\nundeclaredVar = 5\n`, scope, 'global')
+		expect(scope.undeclaredVar).to.equal(5)
+	})
+
+	it('should support For Step with a negative step', () => {
+		const scope = {} as any
+		new Transpiler(table, player).execute(
+			`Dim s\nDim i\ns = ""\nFor i = 3 To 1 Step -1\ns = s & i\nNext\n`,
+			scope,
+			'global',
+		)
+		expect(scope.s).to.equal('321')
+	})
+
+	it('should support Select Case', () => {
+		const scope = {} as any
+		const vbs = `Dim a\nDim b\na = 2\nSelect Case a\nCase 1\nb = "one"\nCase 2\nb = "two"\nCase Else\nb = "other"\nEnd Select\n`
+		new Transpiler(table, player).execute(vbs, scope, 'global')
+		expect(scope.b).to.equal('two')
+	})
+
+	it('should re-arm throwing with On Error GoTo 0 after On Error Resume Next', () => {
+		const scope = {} as any
+		new Transpiler(table, player).execute(
+			`On Error Resume Next\nresult = CInt("abc")\ncode = Err.Number\nOn Error GoTo 0\n`,
+			scope,
+			'global',
+		)
+		expect(scope.code).to.equal(13)
+		expect(() => {
+			new Transpiler(table, player).execute(`On Error GoTo 0\nresult = CInt("abc")\n`, {} as any, 'global')
+		}).to.throw()
+	})
+
+	it('should grow an array on out-of-range write after a ByVal ReDim (FlipperPolarity.AddPt pattern)', () => {
+		// Walking Dead calls x.AddPt, which ReDims a ByRef array inside
+		// ShuffleArray (plain ReDim rebinds, so the growth is lost through
+		// our by-value args) and then writes past the caller's length.
+		// The write must extend for the table to load.
+		const scope = {} as any
+		const vbs = `On Error GoTo 0\nDim xs\nReDim xs(0)\nSub Grow(a)\nReDim a(UBound(a) + 1)\nEnd Sub\nGrow xs\nxs(1) = 42\nResult = xs(1)\n`
+		new Transpiler(table, player).execute(vbs, scope, 'global')
+		expect(scope.Result).to.equal(42)
+	})
+
 	it('should throw instead of silently succeeding when the script defines no play function', () => {
 		const stalePlay = sinon.spy()
 		const prevPlay = (globalThis as any).play

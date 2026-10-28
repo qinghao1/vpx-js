@@ -56,6 +56,16 @@ export class VbsArray<T> implements ProxyHandler<VbsArray<T>> {
 		const key = normalizeKey(rawKey)
 		if (typeof key === 'string' && /^-?\d+$/.test(key)) {
 			const n = Number(key)
+			// A negative subscript is always Subscript out of range (9).
+			// Writing past the end extends the array: callers pass arrays
+			// by value, so a callee's plain-ReDim growth (e.g. Walking
+			// Dead's ShuffleArray behind FlipperPolarity.AddPt) is lost and
+			// only the caller's write can grow the array. Real VBScript
+			// would have grown it via ByRef instead.
+			if (n < 0) {
+				ERR.Raise(new VbsError('Subscript out of range', 9))
+				return true
+			}
 			;(target as Record<number, unknown>)[n] = value
 			return true
 		}

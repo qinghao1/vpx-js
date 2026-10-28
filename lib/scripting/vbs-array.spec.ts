@@ -26,10 +26,7 @@ describe('The VBScript array', () => {
 	})
 
 	it('should loop correctly', () => {
-		const arr = new VbsArray<number | string>() as any
-		arr[0] = 1
-		arr[1] = 'two'
-		arr[2] = 3
+		const arr = new VbsArray<number | string>([1, 'two', 3]) as any
 		let i = 0
 		for (const val of arr) {
 			switch (i) {
@@ -92,6 +89,37 @@ describe('The VBScript array', () => {
 		arr[null as any] = 10
 		expect(ERR.Number).to.equal(94)
 		expect(arr[0]).to.equal(1)
+	})
+
+	it('should extend on a past-the-end write but record error 9 for a negative one', () => {
+		// Strict VBScript would raise 9 for both, but our by-value args
+		// lose a callee's plain-ReDim growth (see the FlipperPolarity
+		// transpiler test), so only the caller's write can grow the array.
+		// Negatives are error 9 in VBScript unconditionally.
+		const arr = new VbsArray<number | string>([1, 'two', 3]) as any
+		ERR.Clear()
+		arr[3] = 10
+		expect(ERR.Number).to.equal(0)
+		expect(arr.length).to.equal(4)
+		expect(arr[3]).to.equal(10)
+		ERR.Clear()
+		arr[-1] = 10
+		expect(ERR.Number).to.equal(9)
+	})
+
+	it('should throw error 9 for a negative write without On Error Resume Next', () => {
+		const arr = new VbsArray<number | string>([1, 'two', 3]) as any
+		ERR.OnErrorGoto0()
+		try {
+			expect(() => {
+				arr[-1] = 10
+			}).to.throw(VbsError)
+			arr[3] = 10
+		} finally {
+			ERR.OnErrorResumeNext()
+		}
+		expect(arr.length).to.equal(4)
+		expect(arr[2]).to.equal(3)
 	})
 
 	it('should throw error 94 for a Null subscript without On Error Resume Next', () => {

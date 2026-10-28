@@ -147,14 +147,32 @@ export class ReferenceTransformer extends Transformer {
 
 	public transform(): Program {
 		this.addScope()
-		this.replaceElementObjectNames(this.ast)
-		this.replaceEnumObjectNames(this.ast)
-		this.replaceStdlibNames(this.ast)
-		this.replaceGlobalApiNames(this.ast)
+		this.replaceNamespacedNames(this.ast)
 		this.replaceReservedWords(this.ast)
 		this.replaceGetRef(this.ast)
 		this.replaceExecuteGlobal(this.ast)
 		return this.ast
+	}
+
+	/**
+	 * Element/enum/stdlib/global lookups in a single traversal (previously
+	 * one `replace` pass per namespace). Identifiers resolve on enter in
+	 * pass order (element, stdlib, global); enum member expressions resolve
+	 * on leave so an element-named enum object keeps element priority, as
+	 * when the element pass ran first.
+	 */
+	public replaceNamespacedNames(ast: Program): void {
+		replace(ast, {
+			enter: (node, parent: any) => this.replaceIdentifierReference(node, parent),
+			leave: (node, parent: any) => this.replaceEnumReference(node, parent),
+		})
+	}
+
+	/** Bare-identifier chain (element, then stdlib, then global). */
+	private replaceIdentifierReference(node: any, parent: any): any {
+		node = this.replaceElementReference(node, parent)
+		node = this.replaceStdlibReference(node, parent)
+		return this.replaceGlobalApiReference(node, parent)
 	}
 
 	/**
@@ -186,82 +204,86 @@ export class ReferenceTransformer extends Transformer {
 	 */
 	public replaceElementObjectNames(ast: Program): void {
 		replace(ast, {
-			enter: (node, parent: any) => {
-				if (!this.isEligible(node, parent)) {
-					return node
-				}
-
-				// table items are no functions
-				if (parent && parent.type === 'FunctionDeclaration') {
-					return node
-				}
-
-				// now check the item name
-				const elementName = this.table.getElementApiName((node as Identifier).name)
-				if (!elementName) {
-					return node
-				}
-
-				// patch property
-				if (parent.property?.name) {
-					const propName = getPropName(this.itemApis[elementName], parent.property.name)
-					if (propName) {
-						parent.property.name = propName
-					}
-				}
-				return memberExpression(identifier(Transformer.ITEMS_NAME), identifier(elementName))
-			},
+			enter: (node, parent: any) => this.replaceElementReference(node, parent),
 		})
+	}
+
+	private replaceElementReference(node: any, parent: any): any {
+		if (!this.isEligible(node, parent)) {
+			return node
+		}
+
+		// table items are no functions
+		if (parent && parent.type === 'FunctionDeclaration') {
+			return node
+		}
+
+		// now check the item name
+		const elementName = this.table.getElementApiName((node as Identifier).name)
+		if (!elementName) {
+			return node
+		}
+
+		// patch property
+		if (parent.property?.name) {
+			const propName = getPropName(this.itemApis[elementName], parent.property.name)
+			if (propName) {
+				parent.property.name = propName
+			}
+		}
+		return memberExpression(identifier(Transformer.ITEMS_NAME), identifier(elementName))
 	}
 
 	public replaceEnumObjectNames(ast: Program): void {
 		replace(ast, {
-			enter: (node, parent: any) => {
-				const isFunction = parent && parent.type === 'CallExpression'
-				const isIdentifier =
-					node.type === 'MemberExpression' &&
-					node.object.type === 'Identifier' &&
-					node.property.type === 'Identifier'
-				if (isIdentifier && !isFunction) {
-					const enumNode = node as MemberExpression
-					const enumObject = enumNode.object as Identifier
-					const enumProperty = enumNode.property as Identifier
-					const enumName = this.enumApis._getPropertyName(enumObject.name)
-					let propName: string | undefined
-					if (enumName) {
-						propName = getPropName(
-							(this.enumApis as unknown as Record<string, unknown>)[enumName],
-							enumProperty.name,
-						)
-						if (propName) {
-							enumNode.object = memberExpression(identifier(Transformer.ENUMS_NAME), identifier(enumName))
-							enumProperty.name = propName
-						} else {
-							logger().warn(`[scripting] Unknown value "${enumProperty.name}" of enum ${enumName}.`)
-						}
-					}
-				}
-				return node
-			},
+			enter: (node, parent: any) => this.replaceEnumReference(node, parent),
 		})
+	}
+
+	private replaceEnumReference(node: any, parent: any): any {
+		const isFunction = parent && parent.type === 'CallExpression'
+		const isIdentifier =
+			node.type === 'MemberExpression' && node.object.type === 'Identifier' && node.property.type === 'Identifier'
+		if (isIdentifier && !isFunction) {
+			const enumNode = node as MemberExpression
+			const enumObject = enumNode.object as Identifier
+			const enumProperty = enumNode.property as Identifier
+			const enumName = this.enumApis._getPropertyName(enumObject.name)
+			let propName: string | undefined
+			if (enumName) {
+				propName = getPropName(
+					(this.enumApis as unknown as Record<string, unknown>)[enumName],
+					enumProperty.name,
+				)
+				if (propName) {
+					enumNode.object = memberExpression(identifier(Transformer.ENUMS_NAME), identifier(enumName))
+					enumProperty.name = propName
+				} else {
+					logger().warn(`[scripting] Unknown value "${enumProperty.name}" of enum ${enumName}.`)
+				}
+			}
+		}
+		return node
 	}
 
 	public replaceGlobalApiNames(ast: Program): void {
 		replace(ast, {
-			enter: (node, parent: any) => {
-				if (!this.isEligible(node, parent)) {
-					return node
-				}
-
-				// now, check the global namespace
-				const name = this.globalApi._getPropertyName((node as Identifier).name)
-				if (!name) {
-					return node
-				}
-
-				return memberExpression(identifier(Transformer.GLOBAL_NAME), identifier(name))
-			},
+			enter: (node, parent: any) => this.replaceGlobalApiReference(node, parent),
 		})
+	}
+
+	private replaceGlobalApiReference(node: any, parent: any): any {
+		if (!this.isEligible(node, parent)) {
+			return node
+		}
+
+		// now, check the global namespace
+		const name = this.globalApi._getPropertyName((node as Identifier).name)
+		if (!name) {
+			return node
+		}
+
+		return memberExpression(identifier(Transformer.GLOBAL_NAME), identifier(name))
 	}
 
 	/**
@@ -276,34 +298,36 @@ export class ReferenceTransformer extends Transformer {
 
 	public replaceStdlibNames(ast: Program): void {
 		replace(ast, {
-			enter: (node, parent: any) => {
-				if (!this.isEligible(node, parent)) {
-					return node
-				}
-
-				// check the name in stdlib's namespace
-				const name = this.stdlib._getPropertyName((node as Identifier).name)
-				if (!name) {
-					return node
-				}
-				// patch property
-				if (parent.property?.name && (this.stdlib as unknown as Record<string, unknown>)[name]) {
-					const propName = getPropName(
-						(this.stdlib as unknown as Record<string, unknown>)[name],
-						parent.property.name,
-					)
-					if (propName) {
-						parent.property.name = propName
-					}
-				}
-
-				// add player object to activeX instantiation
-				if (name === 'CreateObject' && parent?.type === 'CallExpression' && parent.callee === node) {
-					parent.arguments.push(identifier(Transformer.PLAYER_NAME))
-				}
-				return memberExpression(identifier(Transformer.STDLIB_NAME), identifier(name))
-			},
+			enter: (node, parent: any) => this.replaceStdlibReference(node, parent),
 		})
+	}
+
+	private replaceStdlibReference(node: any, parent: any): any {
+		if (!this.isEligible(node, parent)) {
+			return node
+		}
+
+		// check the name in stdlib's namespace
+		const name = this.stdlib._getPropertyName((node as Identifier).name)
+		if (!name) {
+			return node
+		}
+		// patch property
+		if (parent.property?.name && (this.stdlib as unknown as Record<string, unknown>)[name]) {
+			const propName = getPropName(
+				(this.stdlib as unknown as Record<string, unknown>)[name],
+				parent.property.name,
+			)
+			if (propName) {
+				parent.property.name = propName
+			}
+		}
+
+		// add player object to activeX instantiation
+		if (name === 'CreateObject' && parent?.type === 'CallExpression' && parent.callee === node) {
+			parent.arguments.push(identifier(Transformer.PLAYER_NAME))
+		}
+		return memberExpression(identifier(Transformer.STDLIB_NAME), identifier(name))
 	}
 
 	private isEligible(node: any, parent: any): boolean {

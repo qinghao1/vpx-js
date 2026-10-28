@@ -289,7 +289,6 @@ describe('The VBScript stdlib', () => {
 			['CBool(1)', true],
 			['CBool(0)', false],
 			['CBool("true")', true],
-			['CBool("")', false],
 			['CBool("0")', false],
 			['CByte(2.5)', 2],
 			['CByte(255)', 255],
@@ -359,6 +358,8 @@ describe('The VBScript stdlib', () => {
 			['CCur("abc")', 13],
 			['CCur(Null)', 94],
 			['CBool("abc")', 13],
+			['CBool("")', 13],
+			['CBool("   ")', 13],
 			['CBool(Null)', 94],
 			['CStr(Null)', 94],
 			['CDate("bogus")', 13],
@@ -382,6 +383,9 @@ describe('The VBScript stdlib', () => {
 	it('should throw bad conversions without On Error Resume Next', () => {
 		expect(() => {
 			new Transpiler(table, player).execute('result = CInt("abc")', {} as any, 'global')
+		}).to.throw()
+		expect(() => {
+			new Transpiler(table, player).execute('result = CBool("")', {} as any, 'global')
 		}).to.throw()
 	})
 

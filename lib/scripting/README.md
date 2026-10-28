@@ -33,6 +33,7 @@ eval + play(...)              transpiler.ts: evals JS, calls the wrapped `play`
 
 `transpile(vbs)` returns JS without running it. `execute(vbs, scope)` transpiles,
 evals, and calls `play`. `bin/vbs2js.ts` exposes the same for the CLI.
+`execute` needs `eval` of generated code, so a hosting page must allow `unsafe-eval` in its CSP.
 
 ## The 7 namespaces
 
@@ -93,6 +94,19 @@ The worker can't see the `Table`, so the main thread ships a
 `TableDataPayload` (element names, events, API shapes) and the worker rebuilds
 mocks, then runs the *same* `buildPipeline`. If sync and worker output ever
 diverge, the bug is in the mocks, not the pipeline.
+
+## VBScript value primer
+
+The semantics the runtime emulates, for readers coming from JS:
+
+- `Empty` (unassigned/`Dim` without value) coerces to `0`/`''`; `Null`
+  propagates through operators and fails conversions with 94; `Nothing`
+  (uninitialized objects) fails member access and conversions with 91.
+- `True` is `-1`, not `1`. Bitwise `And`/`Or`/`Xor`/`Eqv`/`Not` and `\`
+  banker's-round (halves to even) via `bankersRound` before operating.
+- Numeric strings parse like literals, including `&H` hex and `&O` octal;
+  anything else is a type mismatch (13), and a non-finite result is an
+  overflow (6).
 
 ## Known divergences from VBScript
 

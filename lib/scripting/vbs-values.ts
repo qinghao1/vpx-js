@@ -213,6 +213,27 @@ export function vbsNot(value: unknown): VbsLogicResult {
 }
 
 /**
+ * Shared arithmetic-operand prologue: Null yields Null, Nothing raises 91, and
+ * garbage raises type mismatch (13). Returns the coerced pair, Null when a
+ * Null operand was seen, or undefined when the error was recorded instead of
+ * thrown (see vbsIntDiv).
+ */
+function coerceArithmeticPair(left: unknown, right: unknown): [number, number] | null | undefined {
+	if (left === null || right === null) {
+		return null
+	}
+	if (!assertNotNothing(left) || !assertNotNothing(right)) {
+		return undefined
+	}
+	const leftNumeric = toVbsNumber(left)
+	const rightNumeric = toVbsNumber(right)
+	if (Number.isNaN(leftNumeric) || Number.isNaN(rightNumeric)) {
+		return raiseCoercion(13, 'Type mismatch')
+	}
+	return [leftNumeric, rightNumeric]
+}
+
+/**
  * Coerces an arithmetic operand to a VBS number: True is -1, numeric strings
  * parse like conversion functions (`&H` hex included), Empty is 0. Garbage
  * yields NaN and the caller raises type mismatch (13).
@@ -250,17 +271,14 @@ function toVbsNumber(value: unknown): number {
  * statement-level support the callers don't have yet).
  */
 export function vbsIntDiv(left: unknown, right: unknown): number | null | undefined {
-	if (left === null || right === null) {
+	const pair = coerceArithmeticPair(left, right)
+	if (pair === null) {
 		return null
 	}
-	if (!assertNotNothing(left) || !assertNotNothing(right)) {
+	if (pair === undefined) {
 		return undefined
 	}
-	const dividend = toVbsNumber(left)
-	const divisor = toVbsNumber(right)
-	if (Number.isNaN(dividend) || Number.isNaN(divisor)) {
-		return raiseCoercion(13, 'Type mismatch')
-	}
+	const [dividend, divisor] = pair
 	if (!Number.isFinite(dividend) || !Number.isFinite(divisor)) {
 		return raiseCoercion(6, 'Overflow')
 	}
@@ -285,17 +303,14 @@ function isVbsUndef(value: unknown): boolean {
  * Next` the error is recorded and the result is undefined (see vbsIntDiv).
  */
 export function vbsDiv(left: unknown, right: unknown): number | null | undefined {
-	if (left === null || right === null) {
+	const pair = coerceArithmeticPair(left, right)
+	if (pair === null) {
 		return null
 	}
-	if (!assertNotNothing(left) || !assertNotNothing(right)) {
+	if (pair === undefined) {
 		return undefined
 	}
-	const dividend = toVbsNumber(left)
-	const divisor = toVbsNumber(right)
-	if (Number.isNaN(dividend) || Number.isNaN(divisor)) {
-		return raiseCoercion(13, 'Type mismatch')
-	}
+	const [dividend, divisor] = pair
 	if (divisor === 0) {
 		return raiseCoercion(11, 'Division by zero')
 	}
@@ -313,17 +328,14 @@ export function vbsDiv(left: unknown, right: unknown): number | null | undefined
  * and the result is undefined (see vbsIntDiv).
  */
 export function vbsMod(left: unknown, right: unknown): number | null | undefined {
-	if (left === null || right === null) {
+	const pair = coerceArithmeticPair(left, right)
+	if (pair === null) {
 		return null
 	}
-	if (!assertNotNothing(left) || !assertNotNothing(right)) {
+	if (pair === undefined) {
 		return undefined
 	}
-	const dividend = toVbsNumber(left)
-	const divisor = toVbsNumber(right)
-	if (Number.isNaN(dividend) || Number.isNaN(divisor)) {
-		return raiseCoercion(13, 'Type mismatch')
-	}
+	const [dividend, divisor] = pair
 	if (!Number.isFinite(dividend) || !Number.isFinite(divisor)) {
 		return raiseCoercion(6, 'Overflow')
 	}
@@ -369,12 +381,12 @@ export function vbsAdd(left: unknown, right: unknown): unknown {
 		}
 		return left + right
 	}
-	const leftNumeric = toVbsNumber(left)
-	const rightNumeric = toVbsNumber(right)
-	if (Number.isNaN(leftNumeric) || Number.isNaN(rightNumeric)) {
-		return raiseCoercion(13, 'Type mismatch')
+	// Null/Nothing were ruled out above, so the pair is always numbers here.
+	const pair = coerceArithmeticPair(left, right)
+	if (!pair) {
+		return undefined
 	}
-	return vbsCheckedResult(leftNumeric + rightNumeric)
+	return vbsCheckedResult(pair[0] + pair[1])
 }
 
 /**
@@ -384,18 +396,14 @@ export function vbsAdd(left: unknown, right: unknown): unknown {
  * and the result is undefined (see vbsIntDiv).
  */
 export function vbsSub(left: unknown, right: unknown): number | null | undefined {
-	if (left === null || right === null) {
+	const pair = coerceArithmeticPair(left, right)
+	if (pair === null) {
 		return null
 	}
-	if (!assertNotNothing(left) || !assertNotNothing(right)) {
+	if (pair === undefined) {
 		return undefined
 	}
-	const leftNumeric = toVbsNumber(left)
-	const rightNumeric = toVbsNumber(right)
-	if (Number.isNaN(leftNumeric) || Number.isNaN(rightNumeric)) {
-		return raiseCoercion(13, 'Type mismatch')
-	}
-	return vbsCheckedResult(leftNumeric - rightNumeric)
+	return vbsCheckedResult(pair[0] - pair[1])
 }
 
 /**
@@ -405,18 +413,14 @@ export function vbsSub(left: unknown, right: unknown): number | null | undefined
  * and the result is undefined (see vbsIntDiv).
  */
 export function vbsMul(left: unknown, right: unknown): number | null | undefined {
-	if (left === null || right === null) {
+	const pair = coerceArithmeticPair(left, right)
+	if (pair === null) {
 		return null
 	}
-	if (!assertNotNothing(left) || !assertNotNothing(right)) {
+	if (pair === undefined) {
 		return undefined
 	}
-	const leftNumeric = toVbsNumber(left)
-	const rightNumeric = toVbsNumber(right)
-	if (Number.isNaN(leftNumeric) || Number.isNaN(rightNumeric)) {
-		return raiseCoercion(13, 'Type mismatch')
-	}
-	return vbsCheckedResult(leftNumeric * rightNumeric)
+	return vbsCheckedResult(pair[0] * pair[1])
 }
 
 /**
@@ -428,17 +432,14 @@ export function vbsMul(left: unknown, right: unknown): number | null | undefined
  * the error is recorded and the result is undefined (see vbsIntDiv).
  */
 export function vbsExponent(base: unknown, exp: unknown): number | null | undefined {
-	if (base === null || exp === null) {
+	const pair = coerceArithmeticPair(base, exp)
+	if (pair === null) {
 		return null
 	}
-	if (!assertNotNothing(base) || !assertNotNothing(exp)) {
+	if (pair === undefined) {
 		return undefined
 	}
-	const baseNumeric = toVbsNumber(base)
-	const expNumeric = toVbsNumber(exp)
-	if (Number.isNaN(baseNumeric) || Number.isNaN(expNumeric)) {
-		return raiseCoercion(13, 'Type mismatch')
-	}
+	const [baseNumeric, expNumeric] = pair
 	const result = baseNumeric ** expNumeric
 	if (Number.isNaN(result)) {
 		return raiseCoercion(5, 'Invalid procedure call or argument')
