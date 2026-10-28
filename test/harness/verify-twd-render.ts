@@ -40,7 +40,7 @@ function hasPendingMap(material: THREE.Material): boolean {
 	return Boolean((material as any)?.userData?.pendingMap)
 }
 
-const DEFAULT_VPX = '/home/qinghao1/Downloads/walking_dead.vpx'
+const DEFAULT_VPX = process.env.WALKING_DEAD_VPX ?? '/home/qinghao1/Downloads/walking_dead.vpx'
 const parsed = parseVpxArgs(process.argv.slice(2))
 const vpxInput = parsed.vpx ?? DEFAULT_VPX
 const vpxPath = resolveVpxPath(vpxInput)

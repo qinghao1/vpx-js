@@ -73,9 +73,10 @@ describe('legacy CLI exit codes', () => {
 
 	describe('success still exits zero', () => {
 		it('vbs2js transpiles a valid script', () => {
+			const vbs = readFileSync(validVbs, 'utf-8')
 			const run = runCli('bin/vbs2js.ts', [validVbs])
 			expect(run.status).toBe(0)
-			expect(run.stdout).toContain('function Test')
+			expect(run.stdout).toBe(`${new Grammar().vbsToJs(vbs)}\n`)
 		})
 
 		it('vbs-benchmark transpiles a valid script', () => {
@@ -104,13 +105,6 @@ describe('legacy CLI exit codes', () => {
 	})
 
 	describe('vbs2js output matches the Grammar library', () => {
-		it('prints Grammar.vbsToJs output by default', () => {
-			const vbs = readFileSync(validVbs, 'utf-8')
-			const run = runCli('bin/vbs2js.ts', [validVbs])
-			expect(run.status).toBe(0)
-			expect(run.stdout).toBe(`${new Grammar().vbsToJs(vbs)}\n`)
-		})
-
 		it('prints Grammar.format output with --format-only', () => {
 			const vbs = readFileSync(validVbs, 'utf-8')
 			const run = runCli('bin/vbs2js.ts', [validVbs, '--format-only'])

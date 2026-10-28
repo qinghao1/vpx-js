@@ -25,7 +25,7 @@ import {
 import { getArg, hasFlag } from './vpinball-resolver.js'
 
 const args = process.argv.slice(2)
-const vpx = getArg(args, 'vpx', '/home/qinghao1/Downloads/walking_dead.vpx')
+const vpx = getArg(args, 'vpx', process.env.WALKING_DEAD_VPX ?? '/home/qinghao1/Downloads/walking_dead.vpx')
 if (!fs.existsSync(vpx)) {
 	console.error(`VPX not found ${vpx}`)
 	process.exit(1)

@@ -46,8 +46,8 @@ Node via `fnm` — `.nvmrc` `24`, `.node-version` `24.19.0`. Activate with `eval
 
 ## Testing
 
-- `vitest` on `lib/**/*.spec.ts` (`pool:forks`, `fileParallelism:false`, 10s timeout).
-- `test/harness/` is the single E2E entry: `verify-all.ts` (TAP 1..8) → `verify-browser.ts` → `demo-browser/e2e/integration.mjs` (+ `verify-vpinball-compat.ts` + `capture-discrepancies.ts` optional # SKIP if native missing). Keep it unified.
+- `vitest` on `lib/**/*.spec.ts` + `test/harness/*.spec.ts` (`pool:forks`, 10s timeout).
+- `test/harness/` is the single E2E entry: `verify-all.ts` (TAP 1..10) → `verify-browser.ts` → `demo-browser/e2e/integration.mjs` (+ `verify-vpinball-compat.ts` + `capture-discrepancies.ts` optional # SKIP if native missing). Keep it unified.
 
 ## Gotchas
 

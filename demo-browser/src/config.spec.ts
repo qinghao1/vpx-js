@@ -21,22 +21,27 @@ function makeMesh(name: string): THREE.Mesh {
 	return mesh
 }
 
+function makeTwdLikeRoot(): { root: THREE.Group; meshEmpty: THREE.Mesh; vrMesh: THREE.Mesh } {
+	const root = makeGroup('playfield')
+	const typePlayfield = makeGroup('playfield')
+	const tableGroup = makeGroup('Table1')
+	const meshEmpty = makeMesh('')
+	root.add(typePlayfield)
+	typePlayfield.add(tableGroup)
+	tableGroup.add(meshEmpty)
+
+	const primitives = makeGroup('primitives')
+	root.add(primitives)
+	const vrGroup = makeGroup('VR_MegaRailing')
+	const vrMesh = makeMesh('primitive-VR_MegaRailing')
+	primitives.add(vrGroup)
+	vrGroup.add(vrMesh)
+	return { root, meshEmpty, vrMesh }
+}
+
 describe('regression: table hit test excludes root and is generic', () => {
 	it('playfield base mesh via type group is hit, VR is not', () => {
-		const root = makeGroup('playfield')
-		const typePlayfield = makeGroup('playfield')
-		const tableGroup = makeGroup('Table1')
-		const meshEmpty = makeMesh('')
-		root.add(typePlayfield)
-		typePlayfield.add(tableGroup)
-		tableGroup.add(meshEmpty)
-
-		const primitives = makeGroup('primitives')
-		root.add(primitives)
-		const vrGroup = makeGroup('VR_MegaRailing')
-		const vrMesh = makeMesh('primitive-VR_MegaRailing')
-		primitives.add(vrGroup)
-		vrGroup.add(vrMesh)
+		const { root, meshEmpty, vrMesh } = makeTwdLikeRoot()
 
 		root.updateMatrixWorld(true)
 
@@ -98,20 +103,7 @@ describe('regression: table hit test excludes root and is generic', () => {
 	})
 
 	it('hits.some with mixed VR and playfield returns true', () => {
-		const root = makeGroup('playfield')
-		const typePlayfield = makeGroup('playfield')
-		const tableGroup = makeGroup('Table1')
-		const meshEmpty = makeMesh('')
-		root.add(typePlayfield)
-		typePlayfield.add(tableGroup)
-		tableGroup.add(meshEmpty)
-
-		const primitives = makeGroup('primitives')
-		root.add(primitives)
-		const vrGroup = makeGroup('VR_MegaRailing')
-		const vrMesh = makeMesh('primitive-VR_MegaRailing')
-		primitives.add(vrGroup)
-		vrGroup.add(vrMesh)
+		const { root, meshEmpty, vrMesh } = makeTwdLikeRoot()
 
 		const hits = [{ object: vrMesh }, { object: meshEmpty }] as any
 		expect(

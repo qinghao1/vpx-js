@@ -41,6 +41,27 @@ function fileExists(filePath: string): boolean {
 	}
 }
 
+// Cached lib/*.ts file list: the P3 churn check used to synchronously walk +
+// re-read the whole tree on every run. Walk once, reuse across checks.
+let libTsFilesCache: string[] | null = null
+export function getLibTsFiles(): string[] {
+	if (libTsFilesCache) return libTsFilesCache
+	const out: string[] = []
+	const walk = (dir: string): void => {
+		for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+			const full = path.join(dir, entry.name)
+			if (entry.isDirectory()) {
+				if (entry.name !== 'node_modules') walk(full)
+			} else if (entry.name.endsWith('.ts') && !entry.name.endsWith('.spec.ts')) {
+				out.push(full)
+			}
+		}
+	}
+	walk(path.join(REPO_ROOT, 'lib'))
+	libTsFilesCache = out
+	return out
+}
+
 const checks: DiscrepancyCheck[] = [
 	{
 		id: 'P1',
@@ -103,20 +124,12 @@ const checks: DiscrepancyCheck[] = [
 			// constructor; any other construction site is per-step churn.
 			const allowed = new Set(['lib/physics/collision-event.ts', 'lib/vpt/ball/ball-hit.ts'])
 			const offenders: string[] = []
-			const walk = (dir: string): void => {
-				for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-					const full = path.join(dir, entry.name)
-					if (entry.isDirectory()) {
-						if (entry.name !== 'node_modules') walk(full)
-					} else if (entry.name.endsWith('.ts') && !entry.name.endsWith('.spec.ts')) {
-						const rel = path.relative(REPO_ROOT, full)
-						if (!allowed.has(rel) && readFileSafe(full).includes('new CollisionEvent(')) {
-							offenders.push(rel)
-						}
-					}
+			for (const full of getLibTsFiles()) {
+				const rel = path.relative(REPO_ROOT, full)
+				if (!allowed.has(rel) && readFileSafe(full).includes('new CollisionEvent(')) {
+					offenders.push(rel)
 				}
 			}
-			walk(path.join(REPO_ROOT, 'lib'))
 			if (!hasPool) {
 				return {
 					status: 'fail',
@@ -304,13 +317,26 @@ const checks: DiscrepancyCheck[] = [
 		description: 'Windows RGB(r,g,b) = 0x00BBGGRR; web returns 0xRRGGBB, swapping R/B.',
 		impact: 'Colors, lamps, DMD palettes render swapped.',
 		check: async () => {
-			const src = readFileSafe(path.join(REPO_ROOT, 'lib/scripting/stdlib/index.ts'))
-			const hasSwap = src.includes('(r << 16) + (g << 8) + b')
-			const correct = src.includes('(b << 16)') || src.includes('b << 16')
-			return {
-				status: hasSwap && !correct ? 'fail' : 'pass',
-				detail: hasSwap ? 'stdlib RGB is (r<<16)|(g<<8)|b → RRGGBB (native BBGGRR)' : 'RGB mapping not found',
-				evidence: 'lib/scripting/stdlib/index.ts: RGB()',
+			// Runtime probe: call Stdlib.RGB and compare against the Windows
+			// COLORREF formula (0x00BBGGRR) instead of grepping the source.
+			try {
+				const { Stdlib } = await import('../../lib/scripting/stdlib/index.js')
+				const got = new Stdlib().RGB(10, 20, 30) as number
+				const nativeColorref = (30 << 16) | (20 << 8) | 10
+				const hex = (n: number) => `0x${n.toString(16).padStart(6, '0')}`
+				return got === nativeColorref
+					? {
+							status: 'pass',
+							detail: `Stdlib.RGB(10,20,30) = ${hex(got)} matches COLORREF BBGGRR`,
+							evidence: 'lib/scripting/stdlib/index.ts: RGB() (runtime)',
+						}
+					: {
+							status: 'fail',
+							detail: `Stdlib.RGB(10,20,30) = ${hex(got)} (RRGGBB) vs native ${hex(nativeColorref)} (BBGGRR)`,
+							evidence: 'lib/scripting/stdlib/index.ts: RGB() (runtime)',
+						}
+			} catch (error: unknown) {
+				return { status: 'warn', detail: `RGB probe error: ${(error as Error).message}` }
 			}
 		},
 	},
@@ -512,7 +538,7 @@ const checks: DiscrepancyCheck[] = [
 		description: 'Resolver extracts cGameName and searches pinmame/roms hierarchy.',
 		impact: 'Walking Dead needs twd_160h.zip; missing ROM = silent DMD fail.',
 		check: async () => {
-			const twdRom = '/home/qinghao1/.pinmame/roms/twd_160h.zip'
+			const twdRom = path.join(HOME, '.pinmame/roms/twd_160h.zip')
 			const hasRom = fileExists(twdRom)
 			return {
 				status: hasRom ? 'pass' : 'warn',

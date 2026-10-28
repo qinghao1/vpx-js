@@ -12,7 +12,7 @@ const SKIP_EXIT = 77
 
 type CheckStatus = 'pass' | 'fail' | 'skip'
 
-function exitCodeToStatus(exitCode: number | null): CheckStatus {
+export function exitCodeToStatus(exitCode: number | null): CheckStatus {
 	if (exitCode === 0) return 'pass'
 	if (exitCode === SKIP_EXIT) return 'skip'
 	return 'fail'
@@ -132,15 +132,20 @@ const checks: E2ECheck[] = [
 	},
 ]
 
-// Node-only checks safe for parallel spawn (no shared chrome/display).
-const PARALLEL_NAMES = new Set(['wasm', 'table', 'pinmame', 'player', 'gameplay', 'play-room'])
+// Node-only checks safe for parallel spawn: script-driven, non-optional gates
+// (no shared chrome/display). Derived from the gate table above so adding a
+// serial (in-process `run` or optional chrome/native) leg cannot silently join
+// the parallel pool.
+const PARALLEL_NAMES = new Set(checks.filter(c => !c.run && !c.optional).map(c => c.name))
 
 interface CheckResult {
 	status: CheckStatus
 	output: string
 }
 
-async function runCheckCaptured(check: E2ECheck): Promise<CheckResult> {
+// Single spawn path: capture=false streams to the console (serial legs),
+// capture=true buffers for ordered replay (parallel legs).
+async function runCheck(check: E2ECheck, opts: { capture?: boolean } = {}): Promise<CheckResult> {
 	if (check.run) {
 		try {
 			const status = await check.run()
@@ -152,33 +157,20 @@ async function runCheckCaptured(check: E2ECheck): Promise<CheckResult> {
 	const scriptPath = path.resolve(check.script ?? '')
 	if (!fs.existsSync(scriptPath)) return { status: 'skip', output: '' }
 	return new Promise(resolve => {
-		const child = spawn('npx', ['tsx', scriptPath], { stdio: ['ignore', 'pipe', 'pipe'] })
+		const child = spawn('npx', ['tsx', scriptPath], {
+			stdio: opts.capture ? ['ignore', 'pipe', 'pipe'] : 'inherit',
+		})
 		let out = ''
-		child.stdout?.on('data', d => {
-			out += d.toString()
-		})
-		child.stderr?.on('data', d => {
-			out += d.toString()
-		})
+		if (opts.capture) {
+			child.stdout?.on('data', d => {
+				out += d.toString()
+			})
+			child.stderr?.on('data', d => {
+				out += d.toString()
+			})
+		}
 		child.on('close', exitCode => resolve({ status: exitCodeToStatus(exitCode), output: out }))
 		child.on('error', err => resolve({ status: 'fail', output: out + String(err) }))
-	})
-}
-
-async function runCheck(check: E2ECheck): Promise<CheckStatus> {
-	if (check.run) {
-		try {
-			return await check.run()
-		} catch {
-			return 'fail'
-		}
-	}
-	const scriptPath = path.resolve(check.script ?? '')
-	if (!fs.existsSync(scriptPath)) return 'skip'
-	return new Promise(resolve => {
-		const child = spawn('npx', ['tsx', scriptPath], { stdio: 'inherit' })
-		child.on('close', exitCode => resolve(exitCodeToStatus(exitCode)))
-		child.on('error', () => resolve('fail'))
 	})
 }
 
@@ -214,7 +206,7 @@ async function main(): Promise<void> {
 			console.log('')
 			tapComment(`--- ${check.name} ---`)
 			try {
-				report(index, check, await runCheck(check), pass)
+				report(index, check, (await runCheck(check)).status, pass)
 			} catch (err) {
 				tapNotOk(index + 1, check.name, `— ${(err as Error).message}`)
 			}
@@ -230,7 +222,7 @@ async function main(): Promise<void> {
 				if (i >= parallel.length) return
 				const globalIndex = checks.indexOf(parallel[i])
 				try {
-					results[globalIndex] = await runCheckCaptured(parallel[i])
+					results[globalIndex] = await runCheck(parallel[i], { capture: true })
 				} catch {
 					results[globalIndex] = { status: 'fail', output: '' }
 				}
@@ -251,7 +243,7 @@ async function main(): Promise<void> {
 			console.log('')
 			tapComment(`--- ${check.name} --- (serial: shares chrome/display)`)
 			try {
-				report(index, check, await runCheck(check), pass)
+				report(index, check, (await runCheck(check)).status, pass)
 			} catch (err) {
 				tapNotOk(index + 1, check.name, `— ${(err as Error).message}`)
 			}

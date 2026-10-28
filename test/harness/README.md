@@ -3,7 +3,7 @@
 E2E harnesses, benches, and repros. Single entry point:
 
 ```bash
-npx tsx test/harness/verify-all.ts   # TAP 1..8: wasm → table → pinmame → player → gameplay → browser → vpinball-compat → discrepancies
+npx tsx test/harness/verify-all.ts   # TAP 1..10: wasm → table → pinmame → player → gameplay → play-room → browser → vpinball-compat → discrepancies → twd-render
 ```
 
 ## Runner rule (.ts vs .mjs)
@@ -21,7 +21,7 @@ npx tsx test/harness/verify-all.ts   # TAP 1..8: wasm → table → pinmame → 
 
 | File | What | Needs |
 |------|------|-------|
-| `verify-all.ts` | Aggregator, TAP 1..8, exit 0/1 | varies per step |
+| `verify-all.ts` | Aggregator, TAP 1..10, exit 0/1 | varies per step |
 | `verify-wasm.ts` | Wasm build checks: file-existence + `dist/kernels.js` behavioral + mock/real loader consistency | — |
 | `verify-table.ts` | VPX parse + script extract over fixtures + `example-table.vpx` | — |
 | `verify-pinmame.ts` | PinMAME emu boot + DMD frames; mock when no ROM | ROM or mock |

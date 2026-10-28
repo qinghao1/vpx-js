@@ -7,9 +7,9 @@ import { spawn } from 'node:child_process'
 import * as fs from 'node:fs'
 import path from 'node:path'
 import { tapComment, tapHeader, tapNotOk, tapOk, tapPlan, tapSkip } from './tap.js'
-import { verifyBrowser } from './verify-all.js'
+import { exitCodeToStatus, verifyBrowser } from './verify-all.js'
 
-export { verifyBrowser }
+export { exitCodeToStatus, verifyBrowser }
 
 /** Child exit convention (see verify-all.ts): 0 pass, 77 skipped, 1 failure. */
 export function browserStatusToExitCode(status: 'pass' | 'fail' | 'skip'): number {
@@ -18,28 +18,18 @@ export function browserStatusToExitCode(status: 'pass' | 'fail' | 'skip'): numbe
 
 type CheckStatus = 'pass' | 'fail' | 'skip'
 
-function exitCodeToStatus(exitCode: number | null): CheckStatus {
-	if (exitCode === 0) return 'pass'
-	if (exitCode === 77) return 'skip'
-	return 'fail'
-}
-
-// Forward only TWD-leg addressing args (both --flag=value and --flag value);
-// --primary-only stays local.
-function twdArgs(argv: string[]): string[] {
+// Forward every flag to the TWD leg except --primary-only (which stays local).
+// A flag followed by a non-flag token passes through as a pair, so unknown
+// --flags keep their values verbatim and new legs need no allowlist update.
+export function twdArgs(argv: string[]): string[] {
 	const out: string[] = []
 	for (let i = 0; i < argv.length; i++) {
 		const token = argv[i]
-		if (
-			token.startsWith('--vpx=') ||
-			token.startsWith('--rom=') ||
-			token.startsWith('--url=') ||
-			token.startsWith('--gpu=') ||
-			token === '--gpu'
-		) {
-			out.push(token)
-		} else if ((token === '--vpx' || token === '--rom' || token === '--url') && argv[i + 1]) {
-			out.push(token, argv[++i])
+		if (token === '--primary-only') continue
+		if (!token.startsWith('--')) continue
+		out.push(token)
+		if (!token.includes('=') && argv[i + 1] && !argv[i + 1].startsWith('--')) {
+			out.push(argv[++i])
 		}
 	}
 	return out

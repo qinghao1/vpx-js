@@ -131,6 +131,12 @@ export function expandFixture(input: string): string | null {
 	return null
 }
 
+// Resolves a VPX input to an absolute path, or null when nothing exists.
+// Contract: non-null means the file exists (existsFile true). Missing inputs
+// (unknown fixtures, absent absolute paths, /@fs URLs for absent files)
+// return null — callers must not assume a non-null result is usable without
+// this guarantee. Bare URLs are never filesystem paths, so they return null;
+// use resolveUrlToPath to extract their vpx/rom params first.
 export function resolveVpxPath(input: string): string | null {
 	if (!input) return null
 	const trimmed = input.trim()
@@ -144,7 +150,7 @@ export function resolveVpxPath(input: string): string | null {
 	if (decoded.startsWith('/@fs/') || decoded.startsWith('/@fs')) {
 		const p = decodeViteFsParam(decoded)
 		if (existsFile(p)) return path.resolve(p)
-		return path.resolve(p)
+		return null
 	}
 	const tilde = expandTilde(decoded)
 	if (existsFile(tilde)) return path.resolve(tilde)
@@ -157,7 +163,7 @@ export function resolveVpxPath(input: string): string | null {
 	// try repo fixtures with raw name
 	const repoTry = path.join(REPO_ROOT, 'test/fixtures', path.basename(tilde))
 	if (existsFile(repoTry)) return path.resolve(repoTry)
-	return path.resolve(tilde)
+	return null
 }
 
 export function resolveUrlToPath(browserUrl: string): { vpxPath: string | null; romPath: string | null } {
@@ -255,11 +261,11 @@ export async function resolveRomPath(
 ): Promise<string | null> {
 	if (explicitRom) {
 		const p = resolveVpxPath(explicitRom)
-		if (p && existsFile(p)) return p
+		if (p) return p
 		const decoded = decodeViteFsParam(explicitRom)
 		if (existsFile(decoded)) return path.resolve(decoded)
 		if (existsFile(explicitRom)) return path.resolve(explicitRom)
-		return p
+		return null
 	}
 	if (gameName) {
 		return findRomForGameName(gameName, tableDir)
@@ -459,21 +465,15 @@ export async function resolveVpxSession(args: string[] | string): Promise<Resolv
 
 	let romPath: string | null = null
 	if (romInput) {
-		romPath = await resolveRomPath(romInput, null, tableDir)
-		if (!romPath) {
-			const decoded = decodeViteFsParam(romInput)
-			romPath = resolveVpxPath(decoded) ?? path.resolve(decoded)
-		}
+		const resolved = await resolveRomPath(romInput, null, tableDir)
+		romPath = resolved && existsFile(resolved) ? resolved : null
 	} else if (gameName) {
 		romPath = findRomForGameName(gameName, tableDir)
 	}
 
-	let browserUrl: string
-	if (explicitUrl?.includes('localhost:3000')) {
-		browserUrl = explicitUrl
-	} else {
-		browserUrl = resolvePathToUrl(vpxPath, romPath)
-	}
+	// Preserve caller-supplied URLs verbatim (https vite origins included);
+	// only synthesize a URL when none was given.
+	const browserUrl = explicitUrl ?? resolvePathToUrl(vpxPath, romPath)
 
 	const iniPath = createSessionIni(vpxPath, romPath)
 	const nativeArgs = getNativeArgs(vpxPath, iniPath, 'play')

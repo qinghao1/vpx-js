@@ -18,7 +18,7 @@ import {
 } from './vpinball-resolver.js'
 
 const SKIP_EXIT = 77
-const DEFAULT_VPX = '/home/qinghao1/Downloads/walking_dead.vpx'
+const DEFAULT_VPX = process.env.WALKING_DEAD_VPX ?? '/home/qinghao1/Downloads/walking_dead.vpx'
 
 const tap = new Tap('twd browser e2e')
 const args = process.argv.slice(2)

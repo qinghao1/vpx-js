@@ -24,9 +24,8 @@ interface Scenario {
 async function runGameplayHarness() {
 	console.log('=== Comprehensive Gameplay Physics & Flipper Collision Harness ===')
 	const parsed = parseVpxArgs(process.argv.slice(2))
-	const defaultVpx = fs.existsSync('/home/qinghao1/Downloads/walking_dead.vpx')
-		? '/home/qinghao1/Downloads/walking_dead.vpx'
-		: 'test/fixtures/table-flipper.vpx'
+	const benchVpx = process.env.WALKING_DEAD_VPX ?? '/home/qinghao1/Downloads/walking_dead.vpx'
+	const defaultVpx = fs.existsSync(benchVpx) ? benchVpx : 'test/fixtures/table-flipper.vpx'
 	const targetVpx = parsed.vpx ? (resolveVpxPath(parsed.vpx) ?? parsed.vpx) : defaultVpx
 	if (!fs.existsSync(targetVpx)) {
 		tap.assert(false, `VPX not found: ${targetVpx}`)

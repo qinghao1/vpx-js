@@ -14,6 +14,19 @@ export async function loadPuppeteer() {
 
 export const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 
+// Predicate poll: resolves true as soon as `fn` returns truthy, false on
+// timeout. Prefer over a fixed sleep when waiting for page/viewer state.
+export async function waitFor(fn, { timeoutMs = 5000, intervalMs = 100 } = {}) {
+	const start = Date.now()
+	for (;;) {
+		try {
+			if (await fn()) return true
+		} catch {}
+		if (Date.now() - start >= timeoutMs) return false
+		await sleep(intervalMs)
+	}
+}
+
 const _browsers = new Set()
 const _vites = new Set()
 const _profileDirs = new Map()
@@ -419,7 +432,9 @@ export async function openTablePage(
 	if (!viewerReady) log(`[${label}] viewer not ready, continuing anyway`)
 	log(`[${label}] switching to play mode`)
 	await switchToPlayMode(page)
-	await sleep(2000)
+	// Predicate poll (was: fixed sleep(2000)): proceed as soon as the viewer
+	// reports play mode, wait up to 5s on slow loads, then continue anyway.
+	await waitFor(() => page.evaluate(() => window.viewer?.viewerMode === 'play'), { timeoutMs: 5000 })
 	let playReady = false
 	if (playTimeoutMs > 0) {
 		log(`[${label}] waiting for play emu (up to ${Math.round(playTimeoutMs / 1000)}s)`)
