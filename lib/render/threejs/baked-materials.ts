@@ -168,7 +168,7 @@ export const applyBakedMaterial = (
 }
 
 /** Single role dispatch replacing the three parallel main/overlay/alpha ternaries. */
-export type BakedKind = 'main' | 'overlayGi' | 'overlayOff' | 'alpha' | 'opaque'
+export type BakedKind = 'main' | 'overlay_gi' | 'overlay_off' | 'alpha' | 'opaque'
 
 export function resolveBakedKind(
 	isMainBake: boolean,
@@ -177,7 +177,7 @@ export function resolveBakedKind(
 	alpha: boolean,
 ): BakedKind {
 	if (isMainBake) return 'main'
-	if (isVlmBake) return isGiOverlay(meshLower) ? 'overlayGi' : 'overlayOff'
+	if (isVlmBake) return isGiOverlay(meshLower) ? 'overlay_gi' : 'overlay_off'
 	return alpha ? 'alpha' : 'opaque'
 }
 
@@ -200,7 +200,7 @@ export const createBakedMaterialResolver = (): ((
 		const alpha = !isMainBake && !isRamp && !isApron && needsAlpha
 		const kind = resolveBakedKind(isMainBake, isVlmBake, meshLower, alpha)
 		const role = `${isApron ? 'a' : 'x'}|${isRamp ? 'r' : 'x'}|${needsAlpha ? 'n' : 'x'}`
-		const key = `${base.name}|${(base.map as THREE.Texture | undefined)?.name ?? ''}|${pending}|${kind === 'overlayGi' ? 'overlay_gi' : kind === 'overlayOff' ? 'overlay_off' : kind}|${base.polygonOffset ? `${base.polygonOffsetFactor}/${base.polygonOffsetUnits}` : '0'}|${role}`
+		const key = `${base.name}|${(base.map as THREE.Texture | undefined)?.name ?? ''}|${pending}|${kind}|${base.polygonOffset ? `${base.polygonOffsetFactor}/${base.polygonOffsetUnits}` : '0'}|${role}`
 		const cached = bakedCache.get(key)
 		if (cached) return cached
 		const cloned = cloneMaterialForWrite(base) as THREE.MeshStandardMaterial
@@ -233,16 +233,15 @@ export const createBakedMaterialResolver = (): ((
 			}
 			cloned.toneMapped = false
 			cloned.needsUpdate = true
-		} else if (kind === 'overlayGi' || kind === 'overlayOff') {
-			const isLit = kind === 'overlayGi'
+		} else if (kind === 'overlay_gi' || kind === 'overlay_off') {
 			fixBaked(cloned, cloned.map as THREE.Texture | undefined)
 			if (clonedUserData?.__primitiveKind === PRIMITIVE_ADDITIVE_KIND) {
-				updatePrimitiveAdditive(cloned, { intensity: isLit ? 1.0 : 0 })
+				updatePrimitiveAdditive(cloned, { intensity: kind === 'overlay_gi' ? 1 : 0 })
 			} else {
-				cloned.emissiveIntensity = isLit ? 1.0 : 0
+				cloned.emissiveIntensity = kind === 'overlay_gi' ? 1 : 0
 			}
 			cloned.transparent = true
-			cloned.opacity = isLit ? 1.0 : 0
+			cloned.opacity = kind === 'overlay_gi' ? 1 : 0
 			cloned.blending = THREE.AdditiveBlending
 			cloned.depthWrite = false
 			cloned.alphaTest = 0

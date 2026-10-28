@@ -433,15 +433,7 @@ function expandToRgba(
 						? isTransparentRgb(raw[src], raw[src + 1], raw[src + 2], transparency)
 							? 0
 							: 255
-						: isTransparentRgb16(
-									raw[src],
-									raw[src + 1],
-									raw[src + 2],
-									raw[src + 3],
-									raw[src + 4],
-									raw[src + 5],
-									transparency,
-								)
+						: isTransparentRgb16(raw, src, transparency)
 							? 0
 							: 255
 			} else if (colorType === 4) {
@@ -458,7 +450,7 @@ function expandToRgba(
 						? isTransparentGray(raw[src], transparency)
 							? 0
 							: 255
-						: isTransparentGray16(raw[src], raw[src + 1], transparency)
+						: isTransparentGray16(raw, src, transparency)
 							? 0
 							: 255
 			} else if (palette) {
@@ -489,27 +481,21 @@ function isTransparentGray(gray: number, transparency: Uint8Array | null): boole
 
 // 16-bit tRNS entries are full big-endian sample values (unlike the 8-bit
 // path above, which reads the low byte encoders fill in).
-function isTransparentRgb16(
-	redHi: number,
-	redLo: number,
-	greenHi: number,
-	greenLo: number,
-	blueHi: number,
-	blueLo: number,
-	transparency: Uint8Array | null,
-): boolean {
+function isTransparentRgb16(raw: Uint8Array, src: number, transparency: Uint8Array | null): boolean {
 	return (
 		!!transparency &&
 		transparency.length >= 6 &&
-		transparency[0] === redHi &&
-		transparency[1] === redLo &&
-		transparency[2] === greenHi &&
-		transparency[3] === greenLo &&
-		transparency[4] === blueHi &&
-		transparency[5] === blueLo
+		transparency[0] === raw[src] &&
+		transparency[1] === raw[src + 1] &&
+		transparency[2] === raw[src + 2] &&
+		transparency[3] === raw[src + 3] &&
+		transparency[4] === raw[src + 4] &&
+		transparency[5] === raw[src + 5]
 	)
 }
 
-function isTransparentGray16(hi: number, lo: number, transparency: Uint8Array | null): boolean {
-	return !!transparency && transparency.length >= 2 && transparency[0] === hi && transparency[1] === lo
+function isTransparentGray16(raw: Uint8Array, src: number, transparency: Uint8Array | null): boolean {
+	return (
+		!!transparency && transparency.length >= 2 && transparency[0] === raw[src] && transparency[1] === raw[src + 1]
+	)
 }

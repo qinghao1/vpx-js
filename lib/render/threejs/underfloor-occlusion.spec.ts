@@ -1,9 +1,9 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
-// Underfloor occlusion is a baked-material invariant, not a playfield
-// special-case: every opaque baked main surface resolves to a double-sided
-// depth writer (see baked-materials.ts), so the baked playfield — the only
-// floor between a below-table camera and the lights/DMD on VR tables —
-// occludes from underneath whatever the authored backfaces flag says.
+// Underfloor occlusion is a baked-material invariant: every opaque baked
+// main surface resolves to a double-sided depth writer (see
+// baked-materials.ts), so the baked playfield — the only floor between a
+// below-table camera and the lights/DMD on VR tables — occludes from
+// underneath whatever the authored backfaces flag says.
 import * as fs from 'node:fs'
 import * as THREE from 'three'
 import { describe, expect, it } from 'vitest'
@@ -71,8 +71,8 @@ describe('underfloor occlusion: opaque baked materials occlude from both sides',
 		// The resolver key and the material fork must agree on one dispatch;
 		// separate ternaries drifted before (overlay_gi vs overlay_off).
 		expect(resolveBakedKind(true, false, 'primitive-bm_playfield', false)).toBe('main')
-		expect(resolveBakedKind(false, true, 'primitive-lm_gi01_playfield', false)).toBe('overlayGi')
-		expect(resolveBakedKind(false, true, 'primitive-lm_insrt01_playfield', false)).toBe('overlayOff')
+		expect(resolveBakedKind(false, true, 'primitive-lm_gi01_playfield', false)).toBe('overlay_gi')
+		expect(resolveBakedKind(false, true, 'primitive-lm_insrt01_playfield', false)).toBe('overlay_off')
 		expect(resolveBakedKind(false, false, 'primitive-ramp_main', true)).toBe('alpha')
 		expect(resolveBakedKind(false, false, 'primitive-post001', false)).toBe('opaque')
 		// Main wins over the overlay flag when both classify true.

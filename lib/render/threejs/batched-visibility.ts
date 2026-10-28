@@ -19,7 +19,7 @@ export interface BatchedInstanceInfo {
 // Shared zero-scale matrix for InstancedMesh hides: setMatrixAt copies the
 // values into the instance buffer, so one frozen instance is safe to reuse
 // instead of allocating per hide.
-export const ZERO_SCALE = new Matrix4().makeScale(0, 0, 0)
+const ZERO_SCALE = new Matrix4().makeScale(0, 0, 0)
 
 function batchedInfoOf(node: Object3D): BatchedInstanceInfo | undefined {
 	const info = (node as { userData?: { __batched?: unknown } }).userData?.__batched as BatchedInstanceInfo | undefined
@@ -47,12 +47,12 @@ function hideInstance(info: BatchedInstanceInfo, stats: BatchedVisibilityStats):
  */
 export function unbatchInstances(obj: Object3D, stats: BatchedVisibilityStats): void {
 	if (!obj) return
-	const visit = (current: any): void => {
-		const info = current.userData?.__batched
-		if (info?.batched && typeof info.instanceId === 'number') {
+	const visit = (current: Object3D): void => {
+		const info = batchedInfoOf(current)
+		if (info) {
 			hideInstance(info, stats)
 			current.visible = true
-			let anc: any = current.parent
+			let anc = current.parent
 			while (anc && anc !== obj.parent) {
 				if (!anc.visible) anc.visible = true
 				if (anc === obj) break
@@ -60,7 +60,7 @@ export function unbatchInstances(obj: Object3D, stats: BatchedVisibilityStats): 
 			}
 			delete current.userData.__batched
 		}
-		if (current.children) for (const child of current.children) visit(child)
+		for (const child of current.children ?? []) visit(child)
 	}
 	visit(obj)
 }
@@ -127,7 +127,8 @@ export function applyBatchedVisibility(obj: Object3D, visible: boolean, stats: B
 		if (info) syncInstance(node, info, visible, stats)
 		// Re-read: the sync above may have unbatched the node (missing
 		// restore matrix), which must then follow the plain show path.
-		node.visible = visible && getAuthoredVisible(node) && !batchedInfoOf(node)
+		const stillBatched = batchedInfoOf(node)
+		node.visible = visible && getAuthoredVisible(node) && !stillBatched
 		for (const child of node.children ?? []) visit(child)
 	}
 	visit(obj)
