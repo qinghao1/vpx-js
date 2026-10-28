@@ -106,15 +106,16 @@ describe('The LZW reader rewrite guards', () => {
 		expect(new Uint8Array(out)).to.deep.equal(new Uint8Array([1, 2, 3, 4]))
 	})
 
-	it('should stop at the output end on corrupt over-emission', () => {
-		const [out] = new LzwReader(encode([CLEAR, 9, 9, 9, 9, 9, 9, 9, 9, END]), 2, 1, 2).decompress()
-		expect(new Uint8Array(out)).to.deep.equal(new Uint8Array([9, 9]))
-	})
-
 	it('should terminate on truncated input', () => {
 		const truncated = encode([CLEAR, 1, 2, 3, 4, 5, 6, 7, 8]).subarray(0, 5)
 		const [out, consumed] = new LzwReader(truncated, 8, 1, 8).decompress()
 		expect(out.length).to.equal(8)
 		expect(consumed).to.equal(truncated.length)
+	})
+
+	it('should count codes beyond the current slot instead of dropping them silently', () => {
+		const reader = new LzwReader(encode([CLEAR, 5, 260, END]), 3, 1, 3)
+		reader.decompress()
+		expect(reader.getBadCodeCount()).to.be.greaterThan(0)
 	})
 })

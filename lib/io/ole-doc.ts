@@ -1,7 +1,6 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { EventEmitter } from '../util/event-emitter.js'
 import { getDataView } from './binary-helpers.js'
 import { AllocationTable } from './ole-allocation-table.js'
 import { DirectoryTree } from './ole-directory-tree.js'
@@ -15,7 +14,7 @@ export { Header } from './ole-header.js'
 export { Storage } from './ole-storage.js'
 
 /** OLE compound document (VPX container). */
-export class OleCompoundDoc extends EventEmitter {
+export class OleCompoundDoc {
 	header!: Header
 	SAT!: AllocationTable
 	SSAT!: AllocationTable
@@ -28,7 +27,6 @@ export class OleCompoundDoc extends EventEmitter {
 	private directoryTree?: DirectoryTree
 
 	private constructor(reader: IBinaryReader) {
-		super()
 		this.reader = reader
 	}
 

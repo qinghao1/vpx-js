@@ -65,34 +65,64 @@ export class DirectoryTree {
 		this.buildHierarchy(root)
 	}
 
-	private buildHierarchy(entry: StorageEntry, seen: Set<StorageEntry> = new Set()): void {
-		if (seen.has(entry)) throw new Error('Corrupt file: cycle detected in directory storage hierarchy.')
-		seen.add(entry)
-		const ids = this.getChildIds(entry)
-		entry.storages = {}
-		entry.streams = {}
-		for (const id of ids) {
-			const child = this.entries[id]
-			if (child.type === DirectoryTree.EntryTypeStorage) entry.storages[child.name] = child
-			if (child.type === DirectoryTree.EntryTypeStream) entry.streams[child.name] = child
+	private buildHierarchy(root: StorageEntry): void {
+		// Iterative DFS: a corrupt file can nest storages deeper than the call
+		// stack allows, and pole walks siblings iteratively and bounded too.
+		const active = new Set<StorageEntry>()
+		// null = not yet expanded; [] = expanded leaf. A drained ([]) frame
+		// must pop, never re-expand, or it refills and loops forever.
+		const stack: Array<{ entry: StorageEntry; children: StorageEntry[] | null }> = [{ entry: root, children: null }]
+		active.add(root)
+		while (stack.length > 0) {
+			const frame = stack[stack.length - 1]!
+			if (frame.children === null) {
+				const ids = this.getChildIds(frame.entry)
+				frame.entry.storages = {}
+				frame.entry.streams = {}
+				for (const id of ids) {
+					const child = this.entries[id]
+					if (child.type === DirectoryTree.EntryTypeStorage) frame.entry.storages[child.name] = child
+					if (child.type === DirectoryTree.EntryTypeStream) frame.entry.streams[child.name] = child
+				}
+				frame.children = Object.values(frame.entry.storages)
+			}
+			const child = frame.children.pop()
+			if (!child) {
+				active.delete(frame.entry)
+				stack.pop()
+				continue
+			}
+			if (active.has(child)) throw new Error('Corrupt file: cycle detected in directory storage hierarchy.')
+			active.add(child)
+			stack.push({ entry: child, children: null })
 		}
-		for (const child of Object.values(entry.storages)) this.buildHierarchy(child, seen)
 	}
 
 	private getChildIds(entry: StorageEntry): number[] {
 		if (entry.storageDirId <= -1) return []
 		this.assertIndex(entry.storageDirId)
-		return this.visit(this.entries[entry.storageDirId], [entry.storageDirId], new Set([entry.storageDirId]))
-	}
-
-	private visit(entry: StorageEntry, ids: number[], seen: Set<number>): number[] {
-		for (const next of [entry.left, entry.right]) {
-			if (next === DirectoryTree.Leaf) continue
-			this.assertIndex(next)
-			if (seen.has(next)) throw new Error(`Corrupt file: cycle detected at directory index ${next}.`)
-			seen.add(next)
-			ids.push(next)
-			this.visit(this.entries[next], ids, seen)
+		// Iterative pre-order BST walk like pole's dirtree_find_siblings: each
+		// index is visited once, so the walk is bounded by the entry count and
+		// cannot recurse on a crafted deep chain. Indexes land in `ids` in pop
+		// (visit) order — left subtree before right, like the old recursion —
+		// so duplicate child names keep last-wins with the same winner.
+		const ids: number[] = []
+		const seen = new Set([entry.storageDirId])
+		const pending = [entry.storageDirId]
+		while (pending.length > 0) {
+			const id = pending.pop()!
+			ids.push(id)
+			const current = this.entries[id]
+			// Push right first so the left subtree still drains first.
+			for (const next of [current.right, current.left]) {
+				if (next === DirectoryTree.Leaf) continue
+				this.assertIndex(next)
+				if (seen.has(next)) throw new Error(`Corrupt file: cycle detected at directory index ${next}.`)
+				seen.add(next)
+				pending.push(next)
+			}
+			if (ids.length > this.entries.length)
+				throw new Error('Corrupt file: directory sibling walk exceeded entry count.')
 		}
 		return ids
 	}

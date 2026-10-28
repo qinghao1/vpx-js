@@ -16,8 +16,9 @@ export class BiffParser {
 			if (data.length < 4) return null
 
 			let len = readInt32LE(data, 0)
-			// len<4 would advance pos by 0 and hang streamFiltered (upstream ValidateLength rejects len<0).
-			if (len < 4) return null
+			// Upstream BiffReader::ValidateLength flags len<0 or beyond-remaining as
+			// m_hasError and fails the load; throw instead of stalling the stream.
+			if (len < 4) throw new Error(`Corrupt BIFF record: invalid size ${len}.`)
 			if (len > data.length - 4) return -(len + 4)
 			const tag = decodeUtf8(data.subarray(4, 8))
 
@@ -44,8 +45,9 @@ export class BiffParser {
 				// cchar sits at payload offset 4; request more bytes on truncated records.
 				if (data.length < 12) return -12
 				const cchar = readInt32LE(data, 8)
-				// Reject negative cchar or the advance goes negative and stalls the stream.
-				if (cchar < 0) return null
+				// Upstream AsScript fails the load on a short script read; a negative
+				// length is always corrupt, so throw instead of stalling the stream.
+				if (cchar < 0) throw new Error(`Corrupt BIFF record: invalid CODE length ${cchar}.`)
 				len += cchar + 4
 			}
 			const chunk = streamed ? new Uint8Array(0) : data.subarray(8, 8 + len - 4)
@@ -54,7 +56,7 @@ export class BiffParser {
 			const relEnd = streamed ? -8 : -4
 
 			// ENDB terminates a BIFF stream.
-			if (!tag || tag === 'ENDB') {
+			if (tag === 'ENDB') {
 				if (nested) {
 					nested.onEnd(nestedItem)
 					nested = nestedItem = null

@@ -1,11 +1,13 @@
 import { readFile } from 'node:fs/promises'
 import { expect } from 'chai'
+import { BiffParser } from './biff-parser.js'
 import { OLE_ID } from './binary-helpers.js'
 import { BinaryReader } from './binary-reader.js'
 import { AllocationTable } from './ole-allocation-table.js'
-import { DirectoryTree } from './ole-directory-tree.js'
+import { DirectoryTree, type StorageEntry } from './ole-directory-tree.js'
 import { type IBinaryReader, OleCompoundDoc } from './ole-doc.js'
 import { Header } from './ole-header.js'
+import { Storage } from './ole-storage.js'
 
 interface HeaderOverrides {
 	secShift?: number
@@ -38,7 +40,15 @@ function buildHeader(overrides: HeaderOverrides = {}): Uint8Array {
 	return header
 }
 
-function buildNamedDirEntry(name: string, type: number, child: number, secId: number, size: number): Uint8Array {
+function buildNamedDirEntry(
+	name: string,
+	type: number,
+	child: number,
+	secId: number,
+	size: number,
+	left = -1,
+	right = -1,
+): Uint8Array {
 	const entry = new Uint8Array(128)
 	const view = new DataView(entry.buffer)
 	for (let i = 0; i < name.length; i++) {
@@ -46,8 +56,8 @@ function buildNamedDirEntry(name: string, type: number, child: number, secId: nu
 	}
 	view.setUint16(64, (name.length + 1) * 2, true)
 	view.setInt8(66, type)
-	view.setInt32(68, -1, true)
-	view.setInt32(72, -1, true)
+	view.setInt32(68, left, true)
+	view.setInt32(72, right, true)
 	view.setInt32(76, child, true)
 	view.setInt32(116, secId, true)
 	view.setUint32(120, size, true)
@@ -111,7 +121,10 @@ function endlessTable(): Uint8Array {
 	return bytes
 }
 
-/** In-memory reader that rejects impossible positions and short-reads past EOF. */
+/**
+ * Single in-memory reader fake: rejects impossible positions, short-reads
+ * past EOF, and returns the same single-subarray-copy view BinaryReader does.
+ */
 class MemoryReader implements IBinaryReader {
 	private openFlag = false
 	constructor(private readonly fileData: Uint8Array) {}
@@ -126,9 +139,9 @@ class MemoryReader implements IBinaryReader {
 	}
 	async read(target: Uint8Array, offset: number, length: number, position: number): Promise<[number, Uint8Array]> {
 		if (!Number.isInteger(position) || position < 0) throw new Error(`Invalid read position ${position}.`)
-		const available = Math.max(0, Math.min(length, this.fileData.length - position))
-		target.set(this.fileData.subarray(position, position + available), offset)
-		return [available, target]
+		const slice = this.fileData.subarray(position, position + length)
+		target.set(slice, offset)
+		return [slice.length, target.subarray(offset, offset + slice.length)]
 	}
 }
 
@@ -241,6 +254,34 @@ describe('The OLE compound document reader', () => {
 		await expectRejection(DirectoryTree.load(fakeDoc, [0]), /cycle/)
 	})
 
+	it('keeps last-wins resolution for duplicate sibling names', async () => {
+		// BST: root -> A; A.left = B('Dup', secId 10), A.right = C('Dup', secId 20).
+		// Pre-order visit [A, B, C] assigns B then C, so the right sibling wins.
+		const buf = concatBytes(
+			buildNamedDirEntry('Root', 5, 1, -2, 0),
+			buildNamedDirEntry('A', 2, -1, -2, 0, 2, 3),
+			buildNamedDirEntry('Dup', 2, -1, 10, 0),
+			buildNamedDirEntry('Dup', 2, -1, 20, 0),
+		)
+		const fakeDoc = { readSectors: async () => buf } as unknown as OleCompoundDoc
+		const tree = await DirectoryTree.load(fakeDoc, [0])
+		expect(tree.root.streams.Dup?.secId).to.equal(20)
+	})
+
+	it('resolves nested storages without re-walking drained frames', async () => {
+		const buf = concatBytes(
+			buildNamedDirEntry('Root', 5, 1, -2, 0),
+			buildNamedDirEntry('GameStg', 1, 2, -2, 0),
+			buildNamedDirEntry('GameData', 2, -1, -2, 0),
+		)
+		const fakeDoc = { readSectors: async () => buf } as unknown as OleCompoundDoc
+		const tree = await DirectoryTree.load(fakeDoc, [0])
+		const gameStg = tree.root.storages.GameStg
+		expect(gameStg).to.not.equal(undefined)
+		if (gameStg) expect(Object.keys(gameStg.streams)).to.deep.equal(['GameData'])
+		expect(Object.keys(tree.root.streams)).to.deep.equal([])
+	})
+
 	it('rejects MSAT holes', async () => {
 		const fileData = concatBytes(buildHeader({ satSize: 200, msatSize: 0 }), endlessTable())
 		await expectRejection(OleCompoundDoc.load(new MemoryReader(fileData)), /MSAT/)
@@ -313,37 +354,103 @@ describe('The OLE compound document reader', () => {
 		await doc.reopen()
 		expect((await doc.readSector(0)).length).to.equal(512)
 	})
+
+	it('rejects a streamed CODE record that overruns its stream', async () => {
+		// CODE header claims len=4 with cchar=1000, but only 10 payload bytes follow.
+		const cchar = new Uint8Array(4)
+		new DataView(cchar.buffer).setInt32(0, 1000, true)
+		const codeHead = new Uint8Array(8)
+		new DataView(codeHead.buffer).setInt32(0, 4, true)
+		for (let i = 0; i < 4; i++) codeHead[4 + i] = 'CODE'.charCodeAt(i)
+		const stream = concatBytes(codeHead, cchar, new Uint8Array(10).fill(0x41))
+		const doc = {
+			header: { shortStreamMax: 4096, secSize: 512, shortSecSize: 64 },
+			SAT: { getSecIdChain: () => [0] },
+			SSAT: { getSecIdChain: () => [0] },
+			readSectors: async () => stream,
+			readShortSectors: async () => stream,
+		} as unknown as OleCompoundDoc
+		const streamEntry = (name: string, size: number): StorageEntry => ({
+			name,
+			type: 2,
+			nodeColor: 0,
+			left: -1,
+			right: -1,
+			storageDirId: -1,
+			secId: 0,
+			size,
+			storages: {},
+			streams: {},
+		})
+		const dirEntry: StorageEntry = {
+			...streamEntry('', 0),
+			type: 5,
+			storages: {},
+			streams: { GameData: streamEntry('GameData', stream.length) },
+		}
+		const storage = new Storage(doc, dirEntry)
+		await expectRejection(
+			storage.streamFiltered(
+				'GameData',
+				0,
+				BiffParser.stream(async () => 0, { streamedTags: ['CODE'] }),
+			),
+			/past end of stream/,
+		)
+	})
+
+	it('walks a deep sibling chain without recursing', async () => {
+		const count = 20000
+		const buf = new Uint8Array(count * 128)
+		const view = new DataView(buf.buffer)
+		const setEntry = (index: number, type: number, left: number, child: number): void => {
+			const off = index * 128
+			const name = `s${index}`
+			for (let k = 0; k < name.length; k++) view.setUint16(off + k * 2, name.charCodeAt(k), true)
+			view.setUint16(off + 64, (name.length + 1) * 2, true)
+			view.setInt8(off + 66, type)
+			view.setInt32(off + 68, left, true)
+			view.setInt32(off + 72, -1, true)
+			view.setInt32(off + 76, child, true)
+			view.setInt32(off + 116, -2, true)
+		}
+		setEntry(0, 5, -1, 1)
+		for (let i = 1; i < count - 1; i++) setEntry(i, 2, i + 1, -1)
+		setEntry(count - 1, 2, -1, -1)
+		const fakeDoc = { readSectors: async () => buf } as unknown as OleCompoundDoc
+		const tree = await DirectoryTree.load(fakeDoc, [0])
+		expect(Object.keys(tree.root.streams).length).to.equal(count - 1)
+	})
+
+	it('builds a deep storage hierarchy without recursing', async () => {
+		const count = 20000
+		const buf = new Uint8Array(count * 128)
+		const view = new DataView(buf.buffer)
+		const setEntry = (index: number, type: number, child: number): void => {
+			const off = index * 128
+			const name = `s${index}`
+			for (let k = 0; k < name.length; k++) view.setUint16(off + k * 2, name.charCodeAt(k), true)
+			view.setUint16(off + 64, (name.length + 1) * 2, true)
+			view.setInt8(off + 66, type)
+			view.setInt32(off + 68, -1, true)
+			view.setInt32(off + 72, -1, true)
+			view.setInt32(off + 76, child, true)
+			view.setInt32(off + 116, -2, true)
+		}
+		setEntry(0, 5, 1)
+		for (let i = 1; i < count - 1; i++) setEntry(i, 1, i + 1)
+		setEntry(count - 1, 1, -1)
+		const fakeDoc = { readSectors: async () => buf } as unknown as OleCompoundDoc
+		const tree = await DirectoryTree.load(fakeDoc, [0])
+		let entry = tree.root
+		let depth = 0
+		while (Object.keys(entry.storages).length > 0) {
+			entry = Object.values(entry.storages)[0]!
+			depth++
+		}
+		expect(depth).to.equal(count - 1)
+	})
 })
-
-/** In-memory reader with the same single-subarray-copy contract as BinaryReader. */
-class SubarrayMemoryReader implements IBinaryReader {
-	private opened = false
-	constructor(private readonly data: Uint8Array) {}
-
-	public async open(): Promise<void> {
-		this.opened = true
-	}
-
-	public async close(): Promise<void> {
-		this.opened = false
-	}
-
-	public isOpen(): boolean {
-		return this.opened
-	}
-
-	public async read(
-		target: Uint8Array,
-		offset: number,
-		length: number,
-		position: number,
-	): Promise<[number, Uint8Array]> {
-		if (!this.opened) throw new Error('MemoryReader not open')
-		const slice = this.data.subarray(position, position + length)
-		target.set(slice, offset)
-		return [slice.length, target.subarray(offset, offset + slice.length)]
-	}
-}
 
 const FIXTURE = 'test/fixtures/table-empty.vpx'
 
@@ -379,7 +486,7 @@ describe('The OLE compound document against real files', () => {
 	it('should read identical bytes through a subarray-copy reader', async () => {
 		const bytes = new Uint8Array(await readFile(FIXTURE))
 		const viaBinary = await OleCompoundDoc.load(new BinaryReader(bytes))
-		const viaMemory = await OleCompoundDoc.load(new SubarrayMemoryReader(bytes))
+		const viaMemory = await OleCompoundDoc.load(new MemoryReader(bytes))
 		try {
 			const a = await viaBinary.storage('TableInfo').read('TableName')
 			const b = await viaMemory.storage('TableInfo').read('TableName')

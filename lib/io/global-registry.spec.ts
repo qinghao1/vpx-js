@@ -51,6 +51,25 @@ describe('The global registry emulator', () => {
 		expect(new GlobalRegistry().regRead('HKCU\\Software\\Nope\\Missing')).to.equal(undefined)
 	})
 
+	it('should not rewrite a hive name that appears mid-path', () => {
+		const reg = new GlobalRegistry()
+		reg.regWrite('HKCU\\Software\\hkey_current_user\\Val', 'x')
+		expect(reg.regRead('HKCU\\Software\\hkey_current_user\\Val')).to.equal('x')
+		// The mid-path component is a literal subkey, not a hive abbreviation.
+		expect(reg.regRead('HKCU\\Software\\hkcu\\Val')).to.equal(undefined)
+	})
+
+	it('should read stored values as float with fallback', () => {
+		const reg = new GlobalRegistry()
+		expect(reg.getRegStringAsFloat('Player', 'FlipperPhysicsMass0', 1)).to.equal(1)
+		reg.regWrite('HKCU\\Software\\Visual Pinball\\Player\\FlipperPhysicsMass0', 3.5)
+		expect(reg.getRegStringAsFloat('Player', 'FlipperPhysicsMass0', 1)).to.equal(3.5)
+		reg.regWrite('HKCU\\Software\\Visual Pinball\\Player\\FlipperPhysicsMass1', '2.5')
+		expect(reg.getRegStringAsFloat('Player', 'FlipperPhysicsMass1', 1)).to.equal(2.5)
+		reg.regWrite('HKCU\\Software\\Visual Pinball\\Player\\FlipperPhysicsMass2', 'not-a-number')
+		expect(reg.getRegStringAsFloat('Player', 'FlipperPhysicsMass2', 1)).to.equal(1)
+	})
+
 	it('should match long-form hives regardless of case', () => {
 		const reg = new GlobalRegistry()
 		reg.regWrite('hkey_current_user\\software\\mykey\\val', 'x')

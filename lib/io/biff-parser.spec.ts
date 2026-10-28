@@ -50,7 +50,7 @@ describe('BiffParser.stream', () => {
 		expect(adv).to.equal(12 + script.length)
 	})
 
-	it('terminates on corrupt size len<4 instead of hanging (len=-4 => pos+=0)', async () => {
+	it('throws on corrupt size len<4 like upstream m_hasError instead of hanging', async () => {
 		for (const bad of [-8, -4, -1, 0, 1, 3]) {
 			const buf = new Uint8Array(12)
 			new DataView(buf.buffer).setInt32(0, bad, true)
@@ -60,10 +60,30 @@ describe('BiffParser.stream', () => {
 				called = true
 				return 0
 			})
-			const r = await next({ data: buf, storageOffset: 0 })
-			expect(r, `len=${bad}`).to.equal(null)
+			let error: unknown
+			try {
+				await next({ data: buf, storageOffset: 0 })
+			} catch (err) {
+				error = err
+			}
+			expect((error as Error)?.message, `len=${bad}`).to.match(/invalid size/)
 			expect(called, `len=${bad}`).to.equal(false)
 		}
+	})
+
+	it('throws on a negative CODE length instead of stalling', async () => {
+		const head = new Uint8Array(12)
+		new DataView(head.buffer).setInt32(0, 4, true)
+		for (let i = 0; i < 4; i++) head[4 + i] = 'CODE'.charCodeAt(i)
+		new DataView(head.buffer).setInt32(8, -5, true)
+		const next = BiffParser.stream(async () => 0, { streamedTags: ['CODE'] })
+		let error: unknown
+		try {
+			await next({ data: head, storageOffset: 0 })
+		} catch (err) {
+			error = err
+		}
+		expect((error as Error)?.message).to.match(/invalid CODE length/)
 	})
 
 	it('skips FONT via 11+nameLen (not streamed cchar math) and continues to ENDB', async () => {

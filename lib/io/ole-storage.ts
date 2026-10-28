@@ -60,6 +60,11 @@ export class Storage {
 			if (len === null) break
 			if (len < 0) throw new Error('Second negative len not supported')
 			pos += len
+			// A streamed record (CODE) sizes itself from its cchar; an advance past
+			// the stream end means the length overran the stream (upstream AsScript
+			// fails the load on a short read), so reject instead of recording it.
+			if (pos > buf.length)
+				throw new Error(`Corrupt BIFF record: extends ${pos - buf.length} bytes past end of stream "${name}".`)
 		}
 	}
 

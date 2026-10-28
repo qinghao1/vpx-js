@@ -37,9 +37,7 @@ export class LzwReader {
 	private prefix: number[] = [] /* Prefix linked list */
 
 	private readonly width: number
-	private readonly height: number
 	private badCodeCount: number = 0
-	private linesLeft: number = 0
 
 	constructor(pstm: Uint8Array, width: number, height: number, pitch: number) {
 		for (let i = 0; i < MAX_CODES + 1; i++) {
@@ -53,8 +51,11 @@ export class LzwReader {
 		this.pstm = new BufferPtr(pstm)
 
 		this.width = width // 32-bit picture
-		this.height = height
-		this.linesLeft = height + 1 // +1 because 1 gets taken o
+	}
+
+	/** Corrupt codes seen beyond the current slot (KwKwK over-emission guard). */
+	public getBadCodeCount(): number {
+		return this.badCodeCount
 	}
 
 	public decompress(): [Uint8Array, number] {
@@ -208,7 +209,6 @@ export class LzwReader {
 	private NextLine(): BufferPtr {
 		const pbRet = BufferPtr.fromPtr(this.pbBitsOutCur)
 		this.pbBitsOutCur.incr(this.cbStride) // rows are stored bottom-up, so step one stride per line
-		this.linesLeft--
 		return pbRet
 	}
 

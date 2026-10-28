@@ -21,7 +21,13 @@ export class GlobalRegistry {
 		'hkcu\\software\\freeware\\visual pinmame\\globals\\nvram_directory': 'browser://vnrams/',
 	}
 
-	public getRegStringAsFloat(_key: string, _value: string, fallback: number): number {
+	public getRegStringAsFloat(key: string, value: string, fallback: number): number {
+		const raw = this.regRead(`HKCU\\Software\\Visual Pinball\\${key}\\${value}`)
+		if (typeof raw === 'number') return Number.isFinite(raw) ? raw : fallback
+		if (typeof raw === 'string') {
+			const parsed = Number.parseFloat(raw)
+			if (Number.isFinite(parsed)) return parsed
+		}
 		return fallback
 	}
 
@@ -35,13 +41,15 @@ export class GlobalRegistry {
 	}
 
 	private normalize(path: string): string {
+		// Anchor long hive names at the start: an unanchored replace would also
+		// rewrite a subkey that merely contains the hive name mid-path.
 		return path
 			.toLowerCase()
-			.replace('hkey_current_user\\', 'hkcu\\')
-			.replace('hkey_classes_root\\', 'hkcr\\')
-			.replace('hkey_local_machine\\', 'hklm\\')
-			.replace('hkey_users\\', 'hku\\')
-			.replace('hkey_current_config\\', 'hkcc\\')
+			.replace(/^hkey_current_user\\/, 'hkcu\\')
+			.replace(/^hkey_classes_root\\/, 'hkcr\\')
+			.replace(/^hkey_local_machine\\/, 'hklm\\')
+			.replace(/^hkey_users\\/, 'hku\\')
+			.replace(/^hkey_current_config\\/, 'hkcc\\')
 	}
 }
 
