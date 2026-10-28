@@ -168,8 +168,8 @@ export class Player extends EventEmitter {
 	}
 
 	/** Advances physics to absolute `timeMs` (ms, not a delta); omitted = real clock. Returns iterations run. */
-	public updatePhysics(timeMs?: number): number {
-		const iterations = this.physics.updatePhysics(timeMs)
+	public updatePhysics(timeMs?: number, skipBalls = false): number {
+		const iterations = this.physics.updatePhysics(timeMs, skipBalls)
 		if (iterations > 0) {
 			for (const ball of this.physics.balls) this.markDirty(ball.getName())
 			for (const movable of this.table.getMovables()) {

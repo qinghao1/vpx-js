@@ -21,6 +21,7 @@ import {
 	drainInput,
 	INPUT_KEY_DOWN,
 	INPUT_KEY_UP,
+	INPUT_NUDGE,
 	type InputEvent,
 	MAX_BALLS,
 	SAB_SIZE,
@@ -227,6 +228,12 @@ export class WorkerSim {
 		const drained = drainInput(sab, this.ringEvents)
 		const startKey = this.pinInput.getKey(AssignKey.StartGameKey)
 		for (const event of this.ringEvents) {
+			// Nudges bypass the key filter below: their key slot carries force×1000,
+			// which can numerically collide with a filtered DIK (e.g. force 0.002 → key 2 = DIK_1).
+			if (event.kind === INPUT_NUDGE) {
+				this.pinInput.nudge(event.val, event.key / 1000)
+				continue
+			}
 			if (isSimFilteredKey(event.key, startKey)) continue
 			if (event.kind === INPUT_KEY_DOWN) this.pinInput.onKeyDown(event.key)
 			else if (event.kind === INPUT_KEY_UP) this.pinInput.onKeyUp(event.key)

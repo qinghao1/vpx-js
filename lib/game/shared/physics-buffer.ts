@@ -16,9 +16,11 @@ export const BALL_ID = 7
 export const BALL_FROZEN = 8
 export const BALL_RESERVED = 9
 
-/** Input ring kinds: main thread pushes key transitions, worker drains them into PinInput. */
+/** Input ring kinds: main thread pushes key transitions, worker drains them into PinInput.
+ * Nudge carries its payload differently: key = force × 1000 (uint16), val = angle in degrees (float32). */
 export const INPUT_KEY_UP = 0
 export const INPUT_KEY_DOWN = 1
+export const INPUT_NUDGE = 2
 
 const HEADER_SIZE = 128 // 2×64B cache lines; 128B on Apple M1/M2 — keeps HEAD/TAIL on separate lines
 const TIMES_OFFSET = 128 // pad header→times to 128B to avoid false sharing with TAIL (tail line is hot)

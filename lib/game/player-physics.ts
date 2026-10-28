@@ -23,6 +23,7 @@ import { isLowQuality } from '../util/quality.js'
 import { Ball } from '../vpt/ball/ball.js'
 import { BallData } from '../vpt/ball/ball-data.js'
 import { BallHit } from '../vpt/ball/ball-hit.js'
+import { BallMover } from '../vpt/ball/ball-mover.js'
 import { BallState } from '../vpt/ball/ball-state.js'
 import type { FlipperMover } from '../vpt/flipper/flipper-mover.js'
 import type { Table } from '../vpt/table/table.js'
@@ -139,7 +140,11 @@ export class PlayerPhysics {
 		this.hitOcTreeDynamic.fillFromVector(this.hitObjectsDynamic, true)
 	}
 
-	public physicsSimulateCycle(dTime: number): void {
+	// skipBalls gates only the ball integrators (BallMover displacement and
+	// velocity): the worker mirror overwrites pos/vel right after, so that work
+	// is discarded. Hit-testing, collide/contact response, hit events, movers,
+	// timers, and emu flushing all still run — game logic never moves threads.
+	public physicsSimulateCycle(dTime: number, skipBalls = false): void {
 		if (!this.hitPlayfield || !this.hitTopGlass) return
 		let staticCnts = STATICCNTS
 		this.hitOcTreeDynamic.update()
@@ -179,7 +184,13 @@ export class PlayerPhysics {
 				this.recordContacts = false
 			}
 			if (hitTime > STATICTIME) staticCnts = STATICCNTS
-			for (const m of this.movers) m.updateDisplacements(hitTime)
+			for (const m of this.movers) {
+				// Skipped in mirror mode: the mirror apply refreshes the bbox
+				// and event travel the hit-test/filter below consume, and the
+				// integrated pos/vel would be overwritten anyway.
+				if (skipBalls && m instanceof BallMover) continue
+				m.updateDisplacements(hitTime)
+			}
 			// A throwing collide/contact must not leak pooled contacts: the release
 			// loop below is the only return path to the pool, and the next cycle's
 			// `contacts.length = 0` reset drops entries without releasing them.
@@ -221,8 +232,10 @@ export class PlayerPhysics {
 	/**
 	 * Advances physics to `time` (ms). Returns iterations run.
 	 * @param time absolute physics-clock time in ms (not a delta); omitted follows the wall clock.
+	 * @param skipBalls skip ball kinematics (worker mirror overwrites them); timers, movers,
+	 * hit events, and emu flushing still run. Single-threaded callers leave it off.
 	 */
-	public updatePhysics(time?: number): number {
+	public updatePhysics(time?: number, skipBalls = false): number {
 		const initial = time !== undefined ? time * 1000 : Math.floor(this.now() * 1000)
 		if (this.ensureInitialTime(initial, time)) return 0
 		if (this.isPaused) {
@@ -276,8 +289,8 @@ export class PlayerPhysics {
 				if (this.emuAccumMs >= EMU_SYNC_MS) this.flushEmu(this.emu)
 			}
 			if (!this.disablePhysics) {
-				this.updateVelocities()
-				this.physicsSimulateCycle(dt)
+				this.updateVelocities(skipBalls)
+				this.physicsSimulateCycle(dt, skipBalls)
 			}
 			this.curPhysicsFrameTime = this.nextPhysicsFrameTime
 			this.nextPhysicsFrameTime += PHYSICS_STEPTIME
@@ -383,8 +396,11 @@ export class PlayerPhysics {
 		}
 	}
 
-	public updateVelocities(): void {
-		for (const m of this.movers) m.updateVelocities(this)
+	public updateVelocities(skipBalls = false): void {
+		for (const m of this.movers) {
+			if (skipBalls && m instanceof BallMover) continue
+			m.updateVelocities(this)
+		}
 	}
 
 	public createBall(ballCreator: IBallCreationPosition, player: Player, radius = DEFAULT_BALL_SIZE, mass = 1): Ball {

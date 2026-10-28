@@ -14,6 +14,7 @@ import {
 	createPhysicsSAB,
 	INPUT_KEY_DOWN,
 	INPUT_KEY_UP,
+	INPUT_NUDGE,
 	MAX_BALLS,
 	pushInput,
 	trySnap,
@@ -317,6 +318,7 @@ export class Viewer {
 		this._physicsScratch = null
 		this._physicsReady = false
 		this._physicsPaused = false
+		this._lastWorkerSyncCount = -1
 	}
 	_setupDebugToggle() {
 		const btn = document.getElementById('debug-toggle')
@@ -814,6 +816,7 @@ export class Viewer {
 	_syncWorkerBalls() {
 		const worker = this._physicsWorker
 		if (!worker || !this._physicsReady || !this.player) return
+		this._lastWorkerSyncCount = this.player.balls.length
 		worker.postMessage({
 			type: 'syncBalls',
 			balls: this.player.balls.map(ball => ({
@@ -825,18 +828,23 @@ export class Viewer {
 		})
 	}
 	// Steps game logic on the main thread while ball kinematics come from the
-	// worker. The full main-thread step (movers, timers, hit events, script
-	// kicks/captures) runs first and the worker frame is mirrored last, so the
-	// mirrored balls are never re-integrated by the main thread in the same
-	// frame (that double-step applied every impulse twice). Worker frames stay
-	// authoritative; discrete script-side jumps still teleport back to the
-	// worker via the drift check below.
+	// worker. The worker frame is claimed first: when the mirror will apply,
+	// the main step skips ball integration (movers, timers, hit events, script
+	// kicks/captures, and emu flushing still run) so mirrored balls are never
+	// double-stepped (that double-step applied every impulse twice). Worker
+	// frames stay authoritative; discrete script-side jumps still teleport back
+	// to the worker via the drift check below.
 	_stepPhysicsWithWorker() {
 		this.player.setPhysicsEnabled(this.viewerMode === 'play')
-		this.player.updatePhysics()
 		const sab = this._physicsSab
 		const scratch = this._physicsScratch
+		// Claim the worker frame BEFORE the main step: the claim decides whether
+		// the mirror will apply this frame, so the ball-integration skip reuses
+		// the exact mirror condition instead of predicting it.
 		const frame = sab && scratch && this._physicsReady ? trySnap(sab, scratch) : null
+		const preBalls = this.player?.balls ?? []
+		const skipBalls = !!frame && frame.count > 0 && frame.count === preBalls.length && !this.isPaused
+		this.player.updatePhysics(undefined, skipBalls)
 		const mainBalls = this.player?.balls ?? []
 		if (frame && frame.count > 0 && frame.count === mainBalls.length && !this.isPaused) {
 			for (let i = 0; i < frame.count; i++) {
@@ -850,7 +858,16 @@ export class Viewer {
 				const dvx = vel.x - scratch[off + BALL_VEL]
 				const dvy = vel.y - scratch[off + BALL_VEL + 1]
 				const dvz = vel.z - scratch[off + BALL_VEL + 2]
-				if (Math.hypot(dx, dy, dz) > WORKER_POS_DRIFT || Math.hypot(dvx, dvy, dvz) > WORKER_VEL_DRIFT) {
+				const workerFrozen = scratch[off + BALL_FROZEN] !== 0
+				// A frozen-flag-only script edit (hold, release, capture) moves
+				// nothing, so the drift budgets below never catch it — forward it
+				// explicitly. Main is authoritative for game state, so any frozen
+				// mismatch teleports main→worker and converges within a frame.
+				if (
+					Math.hypot(dx, dy, dz) > WORKER_POS_DRIFT ||
+					Math.hypot(dvx, dvy, dvz) > WORKER_VEL_DRIFT ||
+					ball.state.isFrozen !== workerFrozen
+				) {
 					this._physicsWorker?.postMessage({
 						type: 'teleportBall',
 						index: i,
@@ -865,9 +882,20 @@ export class Viewer {
 					vel.x = scratch[off + BALL_VEL]
 					vel.y = scratch[off + BALL_VEL + 1]
 					vel.z = scratch[off + BALL_VEL + 2]
-					ball.state.isFrozen = scratch[off + BALL_FROZEN] !== 0
+					ball.state.isFrozen = workerFrozen
+					// The skipped ball integrators no longer refresh these, but
+					// the still-running hit-test and hit-event filter consume
+					// them — account the mirrored travel and bbox here instead.
+					ball.hit.lastEventSqrDist += dx * dx + dy * dy + dz * dz
+					ball.hit.calcHitBBox()
 				}
 			}
+		} else if (frame && this._physicsWorker && mainBalls.length !== this._lastWorkerSyncCount) {
+			// Count-mismatch blackout recovery: drift can never realign ball
+			// counts, so a skipped mirror re-syncs the worker instead of
+			// stalling until the next lifecycle event. Guarded to one sync per
+			// distinct main-thread count while in-flight frames still disagree.
+			this._syncWorkerBalls()
 		}
 	}
 	enterPlayMode() {
@@ -2356,6 +2384,13 @@ export class Viewer {
 	_nudge(angle, force = 2.6) {
 		if (!this.player || this.viewerMode !== 'play' || this.isPaused) return
 		this.player.nudge(angle, force)
+		// Same fan-out as _sendKey: the main player stays authoritative for the
+		// single-threaded path, and the worker sim applies the same impulse on
+		// drain so it no longer has to infer nudges from drift.
+		if (this._physicsSab) {
+			const forceKey = Math.max(0, Math.min(65535, Math.round(force * 1000)))
+			pushInput(this._physicsSab, INPUT_NUDGE, forceKey, angle)
+		}
 		this._flashNudge(angle)
 	}
 	_sendKey(code, down) {

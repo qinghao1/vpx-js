@@ -2,13 +2,23 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { TableBuilder } from '../../test/table-builder.js'
 import { Vertex3D } from '../math/vector.js'
-import { startHost, WorkerSim } from './physics.worker.js'
+import { DIK_1 } from './key-code.js'
+import { startHost, type WorkerBallState, WorkerSim } from './physics.worker.js'
 import type { IBallCreationPosition } from './player.js'
 import { Player } from './player.js'
-import { BALL_STRIDE, createPhysicsSAB, MAX_BALLS, trySnap } from './shared/physics-buffer.js'
+import {
+	BALL_STRIDE,
+	createPhysicsSAB,
+	INPUT_KEY_DOWN,
+	INPUT_NUDGE,
+	MAX_BALLS,
+	pushInput,
+	trySnap,
+} from './shared/physics-buffer.js'
 
 type Posted = {
 	type: string
+	balls?: number
 	id?: number
 	steps?: number
 }
@@ -230,6 +240,33 @@ describe('physics worker protocol hardening', () => {
 		await waitFor(() => posted.filter(m => m.type === 'error').length >= 5, 'five errors')
 	}, 30000)
 
+	it('recovers ball counts through the syncBalls message path', async () => {
+		const { host, posted, send } = makeHost()
+		startHost(host)
+		const sab = createPhysicsSAB()
+		send({ type: 'init', sab, vpx: loadVpx() })
+		await waitFor(() => posted.some(m => m.type === 'ready'), 'ready')
+		const pongBalls = async (id: number): Promise<number> => {
+			send({ type: 'ping', id })
+			await waitFor(() => posted.some(m => m.type === 'pong' && m.id === id), `pong ${id}`)
+			return posted.find(m => m.type === 'pong' && m.id === id)?.balls ?? -1
+		}
+		const ball = (frozen: boolean): WorkerBallState => ({
+			pos: [0, 0, 50],
+			vel: [0, 0, 0],
+			radius: 25,
+			frozen,
+		})
+		// Grow: main-thread creation (trough eject, multiball) converges the worker list.
+		send({ type: 'syncBalls', balls: [ball(false), ball(false)] })
+		expect(await pongBalls(1)).toBe(2)
+		// Shrink: main-thread destroy (drain, kicker release) converges too —
+		// counts never self-heal through drift, so this path is the recovery.
+		send({ type: 'syncBalls', balls: [ball(true)] })
+		expect(await pongBalls(2)).toBe(1)
+		expect(posted.some(m => m.type === 'error')).toBe(false)
+	}, 30000)
+
 	it('acks stop/pause/resume only on real transitions', async () => {
 		const { host, posted, send } = makeHost()
 		startHost(host)
@@ -256,4 +293,73 @@ describe('physics worker protocol hardening', () => {
 		await waitFor(() => posted.some(m => m.type === 'stopped'), 'stopped')
 		expect(count('stopped')).toBe(1)
 	}, 30000)
+})
+
+describe('physics worker script/emu edit propagation', () => {
+	it('applies frozen-only ball edits without waiting for drift', () => {
+		const table = new TableBuilder().build()
+		table.data.glassHeight = 4000
+		const sim = new WorkerSim(table)
+		sim.syncBalls([{ pos: [100, 200, 300], vel: [0, 0, 0], radius: 25, frozen: false }])
+		expect(sim.physics.balls[0].state.isFrozen).toBe(false)
+		// Frozen-only change: identical pos/vel, so no drift budget would ever trip.
+		sim.syncBalls([{ pos: [100, 200, 300], vel: [0, 0, 0], radius: 25, frozen: true }])
+		expect(sim.physics.balls.length).toBe(1)
+		expect(sim.physics.balls[0].state.isFrozen).toBe(true)
+		expect(sim.physics.balls[0].state.pos.x).toBe(100)
+		// Same through the discrete teleport op the viewer sends on frozen mismatch.
+		sim.teleportBall(0, { pos: [100, 200, 300], vel: [0, 0, 0], radius: 25, frozen: false })
+		expect(sim.physics.balls[0].state.isFrozen).toBe(false)
+	})
+
+	it('nudges identically on the main thread and through the input ring', () => {
+		const mkMain = (): { player: Player; ball: ReturnType<Player['createBall']> } => {
+			const table = new TableBuilder().build()
+			table.data.glassHeight = 4000
+			const player = new Player(table).init()
+			return { player, ball: player.createBall(dropAt(500, 500, 975), 25) }
+		}
+		const mkWorker = (): { sim: WorkerSim; ball: ReturnType<WorkerSim['spawnBall']> } => {
+			const table = new TableBuilder().build()
+			table.data.glassHeight = 4000
+			const sim = new WorkerSim(table)
+			const ball = sim.spawnBall({ pos: [500, 500, 1000], vel: [0, 0, 0], radius: 25, frozen: false })
+			return { sim, ball }
+		}
+		const main = mkMain()
+		const worker = mkWorker()
+		main.player.nudge(285, 2.6)
+		const sab = createPhysicsSAB()
+		expect(pushInput(sab, INPUT_NUDGE, Math.round(2.6 * 1000), 285)).toBe(true)
+		expect(worker.sim.drainInputs(sab)).toBe(1)
+		expect(worker.sim.pinInput.getNudgeHandler().getIndex()).toBe(main.player.getNudgeHandler().getIndex())
+		for (let timeMs = 16; timeMs <= 500; timeMs += 16) {
+			main.player.updatePhysics(timeMs)
+			worker.sim.physics.updatePhysics(timeMs)
+		}
+		// Integer angles and force×1000 survive the ring exactly (float32/uint16),
+		// so both sims run bit-identical cabinet impulses; assert tight.
+		const mainAcc = main.player.getPhysics().getCabinetAcceleration()
+		const workerAcc = worker.sim.physics.getCabinetAcceleration()
+		expect(Math.abs(mainAcc.x - workerAcc.x)).toBeLessThan(1e-12)
+		expect(Math.abs(mainAcc.y - workerAcc.y)).toBeLessThan(1e-12)
+		expect(Math.abs(main.ball.state.pos.x - worker.ball.state.pos.x)).toBeLessThan(1e-9)
+		expect(Math.abs(main.ball.state.pos.y - worker.ball.state.pos.y)).toBeLessThan(1e-9)
+		expect(Math.abs(main.ball.state.pos.z - worker.ball.state.pos.z)).toBeLessThan(1e-9)
+		expect(Math.abs(main.ball.hit.vel.x - worker.ball.hit.vel.x)).toBeLessThan(1e-9)
+	})
+
+	it('applies ring nudges whose force slot collides with the filtered start key', () => {
+		const sim = new WorkerSim(new TableBuilder().build())
+		const before = sim.pinInput.getNudgeHandler().getIndex()
+		const sab = createPhysicsSAB()
+		// force DIK_1/1000 encodes to key DIK_1: the start-key filter must not swallow it.
+		expect(pushInput(sab, INPUT_NUDGE, DIK_1, 90)).toBe(true)
+		expect(sim.drainInputs(sab)).toBe(1)
+		expect(sim.pinInput.getNudgeHandler().getIndex()).toBe(before + 1)
+		// While a real Start key press stays main-thread owned.
+		expect(pushInput(sab, INPUT_KEY_DOWN, DIK_1, 0)).toBe(true)
+		sim.drainInputs(sab)
+		expect(sim.pinInput.getNudgeHandler().getIndex()).toBe(before + 1)
+	})
 })
