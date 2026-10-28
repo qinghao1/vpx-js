@@ -92,7 +92,9 @@ describe('regression: playfield lights via szLightmap', () => {
 		expect(mat.emissiveIntensity, 'half intensity => 0.5').toBeCloseTo(0.5, 0.01)
 	})
 
-	it('Viewer.applyChangedStates propagates light changes to szLightmap primitives', async () => {
+	// Dynamic viewer import + TableBuilder scene takes seconds solo; allow
+	// headroom so parallel-suite load does not flake the gate.
+	it('Viewer.applyChangedStates propagates light changes to szLightmap primitives', { timeout: 60000 }, async () => {
 		const { Viewer } = await import('../../../demo-browser/src/viewer.js')
 		const table: any = new TableBuilder()
 			.addMaterial('VLM.Bake', { baseColor: 0xffffff })
