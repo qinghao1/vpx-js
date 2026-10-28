@@ -7,6 +7,7 @@ import { TableBuilder } from '../../test/table-builder.js'
 import { ThreeHelper } from '../../test/three.helper'
 import { NodeBinaryReader } from '../io/binary-reader.node.js'
 import { Vertex3D } from '../math/vector.js'
+import { _resetQualityCache } from '../util/quality.js'
 import { Table } from '../vpt/table/table.js'
 import { FULL_SWEEP_EVERY, type IBallCreationPosition, Player } from './player.js'
 
@@ -251,6 +252,84 @@ describe('The VPinball player', () => {
 		const table2 = await Table.load(new NodeBinaryReader(three.fixturePath('table-timer.vpx')))
 		const player2 = new Player(table2).init()
 		expect(player2.updatePhysics(16)).to.equal(16)
+	})
+
+	it('should reach the exact grid endpoint when simulating time', () => {
+		const table = new TableBuilder().withTableScript('').build('Table1')
+		const player = new Player(table).init({})
+
+		// 100 ms is an exact multiple of the 1000/60 ms grid: float accumulation
+		// overshoots it (100.00000000000001 > 100), which used to skip the
+		// terminal step and leave game time at 83.
+		player.simulateTime(100)
+		expect(player.getGameTime()).to.equal(100)
+	})
+
+	it('should initialize clocks on the first wall-clock call without a catch-up spiral', () => {
+		const table = new TableBuilder().withTableScript('').build('Table1')
+		const player = new Player(table).init({})
+
+		// First wall-clock frame far past the epoch: clock init consumes the
+		// call (0 iterations) instead of running a 1 kHz catch-up spiral.
+		const realNow = performance.now.bind(performance)
+		performance.now = () => 5_000_000
+		try {
+			expect(player.updatePhysics()).to.equal(0)
+		} finally {
+			performance.now = realNow
+		}
+
+		// Clocks now sit at the wall time, so explicit stepping continues exactly
+		// (game time is relative to sim start, hence 16 rather than 5000016).
+		expect(player.updatePhysics(5_000_016)).to.equal(16)
+		expect(player.getGameTime()).to.equal(16)
+	})
+
+	it('should bound explicit-time bursts to 16 steps on low-quality devices', () => {
+		const table = new TableBuilder().withTableScript('').build('Table1')
+		const player = new Player(table).init({})
+		player.updatePhysics(10)
+
+		// Force the low-quality branch the same way the render specs do.
+		const hadWindow = 'window' in globalThis
+		const hadLocation = 'location' in globalThis
+		const prevWindow = (globalThis as any).window
+		const prevLocation = (globalThis as any).location
+		try {
+			;(globalThis as any).window = { innerWidth: 1920, innerHeight: 1080 }
+			;(globalThis as any).location = { search: '?quality=low' }
+			_resetQualityCache()
+			// 16-step budget, then the clocks fast-forward: game time advances
+			// only the 16 simulated ms instead of jumping to the target.
+			expect(player.updatePhysics(10_000)).to.equal(16)
+			expect(player.getGameTime()).to.equal(26)
+		} finally {
+			// Assign rather than delete: `typeof window/location === 'undefined'`
+			// still holds, and it avoids the noDelete lint.
+			if (hadWindow) (globalThis as any).window = prevWindow
+			else (globalThis as any).window = undefined
+			if (hadLocation) (globalThis as any).location = prevLocation
+			else (globalThis as any).location = undefined
+			_resetQualityCache()
+		}
+	})
+
+	it('should not double-fire a timer enabled twice without an intervening change', async () => {
+		const table = await Table.load(new NodeBinaryReader(three.fixturePath('table-timer.vpx')))
+		const player = new Player(table).init()
+		const timer = table.timers.Timer1.getApi()
+		timer.Interval = 10
+		timer.Enabled = true
+		let fires = 0
+		timer.on('Timer', () => fires++)
+
+		// Api-level sets guard on change, so double-enable goes through physics
+		// directly: the upsert must not register the timer twice.
+		const hitTimer = (timer as any).hitTimer
+		player.getPhysics().timerStateChange(hitTimer, true)
+		player.getPhysics().timerStateChange(hitTimer, true)
+		player.updatePhysics(35)
+		expect(fires).to.equal(3)
 	})
 
 	it('should report no changes on first popStates and track new balls after', async () => {

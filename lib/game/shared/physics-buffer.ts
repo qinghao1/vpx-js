@@ -200,8 +200,6 @@ export function trySnap(sab: SharedArrayBuffer, out: Float32Array): FrameSnapsho
 	}
 }
 
-export const readFrame = trySnap
-
 export function pushInput(sab: SharedArrayBuffer, kind: number, key: number, val: number): boolean {
 	const h = getHeader(sab)
 	const dv = getRing(sab)

@@ -286,25 +286,31 @@ export class PinInput {
 			isInitialized?: () => boolean
 		} | null
 		if (emu && !emu.isMock && emu.isInitialized?.()) return
-		const kickers = Object.values(this.table.kickers) as unknown as Array<{
-			hit?: { ball?: unknown }
-			getApi(): { Kick(a: number, s: number): void; DestroyBall(): number }
-			getName(): string
-			data: { center: { x: number } }
-		}>
-		const withBall = kickers.filter(kicker => kicker.hit?.ball)
-		if (!withBall.length) {
-			const plunger = Object.values(this.table.plungers)[0] as unknown as
-				| { getApi(): { CreateBall(): unknown } }
-				| undefined
-			if (plunger) {
-				plunger.getApi().CreateBall()
+		// No array allocs on this per-keypress path: single for-in pass, keep the
+		// rightmost ball-holding kicker as the trough exit.
+		const kickers = this.table.kickers as unknown as Record<
+			string,
+			{
+				hit?: { ball?: unknown }
+				getApi(): { Kick(a: number, s: number): void; DestroyBall(): number }
+				getName(): string
+				data: { center: { x: number } }
+			}
+		>
+		let exit: (typeof kickers)[string] | undefined
+		for (const name in kickers) {
+			const kicker = kickers[name]
+			if (!kicker?.hit?.ball) continue
+			if (!exit || kicker.data.center.x > exit.data.center.x) exit = kicker
+		}
+		if (!exit) {
+			for (const name in this.table.plungers) {
+				const plunger = this.table.plungers[name] as unknown as { getApi(): { CreateBall(): unknown } }
+				plunger?.getApi().CreateBall()
+				break
 			}
 			return
 		}
-		withBall.sort((a, b) => b.data.center.x - a.data.center.x)
-		const exit = withBall[0]
-		if (!exit) return
 		exit.getApi().Kick(TROUGH_KICK_ANGLE, TROUGH_KICK_SPEED)
 	}
 

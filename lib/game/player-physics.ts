@@ -35,10 +35,8 @@ import type { PinInput } from './pin-input.js'
 import type { IBallCreationPosition, Player } from './player.js'
 
 const CLOCK_INIT_THRESHOLD_USEC = 1_000_000
-// Deliberate divergence from upstream: VPinball has no backlog clamp (its 200 ms is an in-loop
-// anti-hang guard on wall time burned, PhysicsEngine.cpp). vpx-js caps catch-up per wall-clock
-// frame instead so a heavy frame cannot spiral into 1 kHz catch-up jank. Explicit-time callers
-// still run full catch-up like upstream.
+// Divergence: upstream has no backlog clamp (its 200 ms is an in-loop anti-hang
+// guard, PhysicsEngine.cpp). vpx-js caps catch-up per wall-clock frame instead.
 const MAX_CATCHUP_USEC = 50 * PHYSICS_STEPTIME
 const MAX_CATCHUP_USEC_LOW = 16 * PHYSICS_STEPTIME
 const MAX_ITER_LOW = 16
@@ -53,11 +51,9 @@ export class PlayerPhysics {
 	public contacts: CollisionEvent[] = []
 	public activeBall?: Ball
 	public activeBallBC?: Ball
-	// Intentional divergence from upstream PhysicsEngine.cpp: upstream draws one
-	// random per ball for hit-test order (~L679) and one per substep for contact
-	// order (~L803/812), plus a deterministic per-substep toggle for ball-ball
-	// dedupe (L868). This port drives all three from the toggle so physics stays
-	// reproducible. Do not "fix" with Math.random().
+	// Divergence: upstream randomizes hit-test/contact order per ball and substep
+	// (PhysicsEngine.cpp); the port drives all three from this toggle so physics
+	// stays reproducible. Do not "fix" with Math.random().
 	public swapBallCollisionHandling = false
 	public lastPlungerHit = 0
 	public ballControl = false
@@ -238,27 +234,12 @@ export class PlayerPhysics {
 			this.curPhysicsFrameTime += drift
 			this.nextPhysicsFrameTime += drift
 		}
-		this.lastFrameDuration = initial - this.lastTimeUsec
-		if (this.lastFrameDuration > 1_000_000) this.lastFrameDuration = DEFAULT_STEPTIME
-		this.lastTimeUsec = initial
-		this.cFrames++
-		if (this.timeMsec - this.lastFpsTime > 1000) {
-			this.fps = (this.cFrames * 1000) / (this.timeMsec - this.lastFpsTime)
-			this.lastFpsTime = this.timeMsec
-			this.cFrames = 0
-		}
+		this.advanceFrameClock(initial)
 		this.scriptPeriod = 0
 		let iterations = 0
-		// Deliberate divergence from upstream PhysicsEngine.cpp
-		// (`while (m_nextPhysicsFrameTime < initial_time_usec)`): run a step once
-		// its end reaches the target time, so explicit-ms callers advance exactly
-		// to the requested time (updatePhysics(16) runs 16 steps). Upstream stops
-		// one step short to stay behind the wall clock; the port favors exact
-		// explicit-time stepping because the physics corpus and headless
-		// determinism depend on it — adopting `<` shifts collection, gate,
-		// hit-target and timer expectations. Pinned by the player.spec loop-bound
-		// specs ("keep physics behind wall clock", "zero iterations", "clamp
-		// wall-clock catch-up").
+		// Divergence: upstream loops while `next < initial` (stays a step behind
+		// the wall clock); the port uses `<=` so explicit-ms callers advance
+		// exactly to the requested time. Pinned by the player.spec loop-bound specs.
 		while (this.nextPhysicsFrameTime <= initial) {
 			if (isLowQuality() && iterations >= MAX_ITER_LOW) {
 				const drift = initial - this.curPhysicsFrameTime
@@ -275,9 +256,8 @@ export class PlayerPhysics {
 			this.pinInput.tickNudge()
 			const oldBall = this.activeBall
 			this.activeBall = undefined
-			// Wall-clock-only budget (upstream MAX_TIMERS_MSEC_OVERALL anti-spiral
-			// guard): explicit-time callers always fire so headless sims stay
-			// deterministic no matter how slow the wall clock runs.
+			// Upstream MAX_TIMERS_MSEC_OVERALL anti-spiral guard, wall-clock only:
+			// explicit-time callers always fire so headless sims stay deterministic.
 			if (time !== undefined || this.scriptPeriod <= 1000 * MAX_TIMERS_MSEC_OVERALL) {
 				this.fireTimers(TimerMode.Update)
 				this.scriptPeriod += Math.floor(performance.now() - t0)
@@ -292,12 +272,8 @@ export class PlayerPhysics {
 			this.nextPhysicsFrameTime += PHYSICS_STEPTIME
 		}
 		this.timeMsec = Math.floor((initial - this.startTimeUsec) / 1000)
-		// One-call-one-frame: headless callers own no render/game-logic frame, so
-		// each updatePhysics call IS one frame — -1 fires once per call (even
-		// paused, even for a repeated timestamp) and -2 once per call while
-		// playing. Upstream splits this across Player::Render (-1, every frame)
-		// and UpdateGameLogic (-2, only while playing); the port collapses both
-		// onto the physics-frame call. Do not "fix" repeats into once-per-ms.
+		// One call is one headless frame: -1 fires per call (even paused/repeated),
+		// -2 per call while playing. Upstream splits these across Render/UpdateGameLogic.
 		this.fireTimers(TimerMode.OnNewFrame)
 		// Upstream fires -2 only while playing, but -1 on every frame incl. paused.
 		if (!this.isPaused) this.fireTimers(TimerMode.OnGameSync)
@@ -344,12 +320,18 @@ export class PlayerPhysics {
 			else this.changedHitTimers.push(new TimerOnOff(enabled, timer))
 		} else if (enabled) {
 			timer.nextFire = this.timeMsec + timer.interval
-			if (!this.hitTimers.includes(timer)) this.hitTimers.push(timer)
+			this.upsertTimer(timer, true)
 		} else {
-			const idx = this.hitTimers.indexOf(timer)
-			if (idx >= 0) this.hitTimers.splice(idx, 1)
+			this.upsertTimer(timer, false)
 			timer.nextFire = TIMER_DISABLED
 		}
+	}
+
+	private upsertTimer(timer: TimerHit, enabled: boolean): void {
+		const idx = this.hitTimers.indexOf(timer)
+		if (enabled) {
+			if (idx < 0) this.hitTimers.push(timer)
+		} else if (idx >= 0) this.hitTimers.splice(idx, 1)
 	}
 
 	private ensureInitialTime(initial: number, time?: number): boolean {
@@ -368,13 +350,20 @@ export class PlayerPhysics {
 	}
 
 	private flushTimers(): void {
-		for (const c of this.changedHitTimers) {
-			const idx = this.hitTimers.indexOf(c.timer)
-			if (c.enabled) {
-				if (idx < 0) this.hitTimers.push(c.timer)
-			} else if (idx >= 0) this.hitTimers.splice(idx, 1)
-		}
+		for (const c of this.changedHitTimers) this.upsertTimer(c.timer, c.enabled)
 		this.changedHitTimers.length = 0
+	}
+
+	private advanceFrameClock(initial: number): void {
+		this.lastFrameDuration = initial - this.lastTimeUsec
+		if (this.lastFrameDuration > 1_000_000) this.lastFrameDuration = DEFAULT_STEPTIME
+		this.lastTimeUsec = initial
+		this.cFrames++
+		if (this.timeMsec - this.lastFpsTime > 1000) {
+			this.fps = (this.cFrames * 1000) / (this.timeMsec - this.lastFpsTime)
+			this.lastFpsTime = this.timeMsec
+			this.cFrames = 0
+		}
 	}
 
 	public updateVelocities(): void {

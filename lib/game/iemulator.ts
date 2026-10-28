@@ -34,5 +34,3 @@ export interface IEmulator {
 	setSolMask?(low: number, mask: number): void
 	setTimeFence?(time: number): void
 }
-
-export type { IEmulator as Emulator }

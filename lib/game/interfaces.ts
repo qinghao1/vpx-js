@@ -20,13 +20,11 @@ import type { Player } from './player.js'
 export interface IItem {
 	getName(): string
 }
-export type { IItem as ItemEntity }
 
 /** Table element that participates in gameplay (≈ IEditable in VPinball). */
 export interface IPlayable extends IItem {
 	setupPlayer(player: Player, table: Table): void
 }
-export type { IPlayable as Playable }
 
 export function isPlayable(arg: unknown): arg is IPlayable {
 	return typeof arg === 'object' && arg !== null && 'setupPlayer' in arg
@@ -42,7 +40,6 @@ export interface IRenderable<STATE extends ItemState = ItemState> extends IItem 
 	getState(): STATE
 	getUpdater(): ItemUpdater<STATE>
 }
-export type { IRenderable as Renderable }
 
 export function isRenderable(arg: unknown): arg is IRenderable<ItemState> {
 	return typeof arg === 'object' && arg !== null && 'getMeshes' in arg
@@ -81,7 +78,6 @@ export interface IHittable extends IPlayable {
 	getHitShapes(): HitObject[]
 	getEventProxy(): EventProxy
 }
-export type { IHittable as Hittable }
 
 export function isHittable(arg: unknown): arg is IHittable {
 	return typeof arg === 'object' && arg !== null && 'getHitShapes' in arg
@@ -91,7 +87,6 @@ export function isHittable(arg: unknown): arg is IHittable {
 export interface IMovable extends IPlayable {
 	getMover(): MoverObject
 }
-export type { IMovable as Movable }
 
 export function isMovable(arg: unknown): arg is IMovable {
 	return typeof arg === 'object' && arg !== null && 'getMover' in arg
@@ -101,13 +96,11 @@ export function isMovable(arg: unknown): arg is IMovable {
 export interface IAnimatable extends IPlayable {
 	getAnimation(): IAnimation
 }
-export type { IAnimatable as Animatable }
 
 export interface IAnimation {
 	init(timeMsec: number): void
 	updateAnimation(timeMsec: number, table: Table): boolean
 }
-export type { IAnimation as Animation }
 
 export function isAnimatable(arg: unknown): arg is IAnimatable {
 	return typeof arg === 'object' && arg !== null && 'getAnimation' in arg
@@ -118,7 +111,6 @@ export interface IScriptable<T extends ItemApi<ItemData> = ItemApi<ItemData>> ex
 	getApi(): T
 	getEventNames(): string[]
 }
-export type { IScriptable as Scriptable }
 
 export function isScriptable<T extends ItemApi<ItemData>>(arg: unknown): arg is IScriptable<T> {
 	return typeof arg === 'object' && arg !== null && 'getApi' in arg

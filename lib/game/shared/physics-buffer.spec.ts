@@ -8,7 +8,6 @@ import {
 	drainInput,
 	MAX_BALLS,
 	pushInput,
-	readFrame,
 	SAB_SIZE,
 	trySnap,
 	writeFrame,
@@ -73,7 +72,7 @@ describe('physics-buffer', () => {
 				}
 			}
 			if (i % 7 === 0) {
-				const r = readFrame(sab, out)
+				const r = trySnap(sab, out)
 				if (r) expect(r.tNext).toBeGreaterThan(r.tPrev)
 			}
 		}

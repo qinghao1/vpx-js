@@ -27,6 +27,13 @@ export interface DomKeyEvent {
 /** Full state-sweep cadence: every Nth popStates re-checks all states to catch unmarked mutations. */
 export const FULL_SWEEP_EVERY = 300
 
+/**
+ * Full-sweep skip threshold: when the dirty set already covers this fraction
+ * of all states, the incremental diff visits nearly everything anyway, so the
+ * periodic full sweep is redundant that frame.
+ */
+export const FULL_SWEEP_MIN_COVERAGE = 0.5
+
 /** Host-facing game controller: input, physics, animations and state diffing. */
 export class Player extends EventEmitter {
 	private readonly pinInput: PinInput
@@ -150,7 +157,11 @@ export class Player extends EventEmitter {
 	/** Headless driver: steps physics + animations at 60 Hz up to absolute `endMs` (ms, not a delta). */
 	public simulateTime(endMs: number): void {
 		if (!this.isInitialized) throw new Error('Player must be initialized before simulating time!')
-		for (const dt = 1000 / 60; this.simulatedTimeMs <= endMs; this.simulatedTimeMs += dt) {
+		// 1 ns tolerance: float accumulation overshoots exact grid multiples
+		// (t=100.00000000000001 > 100), which would otherwise skip the terminal
+		// step and leave game time behind endMs. Far below the 16.7 ms grid, so
+		// no spurious step is possible.
+		for (const dt = 1000 / 60; this.simulatedTimeMs <= endMs + 1e-6; this.simulatedTimeMs += dt) {
 			this.updatePhysics(this.simulatedTimeMs)
 			this.updateAnimations(this.simulatedTimeMs)
 		}
@@ -181,7 +192,9 @@ export class Player extends EventEmitter {
 	public popStates(): ChangedStates<ItemState> {
 		const changed = new ChangedStates<ItemState>()
 		this.frameCount++
-		const useFull = this.frameCount % FULL_SWEEP_EVERY === 0 && this.dirtySet.size < this.allStateNames.length * 0.5
+		const useFull =
+			this.frameCount % FULL_SWEEP_EVERY === 0 &&
+			this.dirtySet.size < this.allStateNames.length * FULL_SWEEP_MIN_COVERAGE
 		if (useFull) {
 			for (const name of this.allStateNames) this.dirtySet.add(name)
 		}

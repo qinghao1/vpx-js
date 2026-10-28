@@ -153,19 +153,21 @@ export function keyEventToDirectInputKey(event: {
 	const codeStr = String(event.code ?? '')
 	// DirectInput codes are scancodes, so map by physical key first. This keeps
 	// shifted punctuation (key "!" on Digit1) and non-US layouts working.
-	const codeDi = KEY_CODE2DI[codeStr]
+	const codeDi = KEY_TO_DI[codeStr] ?? KEY_TO_DI[keyLower]
 	if (codeDi) return codeDi
-	// legacy fallback for events without `code`
+	// legacy fallback for shift events without `code`
 	if (keyLower === 'shift' || kc === 16) return loc === 2 ? DIK_RSHIFT : DIK_LSHIFT
-	return KEY_JS2DI[keyLower] ?? 0
+	return 0
 }
 
 /**
- * Maps layout-independent `KeyboardEvent.code` (physical key) to DirectInput
- * key codes. Primary map: unlike `key`, it is unaffected by shift state and
- * keyboard layout.
+ * Browser key to DirectInput code. Physical `KeyboardEvent.code` entries come
+ * first (case-sensitive, layout-independent: unaffected by shift state and
+ * keyboard layout, so shifted punctuation and non-US layouts map correctly),
+ * then legacy lowercase `key` names for events without `code`. The two key
+ * sets are disjoint, so one lookup tries the physical key, then the legacy name.
  */
-const KEY_CODE2DI: { [key: string]: number } = {
+const KEY_TO_DI: { [key: string]: number } = {
 	Escape: DIK_ESCAPE,
 	Digit1: DIK_1,
 	Digit2: DIK_2,
@@ -271,15 +273,10 @@ const KEY_CODE2DI: { [key: string]: number } = {
 	Delete: DIK_DELETE,
 	MetaLeft: DIK_LWIN,
 	MetaRight: DIK_RWIN,
-}
 
-/**
- * Maps Javascript Keycodes to DirectInput key codes.
- *
- * Lowercase, because ascii letters would become upper-cased in case shift
- * was hold, and we only care about the key, not other combinations.
- */
-const KEY_JS2DI: { [key: string]: number } = {
+	// Legacy fallback below: lowercase `key` names for events without `code`.
+	// Lowercase, because ascii letters become upper-cased while shift is held,
+	// and we only care about the key, not other combinations.
 	escape: DIK_ESCAPE,
 	backspace: DIK_BACK,
 	tab: DIK_TAB,

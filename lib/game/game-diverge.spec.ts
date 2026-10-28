@@ -53,26 +53,16 @@ describe('destroyBall', () => {
 })
 
 describe('swapBallCollisionHandling', () => {
-	it('toggles exactly once per simulate cycle (deterministic, no RNG)', () => {
-		const player = new Player(new TableBuilder().build()).init()
-		const physics = player.getPhysics()
-		physics.swapBallCollisionHandling = false
-		physics.physicsSimulateCycle(1)
-		expect(physics.swapBallCollisionHandling).toBe(true)
-		physics.physicsSimulateCycle(1)
-		expect(physics.swapBallCollisionHandling).toBe(false)
+	it.each([4, 5])('simulates repeat runs identically over %i cycles (no RNG in traversal)', cycles => {
+		expect(simulateBallPositions(cycles)).toEqual(simulateBallPositions(cycles))
 	})
 
-	it('simulates repeat runs identically (no RNG in traversal)', () => {
-		expect(simulateBallPositions()).toEqual(simulateBallPositions())
-	})
-
-	function simulateBallPositions(): number[] {
+	function simulateBallPositions(cycles: number): number[] {
 		const player = new Player(new TableBuilder().build()).init()
 		player.createBall(mockCreator())
 		player.createBall(mockCreator(1200, 1000, 100))
 		const physics = player.getPhysics()
-		for (let i = 0; i < 5; i++) physics.physicsSimulateCycle(1)
+		for (let i = 0; i < cycles; i++) physics.physicsSimulateCycle(1)
 		return player.getBalls().flatMap(ball => {
 			const pos = ball.getState().pos
 			return [pos.x, pos.y, pos.z]

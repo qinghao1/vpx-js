@@ -22,6 +22,19 @@ epoch and silently advances nothing once the clock has passed it — always pass
 a running total (see `simulateTime`, `test/harness/harness-gameplay.ts`).
 Omitting the argument uses the real clock.
 
+## Physics constants (upstream `PhysicsEngine.cpp`, `physconst.h`)
+
+- `STATICTIME = 0.02`, `STATICCNTS = 10`: a collision pass may reuse a hit
+  time below 0.02 at most 10 times before it is clamped to 0.02, so resting
+  contact terminates instead of looping on ever-smaller hit times.
+- Wall-clock catch-up is capped at `MAX_CATCHUP_USEC = 50` physics steps
+  (`16` on low-quality devices); explicit-time callers always run full
+  catch-up like upstream. Low-quality also stops an explicit-time burst after
+  `MAX_ITER_LOW = 16` steps and fast-forwards the clocks.
+- Script-timer budget: `MAX_TIMERS_MSEC_OVERALL = 5` caps wall-clock script
+  time per frame (upstream anti-spiral guard); explicit-time callers always
+  fire so headless sims stay deterministic.
+
 ## Step rates: 1 kHz movers vs per-frame animations
 
 - Movers (`IMovable`, e.g. flippers, gates) update inside every 1 ms physics
@@ -51,6 +64,18 @@ The host must `release()` the returned `ChangedStates`.
 flipper/plunger/nudge/cabinet sync. Keys are level-triggered through the
 `pressed` set, so draining per-iteration (not per-frame) keeps short taps from
 being lost at low frame rates.
+
+Key codes are DirectInput scancodes (upstream `InputManager.cpp`), not DOM
+values: `key-code.ts` maps the layout-independent physical
+`KeyboardEvent.code` first (shifted punctuation and non-US layouts keep
+working) and falls back to the lowercase `key` name for events without `code`.
+Left/right Shift are disambiguated by `code` (`ShiftLeft`/`ShiftRight`); only
+the legacy no-`code` path uses `location`/`keyLocation` (`2` = right).
+Free-play helpers (auto-credits, Start coin pulses, mock trough eject) are
+vpx-js-only — none exists upstream — and default on via the static
+`PinInput.freePlayDefault` (set false before constructing the `Player` to
+disable). All free-play scheduling runs on the physics clock, so pausing the
+game pauses it.
 
 ## Threaded physics (optional)
 

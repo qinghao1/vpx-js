@@ -340,6 +340,9 @@ export function startHost(host: WorkerHost): void {
 			})
 			return
 		}
+		// 1 ms cooperative cadence, not a 1 kHz promise: the timeout yields so
+		// init/start/stop messages interleave, and each tick catches the sim up
+		// to the wall clock via updatePhysics() (no-arg wall-clock stepping).
 		timer = setTimeout(loop, 1)
 	}
 
