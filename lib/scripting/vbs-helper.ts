@@ -201,9 +201,7 @@ export class VBSHelper {
 	/**
 	 * Coerces an `Execute`/`Eval` argument to source text. VBScript converts
 	 * scalars implicitly (`Eval(2)` works); Empty is a type mismatch (13),
-	 * Null is invalid use (94).
-	 * Raises through `ERR` so `On Error Resume Next` records it instead of
-	 * throwing, and returns `undefined` in that case.
+	 * Null is invalid use (94). Failures route through `ERR` (see coerceBound).
 	 */
 	private coerceInline(vbs: unknown): string | undefined {
 		if (vbs === null) {

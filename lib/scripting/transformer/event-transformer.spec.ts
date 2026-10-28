@@ -6,7 +6,6 @@ import { expect } from 'chai'
 import sinonChai from 'sinon-chai'
 import { ScriptHelper } from '../../../test/script.helper'
 import { TableBuilder } from '../../../test/table-builder.js'
-import { ThreeHelper } from '../../../test/three.helper'
 import { Player } from '../../game/player.js'
 import type { Table } from '../../vpt/table/table.js'
 import { Transpiler } from '../transpiler.js'
@@ -15,7 +14,6 @@ import { EventTransformer } from './event-transformer.js'
 chai.use((sinonChai as any).default ?? sinonChai)
 
 describe('The scripting event transformer', () => {
-	const _three = new ThreeHelper()
 	let table: Table
 
 	before(() => {

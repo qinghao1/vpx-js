@@ -35,11 +35,17 @@ interface VpmControllerDisplayStubs {
 chai.use((sinonChai as any).default ?? sinonChai)
 describe('The VpmController - VISUAL PINMAME COM OBJECT', () => {
 	const sandbox = sinon.createSandbox()
+	let sharedPlayer: Player
 	let vpmController: VpmController & VpmControllerDisplayStubs
 	let setSwitchInputSpy: SinonStub<[number, boolean?]>
 	let setFliptronicsInputSpy: SinonStub<[string, boolean?]>
 	let setDipSwitchByteSpy: SinonStub<[number, number?]>
 	let _getDipSwitchByteSpy: SinonStub<any>
+
+	before(() => {
+		const table: Table = new TableBuilder().build()
+		sharedPlayer = new Player(table)
+	})
 
 	beforeEach(() => {
 		setSwitchInputSpy = sandbox.stub(Emulator.prototype, 'setSwitchInput').returns(true)
@@ -47,9 +53,7 @@ describe('The VpmController - VISUAL PINMAME COM OBJECT', () => {
 		setDipSwitchByteSpy = sandbox.stub(Emulator.prototype, 'setDipSwitchByte')
 		_getDipSwitchByteSpy = sandbox.stub(Emulator.prototype, 'getDipSwitchByte').returns(123)
 
-		const table: Table = new TableBuilder().build()
-		const player: Player = new Player(table)
-		vpmController = new VpmController(player) as VpmController & VpmControllerDisplayStubs
+		vpmController = new VpmController(sharedPlayer) as VpmController & VpmControllerDisplayStubs
 	})
 
 	afterEach(() => {
@@ -356,80 +360,31 @@ describe('The VpmController - VISUAL PINMAME COM OBJECT', () => {
 		expect(result).to.equal('SPLASH!')
 	})
 
-	it('dummy Debugging function (GET): ShowDMDOnly', () => {
-		const result: boolean = vpmController.ShowDMDOnly
-		expect(result).to.equal(false)
-	})
+	it.each([
+		['ShowDMDOnly', false],
+		['HandleKeyboard', false],
+		['ShowTitle', false],
+		['LockDisplay', false],
+		['Hidden', false],
+		['DoubleSize', false],
+		['Antialias', false],
+		['ShowFrame', false],
+	] as Array<[keyof VpmControllerDisplayStubs, boolean]>)(
+		'dummy boolean function stays false: %s',
+		(prop, expected) => {
+			;(vpmController as any)[prop] = true
+			expect(vpmController[prop]).to.equal(expected)
+		},
+	)
 
-	it('dummy Debugging function (GET): HandleKeyboard', () => {
-		const result: boolean = vpmController.HandleKeyboard
-		expect(result).to.equal(false)
-	})
-
-	it('dummy Debugging function (GET): ShowTitle', () => {
-		const result: boolean = vpmController.ShowTitle
-		expect(result).to.equal(false)
-	})
-
-	it('set dummy Debugging functions', () => {
-		vpmController.ShowDMDOnly = true
-		vpmController.HandleKeyboard = true
-		vpmController.ShowTitle = true
-		expect(vpmController.ShowTitle).to.equal(false)
-	})
-
-	it('dummy Customization function (GET): LockDisplay', () => {
-		vpmController.LockDisplay = true
-		const result: boolean = vpmController.LockDisplay
-		expect(result).to.equal(false)
-	})
-
-	it('dummy Customization function: Hidden', () => {
-		vpmController.Hidden = true
-		const result: boolean = vpmController.Hidden
-		expect(result).to.equal(false)
-	})
-
-	it('dummy Customization function: DoubleSize', () => {
-		vpmController.DoubleSize = true
-		const result: boolean = vpmController.DoubleSize
-		expect(result).to.equal(false)
-	})
-
-	it('dummy Customization function: Antialias', () => {
-		vpmController.Antialias = true
-		const result: boolean = vpmController.Antialias
-		expect(result).to.equal(false)
-	})
-
-	it('dummy Customization function: ShowFrame', () => {
-		vpmController.ShowFrame = true
-		const result: boolean = vpmController.ShowFrame
-		expect(result).to.equal(false)
-	})
-
-	it('dummy Customization function: BorderSizeX', () => {
-		vpmController.BorderSizeX = 5
-		const result: number = vpmController.BorderSizeX
-		expect(result).to.equal(0)
-	})
-
-	it('dummy Customization function: BorderSizeY', () => {
-		vpmController.BorderSizeY = 5
-		const result: number = vpmController.BorderSizeY
-		expect(result).to.equal(0)
-	})
-
-	it('dummy Customization function: WindowPosX', () => {
-		vpmController.WindowPosX = 5
-		const result: number = vpmController.WindowPosX
-		expect(result).to.equal(0)
-	})
-
-	it('dummy Customization function: WindowPosY', () => {
-		vpmController.WindowPosY = 5
-		const result: number = vpmController.WindowPosY
-		expect(result).to.equal(0)
+	it.each([
+		['BorderSizeX', 0],
+		['BorderSizeY', 0],
+		['WindowPosX', 0],
+		['WindowPosY', 0],
+	] as Array<[keyof VpmControllerDisplayStubs, number]>)('dummy numeric function stays 0: %s', (prop, expected) => {
+		;(vpmController[prop] as number) = 5
+		expect(vpmController[prop]).to.equal(expected)
 	})
 
 	it('dummy GameSetting function: HandleMechanics', () => {

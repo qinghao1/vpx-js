@@ -5,22 +5,11 @@ import * as chai from 'chai'
 import { expect } from 'chai'
 import sinonChai from 'sinon-chai'
 import { ScriptHelper } from '../../../test/script.helper'
-import { TableBuilder } from '../../../test/table-builder.js'
-import { Player } from '../../game/player.js'
-import type { Table } from '../../vpt/table/table.js'
 import { FunctionHoistTransformer } from './function-hoist-transformer.js'
 
 chai.use((sinonChai as any).default ?? sinonChai)
 
 describe('The scripting function hoist transformer', () => {
-	let table: Table
-	let _player: Player
-
-	beforeEach(() => {
-		table = new TableBuilder().build()
-		_player = new Player(table)
-	})
-
 	it('should move a function to the top', () => {
 		const vbs = `test\nsub test\nend sub`
 		const js = transform(vbs)

@@ -256,7 +256,7 @@ describe('The VBScript stdlib', () => {
 
 	it('should provide the IsNumeric function', () => {
 		const scope = {} as any
-		const vbs = `result1 = IsNumeric("12")\nresult2 = IsNumeric("12.5")\nresult3 = IsNumeric("abc")\nresult4 = IsNumeric("")`
+		const vbs = `result1 = IsNumeric("12")\nresult2 = IsNumeric("12.5")\nresult3 = IsNumeric("abc")\nresult4 = IsNumeric("")\nresult5 = IsNumeric(CDate("2024-01-15"))`
 		const transpiler = new Transpiler(table, player)
 		transpiler.execute(vbs, scope, 'global')
 
@@ -264,6 +264,7 @@ describe('The VBScript stdlib', () => {
 		expect(scope.result2).to.equal(true)
 		expect(scope.result3).to.equal(false)
 		expect(scope.result4).to.equal(false)
+		expect(scope.result5).to.equal(true)
 	})
 
 	it('should provide vb string constants', () => {
@@ -304,7 +305,6 @@ describe('The VBScript stdlib', () => {
 			['CStr(42)', '42'],
 			['CStr(True)', 'True'],
 			['TypeName(CDate("2020-01-02"))', 'Date'],
-			['CDate("bogus")', 'bogus'],
 			['CCur(1.234)', 1.234],
 			['CCur(1.23456)', 1.2346],
 			['RGB(255, 0, 0)', 16711680],
@@ -361,6 +361,10 @@ describe('The VBScript stdlib', () => {
 			['CBool("abc")', 13],
 			['CBool(Null)', 94],
 			['CStr(Null)', 94],
+			['CDate("bogus")', 13],
+			['CDate("")', 13],
+			['CDate(Null)', 94],
+			['CDate(Nothing)', 91],
 		]
 		for (const [expr, code] of rows) {
 			const scope = {} as any

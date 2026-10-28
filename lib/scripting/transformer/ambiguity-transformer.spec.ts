@@ -50,12 +50,6 @@ describe('The scripting ambiguity transformer', () => {
 			expect(js).to.equal(`${Transformer.SCOPE_NAME}.result = __stdlib.Math.pow(10, 2);`)
 		})
 
-		// it('should not use the helper string parameters', () => {
-		// 	const vbs = `LoadController "EM"\n`;
-		// 	const js = transpiler.transpile(vbs);
-		// 	expect(js).to.equal(`${Transformer.SCOPE_NAME}.LoadController('EM');`);
-		// });
-
 		it('should use the helper to access scope variables', () => {
 			const vbs = `x = DOFeffects(Effect)\n`
 			const js = transpiler.transpile(vbs)

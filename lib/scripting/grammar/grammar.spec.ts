@@ -88,28 +88,6 @@ describe('The scripting grammar - real-world scripts', () => {
 			expect(() => grammar.transpile(vbs)).not.to.throw(Error, n)
 		}
 	})
-
-	it('should transpile walking_dead when available', { timeout: 30000 }, async () => {
-		const fs = await import('node:fs')
-		const path = '/home/qinghao1/Downloads/walking_dead.vpx'
-		if (!fs.existsSync(path)) return
-		const { NodeBinaryReader } = await import('../../io/binary-reader.node.js')
-		const { Table } = await import('../../vpt/table/table.js')
-		const { Player } = await import('../../game/player.js')
-		const { Transpiler } = await import('../transpiler.js')
-		const table = await Table.load(new NodeBinaryReader(path), { skipTextures: true } as any)
-		const vbs = (table as any).tableScript as string
-		expect(vbs.length).to.be.greaterThan(10000)
-		const player = new Player(table)
-		const transpiler = new Transpiler(table, player)
-		let js: string
-		expect(() => {
-			js = transpiler.transpile(vbs)
-		}).not.to.throw()
-		expect(js!.length).to.be.greaterThan(10000)
-		const prog = grammar.transpile('Dim x\n')
-		expect(prog.body.length).to.equal(1)
-	})
 })
 
 describe('The scripting grammar - block Else If (two words)', () => {

@@ -1,6 +1,4 @@
 // Copyright (C) 2026 Chu Qinghao — GPL-2.0 — see LICENSE
-import * as fs from 'node:fs'
-import * as path from 'node:path'
 import * as sinon from 'sinon'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { GamelistDB } from 'wpc-emu'
@@ -8,8 +6,6 @@ import { TableBuilder } from '../../../test/table-builder.js'
 import { PinMameEmulator } from '../../emu/pinmame/pinmame-emu.js'
 import { resetPinmameModuleCache } from '../../emu/pinmame/pinmame-loader.js'
 import { Player } from '../../game/player.js'
-import { NodeBinaryReader } from '../../io/binary-reader.node.js'
-import { Table } from '../../vpt/table/table.js'
 import { VpmController } from './vpm-controller.js'
 
 async function waitFor(fn: () => boolean, ms = 500): Promise<void> {
@@ -54,16 +50,6 @@ describe('VpmController integration', () => {
 		expect(() => (vpm.Dip[0] = 0x55)).not.toThrow()
 		expect(() => (vpm.Switch[112] = 1)).not.toThrow()
 		expect(() => (vpm.Switch[112] = 0)).not.toThrow()
-	})
-
-	it('loads example VPX and extracts GameName (if present)', async () => {
-		const vpxPath = path.resolve('example-table.vpx')
-		if (!fs.existsSync(vpxPath)) return
-		const table = await Table.load(new NodeBinaryReader(vpxPath))
-		expect(table.tableScript?.length).toBeGreaterThan(10000)
-		const m = table.tableScript?.match(/cGameName\s*=\s*["']([^"']+)["']/i)
-		expect(m).not.toBeNull()
-		expect(m?.[1].length).toBeGreaterThan(2)
 	})
 
 	it('generic game name routes to PinMAME — not just twd_160h', async () => {

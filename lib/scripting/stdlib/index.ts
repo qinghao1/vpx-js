@@ -317,7 +317,15 @@ export class Stdlib extends VbsApi {
 	}
 
 	public CDate(v: any): Date | string {
+		if (v === null) {
+			ERR.Raise(new VbsError('Invalid use of Null', 94))
+			return ''
+		}
 		if (this.isUndef(v)) return ''
+		if (v === NOTHING) {
+			ERR.Raise(new VbsError('Object variable not set', 91))
+			return ''
+		}
 		let input: string
 		try {
 			input = String(v).trim().replace(/^#|#$/g, '')
@@ -325,12 +333,12 @@ export class Stdlib extends VbsApi {
 			ERR.Raise(new VbsError('Type mismatch', 13))
 			return ''
 		}
-		try {
-			const date = new Date(input)
-			return isNaN(date.getTime()) ? String(v) : date
-		} catch {
-			return String(v)
+		const date = new Date(input)
+		if (isNaN(date.getTime())) {
+			ERR.Raise(new VbsError('Type mismatch', 13))
+			return ''
 		}
+		return date
 	}
 
 	public CCur(v: any): number {
@@ -432,7 +440,7 @@ export class Stdlib extends VbsApi {
 		if (this.isUndef(value)) return false
 		if (typeof value === 'boolean') return true
 		if (typeof value === 'number') return !Number.isNaN(value)
-		if (value instanceof Date) return false
+		if (value instanceof Date) return true
 		if (typeof value !== 'string') return false
 		const text = value.trim()
 		if (text === '') return false
@@ -443,6 +451,8 @@ export class Stdlib extends VbsApi {
 		// Initializes the random-number generator in VBScript. Nothing to initialize here.
 	}
 
+	// Stub: VBScript's optional argument reseeds (negative) or repeats (zero)
+	// the sequence; we always return the next Math.random() value instead.
 	public Rnd(_n?: number): number {
 		return Math.random()
 	}

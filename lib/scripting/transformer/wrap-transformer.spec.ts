@@ -5,20 +5,20 @@ import * as chai from 'chai'
 import { expect } from 'chai'
 import sinonChai from 'sinon-chai'
 import { ScriptHelper } from '../../../test/script.helper'
-import { ThreeHelper } from '../../../test/three.helper'
-import { NodeBinaryReader } from '../../io/binary-reader.node.js'
-import { Table } from '../../vpt/table/table.js'
+import { TableBuilder } from '../../../test/table-builder.js'
+import type { Table } from '../../vpt/table/table.js'
 import { ReferenceTransformer } from './reference-transformer.js'
 import { WrapTransformer } from './wrap-transformer.js'
 
 chai.use((sinonChai as any).default ?? sinonChai)
 
 describe('The scripting wrap transformer', () => {
-	const three = new ThreeHelper()
+	// NOTE: transform() below ignores the table; a bare TableBuilder table
+	// is enough — no need to parse a real .vpx fixture for this test.
 	let table: Table
 
 	before(async () => {
-		table = await Table.load(new NodeBinaryReader(three.fixturePath('table-gate.vpx')))
+		table = new TableBuilder().build()
 	})
 
 	it('should wrap everything into a function', () => {

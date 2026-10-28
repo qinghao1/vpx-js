@@ -15,6 +15,10 @@ import { Transformer } from './transformer.js'
 chai.use((sinonChai as any).default ?? sinonChai)
 
 describe('The scripting date literal transformer', () => {
+	const table = new TableBuilder().build()
+	const player = new Player(table)
+	const transpiler = new Transpiler(table, player)
+
 	it('should rewrite a scope-wrapped placeholder to a real Date', () => {
 		const vbs = `x = #1/2/2024#\n`
 		const js = transform(vbs)
@@ -29,15 +33,13 @@ describe('The scripting date literal transformer', () => {
 	})
 
 	it('should leave a user variable named Date alone', () => {
-		const table = new TableBuilder().build()
-		const js = new Transpiler(table, new Player(table)).transpile(`Dim Date\nDate = 5\n`)
+		const js = transpiler.transpile(`Dim Date\nDate = 5\n`)
 		expect(js).to.equal(`${Transformer.SCOPE_NAME}.Date = undefined;\n${Transformer.SCOPE_NAME}.Date = 5;`)
 	})
 
 	it('should produce a working Date through the full pipeline', () => {
-		const table = new TableBuilder().build()
 		const scope = {} as any
-		new Transpiler(table, new Player(table)).execute(`x = #1/2/2024#`, scope, 'global')
+		transpiler.execute(`x = #1/2/2024#`, scope, 'global')
 		expect(scope.x).to.be.an.instanceof(Date)
 	})
 })

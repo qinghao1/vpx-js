@@ -127,28 +127,16 @@ describe('The VBScript transpiler - Expressions', () => {
 		expect(js).to.equal(`EnableBallControl = ${Transformer.VBSHELPER_NAME}.is(EnableBallControl, 2);`)
 	})
 
-	it('should transpile a ">=" expression', () => {
-		const vbs = `EnableBallControl = EnableBallControl >= 2`
-		const js = grammar.vbsToJs(vbs)
-		expect(js).to.equal(`EnableBallControl = ${Transformer.VBSHELPER_NAME}.gte(EnableBallControl, 2);`)
+	it('should transpile ">=" and "=>" expressions identically', () => {
+		const expected = `EnableBallControl = ${Transformer.VBSHELPER_NAME}.gte(EnableBallControl, 2);`
+		expect(grammar.vbsToJs(`EnableBallControl = EnableBallControl >= 2`)).to.equal(expected)
+		expect(grammar.vbsToJs(`EnableBallControl = EnableBallControl => 2`)).to.equal(expected)
 	})
 
-	it('should transpile a "=>" expression', () => {
-		const vbs = `EnableBallControl = EnableBallControl => 2`
-		const js = grammar.vbsToJs(vbs)
-		expect(js).to.equal(`EnableBallControl = ${Transformer.VBSHELPER_NAME}.gte(EnableBallControl, 2);`)
-	})
-
-	it('should transpile a "<=" expression', () => {
-		const vbs = `EnableBallControl = EnableBallControl <= 2`
-		const js = grammar.vbsToJs(vbs)
-		expect(js).to.equal(`EnableBallControl = ${Transformer.VBSHELPER_NAME}.lte(EnableBallControl, 2);`)
-	})
-
-	it('should transpile a "=<" expression', () => {
-		const vbs = `EnableBallControl = EnableBallControl =< 2`
-		const js = grammar.vbsToJs(vbs)
-		expect(js).to.equal(`EnableBallControl = ${Transformer.VBSHELPER_NAME}.lte(EnableBallControl, 2);`)
+	it('should transpile "<=" and "=<" expressions identically', () => {
+		const expected = `EnableBallControl = ${Transformer.VBSHELPER_NAME}.lte(EnableBallControl, 2);`
+		expect(grammar.vbsToJs(`EnableBallControl = EnableBallControl <= 2`)).to.equal(expected)
+		expect(grammar.vbsToJs(`EnableBallControl = EnableBallControl =< 2`)).to.equal(expected)
 	})
 
 	it('should transpile a ">" expression', () => {
@@ -163,16 +151,10 @@ describe('The VBScript transpiler - Expressions', () => {
 		expect(js).to.equal(`EnableBallControl = ${Transformer.VBSHELPER_NAME}.lt(EnableBallControl, 2);`)
 	})
 
-	it('should transpile a "<>" expression', () => {
-		const vbs = `EnableBallControl = EnableBallControl <> 2`
-		const js = grammar.vbsToJs(vbs)
-		expect(js).to.equal(`EnableBallControl = ${Transformer.VBSHELPER_NAME}.notEquals(EnableBallControl, 2);`)
-	})
-
-	it('should transpile a "><" expression', () => {
-		const vbs = `EnableBallControl = EnableBallControl >< 2`
-		const js = grammar.vbsToJs(vbs)
-		expect(js).to.equal(`EnableBallControl = ${Transformer.VBSHELPER_NAME}.notEquals(EnableBallControl, 2);`)
+	it('should transpile "<>" and "><" expressions identically', () => {
+		const expected = `EnableBallControl = ${Transformer.VBSHELPER_NAME}.notEquals(EnableBallControl, 2);`
+		expect(grammar.vbsToJs(`EnableBallControl = EnableBallControl <> 2`)).to.equal(expected)
+		expect(grammar.vbsToJs(`EnableBallControl = EnableBallControl >< 2`)).to.equal(expected)
 	})
 
 	it('should transpile a "=" expression', () => {

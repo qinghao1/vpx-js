@@ -2,8 +2,12 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { expect } from 'chai'
+import { TableBuilder } from '../../../test/table-builder.js'
+import { Player } from '../../game/player.js'
+import type { Table } from '../../vpt/table/table.js'
 import { Grammar } from '../grammar/grammar.js'
 import { Transformer } from '../transformer/transformer.js'
+import { Transpiler } from '../transpiler.js'
 
 let grammar: Grammar
 
@@ -80,5 +84,31 @@ describe('The VBScript transpiler - Class', () => {
 		expect(js).to.equal(
 			'class cvpmTimer {\n    constructor() {\n        this.mBalls = undefined;\n    }\n    get Balls() {\n        let Balls = undefined;\n        Balls = this.mballs.Keys;\n        Test = x.mBalls;\n        return Balls;\n    }\n}',
 		)
+	})
+})
+
+describe('The VBScript transpiler - Property Get behavior', () => {
+	let table: Table
+	let player: Player
+
+	before(async () => {
+		table = new TableBuilder().build()
+		player = new Player(table)
+	})
+
+	function execute(vbs: string): any {
+		const scope = {} as any
+		new Transpiler(table, player).execute(vbs, scope, 'global')
+		return scope
+	}
+
+	it('should return the current value on Exit Property', () => {
+		// Locks the Exit Property coupling: branch.ts emits a bare `return`
+		// that ppPropertyGetDeclaration fills with the property-name value.
+		const scope = execute(
+			'Class C\nPublic Property Get P(x)\nP = 41\nIf x = 1 Then Exit Property\nP = 99\nEnd Property\nEnd Class\nDim o : Set o = New C\nr1 = o.P(1)\nr2 = o.P(2)',
+		)
+		expect(scope.r1).to.equal(41)
+		expect(scope.r2).to.equal(99)
 	})
 })
