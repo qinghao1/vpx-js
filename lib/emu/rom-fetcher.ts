@@ -67,16 +67,12 @@ export async function fetchWithTimeout(url: string, what: string, timeoutMs = FE
 	return r
 }
 
-async function fetchOk(url: string, what: string): Promise<Response> {
-	return fetchWithTimeout(url, what)
-}
-
 async function fetchJson<T>(url: string): Promise<T> {
-	return (await fetchOk(url, 'JSON')).json()
+	return (await fetchWithTimeout(url, 'JSON')).json()
 }
 
 async function fetchBytes(url: string): Promise<Uint8Array> {
-	return new Uint8Array(await (await fetchOk(url, 'ROM')).arrayBuffer())
+	return new Uint8Array(await (await fetchWithTimeout(url, 'ROM')).arrayBuffer())
 }
 
 export interface LoadedGameEntry {

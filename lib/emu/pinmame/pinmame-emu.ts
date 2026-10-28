@@ -74,9 +74,10 @@ export class PinMameEmulator implements IEmulator {
 	private readonly mockSwitches = new Map<number, number>()
 	private readonly solMasks = new Map<number, number>()
 	private readonly pendingSwitches = new Map<number, number>()
-	// Shared, mutated in place by pullDmd — getDmdDimensions hands out this
-	// instance so per-frame callers don't allocate. Read x/y, don't mutate.
-	private readonly dmdDims = new Vertex2D(FALLBACK_DMD.x, FALLBACK_DMD.y)
+	// Last good DMD size from pullDmd; getDmdDimensions hands out a fresh
+	// copy so callers can't mutate shared state. Read x/y.
+	private dmdW = FALLBACK_DMD.x
+	private dmdH = FALLBACK_DMD.y
 	// Scratch buffers pooled across frames to avoid per-sync _malloc churn.
 	// The pull slot is shared: lamp/sol/GI pulls run sequentially (never
 	// concurrently), each writing 8-byte (i32 index, i32 value) pairs. Sizes
@@ -244,12 +245,12 @@ export class PinMameEmulator implements IEmulator {
 	}
 	registerAudioConsumer(): void {}
 	getDmdDimensions(): Vertex2D {
-		return this.dmdDims
+		return new Vertex2D(this.dmdW, this.dmdH)
 	}
 	getDmdFrame(): Uint8Array {
 		const d = this.emulatorState.getDmdScreen()
 		// The non-empty buffer is the live stored frame: read it, don't mutate it.
-		return d.length ? d : new Uint8Array(this.dmdDims.x * this.dmdDims.y)
+		return d.length ? d : new Uint8Array(this.dmdW * this.dmdH)
 	}
 	getDipSwitchByte(bank = 0): number {
 		return this.isMock || !this.api ? 0 : this.api.getDIP(bank)
@@ -313,7 +314,6 @@ export class PinMameEmulator implements IEmulator {
 	}
 
 	private ensureWasmBuf(slot: 'pull' | 'dmd', bytes: number): number {
-		if (!Number.isFinite(bytes) || bytes <= 0) return 0
 		const buf = this.wasmBufs[slot]
 		if (buf.ptr && buf.cap >= bytes) return buf.ptr
 		if (buf.ptr) this.mod?._free(buf.ptr)
@@ -332,7 +332,8 @@ export class PinMameEmulator implements IEmulator {
 		if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0) return
 		const n = w * h
 		if (n > MAX_DMD_BYTES) return
-		this.dmdDims.set(w, h)
+		this.dmdW = w
+		this.dmdH = h
 		const ptr = this.ensureWasmBuf('dmd', n)
 		// getDmdFrame returns bytes written (0 = no display yet). The frame is
 		// copied out of wasm memory twice — HEAPU8 into the reusable

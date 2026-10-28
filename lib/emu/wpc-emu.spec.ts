@@ -192,7 +192,7 @@ class MockWpcEmulator implements WpcEmuApi.Emulator {
 	public switchInput: number[] = []
 	public dipSwitchInput: number[] = []
 	public start(): void {
-		throw new Error('MockWpcEmulator.start: not implemented.')
+		throw new Error('Method not implemented.')
 	}
 	public getUiState(_includeExpensiveData?: boolean): WpcEmuWebWorkerApi.EmuState {
 		return {
@@ -254,16 +254,16 @@ class MockWpcEmulator implements WpcEmuApi.Emulator {
 		}
 	}
 	public getState(): WpcEmuWebWorkerApi.EmuState {
-		throw new Error('MockWpcEmulator.getState: not implemented.')
+		throw new Error('Method not implemented.')
 	}
 	public setState(_stateObject: WpcEmuWebWorkerApi.EmuState): void {
-		throw new Error('MockWpcEmulator.setState: not implemented.')
+		throw new Error('Method not implemented.')
 	}
 	public registerAudioConsumer(callbackFunction: (audioJSON: WpcEmuApi.AudioMessage) => void): void {
 		callbackFunction({ command: 'FOO', id: 123 })
 	}
 	public executeCycle(_ticksToRun: number, _tickSteps: number): number {
-		throw new Error('MockWpcEmulator.executeCycle: not implemented.')
+		throw new Error('Method not implemented.')
 	}
 	public executeCycleForTime(advanceByMs: number, _tickSteps: number): number {
 		this.executedCyclesMs += advanceByMs
@@ -279,13 +279,13 @@ class MockWpcEmulator implements WpcEmuApi.Emulator {
 		this.fliptronicsInput.push(value)
 	}
 	public toggleMidnightMadnessMode(): void {
-		throw new Error('MockWpcEmulator.toggleMidnightMadnessMode: not implemented.')
+		throw new Error('Method not implemented.')
 	}
 	public reset(): void {
 		// ignored
 	}
 	public version(): string {
-		throw new Error('MockWpcEmulator.version: not implemented.')
+		throw new Error('Method not implemented.')
 	}
 	public setDipSwitchByte(dipSwitch: number): void {
 		this.dipSwitchInput.push(dipSwitch)
