@@ -13,7 +13,7 @@ import { Table } from './table/table.js'
 
 const PRIMITIVE_FIXTURE = path.resolve('test/fixtures/table-primitive.vpx')
 
-/** Parses one raw `Sound{i}` stream from the real fixture (no Table.load involved). */
+/** Raw `Sound{i}` stream without Table.load. */
 async function loadFixtureSound(index: number): Promise<Sound> {
 	const doc = await OleCompoundDoc.load(new BinaryReader(new Uint8Array(readFileSync(PRIMITIVE_FIXTURE))))
 	try {
@@ -28,10 +28,8 @@ describe('Sound', () => {
 		const sound = await loadFixtureSound(0)
 		expect(sound.getName()).toBe('ballrelease')
 		expect(sound.path).toMatch(/\.wav$/i)
-		// Rebuilt file is a playable WAV: 44-byte header + the 46710 cdata bytes.
 		expect(sound.data.length).toBe(44 + 46710)
 		expect(sound.sampleRate).toBe(44100)
-		// 46710 mono 16-bit bytes -> 23355 float samples.
 		expect(sound.pcm?.length).toBe(23355)
 		expect(sound.pcm![0]).toBeCloseTo(1029 / 32768, 6)
 		expect(sound.pcm![1]).toBeCloseTo(1056 / 32768, 6)
@@ -41,7 +39,6 @@ describe('Sound', () => {
 		const sound = await loadFixtureSound(5)
 		expect(sound.getName()).toBe('kicker_enter_center')
 		expect(sound.sampleRate).toBe(44100)
-		// 56756 stereo 16-bit bytes -> 14189 mono frames.
 		expect(sound.pcm?.length).toBe(14189)
 		expect(sound.pcm![0]).toBeCloseTo((2243 + 2242) / 2 / 32768, 6)
 	})
@@ -91,7 +88,6 @@ describe('Table sounds in the player', () => {
 		expect(engine.hasSample('ballrelease')).toBe(true)
 		expect(engine.hasSample('BallRelease')).toBe(true)
 		expect(engine.hasSample('Flipper_Rubber_7')).toBe(false)
-		// The exact symptom: a script PlaySound call resolves instead of warning.
 		table.getApi().PlaySound('plunger', 1, 1, 0, 0, 0, false, true, 0)
 		expect(engine.isPlaying('plunger')).toBe(true)
 		expect(engine.playSound('BallRelease')).toBeGreaterThan(0)
@@ -116,7 +112,6 @@ describe('Table sounds in the player', () => {
 	})
 })
 
-/** Builds a minimal raw `Sound{i}` stream around a body + tail. */
 function buildStream(name: string, path: string, body: Uint8Array, tail: Uint8Array): Uint8Array {
 	const enc = new TextEncoder()
 	const nameBytes = enc.encode(name)
@@ -141,7 +136,6 @@ function buildStream(name: string, path: string, body: Uint8Array, tail: Uint8Ar
 	return out
 }
 
-/** PCM mono 8 kHz 16-bit WAVEFORMATEX body with cdata silent samples. */
 function wavBody(samples: number): Uint8Array {
 	const body = new Uint8Array(18 + 4 + samples * 2)
 	const view = new DataView(body.buffer)

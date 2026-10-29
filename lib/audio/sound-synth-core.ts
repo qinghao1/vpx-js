@@ -6,9 +6,8 @@
 // dependency-free so the worker bundle stays lean.
 export const DEFAULT_SYNTH_RATE = 44100
 
-/** 0.18 s knocker thock: noise click plus a 160 Hz body, both exponentially decayed.
- * Tuned approximation (decay 220/45, mix 0.7/0.6, fixed LCG seed for stability) —
- * native drives hardware (`ushock_output_knock`), so there is no faithful source. */
+/** Tuned approximation — native drives hardware (`ushock_output_knock`),
+ * so there is no faithful source; fixed LCG seed for stability. */
 export function knockPcm(sampleRate = DEFAULT_SYNTH_RATE): Float32Array {
 	const frames = Math.floor(sampleRate * 0.18)
 	const out = new Float32Array(frames)
@@ -26,8 +25,7 @@ export function knockPcm(sampleRate = DEFAULT_SYNTH_RATE): Float32Array {
 	return out
 }
 
-/** Faded sine probe (tests/E2E sample registration): 0.5 headroom with a
- * click-suppressing edge fade (1/8 of the buffer, capped at 10 ms). */
+/** Faded sine probe (tests/E2E sample registration) with a click-suppressing edge fade. */
 export function tonePcm(freq = 440, seconds = 0.25, sampleRate = DEFAULT_SYNTH_RATE): Float32Array {
 	const frames = Math.max(1, Math.floor(sampleRate * seconds))
 	const out = new Float32Array(frames)

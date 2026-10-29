@@ -2,11 +2,8 @@
 
 import { DEFAULT_SYNTH_RATE, knockPcm, tonePcm } from './sound-synth-core.js'
 
-// Knocker/tone synthesis in a plain Worker, off the main thread (mirrors
-// image-worker-pool.ts: singleton, id-keyed pending map, timeout, inline
-// fallback). The WebAudio render thread owns the actual output, so synthesis
-// here never blocks playback. Kernels live in sound-synth-core.js, imported
-// by both this pool and the worker.
+// Knocker/tone synthesis in a plain Worker (mirrors image-worker-pool.ts:
+// singleton, id-keyed pending map, timeout, inline fallback).
 
 let worker: Worker | null = null
 let seq = 0
@@ -77,12 +74,12 @@ async function request(req: SynthRequest): Promise<Float32Array> {
 	}).catch(() => fallback())
 }
 
-/** Knocker PCM synthesized off the main thread (inline fallback when workers are unavailable). */
+/** Inline fallback when workers are unavailable. */
 export async function synthKnock(sampleRate = DEFAULT_SYNTH_RATE): Promise<Float32Array> {
 	return request({ kind: 'knock', sampleRate })
 }
 
-/** Sine-probe PCM synthesized off the main thread (inline fallback when workers are unavailable). */
+/** Inline fallback when workers are unavailable. */
 export async function synthTone(freq = 440, seconds = 0.25, sampleRate = DEFAULT_SYNTH_RATE): Promise<Float32Array> {
 	return request({ kind: 'tone', freq, seconds, sampleRate })
 }

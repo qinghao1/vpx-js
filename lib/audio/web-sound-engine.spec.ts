@@ -90,7 +90,6 @@ describe('WebSoundEngine', () => {
 	it('should mute the master bus and restore the level on unmute', () => {
 		engine.setVolume(0.25)
 		engine.playSound('tone')
-		// The master bus is the node carrying sqrt(0.25); voice and music sit at unity.
 		const master = FakeCtx.gains.find(g => Math.abs(g.gain.value - 0.5) < 1e-9)
 		if (!master) throw new Error('master bus gain not found')
 		engine.setMuted(true)
@@ -102,7 +101,6 @@ describe('WebSoundEngine', () => {
 	it('should replay finite loops then end the voice', () => {
 		engine.playSound('tone', { loopCount: 3 })
 		expect(FakeCtx.sources.length).to.equal(1)
-		// Each `ended` re-triggers exactly one replay; the live source is the latest.
 		FakeCtx.sources.at(-1)?.onended?.()
 		expect(FakeCtx.sources.length).to.equal(2)
 		expect(engine.isPlaying('tone')).to.equal(true)
@@ -114,9 +112,7 @@ describe('WebSoundEngine', () => {
 	})
 
 	it('should retune a reused playing voice without restarting it', () => {
-		// Ramp-roll idiom: per-tick re-Play with useSame, no restart. Native
-		// applies the new settings to the live voice, so there is still exactly
-		// one source (no restart, no orphan) carrying the latest settings.
+		// Ramp-roll idiom: per-tick re-Play with useSame, no restart.
 		engine.setVolume(0.25)
 		engine.playSound('tone', { loopCount: -1, volume: 0.36, useSame: true, restart: false })
 		engine.playSound('tone', { loopCount: -1, volume: 0.81, pitch: 800, useSame: true, restart: false })
@@ -179,7 +175,6 @@ describe('WebSoundEngine', () => {
 		live.onended?.()
 		expect(ended).to.equal(1)
 		expect(engine.getMusic()).to.equal(null)
-		// A forced stop is not a natural end: nothing reports afterwards.
 		engine.playMusic('theme', 0.6)
 		engine.endMusic()
 		FakeCtx.sources.at(-1)?.onended?.()
@@ -193,7 +188,6 @@ describe('WebSoundEngine', () => {
 			volume: -0.5,
 		})
 		engine.playSound('stereo', { volume: 1 })
-		// 2 channels × sqrt(clamp01(0.5 × 1)); the voice is the only node above unity.
 		const expected = 2 * Math.sqrt(0.5)
 		const voice = FakeCtx.gains.find(g => Math.abs(g.gain.value - expected) < 1e-9)
 		if (!voice) throw new Error('voice gain not found')

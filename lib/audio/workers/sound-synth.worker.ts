@@ -1,7 +1,6 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-// Isolated synthesis worker: kernels imported from sound-synth-core.js
-// (shipped side-by-side in dist-esm, so the relative import resolves).
+// Kernels ship side-by-side in dist-esm, so the relative import resolves.
 import { DEFAULT_SYNTH_RATE, knockPcm, tonePcm } from '../sound-synth-core.js'
 
 addEventListener('message', (e: MessageEvent) => {

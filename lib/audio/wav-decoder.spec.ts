@@ -3,7 +3,6 @@
 import { expect } from 'chai'
 import { decodeWavAudio } from './wav-decoder.js'
 
-/** Builds a minimal WAV file: 44-byte header + payload (+ optional chunks before fmt). */
 function buildWav(
 	formatTag: number,
 	channels: number,

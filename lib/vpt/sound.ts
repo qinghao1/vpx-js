@@ -4,41 +4,30 @@ import { decodeWavAudio } from '../audio/wav-decoder.js'
 import { decodeUtf8OrCp1252, getDataView, writeFourCc } from '../io/binary-helpers.js'
 import type { Storage } from '../io/ole-doc.js'
 
-/** Upstream sound-format tail size: outputTarget byte + volume/pan/fade int32s + a
- * duplicate volume int32 (written twice by SaveToStream). @see Sound::CreateFromStream */
+/** 1 output-target byte + 3 int32s + duplicate volume int32. @see Sound::CreateFromStream */
 const NEW_SOUND_TAIL_SIZE = 17
 
-/** WAVEFORMATEX blob size inside the stream (@see WavFmt, `static_assert(sizeof(WavFmt) == 18)`). */
+/** @see WavFmt (`sizeof(WavFmt) == 18`) */
 const WAV_FORMAT_SIZE = 18
 
-/** Upstream `SoundOutTypes` (parts/Sound.h): table vs backglass output. */
+/** Upstream SoundOutTypes. */
 export enum SoundOutType {
 	TABLE = 0,
 	BACKGLASS = 1,
 }
 
-/** Legacy backglass markers (case-insensitive): name substring and full import path. */
 const BACKGLASS_NAME_MARKER = 'bgout_'
 const BACKGLASS_PATH_SENTINEL = '* backglass output *'
 
 /**
  * Table-embedded sound — a `Sound{i}` GameStg stream (raw struct, not BIFF).
  * @see https://github.com/vpinball/vpinball/blob/master/src/parts/Sound.cpp (CreateFromStream/SaveToStream)
- *
- * Layout: int32 nameLen + name, int32 pathLen + path, int32 dummyLen + dummy,
- * then an exact length fit at the WAVEFORMATEX offset selects the 18-byte
- * WAVEFORMATEX + int32 cdata + cdata raw PCM bytes branch (rebuilt here into a
- * playable WAV file in `data`, as upstream does), an exact fit at offset 0 the
- * int32 cdata + cdata raw imported-file bytes branch, and ties fall back to the
- * path (empty extensions count as WAV). Followed by the settings tail:
- * 17 bytes (new format) or 1 bool byte (pre-1031).
  */
 export class Sound {
 	/** Script-facing sample name (`PlaySound("...")`). */
 	public name!: string
 	/** Original import path (extension decides the WAV branch, upstream `isWav`). */
 	public path = ''
-	/** Complete playable file bytes (WAV with header, or the raw imported file). */
 	public data!: Uint8Array
 	/** Decoded mono float PCM (null for non-WAV imports and unsupported codecs). */
 	public pcm: Float32Array | null = null
@@ -46,7 +35,7 @@ export class Sound {
 	/** Decoded source channel count (pre-downmix; 1 when undecodable). */
 	public channels = 1
 	public outputTarget: SoundOutType = SoundOutType.TABLE
-	// Editor base levels in percent (upstream Sound defaults, overwritten by the tail when present).
+	// Base levels in percent; the tail overwrites when present.
 	public volume = 0
 	public pan = 0
 	public frontRearFade = 0
@@ -89,7 +78,7 @@ export class Sound {
 		}
 		this.name = decodeUtf8OrCp1252(readBytes(readInt32('name length'), 'name'))
 		this.path = decodeUtf8OrCp1252(readBytes(readInt32('path length'), 'path'))
-		// Legacy lowercase-name copy (modern saves store a single NUL); content unused.
+		// Lowercase-name copy; content unused.
 		readBytes(readInt32('name-copy length'), 'name copy')
 		if (Sound.classifyStored(view, pos, bytes.length, this.path)) {
 			need(WAV_FORMAT_SIZE, 'WAVEFORMATEX')
@@ -128,8 +117,7 @@ export class Sound {
 			this.pan = view.getInt32(pos + 5, true)
 			this.frontRearFade = view.getInt32(pos + 9, true)
 		} else if (remaining === 1) {
-			// Pre-1031: base levels default to 100 upstream (Sound.cpp locals), and
-			// backglass falls back to a case-insensitive bgout_ substring or path match.
+			// Pre-1031 has no levels (default 100); backglass via name/path markers.
 			this.volume = 100
 			this.pan = 100
 			this.frontRearFade = 100
@@ -145,12 +133,7 @@ export class Sound {
 		}
 	}
 
-	/**
-	 * Upstream storage sniffing (`Sound::CreateFromStream`): an exact length fit
-	 * at the WAVEFORMATEX offset means WAV, at offset 0 means raw; ties (and
-	 * legacy 1-byte tails) fall back to the path. Both tail sizes are tried,
-	 * modern first, since the version is not plumbed this far.
-	 */
+	/** Exact length fit selects the WAV branch; ties fall back to the path. */
 	private static classifyStored(view: DataView, pos: number, size: number, path: string): boolean {
 		const rest = size - pos
 		const fits = (tail: number, offset: number): boolean => {
@@ -166,7 +149,7 @@ export class Sound {
 		return Sound.isWavPath(path)
 	}
 
-	/** Upstream `isWav`: empty extensions count as WAV, otherwise the stored extension decides. */
+	/** Upstream `isWav`: empty extensions count as WAV. */
 	public static isWavPath(path: string): boolean {
 		const base = path.split(/[\\/]/).pop() ?? path
 		const dot = base.lastIndexOf('.')
@@ -196,7 +179,6 @@ export class Sound {
 	}
 }
 
-/** WAVEFORMATEX blob carried inside the sound stream. */
 interface WavFormat {
 	tag: number
 	channels: number

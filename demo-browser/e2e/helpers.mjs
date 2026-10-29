@@ -1652,9 +1652,7 @@ export const cameraTransitionChecks = async page => {
 	})
 }
 
-// Sound leg: verifies the audible *path* (headless CI cannot hear output).
-// Mute/volume chrome drives the engine, knocker knocks, and a synthetic probe
-// sample plays/stops through the script API surface.
+// Sound leg: headless CI cannot hear output; exercise the path instead.
 export const soundChecks = async page => {
 	return page.evaluate(() => {
 		const v = window.viewer
@@ -1671,8 +1669,6 @@ export const soundChecks = async page => {
 			btn.click()
 			if (s.isMuted() === wasMuted) btn.click()
 			const mutedOk = s.isMuted() !== wasMuted && btn.getAttribute('aria-pressed') === String(s.isMuted())
-			// Volume through the slider: the input handler drives the engine,
-			// unmuting when the level rises above zero, and re-syncs the chrome.
 			// Probe the volume unmuted: getVolume() reports 0 while muted, so a
 			// persisted muted profile would fail the check below on user settings.
 			const volBefore = typeof s.getLevel === 'function' ? s.getLevel() : s.getVolume()
@@ -1681,8 +1677,6 @@ export const soundChecks = async page => {
 			const volOk = Math.abs(s.getVolume() - 0.5) < 1e-9 && slider.value === '50' && s.isMuted() === false
 			slider.value = String(Math.round(volBefore * 100))
 			slider.dispatchEvent(new Event('input', { bubbles: true }))
-			// Restore the pre-check mute state through the control as well, so the
-			// chrome (aria-pressed, icon, slider) stays in sync with the engine.
 			if (s.isMuted() !== wasMuted) btn.click()
 			if (s.isMuted() !== wasMuted) btn.click()
 			const muteRestoreOk = s.isMuted() === wasMuted

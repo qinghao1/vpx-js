@@ -2,29 +2,23 @@
 
 import { readFourCc } from '../io/binary-helpers.js'
 
-/** Minimal WAV file decoder (PCM + IEEE float, downmixed to mono).
+/** Minimal WAV decoder: tags 1 (PCM 8/16/24/32-bit) and 3 (float 32/64-bit), downmixed to mono.
  *
  * VPX stores imported .wav sounds as a reconstructed canonical WAVE file
- * (44-byte header + raw sample bytes, @see Sound::CreateFromStream), so a
- * small header parser covers every table-embedded WAV without runtime deps.
- * It runs inline in both Node/tests and the browser: no worker round-trip
- * and no decodeAudioData needed.
- *
- * Tradeoff: only format tags 1 (PCM 8/16/24/32-bit) and 3 (IEEE float
- * 32/64-bit) decode. Exotic codecs (e.g. ADPCM tags 2/17/34) and non-WAV
- * imports (upstream stores those as raw MP3/OGG file bytes) return null —
- * playing those is a follow-up (browser decodeAudioData or a codec dep).
- * Multi-channel audio is downmixed to mono: the repo sinks
- * (Web/NullSoundEngine) are mono-only (`createBuffer(1, ...)`).
+ * (@see Sound::CreateFromStream), so a small header parser covers every
+ * table-embedded WAV without runtime deps. Runs inline in Node/tests and
+ * the browser (no worker round-trip, no decodeAudioData).
+ * Unsupported codecs (e.g. ADPCM tags 2/17/34) and non-WAV imports (upstream
+ * stores those as raw MP3/OGG bytes) return null. Multi-channel audio is
+ * downmixed to mono: the sinks are mono-only (`createBuffer(1, ...)`).
  */
 export interface DecodedWav {
 	pcm: Float32Array
 	sampleRate: number
-	/** Source channel count (pre-downmix; native feeds this to mono compensation). */
+	/** Pre-downmix count; native feeds this to mono compensation. */
 	channels: number
 }
 
-/** Decodes a complete WAV file to mono float PCM, or null when unsupported/corrupt. */
 export function decodeWavAudio(bytes: Uint8Array): DecodedWav | null {
 	if (bytes.length < 44) return null
 	const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)

@@ -1,9 +1,8 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-// Browser sink: WebAudio output for the script sound engine. Decode/synthesis
-// runs in a plain Worker (sound-synth-pool.ts) while the browser's audio
-// render thread owns mixing — script and physics threads never block on audio.
-// Without an AudioContext (Node/tests) every call degrades to state tracking.
+// Decode/synthesis runs in a plain Worker (sound-synth-pool.ts) while the
+// audio render thread owns mixing — script and physics threads never block
+// on audio. Without an AudioContext every call degrades to state tracking.
 
 import { warnOnce } from '../emu/warn-once.js'
 import {
@@ -58,8 +57,6 @@ export class WebSoundEngine extends BaseSoundEngine {
 			if (!buffer) return
 			// Per-voice gain carries sqrt(script volume); the master bus carries
 			// sqrt(master level), so the product matches native sqrt(sound*main).
-			// monoCompensation is the decoded source channel count, compensating
-			// the averaging loss of the mono downmix (native converter.channelsIn).
 			// frontRearFade has no stereo equivalent and is ignored.
 			const gainValue = effectiveGain(voice.volume, 1, sample.channels)
 			const pan = uncurvePanFade(voice.pan)
@@ -72,8 +69,7 @@ export class WebSoundEngine extends BaseSoundEngine {
 			}
 			// useSame + restart=false on a playing voice: native applies the new
 			// settings to the live voice (AudioPlayer selection keeps it), so retune
-			// instead of restarting. A restart halts first, so a tracked source here
-			// is always that no-restart reuse.
+			// instead of restarting.
 			const live = this.nodes.get(voice.id)
 			if (live) {
 				live.gain.gain.value = gainValue
@@ -163,8 +159,7 @@ export class WebSoundEngine extends BaseSoundEngine {
 	}
 
 	// Fire-and-forget one-shot per push: no queue or backpressure, so a dense
-	// continuous emu chunk stream can gap. A persistent AudioWorklet ring buffer
-	// is the fix if that path ever goes dense.
+	// continuous emu chunk stream can gap.
 	protected emitEmuPcm(pcm: Float32Array): void {
 		const ctx = this.ensureContext()
 		if (!ctx) return
@@ -202,12 +197,9 @@ export class WebSoundEngine extends BaseSoundEngine {
 		this.stopMusicNodes()
 		const music = this.getMusic()
 		const ctx = this.ensureContext()
-		// State is already stored by the base; resolve the sample here, warning
-		// on a miss like playSound (native logs the streaming failure the same way).
 		const sample = music ? this.getSample(music.name) : undefined
 		if (!music || !ctx || !this.musicBus || !sample) {
-			// Native logs a streaming failure; music resolves through registered
-			// samples here (no Music-dir file streaming), so warn the same way.
+			// Music resolves through registered samples here (no Music-dir file streaming).
 			if (music && !sample)
 				warnOnce(
 					`music:${music.name.toLowerCase()}`,
@@ -223,10 +215,9 @@ export class WebSoundEngine extends BaseSoundEngine {
 			source.buffer = buffer
 			// Native streams the file once per PlayMusic and fires MusicDone at
 			// the end (SoundPlayer::OnSoundEnd); a forced stop nulls musicNodes
-			// first, so only a natural end reports (loop defaults to false).
+			// first, so only a natural end reports.
 			const gain = ctx.createGain()
-			// Native music staging is sqrt-curved (ApplyVolume); the music bus
-			// below carries sqrt(musicVolume) and the master its own level.
+			// Voice gain carries sqrt(script volume); the music bus carries sqrt(musicVolume).
 			gain.gain.value = effectiveGain(music.volume, 1)
 			source.connect(gain)
 			gain.connect(this.musicBus)
@@ -255,7 +246,6 @@ export class WebSoundEngine extends BaseSoundEngine {
 		} catch {}
 	}
 
-	/** Master-bus gain: sqrt(level) with mute forced to silence (restores on unmute). */
 	private unmutedMaster(): number {
 		return this.isMuted() ? 0 : sqrt01(this.getLevel())
 	}

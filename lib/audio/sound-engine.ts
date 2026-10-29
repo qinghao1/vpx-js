@@ -2,7 +2,7 @@
 
 import { warnOnce } from '../emu/warn-once.js'
 
-/** PlaySound call options. Native defaults: loop 1, volume 1, restart true. @see AudioPlayer::PlaySound */
+/** Native defaults: loop 1, volume 1, restart true. @see AudioPlayer::PlaySound */
 export interface PlaySoundOptions {
 	loopCount?: number
 	volume?: number
@@ -14,7 +14,7 @@ export interface PlaySoundOptions {
 	frontRearFade?: number
 }
 
-/** Resolved per-voice playback state (one entry per concurrent play of a name). */
+/** One entry per concurrent play of a name. */
 export interface SoundVoice {
 	id: number
 	name: string
@@ -26,23 +26,21 @@ export interface SoundVoice {
 	playing: boolean
 }
 
-/** Per-sound editor base levels (dequantized percent offsets, upstream Sound volume/pan/fade). */
+/** Dequantized percent offsets from upstream Sound volume/pan/fade. */
 export interface SoundBaseLevels {
 	volume: number
 	pan: number
 	frontRearFade: number
 }
 
-/** Stored sample bytes (raw PCM awaiting output). */
 export interface SoundSample {
 	pcm: Float32Array
 	sampleRate: number
-	/** Decoded source channel count (native mono-compensation input; 1 when unknown). */
+	/** Native mono-compensation input; 1 when unknown. */
 	channels: number
 	base: SoundBaseLevels
 }
 
-/** Optional sample metadata for registerSample (all native-faithful defaults). */
 export interface SampleMeta {
 	channels?: number
 	volume?: number
@@ -50,7 +48,7 @@ export interface SampleMeta {
 	frontRearFade?: number
 }
 
-/** Script-visible sound sink. Implemented by the null (Node/tests) and WebAudio (browser) engines. */
+/** Script-visible sound sink. */
 export interface ISoundEngine {
 	playSound(name: string, opts?: PlaySoundOptions): number
 	stopSound(name: string): void
@@ -101,14 +99,12 @@ export function uncurvePanFade(v: number): number {
 	return c < 0 ? -((-c) ** 0.1) : c ** 0.1
 }
 
-/** Pre-emphasized spatial pan/fade from a normalized table position (inverse of uncurvePanFade). */
 export function curvePanFade(n: number): number {
 	return n < 0 ? -((-n) ** 10) : n ** 10
 }
 
 /** Native voice gain: mono-compensated sqrt of the clamped product. @see SoundPlayer::ApplyVolume
- * monoCompensation is the decoded channel count (native `converter.channelsIn`):
- * single-channel table sounds played through wider buses need the energy lift. */
+ * @param monoCompensation decoded channel count (native `converter.channelsIn`). */
 export function effectiveGain(soundVolume: number, mainVolume: number, monoCompensation = 1): number {
 	return monoCompensation * Math.sqrt(clamp01(soundVolume * mainVolume))
 }
@@ -125,12 +121,12 @@ export function pitchFactor(sampleRate: number, pitch = 0, randomPitch = 0, rand
 	return rate
 }
 
-/** Case-insensitive sample/voice key (upstream resolves names through a case-insensitive map). */
+/** Upstream resolves names through a case-insensitive map. */
 function soundKey(name: string): string {
 	return name.toLowerCase()
 }
 
-/** Shared voice bookkeeping; subclasses add the audible output behind `emitVoice`/`emitKnock`. */
+/** Subclasses add the audible output behind `emitVoice`/`emitKnock`. */
 export abstract class BaseSoundEngine implements ISoundEngine {
 	private readonly voices = new Map<string, SoundVoice[]>()
 	private readonly samples = new Map<string, SoundSample>()
@@ -166,7 +162,6 @@ export abstract class BaseSoundEngine implements ISoundEngine {
 		} = opts
 		const sample = this.samples.get(key)
 		if (!sample) {
-			// Native warns once per missing name and plays nothing.
 			warnOnce(`sound:${key}`, 'Request to play "%s", but sound was not found.', name)
 			return 0
 		}
@@ -176,9 +171,6 @@ export abstract class BaseSoundEngine implements ISoundEngine {
 			this.voices.set(key, list)
 		}
 		if (restart) for (const voice of list) this.halt(voice)
-		// Allocation: restart halts all voices then reuses the first, useSame
-		// steals a playing voice for live updates, otherwise a new overlapping
-		// voice is created when every existing one is still playing.
 		let voice = useSame || restart ? list[0] : list.find(v => !v.playing)
 		if (!voice) {
 			voice = {
@@ -245,8 +237,7 @@ export abstract class BaseSoundEngine implements ISoundEngine {
 		const knocks = Math.floor(count)
 		if (!Number.isFinite(knocks) || knocks <= 0) return
 		this.knockCount += knocks
-		// One audible knock regardless of count (the synthesis is an
-		// approximation; native drives N hardware knocks).
+		// One audible knock regardless of count (native drives N hardware knocks).
 		this.emitKnock()
 	}
 
@@ -330,7 +321,7 @@ export abstract class BaseSoundEngine implements ISoundEngine {
 		return this.emuFrames
 	}
 
-	/** Mark one voice ended (audible output finished without a stop call). */
+	/** Audible output finished without a stop call. */
 	protected endVoice(id: number): void {
 		for (const list of this.voices.values()) {
 			const voice = list.find(v => v.id === id)
@@ -356,7 +347,7 @@ export abstract class BaseSoundEngine implements ISoundEngine {
 	}
 }
 
-/** Best-effort Float32 PCM out of the wpc-emu/PinMAME audio message shapes (null when unrecognised). */
+/** Best-effort Float32 PCM out of the wpc-emu/PinMAME audio message shapes. */
 export function extractPcm(data: unknown): Float32Array | null {
 	if (!data) return null
 	if (data instanceof Float32Array) return data.length ? data : null
