@@ -1,7 +1,7 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { decodeWavAudio } from '../audio/wav-decoder.js'
-import { decodeUtf8OrCp1252, getDataView } from '../io/binary-helpers.js'
+import { decodeUtf8OrCp1252, getDataView, writeFourCc } from '../io/binary-helpers.js'
 import type { Storage } from '../io/ole-doc.js'
 
 /** Upstream sound-format tail size: outputTarget byte + volume/pan/fade int32s + a
@@ -16,6 +16,10 @@ export enum SoundOutType {
 	TABLE = 0,
 	BACKGLASS = 1,
 }
+
+/** Legacy backglass markers (case-insensitive): name substring and full import path. */
+const BACKGLASS_NAME_MARKER = 'bgout_'
+const BACKGLASS_PATH_SENTINEL = '* backglass output *'
 
 /**
  * Table-embedded sound — a `Sound{i}` GameStg stream (raw struct, not BIFF).
@@ -67,16 +71,20 @@ export class Sound {
 	private parse(bytes: Uint8Array, itemName: string): void {
 		const view = getDataView(bytes)
 		let pos = 0
+		const fail = (what: string): never => {
+			throw new Error(`Corrupt sound stream "${itemName}": ${what} overruns the stream.`)
+		}
+		const need = (len: number, what: string): void => {
+			if (len < 0 || pos + len > bytes.length) fail(`${what} of ${len} bytes`)
+		}
 		const readBytes = (len: number, what: string): Uint8Array => {
-			if (len < 0 || pos + len > bytes.length)
-				throw new Error(`Corrupt sound stream "${itemName}": ${what} of ${len} bytes overruns the stream.`)
+			need(len, what)
 			const slice = bytes.subarray(pos, pos + len)
 			pos += len
 			return slice
 		}
 		const readInt32 = (what: string): number => {
-			if (pos + 4 > bytes.length)
-				throw new Error(`Corrupt sound stream "${itemName}": ${what} overruns the stream.`)
+			need(4, what)
 			const value = view.getInt32(pos, true)
 			pos += 4
 			return value
@@ -86,26 +94,19 @@ export class Sound {
 		// Legacy lowercase-name copy (modern saves store a single NUL); content unused.
 		readBytes(readInt32('name-copy length'), 'name copy')
 		if (Sound.classifyStored(view, pos, bytes.length, this.path)) {
-			if (pos + 18 > bytes.length)
-				throw new Error(`Corrupt sound stream "${itemName}": WAVEFORMATEX overruns the stream.`)
-			const wFormatTag = view.getUint16(pos, true)
-			const nChannels = view.getUint16(pos + 2, true)
-			const nSamplesPerSec = view.getUint32(pos + 4, true)
-			const nAvgBytesPerSec = view.getUint32(pos + 8, true)
-			const nBlockAlign = view.getUint16(pos + 12, true)
-			const wBitsPerSample = view.getUint16(pos + 14, true)
-			pos += 18
+			need(WAV_FORMAT_SIZE, 'WAVEFORMATEX')
+			const fmt: WavFormat = {
+				tag: view.getUint16(pos, true),
+				channels: view.getUint16(pos + 2, true),
+				rate: view.getUint32(pos + 4, true),
+				avgBytesPerSec: view.getUint32(pos + 8, true),
+				blockAlign: view.getUint16(pos + 12, true),
+				bits: view.getUint16(pos + 14, true),
+			}
+			pos += WAV_FORMAT_SIZE
 			const cdata = readInt32('WAV sample length')
 			const samples = readBytes(cdata, 'WAV samples')
-			this.data = Sound.rebuildWav(
-				wFormatTag,
-				nChannels,
-				nSamplesPerSec,
-				nAvgBytesPerSec,
-				nBlockAlign,
-				wBitsPerSample,
-				samples,
-			)
+			this.data = Sound.rebuildWav(fmt, samples)
 		} else {
 			this.data = readBytes(readInt32('sample length'), 'samples').slice()
 		}
@@ -119,6 +120,8 @@ export class Sound {
 	}
 
 	private parseTail(view: DataView, size: number, pos: number, itemName: string): void {
+		// Trailing bytes are the new-format tail (17), the pre-1031 backglass
+		// flag (1), nothing (0), or corruption (anything else).
 		const remaining = size - pos
 		if (remaining >= NEW_SOUND_TAIL_SIZE) {
 			const target = view.getUint8(pos)
@@ -134,8 +137,8 @@ export class Sound {
 			this.frontRearFade = 100
 			const backglass =
 				view.getUint8(pos) !== 0 ||
-				this.name.toLowerCase().includes('bgout_') ||
-				this.path.toLowerCase() === '* backglass output *'
+				this.name.toLowerCase().includes(BACKGLASS_NAME_MARKER) ||
+				this.path.toLowerCase() === BACKGLASS_PATH_SENTINEL
 			this.outputTarget = backglass ? SoundOutType.BACKGLASS : SoundOutType.TABLE
 		} else if (remaining !== 0) {
 			throw new Error(
@@ -151,20 +154,18 @@ export class Sound {
 	 * modern first, since the version is not plumbed this far.
 	 */
 	private static classifyStored(view: DataView, pos: number, size: number, path: string): boolean {
-		for (const tailSize of [NEW_SOUND_TAIL_SIZE, 1]) {
-			const available = size - pos - tailSize
-			if (available < 0) continue
-			const rawFits = Sound.lengthFits(view, pos, size, 0, available)
-			const wavFits = Sound.lengthFits(view, pos, size, WAV_FORMAT_SIZE, available)
-			if (rawFits !== wavFits) return wavFits
+		const rest = size - pos
+		const fits = (tail: number, offset: number): boolean => {
+			if (pos + offset + 4 > size) return false
+			const len = view.getInt32(pos + offset, true)
+			return len >= 0 && rest - tail === offset + 4 + len
+		}
+		for (const tail of [NEW_SOUND_TAIL_SIZE, 1]) {
+			const raw = fits(tail, 0)
+			const wav = fits(tail, WAV_FORMAT_SIZE)
+			if (raw !== wav) return wav
 		}
 		return Sound.isWavPath(path)
-	}
-
-	private static lengthFits(view: DataView, pos: number, size: number, offset: number, available: number): boolean {
-		if (pos + offset + 4 > size) return false
-		const len = view.getInt32(pos + offset, true)
-		return len >= 0 && offset + 4 + len === available
 	}
 
 	/** Upstream `isWav`: empty extensions count as WAV, otherwise the stored extension decides. */
@@ -176,35 +177,33 @@ export class Sound {
 	}
 
 	/** Rebuilds the canonical WAV file upstream synthesizes from WAVEFORMATEX + cdata. */
-	private static rebuildWav(
-		wFormatTag: number,
-		nChannels: number,
-		nSamplesPerSec: number,
-		nAvgBytesPerSec: number,
-		nBlockAlign: number,
-		wBitsPerSample: number,
-		samples: Uint8Array,
-	): Uint8Array {
+	private static rebuildWav(fmt: WavFormat, samples: Uint8Array): Uint8Array {
 		const out = new Uint8Array(44 + samples.length)
 		const view = getDataView(out)
-		writeTag(view, 0, 'RIFF')
+		writeFourCc(view, 0, 'RIFF')
 		view.setUint32(4, out.length - 8, true)
-		writeTag(view, 8, 'WAVE')
-		writeTag(view, 12, 'fmt ')
+		writeFourCc(view, 8, 'WAVE')
+		writeFourCc(view, 12, 'fmt ')
 		view.setUint32(16, 16, true)
-		view.setUint16(20, wFormatTag, true)
-		view.setUint16(22, nChannels, true)
-		view.setUint32(24, nSamplesPerSec, true)
-		view.setUint32(28, nAvgBytesPerSec, true)
-		view.setUint16(32, nBlockAlign, true)
-		view.setUint16(34, wBitsPerSample, true)
-		writeTag(view, 36, 'data')
+		view.setUint16(20, fmt.tag, true)
+		view.setUint16(22, fmt.channels, true)
+		view.setUint32(24, fmt.rate, true)
+		view.setUint32(28, fmt.avgBytesPerSec, true)
+		view.setUint16(32, fmt.blockAlign, true)
+		view.setUint16(34, fmt.bits, true)
+		writeFourCc(view, 36, 'data')
 		view.setUint32(40, samples.length, true)
 		out.set(samples, 44)
 		return out
 	}
 }
 
-function writeTag(view: DataView, pos: number, tag: string): void {
-	for (let i = 0; i < 4; i++) view.setUint8(pos + i, tag.charCodeAt(i))
+/** WAVEFORMATEX blob carried inside the sound stream. */
+interface WavFormat {
+	tag: number
+	channels: number
+	rate: number
+	avgBytesPerSec: number
+	blockAlign: number
+	bits: number
 }

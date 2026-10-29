@@ -8,10 +8,11 @@
 import { warnOnce } from '../emu/warn-once.js'
 import {
 	BaseSoundEngine,
-	clamp01,
+	clamp11,
 	effectiveGain,
 	type SoundSample,
 	type SoundVoice,
+	sqrt01,
 	uncurvePanFade,
 } from './sound-engine.js'
 import { synthKnock } from './sound-synth-pool.js'
@@ -189,6 +190,7 @@ export class WebSoundEngine extends BaseSoundEngine {
 		if (!ctx) return null
 		try {
 			const buffer = ctx.createBuffer(1, pcm.length, sampleRate)
+			// from() widens ArrayBufferLike PCM to the ArrayBuffer copyToChannel requires.
 			buffer.copyToChannel(Float32Array.from(pcm), 0)
 			return buffer
 		} catch {
@@ -250,13 +252,13 @@ export class WebSoundEngine extends BaseSoundEngine {
 		try {
 			// 10 ms smoothing: de-clicks slider/mute moves without audible lag.
 			this.master?.gain.setTargetAtTime(this.unmutedMaster(), t, 0.01)
-			this.musicBus?.gain.setTargetAtTime(Math.sqrt(clamp01(this.getMusicVolume())), t, 0.01)
+			this.musicBus?.gain.setTargetAtTime(sqrt01(this.getMusicVolume()), t, 0.01)
 		} catch {}
 	}
 
 	/** Master-bus gain: sqrt(level) with mute forced to silence (restores on unmute). */
 	private unmutedMaster(): number {
-		return this.isMuted() ? 0 : Math.sqrt(clamp01(this.getLevel()))
+		return this.isMuted() ? 0 : sqrt01(this.getLevel())
 	}
 
 	public override dispose(): void {
@@ -283,7 +285,7 @@ export class WebSoundEngine extends BaseSoundEngine {
 			this.master.gain.value = this.unmutedMaster()
 			this.master.connect(ctx.destination)
 			this.musicBus = ctx.createGain()
-			this.musicBus.gain.value = Math.sqrt(clamp01(this.getMusicVolume()))
+			this.musicBus.gain.value = sqrt01(this.getMusicVolume())
 			this.musicBus.connect(this.master)
 			this.ctx = ctx
 			this.hookGesture()
@@ -297,7 +299,7 @@ export class WebSoundEngine extends BaseSoundEngine {
 		if (!this.ctx || typeof this.ctx.createStereoPanner !== 'function') return null
 		try {
 			const node = this.ctx.createStereoPanner()
-			node.pan.value = Math.max(-1, Math.min(1, pan))
+			node.pan.value = clamp11(pan)
 			return node
 		} catch {
 			return null
@@ -312,7 +314,7 @@ export class WebSoundEngine extends BaseSoundEngine {
 		window.addEventListener('keydown', unlock)
 	}
 
-	private stopNodes(nodes: VoiceNodes | null | undefined): void {
+	private stopNodes(nodes: VoiceNodes | null): void {
 		if (!nodes) return
 		try {
 			nodes.source.onended = null

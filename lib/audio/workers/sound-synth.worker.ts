@@ -2,26 +2,30 @@
 
 // Isolated synthesis worker: kernels imported from sound-synth-core.js
 // (shipped side-by-side in dist-esm, so the relative import resolves).
-import { knockPcm, tonePcm } from '../sound-synth-core.js'
+import { DEFAULT_SYNTH_RATE, knockPcm, tonePcm } from '../sound-synth-core.js'
 
-self.onmessage = (e: MessageEvent) => {
+addEventListener('message', (e: MessageEvent) => {
 	const {
 		id,
 		kind,
-		sampleRate = 44100,
+		sampleRate = DEFAULT_SYNTH_RATE,
 		freq = 440,
 		seconds = 0.25,
 	} = e.data as {
 		id: number
-		kind: 'knock' | 'tone'
+		kind: string
 		sampleRate?: number
 		freq?: number
 		seconds?: number
 	}
 	try {
-		const pcm = kind === 'tone' ? tonePcm(freq, seconds, sampleRate) : knockPcm(sampleRate)
-		self.postMessage({ id, ok: true, pcm: pcm.buffer }, [pcm.buffer] as never)
+		let pcm: Float32Array
+		if (kind === 'tone') pcm = tonePcm(freq, seconds, sampleRate)
+		else if (kind === 'knock') pcm = knockPcm(sampleRate)
+		else throw new Error(`unknown synth kind "${kind}"`)
+		// Transfer list: valid in workers, but DOM lib types this global as window.postMessage.
+		postMessage({ id, ok: true, pcm: pcm.buffer }, [pcm.buffer] as never)
 	} catch (err) {
-		self.postMessage({ id, ok: false, error: String((err as Error)?.message ?? err) })
+		postMessage({ id, ok: false, error: String((err as Error)?.message ?? err) })
 	}
-}
+})

@@ -231,6 +231,9 @@ describe('The VPinball global API', () => {
 		engine.registerSample('drain-at', new Float32Array([0, 0.2, -0.2, 0]), 8000)
 		api.PlaySoundAt('drain-at', 10, 20)
 		expect(engine.isPlaying('drain-at')).to.equal(true)
+		const voice = api.PlaySound('drain-at', 1, 0.5, 0, 0, 0, false, true, 0)
+		expect(voice).to.be.above(0)
+		expect(engine.isPlaying('drain-at')).to.equal(true)
 	})
 
 	it('should store the music volume on the engine', () => {

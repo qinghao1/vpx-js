@@ -1,5 +1,7 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
+import { readFourCc } from '../io/binary-helpers.js'
+
 /** Minimal WAV file decoder (PCM + IEEE float, downmixed to mono).
  *
  * VPX stores imported .wav sounds as a reconstructed canonical WAVE file
@@ -26,14 +28,14 @@ export interface DecodedWav {
 export function decodeWavAudio(bytes: Uint8Array): DecodedWav | null {
 	if (bytes.length < 44) return null
 	const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
-	if (readTag(view, 0) !== 'RIFF' || readTag(view, 8) !== 'WAVE') return null
+	if (readFourCc(view, 0) !== 'RIFF' || readFourCc(view, 8) !== 'WAVE') return null
 	// Scan chunks (fmt, data, skipping unknowns) instead of assuming a 44-byte header.
 	let fmt: { tag: number; channels: number; rate: number; bits: number } | null = null
 	let dataOffset = -1
 	let dataSize = 0
 	let pos = 12
 	while (pos + 8 <= bytes.length) {
-		const tag = readTag(view, pos)
+		const tag = readFourCc(view, pos)
 		const size = view.getUint32(pos + 4, true)
 		if (tag === 'fmt ' && fmt === null && size >= 16 && pos + 24 <= bytes.length) {
 			fmt = {
@@ -73,15 +75,6 @@ export function decodeWavAudio(bytes: Uint8Array): DecodedWav | null {
 	return { pcm, sampleRate: rate, channels }
 }
 
-function readTag(view: DataView, pos: number): string {
-	return String.fromCharCode(
-		view.getUint8(pos),
-		view.getUint8(pos + 1),
-		view.getUint8(pos + 2),
-		view.getUint8(pos + 3),
-	)
-}
-
 function readSample(view: DataView, bytes: Uint8Array, off: number, tag: number, bits: number): number {
 	if (tag === 3) return bits === 32 ? view.getFloat32(off, true) : view.getFloat64(off, true)
 	switch (bits) {
@@ -94,7 +87,9 @@ function readSample(view: DataView, bytes: Uint8Array, off: number, tag: number,
 			const raw = bytes[off]! | (bytes[off + 1]! << 8) | (bytes[off + 2]! << 16)
 			return (raw & 0x800000 ? raw - 0x1000000 : raw) / 8388608
 		}
-		default:
+		case 32:
 			return view.getInt32(off, true) / 2147483648
+		default:
+			return null as never
 	}
 }

@@ -3,6 +3,7 @@
 
 import { MathUtils } from 'three'
 
+import { curvePanFade, type PlaySoundOptions } from '../../audio/sound-engine.js'
 import type { EventProxy } from '../../game/event-proxy.js'
 import type { Player } from '../../game/player.js'
 import { VP_VERSION_MAJOR, VP_VERSION_MINOR, VP_VERSION_REV } from '../../index.js'
@@ -580,8 +581,8 @@ export class TableApi extends ItemApi<TableData> {
 		usesame = false,
 		restart = true,
 		frontRearFade = 0,
-	): void {
-		this.player.getSoundEngine().playSound(bstr, {
+	): number {
+		return this.playSample(bstr, {
 			loopCount: loopcount,
 			volume,
 			pan,
@@ -604,22 +605,23 @@ export class TableApi extends ItemApi<TableData> {
 		pitch = 0,
 		usesame = false,
 		restart = true,
-	): void {
+	): number {
 		// Native maps the position to pre-emphasized pan/fade when spatial audio is off.
 		const nx = this.Width > 0 ? Math.max(-1, Math.min(1, (x / this.Width) * 2 - 1)) : 0
 		const ny = this.Height > 0 ? Math.max(-1, Math.min(1, (y / this.Height) * 2 - 1)) : 0
-		const pan = nx < 0 ? -((-nx) ** 10) : nx ** 10
-		const fade = ny < 0 ? -((-ny) ** 10) : ny ** 10
-		this.player.getSoundEngine().playSound(bstr, {
+		return this.playSample(bstr, {
 			loopCount: loopcount,
 			volume,
-			pan,
+			pan: curvePanFade(nx),
 			randomPitch: randompitch,
 			pitch,
 			useSame: usesame,
 			restart,
-			frontRearFade: fade,
+			frontRearFade: curvePanFade(ny),
 		})
+	}
+	private playSample(name: string, opts: PlaySoundOptions): number {
+		return this.player.getSoundEngine().playSound(name, opts)
 	}
 	public GetPredefinedStrings(_dispID: number): string[] {
 		return []

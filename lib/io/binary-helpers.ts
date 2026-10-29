@@ -66,3 +66,18 @@ export function decodeUtf8OrCp1252(buf: Uint8Array): string {
 export function readInt32LE(buf: Uint8Array, off: number): number {
 	return getDataView(buf).getInt32(off, true)
 }
+
+/** Reads a four-character chunk tag (e.g. 'RIFF', 'fmt '). */
+export function readFourCc(view: DataView, pos: number): string {
+	return String.fromCharCode(
+		view.getUint8(pos),
+		view.getUint8(pos + 1),
+		view.getUint8(pos + 2),
+		view.getUint8(pos + 3),
+	)
+}
+
+/** Writes a four-character chunk tag. */
+export function writeFourCc(view: DataView, pos: number, tag: string): void {
+	for (let i = 0; i < 4; i++) view.setUint8(pos + i, tag.charCodeAt(i))
+}

@@ -80,6 +80,14 @@ export function clamp01(v: number): number {
 	return Math.max(0, Math.min(1, v))
 }
 
+export function clamp11(v: number): number {
+	return Math.max(-1, Math.min(1, v))
+}
+
+export function sqrt01(v: number): number {
+	return Math.sqrt(clamp01(v))
+}
+
 /** Native loop mapping: <=1 plays once, >1 repeats n-1, <0 loops forever. @see SoundPlayer::Play */
 export function mapLoopCount(loopCount = 1): number {
 	if (loopCount < 0) return -1
@@ -89,8 +97,13 @@ export function mapLoopCount(loopCount = 1): number {
 
 /** Undo the x^10 pre-emphasis tables apply to pan/fade. @see SoundPlayer::Play */
 export function uncurvePanFade(v: number): number {
-	const c = Math.max(-1, Math.min(1, v))
+	const c = clamp11(v)
 	return c < 0 ? -((-c) ** 0.1) : c ** 0.1
+}
+
+/** Pre-emphasized spatial pan/fade from a normalized table position (inverse of uncurvePanFade). */
+export function curvePanFade(n: number): number {
+	return n < 0 ? -((-n) ** 10) : n ** 10
 }
 
 /** Native voice gain: mono-compensated sqrt of the clamped product. @see SoundPlayer::ApplyVolume
@@ -134,7 +147,7 @@ export abstract class BaseSoundEngine implements ISoundEngine {
 	protected abstract emitVoice(voice: SoundVoice, sample: SoundSample, rate: number): void
 	protected abstract emitKnock(): void
 	protected abstract emitEmuPcm(_pcm: Float32Array): void
-	protected stopVoice?(_voice: SoundVoice): void
+	protected stopVoice(_voice: SoundVoice): void {}
 
 	public playSound(name: string, opts: PlaySoundOptions = {}): number {
 		if (this.disposed || !name) return 0
@@ -158,12 +171,15 @@ export abstract class BaseSoundEngine implements ISoundEngine {
 			return 0
 		}
 		let list = this.voices.get(key)
-		if (!list) this.voices.set(key, (list = []))
+		if (!list) {
+			list = []
+			this.voices.set(key, list)
+		}
 		if (restart) for (const voice of list) this.halt(voice)
 		// Allocation: restart halts all voices then reuses the first, useSame
 		// steals a playing voice for live updates, otherwise a new overlapping
 		// voice is created when every existing one is still playing.
-		let voice = list.find(v => useSame || restart || !v.playing)
+		let voice = useSame || restart ? list[0] : list.find(v => !v.playing)
 		if (!voice) {
 			voice = {
 				id: ++this.seq,
@@ -180,7 +196,7 @@ export abstract class BaseSoundEngine implements ISoundEngine {
 		voice.loopCount = mapLoopCount(loopCount)
 		// Native adds the sound's editor base levels to the script offsets.
 		voice.volume = sample.base.volume + volume
-		voice.pan = Math.max(-1, Math.min(1, sample.base.pan + pan))
+		voice.pan = clamp11(sample.base.pan + pan)
 		voice.frontRearFade = sample.base.frontRearFade + frontRearFade
 		voice.pitch = pitch
 		voice.playing = true
@@ -253,6 +269,7 @@ export abstract class BaseSoundEngine implements ISoundEngine {
 		this.onOutputChanged()
 	}
 
+	/** Audible level (0 while muted). */
 	public getVolume(): number {
 		return this.muted ? 0 : this.volume
 	}
@@ -336,7 +353,7 @@ export abstract class BaseSoundEngine implements ISoundEngine {
 	private halt(voice: SoundVoice): void {
 		voice.playing = false
 		try {
-			this.stopVoice?.(voice)
+			this.stopVoice(voice)
 		} catch {}
 	}
 }

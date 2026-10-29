@@ -2,8 +2,8 @@
 
 // Shared synthesis kernels: imported by sound-synth-pool.ts (main-thread
 // fallback) and workers/sound-synth.worker.ts (off-thread synthesis).
-// Single source of truth so the two copies cannot drift.
-
+// Single source of truth so the two copies cannot drift. Intentionally
+// dependency-free so the worker bundle stays lean.
 export const DEFAULT_SYNTH_RATE = 44100
 
 /** 0.18 s knocker thock: noise click plus a 160 Hz body, both exponentially decayed.
