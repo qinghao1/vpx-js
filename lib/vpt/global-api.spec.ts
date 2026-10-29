@@ -185,17 +185,12 @@ describe('The VPinball global API', () => {
 		expect(() => transpiler.execute('CloseSerial', {})).to.not.throw()
 	})
 
-	it('should route PlaySound through the player sound engine', () => {
+	it('should play and stop registered samples but ignore missing ones', () => {
 		const api = new GlobalApi(table, player)
 		const engine = player.getSoundEngine()
 		expect(api.PlaySound('missing-sample')).to.equal(0)
 		expect(engine.isPlaying('missing-sample')).to.equal(false)
 		api.StopSound('missing-sample')
-	})
-
-	it('should play and stop registered samples', () => {
-		const api = new GlobalApi(table, player)
-		const engine = player.getSoundEngine()
 		engine.registerSample('sling', new Float32Array([0, 0.2, -0.2, 0]), 8000)
 		const voice = api.PlaySound('sling', 1, 0.5, 0, 0, 0, false, true, 0)
 		expect(voice).to.be.above(0)
@@ -214,6 +209,18 @@ describe('The VPinball global API', () => {
 		expect(engine.getKnockCount()).to.equal(knocks + 3)
 		api.PlayMusic('theme', 0.6)
 		expect(engine.getMusic()).to.deep.equal({ name: 'theme', volume: 0.6 })
+		api.EndMusic()
+		expect(engine.getMusic()).to.equal(null)
+	})
+
+	it('should scale music by the table music level', () => {
+		const api = new GlobalApi(table, player)
+		const engine = player.getSoundEngine()
+		const data = table.data
+		if (!data) throw new Error('table data not loaded')
+		;(data as unknown as { tableMusicVolume: number }).tableMusicVolume = 0.5
+		api.PlayMusic('theme', 0.6)
+		expect(engine.getMusic()).to.deep.equal({ name: 'theme', volume: 0.3 })
 		api.EndMusic()
 		expect(engine.getMusic()).to.equal(null)
 	})

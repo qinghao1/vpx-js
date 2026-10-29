@@ -21,7 +21,7 @@ This is a maintained **fork of [`vpdb/vpx-js`](https://github.com/vpdb/vpx-js)**
 - **Physics** — vpinball collision/rigid-body code ported 1:1; `Player` drives a 1 kHz physics + 60 Hz animation loop (including nudge).
 - **Scripting** — VBScript transpiled to JS (EBNF grammar + transformers) and run against per-item APIs.
 - **Emulation** — `wpc-emu` for WPC plus **PinMAME WASM** (libPinMAME 3.7) for SAM/Whitestar/S11/Data East and others via `VpmController`.
-- **Sound** — table-embedded WAV sounds load from `Sound{i}` streams (other codecs stay silent with a warning) and script `PlaySound`/`PlaySoundAt`/`StopSound`/`FireKnocker`/`PlayMusic`/`EndMusic` play through WebAudio (music loops; synthesized knocker, worker-offloaded synthesis, mute/volume UI with persisted prefs).
+- **Sound** — table-embedded WAV sounds load from `Sound{i}` streams (other codecs stay silent with a warning) and script `PlaySound`/`PlaySoundAt`/`StopSound`/`FireKnocker`/`PlayMusic`/`EndMusic` play through WebAudio (single-play music reporting `MusicDone`; synthesized knocker, worker-offloaded synthesis, mute/volume UI with persisted prefs).
 - **Portable** — `Uint8Array`/`DataView` I/O, no Node shims; explicit `lib/refs.node.js` vs `lib/refs.browser.js` split.
 
 ## Requirements

@@ -5,6 +5,7 @@
 // render thread owns mixing — script and physics threads never block on audio.
 // Without an AudioContext (Node/tests) every call degrades to state tracking.
 
+import { warnOnce } from '../emu/warn-once.js'
 import {
 	BaseSoundEngine,
 	clamp01,
@@ -18,6 +19,7 @@ import { synthKnock } from './sound-synth-pool.js'
 interface VoiceNodes {
 	source: AudioBufferSourceNode
 	gain: GainNode
+	pan: StereoPannerNode | null
 }
 
 interface VoiceReplay {
@@ -67,6 +69,17 @@ export class WebSoundEngine extends BaseSoundEngine {
 				// by an earlier finite-loop play of this voice.
 				this.repeats.delete(voice.id)
 			}
+			// useSame + restart=false on a playing voice: native applies the new
+			// settings to the live voice (AudioPlayer selection keeps it), so retune
+			// instead of restarting. A restart halts first, so a tracked source here
+			// is always that no-restart reuse.
+			const live = this.nodes.get(voice.id)
+			if (live) {
+				live.gain.gain.value = gainValue
+				if (live.pan) live.pan.pan.value = pan
+				live.source.playbackRate.value = rate
+				return
+			}
 			this.startVoiceSource(ctx, voice, buffer, rate, gainValue, pan, voice.loopCount === -1)
 		} catch {}
 	}
@@ -101,7 +114,7 @@ export class WebSoundEngine extends BaseSoundEngine {
 		} else if (this.master) {
 			gain.connect(this.master)
 		}
-		this.nodes.set(voice.id, { source, gain })
+		this.nodes.set(voice.id, { source, gain, pan: panNode })
 		source.onended = () => this.onVoiceEnded(voice.id)
 		source.start()
 	}
@@ -187,27 +200,41 @@ export class WebSoundEngine extends BaseSoundEngine {
 		this.stopMusicNodes()
 		const music = this.getMusic()
 		const ctx = this.ensureContext()
-		// Records state even without a sample (plays nothing); unlike
-		// playSound there is no warnOnce because music names are file paths.
+		// State is already stored by the base; resolve the sample here, warning
+		// on a miss like playSound (native logs the streaming failure the same way).
 		const sample = music ? this.getSample(music.name) : undefined
-		if (!music || !ctx || !this.musicBus || !sample) return
+		if (!music || !ctx || !this.musicBus || !sample) {
+			// Native logs a streaming failure; music resolves through registered
+			// samples here (no Music-dir file streaming), so warn the same way.
+			if (music && !sample)
+				warnOnce(
+					`music:${music.name.toLowerCase()}`,
+					'Request to play music "%s", but it was not found.',
+					music.name,
+				)
+			return
+		}
 		try {
 			const buffer = this.uploadPcm(sample.pcm, sample.sampleRate)
 			if (!buffer) return
 			const source = ctx.createBufferSource()
 			source.buffer = buffer
-			// Simplification: music always loops (native streams the file once per PlayMusic).
-			source.loop = true
+			// Native streams the file once per PlayMusic and fires MusicDone at
+			// the end (SoundPlayer::OnSoundEnd); a forced stop nulls musicNodes
+			// first, so only a natural end reports.
+			source.loop = false
 			const gain = ctx.createGain()
 			// Native music staging is sqrt-curved (ApplyVolume); the music bus
 			// below carries sqrt(musicVolume) and the master its own level.
 			gain.gain.value = effectiveGain(music.volume, 1)
 			source.connect(gain)
 			gain.connect(this.musicBus)
-			const nodes = { source, gain }
+			const nodes: VoiceNodes = { source, gain, pan: null }
 			this.musicNodes = nodes
 			source.onended = () => {
-				if (this.musicNodes === nodes) this.musicNodes = null
+				if (this.musicNodes !== nodes) return
+				this.endMusic()
+				this.onMusicEnded?.()
 			}
 			source.start()
 		} catch {}

@@ -13,14 +13,12 @@ const pending = new Map<
 	{ resolve: (p: Float32Array) => void; reject: (e: Error) => void; timer: ReturnType<typeof setTimeout> }
 >()
 
-import { DEFAULT_SYNTH_RATE as DEFAULT_RATE, knockPcm, tonePcm } from './sound-synth-core.js'
-
-export { knockPcm, tonePcm } from './sound-synth-core.js'
+import { DEFAULT_SYNTH_RATE, knockPcm, tonePcm } from './sound-synth-core.js'
 
 // Generous because expiry degrades to the inline fallback instead of failing.
 const SYNTH_TIMEOUT_MS = 5000
 
-export function hasSoundWorker(): boolean {
+function hasSoundWorker(): boolean {
 	return typeof Worker !== 'undefined' && typeof window !== 'undefined'
 }
 
@@ -76,11 +74,11 @@ async function request(kind: 'knock' | 'tone', payload: Record<string, number>):
 }
 
 /** Knocker PCM synthesized off the main thread (inline fallback when workers are unavailable). */
-export async function synthKnock(sampleRate = DEFAULT_RATE): Promise<Float32Array> {
+export async function synthKnock(sampleRate = DEFAULT_SYNTH_RATE): Promise<Float32Array> {
 	return request('knock', { sampleRate })
 }
 
 /** Sine-probe PCM synthesized off the main thread (inline fallback when workers are unavailable). */
-export async function synthTone(freq = 440, seconds = 0.25, sampleRate = DEFAULT_RATE): Promise<Float32Array> {
+export async function synthTone(freq = 440, seconds = 0.25, sampleRate = DEFAULT_SYNTH_RATE): Promise<Float32Array> {
 	return request('tone', { freq, seconds, sampleRate })
 }

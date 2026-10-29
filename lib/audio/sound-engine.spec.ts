@@ -5,7 +5,8 @@ import { resetWarnOnce } from '../emu/warn-once.js'
 import { Logger } from '../util/logger.js'
 import { NullSoundEngine } from './null-sound-engine.js'
 import { effectiveGain, extractPcm, mapLoopCount, pitchFactor, uncurvePanFade } from './sound-engine.js'
-import { hasSoundWorker, knockPcm, synthKnock, synthTone, tonePcm } from './sound-synth-pool.js'
+import { knockPcm, tonePcm } from './sound-synth-core.js'
+import { synthKnock, synthTone } from './sound-synth-pool.js'
 
 function tone(name = 'probe'): { engine: NullSoundEngine; name: string } {
 	const engine = new NullSoundEngine()
@@ -228,8 +229,7 @@ describe('Sound synth pool', () => {
 		expect([...toneBuffer].every(v => Number.isFinite(v) && Math.abs(v) <= 0.5)).to.equal(true)
 	})
 
-	it('should fall back inline when no worker is available', async () => {
-		expect(hasSoundWorker()).to.equal(false)
+	it('should synthesize knocker and tone PCM', async () => {
 		const knock = await synthKnock(8000)
 		expect(knock).to.be.instanceOf(Float32Array)
 		expect(knock.length).to.be.above(0)

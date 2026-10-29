@@ -234,6 +234,8 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 	/** Registers every decoded table sound with the engine (re-run on engine swaps). */
 	public registerTableSounds(engine: ISoundEngine): void {
 		if (!engine) return
+		// Route natural music ends to the script MusicDone event (native SoundPlayer::OnSoundEnd).
+		engine.onMusicEnded = () => this.events?.fireVoidEvent(Event.GameEventsMusicDone)
 		for (const [key, sound] of Object.entries(this.sounds)) {
 			const name = sound.getName() || key
 			if (sound.isPlayable())

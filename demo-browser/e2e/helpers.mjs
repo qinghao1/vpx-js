@@ -1666,16 +1666,26 @@ export const soundChecks = async page => {
 			const slider = document.getElementById('sound-volume')
 			if (!btn || !slider) return { pass: false, reason: 'missing sound controls' }
 			const wasMuted = !!s.isMuted()
-			s.setMuted(true)
-			const mutedOk = s.isMuted() === true && btn.getAttribute('aria-pressed') !== null
+			// Mute through the user control: on touch layouts the first tap only
+			// reveals the slider, so tap until the engine state actually flips.
+			btn.click()
+			if (s.isMuted() === wasMuted) btn.click()
+			const mutedOk = s.isMuted() !== wasMuted && btn.getAttribute('aria-pressed') === String(s.isMuted())
+			// Volume through the slider: the input handler drives the engine,
+			// unmuting when the level rises above zero, and re-syncs the chrome.
 			// Probe the volume unmuted: getVolume() reports 0 while muted, so a
 			// persisted muted profile would fail the check below on user settings.
-			s.setMuted(false)
 			const volBefore = typeof s.getLevel === 'function' ? s.getLevel() : s.getVolume()
-			s.setVolume(0.5)
-			const volOk = Math.abs(s.getVolume() - 0.5) < 1e-9
-			s.setVolume(volBefore)
-			s.setMuted(wasMuted)
+			slider.value = '50'
+			slider.dispatchEvent(new Event('input', { bubbles: true }))
+			const volOk = Math.abs(s.getVolume() - 0.5) < 1e-9 && slider.value === '50' && s.isMuted() === false
+			slider.value = String(Math.round(volBefore * 100))
+			slider.dispatchEvent(new Event('input', { bubbles: true }))
+			// Restore the pre-check mute state through the control as well, so the
+			// chrome (aria-pressed, icon, slider) stays in sync with the engine.
+			if (s.isMuted() !== wasMuted) btn.click()
+			if (s.isMuted() !== wasMuted) btn.click()
+			const muteRestoreOk = s.isMuted() === wasMuted
 			const k0 = s.getKnockCount()
 			s.fireKnocker(1)
 			const knockOk = s.getKnockCount() === k0 + 1
@@ -1687,9 +1697,10 @@ export const soundChecks = async page => {
 			const stopOk = !s.isPlaying('__e2e_probe__')
 			const missingOk = s.playSound('__e2e_missing_xyz__') === 0
 			const tableApi = v.player ? v.table?.getApi?.() : null
+			const scriptRunnable = !!(v.player && tableApi && typeof tableApi.PlaySound === 'function')
 			let scriptOk = true
 			try {
-				if (v.player && tableApi && typeof tableApi.PlaySound === 'function') {
+				if (scriptRunnable) {
 					tableApi.PlaySound('__e2e_probe__', 1, 0.5, 0, 0, 0, false, true, 0)
 					scriptOk = s.isPlaying('__e2e_probe__')
 					tableApi.FireKnocker?.(1)
@@ -1700,10 +1711,10 @@ export const soundChecks = async page => {
 			try {
 				s.stopSound('__e2e_probe__')
 			} catch {}
-			const pass = mutedOk && volOk && knockOk && playOk && stopOk && missingOk && scriptOk
+			const pass = mutedOk && muteRestoreOk && volOk && knockOk && playOk && stopOk && missingOk && scriptOk
 			return {
 				pass,
-				reason: `mute=${mutedOk} vol=${volOk} knock=${knockOk} play=${playOk} stop=${stopOk} missing=${missingOk} script=${scriptOk}`,
+				reason: `mute=${mutedOk} muteRestore=${muteRestoreOk} vol=${volOk} knock=${knockOk} play=${playOk} stop=${stopOk} missing=${missingOk} script=${scriptOk}${scriptRunnable ? '' : ' (skipped: no player)'}`,
 			}
 		} catch (e) {
 			return { pass: false, reason: String(e?.message ?? e).slice(0, 200) }

@@ -299,9 +299,12 @@ export class GlobalApi extends VbsApi {
 	}
 
 	public PlayMusic(music: string, volume = 1): void {
-		this.player.getSoundEngine().playMusic(music, volume)
+		// Native multiplies the script volume by the table music level at play
+		// time (ScriptGlobalTable::PlayMusic); the setter stays data-only there too.
+		this.player.getSoundEngine().playMusic(music, volume * (this.table.data?.tableMusicVolume ?? 1))
 	}
 
+	// Native EndMusic takes no name and clears whatever is playing.
 	public EndMusic(_music?: string): void {
 		this.player.getSoundEngine().endMusic()
 	}

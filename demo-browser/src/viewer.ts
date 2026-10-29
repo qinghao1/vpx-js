@@ -402,16 +402,16 @@ export class Viewer {
 	}
 	_applySoundPrefs() {
 		if (!this.sound) return
-		// Persisted user prefs win over the table's SVOL/MVOL defaults (music follows the table only).
+		// Persisted user prefs win over the table's SVOL default. The table music
+		// level is not seeded on the bus (native defaults it to 1): it applies
+		// per PlayMusic, multiplied with the script volume.
 		const tableSound = Number.isFinite(this.table?.data?.tableSoundVolume) ? this.table.data.tableSoundVolume : 1
-		const tableMusic = Number.isFinite(this.table?.data?.tableMusicVolume) ? this.table.data.tableMusicVolume : 1
 		let prefs = null
 		try {
 			prefs = JSON.parse(localStorage.getItem('vpx:sound') ?? 'null')
 		} catch {}
 		this.sound.setVolume(Math.max(0, Math.min(1, prefs?.volume ?? tableSound ?? 1)))
 		this.sound.setMuted(!!prefs?.muted)
-		this.sound.setMusicVolume(Math.max(0, tableMusic ?? 1))
 	}
 	_saveSoundPrefs() {
 		if (!this.sound) return

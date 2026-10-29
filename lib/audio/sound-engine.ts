@@ -58,6 +58,8 @@ export interface ISoundEngine {
 	endMusic(): void
 	getMusic(): { name: string; volume: number } | null
 	fireKnocker(count?: number): void
+	/** Fired when music ends on its own; the host routes it to the script MusicDone event. */
+	onMusicEnded: (() => void) | null
 	setMuted(muted: boolean): void
 	isMuted(): boolean
 	setVolume(volume: number): void
@@ -74,7 +76,6 @@ export interface ISoundEngine {
 	dispose(): void
 }
 
-/** Clamp to the 0..1 volume range. */
 export function clamp01(v: number): number {
 	return Math.max(0, Math.min(1, v))
 }
@@ -112,7 +113,7 @@ export function pitchFactor(sampleRate: number, pitch = 0, randomPitch = 0, rand
 }
 
 /** Case-insensitive sample/voice key (upstream resolves names through a case-insensitive map). */
-export function soundKey(name: string): string {
+function soundKey(name: string): string {
 	return name.toLowerCase()
 }
 
@@ -124,6 +125,7 @@ export abstract class BaseSoundEngine implements ISoundEngine {
 	private volume = 1
 	private musicVolume = 1
 	private music: { name: string; volume: number } | null = null
+	public onMusicEnded: (() => void) | null = null
 	private knockCount = 0
 	private emuFrames = 0
 	private seq = 0

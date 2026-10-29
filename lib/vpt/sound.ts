@@ -4,11 +4,12 @@ import { decodeWavAudio } from '../audio/wav-decoder.js'
 import { decodeUtf8OrCp1252, getDataView } from '../io/binary-helpers.js'
 import type { Storage } from '../io/ole-doc.js'
 
-/** Upstream sound-format tail size (outputTarget byte + volume/pan/fade/volume int32s). @see Sound::CreateFromStream */
+/** Upstream sound-format tail size: outputTarget byte + volume/pan/fade int32s + a
+ * duplicate volume int32 (written twice by SaveToStream). @see Sound::CreateFromStream */
 const NEW_SOUND_TAIL_SIZE = 17
 
-/** File format version that introduced the surround tail. @see NEW_SOUND_FORMAT_VERSION */
-export const NEW_SOUND_FORMAT_VERSION = 1031
+/** WAVEFORMATEX blob size inside the stream (@see WavFmt, `static_assert(sizeof(WavFmt) == 18)`). */
+const WAV_FORMAT_SIZE = 18
 
 /** Upstream `SoundOutTypes` (parts/Sound.h): table vs backglass output. */
 export enum SoundOutType {
@@ -21,10 +22,12 @@ export enum SoundOutType {
  * @see https://github.com/vpinball/vpinball/blob/master/src/parts/Sound.cpp (CreateFromStream/SaveToStream)
  *
  * Layout: int32 nameLen + name, int32 pathLen + path, int32 dummyLen + dummy,
- * then for `.wav` paths an 18-byte WAVEFORMATEX + int32 cdata + cdata raw PCM
- * bytes (rebuilt here into a playable WAV file in `data`, as upstream does),
- * else int32 cdata + cdata raw imported-file bytes. Followed by the settings
- * tail: 17 bytes (new format) or 1 bool byte (pre-1031).
+ * then an exact length fit at the WAVEFORMATEX offset selects the 18-byte
+ * WAVEFORMATEX + int32 cdata + cdata raw PCM bytes branch (rebuilt here into a
+ * playable WAV file in `data`, as upstream does), an exact fit at offset 0 the
+ * int32 cdata + cdata raw imported-file bytes branch, and ties fall back to the
+ * path (empty extensions count as WAV). Followed by the settings tail:
+ * 17 bytes (new format) or 1 bool byte (pre-1031).
  */
 export class Sound {
 	/** Script-facing sample name (`PlaySound("...")`). */
@@ -82,7 +85,7 @@ export class Sound {
 		this.path = decodeUtf8OrCp1252(readBytes(readInt32('path length'), 'path'))
 		// Legacy lowercase-name copy (modern saves store a single NUL); content unused.
 		readBytes(readInt32('name-copy length'), 'name copy')
-		if (Sound.isWavPath(this.path)) {
+		if (Sound.classifyStored(view, pos, bytes.length, this.path)) {
 			if (pos + 18 > bytes.length)
 				throw new Error(`Corrupt sound stream "${itemName}": WAVEFORMATEX overruns the stream.`)
 			const wFormatTag = view.getUint16(pos, true)
@@ -124,11 +127,15 @@ export class Sound {
 			this.pan = view.getInt32(pos + 5, true)
 			this.frontRearFade = view.getInt32(pos + 9, true)
 		} else if (remaining === 1) {
-			// Pre-1031: toBackglassOutput bool (also implied by a bgout_ name prefix upstream).
+			// Pre-1031: base levels default to 100 upstream (Sound.cpp locals), and
+			// backglass falls back to a case-insensitive bgout_ substring or path match.
+			this.volume = 100
+			this.pan = 100
+			this.frontRearFade = 100
 			const backglass =
 				view.getUint8(pos) !== 0 ||
-				this.name.toLowerCase().startsWith('bgout_') ||
-				this.path === '* Backglass Output *'
+				this.name.toLowerCase().includes('bgout_') ||
+				this.path.toLowerCase() === '* backglass output *'
 			this.outputTarget = backglass ? SoundOutType.BACKGLASS : SoundOutType.TABLE
 		} else if (remaining !== 0) {
 			throw new Error(
@@ -137,9 +144,35 @@ export class Sound {
 		}
 	}
 
-	/** Upstream `isWav`: the stored extension decides the WAVEFORMATEX branch. */
+	/**
+	 * Upstream storage sniffing (`Sound::CreateFromStream`): an exact length fit
+	 * at the WAVEFORMATEX offset means WAV, at offset 0 means raw; ties (and
+	 * legacy 1-byte tails) fall back to the path. Both tail sizes are tried,
+	 * modern first, since the version is not plumbed this far.
+	 */
+	private static classifyStored(view: DataView, pos: number, size: number, path: string): boolean {
+		for (const tailSize of [NEW_SOUND_TAIL_SIZE, 1]) {
+			const available = size - pos - tailSize
+			if (available < 0) continue
+			const rawFits = Sound.lengthFits(view, pos, size, 0, available)
+			const wavFits = Sound.lengthFits(view, pos, size, WAV_FORMAT_SIZE, available)
+			if (rawFits !== wavFits) return wavFits
+		}
+		return Sound.isWavPath(path)
+	}
+
+	private static lengthFits(view: DataView, pos: number, size: number, offset: number, available: number): boolean {
+		if (pos + offset + 4 > size) return false
+		const len = view.getInt32(pos + offset, true)
+		return len >= 0 && offset + 4 + len === available
+	}
+
+	/** Upstream `isWav`: empty extensions count as WAV, otherwise the stored extension decides. */
 	public static isWavPath(path: string): boolean {
-		return /\.wav$/i.test(path)
+		const base = path.split(/[\\/]/).pop() ?? path
+		const dot = base.lastIndexOf('.')
+		const ext = dot < 0 ? '' : base.slice(dot).toLowerCase()
+		return ext === '' || ext === '.wav'
 	}
 
 	/** Rebuilds the canonical WAV file upstream synthesizes from WAVEFORMATEX + cdata. */

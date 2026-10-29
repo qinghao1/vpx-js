@@ -8,7 +8,7 @@ import { Player } from '../game/player.js'
 import { BinaryReader } from '../io/binary-reader.js'
 import type { Storage } from '../io/ole-doc.js'
 import { OleCompoundDoc } from '../io/ole-doc.js'
-import { Sound } from './sound.js'
+import { Sound, SoundOutType } from './sound.js'
 import { Table } from './table/table.js'
 
 const PRIMITIVE_FIXTURE = path.resolve('test/fixtures/table-primitive.vpx')
@@ -104,5 +104,96 @@ describe('Table sounds in the player', () => {
 		player.setSoundEngine(new NullSoundEngine())
 		expect(player.getSoundEngine().hasSample('kicker_enter_center')).toBe(true)
 		expect(player.getSoundEngine().playSound('knocker')).toBeGreaterThan(0)
+	})
+
+	it('routes natural music ends to the script MusicDone event', async () => {
+		const table = await Table.load(new BinaryReader(new Uint8Array(readFileSync(PRIMITIVE_FIXTURE))))
+		const player = new Player(table)
+		let done = 0
+		table.getApi().on('MusicDone', () => done++)
+		player.getSoundEngine().onMusicEnded?.()
+		expect(done).toBe(1)
+	})
+})
+
+/** Builds a minimal raw `Sound{i}` stream around a body + tail. */
+function buildStream(name: string, path: string, body: Uint8Array, tail: Uint8Array): Uint8Array {
+	const enc = new TextEncoder()
+	const nameBytes = enc.encode(name)
+	const pathBytes = enc.encode(path)
+	const out = new Uint8Array(4 + nameBytes.length + 4 + pathBytes.length + 4 + 1 + body.length + tail.length)
+	const view = new DataView(out.buffer)
+	let pos = 0
+	view.setInt32(pos, nameBytes.length, true)
+	pos += 4
+	out.set(nameBytes, pos)
+	pos += nameBytes.length
+	view.setInt32(pos, pathBytes.length, true)
+	pos += 4
+	out.set(pathBytes, pos)
+	pos += pathBytes.length
+	view.setInt32(pos, 1, true)
+	pos += 4
+	out[pos++] = 0
+	out.set(body, pos)
+	pos += body.length
+	out.set(tail, pos)
+	return out
+}
+
+/** PCM mono 8 kHz 16-bit WAVEFORMATEX body with cdata silent samples. */
+function wavBody(samples: number): Uint8Array {
+	const body = new Uint8Array(18 + 4 + samples * 2)
+	const view = new DataView(body.buffer)
+	view.setUint16(0, 1, true)
+	view.setUint16(2, 1, true)
+	view.setUint32(4, 8000, true)
+	view.setUint32(8, 16000, true)
+	view.setUint16(12, 2, true)
+	view.setUint16(14, 16, true)
+	view.setInt32(18, samples * 2, true)
+	return body
+}
+
+function loadSynthetic(name: string, path: string, body: Uint8Array, tail: Uint8Array): Promise<Sound> {
+	const storage = { read: async () => buildStream(name, path, body, tail) } as Storage
+	return Sound.fromStorage(storage, 'Sound0')
+}
+
+describe('Sound legacy and storage formats', () => {
+	it('defaults pre-1031 levels to 100 with a table target', async () => {
+		const sound = await loadSynthetic('old', 'C:\\snd\\old.wav', wavBody(2), new Uint8Array([0]))
+		expect(sound.volume).toBe(100)
+		expect(sound.pan).toBe(100)
+		expect(sound.frontRearFade).toBe(100)
+		expect(sound.isPlayable()).toBe(true)
+		expect(sound.pcm?.length).toBe(2)
+	})
+
+	it('detects backglass by case-insensitive bgout_ substring', async () => {
+		const sound = await loadSynthetic('xBgOuT_hit', 'C:\\snd\\hit.wav', wavBody(2), new Uint8Array([0]))
+		expect(sound.outputTarget).toBe(SoundOutType.BACKGLASS)
+	})
+
+	it('detects backglass by legacy path spelling', async () => {
+		const sound = await loadSynthetic('old', '* BACKGLASS output *', wavBody(2), new Uint8Array([0]))
+		expect(sound.outputTarget).toBe(SoundOutType.BACKGLASS)
+	})
+
+	it('sniffs WAV storage on extensionless paths', async () => {
+		const sound = await loadSynthetic('kick', 'kick', wavBody(2), new Uint8Array(17))
+		expect(sound.sampleRate).toBe(8000)
+		expect(sound.pcm?.length).toBe(2)
+	})
+
+	it('keeps raw storage for non-WAV paths', async () => {
+		const sound = await loadSynthetic(
+			'track',
+			'track.mp3',
+			new Uint8Array([3, 0, 0, 0, 1, 2, 3]),
+			new Uint8Array(17),
+		)
+		expect([...sound.data]).toEqual([1, 2, 3])
+		expect(sound.pcm).toBe(null)
 	})
 })

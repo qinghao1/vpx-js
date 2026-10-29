@@ -50,6 +50,7 @@ export function decodeWavAudio(bytes: Uint8Array): DecodedWav | null {
 	}
 	if (!fmt || dataOffset < 0) return null
 	const { tag, channels, rate, bits } = fmt
+	// Sanity cap: real WAVs stay far below 64 channels, so more means a corrupt fmt chunk.
 	if (!(rate > 0) || channels < 1 || channels > 64) return null
 	const bytesPerSample = bits / 8
 	if (![1, 2, 3, 4].includes(bytesPerSample)) return null
