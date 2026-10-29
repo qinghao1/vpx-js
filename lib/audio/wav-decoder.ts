@@ -8,7 +8,7 @@ import { readFourCc } from '../io/binary-helpers.js'
  * (@see Sound::CreateFromStream), so a small header parser covers every
  * table-embedded WAV without runtime deps. Runs inline in Node/tests and
  * the browser (no worker round-trip, no decodeAudioData).
- * Unsupported codecs (e.g. ADPCM tags 2/17/34) and non-WAV imports (upstream
+ * Unsupported codecs (e.g. tag 34) and non-WAV imports (upstream
  * stores those as raw MP3/OGG bytes) return null. Multi-channel audio is
  * downmixed to mono: the sinks are mono-only (`createBuffer(1, ...)`).
  */
@@ -74,7 +74,8 @@ export function decodeWavAudio(bytes: Uint8Array): DecodedWav | null {
 
 /**
  * Decodes any browser-supported container (MP3/OGG/FLAC/WAV) through a
- * throwaway offline context, downmixed to mono and resampled to its rate. Null where
+ * throwaway offline context, downmixed to mono and resampled to the context's
+ * 44.1 kHz rate. Null where
  * decoding is unavailable (Node/tests) or the bytes are undecodable; the
  * input is copied because `decodeAudioData` detaches its buffer.
  */
@@ -83,19 +84,13 @@ export async function decodeExternalAudio(bytes: Uint8Array): Promise<DecodedWav
 	if (!Ctor || bytes.length < 16) return null
 	try {
 		const ctx = new Ctor(1, 1, 44100)
-		const copy = new Uint8Array(bytes.length)
-		copy.set(bytes)
+		const copy = bytes.slice()
 		const buffer = await ctx.decodeAudioData(copy.buffer)
 		const channels = buffer.numberOfChannels
 		const frames = buffer.length
-		if (!(buffer.sampleRate > 0) || channels < 1 || frames <= 0) return null
 		const pcm = new Float32Array(frames)
 		for (let ch = 0; ch < channels; ch++) {
 			const data = buffer.getChannelData(ch)
-			if (channels === 1) {
-				pcm.set(data)
-				break
-			}
 			for (let i = 0; i < frames; i++) pcm[i] += data[i] / channels
 		}
 		return { pcm, sampleRate: buffer.sampleRate, channels }
@@ -160,8 +155,6 @@ function decodeAdpcm(
 	const perBlock = isMs
 		? Math.floor(((blockAlign - 7 * channels) * 2) / channels) + 2
 		: Math.floor(((blockAlign - 4 * channels) * 8) / (4 * channels)) + 1
-	// Each byte carries at most 2 samples; more implies a corrupt header.
-	if (perBlock < (isMs ? 2 : 1) || perBlock > blockAlign * 2 + 2) return null
 	const available = Math.min(dataSize, bytes.length - dataOffset)
 	const blocks = Math.floor(available / blockAlign)
 	if (blocks <= 0) return null
@@ -198,12 +191,11 @@ function decodeAdpcm(
 					const u = nibble % 2 === 0 ? (byte >> 4) & 0x0f : byte & 0x0f
 					nibble++
 					const signed = u >= 8 ? u - 16 : u
+					// Arithmetic shift like upstream dr_wav; truncating division rounds
+					// negative predictor sums the wrong way (off by one).
 					const next = Math.max(
 						-32768,
-						Math.min(
-							32767,
-							Math.trunc((sample1[c] * coef1[c] + sample2[c] * coef2[c]) / 256) + signed * delta[c],
-						),
+						Math.min(32767, ((sample1[c] * coef1[c] + sample2[c] * coef2[c]) >> 8) + signed * delta[c]),
 					)
 					chans[c][frame + n] = next / 32768
 					sample2[c] = sample1[c]

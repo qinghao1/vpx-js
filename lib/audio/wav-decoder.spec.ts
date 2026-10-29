@@ -159,6 +159,14 @@ describe('decodeWavAudio', () => {
 		for (const [i, v] of [500, 1000, 1064, 1064].entries()) expect(decoded?.pcm[i]).to.be.closeTo(v / 32768, 1e-9)
 	})
 
+	it('should round negative MS-ADPCM predictor sums down', () => {
+		// coef[3]=(192,64), s1=-1000/s2=501: (-192000+32064)/256=-624.75 floors
+		// to -625 (truncation would give -624); next frame floors -718.75 to -719.
+		const header = new Uint8Array([3, 0, 0, 0x18, 0xfc, 0xf5, 0x01])
+		const decoded = decodeWavAudio(buildWav(2, 1, 8000, 4, new Uint8Array([...header, 0x00]), [], 8))
+		for (const [i, v] of [501, -1000, -625, -719].entries()) expect(decoded?.pcm[i]).to.be.closeTo(v / 32768, 1e-9)
+	})
+
 	it('should decode MS-ADPCM stereo and downmix', () => {
 		// Seeds L(500/1000) R(1500/2000), nibbles 1/1 then 0/0.
 		const header = new Uint8Array([0, 0, 64, 0, 64, 0, 232, 3, 208, 7, 244, 1, 220, 5])

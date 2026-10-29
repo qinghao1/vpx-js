@@ -201,9 +201,9 @@ export class TableLoader {
 			const name = `Sound${index}`
 			try {
 				const sound = await Sound.fromStorage(storage, name)
-				// Embedded MP3/OGG bytes decode through the browser only; the WAV
-				// fast path above already covered everything sync-decodable.
-				if (!sound.isPlayable() && sound.data.length > 0) {
+				// Embedded MP3/OGG bytes decode through the browser only; Sound.parse's
+				// sync WAV path already covered everything sync-decodable.
+				if (!sound.isPlayable()) {
 					const decoded = await decodeExternalAudio(sound.data)
 					if (decoded) {
 						sound.pcm = decoded.pcm
