@@ -300,7 +300,7 @@ export class WebSoundEngine extends BaseSoundEngine {
 		// ROM stream sum past 0 dBFS without it. Created outside the guard so
 		// a missing node type throws instead of running unprotected.
 		const limiter = ctx.createDynamicsCompressor()
-		limiter.threshold.value = -3
+		limiter.threshold.value = -1
 		limiter.knee.value = 0
 		limiter.ratio.value = 20
 		limiter.attack.value = 0.001

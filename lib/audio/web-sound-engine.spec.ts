@@ -129,7 +129,7 @@ describe('WebSoundEngine', () => {
 		expect(FakeCtx.compressors).to.have.length(1)
 		const limiter = FakeCtx.compressors[0]
 		if (!limiter) throw new Error('limiter not found')
-		expect(limiter.threshold.value).to.equal(-3)
+		expect(limiter.threshold.value).to.equal(-1)
 		expect(limiter.knee.value).to.equal(0)
 		expect(limiter.ratio.value).to.equal(20)
 		expect(limiter.attack.value).to.equal(0.001)
