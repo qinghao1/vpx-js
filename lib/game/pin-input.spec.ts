@@ -152,30 +152,6 @@ describe('free-play helpers (vpx-js-only)', () => {
 		return log.filter(call => call.nr === nr && call.enable === true).length
 	}
 
-	it('delivers all auto-credits by advancing physics time alone', () => {
-		const table = new TableBuilder().withTableScript(coinScript).build('Table1')
-		const player = new Player(table).init({})
-		const log: SwitchCall[] = []
-		player.setEmulator(fakeEmu(log))
-		player.updatePhysics(4000)
-		expect(enablesOf(log, 10)).to.be.equal(7)
-	})
-
-	it('delivers staggered auto-credits in due order', () => {
-		const table = new TableBuilder().withTableScript(coinScript).build('Table1')
-		const player = new Player(table).init({})
-		const log: SwitchCall[] = []
-		player.setEmulator(fakeEmu(log))
-		player.updatePhysics(100)
-		expect(enablesOf(log, 10)).to.be.equal(1)
-		player.updatePhysics(600)
-		expect(enablesOf(log, 10)).to.be.equal(3)
-		player.updatePhysics(2000)
-		expect(enablesOf(log, 10)).to.be.equal(5)
-		player.updatePhysics(4000)
-		expect(enablesOf(log, 10)).to.be.equal(7)
-	})
-
 	it('releases pulsed coin switches on physics time', () => {
 		const table = new TableBuilder().withTableScript(coinScript).build('Table1')
 		const player = new Player(table).init({})
@@ -186,16 +162,6 @@ describe('free-play helpers (vpx-js-only)', () => {
 		expect(enablesOf(log, 10)).to.be.equal(1)
 		player.updatePhysics(400)
 		expect(log.filter(call => call.nr === 10 && call.enable === false).length).to.be.equal(1)
-	})
-
-	it('schedules auto-credits only once', () => {
-		const table = new TableBuilder().withTableScript(coinScript).build('Table1')
-		const player = new Player(table).init({})
-		const log: SwitchCall[] = []
-		player.setEmulator(fakeEmu(log))
-		player.setEmulator(fakeEmu(log))
-		player.updatePhysics(4000)
-		expect(enablesOf(log, 10)).to.be.equal(7)
 	})
 
 	function setupTroughKick(): { player: Player; kicks: Array<[number, number]> } {

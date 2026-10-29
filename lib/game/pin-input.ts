@@ -79,22 +79,16 @@ const SWITCH_FLIPPER_R = [82, 86, 112, 116] as const
 const TROUGH_KICK_ANGLE = 60
 const TROUGH_KICK_SPEED = 10
 
-// Free-play schedule in physics ms: pulse width, stagger between credits,
-// and the 3+2+2 auto-credit batches after emu start.
+// Free-play credit timings in physics ms: switch pulse width, stagger between credits.
 const CREDIT_PULSE_MS = 120
 const CREDIT_STAGGER_MS = 250
-const FREE_PLAY_BATCHES = [
-	{ delay: 0, count: 3 },
-	{ delay: 1500, count: 2 },
-	{ delay: 3500, count: 2 },
-]
 
 export class PinInput {
 	/**
 	 * Default for freePlay. Set to false before creating the Player to disable the
-	 * vpx-js-only free-play helpers (none exists upstream): auto-credits when the emu
-	 * starts, coin-switch pulses on Start, and mock trough eject. All run on the
-	 * physics clock, so pausing the game pauses them.
+	 * vpx-js-only free-play helpers (none exists upstream): coin-switch pulses on
+	 * Start and mock trough eject. All run on the physics clock, so pausing the
+	 * game pauses them.
 	 */
 	public static freePlayDefault = true
 
@@ -102,7 +96,6 @@ export class PinInput {
 	private readonly pressed = new Set<number>()
 	private readonly nudgeHandler = new NudgeHandler()
 	private scheduled: ScheduledAction[] = []
-	private freePlayScheduled = false
 	private randomSource: () => number = Math.random
 
 	/** Override the RNG for keyboard-nudge variance (tests seed it; default Math.random). */
@@ -206,14 +199,6 @@ export class PinInput {
 				this.schedule(CREDIT_PULSE_MS, () => this.onKeyUp(key))
 				this.pulseSwitches(direct)
 			})
-		}
-	}
-
-	public ensureFreePlay(): void {
-		if (!this.freePlay || this.freePlayScheduled) return
-		this.freePlayScheduled = true
-		for (const batch of FREE_PLAY_BATCHES) {
-			this.schedule(batch.delay, () => this.addCredit(batch.count))
 		}
 	}
 
