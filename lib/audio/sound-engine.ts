@@ -352,9 +352,7 @@ export abstract class BaseSoundEngine implements ISoundEngine {
 
 	private halt(voice: SoundVoice): void {
 		voice.playing = false
-		try {
-			this.stopVoice(voice)
-		} catch {}
+		this.stopVoice(voice)
 	}
 }
 

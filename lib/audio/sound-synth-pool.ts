@@ -26,28 +26,18 @@ function hasSoundWorker(): boolean {
 	return typeof Worker !== 'undefined' && typeof window !== 'undefined'
 }
 
-/** Settle one pending request: drop the timeout and run the resolver. */
-function settle(
-	id: number,
-	run: (p: { resolve: (p: Float32Array) => void; reject: (e: Error) => void }) => void,
-): void {
-	const p = pending.get(id)
-	if (!p) return
-	pending.delete(id)
-	clearTimeout(p.timer)
-	run(p)
-}
-
 function getWorker(): Worker | null {
 	if (!hasSoundWorker()) return null
 	if (worker) return worker
 	try {
 		const w = new Worker(new URL('./workers/sound-synth.worker.js', import.meta.url), { type: 'module' })
 		w.onmessage = ({ data }: { data: { id: number; ok: boolean; pcm?: ArrayBuffer; error?: string } }) => {
-			settle(data.id, p => {
-				if (data.ok && data.pcm) p.resolve(new Float32Array(data.pcm))
-				else p.reject(new Error(data.error ?? 'sound worker failed'))
-			})
+			const p = pending.get(data.id)
+			if (!p) return
+			pending.delete(data.id)
+			clearTimeout(p.timer)
+			if (data.ok && data.pcm) p.resolve(new Float32Array(data.pcm))
+			else p.reject(new Error(data.error ?? 'sound worker failed'))
 		}
 		w.onerror = (e: ErrorEvent) => {
 			for (const p of pending.values()) {

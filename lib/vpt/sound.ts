@@ -71,11 +71,9 @@ export class Sound {
 	private parse(bytes: Uint8Array, itemName: string): void {
 		const view = getDataView(bytes)
 		let pos = 0
-		const fail = (what: string): never => {
-			throw new Error(`Corrupt sound stream "${itemName}": ${what} overruns the stream.`)
-		}
 		const need = (len: number, what: string): void => {
-			if (len < 0 || pos + len > bytes.length) fail(`${what} of ${len} bytes`)
+			if (len < 0 || pos + len > bytes.length)
+				throw new Error(`Corrupt sound stream "${itemName}": ${what} of ${len} bytes overruns the stream.`)
 		}
 		const readBytes = (len: number, what: string): Uint8Array => {
 			need(len, what)

@@ -223,8 +223,7 @@ export class WebSoundEngine extends BaseSoundEngine {
 			source.buffer = buffer
 			// Native streams the file once per PlayMusic and fires MusicDone at
 			// the end (SoundPlayer::OnSoundEnd); a forced stop nulls musicNodes
-			// first, so only a natural end reports.
-			source.loop = false
+			// first, so only a natural end reports (loop defaults to false).
 			const gain = ctx.createGain()
 			// Native music staging is sqrt-curved (ApplyVolume); the music bus
 			// below carries sqrt(musicVolume) and the master its own level.
