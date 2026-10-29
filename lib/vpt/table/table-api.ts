@@ -596,6 +596,7 @@ export class TableApi extends ItemApi<TableData> {
 		bstr: string,
 		x: number,
 		y: number,
+		// z has no stereo mapping and is dropped (native z use unverified).
 		_z = 0,
 		loopcount = 1,
 		volume = 1,

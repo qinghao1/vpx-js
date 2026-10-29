@@ -116,6 +116,16 @@ describe('WebSoundEngine', () => {
 		expect(engine.isPlaying('tone')).to.equal(false)
 	})
 
+	it('should not resurrect replays on a one-shot re-play', () => {
+		engine.playSound('tone', { loopCount: 3, useSame: true, restart: false })
+		expect(FakeCtx.sources.length).to.equal(1)
+		engine.playSound('tone', { useSame: true, restart: false })
+		expect(FakeCtx.sources.length).to.equal(2)
+		FakeCtx.sources.at(-1)?.onended?.()
+		expect(FakeCtx.sources.length).to.equal(2)
+		expect(engine.isPlaying('tone')).to.equal(false)
+	})
+
 	it('should stop replays on stopSound', () => {
 		engine.playSound('tone', { loopCount: 3 })
 		const second = FakeCtx.sources.at(0)?.onended

@@ -5,13 +5,15 @@
 // render thread owns mixing — script and physics threads never block on audio.
 // Without an AudioContext (Node/tests) every call degrades to state tracking.
 
-import { BaseSoundEngine, effectiveGain, type SoundSample, type SoundVoice, uncurvePanFade } from './sound-engine.js'
+import {
+	BaseSoundEngine,
+	clamp01,
+	effectiveGain,
+	type SoundSample,
+	type SoundVoice,
+	uncurvePanFade,
+} from './sound-engine.js'
 import { synthKnock } from './sound-synth-pool.js'
-
-/** ArrayBuffer-backed copy for AudioBuffer.copyToChannel (accepts SharedArrayBuffer views too). */
-function toAudioData(pcm: Float32Array): Float32Array<ArrayBuffer> {
-	return Float32Array.from(pcm)
-}
 
 interface VoiceNodes {
 	source: AudioBufferSourceNode
@@ -32,6 +34,9 @@ export class WebSoundEngine extends BaseSoundEngine {
 	private master: GainNode | null = null
 	private musicBus: GainNode | null = null
 	private readonly nodes = new Map<number, VoiceNodes>()
+	// Pending finite-loop replays. AudioBufferSourceNode.loop is boolean-only,
+	// so loopCount > 1 re-triggers one replay per onended (unlike loop = -1,
+	// which uses native looping); a re-Play with no loops left must clear it.
 	private readonly repeats = new Map<number, VoiceReplay>()
 	private musicNodes: VoiceNodes | null = null
 	private gestureHooked = false
@@ -46,15 +51,20 @@ export class WebSoundEngine extends BaseSoundEngine {
 		const ctx = this.ensureContext()
 		if (!ctx || !this.master) return
 		try {
-			const buffer = ctx.createBuffer(1, sample.pcm.length, sample.sampleRate)
-			buffer.copyToChannel(toAudioData(sample.pcm), 0)
+			const buffer = this.uploadPcm(sample.pcm, sample.sampleRate)
+			if (!buffer) return
 			// Per-voice gain carries sqrt(script volume); the master bus carries
 			// sqrt(master level), so the product matches native sqrt(sound*main).
 			// frontRearFade has no stereo equivalent and is ignored.
 			const gainValue = effectiveGain(voice.volume, 1)
 			const pan = uncurvePanFade(voice.pan)
-			if (voice.loopCount > 0)
+			if (voice.loopCount > 0) {
 				this.repeats.set(voice.id, { voice, buffer, rate, gainValue, pan, remaining: voice.loopCount })
+			} else {
+				// A one-shot or infinite re-Play must not inherit replays scheduled
+				// by an earlier finite-loop play of this voice.
+				this.repeats.delete(voice.id)
+			}
 			this.startVoiceSource(ctx, voice, buffer, rate, gainValue, pan, voice.loopCount === -1)
 		} catch {}
 	}
@@ -145,13 +155,12 @@ export class WebSoundEngine extends BaseSoundEngine {
 		this.playBuffer(pcm, ctx.sampleRate)
 	}
 
-	/** One-shot buffer playback straight to the master bus. */
 	private playBuffer(pcm: Float32Array, sampleRate: number): void {
 		const ctx = this.ctx
 		if (!ctx || !this.master) return
+		const buffer = this.uploadPcm(pcm, sampleRate)
+		if (!buffer) return
 		try {
-			const buffer = ctx.createBuffer(1, pcm.length, sampleRate)
-			buffer.copyToChannel(toAudioData(pcm), 0)
 			const source = ctx.createBufferSource()
 			source.buffer = buffer
 			source.connect(this.master)
@@ -159,21 +168,36 @@ export class WebSoundEngine extends BaseSoundEngine {
 		} catch {}
 	}
 
+	/** Decoded PCM upload (fresh AudioBuffer per call: sources are one-shot). */
+	private uploadPcm(pcm: Float32Array, sampleRate: number): AudioBuffer | null {
+		const ctx = this.ctx
+		if (!ctx) return null
+		try {
+			const buffer = ctx.createBuffer(1, pcm.length, sampleRate)
+			buffer.copyToChannel(Float32Array.from(pcm), 0)
+			return buffer
+		} catch {
+			return null
+		}
+	}
+
 	protected override onMusic(): void {
 		this.stopMusicNodes()
 		const music = this.getMusic()
 		const ctx = this.ensureContext()
+		// Records state even without a sample (plays nothing); unlike
+		// playSound there is no warnOnce because music names are file paths.
 		const sample = music ? this.getSample(music.name) : undefined
 		if (!music || !ctx || !this.musicBus || !sample) return
 		try {
-			const buffer = ctx.createBuffer(1, sample.pcm.length, sample.sampleRate)
-			buffer.copyToChannel(toAudioData(sample.pcm), 0)
+			const buffer = this.uploadPcm(sample.pcm, sample.sampleRate)
+			if (!buffer) return
 			const source = ctx.createBufferSource()
 			source.buffer = buffer
 			// Simplification: music always loops (native streams the file once per PlayMusic).
 			source.loop = true
 			const gain = ctx.createGain()
-			gain.gain.value = Math.max(0, Math.min(1, music.volume))
+			gain.gain.value = clamp01(music.volume)
 			source.connect(gain)
 			gain.connect(this.musicBus)
 			const nodes = { source, gain }

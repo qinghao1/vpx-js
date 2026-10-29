@@ -12,9 +12,6 @@ export interface PlaySoundOptions {
 	useSame?: boolean
 	restart?: boolean
 	frontRearFade?: number
-	x?: number
-	y?: number
-	z?: number
 }
 
 /** Resolved per-voice playback state (one entry per concurrent play of a name). */
@@ -40,13 +37,14 @@ export interface ISoundEngine {
 	playSound(name: string, opts?: PlaySoundOptions): number
 	stopSound(name: string): void
 	playMusic(name: string, volume?: number): void
-	endMusic(name?: string): void
+	endMusic(): void
 	getMusic(): { name: string; volume: number } | null
 	fireKnocker(count?: number): void
 	setMuted(muted: boolean): void
 	isMuted(): boolean
 	setVolume(volume: number): void
 	getVolume(): number
+	getLevel(): number
 	setMusicVolume(volume: number): void
 	getMusicVolume(): number
 	registerSample(name: string, pcm: Float32Array, sampleRate: number): void
@@ -56,6 +54,11 @@ export interface ISoundEngine {
 	pushEmuPcm(data: unknown): void
 	getEmuFrames(): number
 	dispose(): void
+}
+
+/** Clamp to the 0..1 volume range. */
+export function clamp01(v: number): number {
+	return Math.max(0, Math.min(1, v))
 }
 
 /** Native loop mapping: <=1 plays once, >1 repeats n-1, <0 loops forever. @see SoundPlayer::Play */
@@ -128,7 +131,7 @@ export abstract class BaseSoundEngine implements ISoundEngine {
 			frontRearFade = 0,
 		} = opts
 		const key = soundKey(name)
-		const sample = this.samples.get(key)
+		const sample = this.getSample(name)
 		if (!sample) {
 			// Native warns once per missing name and plays nothing.
 			warnOnce(`sound:${key}`, 'Request to play "%s", but sound was not found.', name)
@@ -137,6 +140,9 @@ export abstract class BaseSoundEngine implements ISoundEngine {
 		let list = this.voices.get(key)
 		if (!list) this.voices.set(key, (list = []))
 		if (restart) for (const voice of list) this.halt(voice)
+		// Allocation: restart halts all voices then reuses the first, useSame
+		// steals a playing voice for live updates, otherwise a new overlapping
+		// voice is created when every existing one is still playing.
 		let voice = list.find(v => useSame || restart || !v.playing)
 		if (!voice) {
 			voice = {
@@ -163,23 +169,29 @@ export abstract class BaseSoundEngine implements ISoundEngine {
 
 	public stopSound(name: string): void {
 		if (!name) return
+		const key = soundKey(name)
 		// Native warns on a failed sound lookup, not on an empty voice list.
-		if (!this.hasSample(name)) {
-			warnOnce(`sound:${soundKey(name)}`, 'Request to stop "%s", but sound was not found.', name)
+		if (!this.samples.has(key)) {
+			warnOnce(`sound:${key}`, 'Request to stop "%s", but sound was not found.', name)
 			return
 		}
-		for (const voice of this.voices.get(soundKey(name)) ?? []) this.halt(voice)
+		for (const voice of this.voices.get(key) ?? []) this.halt(voice)
 	}
 
 	public playMusic(name: string, volume = 1): void {
-		if (this.disposed || !name) return
+		if (this.disposed) return
+		// Native ends the current music first, so an empty name stops playback.
+		if (!name) {
+			this.endMusic()
+			return
+		}
 		// Stored raw; the audible level is volume × musicVolume, applied at the music bus.
 		this.music = { name, volume }
 		this.onMusic()
 	}
 
 	// Native EndMusic takes no name and clears whatever is playing.
-	public endMusic(_name?: string): void {
+	public endMusic(): void {
 		this.music = null
 		this.onMusicEnd()
 	}
@@ -196,6 +208,8 @@ export abstract class BaseSoundEngine implements ISoundEngine {
 		const knocks = Math.floor(count)
 		if (!Number.isFinite(knocks) || knocks <= 0) return
 		this.knockCount += knocks
+		// One audible knock regardless of count (the synthesis is an
+		// approximation; native drives N hardware knocks).
 		this.emitKnock()
 	}
 
@@ -213,7 +227,7 @@ export abstract class BaseSoundEngine implements ISoundEngine {
 	}
 
 	public setVolume(volume: number): void {
-		this.volume = Math.max(0, Math.min(1, volume))
+		this.volume = clamp01(volume)
 		this.onOutputChanged()
 	}
 

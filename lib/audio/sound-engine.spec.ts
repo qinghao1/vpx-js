@@ -163,12 +163,18 @@ describe('NullSoundEngine', () => {
 		expect(engine.getVolume()).to.equal(0)
 	})
 
+	it('should stop music on an empty PlayMusic name', () => {
+		const engine = new NullSoundEngine()
+		engine.playMusic('theme', 0.7)
+		expect(engine.getMusic()).to.deep.equal({ name: 'theme', volume: 0.7 })
+		engine.playMusic('')
+		expect(engine.getMusic()).to.equal(null)
+	})
+
 	it('should track music state and volume', () => {
 		const engine = new NullSoundEngine()
 		expect(engine.getMusic()).to.equal(null)
 		engine.playMusic('theme', 0.7)
-		expect(engine.getMusic()).to.deep.equal({ name: 'theme', volume: 0.7 })
-		engine.playMusic('')
 		expect(engine.getMusic()).to.deep.equal({ name: 'theme', volume: 0.7 })
 		engine.setMusicVolume(0.3)
 		expect(engine.getMusicVolume()).to.be.closeTo(0.3, 1e-9)

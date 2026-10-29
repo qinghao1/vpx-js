@@ -27,8 +27,6 @@ export enum SoundOutType {
  * tail: 17 bytes (new format) or 1 bool byte (pre-1031).
  */
 export class Sound {
-	/** Storage stream name (`Sound{i}`), for diagnostics. */
-	public storageName?: string
 	/** Script-facing sample name (`PlaySound("...")`). */
 	public name!: string
 	/** Original import path (extension decides the WAV branch, upstream `isWav`). */
@@ -47,7 +45,6 @@ export class Sound {
 
 	public static async fromStorage(storage: Storage, itemName: string): Promise<Sound> {
 		const sound = new Sound()
-		sound.storageName = itemName
 		sound.parse(await storage.read(itemName), itemName)
 		return sound
 	}

@@ -52,7 +52,6 @@ export function decodeWavAudio(bytes: Uint8Array): DecodedWav | null {
 	const bytesPerSample = bits / 8
 	if (![1, 2, 3, 4].includes(bytesPerSample)) return null
 	const frameSize = channels * bytesPerSample
-	if (frameSize <= 0) return null
 	const available = Math.min(dataSize, bytes.length - dataOffset)
 	const frames = Math.floor(available / frameSize)
 	if (frames <= 0) return null
