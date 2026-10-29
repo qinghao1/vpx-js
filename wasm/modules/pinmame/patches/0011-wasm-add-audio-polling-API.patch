@@ -1,0 +1,164 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Chu Qinghao <6337103+qinghao1@users.noreply.github.com>
+Date: Thu, 29 Oct 2026 00:00:00 +0000
+Subject: [PATCH] wasm: add audio polling API
+
+Poll decoded PCM from JS instead of pushing it through C->JS callbacks
+(DMD polling precedent): snapshot every mixer chunk into a small INT16
+mirror inside osd_update_audio_stream BEFORE/REGARDLESS of the
+cb_OnAudioUpdated early-return, keep the mixer pump primed when no
+callback is configured, and expose PinmameGetAudioFrame /
+PinmameGetAudioChannels / PinmameGetAudioSeq. Produce runs on the game
+thread and drain on the main thread, so the mirror control words are
+atomic and the seqlock drops torn reads. Zero config change: INT16
+44100 default keeps working, the mock needs no update (missing export
+degrades to silence).
+
+---
+  src/libpinmame/libpinmame.cpp |   77 ++++++++++++++++++++++++++++++++++++++++-
+  src/libpinmame/libpinmame.h   |    3 ++
+  2 files changed, 78 insertions(+), 2 deletions(-)
+
+diff --git a/src/libpinmame/libpinmame.cpp b/src/libpinmame/libpinmame.cpp
+--- a/src/libpinmame/libpinmame.cpp
++++ b/src/libpinmame/libpinmame.cpp
+@@ -7,6 +7,8 @@
+ #include <thread>
+ #include <vector>
+ #include <algorithm>
++#include <atomic>
++#include <cstddef>
+ 
+ #if defined(_WIN32) || defined(_WIN64)
+ #define strcasecmp _stricmp
+@@ -51,6 +53,26 @@ static PinmameMechInfo _mechInfo[MECH_MAXMECH];
+ static PinmameAudioInfo _audioInfo;
+ static float _audioData[PINMAME_ACCUMULATOR_SAMPLES * 2];
+ 
++// Poll mirror for the JS-pulls-frames path: every chunk produced by the
++// mixer is snapshotted here as interleaved INT16, then drained by
++// PinmameGetAudioFrame. Overwrite-on-produce (not a ring): bursts
++// collapse into one slot. Produce runs on the game thread, drain on the
++// main thread, so the control words are atomic; the seqlock drops torn
++// chunks (a click, never corruption).
++static INT16 _audioMirror[PINMAME_ACCUMULATOR_SAMPLES * 2];
++static std::atomic<int> _audioMirrorFrames{0};
++static std::atomic<int> _audioMirrorChannels{0};
++// Odd while publishing: the poller drops reads bracketed by a change.
++static std::atomic<int> _audioMirrorSeq{0};
++
++// TS writeConfig writes sample rate i32 at +4, VPM dir at +8; the rest
++// stays zeroed (INT16 format, no callbacks).
++static_assert(offsetof(PinmameConfig, audioFormat) == 0, "audioFormat must stay at +0");
++static_assert(offsetof(PinmameConfig, sampleRate) == 4, "sampleRate must stay at +4");
++static_assert(offsetof(PinmameConfig, vpmPath) == 8, "vpmPath must stay at +8");
++static_assert(offsetof(PinmameConfig, cb_OnAudioAvailable) == 532, "cb_OnAudioAvailable must stay at +532");
++static_assert(offsetof(PinmameConfig, cb_OnAudioUpdated) == 536, "cb_OnAudioUpdated must stay at +536");
++
+ static int _nvramInit = 0;
+ static uint8_t _nvram[CORE_MAXNVRAM];
+ static PinmameNVRAMState _nvramState[CORE_MAXNVRAM];
+@@ -362,7 +386,7 @@ extern "C" int osd_readkey_unicode(const int flush)
+ 
+ extern "C" int osd_start_audio_stream(const int stereo)
+ {
+-	if (!_p_Config->cb_OnAudioAvailable)
++	if (!_p_Config)
+ 		return 0;
+ 
+ 	memset(&_audioInfo, 0, sizeof(PinmameAudioInfo));
+@@ -373,6 +397,10 @@ extern "C" int osd_start_audio_stream(const int stereo)
+ 	_audioInfo.samplesPerFrame = (int)(Machine->sample_rate / Machine->drv->frames_per_second);
+ 	_audioInfo.bufferSize = PINMAME_ACCUMULATOR_SAMPLES * 2;
+ 
++	// No callback: return the nominal count so the mixer keeps producing for polling.
++	if (!_p_Config->cb_OnAudioAvailable)
++		return _audioInfo.samplesPerFrame;
++
+ 	return (*(_p_Config->cb_OnAudioAvailable))(&_audioInfo, _p_userData);
+ }
+ 
+@@ -382,11 +410,27 @@ extern "C" int osd_start_audio_stream(const int stereo)
+ 
+ extern "C" int osd_update_audio_stream(INT16* p_buffer)
+ {
+-	if(!_p_Config->cb_OnAudioUpdated || g_fSoundMode != PINMAME_SOUND_MODE_DEFAULT)
++	if (!_p_Config || g_fSoundMode != PINMAME_SOUND_MODE_DEFAULT)
+ 		return 0;
+ 
+ 	const int samplesThisFrame = mixer_samples_this_frame();
+ 
++	// Snapshot every produced chunk BEFORE/REGARDLESS of the callback
++	// early-return below, so PinmameGetAudioFrame works with zero config.
++	if (p_buffer && samplesThisFrame > 0) {
++		const int channels = _audioInfo.channels > 0 ? _audioInfo.channels : 1;
++		const int capFrames = (int)(sizeof(_audioMirror) / sizeof(_audioMirror[0]) / (unsigned)channels);
++		const int frames = samplesThisFrame < capFrames ? samplesThisFrame : capFrames;
++		_audioMirrorSeq.fetch_add(1, std::memory_order_release);
++		memcpy(_audioMirror, p_buffer, (size_t)frames * (size_t)channels * sizeof(INT16));
++		_audioMirrorFrames.store(frames, std::memory_order_release);
++		_audioMirrorChannels.store(channels, std::memory_order_release);
++		_audioMirrorSeq.fetch_add(1, std::memory_order_release);
++	}
++
++	if (!_p_Config->cb_OnAudioUpdated)
++		return samplesThisFrame;
++
+ 	if (_p_Config->audioFormat == PINMAME_AUDIO_FORMAT_INT16)
+ 		return (*(_p_Config->cb_OnAudioUpdated))((void*)p_buffer, samplesThisFrame, _p_userData);
+ 
+@@ -403,6 +447,37 @@ extern "C" void osd_stop_audio_stream(void)
+ {
+ }
+ 
++/******************************************************
++ * PinmameGetAudioChannels / PinmameGetAudioFrame
++ ******************************************************/
++
++PINMAMEAPI int PinmameGetAudioChannels()
++{
++	return _audioMirrorChannels.load(std::memory_order_acquire);
++}
++
++PINMAMEAPI int PinmameGetAudioSeq()
++{
++	return _audioMirrorSeq.load(std::memory_order_acquire);
++}
++
++PINMAMEAPI int PinmameGetAudioFrame(void* p_data, int maxFrames)
++{
++	// 0 = nothing to drain yet (or bad args): normal, not an error.
++	if (!p_data || maxFrames <= 0)
++		return 0;
++	const int framesAvail = _audioMirrorFrames.load(std::memory_order_acquire);
++	const int channels = _audioMirrorChannels.load(std::memory_order_acquire);
++	if (framesAvail <= 0 || channels <= 0)
++		return 0;
++	const int frames = framesAvail < maxFrames ? framesAvail : maxFrames;
++	memcpy(p_data, _audioMirror, (size_t)frames * (size_t)channels * sizeof(INT16));
++	// Drain-on-read: a second pull before the next chunk yields 0 instead
++	// of replaying the same audio twice.
++	_audioMirrorFrames.store(0, std::memory_order_release);
++	return frames;
++}
++
+ /******************************************************
+  * osd_sound_enable
+  ******************************************************/
+diff --git a/src/libpinmame/libpinmame.h b/src/libpinmame/libpinmame.h
+--- a/src/libpinmame/libpinmame.h
++++ b/src/libpinmame/libpinmame.h
+@@ -485,8 +485,11 @@ PINMAMEAPI int PinmameGetNVRAM(PinmameNVRAMState* const p_nvramStates);
+ PINMAMEAPI int PinmameGetChangedNVRAM(PinmameNVRAMState* const p_nvramStates);
+ PINMAMEAPI int PinmameReadMainCPUByte(uint32_t address, uint8_t* const p_value);
+ PINMAMEAPI const uint8_t* PinmameGetRawMemoryRegion(const int region);
+ PINMAMEAPI size_t PinmameGetRawMemoryRegionLength(const int region);
+ PINMAMEAPI int PinmameGetDisplayCount();
+ PINMAMEAPI int PinmameGetDisplayInfo(int idx, PinmameDisplayLayout* p_layout);
+ PINMAMEAPI int PinmameGetDisplayFrame(int idx, void* p_data, int size);
+ PINMAMEAPI void PinmameSetUserData(void* const p_userData);
++PINMAMEAPI int PinmameGetAudioChannels();
++PINMAMEAPI int PinmameGetAudioSeq();
++PINMAMEAPI int PinmameGetAudioFrame(void* p_data, int maxFrames);
+ -- 
+ 2.53.0

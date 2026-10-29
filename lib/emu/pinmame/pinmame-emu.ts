@@ -21,6 +21,9 @@ const SAMPLE_RATE = 44100
 // most a few dozen KiB; anything bigger is a corrupt width/height pair and
 // must not reach _malloc.
 const MAX_DMD_BYTES = 1 << 20
+// Largest single audio drain from the wasm core: one full mixer
+// accumulator (PINMAME_ACCUMULATOR_SAMPLES) of per-channel frames.
+const MAX_AUDIO_FRAMES = 8192
 
 type Api = {
 	setConfig(p: number): void
@@ -31,6 +34,9 @@ type Api = {
 	getChangedLamps(p: number): number
 	getChangedSols(p: number): number
 	getChangedGIs(p: number): number
+	getAudioFrame?(p: number, max: number): number
+	getAudioChannels?(): number
+	getAudioSeq?(): number
 	getDIP(b: number): number
 	setDIP(b: number, v: number): void
 	getDmdWidth(): number
@@ -84,12 +90,16 @@ export class PinMameEmulator implements IEmulator {
 	// below are bytes: the slot grows on demand to the largest pull (1024
 	// lamps = 8 KiB). The DMD slot is separate so frame-sized buffers don't
 	// thrash against pull pages when resolutions differ from the 128x32 fallback.
-	private readonly wasmBufs: Record<'pull' | 'dmd', { ptr: number; cap: number; min: number }> = {
+	private readonly wasmBufs: Record<'pull' | 'dmd' | 'audio', { ptr: number; cap: number; min: number }> = {
 		// 1024 covers the sol/GI pulls; lamps grow it to 8 KiB. 4096 is one full 128x32 DMD frame.
 		pull: { ptr: 0, cap: 0, min: 1024 },
 		dmd: { ptr: 0, cap: 0, min: 4096 },
+		// 16384 B covers one mono accumulator drain; stereo grows it to 32 KiB.
+		audio: { ptr: 0, cap: 0, min: MAX_AUDIO_FRAMES * 2 },
 	}
 	private _dmdFrameBuf: Uint8Array | null = null
+	// Single listener slot: last writer wins instead of stacking streams.
+	private audioConsumer: ((msg: unknown) => void) | null = null
 
 	async init(): Promise<void> {
 		if (this.mod) return
@@ -133,6 +143,14 @@ export class PinMameEmulator implements IEmulator {
 		// when a (future) wasm build provides it, so cwrap never wraps a hole.
 		if (typeof (module as unknown as Record<string, unknown>)._PinmameSetCabinetInput === 'function') {
 			this.api.setCabinetInput = wrap('PinmameSetCabinetInput', null, ['number'])
+		}
+		// PinmameGetAudioFrame/Channels/Seq ship in audio-polling wasm builds —
+		// wire them only when present so older builds (and the mock) stay
+		// silent instead of wrapping a hole.
+		if (typeof (module as unknown as Record<string, unknown>)._PinmameGetAudioFrame === 'function') {
+			this.api.getAudioFrame = wrap('PinmameGetAudioFrame', 'number', ['number', 'number'])
+			this.api.getAudioChannels = wrap('PinmameGetAudioChannels', 'number', [])
+			this.api.getAudioSeq = wrap('PinmameGetAudioSeq', 'number', [])
 		}
 	}
 
@@ -243,7 +261,9 @@ export class PinMameEmulator implements IEmulator {
 	getPaused(): boolean {
 		return this.paused
 	}
-	registerAudioConsumer(): void {}
+	registerAudioConsumer(cb: (msg: unknown) => void): void {
+		this.audioConsumer = cb
+	}
 	getDmdDimensions(): Vertex2D {
 		return new Vertex2D(this.dmdW, this.dmdH)
 	}
@@ -313,9 +333,45 @@ export class PinMameEmulator implements IEmulator {
 			this.pull(fn, buf)
 		this.emulatorState.applyPinmame(this.lamps, this.sols, this.gis)
 		this.pullDmd()
+		this.pullAudio()
 	}
 
-	private ensureWasmBuf(slot: 'pull' | 'dmd', bytes: number): number {
+	private pullAudio(): void {
+		const m = this.mod
+		const consumer = this.audioConsumer
+		const getFrame = this.api?.getAudioFrame
+		// No consumer means no drain: mirrored frames wait until one registers.
+		if (!m || !consumer || typeof getFrame !== 'function') return
+		// 0 channels means the stream hasn't started yet — wait, don't assume.
+		const channels = this.api?.getAudioChannels?.()
+		if (channels !== 1 && channels !== 2) return
+		// Seqlock guard: a counter change across the drain means the copy may
+		// be torn or stale — drop it either way.
+		const seq0 = this.api?.getAudioSeq?.() ?? 0
+		if (seq0 & 1) return
+		// Always stereo-sized: the layout can change mid-drain, and an
+		// undersized buffer would overflow the wasm heap.
+		const ptr = this.ensureWasmBuf('audio', MAX_AUDIO_FRAMES * 2 * 2)
+		// Drain at most one accumulator per sync (~735 frames at 60 Hz).
+		// 0 = none yet (no stream or already drained): not an error.
+		const frames = getFrame(ptr, MAX_AUDIO_FRAMES)
+		if (frames <= 0 || (this.api?.getAudioSeq?.() ?? seq0) !== seq0) return
+		// Re-read the layout: it can change mid-drain, and the conversion
+		// must match the drained bytes.
+		const fresh = this.api?.getAudioChannels?.() ?? 0
+		if (fresh !== 1 && fresh !== 2) return
+		const view = new DataView(m.HEAPU8.buffer, ptr, frames * fresh * 2)
+		const pcm = new Float32Array(frames)
+		if (fresh === 1) {
+			for (let i = 0; i < frames; i++) pcm[i] = view.getInt16(i * 2, true) / 32768
+		} else {
+			for (let i = 0; i < frames; i++)
+				pcm[i] = (view.getInt16(i * 4, true) + view.getInt16(i * 4 + 2, true)) / 2 / 32768
+		}
+		consumer(pcm)
+	}
+
+	private ensureWasmBuf(slot: 'pull' | 'dmd' | 'audio', bytes: number): number {
 		const buf = this.wasmBufs[slot]
 		if (buf.ptr && buf.cap >= bytes) return buf.ptr
 		if (buf.ptr) this.mod?._free(buf.ptr)

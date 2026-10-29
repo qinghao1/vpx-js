@@ -280,6 +280,280 @@ describe('PinMAME WASM emulator (mock)', () => {
 		emu.emuSimulateCycle(16)
 		expect([emu.getDmdDimensions().x, emu.getDmdDimensions().y]).toEqual([4, 2])
 	})
+	it('pullAudio delivers INT16 mono as Float32 to the registered consumer', () => {
+		const heap = new Uint8Array(65536)
+		const view = new DataView(heap.buffer)
+		const received: Float32Array[] = []
+		emu.setBackendForTesting(
+			{
+				_malloc: () => 64,
+				_free: () => {},
+				HEAPU8: heap,
+				getValue: () => 0,
+			},
+			{
+				getChangedLamps: () => 0,
+				getChangedSols: () => 0,
+				getChangedGIs: () => 0,
+				getDmdWidth: () => 0,
+				getDmdHeight: () => 0,
+				getAudioChannels: () => 1,
+				getAudioFrame: (ptr: number) => {
+					view.setInt16(ptr, 16384, true)
+					view.setInt16(ptr + 2, -16384, true)
+					return 2
+				},
+			},
+		)
+		emu.registerAudioConsumer(msg => void received.push(msg as Float32Array))
+		emu.markReady()
+		emu.emuSimulateCycle(16)
+		expect(received.length).toBe(1)
+		expect([...received[0]]).toEqual([0.5, -0.5])
+	})
+	it('pullAudio mixes stereo down to mono', () => {
+		const heap = new Uint8Array(65536)
+		const view = new DataView(heap.buffer)
+		const received: Float32Array[] = []
+		emu.setBackendForTesting(
+			{
+				_malloc: () => 64,
+				_free: () => {},
+				HEAPU8: heap,
+				getValue: () => 0,
+			},
+			{
+				getChangedLamps: () => 0,
+				getChangedSols: () => 0,
+				getChangedGIs: () => 0,
+				getDmdWidth: () => 0,
+				getDmdHeight: () => 0,
+				getAudioChannels: () => 2,
+				getAudioFrame: (ptr: number) => {
+					view.setInt16(ptr, 10000, true)
+					view.setInt16(ptr + 2, 20000, true)
+					return 1
+				},
+			},
+		)
+		emu.registerAudioConsumer(msg => void received.push(msg as Float32Array))
+		emu.markReady()
+		emu.emuSimulateCycle(16)
+		expect(received.length).toBe(1)
+		expect(received[0][0]).toBeCloseTo(15000 / 32768, 5)
+	})
+	it('pullAudio no-ops when the wasm build lacks the audio export', () => {
+		const consumer = vi.fn()
+		emu.setBackendForTesting(
+			{
+				_malloc: () => 64,
+				_free: () => {},
+				HEAPU8: new Uint8Array(65536),
+				getValue: () => 0,
+			},
+			{
+				getChangedLamps: () => 0,
+				getChangedSols: () => 0,
+				getChangedGIs: () => 0,
+				getDmdWidth: () => 0,
+				getDmdHeight: () => 0,
+			},
+		)
+		emu.registerAudioConsumer(consumer)
+		emu.markReady()
+		expect(() => emu.emuSimulateCycle(16)).not.toThrow()
+		expect(consumer).not.toHaveBeenCalled()
+	})
+	it('pullAudio replaces the consumer on re-register (single slot, last writer wins)', () => {
+		const first = vi.fn()
+		const second = vi.fn()
+		const heap = new Uint8Array(65536)
+		emu.setBackendForTesting(
+			{
+				_malloc: () => 64,
+				_free: () => {},
+				HEAPU8: heap,
+				getValue: () => 0,
+			},
+			{
+				getChangedLamps: () => 0,
+				getChangedSols: () => 0,
+				getChangedGIs: () => 0,
+				getDmdWidth: () => 0,
+				getDmdHeight: () => 0,
+				getAudioChannels: () => 1,
+				getAudioFrame: () => 1,
+			},
+		)
+		emu.registerAudioConsumer(first)
+		emu.registerAudioConsumer(second)
+		emu.markReady()
+		emu.emuSimulateCycle(16)
+		expect(first).not.toHaveBeenCalled()
+		expect(second).toHaveBeenCalledTimes(1)
+	})
+	it('pullAudio stays silent with no registered consumer', () => {
+		const getAudioFrame = vi.fn(() => 0)
+		emu.setBackendForTesting(
+			{
+				_malloc: () => 64,
+				_free: () => {},
+				HEAPU8: new Uint8Array(65536),
+				getValue: () => 0,
+			},
+			{
+				getChangedLamps: () => 0,
+				getChangedSols: () => 0,
+				getChangedGIs: () => 0,
+				getDmdWidth: () => 0,
+				getDmdHeight: () => 0,
+				getAudioChannels: () => 1,
+				getAudioFrame,
+			},
+		)
+		emu.markReady()
+		emu.emuSimulateCycle(16)
+		expect(getAudioFrame).not.toHaveBeenCalled()
+	})
+	it('pullAudio skips zero-frame drains and pre-stream channels', () => {
+		const consumer = vi.fn()
+		const getAudioFrame = vi.fn(() => 0)
+		const api = {
+			getChangedLamps: () => 0,
+			getChangedSols: () => 0,
+			getChangedGIs: () => 0,
+			getDmdWidth: () => 0,
+			getDmdHeight: () => 0,
+			getAudioChannels: () => 0,
+			getAudioFrame,
+		}
+		emu.setBackendForTesting(
+			{
+				_malloc: () => 64,
+				_free: () => {},
+				HEAPU8: new Uint8Array(65536),
+				getValue: () => 0,
+			},
+			api,
+		)
+		emu.registerAudioConsumer(consumer)
+		emu.markReady()
+		emu.emuSimulateCycle(16)
+		expect(getAudioFrame).not.toHaveBeenCalled()
+		expect(consumer).not.toHaveBeenCalled()
+		api.getAudioChannels = () => 1
+		emu.emuSimulateCycle(16)
+		expect(getAudioFrame).toHaveBeenCalled()
+		expect(consumer).not.toHaveBeenCalled()
+	})
+	it('pullAudio drops drains bracketed by a sequence change', () => {
+		const consumer = vi.fn()
+		let seq = 4
+		emu.setBackendForTesting(
+			{
+				_malloc: () => 64,
+				_free: () => {},
+				HEAPU8: new Uint8Array(65536),
+				getValue: () => 0,
+			},
+			{
+				getChangedLamps: () => 0,
+				getChangedSols: () => 0,
+				getChangedGIs: () => 0,
+				getDmdWidth: () => 0,
+				getDmdHeight: () => 0,
+				getAudioChannels: () => 1,
+				getAudioFrame: () => 1,
+				getAudioSeq: () => seq++,
+			},
+		)
+		emu.registerAudioConsumer(consumer)
+		emu.markReady()
+		emu.emuSimulateCycle(16)
+		expect(consumer).not.toHaveBeenCalled()
+	})
+	it('pullAudio drops drains that start mid-publish', () => {
+		const consumer = vi.fn()
+		emu.setBackendForTesting(
+			{
+				_malloc: () => 64,
+				_free: () => {},
+				HEAPU8: new Uint8Array(65536),
+				getValue: () => 0,
+			},
+			{
+				getChangedLamps: () => 0,
+				getChangedSols: () => 0,
+				getChangedGIs: () => 0,
+				getDmdWidth: () => 0,
+				getDmdHeight: () => 0,
+				getAudioChannels: () => 1,
+				getAudioFrame: () => 1,
+				getAudioSeq: () => 5,
+			},
+		)
+		emu.registerAudioConsumer(consumer)
+		emu.markReady()
+		emu.emuSimulateCycle(16)
+		expect(consumer).not.toHaveBeenCalled()
+	})
+	it('pullAudio delivers drains with a stable sequence', () => {
+		const consumer = vi.fn()
+		emu.setBackendForTesting(
+			{
+				_malloc: () => 64,
+				_free: () => {},
+				HEAPU8: new Uint8Array(65536),
+				getValue: () => 0,
+			},
+			{
+				getChangedLamps: () => 0,
+				getChangedSols: () => 0,
+				getChangedGIs: () => 0,
+				getDmdWidth: () => 0,
+				getDmdHeight: () => 0,
+				getAudioChannels: () => 1,
+				getAudioFrame: () => 1,
+				getAudioSeq: () => 4,
+			},
+		)
+		emu.registerAudioConsumer(consumer)
+		emu.markReady()
+		emu.emuSimulateCycle(16)
+		expect(consumer).toHaveBeenCalledTimes(1)
+	})
+	it('pullAudio converts with the post-drain layout on a mid-drain switch', () => {
+		const heap = new Uint8Array(65536)
+		const received: Float32Array[] = []
+		let channelCalls = 0
+		emu.setBackendForTesting(
+			{
+				_malloc: () => 64,
+				_free: () => {},
+				HEAPU8: heap,
+				getValue: () => 0,
+			},
+			{
+				getChangedLamps: () => 0,
+				getChangedSols: () => 0,
+				getChangedGIs: () => 0,
+				getDmdWidth: () => 0,
+				getDmdHeight: () => 0,
+				getAudioChannels: () => (++channelCalls === 1 ? 1 : 2),
+				getAudioFrame: (ptr: number) => {
+					heap.set([0x00, 0x40, 0x00, 0x00], ptr)
+					return 1
+				},
+				getAudioSeq: () => 4,
+			},
+		)
+		emu.registerAudioConsumer(pcm => received.push(pcm as Float32Array))
+		emu.markReady()
+		emu.emuSimulateCycle(16)
+		// Stale mono would read 0.5; fresh stereo averages to 0.25.
+		expect(received.length).to.equal(1)
+		expect(received[0]?.[0]).to.be.closeTo(0.25, 1e-9)
+	})
 	it('pullDmd copies the frame out of wasm memory', () => {
 		const heap = new Uint8Array(65536)
 		const bytes = [1, 2, 3, 4, 5, 6, 7, 8]

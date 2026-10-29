@@ -31,6 +31,13 @@ interface VoiceReplay {
 	remaining: number
 }
 
+// Mixer rate we request from PinMAME (see SAMPLE_RATE): emu buffers are
+// tagged with it and the browser resamples to the device rate.
+const EMU_SAMPLE_RATE = 44100
+// Backlog cap, seconds: chunks scheduled further out than this are dropped
+// instead of banking permanent lag after bursts.
+const MAX_EMU_SCHEDULE_AHEAD = 0.25
+
 export class WebSoundEngine extends BaseSoundEngine {
 	private ctx: AudioContext | null = null
 	private master: GainNode | null = null
@@ -42,6 +49,9 @@ export class WebSoundEngine extends BaseSoundEngine {
 	private readonly repeats = new Map<number, VoiceReplay>()
 	private musicNodes: VoiceNodes | null = null
 	private gestureHooked = false
+	// Next emu-chunk start, in audio-clock seconds; chunks are sequenced
+	// back-to-back so the stream plays gapless instead of overlapping.
+	private emuNextTime = 0
 
 	/** Create/resume the context (call from a user gesture to satisfy autoplay policy). */
 	public unlock(): void {
@@ -57,8 +67,10 @@ export class WebSoundEngine extends BaseSoundEngine {
 			if (!buffer) return
 			// Per-voice gain carries sqrt(script volume); the master bus carries
 			// sqrt(master level), so the product matches native sqrt(sound*main).
+			// The /sqrt(2) reconciles our equal-power panner (0.7071x at center)
+			// with native's linear diffusion (0.5x): unscaled voices run +3 dB hot.
 			// frontRearFade has no stereo equivalent and is ignored.
-			const gainValue = effectiveGain(voice.volume, 1, sample.channels)
+			const gainValue = effectiveGain(voice.volume, 1, sample.channels) / Math.SQRT2
 			const pan = uncurvePanFade(voice.pan)
 			if (voice.loopCount > 0) {
 				this.repeats.set(voice.id, { voice, buffer, rate, gainValue, pan, remaining: voice.loopCount })
@@ -158,12 +170,21 @@ export class WebSoundEngine extends BaseSoundEngine {
 			.catch(() => {})
 	}
 
-	// Fire-and-forget one-shot per push: no queue or backpressure, so a dense
-	// continuous emu chunk stream can gap.
 	protected emitEmuPcm(pcm: Float32Array): void {
 		const ctx = this.ensureContext()
-		if (!ctx) return
-		this.playBuffer(pcm, ctx.sampleRate)
+		if (!ctx || !this.master) return
+		// Re-anchor when the clock has run past the schedule
+		// (pause/tab-hide): otherwise the chunk starts in the past.
+		const now = ctx.currentTime
+		const startAt = Math.max(now, this.emuNextTime)
+		if (startAt - now > MAX_EMU_SCHEDULE_AHEAD) return
+		const buffer = this.uploadPcm(pcm, EMU_SAMPLE_RATE)
+		if (!buffer) return
+		const source = ctx.createBufferSource()
+		source.buffer = buffer
+		source.connect(this.master)
+		source.start(startAt)
+		this.emuNextTime = startAt + pcm.length / EMU_SAMPLE_RATE
 	}
 
 	private playBuffer(pcm: Float32Array, sampleRate: number): void {
@@ -185,8 +206,9 @@ export class WebSoundEngine extends BaseSoundEngine {
 		if (!ctx) return null
 		try {
 			const buffer = ctx.createBuffer(1, pcm.length, sampleRate)
-			// from() widens ArrayBufferLike PCM to the ArrayBuffer copyToChannel requires.
-			buffer.copyToChannel(Float32Array.from(pcm), 0)
+			// All producers allocate with new Float32Array, so the store is
+			// always an ArrayBuffer; the cast avoids a per-chunk copy.
+			buffer.copyToChannel(pcm as Float32Array<ArrayBuffer>, 0)
 			return buffer
 		} catch {
 			return null
@@ -268,11 +290,26 @@ export class WebSoundEngine extends BaseSoundEngine {
 		const g = globalThis as { AudioContext?: typeof AudioContext; webkitAudioContext?: typeof AudioContext }
 		const Ctor = g.AudioContext ?? g.webkitAudioContext
 		if (!Ctor) return null
+		let ctx: AudioContext
 		try {
-			const ctx = new Ctor()
+			ctx = new Ctor()
+		} catch {
+			return null
+		}
+		// Limiter between master and destination: stacked voices and the unity
+		// ROM stream sum past 0 dBFS without it. Created outside the guard so
+		// a missing node type throws instead of running unprotected.
+		const limiter = ctx.createDynamicsCompressor()
+		limiter.threshold.value = -3
+		limiter.knee.value = 0
+		limiter.ratio.value = 20
+		limiter.attack.value = 0.001
+		limiter.release.value = 0.1
+		try {
 			this.master = ctx.createGain()
 			this.master.gain.value = this.unmutedMaster()
-			this.master.connect(ctx.destination)
+			this.master.connect(limiter)
+			limiter.connect(ctx.destination)
 			this.musicBus = ctx.createGain()
 			this.musicBus.gain.value = sqrt01(this.getMusicVolume())
 			this.musicBus.connect(this.master)
