@@ -148,6 +148,16 @@ describe('NullSoundEngine', () => {
 		}
 	})
 
+	it('should ignore non-finite volumes', () => {
+		const { engine } = tone()
+		engine.setVolume(0.4)
+		engine.setMusicVolume(0.3)
+		engine.setVolume(NaN)
+		engine.setMusicVolume(NaN)
+		expect(engine.getVolume()).to.be.closeTo(0.4, 1e-9)
+		expect(engine.getMusicVolume()).to.be.closeTo(0.3, 1e-9)
+	})
+
 	it('should mute with volume restore', () => {
 		const { engine } = tone()
 		engine.setVolume(0.4)

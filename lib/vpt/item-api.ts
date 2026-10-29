@@ -227,3 +227,8 @@ export function dequantizeUnsignedPercent(i: number): number {
 export function quantizeUnsignedPercent(x: number): number {
 	return Math.min(Math.max(0, x) * 100, 100)
 }
+
+/** Dequantizes -100..100 → -1..1 (upstream dequantizeSignedPercent). */
+export function dequantizeSignedPercent(i: number): number {
+	return Math.max(-1, Math.min(1, i / 100))
+}

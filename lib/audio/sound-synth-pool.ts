@@ -3,8 +3,8 @@
 // Knocker/tone synthesis in a plain Worker, off the main thread (mirrors
 // image-worker-pool.ts: singleton, id-keyed pending map, timeout, inline
 // fallback). The WebAudio render thread owns the actual output, so synthesis
-// here never blocks playback. The worker file duplicates knockPcm/tonePcm —
-// workers run as isolated modules, so keep both copies in sync.
+// here never blocks playback. Kernels live in sound-synth-core.js, imported
+// by both this pool and the worker.
 
 let worker: Worker | null = null
 let seq = 0

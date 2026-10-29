@@ -55,8 +55,10 @@ export class WebSoundEngine extends BaseSoundEngine {
 			if (!buffer) return
 			// Per-voice gain carries sqrt(script volume); the master bus carries
 			// sqrt(master level), so the product matches native sqrt(sound*main).
+			// monoCompensation is the decoded source channel count, compensating
+			// the averaging loss of the mono downmix (native converter.channelsIn).
 			// frontRearFade has no stereo equivalent and is ignored.
-			const gainValue = effectiveGain(voice.volume, 1)
+			const gainValue = effectiveGain(voice.volume, 1, sample.channels)
 			const pan = uncurvePanFade(voice.pan)
 			if (voice.loopCount > 0) {
 				this.repeats.set(voice.id, { voice, buffer, rate, gainValue, pan, remaining: voice.loopCount })
@@ -197,7 +199,9 @@ export class WebSoundEngine extends BaseSoundEngine {
 			// Simplification: music always loops (native streams the file once per PlayMusic).
 			source.loop = true
 			const gain = ctx.createGain()
-			gain.gain.value = clamp01(music.volume)
+			// Native music staging is sqrt-curved (ApplyVolume); the music bus
+			// below carries sqrt(musicVolume) and the master its own level.
+			gain.gain.value = effectiveGain(music.volume, 1)
 			source.connect(gain)
 			gain.connect(this.musicBus)
 			const nodes = { source, gain }
@@ -219,13 +223,13 @@ export class WebSoundEngine extends BaseSoundEngine {
 		try {
 			// 10 ms smoothing: de-clicks slider/mute moves without audible lag.
 			this.master?.gain.setTargetAtTime(this.unmutedMaster(), t, 0.01)
-			this.musicBus?.gain.setTargetAtTime(this.getMusicVolume(), t, 0.01)
+			this.musicBus?.gain.setTargetAtTime(Math.sqrt(clamp01(this.getMusicVolume())), t, 0.01)
 		} catch {}
 	}
 
 	/** Master-bus gain: sqrt(level) with mute forced to silence (restores on unmute). */
 	private unmutedMaster(): number {
-		return this.isMuted() ? 0 : Math.sqrt(Math.max(0, Math.min(1, this.getLevel())))
+		return this.isMuted() ? 0 : Math.sqrt(clamp01(this.getLevel()))
 	}
 
 	public override dispose(): void {
@@ -252,7 +256,7 @@ export class WebSoundEngine extends BaseSoundEngine {
 			this.master.gain.value = this.unmutedMaster()
 			this.master.connect(ctx.destination)
 			this.musicBus = ctx.createGain()
-			this.musicBus.gain.value = this.getMusicVolume()
+			this.musicBus.gain.value = Math.sqrt(clamp01(this.getMusicVolume()))
 			this.musicBus.connect(this.master)
 			this.ctx = ctx
 			this.hookGesture()

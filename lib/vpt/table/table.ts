@@ -40,6 +40,7 @@ import type { Gate } from '../gate/gate.js'
 import type { HitTarget } from '../hit-target/hit-target.js'
 import type { Item } from '../item.js'
 import type { ItemApi } from '../item-api.js'
+import { dequantizeSignedPercent } from '../item-api.js'
 import type { ItemData } from '../item-data.js'
 import { ITEM_REGISTRY } from '../item-registry.js'
 import type { ItemState } from '../item-state.js'
@@ -235,7 +236,13 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 		if (!engine) return
 		for (const [key, sound] of Object.entries(this.sounds)) {
 			const name = sound.getName() || key
-			if (sound.isPlayable()) engine.registerSample(name, sound.pcm!, sound.sampleRate)
+			if (sound.isPlayable())
+				engine.registerSample(name, sound.pcm!, sound.sampleRate, {
+					channels: sound.channels,
+					volume: dequantizeSignedPercent(sound.volume),
+					pan: dequantizeSignedPercent(sound.pan),
+					frontRearFade: dequantizeSignedPercent(sound.frontRearFade),
+				})
 			else
 				warnOnce(
 					`table-sound:${name.toLowerCase()}`,

@@ -138,12 +138,23 @@ describe('WebSoundEngine', () => {
 		expect(FakeCtx.sources.length).to.equal(2)
 	})
 
-	it('should apply music volume once across per-music gain and bus', () => {
+	it('should stage music on the native sqrt curve', () => {
 		engine.registerSample('theme', tonePcm(220, 0.05, 8000), 8000)
 		engine.setMusicVolume(0.5)
 		engine.playMusic('theme', 0.6)
-		expect(FakeCtx.gains.at(1)?.gain.value).to.be.closeTo(0.5, 1e-9)
-		expect(FakeCtx.gains.at(-1)?.gain.value).to.be.closeTo(0.6, 1e-9)
+		expect(FakeCtx.gains.at(1)?.gain.value).to.be.closeTo(Math.sqrt(0.5), 1e-9)
+		expect(FakeCtx.gains.at(-1)?.gain.value).to.be.closeTo(Math.sqrt(0.6), 1e-9)
+	})
+
+	it('should apply editor base levels and mono compensation', () => {
+		engine.setVolume(1)
+		engine.registerSample('stereo', tonePcm(440, 0.05, 8000), 8000, {
+			channels: 2,
+			volume: -0.5,
+		})
+		engine.playSound('stereo', { volume: 1 })
+		// 2 channels × sqrt(clamp01(0.5 × 1)).
+		expect(FakeCtx.gains.at(-1)?.gain.value).to.be.closeTo(2 * Math.sqrt(0.5), 1e-9)
 	})
 
 	it('should schedule knocks through the worker fallback', async () => {

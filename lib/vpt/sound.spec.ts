@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest'
 import { NullSoundEngine } from '../audio/null-sound-engine.js'
 import { Player } from '../game/player.js'
 import { BinaryReader } from '../io/binary-reader.js'
+import type { Storage } from '../io/ole-doc.js'
 import { OleCompoundDoc } from '../io/ole-doc.js'
 import { Sound } from './sound.js'
 import { Table } from './table/table.js'
@@ -61,6 +62,16 @@ describe('Sound', () => {
 			].sort(),
 		)
 		for (const sound of Object.values(table.sounds)) expect(sound.isPlayable()).toBe(true)
+	})
+
+	it('reports decoded channel counts', async () => {
+		expect((await loadFixtureSound(0)).channels).toBe(1)
+		expect((await loadFixtureSound(5)).channels).toBe(2)
+	})
+
+	it('rejects corrupt streams (the loader skips these)', async () => {
+		const storage = { read: async () => new Uint8Array([0x00, 0x01]) } as Storage
+		await expect(Sound.fromStorage(storage, 'Sound0')).rejects.toThrow()
 	})
 
 	it('looks sounds up case-insensitively', async () => {

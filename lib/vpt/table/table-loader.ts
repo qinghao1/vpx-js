@@ -1,6 +1,7 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
+import { warnOnce } from '../../emu/warn-once.js'
 import { type IBinaryReader, OleCompoundDoc, type Storage } from '../../io/ole-doc.js'
 import { logger, progress } from '../../util/logger.js'
 import { Collection } from '../collection/collection.js'
@@ -193,11 +194,20 @@ export class TableLoader {
 		out.sounds = []
 		if (numItems === 0) return
 		const concurrency = Math.min(MAX_CONCURRENCY_SOUNDS, hardwareConcurrency())
-		const results = await this.loadConcurrent(numItems, concurrency, YIELD_EVERY_SOUNDS, index =>
-			Sound.fromStorage(storage, `Sound${index}`),
-		)
+		// One corrupt stream must not abort the table (upstream skips it too):
+		// failures resolve to null and are skipped below.
+		const results = await this.loadConcurrent(numItems, concurrency, YIELD_EVERY_SOUNDS, async index => {
+			const name = `Sound${index}`
+			try {
+				return await Sound.fromStorage(storage, name)
+			} catch (error) {
+				warnOnce(`table-sound:${name}`, '[Table] Skipping corrupt sound stream "%s": %s', name, error)
+				return null
+			}
+		})
 		for (let index = 0; index < numItems; index++) {
-			const sound = results[index]!
+			const sound = results[index]
+			if (!sound) continue
 			out.sounds.push(sound)
 			progress().details(sound.getName())
 		}

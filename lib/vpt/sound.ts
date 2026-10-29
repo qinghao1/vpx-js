@@ -36,8 +36,11 @@ export class Sound {
 	/** Decoded mono float PCM (null for non-WAV imports and unsupported codecs). */
 	public pcm: Float32Array | null = null
 	public sampleRate = 0
+	/** Decoded source channel count (pre-downmix; 1 when undecodable). */
+	public channels = 1
 	public outputTarget: SoundOutType = SoundOutType.TABLE
-	public volume = 100
+	// Editor base levels in percent (upstream Sound defaults, overwritten by the tail when present).
+	public volume = 0
 	public pan = 0
 	public frontRearFade = 0
 
@@ -108,6 +111,7 @@ export class Sound {
 		if (decoded) {
 			this.pcm = decoded.pcm
 			this.sampleRate = decoded.sampleRate
+			this.channels = decoded.channels
 		}
 	}
 

@@ -18,6 +18,8 @@
 export interface DecodedWav {
 	pcm: Float32Array
 	sampleRate: number
+	/** Source channel count (pre-downmix; native feeds this to mono compensation). */
+	channels: number
 }
 
 /** Decodes a complete WAV file to mono float PCM, or null when unsupported/corrupt. */
@@ -33,7 +35,7 @@ export function decodeWavAudio(bytes: Uint8Array): DecodedWav | null {
 	while (pos + 8 <= bytes.length) {
 		const tag = readTag(view, pos)
 		const size = view.getUint32(pos + 4, true)
-		if (tag === 'fmt ' && fmt === null && size >= 16) {
+		if (tag === 'fmt ' && fmt === null && size >= 16 && pos + 24 <= bytes.length) {
 			fmt = {
 				tag: view.getUint16(pos + 8, true),
 				channels: view.getUint16(pos + 10, true),
@@ -67,7 +69,7 @@ export function decodeWavAudio(bytes: Uint8Array): DecodedWav | null {
 		}
 		pcm[frame] = sum / channels
 	}
-	return { pcm, sampleRate: rate }
+	return { pcm, sampleRate: rate, channels }
 }
 
 function readTag(view: DataView, pos: number): string {

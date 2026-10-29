@@ -26,10 +26,28 @@ export interface SoundVoice {
 	playing: boolean
 }
 
+/** Per-sound editor base levels (dequantized percent offsets, upstream Sound volume/pan/fade). */
+export interface SoundBaseLevels {
+	volume: number
+	pan: number
+	frontRearFade: number
+}
+
 /** Stored sample bytes (raw PCM awaiting output). */
 export interface SoundSample {
 	pcm: Float32Array
 	sampleRate: number
+	/** Decoded source channel count (native mono-compensation input; 1 when unknown). */
+	channels: number
+	base: SoundBaseLevels
+}
+
+/** Optional sample metadata for registerSample (all native-faithful defaults). */
+export interface SampleMeta {
+	channels?: number
+	volume?: number
+	pan?: number
+	frontRearFade?: number
 }
 
 /** Script-visible sound sink. Implemented by the null (Node/tests) and WebAudio (browser) engines. */
@@ -47,7 +65,7 @@ export interface ISoundEngine {
 	getLevel(): number
 	setMusicVolume(volume: number): void
 	getMusicVolume(): number
-	registerSample(name: string, pcm: Float32Array, sampleRate: number): void
+	registerSample(name: string, pcm: Float32Array, sampleRate: number, meta?: SampleMeta): void
 	hasSample(name: string): boolean
 	isPlaying(name?: string): boolean
 	getKnockCount(): number
@@ -78,7 +96,7 @@ export function uncurvePanFade(v: number): number {
  * monoCompensation is the decoded channel count (native `converter.channelsIn`):
  * single-channel table sounds played through wider buses need the energy lift. */
 export function effectiveGain(soundVolume: number, mainVolume: number, monoCompensation = 1): number {
-	return monoCompensation * Math.sqrt(Math.max(0, Math.min(1, soundVolume * mainVolume)))
+	return monoCompensation * Math.sqrt(clamp01(soundVolume * mainVolume))
 }
 
 /** Native playback rate: Hz pitch offset plus native's asymmetric random detune. @see SoundPlayer::Play */
@@ -118,8 +136,9 @@ export abstract class BaseSoundEngine implements ISoundEngine {
 
 	public playSound(name: string, opts: PlaySoundOptions = {}): number {
 		if (this.disposed || !name) return 0
+		const key = soundKey(name)
 		// Native fires the hardware knocker for these names *in addition* to the normal voice path.
-		if (soundKey(name) === 'knock' || soundKey(name) === 'knocker') this.fireKnocker(1)
+		if (key === 'knock' || key === 'knocker') this.fireKnocker(1)
 		const {
 			loopCount = 1,
 			volume = 1,
@@ -130,8 +149,7 @@ export abstract class BaseSoundEngine implements ISoundEngine {
 			restart = true,
 			frontRearFade = 0,
 		} = opts
-		const key = soundKey(name)
-		const sample = this.getSample(name)
+		const sample = this.samples.get(key)
 		if (!sample) {
 			// Native warns once per missing name and plays nothing.
 			warnOnce(`sound:${key}`, 'Request to play "%s", but sound was not found.', name)
@@ -158,9 +176,10 @@ export abstract class BaseSoundEngine implements ISoundEngine {
 			list.push(voice)
 		}
 		voice.loopCount = mapLoopCount(loopCount)
-		voice.volume = volume
-		voice.pan = pan
-		voice.frontRearFade = frontRearFade
+		// Native adds the sound's editor base levels to the script offsets.
+		voice.volume = sample.base.volume + volume
+		voice.pan = Math.max(-1, Math.min(1, sample.base.pan + pan))
+		voice.frontRearFade = sample.base.frontRearFade + frontRearFade
 		voice.pitch = pitch
 		voice.playing = true
 		this.emitVoice(voice, sample, pitchFactor(sample.sampleRate, pitch, randomPitch))
@@ -227,6 +246,7 @@ export abstract class BaseSoundEngine implements ISoundEngine {
 	}
 
 	public setVolume(volume: number): void {
+		if (!Number.isFinite(volume)) return
 		this.volume = clamp01(volume)
 		this.onOutputChanged()
 	}
@@ -241,6 +261,7 @@ export abstract class BaseSoundEngine implements ISoundEngine {
 	}
 
 	public setMusicVolume(volume: number): void {
+		if (!Number.isFinite(volume)) return
 		this.musicVolume = Math.max(0, volume)
 		this.onOutputChanged()
 	}
@@ -251,9 +272,18 @@ export abstract class BaseSoundEngine implements ISoundEngine {
 
 	protected onOutputChanged(): void {}
 
-	public registerSample(name: string, pcm: Float32Array, sampleRate: number): void {
+	public registerSample(name: string, pcm: Float32Array, sampleRate: number, meta: SampleMeta = {}): void {
 		if (!name || !pcm?.length || !(sampleRate > 0)) return
-		this.samples.set(soundKey(name), { pcm, sampleRate })
+		this.samples.set(soundKey(name), {
+			pcm,
+			sampleRate,
+			channels: meta.channels !== undefined && meta.channels >= 1 ? Math.floor(meta.channels) : 1,
+			base: {
+				volume: meta.volume ?? 0,
+				pan: meta.pan ?? 0,
+				frontRearFade: meta.frontRearFade ?? 0,
+			},
+		})
 	}
 
 	public hasSample(name: string): boolean {

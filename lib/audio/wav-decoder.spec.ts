@@ -103,4 +103,26 @@ describe('decodeWavAudio', () => {
 		expect(decodeWavAudio(new TextEncoder().encode('RIFF....NOTWAVE' + 'x'.repeat(40)))).to.equal(null)
 		expect(decodeWavAudio(buildWav(1, 1, 8000, 16, new Uint8Array(0)))).to.equal(null)
 	})
+
+	it('should return null (not throw) for a truncated fmt body', () => {
+		// 44 bytes: RIFF header + JUNK chunk + fmt header declaring 16 body
+		// bytes that are not there. Must not throw RangeError.
+		const bytes = new Uint8Array(44)
+		const view = new DataView(bytes.buffer)
+		const writeTag = (pos: number, tag: string): void => {
+			for (let i = 0; i < 4; i++) view.setUint8(pos + i, tag.charCodeAt(i))
+		}
+		writeTag(0, 'RIFF')
+		writeTag(8, 'WAVE')
+		writeTag(12, 'JUNK')
+		view.setUint32(16, 16, true)
+		writeTag(36, 'fmt ')
+		view.setUint32(40, 16, true)
+		expect(decodeWavAudio(bytes)).to.equal(null)
+	})
+
+	it('should report the source channel count', () => {
+		expect(decodeWavAudio(buildWav(1, 1, 8000, 16, int16Samples([0]))!)?.channels).to.equal(1)
+		expect(decodeWavAudio(buildWav(1, 2, 8000, 16, int16Samples([0, 0])))?.channels).to.equal(2)
+	})
 })
