@@ -1,7 +1,7 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { expect } from 'chai'
-import { decodeWavAudio } from './wav-decoder.js'
+import { decodeExternalAudio, decodeWavAudio } from './wav-decoder.js'
 
 function buildWav(
 	formatTag: number,
@@ -10,6 +10,7 @@ function buildWav(
 	bits: number,
 	payload: Uint8Array,
 	extraChunks: Uint8Array[] = [],
+	blockAlign = Math.round((channels * bits) / 8),
 ): Uint8Array {
 	const dataSize = payload.length
 	const headerSize = 12 + extraChunks.reduce((n, c) => n + c.length, 0) + 8 + 16 + 8
@@ -32,7 +33,7 @@ function buildWav(
 	view.setUint16(pos + 10, channels, true)
 	view.setUint32(pos + 12, rate, true)
 	view.setUint32(pos + 16, Math.round((rate * channels * bits) / 8), true)
-	view.setUint16(pos + 20, Math.round((channels * bits) / 8), true)
+	view.setUint16(pos + 20, blockAlign, true)
 	view.setUint16(pos + 22, bits, true)
 	pos += 24
 	writeTag(pos, 'data')
@@ -96,7 +97,7 @@ describe('decodeWavAudio', () => {
 	})
 
 	it('should return null for unsupported codecs and corrupt input', () => {
-		// IMA ADPCM tag with otherwise valid framing.
+		// ADPCM tag with an impossible blockAlign still returns null.
 		expect(decodeWavAudio(buildWav(0x11, 1, 8000, 16, new Uint8Array(256)))).to.equal(null)
 		expect(decodeWavAudio(new Uint8Array(10))).to.equal(null)
 		expect(decodeWavAudio(new TextEncoder().encode('RIFF....NOTWAVE' + 'x'.repeat(40)))).to.equal(null)
@@ -123,5 +124,57 @@ describe('decodeWavAudio', () => {
 	it('should report the source channel count', () => {
 		expect(decodeWavAudio(buildWav(1, 1, 8000, 16, int16Samples([0]))!)?.channels).to.equal(1)
 		expect(decodeWavAudio(buildWav(1, 2, 8000, 16, int16Samples([0, 0])))?.channels).to.equal(2)
+	})
+
+	it('should decode IMA-ADPCM mono', () => {
+		// Predictor 100, index 0, nibbles 7/7: steps 7 then 16 give +11, +30.
+		const header = new Uint8Array([100, 0, 0, 0])
+		const decoded = decodeWavAudio(buildWav(0x11, 1, 8000, 4, new Uint8Array([...header, 0x77, 0, 0, 0]), [], 8))
+		expect(decoded?.sampleRate).to.equal(8000)
+		expect(decoded?.channels).to.equal(1)
+		expect(Array.from(decoded?.pcm ?? [])).to.have.length(9)
+		expect(decoded?.pcm[0]).to.be.closeTo(100 / 32768, 1e-9)
+		expect(decoded?.pcm[1]).to.be.closeTo(111 / 32768, 1e-9)
+		expect(decoded?.pcm[2]).to.be.closeTo(141 / 32768, 1e-9)
+	})
+
+	it('should decode IMA-ADPCM stereo and downmix', () => {
+		const left = new Uint8Array([100, 0, 0, 0])
+		const right = new Uint8Array([156, 255, 0, 0])
+		const decoded = decodeWavAudio(
+			buildWav(0x11, 2, 8000, 4, new Uint8Array([...left, ...right, 0x77, 0, 0, 0, 0x77, 0, 0, 0]), [], 16),
+		)
+		expect(decoded?.channels).to.equal(2)
+		expect(Array.from(decoded?.pcm ?? [])).to.have.length(9)
+		expect(decoded?.pcm[0]).to.be.closeTo(0, 1e-9)
+		expect(decoded?.pcm[1]).to.be.closeTo(11 / 32768, 1e-9)
+	})
+
+	it('should decode MS-ADPCM mono', () => {
+		// coef[0], delta 64, seeds s1=1000/s2=500, nibbles 1/0: 1000+64, then unchanged.
+		const header = new Uint8Array([0, 64, 0, 232, 3, 244, 1])
+		const decoded = decodeWavAudio(buildWav(2, 1, 8000, 4, new Uint8Array([...header, 0x10]), [], 8))
+		expect(decoded?.sampleRate).to.equal(8000)
+		expect(Array.from(decoded?.pcm ?? [])).to.have.length(4)
+		for (const [i, v] of [500, 1000, 1064, 1064].entries()) expect(decoded?.pcm[i]).to.be.closeTo(v / 32768, 1e-9)
+	})
+
+	it('should decode MS-ADPCM stereo and downmix', () => {
+		// Seeds L(500/1000) R(1500/2000), nibbles 1/1 then 0/0.
+		const header = new Uint8Array([0, 0, 64, 0, 64, 0, 232, 3, 208, 7, 244, 1, 220, 5])
+		const decoded = decodeWavAudio(buildWav(2, 2, 8000, 4, new Uint8Array([...header, 0x11, 0x00]), [], 16))
+		expect(decoded?.channels).to.equal(2)
+		expect(Array.from(decoded?.pcm ?? [])).to.have.length(4)
+		for (const [i, v] of [1000, 1500, 1564, 1564].entries()) expect(decoded?.pcm[i]).to.be.closeTo(v / 32768, 1e-6)
+	})
+
+	it('should return null for truncated ADPCM blocks', () => {
+		expect(decodeWavAudio(buildWav(0x11, 1, 8000, 4, new Uint8Array([100, 0]), [], 8))).to.equal(null)
+		expect(decodeWavAudio(buildWav(2, 1, 8000, 4, new Uint8Array(3), [], 4))).to.equal(null)
+	})
+
+	it('should return null from container decode without a browser context', async () => {
+		// Node has no OfflineAudioContext; the browser path is covered by E2E.
+		expect(await decodeExternalAudio(new Uint8Array(64))).to.equal(null)
 	})
 })

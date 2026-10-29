@@ -1,6 +1,7 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
+import { decodeExternalAudio } from '../../audio/wav-decoder.js'
 import { warnOnce } from '../../emu/warn-once.js'
 import { type IBinaryReader, OleCompoundDoc, type Storage } from '../../io/ole-doc.js'
 import { logger, progress } from '../../util/logger.js'
@@ -199,7 +200,18 @@ export class TableLoader {
 		const results = await this.loadConcurrent(numItems, concurrency, YIELD_EVERY_SOUNDS, async index => {
 			const name = `Sound${index}`
 			try {
-				return await Sound.fromStorage(storage, name)
+				const sound = await Sound.fromStorage(storage, name)
+				// Embedded MP3/OGG bytes decode through the browser only; the WAV
+				// fast path above already covered everything sync-decodable.
+				if (!sound.isPlayable() && sound.data.length > 0) {
+					const decoded = await decodeExternalAudio(sound.data)
+					if (decoded) {
+						sound.pcm = decoded.pcm
+						sound.sampleRate = decoded.sampleRate
+						sound.channels = decoded.channels
+					}
+				}
+				return sound
 			} catch (error) {
 				warnOnce(`table-sound:${name}`, '[Table] Skipping corrupt sound stream "%s": %s', name, error)
 				return null

@@ -1,7 +1,11 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 export const DEFAULT_URL = 'https://localhost:3000/?vpx=/test/fixtures/table-empty.vpx&mode=viewer'
+
+// dist-esm prefix for in-page dynamic imports (same pass-it-in rule as below).
+export const DIST_ESM_PREFIX = `/@fs${path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../dist-esm')}`
 
 // Single source of truth for "insert-like" names (mesh, material, primitive,
 // collection keys). page.evaluate callbacks cannot close over module scope, so
@@ -1654,7 +1658,7 @@ export const cameraTransitionChecks = async page => {
 
 // Sound leg: headless CI cannot hear output; exercise the path instead.
 export const soundChecks = async page => {
-	return page.evaluate(() => {
+	return page.evaluate(async decoderUrl => {
 		const v = window.viewer
 		if (!v) return { pass: 'skip', reason: 'no viewer' }
 		const s = v.sound
@@ -1705,13 +1709,62 @@ export const soundChecks = async page => {
 			try {
 				s.stopSound('__e2e_probe__')
 			} catch {}
-			const pass = mutedOk && muteRestoreOk && volOk && knockOk && playOk && stopOk && missingOk && scriptOk
+			// Music: native container decode of an in-page WAV, then single-play
+			// MusicDone reporting through the script event.
+			let musicOk = true
+			let musicWhy = ''
+			try {
+				if (scriptRunnable) {
+					const { decodeExternalAudio } = await import(decoderUrl)
+					const bytes = new Uint8Array(48)
+					const view = new DataView(bytes.buffer)
+					const tag = (p, s) => {
+						for (let i = 0; i < 4; i++) view.setUint8(p + i, s.charCodeAt(i))
+					}
+					tag(0, 'RIFF')
+					view.setUint32(4, 40, true)
+					tag(8, 'WAVE')
+					tag(12, 'fmt ')
+					view.setUint32(16, 16, true)
+					view.setUint16(20, 1, true)
+					view.setUint16(22, 1, true)
+					view.setUint32(24, 8000, true)
+					view.setUint32(28, 16000, true)
+					view.setUint16(32, 2, true)
+					view.setUint16(34, 16, true)
+					tag(36, 'data')
+					view.setUint32(40, 4, true)
+					view.setInt16(44, 1000, true)
+					view.setInt16(46, -1000, true)
+					const decoded = await decodeExternalAudio(bytes)
+					const engine = v.player.getSoundEngine()
+					let done = false
+					if (decoded && decoded.pcm.length > 0 && decoded.sampleRate > 0) {
+						engine.registerSample('__e2e_music__', decoded.pcm, decoded.sampleRate)
+						v.table.getApi().on('MusicDone', () => {
+							done = true
+						})
+						engine.playMusic('__e2e_music__', 1)
+						for (let i = 0; i < 40 && !done; i++) await new Promise(r => setTimeout(r, 50))
+					}
+					if (!decoded) musicWhy = 'decode=null'
+					else if (!(decoded.pcm.length > 0) || !(decoded.sampleRate > 0)) musicWhy = 'empty-decode'
+					else if (!done) musicWhy = 'no-MusicDone'
+					else if (engine.getMusic() !== null) musicWhy = 'music-not-cleared'
+					musicOk = !!decoded && done && engine.getMusic() === null
+				}
+			} catch (e) {
+				musicOk = false
+				musicWhy = `threw=${String(e?.message ?? e).slice(0, 120)}`
+			}
+			const pass =
+				mutedOk && muteRestoreOk && volOk && knockOk && playOk && stopOk && missingOk && scriptOk && musicOk
 			return {
 				pass,
-				reason: `mute=${mutedOk} muteRestore=${muteRestoreOk} vol=${volOk} knock=${knockOk} play=${playOk} stop=${stopOk} missing=${missingOk} script=${scriptOk}${scriptRunnable ? '' : ' (skipped: no player)'}`,
+				reason: `mute=${mutedOk} muteRestore=${muteRestoreOk} vol=${volOk} knock=${knockOk} play=${playOk} stop=${stopOk} missing=${missingOk} script=${scriptOk} music=${musicOk}${musicWhy && !musicOk ? `(${musicWhy})` : ''}${scriptRunnable ? '' : ' (skipped: no player)'}`,
 			}
 		} catch (e) {
 			return { pass: false, reason: String(e?.message ?? e).slice(0, 200) }
 		}
-	})
+	}, `${DIST_ESM_PREFIX}/lib/audio/wav-decoder.js`)
 }

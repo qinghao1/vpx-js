@@ -198,6 +198,7 @@ export async function launchBrowser(puppeteer, opts = {}) {
 			...gpuArgs,
 			'--window-size=1280,900',
 			'--disable-gpu-sandbox',
+			'--autoplay-policy=no-user-gesture-required',
 		],
 		...rest,
 	})

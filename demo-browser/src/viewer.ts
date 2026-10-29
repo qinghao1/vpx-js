@@ -413,6 +413,28 @@ export class Viewer {
 		this.sound.setVolume(Math.max(0, Math.min(1, prefs?.volume ?? tableSound ?? 1)))
 		this.sound.setMuted(!!prefs?.muted)
 	}
+
+	// ?music=url[,url...]: external music files, decoded in the background and
+	// registered under their file names for script PlayMusic(name). Loading is
+	// async, so a PlayMusic call before arrival still misses.
+	async _loadMusicParam() {
+		const param = new URLSearchParams(location.search).get('music')
+		if (!param || !this.player) return
+		const sources = []
+		for (const raw of param.split(',')) {
+			const url = raw.trim()
+			if (!url) continue
+			try {
+				const res = await fetch(new URL(url, location.href).href)
+				if (!res.ok) throw new Error(`${res.status}`)
+				const name = url.split(/[?#]/)[0].split('/').pop() ?? url
+				sources.push({ name, bytes: new Uint8Array(await res.arrayBuffer()) })
+			} catch {
+				this.log(`Music file unavailable: ${url}`)
+			}
+		}
+		if (sources.length > 0) await this.player.loadMusic(sources)
+	}
 	_saveSoundPrefs() {
 		if (!this.sound) return
 		try {
@@ -1551,6 +1573,7 @@ export class Viewer {
 			this.handleBallLifecycle(ball, false)
 		})
 		this._attachSoundToPlayer()
+		void this._loadMusicParam()
 		this.player.on('emuStarted', () => {
 			this._emuStartLogged = true
 			this.log(`PinMAME emu ready: ${this.player.getPhysics().emu?.constructor.name}`)

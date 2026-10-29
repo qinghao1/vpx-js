@@ -3,6 +3,8 @@
 
 import { NullSoundEngine } from '../audio/null-sound-engine.js'
 import type { ISoundEngine } from '../audio/sound-engine.js'
+import { decodeExternalAudio } from '../audio/wav-decoder.js'
+import { warnOnce } from '../emu/warn-once.js'
 import type { Vertex2D, Vertex3D } from '../math/vector.js'
 import type { NudgeHandler } from '../physics/cabinet/nudge-handler.js'
 import { DEFAULT_BALL_SIZE } from '../physics/constants.js'
@@ -292,6 +294,20 @@ export class Player extends EventEmitter {
 		// The host may attach its audible engine after construction (demo-browser
 		// does); re-register table samples so they survive the swap.
 		this.table.registerTableSounds(this.soundEngine)
+	}
+
+	/** Decodes music files and registers each under its file name so script
+	 * PlayMusic(name) resolves. Anything undecodable stays silent with a warning. */
+	public async loadMusic(sources: Array<{ name: string; bytes: Uint8Array }>): Promise<void> {
+		for (const { name, bytes } of sources) {
+			if (!name || bytes.length === 0) continue
+			const decoded = await decodeExternalAudio(bytes)
+			if (!decoded) {
+				warnOnce(`music-file:${name.toLowerCase()}`, 'Music file "%s" could not be decoded.', name)
+				continue
+			}
+			this.soundEngine.registerSample(name, decoded.pcm, decoded.sampleRate, { channels: decoded.channels })
+		}
 	}
 
 	public setEmulator(emu: IEmulator): void {

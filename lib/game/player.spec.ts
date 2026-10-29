@@ -356,4 +356,16 @@ describe('The VPinball player', () => {
 		expect(second.isEmpty).to.equal(false)
 		expect(second.getState(ball.getName())).to.not.equal(undefined)
 	})
+
+	it('should skip undecodable music files without registering them', async () => {
+		const table = await Table.load(new NodeBinaryReader(three.fixturePath('table-kicker.vpx')))
+		const player = new Player(table).init()
+		// Node has no OfflineAudioContext, so nothing decodes here; the call
+		// must still resolve and leave the engine untouched.
+		await player.loadMusic([
+			{ name: 'theme.mp3', bytes: new Uint8Array([1, 2, 3, 4]) },
+			{ name: '', bytes: new Uint8Array(0) },
+		])
+		expect(player.getSoundEngine().hasSample('theme.mp3')).to.equal(false)
+	})
 })
