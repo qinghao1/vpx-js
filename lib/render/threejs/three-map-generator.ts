@@ -160,6 +160,7 @@ export class ThreeMapGenerator {
 	public async retainSources(textures: Texture[], table: Table): Promise<{ retained: number; bytes: number }> {
 		let retained = 0
 		let bytes = 0
+		const failed: string[] = []
 		for (const texture of textures) {
 			if (!texture.getName() || this.hasTexture(texture.getName()) || texture.isRaw() || texture.retainedData)
 				continue
@@ -177,9 +178,17 @@ export class ThreeMapGenerator {
 					bytes += data.length
 				}
 			} catch {
-				// Unreadable now means unloadable later; the demand path warns then.
+				// Unreadable now means unloadable later; record it so the later
+				// demand failure isn't mistaken for a released archive.
+				failed.push(texture.getName())
 			}
 		}
+		if (failed.length)
+			logger().debug(
+				'[ThreeMapGenerator.loadTextures] Could not retain %s texture sources (%s); their demand loads fail once the archive is released.',
+				failed.length,
+				failed.join(', '),
+			)
 		return { retained, bytes }
 	}
 

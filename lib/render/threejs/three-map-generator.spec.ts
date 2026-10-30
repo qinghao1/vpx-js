@@ -263,6 +263,44 @@ describe('ThreeMapGenerator.retainSources', () => {
 		expect(seen).toEqual([bytes])
 		expect(tex.retainedData).toBeUndefined()
 	})
+
+	it('names textures whose sources cannot be retained', async () => {
+		const generator = new ThreeMapGenerator(stubLoader() as any)
+		const good = fakeTexture('Good.png', { len: 10 })
+		const bad = fakeTexture('Bad.png', { len: 10 })
+		const debugs: Array<{ f: string; a: unknown[] }> = []
+		const prev = Logger.logger()
+		Logger.setLogger({
+			wtf: () => {},
+			error: () => {},
+			warn: () => {},
+			info: () => {},
+			debug: (f: string, ...a: unknown[]) => {
+				debugs.push({ f, a })
+			},
+		})
+		try {
+			let reads = 0
+			const result = await generator.retainSources([good as any, bad as any], {
+				streamStorage: async () => {
+					if (++reads === 2) throw new Error('boom')
+					return new Uint8Array(10)
+				},
+			} as any)
+			expect(result).toEqual({ retained: 1, bytes: 10 })
+			expect(good.retainedData).toBeInstanceOf(Uint8Array)
+			expect(bad.retainedData).toBeUndefined()
+			expect(debugs.map(e => [e.f, ...e.a])).toEqual([
+				[
+					'[ThreeMapGenerator.loadTextures] Could not retain %s texture sources (%s); their demand loads fail once the archive is released.',
+					1,
+					'Bad.png',
+				],
+			])
+		} finally {
+			Logger.setLogger(prev)
+		}
+	})
 })
 
 describe('ThreeMapGenerator.loadShared', () => {
