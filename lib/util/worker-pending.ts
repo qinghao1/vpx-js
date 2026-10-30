@@ -35,8 +35,11 @@ export function withWorkerTimeout<T>(
 			}
 		}
 	}, ms)
-	// Pools unref their workers; a ref'd timer alone would keep the loop alive.
-	;(entry.timer as unknown as { unref?: () => void }).unref?.()
+	// Stays ref'd on purpose: pools unref their workers, so this armed
+	// watchdog is the only handle keeping the loop alive while a decode is
+	// in flight. Unref'd, the loop can drain mid-decode and the process
+	// exits with the call still pending. Idle pools arm no timers, so they
+	// still never hold the process open; settle clears the timer.
 }
 
 /** Clears the armed timeout (if any) and removes the entry; undefined when already settled. */

@@ -14,6 +14,19 @@ describe('withWorkerTimeout', () => {
 		expect(String(rejected)).to.contain('boom')
 	})
 
+	it('keeps the event loop alive while armed', async () => {
+		// Pools unref their workers, so the armed watchdog is the only
+		// handle keeping the process alive during a slow decode. If it is
+		// unref'd too, the loop drains and node exits (code 13) with the
+		// decode still pending — observed as a TWD preload stall.
+		const pending = new Map<number, WorkerPendingEntry<string>>()
+		pending.set(3, { resolve: () => {}, reject: () => {} })
+		withWorkerTimeout(pending, 3, 50, 'boom')
+		const timer = pending.get(3)?.timer as unknown as { hasRef?: () => boolean }
+		expect(timer?.hasRef?.() ?? true).to.equal(true)
+		settleWorkerEntry(pending, 3)
+	})
+
 	it('does nothing once settled', async () => {
 		const pending = new Map<number, WorkerPendingEntry<string>>()
 		pending.set(2, { resolve: () => {}, reject: () => {} })
