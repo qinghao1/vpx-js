@@ -1,13 +1,9 @@
 import { deflateSync } from 'node:zlib'
 import { describe, expect, it } from 'vitest'
 import { MAX_FLOAT_TEXTURE_BYTES } from '../../util/quality.js'
+import { expandAndBoxAverage, expandToRgba } from './png-resample.js'
 import { downscaleArray } from './texture-downscale.js'
-import {
-	expandAndBoxAverage,
-	expandToRgba,
-	ThreeTextureLoaderNode,
-	unfilterScanlines,
-} from './three-texture-loader-node.js'
+import { ThreeTextureLoaderNode, unfilterScanlines } from './three-texture-loader-node.js'
 
 const CRC_TABLE: number[] = (() => {
 	const table: number[] = new Array<number>(256)
