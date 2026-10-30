@@ -9,7 +9,7 @@ import { NodeBinaryReader } from '../io/binary-reader.node.js'
 import { Vertex3D } from '../math/vector.js'
 import { _resetQualityCache } from '../util/quality.js'
 import { Table } from '../vpt/table/table.js'
-import { EMU_QUANTUM_MS, type IEmulator } from './iemulator.js'
+import type { IEmulator } from './iemulator.js'
 import { FULL_SWEEP_EVERY, type IBallCreationPosition, Player } from './player.js'
 
 /** Runs fn with performance.now stubbed to `now`; restores the clock afterwards. */
@@ -298,7 +298,7 @@ describe('The VPinball player', () => {
 		expect(player.getGameTime()).to.equal(16)
 	})
 
-	describe('emu quantum sync', () => {
+	describe('emu sync', () => {
 		function setupSyncedPlayer(): { player: Player; calls: number[] } {
 			const table = new TableBuilder().withTableScript('').build('Table1')
 			const player = new Player(table).init({})
@@ -312,49 +312,63 @@ describe('The VPinball player', () => {
 			return { player, calls }
 		}
 
-		it('should flush at most one whole-quantum emu sync per tick', () => {
+		it('should forward each tick to the emu in a single sync', () => {
 			const { player, calls } = setupSyncedPlayer()
 			let time = 0
 			for (let tick = 0; tick < 10; tick++) {
 				const before = calls.length
 				time += 16.7
 				player.updatePhysics(time)
-				const tickCalls = calls.slice(before)
-				expect(tickCalls.length).to.be.lessThan(2)
-				for (const ms of tickCalls) expect(ms % EMU_QUANTUM_MS).to.equal(0)
+				expect(calls.length - before).to.be.lessThan(2)
 			}
 			expect(calls.length).to.be.above(0)
 		})
 
-		it('should carry sub-quantum emu time instead of dropping it', () => {
+		it('should conserve emu time exactly across ticks', () => {
 			const { player, calls } = setupSyncedPlayer()
 			let time = 0
+			let steps = 0
 			for (let tick = 0; tick < 60; tick++) {
 				time += 16.7
-				player.updatePhysics(time)
+				steps += player.updatePhysics(time)
 			}
+			// One ms forwarded per simulated step, nothing carried or dropped.
 			const forwarded = calls.reduce((sum, ms) => sum + ms, 0)
-			// Everything arrives except the carried remainder, always below one quantum.
-			expect(time - forwarded).to.be.at.least(0)
-			expect(time - forwarded).to.be.below(EMU_QUANTUM_MS)
-			expect(forwarded % EMU_QUANTUM_MS).to.equal(0)
+			expect(forwarded).to.be.closeTo(steps, 1e-6)
 		})
 
-		it('should keep the synced emu transparent to instanceof and re-setting', () => {
+		it('should keep the raw emu on physics.emu across re-setting', () => {
 			const table = new TableBuilder().withTableScript('').build('Table1')
 			const player = new Player(table).init({})
 			const emu = new FakeEmu()
 			player.setEmulator(emu as unknown as IEmulator)
+			expect(player.getPhysics().emu).to.equal(emu)
 			expect(player.getPhysics().emu instanceof FakeEmu).to.equal(true)
-			// Controller reloads re-set the same emu: must reuse the batcher, not nest one.
+			// Controller reloads re-set the same emu: still the raw instance.
 			player.setEmulator(player.getPhysics().emu!)
+			expect(player.getPhysics().emu).to.equal(emu)
 			let time = 0
 			for (let tick = 0; tick < 10; tick++) {
 				time += 16.7
 				player.updatePhysics(time)
 			}
 			expect(emu.calls.length).to.be.above(0)
-			for (const ms of emu.calls) expect(ms % EMU_QUANTUM_MS).to.equal(0)
+		})
+
+		it('should forward exactly once per tick with conserved totals under jitter', () => {
+			const { player, calls } = setupSyncedPlayer()
+			let time = 0
+			let steps = 0
+			const jumps = [9.3, 23.7, 11.1, 27.9]
+			for (let tick = 0; tick < 20; tick++) {
+				const before = calls.length
+				time += jumps[tick % jumps.length]!
+				steps += player.updatePhysics(time)
+				// Every tick advances at least one 1 ms step, so each forwards exactly once.
+				expect(calls.length - before).to.equal(1)
+			}
+			const forwarded = calls.reduce((sum, ms) => sum + ms, 0)
+			expect(forwarded).to.be.closeTo(steps, 1e-6)
 		})
 	})
 
