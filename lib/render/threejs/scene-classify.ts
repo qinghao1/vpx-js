@@ -4,7 +4,17 @@ import { isBaked, pendingMapOf, RE_BAKE_MAP, RE_BAKE_MAT, RE_VR } from './materi
 
 export { RE_BAKE_MAP, RE_BAKE_MAT, RE_VR }
 export const RE_ALPHA_MESH = /armp|ramp|bat_|non[_-]?opaque|plastic|gate/i
-export const RE_CAB = /vrcab|cabinet|lockbar|pincab/i
+export const RE_CAB = /vr_?cab|cabinet|lockbar|pincab|backbox|coin_?door/i
+
+/**
+ * VR-room or cabinet content by node name. The showcase viewer keeps these
+ * visible despite script-driven hides (desktop VR tables hide their room
+ * via `object.visible = 0`); play mode applies script hides faithfully.
+ */
+export function isShowcaseRoomNode(name: string | undefined): boolean {
+	if (!name) return false
+	return RE_VR.test(name) || RE_CAB.test(name)
+}
 export const RE_GLASS = /glass/i
 export const RE_LM = /lm_/i
 export const RE_GI = /gi0|gi1|_gi|gi_/i

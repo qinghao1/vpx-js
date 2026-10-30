@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { describe, expect, it } from 'vitest'
+import { isShowcaseRoomNode } from './scene-classify.js'
 import { classify, isBakedPlayfield, isBasePlayfield, postProcessScene } from './three-scene-postprocess.js'
 import { hasBakedPlayfield } from './visibility-heuristics.js'
 
@@ -152,6 +153,9 @@ describe('regression: room must remain visible', () => {
 		}
 		expect(classify('primitive-vrcab_cabinet', '', '', false, false).isVr, 'cab wins over VR').toEqual(false)
 		expect(classify('primitive-vrcab_cabinet', '', '', false, false).isCab, 'cab stays cab').toEqual(true)
+		for (const name of ['primitive-vr_cab', 'VR_Cab', 'VR_Backbox', 'VR_Coin_Door', 'BM_VR_Cab_Siderails']) {
+			expect(classify(name, '', '', false, false).isCab, `${name} is cabinet`).toEqual(true)
+		}
 		for (const name of ['cover', 'primitive-chevron', 'primitive-blackbox']) {
 			expect(classify(name, '', '', false, false).isVr, `${name} is not VR`).toEqual(false)
 		}
@@ -176,6 +180,31 @@ describe('regression: room must remain visible', () => {
 		postProcessScene(root, { harnessLog: () => {}, viewerMode: 'viewer' })
 		expect(white.visible, 'white VR wall stays').toEqual(true)
 		expect(dark.visible, 'dark VR wall stays').toEqual(true)
+	})
+
+	it('isShowcaseRoomNode covers the script-hidden room and cabinet names', () => {
+		// Royal Flush hides VRCab + ColRoom1/ColRoomMinimal on desktop
+		// (`for each Object in VRCab : object.visible = 0`); the showcase
+		// viewer keeps exactly these visible.
+		for (const name of [
+			'VR_Cab',
+			'VR_Backbox',
+			'VR_Cab_Leg_Front_Right',
+			'VR_CabFlipperLeft',
+			'VR_Coin_Door',
+			'VR_Primary_plunger',
+			'VR_Platform',
+			'VR_Sphere',
+			'VRMega1',
+			'VRMeag11',
+			'BM_VR_Cab_Siderails',
+			'VR_Cab_StartButton',
+		]) {
+			expect(isShowcaseRoomNode(name), `${name} is showcase room content`).toEqual(true)
+		}
+		for (const name of ['Playfield', 'primitive-plunger', 'LeftFlipper', 'cover', undefined]) {
+			expect(isShowcaseRoomNode(name), `${String(name)} is not room content`).toEqual(false)
+		}
 	})
 
 	it('isBakedPlayfield unifies the bake-side name checks', () => {

@@ -15,7 +15,7 @@ import {
 	setPrimitiveTransmissionArea,
 } from '../../dist-esm/lib/render/threejs/nodes/primitive-bdl-node.js'
 import { isBakedNodeMaterial, setBakedMap } from '../../dist-esm/lib/render/threejs/nodes/unshaded-baked-node.js'
-import { RE_VR } from '../../dist-esm/lib/render/threejs/scene-classify.js'
+import { isShowcaseRoomNode, RE_VR } from '../../dist-esm/lib/render/threejs/scene-classify.js'
 import {
 	batchStaticOpaques as _batchStaticOpaques,
 	optimizeScene as _optimizeScene,
@@ -988,6 +988,19 @@ export class Viewer {
 			this.nodeCache.delete(ball.getName())
 		}
 	}
+	/**
+	 * Showcase keeps the build-time VR/cabinet force-show: a script-driven
+	 * hide of a VR or cabinet node is dropped from the diff, while the
+	 * diff's matrices and materials still apply. Play mode keeps full
+	 * script fidelity; non-VR items are untouched in both modes.
+	 */
+	showcaseState(nodeName: string | undefined, state: any) {
+		if (this.viewerMode === 'play' || state?.isVisible !== false || !isShowcaseRoomNode(nodeName)) {
+			return state
+		}
+		const { isVisible: _hidden, ...rest } = state
+		return rest
+	}
 	applyChangedStates(changed) {
 		if (!changed || !this.tableGroup || !this.renderApi) {
 			changed?.release?.()
@@ -1002,7 +1015,9 @@ export class Viewer {
 			if (this.table.lights?.[name]) changedLightNames.add(name)
 			const entry = this.nodeCache.get(name)
 			if (!entry) continue
-			entry.item.getUpdater().applyState(entry.node, state, this.renderApi, this.table)
+			entry.item
+				.getUpdater()
+				.applyState(entry.node, this.showcaseState(entry.node?.name, state), this.renderApi, this.table)
 		}
 		if (changedLightNames.size) {
 			for (const lm of changedLightNames) {
