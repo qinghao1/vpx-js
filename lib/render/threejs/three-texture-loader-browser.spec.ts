@@ -1,5 +1,5 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
-import { LinearFilter, LinearMipmapLinearFilter } from 'three'
+import { LinearFilter, LinearMipmapLinearFilter, RGBAFormat } from 'three'
 import { describe, expect, it } from 'vitest'
 import { MAX_FLOAT_TEXTURE_BYTES } from '../../util/quality.js'
 import { ThreeTextureLoaderBrowser } from './three-texture-loader-browser.js'
@@ -52,5 +52,20 @@ describe('ThreeTextureLoaderBrowser tuning', () => {
 		const tex = await raw('screw', 32, 32)
 		expect(tex.generateMipmaps).toBe(false)
 		expect(tex.minFilter).toBe(LinearFilter)
+	})
+
+	it('keeps RGBAFormat for fully-opaque raw bitmaps (WebGPU has no RGB8)', async () => {
+		const w = 16
+		const h = 16
+		const data = new Uint8Array(w * h * 4)
+		for (let i = 0; i < data.length; i += 4) {
+			data[i] = i & 0xff
+			data[i + 1] = (i >> 2) & 0xff
+			data[i + 2] = (i >> 4) & 0xff
+			data[i + 3] = 0xff
+		}
+		const tex = (await loader.loadRawTexture('playfield_opaque', data, w, h)) as any
+		expect(tex.format).toBe(RGBAFormat)
+		expect(tex.image.data.byteLength).toBe(w * h * 4)
 	})
 })

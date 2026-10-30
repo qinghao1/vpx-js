@@ -13,7 +13,6 @@ import {
 	LinearMipMapLinearFilter,
 	LinearSRGBColorSpace,
 	RGBAFormat,
-	RGBFormat,
 	SRGBColorSpace,
 	Texture,
 	TextureLoader,
@@ -212,27 +211,12 @@ export class ThreeTextureLoaderBrowser implements ITextureLoader<ThreeTexture> {
 	}
 
 	public async loadRawTexture(name: string, data: Uint8Array, width: number, height: number): Promise<ThreeTexture> {
-		let format: any = RGBAFormat
-		let src: Uint8Array = data
-		if (data.length === width * height * 4) {
-			let opaque = true
-			for (let i = 3; i < data.length; i += 4)
-				if (data[i] !== 0xff) {
-					opaque = false
-					break
-				}
-			if (opaque) {
-				const rgb = new Uint8Array(width * height * 3)
-				for (let i = 0, j = 0; i < data.length; i += 4, j += 3) {
-					rgb[j] = data[i]
-					rgb[j + 1] = data[i + 1]
-					rgb[j + 2] = data[i + 2]
-				}
-				src = rgb
-				format = RGBFormat
-			}
-		}
-		const tex: any = new DataTexture(src as any, width, height, format as any)
+		// WebGPU has no 24-bit RGB texture format: three r185 maps RGBFormat
+		// only to packed-float types, so an RGB/UnsignedByte DataTexture warns
+		// every frame ('Unsupported texture type with RGBFormat') and falls
+		// back to a 1x1 default. Keep the RGBA upload even when fully opaque;
+		// sampling is identical (alpha reads 1.0).
+		const tex: any = new DataTexture(data as any, width, height, RGBAFormat)
 		tex.flipY = true
 		tex.colorSpace = SRGBColorSpace
 		tex.needsUpdate = true
