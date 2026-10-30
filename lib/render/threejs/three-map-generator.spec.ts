@@ -520,26 +520,10 @@ describe('ThreeMapGenerator.demandPendingMaps', () => {
 		mesh.material.userData.pendingMap = 'Swap'
 		root.add(mesh)
 
-		const infos: unknown[][] = []
-		const prev = Logger.logger()
-		Logger.setLogger({
-			wtf: () => {},
-			error: () => {},
-			warn: () => {},
-			info: (f: string, ...a: unknown[]) => {
-				infos.push([f, ...a])
-			},
-			debug: () => {},
-		})
-		try {
-			expect(await generator.demandPendingMaps(root, table)).toEqual({ loaded: [], missing: ['swap'] })
-			expect(await generator.demandPendingMaps(root, table)).toEqual({ loaded: [], missing: ['swap'] })
-		} finally {
-			Logger.setLogger(prev)
-		}
+		expect(await generator.demandPendingMaps(root, table)).toEqual({ loaded: [], missing: ['swap'] })
+		expect(await generator.demandPendingMaps(root, table)).toEqual({ loaded: [], missing: ['swap'] })
 		expect(calls).toEqual(1)
 		expect(reads).toEqual(1)
-		expect(infos.filter(([f]) => String(f).includes('Pre-loading')).length).toEqual(1)
 	})
 
 	it('re-queues a cooling-down texture once the cooldown lapses', async () => {
@@ -602,7 +586,7 @@ describe('ThreeMapGenerator.demandPendingMaps', () => {
 		}
 	})
 
-	it('skips a cooling-down engine default without re-logging the preload', async () => {
+	it('does not re-attempt a cooling-down engine default', async () => {
 		const table = {
 			getTexture: () => undefined,
 			streamStorage: async (): Promise<Uint8Array> => {
@@ -625,24 +609,8 @@ describe('ThreeMapGenerator.demandPendingMaps', () => {
 		mesh.material.userData.pendingMap = 'Bumper.png'
 		root.add(mesh)
 
-		const infos: unknown[][] = []
-		const prev = Logger.logger()
-		Logger.setLogger({
-			wtf: () => {},
-			error: () => {},
-			warn: () => {},
-			info: (f: string, ...a: unknown[]) => {
-				infos.push([f, ...a])
-			},
-			debug: () => {},
-		})
-		try {
-			expect(await generator.demandPendingMaps(root, table)).toEqual({ loaded: [], missing: ['Bumper.png'] })
-			expect(await generator.demandPendingMaps(root, table)).toEqual({ loaded: [], missing: ['Bumper.png'] })
-		} finally {
-			Logger.setLogger(prev)
-		}
+		expect(await generator.demandPendingMaps(root, table)).toEqual({ loaded: [], missing: ['Bumper.png'] })
+		expect(await generator.demandPendingMaps(root, table)).toEqual({ loaded: [], missing: ['Bumper.png'] })
 		expect(calls).toEqual(1)
-		expect(infos.filter(([f]) => String(f).includes('Pre-loading')).length).toEqual(1)
 	})
 })

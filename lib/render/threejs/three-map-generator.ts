@@ -166,7 +166,7 @@ export class ThreeMapGenerator {
 		}
 		const running = this.inFlight.get(key)
 		if (running) return running
-		if (this.isCoolingDown(texture.getName())) {
+		if (Date.now() - (this.lastFailureAt.get(key) ?? 0) < LOAD_FAILURE_COOLDOWN_MS) {
 			return Promise.resolve(false)
 		}
 		const attempt = this.loadOne(texture, table).finally(() => {
@@ -174,17 +174,6 @@ export class ThreeMapGenerator {
 		})
 		this.inFlight.set(key, attempt)
 		return attempt
-	}
-
-	/**
-	 * True while a failed texture still sits out its retry cooldown
-	 * (LOAD_FAILURE_COOLDOWN_MS). The name is lowercased before lookup,
-	 * matching the keys stored in lastFailureAt. Both loadShared and
-	 * demandPendingMaps consult this so a cooling-down texture reports
-	 * missing without starting a new load.
-	 */
-	private isCoolingDown(name: string): boolean {
-		return Date.now() - (this.lastFailureAt.get(name.toLowerCase()) ?? 0) < LOAD_FAILURE_COOLDOWN_MS
 	}
 
 	/**
@@ -323,13 +312,6 @@ export class ThreeMapGenerator {
 		for (const name of wanted) {
 			const fromTable = table.getTexture(name)
 			if (fromTable) {
-				// Cooling-down retries report missing here, exactly as loadShared would
-				// (false, no new attempt); re-queueing them only repeats the loadTextures
-				// Pre-loading/Loaded summary lines on every demand pass.
-				if (this.isCoolingDown(fromTable.getName())) {
-					missing.push(fromTable.getName())
-					continue
-				}
 				loadable.push(fromTable)
 				continue
 			}
@@ -339,17 +321,8 @@ export class ThreeMapGenerator {
 			const loader = this.textureLoader as unknown as {
 				hasDefaultTexture?: (name: string) => boolean
 			}
-			if (loader?.hasDefaultTexture?.(name) ?? true) {
-				const fallback = Texture.fromFilesystem(name)
-				// Same quiet-skip as the table branch above: a cooling-down
-				// engine default reports missing without re-logging the
-				// loadTextures summaries every demand pass.
-				if (this.isCoolingDown(fallback.getName())) {
-					missing.push(fallback.getName())
-					continue
-				}
-				loadable.push(fallback)
-			} else missing.push(name)
+			if (loader?.hasDefaultTexture?.(name) ?? true) loadable.push(Texture.fromFilesystem(name))
+			else missing.push(name)
 		}
 		await this.loadTextures(loadable, table, (tex, ok) => {
 			if (ok) loaded.push(tex.getName())
