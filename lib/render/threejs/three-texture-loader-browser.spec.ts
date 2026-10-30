@@ -66,6 +66,7 @@ describe('ThreeTextureLoaderBrowser tuning', () => {
 		}
 		const tex = (await loader.loadRawTexture('playfield_opaque', data, w, h)) as any
 		expect(tex.format).toBe(RGBAFormat)
-		expect(tex.image.data.byteLength).toBe(w * h * 4)
+		expect(tex.image.data).toBe(data)
+		expect([data[0], data[1], data[2], data[3]]).toEqual([0, 0, 0, 0xff])
 	})
 })

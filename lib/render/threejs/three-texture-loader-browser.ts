@@ -211,11 +211,8 @@ export class ThreeTextureLoaderBrowser implements ITextureLoader<ThreeTexture> {
 	}
 
 	public async loadRawTexture(name: string, data: Uint8Array, width: number, height: number): Promise<ThreeTexture> {
-		// WebGPU has no 24-bit RGB texture format: three r185 maps RGBFormat
-		// only to packed-float types, so an RGB/UnsignedByte DataTexture warns
-		// every frame ('Unsupported texture type with RGBFormat') and falls
-		// back to a 1x1 default. Keep the RGBA upload even when fully opaque;
-		// sampling is identical (alpha reads 1.0).
+		// WebGPU has no RGB8 texture format, so raw bitmaps always upload
+		// RGBA; with all-1.0 alpha the sample is identical.
 		const tex: any = new DataTexture(data as any, width, height, RGBAFormat)
 		tex.flipY = true
 		tex.colorSpace = SRGBColorSpace

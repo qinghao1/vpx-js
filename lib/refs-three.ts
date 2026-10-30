@@ -1,6 +1,7 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
+export type { PixelFormat, TextureDataType } from 'three'
 export {
 	AdditiveBlending,
 	AnimationClip,
@@ -68,9 +69,3 @@ export {
 	Vector2,
 	Vector3,
 } from 'three'
-
-// Pinned to three's historic RGBFormat value (1022, verified against three 0.185.1):
-// three already dropped the sibling legacy aliases (RGBEFormat, *Encoding) and
-// this export may follow, while the opaque-RGB DataTexture path needs the stable enum.
-export const RGBFormat = 1022
-export type { PixelFormat, TextureDataType } from 'three'
