@@ -17,7 +17,7 @@ This is a maintained **fork of [`vpdb/vpx-js`](https://github.com/vpdb/vpx-js)**
 ## Features
 
 - **VPX parsing** — OLE/BIFF, meshes, materials, textures, and table scripts via `Table.load()` (VPX 10.8.1).
-- **Rendering** — `ThreeRenderApi` → three.js scenes; `TableExporter` → binary GLB with materials/textures/lights.
+- **Rendering** — `ThreeRenderApi` → three.js scenes with materials/textures/lights via `Table.generateTableNode()`.
 - **Physics** — vpinball collision/rigid-body code ported 1:1; `Player` drives a 1 kHz physics + 60 Hz animation loop (including nudge).
 - **Scripting** — VBScript transpiled to JS (EBNF grammar + transformers) and run against per-item APIs.
 - **Emulation** — `wpc-emu` for WPC plus **PinMAME WASM** (libPinMAME 3.7) for SAM/Whitestar/S11/Data East and others via `VpmController`.
@@ -65,19 +65,16 @@ const buf = await fetch('/tables/my_table.vpx').then(r => r.arrayBuffer())
 const table = await Table.load(new BrowserBinaryReader(buf))
 ```
 
-### Export to GLB
+### Render
 
 ```ts
-import { writeFileSync } from 'node:fs'
-import { TableExporter } from 'vpx-js'
+import { ThreeRenderApi } from 'vpx-js'
 
-const glb = await new TableExporter(table).exportGlb({
+const scene = await table.generateTableNode(new ThreeRenderApi(), {
   applyMaterials: true,
 })
-writeFileSync('my_table.glb', glb)
+// `scene` is a three.js Object3D ready to add to your renderer.
 ```
-
-Open the result in [Babylon Sandbox](https://sandbox.babylonjs.com) or [gltf-viewer](https://gltf-viewer.donmccurdy.com).
 
 ### Simulate
 
@@ -98,11 +95,11 @@ table.kickers.BallRelease.getApi().Kick(0, 5)
 - **Modern toolchain** — ESM-only, Node 24, `tsup` + `Biome` + `Vitest`.
 - **Dependencies** — three `^0.185` + `three-mesh-bvh` + `wpc-emu` + `pako`.
 - **Portable I/O** — `Uint8Array`/`DataView` throughout; explicit `refs.node`/`refs.browser` env split.
-- **Rendering rework** — GLB export uses `three/addons/exporters/GLTFExporter`.
+- **Rendering rework** — direct three.js scene graph via `ThreeRenderApi` (no GLB round-trip).
 - **Physics fixes** — VPX 10.8.1 defaults, timer/nudge/collision parity with desktop VPX.
 - **Scripting hardened** — broader VBScript coverage and a proper `with`-proxy sandbox.
 - **New: PinMAME WASM** — `external/pinmame` + `wasm/` build (WASM + mock fallback) for any PinMAME hardware.
-- **Library API** — script extraction, GLB export, and transpiling via `Table.load`, `TableExporter`, `Transpiler`.
+- **Library API** — script extraction, scene generation, and transpiling via `Table.load`, `Table.generateTableNode`, `Transpiler`.
 
 ## Development
 

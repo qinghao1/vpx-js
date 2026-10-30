@@ -12,7 +12,7 @@ ESM TypeScript source for `vpx-js` (Node `>=24`, `ES2024`, `type: module`). Buil
 "./lib/refs.browser.js": "dist/lib/refs.browser.js"
 ```
 
-- `lib/index.ts` — public surface (`VP_VERSION_*`, `Table`, `Player`, `TableExporter`, `ThreeRenderApi`, `Ball`, `OleCompoundDoc`, etc.).
+- `lib/index.ts` — public surface (`VP_VERSION_*`, `Table`, `Player`, `ThreeRenderApi`, `Ball`, `OleCompoundDoc`, etc.).
 - `lib/refs.node.ts` / `lib/refs.browser.ts` — platform-specific surface:
 
 ```ts
@@ -41,7 +41,6 @@ I/O uses `Uint8Array`/`DataView` for both Node and browser.
 import { Mesh, Scene } from 'vpx-js/lib/refs.node.js'
 
 // addons — directly from three
-import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js'
 import { EXRLoader } from 'three/addons/loaders/EXRLoader.js'
 import { HDRLoader } from 'three/addons/loaders/HDRLoader.js'
 ```

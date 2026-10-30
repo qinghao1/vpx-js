@@ -1,26 +1,24 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import type { Mesh } from 'three'
-import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import type { Mesh, Object3D } from 'three'
 import { ThreeHelper } from '../../../test/three.helper'
 import { NodeBinaryReader } from '../../io/binary-reader.node.js'
+import { ThreeRenderApi } from '../../render/threejs/three-render-api.js'
 import { Table } from '../table/table.js'
-import { TableExporter } from '../table/table-exporter.js'
 
 const three = new ThreeHelper()
 
 describe('The VPinball gate generator', () => {
-	let gltf: GLTF
+	let node: Object3D
 
 	before(async () => {
 		const table = await Table.load(new NodeBinaryReader(three.fixturePath('table-gate.vpx')))
-		const exporter = new TableExporter(table)
-		gltf = await three.loadGlb(await exporter.exportGlb())
+		node = await table.generateTableNode(new ThreeRenderApi(), {})
 	})
 
 	it('should generate a long gate mesh', async () => {
-		const gateWireMesh = three.find<Mesh>(gltf, 'gates', 'LongPlate', 'gatewire-LongPlate')
+		const gateWireMesh = three.find<Mesh>(node, 'gates', 'LongPlate', 'gatewire-LongPlate')
 		const gateWireMeshVertices = three.vertices(gateWireMesh)
 		let expectedVertices = [
 			[226.512497, 1415.199951, -1.021],
@@ -88,7 +86,7 @@ describe('The VPinball gate generator', () => {
 		]
 		three.expectVerticesInArray(expectedVertices, gateWireMeshVertices)
 
-		const gateBracketMesh = three.find<Mesh>(gltf, 'gates', 'LongPlate', 'gatebracket-LongPlate')
+		const gateBracketMesh = three.find<Mesh>(node, 'gates', 'LongPlate', 'gatebracket-LongPlate')
 		const gateBracketMeshVertices = three.vertices(gateBracketMesh)
 		expectedVertices = [
 			[229.738998, 1394.106934, -49.808998],
@@ -280,7 +278,7 @@ describe('The VPinball gate generator', () => {
 	})
 
 	it('should generate a plate gate mesh', async () => {
-		const gateWireMesh = three.find<Mesh>(gltf, 'gates', 'Plate', 'gatewire-Plate')
+		const gateWireMesh = three.find<Mesh>(node, 'gates', 'Plate', 'gatewire-Plate')
 		const gateWireMeshVertices = three.vertices(gateWireMesh)
 		let expectedVertices = [
 			[398.805695, 1426.472046, -14.972298],
@@ -356,7 +354,7 @@ describe('The VPinball gate generator', () => {
 		]
 		three.expectVerticesInArray(expectedVertices, gateWireMeshVertices)
 
-		const gateBracketMesh = three.find<Mesh>(gltf, 'gates', 'Plate', 'gatebracket-Plate')
+		const gateBracketMesh = three.find<Mesh>(node, 'gates', 'Plate', 'gatebracket-Plate')
 		const gateBracketMeshVertices = three.vertices(gateBracketMesh)
 		expectedVertices = [
 			[411.893097, 1429.739014, -49.808998],
@@ -548,7 +546,7 @@ describe('The VPinball gate generator', () => {
 	})
 
 	it('should generate a wire rectangle gate mesh', async () => {
-		const gateWireMesh = three.find<Mesh>(gltf, 'gates', 'WireRectangle', 'gatewire-WireRectangle')
+		const gateWireMesh = three.find<Mesh>(node, 'gates', 'WireRectangle', 'gatewire-WireRectangle')
 		const gateWireMeshVertices = three.vertices(gateWireMesh)
 		let expectedVertices = [
 			[550.200012, 1429.356323, -17.063503],
@@ -698,7 +696,7 @@ describe('The VPinball gate generator', () => {
 		]
 		three.expectVerticesInArray(expectedVertices, gateWireMeshVertices)
 
-		const gateBracketMesh = three.find<Mesh>(gltf, 'gates', 'WireRectangle', 'gatebracket-WireRectangle')
+		const gateBracketMesh = three.find<Mesh>(node, 'gates', 'WireRectangle', 'gatebracket-WireRectangle')
 		const gateBracketMeshVertices = three.vertices(gateBracketMesh)
 		expectedVertices = [
 			[565.893127, 1431.739014, -49.808998],
@@ -890,7 +888,7 @@ describe('The VPinball gate generator', () => {
 	})
 
 	it('should generate a wire mesh', async () => {
-		const gateWireMesh = three.find<Mesh>(gltf, 'gates', 'WireW', 'gatewire-WireW')
+		const gateWireMesh = three.find<Mesh>(node, 'gates', 'WireW', 'gatewire-WireW')
 		const gateWireMeshVertices = three.vertices(gateWireMesh)
 		let expectedVertices = [
 			[675.000183, 1467.400391, -50.180401],
@@ -1082,7 +1080,7 @@ describe('The VPinball gate generator', () => {
 		]
 		three.expectVerticesInArray(expectedVertices, gateWireMeshVertices, 4)
 
-		const gateBracketMesh = three.find<Mesh>(gltf, 'gates', 'WireW', 'gatebracket-WireW')
+		const gateBracketMesh = three.find<Mesh>(node, 'gates', 'WireW', 'gatebracket-WireW')
 		const gateBracketMeshVertices = three.vertices(gateBracketMesh)
 		expectedVertices = [
 			[677.739014, 1394.106934, -49.808998],
@@ -1274,16 +1272,16 @@ describe('The VPinball gate generator', () => {
 	})
 
 	it('should not generate an invisible gate', async () => {
-		three.expectNoObject(gltf, 'gates', 'InvisibleGate')
+		three.expectNoObject(node, 'gates', 'InvisibleGate')
 	})
 
 	it('should not generate a bracket mesh if invisible', async () => {
-		three.expectObject(gltf, 'gates', 'NoBracketGate', 'gatewire-NoBracketGate')
-		three.expectNoObject(gltf, 'gates', 'NoBracketGate', 'gatebracket-NoBracketGate')
+		three.expectObject(node, 'gates', 'NoBracketGate', 'gatewire-NoBracketGate')
+		three.expectNoObject(node, 'gates', 'NoBracketGate', 'gatebracket-NoBracketGate')
 	})
 
 	it('should generate a transformed gate', async () => {
-		const gateWireMesh = three.find<Mesh>(gltf, 'gates', 'TransformedGate', 'gatewire-TransformedGate')
+		const gateWireMesh = three.find<Mesh>(node, 'gates', 'TransformedGate', 'gatewire-TransformedGate')
 		const gateWireMeshVertices = three.vertices(gateWireMesh)
 		let expectedVertices = [
 			[583.051514, 788.3974, -52.504211],
@@ -1475,7 +1473,7 @@ describe('The VPinball gate generator', () => {
 		]
 		three.expectVerticesInArray(expectedVertices, gateWireMeshVertices)
 
-		const gateBracketMesh = three.find<Mesh>(gltf, 'gates', 'TransformedGate', 'gatebracket-TransformedGate')
+		const gateBracketMesh = three.find<Mesh>(node, 'gates', 'TransformedGate', 'gatebracket-TransformedGate')
 		const gateBracketMeshVertices = three.vertices(gateBracketMesh)
 		expectedVertices = [
 			[663.930115, 769.635864, -52.083786],
@@ -1667,7 +1665,7 @@ describe('The VPinball gate generator', () => {
 	})
 
 	it('should generate a gate on a surface', async () => {
-		const gateWireMesh = three.find<Mesh>(gltf, 'gates', 'SurfaceGate', 'gatewire-SurfaceGate')
+		const gateWireMesh = three.find<Mesh>(node, 'gates', 'SurfaceGate', 'gatewire-SurfaceGate')
 		const gateWireMeshVertices = three.vertices(gateWireMesh)
 		let expectedVertices = [
 			[407.000214, 347.400391, -100.180397],
@@ -1859,7 +1857,7 @@ describe('The VPinball gate generator', () => {
 		]
 		three.expectVerticesInArray(expectedVertices, gateWireMeshVertices, 4)
 
-		const gateBracketMesh = three.find<Mesh>(gltf, 'gates', 'SurfaceGate', 'gatebracket-SurfaceGate')
+		const gateBracketMesh = three.find<Mesh>(node, 'gates', 'SurfaceGate', 'gatebracket-SurfaceGate')
 		const gateBracketMeshVertices = three.vertices(gateBracketMesh)
 		expectedVertices = [
 			[409.739014, 274.106903, -99.808998],

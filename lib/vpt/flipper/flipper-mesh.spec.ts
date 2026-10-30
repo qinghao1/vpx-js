@@ -1,16 +1,15 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import type { Mesh } from 'three'
-import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import type { Mesh, Object3D } from 'three'
 import { rowClose, rowMul, rowRotateZ, rowTranslate, toRow } from '../../../test/row-matrix.js'
 import { ThreeHelper } from '../../../test/three.helper'
 import { NodeBinaryReader } from '../../io/binary-reader.node.js'
 import { Matrix3D } from '../../math/matrix.js'
 import { Vertex2D } from '../../math/vector.js'
+import { ThreeRenderApi } from '../../render/threejs/three-render-api.js'
 import type { Mesh as VpxMesh } from '../mesh.js'
 import { Table } from '../table/table.js'
-import { TableExporter } from '../table/table-exporter.js'
 import { FlipperData } from './flipper-data.js'
 import { FlipperMesh } from './flipper-mesh.js'
 
@@ -51,16 +50,15 @@ function expectMeshShape(
 }
 
 describe('The VPinball flipper generator', () => {
-	let gltf: GLTF
+	let node: Object3D
 
 	before(async () => {
 		const table = await Table.load(new NodeBinaryReader(three.fixturePath('table-flipper.vpx')))
-		const exporter = new TableExporter(table)
-		gltf = await three.loadGlb(await exporter.exportGlb())
+		node = await table.generateTableNode(new ThreeRenderApi(), {})
 	})
 
 	it('should generate a default flipper mesh', async () => {
-		const flipperBaseMesh = three.find<Mesh>(gltf, 'flippers', 'DefaultFlipper', 'flipperbase-DefaultFlipper')
+		const flipperBaseMesh = three.find<Mesh>(node, 'flippers', 'DefaultFlipper', 'flipperbase-DefaultFlipper')
 		const flipperBaseMeshVertices = three.vertices(flipperBaseMesh)
 		expectMeshShape(flipperBaseMeshVertices, {
 			count: 104,
@@ -78,7 +76,7 @@ describe('The VPinball flipper generator', () => {
 			],
 		})
 
-		const flipperRubberMesh = three.find<Mesh>(gltf, 'flippers', 'DefaultFlipper', 'flipperrubber-DefaultFlipper')
+		const flipperRubberMesh = three.find<Mesh>(node, 'flippers', 'DefaultFlipper', 'flipperrubber-DefaultFlipper')
 		const flipperRubberMeshVertices = three.vertices(flipperRubberMesh)
 		expectMeshShape(flipperRubberMeshVertices, {
 			count: 104,
@@ -98,7 +96,7 @@ describe('The VPinball flipper generator', () => {
 	})
 
 	it('should generate a rotated flipper mesh', async () => {
-		const flipperBaseMesh = three.find<Mesh>(gltf, 'flippers', 'FlipperR', 'flipperbase-FlipperR')
+		const flipperBaseMesh = three.find<Mesh>(node, 'flippers', 'FlipperR', 'flipperbase-FlipperR')
 		const flipperBaseMeshVertices = three.vertices(flipperBaseMesh)
 		expectMeshShape(flipperBaseMeshVertices, {
 			count: 104,
@@ -116,7 +114,7 @@ describe('The VPinball flipper generator', () => {
 			],
 		})
 
-		const flipperRubberMesh = three.find<Mesh>(gltf, 'flippers', 'FlipperR', 'flipperrubber-FlipperR')
+		const flipperRubberMesh = three.find<Mesh>(node, 'flippers', 'FlipperR', 'flipperrubber-FlipperR')
 		const flipperRubberMeshVertices = three.vertices(flipperRubberMesh)
 		expectMeshShape(flipperRubberMeshVertices, {
 			count: 104,
@@ -136,7 +134,7 @@ describe('The VPinball flipper generator', () => {
 	})
 
 	it('should generate a resized flipper mesh', async () => {
-		const flipperBaseMesh = three.find<Mesh>(gltf, 'flippers', 'FatFlipper', 'flipperbase-FatFlipper')
+		const flipperBaseMesh = three.find<Mesh>(node, 'flippers', 'FatFlipper', 'flipperbase-FatFlipper')
 		const flipperBaseMeshVertices = three.vertices(flipperBaseMesh)
 		expectMeshShape(flipperBaseMeshVertices, {
 			count: 104,
@@ -154,7 +152,7 @@ describe('The VPinball flipper generator', () => {
 			],
 		})
 
-		const flipperRubberMesh = three.find<Mesh>(gltf, 'flippers', 'FatFlipper', 'flipperrubber-FatFlipper')
+		const flipperRubberMesh = three.find<Mesh>(node, 'flippers', 'FatFlipper', 'flipperrubber-FatFlipper')
 		const flipperRubberMeshVertices = three.vertices(flipperRubberMesh)
 		expectMeshShape(flipperRubberMeshVertices, {
 			count: 104,
@@ -174,7 +172,7 @@ describe('The VPinball flipper generator', () => {
 	})
 
 	it('should generate a flipper mesh with a thick rubber', async () => {
-		const flipperBaseMesh = three.find<Mesh>(gltf, 'flippers', 'FatRubberFlipper', 'flipperbase-FatRubberFlipper')
+		const flipperBaseMesh = three.find<Mesh>(node, 'flippers', 'FatRubberFlipper', 'flipperbase-FatRubberFlipper')
 		const flipperBaseMeshVertices = three.vertices(flipperBaseMesh)
 		expectMeshShape(flipperBaseMeshVertices, {
 			count: 104,
@@ -193,7 +191,7 @@ describe('The VPinball flipper generator', () => {
 		})
 
 		const flipperRubberMesh = three.find<Mesh>(
-			gltf,
+			node,
 			'flippers',
 			'FatRubberFlipper',
 			'flipperrubber-FatRubberFlipper',
@@ -217,7 +215,7 @@ describe('The VPinball flipper generator', () => {
 	})
 
 	it('should generate a flipper mesh with no rubber', async () => {
-		const flipperBaseMesh = three.find<Mesh>(gltf, 'flippers', 'NoRubberFlipper', 'flipperbase-NoRubberFlipper')
+		const flipperBaseMesh = three.find<Mesh>(node, 'flippers', 'NoRubberFlipper', 'flipperbase-NoRubberFlipper')
 		const flipperBaseMeshVertices = three.vertices(flipperBaseMesh)
 		expectMeshShape(flipperBaseMeshVertices, {
 			count: 104,
@@ -234,15 +232,15 @@ describe('The VPinball flipper generator', () => {
 				[385.180786, 1129.193237, -0.18765],
 			],
 		})
-		three.expectNoObject(gltf, 'flippers', 'NoRubberFlipper', 'flipperrubber-NoRubberFlipper')
+		three.expectNoObject(node, 'flippers', 'NoRubberFlipper', 'flipperrubber-NoRubberFlipper')
 	})
 
 	it('should not generate an invisible flipper', async () => {
-		three.expectNoObject(gltf, 'flippers', 'InvisibleFlipper')
+		three.expectNoObject(node, 'flippers', 'InvisibleFlipper')
 	})
 
 	it('should generate a flipper located on a surface', async () => {
-		const flipperBaseMesh = three.find<Mesh>(gltf, 'flippers', 'SurfaceFlipper', 'flipperbase-SurfaceFlipper')
+		const flipperBaseMesh = three.find<Mesh>(node, 'flippers', 'SurfaceFlipper', 'flipperbase-SurfaceFlipper')
 		const flipperBaseMeshVertices = three.vertices(flipperBaseMesh)
 		expectMeshShape(flipperBaseMeshVertices, {
 			count: 104,
@@ -260,7 +258,7 @@ describe('The VPinball flipper generator', () => {
 			],
 		})
 
-		const flipperRubberMesh = three.find<Mesh>(gltf, 'flippers', 'SurfaceFlipper', 'flipperrubber-SurfaceFlipper')
+		const flipperRubberMesh = three.find<Mesh>(node, 'flippers', 'SurfaceFlipper', 'flipperrubber-SurfaceFlipper')
 		const flipperRubberMeshVertices = three.vertices(flipperRubberMesh)
 		expectMeshShape(flipperRubberMeshVertices, {
 			count: 104,

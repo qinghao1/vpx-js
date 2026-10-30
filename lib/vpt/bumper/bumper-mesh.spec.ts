@@ -1,28 +1,26 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import type { Mesh } from 'three'
-import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import type { Mesh, Object3D } from 'three'
 import { ThreeHelper } from '../../../test/three.helper'
 import { NodeBinaryReader } from '../../io/binary-reader.node.js'
+import { ThreeRenderApi } from '../../render/threejs/three-render-api.js'
 import { Table } from '../table/table.js'
-import { TableExporter } from '../table/table-exporter.js'
 
 const three = new ThreeHelper()
 
 describe('The VPinball bumper generator', () => {
-	let gltf: GLTF
+	let node: Object3D
 
 	before(async () => {
 		const table = await Table.load(new NodeBinaryReader(three.fixturePath('table-bumper.vpx')), {
 			loadInvisibleItems: false,
 		})
-		const exporter = new TableExporter(table)
-		gltf = await three.loadGlb(await exporter.exportGlb())
+		node = await table.generateTableNode(new ThreeRenderApi(), {})
 	})
 
 	it('should generate a scaled and rotated bumper mesh', async () => {
-		const bumperMesh = three.find<Mesh>(gltf, 'bumpers', 'Bumper1', 'bumper-socket-Bumper1')
+		const bumperMesh = three.find<Mesh>(node, 'bumpers', 'Bumper1', 'bumper-socket-Bumper1')
 		const bumperMeshVertices = three.vertices(bumperMesh)
 		const expectedVertices = [
 			[463.157959, 1244.674194, -4.92152],
@@ -512,7 +510,7 @@ describe('The VPinball bumper generator', () => {
 	})
 
 	it('should generate a bumper mesh on a surface', async () => {
-		const bumperMesh = three.find<Mesh>(gltf, 'bumpers', 'Bumper2', 'bumper-socket-Bumper2')
+		const bumperMesh = three.find<Mesh>(node, 'bumpers', 'Bumper2', 'bumper-socket-Bumper2')
 		const bumperMeshVertices = three.vertices(bumperMesh)
 		const expectedVertices = [
 			[445.167603, 873.754761, -54.911709],
@@ -1002,6 +1000,6 @@ describe('The VPinball bumper generator', () => {
 	})
 
 	it('should not generate a bumper with no visible elements', async () => {
-		three.expectNoObject(gltf, 'bumpers', 'Bumper3')
+		three.expectNoObject(node, 'bumpers', 'Bumper3')
 	})
 })

@@ -26,7 +26,7 @@ import { FRect3D } from '../../math/bounds.js'
 import { Vertex3D } from '../../math/vector.js'
 import type { HitObject } from '../../physics/hit-object.js'
 import { HitPlane } from '../../physics/hit-plane.js'
-import type { IRenderApi } from '../../render/irender-api.js'
+import type { IRenderApi, MeshConvertOptions } from '../../render/irender-api.js'
 import { Transpiler } from '../../scripting/transpiler.js'
 import { toLowerCached } from '../../scripting/vbs-api.js'
 import { logger, progress } from '../../util/logger.js'
@@ -61,7 +61,6 @@ import type { Timer } from '../timer/timer.js'
 import type { Trigger } from '../trigger/trigger.js'
 import { TableApi } from './table-api.js'
 import type { TableData } from './table-data.js'
-import type { TableExportOptions } from './table-exporter.js'
 import { TableHitGenerator } from './table-hit-generator.js'
 import { type LoadedTable, resolveLoadOptions, TableLoader } from './table-loader.js'
 import { TableMeshGenerator } from './table-mesh-generator.js'
@@ -528,3 +527,6 @@ export interface TableGenerateGltfOptions {
 	maxTextureSize?: number
 	includeCustomExtensions?: boolean
 }
+
+/** Mesh generation options (generateTableNode/getMeshes). */
+export interface TableExportOptions extends TableGenerateOptions, MeshConvertOptions {}
