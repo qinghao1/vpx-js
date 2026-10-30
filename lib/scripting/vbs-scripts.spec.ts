@@ -31,4 +31,15 @@ describe('bundled VBS system scripts', () => {
 	it('raises VB error 53 for a missing script', () => {
 		expect(() => getTextFile('no-such-file.vbs')).to.throw('53')
 	})
+
+	it('keeps the vendored scripts in sync with upstream', () => {
+		const core = getTextFile('core.vbs')
+		expect(core, 'tracks upstream 3.62').to.contain('VPinMAMEDriverVer = 3.62')
+		expect(core, 'has Capcom flipper-strength support').to.contain('SolOnAboveZero')
+		expect(core, 'held DMD-frame check stays out (IsArray(Uint8Array) is false)').to.not.contain(
+			'Function vpmHasDmdFrame',
+		)
+		expect(core, 'DMD keeps the IsEmpty check').to.contain('If Not IsEmpty(DMDp) Then')
+		expect(getTextFile('sam.vbs'), 'keeps the vpx-js RomMode adaptation').to.contain('RomMode=False')
+	})
 })

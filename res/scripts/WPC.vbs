@@ -96,22 +96,25 @@ Private vpmDips
 Function vpmKeyDown(ByVal keycode)
 	Dim swCopy
 	vpmKeyDown = True ' assume we handle the key
+	Dim stagedFlipperL, stagedFlipperR
+	If keyStagedFlipperL & "" = "" Then stagedFlipperL = -1 Else stagedFlipperL = StagedLeftFlipperKey ' "" disables staged flipper processing
+	If keyStagedFlipperR & "" = "" Then stagedFlipperR = -1 Else stagedFlipperR = StagedRightFlipperKey
 	With Controller
 		Select Case keycode
 			Case LeftFlipperKey
 				.Switch(swLLFlip) = True : vpmKeyDown = False : vpmFlips.FlipL True
-				If keycode = StagedLeftFlipperKey Then ' as vbs will not evaluate the Case StagedLeftFlipperKey then, also handle it here
+				If keycode = stagedFlipperL Then ' as vbs will not evaluate the Case stagedFlipperL then, also handle it here
 					vpmFlips.FlipUL True
 					If vpmFlips.FlipperSolNumber(2) <> 0 Then .Switch(swULFlip) = True
 				End If
 			Case RightFlipperKey
 				.Switch(swLRFlip) = True : vpmKeyDown = False : vpmFlips.FlipR True
-				If keycode = StagedRightFlipperKey Then ' as vbs will not evaluate the Case StagedRightFlipperKey then, also handle it here
+				If keycode = stagedFlipperR Then ' as vbs will not evaluate the Case stagedFlipperR then, also handle it here
 					vpmFlips.FlipUR True
 					If vpmFlips.FlipperSolNumber(3) <> 0 Then .Switch(swURFlip) = True
 				End If
-			Case StagedLeftFlipperKey vpmFlips.FlipUL True : If vpmFlips.FlipperSolNumber(2) <> 0 Then .Switch(swULFlip) = True
-			Case StagedRightFlipperKey vpmFlips.FlipUR True : If vpmFlips.FlipperSolNumber(3) <> 0 Then .Switch(swURFlip) = True
+			Case stagedFlipperL vpmFlips.FlipUL True : If vpmFlips.FlipperSolNumber(2) <> 0 Then .Switch(swULFlip) = True
+			Case stagedFlipperR vpmFlips.FlipUR True : If vpmFlips.FlipperSolNumber(3) <> 0 Then .Switch(swURFlip) = True
 			Case keyInsertCoin1  vpmTimer.AddTimer 750,"vpmTimer.PulseSw swCoin1'" : If Not IsEmpty(Eval("SCoin")) Then Playsound SCoin
 			Case keyInsertCoin2  vpmTimer.AddTimer 750,"vpmTimer.PulseSw swCoin2'" : If Not IsEmpty(Eval("SCoin")) Then Playsound SCoin
 			Case keyInsertCoin3  vpmTimer.AddTimer 750,"vpmTimer.PulseSw swCoin3'" : If Not IsEmpty(Eval("SCoin")) Then Playsound SCoin
@@ -124,7 +127,6 @@ Function vpmKeyDown(ByVal keycode)
 			Case keySlamDoorHit	 swCopy = swSlamTiltX :	   .Switch(swCopy) = True
 			Case keyCoinDoor	 swCopy = swCoinDoorX :	   If toggleKeyCoinDoor Then .Switch(swCopy) = Not .Switch(swCopy) Else .Switch(swCopy) = Not inverseKeyCoinDoor
 			Case keyBangBack	 vpmNudge.DoMechTilt
-			Case keyVPMVolume	 vpmVol
 			Case Else			 vpmKeyDown = False
 		End Select
 	End With
@@ -133,22 +135,25 @@ End Function
 Function vpmKeyUp(ByVal keycode)
 	Dim swCopy
 	vpmKeyUp = True ' assume we handle the key
+	Dim stagedFlipperL, stagedFlipperR
+	If keyStagedFlipperL & "" = "" Then stagedFlipperL = -1 Else stagedFlipperL = StagedLeftFlipperKey ' "" disables staged flipper processing
+	If keyStagedFlipperR & "" = "" Then stagedFlipperR = -1 Else stagedFlipperR = StagedRightFlipperKey
 	With Controller
 		Select Case keycode
 			Case LeftFlipperKey
 				.Switch(swLLFlip) = False : vpmKeyUp = False : vpmFlips.FlipL False
-				If keycode = StagedLeftFlipperKey Then ' as vbs will not evaluate the Case StagedLeftFlipperKey then, also handle it here
+				If keycode = stagedFlipperL Then ' as vbs will not evaluate the Case stagedFlipperL then, also handle it here
 					vpmFlips.FlipUL False
 					If vpmFlips.FlipperSolNumber(2) <> 0 Then .Switch(swULFlip) = False
 				End If
 			Case RightFlipperKey
 				.Switch(swLRFlip) = False : vpmKeyUp = False : vpmFlips.FlipR False
-				If keycode = StagedRightFlipperKey Then ' as vbs will not evaluate the Case StagedRightFlipperKey then, also handle it here
+				If keycode = stagedFlipperR Then ' as vbs will not evaluate the Case stagedFlipperR then, also handle it here
 					vpmFlips.FlipUR False
 					If vpmFlips.FlipperSolNumber(3) <> 0 Then .Switch(swURFlip) = False
 				End If
-			Case StagedLeftFlipperKey vpmFlips.FlipUL False : If vpmFlips.FlipperSolNumber(2) <> 0 Then .Switch(swULFlip) = False
-			Case StagedRightFlipperKey vpmFlips.FlipUR False : If vpmFlips.FlipperSolNumber(3) <> 0 Then .Switch(swURFlip) = False
+			Case stagedFlipperL vpmFlips.FlipUL False : If vpmFlips.FlipperSolNumber(2) <> 0 Then .Switch(swULFlip) = False
+			Case stagedFlipperR vpmFlips.FlipUR False : If vpmFlips.FlipperSolNumber(3) <> 0 Then .Switch(swURFlip) = False
 			Case keyCancel		 swCopy = swCancel :	   .Switch(swCopy) = False
 			Case keyDown		 swCopy = swDown :		   .Switch(swCopy) = False
 			Case keyUp			 swCopy = swUp :		   .Switch(swCopy) = False
@@ -158,7 +163,6 @@ Function vpmKeyUp(ByVal keycode)
 			Case keyCoinDoor	 swCopy = swCoinDoorX :	   If toggleKeyCoinDoor = False Then .Switch(swCopy) = inverseKeyCoinDoor
 			Case keyShowOpts	 .Pause = True : vpmShowOptions : .Pause = False
 			Case keyShowKeys	 .Pause = True : vpmShowHelp : .Pause = False
-			Case keyShowDips	 If IsObject(vpmShowDips) Then .Pause = True : vpmShowDips : .Pause = False
 			Case keyAddBall		 .Pause = True : vpmAddBall	 : .Pause = False
 			Case keyReset		 .Stop : BeginModal : .Run : vpmTimer.Reset : EndModal
 			Case keyFrame		 .LockDisplay = Not .LockDisplay
