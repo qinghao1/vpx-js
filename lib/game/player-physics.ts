@@ -145,14 +145,15 @@ export class PlayerPhysics {
 		this.hitOcTreeDynamic.update()
 		while (dTime > 0) {
 			let hitTime = dTime
-			for (const f of this.flipperMovers) {
-				const t = f.getHitTime()
+			for (let i = 0; i < this.flipperMovers.length; i++) {
+				const t = this.flipperMovers[i]!.getHitTime()
 				if (Number.isFinite(t) && t > 0 && t <= hitTime) hitTime = t
 			}
 			this.recordContacts = true
 			this.contacts.length = 0
 			try {
-				for (const ball of this.balls) {
+				for (let i = 0; i < this.balls.length; i++) {
+					const ball = this.balls[i]!
 					if (ball.state.isFrozen) continue
 					ball.coll.clear()
 					ball.coll.hitTime = hitTime
@@ -179,7 +180,7 @@ export class PlayerPhysics {
 				this.recordContacts = false
 			}
 			if (hitTime > STATICTIME) staticCnts = STATICCNTS
-			for (const m of this.movers) m.updateDisplacements(hitTime)
+			for (let i = 0; i < this.movers.length; i++) this.movers[i]!.updateDisplacements(hitTime)
 			// A throwing collide/contact must not leak pooled contacts: the release
 			// loop below is the only return path to the pool, and the next cycle's
 			// `contacts.length = 0` reset drops entries without releasing them.
@@ -200,7 +201,7 @@ export class PlayerPhysics {
 				// so a ball pressed against another ball or a wall cannot climb off.
 				// Deliberate divergence: traversal direction alternates deterministically
 				// each cycle; upstream picks it randomly per cycle (rand_mt_01).
-				for (const ball of this.balls) ball.hit.contactDeltaV.set(0, 0, 0)
+				for (let i = 0; i < this.balls.length; i++) this.balls[i]!.hit.contactDeltaV.set(0, 0, 0)
 				const lastContact = this.contacts.length - 1
 				for (let pass = 0; pass < 2; pass++) {
 					for (let index = 0; index < this.contacts.length; index++) {
@@ -210,7 +211,7 @@ export class PlayerPhysics {
 					}
 				}
 			} finally {
-				for (const c of this.contacts) CollisionEvent.releaseOne(c)
+				for (let i = 0; i < this.contacts.length; i++) CollisionEvent.releaseOne(this.contacts[i]!)
 				this.contacts.length = 0
 			}
 			dTime = Math.max(0, dTime - hitTime)
@@ -302,7 +303,8 @@ export class PlayerPhysics {
 		try {
 			if (mode === TimerMode.Update) {
 				const cur = this.timeMsec
-				for (const t of this.hitTimers) {
+				for (let i = 0; i < this.hitTimers.length; i++) {
+					const t = this.hitTimers[i]!
 					if (t.interval < 0) continue
 					if (t.nextFire <= cur) {
 						const prev = t.nextFire
@@ -313,7 +315,8 @@ export class PlayerPhysics {
 					}
 				}
 			} else {
-				for (const t of this.hitTimers) {
+				for (let i = 0; i < this.hitTimers.length; i++) {
+					const t = this.hitTimers[i]!
 					if (t.interval !== mode) continue
 					this.safeFire(t)
 				}
@@ -367,7 +370,10 @@ export class PlayerPhysics {
 	}
 
 	private flushTimers(): void {
-		for (const c of this.changedHitTimers) this.upsertTimer(c.timer, c.enabled)
+		for (let i = 0; i < this.changedHitTimers.length; i++) {
+			const c = this.changedHitTimers[i]!
+			this.upsertTimer(c.timer, c.enabled)
+		}
 		this.changedHitTimers.length = 0
 	}
 
@@ -384,7 +390,7 @@ export class PlayerPhysics {
 	}
 
 	public updateVelocities(): void {
-		for (const m of this.movers) m.updateVelocities(this)
+		for (let i = 0; i < this.movers.length; i++) this.movers[i]!.updateVelocities(this)
 	}
 
 	public createBall(ballCreator: IBallCreationPosition, player: Player, radius = DEFAULT_BALL_SIZE, mass = 1): Ball {

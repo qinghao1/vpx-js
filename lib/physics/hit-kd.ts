@@ -87,7 +87,7 @@ export class HitKD {
 	public update(): void {
 		this.dynamicStale = false
 		if (this.numItems <= BRUTE_FORCE_THRESHOLD) {
-			for (const h of this.orgVho) h.calcHitBBox()
+			for (let i = 0; i < this.orgVho.length; i++) this.orgVho[i]!.calcHitBBox()
 			return
 		}
 		this.fillFromVector(this.orgVho)
@@ -102,7 +102,8 @@ export class HitKD {
 			if (this.numItems > BRUTE_FORCE_THRESHOLD) this.fillFromVector(this.orgVho)
 		}
 		if (this.numItems <= BRUTE_FORCE_THRESHOLD) {
-			for (const h of this.orgVho) {
+			for (let i = 0; i < this.orgVho.length; i++) {
+				const h = this.orgVho[i]!
 				if (h === ball.hit || !h.isEnabled) continue
 				if (!h.hitBBox.intersectRect(ball.hit.hitBBox)) continue
 				if (!h.hitBBox.intersectSphere(ball.state.pos, ball.hit.rcHitRadiusSqr)) continue
