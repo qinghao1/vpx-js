@@ -8,9 +8,11 @@ function setClass(el, v) {
 }
 
 // renderStats runs 2x/s on the live HUD: rebuild the subtree once per
-// container, then only touch textContent/className when values change so a
-// steady HUD costs no createElement, no container wipe, no subtree restyle.
+// container, then only touch textContent/className when values change, so
+// steady values cost no createElement, no container wipe, no restyle.
 const statsCache = new WeakMap()
+
+const STAT_KEYS = ['Draws', 'Tris', 'Balls', 'Time', 'Emu', 'WASM']
 
 function buildStats() {
 	const head = document.createElement('div')
@@ -32,11 +34,12 @@ function buildStats() {
 	const grid = document.createElement('div')
 	grid.className = 'stats-grid'
 	const values = []
-	for (let i = 0; i < 6; i++) {
+	for (let i = 0; i < STAT_KEYS.length; i++) {
 		const item = document.createElement('div')
 		item.className = 'stats-item'
 		const kEl = document.createElement('span')
 		kEl.className = 'k'
+		kEl.textContent = STAT_KEYS[i]
 		const vEl = document.createElement('span')
 		item.append(kEl, vEl)
 		grid.append(item)
@@ -52,7 +55,7 @@ export function renderStats(container, data) {
 	const modeLabel = mode === 'PLAY PAUSED' ? 'PAUSED' : mode
 	const fpsCls = fps >= 55 ? 'fps--good' : fps >= 30 ? 'fps--mid' : fps > 0 ? 'fps--low' : ''
 	let c = statsCache.get(container)
-	if (!c) {
+	if (!c?.head.isConnected) {
 		c = buildStats()
 		container.textContent = ''
 		container.append(c.head, c.grid)
@@ -62,19 +65,18 @@ export function renderStats(container, data) {
 	setText(c.badge, modeLabel)
 	setText(c.backend, backend)
 	setClass(c.fps, `fps ${fpsCls}`.trim())
-	if (c.fpsText.nodeValue !== `${fps} fps`) c.fpsText.nodeValue = `${fps} fps`
+	setText(c.fpsText, `${fps} fps`)
 	const rows = [
-		['Draws', String(draws), false],
-		['Tris', trisFmt, false],
-		['Balls', String(balls), false],
-		['Time', tFmt, !tHasValue],
-		['Emu', emuLabel, emuRaw === '—'],
-		['WASM', wasmLabel, !wasmReady],
+		[String(draws), false],
+		[trisFmt, false],
+		[String(balls), false],
+		[tFmt, !tHasValue],
+		[emuLabel, emuRaw === '—'],
+		[wasmLabel, !wasmReady],
 	]
 	for (let i = 0; i < rows.length; i++) {
-		const [k, v, muted] = rows[i]
-		const { kEl, vEl } = c.values[i]
-		setText(kEl, k)
+		const [v, muted] = rows[i]
+		const { vEl } = c.values[i]
 		setText(vEl, v)
 		setClass(vEl, muted ? 'v v--muted' : 'v')
 	}

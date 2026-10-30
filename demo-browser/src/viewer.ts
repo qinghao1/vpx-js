@@ -2275,13 +2275,12 @@ export class Viewer {
 			// The hash dedup in DmdRenderer.updateFrame still suppresses
 			// presents for unchanged frames.
 			let dmdDirty = false
-			const gameMs = this.player?.getGameTime?.() ?? -1
-			if (gameMs >= 0) {
-				if (lastDmdGame < 0 || gameMs < lastDmdGame) lastDmdGame = gameMs - 32
-				if (gameMs - lastDmdGame >= 32) {
-					lastDmdGame = gameMs
-					dmdDirty = this._pollPinmame()
-				}
+			// Without a game clock the rAF timestamp fills in so polling still runs.
+			const gameMs = this.player?.getGameTime?.() ?? timestamp
+			if (lastDmdGame < 0 || gameMs < lastDmdGame) lastDmdGame = gameMs - 32
+			if (gameMs - lastDmdGame >= 32) {
+				lastDmdGame = gameMs
+				dmdDirty = this._pollPinmame()
 			}
 			const forcePresent = this._needsRender
 			this._needsRender = false
