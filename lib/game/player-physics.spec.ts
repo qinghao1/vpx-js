@@ -3,7 +3,10 @@
 import { expect } from 'chai'
 import * as sinon from 'sinon'
 import { TableBuilder } from '../../test/table-builder.js'
+import { ThreeHelper } from '../../test/three.helper.js'
+import { NodeBinaryReader } from '../io/binary-reader.node.js'
 import type { FlipperMover } from '../vpt/flipper/flipper-mover.js'
+import { Table } from '../vpt/table/table.js'
 import { Player } from './player.js'
 
 describe('PlayerPhysics flipper hit-time boundary', () => {
@@ -40,5 +43,26 @@ describe('PlayerPhysics flipper hit-time boundary', () => {
 			displacements.restore()
 			hitTime.restore()
 		}
+	})
+
+	it('should fire staggered update timers on the same ticks when idle substeps skip the timer scan', async () => {
+		const three = new ThreeHelper()
+		const table = await Table.load(new NodeBinaryReader(three.fixturePath('table-timer.vpx')))
+		const player = new Player(table).init()
+		const timer = table.timers.Timer1.getApi()
+		timer.Enabled = true
+		timer.Interval = 30
+		const fires: number[] = []
+		timer.on('Timer', () => fires.push(player.getGameTime()))
+		expect(player.updatePhysics(100)).to.equal(100)
+		expect(fires).to.deep.equal([30, 60, 90])
+		timer.Enabled = false
+		player.updatePhysics(150)
+		timer.Enabled = true
+		timer.Interval = 20
+		const rearmed: number[] = []
+		timer.on('Timer', () => rearmed.push(player.getGameTime()))
+		player.updatePhysics(200)
+		expect(rearmed).to.deep.equal([170, 190])
 	})
 })

@@ -4,11 +4,14 @@
 import { type Vertex2D, Vertex3D } from '../math/vector.js'
 import { CollisionEvent } from '../physics/collision-event.js'
 import {
+	C_CONTACTVEL,
+	C_LOWNORMVEL,
 	DEFAULT_BALL_SIZE,
 	DEFAULT_STEPTIME,
 	DEFAULT_TABLE_GRAVITY,
 	DEFAULT_TABLE_MAX_SLOPE,
 	DEFAULT_TABLE_MIN_SLOPE,
+	PHYS_TOUCH,
 	PHYSICS_STEPTIME,
 	STATICCNTS,
 	STATICTIME,
@@ -79,6 +82,10 @@ export class PlayerPhysics {
 	private hitOcTreeDynamic = new HitKD()
 	private hitOcTree = new HitQuadtree()
 	private hitTimers: TimerHit[] = []
+	// Lower bound over Update-eligible nextFire; undefined means unknown. Reset per
+	// updatePhysics call (script Timer.Interval writes bypass timerStateChange) and
+	// cleared on local timer mutations.
+	private nextUpdateMin: number | undefined
 	private lastTimeUsec = 0
 	private lastFrameDuration = 0
 	private cFrames = 0
@@ -139,6 +146,23 @@ export class PlayerPhysics {
 		this.hitOcTreeDynamic.fillFromVector(this.hitObjectsDynamic, true)
 	}
 
+	// Claim-free reject for the two unconditional static-plane tests: every early-out
+	// below matches a `return -1` in HitPlane.hitTest, so skipping doHitTest changes
+	// nothing but a pooled claim/release.
+	private isPlaneGuaranteedMiss(plane: HitPlane, ball: Ball): boolean {
+		if (!plane.isEnabled) return true
+		const normal = plane.normal
+		const vel = ball.hit.vel
+		const bnv = normal.x * vel.x + normal.y * vel.y + normal.z * vel.z
+		if (bnv > C_CONTACTVEL) return true
+		const pos = ball.state.pos
+		const radius = ball.data.radius
+		const bnd = normal.x * pos.x + normal.y * pos.y + normal.z * pos.z - radius - plane.d
+		if (bnd < radius * -2) return true
+		if (bnd <= PHYS_TOUCH) return false
+		return Math.abs(bnv) <= C_LOWNORMVEL
+	}
+
 	public physicsSimulateCycle(dTime: number): void {
 		if (!this.hitPlayfield || !this.hitTopGlass) return
 		let staticCnts = STATICCNTS
@@ -157,8 +181,12 @@ export class PlayerPhysics {
 					if (ball.state.isFrozen) continue
 					ball.coll.clear()
 					ball.coll.hitTime = hitTime
-					this.hitPlayfield.doHitTest(ball, ball.coll, this)
-					this.hitTopGlass.doHitTest(ball, ball.coll, this)
+					// Static planes are tested unconditionally per ball per iteration; skip the
+					// pooled claim/release on guaranteed misses (exact mirror of HitPlane.hitTest).
+					if (!this.isPlaneGuaranteedMiss(this.hitPlayfield, ball))
+						this.hitPlayfield.doHitTest(ball, ball.coll, this)
+					if (!this.isPlaneGuaranteedMiss(this.hitTopGlass, ball))
+						this.hitTopGlass.doHitTest(ball, ball.coll, this)
 					if (this.swapBallCollisionHandling) {
 						this.hitOcTreeDynamic.hitTestBall(ball, ball.coll, this)
 						this.hitOcTree.hitTestBall(ball, ball.coll, this)
@@ -245,6 +273,13 @@ export class PlayerPhysics {
 		}
 		this.advanceFrameClock(initial)
 		this.scriptPeriod = 0
+		// Input is synchronous: the queue cannot refill mid-loop, so drain it once per
+		// call instead of once per 1 ms substep. Gated on the loop running at all so
+		// queued keys still wait while paused, exactly as before.
+		if (this.nextPhysicsFrameTime <= initial) this.pinInput.processKeys()
+		// Timer.Interval writes bypass timerStateChange, so re-derive the fireTimers
+		// skip bound every call and between-call script writes are never stale.
+		this.nextUpdateMin = undefined
 		let iterations = 0
 		// Divergence: upstream loops while `next < initial` (stays a step behind
 		// the wall clock); the port uses `<=` so explicit-ms callers advance
@@ -260,14 +295,17 @@ export class PlayerPhysics {
 			this.timeMsec = Math.floor((this.curPhysicsFrameTime - this.startTimeUsec) / 1000)
 			iterations++
 			const dt = (this.nextPhysicsFrameTime - this.curPhysicsFrameTime) * (1 / DEFAULT_STEPTIME)
-			const t0 = performance.now()
-			this.pinInput.processKeys()
-			this.pinInput.tickNudge()
 			const oldBall = this.activeBall
 			this.activeBall = undefined
 			// Upstream MAX_TIMERS_MSEC_OVERALL anti-spiral guard, wall-clock only:
 			// explicit-time callers always fire so headless sims stay deterministic.
-			if (time !== undefined || this.scriptPeriod <= 1000 * MAX_TIMERS_MSEC_OVERALL) {
+			// The clock reads are gated on having timers at all: with none,
+			// fireTimers is a no-op and the pair is pure overhead.
+			if (
+				this.hitTimers.length > 0 &&
+				(time !== undefined || this.scriptPeriod <= 1000 * MAX_TIMERS_MSEC_OVERALL)
+			) {
+				const t0 = performance.now()
 				this.fireTimers(TimerMode.Update)
 				this.scriptPeriod += Math.floor(performance.now() - t0)
 			}
@@ -283,6 +321,10 @@ export class PlayerPhysics {
 			this.curPhysicsFrameTime = this.nextPhysicsFrameTime
 			this.nextPhysicsFrameTime += PHYSICS_STEPTIME
 		}
+		// Nudge dynamics advance 1 ms per substep; batch them after the loop so the
+		// total stays exact without per-substep polling. Stepping once per call
+		// instead would stretch each 25 ms impulse over ~25 frames.
+		for (let n = 0; n < iterations; n++) this.pinInput.tickNudge()
 		if (this.emu && this.emuAccumMs > 0) this.flushEmu(this.emu)
 		this.timeMsec = Math.floor((initial - this.startTimeUsec) / 1000)
 		// One call is one headless frame: -1 fires per call (even paused/repeated),
@@ -303,16 +345,26 @@ export class PlayerPhysics {
 		try {
 			if (mode === TimerMode.Update) {
 				const cur = this.timeMsec
-				for (let i = 0; i < this.hitTimers.length; i++) {
-					const t = this.hitTimers[i]!
-					if (t.interval < 0) continue
-					if (t.nextFire <= cur) {
-						const prev = t.nextFire
-						this.safeFire(t)
-						if (prev === t.nextFire && t.interval > 0) {
-							while (t.nextFire <= cur) t.nextFire += t.interval
+				// No Update timer can be due while the bound sits ahead of the clock.
+				if (this.nextUpdateMin === undefined || this.nextUpdateMin <= cur) {
+					let min = Infinity
+					let fired = false
+					for (let i = 0; i < this.hitTimers.length; i++) {
+						const t = this.hitTimers[i]
+						if (t.interval < 0) continue
+						if (t.nextFire <= cur) {
+							const prev = t.nextFire
+							this.safeFire(t)
+							fired = true
+							if (prev === t.nextFire && t.interval > 0) {
+								while (t.nextFire <= cur) t.nextFire += t.interval
+							}
 						}
+						if (t.nextFire < min) min = t.nextFire
 					}
+					// A fired handler may reprogram timers (or queue state changes),
+					// so only a fire-free scan yields an exact bound; otherwise rescan.
+					this.nextUpdateMin = fired ? undefined : min
 				}
 			} else {
 				for (let i = 0; i < this.hitTimers.length; i++) {
@@ -332,6 +384,7 @@ export class PlayerPhysics {
 	}
 
 	public timerStateChange(timer: TimerHit, enabled: boolean): void {
+		this.nextUpdateMin = undefined
 		if (this.deferTimerChanges) {
 			if (enabled) timer.nextFire = this.timeMsec + timer.interval
 			else timer.nextFire = TIMER_DISABLED
@@ -348,6 +401,7 @@ export class PlayerPhysics {
 	}
 
 	private upsertTimer(timer: TimerHit, enabled: boolean): void {
+		this.nextUpdateMin = undefined
 		const idx = this.hitTimers.indexOf(timer)
 		if (enabled) {
 			if (idx < 0) this.hitTimers.push(timer)
