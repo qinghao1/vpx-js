@@ -166,7 +166,7 @@ export class ThreeMapGenerator {
 		}
 		const running = this.inFlight.get(key)
 		if (running) return running
-		if (Date.now() - (this.lastFailureAt.get(key) ?? 0) < LOAD_FAILURE_COOLDOWN_MS) {
+		if (this.isCoolingDown(texture.getName())) {
 			return Promise.resolve(false)
 		}
 		const attempt = this.loadOne(texture, table).finally(() => {
@@ -174,6 +174,16 @@ export class ThreeMapGenerator {
 		})
 		this.inFlight.set(key, attempt)
 		return attempt
+	}
+
+	/**
+	 * True while a failed texture still sits out its retry cooldown
+	 * (LOAD_FAILURE_COOLDOWN_MS; keys are lowercased like lastFailureAt).
+	 * Both loadShared and demandPendingMaps consult this so a cooling-down
+	 * texture reports missing without starting a new load.
+	 */
+	private isCoolingDown(name: string): boolean {
+		return Date.now() - (this.lastFailureAt.get(name.toLowerCase()) ?? 0) < LOAD_FAILURE_COOLDOWN_MS
 	}
 
 	/**
@@ -286,6 +296,8 @@ export class ThreeMapGenerator {
 	 * caller must resolve + rebind afterwards (`resolvePendingTextures`).
 	 * Returns loaded names and names that cannot load (unknown texture or
 	 * cleared/failed source); the caller should warn on the latter.
+	 * Textures inside the failure cooldown also report missing here and are
+	 * retried on a later pass.
 	 */
 	public async demandPendingMaps(root: Group, table: Table): Promise<{ loaded: string[]; missing: string[] }> {
 		const wanted = new Set<string>()
@@ -307,6 +319,13 @@ export class ThreeMapGenerator {
 		for (const name of wanted) {
 			const fromTable = table.getTexture(name)
 			if (fromTable) {
+				// Cooling-down retries report missing here, exactly as loadShared would
+				// (false, no new attempt); re-queueing them only repeats the loadTextures
+				// Pre-loading/Loaded summary lines on every demand pass.
+				if (this.isCoolingDown(fromTable.getName())) {
+					missing.push(fromTable.getName())
+					continue
+				}
 				loadable.push(fromTable)
 				continue
 			}

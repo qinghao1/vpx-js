@@ -1,4 +1,4 @@
-import { Texture } from 'three'
+import { BoxGeometry, Group, Mesh, MeshBasicMaterial, Texture } from 'three'
 import { describe, expect, it, vi } from 'vitest'
 import { TableBuilder } from '../../../test/table-builder.js'
 import { Logger } from '../../util/logger.js'
@@ -484,5 +484,120 @@ describe('ThreeMapGenerator.loadShared', () => {
 			['clearedtex', true],
 			['clearedtex', true],
 		])
+	})
+})
+
+describe('ThreeMapGenerator.demandPendingMaps', () => {
+	it('skips cooling-down textures without re-reading the archive', async () => {
+		const tex = new (VptTexture as any)()
+		tex.storageName = 'Image70'
+		tex.szName = 'Swap'
+		tex.szPath = 'swap.png'
+		tex.isOpaque = true
+		tex.binary = { pos: 0, len: 8 }
+		let reads = 0
+		const table = {
+			getTexture: (name: string) => (name.toLowerCase() === 'swap' ? tex : undefined),
+			streamStorage: async (_name: string, next: (storage: unknown) => Promise<Uint8Array>) => {
+				reads++
+				return next({
+					read: async () => new Uint8Array(8),
+				})
+			},
+		} as any
+		let calls = 0
+		const loader = {
+			loadTexture: async () => {
+				calls++
+				throw new Error('decode boom')
+			},
+			loadRawTexture: async () => new Texture(),
+			loadDefaultTexture: async () => new Texture(),
+		}
+		const generator = new ThreeMapGenerator(loader as any)
+		const root = new Group()
+		const mesh = new Mesh(new BoxGeometry(), new MeshBasicMaterial())
+		mesh.material.userData.pendingMap = 'Swap'
+		root.add(mesh)
+
+		const infos: unknown[][] = []
+		const prev = Logger.logger()
+		Logger.setLogger({
+			wtf: () => {},
+			error: () => {},
+			warn: () => {},
+			info: (f: string, ...a: unknown[]) => {
+				infos.push([f, ...a])
+			},
+			debug: () => {},
+		})
+		try {
+			expect(await generator.demandPendingMaps(root, table)).toEqual({ loaded: [], missing: ['swap'] })
+			expect(await generator.demandPendingMaps(root, table)).toEqual({ loaded: [], missing: ['swap'] })
+		} finally {
+			Logger.setLogger(prev)
+		}
+		expect(calls).toEqual(1)
+		expect(reads).toEqual(1)
+		expect(infos.filter(([f]) => String(f).includes('Pre-loading')).length).toEqual(1)
+	})
+
+	it('re-queues a cooling-down texture once the cooldown lapses', async () => {
+		const start = Date.now()
+		const now = vi.spyOn(Date, 'now').mockReturnValue(start)
+		try {
+			const tex = new (VptTexture as any)()
+			tex.storageName = 'Image70'
+			tex.szName = 'Swap'
+			tex.szPath = 'swap.png'
+			tex.isOpaque = true
+			tex.binary = { pos: 0, len: 8 }
+			let reads = 0
+			const table = {
+				getTexture: (name: string) => (name.toLowerCase() === 'swap' ? tex : undefined),
+				streamStorage: async (_name: string, next: (storage: unknown) => Promise<Uint8Array>) => {
+					reads++
+					return next({
+						read: async () => new Uint8Array(8),
+					})
+				},
+			} as any
+			let calls = 0
+			const loader = {
+				loadTexture: async () => {
+					calls++
+					throw new Error('decode boom')
+				},
+				loadRawTexture: async () => new Texture(),
+				loadDefaultTexture: async () => new Texture(),
+			}
+			const generator = new ThreeMapGenerator(loader as any)
+			const root = new Group()
+			const mesh = new Mesh(new BoxGeometry(), new MeshBasicMaterial())
+			mesh.material.userData.pendingMap = 'Swap'
+			root.add(mesh)
+
+			const prev = Logger.logger()
+			Logger.setLogger({
+				wtf: () => {},
+				error: () => {},
+				warn: () => {},
+				info: () => {},
+				debug: () => {},
+			})
+			try {
+				expect(await generator.demandPendingMaps(root, table)).toEqual({ loaded: [], missing: ['swap'] })
+				expect(await generator.demandPendingMaps(root, table)).toEqual({ loaded: [], missing: ['swap'] })
+				expect(calls).toEqual(1)
+				now.mockReturnValue(start + 30001)
+				expect(await generator.demandPendingMaps(root, table)).toEqual({ loaded: [], missing: ['swap'] })
+			} finally {
+				Logger.setLogger(prev)
+			}
+			expect(calls).toEqual(2)
+			expect(reads).toEqual(2)
+		} finally {
+			now.mockRestore()
+		}
 	})
 })
