@@ -46,19 +46,23 @@ export class ThreeMapGenerator {
 		this.setPlayfieldHint(table)
 
 		const concurrency = this.pickConcurrency()
-		await this.loadConcurrently(textures, table, concurrency, onTexture)
+		let loaded = 0
+		await this.loadConcurrently(textures, table, concurrency, (tex, ok) => {
+			if (ok) loaded++
+			onTexture?.(tex, ok)
+		})
 
 		logger().info(
 			'[ThreeMapGenerator.loadTextures] Loaded %s/%s textures in %sms (concurrency %s).',
-			this.textureCache.size,
+			loaded,
 			textures.length,
 			Date.now() - started,
 			concurrency,
 		)
-		if (this.textureCache.size < textures.length) {
+		if (loaded < textures.length) {
 			logger().warn(
 				'[ThreeMapGenerator.loadTextures] %s textures failed to load (check harness log for details)',
-				textures.length - this.textureCache.size,
+				textures.length - loaded,
 			)
 		}
 	}

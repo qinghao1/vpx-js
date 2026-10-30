@@ -1,6 +1,7 @@
 import { Texture } from 'three'
 import { describe, expect, it, vi } from 'vitest'
 import { TableBuilder } from '../../../test/table-builder.js'
+import { Logger } from '../../util/logger.js'
 import { Texture as VptTexture } from '../../vpt/texture.js'
 import { ThreeMapGenerator } from './three-map-generator.js'
 
@@ -139,6 +140,47 @@ describe('ThreeMapGenerator.loadTextures', () => {
 		)
 
 		expect(started).toEqual(['VLM.Nestmap0', 'WallA.png', 'WallB.png', 'WallC.png'])
+	})
+
+	it('reports per-call totals, not cumulative cache size', async () => {
+		const table = new TableBuilder().build()
+		const generator = new ThreeMapGenerator(stubLoader() as any)
+		const infos: Array<{ f: string; a: unknown[] }> = []
+		const prev = Logger.logger()
+		Logger.setLogger({
+			wtf: () => {},
+			error: () => {},
+			warn: () => {},
+			debug: () => {},
+			info: (f: string, ...a: unknown[]) => {
+				infos.push({ f, a })
+			},
+		})
+		try {
+			const outcomes: Array<[string, boolean]> = []
+			const onTexture = (tex: { getName(): string }, ok: boolean) => {
+				outcomes.push([tex.getName(), ok])
+			}
+			await generator.loadTextures(
+				[VptTexture.fromFilesystem('A.png'), VptTexture.fromFilesystem('B.png')],
+				table,
+				onTexture,
+			)
+			await generator.loadTextures([VptTexture.fromFilesystem('C.png')], table, onTexture)
+
+			const loadedLogs = infos.filter(e => e.f.includes('Loaded'))
+			expect(loadedLogs.map(e => [e.a[0], e.a[1]])).toEqual([
+				[2, 2],
+				[1, 1],
+			])
+			expect(outcomes.sort()).toEqual([
+				['A.png', true],
+				['B.png', true],
+				['C.png', true],
+			])
+		} finally {
+			Logger.setLogger(prev)
+		}
 	})
 })
 
