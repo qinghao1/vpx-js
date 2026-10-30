@@ -29,7 +29,12 @@ import { BallHit } from '../vpt/ball/ball-hit.js'
 import { BallState } from '../vpt/ball/ball-state.js'
 import type { FlipperMover } from '../vpt/flipper/flipper-mover.js'
 import type { Table } from '../vpt/table/table.js'
-import { MAX_TIMERS_MSEC_OVERALL, TIMER_DISABLED, TimerMode } from '../vpt/timer/timer-const.js'
+import {
+	MAX_TIMER_MSEC_INTERVAL,
+	MAX_TIMERS_MSEC_OVERALL,
+	TIMER_DISABLED,
+	TimerMode,
+} from '../vpt/timer/timer-const.js'
 import type { TimerHit } from '../vpt/timer/timer-hit.js'
 import { TimerOnOff } from '../vpt/timer/timer-on-off.js'
 import { Event } from './event.js'
@@ -80,13 +85,6 @@ export class PlayerPhysics {
 	private hitOcTreeDynamic = new HitKD()
 	private hitOcTree = new HitQuadtree()
 	private hitTimers: TimerHit[] = []
-	// Lower bound over Update-eligible nextFire; undefined means unknown. Valid
-	// only while nextUpdateMinEpoch matches timerEpoch: every nextFire/interval
-	// writer bumps the epoch, so a Timer.Interval write after the timer scan
-	// (e.g. from a Hit handler in the collide phase) retires a stale bound.
-	private nextUpdateMin: number | undefined
-	private nextUpdateMinEpoch = 0
-	private timerEpoch = 0
 	private lastTimeUsec = 0
 	private lastFrameDuration = 0
 	private cFrames = 0
@@ -278,9 +276,6 @@ export class PlayerPhysics {
 		// call instead of once per 1 ms substep. Gated on the loop running at all so
 		// queued keys still wait while paused, exactly as before.
 		if (this.nextPhysicsFrameTime <= initial) this.pinInput.processKeys()
-		// Between-call script writes land here while no bound is cached, so a
-		// per-call reset keeps them from ever going stale.
-		this.nextUpdateMin = undefined
 		let iterations = 0
 		// Divergence: upstream loops while `next < initial` (stays a step behind
 		// the wall clock); the port uses `<=` so explicit-ms callers advance
@@ -347,31 +342,16 @@ export class PlayerPhysics {
 		try {
 			if (mode === TimerMode.Update) {
 				const cur = this.timeMsec
-				// No Update timer can be due while a current bound sits ahead of the clock.
-				if (
-					this.nextUpdateMin === undefined ||
-					this.nextUpdateMinEpoch !== this.timerEpoch ||
-					this.nextUpdateMin <= cur
-				) {
-					let min = Infinity
-					let fired = false
-					for (let i = 0; i < this.hitTimers.length; i++) {
-						const t = this.hitTimers[i]
-						if (t.interval < 0) continue
-						if (t.nextFire <= cur) {
-							const prev = t.nextFire
-							this.safeFire(t)
-							fired = true
-							if (prev === t.nextFire && t.interval > 0) {
-								while (t.nextFire <= cur) t.nextFire += t.interval
-							}
+				for (let i = 0; i < this.hitTimers.length; i++) {
+					const t = this.hitTimers[i]
+					if (t.interval < 0) continue
+					if (t.nextFire <= cur) {
+						const prev = t.nextFire
+						this.safeFire(t)
+						if (prev === t.nextFire && t.interval > 0) {
+							while (t.nextFire <= cur) t.nextFire += t.interval
 						}
-						if (t.nextFire < min) min = t.nextFire
 					}
-					// A fired handler may reprogram timers (or queue state changes),
-					// so only a fire-free scan yields an exact bound; otherwise rescan.
-					this.nextUpdateMin = fired ? undefined : min
-					this.nextUpdateMinEpoch = this.timerEpoch
 				}
 			} else {
 				for (let i = 0; i < this.hitTimers.length; i++) {
@@ -390,19 +370,15 @@ export class PlayerPhysics {
 		t.pfe.fireGroupEvent(Event.TimerEventsTimer)
 	}
 
-	/** Reprograms a live Update timer; the epoch bump retires any cached skip bound. */
+	/** Single choke point for live interval writes: clamps, then reprograms. */
 	public reprogramTimer(timer: TimerHit, interval: number): void {
-		timer.interval = interval
-		timer.nextFire = this.timeMsec + interval
-		this.touchTimers()
-	}
-
-	private touchTimers(): void {
-		this.timerEpoch++
+		const clamped =
+			interval >= 0 ? Math.max(interval, MAX_TIMER_MSEC_INTERVAL) : Math.max(TimerMode.OnGameSync, interval)
+		timer.interval = clamped
+		timer.nextFire = this.timeMsec + clamped
 	}
 
 	public timerStateChange(timer: TimerHit, enabled: boolean): void {
-		this.touchTimers()
 		if (this.deferTimerChanges) {
 			if (enabled) timer.nextFire = this.timeMsec + timer.interval
 			else timer.nextFire = TIMER_DISABLED
@@ -419,7 +395,6 @@ export class PlayerPhysics {
 	}
 
 	private upsertTimer(timer: TimerHit, enabled: boolean): void {
-		this.touchTimers()
 		const idx = this.hitTimers.indexOf(timer)
 		if (enabled) {
 			if (idx < 0) this.hitTimers.push(timer)

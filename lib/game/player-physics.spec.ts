@@ -45,7 +45,7 @@ describe('PlayerPhysics flipper hit-time boundary', () => {
 		}
 	})
 
-	it('should fire on time when a mid-loop Interval write precedes the skip bound', async () => {
+	it('should fire on time when a mid-loop Interval write shortens the timer', async () => {
 		const three = new ThreeHelper()
 		const table = await Table.load(new NodeBinaryReader(three.fixturePath('table-timer.vpx')))
 		const player = new Player(table).init()
@@ -56,7 +56,7 @@ describe('PlayerPhysics flipper hit-time boundary', () => {
 		timer.on('Timer', () => fires.push(player.getGameTime()))
 
 		// Mimics a Hit handler: the collide phase runs after the timer scan in
-		// the same substep, so reprogramming here must retire the cached bound.
+		// the same substep, so a reprogram here must take effect on the next substep.
 		const physics = player.getPhysics()
 		const orig = physics.updateVelocities.bind(physics)
 		let reprogrammed = false
@@ -72,8 +72,7 @@ describe('PlayerPhysics flipper hit-time boundary', () => {
 		} finally {
 			stub.restore()
 		}
-		// Reprogrammed at game time 0 to a 5 ms interval: without the epoch
-		// invalidation the t=100 bound skips every scan and nothing fires.
+		// Reprogrammed at game time 0 to a 5 ms interval.
 		expect(fires.slice(0, 3)).to.deep.equal([5, 10, 15])
 	})
 
@@ -100,7 +99,7 @@ describe('PlayerPhysics flipper hit-time boundary', () => {
 		expect(new Set(seen).size).to.be.above(1)
 	})
 
-	it('should fire staggered update timers on the same ticks when idle substeps skip the timer scan', async () => {
+	it('should fire staggered update timers on the same ticks', async () => {
 		const three = new ThreeHelper()
 		const table = await Table.load(new NodeBinaryReader(three.fixturePath('table-timer.vpx')))
 		const player = new Player(table).init()
