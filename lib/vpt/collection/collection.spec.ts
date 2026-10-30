@@ -142,6 +142,9 @@ describe('The VPinball collection', () => {
 		const scope: Record<string, unknown> = {}
 		new Transpiler(table, player).execute('SuppressEvents(0).Name = "renamed"\n', scope, 'global')
 		expect(table.timers.SuppressEventsTimer1.getApi().Name).to.equal('renamed')
+		expect(() => new Transpiler(table, player).execute('x = SuppressEvents(99)\n', scope, 'global')).to.throw(
+			RangeError,
+		)
 		// Companion guard: enumeration is unaffected by the call fall-through.
 		new Transpiler(table, player).execute(
 			'count = 0\nFor Each m In SuppressEvents\ncount = count + 1\nNext\n',

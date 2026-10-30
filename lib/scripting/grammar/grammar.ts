@@ -196,77 +196,60 @@ function blankLiterals(line: string): string {
  * tables (e.g. Royal Flush 1976) fail to parse. Single-line
  * `Else If ... Then <stmt>` needs no `End If` either way: keep it lenient.
  *
- * Repair: per Sub/Function/Property/Class scope, balance `If`/`End If`
- * under the lenient reading; while a scope carries an extra `End If`,
- * split its last block-form candidate into `Else` + `If ... Then`.
- * Balanced scopes pass through byte-identical.
+ * Repair: per Sub/Function/Property/Class scope, count `If`/`End If` under
+ * the lenient reading; a scope with a net extra `End If` splits that many
+ * trailing block-form candidates into `Else` + `If ... Then` (latest first,
+ * a heuristic when several could balance). Balanced scopes return untouched.
  */
 function repairSpacedElseIf(lines: string[]): string[] {
+	const depths = new Map<number, number>()
+	const candidates = new Map<number, number[]>()
+	const stack: number[] = [0]
+	let nextScope = 1
+	for (let i = 0; i < lines.length; i++) {
+		const line = lines[i]!
+		// Boundary lines belong to the outer scope: pop before assigning, push after.
+		const isScopeClose = SCOPE_CLOSE_RE.test(line)
+		if (isScopeClose && stack.length > 1) stack.pop()
+		const scope = stack[stack.length - 1]!
+		if (SCOPE_OPEN_RE.test(line)) {
+			stack.push(nextScope++)
+			continue
+		}
+		if (isScopeClose) continue
+		const stripped = blankLiterals(line)
+		if (END_IF_RE.test(stripped)) {
+			depths.set(scope, (depths.get(scope) ?? 0) - 1)
+			continue
+		}
+		const segments = stripped.split(':')
+		// Any `:` segment may open a block `If` (`z = 1 : If c Then`).
+		if (segments.some(segment => IF_OPEN_RE.test(segment) && BLOCK_THEN_RE.test(segment))) {
+			depths.set(scope, (depths.get(scope) ?? 0) + 1)
+			continue
+		}
+		// Block form only: single-line `Then <stmt>` parses either way, never a candidate.
+		if (SPACED_ELSE_IF_RE.test(stripped) && BLOCK_THEN_RE.test(segments[0]!)) {
+			let list = candidates.get(scope)
+			if (!list) candidates.set(scope, (list = []))
+			list.push(i)
+		}
+	}
+	const splits: number[] = []
+	for (const [scope, depth] of depths) {
+		if (depth < 0) splits.push(...(candidates.get(scope) ?? []).slice(depth))
+	}
+	if (splits.length === 0) return lines
 	const out = [...lines]
-	for (;;) {
-		const scopeOf = new Array<number>(out.length)
-		const stack: number[] = [0]
-		let nextScope = 1
-		for (let i = 0; i < out.length; i++) {
-			const line = out[i]!
-			// Boundary lines belong to the outer scope: pop before assigning, push after.
-			if (SCOPE_CLOSE_RE.test(line) && stack.length > 1) stack.pop()
-			scopeOf[i] = stack[stack.length - 1]!
-			if (SCOPE_OPEN_RE.test(line)) stack.push(nextScope++)
-		}
-		interface Scan {
-			depth: number
-			unbalanced: boolean
-			candidates: number[]
-		}
-		const scans = new Map<number, Scan>()
-		const scanFor = (scope: number): Scan => {
-			let scan = scans.get(scope)
-			if (!scan) {
-				scan = { depth: 0, unbalanced: false, candidates: [] }
-				scans.set(scope, scan)
-			}
-			return scan
-		}
-		for (let i = 0; i < out.length; i++) {
-			const line = out[i]!
-			const scan = scanFor(scopeOf[i]!)
-			if (SCOPE_OPEN_RE.test(line) || SCOPE_CLOSE_RE.test(line)) continue
-			const stripped = blankLiterals(line)
-			if (END_IF_RE.test(stripped)) {
-				scan.depth--
-				if (scan.depth < 0) scan.unbalanced = true
-				continue
-			}
-			// Any `:` segment may open a block `If` (`z = 1 : If c Then`).
-			const opens = stripped.split(':').some(segment => IF_OPEN_RE.test(segment) && BLOCK_THEN_RE.test(segment))
-			if (opens) {
-				scan.depth++
-				continue
-			}
-			// Block form only: single-line `Then <stmt>` parses either way, never a candidate.
-			if (SPACED_ELSE_IF_RE.test(stripped) && BLOCK_THEN_RE.test(stripped.split(':')[0]!)) {
-				scan.candidates.push(i)
-			}
-		}
-		for (const scan of scans.values()) {
-			// Only an extra `End If` is splittable: opening another `If`
-			// can never repair a missing `End If`.
-			if (scan.depth < 0) scan.unbalanced = true
-		}
-		// One split per pass, then re-scan; take the latest candidate.
-		let split = -1
-		for (const scan of scans.values()) {
-			if (scan.unbalanced && scan.candidates.length > 0) {
-				split = Math.max(split, scan.candidates[scan.candidates.length - 1]!)
-			}
-		}
-		if (split === -1) return out
+	// Descending so earlier indices stay valid; splits never emit scope
+	// boundaries, so scopes and remaining candidacies are unaffected.
+	for (const split of splits.sort((a, b) => b - a)) {
 		// Keep the tail verbatim (`Then : stmt` stays on the new `If` line).
 		const indent = /^(\s*)/.exec(out[split]!)![1]
 		const rest = out[split]!.trimStart().slice('Else'.length).trimStart()
 		out.splice(split, 1, `${indent}Else`, `${indent}${rest}`)
 	}
+	return out
 }
 
 /**

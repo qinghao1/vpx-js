@@ -475,6 +475,13 @@ export class VBSHelper {
 			if (value === Array) return Array.of(...params)
 			return Reflect.apply(value as (...a: unknown[]) => unknown, receiver, params)
 		}
+		// Default-member call (`Coll(i)`): ICollection.Item is the only
+		// DISPID_VALUE in vpinball.idl, so a callable `.Item` is the default
+		// member; routing through it keeps native bounds checks (RangeError, native error 9).
+		if (params.length > 0) {
+			const item = (value as Record<string, unknown> | null | undefined)?.Item
+			if (typeof item === 'function') return Reflect.apply(item as (...a: unknown[]) => unknown, value, params)
+		}
 		return this.traverse(value, params)
 	}
 

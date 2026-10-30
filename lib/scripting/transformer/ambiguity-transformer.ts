@@ -152,7 +152,7 @@ export class AmbiguityTransformer extends Transformer {
 				// a non-function value (a collection's default member `Coll(i)`,
 				// an array, ...) throws at runtime. Fall through to the
 				// dispatcher, which invokes functions and index-traverses the rest.
-				if (node.arguments.length === 0 || typeof obj === 'function' || typeof obj === 'undefined') {
+				if (typeof obj === 'function' || typeof obj === 'undefined') {
 					return node
 				}
 			}
