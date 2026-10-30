@@ -53,9 +53,9 @@ export class BiffParser {
 				if (cchar < 0) throw new Error(`Corrupt BIFF record: invalid CODE length ${cchar}.`)
 				len += cchar + 4
 			}
-			// Self-terminated ranged records (e.g. texture BITS): the declared len
-			// covers only the header, so the payload is served from this already-
-			// fetched range instead of a second OLE read. Same overrun guard as above.
+			// Self-terminated records (e.g. BITS): the declared len covers only
+			// the header, so the payload is served from this fetched range —
+			// no second OLE read. Same overrun guard as above.
 			const rawHandler = !nested && opts.rawTags?.[tag]
 			if (rawHandler) {
 				if (len > data.length - 4) return -(len + 4)

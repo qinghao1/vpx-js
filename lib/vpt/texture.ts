@@ -56,8 +56,7 @@ export class Texture extends BiffParser {
 				},
 			},
 			// BITS declares len 4 (header only); the LZW payload is self-terminated,
-			// so it decompresses straight from the fetched range (zero-copy view)
-			// instead of re-reading the stream from its offset to the end.
+			// so it decompresses straight from the fetched range with no second read.
 			rawTags: {
 				BITS: async range => {
 					const [pdsBuffer, compressedLen] = BaseTexture.fromBytes(
@@ -200,13 +199,12 @@ class BaseTexture {
 	}
 
 	/**
-	 * Swaps R/B in place, so the decode buffer is the final buffer (no second alloc).
-	 * The all-zero-alpha scan folds into the same pass — alpha is untouched by the
-	 * swap, so detection equals a separate alpha scan.
+	 * Swaps R/B in place (no second alloc), folding in the all-zero-alpha
+	 * scan — alpha is untouched by the swap, so one pass detects as well.
 	 */
 	private swapRedBlue(width: number, height: number): void {
-		// format is initialized RGBA and never reassigned, so the RGB_FP path
-		// below is unreachable — throw loudly instead of silently carrying it.
+		// format is initialized RGBA and never reassigned; anything else is
+		// corrupt input, so throw instead of mis-decoding.
 		if (this.format !== BaseTexture.RGBA) throw new Error(`unsupported texture format ${this.format}`)
 		const data = this.data
 		const pitch = this.pitch()

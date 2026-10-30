@@ -68,8 +68,6 @@ export interface IRenderApi<NODE, GEOMETRY, POINT_LIGHT> {
 	 * calls this once per frame (when anything moved) before presenting.
 	 * Optional for backward compatibility: hosts fall back to presenting
 	 * directly (the renderer updates world matrices itself) when missing.
-	 *
-	 * @param root Subtree root to refresh. Does nothing if not set.
 	 */
 	flushMatrixUpdates?(root: NODE | undefined): void
 

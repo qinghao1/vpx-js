@@ -25,7 +25,6 @@ export class AllocationTable {
 		return new AllocationTable(doc, table)
 	}
 
-	/** Cached chain for a stream entry; the caller selects the SAT or SSAT table. */
 	public getChainForEntry(entry: StorageEntry): number[] {
 		const hit = this.chainCache.get(entry)
 		if (hit) return hit

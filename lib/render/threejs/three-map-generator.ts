@@ -82,10 +82,9 @@ export class ThreeMapGenerator {
 		concurrency: number,
 		onTexture?: (tex: Texture, ok: boolean) => void,
 	): Promise<void> {
-		// Playfield-first queue: the playfield bake unblocks first paint, so
-		// it dispatches before wall/plastic thumbnails. Stable sort keeps the
-		// caller's relative order otherwise; cached results are identical.
-		// Flags are computed once up front, not per comparison.
+		// Playfield-first: the playfield bake unblocks first paint, so it
+		// dispatches before thumbnails. Stable sort keeps the caller's order;
+		// cached results are identical either way.
 		const isPlayfield = textures.map(tex => isPlayfieldCap(tex.getName()))
 		const order = textures.map((_, i) => i).sort((a, b) => Number(!isPlayfield[a]) - Number(!isPlayfield[b]))
 		let next = 0

@@ -5,10 +5,9 @@ import { isPlayfieldCap } from './texture-tags.js'
 
 export type DownscaleArray = Uint8Array | Uint8ClampedArray | Uint16Array | Float32Array
 
-// Half -> float lookup built once from DataUtils.fromHalfFloat, so the
-// playfield box average below pays one array read per sample instead of a
-// bit-twiddling call. Entries equal fromHalfFloat exactly, hence output bits
-// are unchanged; toHalfFloat on the average stays a call (no exact LUT).
+// Half->float lookup built once: one array read per sample instead of a
+// bit-twiddling call, with entries exactly equal to fromHalfFloat (output
+// bits unchanged). The averaging toHalfFloat stays a call — no exact LUT.
 let halfToFloatLut: Float32Array | null = null
 
 /** Shared half-float decode table; exported for tests. */
@@ -46,8 +45,7 @@ export function downscaleArray<T extends DownscaleArray>(
 	const out = new (src.constructor as any)(nw * nh * comps) as T
 	const isHalf = src instanceof Uint16Array && type === HalfFloatType
 	const isFloat = src instanceof Float32Array
-	// Decoded once per call so exactBox windows below read floats from the
-	// table; null for other dtypes (branch folds out of the inner loop).
+	// Hoisted per call so the box loop below reads floats with no per-sample branch.
 	const halfLut = isHalf ? getHalfToFloatLut() : null
 	// Integer-factor fast path: exact 2x/4x/... box windows tile the source
 	// with no per-pixel floor/ceil/min/div. Window bounds and accumulation

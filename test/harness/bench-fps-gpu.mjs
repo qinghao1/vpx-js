@@ -68,9 +68,8 @@ async function runLeg(mode) {
 			durMs =>
 				new Promise(resolve => {
 					const r = window.viewer?.renderer
-					// Per-tick presents (not rAF ticks): info.reset() zeroes render.frameCalls
-					// every tick, so end-of-window reads miss skipped frames; count ticks with
-					// frameCalls > 0 and sum their draws/tris instead.
+					// Count per-tick presents, not rAF ticks: info.reset() zeroes
+					// frameCalls every tick, so cumulative reads miss skipped frames.
 					let frames = 0
 					let presents = 0
 					let draws = 0

@@ -104,10 +104,8 @@ async function getHdrWorkers(): Promise<any[]> {
 
 async function decodeHdrViaWorker(buffer: ArrayBuffer, type: 'hdr' | 'exr', name?: string): Promise<any> {
 	const workers = await getHdrWorkers()
-	// Playfield bakes jump to the least-busy worker so an 8K EXR never waits
-	// behind two full-length DWAA decodes; the decoded bytes are identical.
-	// Round-robin resumes where it left off — the playfield detour does not
-	// consume a turn.
+	// Playfield bakes take the least-busy worker (decoded bytes are
+	// identical); round-robin resumes where it left off.
 	const preferLeastBusy = isPlayfieldCap(name)
 	const picked = hdrTracker.pick(workers, preferLeastBusy, hdrNextWorker)
 	hdrNextWorker = picked.next

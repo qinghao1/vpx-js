@@ -91,11 +91,9 @@ export function getVbsMemCache(key: string): string | undefined {
 
 /**
  * Parsed ESTrees (`Grammar.transpile` output, pre-pipeline) by script content
- * hash. Parse + post-process are table-independent, so a repeat transpile of
- * the same script — new Transpiler, worker call, or different gf/go — skips
- * straight to the table-dependent pipeline. Shares the JS cache's
- * oldest-first bound; entries are cloned on the way in and out because the
- * pipeline mutates the tree it receives.
+ * hash. Parse + post-process are table-independent, so repeats skip straight
+ * to the table-dependent pipeline. Shares the JS cache's oldest-first bound;
+ * entries are cloned in and out because the pipeline mutates the tree.
  */
 const astMemCache = new Map<string, Program>()
 export const MAX_AST_MEM_CACHE_ENTRIES = MAX_VBS_MEM_CACHE_ENTRIES
@@ -107,11 +105,9 @@ export function getAstMemCache(key: string): Program | undefined {
 
 export function setAstMemCache(key: string, ast: Program): void {
 	boundedSet(astMemCache, key, structuredClone(ast) as Program, MAX_AST_MEM_CACHE_ENTRIES)
-	// Deliberately memory-only: the transpiled-JS IDB cache (vbs7:) already
-	// persists full transpiles across sessions, so a stored tree would only
-	// pay off when the JS cache misses on a previously seen script (different
-	// table data) — too rare to pay a structuredClone + IDB write per miss.
-	// Grammar.transpile stays synchronous, which an IDB read could not be.
+	// Deliberately memory-only: a stored tree would only pay off when the JS
+	// cache misses on a previously seen script — too rare for a clone + IDB
+	// write per miss — and transpile must stay synchronous.
 }
 
 export function clearAstMemCache(): void {
@@ -281,11 +277,9 @@ function isMethod(proto: any, prop: string): boolean {
 }
 
 /**
- * Per-table payload memo: the walk below (event names, API props, global
- * sample) costs tens of ms on big tables, but table content is fixed after
- * load — so a repeat call for the same table and player reuses the payload.
- * The element-name list is re-read every call and must match exactly, so
- * added or removed elements still rebuild instead of serving a stale payload.
+ * Payload memo: the walk below costs tens of ms on big tables, but table
+ * content is fixed after load. Element names are re-read every call and must
+ * match exactly, so changed elements rebuild instead of serving stale data.
  */
 const tableDataMemo = new WeakMap<object, { names: string[]; player: unknown; payload: TableDataPayload | null }>()
 
@@ -293,8 +287,6 @@ export function getTableDataForWorker(table: any, player?: any): TableDataPayloa
 	try {
 		const elements = table.getElements?.() ?? {}
 		const names = Object.keys(elements)
-		// Non-object tables cannot reach here in practice (callers pass Table);
-		// if one did, the WeakMap access below throws into the outer catch.
 		const memo = tableDataMemo.get(table)
 		if (
 			memo &&

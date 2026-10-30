@@ -8,9 +8,7 @@ export const BALL_ROUGHNESS = 0.08
 export const RE_BAKE_MAT = /bake/i
 export const RE_BAKE_MAP = /bake|nestmap/i
 
-// Playfield lightmap family: base playfields, VLM/nestmap bakes, and pre-baked
-// overlays all take the playfield size cap. Canonical definition lives in
-// texture-tags.ts, shared by the loaders and both decode workers.
+// Re-exported for the browser loader; the taxonomy lives in texture-tags.ts.
 export { RE_PLAYFIELD } from './texture-tags.js'
 
 let _globalEmissionScale = 1
@@ -32,7 +30,7 @@ export const pendingKeyFor = (key: 'map' | 'normalMap' | 'envMap' | 'emissiveMap
 
 const TEX_SLOT_KEYS = ['map', 'normalMap', 'envMap', 'emissiveMap'] as const
 
-/** Canonical streaming keys (legacy spellings resolve via normalizePendingKeys first). */
+/** Canonical streaming keys; normalize legacy spellings first. */
 export const PENDING_MAP_KEYS: readonly string[] = TEX_SLOT_KEYS.map(pendingKeyFor)
 
 /** Legacy lowercase streaming key. Canonical is `pendingMap`; normalize once at ingestion. */

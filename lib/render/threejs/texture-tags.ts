@@ -1,13 +1,8 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-// Playfield texture taxonomy: which texture names count as playfield bakes.
-// Single home shared by the loaders, both decode workers, the map generator,
-// and material setup. Worker scheduling lives in texture-dispatch.ts; pixel
-// math lives in texture-downscale.ts; both import from here.
-
-// Canonical playfield lightmap family: base playfields, VLM/nestmap bakes, and
-// pre-baked overlays all take the playfield size cap and the box-average
-// downscale path.
+// Which texture names count as playfield bakes (base playfields, VLM/nestmap,
+// pre-baked overlays): single home for the loaders, both decode workers, the
+// map generator, and material setup.
 export const RE_PLAYFIELD = /playfield|nestmap|bake|vlm/i
 
 /** Single predicate selecting the playfield size cap and box-average path. */

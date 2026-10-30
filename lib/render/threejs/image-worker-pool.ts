@@ -1,8 +1,7 @@
-// Browser-only pool (Node decodes inline): image decode + resize runs off the
-// main thread so texture preload does not jank the first frames. Sized by
-// CPU count, capped at 4; playfield maps dispatch to the least-busy worker
-// while the rest stay round-robin, with a 30s per-image timeout and
-// main-thread fallback when workers are unavailable.
+// Browser-only pool (Node decodes inline): decode + resize off the main
+// thread. Sized by CPU count, capped at 4; playfield maps take the
+// least-busy worker, the rest stay round-robin (30s timeout, main-thread
+// fallback).
 
 import { settleWorkerEntry, type WorkerPendingEntry, withWorkerTimeout } from '../../util/worker-pending.js'
 import { WorkerLoadTracker } from './texture-dispatch.js'
@@ -60,9 +59,8 @@ export function hasImageWorker(): boolean {
 export async function decodeInWorker(data: Uint8Array, mime: string, max: number, name: string): Promise<ImageBitmap> {
 	const workers = ensurePool()
 	if (!workers?.length) throw new Error('no image worker')
-	// Playfield maps jump to the least-busy worker; the bitmap is identical.
-	// Round-robin resumes where it left off — the playfield detour does not
-	// consume a turn.
+	// Playfield maps take the least-busy worker (same bitmap either way);
+	// round-robin resumes where it left off.
 	const preferLeastBusy = isPlayfieldCap(name)
 	const picked = tracker.pick(workers, preferLeastBusy, next)
 	next = picked.next

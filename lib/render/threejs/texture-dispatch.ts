@@ -1,16 +1,12 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-// Shared decode dispatch: which worker decodes what. Playfield taxonomy
-// lives in texture-tags.ts; everything about scheduling workers lives here
-// so the browser image pool and the node HDR pool share one implementation.
+// Shared decode dispatch (which worker decodes what) for the browser image
+// pool and the node HDR pool.
 
 /**
- * Per-worker in-flight decode counts behind one scheduling policy. Both
- * decode pools track the same thing (browser: array slots, node: worker
- * handles); the tracker owns the policy so the pools stay dumb callers.
- * Only the schedule changes with preference — decoded bytes are identical
- * either way: playfield bakes jump to the least-loaded worker so an 8K EXR
- * never waits behind two full decodes, everything else stays round-robin.
+ * Per-worker in-flight decode counts behind one scheduling policy, so both
+ * decode pools stay dumb callers. Only the schedule changes with
+ * preference — decoded bytes are identical either way.
  */
 export class WorkerLoadTracker {
 	private readonly loads = new Map<object, number>()
@@ -56,9 +52,8 @@ export class WorkerLoadTracker {
 	}
 
 	/**
-	 * Zeroes every count. Call when all pending work is rejected and dropped:
-	 * no worker has anything in flight afterwards, so survivors must not keep
-	 * a stale bias in least-busy dispatch.
+	 * Zeroes every count. Call only when all pending work is rejected and
+	 * dropped — no worker has anything in flight afterwards.
 	 */
 	resetAll(): void {
 		for (const key of this.loads.keys()) this.loads.set(key, 0)

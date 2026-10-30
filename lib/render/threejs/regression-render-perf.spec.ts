@@ -91,14 +91,12 @@ describe('regression: render hotpath zero-allocation', () => {
 		m.elements[14] = 50
 		api.applyMatrixToNode(m, child)
 		Matrix3D.release(m)
-		// local matrix refreshes synchronously (position/quaternion/scale)…
+		// Local matrix refreshes synchronously, but no subtree walk runs: the
+		// node is only flagged dirty.
 		expect(child.position.x).toBe(100)
-		// …but no subtree walk runs: the node is only flagged dirty and the
-		// world matrix still holds the pre-update composition (10, 0, 0).
 		expect(child.matrixWorldNeedsUpdate).toBe(true)
 		const stale = new THREE.Vector3().setFromMatrixPosition(child.matrixWorld)
 		expect(stale.x).toBe(10)
-		// a second dirty node must not force a second walk either
 		const sibling = new THREE.Group()
 		sibling.matrixAutoUpdate = false
 		root.add(sibling)
@@ -108,7 +106,6 @@ describe('regression: render hotpath zero-allocation', () => {
 		api.applyMatrixToNode(m2, sibling)
 		Matrix3D.release(m2)
 		expect(sibling.matrixWorldNeedsUpdate).toBe(true)
-		// one root flush recomposes every dirty subtree: parent * local
 		api.flushMatrixUpdates(root)
 		expect(child.matrixWorldNeedsUpdate).toBe(false)
 		expect(sibling.matrixWorldNeedsUpdate).toBe(false)

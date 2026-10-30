@@ -15,6 +15,7 @@ import {
 	setPrimitiveTransmissionArea,
 } from '../../dist-esm/lib/render/threejs/nodes/primitive-bdl-node.js'
 import { isBakedNodeMaterial, setBakedMap } from '../../dist-esm/lib/render/threejs/nodes/unshaded-baked-node.js'
+import { RE_VR } from '../../dist-esm/lib/render/threejs/scene-classify.js'
 import {
 	batchStaticOpaques as _batchStaticOpaques,
 	optimizeScene as _optimizeScene,
@@ -91,14 +92,7 @@ function syncRoom(
 ): THREE.Group | null {
 	let hasVr = false
 	node.traverse((o: any) => {
-		if (
-			o.isMesh &&
-			o.visible &&
-			String(o.name ?? '')
-				.toLowerCase()
-				.includes('vr_')
-		)
-			hasVr = true
+		if (o.isMesh && o.visible && RE_VR.test(String(o.name ?? '').toLowerCase())) hasVr = true
 	})
 	const room = ensureProceduralRoom(scene, center, size, { hasVr })
 	scene.background = getPrerenderedBackground() as any
@@ -855,9 +849,8 @@ export class Viewer {
 		const start = performance.now()
 		return new Promise(resolve => {
 			const tick = () => {
-				// Every tick mutates the camera outside the gated loop, so
-				// force the next present (covers the final pose too, which
-				// lands after _cameraRaf is cleared).
+				// Camera ticks run outside the gated loop: invalidate every tick,
+				// including the final pose that lands after _cameraRaf clears.
 				this.invalidate()
 				if (_gen !== this._cameraGen) {
 					this.gate.endAnimation()
@@ -2213,8 +2206,7 @@ export class Viewer {
 			fps = 0
 		let lastFpsUpdate = performance.now()
 		let lastDmd = 0
-		// Rolls the fps window on expiry. Presented frames record the measured
-		// rate first; skipped frames just reset, so the next present measures
+		// Skipped frames reset without recording, so the next present measures
 		// a live rate instead of averaging in the idle gap.
 		const rollFpsWindow = (timestamp: number, presented: boolean): boolean => {
 			if (timestamp - lastFpsUpdate <= 500) return false
@@ -2242,13 +2234,9 @@ export class Viewer {
 		}
 		this.renderer.setAnimationLoop((timestamp, frame) => {
 			if (this._disposed || this.isPaused) return
-			// Dirty-gated present: every flag below reports whether anything
-			// visible changed; idle frames skip the present (and its
-			// scene-wide matrix pass) entirely. Physics still steps every
-			// frame above — only the GPU present is gated.
-			// A changed transmission buffer alters BDL shading, so it presents
-			// like any other change. The idle-frame scan itself is cheap
-			// (numeric-signature fast path, no string/splat work).
+			// Dirty-gated present: idle frames skip the present (and its matrix
+			// pass) entirely — physics above still steps every frame. The scan
+			// itself is cheap (numeric signatures, no string work).
 			const transmissionDirty = (() => {
 				if (!this.table || (this as any)._skipTrans) return false
 				try {
@@ -2376,8 +2364,7 @@ export class Viewer {
 		const hasOff = off && (Math.abs(off.x) > 1e-4 || Math.abs(off.y) > 1e-4)
 		const hasAcc = acc && (Math.abs(acc.x) > 1e-3 || Math.abs(acc.y) > 1e-3)
 		if (!hasOff && !hasAcc) {
-			// Still dirty while the table eases back to its base pose; settled
-			// once the pose matches and the flag clears.
+			// Keep presenting while the table eases back to its base pose.
 			let settling = false
 			if (this.tableGroup.userData._nudgeApplied) {
 				this.tableGroup.position.x += (base.x - this.tableGroup.position.x) * 0.15

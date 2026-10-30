@@ -136,18 +136,15 @@ describe('regression: texture stripe artifacts', () => {
 	})
 
 	it('exactBox downscale equals generic-window averaging on half float', () => {
-		// 12x12 -> 6x6 is an exact 2x window, so the integer fast path plus
-		// the half-float LUT must equal a per-sample fromHalfFloat reference.
+		// 12x12 -> 6x6 is an exact 2x window; any data works since the
+		// reference below averages the same inputs.
 		const w = 12,
 			h = 12,
 			comps = 4
 		const data = new Uint16Array(w * h * comps)
-		// Deterministic spread of half floats; any data works since the
-		// reference below averages the same inputs through the generic window.
 		for (let i = 0; i < data.length; i++) data[i] = DataUtils.toHalfFloat(((i % 7) * 0.5) % 4)
 		const fast = downscaleArray(data, w, h, 6, 'playfield', HalfFloatType)
 		expect(fast.width).toEqual(6)
-		// Reference: per-window average with a fromHalfFloat call per sample.
 		for (let y = 0; y < fast.height; y++) {
 			for (let x = 0; x < fast.width; x++) {
 				for (let c = 0; c < comps; c++) {

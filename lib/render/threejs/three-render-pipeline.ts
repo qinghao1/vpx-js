@@ -6,7 +6,6 @@ import { pass, uniform } from 'three/tsl'
 import * as THREE from 'three/webgpu'
 import { clampExposure, resolveToneMapping } from './tone-mapping.js'
 
-/** Bloom blur-chain scale: 0.5 at full quality, 0.25 at low quality. */
 const BLOOM_SCALE_FULL = 0.5
 const BLOOM_SCALE_LOW = 0.25
 

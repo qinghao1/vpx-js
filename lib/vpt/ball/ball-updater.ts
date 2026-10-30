@@ -62,7 +62,7 @@ export class BallUpdater extends ItemUpdater<BallState> {
 		} finally {
 			Matrix3D.release(orient, trans, scale, mat)
 		}
-		// World-matrix refresh is the backend's job: applyMatrixToNode flags
-		// the node per the IRenderApi contract and the host flushes once.
+		// World-matrix refresh is the backend's job: the node is flagged here,
+		// flushed once per frame by the host.
 	}
 }
