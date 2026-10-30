@@ -1,68 +1,54 @@
-# Visual Pinball X in JavaScript
+# vpx-js
 
-*A port of [Visual Pinball](https://github.com/vpinball/vpinball) for Node.js and the browser — parse `.vpx`, render with three.js, simulate physics, transpile VBScript, and emulate PinMAME.*
+Visual Pinball for Node.js and the browser — parse `.vpx` tables, render them with three.js, simulate physics, transpile VBScript, and emulate PinMAME ROMs.
 
-![table](https://user-images.githubusercontent.com/70426/56841267-0419fc00-688d-11e9-9996-6d84070da392.png)
-
-> **v2.0.0** · ESM-only · Node `>=24` · TypeScript `^6` · three `^0.185` · GPL-2.0
-
-## Origin and License
-
-This is a maintained **fork of [`vpdb/vpx-js`](https://github.com/vpdb/vpx-js)** by [freezy](https://github.com/freezy) and contributors.
-
-- **Original:** [`vpdb/vpx-js@v1.3.4`](https://github.com/vpdb/vpx-js/releases/tag/v1.3.4) (`e8a6d6fa522`), GPL-2.0.
-- **License stays GPL-2.0.** See [`LICENSE`](LICENSE). All original `Copyright (C) 2019 freezy` headers are retained; modified files add `Copyright (C) 2026 Chu Qinghao`.
-- **Please credit both** the original project and this fork, and distribute source with any binary per GPL-2.0.
+Fork of [`vpdb/vpx-js`](https://github.com/vpdb/vpx-js) by [freezy](https://github.com/freezy) and contributors, kept under GPL-2.0 — please credit both the original project and this fork. See [`LICENSE`](LICENSE).
 
 ## Features
 
-- **VPX parsing** — OLE/BIFF, meshes, materials, textures, and table scripts via `Table.load()` (VPX 10.8.1).
-- **Rendering** — `ThreeRenderApi` → three.js scenes; `TableExporter` → binary GLB with materials/textures/lights.
-- **Physics** — vpinball collision/rigid-body code ported 1:1; `Player` drives a 1 kHz physics + 60 Hz animation loop (including nudge).
-- **Scripting** — VBScript transpiled to JS (EBNF grammar + transformers) and run against per-item APIs.
-- **Emulation** — `wpc-emu` for WPC plus **PinMAME WASM** (libPinMAME 3.7) for SAM/Whitestar/S11/Data East and others via `VpmController`.
-- **Sound** — table-embedded sounds load from `Sound{i}` streams (PCM/float/ADPCM inline; MP3/OGG decode in the browser, anything else stays silent with a warning), and `PlaySound`/`PlaySoundAt`/`StopSound`/`FireKnocker`/`PlayMusic`/`EndMusic` play through WebAudio (single-play music reporting `MusicDone`; synthesized knocker, mute/volume UI with persisted prefs).
-- **Portable** — `Uint8Array`/`DataView` I/O, no Node shims; explicit `lib/refs.node.js` vs `lib/refs.browser.js` split.
+- **Parse** `.vpx` tables — OLE/BIFF, meshes, materials, textures, and scripts — with `Table.load()`.
+- **Render** with three.js and export binary GLB with `TableExporter`.
+- **Simulate** headless with `Player`: 60 Hz physics/animation stepping plus table-script execution.
+- **Transpile** VBScript table scripts to JavaScript with `Transpiler`.
+- **Emulate** WPC ROMs with `wpc-emu` and other hardware via the PinMAME WASM build.
 
 ## Requirements
 
-- Node `>=24` (ES2024, `"type": "module"`)
-- Browser with ESM + WebGPU (`THREE.WebGPURenderer`, no WebGL fallback)
-- Rebuilding WASM needs Emscripten `>=4.0`, CMake `>=3.28`, Ninja `>=1.11` (otherwise a mock fallback is used)
+- Node `>=24`
+- A browser with WebGPU support for the demo
+- Emscripten, CMake, and Ninja only to rebuild the PinMAME WASM module (`npm run build:wasm:mock` covers the rest)
 
-## Installation
-
-```bash
-npm install vpx-js
-```
-
-From source:
+## Quickstart
 
 ```bash
-git clone <this-fork-url> && cd vpx-js
 npm ci
-npm run build
+npm run build:esm
+cd demo-browser
+npm ci
+npm run dev
 ```
+
+Open the printed localhost URL and load a `.vpx` file. For the production build, run `npm run build` then `npm run preview` inside `demo-browser`.
 
 ## Usage
 
 ### Load a table
 
 ```ts
-import { NodeBinaryReader } from 'vpx-js/lib/refs.node.js'
-import { Table } from 'vpx-js'
+import { BinaryReader, Table } from 'vpx-js'
 
-const table = await Table.load(new NodeBinaryReader('my_table.vpx'))
-console.log(table.info?.TableName, Object.keys(table.items).length)
+const table = await Table.load(new BinaryReader('my_table.vpx'))
+console.log(Object.keys(table.items).length)
 console.log(table.getTableScript().slice(0, 400))
 ```
 
-In the browser use `BrowserBinaryReader` with an `ArrayBuffer`:
+In Node, `BinaryReader` reads from a file path. In the browser, pass an `ArrayBuffer` instead:
 
 ```ts
-import { BrowserBinaryReader } from 'vpx-js/lib/refs.browser.js'
-const buf = await fetch('/tables/my_table.vpx').then(r => r.arrayBuffer())
-const table = await Table.load(new BrowserBinaryReader(buf))
+import { BrowserBinaryReader, Table } from 'vpx-js'
+
+const response = await fetch('/tables/my_table.vpx')
+const table = await Table.load(new BrowserBinaryReader(await response.arrayBuffer()))
 ```
 
 ### Export to GLB
@@ -71,62 +57,50 @@ const table = await Table.load(new BrowserBinaryReader(buf))
 import { writeFileSync } from 'node:fs'
 import { TableExporter } from 'vpx-js'
 
-const glb = await new TableExporter(table).exportGlb({
-  applyMaterials: true,
-})
+const glb = await new TableExporter(table).exportGlb()
 writeFileSync('my_table.glb', glb)
 ```
-
-Open the result in [Babylon Sandbox](https://sandbox.babylonjs.com) or [gltf-viewer](https://gltf-viewer.donmccurdy.com).
 
 ### Simulate
 
 ```ts
 import { Player } from 'vpx-js'
 
-const player = new Player(table).init() // or initAsync()
+const player = new Player(table).init()
 player.simulateTime(1000)
-const changed = player.onFrame() // diffed states for the renderer
-
-// example: kick a ball
-table.kickers.BallRelease.getApi().CreateBall()
-table.kickers.BallRelease.getApi().Kick(0, 5)
+const changed = player.onFrame()
 ```
 
-## What Changed Since Upstream v1.3.4
+`simulateTime` steps physics and animations at 60 Hz up to an absolute millisecond timestamp; `onFrame` returns the changed item states for the renderer. For example, on a table with a `BallRelease` kicker:
 
-- **Modern toolchain** — ESM-only, Node 24, `tsup` + `Biome` + `Vitest`.
-- **Dependencies** — three `^0.185` + `three-mesh-bvh` + `wpc-emu` + `pako`.
-- **Portable I/O** — `Uint8Array`/`DataView` throughout; explicit `refs.node`/`refs.browser` env split.
-- **Rendering rework** — GLB export uses `three/addons/exporters/GLTFExporter`.
-- **Physics fixes** — VPX 10.8.1 defaults, timer/nudge/collision parity with desktop VPX.
-- **Scripting hardened** — broader VBScript coverage and a proper `with`-proxy sandbox.
-- **New: PinMAME WASM** — `external/pinmame` + `wasm/` build (WASM + mock fallback) for any PinMAME hardware.
-- **Library API** — script extraction, GLB export, and transpiling via `Table.load`, `TableExporter`, `Transpiler`.
+```ts
+const kicker = table.kickers.BallRelease.getApi()
+const ball = kicker.CreateBall()
+kicker.Kick(0, 10)
+```
+
+### Transpile a script
+
+```ts
+import { Transpiler } from './lib/scripting/transpiler.js'
+
+const player = new Player(table)
+const js = new Transpiler(table, player).transpile(table.getTableScript())
+```
+
+`Transpiler` is imported from source, so run repo-relative scripts with `npx tsx`.
 
 ## Development
 
 ```bash
-npm run build        # compile grammar + tsup + copy res/
-npm run dev          # watch mode
-npm run typecheck
+npm run build        # tsup + tsc → dist/ + dist-esm/
+npm run build:esm    # dist-esm/ only (required before demo-browser)
+npm run typecheck    # tsc --noEmit
 npm run lint         # biome check
-npm test             # vitest + v8 coverage
-npm run verify:all   # wasm + table + pinmame + player harness
+npm test             # vitest with coverage
+npm run verify:all   # end-to-end harness (wasm, table, pinmame, player, browser)
 ```
-
-Optional WASM rebuild:
-
-```bash
-npm run build:wasm        # release (needs emcc)
-npm run build:wasm:mock   # mock only
-```
-
 
 ## License
 
 GPL-2.0 — see [`LICENSE`](LICENSE).
-
-## Credits
-
-Original project by [freezy](https://github.com/freezy) — especially [@jsm174](https://github.com/jsm174) (grammar) and [@neophob](https://github.com/neophob) (wpc-emu). Fork maintenance by Chu Qinghao. Thanks to JetBrains for IDE support of the original project.
