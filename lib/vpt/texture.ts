@@ -1,7 +1,7 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { BiffParser } from '../io/biff-parser.js'
+import { BIFF_TAG_HEADER_SIZE, BiffParser } from '../io/biff-parser.js'
 import { LzwReader } from '../io/lzw-reader.js'
 import type { Storage } from '../io/ole-doc.js'
 import type { ITextureLoader } from '../render/irender-api.js'
@@ -35,7 +35,7 @@ export class Texture extends BiffParser {
 	public static async fromStorage(storage: Storage, itemName: string): Promise<Texture> {
 		const texture = new Texture()
 		texture.storageName = itemName
-		await storage.streamFiltered(itemName, 0, Texture.createStreamHandler(storage, itemName, texture))
+		await storage.streamFiltered(itemName, 0, Texture.createStreamHandler(texture))
 		return texture
 	}
 
@@ -45,20 +45,31 @@ export class Texture extends BiffParser {
 		return texture
 	}
 
-	private static createStreamHandler(storage: Storage, itemName: string, texture: Texture) {
+	private static createStreamHandler(texture: Texture) {
 		texture.binary = new Binary()
-		return BiffParser.stream(
-			(buffer, tag, offset, len) => texture.fromTag(buffer, tag, offset, len, storage, itemName),
-			{
-				nestedTags: {
-					JPEG: {
-						onStart: () => new Binary(),
-						onTag: binary => binary.fromTag.bind(binary),
-						onEnd: binary => (texture.binary = binary),
-					},
+		return BiffParser.stream((buffer, tag, offset, len) => texture.fromTag(buffer, tag, offset, len), {
+			nestedTags: {
+				JPEG: {
+					onStart: () => new Binary(),
+					onTag: binary => binary.fromTag.bind(binary),
+					onEnd: binary => (texture.binary = binary),
 				},
 			},
-		)
+			// BITS declares len 4 (header only); the LZW payload is self-terminated,
+			// so it decompresses straight from the fetched range (zero-copy view)
+			// instead of re-reading the stream from its offset to the end.
+			rawTags: {
+				BITS: async range => {
+					const [pdsBuffer, compressedLen] = BaseTexture.fromBytes(
+						range.subarray(BIFF_TAG_HEADER_SIZE),
+						texture.width,
+						texture.height,
+					)
+					texture.pdsBuffer = pdsBuffer
+					return compressedLen + 4
+				},
+			},
+		})
 	}
 
 	public getName(): string {
@@ -115,14 +126,7 @@ export class Texture extends BiffParser {
 		return fileName.endsWith('.exr') || fileName.endsWith('.hdr')
 	}
 
-	private async fromTag(
-		buffer: Uint8Array,
-		tag: string,
-		offset: number,
-		len: number,
-		storage: Storage,
-		itemName: string,
-	): Promise<number> {
+	private async fromTag(buffer: Uint8Array, tag: string, _offset: number, len: number): Promise<number> {
 		switch (tag) {
 			case 'NAME':
 				this.szName = this.getString(buffer, len)
@@ -143,18 +147,6 @@ export class Texture extends BiffParser {
 				// Native stores 0..255 on disk and normalizes on load (Texture.cpp: AsFloat() * (1/255)).
 				this.alphaTestValue = this.getFloat(buffer) / 255
 				break
-			case 'BITS': {
-				let compressedLen: number
-				;[this.pdsBuffer, compressedLen] = await BaseTexture.get(
-					storage,
-					itemName,
-					offset,
-					this.width,
-					this.height,
-				)
-				return compressedLen + 4
-			}
-
 			/* istanbul ignore next: duh. */
 			case 'LINK':
 				logger().warn(
@@ -198,76 +190,47 @@ class BaseTexture {
 		return this.data
 	}
 
-	public static async get(
-		storage: Storage,
-		itemName: string,
-		pos: number,
-		width: number,
-		height: number,
-	): Promise<[BaseTexture, number]> {
+	public static fromBytes(payload: Uint8Array, width: number, height: number): [BaseTexture, number] {
 		const pdsBuffer = new BaseTexture(width)
-		const compressed = await storage.read(itemName, pos)
-
-		const lzw = new LzwReader(compressed, width * 4, height, pdsBuffer.pitch())
+		const lzw = new LzwReader(payload, width * 4, height, pdsBuffer.pitch())
 		let compressedLen: number
 		;[pdsBuffer.data, compressedLen] = lzw.decompress()
-
-		const lpitch = pdsBuffer.pitch()
-
-		// Assume our 32 bit color structure
-		// Find out if all alpha values are zero
-		const pch = pdsBuffer.data
-		let allAlphaZero = true
-		loop: for (let i = 0; i < height; i++) {
-			for (let l = 0; l < width; l++) {
-				if (pch[i * lpitch + 4 * l + 3] !== 0) {
-					allAlphaZero = false
-					break loop
-				}
-			}
-		}
-
-		// all alpha values are 0: set them all to 0xff
-		if (allAlphaZero) {
-			for (let i = 0; i < height; i++) {
-				for (let l = 0; l < width; l++) {
-					pch[i * lpitch + 4 * l + 3] = 0xff
-				}
-			}
-		}
-		pdsBuffer.data = pdsBuffer.rgbToBgr(width, height)
+		pdsBuffer.swapRedBlue(width, height)
 		return [pdsBuffer, compressedLen]
 	}
 
-	private rgbToBgr(width: number, height: number): Uint8Array {
+	/**
+	 * Swaps R/B in place, so the decode buffer is the final buffer (no second alloc).
+	 * The all-zero-alpha scan folds into the same pass — alpha is untouched by the
+	 * swap, so detection equals a separate alpha scan.
+	 */
+	private swapRedBlue(width: number, height: number): void {
+		// format is initialized RGBA and never reassigned, so the RGB_FP path
+		// below is unreachable — throw loudly instead of silently carrying it.
+		if (this.format !== BaseTexture.RGBA) throw new Error(`unsupported texture format ${this.format}`)
+		const data = this.data
 		const pitch = this.pitch()
-		const from = this.data
-		const to = new Uint8Array(pitch * height)
-		for (let i = 0; i < height; i++) {
-			for (let l = 0; l < width; l++) {
-				if (this.format === BaseTexture.RGBA) {
-					to[i * pitch + 4 * l] = from[i * pitch + 4 * l + 2] // r
-					to[i * pitch + 4 * l + 1] = from[i * pitch + 4 * l + 1] // g
-					to[i * pitch + 4 * l + 2] = from[i * pitch + 4 * l] // b
-					to[i * pitch + 4 * l + 3] = from[i * pitch + 4 * l + 3] // a
-				} else {
-					to[i * pitch + 4 * l] = from[i * pitch + 4 * l + 6] // r
-					to[i * pitch + 4 * l + 1] = from[i * pitch + 4 * l + 7]
-					to[i * pitch + 4 * l + 2] = from[i * pitch + 4 * l + 8]
-
-					to[i * pitch + 4 * l + 3] = from[i * pitch + 4 * l + 3] // g
-					to[i * pitch + 4 * l + 4] = from[i * pitch + 4 * l + 4]
-					to[i * pitch + 4 * l + 5] = from[i * pitch + 4 * l + 5]
-
-					to[i * pitch + 4 * l + 6] = from[i * pitch + 4 * l] // b
-					to[i * pitch + 4 * l + 7] = from[i * pitch + 4 * l + 1]
-					to[i * pitch + 4 * l + 8] = from[i * pitch + 4 * l + 2]
-
-					to[i * pitch + 4 * l + 9] = from[i * pitch + 4 * l + 9] // a
+		// Assume our 32 bit color structure
+		let allAlphaZero = true
+		for (let y = 0; y < height; y++) {
+			const row = y * pitch
+			for (let x = 0; x < width; x++) {
+				const off = row + 4 * x
+				const r = data[off]
+				data[off] = data[off + 2] // r
+				data[off + 2] = r // b
+				if (data[off + 3] !== 0) allAlphaZero = false // a
+			}
+		}
+		// all alpha values are 0: set them all to 0xff
+		if (allAlphaZero) {
+			for (let y = 0; y < height; y++) {
+				const row = y * pitch
+				for (let x = 0; x < width; x++) {
+					data[row + 4 * x + 3] = 0xff
 				}
 			}
 		}
-		return to
 	}
 
 	private pitch(): number {

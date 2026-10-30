@@ -4,6 +4,9 @@
 import { concatUint8Arrays, decodeUtf8, decodeUtf8OrCp1252, getDataView, readInt32LE } from './binary-helpers.js'
 import type { ReadResult } from './ole-doc.js'
 
+/** Byte size of a BIFF record header (4-byte size + 4-byte tag); payloads begin here. */
+export const BIFF_TAG_HEADER_SIZE = 8
+
 /** BIFF record parser. @see https://github.com/vpinball/vpinball/blob/master/src/utils/BiffReader.cpp */
 export class BiffParser {
 	/** Creates a streaming BIFF handler. */
@@ -50,6 +53,16 @@ export class BiffParser {
 				if (cchar < 0) throw new Error(`Corrupt BIFF record: invalid CODE length ${cchar}.`)
 				len += cchar + 4
 			}
+			// Self-terminated ranged records (e.g. texture BITS): the declared len
+			// covers only the header, so the payload is served from this already-
+			// fetched range instead of a second OLE read. Same overrun guard as above.
+			const rawHandler = !nested && opts.rawTags?.[tag]
+			if (rawHandler) {
+				if (len > data.length - 4) return -(len + 4)
+				const skip = await rawHandler(data, result.storageOffset)
+				return (skip || len) + 4
+			}
+
 			const chunk = streamed ? new Uint8Array(0) : data.subarray(8, 8 + len - 4)
 			// Streamed CODE carries no payload chunk: offsets skip the extra cchar int.
 			const relStart = streamed ? 12 : 8
@@ -163,4 +176,11 @@ export interface OnBiffResultStream<T> {
 export interface BiffStreamOptions {
 	streamedTags?: string[]
 	nestedTags?: Record<string, OnBiffResultStream<any>>
+	/**
+	 * Self-terminated records served from the fetched range. `range` starts
+	 * at the record's tag header (4-byte size + 4-byte tag, so payloads begin
+	 * at offset 8); returning 0/undefined falls back to the declared `len`,
+	 * and the returned value skips that many bytes plus the 4-byte size.
+	 */
+	rawTags?: Record<string, (range: Uint8Array, storageOffset: number) => Promise<number>>
 }

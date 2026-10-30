@@ -379,8 +379,8 @@ describe('The OLE compound document reader', () => {
 		const stream = concatBytes(codeHead, cchar, new Uint8Array(10).fill(0x41))
 		const doc = {
 			header: { shortStreamMax: 4096, secSize: 512, shortSecSize: 64 },
-			SAT: { getSecIdChain: () => [0] },
-			SSAT: { getSecIdChain: () => [0] },
+			SAT: { getSecIdChain: () => [0], getChainForEntry: () => [0] },
+			SSAT: { getSecIdChain: () => [0], getChainForEntry: () => [0] },
 			readSectors: async () => stream,
 			readShortSectors: async () => stream,
 		} as unknown as OleCompoundDoc
@@ -539,8 +539,8 @@ describe('The OLE directory in-order walk and validity', () => {
 		for (let i = 0; i < 4; i++) partial[4 + i] = 'TEST'.charCodeAt(i)
 		const doc = {
 			header: { shortStreamMax: 4096, secSize: 512, shortSecSize: 64 },
-			SAT: { getSecIdChain: () => [0] },
-			SSAT: { getSecIdChain: () => [0] },
+			SAT: { getSecIdChain: () => [0], getChainForEntry: () => [0] },
+			SSAT: { getSecIdChain: () => [0], getChainForEntry: () => [0] },
 			readSectors: async () => partial,
 			readShortSectors: async () => partial,
 		} as unknown as OleCompoundDoc

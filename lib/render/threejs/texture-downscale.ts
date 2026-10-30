@@ -1,24 +1,26 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { DataUtils, HalfFloatType } from 'three'
-
-// Canonical playfield lightmap family: base playfields, VLM/nestmap bakes, and
-// pre-baked overlays all take the playfield size cap and the box-average
-// downscale path. Single definition shared by the browser loader, the node
-// loader, and both decode workers.
-export const RE_PLAYFIELD = /playfield|nestmap|bake|vlm/i
-
-/** Single predicate selecting the playfield size cap and box-average path. */
-export function isPlayfieldCap(name: string | undefined): boolean {
-	return !!name && RE_PLAYFIELD.test(name)
-}
-
-/** Static 4096/2048 cap for the node loader and decode workers (no quality tiers there). */
-export function getMaxTextureSize(name: string): number {
-	return isPlayfieldCap(name) ? 4096 : 2048
-}
+import { isPlayfieldCap } from './texture-tags.js'
 
 export type DownscaleArray = Uint8Array | Uint8ClampedArray | Uint16Array | Float32Array
+
+// Half -> float lookup built once from DataUtils.fromHalfFloat, so the
+// playfield box average below pays one array read per sample instead of a
+// bit-twiddling call. Entries equal fromHalfFloat exactly, hence output bits
+// are unchanged; toHalfFloat on the average stays a call (no exact LUT).
+let halfToFloatLut: Float32Array | null = null
+
+/** Shared half-float decode table; exported for tests. */
+export function getHalfToFloatLut(): Float32Array {
+	let lut = halfToFloatLut
+	if (!lut) {
+		lut = new Float32Array(65536)
+		for (let i = 0; i < 65536; i++) lut[i] = DataUtils.fromHalfFloat(i)
+		halfToFloatLut = lut
+	}
+	return lut
+}
 
 /**
  * Generic downscale kernel shared by every texture path. Playfields use a
@@ -44,6 +46,9 @@ export function downscaleArray<T extends DownscaleArray>(
 	const out = new (src.constructor as any)(nw * nh * comps) as T
 	const isHalf = src instanceof Uint16Array && type === HalfFloatType
 	const isFloat = src instanceof Float32Array
+	// Decoded once per call so exactBox windows below read floats from the
+	// table; null for other dtypes (branch folds out of the inner loop).
+	const halfLut = isHalf ? getHalfToFloatLut() : null
 	// Integer-factor fast path: exact 2x/4x/... box windows tile the source
 	// with no per-pixel floor/ceil/min/div. Window bounds and accumulation
 	// order match the generic loop below, so output bytes are identical.
@@ -52,8 +57,7 @@ export function downscaleArray<T extends DownscaleArray>(
 	const exactBox = qx >= 1 && qy >= 1 && qx * nw === width && qy * nh === height
 	if (isPlayfieldCap(name)) {
 		for (let y = 0; y < nh; y++) {
-			// Exact-factor windows tile the source (y0 + qy <= height always),
-			// so the generic floor/ceil/min/div per pixel is skipped.
+			// Exact windows tile the source, so the generic per-pixel math is skipped.
 			const y0 = exactBox ? y * qy : Math.floor((y / nh) * height)
 			const y1 = exactBox ? y0 + qy : Math.min(height, Math.ceil(((y + 1) / nh) * height))
 			for (let x = 0; x < nw; x++) {
@@ -66,8 +70,8 @@ export function downscaleArray<T extends DownscaleArray>(
 					for (let sy = y0; sy < y1; sy++) {
 						const row = sy * width * comps
 						for (let sx = x0; sx < x1; sx++)
-							sum += isHalf
-								? DataUtils.fromHalfFloat((src as any)[row + sx * comps + c] as any)
+							sum += halfLut
+								? halfLut[(src as any)[row + sx * comps + c]]!
 								: (src as any)[row + sx * comps + c]
 					}
 					const avg = sum / count

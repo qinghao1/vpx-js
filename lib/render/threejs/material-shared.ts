@@ -10,8 +10,8 @@ export const RE_BAKE_MAP = /bake|nestmap/i
 
 // Playfield lightmap family: base playfields, VLM/nestmap bakes, and pre-baked
 // overlays all take the playfield size cap. Canonical definition lives in
-// texture-downscale.ts, shared by the loaders and both decode workers.
-export { RE_PLAYFIELD } from './texture-downscale.js'
+// texture-tags.ts, shared by the loaders and both decode workers.
+export { RE_PLAYFIELD } from './texture-tags.js'
 
 let _globalEmissionScale = 1
 const _emissionListeners = new Set<(scale: number) => void>()
@@ -29,6 +29,11 @@ export const getGlobalEmissionScale = () => _globalEmissionScale
 
 export const pendingKeyFor = (key: 'map' | 'normalMap' | 'envMap' | 'emissiveMap'): string =>
 	`pending${key.charAt(0).toUpperCase()}${key.slice(1)}`
+
+const TEX_SLOT_KEYS = ['map', 'normalMap', 'envMap', 'emissiveMap'] as const
+
+/** Canonical streaming keys (legacy spellings resolve via normalizePendingKeys first). */
+export const PENDING_MAP_KEYS: readonly string[] = TEX_SLOT_KEYS.map(pendingKeyFor)
 
 /** Legacy lowercase streaming key. Canonical is `pendingMap`; normalize once at ingestion. */
 const LEGACY_PENDING_MAP = 'pendingmap'
@@ -68,7 +73,7 @@ export function isBaked(material?: { name: string }, map?: string): boolean {
  * these names. Dropping them strands the fork mapless forever.
  */
 export function copyPendingKeys(from: Record<string, unknown>, to: Record<string, unknown>): void {
-	for (const texKey of ['map', 'normalMap', 'envMap', 'emissiveMap'] as const) {
+	for (const texKey of TEX_SLOT_KEYS) {
 		const pendingKey = pendingKeyFor(texKey)
 		const value = from[pendingKey]
 		if (typeof value === 'string' && value.length > 0) to[pendingKey] = value

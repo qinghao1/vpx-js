@@ -1,7 +1,8 @@
 import { parentPort } from 'node:worker_threads'
 import { EXRLoader } from 'three/examples/jsm/loaders/EXRLoader.js'
 import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js'
-import { downscaleArray, getMaxTextureSize } from './texture-downscale.js'
+import { downscaleArray } from './texture-downscale.js'
+import { getMaxTextureSize } from './texture-tags.js'
 
 if (parentPort) {
 	parentPort.on('message', (msg: any) => {

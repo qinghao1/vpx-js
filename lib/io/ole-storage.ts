@@ -75,7 +75,7 @@ export class Storage {
 	private sectorInfo(e: StorageEntry, offset: number) {
 		const shortStream = e.size < this.doc.header.shortStreamMax
 		const secSize = shortStream ? this.doc.header.shortSecSize : this.doc.header.secSize
-		const secIds = (shortStream ? this.doc.SSAT : this.doc.SAT).getSecIdChain(e.secId)
+		const secIds = (shortStream ? this.doc.SSAT : this.doc.SAT).getChainForEntry(e)
 		const secOffset = Math.floor(offset / secSize)
 		const innerOffset = offset % secSize
 		return { shortStream, secSize, secIds, secOffset, innerOffset }

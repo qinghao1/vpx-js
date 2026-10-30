@@ -2,12 +2,16 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { getDataView } from './binary-helpers.js'
+import type { StorageEntry } from './ole-directory-tree.js'
 import type { OleCompoundDoc } from './ole-doc.js'
 
 /** Sector allocation table (SAT/SSAT).
  * @see https://github.com/vpinball/vpinball/blob/master/third-party/include/pole/pole.cpp */
 export class AllocationTable {
 	private static SecIdEndOfChain = -2
+
+	/** Sector chains by stream entry: entries are immutable after load, so the walk runs once. */
+	private readonly chainCache = new WeakMap<StorageEntry, number[]>()
 
 	private constructor(
 		readonly _doc: OleCompoundDoc,
@@ -19,6 +23,15 @@ export class AllocationTable {
 		const view = getDataView(buf)
 		const table = Array.from({ length: buf.length / 4 }, (_, i) => view.getInt32(i * 4, true))
 		return new AllocationTable(doc, table)
+	}
+
+	/** Cached chain for a stream entry; the caller selects the SAT or SSAT table. */
+	public getChainForEntry(entry: StorageEntry): number[] {
+		const hit = this.chainCache.get(entry)
+		if (hit) return hit
+		const chain = this.getSecIdChain(entry.secId)
+		this.chainCache.set(entry, chain)
+		return chain
 	}
 
 	public getSecIdChain(start: number): number[] {

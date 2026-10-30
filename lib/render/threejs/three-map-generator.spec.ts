@@ -72,11 +72,12 @@ describe('ThreeMapGenerator.getTexture', () => {
 })
 
 describe('ThreeMapGenerator.loadTextures', () => {
-	function stubLoader(failName?: string) {
+	function stubLoader(failName?: string, onName?: (name: string) => void) {
 		return {
 			loadTexture: async () => new Texture(),
 			loadRawTexture: async () => new Texture(),
 			loadDefaultTexture: async (name: string) => {
+				onName?.(name)
 				if (name === failName) throw new Error('decode boom')
 				return new Texture()
 			},
@@ -121,6 +122,23 @@ describe('ThreeMapGenerator.loadTextures', () => {
 		expect(generator.hasTexture('Good.png')).toBe(true)
 		expect(generator.hasTexture('Bad.png')).toBe(false)
 		expect(generator.getCache().size).toEqual(2)
+	})
+
+	it('dispatches playfield textures before others, keeping stable order', async () => {
+		const table = new TableBuilder().build()
+		const started: string[] = []
+		const generator = new ThreeMapGenerator(stubLoader(undefined, n => started.push(n)) as any)
+		await generator.loadTextures(
+			[
+				VptTexture.fromFilesystem('WallA.png'),
+				VptTexture.fromFilesystem('WallB.png'),
+				VptTexture.fromFilesystem('VLM.Nestmap0'),
+				VptTexture.fromFilesystem('WallC.png'),
+			],
+			table,
+		)
+
+		expect(started).toEqual(['VLM.Nestmap0', 'WallA.png', 'WallB.png', 'WallC.png'])
 	})
 })
 

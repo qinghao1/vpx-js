@@ -3,7 +3,8 @@ import { deflate } from 'pako'
 import { DataUtils, HalfFloatType } from 'three'
 import { describe, expect, it } from 'vitest'
 import { QUALITY_CAPS } from '../../util/quality.js'
-import { downscaleArray, getMaxTextureSize } from './texture-downscale.js'
+import { downscaleArray, getHalfToFloatLut } from './texture-downscale.js'
+import { getMaxTextureSize } from './texture-tags.js'
 import { effectiveMax, ThreeTextureLoaderBrowser } from './three-texture-loader-browser.js'
 import { ThreeTextureLoaderNode } from './three-texture-loader-node.js'
 
@@ -117,8 +118,48 @@ describe('regression: texture stripe artifacts', () => {
 		expect(nh, 'nh <=4096').toBeLessThanOrEqual(4096)
 		expect(nw).toEqual(3040) // 6080*0.5
 		expect(nh).toEqual(4096) // 8192*0.5
-		// ensure not 16384 (old bug would have allowed 6080x8192 without downscale on hw 16384)
-		expect(max, 'old bug cap 16384 must not be used').not.toEqual(16384)
+		// 16384 would skip downscale entirely, exceeding the 4096 cap
+		expect(max, 'cap 16384 must not be used').not.toEqual(16384)
+	})
+
+	it('half-float LUT matches DataUtils.fromHalfFloat bit-for-bit', () => {
+		const lut = getHalfToFloatLut()
+		expect(lut.length).toEqual(65536)
+		expect(getHalfToFloatLut(), 'table is built once and cached').toBe(lut)
+		let mismatches = 0
+		for (let i = 0; i < 65536; i++) {
+			const a = lut[i]!
+			const b = DataUtils.fromHalfFloat(i)
+			if (!(a === b || (Number.isNaN(a) && Number.isNaN(b)))) mismatches++
+		}
+		expect(mismatches, 'LUT entries must equal fromHalfFloat exactly').toEqual(0)
+	})
+
+	it('exactBox downscale equals generic-window averaging on half float', () => {
+		// 12x12 -> 6x6 is an exact 2x window, so the integer fast path plus
+		// the half-float LUT must equal a per-sample fromHalfFloat reference.
+		const w = 12,
+			h = 12,
+			comps = 4
+		const data = new Uint16Array(w * h * comps)
+		// Deterministic spread of half floats; any data works since the
+		// reference below averages the same inputs through the generic window.
+		for (let i = 0; i < data.length; i++) data[i] = DataUtils.toHalfFloat(((i % 7) * 0.5) % 4)
+		const fast = downscaleArray(data, w, h, 6, 'playfield', HalfFloatType)
+		expect(fast.width).toEqual(6)
+		// Reference: per-window average with a fromHalfFloat call per sample.
+		for (let y = 0; y < fast.height; y++) {
+			for (let x = 0; x < fast.width; x++) {
+				for (let c = 0; c < comps; c++) {
+					let sum = 0
+					for (let sy = y * 2; sy < y * 2 + 2; sy++)
+						for (let sx = x * 2; sx < x * 2 + 2; sx++)
+							sum += DataUtils.fromHalfFloat(data[(sy * w + sx) * comps + c]!)
+					const expected = DataUtils.toHalfFloat(sum / 4)
+					expect((fast.data as Uint16Array)[(y * fast.width + x) * comps + c]).toEqual(expected)
+				}
+			}
+		}
 	})
 })
 

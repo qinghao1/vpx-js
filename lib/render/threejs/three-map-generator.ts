@@ -7,10 +7,8 @@ import { logger, progress } from '../../util/logger.js'
 import type { Table } from '../../vpt/table/table.js'
 import { Texture } from '../../vpt/texture.js'
 import type { ITextureLoader } from '../irender-api.js'
-import { normalizePendingKeys } from './material-shared.js'
-
-/** `userData` slot keys holding not-yet-arrived texture names (see `MaterialSlots`). */
-const PENDING_KEYS = ['pendingMap', 'pendingmap', 'pendingNormalMap', 'pendingEnvMap', 'pendingEmissiveMap']
+import { normalizePendingKeys, PENDING_MAP_KEYS } from './material-shared.js'
+import { isPlayfieldCap } from './texture-tags.js'
 
 const HARDWARE_CONCURRENCY_FALLBACK = 4
 
@@ -84,15 +82,22 @@ export class ThreeMapGenerator {
 		concurrency: number,
 		onTexture?: (tex: Texture, ok: boolean) => void,
 	): Promise<void> {
+		// Playfield-first queue: the playfield bake unblocks first paint, so
+		// it dispatches before wall/plastic thumbnails. Stable sort keeps the
+		// caller's relative order otherwise; cached results are identical.
+		// Flags are computed once up front, not per comparison.
+		const isPlayfield = textures.map(tex => isPlayfieldCap(tex.getName()))
+		const order = textures.map((_, i) => i).sort((a, b) => Number(!isPlayfield[a]) - Number(!isPlayfield[b]))
 		let next = 0
 		const workers = Array.from({ length: Math.min(concurrency, textures.length) }, async () => {
 			while (true) {
 				if (this.gate.isAnimating()) await this.gate.waitIfAnimating()
-				const i = next++
-				if (i >= textures.length) break
-				const ok = await this.loadShared(textures[i]!, table)
-				onTexture?.(textures[i]!, ok)
-				if (i % 2 === 0) await this.gate.yieldToMain()
+				const slot = next++
+				if (slot >= order.length) break
+				const texIdx = order[slot]!
+				const ok = await this.loadShared(textures[texIdx]!, table)
+				onTexture?.(textures[texIdx]!, ok)
+				if (slot % 2 === 0) await this.gate.yieldToMain()
 			}
 		})
 		await Promise.all(workers)
@@ -213,7 +218,7 @@ export class ThreeMapGenerator {
 			for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
 				const userData = (material as Material & { userData?: Record<string, unknown> }).userData
 				if (userData) normalizePendingKeys(userData)
-				for (const key of PENDING_KEYS) {
+				for (const key of PENDING_MAP_KEYS) {
 					const name = userData?.[key]
 					if (typeof name === 'string' && name && !this.hasTexture(name)) wanted.add(name)
 				}

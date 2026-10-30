@@ -11,14 +11,18 @@ import { EXRLoader } from 'three/examples/jsm/loaders/EXRLoader.js'
 import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js'
 import { logger } from '../../util/logger.js'
 import { MAX_FLOAT_TEXTURE_BYTES } from '../../util/quality.js'
+import { settleWorkerEntry, type WorkerPendingEntry, withWorkerTimeout } from '../../util/worker-pending.js'
 import type { ITextureLoader } from '../irender-api.js'
-import { downscaleArray, getMaxTextureSize, isPlayfieldCap } from './texture-downscale.js'
+import { WorkerLoadTracker } from './texture-dispatch.js'
+import { downscaleArray } from './texture-downscale.js'
+import { getMaxTextureSize, isPlayfieldCap } from './texture-tags.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
 let hdrWorkers: any[] = []
 let hdrReady: Promise<any[]> | null = null
-const hdrPending = new Map<number, { resolve: (v: any) => void; reject: (e: any) => void }>()
+const hdrPending = new Map<number, WorkerPendingEntry>()
+const hdrTracker = new WorkerLoadTracker()
 let hdrNextId = 1
 let hdrNextWorker = 0
 /**
@@ -66,19 +70,27 @@ async function getHdrWorkers(): Promise<any[]> {
 			}
 			if (!w) throw new Error('hdr worker not available - expected ./hdr-decode.worker.node.js')
 			w.on('message', (m: any) => {
-				const p = hdrPending.get(m.id)
-				if (!p) return
-				hdrPending.delete(m.id)
-				m.ok ? p.resolve(m) : p.reject(new Error(m.error))
+				const entry = settleWorkerEntry(hdrPending, m.id)
+				if (!entry) return
+				hdrTracker.idle(w)
+				m.ok ? entry.resolve(m) : entry.reject(new Error(m.error))
 			})
 			w.on('error', (e: any) => {
-				for (const [, p] of hdrPending) p.reject(e)
+				hdrTracker.resetAll()
+				for (const [, entry] of hdrPending) {
+					if (entry.timer) clearTimeout(entry.timer)
+					entry.reject(e)
+				}
 				hdrPending.clear()
 			})
 			w.on('exit', () => {
+				hdrTracker.drop(w)
 				hdrWorkers = hdrWorkers.filter(x => x !== w)
 				if (!hdrWorkers.length) hdrReady = null
-				for (const [, p] of hdrPending) p.reject(new Error('hdr worker exited'))
+				for (const [, entry] of hdrPending) {
+					if (entry.timer) clearTimeout(entry.timer)
+					entry.reject(new Error('hdr worker exited'))
+				}
 				hdrPending.clear()
 			})
 			;(w as any).unref?.()
@@ -92,22 +104,26 @@ async function getHdrWorkers(): Promise<any[]> {
 
 async function decodeHdrViaWorker(buffer: ArrayBuffer, type: 'hdr' | 'exr', name?: string): Promise<any> {
 	const workers = await getHdrWorkers()
-	const w = workers[hdrNextWorker++ % workers.length]!
+	// Playfield bakes jump to the least-busy worker so an 8K EXR never waits
+	// behind two full-length DWAA decodes; the decoded bytes are identical.
+	// Round-robin resumes where it left off — the playfield detour does not
+	// consume a turn.
+	const preferLeastBusy = isPlayfieldCap(name)
+	const picked = hdrTracker.pick(workers, preferLeastBusy, hdrNextWorker)
+	hdrNextWorker = picked.next
+	const worker = picked.worker
 	return new Promise((resolve, reject) => {
 		const id = hdrNextId++
 		hdrPending.set(id, { resolve, reject })
+		withWorkerTimeout(hdrPending, id, 60000, 'hdr worker timeout', () => hdrTracker.idle(worker))
 		try {
-			w.postMessage({ id, buffer, type, name }, [buffer] as any)
+			hdrTracker.busy(worker)
+			worker.postMessage({ id, buffer, type, name }, [buffer] as any)
 		} catch (e) {
-			hdrPending.delete(id)
+			const entry = settleWorkerEntry(hdrPending, id)
+			if (entry) hdrTracker.idle(worker)
 			reject(e)
 		}
-		setTimeout(() => {
-			if (hdrPending.has(id)) {
-				hdrPending.delete(id)
-				reject(new Error('hdr worker timeout'))
-			}
-		}, 60000)
 	})
 }
 

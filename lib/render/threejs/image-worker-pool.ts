@@ -1,14 +1,18 @@
 // Browser-only pool (Node decodes inline): image decode + resize runs off the
-// main thread so texture preload does not jank the first frames. Capped at 4
-// workers; round-robin dispatch with a 30s per-image timeout and main-thread
-// fallback when workers are unavailable.
+// main thread so texture preload does not jank the first frames. Sized by
+// CPU count, capped at 4; playfield maps dispatch to the least-busy worker
+// while the rest stay round-robin, with a 30s per-image timeout and
+// main-thread fallback when workers are unavailable.
+
+import { settleWorkerEntry, type WorkerPendingEntry, withWorkerTimeout } from '../../util/worker-pending.js'
+import { WorkerLoadTracker } from './texture-dispatch.js'
+import { isPlayfieldCap } from './texture-tags.js'
+
 const pool: Worker[] = []
 let next = 0
 let seq = 0
-const pending = new Map<
-	number,
-	{ resolve: (b: ImageBitmap) => void; reject: (e: any) => void; timer: ReturnType<typeof setTimeout> }
->()
+const tracker = new WorkerLoadTracker()
+const pending = new Map<number, WorkerPendingEntry<ImageBitmap>>()
 
 function getSize(): number {
 	const c = (globalThis as any).navigator?.hardwareConcurrency
@@ -24,18 +28,18 @@ function ensurePool(): Worker[] | null {
 				type: 'module',
 			} as any)
 			w.onmessage = ({ data }: any) => {
-				const p = pending.get(data.id)
-				if (!p) return
-				pending.delete(data.id)
-				clearTimeout(p.timer)
+				const entry = settleWorkerEntry(pending, data.id)
+				if (!entry) return
+				tracker.idle(w)
 				data.ok && data.bitmap
-					? p.resolve(data.bitmap as ImageBitmap)
-					: p.reject(new Error(data.error ?? 'image worker failed'))
+					? entry.resolve(data.bitmap as ImageBitmap)
+					: entry.reject(new Error(data.error ?? 'image worker failed'))
 			}
 			w.onerror = (e: any) => {
-				for (const [, p] of pending) {
-					clearTimeout(p.timer)
-					p.reject(e.error ?? new Error(String(e.message ?? e)))
+				tracker.resetAll()
+				for (const [, entry] of pending) {
+					if (entry.timer) clearTimeout(entry.timer)
+					entry.reject(e.error ?? new Error(String(e.message ?? e)))
 				}
 				pending.clear()
 			}
@@ -56,22 +60,24 @@ export function hasImageWorker(): boolean {
 export async function decodeInWorker(data: Uint8Array, mime: string, max: number, name: string): Promise<ImageBitmap> {
 	const workers = ensurePool()
 	if (!workers?.length) throw new Error('no image worker')
-	const w = workers[next++ % workers.length]!
+	// Playfield maps jump to the least-busy worker; the bitmap is identical.
+	// Round-robin resumes where it left off — the playfield detour does not
+	// consume a turn.
+	const preferLeastBusy = isPlayfieldCap(name)
+	const picked = tracker.pick(workers, preferLeastBusy, next)
+	next = picked.next
+	const worker = picked.worker
 	const id = ++seq
 	const buffer = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer
 	return new Promise<ImageBitmap>((resolve, reject) => {
-		const timer = setTimeout(() => {
-			if (pending.has(id)) {
-				pending.delete(id)
-				reject(new Error('image worker timeout'))
-			}
-		}, 30000)
-		pending.set(id, { resolve, reject, timer })
+		pending.set(id, { resolve, reject })
+		withWorkerTimeout(pending, id, 30000, 'image worker timeout', () => tracker.idle(worker))
 		try {
-			w.postMessage({ id, buffer, mime, max, name }, [buffer] as any)
+			tracker.busy(worker)
+			worker.postMessage({ id, buffer, mime, max, name }, [buffer] as any)
 		} catch (e) {
-			pending.delete(id)
-			clearTimeout(timer)
+			const entry = settleWorkerEntry(pending, id)
+			if (entry) tracker.idle(worker)
 			reject(e)
 		}
 	})
