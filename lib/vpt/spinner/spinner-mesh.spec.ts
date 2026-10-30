@@ -1,26 +1,24 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import type { Mesh } from 'three'
-import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import type { Mesh, Object3D } from 'three'
 import { ThreeHelper } from '../../../test/three.helper'
 import { NodeBinaryReader } from '../../io/binary-reader.node.js'
+import { ThreeRenderApi } from '../../render/threejs/three-render-api.js'
 import { Table } from '../table/table.js'
-import { TableExporter } from '../table/table-exporter.js'
 
 const three = new ThreeHelper()
 
 describe('The VPinball spinner generator', () => {
-	let gltf: GLTF
+	let node: Object3D
 
 	before(async () => {
 		const table = await Table.load(new NodeBinaryReader(three.fixturePath('table-spinner.vpx')))
-		const exporter = new TableExporter(table)
-		gltf = await three.loadGlb(await exporter.exportGlb())
+		node = await table.generateTableNode(new ThreeRenderApi(), {})
 	})
 
 	it('should generate a standard spinner mesh', async () => {
-		const plateMesh = three.find<Mesh>(gltf, 'spinners', 'Spinner', 'spinnerplate-Spinner')
+		const plateMesh = three.find<Mesh>(node, 'spinners', 'Spinner', 'spinnerplate-Spinner')
 		const plateMeshVertices = three.vertices(plateMesh)
 		let expectedVertices = [
 			[228.001434, 1171.200928, -77.000641],
@@ -254,7 +252,7 @@ describe('The VPinball spinner generator', () => {
 		]
 		three.expectVerticesInArray(expectedVertices, plateMeshVertices)
 
-		const bracketMesh = three.find<Mesh>(gltf, 'spinners', 'Spinner', 'spinnerbracket-Spinner')
+		const bracketMesh = three.find<Mesh>(node, 'spinners', 'Spinner', 'spinnerbracket-Spinner')
 		const bracketMeshVertices = three.vertices(bracketMesh)
 		expectedVertices = [
 			[239.796234, 1169.677368, -98.095039],
@@ -414,7 +412,7 @@ describe('The VPinball spinner generator', () => {
 	})
 
 	it('should generate a transformed spinner mesh', async () => {
-		const plateMesh = three.find<Mesh>(gltf, 'spinners', 'Transformed', 'spinnerplate-Transformed')
+		const plateMesh = three.find<Mesh>(node, 'spinners', 'Transformed', 'spinnerplate-Transformed')
 		const plateMeshVertices = three.vertices(plateMesh)
 		let expectedVertices = [
 			[440.618469, 1159.417236, -57.644672],
@@ -648,7 +646,7 @@ describe('The VPinball spinner generator', () => {
 		]
 		three.expectVerticesInArray(expectedVertices, plateMeshVertices)
 
-		const bracketMesh = three.find<Mesh>(gltf, 'spinners', 'Transformed', 'spinnerbracket-Transformed')
+		const bracketMesh = three.find<Mesh>(node, 'spinners', 'Transformed', 'spinnerbracket-Transformed')
 		const bracketMeshVertices = three.vertices(bracketMesh)
 		expectedVertices = [
 			[456.819733, 1153.730835, -88.099716],
@@ -808,7 +806,7 @@ describe('The VPinball spinner generator', () => {
 	})
 
 	it('should generate generate the plate only when bracket is invisible', async () => {
-		const plateMesh = three.find<Mesh>(gltf, 'spinners', 'WithoutBracket', 'spinnerplate-WithoutBracket')
+		const plateMesh = three.find<Mesh>(node, 'spinners', 'WithoutBracket', 'spinnerplate-WithoutBracket')
 		const plateMeshVertices = three.vertices(plateMesh)
 		const expectedVertices = [
 			[616.001465, 1175.200928, -77.000641],
@@ -1041,11 +1039,11 @@ describe('The VPinball spinner generator', () => {
 			[642.878662, 1172.287598, -60.712639],
 		]
 		three.expectVerticesInArray(expectedVertices, plateMeshVertices)
-		three.expectNoObject(gltf, 'spinners', 'WithoutBracket', 'spinnerbracket-WithoutBracket')
+		three.expectNoObject(node, 'spinners', 'WithoutBracket', 'spinnerbracket-WithoutBracket')
 	})
 
 	it('should generate a spinner mesh on a surface', async () => {
-		const plateMesh = three.find<Mesh>(gltf, 'spinners', 'Surface', 'spinnerplate-Surface')
+		const plateMesh = three.find<Mesh>(node, 'spinners', 'Surface', 'spinnerplate-Surface')
 		const plateMeshVertices = three.vertices(plateMesh)
 		let expectedVertices = [
 			[536.001465, 961.200989, -127.000641],
@@ -1279,7 +1277,7 @@ describe('The VPinball spinner generator', () => {
 		]
 		three.expectVerticesInArray(expectedVertices, plateMeshVertices)
 
-		const bracketMesh = three.find<Mesh>(gltf, 'spinners', 'Surface', 'spinnerbracket-Surface')
+		const bracketMesh = three.find<Mesh>(node, 'spinners', 'Surface', 'spinnerbracket-Surface')
 		const bracketMeshVertices = three.vertices(bracketMesh)
 		expectedVertices = [
 			[547.796265, 959.677368, -148.095032],
@@ -1439,6 +1437,6 @@ describe('The VPinball spinner generator', () => {
 	})
 
 	it('should not generate an invisible spinner', async () => {
-		three.expectNoObject(gltf, 'spinners', 'Invisible')
+		three.expectNoObject(node, 'spinners', 'Invisible')
 	})
 })

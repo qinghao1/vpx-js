@@ -4,27 +4,30 @@
 import * as chai from 'chai'
 import { expect } from 'chai'
 import sinonChai from 'sinon-chai'
-import { type Mesh, Vector3 } from 'three'
+import { Group, type Mesh, Vector3 } from 'three'
 import { createBall } from '../../../test/physics.helper'
 import { ThreeHelper } from '../../../test/three.helper'
 import { Player } from '../../game/player.js'
 import { NodeBinaryReader } from '../../io/binary-reader.node.js'
 import { ThreeRenderApi } from '../../render/threejs/three-render-api.js'
 import { Table } from '../table/table.js'
-import { TableExporter } from '../table/table-exporter.js'
 
 chai.use((sinonChai as any).default ?? sinonChai)
 const three = new ThreeHelper()
 const renderApi = new ThreeRenderApi()
 
+async function loadScene(table: Table): Promise<Group> {
+	const scene = new Group()
+	scene.add(await table.generateTableNode(new ThreeRenderApi(), {}))
+	return scene
+}
+
 describe('The VPinball ball physics', () => {
 	let table: Table
-	let exporter: TableExporter
 	let player: Player
 
 	before(async () => {
 		table = await Table.load(new NodeBinaryReader(three.fixturePath('table-empty.vpx')))
-		exporter = new TableExporter(table)
 	})
 
 	beforeEach(() => {
@@ -90,12 +93,12 @@ describe('The VPinball ball physics', () => {
 
 	it('should apply the mesh transformation', async () => {
 		// create scene
-		const gltf = await three.loadGlb(await exporter.exportGlb())
+		const scene = await loadScene(table)
 
 		// add ball
 		const ball = createBall(player, 500, 500, 0, 0, 10)
-		await ball.addToScene(gltf.scene as any, renderApi, table) // fixme type
-		const ballObj = three.find<Mesh>(gltf, 'balls', ball.getName())
+		await ball.addToScene(scene as any, renderApi, table) // fixme type
+		const ballObj = three.find<Mesh>(scene, 'balls', ball.getName())
 
 		// init vectors
 		const startPos = new Vector3()
@@ -117,20 +120,20 @@ describe('The VPinball ball physics', () => {
 
 	it('should remove a ball from the scene', async () => {
 		// create scene
-		const gltf = await three.loadGlb(await exporter.exportGlb())
+		const scene = await loadScene(table)
 
 		// add ball
 		const ball = createBall(player, 500, 500, 0, 0, 10)
-		await ball.addToScene(gltf.scene as any, renderApi, table) // fixme type
+		await ball.addToScene(scene as any, renderApi, table) // fixme type
 
 		// assert it's in the scene
-		three.expectObject(gltf, 'balls', ball.getName())
+		three.expectObject(scene, 'balls', ball.getName())
 
 		// destroy ball
 		player.destroyBall(ball)
-		ball.removeFromScene(gltf.scene as any, renderApi) // fixme type
+		ball.removeFromScene(scene as any, renderApi) // fixme type
 
 		// assert it's gone
-		three.expectNoObject(gltf, 'balls', ball.getName())
+		three.expectNoObject(scene, 'balls', ball.getName())
 	})
 })

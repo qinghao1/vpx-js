@@ -18,49 +18,44 @@
  */
 
 import { resolve as resolvePath } from 'node:path'
-import { type GLTF, GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import type { Mesh, Object3D } from '../lib/refs.node.js'
 
-// GLB-roundtrip assumption: export→parse preserves the table→group→item→object hierarchy and node names,
-// except the exporter may suffix duplicate names with "_<n>" (see matchesName); the table root is named "playfield*".
+// Direct-scene lookup over the node returned by Table.generateTableNode (or a
+// wrapper group/scene containing it). Mirrors the old GLB round-trip view:
+// the exporter ran with onlyVisible, so invisible nodes are treated as
+// absent, and GLTFLoader sanitized names (whitespace to '_', '[] . : /'
+// stripped, duplicate siblings suffixed '_<n>') — matchesName applies the
+// same rule so existing mesh names keep working. The table root is named
+// "playfield*".
 export class ThreeHelper {
-	private readonly loader: any
-
-	constructor() {
-		this.loader = new GLTFLoader()
+	public first<T extends Object3D>(root: Object3D, groupName: string): T {
+		const table = this.getTable(root)
+		const group = table.children.filter(isPresent).find(child => matchesName(child, groupName))
+		if (!group) {
+			throw new Error(
+				`Scene has no "${groupName}" group! ` +
+					`(available: [${table.children.map(child => child.name).join(', ')}])`,
+			)
+		}
+		const visible = group.children.filter(isPresent)
+		if (!visible.length) {
+			throw new Error(`The "${groupName}" group of the scene has no children.`)
+		}
+		if (!visible[0].children?.filter(isPresent).length) {
+			throw new Error(`The first child of the group "${groupName}" of the scene has no children.`)
+		}
+		return visible[0].children.filter(isPresent)[0] as T
 	}
 
-	public async loadGlb(glb: Buffer): Promise<GLTF> {
-		return new Promise((resolve, reject) => this.loader.parse(toArrayBuffer(glb), '', resolve, reject))
-	}
-
-	public first<T extends Object3D>(gltf: GLTF, groupName: string): T {
-		const table = this.getTable(gltf)
-		if (!table.children?.length) {
-			throw new Error('GLTF table has no children!')
-		}
-		const objects = table.children.find(child => matchesName(child, groupName))
-		if (!objects) {
-			throw new Error(`GLTF table has no "${groupName}" group!`)
-		}
-		if (!objects.children?.length) {
-			throw new Error(`The "${groupName}" group of the GLTF table has no children.`)
-		}
-		if (!objects.children[0].children?.length) {
-			throw new Error(`The first child of the group "${groupName}" of the GLTF table has no children.`)
-		}
-		return objects.children[0].children[0] as T
-	}
-
-	public find<T extends Object3D>(gltf: GLTF, groupName: string, itemName: string, objectName?: string): T {
-		const { group, item, object } = this.lookup(gltf, groupName, itemName, objectName)
+	public find<T extends Object3D>(root: Object3D, groupName: string, itemName: string, objectName?: string): T {
+		const { group, item, object } = this.lookup(root, groupName, itemName, objectName)
 		const found = this.requireItem(group, groupName, itemName, item)
 		if (!objectName) {
 			return found as T
 		}
 		if (!object) {
 			throw new Error(
-				`Item "${itemName}" of group "${groupName}" of the GLTF table has no child named "${objectName}". ` +
+				`Item "${itemName}" of group "${groupName}" of the scene has no child named "${objectName}". ` +
 					`(available: [${found.children.map(child => child.name).join(', ')}])`,
 			)
 		}
@@ -68,34 +63,34 @@ export class ThreeHelper {
 	}
 
 	private lookup(
-		gltf: GLTF,
+		root: Object3D,
 		groupName: string,
 		itemName: string,
 		objectName?: string,
 	): { group: Object3D; item?: Object3D; object?: Object3D } {
-		const table = this.getTable(gltf)
-		if (!table.children?.length) {
-			throw new Error('GLTF table has no children!')
-		}
-		const group = table.children.find(child => matchesName(child, groupName))
+		const table = this.getTable(root)
+		const group = table.children.filter(isPresent).find(child => matchesName(child, groupName))
 		if (!group) {
 			throw new Error(
-				`GLTF table has no "${groupName}" group! ` +
+				`Scene has no "${groupName}" group! ` +
 					`(available: [${table.children.map(child => child.name).join(', ')}])`,
 			)
 		}
-		const item = group.children?.find(child => matchesName(child, itemName))
-		const object = objectName && item ? item.children.find(child => matchesName(child, objectName)) : undefined
+		const item = group.children?.filter(isPresent).find(child => matchesName(child, itemName))
+		const object =
+			objectName && item
+				? item.children.filter(isPresent).find(child => matchesName(child, objectName))
+				: undefined
 		return { group, item, object }
 	}
 
 	private requireItem(group: Object3D, groupName: string, itemName: string, item?: Object3D): Object3D {
-		if (!group.children?.length) {
-			throw new Error(`The "${groupName}" group of the GLTF table has no children.`)
+		if (!group.children?.filter(isPresent).length) {
+			throw new Error(`The "${groupName}" group of the scene has no children.`)
 		}
 		if (!item) {
 			throw new Error(
-				`The "${groupName}" group of the GLTF table has no child named "${itemName}". ` +
+				`The "${groupName}" group of the scene has no child named "${itemName}". ` +
 					`(available: [${group.children.map(child => child.name).join(', ')}])`,
 			)
 		}
@@ -106,40 +101,40 @@ export class ThreeHelper {
 		return (mesh.geometry as any).attributes.position.array
 	}
 
-	public getTable(gltf: GLTF): Object3D {
-		if (!gltf?.scene?.children?.length) {
-			throw new Error('Cannot find scene in GLTF.')
+	public getTable(root: Object3D): Object3D {
+		if (root.name.startsWith('playfield')) {
+			return root
 		}
-		const table = gltf.scene.children.find(child => child.name.startsWith('playfield'))
+		const table = root.children?.find(child => child.name.startsWith('playfield'))
 		if (!table) {
-			throw new Error('Cannot find table in GLTF.')
+			throw new Error('Cannot find table in scene.')
 		}
 		return table
 	}
 
-	public expectNoObject(gltf: GLTF, groupName: string, itemName: string, objectName?: string): void {
-		const { group, item, object } = this.lookup(gltf, groupName, itemName, objectName)
+	public expectNoObject(root: Object3D, groupName: string, itemName: string, objectName?: string): void {
+		const { group, item, object } = this.lookup(root, groupName, itemName, objectName)
 		if (objectName) {
 			this.requireItem(group, groupName, itemName, item)
 			if (object) {
 				throw new Error(
-					`The "${itemName}" item of the "${groupName}" group of the GLTF table has a child named ` +
+					`The "${itemName}" item of the "${groupName}" group of the scene has a child named ` +
 						`"${objectName}" but none was expected.`,
 				)
 			}
 		} else if (item) {
 			throw new Error(
-				`The "${groupName}" group of the GLTF table has a child named "${itemName}" but none was expected.`,
+				`The "${groupName}" group of the scene has a child named "${itemName}" but none was expected.`,
 			)
 		}
 	}
 
-	public expectObject(gltf: GLTF, groupName: string, itemName: string, objectName?: string): void {
-		const { group, item, object } = this.lookup(gltf, groupName, itemName, objectName)
+	public expectObject(root: Object3D, groupName: string, itemName: string, objectName?: string): void {
+		const { group, item, object } = this.lookup(root, groupName, itemName, objectName)
 		const found = this.requireItem(group, groupName, itemName, item)
 		if (objectName && !object) {
 			throw new Error(
-				`The "${itemName}" item in the "${groupName}" group of the GLTF table has no child named ` +
+				`The "${itemName}" item in the "${groupName}" group of the scene has no child named ` +
 					`"${objectName}". (available: [${found.children.map(child => child.name).join(', ')}])`,
 			)
 		}
@@ -169,10 +164,10 @@ export class ThreeHelper {
 		}
 	}
 
-	public concatMeshes(gltf: GLTF, groupName: string, itemName: string, objectNames: string[]): number[] {
+	public concatMeshes(root: Object3D, groupName: string, itemName: string, objectNames: string[]): number[] {
 		const arr: number[] = []
 		for (const objName of objectNames) {
-			const mesh = this.find(gltf, groupName, itemName, objName) as Mesh
+			const mesh = this.find(root, groupName, itemName, objName) as Mesh
 			const geometry = mesh.geometry as any
 			arr.push(...geometry.attributes.position.array)
 		}
@@ -189,10 +184,18 @@ export class ThreeHelper {
 	}
 }
 
-function matchesName(node: Object3D, name: string): boolean {
-	return node.name === name || node.name.startsWith(`${name}_`)
+function isPresent(node: Object3D): boolean {
+	return node.visible !== false
 }
 
-function toArrayBuffer(buf: Buffer): ArrayBuffer {
-	return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.length) as ArrayBuffer
+// Same name mangling the GLB round-trip applied (GLTFLoader after
+// PropertyBinding.sanitizeNodeName, plus '_<n>' deduplication), so specs
+// keep addressing meshes with their familiar names.
+function matchesName(node: Object3D, name: string): boolean {
+	const sane = sanitizeName(node.name)
+	return sane === name || sane.startsWith(`${name}_`)
+}
+
+function sanitizeName(name: string): string {
+	return name.replace(/\s/g, '_').replace(/[[\].:/]/g, '')
 }

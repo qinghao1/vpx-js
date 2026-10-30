@@ -2,11 +2,11 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { expect } from 'chai'
-import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import type { Object3D } from 'three'
 import { ThreeHelper } from '../../../test/three.helper'
 import { NodeBinaryReader } from '../../io/binary-reader.node.js'
+import { ThreeRenderApi } from '../../render/threejs/three-render-api.js'
 import { Table } from '../table/table.js'
-import { TableExporter } from '../table/table-exporter.js'
 import type { PlungerData } from './plunger-data.js'
 import { PlungerDesc } from './plunger-desc.js'
 
@@ -20,25 +20,26 @@ async function loadPlungerTable(): Promise<Table> {
 }
 
 describe('The VPinball plunger generator', () => {
-	let gltf: GLTF
+	let node: Object3D
 
 	before(async () => {
-		const exporter = new TableExporter(await loadPlungerTable())
-		gltf = await three.loadGlb(await exporter.exportGlb({ exportPlayfieldLights: true }))
+		node = await (await loadPlungerTable()).generateTableNode(new ThreeRenderApi(), {
+			exportPlayfieldLights: true,
+		})
 	})
 
 	it('should generate a flat plunger', async () => {
-		three.expectObject(gltf, 'plungers', 'FlatPlunger', 'flat')
+		three.expectObject(node, 'plungers', 'FlatPlunger', 'flat')
 	})
 
 	it('should generate a modern plunger', async () => {
-		three.expectObject(gltf, 'plungers', 'ModernPlunger', 'spring')
-		three.expectObject(gltf, 'plungers', 'ModernPlunger', 'rod')
+		three.expectObject(node, 'plungers', 'ModernPlunger', 'spring')
+		three.expectObject(node, 'plungers', 'ModernPlunger', 'rod')
 	})
 
 	it('should generate a custom plunger', async () => {
-		three.expectObject(gltf, 'plungers', 'CustomPlunger', 'spring')
-		three.expectObject(gltf, 'plungers', 'CustomPlunger', 'rod')
+		three.expectObject(node, 'plungers', 'CustomPlunger', 'spring')
+		three.expectObject(node, 'plungers', 'CustomPlunger', 'rod')
 	})
 })
 

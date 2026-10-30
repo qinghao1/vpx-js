@@ -2,30 +2,28 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { expect } from 'chai'
-import type { Mesh } from 'three'
-import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import type { Mesh, Object3D } from 'three'
 import { TableBuilder } from '../../../test/table-builder.js'
 import { ThreeHelper } from '../../../test/three.helper'
 import { NodeBinaryReader } from '../../io/binary-reader.node.js'
+import { ThreeRenderApi } from '../../render/threejs/three-render-api.js'
 import { Enums } from '../enums.js'
 import { loadMesh } from '../mesh-loader.js'
 import { Table } from '../table/table.js'
-import { TableExporter } from '../table/table-exporter.js'
 import { TriggerMeshGenerator } from './trigger-mesh-generator.js'
 
 const three = new ThreeHelper()
 
 describe('The VPinball trigger generator', () => {
-	let gltf: GLTF
+	let node: Object3D
 
 	before(async () => {
 		const table = await Table.load(new NodeBinaryReader(three.fixturePath('table-trigger.vpx')))
-		const exporter = new TableExporter(table)
-		gltf = await three.loadGlb(await exporter.exportGlb())
+		node = await table.generateTableNode(new ThreeRenderApi(), {})
 	})
 
 	it('should generate a button trigger mesh', async () => {
-		const triggerMesh = three.find<Mesh>(gltf, 'triggers', 'Button', 'trigger-Button')
+		const triggerMesh = three.find<Mesh>(node, 'triggers', 'Button', 'trigger-Button')
 		const triggerMeshVertices = three.vertices(triggerMesh)
 
 		// structural: the Button fixture is a radius-25 button at rot=0 centered
@@ -58,15 +56,15 @@ describe('The VPinball trigger generator', () => {
 	})
 
 	it('should not generate a "None" trigger mesh', async () => {
-		three.expectNoObject(gltf, 'triggers', 'None')
+		three.expectNoObject(node, 'triggers', 'None')
 	})
 
 	it('should not generate an invisible trigger mesh', async () => {
-		three.expectNoObject(gltf, 'triggers', 'Invisible')
+		three.expectNoObject(node, 'triggers', 'Invisible')
 	})
 
 	it('should generate a star trigger mesh', async () => {
-		const triggerMesh = three.find<Mesh>(gltf, 'triggers', 'Star', 'trigger-Star')
+		const triggerMesh = three.find<Mesh>(node, 'triggers', 'Star', 'trigger-Star')
 		const triggerMeshVertices = three.vertices(triggerMesh)
 		const expectedVertices = [
 			[398.788025, 1437.033936, -8.024473],
@@ -305,7 +303,7 @@ describe('The VPinball trigger generator', () => {
 	})
 
 	it('should generate a wire A trigger mesh', async () => {
-		const triggerMesh = three.find<Mesh>(gltf, 'triggers', 'WireA', 'trigger-WireA')
+		const triggerMesh = three.find<Mesh>(node, 'triggers', 'WireA', 'trigger-WireA')
 		const triggerMeshVertices = three.vertices(triggerMesh)
 		const expectedVertices = [
 			[510.584137, 1405.08374, -33.562248],
@@ -362,7 +360,7 @@ describe('The VPinball trigger generator', () => {
 	})
 
 	it('should generate a wire B trigger mesh', async () => {
-		const triggerMesh = three.find<Mesh>(gltf, 'triggers', 'WireB', 'trigger-WireB')
+		const triggerMesh = three.find<Mesh>(node, 'triggers', 'WireB', 'trigger-WireB')
 		const triggerMeshVertices = three.vertices(triggerMesh)
 		const expectedVertices = [
 			[632.321655, 1405.005005, -39.694489],
@@ -419,7 +417,7 @@ describe('The VPinball trigger generator', () => {
 	})
 
 	it('should generate a wire C trigger mesh', async () => {
-		const triggerMesh = three.find<Mesh>(gltf, 'triggers', 'WireC', 'trigger-WireC')
+		const triggerMesh = three.find<Mesh>(node, 'triggers', 'WireC', 'trigger-WireC')
 		const triggerMeshVertices = three.vertices(triggerMesh)
 		const expectedVertices = [
 			[868.305176, 1412.04895, 59.187416],
@@ -476,7 +474,7 @@ describe('The VPinball trigger generator', () => {
 	})
 
 	it('should generate a wire D trigger mesh', async () => {
-		const triggerMesh = three.find<Mesh>(gltf, 'triggers', 'WireD', 'trigger-WireD')
+		const triggerMesh = three.find<Mesh>(node, 'triggers', 'WireD', 'trigger-WireD')
 		const triggerMeshVertices = three.vertices(triggerMesh)
 		const expectedVertices = [
 			[503.068207, 1569.602173, -1.965605],
@@ -687,7 +685,7 @@ describe('The VPinball trigger generator', () => {
 	})
 
 	it('should generate a wire trigger mesh with a thick wire', async () => {
-		const triggerMesh = three.find<Mesh>(gltf, 'triggers', 'ThickWire', 'trigger-ThickWire')
+		const triggerMesh = three.find<Mesh>(node, 'triggers', 'ThickWire', 'trigger-ThickWire')
 		const triggerMeshVertices = three.vertices(triggerMesh)
 		const expectedVertices = [
 			[314.748993, 1563.871094, -2.971205],
@@ -898,7 +896,7 @@ describe('The VPinball trigger generator', () => {
 	})
 
 	it('should generate a wire trigger mesh on a surface', async () => {
-		const triggerMesh = three.find<Mesh>(gltf, 'triggers', 'Surface', 'trigger-Surface')
+		const triggerMesh = three.find<Mesh>(node, 'triggers', 'Surface', 'trigger-Surface')
 		const triggerMeshVertices = three.vertices(triggerMesh)
 		const expectedVertices = [
 			[491.855377, 120.284477, -33.562248],

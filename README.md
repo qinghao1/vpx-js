@@ -7,7 +7,7 @@ Fork of [`vpdb/vpx-js`](https://github.com/vpdb/vpx-js) by [freezy](https://gith
 ## Features
 
 - **Parse** `.vpx` tables — OLE/BIFF, meshes, materials, textures, and scripts — with `Table.load()`.
-- **Render** with three.js and export binary GLB with `TableExporter`.
+- **Render** with three.js via `Table.generateTableNode()`.
 - **Simulate** headless with `Player`: 60 Hz physics/animation stepping plus table-script execution.
 - **Transpile** VBScript table scripts to JavaScript with `Transpiler`.
 - **Emulate** WPC ROMs with `wpc-emu` and other hardware via the PinMAME WASM build.
@@ -51,14 +51,15 @@ const response = await fetch('/tables/my_table.vpx')
 const table = await Table.load(new BrowserBinaryReader(await response.arrayBuffer()))
 ```
 
-### Export to GLB
+### Render
 
 ```ts
-import { writeFileSync } from 'node:fs'
-import { TableExporter } from 'vpx-js'
+import { ThreeRenderApi } from 'vpx-js'
 
-const glb = await new TableExporter(table).exportGlb()
-writeFileSync('my_table.glb', glb)
+const scene = await table.generateTableNode(new ThreeRenderApi(), {
+  applyMaterials: true,
+})
+// `scene` is a three.js Object3D ready to add to your renderer.
 ```
 
 ### Simulate

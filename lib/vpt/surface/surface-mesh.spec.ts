@@ -1,28 +1,27 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import type { Object3D } from 'three'
 import { expect } from 'vitest'
 import { TableBuilder } from '../../../test/table-builder.js'
 import { ThreeHelper } from '../../../test/three.helper'
 import { NodeBinaryReader } from '../../io/binary-reader.node.js'
+import { ThreeRenderApi } from '../../render/threejs/three-render-api.js'
 import { Table } from '../table/table.js'
-import { TableExporter } from '../table/table-exporter.js'
 import { SurfaceMeshGenerator } from './surface-view.js'
 
 const three = new ThreeHelper()
 
 describe('The VPinball surface generator', () => {
-	let gltf: GLTF
+	let node: Object3D
 
 	before(async () => {
 		const table = await Table.load(new NodeBinaryReader(three.fixturePath('table-surface.vpx')))
-		const exporter = new TableExporter(table)
-		gltf = await three.loadGlb(await exporter.exportGlb())
+		node = await table.generateTableNode(new ThreeRenderApi(), {})
 	})
 
 	it('should generate a surface mesh', async () => {
-		const vertices = three.concatMeshes(gltf, 'surfaces', 'Wall', ['surfacetop-Wall', 'surfaceside-Wall'])
+		const vertices = three.concatMeshes(node, 'surfaces', 'Wall', ['surfacetop-Wall', 'surfaceside-Wall'])
 		const expectedVertices = [
 			[251.0, 353.0, -0.0],
 			[251.0, 353.0, -50.0],
@@ -294,7 +293,7 @@ describe('The VPinball surface generator', () => {
 	})
 
 	it('should generate a surface mesh with invisible top', async () => {
-		const vertices = three.concatMeshes(gltf, 'surfaces', 'TopInvisible', ['surfaceside-TopInvisible'])
+		const vertices = three.concatMeshes(node, 'surfaces', 'TopInvisible', ['surfaceside-TopInvisible'])
 		const expectedVertices = [
 			[379.0, 1125.0, -2.7],
 			[379.0, 1125.0, -49.599998],
@@ -338,11 +337,11 @@ describe('The VPinball surface generator', () => {
 			[379.0, 1125.0, -2.7],
 		]
 		three.expectVerticesInArray(expectedVertices, vertices)
-		three.expectNoObject(gltf, 'surfaces', 'TopInvisible', 'surfacetop-TopInvisible')
+		three.expectNoObject(node, 'surfaces', 'TopInvisible', 'surfacetop-TopInvisible')
 	})
 
 	it('should generate a surface mesh with invisible sides', async () => {
-		const vertices = three.concatMeshes(gltf, 'surfaces', 'SideInvisible', ['surfacetop-SideInvisible'])
+		const vertices = three.concatMeshes(node, 'surfaces', 'SideInvisible', ['surfacetop-SideInvisible'])
 		const expectedVertices = [
 			[455.0, 1667.0, -11.5],
 			[450.444305, 1670.719604, -11.5],
@@ -465,11 +464,11 @@ describe('The VPinball surface generator', () => {
 			[461.540344, 1659.923218, -11.5],
 		]
 		three.expectVerticesInArray(expectedVertices, vertices)
-		three.expectNoObject(gltf, 'surfaces', 'SideInvisible', 'surfaceside-SideInvisible')
+		three.expectNoObject(node, 'surfaces', 'SideInvisible', 'surfaceside-SideInvisible')
 	})
 
 	it('should not generate a surface mesh with invisible sides and top', async () => {
-		three.expectNoObject(gltf, 'surfaces', 'Invisible')
+		three.expectNoObject(node, 'surfaces', 'Invisible')
 	})
 
 	it('should emit upstream side/top normals instead of zero normals', () => {

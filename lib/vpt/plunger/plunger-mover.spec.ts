@@ -4,13 +4,12 @@
 import * as chai from 'chai'
 import { expect } from 'chai'
 import sinonChai from 'sinon-chai'
-import type { Mesh } from 'three'
+import type { Mesh, Object3D } from 'three'
 import { ThreeHelper } from '../../../test/three.helper'
 import { Player } from '../../game/player.js'
 import { NodeBinaryReader } from '../../io/binary-reader.node.js'
 import { ThreeRenderApi } from '../../render/threejs/three-render-api.js'
 import { Table } from '../table/table.js'
-import { TableExporter } from '../table/table-exporter.js'
 import type { PlungerMover } from './plunger-mover.js'
 import type { PlungerState } from './plunger-state.js'
 
@@ -20,12 +19,10 @@ const renderApi = new ThreeRenderApi()
 
 describe('The VPinball plunger physics', () => {
 	let table: Table
-	let exporter: TableExporter
 	let player: Player
 
 	before(async () => {
 		table = await Table.load(new NodeBinaryReader(three.fixturePath('table-plunger.vpx')))
-		exporter = new TableExporter(table)
 	})
 
 	beforeEach(() => {
@@ -148,11 +145,11 @@ describe('The VPinball plunger physics', () => {
 
 	it('should apply the mesh transformation when animated', async () => {
 		// create scene
-		const gltf = await three.loadGlb(await exporter.exportGlb())
+		const node: Object3D = await table.generateTableNode(new ThreeRenderApi(), {})
 		const plunger = table.plungers.CustomPlunger
 
 		// retrieve plunger
-		const plungerObj = three.find<Mesh>(gltf, 'plungers', 'CustomPlunger')
+		const plungerObj = three.find<Mesh>(node, 'plungers', 'CustomPlunger')
 		const rodObj = plungerObj.children.find(c => c.name === 'rod') as Mesh
 		const springObj = plungerObj.children.find(c => c.name === 'spring') as Mesh
 

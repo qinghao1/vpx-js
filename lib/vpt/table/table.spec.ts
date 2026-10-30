@@ -2,14 +2,13 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { expect } from 'chai'
-import type { Mesh } from 'three'
-import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import type { Mesh, Object3D } from 'three'
 import { ThreeHelper } from '../../../test/three.helper'
 import { NodeBinaryReader } from '../../io/binary-reader.node.js'
 import type { ReadResult, Storage } from '../../io/ole-doc.js'
+import { ThreeRenderApi } from '../../render/threejs/three-render-api.js'
 import { Table } from './table.js'
 import { TableData } from './table-data.js'
-import { TableExporter } from './table-exporter.js'
 
 const three = new ThreeHelper()
 
@@ -18,17 +17,16 @@ const tableHeight = 2222
 const tableDepth = 20
 
 describe('The VPinball table generator', () => {
-	let gltf: GLTF
+	let node: Object3D
 	let table: Table
 
 	before(async () => {
 		table = await Table.load(new NodeBinaryReader(three.fixturePath('table-empty.vpx')))
-		const exporter = new TableExporter(table)
-		gltf = await three.loadGlb(await exporter.exportGlb({ exportPlayfieldLights: false }))
+		node = await table.generateTableNode(new ThreeRenderApi(), { exportPlayfieldLights: false })
 	})
 
 	it('should generate the correct playfield mesh', async () => {
-		const playfieldMesh = three.first<Mesh>(gltf, 'playfield')
+		const playfieldMesh = three.first<Mesh>(node, 'playfield')
 		const playfieldVertices = three.vertices(playfieldMesh)
 		const verts = Array.from(playfieldVertices)
 		const axis = (offset: number): number[] => verts.filter((_, i) => i % 3 === offset)

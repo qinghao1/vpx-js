@@ -2,31 +2,29 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { expect } from 'chai'
-import type { Mesh } from 'three'
-import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import type { Mesh, Object3D } from 'three'
 import { TableBuilder } from '../../../test/table-builder.js'
 import { ThreeHelper } from '../../../test/three.helper'
 import { NodeBinaryReader } from '../../io/binary-reader.node.js'
 import type { ReadResult, Storage } from '../../io/ole-doc.js'
 import { Vertex3D } from '../../math/vector.js'
+import { ThreeRenderApi } from '../../render/threejs/three-render-api.js'
 import { Table } from '../table/table.js'
-import { TableExporter } from '../table/table-exporter.js'
 import { PrimitiveData } from './primitive-data.js'
 import { PrimitiveMeshGenerator } from './primitive-mesh-generator.js'
 
 const three = new ThreeHelper()
 
 describe('The VPinball primitive generator', () => {
-	let gltf: GLTF
+	let node: Object3D
 
 	before(async () => {
 		const table = await Table.load(new NodeBinaryReader(three.fixturePath('table-primitive.vpx')))
-		const exporter = new TableExporter(table)
-		gltf = await three.loadGlb(await exporter.exportGlb())
+		node = await table.generateTableNode(new ThreeRenderApi(), {})
 	})
 
 	it('should generate a simple primitive mesh', async () => {
-		const cubeMesh = three.find<Mesh>(gltf, 'primitives', 'Cube', 'primitive-Cube')
+		const cubeMesh = three.find<Mesh>(node, 'primitives', 'Cube', 'primitive-Cube')
 		const cubeMeshVertices = three.vertices(cubeMesh)
 		const expectedVertices = [
 			[600.0, 600.0, 100.0],
@@ -58,7 +56,7 @@ describe('The VPinball primitive generator', () => {
 	})
 
 	it('should generate a simple generated mesh', async () => {
-		const triangleMesh = three.find<Mesh>(gltf, 'primitives', 'Triangle', 'primitive-Triangle')
+		const triangleMesh = three.find<Mesh>(node, 'primitives', 'Triangle', 'primitive-Triangle')
 		const triangleMeshVertices = three.vertices(triangleMesh)
 		const expectedVertices = [
 			[526.975952, 913.236511, -246.442444],
@@ -124,10 +122,9 @@ describe('The VPinball primitive generator', () => {
 
 	it('should generate a compressed mesh', async () => {
 		const vptSink = await Table.load(new NodeBinaryReader(three.fixturePath('table-sink.vpx')))
-		const exporterSink = new TableExporter(vptSink)
-		const gltfSink = await three.loadGlb(await exporterSink.exportGlb())
+		const nodeSink = await vptSink.generateTableNode(new ThreeRenderApi(), {})
 
-		const sinkMesh = three.find<Mesh>(gltfSink, 'primitives', 'Primitive1', 'primitive-Primitive1')
+		const sinkMesh = three.find<Mesh>(nodeSink, 'primitives', 'Primitive1', 'primitive-Primitive1')
 		const sinkMeshVertices = three.vertices(sinkMesh)
 		const expectedVertices = [
 			[450.063995, 1123.057007, -85.772011],

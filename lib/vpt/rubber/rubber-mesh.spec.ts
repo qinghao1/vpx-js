@@ -1,26 +1,24 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import type { Mesh } from 'three'
-import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import type { Mesh, Object3D } from 'three'
 import { ThreeHelper } from '../../../test/three.helper'
 import { NodeBinaryReader } from '../../io/binary-reader.node.js'
+import { ThreeRenderApi } from '../../render/threejs/three-render-api.js'
 import { Table } from '../table/table.js'
-import { TableExporter } from '../table/table-exporter.js'
 
 const three = new ThreeHelper()
 
 describe('The VPinball rubber generator', () => {
-	let gltf: GLTF
+	let node: Object3D
 
 	before(async () => {
 		const table = await Table.load(new NodeBinaryReader(three.fixturePath('table-rubber.vpx')))
-		const exporter = new TableExporter(table)
-		gltf = await three.loadGlb(await exporter.exportGlb())
+		node = await table.generateTableNode(new ThreeRenderApi(), {})
 	})
 
 	it('should generate a rubber mesh', async () => {
-		const rubberMesh = three.find<Mesh>(gltf, 'rubbers', 'Rubber2', 'rubber-Rubber2')
+		const rubberMesh = three.find<Mesh>(node, 'rubbers', 'Rubber2', 'rubber-Rubber2')
 		const rubberMeshVertices = three.vertices(rubberMesh)
 		const expectedVertices = [
 			[474.438477, 450.783447, -21.006498],
@@ -388,7 +386,7 @@ describe('The VPinball rubber generator', () => {
 	})
 
 	it('should generate a rotated rubber mesh', async () => {
-		const rubberMesh = three.find<Mesh>(gltf, 'rubbers', 'Rubber1', 'rubber-Rubber1')
+		const rubberMesh = three.find<Mesh>(node, 'rubbers', 'Rubber1', 'rubber-Rubber1')
 		const rubberMeshVertices = three.vertices(rubberMesh)
 		const expectedVertices = [
 			[504.43042, 1035.444336, 61.705627],
