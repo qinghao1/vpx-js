@@ -11,7 +11,7 @@
 This is a maintained **fork of [`vpdb/vpx-js`](https://github.com/vpdb/vpx-js)** by [freezy](https://github.com/freezy) and contributors.
 
 - **Original:** [`vpdb/vpx-js@v1.3.4`](https://github.com/vpdb/vpx-js/releases/tag/v1.3.4) (`e8a6d6fa522`), GPL-2.0.
-- **License stays GPL-2.0.** See [`LICENSE`](LICENSE). All original `Copyright (C) 2019 freezy` headers are retained; modified files add `Copyright (C) 2026 Chu Qinghao`. No relicensing.
+- **License stays GPL-2.0.** See [`LICENSE`](LICENSE). All original `Copyright (C) 2019 freezy` headers are retained; modified files add `Copyright (C) 2026 Chu Qinghao`.
 - **Please credit both** the original project and this fork, and distribute source with any binary per GPL-2.0.
 
 ## Features
@@ -21,7 +21,7 @@ This is a maintained **fork of [`vpdb/vpx-js`](https://github.com/vpdb/vpx-js)**
 - **Physics** — vpinball collision/rigid-body code ported 1:1; `Player` drives a 1 kHz physics + 60 Hz animation loop (including nudge).
 - **Scripting** — VBScript transpiled to JS (EBNF grammar + transformers) and run against per-item APIs.
 - **Emulation** — `wpc-emu` for WPC plus **PinMAME WASM** (libPinMAME 3.7) for SAM/Whitestar/S11/Data East and others via `VpmController`.
-- **Sound** — table-embedded sounds load from `Sound{i}` streams (PCM/float/ADPCM inline; MP3/OGG decode in the browser, anything else stays silent with a warning), and `PlaySound`/`PlaySoundAt`/`StopSound`/`FireKnocker`/`PlayMusic`/`EndMusic` play through WebAudio (single-play music reporting `MusicDone`; synthesized knocker, worker-offloaded synthesis, mute/volume UI with persisted prefs).
+- **Sound** — table-embedded sounds load from `Sound{i}` streams (PCM/float/ADPCM inline; MP3/OGG decode in the browser, anything else stays silent with a warning), and `PlaySound`/`PlaySoundAt`/`StopSound`/`FireKnocker`/`PlayMusic`/`EndMusic` play through WebAudio (single-play music reporting `MusicDone`; synthesized knocker, mute/volume UI with persisted prefs).
 - **Portable** — `Uint8Array`/`DataView` I/O, no Node shims; explicit `lib/refs.node.js` vs `lib/refs.browser.js` split.
 
 ## Requirements
@@ -95,17 +95,14 @@ table.kickers.BallRelease.getApi().Kick(0, 5)
 
 ## What Changed Since Upstream v1.3.4
 
-In short:
-
-- **Modern toolchain** — ESM-only, Node 24, `tsup` + `Biome` + `Vitest` replacing Rollup/Mocha/NYC.
-- **Current dependencies** — three `^0.185` + `three-mesh-bvh` + `wpc-emu` + `pako`.
-- **Portable I/O** — `Uint8Array`/`DataView` throughout; `refs.node`/`refs.browser` replaces the old `pkg.browser` shim.
-- **Rendering rework** — GLB export now uses `three/addons/exporters/GLTFExporter`.
+- **Modern toolchain** — ESM-only, Node 24, `tsup` + `Biome` + `Vitest`.
+- **Dependencies** — three `^0.185` + `three-mesh-bvh` + `wpc-emu` + `pako`.
+- **Portable I/O** — `Uint8Array`/`DataView` throughout; explicit `refs.node`/`refs.browser` env split.
+- **Rendering rework** — GLB export uses `three/addons/exporters/GLTFExporter`.
 - **Physics fixes** — VPX 10.8.1 defaults, timer/nudge/collision parity with desktop VPX.
 - **Scripting hardened** — broader VBScript coverage and a proper `with`-proxy sandbox.
-- **New: PinMAME WASM** — `external/pinmame` + `wasm/` build (WASM + mock fallback) for any PinMAME hardware; upstream only mentioned `wpc-emu`.
-- **Leaner repo** — script extraction, GLB export, and transpiling are library API (`Table.load`, `TableExporter`, `Transpiler`).
-
+- **New: PinMAME WASM** — `external/pinmame` + `wasm/` build (WASM + mock fallback) for any PinMAME hardware.
+- **Library API** — script extraction, GLB export, and transpiling via `Table.load`, `TableExporter`, `Transpiler`.
 
 ## Development
 
@@ -128,7 +125,7 @@ npm run build:wasm:mock   # mock only
 
 ## License
 
-GPL-2.0 — see [`LICENSE`](LICENSE). Same as [`vpdb/vpx-js`](https://github.com/vpdb/vpx-js).
+GPL-2.0 — see [`LICENSE`](LICENSE).
 
 ## Credits
 
