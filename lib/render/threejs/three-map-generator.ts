@@ -19,6 +19,18 @@ const HARDWARE_CONCURRENCY_FALLBACK = 4
  */
 const LOAD_FAILURE_COOLDOWN_MS = 30000
 
+// Round band edges, not measured knees — retune once dispatch is profiled.
+const SMALL_TEXTURE_BYTES = 1 << 20
+const GIANT_TEXTURE_BYTES = 16 << 20
+
+function payloadBytes(texture: Texture): number {
+	return texture.retainedData?.length ?? texture.binary?.len ?? texture.pdsBuffer?.getData()?.length ?? 0
+}
+
+function sizeBucket(bytes: number): number {
+	return bytes < SMALL_TEXTURE_BYTES ? 0 : bytes > GIANT_TEXTURE_BYTES ? 2 : 1
+}
+
 /**
  * Caches and preloads Three.js textures. Each texture is cached under both
  * its exact and lowercased name because table authors reference textures
@@ -94,11 +106,24 @@ export class ThreeMapGenerator {
 		concurrency: number,
 		onTexture?: (tex: Texture, ok: boolean) => void,
 	): Promise<void> {
-		// Playfield-first: the playfield bake unblocks first paint, so it
-		// dispatches before thumbnails. Stable sort keeps the caller's order;
-		// cached results are identical either way.
+		// Small-first, giants-last: giant playfield bakes at the head occupied
+		// every worker (~20s stall) while small completions starved. Pure size
+		// order would instead starve first paint, so the first playfield bake
+		// stays pinned at slot 0 (one worker) and everything else dispatches
+		// by size band, playfield-first within each band, caller order beyond
+		// that. Unknown-size (filesystem/default) textures sort as small.
 		const isPlayfield = textures.map(tex => isPlayfieldCap(tex.getName()))
-		const order = textures.map((_, i) => i).sort((a, b) => Number(!isPlayfield[a]) - Number(!isPlayfield[b]))
+		const bucket = textures.map(tex => sizeBucket(payloadBytes(tex)))
+		const firstPlayfield = isPlayfield.indexOf(true)
+		const order = textures
+			.map((_, i) => i)
+			.sort(
+				(a, b) =>
+					(a === firstPlayfield ? -1 : b === firstPlayfield ? 1 : 0) ||
+					bucket[a]! - bucket[b]! ||
+					Number(!isPlayfield[a]) - Number(!isPlayfield[b]) ||
+					a - b,
+			)
 		let next = 0
 		const workers = Array.from({ length: Math.min(concurrency, textures.length) }, async () => {
 			while (true) {

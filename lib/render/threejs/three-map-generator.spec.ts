@@ -142,6 +142,89 @@ describe('ThreeMapGenerator.loadTextures', () => {
 		expect(started).toEqual(['VLM.Nestmap0', 'WallA.png', 'WallB.png', 'WallC.png'])
 	})
 
+	function sizedTexture(name: string, bytes: number) {
+		const tex = VptTexture.fromFilesystem(name)
+		;(tex as any).binary = { pos: 0, len: bytes }
+		return tex
+	}
+
+	it('dispatches sub-1MB textures before mediums and tails >16MB giants', async () => {
+		const table = new TableBuilder().build()
+		const started: string[] = []
+		const generator = new ThreeMapGenerator(stubLoader(undefined, n => started.push(n)) as any)
+		await generator.loadTextures(
+			[
+				sizedTexture('GiantA.png', 30 << 20),
+				sizedTexture('SmallA.png', 100 << 10),
+				sizedTexture('Medium.png', 5 << 20),
+				sizedTexture('GiantB.png', 20 << 20),
+				sizedTexture('SmallB.png', 50 << 10),
+			],
+			table,
+		)
+
+		expect(started.slice(-2)).toEqual(['GiantA.png', 'GiantB.png'])
+		const at = (n: string) => started.indexOf(n)
+		expect(Math.max(at('SmallA.png'), at('SmallB.png'))).toBeLessThan(at('Medium.png'))
+		expect(at('Medium.png')).toBeLessThan(Math.min(at('GiantA.png'), at('GiantB.png')))
+	})
+
+	it('pins the first playfield bake at the head and tails the remaining giants', async () => {
+		const table = new TableBuilder().build()
+		const started: string[] = []
+		const generator = new ThreeMapGenerator(stubLoader(undefined, n => started.push(n)) as any)
+		await generator.loadTextures(
+			[
+				sizedTexture('WallA.png', 100 << 10),
+				sizedTexture('Playfield.png', 30 << 20),
+				sizedTexture('VLM.Nestmap0', 25 << 20),
+				sizedTexture('WallB.png', 50 << 10),
+			],
+			table,
+		)
+
+		expect(started[0]).toEqual('Playfield.png')
+		expect(started.slice(-1)).toEqual(['VLM.Nestmap0'])
+		const at = (n: string) => started.indexOf(n)
+		expect(Math.max(at('WallA.png'), at('WallB.png'))).toBeLessThan(at('VLM.Nestmap0'))
+	})
+
+	it('dispatches a same-band playfield bake before a non-playfield medium', async () => {
+		const table = new TableBuilder().build()
+		const started: string[] = []
+		const generator = new ThreeMapGenerator(stubLoader(undefined, n => started.push(n)) as any)
+		await generator.loadTextures(
+			[
+				sizedTexture('VLM.Nestmap0', 100 << 10),
+				sizedTexture('SmallA.png', 100 << 10),
+				sizedTexture('Wall.png', 5 << 20),
+				sizedTexture('Bake.png', 5 << 20),
+			],
+			table,
+		)
+
+		// VLM.Nestmap0 absorbs the head pin (and is small anyway), so Bake.png
+		// reaching Wall.png proves within-band playfield-first, not the pin.
+		expect(started).toEqual(['VLM.Nestmap0', 'SmallA.png', 'Bake.png', 'Wall.png'])
+	})
+
+	it('treats exactly 1MB and exactly 16MB as medium band', async () => {
+		const table = new TableBuilder().build()
+		const started: string[] = []
+		const generator = new ThreeMapGenerator(stubLoader(undefined, n => started.push(n)) as any)
+		await generator.loadTextures(
+			[
+				sizedTexture('Giant.png', (16 << 20) + 1),
+				sizedTexture('Edge1.png', 1 << 20),
+				sizedTexture('Edge16.png', 16 << 20),
+				sizedTexture('Small.png', (1 << 20) - 1),
+			],
+			table,
+		)
+
+		expect(started).toEqual(['Small.png', 'Edge1.png', 'Edge16.png', 'Giant.png'])
+	})
+
 	it('reports per-call totals, not cumulative cache size', async () => {
 		const table = new TableBuilder().build()
 		const generator = new ThreeMapGenerator(stubLoader() as any)
