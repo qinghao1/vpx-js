@@ -57,7 +57,7 @@ const table = await Table.load(new BrowserBinaryReader(await response.arrayBuffe
 import { ThreeRenderApi } from 'vpx-js'
 
 const scene = await table.generateTableNode(new ThreeRenderApi(), {
-  applyMaterials: true,
+	applyMaterials: true,
 })
 // `scene` is a three.js Object3D ready to add to your renderer.
 ```
