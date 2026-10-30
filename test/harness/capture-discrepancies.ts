@@ -731,8 +731,7 @@ async function main(): Promise<void> {
 	console.log(
 		`\n# pass ${passCount}/${results.length} (fail=${countBy(results, 'fail')}, warn=${countBy(results, 'warn')}, skip=${countBy(results, 'skip')})`,
 	)
-	// Every `not ok` line fails the gate: minor/info failures used to exit 0,
-	// so verify-all mapped them to pass.
+	// Every `not ok` line fails the gate.
 	const failCount = countBy(results, 'fail')
 	const majorFail = results.filter(r => r.status === 'fail' && r.severity === 'major').length
 	console.log(

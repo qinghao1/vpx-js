@@ -1,4 +1,4 @@
-// Harness to reproduce walking_dead artifacts generically
+// Reproduces render artifacts: underwall visibility, pending bulb maps.
 // Run: npx tsx test/harness/repro-artifact.ts
 import * as fs from 'node:fs'
 import type * as THREE from 'three'

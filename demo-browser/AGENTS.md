@@ -27,7 +27,7 @@ Requires `dist-esm` built. `server.fs.allow` covers repo root, `dist`, `dist-esm
 - `src/ui/loading-bar.ts`, `stats-overlay.ts`, `help-dialog.ts`, `log-viewer.ts` — typed `CustomEvent` UI, no `fetch`/`XHR` monkey-patch
 - `src/utils/candidate-resolver.ts`, `texture-filter.ts` — VPX/ROM resolution & glass-texture filtering
 - `src/env.js`, `src/utils.js` — env caps/quality flags + `$`/`fmtBytes` helpers and `utils/*` re-exports
-- `src/input.js` — `attachInput` composer over `input/` + `nudge-controller` (kept: defines logic, not a shim); `config.js`, `utils.js`, `env.js` are real sources (viewer imports them directly from `./ui/*` and `./input/*`)
+- `src/input.js` — `attachInput` composer over `input/` + `nudge-controller` (defines logic, not a shim); `config.js`, `utils.js`, `env.js` are real sources (viewer imports them directly from `./ui/*` and `./input/*`)
 - `vite.config.ts` — ~210 LOC: `basicSsl`, dedupes `three`/`three-mesh-bvh`, aliases `refs.node`→`refs.browser` etc., `rawLoader` for `.vbs`/`.bnf`, static `/wasm` + ROM middleware
 - `e2e/integration.mjs` + `e2e/helpers.mjs` — unified E2E (waitReady → diagnostics → physics → DMD → shots), single generic harness
 
