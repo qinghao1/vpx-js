@@ -1389,13 +1389,21 @@ export class Viewer {
 	}
 	_clearRawTextures() {
 		let clearedCount = 0
+		let retainedCount = 0
 		if (!this.table?.textures) return
+		const mapGen = this.renderApi?.getMapGenerator?.()
 		for (const key of Object.keys(this.table.textures)) {
-			this.table.textures[key].binary = undefined
-			this.table.textures[key].pdsBuffer = undefined
-			clearedCount++
+			const tex = this.table.textures[key]
+			// Only free sources already on the GPU: filtered-out and failed
+			// textures keep binaries for future demand passes (mid-game swaps).
+			if (mapGen?.hasTexture(tex.getName())) {
+				tex.binary = undefined
+				tex.pdsBuffer = undefined
+				clearedCount++
+			} else retainedCount++
 		}
-		if (clearedCount) this.harnessLog?.(`[mem] Cleared ${clearedCount} raw texture buffers`, 'info')
+		if (clearedCount)
+			this.harnessLog?.(`[mem] Cleared ${clearedCount} raw texture buffers (${retainedCount} retained)`, 'info')
 	}
 	async _mount(table, node, opts = {}, source = null) {
 		if (this.tableGroup) this.scene.remove(this.tableGroup)
