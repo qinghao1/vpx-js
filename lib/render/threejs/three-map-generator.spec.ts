@@ -589,6 +589,7 @@ describe('ThreeMapGenerator.demandPendingMaps', () => {
 				expect(await generator.demandPendingMaps(root, table)).toEqual({ loaded: [], missing: ['swap'] })
 				expect(await generator.demandPendingMaps(root, table)).toEqual({ loaded: [], missing: ['swap'] })
 				expect(calls).toEqual(1)
+				// LOAD_FAILURE_COOLDOWN_MS (30s, module-private) + 1.
 				now.mockReturnValue(start + 30001)
 				expect(await generator.demandPendingMaps(root, table)).toEqual({ loaded: [], missing: ['swap'] })
 			} finally {
@@ -599,5 +600,49 @@ describe('ThreeMapGenerator.demandPendingMaps', () => {
 		} finally {
 			now.mockRestore()
 		}
+	})
+
+	it('skips a cooling-down engine default without re-logging the preload', async () => {
+		const table = {
+			getTexture: () => undefined,
+			streamStorage: async (): Promise<Uint8Array> => {
+				throw new Error('must not read archive for engine defaults')
+			},
+		} as any
+		let calls = 0
+		const loader = {
+			hasDefaultTexture: () => true,
+			loadTexture: async () => new Texture(),
+			loadRawTexture: async () => new Texture(),
+			loadDefaultTexture: async () => {
+				calls++
+				throw new Error('decode boom')
+			},
+		}
+		const generator = new ThreeMapGenerator(loader as any)
+		const root = new Group()
+		const mesh = new Mesh(new BoxGeometry(), new MeshBasicMaterial())
+		mesh.material.userData.pendingMap = 'Bumper.png'
+		root.add(mesh)
+
+		const infos: unknown[][] = []
+		const prev = Logger.logger()
+		Logger.setLogger({
+			wtf: () => {},
+			error: () => {},
+			warn: () => {},
+			info: (f: string, ...a: unknown[]) => {
+				infos.push([f, ...a])
+			},
+			debug: () => {},
+		})
+		try {
+			expect(await generator.demandPendingMaps(root, table)).toEqual({ loaded: [], missing: ['Bumper.png'] })
+			expect(await generator.demandPendingMaps(root, table)).toEqual({ loaded: [], missing: ['Bumper.png'] })
+		} finally {
+			Logger.setLogger(prev)
+		}
+		expect(calls).toEqual(1)
+		expect(infos.filter(([f]) => String(f).includes('Pre-loading')).length).toEqual(1)
 	})
 })

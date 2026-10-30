@@ -178,9 +178,10 @@ export class ThreeMapGenerator {
 
 	/**
 	 * True while a failed texture still sits out its retry cooldown
-	 * (LOAD_FAILURE_COOLDOWN_MS; keys are lowercased like lastFailureAt).
-	 * Both loadShared and demandPendingMaps consult this so a cooling-down
-	 * texture reports missing without starting a new load.
+	 * (LOAD_FAILURE_COOLDOWN_MS). The name is lowercased before lookup,
+	 * matching the keys stored in lastFailureAt. Both loadShared and
+	 * demandPendingMaps consult this so a cooling-down texture reports
+	 * missing without starting a new load.
 	 */
 	private isCoolingDown(name: string): boolean {
 		return Date.now() - (this.lastFailureAt.get(name.toLowerCase()) ?? 0) < LOAD_FAILURE_COOLDOWN_MS
@@ -241,6 +242,9 @@ export class ThreeMapGenerator {
 			}
 			this.textureCache.set(texture.getName(), tex)
 			this.textureCache.set(texture.getName().toLowerCase(), tex)
+			// A cached texture never consults the cooldown, so drop its
+			// stamp instead of growing one map entry per failed name.
+			this.lastFailureAt.delete(texture.getName().toLowerCase())
 			progress().details(texture.getName())
 			this.clearTextureSource(texture)
 			return true
@@ -335,8 +339,17 @@ export class ThreeMapGenerator {
 			const loader = this.textureLoader as unknown as {
 				hasDefaultTexture?: (name: string) => boolean
 			}
-			if (loader?.hasDefaultTexture?.(name) ?? true) loadable.push(Texture.fromFilesystem(name))
-			else missing.push(name)
+			if (loader?.hasDefaultTexture?.(name) ?? true) {
+				const fallback = Texture.fromFilesystem(name)
+				// Same quiet-skip as the table branch above: a cooling-down
+				// engine default reports missing without re-logging the
+				// loadTextures summaries every demand pass.
+				if (this.isCoolingDown(fallback.getName())) {
+					missing.push(fallback.getName())
+					continue
+				}
+				loadable.push(fallback)
+			} else missing.push(name)
 		}
 		await this.loadTextures(loadable, table, (tex, ok) => {
 			if (ok) loaded.push(tex.getName())
