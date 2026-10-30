@@ -263,7 +263,8 @@ function parseWorker(
 			w.postMessage({ id, buffer, type: kind, max, name }, [buffer] as any)
 		} catch (e) {
 			// A worker that cannot even take a post is suspect: terminate and
-			// respawn it so the crash-code retry below lands on a fresh worker.
+			// replace it so the crash-code retry below can't land back on the
+			// dead worker (a fresh pick may use the other live worker).
 			if (settleWorkerEntry(floatPending, id)) floatTracker.idle(w)
 			replaceFloatWorker(w)
 			reject(floatInfraError('float-worker-crash', `exr worker post failed: ${(e as Error)?.message ?? e}`))
@@ -641,8 +642,8 @@ async function tryLoadViaWorker(name: string, kind: 'exr' | 'hdr', data: Uint8Ar
 		parsed = await parseWorker(slice(), kind, max, name)
 	} catch (e) {
 		// A crashed worker is already terminated-and-replaced above: retry the
-		// failed decode once on the fresh worker. Timeouts never retry — a
-		// hung (usually DWAA) source would likely re-hang on the fresh worker.
+		// failed decode once (re-picked off the dead worker). Timeouts never
+		// retry — a hung (usually DWAA) source would likely re-hang.
 		if ((e as { code?: unknown })?.code !== 'float-worker-crash') throw e
 		parsed = await parseWorker(slice(), kind, max, name)
 	}

@@ -820,6 +820,48 @@ describe('ThreeTextureLoaderBrowser LDR decode-at-size', () => {
 		}
 	})
 
+	it('probes a 10-byte GIF at the floor', () => {
+		// GIF dims live at bytes 6-9: a 10-byte header is the smallest probed input.
+		const floor = new Uint8Array([0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0x10, 0x00, 0x10, 0x00])
+		expect(probeEncodedSize(floor)).toEqual({ width: 16, height: 16 })
+		expect(probeEncodedSize(floor.slice(0, 9))).toBeNull()
+	})
+
+	it('resolves a JPEG SOF ending at the exact tail', () => {
+		// SOI + APP0 + SOF0(64x32) ending at the last byte: the scan bound is
+		// inclusive of the tail (the SOF needs bytes i..i+8 with i+9 == end).
+		const data = new Uint8Array([
+			0xff, 0xd8, 0xff, 0xe0, 0x00, 0x05, 0x01, 0x02, 0x03, 0xff, 0xc0, 0x00, 0x07, 0x08, 0x00, 0x20, 0x00, 0x40,
+		])
+		expect(probeEncodedSize(data)).toEqual({ width: 64, height: 32 })
+		expect(cappedDecodeTarget(data, 4096)).toBeNull()
+	})
+
+	it('falls through when bitmap-source resize returns an over-cap frame', async () => {
+		vi.mocked(hasImageWorker).mockReturnValue(false)
+		vi.mocked(decodeInWorker).mockClear()
+		// The engine ignores resize at both tiers: blob and bitmap sources come back full-res.
+		const cib = vi.fn(async () => ({ width: 6080, height: 8192, close() {} }))
+		vi.stubGlobal('createImageBitmap', cib)
+		// No ImageDecoder stub: decodeMainAtSize throws and the oversize bitmap falls through.
+		const { Loader } = await import('three')
+		const loadSpy = vi
+			.spyOn(Loader.prototype as any, 'loadAsync')
+			.mockResolvedValue({ image: { width: 3040, height: 4096 } } as any)
+		try {
+			const tex = (await loader.loadTexture('playfield_image', '.png', pngBytes(6080, 8192))) as any
+			expect(decodeInWorker).not.toHaveBeenCalled()
+			// Sized blob decode + bitmap-source resize attempt, both ignored.
+			expect(cib).toHaveBeenCalledTimes(2)
+			// The TextureLoader fallthrough keeps the output bounded.
+			expect(tex.image.width).toBe(3040)
+			expect(tex.image.height).toBe(4096)
+		} finally {
+			loadSpy.mockRestore()
+			vi.unstubAllGlobals()
+		}
+	})
+
 	it('rejects PNG headers without the IHDR chunk tag', () => {
 		const bad = pngBytes(6080, 8192)
 		bad.set([0x49, 0x44, 0x41, 0x54], 12)
