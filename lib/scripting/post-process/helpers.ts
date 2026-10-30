@@ -17,6 +17,16 @@ export function vbsCall(name: string, args: Expression[]): Expression {
 	return callExpression(memberExpression(identifier(Transformer.VBSHELPER_NAME), identifier(name)), args)
 }
 
+/**
+ * Wraps a condition test with Empty-aware truthiness (see `VbsHelper.isTrue`).
+ * Every VBS `If` / `ElseIf` / `While` / `Until` test routes through here: a
+ * raw JS test would take the true branch for the UNDEF sentinel object that
+ * unread array slots and `Empty` produce.
+ */
+export function vbsTest(expr: Expression): Expression {
+	return vbsCall('isTrue', [expr])
+}
+
 /** Generic post-processors for shared grammar nodes. */
 export function ppHelpers(node: ESIToken): unknown {
 	switch (node.type) {

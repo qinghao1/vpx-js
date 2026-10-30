@@ -170,6 +170,30 @@ describe('The VBScript transpiler', () => {
 		expect(scope.Result).to.equal(42)
 	})
 
+	it('should take the Else branch for an unread array slot (trough HasSw pattern)', () => {
+		// Royal Flush's cvpmBallStack.HasSw does `If mSw(aNo) Then` on slots
+		// that were never written (Empty). Empty is falsy in VBScript; raw JS
+		// truthiness takes the true branch for the UNDEF sentinel instead.
+		const scope = {} as any
+		const vbs = `Dim a(10)\nDim x\nIf a(8) Then\nx = 1\nElse\nx = 2\nEnd If\n`
+		new Transpiler(table, player).execute(vbs, scope, 'global')
+		expect(scope.x).to.equal(2)
+	})
+
+	it('should skip a Do While body guarded by an unread array slot', () => {
+		const scope = {} as any
+		const vbs = `Dim a(10)\nDim x\nx = 0\nDo While a(8)\nx = 1\nExit Do\nLoop\n`
+		new Transpiler(table, player).execute(vbs, scope, 'global')
+		expect(scope.x).to.equal(0)
+	})
+
+	it('should keep looping a Do Until guarded by an unread array slot', () => {
+		const scope = {} as any
+		const vbs = `Dim a(10)\nDim x\nx = 0\nDo\nx = x + 1\nIf x > 3 Then Exit Do\nLoop Until a(8)\n`
+		new Transpiler(table, player).execute(vbs, scope, 'global')
+		expect(scope.x).to.equal(4)
+	})
+
 	it('should throw instead of silently succeeding when the script defines no play function', () => {
 		const stalePlay = sinon.spy()
 		const prevPlay = (globalThis as any).play

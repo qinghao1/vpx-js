@@ -97,7 +97,7 @@ describe('The scripting grammar - block Else If (two words)', () => {
 		const vbs = `If x = 1 Then\ny = 1\nElse If x = 2 Then\ny = 2\nEnd If`
 		const js = grammar.vbsToJs(vbs)
 		expect(js).to.equal(
-			`if (${Transformer.VBSHELPER_NAME}.equals(x, 1)) {\n    y = 1;\n} else if (${Transformer.VBSHELPER_NAME}.equals(x, 2)) {\n    y = 2;\n}`,
+			`if (${Transformer.VBSHELPER_NAME}.isTrue(${Transformer.VBSHELPER_NAME}.equals(x, 1))) {\n    y = 1;\n} else if (${Transformer.VBSHELPER_NAME}.isTrue(${Transformer.VBSHELPER_NAME}.equals(x, 2))) {\n    y = 2;\n}`,
 		)
 	})
 
@@ -105,7 +105,7 @@ describe('The scripting grammar - block Else If (two words)', () => {
 		const vbs = `If x = 1 Then\ny = 1\nelse  If x = 2 Then\ny = 2\nElse\ny = 3\nEnd If`
 		const js = grammar.vbsToJs(vbs)
 		expect(js).to.equal(
-			`if (${Transformer.VBSHELPER_NAME}.equals(x, 1)) {\n    y = 1;\n} else if (${Transformer.VBSHELPER_NAME}.equals(x, 2)) {\n    y = 2;\n} else {\n    y = 3;\n}`,
+			`if (${Transformer.VBSHELPER_NAME}.isTrue(${Transformer.VBSHELPER_NAME}.equals(x, 1))) {\n    y = 1;\n} else if (${Transformer.VBSHELPER_NAME}.isTrue(${Transformer.VBSHELPER_NAME}.equals(x, 2))) {\n    y = 2;\n} else {\n    y = 3;\n}`,
 		)
 	})
 
@@ -113,7 +113,7 @@ describe('The scripting grammar - block Else If (two words)', () => {
 		const vbs = `If x = 1 Then\ny = 1\nElse If x = 2 Then y = 2\nElse If x = 3 Then\ny = 3\nEnd If`
 		const js = grammar.vbsToJs(vbs)
 		expect(js).to.equal(
-			`if (${Transformer.VBSHELPER_NAME}.equals(x, 1)) {\n    y = 1;\n} else if (${Transformer.VBSHELPER_NAME}.equals(x, 2)) {\n    y = 2;\n} else if (${Transformer.VBSHELPER_NAME}.equals(x, 3)) {\n    y = 3;\n}`,
+			`if (${Transformer.VBSHELPER_NAME}.isTrue(${Transformer.VBSHELPER_NAME}.equals(x, 1))) {\n    y = 1;\n} else if (${Transformer.VBSHELPER_NAME}.isTrue(${Transformer.VBSHELPER_NAME}.equals(x, 2))) {\n    y = 2;\n} else if (${Transformer.VBSHELPER_NAME}.isTrue(${Transformer.VBSHELPER_NAME}.equals(x, 3))) {\n    y = 3;\n}`,
 		)
 	})
 

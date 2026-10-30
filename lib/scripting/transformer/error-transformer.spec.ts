@@ -15,7 +15,7 @@ describe('The scripting error transformer', () => {
 		const vbs = `If Err Then MsgBox "Can't start Game" & cGameName & vbNewLine & Err.Description:Exit Sub`
 		const js = transform(vbs)
 		expect(js).to.equal(
-			`if (Err.Number) {\n    MsgBox(__vbs.concat(__vbs.concat(__vbs.concat('Can\\'t start Game', cGameName), vbNewLine), Err.Description));\n    return;\n}`,
+			`if (__vbs.isTrue(Err.Number)) {\n    MsgBox(__vbs.concat(__vbs.concat(__vbs.concat('Can\\'t start Game', cGameName), vbNewLine), Err.Description));\n    return;\n}`,
 		)
 	})
 
@@ -23,25 +23,25 @@ describe('The scripting error transformer', () => {
 		// No Err.Number rewrite here: __vbs.or coerces Err via valueOf, which reads Err.Number.
 		const vbs = `If aSw = 0 Or Err Then x = 5 End If`
 		const js = transform(vbs)
-		expect(js).to.equal(`if (__vbs.or(__vbs.equals(aSw, 0), Err)) {\n    x = 5;\n}`)
+		expect(js).to.equal(`if (__vbs.isTrue(__vbs.or(__vbs.equals(aSw, 0), Err))) {\n    x = 5;\n}`)
 	})
 
 	it('should update Err when used in a "While" test', () => {
 		const vbs = `While Err\nx = 1\nWend`
 		const js = transform(vbs)
-		expect(js).to.equal(`__exitDo:\n    while (Err.Number) {\n        x = 1;\n    }`)
+		expect(js).to.equal(`__exitDo:\n    while (__vbs.isTrue(Err.Number)) {\n        x = 1;\n    }`)
 	})
 
 	it('should update Err when used in a "Do While" test', () => {
 		const vbs = `Do While Err\nx = 1\nLoop`
 		const js = transform(vbs)
-		expect(js).to.equal(`__exitDo:\n    while (Err.Number) {\n        x = 1;\n    }`)
+		expect(js).to.equal(`__exitDo:\n    while (__vbs.isTrue(Err.Number)) {\n        x = 1;\n    }`)
 	})
 
 	it('should update Err when used in a "Loop While" test', () => {
 		const vbs = `Do\nx = 1\nLoop While Err`
 		const js = transform(vbs)
-		expect(js).to.equal(`__exitDo:\n    do {\n        x = 1;\n    } while (Err.Number);`)
+		expect(js).to.equal(`__exitDo:\n    do {\n        x = 1;\n    } while (__vbs.isTrue(Err.Number));`)
 	})
 
 	it('should leave "Select Case Err" to temp coercion', () => {

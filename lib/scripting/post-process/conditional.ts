@@ -15,7 +15,7 @@ import {
 } from '../estree.js'
 import type { ESIToken } from '../grammar/grammar.js'
 import { Transformer } from '../transformer/transformer.js'
-import { collectChildren, findChildBlock, findInlineBlock } from './helpers.js'
+import { collectChildren, findChildBlock, findInlineBlock, vbsTest } from './helpers.js'
 
 /** Temp holding the `Select Case` discriminant (evaluated once, like VBS). */
 const SELECT_TEMP = '__vbsSelect'
@@ -57,12 +57,12 @@ function ppBlockIfStatement(node: ESIToken): unknown {
 			}
 		}
 	}
-	return ifStatement(expr, findChildBlock(node) ?? blockStatement([]), alternate)
+	return ifStatement(vbsTest(expr), findChildBlock(node) ?? blockStatement([]), alternate)
 }
 
 function ppElseIfStatement(node: ESIToken): unknown {
 	const expr = node.children[0].estree
-	return ifStatement(expr, findChildBlock(node) ?? findInlineBlock(node) ?? blockStatement([]), null)
+	return ifStatement(vbsTest(expr), findChildBlock(node) ?? findInlineBlock(node) ?? blockStatement([]), null)
 }
 
 function ppElseStatement(node: ESIToken): unknown {
@@ -73,7 +73,7 @@ function ppLineIfThenStatement(node: ESIToken): unknown {
 	const expr = node.children[0].estree
 	const stmts = node.children[1].estree
 	const elseStmts = node.children.length > 2 ? node.children[2].estree : null
-	return ifStatement(expr, blockStatement(stmts), elseStmts ? blockStatement(elseStmts) : null)
+	return ifStatement(vbsTest(expr), blockStatement(stmts), elseStmts ? blockStatement(elseStmts) : null)
 }
 
 interface CaseBranch {

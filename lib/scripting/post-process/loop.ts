@@ -16,7 +16,7 @@ import {
 	whileStatement,
 } from '../estree.js'
 import type { ESIToken } from '../grammar/grammar.js'
-import { findChildBlock, findInlineBlock, vbsCall } from './helpers.js'
+import { findChildBlock, findInlineBlock, vbsCall, vbsTest } from './helpers.js'
 
 /** Statement labels binding `Exit Do` / `Exit For` to the nearest same-kind loop. */
 export const EXIT_DO_LABEL = '__exitDo'
@@ -94,7 +94,7 @@ export function ppLoop(node: ESIToken): unknown {
 function ppWhileStatement(node: ESIToken): unknown {
 	const expr = node.children[0].estree
 	const block = node.children[2].type === 'Block' ? node.children[2].estree : null
-	return labeledLoop(labelForLoop(node, 'Do'), whileStatement(expr, block ? block : blockStatement([])))
+	return labeledLoop(labelForLoop(node, 'Do'), whileStatement(vbsTest(expr), block ? block : blockStatement([])))
 }
 
 function ppDoTopLoopStatement(node: ESIToken): unknown {
@@ -102,10 +102,10 @@ function ppDoTopLoopStatement(node: ESIToken): unknown {
 	if (node.children[0].type === 'WhileOrUntil') {
 		if (node.children[0].text === 'While') {
 			const expr = node.children[1].estree
-			return labeledLoop(labelForLoop(node, 'Do'), whileStatement(expr, block))
+			return labeledLoop(labelForLoop(node, 'Do'), whileStatement(vbsTest(expr), block))
 		} else {
 			const expr = node.children[1].estree
-			block.body.unshift(ifStatement(expr, breakStatement(), null))
+			block.body.unshift(ifStatement(vbsTest(expr), breakStatement(), null))
 			return labeledLoop(labelForLoop(node, 'Do'), doWhileStatement(block, literal(true)))
 		}
 	} else {
@@ -125,12 +125,15 @@ function ppDoBottomLoopStatement(node: ESIToken): unknown {
 		expr = node.children[2].estree
 	}
 	if (whileOrUntil === 'While') {
-		return labeledLoop(labelForLoop(node, 'Do'), doWhileStatement(block ? block : blockStatement([]), expr))
+		return labeledLoop(
+			labelForLoop(node, 'Do'),
+			doWhileStatement(block ? block : blockStatement([]), vbsTest(expr)),
+		)
 	} else {
 		if (block === null) {
 			block = blockStatement([])
 		}
-		block.body.push(ifStatement(expr, breakStatement(), null))
+		block.body.push(ifStatement(vbsTest(expr), breakStatement(), null))
 		return labeledLoop(labelForLoop(node, 'Do'), doWhileStatement(block, literal(true)))
 	}
 }

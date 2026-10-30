@@ -33,7 +33,7 @@ describe('The VBScript transpiler - Expressions', () => {
 		const vbs = `If test = 5 Or Err Then test = 6`
 		const js = grammar.vbsToJs(vbs)
 		expect(js).to.equal(
-			`if (${Transformer.VBSHELPER_NAME}.or(${Transformer.VBSHELPER_NAME}.equals(test, 5), Err)) {\n    test = 6;\n}`,
+			`if (${Transformer.VBSHELPER_NAME}.isTrue(${Transformer.VBSHELPER_NAME}.or(${Transformer.VBSHELPER_NAME}.equals(test, 5), Err))) {\n    test = 6;\n}`,
 		)
 	})
 
@@ -41,7 +41,7 @@ describe('The VBScript transpiler - Expressions', () => {
 		const vbs = `If test = 5 And Err Then test = 6`
 		const js = grammar.vbsToJs(vbs)
 		expect(js).to.equal(
-			`if (${Transformer.VBSHELPER_NAME}.and(${Transformer.VBSHELPER_NAME}.equals(test, 5), Err)) {\n    test = 6;\n}`,
+			`if (${Transformer.VBSHELPER_NAME}.isTrue(${Transformer.VBSHELPER_NAME}.and(${Transformer.VBSHELPER_NAME}.equals(test, 5), Err))) {\n    test = 6;\n}`,
 		)
 	})
 

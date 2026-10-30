@@ -235,7 +235,7 @@ describe('The scripting reference transformer', () => {
 			const vbs = `If IsEmpty(CreateObject) Then x = 1 End If\n`
 			const js = transform(vbs, table, player)
 			expect(js).to.equal(
-				`if (${Transformer.STDLIB_NAME}.IsEmpty(${Transformer.STDLIB_NAME}.CreateObject)) {\n    x = 1;\n}`,
+				`if (${Transformer.VBSHELPER_NAME}.isTrue(${Transformer.STDLIB_NAME}.IsEmpty(${Transformer.STDLIB_NAME}.CreateObject))) {\n    x = 1;\n}`,
 			)
 		})
 

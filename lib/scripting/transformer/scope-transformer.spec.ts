@@ -74,7 +74,7 @@ describe('The scripting scope transformer', () => {
 		const vbs = `For j = 1 To 20\nIf j = 10 Then Exit For\nNext\n`
 		const js = transform(vbs)
 		expect(js).to.equal(
-			`__exitFor:\n    for (${Transformer.SCOPE_NAME}.j = 1; ${Transformer.VBSHELPER_NAME}.lte(${Transformer.SCOPE_NAME}.j, 20); ${Transformer.SCOPE_NAME}.j = ${Transformer.VBSHELPER_NAME}.add(${Transformer.SCOPE_NAME}.j, 1)) {\n        if (${Transformer.VBSHELPER_NAME}.equals(${Transformer.SCOPE_NAME}.j, 10)) {\n            break __exitFor;\n        }\n    }`,
+			`__exitFor:\n    for (${Transformer.SCOPE_NAME}.j = 1; ${Transformer.VBSHELPER_NAME}.lte(${Transformer.SCOPE_NAME}.j, 20); ${Transformer.SCOPE_NAME}.j = ${Transformer.VBSHELPER_NAME}.add(${Transformer.SCOPE_NAME}.j, 1)) {\n        if (${Transformer.VBSHELPER_NAME}.isTrue(${Transformer.VBSHELPER_NAME}.equals(${Transformer.SCOPE_NAME}.j, 10))) {\n            break __exitFor;\n        }\n    }`,
 		)
 	})
 

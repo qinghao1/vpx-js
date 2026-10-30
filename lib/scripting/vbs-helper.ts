@@ -53,6 +53,16 @@ export class VBSHelper {
 		return value == null || (value as unknown as Record<symbol, unknown>)[UNDEF] === true
 	}
 
+	/**
+	 * VBScript condition truthiness: Empty (including unread array slots) and
+	 * Null are false; anything else follows JS truthiness. Every `If` /
+	 * `While` / `Until` test goes through here — a raw `if` would take the
+	 * true branch for the UNDEF sentinel object.
+	 */
+	public isTrue(value: unknown): boolean {
+		return !this.isUndef(value) && !!value
+	}
+
 	private sourcePrefix(vbs: string, filename?: string): string {
 		if (filename) return `//@ sourceURL=game:///${filename}.js\n`
 		if (vbs.length > 150) return `//@ sourceURL=game:///inline${this.transpileCount++}.js\n`

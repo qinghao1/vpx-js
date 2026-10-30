@@ -90,7 +90,7 @@ describe('The VBScript transpiler - Method - Function', () => {
 		[
 			'a function with params and exit',
 			`Function MyFunction(value)\nMyFunction = 6\nif value = 5 Then\nMyFunction = 10\nExit Function\nEnd If\nEnd Function`,
-			`function MyFunction(value) {\n    let MyFunction = undefined;\n    MyFunction = 6;\n    if (${Transformer.VBSHELPER_NAME}.equals(value, 5)) {\n        MyFunction = 10;\n        return MyFunction;\n    }\n    return MyFunction;\n}`,
+			`function MyFunction(value) {\n    let MyFunction = undefined;\n    MyFunction = 6;\n    if (${Transformer.VBSHELPER_NAME}.isTrue(${Transformer.VBSHELPER_NAME}.equals(value, 5))) {\n        MyFunction = 10;\n        return MyFunction;\n    }\n    return MyFunction;\n}`,
 		],
 		[
 			'a inline function with params and exit',
