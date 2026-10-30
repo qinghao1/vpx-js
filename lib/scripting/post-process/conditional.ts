@@ -66,7 +66,10 @@ function ppElseIfStatement(node: ESIToken): unknown {
 }
 
 function ppElseStatement(node: ESIToken): unknown {
-	return findChildBlock(node) ?? blockStatement([])
+	const inline = findInlineBlock(node)
+	const block = findChildBlock(node)
+	if (inline && block) return blockStatement([...inline.body, ...block.body])
+	return block ?? inline ?? blockStatement([])
 }
 
 function ppLineIfThenStatement(node: ESIToken): unknown {

@@ -64,6 +64,14 @@ describe('The VBScript transpiler - Conditional', () => {
 		)
 	})
 
+	it('should transpile an "If/Then...Else <inline>...End If" statement', () => {
+		const vbs = `If a = 1 Then\nb = 1\nElse b = 2\nc = 3\nEnd If`
+		const js = grammar.vbsToJs(vbs)
+		expect(js).to.equal(
+			`if (${Transformer.VBSHELPER_NAME}.isTrue(${Transformer.VBSHELPER_NAME}.equals(a, 1))) {\n    b = 1;\n} else {\n    b = 2;\n    c = 3;\n}`,
+		)
+	})
+
 	it('should transpile an "If/Then...ElseIf/Then...End If" statement', () => {
 		const vbs = `If DayOfWeek = "MON" Then\nDay = 1\nElseIf DayOfWeek = "TUE" Then\nDay = 2\nElseIf DayOfWeek = "WED" Then\nDay=3\nEnd If`
 		const js = grammar.vbsToJs(vbs)
