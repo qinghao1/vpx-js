@@ -363,4 +363,35 @@ describe('WebSoundEngine', () => {
 		engine.pushEmuPcm(new Float32Array(11025))
 		expect(FakeCtx.sources.length).to.equal(3)
 	})
+
+	it('should reuse emu buffers across chunks once their source ends', () => {
+		engine.pushEmuPcm(new Float32Array(441))
+		engine.pushEmuPcm(new Float32Array(441))
+		expect(FakeCtx.buffers.length).to.equal(2)
+		FakeCtx.sources[0]?.onended?.()
+		engine.pushEmuPcm(new Float32Array(441))
+		expect(FakeCtx.sources.length).to.equal(3)
+		expect(FakeCtx.buffers.length).to.equal(2)
+	})
+
+	it('should bucket pooled emu buffers by length and allocate on underrun', () => {
+		engine.pushEmuPcm(new Float32Array(441))
+		engine.pushEmuPcm(new Float32Array(441))
+		engine.pushEmuPcm(new Float32Array(882))
+		expect(FakeCtx.buffers.length).to.equal(3)
+		FakeCtx.sources[0]?.onended?.()
+		FakeCtx.sources[2]?.onended?.()
+		engine.pushEmuPcm(new Float32Array(882))
+		engine.pushEmuPcm(new Float32Array(441))
+		expect(FakeCtx.sources.length).to.equal(5)
+		expect(FakeCtx.buffers.length).to.equal(3)
+	})
+
+	it('should allocate no buffer for emu chunks dropped past the schedule cap', () => {
+		for (let i = 0; i < 27; i++) engine.pushEmuPcm(new Float32Array(441))
+		// The 0.25 s cap engages partway through: later chunks drop, and every
+		// scheduled chunk owns exactly one buffer — drops allocate nothing.
+		expect(FakeCtx.sources.length).to.be.lessThan(27)
+		expect(FakeCtx.buffers.length).to.equal(FakeCtx.sources.length)
+	})
 })

@@ -36,6 +36,9 @@ const EMU_SAMPLE_RATE = 44100
 // Backlog cap, seconds: chunks scheduled further out than this are dropped
 // instead of banking permanent lag after bursts.
 const MAX_EMU_SCHEDULE_AHEAD = 0.25
+// Pooled emu-stream buffers cap: in-flight chunks are bounded by the schedule
+// cap above (~25 ten-ms chunks), so the pool cannot grow past it; extras drop.
+const MAX_EMU_POOLED_BUFFERS = 32
 
 export class WebSoundEngine extends BaseSoundEngine {
 	private ctx: AudioContext | null = null
@@ -55,6 +58,12 @@ export class WebSoundEngine extends BaseSoundEngine {
 	// Next emu-chunk start, in audio-clock seconds; chunks are sequenced
 	// back-to-back so the stream plays gapless instead of overlapping.
 	private emuNextTime = 0
+	// AudioBuffer pool for the emu stream, bucketed by frame length. Chunks
+	// arrive about every 10 ms and overlap while scheduled, so buffers return
+	// to the pool from their source's onended instead of a fixed ring (which
+	// would alias live buffers). Lengths vary per drain, hence the buckets.
+	private readonly emuBufferPool = new Map<number, AudioBuffer[]>()
+	private emuPooledCount = 0
 
 	/** Create/resume the context (call from a user gesture to satisfy autoplay policy). */
 	public unlock(): void {
@@ -174,13 +183,50 @@ export class WebSoundEngine extends BaseSoundEngine {
 		const now = ctx.currentTime
 		const startAt = Math.max(now, this.emuNextTime)
 		if (startAt - now > MAX_EMU_SCHEDULE_AHEAD) return
-		const buffer = this.uploadPcm(pcm, EMU_SAMPLE_RATE)
+		// pcm is a borrowed emu-pool view (see IEmulator.registerAudioConsumer):
+		// copy it synchronously — it may be overwritten on the next emu sync.
+		const buffer = this.takeEmuBuffer(ctx, pcm)
 		if (!buffer) return
 		const source = ctx.createBufferSource()
 		source.buffer = buffer
 		source.connect(this.master)
+		source.onended = () => this.releaseEmuBuffer(buffer, pcm.length)
 		source.start(startAt)
 		this.emuNextTime = startAt + pcm.length / EMU_SAMPLE_RATE
+	}
+
+	private takeEmuBuffer(ctx: AudioContext, pcm: Float32Array): AudioBuffer | null {
+		const bucket = this.emuBufferPool.get(pcm.length)
+		const buffer = bucket?.pop()
+		if (buffer) {
+			if (bucket && bucket.length === 0) this.emuBufferPool.delete(pcm.length)
+			this.emuPooledCount--
+			try {
+				buffer.getChannelData(0).set(pcm)
+				return buffer
+			} catch {
+				return null
+			}
+		}
+		// Underrun fallback: pool empty or length unseen — allocate fresh.
+		try {
+			const fresh = ctx.createBuffer(1, pcm.length, EMU_SAMPLE_RATE)
+			fresh.getChannelData(0).set(pcm)
+			return fresh
+		} catch {
+			return null
+		}
+	}
+
+	private releaseEmuBuffer(buffer: AudioBuffer, frames: number): void {
+		if (this.emuPooledCount >= MAX_EMU_POOLED_BUFFERS) return
+		let bucket = this.emuBufferPool.get(frames)
+		if (!bucket) {
+			bucket = []
+			this.emuBufferPool.set(frames, bucket)
+		}
+		bucket.push(buffer)
+		this.emuPooledCount++
 	}
 
 	private playBuffer(pcm: Float32Array, sampleRate: number): void {
@@ -269,6 +315,8 @@ export class WebSoundEngine extends BaseSoundEngine {
 		for (const [, nodes] of this.nodes) this.stopNodes(nodes)
 		this.nodes.clear()
 		this.repeats.clear()
+		this.emuBufferPool.clear()
+		this.emuPooledCount = 0
 		this.stopMusicNodes()
 		const ctx = this.ctx
 		this.ctx = null
