@@ -95,23 +95,34 @@ export abstract class HitObject {
 	setType(type: CollisionType): void {
 		this.objType = type
 	}
+	// Reused narrowphase probe: every hitTest only writes coll on the hit path
+	// and only reads coll.ball plus its own writes, so a reset probe starts
+	// each call identical to a fresh pool claim. No user code runs between the
+	// reset and the read (abortHitTest precedes it; fireHitEvent/onCollision
+	// only fire from collide()), hence no reentrancy can clobber it.
+	private static readonly probe = new CollisionEvent()
 	doHitTest(ball: Ball, coll: CollisionEvent, physics: PlayerPhysics): void {
 		if (!ball) return
 		if (this.obj?.abortHitTest?.()) return
-		const newColl = CollisionEvent.claim(ball)
-		const newTime = this.hitTest(ball, coll.hitTime, newColl, physics)
+		const probe = HitObject.probe
+		CollisionEvent.reset(probe)
+		probe.ball = ball
+		const newTime = this.hitTest(ball, coll.hitTime, probe, physics)
 		const validHit = newTime >= 0 && newTime <= coll.hitTime
 		if (!physics.recordContacts) {
 			if (validHit) {
-				newColl.ball = ball
+				const newColl = CollisionEvent.claim(ball)
+				newColl.set(probe)
 				newColl.obj = this
 				newColl.hitTime = newTime
 				coll.set(newColl)
+				CollisionEvent.releaseOne(newColl)
 			}
-			CollisionEvent.releaseOne(newColl)
 			return
 		}
-		if (newColl.isContact || validHit) {
+		if (probe.isContact || validHit) {
+			const newColl = CollisionEvent.claim(ball)
+			newColl.set(probe)
 			newColl.ball = ball
 			newColl.obj = this
 			if (newColl.isContact) physics.contacts.push(newColl)
@@ -120,8 +131,6 @@ export abstract class HitObject {
 				coll.hitTime = newTime
 				CollisionEvent.releaseOne(newColl)
 			}
-		} else {
-			CollisionEvent.releaseOne(newColl)
 		}
 	}
 	applyPhysics(data: IPhysicalData, table: Table): void {
