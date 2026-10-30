@@ -41,5 +41,6 @@ describe('bundled VBS system scripts', () => {
 		)
 		expect(core, 'DMD keeps the IsEmpty check').to.contain('If Not IsEmpty(DMDp) Then')
 		expect(getTextFile('sam.vbs'), 'keeps the vpx-js RomMode adaptation').to.contain('RomMode=False')
+		expect(core, 'flippers work without ROM control like sam.vbs').to.contain('FlippersEnabled=1')
 	})
 })

@@ -2309,7 +2309,10 @@ Class cvpmFlips2 'test fastflips switches to rom control after 100ms or so delay
 
 	Private Sub Class_Initialize()
 		dim idx :for idx = 0 to 3 :FlipperSub(idx) = "NullFunction" : Set FlipperSubRef(idx) = Nothing: OnOff=True: ButtonState(idx)=0:SolState(idx)=0: Next
-		Delay=0: FlippersEnabled=0: DebugOn=0 : LagCompensation=0 : Sol=0 : TiltObjects=1
+		'vpx-js adaptation: cabinet-switch KeyDown/KeyUp drives the flippers
+		'(lib/game/pin-input.ts), so default the circuit on like sam.vbs does.
+		'The ROM can still switch it via EnableFlippers.
+		Delay=0: FlippersEnabled=1: DebugOn=0 : LagCompensation=0 : Sol=0 : TiltObjects=1
 		RomControlDelay = 100	'RomControlDelay MS between switching to rom controlled flippers
 		FlipperSolNumber(0)=sLLFlipper :FlipperSolNumber(1)=sLRFlipper :FlipperSolNumber(2)=sULFlipper : FlipperSolNumber(3)=sURFlipper
 		Initialized = False
