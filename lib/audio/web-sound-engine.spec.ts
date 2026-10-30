@@ -46,11 +46,17 @@ class FakeCompressor {
 	}
 }
 
+class FakePanner {
+	readonly pan = { value: 0 }
+	connect(): void {}
+}
+
 class FakeCtx {
 	static sources: FakeSource[] = []
 	static gains: FakeGain[] = []
 	static compressors: FakeCompressor[] = []
 	static buffers: Array<{ channels: number; length: number; sampleRate: number }> = []
+	static panners: FakePanner[] = []
 	static instances: FakeCtx[] = []
 	sampleRate = 44100
 	readonly state = 'running'
@@ -59,9 +65,9 @@ class FakeCtx {
 	constructor() {
 		FakeCtx.instances.push(this)
 	}
-	createBuffer(channels: number, length: number, sampleRate: number): { copyToChannel(): void } {
+	createBuffer(channels: number, length: number, sampleRate: number): { getChannelData(): { set(): void } } {
 		FakeCtx.buffers.push({ channels, length, sampleRate })
-		return { copyToChannel(): void {} }
+		return { getChannelData: () => ({ set(): void {} }) }
 	}
 	createBufferSource(): FakeSource {
 		const source = new FakeSource()
@@ -78,8 +84,10 @@ class FakeCtx {
 		FakeCtx.compressors.push(compressor)
 		return compressor
 	}
-	createStereoPanner(): null {
-		return null
+	createStereoPanner(): FakePanner {
+		const panner = new FakePanner()
+		FakeCtx.panners.push(panner)
+		return panner
 	}
 	resume(): Promise<void> {
 		return Promise.resolve()
@@ -97,6 +105,7 @@ describe('WebSoundEngine', () => {
 		FakeCtx.gains = []
 		FakeCtx.compressors = []
 		FakeCtx.buffers = []
+		FakeCtx.panners = []
 		FakeCtx.instances = []
 		;(globalThis as Record<string, unknown>).AudioContext = FakeCtx as unknown as typeof AudioContext
 		engine = new WebSoundEngine()
@@ -111,14 +120,11 @@ describe('WebSoundEngine', () => {
 	it('should split native sqrt gain across voice and master bus', () => {
 		engine.setVolume(0.25)
 		engine.playSound('tone', { volume: 0.36 })
-		// One node per bus plus the voice; identify each by its audible level,
-		// not creation order: master sqrt(0.25), music sqrt(1), voice
-		// sqrt(0.36)/sqrt(2) for native center diffusion.
-		const values = FakeCtx.gains.map(g => g.gain.value).sort((a, b) => a - b)
-		expect(values).to.have.length(3)
-		expect(values[0]).to.be.closeTo(0.6 / Math.SQRT2, 1e-9)
-		expect(values[1]).to.be.closeTo(0.5, 1e-9)
-		expect(values[2]).to.be.closeTo(1, 1e-9)
+		// Creation order: master sqrt(0.25), music bus sqrt(1), voice sqrt(0.36)/sqrt(2).
+		expect(FakeCtx.gains).to.have.length(3)
+		expect(FakeCtx.gains[0]?.gain.value).to.be.closeTo(0.5, 1e-9)
+		expect(FakeCtx.gains[1]?.gain.value).to.be.closeTo(1, 1e-9)
+		expect(FakeCtx.gains[2]?.gain.value).to.be.closeTo(0.6 / Math.SQRT2, 1e-9)
 	})
 
 	it('should cap the master bus through one limiter', () => {
@@ -134,7 +140,7 @@ describe('WebSoundEngine', () => {
 		expect(limiter.ratio.value).to.equal(20)
 		expect(limiter.attack.value).to.equal(0.001)
 		expect(limiter.release.value).to.equal(0.1)
-		const master = FakeCtx.gains.find(g => Math.abs(g.gain.value - 0.5) < 1e-9)
+		const master = FakeCtx.gains[0]
 		if (!master) throw new Error('master bus gain not found')
 		expect(master.targets).to.include(limiter)
 		expect(limiter.targets).to.include(FakeCtx.instances[0]?.destination)
@@ -154,7 +160,7 @@ describe('WebSoundEngine', () => {
 	it('should mute the master bus and restore the level on unmute', () => {
 		engine.setVolume(0.25)
 		engine.playSound('tone')
-		const master = FakeCtx.gains.find(g => Math.abs(g.gain.value - 0.5) < 1e-9)
+		const master = FakeCtx.gains[0]
 		if (!master) throw new Error('master bus gain not found')
 		engine.setMuted(true)
 		expect(master.gain.lastSet).to.equal(0)
@@ -186,11 +192,31 @@ describe('WebSoundEngine', () => {
 		if (!live) throw new Error('live voice source not found')
 		expect(live.stopped).to.equal(false)
 		expect(live.playbackRate.value).to.be.closeTo(1.1, 1e-9)
-		const voice = FakeCtx.gains.find(g => Math.abs(g.gain.value - 0.9 / Math.SQRT2) < 1e-9)
+		const voice = FakeCtx.gains[2]
 		if (!voice) throw new Error('retuned voice gain not found')
+		expect(voice.gain.value).to.be.closeTo(0.9 / Math.SQRT2, 1e-9)
 		engine.stopSound('tone')
 		expect(live.stopped).to.equal(true)
 		expect(engine.isPlaying('tone')).to.equal(false)
+	})
+
+	it('should update the loop mode when retuning a live voice', () => {
+		engine.playSound('tone', { loopCount: -1, useSame: true, restart: false })
+		const live = FakeCtx.sources.at(-1)
+		if (!live) throw new Error('live voice source not found')
+		expect(live.loop).to.equal(true)
+		engine.playSound('tone', { loopCount: 2, useSame: true, restart: false })
+		expect(FakeCtx.sources.length).to.equal(1)
+		expect(live.loop).to.equal(false)
+		engine.playSound('tone', { loopCount: -1, useSame: true, restart: false })
+		expect(live.loop).to.equal(true)
+	})
+
+	it('should reuse the uploaded buffer for replays of a registered sample', () => {
+		engine.playSound('tone')
+		engine.playSound('tone')
+		expect(FakeCtx.sources.length).to.equal(2)
+		expect(FakeCtx.buffers.length).to.equal(1)
 	})
 
 	it('should not resurrect replays on a one-shot re-play', () => {
@@ -218,25 +244,28 @@ describe('WebSoundEngine', () => {
 		engine.registerSample('theme', tonePcm(220, 0.05, 8000), 8000)
 		engine.setMusicVolume(0.5)
 		engine.playMusic('theme', 0.6)
-		// Bus levels identified by value, not creation order:
-		// music sqrt(0.5), music voice sqrt(0.6), master sqrt(1).
-		const values = FakeCtx.gains.map(g => g.gain.value).sort((a, b) => a - b)
-		expect(values).to.have.length(3)
-		expect(values[0]).to.be.closeTo(Math.sqrt(0.5), 1e-9)
-		expect(values[1]).to.be.closeTo(Math.sqrt(0.6), 1e-9)
-		expect(values[2]).to.be.closeTo(1, 1e-9)
+		// Creation order: master sqrt(1), music bus sqrt(0.5), music voice sqrt(0.6).
+		expect(FakeCtx.gains).to.have.length(3)
+		expect(FakeCtx.gains[0]?.gain.value).to.be.closeTo(1, 1e-9)
+		expect(FakeCtx.gains[1]?.gain.value).to.be.closeTo(Math.sqrt(0.5), 1e-9)
+		expect(FakeCtx.gains[2]?.gain.value).to.be.closeTo(Math.sqrt(0.6), 1e-9)
 	})
 
-	it('should play music once and report the natural end', () => {
+	it('should play music once without looping', () => {
 		engine.registerSample('theme', tonePcm(220, 0.05, 8000), 8000)
-		let ended = 0
-		engine.onMusicEnded = () => ended++
 		engine.playMusic('theme', 0.6)
 		const live = FakeCtx.sources.at(-1)
 		if (!live) throw new Error('music source not found')
 		// Native streams the file once per PlayMusic (no loop).
 		expect(live.loop).to.equal(false)
-		live.onended?.()
+	})
+
+	it('should report the natural music end but not a forced stop', () => {
+		engine.registerSample('theme', tonePcm(220, 0.05, 8000), 8000)
+		let ended = 0
+		engine.onMusicEnded = () => ended++
+		engine.playMusic('theme', 0.6)
+		FakeCtx.sources.at(-1)?.onended?.()
 		expect(ended).to.equal(1)
 		expect(engine.getMusic()).to.equal(null)
 		engine.playMusic('theme', 0.6)
@@ -254,9 +283,15 @@ describe('WebSoundEngine', () => {
 		engine.playSound('stereo', { volume: 1 })
 		// Native diffusion plays 0.5x per channel at center; the panner's
 		// 0.7071x completes it, so the voice gain lands exactly on 1.0.
-		const voice = FakeCtx.gains.find(g => Math.abs(g.gain.value - 1) < 1e-9)
+		const voice = FakeCtx.gains[2]
 		if (!voice) throw new Error('voice gain not found')
 		expect(voice.gain.value).to.be.closeTo(1, 1e-9)
+	})
+
+	it('should apply uncurved pan to the stereo panner', () => {
+		engine.playSound('tone', { pan: 0.5 ** 10 })
+		expect(FakeCtx.panners).to.have.length(1)
+		expect(FakeCtx.panners[0]?.pan.value).to.be.closeTo(0.5, 1e-9)
 	})
 
 	it('should steal the oldest voice past the same-sound cap', () => {
@@ -270,22 +305,17 @@ describe('WebSoundEngine', () => {
 		expect(engine.isPlaying('tone')).to.equal(true)
 	})
 
-	it('should match native center diffusion on voice gain', () => {
-		engine.setVolume(1)
-		engine.playSound('tone')
-		// Native linear diffusion plays 0.5x per channel at center; our
-		// equal-power panner plays 0.7071x, so the voice carries 1/sqrt(2)
-		// and the product lands on native's 0.5 instead of +3 dB hot.
-		const voice = FakeCtx.gains.find(g => Math.abs(g.gain.value - 1 / Math.SQRT2) < 1e-9)
-		if (!voice) throw new Error('voice gain not found')
-		expect(voice.gain.value).to.be.closeTo(1 / Math.SQRT2, 1e-9)
+	it('should loop infinite voices natively without replays', () => {
+		engine.playSound('tone', { loopCount: -1 })
+		const live = FakeCtx.sources.at(-1)
+		if (!live) throw new Error('live voice source not found')
+		expect(live.loop).to.equal(true)
+		expect(engine.isPlaying('tone')).to.equal(true)
 	})
 
-	it('should schedule knocks through the worker fallback', async () => {
+	it('should schedule knocks inline', () => {
 		engine.fireKnocker(1)
 		expect(engine.getKnockCount()).to.equal(1)
-		// The inline fallback resolves on microtasks: flush those, never the wall clock.
-		for (let i = 0; i < 10 && FakeCtx.sources.length === 0; i++) await Promise.resolve()
 		expect(FakeCtx.sources.length).to.equal(1)
 	})
 
@@ -302,7 +332,6 @@ describe('WebSoundEngine', () => {
 		expect(emu.channels).to.equal(1)
 		expect(emu.length).to.equal(441)
 		expect(emu.sampleRate).to.equal(44100)
-		expect(engine.getEmuFrames()).to.equal(882)
 	})
 
 	it('should schedule emu chunks back-to-back without gaps', () => {

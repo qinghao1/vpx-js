@@ -97,11 +97,55 @@ describe('decodeWavAudio', () => {
 	})
 
 	it('should return null for unsupported codecs and corrupt input', () => {
-		// ADPCM tag with an impossible blockAlign still returns null.
 		expect(decodeWavAudio(buildWav(0x11, 1, 8000, 16, new Uint8Array(256)))).to.equal(null)
+		expect(decodeWavAudio(buildWav(34, 1, 8000, 16, int16Samples([0])))).to.equal(null)
+		expect(decodeWavAudio(buildWav(3, 1, 8000, 24, new Uint8Array(3)))).to.equal(null)
+		expect(decodeWavAudio(buildWav(1, 65, 8000, 16, new Uint8Array(130)))).to.equal(null)
 		expect(decodeWavAudio(new Uint8Array(10))).to.equal(null)
 		expect(decodeWavAudio(new TextEncoder().encode('RIFF....NOTWAVE' + 'x'.repeat(40)))).to.equal(null)
 		expect(decodeWavAudio(buildWav(1, 1, 8000, 16, new Uint8Array(0)))).to.equal(null)
+	})
+
+	it('should decode 24-bit PCM sign extension', () => {
+		const payload = new Uint8Array([0x00, 0x00, 0x80, 0xff, 0xff, 0x7f])
+		const decoded = decodeWavAudio(buildWav(1, 1, 8000, 24, payload))!
+		expect(decoded?.pcm[0]).to.equal(-1)
+		expect(decoded?.pcm[1]).to.be.closeTo(8388607 / 8388608, 1e-9)
+	})
+
+	it('should decode 32-bit int and 64-bit float PCM', () => {
+		const intPayload = new Uint8Array(8)
+		const intView = new DataView(intPayload.buffer)
+		intView.setInt32(0, 2147483647, true)
+		intView.setInt32(4, -2147483648, true)
+		const intDecoded = decodeWavAudio(buildWav(1, 1, 8000, 32, intPayload))!
+		expect(intDecoded?.pcm[0]).to.be.closeTo(2147483647 / 2147483648, 1e-9)
+		expect(intDecoded?.pcm[1]).to.equal(-1)
+		const floatPayload = new Uint8Array(8)
+		new DataView(floatPayload.buffer).setFloat64(0, 0.5, true)
+		const floatDecoded = decodeWavAudio(buildWav(3, 1, 8000, 64, floatPayload))!
+		expect(floatDecoded?.pcm[0]).to.be.closeTo(0.5, 1e-9)
+	})
+
+	it('should downmix stereo 8-bit PCM to mono', () => {
+		const decoded = decodeWavAudio(buildWav(1, 2, 11025, 8, new Uint8Array([128, 128, 255, 0])))!
+		expect(Array.from(decoded?.pcm ?? [])).to.have.length(2)
+		expect(decoded?.pcm[0]).to.equal(0)
+		expect(decoded?.pcm[1]).to.be.closeTo(-1 / 256, 1e-9)
+	})
+
+	it('should clamp an overrunning data size to the buffer', () => {
+		const bytes = buildWav(1, 1, 8000, 16, int16Samples([16384]))
+		new DataView(bytes.buffer).setUint32(40, 100, true)
+		const decoded = decodeWavAudio(bytes)!
+		expect(Array.from(decoded?.pcm ?? [])).to.have.length(1)
+		expect(decoded?.pcm[0]).to.be.closeTo(0.5, 1e-6)
+	})
+
+	it('should skip odd-size chunks with padding', () => {
+		const junk = new Uint8Array([0x4a, 0x55, 0x4e, 0x4b, 5, 0, 0, 0, 1, 2, 3, 4, 5, 0])
+		const decoded = decodeWavAudio(buildWav(1, 1, 8000, 16, int16Samples([16384]), [junk]))!
+		expect(decoded?.pcm[0]).to.be.closeTo(0.5, 1e-6)
 	})
 
 	it('should return null (not throw) for a truncated fmt body', () => {
@@ -121,13 +165,7 @@ describe('decodeWavAudio', () => {
 		expect(decodeWavAudio(bytes)).to.equal(null)
 	})
 
-	it('should report the source channel count', () => {
-		expect(decodeWavAudio(buildWav(1, 1, 8000, 16, int16Samples([0]))!)?.channels).to.equal(1)
-		expect(decodeWavAudio(buildWav(1, 2, 8000, 16, int16Samples([0, 0])))?.channels).to.equal(2)
-	})
-
 	it('should decode IMA-ADPCM mono', () => {
-		// Predictor 100, index 0, nibbles 7/7: steps 7 then 16 give +11, +30.
 		const header = new Uint8Array([100, 0, 0, 0])
 		const decoded = decodeWavAudio(buildWav(0x11, 1, 8000, 4, new Uint8Array([...header, 0x77, 0, 0, 0]), [], 8))
 		expect(decoded?.sampleRate).to.equal(8000)
@@ -151,7 +189,6 @@ describe('decodeWavAudio', () => {
 	})
 
 	it('should decode MS-ADPCM mono', () => {
-		// coef[0], delta 64, seeds s1=1000/s2=500, nibbles 1/0: 1000+64, then unchanged.
 		const header = new Uint8Array([0, 64, 0, 232, 3, 244, 1])
 		const decoded = decodeWavAudio(buildWav(2, 1, 8000, 4, new Uint8Array([...header, 0x10]), [], 8))
 		expect(decoded?.sampleRate).to.equal(8000)
@@ -168,7 +205,6 @@ describe('decodeWavAudio', () => {
 	})
 
 	it('should decode MS-ADPCM stereo and downmix', () => {
-		// Seeds L(500/1000) R(1500/2000), nibbles 1/1 then 0/0.
 		const header = new Uint8Array([0, 0, 64, 0, 64, 0, 232, 3, 208, 7, 244, 1, 220, 5])
 		const decoded = decodeWavAudio(buildWav(2, 2, 8000, 4, new Uint8Array([...header, 0x11, 0x00]), [], 16))
 		expect(decoded?.channels).to.equal(2)
@@ -182,7 +218,6 @@ describe('decodeWavAudio', () => {
 	})
 
 	it('should return null from container decode without a browser context', async () => {
-		// Node has no OfflineAudioContext; the browser path is covered by E2E.
 		expect(await decodeExternalAudio(new Uint8Array(64))).to.equal(null)
 	})
 })

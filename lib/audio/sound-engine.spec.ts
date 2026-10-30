@@ -4,9 +4,8 @@ import { expect } from 'chai'
 import { resetWarnOnce } from '../emu/warn-once.js'
 import { Logger } from '../util/logger.js'
 import { NullSoundEngine } from './null-sound-engine.js'
-import { effectiveGain, extractPcm, mapLoopCount, pitchFactor, uncurvePanFade } from './sound-engine.js'
+import { curvePanFade, effectiveGain, extractPcm, mapLoopCount, pitchFactor, uncurvePanFade } from './sound-engine.js'
 import { knockPcm, tonePcm } from './sound-synth-core.js'
-import { synthKnock, synthTone } from './sound-synth-pool.js'
 
 function tone(name = 'probe'): { engine: NullSoundEngine; name: string } {
 	const engine = new NullSoundEngine()
@@ -32,6 +31,7 @@ describe('Sound engine math', () => {
 		expect(uncurvePanFade(0.5 ** 10)).to.be.closeTo(0.5, 1e-9)
 		expect(uncurvePanFade(-(0.5 ** 10))).to.be.closeTo(-0.5, 1e-9)
 		expect(uncurvePanFade(99)).to.equal(1)
+		expect(curvePanFade(uncurvePanFade(0.5 ** 10))).to.be.closeTo(0.5 ** 10, 1e-9)
 	})
 
 	it('should scale voices by sqrt of the clamped product', () => {
@@ -47,8 +47,9 @@ describe('Sound engine math', () => {
 		expect(pitchFactor(44100, 4410)).to.be.closeTo(1.1, 1e-9)
 		expect(pitchFactor(0, 100)).to.equal(1)
 		const detuned = pitchFactor(44100, 0, 0.2, () => 0.5)
-		expect(detuned).to.be.within(0.9, 1.1)
+		expect(detuned).to.be.closeTo(1.025, 1e-9)
 		expect(pitchFactor(44100, 0, 0, () => 0.99)).to.equal(1)
+		expect(pitchFactor(44100, 0, -0.5, () => 0.99)).to.equal(1)
 	})
 })
 
@@ -155,34 +156,25 @@ describe('NullSoundEngine', () => {
 		engine.setMusicVolume(0.3)
 		engine.setVolume(NaN)
 		engine.setMusicVolume(NaN)
-		expect(engine.getVolume()).to.be.closeTo(0.4, 1e-9)
+		expect(engine.getLevel()).to.be.closeTo(0.4, 1e-9)
 		expect(engine.getMusicVolume()).to.be.closeTo(0.3, 1e-9)
 	})
 
 	it('should mute with volume restore', () => {
 		const { engine } = tone()
 		engine.setVolume(0.4)
-		expect(engine.getVolume()).to.be.closeTo(0.4, 1e-9)
+		expect(engine.getLevel()).to.be.closeTo(0.4, 1e-9)
 		engine.setMuted(true)
 		expect(engine.isMuted()).to.equal(true)
-		expect(engine.getVolume()).to.equal(0)
 		engine.setMuted(false)
-		expect(engine.getVolume()).to.be.closeTo(0.4, 1e-9)
+		expect(engine.getLevel()).to.be.closeTo(0.4, 1e-9)
 		engine.setVolume(99)
-		expect(engine.getVolume()).to.equal(1)
+		expect(engine.getLevel()).to.equal(1)
 		engine.setVolume(-1)
-		expect(engine.getVolume()).to.equal(0)
+		expect(engine.getLevel()).to.equal(0)
 	})
 
-	it('should stop music on an empty PlayMusic name', () => {
-		const engine = new NullSoundEngine()
-		engine.playMusic('theme', 0.7)
-		expect(engine.getMusic()).to.deep.equal({ name: 'theme', volume: 0.7 })
-		engine.playMusic('')
-		expect(engine.getMusic()).to.equal(null)
-	})
-
-	it('should track music state and volume', () => {
+	it('should track music state and volume, stopping on an empty name', () => {
 		const engine = new NullSoundEngine()
 		expect(engine.getMusic()).to.equal(null)
 		engine.playMusic('theme', 0.7)
@@ -191,19 +183,44 @@ describe('NullSoundEngine', () => {
 		expect(engine.getMusicVolume()).to.be.closeTo(0.3, 1e-9)
 		engine.endMusic()
 		expect(engine.getMusic()).to.equal(null)
+		engine.playMusic('theme', 0.7)
+		engine.playMusic('')
+		expect(engine.getMusic()).to.equal(null)
 	})
 
-	it('should count emulator PCM frames and ignore junk', () => {
-		const engine = new NullSoundEngine()
+	it('should reject invalid sample registrations', () => {
+		const warns: unknown[][] = []
+		const orig = Logger.logger()
+		const noop = () => {}
+		Logger.setLogger({
+			wtf: noop,
+			error: noop,
+			warn: (...a: unknown[]) => void warns.push(a),
+			info: noop,
+			debug: noop,
+		})
+		try {
+			const engine = new NullSoundEngine()
+			engine.registerSample('', new Float32Array(8), 8000)
+			engine.registerSample('empty', new Float32Array(0), 8000)
+			engine.registerSample('rate', new Float32Array(8), 0)
+			expect(engine.hasSample('')).to.equal(false)
+			expect(engine.hasSample('empty')).to.equal(false)
+			expect(engine.hasSample('rate')).to.equal(false)
+			expect(warns.length).to.equal(3)
+		} finally {
+			Logger.setLogger(orig)
+		}
+	})
+
+	it('should accept raw Float32Array emu PCM and ignore junk', () => {
 		expect(extractPcm(null)).to.equal(null)
 		expect(extractPcm({})).to.equal(null)
-		engine.pushEmuPcm(null)
-		engine.pushEmuPcm({ samples: [] })
-		expect(engine.getEmuFrames()).to.equal(0)
-		engine.pushEmuPcm(new Float32Array(128))
-		engine.pushEmuPcm({ samples: new Float32Array(64) })
-		engine.pushEmuPcm({ pcm: [0.1, -0.1] })
-		expect(engine.getEmuFrames()).to.equal(194)
+		expect(extractPcm({ samples: new Float32Array(64) })).to.equal(null)
+		expect(extractPcm({ pcm: [0.1, -0.1] })).to.equal(null)
+		expect(extractPcm(new Float32Array(0))).to.equal(null)
+		const pcm = new Float32Array(128)
+		expect(extractPcm(pcm)).to.equal(pcm)
 	})
 
 	it('should clear voices and samples on dispose', () => {
@@ -217,7 +234,7 @@ describe('NullSoundEngine', () => {
 	})
 })
 
-describe('Sound synth pool', () => {
+describe('Sound synth kernels', () => {
 	it('should synthesize finite knocker and tone PCM inline', () => {
 		const knock = knockPcm(8000)
 		expect(knock.length).to.equal(Math.floor(8000 * 0.18))
@@ -227,13 +244,5 @@ describe('Sound synth pool', () => {
 		const toneBuffer = tonePcm(440, 0.05, 8000)
 		expect(toneBuffer.length).to.equal(400)
 		expect([...toneBuffer].every(v => Number.isFinite(v) && Math.abs(v) <= 0.5)).to.equal(true)
-	})
-
-	it('should synthesize knocker and tone PCM', async () => {
-		const knock = await synthKnock(8000)
-		expect(knock).to.be.instanceOf(Float32Array)
-		expect(knock.length).to.be.above(0)
-		const toneBuffer = await synthTone(440, 0.05, 8000)
-		expect(toneBuffer.length).to.equal(400)
 	})
 })

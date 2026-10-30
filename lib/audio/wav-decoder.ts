@@ -2,15 +2,10 @@
 
 import { readFourCc } from '../io/binary-helpers.js'
 
-/** Minimal WAV decoder: tags 1 (PCM), 3 (float) and 0x11/0x02 (IMA/MS-ADPCM), downmixed to mono.
+/** Minimal WAV decoder: tags 1 (PCM), 3 (float), 0x11/0x02 (ADPCM), downmixed to mono.
  *
- * VPX stores imported .wav sounds as a reconstructed canonical WAVE file
- * (@see Sound::CreateFromStream), so a small header parser covers every
- * table-embedded WAV without runtime deps. Runs inline in Node/tests and
- * the browser (no worker round-trip, no decodeAudioData).
- * Unsupported codecs (e.g. tag 34) and non-WAV imports (upstream
- * stores those as raw MP3/OGG bytes) return null. Multi-channel audio is
- * downmixed to mono: the sinks are mono-only (`createBuffer(1, ...)`).
+ * Table sounds arrive as canonical WAVE (@see Sound::CreateFromStream).
+ * Other codecs and non-WAV imports return null; sinks are mono-only.
  */
 export interface DecodedWav {
 	pcm: Float32Array
@@ -23,7 +18,7 @@ export function decodeWavAudio(bytes: Uint8Array): DecodedWav | null {
 	if (bytes.length < 44) return null
 	const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
 	if (readFourCc(view, 0) !== 'RIFF' || readFourCc(view, 8) !== 'WAVE') return null
-	// Scan chunks (fmt, data, skipping unknowns) instead of assuming a 44-byte header.
+	// Chunks may precede fmt/data; don't assume a 44-byte header.
 	let fmt: { tag: number; channels: number; rate: number; bits: number; blockAlign: number } | null = null
 	let dataOffset = -1
 	let dataSize = 0
@@ -52,7 +47,7 @@ export function decodeWavAudio(bytes: Uint8Array): DecodedWav | null {
 	if (tag === 2 || tag === 0x11)
 		return decodeAdpcm(view, bytes, dataOffset, dataSize, tag, channels, rate, blockAlign)
 	const bytesPerSample = bits / 8
-	if (![1, 2, 3, 4].includes(bytesPerSample)) return null
+	if (![1, 2, 3, 4, 8].includes(bytesPerSample)) return null
 	const frameSize = channels * bytesPerSample
 	const available = Math.min(dataSize, bytes.length - dataOffset)
 	const frames = Math.floor(available / frameSize)
@@ -61,6 +56,7 @@ export function decodeWavAudio(bytes: Uint8Array): DecodedWav | null {
 	const isFloat = tag === 3
 	if (isFloat && bits !== 32 && bits !== 64) return null
 	if (!isFloat && tag !== 1) return null
+	if (!isFloat && bytesPerSample > 4) return null
 	for (let frame = 0; frame < frames; frame++) {
 		let sum = 0
 		for (let ch = 0; ch < channels; ch++) {
@@ -73,11 +69,9 @@ export function decodeWavAudio(bytes: Uint8Array): DecodedWav | null {
 }
 
 /**
- * Decodes any browser-supported container (MP3/OGG/FLAC/WAV) through a
- * throwaway offline context, downmixed to mono and resampled to the context's
- * 44.1 kHz rate. Null where
- * decoding is unavailable (Node/tests) or the bytes are undecodable; the
- * input is copied because `decodeAudioData` detaches its buffer.
+ * Decode any browser-supported container to mono PCM at 44100 Hz. Null without
+ * OfflineAudioContext or for undecodable bytes; the input is copied because
+ * decodeAudioData detaches its buffer.
  */
 export async function decodeExternalAudio(bytes: Uint8Array): Promise<DecodedWav | null> {
 	const Ctor = (globalThis as { OfflineAudioContext?: typeof OfflineAudioContext }).OfflineAudioContext
@@ -138,7 +132,6 @@ const MS_COEFS: Array<readonly [number, number]> = [
 	[392, -232],
 ]
 
-/** IMA-ADPCM (0x11) and MS-ADPCM (0x02) block decode, downmixed to mono. */
 function decodeAdpcm(
 	view: DataView,
 	bytes: Uint8Array,

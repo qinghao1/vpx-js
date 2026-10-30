@@ -15,7 +15,7 @@ const FALLBACK_DMD = new Vertex2D(128, 32)
 // PinMAME reads a fixed 1 KiB config struct from the given pointer.
 const CONFIG_SIZE = 1024
 const VPM_DIR = '/pinmame'
-// Hz — the mixer rate PinMAME resamples its audio to.
+// Mixer rate PinMAME resamples its audio to (Hz).
 const SAMPLE_RATE = 44100
 // Largest DMD frame accepted from the wasm core (1 MiB). Real DMDs are at
 // most a few dozen KiB; anything bigger is a corrupt width/height pair and
@@ -91,10 +91,8 @@ export class PinMameEmulator implements IEmulator {
 	// lamps = 8 KiB). The DMD slot is separate so frame-sized buffers don't
 	// thrash against pull pages when resolutions differ from the 128x32 fallback.
 	private readonly wasmBufs: Record<'pull' | 'dmd' | 'audio', { ptr: number; cap: number; min: number }> = {
-		// 1024 covers the sol/GI pulls; lamps grow it to 8 KiB. 4096 is one full 128x32 DMD frame.
 		pull: { ptr: 0, cap: 0, min: 1024 },
 		dmd: { ptr: 0, cap: 0, min: 4096 },
-		// 16384 B covers one mono accumulator drain; stereo grows it to 32 KiB.
 		audio: { ptr: 0, cap: 0, min: MAX_AUDIO_FRAMES * 2 },
 	}
 	private _dmdFrameBuf: Uint8Array | null = null
@@ -352,12 +350,9 @@ export class PinMameEmulator implements IEmulator {
 		// Always stereo-sized: the layout can change mid-drain, and an
 		// undersized buffer would overflow the wasm heap.
 		const ptr = this.ensureWasmBuf('audio', MAX_AUDIO_FRAMES * 2 * 2)
-		// Drain at most one accumulator per sync (~735 frames at 60 Hz).
-		// 0 = none yet (no stream or already drained): not an error.
+		// At most one accumulator per sync; 0 means nothing drained yet, not an error.
 		const frames = getFrame(ptr, MAX_AUDIO_FRAMES)
 		if (frames <= 0 || (this.api?.getAudioSeq?.() ?? seq0) !== seq0) return
-		// Re-read the layout: it can change mid-drain, and the conversion
-		// must match the drained bytes.
 		const fresh = this.api?.getAudioChannels?.() ?? 0
 		if (fresh !== 1 && fresh !== 2) return
 		const view = new DataView(m.HEAPU8.buffer, ptr, frames * fresh * 2)
@@ -424,6 +419,7 @@ export class PinMameEmulator implements IEmulator {
 			if (!Number.isFinite(n) || n < 0) n = 0
 			n = Math.min(n, buf.length)
 		} catch {
+			warnOnce('pinmame:pull', '[pinmame] stage pull threw; changes dropped.')
 			n = 0
 		}
 		for (let i = 0; i < n; i++) {

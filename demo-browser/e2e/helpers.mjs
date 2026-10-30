@@ -1678,12 +1678,12 @@ export const soundChecks = async page => {
 			btn.click()
 			if (s.isMuted() === wasMuted) btn.click()
 			const mutedOk = s.isMuted() !== wasMuted && btn.getAttribute('aria-pressed') === String(s.isMuted())
-			// Probe the volume unmuted: getVolume() reports 0 while muted, so a
-			// persisted muted profile would fail the check below on user settings.
-			const volBefore = typeof s.getLevel === 'function' ? s.getLevel() : s.getVolume()
+			// Probe the volume unmuted: mute keeps the level, so read getLevel()
+			// instead of the muted-audible value a persisted profile would break.
+			const volBefore = s.getLevel()
 			slider.value = '50'
 			slider.dispatchEvent(new Event('input', { bubbles: true }))
-			const volOk = Math.abs(s.getVolume() - 0.5) < 1e-9 && slider.value === '50' && s.isMuted() === false
+			const volOk = Math.abs(s.getLevel() - 0.5) < 1e-9 && slider.value === '50' && s.isMuted() === false
 			slider.value = String(Math.round(volBefore * 100))
 			slider.dispatchEvent(new Event('input', { bubbles: true }))
 			if (s.isMuted() !== wasMuted) btn.click()

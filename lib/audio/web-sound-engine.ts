@@ -1,8 +1,8 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-// Decode/synthesis runs in a plain Worker (sound-synth-pool.ts) while the
-// audio render thread owns mixing — script and physics threads never block
-// on audio. Without an AudioContext every call degrades to state tracking.
+// Knock synthesis runs inline (~8k frames, sub-millisecond) while the audio
+// render thread owns mixing — callers never wait on audio. Without an
+// AudioContext every call degrades to state tracking.
 
 import { warnOnce } from '../emu/warn-once.js'
 import {
@@ -14,7 +14,7 @@ import {
 	sqrt01,
 	uncurvePanFade,
 } from './sound-engine.js'
-import { synthKnock } from './sound-synth-pool.js'
+import { knockPcm } from './sound-synth-core.js'
 
 interface VoiceNodes {
 	source: AudioBufferSourceNode
@@ -31,8 +31,7 @@ interface VoiceReplay {
 	remaining: number
 }
 
-// Mixer rate we request from PinMAME (see SAMPLE_RATE): emu buffers are
-// tagged with it and the browser resamples to the device rate.
+// Mixer rate tagged on emu buffers; the browser resamples to the device rate.
 const EMU_SAMPLE_RATE = 44100
 // Backlog cap, seconds: chunks scheduled further out than this are dropped
 // instead of banking permanent lag after bursts.
@@ -49,6 +48,10 @@ export class WebSoundEngine extends BaseSoundEngine {
 	private readonly repeats = new Map<number, VoiceReplay>()
 	private musicNodes: VoiceNodes | null = null
 	private gestureHooked = false
+	// Uploaded buffers by registered sample: sources are one-shot but buffers
+	// are immutable, so replays share one upload until re-registration swaps
+	// the sample object (which the map then forgets on its own).
+	private readonly buffers = new WeakMap<SoundSample, AudioBuffer>()
 	// Next emu-chunk start, in audio-clock seconds; chunks are sequenced
 	// back-to-back so the stream plays gapless instead of overlapping.
 	private emuNextTime = 0
@@ -62,35 +65,31 @@ export class WebSoundEngine extends BaseSoundEngine {
 	protected emitVoice(voice: SoundVoice, sample: SoundSample, rate: number): void {
 		const ctx = this.ensureContext()
 		if (!ctx || !this.master) return
-		try {
-			const buffer = this.uploadPcm(sample.pcm, sample.sampleRate)
-			if (!buffer) return
-			// Per-voice gain carries sqrt(script volume); the master bus carries
-			// sqrt(master level), so the product matches native sqrt(sound*main).
-			// The /sqrt(2) reconciles our equal-power panner (0.7071x at center)
-			// with native's linear diffusion (0.5x): unscaled voices run +3 dB hot.
-			// frontRearFade has no stereo equivalent and is ignored.
-			const gainValue = effectiveGain(voice.volume, 1, sample.channels) / Math.SQRT2
-			const pan = uncurvePanFade(voice.pan)
-			if (voice.loopCount > 0) {
-				this.repeats.set(voice.id, { voice, buffer, rate, gainValue, pan, remaining: voice.loopCount })
-			} else {
-				// A one-shot or infinite re-Play must not inherit replays scheduled
-				// by an earlier finite-loop play of this voice.
-				this.repeats.delete(voice.id)
-			}
-			// useSame + restart=false on a playing voice: native applies the new
-			// settings to the live voice (AudioPlayer selection keeps it), so retune
-			// instead of restarting.
-			const live = this.nodes.get(voice.id)
-			if (live) {
-				live.gain.gain.value = gainValue
-				if (live.pan) live.pan.pan.value = pan
-				live.source.playbackRate.value = rate
-				return
-			}
-			this.startVoiceSource(ctx, voice, buffer, rate, gainValue, pan, voice.loopCount === -1)
-		} catch {}
+		const buffer = this.uploadPcm(sample.pcm, sample.sampleRate, sample)
+		if (!buffer) return
+		// Voice carries sqrt(script volume)/sqrt(2), master carries sqrt(level); the /sqrt(2)
+		// reconciles our equal-power panner with native's linear diffusion. Fade is stereo-ignored.
+		const gainValue = effectiveGain(voice.volume, 1, sample.channels) / Math.SQRT2
+		const pan = uncurvePanFade(voice.pan)
+		if (voice.loopCount > 0) {
+			this.repeats.set(voice.id, { voice, buffer, rate, gainValue, pan, remaining: voice.loopCount })
+		} else {
+			// A one-shot or infinite re-Play must not inherit replays scheduled
+			// by an earlier finite-loop play of this voice.
+			this.repeats.delete(voice.id)
+		}
+		// useSame + restart=false on a playing voice: native applies the new
+		// settings to the live voice (AudioPlayer selection keeps it), so retune
+		// instead of restarting.
+		const live = this.nodes.get(voice.id)
+		if (live) {
+			live.gain.gain.value = gainValue
+			if (live.pan) live.pan.pan.value = pan
+			live.source.playbackRate.value = rate
+			live.source.loop = voice.loopCount === -1
+			return
+		}
+		this.startVoiceSource(ctx, voice, buffer, rate, gainValue, pan, voice.loopCount === -1)
 	}
 
 	private startVoiceSource(
@@ -161,13 +160,10 @@ export class WebSoundEngine extends BaseSoundEngine {
 
 	protected emitKnock(): void {
 		const ctx = this.ensureContext()
-		if (!ctx) return
+		if (!ctx || !this.master) return
 		// The master bus carries the level; the knock itself plays at unity.
-		void synthKnock(ctx.sampleRate)
-			.then(pcm => {
-				if (pcm.length) this.playBuffer(pcm, ctx.sampleRate)
-			})
-			.catch(() => {})
+		const pcm = knockPcm(ctx.sampleRate)
+		if (pcm.length) this.playBuffer(pcm, ctx.sampleRate)
 	}
 
 	protected emitEmuPcm(pcm: Float32Array): void {
@@ -192,23 +188,24 @@ export class WebSoundEngine extends BaseSoundEngine {
 		if (!ctx || !this.master) return
 		const buffer = this.uploadPcm(pcm, sampleRate)
 		if (!buffer) return
-		try {
-			const source = ctx.createBufferSource()
-			source.buffer = buffer
-			source.connect(this.master)
-			source.start()
-		} catch {}
+		const source = ctx.createBufferSource()
+		source.buffer = buffer
+		source.connect(this.master)
+		source.start()
 	}
 
-	/** Decoded PCM upload (fresh AudioBuffer per call: sources are one-shot). */
-	private uploadPcm(pcm: Float32Array, sampleRate: number): AudioBuffer | null {
+	/** Decoded PCM upload, shared per registered sample (pass it for reuse). */
+	private uploadPcm(pcm: Float32Array, sampleRate: number, sample?: SoundSample): AudioBuffer | null {
 		const ctx = this.ctx
 		if (!ctx) return null
+		if (sample) {
+			const hit = this.buffers.get(sample)
+			if (hit) return hit
+		}
 		try {
 			const buffer = ctx.createBuffer(1, pcm.length, sampleRate)
-			// All producers allocate with new Float32Array, so the store is
-			// always an ArrayBuffer; the cast avoids a per-chunk copy.
-			buffer.copyToChannel(pcm as Float32Array<ArrayBuffer>, 0)
+			buffer.getChannelData(0).set(pcm)
+			if (sample) this.buffers.set(sample, buffer)
 			return buffer
 		} catch {
 			return null
@@ -230,28 +227,26 @@ export class WebSoundEngine extends BaseSoundEngine {
 				)
 			return
 		}
-		try {
-			const buffer = this.uploadPcm(sample.pcm, sample.sampleRate)
-			if (!buffer) return
-			const source = ctx.createBufferSource()
-			source.buffer = buffer
-			// Native streams the file once per PlayMusic and fires MusicDone at
-			// the end (SoundPlayer::OnSoundEnd); a forced stop nulls musicNodes
-			// first, so only a natural end reports.
-			const gain = ctx.createGain()
-			// Voice gain carries sqrt(script volume); the music bus carries sqrt(musicVolume).
-			gain.gain.value = effectiveGain(music.volume, 1)
-			source.connect(gain)
-			gain.connect(this.musicBus)
-			const nodes: VoiceNodes = { source, gain, pan: null }
-			this.musicNodes = nodes
-			source.onended = () => {
-				if (this.musicNodes !== nodes) return
-				this.endMusic()
-				this.onMusicEnded?.()
-			}
-			source.start()
-		} catch {}
+		const buffer = this.uploadPcm(sample.pcm, sample.sampleRate, sample)
+		if (!buffer) return
+		const source = ctx.createBufferSource()
+		source.buffer = buffer
+		// Native streams the file once per PlayMusic and fires MusicDone at
+		// the end (SoundPlayer::OnSoundEnd); a forced stop nulls musicNodes
+		// first, so only a natural end reports.
+		const gain = ctx.createGain()
+		// Unlike SFX, music plays uncompensated: it streams from file natively, not from a Sound object.
+		gain.gain.value = effectiveGain(music.volume, 1)
+		source.connect(gain)
+		gain.connect(this.musicBus)
+		const nodes: VoiceNodes = { source, gain, pan: null }
+		this.musicNodes = nodes
+		source.onended = () => {
+			if (this.musicNodes !== nodes) return
+			this.endMusic()
+			this.onMusicEnded?.()
+		}
+		source.start()
 	}
 
 	protected override onMusicEnd(): void {
@@ -261,11 +256,9 @@ export class WebSoundEngine extends BaseSoundEngine {
 	protected override onOutputChanged(): void {
 		if (!this.ctx) return
 		const t = this.ctx.currentTime
-		try {
-			// 10 ms smoothing: de-clicks slider/mute moves without audible lag.
-			this.master?.gain.setTargetAtTime(this.unmutedMaster(), t, 0.01)
-			this.musicBus?.gain.setTargetAtTime(sqrt01(this.getMusicVolume()), t, 0.01)
-		} catch {}
+		// 10 ms smoothing: de-clicks slider/mute moves without audible lag.
+		this.master?.gain.setTargetAtTime(this.unmutedMaster(), t, 0.01)
+		this.musicBus?.gain.setTargetAtTime(sqrt01(this.getMusicVolume()), t, 0.01)
 	}
 
 	private unmutedMaster(): number {
@@ -306,17 +299,20 @@ export class WebSoundEngine extends BaseSoundEngine {
 		limiter.attack.value = 0.001
 		limiter.release.value = 0.1
 		try {
-			this.master = ctx.createGain()
-			this.master.gain.value = this.unmutedMaster()
-			this.master.connect(limiter)
+			const master = ctx.createGain()
+			master.gain.value = this.unmutedMaster()
+			master.connect(limiter)
 			limiter.connect(ctx.destination)
-			this.musicBus = ctx.createGain()
-			this.musicBus.gain.value = sqrt01(this.getMusicVolume())
-			this.musicBus.connect(this.master)
+			const musicBus = ctx.createGain()
+			musicBus.gain.value = sqrt01(this.getMusicVolume())
+			musicBus.connect(master)
+			this.master = master
+			this.musicBus = musicBus
 			this.ctx = ctx
 			this.hookGesture()
 			return ctx
 		} catch {
+			void ctx.close().catch(() => {})
 			return null
 		}
 	}

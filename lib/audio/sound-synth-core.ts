@@ -1,13 +1,10 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-// Shared synthesis kernels: imported by sound-synth-pool.ts (main-thread
-// fallback) and workers/sound-synth.worker.ts (off-thread synthesis).
-// Single source of truth so the two copies cannot drift. Intentionally
-// dependency-free so the worker bundle stays lean.
+// Synthesis kernels: knockPcm feeds the engine inline, tonePcm is a faded
+// sine probe for sample-registration tests. Intentionally dependency-free.
 export const DEFAULT_SYNTH_RATE = 44100
 
-/** Tuned approximation — native drives hardware (`ushock_output_knock`),
- * so there is no faithful source; fixed LCG seed for stability. */
+/** Knocker hit: hardware has no faithful source; fixed LCG seed keeps it stable. */
 export function knockPcm(sampleRate = DEFAULT_SYNTH_RATE): Float32Array {
 	const frames = Math.floor(sampleRate * 0.18)
 	const out = new Float32Array(frames)
@@ -25,7 +22,7 @@ export function knockPcm(sampleRate = DEFAULT_SYNTH_RATE): Float32Array {
 	return out
 }
 
-/** Faded sine probe (tests/E2E sample registration) with a click-suppressing edge fade. */
+/** Sine probe for tests/E2E registration; edge-faded. */
 export function tonePcm(freq = 440, seconds = 0.25, sampleRate = DEFAULT_SYNTH_RATE): Float32Array {
 	const frames = Math.max(1, Math.floor(sampleRate * seconds))
 	const out = new Float32Array(frames)

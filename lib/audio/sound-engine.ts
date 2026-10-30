@@ -14,7 +14,7 @@ export interface PlaySoundOptions {
 	frontRearFade?: number
 }
 
-/** One entry per concurrent play of a name. */
+/** One concurrent play of a named sound. */
 export interface SoundVoice {
 	id: number
 	name: string
@@ -48,7 +48,7 @@ export interface SampleMeta {
 	frontRearFade?: number
 }
 
-/** Script-visible sound sink. */
+/** Script-facing sink: PlaySound/PlayMusic/knocker/emu PCM. */
 export interface ISoundEngine {
 	playSound(name: string, opts?: PlaySoundOptions): number
 	stopSound(name: string): void
@@ -61,7 +61,6 @@ export interface ISoundEngine {
 	setMuted(muted: boolean): void
 	isMuted(): boolean
 	setVolume(volume: number): void
-	getVolume(): number
 	getLevel(): number
 	setMusicVolume(volume: number): void
 	getMusicVolume(): number
@@ -70,7 +69,6 @@ export interface ISoundEngine {
 	isPlaying(name?: string): boolean
 	getKnockCount(): number
 	pushEmuPcm(data: unknown): void
-	getEmuFrames(): number
 	dispose(): void
 }
 
@@ -129,7 +127,6 @@ function soundKey(name: string): string {
 /** At most 2 concurrent voices per sound: further plays steal the front voice instead of stacking into the limiter. */
 const MAX_SAME_SOUND_VOICES = 2
 
-/** Subclasses add the audible output behind `emitVoice`/`emitKnock`. */
 export abstract class BaseSoundEngine implements ISoundEngine {
 	private readonly voices = new Map<string, SoundVoice[]>()
 	private readonly samples = new Map<string, SoundSample>()
@@ -139,7 +136,6 @@ export abstract class BaseSoundEngine implements ISoundEngine {
 	private music: { name: string; volume: number } | null = null
 	public onMusicEnded: (() => void) | null = null
 	private knockCount = 0
-	private emuFrames = 0
 	private seq = 0
 	private disposed = false
 
@@ -176,8 +172,7 @@ export abstract class BaseSoundEngine implements ISoundEngine {
 		if (restart) for (const voice of list) this.halt(voice)
 		let voice = useSame || restart ? list[0] : list.find(v => !v.playing)
 		if (!voice) {
-			// restart=false callers would otherwise stack unboundedly
-			// into the limiter: steal the front voice.
+			// Steal the front voice (see MAX_SAME_SOUND_VOICES).
 			const front = list.length >= MAX_SAME_SOUND_VOICES ? list.shift() : undefined
 			if (front) this.halt(front)
 			voice = {
@@ -226,7 +221,6 @@ export abstract class BaseSoundEngine implements ISoundEngine {
 		this.onMusic()
 	}
 
-	// Native EndMusic takes no name and clears whatever is playing.
 	public endMusic(): void {
 		this.music = null
 		this.onMusicEnd()
@@ -267,11 +261,6 @@ export abstract class BaseSoundEngine implements ISoundEngine {
 		this.onOutputChanged()
 	}
 
-	/** Audible level (0 while muted). */
-	public getVolume(): number {
-		return this.muted ? 0 : this.volume
-	}
-
 	/** Unmuted level (mute keeps the level so unmute restores it). */
 	public getLevel(): number {
 		return this.volume
@@ -290,7 +279,10 @@ export abstract class BaseSoundEngine implements ISoundEngine {
 	protected onOutputChanged(): void {}
 
 	public registerSample(name: string, pcm: Float32Array, sampleRate: number, meta: SampleMeta = {}): void {
-		if (!name || !pcm?.length || !(sampleRate > 0)) return
+		if (!name || !pcm?.length || !(sampleRate > 0)) {
+			warnOnce(`sample:${String(name).toLowerCase()}`, 'Invalid sample "%s": not registered.', String(name))
+			return
+		}
 		this.samples.set(soundKey(name), {
 			pcm,
 			sampleRate,
@@ -319,16 +311,11 @@ export abstract class BaseSoundEngine implements ISoundEngine {
 
 	public pushEmuPcm(data: unknown): void {
 		const pcm = extractPcm(data)
-		if (!pcm) return
-		this.emuFrames += pcm.length
-		if (!this.disposed) this.emitEmuPcm(pcm)
+		if (!pcm || this.disposed) return
+		this.emitEmuPcm(pcm)
 	}
 
-	public getEmuFrames(): number {
-		return this.emuFrames
-	}
-
-	/** Audible output finished without a stop call. */
+	/** Mark a voice ended by its source (natural end, not stopSound). */
 	protected endVoice(id: number): void {
 		for (const list of this.voices.values()) {
 			const voice = list.find(v => v.id === id)
@@ -354,15 +341,7 @@ export abstract class BaseSoundEngine implements ISoundEngine {
 	}
 }
 
-/** Best-effort Float32 PCM out of the wpc-emu/PinMAME audio message shapes. */
+/** Raw Float32Array PCM in; anything else (including empty) is null. */
 export function extractPcm(data: unknown): Float32Array | null {
-	if (!data) return null
-	if (data instanceof Float32Array) return data.length ? data : null
-	const shaped = data as { samples?: unknown; pcm?: unknown; data?: unknown }
-	for (const field of [shaped.samples, shaped.pcm, shaped.data]) {
-		if (field instanceof Float32Array) return field.length ? field : null
-		if (Array.isArray(field) && field.length && field.every(v => typeof v === 'number'))
-			return Float32Array.from(field as number[])
-	}
-	return null
+	return data instanceof Float32Array && data.length ? data : null
 }
