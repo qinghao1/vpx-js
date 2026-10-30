@@ -45,6 +45,61 @@ describe('PlayerPhysics flipper hit-time boundary', () => {
 		}
 	})
 
+	it('should fire on time when a mid-loop Interval write precedes the skip bound', async () => {
+		const three = new ThreeHelper()
+		const table = await Table.load(new NodeBinaryReader(three.fixturePath('table-timer.vpx')))
+		const player = new Player(table).init()
+		const timer = table.timers.Timer1.getApi()
+		timer.Enabled = true
+		timer.Interval = 100
+		const fires: number[] = []
+		timer.on('Timer', () => fires.push(player.getGameTime()))
+
+		// Mimics a Hit handler: the collide phase runs after the timer scan in
+		// the same substep, so reprogramming here must retire the cached bound.
+		const physics = player.getPhysics()
+		const orig = physics.updateVelocities.bind(physics)
+		let reprogrammed = false
+		const stub = sinon.stub(physics, 'updateVelocities').callsFake((): void => {
+			orig()
+			if (!reprogrammed) {
+				reprogrammed = true
+				timer.Interval = 5
+			}
+		})
+		try {
+			player.updatePhysics(100)
+		} finally {
+			stub.restore()
+		}
+		// Reprogrammed at game time 0 to a 5 ms interval: without the epoch
+		// invalidation the t=100 bound skips every scan and nothing fires.
+		expect(fires.slice(0, 3)).to.deep.equal([5, 10, 15])
+	})
+
+	it('should step nudge dynamics per substep so movers read fresh acceleration', () => {
+		const table = new TableBuilder().withTableScript('').build('Table1')
+		const player = new Player(table).init({})
+		player.nudge(0, 10)
+
+		// Sample what BallMover sees: updateVelocities runs after the nudge
+		// step in every substep, so the acceleration must evolve across them.
+		const physics = player.getPhysics()
+		const orig = physics.updateVelocities.bind(physics)
+		const seen: number[] = []
+		const stub = sinon.stub(physics, 'updateVelocities').callsFake((): void => {
+			seen.push(physics.getCabinetAcceleration().y)
+			orig()
+		})
+		try {
+			expect(player.updatePhysics(10)).to.equal(10)
+		} finally {
+			stub.restore()
+		}
+		expect(seen.length).to.equal(10)
+		expect(new Set(seen).size).to.be.above(1)
+	})
+
 	it('should fire staggered update timers on the same ticks when idle substeps skip the timer scan', async () => {
 		const three = new ThreeHelper()
 		const table = await Table.load(new NodeBinaryReader(three.fixturePath('table-timer.vpx')))

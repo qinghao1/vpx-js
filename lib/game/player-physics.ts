@@ -37,8 +37,6 @@ import type { IEmulator } from './iemulator.js'
 import type { PinInput } from './pin-input.js'
 import type { IBallCreationPosition, Player } from './player.js'
 
-// Sync emu state once per 10 ms of physics time, not per 1 ms tick.
-const EMU_SYNC_MS = 10
 const CLOCK_INIT_THRESHOLD_USEC = 1_000_000
 // Divergence: upstream has no backlog clamp (its 200 ms is an in-loop anti-hang
 // guard, PhysicsEngine.cpp). vpx-js caps catch-up per wall-clock frame instead.
@@ -82,10 +80,13 @@ export class PlayerPhysics {
 	private hitOcTreeDynamic = new HitKD()
 	private hitOcTree = new HitQuadtree()
 	private hitTimers: TimerHit[] = []
-	// Lower bound over Update-eligible nextFire; undefined means unknown. Reset per
-	// updatePhysics call (script Timer.Interval writes bypass timerStateChange) and
-	// cleared on local timer mutations.
+	// Lower bound over Update-eligible nextFire; undefined means unknown. Valid
+	// only while nextUpdateMinEpoch matches timerEpoch: every nextFire/interval
+	// writer bumps the epoch, so a Timer.Interval write after the timer scan
+	// (e.g. from a Hit handler in the collide phase) retires a stale bound.
 	private nextUpdateMin: number | undefined
+	private nextUpdateMinEpoch = 0
+	private timerEpoch = 0
 	private lastTimeUsec = 0
 	private lastFrameDuration = 0
 	private cFrames = 0
@@ -277,8 +278,8 @@ export class PlayerPhysics {
 		// call instead of once per 1 ms substep. Gated on the loop running at all so
 		// queued keys still wait while paused, exactly as before.
 		if (this.nextPhysicsFrameTime <= initial) this.pinInput.processKeys()
-		// Timer.Interval writes bypass timerStateChange, so re-derive the fireTimers
-		// skip bound every call and between-call script writes are never stale.
+		// Between-call script writes land here while no bound is cached, so a
+		// per-call reset keeps them from ever going stale.
 		this.nextUpdateMin = undefined
 		let iterations = 0
 		// Divergence: upstream loops while `next < initial` (stays a step behind
@@ -310,10 +311,11 @@ export class PlayerPhysics {
 				this.scriptPeriod += Math.floor(performance.now() - t0)
 			}
 			this.activeBall = oldBall
-			if (this.emu) {
-				this.emuAccumMs += dt * 10
-				if (this.emuAccumMs >= EMU_SYNC_MS) this.flushEmu(this.emu)
-			}
+			// One wasm round-trip per tick: accumulate here, flush once at the end.
+			if (this.emu) this.emuAccumMs += dt * 10
+			// Upstream order (PhysicsEngine::UpdatePhysics): step nudge before the
+			// movers so BallMover reads this substep's cabinet acceleration.
+			this.pinInput.tickNudge()
 			if (!this.disablePhysics) {
 				this.updateVelocities()
 				this.physicsSimulateCycle(dt)
@@ -321,11 +323,7 @@ export class PlayerPhysics {
 			this.curPhysicsFrameTime = this.nextPhysicsFrameTime
 			this.nextPhysicsFrameTime += PHYSICS_STEPTIME
 		}
-		// Nudge dynamics advance 1 ms per substep; batch them after the loop so the
-		// total stays exact without per-substep polling. Stepping once per call
-		// instead would stretch each 25 ms impulse over ~25 frames.
-		for (let n = 0; n < iterations; n++) this.pinInput.tickNudge()
-		if (this.emu && this.emuAccumMs > 0) this.flushEmu(this.emu)
+		this.flushEmu()
 		this.timeMsec = Math.floor((initial - this.startTimeUsec) / 1000)
 		// One call is one headless frame: -1 fires per call (even paused/repeated),
 		// -2 per call while playing. Upstream splits these across Render/UpdateGameLogic.
@@ -335,9 +333,13 @@ export class PlayerPhysics {
 		return iterations
 	}
 
-	private flushEmu(emu: IEmulator): void {
-		emu.emuSimulateCycle(this.emuAccumMs)
-		this.emuAccumMs = 0
+	/** Forwards the tick's whole accumulation in one call; totals exact, nothing carried. */
+	private flushEmu(): void {
+		const emu = this.emu
+		if (emu && this.emuAccumMs > 0) {
+			emu.emuSimulateCycle(this.emuAccumMs)
+			this.emuAccumMs = 0
+		}
 	}
 
 	private fireTimers(mode: TimerMode): void {
@@ -345,8 +347,12 @@ export class PlayerPhysics {
 		try {
 			if (mode === TimerMode.Update) {
 				const cur = this.timeMsec
-				// No Update timer can be due while the bound sits ahead of the clock.
-				if (this.nextUpdateMin === undefined || this.nextUpdateMin <= cur) {
+				// No Update timer can be due while a current bound sits ahead of the clock.
+				if (
+					this.nextUpdateMin === undefined ||
+					this.nextUpdateMinEpoch !== this.timerEpoch ||
+					this.nextUpdateMin <= cur
+				) {
 					let min = Infinity
 					let fired = false
 					for (let i = 0; i < this.hitTimers.length; i++) {
@@ -365,6 +371,7 @@ export class PlayerPhysics {
 					// A fired handler may reprogram timers (or queue state changes),
 					// so only a fire-free scan yields an exact bound; otherwise rescan.
 					this.nextUpdateMin = fired ? undefined : min
+					this.nextUpdateMinEpoch = this.timerEpoch
 				}
 			} else {
 				for (let i = 0; i < this.hitTimers.length; i++) {
@@ -383,8 +390,19 @@ export class PlayerPhysics {
 		t.pfe.fireGroupEvent(Event.TimerEventsTimer)
 	}
 
+	/** Reprograms a live Update timer; the epoch bump retires any cached skip bound. */
+	public reprogramTimer(timer: TimerHit, interval: number): void {
+		timer.interval = interval
+		timer.nextFire = this.timeMsec + interval
+		this.touchTimers()
+	}
+
+	private touchTimers(): void {
+		this.timerEpoch++
+	}
+
 	public timerStateChange(timer: TimerHit, enabled: boolean): void {
-		this.nextUpdateMin = undefined
+		this.touchTimers()
 		if (this.deferTimerChanges) {
 			if (enabled) timer.nextFire = this.timeMsec + timer.interval
 			else timer.nextFire = TIMER_DISABLED
@@ -401,7 +419,7 @@ export class PlayerPhysics {
 	}
 
 	private upsertTimer(timer: TimerHit, enabled: boolean): void {
-		this.nextUpdateMin = undefined
+		this.touchTimers()
 		const idx = this.hitTimers.indexOf(timer)
 		if (enabled) {
 			if (idx < 0) this.hitTimers.push(timer)

@@ -212,9 +212,9 @@ export abstract class ItemApi<DATA extends ItemData> extends EventEmitter {
 	protected _setTimerInterval(interval: number): void {
 		this.data.timer.interval = interval
 		if (this.hitTimer) {
-			this.hitTimer.interval =
+			const clamped =
 				interval >= 0 ? Math.max(interval, MAX_TIMER_MSEC_INTERVAL) : Math.max(TimerMode.OnGameSync, interval)
-			this.hitTimer.nextFire = this.player.getPhysics().timeMsec + this.hitTimer.interval
+			this.player.getPhysics().reprogramTimer(this.hitTimer, clamped)
 		}
 	}
 }
