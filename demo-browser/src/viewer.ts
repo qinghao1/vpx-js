@@ -62,6 +62,7 @@ import {
 	QUALITY_CAPS,
 } from './env.js'
 import { keyForCode, locationForCode, RELEASE_CODES } from './input/input-manager.js'
+import { pollNudgePads } from './input/nudge-controller.js'
 import { attachInput } from './input.js'
 import { createHarness } from './ui/log-viewer.js'
 import { renderModeHint, renderStats } from './ui/stats-overlay.js'
@@ -2218,7 +2219,7 @@ export class Viewer {
 			frames = 0,
 			fps = 0
 		let lastFpsUpdate = performance.now()
-		let lastDmd = 0
+		let lastDmdGame = -1
 		// Skipped frames reset without recording, so the next present measures
 		// a live rate instead of averaging in the idle gap.
 		const rollFpsWindow = (timestamp: number, presented: boolean): boolean => {
@@ -2265,10 +2266,22 @@ export class Viewer {
 			const controlsDirty = this.controls?.enabled ? !!this.controls.update() : false
 			const cameraDirty = !!this._cameraRaf
 			const nudgeDirty = this._applyNudgeVisual()
+			// Gamepad nudges share this rAF tick (play-mode gated inside).
+			pollNudgePads(this, timestamp)
+			// The DMD rides the physics clock, not the rAF timestamp: a 32ms
+			// wall gate sits just above the 2-frame quantum, so vsync jitter
+			// flips polls between a 2- and 3-frame cadence. Game-time quanta
+			// are exact, keeping polls phase-locked to emu frame production.
+			// The hash dedup in DmdRenderer.updateFrame still suppresses
+			// presents for unchanged frames.
 			let dmdDirty = false
-			if (timestamp - lastDmd >= 32) {
-				lastDmd = timestamp
-				dmdDirty = this._pollPinmame()
+			const gameMs = this.player?.getGameTime?.() ?? -1
+			if (gameMs >= 0) {
+				if (lastDmdGame < 0 || gameMs < lastDmdGame) lastDmdGame = gameMs - 32
+				if (gameMs - lastDmdGame >= 32) {
+					lastDmdGame = gameMs
+					dmdDirty = this._pollPinmame()
+				}
 			}
 			const forcePresent = this._needsRender
 			this._needsRender = false
