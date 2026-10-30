@@ -6,7 +6,6 @@ import type { Program } from 'estree'
 import { identifier, memberExpression } from '../estree.js'
 import { Transformer } from './transformer.js'
 
-/** Transforms On Error. */
 export class ErrorTransformer extends Transformer {
 	public transform(): Program {
 		return replace(this.ast, {

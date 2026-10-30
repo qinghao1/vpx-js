@@ -39,7 +39,6 @@ import {
  */
 const EVAL_SCRATCH = '__vbsEvalResult'
 
-/** VBS runtime helpers. */
 export class VBSHelper {
 	private static readonly UNDEFINED = new VbsUndefined()
 	private readonly transpiler: Transpiler

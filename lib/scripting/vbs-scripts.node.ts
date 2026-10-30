@@ -27,7 +27,6 @@ export function hasTextFile(fileName: string): boolean {
 	}
 }
 
-/** getTextFile. */
 export function getTextFile(fileName: string): string {
 	return readFileSync(getLocalPath(fileName)).toString('utf8')
 }

@@ -24,7 +24,6 @@ export function hasTextFile(fileName: string): boolean {
 	return MAP[fileName.toLowerCase()] !== undefined
 }
 
-/** getTextFile. */
 export function getTextFile(fileName: string): string {
 	const lower = fileName.toLowerCase()
 	if (MAP[lower] !== undefined) return MAP[lower]

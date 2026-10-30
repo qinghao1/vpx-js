@@ -39,41 +39,14 @@ export interface IRenderApi<NODE, GEOMETRY, POINT_LIGHT> {
 	 */
 	transformScene(scene: NODE, table: Table): void
 
-	/**
-	 * Creates a new parent node.
-	 *
-	 * @param name Name of the node
-	 */
 	createParentNode(name: string): NODE
 
-	/**
-	 * Adds a child to a parent node.
-	 *
-	 * @param parent Parent node
-	 * @param child Child node
-	 */
 	addChildToParent(parent: NODE, child: NODE | POINT_LIGHT): void
 
-	/**
-	 * Retrieves a child node from a parent node.
-	 *
-	 * @param parent Parent node
-	 * @param name Name of the child node
-	 */
 	findInGroup(parent: NODE, name: string): NODE | undefined
 
-	/**
-	 * Removes a child from a parent node
-	 *
-	 * @param parent The parent node
-	 * @param child The child node to remove
-	 */
 	removeFromParent(parent: NODE, child: NODE | undefined): void
 
-	/**
-	 * Removes all children from a parent node
-	 * @param node Parent node
-	 */
 	removeChildren(node: NODE | undefined): void
 
 	/**
@@ -88,10 +61,7 @@ export interface IRenderApi<NODE, GEOMETRY, POINT_LIGHT> {
 	applyMatrixToNode(matrix: Matrix3D, node: NODE | undefined): void
 
 	/**
-	 * Updates a node with a new mesh.
-	 *
-	 * @param mesh New mesh. Must contain the same number of vertices as the node.
-	 * @param node The node to which the new mesh is applied to.
+	 * @param mesh Must contain the same number of vertices as the node.
 	 */
 	applyMeshToNode(mesh: Mesh, node: NODE | undefined): void
 
@@ -119,25 +89,11 @@ export interface IRenderApi<NODE, GEOMETRY, POINT_LIGHT> {
 		node: NODE | undefined,
 	): void
 
-	/**
-	 * Update's a light's parameters.
-	 *
-	 * @param state New light state
-	 * @param node The light node
-	 */
 	applyLighting(state: LightState, node: NODE | undefined): void
 
-	/**
-	 * Toggles visibility of an object.
-	 *
-	 * @param isVisible True if visible, false otherwise
-	 * @param node Object to apply to
-	 */
 	applyVisibility(isVisible: boolean, node: NODE | undefined): void
 
 	/**
-	 * Applies a material to a node.
-	 *
 	 * If the node is a group node, the material is applied to all children.
 	 * If the node is undefined, nothing is applied.
 	 *
@@ -171,83 +127,32 @@ export interface IRenderApi<NODE, GEOMETRY, POINT_LIGHT> {
 	 */
 	cloneMaterialForWrite?<MATERIAL>(mat: MATERIAL): MATERIAL
 
-	/**
-	 * Creates a new node based on a renderable.
-	 *
-	 * @param renderable The renderable from the VPX file
-	 * @param table The table object
-	 * @param opts Options, see {@link TableGenerateOptions}.
-	 */
 	createObjectFromRenderable(renderable: IRenderable<ItemState>, table: Table, opts: TableGenerateOptions): NODE
 
-	/**
-	 * Creates a new node based on a RenderInfo object.
-	 *
-	 * @param obj RenderInfo
-	 */
 	createMesh(obj: RenderInfo<GEOMETRY>): NODE
 
-	/**
-	 * Creates a playfield light geometry.
-	 *
-	 * @param lightData Light parameters from the VPX file
-	 * @param table The table object
-	 */
 	createLightGeometry(lightData: LightData, table: Table): GEOMETRY
 
 	/**
-	 * Creates a flat additive glow polygon for a bulb light.
-	 *
 	 * Native renders every light with drag-point vertices as a lightmap glow
 	 * quad (`m_lightmapMeshBuffer` in `src/parts/light.cpp`, `fs_light.sc` bulb blend),
 	 * independent of the bulb-mesh and surface-light paths.
 	 */
 	createBulbGlowGeometry(lightData: LightData, table: Table): GEOMETRY
 
-	/**
-	 * Creates the playfield geometry.
-	 *
-	 * @param table The table object
-	 * @param opts Options, see {@link TableGenerateOptions}.
-	 */
 	createPlayfieldGeometry(table: Table, opts: TableGenerateOptions): GEOMETRY
 
-	/**
-	 * Creates a new point light.
-	 *
-	 * @param lightData Light parameters from the VPX file.
-	 * @param table Optional table for surface height.
-	 */
 	createPointLight(lightData: LightData, table?: Table): POINT_LIGHT
 }
 
 export interface ITextureLoader<TEXTURE> {
-	/**
-	 * Loads a texture coming from an `Image{n}` stream.
-	 *
-	 * @param name Name of the texture
-	 * @param ext Original file extension of the texture, including the dot
-	 * @param data Binary data
-	 */
+	/** Loads a texture coming from an `Image{n}` stream. */
 	loadTexture(name: string, ext: string, data: Uint8Array): Promise<TEXTURE>
 
-	/**
-	 * Loads a raw texture coming from the `BITS` tag (pdsUint8Array)
-	 *
-	 * @param name Name of the texture
-	 * @param data Binary data
-	 * @param width Image width
-	 * @param height Image height
-	 */
+	/** Loads a raw texture coming from the `BITS` tag (pdsUint8Array). */
 	loadRawTexture(name: string, data: Uint8Array, width: number, height: number): Promise<TEXTURE>
 
-	/**
-	 * Loads a texture shipped by Visual Pinball
-	 *
-	 * @param name Name of the texture
-	 * @param ext Original file extension of the texture, including the dot
-	 * @param fileName Filename without path
-	 */
+	/** Loads a texture shipped by Visual Pinball. */
 	loadDefaultTexture(name: string, ext: string, fileName: string): Promise<TEXTURE>
 
 	/**

@@ -12,7 +12,6 @@ export const UNDEF = Symbol.for('vbs.undefined')
  */
 export const NOTHING_TAG = Symbol('vpxjs.nothing')
 
-/** VBS undefined sentinel. */
 export class VbsUndefined implements ProxyHandler<any> {
 	private readonly __errSet?: VbsError
 	private readonly __errGet?: VbsError

@@ -5,7 +5,6 @@ import { type BufferGeometry, ExtrudeGeometry, Shape } from 'three'
 import { Table, type TableGenerateOptions } from '../../vpt/table/table.js'
 import { playfieldUvGenerator } from './three-mesh-generator.js'
 
-/** Generates playfield mesh. */
 export class ThreePlayfieldMeshGenerator {
 	public createPlayfieldGeometry(table: Table, _opts: TableGenerateOptions): BufferGeometry {
 		if (!table.data) throw new Error('Table data not loaded')

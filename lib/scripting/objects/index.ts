@@ -16,7 +16,6 @@ const factories: Record<string, (player: Player) => object> = {
 	'wscript.shell': () => new WshShell(),
 }
 
-/** getObject. */
 export function getObject<T>(name: string, player: Player): T | undefined {
 	const create = factories[name.toLowerCase()]
 	if (!create) {

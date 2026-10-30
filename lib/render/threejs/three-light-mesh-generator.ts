@@ -7,7 +7,6 @@ import type { LightData } from '../../vpt/light/light.js'
 import type { Table } from '../../vpt/table/table.js'
 import { playfieldUvGenerator } from './three-mesh-generator.js'
 
-/** Generates light insert meshes. */
 export class ThreeLightMeshGenerator {
 	public createLight(lightData: LightData, table: Table, depth = 5, bevel = 0.5): ExtrudeGeometry {
 		const shape = this.getShape(lightData, table)

@@ -4,7 +4,6 @@
 import { getTextFile, hasTextFile } from '../vbs-scripts.node.js'
 import { TextStream } from './text-stream.js'
 
-/** FileSystem. */
 export class FileSystem {
 	private readonly files = new Map<string, TextStream>()
 
