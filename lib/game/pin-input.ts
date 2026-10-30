@@ -8,11 +8,8 @@ import { Event } from './event.js'
 import {
 	AssignKey,
 	DIK_1,
-	DIK_2,
-	DIK_3,
 	DIK_4,
 	DIK_5,
-	DIK_6,
 	DIK_D,
 	DIK_EQUALS,
 	DIK_ESCAPE,
@@ -37,7 +34,6 @@ import {
 import type { Player } from './player.js'
 
 type KeyEvent = { code: number; down: boolean }
-type ScheduledAction = { due: number; run: () => void }
 
 const DEFAULT_KEYS: Record<number, number> = {
 	[AssignKey.LeftFlipperKey]: DIK_LSHIFT,
@@ -64,37 +60,26 @@ const DEFAULT_KEYS: Record<number, number> = {
 }
 
 // Cabinet switch ids for the emu (VPM-style numbers, vpx-js-defined — upstream
-// InputManager.cpp holds no such tables). Coin ids come from the script's
-// "Const swCoin*" names (driver-agnostic); tables declaring them credit
-// through their own KeyDown handler, others use the fallback drives below.
+// InputManager.cpp holds no such tables). Coin keys are script-only: no entry
+// below means no emu switch moves, so a script that ignores coin keys takes no coins.
 const SWITCH_START = [16, 13, 1] as const
-const SWITCH_CREDIT_2_3 = [65, 1, 2, 3, 4] as const
-const SWITCH_CREDIT_4 = [66, 2, 1, 65, 67] as const
-const SWITCH_CREDIT_5 = [67, 3, 1, 2, 65, 66, 68] as const
-const SWITCH_CREDIT_6 = [68, 4, 1, 67] as const
 const SWITCH_FLIPPER_L = [84, 114, 112] as const
 const SWITCH_FLIPPER_R = [82, 86, 112, 116] as const
 
 const TROUGH_KICK_ANGLE = 60
 const TROUGH_KICK_SPEED = 10
 
-// Free-play credit timings in physics ms: switch pulse width, stagger between credits.
-const CREDIT_PULSE_MS = 120
-const CREDIT_STAGGER_MS = 250
-
 export class PinInput {
 	/**
 	 * Default for freePlay. Set to false before creating the Player to disable the
-	 * vpx-js-only free-play helpers (none exists upstream): fallback coin-switch
-	 * pulses on Start for scripts without a coin path, and mock trough eject.
-	 * All run on the physics clock, so pausing the game pauses them.
+	 * vpx-js-only mock trough eject (none exists upstream; free play itself is a
+	 * ROM setting). It runs on the physics clock, so pausing the game pauses it.
 	 */
 	public static freePlayDefault = true
 
 	private readonly queue: KeyEvent[] = []
 	private readonly pressed = new Set<number>()
 	private readonly nudgeHandler = new NudgeHandler()
-	private scheduled: ScheduledAction[] = []
 	private randomSource: () => number = Math.random
 
 	/** Override the RNG for keyboard-nudge variance (tests seed it; default Math.random). */
@@ -104,9 +89,6 @@ export class PinInput {
 
 	readonly rgKeys: Record<number, number> = { ...DEFAULT_KEYS }
 	public freePlay = PinInput.freePlayDefault
-	private cachedCoinSwitches: number[] | null = null
-	private coinPathChecked = false
-	private coinPathScript = false
 
 	constructor(
 		private readonly table: Table,
@@ -141,78 +123,6 @@ export class PinInput {
 		this.nudgeHandler.applyImpulse(angle, force)
 	}
 
-	private now(): number {
-		return this.player.getGameTime()
-	}
-
-	private schedule(delayMs: number, run: () => void): void {
-		this.scheduled.push({ due: this.now() + delayMs, run })
-	}
-
-	private runDue(): void {
-		if (!this.scheduled.length) return
-		const now = this.now()
-		const pending: ScheduledAction[] = []
-		const due: ScheduledAction[] = []
-		for (const action of this.scheduled) (action.due <= now ? due : pending).push(action)
-		if (!due.length) return
-		this.scheduled = pending
-		for (const action of due) action.run()
-	}
-
-	private pulseSwitches(switches: readonly number[]): void {
-		const emu = this.player.getPhysics().emu
-		if (!emu) return
-		for (const sw of switches) {
-			emu.setSwitchInput(sw, true)
-		}
-		this.schedule(CREDIT_PULSE_MS, () => {
-			for (const sw of switches) {
-				emu.setSwitchInput(sw, false)
-			}
-		})
-	}
-
-	// True when the table script declares its own coin switches ("Const swCoin*").
-	private scriptOwnsCoinPath(): boolean {
-		if (this.coinPathChecked) return this.coinPathScript
-		this.coinPathChecked = true
-		const script = (this.table as unknown as { tableScript?: string }).tableScript ?? ''
-		this.coinPathScript = /Const\s+swCoin\d*\s*=\s*-?\d+/i.test(script)
-		return this.coinPathScript
-	}
-
-	private discoverCoinSwitches(): number[] {
-		if (this.cachedCoinSwitches) return this.cachedCoinSwitches
-		const script = (this.table as unknown as { tableScript?: string }).tableScript ?? ''
-		const re = /Const\s+swCoin\d*\s*=\s*(-?\d+)/gi
-		const seen = new Set<number>()
-		const out: number[] = []
-		let m: RegExpExecArray | null
-		while ((m = re.exec(script))) {
-			const v = Number.parseInt(m[1] ?? '', 10)
-			if (Number.isFinite(v) && v >= 0 && !seen.has(v)) {
-				seen.add(v)
-				out.push(v)
-			}
-		}
-		this.cachedCoinSwitches = out.length ? out : [65, 1, 2]
-		return this.cachedCoinSwitches
-	}
-
-	public addCredit(count = 1): void {
-		const key = this.getKey(AssignKey.AddCreditKey)
-		// Fallback only; see scriptOwnsCoinPath.
-		const direct = this.scriptOwnsCoinPath() ? null : this.discoverCoinSwitches().slice(0, 3)
-		for (let index = 0; index < count; index++) {
-			this.schedule(index * CREDIT_STAGGER_MS, () => {
-				this.onKeyDown(key)
-				this.schedule(CREDIT_PULSE_MS, () => this.onKeyUp(key))
-				if (direct) this.pulseSwitches(direct)
-			})
-		}
-	}
-
 	onKeyDown(code: number): void {
 		this.queue.push({ code, down: true })
 	}
@@ -222,13 +132,12 @@ export class PinInput {
 	}
 
 	processKeys(): void {
-		this.runDue()
 		if (!this.queue.length) return
 		const queued = this.queue.splice(0, this.queue.length)
-		// Upstream parity (InputManager::PushButtonEvent): every keyboard key reaches
-		// script KeyDown/KeyUp, including FrameCount/Enable3D/DBGBalls — nothing is swallowed.
+		// Upstream parity (InputManager::PushButtonEvent): every mapped key reaches
+		// script KeyDown/KeyUp, including FrameCount/Enable3D/DBGBalls. Unmapped
+		// keys (dik == 0) never fire; held-key repeats fire once (pressed guard below).
 		for (const ev of queued) {
-			// Upstream PushButtonEvent drops unmapped keys (dik == 0, InputManager.cpp).
 			if (ev.code === 0) continue
 			if (ev.down) {
 				if (this.pressed.has(ev.code)) continue
@@ -313,10 +222,6 @@ export class PinInput {
 	private syncCabinet(isDown: boolean, code: number): void {
 		const emu = this.player.getPhysics().emu
 		if (!emu) return
-		if (this.freePlay && isDown && code === this.getKey(AssignKey.StartGameKey)) {
-			// Fallback only; keeps free-play Start working without a script coin path.
-			if (!this.scriptOwnsCoinPath()) this.pulseSwitches(this.discoverCoinSwitches())
-		}
 		const switches = this.getCabinetSwitches(code)
 		if (!switches) return
 		for (const sw of switches) {
@@ -326,14 +231,6 @@ export class PinInput {
 
 	private getCabinetSwitches(code: number): readonly number[] | undefined {
 		if (code === this.getKey(AssignKey.StartGameKey)) return SWITCH_START
-		// Script-owned tables credit through their KeyDown handler alone;
-		// driving switches here too would double-credit.
-		if (!this.scriptOwnsCoinPath()) {
-			if (code === DIK_2 || code === DIK_3) return SWITCH_CREDIT_2_3
-			if (code === DIK_4 || code === this.getKey(AssignKey.AddCreditKey2)) return SWITCH_CREDIT_4
-			if (code === DIK_5 || code === this.getKey(AssignKey.AddCreditKey)) return SWITCH_CREDIT_5
-			if (code === DIK_6) return SWITCH_CREDIT_6
-		}
 		const leftKey = this.getKey(AssignKey.LeftFlipperKey)
 		const rightKey = this.getKey(AssignKey.RightFlipperKey)
 		if (code === leftKey || code === DIK_LEFT) return SWITCH_FLIPPER_L
