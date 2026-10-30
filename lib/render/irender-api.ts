@@ -174,6 +174,12 @@ export interface ITextureLoader<TEXTURE> {
 	 * @param name Texture name as referenced by the scene
 	 */
 	hasDefaultTexture?(name: string): boolean
+
+	/**
+	 * Warms an expensive decode pool ahead of dispatch (e.g. HDR workers).
+	 * Optional for backward compatibility with custom loaders.
+	 */
+	warmup?(): void
 }
 
 export interface MeshConvertOptions {

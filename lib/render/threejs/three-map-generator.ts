@@ -41,10 +41,12 @@ export class ThreeMapGenerator {
 	): Promise<void> {
 		if (!this.textureLoader) return
 		if (!textures.length) return
-		// Overlap HDR worker spawn (~150ms) with PNG parsing: the node
-		// loader spawns its decode pool lazily, so kick it before dispatch.
-		// Gated on float textures so HDR-free tables skip the spawn entirely.
-		if (textures.some(tex => tex.isHdr())) {
+		// Overlap HDR worker spawn with PNG parsing: the node loader spawns
+		// its decode pool lazily, so kick it before dispatch. Gated on
+		// non-raw float textures — raw floats decode in memory via
+		// loadRawTexture and never touch the pool — so HDR-free and raw-only
+		// tables skip the spawn entirely.
+		if (textures.some(tex => tex.isHdr() && !tex.isRaw())) {
 			this.textureLoader.warmup?.()
 		}
 		const started = Date.now()
