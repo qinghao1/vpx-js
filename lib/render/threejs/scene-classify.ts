@@ -1,10 +1,9 @@
 import type * as THREE from 'three'
 import { resolveButtonCode } from './cabinet-buttons.js'
-import { isBaked, pendingMapOf, RE_BAKE_MAP, RE_BAKE_MAT } from './material-shared.js'
+import { isBaked, pendingMapOf, RE_BAKE_MAP, RE_BAKE_MAT, RE_VR } from './material-shared.js'
 
-export { RE_BAKE_MAP, RE_BAKE_MAT }
+export { RE_BAKE_MAP, RE_BAKE_MAT, RE_VR }
 export const RE_ALPHA_MESH = /armp|ramp|bat_|non[_-]?opaque|plastic|gate/i
-export const RE_VR = /vr_/i
 export const RE_CAB = /vrcab|cabinet|lockbar|pincab/i
 export const RE_GLASS = /glass/i
 export const RE_LM = /lm_/i
@@ -66,10 +65,7 @@ export const classify = (mesh: string, mat: string, map: string, baked = false, 
 	const meshLower = mesh.toLowerCase()
 	// Name-based bake detection is the single `isBaked` definition; only the
 	// mesh-name fallback (which needs mesh context `isBaked` lacks) stays here.
-	const isBakedMat =
-		baked ||
-		isBaked({ name: mat }, map) ||
-		(RE_BAKE_MAP.test(meshLower) && !meshLower.startsWith('vr_') && !meshLower.includes('vr_'))
+	const isBakedMat = baked || isBaked({ name: mat }, map) || (RE_BAKE_MAP.test(meshLower) && !RE_VR.test(meshLower))
 	const isRampFamily = RE_RAMP_FAMILY.test(meshLower)
 	const isMainBake = isBakedMat && !addBlend
 	const isVlmBake = isBakedMat && addBlend

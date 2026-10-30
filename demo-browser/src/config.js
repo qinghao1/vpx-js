@@ -13,7 +13,6 @@ export const DMD = { w: 128, h: 32, scale: 4 }
 export const RE_BAKE_MAT = /bake/i
 export const RE_BAKE_MAP = /bake|nestmap/i
 export const RE_ALPHA_MESH = /armp|ramp|bat_|non[_-]?opaque|plastic|gate/i
-export const RE_VR = /vr_/i
 export const RE_CAB = /vrcab|cabinet|lockbar|pincab/i
 export const RE_OUTER = /VRCab_(Cabinet|Backbox|LegsFront|LegsBack)$/i
 export const RE_GLASS = /glass/i

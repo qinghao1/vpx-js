@@ -8,6 +8,10 @@ export const BALL_ROUGHNESS = 0.08
 export const RE_BAKE_MAT = /bake/i
 export const RE_BAKE_MAP = /bake|nestmap/i
 
+// VR-room token: `vr` after a boundary (start or non-alphanumeric), as in
+// `VRMega`; never the `vr` inside English words (`cover`).
+export const RE_VR = /(?:^|[^a-z0-9])vr/i
+
 // Re-exported for the browser loader; the taxonomy lives in texture-tags.ts.
 export { RE_PLAYFIELD } from './texture-tags.js'
 
@@ -61,7 +65,7 @@ export function pendingMapOf(userData: Record<string, unknown> | undefined): str
 // vpx-js fallback by material/map name substring for tables whose maps carry no other signal.
 export function isBaked(material?: { name: string }, map?: string): boolean {
 	if (material && RE_BAKE_MAT.test(material.name)) return true
-	if (map && RE_BAKE_MAP.test(map) && !map.toLowerCase().startsWith('vr_')) return true
+	if (map && RE_BAKE_MAP.test(map) && !RE_VR.test(map)) return true
 	return false
 }
 

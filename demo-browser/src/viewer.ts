@@ -92,7 +92,7 @@ function syncRoom(
 ): THREE.Group | null {
 	let hasVr = false
 	node.traverse((o: any) => {
-		if (o.isMesh && o.visible && RE_VR.test(String(o.name ?? '').toLowerCase())) hasVr = true
+		if (o.isMesh && o.visible && RE_VR.test(String(o.name ?? ''))) hasVr = true
 	})
 	const room = ensureProceduralRoom(scene, center, size, { hasVr })
 	scene.background = getPrerenderedBackground() as any
@@ -1349,14 +1349,14 @@ export class Viewer {
 				if (aMain !== bMain) return aMain - bMain
 				const aCab =
 					nameA.includes('vrcab') ||
-					nameA.includes('vr_') ||
+					RE_VR.test(nameA) ||
 					nameA.includes('lockbar') ||
 					nameA.includes('cabinet')
 						? 0
 						: 1
 				const bCab =
 					nameB.includes('vrcab') ||
-					nameB.includes('vr_') ||
+					RE_VR.test(nameB) ||
 					nameB.includes('lockbar') ||
 					nameB.includes('cabinet')
 						? 0

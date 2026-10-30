@@ -139,6 +139,45 @@ describe('regression: room must remain visible', () => {
 		expect(hasBakedPlayfield([custom]), 'flagged playfield bake counts').toEqual(true)
 	})
 
+	it('VR detection covers unseparated names', () => {
+		for (const name of [
+			'primitive-vr_megawall005',
+			'primitive-vrmega1',
+			'vrmega4',
+			'vrmeag11',
+			'vr_platform',
+			'primitive-vrmin_light',
+		]) {
+			expect(classify(name, '', '', false, false).isVr, `${name} classifies VR`).toEqual(true)
+		}
+		expect(classify('primitive-vrcab_cabinet', '', '', false, false).isVr, 'cab wins over VR').toEqual(false)
+		expect(classify('primitive-vrcab_cabinet', '', '', false, false).isCab, 'cab stays cab').toEqual(true)
+		for (const name of ['cover', 'primitive-chevron', 'primitive-blackbox']) {
+			expect(classify(name, '', '', false, false).isVr, `${name} is not VR`).toEqual(false)
+		}
+	})
+
+	it('unmapped VR room walls survive the wall passes', () => {
+		const root = new THREE.Group()
+		root.name = 'table'
+		const white = makeMesh(
+			'primitive-vrmega_wall',
+			new THREE.BoxGeometry(200, 200, 60),
+			new THREE.MeshStandardMaterial({ color: 0xffffff }),
+		)
+		const dark = makeMesh(
+			'primitive-vrmega_dark',
+			new THREE.BoxGeometry(200, 200, 60),
+			new THREE.MeshStandardMaterial({ color: 0x000000 }),
+		)
+		root.add(white)
+		root.add(dark)
+		root.updateMatrixWorld(true)
+		postProcessScene(root, { harnessLog: () => {}, viewerMode: 'viewer' })
+		expect(white.visible, 'white VR wall stays').toEqual(true)
+		expect(dark.visible, 'dark VR wall stays').toEqual(true)
+	})
+
 	it('isBakedPlayfield unifies the bake-side name checks', () => {
 		const main = { isMainBake: true } as any
 		const overlay = { isMainBake: false } as any

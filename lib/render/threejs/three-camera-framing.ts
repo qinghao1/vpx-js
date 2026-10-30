@@ -57,8 +57,7 @@ const excludeNonPlayfield = (name: string): boolean =>
 	!name.includes('plunger') &&
 	!name.includes('apron')
 
-const isVrNonCab = (name: string): boolean =>
-	(RE_VR.test(name) && !RE_CAB.test(name)) || name.includes('vr_mega') || name.includes('vr_mini')
+const isVrNonCab = (name: string): boolean => RE_VR.test(name) && !RE_CAB.test(name)
 
 const VIEWER: FramingConfig = { dist: 1.2, elev: 0.85, azim: 0.65, near: 0.015, farScale: 8, farMin: 2000 }
 const PLAY: FramingConfig = {

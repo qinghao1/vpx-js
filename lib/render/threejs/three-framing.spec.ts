@@ -126,6 +126,16 @@ describe('regression: framing keeps DMD and full playfield visible', () => {
 		expect(play.position.z, 'play camera more forward (bias)').to.be.lessThan(viewer.position.z)
 	})
 
+	it('unseparated VR names are excluded from sizing', () => {
+		const withRoom = buildWalkingDeadGroup()
+		const roomGeom = new THREE.BoxGeometry(2000, 2000, 2000)
+		const room = makeMesh('primitive-VRMega1', roomGeom, new THREE.Vector3(0, 800, 600))
+		withRoom.add(room)
+		withRoom.updateMatrixWorld(true)
+		const framed = computeViewerFraming(withRoom)
+		expect(framed.maxDim, 'VRMega room must not inflate framing').to.be.closeTo(210.6, 6)
+	})
+
 	it('viewer <-> play transition does not teleport the target (no snap)', () => {
 		const group = buildWalkingDeadGroup()
 		const play = computePlayFraming(group)
