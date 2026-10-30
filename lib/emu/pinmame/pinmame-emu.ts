@@ -14,7 +14,7 @@ import type { PinmameModule } from './pinmame-module.js'
 const FALLBACK_DMD = new Vertex2D(128, 32)
 // PinMAME reads a fixed 1 KiB config struct from the given pointer.
 const CONFIG_SIZE = 1024
-const VPM_DIR = '/pinmame'
+const VPM_DIR = '/pinmame/'
 // Mixer rate PinMAME resamples its audio to (Hz).
 const SAMPLE_RATE = 44100
 // Largest DMD frame accepted from the wasm core (1 MiB). Real DMDs are at
