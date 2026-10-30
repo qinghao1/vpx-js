@@ -11,23 +11,16 @@ import { BatchCollector, countBatchables } from './wasm/batched-hittest.js'
 import { getWasmKernels, isWasmReady, warmWasmPools } from './wasm/kernels.js'
 
 /** @see https://github.com/vpinball/vpinball/blob/master/src/physics/quadtree.cpp */
-// Batched (WASM) hit tests only pay off above this many candidates; keep in
-// sync with WASM_THRESHOLD in ./wasm/batched-hittest.ts (not exported there).
-const SCALAR_BYPASS_THRESHOLD = 64
-
-/** @see https://github.com/vpinball/vpinball/blob/master/src/physics/quadtree.cpp */
 export class HitQuadtree {
 	private vho: HitObject[] = []
 	private children: HitQuadtree[] = []
 	private vCenter = new Vertex3D()
 	private isLeaf = true
-	private total = 0
 
 	private batches = new BatchCollector()
 
 	public addElement(o: HitObject): void {
 		this.vho.push(o)
-		this.total++
 	}
 
 	public initialize(b?: FRect3D): void {
@@ -45,11 +38,7 @@ export class HitQuadtree {
 	}
 
 	public hitTestBall(ball: Ball, coll: CollisionEvent, physics: PlayerPhysics): void {
-		// Small trees skip the collect/classify/replay pass: the scalar walk
-		// tests the same candidates via the same doHitTest. Gated on the whole
-		// tree's size, so large trees keep their single ordered batch; child
-		// subtrees compose because they carry no total and stay scalar too.
-		if (!isWasmReady() || this.total < SCALAR_BYPASS_THRESHOLD) return this.hitTestBallScalar(ball, coll, physics)
+		if (!isWasmReady()) return this.hitTestBallScalar(ball, coll, physics)
 		// Empty collect provably finds nothing on re-walk: same bbox cull as the
 		// scalar walk, and traverse only skips abortHitTest, which doHitTest re-checks.
 		if (!this.collect(ball)) return

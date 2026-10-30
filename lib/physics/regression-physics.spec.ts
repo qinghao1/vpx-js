@@ -555,6 +555,137 @@ describe('regression: doHitTest must not clobber a recorded hit on miss', () => 
 	})
 })
 
+describe('regression: small-order BatchCollector.run matches the scalar doHitTest loop', () => {
+	class OrderedHit extends HitObject {
+		public override hitKind = HitKind.Other
+		public constructor(
+			private readonly time: number,
+			private readonly order: string[],
+			private readonly name: string,
+		) {
+			super()
+		}
+		public override calcHitBBox(): void {}
+		public override hitTest(_ball: Ball, _dTime: number, coll: CollisionEvent): number {
+			this.order.push(this.name)
+			if (this.time < 0) {
+				coll.hitNormal.set(0.99, 0.01, 0)
+				return -1
+			}
+			coll.hitNormal.set(0, 0, 1)
+			coll.hitDistance = 0.01
+			return this.time
+		}
+		public override collide(): void {}
+	}
+
+	function runCase(times: number[], recordContacts: boolean, useCollector: boolean) {
+		const order: string[] = []
+		const hits = times.map((time, i) => new OrderedHit(time, order, `h${i}`))
+		const ball = {} as unknown as Ball
+		const coll = new CollisionEvent(ball)
+		coll.hitTime = 1
+		const physics = { recordContacts, contacts: [] } as unknown as PlayerPhysics
+		if (useCollector) {
+			const collector = new BatchCollector()
+			for (const hit of hits) collector.classify(hit)
+			expect(collector.run(ball, coll, physics)).toBe(true)
+		} else for (const hit of hits) hit.doHitTest(ball, coll, physics)
+		const summary = {
+			order,
+			winner: hits.indexOf(coll.obj as OrderedHit),
+			hitTime: coll.hitTime,
+			normal: [coll.hitNormal.x, coll.hitNormal.y, coll.hitNormal.z],
+		}
+		CollisionEvent.release(...physics.contacts)
+		return summary
+	}
+
+	for (const recordContacts of [false, true]) {
+		it(`sub-threshold replay visits and records like scalar (recordContacts=${recordContacts})`, () => {
+			const times = [0.5, 0.2, 0.8, -1]
+			expect(runCase(times, recordContacts, true)).toEqual(runCase(times, recordContacts, false))
+			expect(runCase(times, recordContacts, false).winner).toBe(1)
+			expect(runCase(times, recordContacts, false).hitTime).toBe(0.2)
+		})
+	}
+
+	it('recording contact keeps its owner on the pushed event', () => {
+		class ContactHit extends HitObject {
+			public override hitKind = HitKind.Other
+			public override calcHitBBox(): void {}
+			public override hitTest(_ball: Ball, _dTime: number, coll: CollisionEvent): number {
+				coll.isContact = true
+				return 0
+			}
+			public override collide(): void {}
+		}
+		const ball = {} as unknown as Ball
+		const coll = new CollisionEvent(ball)
+		coll.hitTime = 1
+		const physics = { recordContacts: true, contacts: [] } as unknown as PlayerPhysics
+		const hit = new ContactHit()
+		hit.doHitTest(ball, coll, physics)
+		expect(physics.contacts).toHaveLength(1)
+		const [contact] = physics.contacts
+		expect(contact?.obj).toBe(hit)
+		expect(contact?.ball).toBe(ball)
+		expect(coll.obj).toBeUndefined()
+		CollisionEvent.release(...physics.contacts)
+	})
+})
+
+describe('regression: nested doHitTest calls stay independent', () => {
+	class InnerHit extends HitObject {
+		public override hitKind = HitKind.Other
+		public override calcHitBBox(): void {}
+		public override hitTest(_ball: Ball, _dTime: number, coll: CollisionEvent): number {
+			coll.hitNormal.set(1, 0, 0)
+			return 0.1
+		}
+		public override collide(): void {}
+	}
+
+	class OuterHit extends HitObject {
+		public override hitKind = HitKind.Other
+		public constructor(
+			private readonly inner: InnerHit,
+			private readonly innerBall: Ball,
+			private readonly innerColl: CollisionEvent,
+		) {
+			super()
+		}
+		public override calcHitBBox(): void {}
+		public override hitTest(_ball: Ball, _dTime: number, coll: CollisionEvent, physics: PlayerPhysics): number {
+			// A narrowphase path reentering doHitTest while an outer probe is live.
+			this.inner.doHitTest(this.innerBall, this.innerColl, physics)
+			coll.hitNormal.set(0, 0, 1)
+			return 0.3
+		}
+		public override collide(): void {}
+	}
+
+	it('inner call cannot clobber the outer in-flight result', () => {
+		const outerBall = {} as unknown as Ball
+		const innerBall = {} as unknown as Ball
+		const outerColl = new CollisionEvent(outerBall)
+		outerColl.hitTime = 1
+		const innerColl = new CollisionEvent(innerBall)
+		innerColl.hitTime = 1
+		const physics = { recordContacts: false } as unknown as PlayerPhysics
+		const inner = new InnerHit()
+		new OuterHit(inner, innerBall, innerColl).doHitTest(outerBall, outerColl, physics)
+		expect(outerColl.obj).toBeInstanceOf(OuterHit)
+		expect(outerColl.ball).toBe(outerBall)
+		expect(outerColl.hitTime).toBe(0.3)
+		expect([outerColl.hitNormal.x, outerColl.hitNormal.y, outerColl.hitNormal.z]).toEqual([0, 0, 1])
+		expect(innerColl.obj).toBe(inner)
+		expect(innerColl.ball).toBe(innerBall)
+		expect(innerColl.hitTime).toBe(0.1)
+		expect([innerColl.hitNormal.x, innerColl.hitNormal.y, innerColl.hitNormal.z]).toEqual([1, 0, 0])
+	})
+})
+
 describe('regression: wasm replay must gate contacts on shrunken hitTime', () => {
 	class FixedHit extends HitObject {
 		public override hitKind = HitKind.Other

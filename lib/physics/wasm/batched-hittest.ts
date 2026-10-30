@@ -58,7 +58,8 @@ const isBatchPoly = (h: HitObject): h is Hit3DPoly =>
 	h.hitKind === HitKind.Poly &&
 	(h as Hit3DPoly).objType !== CollisionType.Trigger &&
 	(h as Hit3DPoly).rgv.length <= POLY_MAX_VERTS
-const WASM_THRESHOLD = 64
+/** Batched (WASM) hit tests only pay off above this many post-cull candidates. */
+export const WASM_THRESHOLD = 64
 
 /** Per-kind batchable counts in warmWasmPools() argument order. */
 export function countBatchables(
@@ -165,6 +166,9 @@ export class BatchCollector {
 	 * pools must grow first — the caller falls back to scalar for this step.
 	 */
 	run(ball: Ball, coll: CollisionEvent, physics: PlayerPhysics): boolean {
+		// Shared small-tree path for every tree type: below-threshold batches
+		// replay scalar in collection order. Callers must not add their own
+		// pre-cull size gate; pre-cull totals overcount culled candidates.
 		if (this.orderLen < WASM_THRESHOLD) {
 			for (let i = 0; i < this.orderLen; i++) this.order[i]!.obj.doHitTest(ball, coll, physics)
 			return true

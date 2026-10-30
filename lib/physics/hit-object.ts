@@ -95,43 +95,35 @@ export abstract class HitObject {
 	setType(type: CollisionType): void {
 		this.objType = type
 	}
-	// Reused narrowphase probe: every hitTest only writes coll on the hit path
-	// and only reads coll.ball plus its own writes, so a reset probe starts
-	// each call identical to a fresh pool claim. No user code runs between the
-	// reset and the read (abortHitTest precedes it; fireHitEvent/onCollision
-	// only fire from collide()), hence no reentrancy can clobber it.
-	private static readonly probe = new CollisionEvent()
 	doHitTest(ball: Ball, coll: CollisionEvent, physics: PlayerPhysics): void {
 		if (!ball) return
 		if (this.obj?.abortHitTest?.()) return
-		const probe = HitObject.probe
-		CollisionEvent.reset(probe)
-		probe.ball = ball
-		const newTime = this.hitTest(ball, coll.hitTime, probe, physics)
+		// Per-call scratch: miss-path writes (normal, distance, flags) land
+		// here and are discarded, so a miss never clobbers the hit in coll.
+		// Each call owns its instance, so nested doHitTest calls stay independent.
+		const scratch = CollisionEvent.claim(ball)
+		const newTime = this.hitTest(ball, coll.hitTime, scratch, physics)
 		const validHit = newTime >= 0 && newTime <= coll.hitTime
 		if (!physics.recordContacts) {
 			if (validHit) {
-				const newColl = CollisionEvent.claim(ball)
-				newColl.set(probe)
-				newColl.obj = this
-				newColl.hitTime = newTime
-				coll.set(newColl)
-				CollisionEvent.releaseOne(newColl)
+				coll.set(scratch)
+				coll.obj = this
+				coll.hitTime = newTime
 			}
+			CollisionEvent.releaseOne(scratch)
 			return
 		}
-		if (probe.isContact || validHit) {
-			const newColl = CollisionEvent.claim(ball)
-			newColl.set(probe)
-			newColl.ball = ball
-			newColl.obj = this
-			if (newColl.isContact) physics.contacts.push(newColl)
-			else {
-				coll.set(newColl)
+		if (scratch.isContact || validHit) {
+			if (scratch.isContact) {
+				scratch.obj = this
+				physics.contacts.push(scratch)
+			} else {
+				coll.set(scratch)
+				coll.obj = this
 				coll.hitTime = newTime
-				CollisionEvent.releaseOne(newColl)
+				CollisionEvent.releaseOne(scratch)
 			}
-		}
+		} else CollisionEvent.releaseOne(scratch)
 	}
 	applyPhysics(data: IPhysicalData, table: Table): void {
 		const mat = table.getMaterial(data.szPhysicsMaterial)
