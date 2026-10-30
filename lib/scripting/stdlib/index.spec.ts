@@ -169,12 +169,32 @@ describe('The VBScript stdlib', () => {
 
 	it('should round Empty to 0 instead of producing NaN', () => {
 		const scope = {} as any
-		const vbs = `Dim base\nresult1 = Round(base, 0)\nDim arr(1)\nresult2 = arr(1) And &HFF`
+		const vbs = `Dim base\nresult1 = Round(base, 0)\nresult2 = Round(base, 0) And &HFF`
 		const transpiler = new Transpiler(table, player)
 		transpiler.execute(vbs, scope, 'global')
 
 		expect(scope.result1).to.equal(0)
 		expect(scope.result2).to.equal(0)
+	})
+
+	it('should raise VBS errors for bad Round operands', () => {
+		const rows: Array<[string, number]> = [
+			['Round("abc")', 13],
+			['Round("")', 13],
+			['Round(Null)', 94],
+			['Round(Nothing)', 91],
+		]
+		for (const [expr, code] of rows) {
+			const scope = {} as any
+			new Transpiler(table, player).execute(
+				`On Error Resume Next\nresult = ${expr}\ncode = Err.Number`,
+				scope,
+				'global',
+			)
+			expect(scope.code, expr).to.equal(code)
+			ERR.Clear()
+			ERR.OnErrorGoto0()
+		}
 	})
 
 	it('should provide the UCase function', () => {

@@ -302,12 +302,13 @@ export class Stdlib extends VbsApi {
 	}
 
 	public Round(value: unknown, decimals = 0): number {
-		// Empty rounds to 0 like the other numeric conversions; without
-		// this head an Empty value coerced to NaN and poisoned downstream
-		// bitwise ops with a type mismatch.
+		// Coerced like the other numeric conversions: Empty rounds to 0,
+		// garbage raises type mismatch (13), Null raises 94.
 		const n = this.convertNumber(value)
 		if (n === undefined) return 0
-		const factor = 10 ** Math.trunc(Number(decimals) || 0)
+		const d = this.convertNumber(decimals)
+		if (d === undefined) return 0
+		const factor = 10 ** Math.trunc(d)
 		return bankersRound(n * factor) / factor
 	}
 
