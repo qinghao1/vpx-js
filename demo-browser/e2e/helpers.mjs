@@ -200,8 +200,13 @@ export const physicsChecks = async page => {
 				}
 				const coinBefore = readMany(coinCandidates)
 				v.player.onKeyDown({ code: 'Digit5', key: '5', ts: Date.now() })
-				await new Promise(r => setTimeout(r, 300))
-				const coinMid = readMany(coinCandidates)
+				// Script-owned coin path pulses ~720 ms later for ~40 ms: poll for it.
+				let coinMid = readMany(coinCandidates)
+				const coinT0 = Date.now()
+				while (!Object.values(coinMid).some(Boolean) && Date.now() - coinT0 < 3000) {
+					await new Promise(r => setTimeout(r, 25))
+					coinMid = readMany(coinCandidates)
+				}
 				v.player.onKeyUp({ code: 'Digit5', key: '5', ts: Date.now() })
 				await new Promise(r => setTimeout(r, 300))
 				const coinAfter = readMany(coinCandidates)

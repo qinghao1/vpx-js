@@ -64,10 +64,9 @@ const DEFAULT_KEYS: Record<number, number> = {
 }
 
 // Cabinet switch ids for the emu (VPM-style numbers, vpx-js-defined — upstream
-// InputManager.cpp holds no such tables); free-play coin search mirrors
-// Jakobud/freeplay MAME plugin (init.lua: search ioport fields by name "Free Play"):
-// we search tableScript for "Const swCoin* = N" by name (driver-agnostic) and use the
-// script's AddCreditKey path (vpmKeyDown -> PulseSw) plus a tiny direct pulse for timing.
+// InputManager.cpp holds no such tables). Coin ids come from the script's
+// "Const swCoin*" names (driver-agnostic); tables declaring them credit
+// through their own KeyDown handler, others use the fallback drives below.
 const SWITCH_START = [16, 13, 1] as const
 const SWITCH_CREDIT_2_3 = [65, 1, 2, 3, 4] as const
 const SWITCH_CREDIT_4 = [66, 2, 1, 65, 67] as const
@@ -86,9 +85,9 @@ const CREDIT_STAGGER_MS = 250
 export class PinInput {
 	/**
 	 * Default for freePlay. Set to false before creating the Player to disable the
-	 * vpx-js-only free-play helpers (none exists upstream): coin-switch pulses on
-	 * Start and mock trough eject. All run on the physics clock, so pausing the
-	 * game pauses them.
+	 * vpx-js-only free-play helpers (none exists upstream): fallback coin-switch
+	 * pulses on Start for scripts without a coin path, and mock trough eject.
+	 * All run on the physics clock, so pausing the game pauses them.
 	 */
 	public static freePlayDefault = true
 
@@ -106,6 +105,8 @@ export class PinInput {
 	readonly rgKeys: Record<number, number> = { ...DEFAULT_KEYS }
 	public freePlay = PinInput.freePlayDefault
 	private cachedCoinSwitches: number[] | null = null
+	private coinPathChecked = false
+	private coinPathScript = false
 
 	constructor(
 		private readonly table: Table,
@@ -172,6 +173,15 @@ export class PinInput {
 		})
 	}
 
+	// True when the table script declares its own coin switches ("Const swCoin*").
+	private scriptOwnsCoinPath(): boolean {
+		if (this.coinPathChecked) return this.coinPathScript
+		this.coinPathChecked = true
+		const script = (this.table as unknown as { tableScript?: string }).tableScript ?? ''
+		this.coinPathScript = /Const\s+swCoin\d*\s*=\s*-?\d+/i.test(script)
+		return this.coinPathScript
+	}
+
 	private discoverCoinSwitches(): number[] {
 		if (this.cachedCoinSwitches) return this.cachedCoinSwitches
 		const script = (this.table as unknown as { tableScript?: string }).tableScript ?? ''
@@ -192,12 +202,13 @@ export class PinInput {
 
 	public addCredit(count = 1): void {
 		const key = this.getKey(AssignKey.AddCreditKey)
-		const direct = this.discoverCoinSwitches().slice(0, 3)
+		// Fallback only; see scriptOwnsCoinPath.
+		const direct = this.scriptOwnsCoinPath() ? null : this.discoverCoinSwitches().slice(0, 3)
 		for (let index = 0; index < count; index++) {
 			this.schedule(index * CREDIT_STAGGER_MS, () => {
 				this.onKeyDown(key)
 				this.schedule(CREDIT_PULSE_MS, () => this.onKeyUp(key))
-				this.pulseSwitches(direct)
+				if (direct) this.pulseSwitches(direct)
 			})
 		}
 	}
@@ -303,7 +314,8 @@ export class PinInput {
 		const emu = this.player.getPhysics().emu
 		if (!emu) return
 		if (this.freePlay && isDown && code === this.getKey(AssignKey.StartGameKey)) {
-			this.pulseSwitches(this.discoverCoinSwitches())
+			// Fallback only; keeps free-play Start working without a script coin path.
+			if (!this.scriptOwnsCoinPath()) this.pulseSwitches(this.discoverCoinSwitches())
 		}
 		const switches = this.getCabinetSwitches(code)
 		if (!switches) return
@@ -314,10 +326,14 @@ export class PinInput {
 
 	private getCabinetSwitches(code: number): readonly number[] | undefined {
 		if (code === this.getKey(AssignKey.StartGameKey)) return SWITCH_START
-		if (code === DIK_2 || code === DIK_3) return SWITCH_CREDIT_2_3
-		if (code === DIK_4 || code === this.getKey(AssignKey.AddCreditKey2)) return SWITCH_CREDIT_4
-		if (code === DIK_5 || code === this.getKey(AssignKey.AddCreditKey)) return SWITCH_CREDIT_5
-		if (code === DIK_6) return SWITCH_CREDIT_6
+		// Script-owned tables credit through their KeyDown handler alone;
+		// driving switches here too would double-credit.
+		if (!this.scriptOwnsCoinPath()) {
+			if (code === DIK_2 || code === DIK_3) return SWITCH_CREDIT_2_3
+			if (code === DIK_4 || code === this.getKey(AssignKey.AddCreditKey2)) return SWITCH_CREDIT_4
+			if (code === DIK_5 || code === this.getKey(AssignKey.AddCreditKey)) return SWITCH_CREDIT_5
+			if (code === DIK_6) return SWITCH_CREDIT_6
+		}
 		const leftKey = this.getKey(AssignKey.LeftFlipperKey)
 		const rightKey = this.getKey(AssignKey.RightFlipperKey)
 		if (code === leftKey || code === DIK_LEFT) return SWITCH_FLIPPER_L

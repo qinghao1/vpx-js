@@ -133,6 +133,7 @@ describe('flipper and plunger keys stay script-only', () => {
 
 describe('free-play helpers (vpx-js-only)', () => {
 	const coinScript = 'Const swCoin1 = 10\nSub Table1_KeyDown(ByVal keycode)\nEnd Sub\n'
+	const noCoinScript = 'Sub Table1_KeyDown(ByVal keycode)\nEnd Sub\n'
 
 	type SwitchCall = { nr: number; enable: boolean | undefined }
 
@@ -152,16 +153,51 @@ describe('free-play helpers (vpx-js-only)', () => {
 		return log.filter(call => call.nr === nr && call.enable === true).length
 	}
 
-	it('releases pulsed coin switches on physics time', () => {
+	it('drives Start switches without coin pulses when the script owns the coin path', () => {
 		const table = new TableBuilder().withTableScript(coinScript).build('Table1')
 		const player = new Player(table).init({})
 		const log: SwitchCall[] = []
 		player.getPhysics().emu = fakeEmu(log)
 		player.onKeyDown({ code: 'Digit1', key: '1' })
 		player.updatePhysics(20)
-		expect(enablesOf(log, 10)).to.be.equal(1)
+		expect(enablesOf(log, 16)).to.be.equal(1)
+		expect(log.filter(call => call.nr === 10).length).to.be.equal(0)
+	})
+
+	it('pulses fallback coin switches on Start for scriptless tables', () => {
+		const table = new TableBuilder().withTableScript(noCoinScript).build('Table1')
+		const player = new Player(table).init({})
+		const log: SwitchCall[] = []
+		player.getPhysics().emu = fakeEmu(log)
+		player.onKeyDown({ code: 'Digit1', key: '1' })
+		player.updatePhysics(20)
+		expect(enablesOf(log, 16)).to.be.equal(1)
+		expect(enablesOf(log, 65)).to.be.equal(1)
 		player.updatePhysics(400)
-		expect(log.filter(call => call.nr === 10 && call.enable === false).length).to.be.equal(1)
+		expect(log.filter(call => call.nr === 65 && call.enable === false).length).to.be.equal(1)
+	})
+
+	it('sends coin keys script-only when the script owns the coin path', () => {
+		const coinCapture = 'Const swCoin1 = 10\nSub Table1_KeyDown(ByVal keycode)\nkeyDown = keycode\nEnd Sub\n'
+		const table = new TableBuilder().withTableScript(coinCapture).build('Table1')
+		const scope: any = {}
+		const player = new Player(table).init(scope)
+		const log: SwitchCall[] = []
+		player.getPhysics().emu = fakeEmu(log)
+		player.onKeyDown({ code: 'Digit5', key: '5' })
+		player.updatePhysics(20)
+		expect(log).to.have.length(0)
+		expect(scope.keyDown).to.be.equal(player.getKey(AssignKey.AddCreditKey))
+	})
+
+	it('drives coin switches directly for scriptless tables', () => {
+		const table = new TableBuilder().withTableScript(noCoinScript).build('Table1')
+		const player = new Player(table).init({})
+		const log: SwitchCall[] = []
+		player.getPhysics().emu = fakeEmu(log)
+		player.onKeyDown({ code: 'Digit5', key: '5' })
+		player.updatePhysics(20)
+		expect(enablesOf(log, 67)).to.be.equal(1)
 	})
 
 	function setupTroughKick(): { player: Player; kicks: Array<[number, number]> } {
