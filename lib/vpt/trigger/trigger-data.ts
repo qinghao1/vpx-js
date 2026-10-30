@@ -22,8 +22,7 @@ const INT_MAP: Record<string, string> = { SHAP: 'shape' }
 const BOOL_MAP: Record<string, string> = { VSBL: 'isVisible', EBLD: 'isEnabled', REEN: 'isReflectionEnabled' }
 const STRING_MAP: Record<string, string> = { MATR: 'szMaterial', SURF: 'szSurface', LINK: 'stateSrcLink' }
 
-/** Trigger data.
- * @see https://github.com/vpinball/vpinball/blob/master/trigger.cpp */
+/** @see https://github.com/vpinball/vpinball/blob/master/trigger.cpp */
 export class TriggerData extends ItemData {
 	public dragPoints: DragPoint[] = []
 	public center!: Vertex2D

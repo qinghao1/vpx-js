@@ -3,7 +3,7 @@
 
 import { ItemState } from '../item-state.js'
 
-/** Plunger state. @see https://github.com/vpinball/vpinball/blob/master/plunger.cpp */
+/** @see https://github.com/vpinball/vpinball/blob/master/plunger.cpp */
 export class PlungerState extends ItemState {
 	public frame = 0
 

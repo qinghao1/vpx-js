@@ -71,8 +71,7 @@ export interface BulbGlowParams {
 	modulateVsAdd: number
 }
 
-/** Light data.
- * @see https://github.com/vpinball/vpinball/blob/master/light.cpp */
+/** @see https://github.com/vpinball/vpinball/blob/master/light.cpp */
 export class LightData extends ItemData {
 	public center!: Vertex2D
 	public falloff = 50
@@ -202,7 +201,7 @@ export class LightData extends ItemData {
 	}
 }
 
-/** Light state. @see https://github.com/vpinball/vpinball/blob/master/light.cpp */
+/** @see https://github.com/vpinball/vpinball/blob/master/light.cpp */
 export class LightState extends ItemState {
 	public intensity = 0
 	public color: number = 0
@@ -435,7 +434,7 @@ export class LightApi extends ItemApi<LightData> {
 	}
 }
 
-/** Light item. @see https://github.com/vpinball/vpinball/blob/master/light.cpp */
+/** @see https://github.com/vpinball/vpinball/blob/master/light.cpp */
 export class Light extends Item<LightData> implements IRenderable<LightState>, IAnimatable, IScriptable<LightApi> {
 	public declare readonly data: LightData
 	private readonly state: LightState

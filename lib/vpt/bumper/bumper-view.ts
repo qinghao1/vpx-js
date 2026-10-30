@@ -23,7 +23,7 @@ export interface BumperMesh {
 	cap: Mesh
 }
 
-/** Generates bumper meshes. @see https://github.com/vpinball/vpinball/blob/master/bumper.cpp */
+/** @see https://github.com/vpinball/vpinball/blob/master/bumper.cpp */
 export class BumperMeshGenerator {
 	constructor(private readonly data: BumperData) {}
 

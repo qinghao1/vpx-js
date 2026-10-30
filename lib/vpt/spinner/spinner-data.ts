@@ -19,8 +19,7 @@ const FLOAT_MAP: Record<string, string> = {
 const BOOL_MAP: Record<string, string> = { SSUP: 'showBracket', SVIS: 'isVisible', REEN: 'isReflectionEnabled' }
 const STRING_MAP: Record<string, string> = { MATR: 'szMaterial', IMGF: 'szImage', SURF: 'szSurface' }
 
-/** Spinner data.
- * @see https://github.com/vpinball/vpinball/blob/master/spinner.cpp */
+/** @see https://github.com/vpinball/vpinball/blob/master/spinner.cpp */
 export class SpinnerData extends ItemData {
 	public center!: Vertex2D
 	public rotation = 0

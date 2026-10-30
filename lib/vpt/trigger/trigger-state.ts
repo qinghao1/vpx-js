@@ -3,7 +3,7 @@
 
 import { ItemState } from '../item-state.js'
 
-/** Trigger state. @see https://github.com/vpinball/vpinball/blob/master/trigger.cpp */
+/** @see https://github.com/vpinball/vpinball/blob/master/trigger.cpp */
 export class TriggerState extends ItemState {
 	public heightOffset = 0
 	public material?: string

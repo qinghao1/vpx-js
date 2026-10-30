@@ -38,7 +38,6 @@ export interface PrebuiltAnimationFrame {
 	bounds: Float32Array
 }
 
-/** Primitive updater — syncs state to render node. */
 export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 	private animMesh?: Mesh
 	private animFrames: PrebuiltAnimationFrame[] = []

@@ -3,7 +3,7 @@
 
 import { ItemData } from '../item-data.js'
 
-/** Ball data. @see https://github.com/vpinball/vpinball/blob/master/ball.cpp */
+/** @see https://github.com/vpinball/vpinball/blob/master/ball.cpp */
 export class BallData extends ItemData {
 	public color = 0xffffff
 	public environmentMap = ''

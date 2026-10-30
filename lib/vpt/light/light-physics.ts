@@ -43,7 +43,7 @@ export function bakedIntensity(data: Pick<LightData, 'intensity' | 'state' | 'rg
 	return data.intensity * level
 }
 
-/** Light animation. @see https://github.com/vpinball/vpinball/blob/master/light.cpp */
+/** @see https://github.com/vpinball/vpinball/blob/master/light.cpp */
 export class LightAnimation implements IAnimation {
 	public realState: number = Enums.LightStatus.LightStateOff
 	public finalState: number = Enums.LightStatus.LightStateOff

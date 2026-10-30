@@ -14,8 +14,7 @@ import { ItemData } from '../item-data.js'
 import type { Table } from '../table/table.js'
 import { LightSeqAnimation } from './lightseq-animation.js'
 
-/** LightSeq data.
- * @see https://github.com/vpinball/vpinball/blob/master/lightseq.cpp */
+/** @see https://github.com/vpinball/vpinball/blob/master/lightseq.cpp */
 export class LightSeqData extends ItemData {
 	public collection?: string
 	public center: Vertex2D = new Vertex2D()

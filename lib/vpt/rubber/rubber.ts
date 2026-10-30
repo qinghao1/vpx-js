@@ -41,8 +41,7 @@ const BOOL_MAP: Record<string, string> = {
 }
 const STRING_MAP: Record<string, string> = { MATR: 'szMaterial', IMAG: 'szImage', MAPH: 'szPhysicsMaterial' }
 
-/** Rubber data.
- * @see https://github.com/vpinball/vpinball/blob/master/rubber.cpp */
+/** @see https://github.com/vpinball/vpinball/blob/master/rubber.cpp */
 export class RubberData extends ItemData implements IPhysicalData {
 	public height = 25
 	public hitHeight = 25
@@ -99,7 +98,7 @@ export class RubberData extends ItemData implements IPhysicalData {
 	}
 }
 
-/** Rubber state. @see https://github.com/vpinball/vpinball/blob/master/rubber.cpp */
+/** @see https://github.com/vpinball/vpinball/blob/master/rubber.cpp */
 export class RubberState extends ItemState {
 	public height!: number
 	public rotX!: number
@@ -276,7 +275,7 @@ export class RubberApi extends ItemApi<RubberData> {
 	}
 }
 
-/** Rubber item. @see https://github.com/vpinball/vpinball/blob/master/rubber.cpp */
+/** @see https://github.com/vpinball/vpinball/blob/master/rubber.cpp */
 export class Rubber extends Item<RubberData> implements IRenderable<RubberState>, IHittable, IScriptable<RubberApi> {
 	private readonly state: RubberState
 	private readonly meshGenerator: RubberMeshGenerator

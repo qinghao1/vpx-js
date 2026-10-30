@@ -20,7 +20,7 @@ import type { HitTargetMeshGenerator } from './hit-target-view.js'
 
 export const DROP_TARGET_LIMIT = 52.0
 
-/** HitTarget animation. @see https://github.com/vpinball/vpinball/blob/master/hittarget.cpp */
+/** @see https://github.com/vpinball/vpinball/blob/master/hittarget.cpp */
 export class HitTargetAnimation implements IAnimation {
 	public timeStamp = 0
 	public hitEvent = false
@@ -125,7 +125,7 @@ const dropTargetHitPlaneIndices: number[] = [
 	12, 13, 14, 13, 15, 14,
 ]
 
-/** HitTarget hit generator. @see https://github.com/vpinball/vpinball/blob/master/hittarget.cpp */
+/** @see https://github.com/vpinball/vpinball/blob/master/hittarget.cpp */
 export class HitTargetHitGenerator {
 	constructor(
 		private readonly data: HitTargetData,

@@ -49,8 +49,7 @@ const BOOL_MAP: Record<string, string> = {
 }
 const STRING_MAP: Record<string, string> = { MATR: 'szMaterial', IMAG: 'szImage', MAPH: 'szPhysicsMaterial' }
 
-/** Ramp data.
- * @see https://github.com/vpinball/vpinball/blob/master/ramp.cpp */
+/** @see https://github.com/vpinball/vpinball/blob/master/ramp.cpp */
 export class RampData extends ItemData implements IPhysicalData {
 	public depthBias = 0
 	public dragPoints: DragPoint[] = []
@@ -113,7 +112,7 @@ export class RampData extends ItemData implements IPhysicalData {
 	}
 }
 
-/** Ramp state. @see https://github.com/vpinball/vpinball/blob/master/ramp.cpp */
+/** @see https://github.com/vpinball/vpinball/blob/master/ramp.cpp */
 export class RampState extends ItemState {
 	public type?: number
 
@@ -370,7 +369,7 @@ export class RampApi extends ItemApi<RampData> {
 	}
 }
 
-/** Ramp item. @see https://github.com/vpinball/vpinball/blob/master/ramp.cpp */
+/** @see https://github.com/vpinball/vpinball/blob/master/ramp.cpp */
 export class Ramp extends Item<RampData> implements IRenderable<RampState>, IHittable, IScriptable<RampApi> {
 	private readonly meshGenerator: RampMeshGenerator
 	private readonly hitGenerator: RampHitGenerator

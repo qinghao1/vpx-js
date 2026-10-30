@@ -17,7 +17,7 @@ const gatePlateMesh = loadMesh('gate-plate-mesh')
 const gateWireMesh = loadMesh('gate-wire-mesh')
 const gateWireRectangleMesh = loadMesh('gate-wire-rectangle-mesh')
 
-/** Generates gate meshes. @see https://github.com/vpinball/vpinball/blob/master/gate.cpp */
+/** @see https://github.com/vpinball/vpinball/blob/master/gate.cpp */
 export class GateMeshGenerator {
 	constructor(private readonly data: GateData) {}
 

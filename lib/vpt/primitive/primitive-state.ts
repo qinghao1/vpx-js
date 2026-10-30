@@ -4,7 +4,7 @@
 import { Vertex3D } from '../../math/vector.js'
 import { ItemState } from '../item-state.js'
 
-/** Primitive state. @see https://github.com/vpinball/vpinball/blob/master/primitive.cpp */
+/** @see https://github.com/vpinball/vpinball/blob/master/primitive.cpp */
 export class PrimitiveState extends ItemState {
 	public position: Vertex3D = Vertex3D.claim()
 	public size: Vertex3D = Vertex3D.claim()

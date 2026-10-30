@@ -46,8 +46,7 @@ const BOOL_MAP: Record<string, string> = {
 }
 const STRING_MAP: Record<string, string> = { IMAG: 'szImage', MATR: 'szMaterial', MAPH: 'szPhysicsMaterial' }
 
-/** HitTarget data.
- * @see https://github.com/vpinball/vpinball/blob/master/hittarget.cpp */
+/** @see https://github.com/vpinball/vpinball/blob/master/hittarget.cpp */
 export class HitTargetData extends ItemData implements IPhysicalData {
 	public depthBias?: number
 	public disableLightingBelow?: number
@@ -371,7 +370,7 @@ export class HitTargetApi extends ItemApi<HitTargetData> {
 	}
 }
 
-/** HitTarget item. @see https://github.com/vpinball/vpinball/blob/master/hittarget.cpp */
+/** @see https://github.com/vpinball/vpinball/blob/master/hittarget.cpp */
 export class HitTarget
 	extends Item<HitTargetData>
 	implements IRenderable<HitTargetState>, IHittable, IAnimatable, IScriptable<HitTargetApi>

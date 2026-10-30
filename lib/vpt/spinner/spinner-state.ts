@@ -3,7 +3,7 @@
 
 import { ItemState } from '../item-state.js'
 
-/** Spinner state. @see https://github.com/vpinball/vpinball/blob/master/spinner.cpp */
+/** @see https://github.com/vpinball/vpinball/blob/master/spinner.cpp */
 export class SpinnerState extends ItemState {
 	public angle = 0
 	public texture?: string

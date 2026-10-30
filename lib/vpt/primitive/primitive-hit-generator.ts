@@ -21,7 +21,7 @@ import { Mesh } from '../mesh.js'
 import type { Table } from '../table/table.js'
 import type { PrimitiveData } from './primitive-data.js'
 
-/** Primitive hit generator. @see https://github.com/vpinball/vpinball/blob/master/primitive.cpp */
+/** @see https://github.com/vpinball/vpinball/blob/master/primitive.cpp */
 export class PrimitiveHitGenerator {
 	constructor(private readonly data: PrimitiveData) {
 		if (this.data.getName().toLowerCase() === 'playfield_mesh') {

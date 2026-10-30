@@ -55,8 +55,7 @@ const STRING_MAP: Record<string, string> = {
 }
 const WIDE_STRING_MAP: Record<string, string> = { M3DN: 'meshFileName' }
 
-/** Primitive data.
- * @see https://github.com/vpinball/vpinball/blob/master/primitive.cpp */
+/** @see https://github.com/vpinball/vpinball/blob/master/primitive.cpp */
 export class PrimitiveData extends ItemData implements IPhysicalData {
 	public numVertices!: number
 	public compressedAnimationVertices?: number

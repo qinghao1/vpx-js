@@ -19,7 +19,7 @@ const kickerSimpleHoleMesh = loadMesh('kicker-simple-hole-mesh')
 const kickerT1Mesh = loadMesh('kicker-t1-mesh')
 const kickerWilliamsMesh = loadMesh('kicker-williams-mesh')
 
-/** Generates kicker mesh. @see https://github.com/vpinball/vpinball/blob/master/kicker.cpp */
+/** @see https://github.com/vpinball/vpinball/blob/master/kicker.cpp */
 export class KickerMeshGenerator {
 	constructor(private readonly data: KickerData) {}
 

@@ -29,7 +29,6 @@ import type { ItemApi } from './item-api.js'
 import type { ItemData } from './item-data.js'
 import type { Table } from './table/table.js'
 
-/** Global API. */
 export class GlobalApi extends VbsApi {
 	private readonly table: Table
 	private readonly player: Player

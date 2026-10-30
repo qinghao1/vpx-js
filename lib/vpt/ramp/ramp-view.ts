@@ -51,7 +51,6 @@ const HABITRAIL_TYPES: readonly number[] = [
 /** Mesh slots of a generated ramp, iterated by getMeshes and updateMeshes. */
 const RAMP_MESH_KEYS = ['wire1', 'wire2', 'wire3', 'wire4', 'floor', 'left', 'right'] as const
 
-/** Ramp mesh generator. */
 export class RampMeshGenerator {
 	private readonly data: RampData
 	private readonly state: RampState

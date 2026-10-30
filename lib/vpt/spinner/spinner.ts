@@ -29,7 +29,7 @@ import type { SpinnerMover } from './spinner-mover.js'
 import { SpinnerState } from './spinner-state.js'
 import { SpinnerUpdater } from './spinner-updater.js'
 
-/** Spinner item. @see https://github.com/vpinball/vpinball/blob/master/src/parts/spinner.cpp */
+/** @see https://github.com/vpinball/vpinball/blob/master/src/parts/spinner.cpp */
 export class Spinner
 	extends Item<SpinnerData>
 	implements IRenderable<SpinnerState>, IPlayable, IMovable, IHittable, IScriptable<SpinnerApi>, IAnimatable
@@ -43,7 +43,6 @@ export class Spinner
 	private hitCircles: HitCircle[] = []
 	private api?: SpinnerApi
 
-	// public props
 	get angleMin() {
 		return this.data.angleMin
 	}

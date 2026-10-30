@@ -5,7 +5,7 @@ import { Vertex2D } from '../../math/vector.js'
 import { HitCircle } from '../../physics/hit-circle.js'
 import type { SpinnerData } from './spinner-data.js'
 
-/** Spinner hit generator. @see https://github.com/vpinball/vpinball/blob/master/spinner.cpp */
+/** @see https://github.com/vpinball/vpinball/blob/master/spinner.cpp */
 export class SpinnerHitGenerator {
 	constructor(private readonly data: SpinnerData) {}
 

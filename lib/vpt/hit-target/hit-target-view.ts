@@ -22,7 +22,7 @@ const hitTargetRoundMesh = loadMesh('hit-target-round-mesh')
 const hitTargetT1SlimMesh = loadMesh('hit-target-t1-slim-mesh')
 const hitTargetT2SlimMesh = loadMesh('hit-target-t2-slim-mesh')
 
-/** Generates hit-target mesh. @see https://github.com/vpinball/vpinball/blob/master/hittarget.cpp */
+/** @see https://github.com/vpinball/vpinball/blob/master/hittarget.cpp */
 export class HitTargetMeshGenerator {
 	constructor(private readonly data: HitTargetData) {}
 

@@ -42,8 +42,7 @@ const STRING_MAP: Record<string, string> = {
 	TIPS: 'szTipShape',
 }
 
-/** Plunger data.
- * @see https://github.com/vpinball/vpinball/blob/master/plunger.cpp */
+/** @see https://github.com/vpinball/vpinball/blob/master/plunger.cpp */
 export class PlungerData extends ItemData {
 	public type: number = Enums.PlungerType.PlungerTypeModern
 	public center!: Vertex2D
