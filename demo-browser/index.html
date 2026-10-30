@@ -122,6 +122,8 @@
 			<span id="stream-text">0%</span>
 		</div>
 		<div id="canvas-wrap">
+			<!-- Placeholder canvas: the render worker takes it via transferControlToOffscreen()
+				(one-shot, before any getContext); CSS size stays owned by this element. -->
 			<canvas id="canvas" tabindex="0"></canvas>
 			<div id="nudge-flash" hidden></div>
 		</div>

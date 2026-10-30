@@ -105,22 +105,3 @@ export const resolveButtonCode = name => {
 	for (const { regex, code } of BUTTON_CODE_PATTERNS) if (regex.test(n)) return code
 	return null
 }
-
-export const TABLE_OPTS = {
-	exportPlayfield: true,
-	exportPrimitives: true,
-	exportRubbers: true,
-	exportSurfaces: true,
-	exportFlippers: true,
-	exportBumpers: true,
-	exportRamps: true,
-	exportLightBulbs: true,
-	exportPlayfieldLights: true,
-	exportHitTargets: true,
-	exportGates: true,
-	exportKickers: true,
-	exportTriggers: true,
-	exportSpinners: true,
-	exportPlungers: true,
-	exportLightBulbLights: true,
-}

@@ -16,9 +16,11 @@ import {
 } from '../../dist-esm/lib/render/threejs/nodes/primitive-bdl-node.js'
 import { isBakedNodeMaterial, setBakedMap } from '../../dist-esm/lib/render/threejs/nodes/unshaded-baked-node.js'
 import {
-	batchStaticOpaques as _batchStaticOpaques,
-	optimizeScene as _optimizeScene,
-} from '../../dist-esm/lib/render/threejs/three-batched-builder.js'
+	assembleTableScene,
+	PRERENDERED_BACKGROUND,
+	syncTableRoom,
+} from '../../dist-esm/lib/render/threejs/table-scene.js'
+import { batchStaticOpaques as _batchStaticOpaques } from '../../dist-esm/lib/render/threejs/three-batched-builder.js'
 import { buildBvhIdle } from '../../dist-esm/lib/render/threejs/three-bvh.js'
 import {
 	applyCameraState,
@@ -47,9 +49,31 @@ import {
 	getTransmissionDebug,
 	updateTransmissionBuffer,
 } from '../../dist-esm/lib/render/threejs/transmission-buffer.js'
+import { collectCatchUp } from '../../dist-esm/lib/render/worker/catch-up.js'
+import {
+	BALL_STRIDE,
+	createNodeIdMap,
+	encodeChangedStates,
+	MAX_BALLS,
+	MAX_DELTAS,
+	V_ACC_X,
+	V_ACC_Y,
+	V_CAM_FOV,
+	V_CAM_NEAR,
+	V_CAM_POS,
+	V_CAM_TGT,
+	V_NUDGE_X,
+	V_NUDGE_Y,
+	V_PX_H,
+	V_PX_W,
+	workerNodeNames,
+} from '../../dist-esm/lib/render/worker/frame-state.js'
+import { createBridgeScratch } from '../../dist-esm/lib/render/worker/main-bridge.js'
+import { buildNodeCache, nudgeOffset } from '../../dist-esm/lib/render/worker/shared-scene.js'
+import { probeRenderCaps, selectRenderMode } from '../../dist-esm/lib/render/worker/worker-protocol.js'
 import { AnimationGate } from '../../dist-esm/lib/util/animation-gate.js'
 import { Table } from '../../dist-esm/lib/vpt/table/table.js'
-import { CAM, CAM_ANIM, isTableHit, LIGHT_AMBIENT, LIGHT_DIR, LIGHT_HEMI, RE_BAKE_MAP, TABLE_OPTS } from './config.js'
+import { CAM, CAM_ANIM, isTableHit, LIGHT_AMBIENT, LIGHT_DIR, LIGHT_HEMI, RE_BAKE_MAP } from './config.js'
 import { DmdRenderer } from './dmd/dmd-renderer.js'
 import {
 	isDev as _isDev,
@@ -75,52 +99,6 @@ import {
 	resolveRomCandidates,
 	resolveVpxCandidates,
 } from './utils.js'
-
-let _prerenderedBackground: THREE.Color | null = null
-function getPrerenderedBackground(): THREE.Color {
-	if (_prerenderedBackground) return _prerenderedBackground
-	_prerenderedBackground = new THREE.Color(0x121a2b)
-	return _prerenderedBackground
-}
-
-function syncRoom(
-	scene: THREE.Scene,
-	node: THREE.Object3D,
-	center: THREE.Vector3,
-	size: THREE.Vector3,
-): THREE.Group | null {
-	let hasVr = false
-	node.traverse((o: any) => {
-		if (
-			o.isMesh &&
-			o.visible &&
-			String(o.name ?? '')
-				.toLowerCase()
-				.includes('vr_')
-		)
-			hasVr = true
-	})
-	const room = ensureProceduralRoom(scene, center, size, { hasVr })
-	scene.background = getPrerenderedBackground() as any
-	return room
-}
-
-function cullExcessLights(root: any, maxLights: number) {
-	const lights: any[] = []
-	root.traverse((o: any) => {
-		if (o.isPointLight) lights.push(o)
-	})
-	if (lights.length <= maxLights) return null
-	lights.sort((a: any, b: any) => (b.intensity || 0) - (a.intensity || 0))
-	let culled = 0
-	for (const light of lights.slice(maxLights)) {
-		light.visible = false
-		light.intensity = 0
-		light.parent?.remove(light)
-		culled++
-	}
-	return { before: lights.length, after: maxLights, culled }
-}
 
 export {
 	createHarness,
@@ -181,7 +159,7 @@ export class Viewer {
 		}
 		this.harnessLog = createHarness(this.dom.logEl).harnessLog
 		this.scene = new THREE.Scene()
-		this.scene.background = getPrerenderedBackground() as any
+		this.scene.background = new THREE.Color(PRERENDERED_BACKGROUND)
 		this.camera = new THREE.PerspectiveCamera(
 			CAM.fov,
 			(typeof window !== 'undefined' ? window.innerWidth : 800) /
@@ -201,6 +179,7 @@ export class Viewer {
 		this.renderApi = null
 		this.nodeCache = new Map()
 		this._lightmapMap = new Map()
+		this._lightNames = new Set()
 		this.isPaused = false
 		this._playCameraApplied = false
 		this._cameraTimeout = null
@@ -224,6 +203,19 @@ export class Viewer {
 		this.renderer = null
 		this.controls = null
 		this._eventCleanups = []
+		this._workerBridge = null
+		this._workerScratch = null
+		this._workerDeltaCount = 0
+		this._workerDroppedWarned = 0
+		this._workerDmdFrameId = 0
+		this._workerBallNames = new Set()
+		this._workerIdOf = null
+		this._workerIdTable = null
+		this._viewerCanvasCtrl = null
+		// Opt-in (?worker=render, see _ensureWorkerBridge): the worker takes a
+		// FRESH canvas at table setup, since transferControlToOffscreen is
+		// one-shot and the viewer canvas already owns a context by then.
+		this._wantWorker = typeof location !== 'undefined' && new URLSearchParams(location.search).has('worker')
 		this._boundResize = () => this._onResize()
 		this._disposed = false
 		this._deviceLossCount = 0
@@ -295,6 +287,14 @@ export class Viewer {
 		}
 		for (const fn of this._eventCleanups) fn()
 		this._eventCleanups = []
+		try {
+			this._viewerCanvasCtrl?.abort()
+		} catch {}
+		this._viewerCanvasCtrl = null
+		this._workerBridge?.dispose()
+		this._workerBridge = null
+		this._workerScratch = null
+		this._workerAttaching = false
 		this.controls?.dispose?.()
 		this.renderPipeline?.dispose?.()
 		this.renderer?.setAnimationLoop(null)
@@ -414,27 +414,6 @@ export class Viewer {
 		this.sound.setMuted(!!prefs?.muted)
 	}
 
-	// ?music=url[,url...]: external music files, decoded in the background and
-	// registered under their file names for script PlayMusic(name). Loading is
-	// async, so a PlayMusic call before arrival still misses.
-	async _loadMusicParam() {
-		const param = new URLSearchParams(location.search).get('music')
-		if (!param || !this.player) return
-		const sources = []
-		for (const raw of param.split(',')) {
-			const url = raw.trim()
-			if (!url) continue
-			try {
-				const res = await fetch(new URL(url, location.href).href)
-				if (!res.ok) throw new Error(`${res.status}`)
-				const name = url.split(/[?#]/)[0].split('/').pop() ?? url
-				sources.push({ name, bytes: new Uint8Array(await res.arrayBuffer()) })
-			} catch {
-				this.log(`Music file unavailable: ${url}`)
-			}
-		}
-		if (sources.length > 0) await this.player.loadMusic(sources)
-	}
 	_saveSoundPrefs() {
 		if (!this.sound) return
 		try {
@@ -586,6 +565,18 @@ export class Viewer {
 		if (!this.player) return
 		this.player.setPhysicsEnabled(this.viewerMode === 'play')
 		this.player.updatePhysics()
+		// Worker-owned present in both modes: the worker poses its own scene
+		// from deltas. Viewer physics stays disabled, so viewer deltas carry
+		// animations only — same producer as the main-thread viewer path below.
+		if (this._workerBridge) {
+			if (this.viewerMode !== 'play' || !this.isPaused) {
+				this.player.updateAnimations(this.player.getGameTime())
+				const changed = this.player.popStates()
+				this._encodeWorkerDeltas(changed)
+				changed.release()
+			}
+			return
+		}
 		if (this.viewerMode !== 'play' || !this.isPaused) {
 			this.player.updateAnimations(this.player.getGameTime())
 			const changed = this.player.popStates()
@@ -618,6 +609,8 @@ export class Viewer {
 		const pixelRatio = getTargetPixelRatio(this.viewerMode)
 		if (this.renderer) this.renderer.setPixelRatio(pixelRatio)
 		this.renderer?.setSize(width, height)
+		// Worker-owned canvas re-targets on the resize seq; CSS layout stays main-side.
+		this._workerBridge?.notifyResize(width, height, pixelRatio)
 	}
 	_setupModeSwitch() {
 		const onOrbitToggle = e => {
@@ -631,8 +624,18 @@ export class Viewer {
 		this._raycaster = new THREE.Raycaster()
 		this._raycaster.firstHitOnly = false
 		this._mouse = new THREE.Vector2()
+		this._bindViewerCanvas(this.dom.canvas)
+	}
+	// Viewer click-to-play + hover tip listen on one canvas element. The worker
+	// swap replaces that element, so re-run this against the fresh canvas after
+	// the swap; the AbortController drops the detached canvas listeners.
+	_bindViewerCanvas(canvas) {
+		try {
+			this._viewerCanvasCtrl?.abort()
+		} catch {}
+		const ctrl = (this._viewerCanvasCtrl = new AbortController())
+		const { signal } = ctrl
 		const tip = this.dom.playTip
-		const canvas = this.dom.canvas
 		let hovered = false
 		const hideTip = () => {
 			hovered = false
@@ -674,17 +677,25 @@ export class Viewer {
 			if (hoverRaf) return
 			hoverRaf = requestAnimationFrame(flushHover)
 		}
-		canvas.addEventListener('pointermove', onHover)
-		canvas.addEventListener('pointerleave', () => {
-			if (hoverRaf) cancelAnimationFrame(hoverRaf)
-			hoverRaf = 0
-			hideTip()
-		})
-		canvas.addEventListener('click', event => {
-			if (this.viewerMode !== 'viewer' || !this.tableGroup || event.button !== 0) return
-			if (!hitTest(event.clientX, event.clientY)) return
-			this._switchToPlay()
-		})
+		canvas.addEventListener('pointermove', onHover, { signal })
+		canvas.addEventListener(
+			'pointerleave',
+			() => {
+				if (hoverRaf) cancelAnimationFrame(hoverRaf)
+				hoverRaf = 0
+				hideTip()
+			},
+			{ signal },
+		)
+		canvas.addEventListener(
+			'click',
+			event => {
+				if (this.viewerMode !== 'viewer' || !this.tableGroup || event.button !== 0) return
+				if (!hitTest(event.clientX, event.clientY)) return
+				this._switchToPlay()
+			},
+			{ signal },
+		)
 		const onViewerTouchEnd = event => {
 			if (this.viewerMode !== 'viewer' || !this.tableGroup) return
 			const touch = event.changedTouches?.[0]
@@ -693,8 +704,7 @@ export class Viewer {
 			this._switchToPlay()
 			event.preventDefault()
 		}
-		canvas.addEventListener('touchend', onViewerTouchEnd, { passive: false })
-		this._eventCleanups.push(() => canvas.removeEventListener('touchend', onViewerTouchEnd))
+		canvas.addEventListener('touchend', onViewerTouchEnd, { signal, passive: false })
 	}
 	async _switchToPlay() {
 		if (this.viewerMode === 'play' || !this.tableGroup) return
@@ -727,7 +737,7 @@ export class Viewer {
 		}
 		{
 			const framing = computePlayFraming(this.tableGroup)
-			syncRoom(this.scene, this.tableGroup, framing.center, framing.size)
+			syncTableRoom(this.scene, this.tableGroup, framing.center, framing.size)
 		}
 		if (!this.player) {
 			if (this.table) {
@@ -744,6 +754,14 @@ export class Viewer {
 				})
 			}
 		}
+		if (this._wantWorker && !this._workerBridge && !this._workerAttaching && this.player && !this._disposed) {
+			this._workerAttaching = true
+			try {
+				await this._ensureWorkerBridge()
+			} finally {
+				this._workerAttaching = false
+			}
+		}
 	}
 	// A failed play-load must not strand the viewer in play mode with no
 	// player: drop back to viewer chrome instead of warn-and-continue.
@@ -756,6 +774,9 @@ export class Viewer {
 	}
 	async _switchToViewer() {
 		if (this.viewerMode !== 'play' || !this.tableGroup) return
+		// Worker-owned present persists across modes: the worker follows the
+		// viewer camera via the per-frame view rows, so no teardown here.
+		if (!this._workerBridge) this._rendererBackend = 'webgpu'
 		this.viewerMode = 'viewer'
 		if (typeof history !== 'undefined' && history.state?.mode === 'play') {
 			history.back()
@@ -771,7 +792,12 @@ export class Viewer {
 			this.camera.updateProjectionMatrix()
 		}
 		if (this.tableGroup)
-			syncRoom(this.scene, this.tableGroup, target.center, (target as any).size || new THREE.Vector3(1, 1, 1))
+			syncTableRoom(
+				this.scene,
+				this.tableGroup,
+				target.center,
+				(target as any).size || new THREE.Vector3(1, 1, 1),
+			)
 		if (this.player) this.player.setPhysicsEnabled(false)
 		this.exitPlayMode()
 	}
@@ -898,7 +924,7 @@ export class Viewer {
 			const framing = this.tableGroup ? computePlayFraming(this.tableGroup) : null
 			const center = framing?.center ?? new THREE.Vector3()
 			const size = framing?.size ?? new THREE.Vector3(1000, 2000, 500)
-			syncRoom(this.scene, this.tableGroup ?? this.scene, center, size)
+			syncTableRoom(this.scene, this.tableGroup ?? this.scene, center, size)
 		}
 		const ballsNode = this.tableGroup?.getObjectByName('balls')
 		if (ballsNode) ballsNode.visible = true
@@ -909,6 +935,12 @@ export class Viewer {
 			this.dom.canvas.focus()
 		}
 		this.hookInput()
+		if (this._wantWorker && !this._workerBridge && !this._workerAttaching && !this._disposed) {
+			this._workerAttaching = true
+			this._ensureWorkerBridge().finally(() => {
+				this._workerAttaching = false
+			})
+		}
 		if (!this._blurHandler) {
 			this._blurHandler = () => {
 				for (const code of RELEASE_CODES) this._sendKey(code, false)
@@ -934,27 +966,22 @@ export class Viewer {
 	buildNodeCache() {
 		this.nodeCache.clear()
 		this._lightmapMap = new Map()
+		this._lightNames = new Set()
 		if (!this.tableGroup || !this.table) return
-		for (const name of Object.keys(this.table.items)) {
-			if (
-				this.viewerMode === 'play' &&
-				name.toLowerCase().includes('vrcab') &&
-				name.toLowerCase().includes('flipper')
-			)
-				continue
-			const item = this.table.items[name]
-			const node = this.tableGroup.getObjectByName(name) || this.tableGroup.getObjectByName(name.toLowerCase())
-			if (item?.getUpdater && node) this.nodeCache.set(name, { item, node })
+		// Shared item loop, 3-variant lookup, vrcab-flipper skip, and lightmap
+		// (see lib/render/worker/shared-scene.ts): cabinet-flipper rig nodes
+		// never carry state, so they stay out of the cache in every mode.
+		const cache = buildNodeCache(this.table, this.tableGroup)
+		for (const entry of cache.entries) {
+			if (!entry) continue
+			this.nodeCache.set(entry.name, { item: entry.item, node: entry.node })
 		}
-		for (const [primName, prim] of Object.entries(this.table.primitives ?? {})) {
-			const lm = prim?.data?.szLightmap
-			if (!lm) continue
-			const list = this._lightmapMap.get(lm)
-			if (list) list.push(primName)
-			else this._lightmapMap.set(lm, [primName])
-		}
+		this._lightmapMap = cache.lightmap
+		this._lightNames = cache.lightNames
 	}
 	handleBallLifecycle(ball, created) {
+		// Worker-owned present: the worker poses its own ball pool from ball rows.
+		if (this._workerBridge) return
 		const ballsGroup = this.tableGroup?.getObjectByName('balls')
 		if (!ballsGroup || !ball) return
 		if (created) {
@@ -993,7 +1020,7 @@ export class Viewer {
 		for (const name in states) {
 			const state = states[name]
 			if (!state) continue
-			if (this.table.lights?.[name]) changedLightNames.add(name)
+			if (this._lightNames?.has(name)) changedLightNames.add(name)
 			const entry = this.nodeCache.get(name)
 			if (!entry) continue
 			entry.item.getUpdater().applyState(entry.node, state, this.renderApi, this.table)
@@ -1211,29 +1238,34 @@ export class Viewer {
 		}
 		this._loading(78, 'Assembling cabinet…', 'Building the machine…')
 		const t0 = performance.now()
-		const node = await table.generateTableNode(renderApi, {
-			...TABLE_OPTS,
-			preloadTextures: false,
+		// One shared assembly with the worker renderer (same generate flags,
+		// same postprocess, same transmission lift, same light cull).
+		const useBatch = !new URLSearchParams(location.search).has('nobatched')
+		const {
+			node,
+			stats: ppStats,
+			batch: batchRes,
+			culled,
+		} = await assembleTableScene(renderApi, table, {
+			viewerMode: this.viewerMode,
+			harnessLog: this.harnessLog,
+			batch: useBatch,
+			maxLights: getMaxLights(),
 		})
-		try {
-			// Anchor the bulb-lift height gate to the built playfield plane:
-			// the table z=0 plane in world units, so below-table geometry
-			// sharing the playfield footprint stays dark.
-			const dim = table.getDimensions?.()
-			if (dim) {
-				node.updateWorldMatrix(true, false)
-				const surfaceY = node.localToWorld(new THREE.Vector3(0, 0, 0)).y
-				setPrimitiveTransmissionArea(dim.width, dim.height, ThreeRenderApi.SCALE, surfaceY)
-			}
-		} catch {}
-		{
-			const maxLights = getMaxLights()
-			const culled = cullExcessLights(node, maxLights)
-			if (culled)
-				this.log(
-					`[quality] ${isLowQuality() ? 'low' : 'high'} — lights ${culled.before} → ${culled.after} (culled ${culled.culled})`,
-					'debug',
-				)
+		if (culled)
+			this.log(
+				`[quality] ${isLowQuality() ? 'low' : 'high'} — lights ${culled.before} → ${culled.after} (culled ${culled.culled})`,
+				'debug',
+			)
+		if (batchRes && (batchRes.batched || batchRes.instanced) && this.harnessLog) {
+			let before = 0
+			node.traverse(o => {
+				if (o.isMesh) before++
+			})
+			this.harnessLog(
+				`[batch] BatchedMesh ${batchRes.batched} + Instanced ${batchRes.instanced} — meshes ${before}`,
+				'debug',
+			)
 		}
 		{
 			const pfLower = table.getPlayfieldMap()?.toLowerCase()
@@ -1370,6 +1402,7 @@ export class Viewer {
 		return {
 			node,
 			textures,
+			stats: ppStats,
 		}
 	}
 	async _cleanupReader(reader) {
@@ -1398,28 +1431,10 @@ export class Viewer {
 		;(globalThis as any).renderApi = this.renderApi
 		this._tableBasePos = node.position.clone()
 		this.scene.add(node)
-		const pp = postProcessScene(node, {
-			viewerMode: this.viewerMode,
-			harnessLog: this.harnessLog,
-		})
-		const params = new URLSearchParams(location.search)
-		const useBatch = !params.has('nobatched')
-		if (useBatch && table && this.renderApi) {
-			const res = _optimizeScene(node, table, this.renderApi)
-			if ((res.batched || res.instanced) && this.harnessLog) {
-				const before = (() => {
-					let c = 0
-					node.traverse(o => {
-						if (o.isMesh) c++
-					})
-					return c
-				})()
-				this.harnessLog(
-					`[batch] BatchedMesh ${res.batched} + Instanced ${res.instanced} — meshes ${before}`,
-					'debug',
-				)
-			}
-		}
+		// Content passes (generate, postprocess, transmission lift, light cull,
+		// batching) already ran in _buildScene via the shared table assembly
+		// the worker renderer uses; mount only frames, rooms, and shows.
+		const pp = (opts && (opts as any).stats) || { lightmaps: 0 }
 		this.buildNodeCache()
 		this.dmd._ensureTexture()
 		this.dmd.findMeshes()
@@ -1459,7 +1474,7 @@ export class Viewer {
 		}
 		const center = framed.center,
 			size = framed.size || new THREE.Vector3(1, 1, 1)
-		syncRoom(this.scene, node, center, size)
+		syncTableRoom(this.scene, node, center, size)
 		this._showCanvas()
 		this.log(
 			`Framed ${pp.lightmaps ? `(hid ${pp.lightmaps} lm)` : ''} — ${this.tableGroup ? countObjects(this.tableGroup) : 0} objs`.trim(),
@@ -1511,6 +1526,15 @@ export class Viewer {
 			logMem(this.harnessLog, 'Ready final')
 		} else {
 			this._loading(88, 'Finishing up…', 'Finishing up…')
+		}
+		// ?worker=render engages in viewer mode too: attach at table setup so
+		// the worker owns present from the first frame in both modes. Play
+		// entry keeps its own attach call for loads that skip table setup.
+		if (this._wantWorker && !this._workerBridge && !this._workerAttaching && this.player && !this._disposed) {
+			this._workerAttaching = true
+			void this._ensureWorkerBridge().finally(() => {
+				this._workerAttaching = false
+			})
 		}
 		if (_isDev)
 			Object.assign(window, {
@@ -1573,7 +1597,6 @@ export class Viewer {
 			this.handleBallLifecycle(ball, false)
 		})
 		this._attachSoundToPlayer()
-		void this._loadMusicParam()
 		this.player.on('emuStarted', () => {
 			this._emuStartLogged = true
 			this.log(`PinMAME emu ready: ${this.player.getPhysics().emu?.constructor.name}`)
@@ -2015,12 +2038,12 @@ export class Viewer {
 			await this._cleanupReader(reader)
 			return null
 		}
-		const { node, textures } = await this._buildScene(table)
+		const { node, textures, stats } = await this._buildScene(table)
 		if (_loadGen !== this._loadId) {
 			await this._cleanupReader(reader)
 			return null
 		}
-		const mounted = await this._mount(table, node, {}, source)
+		const mounted = await this._mount(table, node, { stats }, source)
 		if (_loadGen !== this._loadId) {
 			await this._cleanupReader(reader)
 			return mounted
@@ -2203,6 +2226,9 @@ export class Viewer {
 		// expose immediate physics tick for tests
 		;(this as any)._tickPhysicsImmediate = () => {
 			if (!this.player || this.isPaused || this.viewerMode !== 'play') return
+			// Worker-owned present: the worker drains popStates via
+			// _encodeWorkerDeltas, so this test-only tick must not steal it.
+			if (this._workerBridge) return
 			if (isLowQuality()) return
 			this.player.setPhysicsEnabled(true)
 			this.player.updatePhysics()
@@ -2229,13 +2255,18 @@ export class Viewer {
 			}
 			this._syncPhysicsTransforms(timestamp)
 			if (this.controls?.enabled) this.controls.update()
-			this._applyNudgeVisual()
+			const bridged = !!this._workerBridge
+			if (!bridged) this._applyNudgeVisual()
 			if (timestamp - lastDmd >= 32) {
 				lastDmd = timestamp
-				this._pollPinmame()
+				if (bridged) this._pollWorkerDmd()
+				else this._pollPinmame()
 			}
-			if (this.renderPipeline) this.renderPipeline.render()
-			else this.renderer.render(this.scene, this.camera)
+			if (!bridged) {
+				if (this.renderPipeline) this.renderPipeline.render()
+				else this.renderer.render(this.scene, this.camera)
+			}
+			this._publishWorkerFrame(timestamp)
 			frames++
 			if (timestamp - lastFpsUpdate > 500) {
 				fps = Math.round((frames * 1000) / (timestamp - lastFpsUpdate))
@@ -2296,6 +2327,234 @@ export class Viewer {
 		if (this.renderPipeline) this.renderPipeline.render()
 		else this.renderer?.render(this.scene, this.camera)
 	}
+	// OrbitControls listens on the canvas it was built with, but the camera
+	// object is shared — so after a canvas swap rebuild controls on the live
+	// canvas, preserving orbit target + enabled state. The published camera
+	// rows then carry viewer orbit to the worker every frame.
+	_rebindControlsToCanvas(canvas) {
+		if (!this.camera || !canvas) return
+		const prev = this.controls
+		const target = prev?.target?.clone?.() ?? new THREE.Vector3(0, 0, 0)
+		const enabled = prev ? !!prev.enabled : this.viewerMode !== 'play'
+		const damping = prev ? !!prev.enableDamping : true
+		prev?.dispose?.()
+		this.controls = new OrbitControls(this.camera, canvas)
+		this.controls.enableDamping = damping
+		this.controls.target.copy(target)
+		this.controls.update()
+		this.controls.enabled = enabled
+	}
+	// Opt-in render-worker path (?worker=render): engaged at table setup in
+	// both modes. Sim stays main-thread, frame state publishes zero-copy over
+	// SAB. The worker takes a FRESH canvas: transferControlToOffscreen is
+	// one-shot and the viewer canvas already owns a context. No fallback: any
+	// failure throws, and the canvas swap below runs only after attach
+	// succeeds so a late throw leaves the main-thread canvas and loop intact.
+	async _ensureWorkerBridge() {
+		if (this._workerBridge) return this._workerBridge
+		const caps = probeRenderCaps(this.dom.canvas)
+		if (selectRenderMode(caps) !== 'l0-shared')
+			throw new Error('Render worker needs OffscreenCanvas + SAB + isolation + WebGPU')
+		const vpx = new URLSearchParams(location.search).get('vpx')
+		if (!vpx) throw new Error('Render worker needs a ?vpx= table URL')
+		const tableUrl = new URL(vpx, location.href).href
+		const { default: workerUrl } = await import('../../lib/render/worker/render-worker.ts?worker&url')
+		const defaults = await this._loadWorkerDefaults()
+		const fresh = document.createElement('canvas')
+		{
+			const oldCanvas = this.dom.canvas
+			fresh.id = oldCanvas.id
+			fresh.tabIndex = oldCanvas.tabIndex
+			fresh.className = oldCanvas.className
+		}
+		// Orbit + viewer click-to-play + pointer input follow the live
+		// canvas (keyboard input stays window-bound). hookInput no-ops
+		// until the player exists; player creation re-hooks anyway.
+		this._rebindControlsToCanvas(fresh)
+		this._bindViewerCanvas(fresh)
+		this.hookInput()
+		const { RenderBridge } = await import('../../dist-esm/lib/render/worker/main-bridge.js')
+		// Boot has exactly one deadline: the harness waitForFunction on
+		// first stats. Explicit worker failure arrives via onBootFailure.
+		const bridge = RenderBridge.attach(fresh, {
+			workerUrl,
+			tableUrl,
+			fov: Number.isFinite(this.table?.data?.bgFov?.[0]) ? this.table.data.bgFov[0] : CAM.fov,
+			viewerMode: this.viewerMode,
+			defaults,
+			onStats: s => {
+				window.__workerStats = s
+			},
+			onBootFailure: error => {
+				bridge.dispose()
+				window.__workerFailed = `Render worker failed to boot (${error})`
+				throw new Error(window.__workerFailed)
+			},
+		})
+		// Swap only on success: a late attach throw leaves the old canvas in
+		// the DOM and dom.canvas untouched (see the no-fallback note above).
+		const oldCanvas = this.dom.canvas
+		oldCanvas.parentNode?.replaceChild(fresh, oldCanvas)
+		this.dom.canvas = fresh
+		this._workerBridge = bridge
+		this._rendererBackend = 'webgpu-worker'
+		fresh.focus()
+		window.__workerBridge = bridge
+		this._onResize()
+		this.log('Render worker active: sim on main thread, WebGPU in worker', 'info')
+		return bridge
+	}
+	// Fetch engine-default bitmaps for the worker; consumed via `seedDefaults`
+	// (keys align with `defaultTextureUrls`/`DEFAULT_TEXTURE_FILES`).
+	async _loadWorkerDefaults() {
+		const out = []
+		const loader = await import('../../dist-esm/lib/render/threejs/three-texture-loader-browser.js')
+		for (const [key, url] of Object.entries(loader.defaultTextureUrls())) {
+			const res = await fetch(url)
+			if (!res.ok) throw new Error(`Render worker default texture missing: ${key}`)
+			out.push({ name: key, bitmap: await createImageBitmap(await res.blob()) })
+		}
+		const tex = loader.createBallEnvTexture('ball.png')
+		if (tex?.image) out.push({ name: 'ball.png', bitmap: await createImageBitmap(tex.image) })
+		return out
+	}
+	_encodeWorkerDeltas(changed) {
+		this._workerDeltaCount = 0
+		const table = this.player?.table
+		if (!table || !changed) return
+		// Full lamp levels ride every frame under the changed rows: a worker
+		// that starts consuming late (or stalls) still converges on boot-settled
+		// lamp values instead of freezing at authored defaults. Catch-up rows
+		// do the same for script-settled flasher/primitive states (InitVLM GI
+		// repaints, init visibility) that the worker otherwise never sees: it
+		// boots from authored data while the main side consumed the init diff
+		// pre-attach. Changed (or injected) rows win over both nets below.
+		// Live rows encode first so an overflow clamp drops self-healing
+		// catch-up tail, never live deltas.
+		const full = {}
+		const overridden = changed.changedStates as Record<string, unknown>
+		for (const [name, item] of Object.entries(table.lights ?? {})) {
+			if (name in overridden) continue
+			const st = item?.getState?.()
+			if (!st) continue
+			const row = {}
+			for (const k of ['intensity', 'color', 'colorFull']) {
+				if (st[k] !== undefined) row[k] = st[k]
+			}
+			if (Object.keys(row).length > 0) full[name] = row
+		}
+		const mergedStates = { ...overridden } as Record<string, unknown>
+		for (const [name, row] of Object.entries({ ...collectCatchUp(table, overridden), ...full })) {
+			if (name in mergedStates) continue
+			mergedStates[name] = row
+		}
+		const merged = { changedStates: mergedStates, isEmpty: false }
+		if (this._workerIdTable !== table) {
+			// Id-map cache: names are static per table, so rebuild only on load.
+			this._workerIdOf = createNodeIdMap(workerNodeNames(table))
+			this._workerIdTable = table
+			this._workerDroppedWarned = 0
+		}
+		const scratch = this._workerScratch ?? (this._workerScratch = createBridgeScratch())
+		this._workerBallNames.clear()
+		for (const b of this.player.balls ?? []) {
+			this._workerBallNames.add(b.getName())
+		}
+		const names = this._workerBallNames
+		const dropped = { count: 0 }
+		this._workerDeltaCount = encodeChangedStates(
+			merged,
+			this._workerIdOf,
+			name => names.has(name),
+			scratch.deltas,
+			MAX_DELTAS,
+			dropped,
+		)
+		// Overflow clamps inside encode; warn once per table, re-warn on change.
+		if (dropped.count > 0 && dropped.count !== this._workerDroppedWarned) {
+			this._workerDroppedWarned = dropped.count
+			console.warn(`[viewer] worker delta overflow: dropped ${dropped.count} rows; worker scene may lag`)
+		}
+	}
+	_pollWorkerDmd() {
+		const bridge = this._workerBridge
+		if (!bridge || !this.player) return
+		const frame = this.player.getDmdFrame?.()
+		const dims = this.player.getDmdDimensions?.()
+		if (!frame?.length) return
+		const w = Math.round(dims?.x ?? 128) || 128
+		const h = Math.round(dims?.y ?? 32) || 32
+		this._workerDmdFrameId = bridge.publishDmd(frame, w, h)
+	}
+	_publishWorkerFrame(timestamp) {
+		const bridge = this._workerBridge
+		const player = this.player
+		if (!bridge || !player || this.isPaused) return
+		const scratch = this._workerScratch ?? (this._workerScratch = createBridgeScratch())
+		const phys = player.getPhysics?.()
+		const balls = player.balls ?? []
+		const n = Math.min(balls.length, MAX_BALLS)
+		const identity = [1, 0, 0, 0, 1, 0, 0, 0, 1]
+		for (let i = 0; i < n; i++) {
+			const b = balls[i]
+			const p = b?.state?.pos ?? { x: 0, y: 0, z: 0 }
+			const v = b?.hit?.vel ?? { x: 0, y: 0, z: 0 }
+			const o = i * BALL_STRIDE
+			scratch.balls[o] = p.x
+			scratch.balls[o + 1] = p.y
+			scratch.balls[o + 2] = p.z
+			scratch.balls[o + 3] = v.x
+			scratch.balls[o + 4] = v.y
+			scratch.balls[o + 5] = v.z
+			scratch.balls[o + 6] = b?.data?.radius ?? 25
+			scratch.balls[o + 7] = 1
+			const els = b?.state?.orientation?.elements ?? identity
+			for (let k = 0; k < 9; k++) scratch.balls[o + 8 + k] = els[k] ?? (k % 4 === 0 ? 1 : 0)
+		}
+		// The worker owns present in both modes: the live camera (viewer orbit
+		// included) rides view rows 0-6 (V_CAM_POS/TGT/FOV, frame-state.ts) so
+		// the worker image tracks main-thread framing, including the
+		// _animateCameraTo lerp. Fov 0 = unset (worker keeps boot framing).
+		// CSS pixels ride V_PX_W/H, cabinet offset/accel ride V_NUDGE/V_ACC.
+		const tgt = this.controls?.target
+		if (tgt && Number.isFinite(this.camera.fov)) {
+			scratch.view[V_CAM_POS] = this.camera.position.x
+			scratch.view[V_CAM_POS + 1] = this.camera.position.y
+			scratch.view[V_CAM_POS + 2] = this.camera.position.z
+			scratch.view[V_CAM_TGT] = tgt.x
+			scratch.view[V_CAM_TGT + 1] = tgt.y
+			scratch.view[V_CAM_TGT + 2] = tgt.z
+			scratch.view[V_CAM_FOV] = this.camera.fov
+			scratch.view[V_CAM_NEAR] = this.camera.near
+		} else {
+			scratch.view[V_CAM_FOV] = 0
+		}
+		const off = phys?.getCabinetOffset?.() ?? { x: 0, y: 0 }
+		const acc = phys?.getCabinetAcceleration?.() ?? { x: 0, y: 0 }
+		scratch.view[V_PX_W] = typeof window !== 'undefined' ? window.innerWidth : 800
+		scratch.view[V_PX_H] = typeof window !== 'undefined' ? window.innerHeight : 600
+		scratch.view[V_NUDGE_X] = off.x
+		scratch.view[V_NUDGE_Y] = off.y
+		scratch.view[V_ACC_X] = acc.x
+		scratch.view[V_ACC_Y] = acc.y
+		try {
+			window.__workerFrame = { deltaCount: this._workerDeltaCount, ballCount: n }
+		} catch {}
+		bridge.publishFrame({
+			simTime: phys?.timeMsec ?? 0,
+			timeSec: (phys?.timeMsec ?? 0) / 1000,
+			overallFrames: 0,
+			balls: scratch.balls,
+			ballCount: n,
+			deltas: scratch.deltas,
+			deltaCount: this._workerDeltaCount,
+			view: scratch.view,
+			vsync: 0,
+			lastPresentTick: timestamp,
+			targetLen: 1000 / 60,
+			dmdFrameId: this._workerDmdFrameId,
+		})
+	}
 
 	_pollPinmame() {
 		if (!this._emuStartLogged) {
@@ -2336,12 +2595,8 @@ export class Viewer {
 			}
 			return
 		}
-		const ampOff = 110
-		const ampAcc = 0.22
-		const tx = (off?.x ?? 0) * ampOff + (acc?.x ?? 0) * ampAcc
-		const ty = (off?.y ?? 0) * ampOff + (acc?.y ?? 0) * ampAcc
-		const scaleX = Math.max(-6, Math.min(6, tx))
-		const scaleY = Math.max(-6, Math.min(6, -ty * 0.6))
+		// Shared clamped playfield shift (see lib/render/worker/shared-scene.ts).
+		const { x: scaleX, y: scaleY } = nudgeOffset(off?.x ?? 0, off?.y ?? 0, acc?.x ?? 0, acc?.y ?? 0)
 		this.tableGroup.position.x = base.x + scaleX
 		this.tableGroup.position.y = base.y + scaleY
 		this.tableGroup.userData._nudgeApplied = true

@@ -130,6 +130,24 @@ const checks: E2ECheck[] = [
 		optional: true,
 		skipReason: 'VPX not available (child exit 77)',
 	},
+	{
+		name: 'worker-texture-caps',
+		script: 'test/harness/verify-worker-texture-caps.mjs',
+		optional: true,
+		skipReason: 'browser not runnable here',
+	},
+	{
+		name: 'worker-view-mode',
+		script: 'test/harness/verify-worker-view-mode.mjs',
+		optional: true,
+		skipReason: 'browser not runnable here',
+	},
+	{
+		name: 'worker-ab',
+		script: 'test/harness/verify-worker-ab.mjs',
+		optional: true,
+		skipReason: 'browser not runnable here',
+	},
 ]
 
 // Node-only checks safe for parallel spawn: script-driven, non-optional gates

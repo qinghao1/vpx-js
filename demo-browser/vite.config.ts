@@ -205,6 +205,9 @@ export default defineConfig({
 			},
 		},
 	],
+	// Render worker (lib/render/worker/render-worker.ts) bundles as a module worker.
+	// COOP/COEP below keep crossOriginIsolated true in dev; production must serve
+	// the same headers or the SAB fast path falls back to L1/L2.
 	worker: { format: 'es' },
 	build: { target: 'esnext', assetsInlineLimit: 0 },
 })

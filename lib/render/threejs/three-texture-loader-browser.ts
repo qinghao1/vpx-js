@@ -33,6 +33,14 @@ function defaultKeyFor(fileName: string): string {
 	return dot >= 0 ? fileName.slice(0, dot) : fileName
 }
 
+/**
+ * Absolute URLs of engine-shipped default textures, for hosts that fetch without guessing.
+ * Viewer `_loadWorkerDefaults` fetches these; the worker consumes them via `seedDefaults`.
+ */
+export function defaultTextureUrls(): Record<string, string> {
+	return { ...imageMap }
+}
+
 const imageMap: Record<string, string> = {
 	bumperbase: new URL('../../../res/maps/bumperbase.png', import.meta.url).href,
 	bumperCap: new URL('../../../res/maps/bumperCap.png', import.meta.url).href,
@@ -44,6 +52,24 @@ const imageMap: Record<string, string> = {
 	kickerT1: new URL('../../../res/maps/kickerT1.png', import.meta.url).href,
 	kickerWilliams: new URL('../../../res/maps/kickerWilliams.png', import.meta.url).href,
 }
+
+/**
+ * Canonical engine-shipped default texture file names (with extension), shared by
+ * the main-thread loader (imageMap above) and the render worker. Plain string data.
+ * The worker seeds them via `seedDefaults` (see viewer `_loadWorkerDefaults`).
+ */
+export const DEFAULT_TEXTURE_FILES: readonly string[] = [
+	'ball.png',
+	'bumperbase.png',
+	'bumperCap.png',
+	'bumperring.png',
+	'bumperskirt.png',
+	'kickerCup.png',
+	'kickerGottlieb.png',
+	'kickerHoleWood.png',
+	'kickerT1.png',
+	'kickerWilliams.png',
+]
 
 /** Worker OOM-bound rejections (fail-fast size guard), as opposed to genuine decode failures. */
 function isFloatSizeRejection(e: unknown): boolean {
@@ -283,7 +309,7 @@ export class ThreeTextureLoaderBrowser implements ITextureLoader<ThreeTexture> {
 }
 
 // POT 256×128 avoids SwiftShader failure with NPOT + Repeat + mips
-function createBallEnvTexture(name: string): ThreeTexture {
+export function createBallEnvTexture(name: string): ThreeTexture {
 	const w = 256
 	const h = 128
 	if (typeof document === 'undefined') {

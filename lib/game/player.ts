@@ -289,8 +289,7 @@ export class Player extends EventEmitter {
 
 	public setSoundEngine(engine: ISoundEngine): void {
 		this.soundEngine = engine ?? new NullSoundEngine()
-		// The host may attach its audible engine after construction (demo-browser
-		// does); re-register table samples so they survive the swap.
+		// Re-register table samples so they survive the engine swap.
 		this.table.registerTableSounds(this.soundEngine)
 	}
 
