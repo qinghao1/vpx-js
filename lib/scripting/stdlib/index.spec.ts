@@ -167,6 +167,16 @@ describe('The VBScript stdlib', () => {
 		expect(scope.result4).to.equal(-2)
 	})
 
+	it('should round Empty to 0 instead of producing NaN', () => {
+		const scope = {} as any
+		const vbs = `Dim base\nresult1 = Round(base, 0)\nDim arr(1)\nresult2 = arr(1) And &HFF`
+		const transpiler = new Transpiler(table, player)
+		transpiler.execute(vbs, scope, 'global')
+
+		expect(scope.result1).to.equal(0)
+		expect(scope.result2).to.equal(0)
+	})
+
 	it('should provide the UCase function', () => {
 		const scope = {} as any
 		const vbs = `result = UCase("abC123")`

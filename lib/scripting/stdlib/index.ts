@@ -301,9 +301,14 @@ export class Stdlib extends VbsApi {
 		return Math.round(n * 10000) / 10000
 	}
 
-	public Round(value: number, decimals = 0): number {
+	public Round(value: unknown, decimals = 0): number {
+		// Empty rounds to 0 like the other numeric conversions; without
+		// this head an Empty value coerced to NaN and poisoned downstream
+		// bitwise ops with a type mismatch.
+		const n = this.convertNumber(value)
+		if (n === undefined) return 0
 		const factor = 10 ** Math.trunc(Number(decimals) || 0)
-		return bankersRound(Number(value) * factor) / factor
+		return bankersRound(n * factor) / factor
 	}
 
 	public Cos(n: number): number {
