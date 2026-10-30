@@ -194,6 +194,44 @@ describe('The VBScript transpiler', () => {
 		expect(scope.x).to.equal(4)
 	})
 
+	it('should dispatch solenoid callbacks through an Is Nothing guard (SolCallbackRef pattern)', () => {
+		// core.vbs dispatches with `Set cb = SolCallbackRef(n)` then
+		// `If Not cb Is Nothing Then cb bstate`. The guard must compare the
+		// reference, not invoke it: invoking yields undefined, the guard
+		// takes the wrong branch, and the callback never fires with state.
+		const cb = sinon.spy()
+		const scope = { cb } as any
+		new Transpiler(table, player).execute('If Not cb Is Nothing Then cb True', scope, 'global')
+		expect(cb).to.have.been.calledOnceWithExactly(true)
+	})
+
+	it('should read function references in Is checks without invoking them', () => {
+		let calls = 0
+		const scope = { cb: () => calls++, check: undefined } as any
+		new Transpiler(table, player).execute('check = (cb Is Nothing)', scope, 'global')
+		expect(calls).to.equal(0)
+		expect(scope.check).to.equal(false)
+	})
+
+	it('should invoke parameterized Property Let on assignment LHS (sam.vbs CallBack pattern)', () => {
+		// vpmFFlipsSAM registers flipper callbacks via `CallBack(0) = aInput`,
+		// a Property Let with parameters. Lowering it to an index store
+		// writes an expando on the method instead of running the setter.
+		const scope = {} as any
+		const vbs = `Class Box\nPublic stored\nPublic Property Let Slot(aIdx, aInput)\nMe.stored = aInput\nEnd Property\nEnd Class\nDim b\nSet b = New Box\nb.Slot(0) = 42\nResult = b.stored\n`
+		new Transpiler(table, player).execute(vbs, scope, 'global')
+		expect(scope.Result).to.equal(42)
+	})
+
+	it('should keep indexed member writes on assignment LHS (Controller.Switch pattern)', () => {
+		// Non-function members keep the index-store form: VPM indexed
+		// properties (`Controller.Switch(17) = True`) and plain arrays must
+		// not be invoked.
+		const scope = { box: { items: [0, 0] } } as any
+		new Transpiler(table, player).execute('box.items(1) = 7', scope, 'global')
+		expect(scope.box.items[1]).to.equal(7)
+	})
+
 	it('should throw instead of silently succeeding when the script defines no play function', () => {
 		const stalePlay = sinon.spy()
 		const prevPlay = (globalThis as any).play

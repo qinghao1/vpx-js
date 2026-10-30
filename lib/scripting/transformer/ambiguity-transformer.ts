@@ -2,10 +2,10 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { replace } from 'estraverse'
-import type { CallExpression, Expression, MemberExpression, Program } from 'estree'
+import type { CallExpression, Expression, Identifier, MemberExpression, Program } from 'estree'
 import type { EnumsApi } from '../../vpt/enums.js'
 import type { GlobalApi } from '../../vpt/global-api.js'
-import { callExpression, identifier, literal, memberExpression } from '../estree.js'
+import { arrayExpression, callExpression, identifier, literal, memberExpression } from '../estree.js'
 import type { Stdlib } from '../stdlib/index.js'
 import { Transformer } from './transformer.js'
 
@@ -58,6 +58,9 @@ export class AmbiguityTransformer extends Transformer {
 	public transform(): Program {
 		return replace(this.ast, {
 			enter: (node, parent: any) => {
+				if (node.type === 'AssignmentExpression') {
+					return this.transformSetAssignment(node, parent) ?? node
+				}
 				if (node.type === 'CallExpression') {
 					return this.transformCallExpression(node, parent)
 				}
@@ -67,6 +70,27 @@ export class AmbiguityTransformer extends Transformer {
 				return node
 			},
 		}) as Program
+	}
+
+	/**
+	 * Rewrites a parameterized call on an assignment LHS (`X(a) = v`) to a
+	 * runtime-dispatched `setOrCall`: a function member is a parameterized
+	 * `Property Let` and runs with the value appended, anything else
+	 * index-stores. Bare-name callees keep the plain index-store form below.
+	 */
+	private transformSetAssignment(node: any, _parent: any): Expression | undefined {
+		const left = node?.left
+		if (!left || left.type !== 'CallExpression') return undefined
+		const callee = left.callee
+		if (!callee || callee.type !== 'MemberExpression') return undefined
+		if (callee.property?.type !== 'Identifier' || callee.computed) return undefined
+		if (!Array.isArray(left.arguments) || left.arguments.length < 1) return undefined
+		return callExpression(memberExpression(identifier(Transformer.VBSHELPER_NAME), identifier('setOrCall')), [
+			callee.object as Expression,
+			literal(callee.property.name),
+			arrayExpression(left.arguments as Expression[]),
+			node.right as Expression,
+		])
 	}
 
 	/** Whether a name is a known namespace object (`__items`, `__enums`, ...) rather than a VBS value. */
@@ -212,6 +236,15 @@ export class AmbiguityTransformer extends Transformer {
 			return node
 		}
 
+		// A bare scope variable feeding `Is` compares the reference itself, so
+		// read it without invoking: a function held by the variable (e.g. the
+		// `Set cb = ...` / `If Not cb Is Nothing Then cb bstate` solenoid
+		// dispatch in core.vbs) would otherwise fire with no arguments, yield
+		// undefined, and skip the guarded call.
+		if (isIsOperand(node, parent)) {
+			return getRef(node)
+		}
+
 		// otherwise we don't know. so eval runtime
 		return getOrCall(node)
 	}
@@ -245,6 +278,45 @@ function getValue(obj: unknown, ast: MemberExpression, path: string[] = []): unk
 		return o
 	}
 	return undefined
+}
+
+/**
+ * Whether a member read is a direct operand of an `__vbs.is(...)` check.
+ * Only bare scope-variable reads (`__scope.name`) qualify: member reads on
+ * other objects are property accesses (whose getters must run), and reads
+ * with call arguments are real calls — both keep the invoking form.
+ */
+function isIsOperand(node: MemberExpression, parent: any): boolean {
+	if (parent?.type !== 'CallExpression' || parent.callee === node) return false
+	const callee = parent.callee as MemberExpression
+	if (callee?.type !== 'MemberExpression') return false
+	const helper = callee.object as Identifier
+	const method = callee.property as Identifier
+	if (helper?.type !== 'Identifier' || helper.name !== Transformer.VBSHELPER_NAME) return false
+	if (method?.type !== 'Identifier' || method.name !== 'is') return false
+	const obj = node.object as Identifier
+	const prop = node.property as Identifier
+	return (
+		obj?.type === 'Identifier' &&
+		obj.name === Transformer.SCOPE_NAME &&
+		prop?.type === 'Identifier' &&
+		!node.computed
+	)
+}
+
+/**
+ * Creates a callExpression to the non-invoking "getRef" vbs-helper
+ * (see `VbsHelper.getRef`). Twin of {@link getOrCall} for reference positions.
+ * @param callee Object
+ */
+function getRef(callee: MemberExpression): CallExpression {
+	if (callee.property.type === 'Identifier') {
+		return callExpression(memberExpression(identifier(Transformer.VBSHELPER_NAME), identifier('getRef')), [
+			callee.object as Expression,
+			literal(callee.property.name),
+		])
+	}
+	return getOrCall(callee)
 }
 
 /**

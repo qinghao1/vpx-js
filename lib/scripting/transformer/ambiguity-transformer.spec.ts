@@ -30,10 +30,15 @@ describe('The scripting ambiguity transformer', () => {
 			expect(js).to.equal(`eval(${Transformer.VBSHELPER_NAME}.transpileInline('Dim x'));`)
 		})
 
-		it('should not use the helper for assignments', () => {
+		it('should dispatch assignments through setOrCall', () => {
+			// Parameterized calls on an assignment LHS route through
+			// setOrCall: functions (parameterized Property Let) run with the
+			// value appended, anything else index-stores like before.
 			const vbs = `rolling(0) = False\n`
 			const js = transpiler.transpile(vbs)
-			expect(js).to.equal(`${Transformer.SCOPE_NAME}.rolling[0] = false;`)
+			expect(js).to.equal(
+				`${Transformer.VBSHELPER_NAME}.setOrCall(${Transformer.SCOPE_NAME}, 'rolling', [0], false);`,
+			)
 		})
 
 		it('should not use the helper for known calls', () => {
@@ -70,7 +75,7 @@ describe('The scripting ambiguity transformer', () => {
 			const vbs = `dim result(1, 1, 1)\nresult(0, 0, 0) = 42`
 			const js = transpiler.transpile(vbs)
 			expect(js).to.equal(
-				`${Transformer.SCOPE_NAME}.result = ${Transformer.VBSHELPER_NAME}.dim([\n    1,\n    1,\n    1\n]);\n${Transformer.SCOPE_NAME}.result[0][0][0] = 42;`,
+				`${Transformer.SCOPE_NAME}.result = ${Transformer.VBSHELPER_NAME}.dim([\n    1,\n    1,\n    1\n]);\n${Transformer.VBSHELPER_NAME}.setOrCall(${Transformer.SCOPE_NAME}, 'result', [\n    0,\n    0,\n    0\n], 42);`,
 			)
 		})
 

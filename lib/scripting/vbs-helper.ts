@@ -417,6 +417,59 @@ export class VBSHelper {
 		return this.invokeOrTraverse(value, parent as object, params)
 	}
 
+	/**
+	 * Reads a scope variable without invoking it when it holds a function.
+	 *
+	 * Traverse-only twin of {@link getOrCallBound} for reference positions —
+	 * `Is`/`IsNot` operands — where VBScript compares the reference itself.
+	 * A bare read through {@link getOrCallBound} would invoke a function
+	 * value with no arguments (e.g. the `Set cb = ...` / `If Not cb Is
+	 * Nothing Then cb bstate` solenoid dispatch in core.vbs), yielding
+	 * undefined and skipping the guarded call.
+	 */
+	public getRef(parent: Record<string, unknown> | null | undefined, prop: string): unknown {
+		if (parent === null) {
+			ERR.Raise(new VbsError(`Invalid use of Null: ${prop}`, 94))
+			return VBSHelper.UNDEFINED
+		}
+		if (this.isUndef(parent)) return VBSHelper.UNDEFINED
+		const value: unknown = (parent as Record<string, unknown>)[prop]
+		if (value === undefined || (value as unknown as Record<symbol, unknown>)?.[UNDEF] === true) {
+			return VBSHelper.UNDEFINED
+		}
+		return this.traverse(value, [])
+	}
+
+	/**
+	 * Assignment to a parameterized call target (`X(a) = v`).
+	 *
+	 * When the member holds a function it is a parameterized `Property Let`
+	 * and runs with the assigned value appended (`CallBack(0) = aInput` in
+	 * sam.vbs registers the flipper callback); otherwise the value
+	 * index-stores exactly like the plain `X[a] = v` form (VPM indexed
+	 * properties such as `Controller.Switch(17) = True`, plain arrays).
+	 */
+	public setOrCall(obj: unknown, prop: string, args: unknown[], value: unknown): unknown {
+		if (obj === null) {
+			ERR.Raise(new VbsError(`Invalid use of Null: ${prop}`, 94))
+			return VBSHelper.UNDEFINED
+		}
+		if (obj === undefined || this.isUndef(obj)) {
+			ERR.Raise(new VbsError(`Object required: ${prop}`, 424))
+			return VBSHelper.UNDEFINED
+		}
+		const target = (obj as Record<string, unknown>)[prop]
+		if (typeof target === 'function') {
+			return Reflect.apply(target as (...a: unknown[]) => unknown, obj, [...args, value])
+		}
+		let container = target as Record<PropertyKey, unknown>
+		for (let i = 0; i < args.length - 1; i++) {
+			container = container[args[i] as PropertyKey] as Record<PropertyKey, unknown>
+		}
+		container[args[args.length - 1] as PropertyKey] = value
+		return value
+	}
+
 	private invokeOrTraverse(value: unknown, receiver: object, params: unknown[]): unknown {
 		if (typeof value === 'function') {
 			if (value === Array) return Array.of(...params)
