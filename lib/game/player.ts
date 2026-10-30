@@ -385,3 +385,24 @@ export class ChangedStates<STATE extends ItemState = ItemState> {
  * `release()` no-ops on it by identity.
  */
 const EMPTY_CHANGED_STATES = new ChangedStates<ItemState>()
+
+/**
+ * Best-effort boot for the scene mount: construct plus script init as one
+ * step. A throwing table script resolves null (logged once, with the cause)
+ * instead of rejecting — the caller keeps presenting the built scene
+ * viewer-only and retries strict creation on play entry.
+ */
+export const tryBootPlayer = async (
+	table: Table,
+	gate: AnimationGate = animationGate,
+	log: (message: string, level?: string) => void = () => {},
+): Promise<Player | null> => {
+	try {
+		const player = new Player(table, gate)
+		await player.initAsync()
+		return player
+	} catch (error) {
+		log(`Player init failed: ${(error as Error)?.message ?? error} — showing table without game logic`, 'error')
+		return null
+	}
+}

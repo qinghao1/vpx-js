@@ -5,7 +5,7 @@
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import * as THREE from 'three/webgpu'
 import { WebSoundEngine } from '../../dist-esm/lib/audio/web-sound-engine.js'
-import { Player } from '../../dist-esm/lib/game/player.js'
+import { tryBootPlayer } from '../../dist-esm/lib/game/player.js'
 import { BrowserBinaryReader } from '../../dist-esm/lib/io/binary-reader.js'
 import { isWasmReady } from '../../dist-esm/lib/physics/wasm/kernels.js'
 import { setGlobalEmissionScale } from '../../dist-esm/lib/render/threejs/material-shared.js'
@@ -1506,7 +1506,16 @@ export class Viewer {
 		if (!opts.skipPlayer) {
 			this._loading(92, 'Almost ready…', 'Starting game logic…')
 			await new Promise(r => setTimeout(r, 0))
-			await this._createPlayer()
+			try {
+				await this._createPlayer()
+			} catch {
+				// A broken table script must not unmount a successfully built
+				// scene: stay viewer-only so the table still renders and
+				// orbits. Play entry retries creation on demand. The script
+				// cause is already logged by the boot above.
+				this.player = null
+				this._revertFailedPlay()
+			}
 			this._loading(100, 'Ready!', 'Ready to play')
 			if (this.dom.loadTitle)
 				this.dom.loadTitle.textContent =
@@ -1553,11 +1562,15 @@ export class Viewer {
 	}
 	async _createPlayer() {
 		if (this.player) this.player.removeAllListeners?.()
-		this.player = new Player(this.table, (this.gate ??= new AnimationGate()))
+		// Never keep a stale or half-initialized player: a throw below must
+		// leave `player` null so the loop treats the table as scriptless.
+		this.player = null
+		const booted = await tryBootPlayer(this.table, (this.gate ??= new AnimationGate()), this.log.bind(this))
+		// Strict here: play entry catches and reverts, the initial mount
+		// catches and stays viewer-only. The script cause is logged above.
+		if (!booted) throw new Error('Player init failed')
+		this.player = booted
 		this.player.setPhysicsEnabled(this.viewerMode === 'play')
-		const activePlayer = this.player
-		if (typeof activePlayer.initAsync === 'function') await activePlayer.initAsync()
-		else this.player.init()
 		this.nodeCache.clear()
 		this.buildNodeCache()
 		let ballsGroup = this.tableGroup?.getObjectByName('balls')
