@@ -156,7 +156,14 @@ export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, Poin
 		obj.matrix.copy(ThreeRenderApi._scratchM4)
 		obj.matrix.decompose(obj.position, obj.quaternion, obj.scale)
 		obj.updateMatrix()
-		obj.updateMatrixWorld(true)
+		// Flag only; world matrices recompute in flushMatrixUpdates.
+		obj.matrixWorldNeedsUpdate = true
+	}
+
+	public flushMatrixUpdates(root: Object3D | undefined): void {
+		if (!root) return
+		// Unforced: only flagged subtrees recompute; clean branches are skipped.
+		root.updateMatrixWorld()
 	}
 
 	public applyVisibility(isVisible: boolean | number, obj: Object3D): void {

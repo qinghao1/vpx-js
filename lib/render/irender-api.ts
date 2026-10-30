@@ -61,6 +61,19 @@ export interface IRenderApi<NODE, GEOMETRY, POINT_LIGHT> {
 	applyMatrixToNode(matrix: Matrix3D, node: NODE | undefined): void
 
 	/**
+	 * Recomputes world matrices for the subtree in a single deferred pass.
+	 *
+	 * `applyMatrixToNode` only refreshes the local matrix and flags the node
+	 * dirty, so per-frame updaters never pay a subtree walk per item. The host
+	 * calls this once per frame (when anything moved) before presenting.
+	 * Optional for backward compatibility: hosts fall back to presenting
+	 * directly (the renderer updates world matrices itself) when missing.
+	 *
+	 * @param root Subtree root to refresh. Does nothing if not set.
+	 */
+	flushMatrixUpdates?(root: NODE | undefined): void
+
+	/**
 	 * @param mesh Must contain the same number of vertices as the node.
 	 */
 	applyMeshToNode(mesh: Mesh, node: NODE | undefined): void

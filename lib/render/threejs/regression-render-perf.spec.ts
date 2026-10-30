@@ -74,4 +74,56 @@ describe('regression: render hotpath zero-allocation', () => {
 		gen.applyLighting(LightState.claim('solo', 10, 0x00ff00, 0x00ff00), solo)
 		expect(soloLight.intensity).toBe(10)
 	})
+
+	it('applyMatrixToNode defers the world-matrix walk to flushMatrixUpdates', () => {
+		const api = new ThreeRenderApi()
+		const root = new THREE.Group()
+		root.position.set(10, 0, 0)
+		root.updateMatrix()
+		const child = new THREE.Group()
+		child.matrixAutoUpdate = false
+		root.add(child)
+		root.updateMatrixWorld(true)
+		const m = Matrix3D.claim()
+		m.identity()
+		m.elements[12] = 100
+		m.elements[13] = 200
+		m.elements[14] = 50
+		api.applyMatrixToNode(m, child)
+		Matrix3D.release(m)
+		// local matrix refreshes synchronously (position/quaternion/scale)…
+		expect(child.position.x).toBe(100)
+		// …but no subtree walk runs: the node is only flagged dirty and the
+		// world matrix still holds the pre-update composition (10, 0, 0).
+		expect(child.matrixWorldNeedsUpdate).toBe(true)
+		const stale = new THREE.Vector3().setFromMatrixPosition(child.matrixWorld)
+		expect(stale.x).toBe(10)
+		// a second dirty node must not force a second walk either
+		const sibling = new THREE.Group()
+		sibling.matrixAutoUpdate = false
+		root.add(sibling)
+		const m2 = Matrix3D.claim()
+		m2.identity()
+		m2.elements[12] = 1
+		api.applyMatrixToNode(m2, sibling)
+		Matrix3D.release(m2)
+		expect(sibling.matrixWorldNeedsUpdate).toBe(true)
+		// one root flush recomposes every dirty subtree: parent * local
+		api.flushMatrixUpdates(root)
+		expect(child.matrixWorldNeedsUpdate).toBe(false)
+		expect(sibling.matrixWorldNeedsUpdate).toBe(false)
+		const p = new THREE.Vector3().setFromMatrixPosition(child.matrixWorld)
+		expect(p.x).toBe(110)
+		expect(p.y).toBe(200)
+		expect(p.z).toBe(50)
+		const q = new THREE.Vector3().setFromMatrixPosition(sibling.matrixWorld)
+		expect(q.x).toBe(11)
+		expect(q.y).toBe(0)
+		expect(q.z).toBe(0)
+	})
+
+	it('flushMatrixUpdates tolerates a missing root', () => {
+		const api = new ThreeRenderApi()
+		expect(() => api.flushMatrixUpdates(undefined)).not.toThrow()
+	})
 })

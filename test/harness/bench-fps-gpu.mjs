@@ -68,28 +68,31 @@ async function runLeg(mode) {
 			durMs =>
 				new Promise(resolve => {
 					const r = window.viewer?.renderer
-					// WebGPURenderer (current backend): counters live on info.frame /
-					// info.render.{drawCalls,triangles}; info.render.calls counts render
-					// contexts, not draws. Legacy WebGLRenderer nests frame under
-					// info.render.frame. Support both.
-					const frameOf = () => r?.info?.frame ?? r?.info?.render?.frame ?? null
-					const f0 = frameOf()
+					// Per-tick presents (not rAF ticks): info.reset() zeroes render.frameCalls
+					// every tick, so end-of-window reads miss skipped frames; count ticks with
+					// frameCalls > 0 and sum their draws/tris instead.
 					let frames = 0
+					let presents = 0
+					let draws = 0
+					let tris = 0
 					const t0 = performance.now()
 					const tick = () => {
 						frames++
+						const renderInfo = r?.info?.render ?? {}
+						const frameCalls = renderInfo.frameCalls ?? 0
+						if (frameCalls > 0) {
+							presents++
+							draws += renderInfo.drawCalls ?? 0
+							tris += renderInfo.triangles ?? 0
+						}
 						if (performance.now() - t0 < durMs) requestAnimationFrame(tick)
 						else {
-							const elapsed = performance.now() - t0
-							const f1 = frameOf()
-							const ren = r?.info?.render ?? {}
 							resolve({
 								frames,
-								elapsedMs: Math.round(elapsed),
-								f0,
-								f1,
-								calls: ren.drawCalls ?? ren.calls ?? r?.info?.calls ?? 0,
-								tris: ren.triangles ?? 0,
+								elapsedMs: Math.round(performance.now() - t0),
+								presents,
+								draws,
+								tris,
 							})
 						}
 					}
@@ -113,15 +116,16 @@ async function runLeg(mode) {
 	await page.close().catch(() => {})
 	if (m.error) return { mode, ok: false, reason: m.error }
 	const fpsRaf = Math.round((m.frames * 1000) / m.elapsedMs)
-	const fpsInfo = m.f0 != null && m.f1 != null ? +(((m.f1 - m.f0) * 1000) / m.elapsedMs).toFixed(1) : null
+	const fpsPresents = +(((m.presents ?? 0) * 1000) / m.elapsedMs).toFixed(1)
 	return {
 		mode,
 		ok: true,
 		fpsRaf,
-		fpsInfo,
+		fpsPresents,
 		frames: m.frames,
+		presents: m.presents ?? 0,
 		elapsedMs: m.elapsedMs,
-		draws: m.calls,
+		draws: m.draws,
 		tris: m.tris,
 		gl,
 	}
@@ -131,7 +135,7 @@ const results = []
 for (const mode of legs) {
 	const r = await runLeg(mode)
 	console.log(
-		`[fps-gpu] leg=${r.mode} ${r.ok ? `fpsRaf=${r.fpsRaf} fpsInfo=${r.fpsInfo} frames=${r.frames}/${r.elapsedMs}ms draws=${r.draws} tris=${r.tris}` : `FAIL ${r.reason}`} gl=${r.gl ?? ''}`,
+		`[fps-gpu] leg=${r.mode} ${r.ok ? `fpsRaf=${r.fpsRaf} presents=${r.presents ?? '?'} fps=${r.fpsPresents} frames=${r.frames}/${r.elapsedMs}ms draws=${r.draws} tris=${r.tris}` : `FAIL ${r.reason}`} gl=${r.gl ?? ''}`,
 	)
 	results.push(r)
 }

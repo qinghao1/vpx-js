@@ -209,6 +209,7 @@ export class Viewer {
 		this._animRaf = null
 		this._animTimeout = null
 		this._emuStartLogged = false
+		this.invalidate()
 		this._streamId = 0
 		this._loadId = 0
 		this._cameraGen = 0
@@ -583,15 +584,19 @@ export class Viewer {
 	}
 
 	private _syncPhysicsTransforms(_timestamp) {
-		if (!this.player) return
+		if (!this.player) return false
 		this.player.setPhysicsEnabled(this.viewerMode === 'play')
 		this.player.updatePhysics()
 		if (this.viewerMode !== 'play' || !this.isPaused) {
 			this.player.updateAnimations(this.player.getGameTime())
 			const changed = this.player.popStates()
-			if (!changed.isEmpty) this.applyChangedStates(changed)
-			else changed.release()
+			if (!changed.isEmpty) {
+				this.applyChangedStates(changed)
+				return true
+			}
+			changed.release()
 		}
+		return false
 	}
 
 	stopLoop() {
@@ -611,6 +616,7 @@ export class Viewer {
 		this._animateCameraTo(state, CAM_ANIM.durationReset)
 	}
 	_onResize() {
+		this.invalidate()
 		const width = typeof window !== 'undefined' ? window.innerWidth : 800
 		const height = typeof window !== 'undefined' ? window.innerHeight : 600
 		this.camera.aspect = width / height
@@ -849,6 +855,10 @@ export class Viewer {
 		const start = performance.now()
 		return new Promise(resolve => {
 			const tick = () => {
+				// Every tick mutates the camera outside the gated loop, so
+				// force the next present (covers the final pose too, which
+				// lands after _cameraRaf is cleared).
+				this.invalidate()
 				if (_gen !== this._cameraGen) {
 					this.gate.endAnimation()
 					this.controls.enableDamping = prevDamping
@@ -891,6 +901,7 @@ export class Viewer {
 		})
 	}
 	enterPlayMode() {
+		this.invalidate()
 		if (this.renderer) this.renderer.shadowMap.enabled = false
 		if (this.controls) this.controls.enabled = false
 		if (this.tableGroup) hideCabFlippers(this.tableGroup)
@@ -920,6 +931,7 @@ export class Viewer {
 		}
 	}
 	exitPlayMode() {
+		this.invalidate()
 		if (this.player) {
 			for (const code of this._touchMap.values()) this._sendKey(code, false)
 			this._touchMap.clear()
@@ -1034,6 +1046,7 @@ export class Viewer {
 					matGen?.resolvePendingInScene(this.tableGroup)
 					matGen?.resolvePendingTextures?.()
 					this._patchCloned?.()
+					this.invalidate()
 				}
 				this._demandWarned ??= new Set()
 				for (const name of missing) {
@@ -2200,6 +2213,16 @@ export class Viewer {
 			fps = 0
 		let lastFpsUpdate = performance.now()
 		let lastDmd = 0
+		// Rolls the fps window on expiry. Presented frames record the measured
+		// rate first; skipped frames just reset, so the next present measures
+		// a live rate instead of averaging in the idle gap.
+		const rollFpsWindow = (timestamp: number, presented: boolean): boolean => {
+			if (timestamp - lastFpsUpdate <= 500) return false
+			if (presented) fps = Math.round((frames * 1000) / (timestamp - lastFpsUpdate))
+			lastFpsUpdate = timestamp
+			frames = 0
+			return true
+		}
 		// expose immediate physics tick for tests
 		;(this as any)._tickPhysicsImmediate = () => {
 			if (!this.player || this.isPaused || this.viewerMode !== 'play') return
@@ -2211,6 +2234,7 @@ export class Viewer {
 			if (!changed.isEmpty) {
 				this.applyChangedStates(changed)
 				if (!this._disposed) {
+					this.renderApi?.flushMatrixUpdates?.(this.tableGroup)
 					if (this.renderPipeline) this.renderPipeline.render()
 					else this.renderer.render(this.scene, this.camera)
 				}
@@ -2218,29 +2242,52 @@ export class Viewer {
 		}
 		this.renderer.setAnimationLoop((timestamp, frame) => {
 			if (this._disposed || this.isPaused) return
-			if (this.table && !(this as any)._skipTrans) {
+			// Dirty-gated present: every flag below reports whether anything
+			// visible changed; idle frames skip the present (and its
+			// scene-wide matrix pass) entirely. Physics still steps every
+			// frame above — only the GPU present is gated.
+			// A changed transmission buffer alters BDL shading, so it presents
+			// like any other change. The idle-frame scan itself is cheap
+			// (numeric-signature fast path, no string/splat work).
+			const transmissionDirty = (() => {
+				if (!this.table || (this as any)._skipTrans) return false
 				try {
-					// updateTransmissionBuffer reports whether anything changed; the
-					// full-buffer half-float debug scan only runs on change.
-					if (updateTransmissionBuffer(this.table as never)) {
-						;(window as unknown as Record<string, unknown>).__transDebug = getTransmissionDebug()
-					}
-				} catch {}
+					return updateTransmissionBuffer(this.table as never)
+				} catch {
+					return false
+				}
+			})()
+			if (transmissionDirty) {
+				;(window as unknown as Record<string, unknown>).__transDebug = getTransmissionDebug()
 			}
-			this._syncPhysicsTransforms(timestamp)
-			if (this.controls?.enabled) this.controls.update()
-			this._applyNudgeVisual()
+			const stateDirty = this._syncPhysicsTransforms(timestamp)
+			const controlsDirty = this.controls?.enabled ? !!this.controls.update() : false
+			const cameraDirty = !!this._cameraRaf
+			const nudgeDirty = this._applyNudgeVisual()
+			let dmdDirty = false
 			if (timestamp - lastDmd >= 32) {
 				lastDmd = timestamp
-				this._pollPinmame()
+				dmdDirty = this._pollPinmame()
 			}
+			const forcePresent = this._needsRender
+			this._needsRender = false
+			const dirty =
+				stateDirty ||
+				controlsDirty ||
+				cameraDirty ||
+				nudgeDirty ||
+				dmdDirty ||
+				transmissionDirty ||
+				forcePresent
+			if (!dirty) {
+				rollFpsWindow(timestamp, false)
+				return
+			}
+			if (stateDirty || nudgeDirty) this.renderApi?.flushMatrixUpdates?.(this.tableGroup)
 			if (this.renderPipeline) this.renderPipeline.render()
 			else this.renderer.render(this.scene, this.camera)
 			frames++
-			if (timestamp - lastFpsUpdate > 500) {
-				fps = Math.round((frames * 1000) / (timestamp - lastFpsUpdate))
-				lastFpsUpdate = timestamp
-				frames = 0
+			if (rollFpsWindow(timestamp, true)) {
 				if (this.dom.stats) {
 					const balls = this.player?.balls.length ?? 0
 					const t = this.player?.getPhysics()?.timeMsec ?? 0
@@ -2292,12 +2339,21 @@ export class Viewer {
 		})
 	}
 
-	render() {
-		if (this.renderPipeline) this.renderPipeline.render()
-		else this.renderer?.render(this.scene, this.camera)
+	_needsRender = false
+
+	/** Requests one gated-loop present (mode switch, resize, camera tick, demand texture). Immediate render() also clears it. */
+	invalidate(): void {
+		this._needsRender = true
 	}
 
-	_pollPinmame() {
+	render() {
+		this.renderApi?.flushMatrixUpdates?.(this.tableGroup)
+		if (this.renderPipeline) this.renderPipeline.render()
+		else this.renderer?.render(this.scene, this.camera)
+		this._needsRender = false
+	}
+
+	_pollPinmame(): boolean {
 		if (!this._emuStartLogged) {
 			const emu = this.player?.getPhysics()?.emu
 			if (emu) {
@@ -2305,12 +2361,12 @@ export class Viewer {
 				this.log(`PinMAME emu started: ${emu.constructor.name} ${emu.getVersion?.() ?? ''}`)
 			}
 		}
-		this.dmd.render()
+		return this.dmd.render()
 	}
 	_applyNudgeVisual() {
-		if (!this.tableGroup || !this.player || this.viewerMode !== 'play') return
+		if (!this.tableGroup || !this.player || this.viewerMode !== 'play') return false
 		const phys = this.player.getPhysics?.()
-		if (!phys) return
+		if (!phys) return false
 		if (!this._tableBasePos) {
 			this._tableBasePos = this.tableGroup.position.clone()
 		}
@@ -2320,6 +2376,9 @@ export class Viewer {
 		const hasOff = off && (Math.abs(off.x) > 1e-4 || Math.abs(off.y) > 1e-4)
 		const hasAcc = acc && (Math.abs(acc.x) > 1e-3 || Math.abs(acc.y) > 1e-3)
 		if (!hasOff && !hasAcc) {
+			// Still dirty while the table eases back to its base pose; settled
+			// once the pose matches and the flag clears.
+			let settling = false
 			if (this.tableGroup.userData._nudgeApplied) {
 				this.tableGroup.position.x += (base.x - this.tableGroup.position.x) * 0.15
 				this.tableGroup.position.y += (base.y - this.tableGroup.position.y) * 0.15
@@ -2328,13 +2387,14 @@ export class Viewer {
 					this.tableGroup.position.y = base.y
 					this.tableGroup.userData._nudgeApplied = false
 				}
+				settling = this.tableGroup.userData._nudgeApplied === true
 			}
 			const wrap = this.dom.wrap
 			if (wrap) {
 				wrap.classList.remove('is-nudging')
 				wrap.style.removeProperty('--nudge-transform')
 			}
-			return
+			return settling
 		}
 		const ampOff = 110
 		const ampAcc = 0.22
@@ -2356,6 +2416,7 @@ export class Viewer {
 				wrap.style.removeProperty('--nudge-transform')
 			}
 		}
+		return true
 	}
 	_nudge(angle, force = 2.6) {
 		if (!this.player || this.viewerMode !== 'play' || this.isPaused) return

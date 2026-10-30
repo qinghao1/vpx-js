@@ -62,6 +62,7 @@ export class BallUpdater extends ItemUpdater<BallState> {
 		} finally {
 			Matrix3D.release(orient, trans, scale, mat)
 		}
-		;(obj as unknown as { updateMatrixWorld?: (f: boolean) => void }).updateMatrixWorld?.(true)
+		// World-matrix refresh is the backend's job: applyMatrixToNode flags
+		// the node per the IRenderApi contract and the host flushes once.
 	}
 }

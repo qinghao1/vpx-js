@@ -6,6 +6,10 @@ import { pass, uniform } from 'three/tsl'
 import * as THREE from 'three/webgpu'
 import { clampExposure, resolveToneMapping } from './tone-mapping.js'
 
+/** Bloom blur-chain scale: 0.5 at full quality, 0.25 at low quality. */
+const BLOOM_SCALE_FULL = 0.5
+const BLOOM_SCALE_LOW = 0.25
+
 export interface PipelineConfig {
 	exposure?: number
 	toneMapper?: number
@@ -55,6 +59,9 @@ export class VpxRenderPipeline {
 				config.bloomRadius ?? 0.4,
 				config.bloomThreshold ?? 0.85,
 			)
+			try {
+				bloomNode?.setResolutionScale?.(config.lowQuality ? BLOOM_SCALE_LOW : BLOOM_SCALE_FULL)
+			} catch {}
 			compositeNode = compositeNode.add(bloomNode)
 		}
 

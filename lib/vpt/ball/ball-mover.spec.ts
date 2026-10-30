@@ -91,6 +91,12 @@ describe('The VPinball ball physics', () => {
 		expect(ball.getState().pos.z).to.be.below(50)
 	})
 
+	it('should tolerate a missing scene node when applying ball state', () => {
+		const ball = createBall(player, 500, 500, 0)
+		player.updatePhysics(0)
+		expect(() => ball.getUpdater().applyState(undefined as any, ball.getState(), renderApi, table)).not.to.throw()
+	})
+
 	it('should apply the mesh transformation', async () => {
 		// create scene
 		const scene = await loadScene(table)

@@ -386,11 +386,13 @@ export class DmdRenderer {
 		this.viewer.dmdMeshes = this.meshes
 	}
 
+	/** True when the frame visibly changed (hash or size) and the viewer should present. */
 	updateFrame(rawFrame, width, height) {
-		if (!rawFrame || rawFrame.length < width * height) return
+		if (!rawFrame || rawFrame.length < width * height) return false
 		// delegate bit-depth hashing & texture upload to shared controller
 		const prevW = this.w,
 			prevH = this.h
+		const before = this._controller?.lastHash ?? this.lastHash
 		this._controller.updateFrame(rawFrame, width, height)
 		// sync handles if controller reallocated (mutates in place so usually no change)
 		this.dataTexture = this._controller.getTexture()
@@ -403,19 +405,21 @@ export class DmdRenderer {
 		this.viewer.dmdW = width
 		this.viewer.dmdH = height
 		// mirror hash for dedup check
-		this.lastHash = (this._controller as any).lastHash ?? this.lastHash
+		this.lastHash = this._controller?.lastHash ?? this.lastHash
 		if (prevW !== width || prevH !== height) this._syncViewerTexture()
+		return this.lastHash !== before || prevW !== width || prevH !== height
 	}
 
+	/** True when the DMD visibly changed; feeds the viewer's dirty-gated present. */
 	render() {
-		if (!this.viewer.player) return
+		if (!this.viewer.player) return false
 		const frame = this.viewer.player.getDmdFrame?.()
 		const dims = this.viewer.player.getDmdDimensions?.()
-		if (!frame?.length) return
+		if (!frame?.length) return false
 		const w = Math.round(dims?.x ?? DMD.w) || DMD.w
 		const h = Math.round(dims?.y ?? DMD.h) || DMD.h
-		if (!w || !h || frame.length < w * h) return
-		this.updateFrame(frame, w, h)
+		if (!w || !h || frame.length < w * h) return false
+		return this.updateFrame(frame, w, h)
 	}
 
 	update() {
