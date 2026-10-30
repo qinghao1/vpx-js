@@ -436,7 +436,7 @@ export class LightApi extends ItemApi<LightData> {
 
 /** @see https://github.com/vpinball/vpinball/blob/master/light.cpp */
 export class Light extends Item<LightData> implements IRenderable<LightState>, IAnimatable, IScriptable<LightApi> {
-	public declare readonly data: LightData
+	declare public readonly data: LightData
 	private readonly state: LightState
 	private readonly meshGenerator: LightMeshGenerator
 	private readonly updater: LightUpdater

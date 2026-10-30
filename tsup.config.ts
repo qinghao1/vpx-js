@@ -6,13 +6,9 @@ export default defineConfig({
 		'lib/refs.browser': 'lib/refs.browser.ts',
 	},
 	format: ['esm'],
-	dts: {
-		entry: {
-			index: 'lib/index.ts',
-			'lib/refs.node': 'lib/refs.node.ts',
-			'lib/refs.browser': 'lib/refs.browser.ts',
-		},
-	},
+	// NOTE: tsup cannot bundle declarations here (its dts bundler needs the
+	// legacy TypeScript compiler API); build:dts emits them with tsc instead.
+	dts: false,
 	splitting: false,
 	sourcemap: true,
 	clean: true,

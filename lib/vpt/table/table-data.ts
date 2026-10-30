@@ -238,7 +238,7 @@ export class TableData extends ItemData {
 	public numCollections!: number
 	public scriptPos!: number
 	public scriptLen!: number
-	public declare name: string
+	declare public name: string
 
 	public Light: LightSource[] = [new LightSource()]
 	public szImageColorGrade?: string

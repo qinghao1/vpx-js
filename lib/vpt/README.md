@@ -8,13 +8,13 @@ The original Visual Pinball source covers all of that in one class per item;
 here each item gets its own folder with a focused main class plus helper
 classes (JavaScript has no multiple inheritance):
 
-- There is a *main class* which is referenced by rest of the library. This class
-  delegates most of its functionality to its *helper classes*.
+- There is a _main class_ which is referenced by rest of the library. This class
+  delegates most of its functionality to its _helper classes_.
 - The helper classes are instantiated on-demand. For example, during mesh
   generation, no collision helpers will be created.
-- No globals. If a class needs the player or the table object, it needs to be 
+- No globals. If a class needs the player or the table object, it needs to be
   passed through the constructor or even better to the method only.
-  
+
 ## Main Class
 
 The main class of a playfield item is the class interacting with the rest of the
@@ -28,7 +28,7 @@ They all extend [`Item`](item.ts).
 - `IPlayable` is implemented for logic during game play
 - `IScriptable` means the item offers a VBScript API
 
-The difference between `IMovable` and `IAnimatable` is subtle: While `IMovable` 
+The difference between `IMovable` and `IAnimatable` is subtle: While `IMovable`
 computes its state on the physics loop and thus has a somewhat real-world based
 behavior, `IAnimatable`s are only updated once every frame.
 
@@ -39,7 +39,7 @@ Some helpers exist for every item, others only for a few.
 ### Data Classes
 
 These keep the properties of the `.vpx` file and know how to read them. They
-are *usually* read-only: changes during gameplay are reflected elsewhere,
+are _usually_ read-only: changes during gameplay are reflected elsewhere,
 with a few exceptions.
 
 Most other helpers rely on data classes. All data classes except `BallData`
@@ -47,7 +47,7 @@ Most other helpers rely on data classes. All data classes except `BallData`
 
 ### States
 
-States contain the *visible state* of a table element, i.e. changes the
+States contain the _visible state_ of a table element, i.e. changes the
 renderer must take into account: position for movables, plus visibility,
 material, and textures, which can also change during gameplay. They all
 extend [`ItemState`](item-state.ts).
@@ -68,11 +68,11 @@ extends [`ItemApi`](item-api.ts).
 
 ### Mesh Generators
 
-Mesh generators provide 3D meshes of the playfield item based on their 
+Mesh generators provide 3D meshes of the playfield item based on their
 parameters, i.e. their data. They are usually only used when the table is loaded
 and the 3D model is created.
 
-Mesh generators are called within the main class implementing `IRenderable`. 
+Mesh generators are called within the main class implementing `IRenderable`.
 Their interface isn't defined, but they usually return a left-handed version
 of `IRenderable`'s `getMeshes()`.
 
@@ -82,7 +82,7 @@ Hit generators create the hit shapes that make the ball collide with the table
 item. The generated shapes are a collection of generic hit objects like circle,
 line, triangle or point.
 
-The `IHittable` interface requires a `getHitShapes()` method, which a hit 
+The `IHittable` interface requires a `getHitShapes()` method, which a hit
 generator provides.
 
 ### Hits
@@ -95,18 +95,18 @@ plate, as well as a hit generator for the socket.
 ### Movers
 
 Movers are created within the hit object of items implementing `IMovable`:
- 
+
 - Calculate the item's transformation and velocity on each physics cycle
 - Provide additional parameters to the hit object's collision calculations
 - Read and update the state depending on the above
-   
+
 So movers sit deeply in the physics loop, but they can also interact with the
 outside. For example, for moving a flipper, the flipper API would provide a
 `RotateToEnd()` method which would set the solenoid state of the mover to
 `true`, which results in building up the acceleration of the flipper through the
-mover, which results in the flipper's `angle` state to change and hence the 
+mover, which results in the flipper's `angle` state to change and hence the
 renderer applying a different rotation matrix on the object.
- 
+
 ### Animations
 
 Animation helpers are the "dumb" version of movers: a static sequence of
@@ -117,8 +117,8 @@ Animation helpers are created by classes which implement `IAnimatable`.
 
 ### Updaters
 
-Updaters receive a new state and apply it to the renderer. They usually update 
-the object's transformation, as well as visibility, material and textures. 
+Updaters receive a new state and apply it to the renderer. They usually update
+the object's transformation, as well as visibility, material and textures.
 Sometimes but rarely, they also update the mesh geometry.
 
 In order to do that, they use a provided render adapter which applies the
@@ -179,7 +179,7 @@ opts out with `staticRendering = false` or `animationFrames`
 ### Ramps: `rampType`, habitrails, wires
 
 `rampType` is an int: flat = 0, 4-wire = 1, 2-wire = 2, 3-wire-left = 3,
-3-wire-right = 4, 1-wire = 5 (`enums.ts:118-123`). A *habitrail* is any
+3-wire-right = 4, 1-wire = 5 (`enums.ts:118-123`). A _habitrail_ is any
 non-flat wire type (`isHabitrail()`, `ramp/ramp-view.ts:413`): an elevated
 wire track, meshed as tubes sized by `wireDiameter`/`wireDistanceX`/
 `wireDistanceY` instead of a solid surface. Ramps have separate visible wall
@@ -188,7 +188,7 @@ heights (`leftWallHeightVisible`/`rightWallHeightVisible`).
 ### Walls: physics vs visible heights
 
 `SurfaceData.heightBottom` (default 0) / `heightTop` (default 50) drive
-*both* the collision polys and the visible mesh (`surface/surface.ts:74-75`,
+_both_ the collision polys and the visible mesh (`surface/surface.ts:74-75`,
 `surface/surface-view.ts:23-24`) — there are no separate visible heights.
 Use `isTopBottomVisible`/`isSideVisible` to hide faces instead.
 
@@ -210,23 +210,23 @@ segment into a kicking `LineSegSlingshot` instead of a plain wall segment
 
 Parsed and scriptable; rendering is partial:
 
-| Feature | Status |
-|---|---|
+| Feature                   | Status                                                                |
+| ------------------------- | --------------------------------------------------------------------- |
 | `Filter` / `FilterAmount` | Parsed, not rendered (no custom shader; `flasher/flasher-data.ts:60`) |
-| `szImageB` | Parsed, only ImageA is drawn (`flasher/flasher-data.ts:50`) |
-| Absorb blend mode | Renders as plain additive (`flasher/flasher.ts:65`) |
-| `isDMD` | Parsed; skips the polygon mesh (`flasher/flasher-data.ts:55`) |
-| Runtime rotation/height | Supported; updater rebakes the mesh (`flasher/flasher-updater.ts:64`) |
+| `szImageB`                | Parsed, only ImageA is drawn (`flasher/flasher-data.ts:50`)           |
+| Absorb blend mode         | Renders as plain additive (`flasher/flasher.ts:65`)                   |
+| `isDMD`                   | Parsed; skips the polygon mesh (`flasher/flasher-data.ts:55`)         |
+| Runtime rotation/height   | Supported; updater rebakes the mesh (`flasher/flasher-updater.ts:64`) |
 
 ### Lights: glow vs surface vs bulb, fader modes
 
 Which mesh a light builds depends on its flags (`light/light.ts:136-161`):
 a bulb mesh (`showBulbMesh` + `meshRadius`), a bulb glow polygon (`bulbLight`
-+ 3 or more drag points), a playfield-surface insert (neither, + drag
-points), or a backglass light (`isBackglass`). `fader` (default Linear = 1)
-selects the brightness envelope: None = 0, Linear = 1, Incandescent = 2
-(`enums.ts:273-275`); Incandescent runs a filament-temperature simulation
-(`light/light-physics.ts:86-88`).
+- 3 or more drag points), a playfield-surface insert (neither, + drag
+  points), or a backglass light (`isBackglass`). `fader` (default Linear = 1)
+  selects the brightness envelope: None = 0, Linear = 1, Incandescent = 2
+  (`enums.ts:273-275`); Incandescent runs a filament-temperature simulation
+  (`light/light-physics.ts:86-88`).
 
 ### Light sequencers
 

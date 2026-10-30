@@ -73,6 +73,7 @@ means "input accepted, nothing emulated".
 A quick evaluation of 357 VPX VBS files, showed this amount of API Calls
 
 #### Visual Pinball Calls
+
 - .Switch 9473
 - .Lamp 374
 - .Dip 16
@@ -111,6 +112,7 @@ A quick evaluation of 357 VPX VBS files, showed this amount of API Calls
 - .ShowTitle 313
 
 #### Non Visual Pinball Calls
+
 - .SolMask 78
 - .B2SSetData 505
 - .GetMech 38
@@ -125,8 +127,8 @@ A quick evaluation of 357 VPX VBS files, showed this amount of API Calls
 ### Methods
 
 - Run(parentWindow, minVersion): Starts Visual PinMAME emulation of game specified with .GameName property.
-parentWindow: handler of window to put outputin. (Default= 0 -> no parent window)
-minVersion: Minimum version of Visual PinMAME (e.g. 100 for 1.00) required to run this game! (Default=any version)
+  parentWindow: handler of window to put outputin. (Default= 0 -> no parent window)
+  minVersion: Minimum version of Visual PinMAME (e.g. 100 for 1.00) required to run this game! (Default=any version)
 - Stop, Stops Visual PinMAME emulation.
 
 ## Game Settings
@@ -218,15 +220,15 @@ May not be supported in all scripting environments!
 them run but get no emulation effect. Ordered by real-world usage (STATS
 survey of 357 VBS files above):
 
-| API | Status | Note |
-|---|---|---|
-| `B2SSetData` (505 uses) | stub | Backglass data; no B2S renderer exists |
-| `ChangedLEDs` (56 uses) | returns `[]` | Alphanumeric segments not modeled |
-| `GetMech` / `Mech` (38 uses) | stub | Mechanical toys (TZ clock, gumball) |
-| `HandleMechanics` (292 uses) | stub, accepts value | Same — nothing dispatches on it |
-| `ShowOpts/ShowPathes/ShowAboutDialog`, `CheckROMS`, `SetDisplayPosition` | stubs | Desktop-UI concepts; no window exists |
-| `SampleRate` | fixed `22050`, no setter | Stored nowhere; audio path ignores it |
-| WPC DIP bank ≠ 0 | ignored | `wpc-emu.ts` only models bank 0 |
+| API                                                                      | Status                   | Note                                   |
+| ------------------------------------------------------------------------ | ------------------------ | -------------------------------------- |
+| `B2SSetData` (505 uses)                                                  | stub                     | Backglass data; no B2S renderer exists |
+| `ChangedLEDs` (56 uses)                                                  | returns `[]`             | Alphanumeric segments not modeled      |
+| `GetMech` / `Mech` (38 uses)                                             | stub                     | Mechanical toys (TZ clock, gumball)    |
+| `HandleMechanics` (292 uses)                                             | stub, accepts value      | Same — nothing dispatches on it        |
+| `ShowOpts/ShowPathes/ShowAboutDialog`, `CheckROMS`, `SetDisplayPosition` | stubs                    | Desktop-UI concepts; no window exists  |
+| `SampleRate`                                                             | fixed `22050`, no setter | Stored nowhere; audio path ignores it  |
+| WPC DIP bank ≠ 0                                                         | ignored                  | `wpc-emu.ts` only models bank 0        |
 
 `GetSwitchInput` on PinMAME reflects the mock map until a real ROM loads.
 When closing a gap, update this table and the STATS counts if re-surveyed.

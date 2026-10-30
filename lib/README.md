@@ -16,7 +16,7 @@ ESM TypeScript source for `vpx-js` (Node `>=24`, `ES2024`, `type: module`). Buil
 - `lib/refs.node.ts` / `lib/refs.browser.ts` — platform-specific surface:
 
 ```ts
-import { BinaryReader, storage, ThreeTextureLoader } from 'vpx-js/lib/refs.node.js'    // Node
+import { BinaryReader, storage, ThreeTextureLoader } from 'vpx-js/lib/refs.node.js' // Node
 import { BinaryReader, storage, ThreeTextureLoader } from 'vpx-js/lib/refs.browser.js' // Browser
 ```
 
@@ -24,11 +24,11 @@ import { BinaryReader, storage, ThreeTextureLoader } from 'vpx-js/lib/refs.brows
 
 ## Platform Split
 
-| file | Provides |
-|---|---|
-| `refs.node.ts` | `NodeBinaryReader`, `storage` (node fs), `ThreeTextureLoaderNode` (sharp), `getTextFile` via `readFileSync(res/scripts/…)`, patches `FileLoader.load` for `ArrayBuffer` |
-| `refs.browser.ts` | `BrowserBinaryReader`, `ThreeTextureLoaderBrowser` (canvas), `getTextFile` via bundled `import … from 'res/scripts/….vbs'` |
-| `refs-three.ts` | shared three re-exports for both platforms |
+| file              | Provides                                                                                                                                                                |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `refs.node.ts`    | `NodeBinaryReader`, `storage` (node fs), `ThreeTextureLoaderNode` (sharp), `getTextFile` via `readFileSync(res/scripts/…)`, patches `FileLoader.load` for `ArrayBuffer` |
+| `refs.browser.ts` | `BrowserBinaryReader`, `ThreeTextureLoaderBrowser` (canvas), `getTextFile` via bundled `import … from 'res/scripts/….vbs'`                                              |
+| `refs-three.ts`   | shared three re-exports for both platforms                                                                                                                              |
 
 I/O uses `Uint8Array`/`DataView` for both Node and browser.
 

@@ -34,7 +34,7 @@ it with dedicated length math and continues to `ENDB`.
 
 ## CODE and BITS quirks
 
-- `CODE` (table script) is a *streamed tag*: `fromTag` records only
+- `CODE` (table script) is a _streamed tag_: `fromTag` records only
   `scriptPos`/`scriptLen` (`../vpt/table/table-data.ts:386-389`); the loader
   reads exactly `scriptLen` bytes and UTF-8-decodes the script separately
   (framing is exact, no trim). See also `SECB` (~408) and `MATR`/`RPRB`

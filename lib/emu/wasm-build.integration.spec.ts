@@ -83,7 +83,8 @@ describe('WASM build artifacts', () => {
 		expect(fs.existsSync(path.join(wasmDir, 'modules/pinmame/CMakeLists.txt'))).toBe(true)
 		expect(fs.existsSync(path.join(wasmDir, 'modules/pinmame/patches'))).toBe(true)
 		const patches = fs.readdirSync(path.join(wasmDir, 'modules/pinmame/patches')).filter(f => f.endsWith('.patch'))
-		expect(patches.length).toBeGreaterThanOrEqual(10)
+		// 8-patch series (see wasm/modules/pinmame/patches/).
+		expect(patches.length).toBe(8)
 		expect(fs.existsSync(path.join(wasmDir, 'dist'))).toBe(true)
 	})
 

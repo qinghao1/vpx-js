@@ -14,7 +14,7 @@ OBJ are the same than in VPX-JS'es scene.
 We also change a few parameters and add transformations so test if they are
 correctly applied.
 
-For the textures, we feed multiple formats into VPX and compare the exported 
+For the textures, we feed multiple formats into VPX and compare the exported
 result using [looks-same](https://github.com/gemini-testing/looks-same).
 
 What's currently not tested are:
@@ -36,7 +36,7 @@ if they look the same, we add a unit test that asserts the ball position at key
 moments in time.
 
 For example, when colliding with a horizontal wall, we first assert that the ball
-is moving downwards passing a given position, and at some later point *above* the 
+is moving downwards passing a given position, and at some later point _above_ the
 same position, due to the bounce off.
 
 ## Movement
@@ -50,6 +50,6 @@ Some elements like flippers can be explicitly moved (set the solenoid to on and
 watch the state change), others need to be externally triggered (e.g. a spinner
 won't move alone).
 
-The approach is similar to the collision one: Run it in the browser, visually 
+The approach is similar to the collision one: Run it in the browser, visually
 check if it looks okay, and write a test that asserts the state of the element
 for multiple points in time.

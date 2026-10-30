@@ -1,7 +1,6 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import dashAstImport from 'dash-ast'
 import { type IRule, type IToken, Parser } from 'ebnf'
 import { generate } from 'escodegen'
 import type { Program, Statement } from 'estree'
@@ -25,8 +24,34 @@ import { ppWith } from '../post-process/with.js'
 import { renameReservedWords } from '../transformer/reference-transformer.js'
 import { RULES } from './rules.js'
 
-// dash-ast is CJS, handle both default and direct export
-const dashAst: (ast: any, opts: any) => void = (dashAstImport as any)?.default ?? (dashAstImport as any)
+/**
+ * Post-order token-tree walk. Replaces dash-ast (only its `leave` visitor was
+ * ever used): dash-ast is CJS calling its `require('assert')` result directly,
+ * which bundlers alias to a non-callable ESM shim in the browser — breaking
+ * every in-browser transpile (worker and ExecuteGlobal inline) with
+ * "assert is not a function" while node keeps passing.
+ */
+function walkPostOrder(
+	node: ESIToken,
+	leave: (node: ESIToken, parent: ESIToken | null) => void,
+	parent: ESIToken | null = null,
+): void {
+	for (const key of Object.keys(node)) {
+		if (key === 'parent') continue
+		const value: unknown = (node as unknown as Record<string, unknown>)[key]
+		if (isToken(value)) {
+			walkPostOrder(value, leave, node)
+		} else if (Array.isArray(value)) {
+			for (const child of value) {
+				if (isToken(child)) walkPostOrder(child, leave, node)
+			}
+		}
+	}
+	leave(node, parent)
+}
+
+const isToken = (value: unknown): value is ESIToken =>
+	typeof value === 'object' && value !== null && typeof (value as { type?: unknown }).type === 'string'
 
 const isAlphaChar = (char: string): boolean => /[A-Za-z_]/.test(char)
 const isAlNumChar = (char: string): boolean => /[A-Za-z0-9_]/.test(char)
@@ -721,34 +746,32 @@ export class Grammar {
 			}
 			return null
 		}
-		dashAst(ast, {
-			leave(node: ESIToken, _parent: ESIToken) {
-				if (node.type === 'Program') {
-					for (const child of node.children) {
-						if (child.estree) {
-							if (!Array.isArray(child.estree)) {
-								stmts.push(child.estree)
-							} else {
-								stmts.push(...child.estree)
-							}
+		walkPostOrder(ast, (node: ESIToken, _parent: ESIToken | null) => {
+			if (node.type === 'Program') {
+				for (const child of node.children) {
+					if (child.estree) {
+						if (!Array.isArray(child.estree)) {
+							stmts.push(child.estree)
+						} else {
+							stmts.push(...child.estree)
 						}
 					}
-				} else {
-					/**
-					 * Loop through all registered post processors until an estree
-					 * is returned. If no post processors can handle the node, and
-					 * the node has a child, copy it's estree. This will allow estrees
-					 * to get propagated to parents, and we wont need to have
-					 * post-processors for every single rule in the grammar.
-					 */
-					const estree = runPostProcessors(node)
-					if (estree !== null) {
-						node.estree = estree
-					} else if (node.children[0]) {
-						node.estree = node.children[0].estree
-					}
 				}
-			},
+			} else {
+				/**
+				 * Loop through all registered post processors until an estree
+				 * is returned. If no post processors can handle the node, and
+				 * the node has a child, copy it's estree. This will allow estrees
+				 * to get propagated to parents, and we wont need to have
+				 * post-processors for every single rule in the grammar.
+				 */
+				const estree = runPostProcessors(node)
+				if (estree !== null) {
+					node.estree = estree
+				} else if (node.children[0]) {
+					node.estree = node.children[0].estree
+				}
+			}
 		})
 		logger().debug('[Grammar.transpile] Post-processed in %sms', Date.now() - now)
 

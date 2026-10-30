@@ -57,7 +57,7 @@ engine stays framework-free. For three.js: `NODE = Object3D`,
 
 ## Materials
 
-- **BDL** (`disableLighting`, `RenderInfo.disableLighting`): *not* a boolean.
+- **BDL** (`disableLighting`, `RenderInfo.disableLighting`): _not_ a boolean.
   It is a 0..∞ file value mixing lit vs unlit in-shader: `0` = fully lit,
   `1` = unlit 2× fullbright (kept for native-compat), `>1` = HDR multiples
   (tables drive 130..8500). See `nodes/primitive-bdl-node.ts`.
@@ -73,7 +73,7 @@ engine stays framework-free. For three.js: `NODE = Object3D`,
 - `IMaterialGenerator.getMaterial` takes 11 positional params in a fixed
   order (material, map, normalMap, envMap, emissiveMap, isTransparent,
   depthBias, disableLighting, addBlend, backfacesEnabled, alphaTestValue).
-  `depthBias` is a transparent *sort key*, not a polygon offset;
+  `depthBias` is a transparent _sort key_, not a polygon offset;
   `alphaTestValue` in (0, 1] enables cutout.
 
 ## Texture loading contract

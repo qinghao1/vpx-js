@@ -5,6 +5,7 @@ project(wasm-pinmame LANGUAGES C CXX)
 set(PINMAME_ROOT "${CMAKE_SOURCE_DIR}/../external/pinmame" CACHE PATH "PinMAME source root")
 
 # PINMAME_WASM_PTHREADS is declared once by the umbrella project (wasm/CMakeLists.txt).
+# HAS_PIC32MX=1 because src/wpc/pinheck.c needs the core or link fails.
 add_library(pinmame_config INTERFACE)
 target_compile_definitions(pinmame_config INTERFACE
   HAS_M6809=1 HAS_M6808=1 HAS_M6800=1 HAS_M6803=1 HAS_M6802=1
@@ -15,7 +16,7 @@ target_compile_definitions(pinmame_config INTERFACE
   HAS_4004=1 HAS_PPS4=1 HAS_SCAMP=1 HAS_I8051=1 HAS_I8752=1
   HAS_TMS7000=1 HAS_TMS9900=1 HAS_CDP1802=1 HAS_COP400=1 HAS_COP420=1
   HAS_AT91=1 HAS_ARM7=1 HAS_TMS9980=1 HAS_TMS9995=1
-  HAS_DAC=1 HAS_YM2151_YMFM=1 HAS_YM3812_YMFM=1 HAS_YM3526_YMFM=1 HAS_YMF262_YMFM=1
+  HAS_DAC=1 HAS_PIC32MX=1 HAS_YM2151_YMFM=1 HAS_YM3812_YMFM=1 HAS_YM3526_YMFM=1 HAS_YMF262_YMFM=1
   HAS_HC55516=1 HAS_MC3417=1 HAS_SAMPLES=1 HAS_TMS5220=1 HAS_AY8910=1 HAS_MSM5205=1
   HAS_CUSTOM=1 HAS_BSMT2000=1 HAS_OKIM6295=1 HAS_ADPCM=1 HAS_VOTRAXSC01=1
   HAS_SN76477=1 HAS_SN76496=1 HAS_DISCRETE=1 HAS_SP0250=1 HAS_TMS320AV120=1
@@ -24,7 +25,7 @@ target_compile_definitions(pinmame_config INTERFACE
   MAMEVER=7300 PINMAME PINMAME_NO_UNUSED LIBPINMAME SAM_INCLUDE_COLORED
   LSB_FIRST PI=M_PI HAVE_UNISTD_H=1
   "INLINE=static inline __attribute__((always_inline))"
-  WASM=1 PINMAME_WASM=1
+  WASM=1
 )
 target_compile_options(pinmame_config INTERFACE
   -ffp-contract=fast -fno-rtti -ffunction-sections -fdata-sections
@@ -44,6 +45,23 @@ list(FILTER PINMAME_SOURCES EXCLUDE REGEX ".*/src/wpc/sam\\.c$")
 list(FILTER PINMAME_SOURCES EXCLUDE REGEX ".*/(arm7core|arm7exec|arm7jit|asmintf)\\.c$")
 list(FILTER PINMAME_SOURCES EXCLUDE REGEX ".*ext/libsamplerate/.*\\.(c|cpp)$")
 list(FILTER PINMAME_SOURCES EXCLUDE REGEX ".*/(2100ops|410ops|420ops|6800ops|6800tbl|6809ops|6809tbl|i8051ops|i86time|instr86|instr186|instrv30|t6502|t6510|t65c02|t65sc02|t65ce02|tdeco16|tn2a03|tms70op|tms70tb|disc_(dev|flt|inp|mth|out|wav)|tms5110r|tms5220r|ym2151_opm|m65ce02|d68k|m68k_in|m68kmake|make68k)\\.c$")
+# Pinball 2000 (p2k) and Stern Spike 1 (spike1) are opt-in upstream, not enabled for WASM;
+# shims compile to empty objects behind HAS_MEDIAGX/HAS_SPIKE1 guards.
+list(FILTER PINMAME_SOURCES EXCLUDE REGEX ".*/src/(p2k|spike1)/.*")
+# Test mains: upstream builds test.cpp/test_paths.cpp as separate executables
+# (pinmame_test, pinmame_test_paths), never into the lib.
+list(FILTER PINMAME_SOURCES EXCLUDE REGEX ".*/src/libpinmame/test(_paths)?\\.cpp$")
+# MAME-port sound core, disabled upstream; upstream's lib list keeps sn76477.c only.
+list(FILTER PINMAME_SOURCES EXCLUDE REGEX ".*/src/sound/sn76477_mame\\.c$")
+# BSMT2000 low-level emulation #includes tms320c1x.c directly; compiling the
+# core standalone too yields duplicate symbols. Upstream's lib list keeps only
+# the BSMT2000 TU.
+list(FILTER PINMAME_SOURCES EXCLUDE REGEX ".*/src/cpu/tms320c1x/tms320c1x\\.c$")
+# YM2151-LLE is off by default upstream (compile-time HAS_YM2151_LLE, and the
+# fmopm core is GPLv2, unlike the rest of PinMAME). ym2151_lle.c #includes
+# fmopm.c, so compiling both TUs duplicates FMOPM_Clock; upstream's lib list
+# keeps neither. 2151intf.c degrades to the default core via its guards.
+list(FILTER PINMAME_SOURCES EXCLUDE REGEX ".*/src/sound/(ym2151_lle|fmopm)\\.c$")
 list(FILTER PINMAME_SOURCES INCLUDE REGEX "\\.(c|cpp)$")
 list(APPEND PINMAME_SOURCES "${PINMAME_ROOT}/src/libpinmame/ticker.c")
 list(REMOVE_DUPLICATES PINMAME_SOURCES)

@@ -161,6 +161,12 @@ async function verifyPinmame(romPath: string | undefined, gameName: string) {
 	const rom = new Uint8Array(fs.readFileSync(romPath))
 	console.log(`  ROM: ${romPath} (${(rom.length / 1024 / 1024).toFixed(1)} MB)`)
 	const emu = new PinMameEmulator()
+	// Stream-liveness guard: the wasm mixer must keep producing PCM once the
+	// stream starts (a no-callback update path returning 0 stalls it forever).
+	let audioChunks = 0
+	emu.registerAudioConsumer(() => {
+		audioChunks++
+	})
 	const { isMock } = await createPinmameModule()
 	if (isMock) {
 		console.log('  wasm is mock — loading ROM as mock (physics only)')
@@ -177,6 +183,7 @@ async function verifyPinmame(romPath: string | undefined, gameName: string) {
 	console.log(`  boot poll: dmdSum=${boot.dmdSum} dmdMax=${boot.dmdMax} changed=${boot.changedTotal}`)
 	tap.assert(boot.dmdSum > 0, `real boot shows DMD content within timeout (sum=${boot.dmdSum})`)
 	tap.assert(boot.changedTotal > 0, `real boot drives lamp/sol/GI changes (n=${boot.changedTotal})`)
+	tap.assert(audioChunks > 0, `real boot streams ROM audio PCM (chunks=${audioChunks})`)
 	for (const [label, value] of [
 		['lamp11', emu.getLampState(11)],
 		['sol0', emu.getSolenoidState(0)],
@@ -225,9 +232,9 @@ async function verifyVpmController(gameName: string) {
 	tap.assert(typeof vpm.Switch[11] === 'number', `controller Switch readable (${vpm.Switch[11]})`)
 	tap.assert(typeof vpm.Lamp[0] === 'number', `controller Lamp readable (${vpm.Lamp[0]})`)
 	tap.assert(typeof vpm.Dip[0] === 'number', `controller Dip readable (${vpm.Dip[0]})`)
-	// test fliptronics
+	// fliptronics: Switch reads COM VARIANT_BOOL, so True is -1
 	vpm.Switch[112] = 1
-	tap.assert(vpm.Switch[112] === 1, 'fliptronics Switch[112] round-trips through setFliptronicsInput')
+	tap.assert(vpm.Switch[112] === -1, 'fliptronics Switch[112] round-trips through setFliptronicsInput')
 	if (emu && !emu.isMock) {
 		const boot = await pollBootActivity(emu, 10000)
 		console.log(`  controller boot poll: dmdSum=${boot.dmdSum} changed=${boot.changedTotal}`)

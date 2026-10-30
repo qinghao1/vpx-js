@@ -4,9 +4,9 @@ Emscripten builds for `vpx-js`. All outputs go to `wasm/dist/` (gitignored).
 
 ## Modules
 
-| Module | Source | Output | Purpose |
-|--------|--------|--------|---------|
-| `kernels` | `wasm/modules/kernels/src/kernels.cpp` | `wasm/dist/kernels.js` + `.wasm` | Physics collision batch kernels (SIMD, no FS). Used by `lib/physics/wasm/kernels.ts`. Falls back to pure JS if absent. |
+| Module    | Source                                                                       | Output                              | Purpose                                                                                                                                                 |
+| --------- | ---------------------------------------------------------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `kernels` | `wasm/modules/kernels/src/kernels.cpp`                                       | `wasm/dist/kernels.js` + `.wasm`    | Physics collision batch kernels (SIMD, no FS). Used by `lib/physics/wasm/kernels.ts`. Falls back to pure JS if absent.                                  |
 | `pinmame` | `external/pinmame` (libPinMAME 3.7) + `wasm/modules/pinmame/patches/*.patch` | `wasm/dist/libpinmame.js` + `.wasm` | Full PinMAME emulation (SAM, Whitestar, Data East, etc.). Used by `lib/emu/pinmame/`. Falls back to `wasm/mock/libpinmame.mock.js` when WASM not built. |
 
 `wpc-emu` remains the lightweight path for WPC hardware; PinMAME covers the rest.
@@ -38,6 +38,7 @@ Single `dist/` and single `build/` follow idiomatic Emscripten/CMake practice: o
 ## Prereqs
 
 - Emscripten ≥ 4.0 (tested 6.0.6)
+
   ```bash
   git clone https://github.com/emscripten-core/emsdk.git ~/projects/emsdk
   ~/projects/emsdk/emsdk install latest && ~/projects/emsdk/emsdk activate latest
@@ -144,4 +145,5 @@ Every `_batchHitTest*` export shares one shape (see `BATCH_SPECS` in
 
 - **Pthreads** — PinMAME build uses `-pthread -sPTHREAD_POOL_SIZE=4`. Browsers require `COOP: same-origin` + `COEP: require-corp` headers. Node and workers work without headers.
 - **Patches** — `wasm/modules/pinmame/patches/*.patch` are applied idempotently (`git apply --check`) before each build. To reset: `git -C external/pinmame reset --hard`.
+- **Rebasing patches** — after bumping `external/pinmame`, `wasm/build.sh` stops at the first patch whose context moved; retarget it to the new location (purpose unchanged), confirm with `git apply --check` forward and reverse, then rebuild.
 - **CMake** — Umbrella project `vpx-js-wasm` enforces `EMSCRIPTEN` and `PINMAME_WASM_PTHREADS=ON` by default. Edit `CMakePresets.json` or pass `-DPINMAME_WASM_PTHREADS=OFF` to disable threads.

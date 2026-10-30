@@ -76,4 +76,3 @@ vpx-js-only — none exists upstream — and default on via the static
 `PinInput.freePlayDefault` (set false before constructing the `Player` to
 disable). All free-play scheduling runs on the physics clock, so pausing the
 game pauses it.
-

@@ -1,0 +1,18 @@
+{
+	// Declarations live here (not tsup): tsup's dts bundler needs the legacy TS compiler API.
+	// Only entries are listed; tsc pulls the rest of lib/ in via imports.
+	"extends": "./tsconfig.json",
+	"compilerOptions": {
+		// Explicit like tsconfig.spec.json: the narrowed include set below no
+		// longer pulls @types/node in on its own, breaking node: imports.
+		"types": ["node"],
+		"emitDeclarationOnly": true,
+		"declaration": true,
+		"declarationMap": false,
+		"sourceMap": false,
+		"outDir": "./dist-dts",
+		"rootDir": ".",
+		"noEmit": false
+	},
+	"include": ["lib/index.ts", "lib/refs.node.ts", "lib/refs.browser.ts", "lib/types/raw.d.ts"]
+}

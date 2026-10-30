@@ -1,10 +1,14 @@
 From f6ea44209a2bc9c95cbeb1b12d196024f6dfbf61 Mon Sep 17 00:00:00 2001
 From: Chu Qinghao <6337103+qinghao1@users.noreply.github.com>
 Date: Sun, 9 Aug 2026 01:43:38 -0400
-Subject: [PATCH 3/8] wasm: fix ComposePath missing slash
+Subject: [PATCH] wasm: fix ComposePath missing slash
 
 ComposePath concatenated path and file without a separator.
 Add '/' when needed, otherwise ROM audit fails (e.g. /pinmame + roms).
+
+Upstream-PR-Draft: libpinmame: insert missing separator in ComposePath
+Target: vpinball/pinmame@master
+Body: ComposePath() concatenates vpmPath and the subfolder name with no separator, so any caller passing a path without a trailing slash gets broken paths such as `/pinmame` + `roms` yielding `/pinmameroms`. In-tree callers all happen to pass a trailing slash, which is why this never surfaced natively. The fix appends '/' when the path ends in neither '/' nor '\'. Verified by building the WASM module and running ROM audit against a slash-less path; paths already ending in a separator are unchanged.
 
 ---
  src/libpinmame/libpinmame.cpp | 4 +++-

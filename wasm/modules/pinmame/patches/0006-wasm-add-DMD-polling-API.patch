@@ -1,26 +1,29 @@
-From a0cb73c199f0a22c205ff2c56d77fb118358640a Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Chu Qinghao <6337103+qinghao1@users.noreply.github.com>
-Date: Sun, 9 Aug 2026 01:43:38 -0400
-Subject: [PATCH 8/8] wasm: add DMD polling API
+Date: Fri, 30 Oct 2026 00:00:00 -0400
+Subject: [PATCH] wasm: add DMD polling API
 
 Add DMD polling API (FindDmdDisplay, GetDmdWidth/Height/Depth/Frame
 and generic DisplayCount/Info/Frame) used by PinMameEmulator.
 
+Anchored after PinmameGetRawMemoryRegionLength; API surface unchanged.
+
+Upstream-PR-Draft: libpinmame: add DMD/display polling getters
+Target: vpinball/pinmame@master
+Body: libpinmame exposes polling getters for lamps, solenoids, GIs and LEDs, but display frames are only reachable through the MsgPluginAPI push machinery, which is awkward for WASM and other simple embedders. This change adds PinmameGetDmdWidth/Height/Depth/Frame plus generic PinmameGetDisplayCount/Info/Frame, mirroring the existing GetChanged* polling pattern. VIDEO-type displays are served as grayscale so color DMDs stay readable through the same path. Downstream, a WASM build drives per-tick DMD polling through these exports.
+
 ---
- src/libpinmame/libpinmame.cpp | 86 +++++++++++++++++++++++++++++++++++
+ src/libpinmame/libpinmame.cpp | 85 +++++++++++++++++++++++++++++++++++
  src/libpinmame/libpinmame.h   |  3 ++
- 2 files changed, 89 insertions(+)
+ 2 files changed, 88 insertions(+)
 
 diff --git a/src/libpinmame/libpinmame.cpp b/src/libpinmame/libpinmame.cpp
-index 629bc2c..f3fc5d2 100644
---- a/src/libpinmame/libpinmame.cpp
-+++ b/src/libpinmame/libpinmame.cpp
-@@ -1522,6 +1522,92 @@ PINMAMEAPI size_t PinmameGetRawMemoryRegionLength(const int region)
- 	return _isRunning ? memory_region_length(region) : 0;
+index 8333484..8f12349 100644
+@@ -2266,8 +2266,93 @@
+ 	return IsEmulationRunning() ? memory_region_length(region) : 0;
  }
  
-+
-+/******************************************************
+ /******************************************************
 + * PinmameGetDmdWidth / Height / Depth / Frame
 + ******************************************************/
 +
@@ -105,20 +108,24 @@ index 629bc2c..f3fc5d2 100644
 +	return d->size;
 +}
 +
- /******************************************************
++/******************************************************
   * PinmameSetUserData
   ******************************************************/
+ 
+ PINMAMEAPI void PinmameSetUserData(void* const p_userData)
 diff --git a/src/libpinmame/libpinmame.h b/src/libpinmame/libpinmame.h
-index 31e9f5a..6c9204f 100644
---- a/src/libpinmame/libpinmame.h
-+++ b/src/libpinmame/libpinmame.h
-@@ -486,4 +486,7 @@ PINMAMEAPI int PinmameGetChangedNVRAM(PinmameNVRAMState* const p_nvramStates);
- PINMAMEAPI int PinmameReadMainCPUByte(uint32_t address, uint8_t* const p_value);
+index 74cddfb..2bfbddd 100644
+@@ -578,8 +578,11 @@
+ PINMAMEAPI int PinmameReadMainCPUMemory(uint32_t address, uint8_t* const p_buffer, int size);
+ PINMAMEAPI int PinmameWriteMainCPUMemory(uint32_t address, const uint8_t* const p_buffer, int size);
  PINMAMEAPI const uint8_t* PinmameGetRawMemoryRegion(const int region);
  PINMAMEAPI size_t PinmameGetRawMemoryRegionLength(const int region);
 +PINMAMEAPI int PinmameGetDisplayCount();
 +PINMAMEAPI int PinmameGetDisplayInfo(int idx, PinmameDisplayLayout* p_layout);
 +PINMAMEAPI int PinmameGetDisplayFrame(int idx, void* p_data, int size);
  PINMAMEAPI void PinmameSetUserData(void* const p_userData);
+ 
+ // If defined, libPinMame will implement the core controller messages for display, input & output state queries
+ PINMAMEAPI void PinmameSetMsgAPI(MsgPluginAPI* msgPluginAPI, unsigned int endpointId);
 -- 
 2.53.0

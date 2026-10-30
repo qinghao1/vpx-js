@@ -19,33 +19,33 @@ npx tsx test/harness/verify-all.ts   # TAP 1..10: wasm → table → pinmame →
 
 `verify-*` gate; `bench-*` measure (no pass/fail); `repro-*`/`harness-*` debug.
 
-| File | What | Needs |
-|------|------|-------|
-| `verify-all.ts` | Aggregator, TAP 1..10, exit 0/1 | varies per step |
-| `verify-wasm.ts` | Wasm build checks: file-existence + `dist/kernels.js` behavioral + mock/real loader consistency | — |
-| `verify-table.ts` | VPX parse + script extract over fixtures + `example-table.vpx` | — |
-| `verify-pinmame.ts` | PinMAME emu boot + DMD frames; mock when no ROM | ROM or mock |
-| `verify-player.ts` | Player init, PinInput, physics loop | — |
-| `harness-gameplay.ts` | 4 gameplay scenarios, ball-survival asserts | VPX (TWD or `table-flipper.vpx` fallback) |
-| `verify-browser.ts` | Thin wrapper → `verify-all.verifyBrowser` → `demo-browser/e2e/integration.mjs` | Chrome + vite + `dist-esm` |
-| `verify-play-room.ts` | Play-room scene checks (TAP `Tap` class) | — |
-| `verify-twd-render.ts` | Walking-dead render-pipeline checks | `walking_dead.vpx` |
-| `verify-vpinball-compat.ts` | Script/table/AST parity vs native (`parity-script.ts` + `audit-table.ts`) | native `VPinballX` or SKIP |
-| `capture-discrepancies.ts` | 20-check web-vs-native gap report → `~/docs/vpx-js-web-vs-native-discrepancies.md` | native for full report |
-| `compare-side-by-side.ts` | MANUAL dual-window launcher (browser left, native right) — eyeball only, no asserts | Chrome + vite + native |
-| `bench.mjs` | Browser bench: load + FPS + profile (`--vpx/--rom/--balls/--duration/--warmup/--out/--headed/--gpu/--trace`) | Chrome + vite |
-| `bench-node.ts` | Node bench: physics ticks + scene export (`--vpx/--ticks/--balls/--breakdown/--json`) | VPX file |
-| `bench-physics-profile.ts` | WASM-vs-scalar hit-test profile; buckets mirror `WASM_THRESHOLD=64` | VPX file |
-| `ranked-profile.ts` | Per-phase ranked timings (`--vpx`, default `~/Downloads/walking_dead.vpx`) | VPX file |
-| `bench-shared.ts` | Shared bench helpers (stats, VPX candidates, tri counting) — no main | — |
-| `harness-dmd.mjs` | DMD pipeline gate (injected pattern must reach canvas + meshes) + screenshots | Chrome + vite + ROM |
-| `harness-pinmame.mjs` | Browser PinMAME + DMD check | Chrome + vite + ROM |
-| `repro-artifact.ts` | walking_dead artifact repro, asserts + exit 1 (imports `demo-browser/`) | `walking_dead.vpx` |
-| `repro-spinner-direction.mjs` | Spinner-direction TAP + exit code (run with `tsx`) | fixture VPX |
-| `repro-lights.ts` | Merged dark+horde lights repro, TAP + exit code (`--case=dark\|horde\|all --vpx=...`) | VPX file |
-| `tap.ts` | TAP helpers (`tapHeader/tapOk/tapNotOk/tapSkip/tapPlan`, `Tap` class) — no main | — |
-| `utils.mjs` | Puppeteer/vite helpers (`launchBrowser/newPage/ensureVite/openTablePage`) — no main | — |
-| `vpinball-resolver.ts` | Arg parsing + VPX/ROM/native discovery — no main | — |
+| File                          | What                                                                                                         | Needs                                     |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------ | ----------------------------------------- |
+| `verify-all.ts`               | Aggregator, TAP 1..10, exit 0/1                                                                              | varies per step                           |
+| `verify-wasm.ts`              | Wasm build checks: file-existence + `dist/kernels.js` behavioral + mock/real loader consistency              | —                                         |
+| `verify-table.ts`             | VPX parse + script extract over fixtures + `example-table.vpx`                                               | —                                         |
+| `verify-pinmame.ts`           | PinMAME emu boot + DMD frames; mock when no ROM                                                              | ROM or mock                               |
+| `verify-player.ts`            | Player init, PinInput, physics loop                                                                          | —                                         |
+| `harness-gameplay.ts`         | 4 gameplay scenarios, ball-survival asserts                                                                  | VPX (TWD or `table-flipper.vpx` fallback) |
+| `verify-browser.ts`           | Thin wrapper → `verify-all.verifyBrowser` → `demo-browser/e2e/integration.mjs`                               | Chrome + vite + `dist-esm`                |
+| `verify-play-room.ts`         | Play-room scene checks (TAP `Tap` class)                                                                     | —                                         |
+| `verify-twd-render.ts`        | Walking-dead render-pipeline checks                                                                          | `walking_dead.vpx`                        |
+| `verify-vpinball-compat.ts`   | Script/table/AST parity vs native (`parity-script.ts` + `audit-table.ts`)                                    | native `VPinballX` or SKIP                |
+| `capture-discrepancies.ts`    | 20-check web-vs-native gap report → `~/docs/vpx-js-web-vs-native-discrepancies.md`                           | native for full report                    |
+| `compare-side-by-side.ts`     | MANUAL dual-window launcher (browser left, native right) — eyeball only, no asserts                          | Chrome + vite + native                    |
+| `bench.mjs`                   | Browser bench: load + FPS + profile (`--vpx/--rom/--balls/--duration/--warmup/--out/--headed/--gpu/--trace`) | Chrome + vite                             |
+| `bench-node.ts`               | Node bench: physics ticks + scene export (`--vpx/--ticks/--balls/--breakdown/--json`)                        | VPX file                                  |
+| `bench-physics-profile.ts`    | WASM-vs-scalar hit-test profile; buckets mirror `WASM_THRESHOLD=64`                                          | VPX file                                  |
+| `ranked-profile.ts`           | Per-phase ranked timings (`--vpx`, default `~/Downloads/walking_dead.vpx`)                                   | VPX file                                  |
+| `bench-shared.ts`             | Shared bench helpers (stats, VPX candidates, tri counting) — no main                                         | —                                         |
+| `harness-dmd.mjs`             | DMD pipeline gate (injected pattern must reach canvas + meshes) + screenshots                                | Chrome + vite + ROM                       |
+| `harness-pinmame.mjs`         | Browser PinMAME + DMD check                                                                                  | Chrome + vite + ROM                       |
+| `repro-artifact.ts`           | walking_dead artifact repro, asserts + exit 1 (imports `demo-browser/`)                                      | `walking_dead.vpx`                        |
+| `repro-spinner-direction.mjs` | Spinner-direction TAP + exit code (run with `tsx`)                                                           | fixture VPX                               |
+| `repro-lights.ts`             | Merged dark+horde lights repro, TAP + exit code (`--case=dark\|horde\|all --vpx=...`)                        | VPX file                                  |
+| `tap.ts`                      | TAP helpers (`tapHeader/tapOk/tapNotOk/tapSkip/tapPlan`, `Tap` class) — no main                              | —                                         |
+| `utils.mjs`                   | Puppeteer/vite helpers (`launchBrowser/newPage/ensureVite/openTablePage`) — no main                          | —                                         |
+| `vpinball-resolver.ts`        | Arg parsing + VPX/ROM/native discovery — no main                                                             | —                                         |
 
 ## Quickstart
 

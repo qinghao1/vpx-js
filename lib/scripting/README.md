@@ -41,15 +41,15 @@ evals, and calls `play`.
 `play(__scope, __items, __enums, __global, __stdlib, __vbs, __player)`.
 Earlier transformers rewrite every bare identifier to one of these roots:
 
-| Param | Value (from `Transpiler`) | Holds |
-|---|---|---|
-| `__scope` | `new Proxy(scope, VbsProxyHandler)` | Script-level `Dim`s / globals |
-| `__items` | `table.getElementApis()` | Playfield item APIs (`Drain_Hit` targets) |
-| `__enums` | `Enums` | VPX enum constants |
-| `__global` | `GlobalApi` | `GetPlayer`, table-wide functions |
-| `__stdlib` | `Stdlib` | VBS builtins (`MsgBox`, `CInt`, `Mid`, ...) |
-| `__vbs` | `VBSHelper` | Operators/statements JS can't express |
-| `__player` | `Player` | Game services (audio, emu, input) |
+| Param      | Value (from `Transpiler`)           | Holds                                       |
+| ---------- | ----------------------------------- | ------------------------------------------- |
+| `__scope`  | `new Proxy(scope, VbsProxyHandler)` | Script-level `Dim`s / globals               |
+| `__items`  | `table.getElementApis()`            | Playfield item APIs (`Drain_Hit` targets)   |
+| `__enums`  | `Enums`                             | VPX enum constants                          |
+| `__global` | `GlobalApi`                         | `GetPlayer`, table-wide functions           |
+| `__stdlib` | `Stdlib`                            | VBS builtins (`MsgBox`, `CInt`, `Mid`, ...) |
+| `__vbs`    | `VBSHelper`                         | Operators/statements JS can't express       |
+| `__player` | `Player`                            | Game services (audio, emu, input)           |
 
 Name resolution order lives in `ReferenceTransformer` + `AmbiguityTransformer`:
 locals → items → enums → global → stdlib. Case-insensitivity comes from
@@ -60,10 +60,10 @@ VBS `drain.destroyball` must find `Drain.DestroyBall`.
 
 Three layers, split by who calls them:
 
-- `stdlib/` — things the *script* calls by name: `CStr`, `Split`, `Rnd`,
+- `stdlib/` — things the _script_ calls by name: `CStr`, `Split`, `Rnd`,
   `CreateObject`, `Err`, `vbCrLf`, ... Extends `VbsApi` (case-insensitive
   dispatch). Pure functions over VBS values.
-- `vbs-helper.ts` (`__vbs`) — things *generated code* calls: `equals`, `and/or/
+- `vbs-helper.ts` (`__vbs`) — things _generated code_ calls: `equals`, `and/or/
   xor/eqv/not`, `intDiv`, `getOrCall`, `dim/redim/erase`, `toIterable`,
   `transpileInline`, `onErrorResumeNext`. These implement operators and
   statements, not builtins.
@@ -92,7 +92,7 @@ pins current parse behavior; add a case there when extending the `.bnf`.
 `.browser.ts` (entry) → `transpileInWorker` (`transpiler-worker-core.ts`).
 The worker can't see the `Table`, so the main thread ships a
 `TableDataPayload` (element names, events, API shapes) and the worker rebuilds
-mocks, then runs the *same* `buildPipeline`. If sync and worker output ever
+mocks, then runs the _same_ `buildPipeline`. If sync and worker output ever
 diverge, the bug is in the mocks, not the pipeline.
 
 ## VBScript value primer

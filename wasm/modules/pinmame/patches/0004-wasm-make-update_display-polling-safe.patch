@@ -1,10 +1,15 @@
 From e6b11b59fb5acf706c8da31226088a89fd3d8e76 Mon Sep 17 00:00:00 2001
 From: Chu Qinghao <6337103+qinghao1@users.noreply.github.com>
 Date: Sun, 9 Aug 2026 01:43:38 -0400
-Subject: [PATCH 5/8] wasm: make update_display polling-safe
+Subject: [PATCH] wasm: make update_display polling-safe
 
 Make libpinmame_update_display safe for polling: add bounds and null
 checks, copy pData unconditionally and guard callback invocations.
+
+Upstream-PR-Draft: libpinmame: harden libpinmame_update_display against null/empty display state
+Target: vpinball/pinmame@master
+Body:
+libpinmame_update_display indexes _displays with no validation: a null layout while _displays is empty yields index -1 and an out-of-bounds read, and a null _p_Config or display entry segfaults on dereference. This scopes the upstreamable hardening to an index bounds check plus null guards on the display pointer and config/callback use, leaving the valid-state path behaviorally unchanged. Applies cleanly to current master; guards trigger only on inputs that previously crashed.
 
 ---
  src/libpinmame/libpinmame.cpp | 39 ++++++++++++++++-------------------
