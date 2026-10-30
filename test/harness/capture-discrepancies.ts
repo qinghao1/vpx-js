@@ -498,14 +498,12 @@ const checks: DiscrepancyCheck[] = [
 		description: 'Runner requests right-half window; GNOME mutter centers and adds frames → 743,407 observed.',
 		impact: 'Side-by-side compare is offset; not a rendering bug but hampers visual diff.',
 		check: async () => {
-			const runnerSrc =
-				readFileSafe(path.join(REPO_ROOT, 'bin/vpinball-runner.ts')) +
-				readFileSafe(path.join(REPO_ROOT, 'test/harness/vpinball-resolver.ts'))
-			const hasIni = runnerSrc.includes('PlayfieldWndX')
+			const resolverSrc = readFileSafe(path.join(REPO_ROOT, 'test/harness/vpinball-resolver.ts'))
+			const hasIni = resolverSrc.includes('PlayfieldWndX')
 			return {
 				status: hasIni ? 'pass' : 'warn',
-				detail: hasIni ? 'Runner stages PlayfieldWndX=1280 via transient INI' : 'No INI placement found',
-				evidence: 'bin/vpinball-runner.ts, test/harness/vpinball-resolver.ts',
+				detail: hasIni ? 'Resolver stages PlayfieldWndX=1280 via transient INI' : 'No INI placement found',
+				evidence: 'test/harness/vpinball-resolver.ts',
 			}
 		},
 	},
@@ -693,8 +691,6 @@ function renderMarkdown(results: CheckResult[]): string {
 	out += `npx tsx test/harness/capture-discrepancies.ts --markdown   # alias\n`
 	out += `npm run verify:discrepancies                         # package.json shortcut\n`
 	out += `npm run verify:vpinball -- --vpx=walking_dead.vpx     # ground-truth script parity\n`
-	out += `npx tsx bin/vpinball-runner.ts --doctor               # native ldd/shaders/pinmame\n`
-	out += `npx tsx bin/vpinball-runner.ts "http://localhost:3000/?vpx=/@fs/home/qinghao1/Downloads/walking_dead.vpx&rom=/@fs/home/qinghao1/.pinmame/roms/twd_160h.zip"\n`
 	out += `npm run compare -- --vpx=walking_dead.vpx             # left browser 0,0 + right native 1280,0\n`
 	out += `\`\`\`\n\n`
 

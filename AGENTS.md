@@ -15,10 +15,6 @@ npx tsx test/harness/verify-all.ts   # E2E 1..8: wasm → table → pinmame → 
 
 # Native VPinball debugging (requires VPinballX standalone)
 npm run vpinball:setup     # Tier A build or Tier B prebuilt → ~/.cache/vpinball/
-npm run vpinball:doctor    # ldd/otool, shaders, PinMAMEPath checks
-npm run vpinball -- --vpx=table-flipper --extractvbs   # authoritative script extract
-npm run vpinball:audit -- --vpx=table-flipper          # native table audit
-npm run vpinball -- "http://localhost:3000/?vpx=/@fs/...&rom=/@fs/..."  # play via URL
 npm run compare -- --vpx=table-flipper   # dual window: browser left 0,0 + native right 1280,0
 npm run verify:vpinball -- --all-fixtures   # script & table structure parity across 25 fixtures
 npm run verify:audit       # table structure & physics constants audit across 25 fixtures
@@ -34,7 +30,7 @@ Node via `fnm` — `.nvmrc` `24`, `.node-version` `24.19.0`. Activate with `eval
 - `test/fixtures/*.vpx` + `test/harness/` + `lib/**/*.spec.ts`
 - `wasm/` + `external/pinmame` (submodule) → `wasm/dist/` (`wasm/build.sh`, `--mock` fallback)
 - `external/vpinball` (submodule, `https://github.com/vpinball/vpinball.git`) → native `VPinballX_GL`/`VPinballX_BGFX` + `libSDL3.so` + `shaders-10.8.1/` + `plugins/`
-- `bin/vpinball-runner.ts` + `test/harness/vpinball-resolver.ts` + `test/harness/compare-side-by-side.ts` + `test/harness/verify-vpinball-compat.ts` — vpinball debugging & parity
+- `test/harness/vpinball-resolver.ts` + `test/harness/compare-side-by-side.ts` + `test/harness/verify-vpinball-compat.ts` — vpinball debugging & parity
 - `demo-browser/` — local browser demo (tracked; only `dist/`, `node_modules/`, `.vite/` ignored)
 - `dist/`, `dist-esm/`, `coverage/`, `node_modules/`, `*.vpx`, `lib/scripting/grammar/rules.ts`, `external/vpinball/build/`, `.cache/vpinball/` — ignored, do not commit
 

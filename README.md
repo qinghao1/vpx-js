@@ -93,18 +93,6 @@ table.kickers.BallRelease.getApi().CreateBall()
 table.kickers.BallRelease.getApi().Kick(0, 5)
 ```
 
-### CLI
-
-Build first (`npm run build`), then:
-
-```bash
-vbs2js <script.vbs> [--format-only]          # transpile VBScript → JS
-vpt2glb <table.vpx> [out.glb] [flags]         # convert to GLB
-vptscript <table.vpx|folder> [--save]        # extract table script
-```
-
-`vpt2glb` flags are all opt-out: `--no-textures`, `--no-materials`, `--no-lights`, `--no-primitives`, `--no-flippers`, etc. (Draco/`--compress-vertices` is removed).
-
 ## What Changed Since Upstream v1.3.4
 
 In short:
@@ -117,6 +105,7 @@ In short:
 - **Scripting hardened** — broader VBScript coverage and a proper `with`-proxy sandbox.
 - **New: PinMAME WASM** — `external/pinmame` + `wasm/` build (WASM + mock fallback) for any PinMAME hardware; upstream only mentioned `wpc-emu`.
 - **Leaner repo** — `demo-static` removed.
+- **No CLI tools** — `bin/` removed; script extraction, GLB export, and transpiling are library API (`Table.load`, `TableExporter`, `Transpiler`).
 
 
 ## Development

@@ -344,9 +344,8 @@ export function discoverVpinball(): VpinballDiscovery {
 
 /**
  * Spawn a native GUI child with stdout/stderr piped through a `[tag] ` prefix.
- * Shared by bin/vpinball-runner.ts and test/harness/compare-side-by-side.ts
- * so both launchers tag native output identically; exit/error policy stays
- * with the caller (runner exits the process, compare only logs).
+ * Used by test/harness/compare-side-by-side.ts to tag native output;
+ * exit/error policy stays with the caller (compare only logs).
  */
 export function spawnTaggedProcess(cmd: string, args: string[], env: NodeJS.ProcessEnv, tag: string): ChildProcess {
 	const child = spawn(cmd, args, { stdio: ['inherit', 'pipe', 'pipe'], env })

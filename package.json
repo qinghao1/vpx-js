@@ -36,11 +36,6 @@
 		"dist/**",
 		"res/**"
 	],
-	"bin": {
-		"vbs2js": "./dist/bin/vbs2js.js",
-		"vpt2glb": "./dist/bin/vpt2glb.js",
-		"vptscript": "./dist/bin/vptscript.js"
-	},
 	"scripts": {
 		"build": "npm run build:rules && node build/parallel.mjs -- \"npm run build:js\" \"npm run build:esm:tsc\" && node build/parallel.mjs -- \"npm run build:info\" \"npm run build:cp\" \"npm run build:esm:cp\"",
 		"build:pre": "node build/parallel.mjs -- \"tsx build/compile-rules.ts\" \"tsx build/write-info.ts\"",
@@ -77,11 +72,7 @@
 		"bench:walking-dead:breakdown": "tsx test/harness/bench-node.ts --vpx=${WALKING_DEAD_VPX:-/home/qinghao1/Downloads/walking_dead.vpx} --ticks=5 --breakdown",
 		"profile:walking-dead": "tsx test/harness/ranked-profile.ts --vpx=${WALKING_DEAD_VPX:-/home/qinghao1/Downloads/walking_dead.vpx}",
 		"bench:walking-dead:ranked": "tsx test/harness/ranked-profile.ts --vpx=${WALKING_DEAD_VPX:-/home/qinghao1/Downloads/walking_dead.vpx}",
-		"vpinball": "tsx bin/vpinball-runner.ts",
 		"vpinball:setup": "bash scripts/setup-vpinball.sh",
-		"vpinball:doctor": "tsx bin/vpinball-runner.ts --doctor",
-		"vpinball:extract": "tsx bin/vpinball-runner.ts --extractvbs",
-		"vpinball:audit": "tsx bin/vpinball-runner.ts --audit",
 		"compare": "tsx test/harness/compare-side-by-side.ts",
 		"verify:vpinball": "tsx test/harness/verify-vpinball-compat.ts",
 		"verify:audit": "tsx test/harness/verify-vpinball-compat.ts --audit",

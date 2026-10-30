@@ -32,7 +32,7 @@ eval + play(...)              transpiler.ts: evals JS, calls the wrapped `play`
 ```
 
 `transpile(vbs)` returns JS without running it. `execute(vbs, scope)` transpiles,
-evals, and calls `play`. `bin/vbs2js.ts` exposes the same for the CLI.
+evals, and calls `play`.
 `execute` needs `eval` of generated code, so a hosting page must allow `unsafe-eval` in its CSP.
 
 ## The 7 namespaces

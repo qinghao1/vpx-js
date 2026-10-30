@@ -90,6 +90,6 @@ npm run compare -- --vpx=table-flipper        # manual visual compare
   plus host-wide stale-chrome/vite `pkill` — parallel runs on one host kill
   each other. `CHROME_PATH` overrides chrome discovery.
 - `createSessionIni` makes `/tmp/vpinball-*/VPinballX.ini` via `mkdtemp` and
-  never deletes it — the CALLER must `rm -rf` the dir (`vpinball-runner.ts`
-  and `compare-side-by-side.ts` do; one `rm` per call, both files create one
+  never deletes it — the CALLER must `rm -rf` the dir
+  (`compare-side-by-side.ts` does; one `rm` per call, it creates one
   ini per `createSessionIni` AND one inside `resolveVpxSession`).

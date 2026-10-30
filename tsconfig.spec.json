@@ -1,7 +1,7 @@
 {
 	"extends": "./tsconfig.json",
 	"compilerOptions": { "noEmit": true, "types": ["node", "vitest/globals"] },
-	"include": ["lib/**/*", "bin/**/*", "build/**/*", "test/**/*"],
+	"include": ["lib/**/*", "build/**/*", "test/**/*"],
 	"exclude": [
 		".nyc_output",
 		"node_modules",
