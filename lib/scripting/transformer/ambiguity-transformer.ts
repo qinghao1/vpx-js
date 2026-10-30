@@ -129,28 +129,32 @@ export class AmbiguityTransformer extends Transformer {
 		if (node.callee.type === 'MemberExpression') {
 			const topMemberName = this.getTopMemberName(node.callee)
 			if (this.isNamespaced(topMemberName)) {
-				// zero-arg call on a property getter (e.g. __global.FrameIndex()) should be property, not call
-				if (node.arguments.length === 0) {
-					let api: unknown
-					switch (topMemberName) {
-						case Transformer.GLOBAL_NAME:
-							api = this.globalApi
-							break
-						case Transformer.ITEMS_NAME:
-							api = this.itemApis
-							break
-						case Transformer.STDLIB_NAME:
-							api = this.stdlib
-							break
-						case Transformer.ENUMS_NAME:
-							return node
-					}
-					const obj = getValue(api, node.callee as MemberExpression)
-					if (typeof obj !== 'function' && typeof obj !== 'undefined') {
-						return node.callee as unknown as Expression
-					}
+				let api: unknown
+				switch (topMemberName) {
+					case Transformer.GLOBAL_NAME:
+						api = this.globalApi
+						break
+					case Transformer.ITEMS_NAME:
+						api = this.itemApis
+						break
+					case Transformer.STDLIB_NAME:
+						api = this.stdlib
+						break
+					case Transformer.ENUMS_NAME:
+						return node
 				}
-				return node
+				const obj = getValue(api, node.callee as MemberExpression)
+				// zero-arg call on a property getter (e.g. __global.FrameIndex()) should be property, not call
+				if (node.arguments.length === 0 && typeof obj !== 'function' && typeof obj !== 'undefined') {
+					return node.callee as unknown as Expression
+				}
+				// A parameterized call needs something callable: a direct call on
+				// a non-function value (a collection's default member `Coll(i)`,
+				// an array, ...) throws at runtime. Fall through to the
+				// dispatcher, which invokes functions and index-traverses the rest.
+				if (node.arguments.length === 0 || typeof obj === 'function' || typeof obj === 'undefined') {
+					return node
+				}
 			}
 		}
 		// otherwise, we don't know, so use getOrCall

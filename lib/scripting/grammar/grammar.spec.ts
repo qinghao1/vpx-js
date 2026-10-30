@@ -130,6 +130,59 @@ describe('The scripting grammar - block Else If (two words)', () => {
 		new Transpiler(table, player).execute(vbs, scope, 'global')
 		expect(scope.y).to.equal(3)
 	})
+
+	it('should read two-word "Else If" with its own "End If" as nested (Royal Flush)', () => {
+		// MS VBScript reads a line-leading `Else If <cond> Then` as `Else`
+		// opening a nested block-`If`, so the extra `End If` closes the nest
+		// instead of dangling. Each branch must execute exactly once.
+		for (const [x, y] of [
+			[1, 1],
+			[2, 2],
+			[9, 0],
+		]) {
+			const scope = { x, y: 0 } as any
+			const vbs = `a = 1\nIf a = 1 Then\nIf x = 1 Then\ny = 1\nElse If x = 2 Then\ny = 2\nEnd If\nEnd If\nEnd If`
+			new Transpiler(table, player).execute(vbs, scope, 'global')
+			expect(scope.y, `x=${x}`).to.equal(y)
+		}
+	})
+
+	it('should repair each scope independently', () => {
+		// The nested-style sub needs its extra `End If`; the lenient sub
+		// keeps its single one. Repairing one scope must not touch the other.
+		const vbs =
+			`Sub Nested()\nIf a = 1 Then\nIf x = 1 Then\ny = 1\nElse If x = 2 Then\ny = 2\nEnd If\nEnd If\nEnd If\nEnd Sub\n` +
+			`Sub Lenient()\nIf z = 1 Then\nw = 1\nElse If z = 2 Then\nw = 2\nEnd If\nEnd Sub`
+		const js = grammar.vbsToJs(vbs)
+		expect(js).to.contain('y = 1;')
+		expect(js).to.contain('y = 2;')
+		expect(js).to.contain('w = 1;')
+		expect(js).to.contain('w = 2;')
+	})
+
+	it('should report the failing line number and line', () => {
+		const vbs = `x = 1\ny = \nIf x = 1 Then\nz = 1\nEnd If\n`
+		expect(() => grammar.transpile(vbs)).to.throw(Error, 'line 2: y=')
+	})
+
+	it('should ignore "Then:" inside string literals when balancing', () => {
+		// `s = "Then: x"` is a single-line `If`, not a block opener: the
+		// scope stays balanced and the lenient chain must not be split.
+		const scope = { a: 1, b: 3, y: 0 } as any
+		const vbs = `If a = 1 Then s = "Then: x"\nIf b = 2 Then\ny = 1\nElse If b = 3 Then\ny = 2\nEnd If`
+		new Transpiler(table, player).execute(vbs, scope, 'global')
+		expect(scope.y).to.equal(2)
+	})
+
+	it('should count block `If` after a colon when balancing', () => {
+		// `z = 1 : If c = 3 Then` opens a block whose `End If` must count,
+		// or the co-resident lenient chain gets split spuriously.
+		const scope = { z: 1, c: 3, w: 0, b: 3, y: 0 } as any
+		const vbs = `z = 1 : If c = 3 Then\nw = 1\nEnd If\nIf b = 2 Then\ny = 1\nElse If b = 3 Then\ny = 2\nEnd If`
+		new Transpiler(table, player).execute(vbs, scope, 'global')
+		expect(scope.w).to.equal(1)
+		expect(scope.y).to.equal(2)
+	})
 })
 
 describe('The scripting grammar - Call with parenthesized arguments', () => {

@@ -8,6 +8,7 @@ import sinonChai from 'sinon-chai'
 import { ThreeHelper } from '../../../test/three.helper'
 import { Player } from '../../game/player.js'
 import { NodeBinaryReader } from '../../io/binary-reader.node.js'
+import { Transpiler } from '../../scripting/transpiler.js'
 import type { ItemApi } from '../item-api.js'
 import type { ItemData } from '../item-data.js'
 import { Table } from '../table/table.js'
@@ -135,6 +136,19 @@ describe('The VPinball collection', () => {
 		expect(coll.Item(1).Name).to.equal('SuppressEventsTimer2')
 		expect(() => coll.Item(2)).to.throw(RangeError)
 		expect(() => coll.Item(-1)).to.throw(RangeError)
+	})
+
+	it('should resolve default-member calls to Item(i)', () => {
+		const scope: Record<string, unknown> = {}
+		new Transpiler(table, player).execute('SuppressEvents(0).Name = "renamed"\n', scope, 'global')
+		expect(table.timers.SuppressEventsTimer1.getApi().Name).to.equal('renamed')
+		// Companion guard: enumeration is unaffected by the call fall-through.
+		new Transpiler(table, player).execute(
+			'count = 0\nFor Each m In SuppressEvents\ncount = count + 1\nNext\n',
+			scope,
+			'global',
+		)
+		expect(scope.count).to.equal(2)
 	})
 
 	it('should resolve member names case-insensitively like upstream', () => {

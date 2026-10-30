@@ -175,11 +175,107 @@ export interface ESIToken extends IToken {
 	children: ESIToken[]
 }
 
+const SCOPE_OPEN_RE =
+	/^(?:\s*(?:(?:public|private)(?:\s+default)?\s+)?(?:sub|function)\b|\s*(?:(?:public|private)\s+)?property\s+(?:get|let|set)\b|\s*class\b)/i
+const SCOPE_CLOSE_RE = /^\s*end\s+(?:sub|function|property|class)\b/i
+const IF_OPEN_RE = /^\s*if\b/i
+const BLOCK_THEN_RE = /\bthen\s*$/i
+const END_IF_RE = /^\s*end\s+if\b/i
+const SPACED_ELSE_IF_RE = /^\s*else\s+if\b/i
+const LITERAL_RE = /"(?:""|[^"])*"|#[^#]*#/g
+
+/** Blank string/date literals in place (same length) so the scan can't match inside them. */
+function blankLiterals(line: string): string {
+	return line.replace(LITERAL_RE, match => ' '.repeat(match.length))
+}
+
+/**
+ * Two-word `Else If` parity: MS reads line-leading `Else If <cond> Then`
+ * (nothing after `Then`) as `Else` opening a nested block-`If` with its own
+ * `End If`; our grammar reads one `ElseIf` needing none, so nested-style
+ * tables (e.g. Royal Flush 1976) fail to parse. Single-line
+ * `Else If ... Then <stmt>` needs no `End If` either way: keep it lenient.
+ *
+ * Repair: per Sub/Function/Property/Class scope, balance `If`/`End If`
+ * under the lenient reading; while a scope carries an extra `End If`,
+ * split its last block-form candidate into `Else` + `If ... Then`.
+ * Balanced scopes pass through byte-identical.
+ */
+function repairSpacedElseIf(lines: string[]): string[] {
+	const out = [...lines]
+	for (;;) {
+		const scopeOf = new Array<number>(out.length)
+		const stack: number[] = [0]
+		let nextScope = 1
+		for (let i = 0; i < out.length; i++) {
+			const line = out[i]!
+			// Boundary lines belong to the outer scope: pop before assigning, push after.
+			if (SCOPE_CLOSE_RE.test(line) && stack.length > 1) stack.pop()
+			scopeOf[i] = stack[stack.length - 1]!
+			if (SCOPE_OPEN_RE.test(line)) stack.push(nextScope++)
+		}
+		interface Scan {
+			depth: number
+			unbalanced: boolean
+			candidates: number[]
+		}
+		const scans = new Map<number, Scan>()
+		const scanFor = (scope: number): Scan => {
+			let scan = scans.get(scope)
+			if (!scan) {
+				scan = { depth: 0, unbalanced: false, candidates: [] }
+				scans.set(scope, scan)
+			}
+			return scan
+		}
+		for (let i = 0; i < out.length; i++) {
+			const line = out[i]!
+			const scan = scanFor(scopeOf[i]!)
+			if (SCOPE_OPEN_RE.test(line) || SCOPE_CLOSE_RE.test(line)) continue
+			const stripped = blankLiterals(line)
+			if (END_IF_RE.test(stripped)) {
+				scan.depth--
+				if (scan.depth < 0) scan.unbalanced = true
+				continue
+			}
+			// Any `:` segment may open a block `If` (`z = 1 : If c Then`).
+			const opens = stripped.split(':').some(segment => IF_OPEN_RE.test(segment) && BLOCK_THEN_RE.test(segment))
+			if (opens) {
+				scan.depth++
+				continue
+			}
+			// Block form only: single-line `Then <stmt>` parses either way, never a candidate.
+			if (SPACED_ELSE_IF_RE.test(stripped) && BLOCK_THEN_RE.test(stripped.split(':')[0]!)) {
+				scan.candidates.push(i)
+			}
+		}
+		for (const scan of scans.values()) {
+			// Only an extra `End If` is splittable: opening another `If`
+			// can never repair a missing `End If`.
+			if (scan.depth < 0) scan.unbalanced = true
+		}
+		// One split per pass, then re-scan; take the latest candidate.
+		let split = -1
+		for (const scan of scans.values()) {
+			if (scan.unbalanced && scan.candidates.length > 0) {
+				split = Math.max(split, scan.candidates[scan.candidates.length - 1]!)
+			}
+		}
+		if (split === -1) return out
+		// Keep the tail verbatim (`Then : stmt` stays on the new `If` line).
+		const indent = /^(\s*)/.exec(out[split]!)![1]
+		const rest = out[split]!.trimStart().slice('Else'.length).trimStart()
+		out.splice(split, 1, `${indent}Else`, `${indent}${rest}`)
+	}
+}
+
 /**
  * VBS grammar parser: `format` (strip comments, join `_` continuations,
- * normalize keyword case) → `ebnf` parse with generated `RULES` → post-process
- * (`post-process/pp*`, token tree → ESTree). AST transformers run later in
- * `Transpiler` via `buildPipeline`, not here. See `../README.md`.
+ * repair two-word `Else If` to the nested MS reading when the lenient
+ * `ElseIf` reading unbalances the scope, normalize keyword case) → `ebnf`
+ * parse with generated `RULES` → post-process (`post-process/pp*`, token
+ * tree → ESTree). AST transformers run later in `Transpiler` via
+ * `buildPipeline`, not here. See `../README.md`.
  */
 const GRAMMAR_KEYWORDS: string[] = [
 	'And',
@@ -419,7 +515,7 @@ export class Grammar {
 			}
 		}
 		const outLines: string[] = []
-		for (const raw of joined) {
+		for (const raw of repairSpacedElseIf(joined)) {
 			let res = ''
 			let prevTokenType: string | null = null
 			let prevTokenText = ''
@@ -710,10 +806,10 @@ export class Grammar {
 			throw new Error('Unable to transpile script.')
 		} else if (ast.rest?.length) {
 			const start = formattedScript.length - ast.rest.length
-			throw new Error(
-				'Unable to transpile script. Syntax error at: ' +
-					formattedScript.substr(start, formattedScript.indexOf('\n', start)),
-			)
+			const lineNo = formattedScript.slice(0, start).split('\n').length
+			const eol = formattedScript.indexOf('\n', start)
+			const line = formattedScript.slice(start, eol === -1 ? start + 200 : eol)
+			throw new Error(`Unable to transpile script. Syntax error at line ${lineNo}: ${line}`)
 		}
 		logger().debug('[Grammar.transpile] Parsed in %sms', Date.now() - now)
 
@@ -770,8 +866,8 @@ export class Grammar {
 				/**
 				 * Loop through all registered post processors until an estree
 				 * is returned. If no post processors can handle the node, and
-				 * the node has a child, copy it's estree. This will allow estrees
-				 * to get propagated to parents, and we wont need to have
+				 * the node has a child, copy its estree. This will allow estrees
+				 * to get propagated to parents, and we won't need to have
 				 * post-processors for every single rule in the grammar.
 				 */
 				const estree = runPostProcessors(node)

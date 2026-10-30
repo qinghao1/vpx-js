@@ -125,8 +125,8 @@ describe('vbsCacheKey', () => {
 		// Stale transpiled JS running against a newer runtime produces
 		// undebuggable crashes (wrong line numbers, old codegen). The prefix
 		// must change whenever transpile output semantics change; retired
-		// prefixes (vbs6 and older) must not be emitted anymore.
-		const retired = ['vbs1:', 'vbs2:', 'vbs3:', 'vbs4:', 'vbs5:', 'vbs6:']
+		// prefixes (vbs7 and older) must not be emitted anymore.
+		const retired = ['vbs1:', 'vbs2:', 'vbs3:', 'vbs4:', 'vbs5:', 'vbs6:', 'vbs7:']
 		const key = vbsCacheKey('Dim x')
 		// Deterministic.
 		expect(vbsCacheKey('Dim x')).toBe(key)
