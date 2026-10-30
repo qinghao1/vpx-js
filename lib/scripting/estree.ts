@@ -49,7 +49,7 @@ import type {
 	WhileStatement,
 } from 'estree'
 
-/** ESTree factories — concise helpers with optional scope forwarding. */
+/** ESTree factories with optional scope forwarding. */
 
 export const program = (body: Statement[]): Program => ({ type: 'Program', sourceType: 'script', body })
 

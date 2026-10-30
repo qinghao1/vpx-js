@@ -12,7 +12,6 @@ export function toLowerCached(text: string): string {
 	return result
 }
 
-/** Base for VBS-exposed APIs. */
 export abstract class VbsApi {
 	private propertyMap?: { [key: string]: string }
 
@@ -29,7 +28,6 @@ export abstract class VbsApi {
 	}
 }
 
-/** VbsNotImplementedError. */
 export class VbsNotImplementedError extends Error {
 	constructor() {
 		super('This method of the VBScript API has not been implemented.')

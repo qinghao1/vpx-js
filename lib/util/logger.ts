@@ -1,7 +1,6 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-/** Minimal logger. */
 export interface ILogger {
 	wtf(f: string, ...a: unknown[]): void
 	error(f: string, ...a: unknown[]): void
@@ -9,7 +8,6 @@ export interface ILogger {
 	info(f: string, ...a: unknown[]): void
 	debug(f: string, ...a: unknown[]): void
 }
-/** Progress reporter. */
 export interface IProgress {
 	start(id: string, title: string): void
 	end(id: string): void
@@ -17,7 +15,6 @@ export interface IProgress {
 	details(details: string): void
 }
 
-/** Console logger with replaceable singleton. */
 export class Logger implements ILogger {
 	private static _instance: ILogger = new Logger()
 	private static _forcedDebug: boolean | null = null
@@ -56,7 +53,6 @@ export class Logger implements ILogger {
 	}
 }
 
-/** Throttled console progress. */
 export class Progress implements IProgress {
 	private static _instance: IProgress = new Progress()
 	private title?: string

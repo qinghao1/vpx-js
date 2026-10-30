@@ -41,7 +41,6 @@ export function findDeclaringScope(currentScope: any, lowerName: string): any {
 	return null
 }
 
-/** Base AST transformer with scope analysis. */
 export class Transformer {
 	public static SCOPE_NAME = '__scope'
 	public static ITEMS_NAME = '__items'

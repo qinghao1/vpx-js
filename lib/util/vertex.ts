@@ -3,14 +3,12 @@
 
 import { Vertex2D, Vertex3D } from '../math/vector.js'
 
-/** Minimal vector contract. */
 export interface Vertex {
 	x: number
 	y: number
 	distanceTo(other: { x: number; y: number }): number
 }
 
-/** Vertex with editor flags. */
 export interface IRenderVertex {
 	x: number
 	y: number

@@ -59,7 +59,6 @@ export function isNothing(value: unknown): boolean {
 	)
 }
 
-/** VBS stdlib. */
 export class Stdlib extends VbsApi {
 	private readonly math = new VbsMath()
 

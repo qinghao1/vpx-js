@@ -9,7 +9,6 @@ import { getAuthoredVisible } from './authored-visible.js'
 import { type MergedBulbGlowRef, setBulbGlowState, setMergedBulbGlowRangeState } from './nodes/bulb-glow-node.js'
 import { ThreeRenderApi } from './three-render-api.js'
 
-/** Generates and updates Three.js lights. */
 export class ThreeLightGenerator {
 	public createPointLight(d: LightData, table?: Table): PointLight {
 		// Bake-time live level mirrors native RenderSetup; the authored
