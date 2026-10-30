@@ -20,7 +20,10 @@ const checks: Array<[string, () => boolean]> = [
 	['modules/pinmame CMake exists', () => fs.existsSync(path.join(wasmDir, 'modules/pinmame/CMakeLists.txt'))],
 	[
 		'modules/pinmame patches exist',
-		() => fs.existsSync(path.join(wasmDir, 'modules/pinmame/patches/0001-wasm-guard-__rolq-__rorq-for-WASM.patch')),
+		() =>
+			fs.existsSync(
+				path.join(wasmDir, 'modules/pinmame/patches/0001-wasm-make-update_display-polling-safe.patch'),
+			),
 	],
 	['CMakeLists requires 3.28+', () => readWasmFile('CMakeLists.txt').includes('3.28')],
 	['CMakeLists has EMSCRIPTEN guard', () => readWasmFile('CMakeLists.txt').includes('NOT EMSCRIPTEN')],

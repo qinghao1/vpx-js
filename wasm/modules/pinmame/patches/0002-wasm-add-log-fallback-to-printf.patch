@@ -3,18 +3,19 @@ From: Chu Qinghao <6337103+qinghao1@users.noreply.github.com>
 Date: Fri, 30 Oct 2026 00:00:00 -0400
 Subject: [PATCH] wasm: add log fallback to printf
 
-Add fallback to printf/vfprintf when no log callback is set.
+Add fallback to printf/vfprintf when no log callback is set
+(Emscripten-only, behind __EMSCRIPTEN__).
 Helps debugging ROM load failures in WASM.
 
 ---
- src/libpinmame/libpinmame.cpp | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+ src/libpinmame/libpinmame.cpp | 18 ++++++++++++------
+ 1 file changed, 12 insertions(+), 6 deletions(-)
 
 diff --git a/src/libpinmame/libpinmame.cpp b/src/libpinmame/libpinmame.cpp
 index 3a97dc4..8333484 100644
 --- a/src/libpinmame/libpinmame.cpp
 +++ b/src/libpinmame/libpinmame.cpp
-@@ -978,14 +978,13 @@
+@@ -978,14 +978,16 @@
   ******************************************************/
 
  extern "C" void libpinmame_log_info(const char* format, ...)
@@ -27,12 +28,15 @@ index 3a97dc4..8333484 100644
 -	(*(_p_Config->cb_OnLogMessage))(PINMAME_LOG_LEVEL_INFO, format, args, _p_userData);
 +	if (_p_Config && _p_Config->cb_OnLogMessage)
 +		(*(_p_Config->cb_OnLogMessage))(PINMAME_LOG_LEVEL_INFO, format, args, _p_userData);
++#ifdef __EMSCRIPTEN__
++/* Emscripten hosts have no log callback: mirror to the console instead. */
 +	else { vprintf(format, args); printf("\n"); }
++#endif
  	va_end(args);
  }
 
  /******************************************************
-@@ -993,14 +992,13 @@
+@@ -993,14 +992,16 @@
   ******************************************************/
 
  extern "C" void libpinmame_log_error(const char* format, ...)
@@ -45,7 +49,10 @@ index 3a97dc4..8333484 100644
 -	(*(_p_Config->cb_OnLogMessage))(PINMAME_LOG_LEVEL_ERROR, format, args, _p_userData);
 +	if (_p_Config && _p_Config->cb_OnLogMessage)
 +		(*(_p_Config->cb_OnLogMessage))(PINMAME_LOG_LEVEL_ERROR, format, args, _p_userData);
++#ifdef __EMSCRIPTEN__
++/* Emscripten hosts have no log callback: mirror to the console instead. */
 +	else { vfprintf(stderr, format, args); fprintf(stderr, "\n"); }
++#endif
  	va_end(args);
  }
 
