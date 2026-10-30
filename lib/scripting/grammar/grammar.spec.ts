@@ -79,7 +79,7 @@ describe('The scripting grammar - transpile', () => {
 
 describe('The scripting grammar - real-world scripts', () => {
 	it('should transpile bundled scripts', () => {
-		const names = ['controller.vbs', 'core.vbs', 'sam.vbs', 'WPC.vbs', 'VPMKeys.vbs']
+		const names = ['controller.vbs', 'core.vbs', 'sam.vbs', 'WPC.vbs', 'VPMKeys.vbs', 'sys80.vbs']
 		for (const n of names) {
 			let vbs: string
 			try {

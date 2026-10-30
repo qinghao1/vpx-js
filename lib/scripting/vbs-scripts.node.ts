@@ -1,59 +1,52 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { ERR } from './stdlib/err.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
+// Committed set first; dev-only upstream checkout second.
+const SEARCH_DIRS = [resolve(__dirname, '../../res/scripts'), resolve(__dirname, '../../external/vpinball/src/scripts')]
 
-/* istanbul ignore next: We don't test VB's core library. */
-/** Whether a bundled text file exists without fallback. */
+/** Whether a bundled text file exists. */
 export function hasTextFile(fileName: string): boolean {
-	const base = fileName.replace(/.*[\\/]/, '')
 	try {
-		const p = getLocalPath(base)
-		readFileSync(p)
+		getLocalPath(fileName)
 		return true
 	} catch {
-		try {
-			const p2 = getLocalPath(fileName)
-			readFileSync(p2)
-			return true
-		} catch {
-			return false
-		}
+		return false
 	}
 }
 
 export function getTextFile(fileName: string): string {
-	return readFileSync(getLocalPath(fileName)).toString('utf8')
+	try {
+		return readFileSync(getLocalPath(fileName)).toString('utf8')
+	} catch {
+		ERR.Raise(53, 'GetTextFile', `Unable to open ${fileName}`)
+		// Raise returns in record mode (On Error Resume Next); the empty string is the fallback text.
+		return ''
+	}
 }
 
-/* istanbul ignore next: We don't test VB's core library. */
 function getLocalPath(fileName: string): string {
-	switch (fileName.toLowerCase()) {
-		case 'controller.vbs':
-			return resolve(__dirname, '../../res/scripts/controller.vbs')
-		case 'core.vbs':
-			return resolve(__dirname, '../../res/scripts/core.vbs')
-		case 'sam.vbs':
-			return resolve(__dirname, '../../res/scripts/sam.vbs')
-		case 'vpmkeys.vbs':
-			return resolve(__dirname, '../../res/scripts/VPMKeys.vbs')
-		case 'wpc.vbs':
-			return resolve(__dirname, '../../res/scripts/WPC.vbs')
-	}
-	// Unknown VBS: try res/scripts/<name> then vpinball/scripts/<name> before falling back
-	const lower = fileName.toLowerCase()
-	const candidates = [
-		resolve(__dirname, `../../res/scripts/${fileName}`),
-		resolve(__dirname, `../../res/scripts/${lower}`),
-	]
-	for (const c of candidates) {
-		readFileSync(c)
-		return c
+	const base = fileName.replace(/.*[\\/]/, '')
+	for (const dir of SEARCH_DIRS) {
+		const exact = resolve(dir, base)
+		if (existsSync(exact)) return exact
+		const lower = base.toLowerCase()
+		// Names may be mixed-case; match case-insensitively.
+		try {
+			for (const entry of readdirSync(dir)) {
+				if (entry.toLowerCase() === lower) {
+					return resolve(dir, entry)
+				}
+			}
+		} catch {
+			// A search dir may be absent (packed tree, checkout without submodules).
+		}
 	}
 	throw new Error(`Cannot find text file ${fileName}`)
 }
