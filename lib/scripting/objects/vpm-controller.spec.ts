@@ -13,7 +13,10 @@ import { crc32 } from '../../emu/rom-fetcher.js'
 import { Emulator } from '../../emu/wpc-emu.js'
 import { Player } from '../../game/player.js'
 import type { Table } from '../../vpt/table/table.js'
+import { Transpiler } from '../transpiler.js'
+import { VbsUndefined } from '../vbs-undefined.js'
 import { vbsEquals, vbsNot } from '../vbs-values.js'
+import { getObject } from './index.js'
 import { VpmController } from './vpm-controller.js'
 
 /** Display/debug stubs defined on VpmController at runtime via Object.defineProperty in its static block. */
@@ -35,6 +38,7 @@ interface VpmControllerDisplayStubs {
 chai.use((sinonChai as any).default ?? sinonChai)
 describe('The VpmController - VISUAL PINMAME COM OBJECT', () => {
 	const sandbox = sinon.createSandbox()
+	let sharedTable: Table
 	let sharedPlayer: Player
 	let vpmController: VpmController & VpmControllerDisplayStubs
 	let setSwitchInputSpy: SinonStub<[number, boolean?]>
@@ -43,8 +47,8 @@ describe('The VpmController - VISUAL PINMAME COM OBJECT', () => {
 	let _getDipSwitchByteSpy: SinonStub<any>
 
 	before(() => {
-		const table: Table = new TableBuilder().build()
-		sharedPlayer = new Player(table)
+		sharedTable = new TableBuilder().build()
+		sharedPlayer = new Player(sharedTable)
 	})
 
 	beforeEach(() => {
@@ -317,6 +321,43 @@ describe('The VpmController - VISUAL PINMAME COM OBJECT', () => {
 		// @ts-expect-error
 		vpmController.Switch[11] = false
 		expect(setSwitchInputSpy.args[0]).to.deep.equal([11, false])
+	})
+
+	it('should drop a Switch write with an Empty index instead of throwing a falsish-trap TypeError', () => {
+		// cvpmBallStack.SetSw: an unassigned trough slot leaves mSwcopy Empty, so
+		// `Controller.Switch(mSwcopy) = ...` indexes with Empty (an "undefined" key).
+		// The write is dropped, but the proxy set trap must still return true.
+		expect(() => {
+			;(vpmController.Switch as any)[new VbsUndefined() as any] = false
+		}).to.not.throw()
+		expect(setSwitchInputSpy.called).to.equal(false)
+	})
+
+	it('should not throw when the emulator reports a failed switch write', () => {
+		// PinMameEmulator.setSwitchInput returns false when the backend write throws
+		// (the write is queued for retry). That boolean must not leak into the proxy
+		// set trap, where falsish means assignment failure.
+		setSwitchInputSpy.returns(false)
+		expect(() => {
+			vpmController.Switch[11] = 1
+		}).to.not.throw()
+		expect(setSwitchInputSpy.args[0]).to.deep.equal([11, true])
+	})
+
+	it('should ignore writes to GetMech without throwing', () => {
+		expect(() => {
+			vpmController.GetMech[1] = 1
+		}).to.not.throw()
+	})
+
+	it('should run a parameterized Switch write with an Empty index (trough SetSw)', () => {
+		// End to end through the real transpile+eval path: `mSwcopy = mSw(1)` reads an
+		// unassigned slot (Empty), then `Controller.Switch(mSwcopy) = ...` emits
+		// `...Switch[mSwcopy] = ...` with an "undefined" key. Must not throw.
+		const transpiler = new Transpiler(sharedTable, sharedPlayer)
+		const scope: Record<string, unknown> = { Controller: getObject('VPinMAME.Controller', sharedPlayer) }
+		const vbs = 'Dim mSw(2)\nDim mSwcopy\nmSwcopy = mSw(1)\nController.Switch(mSwcopy) = False\n'
+		expect(() => transpiler.execute(vbs, scope, 'globalThis')).to.not.throw()
 	})
 
 	it('get Lamp 0 (offset 11)', () => {

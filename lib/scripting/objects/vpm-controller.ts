@@ -379,8 +379,16 @@ export class VpmController {
 				return index === null ? (undefined as any) : get(index)
 			},
 			set: (_target, key, value) => {
+				// A `set` trap must return true once handled: a falsish
+				// return makes strict-mode script assignments throw
+				// `trap returned falsish`. An Empty (or otherwise
+				// non-numeric) index means "no switch", and a failed
+				// emulator write is already queued inside — neither is a
+				// trap failure, so the setter's own boolean is not propagated.
 				const index = toIndex(key)
-				return index === null ? false : set(index, value)
+				if (index === null) return true
+				set(index, value)
+				return true
 			},
 		})
 	}
