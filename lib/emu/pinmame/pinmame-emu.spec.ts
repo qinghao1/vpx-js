@@ -342,6 +342,52 @@ describe('PinMAME WASM emulator (mock)', () => {
 		expect(received.length).toBe(1)
 		expect(received[0][0]).toBeCloseTo(15000 / 32768, 5)
 	})
+	it('pullAudio hands out a pooled view valid only until the next drain', () => {
+		const received: Float32Array[] = []
+		const backend = (sample: number) => {
+			const heap = new Uint8Array(65536)
+			return {
+				mod: {
+					_malloc: () => 64,
+					_free: () => {},
+					HEAPU8: heap,
+					getValue: () => 0,
+				},
+				api: {
+					getChangedLamps: () => 0,
+					getChangedSols: () => 0,
+					getChangedGIs: () => 0,
+					getDmdWidth: () => 0,
+					getDmdHeight: () => 0,
+					getAudioChannels: () => 1,
+					getAudioFrame: (ptr: number) => {
+						new DataView(heap.buffer).setInt16(ptr, sample, true)
+						return 1
+					},
+				},
+			}
+		}
+		const first = backend(16384)
+		emu.setBackendForTesting(first.mod, first.api)
+		emu.registerAudioConsumer(msg => void received.push(msg as Float32Array))
+		emu.markReady()
+		emu.emuSimulateCycle(16)
+		expect(received.length).toBe(1)
+		expect(received[0][0]).toBe(0.5)
+		const copy = received[0].slice()
+		const second = backend(-16384)
+		emu.setBackendForTesting(second.mod, second.api)
+		emu.emuSimulateCycle(16)
+		expect(received.length).toBe(2)
+		expect(received[0].buffer).toBe(received[1].buffer)
+		// The earlier view now reads the latest drain's samples.
+		expect(received[0][0]).toBe(-0.5)
+		expect([...copy]).toEqual([0.5])
+		// A same-content drain still delivers instead of going stale.
+		emu.emuSimulateCycle(16)
+		expect(received.length).toBe(3)
+		expect(received[2][0]).toBe(-0.5)
+	})
 	it('pullAudio no-ops when the wasm build lacks the audio export', () => {
 		const consumer = vi.fn()
 		emu.setBackendForTesting(

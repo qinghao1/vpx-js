@@ -95,6 +95,8 @@ export class PinMameEmulator implements IEmulator {
 		audio: { ptr: 0, cap: 0, min: MAX_AUDIO_FRAMES * 2 },
 	}
 	private _dmdFrameBuf: Uint8Array | null = null
+	// Pooled output; borrowed, not owned (see pullAudio).
+	private readonly _audioPcm = new Float32Array(MAX_AUDIO_FRAMES)
 	// Single listener slot: last writer wins instead of stacking streams.
 	private audioConsumer: ((msg: unknown) => void) | null = null
 
@@ -331,6 +333,8 @@ export class PinMameEmulator implements IEmulator {
 		this.pullAudio()
 	}
 
+	// The delivered Float32Array is a pooled view, only valid until the next
+	// drain call — consumers must copy it synchronously, not retain it.
 	private pullAudio(): void {
 		const m = this.mod
 		const consumer = this.audioConsumer
@@ -348,12 +352,14 @@ export class PinMameEmulator implements IEmulator {
 		// undersized buffer would overflow the wasm heap.
 		const ptr = this.ensureWasmBuf('audio', MAX_AUDIO_FRAMES * 2 * 2)
 		// At most one accumulator per sync; 0 means nothing drained yet, not an error.
-		const frames = getFrame(ptr, MAX_AUDIO_FRAMES)
+		// Backend-trusted count: clamp to the pool so a rogue backend can't
+		// stretch the DataView below or write past the pooled array.
+		const frames = Math.min(getFrame(ptr, MAX_AUDIO_FRAMES), MAX_AUDIO_FRAMES)
 		if (frames <= 0 || (this.api?.getAudioSeq?.() ?? seq0) !== seq0) return
 		const fresh = this.api?.getAudioChannels?.() ?? 0
 		if (fresh !== 1 && fresh !== 2) return
 		const view = new DataView(m.HEAPU8.buffer, ptr, frames * fresh * 2)
-		const pcm = new Float32Array(frames)
+		const pcm = this._audioPcm.subarray(0, frames)
 		if (fresh === 1) {
 			for (let i = 0; i < frames; i++) pcm[i] = view.getInt16(i * 2, true) / 32768
 		} else {

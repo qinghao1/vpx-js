@@ -16,6 +16,10 @@ export interface IEmulator {
 	getVersion(): string
 	setPaused(v: boolean): void
 	getPaused(): boolean
+	/**
+	 * Delivered audio views are borrowed until the next drain — consumers
+	 * must copy synchronously, not retain them.
+	 */
 	registerAudioConsumer(cb: (msg: unknown) => void): void
 
 	emuSimulateCycle(ms: number): number
