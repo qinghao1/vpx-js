@@ -356,4 +356,16 @@ describe('The VPinball player', () => {
 		expect(second.isEmpty).to.equal(false)
 		expect(second.getState(ball.getName())).to.not.equal(undefined)
 	})
+
+	it('should return a shared empty instance from idle popStates', async () => {
+		const table = await Table.load(new NodeBinaryReader(three.fixturePath('table-timer.vpx')))
+		const player = new Player(table).init()
+		player.popStates()
+		const empty1 = player.popStates()
+		const empty2 = player.popStates()
+		expect(empty1.isEmpty).to.equal(true)
+		expect(empty2).to.equal(empty1)
+		expect(() => empty1.release()).to.not.throw()
+		expect(player.popStates()).to.equal(empty1)
+	})
 })

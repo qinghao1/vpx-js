@@ -13,6 +13,7 @@ import type { ItemState } from '../vpt/item-state.js'
 import type { Table } from '../vpt/table/table.js'
 import { Event } from './event.js'
 import type { IEmulator } from './iemulator.js'
+import type { IAnimatable, IMovable } from './interfaces.js'
 import { type AssignKey, keyEventToDirectInputKey } from './key-code.js'
 import { PinInput } from './pin-input.js'
 import { PlayerPhysics } from './player-physics.js'
@@ -44,6 +45,11 @@ export class Player extends EventEmitter {
 	private previousStates: Record<string, ItemState> = {}
 	private currentStates: Record<string, ItemState> = {}
 	private simulatedTimeMs = 0
+	// Table items are fixed at load (assigned once in the Table constructor,
+	// no add/remove API), so the per-tick subsets are snapshotted once.
+	// Balls are not table items and stay on their own physics.balls path.
+	private readonly movables: IMovable[]
+	private readonly animatables: IAnimatable[]
 	private dirtySet = new Set<string>()
 	private allStateNames: string[] = []
 	private frameCount = 0
@@ -67,6 +73,8 @@ export class Player extends EventEmitter {
 		super()
 		this.pinInput = new PinInput(table, this)
 		this.physics = new PlayerPhysics(table, this.pinInput)
+		this.movables = table.getMovables()
+		this.animatables = table.getAnimatables()
 		this.setupTableElements()
 		this.setupStates()
 		this.wrapApis()
@@ -174,9 +182,9 @@ export class Player extends EventEmitter {
 	public updatePhysics(timeMs?: number): number {
 		const iterations = this.physics.updatePhysics(timeMs)
 		if (iterations > 0) {
-			for (const ball of this.physics.balls) this.markDirty(ball.getName())
-			for (const movable of this.table.getMovables()) {
-				this.markDirty(movable.getName())
+			for (let i = 0; i < this.physics.balls.length; i++) this.markDirty(this.physics.balls[i]!.getName())
+			for (let i = 0; i < this.movables.length; i++) {
+				this.markDirty(this.movables[i]!.getName())
 			}
 		}
 		return iterations
@@ -186,14 +194,14 @@ export class Player extends EventEmitter {
 		return this.popStates()
 	}
 	public updateAnimations(timeMs: number): void {
-		for (const animatable of this.table.getAnimatables()) {
+		for (let i = 0; i < this.animatables.length; i++) {
+			const animatable = this.animatables[i]!
 			if (animatable.getAnimation().updateAnimation(timeMs, this.table)) {
 				this.markDirty(animatable.getName())
 			}
 		}
 	}
 	public popStates(): ChangedStates<ItemState> {
-		const changed = new ChangedStates<ItemState>()
 		this.frameCount++
 		const useFull =
 			this.frameCount % FULL_SWEEP_EVERY === 0 &&
@@ -201,6 +209,8 @@ export class Player extends EventEmitter {
 		if (useFull) {
 			for (const name of this.allStateNames) this.dirtySet.add(name)
 		}
+		if (this.dirtySet.size === 0) return EMPTY_CHANGED_STATES
+		const changed = new ChangedStates<ItemState>()
 		for (const name of this.dirtySet) {
 			const next = this.currentStates[name]
 			const prev = this.previousStates[name]
@@ -211,7 +221,7 @@ export class Player extends EventEmitter {
 			}
 		}
 		this.dirtySet.clear()
-		return changed
+		return changed.isEmpty ? EMPTY_CHANGED_STATES : changed
 	}
 
 	public onKeyUp(e: DomKeyEvent): void {
@@ -361,9 +371,17 @@ export class ChangedStates<STATE extends ItemState = ItemState> {
 		return this.changedStates[name] as S
 	}
 	public release(): void {
+		if (this === EMPTY_CHANGED_STATES) return
 		for (const k in this.changedStates) {
 			this.changedStates[k]?.release()
 			delete this.changedStates[k]
 		}
 	}
 }
+
+/**
+ * Shared empty diff returned by {@link Player.popStates} when nothing changed,
+ * so idle frames allocate nothing. Must never be mutated or given states;
+ * `release()` no-ops on it by identity.
+ */
+const EMPTY_CHANGED_STATES = new ChangedStates<ItemState>()
