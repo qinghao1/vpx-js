@@ -391,7 +391,7 @@ export class PinMameEmulator implements IEmulator {
 		const ptr = this.ensureWasmBuf('dmd', n)
 		// getDmdFrame returns bytes written (0 = no display yet). The frame is
 		// copied out of wasm memory twice — HEAPU8 into the reusable
-		// _dmdFrameBuf, then EmulatorState.setDmd slices again — so later pulls
+		// _dmdFrameBuf, then into the publish back buffer — so later pulls
 		// can't mutate a previously published frame.
 		if (ptr && this.api.getDmdFrame(ptr) > 0) {
 			if (!this._dmdFrameBuf || this._dmdFrameBuf.length !== n) {

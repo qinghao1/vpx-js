@@ -7,6 +7,15 @@ import { OffsetIndex } from './offset-index.js'
 
 const empty = (n = 64) => new Uint8Array(n)
 
+// Copy src into dst, reallocating only when the size changed. PinMAME
+// reuses its lane buffers in place across syncs, so the state must
+// still copy.
+function copyInto(dst: Uint8Array<ArrayBuffer>, src: Uint8Array<ArrayBufferLike>): Uint8Array<ArrayBuffer> {
+	if (dst.length !== src.length) return Uint8Array.from(src)
+	dst.set(src)
+	return dst
+}
+
 export class EmulatorState {
 	private lamps = empty()
 	private lastLamps = empty()
@@ -15,6 +24,7 @@ export class EmulatorState {
 	private gis = empty()
 	private lastGis = empty()
 	private dmd = new Uint8Array()
+	private dmdBack = new Uint8Array()
 	private switches = new Uint8Array()
 
 	private lampMap: (i: number) => number = OffsetIndex.mapIndexToMatrixIndex
@@ -35,7 +45,7 @@ export class EmulatorState {
 				const v = Math.round(x / 31)
 				return v >= 7 ? 8 : v
 			})
-		if (s.dmd.dmdShadedBuffer) this.dmd = s.dmd.dmdShadedBuffer.slice()
+		if (s.dmd.dmdShadedBuffer) this.publishDmd(s.dmd.dmdShadedBuffer)
 		if (s.wpc.inputSwitchMatrixActiveColumn) this.switches = s.wpc.inputSwitchMatrixActiveColumn.slice()
 	}
 
@@ -43,13 +53,25 @@ export class EmulatorState {
 		this.lampMap = i => i
 		this.solMap = i => i
 		this.giMap = i => i
-		this.lamps = lamps.slice()
-		this.sols = sols.slice()
-		this.gis = gis.slice()
+		this.lamps = copyInto(this.lamps, lamps)
+		this.sols = copyInto(this.sols, sols)
+		this.gis = copyInto(this.gis, gis)
 	}
 
 	setDmd(frame: Uint8Array): void {
-		this.dmd = frame.slice()
+		this.publishDmd(frame)
+	}
+
+	// Double-buffered DMD publish: getDmdScreen hands out the live front
+	// buffer, so the frame is staged in the back buffer and swapped — a
+	// previously published snapshot is never mutated in place, even when a
+	// caller retains it across frames.
+	private publishDmd(frame: Uint8Array): void {
+		if (this.dmdBack.length !== frame.length) this.dmdBack = new Uint8Array(frame.length)
+		this.dmdBack.set(frame)
+		const front = this.dmd
+		this.dmd = this.dmdBack
+		this.dmdBack = front
 	}
 
 	getSwitchState(o: OffsetIndex): number {

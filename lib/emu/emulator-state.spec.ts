@@ -206,4 +206,45 @@ describe('The EmulatorState - handle state changes', () => {
 		const result: Uint8Array = emulatorState.getDmdScreen()
 		expect(result.length).to.equal(0)
 	})
+
+	it('should keep a published DMD snapshot stable across setDmd republishes', () => {
+		emulatorState.setDmd(new Uint8Array([1, 2, 3, 4]))
+		const snap = emulatorState.getDmdScreen()
+		emulatorState.setDmd(new Uint8Array([5, 6, 7, 8]))
+		expect(snap).to.deep.equal(new Uint8Array([1, 2, 3, 4]))
+		expect(emulatorState.getDmdScreen()).to.deep.equal(new Uint8Array([5, 6, 7, 8]))
+	})
+
+	it('should not retain the caller frame passed to setDmd', () => {
+		const frame = new Uint8Array([1, 2, 3, 4])
+		emulatorState.setDmd(frame)
+		frame.fill(9)
+		expect(emulatorState.getDmdScreen()).to.deep.equal(new Uint8Array([1, 2, 3, 4]))
+	})
+
+	it('should keep a published DMD snapshot stable across updateState', () => {
+		emulatorState.updateState(stateOne)
+		const snap = emulatorState.getDmdScreen()
+		emulatorState.updateState({
+			ram: new Uint8Array(),
+			sound: soundState,
+			wpc: wpcState2,
+			dmd: { scanline: 0, dmdShadedBuffer: new Uint8Array([7, 7, 7]), dmdPageMapping: [] },
+		})
+		expect(snap).to.deep.equal(new Uint8Array([1, 2, 3]))
+		expect(emulatorState.getDmdScreen()).to.deep.equal(new Uint8Array([7, 7, 7]))
+	})
+
+	it('should copy pinmame lanes so later caller mutations do not leak in', () => {
+		const lamps = new Uint8Array([1, 0])
+		const sols = new Uint8Array([0, 1])
+		const gis = new Uint8Array([8, 5])
+		emulatorState.applyPinmame(lamps, sols, gis)
+		lamps.fill(0)
+		sols.fill(0)
+		gis.fill(0)
+		expect(emulatorState.getSolenoidState(1)).to.equal(1)
+		expect(emulatorState.getGIState(0)).to.equal(8)
+		expect(emulatorState.getChangedLamps()).to.deep.equal([[0, 1]])
+	})
 })
