@@ -7,7 +7,7 @@ import { logger } from '../../util/logger.js'
 import { EmulatorMessageQueue, MessageType, switchMessageType } from '../emulator-message-queue.js'
 import { EmulatorState } from '../emulator-state.js'
 import { warnOnce } from '../warn-once.js'
-import { createPinmameModule } from './pinmame-loader.js'
+import { createPinmameModule, resetPinmameModuleCache } from './pinmame-loader.js'
 import type { PinmameModule } from './pinmame-module.js'
 
 // VPM default DMD size, used until the core reports real dimensions.
@@ -29,6 +29,8 @@ type Api = {
 	setConfig(p: number): void
 	run(p: number): number
 	isRunning(): number
+	// Optional: only present when the wasm build exports PinmameStop.
+	stop?(): void
 	setSwitch(n: number, v: number): void
 	getSwitch(n: number): number
 	getChangedLamps(p: number): number
@@ -72,6 +74,15 @@ export class PinMameEmulator implements IEmulator {
 	// loadGame calls race the isRunning check — serialize both.
 	private initPromise: Promise<void> | null = null
 	private loadPromise: Promise<void> | null = null
+	// Module-global tracking: the wasm core runs at most one game, shared by
+	// every instance, so in-flight and ownership guards must span instances.
+	// loadingGame names the game currently inside doLoadGame; activeGame the
+	// last game whose PinmameRun returned OK and was never stopped.
+	private static loadingGame: string | null = null
+	private static activeGame = ''
+	// Set immediately before api.run: a later failure with this flag means
+	// our run may have left native state behind, so cleanup must stop it.
+	private attemptedRun = false
 
 	private readonly lamps = new Uint8Array(1024)
 	private readonly sols = new Uint8Array(128)
@@ -142,6 +153,11 @@ export class PinMameEmulator implements IEmulator {
 		if (typeof (module as unknown as Record<string, unknown>)._PinmameSetCabinetInput === 'function') {
 			this.api.setCabinetInput = wrap('PinmameSetCabinetInput', null, ['number'])
 		}
+		// Same for PinmameStop: without it, failure cleanup can only abandon
+		// the poisoned module instance (see stopNative).
+		if (typeof (module as unknown as Record<string, unknown>)._PinmameStop === 'function') {
+			this.api.stop = wrap('PinmameStop', null, [])
+		}
 		// PinmameGetAudioFrame/Channels/Seq ship in audio-polling wasm builds —
 		// wire them only when present so older builds (and the mock) stay
 		// silent instead of wrapping a hole.
@@ -156,7 +172,8 @@ export class PinMameEmulator implements IEmulator {
 		// Serialize loads: the isRunning check below is check-then-act, so two
 		// concurrent loads could both start a run. Failures don't jam the
 		// chain — the catch lets the next load proceed while still rejecting
-		// the caller that failed.
+		// the caller that failed. A second load racing an in-flight one fails
+		// fast inside doLoadGame instead of reaching the wasm ALREADY_RUNNING.
 		const run = (this.loadPromise ?? Promise.resolve()).catch(() => {}).then(() => this.doLoadGame(name, rom))
 		this.loadPromise = run
 		await run
@@ -166,51 +183,123 @@ export class PinMameEmulator implements IEmulator {
 		name: string | { name?: string; pinmame?: { name?: string } },
 		rom: Uint8Array,
 	): Promise<void> {
-		await this.init()
 		const game = gameName(name)
 		if (!game) throw new Error('PINMAME_GAME_NAME_MISSING')
-		if (this.isMock || !this.mod || !this.api) return this.markReady()
-		if (this.api.isRunning()) {
-			// Silently staying on the old game here leaves callers believing
-			// the new game is ready — fail loudly so they stop the emu first.
-			if (this.game !== game) throw new Error(`PINMAME_ALREADY_RUNNING_${this.game}`)
-			return this.markReady()
-		}
-		const m = this.mod
-		for (const dir of ['/pinmame/roms', '/pinmame/nvram', '/pinmame/cfg']) m.FS.mkdirTree(dir)
-		const zipPath = `/pinmame/roms/${game}.zip`
-		if (rom.length) {
-			let reuse = false
-			try {
-				// Size match alone is not identity — compare bytes too, so a
-				// same-length but different ROM is never silently reused.
-				reuse = m.FS.stat(zipPath).size === rom.length && romBytesEqual(m.FS.readFile(zipPath), rom)
-			} catch (e) {
-				const errno = (e as unknown as { errno?: number })?.errno
-				// 44 is ENOENT from the Emscripten FS — no cached zip yet.
-				if (errno !== 44) throw e
-			}
-			if (!reuse) m.FS.writeFile(zipPath, rom)
-		} else {
-			// An empty ROM must not leave a stale zip behind for this game.
-			try {
-				m.FS.unlink(zipPath)
-			} catch (e) {
-				const errno = (e as unknown as { errno?: number })?.errno
-				if (errno !== 44) throw e
-			}
-		}
-		this.writeConfig(m)
-		const ptr = m._malloc(m.lengthBytesUTF8(game) + 1)
+		// Cross-instance fail-fast: the native core is module-global, so the
+		// per-instance chain above cannot serialize two instances racing one
+		// core — the loser gets a clear error, never a half-started run.
+		if (PinMameEmulator.loadingGame !== null)
+			throw new Error(`PINMAME_LOAD_IN_FLIGHT_${game}_WHILE_${PinMameEmulator.loadingGame}_LOADS`)
+		PinMameEmulator.loadingGame = game
 		try {
-			m.stringToUTF8(game, ptr, m.lengthBytesUTF8(game) + 1)
-			const st = this.api.run(ptr)
-			if (st !== 0) logger().warn(`[pinmame] PinmameRun(${game}) status=${st} — continuing with physics only`)
-			else this.game = game
+			await this.init()
+			if (this.isMock || !this.mod || !this.api) return this.markReady()
+			if (this.api.isRunning()) {
+				if (this.game === game) return this.markReady()
+				if (this.game)
+					// This instance owns a different running game — fail
+					// loudly so the caller stops it first instead of
+					// silently staying on the old game.
+					throw new Error(`PINMAME_ALREADY_RUNNING_${this.game}`)
+				// A fresh instance facing a running core: the previous owner
+				// died without cleanup (failed load, aborted table). Reclaim
+				// the orphan so the next load starts from a known state.
+				this.stopNative()
+				await this.init()
+				if (!this.mod || !this.api) return this.markReady()
+				if (this.api.isRunning())
+					throw new Error(`PINMAME_ALREADY_RUNNING_${PinMameEmulator.activeGame || 'unknown'}`)
+			}
+			const m = this.mod
+			for (const dir of ['/pinmame/roms', '/pinmame/nvram', '/pinmame/cfg']) m.FS.mkdirTree(dir)
+			const zipPath = `/pinmame/roms/${game}.zip`
+			if (rom.length) {
+				let reuse = false
+				try {
+					// Size match alone is not identity — compare bytes too, so a
+					// same-length but different ROM is never silently reused.
+					reuse = m.FS.stat(zipPath).size === rom.length && romBytesEqual(m.FS.readFile(zipPath), rom)
+				} catch (e) {
+					const errno = (e as unknown as { errno?: number })?.errno
+					// 44 is ENOENT from the Emscripten FS — no cached zip yet.
+					if (errno !== 44) throw e
+				}
+				if (!reuse) m.FS.writeFile(zipPath, rom)
+			} else {
+				// An empty ROM must not leave a stale zip behind for this game.
+				try {
+					m.FS.unlink(zipPath)
+				} catch (e) {
+					const errno = (e as unknown as { errno?: number })?.errno
+					if (errno !== 44) throw e
+				}
+			}
+			this.writeConfig(m)
+			this.attemptedRun = true
+			const ptr = m._malloc(m.lengthBytesUTF8(game) + 1)
+			try {
+				m.stringToUTF8(game, ptr, m.lengthBytesUTF8(game) + 1)
+				const st = this.api.run(ptr)
+				if (st === 3)
+					// Lost a race the guard couldn't see — never pretend the
+					// new game is ready while another one runs.
+					throw new Error(`PINMAME_ALREADY_RUNNING_${PinMameEmulator.activeGame || game}`)
+				if (st !== 0) logger().warn(`[pinmame] PinmameRun(${game}) status=${st} — continuing with physics only`)
+				else {
+					this.game = game
+					PinMameEmulator.activeGame = game
+				}
+			} finally {
+				m._free(ptr)
+			}
+		} catch (e) {
+			// A failed load must not poison the next one: stop native state
+			// our run may have left behind, then reset so a retry proceeds
+			// past the isRunning guard instead of throwing ALREADY_RUNNING.
+			if (this.attemptedRun) this.stopNative()
+			this.ready = false
+			this.game = ''
+			this.attemptedRun = false
+			this.paused = true
+			// Keep the name when native state survived cleanup — the next
+			// guard names the culprit instead of an empty string.
+			if (PinMameEmulator.activeGame === game && !this.api?.isRunning()) PinMameEmulator.activeGame = ''
+			throw e
 		} finally {
-			m._free(ptr)
+			if (PinMameEmulator.loadingGame === game) PinMameEmulator.loadingGame = null
 		}
 		this.markReady()
+	}
+
+	/**
+	 * Best-effort core stop so a later load starts from a known state. Safe
+	 * on a failed or foreign instance: native state is only touched when this
+	 * instance ran (or still owns) the active game.
+	 */
+	public stop(): void {
+		if (this.attemptedRun || (this.game !== '' && PinMameEmulator.activeGame === this.game)) this.stopNative()
+		this.ready = false
+		this.paused = true
+		this.attemptedRun = false
+		this.game = ''
+		if (PinMameEmulator.activeGame !== '' && !this.api?.isRunning()) PinMameEmulator.activeGame = ''
+	}
+
+	// Native stop when the export exists; otherwise abandon the poisoned
+	// module instance so the next init builds a known-clean one. Abandoning
+	// never kills other instances' games — they keep their own module ref —
+	// it only redirects future inits at a fresh instance.
+	private stopNative(): void {
+		try {
+			this.api?.stop?.()
+		} catch (e) {
+			logger().warn('[pinmame] PinmameStop threw — abandoning module instance instead', e)
+		}
+		if (this.api && !this.api.stop && this.api.isRunning()) {
+			this.mod = null
+			this.api = null
+			resetPinmameModuleCache()
+		}
 	}
 
 	/**
@@ -221,6 +310,12 @@ export class PinMameEmulator implements IEmulator {
 		this.mod = mod as PinmameModule
 		this.api = api as Api
 		this.isMock = false
+	}
+
+	/** Clears module-global load/owner tracking; test seam for spec isolation. */
+	public static resetSharedStateForTesting(): void {
+		PinMameEmulator.loadingGame = null
+		PinMameEmulator.activeGame = ''
 	}
 
 	/** Advances to ready (normally called by loadGame; public for tests). */

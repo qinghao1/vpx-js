@@ -80,7 +80,7 @@ target_compile_options(libpinmame PRIVATE $<$<CONFIG:Release>:-O3> $<$<CONFIG:De
 
 set(PINMAME_EXPORTS
   "_PinmameSetConfig" "_PinmameRun" "_PinmameIsRunning"
-  "_PinmameSetSwitch" "_PinmameGetSwitch" "_PinmameSetSwitches"
+  "_PinmameSetSwitch" "_PinmameGetSwitch" "_PinmameSetSwitches" "_PinmameStop"
   "_PinmameGetChangedLamps" "_PinmameGetChangedSolenoids" "_PinmameGetChangedGIs" "_PinmameGetChangedLEDs"
   "_PinmameGetDIP" "_PinmameSetDIP" "_PinmameGetSolenoidMask" "_PinmameSetSolenoidMask"
   "_PinmameGetDmdWidth" "_PinmameGetDmdHeight" "_PinmameGetDmdDepth" "_PinmameGetDmdFrame"

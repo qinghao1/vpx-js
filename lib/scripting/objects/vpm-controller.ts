@@ -27,6 +27,7 @@ export class VpmController {
 	private splashInfoLine = ''
 	private timeFence = 0
 	private loadPromise: Promise<void> | null = null
+	private loadFailed = false
 	private readonly gameSettings = new Map<string, { Settings: { Value: Record<string, unknown> } }>()
 	private readonly solMaskCache = new Map<number, number>()
 	private readonly dipCache = new Map<number, number>()
@@ -132,9 +133,13 @@ export class VpmController {
 		return this.gameName
 	}
 	set GameName(v: string) {
-		if (v === this.gameName) return
+		// A failed load must stay retryable: without the loadFailed escape the
+		// same name is ignored and the viewer keeps the opaque ALREADY_RUNNING
+		// from the next attempt instead of the real error.
+		if (v === this.gameName && !this.loadFailed) return
 		this.gameName = v
-		this.loadPromise = this._loadGame(v).catch(e => logger().error('DOWNLOAD_FAILED:', e))
+		this.loadFailed = false
+		this.startLoad(v)
 	}
 	async whenReady(): Promise<void> {
 		if (this.loadPromise) await this.loadPromise
@@ -163,11 +168,28 @@ export class VpmController {
 		}
 		const emu = new PinMameEmulator()
 		this.replay(emu)
+		const prev = this.emulator
 		this.emulator = emu
 		const rom = await this.fetchRom(name)
-		await emu.loadGame(name, rom)
+		try {
+			await emu.loadGame(name, rom)
+		} catch (e) {
+			// Stop the failed attempt so its native state can't poison the
+			// retry; restore the previous emulator so a still-running game
+			// keeps serving reads instead of a dead instance.
+			emu.stop()
+			if (this.emulator === emu) this.emulator = prev
+			throw e
+		}
 		this.player.setEmulator(emu)
 		this.replay(emu as unknown as IEmulator)
+	}
+
+	private startLoad(name: string): void {
+		this.loadPromise = this._loadGame(name).catch(e => {
+			this.loadFailed = true
+			logger().error('DOWNLOAD_FAILED:', name, e)
+		})
 	}
 
 	private replay(emu: IEmulator): void {
@@ -264,8 +286,10 @@ export class VpmController {
 			this.stub('Run', { nMinVersion, hParentWnd })
 			return
 		}
-		if (!this.loadPromise)
-			this.loadPromise = this._loadGame(this.gameName).catch(e => logger().error('DOWNLOAD_FAILED:', e))
+		if (!this.loadPromise || this.loadFailed) {
+			this.loadFailed = false
+			this.startLoad(this.gameName)
+		}
 		logger().debug('RUN', this.gameName)
 	}
 	Stop(): void {

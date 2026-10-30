@@ -9,6 +9,7 @@ describe('PinMAME WASM emulator (mock)', () => {
 	beforeEach(() => {
 		emu = new PinMameEmulator()
 		resetWarnOnce()
+		PinMameEmulator.resetSharedStateForTesting()
 	})
 	it('has DMD dimensions 128x32', () => {
 		const d: Vertex2D = emu.getDmdDimensions()
@@ -145,6 +146,61 @@ describe('PinMAME WASM emulator (mock)', () => {
 		await emu.loadGame('gameA', new Uint8Array([1]))
 		api.isRunning.mockReturnValue(1)
 		await expect(emu.loadGame('gameB', new Uint8Array([1]))).rejects.toThrow(/PINMAME_ALREADY_RUNNING_gameA/)
+	})
+	it('failed load stops the core so the retry is not ALREADY_RUNNING', async () => {
+		const shared = sharedBackend({ boomOnRun: true })
+		const first = new PinMameEmulator()
+		attach(first, shared)
+		await expect(first.loadGame('gameA', new Uint8Array([1]))).rejects.toThrow('boom')
+		// The failed run left native state behind; cleanup must have stopped it.
+		expect(shared.state.running).toBe(0)
+		expect(first.isInitialized()).toBe(false)
+		const retry = new PinMameEmulator()
+		attach(retry, shared)
+		await retry.loadGame('gameA', new Uint8Array([1]))
+		expect(retry.isInitialized()).toBe(true)
+		expect(shared.state.running).toBe(1)
+	})
+	it('fresh instance reclaims an orphaned running game left by a dead owner', async () => {
+		const shared = sharedBackend({})
+		const first = new PinMameEmulator()
+		attach(first, shared)
+		await first.loadGame('gameA', new Uint8Array([1]))
+		expect(shared.state.running).toBe(1)
+		// The table died (script throw) without stopping: a new instance for
+		// the retry must reclaim the orphan instead of throwing ALREADY_RUNNING.
+		const retry = new PinMameEmulator()
+		attach(retry, shared)
+		await retry.loadGame('gameB', new Uint8Array([1]))
+		expect(retry.isInitialized()).toBe(true)
+		expect(shared.stop).toHaveBeenCalled()
+	})
+	it('concurrent loads fail fast instead of reaching the wasm ALREADY_RUNNING', async () => {
+		const shared = sharedBackend({})
+		const first = new PinMameEmulator()
+		attach(first, shared)
+		let release!: () => void
+		const gate = new Promise<void>(resolve => (release = resolve))
+		vi.spyOn(first, 'init').mockImplementationOnce(async () => void (await gate))
+		const pending = first.loadGame('gameA', new Uint8Array([1]))
+		const second = new PinMameEmulator()
+		attach(second, shared)
+		await expect(second.loadGame('gameB', new Uint8Array([1]))).rejects.toThrow(/PINMAME_LOAD_IN_FLIGHT_gameB/)
+		release()
+		await pending
+		expect(first.isInitialized()).toBe(true)
+	})
+	it('failed load without the PinmameStop export still recovers via a fresh module', async () => {
+		const shared = sharedBackend({ boomOnRun: true, withStop: false })
+		const first = new PinMameEmulator()
+		attach(first, shared)
+		await expect(first.loadGame('gameA', new Uint8Array([1]))).rejects.toThrow('boom')
+		// No PinmameStop to call and the core is stuck: the retry degrades to
+		// physics-only instead of throwing ALREADY_RUNNING or crashing.
+		const retry = new PinMameEmulator()
+		attach(retry, shared)
+		await retry.loadGame('gameA', new Uint8Array([1]))
+		expect(retry.isInitialized()).toBe(true)
 	})
 	it('loadGame reload of the same game while running stays ready', async () => {
 		const { api } = wired(emu)
@@ -655,6 +711,56 @@ describe('PinMAME WASM emulator (mock)', () => {
 		expect([...emu.getDmdFrame()]).toEqual(bytes)
 	})
 })
+
+// One shared backend stands in for the shared wasm module singleton: every
+// instance attached to it observes the same native running flag.
+function sharedBackend(opts: { boomOnRun?: boolean; withStop?: boolean }) {
+	const state = { running: 0 }
+	const heap = new Uint8Array(65536)
+	const m = {
+		FS: {
+			mkdirTree: () => {},
+			writeFile: () => {},
+			readFile: () => {
+				throw { errno: 44 }
+			},
+			stat: () => {
+				throw { errno: 44 }
+			},
+			unlink: () => {
+				throw { errno: 44 }
+			},
+		},
+		_malloc: () => 8,
+		_free: () => {},
+		HEAPU8: heap,
+		lengthBytesUTF8: (s: string) => s.length,
+		stringToUTF8: () => {},
+	}
+	let failures = opts.boomOnRun ? 1 : 0
+	const api: Record<string, unknown> = {
+		isRunning: () => state.running,
+		run: () => {
+			// A wasm trap after the core started: native state is left
+			// running while the load itself throws.
+			if (failures-- > 0) {
+				state.running = 1
+				throw new Error('boom')
+			}
+			if (state.running) return 3
+			state.running = 1
+			return 0
+		},
+		setConfig: () => {},
+	}
+	if (opts.withStop !== false) api.stop = vi.fn(() => (state.running = 0))
+	return { state, m, api, stop: api.stop as ReturnType<typeof vi.fn> | undefined }
+}
+
+function attach(target: PinMameEmulator, shared: ReturnType<typeof sharedBackend>): void {
+	target.setBackendForTesting(shared.m, shared.api)
+	vi.spyOn(target, 'init').mockResolvedValue(undefined)
+}
 
 function wired(target: PinMameEmulator, files = new Map<string, Uint8Array>()) {
 	const heap = new Uint8Array(65536)
