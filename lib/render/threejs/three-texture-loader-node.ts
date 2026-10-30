@@ -312,14 +312,7 @@ async function decodePng(data: Uint8Array): Promise<DecodedImage | null> {
 	// 16-bit samples are big-endian pairs; the filter distance and stride
 	// count both bytes while expansion below reads the high byte of each.
 	const bytesPerPixel = channels * (bitDepth === 16 ? 2 : 1)
-	const compressedLength = idatParts.reduce((sum, part) => sum + part.length, 0)
-	const compressed = new Uint8Array(compressedLength)
-	let writeOffset = 0
-	for (const part of idatParts) {
-		compressed.set(part, writeOffset)
-		writeOffset += part.length
-	}
-	const raw = await inflateZlib(compressed)
+	const raw = await inflateZlib(idatParts)
 	const stride = width * bytesPerPixel
 	if (!raw || raw.length !== height * (stride + 1)) {
 		return null
@@ -332,13 +325,18 @@ async function decodePng(data: Uint8Array): Promise<DecodedImage | null> {
 	}
 }
 
-async function inflateZlib(compressed: Uint8Array): Promise<Uint8Array | null> {
+async function inflateZlib(parts: Uint8Array[]): Promise<Uint8Array | null> {
 	try {
 		if (typeof DecompressionStream !== 'undefined') {
 			const stream = new DecompressionStream('deflate')
 			const writer = stream.writable.getWriter()
-			writer.write(compressed as unknown as BufferSource)
-			writer.close()
+			// Queued (not awaited) in chunk order, so the stream sees the
+			// concatenated bytes with no file-sized copy. Awaiting close()
+			// before the read loop below deadlocks once output exceeds the
+			// stream queue; failures surface through the reader instead, so
+			// writer-side rejections are dropped here (unhandled otherwise).
+			for (const part of parts) writer.write(part as unknown as BufferSource).catch(() => {})
+			writer.close().catch(() => {})
 			const chunks: Uint8Array[] = []
 			const reader = stream.readable.getReader()
 			while (true) {
@@ -361,6 +359,14 @@ async function inflateZlib(compressed: Uint8Array): Promise<Uint8Array | null> {
 		}
 	} catch {
 		// fall through to pako
+	}
+	// pako needs contiguous input, so only the fallback pays for the copy.
+	const compressedLength = parts.reduce((sum, part) => sum + part.length, 0)
+	const compressed = new Uint8Array(compressedLength)
+	let writeOffset = 0
+	for (const part of parts) {
+		compressed.set(part, writeOffset)
+		writeOffset += part.length
 	}
 	try {
 		const pako = await import('pako')

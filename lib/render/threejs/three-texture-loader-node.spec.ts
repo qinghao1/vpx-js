@@ -37,6 +37,7 @@ function buildPng(
 	colorType: number,
 	rows: number[][],
 	transparency?: number[],
+	idatPartSize?: number,
 ): Uint8Array {
 	const ihdr = new Uint8Array(13)
 	const view = new DataView(ihdr.buffer)
@@ -46,12 +47,17 @@ function buildPng(
 	ihdr[9] = colorType
 	const flat: number[] = []
 	for (const row of rows) flat.push(0, ...row)
-	const idat = deflateSync(Buffer.from(flat))
+	const idatBytes = new Uint8Array(deflateSync(Buffer.from(flat)))
+	const partSize = idatPartSize && idatPartSize > 0 ? idatPartSize : idatBytes.length
+	const idatChunks: Buffer[] = []
+	for (let i = 0; i < idatBytes.length; i += partSize) {
+		idatChunks.push(Buffer.from(pngChunk('IDAT', idatBytes.subarray(i, i + partSize))))
+	}
 	const parts = [
 		Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
 		Buffer.from(pngChunk('IHDR', ihdr)),
 		...(transparency ? [Buffer.from(pngChunk('tRNS', new Uint8Array(transparency)))] : []),
-		Buffer.from(pngChunk('IDAT', new Uint8Array(idat))),
+		...idatChunks,
 		Buffer.from(pngChunk('IEND', new Uint8Array(0))),
 	]
 	return new Uint8Array(Buffer.concat(parts))
@@ -109,6 +115,22 @@ describe('ThreeTextureLoaderNode float size bound', () => {
 		expect(Array.from(rgbaOf(await loader.loadTexture('tex16key', '.png', keyed)).data)[3]).toBe(0)
 		const opaque = buildPng(1, 1, 16, 0, [[0x12, 0x35]], [0x12, 0x34])
 		expect(Array.from(rgbaOf(await loader.loadTexture('tex16opaque', '.png', opaque)).data)[3]).toBe(255)
+	})
+
+	it('decodes split IDATs byte-for-byte identical to a single IDAT', async () => {
+		const loader = new ThreeTextureLoaderNode()
+		// 3-byte IDAT parts slice the zlib stream mid-symbol, so chunk order matters.
+		const rows = [
+			[255, 0, 0, 255, 0, 255, 0, 255],
+			[0, 0, 255, 255, 255, 255, 255, 255],
+		]
+		const expected = [255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 255, 255]
+		const whole = rgbaOf(await loader.loadTexture('texWhole', '.png', buildPng(2, 2, 8, 6, rows)))
+		expect(Array.from(whole.data)).toEqual(expected)
+		const split = rgbaOf(await loader.loadTexture('texSplit', '.png', buildPng(2, 2, 8, 6, rows, undefined, 3)))
+		expect(split.width).toBe(2)
+		expect(split.height).toBe(2)
+		expect(Array.from(split.data)).toEqual(expected)
 	})
 
 	it('still decodes 8-bit grayscale the established way', async () => {
