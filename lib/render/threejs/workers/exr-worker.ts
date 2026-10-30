@@ -3,6 +3,7 @@ import { EXRLoader } from 'three/examples/jsm/loaders/EXRLoader.js'
 import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js'
 import { MAX_FLOAT_TEXTURE_BYTES } from '../../../util/quality.js'
 import { downscaleArray } from '../texture-downscale.js'
+import { isPlayfieldCap } from '../texture-tags.js'
 
 self.onmessage = (e: MessageEvent) => {
 	const { id, buffer, type, max, name } = e.data as {
@@ -16,7 +17,10 @@ self.onmessage = (e: MessageEvent) => {
 		// Last line of defense for the pre-decode bound enforced in
 		// three-texture-loader-browser.ts: the parse below expands to a
 		// full-res half-float frame before downsampling, so reject here too.
-		if (buffer.byteLength > MAX_FLOAT_TEXTURE_BYTES) {
+		// Playfield bakes are exempt (the main thread routes over-cap ones
+		// here precisely to keep the slow parse off its event loop); a
+		// worker-side OOM kills only the worker, not the tab.
+		if (buffer.byteLength > MAX_FLOAT_TEXTURE_BYTES && !isPlayfieldCap(name)) {
 			throw new Error(
 				`Float texture "${name ?? 'unknown'}" is too large to decode ` +
 					`(${(buffer.byteLength / 1048576).toFixed(1)}MB > ${MAX_FLOAT_TEXTURE_BYTES / 1048576}MB cap)`,
