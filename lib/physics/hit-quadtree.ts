@@ -39,7 +39,9 @@ export class HitQuadtree {
 
 	public hitTestBall(ball: Ball, coll: CollisionEvent, physics: PlayerPhysics): void {
 		if (!isWasmReady()) return this.hitTestBallScalar(ball, coll, physics)
-		if (!this.collect(ball)) return this.hitTestBallScalar(ball, coll, physics)
+		// Empty collect provably finds nothing on re-walk: same bbox cull as the
+		// scalar walk, and traverse only skips abortHitTest, which doHitTest re-checks.
+		if (!this.collect(ball)) return
 		if (!this.batches.run(ball, coll, physics)) this.hitTestBallScalar(ball, coll, physics)
 	}
 

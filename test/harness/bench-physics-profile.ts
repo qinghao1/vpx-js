@@ -58,12 +58,15 @@ let wasmCalls = 0
 let scalarCalls = 0
 let totalOrderLen = 0
 let maxOrderLen = 0
+let qtDepth = 0
+let emptyCalls = 0
 const orderHist = new Map<string, number>()
 
 function resetCounters(): void {
 	hitCalls = 0
 	wasmCalls = 0
 	scalarCalls = 0
+	emptyCalls = 0
 	totalOrderLen = 0
 	maxOrderLen = 0
 	orderHist.clear()
@@ -78,12 +81,15 @@ function orderBucket(len: number): string {
 }
 const HitQuadtree = (await import('../../lib/physics/hit-quadtree.js')).HitQuadtree
 
+// Root-only accounting: child calls recurse through the same method.
 const origQT = HitQuadtree.prototype.hitTestBall
 HitQuadtree.prototype.hitTestBall = function (ball: any, coll: any, physics: any) {
-	hitCalls++
-	const lenBefore = (this as any)._orderLen ?? 0
+	if (qtDepth > 0) return origQT.call(this, ball, coll, physics)
+	qtDepth++
 	const res = origQT.call(this, ball, coll, physics)
-	const len = (this as any)._orderLen ?? lenBefore
+	qtDepth--
+	hitCalls++
+	const len = (this as any).batches?.orderLen ?? 0
 	if (len > 0) {
 		totalOrderLen += len
 		maxOrderLen = Math.max(maxOrderLen, len)
@@ -92,8 +98,7 @@ HitQuadtree.prototype.hitTestBall = function (ball: any, coll: any, physics: any
 		if (len >= 64 && isWasmReady()) wasmCalls++
 		else scalarCalls++
 	} else {
-		// still count as scalar if fallback
-		if (lenBefore < 64) scalarCalls++
+		emptyCalls++
 	}
 	return res
 } as any
@@ -146,8 +151,9 @@ for (let i = 0; i < ticks; i++) {
 const totalMs = performance.now() - tStart
 
 const hitAvg = hitCalls ? totalOrderLen / hitCalls : 0
+const microSummary = `ticks=${ticks} total=${totalMs.toFixed(0)}ms wasm~${wasmCalls} scalar~${scalarCalls} empty~${emptyCalls}`
 console.log(
-	`\n[results] ticks=${ticks} total=${totalMs.toFixed(0)}ms  avgTick=${(totalMs / ticks).toFixed(3)}ms  throughput=${Math.round((ticks * 1000) / totalMs)} ticks/sec`,
+	`\n[results] ${microSummary}  avgTick=${(totalMs / ticks).toFixed(3)}ms  throughput=${Math.round((ticks * 1000) / totalMs)} ticks/sec`,
 )
 console.log(`  phys updatePhysics stats`, stats(physTimes, 3))
 console.log(`  mover updateVelocities stats`, stats(moverTimes, 3))
@@ -156,7 +162,7 @@ console.log(
 	`  inner physicsSimulateCycle total ${innerHitMs.toFixed(1)}ms avg ${(innerHitMs / ticks).toFixed(3)}ms/tick`,
 )
 console.log(
-	`  hitTestBall calls=${hitCalls} wasmPath~${wasmCalls} scalarPath~${scalarCalls} avgOrderLen=${hitAvg.toFixed(1)} max=${maxOrderLen} hist=${JSON.stringify(Object.fromEntries(orderHist))}`,
+	`  hitTestBall calls=${hitCalls} wasm~${wasmCalls} scalar~${scalarCalls} empty~${emptyCalls} avgOrderLen=${hitAvg.toFixed(1)} max=${maxOrderLen} hist=${JSON.stringify(Object.fromEntries(orderHist))}`,
 )
 console.log(
 	`  WASM ready=${wasmReady}  threshold=64  balls=${player.balls.length}  hitObjects=${phys.hitObjects.length}`,
