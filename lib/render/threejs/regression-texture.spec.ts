@@ -3,8 +3,8 @@ import { deflate } from 'pako'
 import { DataUtils, HalfFloatType } from 'three'
 import { describe, expect, it } from 'vitest'
 import { QUALITY_CAPS } from '../../util/quality.js'
-import { downscaleArray, getHalfToFloatLut } from './texture-downscale.js'
-import { getMaxTextureSize } from './texture-tags.js'
+import { boxWindowGeometry, downscaleArray, getHalfToFloatLut } from './texture-downscale.js'
+import { getMaxTextureSize, isPlayfieldCap } from './texture-tags.js'
 import { effectiveMax, ThreeTextureLoaderBrowser } from './three-texture-loader-browser.js'
 import { ThreeTextureLoaderNode } from './three-texture-loader-node.js'
 
@@ -77,8 +77,7 @@ describe('regression: texture stripe artifacts', () => {
 
 	it('playfield half-float averaging must be correct', () => {
 		const w = 4,
-			h = 4,
-			comps = 1
+			h = 4
 		const data = new Uint16Array(w * h)
 		// fill 0 and 1 half-float pattern
 		for (let i = 0; i < w * h; i++) data[i] = DataUtils.toHalfFloat(i % 2 === 0 ? 0 : 2)
@@ -91,18 +90,228 @@ describe('regression: texture stripe artifacts', () => {
 		}
 	})
 
-	it('non-playfield downscale must use point sampling (stripes would appear with averaging if bug)', () => {
+	it('non-playfield LDR downscale must use point sampling (stripes would appear with averaging if bug)', () => {
 		const w = 4,
-			h = 4,
-			comps = 1
-		const data = new Float32Array(w * h)
+			h = 4
+		const data = new Uint8Array(w * h)
 		for (let i = 0; i < w * h; i++) data[i] = i
 		const out = downscaleArray(data as any, w, h, 2, 'some_wall', 0)
 		expect(out.width).toEqual(2)
 		// point sampling: chooses sy=floor(y/nh * h), sx=floor(x/nw * w)
 		// for 4->2: (0,0)->0, (1,0)->2, (0,1)->8, (1,1)->10
 		const expected = [0, 2, 8, 10]
-		for (let i = 0; i < 4; i++) expect((out.data as Float32Array)[i]).toEqual(expected[i])
+		for (let i = 0; i < 4; i++) expect((out.data as Uint8Array)[i]).toEqual(expected[i])
+	})
+
+	it('non-playfield float downscale must use box average (no HDR sparkle)', () => {
+		const w = 4,
+			h = 4
+		const data = new Float32Array(w * h)
+		for (let i = 0; i < w * h; i++) data[i] = i
+		const out = downscaleArray(data as any, w, h, 2, 'some_wall', 0)
+		expect(out.width).toEqual(2)
+		// 2x2 box averages: (0+1+4+5)/4=2.5, (2+3+6+7)/4=4.5, (8+9+12+13)/4=10.5, (10+11+14+15)/4=12.5
+		const expected = [2.5, 4.5, 10.5, 12.5]
+		for (let i = 0; i < 4; i++) expect((out.data as Float32Array)[i]).toBe(expected[i])
+	})
+
+	it('non-playfield half-float downscale must use box average', () => {
+		const w = 4,
+			h = 4
+		const data = new Uint16Array(w * h)
+		for (let i = 0; i < w * h; i++) data[i] = DataUtils.toHalfFloat(i)
+		const out = downscaleArray(data as any, w, h, 2, 'some_wall', HalfFloatType)
+		expect(out.width).toEqual(2)
+		// 2x2 blocks of {0,1,4,5}, {2,3,6,7}, {8,9,12,13}, {10,11,14,15}; all exactly representable
+		const blocks = [
+			[0, 1, 4, 5],
+			[2, 3, 6, 7],
+			[8, 9, 12, 13],
+			[10, 11, 14, 15],
+		]
+		for (let i = 0; i < 4; i++)
+			expect((out.data as Uint16Array)[i]).toBe(DataUtils.toHalfFloat(blocks[i].reduce((a, b) => a + b, 0) / 4))
+	})
+
+	it('specialized box kernels are bit-identical to the generic reference', () => {
+		// Naive generic box (per-sample decode ternary, c-outer accumulation,
+		// per-output encode branch, inline window math): the specialized
+		// dtype kernels must match it exactly on every dtype/shape/name.
+		const reference = (
+			src: Uint8Array | Uint8ClampedArray | Uint16Array | Float32Array,
+			width: number,
+			height: number,
+			max: number,
+			name: string | undefined,
+			type?: number,
+		): { data: typeof src; width: number; height: number } => {
+			const scale = Math.min(max / width, max / height)
+			const nw = Math.max(1, Math.floor(width * scale))
+			const nh = Math.max(1, Math.floor(height * scale))
+			const comps = Math.round(src.length / (width * height)) || 4
+			const Case = src.constructor as any
+			const out = new Case(nw * nh * comps) as typeof src
+			const isHalf = src instanceof Uint16Array && type === HalfFloatType
+			const isFloat = src instanceof Float32Array
+			const lut = isHalf ? getHalfToFloatLut() : null
+			if (!isPlayfieldCap(name) && !isHalf && !isFloat) {
+				for (let y = 0; y < nh; y++) {
+					const sy = Math.min(height - 1, Math.floor((y / nh) * height))
+					for (let x = 0; x < nw; x++) {
+						const sx = Math.min(width - 1, Math.floor((x / nw) * width))
+						const sIdx = (sy * width + sx) * comps
+						const dIdx = (y * nw + x) * comps
+						for (let c = 0; c < comps; c++) out[dIdx + c] = src[sIdx + c]
+					}
+				}
+				return { data: out, width: nw, height: nh }
+			}
+			const qx = Math.round(width / nw)
+			const qy = Math.round(height / nh)
+			const exactBox = qx >= 1 && qy >= 1 && qx * nw === width && qy * nh === height
+			for (let y = 0; y < nh; y++) {
+				const y0 = exactBox ? y * qy : Math.floor((y / nh) * height)
+				const y1 = exactBox ? y0 + qy : Math.min(height, Math.ceil(((y + 1) / nh) * height))
+				for (let x = 0; x < nw; x++) {
+					const x0 = exactBox ? x * qx : Math.floor((x / nw) * width)
+					const x1 = exactBox ? x0 + qx : Math.min(width, Math.ceil(((x + 1) / nw) * width))
+					const count = (x1 - x0) * (y1 - y0)
+					const dBase = (y * nw + x) * comps
+					for (let c = 0; c < comps; c++) {
+						let sum = 0
+						for (let sy = y0; sy < y1; sy++) {
+							const row = sy * width * comps
+							for (let sx = x0; sx < x1; sx++)
+								sum += lut
+									? lut[(src as Uint16Array)[row + sx * comps + c]]
+									: (src as any)[row + sx * comps + c]
+						}
+						const avg = sum / count
+						out[dBase + c] = isHalf ? DataUtils.toHalfFloat(avg) : isFloat ? avg : Math.round(avg)
+					}
+				}
+			}
+			return { data: out, width: nw, height: nh }
+		}
+		let seed = 0x12345678
+		const rand = (): number => {
+			seed = (seed * 1664525 + 1013904223) >>> 0
+			return seed / 0x100000000
+		}
+		const cases: Array<{ w: number; h: number; max: number; comps: number; name: string | undefined }> = [
+			{ w: 12, h: 12, max: 6, comps: 4, name: 'playfield' },
+			{ w: 12, h: 12, max: 6, comps: 4, name: 'some_wall' },
+			{ w: 13, h: 9, max: 6, comps: 4, name: 'playfield' },
+			{ w: 13, h: 9, max: 6, comps: 4, name: 'some_wall' },
+			{ w: 7, h: 5, max: 4, comps: 3, name: 'playfield' },
+			{ w: 7, h: 5, max: 4, comps: 1, name: 'some_wall' },
+			{ w: 10, h: 6, max: 4, comps: 4, name: 'VLM.Nestmap0' },
+			{ w: 13, h: 9, max: 1, comps: 4, name: 'playfield' },
+			{ w: 13, h: 9, max: 6, comps: 2, name: 'playfield' },
+			{ w: 13, h: 9, max: 6, comps: 2, name: 'some_wall' },
+		]
+		const builders: Array<{
+			kind: string
+			make: (n: number) => Uint8Array | Uint8ClampedArray | Uint16Array | Float32Array
+			type?: number
+			check: (a: number, b: number) => void
+		}> = [
+			{
+				kind: 'u8',
+				make: n => {
+					const a = new Uint8Array(n)
+					for (let i = 0; i < n; i++) a[i] = Math.floor(rand() * 256)
+					return a
+				},
+				check: (a, b) => expect(a).toBe(b),
+			},
+			{
+				kind: 'u8c',
+				make: n => {
+					const a = new Uint8ClampedArray(n)
+					for (let i = 0; i < n; i++) a[i] = Math.floor(rand() * 256)
+					return a
+				},
+				check: (a, b) => expect(a).toBe(b),
+			},
+			{
+				kind: 'half',
+				make: n => {
+					const a = new Uint16Array(n)
+					for (let i = 0; i < n; i++)
+						a[i] = DataUtils.toHalfFloat(Math.floor(rand() * 40) * 0.25 + (rand() < 0.1 ? 100 : 0))
+					return a
+				},
+				type: HalfFloatType,
+				check: (a, b) => expect(a).toBe(b),
+			},
+			{
+				kind: 'u16',
+				make: n => {
+					const a = new Uint16Array(n)
+					for (let i = 0; i < n; i++) a[i] = Math.floor(rand() * 65536)
+					return a
+				},
+				check: (a, b) => expect(a).toBe(b),
+			},
+			{
+				kind: 'float',
+				make: n => {
+					const a = new Float32Array(n)
+					for (let i = 0; i < n; i++) a[i] = rand() * 10 + (rand() < 0.1 ? 100 : 0)
+					return a
+				},
+				check: (a, b) => expect(a).toBe(b),
+			},
+		]
+		for (const c of cases) {
+			for (const b of builders) {
+				seed = 0x12345678
+				const src = b.make(c.w * c.h * c.comps)
+				const got = downscaleArray(src as any, c.w, c.h, c.max, c.name, b.type)
+				seed = 0x12345678
+				const want = reference(b.make(c.w * c.h * c.comps), c.w, c.h, c.max, c.name, b.type)
+				expect(got.width, `${b.kind} ${c.w}x${c.h} w`).toEqual(want.width)
+				expect(got.height, `${b.kind} ${c.w}x${c.h} h`).toEqual(want.height)
+				expect(got.data.length, `${b.kind} ${c.w}x${c.h} len`).toEqual(want.data.length)
+				for (let i = 0; i < want.data.length; i++) b.check((got.data as any)[i], (want.data as any)[i])
+			}
+		}
+	})
+
+	it('box windows match hardcoded 13x9 -> 6x4 bound tables', () => {
+		// Independent oracle: hand-derived floor/ceil windows, written out
+		// literally with no exactBox branch. A window bug shared by the
+		// exactBox branch and the in-spec reference above would still fail here.
+		const bx0 = [0, 2, 4, 6, 8, 10]
+		const bx1 = [3, 5, 7, 9, 11, 13]
+		const by0 = [0, 2, 4, 6]
+		const by1 = [3, 5, 7, 9]
+		const geom = boxWindowGeometry(13, 9, 6)
+		expect(geom.nw).toEqual(6)
+		expect(geom.nh).toEqual(4)
+		expect(Array.from(geom.x0)).toEqual(bx0)
+		expect(Array.from(geom.x1)).toEqual(bx1)
+		expect(Array.from(geom.y0)).toEqual(by0)
+		expect(Array.from(geom.y1)).toEqual(by1)
+		// End-to-end through the hardcoded windows: average a counting
+		// pattern with a branchless loop and require an exact match.
+		const w = 13,
+			h = 9
+		const src = new Float32Array(w * h)
+		for (let i = 0; i < src.length; i++) src[i] = i
+		const got = downscaleArray(src, w, h, 6, 'playfield')
+		const want = new Float32Array(6 * 4)
+		for (let y = 0; y < 4; y++)
+			for (let x = 0; x < 6; x++) {
+				let sum = 0
+				for (let sy = by0[y]; sy < by1[y]; sy++)
+					for (let sx = bx0[x]; sx < bx1[x]; sx++) sum += src[sy * w + sx]
+				want[y * 6 + x] = sum / ((bx1[x] - bx0[x]) * (by1[y] - by0[y]))
+			}
+		expect(got.width).toEqual(6)
+		expect(got.height).toEqual(4)
+		expect(Array.from(got.data as Float32Array)).toEqual(Array.from(want))
 	})
 
 	it('6080x8192 playfield must downscale to <=4096', () => {
@@ -128,7 +337,7 @@ describe('regression: texture stripe artifacts', () => {
 		expect(getHalfToFloatLut(), 'table is built once and cached').toBe(lut)
 		let mismatches = 0
 		for (let i = 0; i < 65536; i++) {
-			const a = lut[i]!
+			const a = lut[i]
 			const b = DataUtils.fromHalfFloat(i)
 			if (!(a === b || (Number.isNaN(a) && Number.isNaN(b)))) mismatches++
 		}
@@ -151,7 +360,7 @@ describe('regression: texture stripe artifacts', () => {
 					let sum = 0
 					for (let sy = y * 2; sy < y * 2 + 2; sy++)
 						for (let sx = x * 2; sx < x * 2 + 2; sx++)
-							sum += DataUtils.fromHalfFloat(data[(sy * w + sx) * comps + c]!)
+							sum += DataUtils.fromHalfFloat(data[(sy * w + sx) * comps + c])
 					const expected = DataUtils.toHalfFloat(sum / 4)
 					expect((fast.data as Uint16Array)[(y * fast.width + x) * comps + c]).toEqual(expected)
 				}
