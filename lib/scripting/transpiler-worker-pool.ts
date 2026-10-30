@@ -1,10 +1,12 @@
+import type { Program } from 'estree'
 import { idbGet, idbSet, vbsCacheKey } from '../util/idb-cache.js'
+import { settleWorkerEntry, type WorkerPendingEntry, withWorkerTimeout } from '../util/worker-pending.js'
 import { GlobalApi } from '../vpt/global-api.js'
 import { ItemApi } from '../vpt/item-api.js'
 import type { TableDataPayload } from './transpiler-worker-core.js'
 
 let nodeWorker: any = null
-const nodePending = new Map<number, { resolve: (s: string) => void; reject: (e: any) => void }>()
+const nodePending = new Map<number, WorkerPendingEntry<string>>()
 let nodeNextId = 1
 let nodeReady: Promise<any> | null = null
 
@@ -36,13 +38,15 @@ async function getNodeWorker(): Promise<any> {
 		}
 		if (!w) throw new Error('transpiler worker not available - expected ./transpiler.worker.node.js')
 		w.on('message', (m: any) => {
-			const p = nodePending.get(m.id)
-			if (!p) return
-			nodePending.delete(m.id)
-			m.ok ? p.resolve(m.js) : p.reject(new Error(m.error))
+			const entry = settleWorkerEntry(nodePending, m.id)
+			if (!entry) return
+			m.ok ? entry.resolve(m.js) : entry.reject(new Error(m.error))
 		})
 		w.on('error', (e: any) => {
-			for (const p of nodePending.values()) p.reject(e)
+			for (const [, entry] of nodePending) {
+				if (entry.timer) clearTimeout(entry.timer)
+				entry.reject(e)
+			}
 			nodePending.clear()
 		})
 		w.on('exit', () => {
@@ -57,7 +61,7 @@ async function getNodeWorker(): Promise<any> {
 }
 
 let browserWorker: Worker | null = null
-const browserPending = new Map<number, { resolve: (s: string) => void; reject: (e: any) => void }>()
+const browserPending = new Map<number, WorkerPendingEntry<string>>()
 let browserNextId = 1
 
 const vbsMemCache = new Map<string, string>()
@@ -68,20 +72,59 @@ const vbsMemCache = new Map<string, string>()
  */
 export const MAX_VBS_MEM_CACHE_ENTRIES = 50
 
-export function setVbsMemCache(key: string, js: string): void {
-	if (!vbsMemCache.has(key) && vbsMemCache.size >= MAX_VBS_MEM_CACHE_ENTRIES) {
-		const oldest = vbsMemCache.keys().next()
-		if (!oldest.done) vbsMemCache.delete(oldest.value)
+/** Oldest-first insert into a size-bounded cache (Maps preserve insertion order). */
+function boundedSet<K, V>(map: Map<K, V>, key: K, value: V, max: number): void {
+	if (!map.has(key) && map.size >= max) {
+		const oldest = map.keys().next()
+		if (!oldest.done) map.delete(oldest.value)
 	}
-	vbsMemCache.set(key, js)
+	map.set(key, value)
+}
+
+export function setVbsMemCache(key: string, js: string): void {
+	boundedSet(vbsMemCache, key, js, MAX_VBS_MEM_CACHE_ENTRIES)
 }
 
 export function getVbsMemCache(key: string): string | undefined {
 	return vbsMemCache.get(key)
 }
 
+/**
+ * Parsed ESTrees (`Grammar.transpile` output, pre-pipeline) by script content
+ * hash. Parse + post-process are table-independent, so a repeat transpile of
+ * the same script — new Transpiler, worker call, or different gf/go — skips
+ * straight to the table-dependent pipeline. Shares the JS cache's
+ * oldest-first bound; entries are cloned on the way in and out because the
+ * pipeline mutates the tree it receives.
+ */
+const astMemCache = new Map<string, Program>()
+export const MAX_AST_MEM_CACHE_ENTRIES = MAX_VBS_MEM_CACHE_ENTRIES
+
+export function getAstMemCache(key: string): Program | undefined {
+	const hit = astMemCache.get(key)
+	return hit === undefined ? undefined : (structuredClone(hit) as Program)
+}
+
+export function setAstMemCache(key: string, ast: Program): void {
+	boundedSet(astMemCache, key, structuredClone(ast) as Program, MAX_AST_MEM_CACHE_ENTRIES)
+	// Deliberately memory-only: the transpiled-JS IDB cache (vbs7:) already
+	// persists full transpiles across sessions, so a stored tree would only
+	// pay off when the JS cache misses on a previously seen script (different
+	// table data) — too rare to pay a structuredClone + IDB write per miss.
+	// Grammar.transpile stays synchronous, which an IDB read could not be.
+}
+
+export function clearAstMemCache(): void {
+	astMemCache.clear()
+}
+
+/** Memoized table hashes: payloads are treated as immutable after build. */
+const tdHashMemo = new WeakMap<TableDataPayload, string>()
+
 export function tdHash(td: TableDataPayload | null | undefined): string {
 	if (!td) return 'notd'
+	const memo = tdHashMemo.get(td)
+	if (memo !== undefined) return memo
 	try {
 		let h = 5381
 		const feed = (s: string): void => {
@@ -121,7 +164,9 @@ export function tdHash(td: TableDataPayload | null | undefined): string {
 		feedList(td.globalUndefined)
 		feed(';')
 		feedEntries(td.elementEvents)
-		return (h >>> 0).toString(36)
+		const hash = (h >>> 0).toString(36)
+		tdHashMemo.set(td, hash)
+		return hash
 	} catch {
 		return 'badtd'
 	}
@@ -138,13 +183,15 @@ function getBrowserWorker(): Worker {
 	} as any)
 	browserWorker.onmessage = (e: MessageEvent) => {
 		const m: any = (e as any).data
-		const p = browserPending.get(m.id)
-		if (!p) return
-		browserPending.delete(m.id)
-		m.ok ? p.resolve(m.js) : p.reject(new Error(m.error))
+		const entry = settleWorkerEntry(browserPending, m.id)
+		if (!entry) return
+		m.ok ? entry.resolve(m.js) : entry.reject(new Error(m.error))
 	}
 	browserWorker.onerror = (e: any) => {
-		for (const p of browserPending.values()) p.reject(new Error(e.message ?? String(e)))
+		for (const [, entry] of browserPending) {
+			if (entry.timer) clearTimeout(entry.timer)
+			entry.reject(new Error(e.message ?? String(e)))
+		}
 		browserPending.clear()
 	}
 	return browserWorker
@@ -162,7 +209,7 @@ function vbsLog(message: string): void {
 	} catch {}
 }
 
-type Pending = Map<number, { resolve: (s: string) => void; reject: (e: any) => void }>
+type Pending = Map<number, WorkerPendingEntry<string>>
 
 function requestTranspile(
 	message: { vbs: string; globalFunction?: string; globalObject?: string; tableData?: TableDataPayload | null },
@@ -172,19 +219,14 @@ function requestTranspile(
 ): Promise<string> {
 	return new Promise<string>((resolve, reject) => {
 		pending.set(id, { resolve, reject })
+		withWorkerTimeout(pending, id, 20000, 'transpiler worker timeout')
 		try {
 			post({ id, ...message })
 		} catch (error) {
-			pending.delete(id)
+			settleWorkerEntry(pending, id)
 			reject(error)
 			return
 		}
-		setTimeout(() => {
-			if (pending.has(id)) {
-				pending.delete(id)
-				reject(new Error('worker timeout'))
-			}
-		}, 20000)
 	})
 }
 
@@ -238,10 +280,30 @@ function isMethod(proto: any, prop: string): boolean {
 	return false
 }
 
+/**
+ * Per-table payload memo: the walk below (event names, API props, global
+ * sample) costs tens of ms on big tables, but table content is fixed after
+ * load — so a repeat call for the same table and player reuses the payload.
+ * The element-name list is re-read every call and must match exactly, so
+ * added or removed elements still rebuild instead of serving a stale payload.
+ */
+const tableDataMemo = new WeakMap<object, { names: string[]; player: unknown; payload: TableDataPayload | null }>()
+
 export function getTableDataForWorker(table: any, player?: any): TableDataPayload | null {
 	try {
 		const elements = table.getElements?.() ?? {}
 		const names = Object.keys(elements)
+		// Non-object tables cannot reach here in practice (callers pass Table);
+		// if one did, the WeakMap access below throws into the outer catch.
+		const memo = tableDataMemo.get(table)
+		if (
+			memo &&
+			memo.player === player &&
+			memo.names.length === names.length &&
+			memo.names.every((name, index) => name === names[index])
+		) {
+			return memo.payload
+		}
 		const events: Record<string, string[]> = {}
 		for (const n of names) {
 			try {
@@ -298,7 +360,7 @@ export function getTableDataForWorker(table: any, player?: any): TableDataPayloa
 				}
 			}
 		}
-		return {
+		const payload: TableDataPayload = {
 			elementNames: names,
 			elementEvents: events,
 			elementApis,
@@ -307,6 +369,8 @@ export function getTableDataForWorker(table: any, player?: any): TableDataPayloa
 			globalFuncs,
 			globalUndefined: globalUndef,
 		}
+		tableDataMemo.set(table, { names, player, payload })
+		return payload
 	} catch {
 		return null
 	}

@@ -4,6 +4,7 @@
 import { type IRule, type IToken, Parser } from 'ebnf'
 import { generate } from 'escodegen'
 import type { Program, Statement } from 'estree'
+import { astCacheKey } from '../../util/idb-cache.js'
 import { logger, progress } from '../../util/logger.js'
 import { program } from '../estree.js'
 import { ppArray } from '../post-process/array.js'
@@ -22,6 +23,7 @@ import { ppMethod } from '../post-process/method.js'
 import { ppVarDecl } from '../post-process/vardecl.js'
 import { ppWith } from '../post-process/with.js'
 import { renameReservedWords } from '../transformer/reference-transformer.js'
+import { getAstMemCache, setAstMemCache } from '../transpiler-worker-pool.js'
 import { RULES } from './rules.js'
 
 /**
@@ -693,6 +695,13 @@ export class Grammar {
 			return program(stmts)
 		}
 
+		// Table-independent cache (see setAstMemCache); hits are caller-owned clones.
+		const astKey = astCacheKey(formattedScript)
+		const astHit = getAstMemCache(astKey)
+		if (astHit !== undefined) {
+			return astHit
+		}
+
 		let now = Date.now()
 
 		progress().details('transpiling')
@@ -775,7 +784,9 @@ export class Grammar {
 		})
 		logger().debug('[Grammar.transpile] Post-processed in %sms', Date.now() - now)
 
-		return program(stmts)
+		const result = program(stmts)
+		setAstMemCache(astKey, result)
+		return result
 	}
 
 	public vbsToJs(script: string): string {

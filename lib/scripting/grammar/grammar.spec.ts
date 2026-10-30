@@ -11,6 +11,7 @@ import { getTextFile } from '../../scripting/vbs-scripts.node.js'
 import type { Table } from '../../vpt/table/table.js'
 import { Transformer } from '../transformer/transformer.js'
 import { Transpiler } from '../transpiler.js'
+import { clearAstMemCache } from '../transpiler-worker-pool.js'
 import { Grammar } from './grammar.js'
 
 chai.use((sinonChai as any).default ?? sinonChai)
@@ -231,5 +232,19 @@ describe('The scripting grammar - keyword fast path', () => {
 			expect(() => grammar.transpile(`Dim q${keyword}\n`), keyword).not.to.throw(Error)
 			expect(() => grammar.transpile(`Dim ${keyword}1\n`), keyword).not.to.throw(Error)
 		}
+	})
+})
+
+describe('The scripting grammar - parse cache', () => {
+	it('should serve repeat transpiles from the script-hash cache', async () => {
+		const vbs = `Dim cacheProbeUnique42\ncacheProbeUnique42 = 1 + 2\n`
+		clearAstMemCache()
+		const first = grammar.transpile(vbs)
+		const second = grammar.transpile(vbs)
+		expect(second).to.eql(first)
+		expect(second).to.not.equal(first)
+		// The pipeline mutates its input, so hits must be isolated clones.
+		second.body.push({ type: 'EmptyStatement' } as any)
+		expect(grammar.transpile(vbs).body).to.have.length(first.body.length)
 	})
 })

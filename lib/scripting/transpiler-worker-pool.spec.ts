@@ -2,7 +2,18 @@
 
 import { expect } from 'chai'
 import type { TableDataPayload } from './transpiler-worker-core.js'
-import { cacheKey, getVbsMemCache, MAX_VBS_MEM_CACHE_ENTRIES, setVbsMemCache } from './transpiler-worker-pool.js'
+import {
+	cacheKey,
+	clearAstMemCache,
+	getAstMemCache,
+	getTableDataForWorker,
+	getVbsMemCache,
+	MAX_AST_MEM_CACHE_ENTRIES,
+	MAX_VBS_MEM_CACHE_ENTRIES,
+	setAstMemCache,
+	setVbsMemCache,
+	tdHash,
+} from './transpiler-worker-pool.js'
 
 function payloadWith(apiProps: string[]): TableDataPayload {
 	return {
@@ -10,6 +21,13 @@ function payloadWith(apiProps: string[]): TableDataPayload {
 		elementEvents: { MyFlipper: ['Hit'] },
 		elementApis: { MyFlipper: apiProps },
 	}
+}
+
+function mockTable(names: string[]) {
+	const elements: Record<string, unknown> = {}
+	for (const name of names) elements[name] = { getEventNames: () => ['Hit'] as string[] }
+	const table = { getElements: () => elements, getElementApis: () => ({}) }
+	return { table, elements }
 }
 
 describe('Transpiler worker cache keys', () => {
@@ -32,6 +50,50 @@ describe('Transpiler worker cache keys', () => {
 		expect(cacheKey(vbs, 'play', 'global', payloadWith(['X']))).to.equal(
 			cacheKey(vbs, 'play', 'global', payloadWith(['X'])),
 		)
+	})
+
+	it('should memoize the table hash per payload object', () => {
+		const td = payloadWith(['X', 'Y'])
+		expect(tdHash(payloadWith(['X', 'Y']))).to.equal(tdHash(td))
+	})
+
+	it('should reuse the table-data payload for the same table object', () => {
+		const { table } = mockTable(['Flipper'])
+		const first = getTableDataForWorker(table)
+		expect(first?.elementNames).to.eql(['Flipper'])
+		expect(getTableDataForWorker(table)).to.equal(first)
+	})
+
+	it('should rebuild the table-data payload when elements change', () => {
+		const { table, elements } = mockTable(['Flipper'])
+		const first = getTableDataForWorker(table)
+		elements.Bumper = { getEventNames: () => [] as string[] }
+		const second = getTableDataForWorker(table)
+		expect(second).to.not.equal(first)
+		expect(second?.elementNames).to.eql(['Flipper', 'Bumper'])
+		// Same table, different player: the GlobalApi sample may differ, so no shared payload.
+		expect(getTableDataForWorker(table, { id: 1 })).to.not.equal(getTableDataForWorker(table, { id: 2 }))
+	})
+
+	it('should round-trip cached ESTrees as fresh clones', () => {
+		clearAstMemCache()
+		setAstMemCache('__ast-probe', { type: 'Program', body: [{ type: 'EmptyStatement' }] } as any)
+		const hit = getAstMemCache('__ast-probe')
+		expect(hit).to.eql({ type: 'Program', body: [{ type: 'EmptyStatement' }] })
+		expect(hit).to.not.equal(getAstMemCache('__ast-probe'))
+		// Mutating a hit must not corrupt the cached tree (the pipeline mutates in place).
+		;(hit as any).body.push({ type: 'EmptyStatement' })
+		expect((getAstMemCache('__ast-probe') as any).body).to.have.length(1)
+	})
+
+	it('should bound the ESTree cache with oldest-first eviction', () => {
+		clearAstMemCache()
+		for (let i = 0; i < MAX_AST_MEM_CACHE_ENTRIES + 2; i++) {
+			setAstMemCache(`__ast-bound-${i}`, { type: 'Program', body: [] } as any)
+		}
+		expect(getAstMemCache('__ast-bound-0')).to.equal(undefined)
+		expect(getAstMemCache(`__ast-bound-${MAX_AST_MEM_CACHE_ENTRIES + 1}`)).to.not.equal(undefined)
+		clearAstMemCache()
 	})
 
 	it('should bound the memory cache with oldest-first eviction', () => {

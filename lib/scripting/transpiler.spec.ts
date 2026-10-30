@@ -50,6 +50,15 @@ describe('The VBScript transpiler', () => {
 		expect(transpiler.transpile(vbs, 'play', 'global')).to.equal(first)
 	})
 
+	it('should reuse memoized table data and parse trees across Transpiler instances', () => {
+		const vbs = `Dim sharedCacheProbe\nsharedCacheProbe = 40 + 2\n`
+		const first = new Transpiler(table, player).transpile(vbs, 'play', 'global')
+		expect(new Transpiler(table, player).transpile(vbs, 'play', 'global')).to.equal(first)
+		const scope = {} as any
+		new Transpiler(table, player).execute(vbs, scope, 'global')
+		expect(scope.sharedCacheProbe).to.equal(42)
+	})
+
 	it('should execute the table script', () => {
 		const Spy = sinon.spy()
 		const vbs = `Spy\n` // that's our spy, in VBScript!
