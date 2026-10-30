@@ -1387,6 +1387,17 @@ export class Viewer {
 		if (typeof (window as any).gc === 'function') (window as any).gc()
 		logMem(this.harnessLog, 'after reader release')
 	}
+	// Snapshot sources of small unstreamed textures before the archive is
+	// released, so mid-game script swaps still resolve afterwards.
+	async _retainUnstreamedSources(table) {
+		if (!this.renderApi || !table?.textures) return
+		const retained = await this.renderApi.getMapGenerator().retainSources(Object.values(table.textures), table)
+		if (retained.retained > 0)
+			this.log(
+				`[stream] Retained ${retained.retained} small texture sources (${(retained.bytes / 1048576).toFixed(1)} MB) for late swaps`,
+				'debug',
+			)
+	}
 	_clearRawTextures() {
 		let clearedCount = 0
 		let retainedCount = 0
@@ -1655,8 +1666,9 @@ export class Viewer {
 		if (this.viewerMode === 'play') this.enterPlayMode()
 		else this.exitPlayMode()
 	}
-	_streamTextures(table, textures, reader) {
+	async _streamTextures(table, textures, reader) {
 		if (!textures?.length) {
+			await this._retainUnstreamedSources(table)
 			if (reader) void this._cleanupReader(reader).catch(() => {})
 			// generic: free raw texture binaries after streaming regardless of mode; keeps GPU textures only
 			this._clearRawTextures?.()
@@ -1999,6 +2011,7 @@ export class Viewer {
 			if (this.dom.streamLabel) this.dom.streamLabel.textContent = 'Visuals ready'
 			setTimeout(() => this._hideStream(), 1200)
 			logMem(this.harnessLog, 'Stream ready')
+			await this._retainUnstreamedSources(table)
 			if (reader) {
 				await this._cleanupReader(reader)
 			}
