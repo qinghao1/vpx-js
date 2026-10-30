@@ -352,7 +352,6 @@ export class PinMameEmulator implements IEmulator {
 		const ptr = this.ensureWasmBuf('audio', MAX_AUDIO_FRAMES * 2 * 2)
 		// At most one accumulator per sync; 0 means nothing drained yet, not an error.
 		// Rogue backend guard: never size the DataView past the pool.
-		// Rogue backend guard: never size the DataView past the pool.
 		const frames = Math.min(getFrame(ptr, MAX_AUDIO_FRAMES), MAX_AUDIO_FRAMES)
 		if (frames <= 0 || (this.api?.getAudioSeq?.() ?? seq0) !== seq0) return
 		const fresh = this.api?.getAudioChannels?.() ?? 0
