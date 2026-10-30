@@ -225,6 +225,7 @@ describe('createSessionIni + getNativeArgs', () => {
 				expect(content).to.contain('PlayfieldWidth = 800')
 				expect(content).to.contain('PlayfieldHeight = 600')
 				expect(content).to.contain(`PinMAMEPath = ${dir}`)
+				expect(content).to.contain('ForceDisableB2S = 1')
 			} finally {
 				fs.rmSync(path.dirname(iniPath), { recursive: true, force: true })
 			}

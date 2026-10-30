@@ -390,6 +390,10 @@ export function createSessionIni(
 	}
 	const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'vpinball-'))
 	const iniPath = path.join(tmpDir, 'VPinballX.ini')
+	// ForceDisableB2S: the harness never opens a B2S backglass window, so a
+	// B2S.Server with no .directb2s would set B2SOn and (on EM tables) hide the
+	// local score reels while scores route nowhere. Disabling B2S keeps EM
+	// reels visible and VPM tables fall back to VPinMAME.
 	const content = `[Version]
 VPinball = 10.8.1
 
@@ -404,6 +408,9 @@ MusicVolume = 100
 
 [Plugin.PinMAME]
 PinMAMEPath = ${pinmamePath}
+
+[Controller]
+ForceDisableB2S = 1
 `
 	fs.writeFileSync(iniPath, content, 'utf-8')
 	return iniPath
