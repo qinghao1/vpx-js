@@ -11,7 +11,7 @@ npm run build:esm          # tsc → dist-esm only (required before demo-browser
 npx tsc --noEmit           # typecheck
 npx biome check .          # lint/format (tabs, width 120)
 npm test                   # vitest --coverage
-npx tsx test/harness/verify-all.ts   # E2E 1..8: wasm → table → pinmame → player → gameplay → browser → vpinball-compat → discrepancies
+npx tsx test/harness/verify-all.ts   # E2E 1..10: wasm → table → pinmame → player → gameplay → play-room → browser → vpinball-compat → discrepancies → twd-render
 
 # Native VPinball debugging (requires VPinballX standalone)
 npm run vpinball:setup     # Tier A build or Tier B prebuilt → ~/.cache/vpinball/
