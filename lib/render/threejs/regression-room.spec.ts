@@ -1,5 +1,7 @@
 import * as THREE from 'three'
 import { describe, expect, it } from 'vitest'
+import { createVrMaterialResolver } from './baked-materials.js'
+import { createUnshadedBakedNodeMaterial } from './nodes/unshaded-baked-node.js'
 import { isShowcaseRoomNode } from './scene-classify.js'
 import { classify, isBakedPlayfield, isBasePlayfield, postProcessScene } from './three-scene-postprocess.js'
 import { hasBakedPlayfield } from './visibility-heuristics.js'
@@ -205,6 +207,18 @@ describe('regression: room must remain visible', () => {
 		for (const name of ['Playfield', 'primitive-plunger', 'LeftFlipper', 'cover', undefined]) {
 			expect(isShowcaseRoomNode(name), `${String(name)} is not room content`).toEqual(false)
 		}
+	})
+
+	it('getVr keeps baked-node VR materials opaque while maps are pending', () => {
+		// The room/cabinet bake their maps after postprocess; zeroing the
+		// material here hid them permanently (the map bind later only sets
+		// the texture, never opacity). Pre-arrival invisibility still comes
+		// from the baked shader's own placeholder alpha.
+		const mat = createUnshadedBakedNodeMaterial({ transmission: false })
+		;(mat.userData as Record<string, unknown>).pendingMap = 'vr_travertine'
+		const out = createVrMaterialResolver()(mat as unknown as THREE.MeshStandardMaterial, 'primitive-vr_megawall005')
+		expect(out.opacity, 'baked VR stays opaque until the map binds').toEqual(1)
+		expect(out.transparent, 'baked VR is not transparent').toEqual(false)
 	})
 
 	it('isBakedPlayfield unifies the bake-side name checks', () => {

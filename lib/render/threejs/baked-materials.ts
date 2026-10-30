@@ -287,7 +287,9 @@ export const createVrMaterialResolver = (): ((
 		const cloned = cloneMaterialForWrite(base) as THREE.MeshStandardMaterial
 		fixVr(cloned, isCab)
 		const hasPending = !!pending && !base.map
-		if (hasPending) {
+		// Baked node materials hide pre-arrival pixels in-shader (placeholder
+		// alpha) and the map bind never restores opacity, so skip the zeroing.
+		if (hasPending && !isBakedNodeMaterial(base)) {
 			if (isCab) {
 				cloned.transparent = false
 				cloned.opacity = 1
