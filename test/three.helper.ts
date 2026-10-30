@@ -21,11 +21,9 @@ import { resolve as resolvePath } from 'node:path'
 import type { Mesh, Object3D } from '../lib/refs.node.js'
 
 // Direct-scene lookup over the node returned by Table.generateTableNode (or a
-// wrapper group/scene containing it). Mirrors the old GLB round-trip view:
-// the exporter ran with onlyVisible, so invisible nodes are treated as
-// absent, and GLTFLoader sanitized names (whitespace to '_', '[] . : /'
-// stripped, duplicate siblings suffixed '_<n>') — matchesName applies the
-// same rule so existing mesh names keep working. The table root is named
+// wrapper group/scene containing it). Invisible nodes are treated as absent,
+// and names are matched after sanitization (whitespace to '_', '[] . : /'
+// stripped, duplicate siblings suffixed '_<n>'). The table root is named
 // "playfield*".
 export class ThreeHelper {
 	public first<T extends Object3D>(root: Object3D, groupName: string): T {
@@ -188,9 +186,8 @@ function isPresent(node: Object3D): boolean {
 	return node.visible !== false
 }
 
-// Same name mangling the GLB round-trip applied (GLTFLoader after
-// PropertyBinding.sanitizeNodeName, plus '_<n>' deduplication), so specs
-// keep addressing meshes with their familiar names.
+// Match mesh names after sanitization, so specs keep addressing meshes with
+// their familiar names.
 function matchesName(node: Object3D, name: string): boolean {
 	const sane = sanitizeName(node.name)
 	return sane === name || sane.startsWith(`${name}_`)
