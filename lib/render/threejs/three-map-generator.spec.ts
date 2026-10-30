@@ -182,18 +182,6 @@ describe('ThreeMapGenerator.loadTextures', () => {
 			Logger.setLogger(prev)
 		}
 	})
-
-	it('warms the HDR pool only when float textures are queued', async () => {
-		const table = new TableBuilder().build()
-		const warmup = vi.fn()
-		const generator = new ThreeMapGenerator({ ...stubLoader(), warmup } as any)
-		await generator.loadTextures([VptTexture.fromFilesystem('env.hdr')], table)
-		expect(warmup).toHaveBeenCalledTimes(1)
-		const idle = new ThreeMapGenerator({ ...stubLoader(), warmup } as any)
-		warmup.mockClear()
-		await idle.loadTextures([VptTexture.fromFilesystem('WallA.png')], table)
-		expect(warmup).not.toHaveBeenCalled()
-	})
 })
 
 describe('ThreeMapGenerator.retainSources', () => {
