@@ -262,6 +262,11 @@ export class GlobalApi extends VbsApi {
 		return getTextFile(fileName)
 	}
 
+	/** Shows an in-game UI toast upstream; vpx-js has no live UI, so this is a silent no-op returning 0. */
+	public PushNotification(_message: string, _durationMs = 5000, _reuseId = 0): number {
+		return 0
+	}
+
 	public PlaySound(
 		sampleName: string,
 		loopCount = 1,

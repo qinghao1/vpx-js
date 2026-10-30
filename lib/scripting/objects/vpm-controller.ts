@@ -249,6 +249,9 @@ export class VpmController {
 	get Version(): string {
 		return '03070000'
 	}
+	get IsPlugin(): boolean {
+		return false
+	}
 	get TimeFence(): number {
 		return this.timeFence
 	}
