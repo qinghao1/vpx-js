@@ -7,7 +7,9 @@
  */
 export function probeEncodedSize(data: Uint8Array): { width: number; height: number } | null {
 	try {
-		if (data.length < 16) return null
+		if (data.length < 10) return null
+		// GIF dims live at bytes 6-9: probe them below the 16-byte floor the other containers need.
+		if (data.length < 16 && (data[0] !== 0x47 || data[1] !== 0x49 || data[2] !== 0x46)) return null
 		// PNG: width/height BE32 at 16/20 (8-byte signature + IHDR length + type).
 		if (
 			data[0] === 0x89 &&
@@ -32,7 +34,7 @@ export function probeEncodedSize(data: Uint8Array): { width: number; height: num
 			// SOF dims live in the early headers: cap the scan well above any
 			// real header block. Anything later falls back to full decode.
 			const end = Math.min(data.length, 64 * 1024)
-			while (i + 9 < end) {
+			while (i + 9 <= end) {
 				// Skip fill bytes and resync on stray bytes: neither carries
 				// dims, so stepping over stays safe-direction (null at worst).
 				if (data[i] !== 0xff) {
@@ -102,7 +104,7 @@ export function probeEncodedSize(data: Uint8Array): { width: number; height: num
 			data[10] === 0x42 &&
 			data[11] === 0x50
 		) {
-			const fourcc = String.fromCharCode(data[12], data[13], data[14]) + String.fromCharCode(data[15] ?? 0)
+			const fourcc = String.fromCharCode(data[12], data[13], data[14]) + String.fromCharCode(data[15])
 			if (fourcc === 'VP8X' && data.length >= 30) {
 				const width = 1 + (data[24] + (data[25] << 8) + (data[26] << 16))
 				const height = 1 + (data[27] + (data[28] << 8) + (data[29] << 16))

@@ -147,6 +147,14 @@ async function fitToMax(bitmap: ImageBitmap, max: number): Promise<ImageBitmap> 
 				resizeQuality: 'high',
 			})
 		} catch {}
+		// Bitmap-source resize is best-effort per engine: a still-over-cap
+		// frame falls through to the canvas tier instead of escaping.
+		if (resized && (resized.width > max || resized.height > max)) {
+			try {
+				resized.close?.()
+			} catch {}
+			resized = null
+		}
 		if (resized) {
 			try {
 				bitmap.close?.()
