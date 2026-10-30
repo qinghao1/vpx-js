@@ -10,7 +10,7 @@ Targets src/bitops.h.
 
 Upstream-PR-Draft: wasm: guard x86 __rolq/__rorq intrinsics in bitops.h
 Target: vpinball/pinmame@master
-Body: Emscripten Clang defines __clang__ but provides no x86 __rolq/__rorq intrinsics, so rotl_64/rotr_64 in src/bitops.h fail to compile for wasm32 targets. This extends the existing architecture exclusion using the Emscripten-provided __EMSCRIPTEN__ macro, so those targets use the portable C fallback that ARM builds already use. Tested in a downstream Emscripten build: the WASM target compiles with the guard and fails without it, while native x86/ARM paths are unchanged.
+Body: Why: Emscripten Clang provides no x86 __rolq/__rorq intrinsics, so rotl_64/rotr_64 in src/bitops.h fail to compile for wasm32 targets. How: extend the existing arch exclusion with !defined(__EMSCRIPTEN__) so Emscripten builds use the portable C fallback already used on ARM. Tested: a wasm32 Emscripten build compiles with the guard and fails without it; native x86/ARM paths unchanged.
 
 ---
  src/bitops.h | 4 ++--

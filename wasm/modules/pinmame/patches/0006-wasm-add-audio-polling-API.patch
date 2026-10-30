@@ -16,7 +16,12 @@ atomic and the seqlock drops torn reads. Zero config change: INT16
 Upstream-PR-Draft: libpinmame: add polling audio-frame API (PinmameGetAudioFrame/Channels/Seq)
 Target: vpinball/pinmame@master
 Body:
-Hosts that drain emulator state on their own pump instead of receiving per-frame C callbacks — the same reason libpinmame already offers PinmameGetChanged* polling getters — currently have no way to read decoded PCM. With no audio callback configured both osd_start_audio_stream and osd_update_audio_stream return 0; the latter is fatal because the mixer adopts the update return as the next frame's count, stalling it at zero samples per frame. This snapshots each produced chunk into a small seqlock-guarded INT16 mirror in osd_update_audio_stream regardless of the callback branches, returns the nominal sample count from both no-callback paths, and exposes PinmameGetAudioFrame/Channels/Seq with drain-on-read semantics. Behavior with callbacks configured is unchanged. Tested by polling frames from a callback-less host and confirming continuous, non-torn PCM delivery with an idle second pull yielding 0.
+Why: Callback-less hosts (e.g. Emscripten builds) cannot read decoded PCM, while lamps/sols/GIs already offer PinmameGetChanged* polling getters. Worse, both no-callback paths return 0, yet the mixer takes osd_update_audio_stream's return as the next frame's count — so it stalls at zero.
+How:
+- Mirror every produced chunk into a small seqlock-guarded INT16 buffer in osd_update_audio_stream, regardless of callback branches.
+- Return the nominal sample count from both no-callback paths to keep the mixer pump primed.
+- Export PinmameGetAudioFrame/Channels/Seq; frame read drains, so an idle second pull yields 0.
+Tested: Polled frames from a callback-less host; verified continuous, non-torn PCM with an idle second pull yielding 0.
 
 ---
  src/libpinmame/libpinmame.cpp | 82 ++++++++++++++++++++++++++++++++++++++++-

@@ -89,12 +89,12 @@ describe('PinMAME WASM emulator (mock)', () => {
 		emu.emuSimulateCycle(16)
 		expect(emu.getLampState(2)).toBe(255)
 	})
-	it('setTimeFence queues pre-ready and replays on markReady', () => {
+	it('setTimeFence replays pre-ready writes but absorbs them (fence never armed)', () => {
 		emu.setTimeFence(100)
 		const setTimeFence = vi.fn()
 		emu.setBackendForTesting(null, { setTimeFence })
 		emu.markReady()
-		expect(setTimeFence).toHaveBeenCalledWith(100)
+		expect(setTimeFence).not.toHaveBeenCalled()
 	})
 	it('setTimeFence warns once on ready mock', () => {
 		const orig = Logger.logger()
@@ -111,12 +111,12 @@ describe('PinMAME WASM emulator (mock)', () => {
 			Logger.setLogger(orig)
 		}
 	})
-	it('setTimeFence forwards to api when ready', () => {
+	it('setTimeFence absorbs writes when ready (fence never armed)', () => {
 		const setTimeFence = vi.fn()
 		emu.setBackendForTesting(null, { setTimeFence })
 		emu.markReady()
 		emu.setTimeFence(7)
-		expect(setTimeFence).toHaveBeenCalledWith(7)
+		expect(setTimeFence).not.toHaveBeenCalled()
 	})
 	it('setCabinetInput forwards to the api when the export exists', () => {
 		const setCabinetInput = vi.fn()

@@ -8,7 +8,7 @@ Add '/' when needed, otherwise ROM audit fails (e.g. /pinmame + roms).
 
 Upstream-PR-Draft: libpinmame: insert missing separator in ComposePath
 Target: vpinball/pinmame@master
-Body: ComposePath() concatenates vpmPath and the subfolder name with no separator, so any caller passing a path without a trailing slash gets broken paths such as `/pinmame` + `roms` yielding `/pinmameroms`. In-tree callers all happen to pass a trailing slash, which is why this never surfaced natively. The fix appends '/' when the path ends in neither '/' nor '\'. Verified by building the WASM module and running ROM audit against a slash-less path; paths already ending in a separator are unchanged.
+Body: Why: ComposePath() concatenates the PinmameSetConfig path and the subfolder name with no separator, so any caller passing a path without a trailing slash gets broken paths (e.g. `/pinmame` + `roms` becomes `/pinmameroms`). In-tree callers all pass a trailing slash, which is why this never surfaced natively. How: in src/libpinmame/libpinmame.cpp, ComposePath() appends '/' when the path is non-empty and ends in neither '/' nor '\'. Tested: separator-less inputs now join correctly; inputs already ending in a separator are unchanged.
 
 ---
  src/libpinmame/libpinmame.cpp | 4 +++-

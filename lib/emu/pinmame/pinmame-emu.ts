@@ -44,7 +44,6 @@ type Api = {
 	getDmdFrame(p: number): number
 	getSolMask(low: number): number
 	setSolMask(low: number, mask: number): void
-	setTimeFence(t: number): void
 	// Optional: only present when the wasm build exports PinmameSetCabinetInput.
 	setCabinetInput?(v: number): void
 }
@@ -135,7 +134,6 @@ export class PinMameEmulator implements IEmulator {
 			getDmdFrame: wrap('PinmameGetDmdFrame', 'number', ['number']),
 			getSolMask: wrap('PinmameGetSolenoidMask', 'number', ['number']),
 			setSolMask: wrap('PinmameSetSolenoidMask', null, ['number', 'number']),
-			setTimeFence: wrap('PinmameSetTimeFence', null, ['number']),
 		}
 		// PinmameSetCabinetInput is not in PINMAME_EXPORTS yet — wire it only
 		// when a (future) wasm build provides it, so cwrap never wraps a hole.
@@ -318,7 +316,6 @@ export class PinMameEmulator implements IEmulator {
 			warnOnce('pinmame:time-fence', '[pinmame] setTimeFence without a backend — input ignored')
 			return
 		}
-		this.api.setTimeFence(time)
 	}
 
 	private sync(): void {
