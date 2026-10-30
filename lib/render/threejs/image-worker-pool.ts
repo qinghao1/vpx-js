@@ -1,7 +1,7 @@
 // Browser-only pool (Node decodes inline): decode + resize off the main
 // thread. Sized by CPU count, capped at 4; playfield maps take the
-// least-busy worker, the rest stay round-robin (30s timeout, main-thread
-// fallback).
+// least-busy worker, the rest stay round-robin (30s timeout; callers fall
+// back to main-thread decode).
 
 import { settleWorkerEntry, type WorkerPendingEntry, withWorkerTimeout } from '../../util/worker-pending.js'
 import { WorkerLoadTracker } from './texture-dispatch.js'
@@ -13,9 +13,20 @@ let seq = 0
 const tracker = new WorkerLoadTracker()
 const pending = new Map<number, WorkerPendingEntry<ImageBitmap>>()
 
+const IMAGE_POOL_SIZE = 4
+
+/**
+ * Shared worker-pool sizing: finite core counts clamp to [1, cap];
+ * missing/NaN/Infinity fall back to the cap default.
+ */
+export function poolSize(cores: unknown, cap: number): number {
+	const n = typeof cores === 'number' ? cores : cap
+	const finite = Number.isFinite(n) ? Math.floor(n) : cap
+	return Math.max(1, Math.min(finite, cap))
+}
+
 function getSize(): number {
-	const c = (globalThis as any).navigator?.hardwareConcurrency
-	return Math.max(1, Math.min(typeof c === 'number' ? c : 4, 4))
+	return poolSize((globalThis as any).navigator?.hardwareConcurrency, IMAGE_POOL_SIZE)
 }
 
 function ensurePool(): Worker[] | null {
@@ -74,6 +85,7 @@ export async function decodeInWorker(data: Uint8Array, mime: string, max: number
 			tracker.busy(worker)
 			worker.postMessage({ id, buffer, mime, max, name }, [buffer] as any)
 		} catch (e) {
+			// No replace: callers fall back to main-thread decode, unlike the float pool whose retry must land fresh.
 			const entry = settleWorkerEntry(pending, id)
 			if (entry) tracker.idle(worker)
 			reject(e)

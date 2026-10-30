@@ -11,12 +11,16 @@ vi.mock('../../util/idb-cache.js', async importOriginal => {
 	return { ...mod, idbGet: vi.fn(async () => undefined), idbSet: vi.fn(async () => {}) }
 })
 
-vi.mock('./image-worker-pool.js', () => ({
-	hasImageWorker: vi.fn(() => false),
-	decodeInWorker: vi.fn(async () => {
-		throw new Error('no image worker')
-	}),
-}))
+vi.mock('./image-worker-pool.js', async importOriginal => {
+	const mod = await importOriginal<typeof import('./image-worker-pool.js')>()
+	return {
+		...mod,
+		hasImageWorker: vi.fn(() => false),
+		decodeInWorker: vi.fn(async () => {
+			throw new Error('no image worker')
+		}),
+	}
+})
 
 describe('ThreeTextureLoaderBrowser float size bound', () => {
 	it('rejects oversized non-playfield EXR/HDR payloads before worker decode', async () => {
@@ -26,15 +30,19 @@ describe('ThreeTextureLoaderBrowser float size bound', () => {
 		await expect(loader.loadTexture('cabinet_env', '.exr', huge)).rejects.toThrow(/too large/)
 		await expect(loader.loadTexture('cabinet_env', '.hdr', huge)).rejects.toThrow(/too large/)
 	})
-	it('routes oversized playfield/nestmap floats to the slow decode instead of failing fast', async () => {
+	it('throws for oversized playfield/nestmap floats without a worker pool instead of slow-parsing', async () => {
 		const loader = new ThreeTextureLoaderBrowser()
 		const huge = new Uint8Array(MAX_FLOAT_TEXTURE_BYTES + 1)
-		// Playfield lightmap bakes gate playfield brightness: the worker OOM
-		// bound must not strand them mapless. Zero bytes are not an EXR, so the
-		// slow main-thread fallback fails at parse — proving the guard let the
-		// decode path through instead of failing fast with 'too large'.
-		await expect(loader.loadTexture('vlm.nestmap1', '.exr', huge)).rejects.toThrow(/HDR\/EXR parse failed/)
-		await expect(loader.loadTexture('vlm.nestmap1', '.hdr', huge)).rejects.toThrow(/HDR\/EXR parse failed/)
+		// No Worker in node: the pool outage surfaces as infra so the map
+		// generator skips — the slow main-thread parse would expand the 512MB
+		// frame the cap prevents. Over-cap playfields reach the pool (not the
+		// fail-fast guard) but must never fall back to the main thread.
+		await expect(loader.loadTexture('vlm.nestmap1', '.exr', huge)).rejects.toMatchObject({
+			code: 'float-no-worker',
+		})
+		await expect(loader.loadTexture('vlm.nestmap1', '.hdr', huge)).rejects.toMatchObject({
+			code: 'float-no-worker',
+		})
 		// Small non-playfield payloads still reach the worker path (node has none), proving no over-blocking.
 		await expect(loader.loadTexture('cabinet_env', '.exr', new Uint8Array(1024))).rejects.toThrow(/no worker/)
 	})
@@ -98,7 +106,10 @@ describe('EXR worker pool', () => {
 	})
 
 	/** Fresh loader with a fake Worker + DOM-ish globals, so routing is observable without a browser. */
-	function installFakes(handlers: { float?: (msg: any, worker: any) => void }, cores = 2) {
+	function installFakes(
+		handlers: { float?: (msg: any, worker: any) => void; post?: (msg: any, worker: any) => void },
+		cores = 2,
+	) {
 		const G = globalThis as any
 		for (const k of ['Worker', 'window', 'document', 'createImageBitmap']) savedGlobals[k] = G[k]
 		savedNavigator = Object.getOwnPropertyDescriptor(globalThis, 'navigator')
@@ -122,6 +133,9 @@ describe('EXR worker pool', () => {
 				workers.push(this)
 			}
 			public postMessage(msg: any) {
+				// A throwing post hook simulates postMessage clone failures:
+				// the post never records and no reply is ever queued.
+				handlers.post?.(msg, this)
 				posted.push({ id: msg.id, buffer: msg.buffer, worker: this })
 				queueMicrotask(() => handlers.float?.(msg, this))
 			}
@@ -327,7 +341,7 @@ describe('EXR worker pool', () => {
 		}
 	})
 
-	it('falls back to the slow main-thread parse when a hung worker strands an over-cap playfield bake', async () => {
+	it('throws instead of slow-parsing when a hung worker strands an over-cap playfield bake', async () => {
 		vi.useFakeTimers()
 		try {
 			installFakes({ float: () => {} })
@@ -340,13 +354,26 @@ describe('EXR worker pool', () => {
 				)
 			await vi.advanceTimersByTimeAsync(0)
 			await vi.advanceTimersByTimeAsync(120000)
-			// The timeout is infra: the bake falls through to the slow parse,
-			// which fails on the zero bytes — proving the fallback ran.
-			await vi.advanceTimersByTimeAsync(10)
-			expect(String(((await settled) as any).err?.message)).toMatch(/HDR\/EXR parse failed/)
+			// Over-cap: the infra error surfaces so the map generator skips —
+			// the slow main-thread parse would expand the 512MB frame the cap
+			// prevents. (Under-cap playfields still fall back; see below.)
+			expect(((await settled) as any).err).toMatchObject({ code: 'float-worker-timeout' })
 		} finally {
 			vi.useRealTimers()
 		}
+	})
+
+	it('throws instead of slow-parsing when an over-cap playfield bake OOMs its worker', async () => {
+		installFakes({
+			float: (_msg, worker) => worker.onerror?.({ message: 'oom', error: new Error('oom') }),
+		})
+		const Loader = await freshLoader()
+		// Crash plus failed retry surfaces infra; over-cap must not fall
+		// through to the slow main-thread parse (the 512MB expansion the cap
+		// prevents) — the map generator skips on this throw instead.
+		await expect(
+			new Loader().loadTexture('vlm.nestmap1', '.exr', new Uint8Array(MAX_FLOAT_TEXTURE_BYTES + 1)),
+		).rejects.toMatchObject({ code: 'float-worker-crash' })
 	})
 
 	it('holds concurrent decodes to a single worker on 1-core machines', async () => {
@@ -507,6 +534,57 @@ describe('EXR worker pool', () => {
 			code: 'float-worker-crash',
 		})
 		expect(fakes.posted).toHaveLength(2)
+	})
+
+	it('replaces the worker when postMessage throws so the retry lands off the dead worker', async () => {
+		let posts = 0
+		const fakes = installFakes({
+			float: (msg, worker) => worker.onmessage?.({ data: floatFrame(msg.id) }),
+			post: () => {
+				if (++posts === 1) throw new Error('post boom')
+			},
+		})
+		const Loader = await freshLoader()
+		const tex = (await new Loader().loadTexture('env_a', '.exr', new Uint8Array(1024))) as any
+		expect(tex.image.width).toBe(64)
+		const [dead] = fakes.workers
+		// The failed post terminated and respawned its worker; the thrown
+		// post never recorded, and the retry resolved off a live worker.
+		expect(dead.terminate).toHaveBeenCalled()
+		expect(fakes.workers).toHaveLength(3)
+		expect(fakes.posted).toHaveLength(1)
+		expect(fakes.posted[0].worker).not.toBe(dead)
+		expect(fakes.workers).toContain(fakes.posted[0].worker)
+	})
+
+	it('regrows to target size on the next ensure after a once-failing Worker constructor', async () => {
+		const fakes = installFakes(
+			{
+				float: (msg, worker) => worker.onmessage?.({ data: floatFrame(msg.id) }),
+			},
+			2,
+		)
+		const G = globalThis as any
+		const RealWorker = G.Worker
+		let calls = 0
+		G.Worker = class extends RealWorker {
+			public constructor(url: URL) {
+				if (calls++ === 0) throw new Error('spawn boom')
+				super(url)
+			}
+		}
+		const Loader = await freshLoader()
+		const loader = new Loader()
+		// The first spawn fails, so the pool stays empty and the decode surfaces infra.
+		await expect(loader.loadTexture('env_a', '.exr', new Uint8Array(1024))).rejects.toMatchObject({
+			code: 'float-no-worker',
+		})
+		expect(fakes.workers).toHaveLength(0)
+		// The next ensure rebuilds the pool whole: target size, serving decodes.
+		const tex = (await loader.loadTexture('env_b', '.exr', new Uint8Array(1024))) as any
+		expect(fakes.workers).toHaveLength(2)
+		expect(fakes.posted).toHaveLength(1)
+		expect(tex.image.width).toBe(64)
 	})
 
 	it('falls back to the slow parse for under-cap playfield textures on pool outage', async () => {
@@ -917,5 +995,42 @@ describe('ThreeTextureLoaderBrowser LDR decode-at-size', () => {
 		expect(cappedDecodeTarget(pngBytes(64, 64), 4096)).toBeNull()
 		expect(cappedDecodeTarget(new Uint8Array(4), 4096)).toBeNull()
 		expect(cappedDecodeTarget(new Uint8Array(32), 4096)).toBeNull()
+	})
+
+	it('resolves top-down (negative-height) BMP dims by magnitude', () => {
+		// Negative DIB height means top-down row order; the extent is the magnitude.
+		expect(probeEncodedSize(bmpBytes(6080, -8192))).toEqual({ width: 6080, height: 8192 })
+		expect(cappedDecodeTarget(bmpBytes(6080, -8192), 4096)).toEqual({ width: 3040, height: 4096 })
+	})
+
+	it('stays bounded when the header claims huge and every resize hint is ignored', async () => {
+		vi.mocked(hasImageWorker).mockReturnValue(false)
+		vi.mocked(decodeInWorker).mockClear()
+		// Engine ignores resize at every tier: full-res back from blob and bitmap sources alike.
+		const cib = vi.fn(async () => ({ width: 6080, height: 8192, close() {} }))
+		vi.stubGlobal('createImageBitmap', cib)
+		// No ImageDecoder stub: decodeMainAtSize throws and the oversize bitmap falls through.
+		// loadAsync lives on Loader.prototype (TextureLoader inherits it): spy where it is owned.
+		const { Loader } = await import('three')
+		const loadSpy = vi
+			.spyOn(Loader.prototype as any, 'loadAsync')
+			.mockResolvedValue({ image: { width: 6080, height: 8192 } } as any)
+		try {
+			vi.stubGlobal('document', {
+				createElement: (tag: string) => {
+					expect(tag).toBe('canvas')
+					return { width: 0, height: 0, getContext: () => ({ drawImage() {} }) }
+				},
+			})
+			const tex = (await loader.loadTexture('playfield_image', '.png', pngBytes(6080, 8192))) as any
+			expect(decodeInWorker).not.toHaveBeenCalled()
+			// Sized blob decode + two-step bitmap resize, then the TextureLoader canvas tier.
+			expect(cib).toHaveBeenCalledTimes(2)
+			expect(tex.image.width).toBe(3040)
+			expect(tex.image.height).toBe(4096)
+		} finally {
+			loadSpy.mockRestore()
+			vi.unstubAllGlobals()
+		}
 	})
 })

@@ -24,7 +24,7 @@ import { _resetQualityCache, cappedAniso, getEffectiveCaps, MAX_FLOAT_TEXTURE_BY
 import { settleWorkerEntry, type WorkerPendingEntry } from '../../util/worker-pending.js'
 import type { ITextureLoader } from '../irender-api.js'
 import { cappedDecodeTarget } from './encoded-size-probe.js'
-import { decodeInWorker, hasImageWorker } from './image-worker-pool.js'
+import { decodeInWorker, hasImageWorker, poolSize } from './image-worker-pool.js'
 import { RE_PLAYFIELD } from './material-shared.js'
 import { WorkerLoadTracker } from './texture-dispatch.js'
 import { downscaleArray } from './texture-downscale.js'
@@ -120,7 +120,7 @@ function finalize(tex: any, name: string, isFloat: boolean): any {
 // image-worker-pool.ts sizing; capped frames peak at 128MB for a 4096
 // playfield bake, 32MB elsewhere, so two in flight bound memory). Playfield
 // bakes take the least-busy worker, the rest stay round-robin (120s timeout;
-// slow main-thread parse only as playfield infra fallback).
+// slow main-thread parse only as under-cap playfield infra fallback).
 const FLOAT_POOL_SIZE = 2
 const FLOAT_WORKER_TIMEOUT_MS = 120000
 const floatPool: Worker[] = []
@@ -153,9 +153,7 @@ const FLOAT_PENDING_FACTOR = 2
 let floatWarmed = false
 
 function floatPoolSize(): number {
-	const raw = (globalThis as any).navigator?.hardwareConcurrency
-	const cores = typeof raw === 'number' && Number.isFinite(raw) ? Math.floor(raw) : FLOAT_POOL_SIZE
-	return Math.max(1, Math.min(cores, FLOAT_POOL_SIZE))
+	return poolSize((globalThis as any).navigator?.hardwareConcurrency, FLOAT_POOL_SIZE)
 }
 
 /** Fails every entry affine to a dead worker, then terminates and replaces it. */
@@ -264,7 +262,10 @@ function parseWorker(
 			floatTracker.busy(w)
 			w.postMessage({ id, buffer, type: kind, max, name }, [buffer] as any)
 		} catch (e) {
+			// A worker that cannot even take a post is suspect: terminate and
+			// respawn it so the crash-code retry below lands on a fresh worker.
 			if (settleWorkerEntry(floatPending, id)) floatTracker.idle(w)
+			replaceFloatWorker(w)
 			reject(floatInfraError('float-worker-crash', `exr worker post failed: ${(e as Error)?.message ?? e}`))
 		}
 	})
@@ -387,11 +388,14 @@ export class ThreeTextureLoaderBrowser implements ITextureLoader<ThreeTexture> {
 				// playfield lightmap bakes gate playfield brightness: a missing
 				// nestmap leaves the GI overlays mapless and the playfield dark.
 				// Let those fall through to the slow main-thread parse with a
-				// single warning; every other worker failure still throws. Any
-				// pool outage qualifies at any size — the slow parse is cheap
-				// for under-cap payloads and the mapless rationale still holds.
+				// single warning; every other worker failure still throws. Pool
+				// outages qualify only under the worker cap — an over-cap
+				// playfield whose worker OOMs must throw (let the map generator
+				// skip) instead of running the main-thread full-res slow parse,
+				// the exact 512MB expansion the cap prevents.
+				// Dead defense (unreachable): both "too large" producers exempt playfields.
 				const sizeFallback = isFloatSizeRejection(e) && isPlayfieldCap(name)
-				const outageFallback = isPlayfieldCap(name) && isFloatInfraFailure(e)
+				const outageFallback = isPlayfieldCap(name) && !overCap && isFloatInfraFailure(e)
 				if (!sizeFallback && !outageFallback) throw e
 				logger().warn(
 					'[ThreeTextureLoaderBrowser.loadTexture] Float texture %s slow main-thread decode (%sMB%s)',
@@ -578,6 +582,14 @@ async function tryCreateBitmap(data: Uint8Array, mime: string, name: string): Pr
 					bitmap.close?.()
 				} catch {}
 				bitmap = resized
+				// Bitmap-source resize is best-effort per engine: a still-over-cap
+				// frame falls through to the TextureLoader path instead of escaping.
+				if (bitmap.width > max || bitmap.height > max) {
+					try {
+						bitmap.close?.()
+					} catch {}
+					return null
+				}
 			} catch {
 				try {
 					bitmap.close?.()
