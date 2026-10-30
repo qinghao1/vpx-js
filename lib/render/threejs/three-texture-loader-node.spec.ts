@@ -133,6 +133,32 @@ describe('ThreeTextureLoaderNode float size bound', () => {
 		expect(Array.from(split.data)).toEqual(expected)
 	})
 
+	it('returns the 1x1 placeholder for corrupt IDAT data instead of throwing', async () => {
+		const loader = new ThreeTextureLoaderNode()
+		const rows = [
+			[255, 0, 0, 255, 0, 255, 0, 255],
+			[0, 0, 255, 255, 255, 255, 255, 255],
+		]
+		const png = buildPng(2, 2, 8, 6, rows)
+		// Flip a byte mid-payload of the first IDAT chunk (no CRC check on
+		// parse): the corrupt bytes must fail inflate soft, not throw, and
+		// any writer-side rejection must stay observed.
+		let offset = 8
+		const view = new DataView(png.buffer)
+		while (offset + 8 <= png.length) {
+			const length = view.getUint32(offset)
+			const type = String.fromCharCode(png[offset + 4]!, png[offset + 5]!, png[offset + 6]!, png[offset + 7]!)
+			if (type === 'IDAT') {
+				png[offset + 8 + (length >> 1)]! ^= 0xff
+				break
+			}
+			offset += 12 + length
+		}
+		const { width, data } = rgbaOf(await loader.loadTexture('texCorrupt', '.png', png))
+		expect(width).toBe(1)
+		expect(data.length).toBe(4)
+	})
+
 	it('still decodes 8-bit grayscale the established way', async () => {
 		const loader = new ThreeTextureLoaderNode()
 		const png = buildPng(1, 1, 8, 0, [[0x7f]])

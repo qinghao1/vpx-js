@@ -333,8 +333,7 @@ export class PinMameEmulator implements IEmulator {
 		this.pullAudio()
 	}
 
-	// The delivered Float32Array is a pooled view, only valid until the next
-	// drain call — consumers must copy it synchronously, not retain it.
+	// Borrowed view — see registerAudioConsumer contract.
 	private pullAudio(): void {
 		const m = this.mod
 		const consumer = this.audioConsumer
@@ -352,8 +351,8 @@ export class PinMameEmulator implements IEmulator {
 		// undersized buffer would overflow the wasm heap.
 		const ptr = this.ensureWasmBuf('audio', MAX_AUDIO_FRAMES * 2 * 2)
 		// At most one accumulator per sync; 0 means nothing drained yet, not an error.
-		// Backend-trusted count: clamp to the pool so a rogue backend can't
-		// stretch the DataView below or write past the pooled array.
+		// Rogue backend guard: never size the DataView past the pool.
+		// Rogue backend guard: never size the DataView past the pool.
 		const frames = Math.min(getFrame(ptr, MAX_AUDIO_FRAMES), MAX_AUDIO_FRAMES)
 		if (frames <= 0 || (this.api?.getAudioSeq?.() ?? seq0) !== seq0) return
 		const fresh = this.api?.getAudioChannels?.() ?? 0

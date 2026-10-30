@@ -17,8 +17,9 @@ export interface IEmulator {
 	setPaused(v: boolean): void
 	getPaused(): boolean
 	/**
-	 * Delivered audio views are borrowed until the next drain — consumers
-	 * must copy synchronously, not retain them.
+	 * Implementations delivering Float32Array PCM (PinMAME) hand out pooled
+	 * borrows valid until the next drain — consumers must copy
+	 * synchronously, not retain them.
 	 */
 	registerAudioConsumer(cb: (msg: unknown) => void): void
 

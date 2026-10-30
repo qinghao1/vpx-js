@@ -388,6 +388,32 @@ describe('PinMAME WASM emulator (mock)', () => {
 		expect(received.length).toBe(3)
 		expect(received[2][0]).toBe(-0.5)
 	})
+	it('caps a rogue backend frame count at the pool instead of throwing', () => {
+		const received: Float32Array[] = []
+		const heap = new Uint8Array(65536)
+		emu.setBackendForTesting(
+			{
+				_malloc: () => 64,
+				_free: () => {},
+				HEAPU8: heap,
+				getValue: () => 0,
+			},
+			{
+				getChangedLamps: () => 0,
+				getChangedSols: () => 0,
+				getChangedGIs: () => 0,
+				getDmdWidth: () => 0,
+				getDmdHeight: () => 0,
+				getAudioChannels: () => 1,
+				getAudioFrame: () => 1 << 20,
+			},
+		)
+		emu.registerAudioConsumer(msg => void received.push(msg as Float32Array))
+		emu.markReady()
+		emu.emuSimulateCycle(16)
+		expect(received.length).toBe(1)
+		expect(received[0].length).toBeLessThanOrEqual(8192)
+	})
 	it('pullAudio no-ops when the wasm build lacks the audio export', () => {
 		const consumer = vi.fn()
 		emu.setBackendForTesting(
