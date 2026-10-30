@@ -85,6 +85,9 @@ async function getHdrWorkers(): Promise<any[]> {
 			})
 			w.on('exit', () => {
 				hdrTracker.drop(w)
+				// Survivor counts are stale for the rejected calls below, so
+				// zero them rather than biasing least-busy dispatch.
+				hdrTracker.resetAll()
 				hdrWorkers = hdrWorkers.filter(x => x !== w)
 				if (!hdrWorkers.length) hdrReady = null
 				for (const [, entry] of hdrPending) {

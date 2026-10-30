@@ -40,6 +40,12 @@ describe('WorkerLoadTracker', () => {
 		expect(tracker.pick([b], true, 0).worker).to.equal(b)
 	})
 
+	it('throws on an empty pool in either branch', () => {
+		const tracker = new WorkerLoadTracker()
+		expect(() => tracker.pick([], false, 0)).to.throw('no decode worker')
+		expect(() => tracker.pick([], true, 0)).to.throw('no decode worker')
+	})
+
 	it('resetAll clears the stale-bias error path', () => {
 		const tracker = new WorkerLoadTracker()
 		const [a, b] = workers3()

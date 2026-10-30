@@ -7,13 +7,14 @@
 export interface WorkerPendingEntry<T = unknown> {
 	resolve: (value: T) => void
 	reject: (reason?: unknown) => void
-	timer?: ReturnType<typeof setTimeout> | undefined
+	timer?: ReturnType<typeof setTimeout>
 }
 
 /**
- * Arms the timeout for a pending entry (durations stay pool-specific).
- * Callers clearTimeout via settleWorkerEntry on every settle path so a
- * resolved entry never fires late.
+ * Arms the timeout for a pending entry (durations stay pool-specific, and
+ * `onTimeout` must not throw — a throw escapes the timer callback). Callers
+ * clearTimeout via settleWorkerEntry on every settle path so a resolved
+ * entry never fires late.
  */
 export function withWorkerTimeout<T>(
 	pending: Map<number, WorkerPendingEntry<T>>,
@@ -34,6 +35,8 @@ export function withWorkerTimeout<T>(
 			}
 		}
 	}, ms)
+	// Pools unref their workers; a ref'd timer alone would keep the loop alive.
+	;(entry.timer as unknown as { unref?: () => void }).unref?.()
 }
 
 /** Clears the armed timeout (if any) and removes the entry; undefined when already settled. */

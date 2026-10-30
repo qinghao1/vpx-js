@@ -52,6 +52,11 @@ async function getNodeWorker(): Promise<any> {
 		w.on('exit', () => {
 			nodeWorker = null
 			nodeReady = null
+			for (const [, entry] of nodePending) {
+				if (entry.timer) clearTimeout(entry.timer)
+				entry.reject(new Error('transpiler worker exited'))
+			}
+			nodePending.clear()
 		})
 		;(w as any).unref?.()
 		nodeWorker = w

@@ -17,8 +17,8 @@ export class WorkerLoadTracker {
 	 * unchanged) so regular work resumes where it left off.
 	 */
 	pick<W extends object>(workers: W[], preferLeastBusy: boolean, next: number): { worker: W; next: number } {
+		if (!workers.length) throw new Error('no decode worker')
 		if (!preferLeastBusy) {
-			if (!workers.length) throw new Error('no decode worker')
 			const slot = next % workers.length
 			return { worker: workers[slot], next: slot + 1 }
 		}
@@ -33,7 +33,6 @@ export class WorkerLoadTracker {
 				bestLoad = load
 			}
 		}
-		if (!workers.length) throw new Error('no decode worker')
 		return { worker: workers[best], next }
 	}
 
