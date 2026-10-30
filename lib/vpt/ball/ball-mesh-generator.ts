@@ -7,7 +7,7 @@ import type { BallData } from './ball-data.js'
 
 const ballMesh = loadMesh('ball-mesh')
 
-/** Generates ball mesh. @see https://github.com/vpinball/vpinball/blob/master/ball.cpp */
+/** @see https://github.com/vpinball/vpinball/blob/master/ball.cpp */
 export class BallMeshGenerator {
 	constructor(readonly _data: BallData) {}
 	public getMesh(): Mesh {

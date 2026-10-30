@@ -16,7 +16,7 @@ const triggerStarMesh = loadMesh('trigger-star-mesh')
 const triggerDWireMesh = loadMesh('trigger-wire-d-mesh')
 const triggerInderMesh = loadMesh('trigger-inder-mesh')
 
-/** Generates trigger mesh. @see https://github.com/vpinball/vpinball/blob/master/trigger.cpp */
+/** @see https://github.com/vpinball/vpinball/blob/master/trigger.cpp */
 export class TriggerMeshGenerator {
 	private readonly data: TriggerData
 	constructor(data: TriggerData) {

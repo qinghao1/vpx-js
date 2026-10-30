@@ -15,7 +15,7 @@ import type { Table } from '../table/table.js'
 import type { RampData } from './ramp.js'
 import type { RampMeshGenerator } from './ramp-view.js'
 
-/** Ramp hit generator. @see https://github.com/vpinball/vpinball/blob/master/ramp.cpp */
+/** @see https://github.com/vpinball/vpinball/blob/master/ramp.cpp */
 export class RampHitGenerator {
 	constructor(
 		private readonly data: RampData,

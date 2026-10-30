@@ -12,7 +12,7 @@ import { HitCircle } from '../../physics/hit-circle.js'
 import type { Table } from '../table/table.js'
 import type { BumperData, BumperState } from './bumper.js'
 
-/** Bumper animation. @see https://github.com/vpinball/vpinball/blob/master/bumper.cpp */
+/** @see https://github.com/vpinball/vpinball/blob/master/bumper.cpp */
 export class BumperAnimation implements IAnimation {
 	private timeMsec = 0
 	private ringAnimate = false

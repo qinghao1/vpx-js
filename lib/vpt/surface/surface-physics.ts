@@ -54,7 +54,7 @@ export function normalizeWindingOrder(vVertex: RenderVertex[]): boolean {
 	return true
 }
 
-/** Surface hit generator. @see https://github.com/vpinball/vpinball/blob/master/surface.cpp */
+/** @see https://github.com/vpinball/vpinball/blob/master/surface.cpp */
 export class SurfaceHitGenerator {
 	public lineSling: LineSegSlingshot[] = []
 

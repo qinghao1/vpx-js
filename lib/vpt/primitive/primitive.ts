@@ -19,7 +19,7 @@ import { PrimitiveMeshGenerator } from './primitive-mesh-generator.js'
 import { PrimitiveState } from './primitive-state.js'
 import { PrimitiveUpdater } from './primitive-updater.js'
 
-/** Primitive item. @see https://github.com/vpinball/vpinball/blob/master/primitive.cpp */
+/** @see https://github.com/vpinball/vpinball/blob/master/primitive.cpp */
 export class Primitive
 	extends Item<PrimitiveData>
 	implements IRenderable<PrimitiveState>, IHittable, IScriptable<PrimitiveApi>, IAnimatable

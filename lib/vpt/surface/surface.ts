@@ -55,8 +55,7 @@ const STRING_MAP: Record<string, string> = {
 	SLMA: 'szSlingShotMaterial',
 }
 
-/** Surface data.
- * @see https://github.com/vpinball/vpinball/blob/master/src/parts/surface.cpp */
+/** @see https://github.com/vpinball/vpinball/blob/master/src/parts/surface.cpp */
 export class SurfaceData extends ItemData implements IPhysicalData {
 	public hitEvent = false
 	public isDroppable = false
@@ -134,7 +133,7 @@ export class SurfaceData extends ItemData implements IPhysicalData {
 	}
 }
 
-/** Surface state. @see https://github.com/vpinball/vpinball/blob/master/src/parts/surface.cpp */
+/** @see https://github.com/vpinball/vpinball/blob/master/src/parts/surface.cpp */
 export class SurfaceState extends ItemState {
 	public isDropped = false
 
@@ -420,7 +419,7 @@ export class SurfaceApi extends ItemApi<SurfaceData> {
 	}
 }
 
-/** Surface item. @see https://github.com/vpinball/vpinball/blob/master/src/parts/surface.cpp */
+/** @see https://github.com/vpinball/vpinball/blob/master/src/parts/surface.cpp */
 export class Surface
 	extends Item<SurfaceData>
 	implements IRenderable<SurfaceState>, IHittable, IScriptable<SurfaceApi>

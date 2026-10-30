@@ -33,7 +33,7 @@ const FLOAT_MAP: Record<string, string> = {
 const BOOL_MAP: Record<string, string> = { EBLD: 'isEnabled', FATH: 'fallThrough', LEMO: 'legacyMode' }
 const STRING_MAP: Record<string, string> = { MATR: 'szMaterial', SURF: 'szSurface' }
 
-/** Kicker data. @see https://github.com/vpinball/vpinball/blob/master/kicker.cpp */
+/** @see https://github.com/vpinball/vpinball/blob/master/kicker.cpp */
 export class KickerData extends ItemData {
 	public kickerType: number = Enums.KickerType.KickerHole
 	public center!: Vertex2D
@@ -257,7 +257,7 @@ export class KickerApi extends ItemApi<KickerData> {
 	}
 }
 
-/** Kicker item. @see https://github.com/vpinball/vpinball/blob/master/kicker.cpp */
+/** @see https://github.com/vpinball/vpinball/blob/master/kicker.cpp */
 export class Kicker
 	extends Item<KickerData>
 	implements IRenderable<KickerState>, IHittable, IBallCreationPosition, IScriptable<KickerApi>

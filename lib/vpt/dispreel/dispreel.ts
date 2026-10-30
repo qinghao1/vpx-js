@@ -20,8 +20,7 @@ const INT_MAP: Record<string, string> = { GIPR: 'imagesPerGridRow', UPTM: 'updat
 const BOOL_MAP: Record<string, string> = { TRNS: 'isTransparent', VISI: 'isVisible', UGRD: 'useImageGrid' }
 const STRING_MAP: Record<string, string> = { IMAG: 'szImage', SOUN: 'szSound' }
 
-/** DispReel data.
- * @see https://github.com/vpinball/vpinball/blob/master/src/parts/dispreel.cpp */
+/** @see https://github.com/vpinball/vpinball/blob/master/src/parts/dispreel.cpp */
 export class DispReelData extends ItemData {
 	public v1!: Vertex2D
 	public v2!: Vertex2D

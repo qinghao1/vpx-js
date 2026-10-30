@@ -16,8 +16,7 @@ import type { TimerHit } from '../timer/timer-hit.js'
 const BOOL_MAP: Record<string, string> = { EVNT: 'fireEvents', SSNG: 'stopSingleEvents', GREL: 'groupElements' }
 const INDEX_PATTERN = /^\d+$/
 
-/** Collection data.
- * @see https://github.com/vpinball/vpinball/blob/master/collection.cpp */
+/** @see https://github.com/vpinball/vpinball/blob/master/collection.cpp */
 export class CollectionData extends ItemData {
 	public itemNames: string[] = []
 	public fireEvents = false
@@ -106,7 +105,7 @@ export class CollectionApi extends ItemApi<CollectionData> implements Iterable<I
 	}
 }
 
-/** Collection item. @see https://github.com/vpinball/vpinball/blob/master/collection.cpp */
+/** @see https://github.com/vpinball/vpinball/blob/master/collection.cpp */
 export class Collection extends Item<CollectionData> implements IPlayable, IScriptable<CollectionApi> {
 	public readonly items: Array<ItemApi<ItemData>> = []
 	private api?: CollectionApi

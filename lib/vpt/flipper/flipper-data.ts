@@ -44,8 +44,7 @@ const STRING_MAP: Record<string, string> = {
 	IMAG: 'szImage',
 }
 
-/** Flipper data.
- * @see https://github.com/vpinball/vpinball/blob/master/flipper.cpp */
+/** @see https://github.com/vpinball/vpinball/blob/master/flipper.cpp */
 export class FlipperData extends ItemData {
 	public baseRadius = 21.5
 	public endRadius = 13.0

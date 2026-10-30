@@ -7,7 +7,7 @@ import type { Table } from '../table/table.js'
 import type { TriggerData } from './trigger-data.js'
 import type { TriggerState } from './trigger-state.js'
 
-/** Trigger animation. @see https://github.com/vpinball/vpinball/blob/master/trigger.cpp */
+/** @see https://github.com/vpinball/vpinball/blob/master/trigger.cpp */
 export class TriggerAnimation implements IAnimation {
 	public hitEvent = false
 	public unhitEvent = false

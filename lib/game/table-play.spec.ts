@@ -20,9 +20,9 @@ const WALKING_DEAD = '/home/qinghao1/Downloads/walking_dead.vpx'
 
 describe('table play executes without uncaught script errors', () => {
 	it('plays an inline script with Null comparisons and guarded Null access', () => {
-		// Mirrors the two fixed classes through the Player path (not just the
-		// helpers): a Null-vs-string ordering (was error 13) and a member
-		// access on a value that starts Null but is assigned before use.
+		// Mirrors the two classes through the Player path (not just the
+		// helpers): a Null-vs-string ordering and a member access on a value
+		// that starts Null but is assigned before use.
 		const vbs = [
 			'Dim n',
 			'n = Null',

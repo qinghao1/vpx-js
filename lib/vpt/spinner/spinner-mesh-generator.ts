@@ -11,7 +11,7 @@ import type { SpinnerData } from './spinner-data.js'
 const spinnerBracketMesh = loadMesh('spinner-bracket-mesh')
 const spinnerPlateMesh = loadMesh('spinner-plate-mesh')
 
-/** Generates spinner meshes. @see https://github.com/vpinball/vpinball/blob/master/spinner.cpp */
+/** @see https://github.com/vpinball/vpinball/blob/master/spinner.cpp */
 export class SpinnerMeshGenerator {
 	constructor(private readonly data: SpinnerData) {}
 	public generateMeshes(table: Table): { plate: Mesh; bracket: Mesh } {

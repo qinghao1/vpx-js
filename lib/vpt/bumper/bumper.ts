@@ -45,8 +45,7 @@ const BOOL_TAGS: Record<string, string> = {
 	REEN: 'isReflectionEnabled',
 }
 
-/** Bumper data.
- * @see https://github.com/vpinball/vpinball/blob/master/bumper.cpp */
+/** @see https://github.com/vpinball/vpinball/blob/master/bumper.cpp */
 export class BumperData extends ItemData {
 	public center!: Vertex2D
 	public radius = 45
@@ -166,7 +165,7 @@ export class BumperState extends ItemState {
 	}
 }
 
-/** Bumper API. @see https://github.com/vpinball/vpinball/blob/master/bumper.cpp */
+/** @see https://github.com/vpinball/vpinball/blob/master/bumper.cpp */
 export class BumperApi extends ItemApi<BumperData> {
 	private readonly isBaseDynamic: boolean
 	private readonly isCapDynamic: boolean
@@ -360,7 +359,7 @@ export class BumperApi extends ItemApi<BumperData> {
 	}
 }
 
-/** Bumper item. @see https://github.com/vpinball/vpinball/blob/master/bumper.cpp */
+/** @see https://github.com/vpinball/vpinball/blob/master/bumper.cpp */
 export class Bumper
 	extends Item<BumperData>
 	implements IRenderable<BumperState>, IHittable, IAnimatable, IScriptable<BumperApi>

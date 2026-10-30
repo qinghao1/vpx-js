@@ -19,7 +19,7 @@ import type { PlungerMover } from './plunger-mover.js'
 import { PlungerState } from './plunger-state.js'
 import { PlungerUpdater } from './plunger-updater.js'
 
-/** Plunger item. @see https://github.com/vpinball/vpinball/blob/master/plunger.cpp */
+/** @see https://github.com/vpinball/vpinball/blob/master/plunger.cpp */
 export class Plunger
 	extends Item<PlungerData>
 	implements IRenderable<PlungerState>, IPlayable, IMovable, IHittable, IBallCreationPosition, IScriptable<PlungerApi>

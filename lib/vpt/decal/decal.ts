@@ -19,8 +19,7 @@ const INT_MAP: Record<string, string> = { TYPE: 'decalType', SIZE: 'sizingType' 
 const BOOL_MAP: Record<string, string> = { VERT: 'verticalText', BGLS: 'isBackglass' }
 const STRING_MAP: Record<string, string> = { IMAG: 'szImage', SURF: 'szSurface', TEXT: 'text', MATR: 'szMaterial' }
 
-/** Decal data.
- * @see https://github.com/vpinball/vpinball/blob/master/src/parts/decal.cpp */
+/** @see https://github.com/vpinball/vpinball/blob/master/src/parts/decal.cpp */
 export class DecalData extends ItemData {
 	public center!: Vertex2D
 	public width = 100

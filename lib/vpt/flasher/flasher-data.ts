@@ -57,8 +57,7 @@ export function clampAddBlend(value: number): FlasherAddBlend {
 	return Math.max(FlasherAddBlend.None, Math.min(FlasherAddBlend.Absorb, value)) as FlasherAddBlend
 }
 
-/** Flasher data.
- * @see https://github.com/vpinball/vpinball/blob/master/flasher.cpp */
+/** @see https://github.com/vpinball/vpinball/blob/master/flasher.cpp */
 export class FlasherData extends ItemData {
 	public height = 50
 	public rotX = 0

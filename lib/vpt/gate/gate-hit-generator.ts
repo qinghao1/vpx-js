@@ -10,7 +10,7 @@ import type { GateData } from './gate-data.js'
 import { GateHit } from './gate-hit.js'
 import type { GateState } from './gate-state.js'
 
-/** Gate hit generator. @see https://github.com/vpinball/vpinball/blob/master/gate.cpp */
+/** @see https://github.com/vpinball/vpinball/blob/master/gate.cpp */
 export class GateHitGenerator {
 	constructor(private readonly data: GateData) {}
 

@@ -4,5 +4,4 @@
 import { ItemUpdater } from '../item-updater.js'
 import type { TableState } from './table-state.js'
 
-/** Updates table render state. */
 export class TableUpdater extends ItemUpdater<TableState> {}

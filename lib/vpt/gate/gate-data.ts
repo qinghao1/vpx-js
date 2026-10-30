@@ -28,8 +28,7 @@ const BOOL_MAP: Record<string, string> = {
 }
 const STRING_MAP: Record<string, string> = { MATR: 'szMaterial', SURF: 'szSurface' }
 
-/** Gate data.
- * @see https://github.com/vpinball/vpinball/blob/master/gate.cpp */
+/** @see https://github.com/vpinball/vpinball/blob/master/gate.cpp */
 export class GateData extends ItemData {
 	public angleMax = Math.PI / 2
 	public angleMin = 0

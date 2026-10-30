@@ -17,7 +17,7 @@ export interface LightMeshes<GEOMETRY> {
 	socket?: Mesh
 }
 
-/** Generates light meshes. @see https://github.com/vpinball/vpinball/blob/master/light.cpp */
+/** @see https://github.com/vpinball/vpinball/blob/master/light.cpp */
 export class LightMeshGenerator {
 	constructor(private readonly data: LightData) {}
 
