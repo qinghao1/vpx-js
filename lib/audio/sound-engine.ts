@@ -126,6 +126,9 @@ function soundKey(name: string): string {
 	return name.toLowerCase()
 }
 
+/** At most 2 concurrent voices per sound: further plays steal the front voice instead of stacking into the limiter. */
+const MAX_SAME_SOUND_VOICES = 2
+
 /** Subclasses add the audible output behind `emitVoice`/`emitKnock`. */
 export abstract class BaseSoundEngine implements ISoundEngine {
 	private readonly voices = new Map<string, SoundVoice[]>()
@@ -173,6 +176,10 @@ export abstract class BaseSoundEngine implements ISoundEngine {
 		if (restart) for (const voice of list) this.halt(voice)
 		let voice = useSame || restart ? list[0] : list.find(v => !v.playing)
 		if (!voice) {
+			// restart=false callers would otherwise stack unboundedly
+			// into the limiter: steal the front voice.
+			const front = list.length >= MAX_SAME_SOUND_VOICES ? list.shift() : undefined
+			if (front) this.halt(front)
 			voice = {
 				id: ++this.seq,
 				name,

@@ -259,6 +259,17 @@ describe('WebSoundEngine', () => {
 		expect(voice.gain.value).to.be.closeTo(1, 1e-9)
 	})
 
+	it('should steal the oldest voice past the same-sound cap', () => {
+		engine.playSound('tone', { restart: false })
+		engine.playSound('tone', { restart: false })
+		engine.playSound('tone', { restart: false })
+		// Three overlapping plays leave two live sources: the first is stolen.
+		expect(FakeCtx.sources).to.have.length(3)
+		expect(FakeCtx.sources.filter(s => !s.stopped)).to.have.length(2)
+		expect(FakeCtx.sources[0]?.stopped).to.equal(true)
+		expect(engine.isPlaying('tone')).to.equal(true)
+	})
+
 	it('should match native center diffusion on voice gain', () => {
 		engine.setVolume(1)
 		engine.playSound('tone')
