@@ -2,8 +2,7 @@
 
 `IRenderApi` decouples the engine from any 3D framework: gameplay code in
 `lib/game/` and `lib/vpt/` never touches three.js directly. The only backend
-is `ThreeRenderApi` (`threejs/`); there is no Babylon adapter despite older
-claims.
+is `ThreeRenderApi` (`threejs/`); there is no Babylon adapter.
 
 ## Pipeline
 

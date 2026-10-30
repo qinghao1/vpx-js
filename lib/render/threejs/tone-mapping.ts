@@ -13,8 +13,7 @@ export function resolveToneMapping(tm?: number): number {
 
 /**
  * Single owner of the exposure cap: the native 0..2 range, tightened to 1.5
- * on the low-quality perf path (mirrors the low-q branch that used to live
- * in applyRendererToneMapping).
+ * on the low-quality perf path.
  */
 export function clampExposure(value: unknown, lowQuality = false): number {
 	const v = typeof value === 'number' ? value : Number(value)

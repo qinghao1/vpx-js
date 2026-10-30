@@ -41,8 +41,7 @@ function fileExists(filePath: string): boolean {
 	}
 }
 
-// Cached lib/*.ts file list: the P3 churn check used to synchronously walk +
-// re-read the whole tree on every run. Walk once, reuse across checks.
+// Cached lib/*.ts file list: walk once, reuse across checks.
 let libTsFilesCache: string[] | null = null
 export function getLibTsFiles(): string[] {
 	if (libTsFilesCache) return libTsFilesCache

@@ -32,12 +32,12 @@ export interface MaterialSlots {
 	__baseColor?: number
 	__uAlbedo?: SlotUniform<Color>
 	__uBDL?: SlotUniform<number>
-	/** Canonical BDL lit-factor uniform. The legacy `__uDim` alias was removed; read this. */
+	/** Canonical BDL lit-factor uniform. */
 	__uLitF?: SlotUniform<number>
 	__uCarry?: SlotUniform<number>
 	__uAlpha?: SlotUniform<number>
 	__uBelowF?: SlotUniform<number>
-	/** Canonical tint uniform (BDL `__uFlat` source, baked albedo). The legacy `__uTintColor` alias was removed; read this. */
+	/** Canonical tint uniform (BDL `__uFlat` source, baked albedo). */
 	__uTint?: SlotUniform<Color>
 	__uIntensity?: SlotUniform<number>
 	__uFlat?: SlotUniform<Color>

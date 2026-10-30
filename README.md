@@ -97,15 +97,14 @@ table.kickers.BallRelease.getApi().Kick(0, 5)
 
 In short:
 
-- **Modern toolchain** — ESM-only, Node 24, `tsup` + `Biome` + `Vitest` replacing Rollup/TSLint/Mocha/NYC.
+- **Modern toolchain** — ESM-only, Node 24, `tsup` + `Biome` + `Vitest` replacing Rollup/Mocha/NYC.
 - **Current dependencies** — three `^0.185` + `three-mesh-bvh` + `wpc-emu` + `pako`.
 - **Portable I/O** — `Uint8Array`/`DataView` throughout; `refs.node`/`refs.browser` replaces the old `pkg.browser` shim.
-- **Rendering rework** — custom glTF/Draco code removed; GLB export now uses `three/addons/exporters/GLTFExporter`.
+- **Rendering rework** — GLB export now uses `three/addons/exporters/GLTFExporter`.
 - **Physics fixes** — VPX 10.8.1 defaults, timer/nudge/collision parity with desktop VPX.
 - **Scripting hardened** — broader VBScript coverage and a proper `with`-proxy sandbox.
 - **New: PinMAME WASM** — `external/pinmame` + `wasm/` build (WASM + mock fallback) for any PinMAME hardware; upstream only mentioned `wpc-emu`.
-- **Leaner repo** — `demo-static` removed.
-- **No CLI tools** — `bin/` removed; script extraction, GLB export, and transpiling are library API (`Table.load`, `TableExporter`, `Transpiler`).
+- **Leaner repo** — script extraction, GLB export, and transpiling are library API (`Table.load`, `TableExporter`, `Transpiler`).
 
 
 ## Development
