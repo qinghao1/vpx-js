@@ -1,20 +1,14 @@
 # Table Elements
 
-This folder contains implementations of the playfield items. There are various
-aspects to each item, such as data parsing, mesh generation, collision handling,
-physical movement, animation, scripting, and state management. 
+This folder contains implementations of the playfield items. Each item spans
+data parsing, mesh generation, collision handling, physical movement,
+animation, scripting, and state management.
 
-The original Visual Pinball source code covers all those aspects in one single
-class per item. Common code is found in parent classes which are extended by
-each item.
+The original Visual Pinball source covers all of that in one class per item;
+here each item gets its own folder with a focused main class plus helper
+classes (JavaScript has no multiple inheritance):
 
-Unlike C++, JavaScript doesn't support multiple inheritance. Additionally, we 
-try to keep a class focused on one single thing, and keep it as small as 
-possible. This results in a somewhat different structure than the original 
-Visual Pinball source code:
-
-- Every playfield item gets its own folder
-- There is a *main class* which is referenced by rest of the library. This class 
+- There is a *main class* which is referenced by rest of the library. This class
   delegates most of its functionality to its *helper classes*.
 - The helper classes are instantiated on-demand. For example, during a GLTF 
   export, no collision helpers will be created.
@@ -26,8 +20,6 @@ Visual Pinball source code:
 The main class of a playfield item is the class interacting with the rest of the
 library. They are named without any suffix, like `Flipper`, `Rubber` and `Ball`.
 They all extend [`Item`](item.ts).
-
-You can see what a given playfield item is used for by looking at its interfaces.
 
 - `IRenderable<STATE>` is for table elements that are rendered on the playfield
 - `IHittable` means the ball can collide with it
@@ -42,40 +34,34 @@ behavior, `IAnimatable`s are only updated once every frame.
 
 ## Helper Classes
 
-Some helper classes are available for every table item, some only for a handful.
-The following is a description of patterns and how they relate to the interfaces
-defined above.
+Some helpers exist for every item, others only for a few.
 
 ### Data Classes
 
 These keep the properties of the `.vpx` file and know how to read them. They
-are *usually* read-only, i.e. changes during gameplay are reflected elsewhere,
-but there are some exceptions (which probably are worth refactoring).
+are *usually* read-only: changes during gameplay are reflected elsewhere,
+with a few exceptions.
 
-Most other helpers rely on data classes to do their job, so they are referenced
-a lot. All data classes except `BallData` (which isn't persisted) extend 
-[`ItemData`](item-data.ts).
+Most other helpers rely on data classes. All data classes except `BallData`
+(which isn't persisted) extend [`ItemData`](item-data.ts).
 
 ### States
 
-States contain the *visible state* of a table element, i.e. changes that must be
-taken into account by the renderer. They are relatively small, if it's a movable
-element it contains the position, as well as visibility, material and textures,
-which be changed during gameplay as well. They all extend 
-[`ItemState`](item-state.ts).
+States contain the *visible state* of a table element, i.e. changes the
+renderer must take into account: position for movables, plus visibility,
+material, and textures, which can also change during gameplay. They all
+extend [`ItemState`](item-state.ts).
 
-States are updated directly in the physics loop or via the script API. A list of
-states that have been changed since the last retrieval can be retrieved by the 
-`Player` class.
+States are updated directly in the physics loop or via the script API. The
+`Player` class returns the states changed since the last retrieval.
 
 Since the state changes in the worker thread and needs to be passed to the main
 thread, the transfer object only contains the changed values of the state.
 
 ### APIs
 
-Visual Pinball provides an API for both the editor and the VBScript engine to
-interact with playfield elements. The goal of the API helpers is to provide an
-instance that implements that API without being spoiled by internals. 
+API helpers expose the item's Visual Pinball API (editor and VBScript)
+without leaking internals.
 
 Playfield items with an API implement `IScriptable`. The returned API class
 extends [`ItemApi`](item-api.ts).
@@ -108,8 +94,7 @@ plate, as well as a hit generator for the socket.
 
 ### Movers
 
-Movers are created within the hit object. They are the result of `IMovable` and 
-do a few things:
+Movers are created within the hit object of items implementing `IMovable`:
  
 - Calculate the item's transformation and velocity on each physics cycle
 - Provide additional parameters to the hit object's collision calculations
@@ -124,9 +109,9 @@ renderer applying a different rotation matrix on the object.
  
 ### Animations
 
-Animation helpers are the "dumb" version of movers. They basically apply a 
-static sequence of transformations which are computed only once per frame 
-(although the "transformation" is usually just a state parameter changing).
+Animation helpers are the "dumb" version of movers: a static sequence of
+transformations computed once per frame (usually just a state parameter
+changing).
 
 Animation helpers are created by classes which implement `IAnimatable`.
 

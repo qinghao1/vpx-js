@@ -81,10 +81,10 @@ import { OleCompoundDoc } from './ole-doc.js'
 import { BinaryReader } from '../refs.browser.js' // or ../refs.node.js on Node
 
 const reader = new BinaryReader(bytes) // Blob | Uint8Array | ArrayBuffer | DataView (on Node: a file path)
-const doc = await OleCompoundDoc.load(reader) // opens the reader, reads header, SAT, SSAT and directory tree
-const table = doc.storage('GameStg') // named storage off the root
-const names = table.getStreams() // stream names inside it
-const data = await table.read(names[0]) // full stream bytes
+const doc = await OleCompoundDoc.load(reader) // reads header, SAT, SSAT and directory tree
+const table = doc.storage('GameStg')
+const names = table.getStreams()
+const data = await table.read(names[0])
 await doc.close()
 ```
 
