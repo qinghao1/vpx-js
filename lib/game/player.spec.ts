@@ -9,6 +9,7 @@ import { NodeBinaryReader } from '../io/binary-reader.node.js'
 import { Vertex3D } from '../math/vector.js'
 import { _resetQualityCache } from '../util/quality.js'
 import { Table } from '../vpt/table/table.js'
+import { EMU_QUANTUM_MS, type IEmulator } from './iemulator.js'
 import { FULL_SWEEP_EVERY, type IBallCreationPosition, Player } from './player.js'
 
 /** Runs fn with performance.now stubbed to `now`; restores the clock afterwards. */
@@ -19,6 +20,15 @@ function withStubbedNow(now: number, fn: () => void): void {
 		fn()
 	} finally {
 		performance.now = realNow
+	}
+}
+
+/** Recording stand-in for the quantum-sync transparency spec below. */
+class FakeEmu {
+	public readonly calls: number[] = []
+	public emuSimulateCycle(ms: number): number {
+		this.calls.push(ms)
+		return ms
 	}
 }
 
@@ -286,6 +296,66 @@ describe('The VPinball player', () => {
 		// (game time is relative to sim start, hence 16 rather than 5000016).
 		expect(player.updatePhysics(5_000_016)).to.equal(16)
 		expect(player.getGameTime()).to.equal(16)
+	})
+
+	describe('emu quantum sync', () => {
+		function setupSyncedPlayer(): { player: Player; calls: number[] } {
+			const table = new TableBuilder().withTableScript('').build('Table1')
+			const player = new Player(table).init({})
+			const calls: number[] = []
+			player.setEmulator({
+				emuSimulateCycle: (ms: number) => {
+					calls.push(ms)
+					return ms
+				},
+			} as unknown as IEmulator)
+			return { player, calls }
+		}
+
+		it('should flush at most one whole-quantum emu sync per tick', () => {
+			const { player, calls } = setupSyncedPlayer()
+			let time = 0
+			for (let tick = 0; tick < 10; tick++) {
+				const before = calls.length
+				time += 16.7
+				player.updatePhysics(time)
+				const tickCalls = calls.slice(before)
+				expect(tickCalls.length).to.be.lessThan(2)
+				for (const ms of tickCalls) expect(ms % EMU_QUANTUM_MS).to.equal(0)
+			}
+			expect(calls.length).to.be.above(0)
+		})
+
+		it('should carry sub-quantum emu time instead of dropping it', () => {
+			const { player, calls } = setupSyncedPlayer()
+			let time = 0
+			for (let tick = 0; tick < 60; tick++) {
+				time += 16.7
+				player.updatePhysics(time)
+			}
+			const forwarded = calls.reduce((sum, ms) => sum + ms, 0)
+			// Everything arrives except the carried remainder, always below one quantum.
+			expect(time - forwarded).to.be.at.least(0)
+			expect(time - forwarded).to.be.below(EMU_QUANTUM_MS)
+			expect(forwarded % EMU_QUANTUM_MS).to.equal(0)
+		})
+
+		it('should keep the synced emu transparent to instanceof and re-setting', () => {
+			const table = new TableBuilder().withTableScript('').build('Table1')
+			const player = new Player(table).init({})
+			const emu = new FakeEmu()
+			player.setEmulator(emu as unknown as IEmulator)
+			expect(player.getPhysics().emu instanceof FakeEmu).to.equal(true)
+			// Controller reloads re-set the same emu: must reuse the batcher, not nest one.
+			player.setEmulator(player.getPhysics().emu!)
+			let time = 0
+			for (let tick = 0; tick < 10; tick++) {
+				time += 16.7
+				player.updatePhysics(time)
+			}
+			expect(emu.calls.length).to.be.above(0)
+			for (const ms of emu.calls) expect(ms % EMU_QUANTUM_MS).to.equal(0)
+		})
 	})
 
 	it('should bound explicit-time bursts to 16 steps on low-quality devices', () => {

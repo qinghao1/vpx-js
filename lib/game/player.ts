@@ -12,7 +12,7 @@ import type { Ball } from '../vpt/ball/ball.js'
 import type { ItemState } from '../vpt/item-state.js'
 import type { Table } from '../vpt/table/table.js'
 import { Event } from './event.js'
-import type { IEmulator } from './iemulator.js'
+import { type IEmulator, QuantumEmuSync } from './iemulator.js'
 import type { IAnimatable, IMovable } from './interfaces.js'
 import { type AssignKey, keyEventToDirectInputKey } from './key-code.js'
 import { PinInput } from './pin-input.js'
@@ -41,6 +41,7 @@ const FULL_SWEEP_MIN_COVERAGE = 0.5
 export class Player extends EventEmitter {
 	private readonly pinInput: PinInput
 	private readonly physics: PlayerPhysics
+	private emuSync?: QuantumEmuSync
 	private isInitialized = false
 	private previousStates: Record<string, ItemState> = {}
 	private currentStates: Record<string, ItemState> = {}
@@ -181,10 +182,12 @@ export class Player extends EventEmitter {
 	/** Advances physics to absolute `timeMs` (ms, not a delta); omitted = real clock. Returns iterations run. */
 	public updatePhysics(timeMs?: number): number {
 		const iterations = this.physics.updatePhysics(timeMs)
+		// End-of-tick emu flush: at most one whole-quantum wasm round-trip, sub-quantum time stays carried.
+		this.emuSync?.flushTick()
 		if (iterations > 0) {
-			for (let i = 0; i < this.physics.balls.length; i++) this.markDirty(this.physics.balls[i]!.getName())
+			for (let i = 0; i < this.physics.balls.length; i++) this.markDirty(this.physics.balls[i].getName())
 			for (let i = 0; i < this.movables.length; i++) {
-				this.markDirty(this.movables[i]!.getName())
+				this.markDirty(this.movables[i].getName())
 			}
 		}
 		return iterations
@@ -195,7 +198,7 @@ export class Player extends EventEmitter {
 	}
 	public updateAnimations(timeMs: number): void {
 		for (let i = 0; i < this.animatables.length; i++) {
-			const animatable = this.animatables[i]!
+			const animatable = this.animatables[i]
 			if (animatable.getAnimation().updateAnimation(timeMs, this.table)) {
 				this.markDirty(animatable.getName())
 			}
@@ -304,7 +307,12 @@ export class Player extends EventEmitter {
 	}
 
 	public setEmulator(emu: IEmulator): void {
-		this.physics.emu = emu
+		// Batch the loop's per-iteration flushes into one quantum-multiple sync
+		// per tick. The proxy keeps the target's prototype, so `instanceof`
+		// checks on physics.emu (controller-reload reuse) keep working.
+		const sync = QuantumEmuSync.wrap(emu)
+		this.emuSync = sync
+		this.physics.emu = sync.proxy
 		this.emit('emuStarted')
 	}
 	public hasDmd(): boolean {
