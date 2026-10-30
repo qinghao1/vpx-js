@@ -185,40 +185,46 @@ export class WebSoundEngine extends BaseSoundEngine {
 		if (startAt - now > MAX_EMU_SCHEDULE_AHEAD) return
 		// pcm is a borrowed emu-pool view (see IEmulator.registerAudioConsumer):
 		// copy it synchronously — it may be overwritten on the next emu sync.
+		const frames = pcm.length
 		const buffer = this.takeEmuBuffer(ctx, pcm)
 		if (!buffer) return
 		const source = ctx.createBufferSource()
 		source.buffer = buffer
 		source.connect(this.master)
-		source.onended = () => this.releaseEmuBuffer(buffer, pcm.length)
-		source.start(startAt)
-		this.emuNextTime = startAt + pcm.length / EMU_SAMPLE_RATE
+		source.onended = () => this.releaseEmuBuffer(buffer, frames)
+		try {
+			source.start(startAt)
+		} catch {
+			this.releaseEmuBuffer(buffer, frames)
+			return
+		}
+		this.emuNextTime = startAt + frames / EMU_SAMPLE_RATE
 	}
 
 	private takeEmuBuffer(ctx: AudioContext, pcm: Float32Array): AudioBuffer | null {
 		const bucket = this.emuBufferPool.get(pcm.length)
-		const buffer = bucket?.pop()
+		let buffer = bucket?.pop()
 		if (buffer) {
-			if (bucket && bucket.length === 0) this.emuBufferPool.delete(pcm.length)
+			if (bucket.length === 0) this.emuBufferPool.delete(pcm.length)
 			this.emuPooledCount--
+		} else {
+			// Pool miss: pool empty or length unseen — allocate fresh.
 			try {
-				buffer.getChannelData(0).set(pcm)
-				return buffer
+				buffer = ctx.createBuffer(1, pcm.length, EMU_SAMPLE_RATE)
 			} catch {
 				return null
 			}
 		}
-		// Underrun fallback: pool empty or length unseen — allocate fresh.
 		try {
-			const fresh = ctx.createBuffer(1, pcm.length, EMU_SAMPLE_RATE)
-			fresh.getChannelData(0).set(pcm)
-			return fresh
+			buffer.getChannelData(0).set(pcm)
+			return buffer
 		} catch {
 			return null
 		}
 	}
 
 	private releaseEmuBuffer(buffer: AudioBuffer, frames: number): void {
+		if (!this.ctx) return
 		if (this.emuPooledCount >= MAX_EMU_POOLED_BUFFERS) return
 		let bucket = this.emuBufferPool.get(frames)
 		if (!bucket) {

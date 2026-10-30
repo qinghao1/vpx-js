@@ -394,4 +394,30 @@ describe('WebSoundEngine', () => {
 		expect(FakeCtx.sources.length).to.be.lessThan(27)
 		expect(FakeCtx.buffers.length).to.equal(FakeCtx.sources.length)
 	})
+
+	it('should drop late emu onended arrivals after dispose instead of pooling them', () => {
+		engine.pushEmuPcm(new Float32Array(441))
+		const late = FakeCtx.sources.at(-1)?.onended
+		engine.dispose()
+		late?.()
+		const pool = engine as unknown as { emuBufferPool: Map<number, AudioBuffer[]> }
+		expect(pool.emuBufferPool.size).to.equal(0)
+	})
+
+	it('should return the emu buffer to the pool when starting the source throws', () => {
+		const origStart = FakeSource.prototype.start
+		FakeSource.prototype.start = (): void => {
+			throw new Error('interrupted')
+		}
+		try {
+			engine.pushEmuPcm(new Float32Array(441))
+		} finally {
+			FakeSource.prototype.start = origStart
+		}
+		expect(FakeCtx.sources.length).to.equal(1)
+		expect(FakeCtx.buffers.length).to.equal(1)
+		engine.pushEmuPcm(new Float32Array(441))
+		expect(FakeCtx.sources.length).to.equal(2)
+		expect(FakeCtx.buffers.length).to.equal(1)
+	})
 })
