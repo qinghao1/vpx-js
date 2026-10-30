@@ -72,19 +72,19 @@ describe('ThreeMapGenerator.getTexture', () => {
 	})
 })
 
-describe('ThreeMapGenerator.loadTextures', () => {
-	function stubLoader(failName?: string, onName?: (name: string) => void) {
-		return {
-			loadTexture: async () => new Texture(),
-			loadRawTexture: async () => new Texture(),
-			loadDefaultTexture: async (name: string) => {
-				onName?.(name)
-				if (name === failName) throw new Error('decode boom')
-				return new Texture()
-			},
-		}
+function stubLoader(failName?: string, onName?: (name: string) => void) {
+	return {
+		loadTexture: async () => new Texture(),
+		loadRawTexture: async () => new Texture(),
+		loadDefaultTexture: async (name: string) => {
+			onName?.(name)
+			if (name === failName) throw new Error('decode boom')
+			return new Texture()
+		},
 	}
+}
 
+describe('ThreeMapGenerator.loadTextures', () => {
 	it('caches arrivals under exact and lowercase names retrievable any-case', async () => {
 		const table = new TableBuilder().build()
 		const generator = new ThreeMapGenerator(stubLoader() as any)
@@ -181,6 +181,86 @@ describe('ThreeMapGenerator.loadTextures', () => {
 		} finally {
 			Logger.setLogger(prev)
 		}
+	})
+
+	it('warms the HDR pool only when float textures are queued', async () => {
+		const table = new TableBuilder().build()
+		const warmup = vi.fn()
+		const generator = new ThreeMapGenerator({ ...stubLoader(), warmup } as any)
+		await generator.loadTextures([VptTexture.fromFilesystem('env.hdr')], table)
+		expect(warmup).toHaveBeenCalledTimes(1)
+		const idle = new ThreeMapGenerator({ ...stubLoader(), warmup } as any)
+		warmup.mockClear()
+		await idle.loadTextures([VptTexture.fromFilesystem('WallA.png')], table)
+		expect(warmup).not.toHaveBeenCalled()
+	})
+})
+
+describe('ThreeMapGenerator.retainSources', () => {
+	function fakeTexture(name: string, opts: { raw?: boolean; len?: number } = {}) {
+		return {
+			getName: () => name,
+			isRaw: () => opts.raw ?? false,
+			isHdr: () => false,
+			isOpaque: true,
+			storageName: 'Image1',
+			binary: opts.len === undefined ? undefined : { pos: 8, len: opts.len },
+			sawData: [] as Array<Uint8Array | null | undefined>,
+			loadTexture: async function (
+				this: { sawData: Array<Uint8Array | null | undefined> },
+				_loader: unknown,
+				_table: unknown,
+				data?: Uint8Array | null,
+			) {
+				this.sawData.push(data)
+				return new Texture()
+			},
+		}
+	}
+
+	it('retains small uncached sources and skips the rest', async () => {
+		const generator = new ThreeMapGenerator(stubLoader() as any)
+		const cached = fakeTexture('Cached.png', { len: 100 })
+		generator.getCache().set('cached.png', new Texture())
+		const small = fakeTexture('Small.png', { len: 100 })
+		let reads = 0
+		const table = {
+			streamStorage: async () => {
+				reads++
+				return new Uint8Array(100)
+			},
+		}
+		const result = await generator.retainSources(
+			[
+				cached as any,
+				small as any,
+				fakeTexture('Raw.png', { raw: true, len: 100 }) as any,
+				fakeTexture('Huge.png', { len: 2 * 1024 * 1024 }) as any,
+				fakeTexture('Naked.png') as any,
+			],
+			table as any,
+		)
+		expect(result).toEqual({ retained: 1, bytes: 100 })
+		expect(reads).toEqual(1)
+	})
+
+	it('serves retained bytes without re-reading the archive', async () => {
+		const generator = new ThreeMapGenerator(stubLoader() as any)
+		const bytes = new Uint8Array([1, 2, 3])
+		const tex = fakeTexture('Swap.png', { len: 3 })
+		await generator.retainSources([tex as any], { streamStorage: async () => bytes } as any)
+		// Archive released: further reads throw, like the released OLE reader.
+		const deadTable = {
+			streamStorage: async (): Promise<Uint8Array> => {
+				throw new Error('BinaryReader: data already consumed and not available')
+			},
+		}
+		const outcomes: Array<[string, boolean]> = []
+		await generator.loadTextures([tex as any], deadTable as any, (t, ok) => {
+			outcomes.push([(t as unknown as { getName(): string }).getName(), ok])
+		})
+		expect(outcomes).toEqual([['Swap.png', true]])
+		expect(tex.sawData).toEqual([bytes])
 	})
 })
 
