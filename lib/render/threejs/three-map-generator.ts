@@ -20,13 +20,6 @@ const HARDWARE_CONCURRENCY_FALLBACK = 4
 const LOAD_FAILURE_COOLDOWN_MS = 30000
 
 /**
- * Retain CPU sources up to this size for textures that never streamed, so
- * mid-game script swaps still resolve after the archive is released.
- * Swap variants are small UI-style images; bakes and VR rooms stay out.
- */
-const MAX_RETAINED_SOURCE_BYTES = 1024 * 1024
-
-/**
  * Caches and preloads Three.js textures. Each texture is cached under both
  * its exact and lowercased name because table authors reference textures
  * case-inconsistently; lookups must stay case-insensitive.
@@ -35,7 +28,6 @@ export class ThreeMapGenerator {
 	private readonly textureCache = new Map<string, ThreeTexture>()
 	private readonly inFlight = new Map<string, Promise<boolean>>()
 	private readonly lastFailureAt = new Map<string, number>()
-	private readonly retainedSources = new Map<string, Uint8Array>()
 
 	constructor(
 		private readonly textureLoader?: ITextureLoader<ThreeTexture>,
@@ -53,7 +45,7 @@ export class ThreeMapGenerator {
 		// loader spawns its decode pool lazily, so kick it before dispatch.
 		// Gated on float textures so HDR-free tables skip the spawn entirely.
 		if (textures.some(tex => tex.isHdr())) {
-			;(this.textureLoader as unknown as { warmup?: () => void }).warmup?.()
+			this.textureLoader.warmup?.()
 		}
 		const started = Date.now()
 		logger().info('[ThreeMapGenerator.loadTextures] Pre-loading %s textures..', textures.length)
@@ -122,7 +114,7 @@ export class ThreeMapGenerator {
 
 	private clearTextureSource(texture: Texture): void {
 		// Best-effort cleanup: the source buffer simply stays referenced if unset fails.
-		for (const field of ['binary', 'pdsBuffer'] as const) {
+		for (const field of ['binary', 'pdsBuffer', 'retainedData'] as const) {
 			try {
 				;(texture as any)[field] = undefined
 			} catch {
@@ -143,7 +135,6 @@ export class ThreeMapGenerator {
 		// source-less re-read fetches the whole OLE stream, which the image
 		// decoder rejects with a message-less DOM error event.
 		if (this.hasTexture(texture.getName())) {
-			this.retainedSources.delete(texture.getName().toLowerCase())
 			return Promise.resolve(true)
 		}
 		const running = this.inFlight.get(key)
@@ -159,26 +150,27 @@ export class ThreeMapGenerator {
 	}
 
 	/**
-	 * Snapshots CPU sources of small textures missing from the GPU cache, so
-	 * later demand loads survive the archive release. Already cached, raw
-	 * (decoded in memory), oversized, or source-less textures are skipped.
+	 * Snapshots archive sources of textures missing from the GPU cache, so
+	 * later demand loads survive the reader release. Already cached, raw
+	 * (decoded in memory), or source-less textures are skipped. Bytes live
+	 * on the texture and die with the table; successful loads drain them.
 	 */
 	public async retainSources(textures: Texture[], table: Table): Promise<{ retained: number; bytes: number }> {
 		let retained = 0
 		let bytes = 0
 		for (const texture of textures) {
-			const key = texture.getName().toLowerCase()
-			if (!key || this.hasTexture(key) || texture.isRaw() || this.retainedSources.has(key)) continue
-			const len = texture.binary?.len ?? 0
+			if (!texture.getName() || this.hasTexture(texture.getName()) || texture.isRaw() || texture.retainedData)
+				continue
 			const storageName = texture.storageName
 			const pos = texture.binary?.pos
-			if (!storageName || pos === undefined || len <= 0 || len > MAX_RETAINED_SOURCE_BYTES) continue
+			const len = texture.binary?.len ?? 0
+			if (!storageName || pos === undefined || len <= 0) continue
 			try {
 				const data = await table.streamStorage<Uint8Array>('GameStg', storage =>
 					storage.read(storageName, pos, len),
 				)
 				if (data?.length) {
-					this.retainedSources.set(key, data)
+					texture.retainedData = data
 					retained++
 					bytes += data.length
 				}
@@ -190,9 +182,8 @@ export class ThreeMapGenerator {
 	}
 
 	private async loadOne(texture: Texture, table: Table): Promise<boolean> {
-		const key = texture.getName().toLowerCase()
 		try {
-			const tex = await texture.loadTexture(this.textureLoader!, table, this.retainedSources.get(key))
+			const tex = await texture.loadTexture(this.textureLoader!, table)
 			try {
 				const rawCutout = !texture.isOpaque ? (texture.alphaTestValue ?? 0) : 0
 				;(tex as any).userData = {
@@ -206,7 +197,6 @@ export class ThreeMapGenerator {
 			this.textureCache.set(texture.getName().toLowerCase(), tex)
 			progress().details(texture.getName())
 			this.clearTextureSource(texture)
-			this.retainedSources.delete(key)
 			return true
 		} catch (error) {
 			this.lastFailureAt.set(texture.getName().toLowerCase(), Date.now())

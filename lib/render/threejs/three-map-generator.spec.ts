@@ -205,24 +205,18 @@ describe('ThreeMapGenerator.retainSources', () => {
 			isOpaque: true,
 			storageName: 'Image1',
 			binary: opts.len === undefined ? undefined : { pos: 8, len: opts.len },
-			sawData: [] as Array<Uint8Array | null | undefined>,
-			loadTexture: async function (
-				this: { sawData: Array<Uint8Array | null | undefined> },
-				_loader: unknown,
-				_table: unknown,
-				data?: Uint8Array | null,
-			) {
-				this.sawData.push(data)
-				return new Texture()
-			},
+			retainedData: undefined as Uint8Array | null | undefined,
+			loadTexture: VptTexture.prototype.loadTexture,
 		}
 	}
 
-	it('retains small uncached sources and skips the rest', async () => {
+	it('stashes archive bytes on uncached sourced textures only', async () => {
 		const generator = new ThreeMapGenerator(stubLoader() as any)
 		const cached = fakeTexture('Cached.png', { len: 100 })
 		generator.getCache().set('cached.png', new Texture())
 		const small = fakeTexture('Small.png', { len: 100 })
+		const raw = fakeTexture('Raw.png', { raw: true, len: 100 })
+		const naked = fakeTexture('Naked.png')
 		let reads = 0
 		const table = {
 			streamStorage: async () => {
@@ -231,21 +225,27 @@ describe('ThreeMapGenerator.retainSources', () => {
 			},
 		}
 		const result = await generator.retainSources(
-			[
-				cached as any,
-				small as any,
-				fakeTexture('Raw.png', { raw: true, len: 100 }) as any,
-				fakeTexture('Huge.png', { len: 2 * 1024 * 1024 }) as any,
-				fakeTexture('Naked.png') as any,
-			],
+			[cached as any, small as any, raw as any, naked as any],
 			table as any,
 		)
 		expect(result).toEqual({ retained: 1, bytes: 100 })
 		expect(reads).toEqual(1)
+		expect(small.retainedData).toBeInstanceOf(Uint8Array)
+		expect(cached.retainedData).toBeUndefined()
+		expect(raw.retainedData).toBeUndefined()
+		expect(naked.retainedData).toBeUndefined()
 	})
 
-	it('serves retained bytes without re-reading the archive', async () => {
-		const generator = new ThreeMapGenerator(stubLoader() as any)
+	it('serves retained bytes without re-reading the archive, then drains', async () => {
+		const seen: Uint8Array[] = []
+		const loader = {
+			...stubLoader(),
+			loadTexture: async (_name: string, _ext: string, data: Uint8Array) => {
+				seen.push(data)
+				return new Texture()
+			},
+		}
+		const generator = new ThreeMapGenerator(loader as any)
 		const bytes = new Uint8Array([1, 2, 3])
 		const tex = fakeTexture('Swap.png', { len: 3 })
 		await generator.retainSources([tex as any], { streamStorage: async () => bytes } as any)
@@ -260,7 +260,8 @@ describe('ThreeMapGenerator.retainSources', () => {
 			outcomes.push([(t as unknown as { getName(): string }).getName(), ok])
 		})
 		expect(outcomes).toEqual([['Swap.png', true]])
-		expect(tex.sawData).toEqual([bytes])
+		expect(seen).toEqual([bytes])
+		expect(tex.retainedData).toBeUndefined()
 	})
 })
 

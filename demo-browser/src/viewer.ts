@@ -1387,14 +1387,14 @@ export class Viewer {
 		if (typeof (window as any).gc === 'function') (window as any).gc()
 		logMem(this.harnessLog, 'after reader release')
 	}
-	// Snapshot sources of small unstreamed textures before the archive is
-	// released, so mid-game script swaps still resolve afterwards.
+	// Snapshot unstreamed texture sources before the archive is released,
+	// so mid-game script swaps still resolve afterwards.
 	async _retainUnstreamedSources(table) {
 		if (!this.renderApi || !table?.textures) return
 		const retained = await this.renderApi.getMapGenerator().retainSources(Object.values(table.textures), table)
 		if (retained.retained > 0)
 			this.log(
-				`[stream] Retained ${retained.retained} small texture sources (${(retained.bytes / 1048576).toFixed(1)} MB) for late swaps`,
+				`[stream] Retained ${retained.retained} texture sources (${retained.bytes < 1048576 ? `${(retained.bytes / 1024).toFixed(0)} KB` : `${(retained.bytes / 1048576).toFixed(1)} MB`}) for late swaps`,
 				'debug',
 			)
 	}

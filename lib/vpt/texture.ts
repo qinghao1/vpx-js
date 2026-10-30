@@ -27,6 +27,8 @@ export class Texture extends BiffParser {
 	public rgbTransparent?: number
 	public binary?: Binary
 	public pdsBuffer?: BaseTexture
+	// Retained archive bytes for demand loads after the reader is released.
+	public retainedData?: Uint8Array | null
 
 	private constructor() {
 		super()
@@ -86,13 +88,7 @@ export class Texture extends BiffParser {
 	 * placeholder there (documented at the loader), while the browser loader
 	 * decodes them for real. Non-PNG exports therefore differ by platform.
 	 */
-	public async loadTexture<TEXTURE>(
-		loader: ITextureLoader<TEXTURE>,
-		table: Table,
-		// Pre-read bytes (retained small sources) used instead of the archive
-		// range, which is unreadable after the reader is released.
-		sourceData?: Uint8Array | null,
-	): Promise<TEXTURE> {
+	public async loadTexture<TEXTURE>(loader: ITextureLoader<TEXTURE>, table: Table): Promise<TEXTURE> {
 		if (this.isRaw()) {
 			return loader.loadRawTexture(this.getName(), this.pdsBuffer?.getData(), this.width, this.height)
 		}
@@ -111,11 +107,11 @@ export class Texture extends BiffParser {
 		if (this.storageName && (this.binary?.pos === undefined || this.binary?.len === undefined)) {
 			throw new Error(`Cannot load image data for texture ${this.getName()} (source cleared or missing)`)
 		}
-		const data = sourceData?.length
-			? sourceData
-			: await table.streamStorage<Uint8Array>('GameStg', storage =>
-					storage.read(this.storageName!, this.binary?.pos, this.binary?.len),
-				)
+		const data =
+			this.retainedData ??
+			(await table.streamStorage<Uint8Array>('GameStg', storage =>
+				storage.read(this.storageName!, this.binary?.pos, this.binary?.len),
+			))
 		if (!data?.length) {
 			throw new Error(`Cannot load image data for texture ${this.getName()}`)
 		}
