@@ -16,6 +16,7 @@
 		"outDir": "./dist",
 		"rootDir": ".",
 		"forceConsistentCasingInFileNames": true,
+		"types": ["node"],
 		"strictNullChecks": false,
 		"strictBindCallApply": false,
 		"strictFunctionTypes": false,

@@ -1,7 +1,7 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { expect } from 'chai'
-import { tonePcm } from './sound-synth-core.js'
+import { knockPcm } from './sound-synth-core.js'
 import { WebSoundEngine } from './web-sound-engine.js'
 
 class FakeSource {
@@ -109,7 +109,7 @@ describe('WebSoundEngine', () => {
 		FakeCtx.instances = []
 		;(globalThis as Record<string, unknown>).AudioContext = FakeCtx as unknown as typeof AudioContext
 		engine = new WebSoundEngine()
-		engine.registerSample('tone', tonePcm(440, 0.05, 8000), 8000)
+		engine.registerSample('tone', knockPcm(8000), 8000)
 	})
 
 	afterEach(() => {
@@ -241,7 +241,7 @@ describe('WebSoundEngine', () => {
 	})
 
 	it('should stage music on the native sqrt curve', () => {
-		engine.registerSample('theme', tonePcm(220, 0.05, 8000), 8000)
+		engine.registerSample('theme', knockPcm(8000), 8000)
 		engine.setMusicVolume(0.5)
 		engine.playMusic('theme', 0.6)
 		// Creation order: master sqrt(1), music bus sqrt(0.5), music voice sqrt(0.6).
@@ -252,7 +252,7 @@ describe('WebSoundEngine', () => {
 	})
 
 	it('should play music once without looping', () => {
-		engine.registerSample('theme', tonePcm(220, 0.05, 8000), 8000)
+		engine.registerSample('theme', knockPcm(8000), 8000)
 		engine.playMusic('theme', 0.6)
 		const live = FakeCtx.sources.at(-1)
 		if (!live) throw new Error('music source not found')
@@ -261,7 +261,7 @@ describe('WebSoundEngine', () => {
 	})
 
 	it('should report the natural music end but not a forced stop', () => {
-		engine.registerSample('theme', tonePcm(220, 0.05, 8000), 8000)
+		engine.registerSample('theme', knockPcm(8000), 8000)
 		let ended = 0
 		engine.onMusicEnded = () => ended++
 		engine.playMusic('theme', 0.6)
@@ -276,7 +276,7 @@ describe('WebSoundEngine', () => {
 
 	it('should apply editor base levels and mono compensation', () => {
 		engine.setVolume(1)
-		engine.registerSample('stereo', tonePcm(440, 0.05, 8000), 8000, {
+		engine.registerSample('stereo', knockPcm(8000), 8000, {
 			channels: 2,
 			volume: -0.5,
 		})

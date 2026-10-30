@@ -1,4 +1,4 @@
-import type { IEmulator } from './emulator.js'
+import type { IEmulator } from '../game/iemulator.js'
 
 /**
  * Minimal port of upstream `ResURIResolver` float-state resolution (`ctrl://` links).

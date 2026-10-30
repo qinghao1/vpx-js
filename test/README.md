@@ -14,8 +14,8 @@ OBJ are the same than in VPX-JS'es scene.
 We also change a few parameters and add transformations so test if they are
 correctly applied.
 
-For the textures, we feed multiple formats into VPX and compare the exported
-result using [looks-same](https://github.com/gemini-testing/looks-same).
+For the textures, we feed multiple formats into VPX and assert the sizing
+caps.
 
 What's currently not tested are:
 

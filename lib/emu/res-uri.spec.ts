@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { IEmulator } from './emulator.js'
+import type { IEmulator } from '../game/iemulator.js'
 import { parseStateLink, tryGetFloatState } from './res-uri.js'
 
 function stubEmulator(

@@ -5,11 +5,11 @@ import { resetWarnOnce } from '../emu/warn-once.js'
 import { Logger } from '../util/logger.js'
 import { NullSoundEngine } from './null-sound-engine.js'
 import { curvePanFade, effectiveGain, extractPcm, mapLoopCount, pitchFactor, uncurvePanFade } from './sound-engine.js'
-import { knockPcm, tonePcm } from './sound-synth-core.js'
+import { knockPcm } from './sound-synth-core.js'
 
 function tone(name = 'probe'): { engine: NullSoundEngine; name: string } {
 	const engine = new NullSoundEngine()
-	engine.registerSample(name, tonePcm(440, 0.05, 8000), 8000)
+	engine.registerSample(name, knockPcm(8000), 8000)
 	return { engine, name }
 }
 
@@ -235,14 +235,11 @@ describe('NullSoundEngine', () => {
 })
 
 describe('Sound synth kernels', () => {
-	it('should synthesize finite knocker and tone PCM inline', () => {
+	it('should synthesize finite knocker PCM inline', () => {
 		const knock = knockPcm(8000)
 		expect(knock.length).to.equal(Math.floor(8000 * 0.18))
 		expect([...knock].every(v => Number.isFinite(v) && Math.abs(v) <= 1)).to.equal(true)
 		expect(Math.abs(knock.at(0) ?? 0)).to.be.above(0)
 		expect(Math.abs(knock.at(-1) ?? 1)).to.be.below(0.05)
-		const toneBuffer = tonePcm(440, 0.05, 8000)
-		expect(toneBuffer.length).to.equal(400)
-		expect([...toneBuffer].every(v => Number.isFinite(v) && Math.abs(v) <= 0.5)).to.equal(true)
 	})
 })

@@ -24,7 +24,7 @@ pipeline in [`../README.md`](../README.md).
 | `three-camera-framing.ts`                                                                                                                                                                   | Viewer/play camera fits                                                          |
 | `three-bvh.ts`                                                                                                                                                                              | BVH install for raycast/hit-test acceleration                                    |
 | `transmission-buffer.ts`                                                                                                                                                                    | Playfield-UV bulb-light buffer sampled by BDL shaders                            |
-| `image-worker-pool.ts`, `workers/`, `hdr-decode.worker.node.ts`, `deferred-texture.ts`, `node-canvas-polyfill.ts`                                                                           | Off-thread image decode plumbing                                                 |
+| `image-worker-pool.ts`, `workers/`, `hdr-decode.worker.node.ts`, `deferred-texture.ts`                                                                                                      | Off-thread image decode plumbing                                                 |
 
 ## Upstream parity notes
 
