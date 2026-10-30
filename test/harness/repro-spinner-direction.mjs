@@ -5,10 +5,8 @@ import { Vertex3D } from '../../lib/math/vector.ts'
 import { loadMesh } from '../../lib/vpt/mesh-loader.ts'
 import { Table } from '../../lib/vpt/table/table.ts'
 
-// NOTE: the visual-brute check formerly here was deleted as redundant —
-// lib/vpt/spinner/spinner-visual-regression.spec.ts covers it (5 verts x 4
-// rotations + sign-flip + fixture). This harness keeps only the
-// physics-to-visual direction coupling, which no spec covers.
+// Physics-to-visual direction coupling only (no spec covers it); visual-brute
+// coverage lives in lib/vpt/spinner/spinner-visual-regression.spec.ts.
 
 async function harness() {
 	console.log('TAP version 13')

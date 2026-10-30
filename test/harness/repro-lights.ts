@@ -1,6 +1,5 @@
 #!/usr/bin/env tsx
-// Merged lights repro: --case=dark (was repro-everything-dark.mjs) and
-// --case=horde (was repro-lights-horde.mjs). Shared table load + scene build,
+// Lights repro: --case=dark and --case=horde. Shared table load + scene build,
 // TAP output, nonzero exit on failure.
 // Run: npx tsx test/harness/repro-lights.ts [--case=dark|horde|all] [--vpx=path]
 import * as fs from 'node:fs'
@@ -52,7 +51,7 @@ if (!fs.existsSync(vpx)) {
 const tap = new Tap('repro-lights')
 tapComment(`vpx: ${vpx} cases: ${cases.join(',')}`)
 
-// Shared setup (was duplicated verbatim in both repro scripts).
+// Shared table + scene setup for both cases.
 const table = await Table.load(new NodeBinaryReader(vpx))
 const lights = Object.values(table.lights)
 const bulbTrue = lights.filter(light => light.data.bulbLight).length

@@ -1,4 +1,4 @@
-// Table structure & physics-constants audit (split from verify-vpinball-compat.ts).
+// Table structure & physics-constants audit.
 export interface TableStructureAudit {
 	itemCounts: {
 		bumpers: number

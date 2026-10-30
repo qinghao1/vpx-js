@@ -69,7 +69,7 @@ async function puppeteerAvailable(): Promise<boolean> {
 	}
 }
 
-// Browser integration — puppeteer full stack (folded in from verify-browser.ts).
+// Browser integration — puppeteer full stack.
 export async function verifyBrowser(): Promise<CheckStatus> {
 	tapComment('browser — integration (viewer + physics + DMD)')
 	const script = path.join(process.cwd(), 'demo-browser/e2e/integration.mjs')
