@@ -91,19 +91,21 @@ export abstract class ItemState {
 	}
 
 	public diff(state: ItemState): this {
-		const result = this.clone() as unknown as Record<string, unknown>
+		const self = this as unknown as Record<string, unknown>
 		const other = state as unknown as Record<string, unknown>
+		// Bare prototype shell: `new` would claim pooled members via field initializers only to overwrite them,
+		// and a pooled shell is unreusable since release() keeps keys with undefined values.
+		const result = Object.create(Object.getPrototypeOf(this)) as this
+		const partial = result as unknown as Record<string, unknown>
+		partial['name'] = self['name']
 		for (const key of Object.keys(this)) {
 			if (key === 'name') continue
-			const mine = asPooledMember(result[key])
+			const mine = asPooledMember(self[key])
 			const theirs = asPooledMember(other[key])
-			const equal = mine || theirs ? !!mine && !!theirs && membersEqual(mine, theirs) : result[key] === other[key]
-			if (equal) {
-				if (mine) releaseMember(mine)
-				delete result[key]
-			}
+			const equal = mine || theirs ? !!mine && !!theirs && membersEqual(mine, theirs) : self[key] === other[key]
+			if (!equal) partial[key] = mine ? cloneMember(mine) : self[key]
 		}
-		return result as this
+		return result
 	}
 
 	/** Merges a (possibly partial) diff into this state, deep-copying pooled members. */
