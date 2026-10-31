@@ -11,7 +11,7 @@ classes (JavaScript has no multiple inheritance):
 - There is a _main class_ which is referenced by rest of the library. This class
   delegates most of its functionality to its _helper classes_.
 - The helper classes are instantiated on-demand. For example, during mesh
-  generation, no collision helpers will be created.
+  generation (or a GLTF export), no collision helpers will be created.
 - No globals. If a class needs the player or the table object, it needs to be
   passed through the constructor or even better to the method only.
 
