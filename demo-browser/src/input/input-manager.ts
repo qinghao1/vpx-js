@@ -190,6 +190,7 @@ function attachKeyboardHost(host: InputHost, signal: AbortSignal): void {
 		if (host.viewerMode !== 'play') return
 
 		if (e.code === 'Escape' && down) {
+			pressed.clear()
 			host.exitPlayMode()
 			e.preventDefault()
 			return
