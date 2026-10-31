@@ -279,10 +279,12 @@ export function isCertError(error) {
 
 async function fetchOk(url, method = 'HEAD') {
 	// Self-signed local vite cert: disable TLS verification for the probe only, then restore.
+	// Bound the probe: sandboxed localhost dials can blackhole instead of
+	// refusing, and an unbounded fetch would stall the harness silently.
 	const prevTlsReject = process.env.NODE_TLS_REJECT_UNAUTHORIZED
 	process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
 	try {
-		if ((await fetch(url, { method })).ok) return true
+		if ((await fetch(url, { method, signal: AbortSignal.timeout(5000) })).ok) return true
 	} catch (e) {
 		if (isCertError(e)) return true
 	} finally {
