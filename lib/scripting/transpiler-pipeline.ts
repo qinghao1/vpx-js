@@ -59,6 +59,9 @@ function rewriteOption(segment: string): string {
 }
 
 function rewriteOptionOutsideStrings(text: string): string {
+	// Native pre-scan: the rewrite only fires on `.Option` (any case), so
+	// scripts without it skip the string-aware O(n) walk entirely.
+	if (!/\.option/i.test(text)) return text
 	return rewriteOutsideStrings(text, rewriteOption)
 }
 
@@ -104,6 +107,9 @@ function scanBalancedArgs(vbs: string, openParenEnd: number): { text: string; en
 
 /** Desugars inline `(New Class)(args)` construction, leaving string literals untouched. */
 function rewriteNewForms(vbs: string): string {
+	// Native pre-scan (no per-char JS loop): the patterns below all require
+	// a `New` token, so scripts without one skip the string-aware walk.
+	if (!/new/i.test(vbs)) return vbs
 	NEW_FORM_PATTERN.lastIndex = 0
 	let result = ''
 	let cursor = 0

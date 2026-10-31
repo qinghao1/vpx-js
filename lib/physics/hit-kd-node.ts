@@ -83,8 +83,13 @@ export class HitKDNode {
 		const count = node.items & COUNT_MASK
 		for (let i = node.start; i < node.start + count; i++) {
 			const h = node.hitOct.getItemAt(i)
-			if (h === ball.hit || h.obj?.abortHitTest?.() || !h.isEnabled) continue
+			if (h === ball.hit || !h.isEnabled) continue
 			if (!h.hitBBox.intersectRect(b) || !h.hitBBox.intersectSphere(pos, rs)) continue
+			// Veto last (same rationale as HitQuadtree.traverse): the predicate
+			// is side-effect free (`() => this.data.isDropped`) and doHitTest
+			// re-checks it, so skipping the call on culled candidates only
+			// drops calls, never hits.
+			if (h.obj?.abortHitTest?.()) continue
 			this.batches.classify(h)
 		}
 		if (node.children.length === 0) return

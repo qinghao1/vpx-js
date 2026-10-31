@@ -77,12 +77,16 @@ export class HitQuadtree {
 	private traverse(node: HitQuadtree, ball: Ball): void {
 		for (let i = 0; i < node.vho.length; i++) {
 			const h = node.vho[i]!
-			if (h === ball.hit || h.obj?.abortHitTest?.() || !h.isEnabled) continue
+			if (h === ball.hit || !h.isEnabled) continue
 			if (
 				!h.hitBBox.intersectRect(ball.hit.hitBBox) ||
 				!h.hitBBox.intersectSphere(ball.state.pos, ball.hit.rcHitRadiusSqr)
 			)
 				continue
+			// Veto last: abortHitTest is a virtual call, and culled candidates
+			// never reach doHitTest either way, so skipping it on misses only
+			// drops calls, never hits (doHitTest re-checks it for survivors).
+			if (h.obj?.abortHitTest?.()) continue
 			this.batches.classify(h)
 		}
 		if (node.isLeaf) return

@@ -179,37 +179,35 @@ if (hasFlag(args, 'preload-all') && allTex.length) {
 }
 
 let grammarMs = 0
-const pipelinePer = new Map<string, number>()
-let genMs = 0
+let parseTransformMs = 0
+let transpileMs = 0
 let execMs = 0
 let physMs = 0
 
 const grammarProto = Grammar.prototype as any
 const origGrammar = grammarProto.transpile
+// Table-script execution triggers ~30 nested transpiles (inline Eval/Execute);
+// first call is the cold full-script one, later calls are AST/JS cache hits.
 grammarProto.transpile = timedSync(origGrammar, ms => {
-	grammarMs = ms
+	if (grammarMs === 0) grammarMs = ms
 })
 
 const transpilerProto = Transpiler.prototype as any
 const origExecute = transpilerProto.execute
-const origGen = transpilerProto.gen
-const origPipeline = transpilerProto.pipeline
-
-transpilerProto.gen = timedSync(origGen, ms => {
-	genMs = ms
-})
-
-transpilerProto.pipeline = function (gf?: string, go?: string) {
-	const fns = origPipeline.call(this, gf, go)
-	const names = ['FunctionHoist', 'Event', 'Error', 'Reference', 'Scope', 'ClassThis', 'Ambiguity', 'Class', 'Wrap']
-	return fns.map((fn: any, i: number) => (ast: any) => {
-		const start = performance.now()
-		const result = fn(ast)
-		const key = names[i] ?? `step${i}`
-		pipelinePer.set(key, (pipelinePer.get(key) ?? 0) + (performance.now() - start))
-		return result
+const origTranspile = transpilerProto.transpile
+// parseAndTransform = normalize + Grammar.transpile + 10-step pipeline
+// (buildPipeline steps are module-level and stay merged here; per-step split
+// needs an in-Transpiler hook).
+const origParseAndTransform = transpilerProto.parseAndTransform
+if (typeof origParseAndTransform === 'function') {
+	transpilerProto.parseAndTransform = timedSync(origParseAndTransform, ms => {
+		if (parseTransformMs === 0) parseTransformMs = ms
 	})
 }
+
+transpilerProto.transpile = timedSync(origTranspile, ms => {
+	if (transpileMs === 0) transpileMs = ms
+})
 
 transpilerProto.execute = timedSync(origExecute, ms => {
 	execMs = ms
@@ -227,16 +225,17 @@ ms = performance.now() - t
 push('Player.init', ms)
 push('  PlayerPhysics.init', physMs)
 push('  Transpiler.execute', execMs)
-push('    Grammar.transpile', grammarMs)
-for (const [k, v] of pipelinePer) push(`    Transformer:${k}`, v)
-push('    escodegen.generate', genMs)
-const other = execMs - grammarMs - Array.from(pipelinePer.values()).reduce((a, b) => a + b, 0) - genMs
-push('    eval+play', other > 0 ? other : 0)
+push('    Transpiler.transpile', transpileMs)
+push('      parseAndTransform', parseTransformMs)
+push('        Grammar.transpile', grammarMs)
+push('        pipeline(all steps)', Math.max(0, parseTransformMs - grammarMs))
+push('      escodegen.generate+cache', Math.max(0, transpileMs - parseTransformMs))
+push('    eval+play', Math.max(0, execMs - transpileMs))
 
 grammarProto.transpile = origGrammar
 transpilerProto.execute = origExecute
-transpilerProto.gen = origGen
-transpilerProto.pipeline = origPipeline
+transpilerProto.transpile = origTranspile
+if (typeof origParseAndTransform === 'function') transpilerProto.parseAndTransform = origParseAndTransform
 physicsProto.init = origPhysInit
 
 const tTotal = performance.now() - tTotal0

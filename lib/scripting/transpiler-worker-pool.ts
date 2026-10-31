@@ -78,7 +78,7 @@ const vbsMemCache = new Map<string, string>()
 export const MAX_VBS_MEM_CACHE_ENTRIES = 50
 
 /** Oldest-first insert into a size-bounded cache (Maps preserve insertion order). */
-function boundedSet<K, V>(map: Map<K, V>, key: K, value: V, max: number): void {
+export function boundedSet<K, V>(map: Map<K, V>, key: K, value: V, max: number): void {
 	if (!map.has(key) && map.size >= max) {
 		const oldest = map.keys().next()
 		if (!oldest.done) map.delete(oldest.value)

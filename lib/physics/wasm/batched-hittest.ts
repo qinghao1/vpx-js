@@ -122,31 +122,51 @@ export class BatchCollector {
 	}
 
 	classify(hit: HitObject): void {
-		if (isBatchCircle(hit)) {
-			this.pushOrder(hit, HitKind.Circle, this.circles.length)
-			this.circles.push(hit)
-		} else if (hit.hitKind === HitKind.Plane) {
-			this.pushOrder(hit, HitKind.Plane, this.planes.length)
-			this.planes.push(hit as HitPlane)
-		} else if (hit.hitKind === HitKind.LineZ) {
-			this.pushOrder(hit, HitKind.LineZ, this.lineZs.length)
-			this.lineZs.push(hit as HitLineZ)
-		} else if (isBatchPoint(hit)) {
-			this.pushOrder(hit, HitKind.Point, this.points.length)
-			this.points.push(hit)
-		} else if (isBatchTriangle(hit)) {
-			this.pushOrder(hit, HitKind.Triangle, this.triangles.length)
-			this.triangles.push(hit)
-		} else if (isBatchLine3D(hit)) {
-			this.pushOrder(hit, HitKind.Line3D, this.line3Ds.length)
-			this.line3Ds.push(hit)
-		} else if (isBatchLineSeg(hit)) {
-			this.pushOrder(hit, HitKind.LineSeg, this.lineSegs.length)
-			this.lineSegs.push(hit)
-		} else if (isBatchPoly(hit)) {
-			this.pushOrder(hit, HitKind.Poly, this.polys.length)
-			this.polys.push(hit)
-		} else this.pushOrder(hit, HitKind.Other, -1)
+		// Single switch on hitKind; cases mirror the batchability guards above.
+		switch (hit.hitKind) {
+			case HitKind.Circle:
+				if (hit.hitTest === HitCircle.prototype.hitTest) {
+					this.pushOrder(hit, HitKind.Circle, this.circles.length)
+					this.circles.push(hit as HitCircle)
+				} else this.pushOrder(hit, HitKind.Other, -1)
+				return
+			case HitKind.Plane:
+				this.pushOrder(hit, HitKind.Plane, this.planes.length)
+				this.planes.push(hit as HitPlane)
+				return
+			case HitKind.LineZ:
+				this.pushOrder(hit, HitKind.LineZ, this.lineZs.length)
+				this.lineZs.push(hit as HitLineZ)
+				return
+			case HitKind.Point:
+				this.pushOrder(hit, HitKind.Point, this.points.length)
+				this.points.push(hit as HitPoint)
+				return
+			case HitKind.Triangle:
+				this.pushOrder(hit, HitKind.Triangle, this.triangles.length)
+				this.triangles.push(hit as HitTriangle)
+				return
+			case HitKind.Line3D:
+				this.pushOrder(hit, HitKind.Line3D, this.line3Ds.length)
+				this.line3Ds.push(hit as HitLine3D)
+				return
+			case HitKind.LineSeg:
+				if (hit.hitTest === LineSeg.prototype.hitTest) {
+					this.pushOrder(hit, HitKind.LineSeg, this.lineSegs.length)
+					this.lineSegs.push(hit as LineSeg)
+				} else this.pushOrder(hit, HitKind.Other, -1)
+				return
+			case HitKind.Poly: {
+				const poly = hit as Hit3DPoly
+				if (poly.objType !== CollisionType.Trigger && poly.rgv.length <= POLY_MAX_VERTS) {
+					this.pushOrder(hit, HitKind.Poly, this.polys.length)
+					this.polys.push(poly)
+				} else this.pushOrder(hit, HitKind.Other, -1)
+				return
+			}
+			default:
+				this.pushOrder(hit, HitKind.Other, -1)
+		}
 	}
 
 	private pushOrder(o: HitObject, k: HitKind, idx: number): void {

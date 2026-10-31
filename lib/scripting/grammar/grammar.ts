@@ -470,11 +470,10 @@ export class Grammar {
 				trimmed.slice(0, 3).toLowerCase() === 'rem' &&
 				(trimmed.length === 3 || /[\s:]/.test(trimmed[3]!))
 			) {
-				const idx = content.toLowerCase().indexOf('rem')
-				if (idx >= 0) {
-					const before = content.slice(0, idx)
-					if (before.trimEnd() === '' || before.trimEnd().endsWith(':')) content = content.slice(0, idx)
-				}
+				// trimmed starts with rem, so its index is the leading-whitespace width.
+				const idx = content.length - trimmed.length
+				const before = content.slice(0, idx)
+				if (before.trimEnd() === '' || before.trimEnd().endsWith(':')) content = content.slice(0, idx)
 			}
 			content = content.trimEnd()
 			if (!content.trim()) continue

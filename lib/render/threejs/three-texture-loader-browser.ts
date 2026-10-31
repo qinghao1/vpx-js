@@ -231,10 +231,14 @@ function parseWorker(
 ): Promise<any> {
 	const pool = ensureFloatPool()
 	if (!pool?.length) return Promise.reject(floatInfraError('float-no-worker', 'no worker'))
+	const playfield = isPlayfieldCap(name)
 	// Table-load bursts must reject fast with a typed error instead of
 	// growing the pending map (and worker backlogs) without bound. Warmup
-	// decodes never count: a burst racing warmup must not trip the cap.
-	if (!warmup) {
+	// decodes never count, and playfield lightmap bakes are exempt: a table
+	// holds only a handful, the 2-slot pool still bounds concurrent decodes,
+	// and rejecting one costs a 30s failure-cooldown retry on the texture
+	// that gates first visuals.
+	if (!warmup && !playfield) {
 		let queued = 0
 		for (const entry of floatPending.values()) if (!entry.warmup) queued++
 		const maxPending = pool.length * FLOAT_PENDING_FACTOR
@@ -245,7 +249,7 @@ function parseWorker(
 	}
 	// Playfield maps take the least-busy worker (same decode either way);
 	// round-robin resumes where it left off.
-	const picked = floatTracker.pick(pool, isPlayfieldCap(name), floatNext)
+	const picked = floatTracker.pick(pool, playfield, floatNext)
 	floatNext = picked.next
 	const w = picked.worker
 	const id = ++floatSeq
@@ -381,6 +385,7 @@ export class ThreeTextureLoaderBrowser implements ITextureLoader<ThreeTexture> {
 		if (isHdr || isExr) {
 			const kind = isExr ? ('exr' as const) : ('hdr' as const)
 			const overCap = data.byteLength > MAX_FLOAT_TEXTURE_BYTES
+			const playfield = isPlayfieldCap(name)
 			try {
 				const viaWorker = await tryLoadViaWorker(name, kind, data)
 				if (viaWorker) return viaWorker
@@ -395,8 +400,8 @@ export class ThreeTextureLoaderBrowser implements ITextureLoader<ThreeTexture> {
 				// skip) instead of running the main-thread full-res slow parse,
 				// the exact 512MB expansion the cap prevents.
 				// Dead defense (unreachable): both "too large" producers exempt playfields.
-				const sizeFallback = isFloatSizeRejection(e) && isPlayfieldCap(name)
-				const outageFallback = isPlayfieldCap(name) && !overCap && isFloatInfraFailure(e)
+				const sizeFallback = isFloatSizeRejection(e) && playfield
+				const outageFallback = playfield && !overCap && isFloatInfraFailure(e)
 				if (!sizeFallback && !outageFallback) throw e
 				logger().warn(
 					'[ThreeTextureLoaderBrowser.loadTexture] Float texture %s slow main-thread decode (%sMB%s)',
@@ -606,12 +611,15 @@ async function tryCreateBitmap(data: Uint8Array, mime: string, name: string): Pr
 
 async function tryLoadViaWorker(name: string, kind: 'exr' | 'hdr', data: Uint8Array): Promise<ThreeTexture | null> {
 	const max = effectiveMax(true, name)
-	// Over-cap playfield bakes skip the IDB round-trip (the content hash plus
-	// the structured clone of a capped frame — up to 128MB at the 4096
-	// playfield cap — would itself stall the main thread) and go straight to
-	// the pool, which absorbs the slow parse.
+	// Over-cap non-playfield floats fail fast below and never reach the pool,
+	// so they need no key. Over-cap playfield bakes (8192px DWAA nestmaps take
+	// ~9s to parse, measured) DO decode via the pool, and the capped transcode
+	// (at most 128MiB at the 4096 playfield cap) is worth caching: an IDB
+	// revival (~69ms read + ~176ms clone, measured headless) versus ~9s of
+	// re-parse, and the write is fire-and-forget.
 	const overCap = data.byteLength > MAX_FLOAT_TEXTURE_BYTES
-	const key = overCap ? null : exrCacheKey(name, data, kind, max)
+	const playfield = isPlayfieldCap(name)
+	const key = overCap && !playfield ? null : exrCacheKey(name, data, kind, max)
 	if (key) {
 		const cached: any = await idbGet(key)
 		if (cached?.width && cached?.data) {
@@ -629,7 +637,7 @@ async function tryLoadViaWorker(name: string, kind: 'exr' | 'hdr', data: Uint8Ar
 	// debug path and the failure cooldown absorbs demand retries. Playfield
 	// bakes are exempt: the pool decodes them off the main thread, and a
 	// worker-side OOM kills only the worker, not the tab.
-	if (overCap && !isPlayfieldCap(name)) {
+	if (overCap && !playfield) {
 		throw new Error(
 			`Float texture "${name}" is too large to decode ` +
 				`(${(data.byteLength / 1048576).toFixed(1)}MB > ${MAX_FLOAT_TEXTURE_BYTES / 1048576}MB cap): ` +

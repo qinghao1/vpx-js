@@ -240,7 +240,7 @@ describe('EXR worker pool', () => {
 		expect(fakes.posted).toHaveLength(0)
 	})
 
-	it('skips the IDB round-trip for over-cap playfield floats', async () => {
+	it('caches the IDB round-trip for over-cap playfield floats', async () => {
 		const fakes = installFakes({
 			float: (msg, worker) => worker.onmessage?.({ data: floatFrame(msg.id, 512, 256) }),
 		})
@@ -252,8 +252,12 @@ describe('EXR worker pool', () => {
 		const tex = (await new Loader().loadTexture('vlm.nestmap1', '.exr', huge)) as any
 		expect(fakes.posted).toHaveLength(1)
 		expect(tex.image.width).toBe(512)
-		expect(vi.mocked(idb.idbGet)).not.toHaveBeenCalled()
-		expect(vi.mocked(idb.idbSet)).not.toHaveBeenCalled()
+		// Over-cap playfield bakes (8192px DWAA nestmaps) re-parse for ~10s,
+		// so the capped transcode is IDB-cached: a ~0.5s revival beats a ~10s
+		// re-parse, and the write is fire-and-forget. Only over-cap
+		// non-playfield floats skip the round-trip (fail-fast, covered above).
+		expect(vi.mocked(idb.idbGet)).toHaveBeenCalledTimes(1)
+		expect(vi.mocked(idb.idbSet)).toHaveBeenCalledTimes(1)
 	})
 
 	it("retries the crashed worker's decode on its replacement, leaving the survivor alone", async () => {
@@ -447,6 +451,35 @@ describe('EXR worker pool', () => {
 		// Drain the queue so no 120s watchdog timers leak past the test.
 		for (const p of fakes.posted) p.worker.onmessage?.({ data: floatFrame(p.id) })
 		expect((await Promise.all(queued)).every(r => (r as any).ok)).toBe(true)
+	})
+
+	it('queues over-cap playfield bakes past a full pending queue instead of failing fast', async () => {
+		// Workers never answer: every submission stays pending.
+		const fakes = installFakes({ float: () => {} })
+		const Loader = await freshLoader()
+		const loader = new Loader()
+		const queued = []
+		for (let i = 0; i < 4; i++)
+			queued.push(
+				loader.loadTexture(`env_${i}`, '.exr', new Uint8Array(1024)).then(
+					v => ({ ok: v }),
+					e => ({ err: e }),
+				),
+			)
+		await new Promise(r => setTimeout(r, 10))
+		expect(fakes.posted).toHaveLength(4)
+		// A playfield bake (over-cap DWAA nestmap) queues as the fifth post
+		// instead of rejecting: rejecting costs a 30s failure-cooldown retry
+		// on the texture gating first visuals.
+		const bake = loader.loadTexture('vlm.nestmap1', '.exr', new Uint8Array(MAX_FLOAT_TEXTURE_BYTES + 1)).then(
+			v => ({ ok: v }),
+			e => ({ err: e }),
+		)
+		await new Promise(r => setTimeout(r, 10))
+		expect(fakes.posted).toHaveLength(5)
+		for (const p of fakes.posted) p.worker.onmessage?.({ data: floatFrame(p.id, 512, 256) })
+		const results = await Promise.all([...queued, bake])
+		expect(results.every(r => (r as any).ok)).toBe(true)
 	})
 
 	it('warms the float pool without waiting for the first decode', async () => {

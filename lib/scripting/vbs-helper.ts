@@ -4,6 +4,7 @@
 import { ERR, VbsError } from './stdlib/err.js'
 import { isNothing } from './stdlib/index.js'
 import type { Transpiler } from './transpiler.js'
+import { boundedSet } from './transpiler-worker-pool.js'
 import { VbsArray } from './vbs-array.js'
 import { UNDEF, VbsUndefined } from './vbs-undefined.js'
 import {
@@ -202,9 +203,13 @@ export class VBSHelper {
 		return { text, key, cached: this.inlineCache.get(key) }
 	}
 
+	/** Bound on cached inline snippets; the cache is dropped with its helper. */
+	private static readonly MAX_INLINE_CACHE_ENTRIES = 200
+
 	/** Shared cache-store tail of transpileInline/transpileInlineAsync. */
 	private storeInline(key: string, js: string): void {
-		if (key.length < 50000) this.inlineCache.set(key, js)
+		if (key.length >= 50000) return
+		boundedSet(this.inlineCache, key, js, VBSHelper.MAX_INLINE_CACHE_ENTRIES)
 	}
 
 	/**
