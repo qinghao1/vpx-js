@@ -186,7 +186,7 @@ let physMs = 0
 
 const grammarProto = Grammar.prototype as any
 const origGrammar = grammarProto.transpile
-// ~30 nested inline transpiles fire per run; only the first call is cold.
+// ~30 nested inline transpiles fire per run (inline Eval/Execute); only the first — the full table script — matters here.
 grammarProto.transpile = timedSync(origGrammar, ms => {
 	if (grammarMs === 0) grammarMs = ms
 })

@@ -48,11 +48,6 @@ const imageMap: Record<string, string> = {
 	kickerWilliams: new URL('../../../res/maps/kickerWilliams.png', import.meta.url).href,
 }
 
-/** Worker OOM-bound rejections (fail-fast size guard), as opposed to genuine decode failures. */
-function isFloatSizeRejection(e: unknown): boolean {
-	return /too large to decode/.test((e as Error)?.message ?? String(e))
-}
-
 export function effectiveMax(_isFloat: boolean, name?: string): number {
 	const caps = getEffectiveCaps()
 	return name && RE_PLAYFIELD.test(name) ? caps.playfield : caps.other
@@ -387,15 +382,15 @@ export class ThreeTextureLoaderBrowser implements ITextureLoader<ThreeTexture> {
 				const viaWorker = await tryLoadViaWorker(name, kind, data)
 				if (viaWorker) return viaWorker
 			} catch (e) {
-				// Playfield bakes gate playfield brightness, so they fall through
-				// to the slow main-thread parse with a single warning; every
-				// other worker failure still throws. Over-cap playfield worker
-				// OOMs still throw (the map generator skips) instead of running
-				// the main-thread full-res parse the cap prevents.
-				// Dead defense (unreachable): both "too large" producers exempt playfields.
-				const sizeFallback = isFloatSizeRejection(e) && playfield
-				const outageFallback = playfield && !overCap && isFloatInfraFailure(e)
-				if (!sizeFallback && !outageFallback) throw e
+				// Playfield bakes gate playfield brightness, so under-cap pool
+				// outages fall through to the slow main-thread parse with a
+				// single warning; every other worker failure still throws.
+				// Over-cap playfield failures throw (the map generator skips)
+				// instead of running the main-thread full-res parse the cap
+				// prevents. ("Too large" producers exempt playfields, so there
+				// is no size fallback: message-sniffing one would arm the
+				// 512MB parse on any matching worker error.)
+				if (!(playfield && !overCap && isFloatInfraFailure(e))) throw e
 				logger().warn(
 					'[ThreeTextureLoaderBrowser.loadTexture] Float texture %s slow main-thread decode (%sMB%s)',
 					name,
