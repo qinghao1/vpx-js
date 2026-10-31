@@ -504,6 +504,7 @@ export interface TableGenerateOptions {
 	exportPrimitives?: boolean
 	exportRubbers?: boolean
 	exportSurfaces?: boolean
+	exportFlashers?: boolean
 	exportFlippers?: boolean
 	exportBumpers?: boolean
 	exportRamps?: boolean

@@ -5,6 +5,7 @@ import type { IRenderable } from '../../game/interfaces.js'
 import type { IRenderApi } from '../../render/irender-api.js'
 import { logger, progress } from '../../util/logger.js'
 import type { Bumper } from '../bumper/bumper.js'
+import type { Flasher } from '../flasher/flasher.js'
 import type { Flipper } from '../flipper/flipper.js'
 import type { ItemState } from '../item-state.js'
 import type { Primitive } from '../primitive/primitive.js'
@@ -44,6 +45,11 @@ export class TableMeshGenerator {
 			},
 			{ name: 'rubbers', meshes: Object.values<Rubber>(this.table.rubbers), enabled: !!opts.exportRubbers },
 			{ name: 'surfaces', meshes: Object.values<Surface>(this.table.surfaces), enabled: !!opts.exportSurfaces },
+			{
+				name: 'flashers',
+				meshes: Object.values<Flasher>(this.table.flashers),
+				enabled: !!opts.exportFlashers,
+			},
 			{ name: 'flippers', meshes: Object.values<Flipper>(this.table.flippers), enabled: !!opts.exportFlippers },
 			{ name: 'bumpers', meshes: Object.values<Bumper>(this.table.bumpers), enabled: !!opts.exportBumpers },
 			{ name: 'ramps', meshes: Object.values<Ramp>(this.table.ramps), enabled: !!opts.exportRamps },
@@ -129,6 +135,7 @@ export const defaultTableGenerateOptions: TableGenerateOptions = {
 	exportPrimitives: true,
 	exportRubbers: true,
 	exportSurfaces: true,
+	exportFlashers: true,
 	exportFlippers: true,
 	exportBumpers: true,
 	exportRamps: true,

@@ -18,6 +18,7 @@ export class FlasherUpdater extends ItemUpdater<FlasherState> {
 	private lastRotY: number
 	private lastRotZ: number
 	private lastHeight: number
+	private lastImageA: string
 	private linkedLight?: Light
 
 	constructor(
@@ -30,6 +31,7 @@ export class FlasherUpdater extends ItemUpdater<FlasherState> {
 		this.lastRotY = data.rotY
 		this.lastRotZ = data.rotZ
 		this.lastHeight = data.height
+		this.lastImageA = data.szImageA ?? ''
 	}
 
 	/** Resolves the LMAP-linked light. @see Flasher::RenderSetup (`m_lightmap = m_ptable->GetLight(m_d.m_szLightmap)`) */
@@ -47,6 +49,7 @@ export class FlasherUpdater extends ItemUpdater<FlasherState> {
 		this.applyTransform(obj, renderApi, table)
 		const target = obj as unknown as Object3D
 		if (!target) return
+		this.applyImage(target, renderApi)
 
 		const alpha = this.effectiveAlpha(table)
 		// Native Render skips the draw when the intensity scale is 0
@@ -113,6 +116,21 @@ export class FlasherUpdater extends ItemUpdater<FlasherState> {
 			return (alpha * light.getState().intensity) / (intensity * scale)
 		}
 		return alpha
+	}
+
+	/**
+	 * Rebinds the overlay texture on script image swaps. Upstream resolves
+	 * `GetImage(m_d.m_szImageA)` every frame (`Flasher::Render`); the
+	 * build-time map only covers the authored image. Runs ahead of the
+	 * visibility gate so a reshown flasher never flashes a stale image.
+	 */
+	private applyImage<NODE, GEOMETRY, POINT_LIGHT>(
+		target: Object3D,
+		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
+	): void {
+		if (this.state.imageA === this.lastImageA) return
+		this.lastImageA = this.state.imageA
+		renderApi.applyMaterial(target as unknown as NODE, undefined, this.state.imageA || undefined)
 	}
 
 	/** Regenerates the baked mesh when rotation/height changed, like upstream's dynamic vertex buffer. */

@@ -124,6 +124,7 @@ export const TABLE_OPTS = {
 	exportRubbers: true,
 	exportSurfaces: true,
 	exportFlippers: true,
+	exportFlashers: true,
 	exportBumpers: true,
 	exportRamps: true,
 	exportLightBulbs: true,

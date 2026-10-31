@@ -167,6 +167,28 @@ describe('The VPinball flasher mesh generator and updater', () => {
 		expect(center.y).toBe(0)
 	})
 
+	it('should emit a flashers scene group gated by exportFlashers', async () => {
+		const { NodeBinaryReader } = await import('../../io/binary-reader.node.js')
+		const { ThreeHelper } = await import('../../../test/three.helper.js')
+		const { ThreeRenderApi } = await import('../../render/threejs/three-render-api.js')
+		const { Table } = await import('../table/table.js')
+
+		const three = new ThreeHelper()
+		const table = await Table.load(new NodeBinaryReader(three.fixturePath('table-flasher.vpx')))
+		const names = (root: any): string[] => {
+			const out: string[] = []
+			root.traverse((o: any) => out.push(o.name))
+			return out
+		}
+
+		const node = (await table.generateTableNode(new ThreeRenderApi(), { exportFlashers: true })) as any
+		expect(names(node)).toContain('flashers')
+		expect(names(node)).toContain('Flasher')
+
+		const bare = (await table.generateTableNode(new ThreeRenderApi(), { exportFlashers: false })) as any
+		expect(names(bare)).not.toContain('flashers')
+	})
+
 	it('should return undefined if drag points cannot form a valid polygon', () => {
 		const table = new TableBuilder().build()
 		const data = createFlasherData('InvalidFlasher')
@@ -216,6 +238,41 @@ describe('The VPinball flasher mesh generator and updater', () => {
 		expect(tintColor).toBe(0xff8844)
 		expect(targetMesh.material.userData.__uIntensity.value).toBeCloseTo((80 * 2) / 100, 1e-5)
 		expect(targetMesh.material.needsUpdate).toBe(true)
+	})
+
+	it('should rebind the overlay texture when the script swaps ImageA', () => {
+		const table = new TableBuilder().build()
+		const data = createFlasherData('DigitFlasher')
+		data.szImageA = 'd_title'
+		data.dragPoints = [
+			Object.assign(new DragPoint(), { vertex: new Vertex2D(0, 0) }),
+			Object.assign(new DragPoint(), { vertex: new Vertex2D(100, 0) }),
+			Object.assign(new DragPoint(), { vertex: new Vertex2D(100, 100) }),
+			Object.assign(new DragPoint(), { vertex: new Vertex2D(0, 100) }),
+		]
+		const state = FlasherState.claim('DigitFlasher', true, 0xffffff, 100)
+		state.imageA = 'd_title'
+		const updater = new FlasherUpdater(state, data)
+
+		const rebound: Array<string | undefined> = []
+		const node = { visible: true, traverse: () => {} }
+		const renderApi = new TestRenderApi() as unknown as IRenderApi<any, any, any>
+		renderApi.applyMaterial = (_node: unknown, _material: unknown, map?: string) => {
+			rebound.push(map)
+		}
+
+		const unchanged = state.clone()
+		updater.applyState(node, unchanged, renderApi, table)
+		expect(rebound).toEqual([])
+
+		const swapped = state.clone()
+		swapped.imageA = 'd_5'
+		updater.applyState(node, swapped, renderApi, table)
+		expect(rebound).toEqual(['d_5'])
+
+		// Sticky: repeating the same image never rebinds.
+		updater.applyState(node, swapped, renderApi, table)
+		expect(rebound).toEqual(['d_5'])
 	})
 
 	it('should hide flasher if alpha is zero or additive color is black (native VPX)', () => {
@@ -386,6 +443,7 @@ describe('The VPinball flasher mesh generator and updater', () => {
 		api.Color = 0x00ff88
 		api.Alpha = 75
 		api.Visible = false
+		api.ImageA = 'd_5'
 
 		expect(state.rotX).toBe(45)
 		expect(state.rotY).toBe(60)
@@ -394,8 +452,10 @@ describe('The VPinball flasher mesh generator and updater', () => {
 		expect(state.color).toBe(0x00ff88)
 		expect(state.alpha).toBe(75)
 		expect(state.isVisible).toBe(false)
+		expect(state.imageA).toBe('d_5')
 
 		const poppedStates = player.popStates()
 		expect(poppedStates.getState<FlasherState>('Flasher')?.alpha).toBe(75)
+		expect(poppedStates.getState<FlasherState>('Flasher')?.imageA).toBe('d_5')
 	})
 })

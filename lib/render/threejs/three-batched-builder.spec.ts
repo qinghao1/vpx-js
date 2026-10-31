@@ -6,7 +6,7 @@ import type { Table } from '../../vpt/table/table.js'
 import { batchStaticOpaques, instancedBulbs } from './three-batched-builder.js'
 import type { ThreeRenderApi } from './three-render-api.js'
 
-function mockTable(lights: Record<string, unknown> = {}): Table {
+function mockTable(lights: Record<string, unknown> = {}, flashers: Record<string, unknown> = {}): Table {
 	return {
 		getMovables: () => [],
 		getAnimatables: () => [],
@@ -15,7 +15,7 @@ function mockTable(lights: Record<string, unknown> = {}): Table {
 		primitives: {},
 		rubbers: {},
 		lights,
-		flashers: {},
+		flashers,
 		textboxes: {},
 		getDimensions: () => ({ width: 1000, height: 2000 }),
 	} as unknown as Table
@@ -187,6 +187,33 @@ describe('batchStaticOpaques geometry identity', () => {
 			expect(info.isInstanced).to.equal(true)
 			expect(info.matrix).to.be.instanceOf(THREE.Matrix4)
 		}
+	})
+})
+
+describe('batchStaticOpaques flasher exclusion', () => {
+	it('never batches flasher meshes: the script can swap their image any tick', () => {
+		const root = new THREE.Group()
+		root.name = 'table'
+		const flashers: Record<string, unknown> = {}
+		for (const [i, name] of ['digit001', 'digit002'].entries()) {
+			const mat = new THREE.MeshStandardMaterial({ color: 0xffffff })
+			mat.name = 'material:shared'
+			const mesh = makeMesh(`flasher-${name}`, new THREE.BoxGeometry(10, 10, 1, 4, 4, 4), mat)
+			mesh.position.set(i * 100, 0, 0)
+			const group = new THREE.Group()
+			group.name = name
+			group.add(mesh)
+			root.add(group)
+			flashers[name] = { getName: () => name, data: {} }
+		}
+		root.updateMatrixWorld(true)
+		// Identical geometry/material would merge (cf. 'still merges true clones').
+		expect(batchStaticOpaques(root, mockTable({}, flashers), stubApi)).to.equal(0)
+		const { batched, instanced, meshes } = collect(root)
+		expect(batched, 'no BatchedMesh may absorb flashers').to.have.lengthOf(0)
+		expect(instanced, 'no InstancedMesh may absorb flashers').to.have.lengthOf(0)
+		expect(meshes).to.have.lengthOf(2)
+		for (const mesh of meshes) expect(mesh.visible, `${mesh.name} stays live`).to.equal(true)
 	})
 })
 

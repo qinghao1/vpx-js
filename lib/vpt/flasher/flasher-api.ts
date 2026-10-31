@@ -85,6 +85,7 @@ export class FlasherApi extends ItemApi<FlasherData> {
 	}
 	set ImageA(value) {
 		this.data.szImageA = value
+		if (this._state) this._state.imageA = value ?? ''
 	}
 	get ImageB() {
 		return this.data.szImageB
