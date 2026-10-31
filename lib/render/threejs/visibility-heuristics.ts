@@ -14,8 +14,12 @@ import {
 
 export const RE_KEEP_DARK =
 	/playfield|ball|flipper|bumper|light|dmd|vr_|vrcab|cabinet|lockbar|pincab|ramp|plastic|gate|kicker|target|spinner|button|coin|plunger/i
-// The white-wall pass additionally keeps baked (`bm_`) meshes; the dark-occluder pass does not.
-export const RE_KEEP_WHITE = new RegExp(`${RE_KEEP_DARK.source}|bm_`, 'i')
+// The white-wall pass additionally keeps baked (`bm_`) meshes and authored
+// item families (`primitive-`/`rubber-`/`surface.*`): white untextured plastics,
+// rails and walls are legitimate table geometry (e.g. EM tables), never strays.
+// The dark-occluder pass does not share these: a black untextured primitive is
+// still treated as an occluder there.
+export const RE_KEEP_WHITE = new RegExp(`${RE_KEEP_DARK.source}|bm_|primitive|rubber|surface`, 'i')
 
 export function isInCabFlipper(obj: THREE.Object3D): boolean {
 	for (let cur: THREE.Object3D | null = obj; cur; cur = cur.parent) {

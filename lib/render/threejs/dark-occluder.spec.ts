@@ -31,6 +31,7 @@ describe('regression: dark occluder side artifact', () => {
 		playfield: THREE.Mesh
 		gate: THREE.Mesh
 		vrDark: THREE.Mesh
+		authored: THREE.Mesh[]
 		logText: string
 	} {
 		const root = new THREE.Group()
@@ -68,6 +69,20 @@ describe('regression: dark occluder side artifact', () => {
 		whiteWall.position.set(20, 20, 5)
 		root.add(whiteWall)
 
+		const authored: THREE.Mesh[] = []
+		for (const [meshName, x] of [
+			['primitive-RailLeft1', 40],
+			['rubber-SlingR', 45],
+			['surface.top-SideWall', 50],
+		] as Array<[string, number]>) {
+			const authoredMat = new THREE.MeshStandardMaterial({ color: 0xffffff })
+			authoredMat.name = 'WhiteAuthored'
+			const authoredMesh = makeMesh(meshName, new THREE.BoxGeometry(12, 12, 12), authoredMat)
+			authoredMesh.position.set(x, 20, 5)
+			root.add(authoredMesh)
+			authored.push(authoredMesh)
+		}
+
 		const pfMat = new THREE.MeshStandardMaterial({ color: 0xffffff })
 		pfMat.name = 'PlayfieldMat'
 		const pfGeom = new THREE.PlaneGeometry(20, 20)
@@ -92,7 +107,7 @@ describe('regression: dark occluder side artifact', () => {
 		const logs: string[] = []
 		root.updateMatrixWorld(true)
 		postProcessScene(root, { harnessLog: (msg: string) => logs.push(msg), viewerMode: 'viewer' })
-		return { blackbox, cabinet, small, whiteWall, playfield, gate, vrDark, logText: logs.join(' ') }
+		return { blackbox, cabinet, small, whiteWall, playfield, gate, vrDark, authored, logText: logs.join(' ') }
 	}
 
 	function singleMaterial(mesh: THREE.Mesh): THREE.MeshStandardMaterial {
@@ -126,6 +141,18 @@ describe('regression: dark occluder side artifact', () => {
 		const { whiteWall, logText } = setupOccluderScene()
 		expect(whiteWall.visible, 'white untextured stray must be hidden').to.equal(false)
 		expect(logText).to.include('white untextured')
+	})
+
+	it('keeps white untextured authored item meshes visible', () => {
+		const { authored } = setupOccluderScene()
+		expect(authored.map(mesh => mesh.name)).to.deep.equal([
+			'primitive-RailLeft1',
+			'rubber-SlingR',
+			'surface.top-SideWall',
+		])
+		for (const mesh of authored) {
+			expect(mesh.visible, `${mesh.name} is authored geometry, not a stray`).to.equal(true)
+		}
 	})
 
 	it('keeps the playfield visible despite white', () => {
