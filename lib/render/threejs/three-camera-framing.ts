@@ -119,54 +119,49 @@ function fitDistance(box: Box3, target: Vector3, dir: Vector3, tanHalfFov: numbe
 	return dist
 }
 
-function framingState(
-	node: Object3D,
-	targetExclude: (name: string) => boolean,
-	sizeExclude: (name: string) => boolean,
-	cfg: FramingConfig,
-	fit?: { fov: number; aspect: number },
-): FramingState {
-	// When the fit solves, target and distance come from the playfield box,
-	// so furniture never steers the play camera (the maxDim fallback still
-	// sizes from the cabinet). The orbit overview instead targets the wider
-	// playfield cluster (furniture included).
-	const centerBox = fit ? framingBox(node, excludeNonPlaySurface) : framingBox(node, targetExclude)
-	const target = centerBox.center.clone()
-	const { size, maxDim } = framingBox(node, sizeExclude)
-	if (cfg.forwardBias) target.z += centerBox.size.z * cfg.forwardBias
+function clipPlanes(maxDim: number, cfg: FramingConfig): { near: number; far: number } {
+	return { near: Math.max(1, maxDim * cfg.near), far: Math.max(cfg.farMin, maxDim * cfg.farScale) }
+}
+
+function viewerFramingState(node: Object3D, cfg: FramingConfig): FramingState {
+	const target = framingBox(node, excludeNonPlayfield).center.clone()
+	const { size, maxDim } = framingBox(node, excludeNonTable)
+	const dist = maxDim * cfg.dist
+	const position = new Vector3(target.x, target.y + dist * cfg.elev, target.z + dist * cfg.azim)
+	const { near, far } = clipPlanes(maxDim, cfg)
+	return { position, target, center: target.clone(), size, maxDim, near, far }
+}
+
+function playFramingState(node: Object3D, cfg: FramingConfig, fit: { fov: number; aspect: number }): FramingState {
+	// Target and distance come from the playfield box, so furniture never
+	// steers the play camera (the maxDim fallback still sizes from the cabinet).
+	const surface = framingBox(node, excludeNonPlaySurface)
+	const target = surface.center.clone()
+	if (cfg.forwardBias) target.z += surface.size.z * cfg.forwardBias
+	const { size, maxDim } = framingBox(node, excludeNonTable)
 	const offset = new Vector3(0, cfg.elev, cfg.azim).normalize()
 	let dist = maxDim * cfg.dist
-	if (fit) {
-		const solved = fitDistance(centerBox.box, target, offset, Math.tan((fit.fov * Math.PI) / 360), fit.aspect)
-		if (Number.isFinite(solved) && solved > 0) dist = solved
-	}
-	return {
-		center: target.clone(),
-		size,
-		maxDim,
-		target: target.clone(),
-		position: fit
-			? target.clone().addScaledVector(offset, dist)
-			: new Vector3(target.x, target.y + dist * cfg.elev, target.z + dist * cfg.azim),
-		near: Math.max(1, maxDim * cfg.near),
-		far: Math.max(cfg.farMin, maxDim * cfg.farScale),
-	}
+	const solved = fitDistance(surface.box, target, offset, Math.tan((fit.fov * Math.PI) / 360), fit.aspect)
+	if (Number.isFinite(solved) && solved > 0) dist = solved
+	const position = target.clone().addScaledVector(offset, dist)
+	const { near, far } = clipPlanes(maxDim, cfg)
+	return { position, target, center: target.clone(), size, maxDim, near, far }
 }
 
 // Size covers the cabinet (keep-token table meshes plus RE_CAB cabinetry)
 // so the room has a stable anchor; anything else is excluded by default and
-// token-free room scenery cannot inflate the frame.
+// token-free room scenery cannot inflate the frame. (RE_CAB's _? arms are
+// inert here: names arrive separator-folded.)
 const excludeNonTable = (name: string): boolean => excludeNonPlayfield(name) && !RE_CAB.test(name)
 
-export const computeViewerFraming = (node: Object3D): FramingState =>
-	framingState(node, excludeNonPlayfield, excludeNonTable, VIEWER)
+export const computeViewerFraming = (node: Object3D): FramingState => viewerFramingState(node, VIEWER)
 
 // Play distance and target come from the playfield box (fov/aspect aware),
 // so every table fills the screen the same way; size still spans the cabinet
 // for room sync (demo-browser syncRoom). Callers pass the live camera's fov
 // (vertical degrees, as PerspectiveCamera.fov) and aspect.
 export const computePlayFraming = (node: Object3D, view: { fov: number; aspect: number }): FramingState =>
-	framingState(node, excludeNonPlayfield, excludeNonTable, PLAY, view)
+	playFramingState(node, PLAY, view)
 
 export function applyCameraState(camera: PerspectiveCamera, controls: FramingControls, state: FramingState): void {
 	controls.target.copy(state.target)

@@ -38,7 +38,7 @@ function buildWalkingDeadGroup(): THREE.Group {
 	const cabinet = makeMesh('VRCab_Cabinet', cabGeom, pc.clone())
 	root.add(cabinet)
 
-	// Legs that must be excluded for PLAY sizing but included for VIEWER
+	// Plain legs: excluded from both sizings (no keep-token, not RE_CAB)
 	const legGeom = new THREE.BoxGeometry(8, 8, 40)
 	const legL = makeMesh('primitive-leg_left', legGeom, new THREE.Vector3(-25, -20, -30))
 	const legR = makeMesh('primitive-leg_right', legGeom, new THREE.Vector3(25, -20, -30))
@@ -176,6 +176,16 @@ describe('regression: framing keeps DMD and full playfield visible', () => {
 		const dist = state.position.distanceTo(state.target)
 		expect(dist, 'fallback distance is finite').to.be.finite
 		expect(dist, 'fallback distance is positive').to.be.greaterThan(0)
+	})
+
+	it('clip planes stay positive and ordered', () => {
+		const play = computePlayFraming(buildWalkingDeadGroup(), STD_VIEW)
+		const viewer = computeViewerFraming(buildWalkingDeadGroup())
+		for (const state of [play, viewer]) {
+			expect(state.near, 'near is finite').to.be.finite
+			expect(state.near, 'near is positive').to.be.greaterThan(0)
+			expect(state.far, 'far exceeds near').to.be.greaterThan(state.near)
+		}
 	})
 
 	it('play is tighter than viewer but both fit', () => {
