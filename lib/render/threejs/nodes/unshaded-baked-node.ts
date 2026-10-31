@@ -10,6 +10,7 @@ import {
 } from 'three'
 import { Fn, float, positionWorld, sqrt, step, texture, uniform, uv, vec2, vec4 } from 'three/tsl'
 import { MeshBasicNodeMaterial } from 'three/webgpu'
+import { isValidCutout } from '../../../vpt/primitive/primitive-material-protocol.js'
 import { copyForkedRenderState, setNodeMapSlot } from '../material-shared.js'
 import { getTransmissionTexture, TRANSMISSION_OPAQUE_CUTOFF } from '../transmission-buffer.js'
 import { inLiftVolume, sideFor, uTransArea } from './primitive-bdl-node.js'
@@ -109,8 +110,7 @@ export function createUnshadedBakedNodeMaterial(options: BakedNodeMaterialOption
 	mat.blendSrcAlpha = OneFactor
 	mat.blendDstAlpha = OneMinusSrcAlphaFactor
 	mat.blendEquationAlpha = AddEquation
-	mat.alphaTest =
-		options.alphaTestValue && options.alphaTestValue > 0 && options.alphaTestValue <= 1 ? options.alphaTestValue : 0
+	mat.alphaTest = isValidCutout(options.alphaTestValue) ? options.alphaTestValue : 0
 	mat.toneMapped = false
 
 	if (options.polygonOffset) {

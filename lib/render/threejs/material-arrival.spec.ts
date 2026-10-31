@@ -72,11 +72,75 @@ describe('material arrival: BDL uniforms survive streaming', () => {
 		expect(mat.alphaTest, 'cutout must be restored on arrival').to.be.closeTo(1 / 255, 1e-6)
 	})
 
+	it('refreshes the cutout when a script swaps the image on an already-cutout material', () => {
+		// Native re-reads img->m_alphaTestValue every frame (primitive.cpp), so a
+		// script image swap must follow the arriving image, not the stale stash.
+		const tex = makeTex()
+		;(tex as any).userData = { alphaTestValue: 0.5 }
+		const textures = new Map<string, DataTexture>([['imageb', tex]])
+		const generator = makeGenerator(textures)
+		const mat = new MeshStandardMaterial({ color: 0x000000 }) as any
+		mat.userData.__alphaTestValue = 1 / 255
+		mat.alphaTest = 1 / 255
+		generator.applyMap(mat, 'imageb')
+		expect(mat.map, 'swapped map bound').toBe(tex)
+		expect(mat.userData.__alphaTestValue, 'stash follows the arriving image').toBeCloseTo(0.5, 10)
+		expect(mat.alphaTest, 'cutout follows the arriving image').toBeCloseTo(0.5, 10)
+	})
+
+	it('refreshes the cutout through the node-map route when a script swaps the image', () => {
+		// Production script swaps run the node-map route (setPrimitiveMap),
+		// not the classic slot — the refresh must work there too.
+		const texA = makeTex()
+		;(texA as any).userData = { alphaTestValue: 1 / 255 }
+		const texB = makeTex()
+		;(texB as any).userData = { alphaTestValue: 0.5 }
+		const textures = new Map<string, DataTexture>([
+			['imagea', texA],
+			['imageb', texB],
+		])
+		const generator = makeGenerator(textures)
+		const mat: any = (generator as any).getMaterial(
+			{ name: 'NodeSwap', baseColor: 0xffffff } as any,
+			'imagea',
+			undefined,
+			undefined,
+			undefined,
+			false,
+			0,
+			undefined,
+			false,
+			undefined,
+			1 / 255,
+		)
+		expect(mat.alphaTest, 'cutout known at creation').toBeCloseTo(1 / 255, 10)
+		generator.applyMap(mat, 'imageb')
+		expect(mat.userData.__map, 'swapped map bound').toBe(texB)
+		expect(mat.userData.__alphaTestValue, 'stash follows the arriving image').toBeCloseTo(0.5, 10)
+		expect(mat.alphaTest, 'cutout follows the arriving image').toBeCloseTo(0.5, 10)
+	})
+
+	it('keeps the stale cutout when a script swaps in a cutout-less image', () => {
+		// Known native divergence, pinned not fixed: native re-reads
+		// img->m_alphaTestValue every frame and would disable the cutout for
+		// the new image, while restoreCutout keeps the stale threshold when
+		// the arriving image carries no valid cutout.
+		const textures = new Map<string, DataTexture>([['imageb', makeTex()]])
+		const generator = makeGenerator(textures)
+		const mat = new MeshStandardMaterial({ color: 0x000000 }) as any
+		mat.userData.__alphaTestValue = 1 / 255
+		mat.alphaTest = 1 / 255
+		generator.applyMap(mat, 'imageb')
+		expect(mat.map, 'swapped map bound').toBe(textures.get('imageb'))
+		expect(mat.userData.__alphaTestValue, 'stale stash kept').toBeCloseTo(1 / 255, 10)
+		expect(mat.alphaTest, 'stale cutout kept').toBeCloseTo(1 / 255, 10)
+	})
+
 	it('restores the file cutout stashed on the arriving texture when creation knew none', () => {
 		// Royal Flush 1976 instruction cards: the material is created while the
 		// map still streams, so creation stashes 0 ("unknown"). The map
 		// generator stashes the file ALTV on the arriving texture; a 0 stash
-		// must not shadow it via ?? or the transparent texels render black.
+		// must not shadow it or the transparent texels render black.
 		const textures = new Map<string, DataTexture>()
 		const generator = makeGenerator(textures)
 		const mat: any = (generator as any).getMaterial(

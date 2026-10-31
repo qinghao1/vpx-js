@@ -4,6 +4,7 @@
 import type { Group, Material, Mesh, Texture as ThreeTexture } from 'three'
 import { type AnimationGate, animationGate } from '../../util/animation-gate.js'
 import { logger, progress } from '../../util/logger.js'
+import { isValidCutout } from '../../vpt/primitive/primitive-material-protocol.js'
 import type { Table } from '../../vpt/table/table.js'
 import { Texture } from '../../vpt/texture.js'
 import type { ITextureLoader } from '../irender-api.js'
@@ -224,7 +225,7 @@ export class ThreeMapGenerator {
 				const rawCutout = !texture.isOpaque ? (texture.alphaTestValue ?? 0) : 0
 				;(tex as any).userData = {
 					...((tex as any).userData ?? {}),
-					alphaTestValue: rawCutout > 0 && rawCutout <= 1 ? rawCutout : 0,
+					alphaTestValue: isValidCutout(rawCutout) ? rawCutout : 0,
 				}
 			} catch {
 				// Best-effort cleanup: alphaTest fallback stays in material userData if the texture is frozen.

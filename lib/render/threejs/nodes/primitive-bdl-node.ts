@@ -19,6 +19,7 @@ import {
 	belowFactor,
 	getPrimitiveKind,
 	isPrimitiveNodeMaterial,
+	isValidCutout,
 	PRIMITIVE_ADDITIVE_KIND,
 	PRIMITIVE_BDL_KIND,
 	type PrimitiveAdditiveUpdate,
@@ -227,7 +228,7 @@ export function createPrimitiveBdlMaterial(opts: PrimitiveBdlOptions): MeshStand
 	mat.metalness = opts.metalness ?? 0
 	mat.roughness = opts.roughness ?? 0.4
 	mat.side = sideFor(opts.doubleSided)
-	mat.alphaTest = opts.alphaTestValue && opts.alphaTestValue > 0 && opts.alphaTestValue <= 1 ? opts.alphaTestValue : 0
+	mat.alphaTest = isValidCutout(opts.alphaTestValue) ? opts.alphaTestValue : 0
 	mat.blending = CustomBlending
 	mat.blendSrc = SrcAlphaFactor
 	mat.blendDst = OneMinusSrcAlphaFactor

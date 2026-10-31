@@ -2,7 +2,7 @@ import { Color, DoubleSide, type Object3D } from 'three'
 import { Fn, texture, uniform, uv, vec4 } from 'three/tsl'
 import type { RenderInfo } from '../../game/interfaces.js'
 import type { Material } from '../../vpt/material.js'
-import { resolveTransparency } from '../../vpt/primitive/primitive-material-protocol.js'
+import { isValidCutout, resolveTransparency } from '../../vpt/primitive/primitive-material-protocol.js'
 import type { MeshConvertOptions } from '../irender-api.js'
 import type { IMaterialGenerator } from './imaterial-generator.js'
 import {
@@ -70,7 +70,7 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 
 	private stashCutout(mat: any, alphaTestValue: number, depthBias: number, additive: boolean): void {
 		const userData = getSlots(mat)
-		const validCutout = alphaTestValue > 0 && alphaTestValue <= 1 ? alphaTestValue : 0
+		const validCutout = isValidCutout(alphaTestValue) ? alphaTestValue : 0
 		userData.__alphaTestValue = validCutout
 		userData.__depthBias = depthBias
 		if (!additive && validCutout > 0 && !(mat.alphaTest > 0)) mat.alphaTest = validCutout
@@ -79,14 +79,25 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 	private restoreCutout(mat: any, tex?: any): boolean {
 		if (!mat?.userData) return false
 		const userData = getSlots(mat)
-		if (userData.__addBlend || mat.alphaTest > 0) return false
+		if (userData.__addBlend) return false
+		const fromTex = (tex as { userData?: { alphaTestValue?: number } })?.userData?.alphaTestValue
+		if (mat.alphaTest > 0) {
+			// Script texture swap on an already-cutout material: native re-reads
+			// img->m_alphaTestValue every frame (primitive.cpp), so the arriving
+			// texture refreshes the stash (and alphaTest when it changed).
+			if (!isValidCutout(fromTex) || (userData.__alphaTestValue === fromTex && mat.alphaTest === fromTex))
+				return false
+			userData.__alphaTestValue = fromTex
+			mat.alphaTest = fromTex
+			mat.needsUpdate = true
+			return true
+		}
 		// A stashed 0 means "unknown at creation" (the map was still
 		// streaming), not "no cutout": it must not shadow the file value the
 		// map generator stashed on the arriving texture.
 		const stashed = userData.__alphaTestValue as number
-		const fromTex = (tex as { userData?: { alphaTestValue?: number } })?.userData?.alphaTestValue
-		const cutoutValue = [stashed, fromTex].find((v): v is number => typeof v === 'number' && v > 0 && v <= 1) ?? 0
-		if (cutoutValue > 0 && cutoutValue <= 1) {
+		const cutoutValue = [stashed, fromTex].find(isValidCutout) ?? 0
+		if (cutoutValue > 0) {
 			mat.alphaTest = cutoutValue
 			mat.needsUpdate = true
 			return true
@@ -100,7 +111,7 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 		}
 		const mapTex = obj.map ?? obj.material?.emissiveMap
 		const rawAlphaTest = mapTex && !mapTex.isOpaque ? (mapTex.alphaTestValue ?? 0) : 0
-		const alphaTestValue = rawAlphaTest > 0 && rawAlphaTest <= 1 ? rawAlphaTest : 0
+		const alphaTestValue = isValidCutout(rawAlphaTest) ? rawAlphaTest : 0
 		return this.getMaterial(
 			opts.applyMaterials && obj.material ? obj.material : undefined,
 			opts.applyTextures && obj.map ? obj.map.getName() : undefined,
@@ -482,8 +493,8 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 	): boolean {
 		if (route === 'ignore') return false
 		if (route === 'node-map') {
-			// Short-circuit preserved: a remapped map already flags the program change,
-			// so the cutout restore only runs when the map did not change.
+			// Short-circuit preserved: a remapped map already flags the program
+			// change — either path flags the update below.
 			const changed = kindOf(mat) === 'baked' ? setBakedMap(mat, tex, name) : setPrimitiveMap(mat, tex, name)
 			const cut = this.restoreCutout(mat, tex)
 			if (changed || cut) (mat as any).needsUpdate = true

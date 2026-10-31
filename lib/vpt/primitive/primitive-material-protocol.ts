@@ -85,6 +85,11 @@ export function resolveTransparency(
 	return { opacity, transparent }
 }
 
+/** File alpha-cutout validity: only (0, 1] applies — a stashed 0 means "unknown", anything else is junk. */
+export function isValidCutout(value: unknown): value is number {
+	return typeof value === 'number' && value > 0 && value <= 1
+}
+
 export function isPrimitiveNodeMaterial(mat: unknown): boolean {
 	const kind = (mat as { userData?: { __primitiveKind?: string } })?.userData?.__primitiveKind
 	return kind === PRIMITIVE_BDL_KIND || kind === PRIMITIVE_ADDITIVE_KIND
