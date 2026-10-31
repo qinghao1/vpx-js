@@ -83,9 +83,7 @@ export class HitQuadtree {
 				!h.hitBBox.intersectSphere(ball.state.pos, ball.hit.rcHitRadiusSqr)
 			)
 				continue
-			// Veto last: abortHitTest is a virtual call, and culled candidates
-			// never reach doHitTest either way, so skipping it on misses only
-			// drops calls, never hits (doHitTest re-checks it for survivors).
+			// Veto last: abortHitTest is pure and doHitTest re-checks it, so skipping it on culled candidates only drops calls.
 			if (h.obj?.abortHitTest?.()) continue
 			this.batches.classify(h)
 		}

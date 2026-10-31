@@ -122,7 +122,6 @@ export class BatchCollector {
 	}
 
 	classify(hit: HitObject): void {
-		// Single switch on hitKind; cases mirror the batchability guards above.
 		switch (hit.hitKind) {
 			case HitKind.Circle:
 				if (hit.hitTest === HitCircle.prototype.hitTest) {

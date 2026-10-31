@@ -252,10 +252,8 @@ describe('EXR worker pool', () => {
 		const tex = (await new Loader().loadTexture('vlm.nestmap1', '.exr', huge)) as any
 		expect(fakes.posted).toHaveLength(1)
 		expect(tex.image.width).toBe(512)
-		// Over-cap playfield bakes (8192px DWAA nestmaps) re-parse for ~10s,
-		// so the capped transcode is IDB-cached: a ~0.5s revival beats a ~10s
-		// re-parse, and the write is fire-and-forget. Only over-cap
-		// non-playfield floats skip the round-trip (fail-fast, covered above).
+		// Over-cap playfield bakes (~9s DWAA re-parse, measured) are IDB-cached:
+		// revival is ~69ms read + ~176ms clone (measured) and writes are fire-and-forget.
 		expect(vi.mocked(idb.idbGet)).toHaveBeenCalledTimes(1)
 		expect(vi.mocked(idb.idbSet)).toHaveBeenCalledTimes(1)
 	})
@@ -468,9 +466,7 @@ describe('EXR worker pool', () => {
 			)
 		await new Promise(r => setTimeout(r, 10))
 		expect(fakes.posted).toHaveLength(4)
-		// A playfield bake (over-cap DWAA nestmap) queues as the fifth post
-		// instead of rejecting: rejecting costs a 30s failure-cooldown retry
-		// on the texture gating first visuals.
+		// The bake must queue, not reject: rejection costs a 30s failure-cooldown retry.
 		const bake = loader.loadTexture('vlm.nestmap1', '.exr', new Uint8Array(MAX_FLOAT_TEXTURE_BYTES + 1)).then(
 			v => ({ ok: v }),
 			e => ({ err: e }),

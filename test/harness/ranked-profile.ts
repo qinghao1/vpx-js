@@ -186,8 +186,7 @@ let physMs = 0
 
 const grammarProto = Grammar.prototype as any
 const origGrammar = grammarProto.transpile
-// Table-script execution triggers ~30 nested transpiles (inline Eval/Execute);
-// first call is the cold full-script one, later calls are AST/JS cache hits.
+// ~30 nested inline transpiles fire per run; only the first call is cold.
 grammarProto.transpile = timedSync(origGrammar, ms => {
 	if (grammarMs === 0) grammarMs = ms
 })
@@ -195,9 +194,7 @@ grammarProto.transpile = timedSync(origGrammar, ms => {
 const transpilerProto = Transpiler.prototype as any
 const origExecute = transpilerProto.execute
 const origTranspile = transpilerProto.transpile
-// parseAndTransform = normalize + Grammar.transpile + 10-step pipeline
-// (buildPipeline steps are module-level and stay merged here; per-step split
-// needs an in-Transpiler hook).
+// parseAndTransform covers normalize + Grammar + pipeline; buildPipeline is module-level, so no per-step split.
 const origParseAndTransform = transpilerProto.parseAndTransform
 if (typeof origParseAndTransform === 'function') {
 	transpilerProto.parseAndTransform = timedSync(origParseAndTransform, ms => {

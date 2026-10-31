@@ -232,12 +232,9 @@ function parseWorker(
 	const pool = ensureFloatPool()
 	if (!pool?.length) return Promise.reject(floatInfraError('float-no-worker', 'no worker'))
 	const playfield = isPlayfieldCap(name)
-	// Table-load bursts must reject fast with a typed error instead of
-	// growing the pending map (and worker backlogs) without bound. Warmup
-	// decodes never count, and playfield lightmap bakes are exempt: a table
-	// holds only a handful, the 2-slot pool still bounds concurrent decodes,
-	// and rejecting one costs a 30s failure-cooldown retry on the texture
-	// that gates first visuals.
+	// Bursts reject fast to bound the pending map. Warmup decodes never
+	// count, and playfield bakes are exempt: only a handful per table, and
+	// rejecting one costs a 30s cooldown retry on first-visual textures.
 	if (!warmup && !playfield) {
 		let queued = 0
 		for (const entry of floatPending.values()) if (!entry.warmup) queued++
@@ -390,15 +387,11 @@ export class ThreeTextureLoaderBrowser implements ITextureLoader<ThreeTexture> {
 				const viaWorker = await tryLoadViaWorker(name, kind, data)
 				if (viaWorker) return viaWorker
 			} catch (e) {
-				// The worker OOM bound rejects huge payloads before decode, but
-				// playfield lightmap bakes gate playfield brightness: a missing
-				// nestmap leaves the GI overlays mapless and the playfield dark.
-				// Let those fall through to the slow main-thread parse with a
-				// single warning; every other worker failure still throws. Pool
-				// outages qualify only under the worker cap — an over-cap
-				// playfield whose worker OOMs must throw (let the map generator
-				// skip) instead of running the main-thread full-res slow parse,
-				// the exact 512MB expansion the cap prevents.
+				// Playfield bakes gate playfield brightness, so they fall through
+				// to the slow main-thread parse with a single warning; every
+				// other worker failure still throws. Over-cap playfield worker
+				// OOMs still throw (the map generator skips) instead of running
+				// the main-thread full-res parse the cap prevents.
 				// Dead defense (unreachable): both "too large" producers exempt playfields.
 				const sizeFallback = isFloatSizeRejection(e) && playfield
 				const outageFallback = playfield && !overCap && isFloatInfraFailure(e)
@@ -611,12 +604,10 @@ async function tryCreateBitmap(data: Uint8Array, mime: string, name: string): Pr
 
 async function tryLoadViaWorker(name: string, kind: 'exr' | 'hdr', data: Uint8Array): Promise<ThreeTexture | null> {
 	const max = effectiveMax(true, name)
-	// Over-cap non-playfield floats fail fast below and never reach the pool,
-	// so they need no key. Over-cap playfield bakes (8192px DWAA nestmaps take
-	// ~9s to parse, measured) DO decode via the pool, and the capped transcode
-	// (at most 128MiB at the 4096 playfield cap) is worth caching: an IDB
-	// revival (~69ms read + ~176ms clone, measured headless) versus ~9s of
-	// re-parse, and the write is fire-and-forget.
+	// Over-cap playfield bakes (8192px DWAA, ~9s to parse, measured) are
+	// IDB-cached: revival is ~69ms read + ~176ms clone (measured) versus
+	// ~9s of re-parse, and writes are fire-and-forget. Non-playfield
+	// floats fail fast below and need no key.
 	const overCap = data.byteLength > MAX_FLOAT_TEXTURE_BYTES
 	const playfield = isPlayfieldCap(name)
 	const key = overCap && !playfield ? null : exrCacheKey(name, data, kind, max)

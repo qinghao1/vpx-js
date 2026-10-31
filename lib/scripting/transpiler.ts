@@ -73,8 +73,7 @@ export class Transpiler {
 		// Reading it back instead of the global namespace avoids running a
 		// stale globalThis.play, and throwing here turns a codegen regression
 		// into a loud failure instead of an execute() that runs nothing.
-		// Repeat executes reuse the V8-compiled function: the JS string cache
-		// saves the transpile, this saves the recompile (same key covers both).
+		// Repeat executes reuse the compiled function (JS cache skips the transpile, this skips the recompile).
 		let playFn: PlayFn | undefined
 		if (cacheKeyFor !== undefined) playFn = compiledCache.get(cacheKeyFor)
 		if (playFn === undefined) {
