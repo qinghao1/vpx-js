@@ -32,6 +32,7 @@ const group = (await table.generateTableNode(api, {
 	exportTriggers: true,
 	exportSpinners: true,
 	exportPlungers: true,
+	exportFlashers: true,
 	preloadTextures: false,
 })) as THREE.Group
 group.updateMatrixWorld(true)

@@ -130,6 +130,9 @@ export class FlasherUpdater extends ItemUpdater<FlasherState> {
 	): void {
 		if (this.state.imageA === this.lastImageA) return
 		this.lastImageA = this.state.imageA
+		// Write back so a later transform regen (which rebuilds from data)
+		// cannot resurrect the replaced image, like the fields below do.
+		this.data.szImageA = this.state.imageA
 		// Empty string clears the slot; `undefined` would keep a stale bind.
 		renderApi.applyMaterial(target as unknown as NODE, undefined, this.state.imageA)
 	}

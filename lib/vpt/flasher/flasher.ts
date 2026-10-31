@@ -42,8 +42,8 @@ export class Flasher
 			data.rotY,
 			data.rotZ,
 			data.height,
+			data.szImageA ?? '',
 		)
-		this.state.imageA = data.szImageA ?? ''
 		this.updater = new FlasherUpdater(this.state, this.data)
 	}
 

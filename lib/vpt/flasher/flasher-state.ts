@@ -32,6 +32,7 @@ export class FlasherState extends ItemState {
 		rotY = 0,
 		rotZ = 0,
 		height = 50,
+		imageA = '',
 	): FlasherState {
 		const state = new FlasherState()
 		state.name = name
@@ -42,6 +43,7 @@ export class FlasherState extends ItemState {
 		state.rotY = rotY
 		state.rotZ = rotZ
 		state.height = height
+		state.imageA = imageA
 		state.inPlayState = isVisible
 		return state
 	}

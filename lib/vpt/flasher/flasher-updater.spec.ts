@@ -269,6 +269,7 @@ describe('The VPinball flasher mesh generator and updater', () => {
 		swapped.imageA = 'd_5'
 		updater.applyState(node, swapped, renderApi, table)
 		expect(rebound).toEqual(['d_5'])
+		expect(data.szImageA, 'data follows the applied image for later regens').toBe('d_5')
 
 		// Sticky: repeating the same image never rebinds.
 		updater.applyState(node, swapped, renderApi, table)

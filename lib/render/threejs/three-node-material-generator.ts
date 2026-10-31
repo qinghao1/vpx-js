@@ -455,22 +455,23 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 	}
 
 	/**
-	 * Unbinds a texture slot the script emptied. Dropping the pending key too
-	 * means a late arrival of the removed name can never rebind it. Classic
-	 * slots render color-only afterwards, like upstream's untextured draw;
-	 * node slots keep the placeholder branch, which hides rather than flashing
-	 * a stale image.
+	 * Unbinds a texture slot the script emptied; the pending key and cached
+	 * name go too, so a late arrival of the removed name can never rebind it.
+	 * The slot renders untextured afterwards, like upstream's imageless draw.
 	 */
 	private clearTextureSlot(mat: any, key: 'map' | 'normalMap' | 'envMap' | 'emissiveMap'): void {
-		delete getSlots(mat)[pendingKeyFor(key)]
+		const slots = getSlots(mat)
+		normalizePendingKeys(slots)
+		delete slots[pendingKeyFor(key)]
+		if (key !== 'map') return
+		slots.__mapName = undefined
 		const route = SLOT_ROUTES[kindOf(mat)][key]
 		if (route === 'node-map') {
 			const changed = kindOf(mat) === 'baked' ? setBakedMap(mat, null) : setPrimitiveMap(mat, null)
 			if (changed) mat.needsUpdate = true
 			return
 		}
-		if (route === 'ignore') return
-		if (mat[key] !== null) {
+		if (route !== 'ignore' && mat[key] !== null) {
 			mat[key] = null
 			mat.needsUpdate = true
 		}
