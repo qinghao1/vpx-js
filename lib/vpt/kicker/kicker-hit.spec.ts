@@ -216,6 +216,7 @@ describe('The VPinball kicker collision', () => {
 			expect(ball.state.isFrozen).to.equal(true)
 			expect(ball.state.pos.x).to.be.closeTo(500, 1e-6)
 			expect(ball.state.pos.y).to.be.closeTo(500, 1e-6)
+			builtPlayer.destroyBall(ball)
 		})
 
 		it('should never fire for a roller over a cylinder top below ball rest height', () => {
@@ -232,7 +233,7 @@ describe('The VPinball kicker collision', () => {
 				.build()
 			const builtPlayer = new Player(built).init()
 			const kicker = built.kickers.shallow
-			expect(kicker.getHit().radius).to.be.closeTo(13.2, 1e-6)
+			expect(kicker.getHit().radius).to.be.closeTo(22 * 0.6, 1e-6) // legacy scale
 			for (const offset of [-30, -10, 10, 30]) {
 				for (const speed of [0.5, 30]) {
 					const vx = offset > 0 ? -speed : speed

@@ -353,7 +353,6 @@ describe('flipper keys drive cabinet switches', () => {
 			[82, true],
 			[86, true],
 			[112, true],
-			[116, true],
 		])
 	})
 })

@@ -203,6 +203,7 @@ describe('The VpmController - VISUAL PINMAME COM OBJECT', () => {
 		}
 	})
 
+	// Only a same-name preloaded ROM is used; a foreign one falls through to fetch.
 	it('ignores a preloaded ROM uploaded for another table', async () => {
 		const pinLoad = sandbox.stub(PinMameEmulator.prototype, 'loadGame').resolves()
 		const wpcLoad = sandbox.stub(Emulator.prototype, 'loadGame').resolves()
