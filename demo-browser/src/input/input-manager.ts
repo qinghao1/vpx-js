@@ -39,8 +39,10 @@ export const locationForCode = (code: string): number | undefined =>
 // modifiers, plunger (Enter), nudge keys, the coin-door/service cluster
 // (7/8/9/0, End, Home) whose switches would otherwise latch the game in test
 // menus, and Start/coin/arrow keys whose emu switches or pressed-set entry
-// would otherwise stick. Blur/hide/exit-play release this whole list so a key
-// held during focus loss cannot stay logically down.
+// would otherwise stick. Toggles without emu or script switches (KeyA/KeyD
+// for alternate bindings, Escape, KeyM mute) are listed too so no pressed
+// entry survives focus loss. Blur/hide/exit-play release this whole list so
+// a key held during focus loss cannot stay logically down.
 export const RELEASE_CODES = [
 	'ShiftLeft',
 	'ShiftRight',
@@ -62,6 +64,10 @@ export const RELEASE_CODES = [
 	'Digit5',
 	'ArrowLeft',
 	'ArrowRight',
+	'KeyA',
+	'KeyD',
+	'Escape',
+	'KeyM',
 ]
 
 export interface InputHost {
@@ -171,6 +177,10 @@ function attachKeyboardHost(host: InputHost, signal: AbortSignal): void {
 	const pressed = new Set<number>()
 
 	const onKey = (e: KeyboardEvent, down: boolean): void => {
+		// Typing into a focused field must not drive the table, but releases
+		// always go through: a key let go over a field still clears its switch.
+		const tag = (document.activeElement?.tagName || '').toLowerCase()
+		if (down && (tag === 'input' || tag === 'textarea' || tag === 'select')) return
 		if (e.key === '?' || (e.key.length === 1 && ['h', 'o'].includes(e.key.toLowerCase()))) return
 
 		if (down && host.viewerMode === 'viewer' && (PLAY_CODES.has(e.code) || PLAY_CODES.has(e.key))) {
@@ -237,7 +247,10 @@ function attachKeyboardHost(host: InputHost, signal: AbortSignal): void {
 	document.addEventListener(
 		'visibilitychange',
 		() => {
-			if (document.hidden) host.releaseKeys(RELEASE_CODES)
+			if (document.hidden) {
+				pressed.clear()
+				host.releaseKeys(RELEASE_CODES)
+			}
 		},
 		{ signal },
 	)
