@@ -80,13 +80,22 @@ export class FlasherUpdater extends ItemUpdater<FlasherState> {
 					if (userData?.__uIntensity) userData.__uIntensity.value = intensity
 					if (userData?.__uFlat?.value?.set)
 						userData.__uFlat.value.set(this.state.color).multiplyScalar(intensity)
-					if (absorb) applyAbsorbBlendState(mat)
+					// Blend factors are static per flasher; revalidating the
+					// program every frame for identical state rebuilds shaders
+					// continuously. Uniform writes above need no invalidation.
+					if (absorb && !userData?.__absorbBlend) {
+						applyAbsorbBlendState(mat)
+						mat.needsUpdate = true
+					}
 				} else {
 					if (mat.color?.set) mat.color.set(this.state.color)
 					mat.opacity = Math.min(1, Math.max(0, alpha / 100))
-					mat.transparent = mat.opacity < 1
+					const transparent = mat.opacity < 1
+					if (mat.transparent !== transparent) {
+						mat.transparent = transparent
+						mat.needsUpdate = true
+					}
 				}
-				mat.needsUpdate = true
 			}
 		})
 	}

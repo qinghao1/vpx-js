@@ -44,6 +44,9 @@ export function createUnshadedBakedNodeMaterial(options: BakedNodeMaterialOption
 	const rebuild = (map: ThreeTexture | null): void => {
 		if (map) {
 			const texNode = texture(map, uv())
+			// Stashed for same-branch swaps (see setNodeMapSlot): rebinding
+			// the value in place skips the graph rebuild + revalidation.
+			;(mat.userData as Record<string, unknown>).__mapNodes = [texNode]
 			mat.colorNode = Fn(() => {
 				const texColor = texNode
 				// Upstream never dims the diffuse albedo: the global emission
@@ -89,6 +92,7 @@ export function createUnshadedBakedNodeMaterial(options: BakedNodeMaterialOption
 			// No texture by design (untextured solid): render the tint directly.
 			mat.colorNode = Fn(() => vec4(uTintColor, 1))()
 		}
+		if (!map) (mat.userData as Record<string, unknown>).__mapNodes = undefined
 	}
 	const userData = mat.userData as Record<string, unknown>
 	userData.__rebuild = rebuild

@@ -151,6 +151,24 @@ export function setNodeMapSlot(
 			return false
 		}
 	}
+	const prevMap = userData.__map as ThreeTexture | null | undefined
+	if (prevMap != null && nextMap !== null) {
+		// Same-branch swap (textured -> textured): the compiled program only
+		// depends on the branch, so rebind the stashed texture nodes in place
+		// instead of rebuilding the graph + revalidating. Cutout changes are
+		// still caught by the caller's restoreCutout, which invalidates alone.
+		// Without stashed nodes (e.g. JSON-cloned materials) fall through.
+		const nodes = userData.__mapNodes as { value: unknown }[] | undefined
+		if (
+			nodes?.length &&
+			(prevMap as { colorSpace?: unknown }).colorSpace === (nextMap as { colorSpace?: unknown }).colorSpace
+		) {
+			for (const node of nodes) node.value = nextMap
+			userData.__map = nextMap
+			if (name !== undefined) userData.__mapName = name
+			return false
+		}
+	}
 	userData.__map = nextMap
 	if (name !== undefined) userData.__mapName = name
 	if (typeof userData.__rebuild === 'function') (userData.__rebuild as (next: ThreeTexture | null) => void)(nextMap)

@@ -312,4 +312,66 @@ describe('material arrival: BDL uniforms survive streaming', () => {
 		expect(mat.userData.__uAlbedo.value.getHex(), 'albedo uniform untouched').toBe(0x112233)
 		expect(mat.userData.__uAlpha.value, 'alpha uniform untouched').toBe(0.5)
 	})
+
+	it('rebinds same-branch texture swaps without invalidating the program', () => {
+		// Lamp flicker swaps two cached textures every frame; rebuilding the
+		// node graph + revalidating the program per swap is pure overhead when
+		// the branch (map present) and cutout are unchanged.
+		const textures = new Map<string, DataTexture>([
+			['imagea', makeTex()],
+			['imageb', makeTex()],
+		])
+		const generator = makeGenerator(textures)
+		const mat: any = (generator as any).getMaterial(
+			{ name: 'SwapNoRebuild', baseColor: 0xffffff } as any,
+			'imagea',
+			undefined,
+			undefined,
+			undefined,
+			false,
+			0,
+			undefined,
+			false,
+			undefined,
+			0,
+		)
+		expect(mat.userData.__map, 'initial map bound').toBe(textures.get('imagea'))
+		const v0 = mat.version
+		generator.applyMap(mat, 'imageb')
+		expect(mat.userData.__map, 'swapped map bound').toBe(textures.get('imageb'))
+		expect(mat.version, 'same-branch swap must not revalidate the program').toBe(v0)
+		generator.applyMap(mat, 'imagea')
+		expect(mat.userData.__map, 'swapped back').toBe(textures.get('imagea'))
+		expect(mat.version, 'swap back must not revalidate either').toBe(v0)
+	})
+
+	it('still invalidates when a swap changes the alpha cutout', () => {
+		const texA = makeTex()
+		;(texA as any).userData = { alphaTestValue: 1 / 255 }
+		const texB = makeTex()
+		;(texB as any).userData = { alphaTestValue: 0.5 }
+		const textures = new Map<string, DataTexture>([
+			['imagea', texA],
+			['imageb', texB],
+		])
+		const generator = makeGenerator(textures)
+		const mat: any = (generator as any).getMaterial(
+			{ name: 'SwapCutout', baseColor: 0xffffff } as any,
+			'imagea',
+			undefined,
+			undefined,
+			undefined,
+			false,
+			0,
+			undefined,
+			false,
+			undefined,
+			1 / 255,
+		)
+		const v0 = mat.version
+		generator.applyMap(mat, 'imageb')
+		expect(mat.userData.__map, 'swapped map bound').toBe(texB)
+		expect(mat.alphaTest, 'cutout follows the arriving image').toBeCloseTo(0.5, 10)
+		expect(mat.version, 'cutout change must revalidate the program').toBeGreaterThan(v0)
+	})
 })

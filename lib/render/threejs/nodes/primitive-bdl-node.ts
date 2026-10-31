@@ -7,6 +7,8 @@ import {
 	FrontSide,
 	OneFactor,
 	OneMinusSrcAlphaFactor,
+	OneMinusSrcColorFactor,
+	ReverseSubtractEquation,
 	SrcAlphaFactor,
 	type Texture as ThreeTexture,
 	Vector2,
@@ -146,6 +148,35 @@ export interface PrimitiveAdditiveOptions {
 	alphaTestValue?: number
 	doubleSided?: boolean
 	depthBias?: number
+	/**
+	 * Native `m_modulate_vs_add` for AB_ADD flashers. When set, the overlay
+	 * uses the native modulate-vs-add composite (negatively-encoded output
+	 * under REVSUBTRACT, same scheme as the bulb glow) instead of plain
+	 * additive. When unset, the legacy plain-additive overlay stays.
+	 */
+	modulateVsAdd?: number
+}
+
+/**
+ * Native `m_modulate_vs_add` clamp (flasher.cpp, same 0.0001..0.9999 window as
+ * the bulb composite in bulb-glow-node.ts): avoids 0 (which disables the
+ * blend) and 1 (which reads wrong under day/night swings).
+ */
+function clampFlasherModulateVsAdd(value: number): number {
+	return Math.max(0.0001, Math.min(0.9999, value))
+}
+
+/**
+ * Per-channel native AB_ADD flasher composite (`fs_flasher.sc` under
+ * REVSUBTRACT with SRC_ALPHA/INV_SRC_COLOR): `dst + L·(1 − m·(1 − dst))`
+ * with `L = resultLight·resultA`, `resultLight = tint·texRgb`,
+ * `resultA = intensity·texAlpha`, emitted as the negative `−m·L` Sydney with
+ * src alpha `1/m − 1`.
+ */
+export function flasherAdditiveComposite(dst: number, resultLight: number, resultA: number, modulate: number): number {
+	const m = clampFlasherModulateVsAdd(modulate)
+	const s = m * resultA * resultLight
+	return dst * (1 + s) + s * (1 / m - 1)
 }
 
 // Single-sided fallback shared by every material path: converted VPX meshes are
@@ -188,6 +219,9 @@ export function createPrimitiveBdlMaterial(opts: PrimitiveBdlOptions): MeshStand
 			const texAlpha = texture(map, uv())
 			const texDiffuse = texture(map, uv())
 			const texTransmission = texture(map, uv())
+			// Stashed for same-branch swaps (see setNodeMapSlot): rebinding
+			// the values in place skips the graph rebuild + revalidation.
+			userData.__mapNodes = [texColor, texAlpha, texDiffuse, texTransmission]
 			mat.colorNode = Fn(() => texColor.rgb.mul(uAlbedo).mul(uLitF))()
 			mat.opacityNode = Fn(() => texAlpha.a.mul(uAlpha))()
 			mat.emissiveNode = Fn(() => {
@@ -219,6 +253,7 @@ export function createPrimitiveBdlMaterial(opts: PrimitiveBdlOptions): MeshStand
 			mat.opacityNode = Fn(() => uAlpha)()
 			mat.emissiveNode = Fn(() => uAlbedo.mul(uCarry))()
 		}
+		if (!map) userData.__mapNodes = undefined
 		mat.outputNode = null
 	}
 	userData.__rebuild = rebuild
@@ -283,6 +318,9 @@ export function createPrimitiveAdditiveMaterial(opts: PrimitiveAdditiveOptions):
 	const rebuild = (map: ThreeTexture | null): void => {
 		if (map) {
 			const tex = texture(map, uv())
+			// Stashed for same-branch swaps (see setNodeMapSlot): rebinding
+			// the value in place skips the graph rebuild + revalidation.
+			userData.__mapNodes = [tex]
 			// Native (primitive.cpp additive path + fs_unshaded.sc): staticColor is
 			// premultiplied (rgb = tint * alpha), result = staticColor * tex, blended
 			// SRC_ALPHA,ONE, so the framebuffer receives tint * tex * alpha^2. The rgb
@@ -300,6 +338,7 @@ export function createPrimitiveAdditiveMaterial(opts: PrimitiveAdditiveOptions):
 		} else {
 			mat.colorNode = uFlat
 		}
+		if (!map) userData.__mapNodes = undefined
 	}
 	userData.__rebuild = rebuild
 	const map = opts.map ?? null

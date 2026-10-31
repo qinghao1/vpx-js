@@ -6,7 +6,7 @@ import type { IRenderApi } from '../../render/irender-api.js'
 import { DragPoint } from '../dragpoint.js'
 import { Enums } from '../enums.js'
 import type { Mesh } from '../mesh.js'
-import { FlasherData } from './flasher-data.js'
+import { FlasherAddBlend, FlasherData } from './flasher-data.js'
 import { FlasherMeshGenerator } from './flasher-mesh-generator.js'
 import { FlasherState } from './flasher-state.js'
 import { FlasherUpdater } from './flasher-updater.js'
@@ -237,7 +237,49 @@ describe('The VPinball flasher mesh generator and updater', () => {
 		expect(node.visible).toBe(true)
 		expect(tintColor).toBe(0xff8844)
 		expect(targetMesh.material.userData.__uIntensity.value).toBeCloseTo((80 * 2) / 100, 1e-5)
-		expect(targetMesh.material.needsUpdate).toBe(true)
+		// Uniform-only updates never invalidate the program.
+		expect(targetMesh.material.needsUpdate).toBe(false)
+	})
+
+	it('should invalidate the program once for absorb blending, then stay stable', () => {
+		const data = createFlasherData('AbsorbFlasher')
+		data.addBlend = true
+		data.addBlendMode = FlasherAddBlend.Absorb
+		const state = FlasherState.claim('AbsorbFlasher', true, 0xff8844, 80)
+		const updater = new FlasherUpdater(state, data)
+
+		const material: any = { needsUpdate: false, userData: {} }
+		const node = {
+			visible: false,
+			traverse: (callback: (child: unknown) => void) => callback({ isMesh: true, material }),
+		}
+		const renderApi = new TestRenderApi() as unknown as IRenderApi<any, any, any>
+		const table = new TableBuilder().build()
+		updater.applyState(node, state, renderApi, table)
+		expect(material.needsUpdate).toBe(true)
+		expect(material.userData.__absorbBlend).toBe(true)
+
+		material.needsUpdate = false
+		updater.applyState(node, state, renderApi, table)
+		expect(material.needsUpdate).toBe(false)
+	})
+
+	it('should not invalidate the program when opacity values are unchanged', () => {
+		const data = createFlasherData('StableFlasher')
+		data.addBlend = false
+		const state = FlasherState.claim('StableFlasher', true, 0x112233, 50)
+		const updater = new FlasherUpdater(state, data)
+
+		const material: any = { color: { set: () => {} }, opacity: 0.5, transparent: true, needsUpdate: false }
+		const node = {
+			visible: false,
+			traverse: (callback: (child: unknown) => void) => callback({ isMesh: true, material }),
+		}
+		const renderApi = new TestRenderApi() as unknown as IRenderApi<any, any, any>
+		const table = new TableBuilder().build()
+		updater.applyState(node, state, renderApi, table)
+		expect(material.opacity).toBeCloseTo(0.5, 1e-5)
+		expect(material.needsUpdate).toBe(false)
 	})
 
 	it('should rebind the overlay texture when the script swaps ImageA', () => {
