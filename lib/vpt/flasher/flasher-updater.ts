@@ -142,6 +142,7 @@ export class FlasherUpdater extends ItemUpdater<FlasherState> {
 		// Empty string clears the slot; `undefined` would keep a stale bind
 		// (remote has no '' clear path — `!name` returns early there).
 		renderApi.applyMaterial(target as unknown as NODE, undefined, this.state.imageA)
+		if (this.state.imageA) noteTextureDemand(renderApi, this.state.imageA)
 	}
 
 	/** Regenerates the baked mesh when rotation/height changed, like upstream's dynamic vertex buffer. */
