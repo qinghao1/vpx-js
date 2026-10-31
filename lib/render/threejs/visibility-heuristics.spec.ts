@@ -36,6 +36,13 @@ describe('cabinet flipper visibility', () => {
 		expect(isInCabFlipper(named('primitive-VR_CabSideRail'))).to.be.false
 	})
 
+	it('needs both tokens on one name', () => {
+		const parent = named('VRCab_Cabinet')
+		const child = named('flipper.base-LeftFlipper')
+		parent.add(child)
+		expect(isInCabFlipper(child)).to.be.false
+	})
+
 	it('hide/show round-trips the underscore spelling', () => {
 		const root = new THREE.Group()
 		const cab = named('primitive-VR_CabFlipperLeft')

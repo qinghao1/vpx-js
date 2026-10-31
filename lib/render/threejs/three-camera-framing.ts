@@ -43,12 +43,11 @@ const MIN_ORBIT_SCALE = 0.05
 
 // vpinball ViewSetup::FitCameraToVertices() solves camera distance from
 // bounding-vertex slope intercepts (FOV/aspect) and centers on the fitted
-// set; upstream fits every part in legacy mode. This applies the same
+// set; upstream fits the legacy subset (primitives excluded). This applies the same
 // slope-intercept family to the playfield set for target and distance —
 // per-corner, with a 0.98 fill — so per-table cabinet furniture (coin door,
-// buttons, plunger trim) cannot move the play camera. Size still spans the
-// cabinet; the orbit overview keeps the maxDim-distance framing of the
-// whole machine.
+// buttons, plunger trim) cannot move the play camera. Size spans the
+// cabinet body; the orbit overview keeps the maxDim-distance framing.
 
 function framingBox(node: Object3D, exclude?: (name: string) => boolean): FramingBox {
 	node.updateMatrixWorld(true)
@@ -131,9 +130,10 @@ function framingState(
 	cfg: FramingConfig,
 	fit?: { fov: number; aspect: number },
 ): FramingState {
-	// When fitting, target and distance come from the playfield box, so
-	// furniture never steers the play camera. The orbit overview instead
-	// targets the wider playfield cluster (furniture included).
+	// When the fit solves, target and distance come from the playfield box,
+	// so furniture never steers the play camera (the maxDim fallback still
+	// sizes from the cabinet). The orbit overview instead targets the wider
+	// playfield cluster (furniture included).
 	const centerBox = fit ? framingBox(node, excludeNonPlaySurface) : framingBox(node, targetExclude)
 	const target = centerBox.center.clone()
 	const { size, maxDim } = framingBox(node, sizeExclude)

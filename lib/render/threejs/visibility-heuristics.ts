@@ -26,8 +26,8 @@ export function isInCabFlipper(obj: THREE.Object3D): boolean {
 	for (let cur: THREE.Object3D | null = obj; cur; cur = cur.parent) {
 		// Fold separators, then require `vrcab` and `flipper` co-occurring
 		// on one ancestor-or-self name (`vrcab`, `vr_cab`, `vr-cab`, ...).
-		// The `flipper` conjunction is the guard: bare cabinet names never
-		// match.
+		// The `flipper` conjunction is the guard: a bare cabinet name alone
+		// never matches.
 		const flat = flatName(cur.name ?? '')
 		if (flat.includes('vrcab') && flat.includes('flipper')) return true
 	}

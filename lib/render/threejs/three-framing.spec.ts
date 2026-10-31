@@ -130,17 +130,20 @@ describe('regression: framing keeps DMD and full playfield visible', () => {
 		expect(viewerCabined.maxDim, 'viewer keeps sizing the whole machine').to.be.greaterThan(viewerPlain.maxDim)
 	})
 
-	it('degenerate optics fall back to a finite distance', () => {
+	it('degenerate optics fall back to the full cabinet distance', () => {
 		const group = buildWalkingDeadGroup()
 		for (const view of [
 			{ fov: 0, aspect: 16 / 9 },
+			{ fov: -45, aspect: 16 / 9 },
+			{ fov: NaN, aspect: 16 / 9 },
 			{ fov: 45, aspect: 0 },
 			{ fov: 45, aspect: -1 },
+			{ fov: 45, aspect: NaN },
 		]) {
 			const state = computePlayFraming(group, view)
 			const dist = state.position.distanceTo(state.target)
 			expect(dist, `fallback dist for ${JSON.stringify(view)}`).to.be.finite
-			expect(dist, `fallback dist for ${JSON.stringify(view)}`).to.be.greaterThan(0)
+			expect(dist, `fallback dist for ${JSON.stringify(view)}`).to.be.closeTo(state.maxDim, 1e-6)
 		}
 	})
 
@@ -154,6 +157,10 @@ describe('regression: framing keeps DMD and full playfield visible', () => {
 		const play = computePlayFraming(group, { fov: 45, aspect: 16 / 9 })
 		const plain = computePlayFraming(buildWalkingDeadGroup(), { fov: 45, aspect: 16 / 9 })
 		expect(play.position.distanceTo(plain.position), 'hyphenated cab must not move the play camera').to.be.closeTo(
+			0,
+			1e-6,
+		)
+		expect(play.target.distanceTo(plain.target), 'hyphenated cab must not move the play target').to.be.closeTo(
 			0,
 			1e-6,
 		)
