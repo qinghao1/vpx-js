@@ -414,6 +414,13 @@ describe('The VpmController - VISUAL PINMAME COM OBJECT', () => {
 		expect(setSwitchInputSpy.args[0]).to.deep.equal([11, false])
 	})
 
+	it('validate setSwitchInput treats VBS True-as--1 as an explicit press', () => {
+		// VBS `Not x` normalizes to -1/0, so coin-door writes like
+		// `.Switch(swCopy) = Not .Switch(swCopy)` arrive as -1, not true.
+		vpmController.Switch[8] = -1
+		expect(setSwitchInputSpy.args[0]).to.deep.equal([8, true])
+	})
+
 	it('should drop a Switch write with an Empty index instead of throwing a falsish-trap TypeError', () => {
 		// cvpmBallStack.SetSw: an unassigned trough slot leaves mSwcopy Empty, so
 		// `Controller.Switch(mSwcopy) = ...` indexes with Empty (an "undefined" key).

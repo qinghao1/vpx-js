@@ -53,7 +53,10 @@ export class VpmController {
 				return this.emulator.getSwitchInput(i) ? -1 : 0
 			},
 			(n, raw) => {
-				const v = raw === 1 || raw === true ? true : raw === 0 || raw === false ? false : undefined
+				// VBS True is -1, and `Not x` normalizes to -1/0, so a computed
+				// press (`.Switch(n) = Not .Switch(n)`) arrives as -1, not true.
+				const v =
+					raw === 1 || raw === true || raw === -1 ? true : raw === 0 || raw === false ? false : undefined
 				if (v === true) this.switchCache.set(n, true)
 				else if (v === false) this.switchCache.set(n, false)
 				else if (v === undefined) this.switchCache.delete(n)

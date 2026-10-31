@@ -36,8 +36,10 @@ export const locationForCode = (code: string): number | undefined =>
 	code.endsWith('Left') ? 1 : code.endsWith('Right') ? 2 : undefined
 
 // Every gameplay code that must never stick down across blur/hide/exit-play:
-// modifiers plus plunger (Enter) and nudge keys. Blur/hide/exit-play release
-// this whole list so a key held during focus loss cannot stay logically down.
+// modifiers, plunger (Enter), nudge keys, and the coin-door/service cluster
+// (7/8/9/0, End, Home) whose switches would otherwise latch the game in test
+// menus. Blur/hide/exit-play release this whole list so a key held during
+// focus loss cannot stay logically down.
 export const RELEASE_CODES = [
 	'ShiftLeft',
 	'ShiftRight',
@@ -49,6 +51,12 @@ export const RELEASE_CODES = [
 	'KeyZ',
 	'Slash',
 	'Space',
+	'Digit7',
+	'Digit8',
+	'Digit9',
+	'Digit0',
+	'End',
+	'Home',
 ]
 
 export interface InputHost {
