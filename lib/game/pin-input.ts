@@ -189,6 +189,10 @@ export class PinInput {
 		// Mapped Start key only: a hardcoded DIK_1 here would keep the physical
 		// "1" key acting as Start after the user remaps StartGameKey elsewhere.
 		if (code !== this.getKey(AssignKey.StartGameKey)) return
+		// Script-owned KeyDown (fired above) serves scripted troughs via Drain.Kick;
+		// mock-kicking here too would release a second ball. Script-less tables
+		// (no KeyDown listener) still fall through, including the empty-trough fallback.
+		if (this.table.getApi().listenerCount('KeyDown') > 0) return
 		const emu = this.player.getPhysics().emu as unknown as {
 			isMock?: boolean
 			isInitialized?: () => boolean

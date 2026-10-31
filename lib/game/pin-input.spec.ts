@@ -195,9 +195,10 @@ describe('free-play helpers (vpx-js-only)', () => {
 		expect(scope.keyDown).to.be.equal(player.getKey(AssignKey.AddCreditKey))
 	})
 
-	function setupTroughKick(): { player: Player; kicks: Array<[number, number]> } {
-		const table = new TableBuilder().withTableScript(coinScript).addKicker('TroughExit').build('Table1')
-		const player = new Player(table).init({})
+	function setupTroughKick(script = ''): { player: Player; kicks: Array<[number, number]>; scope: any } {
+		const table = new TableBuilder().withTableScript(script).addKicker('TroughExit').build('Table1')
+		const scope: any = {}
+		const player = new Player(table).init(scope)
 		player.getPhysics().emu = fakeEmu([])
 		const kickers = Object.values(table.kickers) as unknown as Array<{
 			hit?: { ball?: unknown }
@@ -211,7 +212,7 @@ describe('free-play helpers (vpx-js-only)', () => {
 		kicker.getApi().Kick = (angle: number, speed: number) => {
 			kicks.push([angle, speed])
 		}
-		return { player, kicks }
+		return { player, kicks, scope }
 	}
 
 	function pressStart(player: Player): void {
@@ -223,6 +224,29 @@ describe('free-play helpers (vpx-js-only)', () => {
 		const { player, kicks } = setupTroughKick()
 		pressStart(player)
 		expect(kicks).to.deep.equal([[60, 10]])
+	})
+
+	it('does not mock-kick a script-served trough on start', () => {
+		// Scripted tables serve via their own Drain.Kick (no upstream
+		// equivalent exists): the Start press below reaches the script, so
+		// the mock must not loose a second ball behind it.
+		const scripted = 'Sub Table1_KeyDown(ByVal keycode)\nkeyDown = keycode\nEnd Sub\n'
+		const { player, kicks, scope } = setupTroughKick(scripted)
+		pressStart(player)
+		expect(scope.keyDown).to.be.equal(player.getKey(AssignKey.StartGameKey))
+		expect(kicks).to.deep.equal([])
+	})
+
+	it('lets script presence win even when its handler ignores Start', () => {
+		// The gate keys on handler presence, not on Start being served: a
+		// flipper-only script still suppresses the mock (whose untracked ball
+		// the script would never know about).
+		// Start arrives as keycode 2 (DIK_1); guard on 4 so the handler ignores it.
+		const flipperOnly = 'Sub Table1_KeyDown(ByVal keycode)\nif keycode = 4 then keyDown = keycode\nEnd Sub\n'
+		const { player, kicks, scope } = setupTroughKick(flipperOnly)
+		pressStart(player)
+		expect(scope.keyDown).to.be.equal(undefined)
+		expect(kicks).to.deep.equal([])
 	})
 
 	it('does not eject a trough ball when free play is disabled', () => {
