@@ -607,9 +607,7 @@ export class Grammar {
 					hadSep = false
 					continue
 				}
-				// `&` starts a hex/octal literal only when `&H`/`&O` is followed by a
-				// valid digit; otherwise it is the string-concatenation operator
-				// (e.g. `"1> " &HighScoreName(0)` or `"a" &Orange`).
+				// `&H`/`&O` without a following digit is the `&` concatenation operator.
 				const isHexStart =
 					ch === '&' && i + 2 < n && /[Hh]/.test(raw[i + 1]!) && /[0-9A-Fa-f]/.test(raw[i + 2]!)
 				const isOctalStart = ch === '&' && i + 2 < n && /[Oo]/.test(raw[i + 1]!) && /[0-7]/.test(raw[i + 2]!)
@@ -623,8 +621,8 @@ export class Grammar {
 					if (isHexStart || isOctalStart) {
 						num += raw[i]! + raw[i + 1]!
 						i += 2
-						const digit = isHexStart ? /[0-9A-Fa-f]/ : /[0-7]/
-						while (i < n && digit.test(raw[i]!)) {
+						const digitRe = isHexStart ? /[0-9A-Fa-f]/ : /[0-7]/
+						while (i < n && digitRe.test(raw[i]!)) {
 							num += raw[i]!
 							i++
 						}

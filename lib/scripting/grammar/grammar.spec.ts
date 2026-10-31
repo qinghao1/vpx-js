@@ -58,8 +58,6 @@ describe('The scripting grammar - format', () => {
 	})
 
 	it('should keep & as concat before identifiers starting with H or O', () => {
-		// Space Cadet: `"1> " &HighScoreName(0)` — `&H` without a hex digit
-		// is the concat operator, not a hex literal.
 		expect(grammar.format(`x = "1> " &HighScoreName(0)`)).to.equal(`x="1> "&HighScoreName(0)\n`)
 		expect(grammar.format(`x = "a" &Orange`)).to.equal(`x="a"&Orange\n`)
 	})

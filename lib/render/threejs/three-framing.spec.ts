@@ -137,9 +137,7 @@ describe('regression: framing keeps DMD and full playfield visible', () => {
 	})
 
 	it('non-table scenery is excluded from sizing whatever it is named', () => {
-		// Sizing sees the playfield cluster plus the cabinet only, so room
-		// and diorama pieces need no `vr`/`sky` token to stay out of the
-		// frame — these names are deliberately token-free.
+		// Token-free names: exclusion holds by construction, not by token.
 		for (const framing of [computePlayFraming, computeViewerFraming]) {
 			const withSky = buildWalkingDeadGroup()
 			withSky.add(
@@ -155,8 +153,6 @@ describe('regression: framing keeps DMD and full playfield visible', () => {
 	})
 
 	it('applied camera state keeps the orbit inside the framed world', () => {
-		// Unbounded dolly-out parks the camera outside room/skybox shells,
-		// where a dark exterior fills the view.
 		const group = buildWalkingDeadGroup()
 		const state = computeViewerFraming(group)
 		const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 4000)

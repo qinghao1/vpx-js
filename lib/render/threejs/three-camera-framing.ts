@@ -31,9 +31,19 @@ type FramingState = {
 	far: number
 }
 
+type FramingControls = {
+	target: Vector3
+	update: () => void
+	maxDistance?: number
+	minDistance?: number
+}
+
+const MAX_ORBIT_SCALE = 3
+const MIN_ORBIT_SCALE = 0.05
+
 // vpinball: ViewSetup.cpp FitCameraToVertices() frames table via bounding vertices + FOV.
 // Demo heuristic mimics that without ViewSetup table data: use THREE.Box3 of visible meshes.
-// Center on playfield/apron/button cluster (excludeNonPlayfield), size from cabinet-excluded box.
+// Center on the playfield cluster; size from the table (cluster plus cabinet).
 // Threading the live table data (inclination/rotation/FOV via ComputeMVP) through is a follow-up.
 function framingBox(node: Object3D, exclude?: (name: string) => boolean): FramingBox {
 	node.updateMatrixWorld(true)
@@ -89,9 +99,7 @@ function framingState(
 	}
 }
 
-// Camera sizing sees the table only: the playfield cluster plus the cabinet
-// that encloses it. Legs, supports, VR-room and diorama scenery are sized
-// out by construction, whatever individual pieces happen to be named.
+// Size from the table only, so room scenery cannot inflate the frame.
 const excludeNonTable = (name: string): boolean => excludeNonPlayfield(name) && !RE_CAB.test(name)
 
 export const computeViewerFraming = (node: Object3D): FramingState =>
@@ -100,29 +108,24 @@ export const computeViewerFraming = (node: Object3D): FramingState =>
 export const computePlayFraming = (node: Object3D): FramingState =>
 	framingState(node, excludeNonPlayfield, excludeNonTable, PLAY)
 
-export function applyCameraState(
-	camera: PerspectiveCamera,
-	controls: { target: Vector3; update: () => void; maxDistance?: number; minDistance?: number },
-	state: FramingState,
-): void {
+export function applyCameraState(camera: PerspectiveCamera, controls: FramingControls, state: FramingState): void {
 	controls.target.copy(state.target)
 	camera.position.copy(state.position)
 	camera.near = state.near
 	camera.far = state.far
 	camera.updateProjectionMatrix()
 	camera.lookAt(state.target)
-	// Keep the orbit inside the authored world: unbounded dolly-out parks the
-	// camera outside room/skybox shells, where a dark exterior fills the view.
+	// Unbounded dolly-out leaves the authored world, showing its dark exterior.
 	const dist = state.position.distanceTo(state.target)
-	controls.maxDistance = dist * 3
-	controls.minDistance = Math.max(state.near, dist * 0.05)
+	controls.maxDistance = dist * MAX_ORBIT_SCALE
+	controls.minDistance = Math.max(state.near, dist * MIN_ORBIT_SCALE)
 	controls.update()
 }
 
 export function frameCamera(
 	node: Object3D,
 	camera: PerspectiveCamera,
-	controls: { target: Vector3; update: () => void; maxDistance?: number; minDistance?: number },
+	controls: FramingControls,
 ): Pick<FramingState, 'center' | 'size' | 'maxDim'> {
 	const state = computeViewerFraming(node)
 	applyCameraState(camera, controls, state)
