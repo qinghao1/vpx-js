@@ -31,6 +31,11 @@ describe('cabinet flipper visibility', () => {
 		expect(isInCabFlipper(named('primitive-LM_GI_GI_2_FlipperT5'))).to.be.false
 	})
 
+	it('leaves bare cabinet names alone', () => {
+		expect(isInCabFlipper(named('VRCab_Cabinet'))).to.be.false
+		expect(isInCabFlipper(named('primitive-VR_CabSideRail'))).to.be.false
+	})
+
 	it('hide/show round-trips the underscore spelling', () => {
 		const root = new THREE.Group()
 		const cab = named('primitive-VR_CabFlipperLeft')

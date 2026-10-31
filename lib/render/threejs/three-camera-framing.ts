@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { Box3, type Mesh, type Object3D, type PerspectiveCamera, Vector3 } from 'three'
-import { RE_CAB } from './scene-classify.js'
+import { flatName, RE_CAB } from './scene-classify.js'
 
 type FramingBox = {
 	box: Box3
@@ -43,15 +43,12 @@ const MIN_ORBIT_SCALE = 0.05
 
 // vpinball ViewSetup::FitCameraToVertices() solves camera distance from
 // bounding-vertex slope intercepts (FOV/aspect) and centers on the fitted
-// set; upstream fits every part in legacy mode. This applies the same math
-// to the playfield set only, so per-table cabinet furniture (coin door,
+// set; upstream fits every part in legacy mode. This applies the same
+// slope-intercept family to the playfield set for target and distance —
+// per-corner, with a 0.98 fill — so per-table cabinet furniture (coin door,
 // buttons, plunger trim) cannot move the play camera. Size still spans the
-// cabinet; the orbit overview keeps the previous maxDim-distance framing of
-// the whole machine.
-
-// Author spellings vary (`vrcab` vs `vr_cab`, hyphens); fold separators so
-// token tests see one canonical form.
-const flatName = (name: string): string => name.toLowerCase().replace(/[_-]/g, '')
+// cabinet; the orbit overview keeps the maxDim-distance framing of the
+// whole machine.
 
 function framingBox(node: Object3D, exclude?: (name: string) => boolean): FramingBox {
 	node.updateMatrixWorld(true)
@@ -81,7 +78,9 @@ const excludeNonPlayfield = (name: string): boolean =>
 	!name.includes('apron')
 
 // Centering and distance set for the play camera: playfield-named meshes
-// only, so cabinet furniture stays out by design.
+// only, so cabinet furniture stays out by design. (The looser playfield
+// cluster above also feeds the orbit overview, which keeps furniture in
+// frame by design.)
 const excludeNonPlaySurface = (name: string): boolean => !name.includes('playfield')
 
 const VIEWER: FramingConfig = { dist: 1.2, elev: 0.85, azim: 0.65, near: 0.015, farScale: 8, farMin: 2000 }
@@ -92,7 +91,7 @@ const PLAY: FramingConfig = {
 	near: 0.012,
 	farScale: 10,
 	farMin: 4000,
-	forwardBias: -0.07, // down-table (toward the backbox), in target-box depths.
+	forwardBias: -0.07, // toward the backbox (up-table, -Z), in target-box depths.
 }
 
 // Playfield surface fills the frame (NDC half-extent 1): every table renders
@@ -105,6 +104,8 @@ const PLAY_FILL = 0.98
 // Closed-form pinhole solve: each box corner requires
 // dist >= perp / (PLAY_FILL * tan) + depth; the max over corners fits them all.
 function fitDistance(box: Box3, target: Vector3, dir: Vector3, tanHalfFov: number, aspect: number): number {
+	// Degenerate optics solve nothing: the caller falls back to maxDim dist.
+	if (!(tanHalfFov > 0) || !(aspect > 0)) return NaN
 	const forward = dir.clone().negate()
 	const right = new Vector3().crossVectors(forward, new Vector3(0, 1, 0))
 	if (right.lengthSq() < 1e-6) right.set(1, 0, 0)
@@ -130,8 +131,9 @@ function framingState(
 	cfg: FramingConfig,
 	fit?: { fov: number; aspect: number },
 ): FramingState {
-	// Camera target: the playfield box when fitting, else the playfield
-	// cluster. Either way furniture never steers the play camera.
+	// When fitting, target and distance come from the playfield box, so
+	// furniture never steers the play camera. The orbit overview instead
+	// targets the wider playfield cluster (furniture included).
 	const centerBox = fit ? framingBox(node, excludeNonPlaySurface) : framingBox(node, targetExclude)
 	const target = centerBox.center.clone()
 	const { size, maxDim } = framingBox(node, sizeExclude)
@@ -157,7 +159,7 @@ function framingState(
 
 // Size covers the cabinet (keep-token table meshes plus RE_CAB cabinetry)
 // so the room has a stable anchor; anything else is excluded by default and
-// room scenery cannot inflate the frame.
+// token-free room scenery cannot inflate the frame.
 const excludeNonTable = (name: string): boolean => excludeNonPlayfield(name) && !RE_CAB.test(name)
 
 export const computeViewerFraming = (node: Object3D): FramingState =>

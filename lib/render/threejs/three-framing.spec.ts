@@ -130,6 +130,35 @@ describe('regression: framing keeps DMD and full playfield visible', () => {
 		expect(viewerCabined.maxDim, 'viewer keeps sizing the whole machine').to.be.greaterThan(viewerPlain.maxDim)
 	})
 
+	it('degenerate optics fall back to a finite distance', () => {
+		const group = buildWalkingDeadGroup()
+		for (const view of [
+			{ fov: 0, aspect: 16 / 9 },
+			{ fov: 45, aspect: 0 },
+			{ fov: 45, aspect: -1 },
+		]) {
+			const state = computePlayFraming(group, view)
+			const dist = state.position.distanceTo(state.target)
+			expect(dist, `fallback dist for ${JSON.stringify(view)}`).to.be.finite
+			expect(dist, `fallback dist for ${JSON.stringify(view)}`).to.be.greaterThan(0)
+		}
+	})
+
+	it('hyphenated cabinet names size the viewer but not the play camera', () => {
+		const group = buildWalkingDeadGroup()
+		group.add(
+			makeMesh('primitive-VR-Cab_CabinetTall', new THREE.BoxGeometry(60, 220, 40), new THREE.Vector3(0, 90, -70)),
+		)
+		group.updateMatrixWorld(true)
+		expect(computeViewerFraming(group).maxDim, 'hyphenated cab still sizes the viewer').to.be.greaterThan(210.6)
+		const play = computePlayFraming(group, { fov: 45, aspect: 16 / 9 })
+		const plain = computePlayFraming(buildWalkingDeadGroup(), { fov: 45, aspect: 16 / 9 })
+		expect(play.position.distanceTo(plain.position), 'hyphenated cab must not move the play camera').to.be.closeTo(
+			0,
+			1e-6,
+		)
+	})
+
 	it('a table with no playfield-named mesh still frames finitely', () => {
 		const root = new THREE.Group()
 		root.add(makeMesh('VRCab_Cabinet', new THREE.BoxGeometry(60, 120, 210), new THREE.Vector3(0, 20, 0)))

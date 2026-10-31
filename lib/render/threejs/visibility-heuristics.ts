@@ -4,6 +4,7 @@ import { isBulbGlowMaterial } from './nodes/bulb-glow-node.js'
 import {
 	type CustomMaterialUserData,
 	classify,
+	flatName,
 	isBakedPlayfield,
 	isBasePlayfield,
 	pendingOf,
@@ -23,9 +24,12 @@ export const RE_KEEP_WHITE = new RegExp(`${RE_KEEP_DARK.source}|bm_|primitive|ru
 
 export function isInCabFlipper(obj: THREE.Object3D): boolean {
 	for (let cur: THREE.Object3D | null = obj; cur; cur = cur.parent) {
-		// Authors spell the cabinet prefix `vrcab`, `vr_cab`, `vr-cab`, ...
-		const nameLower = (cur.name ?? '').toLowerCase().replace(/[_-]/g, '')
-		if (nameLower.includes('vrcab') && nameLower.includes('flipper')) return true
+		// Fold separators, then require `vrcab` and `flipper` co-occurring
+		// on one ancestor-or-self name (`vrcab`, `vr_cab`, `vr-cab`, ...).
+		// The `flipper` conjunction is the guard: bare cabinet names never
+		// match.
+		const flat = flatName(cur.name ?? '')
+		if (flat.includes('vrcab') && flat.includes('flipper')) return true
 	}
 	return false
 }

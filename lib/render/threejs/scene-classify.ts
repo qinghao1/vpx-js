@@ -6,6 +6,10 @@ export { RE_BAKE_MAP, RE_BAKE_MAT, RE_VR }
 export const RE_ALPHA_MESH = /armp|ramp|bat_|non[_-]?opaque|plastic|gate/i
 export const RE_CAB = /vr_?cab|cabinet|lockbar|pincab|backbox|coin_?door/i
 
+// Author spellings vary (`vrcab` vs `vr_cab`, hyphens); fold separators so
+// token tests see one canonical form.
+export const flatName = (name: string): string => name.toLowerCase().replace(/[_-]/g, '')
+
 /**
  * VR-room or cabinet content by node name. The viewer keeps these visible
  * despite script-driven hides (desktop VR tables hide their room via
