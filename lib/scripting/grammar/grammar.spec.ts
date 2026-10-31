@@ -56,6 +56,18 @@ describe('The scripting grammar - format', () => {
 		const js = grammar.format(vbs)
 		expect(js).to.equal(`x=x+5\nx=x+10\n`)
 	})
+
+	it('should keep & as concat before identifiers starting with H or O', () => {
+		// Space Cadet: `"1> " &HighScoreName(0)` — `&H` without a hex digit
+		// is the concat operator, not a hex literal.
+		expect(grammar.format(`x = "1> " &HighScoreName(0)`)).to.equal(`x="1> "&HighScoreName(0)\n`)
+		expect(grammar.format(`x = "a" &Orange`)).to.equal(`x="a"&Orange\n`)
+	})
+
+	it('should still lex genuine &H/&O literals', () => {
+		expect(grammar.format(`x = &HFF`)).to.equal(`x=&HFF\n`)
+		expect(grammar.format(`x = &O17`)).to.equal(`x=&O17\n`)
+	})
 })
 
 describe('The scripting grammar - transpile', () => {
@@ -74,6 +86,11 @@ describe('The scripting grammar - transpile', () => {
 		const vbs = `SLLPos=0:Me.TimerEnabled=1:\n`
 		const js = grammar.vbsToJs(vbs)
 		expect(js).to.equal(`SLLPos = 0;\nthis.TimerEnabled = 1;`)
+	})
+
+	it('should transpile & concat before identifiers starting with H or O', () => {
+		expect(() => grammar.transpile(`x = "1> " &HighScoreName(0)`)).not.to.throw(Error)
+		expect(() => grammar.transpile(`x = "a" &Orange`)).not.to.throw(Error)
 	})
 })
 
