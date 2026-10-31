@@ -10,10 +10,15 @@ export function initHelp(viewer) {
 
 	const grid = help.querySelector('.help-grid')
 	if (grid && !grid.dataset.populated) {
-		grid.innerHTML = CONTROL_SCHEME.map(
-			c =>
-				`<div class="help-row"><span class="help-label">${c.label}</span><span class="help-keys">${c.help}</span></div>`,
-		).join('')
+		let section = ''
+		grid.innerHTML = CONTROL_SCHEME.map(c => {
+			let head = ''
+			if (c.section && c.section !== section) {
+				section = c.section
+				head = `<div class="help-section">${section}</div>`
+			}
+			return `${head}<div class="help-row"><span class="help-label">${c.label}</span><span class="help-keys">${c.help}</span></div>`
+		}).join('')
 		grid.dataset.populated = '1'
 	}
 

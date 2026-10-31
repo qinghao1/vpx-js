@@ -33,6 +33,7 @@ export const NUDGE = { left: 75, right: 285, forward: 0, back: 180, force: 2.6 }
 export const CONTROL_SCHEME = [
 	{
 		label: 'Left Flipper',
+		section: 'Play',
 		help: '<kbd>Shift</kbd><span class="hint">L</span> <span class="sep">·</span> <kbd>←</kbd><span class="sep">·</span><kbd>A</kbd>',
 		keys: ['ShiftLeft', 'ArrowLeft', 'KeyA'],
 	},
@@ -78,7 +79,19 @@ export const CONTROL_SCHEME = [
 		keys: ['KeyZ', 'Slash', 'Space'],
 	},
 	{
+		label: 'Coin Door',
+		section: 'Service',
+		help: '<kbd>End</kbd><span class="hint">open / close</span><span class="sep">·</span><kbd>Home</kbd><span class="hint">slam tilt</span>',
+		keys: ['End', 'Home'],
+	},
+	{
+		label: 'Service',
+		help: '<kbd>7</kbd><span class="hint">cancel</span><span class="sep">·</span><kbd>8</kbd><span class="hint">down / advance</span><span class="sep">·</span><kbd>9</kbd><span class="hint">up</span><span class="sep">·</span><kbd>0</kbd><span class="hint">enter</span>',
+		keys: ['Digit7', 'Digit8', 'Digit9', 'Digit0'],
+	},
+	{
 		label: 'Sound',
+		section: 'App',
 		help: '<kbd>M</kbd> mute<span class="sep">·</span>slider for volume',
 		keys: ['KeyM'],
 	},

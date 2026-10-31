@@ -835,6 +835,19 @@ dialog.help::backdrop {
 	flex-direction: column;
 	gap: 8px;
 }
+#help .help-section,
+.help .help-section {
+	font-size: 10px;
+	font-weight: 700;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--muted);
+	padding-top: 4px;
+}
+#help .help-section:first-child,
+.help .help-section:first-child {
+	padding-top: 0;
+}
 #help .help-row,
 .help .help-row {
 	display: grid;
