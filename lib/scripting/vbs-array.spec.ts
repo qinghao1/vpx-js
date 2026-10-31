@@ -5,7 +5,7 @@ import * as chai from 'chai'
 import { expect } from 'chai'
 import sinonChai from 'sinon-chai'
 import { ERR, VbsError } from './stdlib/err.js'
-import { VbsArray } from './vbs-array.js'
+import { isIntKey, isVbsArray, VbsArray } from './vbs-array.js'
 import { VbsUndefined } from './vbs-undefined.js'
 
 chai.use((sinonChai as any).default ?? sinonChai)
@@ -135,5 +135,39 @@ describe('The VBScript array', () => {
 		} finally {
 			ERR.OnErrorResumeNext()
 		}
+	})
+
+	it('should accept exactly the integer subscripts of /^-?\\d+$/', () => {
+		const accepted = ['0', '7', '42', '007', '-0', '-3', '1234567890']
+		const rejected = [
+			'',
+			'-',
+			' ',
+			' 12',
+			'+12',
+			'1e3',
+			'0x10',
+			'12.5',
+			'1_2',
+			'abc',
+			'Item',
+			'length',
+			'NaN',
+			'Infinity',
+		]
+		for (const key of accepted) expect(isIntKey(key), key).to.equal(true)
+		for (const key of rejected) expect(isIntKey(key), key).to.equal(false)
+		for (const key of [...accepted, ...rejected]) {
+			expect(isIntKey(key), key).to.equal(/^-?\d+$/.test(key))
+		}
+	})
+
+	it('should brand only its own proxies', () => {
+		const arr = new VbsArray([1, 2, 3])
+		expect(isVbsArray(arr)).to.equal(true)
+		expect(isVbsArray([1, 2, 3])).to.equal(false)
+		expect(isVbsArray({ 0: 1, length: 1 })).to.equal(false)
+		expect(isVbsArray(null)).to.equal(false)
+		expect(isVbsArray(7)).to.equal(false)
 	})
 })

@@ -5,7 +5,7 @@ import { ERR, VbsError } from './stdlib/err.js'
 import { isNothing } from './stdlib/index.js'
 import type { Transpiler } from './transpiler.js'
 import { boundedSet } from './transpiler-worker-pool.js'
-import { VbsArray } from './vbs-array.js'
+import { isVbsArray, VbsArray } from './vbs-array.js'
 import { UNDEF, VbsUndefined } from './vbs-undefined.js'
 import {
 	bankersRound,
@@ -483,7 +483,9 @@ export class VBSHelper {
 		// Default-member call (`Coll(i)`): ICollection.Item is the only
 		// DISPID_VALUE in vpinball.idl, so a callable `.Item` is the default
 		// member; routing through it keeps native bounds checks (RangeError, native error 9).
-		if (params.length > 0) {
+		// VbsArray never carries a callable Item, and probing it pays a full
+		// miss (two thunk closures plus a VbsUndefined) on every indexed access.
+		if (params.length > 0 && !isVbsArray(value)) {
 			const item = (value as Record<string, unknown> | null | undefined)?.Item
 			if (typeof item === 'function') return Reflect.apply(item as (...a: unknown[]) => unknown, value, params)
 		}

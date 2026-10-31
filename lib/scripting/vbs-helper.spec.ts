@@ -9,6 +9,7 @@ import { Player } from '../game/player.js'
 import { ERR, VbsError } from './stdlib/err.js'
 import { Stdlib } from './stdlib/index.js'
 import { Transpiler } from './transpiler.js'
+import { VbsArray } from './vbs-array.js'
 import { VBSHelper } from './vbs-helper.js'
 import { VbsUndefined } from './vbs-undefined.js'
 
@@ -619,5 +620,24 @@ describe('The scripting VBS Helper', () => {
 		ERR.Clear()
 		expect(await vbsHelper.transpileInlineAsync('1 +')).to.equal('undefined')
 		expect(ERR.Number).to.equal(1002)
+	})
+
+	it('should route parameterized access through a callable default Item member', () => {
+		const calls: unknown[][] = []
+		const coll = {
+			Item: (...args: unknown[]) => {
+				calls.push(args)
+				return args[0]
+			},
+		}
+		expect(vbsHelper.getOrCall(coll, 7)).to.equal(7)
+		expect(calls).to.deep.equal([[7]])
+	})
+
+	it('should index VbsArray directly without invoking a stored Item', () => {
+		const arr = new VbsArray([10, 20, 30]) as any
+		arr.Item = 'not-callable'
+		expect(vbsHelper.getOrCall(arr, 1)).to.equal(20)
+		expect(vbsHelper.getOrCall(arr, 1, 0)).to.be.an.instanceof(VbsUndefined)
 	})
 })
