@@ -24,7 +24,7 @@ describe('The scripting event transformer', () => {
 		const vbs = `Sub WireRectangle_Init()\nBallRelease.CreateBall\nEnd Sub\n`
 		const js = transform(vbs, table)
 		expect(js).to.equal(
-			`WireRectangle.on('Init', WireRectangle_Init = function () {\n    BallRelease.CreateBall();\n});`,
+			`WireRectangle.on('Init', WireRectangle_Init = function () {\n    BallRelease.CreateBall();\n}.bind(WireRectangle));`,
 		)
 	})
 
@@ -32,7 +32,7 @@ describe('The scripting event transformer', () => {
 		const vbs = `Sub Wire_Rectangle_Init()\nBallRelease.CreateBall\nEnd Sub\n`
 		const js = transform(vbs, table)
 		expect(js).to.equal(
-			`Wire_Rectangle.on('Init', Wire_Rectangle_Init = function () {\n    BallRelease.CreateBall();\n});`,
+			`Wire_Rectangle.on('Init', Wire_Rectangle_Init = function () {\n    BallRelease.CreateBall();\n}.bind(Wire_Rectangle));`,
 		)
 	})
 
@@ -40,7 +40,7 @@ describe('The scripting event transformer', () => {
 		const vbs = `Sub WireRectangle_init()\nBallRelease.CreateBall\nEnd Sub\n`
 		const js = transform(vbs, table)
 		expect(js).to.equal(
-			`WireRectangle.on('Init', WireRectangle_init = function () {\n    BallRelease.CreateBall();\n});`,
+			`WireRectangle.on('Init', WireRectangle_init = function () {\n    BallRelease.CreateBall();\n}.bind(WireRectangle));`,
 		)
 	})
 
@@ -68,6 +68,15 @@ describe('The scripting event transformer', () => {
 		expect(js).to.contain(`WireRectangle_Init = function`)
 		expect(js).to.contain(`WireRectangle_Init();`)
 	})
+
+	it('should bind me to the item api in event handlers', () => {
+		// Native `Me` is the event owner no matter how the handler runs; the
+		// emitter invokes listeners with its own `this`, so the handler must
+		// carry the item binding itself or `me.enabled=false` lands nowhere.
+		const vbs = `Sub WireRectangle_Init()\nme.enabled=false\nEnd Sub\n`
+		const js = transform(vbs, table)
+		expect(js).to.contain(`.bind(WireRectangle)`)
+	})
 })
 
 describe('The scripting event transformer - behavior', () => {
@@ -86,6 +95,24 @@ describe('The scripting event transformer - behavior', () => {
 		const table = new TableBuilder().addGate('WireRectangle').build()
 		const js = new Transpiler(table, new Player(table)).transpile(`Sub WireRectangle_Init()\nx = 1\nEnd Sub\n`)
 		expect(js).to.contain(`.on('Init'`)
+	})
+
+	it('should route me writes through the item api on emit', () => {
+		// Royal Flush 1976 startGame_timer: `me.enabled=false` must disable the
+		// live timer. The emitter invokes listeners with its own `this` (the
+		// raw target behind the api proxy), so an unbound handler writes a dead
+		// own property instead of reaching the Enabled setter. Lowercase, as
+		// scripts canonically spell it: only the proxy maps it case-insensitively.
+		const table = new TableBuilder().addKicker('Kicker1').build()
+		new Transpiler(table, new Player(table)).execute(
+			`Sub Kicker1_Hit()\nme.enabled=false\nEnd Sub\n`,
+			{} as any,
+			'global',
+		)
+		const api = (table as any).items.Kicker1.getApi()
+		expect(api.data.isEnabled, 'precondition: kicker starts enabled').to.equal(true)
+		api.emit('Hit')
+		expect(api.data.isEnabled, 'me write must reach the Enabled setter').to.equal(false)
 	})
 })
 

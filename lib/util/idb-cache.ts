@@ -99,15 +99,14 @@ function contentKey(prefix: string, script: string): string {
 }
 
 export function vbsCacheKey(script: string): string {
-	// vbs8 versions the transpiler pipeline; bump when output changes.
-	// vbs8: parameterized `__items.*` calls on non-callable targets fall
-	// through to the runtime dispatcher, and the `Else If` repair changes
-	// formatted output — both alter JS for identical raw scripts.
-	return contentKey('vbs8', script)
+	// vbs9 versions the transpiler pipeline; bump when output changes.
+	// vbs9: event handlers bind the item api (`me` semantics) — the emitted
+	// JS gains `.bind(<item>)` for identical raw scripts.
+	return contentKey('vbs9', script)
 }
 
 /** Content-hash key for cached grammar ESTrees (`ast:` ≠ `vbs:` namespace). */
 export function astCacheKey(script: string): string {
-	// ast1 versions the grammar (parse + post-processors); bump independently of vbs7.
+	// ast1 versions the grammar (parse + post-processors); bump independently of vbs9.
 	return contentKey('ast1', script)
 }

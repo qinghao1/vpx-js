@@ -27,8 +27,11 @@ describe('The scripting scope transformer', () => {
 	it('should add the scope even if there is a defined function with a different scope', () => {
 		const vbs = `Dim Ballsize\nSub Table1_Init\nEnd Sub\n`
 		const js = transpiler.transpile(vbs)
+		// The event transformer binds the handler to its item; the ambiguity
+		// pass routes the compiler-generated `.bind` through the dispatcher,
+		// which is equivalent (bind always exists on a function literal).
 		expect(js).to.equal(
-			`${Transformer.ITEMS_NAME}.Table1.on('Init', ${Transformer.SCOPE_NAME}.Table1_Init = function () {\n});\n${Transformer.SCOPE_NAME}.Ballsize = undefined;`,
+			`${Transformer.ITEMS_NAME}.Table1.on('Init', ${Transformer.SCOPE_NAME}.Table1_Init = ${Transformer.VBSHELPER_NAME}.getOrCallBound(function () {\n}, 'bind', ${Transformer.ITEMS_NAME}.Table1));\n${Transformer.SCOPE_NAME}.Ballsize = undefined;`,
 		)
 	})
 

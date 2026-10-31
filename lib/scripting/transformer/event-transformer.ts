@@ -19,10 +19,11 @@ import { Transformer } from './transformer.js'
  * This transforms event subs into proper JavaScript event listeners.
  *
  * Example: `function Plunger_Init() {}` would become:
- * `Plunger.on('Init', Plunger_Init = function () {})`.
+ * `Plunger.on('Init', Plunger_Init = function () {}.bind(Plunger))`.
  *
  * The handler stays assigned under its own name so a manual `Plunger_Init()`
- * call from table script keeps working (VBS runs the handler body).
+ * call from table script keeps working (VBS runs the handler body); the bind
+ * fixes `Me` to the event owner on every path (see below).
  */
 export class EventTransformer extends Transformer {
 	private readonly itemMap: Map<string, { key: string; item: IScriptable<any> }>
@@ -64,13 +65,23 @@ export class EventTransformer extends Transformer {
 					return node
 				}
 
+				// Native `Me` is the event owner however the handler runs, but the
+				// emitter invokes listeners with its own `this` (the raw target
+				// behind the api proxy), so a bare function would resolve `me`
+				// on the wrong receiver. Bind the item api at registration.
 				return expressionStatement(
 					callExpression(memberExpression(identifier(entry.key), identifier('on')), [
 						literal(existingEventName),
 						assignmentExpression(
 							identifier(functionNode.id.name),
 							'=',
-							functionExpression(functionNode.body, functionNode.params),
+							callExpression(
+								memberExpression(
+									functionExpression(functionNode.body, functionNode.params),
+									identifier('bind'),
+								),
+								[identifier(entry.key)],
+							),
 						),
 					]),
 				)
