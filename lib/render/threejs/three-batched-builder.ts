@@ -40,7 +40,11 @@ function signature(geo: BufferGeometry): string {
 // materials that diverge at runtime. Every live prop joins this key instead.
 function materialKey(mat: MeshStandardMaterial): string {
 	const ud = mat.userData as any
-	const map = (mat.map as any)?.name ?? 'nomap'
+	// Node materials (BDL/baked) keep the bound texture in userData, never in
+	// the classic .map slot: key its name too, or same-name materials with
+	// different images merge into one batch rendering the first map.
+	// (Pending maps need no disjunct: canBatch rejects them before this key.)
+	const map = (mat.map as any)?.name ?? ud.__mapName ?? 'nomap'
 	const pending = pendingMapOf(ud)
 	const color = (mat.color as { getHex?: () => number } | undefined)?.getHex?.() ?? ''
 	const emissive = (mat.emissive as { getHex?: () => number } | undefined)?.getHex?.() ?? ''

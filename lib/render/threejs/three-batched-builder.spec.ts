@@ -239,4 +239,17 @@ describe('batchStaticOpaques material identity', () => {
 		expect(buckets).to.equal(1)
 		for (const mesh of meshes) expect(mesh.visible).to.equal(false)
 	})
+
+	it('does not merge same-name materials with different node maps', () => {
+		// Royal Flush 1976 wooden rails vs apron.
+		const matA = new THREE.MeshStandardMaterial({ color: 0xffffff })
+		matA.name = 'material:Plastic with an image opacity'
+		;(matA.userData as any).__mapName = 'sidewood._h'
+		const matB = new THREE.MeshStandardMaterial({ color: 0xffffff })
+		matB.name = 'material:Plastic with an image opacity'
+		;(matB.userData as any).__mapName = 'emblankapron'
+		const { buckets, meshes } = batchPair(matA, matB)
+		expect(buckets).to.equal(0)
+		for (const mesh of meshes) expect(mesh.visible).to.equal(true)
+	})
 })
