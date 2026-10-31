@@ -728,13 +728,6 @@ export class Viewer {
 		const target = computePlayFraming(this.tableGroup)
 		await this._animateCameraTo(target, CAM_ANIM.durationMode)
 		{
-			const fov = Number.isFinite(this.table?.data?.bgFov?.[0]) ? this.table.data.bgFov[0] : CAM.fov
-			if (Number.isFinite(fov) && Math.abs(this.camera.fov - fov) > 0.5) {
-				this.camera.fov = Math.max(20, Math.min(70, fov))
-				this.camera.updateProjectionMatrix()
-			}
-		}
-		{
 			const framing = computePlayFraming(this.tableGroup)
 			syncRoom(this.scene, this.tableGroup, framing.center, framing.size)
 		}
@@ -794,13 +787,6 @@ export class Viewer {
 		if (!this.tableGroup || !this.controls) return
 		const state = computePlayFraming(this.tableGroup)
 		applyCameraState(this.camera, this.controls, state)
-		{
-			const fov = Number.isFinite(this.table?.data?.bgFov?.[0]) ? this.table.data.bgFov[0] : CAM.fov
-			if (Number.isFinite(fov) && Math.abs(this.camera.fov - fov) > 0.5) {
-				this.camera.fov = Math.max(20, Math.min(70, fov))
-				this.camera.updateProjectionMatrix()
-			}
-		}
 		this._playCameraApplied = true
 	}
 	async _animateCameraTo(state, duration = CAM_ANIM.durationMode) {
@@ -829,13 +815,8 @@ export class Viewer {
 		const toTarget = state.target.clone()
 		const toNear = state.near
 		const toFar = state.far
-		const toFov = (() => {
-			if (this.viewerMode === 'play') {
-				const f = Number.isFinite(this.table?.data?.bgFov?.[0]) ? this.table.data.bgFov[0] : CAM.fov
-				return Number.isFinite(f) ? Math.max(20, Math.min(70, f)) : CAM.fov
-			}
-			return CAM.fov
-		})()
+		// Play and viewer modes share one FOV so every table frames the same way; the table's own ViewSetup FOV stays script-visible via api.FieldOfView only.
+		const toFov = CAM.fov
 		if (
 			fromPos.distanceTo(toPos) < 0.5 &&
 			fromTarget.distanceTo(toTarget) < 0.5 &&
@@ -1487,13 +1468,6 @@ export class Viewer {
 		else if (this.viewerMode === 'play') {
 			const state = computePlayFraming(this.tableGroup)
 			applyCameraState(this.camera, this.controls, state)
-			{
-				const fov = Number.isFinite(this.table?.data?.bgFov?.[0]) ? this.table.data.bgFov[0] : CAM.fov
-				if (Number.isFinite(fov) && Math.abs(this.camera.fov - fov) > 0.5) {
-					this.camera.fov = Math.max(20, Math.min(70, fov))
-					this.camera.updateProjectionMatrix()
-				}
-			}
 			this._playCameraApplied = true
 			framed = {
 				center: state.center,
