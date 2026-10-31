@@ -72,6 +72,35 @@ describe('material arrival: BDL uniforms survive streaming', () => {
 		expect(mat.alphaTest, 'cutout must be restored on arrival').to.be.closeTo(1 / 255, 1e-6)
 	})
 
+	it('restores the file cutout stashed on the arriving texture when creation knew none', () => {
+		// Royal Flush 1976 instruction cards: the material is created while the
+		// map still streams, so creation stashes 0 ("unknown"). The map
+		// generator stashes the file ALTV on the arriving texture; a 0 stash
+		// must not shadow it via ?? or the transparent texels render black.
+		const textures = new Map<string, DataTexture>()
+		const generator = makeGenerator(textures)
+		const mat: any = (generator as any).getMaterial(
+			{ name: 'Plastic with an image', baseColor: 0xffffff } as any,
+			'instcard5balls',
+			undefined,
+			undefined,
+			undefined,
+			false,
+			0,
+			undefined,
+			false,
+			undefined,
+			0,
+		)
+		expect(mat.userData.__alphaTestValue, 'unknown at creation').toEqual(0)
+		expect(mat.alphaTest, 'no cutout before arrival').toEqual(0)
+		const tex = makeTex()
+		;(tex as any).userData = { alphaTestValue: 1 / 255 }
+		textures.set('instcard5balls', tex)
+		expect(generator.resolvePendingTextures(), 'arrival attaches').toEqual(1)
+		expect(mat.alphaTest, 'file cutout must be restored on arrival').to.be.closeTo(1 / 255, 1e-6)
+	})
+
 	it('lights mapless bake-named materials with the authored baseColor as albedo (upstream lit parity)', () => {
 		// A bake name without a referenced texture has no bake texels to show;
 		// the unlit baked path would render the raw author tint flat (near-black

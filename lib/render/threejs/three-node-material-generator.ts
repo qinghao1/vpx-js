@@ -80,10 +80,12 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 		if (!mat?.userData) return false
 		const userData = getSlots(mat)
 		if (userData.__addBlend || mat.alphaTest > 0) return false
-		const cutoutValue =
-			(userData.__alphaTestValue as number) ??
-			(tex as { userData?: { alphaTestValue?: number } })?.userData?.alphaTestValue ??
-			0
+		// A stashed 0 means "unknown at creation" (the map was still
+		// streaming), not "no cutout": it must not shadow the file value the
+		// map generator stashed on the arriving texture.
+		const stashed = userData.__alphaTestValue as number
+		const fromTex = (tex as { userData?: { alphaTestValue?: number } })?.userData?.alphaTestValue
+		const cutoutValue = [stashed, fromTex].find((v): v is number => typeof v === 'number' && v > 0 && v <= 1) ?? 0
 		if (cutoutValue > 0 && cutoutValue <= 1) {
 			mat.alphaTest = cutoutValue
 			mat.needsUpdate = true
