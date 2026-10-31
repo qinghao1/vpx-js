@@ -131,7 +131,7 @@ describe('flipper and plunger keys stay script-only', () => {
 	})
 })
 
-describe('free-play helpers (vpx-js-only)', () => {
+describe('coin and Start keys stay script-owned', () => {
 	const coinScript = 'Const swCoin1 = 10\nSub Table1_KeyDown(ByVal keycode)\nEnd Sub\n'
 	const noCoinScript = 'Sub Table1_KeyDown(ByVal keycode)\nEnd Sub\n'
 
@@ -220,16 +220,8 @@ describe('free-play helpers (vpx-js-only)', () => {
 		player.updatePhysics(20)
 	}
 
-	it('ejects a trough ball on start with a mock emu by default', () => {
-		const { player, kicks } = setupTroughKick()
-		pressStart(player)
-		expect(kicks).to.deep.equal([[60, 10]])
-	})
-
-	it('does not mock-kick a script-served trough on start', () => {
-		// Scripted tables serve via their own Drain.Kick (no upstream
-		// equivalent exists): the Start press below reaches the script, so
-		// the mock must not loose a second ball behind it.
+	it('forwards Start to the script without touching kickers', () => {
+		// No mock eject exists upstream: the script alone owns ball serving.
 		const scripted = 'Sub Table1_KeyDown(ByVal keycode)\nkeyDown = keycode\nEnd Sub\n'
 		const { player, kicks, scope } = setupTroughKick(scripted)
 		pressStart(player)
@@ -237,27 +229,11 @@ describe('free-play helpers (vpx-js-only)', () => {
 		expect(kicks).to.deep.equal([])
 	})
 
-	it('lets script presence win even when its handler ignores Start', () => {
-		// The gate keys on handler presence, not on Start being served: a
-		// flipper-only script still suppresses the mock (whose untracked ball
-		// the script would never know about).
-		// Start arrives as keycode 2 (DIK_1); guard on 4 so the handler ignores it.
-		const flipperOnly = 'Sub Table1_KeyDown(ByVal keycode)\nif keycode = 4 then keyDown = keycode\nEnd Sub\n'
-		const { player, kicks, scope } = setupTroughKick(flipperOnly)
+	it('leaves a staged trough ball alone on Start without a script', () => {
+		// No script to receive the press; nothing may serve the ball.
+		const { player, kicks } = setupTroughKick()
 		pressStart(player)
-		expect(scope.keyDown).to.be.equal(undefined)
 		expect(kicks).to.deep.equal([])
-	})
-
-	it('does not eject a trough ball when free play is disabled', () => {
-		PinInput.freePlayDefault = false
-		try {
-			const { player, kicks } = setupTroughKick()
-			pressStart(player)
-			expect(kicks).to.deep.equal([])
-		} finally {
-			PinInput.freePlayDefault = true
-		}
 	})
 })
 
@@ -416,11 +392,11 @@ describe('remapped Start key', () => {
 		expect(kicks).to.deep.equal([])
 	})
 
-	it('should not drive switches from the remapped key but still kick the trough', () => {
+	it('should not drive switches from the remapped key and never kick the trough', () => {
 		const { player, log, kicks } = setupStartRemap()
 		player.onKeyDown({ code: 'KeyG', key: 'g' })
 		player.updatePhysics(20)
 		expect(log).to.deep.equal([])
-		expect(kicks).to.deep.equal([[60, 10]])
+		expect(kicks).to.deep.equal([])
 	})
 })

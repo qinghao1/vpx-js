@@ -71,8 +71,7 @@ values: `key-code.ts` maps the layout-independent physical
 working) and falls back to the lowercase `key` name for events without `code`.
 Left/right Shift are disambiguated by `code` (`ShiftLeft`/`ShiftRight`); only
 the legacy no-`code` path uses `location`/`keyLocation` (`2` = right).
-Free-play helpers (auto-credits, Start coin pulses, mock trough eject) are
-vpx-js-only — none exists upstream — and default on via the static
-`PinInput.freePlayDefault` (set false before constructing the `Player` to
-disable). All free-play scheduling runs on the physics clock, so pausing the
-game pauses it.
+Coin and Start keys are script-owned: `PinInput` forwards them to the table
+script and never drives switches, kickers, or the plunger itself — there is
+no mock trough eject upstream (`InputManager.cpp` only fires key events), so
+ball serving belongs to the script alone.

@@ -69,17 +69,7 @@ const SWITCH_FLIPPER_L = [84, 114] as const
 // staged-flipper path, so plain presses must not assert them.
 const SWITCH_FLIPPER_R = [82, 86, 112] as const
 
-const TROUGH_KICK_ANGLE = 60
-const TROUGH_KICK_SPEED = 10
-
 export class PinInput {
-	/**
-	 * Default for freePlay. Set to false before creating the Player to disable the
-	 * vpx-js-only mock trough eject (none exists upstream; free play itself is a
-	 * ROM setting). It runs on the physics clock, so pausing the game pauses it.
-	 */
-	public static freePlayDefault = true
-
 	private readonly queue: KeyEvent[] = []
 	private readonly pressed = new Set<number>()
 	private readonly nudgeHandler = new NudgeHandler()
@@ -91,7 +81,6 @@ export class PinInput {
 	}
 
 	readonly rgKeys: Record<number, number> = { ...DEFAULT_KEYS }
-	public freePlay = PinInput.freePlayDefault
 
 	constructor(
 		private readonly table: Table,
@@ -164,7 +153,6 @@ export class PinInput {
 		// (src/parts/flipper.cpp). Never drive them directly from input here.
 		this.syncNudge(isDown, code, prevNudgeIndex)
 		this.syncCabinet(isDown, code)
-		this.tryMockTroughEject(isDown, code)
 	}
 
 	private syncNudge(isDown: boolean, code: number, prevIndex: number): void {
@@ -182,48 +170,6 @@ export class PinInput {
 		else if (code === rightKey) angle = 285 + angleVariance
 		else angle = angleVariance
 		this.nudgeHandler.applyImpulse(angle, force)
-	}
-
-	private tryMockTroughEject(isDown: boolean, code: number): void {
-		if (!isDown || !this.freePlay) return
-		// Mapped Start key only: a hardcoded DIK_1 here would keep the physical
-		// "1" key acting as Start after the user remaps StartGameKey elsewhere.
-		if (code !== this.getKey(AssignKey.StartGameKey)) return
-		// Script-owned KeyDown (fired above) serves scripted troughs via Drain.Kick;
-		// mock-kicking here too would release a second ball. Script-less tables
-		// (no KeyDown listener) still fall through, including the empty-trough fallback.
-		if (this.table.getApi().listenerCount('KeyDown') > 0) return
-		const emu = this.player.getPhysics().emu as unknown as {
-			isMock?: boolean
-			isInitialized?: () => boolean
-		} | null
-		if (emu && !emu.isMock && emu.isInitialized?.()) return
-		// No array allocs on this per-keypress path: single for-in pass, keep the
-		// rightmost ball-holding kicker as the trough exit.
-		const kickers = this.table.kickers as unknown as Record<
-			string,
-			{
-				hit?: { ball?: unknown }
-				getApi(): { Kick(a: number, s: number): void; DestroyBall(): number }
-				getName(): string
-				data: { center: { x: number } }
-			}
-		>
-		let exit: (typeof kickers)[string] | undefined
-		for (const name in kickers) {
-			const kicker = kickers[name]
-			if (!kicker.hit?.ball) continue
-			if (!exit || kicker.data.center.x > exit.data.center.x) exit = kicker
-		}
-		if (!exit) {
-			for (const name in this.table.plungers) {
-				const plunger = this.table.plungers[name] as unknown as { getApi(): { CreateBall(): unknown } }
-				plunger.getApi().CreateBall()
-				break
-			}
-			return
-		}
-		exit.getApi().Kick(TROUGH_KICK_ANGLE, TROUGH_KICK_SPEED)
 	}
 
 	private syncCabinet(isDown: boolean, code: number): void {
