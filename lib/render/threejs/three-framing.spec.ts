@@ -3,7 +3,7 @@ import * as chai from 'chai'
 import { expect } from 'chai'
 import sinonChai from 'sinon-chai'
 import * as THREE from 'three'
-import { computePlayFraming, computeViewerFraming } from './three-camera-framing.js'
+import { applyCameraState, computePlayFraming, computeViewerFraming } from './three-camera-framing.js'
 
 chai.use((sinonChai as any).default ?? sinonChai)
 
@@ -152,6 +152,20 @@ describe('regression: framing keeps DMD and full playfield visible', () => {
 			const framed = framing(withSky)
 			expect(framed.maxDim, 'scenery must not inflate framing').to.be.closeTo(210.6, 6)
 		}
+	})
+
+	it('applied camera state keeps the orbit inside the framed world', () => {
+		// Unbounded dolly-out parks the camera outside room/skybox shells,
+		// where a dark exterior fills the view.
+		const group = buildWalkingDeadGroup()
+		const state = computeViewerFraming(group)
+		const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 4000)
+		const controls = { target: new THREE.Vector3(), update: () => {} }
+		applyCameraState(camera, controls, state)
+		const dist = state.position.distanceTo(state.target)
+		expect(controls.maxDistance, 'dolly-out must stay near the table').to.be.closeTo(dist * 3, 1)
+		expect(controls.minDistance, 'dolly-in must stay out of the table').to.be.greaterThan(0)
+		expect(controls.minDistance, 'dolly-in must allow close-ups').to.be.lessThan(dist)
 	})
 
 	it('viewer <-> play transition does not teleport the target (no snap)', () => {

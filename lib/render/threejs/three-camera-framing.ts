@@ -102,7 +102,7 @@ export const computePlayFraming = (node: Object3D): FramingState =>
 
 export function applyCameraState(
 	camera: PerspectiveCamera,
-	controls: { target: Vector3; update: () => void },
+	controls: { target: Vector3; update: () => void; maxDistance?: number; minDistance?: number },
 	state: FramingState,
 ): void {
 	controls.target.copy(state.target)
@@ -111,13 +111,18 @@ export function applyCameraState(
 	camera.far = state.far
 	camera.updateProjectionMatrix()
 	camera.lookAt(state.target)
+	// Keep the orbit inside the authored world: unbounded dolly-out parks the
+	// camera outside room/skybox shells, where a dark exterior fills the view.
+	const dist = state.position.distanceTo(state.target)
+	controls.maxDistance = dist * 3
+	controls.minDistance = Math.max(state.near, dist * 0.05)
 	controls.update()
 }
 
 export function frameCamera(
 	node: Object3D,
 	camera: PerspectiveCamera,
-	controls: { target: Vector3; update: () => void },
+	controls: { target: Vector3; update: () => void; maxDistance?: number; minDistance?: number },
 ): Pick<FramingState, 'center' | 'size' | 'maxDim'> {
 	const state = computeViewerFraming(node)
 	applyCameraState(camera, controls, state)
