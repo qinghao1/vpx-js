@@ -20,6 +20,8 @@ import { Transformer } from './transformer.js'
  *
  * Example: `function Plunger_Init() {}` would become:
  * `Plunger.on('Init', Plunger_Init = function () {}.bind(Plunger))`.
+ * (The ambiguity pass later routes this through the equivalent
+ * `getOrCallBound` dispatcher; see scope-transformer.spec.ts.)
  *
  * The handler stays assigned under its own name so a manual `Plunger_Init()`
  * call from table script keeps working (VBS runs the handler body); the bind
