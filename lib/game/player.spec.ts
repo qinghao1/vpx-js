@@ -7,6 +7,7 @@ import { TableBuilder } from '../../test/table-builder.js'
 import { ThreeHelper } from '../../test/three.helper'
 import { NodeBinaryReader } from '../io/binary-reader.node.js'
 import { Vertex3D } from '../math/vector.js'
+import { Logger } from '../util/logger.js'
 import { _resetQualityCache } from '../util/quality.js'
 import { Table } from '../vpt/table/table.js'
 import type { IEmulator } from './iemulator.js'
@@ -417,6 +418,46 @@ describe('The VPinball player', () => {
 		player.getPhysics().timerStateChange(hitTimer, true)
 		player.updatePhysics(35)
 		expect(fires).to.equal(3)
+	})
+
+	it('should isolate a throwing timer so later timers still fire', async () => {
+		const table = await Table.load(new NodeBinaryReader(three.fixturePath('table-timer.vpx')))
+		const player = new Player(table).init()
+		const bad = table.timers.Timer1.getApi()
+		const good = table.timers.TimerDisabled.getApi()
+		bad.Interval = 10
+		good.Interval = 10
+		bad.Enabled = true
+		good.Enabled = true
+		bad.on('Timer', () => {
+			throw new Error('boom')
+		})
+		let fires = 0
+		good.on('Timer', () => fires++)
+		const warns: unknown[][] = []
+		const orig = Logger.logger()
+		const noop = () => {}
+		Logger.setLogger({
+			wtf: noop,
+			error: noop,
+			warn: (...a: unknown[]) => void warns.push(a),
+			info: noop,
+			debug: noop,
+		})
+		try {
+			player.updatePhysics(35)
+			expect(fires).to.equal(3)
+			// Three throws inside one 5s window collapse to a single warn.
+			expect(warns.length).to.equal(1)
+			// Reminder half: driving game time past the 5s interval warns again
+			// (explicit-time stepping, so the withStubbedNow wall-clock helper
+			// does not apply here).
+			player.updatePhysics(5035)
+			expect(warns.length).to.equal(2)
+		} finally {
+			Logger.setLogger(orig)
+		}
+		expect(fires).to.be.above(3)
 	})
 
 	it('should report no changes on first popStates and track new balls after', async () => {

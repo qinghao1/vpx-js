@@ -48,6 +48,10 @@ const CLOCK_INIT_THRESHOLD_USEC = 1_000_000
 const MAX_CATCHUP_USEC = 50 * PHYSICS_STEPTIME
 const MAX_CATCHUP_USEC_LOW = 16 * PHYSICS_STEPTIME
 const MAX_ITER_LOW = 16
+// Reminder cadence for a persistently throwing timer: first throw warns,
+// repeats remind at most this often (game time) so a broken fast timer
+// cannot spam the log forever, yet repeat failures stay visible.
+const TIMER_WARN_INTERVAL_MSEC = 5_000
 
 /** Core physics loop — 1 kHz collision, timers, movers.
  * @see https://github.com/vpinball/vpinball/blob/master/src/physics/PhysicsEngine.cpp (PhysicsEngine::UpdatePhysics) */
@@ -85,6 +89,7 @@ export class PlayerPhysics {
 	private hitOcTreeDynamic = new HitKD()
 	private hitOcTree = new HitQuadtree()
 	private hitTimers: TimerHit[] = []
+	private readonly lastTimerWarnAt = new WeakMap<TimerHit, number>()
 	private lastTimeUsec = 0
 	private lastFrameDuration = 0
 	private cFrames = 0
@@ -367,7 +372,22 @@ export class PlayerPhysics {
 	}
 
 	private safeFire(t: TimerHit): void {
-		t.pfe.fireGroupEvent(Event.TimerEventsTimer)
+		try {
+			t.pfe.fireGroupEvent(Event.TimerEventsTimer)
+		} catch (err) {
+			// A table-script timer must not abort the tick: upstream FireDispID
+			// ignores each sink's Invoke HRESULT and keeps looping
+			// (src/utils/eventproxy.h); this try/catch is the port's equivalent,
+			// and the nextFire advance in fireTimers still applies so a broken
+			// timer cannot hot-loop.
+			// Warn once per timer, then only a periodic reminder: a permanently
+			// broken fast timer would otherwise log ~100 lines/sec forever.
+			const last = this.lastTimerWarnAt.get(t)
+			if (last === undefined || this.timeMsec - last >= TIMER_WARN_INTERVAL_MSEC) {
+				this.lastTimerWarnAt.set(t, this.timeMsec)
+				logger().warn('[PlayerPhysics] Timer handler threw; continuing.', err)
+			}
+		}
 	}
 
 	/** Single choke point for live interval writes: clamps, then reprograms. */
