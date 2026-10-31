@@ -69,12 +69,8 @@ function framingBox(node: Object3D, exclude?: (name: string) => boolean): Framin
 	return { box, center, size, maxDim: Math.max(size.x, size.y, size.z) }
 }
 
-const excludeNonPlayfield = (name: string): boolean =>
-	!name.includes('playfield') &&
-	!name.includes('button') &&
-	!name.includes('coin') &&
-	!name.includes('plunger') &&
-	!name.includes('apron')
+const KEEP_TOKENS = ['playfield', 'button', 'coin', 'plunger', 'apron']
+const excludeNonPlayfield = (name: string): boolean => !KEEP_TOKENS.some(token => name.includes(token))
 
 // Centering and distance set for the play camera: playfield-named meshes
 // only, so cabinet furniture stays out by design. (The looser playfield
@@ -105,11 +101,11 @@ const PLAY_FILL = 0.98
 function fitDistance(box: Box3, target: Vector3, dir: Vector3, tanHalfFov: number, aspect: number): number {
 	// Degenerate optics solve nothing: the caller falls back to maxDim dist.
 	if (!(tanHalfFov > 0) || !(aspect > 0)) return NaN
-	const forward = dir.clone().negate()
-	const right = new Vector3().crossVectors(forward, new Vector3(0, 1, 0))
+	// Signs are free: every use below takes abs(), so solve directly from dir.
+	const right = new Vector3().crossVectors(dir, new Vector3(0, 1, 0))
 	if (right.lengthSq() < 1e-6) right.set(1, 0, 0)
 	right.normalize()
-	const up = new Vector3().crossVectors(right, forward)
+	const up = new Vector3().crossVectors(right, dir)
 	const scale = PLAY_FILL * tanHalfFov
 	const rel = new Vector3()
 	let dist = 0

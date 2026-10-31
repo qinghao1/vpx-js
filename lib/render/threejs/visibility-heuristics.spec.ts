@@ -11,10 +11,13 @@ const named = (name: string): THREE.Object3D => {
 
 describe('cabinet flipper visibility', () => {
 	it('matches both vrcab and vr_cab spellings', () => {
-		expect(isInCabFlipper(named('primitive-VRCab_FlipperLeft'))).to.be.true
-		expect(isInCabFlipper(named('primitive-VR_CabFlipperLeft'))).to.be.true
-		expect(isInCabFlipper(named('primitive-VR_CabFlipperLeftRing'))).to.be.true
-		expect(isInCabFlipper(named('primitive-VR-CabFlipperLeft'))).to.be.true
+		for (const name of [
+			'primitive-VRCab_FlipperLeft',
+			'primitive-VR_CabFlipperLeft',
+			'primitive-VR_CabFlipperLeftRing',
+			'primitive-VR-CabFlipperLeft',
+		])
+			expect(isInCabFlipper(named(name)), name).to.be.true
 	})
 
 	it('matches a neutral child under a cabinet flipper group', () => {
