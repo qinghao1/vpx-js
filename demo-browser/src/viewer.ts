@@ -51,6 +51,7 @@ import {
 import { AnimationGate } from '../../dist-esm/lib/util/animation-gate.js'
 import { stripVbsComments } from '../../dist-esm/lib/util/vbs-comments.js'
 import { Table } from '../../dist-esm/lib/vpt/table/table.js'
+import { BackglassRenderer } from './backglass/backglass-renderer.js'
 import { CAM, CAM_ANIM, isTableHit, LIGHT_AMBIENT, LIGHT_DIR, LIGHT_HEMI, RE_BAKE_MAP, TABLE_OPTS } from './config.js'
 import { DmdRenderer } from './dmd/dmd-renderer.js'
 import {
@@ -65,6 +66,7 @@ import {
 import { keyForCode, locationForCode, RELEASE_CODES } from './input/input-manager.js'
 import { pollNudgePads } from './input/nudge-controller.js'
 import { attachInput } from './input.js'
+import type { DirtyOverlay } from './overlays/dirty-overlay.js'
 import { createHarness } from './ui/log-viewer.js'
 import { renderModeHint, renderStats } from './ui/stats-overlay.js'
 import {
@@ -142,6 +144,7 @@ const setTitle = title => {
 	if (el && title) el.textContent = title
 }
 export class Viewer {
+	private readonly overlays: DirtyOverlay[]
 	constructor(opts = {}) {
 		ensureGlobals()
 		ensureBvh()
@@ -233,6 +236,8 @@ export class Viewer {
 			)
 		})
 		this.dmd = new DmdRenderer(this)
+		this.backglass = new BackglassRenderer(this)
+		this.overlays = [this.dmd, this.backglass]
 		if (_isDev)
 			Object.assign(window, {
 				scene: this.scene,
@@ -293,6 +298,7 @@ export class Viewer {
 		}
 		for (const fn of this._eventCleanups) fn()
 		this._eventCleanups = []
+		for (const overlay of this.overlays) overlay.dispose?.()
 		this.controls?.dispose?.()
 		this.renderPipeline?.dispose?.()
 		this.renderer?.setAnimationLoop(null)
@@ -1434,6 +1440,11 @@ export class Viewer {
 			this.harnessLog?.(`[mem] Cleared ${clearedCount} raw texture buffers (${retainedCount} retained)`, 'info')
 	}
 	async _mount(table, node, opts = {}, source = null) {
+		// The renderApi (and its texture cache) is recreated per scene build,
+		// so overlays sync here — a _loadTable-time preload would land in
+		// the discarded cache.
+		for (const overlay of this.overlays)
+			void overlay.syncTable?.(table)?.catch?.(e => this.log?.(`overlay sync failed: ${e}`, 'warn'))
 		if (this.tableGroup) this.scene.remove(this.tableGroup)
 		this.tableGroup = node
 		;(globalThis as any).tableGroup = node
@@ -2257,7 +2268,6 @@ export class Viewer {
 			frames = 0,
 			fps = 0
 		let lastFpsUpdate = performance.now()
-		let lastDmdGame = -1
 		// Skipped frames reset without recording, so the next present measures
 		// a live rate instead of averaging in the idle gap.
 		const rollFpsWindow = (timestamp: number, presented: boolean): boolean => {
@@ -2306,21 +2316,11 @@ export class Viewer {
 			const nudgeDirty = this._applyNudgeVisual()
 			// Gamepad nudges share this rAF tick (play-mode gated inside).
 			pollNudgePads(this, timestamp)
-			// The DMD rides the physics clock, not the rAF timestamp: a 32ms
-			// wall gate sits just above the 2-frame quantum, so vsync jitter
-			// flips polls between a 2- and 3-frame cadence. Game-time quanta
-			// are exact, keeping polls phase-locked to emu frame production.
-			// The hash dedup in DmdRenderer.updateFrame still suppresses
-			// presents for unchanged frames.
-			let dmdDirty = false
-			const gameMs = this.player?.getGameTime?.() ?? -1
-			if (gameMs >= 0) {
-				if (lastDmdGame < 0 || gameMs < lastDmdGame) lastDmdGame = gameMs - 32
-				if (gameMs - lastDmdGame >= 32) {
-					lastDmdGame = gameMs
-					dmdDirty = this._pollPinmame()
-				}
-			}
+			// Each overlay owns its poll cadence (the DMD gates on game time);
+			// every overlay updates each tick so none starves when an
+			// earlier one reports dirty.
+			let overlayDirty = false
+			for (const overlay of this.overlays) overlayDirty = overlay.update() || overlayDirty
 			const forcePresent = this._needsRender
 			this._needsRender = false
 			const dirty =
@@ -2328,7 +2328,7 @@ export class Viewer {
 				controlsDirty ||
 				cameraDirty ||
 				nudgeDirty ||
-				dmdDirty ||
+				overlayDirty ||
 				transmissionDirty ||
 				forcePresent
 			if (!dirty) {

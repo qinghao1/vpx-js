@@ -2,6 +2,7 @@
 import * as THREE from 'three'
 import { GpuDmdNodeController } from '../../../dist-esm/lib/render/threejs/nodes/dmd-node.js'
 import { DMD } from '../config.js'
+import type { DirtyOverlay } from '../overlays/dirty-overlay.js'
 
 // vpinball flasher.cpp:1306: ZWRITEENABLE false, DrawMesh depthBias -10000
 // depthTest: true, depthWrite: false, polygonOffsetFactor: -4, polygonOffsetUnits: -8, renderOrder: 20, DoubleSide
@@ -10,6 +11,7 @@ const VISIBLE_WEIGHT = 1e6
 const DUP_MAX = 600
 const DUP_FACTOR = 0.3
 const SIZE_TOL = 0.4
+const DMD_POLL_INTERVAL_MS = 32
 
 // Production FlasherData anchors the DMD at getCenter() (bbox midpoint of the
 // drag points); TextboxData anchors at the v1/v2 midpoint. Neither exposes a
@@ -53,9 +55,10 @@ export function getFlasherCenter(fl, fallback) {
 	return { x: 0, y: 0 }
 }
 
-export class DmdRenderer {
+export class DmdRenderer implements DirtyOverlay {
 	constructor(viewer) {
 		this.viewer = viewer
+		this.lastDmdGame = -1
 		this.w = DMD.w
 		this.h = DMD.h
 		this.meshes = []
@@ -422,12 +425,33 @@ export class DmdRenderer {
 		return this.updateFrame(frame, w, h)
 	}
 
+	/**
+	 * @override DirtyOverlay.update.
+	 * The poll rides the physics clock, not the rAF timestamp: a 32ms
+	 * game-time gate sits just above the 2-frame quantum, so vsync jitter
+	 * flips polls between a 2- and 3-frame cadence. Game-time quanta
+	 * are exact, keeping polls phase-locked to emu frame production.
+	 * The hash dedup in updateFrame suppresses presents for
+	 * unchanged frames.
+	 */
 	update() {
-		return this.render()
+		const gameMs = this.viewer.player?.getGameTime?.() ?? -1
+		if (gameMs < 0) return false
+		if (this.lastDmdGame < 0 || gameMs < this.lastDmdGame) this.lastDmdGame = gameMs - DMD_POLL_INTERVAL_MS
+		if (gameMs - this.lastDmdGame < DMD_POLL_INTERVAL_MS) return false
+		this.lastDmdGame = gameMs
+		return this.viewer._pollPinmame()
 	}
 
 	getTexture() {
 		this._ensureTexture()
 		return this.texture
+	}
+
+	dispose() {
+		this.dataTexture?.dispose?.()
+		this.material?.dispose?.()
+		this._controller = null
+		this.texture = this.dataTexture = null
 	}
 }
