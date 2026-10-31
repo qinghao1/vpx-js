@@ -40,12 +40,13 @@ export class VbsArray<T> implements ProxyHandler<VbsArray<T>> {
 			if (t[n] !== undefined) return t[n] as T
 		}
 		const t = target as Record<string | symbol, unknown>
-		return t[key] !== undefined
-			? (t[key] as T)
-			: new VbsUndefined(
-					new VbsError(`ReferenceError: Cannot set ${String(key)} from undefined.`, 9),
-					new VbsError(`ReferenceError: Cannot get ${String(key)} from undefined.`, 9),
-				)
+		if (t[key] !== undefined) return t[key] as T
+		// Thunks: VbsError captures a stack at construction, and most misses are never raised.
+		const missed = String(key)
+		return new VbsUndefined(
+			() => new VbsError(`ReferenceError: Cannot set ${missed} from undefined.`, 9),
+			() => new VbsError(`ReferenceError: Cannot get ${missed} from undefined.`, 9),
+		)
 	}
 
 	public set(target: unknown, rawKey: string | symbol, value: unknown): boolean {

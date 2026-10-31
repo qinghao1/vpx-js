@@ -13,10 +13,10 @@ export const UNDEF = Symbol.for('vbs.undefined')
 export const NOTHING_TAG = Symbol('vpxjs.nothing')
 
 export class VbsUndefined implements ProxyHandler<any> {
-	private readonly __errSet?: VbsError
-	private readonly __errGet?: VbsError
+	private readonly __errSet?: () => VbsError
+	private readonly __errGet?: () => VbsError
 
-	constructor(errSet?: VbsError, errGet?: VbsError) {
+	constructor(errSet?: () => VbsError, errGet?: () => VbsError) {
 		this.__errSet = errSet
 		this.__errGet = errGet
 		return new Proxy(this, this)
@@ -42,7 +42,7 @@ export class VbsUndefined implements ProxyHandler<any> {
 			return Reflect.get(target, p)
 		}
 		ERR.Raise(
-			this.__errGet ||
+			this.__errGet?.() ??
 				new VbsError(`ReferenceError: Cannot get property "${String(p)}" of undefined array element.`, 9),
 		)
 		return this
@@ -50,7 +50,7 @@ export class VbsUndefined implements ProxyHandler<any> {
 
 	public set(_target: any, p: string | number | symbol, _value: any, _receiver: any): boolean {
 		ERR.Raise(
-			this.__errSet ||
+			this.__errSet?.() ??
 				new VbsError(`ReferenceError: Cannot set property "${String(p)}" of undefined array element.`, 9),
 		)
 		return true
