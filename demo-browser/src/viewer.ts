@@ -95,8 +95,10 @@ function syncRoom(
 	size: THREE.Vector3,
 ): THREE.Group | null {
 	let hasVr = false
+	// Visibility-independent: script states hide the authored room after
+	// mount, but the meshes still count as a room (no procedural fallback).
 	node.traverse((o: any) => {
-		if (o.isMesh && o.visible && RE_VR.test(String(o.name ?? ''))) hasVr = true
+		if (o.isMesh && RE_VR.test(String(o.name ?? ''))) hasVr = true
 	})
 	const room = ensureProceduralRoom(scene, center, size, { hasVr })
 	scene.background = getPrerenderedBackground() as any
@@ -979,18 +981,19 @@ export class Viewer {
 		}
 	}
 	/**
-	 * Showcase keeps the build-time VR/cabinet force-show: a script-driven
-	 * hide of a VR or cabinet node is dropped from the diff, while the
-	 * diff's matrices and materials still apply. Play mode keeps full
-	 * script fidelity; non-VR items are untouched in both modes.
+	 * Room/cabinet force-show: a script-driven hide of a VR or cabinet node
+	 * is dropped from the diff in both modes, while the diff's matrices and
+	 * materials still apply. Tables that ship a room show it on flat
+	 * screens; the backdrop is the fallback only when no room exists.
+	 * Non-room states are untouched in both modes.
 	 */
 	showcaseState(nodeName: string | undefined, state: any) {
-		if (this.viewerMode === 'play' || state?.isVisible !== false || !isShowcaseRoomNode(nodeName)) {
+		if (state?.isVisible !== false || !isShowcaseRoomNode(nodeName)) {
 			return state
 		}
-		// Drop the hide: updater mergeFrom would otherwise write the filtered
-		// value back into the shared model state. The node-level re-show for
-		// a play→viewer resync happens in applyChangedStates instead.
+		// Drop the hide from the updater merge/apply (each resync re-strips
+		// it). The node-level re-show after a resync happens in
+		// applyChangedStates instead.
 		const { isVisible: _hidden, ...rest } = state
 		return rest
 	}
@@ -1011,9 +1014,9 @@ export class Viewer {
 			entry.item
 				.getUpdater()
 				.applyState(entry.node, this.showcaseState(entry.node?.name, state), this.renderApi, this.table)
-			if (this.viewerMode === 'viewer' && state.isVisible === false && isShowcaseRoomNode(entry.node?.name)) {
+			if (state.isVisible === false && isShowcaseRoomNode(entry.node?.name)) {
 				// The hide above was dropped to keep the model pristine, so the
-				// node still needs showing here after a play→viewer resync.
+				// node still needs showing here after a resync, in either mode.
 				this.renderApi.applyVisibility(true, entry.node)
 			}
 		}

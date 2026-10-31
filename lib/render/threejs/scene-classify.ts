@@ -7,9 +7,9 @@ export const RE_ALPHA_MESH = /armp|ramp|bat_|non[_-]?opaque|plastic|gate/i
 export const RE_CAB = /vr_?cab|cabinet|lockbar|pincab|backbox|coin_?door/i
 
 /**
- * VR-room or cabinet content by node name. The showcase viewer keeps these
- * visible despite script-driven hides (desktop VR tables hide their room
- * via `object.visible = 0`); play mode applies script hides faithfully.
+ * VR-room or cabinet content by node name. The viewer keeps these visible
+ * despite script-driven hides (desktop VR tables hide their room via
+ * `object.visible = 0`) in both viewer and play modes.
  */
 export function isShowcaseRoomNode(name: string | undefined): boolean {
 	if (!name) return false

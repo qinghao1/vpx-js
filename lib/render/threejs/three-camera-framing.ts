@@ -77,12 +77,14 @@ const PLAY: FramingConfig = {
 	near: 0.012,
 	farScale: 10,
 	farMin: 4000,
-	forwardBias: -0.07,
+	forwardBias: -0.07, // down-table (toward the backbox), in cluster depths.
 }
 
 // Playfield cluster fills the frame (NDC half-extent 1): every table renders
 // the same regardless of backbox/cabinet proportions. Slightly under 1 keeps
 // a hairline of the rails visible instead of clipping the playfield edge.
+// Backbox/DMD stay outside the fit by design (upstream parity); including
+// them would reintroduce cabinet-driven variance.
 const PLAY_FILL = 0.98
 
 // Closed-form pinhole solve: each box corner requires
@@ -144,7 +146,8 @@ export const computeViewerFraming = (node: Object3D): FramingState =>
 
 // Play distance fits the playfield cluster to the frame (fov/aspect aware),
 // so every table fills the screen the same way; size still covers the cabinet
-// for room sync. Callers pass the live camera's fov/aspect.
+// for room sync. Callers pass the live camera's fov (vertical degrees, as
+// PerspectiveCamera.fov) and aspect.
 export const computePlayFraming = (node: Object3D, view: { fov: number; aspect: number }): FramingState =>
 	framingState(node, excludeNonPlayfield, excludeNonTable, PLAY, view)
 
