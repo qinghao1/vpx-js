@@ -6,7 +6,7 @@ import { ItemState } from '../item-state.js'
 export class FlasherState extends ItemState {
 	public color = 0
 	public alpha = 100
-	/** Script-driven overlay image; rebound by the updater like upstream's per-frame GetImage. */
+	/** Script-driven overlay image name; rebound by the updater per `Flasher::Render`. */
 	public imageA = ''
 	public rotX = 0
 	public rotY = 0

@@ -85,6 +85,7 @@ export class FlasherApi extends ItemApi<FlasherData> {
 	}
 	set ImageA(value) {
 		this.data.szImageA = value
+		// Dual-write: the Player delta pipeline diffs state, never data.
 		if (this._state) this._state.imageA = value ?? ''
 	}
 	get ImageB() {

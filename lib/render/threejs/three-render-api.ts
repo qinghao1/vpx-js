@@ -279,6 +279,9 @@ export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, Poin
 		const targets = obj.children?.length ? (obj.children as Object3D[]) : [obj]
 		for (const child of targets) {
 			const mat = (child as ThreeMesh).material as MeshStandardMaterial
+			// Meshless item groups (e.g. flashers without geometry) carry state
+			// but nothing to rebind; skipping also keeps the per-frame state loop alive.
+			if (!mat) continue
 			const gen = this.nodeMaterialGenerator
 			if (material) gen.applyMaterial(mat, material)
 			gen.applyMap(mat, map)

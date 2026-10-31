@@ -34,6 +34,7 @@ const ALL_EXPORTS_OFF = {
 	exportPrimitives: false,
 	exportRubbers: false,
 	exportSurfaces: false,
+	exportFlashers: false,
 	exportFlippers: false,
 	exportBumpers: false,
 	exportRamps: false,

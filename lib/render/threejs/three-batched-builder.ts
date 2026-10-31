@@ -144,20 +144,11 @@ export function batchStaticOpaques(root: Group, table: Table, _renderApi: ThreeR
 	}
 
 	const dmdNames = new Set<string>()
-	for (const group of [(table as any).flashers, (table as any).textboxes]) {
+	for (const group of [(table as any).textboxes]) {
 		for (const k in group) {
 			const item = group[k]
 			if (item?.data?.isDMD) dmdNames.add(item.getName().toLowerCase())
 		}
-	}
-	// Every flasher renders dynamically upstream (`Flasher::Render` runs per
-	// frame and re-resolves the script-writable image): static merging would
-	// freeze score digits and bury the updater's live color/opacity writes.
-	const flasherNames = new Set<string>()
-	for (const k in (table as any).flashers) {
-		const item = (table as any).flashers[k]
-		const name = item?.getName?.() ?? k
-		if (name) flasherNames.add(String(name).toLowerCase())
 	}
 
 	const buckets = new Map<string, { material: MeshStandardMaterial; meshes: Mesh[] }>()
@@ -173,7 +164,9 @@ export function batchStaticOpaques(root: Group, table: Table, _renderApi: ThreeR
 		if (!canBatch(mat)) return
 		if (isAnimated(o)) return
 		if (isDmdLike(o, dmdNames)) return
-		if (isUnder(o, root, name => flasherNames.has(name), true)) return
+		// The flashers type-group roots every flasher subtree: matching it (not
+		// item names or image content) keeps script-driven image swaps live.
+		if (isUnder(o, root, name => name === 'flashers', true)) return
 		if (isButtonLike(o.name, o.userData)) return
 		const geo = o.geometry as BufferGeometry
 		if (!geo.getAttribute('position')) return

@@ -1,10 +1,11 @@
 // Copyright (C) 2026 Chu Qinghao — GPL-2.0 — see LICENSE
-import { BoxGeometry, Group, MathUtils, Matrix4, Mesh, MeshStandardMaterial, Vector3 } from 'three'
+import { BoxGeometry, DataTexture, Group, MathUtils, Matrix4, Mesh, MeshStandardMaterial, Vector3 } from 'three'
 import { describe, expect, it } from 'vitest'
 import { Matrix3D } from '../../math/matrix.js'
 import { Vertex3D } from '../../math/vector.js'
 import type { Table } from '../../vpt/table/table.js'
 import { batchStaticOpaques } from './three-batched-builder.js'
+import { ThreeNodeMaterialGenerator } from './three-node-material-generator.js'
 import { ThreeRenderApi } from './three-render-api.js'
 
 describe('ThreeRenderApi matrix application', () => {
@@ -59,6 +60,18 @@ describe('ThreeRenderApi null-node no-ops', () => {
 			expect(() => api.applyVisibility(true, missing), `applyVisibility ${String(node)}`).not.toThrow()
 			expect(() => api.applyMaterial(missing, {} as any, 'map'), `applyMaterial ${String(node)}`).not.toThrow()
 		}
+	})
+
+	it('skips material-less groups such as meshless flasher nodes', () => {
+		const tex = new DataTexture(new Uint8Array([10, 20, 30, 255]), 1, 1)
+		tex.name = 'd_5'
+		;(api as any).nodeMaterialGenerator = new ThreeNodeMaterialGenerator({
+			hasTexture: (name: string) => name === 'd_5',
+			getTexture: () => tex,
+		} as any)
+		const group = new Group()
+		group.name = 'flasher-ghost'
+		expect(() => api.applyMaterial(group, undefined, 'd_5')).not.toThrow()
 	})
 })
 

@@ -1,5 +1,5 @@
 // Copyright (C) 2026 Chu Qinghao — GPL-2.0 — see LICENSE
-import { DataTexture, DoubleSide, FrontSide } from 'three'
+import { DataTexture, DoubleSide, FrontSide, Group, Mesh, MeshStandardMaterial } from 'three'
 import { describe, expect, it } from 'vitest'
 import { graphReferences, materialize } from './nodes/tsl-test-harness.js'
 import { ThreeNodeMaterialGenerator } from './three-node-material-generator.js'
@@ -30,6 +30,51 @@ describe('additive blend parity (upstream flasher.cpp SetupAddBlendState)', () =
 function openWallGenerator(): any {
 	return new ThreeNodeMaterialGenerator({ hasTexture: () => false, getTexture: () => null } as any)
 }
+
+describe('explicit texture clear (script-emptied image)', () => {
+	function clearGenerator(textures: Map<string, DataTexture>): any {
+		return new ThreeNodeMaterialGenerator({
+			hasTexture: (name: string) => textures.has(name.toLowerCase()),
+			getTexture: (name: string) => textures.get(name.toLowerCase()),
+		} as any)
+	}
+
+	function makeTex(): DataTexture {
+		const tex = new DataTexture(new Uint8Array([10, 20, 30, 255]), 1, 1)
+		tex.needsUpdate = true
+		return tex
+	}
+
+	it('unbinds the slot and drops the pending key when cleared to empty', () => {
+		const generator = clearGenerator(new Map([['d_5', makeTex()]]))
+		const mat = new MeshStandardMaterial() as any
+		generator.applyMap(mat, 'd_5')
+		expect(mat.map, 'map bound').not.toBeNull()
+		// `needsUpdate` is setter-only (no readback); the version bump is the observable.
+		const version = mat.version
+		generator.applyMap(mat, '')
+		expect(mat.map, 'slot unbound').toBeNull()
+		expect(mat.userData.pendingMap, 'no pending key').toBeUndefined()
+		expect(mat.version, 'program invalidated').toBeGreaterThan(version)
+	})
+
+	it('a late arrival of the cleared name never rebinds', () => {
+		const textures = new Map<string, DataTexture>()
+		const generator = clearGenerator(textures)
+		const mat = new MeshStandardMaterial() as any
+		generator.applyMap(mat, 'd_5')
+		expect(mat.userData.pendingMap, 'streams').toBe('d_5')
+		generator.applyMap(mat, '')
+		textures.set('d_5', makeTex())
+		const root = new Group()
+		const mesh = new Mesh()
+		mesh.material = mat
+		root.add(mesh)
+		const fixed = generator.resolvePendingInScene(root)
+		expect(fixed, 'cleared name stays unbound').toBe(0)
+		expect(mat.map, 'slot stays empty').toBeNull()
+	})
+})
 
 function wallInfo(backfacesEnabled: boolean, indices: number[]): any {
 	return {

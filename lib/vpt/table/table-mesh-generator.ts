@@ -45,11 +45,7 @@ export class TableMeshGenerator {
 			},
 			{ name: 'rubbers', meshes: Object.values<Rubber>(this.table.rubbers), enabled: !!opts.exportRubbers },
 			{ name: 'surfaces', meshes: Object.values<Surface>(this.table.surfaces), enabled: !!opts.exportSurfaces },
-			{
-				name: 'flashers',
-				meshes: Object.values<Flasher>(this.table.flashers),
-				enabled: !!opts.exportFlashers,
-			},
+			{ name: 'flashers', meshes: Object.values<Flasher>(this.table.flashers), enabled: !!opts.exportFlashers },
 			{ name: 'flippers', meshes: Object.values<Flipper>(this.table.flippers), enabled: !!opts.exportFlippers },
 			{ name: 'bumpers', meshes: Object.values<Bumper>(this.table.bumpers), enabled: !!opts.exportBumpers },
 			{ name: 'ramps', meshes: Object.values<Ramp>(this.table.ramps), enabled: !!opts.exportRamps },

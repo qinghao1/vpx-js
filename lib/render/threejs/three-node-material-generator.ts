@@ -412,6 +412,11 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 		name?: string,
 		init?: (material: any) => void,
 	): void {
+		// `undefined` keeps the slot; only an explicit empty string clears it.
+		if (name === '') {
+			this.clearTextureSlot(mat, key)
+			return
+		}
 		if (!name) return
 		// Single kind×key dispatch (see SLOT_ROUTES): `ignore` drops the key
 		// unbound so demandPendingMaps loads no texture nobody binds, `node-map`
@@ -445,6 +450,28 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 			this.refreshBakedMapTint(mat, tex, userData)
 			mat.needsUpdate = true
 		} else if (!restoredCutout) {
+			mat.needsUpdate = true
+		}
+	}
+
+	/**
+	 * Unbinds a texture slot the script emptied. Dropping the pending key too
+	 * means a late arrival of the removed name can never rebind it. Classic
+	 * slots render color-only afterwards, like upstream's untextured draw;
+	 * node slots keep the placeholder branch, which hides rather than flashing
+	 * a stale image.
+	 */
+	private clearTextureSlot(mat: any, key: 'map' | 'normalMap' | 'envMap' | 'emissiveMap'): void {
+		delete getSlots(mat)[pendingKeyFor(key)]
+		const route = SLOT_ROUTES[kindOf(mat)][key]
+		if (route === 'node-map') {
+			const changed = kindOf(mat) === 'baked' ? setBakedMap(mat, null) : setPrimitiveMap(mat, null)
+			if (changed) mat.needsUpdate = true
+			return
+		}
+		if (route === 'ignore') return
+		if (mat[key] !== null) {
+			mat[key] = null
 			mat.needsUpdate = true
 		}
 	}
