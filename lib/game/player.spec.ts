@@ -267,6 +267,27 @@ describe('The VPinball player', () => {
 		expect(surfaced).to.include(ball.getName())
 	})
 
+	it('should re-emit consumed states after resyncStates', () => {
+		const table = new TableBuilder().withTableScript('').addFlipper('LeftFlipper').build('Table1')
+		const player = new Player(table).init({})
+		player.popStates()
+
+		// Script hides the item and the consumer applies (then drops) the diff.
+		table.flippers.LeftFlipper.getApi().Visible = false
+		const hid = player.popStates()
+		expect(hid.keys).to.include('LeftFlipper')
+		expect(hid.getState('LeftFlipper').isVisible).to.equal(false)
+		expect(player.popStates().isEmpty).to.equal(true)
+
+		// A mode switch changes consumer filtering: resync re-emits current
+		// states so a filtered-out hide converges instead of sticking forever.
+		player.resyncStates()
+		const re = player.popStates()
+		expect(re.keys).to.include('LeftFlipper')
+		expect(re.getState('LeftFlipper').isVisible).to.equal(false)
+		expect(player.popStates().isEmpty).to.equal(true)
+	})
+
 	it('should fire frame-sync timers once per updatePhysics call', async () => {
 		// One-call-one-frame: each updatePhysics call is one headless frame, so
 		// a repeated same-timestamp call fires -1/-2 again (upstream fires -1

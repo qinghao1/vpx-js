@@ -894,6 +894,8 @@ export class Viewer {
 		const ballsNode = this.tableGroup?.getObjectByName('balls')
 		if (ballsNode) ballsNode.visible = true
 		this.player?.setPhysicsEnabled(true)
+		// State filtering changes per mode — reconverge under the new filter.
+		this.player?.resyncStates()
 		this._emitModeChange()
 		if (this.dom.canvas) {
 			this.dom.canvas.tabIndex = 0
@@ -921,6 +923,8 @@ export class Viewer {
 		if (this.tableGroup) showCabFlippers(this.tableGroup)
 		const ballsNode = this.tableGroup?.getObjectByName('balls')
 		if (ballsNode) ballsNode.visible = false
+		// Mirror of enterPlayMode: reconverge filtered states under viewer filtering.
+		this.player?.resyncStates()
 		this._emitModeChange()
 	}
 	buildNodeCache() {
@@ -984,6 +988,9 @@ export class Viewer {
 		if (this.viewerMode === 'play' || state?.isVisible !== false || !isShowcaseRoomNode(nodeName)) {
 			return state
 		}
+		// Drop the hide: updater mergeFrom would otherwise write the filtered
+		// value back into the shared model state. The node-level re-show for
+		// a play→viewer resync happens in applyChangedStates instead.
 		const { isVisible: _hidden, ...rest } = state
 		return rest
 	}
@@ -1004,6 +1011,11 @@ export class Viewer {
 			entry.item
 				.getUpdater()
 				.applyState(entry.node, this.showcaseState(entry.node?.name, state), this.renderApi, this.table)
+			if (this.viewerMode === 'viewer' && state.isVisible === false && isShowcaseRoomNode(entry.node?.name)) {
+				// The hide above was dropped to keep the model pristine, so the
+				// node still needs showing here after a play→viewer resync.
+				this.renderApi.applyVisibility(true, entry.node)
+			}
 		}
 		if (changedLightNames.size) {
 			for (const lm of changedLightNames) {

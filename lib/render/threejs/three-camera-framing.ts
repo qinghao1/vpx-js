@@ -86,23 +86,21 @@ const PLAY: FramingConfig = {
 const PLAY_FILL = 0.98
 
 // Closed-form pinhole solve: each box corner requires
-// dist >= perp / (FILL * tan) + depth; the max over corners fits them all.
+// dist >= perp / (PLAY_FILL * tan) + depth; the max over corners fits them all.
 function fitDistance(box: Box3, target: Vector3, dir: Vector3, tanHalfFov: number, aspect: number): number {
 	const forward = dir.clone().negate()
 	const right = new Vector3().crossVectors(forward, new Vector3(0, 1, 0))
 	if (right.lengthSq() < 1e-6) right.set(1, 0, 0)
 	right.normalize()
 	const up = new Vector3().crossVectors(right, forward)
+	const scale = PLAY_FILL * tanHalfFov
 	const rel = new Vector3()
 	let dist = 0
 	for (const x of [box.min.x, box.max.x])
 		for (const y of [box.min.y, box.max.y])
 			for (const z of [box.min.z, box.max.z]) {
 				rel.set(x, y, z).sub(target)
-				const depth = rel.dot(dir)
-				const need =
-					Math.max(Math.abs(rel.dot(right)) / aspect, Math.abs(rel.dot(up))) / (PLAY_FILL * tanHalfFov) +
-					depth
+				const need = Math.max(Math.abs(rel.dot(right)) / aspect, Math.abs(rel.dot(up))) / scale + rel.dot(dir)
 				if (need > dist) dist = need
 			}
 	return dist

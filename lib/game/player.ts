@@ -53,6 +53,7 @@ export class Player extends EventEmitter {
 	private dirtySet = new Set<string>()
 	private allStateNames: string[] = []
 	private frameCount = 0
+	private resyncRequested = false
 
 	public width = 0
 	public height = 0
@@ -132,6 +133,18 @@ export class Player extends EventEmitter {
 		if (name) this.dirtySet.add(name)
 	}
 
+	/**
+	 * Re-emits every current state on the next popStates, even with no new
+	 * mutations. Call when the consumer's filtering changes (viewer/play
+	 * mode switch drops or applies script-driven visibility per mode), so a
+	 * state consumed under one filter re-converges under the new one instead
+	 * of sticking forever.
+	 */
+	public resyncStates(): void {
+		// Flag alone suffices: popStates re-adds every name when it sees force.
+		this.resyncRequested = true
+	}
+
 	private wrapSingleApi(api: any, name: string): any {
 		if (!api || !name || api.__isDirtyProxy) return api
 		const player = this
@@ -203,10 +216,12 @@ export class Player extends EventEmitter {
 	}
 	public popStates(): ChangedStates<ItemState> {
 		this.frameCount++
+		const force = this.resyncRequested
+		this.resyncRequested = false
 		const useFull =
 			this.frameCount % FULL_SWEEP_EVERY === 0 &&
 			this.dirtySet.size < this.allStateNames.length * FULL_SWEEP_MIN_COVERAGE
-		if (useFull) {
+		if (useFull || force) {
 			for (const name of this.allStateNames) this.dirtySet.add(name)
 		}
 		if (this.dirtySet.size === 0) return EMPTY_CHANGED_STATES
@@ -215,8 +230,11 @@ export class Player extends EventEmitter {
 			const next = this.currentStates[name]
 			const prev = this.previousStates[name]
 			if (!next || !prev) continue
-			if (!next.equals(prev)) {
-				changed.setState(name, next.diff(prev))
+			if (force || !next.equals(prev)) {
+				// Forced re-emission carries a full clone (not a diff against
+				// an equal previous, which would be empty); clones own their
+				// pooled members, so the usual release() still applies.
+				changed.setState(name, force ? next.clone() : next.diff(prev))
 				prev.copyFrom(next)
 			}
 		}
