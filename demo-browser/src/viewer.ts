@@ -727,10 +727,7 @@ export class Viewer {
 		this.dom.canvas?.focus()
 		const target = computePlayFraming(this.tableGroup)
 		await this._animateCameraTo(target, CAM_ANIM.durationMode)
-		{
-			const framing = computePlayFraming(this.tableGroup)
-			syncRoom(this.scene, this.tableGroup, framing.center, framing.size)
-		}
+		syncRoom(this.scene, this.tableGroup, target.center, target.size)
 		if (!this.player) {
 			if (this.table) {
 				try {
