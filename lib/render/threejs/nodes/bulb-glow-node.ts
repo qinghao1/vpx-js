@@ -1,5 +1,17 @@
 import type { Group } from 'three'
-import { AdditiveBlending, BufferAttribute, BufferGeometry, Color, DoubleSide, Matrix4, Mesh, Vector2 } from 'three'
+import {
+	BufferAttribute,
+	BufferGeometry,
+	Color,
+	CustomBlending,
+	DoubleSide,
+	Matrix4,
+	Mesh,
+	OneMinusSrcColorFactor,
+	ReverseSubtractEquation,
+	SrcAlphaFactor,
+	Vector2,
+} from 'three'
 import {
 	attribute,
 	clamp,
@@ -32,6 +44,36 @@ export interface BulbGlowOptions {
 	modulateVsAdd?: number
 }
 
+/**
+ * Native `m_modulate_vs_add` clamp (`light.cpp`): avoids 0 (which disables
+ * the blend) and 1 (which reads wrong under day/night swings). Insert tables
+ * authoring ≈1.0 land on 0.9999, leaving a ~1e-4 additive sliver.
+ */
+export function clampBulbModulateVsAdd(value?: number): number {
+	return Math.max(0.0001, Math.min(0.9999, value ?? 0.9))
+}
+
+/**
+ * Per-channel native bulb composite (`fs_light.sc` under REVSUBTRACT with
+ * SRC_ALPHA/INV_SRC_COLOR): `dst + atten·I·(dst·m·l + (1−m)·l)`.
+ */
+export function bulbGlowComposite(
+	dst: number,
+	atten: number,
+	intensity: number,
+	modulate: number,
+	light: number,
+): number {
+	const m = clampBulbModulateVsAdd(modulate)
+	const glow = atten * intensity * light
+	return dst * (1 + m * glow) + (1 - m) * glow
+}
+
+/** Native bulb src alpha (`fs_light.sc`): `gl_FragColor.a = 1/m − 1`. */
+export function bulbGlowSrcAlpha(modulate: number): number {
+	return 1 / clampBulbModulateVsAdd(modulate) - 1
+}
+
 export function createBulbGlowNodeMaterial(options: BulbGlowOptions): MeshBasicNodeMaterial {
 	const mat = new MeshBasicNodeMaterial()
 	const uColor = uniform(new Color(options.color))
@@ -40,19 +82,27 @@ export function createBulbGlowNodeMaterial(options: BulbGlowOptions): MeshBasicN
 	const uInvFalloff = uniform(1 / Math.max(options.falloff, 0.1))
 	const uFalloffPower = uniform(options.falloffPower)
 	const uIntensity = uniform(options.intensity)
-	// Native bulb blend (`fs_light.sc`, REVSUBTRACT with SRC_ALPHA/INVSRC_COLOR) adds
-	// `atten·intensity·(dst·modulate + (1−modulate))`. The dst-modulated term needs
-	// framebuffer feedback, unavailable in a single forward pass, so this composite
-	// emits the constant-add term `atten·intensity·(1−modulate)` with plain additive
-	// blending. The modulated part is carried by lightmap-driven primitives instead.
-	const clampedModulate = Math.max(0.0001, Math.min(0.9999, options.modulateVsAdd ?? 0.9))
-	const uAddScale = uniform(1 - clampedModulate)
+	// Native bulb composite (`light.cpp` REVSUBTRACT with
+	// SRC_ALPHA/INV_SRC_COLOR over the post-opaque scene color, fed the
+	// negatively-encoded `fs_light.sc` output below) evaluates the full
+	// `dst + atten·I·(dst·m·l + (1−m)·l)`. The blend unit samples dst, so the
+	// dst-modulated term needs no extra pass or scene buffer: these draws run
+	// in the pipeline scene pass's transparent phase (post-opaque dst) and the
+	// restored energy feeds the existing pipeline bloom. The szLightmap
+	// primitive path is untouched; native runs both draws too. Overlapping
+	// halos with different m composite in draw order (three.js transparent
+	// sort for per-quad draws, bake order in the merged mesh); native sorts
+	// transparent on absolute z + depthBias, so overlap pixels can differ
+	// slightly — REVSUBTRACT is order-dependent.
+	const uModulate = uniform(clampBulbModulateVsAdd(options.modulateVsAdd))
 
 	mat.colorNode = Fn(() => {
 		// Matches fs_light.sc: atten = pow(max(1 - saturate(len), 0.0001),
 		// falloff_power) with the color ramp on the unclamped sqrt(len) —
 		// the floor keeps a fully covered pixel from going exactly 0 and
-		// the ramp extrapolates past the rim instead of clamping.
+		// the ramp extrapolates past the rim instead of clamping. The rgb is
+		// negatively encoded (`−m·atten·I·lcolor`) with src alpha `1/m − 1`,
+		// exactly the shader outputs REVSUBTRACT composites upstream.
 		const len = length(positionLocal.xy.sub(uCenter)).mul(uInvFalloff)
 		const atten = pow(max(float(1).sub(clamp(len, float(0), float(1))), float(0.0001)), uFalloffPower)
 		const glowColor = mix(uColor2, uColor, sqrt(len))
@@ -67,11 +117,17 @@ export function createBulbGlowNodeMaterial(options: BulbGlowOptions): MeshBasicN
 			float(0.5).sub(positionWorld.z.div(uTransArea.y)),
 		)
 		const footprint = mix(float(1), inPlayfieldBounds(pfUv), uBulbGlowFootprintClip)
-		const rgb = glowColor.mul(atten).mul(uIntensity).mul(uAddScale).mul(footprint)
-		return vec4(rgb, float(1))
+		const rgb = glowColor.mul(atten).mul(uIntensity).mul(uModulate).mul(float(-1)).mul(footprint)
+		return vec4(rgb, float(1).div(uModulate).sub(float(1)))
 	})()
 
-	mat.blending = AdditiveBlending
+	mat.blending = CustomBlending
+	mat.blendSrc = SrcAlphaFactor
+	mat.blendDst = OneMinusSrcColorFactor
+	mat.blendEquation = ReverseSubtractEquation
+	mat.blendSrcAlpha = SrcAlphaFactor
+	mat.blendDstAlpha = OneMinusSrcColorFactor
+	mat.blendEquationAlpha = ReverseSubtractEquation
 	mat.transparent = true
 	mat.depthWrite = false
 	mat.depthTest = true
@@ -83,7 +139,7 @@ export function createBulbGlowNodeMaterial(options: BulbGlowOptions): MeshBasicN
 	ud.__uColor = uColor
 	ud.__uColor2 = uColor2
 	ud.__uIntensity = uIntensity
-	ud.__uAddScale = uAddScale
+	ud.__uModulate = uModulate
 	return mat
 }
 
@@ -114,7 +170,7 @@ export function setBulbGlowState(mat: unknown, state: { intensity?: number; colo
  *
  * Per-quad materials carry the halo parameters as uniforms, so N lamps cost N
  * draws with N program bindings. The merged mesh bakes the static parameters
- * (center, falloff, color ramp anchors, add scale) into per-vertex attributes
+ * (center, falloff, color ramp anchors, modulate) into per-vertex attributes
  * and keeps only the live lamp state (intensity, colors) in attributes updated
  * in place — the fragment math is identical to the per-quad material above,
  * only the parameter source changes from uniforms to attributes.
@@ -144,6 +200,8 @@ export function createMergedBulbGlowMaterial(): MeshBasicNodeMaterial {
 	const aDyn = attribute<'vec2'>('aGlowDyn', 'vec2')
 	mat.colorNode = Fn(() => {
 		// Same math as the per-quad material; params come from attributes.
+		// aDyn.y carries the native modulate m (static per lamp); the rgb is
+		// negatively encoded and the alpha is 1/m − 1, as upstream.
 		const len = length(positionLocal.xy.sub(aCenter)).mul(aParams.x)
 		const atten = pow(max(float(1).sub(clamp(len, float(0), float(1))), float(0.0001)), aParams.y)
 		const glowColor = mix(aColor2, aColor, sqrt(len))
@@ -152,10 +210,16 @@ export function createMergedBulbGlowMaterial(): MeshBasicNodeMaterial {
 			float(0.5).sub(positionWorld.z.div(uTransArea.y)),
 		)
 		const footprint = mix(float(1), inPlayfieldBounds(pfUv), uBulbGlowFootprintClip)
-		const rgb = glowColor.mul(atten).mul(aDyn.x).mul(aDyn.y).mul(footprint)
-		return vec4(rgb, float(1))
+		const rgb = glowColor.mul(atten).mul(aDyn.x).mul(aDyn.y).mul(float(-1)).mul(footprint)
+		return vec4(rgb, float(1).div(aDyn.y).sub(float(1)))
 	})()
-	mat.blending = AdditiveBlending
+	mat.blending = CustomBlending
+	mat.blendSrc = SrcAlphaFactor
+	mat.blendDst = OneMinusSrcColorFactor
+	mat.blendEquation = ReverseSubtractEquation
+	mat.blendSrcAlpha = SrcAlphaFactor
+	mat.blendDstAlpha = OneMinusSrcColorFactor
+	mat.blendEquationAlpha = ReverseSubtractEquation
 	mat.transparent = true
 	mat.depthWrite = false
 	mat.depthTest = true
@@ -173,7 +237,7 @@ interface BulbGlowUniforms {
 	color: Color
 	color2: Color
 	intensity: number
-	addScale: number
+	modulate: number
 }
 
 function liveGlowUniforms(mesh: Mesh): BulbGlowUniforms | undefined {
@@ -182,9 +246,9 @@ function liveGlowUniforms(mesh: Mesh): BulbGlowUniforms | undefined {
 	const color = (ud.__uColor as { value?: Color } | undefined)?.value
 	const color2 = (ud.__uColor2 as { value?: Color } | undefined)?.value
 	const intensity = (ud.__uIntensity as { value?: unknown } | undefined)?.value
-	const addScale = (ud.__uAddScale as { value?: unknown } | undefined)?.value
-	if (!color || !color2 || typeof intensity !== 'number' || typeof addScale !== 'number') return undefined
-	return { color, color2, intensity, addScale }
+	const modulate = (ud.__uModulate as { value?: unknown } | undefined)?.value
+	if (!color || !color2 || typeof intensity !== 'number' || typeof modulate !== 'number') return undefined
+	return { color, color2, intensity, modulate }
 }
 
 interface GlowLightParams {
@@ -380,7 +444,7 @@ export function mergeBulbGlowQuads(root: Group, table: unknown): number {
 			aColor2[v * 3 + 1] = c.live.color2.g
 			aColor2[v * 3 + 2] = c.live.color2.b
 			aDyn[v * 2] = c.live.intensity
-			aDyn[v * 2 + 1] = c.live.addScale
+			aDyn[v * 2 + 1] = c.live.modulate
 		}
 		for (let i = 0; i < srcIdx.length; i++) indices[iCursor + i] = vCursor + (srcIdx[i] as number)
 		ranges.set(c.lightName, { start: vCursor, count })

@@ -1,4 +1,4 @@
-import { AdditiveBlending } from 'three'
+import { CustomBlending, OneMinusSrcColorFactor, ReverseSubtractEquation, SrcAlphaFactor } from 'three'
 import { afterEach, describe, expect, it } from 'vitest'
 import { createBulbGlowNodeMaterial, isBulbGlowMaterial, setBulbGlowState } from './bulb-glow-node.js'
 import {
@@ -22,7 +22,7 @@ afterEach(() => {
 })
 
 describe('bulb glow node material', () => {
-	it('should create a flagged additive material', () => {
+	it('should create a flagged native-composite material', () => {
 		const mat = createBulbGlowNodeMaterial({
 			color: 0xff6020,
 			color2: 0xffffff,
@@ -36,14 +36,17 @@ describe('bulb glow node material', () => {
 		expect(mat.transparent).toBe(true)
 		expect(mat.depthWrite).toBe(false)
 		expect(mat.colorNode).toBeDefined()
-		// Upstream fs_light.sc runs SRC_ALPHA/INVSRC_COLOR/REVSUBTRACT with a
-		// negatively-encoded output that needs framebuffer feedback
-		// (dst-modulated term); a single forward pass cannot provide it, so
-		// the halo stays plain additive carrying only the (1-modulate) term.
-		expect(mat.blending, 'bulb halo stays plain additive without framebuffer feedback').toBe(AdditiveBlending)
+		// Full fs_light.sc composite via the blend unit: REVSUBTRACT with
+		// SRC_ALPHA/INV_SRC_COLOR over the post-opaque scene color, fed the
+		// negatively-encoded shader output. Runs in the pipeline scene
+		// pass's transparent phase, so no extra pass is needed.
+		expect(mat.blending, 'bulb halo composites with the native blend state').toBe(CustomBlending)
+		expect(mat.blendSrc).toBe(SrcAlphaFactor)
+		expect(mat.blendDst).toBe(OneMinusSrcColorFactor)
+		expect(mat.blendEquation).toBe(ReverseSubtractEquation)
 	})
 
-	it('should scale output by (1 - modulateVsAdd)', () => {
+	it('should store the clamped modulateVsAdd for the negative encoding', () => {
 		const additive = createBulbGlowNodeMaterial({
 			color: 0xffffff,
 			color2: 0xffffff,
@@ -64,9 +67,9 @@ describe('bulb glow node material', () => {
 			intensity: 10,
 			modulateVsAdd: 0.9,
 		})
-		const scaleOf = (mat: unknown): number => (mat as any).userData.__uAddScale.value as number
-		expect(scaleOf(additive)).toBeCloseTo(0.9999, 4)
-		expect(scaleOf(modulated)).toBeCloseTo(0.1, 4)
+		const modulateOf = (mat: unknown): number => (mat as any).userData.__uModulate.value as number
+		expect(modulateOf(additive)).toBeCloseTo(0.0001, 4)
+		expect(modulateOf(modulated)).toBeCloseTo(0.9, 4)
 		expect(isBulbGlowMaterial(modulated)).toBe(true)
 	})
 

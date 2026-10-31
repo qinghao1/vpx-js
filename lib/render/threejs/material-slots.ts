@@ -44,7 +44,7 @@ export interface MaterialSlots {
 	__uEmissionScale?: SlotUniform<number>
 	__uColor?: SlotUniform<Color>
 	__uColor2?: SlotUniform<Color>
-	__uAddScale?: SlotUniform<number>
+	__uModulate?: SlotUniform<number>
 	__rebuild?: (next: Texture | null) => void
 	pendingMap?: string
 	/** Legacy lowercase spelling, normalized to `pendingMap` once at ingestion (see `normalizePendingKeys`). Never written in-tree. */

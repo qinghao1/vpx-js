@@ -1,6 +1,6 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { type BufferAttribute, type BufferGeometry, Color, Group, Mesh, PlaneGeometry } from 'three'
+import { type BufferAttribute, type BufferGeometry, Color, CustomBlending, Group, Mesh, PlaneGeometry } from 'three'
 import { describe, expect, it } from 'vitest'
 import { getAuthoredVisible, setAuthoredVisible } from '../authored-visible.js'
 import { ThreeLightGenerator } from '../three-light-generator.js'
@@ -66,13 +66,14 @@ function twoLampRoot(): { root: Group; quadA: Mesh; quadB: Mesh } {
 }
 
 describe('merged bulb-glow composite', () => {
-	it('creates a flagged additive material', () => {
+	it('creates a flagged native-composite material', () => {
 		const mat = createMergedBulbGlowMaterial()
 		expect(isMergedBulbGlowMaterial(mat)).to.equal(true)
 		expect(isBulbGlowMaterial(mat)).to.equal(false)
 		expect(mat.transparent).to.equal(true)
 		expect(mat.depthWrite).to.equal(false)
 		expect(mat.depthTest).to.equal(true)
+		expect(mat.blending).to.equal(CustomBlending)
 	})
 
 	it('folds two quads into one draw with per-lamp parameter attributes', () => {
@@ -93,7 +94,7 @@ describe('merged bulb-glow composite', () => {
 		expect(refB.mesh).to.equal(merged)
 		expect(refB.start).to.equal(refA.start + refA.count)
 		// Baked params mirror the per-quad material uniforms: center, inverse
-		// falloff, power, linear-space ramp colors, live intensity + add scale.
+		// falloff, power, linear-space ramp colors, live intensity + modulate m.
 		const center = geo.getAttribute('aGlowCenter') as BufferAttribute
 		expect(Array.from((center.array as Float32Array).slice(0, 2))).to.deep.equal([500, 1000])
 		const params = geo.getAttribute('aGlowParams') as BufferAttribute
@@ -105,9 +106,9 @@ describe('merged bulb-glow composite', () => {
 		expect((color.array as Float32Array)[rangeA.start * 3]).to.be.closeTo(expectedRed.r, 1e-6)
 		const dyn = geo.getAttribute('aGlowDyn') as BufferAttribute
 		expect((dyn.array as Float32Array)[rangeA.start * 2]).to.equal(10)
-		// Float32 attribute storage cannot represent 0.1 (error ~1.5e-9), so the
+		// Float32 attribute storage cannot represent 0.9 (error ~1.5e-9), so the
 		// tolerance matches the 1e-6 used for colors elsewhere in this file.
-		expect((dyn.array as Float32Array)[rangeA.start * 2 + 1]).to.be.closeTo(0.1, 1e-6)
+		expect((dyn.array as Float32Array)[rangeA.start * 2 + 1]).to.be.closeTo(0.9, 1e-6)
 	})
 
 	it('updates live lamp state in place without reallocating', () => {

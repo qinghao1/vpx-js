@@ -33,9 +33,10 @@ Three deliberate divergences from VPinball, each pinned by a spec:
 - `AB_ADD` flashers stay plain additive. Upstream pairs `REVSUBTRACT` with a
   negatively-encoded shader output (`flasher.cpp`, `fs_flasher.sc`); this
   backend emits positive premultiplied color, which that blend would darken.
-- Bulb halos emit only the `(1-modulate)` add term with plain additive
-  blending. The upstream `dst`-modulated term (`fs_light.sc`) needs
-  framebuffer feedback, unavailable in a single forward pass.
+- Bulb halos evaluate the full `fs_light.sc` composite through the native
+  blend state (`REVSUBTRACT` with `SRC_ALPHA`/`INV_SRC_COLOR`, negatively
+  encoded output) over the post-opaque scene color, so the `dst`-modulated
+  term lights inserts on tables without `szLightmap` receivers.
 - VR-room/cabinet meshes are always forced visible (upstream hides them via
   `PartGroupData::PlayerModeVisibilityMask` per player mode); threading the
   real player mode through is a follow-up.
