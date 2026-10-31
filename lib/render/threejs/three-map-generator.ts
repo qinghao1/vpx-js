@@ -20,6 +20,13 @@ const HARDWARE_CONCURRENCY_FALLBACK = 4
  */
 const LOAD_FAILURE_COOLDOWN_MS = 30000
 
+/**
+ * Starved demand passes (nothing loaded) skip the scene walk for this long.
+ * Script texture assignments wake the pass immediately (noteTextureDemand),
+ * so the only cost is a bounded delay for bindings created off that path.
+ */
+const DEMAND_RESCAN_MS = 500
+
 // Round band edges, not measured knees — retune once dispatch is profiled.
 const SMALL_TEXTURE_BYTES = 1 << 20
 const GIANT_TEXTURE_BYTES = 16 << 20
@@ -41,6 +48,9 @@ export class ThreeMapGenerator {
 	private readonly textureCache = new Map<string, ThreeTexture>()
 	private readonly inFlight = new Map<string, Promise<boolean>>()
 	private readonly lastFailureAt = new Map<string, number>()
+	private lastDemandScanAt = 0
+	private lastDemandUnproductive = false
+	private lastDemandMissing: string[] = []
 
 	constructor(
 		private readonly textureLoader?: ITextureLoader<ThreeTexture>,
@@ -284,6 +294,16 @@ export class ThreeMapGenerator {
 	}
 
 	/**
+	 * Marks a script texture assignment the demand pass has not seen yet, so
+	 * the next pass scans immediately instead of waiting out the starvation
+	 * throttle below. Call when assigning a name the cache does not hold.
+	 */
+	public noteTextureDemand(): void {
+		this.lastDemandScanAt = 0
+		this.lastDemandUnproductive = false
+	}
+
+	/**
 	 * Loads table textures for scene materials whose pending key missed the
 	 * cache — typically images assigned by table script after the stream
 	 * filter ran (e.g. `VRCab_Backbox.image = ...` in `Table1_Init`). The
@@ -294,6 +314,16 @@ export class ThreeMapGenerator {
 	 * retried on a later pass.
 	 */
 	public async demandPendingMaps(root: Group, table: Table): Promise<{ loaded: string[]; missing: string[] }> {
+		// Steady-state passes find nothing (one doomed name, the rest cooling
+		// down) yet each walks the whole scene, so skip the walk while starved.
+		// Script assignments wake the pass via noteTextureDemand; anything else
+		// surfaces on the next periodic rescan.
+		if (this.lastDemandUnproductive && Date.now() - this.lastDemandScanAt < DEMAND_RESCAN_MS) {
+			return { loaded: [], missing: this.lastDemandMissing.filter(name => !this.hasTexture(name)) }
+		}
+		this.lastDemandScanAt = Date.now()
+		this.lastDemandUnproductive = true
+		this.lastDemandMissing = []
 		const wanted = new Set<string>()
 		root.traverse(o => {
 			const mesh = o as Mesh
@@ -329,6 +359,8 @@ export class ThreeMapGenerator {
 			if (ok) loaded.push(tex.getName())
 			else missing.push(tex.getName())
 		})
+		if (loaded.length > 0) this.lastDemandUnproductive = false
+		this.lastDemandMissing = missing
 		return { loaded, missing }
 	}
 

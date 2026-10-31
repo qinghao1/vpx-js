@@ -236,10 +236,22 @@ function falloffKernel(power: number): { atten: Float32Array; hub: Float32Array 
 	return kernel
 }
 
+/** Texel centers in table units; splat-independent, rebuilt when the table size changes. */
+const columnX = new Float64Array(TRANSMISSION_WIDTH)
+const rowY = new Float64Array(TRANSMISSION_HEIGHT)
+let axesRight = -1
+let axesBottom = -1
+
 /** Splats one lamp list into a half-float playfield-UV buffer. */
 function fillBuffer(data: Uint16Array, list: TransmissionSplat[], right: number, bottom: number): void {
 	const acc = scratchAcc
 	acc.fill(0)
+	if (axesRight !== right || axesBottom !== bottom) {
+		for (let px = 0; px < TRANSMISSION_WIDTH; px++) columnX[px] = ((px + 0.5) / TRANSMISSION_WIDTH) * right
+		for (let py = 0; py < TRANSMISSION_HEIGHT; py++) rowY[py] = (1 - (py + 0.5) / TRANSMISSION_HEIGHT) * bottom
+		axesRight = right
+		axesBottom = bottom
+	}
 	for (const splat of list) {
 		const falloff = splat.falloff
 		const falloffSq = falloff * falloff
@@ -258,24 +270,28 @@ function fillBuffer(data: Uint16Array, list: TransmissionSplat[], right: number,
 		const minPy = Math.max(0, Math.floor((vCenter - vRadius) * TRANSMISSION_HEIGHT))
 		const maxPy = Math.min(TRANSMISSION_HEIGHT - 1, Math.ceil((vCenter + vRadius) * TRANSMISSION_HEIGHT))
 		for (let py = minPy; py <= maxPy; py++) {
-			const ty = (1 - (py + 0.5) / TRANSMISSION_HEIGHT) * bottom
+			const dy = (rowY[py] as number) - splat.y
+			const dySq = dy * dy
+			let offset = (py * TRANSMISSION_WIDTH + minPx) * 4
 			for (let px = minPx; px <= maxPx; px++) {
-				const tx = ((px + 0.5) / TRANSMISSION_WIDTH) * right
-				const dx = tx - splat.x
-				const dy = ty - splat.y
-				const distSq = dx * dx + dy * dy
-				if (distSq >= falloffSq) continue
+				const dx = (columnX[px] as number) - splat.x
+				const distSq = dx * dx + dySq
+				if (distSq >= falloffSq) {
+					offset += 4
+					continue
+				}
 				// Table lookup replaces the sqrt/pow/hub triple; the boundary
 				// above keeps edge texels identical to the analytic version.
 				const kernelIndex = (distSq * kernelScale) | 0
 				const atten = kernelAtten[kernelIndex] as number
-				if (atten <= 0) continue
-				const hub = kernelHub[kernelIndex] as number
-				const offset = (py * TRANSMISSION_WIDTH + px) * 4
-				acc[offset] += (splat.red2 + redSpan * hub) * atten
-				acc[offset + 1] += (splat.green2 + greenSpan * hub) * atten
-				acc[offset + 2] += (splat.blue2 + blueSpan * hub) * atten
-				acc[offset + 3] = 1
+				if (atten > 0) {
+					const hub = kernelHub[kernelIndex] as number
+					acc[offset] += (splat.red2 + redSpan * hub) * atten
+					acc[offset + 1] += (splat.green2 + greenSpan * hub) * atten
+					acc[offset + 2] += (splat.blue2 + blueSpan * hub) * atten
+					acc[offset + 3] = 1
+				}
+				offset += 4
 			}
 		}
 	}

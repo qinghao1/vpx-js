@@ -4,7 +4,7 @@
 import type { Object3D } from 'three'
 import type { IRenderApi } from '../../render/irender-api.js'
 import { applyAbsorbBlendState } from '../../render/threejs/nodes/primitive-bdl-node.js'
-import { ItemUpdater } from '../item-updater.js'
+import { ItemUpdater, noteTextureDemand } from '../item-updater.js'
 import type { Light } from '../light/light.js'
 import type { LightAnimation } from '../light/light-physics.js'
 import type { Table } from '../table/table.js'
@@ -140,6 +140,7 @@ export class FlasherUpdater extends ItemUpdater<FlasherState> {
 		if (this.state.imageA === this.lastImageA) return
 		this.lastImageA = this.state.imageA
 		renderApi.applyMaterial(target as unknown as NODE, undefined, this.state.imageA || undefined)
+		if (this.state.imageA) noteTextureDemand(renderApi, this.state.imageA)
 	}
 
 	/** Regenerates the baked mesh when rotation/height changed, like upstream's dynamic vertex buffer. */

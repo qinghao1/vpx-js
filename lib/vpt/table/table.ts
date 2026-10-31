@@ -80,7 +80,12 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 	private api?: TableApi
 	private readonly itemIndex = new Map<string, string>()
 	// getTexture is per-frame hot (meshes + script setters); cache the case-insensitive lookup.
-	private textureCache?: { map: Map<string, { key: string; texture: Texture }>; size: number }
+	private textureCache?: {
+		map: Map<string, { key: string; texture: Texture }>
+		size: number
+		source: Record<string, Texture>
+	}
+	private materialCache?: { map: Map<string, Material>; materials: Material[]; length: number }
 
 	public readonly textures: Record<string, Texture> = {}
 	public readonly sounds: Record<string, Sound> = {}
@@ -172,16 +177,17 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 	/** Case-insensitive, last wins (upstream resolves names through a case-insensitive map during playback). */
 	public getTexture(name?: string): Texture | undefined {
 		if (!name) return undefined
+		if (!this.textureCache || this.textureCache.source !== this.textures) {
+			this.rebuildTextureCache()
+		}
 		const lc = name.toLowerCase()
-		const size = Object.keys(this.textures).length
-		if (!this.textureCache || this.textureCache.size !== size) this.rebuildTextureCache(size)
 		const cached = this.textureCache.map.get(lc)
 		if (cached && this.textures[cached.key] === cached.texture) return cached.texture
-		// Stale hit or uncached miss: the dict may have been swapped at equal size, so rebuild once.
-		this.rebuildTextureCache(size)
+		// Stale hit or uncached miss: the dict may have grown or been swapped, so rebuild once.
+		this.rebuildTextureCache()
 		return this.textureCache.map.get(lc)?.texture
 	}
-	private rebuildTextureCache(size: number): void {
+	private rebuildTextureCache(): void {
 		const map = new Map<string, { key: string; texture: Texture }>()
 		for (const [key, texture] of Object.entries(this.textures)) {
 			const entry = { key, texture }
@@ -189,16 +195,17 @@ export class Table implements IScriptable<TableApi>, IRenderable<TableState> {
 			const textureName = texture.getName?.()
 			if (textureName) map.set(textureName.toLowerCase(), entry)
 		}
-		this.textureCache = { map, size }
+		this.textureCache = { map, size: map.size, source: this.textures }
 	}
 	public getMaterial(name?: string): Material | undefined {
 		if (!name || !this.data) return undefined
 		const mats = this.data.materials
-		const lc = name.toLowerCase()
-		for (let i = mats.length - 1; i >= 0; i--) {
-			if (mats[i]!.name.toLowerCase() === lc) return mats[i]
+		if (!this.materialCache || this.materialCache.materials !== mats || this.materialCache.length !== mats.length) {
+			const map = new Map<string, Material>()
+			for (const mat of mats) map.set(mat.name.toLowerCase(), mat)
+			this.materialCache = { map, materials: mats, length: mats.length }
 		}
-		return undefined
+		return this.materialCache.map.get(name.toLowerCase())
 	}
 	public getApi(): TableApi {
 		return this.api!

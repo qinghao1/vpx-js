@@ -42,6 +42,8 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 	private animMesh?: Mesh
 	private animFrames: PrebuiltAnimationFrame[] = []
 	private animScratch?: { positions: Float32Array; normals: Float32Array; bounds: Float32Array }
+	private lastHexKey = -1
+	private lastHex = 0xffffff
 
 	constructor(
 		private readonly data: PrimitiveData,
@@ -265,7 +267,13 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 		const matObj = table.getMaterial(this.state.material ?? this.data.szMaterial ?? '')
 		const base = matObj?.baseColor ?? 0xffffff
 		const matOpacity = matObj?.isOpacityActive ? Math.min(1, Math.max(0, matObj.opacity)) : 1
-		const hex = new Color(base).multiply(new Color(prim)).getHex()
+		// Script color sets are rare; lamp-fade re-applies reuse the same pair.
+		const hexKey = base * 0x1000000 + prim
+		if (hexKey !== this.lastHexKey) {
+			this.lastHexKey = hexKey
+			this.lastHex = new Color(base).multiply(new Color(prim)).getHex()
+		}
+		const hex = this.lastHex
 		// Upstream applies the controller link *or* the lightmap, never both
 		// (primitive.cpp:932-940): a resolved SLNK link scales the alpha and
 		// suppresses the lamp modulation; otherwise the lightmap ratio applies.

@@ -7,6 +7,25 @@ import type { IRenderApi } from '../render/irender-api.js'
 import type { ItemState } from './item-state.js'
 import type { Table } from './table/table.js'
 
+/**
+ * Wakes the texture demand pass after assigning a name the cache does not
+ * hold, so script image swaps bind on the next pass instead of waiting out
+ * the starvation throttle. Cached names need no pass and stay quiet.
+ */
+export function noteTextureDemand(renderApi: IRenderApi<unknown, unknown, unknown>, texture: string): void {
+	try {
+		const generator = (
+			renderApi as unknown as {
+				getMapGenerator?: () => { hasTexture?: (name: string) => boolean; noteTextureDemand?: () => void }
+			}
+		).getMapGenerator?.()
+		if (generator && !generator.hasTexture?.(texture)) generator.noteTextureDemand?.()
+	} catch {
+		// Demand wakeup is best effort; a backend without a map generator
+		// resolves the same binding on its next periodic rescan.
+	}
+}
+
 /** Base for item updaters (applies state to render node). */
 export abstract class ItemUpdater<STATE extends ItemState> {
 	protected readonly state: STATE
@@ -43,6 +62,7 @@ export abstract class ItemUpdater<STATE extends ItemState> {
 	) {
 		if (material || texture) {
 			renderApi.applyMaterial(obj, table.getMaterial(material), texture)
+			if (texture) noteTextureDemand(renderApi, texture)
 		}
 	}
 

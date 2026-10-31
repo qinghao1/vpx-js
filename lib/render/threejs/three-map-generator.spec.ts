@@ -586,6 +586,99 @@ describe('ThreeMapGenerator.demandPendingMaps', () => {
 		}
 	})
 
+	it('skips the scene walk while starved and rescans after the interval', async () => {
+		const table = {
+			getTexture: vi.fn(() => undefined),
+			streamStorage: async (): Promise<Uint8Array> => {
+				throw new Error('unreachable')
+			},
+		} as any
+		const loader = { hasDefaultTexture: () => false }
+		const generator = new ThreeMapGenerator(loader as any)
+		const root = new Group()
+		const mesh = new Mesh(new BoxGeometry(), new MeshBasicMaterial())
+		mesh.material.userData.pendingMap = 'gone'
+		root.add(mesh)
+
+		const start = Date.now()
+		const now = vi.spyOn(Date, 'now').mockReturnValue(start)
+		try {
+			expect(await generator.demandPendingMaps(root, table)).toEqual({ loaded: [], missing: ['gone'] })
+			expect(table.getTexture).toHaveBeenCalledTimes(1)
+			// Starved: same report without walking the scene again.
+			expect(await generator.demandPendingMaps(root, table)).toEqual({ loaded: [], missing: ['gone'] })
+			expect(table.getTexture).toHaveBeenCalledTimes(1)
+			now.mockReturnValue(start + 501)
+			expect(await generator.demandPendingMaps(root, table)).toEqual({ loaded: [], missing: ['gone'] })
+			expect(table.getTexture).toHaveBeenCalledTimes(2)
+		} finally {
+			now.mockRestore()
+		}
+	})
+
+	it('wakes a starved pass when a script assignment misses the cache', async () => {
+		const table = {
+			getTexture: vi.fn(() => undefined),
+			streamStorage: async (): Promise<Uint8Array> => {
+				throw new Error('unreachable')
+			},
+		} as any
+		const loader = { hasDefaultTexture: () => false }
+		const generator = new ThreeMapGenerator(loader as any)
+		const root = new Group()
+		const mesh = new Mesh(new BoxGeometry(), new MeshBasicMaterial())
+		mesh.material.userData.pendingMap = 'gone'
+		root.add(mesh)
+
+		const start = Date.now()
+		const now = vi.spyOn(Date, 'now').mockReturnValue(start)
+		try {
+			expect(await generator.demandPendingMaps(root, table)).toEqual({ loaded: [], missing: ['gone'] })
+			generator.noteTextureDemand()
+			expect(await generator.demandPendingMaps(root, table)).toEqual({ loaded: [], missing: ['gone'] })
+			expect(table.getTexture).toHaveBeenCalledTimes(2)
+		} finally {
+			now.mockRestore()
+		}
+	})
+
+	it('keeps scanning while passes make progress', async () => {
+		const tex = new (VptTexture as any)()
+		tex.storageName = 'Image70'
+		tex.szName = 'Swap'
+		tex.szPath = 'swap.png'
+		tex.isOpaque = true
+		tex.binary = { pos: 0, len: 8 }
+		const table = {
+			getTexture: vi.fn(() => tex),
+			streamStorage: async (_name: string, next: (storage: unknown) => Promise<Uint8Array>) => {
+				return next({ read: async () => new Uint8Array(8) })
+			},
+		} as any
+		const loader = {
+			loadTexture: async () => new Texture(),
+			loadRawTexture: async () => new Texture(),
+			loadDefaultTexture: async () => new Texture(),
+		}
+		const generator = new ThreeMapGenerator(loader as any)
+		const root = new Group()
+		const traverse = vi.spyOn(root, 'traverse')
+		const mesh = new Mesh(new BoxGeometry(), new MeshBasicMaterial())
+		mesh.material.userData.pendingMap = 'Swap'
+		root.add(mesh)
+
+		const start = Date.now()
+		const now = vi.spyOn(Date, 'now').mockReturnValue(start)
+		try {
+			expect(await generator.demandPendingMaps(root, table)).toEqual({ loaded: ['swap'], missing: [] })
+			// Productive pass: the next pass still walks the scene.
+			expect(await generator.demandPendingMaps(root, table)).toEqual({ loaded: [], missing: [] })
+			expect(traverse).toHaveBeenCalledTimes(2)
+		} finally {
+			now.mockRestore()
+		}
+	})
+
 	it('does not re-attempt a cooling-down engine default', async () => {
 		const table = {
 			getTexture: () => undefined,
