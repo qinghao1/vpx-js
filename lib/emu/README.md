@@ -37,7 +37,8 @@ returns `[[number, state], ...]` (VBS 2-D array shape). Consequences:
   empty. Poll once per frame and fan out.
 - Numbers are backend-native: WPC matrix numbers under wpc-emu (see below),
   PinMAME indices under PinMAME (`applyPinmame` switches the map to identity).
-- `getChangedLEDs` always returns `[]` (unimplemented).
+- `getChangedLEDs` returns `[[ledNo, chgSeg, state], ...]` triples drained
+  since the last read (empty under wpc-emu, which has no LED surface).
 
 ## WPC matrix numbering
 

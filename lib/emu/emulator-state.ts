@@ -105,12 +105,19 @@ export class EmulatorState {
 		this.lastGis = this.gis.slice()
 		return d
 	}
-	// Alphanumeric/segment-display LEDs. The wasm link already exports
-	// _PinmameGetChangedLEDs but no TS binding pulls it yet, and wpc-emu has
-	// no LED surface — so this stays a pinned [] stub until that pipeline
-	// is wired (deliberately not implemented here).
+	// Segment-display LEDs arrive pre-diffed from the wasm side — one
+	// (ledNo, chgSeg, state) triple per changed LED since the previous pull
+	// — so they accumulate here and drain on read, mirroring VPM where
+	// ChangedLEDs reports the changes since the script's last read. wpc-emu
+	// has no LED surface, so this lane stays empty for it.
+	private pendingLEDs: number[][] = []
+	pullLEDs(rows: number[][]): void {
+		for (const row of rows) this.pendingLEDs.push(row)
+	}
 	getChangedLEDs(): number[][] {
-		return []
+		const out = this.pendingLEDs
+		this.pendingLEDs = []
+		return out
 	}
 	getDmdScreen(): Uint8Array {
 		return this.dmd

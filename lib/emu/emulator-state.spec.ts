@@ -197,9 +197,16 @@ describe('The EmulatorState - handle state changes', () => {
 		])
 	})
 
-	it('should return empty array after fetching getChangedLEDs - not implemented used for Alphanumeric displays only', () => {
-		const result: number[][] = emulatorState.getChangedLEDs()
-		expect(result).to.deep.equal([])
+	it('should accumulate LED triples and drain on read', () => {
+		emulatorState.pullLEDs([
+			[7, 1, 2],
+			[9, 4, 5],
+		])
+		expect(emulatorState.getChangedLEDs()).to.deep.equal([
+			[7, 1, 2],
+			[9, 4, 5],
+		])
+		expect(emulatorState.getChangedLEDs(), 'drains like a VPM read').to.deep.equal([])
 	})
 
 	it('should get empty getDmdScreen', () => {
