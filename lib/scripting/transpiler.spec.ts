@@ -109,6 +109,22 @@ describe('The VBScript transpiler', () => {
 		expect(() => transpiler.transpile(`Dim a\na = True Imp False\n`)).to.throw()
 	})
 
+	it('should hoist a block-scoped Dim to the procedure', () => {
+		const scope = {} as any
+		const vbs = `Sub Foo()\n\tIf False Then\n\t\tDim VelCoef\n\t\tVelCoef = 42\n\tEnd If\n\tResult = VelCoef\nEnd Sub\nFoo`
+		new Transpiler(table, player).execute(vbs, scope, 'global')
+
+		expect(scope.Result).to.equal(undefined)
+	})
+
+	it('should keep a For loop variable visible after the loop', () => {
+		const scope = {} as any
+		const vbs = `Sub Foo()\n\tFor x = 1 To 3\n\t\ttotal = x\n\tNext\n\tResult = total\nEnd Sub\nFoo`
+		new Transpiler(table, player).execute(vbs, scope, 'global')
+
+		expect(scope.Result).to.equal(3)
+	})
+
 	it('should fail loudly on On Error GoTo with a label instead of silently ignoring it', () => {
 		const transpiler = new Transpiler(table, player)
 		expect(() => transpiler.transpile(`On Error GoTo Handler\nHandler:\n`)).to.throw()

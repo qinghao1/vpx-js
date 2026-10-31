@@ -201,13 +201,13 @@ describe('The scripting reference transformer', () => {
 		it('should rename an unresolved `switch` variable', () => {
 			const vbs = `Dim switch\nswitch = 1\n`
 			const js = transform(vbs, table, player)
-			expect(js).to.equal(`let aSwitch;\naSwitch = 1;`)
+			expect(js).to.equal(`var aSwitch;\naSwitch = 1;`)
 		})
 
 		it('should rename other unresolved reserved words', () => {
 			const vbs = `Dim var\nvar = 1\nDim this\nthis = 2\nDim typeof\ntypeof = 3\n`
 			const js = transform(vbs, table, player)
-			expect(js).to.equal(`let aVar;\naVar = 1;\nlet aThis;\naThis = 2;\nlet aTypeof;\naTypeof = 3;`)
+			expect(js).to.equal(`var aVar;\naVar = 1;\nvar aThis;\naThis = 2;\nvar aTypeof;\naTypeof = 3;`)
 		})
 
 		it('should prefer a table element named `Switch` over the rename', () => {

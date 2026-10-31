@@ -146,19 +146,33 @@ export class VpmController {
 	}
 
 	private async _loadGame(name: string): Promise<void> {
+		const prev = this.emulator
 		if (GamelistDB.getByPinmameName(name)) {
-			const { wpcDbEntry, romFile } = await downloadGameEntry(name)
-			// Fresh wpc Emulator, symmetric with the PinMAME branch below —
-			// this.emulator may hold a PinMAME instance from an earlier load.
-			const emu = new Emulator()
-			// No pre-loadGame replay: pre-init setter calls queue inside the
-			// adapter and loadGame drains that queue, while the post-loadGame
-			// replay below re-applies these same caches.
-			this.emulator = emu
-			await emu.loadGame(wpcDbEntry, romFile)
-			this.player.setEmulator(emu)
-			this.replay(emu as unknown as IEmulator)
-			return
+			// Fall through to the PinMAME branch when the download fails, so a
+			// locally provided ROM can still boot the table.
+			const entry = await downloadGameEntry(name).catch(e => {
+				logger().warn(`[vpm] WPC ROM download failed for ${name}, trying local ROM via PinMAME`, e)
+				return null
+			})
+			if (entry) {
+				// Fresh wpc Emulator, symmetric with the PinMAME branch below —
+				// this.emulator may hold a PinMAME instance from an earlier load.
+				const emu = new Emulator()
+				// No pre-loadGame replay: pre-init setter calls queue inside the
+				// adapter and loadGame drains that queue, while the post-loadGame
+				// replay below re-applies these same caches.
+				this.emulator = emu
+				try {
+					await emu.loadGame(entry.wpcDbEntry, entry.romFile)
+				} catch (e) {
+					// A failed wpc boot must not displace a running game.
+					if (this.emulator === emu) this.emulator = prev
+					throw e
+				}
+				this.player.setEmulator(emu)
+				this.replay(emu as unknown as IEmulator)
+				return
+			}
 		}
 		const existing = this.player.getPhysics().emu
 		if (existing?.isInitialized() && existing instanceof PinMameEmulator) {
@@ -168,7 +182,7 @@ export class VpmController {
 		}
 		const emu = new PinMameEmulator()
 		this.replay(emu)
-		const prev = this.emulator
+		// Swap in the new emulator; the catch below restores prev on failure.
 		this.emulator = emu
 		const rom = await this.fetchRom(name)
 		try {
@@ -212,11 +226,12 @@ export class VpmController {
 			__pendingRomName?: string
 			__pendingRomUrl?: string
 		}
-		if (
-			pendingWindow.__pendingRom?.length &&
-			(!pendingWindow.__pendingRomName || pendingWindow.__pendingRomName === name)
-		) {
-			return pendingWindow.__pendingRom
+		if (pendingWindow.__pendingRom?.length) {
+			if (!pendingWindow.__pendingRomName || pendingWindow.__pendingRomName === name) {
+				return pendingWindow.__pendingRom
+			}
+			// A stale upload for another table must not boot silently under this name.
+			logger().warn(`[pinmame] ignoring preloaded ROM ${pendingWindow.__pendingRomName} (expected ${name})`)
 		}
 		if (typeof process !== 'undefined' && process.versions?.node) {
 			try {

@@ -82,7 +82,7 @@ describe('The VBScript transpiler - Loop', () => {
 		const vbs = `Dim x\nx = 1\nDo While x < 5\nx = x + 1\nLoop`
 		const js = grammar.vbsToJs(vbs)
 		expect(js).to.equal(
-			`let x;\nx = 1;\n__exitDo:\n    while (${Transformer.VBSHELPER_NAME}.isTrue(${Transformer.VBSHELPER_NAME}.lt(x, 5))) {\n        x = ${Transformer.VBSHELPER_NAME}.add(x, 1);\n    }`,
+			`var x;\nx = 1;\n__exitDo:\n    while (${Transformer.VBSHELPER_NAME}.isTrue(${Transformer.VBSHELPER_NAME}.lt(x, 5))) {\n        x = ${Transformer.VBSHELPER_NAME}.add(x, 1);\n    }`,
 		)
 	})
 
@@ -90,7 +90,7 @@ describe('The VBScript transpiler - Loop', () => {
 		const vbs = `Dim x\nx = 1\nDo While x < 5\nLoop`
 		const js = grammar.vbsToJs(vbs)
 		expect(js).to.equal(
-			`let x;\nx = 1;\n__exitDo:\n    while (${Transformer.VBSHELPER_NAME}.isTrue(${Transformer.VBSHELPER_NAME}.lt(x, 5))) {\n    }`,
+			`var x;\nx = 1;\n__exitDo:\n    while (${Transformer.VBSHELPER_NAME}.isTrue(${Transformer.VBSHELPER_NAME}.lt(x, 5))) {\n    }`,
 		)
 	})
 
@@ -98,7 +98,7 @@ describe('The VBScript transpiler - Loop', () => {
 		const vbs = `Dim x\nx = 1\nDo Until x = 5\nx = x + 1\nLoop`
 		const js = grammar.vbsToJs(vbs)
 		expect(js).to.equal(
-			`let x;\nx = 1;\n__exitDo:\n    do {\n        if (${Transformer.VBSHELPER_NAME}.isTrue(${Transformer.VBSHELPER_NAME}.equals(x, 5)))\n            break;\n        x = ${Transformer.VBSHELPER_NAME}.add(x, 1);\n    } while (true);`,
+			`var x;\nx = 1;\n__exitDo:\n    do {\n        if (${Transformer.VBSHELPER_NAME}.isTrue(${Transformer.VBSHELPER_NAME}.equals(x, 5)))\n            break;\n        x = ${Transformer.VBSHELPER_NAME}.add(x, 1);\n    } while (true);`,
 		)
 	})
 
@@ -106,7 +106,7 @@ describe('The VBScript transpiler - Loop', () => {
 		const vbs = `Dim x\nx = 1\nDo Until x = 5\nLoop`
 		const js = grammar.vbsToJs(vbs)
 		expect(js).to.equal(
-			`let x;\nx = 1;\n__exitDo:\n    do {\n        if (${Transformer.VBSHELPER_NAME}.isTrue(${Transformer.VBSHELPER_NAME}.equals(x, 5)))\n            break;\n    } while (true);`,
+			`var x;\nx = 1;\n__exitDo:\n    do {\n        if (${Transformer.VBSHELPER_NAME}.isTrue(${Transformer.VBSHELPER_NAME}.equals(x, 5)))\n            break;\n    } while (true);`,
 		)
 	})
 
@@ -114,7 +114,7 @@ describe('The VBScript transpiler - Loop', () => {
 		const vbs = `Dim x\nx = 7\nDo\nx = x + 1\nLoop While x < 5`
 		const js = grammar.vbsToJs(vbs)
 		expect(js).to.equal(
-			`let x;\nx = 7;\n__exitDo:\n    do {\n        x = ${Transformer.VBSHELPER_NAME}.add(x, 1);\n    } while (${Transformer.VBSHELPER_NAME}.isTrue(${Transformer.VBSHELPER_NAME}.lt(x, 5)));`,
+			`var x;\nx = 7;\n__exitDo:\n    do {\n        x = ${Transformer.VBSHELPER_NAME}.add(x, 1);\n    } while (${Transformer.VBSHELPER_NAME}.isTrue(${Transformer.VBSHELPER_NAME}.lt(x, 5)));`,
 		)
 	})
 
@@ -122,7 +122,7 @@ describe('The VBScript transpiler - Loop', () => {
 		const vbs = `Dim x\nx = 7\nDo\nLoop While x < 5`
 		const js = grammar.vbsToJs(vbs)
 		expect(js).to.equal(
-			`let x;\nx = 7;\n__exitDo:\n    do {\n    } while (${Transformer.VBSHELPER_NAME}.isTrue(${Transformer.VBSHELPER_NAME}.lt(x, 5)));`,
+			`var x;\nx = 7;\n__exitDo:\n    do {\n    } while (${Transformer.VBSHELPER_NAME}.isTrue(${Transformer.VBSHELPER_NAME}.lt(x, 5)));`,
 		)
 	})
 
@@ -130,7 +130,7 @@ describe('The VBScript transpiler - Loop', () => {
 		const vbs = `Dim i\ni = 10\nDo\ni = i + 1\nLoop Until i < 15`
 		const js = grammar.vbsToJs(vbs)
 		expect(js).to.equal(
-			`let i;\ni = 10;\n__exitDo:\n    do {\n        i = ${Transformer.VBSHELPER_NAME}.add(i, 1);\n        if (${Transformer.VBSHELPER_NAME}.isTrue(${Transformer.VBSHELPER_NAME}.lt(i, 15)))\n            break;\n    } while (true);`,
+			`var i;\ni = 10;\n__exitDo:\n    do {\n        i = ${Transformer.VBSHELPER_NAME}.add(i, 1);\n        if (${Transformer.VBSHELPER_NAME}.isTrue(${Transformer.VBSHELPER_NAME}.lt(i, 15)))\n            break;\n    } while (true);`,
 		)
 	})
 
@@ -138,7 +138,7 @@ describe('The VBScript transpiler - Loop', () => {
 		const vbs = `Dim i\ni = 10\nDo\nLoop Until i < 15`
 		const js = grammar.vbsToJs(vbs)
 		expect(js).to.equal(
-			`let i;\ni = 10;\n__exitDo:\n    do {\n        if (${Transformer.VBSHELPER_NAME}.isTrue(${Transformer.VBSHELPER_NAME}.lt(i, 15)))\n            break;\n    } while (true);`,
+			`var i;\ni = 10;\n__exitDo:\n    do {\n        if (${Transformer.VBSHELPER_NAME}.isTrue(${Transformer.VBSHELPER_NAME}.lt(i, 15)))\n            break;\n    } while (true);`,
 		)
 	})
 
@@ -146,7 +146,7 @@ describe('The VBScript transpiler - Loop', () => {
 		const vbs = `Dim x\nx = 7\nDo\nx = x + 1\nLoop`
 		const js = grammar.vbsToJs(vbs)
 		expect(js).to.equal(
-			`let x;\nx = 7;\n__exitDo:\n    do {\n        x = ${Transformer.VBSHELPER_NAME}.add(x, 1);\n    } while (true);`,
+			`var x;\nx = 7;\n__exitDo:\n    do {\n        x = ${Transformer.VBSHELPER_NAME}.add(x, 1);\n    } while (true);`,
 		)
 	})
 
@@ -154,7 +154,7 @@ describe('The VBScript transpiler - Loop', () => {
 		const vbs = `Dim x\nx = 1\nWhile x < 5\nx = x + 1\nWEnd`
 		const js = grammar.vbsToJs(vbs)
 		expect(js).to.equal(
-			`let x;\nx = 1;\n__exitDo:\n    while (${Transformer.VBSHELPER_NAME}.isTrue(${Transformer.VBSHELPER_NAME}.lt(x, 5))) {\n        x = ${Transformer.VBSHELPER_NAME}.add(x, 1);\n    }`,
+			`var x;\nx = 1;\n__exitDo:\n    while (${Transformer.VBSHELPER_NAME}.isTrue(${Transformer.VBSHELPER_NAME}.lt(x, 5))) {\n        x = ${Transformer.VBSHELPER_NAME}.add(x, 1);\n    }`,
 		)
 	})
 
@@ -162,7 +162,7 @@ describe('The VBScript transpiler - Loop', () => {
 		const vbs = `Dim x\nx = 1\nWhile x < 5\nWEnd`
 		const js = grammar.vbsToJs(vbs)
 		expect(js).to.equal(
-			`let x;\nx = 1;\n__exitDo:\n    while (${Transformer.VBSHELPER_NAME}.isTrue(${Transformer.VBSHELPER_NAME}.lt(x, 5))) {\n    }`,
+			`var x;\nx = 1;\n__exitDo:\n    while (${Transformer.VBSHELPER_NAME}.isTrue(${Transformer.VBSHELPER_NAME}.lt(x, 5))) {\n    }`,
 		)
 	})
 

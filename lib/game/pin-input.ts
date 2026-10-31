@@ -62,7 +62,8 @@ const DEFAULT_KEYS: Record<number, number> = {
 // Cabinet switch ids for the emu (VPM-style numbers, vpx-js-defined — upstream
 // InputManager.cpp holds no such tables). Coin keys are script-only: no entry
 // below means no emu switch moves, so a script that ignores coin keys takes no coins.
-const SWITCH_START = [16, 13, 1] as const
+// Start has no entry either: the table script maps StartGameKey to its own
+// system's switch, and only the script knows that number.
 const SWITCH_FLIPPER_L = [84, 114, 112] as const
 const SWITCH_FLIPPER_R = [82, 86, 112, 116] as const
 
@@ -230,7 +231,6 @@ export class PinInput {
 	}
 
 	private getCabinetSwitches(code: number): readonly number[] | undefined {
-		if (code === this.getKey(AssignKey.StartGameKey)) return SWITCH_START
 		const leftKey = this.getKey(AssignKey.LeftFlipperKey)
 		const rightKey = this.getKey(AssignKey.RightFlipperKey)
 		if (code === leftKey || code === DIK_LEFT) return SWITCH_FLIPPER_L

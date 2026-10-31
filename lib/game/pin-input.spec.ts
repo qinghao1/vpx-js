@@ -149,30 +149,24 @@ describe('free-play helpers (vpx-js-only)', () => {
 		} as unknown as IEmulator
 	}
 
-	function enablesOf(log: SwitchCall[], nr: number): number {
-		return log.filter(call => call.nr === nr && call.enable === true).length
-	}
-
-	it('drives Start switches and no coin switches when the script handles coins', () => {
+	it('leaves Start switches to the script when the script handles coins', () => {
 		const table = new TableBuilder().withTableScript(coinScript).build('Table1')
 		const player = new Player(table).init({})
 		const log: SwitchCall[] = []
 		player.getPhysics().emu = fakeEmu(log)
 		player.onKeyDown({ code: 'Digit1', key: '1' })
 		player.updatePhysics(20)
-		expect(enablesOf(log, 16)).to.be.equal(1)
-		expect(log.filter(call => call.nr === 10).length).to.be.equal(0)
+		expect(log).to.have.length(0)
 	})
 
-	it('drives Start switches and no coin switches when the script ignores coin keys', () => {
+	it('leaves Start switches to the script when the script ignores coin keys', () => {
 		const table = new TableBuilder().withTableScript(noCoinScript).build('Table1')
 		const player = new Player(table).init({})
 		const log: SwitchCall[] = []
 		player.getPhysics().emu = fakeEmu(log)
 		player.onKeyDown({ code: 'Digit1', key: '1' })
 		player.updatePhysics(20)
-		expect(enablesOf(log, 16)).to.be.equal(1)
-		expect(log.filter(call => call.nr === 65).length).to.be.equal(0)
+		expect(log).to.have.length(0)
 	})
 
 	it('sends coin keys script-only when the script owns the coin path', () => {
@@ -402,11 +396,11 @@ describe('remapped Start key', () => {
 		expect(kicks).to.deep.equal([])
 	})
 
-	it('should still drive Start switches and the trough from the remapped key', () => {
+	it('should not drive switches from the remapped key but still kick the trough', () => {
 		const { player, log, kicks } = setupStartRemap()
 		player.onKeyDown({ code: 'KeyG', key: 'g' })
 		player.updatePhysics(20)
-		expect(log.filter(call => call.nr === 16 && call.enable === true).length).to.equal(1)
+		expect(log).to.deep.equal([])
 		expect(kicks).to.deep.equal([[60, 10]])
 	})
 })

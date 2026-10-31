@@ -49,6 +49,7 @@ import {
 	updateTransmissionBuffer,
 } from '../../dist-esm/lib/render/threejs/transmission-buffer.js'
 import { AnimationGate } from '../../dist-esm/lib/util/animation-gate.js'
+import { stripVbsComments } from '../../dist-esm/lib/util/vbs-comments.js'
 import { Table } from '../../dist-esm/lib/vpt/table/table.js'
 import { CAM, CAM_ANIM, isTableHit, LIGHT_AMBIENT, LIGHT_DIR, LIGHT_HEMI, RE_BAKE_MAP, TABLE_OPTS } from './config.js'
 import { DmdRenderer } from './dmd/dmd-renderer.js'
@@ -134,7 +135,8 @@ const SOUND_ICON_HIGH = `<svg ${SOUND_SVG_ATTRS}>${SOUND_SPEAKER}<path d="M15.5 
 const SOUND_ICON_LOW = `<svg ${SOUND_SVG_ATTRS}>${SOUND_SPEAKER}<path d="M15.5 8.5a5 5 0 0 1 0 7"></path></svg>`
 const SOUND_ICON_OFF = `<svg ${SOUND_SVG_ATTRS}>${SOUND_SPEAKER}<line x1="16" y1="9" x2="22" y2="15"></line><line x1="22" y1="9" x2="16" y2="15"></line></svg>`
 
-const cGameName = table => table?.tableScript?.match(/cGameName\s*=\s*["']([^"']+)["']/i)?.[1] || ''
+const cGameName = table =>
+	stripVbsComments(table?.tableScript ?? '').match(/cGameName\s*=\s*["']([^"']+)["']/i)?.[1] || ''
 const setTitle = title => {
 	const el = document.getElementById('title')
 	if (el && title) el.textContent = title

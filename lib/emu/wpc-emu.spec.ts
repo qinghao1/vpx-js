@@ -141,6 +141,24 @@ describe('WPC-EMU', () => {
 		expect(mockEmu.switchInput).to.deep.equal([20])
 	})
 
+	it('should route dedicated switches 1-8 through the cabinet byte', async () => {
+		await emulator.loadGame(mockGameEntry, new Uint8Array())
+		emulator.setSwitchInput(1, true)
+		emulator.setSwitchInput(5, true)
+		// Presses combine in the cabinet byte instead of clobbering each other.
+		expect(mockEmu.cabinetInput).to.deep.equal([16, 0x01, 0x11])
+		emulator.setSwitchInput(1, false)
+		emulator.setSwitchInput(5, false)
+		emulator.setSwitchInput(13, true)
+		expect(mockEmu.cabinetInput).to.deep.equal([16, 0x01, 0x11, 0x10, 0x00])
+		expect(mockEmu.switchInput).to.deep.equal([13])
+		// The mock ui state reports cabinet byte 1 (coin 1 held): dedicated
+		// reads mirror the byte instead of throwing INVALID_WPC_MATRIX_INDEX.
+		emulator.emuSimulateCycle(20)
+		expect(emulator.getSwitchInput(1)).to.equal(1)
+		expect(emulator.getSwitchInput(5)).to.equal(0)
+	})
+
 	it('should call WPC-Emu fliptronicsInput when initialized', async () => {
 		await emulator.loadGame(mockGameEntry, new Uint8Array())
 		emulator.setFliptronicsInput('A123')

@@ -6,7 +6,7 @@ import type { IEmulator } from '../game/iemulator.js'
 import { Vertex2D } from '../math/vector.js'
 import { logger } from '../util/logger.js'
 import { EmulatorMessageQueue, MessageType, switchMessageType } from './emulator-message-queue.js'
-import { EmulatorState } from './emulator-state.js'
+import { type CabinetBit, EmulatorState } from './emulator-state.js'
 import { OffsetIndex } from './offset-index.js'
 import { warnOnce } from './warn-once.js'
 import { resolveWpcEmu } from './wpc-emu-interop.js'
@@ -22,13 +22,26 @@ const INCLUDE_RAM = false
 // granularity (see wpc-emu BENCHMARK.md).
 const WARMUP_MS = 1000
 const WARMUP_TICK_STEPS = 4
-// Initial cabinet-key state replayed after load. wpc-emu autoreleases
-// cabinet keys after 100 ms, so this is a boot pulse, not a held switch.
+// Boot pulse replayed after load: 16 is wpc-emu's own boot value
+// (headless-runner), autoreleased after 100 ms — not a held switch.
 const INITIAL_CABINET_KEY = 16
+
+// Maps VPM dedicated switches 1-8 to $3FE8 cabinet-byte bits: bit =
+// 1 << (nr - 1), coins 1-4 on the low nibble, service buttons
+// (Escape/Down/Up/Enter) on the high nibble (PinMAME WPC_COMPORTS).
+const CABINET_SWITCH_BITS: readonly CabinetBit[] = [0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80]
+
+function cabinetBitFor(nr: number): CabinetBit | undefined {
+	return nr >= 1 && nr <= 8 ? CABINET_SWITCH_BITS[nr - 1] : undefined
+}
 
 /** WPC-EMU adapter. @see https://github.com/vpinball/wpc-emu */
 export class Emulator implements IEmulator {
 	readonly emulatorState = new EmulatorState()
+	// Held dedicated-switch bits. The backend assigns the whole cabinet
+	// byte per write, so presses/releases read-modify-write this shadow
+	// instead of clobbering each other; raw setCabinetInput writes bypass it.
+	private cabinetByte = 0
 	private readonly queue = new EmulatorMessageQueue()
 	private readonly dmdSize = new Vertex2D(128, 32)
 	private paused = false
@@ -77,6 +90,11 @@ export class Emulator implements IEmulator {
 	}
 
 	getSwitchInput(nr: number): number {
+		// The cabinet byte holds switches 1-8, which the matrix mapping cannot address.
+		const cabinetBit = cabinetBitFor(nr)
+		if (cabinetBit !== undefined) {
+			return this.emulatorState.getCabinetBit(cabinetBit)
+		}
 		return this.emulatorState.getSwitchState(OffsetIndex.fromWpcMatrix(nr))
 	}
 	getLampState(nr: number): number {
@@ -90,6 +108,14 @@ export class Emulator implements IEmulator {
 	}
 
 	setSwitchInput(nr: number, enable?: boolean): boolean {
+		// Dedicated switches bypass the matrix lane, which cannot address
+		// numbers below 11 — route them through the cabinet lane instead.
+		const cabinetBit = cabinetBitFor(nr)
+		if (cabinetBit !== undefined) {
+			this.cabinetByte = enable === false ? this.cabinetByte & ~cabinetBit : this.cabinetByte | cabinetBit
+			this.setCabinetInput(this.cabinetByte)
+			return true
+		}
 		if (!this.emulator) {
 			this.queue.addMessage(switchMessageType(enable), nr)
 			return true

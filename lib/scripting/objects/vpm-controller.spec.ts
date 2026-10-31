@@ -177,6 +177,72 @@ describe('The VpmController - VISUAL PINMAME COM OBJECT', () => {
 		}
 	})
 
+	it('WPC game falls back to a local ROM when the VPDB download fails', async () => {
+		const pinLoad = sandbox.stub(PinMameEmulator.prototype, 'loadGame').resolves()
+		const wpcLoad = sandbox.stub(Emulator.prototype, 'loadGame').resolves()
+		const pending = new Uint8Array([9, 8, 7])
+		const g = globalThis as any
+		const origFetch = globalThis.fetch
+		const origPendingRom = g.__pendingRom
+		const origPendingRomName = g.__pendingRomName
+		g.__pendingRom = pending
+		g.__pendingRomName = 'mm_109c'
+		globalThis.fetch = (async () => ({ ok: false, status: 404 })) as any
+		try {
+			vpmController.GameName = 'mm_109c'
+			await vpmController.whenReady()
+			expect(pinLoad.calledOnce).to.equal(true)
+			expect(wpcLoad.called).to.equal(false)
+			expect(pinLoad.firstCall.args[0]).to.equal('mm_109c')
+			expect(pinLoad.firstCall.args[1]).to.deep.equal(pending)
+			expect((vpmController as any).emulator).to.be.an.instanceof(PinMameEmulator)
+		} finally {
+			globalThis.fetch = origFetch
+			g.__pendingRom = origPendingRom
+			g.__pendingRomName = origPendingRomName
+		}
+	})
+
+	it('WPC boot failure restores the previous emulator instead of keeping the dead instance', async () => {
+		const prev = new PinMameEmulator()
+		;(vpmController as any).emulator = prev
+		const body = new TextEncoder().encode('ABCD')
+		const entry = [
+			{
+				id: 'mm_109c',
+				rom_files: [
+					{ filename: 'mm_1_09c.bin', bytes: body.length, crc: crc32(body), type: 'main', system: 'wpc' },
+				],
+				file: {
+					id: 'x',
+					name: 'mm_109c.zip',
+					bytes: 4,
+					mime_type: 'application/zip',
+					url: 'https://storage.vpdb.io/files/x.zip',
+					is_protected: true,
+					counter: { downloads: 1 },
+					variations: {},
+				},
+			},
+		]
+		const origFetch = globalThis.fetch
+		globalThis.fetch = (async (url: any) => {
+			const s = String(url)
+			if (s.includes('/v1/games/mm/roms/')) return { ok: true, json: async () => entry }
+			return { ok: true, arrayBuffer: async () => body.buffer }
+		}) as any
+		const loadGame = sandbox.stub(Emulator.prototype, 'loadGame').rejects(new Error('wpc boot failed'))
+		try {
+			vpmController.GameName = 'mm_109c'
+			await vpmController.whenReady()
+			expect(loadGame.calledOnce).to.equal(true)
+			expect((vpmController as any).emulator).to.equal(prev)
+			expect((vpmController as any).loadFailed).to.equal(true)
+		} finally {
+			globalThis.fetch = origFetch
+		}
+	})
+
 	it('RawDmdPixels falls back to a zeroed w*h buffer when the emulator throws', () => {
 		;(vpmController as any).emulator = {
 			getDmdDimensions: () => ({ x: 128, y: 32 }),

@@ -14,7 +14,10 @@ import type { ESIToken } from '../grammar/grammar.js'
 import { Transformer } from '../transformer/transformer.js'
 import { collectChildren } from './helpers.js'
 
-/** Maps `Dim` variable declarators to `let` declarations. */
+/**
+ * Maps `Dim` declarators to `var`: `Dim` is procedure-scoped, so `var`
+ * hoists block-level declarations instead of throwing ReferenceError.
+ */
 export function ppVarDecl(node: ESIToken): unknown {
 	switch (node.type) {
 		case 'VariableMemberDeclaration':
@@ -30,7 +33,7 @@ export function ppVarDecl(node: ESIToken): unknown {
 
 function ppVariableMemberDeclaration(node: ESIToken): unknown {
 	const varDecls = node.children[1].estree
-	return variableDeclaration('let', varDecls)
+	return variableDeclaration('var', varDecls)
 }
 
 function ppVariableIdentifiers(node: ESIToken): unknown {

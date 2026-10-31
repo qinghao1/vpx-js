@@ -16,6 +16,9 @@ function copyInto(dst: Uint8Array<ArrayBuffer>, src: Uint8Array<ArrayBufferLike>
 	return dst
 }
 
+/** $3FE8 cabinet-byte bit for one dedicated switch (VPM 1-8). */
+export type CabinetBit = 0x01 | 0x02 | 0x04 | 0x08 | 0x10 | 0x20 | 0x40 | 0x80
+
 export class EmulatorState {
 	private lamps = empty()
 	private lastLamps = empty()
@@ -26,6 +29,7 @@ export class EmulatorState {
 	private dmd = new Uint8Array()
 	private dmdBack = new Uint8Array()
 	private switches = new Uint8Array()
+	private cabinet = 0
 
 	private lampMap: (i: number) => number = OffsetIndex.mapIndexToMatrixIndex
 	private solMap: (i: number) => number = i => i + 1
@@ -46,7 +50,12 @@ export class EmulatorState {
 				return v >= 7 ? 8 : v
 			})
 		if (s.dmd.dmdShadedBuffer) this.publishDmd(s.dmd.dmdShadedBuffer)
-		if (s.wpc.inputSwitchMatrixActiveColumn) this.switches = s.wpc.inputSwitchMatrixActiveColumn.slice()
+		// inputSwitchMatrixActiveColumn arrives as the strobed column number,
+		// not row data — only array snapshots refresh the matrix state.
+		if (Array.isArray(s.wpc.inputSwitchMatrixActiveColumn))
+			this.switches = s.wpc.inputSwitchMatrixActiveColumn.slice()
+		// inputState[0] is the $3FE8 cabinet byte.
+		if (s.wpc.inputState) this.cabinet = s.wpc.inputState[0] ?? 0
 	}
 
 	applyPinmame(lamps: Uint8Array, sols: Uint8Array, gis: Uint8Array): void {
@@ -76,6 +85,11 @@ export class EmulatorState {
 
 	getSwitchState(o: OffsetIndex): number {
 		return this.switches[o.zeroBasedIndex] ?? 0
+	}
+
+	/** Reads one $3FE8 cabinet-byte bit (coins 1-4, Escape/Down/Up/Enter). */
+	getCabinetBit(bit: CabinetBit): number {
+		return this.cabinet & bit ? 1 : 0
 	}
 	getLampState(o: OffsetIndex): number {
 		return this.lamps[o.zeroBasedIndex] ?? 0

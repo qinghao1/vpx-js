@@ -2,6 +2,7 @@ import { type ChildProcess, execSync, spawn } from 'node:child_process'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
+import { stripVbsComments } from '../../lib/util/vbs-comments.js'
 
 export interface ResolvedVpxSession {
 	vpxPath: string
@@ -198,7 +199,7 @@ export function resolvePathToUrl(
 }
 
 export function extractGameName(script: string): string | null {
-	const clean = script.replace(/^\uFEFF/, '')
+	const clean = stripVbsComments(script.replace(/^\uFEFF/, ''))
 	const patterns = [
 		/cGameName\s*=\s*["']([^"']+)["']/i,
 		/Controller\.GameName\s*=\s*["']([^"']+)["']/i,

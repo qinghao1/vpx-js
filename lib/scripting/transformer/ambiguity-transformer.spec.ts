@@ -67,7 +67,7 @@ describe('The scripting ambiguity transformer', () => {
 			const vbs = `Sub LoadCore\nDim fso\nSet fso = CreateObject("Scripting.FileSystemObject")\nExecuteGlobal fso.OpenTextFile("core.vbs", 1).ReadAll\nEnd Sub\n`
 			const js = transpiler.transpile(vbs)
 			expect(js).to.equal(
-				`${Transformer.SCOPE_NAME}.LoadCore = function () {\n    let fso;\n    fso = ${Transformer.STDLIB_NAME}.CreateObject('Scripting.FileSystemObject', ${Transformer.PLAYER_NAME});\n    eval(${Transformer.VBSHELPER_NAME}.transpileInline(${Transformer.VBSHELPER_NAME}.getOrCallBound(${Transformer.VBSHELPER_NAME}.getOrCallBound(fso, 'OpenTextFile', 'core.vbs', 1), 'ReadAll')));\n};`,
+				`${Transformer.SCOPE_NAME}.LoadCore = function () {\n    var fso;\n    fso = ${Transformer.STDLIB_NAME}.CreateObject('Scripting.FileSystemObject', ${Transformer.PLAYER_NAME});\n    eval(${Transformer.VBSHELPER_NAME}.transpileInline(${Transformer.VBSHELPER_NAME}.getOrCallBound(${Transformer.VBSHELPER_NAME}.getOrCallBound(fso, 'OpenTextFile', 'core.vbs', 1), 'ReadAll')));\n};`,
 			)
 		})
 
@@ -135,7 +135,7 @@ describe('The scripting ambiguity transformer', () => {
 			const vbs = `sub test\ndim prop\nx = prop\nend sub\n`
 			const js = transpiler.transpile(vbs)
 			expect(js).to.equal(
-				`${Transformer.SCOPE_NAME}.test = function () {\n    let prop;\n    ${Transformer.SCOPE_NAME}.x = prop;\n};`,
+				`${Transformer.SCOPE_NAME}.test = function () {\n    var prop;\n    ${Transformer.SCOPE_NAME}.x = prop;\n};`,
 			)
 		})
 

@@ -66,6 +66,23 @@ describe('vpinball resolver', () => {
 		it('returns null when no game name is present', () => {
 			expect(extractGameName('Sub Foo()\nEnd Sub\n')).toBeNull()
 		})
+
+		it('ignores cGameName values in VBScript comments', () => {
+			expect(extractGameName(`'Const cGameName = "mm_10"\nConst cGameName="mm_109b"`)).toBe('mm_109b')
+		})
+
+		it('ignores REM-commented and trailing-comment assignments', () => {
+			expect(extractGameName(`REM cGameName = "mm_10"\nController.GameName="tz_94h"`)).toBe('tz_94h')
+			expect(extractGameName(`Const cGameName="mm_109b" ' was "mm_10"`)).toBe('mm_109b')
+		})
+
+		it('ignores colon-separated trailing REM comments', () => {
+			expect(extractGameName(`x = 1 : REM cGameName = "olddead"\nConst cGameName="mm_109b"`)).toBe('mm_109b')
+		})
+
+		it('keeps REMARK identifiers as code', () => {
+			expect(extractGameName(`REMARK = 1\nConst cGameName="mm_109b"`)).toBe('mm_109b')
+		})
 	})
 
 	describe('browser url round-trip', () => {

@@ -91,6 +91,31 @@ describe('The EmulatorState - handle state changes', () => {
 		expect(emulatorState.getChangedGI()).to.deep.equal([])
 	})
 
+	it('should ignore a numeric matrix column instead of throwing', () => {
+		// The live backend reports the strobed column as a number, not row data.
+		expect(() =>
+			emulatorState.updateState({
+				...stateOne,
+				wpc: { ...wpcState1, inputSwitchMatrixActiveColumn: 3 as unknown as Uint8Array },
+			}),
+		).not.to.throw()
+	})
+
+	it('should read cabinet-byte bits for dedicated switches 1-8', () => {
+		emulatorState.updateState({
+			...stateOne,
+			wpc: { ...wpcState1, inputState: new Uint8Array([0x10 | 0x01]) },
+		})
+		expect(emulatorState.getCabinetBit(0x10)).to.equal(1)
+		expect(emulatorState.getCabinetBit(0x01)).to.equal(1)
+		expect(emulatorState.getCabinetBit(0x40)).to.equal(0)
+		emulatorState.updateState({
+			...stateOne,
+			wpc: { ...wpcState1, inputState: new Uint8Array([0x00]) },
+		})
+		expect(emulatorState.getCabinetBit(0x10)).to.equal(0)
+	})
+
 	it('should get changed lamps when transition from empty state to state 1', () => {
 		const expectedDiff: number[][] = [
 			[16, 1],

@@ -25,7 +25,7 @@ describe('The scripting wrap transformer', () => {
 		const vbs = `Dim test\n`
 		const js = transform(vbs, 'tableScript', table)
 		expect(js).to.equal(
-			`window.tableScript = (${ReferenceTransformer.SCOPE_NAME}, ${ReferenceTransformer.ITEMS_NAME}, ${ReferenceTransformer.ENUMS_NAME}, ${ReferenceTransformer.GLOBAL_NAME}, ${ReferenceTransformer.STDLIB_NAME}, ${ReferenceTransformer.VBSHELPER_NAME}, ${ReferenceTransformer.PLAYER_NAME}) => {\n    let test;\n};`,
+			`window.tableScript = (${ReferenceTransformer.SCOPE_NAME}, ${ReferenceTransformer.ITEMS_NAME}, ${ReferenceTransformer.ENUMS_NAME}, ${ReferenceTransformer.GLOBAL_NAME}, ${ReferenceTransformer.STDLIB_NAME}, ${ReferenceTransformer.VBSHELPER_NAME}, ${ReferenceTransformer.PLAYER_NAME}) => {\n    var test;\n};`,
 		)
 	})
 })

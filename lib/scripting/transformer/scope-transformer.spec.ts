@@ -94,14 +94,14 @@ describe('The scripting scope transformer', () => {
 		const vbs = `Function AudioPan(tableobj)\nDim tmp\ntmp = tableobj.x * 2 / table1.width-1\nEnd Function`
 		const js = transform(vbs)
 		expect(js).to.equal(
-			`${Transformer.SCOPE_NAME}.AudioPan = function (tableobj) {\n    let AudioPan = undefined;\n    let tmp;\n    tmp = ${Transformer.VBSHELPER_NAME}.sub(${Transformer.VBSHELPER_NAME}.div(${Transformer.VBSHELPER_NAME}.mul(tableobj.x, 2), ${Transformer.SCOPE_NAME}.table1.width), 1);\n    return AudioPan;\n};`,
+			`${Transformer.SCOPE_NAME}.AudioPan = function (tableobj) {\n    let AudioPan = undefined;\n    var tmp;\n    tmp = ${Transformer.VBSHELPER_NAME}.sub(${Transformer.VBSHELPER_NAME}.div(${Transformer.VBSHELPER_NAME}.mul(tableobj.x, 2), ${Transformer.SCOPE_NAME}.table1.width), 1);\n    return AudioPan;\n};`,
 		)
 	})
 
 	it('should not add the scope to a function-level variable assignment', () => {
 		const vbs = `Sub X\n	Dim x\nEnd Sub`
 		const js = transform(vbs)
-		expect(js).to.equal(`${Transformer.SCOPE_NAME}.X = function () {\n    let x;\n};`)
+		expect(js).to.equal(`${Transformer.SCOPE_NAME}.X = function () {\n    var x;\n};`)
 	})
 
 	it('should add the scope to a Select Case discriminant (declarator init, not id)', () => {
