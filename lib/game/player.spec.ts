@@ -163,9 +163,8 @@ describe('The VPinball player', () => {
 	})
 
 	it('should drive a runtime-defined VPM timer handler through the Timer item exactly once', async () => {
-		// core.vbs defines `Sub <Timer>_Timer` at runtime via vpmBuildEvent +
-		// ExecuteGlobal, which transpiles to Timer event wiring, so the physics
-		// timers alone drive vpmTimer.Update at the item cadence (no game-loop pump).
+		// `Sub <Timer>_Timer` is runtime-defined (vpmBuildEvent + ExecuteGlobal).
+		// It still transpiles to Timer event wiring, hence the Transpiler setup.
 		const table = await Table.load(new NodeBinaryReader(three.fixturePath('table-timer.vpx')))
 		let updates = 0
 		const scope: Record<string, unknown> = {
@@ -181,7 +180,7 @@ describe('The VPinball player', () => {
 		timer.Enabled = true
 		timer.Interval = 40
 		player.simulateTime(500)
-		// Nominal 500/40 = 12.5; a game-loop pump on top would double this (~22).
+		// Nominal 12 fires at 40ms cadence; double-drive falls outside this window.
 		expect(updates, 'wired handler fires once per 40ms interval').to.be.within(10, 14)
 	})
 
