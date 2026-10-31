@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { Box3, type Mesh, type Object3D, type PerspectiveCamera, Vector3 } from 'three'
-import { RE_CAB, RE_VR } from './scene-classify.js'
+import { RE_CAB } from './scene-classify.js'
 
 type FramingBox = {
 	box: Box3
@@ -57,8 +57,6 @@ const excludeNonPlayfield = (name: string): boolean =>
 	!name.includes('plunger') &&
 	!name.includes('apron')
 
-const isVrNonCab = (name: string): boolean => RE_VR.test(name) && !RE_CAB.test(name)
-
 const VIEWER: FramingConfig = { dist: 1.2, elev: 0.85, azim: 0.65, near: 0.015, farScale: 8, farMin: 2000 }
 const PLAY: FramingConfig = {
 	dist: 1.0,
@@ -91,14 +89,16 @@ function framingState(
 	}
 }
 
-export const computeViewerFraming = (node: Object3D): FramingState =>
-	framingState(node, excludeNonPlayfield, isVrNonCab, VIEWER)
+// Camera sizing sees the table only: the playfield cluster plus the cabinet
+// that encloses it. Legs, supports, VR-room and diorama scenery are sized
+// out by construction, whatever individual pieces happen to be named.
+const excludeNonTable = (name: string): boolean => excludeNonPlayfield(name) && !RE_CAB.test(name)
 
-const excludeLegsForPlay = (name: string): boolean =>
-	name.includes('leg') || name.includes('support') || name.includes('bottom') || isVrNonCab(name)
+export const computeViewerFraming = (node: Object3D): FramingState =>
+	framingState(node, excludeNonPlayfield, excludeNonTable, VIEWER)
 
 export const computePlayFraming = (node: Object3D): FramingState =>
-	framingState(node, excludeNonPlayfield, excludeLegsForPlay, PLAY)
+	framingState(node, excludeNonPlayfield, excludeNonTable, PLAY)
 
 export function applyCameraState(
 	camera: PerspectiveCamera,

@@ -136,6 +136,24 @@ describe('regression: framing keeps DMD and full playfield visible', () => {
 		expect(framed.maxDim, 'VRMega room must not inflate framing').to.be.closeTo(210.6, 6)
 	})
 
+	it('non-table scenery is excluded from sizing whatever it is named', () => {
+		// Sizing sees the playfield cluster plus the cabinet only, so room
+		// and diorama pieces need no `vr`/`sky` token to stay out of the
+		// frame — these names are deliberately token-free.
+		for (const framing of [computePlayFraming, computeViewerFraming]) {
+			const withSky = buildWalkingDeadGroup()
+			withSky.add(
+				makeMesh('primitive-MegaDome', new THREE.BoxGeometry(6000, 6000, 6000), new THREE.Vector3(0, 0, 0)),
+			)
+			withSky.add(
+				makeMesh('primitive-Orb1', new THREE.BoxGeometry(2000, 2000, 2000), new THREE.Vector3(0, 500, 0)),
+			)
+			withSky.updateMatrixWorld(true)
+			const framed = framing(withSky)
+			expect(framed.maxDim, 'scenery must not inflate framing').to.be.closeTo(210.6, 6)
+		}
+	})
+
 	it('viewer <-> play transition does not teleport the target (no snap)', () => {
 		const group = buildWalkingDeadGroup()
 		const play = computePlayFraming(group)
