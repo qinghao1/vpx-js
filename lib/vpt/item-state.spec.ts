@@ -63,6 +63,33 @@ describe('The VPinball item state', () => {
 		expect(target.pos.x).to.equal(4)
 	})
 
+	it('should stay correct when pooled slots are released to undefined', () => {
+		const ball = BallState.claim('ball', new Vertex3D(1, 2, 3))
+		const prev = ball.clone()
+		expect(ball.equals(prev)).to.equal(true)
+		ball.release()
+		expect(ball.equals(prev)).to.equal(false)
+		expect(prev.equals(ball)).to.equal(false)
+		const diff = prev.diff(ball)
+		expect(Object.hasOwn(diff, 'pos')).to.equal(true)
+		prev.copyFrom(ball)
+		expect(prev.equals(ball)).to.equal(true)
+	})
+
+	it('should stay correct across repeated mutate-compare-copy cycles', () => {
+		const ball = BallState.claim('ball', new Vertex3D(1, 2, 3))
+		const prev = ball.clone()
+		for (let i = 0; i < 3; i++) {
+			ball.pos.set(new Vertex3D(4 + i, 5, 6))
+			expect(ball.equals(prev)).to.equal(false)
+			const diff = ball.diff(prev)
+			expect(Object.hasOwn(diff, 'pos')).to.equal(true)
+			prev.copyFrom(ball)
+			expect(ball.equals(prev)).to.equal(true)
+			expect(prev.diff(ball)).to.satisfy((d: BallState) => !Object.hasOwn(d, 'pos'))
+		}
+	})
+
 	it('should return pooled members to their pools on release', () => {
 		const balls = [
 			BallState.claim('a', new Vertex3D(1, 0, 0)),

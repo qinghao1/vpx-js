@@ -35,6 +35,46 @@ function releaseMember(member: PooledMember): void {
 	else Vertex2D.release(member)
 }
 
+/** Per-key shape descriptor: 0 means compared by identity, otherwise a pooled member kind. */
+const KIND_PLAIN = 0
+const KIND_VERTEX2D = 1
+const KIND_VERTEX3D = 2
+const KIND_MATRIX2D = 3
+
+function kindOf(value: unknown): number {
+	if (value instanceof Matrix2D) return KIND_MATRIX2D
+	if (value instanceof Vertex3D) return KIND_VERTEX3D
+	if (value instanceof Vertex2D) return KIND_VERTEX2D
+	return KIND_PLAIN
+}
+
+function isKind(value: unknown, kind: number): boolean {
+	switch (kind) {
+		case KIND_MATRIX2D:
+			return value instanceof Matrix2D
+		case KIND_VERTEX3D:
+			return value instanceof Vertex3D
+		case KIND_VERTEX2D:
+			return value instanceof Vertex2D
+		default:
+			return false
+	}
+}
+
+/** Uncached single-key copy: the exact historical per-key logic, used whenever values differ. */
+function copyKeySlow(target: Record<string, unknown>, source: Record<string, unknown>, key: string): void {
+	const sourceMember = asPooledMember(source[key])
+	const targetMember = asPooledMember(target[key])
+	if (sourceMember && targetMember) {
+		setMember(targetMember, sourceMember)
+	} else if (sourceMember) {
+		target[key] = cloneMember(sourceMember)
+	} else {
+		if (targetMember) releaseMember(targetMember)
+		target[key] = source[key]
+	}
+}
+
 /**
  * Render state for an item.
  *
@@ -45,6 +85,27 @@ function releaseMember(member: PooledMember): void {
 export abstract class ItemState {
 	public name = ''
 	public isVisible = true
+
+	/**
+	 * Lazily built own-key descriptor. States fix their own-key shape at
+	 * construction (all fields assigned in initializers); diff shells are
+	 * single-use, so their descriptor costs one build and is never reused.
+	 * Every consumer re-verifies the cached kind per key and falls back to
+	 * the uncached logic on any deviation, so a shape change can only cost
+	 * speed, never correctness.
+	 */
+	#shape?: { keys: string[]; kinds: number[] }
+
+	private shape(): { keys: string[]; kinds: number[] } {
+		let shape = this.#shape
+		if (!shape) {
+			const self = this as unknown as Record<string, unknown>
+			const keys = Object.keys(this)
+			shape = { keys, kinds: keys.map(key => kindOf(self[key])) }
+			this.#shape = shape
+		}
+		return shape
+	}
 
 	public clone(): this {
 		const copy = new (this.constructor as new () => ItemState)() as this
@@ -60,16 +121,15 @@ export abstract class ItemState {
 	public copyFrom(state: ItemState): void {
 		const source = state as unknown as Record<string, unknown>
 		const target = this as unknown as Record<string, unknown>
-		for (const key of Object.keys(this)) {
-			const sourceMember = asPooledMember(source[key])
-			const targetMember = asPooledMember(target[key])
-			if (sourceMember && targetMember) {
-				setMember(targetMember, sourceMember)
-			} else if (sourceMember) {
-				target[key] = cloneMember(sourceMember)
+		const { keys, kinds } = this.shape()
+		for (let i = 0; i < keys.length; i++) {
+			const key = keys[i] as string
+			if (target[key] === source[key]) continue
+			const kind = kinds[i] as number
+			if (kind !== KIND_PLAIN && isKind(target[key], kind) && isKind(source[key], kind)) {
+				setMember(target[key] as PooledMember, source[key] as PooledMember)
 			} else {
-				if (targetMember) releaseMember(targetMember)
-				target[key] = source[key]
+				copyKeySlow(target, source, key)
 			}
 		}
 	}
@@ -78,16 +138,35 @@ export abstract class ItemState {
 		if (!state) return false
 		const other = state as unknown as Record<string, unknown>
 		const self = this as unknown as Record<string, unknown>
-		for (const key of Object.keys(this)) {
-			const mine = asPooledMember(self[key])
-			const theirs = asPooledMember(other[key])
-			if (mine || theirs) {
-				if (!mine || !theirs || !membersEqual(mine, theirs)) return false
-			} else if (self[key] !== other[key]) {
-				return false
-			}
+		const { keys, kinds } = this.shape()
+		for (let i = 0; i < keys.length; i++) {
+			const key = keys[i] as string
+			if (!ItemState.keysEqual(self, other, key, kinds[i] as number)) return false
 		}
 		return true
+	}
+
+	/**
+	 * Single-key equality with a cached-kind fast path. Identity implies
+	 * equality for every member type, so differing values always take the
+	 * uncached comparison; a shape change can only cost speed.
+	 */
+	private static keysEqual(
+		self: Record<string, unknown>,
+		other: Record<string, unknown>,
+		key: string,
+		kind: number,
+	): boolean {
+		const mine = self[key]
+		const theirs = other[key]
+		if (mine === theirs) return true
+		if (kind === KIND_PLAIN || !isKind(mine, kind) || !isKind(theirs, kind)) {
+			const slowMine = asPooledMember(mine)
+			const slowTheirs = asPooledMember(theirs)
+			if (slowMine || slowTheirs) return !!slowMine && !!slowTheirs && membersEqual(slowMine, slowTheirs)
+			return mine === theirs
+		}
+		return membersEqual(mine as PooledMember, theirs as PooledMember)
 	}
 
 	public diff(state: ItemState): this {
@@ -98,8 +177,17 @@ export abstract class ItemState {
 		const result = Object.create(Object.getPrototypeOf(this)) as this
 		const partial = result as unknown as Record<string, unknown>
 		partial['name'] = self['name']
-		for (const key of Object.keys(this)) {
-			if (key === 'name') continue
+		const { keys, kinds } = this.shape()
+		for (let i = 0; i < keys.length; i++) {
+			const key = keys[i] as string
+			if (key === 'name' || self[key] === other[key]) continue
+			const kind = kinds[i] as number
+			if (kind !== KIND_PLAIN && isKind(self[key], kind) && isKind(other[key], kind)) {
+				if (!membersEqual(self[key] as PooledMember, other[key] as PooledMember)) {
+					partial[key] = cloneMember(self[key] as PooledMember)
+				}
+				continue
+			}
 			const mine = asPooledMember(self[key])
 			const theirs = asPooledMember(other[key])
 			const equal = mine || theirs ? !!mine && !!theirs && membersEqual(mine, theirs) : self[key] === other[key]
