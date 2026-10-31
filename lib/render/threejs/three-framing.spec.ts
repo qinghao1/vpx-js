@@ -55,8 +55,21 @@ function buildWalkingDeadGroup(): THREE.Group {
 	return root
 }
 
+// Same playfield as buildWalkingDeadGroup but a much taller backbox, longer
+// legs and a cabinet-front overhang: per-table cabinet proportions must not
+// move the play camera.
+function buildBigCabinetGroup(): THREE.Group {
+	const root = buildWalkingDeadGroup()
+	root.add(makeMesh('VRCab_BackboxTall', new THREE.BoxGeometry(60, 220, 40), new THREE.Vector3(0, 90, -70)))
+	root.add(makeMesh('VRCab_LegTall', new THREE.BoxGeometry(8, 200, 8), new THREE.Vector3(25, -110, -30)))
+	root.add(
+		makeMesh('primitive-VRCab_FrontMolding', new THREE.BoxGeometry(30, 20, 60), new THREE.Vector3(0, -30, 100)),
+	)
+	root.updateMatrixWorld(true)
+	return root
+}
+
 const DMD = new THREE.Vector3(-0.27, 31.75, -54.22)
-const DMD_TOP = DMD.clone().add(new THREE.Vector3(0, 2, -6))
 const PF_MIN = new THREE.Vector3(-26.5, -25.07, -37.5)
 const PF_MAX = new THREE.Vector3(26.6, 13.3, 75.5)
 const PF_CORNERS: THREE.Vector3[] = []
@@ -82,48 +95,44 @@ function ndc(
 describe('regression: framing keeps DMD and full playfield visible', () => {
 	const aspects = [0.6, 0.75, 1.0, 1.33, 1.78, 2.0, 2.5]
 
-	it('play framing shows DMD with margin and full playfield at all aspects (FOV 40)', () => {
+	it('play framing fits the playfield cluster at all aspects (FOV 45)', () => {
 		const group = buildWalkingDeadGroup()
-		const state = computePlayFraming(group)
-
-		expect(state.maxDim, 'play maxDim should be cabinet size ~210').to.be.closeTo(210.6, 6)
-		expect(state.target.z, 'play forwardBias -0.07').to.be.closeTo(18.99 + 210.6 * -0.07, 0.5)
-
 		for (const asp of aspects) {
-			const dc = ndc(DMD, state.position, state.target, 40, asp)
-			const dt = ndc(DMD_TOP, state.position, state.target, 40, asp)
-			let minY = Infinity
-			let maxY = -Infinity
-			let minX = Infinity
-			let maxX = -Infinity
+			const state = computePlayFraming(group, { fov: 45, aspect: asp })
+			let extreme = 0
 			for (const p of PF_CORNERS) {
-				const n = ndc(p, state.position, state.target, 40, asp)
-				minY = Math.min(minY, n.y)
-				maxY = Math.max(maxY, n.y)
-				minX = Math.min(minX, n.x)
-				maxX = Math.max(maxX, n.x)
+				const n = ndc(p, state.position, state.target, 45, asp)
+				extreme = Math.max(extreme, Math.abs(n.x), Math.abs(n.y))
 			}
-			expect(dc.y, `play asp ${asp} DMD center Y`).to.be.within(0.64, 0.76)
-			expect(dt.y, `play asp ${asp} DMD top Y must stay below 0.82 with margin`).to.be.lessThan(0.82)
-			expect(dt.y, `play asp ${asp} DMD top above center`).to.be.greaterThan(dc.y)
-			expect(minY, `play asp ${asp} playfield bottom`).to.be.within(-0.92, -0.65)
-			expect(maxY, `play asp ${asp} playfield top`).to.be.within(0.3, 0.62)
-			expect(minX, `play asp ${asp} playfield left`).to.be.greaterThan(-0.95)
-			expect(maxX, `play asp ${asp} playfield right`).to.be.lessThan(0.95)
-			// ensure no clipping beyond NDC
-			expect(minY, `play asp ${asp} not clipped bottom`).to.be.greaterThan(-1)
-			expect(maxY, `play asp ${asp} not clipped top`).to.be.lessThan(1)
+			expect(extreme, `play asp ${asp} cluster fits the frame`).to.be.lessThan(1)
+			expect(extreme, `play asp ${asp} cluster fills the frame`).to.be.greaterThan(0.9)
 		}
 	})
 
-	it('play is tighter than viewer (cropping legs via frustum) but both fit', () => {
+	it('cabinet proportions do not move the play camera', () => {
+		// A taller backbox, longer legs and a cabinet-front overhang change
+		// the cabinet-driven size box but must not change the fitted play
+		// view: distance comes from the playfield cluster only.
+		const plain = computePlayFraming(buildWalkingDeadGroup(), { fov: 45, aspect: 16 / 9 })
+		const cabined = computePlayFraming(buildBigCabinetGroup(), { fov: 45, aspect: 16 / 9 })
+		expect(cabined.position.distanceTo(plain.position), 'cabinet must not move the play camera').to.equal(0)
+		expect(cabined.target.distanceTo(plain.target), 'cabinet must not move the play target').to.equal(0)
+		// The orbit overview still frames the whole machine, legs included.
+		const viewerPlain = computeViewerFraming(buildWalkingDeadGroup())
+		const viewerCabined = computeViewerFraming(buildBigCabinetGroup())
+		expect(viewerCabined.maxDim, 'viewer keeps sizing the whole machine').to.be.greaterThan(viewerPlain.maxDim)
+	})
+
+	it('play is tighter than viewer but both fit', () => {
 		const group = buildWalkingDeadGroup()
-		const play = computePlayFraming(group)
+		const play = computePlayFraming(group, { fov: 45, aspect: 16 / 9 })
 		const viewer = computeViewerFraming(group)
-		expect(play.maxDim, 'play and viewer share cabinet maxDim').to.be.closeTo(viewer.maxDim, 1)
+		expect(play.maxDim, 'play and viewer share cabinet maxDim').to.be.closeTo(viewer.maxDim, 1e-6)
+		expect(
+			play.position.distanceTo(play.target),
+			'play fits the cluster so sits closer than the cabinet-wide orbit',
+		).to.be.lessThan(viewer.position.distanceTo(viewer.target))
 		expect(play.target.z, 'play forwardBias shifts target forward').to.be.lessThan(viewer.target.z)
-		expect(play.position.y, 'play camera more overhead').to.be.greaterThan(viewer.position.y)
-		expect(play.position.z, 'play camera more forward (bias)').to.be.lessThan(viewer.position.z)
 	})
 
 	it('unseparated VR names are excluded from sizing', () => {
@@ -138,18 +147,15 @@ describe('regression: framing keeps DMD and full playfield visible', () => {
 
 	it('non-table scenery is excluded from sizing whatever it is named', () => {
 		// Token-free names: exclusion holds by construction, not by token.
-		for (const framing of [computePlayFraming, computeViewerFraming]) {
-			const withSky = buildWalkingDeadGroup()
-			withSky.add(
-				makeMesh('primitive-MegaDome', new THREE.BoxGeometry(6000, 6000, 6000), new THREE.Vector3(0, 0, 0)),
-			)
-			withSky.add(
-				makeMesh('primitive-Orb1', new THREE.BoxGeometry(2000, 2000, 2000), new THREE.Vector3(0, 500, 0)),
-			)
-			withSky.updateMatrixWorld(true)
-			const framed = framing(withSky)
-			expect(framed.maxDim, 'scenery must not inflate framing').to.be.closeTo(210.6, 6)
-		}
+		const withSky = buildWalkingDeadGroup()
+		withSky.add(makeMesh('primitive-MegaDome', new THREE.BoxGeometry(6000, 6000, 6000), new THREE.Vector3(0, 0, 0)))
+		withSky.add(makeMesh('primitive-Orb1', new THREE.BoxGeometry(2000, 2000, 2000), new THREE.Vector3(0, 500, 0)))
+		withSky.updateMatrixWorld(true)
+		expect(computeViewerFraming(withSky).maxDim, 'scenery must not inflate viewer').to.be.closeTo(210.6, 6)
+		expect(
+			computePlayFraming(withSky, { fov: 45, aspect: 16 / 9 }).maxDim,
+			'scenery must not inflate play',
+		).to.be.closeTo(210.6, 6)
 	})
 
 	it('applied camera state keeps the orbit inside the framed world', () => {
@@ -166,7 +172,7 @@ describe('regression: framing keeps DMD and full playfield visible', () => {
 
 	it('viewer <-> play transition does not teleport the target (no snap)', () => {
 		const group = buildWalkingDeadGroup()
-		const play = computePlayFraming(group)
+		const play = computePlayFraming(group, { fov: 45, aspect: 16 / 9 })
 		const viewer = computeViewerFraming(group)
 		expect(play.target.distanceTo(viewer.target), 'target should not teleport').to.be.lessThan(20)
 	})

@@ -725,7 +725,7 @@ export class Viewer {
 			this.hookInput()
 		}
 		this.dom.canvas?.focus()
-		const target = computePlayFraming(this.tableGroup)
+		const target = computePlayFraming(this.tableGroup, this.camera)
 		await this._animateCameraTo(target, CAM_ANIM.durationMode)
 		syncRoom(this.scene, this.tableGroup, target.center, target.size)
 		if (!this.player) {
@@ -782,7 +782,7 @@ export class Viewer {
 	}
 	setupPlayCamera() {
 		if (!this.tableGroup || !this.controls) return
-		const state = computePlayFraming(this.tableGroup)
+		const state = computePlayFraming(this.tableGroup, this.camera)
 		applyCameraState(this.camera, this.controls, state)
 		this._playCameraApplied = true
 	}
@@ -886,7 +886,7 @@ export class Viewer {
 		if (this.controls) this.controls.enabled = false
 		if (this.tableGroup) hideCabFlippers(this.tableGroup)
 		{
-			const framing = this.tableGroup ? computePlayFraming(this.tableGroup) : null
+			const framing = this.tableGroup ? computePlayFraming(this.tableGroup, this.camera) : null
 			const center = framing?.center ?? new THREE.Vector3()
 			const size = framing?.size ?? new THREE.Vector3(1000, 2000, 500)
 			syncRoom(this.scene, this.tableGroup ?? this.scene, center, size)
@@ -1463,7 +1463,7 @@ export class Viewer {
 				maxDim: 1,
 			}
 		else if (this.viewerMode === 'play') {
-			const state = computePlayFraming(this.tableGroup)
+			const state = computePlayFraming(this.tableGroup, this.camera)
 			applyCameraState(this.camera, this.controls, state)
 			this._playCameraApplied = true
 			framed = {

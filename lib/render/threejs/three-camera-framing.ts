@@ -41,10 +41,12 @@ type FramingControls = {
 const MAX_ORBIT_SCALE = 3
 const MIN_ORBIT_SCALE = 0.05
 
-// vpinball: ViewSetup.cpp FitCameraToVertices() frames table via bounding vertices + FOV.
-// Demo heuristic mimics that without ViewSetup table data: use THREE.Box3 of visible meshes.
-// Center on the playfield cluster; size from the table (cluster plus cabinet).
-// Threading the live table data (inclination/rotation/FOV via ComputeMVP) through is a follow-up.
+// vpinball: ViewSetup.cpp FitCameraToVertices() frames tables via bounding vertices + FOV.
+// Demo heuristic mimics that without ViewSetup table data: the play view fits
+// the playfield cluster's Box3 corners through the live projection (closed
+// form, one pass), so every table fills the frame identically at the shared
+// FOV; size still spans the cabinet for room sync. The orbit overview keeps
+// the legacy maxDim-distance framing of the whole machine.
 function framingBox(node: Object3D, exclude?: (name: string) => boolean): FramingBox {
 	node.updateMatrixWorld(true)
 	const box = new Box3().makeEmpty()
@@ -78,22 +80,59 @@ const PLAY: FramingConfig = {
 	forwardBias: -0.07,
 }
 
+// Playfield cluster fills the frame (NDC half-extent 1): every table renders
+// the same regardless of backbox/cabinet proportions. Slightly under 1 keeps
+// a hairline of the rails visible instead of clipping the playfield edge.
+const PLAY_FILL = 0.98
+
+// Closed-form pinhole solve: each box corner requires
+// dist >= perp / (FILL * tan) + depth; the max over corners fits them all.
+function fitDistance(box: Box3, target: Vector3, dir: Vector3, tanHalfFov: number, aspect: number): number {
+	const forward = dir.clone().negate()
+	const right = new Vector3().crossVectors(forward, new Vector3(0, 1, 0))
+	if (right.lengthSq() < 1e-6) right.set(1, 0, 0)
+	right.normalize()
+	const up = new Vector3().crossVectors(right, forward)
+	const rel = new Vector3()
+	let dist = 0
+	for (const x of [box.min.x, box.max.x])
+		for (const y of [box.min.y, box.max.y])
+			for (const z of [box.min.z, box.max.z]) {
+				rel.set(x, y, z).sub(target)
+				const depth = rel.dot(dir)
+				const need =
+					Math.max(Math.abs(rel.dot(right)) / aspect, Math.abs(rel.dot(up))) / (PLAY_FILL * tanHalfFov) +
+					depth
+				if (need > dist) dist = need
+			}
+	return dist
+}
+
 function framingState(
 	node: Object3D,
 	targetExclude: (name: string) => boolean,
 	sizeExclude: (name: string) => boolean,
 	cfg: FramingConfig,
+	fit?: { fov: number; aspect: number },
 ): FramingState {
-	const target = framingBox(node, targetExclude).center.clone()
+	const cluster = framingBox(node, targetExclude)
+	const target = cluster.center.clone()
 	const { size, maxDim } = framingBox(node, sizeExclude)
-	if (cfg.forwardBias) target.z += size.z * cfg.forwardBias
-	const dist = maxDim * cfg.dist
+	if (cfg.forwardBias) target.z += cluster.size.z * cfg.forwardBias
+	const offset = new Vector3(0, cfg.elev, cfg.azim).normalize()
+	let dist = maxDim * cfg.dist
+	if (fit) {
+		const solved = fitDistance(cluster.box, target, offset, Math.tan((fit.fov * Math.PI) / 360), fit.aspect)
+		if (Number.isFinite(solved) && solved > 0) dist = solved
+	}
 	return {
 		center: target.clone(),
 		size,
 		maxDim,
 		target: target.clone(),
-		position: new Vector3(target.x, target.y + dist * cfg.elev, target.z + dist * cfg.azim),
+		position: fit
+			? target.clone().addScaledVector(offset, dist)
+			: new Vector3(target.x, target.y + dist * cfg.elev, target.z + dist * cfg.azim),
 		near: Math.max(1, maxDim * cfg.near),
 		far: Math.max(cfg.farMin, maxDim * cfg.farScale),
 	}
@@ -105,8 +144,11 @@ const excludeNonTable = (name: string): boolean => excludeNonPlayfield(name) && 
 export const computeViewerFraming = (node: Object3D): FramingState =>
 	framingState(node, excludeNonPlayfield, excludeNonTable, VIEWER)
 
-export const computePlayFraming = (node: Object3D): FramingState =>
-	framingState(node, excludeNonPlayfield, excludeNonTable, PLAY)
+// Play distance fits the playfield cluster to the frame (fov/aspect aware),
+// so every table fills the screen the same way; size still covers the cabinet
+// for room sync. Callers pass the live camera's fov/aspect.
+export const computePlayFraming = (node: Object3D, view: { fov: number; aspect: number }): FramingState =>
+	framingState(node, excludeNonPlayfield, excludeNonTable, PLAY, view)
 
 export function applyCameraState(camera: PerspectiveCamera, controls: FramingControls, state: FramingState): void {
 	controls.target.copy(state.target)
