@@ -121,7 +121,7 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 		// backfacesEnabled slot so the material cache key keeps splitting open
 		// vs closed meshes that share one file material.
 		const openWall = isOpenMesh(obj.mesh)
-		const backfaces = openWall ? true : obj.backfacesEnabled
+		const backfaces = openWall || obj.backfacesEnabled
 		return this.getMaterial(
 			opts.applyMaterials && obj.material ? obj.material : undefined,
 			opts.applyTextures && obj.map ? obj.map.getName() : undefined,
