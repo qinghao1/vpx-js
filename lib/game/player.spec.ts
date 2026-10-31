@@ -7,6 +7,7 @@ import { TableBuilder } from '../../test/table-builder.js'
 import { ThreeHelper } from '../../test/three.helper'
 import { NodeBinaryReader } from '../io/binary-reader.node.js'
 import { Vertex3D } from '../math/vector.js'
+import { Transpiler } from '../scripting/transpiler.js'
 import { Logger } from '../util/logger.js'
 import { _resetQualityCache } from '../util/quality.js'
 import { Table } from '../vpt/table/table.js'
@@ -161,25 +162,27 @@ describe('The VPinball player', () => {
 		expect(receivedEventId).to.equal(0)
 	})
 
-	it('should pump the VPM timer queue from the game loop', () => {
-		// core.vbs drives vpmTimer through a table Timer item whose handler is
-		// defined at runtime (vpmBuildEvent), so the transpiled build never
-		// wires it. The loop drives the queue at core.vbs cadence instead.
-		const table = new TableBuilder().withTableScript('').build('Table1')
-		const player = new Player(table).init({})
-		let slow = 0
-		let fast = 0
-		;(player as unknown as { scriptScope: Record<string, unknown> }).scriptScope.vpmTimer = {
-			Update: () => {
-				slow++
-			},
-			FastUpdate: () => {
-				fast++
+	it('should drive a runtime-defined VPM timer handler through the Timer item exactly once', async () => {
+		// core.vbs defines `Sub <Timer>_Timer` at runtime via vpmBuildEvent +
+		// ExecuteGlobal, which transpiles to Timer event wiring, so the physics
+		// timers alone drive vpmTimer.Update at the item cadence (no game-loop pump).
+		const table = await Table.load(new NodeBinaryReader(three.fixturePath('table-timer.vpx')))
+		let updates = 0
+		const scope: Record<string, unknown> = {
+			vpmTimer: {
+				Update: () => {
+					updates++
+				},
 			},
 		}
+		const player = new Player(table).init(scope)
+		new Transpiler(table, player).execute('Sub Timer1_Timer\nvpmTimer.Update\nEnd Sub', scope)
+		const timer = table.timers.Timer1.getApi()
+		timer.Enabled = true
+		timer.Interval = 40
 		player.simulateTime(500)
-		expect(slow, 'slow queue pumped at 40ms cadence').to.be.greaterThan(0)
-		expect(fast, 'fast devices pumped faster than the slow queue').to.be.greaterThan(slow)
+		// Nominal 500/40 = 12.5; a game-loop pump on top would double this (~22).
+		expect(updates, 'wired handler fires once per 40ms interval').to.be.within(10, 14)
 	})
 
 	it('should mark items dirty when collection elements are mutated', async () => {
