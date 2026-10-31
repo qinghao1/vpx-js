@@ -5,6 +5,7 @@ import {
 	getTransmissionDebug,
 	getTransmissionTexture,
 	resetTransmissionBuffer,
+	setTransmissionRebuildThrottle,
 	TRANSMISSION_HEIGHT,
 	TRANSMISSION_OPAQUE_CUTOFF,
 	TRANSMISSION_WIDTH,
@@ -12,6 +13,10 @@ import {
 } from './transmission-buffer.js'
 
 describe('transmission light buffer', () => {
+	beforeEach(() => {
+		setTransmissionRebuildThrottle(0)
+	})
+
 	it('gates the bulb lift to non-opaque pixels just below native strict 1.0', () => {
 		expect(TRANSMISSION_OPAQUE_CUTOFF).to.be.lessThan(1)
 		expect(TRANSMISSION_OPAQUE_CUTOFF).to.be.greaterThan(0.99)
@@ -266,5 +271,47 @@ describe('transmission light buffer', () => {
 		const empty = { data: { right: 1000, bottom: 2000 }, lights: {} } as never
 		expect(updateTransmissionBuffer(empty)).to.equal(true)
 		expect(getTransmissionDebug().splats, 'empty signature reports no splats').to.equal(0)
+	})
+
+	it('coalesces rapid rebuilds under throttle and converges once lamps settle', () => {
+		const lampAt = (intensity: number) =>
+			({
+				data: { right: 1000, bottom: 2000 },
+				lights: {
+					a: {
+						data: {
+							center: { x: 500, y: 1000 },
+							color: 0xffffff,
+							bulbLight: true,
+							transmissionScale: 1,
+							falloff: 200,
+							falloffPower: 2,
+						},
+						getState: () => ({ intensity, color: 0xffffff }),
+					},
+				},
+			}) as never
+		const snapshot = (): number[] => Array.from(getTransmissionTexture().image.data as Uint16Array)
+		setTransmissionRebuildThrottle(50)
+		resetTransmissionBuffer()
+		expect(updateTransmissionBuffer(lampAt(8))).to.equal(true)
+		// Same-tick change is pending, not rebuilt: the stale signature retries.
+		expect(updateTransmissionBuffer(lampAt(4))).to.equal(false)
+		// Once the lamps settle, the very next pass rebuilds to the exact
+		// unthrottled buffer.
+		setTransmissionRebuildThrottle(0)
+		expect(updateTransmissionBuffer(lampAt(4))).to.equal(true)
+		const throttled = snapshot()
+
+		setTransmissionRebuildThrottle(0)
+		resetTransmissionBuffer()
+		expect(updateTransmissionBuffer(lampAt(8))).to.equal(true)
+		expect(updateTransmissionBuffer(lampAt(4))).to.equal(true)
+		expect(snapshot(), 'throttled buffer converges bit-exact').to.deep.equal(throttled)
+
+		// Disabling the throttle restores back-to-back rebuilds.
+		resetTransmissionBuffer()
+		expect(updateTransmissionBuffer(lampAt(8))).to.equal(true)
+		expect(updateTransmissionBuffer(lampAt(4))).to.equal(true)
 	})
 })

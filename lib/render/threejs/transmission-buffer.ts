@@ -32,6 +32,14 @@ const contribScratch: Array<{
 	power: number
 }> = []
 
+export const TRANSMISSION_REBUILD_THROTTLE_MS = 50
+let rebuildThrottleMs = TRANSMISSION_REBUILD_THROTTLE_MS
+let lastRebuildAt = 0
+
+export function setTransmissionRebuildThrottle(ms: number): void {
+	rebuildThrottleMs = Math.max(0, ms)
+}
+
 export function getTransmissionTexture(): DataTexture {
 	if (!texture) {
 		texture = makeBuffer()
@@ -155,6 +163,12 @@ export function updateTransmissionBuffer(table: Table): boolean {
 		}
 		if (same) return false
 	}
+	// Sustained lamp motion (fades, attract) changes the signature every frame.
+	// The buffer is a heavily blurred glow, so coalesce rebuilds to the throttle
+	// window and report clean: the stale signature retries on the next frame.
+	if (rebuildThrottleMs > 0 && lastRebuildAt > 0 && performance.now() - lastRebuildAt < rebuildThrottleMs) {
+		return false
+	}
 	lastSigNums.length = 0
 	for (let i = 0; i < curSigNums.length; i++) lastSigNums.push(curSigNums[i] as number)
 	// Native (Renderer::DrawBulbLightBuffer + Light::Render LIGHT_BUFFER + fs_light.sc
@@ -204,6 +218,7 @@ export function updateTransmissionBuffer(table: Table): boolean {
 	// (falloff 1500) splats, enough to collapse the frame rate on their own.
 	fillBuffer(data, splats, right, bottom)
 	tex.needsUpdate = true
+	lastRebuildAt = performance.now()
 	return true
 }
 
@@ -306,6 +321,7 @@ export function resetTransmissionBuffer(): void {
 	lastSigNums.push(-1)
 	curSigNums.length = 0
 	contribScratch.length = 0
+	lastRebuildAt = 0
 }
 
 export function getTransmissionDebug(): {
