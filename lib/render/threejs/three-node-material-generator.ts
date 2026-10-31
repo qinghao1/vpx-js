@@ -2,7 +2,7 @@ import { Color, DoubleSide, type Object3D } from 'three'
 import { Fn, texture, uniform, uv, vec4 } from 'three/tsl'
 import type { RenderInfo } from '../../game/interfaces.js'
 import type { Material } from '../../vpt/material.js'
-import { isValidCutout, resolveTransparency } from '../../vpt/primitive/primitive-material-protocol.js'
+import { isOpenMesh, isValidCutout, resolveTransparency } from '../../vpt/primitive/primitive-material-protocol.js'
 import type { MeshConvertOptions } from '../irender-api.js'
 import type { IMaterialGenerator } from './imaterial-generator.js'
 import {
@@ -112,6 +112,16 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 		const mapTex = obj.map ?? obj.material?.emissiveMap
 		const rawAlphaTest = mapTex && !mapTex.isOpaque ? (mapTex.alphaTestValue ?? 0) : 0
 		const alphaTestValue = isValidCutout(rawAlphaTest) ? rawAlphaTest : 0
+		// Open-wall rule (table-agnostic, no name checks): cabinet side walls
+		// are open single-sided sheets (PrimWalls, inward-facing fronts,
+		// backfacesEnabled=false) that vanish from outside/behind under
+		// FrontSide, while closed solids stay FrontSide. Native stays
+		// single-sided here (primitive.cpp CULL_CCW); its camera never leaves
+		// the playfield while the orbit viewer does. Folded into the
+		// backfacesEnabled slot so the material cache key keeps splitting open
+		// vs closed meshes that share one file material.
+		const openWall = isOpenMesh(obj.mesh)
+		const backfaces = openWall ? true : obj.backfacesEnabled
 		return this.getMaterial(
 			opts.applyMaterials && obj.material ? obj.material : undefined,
 			opts.applyTextures && obj.map ? obj.map.getName() : undefined,
@@ -122,7 +132,7 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 			obj.depthBias ?? 0,
 			obj.disableLighting,
 			!!obj.addBlend,
-			obj.backfacesEnabled,
+			backfaces,
 			alphaTestValue,
 			obj.addBlendMode,
 			(obj as { disableLightingBelow?: number }).disableLightingBelow ?? 0,

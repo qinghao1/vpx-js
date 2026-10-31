@@ -90,6 +90,34 @@ export function isValidCutout(value: unknown): value is number {
 	return typeof value === 'number' && value > 0 && value <= 1
 }
 
+/**
+ * Watertightness test over a triangle index list: a mesh is open when any
+ * edge is used by exactly one triangle (a boundary edge). Open sheets such
+ * as cabinet side walls carry boundary edges along their whole rim, while
+ * closed solids share every edge between two triangles. Empty or degenerate
+ * lists report closed so callers keep their current behavior.
+ */
+export function isOpenMesh(mesh: { indices?: ArrayLike<number> } | undefined | null): boolean {
+	const indices = mesh?.indices
+	if (!indices || indices.length < 3) return false
+	// Exact for table-scale vertex counts (needs a, b < 2^21).
+	const edgeKey = (a: number, b: number): number => (a < b ? a * 4294967296 + b : b * 4294967296 + a)
+	const edgeUses = new Map<number, number>()
+	for (let t = 0; t + 2 < indices.length; t += 3) {
+		// In range by the loop guard, so the ?? 0 fallback never fires.
+		const a = indices[t] ?? 0
+		const b = indices[t + 1] ?? 0
+		const c = indices[t + 2] ?? 0
+		for (const key of [edgeKey(a, b), edgeKey(b, c), edgeKey(c, a)]) {
+			edgeUses.set(key, (edgeUses.get(key) ?? 0) + 1)
+		}
+	}
+	for (const uses of edgeUses.values()) {
+		if (uses === 1) return true
+	}
+	return false
+}
+
 export function isPrimitiveNodeMaterial(mat: unknown): boolean {
 	const kind = (mat as { userData?: { __primitiveKind?: string } })?.userData?.__primitiveKind
 	return kind === PRIMITIVE_BDL_KIND || kind === PRIMITIVE_ADDITIVE_KIND
