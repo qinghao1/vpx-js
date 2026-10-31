@@ -161,6 +161,27 @@ describe('The VPinball player', () => {
 		expect(receivedEventId).to.equal(0)
 	})
 
+	it('should pump the VPM timer queue from the game loop', () => {
+		// core.vbs drives vpmTimer through a table Timer item whose handler is
+		// defined at runtime (vpmBuildEvent), so the transpiled build never
+		// wires it. The loop drives the queue at core.vbs cadence instead.
+		const table = new TableBuilder().withTableScript('').build('Table1')
+		const player = new Player(table).init({})
+		let slow = 0
+		let fast = 0
+		;(player as unknown as { scriptScope: Record<string, unknown> }).scriptScope.vpmTimer = {
+			Update: () => {
+				slow++
+			},
+			FastUpdate: () => {
+				fast++
+			},
+		}
+		player.simulateTime(500)
+		expect(slow, 'slow queue pumped at 40ms cadence').to.be.greaterThan(0)
+		expect(fast, 'fast devices pumped faster than the slow queue').to.be.greaterThan(slow)
+	})
+
 	it('should mark items dirty when collection elements are mutated', async () => {
 		const table = await Table.load(new NodeBinaryReader(three.fixturePath('table-collection.vpx')))
 		const player = new Player(table).init()

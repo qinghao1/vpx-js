@@ -37,6 +37,13 @@ export const FULL_SWEEP_EVERY = 300
  */
 const FULL_SWEEP_MIN_COVERAGE = 0.5
 
+/**
+ * core.vbs conTimerPulse/conFastTicks: the VPM timer queue advances in
+ * 40 ms steps, fast devices every 10 ms.
+ */
+const VPM_SLOW_MS = 40
+const VPM_FAST_MS = 10
+
 /** Host-facing game controller: input, physics, animations and state diffing. */
 export class Player extends EventEmitter {
 	private readonly pinInput: PinInput
@@ -53,6 +60,9 @@ export class Player extends EventEmitter {
 	private dirtySet = new Set<string>()
 	private allStateNames: string[] = []
 	private frameCount = 0
+	private scriptScope: Record<string, unknown> | undefined
+	private lastVpmSlowMs = 0
+	private lastVpmFastMs = 0
 
 	public width = 0
 	public height = 0
@@ -87,6 +97,7 @@ export class Player extends EventEmitter {
 	}
 
 	private runScript(scope: Record<string, unknown>, async: boolean): Promise<void> | void {
+		this.scriptScope = scope
 		const asyncTable = this.table as unknown as {
 			runTableScriptAsync?: (player: Player, scriptScope: Record<string, unknown>) => Promise<void>
 		}
@@ -178,9 +189,31 @@ export class Player extends EventEmitter {
 		}
 	}
 
+	/**
+	 * VPM timer pump. Tables drive core.vbs `vpmTimer` through a table Timer
+	 * item whose handler (`Sub <Timer>_Timer`) is defined at runtime by
+	 * `vpmBuildEvent`, so it never gets event wiring in the transpiled build.
+	 * Drive the queue from the game loop at core.vbs cadence instead; the
+	 * queued `Execute` strings already run through transpileInline+eval.
+	 */
+	private pumpVpmTimer(): void {
+		const timer = this.scriptScope?.vpmTimer as { Update?: unknown; FastUpdate?: unknown } | undefined
+		if (typeof timer?.Update !== 'function') return
+		const now = this.physics.timeMsec
+		if (now - this.lastVpmSlowMs >= VPM_SLOW_MS) {
+			this.lastVpmSlowMs = now
+			;(timer.Update as () => void).call(timer)
+		}
+		if (typeof timer.FastUpdate === 'function' && now - this.lastVpmFastMs >= VPM_FAST_MS) {
+			this.lastVpmFastMs = now
+			;(timer.FastUpdate as () => void).call(timer)
+		}
+	}
+
 	/** Advances physics to absolute `timeMs` (ms, not a delta); omitted = real clock. Returns iterations run. */
 	public updatePhysics(timeMs?: number): number {
 		const iterations = this.physics.updatePhysics(timeMs)
+		this.pumpVpmTimer()
 		if (iterations > 0) {
 			for (let i = 0; i < this.physics.balls.length; i++) this.markDirty(this.physics.balls[i].getName())
 			for (let i = 0; i < this.movables.length; i++) {
