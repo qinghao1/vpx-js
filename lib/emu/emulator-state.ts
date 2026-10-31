@@ -109,9 +109,9 @@ export class EmulatorState {
 	// (ledNo, chgSeg, state) triple per changed LED since the previous pull
 	// — so they accumulate here and drain on read, mirroring VPM where
 	// ChangedLEDs reports the changes since the script's last read. Rows
-	// coalesce by LED (changed bits ORed, state is latest), which is exactly
-	// VPM's XOR-versus-last-read. wpc-emu has no LED surface, so this lane
-	// stays empty for it.
+	// coalesce by LED (changed bits ORed, state is latest), approximating
+	// VPM's XOR-versus-last-read across one drain window. wpc-emu has no
+	// LED surface, so this lane stays empty for it.
 	private pendingLEDs = new Map<number, [number, number]>()
 	pullLEDs(rows: number[][]): void {
 		for (const row of rows) {

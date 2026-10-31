@@ -166,9 +166,8 @@ export class PinMameEmulator implements IEmulator {
 		}
 		// Segment-display LEDs ship in every current build; the guard keeps
 		// older builds (and the mock) on the empty lane instead of wrapping
-		// a hole. The pull below always uses full masks: the script masks
-		// never arrive here (the bridge has no parameterized-propget
-		// support), and forwarding them is a follow-up, not this lane.
+		// a hole. The pull below always uses full masks — per-read script
+		// masks are widened for now; forwarding them is a follow-up.
 		if (typeof (module as unknown as Record<string, unknown>)._PinmameGetChangedLEDs === 'function') {
 			this.api.getChangedLEDs = wrap('PinmameGetChangedLEDs', 'number', ['bigint', 'bigint', 'number'])
 		}
