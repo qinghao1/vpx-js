@@ -123,6 +123,10 @@ export function updateTransmissionBuffer(table: Table): boolean {
 			if (level <= 0) continue
 			if ((color & 0xffffff) === 0 && (color2 & 0xffffff) === 0) continue
 			const transmissionScale = lamp.data?.transmissionScale ?? 0
+			// Sub-quantum contributions (below half the signature quantum)
+			// neither rebuild nor splat: invisible either way, so they stay
+			// out of the signature entirely instead of forcing rebuilds.
+			if (transmissionScale <= 0 || level * transmissionScale < 0.05) continue
 			const centerX = lamp.data?.center?.x ?? right / 2
 			const centerY = lamp.data?.center?.y ?? bottom / 2
 			const falloff = Math.max(lamp.data?.falloff ?? 50, 0.1)
@@ -183,7 +187,8 @@ export function updateTransmissionBuffer(table: Table): boolean {
 		}
 		splats.push(entry(c.level * c.transmissionScale))
 	}
-	// Signature covers every lit bulb lamp; splats only scale > 0 ones.
+	// Signature and splats cover only contributing lamps; sub-quantum and
+	// zero-scale ones stay out entirely (see the skip above).
 	const parts: string[] = []
 	for (let i = 0; i + 7 < curSigNums.length; i += 8) {
 		parts.push(
@@ -205,19 +210,51 @@ export function updateTransmissionBuffer(table: Table): boolean {
 /** Module-scope scratch: per-rebuild allocs showed up as GC churn on profiles. */
 const scratchAcc = new Float32Array(TRANSMISSION_WIDTH * TRANSMISSION_HEIGHT * 4)
 
+/**
+ * Radial falloff lookup: the per-texel sqrt/pow/hub triple dominates the
+ * bulb pass, but the profile only depends on normalized radius, so 256 steps
+ * are indistinguishable in the blurred glow buffer. One table per power,
+ * built lazily; powers are a handful of distinct values per table.
+ */
+const KERNEL_STEPS = 256
+const kernelCache = new Map<number, { atten: Float32Array; hub: Float32Array }>()
+
+function falloffKernel(power: number): { atten: Float32Array; hub: Float32Array } {
+	let kernel = kernelCache.get(power)
+	if (!kernel) {
+		const atten = new Float32Array(KERNEL_STEPS)
+		const hub = new Float32Array(KERNEL_STEPS)
+		for (let i = 0; i < KERNEL_STEPS; i++) {
+			const r = i / (KERNEL_STEPS - 1)
+			const oneMinus = 1 - r
+			atten[i] = power === 2 ? oneMinus * oneMinus : power === 1 ? oneMinus : oneMinus ** power
+			hub[i] = Math.sqrt(r)
+		}
+		kernel = { atten, hub }
+		kernelCache.set(power, kernel)
+	}
+	return kernel
+}
+
 /** Splats one lamp list into a half-float playfield-UV buffer. */
 function fillBuffer(data: Uint16Array, list: TransmissionSplat[], right: number, bottom: number): void {
 	const acc = scratchAcc
 	acc.fill(0)
 	for (const splat of list) {
-		const minPx = Math.max(0, Math.floor(((splat.x - splat.falloff) / right) * TRANSMISSION_WIDTH))
-		const maxPx = Math.min(
-			TRANSMISSION_WIDTH - 1,
-			Math.ceil(((splat.x + splat.falloff) / right) * TRANSMISSION_WIDTH),
-		)
+		const falloff = splat.falloff
+		const falloffSq = falloff * falloff
+		const kernelScale = (KERNEL_STEPS - 1) / falloffSq
+		const kernel = falloffKernel(splat.power)
+		const kernelAtten = kernel.atten
+		const kernelHub = kernel.hub
+		const redSpan = splat.red - splat.red2
+		const greenSpan = splat.green - splat.green2
+		const blueSpan = splat.blue - splat.blue2
+		const minPx = Math.max(0, Math.floor(((splat.x - falloff) / right) * TRANSMISSION_WIDTH))
+		const maxPx = Math.min(TRANSMISSION_WIDTH - 1, Math.ceil(((splat.x + falloff) / right) * TRANSMISSION_WIDTH))
 		// Buffer rows run top-down (row 0 is table y=bottom), so bound in v-space.
 		const vCenter = 1 - splat.y / bottom
-		const vRadius = splat.falloff / bottom
+		const vRadius = falloff / bottom
 		const minPy = Math.max(0, Math.floor((vCenter - vRadius) * TRANSMISSION_HEIGHT))
 		const maxPy = Math.min(TRANSMISSION_HEIGHT - 1, Math.ceil((vCenter + vRadius) * TRANSMISSION_HEIGHT))
 		for (let py = minPy; py <= maxPy; py++) {
@@ -226,21 +263,24 @@ function fillBuffer(data: Uint16Array, list: TransmissionSplat[], right: number,
 				const tx = ((px + 0.5) / TRANSMISSION_WIDTH) * right
 				const dx = tx - splat.x
 				const dy = ty - splat.y
-				const dist = Math.sqrt(dx * dx + dy * dy)
-				if (dist >= splat.falloff) continue
-				const normDist = dist / splat.falloff
-				const atten = (1 - normDist) ** splat.power
+				const distSq = dx * dx + dy * dy
+				if (distSq >= falloffSq) continue
+				// Table lookup replaces the sqrt/pow/hub triple; the boundary
+				// above keeps edge texels identical to the analytic version.
+				const kernelIndex = (distSq * kernelScale) | 0
+				const atten = kernelAtten[kernelIndex] as number
 				if (atten <= 0) continue
-				const hub = Math.sqrt(normDist)
+				const hub = kernelHub[kernelIndex] as number
 				const offset = (py * TRANSMISSION_WIDTH + px) * 4
-				acc[offset] += (splat.red2 + (splat.red - splat.red2) * hub) * atten
-				acc[offset + 1] += (splat.green2 + (splat.green - splat.green2) * hub) * atten
-				acc[offset + 2] += (splat.blue2 + (splat.blue - splat.blue2) * hub) * atten
+				acc[offset] += (splat.red2 + redSpan * hub) * atten
+				acc[offset + 1] += (splat.green2 + greenSpan * hub) * atten
+				acc[offset + 2] += (splat.blue2 + blueSpan * hub) * atten
 				acc[offset + 3] = 1
 			}
 		}
 	}
-	for (let i = 0; i < acc.length; i++) data[i] = DataUtils.toHalfFloat(acc[i])
+	// The convert call dominates this pass; untouched texels stay half-zero.
+	for (let i = 0; i < acc.length; i++) data[i] = acc[i] !== 0 ? DataUtils.toHalfFloat(acc[i]) : 0
 }
 
 export function resetTransmissionBuffer(): void {

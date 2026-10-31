@@ -54,7 +54,9 @@ describe('transmission light buffer', () => {
 				},
 			},
 		} as never
-		expect(updateTransmissionBuffer(plain)).to.equal(true)
+		// A zero-scale lamp stays out of the signature entirely, so with
+		// nothing else changed there is nothing to rebuild or present.
+		expect(updateTransmissionBuffer(plain)).to.equal(false)
 		let peak = 0
 		for (let index = 0; index < data.length; index += 4) peak = Math.max(peak, data[index] ?? 0)
 		expect(peak, 'zero transmission scale contributes nothing').to.equal(0)
@@ -117,6 +119,31 @@ describe('transmission light buffer', () => {
 		// stays above (1-22/200)^2.
 		expect(peak).to.be.lessThan(51)
 		expect(peak).to.be.greaterThan(30)
+	})
+
+	it('skips sub-quantum lamps entirely', () => {
+		resetTransmissionBuffer()
+		const table = {
+			data: { right: 1000, bottom: 2000 },
+			lights: {
+				a: {
+					data: {
+						center: { x: 500, y: 1000 },
+						intensity: 100,
+						color: 0xffffff,
+						bulbLight: true,
+						transmissionScale: 1,
+						falloff: 200,
+						falloffPower: 2,
+					},
+					getState: () => ({ intensity: 0.04, color: 0xffffff }),
+				},
+			},
+		} as never
+		expect(updateTransmissionBuffer(table)).to.equal(true)
+		expect(getTransmissionDebug().splats, 'invisible lamp splats nothing').to.equal(0)
+		// Stable across frames: no rebuild churn from invisible flicker.
+		expect(updateTransmissionBuffer(table)).to.equal(false)
 	})
 
 	it('rebuilds when falloff, falloff power, or rim color change', () => {
