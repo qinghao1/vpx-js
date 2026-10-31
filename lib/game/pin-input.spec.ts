@@ -334,17 +334,14 @@ describe('flipper keys drive cabinet switches', () => {
 		expect(callsOf(log)).to.deep.equal([
 			[84, true],
 			[114, true],
-			[112, true],
 		])
 		player.onKeyUp({ code: 'ShiftLeft', key: 'Shift' })
 		player.updatePhysics(40)
 		expect(callsOf(log)).to.deep.equal([
 			[84, true],
 			[114, true],
-			[112, true],
 			[84, false],
 			[114, false],
-			[112, false],
 		])
 	})
 

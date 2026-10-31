@@ -203,6 +203,30 @@ describe('The VpmController - VISUAL PINMAME COM OBJECT', () => {
 		}
 	})
 
+	it('ignores a preloaded ROM uploaded for another table', async () => {
+		const pinLoad = sandbox.stub(PinMameEmulator.prototype, 'loadGame').resolves()
+		const wpcLoad = sandbox.stub(Emulator.prototype, 'loadGame').resolves()
+		const stale = new Uint8Array([1, 2, 3])
+		const g = globalThis as any
+		const origFetch = globalThis.fetch
+		const origPendingRom = g.__pendingRom
+		const origPendingRomName = g.__pendingRomName
+		g.__pendingRom = stale
+		g.__pendingRomName = 'totally_different_table'
+		globalThis.fetch = (async () => ({ ok: false, status: 404 })) as any
+		try {
+			vpmController.GameName = 'mm_109c'
+			await vpmController.whenReady()
+			expect(pinLoad.calledOnce).to.equal(true)
+			expect(wpcLoad.called).to.equal(false)
+			expect(pinLoad.firstCall.args[1]).to.not.equal(stale)
+		} finally {
+			globalThis.fetch = origFetch
+			g.__pendingRom = origPendingRom
+			g.__pendingRomName = origPendingRomName
+		}
+	})
+
 	it('WPC boot failure restores the previous emulator instead of keeping the dead instance', async () => {
 		const prev = new PinMameEmulator()
 		;(vpmController as any).emulator = prev

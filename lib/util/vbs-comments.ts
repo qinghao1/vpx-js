@@ -4,7 +4,7 @@ const REM_HEAD = /^rem(\s|$|:)/i
 
 /** True when the text at j opens a `Rem` comment — VBScript requires the colon after other statements. */
 function isRemComment(line: string, j: number): boolean {
-	while (j < line.length && (line[j] === ' ' || line[j] === '\t')) j++
+	while (j < line.length && /\s/.test(line[j])) j++
 	return REM_HEAD.test(line.slice(j))
 }
 
@@ -15,7 +15,7 @@ export function stripVbsComments(script: string): string {
 	return script
 		.split('\n')
 		.map(line => {
-			if (/^\s*rem(\s|$|:)/i.test(line)) return ''
+			if (isRemComment(line, 0)) return ''
 			let inStr = false
 			for (let i = 0; i < line.length; i++) {
 				const c = line[i]

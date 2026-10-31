@@ -9,7 +9,8 @@ import { TableBuilder } from '../../../test/table-builder.js'
 import { ThreeHelper } from '../../../test/three.helper'
 import { Player } from '../../game/player.js'
 import { NodeBinaryReader } from '../../io/binary-reader.node.js'
-import { Vertex3D } from '../../math/vector.js'
+import { Vertex2D, Vertex3D } from '../../math/vector.js'
+import { CollisionEvent } from '../../physics/collision-event.js'
 import { Table } from '../table/table.js'
 
 chai.use((sinonChai as any).default ?? sinonChai)
@@ -190,6 +191,58 @@ describe('The VPinball kicker collision', () => {
 			const kicker = table.kickers.Williams
 			expect(kicker.data.legacyMode).to.equal(false)
 			expect(kicker.getHit().radius).to.be.closeTo(kicker.data.radius, 1e-6)
+		})
+	})
+
+	describe('capture height parity', () => {
+		it('should capture a ball resting inside a healthy kicker volume', () => {
+			// Upstream 2D branch (HitTestBasicRadius, collide.cpp): the ball rolls
+			// below the cylinder top, so inside (!in-vol) reports Hit at time 0 and
+			// DoCollide freezes it at the center (KickerHitCircle, kicker.cpp).
+			const built = new TableBuilder()
+				.addKicker('hole', {
+					center: new Vertex2D(500, 500),
+					radius: 25,
+					hitHeight: 40,
+					legacyMode: true,
+				})
+				.build()
+			const builtPlayer = new Player(built).init()
+			const kicker = built.kickers.hole
+			const ball = createBall(builtPlayer, 510, 500, 0, 0, 0, 0)
+			const hitTime = kicker.getHit().hitTest(ball, 1, new CollisionEvent(ball))
+			expect(hitTime).to.be.at.least(0)
+			kicker.getHit().doCollide(builtPlayer.getPhysics(), ball, new Vertex3D(1, 0, 0), false, false)
+			expect(ball.state.isFrozen).to.equal(true)
+			expect(ball.state.pos.x).to.be.closeTo(500, 1e-6)
+			expect(ball.state.pos.y).to.be.closeTo(500, 1e-6)
+		})
+
+		it('should never fire for a roller over a cylinder top below ball rest height', () => {
+			// Upstream capsule branch (HitTestBasicRadius, collide.cpp): the ball
+			// rides above the cylinder top, and the capsule sphere around the buried
+			// center never meets the playfield plane, so no Hit fires at any speed.
+			const built = new TableBuilder()
+				.addKicker('shallow', {
+					center: new Vertex2D(500, 500),
+					radius: 22,
+					hitHeight: 20,
+					legacyMode: true,
+				})
+				.build()
+			const builtPlayer = new Player(built).init()
+			const kicker = built.kickers.shallow
+			expect(kicker.getHit().radius).to.be.closeTo(13.2, 1e-6)
+			for (const offset of [-30, -10, 10, 30]) {
+				for (const speed of [0.5, 30]) {
+					const vx = offset > 0 ? -speed : speed
+					const ball = createBall(builtPlayer, 500 + offset, 500, 0, vx, 0, 0)
+					const hitTime = kicker.getHit().hitTest(ball, 1, new CollisionEvent(ball))
+					expect(hitTime, `offset ${offset} speed ${speed}`).to.be.below(0)
+					expect(ball.state.isFrozen).to.equal(false)
+					builtPlayer.destroyBall(ball)
+				}
+			}
 		})
 	})
 

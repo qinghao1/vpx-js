@@ -35,6 +35,15 @@ function cabinetBitFor(nr: number): CabinetBit | undefined {
 	return nr >= 1 && nr <= 8 ? CABINET_SWITCH_BITS[nr - 1] : undefined
 }
 
+// Maps VPM flipper-button switches to wpc-emu fliptronics keys. The matrix
+// lane cannot address these numbers, and the backend exposes the buttons
+// on the fliptronics column instead.
+const FLIPTRONICS_KEYS: Record<number, string> = { 112: 'F2', 114: 'F4', 116: 'F6', 118: 'F8' }
+
+export function fliptronicsKeyFor(nr: number): string | undefined {
+	return FLIPTRONICS_KEYS[nr]
+}
+
 /** WPC-EMU adapter. @see https://github.com/vpinball/wpc-emu */
 export class Emulator implements IEmulator {
 	readonly emulatorState = new EmulatorState()
@@ -118,6 +127,14 @@ export class Emulator implements IEmulator {
 		}
 		if (!this.emulator) {
 			this.queue.addMessage(switchMessageType(enable), nr)
+			return true
+		}
+		// Flipper buttons bypass the matrix lane like dedicated switches —
+		// route them through the fliptronics lane instead. Queued above as
+		// plain switch numbers so pre-init presses replay into this lane.
+		const flipKey = fliptronicsKeyFor(nr)
+		if (flipKey !== undefined) {
+			this.emulator.setFliptronicsInput(flipKey, enable)
 			return true
 		}
 		this.emulator.setSwitchInput(nr, enable)

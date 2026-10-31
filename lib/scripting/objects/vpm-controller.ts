@@ -7,14 +7,13 @@ const GamelistDB = (wpcEmuPkg as any)?.GamelistDB ?? (wpcEmuPkg as any)?.default
 
 import { PinMameEmulator } from '../../emu/pinmame/pinmame-emu.js'
 import { downloadGameEntry } from '../../emu/rom-fetcher.js'
-import { Emulator } from '../../emu/wpc-emu.js'
+import { Emulator, fliptronicsKeyFor } from '../../emu/wpc-emu.js'
 import type { IEmulator } from '../../game/iemulator.js'
 import type { Player } from '../../game/player.js'
 import { logger } from '../../util/logger.js'
 import type { VbsArray } from '../vbs-array.js'
 
 export class VpmController {
-	private static readonly FLIPTRONICS: Record<number, string> = { 112: 'F2', 114: 'F4', 116: 'F6', 118: 'F8' }
 	private static romBaseUrls: string[] = []
 
 	/** Prepend custom ROM base URLs (e.g. a Vite `/@fs/...` dev prefix) to the browser ROM lookup. */
@@ -58,7 +57,7 @@ export class VpmController {
 				if (v === true) this.switchCache.set(n, true)
 				else if (v === false) this.switchCache.set(n, false)
 				else if (v === undefined) this.switchCache.delete(n)
-				const f = VpmController.FLIPTRONICS[n]
+				const f = fliptronicsKeyFor(n)
 				if (f && this.emulator instanceof Emulator) {
 					this.emulator.setFliptronicsInput(f, v)
 					return true

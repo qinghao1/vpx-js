@@ -165,6 +165,18 @@ describe('WPC-EMU', () => {
 		expect(mockEmu.fliptronicsInput).to.deep.equal(['A123'])
 	})
 
+	it('should route flipper buttons through the fliptronics lane, not the matrix', async () => {
+		await emulator.loadGame(mockGameEntry, new Uint8Array())
+		// WPC flipper buttons have no matrix address (fromWpcMatrix throws
+		// below row/col 1 and above 8); the backend reads them from the
+		// fliptronics column instead.
+		emulator.setSwitchInput(114, true)
+		emulator.setSwitchInput(114, false)
+		emulator.setSwitchInput(112, true)
+		expect(mockEmu.fliptronicsInput).to.deep.equal(['F4', 'F4', 'F2'])
+		expect(mockEmu.switchInput).to.deep.equal([])
+	})
+
 	it('should call WPC-Emu set DipSwitchByte when initialized', async () => {
 		await emulator.loadGame(mockGameEntry, new Uint8Array())
 		emulator.setDipSwitchByte(44)

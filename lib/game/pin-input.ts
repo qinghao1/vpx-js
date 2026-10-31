@@ -64,7 +64,7 @@ const DEFAULT_KEYS: Record<number, number> = {
 // below means no emu switch moves, so a script that ignores coin keys takes no coins.
 // Start has no entry either: the table script maps StartGameKey to its own
 // system's switch, and only the script knows that number.
-const SWITCH_FLIPPER_L = [84, 114, 112] as const
+const SWITCH_FLIPPER_L = [84, 114] as const
 const SWITCH_FLIPPER_R = [82, 86, 112, 116] as const
 
 const TROUGH_KICK_ANGLE = 60
