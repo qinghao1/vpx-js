@@ -23,7 +23,8 @@ export const RE_KEEP_WHITE = new RegExp(`${RE_KEEP_DARK.source}|bm_|primitive|ru
 
 export function isInCabFlipper(obj: THREE.Object3D): boolean {
 	for (let cur: THREE.Object3D | null = obj; cur; cur = cur.parent) {
-		const nameLower = (cur.name ?? '').toLowerCase()
+		// Authors spell the cabinet prefix `vrcab`, `vr_cab`, `vr-cab`, ...
+		const nameLower = (cur.name ?? '').toLowerCase().replace(/[_-]/g, '')
 		if (nameLower.includes('vrcab') && nameLower.includes('flipper')) return true
 	}
 	return false

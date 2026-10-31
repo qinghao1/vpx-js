@@ -41,20 +41,31 @@ type FramingControls = {
 const MAX_ORBIT_SCALE = 3
 const MIN_ORBIT_SCALE = 0.05
 
-// vpinball: ViewSetup.cpp FitCameraToVertices() frames tables via bounding vertices + FOV.
-// Demo heuristic mimics that without ViewSetup table data: the play view fits
-// the playfield cluster's Box3 corners through the live projection (closed
-// form, one pass), so every table fills the frame identically at the shared
-// FOV; size still spans the cabinet for room sync. The orbit overview keeps
-// the legacy maxDim-distance framing of the whole machine.
+// vpinball ViewSetup::FitCameraToVertices() solves camera distance from
+// bounding-vertex slope intercepts (FOV/aspect) and centers on the fitted
+// set; upstream fits every part in legacy mode. This applies the same math
+// to the playfield set only, so per-table cabinet furniture (coin door,
+// buttons, plunger trim) cannot move the play camera. Size still spans the
+// cabinet; the orbit overview keeps the previous maxDim-distance framing of
+// the whole machine.
+
+// Author spellings vary (`vrcab` vs `vr_cab`, hyphens); fold separators so
+// token tests see one canonical form.
+const flatName = (name: string): string => name.toLowerCase().replace(/[_-]/g, '')
+
 function framingBox(node: Object3D, exclude?: (name: string) => boolean): FramingBox {
 	node.updateMatrixWorld(true)
 	const box = new Box3().makeEmpty()
 	node.traverse((obj: Object3D) => {
 		const mesh = obj as Mesh
 		if (!mesh.isMesh || !mesh.visible || !mesh.geometry?.attributes?.position) return
-		if (exclude?.((obj.name ?? '').toLowerCase())) return
-		box.expandByObject(obj)
+		if (exclude?.(flatName(obj.name ?? ''))) return
+		// Self box only: expandByObject unions the whole subtree, so an
+		// excluded descendant of an included mesh would leak into the box.
+		if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox()
+		const bounds = mesh.geometry.boundingBox
+		if (!bounds || bounds.isEmpty()) return
+		box.union(bounds.clone().applyMatrix4(mesh.matrixWorld))
 	})
 	if (box.isEmpty() || !Number.isFinite(box.min.x)) box.setFromObject(node)
 	const center = box.getCenter(new Vector3())
@@ -69,6 +80,10 @@ const excludeNonPlayfield = (name: string): boolean =>
 	!name.includes('plunger') &&
 	!name.includes('apron')
 
+// Centering and distance set for the play camera: playfield-named meshes
+// only, so cabinet furniture stays out by design.
+const excludeNonPlaySurface = (name: string): boolean => !name.includes('playfield')
+
 const VIEWER: FramingConfig = { dist: 1.2, elev: 0.85, azim: 0.65, near: 0.015, farScale: 8, farMin: 2000 }
 const PLAY: FramingConfig = {
 	dist: 1.0,
@@ -77,14 +92,14 @@ const PLAY: FramingConfig = {
 	near: 0.012,
 	farScale: 10,
 	farMin: 4000,
-	forwardBias: -0.07, // down-table (toward the backbox), in cluster depths.
+	forwardBias: -0.07, // down-table (toward the backbox), in target-box depths.
 }
 
-// Playfield cluster fills the frame (NDC half-extent 1): every table renders
+// Playfield surface fills the frame (NDC half-extent 1): every table renders
 // the same regardless of backbox/cabinet proportions. Slightly under 1 keeps
 // a hairline of the rails visible instead of clipping the playfield edge.
-// Backbox/DMD stay outside the fit by design (upstream parity); including
-// them would reintroduce cabinet-driven variance.
+// Backbox/DMD stay outside the fit by design; including them would
+// reintroduce cabinet-driven variance.
 const PLAY_FILL = 0.98
 
 // Closed-form pinhole solve: each box corner requires
@@ -115,14 +130,16 @@ function framingState(
 	cfg: FramingConfig,
 	fit?: { fov: number; aspect: number },
 ): FramingState {
-	const cluster = framingBox(node, targetExclude)
-	const target = cluster.center.clone()
+	// Camera target: the playfield box when fitting, else the playfield
+	// cluster. Either way furniture never steers the play camera.
+	const centerBox = fit ? framingBox(node, excludeNonPlaySurface) : framingBox(node, targetExclude)
+	const target = centerBox.center.clone()
 	const { size, maxDim } = framingBox(node, sizeExclude)
-	if (cfg.forwardBias) target.z += cluster.size.z * cfg.forwardBias
+	if (cfg.forwardBias) target.z += centerBox.size.z * cfg.forwardBias
 	const offset = new Vector3(0, cfg.elev, cfg.azim).normalize()
 	let dist = maxDim * cfg.dist
 	if (fit) {
-		const solved = fitDistance(cluster.box, target, offset, Math.tan((fit.fov * Math.PI) / 360), fit.aspect)
+		const solved = fitDistance(centerBox.box, target, offset, Math.tan((fit.fov * Math.PI) / 360), fit.aspect)
 		if (Number.isFinite(solved) && solved > 0) dist = solved
 	}
 	return {
@@ -138,16 +155,18 @@ function framingState(
 	}
 }
 
-// Size from the table only, so room scenery cannot inflate the frame.
+// Size covers the cabinet (keep-token table meshes plus RE_CAB cabinetry)
+// so the room has a stable anchor; anything else is excluded by default and
+// room scenery cannot inflate the frame.
 const excludeNonTable = (name: string): boolean => excludeNonPlayfield(name) && !RE_CAB.test(name)
 
 export const computeViewerFraming = (node: Object3D): FramingState =>
 	framingState(node, excludeNonPlayfield, excludeNonTable, VIEWER)
 
-// Play distance fits the playfield cluster to the frame (fov/aspect aware),
-// so every table fills the screen the same way; size still covers the cabinet
-// for room sync. Callers pass the live camera's fov (vertical degrees, as
-// PerspectiveCamera.fov) and aspect.
+// Play distance and target come from the playfield box (fov/aspect aware),
+// so every table fills the screen the same way; size still spans the cabinet
+// for room sync (demo-browser syncRoom). Callers pass the live camera's fov
+// (vertical degrees, as PerspectiveCamera.fov) and aspect.
 export const computePlayFraming = (node: Object3D, view: { fov: number; aspect: number }): FramingState =>
 	framingState(node, excludeNonPlayfield, excludeNonTable, PLAY, view)
 

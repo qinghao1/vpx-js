@@ -56,8 +56,9 @@ function buildWalkingDeadGroup(): THREE.Group {
 }
 
 // Same playfield as buildWalkingDeadGroup but a much taller backbox, longer
-// legs and a cabinet-front overhang: per-table cabinet proportions must not
-// move the play camera.
+// legs, a cabinet-front overhang and keep-token furniture (plunger, apron,
+// button): per-table cabinet proportions and furniture must not move the play
+// camera.
 function buildBigCabinetGroup(): THREE.Group {
 	const root = buildWalkingDeadGroup()
 	root.add(makeMesh('VRCab_BackboxTall', new THREE.BoxGeometry(60, 220, 40), new THREE.Vector3(0, 90, -70)))
@@ -65,6 +66,9 @@ function buildBigCabinetGroup(): THREE.Group {
 	root.add(
 		makeMesh('primitive-VRCab_FrontMolding', new THREE.BoxGeometry(30, 20, 60), new THREE.Vector3(0, -30, 100)),
 	)
+	root.add(makeMesh('primitive-plunger_housing', new THREE.BoxGeometry(30, 30, 60), new THREE.Vector3(20, -30, 100)))
+	root.add(makeMesh('primitive-apron_trim', new THREE.BoxGeometry(70, 10, 10), new THREE.Vector3(0, -20, 60)))
+	root.add(makeMesh('primitive-start_button', new THREE.BoxGeometry(6, 6, 6), new THREE.Vector3(-15, -25, 90)))
 	root.updateMatrixWorld(true)
 	return root
 }
@@ -93,9 +97,9 @@ function ndc(
 }
 
 describe('regression: framing keeps DMD and full playfield visible', () => {
-	const aspects = [0.6, 0.75, 1.0, 1.33, 1.78, 2.0, 2.5]
+	const aspects = [0.5, 0.6, 0.75, 1.0, 1.33, 1.78, 2.0, 2.5]
 
-	it('play framing fits the playfield cluster at all aspects (FOV 45)', () => {
+	it('play framing fits the playfield surface at all aspects (FOV 45)', () => {
 		const group = buildWalkingDeadGroup()
 		for (const asp of aspects) {
 			const state = computePlayFraming(group, { fov: 45, aspect: asp })
@@ -104,23 +108,37 @@ describe('regression: framing keeps DMD and full playfield visible', () => {
 				const n = ndc(p, state.position, state.target, 45, asp)
 				extreme = Math.max(extreme, Math.abs(n.x), Math.abs(n.y))
 			}
-			expect(extreme, `play asp ${asp} cluster fits the frame`).to.be.lessThan(1)
-			expect(extreme, `play asp ${asp} cluster fills the frame`).to.be.greaterThan(0.9)
+			expect(extreme, `play asp ${asp} surface fits the frame`).to.be.lessThan(1)
+			expect(extreme, `play asp ${asp} surface fills the frame`).to.be.greaterThan(0.95)
 		}
 	})
 
 	it('cabinet proportions do not move the play camera', () => {
 		// A taller backbox, longer legs and a cabinet-front overhang change
 		// the cabinet-driven size box but must not change the fitted play
-		// view: distance comes from the playfield cluster only.
+		// view: distance comes from the playfield surface only.
 		const plain = computePlayFraming(buildWalkingDeadGroup(), { fov: 45, aspect: 16 / 9 })
 		const cabined = computePlayFraming(buildBigCabinetGroup(), { fov: 45, aspect: 16 / 9 })
-		expect(cabined.position.distanceTo(plain.position), 'cabinet must not move the play camera').to.equal(0)
-		expect(cabined.target.distanceTo(plain.target), 'cabinet must not move the play target').to.equal(0)
+		expect(cabined.position.distanceTo(plain.position), 'cabinet must not move the play camera').to.be.closeTo(
+			0,
+			1e-6,
+		)
+		expect(cabined.target.distanceTo(plain.target), 'cabinet must not move the play target').to.be.closeTo(0, 1e-6)
 		// The orbit overview still frames the whole machine, legs included.
 		const viewerPlain = computeViewerFraming(buildWalkingDeadGroup())
 		const viewerCabined = computeViewerFraming(buildBigCabinetGroup())
 		expect(viewerCabined.maxDim, 'viewer keeps sizing the whole machine').to.be.greaterThan(viewerPlain.maxDim)
+	})
+
+	it('a table with no playfield-named mesh still frames finitely', () => {
+		const root = new THREE.Group()
+		root.add(makeMesh('VRCab_Cabinet', new THREE.BoxGeometry(60, 120, 210), new THREE.Vector3(0, 20, 0)))
+		root.add(makeMesh('primitive-coin_door', new THREE.BoxGeometry(20, 20, 4), new THREE.Vector3(0, -30, 100)))
+		root.updateMatrixWorld(true)
+		const state = computePlayFraming(root, { fov: 45, aspect: 16 / 9 })
+		const dist = state.position.distanceTo(state.target)
+		expect(dist, 'fallback distance is finite').to.be.finite
+		expect(dist, 'fallback distance is positive').to.be.greaterThan(0)
 	})
 
 	it('play is tighter than viewer but both fit', () => {
@@ -130,7 +148,7 @@ describe('regression: framing keeps DMD and full playfield visible', () => {
 		expect(play.maxDim, 'play and viewer share cabinet maxDim').to.be.closeTo(viewer.maxDim, 1e-6)
 		expect(
 			play.position.distanceTo(play.target),
-			'play fits the cluster so sits closer than the cabinet-wide orbit',
+			'play fits the surface so sits closer than the cabinet-wide orbit',
 		).to.be.lessThan(viewer.position.distanceTo(viewer.target))
 		expect(play.target.z, 'play forwardBias shifts target forward').to.be.lessThan(viewer.target.z)
 	})
