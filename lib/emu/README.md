@@ -224,7 +224,7 @@ survey of 357 VBS files above):
 | API                                                                      | Status                   | Note                                   |
 | ------------------------------------------------------------------------ | ------------------------ | -------------------------------------- |
 | `B2SSetData` (505 uses)                                                  | stub                     | Backglass data; no B2S renderer exists |
-| `ChangedLEDs` (56 uses)                                                  | returns `[]`             | Alphanumeric segments not modeled      |
+| `ChangedLEDs` (56 uses)                                                  | wired via PinMAME        | Empty under wpc-emu/mock               |
 | `GetMech` / `Mech` (38 uses)                                             | stub                     | Mechanical toys (TZ clock, gumball)    |
 | `HandleMechanics` (292 uses)                                             | stub, accepts value      | Same — nothing dispatches on it        |
 | `ShowOpts/ShowPathes/ShowAboutDialog`, `CheckROMS`, `SetDisplayPosition` | stubs                    | Desktop-UI concepts; no window exists  |

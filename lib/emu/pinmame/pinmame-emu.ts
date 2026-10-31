@@ -38,10 +38,10 @@ type Api = {
 	getChangedLamps(p: number): number
 	getChangedSols(p: number): number
 	getChangedGIs(p: number): number
-	// PinmameGetChangedLEDs(mask, mask2, out). The build passes i64 masks
-	// as BigInt, which cwrap cannot forward, so this is bound to a closure
-	// below. Optional like setCabinetInput so older builds stay silent.
-	getChangedLEDs?(p: number): number
+	// PinmameGetChangedLEDs(mask, mask2, out). The build passes i64
+	// masks as BigInt, which cwrap forwards with 'bigint' arg types.
+	// Optional like setCabinetInput so older builds stay silent.
+	getChangedLEDs?(m1: bigint, m2: bigint, p: number): number
 	getAudioFrame?(p: number, max: number): number
 	getAudioChannels?(): number
 	getAudioSeq?(): number
@@ -165,13 +165,12 @@ export class PinMameEmulator implements IEmulator {
 			this.api.stop = wrap('PinmameStop', null, [])
 		}
 		// Segment-display LEDs ship in every current build; the guard keeps
-		// older builds (and the mock) on the empty lane instead of binding
-		// a hole. The pull below always uses full masks — VPM's masks only
-		// narrow what a script read reports, and the scripts pass full masks.
+		// older builds (and the mock) on the empty lane instead of wrapping
+		// a hole. The pull below always uses full masks: the script masks
+		// never arrive here (the bridge has no parameterized-propget
+		// support), and forwarding them is a follow-up, not this lane.
 		if (typeof (module as unknown as Record<string, unknown>)._PinmameGetChangedLEDs === 'function') {
-			const raw = (module as unknown as { _PinmameGetChangedLEDs(m1: bigint, m2: bigint, p: number): number })
-				._PinmameGetChangedLEDs
-			this.api.getChangedLEDs = (p: number) => raw.call(module, LED_MASK_ALL, LED_MASK_ALL, p)
+			this.api.getChangedLEDs = wrap('PinmameGetChangedLEDs', 'number', ['bigint', 'bigint', 'number'])
 		}
 		// PinmameGetAudioFrame/Channels/Seq ship in audio-polling wasm builds —
 		// wire them only when present so older builds (and the mock) stay
@@ -543,7 +542,7 @@ export class PinMameEmulator implements IEmulator {
 	}
 
 	// Segment-display lane: 12-byte (ledNo, chgSeg, state) triples, at most
-	// CORE_SEGCOUNT (128) per pull. Full masks — see the wiring comment above.
+	// CORE_SEGCOUNT (128) per pull.
 	private pullLEDs(): void {
 		const m = this.mod
 		const fn = this.api?.getChangedLEDs
@@ -552,7 +551,7 @@ export class PinMameEmulator implements IEmulator {
 		if (!ptr) return
 		let n = 0
 		try {
-			n = fn(ptr) ?? 0
+			n = fn(LED_MASK_ALL, LED_MASK_ALL, ptr) ?? 0
 			if (!Number.isFinite(n) || n < 0) n = 0
 			n = Math.min(n, 128)
 		} catch {

@@ -108,15 +108,20 @@ export class EmulatorState {
 	// Segment-display LEDs arrive pre-diffed from the wasm side — one
 	// (ledNo, chgSeg, state) triple per changed LED since the previous pull
 	// — so they accumulate here and drain on read, mirroring VPM where
-	// ChangedLEDs reports the changes since the script's last read. wpc-emu
-	// has no LED surface, so this lane stays empty for it.
-	private pendingLEDs: number[][] = []
+	// ChangedLEDs reports the changes since the script's last read. Rows
+	// coalesce by LED (changed bits ORed, state is latest), which is exactly
+	// VPM's XOR-versus-last-read. wpc-emu has no LED surface, so this lane
+	// stays empty for it.
+	private pendingLEDs = new Map<number, [number, number]>()
 	pullLEDs(rows: number[][]): void {
-		for (const row of rows) this.pendingLEDs.push(row)
+		for (const row of rows) {
+			const prev = this.pendingLEDs.get(row[0])
+			this.pendingLEDs.set(row[0], [prev ? prev[0] | row[1] : row[1], row[2]])
+		}
 	}
 	getChangedLEDs(): number[][] {
-		const out = this.pendingLEDs
-		this.pendingLEDs = []
+		const out = [...this.pendingLEDs].map(([ledNo, pair]) => [ledNo, pair[0], pair[1]])
+		this.pendingLEDs.clear()
 		return out
 	}
 	getDmdScreen(): Uint8Array {

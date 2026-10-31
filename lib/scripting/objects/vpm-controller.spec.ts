@@ -241,7 +241,7 @@ describe('The VpmController - VISUAL PINMAME COM OBJECT', () => {
 	})
 
 	it('no changed LEDs detected', () => {
-		const result = vpmController.ChangedLEDs
+		const result = vpmController.ChangedLEDs()
 		expect(result).to.deep.equal([])
 	})
 

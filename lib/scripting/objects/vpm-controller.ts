@@ -380,7 +380,13 @@ export class VpmController {
 	get ChangedGI(): number[][] {
 		return this.emulator.emulatorState.getChangedGI()
 	}
-	get ChangedLEDs(): VbsArray<number[]> {
+	// Upstream is a parameterized propget, ChangedLEDs(nHigh, nLow,
+	// nnHigh = 0, nnLow = 0) (VPinMAME.idl). A getter would drop script
+	// masks in the bridge's invoke-or-traverse step, so this is a method:
+	// both the bare read and the masked call resolve through the function
+	// branch. The sync pull always uses full masks; script masks only
+	// narrow what upstream reports, and the tables pass full masks.
+	ChangedLEDs(): VbsArray<number[]> {
 		return this.emulator.emulatorState.getChangedLEDs() as unknown as VbsArray<number[]>
 	}
 

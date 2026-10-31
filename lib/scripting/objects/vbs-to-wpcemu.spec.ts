@@ -110,7 +110,7 @@ describe('VpmController integration test', () => {
 
 	it('VBS should read LED changes with display masks, Controller.ChangedLEDs(mask, mask)', () => {
 		const getChangedLEDsSpy = sandbox.stub(EmulatorState.prototype, 'getChangedLEDs').returns([[7, 1, 2]])
-		const vbs = `Dim Controller\nSet Controller = CreateObject("VPinMAME.Controller")\nDim ChgLED\nChgLED = Controller.ChangedLEDs(&Hffffffff, &Hffffffff)\nDim n\nn = ChgLED(0, 0)\nDim u\nu = UBound(ChgLED)`
+		const vbs = `Dim Controller\nSet Controller = CreateObject("VPinMAME.Controller")\nDim ChgLED\nChgLED = Controller.ChangedLEDs(&Hffffffff, &Hffffffff)\nDim n\nn = ChgLED(0, 0)\nDim u\nu = UBound(ChgLED)\nIf n <> 7 Then Err.Raise 999`
 		setupPlayerTable(vbs)
 
 		expect(getChangedLEDsSpy.args.length).to.equal(1)

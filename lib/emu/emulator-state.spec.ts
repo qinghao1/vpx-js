@@ -209,6 +209,12 @@ describe('The EmulatorState - handle state changes', () => {
 		expect(emulatorState.getChangedLEDs(), 'drains like a VPM read').to.deep.equal([])
 	})
 
+	it('should coalesce repeated LED triples like a VPM read', () => {
+		emulatorState.pullLEDs([[7, 1, 2]])
+		emulatorState.pullLEDs([[7, 4, 8]])
+		expect(emulatorState.getChangedLEDs()).to.deep.equal([[7, 5, 8]])
+	})
+
 	it('should get empty getDmdScreen', () => {
 		const result: Uint8Array = emulatorState.getDmdScreen()
 		expect(result.length).to.equal(0)
