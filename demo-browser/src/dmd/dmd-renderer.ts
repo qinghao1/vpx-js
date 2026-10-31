@@ -426,9 +426,9 @@ export class DmdRenderer implements DirtyOverlay {
 	}
 
 	/**
-	 * @override DirtyOverlay.update.
+	 * @implements DirtyOverlay.update.
 	 * The poll rides the physics clock, not the rAF timestamp: a 32ms
-	 * game-time gate sits just above the 2-frame quantum, so vsync jitter
+	 * game-time gate sits just under the nominal 2-frame total (33.3ms at 60Hz), so vsync jitter
 	 * flips polls between a 2- and 3-frame cadence. Game-time quanta
 	 * are exact, keeping polls phase-locked to emu frame production.
 	 * The hash dedup in updateFrame suppresses presents for
@@ -440,6 +440,7 @@ export class DmdRenderer implements DirtyOverlay {
 		if (this.lastDmdGame < 0 || gameMs < this.lastDmdGame) this.lastDmdGame = gameMs - DMD_POLL_INTERVAL_MS
 		if (gameMs - this.lastDmdGame < DMD_POLL_INTERVAL_MS) return false
 		this.lastDmdGame = gameMs
+		// Round-trip via viewer keeps the one-time PinMAME-started log in one place.
 		return this.viewer._pollPinmame()
 	}
 

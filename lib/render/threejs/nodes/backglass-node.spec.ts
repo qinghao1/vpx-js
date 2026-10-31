@@ -7,8 +7,8 @@ import {
 	BACKDROP_WIDTH,
 	backdropContainScale,
 	backdropRectToNdc,
-	buildBackdropPlane,
-	buildReelDigitQuad,
+	createBackdropPlane,
+	createReelDigitQuad,
 	digitCellUV,
 } from './backglass-node.js'
 
@@ -84,7 +84,7 @@ describe('Backglass layout', () => {
 	})
 
 	it('builds cutout digit quads and a flat fallback backdrop', () => {
-		const quad = buildReelDigitQuad(
+		const quad = createReelDigitQuad(
 			new THREE.Texture(),
 			backdropRectToNdc(0, 0, 21, 40),
 			digitCellUV(0, 9, false, 1),
@@ -92,7 +92,7 @@ describe('Backglass layout', () => {
 		expect(quad.material.alphaTest).to.be.closeTo(128 / 255, 1e-9)
 		expect(quad.material.depthTest).to.equal(true)
 		expect(quad.material.depthWrite).to.equal(true)
-		const flat = buildBackdropPlane(undefined, 0x123456)
+		const flat = createBackdropPlane(undefined, 0x123456)
 		expect(flat.material.color.getHex()).to.equal(0x123456)
 	})
 })

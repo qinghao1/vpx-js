@@ -121,7 +121,7 @@ export function applyDigitCellUV(geometry: THREE.BufferGeometry, cell: DigitCell
  * strip texture with the native cutout. Depth testing stays at defaults —
  * the quad sits at z=2 in the far-behind group and depth-tests against it.
  */
-export function buildReelDigitQuad(map: THREE.Texture, rect: NdcRect, cell: DigitCellUV): THREE.Mesh {
+export function createReelDigitQuad(map: THREE.Texture, rect: NdcRect, cell: DigitCellUV): THREE.Mesh {
 	const geometry = new THREE.PlaneGeometry(1, 1)
 	applyDigitCellUV(geometry, cell)
 	const material = new THREE.MeshBasicMaterial({
@@ -142,7 +142,7 @@ export function buildReelDigitQuad(map: THREE.Texture, rect: NdcRect, cell: Digi
  * Backdrop plane; `map` may be undefined for a flat color. Depth `z`
  * separates stacked layers (background color quad behind, art above, reels top).
  */
-export function buildBackdropPlane(map?: THREE.Texture, color = 0x000000, z = 0): THREE.Mesh {
+export function createBackdropPlane(map?: THREE.Texture, color = 0x000000, z = 0): THREE.Mesh {
 	const material = new THREE.MeshBasicMaterial({
 		map,
 		color: map ? 0xffffff : color,

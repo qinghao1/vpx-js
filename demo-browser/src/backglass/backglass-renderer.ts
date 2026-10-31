@@ -14,8 +14,8 @@ import {
 	applyDigitCellUV,
 	backdropContainScale,
 	backdropRectToNdc,
-	buildBackdropPlane,
-	buildReelDigitQuad,
+	createBackdropPlane,
+	createReelDigitQuad,
 	DEFAULT_ASPECT,
 	digitCellUV,
 } from '../../../dist-esm/lib/render/threejs/nodes/backglass-node.js'
@@ -94,7 +94,7 @@ export class BackglassRenderer implements DirtyOverlay {
 	/** Rebuilds the overlay for the current table; textures stream in async. */
 	async syncTable(table: any): Promise<void> {
 		const key = table
-			? `${table?.data?.szImage ?? table?.getName?.() ?? ''}|${table?.data?.bgImage?.[table?.data?.bgCurrentSet ?? 0] ?? ''}|${Object.keys(table?.dispReels ?? {}).length}`
+			? `${table?.data?.szImage ?? table?.getName?.() ?? ''}|${table?.data?.bgImage?.[table?.data?.bgCurrentSet ?? 0] ?? ''}|${Object.keys(table?.dispReels ?? {}).length}|${table?.data?.renderDecals !== false}|${table?.data?.renderEMReels !== false}`
 			: null
 		if (table === this.table && key === this.syncKey) return
 		this.clear()
@@ -106,9 +106,8 @@ export class BackglassRenderer implements DirtyOverlay {
 		const bgName =
 			table.data?.renderDecals !== false ? (table.data?.bgImage?.[table.data?.bgCurrentSet ?? 0] ?? '') : ''
 		if (!reelItems.length && !bgName) return
-		this.group.visible = true
 		// Backdrop first so reels land on top; textures resolve below.
-		this.group.add(buildBackdropPlane(undefined, table.data?.colorBackdrop ?? 0x000000))
+		this.group.add(createBackdropPlane(undefined, table.data?.colorBackdrop ?? 0x000000))
 		const wanted: any[] = []
 		if (bgName && table.getTexture?.(bgName)) wanted.push(table.getTexture(bgName))
 		for (const item of reelItems) {
@@ -125,7 +124,7 @@ export class BackglassRenderer implements DirtyOverlay {
 		if (this.viewer?._disposed) return
 		const getTexture = (name: string) => this.viewer.renderApi?.getMapGenerator?.()?.getTexture?.(name)
 		const bgMap = bgName ? getTexture(bgName) : undefined
-		if (bgMap) this.fitGroup.add(buildBackdropPlane(bgMap, 0xffffff, 1))
+		if (bgMap) this.fitGroup.add(createBackdropPlane(bgMap, 0xffffff, 1))
 		for (const item of reelItems) {
 			const entry: ReelEntry = {
 				item,
@@ -134,10 +133,12 @@ export class BackglassRenderer implements DirtyOverlay {
 				meshes: [],
 				lastValues: [],
 				lastVisible: false,
+				map: undefined,
 			}
 			const d = entry.data
 			if (!d) continue
 			entry.map = d.szImage ? getTexture(d.szImage) : undefined
+			if (!entry.map) continue
 			const spacing = Math.max(0, d.reelSpacing ?? 0)
 			const width = Math.max(0, d.width ?? 0)
 			const height = Math.max(0, d.height ?? 0)
@@ -149,17 +150,11 @@ export class BackglassRenderer implements DirtyOverlay {
 					width,
 					height,
 				)
-				const mesh = entry.map
-					? buildReelDigitQuad(
-							entry.map,
-							rect,
-							digitCellUV(0, d.digitRange ?? 9, !!d.useImageGrid, d.imagesPerGridRow ?? 1),
-						)
-					: buildBackdropPlane(undefined, d.backColor ?? 0x404040)
-				if (!entry.map) {
-					mesh.position.set(rect.centerX, rect.centerY, 2)
-					mesh.scale.set(rect.sizeX, rect.sizeY, 1)
-				}
+				const mesh = createReelDigitQuad(
+					entry.map,
+					rect,
+					digitCellUV(0, d.digitRange ?? 9, !!d.useImageGrid, d.imagesPerGridRow ?? 1),
+				)
 				mesh.visible = false
 				this.fitGroup.add(mesh)
 				entry.meshes.push(mesh)
@@ -168,17 +163,18 @@ export class BackglassRenderer implements DirtyOverlay {
 			this.entries.push(entry)
 		}
 		this.ready = true
+		this.group.visible = true
 		this.viewer.invalidate?.()
 	}
 
 	/**
 	 * Pins the NDC-space group onto the live camera frustum, just behind
 	 * the table: plain depth testing then occludes it exactly where the
-	 * table (or anything nearer) covers the screen, like native's backdrop
-	 * pass — with real depth margin, since clinging to the far plane risks
-	 * depth-precision failure against the cleared far value. World-space
-	 * billboarding — never
-	 * camera-parented, since some render paths skip camera children.
+	 * table (or anything nearer) covers the screen, matching native's backdrop outcome by other means
+	 * (native instead draws first with depth off and lets the scene overdraw it) — with real depth margin,
+	 * since clinging to the far plane risks depth-precision failure against the cleared far value. World-space
+	 * billboarding — never camera-parented, since three.js only renders camera children when the camera itself
+	 * is added to the scene (which this viewer never does).
 	 */
 	private billboardToCamera(): void {
 		const camera = this.viewer.camera
