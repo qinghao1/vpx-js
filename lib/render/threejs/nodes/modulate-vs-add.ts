@@ -10,7 +10,8 @@ export const MODULATE_MAX = 0.9999
 
 /** Clamp m_modulate_vs_add into (0,1); fallback 0.9. Insert tables authoring ≈1.0 land on 0.9999. */
 export function clampModulateVsAdd(value?: number, fallback = 0.9): number {
-	return Math.max(MODULATE_MIN, Math.min(MODULATE_MAX, value ?? fallback))
+	const v = value ?? fallback
+	return Number.isNaN(v) ? MODULATE_MAX : Math.max(MODULATE_MIN, Math.min(MODULATE_MAX, v))
 }
 
 /** Native negatively-encoded composite blend state (SRC_ALPHA/INV_SRC_COLOR under REVSUBTRACT). */

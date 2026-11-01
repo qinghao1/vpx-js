@@ -27,6 +27,7 @@ describe('bulb-glow native composite (fs_light.sc)', () => {
 		expect(clampModulateVsAdd(0.9)).toBe(0.9)
 		expect(clampModulateVsAdd(0)).toBe(0.0001)
 		expect(clampModulateVsAdd(1)).toBe(0.9999)
+		expect(clampModulateVsAdd(Number.NaN)).toBe(0.9999)
 	})
 
 	it('matches the hand-expanded native blend: dst·(1−src) − src·srcAlpha', () => {

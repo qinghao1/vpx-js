@@ -10,7 +10,6 @@ import { getSlots } from './material-slots.js'
 import { createDynamicBallNodeMaterial } from './nodes/ball-reflection-node.js'
 import { createBulbGlowNodeMaterial } from './nodes/bulb-glow-node.js'
 import {
-	applyAbsorbBlendState,
 	createPrimitiveAdditiveMaterial,
 	createPrimitiveBdlMaterial,
 	isPrimitiveNodeMaterial,
@@ -140,12 +139,9 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 	}
 
 	private getBulbGlowMaterial(params: NonNullable<RenderInfo<any>['bulbGlow']>, material?: Material): any {
-		// Split cache by baked halo profile; live uniforms restamp per frame.
-		const key =
-			`bulb.glow:${material?.name ?? 'none'}:${params.centerX},${params.centerY}:` +
-			`${params.falloff}:${params.falloffPower}`
-		const cached = this.cachedMaterials[key]
-		if (cached) return cached
+		// Per-lamp instances: live uniforms restamp per lamp, so sharing one
+		// instance across lamps would be last-writer-wins corruption. The
+		// material is procedural (no streamed textures), so no cache entry.
 		const mat = createBulbGlowNodeMaterial({
 			color: params.color,
 			color2: params.color2,
@@ -157,7 +153,6 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 			modulateVsAdd: params.modulateVsAdd,
 		})
 		mat.name = material ? `material:${material.name}` : 'material:bulb.glow'
-		this.cachedMaterials[key] = mat
 		return mat
 	}
 
@@ -222,12 +217,8 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 
 		if (addBlend) {
 			// Absent mode derives from the legacy boolean (additive), matching
-			// every pre-existing caller. Only absorb takes its own blend setup.
+			// every pre-existing caller.
 			const absorb = (addBlendMode ?? 1) === ADD_BLEND_ABSORB
-			// The modulate-vs-add composite is the AB_ADD encoding (negative
-			// src under REVSUBTRACT); absorb keeps its positive
-			// premultiplied-over approximation and never takes it.
-			const blendModulate = !absorb ? modulateVsAdd : undefined
 			const tex =
 				(mapName && this.mapGenerator.hasTexture(mapName) && this.mapGenerator.getTexture(mapName)) || null
 			mat = createPrimitiveAdditiveMaterial({
@@ -238,16 +229,13 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 				alphaTestValue,
 				doubleSided: true,
 				depthBias,
-				modulateVsAdd: blendModulate,
+				modulateVsAdd,
+				absorb,
 			})
 			mat.name = material ? `material:${material.name}` : 'material:additive'
 			getSlots(mat).__addBlend = true
 			// Explicit RenderInfo.depthWrite wins over the non-writing additive default.
 			mat.depthWrite = depthWrite ?? false
-			if (absorb) {
-				// Absorb keeps its premultiplied-over approximation; AB_ADD takes the modulate path above.
-				applyAbsorbBlendState(mat)
-			}
 			this.stashCutout(mat, alphaTestValue, depthBias, true)
 			if (!tex && mapName) getSlots(mat)[pendingKeyFor('map')] = mapName
 			this.cachedMaterials[key] = mat

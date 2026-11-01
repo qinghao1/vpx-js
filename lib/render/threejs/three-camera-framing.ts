@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { Box3, type Mesh, type Object3D, type PerspectiveCamera, Vector3 } from 'three'
-import { flatName, RE_CAB } from './scene-classify.js'
+import { flatName, isCabName } from './scene-classify.js'
 
 type FramingBox = {
 	box: Box3
@@ -149,11 +149,10 @@ function playFramingState(node: Object3D, cfg: FramingConfig, fit: { fov: number
 	return { position, target, center: target.clone(), size, maxDim, near, far }
 }
 
-// Size covers the cabinet (keep-token table meshes plus RE_CAB cabinetry)
+// Size covers the cabinet (keep-token table meshes plus isCabName cabinetry)
 // so the room has a stable anchor; anything else is excluded by default and
-// token-free room scenery cannot inflate the frame. (RE_CAB's _? arms are
-// inert on separator-folded names; raw-name callers still need them.)
-const excludeNonTable = (name: string): boolean => excludeNonPlayfield(name) && !RE_CAB.test(name)
+// token-free room scenery cannot inflate the frame.
+const excludeNonTable = (name: string): boolean => excludeNonPlayfield(name) && !isCabName(name)
 
 export const computeViewerFraming = (node: Object3D): FramingState => viewerFramingState(node, VIEWER)
 

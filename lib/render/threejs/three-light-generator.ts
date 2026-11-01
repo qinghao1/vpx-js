@@ -6,20 +6,16 @@ import type { LightData, LightState } from '../../vpt/light/light.js'
 import { bakedIntensity } from '../../vpt/light/light-physics.js'
 import type { Table } from '../../vpt/table/table.js'
 import { getAuthoredVisible } from './authored-visible.js'
-import { type MergedBulbGlowRef, setBulbGlowState, setMergedBulbGlowRangeState } from './nodes/bulb-glow-node.js'
+import {
+	type GlowPatch,
+	type MergedBulbGlowRef,
+	setBulbGlowState,
+	setMergedBulbGlowRangeState,
+} from './nodes/bulb-glow-node.js'
 import { ThreeRenderApi } from './three-render-api.js'
 
-/** Live lamp fields as a setter patch; undefined when nothing is live. */
-function glowPatchOf(
-	state: LightState,
-): { intensity?: number; color?: number; color2?: number; modulate?: number } | undefined {
-	if (
-		state.intensity === undefined &&
-		state.color === undefined &&
-		state.colorFull === undefined &&
-		state.modulate === undefined
-	)
-		return undefined
+/** Live lamp fields as a setter patch. */
+function glowPatchOf(state: LightState): GlowPatch {
 	return { intensity: state.intensity, color: state.color, color2: state.colorFull, modulate: state.modulate }
 }
 
@@ -68,14 +64,12 @@ export class ThreeLightGenerator {
 			case 'bulb.glow': {
 				// Merged quad: write live state into its vertex range in place.
 				const mergedRef = (child as ThreeMesh).userData?.__mergedGlow as MergedBulbGlowRef | undefined
-				const patch = glowPatchOf(state)
 				if (mergedRef) {
-					if (patch)
-						setMergedBulbGlowRangeState(
-							mergedRef.mesh,
-							{ start: mergedRef.start, count: mergedRef.count },
-							patch,
-						)
+					setMergedBulbGlowRangeState(
+						mergedRef.mesh,
+						{ start: mergedRef.start, count: mergedRef.count },
+						glowPatchOf(state),
+					)
 					break
 				}
 				// Visibility follows the live lamp state (an off lamp adds no
@@ -91,8 +85,7 @@ export class ThreeLightGenerator {
 				if (glow) {
 					// Native drives the lightmap glow from the live lamp state
 					// (lightColor_intensity + colors in fs_classic_light.sc).
-					const patch = glowPatchOf(state)
-					if (patch) setBulbGlowState(glow, patch)
+					setBulbGlowState(glow, glowPatchOf(state))
 				}
 				break
 			}

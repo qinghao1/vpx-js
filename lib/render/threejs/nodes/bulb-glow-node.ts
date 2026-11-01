@@ -121,11 +121,15 @@ export function isBulbGlowMaterial(mat: unknown): boolean {
 	return !!(mat as { userData?: Record<string, unknown> } | null)?.userData?.__bulbGlow
 }
 
-export function setBulbGlowState(
-	mat: unknown,
-	state: { intensity?: number; color?: number; color2?: number; modulate?: number },
-): void {
-	// All fields optional: absent keeps the baked value, negatives clamp native-style.
+/** Live lamp fields; absent keeps the baked value, out-of-range clamps. */
+export interface GlowPatch {
+	intensity?: number
+	color?: number
+	color2?: number
+	modulate?: number
+}
+
+export function setBulbGlowState(mat: unknown, state: GlowPatch): void {
 	const ud = (mat as { userData?: Record<string, unknown> } | null)?.userData
 	if (!ud?.__bulbGlow) return
 	if (
@@ -141,7 +145,6 @@ export function setBulbGlowState(
 	if (state.color2 !== undefined && ud.__uColor2) {
 		;(ud.__uColor2 as { value: Color }).value.set(state.color2)
 	}
-	// Native re-reads m_modulate_vs_add per frame; restamp, don't rebuild.
 	if (
 		state.modulate !== undefined &&
 		ud.__uModulate &&
@@ -257,11 +260,7 @@ const scratchGlowColor = new Color()
  * conversion the per-quad `uniform(new Color(hex))` path applies), so a script
  * tick allocates nothing and touches no program state.
  */
-export function setMergedBulbGlowRangeState(
-	merged: Mesh,
-	range: MergedBulbGlowRange,
-	state: { intensity?: number; color?: number; color2?: number; modulate?: number },
-): void {
+export function setMergedBulbGlowRangeState(merged: Mesh, range: MergedBulbGlowRange, state: GlowPatch): void {
 	const attrs = (merged.geometry as BufferGeometry).attributes as Record<string, BufferAttribute | undefined>
 	const dyn = attrs.aGlowDyn
 	const colorAttr = attrs.aGlowColor

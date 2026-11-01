@@ -165,7 +165,7 @@ describe('Flasher absorb parity (upstream flasher.cpp SetupAddBlendState; AB_ADD
 		expect((cloned.userData as Record<string, unknown>).__absorbBlend, 'clone keeps the absorb flag').toBe(true)
 	})
 
-	it('ignores modulateVsAdd on the absorb arm', () => {
+	it('passes modulateVsAdd through on the absorb arm', () => {
 		const generator = makeGenerator()
 		const mat = generator.getMaterial(
 			undefined,
@@ -185,7 +185,9 @@ describe('Flasher absorb parity (upstream flasher.cpp SetupAddBlendState; AB_ADD
 			undefined,
 			0.5,
 		)
-		expect(mat.userData.__uModulate, 'absorb never takes the modulate arm').toBeUndefined()
+		// Native's absorb arm reads m_modulate_vs_add for the src alpha; dropping
+		// the uniform rendered alpha = texA·intensity, diverging at overdrive.
+		expect(mat.userData.__uModulate?.value, 'absorb keeps the modulate uniform').toBeCloseTo(0.5, 12)
 		expect(mat.userData.__absorbBlend, 'absorb stamp still applies').toBe(true)
 	})
 

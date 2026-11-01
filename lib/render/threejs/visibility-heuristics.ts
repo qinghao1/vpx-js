@@ -7,6 +7,7 @@ import {
 	flatName,
 	isBakedPlayfield,
 	isBasePlayfield,
+	isCabName,
 	pendingOf,
 	RE_NON_OPAQUE,
 	RE_RAMP_FAMILY,
@@ -239,7 +240,7 @@ export function applyWhiteWallPass(nodes: THREE.Object3D[], stats: Record<string
 		const mesh = child as THREE.Mesh
 		if (!mesh.isMesh || !mesh.visible) continue
 		const meshName = (mesh.name ?? '').toLowerCase()
-		if (RE_KEEP_WHITE.test(meshName) || RE_VR.test(meshName)) continue
+		if (RE_KEEP_WHITE.test(meshName) || RE_VR.test(meshName) || isCabName(meshName)) continue
 		const mats = (Array.isArray(mesh.material) ? mesh.material : [mesh.material]) as THREE.MeshStandardMaterial[]
 		// Bulb glow quads are shader-driven light splats (no .map by design);
 		// hiding them here would kill all dynamic lamp light with no recovery —
@@ -282,7 +283,7 @@ export function applyDarkOccluderPass(
 		const mesh = child as THREE.Mesh
 		if (!mesh.isMesh || !mesh.visible) continue
 		const meshName = (mesh.name ?? '').toLowerCase()
-		if (RE_KEEP_DARK.test(meshName) || RE_VR.test(meshName)) continue
+		if (RE_KEEP_DARK.test(meshName) || RE_VR.test(meshName) || isCabName(meshName)) continue
 		const mats = (Array.isArray(mesh.material) ? mesh.material : [mesh.material]) as THREE.MeshStandardMaterial[]
 		if (mats.length === 0) continue
 		if (

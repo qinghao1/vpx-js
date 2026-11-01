@@ -92,8 +92,10 @@ export class FlasherUpdater extends ItemUpdater<FlasherState> {
 					// program every frame for identical state rebuilds shaders
 					// continuously. Uniform writes above need no invalidation.
 					if (absorb && !userData?.__absorbBlend) {
-						// Steady-state stamp; blend-mode flips rebuild above.
 						applyAbsorbBlendState(mat)
+						// The stamp now declares absorb-ness; rebuild so the
+						// encoding follows the blend instead of staying AB_ADD.
+						;(userData.__rebuild as ((map: unknown) => void) | undefined)?.(userData.__map ?? null)
 						mat.needsUpdate = true
 					}
 				} else {
