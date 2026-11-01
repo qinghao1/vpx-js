@@ -85,7 +85,7 @@ describe('Flasher absorb parity (upstream flasher.cpp SetupAddBlendState; AB_ADD
 		const add = build(FlasherAddBlend.Add)
 		expect(add.blending, 'add must stay plain additive').toBe(AdditiveBlending)
 		expect(add.userData.__addBlend, 'add stays an overlay').toBe(true)
-		expect(add.userData.__absorb, 'add must not absorb').toBeFalsy()
+		expect(add.userData.__blend, 'add keeps the additive mode').toBe('additive')
 
 		const legacy = build(undefined)
 		expect(legacy.blending, 'boolean callers keep additive').toBe(AdditiveBlending)
@@ -98,13 +98,11 @@ describe('Flasher absorb parity (upstream flasher.cpp SetupAddBlendState; AB_ADD
 		expect(absorb.blendSrcAlpha, 'absorb alpha src factor').toBe(OneFactor)
 		expect(absorb.blendDstAlpha, 'absorb alpha dst factor').toBe(OneMinusSrcAlphaFactor)
 		expect(absorb.userData.__addBlend, 'absorb stays an overlay').toBe(true)
-		expect(absorb.userData.__absorb, 'absorb marker').toBe(true)
+		expect(absorb.userData.__blend, 'absorb marker').toBe('absorb')
 	})
 
-	it('stamps absorb state through the shared helper, matching the generator', () => {
-		// The generator and the per-frame updater share applyAbsorbBlendState
-		// so their blend factors stay identical. AB_ADD is deliberately
-		// excluded — it takes the modulate-vs-add path instead.
+	it('stamps absorb state matching the generator', () => {
+		// AB_ADD is excluded — it takes the modulate-vs-add path instead.
 		const generator = makeGenerator()
 		const fromGenerator = generator.getMaterial(
 			undefined,
@@ -123,7 +121,7 @@ describe('Flasher absorb parity (upstream flasher.cpp SetupAddBlendState; AB_ADD
 		// The helper sets blend factors only; the caller declares the mode, and the
 		// encoding follows the flag on rebuilds.
 		const stub = createPrimitiveAdditiveMaterial({ modulateVsAdd: 0.5 })
-		stub.userData.__absorb = true
+		stub.userData.__blend = 'absorb'
 		applyAbsorbBlendState(stub)
 		for (const key of [
 			'blending',
@@ -163,7 +161,7 @@ describe('Flasher absorb parity (upstream flasher.cpp SetupAddBlendState; AB_ADD
 		const src = createPrimitiveAdditiveMaterial({ modulateVsAdd: 0.5, absorb: true })
 		const cloned = clonePrimitiveNodeMaterial(src)
 		expect(cloned.blending, 'clone keeps premultiplied-over').toBe(CustomBlending)
-		expect(cloned.userData.__absorb, 'clone keeps the absorb flag').toBe(true)
+		expect(cloned.userData.__blend, 'clone keeps the absorb mode').toBe('absorb')
 	})
 
 	it('passes modulateVsAdd through on the absorb arm', () => {
@@ -189,7 +187,7 @@ describe('Flasher absorb parity (upstream flasher.cpp SetupAddBlendState; AB_ADD
 		// Native's absorb arm derives the src alpha from m_modulate_vs_add; the
 		// uniform is required for overdrive correctness.
 		expect(mat.userData.__uModulate?.value, 'absorb keeps the modulate uniform').toBeCloseTo(0.5, 12)
-		expect(mat.userData.__absorb, 'absorb flag still applies').toBe(true)
+		expect(mat.userData.__blend, 'absorb mode still applies').toBe('absorb')
 	})
 
 	it('stamps premultiplied-over onto live absorb materials while keeping the additive uniform path', () => {
@@ -231,7 +229,7 @@ describe('Flasher absorb parity (upstream flasher.cpp SetupAddBlendState; AB_ADD
 		expect(mat.blendSrc).toBe(OneFactor)
 		expect(mat.blendDst).toBe(OneMinusSrcAlphaFactor)
 		expect(mat.blendEquation).toBe(AddEquation)
-		expect(mat.userData.__absorb).toBe(true)
+		expect(mat.userData.__blend).toBe('absorb')
 	})
 
 	it('leaves add and plain materials alone in the updater', () => {
@@ -250,7 +248,10 @@ describe('Flasher absorb parity (upstream flasher.cpp SetupAddBlendState; AB_ADD
 		addUpdater.applyState(addNode, addState, renderApi, table)
 		expect(addNode.visible).toBe(true)
 		expect(addMat.blending, 'add keeps its material blending').toBe(AdditiveBlending)
-		expect((addMat.userData as Record<string, unknown>).__absorb).toBeFalsy()
+		expect(
+			(addMat.userData as Record<string, unknown>).__blend,
+			'non-overlay never enters conversion',
+		).toBeUndefined()
 
 		const plainData = quadData('PlainUntouched')
 		const plainState = FlasherState.claim('PlainUntouched', true, 0x112233, 50)

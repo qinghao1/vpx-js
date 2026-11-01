@@ -254,7 +254,7 @@ function glowParamsOf(table: unknown, lightName: string): GlowLightParams | unde
 // Module-scope scratch: per-tick color writes must not allocate.
 const scratchGlowColor = new Color()
 
-/** Float32 rounding noise: smaller restamp deltas never reach the GPU anyway. */
+/** Epsilon for Float32 restamp comparisons. */
 const FLOAT_NOISE = 1e-6
 
 /**
@@ -269,97 +269,79 @@ export function setMergedBulbGlowRangeState(merged: Mesh, range: MergedBulbGlowR
 	const colorAttr = attrs.aGlowColor
 	const color2Attr = attrs.aGlowColor2
 	if (!dyn || !colorAttr || !color2Attr) return
-	// One dyn upload covers both components; intensity and modulate share it.
-	let dynTouched = false
-	const touchDyn = (): void => {
-		if (!dynTouched) {
-			dynTouched = true
-			dyn.addUpdateRange(range.start * 2, range.count * 2)
-		}
-	}
+	let dynChanged = false
 	if (state.intensity !== undefined) {
-		const arr = dyn.array as Float32Array
-		let changed = false
-		for (let i = range.start; i < range.start + range.count; i++) {
-			if (Math.abs((arr[i * 2] ?? 0) - state.intensity) > FLOAT_NOISE) {
-				arr[i * 2] = state.intensity
-				changed = true
-			}
-		}
-		// Identical restamps skip the upload: fades animate intensity while
-		// colors sit static, and the arrays already hold the live values.
+		const changed = restampDynComponent(dyn, range, 0, state.intensity)
+		dynChanged ||= changed
 		if (changed) {
-			touchDyn()
-			dyn.needsUpdate = true
-			// An off lamp adds no light: hide the merged mesh once no range
-			// is live, mirroring the per-quad gate. The scan runs only on
-			// off-transitions; on-transitions just reshow.
+			// Hidden implies no live value, so positives reshow; off-transitions scan.
 			if (state.intensity > 0) merged.visible = true
 			else merged.visible = anyGlowLive(dyn)
 		}
 	}
 	if (state.color !== undefined) {
 		scratchGlowColor.set(state.color)
-		const { r, g, b } = scratchGlowColor
-		const arr = colorAttr.array as Float32Array
-		let changed = false
-		for (let i = range.start; i < range.start + range.count; i++) {
-			if (
-				Math.abs((arr[i * 3] ?? 0) - r) > FLOAT_NOISE ||
-				Math.abs((arr[i * 3 + 1] ?? 0) - g) > FLOAT_NOISE ||
-				Math.abs((arr[i * 3 + 2] ?? 0) - b) > FLOAT_NOISE
-			) {
-				arr[i * 3] = r
-				arr[i * 3 + 1] = g
-				arr[i * 3 + 2] = b
-				changed = true
-			}
-		}
-		if (changed) {
+		if (restampColorTriplet(colorAttr, range, scratchGlowColor)) {
 			colorAttr.addUpdateRange(range.start * 3, range.count * 3)
 			colorAttr.needsUpdate = true
 		}
 	}
 	if (state.color2 !== undefined) {
 		scratchGlowColor.set(state.color2)
-		const { r, g, b } = scratchGlowColor
-		const arr = color2Attr.array as Float32Array
-		let changed = false
-		for (let i = range.start; i < range.start + range.count; i++) {
-			if (
-				Math.abs((arr[i * 3] ?? 0) - r) > FLOAT_NOISE ||
-				Math.abs((arr[i * 3 + 1] ?? 0) - g) > FLOAT_NOISE ||
-				Math.abs((arr[i * 3 + 2] ?? 0) - b) > FLOAT_NOISE
-			) {
-				arr[i * 3] = r
-				arr[i * 3 + 1] = g
-				arr[i * 3 + 2] = b
-				changed = true
-			}
-		}
-		if (changed) {
+		if (restampColorTriplet(color2Attr, range, scratchGlowColor)) {
 			color2Attr.addUpdateRange(range.start * 3, range.count * 3)
 			color2Attr.needsUpdate = true
 		}
 	}
-	if (state.modulate !== undefined) {
-		const m = clampModulateVsAdd(state.modulate)
-		const arr = dyn.array as Float32Array
-		let changed = false
-		for (let i = range.start; i < range.start + range.count; i++) {
-			if (Math.abs((arr[i * 2 + 1] ?? 0) - m) > FLOAT_NOISE) {
-				arr[i * 2 + 1] = m
-				changed = true
-			}
-		}
-		if (changed) {
-			touchDyn()
-			dyn.needsUpdate = true
-		}
+	// NOTE: no `||=` here — it would skip the restamp once dynChanged is set.
+	if (state.modulate !== undefined)
+		dynChanged = restampDynComponent(dyn, range, 1, clampModulateVsAdd(state.modulate)) || dynChanged
+	// Ranges are array-component offsets; one dyn upload covers both components.
+	if (dynChanged) {
+		dyn.addUpdateRange(range.start * 2, range.count * 2)
+		dyn.needsUpdate = true
 	}
 }
 
-/** Scans the merged intensity channel for any live lamp; off-transitions only. */
+/** Writes one dyn component per vertex when changed; true when the slice changed. */
+function restampDynComponent(
+	dyn: BufferAttribute,
+	range: MergedBulbGlowRange,
+	component: 0 | 1,
+	value: number,
+): boolean {
+	const arr = dyn.array as Float32Array
+	let changed = false
+	for (let i = range.start; i < range.start + range.count; i++) {
+		if (Math.abs((arr[i * 2 + component] ?? 0) - value) > FLOAT_NOISE) {
+			arr[i * 2 + component] = value
+			changed = true
+		}
+	}
+	return changed
+}
+
+/** Writes one rgb triplet per vertex when changed; true when the slice changed. */
+function restampColorTriplet(attr: BufferAttribute, range: MergedBulbGlowRange, color: Color): boolean {
+	const { r, g, b } = color
+	const arr = attr.array as Float32Array
+	let changed = false
+	for (let i = range.start; i < range.start + range.count; i++) {
+		if (
+			Math.abs((arr[i * 3] ?? 0) - r) > FLOAT_NOISE ||
+			Math.abs((arr[i * 3 + 1] ?? 0) - g) > FLOAT_NOISE ||
+			Math.abs((arr[i * 3 + 2] ?? 0) - b) > FLOAT_NOISE
+		) {
+			arr[i * 3] = r
+			arr[i * 3 + 1] = g
+			arr[i * 3 + 2] = b
+			changed = true
+		}
+	}
+	return changed
+}
+
+/** Scans the merged intensity channel for any live lamp. */
 function anyGlowLive(dyn: BufferAttribute): boolean {
 	const arr = dyn.array as Float32Array
 	for (let i = 0; i < arr.length; i += 2) if (arr[i] > 0) return true

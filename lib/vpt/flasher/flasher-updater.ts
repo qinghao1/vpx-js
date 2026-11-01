@@ -88,12 +88,8 @@ export class FlasherUpdater extends ItemUpdater<FlasherState> {
 					if (userData?.__uModulate) userData.__uModulate.value = clampModulateVsAdd(this.data.modulateVsAdd)
 					if (userData?.__uFlat?.value?.set)
 						userData.__uFlat.value.set(this.state.color).multiplyScalar(intensity)
-					// Blend factors are static per flasher; revalidating the
-					// program every frame for identical state rebuilds shaders
-					// continuously. Uniform writes above need no invalidation.
-					// Blend-mode flips rebuild geometry above but keep the
-					// material: convert it in place toward the live mode.
-					if (userData?.__addBlend === true) convertFlasherBlend(mat, absorb ? 'absorb' : 'additive')
+					// Uniform writes above need no invalidation.
+					convertFlasherBlend(mat, absorb ? 'absorb' : 'additive')
 				} else {
 					// Converted overlays take the plain protocol; classic
 					// materials take the authored color/opacity path.

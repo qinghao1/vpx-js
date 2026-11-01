@@ -145,11 +145,11 @@ describe('flasher AB_ABSORB native composite (fs_flasher.sc absorb arm)', () => 
 })
 
 describe('flasher AB_NONE plain output (fs_flasher.sc plain arm)', () => {
-	it('emits opaque static color regardless of backdrop', () => {
+	it('emits opaque static color', () => {
 		expect(flasherPlainComposite(TINT_LIN, TEX_WHITE)).toBeCloseTo(TINT_LIN * TEX_WHITE, 12)
 	})
 
-	it('converts an absorb overlay to opaque static color without revalidating twice', () => {
+	it('converts an absorb overlay to opaque static color', () => {
 		const mat = createPrimitiveAdditiveMaterial({
 			tint: 0x646464,
 			intensity: INTENSITY,
@@ -158,9 +158,8 @@ describe('flasher AB_NONE plain output (fs_flasher.sc plain arm)', () => {
 		})
 		expect(convertFlasherBlend(mat, 'plain')).toBe(true)
 		expect(mat.blending).toBe(NoBlending)
-		expect(mat.transparent).toBe(false)
-		expect(mat.userData.__plain).toBe(true)
-		expect(mat.userData.__absorb).toBe(false)
+		expect(mat.transparent).toBe(true)
+		expect(mat.userData.__blend).toBe('plain')
 		const ud = mat.userData as Record<string, { value: unknown }>
 		expect(graphReferences(materialize(mat.colorNode), ud.__uTint)).toBe(true)
 		expect(convertFlasherBlend(mat, 'plain')).toBe(false)
@@ -178,6 +177,21 @@ describe('flasher AB_NONE plain output (fs_flasher.sc plain arm)', () => {
 		expect(mat.blending).toBe(CustomBlending)
 		expect(mat.blendEquation).toBe(ReverseSubtractEquation)
 		expect(mat.transparent).toBe(true)
-		expect(mat.userData.__plain).toBe(false)
+		expect(mat.userData.__blend).toBe('additive')
+	})
+
+	it('applies the stashed cutout only for the plain target', () => {
+		const mat = createPrimitiveAdditiveMaterial({
+			tint: 0x646464,
+			intensity: INTENSITY,
+			modulateVsAdd: 1,
+			absorb: true,
+			alphaTestValue: 0.5,
+		})
+		expect(mat.alphaTest).toBe(0)
+		convertFlasherBlend(mat, 'plain')
+		expect(mat.alphaTest).toBe(0.5)
+		convertFlasherBlend(mat, 'additive')
+		expect(mat.alphaTest).toBe(0)
 	})
 })

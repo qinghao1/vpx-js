@@ -76,8 +76,7 @@ export class ThreeLightGenerator {
 				// Visibility follows the live lamp state (an off lamp adds no
 				// light, so its quad stays out of the draw list); intensity 0
 				// already renders nothing, this just skips the draw call.
-				// Quads built before the createMesh stamp predate the flag and
-				// default to visible; authored-invisible lights stay hidden
+				// Quads default to visible; authored-invisible lights stay hidden
 				// (upstream gates bulb/glow rendering on m_d.m_visible).
 				if (state.intensity !== undefined) {
 					child.visible = state.intensity > 0 && getAuthoredVisible(child)

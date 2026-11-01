@@ -316,7 +316,7 @@ describe('The VPinball flasher mesh generator and updater', () => {
 		const table = new TableBuilder().build()
 		updater.applyState(node, state, renderApi, table)
 		expect(material.needsUpdate).toBe(true)
-		expect(material.userData.__absorb).toBe(true)
+		expect(material.userData.__blend).toBe('absorb')
 
 		material.needsUpdate = false
 		updater.applyState(node, state, renderApi, table)
@@ -350,7 +350,7 @@ describe('The VPinball flasher mesh generator and updater', () => {
 
 		data.addBlendMode = FlasherAddBlend.Add
 		updater.applyState(node, state, renderApi, table)
-		expect(material.userData.__absorb).toBe(false)
+		expect(material.userData.__blend).toBe('additive')
 		expect(material.blendEquation).toBe(ReverseSubtractEquation)
 		expect(material.blendSrc).toBe(SrcAlphaFactor)
 		expect(material.version).toBe(1)
@@ -360,16 +360,16 @@ describe('The VPinball flasher mesh generator and updater', () => {
 
 		data.addBlendMode = FlasherAddBlend.Absorb
 		updater.applyState(node, state, renderApi, table)
-		expect(material.userData.__absorb).toBe(true)
+		expect(material.userData.__blend).toBe('absorb')
 		expect(material.blendSrc).toBe(OneFactor)
 		expect(material.version).toBe(2)
 
 		data.addBlend = false
 		updater.applyState(node, state, renderApi, table)
-		expect(material.userData.__plain).toBe(true)
-		expect(material.userData.__absorb).toBe(false)
+		expect(material.userData.__blend).toBe('plain')
 		expect(material.blending).toBe(NoBlending)
-		expect(material.transparent).toBe(false)
+		expect(material.transparent).toBe(true)
+		expect(material.alphaTest).toBe(0)
 		expect(material.version).toBe(3)
 
 		updater.applyState(node, state, renderApi, table)
@@ -378,9 +378,8 @@ describe('The VPinball flasher mesh generator and updater', () => {
 		data.addBlend = true
 		data.addBlendMode = FlasherAddBlend.Add
 		updater.applyState(node, state, renderApi, table)
-		expect(material.userData.__plain).toBe(false)
+		expect(material.userData.__blend).toBe('additive')
 		expect(material.blendEquation).toBe(ReverseSubtractEquation)
-		expect(material.transparent).toBe(true)
 		expect(material.version).toBe(4)
 	})
 
