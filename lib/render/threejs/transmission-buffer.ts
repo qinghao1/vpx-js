@@ -173,34 +173,32 @@ export function updateTransmissionBuffer(table: Table): boolean {
 	// Native (Renderer::DrawBulbLightBuffer + Light::Render LIGHT_BUFFER + fs_light.sc
 	// bulb_light): only bulb lights with a nonzero transmission scale contribute, each
 	// as a finite disc of its own falloff radius with a (1-r/falloff)^power profile
-	// (rim color2 morphing to hub color by sqrt(t)), blurred ~19px at bloom-buffer
-	// resolution; support here ends exactly at the falloff radius.
+	// (rim color2 morphing to hub color by sqrt(t)), blurred ~19px at native
+	// bloom-buffer resolution (this buffer itself is unblurred); support
+	// here ends exactly at the falloff radius.
 	const splats: TransmissionSplat[] = []
 	for (const c of contribScratch) {
 		// Native (Light::Render LIGHT_BUFFER halo block): the halo lands in the
 		// buffer at full m_currentIntensity * transmissionScale. The 0.02 term
 		// belongs to the main-pass bulb-hull block, which is explicitly
 		// excluded from the light buffer (!isLightBuffer).
-		const entry = (amount: number): TransmissionSplat => {
-			const [red, green, blue] = splitTransmissionRgb(c.color, amount)
-			const [red2, green2, blue2] = splitTransmissionRgb(c.color2, amount)
-			return {
-				x: c.centerX,
-				y: c.centerY,
-				falloff: c.falloff,
-				power: c.power,
-				red,
-				green,
-				blue,
-				red2,
-				green2,
-				blue2,
-			}
-		}
-		splats.push(entry(c.level * c.transmissionScale))
+		const amount = c.level * c.transmissionScale
+		const [red, green, blue] = splitTransmissionRgb(c.color, amount)
+		const [red2, green2, blue2] = splitTransmissionRgb(c.color2, amount)
+		splats.push({
+			x: c.centerX,
+			y: c.centerY,
+			falloff: c.falloff,
+			power: c.power,
+			red,
+			green,
+			blue,
+			red2,
+			green2,
+			blue2,
+		})
 	}
-	// Signature and splats cover only contributing lamps; sub-quantum and
-	// zero-scale ones stay out entirely (see the skip above).
+	// Contributing lamps only; see the skip above.
 	const parts: string[] = []
 	for (let i = 0; i + 7 < curSigNums.length; i += 8) {
 		parts.push(
@@ -212,15 +210,15 @@ export function updateTransmissionBuffer(table: Table): boolean {
 	lastSignature = signature
 	lastSplatCount = splats.length
 	// Accumulate in float and quantize once per texel: per-splat half-float
-	// round-trips cost milliseconds once attract lights dozens of wide
-	// (falloff 1500) splats, enough to collapse the frame rate on their own.
+	// round-trips are slow once attract mode splats dozens of wide
+	// (falloff 1500) discs.
 	fillBuffer(data, splats, right, bottom)
 	tex.needsUpdate = true
 	lastRebuildAt = performance.now()
 	return true
 }
 
-/** Module-scope scratch: per-rebuild allocs showed up as GC churn on profiles. */
+/** Module-scope scratch: avoids per-rebuild allocation. */
 const scratchAcc = new Float32Array(TRANSMISSION_WIDTH * TRANSMISSION_HEIGHT * 4)
 
 /**
@@ -295,7 +293,7 @@ function fillBuffer(data: Uint16Array, list: TransmissionSplat[], right: number,
 					continue
 				}
 				// Table index is linear normalized radius in [0,1): the distSq
-				// guard above keeps every lookup inside the table (max 254).
+				// guard above keeps every lookup inside the table.
 				const kernelIndex = (Math.sqrt(distSq) * kernelScale) | 0
 				const atten = kernelAtten[kernelIndex] as number
 				if (atten > 0) {

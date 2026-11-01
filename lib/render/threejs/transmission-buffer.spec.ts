@@ -354,7 +354,7 @@ describe('transmission light buffer', () => {
 			expect(normDist, 'probe texel must sit mid-slope').to.be.lessThan(0.7)
 			const expected = 50 * (1 - normDist) ** power
 			// Tolerance ±1 covers LUT quantization plus half-float rounding:
-			// worst case ≈ (power/255)*level + half rounding ≈ 0.6+0.5 < 1
+			// worst case ≈ (power/255)*level + half-ulp ≈ 0.6+0.03 < 1
 			// at level 50/power 3.
 			const actual = DataUtils.fromHalfFloat(data[(py * TRANSMISSION_WIDTH + px) * 4] ?? 0)
 			expect(actual, `power ${power} mid-slope glow matches the analytic profile`).to.be.closeTo(expected, 1)
