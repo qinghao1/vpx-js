@@ -19,9 +19,8 @@ import {
 } from './primitive-bdl-node.js'
 import { graphReferences, materialize } from './tsl-test-harness.js'
 
-// Walking Dead GiGlow (AB_ADD, modulateVsAdd = 1, alpha 500 overdrive): the
-// authored backdrop is a dark apron, so the composite must modulate it, not
-// collect a flat additive constant over it.
+// Overdrive case (modulateVsAdd = 1, high intensity): a dark backdrop must be
+// modulated, not collected as a flat additive constant over it.
 const DST_DARK = 0.02
 const TINT_LIN = 0.1272 // three linear working-space value of authored 0x646464
 const TEX_WHITE = 1
@@ -76,7 +75,7 @@ describe('flasher AB_ADD native composite (fs_flasher.sc)', () => {
 		expect(graphReferences(materialize(mat.colorNode), ud.__uModulate)).toBe(true)
 	})
 
-	it('keeps legacy plain additive when modulateVsAdd is absent', () => {
+	it('keeps plain additive when modulateVsAdd is absent', () => {
 		const mat = createPrimitiveAdditiveMaterial({ tint: 0x646464, intensity: INTENSITY })
 		expect(mat.blending).toBe(AdditiveBlending)
 		expect((mat.userData as Record<string, unknown>).__uModulate).toBeUndefined()

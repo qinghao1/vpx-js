@@ -216,8 +216,7 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 		let mat: any
 
 		if (addBlend) {
-			// Absent mode derives from the legacy boolean (additive), matching
-			// every pre-existing caller.
+			// Absent mode defaults to additive for callers that pass only the boolean.
 			const absorb = (addBlendMode ?? 1) === ADD_BLEND_ABSORB
 			const tex =
 				(mapName && this.mapGenerator.hasTexture(mapName) && this.mapGenerator.getTexture(mapName)) || null
@@ -229,11 +228,12 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 				alphaTestValue,
 				doubleSided: true,
 				depthBias,
-				modulateVsAdd,
+				// Native absorb always modulates (default 0.9, Settings_properties.inl);
+				// without it the premul-over blend would emit unmodulated output.
+				modulateVsAdd: absorb ? (modulateVsAdd ?? 0.9) : modulateVsAdd,
 				absorb,
 			})
 			mat.name = material ? `material:${material.name}` : 'material:additive'
-			getSlots(mat).__addBlend = true
 			// Explicit RenderInfo.depthWrite wins over the non-writing additive default.
 			mat.depthWrite = depthWrite ?? false
 			this.stashCutout(mat, alphaTestValue, depthBias, true)

@@ -1,5 +1,5 @@
 import type { Group } from 'three'
-import { BufferAttribute, BufferGeometry, Color, DoubleSide, Matrix4, Mesh, Vector2 } from 'three'
+import { BufferAttribute, BufferGeometry, Color, DoubleSide, DynamicDrawUsage, Matrix4, Mesh, Vector2 } from 'three'
 import {
 	attribute,
 	clamp,
@@ -121,7 +121,7 @@ export function isBulbGlowMaterial(mat: unknown): boolean {
 	return !!(mat as { userData?: Record<string, unknown> } | null)?.userData?.__bulbGlow
 }
 
-/** Live lamp fields; absent keeps the baked value, out-of-range clamps. */
+/** Live lamp fields; absent keeps the baked value, modulate clamps into (0,1). */
 export interface GlowPatch {
 	intensity?: number
 	color?: number
@@ -268,8 +268,21 @@ export function setMergedBulbGlowRangeState(merged: Mesh, range: MergedBulbGlowR
 	if (!dyn || !colorAttr || !color2Attr) return
 	if (state.intensity !== undefined) {
 		const arr = dyn.array as Float32Array
+		const wasLive = range.count > 0 && (arr[range.start * 2] ?? 0) > 0
 		for (let i = range.start; i < range.start + range.count; i++) arr[i * 2] = state.intensity
+		// Partial upload: ranges are array-component offsets, so a lamp tick
+		// re-uploads its slice instead of the whole merged buffer.
+		dyn.addUpdateRange(range.start * 2, range.count * 2)
 		dyn.needsUpdate = true
+		// An off lamp adds no light: hide the merged mesh once no range is
+		// live, mirroring the per-quad visibility gate. The counter is owned
+		// by mergeBulbGlowQuads; meshes without it keep prior behavior.
+		const isLive = state.intensity > 0
+		const userData = merged.userData as { __glowLiveCount?: number }
+		if (typeof userData.__glowLiveCount === 'number' && wasLive !== isLive) {
+			userData.__glowLiveCount = Math.max(0, userData.__glowLiveCount + (isLive ? 1 : -1))
+			merged.visible = userData.__glowLiveCount > 0
+		}
 	}
 	if (state.color !== undefined) {
 		scratchGlowColor.set(state.color)
@@ -279,6 +292,7 @@ export function setMergedBulbGlowRangeState(merged: Mesh, range: MergedBulbGlowR
 			arr[i * 3 + 1] = scratchGlowColor.g
 			arr[i * 3 + 2] = scratchGlowColor.b
 		}
+		colorAttr.addUpdateRange(range.start * 3, range.count * 3)
 		colorAttr.needsUpdate = true
 	}
 	if (state.color2 !== undefined) {
@@ -289,12 +303,14 @@ export function setMergedBulbGlowRangeState(merged: Mesh, range: MergedBulbGlowR
 			arr[i * 3 + 1] = scratchGlowColor.g
 			arr[i * 3 + 2] = scratchGlowColor.b
 		}
+		color2Attr.addUpdateRange(range.start * 3, range.count * 3)
 		color2Attr.needsUpdate = true
 	}
 	if (state.modulate !== undefined) {
 		const m = clampModulateVsAdd(state.modulate)
 		const arr = dyn.array as Float32Array
 		for (let i = range.start; i < range.start + range.count; i++) arr[i * 2 + 1] = m
+		dyn.addUpdateRange(range.start * 2, range.count * 2)
 		dyn.needsUpdate = true
 	}
 }
@@ -384,6 +400,7 @@ export function mergeBulbGlowQuads(root: Group, table: unknown): number {
 	const ranges = new Map<string, MergedBulbGlowRange>()
 	let vCursor = 0
 	let iCursor = 0
+	let liveCount = 0
 	for (const c of baked) {
 		const e = c.local.elements
 		const e0 = e[0] as number
@@ -428,6 +445,7 @@ export function mergeBulbGlowQuads(root: Group, table: unknown): number {
 		}
 		for (let i = 0; i < srcIdx.length; i++) indices[iCursor + i] = vCursor + (srcIdx[i] as number)
 		ranges.set(c.lightName, { start: vCursor, count })
+		if (c.live.intensity > 0) liveCount++
 		iCursor += srcIdx.length
 		vCursor += count
 	}
@@ -435,15 +453,18 @@ export function mergeBulbGlowQuads(root: Group, table: unknown): number {
 	geo.setAttribute('position', new BufferAttribute(positions, 3))
 	geo.setAttribute('aGlowCenter', new BufferAttribute(aCenter, 2))
 	geo.setAttribute('aGlowParams', new BufferAttribute(aParams, 2))
-	geo.setAttribute('aGlowColor', new BufferAttribute(aColor, 3))
-	geo.setAttribute('aGlowColor2', new BufferAttribute(aColor2, 3))
-	geo.setAttribute('aGlowDyn', new BufferAttribute(aDyn, 2))
+	geo.setAttribute('aGlowColor', new BufferAttribute(aColor, 3).setUsage(DynamicDrawUsage))
+	geo.setAttribute('aGlowColor2', new BufferAttribute(aColor2, 3).setUsage(DynamicDrawUsage))
+	geo.setAttribute('aGlowDyn', new BufferAttribute(aDyn, 2).setUsage(DynamicDrawUsage))
 	geo.setIndex(new BufferAttribute(indices, 1))
 	geo.computeBoundingBox()
 	geo.computeBoundingSphere()
 	const material = createMergedBulbGlowMaterial()
 	material.name = 'material:merged.bulb.glow'
 	const merged = new Mesh(geo, material)
+	// Live-lamp refcount for the all-off draw skip; the setter maintains it.
+	// Build-time visibility stays default — ticks drive it, like per-quad quads.
+	;(merged.userData as { __glowLiveCount?: number }).__glowLiveCount = liveCount
 	merged.name = 'merged:bulb.glow'
 	merged.renderOrder = 10
 	merged.matrixAutoUpdate = false

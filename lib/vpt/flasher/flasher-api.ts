@@ -108,7 +108,7 @@ export class FlasherApi extends ItemApi<FlasherData> {
 	}
 	set ModulateVsAdd(value) {
 		// Raw store like native (put_ModulateVsAdd writes m_d unclamped); every
-		// consumer (glass restamps, bulb uniforms, composite) clamps at render.
+		// consumer (updater restamps, bulb uniforms, composites) clamps at render.
 		this.data.modulateVsAdd = value
 	}
 	get Visible() {

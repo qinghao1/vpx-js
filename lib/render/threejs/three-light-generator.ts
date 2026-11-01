@@ -14,7 +14,7 @@ import {
 } from './nodes/bulb-glow-node.js'
 import { ThreeRenderApi } from './three-render-api.js'
 
-/** Live lamp fields as a setter patch. */
+/** Maps live lamp state onto GlowPatch (colorFull → color2). */
 function glowPatchOf(state: LightState): GlowPatch {
 	return { intensity: state.intensity, color: state.color, color2: state.colorFull, modulate: state.modulate }
 }

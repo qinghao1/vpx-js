@@ -1,9 +1,9 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import type { Object3D } from 'three'
+import { AdditiveBlending, type Object3D } from 'three'
 import type { IRenderApi } from '../../render/irender-api.js'
-import { clampModulateVsAdd } from '../../render/threejs/nodes/modulate-vs-add.js'
+import { applyModulateVsAddBlending, clampModulateVsAdd } from '../../render/threejs/nodes/modulate-vs-add.js'
 import { applyAbsorbBlendState } from '../../render/threejs/nodes/primitive-bdl-node.js'
 import { ItemUpdater, noteTextureDemand } from '../item-updater.js'
 import type { Light } from '../light/light.js'
@@ -91,10 +91,19 @@ export class FlasherUpdater extends ItemUpdater<FlasherState> {
 					// Blend factors are static per flasher; revalidating the
 					// program every frame for identical state rebuilds shaders
 					// continuously. Uniform writes above need no invalidation.
-					if (absorb && !userData?.__absorbBlend) {
+					// Blend-mode flips rebuild geometry above but keep the material:
+					// convert it in place so both directions track native,
+					// which recomputes blend state per draw. Guarded by the
+					// flag, so steady frames pay one comparison.
+					if (absorb && userData?.__absorb !== true) {
+						userData.__absorb = true
 						applyAbsorbBlendState(mat)
-						// The stamp now declares absorb-ness; rebuild so the
-						// encoding follows the blend instead of staying AB_ADD.
+						;(userData.__rebuild as ((map: unknown) => void) | undefined)?.(userData.__map ?? null)
+						mat.needsUpdate = true
+					} else if (!absorb && this.data.addBlend && userData?.__absorb === true) {
+						userData.__absorb = false
+						if (userData?.__uModulate) applyModulateVsAddBlending(mat)
+						else mat.blending = AdditiveBlending
 						;(userData.__rebuild as ((map: unknown) => void) | undefined)?.(userData.__map ?? null)
 						mat.needsUpdate = true
 					}
@@ -175,8 +184,8 @@ export class FlasherUpdater extends ItemUpdater<FlasherState> {
 		) {
 			return
 		}
-		// Material identity (encoding + blend factors) is baked at build;
-		// a script flip of the blend mode or toggle needs a fresh overlay.
+		// Geometry regenerates here; the overlay material converts in place in
+		// applyState, since applyMeshToNode carries geometry only.
 		this.lastAddBlend = this.data.addBlend
 		this.lastAddBlendMode = this.data.addBlendMode
 		this.lastRotX = current.rotX

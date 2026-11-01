@@ -60,7 +60,7 @@ describe('Flasher absorb parity (upstream flasher.cpp SetupAddBlendState; AB_ADD
 			data.addBlendMode = mode
 			const meshes = createFlasher(data).getMeshes(table, renderApi, {})
 			expect(meshes.flasher?.addBlendMode, `mode ${mode} must survive getMeshes`).toBe(mode)
-			expect(meshes.flasher?.addBlend, `legacy boolean for mode ${mode}`).toBe(addBlend)
+			expect(meshes.flasher?.addBlend, `boolean fallback for mode ${mode}`).toBe(addBlend)
 		}
 	})
 
@@ -85,10 +85,10 @@ describe('Flasher absorb parity (upstream flasher.cpp SetupAddBlendState; AB_ADD
 		const add = build(FlasherAddBlend.Add)
 		expect(add.blending, 'add must stay plain additive').toBe(AdditiveBlending)
 		expect(add.userData.__addBlend, 'add stays an overlay').toBe(true)
-		expect(add.userData.__absorbBlend, 'add must not absorb').toBeFalsy()
+		expect(add.userData.__absorb, 'add must not absorb').toBeFalsy()
 
 		const legacy = build(undefined)
-		expect(legacy.blending, 'legacy boolean callers keep additive').toBe(AdditiveBlending)
+		expect(legacy.blending, 'boolean callers keep additive').toBe(AdditiveBlending)
 
 		const absorb = build(FlasherAddBlend.Absorb)
 		expect(absorb.blending, 'absorb must be premultiplied-over, not additive').toBe(CustomBlending)
@@ -98,12 +98,12 @@ describe('Flasher absorb parity (upstream flasher.cpp SetupAddBlendState; AB_ADD
 		expect(absorb.blendSrcAlpha, 'absorb alpha src factor').toBe(OneFactor)
 		expect(absorb.blendDstAlpha, 'absorb alpha dst factor').toBe(OneMinusSrcAlphaFactor)
 		expect(absorb.userData.__addBlend, 'absorb stays an overlay').toBe(true)
-		expect(absorb.userData.__absorbBlend, 'absorb marker').toBe(true)
+		expect(absorb.userData.__absorb, 'absorb marker').toBe(true)
 	})
 
 	it('stamps absorb state through the shared helper, matching the generator', () => {
 		// The generator and the per-frame updater stamp must not drift into a
-		// byte-copy again: both go through applyAbsorbBlendState. AB_ADD is
+		// byte-copy: both go through applyAbsorbBlendState. AB_ADD is
 		// deliberately excluded — it takes the modulate-vs-add path instead.
 		const generator = makeGenerator()
 		const fromGenerator = generator.getMaterial(
@@ -120,7 +120,10 @@ describe('Flasher absorb parity (upstream flasher.cpp SetupAddBlendState; AB_ADD
 			0,
 			FlasherAddBlend.Absorb,
 		)
-		const stub: Record<string, any> = { userData: {} }
+		// The helper sets blend factors only; the caller declares the mode, and the
+		// encoding follows the flag on rebuilds.
+		const stub = createPrimitiveAdditiveMaterial({ modulateVsAdd: 0.5 })
+		stub.userData.__absorb = true
 		applyAbsorbBlendState(stub)
 		for (const key of [
 			'blending',
@@ -133,7 +136,6 @@ describe('Flasher absorb parity (upstream flasher.cpp SetupAddBlendState; AB_ADD
 		] as const) {
 			expect(stub[key], `shared helper ${key} must match the generator`).toBe(fromGenerator[key])
 		}
-		expect(stub.userData.__absorbBlend, 'shared helper absorb marker').toBe(true)
 	})
 
 	it('caches add and absorb materials separately', () => {
@@ -154,15 +156,14 @@ describe('Flasher absorb parity (upstream flasher.cpp SetupAddBlendState; AB_ADD
 				mode,
 			)
 		expect(key(FlasherAddBlend.Absorb), 'absorb key must differ from add').not.toBe(key(FlasherAddBlend.Add))
-		expect(key(undefined), 'legacy keys keep their shape').not.toContain('undefined')
+		expect(key(undefined), 'boolean keys keep their shape').not.toContain('undefined')
 	})
 
 	it('carries absorb state across for-write clones', () => {
-		const src = createPrimitiveAdditiveMaterial({ modulateVsAdd: 0.5 })
-		applyAbsorbBlendState(src)
+		const src = createPrimitiveAdditiveMaterial({ modulateVsAdd: 0.5, absorb: true })
 		const cloned = clonePrimitiveNodeMaterial(src)
 		expect(cloned.blending, 'clone keeps premultiplied-over').toBe(CustomBlending)
-		expect((cloned.userData as Record<string, unknown>).__absorbBlend, 'clone keeps the absorb flag').toBe(true)
+		expect(cloned.userData.__absorb, 'clone keeps the absorb flag').toBe(true)
 	})
 
 	it('passes modulateVsAdd through on the absorb arm', () => {
@@ -188,7 +189,7 @@ describe('Flasher absorb parity (upstream flasher.cpp SetupAddBlendState; AB_ADD
 		// Native's absorb arm reads m_modulate_vs_add for the src alpha; dropping
 		// the uniform rendered alpha = texA·intensity, diverging at overdrive.
 		expect(mat.userData.__uModulate?.value, 'absorb keeps the modulate uniform').toBeCloseTo(0.5, 12)
-		expect(mat.userData.__absorbBlend, 'absorb stamp still applies').toBe(true)
+		expect(mat.userData.__absorb, 'absorb flag still applies').toBe(true)
 	})
 
 	it('stamps premultiplied-over onto live absorb materials while keeping the additive uniform path', () => {
@@ -227,7 +228,7 @@ describe('Flasher absorb parity (upstream flasher.cpp SetupAddBlendState; AB_ADD
 		expect(mat.blendSrc).toBe(OneFactor)
 		expect(mat.blendDst).toBe(OneMinusSrcAlphaFactor)
 		expect(mat.blendEquation).toBe(AddEquation)
-		expect(mat.userData.__absorbBlend).toBe(true)
+		expect(mat.userData.__absorb).toBe(true)
 	})
 
 	it('leaves add and plain materials alone in the updater', () => {

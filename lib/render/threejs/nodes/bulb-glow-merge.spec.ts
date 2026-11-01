@@ -1,6 +1,16 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { type BufferAttribute, type BufferGeometry, Color, CustomBlending, Group, Mesh, PlaneGeometry } from 'three'
+import {
+	type BufferAttribute,
+	type BufferGeometry,
+	Color,
+	CustomBlending,
+	DynamicDrawUsage,
+	Group,
+	Mesh,
+	PlaneGeometry,
+	StaticDrawUsage,
+} from 'three'
 import { describe, expect, it } from 'vitest'
 import { getAuthoredVisible, setAuthoredVisible } from '../authored-visible.js'
 import { ThreeLightGenerator } from '../three-light-generator.js'
@@ -193,5 +203,46 @@ describe('merged bulb-glow composite', () => {
 		const positions = geo.getAttribute('position') as BufferAttribute
 		const src = (quadA.geometry as BufferGeometry).getAttribute('position') as BufferAttribute
 		expect((positions.array as Float32Array)[ref.start * 3]).to.be.closeTo((src.array as Float32Array)[0] * 2, 1e-6)
+	})
+
+	it('flags live attributes dynamic while baked anchors stay static', () => {
+		const { root } = twoLampRoot()
+		expect(mergeBulbGlowQuads(root, tableStub())).to.equal(2)
+		const merged = root.getObjectByName('merged:bulb.glow') as Mesh
+		const geo = merged.geometry as BufferGeometry
+		for (const name of ['aGlowDyn', 'aGlowColor', 'aGlowColor2']) {
+			expect((geo.getAttribute(name) as BufferAttribute).usage, `${name} is rewritten per tick`).to.equal(
+				DynamicDrawUsage,
+			)
+		}
+		for (const name of ['position', 'aGlowCenter', 'aGlowParams']) {
+			expect((geo.getAttribute(name) as BufferAttribute).usage, `${name} is baked once`).to.equal(StaticDrawUsage)
+		}
+	})
+
+	it('records partial update ranges instead of re-uploading whole buffers', () => {
+		const { root, quadA } = twoLampRoot()
+		expect(mergeBulbGlowQuads(root, tableStub())).to.equal(2)
+		const ref = quadA.userData.__mergedGlow as MergedBulbGlowRef
+		const geo = ref.mesh.geometry as BufferGeometry
+		const dyn = geo.getAttribute('aGlowDyn') as BufferAttribute
+		const color = geo.getAttribute('aGlowColor') as BufferAttribute
+		setMergedBulbGlowRangeState(ref.mesh, ref, { intensity: 3, color: 0x0000ff, modulate: 0.3 })
+		expect(dyn.updateRanges).to.deep.include({ start: ref.start * 2, count: ref.count * 2 })
+		expect(color.updateRanges).to.deep.include({ start: ref.start * 3, count: ref.count * 3 })
+	})
+
+	it('hides the merged mesh once every lamp is off and reshows on relight', () => {
+		const { root, quadA, quadB } = twoLampRoot()
+		expect(mergeBulbGlowQuads(root, tableStub())).to.equal(2)
+		const refA = quadA.userData.__mergedGlow as MergedBulbGlowRef
+		const refB = quadB.userData.__mergedGlow as MergedBulbGlowRef
+		expect(refA.mesh.visible).to.equal(true)
+		setMergedBulbGlowRangeState(refA.mesh, refA, { intensity: 0 })
+		expect(refA.mesh.visible, 'one live lamp keeps the draw').to.equal(true)
+		setMergedBulbGlowRangeState(refB.mesh, refB, { intensity: 0 })
+		expect(refA.mesh.visible, 'all-off skips the draw').to.equal(false)
+		setMergedBulbGlowRangeState(refA.mesh, refA, { intensity: 5 })
+		expect(refA.mesh.visible, 'relight reshows').to.equal(true)
 	})
 })

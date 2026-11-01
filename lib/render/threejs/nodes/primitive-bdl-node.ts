@@ -282,16 +282,16 @@ export function createPrimitiveBdlMaterial(opts: PrimitiveBdlOptions): MeshStand
 
 /**
  * Upstream per-draw blend state for AB_ABSORB (flasher.cpp SetupAddBlendState):
- * premultiplied alpha 'over', dst' = src + dst * (1 - srcAlpha). Applied at
- * creation for `absorb` materials; the flasher updater also stamps it onto
- * forked clones that predate the flag.
+ * premultiplied alpha 'over', dst' = src + dst * (1 - srcAlpha). Blend factors
+ * only: callers declare the mode via `userData.__absorb`, which selects the
+ * matching shader encoding on rebuilds.
  *
  * Note: AB_ADD takes the SRC_ALPHA/INVSRC_COLOR/REVSUBTRACT arm with
  * negatively-encoded output (signed modulateVsAdd, fs_flasher.sc) — the same
- * scheme as the bulb glow composite. AB_ABSORB keeps this premultiplied-over
- * arm with the positive absorb encoding instead.
+ * scheme as the bulb glow composite. AB_ABSORB pairs the premultiplied-over
+ * arm below with the positive absorb encoding instead.
  */
-export function applyAbsorbBlendState(mat: any): void {
+export function applyAbsorbBlendState(mat: MeshBasicNodeMaterial): void {
 	mat.blending = CustomBlending
 	mat.blendSrc = OneFactor
 	mat.blendDst = OneMinusSrcAlphaFactor
@@ -299,11 +299,6 @@ export function applyAbsorbBlendState(mat: any): void {
 	mat.blendSrcAlpha = OneFactor
 	mat.blendDstAlpha = OneMinusSrcAlphaFactor
 	mat.blendEquationAlpha = AddEquation
-	const userData = (mat.userData ??= {}) as Record<string, unknown>
-	userData.__absorbBlend = true
-	// The stamp declares absorb-ness, so later rebuilds (texture arrival,
-	// clones) converge on the absorb encoding instead of the AB_ADD arm.
-	userData.__absorb = true
 }
 
 export function createPrimitiveAdditiveMaterial(opts: PrimitiveAdditiveOptions): MeshBasicNodeMaterial {
@@ -315,6 +310,8 @@ export function createPrimitiveAdditiveMaterial(opts: PrimitiveAdditiveOptions):
 	const userData = mat.userData as Record<string, unknown>
 	userData.__primitiveKind = PRIMITIVE_ADDITIVE_KIND
 	userData.__addBlend = true
+	// Read late-bound in rebuild: the updater flips this after creation, and
+	// texture arrival rebuilds against whatever it holds then.
 	userData.__absorb = opts.absorb === true
 	userData.__uTint = uTint
 	userData.__uIntensity = uIntensity
@@ -519,6 +516,5 @@ export function clonePrimitiveNodeMaterial<T>(mat: T): T {
 		absorb: userData.__absorb === true,
 	})
 	finishPrimitiveClone(sourceMaterial, cloned as unknown as CloneablePrimitiveMaterial, 'simple')
-	;(cloned.userData as Record<string, unknown>).__addBlend = true
 	return cloned as unknown as T
 }

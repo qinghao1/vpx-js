@@ -1,8 +1,10 @@
+import { OneFactor, ReverseSubtractEquation, SrcAlphaFactor } from 'three'
 import { describe, expect, it } from 'vitest'
 import { TableBuilder } from '../../../test/table-builder.js'
 import { TestRenderApi } from '../../../test/test-render-api.js'
 import { Vertex2D } from '../../math/vector.js'
 import type { IRenderApi } from '../../render/irender-api.js'
+import { createPrimitiveAdditiveMaterial } from '../../render/threejs/nodes/primitive-bdl-node.js'
 import { DragPoint } from '../dragpoint.js'
 import { Enums } from '../enums.js'
 import type { Mesh } from '../mesh.js'
@@ -313,11 +315,53 @@ describe('The VPinball flasher mesh generator and updater', () => {
 		const table = new TableBuilder().build()
 		updater.applyState(node, state, renderApi, table)
 		expect(material.needsUpdate).toBe(true)
-		expect(material.userData.__absorbBlend).toBe(true)
+		expect(material.userData.__absorb).toBe(true)
 
 		material.needsUpdate = false
 		updater.applyState(node, state, renderApi, table)
 		expect(material.needsUpdate).toBe(false)
+	})
+
+	it('should convert the overlay back to additive when the script leaves absorb mode', () => {
+		const data = createFlasherData('AbsorbRoundTrip')
+		data.addBlend = true
+		data.addBlendMode = FlasherAddBlend.Absorb
+		data.intensityScale = 2
+		const state = FlasherState.claim('AbsorbRoundTrip', true, 0xff8844, 80)
+		const updater = new FlasherUpdater(state, data)
+
+		const material: any = createPrimitiveAdditiveMaterial({
+			tint: 0xff8844,
+			intensity: 1,
+			modulateVsAdd: 0.5,
+			absorb: true,
+		})
+		const node = {
+			visible: false,
+			traverse: (callback: (child: unknown) => void) => callback({ isMesh: true, material }),
+		}
+		const renderApi = new TestRenderApi() as unknown as IRenderApi<any, any, any>
+		const table = new TableBuilder().build()
+		// needsUpdate is set-only on three materials; version counts conversions.
+		expect(material.version).toBe(0)
+		updater.applyState(node, state, renderApi, table)
+		expect(material.version).toBe(0)
+
+		data.addBlendMode = FlasherAddBlend.Add
+		updater.applyState(node, state, renderApi, table)
+		expect(material.userData.__absorb).toBe(false)
+		expect(material.blendEquation).toBe(ReverseSubtractEquation)
+		expect(material.blendSrc).toBe(SrcAlphaFactor)
+		expect(material.version).toBe(1)
+
+		updater.applyState(node, state, renderApi, table)
+		expect(material.version).toBe(1)
+
+		data.addBlendMode = FlasherAddBlend.Absorb
+		updater.applyState(node, state, renderApi, table)
+		expect(material.userData.__absorb).toBe(true)
+		expect(material.blendSrc).toBe(OneFactor)
+		expect(material.version).toBe(2)
 	})
 
 	it('should not invalidate the program when opacity values are unchanged', () => {
