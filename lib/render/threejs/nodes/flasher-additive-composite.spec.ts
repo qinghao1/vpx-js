@@ -12,18 +12,41 @@ import {
 	SrcAlphaFactor,
 } from 'three'
 import { describe, expect, it } from 'vitest'
+import { clampModulateVsAdd } from './modulate-vs-add.js'
 import {
 	clonePrimitiveNodeMaterial,
 	convertFlasherBlend,
 	createPrimitiveAdditiveMaterial,
-	flasherAbsorbComposite,
-	flasherAdditiveComposite,
-	flasherPlainComposite,
 } from './primitive-bdl-node.js'
 import { graphReferences, materialize } from './tsl-test-harness.js'
 
-// Overdrive case (modulateVsAdd = 1, high intensity): a dark backdrop must be
-// modulated, not collected as a flat additive constant over it.
+/** Native AB_ADD composite (`fs_flasher.sc` REVSUBTRACT arm): `dst + L·(1 − m·(1 − dst))`. */
+function flasherAdditiveComposite(dst: number, resultLight: number, resultA: number, modulate: number): number {
+	const m = clampModulateVsAdd(modulate)
+	const s = m * resultA * resultLight
+	return dst * (1 + s) + s * (1 / m - 1)
+}
+
+/** Native AB_ABSORB composite (`fs_flasher.sc` absorb arm, premultiplied-over). */
+function flasherAbsorbComposite(
+	dst: number,
+	tint: number,
+	tex: number,
+	texA: number,
+	intensity: number,
+	modulate: number,
+): number {
+	const m = clampModulateVsAdd(modulate)
+	const resultA = texA * intensity
+	return tint * tex * resultA + dst * (1 - Math.min(1, m * resultA))
+}
+
+/** Native AB_NONE output (`fs_flasher.sc` plain arm, blending disabled). */
+function flasherPlainComposite(tint: number, tex: number): number {
+	return tint * tex
+}
+
+// Overdrive: dark backdrop stays modulated.
 const DST_DARK = 0.02
 const TINT_LIN = 0.1272 // three linear working-space value of authored 0x646464
 const TEX_WHITE = 1
@@ -37,7 +60,7 @@ function legacyAdditive(dst: number, tint: number, tex: number, intensity: numbe
 }
 
 describe('flasher AB_ADD native composite (fs_flasher.sc)', () => {
-	it('matches the hand-expanded native blend: dst·(1−src) − src·srcAlpha', () => {
+	it('matches the native blend: dst·(1−src) − src·srcAlpha', () => {
 		for (const m of [0, 0.0001, 0.5, 0.9, 0.9999, 1]) {
 			const mc = Math.max(0.0001, Math.min(0.9999, m))
 			const resultLight = TINT_LIN * TEX_WHITE
@@ -50,7 +73,7 @@ describe('flasher AB_ADD native composite (fs_flasher.sc)', () => {
 		}
 	})
 
-	it('keeps a dark apron dark at GiGlow overdrive instead of blowing it white', () => {
+	it('keeps a dark backdrop dark at overdrive', () => {
 		const resultLight = TINT_LIN * TEX_WHITE
 		const resultA = INTENSITY * TEX_ALPHA
 		const composited = flasherAdditiveComposite(DST_DARK, resultLight, resultA, MODULATE)
@@ -59,7 +82,7 @@ describe('flasher AB_ADD native composite (fs_flasher.sc)', () => {
 		expect(legacy).toBeGreaterThan(0.5)
 	})
 
-	it('is a no-op off the texture (zero light or zero coverage)', () => {
+	it('is a no-op off the texture', () => {
 		expect(flasherAdditiveComposite(DST_DARK, 0, INTENSITY, MODULATE)).toBeCloseTo(DST_DARK, 12)
 		expect(flasherAdditiveComposite(DST_DARK, TINT_LIN, 0, MODULATE)).toBeCloseTo(DST_DARK, 12)
 	})
@@ -97,7 +120,7 @@ describe('flasher AB_ADD native composite (fs_flasher.sc)', () => {
 })
 
 describe('flasher AB_ABSORB native composite (fs_flasher.sc absorb arm)', () => {
-	it('matches the hand-expanded native composite: src + dst·(1 − srcA)', () => {
+	it('matches the native composite: src + dst·(1 − srcA)', () => {
 		for (const m of [0, 0.0001, 0.5, 0.9, 0.9999, 1]) {
 			const mc = Math.max(0.0001, Math.min(0.9999, m))
 			const resultA = TEX_ALPHA * INTENSITY
@@ -109,7 +132,7 @@ describe('flasher AB_ABSORB native composite (fs_flasher.sc absorb arm)', () => 
 		}
 	})
 
-	it('saturates the src alpha at overdrive instead of inverting the backdrop', () => {
+	it('saturates the src alpha at overdrive', () => {
 		const composited = flasherAbsorbComposite(DST_DARK, TINT_LIN, TEX_WHITE, TEX_ALPHA, INTENSITY, MODULATE)
 		expect(composited).toBeCloseTo(TINT_LIN * TEX_WHITE * INTENSITY, 12)
 	})
@@ -193,5 +216,19 @@ describe('flasher AB_NONE plain output (fs_flasher.sc plain arm)', () => {
 		expect(mat.alphaTest).toBe(0.5)
 		convertFlasherBlend(mat, 'additive')
 		expect(mat.alphaTest).toBe(0)
+	})
+
+	it('keeps the cutout across clones of plain overlays', () => {
+		const mat = createPrimitiveAdditiveMaterial({
+			tint: 0x646464,
+			intensity: INTENSITY,
+			modulateVsAdd: 1,
+			absorb: true,
+			alphaTestValue: 0.5,
+		})
+		convertFlasherBlend(mat, 'plain')
+		const cloned = clonePrimitiveNodeMaterial(mat)
+		expect(cloned.userData.__blend).toBe('plain')
+		expect(cloned.alphaTest).toBe(0.5)
 	})
 })

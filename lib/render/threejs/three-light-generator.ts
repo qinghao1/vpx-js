@@ -15,7 +15,6 @@ import {
 } from './nodes/bulb-glow-node.js'
 import { ThreeRenderApi } from './three-render-api.js'
 
-/** Maps live lamp state onto GlowPatch (colorFull → color2). */
 function glowPatchOf(state: LightState): GlowPatch {
 	return { intensity: state.intensity, color: state.color, color2: state.colorFull, modulate: state.modulate }
 }
@@ -63,7 +62,6 @@ export class ThreeLightGenerator {
 				if (state.color !== undefined) (child as PointLight).color.set(state.color)
 				break
 			case 'bulb.glow': {
-				// Merged quad: write live state into its vertex range in place.
 				const mergedRef = (child as ThreeMesh).userData?.__mergedGlow as MergedBulbGlowRef | undefined
 				if (mergedRef) {
 					setMergedBulbGlowRangeState(
@@ -73,20 +71,13 @@ export class ThreeLightGenerator {
 					)
 					break
 				}
-				// Visibility follows the live lamp state (an off lamp adds no
-				// light, so its quad stays out of the draw list); intensity 0
-				// already renders nothing, this just skips the draw call.
 				// Quads default to visible; authored-invisible lights stay hidden
 				// (upstream gates bulb/glow rendering on m_d.m_visible).
 				if (state.intensity !== undefined) {
 					child.visible = state.intensity > 0 && getAuthoredVisible(child)
 				}
 				const glow = (child as ThreeMesh).material as MeshBasicNodeMaterial
-				if (glow) {
-					// Native drives the lightmap glow from the live lamp state
-					// (lightColor_intensity + colors in fs_classic_light.sc).
-					setBulbGlowState(glow, glowPatchOf(state))
-				}
+				if (glow) setBulbGlowState(glow, glowPatchOf(state))
 				break
 			}
 		}

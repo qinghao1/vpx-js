@@ -92,7 +92,6 @@ describe('merged bulb-glow composite', () => {
 		expect(merged).toBeDefined()
 		expect(merged.renderOrder).to.equal(10)
 		const geo = merged.geometry as BufferGeometry
-		// 2 planes x 4 verts.
 		expect(geo.getAttribute('position').count).to.equal(8)
 		expect((geo.getIndex() as BufferAttribute).count).to.equal(12)
 		expect(quadA.visible).to.equal(false)
@@ -102,8 +101,6 @@ describe('merged bulb-glow composite', () => {
 		expect(refA.mesh).to.equal(merged)
 		expect(refB.mesh).to.equal(merged)
 		expect(refB.start).to.equal(refA.start + refA.count)
-		// Baked params mirror the per-quad material uniforms: center, inverse
-		// falloff, power, linear-space ramp colors, live intensity + modulate m.
 		const center = geo.getAttribute('aGlowCenter') as BufferAttribute
 		expect(Array.from((center.array as Float32Array).slice(0, 2))).to.deep.equal([500, 1000])
 		const params = geo.getAttribute('aGlowParams') as BufferAttribute
@@ -115,8 +112,7 @@ describe('merged bulb-glow composite', () => {
 		expect((color.array as Float32Array)[rangeA.start * 3]).to.be.closeTo(expectedRed.r, 1e-6)
 		const dyn = geo.getAttribute('aGlowDyn') as BufferAttribute
 		expect((dyn.array as Float32Array)[rangeA.start * 2]).to.equal(10)
-		// Float32 attribute storage cannot represent 0.9 (error ~1.5e-9), so the
-		// tolerance matches the 1e-6 used for colors elsewhere in this file.
+		// Float32 cannot represent 0.9 exactly.
 		expect((dyn.array as Float32Array)[rangeA.start * 2 + 1]).to.be.closeTo(0.9, 1e-6)
 	})
 
@@ -178,7 +174,6 @@ describe('merged bulb-glow composite', () => {
 
 	it('skips quads under non-similarity transforms', () => {
 		const { root, quadA, quadB } = twoLampRoot()
-		// Non-uniform stretch: baking it would warp the radial halo.
 		quadB.matrix.makeScale(2, 1, 1)
 		expect(mergeBulbGlowQuads(root, tableStub())).to.equal(0)
 		expect(quadA.visible).to.equal(true)
@@ -187,8 +182,6 @@ describe('merged bulb-glow composite', () => {
 
 	it('bakes a uniform parent scale into positions, center, and falloff', () => {
 		const { root, quadA } = twoLampRoot()
-		// Converter leaves mesh matrices identity; a scaled light group must
-		// still merge, with the similarity baked into vertices and center.
 		for (const group of root.children as Group[]) group.scale.setScalar(2)
 		expect(mergeBulbGlowQuads(root, tableStub())).to.equal(2)
 		const ref = quadA.userData.__mergedGlow as MergedBulbGlowRef

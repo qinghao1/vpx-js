@@ -72,8 +72,7 @@ export class FlasherUpdater extends ItemUpdater<FlasherState> {
 		if (!visible) return
 
 		const intensity = (alpha * this.data.intensityScale) / 100
-		// Both additive modes share the tint/intensity uniform path upstream (the
-		// absorb sign flip lives in the shader encoding); blending differs.
+		// The absorb sign flip lives in the shader encoding, not here.
 		const absorb = this.data.addBlendMode === FlasherAddBlend.Absorb
 		target.traverse((child: any) => {
 			if (!child.isMesh || !child.material) return
@@ -83,16 +82,13 @@ export class FlasherUpdater extends ItemUpdater<FlasherState> {
 				if (this.data.addBlend) {
 					if (userData?.__uTint?.value?.set) userData.__uTint.value.set(this.state.color)
 					if (userData?.__uIntensity) userData.__uIntensity.value = intensity
-					// Native re-reads m_modulate_vs_add every frame; restamp the
-					// uniform in place so script-animated values track without rebuild.
+					// Script-animated values track without rebuild.
 					if (userData?.__uModulate) userData.__uModulate.value = clampModulateVsAdd(this.data.modulateVsAdd)
 					if (userData?.__uFlat?.value?.set)
 						userData.__uFlat.value.set(this.state.color).multiplyScalar(intensity)
-					// Uniform writes above need no invalidation.
 					convertFlasherBlend(mat, absorb ? 'absorb' : 'additive')
 				} else {
-					// Converted overlays take the plain protocol; classic
-					// materials take the authored color/opacity path.
+					// Node graphs ignore classic color/opacity writes; they convert instead.
 					if (userData?.__addBlend === true) convertFlasherBlend(mat, 'plain')
 					else {
 						if (mat.color?.set) mat.color.set(this.state.color)

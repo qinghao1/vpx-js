@@ -148,55 +148,11 @@ export interface PrimitiveAdditiveOptions {
 	alphaTestValue?: number
 	doubleSided?: boolean
 	depthBias?: number
-	/** See RenderInfo.modulateVsAdd. */
 	modulateVsAdd?: number
-	/** AB_ABSORB: positive premultiplied encoding under premul-over, not the AB_ADD negative arm. */
 	absorb?: boolean
-	/** AB_NONE conversion target: opaque static color. */
 	plain?: boolean
 }
 
-/**
- * Per-channel native AB_ADD flasher composite (`fs_flasher.sc` under
- * REVSUBTRACT with SRC_ALPHA/INV_SRC_COLOR): `dst + L·(1 − m·(1 − dst))`
- * with `L = resultLight·resultA`, `resultLight = tint·texRgb`,
- * `resultA = intensity·texAlpha`, emitted as the negative `−m·L` with
- * src alpha `1/m − 1`.
- */
-export function flasherAdditiveComposite(dst: number, resultLight: number, resultA: number, modulate: number): number {
-	const m = clampModulateVsAdd(modulate)
-	const s = m * resultA * resultLight
-	return dst * (1 + s) + s * (1 / m - 1)
-}
-
-/**
- * Per-channel native AB_ABSORB flasher composite (`fs_flasher.sc` absorb arm
- * under premultiplied-over): `src + dst·(1 − srcA)` with
- * `src = tint·tex·(texA·intensity)` and `srcA = saturate(m·texA·intensity)`.
- */
-export function flasherAbsorbComposite(
-	dst: number,
-	tint: number,
-	tex: number,
-	texA: number,
-	intensity: number,
-	modulate: number,
-): number {
-	const m = clampModulateVsAdd(modulate)
-	const resultA = texA * intensity
-	return tint * tex * resultA + dst * (1 - Math.min(1, m * resultA))
-}
-
-/**
- * Native AB_NONE flasher output (`fs_flasher.sc` plain arm, blending
- * disabled): opaque static color through the texture. Intensity folds into
- * coverage only.
- */
-export function flasherPlainComposite(tint: number, tex: number): number {
-	return tint * tex
-}
-
-/** Live blend-mode target for an additive overlay. */
 export type FlasherBlendTarget = 'absorb' | 'additive' | 'plain'
 
 function applyTargetBlend(mat: MeshBasicNodeMaterial, target: FlasherBlendTarget): void {
@@ -208,17 +164,13 @@ function applyTargetBlend(mat: MeshBasicNodeMaterial, target: FlasherBlendTarget
 	else mat.blending = AdditiveBlending
 }
 
-/**
- * Converts an additive overlay toward the live blend mode, matching native's
- * per-draw recompute. Returns whether it converted.
- */
+/** Converts an additive overlay toward the live blend mode. */
 export function convertFlasherBlend(mat: MeshBasicNodeMaterial, target: FlasherBlendTarget): boolean {
 	const userData = mat.userData as Record<string, unknown>
 	if (userData.__addBlend !== true || userData.__blend === target) return false
 	userData.__blend = target
 	applyTargetBlend(mat, target)
-	// Native applies the texture alpha-test only for AB_NONE (flasher.cpp);
-	// the additive targets never discard.
+	// The texture alpha-test applies only for plain; the additive targets never discard.
 	const cutout = userData.__alphaTestValue
 	mat.alphaTest = target === 'plain' && isValidCutout(cutout) ? cutout : 0
 	;(userData.__rebuild as ((map: unknown) => void) | undefined)?.(userData.__map)
@@ -322,17 +274,7 @@ export function createPrimitiveBdlMaterial(opts: PrimitiveBdlOptions): MeshStand
 	return mat
 }
 
-/**
- * Upstream per-draw blend state for AB_ABSORB (flasher.cpp SetupAddBlendState):
- * premultiplied alpha 'over', dst' = src + dst * (1 - srcAlpha). Blend factors
- * only: the mode travels in `userData.__blend`, which selects the matching
- * shader encoding on rebuilds.
- *
- * Note: AB_ADD takes the SRC_ALPHA/INVSRC_COLOR/REVSUBTRACT arm with
- * negatively-encoded output (signed modulateVsAdd, fs_flasher.sc) — the same
- * scheme as the bulb glow composite. AB_ABSORB pairs the premultiplied-over
- * arm below with the positive absorb encoding instead.
- */
+/** Premultiplied-over blend factors for AB_ABSORB (flasher.cpp SetupAddBlendState). */
 export function applyAbsorbBlendState(mat: MeshBasicNodeMaterial): void {
 	mat.blending = CustomBlending
 	mat.blendSrc = OneFactor
@@ -354,9 +296,7 @@ export function createPrimitiveAdditiveMaterial(opts: PrimitiveAdditiveOptions):
 	const userData = mat.userData as Record<string, unknown>
 	userData.__primitiveKind = PRIMITIVE_ADDITIVE_KIND
 	userData.__addBlend = true
-	// One mode per material (plain-first matches the rebuild check order).
-	// Read late-bound in rebuild: the updater flips the mode after creation,
-	// and texture arrival rebuilds against whatever it holds then.
+	// The updater flips the mode after creation; rebuilds read it late.
 	const blend: FlasherBlendTarget = opts.plain === true ? 'plain' : opts.absorb === true ? 'absorb' : 'additive'
 	userData.__blend = blend
 	userData.__uTint = uTint
@@ -444,8 +384,9 @@ export function createPrimitiveAdditiveMaterial(opts: PrimitiveAdditiveOptions):
 	userData.__map = map
 	rebuild(map)
 	applyTargetBlend(mat, blend)
-	// All overlays stay in the transparent pass like native (DrawMesh pins
-	// flashers there); plain only disables the blend.
+	// The stashed cutout applies only for plain; the additive targets never discard.
+	if (blend === 'plain' && isValidCutout(opts.alphaTestValue)) mat.alphaTest = opts.alphaTestValue
+	// All overlays stay in the transparent pass like native.
 	mat.transparent = true
 	mat.depthWrite = false
 	mat.depthTest = true
@@ -564,8 +505,7 @@ export function clonePrimitiveNodeMaterial<T>(mat: T): T {
 		...common,
 		tint: uniformHex((userData.__uTint as { value: unknown })?.value, 0xffffff),
 		intensity: uniformNumber((userData.__uIntensity as { value: unknown })?.value, 1),
-		// uModulate carries over even when plain ignores it: plain→additive
-		// converts back onto the exact prior encoding.
+		// Plain ignores uModulate, but converting back needs it.
 		modulateVsAdd: typeof modulateValue === 'number' ? modulateValue : undefined,
 		absorb: blend === 'absorb',
 		plain: blend === 'plain',

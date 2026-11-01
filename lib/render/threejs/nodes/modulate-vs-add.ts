@@ -4,20 +4,18 @@
 import { CustomBlending, OneMinusSrcColorFactor, ReverseSubtractEquation, SrcAlphaFactor } from 'three'
 import type { MeshBasicNodeMaterial } from 'three/webgpu'
 
-/** Native `m_modulate_vs_add` window (flasher.cpp, light.cpp): 0 disables the blend, 1 reads wrong. */
+/** Valid `m_modulate_vs_add` window is (0,1). */
 export const MODULATE_MIN = 0.0001
 export const MODULATE_MAX = 0.9999
 
-/** Native default (`Settings_properties.inl`): absent modulate means 0.9. */
+/** Native default (`Settings_properties.inl`). */
 export const DEFAULT_MODULATE = 0.9
 
-/** Clamp m_modulate_vs_add into (0,1). */
 export function clampModulateVsAdd(value?: number, fallback = DEFAULT_MODULATE): number {
 	const v = value ?? fallback
 	return Number.isNaN(v) ? MODULATE_MAX : Math.max(MODULATE_MIN, Math.min(MODULATE_MAX, v))
 }
 
-/** Native negatively-encoded composite blend state (SRC_ALPHA/INV_SRC_COLOR under REVSUBTRACT). */
 export function applyModulateVsAddBlending(mat: MeshBasicNodeMaterial): void {
 	mat.blending = CustomBlending
 	mat.blendSrc = SrcAlphaFactor

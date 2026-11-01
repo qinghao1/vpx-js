@@ -33,27 +33,6 @@ export interface BulbGlowOptions {
 	modulateVsAdd?: number
 }
 
-/**
- * Per-channel native bulb composite (`fs_light.sc` under REVSUBTRACT with
- * SRC_ALPHA/INV_SRC_COLOR): `dst + atten·I·(dst·m·l + (1−m)·l)`.
- */
-export function bulbGlowComposite(
-	dst: number,
-	atten: number,
-	intensity: number,
-	modulate: number,
-	light: number,
-): number {
-	const m = clampModulateVsAdd(modulate)
-	const glow = atten * intensity * light
-	return dst * (1 + m * glow) + (1 - m) * glow
-}
-
-/** Native bulb src alpha (`fs_light.sc`): `gl_FragColor.a = 1/m − 1`. */
-export function bulbGlowSrcAlpha(modulate: number): number {
-	return 1 / clampModulateVsAdd(modulate) - 1
-}
-
 export function createBulbGlowNodeMaterial(options: BulbGlowOptions): MeshBasicNodeMaterial {
 	const mat = new MeshBasicNodeMaterial()
 	const uColor = uniform(new Color(options.color))

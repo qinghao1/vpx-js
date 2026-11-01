@@ -2,14 +2,21 @@
 
 import { CustomBlending, OneMinusSrcColorFactor, ReverseSubtractEquation, SrcAlphaFactor } from 'three'
 import { describe, expect, it } from 'vitest'
-import {
-	bulbGlowComposite,
-	bulbGlowSrcAlpha,
-	createBulbGlowNodeMaterial,
-	createMergedBulbGlowMaterial,
-} from './bulb-glow-node.js'
+import { createBulbGlowNodeMaterial, createMergedBulbGlowMaterial } from './bulb-glow-node.js'
 import { clampModulateVsAdd } from './modulate-vs-add.js'
 import { graphReferences, materialize } from './tsl-test-harness.js'
+
+/** Native bulb composite (`fs_light.sc` REVSUBTRACT arm). */
+function bulbGlowComposite(dst: number, atten: number, intensity: number, modulate: number, light: number): number {
+	const m = clampModulateVsAdd(modulate)
+	const glow = atten * intensity * light
+	return dst * (1 + m * glow) + (1 - m) * glow
+}
+
+/** Native bulb src alpha (`fs_light.sc`): `gl_FragColor.a = 1/m − 1`. */
+function bulbGlowSrcAlpha(modulate: number): number {
+	return 1 / clampModulateVsAdd(modulate) - 1
+}
 
 const ATTEN = 0.8
 const INTENSITY = 4
@@ -30,7 +37,7 @@ describe('bulb-glow native composite (fs_light.sc)', () => {
 		expect(clampModulateVsAdd(Number.NaN)).toBe(0.9999)
 	})
 
-	it('matches the hand-expanded native blend: dst·(1−src) − src·srcAlpha', () => {
+	it('matches the native blend: dst·(1−src) − src·srcAlpha', () => {
 		for (const m of [0, 0.0001, 0.5, 0.9, 0.9999, 1]) {
 			const mc = clampModulateVsAdd(m)
 			const src = -mc * ATTEN * INTENSITY * LIGHT
@@ -52,7 +59,7 @@ describe('bulb-glow native composite (fs_light.sc)', () => {
 		expect(restored / Math.max(legacy - dst, 1e-12)).toBeGreaterThan(100)
 	})
 
-	it('degenerates to pure additive at m≈0 (legacy behavior preserved)', () => {
+	it('degenerates to pure additive at m≈0', () => {
 		expect(bulbGlowComposite(DST, ATTEN, INTENSITY, 0.0001, LIGHT)).toBeCloseTo(DST + ATTEN * INTENSITY * LIGHT, 3)
 	})
 
