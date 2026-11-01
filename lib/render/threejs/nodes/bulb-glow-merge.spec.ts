@@ -122,10 +122,11 @@ describe('merged bulb-glow composite', () => {
 		const colorArray = color.array
 		const before = (dynArray as Float32Array)[ref.start * 2]
 		expect(before).to.equal(10)
-		setMergedBulbGlowRangeState(ref.mesh, ref, { intensity: 3, color: 0x0000ff })
+		setMergedBulbGlowRangeState(ref.mesh, ref, { intensity: 3, color: 0x0000ff, modulate: 0.3 })
 		expect(dyn.array).to.equal(dynArray)
 		expect(color.array).to.equal(colorArray)
 		expect((dynArray as Float32Array)[ref.start * 2]).to.equal(3)
+		expect((dynArray as Float32Array)[ref.start * 2 + 1]).to.be.closeTo(0.3, 1e-6)
 		const expectedBlue = new Color(0x0000ff)
 		expect((colorArray as Float32Array)[ref.start * 3]).to.be.closeTo(expectedBlue.r, 1e-6)
 		expect((colorArray as Float32Array)[ref.start * 3 + 2]).to.be.closeTo(expectedBlue.b, 1e-6)

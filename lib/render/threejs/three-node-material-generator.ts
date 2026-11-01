@@ -140,7 +140,12 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 	}
 
 	private getBulbGlowMaterial(params: NonNullable<RenderInfo<any>['bulbGlow']>, material?: Material): any {
-		const key = `bulb.glow:${material?.name ?? 'none'}`
+		// Halo profile is baked (form, footprint, tint); same-named lamps with
+		// different profiles must not share.
+		const key =
+			`bulb.glow:${material?.name ?? 'none'}:${params.color}:${params.color2}:` +
+			`${params.centerX},${params.centerY}:${params.falloff}:${params.falloffPower}:` +
+			`${params.intensity}:${params.modulateVsAdd ?? ''}`
 		const cached = this.cachedMaterials[key]
 		if (cached) return cached
 		const mat = createBulbGlowNodeMaterial({

@@ -206,6 +206,8 @@ export class LightState extends ItemState {
 	public intensity = 0
 	public color: number = 0
 	public colorFull: number = 0
+	/** Live BulbModulateVsAdd; -1 keeps the baked value. */
+	public modulate = -1
 
 	public static claim(name: string, intensity: number, color: number, colorFull: number): LightState {
 		const state = new LightState()
@@ -382,6 +384,7 @@ export class LightApi extends ItemApi<LightData> {
 		return this.data.bulbModulateVsAdd
 	}
 	set BulbModulateVsAdd(v) {
+		this._state.modulate = v
 		this.data.bulbModulateVsAdd = v
 	}
 	get BulbHaloHeight() {

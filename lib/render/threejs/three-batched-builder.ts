@@ -13,7 +13,7 @@ import { isLowQuality } from '../../util/quality.js'
 import type { Table } from '../../vpt/table/table.js'
 import { normalizePendingKeys, pendingMapOf } from './material-shared.js'
 import { mergeBulbGlowQuads } from './nodes/bulb-glow-node.js'
-import { isButtonLike, RE_CAB, RE_VR } from './scene-classify.js'
+import { flatName, isButtonLike, RE_CAB, RE_VR } from './scene-classify.js'
 import type { ThreeRenderApi } from './three-render-api.js'
 
 // Buckets below this vertex count cost more in BatchedMesh bookkeeping than one
@@ -22,7 +22,8 @@ import type { ThreeRenderApi } from './three-render-api.js'
 const VERTEX_THRESHOLD = 100
 
 function isVrCabName(n: string): boolean {
-	return RE_VR.test(n) || RE_CAB.test(n)
+	// RE_VR needs raw separators for its boundary match; only the CAB test folds.
+	return RE_VR.test(n) || RE_CAB.test(flatName(n))
 }
 
 function signature(geo: BufferGeometry): string {

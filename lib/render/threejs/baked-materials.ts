@@ -11,6 +11,7 @@ import {
 	type ClassifyResult,
 	type CustomMaterialUserData,
 	classify,
+	flatName,
 	isGiOverlay,
 	pendingOf,
 	RE_CAB,
@@ -280,7 +281,7 @@ export const createVrMaterialResolver = (): ((
 	const vrCache = new Map<string, THREE.MeshStandardMaterial>()
 	return (base: THREE.MeshStandardMaterial, meshLower = ''): THREE.MeshStandardMaterial => {
 		const pending = pendingOf(base)
-		const isCab = RE_CAB.test(meshLower)
+		const isCab = RE_CAB.test(flatName(meshLower))
 		const key = `${base.name}|${(base.map as THREE.Texture | undefined)?.name ?? pending}|${base.polygonOffset ? `${base.polygonOffsetFactor}/${base.polygonOffsetUnits}` : '0'}|${isCab ? 'cab' : 'vr'}`
 		const cached = vrCache.get(key)
 		if (cached) return cached

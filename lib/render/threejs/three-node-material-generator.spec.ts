@@ -121,6 +121,33 @@ const DOUBLED_QUAD = [0, 1, 2, 0, 2, 3, 2, 1, 0, 3, 2, 0]
 
 const wallOpts = { applyMaterials: true, applyTextures: true } as any
 
+describe('bulb-glow cache splits by halo profile', () => {
+	function bulbInfo(falloff: number): any {
+		return {
+			bulbGlow: {
+				color: 0xffffff,
+				color2: 0xffffff,
+				centerX: 0,
+				centerY: 0,
+				falloff,
+				falloffPower: 2,
+				intensity: 1,
+				modulateVsAdd: 0.9,
+			},
+			material: { name: 'Lamp' },
+		}
+	}
+
+	it('shares same-profile lamps and splits different falloffs', () => {
+		const generator = openWallGenerator()
+		const a: any = generator.getInitialMaterial(bulbInfo(50), wallOpts)
+		const same: any = generator.getInitialMaterial(bulbInfo(50), wallOpts)
+		const other: any = generator.getInitialMaterial(bulbInfo(80), wallOpts)
+		expect(same, 'identical profiles share the baked halo').toBe(a)
+		expect(other, 'different falloffs must not share the baked halo').not.toBe(a)
+	})
+})
+
 describe('open-wall primitives render double-sided, closed solids stay single-sided', () => {
 	it('renders an open wall-like primitive double-sided despite backfacesEnabled=false', () => {
 		const mat: any = openWallGenerator().getInitialMaterial(wallInfo(false, OPEN_QUAD), wallOpts)

@@ -93,6 +93,24 @@ describe('bulb glow node material', () => {
 		expect(() => setBulbGlowState({}, { intensity: 5 })).not.toThrow()
 	})
 
+	it('should restamp modulate in place without rebuilding', () => {
+		const mat = createBulbGlowNodeMaterial({
+			color: 0xffffff,
+			color2: 0xffffff,
+			centerX: 0,
+			centerY: 0,
+			falloff: 100,
+			falloffPower: 2,
+			intensity: 10,
+			modulateVsAdd: 0.9,
+		})
+		const uniforms = mat.userData as any
+		setBulbGlowState(mat, { modulate: 0.4 })
+		expect(uniforms.__uModulate.value).toBeCloseTo(0.4, 1e-5)
+		setBulbGlowState(mat, {})
+		expect(uniforms.__uModulate.value).toBeCloseTo(0.4, 1e-5)
+	})
+
 	it('masks the halo to the playfield footprint (cabinet side-wall light leak)', () => {
 		// Regression: authored halo polygons routinely extend past the
 		// cabinet walls (giant GI discs stick 6-9 units past; flasher sheets

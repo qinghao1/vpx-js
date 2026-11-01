@@ -4,7 +4,11 @@ import { TableBuilder } from '../../../test/table-builder.js'
 import { TestRenderApi } from '../../../test/test-render-api.js'
 import { Vertex2D } from '../../math/vector.js'
 import type { IRenderApi } from '../../render/irender-api.js'
-import { applyAbsorbBlendState } from '../../render/threejs/nodes/primitive-bdl-node.js'
+import {
+	applyAbsorbBlendState,
+	clonePrimitiveNodeMaterial,
+	createPrimitiveAdditiveMaterial,
+} from '../../render/threejs/nodes/primitive-bdl-node.js'
 import { ThreeNodeMaterialGenerator } from '../../render/threejs/three-node-material-generator.js'
 import { DragPoint } from '../dragpoint.js'
 import { Flasher } from './flasher.js'
@@ -151,6 +155,14 @@ describe('Flasher absorb parity (upstream flasher.cpp SetupAddBlendState; AB_ADD
 			)
 		expect(key(FlasherAddBlend.Absorb), 'absorb key must differ from add').not.toBe(key(FlasherAddBlend.Add))
 		expect(key(undefined), 'legacy keys keep their shape').not.toContain('undefined')
+	})
+
+	it('carries absorb state across for-write clones', () => {
+		const src = createPrimitiveAdditiveMaterial({ modulateVsAdd: 0.5 })
+		applyAbsorbBlendState(src)
+		const cloned = clonePrimitiveNodeMaterial(src)
+		expect(cloned.blending, 'clone keeps premultiplied-over').toBe(CustomBlending)
+		expect((cloned.userData as Record<string, unknown>).__absorbBlend, 'clone keeps the absorb flag').toBe(true)
 	})
 
 	it('ignores modulateVsAdd on the absorb arm', () => {

@@ -20,6 +20,8 @@ export class FlasherUpdater extends ItemUpdater<FlasherState> {
 	private lastRotZ: number
 	private lastHeight: number
 	private lastImageA: string
+	private lastAddBlend = true
+	private lastAddBlendMode = FlasherAddBlend.Add
 	private linkedLight?: Light
 
 	constructor(
@@ -33,6 +35,8 @@ export class FlasherUpdater extends ItemUpdater<FlasherState> {
 		this.lastRotZ = data.rotZ
 		this.lastHeight = data.height
 		this.lastImageA = data.szImageA ?? ''
+		this.lastAddBlend = data.addBlend
+		this.lastAddBlendMode = data.addBlendMode
 	}
 
 	/** Resolves the LMAP-linked light. @see Flasher::RenderSetup (`m_lightmap = m_ptable->GetLight(m_d.m_szLightmap)`) */
@@ -162,10 +166,16 @@ export class FlasherUpdater extends ItemUpdater<FlasherState> {
 			current.rotX === this.lastRotX &&
 			current.rotY === this.lastRotY &&
 			current.rotZ === this.lastRotZ &&
-			current.height === this.lastHeight
+			current.height === this.lastHeight &&
+			this.data.addBlend === this.lastAddBlend &&
+			this.data.addBlendMode === this.lastAddBlendMode
 		) {
 			return
 		}
+		// Material identity (encoding + blend factors) is baked at build;
+		// a script flip of the blend mode or toggle needs a fresh overlay.
+		this.lastAddBlend = this.data.addBlend
+		this.lastAddBlendMode = this.data.addBlendMode
 		this.lastRotX = current.rotX
 		this.lastRotY = current.rotY
 		this.lastRotZ = current.rotZ

@@ -144,6 +144,40 @@ describe('The VPinball flasher mesh generator and updater', () => {
 		expect(applied.length).toBe(1)
 	})
 
+	it('should rebuild the overlay when the script flips the blend mode', () => {
+		const table = new TableBuilder().build()
+		const data = createFlasherData('ModeFlasher')
+		data.dragPoints = [
+			Object.assign(new DragPoint(), { vertex: new Vertex2D(0, 0) }),
+			Object.assign(new DragPoint(), { vertex: new Vertex2D(100, 0) }),
+			Object.assign(new DragPoint(), { vertex: new Vertex2D(100, 100) }),
+			Object.assign(new DragPoint(), { vertex: new Vertex2D(0, 100) }),
+		]
+		data.addBlend = true
+		data.addBlendMode = FlasherAddBlend.Add
+		const state = FlasherState.claim('ModeFlasher', true, 0xffffff, 100)
+		const updater = new FlasherUpdater(state, data)
+
+		const applied: Mesh[] = []
+		const renderApi = new TestRenderApi() as unknown as IRenderApi<any, any, any>
+		renderApi.applyMeshToNode = (mesh: Mesh) => {
+			applied.push(mesh)
+		}
+		renderApi.findInGroup = ((_parent: unknown, _name: string) => ({})) as typeof renderApi.findInGroup
+		const node = { visible: true, traverse: () => {} }
+
+		updater.applyState(node, state, renderApi, table)
+		expect(applied.length).toBe(0)
+		// Material identity (encoding + blend factors) is baked at build; a
+		// script flip of the blend mode must rebuild the overlay, and a
+		// repeat state must not rebuild again.
+		data.addBlendMode = FlasherAddBlend.Absorb
+		updater.applyState(node, state, renderApi, table)
+		expect(applied.length).toBe(1)
+		updater.applyState(node, state, renderApi, table)
+		expect(applied.length).toBe(1)
+	})
+
 	it('should derive the flasher center from the drag-point outline', () => {
 		const data = createFlasherData('CenterFlasher')
 		data.dragPoints = [

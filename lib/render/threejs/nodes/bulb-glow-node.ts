@@ -121,7 +121,10 @@ export function isBulbGlowMaterial(mat: unknown): boolean {
 	return !!(mat as { userData?: Record<string, unknown> } | null)?.userData?.__bulbGlow
 }
 
-export function setBulbGlowState(mat: unknown, state: { intensity?: number; color?: number; color2?: number }): void {
+export function setBulbGlowState(
+	mat: unknown,
+	state: { intensity?: number; color?: number; color2?: number; modulate?: number },
+): void {
 	const ud = (mat as { userData?: Record<string, unknown> } | null)?.userData
 	if (!ud?.__bulbGlow) return
 	if (
@@ -137,6 +140,16 @@ export function setBulbGlowState(mat: unknown, state: { intensity?: number; colo
 	if (state.color2 !== undefined && ud.__uColor2) {
 		;(ud.__uColor2 as { value: Color }).value.set(state.color2)
 	}
+	// Native re-reads m_modulate_vs_add every frame; restamp in place so
+	// script-animated values track without rebuilding the quad.
+	if (
+		state.modulate !== undefined &&
+		state.modulate >= 0 &&
+		ud.__uModulate &&
+		typeof (ud.__uModulate as { value: unknown }).value === 'number'
+	) {
+		;(ud.__uModulate as { value: number }).value = clampModulateVsAdd(state.modulate)
+	}
 }
 
 /**
@@ -145,9 +158,10 @@ export function setBulbGlowState(mat: unknown, state: { intensity?: number; colo
  * Per-quad materials carry the halo parameters as uniforms, so N lamps cost N
  * draws with N program bindings. The merged mesh bakes the static parameters
  * (center, falloff, color ramp anchors, modulate) into per-vertex attributes
- * and keeps only the live lamp state (intensity, colors) in attributes updated
- * in place — the fragment math is identical to the per-quad material above,
- * only the parameter source changes from uniforms to attributes.
+ * and keeps only the live lamp state (intensity, colors, modulate) in
+ * attributes updated in place — the fragment math is identical to the
+ * per-quad material above, only the parameter source changes from uniforms
+ * to attributes.
  *
  * Same pattern as InstancedMesh + BufferGeometryUtils merging.
  */
@@ -174,7 +188,7 @@ export function createMergedBulbGlowMaterial(): MeshBasicNodeMaterial {
 	const aDyn = attribute<'vec2'>('aGlowDyn', 'vec2')
 	mat.colorNode = Fn(() => {
 		// Same math as the per-quad material; params come from attributes.
-		// aDyn.y carries the native modulate m (static per lamp); the rgb is
+		// aDyn.y carries the native modulate m (live per lamp); the rgb is
 		// negatively encoded and the alpha is 1/m − 1, as upstream.
 		const len = length(positionLocal.xy.sub(aCenter)).mul(aParams.x)
 		const atten = pow(max(float(1).sub(clamp(len, float(0), float(1))), float(0.0001)), aParams.y)
@@ -253,7 +267,7 @@ const scratchGlowColor = new Color()
 export function setMergedBulbGlowRangeState(
 	merged: Mesh,
 	range: MergedBulbGlowRange,
-	state: { intensity?: number; color?: number; color2?: number },
+	state: { intensity?: number; color?: number; color2?: number; modulate?: number },
 ): void {
 	const attrs = (merged.geometry as BufferGeometry).attributes as Record<string, BufferAttribute | undefined>
 	const dyn = attrs.aGlowDyn
@@ -284,6 +298,12 @@ export function setMergedBulbGlowRangeState(
 			arr[i * 3 + 2] = scratchGlowColor.b
 		}
 		color2Attr.needsUpdate = true
+	}
+	if (state.modulate !== undefined && state.modulate >= 0) {
+		const m = clampModulateVsAdd(state.modulate)
+		const arr = dyn.array as Float32Array
+		for (let i = range.start; i < range.start + range.count; i++) arr[i * 2 + 1] = m
+		dyn.needsUpdate = true
 	}
 }
 

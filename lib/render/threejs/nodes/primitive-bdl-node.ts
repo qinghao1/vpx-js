@@ -480,5 +480,7 @@ export function clonePrimitiveNodeMaterial<T>(mat: T): T {
 	})
 	finishPrimitiveClone(sourceMaterial, cloned as unknown as CloneablePrimitiveMaterial, 'simple')
 	;(cloned.userData as Record<string, unknown>).__addBlend = true
+	// Absorb is stamped post-creation (updater), not rebuilt: carry it across.
+	if ((userData as Record<string, unknown>).__absorbBlend) applyAbsorbBlendState(cloned)
 	return cloned as unknown as T
 }

@@ -221,6 +221,12 @@ describe('regression: room must remain visible', () => {
 		expect(out.transparent, 'baked VR is not transparent').toEqual(false)
 	})
 
+	it('treats hyphenated cabinet names as cabinet content', () => {
+		const mat = createUnshadedBakedNodeMaterial({ transmission: false })
+		const out = createVrMaterialResolver()(mat as unknown as THREE.MeshStandardMaterial, 'primitive-vr-cab-trim')
+		expect(out.polygonOffset, 'hyphenated cab takes the cab path').toEqual(true)
+	})
+
 	it('isBakedPlayfield unifies the bake-side name checks', () => {
 		const main = { isMainBake: true } as any
 		const overlay = { isMainBake: false } as any

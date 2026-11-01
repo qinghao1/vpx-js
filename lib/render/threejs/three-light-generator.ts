@@ -55,7 +55,13 @@ export class ThreeLightGenerator {
 				// Merged quad: write live state into its vertex range in place.
 				const mergedRef = (child as ThreeMesh).userData?.__mergedGlow as MergedBulbGlowRef | undefined
 				if (mergedRef) {
-					if (state.intensity !== undefined || state.color !== undefined || state.colorFull !== undefined) {
+					const modulate = (state as { modulate?: number }).modulate
+					if (
+						state.intensity !== undefined ||
+						state.color !== undefined ||
+						state.colorFull !== undefined ||
+						(modulate !== undefined && modulate >= 0)
+					) {
 						setMergedBulbGlowRangeState(
 							mergedRef.mesh,
 							{ start: mergedRef.start, count: mergedRef.count },
@@ -63,6 +69,7 @@ export class ThreeLightGenerator {
 								intensity: state.intensity,
 								color: state.color,
 								color2: (state as { colorFull?: number }).colorFull,
+								modulate,
 							},
 						)
 					}
@@ -81,11 +88,18 @@ export class ThreeLightGenerator {
 				if (glow) {
 					// Native drives the lightmap glow from the live lamp state
 					// (lightColor_intensity + colors in fs_classic_light.sc).
-					if (state.intensity !== undefined || state.color !== undefined || state.colorFull !== undefined) {
+					const modulate = (state as { modulate?: number }).modulate
+					if (
+						state.intensity !== undefined ||
+						state.color !== undefined ||
+						state.colorFull !== undefined ||
+						(modulate !== undefined && modulate >= 0)
+					) {
 						setBulbGlowState(glow, {
 							intensity: state.intensity,
 							color: state.color,
 							color2: (state as { colorFull?: number }).colorFull,
+							modulate,
 						})
 					}
 				}
