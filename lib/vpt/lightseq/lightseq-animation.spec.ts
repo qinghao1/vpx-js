@@ -21,7 +21,7 @@ const three = new ThreeHelper()
 const seq = Enums.SequencerState
 const SWEEP_MEMBERS = ['Scaled', 'NoBulb', 'PlayfieldLight']
 
-async function loadTableWithSequencer(fixture: string, memberNames: string[]) {
+async function loadTableWithSequencer(fixture: string, memberNames: string[], script?: string) {
 	const table = await Table.load(new NodeBinaryReader(three.fixturePath(fixture)))
 	const collectionData = new (CollectionData as any)('SeqCollection')
 	collectionData.name = 'SeqCollection'
@@ -37,6 +37,12 @@ async function loadTableWithSequencer(fixture: string, memberNames: string[]) {
 	const seqItem = new (LightSeq as any)(seqData)
 	table.items.LightSeqTest = seqItem
 	table.lightSeqs.LightSeqTest = seqItem
+	// Mirror Table.load: index the injected item so the script transformer
+	// resolves it as an element instead of a scope lookup.
+	;(table as unknown as { itemIndex: Map<string, string> }).itemIndex.set('lightseqtest', 'LightSeqTest')
+	if (script !== undefined) {
+		;(table as unknown as { tableScript: string }).tableScript = script
+	}
 	const player = new Player(table).init()
 	return { table, player, seqApi: seqItem.getApi() }
 }
@@ -172,6 +178,43 @@ describe('The VPinball light sequencer', () => {
 			expect(playDone).to.have.been.calledOnce
 		})
 
+		it('should default omitted repeat and pause like the native signature', () => {
+			const playDone = sinon.spy()
+			seqApi.on('PlayDone', playDone)
+
+			seqApi.Play(seq.SeqUpOn, 15)
+			player.simulateTime(3000)
+			expect(playDone).to.have.been.calledOnce
+		})
+
+		it('should default an undefined repeat and pause instead of wedging', () => {
+			const playDone = sinon.spy()
+			seqApi.on('PlayDone', playDone)
+
+			seqApi.Play(seq.SeqUpOn, 10, undefined, undefined)
+			player.simulateTime(3000)
+			expect(playDone).to.have.been.calledOnce
+		})
+
+		it('should truncate fractional play args like a COM long conversion', () => {
+			const playDone = sinon.spy()
+			seqApi.on('PlayDone', playDone)
+
+			seqApi.Play(seq.SeqUpOn, 10.7, 1.9, 0.5)
+			player.simulateTime(3000)
+			expect(playDone).to.have.been.calledOnce
+		})
+
+		it('should fall back to defaults for non-numeric play args', () => {
+			// Native would raise a type mismatch; the port defaults leniently.
+			const playDone = sinon.spy()
+			seqApi.on('PlayDone', playDone)
+
+			seqApi.Play(seq.SeqUpOn, 0, 'abc' as unknown as number, 'xyz' as unknown as number)
+			player.simulateTime(3000)
+			expect(playDone).to.have.been.calledOnce
+		})
+
 		it('should reject plays when the queue is full', () => {
 			for (let i = 0; i < 99; i++) {
 				seqApi.Play(seq.SeqUpOn, 0, 1, 0)
@@ -222,6 +265,38 @@ describe('The VPinball light sequencer', () => {
 			player.simulateTime(500)
 			expect(playDone).to.have.been.calledOnce
 			expect(intensity('Scaled')).to.equal(0)
+		})
+
+		it('should start a sequencer from a bare enum reference in the table script', async () => {
+			const loaded = await loadTableWithSequencer(
+				'table-light.vpx',
+				SWEEP_MEMBERS,
+				'Sub Table1_Init()\n\tLightSeqTest.Play SeqAllOn, 0, 1, 0\nEnd Sub\n',
+			)
+			for (const name of SWEEP_MEMBERS) {
+				loaded.table.lights[name].getApi().Intensity = 10
+				loaded.table.lights[name].getApi().Fader = 0
+			}
+			loaded.player.simulateTime(50)
+			for (const name of SWEEP_MEMBERS) {
+				expect(loaded.table.lights[name].getState().intensity).to.equal(10)
+			}
+		})
+
+		it('should drain a script-started random sequence and fire PlayDone', async () => {
+			const loaded = await loadTableWithSequencer(
+				'table-light.vpx',
+				SWEEP_MEMBERS,
+				'Sub Table1_Init()\n\tLightSeqTest.Play SeqRandom, 10, 1, 50\nEnd Sub\n',
+			)
+			for (const name of SWEEP_MEMBERS) {
+				loaded.table.lights[name].getApi().Intensity = 10
+				loaded.table.lights[name].getApi().Fader = 0
+			}
+			const playDone = sinon.spy()
+			loaded.seqApi.on('PlayDone', playDone)
+			loaded.player.simulateTime(500)
+			expect(playDone).to.have.been.calledOnce
 		})
 
 		it('should clamp the update interval and validate the center', () => {

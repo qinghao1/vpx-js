@@ -481,6 +481,29 @@ export class Stdlib extends VbsApi {
 		return (r << 16) + (g << 8) + b
 	}
 
+	/**
+	 * VBA.VarType: the subtype code of a value (vbEmpty 0, vbNull 1,
+	 * vbInteger 2, vbLong 3, vbDouble 5, vbDate 7, vbString 8, vbObject 9,
+	 * vbBoolean 11, arrays 8192 + 12 (vbArray + vbVariant; VBS arrays hold
+	 * Variants). Unresolvable names read as Empty, so a comparison like
+	 * `VarType(x) = vbString` only passes for actual strings.
+	 */
+	public VarType(value: unknown): number {
+		if (value === NOTHING) return 9
+		if (value === null) return 1
+		if (typeof value === 'undefined' || (value as any)?.[UNDEF] === true) return 0
+		if (typeof value === 'string') return 8
+		if (typeof value === 'boolean') return 11
+		if (typeof value === 'number') {
+			if (Number.isInteger(value) && value >= -32768 && value <= 32767) return 2
+			if (Number.isInteger(value) && value >= -2147483648 && value <= 2147483647) return 3
+			return 5
+		}
+		if (value instanceof Date) return 7
+		if (Array.isArray(value)) return 8192 + 12
+		return 9
+	}
+
 	public InStr(first: unknown, second: unknown, third?: unknown, compare?: unknown): number | null {
 		let start = 1
 		let searched: unknown = first
@@ -650,6 +673,27 @@ export class Stdlib extends VbsApi {
 
 	public Chr(charcode: number): string {
 		return String.fromCharCode(charcode)
+	}
+
+	/**
+	 * VBA.Strings.Space: a string of `count` spaces. Follows the numeric
+	 * conversion conventions (True is -1, numeric strings parse); garbage
+	 * raises type mismatch (13), negatives raise invalid procedure call (5).
+	 */
+	public Space(count: unknown): string | null {
+		if (count === null) return null
+		if (this.isUndef(count)) return ''
+		const n = this.toConverterNumber(count)
+		if (Number.isNaN(n)) {
+			ERR.Raise(new VbsError('Type mismatch', 13))
+			return ''
+		}
+		const rounded = bankersRound(n)
+		if (rounded < 0) {
+			ERR.Raise(new VbsError('Invalid procedure call or argument', 5))
+			return ''
+		}
+		return ' '.repeat(rounded)
 	}
 
 	public Asc(value: unknown): number {

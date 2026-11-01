@@ -19,6 +19,11 @@ function getPropName(obj: unknown, name: string): string | undefined {
 	return (obj as HasPropName)?._getPropertyName?.(name)
 }
 
+/** VBS scope roots: the program and every function. */
+function isScopeRoot(node: any): boolean {
+	return node.type === 'Program' || node.type === 'FunctionDeclaration' || node.type === 'FunctionExpression'
+}
+
 /**
  * VBScript-legal identifiers that are reserved words (or illegal bindings in
  * strict mode, like `arguments`) in JavaScript. Matching is case-insensitive
@@ -157,22 +162,146 @@ export class ReferenceTransformer extends Transformer {
 	/**
 	 * Element/enum/stdlib/global lookups in a single traversal (previously
 	 * one `replace` pass per namespace). Identifiers resolve on enter in
-	 * pass order (element, stdlib, global); enum member expressions resolve
-	 * on leave so an element-named enum object keeps element priority, as
-	 * when the element pass ran first.
+	 * pass order (element, bare enum value, stdlib, global); qualified enum
+	 * member expressions resolve on leave so an element-named enum object
+	 * keeps element priority, as when the element pass ran first.
 	 */
 	public replaceNamespacedNames(ast: Program): void {
+		const assigned = this.collectAssignedNames(ast)
+		const roots: object[] = []
 		replace(ast, {
-			enter: (node, parent: any) => this.replaceIdentifierReference(node, parent),
-			leave: (node, parent: any) => this.replaceEnumReference(node, parent),
+			enter: (node, parent: any) => {
+				if (isScopeRoot(node)) {
+					roots.push(node)
+				}
+				const root = roots[roots.length - 1]
+				return this.replaceIdentifierReference(
+					node,
+					parent,
+					root === undefined ? undefined : assigned.get(root),
+				)
+			},
+			leave: (node, parent: any) => {
+				const out = this.replaceEnumReference(node, parent)
+				if (isScopeRoot(node)) {
+					roots.pop()
+				}
+				return out
+			},
 		})
 	}
 
-	/** Bare-identifier chain (element, then stdlib, then global). */
-	private replaceIdentifierReference(node: any, parent: any): any {
+	/** Bare-identifier chain (element, bare enum value, then stdlib, then global). */
+	private replaceIdentifierReference(node: any, parent: any, assigned?: Set<string>): any {
 		node = this.replaceElementReference(node, parent)
+		node = this.replaceBareEnumReference(node, parent, assigned)
 		node = this.replaceStdlibReference(node, parent)
 		return this.replaceGlobalApiReference(node, parent)
+	}
+
+	private bareEnumMembers?: Map<string, { enumName: string; propName: string } | null>
+
+	/** Bare member name → its enum, or null when several enums share the name. Built once per transformer. */
+	private buildBareEnumMembers(): Map<string, { enumName: string; propName: string } | null> {
+		const members = new Map<string, { enumName: string; propName: string } | null>()
+		const api = this.enumApis as unknown as {
+			_getPropertyNames(): string[]
+			[key: string]: unknown
+		}
+		for (const enumName of api._getPropertyNames()) {
+			const enumObj = api[enumName] as { _getPropertyNames?: () => string[] } | undefined
+			for (const propName of enumObj?._getPropertyNames?.() ?? []) {
+				const key = propName.toLowerCase()
+				members.set(key, members.has(key) ? null : { enumName, propName })
+			}
+		}
+		return members
+	}
+
+	/** Lower-cased bare member name → its enum. */
+	private findBareEnumMember(name: string): { enumName: string; propName: string } | undefined {
+		this.bareEnumMembers ??= this.buildBareEnumMembers()
+		return this.bareEnumMembers.get(name.toLowerCase()) ?? undefined
+	}
+
+	/**
+	 * Script-assigned bare names per scope root. VBS creates a variable on
+	 * assignment, so a name written anywhere in a scope is scope-owned: bare
+	 * reads must not resolve to an enum. This also keeps `For`/`For Each`
+	 * counters scope-bound, since the loop lowering assigns them without
+	 * declaring.
+	 */
+	private collectAssignedNames(ast: Program): Map<object, Set<string>> {
+		const assigned = new Map<object, Set<string>>()
+		const roots: object[] = []
+		replace(ast, {
+			enter: (node: any) => {
+				if (isScopeRoot(node)) {
+					roots.push(node)
+				}
+				const target =
+					node.type === 'AssignmentExpression'
+						? node.left
+						: node.type === 'ForOfStatement'
+							? node.left
+							: node.type === 'UpdateExpression'
+								? node.argument
+								: undefined
+				if (target?.type === 'Identifier') {
+					const root = roots[roots.length - 1]
+					if (root !== undefined) {
+						let names = assigned.get(root)
+						if (!names) {
+							names = new Set()
+							assigned.set(root, names)
+						}
+						names.add(target.name.toLowerCase())
+					}
+				}
+				return node
+			},
+			leave: (node: any) => {
+				if (isScopeRoot(node)) {
+					roots.pop()
+				}
+				return node
+			},
+		})
+		return assigned
+	}
+
+	/**
+	 * Rewrites bare COM type-library constants (`SeqRandom`, `SeqAllOff`)
+	 * to their enum (`__enums.SequencerState.SeqRandom`). Native exposes the
+	 * IDL enums as script globals; previously only the qualified form was
+	 * rewritten, so bare names read as undefined and silently disabled
+	 * sequencer effects. Elements keep priority (checked first); locals win
+	 * via {@link Transformer.isLocalVariable}. Assignment targets are left
+	 * alone so a write can never corrupt the shared enum singleton, and
+	 * member names colliding across enums stay unresolved.
+	 */
+	private replaceBareEnumReference(node: any, parent: any, assigned?: Set<string>): any {
+		if (!this.isEligible(node, parent)) {
+			return node
+		}
+		if (parent?.type === 'AssignmentExpression' && parent.left === node) {
+			return node
+		}
+		// A name assigned anywhere in this scope is scope-owned (VBS creates
+		// the variable on assignment), so its reads must not resolve to an
+		// enum. This also shields `For`/`For Each` counters, which the loop
+		// lowering assigns without declaring.
+		if (assigned?.has(node.name.toLowerCase())) {
+			return node
+		}
+		const hit = this.findBareEnumMember(node.name)
+		if (!hit) {
+			return node
+		}
+		return memberExpression(
+			memberExpression(identifier(Transformer.ENUMS_NAME), identifier(hit.enumName)),
+			identifier(hit.propName),
+		)
 	}
 
 	/**

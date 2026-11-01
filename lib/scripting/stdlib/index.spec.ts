@@ -254,6 +254,82 @@ describe('The VBScript stdlib', () => {
 		expect(scope.result).to.equal('a,b')
 	})
 
+	it('should provide the Space function', () => {
+		const scope = {} as any
+		const vbs = `result = Space(5)`
+		const transpiler = new Transpiler(table, player)
+		transpiler.execute(vbs, scope, 'global')
+
+		expect(scope.result).to.equal('     ')
+	})
+
+	it('should provide Space edge cases', () => {
+		const scope = {} as any
+		const vbs = `result0 = Space(0)\nresult3 = Space("3")\nresultEmpty = Space(Empty)\nresultHalf = Space(2.5)\nresultNull = Space(Null)`
+		const transpiler = new Transpiler(table, player)
+		transpiler.execute(vbs, scope, 'global')
+
+		expect(scope.result0).to.equal('')
+		expect(scope.result3).to.equal('   ')
+		expect(scope.resultEmpty).to.equal('')
+		expect(scope.resultHalf).to.equal('  ')
+		expect(scope.resultNull).to.be.null
+	})
+
+	it('should raise VBS errors for bad Space counts', () => {
+		const rows: Array<[string, number]> = [
+			['Space(-1)', 5],
+			['Space(True)', 5],
+			['Space("x")', 13],
+		]
+		for (const [expr, code] of rows) {
+			const scope = {} as any
+			new Transpiler(table, player).execute(
+				`On Error Resume Next\nresult = ${expr}\ncode = Err.Number`,
+				scope,
+				'global',
+			)
+			expect(scope.code, expr).to.equal(code)
+			ERR.Clear()
+			ERR.OnErrorGoto0()
+		}
+	})
+
+	it('should provide the VarType function', () => {
+		const scope = {} as any
+		const vbs = `result1 = VarType("x")\nresult2 = VarType(1)\nresult3 = VarType(3.5)\nresult4 = VarType(Empty)\nresult5 = VarType(Null)\nresult6 = VarType(True)`
+		const transpiler = new Transpiler(table, player)
+		transpiler.execute(vbs, scope, 'global')
+
+		expect(scope.result1).to.equal(8)
+		expect(scope.result2).to.equal(2)
+		expect(scope.result3).to.equal(5)
+		expect(scope.result4).to.equal(0)
+		expect(scope.result5).to.equal(1)
+		expect(scope.result6).to.equal(11)
+	})
+
+	it('should provide VarType codes for arrays, Nothing, and dates', () => {
+		const scope = {} as any
+		const vbs = `Dim a(1)\nSet n = Nothing\nresult1 = VarType(a)\nresult2 = VarType(n)\nresult3 = VarType(CDate("2031-05-17"))`
+		const transpiler = new Transpiler(table, player)
+		transpiler.execute(vbs, scope, 'global')
+
+		expect(scope.result1).to.equal(8204)
+		expect(scope.result2).to.equal(9)
+		expect(scope.result3).to.equal(7)
+	})
+
+	it('should gate string callbacks on VarType like the vpmTimer queue does', () => {
+		const scope = {} as any
+		const vbs = `result1 = (VarType("vpmTimer.PulseSw swCoin1") = vbString)\nresult2 = (VarType(1) = vbString)`
+		const transpiler = new Transpiler(table, player)
+		transpiler.execute(vbs, scope, 'global')
+
+		expect(scope.result1).to.equal(true)
+		expect(scope.result2).to.equal(false)
+	})
+
 	it('should provide the Replace function', () => {
 		const scope = {} as any
 		const vbs = `result1 = Replace("aaabaaa", "a", "b")\nresult2 = Replace("aaabaaa", "a", "b", 1, 2)\nresult3 = Replace("ABC", "b", "x", 1, -1, 1)\nresult4 = Replace("aabc", "a", "x", 2)`

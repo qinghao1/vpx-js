@@ -114,7 +114,9 @@ export class Transformer {
 		if (!node.__scope) {
 			throw new Error('No scope to check!')
 		}
-		return getScopeVars(node.__scope).has(node.name.toLowerCase())
+		// Walk up: a script-level declaration shadows table items (and
+		// enum/stdlib/global names) from nested scopes too.
+		return findDeclaringScope(node.__scope, node.name.toLowerCase()) !== null
 	}
 
 	/**

@@ -520,6 +520,11 @@ describe('The scripting VBS Helper', () => {
 		expect(ERR.Number).to.equal(13)
 	})
 
+	it('should rewrite bare enum names in transpileInline chunks', () => {
+		const js = vbsHelper.transpileInline('x = SeqRandom')
+		expect(js).to.contain('__enums.SequencerState.SeqRandom')
+	})
+
 	it('should transpile VBS `protected` locals without emitting a strict-mode reserved word', () => {
 		const scope: Record<string, unknown> = {}
 		new Transpiler(table, new Player(table)).execute(

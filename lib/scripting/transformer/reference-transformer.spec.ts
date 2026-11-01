@@ -99,6 +99,91 @@ describe('The scripting reference transformer', () => {
 			const js = transform(vbs, table, player)
 			expect(js).to.equal(`x = ${Transformer.ENUMS_NAME}.GateType.GateWireRectangle;`)
 		})
+
+		it('should convert a bare sequencer value', () => {
+			const vbs = `x = SeqRandom\n`
+			const js = transform(vbs, table, player)
+			expect(js).to.equal(`x = ${Transformer.ENUMS_NAME}.SequencerState.SeqRandom;`)
+		})
+
+		it('should convert a bare sequencer value case-insensitively', () => {
+			const vbs = `x = seqallon\n`
+			const js = transform(vbs, table, player)
+			expect(js).to.equal(`x = ${Transformer.ENUMS_NAME}.SequencerState.SeqAllOn;`)
+		})
+
+		it('should convert a bare enum value passed as an argument', () => {
+			const vbs = `LightSeqTilt.Play SeqAllOff, 0, 1, 0\n`
+			const js = transform(vbs, table, player)
+			expect(js).to.contain(`${Transformer.ENUMS_NAME}.SequencerState.SeqAllOff`)
+		})
+
+		it('should not rewrite a locally declared enum-named variable', () => {
+			const vbs = `Dim SeqRandom\nSeqRandom = 5\nx = SeqRandom\n`
+			const js = transform(vbs, table, player)
+			expect(js).to.not.contain(Transformer.ENUMS_NAME)
+		})
+
+		it('should not rewrite an enum value assigned to', () => {
+			const vbs = `SeqRandom = 5\n`
+			const js = transform(vbs, table, player)
+			expect(js).to.not.contain(Transformer.ENUMS_NAME)
+		})
+
+		it('should rewrite an enum-named variable never assigned', () => {
+			const vbs = `x = Linear\n`
+			const js = transform(vbs, table, player)
+			expect(js).to.equal(`x = ${Transformer.ENUMS_NAME}.Fader.Linear;`)
+		})
+
+		it('should not rewrite an assigned enum-named variable read back', () => {
+			const vbs = `Linear = 5\nx = Linear\n`
+			const js = transform(vbs, table, player)
+			expect(js).to.not.contain(Transformer.ENUMS_NAME)
+		})
+
+		it('should not leak an assignment across function scopes', () => {
+			const vbs = `Sub F\nLinear = 5\nEnd Sub\nx = Linear\n`
+			const js = transform(vbs, table, player)
+			expect(js).to.contain(`x = ${Transformer.ENUMS_NAME}.Fader.Linear;`)
+		})
+
+		it('should not rewrite a For Each variable named like an enum member', () => {
+			const vbs = `For Each SeqRandom In items\nx = SeqRandom\nNext\n`
+			const js = transform(vbs, table, player)
+			expect(js).to.not.contain(Transformer.ENUMS_NAME)
+		})
+
+		it('should not rewrite a For counter named like an enum member', () => {
+			const vbs = `For Linear = 1 To 3\nx = Linear\nNext\n`
+			const js = transform(vbs, table, player)
+			expect(js).to.not.contain(Transformer.ENUMS_NAME)
+		})
+
+		it('should leave a name shared by several enums unresolved', () => {
+			const vbs = `x = None\n`
+			const js = transform(vbs, table, player)
+			expect(js).to.not.contain(Transformer.ENUMS_NAME)
+		})
+
+		it('should not rewrite a function declaration named like an enum member', () => {
+			const vbs = `Sub SeqRandom\nEnd Sub\n`
+			const js = transform(vbs, table, player)
+			expect(js).to.not.contain(Transformer.ENUMS_NAME)
+		})
+
+		it('should not rewrite a locally declared enum name from a nested scope', () => {
+			const vbs = `Dim SeqRandom\nSub Caller\nx = SeqRandom\nEnd Sub\n`
+			const js = transform(vbs, table, player)
+			expect(js).to.not.contain(Transformer.ENUMS_NAME)
+		})
+
+		it('should prefer a script routine over an item from a nested scope', () => {
+			const vbs = `Sub Flipper\nEnd Sub\nSub Caller\nFlipper "x"\nEnd Sub\n`
+			const js = transform(vbs, table, player)
+			expect(js).to.contain(`Flipper('x')`)
+			expect(js).to.not.contain(`${Transformer.ITEMS_NAME}.Flipper`)
+		})
 	})
 
 	describe('for the stdlib', () => {

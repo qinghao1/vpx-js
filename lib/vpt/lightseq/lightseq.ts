@@ -99,6 +99,7 @@ export class LightSeqApi extends ItemApi<LightSeqData> {
 		this.data.updateInterval = rate >= 1 ? rate : 1
 	}
 
+	/** IDL defaults: tailLength 0, repeat 1, pause 0; see LightSeqAnimation.play. */
 	public Play(animation: number, tailLength: number, repeat: number, pause: number): void {
 		this.animation.play(animation, tailLength, repeat, pause)
 	}

@@ -84,6 +84,16 @@ function emptyQueueEntry(): QueueEntry {
 	return { animation: 0, tailLength: 0, repeat: 0, pause: 0, updateRate: 0 }
 }
 
+/**
+ * Truncates a play argument to a long, falling back when the VBS call
+ * omitted it (plain `undefined` coerces to NaN) or passed a non-numeric
+ * value. The `VbsUndefined` sentinel still reads as 0 via `valueOf`.
+ */
+function toFiniteLong(value: unknown, fallback: number): number {
+	const n = Number(value)
+	return Number.isFinite(n) ? Math.trunc(n) : fallback
+}
+
 /** One sequencer-driven collection member (light, flasher or primitive). */
 interface SequencerElement {
 	readonly posX: number
@@ -197,6 +207,14 @@ export class LightSeqAnimation implements IAnimation {
 
 	public play(animation: number, tailLength: number, repeat: number, pause: number): void {
 		this.ensureGrid()
+		// Native defaults from the IDL signature (Play(Animation, TailLength
+		// = 0, Repeat = 1, Pause = 0)); VBS omitted args arrive as undefined
+		// and must not become NaN counters that wedge the queue forever.
+		// Animation itself stays uncoerced: unknown values expire through the
+		// normal queue path.
+		tailLength = toFiniteLong(tailLength, 0)
+		repeat = toFiniteLong(repeat, 1)
+		pause = toFiniteLong(pause, 0)
 		if (tailLength < 0) {
 			tailLength = 0
 		}
