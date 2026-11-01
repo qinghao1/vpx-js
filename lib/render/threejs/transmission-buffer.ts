@@ -173,9 +173,8 @@ export function updateTransmissionBuffer(table: Table): boolean {
 	// Native (Renderer::DrawBulbLightBuffer + Light::Render LIGHT_BUFFER + fs_light.sc
 	// bulb_light): only bulb lights with a nonzero transmission scale contribute, each
 	// as a finite disc of its own falloff radius with a (1-r/falloff)^power profile
-	// (rim color2 morphing to hub color by sqrt(t)), blurred ~19px on the small bloom
-	// buffer. Infinite-support Gaussians over every lamp washed the whole playfield,
-	// so support here ends exactly at the falloff radius.
+	// (rim color2 morphing to hub color by sqrt(t)), blurred ~19px at bloom-buffer
+	// resolution; support here ends exactly at the falloff radius.
 	const splats: TransmissionSplat[] = []
 	for (const c of contribScratch) {
 		// Native (Light::Render LIGHT_BUFFER halo block): the halo lands in the
@@ -228,7 +227,8 @@ const scratchAcc = new Float32Array(TRANSMISSION_WIDTH * TRANSMISSION_HEIGHT * 4
  * Radial falloff lookup indexed by linear normalized radius r = |d|/falloff
  * in [0, 1): atten[r] = (1-r)^power, hub[r] = sqrt(r). 256 steps; the caller
  * guarantees |d| < falloff via the distSq guard, so the index stays in
- * bounds. One table per power, built lazily.
+ * bounds. One table per power, built lazily; powers come from authored
+ * lamp data (code default 2.0), so the map stays at a handful of entries.
  */
 const KERNEL_STEPS = 256
 const kernelCache = new Map<number, { atten: Float32Array; hub: Float32Array }>()
@@ -294,8 +294,8 @@ function fillBuffer(data: Uint16Array, list: TransmissionSplat[], right: number,
 					offset += 4
 					continue
 				}
-				// Table index is linear normalized radius; the distSq guard above
-				// keeps every lookup inside the table.
+				// Table index is linear normalized radius in [0,1): the distSq
+				// guard above keeps every lookup inside the table (max 254).
 				const kernelIndex = (Math.sqrt(distSq) * kernelScale) | 0
 				const atten = kernelAtten[kernelIndex] as number
 				if (atten > 0) {
