@@ -25,6 +25,14 @@ function isScopeRoot(node: any): boolean {
 }
 
 /**
+ * Port-defined enums with no native type-library counterpart. vpinball.idl
+ * defines neither Fader nor ShadowMode (Light.Fader is a plain long), so
+ * their members must not resolve as bare script globals the way real IDL
+ * constants do — keep them qualification-only (`Fader.Linear` still works).
+ */
+const NON_IDL_ENUMS = new Set(['Fader', 'ShadowMode'])
+
+/**
  * VBScript-legal identifiers that are reserved words (or illegal bindings in
  * strict mode, like `arguments`) in JavaScript. Matching is case-insensitive
  * because VBScript is. Deliberately absent: `null` (the VBS `Null` literal
@@ -125,6 +133,7 @@ export function renameReservedWords(ast: Program): void {
  * Examples:
  *   - `BallRelease.CreateBall()` would become `__items.BallRelease.CreateBall()`.
  *   - `ImageAlignment.ImageAlignWorld` would become `__enums.ImageAlignment.ImageAlignWorld`.
+ *   - `SeqRandom` would become `__enums.SequencerState.SeqRandom`.
  *   - `PlaySound()` would become `__global.PlaySound()`.
  */
 export class ReferenceTransformer extends Transformer {
@@ -174,12 +183,7 @@ export class ReferenceTransformer extends Transformer {
 				if (isScopeRoot(node)) {
 					roots.push(node)
 				}
-				const root = roots[roots.length - 1]
-				return this.replaceIdentifierReference(
-					node,
-					parent,
-					root === undefined ? undefined : assigned.get(root),
-				)
+				return this.replaceIdentifierReference(node, parent, roots, assigned)
 			},
 			leave: (node, parent: any) => {
 				const out = this.replaceEnumReference(node, parent)
@@ -192,9 +196,14 @@ export class ReferenceTransformer extends Transformer {
 	}
 
 	/** Bare-identifier chain (element, bare enum value, then stdlib, then global). */
-	private replaceIdentifierReference(node: any, parent: any, assigned?: Set<string>): any {
+	private replaceIdentifierReference(
+		node: any,
+		parent: any,
+		roots: object[],
+		assigned: Map<object, Set<string>>,
+	): any {
 		node = this.replaceElementReference(node, parent)
-		node = this.replaceBareEnumReference(node, parent, assigned)
+		node = this.replaceBareEnumReference(node, parent, roots, assigned)
 		node = this.replaceStdlibReference(node, parent)
 		return this.replaceGlobalApiReference(node, parent)
 	}
@@ -209,6 +218,9 @@ export class ReferenceTransformer extends Transformer {
 			[key: string]: unknown
 		}
 		for (const enumName of api._getPropertyNames()) {
+			if (NON_IDL_ENUMS.has(enumName)) {
+				continue
+			}
 			const enumObj = api[enumName] as { _getPropertyNames?: () => string[] } | undefined
 			for (const propName of enumObj?._getPropertyNames?.() ?? []) {
 				const key = propName.toLowerCase()
@@ -221,15 +233,17 @@ export class ReferenceTransformer extends Transformer {
 	/** Lower-cased bare member name → its enum. */
 	private findBareEnumMember(name: string): { enumName: string; propName: string } | undefined {
 		this.bareEnumMembers ??= this.buildBareEnumMembers()
-		return this.bareEnumMembers.get(name.toLowerCase()) ?? undefined
+		return this.bareEnumMembers.get(name.toLowerCase()) ?? undefined // null = shared by several enums
 	}
 
 	/**
 	 * Script-assigned bare names per scope root. VBS creates a variable on
-	 * assignment, so a name written anywhere in a scope is scope-owned: bare
-	 * reads must not resolve to an enum. This also keeps `For`/`For Each`
-	 * counters scope-bound, since the loop lowering assigns them without
-	 * declaring.
+	 * assignment, so a name written anywhere in a scope is scope-owned: its
+	 * reads stay scope-bound in that scope and every scope nested inside
+	 * it, matching script-level variables visible in procedures. An
+	 * assignment in a nested scope does not shield outer reads. This also
+	 * keeps `For`/`For Each` counters scope-bound, since the loop lowering
+	 * assigns them without declaring.
 	 */
 	private collectAssignedNames(ast: Program): Map<object, Set<string>> {
 		const assigned = new Map<object, Set<string>>()
@@ -276,22 +290,29 @@ export class ReferenceTransformer extends Transformer {
 	 * IDL enums as script globals; previously only the qualified form was
 	 * rewritten, so bare names read as undefined and silently disabled
 	 * sequencer effects. Elements keep priority (checked first); locals win
-	 * via {@link Transformer.isLocalVariable}. Assignment targets are left
-	 * alone so a write can never corrupt the shared enum singleton, and
-	 * member names colliding across enums stay unresolved.
+	 * via {@link Transformer.isLocalVariable}. Binding positions (class
+	 * method ids) and member access on a bare constant stay scope-bound so
+	 * neither can corrupt the shared enum singleton; names assigned anywhere
+	 * in an enclosing scope stay scope-bound too. Members of port-defined
+	 * enums without an IDL counterpart stay qualification-only, and member
+	 * names colliding across enums stay unresolved.
 	 */
-	private replaceBareEnumReference(node: any, parent: any, assigned?: Set<string>): any {
+	private replaceBareEnumReference(node: any, parent: any, roots: object[], assigned: Map<object, Set<string>>): any {
 		if (!this.isEligible(node, parent)) {
 			return node
 		}
-		if (parent?.type === 'AssignmentExpression' && parent.left === node) {
+		// Class methods are not scope bindings, so their ids need an explicit
+		// guard (function ids are covered by isLocalVariable).
+		if (parent?.type === 'MethodDefinition') {
 			return node
 		}
-		// A name assigned anywhere in this scope is scope-owned (VBS creates
-		// the variable on assignment), so its reads must not resolve to an
-		// enum. This also shields `For`/`For Each` counters, which the loop
-		// lowering assigns without declaring.
-		if (assigned?.has(node.name.toLowerCase())) {
+		// Member access on a bare constant (`SeqRandom.foo`) stays
+		// scope-bound: rewriting it would corrupt the shared enum singleton.
+		if (parent?.type === 'MemberExpression' && parent.object === node) {
+			return node
+		}
+		const lower = node.name.toLowerCase()
+		if (roots.some(root => assigned.get(root)?.has(lower))) {
 			return node
 		}
 		const hit = this.findBareEnumMember(node.name)

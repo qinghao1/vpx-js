@@ -196,23 +196,22 @@ describe('The VPinball light sequencer', () => {
 			expect(playDone).to.have.been.calledOnce
 		})
 
-		it('should truncate fractional play args like a COM long conversion', () => {
+		it('should round fractional play args like a COM long conversion', () => {
 			const playDone = sinon.spy()
 			seqApi.on('PlayDone', playDone)
 
 			seqApi.Play(seq.SeqUpOn, 10.7, 1.9, 0.5)
-			player.simulateTime(3000)
+			player.simulateTime(8000)
 			expect(playDone).to.have.been.calledOnce
 		})
 
-		it('should fall back to defaults for non-numeric play args', () => {
-			// Native would raise a type mismatch; the port defaults leniently.
+		it('should raise a type mismatch for non-numeric play args without enqueueing', () => {
 			const playDone = sinon.spy()
 			seqApi.on('PlayDone', playDone)
 
-			seqApi.Play(seq.SeqUpOn, 0, 'abc' as unknown as number, 'xyz' as unknown as number)
+			expect(() => seqApi.Play(seq.SeqUpOn, 0, 'abc' as unknown as number, 0)).to.throw()
 			player.simulateTime(3000)
-			expect(playDone).to.have.been.calledOnce
+			expect(playDone).to.not.have.been.called
 		})
 
 		it('should reject plays when the queue is full', () => {

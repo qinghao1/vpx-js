@@ -5,6 +5,8 @@ import { Event } from '../../game/event.js'
 import type { EventProxy } from '../../game/event-proxy.js'
 import type { IAnimation } from '../../game/interfaces.js'
 import type { Player } from '../../game/player.js'
+import { ERR, VbsError } from '../../scripting/stdlib/err.js'
+import { bankersRound } from '../../scripting/vbs-values.js'
 import { Enums } from '../enums.js'
 import type { Flasher } from '../flasher/flasher.js'
 import type { Light } from '../light/light.js'
@@ -85,13 +87,22 @@ function emptyQueueEntry(): QueueEntry {
 }
 
 /**
- * Truncates a play argument to a long, falling back when the VBS call
- * omitted it (plain `undefined` coerces to NaN) or passed a non-numeric
- * value. The `VbsUndefined` sentinel still reads as 0 via `valueOf`.
+ * Coerces a play argument to a long per the IDL signature, falling back to
+ * the default when the VBS call omitted it. Banker's-rounds like COM LONG
+ * coercion (and the port's CLng); non-numeric garbage raises a type mismatch
+ * (13) without enqueueing, like native IDispatch conversion. The
+ * `VbsUndefined` sentinel still reads as 0 via `valueOf`.
  */
-function toFiniteLong(value: unknown, fallback: number): number {
+function toPlayLong(value: unknown, fallback: number): number | undefined {
+	if (value === undefined) {
+		return fallback
+	}
 	const n = Number(value)
-	return Number.isFinite(n) ? Math.trunc(n) : fallback
+	if (!Number.isFinite(n)) {
+		ERR.Raise(new VbsError('Type mismatch', 13))
+		return undefined
+	}
+	return bankersRound(n)
 }
 
 /** One sequencer-driven collection member (light, flasher or primitive). */
@@ -207,14 +218,18 @@ export class LightSeqAnimation implements IAnimation {
 
 	public play(animation: number, tailLength: number, repeat: number, pause: number): void {
 		this.ensureGrid()
-		// Native defaults from the IDL signature (Play(Animation, TailLength
-		// = 0, Repeat = 1, Pause = 0)); VBS omitted args arrive as undefined
-		// and must not become NaN counters that wedge the queue forever.
+		// IDL defaults: Play(Animation, TailLength = 0, Repeat = 1, Pause = 0).
 		// Animation itself stays uncoerced: unknown values expire through the
 		// normal queue path.
-		tailLength = toFiniteLong(tailLength, 0)
-		repeat = toFiniteLong(repeat, 1)
-		pause = toFiniteLong(pause, 0)
+		const tail = toPlayLong(tailLength, 0)
+		const rep = toPlayLong(repeat, 1)
+		const breath = toPlayLong(pause, 0)
+		if (tail === undefined || rep === undefined || breath === undefined) {
+			return
+		}
+		tailLength = tail
+		repeat = rep
+		pause = breath
 		if (tailLength < 0) {
 			tailLength = 0
 		}

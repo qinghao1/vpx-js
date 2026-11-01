@@ -482,11 +482,14 @@ export class Stdlib extends VbsApi {
 	}
 
 	/**
-	 * VBA.VarType: the subtype code of a value (vbEmpty 0, vbNull 1,
+	 * VBS `VarType`: the subtype code of a value (vbEmpty 0, vbNull 1,
 	 * vbInteger 2, vbLong 3, vbDouble 5, vbDate 7, vbString 8, vbObject 9,
 	 * vbBoolean 11, arrays 8192 + 12 (vbArray + vbVariant; VBS arrays hold
-	 * Variants). Unresolvable names read as Empty, so a comparison like
-	 * `VarType(x) = vbString` only passes for actual strings.
+	 * Variants). Only the subtypes the port can produce: all VBS numbers
+	 * are JS doubles, so floats report vbDouble 5, and codes the port
+	 * cannot observe (vbSingle 4, vbCurrency 6, vbError 10, vbDecimal 14,
+	 * vbByte 17) are unreachable. Unresolvable names read as Empty, so a
+	 * comparison like `VarType(x) = vbString` only passes for actual strings.
 	 */
 	public VarType(value: unknown): number {
 		if (value === NOTHING) return 9
@@ -693,7 +696,13 @@ export class Stdlib extends VbsApi {
 			ERR.Raise(new VbsError('Invalid procedure call or argument', 5))
 			return ''
 		}
-		return ' '.repeat(rounded)
+		try {
+			return ' '.repeat(rounded)
+		} catch {
+			// Astronomic counts overflow the engine string limit.
+			ERR.Raise(new VbsError('Invalid procedure call or argument', 5))
+			return ''
+		}
 	}
 
 	public Asc(value: unknown): number {

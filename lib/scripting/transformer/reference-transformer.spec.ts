@@ -130,22 +130,34 @@ describe('The scripting reference transformer', () => {
 			expect(js).to.not.contain(Transformer.ENUMS_NAME)
 		})
 
-		it('should rewrite an enum-named variable never assigned', () => {
+		it('should leave port-defined enum members unresolved', () => {
 			const vbs = `x = Linear\n`
+			const js = transform(vbs, table, player)
+			expect(js).to.equal(`x = Linear;`)
+		})
+
+		it('should still rewrite a qualified port-defined enum member', () => {
+			const vbs = `x = Fader.Linear\n`
 			const js = transform(vbs, table, player)
 			expect(js).to.equal(`x = ${Transformer.ENUMS_NAME}.Fader.Linear;`)
 		})
 
 		it('should not rewrite an assigned enum-named variable read back', () => {
-			const vbs = `Linear = 5\nx = Linear\n`
+			const vbs = `SeqRandom = 5\nx = SeqRandom\n`
+			const js = transform(vbs, table, player)
+			expect(js).to.not.contain(Transformer.ENUMS_NAME)
+		})
+
+		it('should shield a nested read of a program-level variable', () => {
+			const vbs = `SeqRandom = 5\nSub Caller\nx = SeqRandom\nEnd Sub\n`
 			const js = transform(vbs, table, player)
 			expect(js).to.not.contain(Transformer.ENUMS_NAME)
 		})
 
 		it('should not leak an assignment across function scopes', () => {
-			const vbs = `Sub F\nLinear = 5\nEnd Sub\nx = Linear\n`
+			const vbs = `Sub F\nSeqRandom = 5\nEnd Sub\nx = SeqRandom\n`
 			const js = transform(vbs, table, player)
-			expect(js).to.contain(`x = ${Transformer.ENUMS_NAME}.Fader.Linear;`)
+			expect(js).to.contain(`x = ${Transformer.ENUMS_NAME}.SequencerState.SeqRandom;`)
 		})
 
 		it('should not rewrite a For Each variable named like an enum member', () => {
@@ -155,7 +167,13 @@ describe('The scripting reference transformer', () => {
 		})
 
 		it('should not rewrite a For counter named like an enum member', () => {
-			const vbs = `For Linear = 1 To 3\nx = Linear\nNext\n`
+			const vbs = `For SeqRandom = 1 To 3\nx = SeqRandom\nNext\n`
+			const js = transform(vbs, table, player)
+			expect(js).to.not.contain(Transformer.ENUMS_NAME)
+		})
+
+		it('should not rewrite a class method named like an enum member', () => {
+			const vbs = `Class C\nSub SeqRandom\nEnd Sub\nEnd Class\n`
 			const js = transform(vbs, table, player)
 			expect(js).to.not.contain(Transformer.ENUMS_NAME)
 		})
@@ -164,6 +182,22 @@ describe('The scripting reference transformer', () => {
 			const vbs = `x = None\n`
 			const js = transform(vbs, table, player)
 			expect(js).to.not.contain(Transformer.ENUMS_NAME)
+		})
+
+		it('should not collide with stdlib or global names', () => {
+			const bare = new Set<string>()
+			const api = Enums as unknown as {
+				_getPropertyNames(): string[]
+				[key: string]: { _getPropertyNames(): string[] }
+			}
+			for (const enumName of api._getPropertyNames()) {
+				for (const member of api[enumName]._getPropertyNames()) {
+					bare.add(member.toLowerCase())
+				}
+			}
+			const stdlib = new Stdlib()._getPropertyNames().map(name => name.toLowerCase())
+			const global = new GlobalApi(table, player)._getPropertyNames().map(name => name.toLowerCase())
+			expect([...bare].filter(name => stdlib.includes(name) || global.includes(name))).to.deep.equal([])
 		})
 
 		it('should not rewrite a function declaration named like an enum member', () => {
