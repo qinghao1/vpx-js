@@ -129,6 +129,10 @@ describe('regression: framing keeps DMD and full playfield visible', () => {
 		const viewerPlain = computeViewerFraming(buildWalkingDeadGroup())
 		const viewerCabined = computeViewerFraming(buildBigCabinetGroup())
 		expect(viewerCabined.maxDim, 'viewer keeps sizing the whole machine').to.be.greaterThan(viewerPlain.maxDim)
+		expect(
+			viewerCabined.target.distanceTo(viewerPlain.target),
+			'viewer target follows the whole machine',
+		).to.be.greaterThan(0)
 	})
 
 	it('degenerate optics fall back to the full cabinet distance', () => {

@@ -72,10 +72,8 @@ function framingBox(node: Object3D, exclude?: (name: string) => boolean): Framin
 const KEEP_TOKENS = ['playfield', 'button', 'coin', 'plunger', 'apron']
 const excludeNonPlayfield = (name: string): boolean => !KEEP_TOKENS.some(token => name.includes(token))
 
-// Centering and distance set for the play camera: playfield-named meshes
-// only, so cabinet furniture stays out by design. (The looser playfield
-// cluster above also feeds the orbit overview, which keeps furniture in
-// frame by design.)
+// The looser playfield cluster above also feeds the orbit overview, which
+// keeps furniture in frame by design.
 const excludeNonPlaySurface = (name: string): boolean => !name.includes('playfield')
 
 const VIEWER: FramingConfig = { dist: 1.2, elev: 0.85, azim: 0.65, near: 0.015, farScale: 8, farMin: 2000 }
@@ -101,7 +99,8 @@ const PLAY_FILL = 0.98
 function fitDistance(box: Box3, target: Vector3, dir: Vector3, tanHalfFov: number, aspect: number): number {
 	// Degenerate optics solve nothing: the caller falls back to maxDim dist.
 	if (!(tanHalfFov > 0) || !(aspect > 0)) return NaN
-	// Signs are free: every use below takes abs(), so solve directly from dir.
+	// Lateral signs are free: both cross terms take abs() below (depth stays
+	// signed), so solve directly from dir.
 	const right = new Vector3().crossVectors(dir, new Vector3(0, 1, 0))
 	if (right.lengthSq() < 1e-6) right.set(1, 0, 0)
 	right.normalize()
@@ -133,8 +132,10 @@ function viewerFramingState(node: Object3D, cfg: FramingConfig): FramingState {
 }
 
 function playFramingState(node: Object3D, cfg: FramingConfig, fit: { fov: number; aspect: number }): FramingState {
-	// Target and distance come from the playfield box, so furniture never
-	// steers the play camera (the maxDim fallback still sizes from the cabinet).
+	// Target and distance come from the playfield box when one exists, so
+	// furniture never steers the play camera (the maxDim fallback still
+	// sizes from the cabinet). Only visible meshes count, so callers hide
+	// play-mode furniture first.
 	const surface = framingBox(node, excludeNonPlaySurface)
 	const target = surface.center.clone()
 	if (cfg.forwardBias) target.z += surface.size.z * cfg.forwardBias
