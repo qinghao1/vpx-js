@@ -100,10 +100,11 @@ export class ThreeHelper {
 	}
 
 	public getTable(root: Object3D): Object3D {
-		if (root.name.startsWith('playfield')) {
-			return root
+		const node = (root as unknown as { scene?: Object3D }).scene ?? root
+		if (node.name?.startsWith('playfield')) {
+			return node
 		}
-		const table = root.children?.find(child => child.name.startsWith('playfield'))
+		const table = node.children?.find(child => child.name?.startsWith('playfield'))
 		if (!table) {
 			throw new Error('Cannot find table in scene.')
 		}
