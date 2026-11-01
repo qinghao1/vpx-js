@@ -9,6 +9,20 @@ import { getAuthoredVisible } from './authored-visible.js'
 import { type MergedBulbGlowRef, setBulbGlowState, setMergedBulbGlowRangeState } from './nodes/bulb-glow-node.js'
 import { ThreeRenderApi } from './three-render-api.js'
 
+/** Live lamp fields as a setter patch; undefined when nothing is live. */
+function glowPatchOf(
+	state: LightState,
+): { intensity?: number; color?: number; color2?: number; modulate?: number } | undefined {
+	if (
+		state.intensity === undefined &&
+		state.color === undefined &&
+		state.colorFull === undefined &&
+		state.modulate === undefined
+	)
+		return undefined
+	return { intensity: state.intensity, color: state.color, color2: state.colorFull, modulate: state.modulate }
+}
+
 export class ThreeLightGenerator {
 	public createPointLight(d: LightData, table?: Table): PointLight {
 		// Bake-time live level mirrors native RenderSetup; the authored
@@ -54,25 +68,14 @@ export class ThreeLightGenerator {
 			case 'bulb.glow': {
 				// Merged quad: write live state into its vertex range in place.
 				const mergedRef = (child as ThreeMesh).userData?.__mergedGlow as MergedBulbGlowRef | undefined
+				const patch = glowPatchOf(state)
 				if (mergedRef) {
-					const modulate = (state as { modulate?: number }).modulate
-					if (
-						state.intensity !== undefined ||
-						state.color !== undefined ||
-						state.colorFull !== undefined ||
-						(modulate !== undefined && modulate >= 0)
-					) {
+					if (patch)
 						setMergedBulbGlowRangeState(
 							mergedRef.mesh,
 							{ start: mergedRef.start, count: mergedRef.count },
-							{
-								intensity: state.intensity,
-								color: state.color,
-								color2: (state as { colorFull?: number }).colorFull,
-								modulate,
-							},
+							patch,
 						)
-					}
 					break
 				}
 				// Visibility follows the live lamp state (an off lamp adds no
@@ -88,20 +91,8 @@ export class ThreeLightGenerator {
 				if (glow) {
 					// Native drives the lightmap glow from the live lamp state
 					// (lightColor_intensity + colors in fs_classic_light.sc).
-					const modulate = (state as { modulate?: number }).modulate
-					if (
-						state.intensity !== undefined ||
-						state.color !== undefined ||
-						state.colorFull !== undefined ||
-						(modulate !== undefined && modulate >= 0)
-					) {
-						setBulbGlowState(glow, {
-							intensity: state.intensity,
-							color: state.color,
-							color2: (state as { colorFull?: number }).colorFull,
-							modulate,
-						})
-					}
+					const patch = glowPatchOf(state)
+					if (patch) setBulbGlowState(glow, patch)
 				}
 				break
 			}

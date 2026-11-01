@@ -201,6 +201,8 @@ describe('regression: room must remain visible', () => {
 			'VRMeag11',
 			'BM_VR_Cab_Siderails',
 			'VR_Cab_StartButton',
+			'primitive-coin-door-trim',
+			'primitive-lock-bar-trim',
 		]) {
 			expect(isShowcaseRoomNode(name), `${name} is showcase room content`).toEqual(true)
 		}

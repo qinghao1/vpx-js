@@ -125,6 +125,7 @@ export function setBulbGlowState(
 	mat: unknown,
 	state: { intensity?: number; color?: number; color2?: number; modulate?: number },
 ): void {
+	// All fields optional: absent keeps the baked value, negatives clamp native-style.
 	const ud = (mat as { userData?: Record<string, unknown> } | null)?.userData
 	if (!ud?.__bulbGlow) return
 	if (
@@ -140,11 +141,9 @@ export function setBulbGlowState(
 	if (state.color2 !== undefined && ud.__uColor2) {
 		;(ud.__uColor2 as { value: Color }).value.set(state.color2)
 	}
-	// Native re-reads m_modulate_vs_add every frame; restamp in place so
-	// script-animated values track without rebuilding the quad.
+	// Native re-reads m_modulate_vs_add per frame; restamp, don't rebuild.
 	if (
 		state.modulate !== undefined &&
-		state.modulate >= 0 &&
 		ud.__uModulate &&
 		typeof (ud.__uModulate as { value: unknown }).value === 'number'
 	) {
@@ -156,14 +155,8 @@ export function setBulbGlowState(
  * Merged bulb-glow composite: one draw for every lamp halo.
  *
  * Per-quad materials carry the halo parameters as uniforms, so N lamps cost N
- * draws with N program bindings. The merged mesh bakes the static parameters
- * (center, falloff, color ramp anchors, modulate) into per-vertex attributes
- * and keeps only the live lamp state (intensity, colors, modulate) in
- * attributes updated in place — the fragment math is identical to the
- * per-quad material above, only the parameter source changes from uniforms
- * to attributes.
- *
- * Same pattern as InstancedMesh + BufferGeometryUtils merging.
+ * draws with N program bindings.
+ * Bakes center/falloff/ramp anchors per vertex; intensity, colors, modulate stay live.
  */
 
 export interface MergedBulbGlowRange {
@@ -299,7 +292,7 @@ export function setMergedBulbGlowRangeState(
 		}
 		color2Attr.needsUpdate = true
 	}
-	if (state.modulate !== undefined && state.modulate >= 0) {
+	if (state.modulate !== undefined) {
 		const m = clampModulateVsAdd(state.modulate)
 		const arr = dyn.array as Float32Array
 		for (let i = range.start; i < range.start + range.count; i++) arr[i * 2 + 1] = m

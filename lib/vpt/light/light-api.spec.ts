@@ -41,6 +41,8 @@ describe('The VPinball light API', () => {
 		expect(light.Color).to.equal(0x12ff54)
 		light.ColorFull = 0x00de23
 		expect(light.ColorFull).to.equal(0x00de23)
+		light.BulbModulateVsAdd = 0.4
+		expect(light.BulbModulateVsAdd).to.equal(0.4)
 		light.X = 12
 		expect(light.X).to.equal(12)
 		light.Y = 1123

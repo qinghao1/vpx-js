@@ -143,8 +143,13 @@ describe('bulb-glow cache splits by halo profile', () => {
 		const a: any = generator.getInitialMaterial(bulbInfo(50), wallOpts)
 		const same: any = generator.getInitialMaterial(bulbInfo(50), wallOpts)
 		const other: any = generator.getInitialMaterial(bulbInfo(80), wallOpts)
+		const live: any = generator.getInitialMaterial(
+			{ ...bulbInfo(50), bulbGlow: { ...bulbInfo(50).bulbGlow, intensity: 7, modulateVsAdd: 0.2 } },
+			wallOpts,
+		)
 		expect(same, 'identical profiles share the baked halo').toBe(a)
 		expect(other, 'different falloffs must not share the baked halo').not.toBe(a)
+		expect(live, 'live uniforms restamp per frame, not per material').toBe(a)
 	})
 })
 

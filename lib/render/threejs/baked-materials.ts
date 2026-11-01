@@ -11,10 +11,9 @@ import {
 	type ClassifyResult,
 	type CustomMaterialUserData,
 	classify,
-	flatName,
+	isCabName,
 	isGiOverlay,
 	pendingOf,
-	RE_CAB,
 	RE_NON_OPAQUE,
 	RE_RAMP_FAMILY,
 } from './scene-classify.js'
@@ -281,7 +280,7 @@ export const createVrMaterialResolver = (): ((
 	const vrCache = new Map<string, THREE.MeshStandardMaterial>()
 	return (base: THREE.MeshStandardMaterial, meshLower = ''): THREE.MeshStandardMaterial => {
 		const pending = pendingOf(base)
-		const isCab = RE_CAB.test(flatName(meshLower))
+		const isCab = isCabName(meshLower)
 		const key = `${base.name}|${(base.map as THREE.Texture | undefined)?.name ?? pending}|${base.polygonOffset ? `${base.polygonOffsetFactor}/${base.polygonOffsetUnits}` : '0'}|${isCab ? 'cab' : 'vr'}`
 		const cached = vrCache.get(key)
 		if (cached) return cached

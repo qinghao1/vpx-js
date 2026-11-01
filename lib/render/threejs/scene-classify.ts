@@ -10,6 +10,9 @@ export const RE_CAB = /vr_?cab|cabinet|lockbar|pincab|backbox|coin_?door/i
 // token tests see one canonical form.
 export const flatName = (name: string): string => name.toLowerCase().replace(/[_-]/g, '')
 
+/** Cabinet name allowing author separator spellings (`vr_cab`, `vr-cab`, `coin-door`). */
+export const isCabName = (name: string): boolean => RE_CAB.test(flatName(name))
+
 /**
  * VR-room or cabinet content by node name. The viewer keeps these visible
  * despite script-driven hides (desktop VR tables hide their room via
@@ -17,7 +20,7 @@ export const flatName = (name: string): string => name.toLowerCase().replace(/[_
  */
 export function isShowcaseRoomNode(name: string | undefined): boolean {
 	if (!name) return false
-	return RE_VR.test(name) || RE_CAB.test(name)
+	return RE_VR.test(name) || isCabName(name)
 }
 export const RE_GLASS = /glass/i
 export const RE_LM = /lm_/i
@@ -86,8 +89,8 @@ export const classify = (mesh: string, mat: string, map: string, baked = false, 
 	return {
 		isGlass: RE_GLASS.test(meshLower) || RE_GLASS.test(matLower),
 		isLm: RE_LM.test(meshLower),
-		isVr: RE_VR.test(meshLower) && !RE_CAB.test(meshLower),
-		isCab: RE_CAB.test(meshLower),
+		isVr: RE_VR.test(meshLower) && !isCabName(meshLower),
+		isCab: isCabName(meshLower),
 		isVlmBake,
 		isMainBake,
 		isBakedMat,

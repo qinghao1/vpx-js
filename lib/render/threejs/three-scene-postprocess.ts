@@ -8,10 +8,9 @@ import { isPrimitiveNodeMaterial } from './nodes/primitive-bdl-node.js'
 import {
 	type CustomMaterialUserData,
 	classify,
-	flatName,
 	isBakedPlayfield,
+	isCabName,
 	pendingOf,
-	RE_CAB,
 	RE_NON_OPAQUE,
 	RE_RAMP_FAMILY,
 	RE_VR,
@@ -214,7 +213,7 @@ export function postProcessScene(
 		if (!mesh.isMesh) {
 			if (
 				nameLower &&
-				(RE_CAB.test(flatName(nameLower)) || RE_VR.test(nameLower) || resolveButtonCode(nameLower)) &&
+				(isCabName(nameLower) || RE_VR.test(nameLower) || resolveButtonCode(nameLower)) &&
 				child.visible === false
 			) {
 				child.visible = true
