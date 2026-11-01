@@ -251,7 +251,7 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 			// Explicit RenderInfo.depthWrite wins over the non-writing additive default.
 			mat.depthWrite = depthWrite ?? false
 			if (absorb) {
-				// AB_ADD stays plain additive by design; see applyAbsorbBlendState.
+				// Absorb keeps its premultiplied-over approximation; AB_ADD takes the modulate path above.
 				applyAbsorbBlendState(mat)
 			}
 			this.stashCutout(mat, alphaTestValue, depthBias, true)

@@ -17,7 +17,7 @@ function additiveMaterial({ mapName }: { mapName: string }): any {
 
 describe('additive blend parity (upstream flasher.cpp SetupAddBlendState)', () => {
 	it('scales the positive tint/intensity uniforms on plain additive', () => {
-		// AB_ADD stays plain additive by design; see applyAbsorbBlendState.
+		// Without modulateVsAdd, the overlay stays plain additive.
 		const add = additiveMaterial({ mapName: 'flashA' })
 		const dag = materialize(add.colorNode)
 		expect(graphReferences(dag, add.userData.__uTint), 'additive output scales the positive tint').toBe(true)

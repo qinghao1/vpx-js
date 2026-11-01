@@ -1,17 +1,5 @@
 import type { Group } from 'three'
-import {
-	BufferAttribute,
-	BufferGeometry,
-	Color,
-	CustomBlending,
-	DoubleSide,
-	Matrix4,
-	Mesh,
-	OneMinusSrcColorFactor,
-	ReverseSubtractEquation,
-	SrcAlphaFactor,
-	Vector2,
-} from 'three'
+import { BufferAttribute, BufferGeometry, Color, DoubleSide, Matrix4, Mesh, Vector2 } from 'three'
 import {
 	attribute,
 	clamp,
@@ -30,6 +18,7 @@ import {
 } from 'three/tsl'
 import { MeshBasicNodeMaterial } from 'three/webgpu'
 import { getAuthoredVisible } from '../authored-visible.js'
+import { applyModulateVsAddBlending, clampModulateVsAdd } from './modulate-vs-add.js'
 import { inPlayfieldBounds, uBulbGlowFootprintClip, uTransArea } from './primitive-bdl-node.js'
 
 export interface BulbGlowOptions {
@@ -50,7 +39,7 @@ export interface BulbGlowOptions {
  * authoring ≈1.0 land on 0.9999, leaving a ~1e-4 additive sliver.
  */
 export function clampBulbModulateVsAdd(value?: number): number {
-	return Math.max(0.0001, Math.min(0.9999, value ?? 0.9))
+	return clampModulateVsAdd(value)
 }
 
 /**
@@ -121,13 +110,7 @@ export function createBulbGlowNodeMaterial(options: BulbGlowOptions): MeshBasicN
 		return vec4(rgb, float(1).div(uModulate).sub(float(1)))
 	})()
 
-	mat.blending = CustomBlending
-	mat.blendSrc = SrcAlphaFactor
-	mat.blendDst = OneMinusSrcColorFactor
-	mat.blendEquation = ReverseSubtractEquation
-	mat.blendSrcAlpha = SrcAlphaFactor
-	mat.blendDstAlpha = OneMinusSrcColorFactor
-	mat.blendEquationAlpha = ReverseSubtractEquation
+	applyModulateVsAddBlending(mat)
 	mat.transparent = true
 	mat.depthWrite = false
 	mat.depthTest = true
@@ -213,13 +196,7 @@ export function createMergedBulbGlowMaterial(): MeshBasicNodeMaterial {
 		const rgb = glowColor.mul(atten).mul(aDyn.x).mul(aDyn.y).mul(float(-1)).mul(footprint)
 		return vec4(rgb, float(1).div(aDyn.y).sub(float(1)))
 	})()
-	mat.blending = CustomBlending
-	mat.blendSrc = SrcAlphaFactor
-	mat.blendDst = OneMinusSrcColorFactor
-	mat.blendEquation = ReverseSubtractEquation
-	mat.blendSrcAlpha = SrcAlphaFactor
-	mat.blendDstAlpha = OneMinusSrcColorFactor
-	mat.blendEquationAlpha = ReverseSubtractEquation
+	applyModulateVsAddBlending(mat)
 	mat.transparent = true
 	mat.depthWrite = false
 	mat.depthTest = true

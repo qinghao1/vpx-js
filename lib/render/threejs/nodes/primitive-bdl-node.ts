@@ -32,6 +32,7 @@ import {
 } from '../../../vpt/primitive/primitive-material-protocol.js'
 import { copyForkedRenderState, defineEmissiveIntensityCompat, setNodeMapSlot } from '../material-shared.js'
 import { getTransmissionTexture, TRANSMISSION_OPAQUE_CUTOFF } from '../transmission-buffer.js'
+import { applyModulateVsAddBlending, clampModulateVsAdd } from './modulate-vs-add.js'
 
 export type { PrimitiveAdditiveUpdate, PrimitiveBdlUpdate, ProtocolColor }
 export {
@@ -158,12 +159,11 @@ export interface PrimitiveAdditiveOptions {
 }
 
 /**
- * Native `m_modulate_vs_add` clamp (flasher.cpp, same 0.0001..0.9999 window as
- * the bulb composite in bulb-glow-node.ts): avoids 0 (which disables the
- * blend) and 1 (which reads wrong under day/night swings).
+ * Native `m_modulate_vs_add` clamp (flasher.cpp): flashers always carry a
+ * value, so no fallback — see the shared clamp in modulate-vs-add.ts.
  */
 function clampFlasherModulateVsAdd(value: number): number {
-	return Math.max(0.0001, Math.min(0.9999, value))
+	return clampModulateVsAdd(value)
 }
 
 /**
@@ -370,13 +370,7 @@ export function createPrimitiveAdditiveMaterial(opts: PrimitiveAdditiveOptions):
 	userData.__map = map
 	rebuild(map)
 	if (uModulate) {
-		mat.blending = CustomBlending
-		mat.blendSrc = SrcAlphaFactor
-		mat.blendDst = OneMinusSrcColorFactor
-		mat.blendEquation = ReverseSubtractEquation
-		mat.blendSrcAlpha = SrcAlphaFactor
-		mat.blendDstAlpha = OneMinusSrcColorFactor
-		mat.blendEquationAlpha = ReverseSubtractEquation
+		applyModulateVsAddBlending(mat)
 	} else {
 		mat.blending = AdditiveBlending
 	}

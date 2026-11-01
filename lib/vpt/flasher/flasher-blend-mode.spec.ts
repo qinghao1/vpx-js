@@ -100,8 +100,7 @@ describe('Flasher absorb parity (upstream flasher.cpp SetupAddBlendState; AB_ADD
 	it('stamps absorb state through the shared helper, matching the generator', () => {
 		// The generator and the per-frame updater stamp must not drift into a
 		// byte-copy again: both go through applyAbsorbBlendState. AB_ADD is
-		// deliberately excluded — it stays plain additive, not upstream's
-		// reverse-subtract, pending golden review.
+		// deliberately excluded — it takes the modulate-vs-add path instead.
 		const generator = makeGenerator()
 		const fromGenerator = (generator as any).getMaterial(
 			undefined,

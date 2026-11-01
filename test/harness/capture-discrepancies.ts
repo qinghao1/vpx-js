@@ -65,10 +65,10 @@ const checks: DiscrepancyCheck[] = [
 	{
 		id: 'P1',
 		category: 'Physics & Math',
-		title: 'C_TOL_ENDPNTS tolerance is 0.0 (JS/WASM) vs 0.001 (C++)',
+		title: 'C_TOL_ENDPNTS is 0.001 (JS/WASM) vs 0.0 upstream (deliberate divergence)',
 		severity: 'major',
 		description:
-			'Native C++ uses 0.001 to tolerate segment endpoints; JS/WASM uses 0.0, causing thin-gap tunneling.',
+			'Upstream physconst.h defines 0.0f; vpx-js widens the LineSeg/flipper tangent band to 0.001 to close seam-tunneling at tessellated joints. Scale-consistent (0.5µm vs C_TOL_RADIUS 0.005); intentionally breaks native determinism at band edges.',
 		impact: 'Balls may incorrectly tunnel through flipper tips and line segments at 1 kHz.',
 		check: async () => {
 			const jsConst = readFileSafe(path.join(REPO_ROOT, 'lib/physics/constants.ts'))
@@ -80,7 +80,7 @@ const checks: DiscrepancyCheck[] = [
 			const isFail = jsVal === '0.0' || jsVal === '0' || wasmVal === '0.0' || wasmVal === '0'
 			return {
 				status: isFail ? 'fail' : 'pass',
-				detail: `JS constants.ts=${jsVal}, WASM kernels.cpp=${wasmVal} (expected 0.001 in native)`,
+				detail: `JS constants.ts=${jsVal}, WASM kernels.cpp=${wasmVal} (deliberate: upstream 0.0, vpx-js 0.001)`,
 				evidence: `lib/physics/constants.ts, wasm/modules/kernels/src/kernels.cpp`,
 			}
 		},

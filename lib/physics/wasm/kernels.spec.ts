@@ -7,13 +7,8 @@ import { CollisionEvent } from '../collision-event.js'
 import { CollisionType } from '../collision-type.js'
 import { C_TOL_ENDPNTS } from '../constants.js'
 import { Hit3DPoly } from '../hit-3dpoly.js'
-import { HitCircle } from '../hit-circle.js'
-import { HitLine3D } from '../hit-line-3d.js'
-import { HitLineZ } from '../hit-line-z.js'
 import { HitKind } from '../hit-object.js'
 import { HitPlane } from '../hit-plane.js'
-import { HitPoint } from '../hit-point.js'
-import { HitTriangle } from '../hit-triangle.js'
 import { LineSeg } from '../line-seg.js'
 import { BatchCollector, countBatchables } from './batched-hittest.js'
 import type { LineSegViews } from './kernels.js'
@@ -39,6 +34,14 @@ import {
 const hasWasmDist =
 	existsSync(new URL('../../../wasm/dist/kernels.js', import.meta.url)) &&
 	existsSync(new URL('../../../wasm/dist/kernels.wasm', import.meta.url))
+
+describe('endpoint tolerance', () => {
+	it('C_TOL_ENDPNTS is 0.001 by deliberate divergence from upstream 0.0', () => {
+		// Upstream physconst.h defines 0.0f; vpx-js widens the LineSeg/flipper
+		// tangent band to close seam-tunneling at tessellated joints (harness P1).
+		expect(C_TOL_ENDPNTS).toBe(0.001)
+	})
+})
 
 const C_CONTACTVEL = 0.099,
 	C_LOWNORMVEL = 0.0001,

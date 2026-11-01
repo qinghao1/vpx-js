@@ -97,8 +97,8 @@ const PLAY_FILL = 0.98
 // Closed-form pinhole solve: each box corner requires
 // dist >= perp / (PLAY_FILL * tan) + depth; the max over corners fits them all.
 function fitDistance(box: Box3, target: Vector3, dir: Vector3, tanHalfFov: number, aspect: number): number {
-	// Degenerate optics solve nothing: the caller falls back to maxDim dist.
-	if (!(tanHalfFov > 0) || !(aspect > 0)) return NaN
+	// Degenerate optics solve nothing (caller falls back to maxDim dist via the solved > 0 gate).
+	if (!(tanHalfFov > 0) || !(aspect > 0)) return -1
 	// Lateral signs are free: both cross terms take abs() below (depth stays
 	// signed), so solve directly from dir.
 	const right = new Vector3().crossVectors(dir, new Vector3(0, 1, 0))
@@ -152,7 +152,7 @@ function playFramingState(node: Object3D, cfg: FramingConfig, fit: { fov: number
 // Size covers the cabinet (keep-token table meshes plus RE_CAB cabinetry)
 // so the room has a stable anchor; anything else is excluded by default and
 // token-free room scenery cannot inflate the frame. (RE_CAB's _? arms are
-// inert here: names arrive separator-folded.)
+// inert on separator-folded names; raw-name callers still need them.)
 const excludeNonTable = (name: string): boolean => excludeNonPlayfield(name) && !RE_CAB.test(name)
 
 export const computeViewerFraming = (node: Object3D): FramingState => viewerFramingState(node, VIEWER)
