@@ -314,4 +314,47 @@ describe('transmission light buffer', () => {
 		expect(updateTransmissionBuffer(lampAt(8))).to.equal(true)
 		expect(updateTransmissionBuffer(lampAt(4))).to.equal(true)
 	})
+
+	it('matches the analytic radial profile away from the hub', () => {
+		// The hub texel (attenuation 1) cannot catch a domain error in the
+		// falloff lookup: every wrong-domain table agrees there. Sample the
+		// mid-slope, where indexing by squared radius inflates the glow ~2x.
+		for (const power of [1, 2, 3]) {
+			resetTransmissionBuffer()
+			const table = {
+				data: { right: 1000, bottom: 2000 },
+				lights: {
+					a: {
+						data: {
+							center: { x: 500, y: 1000 },
+							intensity: 100,
+							color: 0xffffff,
+							color2: 0xffffff,
+							bulbLight: true,
+							transmissionScale: 1,
+							falloff: 200,
+							falloffPower: power,
+						},
+						getState: () => ({ intensity: 50, color: 0xffffff, colorFull: 0xffffff }),
+					},
+				},
+			} as never
+			expect(updateTransmissionBuffer(table)).to.equal(true)
+			const data = getTransmissionTexture().image.data as Uint16Array
+			// Texel (57, 23); white/white kills the hub color morph, isolating
+			// attenuation. Analytic oracle from the documented profile —
+			// finite disc with (1-r/falloff)^power — independent of the LUT.
+			const px = 57
+			const py = 23
+			const tx = ((px + 0.5) / TRANSMISSION_WIDTH) * 1000
+			const ty = (1 - (py + 0.5) / TRANSMISSION_HEIGHT) * 2000
+			const dist = Math.sqrt((tx - 500) ** 2 + (ty - 1000) ** 2)
+			const normDist = dist / 200
+			expect(normDist, 'probe texel must sit mid-slope').to.be.greaterThan(0.3)
+			expect(normDist, 'probe texel must sit mid-slope').to.be.lessThan(0.7)
+			const expected = 50 * (1 - normDist) ** power
+			const actual = DataUtils.fromHalfFloat(data[(py * TRANSMISSION_WIDTH + px) * 4] ?? 0)
+			expect(actual, `power ${power} mid-slope glow matches the analytic profile`).to.be.closeTo(expected, 1)
+		}
+	})
 })

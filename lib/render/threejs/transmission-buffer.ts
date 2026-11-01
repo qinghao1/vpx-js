@@ -270,7 +270,7 @@ function fillBuffer(data: Uint16Array, list: TransmissionSplat[], right: number,
 	for (const splat of list) {
 		const falloff = splat.falloff
 		const falloffSq = falloff * falloff
-		const kernelScale = (KERNEL_STEPS - 1) / falloffSq
+		const kernelScale = (KERNEL_STEPS - 1) / falloff
 		const kernel = falloffKernel(splat.power)
 		const kernelAtten = kernel.atten
 		const kernelHub = kernel.hub
@@ -295,9 +295,11 @@ function fillBuffer(data: Uint16Array, list: TransmissionSplat[], right: number,
 					offset += 4
 					continue
 				}
-				// Table lookup replaces the sqrt/pow/hub triple; the boundary
-				// above keeps edge texels identical to the analytic version.
-				const kernelIndex = (distSq * kernelScale) | 0
+				// Table lookup replaces the per-texel pow; the table is indexed
+				// by linear normalized radius, so the sqrt stays (cheap; the
+				// pow it replaces was the dominant cost). The boundary above
+				// keeps edge texels identical to the analytic version.
+				const kernelIndex = (Math.sqrt(distSq) * kernelScale) | 0
 				const atten = kernelAtten[kernelIndex] as number
 				if (atten > 0) {
 					const hub = kernelHub[kernelIndex] as number
