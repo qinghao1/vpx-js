@@ -144,11 +144,9 @@ export function batchStaticOpaques(root: Group, table: Table, _renderApi: ThreeR
 	}
 
 	const dmdNames = new Set<string>()
-	for (const group of [(table as any).textboxes]) {
-		for (const k in group) {
-			const item = group[k]
-			if (item?.data?.isDMD) dmdNames.add(item.getName().toLowerCase())
-		}
+	for (const k in (table as any).textboxes) {
+		const item = (table as any).textboxes[k]
+		if (item?.data?.isDMD) dmdNames.add(item.getName().toLowerCase())
 	}
 
 	const buckets = new Map<string, { material: MeshStandardMaterial; meshes: Mesh[] }>()
@@ -165,7 +163,8 @@ export function batchStaticOpaques(root: Group, table: Table, _renderApi: ThreeR
 		if (isAnimated(o)) return
 		if (isDmdLike(o, dmdNames)) return
 		// The flashers type-group roots every flasher subtree: matching it (not
-		// item names or image content) keeps script-driven image swaps live.
+		// item names or image content) keeps script-driven image swaps and the
+		// updater's live color/opacity writes out of the static bake.
 		if (isUnder(o, root, name => name === 'flashers', true)) return
 		if (isButtonLike(o.name, o.userData)) return
 		const geo = o.geometry as BufferGeometry

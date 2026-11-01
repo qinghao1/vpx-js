@@ -67,6 +67,12 @@ export interface RenderInfo<GEOMETRY> {
 	 * it; absent means "derive from {@link addBlend}" (additive when true).
 	 */
 	addBlendMode?: number
+	/**
+	 * Native `m_modulate_vs_add` for AB_ADD flasher overlays. Selects the
+	 * modulate-vs-add composite (negatively-encoded output under REVSUBTRACT)
+	 * instead of plain additive; absent keeps the legacy overlay.
+	 */
+	modulateVsAdd?: number
 	backfacesEnabled?: boolean
 	depthWrite?: boolean
 	bulbGlow?: BulbGlowParams

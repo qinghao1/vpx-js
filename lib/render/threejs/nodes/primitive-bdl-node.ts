@@ -170,7 +170,7 @@ function clampFlasherModulateVsAdd(value: number): number {
  * Per-channel native AB_ADD flasher composite (`fs_flasher.sc` under
  * REVSUBTRACT with SRC_ALPHA/INV_SRC_COLOR): `dst + L·(1 − m·(1 − dst))`
  * with `L = resultLight·resultA`, `resultLight = tint·texRgb`,
- * `resultA = intensity·texAlpha`, emitted as the negative `−m·L` Sydney with
+ * `resultA = intensity·texAlpha`, emitted as the negative `−m·L` with
  * src alpha `1/m − 1`.
  */
 export function flasherAdditiveComposite(dst: number, resultLight: number, resultA: number, modulate: number): number {
@@ -281,13 +281,12 @@ export function createPrimitiveBdlMaterial(opts: PrimitiveBdlOptions): MeshStand
  * the material generator (fresh absorb materials) and the flasher updater
  * (stamped per frame onto forked clones rebuilt as plain additive).
  *
- * Note: AB_ADD deliberately stays plain AdditiveBlending, not upstream's
- * SRC_ALPHA/INVSRC_COLOR/REVSUBTRACT (flasher.cpp SetupAddBlendState). That
- * blend only amplifies because the flasher shader encodes its output
- * negative (signed modulateVsAdd, fs_flasher.sc); this node's output is
- * positive premultiplied color, so REVSUBTRACT would compute
- * dst*(1-src) - src*srcAlpha and darken. Matching upstream needs the
- * negative encoding too — golden-review territory, not a blend flip.
+ * Note: AB_ADD takes the SRC_ALPHA/INVSRC_COLOR/REVSUBTRACT arm with
+ * negatively-encoded output (signed modulateVsAdd, fs_flasher.sc), wired by
+ * createPrimitiveAdditiveMaterial when modulateVsAdd is set — the same
+ * scheme as the bulb glow composite. AB_ABSORB keeps the premultiplied-over
+ * arm with positive output instead; matching its upstream negative encoding
+ * is golden-review territory, not a blend flip.
  */
 export function applyAbsorbBlendState(mat: any): void {
 	mat.blending = CustomBlending
@@ -305,12 +304,17 @@ export function createPrimitiveAdditiveMaterial(opts: PrimitiveAdditiveOptions):
 	const uTint = uniform(new Color(opts.tint ?? 0xffffff))
 	const uIntensity = uniform(opts.intensity ?? 1)
 	const uFlat = uniform(new Color(opts.tint ?? 0xffffff).multiplyScalar(opts.intensity ?? 1))
+	// Native AB_ADD flasher encoding selector; absent keeps the legacy
+	// plain-additive overlay (non-flasher overlays never set it).
+	const uModulate =
+		opts.modulateVsAdd === undefined ? undefined : uniform(clampFlasherModulateVsAdd(opts.modulateVsAdd))
 	const userData = mat.userData as Record<string, unknown>
 	userData.__primitiveKind = PRIMITIVE_ADDITIVE_KIND
 	userData.__addBlend = true
 	userData.__uTint = uTint
 	userData.__uIntensity = uIntensity
 	userData.__uFlat = uFlat
+	userData.__uModulate = uModulate
 	userData.__mapName = opts.mapName
 	userData.__depthBias = opts.depthBias ?? 0
 	userData.__alphaTestValue = opts.alphaTestValue ?? 0
@@ -321,20 +325,41 @@ export function createPrimitiveAdditiveMaterial(opts: PrimitiveAdditiveOptions):
 			// Stashed for same-branch swaps (see setNodeMapSlot): rebinding
 			// the value in place skips the graph rebuild + revalidation.
 			userData.__mapNodes = [tex]
-			// Native (primitive.cpp additive path + fs_unshaded.sc): staticColor is
-			// premultiplied (rgb = tint * alpha), result = staticColor * tex, blended
-			// SRC_ALPHA,ONE, so the framebuffer receives tint * tex * alpha^2. The rgb
-			// term carries intensity to reproduce the native quadratic falloff.
-			mat.colorNode = Fn(() => {
-				const rgb = tex.rgb.mul(uTint).mul(uIntensity)
-				return vec4(rgb, tex.a.mul(uIntensity))
-			})()
+			if (uModulate) {
+				// Native AB_ADD (`fs_flasher.sc`, modulateVsAdd > 0): the
+				// result (static color modded by the texture) is negatively
+				// encoded and the REVSUBTRACT unit below composites it, so a
+				// dark backdrop is modulated rather than collected flat —
+				// the same scheme as the bulb glow composite.
+				mat.colorNode = Fn(() => {
+					const resultA = tex.a.mul(uIntensity)
+					const rgb = tex.rgb.mul(uTint).mul(resultA).mul(uModulate).mul(float(-1))
+					return vec4(rgb, float(1).div(uModulate).sub(float(1)))
+				})()
+			} else {
+				// Native (primitive.cpp additive path + fs_unshaded.sc): staticColor is
+				// premultiplied (rgb = tint * alpha), result = staticColor * tex, blended
+				// SRC_ALPHA,ONE, so the framebuffer receives tint * tex * alpha^2. The rgb
+				// term carries intensity to reproduce the native quadratic falloff.
+				mat.colorNode = Fn(() => {
+					const rgb = tex.rgb.mul(uTint).mul(uIntensity)
+					return vec4(rgb, tex.a.mul(uIntensity))
+				})()
+			}
 		} else if (userData.__mapName != null) {
 			// The file references a texture that has not streamed in yet. Native loads
 			// textures synchronously so it has no placeholder state; emitting nothing
 			// until arrival avoids a full-strength flat quad flashing in its place.
 			// Overlays with no texture by design (mapName unset) keep the flat color.
+			// A zero src is a no-op under either blend below, so this branch is shared.
 			mat.colorNode = Fn(() => vec4(0, 0, 0, 0))()
+		} else if (uModulate) {
+			// Untextured AB_ADD (native flasherMode 2): the static color rides
+			// through with the same negative encoding.
+			mat.colorNode = Fn(() => {
+				const rgb = uFlat.mul(uModulate).mul(float(-1))
+				return vec4(rgb, float(1).div(uModulate).sub(float(1)))
+			})()
 		} else {
 			mat.colorNode = uFlat
 		}
@@ -344,7 +369,17 @@ export function createPrimitiveAdditiveMaterial(opts: PrimitiveAdditiveOptions):
 	const map = opts.map ?? null
 	userData.__map = map
 	rebuild(map)
-	mat.blending = AdditiveBlending
+	if (uModulate) {
+		mat.blending = CustomBlending
+		mat.blendSrc = SrcAlphaFactor
+		mat.blendDst = OneMinusSrcColorFactor
+		mat.blendEquation = ReverseSubtractEquation
+		mat.blendSrcAlpha = SrcAlphaFactor
+		mat.blendDstAlpha = OneMinusSrcColorFactor
+		mat.blendEquationAlpha = ReverseSubtractEquation
+	} else {
+		mat.blending = AdditiveBlending
+	}
 	mat.transparent = true
 	mat.depthWrite = false
 	mat.depthTest = true
@@ -457,10 +492,12 @@ export function clonePrimitiveNodeMaterial<T>(mat: T): T {
 		finishPrimitiveClone(sourceMaterial, cloned as unknown as CloneablePrimitiveMaterial, 'custom')
 		return cloned as unknown as T
 	}
+	const modulateValue = (userData.__uModulate as { value: unknown } | undefined)?.value
 	const cloned = createPrimitiveAdditiveMaterial({
 		...common,
 		tint: uniformHex((userData.__uTint as { value: unknown })?.value, 0xffffff),
 		intensity: uniformNumber((userData.__uIntensity as { value: unknown })?.value, 1),
+		modulateVsAdd: typeof modulateValue === 'number' ? modulateValue : undefined,
 	})
 	finishPrimitiveClone(sourceMaterial, cloned as unknown as CloneablePrimitiveMaterial, 'simple')
 	;(cloned.userData as Record<string, unknown>).__addBlend = true

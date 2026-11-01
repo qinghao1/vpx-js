@@ -30,9 +30,11 @@ pipeline in [`../README.md`](../README.md).
 
 Three deliberate divergences from VPinball, each pinned by a spec:
 
-- `AB_ADD` flashers stay plain additive. Upstream pairs `REVSUBTRACT` with a
-  negatively-encoded shader output (`flasher.cpp`, `fs_flasher.sc`); this
-  backend emits positive premultiplied color, which that blend would darken.
+- `AB_ADD` flashers evaluate the full `fs_flasher.sc` composite through the
+  native blend state (`REVSUBTRACT` with `SRC_ALPHA`/`INV_SRC_COLOR`,
+  negatively-encoded output), like bulb halos below; `AB_ABSORB` stays
+  premultiplied-over with positive output (its negative encoding is a
+  follow-up).
 - Bulb halos evaluate the full `fs_light.sc` composite through the native
   blend state (`REVSUBTRACT` with `SRC_ALPHA`/`INV_SRC_COLOR`, negatively
   encoded output) over the post-opaque scene color, so the `dst`-modulated

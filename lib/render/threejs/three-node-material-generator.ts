@@ -142,6 +142,7 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 			// primitive.cpp blends on `!img->IsOpaque()` regardless of the file
 			// opacity value.
 			(opts.applyTextures ? (obj.map as { isOpaque?: boolean } | undefined) : undefined) ?? null,
+			obj.modulateVsAdd,
 		)
 	}
 
@@ -183,6 +184,10 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 		// materials are created, so the bound three.js texture is usually null
 		// here and carries no isOpaque flag anyway — the VPT record does.
 		vptMap?: { isOpaque?: boolean } | null,
+		// Native AB_ADD `m_modulate_vs_add` (flashers). Selects the
+		// modulate-vs-add composite for additive overlays; absent keeps the
+		// legacy plain-additive overlay.
+		modulateVsAdd?: number,
 	): any {
 		const key = this.getKey(
 			material,
@@ -199,6 +204,7 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 			addBlendMode,
 			disableLightingBelow,
 			depthWrite,
+			modulateVsAdd,
 		)
 		const cached = this.cachedMaterials[key]
 		if (cached) return cached
@@ -224,6 +230,10 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 			// Absent mode derives from the legacy boolean (additive), matching
 			// every pre-existing caller. Only absorb takes its own blend setup.
 			const absorb = (addBlendMode ?? 1) === ADD_BLEND_ABSORB
+			// The modulate-vs-add composite is the AB_ADD encoding (negative
+			// src under REVSUBTRACT); absorb keeps its positive
+			// premultiplied-over approximation and never takes it.
+			const blendModulate = !absorb ? modulateVsAdd : undefined
 			const tex =
 				(mapName && this.mapGenerator.hasTexture(mapName) && this.mapGenerator.getTexture(mapName)) || null
 			mat = createPrimitiveAdditiveMaterial({
@@ -234,6 +244,7 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 				alphaTestValue,
 				doubleSided: true,
 				depthBias,
+				modulateVsAdd: blendModulate,
 			})
 			mat.name = material ? `material:${material.name}` : 'material:additive'
 			getSlots(mat).__addBlend = true
@@ -455,22 +466,23 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 	}
 
 	/**
-	 * Unbinds a texture slot the script emptied. Dropping the pending key too
-	 * means a late arrival of the removed name can never rebind it. Classic
-	 * slots render color-only afterwards, like upstream's untextured draw;
-	 * node slots keep the placeholder branch, which hides rather than flashing
-	 * a stale image.
+	 * Unbinds a texture slot the script emptied; the pending key and cached
+	 * name go too, so a late arrival of the removed name can never rebind it.
+	 * The slot renders untextured afterwards, like upstream's imageless draw.
 	 */
 	private clearTextureSlot(mat: any, key: 'map' | 'normalMap' | 'envMap' | 'emissiveMap'): void {
-		delete getSlots(mat)[pendingKeyFor(key)]
+		const slots = getSlots(mat)
+		normalizePendingKeys(slots)
+		delete slots[pendingKeyFor(key)]
+		if (key !== 'map') return
+		delete (slots as Record<string, unknown>).__mapName
 		const route = SLOT_ROUTES[kindOf(mat)][key]
 		if (route === 'node-map') {
 			const changed = kindOf(mat) === 'baked' ? setBakedMap(mat, null) : setPrimitiveMap(mat, null)
 			if (changed) mat.needsUpdate = true
 			return
 		}
-		if (route === 'ignore') return
-		if (mat[key] !== null) {
+		if (route !== 'ignore' && mat[key] !== null) {
 			mat[key] = null
 			mat.needsUpdate = true
 		}
@@ -582,7 +594,8 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 		addBlendMode?: number,
 		disableLightingBelow = 0,
 		depthWrite?: boolean,
+		modulateVsAdd?: number,
 	): string {
-		return `${material?.name ?? 'none'}:${map ?? 'none'}:${normalMap ?? 'none'}:${envMap ?? 'none'}:${emissiveMap ?? 'none'}:${isTransparent ? 't' : 'o'}:${depthBias}:${disableLighting ?? 'x'}:${addBlend ? 'a' : 'o'}:${backfacesEnabled ?? 'x'}:${alphaTestValue}:${addBlendMode ?? 'x'}:${disableLightingBelow}:${depthWrite ?? 'x'}`
+		return `${material?.name ?? 'none'}:${map ?? 'none'}:${normalMap ?? 'none'}:${envMap ?? 'none'}:${emissiveMap ?? 'none'}:${isTransparent ? 't' : 'o'}:${depthBias}:${disableLighting ?? 'x'}:${addBlend ? 'a' : 'o'}:${backfacesEnabled ?? 'x'}:${alphaTestValue}:${addBlendMode ?? 'x'}:${disableLightingBelow}:${depthWrite ?? 'x'}:${modulateVsAdd ?? 'x'}`
 	}
 }

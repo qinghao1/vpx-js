@@ -92,6 +92,7 @@ export class FlasherApi extends ItemApi<FlasherData> {
 		return this.data.szImageB
 	}
 	set ImageB(value) {
+		// Data-only: ImageB is parsed but never drawn, so the delta pipeline needs nothing.
 		this.data.szImageB = value
 	}
 	get Alpha() {

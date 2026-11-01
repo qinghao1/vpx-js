@@ -192,6 +192,63 @@ describe('regression: framing keeps DMD and full playfield visible', () => {
 		}
 	})
 
+	it('degenerate optics fall back to the full cabinet distance', () => {
+		const group = buildWalkingDeadGroup()
+		for (const view of [
+			{ fov: 0, aspect: 16 / 9 },
+			{ fov: -45, aspect: 16 / 9 },
+			{ fov: NaN, aspect: 16 / 9 },
+			{ fov: 45, aspect: 0 },
+			{ fov: 45, aspect: -1 },
+			{ fov: 45, aspect: NaN },
+		]) {
+			const state = computePlayFraming(group, view)
+			const dist = state.position.distanceTo(state.target)
+			expect(dist, `fallback dist for ${JSON.stringify(view)}`).to.be.finite
+			expect(dist, `fallback dist for ${JSON.stringify(view)}`).to.be.closeTo(state.maxDim, 1e-6)
+		}
+	})
+
+	it('hyphenated cabinet names size the viewer but not the play camera', () => {
+		const group = buildWalkingDeadGroup()
+		group.add(
+			makeMesh('primitive-VR-Cab_CabinetTall', new THREE.BoxGeometry(60, 220, 40), new THREE.Vector3(0, 90, -70)),
+		)
+		group.updateMatrixWorld(true)
+		expect(computeViewerFraming(group).maxDim, 'hyphenated cab still sizes the viewer').to.be.greaterThan(210.6)
+		const play = computePlayFraming(group, STD_VIEW)
+		const plain = computePlayFraming(buildWalkingDeadGroup(), STD_VIEW)
+		expect(play.position.distanceTo(plain.position), 'hyphenated cab must not move the play camera').to.be.closeTo(
+			0,
+			1e-6,
+		)
+		expect(play.target.distanceTo(plain.target), 'hyphenated cab must not move the play target').to.be.closeTo(
+			0,
+			1e-6,
+		)
+	})
+
+	it('a table with no playfield-named mesh still frames finitely', () => {
+		const root = new THREE.Group()
+		root.add(makeMesh('VRCab_Cabinet', new THREE.BoxGeometry(60, 120, 210), new THREE.Vector3(0, 20, 0)))
+		root.add(makeMesh('primitive-coin_door', new THREE.BoxGeometry(20, 20, 4), new THREE.Vector3(0, -30, 100)))
+		root.updateMatrixWorld(true)
+		const state = computePlayFraming(root, STD_VIEW)
+		const dist = state.position.distanceTo(state.target)
+		expect(dist, 'fallback distance is finite').to.be.finite
+		expect(dist, 'fallback distance is positive').to.be.greaterThan(0)
+	})
+
+	it('clip planes stay positive and ordered', () => {
+		const play = computePlayFraming(buildWalkingDeadGroup(), STD_VIEW)
+		const viewer = computeViewerFraming(buildWalkingDeadGroup())
+		for (const state of [play, viewer]) {
+			expect(state.near, 'near is finite').to.be.finite
+			expect(state.near, 'near is positive').to.be.greaterThan(0)
+			expect(state.far, 'far exceeds near').to.be.greaterThan(state.near)
+		}
+	})
+
 	it('play is tighter than viewer but both fit', () => {
 		const group = buildWalkingDeadGroup()
 		const play = computePlayFraming(group, STD_VIEW)

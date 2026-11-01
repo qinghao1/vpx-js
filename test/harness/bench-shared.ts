@@ -84,6 +84,7 @@ export function defaultGenOpts(overrides: Record<string, boolean> = {}): Record<
 		exportTriggers: true,
 		exportSpinners: true,
 		exportPlungers: true,
+		exportFlashers: true,
 		...overrides,
 	}
 }

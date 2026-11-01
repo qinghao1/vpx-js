@@ -3,10 +3,16 @@
 #include <wasm_simd128.h>
 #endif
 
+// NOTE: upstream src/math/MeshUtils.h is intentionally not included: it carries
+// zero includes of its own yet needs Vertex2D/Vertex3Ds, std::vector, FLT_MAX,
+// __forceinline and CrossProduct from other upstream headers, so it cannot
+// compile standalone in this freestanding target (stub headers are explicitly
+// out of scope for this unit). The helpers below stay hand-mirrored instead.
+
 constexpr float C_CONTACTVEL = 0.099f;
 constexpr float C_LOWNORMVEL = 0.0001f;
 constexpr float PHYS_TOUCH = 0.05f;
-constexpr float C_TOL_ENDPNTS = 0.0f;
+constexpr float C_TOL_ENDPNTS = 0.001f; // Upstream physconst.h defines 0.0f; vpx-js widens it to 0.001 per discrepancy-harness P1.
 
 struct Hit {
 	float t = -1;

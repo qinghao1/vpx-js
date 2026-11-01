@@ -45,8 +45,9 @@ describe('explicit texture clear (script-emptied image)', () => {
 		return tex
 	}
 
-	it('unbinds the slot and drops the pending key when cleared to empty', () => {
-		const generator = clearGenerator(new Map([['d_5', makeTex()]]))
+	it('clears the slot and ignores late arrivals of the cleared name', () => {
+		const textures = new Map<string, DataTexture>([['d_5', makeTex()]])
+		const generator = clearGenerator(textures)
 		const mat = new MeshStandardMaterial() as any
 		generator.applyMap(mat, 'd_5')
 		expect(mat.map, 'map bound').not.toBeNull()
@@ -56,12 +57,7 @@ describe('explicit texture clear (script-emptied image)', () => {
 		expect(mat.map, 'slot unbound').toBeNull()
 		expect(mat.userData.pendingMap, 'no pending key').toBeUndefined()
 		expect(mat.version, 'program invalidated').toBeGreaterThan(version)
-	})
-
-	it('a late arrival of the cleared name never rebinds', () => {
-		const textures = new Map<string, DataTexture>()
-		const generator = clearGenerator(textures)
-		const mat = new MeshStandardMaterial() as any
+		textures.delete('d_5')
 		generator.applyMap(mat, 'd_5')
 		expect(mat.userData.pendingMap, 'streams').toBe('d_5')
 		generator.applyMap(mat, '')
@@ -70,8 +66,24 @@ describe('explicit texture clear (script-emptied image)', () => {
 		const mesh = new Mesh()
 		mesh.material = mat
 		root.add(mesh)
-		const fixed = generator.resolvePendingInScene(root)
-		expect(fixed, 'cleared name stays unbound').toBe(0)
+		expect(generator.resolvePendingInScene(root), 'cleared name stays unbound').toBe(0)
+		expect(mat.map, 'slot stays empty').toBeNull()
+	})
+
+	it('clears the legacy pending spelling too', () => {
+		const textures = new Map<string, DataTexture>()
+		const generator = clearGenerator(textures)
+		const mat = new MeshStandardMaterial() as any
+		mat.userData.pendingmap = 'd_5'
+		generator.applyMap(mat, '')
+		expect(mat.userData.pendingMap, 'no canonical pending key').toBeUndefined()
+		expect(mat.userData.pendingmap, 'no legacy pending key').toBeUndefined()
+		textures.set('d_5', makeTex())
+		const root = new Group()
+		const mesh = new Mesh()
+		mesh.material = mat
+		root.add(mesh)
+		expect(generator.resolvePendingInScene(root), 'legacy spelling stays unbound').toBe(0)
 		expect(mat.map, 'slot stays empty').toBeNull()
 	})
 })

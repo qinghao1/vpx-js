@@ -26,7 +26,7 @@ export const GRAVITYCONST = 1.81751
 
 /** Collision tolerances. */
 export const C_PRECISION = 0.01
-export const C_TOL_ENDPNTS = 0.0
+export const C_TOL_ENDPNTS = 0.001 // Upstream physconst.h defines 0.0f; vpx-js widens it to 0.001 per discrepancy-harness P1.
 export const C_TOL_RADIUS = 0.005
 export const PHYS_SKIN = 25.0
 export const DEFAULT_BALL_SIZE = 25
