@@ -203,8 +203,8 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 		// depthBias windows, and on/off substrings must not change the branch.
 		// The unlit bake path additionally needs bake texels (present or still
 		// streaming): without any referenced texture it would render the raw
-		// author tint flat and unlit — near-black for dark bake materials such
-		// as VLM.Bake.Active (Walking Dead flipper bats). Upstream renders those
+		// author tint flat and unlit — near-black for dark unlit bake materials
+		// on live parts. Upstream renders those
 		// live parts lit (src/parts/flipper.cpp Flipper::Render draws the bat
 		// and rubber through the lit basic shader), so fall through to the lit
 		// primitive path with the authored color as albedo instead.
@@ -228,9 +228,9 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 				alphaTestValue,
 				doubleSided: true,
 				depthBias,
-				// Native absorb always modulates (default 0.9, Settings_properties.inl);
-				// without it the premul-over blend would emit unmodulated output.
-				modulateVsAdd: absorb ? (modulateVsAdd ?? 0.9) : modulateVsAdd,
+				// Absent modulate on absorb falls back to the native default
+				// inside the factory (DEFAULT_MODULATE).
+				modulateVsAdd,
 				absorb,
 			})
 			mat.name = material ? `material:${material.name}` : 'material:additive'

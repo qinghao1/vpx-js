@@ -5,6 +5,7 @@ import {
 	CustomBlending,
 	DoubleSide,
 	FrontSide,
+	NoBlending,
 	OneFactor,
 	OneMinusSrcAlphaFactor,
 	SrcAlphaFactor,
@@ -30,7 +31,7 @@ import {
 } from '../../../vpt/primitive/primitive-material-protocol.js'
 import { copyForkedRenderState, defineEmissiveIntensityCompat, setNodeMapSlot } from '../material-shared.js'
 import { getTransmissionTexture, TRANSMISSION_OPAQUE_CUTOFF } from '../transmission-buffer.js'
-import { applyModulateVsAddBlending, clampModulateVsAdd } from './modulate-vs-add.js'
+import { applyModulateVsAddBlending, clampModulateVsAdd, DEFAULT_MODULATE } from './modulate-vs-add.js'
 
 export type { PrimitiveAdditiveUpdate, PrimitiveBdlUpdate, ProtocolColor }
 export {
@@ -151,6 +152,8 @@ export interface PrimitiveAdditiveOptions {
 	modulateVsAdd?: number
 	/** AB_ABSORB: positive premultiplied encoding under premul-over, not the AB_ADD negative arm. */
 	absorb?: boolean
+	/** AB_NONE conversion target: opaque static color, set post-hoc by the updater, carried by clones. */
+	plain?: boolean
 }
 
 /**
@@ -182,6 +185,49 @@ export function flasherAbsorbComposite(
 	const m = clampModulateVsAdd(modulate)
 	const resultA = texA * intensity
 	return tint * tex * resultA + dst * (1 - Math.min(1, m * resultA))
+}
+
+/**
+ * Native AB_NONE flasher output (`fs_flasher.sc` plain arm, blending
+ * disabled): opaque static color through the texture. Intensity folds into
+ * coverage only, and the disabled blend ignores alpha, so brightness never
+ * overdrives and the backdrop never survives.
+ */
+export function flasherPlainComposite(tint: number, tex: number): number {
+	return tint * tex
+}
+
+/** Live blend-mode target for an additive overlay (native recomputes per draw; three.js bakes per material). */
+export type FlasherBlendTarget = 'absorb' | 'additive' | 'plain'
+
+function applyTargetBlend(mat: MeshBasicNodeMaterial, target: FlasherBlendTarget, modulated: boolean): void {
+	if (target === 'absorb') applyAbsorbBlendState(mat)
+	else if (target === 'plain') mat.blending = NoBlending
+	// REVSUBTRACT is order-dependent: overlapping AB_ADD overlays composite in
+	// draw order (depthBias tiers + transparent sort).
+	else if (modulated) applyModulateVsAddBlending(mat)
+	else mat.blending = AdditiveBlending
+}
+
+/**
+ * Converts an additive overlay toward the live blend mode in place, matching
+ * native's per-draw recompute. Steady state costs one flag comparison;
+ * transitions rebuild the encoding and revalidate once. Returns whether it
+ * converted. Callers declare the mode; only additive overlays (`__addBlend`)
+ * may enter — classic materials keep their own path.
+ */
+export function convertFlasherBlend(mat: MeshBasicNodeMaterial, target: FlasherBlendTarget): boolean {
+	const userData = mat.userData as Record<string, unknown>
+	if ((userData.__absorb === true) === (target === 'absorb') && (userData.__plain === true) === (target === 'plain'))
+		return false
+	userData.__absorb = target === 'absorb'
+	userData.__plain = target === 'plain'
+	applyTargetBlend(mat, target, userData.__uModulate !== undefined)
+	// Plain is opaque like native (EnableAlphaBlend(false)); the additive targets blend.
+	mat.transparent = target !== 'plain'
+	;(userData.__rebuild as ((map: unknown) => void) | undefined)?.(userData.__map ?? null)
+	mat.needsUpdate = true
+	return true
 }
 
 // Single-sided fallback shared by every material path: converted VPX meshes are
@@ -306,13 +352,18 @@ export function createPrimitiveAdditiveMaterial(opts: PrimitiveAdditiveOptions):
 	const uTint = uniform(new Color(opts.tint ?? 0xffffff))
 	const uIntensity = uniform(opts.intensity ?? 1)
 	const uFlat = uniform(new Color(opts.tint ?? 0xffffff).multiplyScalar(opts.intensity ?? 1))
-	const uModulate = opts.modulateVsAdd === undefined ? undefined : uniform(clampModulateVsAdd(opts.modulateVsAdd))
+	// The factory owns the native default: absorb always modulates, so an
+	// absent value means 0.9 (`Settings_properties.inl`), never plain output
+	// under the premultiplied-over blend.
+	const modulateValue = opts.modulateVsAdd ?? (opts.absorb ? DEFAULT_MODULATE : undefined)
+	const uModulate = modulateValue === undefined ? undefined : uniform(clampModulateVsAdd(modulateValue))
 	const userData = mat.userData as Record<string, unknown>
 	userData.__primitiveKind = PRIMITIVE_ADDITIVE_KIND
 	userData.__addBlend = true
-	// Read late-bound in rebuild: the updater flips this after creation, and
-	// texture arrival rebuilds against whatever it holds then.
+	// Read late-bound in rebuild: the updater flips these after creation, and
+	// texture arrival rebuilds against whatever they hold then.
 	userData.__absorb = opts.absorb === true
+	userData.__plain = opts.plain === true
 	userData.__uTint = uTint
 	userData.__uIntensity = uIntensity
 	userData.__uFlat = uFlat
@@ -327,7 +378,15 @@ export function createPrimitiveAdditiveMaterial(opts: PrimitiveAdditiveOptions):
 			// Stashed for same-branch swaps (see setNodeMapSlot): rebinding
 			// the value in place skips the graph rebuild + revalidation.
 			userData.__mapNodes = [tex]
-			if (uModulate) {
+			if (userData.__plain === true) {
+				// Native AB_NONE (`fs_flasher.sc` plain arm): static color
+				// through the texture under the opaque blend below; intensity
+				// folds into coverage only, so brightness never overdrives.
+				mat.colorNode = Fn(() => {
+					const resultA = tex.a.mul(uIntensity)
+					return vec4(tex.rgb.mul(uTint), saturate(resultA))
+				})()
+			} else if (uModulate) {
 				if (userData.__absorb === true) {
 					// Native AB_ABSORB (`fs_flasher.sc` absorb arm): positive
 					// premultiplied output under the premul-over blend below.
@@ -364,6 +423,9 @@ export function createPrimitiveAdditiveMaterial(opts: PrimitiveAdditiveOptions):
 			// Overlays with no texture by design (mapName unset) keep the flat color.
 			// A zero src is a no-op under either blend below, so this branch is shared.
 			mat.colorNode = Fn(() => vec4(0, 0, 0, 0))()
+		} else if (userData.__plain === true) {
+			// Untextured AB_NONE: tex ≡ 1 in the plain formula above.
+			mat.colorNode = Fn(() => vec4(uTint, saturate(uIntensity)))()
 		} else if (uModulate) {
 			if (userData.__absorb === true) {
 				// Untextured AB_ABSORB: tex ≡ 1, so rgb rides uFlat
@@ -386,16 +448,13 @@ export function createPrimitiveAdditiveMaterial(opts: PrimitiveAdditiveOptions):
 	const map = opts.map ?? null
 	userData.__map = map
 	rebuild(map)
-	if (userData.__absorb === true) {
-		applyAbsorbBlendState(mat)
-	} else if (uModulate) {
-		// REVSUBTRACT is order-dependent: overlapping AB_ADD overlays
-		// composite in draw order (depthBias tiers + transparent sort).
-		applyModulateVsAddBlending(mat)
-	} else {
-		mat.blending = AdditiveBlending
-	}
-	mat.transparent = true
+	applyTargetBlend(
+		mat,
+		userData.__absorb === true ? 'absorb' : userData.__plain === true ? 'plain' : 'additive',
+		uModulate !== undefined,
+	)
+	// Plain is opaque like native; the additive targets blend.
+	mat.transparent = userData.__plain !== true
 	mat.depthWrite = false
 	mat.depthTest = true
 	// Coplanar with the opaque bake below; the offset wins that tie while
@@ -514,6 +573,7 @@ export function clonePrimitiveNodeMaterial<T>(mat: T): T {
 		intensity: uniformNumber((userData.__uIntensity as { value: unknown })?.value, 1),
 		modulateVsAdd: typeof modulateValue === 'number' ? modulateValue : undefined,
 		absorb: userData.__absorb === true,
+		plain: userData.__plain === true,
 	})
 	finishPrimitiveClone(sourceMaterial, cloned as unknown as CloneablePrimitiveMaterial, 'simple')
 	return cloned as unknown as T

@@ -1,4 +1,4 @@
-import { OneFactor, ReverseSubtractEquation, SrcAlphaFactor } from 'three'
+import { NoBlending, OneFactor, ReverseSubtractEquation, SrcAlphaFactor } from 'three'
 import { describe, expect, it } from 'vitest'
 import { TableBuilder } from '../../../test/table-builder.js'
 import { TestRenderApi } from '../../../test/test-render-api.js'
@@ -170,9 +170,8 @@ describe('The VPinball flasher mesh generator and updater', () => {
 
 		updater.applyState(node, state, renderApi, table)
 		expect(applied.length).toBe(0)
-		// Material identity (encoding + blend factors) is baked at build; a
-		// script flip of the blend mode must rebuild the overlay, and a
-		// repeat state must not rebuild again.
+		// Geometry regenerates on a script flip of the blend mode while the
+		// overlay material converts in place; a repeat state regenerates nothing.
 		data.addBlendMode = FlasherAddBlend.Absorb
 		updater.applyState(node, state, renderApi, table)
 		expect(applied.length).toBe(1)
@@ -306,7 +305,9 @@ describe('The VPinball flasher mesh generator and updater', () => {
 		const state = FlasherState.claim('AbsorbFlasher', true, 0xff8844, 80)
 		const updater = new FlasherUpdater(state, data)
 
-		const material: any = { needsUpdate: false, userData: {} }
+		// Every additive overlay carries __addBlend from the factory; the guard
+		// keeps classic materials on their own path.
+		const material: any = { needsUpdate: false, userData: { __addBlend: true } }
 		const node = {
 			visible: false,
 			traverse: (callback: (child: unknown) => void) => callback({ isMesh: true, material }),
@@ -362,6 +363,25 @@ describe('The VPinball flasher mesh generator and updater', () => {
 		expect(material.userData.__absorb).toBe(true)
 		expect(material.blendSrc).toBe(OneFactor)
 		expect(material.version).toBe(2)
+
+		data.addBlend = false
+		updater.applyState(node, state, renderApi, table)
+		expect(material.userData.__plain).toBe(true)
+		expect(material.userData.__absorb).toBe(false)
+		expect(material.blending).toBe(NoBlending)
+		expect(material.transparent).toBe(false)
+		expect(material.version).toBe(3)
+
+		updater.applyState(node, state, renderApi, table)
+		expect(material.version).toBe(3)
+
+		data.addBlend = true
+		data.addBlendMode = FlasherAddBlend.Add
+		updater.applyState(node, state, renderApi, table)
+		expect(material.userData.__plain).toBe(false)
+		expect(material.blendEquation).toBe(ReverseSubtractEquation)
+		expect(material.transparent).toBe(true)
+		expect(material.version).toBe(4)
 	})
 
 	it('should not invalidate the program when opacity values are unchanged', () => {

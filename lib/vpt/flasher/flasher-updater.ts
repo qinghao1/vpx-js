@@ -1,10 +1,10 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { AdditiveBlending, type Object3D } from 'three'
+import type { Object3D } from 'three'
 import type { IRenderApi } from '../../render/irender-api.js'
-import { applyModulateVsAddBlending, clampModulateVsAdd } from '../../render/threejs/nodes/modulate-vs-add.js'
-import { applyAbsorbBlendState } from '../../render/threejs/nodes/primitive-bdl-node.js'
+import { clampModulateVsAdd } from '../../render/threejs/nodes/modulate-vs-add.js'
+import { convertFlasherBlend } from '../../render/threejs/nodes/primitive-bdl-node.js'
 import { ItemUpdater, noteTextureDemand } from '../item-updater.js'
 import type { Light } from '../light/light.js'
 import type { LightAnimation } from '../light/light-physics.js'
@@ -91,29 +91,21 @@ export class FlasherUpdater extends ItemUpdater<FlasherState> {
 					// Blend factors are static per flasher; revalidating the
 					// program every frame for identical state rebuilds shaders
 					// continuously. Uniform writes above need no invalidation.
-					// Blend-mode flips rebuild geometry above but keep the material:
-					// convert it in place so both directions track native,
-					// which recomputes blend state per draw. Guarded by the
-					// flag, so steady frames pay one comparison.
-					if (absorb && userData?.__absorb !== true) {
-						userData.__absorb = true
-						applyAbsorbBlendState(mat)
-						;(userData.__rebuild as ((map: unknown) => void) | undefined)?.(userData.__map ?? null)
-						mat.needsUpdate = true
-					} else if (!absorb && this.data.addBlend && userData?.__absorb === true) {
-						userData.__absorb = false
-						if (userData?.__uModulate) applyModulateVsAddBlending(mat)
-						else mat.blending = AdditiveBlending
-						;(userData.__rebuild as ((map: unknown) => void) | undefined)?.(userData.__map ?? null)
-						mat.needsUpdate = true
-					}
+					// Blend-mode flips rebuild geometry above but keep the
+					// material: convert it in place toward the live mode.
+					if (userData?.__addBlend === true) convertFlasherBlend(mat, absorb ? 'absorb' : 'additive')
 				} else {
-					if (mat.color?.set) mat.color.set(this.state.color)
-					mat.opacity = Math.min(1, Math.max(0, alpha / 100))
-					const transparent = mat.opacity < 1
-					if (mat.transparent !== transparent) {
-						mat.transparent = transparent
-						mat.needsUpdate = true
+					// Converted overlays take the plain protocol; classic
+					// materials take the authored color/opacity path.
+					if (userData?.__addBlend === true) convertFlasherBlend(mat, 'plain')
+					else {
+						if (mat.color?.set) mat.color.set(this.state.color)
+						mat.opacity = Math.min(1, Math.max(0, alpha / 100))
+						const transparent = mat.opacity < 1
+						if (mat.transparent !== transparent) {
+							mat.transparent = transparent
+							mat.needsUpdate = true
+						}
 					}
 				}
 			}

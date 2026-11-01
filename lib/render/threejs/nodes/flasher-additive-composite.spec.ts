@@ -4,6 +4,7 @@ import {
 	AddEquation,
 	AdditiveBlending,
 	CustomBlending,
+	NoBlending,
 	OneFactor,
 	OneMinusSrcAlphaFactor,
 	OneMinusSrcColorFactor,
@@ -13,9 +14,11 @@ import {
 import { describe, expect, it } from 'vitest'
 import {
 	clonePrimitiveNodeMaterial,
+	convertFlasherBlend,
 	createPrimitiveAdditiveMaterial,
 	flasherAbsorbComposite,
 	flasherAdditiveComposite,
+	flasherPlainComposite,
 } from './primitive-bdl-node.js'
 import { graphReferences, materialize } from './tsl-test-harness.js'
 
@@ -138,5 +141,43 @@ describe('flasher AB_ABSORB native composite (fs_flasher.sc absorb arm)', () => 
 		expect(cloned.blending).toBe(CustomBlending)
 		expect(cloned.blendSrc).toBe(OneFactor)
 		expect(cloned.blendDst).toBe(OneMinusSrcAlphaFactor)
+	})
+})
+
+describe('flasher AB_NONE plain output (fs_flasher.sc plain arm)', () => {
+	it('emits opaque static color regardless of backdrop', () => {
+		expect(flasherPlainComposite(TINT_LIN, TEX_WHITE)).toBeCloseTo(TINT_LIN * TEX_WHITE, 12)
+	})
+
+	it('converts an absorb overlay to opaque static color without revalidating twice', () => {
+		const mat = createPrimitiveAdditiveMaterial({
+			tint: 0x646464,
+			intensity: INTENSITY,
+			modulateVsAdd: 1,
+			absorb: true,
+		})
+		expect(convertFlasherBlend(mat, 'plain')).toBe(true)
+		expect(mat.blending).toBe(NoBlending)
+		expect(mat.transparent).toBe(false)
+		expect(mat.userData.__plain).toBe(true)
+		expect(mat.userData.__absorb).toBe(false)
+		const ud = mat.userData as Record<string, { value: unknown }>
+		expect(graphReferences(materialize(mat.colorNode), ud.__uTint)).toBe(true)
+		expect(convertFlasherBlend(mat, 'plain')).toBe(false)
+	})
+
+	it('restores the additive encoding on conversion back', () => {
+		const mat = createPrimitiveAdditiveMaterial({
+			tint: 0x646464,
+			intensity: INTENSITY,
+			modulateVsAdd: 1,
+			absorb: true,
+		})
+		convertFlasherBlend(mat, 'plain')
+		expect(convertFlasherBlend(mat, 'additive')).toBe(true)
+		expect(mat.blending).toBe(CustomBlending)
+		expect(mat.blendEquation).toBe(ReverseSubtractEquation)
+		expect(mat.transparent).toBe(true)
+		expect(mat.userData.__plain).toBe(false)
 	})
 })

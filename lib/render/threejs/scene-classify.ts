@@ -4,7 +4,7 @@ import { isBaked, pendingMapOf, RE_BAKE_MAP, RE_BAKE_MAT, RE_VR } from './materi
 
 export { RE_BAKE_MAP, RE_BAKE_MAT, RE_VR }
 export const RE_ALPHA_MESH = /armp|ramp|bat_|non[_-]?opaque|plastic|gate/i
-const RE_CAB = /vr_?cab|cabinet|lockbar|pincab|backbox|coin_?door/i
+const RE_CAB = /vrcab|cabinet|lockbar|pincab|backbox|coindoor/i
 
 // Author spellings vary (`vrcab` vs `vr_cab`, hyphens); fold separators so
 // token tests see one canonical form.

@@ -1,7 +1,8 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { type MeshStandardMaterial, type Object3D, PointLight, type Mesh as ThreeMesh } from 'three'
+import { type Object3D, PointLight, type Mesh as ThreeMesh } from 'three'
+import type { MeshBasicNodeMaterial } from 'three/webgpu'
 import type { LightData, LightState } from '../../vpt/light/light.js'
 import { bakedIntensity } from '../../vpt/light/light-physics.js'
 import type { Table } from '../../vpt/table/table.js'
@@ -81,7 +82,7 @@ export class ThreeLightGenerator {
 				if (state.intensity !== undefined) {
 					child.visible = state.intensity > 0 && getAuthoredVisible(child)
 				}
-				const glow = (child as ThreeMesh).material as MeshStandardMaterial
+				const glow = (child as ThreeMesh).material as MeshBasicNodeMaterial
 				if (glow) {
 					// Native drives the lightmap glow from the live lamp state
 					// (lightColor_intensity + colors in fs_classic_light.sc).

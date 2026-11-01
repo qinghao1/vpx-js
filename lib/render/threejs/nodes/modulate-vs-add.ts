@@ -8,8 +8,11 @@ import type { MeshBasicNodeMaterial } from 'three/webgpu'
 export const MODULATE_MIN = 0.0001
 export const MODULATE_MAX = 0.9999
 
-/** Clamp m_modulate_vs_add into (0,1); fallback 0.9. Insert tables authoring ≈1.0 land on 0.9999. */
-export function clampModulateVsAdd(value?: number, fallback = 0.9): number {
+/** Native default (`Settings_properties.inl`): absorb always modulates, so absent means 0.9, not plain. */
+export const DEFAULT_MODULATE = 0.9
+
+/** Clamp m_modulate_vs_add into (0,1). Insert tables authoring ≈1.0 land on 0.9999. */
+export function clampModulateVsAdd(value?: number, fallback = DEFAULT_MODULATE): number {
 	const v = value ?? fallback
 	return Number.isNaN(v) ? MODULATE_MAX : Math.max(MODULATE_MIN, Math.min(MODULATE_MAX, v))
 }

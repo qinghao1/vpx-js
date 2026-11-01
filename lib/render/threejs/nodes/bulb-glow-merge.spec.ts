@@ -5,7 +5,6 @@ import {
 	type BufferGeometry,
 	Color,
 	CustomBlending,
-	DynamicDrawUsage,
 	Group,
 	Mesh,
 	PlaneGeometry,
@@ -205,19 +204,29 @@ describe('merged bulb-glow composite', () => {
 		expect((positions.array as Float32Array)[ref.start * 3]).to.be.closeTo((src.array as Float32Array)[0] * 2, 1e-6)
 	})
 
-	it('flags live attributes dynamic while baked anchors stay static', () => {
+	it('keeps merged attributes static; partial ranges handle the uploads', () => {
+		// DynamicDrawUsage forces a full re-upload every idle frame on WebGPU;
+		// the partial ranges below already cut tick uploads under any usage.
 		const { root } = twoLampRoot()
 		expect(mergeBulbGlowQuads(root, tableStub())).to.equal(2)
 		const merged = root.getObjectByName('merged:bulb.glow') as Mesh
 		const geo = merged.geometry as BufferGeometry
-		for (const name of ['aGlowDyn', 'aGlowColor', 'aGlowColor2']) {
-			expect((geo.getAttribute(name) as BufferAttribute).usage, `${name} is rewritten per tick`).to.equal(
-				DynamicDrawUsage,
-			)
+		for (const name of ['position', 'aGlowCenter', 'aGlowParams', 'aGlowDyn', 'aGlowColor', 'aGlowColor2']) {
+			expect((geo.getAttribute(name) as BufferAttribute).usage, `${name} stays static`).to.equal(StaticDrawUsage)
 		}
-		for (const name of ['position', 'aGlowCenter', 'aGlowParams']) {
-			expect((geo.getAttribute(name) as BufferAttribute).usage, `${name} is baked once`).to.equal(StaticDrawUsage)
-		}
+	})
+
+	it('skips identical restamps without touching the upload queue', () => {
+		const { root, quadA } = twoLampRoot()
+		expect(mergeBulbGlowQuads(root, tableStub())).to.equal(2)
+		const ref = quadA.userData.__mergedGlow as MergedBulbGlowRef
+		const geo = ref.mesh.geometry as BufferGeometry
+		const dyn = geo.getAttribute('aGlowDyn') as BufferAttribute
+		const version = dyn.version
+		// Baked intensity is already 10: same-value ticks change nothing.
+		setMergedBulbGlowRangeState(ref.mesh, ref, { intensity: 10, color: 0xff0000, modulate: 0.9 })
+		expect(dyn.version, 'no upload without a change').to.equal(version)
+		expect(dyn.updateRanges, 'no ranges without a change').to.have.length(0)
 	})
 
 	it('records partial update ranges instead of re-uploading whole buffers', () => {

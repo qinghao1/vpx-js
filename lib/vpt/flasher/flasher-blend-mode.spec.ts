@@ -102,9 +102,9 @@ describe('Flasher absorb parity (upstream flasher.cpp SetupAddBlendState; AB_ADD
 	})
 
 	it('stamps absorb state through the shared helper, matching the generator', () => {
-		// The generator and the per-frame updater stamp must not drift into a
-		// byte-copy: both go through applyAbsorbBlendState. AB_ADD is
-		// deliberately excluded — it takes the modulate-vs-add path instead.
+		// The generator and the per-frame updater share applyAbsorbBlendState
+		// so their blend factors stay identical. AB_ADD is deliberately
+		// excluded — it takes the modulate-vs-add path instead.
 		const generator = makeGenerator()
 		const fromGenerator = generator.getMaterial(
 			undefined,
@@ -186,8 +186,8 @@ describe('Flasher absorb parity (upstream flasher.cpp SetupAddBlendState; AB_ADD
 			undefined,
 			0.5,
 		)
-		// Native's absorb arm reads m_modulate_vs_add for the src alpha; dropping
-		// the uniform rendered alpha = texA·intensity, diverging at overdrive.
+		// Native's absorb arm derives the src alpha from m_modulate_vs_add; the
+		// uniform is required for overdrive correctness.
 		expect(mat.userData.__uModulate?.value, 'absorb keeps the modulate uniform').toBeCloseTo(0.5, 12)
 		expect(mat.userData.__absorb, 'absorb flag still applies').toBe(true)
 	})
@@ -208,6 +208,9 @@ describe('Flasher absorb parity (upstream flasher.cpp SetupAddBlendState; AB_ADD
 				blending: AdditiveBlending,
 				needsUpdate: false,
 				userData: {
+					// Real clones carry __addBlend from the factory; the guard
+					// keeps classic materials on their own path.
+					__addBlend: true,
 					__uTint: { value: { set: (hex: number) => (tintColor = hex) } },
 					__uIntensity: { value: 0 },
 				},
@@ -247,7 +250,7 @@ describe('Flasher absorb parity (upstream flasher.cpp SetupAddBlendState; AB_ADD
 		addUpdater.applyState(addNode, addState, renderApi, table)
 		expect(addNode.visible).toBe(true)
 		expect(addMat.blending, 'add keeps its material blending').toBe(AdditiveBlending)
-		expect((addMat.userData as Record<string, unknown>).__absorbBlend).toBeFalsy()
+		expect((addMat.userData as Record<string, unknown>).__absorb).toBeFalsy()
 
 		const plainData = quadData('PlainUntouched')
 		const plainState = FlasherState.claim('PlainUntouched', true, 0x112233, 50)
