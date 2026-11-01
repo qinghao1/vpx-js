@@ -7,8 +7,6 @@ import {
 	FrontSide,
 	OneFactor,
 	OneMinusSrcAlphaFactor,
-	OneMinusSrcColorFactor,
-	ReverseSubtractEquation,
 	SrcAlphaFactor,
 	type Texture as ThreeTexture,
 	Vector2,
@@ -149,21 +147,8 @@ export interface PrimitiveAdditiveOptions {
 	alphaTestValue?: number
 	doubleSided?: boolean
 	depthBias?: number
-	/**
-	 * Native `m_modulate_vs_add` for AB_ADD flashers. When set, the overlay
-	 * uses the native modulate-vs-add composite (negatively-encoded output
-	 * under REVSUBTRACT, same scheme as the bulb glow) instead of plain
-	 * additive. When unset, the legacy plain-additive overlay stays.
-	 */
+	/** See RenderInfo.modulateVsAdd. */
 	modulateVsAdd?: number
-}
-
-/**
- * Native `m_modulate_vs_add` clamp (flasher.cpp): flashers always carry a
- * value, so no fallback — see the shared clamp in modulate-vs-add.ts.
- */
-function clampFlasherModulateVsAdd(value: number): number {
-	return clampModulateVsAdd(value)
 }
 
 /**
@@ -174,7 +159,7 @@ function clampFlasherModulateVsAdd(value: number): number {
  * src alpha `1/m − 1`.
  */
 export function flasherAdditiveComposite(dst: number, resultLight: number, resultA: number, modulate: number): number {
-	const m = clampFlasherModulateVsAdd(modulate)
+	const m = clampModulateVsAdd(modulate)
 	const s = m * resultA * resultLight
 	return dst * (1 + s) + s * (1 / m - 1)
 }
@@ -279,7 +264,8 @@ export function createPrimitiveBdlMaterial(opts: PrimitiveBdlOptions): MeshStand
  * Upstream per-draw blend state for AB_ABSORB (flasher.cpp SetupAddBlendState):
  * premultiplied alpha 'over', dst' = src + dst * (1 - srcAlpha). Shared by
  * the material generator (fresh absorb materials) and the flasher updater
- * (stamped per frame onto forked clones rebuilt as plain additive).
+ * (stamped per frame onto forked clones rebuilt via
+ * createPrimitiveAdditiveMaterial with modulate preserved).
  *
  * Note: AB_ADD takes the SRC_ALPHA/INVSRC_COLOR/REVSUBTRACT arm with
  * negatively-encoded output (signed modulateVsAdd, fs_flasher.sc), wired by
@@ -304,10 +290,7 @@ export function createPrimitiveAdditiveMaterial(opts: PrimitiveAdditiveOptions):
 	const uTint = uniform(new Color(opts.tint ?? 0xffffff))
 	const uIntensity = uniform(opts.intensity ?? 1)
 	const uFlat = uniform(new Color(opts.tint ?? 0xffffff).multiplyScalar(opts.intensity ?? 1))
-	// Native AB_ADD flasher encoding selector; absent keeps the legacy
-	// plain-additive overlay (non-flasher overlays never set it).
-	const uModulate =
-		opts.modulateVsAdd === undefined ? undefined : uniform(clampFlasherModulateVsAdd(opts.modulateVsAdd))
+	const uModulate = opts.modulateVsAdd === undefined ? undefined : uniform(clampModulateVsAdd(opts.modulateVsAdd))
 	const userData = mat.userData as Record<string, unknown>
 	userData.__primitiveKind = PRIMITIVE_ADDITIVE_KIND
 	userData.__addBlend = true
@@ -370,6 +353,8 @@ export function createPrimitiveAdditiveMaterial(opts: PrimitiveAdditiveOptions):
 	userData.__map = map
 	rebuild(map)
 	if (uModulate) {
+		// REVSUBTRACT is order-dependent: overlapping AB_ADD overlays
+		// composite in draw order (depthBias tiers + transparent sort).
 		applyModulateVsAddBlending(mat)
 	} else {
 		mat.blending = AdditiveBlending

@@ -241,6 +241,28 @@ describe('The VPinball flasher mesh generator and updater', () => {
 		expect(targetMesh.material.needsUpdate).toBe(false)
 	})
 
+	it('should restamp the modulate uniform when the script animates ModulateVsAdd', () => {
+		const data = createFlasherData('ModFlasher')
+		data.addBlend = true
+		data.modulateVsAdd = 0.9
+		const state = FlasherState.claim('ModFlasher', true, 0xff8844, 80)
+		const updater = new FlasherUpdater(state, data)
+		const targetMesh = {
+			isMesh: true,
+			material: { needsUpdate: false, userData: { __uModulate: { value: 0.9 } } },
+		}
+		const node = {
+			visible: false,
+			traverse: (callback: (child: unknown) => void) => callback(targetMesh),
+		}
+		const renderApi = new TestRenderApi() as unknown as IRenderApi<any, any, any>
+		const table = new TableBuilder().build()
+		data.modulateVsAdd = 0.3
+		updater.applyState(node, state, renderApi, table)
+		expect(targetMesh.material.userData.__uModulate.value).toBeCloseTo(0.3, 1e-5)
+		expect(targetMesh.material.needsUpdate).toBe(false)
+	})
+
 	it('should invalidate the program once for absorb blending, then stay stable', () => {
 		const data = createFlasherData('AbsorbFlasher')
 		data.addBlend = true

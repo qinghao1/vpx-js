@@ -5,10 +5,10 @@ import { describe, expect, it } from 'vitest'
 import {
 	bulbGlowComposite,
 	bulbGlowSrcAlpha,
-	clampBulbModulateVsAdd,
 	createBulbGlowNodeMaterial,
 	createMergedBulbGlowMaterial,
 } from './bulb-glow-node.js'
+import { clampModulateVsAdd } from './modulate-vs-add.js'
 import { graphReferences, materialize } from './tsl-test-harness.js'
 
 const ATTEN = 0.8
@@ -23,15 +23,15 @@ function legacySliver(dst: number, atten: number, intensity: number, modulate: n
 
 describe('bulb-glow native composite (fs_light.sc)', () => {
 	it('clamps modulate like native light.cpp (avoid 0 disabling the blend, avoid 1)', () => {
-		expect(clampBulbModulateVsAdd(undefined)).toBe(0.9)
-		expect(clampBulbModulateVsAdd(0.9)).toBe(0.9)
-		expect(clampBulbModulateVsAdd(0)).toBe(0.0001)
-		expect(clampBulbModulateVsAdd(1)).toBe(0.9999)
+		expect(clampModulateVsAdd(undefined)).toBe(0.9)
+		expect(clampModulateVsAdd(0.9)).toBe(0.9)
+		expect(clampModulateVsAdd(0)).toBe(0.0001)
+		expect(clampModulateVsAdd(1)).toBe(0.9999)
 	})
 
 	it('matches the hand-expanded native blend: dst·(1−src) − src·srcAlpha', () => {
 		for (const m of [0, 0.0001, 0.5, 0.9, 0.9999, 1]) {
-			const mc = clampBulbModulateVsAdd(m)
+			const mc = clampModulateVsAdd(m)
 			const src = -mc * ATTEN * INTENSITY * LIGHT
 			const srcAlpha = 1 / mc - 1
 			const expected = DST * (1 - src) - src * srcAlpha

@@ -41,7 +41,7 @@ describe('material arrival: BDL uniforms survive streaming', () => {
 	it('preserves the authored alpha cutout on materials created while streaming', () => {
 		const textures = new Map<string, DataTexture>()
 		const generator = makeGenerator(textures)
-		const mat: any = (generator as any).getMaterial(
+		const mat: any = generator.getMaterial(
 			{ name: 'insertrectangle1off', baseColor: 0xc8e1ff } as any,
 			'insertrectangle1off',
 			undefined,
@@ -100,7 +100,7 @@ describe('material arrival: BDL uniforms survive streaming', () => {
 			['imageb', texB],
 		])
 		const generator = makeGenerator(textures)
-		const mat: any = (generator as any).getMaterial(
+		const mat: any = generator.getMaterial(
 			{ name: 'NodeSwap', baseColor: 0xffffff } as any,
 			'imagea',
 			undefined,
@@ -143,7 +143,7 @@ describe('material arrival: BDL uniforms survive streaming', () => {
 		// must not shadow it or the transparent texels render black.
 		const textures = new Map<string, DataTexture>()
 		const generator = makeGenerator(textures)
-		const mat: any = (generator as any).getMaterial(
+		const mat: any = generator.getMaterial(
 			{ name: 'Plastic with an image', baseColor: 0xffffff } as any,
 			'instcard5balls',
 			undefined,
@@ -207,10 +207,7 @@ describe('material arrival: BDL uniforms survive streaming', () => {
 		// resolvePendingInScene(tableGroup) (plus cache-only for detached mats).
 		const textures = new Map<string, DataTexture>()
 		const generator = makeGenerator(textures)
-		const mat: any = (generator as any).getMaterial(
-			{ name: 'Some_Primitive', baseColor: 0xffffff } as any,
-			'scriptimage',
-		)
+		const mat: any = generator.getMaterial({ name: 'Some_Primitive', baseColor: 0xffffff } as any, 'scriptimage')
 		expect(mat.userData.pendingMap).toEqual('scriptimage')
 		const fork: any = cloneMaterialForWrite(mat)
 		expect(Object.values((generator as any).cachedMaterials)).not.toContain(fork)
@@ -253,7 +250,7 @@ describe('material arrival: BDL uniforms survive streaming', () => {
 		// Hand-building colorNode here would drop the transmission lift; the node
 		// branch must rebuild the authored graph (tint uniform + bulb tail) instead.
 		const generator = makeGenerator(new Map())
-		const mat: any = (generator as any).getMaterial({ name: 'VLM.Bake', baseColor: 0xffffff } as any, 'bakemap')
+		const mat: any = generator.getMaterial({ name: 'VLM.Bake', baseColor: 0xffffff } as any, 'bakemap')
 		expect(isBakedNodeMaterial(mat)).toBe(true)
 		const tex = makeTex()
 		;(tex as any).name = 'bakemap'
@@ -273,7 +270,7 @@ describe('material arrival: BDL uniforms survive streaming', () => {
 		// A referenced (still streaming) bake texture keeps the material on the
 		// unlit baked path; a bake name with no texture reference at all renders
 		// lit instead (upstream lit live-part parity).
-		const mat: any = (generator as any).getMaterial({ name: 'VLM.Bake', baseColor: 0xffffff } as any, 'bakemap')
+		const mat: any = generator.getMaterial({ name: 'VLM.Bake', baseColor: 0xffffff } as any, 'bakemap')
 		expect(mat.userData.__isBaked).toBe(true)
 		generator.applyNormalMap(mat, 'bakenormal')
 		generator.applyEnvMap(mat, 'bakeenv')
@@ -322,7 +319,7 @@ describe('material arrival: BDL uniforms survive streaming', () => {
 			['imageb', makeTex()],
 		])
 		const generator = makeGenerator(textures)
-		const mat: any = (generator as any).getMaterial(
+		const mat: any = generator.getMaterial(
 			{ name: 'SwapNoRebuild', baseColor: 0xffffff } as any,
 			'imagea',
 			undefined,
@@ -355,7 +352,7 @@ describe('material arrival: BDL uniforms survive streaming', () => {
 			['imageb', texB],
 		])
 		const generator = makeGenerator(textures)
-		const mat: any = (generator as any).getMaterial(
+		const mat: any = generator.getMaterial(
 			{ name: 'SwapCutout', baseColor: 0xffffff } as any,
 			'imagea',
 			undefined,

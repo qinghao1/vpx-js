@@ -34,15 +34,6 @@ export interface BulbGlowOptions {
 }
 
 /**
- * Native `m_modulate_vs_add` clamp (`light.cpp`): avoids 0 (which disables
- * the blend) and 1 (which reads wrong under day/night swings). Insert tables
- * authoring ≈1.0 land on 0.9999, leaving a ~1e-4 additive sliver.
- */
-export function clampBulbModulateVsAdd(value?: number): number {
-	return clampModulateVsAdd(value)
-}
-
-/**
  * Per-channel native bulb composite (`fs_light.sc` under REVSUBTRACT with
  * SRC_ALPHA/INV_SRC_COLOR): `dst + atten·I·(dst·m·l + (1−m)·l)`.
  */
@@ -53,14 +44,14 @@ export function bulbGlowComposite(
 	modulate: number,
 	light: number,
 ): number {
-	const m = clampBulbModulateVsAdd(modulate)
+	const m = clampModulateVsAdd(modulate)
 	const glow = atten * intensity * light
 	return dst * (1 + m * glow) + (1 - m) * glow
 }
 
 /** Native bulb src alpha (`fs_light.sc`): `gl_FragColor.a = 1/m − 1`. */
 export function bulbGlowSrcAlpha(modulate: number): number {
-	return 1 / clampBulbModulateVsAdd(modulate) - 1
+	return 1 / clampModulateVsAdd(modulate) - 1
 }
 
 export function createBulbGlowNodeMaterial(options: BulbGlowOptions): MeshBasicNodeMaterial {
@@ -83,7 +74,7 @@ export function createBulbGlowNodeMaterial(options: BulbGlowOptions): MeshBasicN
 	// sort for per-quad draws, bake order in the merged mesh); native sorts
 	// transparent on absolute z + depthBias, so overlap pixels can differ
 	// slightly — REVSUBTRACT is order-dependent.
-	const uModulate = uniform(clampBulbModulateVsAdd(options.modulateVsAdd))
+	const uModulate = uniform(clampModulateVsAdd(options.modulateVsAdd))
 
 	mat.colorNode = Fn(() => {
 		// Matches fs_light.sc: atten = pow(max(1 - saturate(len), 0.0001),

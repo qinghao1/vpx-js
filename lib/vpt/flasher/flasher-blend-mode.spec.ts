@@ -63,7 +63,7 @@ describe('Flasher absorb parity (upstream flasher.cpp SetupAddBlendState; AB_ADD
 	it('builds absorb materials as premultiplied-over, add materials as plain additive', () => {
 		const generator = makeGenerator()
 		const build = (mode?: number): any =>
-			(generator as any).getMaterial(
+			generator.getMaterial(
 				undefined,
 				undefined,
 				undefined,
@@ -102,7 +102,7 @@ describe('Flasher absorb parity (upstream flasher.cpp SetupAddBlendState; AB_ADD
 		// byte-copy again: both go through applyAbsorbBlendState. AB_ADD is
 		// deliberately excluded — it takes the modulate-vs-add path instead.
 		const generator = makeGenerator()
-		const fromGenerator = (generator as any).getMaterial(
+		const fromGenerator = generator.getMaterial(
 			undefined,
 			undefined,
 			undefined,
@@ -151,6 +151,30 @@ describe('Flasher absorb parity (upstream flasher.cpp SetupAddBlendState; AB_ADD
 			)
 		expect(key(FlasherAddBlend.Absorb), 'absorb key must differ from add').not.toBe(key(FlasherAddBlend.Add))
 		expect(key(undefined), 'legacy keys keep their shape').not.toContain('undefined')
+	})
+
+	it('ignores modulateVsAdd on the absorb arm', () => {
+		const generator = makeGenerator()
+		const mat = generator.getMaterial(
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			true,
+			0,
+			undefined,
+			true,
+			undefined,
+			0,
+			FlasherAddBlend.Absorb,
+			undefined,
+			undefined,
+			undefined,
+			0.5,
+		)
+		expect(mat.userData.__uModulate, 'absorb never takes the modulate arm').toBeUndefined()
+		expect(mat.userData.__absorbBlend, 'absorb stamp still applies').toBe(true)
 	})
 
 	it('stamps premultiplied-over onto live absorb materials while keeping the additive uniform path', () => {

@@ -69,7 +69,8 @@ const checks: DiscrepancyCheck[] = [
 		severity: 'major',
 		description:
 			'Upstream physconst.h defines 0.0f; vpx-js widens the LineSeg/flipper tangent band to 0.001 to close seam-tunneling at tessellated joints. Scale-consistent (0.5µm vs C_TOL_RADIUS 0.005); intentionally breaks native determinism at band edges.',
-		impact: 'Balls may incorrectly tunnel through flipper tips and line segments at 1 kHz.',
+		impact: 'Upstream 0.0 tunnels at tessellated joints; the widened band keeps vpx-js closed there.',
+		// ^ P1 impact describes the upstream behavior we diverge from, not a vpx-js symptom.
 		check: async () => {
 			const jsConst = readFileSafe(path.join(REPO_ROOT, 'lib/physics/constants.ts'))
 			const wasmSrc = readFileSafe(path.join(REPO_ROOT, 'wasm/modules/kernels/src/kernels.cpp'))

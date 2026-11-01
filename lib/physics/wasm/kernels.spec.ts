@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import type { PlayerPhysics } from '../../game/player-physics.js'
 import { Vertex2D, Vertex3D } from '../../math/vector.js'
@@ -36,10 +36,11 @@ const hasWasmDist =
 	existsSync(new URL('../../../wasm/dist/kernels.wasm', import.meta.url))
 
 describe('endpoint tolerance', () => {
-	it('C_TOL_ENDPNTS is 0.001 by deliberate divergence from upstream 0.0', () => {
-		// Upstream physconst.h defines 0.0f; vpx-js widens the LineSeg/flipper
-		// tangent band to close seam-tunneling at tessellated joints (harness P1).
+	it('C_TOL_ENDPNTS is 0.001 in TS and WASM by deliberate divergence from upstream 0.0', () => {
+		// Deliberate divergence; see constants.ts + harness P1.
 		expect(C_TOL_ENDPNTS).toBe(0.001)
+		const wasmSrc = readFileSync(new URL('../../../wasm/modules/kernels/src/kernels.cpp', import.meta.url), 'utf-8')
+		expect(wasmSrc).toMatch(/C_TOL_ENDPNTS\s*=\s*0\.001f/)
 	})
 })
 

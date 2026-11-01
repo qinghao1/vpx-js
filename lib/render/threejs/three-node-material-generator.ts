@@ -5,14 +5,7 @@ import type { Material } from '../../vpt/material.js'
 import { isOpenMesh, isValidCutout, resolveTransparency } from '../../vpt/primitive/primitive-material-protocol.js'
 import type { MeshConvertOptions } from '../irender-api.js'
 import type { IMaterialGenerator } from './imaterial-generator.js'
-import {
-	BALL_METALNESS,
-	BALL_ROUGHNESS,
-	isBaked,
-	normalizePendingKeys,
-	pendingKeyFor,
-	setGlobalEmissionScale,
-} from './material-shared.js'
+import { BALL_METALNESS, BALL_ROUGHNESS, isBaked, normalizePendingKeys, pendingKeyFor } from './material-shared.js'
 import { getSlots } from './material-slots.js'
 import { createDynamicBallNodeMaterial } from './nodes/ball-reflection-node.js'
 import { createBulbGlowNodeMaterial } from './nodes/bulb-glow-node.js'
@@ -184,9 +177,7 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 		// materials are created, so the bound three.js texture is usually null
 		// here and carries no isOpaque flag anyway — the VPT record does.
 		vptMap?: { isOpaque?: boolean } | null,
-		// Native AB_ADD `m_modulate_vs_add` (flashers). Selects the
-		// modulate-vs-add composite for additive overlays; absent keeps the
-		// legacy plain-additive overlay.
+		/** See RenderInfo.modulateVsAdd. */
 		modulateVsAdd?: number,
 	): any {
 		const key = this.getKey(

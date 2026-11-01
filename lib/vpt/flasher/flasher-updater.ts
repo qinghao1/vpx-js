@@ -3,6 +3,7 @@
 
 import type { Object3D } from 'three'
 import type { IRenderApi } from '../../render/irender-api.js'
+import { clampModulateVsAdd } from '../../render/threejs/nodes/modulate-vs-add.js'
 import { applyAbsorbBlendState } from '../../render/threejs/nodes/primitive-bdl-node.js'
 import { ItemUpdater, noteTextureDemand } from '../item-updater.js'
 import type { Light } from '../light/light.js'
@@ -78,6 +79,9 @@ export class FlasherUpdater extends ItemUpdater<FlasherState> {
 				if (this.data.addBlend) {
 					if (userData?.__uTint?.value?.set) userData.__uTint.value.set(this.state.color)
 					if (userData?.__uIntensity) userData.__uIntensity.value = intensity
+					// Native re-reads m_modulate_vs_add every frame; restamp the
+					// uniform in place so script-animated values track without rebuild.
+					if (userData?.__uModulate) userData.__uModulate.value = clampModulateVsAdd(this.data.modulateVsAdd)
 					if (userData?.__uFlat?.value?.set)
 						userData.__uFlat.value.set(this.state.color).multiplyScalar(intensity)
 					// Blend factors are static per flasher; revalidating the

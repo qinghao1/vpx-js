@@ -32,7 +32,7 @@ function makeTex() {
 describe('regression: mapless bake-named flipper parts stay lit', () => {
 	it('routes a mapless bake-named material to the lit primitive path', () => {
 		const generator = makeGenerator(new Map())
-		const mat: any = (generator as any).getMaterial(
+		const mat: any = generator.getMaterial(
 			{ name: 'VLM.Bake.Active', baseColor: 0x323232 } as any,
 			undefined,
 			undefined,
@@ -52,7 +52,7 @@ describe('regression: mapless bake-named flipper parts stay lit', () => {
 
 	it('keeps the unlit bake path while a bake texture is referenced', () => {
 		const generator = makeGenerator(new Map())
-		const mat: any = (generator as any).getMaterial(
+		const mat: any = generator.getMaterial(
 			{ name: 'VLM.Bake.Active', baseColor: 0x323232 } as any,
 			'vlm.nestmap0',
 			undefined,
@@ -72,7 +72,7 @@ describe('regression: mapless bake-named flipper parts stay lit', () => {
 	it('lights a late-arriving map on a mapless bake reference instead of baking it flat', () => {
 		const textures = new Map<string, DataTexture>()
 		const generator = makeGenerator(textures)
-		const mat: any = (generator as any).getMaterial(
+		const mat: any = generator.getMaterial(
 			{ name: 'VLM.Bake.Active', baseColor: 0x323232 } as any,
 			undefined,
 			undefined,

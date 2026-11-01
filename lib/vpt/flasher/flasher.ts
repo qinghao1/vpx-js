@@ -71,8 +71,6 @@ export class Flasher
 			// Tri-state blend mode; absorb renders premultiplied-over downstream.
 			// @see FlasherData::AddBlendMode in src/parts/flasher.h
 			addBlendMode: this.data.addBlendMode,
-			// AB_ADD overlays composite with the native modulate-vs-add
-			// encoding; the material generator only consumes it there.
 			modulateVsAdd: this.data.modulateVsAdd,
 			depthBias: this.data.depthBias,
 			isTransparent: true,

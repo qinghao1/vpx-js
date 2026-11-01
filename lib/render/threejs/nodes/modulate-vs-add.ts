@@ -8,7 +8,7 @@ import type { MeshBasicNodeMaterial } from 'three/webgpu'
 export const MODULATE_MIN = 0.0001
 export const MODULATE_MAX = 0.9999
 
-/** Native clamp shared by the bulb glow and AB_ADD flasher composites. */
+/** Clamp m_modulate_vs_add into (0,1); fallback 0.9. Insert tables authoring ≈1.0 land on 0.9999. */
 export function clampModulateVsAdd(value?: number, fallback = 0.9): number {
 	return Math.max(MODULATE_MIN, Math.min(MODULATE_MAX, value ?? fallback))
 }
