@@ -138,6 +138,66 @@ describe('The VPinball global API', () => {
 		expect(material?.baseColor).to.equal(0x563412)
 	})
 
+	it('should resolve MaterialColor targets once and pick up late materials', () => {
+		const store = { baseColor: 0 }
+		const cachedMaterials: Record<string, any> = {}
+		const fakeTable = {
+			getMaterial: () => store,
+			tableNode: undefined,
+			renderApi: { getMaterialGenerator: () => ({ cachedMaterials }) },
+		}
+		const api = new GlobalApi(fakeTable as any, {} as any)
+		const tracker = (bag: Record<string, number>) => ({
+			set(v: number) {
+				bag.v = v
+			},
+		})
+		const nodeTint: Record<string, number> = {}
+		const classicColor: Record<string, number> = {}
+		const nodeMat = {
+			name: 'material:rollovers',
+			userData: { __primitiveKind: 'mesh', __uTint: { value: tracker(nodeTint) } },
+			needsUpdate: false,
+		}
+		cachedMaterials['rollovers:0'] = nodeMat
+		// Script red (BGR 0x0000ff) resolves the target and tints without a program re-resolve.
+		api.MaterialColor('rollovers', 0x0000ff)
+		expect(store.baseColor).to.equal(0xff0000)
+		expect(nodeTint.v).to.equal(0xff0000)
+		expect(nodeMat.needsUpdate).to.equal(false)
+		// A repeat call reuses the cached resolution (same object, fresh value).
+		api.MaterialColor('rollovers', 0x00ff00)
+		expect(nodeTint.v).to.equal(0x00ff00)
+		expect(nodeMat.needsUpdate).to.equal(false)
+		// A material added later changes the fingerprint and joins the target set.
+		const classicMat = {
+			name: 'rollovers-top',
+			userData: {},
+			color: tracker(classicColor),
+			needsUpdate: false,
+		}
+		cachedMaterials['rollovers:1'] = classicMat
+		api.MaterialColor('rollovers', 0x0000ff)
+		expect(classicColor.v).to.equal(0xff0000)
+		expect(classicMat.needsUpdate).to.equal(true)
+		expect(nodeTint.v).to.equal(0xff0000)
+		// Baked lightmap plates stay untinted.
+		const bakedTint: Record<string, number> = {}
+		const bakedColor: Record<string, number> = {}
+		const bakedMat = {
+			name: 'rollovers-baked',
+			userData: { __isBaked: true, __uTint: { value: tracker(bakedTint) } },
+			color: tracker(bakedColor),
+			needsUpdate: false,
+		}
+		cachedMaterials['rollovers:2'] = bakedMat
+		api.MaterialColor('rollovers', 0x00ff00)
+		expect(bakedMat.needsUpdate).to.equal(false)
+		expect(bakedTint.v).to.equal(undefined)
+		expect(bakedColor.v).to.equal(undefined)
+		expect(classicColor.v).to.equal(0x00ff00)
+	})
+
 	it('should correctly save and load values', () => {
 		const api = new GlobalApi(table, player)
 		api.SaveValue('myTable', 'myValueName', 'myValue')

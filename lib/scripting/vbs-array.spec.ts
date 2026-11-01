@@ -80,6 +80,17 @@ describe('The VBScript array', () => {
 		expect(ERR.Number).to.equal(0)
 	})
 
+	it('should resolve numeric, string, and non-canonical index reads identically', () => {
+		const arr = new VbsArray<number | string>([1, 'two', 3]) as any
+		ERR.Clear()
+		expect(arr[1]).to.equal('two')
+		expect(arr['1']).to.equal('two')
+		expect(arr['01']).to.equal('two')
+		expect(arr.length).to.equal(3)
+		expect(arr[-1] as any).to.be.an.instanceof(VbsUndefined)
+		expect(ERR.Number).to.equal(0)
+	})
+
 	it('should record error 94 for a Null subscript under On Error Resume Next', () => {
 		const arr = new VbsArray<number | string>([1, 'two', 3]) as any
 		ERR.Clear()

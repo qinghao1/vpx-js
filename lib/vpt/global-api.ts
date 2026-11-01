@@ -365,59 +365,79 @@ export class GlobalApi extends VbsApi {
 		// Script colors are OLE_COLOR (BGR); baseColor and three.js use RGB.
 		const rgb = BiffParser.bgrToRgb(color)
 		material.baseColor = rgb
-		const g = globalThis as any
 		const target = name.toLowerCase()
-		const updateMaterial = (m: any) => {
-			if (!m) return
-			const n = (m.name ?? '').toLowerCase()
-			if (n === `material:${target}` || n === target || n.includes(target)) {
-				const ud = m.userData as any
-				if (ud?.__isBaked) {
-					// Baked lightmap plates are pre-lit unshaded textures; do not tint with material albedo color
-					return
-				}
-				if (ud?.__uTint?.value?.set) ud.__uTint.value.set(rgb)
-				if (ud?.__uTintColor?.value?.set) ud.__uTintColor.value.set(rgb)
-				if (ud?.__uAlbedo?.value?.set) ud.__uAlbedo.value.set(rgb)
-				if (ud?.__uFlat?.value?.set) ud.__uFlat.value.set(rgb)
-				const isNodeMat = !!ud?.__primitiveKind || !!ud?.__isBaked
-				if (isNodeMat) {
-					// Node materials manage live parameters via uniform values
-				} else if (m.emissiveMap) {
-					if (m.emissive?.set) m.emissive.set(rgb)
-					m.emissiveIntensity = 1.0
-				} else if (m.color?.set) {
-					m.color.set(rgb)
-				}
-				m.needsUpdate = true
+		const applyTint = (m: any) => {
+			const ud = m.userData as any
+			if (ud?.__isBaked) {
+				// Baked lightmap plates are pre-lit unshaded textures; do not tint with material albedo color
+				return
 			}
+			if (ud?.__uTint?.value?.set) ud.__uTint.value.set(rgb)
+			if (ud?.__uTintColor?.value?.set) ud.__uTintColor.value.set(rgb)
+			if (ud?.__uAlbedo?.value?.set) ud.__uAlbedo.value.set(rgb)
+			if (ud?.__uFlat?.value?.set) ud.__uFlat.value.set(rgb)
+			if (ud?.__primitiveKind || ud?.__isBaked) {
+				// Node materials manage live parameters via uniform values, so no program re-resolve.
+				return
+			}
+			if (m.emissiveMap) {
+				if (m.emissive?.set) m.emissive.set(rgb)
+				m.emissiveIntensity = 1.0
+			} else if (m.color?.set) {
+				m.color.set(rgb)
+			}
+			m.needsUpdate = true
 		}
-		const groups = [
-			(this.table as any).tableNode,
-			g.tableGroup,
-			g.scene,
-			g.viewer?.tableGroup,
-			g.viewer?.scene,
-		].filter(Boolean)
-		for (const grp of groups) {
-			grp.traverse?.((o: any) => {
-				for (const m of o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : []) {
-					updateMaterial(m)
-				}
-			})
-		}
+		for (const m of this.materialColorTargets(target)) applyTint(m)
+	}
+
+	/**
+	 * Three materials matching a script material name. Resolved once per name:
+	 * the scene graph is fixed after build, generator caches are append-only,
+	 * and texture arrival mutates materials in place, so a size fingerprint
+	 * catches every post-load addition. GI scripts call MaterialColor several
+	 * times per LampTimer tick; re-walking five scene graphs there cost
+	 * milliseconds per tick.
+	 */
+	private readonly materialColorCache = new Map<string, { mats: any[]; genSizes: string }>()
+
+	private materialColorTargets(target: string): any[] {
+		const g = globalThis as any
 		const generators = [
 			(this.table as any).renderApi?.getMaterialGenerator?.(),
 			g.renderApi?.getMaterialGenerator?.(),
 			g.viewer?.renderApi?.getMaterialGenerator?.(),
 		].filter(Boolean)
+		const genSizes = generators.map(gen => Object.keys((gen as any).cachedMaterials ?? {}).length).join(',')
+		const cached = this.materialColorCache.get(target)
+		if (cached && cached.genSizes === genSizes) return cached.mats
+		const mats: any[] = []
+		const seen = new Set<any>()
+		const collect = (m: any) => {
+			if (!m || seen.has(m)) return
+			seen.add(m)
+			const n = (m.name ?? '').toLowerCase()
+			if (n === `material:${target}` || n === target || n.includes(target)) mats.push(m)
+		}
+		const groups = new Set(
+			[(this.table as any).tableNode, g.tableGroup, g.scene, g.viewer?.tableGroup, g.viewer?.scene].filter(
+				Boolean,
+			),
+		)
+		for (const grp of groups) {
+			grp.traverse?.((o: any) => {
+				for (const m of o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : []) {
+					collect(m)
+				}
+			})
+		}
 		for (const gen of generators) {
 			for (const [k, m] of Object.entries((gen as any).cachedMaterials ?? {})) {
-				if (k.split(':')[0]!.toLowerCase() === target) {
-					updateMaterial(m)
-				}
+				if (k.split(':')[0]!.toLowerCase() === target) collect(m)
 			}
 		}
+		this.materialColorCache.set(target, { mats, genSizes })
+		return mats
 	}
 
 	public Nudge(angle: number, force: number): void {

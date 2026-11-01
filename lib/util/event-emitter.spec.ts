@@ -129,4 +129,32 @@ describe('EventEmitter', () => {
 		// The throwing listener aborted dispatch: 'after' never ran.
 		expect(calls).toEqual(['before'])
 	})
+
+	it('tracks subscription counts for cheap listener-less skips', () => {
+		const emitter = new EventEmitter()
+		expect(emitter.hasListeners('ev')).toBe(false)
+		const a = () => {}
+		const b = () => {}
+		emitter.on('ev', a)
+		emitter.on('ev', b)
+		expect(emitter.hasListeners('ev')).toBe(true)
+		emitter.off('ev', () => {})
+		expect(emitter.hasListeners('ev')).toBe(true)
+		emitter.off('ev', a)
+		expect(emitter.hasListeners('ev')).toBe(true)
+		emitter.off('ev', b)
+		expect(emitter.hasListeners('ev')).toBe(false)
+		emitter.on('ev', a)
+		emitter.removeAllListeners('other')
+		expect(emitter.hasListeners('ev')).toBe(true)
+		emitter.removeAllListeners('ev')
+		expect(emitter.hasListeners('ev')).toBe(false)
+		emitter.once('ev', a)
+		expect(emitter.hasListeners('ev')).toBe(true)
+		emitter.emit('ev')
+		expect(emitter.hasListeners('ev')).toBe(false)
+		emitter.on('x', a)
+		emitter.removeAllListeners()
+		expect(emitter.hasListeners('x')).toBe(false)
+	})
 })

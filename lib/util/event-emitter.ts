@@ -12,6 +12,8 @@ export type Listener = (...args: any[]) => void
  */
 export class EventEmitter {
 	private _events: Record<string, Listener | Listener[]> = Object.create(null)
+	// Underscore-prefixed like _events so script-facing proxies never expose it.
+	private _listenerCounts = new Map<string, number>()
 
 	public on(event: string, listener: Listener): this {
 		const existing = this._events[event]
@@ -22,6 +24,7 @@ export class EventEmitter {
 		} else {
 			existing.push(listener)
 		}
+		this._listenerCounts.set(event, (this._listenerCounts.get(event) ?? 0) + 1)
 		return this
 	}
 
@@ -43,10 +46,12 @@ export class EventEmitter {
 		if (!list) return this
 		if (list === listener || (list as any).listener === listener) {
 			delete this._events[event]
+			this.dropCount(event)
 		} else if (Array.isArray(list)) {
 			const idx = list.findIndex(fn => fn === listener || (fn as any).listener === listener)
 			if (idx !== -1) {
 				list.splice(idx, 1)
+				this.dropCount(event)
 				if (list.length === 1) this._events[event] = list[0]
 				else if (list.length === 0) {
 					// Drop emptied keys so emit() reports false instead of dispatching an empty list.
@@ -57,6 +62,12 @@ export class EventEmitter {
 		return this
 	}
 
+	private dropCount(event: string): void {
+		const left = (this._listenerCounts.get(event) ?? 1) - 1
+		if (left <= 0) this._listenerCounts.delete(event)
+		else this._listenerCounts.set(event, left)
+	}
+
 	public removeListener(event: string, listener: Listener): this {
 		return this.off(event, listener)
 	}
@@ -65,11 +76,21 @@ export class EventEmitter {
 		if (event) {
 			if (this._events[event]) {
 				delete this._events[event]
+				this._listenerCounts.delete(event)
 			}
 		} else {
 			this._events = Object.create(null)
+			this._listenerCounts.clear()
 		}
 		return this
+	}
+
+	/**
+	 * Whether anything is subscribed. Timer and collision fires check this on
+	 * the raw target to skip the proxy round-trip of a listener-less emit.
+	 */
+	public hasListeners(event: string): boolean {
+		return (this._listenerCounts.get(event) ?? 0) > 0
 	}
 
 	public emit(event: string, ...args: any[]): boolean {

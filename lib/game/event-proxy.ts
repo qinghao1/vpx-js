@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import type { HitObject } from '../physics/hit-object.js'
+import type { EventEmitter } from '../util/event-emitter.js'
 import type { Ball } from '../vpt/ball/ball.js'
 import { Event } from './event.js'
 import type { IPlayable } from './interfaces.js'
@@ -59,7 +60,16 @@ export class EventProxy {
 
 	private fireDispID(e: Event, ...params: unknown[]): void {
 		if (!isScriptable(this.playable)) return
-		const api = this.playable.getApi()
-		api.emit(EVENT_NAMES[e] ?? `UnknownEvent${e}`, ...params)
+		const name = EVENT_NAMES[e] ?? `UnknownEvent${e}`
+		// Handler-less fires (flipper solenoids poll every millisecond) would
+		// pay a proxy round-trip for an emit that reports false. The raw api
+		// target answers from its subscription count instead.
+		const rawApi = (this.playable as unknown as { api?: EventEmitter }).api
+		if (rawApi) {
+			if (!rawApi.hasListeners(name)) return
+			rawApi.emit(name, ...params)
+			return
+		}
+		this.playable.getApi().emit(name, ...params)
 	}
 }
