@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { resolveButtonCode } from './cabinet-buttons.js'
+import { getSlots } from './material-slots.js'
 import { isBulbGlowMaterial } from './nodes/bulb-glow-node.js'
 import {
 	type ClassifyResult,
@@ -142,7 +143,9 @@ export function classifyOf(mesh: THREE.Mesh): ClassifyResult {
 	return classify(
 		(mesh.name ?? '').toLowerCase(),
 		(mat?.name ?? '').toLowerCase(),
-		((mat?.map as THREE.Texture | undefined)?.name ?? '').toLowerCase() || (mat ? pendingOf(mat) : ''),
+		((mat?.map as THREE.Texture | undefined)?.name ?? '').toLowerCase() ||
+			String(getSlots(mat).__mapName ?? '').toLowerCase() ||
+			(mat ? pendingOf(mat) : ''),
 		!!matUserData?.__isBaked,
 		!!matUserData?.__addBlend,
 	)
@@ -178,7 +181,7 @@ export function hasBakedPlayfield(nodes: THREE.Object3D[]): boolean {
  * True when no scene point light illuminates the table and no baked playfield
  * carries its brightness: polygon-bulb lamps render as glow-only halos
  * (scene point lights are only created for glowless bulbs, while native
- * `Light::RenderSetup` projects each bulb onto the playfield via the light
+ * `Light::Render` projects each bulb onto the playfield via the light
  * buffer). The viewer floors the base fill in that case so the table stays
  * readable; baked tables carry their own brightness and are untouched.
  */
@@ -249,16 +252,7 @@ export function applySlingVisibilityPass(
 			meshName.includes('su_')
 		if (!isSling) continue
 		const mat = firstMaterial(mesh)
-		const matUserData = mat?.userData as CustomMaterialUserData | undefined
-		const info = mat
-			? classify(
-					meshName,
-					(mat.name ?? '').toLowerCase(),
-					((mat.map as THREE.Texture | undefined)?.name ?? '').toLowerCase(),
-					!!matUserData?.__isBaked,
-					!!matUserData?.__addBlend,
-				)
-			: null
+		const info = mat ? classifyOf(mesh) : null
 		if (info && (info.isGlass || info.isLm || (info.isVlmBake && !info.isMainBake))) continue
 		if (mat && (mat.name ?? '').toLowerCase().includes('green')) continue
 		mesh.visible = true

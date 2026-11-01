@@ -16,6 +16,7 @@ import {
 	setPrimitiveMap,
 } from '../../render/threejs/nodes/primitive-bdl-node.js'
 import { createUnshadedBakedNodeMaterial } from '../../render/threejs/nodes/unshaded-baked-node.js'
+import { ThreeRenderApi } from '../../render/threejs/three-render-api.js'
 import type { Table } from '../table/table.js'
 import type { PrimitiveState } from './primitive-state.js'
 
@@ -480,12 +481,27 @@ describe('The VPinball primitive updater', () => {
 	})
 
 	it('claims playfield_mesh hidden even when storage says visible', () => {
-		// The authored playfield shape doubles as collision (useAsPlayfield).
-		// Forcing must happen before claiming, otherwise table init re-shows
-		// the white imageless mesh over the real playfield (Space Cadet).
+		// See forceHidePlayfieldMesh: forcing runs before claiming.
 		const t2 = new TableBuilder().addPrimitive('playfield_mesh', { isVisible: true }).build()
-		const prim = (t2.items as any)['playfield_mesh']
+		const prim = (t2.items as any).playfield_mesh
 		expect(prim.getState().isVisible, 'claimed state follows forced invisibility').to.equal(false)
+	})
+
+	it('script Visible=1 re-shows a forced-hidden playfield_mesh end to end', () => {
+		// An explicit script show must still reach the scene node: the api
+		// setter writes both state and data, and the updater routes the live
+		// flag to visibility (Space Cadet decoy stays hidden until shown).
+		const t2 = new TableBuilder().addPrimitive('playfield_mesh', { isVisible: true }).build()
+		new Player(t2).init()
+		const prim = (t2.items as any).playfield_mesh
+		expect(prim.getState().isVisible, 'forced hidden at claim').to.equal(false)
+		prim.getApi().Visible = 1
+		const renderApi = new ThreeRenderApi({ applyMaterials: true } as any)
+		const group = new THREE.Group()
+		group.name = 'primitive-playfield_mesh'
+		group.visible = false
+		prim.getUpdater().applyState(group, prim.getState(), renderApi, t2)
+		expect(group.visible, 'script show must reveal the forced-hidden decoy').to.equal(true)
 	})
 
 	it('should update the transformation matrix', () => {

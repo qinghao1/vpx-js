@@ -84,7 +84,7 @@ export class TableMeshGenerator {
 
 		// Fallback dynamic lights for bulb lights without a glow polygon.
 		// Lights with drag-point vertices render as an additive glow quad instead
-		// (native `Light::RenderSetup` lightmap pass in `src/parts/light.cpp`); only
+		// (native `Light::Render` light-buffer pass in `src/parts/light.cpp`); only
 		// glowless bulbs become scene lights, and only when exportLightBulbLights is
 		// set. Native scenes use 2 fixed lights, so unbounded point lights (e.g. 165
 		// on TWD) still blow out the playfield and kill FPS — keep this fallback narrow.

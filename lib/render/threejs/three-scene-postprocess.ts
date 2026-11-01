@@ -3,7 +3,6 @@ import { isLowQuality } from '../../util/quality.js'
 import { BAKED_EMISSIVE, createBakedMaterialResolver, createVrMaterialResolver } from './baked-materials.js'
 import { resolveButtonCode } from './cabinet-buttons.js'
 import { cloneMaterialForWrite } from './material-shared.js'
-import { getSlots } from './material-slots.js'
 import { isPrimitiveNodeMaterial } from './nodes/primitive-bdl-node.js'
 import {
 	type CustomMaterialUserData,
@@ -24,9 +23,9 @@ import {
 	applyPlayfieldPass,
 	applySlingVisibilityPass,
 	applyWhiteWallPass,
+	classifyOf,
 	collectPostProcessNodes,
 	finishStatic,
-	firstMaterial,
 	hasBakedPlayfield,
 	hasVisibleBakedDuplicate,
 	hasVisiblePlayfieldCover,
@@ -228,14 +227,7 @@ export function postProcessScene(
 			}
 			return
 		}
-		const firstMat = firstMaterial(mesh)
-		const firstUserData = getSlots(firstMat)
-		const matName = (firstMat?.name ?? '').toLowerCase()
-		const mapName =
-			((firstMat?.map as THREE.Texture | undefined)?.name ?? '').toLowerCase() ||
-			String(firstUserData.__mapName ?? '').toLowerCase() ||
-			(firstMat ? pendingOf(firstMat) : '')
-		const info = classify(nameLower, matName, mapName, !!firstUserData.__isBaked, !!firstUserData.__addBlend)
+		const info = classifyOf(mesh)
 		if (info.isGlass) {
 			hideMesh(mesh, 'glass', stats)
 			return
