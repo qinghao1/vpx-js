@@ -6,6 +6,7 @@ import { Matrix2D } from '../math/matrix.js'
 import { Vertex2D, Vertex3D } from '../math/vector.js'
 import { BallState } from './ball/ball-state.js'
 import { FlipperState } from './flipper/flipper-state.js'
+import { LightState } from './light/light.js'
 
 describe('The VPinball item state', () => {
 	it('should deep-copy pooled members on clone', () => {
@@ -36,6 +37,17 @@ describe('The VPinball item state', () => {
 		expect(Object.hasOwn(diff, 'pos')).to.equal(true)
 		expect(Object.hasOwn(diff, 'orientation')).to.equal(false)
 		expect(Object.hasOwn(diff, 'isFrozen')).to.equal(false)
+	})
+
+	it('should keep declared-but-unset optionals in the shape so diffs converge', () => {
+		const next = LightState.claim('lamp', 1, 0xffffff, 0xffffff)
+		const prev = LightState.claim('lamp', 1, 0xffffff, 0xffffff)
+		expect(Object.hasOwn(next, 'modulate')).to.equal(true)
+		next.modulate = 0.4
+		expect(Object.hasOwn(next.diff(prev), 'modulate')).to.equal(true)
+		prev.copyFrom(next)
+		expect(Object.hasOwn(next.diff(prev), 'modulate')).to.equal(false)
+		expect(next.equals(prev)).to.equal(true)
 	})
 
 	it('should deep-copy pooled members on copyFrom', () => {

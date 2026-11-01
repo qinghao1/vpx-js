@@ -207,7 +207,7 @@ export class LightState extends ItemState {
 	public color: number = 0
 	public colorFull: number = 0
 	/** Live BulbModulateVsAdd; absent keeps the baked value. */
-	public modulate?: number
+	public modulate?: number = undefined
 
 	public static claim(name: string, intensity: number, color: number, colorFull: number): LightState {
 		const state = new LightState()
@@ -384,7 +384,7 @@ export class LightApi extends ItemApi<LightData> {
 		return this.data.bulbModulateVsAdd
 	}
 	set BulbModulateVsAdd(v) {
-		// Stored raw like native m_d; the restamp clamps at render.
+		// Stored raw like native m_d.
 		this._state.modulate = v
 		this.data.bulbModulateVsAdd = v
 	}
