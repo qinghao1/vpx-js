@@ -345,4 +345,53 @@ describe('regression: artifact postprocess', () => {
 			).to.equal(0)
 		},
 	)
+	it('hidden playfield extra stays hidden while the base covers the table (Space Cadet decoy)', () => {
+		// Space Cadet ships an authored-invisible primitive-playfield_mesh with
+		// no image over the real playfield. Force-showing it covers the
+		// playfield with a white quad and z-fights it: with the base visible,
+		// the hidden extra must stay hidden.
+		const root = new THREE.Group()
+		const mk = (name: string, visible: boolean) => {
+			const mat = new THREE.MeshStandardMaterial({ color: 0xffffff })
+			mat.name = 'material:primitive'
+			const mesh = makeMesh(name, new THREE.PlaneGeometry(20, 20), mat)
+			mesh.visible = visible
+			root.add(mesh)
+			return mesh
+		}
+		const decoy = mk('primitive-playfield_mesh', false)
+		const base = mk('playfield_base', true)
+		postProcessScene(root, { harnessLog: () => {}, viewerMode: 'play' })
+		expect(decoy.visible, 'hidden playfield decoy must stay hidden').to.equal(false)
+		expect(base.visible, 'visible playfield base must stay visible').to.equal(true)
+	})
+	it('hidden playfield is still rescued when nothing covers the table', () => {
+		const root = new THREE.Group()
+		const mat = new THREE.MeshStandardMaterial({ color: 0xffffff })
+		mat.name = 'material:primitive'
+		const lone = makeMesh('playfield_base', new THREE.PlaneGeometry(20, 20), mat)
+		lone.visible = false
+		root.add(lone)
+		postProcessScene(root, { harnessLog: () => {}, viewerMode: 'play' })
+		expect(lone.visible, 'lone hidden playfield must be rescued').to.equal(true)
+	})
+	it('rescue prefers the base when base and decoy are both hidden', () => {
+		// Both hidden: rescue must not depend on visit order. The base is
+		// the real slab, so it wins and the decoy stays hidden. The decoy
+		// is added first so a live-flag scan would visit (and rescue) it first.
+		const root = new THREE.Group()
+		const mk = (name: string, visible: boolean) => {
+			const mat = new THREE.MeshStandardMaterial({ color: 0xffffff })
+			mat.name = 'material:primitive'
+			const mesh = makeMesh(name, new THREE.PlaneGeometry(20, 20), mat)
+			mesh.visible = visible
+			root.add(mesh)
+			return mesh
+		}
+		const decoy = mk('primitive-playfield_mesh', false)
+		const base = mk('playfield_base', false)
+		postProcessScene(root, { harnessLog: () => {}, viewerMode: 'play' })
+		expect(base.visible, 'hidden base must be rescued over the decoy').to.equal(true)
+		expect(decoy.visible, 'hidden decoy must stay hidden when the base exists').to.equal(false)
+	})
 })

@@ -19,15 +19,12 @@ import {
 import { Vertex3DNoTex2 } from '../../util/vertex.js'
 import { Mesh } from '../mesh.js'
 import type { Table } from '../table/table.js'
-import type { PrimitiveData } from './primitive-data.js'
+import { forceHidePlayfieldMesh, type PrimitiveData } from './primitive-data.js'
 
 /** @see https://github.com/vpinball/vpinball/blob/master/primitive.cpp */
 export class PrimitiveHitGenerator {
 	constructor(private readonly data: PrimitiveData) {
-		if (this.data.getName().toLowerCase() === 'playfield_mesh') {
-			this.data.isVisible = false
-			this.data.useAsPlayfield = true
-		}
+		forceHidePlayfieldMesh(this.data)
 	}
 
 	public generateHitObjects(mesh: Mesh, events: EventProxy, table: Table): HitObject[] {

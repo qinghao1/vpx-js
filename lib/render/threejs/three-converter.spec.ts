@@ -92,4 +92,25 @@ describe('ThreeConverter.createMesh mapping', () => {
 			'Mesh export must either provide mesh or geometry.',
 		)
 	})
+
+	it('stamps authored visibility only on bulb glow quads', () => {
+		const converter = makeConverter()
+		// Plain meshes stay unstamped (default visible): stamping them would
+		// make batch visibility ignore later script-driven shows of
+		// initially-hidden meshes (slingshots, option overlays).
+		const plain = converter.createMesh({ isVisible: false, geometry: box() } as any)
+		expect(plain.visible, 'mesh follows build visibility').to.equal(false)
+		expect('__authoredVisible' in plain.userData, 'plain mesh unstamped so script shows keep working').to.equal(
+			false,
+		)
+		const glow = converter.createMesh({
+			isVisible: false,
+			geometry: box(),
+			bulbGlow: { color: 0xffffff },
+		} as any)
+		expect(
+			(glow.userData as { __authoredVisible?: boolean }).__authoredVisible,
+			'authored-hidden glow quad stamped so the lamp updater keeps it hidden',
+		).to.equal(false)
+	})
 })

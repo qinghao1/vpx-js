@@ -2,12 +2,14 @@ import * as THREE from 'three'
 import { resolveButtonCode } from './cabinet-buttons.js'
 import { isBulbGlowMaterial } from './nodes/bulb-glow-node.js'
 import {
+	type ClassifyResult,
 	type CustomMaterialUserData,
 	classify,
 	flatName,
 	isBakedPlayfield,
 	isBasePlayfield,
 	isCabName,
+	isPlayfieldFamily,
 	pendingOf,
 	RE_NON_OPAQUE,
 	RE_RAMP_FAMILY,
@@ -133,22 +135,58 @@ export function sanitizeNaN(nodes: THREE.Object3D[], stats: Record<string, numbe
 	}
 }
 
+/** Classify info for a mesh from its first material (name/map/pending/bake flags). */
+export function classifyOf(mesh: THREE.Mesh): ClassifyResult {
+	const mat = firstMaterial(mesh)
+	const matUserData = mat?.userData as CustomMaterialUserData | undefined
+	return classify(
+		(mesh.name ?? '').toLowerCase(),
+		(mat?.name ?? '').toLowerCase(),
+		((mat?.map as THREE.Texture | undefined)?.name ?? '').toLowerCase() || (mat ? pendingOf(mat) : ''),
+		!!matUserData?.__isBaked,
+		!!matUserData?.__addBlend,
+	)
+}
+
+/**
+ * True when a mesh of the playfield family is already visible. A hidden
+ * playfield mesh is only force-shown when nothing covers the table (rescue);
+ * an authored-hidden extra (e.g. an invisible decoy quad sharing the
+ * footprint) stays hidden instead of covering/z-fighting the real playfield.
+ */
+export function hasVisiblePlayfieldCover(nodes: THREE.Object3D[]): boolean {
+	for (const child of nodes) {
+		const mesh = child as THREE.Mesh
+		if (!mesh.isMesh || !mesh.visible) continue
+		const name = mesh.name ?? ''
+		if (!name.toLowerCase().includes('playfield')) continue
+		if (isPlayfieldFamily(name, classifyOf(mesh))) return true
+	}
+	return false
+}
+
 export function hasBakedPlayfield(nodes: THREE.Object3D[]): boolean {
 	for (const child of nodes) {
 		const mesh = child as THREE.Mesh
 		if (!mesh.isMesh) continue
-		const mat = firstMaterial(mesh)
-		const matUserData = mat?.userData as CustomMaterialUserData | undefined
-		const info = classify(
-			(child.name ?? '').toLowerCase(),
-			(mat?.name ?? '').toLowerCase(),
-			((mat?.map as THREE.Texture | undefined)?.name ?? '').toLowerCase() || (mat ? pendingOf(mat) : ''),
-			!!matUserData?.__isBaked,
-			!!matUserData?.__addBlend,
-		)
-		if (isBakedPlayfield(child.name ?? '', info)) return true
+		if (isBakedPlayfield(mesh.name ?? '', classifyOf(mesh))) return true
 	}
 	return false
+}
+
+/**
+ * True when no scene point light illuminates the table and no baked playfield
+ * carries its brightness: polygon-bulb lamps render as glow-only halos
+ * (scene point lights are only created for glowless bulbs, while native
+ * `Light::RenderSetup` projects each bulb onto the playfield via the light
+ * buffer). The viewer floors the base fill in that case so the table stays
+ * readable; baked tables carry their own brightness and are untouched.
+ */
+export function needsNoBakeFill(nodes: THREE.Object3D[]): boolean {
+	for (const child of nodes) {
+		if ((child as { isPointLight?: boolean }).isPointLight) return false
+	}
+	return !hasBakedPlayfield(nodes)
 }
 
 export function applyPlayfieldPass(nodes: THREE.Object3D[], root: THREE.Object3D, stats: Record<string, number>): void {
@@ -156,13 +194,7 @@ export function applyPlayfieldPass(nodes: THREE.Object3D[], root: THREE.Object3D
 		const mesh = child as THREE.Mesh
 		if (!mesh.isMesh) continue
 		const meshName = (mesh.name ?? '').toLowerCase()
-		const mat = firstMaterial(mesh)
-		const matUserData = mat?.userData as CustomMaterialUserData | undefined
-		const matName = (mat?.name ?? '').toLowerCase()
-		const mapName = ((mat?.map as THREE.Texture | undefined)?.name ?? '').toLowerCase()
-		const pending = mat ? pendingOf(mat) : ''
-		const effectiveMap = mapName || pending
-		const info = classify(meshName, matName, effectiveMap, !!matUserData?.__isBaked, !!matUserData?.__addBlend)
+		const info = classifyOf(mesh)
 		const isBase = isBasePlayfield(meshName, info)
 		if (isBase && mesh.visible) hideMesh(mesh, 'playfieldHidden', stats)
 		const bakedPlayfield = isBakedPlayfield(meshName, info)

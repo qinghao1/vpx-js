@@ -479,6 +479,15 @@ describe('The VPinball primitive updater', () => {
 		expect(mat.blending, 'additive overlay blends additively').to.equal(THREE.AdditiveBlending)
 	})
 
+	it('claims playfield_mesh hidden even when storage says visible', () => {
+		// The authored playfield shape doubles as collision (useAsPlayfield).
+		// Forcing must happen before claiming, otherwise table init re-shows
+		// the white imageless mesh over the real playfield (Space Cadet).
+		const t2 = new TableBuilder().addPrimitive('playfield_mesh', { isVisible: true }).build()
+		const prim = (t2.items as any)['playfield_mesh']
+		expect(prim.getState().isVisible, 'claimed state follows forced invisibility').to.equal(false)
+	})
+
 	it('should update the transformation matrix', () => {
 		const renderApi = new TestRenderApi()
 		spy(renderApi, 'applyMatrixToNode')

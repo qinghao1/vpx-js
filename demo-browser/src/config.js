@@ -7,6 +7,8 @@ export const CAM_ANIM = { durationMode: 900, durationReset: 700 }
 export const LIGHT_HEMI = { sky: 0xffffff, ground: 0x444444, intensity: 0.35 }
 export const LIGHT_DIR = { color: 0xffffff, intensity: 0.4, pos: [400, -600, 1200] }
 export const LIGHT_AMBIENT = { color: 0xffffff, intensity: 0.18 }
+// Minimum hemi + ambient fill for lamp-only, unlit tables without a baked playfield; see needsNoBakeFill.
+export const LIGHT_NOBAKE_FILL = { hemi: 0.55, ambient: 0.32 }
 
 export const DMD = { w: 128, h: 32, scale: 4 }
 

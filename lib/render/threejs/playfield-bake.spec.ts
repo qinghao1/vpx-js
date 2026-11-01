@@ -4,6 +4,7 @@ import { expect } from 'chai'
 import sinonChai from 'sinon-chai'
 import * as THREE from 'three'
 import { postProcessScene } from './three-scene-postprocess.js'
+import { collectPostProcessNodes, needsNoBakeFill } from './visibility-heuristics.js'
 
 chai.use((sinonChai as any).default ?? sinonChai)
 
@@ -193,5 +194,43 @@ describe('regression: playfield baked hide', () => {
 		const bms = root.children.filter(c => c.name.includes('BM_Playfield_Test'))
 		for (const bm of bms) expect(bm.visible).to.equal(true)
 		expect(base.visible).to.equal(false)
+	})
+})
+
+describe('regression: ambient floor for lamp-only tables', () => {
+	function bakedPlayfieldMesh() {
+		const mat = new THREE.MeshStandardMaterial({ color: 0x000000 })
+		mat.name = 'material:VLM.Bake.Active'
+		const tex = new THREE.DataTexture(new Uint8Array([0, 0, 0, 255]), 1, 1)
+		tex.name = 'vlm.nestmap0'
+		mat.map = tex as any
+		;(mat.userData as any).__isBaked = true
+		return makeMesh('primitive-BM_Playfield', new THREE.PlaneGeometry(20, 20), mat)
+	}
+
+	function litPlayfieldMesh() {
+		const mat = new THREE.MeshStandardMaterial({ color: 0xffffff })
+		mat.name = 'Playfield'
+		return makeMesh('playfield_base', new THREE.PlaneGeometry(20, 20), mat)
+	}
+
+	it('needs the floor when no scene light and no baked playfield (Space Cadet)', () => {
+		const root = new THREE.Group()
+		root.add(litPlayfieldMesh())
+		expect(needsNoBakeFill(collectPostProcessNodes(root)), 'all-glow unlit table needs floor').to.equal(true)
+	})
+
+	it('skips the floor when a point light exists', () => {
+		const root = new THREE.Group()
+		root.add(litPlayfieldMesh())
+		root.add(new THREE.PointLight(0xffffff, 1))
+		expect(needsNoBakeFill(collectPostProcessNodes(root)), 'real scene light disables floor').to.equal(false)
+	})
+
+	it('skips the floor when a baked playfield carries the brightness (Walking Dead)', () => {
+		const root = new THREE.Group()
+		root.add(litPlayfieldMesh())
+		root.add(bakedPlayfieldMesh())
+		expect(needsNoBakeFill(collectPostProcessNodes(root)), 'baked table untouched').to.equal(false)
 	})
 })

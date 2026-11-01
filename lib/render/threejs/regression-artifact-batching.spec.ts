@@ -199,4 +199,20 @@ describe('regression: artifact batching', () => {
 		expect(meshB.userData.__batched, 'write must release the batch slot').to.equal(undefined)
 		expect(batched.getVisibleAt(slot), 'stale batch copy must hide').to.equal(false)
 	})
+	it('script-driven shows reach initially-hidden meshes (Royal Flush slings/options)', () => {
+		// Royal Flush 76 authors slingshot rubbers and option ramps hidden
+		// and shows them from script (RSling1.Visible = 1,
+		// Option1.visible = true). Only bulb-glow quads carry a sticky
+		// authored stamp; plain meshes must follow the live flag.
+		const api = new ThreeRenderApi({ applyMaterials: true } as any)
+		const group = new THREE.Group()
+		group.name = 'lsling1'
+		const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ color: 0xffffff }))
+		mesh.name = 'lsling1-mesh'
+		mesh.visible = false
+		group.visible = false
+		group.add(mesh)
+		api.applyVisibility(true, group)
+		expect(mesh.visible, 'script show must reveal initially-hidden sling').to.equal(true)
+	})
 })

@@ -54,6 +54,9 @@ export class ThreeConverter {
 			// Snapshot of the authored visibility: the lamp updater toggles
 			// this quad with the live state, but a light authored invisible
 			// (cabinet/backbox) must stay hidden — see applyLightToTarget.
+			// Other meshes stay unstamped (read as visible): stamping them
+			// would make batch visibility ignore later script-driven shows
+			// of initially-hidden meshes (slingshots, option overlays).
 			setAuthoredVisible(mesh, obj.isVisible)
 		} else if (obj.depthBias) {
 			// depthBias is a transparent sort key: clamp it into the DMD-safe band.

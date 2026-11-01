@@ -228,3 +228,16 @@ export class PrimitiveData extends ItemData implements IPhysicalData {
 		return FrameData.get(buf, num)
 	}
 }
+
+/**
+ * A primitive named playfield_mesh doubles as table collision: it renders
+ * through the generated playfield instead, so force it hidden up front.
+ * Callers that construct state or hit objects directly (Primitive before
+ * claiming, PrimitiveHitGenerator) share this so the two never disagree.
+ */
+export function forceHidePlayfieldMesh(data: PrimitiveData): void {
+	if (data.getName().toLowerCase() === 'playfield_mesh') {
+		data.isVisible = false
+		data.useAsPlayfield = true
+	}
+}

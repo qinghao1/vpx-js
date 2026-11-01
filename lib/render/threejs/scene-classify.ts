@@ -107,11 +107,22 @@ export const classify = (mesh: string, mat: string, map: string, baked = false, 
 const RE_BASE_PLAYFIELD = /^(playfield_base|primitive-playfield_mesh)$/
 export const isBasePlayfield = (meshName: string, info: { isBakedMat: boolean }): boolean =>
 	RE_BASE_PLAYFIELD.test(meshName.toLowerCase()) && !info.isBakedMat
+// The generated slab itself (three-playfield-mesh-generator), as opposed to
+// authored `primitive-*` extras sharing the footprint.
+export const isGeneratedPlayfieldBase = (meshName: string): boolean => meshName.toLowerCase() === 'playfield_base'
 // Baked playfield overlay (`BM_Playfield*` primitives): engine bake state from
 // classify() (file addBlend/disableLighting flags via `baked`, with
 // material/map-name fallback) — never the mesh name alone.
 export const isBakedPlayfield = (meshName: string, info: { isMainBake: boolean }): boolean =>
 	meshName.toLowerCase().includes('playfield') && info.isMainBake
+// Any mesh of the playfield family: the base slab, the baked overlay, and
+// authored extras sharing the footprint (decoy quads) — never lightmap/glow
+// (`lm_`) quads, walls, or underwalls. `isLm` is mesh-name-only, so this
+// stays a pure name check like the rest of the playfield rules above.
+export const isPlayfieldFamily = (meshName: string, info: { isLm: boolean }): boolean => {
+	const name = meshName.toLowerCase()
+	return name.includes('playfield') && !info.isLm && !name.includes('underwall') && !name.includes('wall')
+}
 export const isBakedMesh = (info: { isBakedMat: boolean }): boolean => !!info.isBakedMat
 
 export const isBakedMeshByNames = (

@@ -10,6 +10,8 @@ import {
 	classify,
 	isBakedPlayfield,
 	isCabName,
+	isGeneratedPlayfieldBase,
+	isPlayfieldFamily,
 	pendingOf,
 	RE_NON_OPAQUE,
 	RE_RAMP_FAMILY,
@@ -27,6 +29,7 @@ import {
 	firstMaterial,
 	hasBakedPlayfield,
 	hasVisibleBakedDuplicate,
+	hasVisiblePlayfieldCover,
 	hideMesh,
 	isInCabFlipper,
 	makeParentsVisible,
@@ -125,6 +128,10 @@ export function postProcessScene(
 	}
 	// Fuse the historical ~10 full tree walks: collect once, run every pass over the array.
 	const nodes = collectPostProcessNodes(node)
+	// Snapshot the playfield cover before the main pass flips visibility:
+	// every hidden extra reads the same pre-pass state, so rescue can never
+	// depend on visit order.
+	const playfieldCoverVisible = hasVisiblePlayfieldCover(nodes)
 	sanitizeNaN(nodes, stats)
 	const getBaked = createBakedMaterialResolver()
 	const getVr = createVrMaterialResolver()
@@ -238,13 +245,13 @@ export function postProcessScene(
 			if (nameLower.includes('bumper')) stats.bumperLM++
 		}
 		if (
-			nameLower.includes('playfield') &&
-			!info.isLm &&
-			!nameLower.startsWith('primitive-lm_') &&
-			!nameLower.startsWith('lm_') &&
-			!nameLower.includes('underwall') &&
-			!nameLower.includes('wall') &&
-			mesh.visible === false
+			isPlayfieldFamily(nameLower, info) &&
+			mesh.visible === false &&
+			// With a visible playfield covering the table, hidden extras stay hidden; see hasVisiblePlayfieldCover.
+			!playfieldCoverVisible &&
+			// Rescue the real surface only: the generated slab or a baked
+			// overlay. Authored extras (e.g. an imageless decoy quad) stay hidden.
+			(isGeneratedPlayfieldBase(nameLower) || isBakedPlayfield(nameLower, info))
 		) {
 			mesh.visible = true
 			makeParentsVisible(mesh, node, stats)

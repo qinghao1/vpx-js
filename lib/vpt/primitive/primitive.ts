@@ -13,7 +13,7 @@ import { Mesh } from '../mesh.js'
 import type { Table } from '../table/table.js'
 import { PrimitiveAnimation } from './primitive-animation.js'
 import { PrimitiveApi } from './primitive-api.js'
-import { PrimitiveData } from './primitive-data.js'
+import { forceHidePlayfieldMesh, PrimitiveData } from './primitive-data.js'
 import { PrimitiveHitGenerator } from './primitive-hit-generator.js'
 import { PrimitiveMeshGenerator } from './primitive-mesh-generator.js'
 import { PrimitiveState } from './primitive-state.js'
@@ -40,6 +40,11 @@ export class Primitive
 
 	public constructor(data: PrimitiveData) {
 		super(data)
+		// The authored playfield shape doubles as collision: hide it up front
+		// so the claimed state (and the generated playfield_base) agree —
+		// claiming first would freeze the storage value and let table init
+		// re-show the mesh over the real playfield.
+		forceHidePlayfieldMesh(data)
 		this.state = PrimitiveState.claimFrom(
 			data.getName(),
 			data.position.clone(true),

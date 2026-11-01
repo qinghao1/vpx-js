@@ -48,11 +48,22 @@ import {
 	getTransmissionDebug,
 	updateTransmissionBuffer,
 } from '../../dist-esm/lib/render/threejs/transmission-buffer.js'
+import { collectPostProcessNodes, needsNoBakeFill } from '../../dist-esm/lib/render/threejs/visibility-heuristics.js'
 import { AnimationGate } from '../../dist-esm/lib/util/animation-gate.js'
 import { stripVbsComments } from '../../dist-esm/lib/util/vbs-comments.js'
 import { Table } from '../../dist-esm/lib/vpt/table/table.js'
 import { BackglassRenderer } from './backglass/backglass-renderer.js'
-import { CAM, CAM_ANIM, isTableHit, LIGHT_AMBIENT, LIGHT_DIR, LIGHT_HEMI, RE_BAKE_MAP, TABLE_OPTS } from './config.js'
+import {
+	CAM,
+	CAM_ANIM,
+	isTableHit,
+	LIGHT_AMBIENT,
+	LIGHT_DIR,
+	LIGHT_HEMI,
+	LIGHT_NOBAKE_FILL,
+	RE_BAKE_MAP,
+	TABLE_OPTS,
+} from './config.js'
 import { DmdRenderer } from './dmd/dmd-renderer.js'
 import {
 	isDev as _isDev,
@@ -1153,6 +1164,19 @@ export class Viewer {
 				this.scene.environment = null
 		} catch {}
 	}
+	// Floor the base hemi + ambient fill when needsNoBakeFill() reports a
+	// lamp-only, unlit table. Never lowers an already brighter rig.
+	_applyNoBakeFill(table, node) {
+		try {
+			if (!table || !node || !this.scene) return
+			if (!needsNoBakeFill(collectPostProcessNodes(node))) return
+			this.scene.traverse((o: any) => {
+				if (o?.isHemisphereLight) o.intensity = Math.max(o.intensity, LIGHT_NOBAKE_FILL.hemi)
+				else if (o?.isAmbientLight) o.intensity = Math.max(o.intensity, LIGHT_NOBAKE_FILL.ambient)
+			})
+			this.log('[light] no-bake ambient floor applied (all-glow lamps)', 'debug')
+		} catch {}
+	}
 	async _buildScene(table) {
 		this._setStatus('')
 		this._loading(70, 'Building playfield…', 'Preparing visuals…')
@@ -1449,6 +1473,7 @@ export class Viewer {
 			viewerMode: this.viewerMode,
 			harnessLog: this.harnessLog,
 		})
+		this._applyNoBakeFill(table, node)
 		const params = new URLSearchParams(location.search)
 		const useBatch = !params.has('nobatched')
 		if (useBatch && table && this.renderApi) {
