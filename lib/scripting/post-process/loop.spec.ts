@@ -36,7 +36,7 @@ describe('The VBScript transpiler - Loop', () => {
 		const vbs = `If mBalls Then For ii = 1 to mBalls : x = 5 : Next`
 		const js = grammar.vbsToJs(vbs)
 		expect(js).to.equal(
-			`if (${Transformer.VBSHELPER_NAME}.isTrue(mBalls)) {\n    __exitFor:\n        for (ii = 1; ${Transformer.VBSHELPER_NAME}.lte(ii, mBalls); ii = ${Transformer.VBSHELPER_NAME}.add(ii, 1)) {\n            x = 5;\n        }\n}`,
+			`if (${Transformer.VBSHELPER_NAME}.isTrue(mBalls)) {\n    {\n        ii = 1;\n        let __vbsForEnd = mBalls;\n        __exitFor:\n            for (; ${Transformer.VBSHELPER_NAME}.lte(ii, __vbsForEnd); ii = ${Transformer.VBSHELPER_NAME}.add(ii, 1)) {\n                x = 5;\n            }\n    }\n}`,
 		)
 	})
 

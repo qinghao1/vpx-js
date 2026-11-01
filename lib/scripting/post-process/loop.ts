@@ -8,11 +8,14 @@ import {
 	breakStatement,
 	conditionalExpression,
 	doWhileStatement,
+	expressionStatement,
 	forOfStatement,
 	forStatement,
 	identifier,
 	ifStatement,
 	literal,
+	variableDeclaration,
+	variableDeclarator,
 	whileStatement,
 } from '../estree.js'
 import type { ESIToken } from '../grammar/grammar.js'
@@ -21,6 +24,9 @@ import { findChildBlock, findInlineBlock, vbsCall, vbsTest } from './helpers.js'
 /** Statement labels binding `Exit Do` / `Exit For` to the nearest same-kind loop. */
 export const EXIT_DO_LABEL = '__exitDo'
 export const EXIT_FOR_LABEL = '__exitFor'
+
+/** Temp holding a `For` upper bound (evaluated once, like VBS). */
+const FOR_TEMP = '__vbsForEnd'
 
 /** Loop kinds by VBS keyword: base label plus the grammar node types that carry it. */
 const LOOP_LABELS: Record<string, { base: string; types: string[] }> = {
@@ -153,21 +159,52 @@ function ppForStatement(node: ESIToken): unknown {
 	const block = findChildBlock(node) ?? findInlineBlock(node)
 	// Bound, direction, and counter go through `__vbs` (see vbsCall) like any
 	// other comparison; `Step True` means -1, not +1.
-	return labeledLoop(
-		labelForLoop(node, 'For'),
-		forStatement(
-			assignmentExpression(id, '=', expr),
-			step
-				? conditionalExpression(
-						vbsCall('lt', [step, literal(0)]),
-						vbsCall('gte', [id, expr2]),
-						vbsCall('lte', [id, expr2]),
-					)
-				: vbsCall('lte', [id, expr2]),
-			assignmentExpression(id, '=', vbsCall('add', [id, step ? step : literal(1)])),
-			block ? block : blockStatement([]),
+	const test = (bound: Expression) =>
+		step
+			? conditionalExpression(
+					vbsCall('lt', [step, literal(0)]),
+					vbsCall('gte', [id, bound]),
+					vbsCall('lte', [id, bound]),
+				)
+			: vbsCall('lte', [id, bound])
+	const update = assignmentExpression(id, '=', vbsCall('add', [id, step ? step : literal(1)]))
+	if (expr2.type === 'Literal') {
+		return labeledLoop(
+			labelForLoop(node, 'For'),
+			forStatement(assignmentExpression(id, '=', expr), test(expr2), update, block ? block : blockStatement([])),
+		)
+	}
+	// VBS evaluates a computed To bound once on entry; the naive condition
+	// would re-evaluate it per iteration (a UBound/array lookup on every lamp
+	// of every LampTimer tick). Hoist it into a temp. Like Select's
+	// `__vbsSelect`, the temp needs a depth suffix: the scope analysis has no
+	// block scopes, so at global scope the declaration becomes a shared
+	// `__scope` slot and an inner loop would otherwise clobber the outer
+	// bound still needed by later tests. Exit For still binds the labeled loop.
+	const end = identifier(forTemp(node))
+	return blockStatement([
+		expressionStatement(assignmentExpression(id, '=', expr)),
+		variableDeclaration('let', [variableDeclarator(end, expr2)]),
+		labeledLoop(
+			labelForLoop(node, 'For'),
+			forStatement(null, test(end), update, block ? block : blockStatement([])),
 		),
-	)
+	])
+}
+
+/**
+ * Temp name for one `For` upper bound. Nested loops need distinct temps: the
+ * scope analysis has no block scopes, so an inner loop would otherwise clobber
+ * the outer bound still needed by later tests.
+ */
+function forTemp(node: ESIToken): string {
+	let depth = 0
+	let current: ESIToken | undefined = node.parent
+	while (current) {
+		if (current.type === 'ForStatement' || current.type === 'ForStatementInline') depth++
+		current = current.parent
+	}
+	return depth === 0 ? FOR_TEMP : `${FOR_TEMP}${depth}`
 }
 
 function ppForEachStatement(node: ESIToken): unknown {

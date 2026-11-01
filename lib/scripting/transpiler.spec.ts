@@ -155,6 +155,28 @@ describe('The VBScript transpiler', () => {
 		expect(scope.s).to.equal('321')
 	})
 
+	it('should evaluate the For upper bound once like VBScript', () => {
+		const scope = {} as any
+		new Transpiler(table, player).execute(
+			`Dim calls\nDim total\nDim i\ncalls = 0\ntotal = 0\nFunction Bound()\ncalls = calls + 1\nBound = 3\nEnd Function\nFor i = 1 To Bound()\ntotal = total + 1\nNext\n`,
+			scope,
+			'global',
+		)
+		expect(scope.total).to.equal(3)
+		expect(scope.calls).to.equal(1)
+	})
+
+	it('should re-evaluate nested For bounds on each entry but not each iteration', () => {
+		const scope = {} as any
+		new Transpiler(table, player).execute(
+			`Dim calls\nDim total\nDim i\nDim j\ncalls = 0\ntotal = 0\nFunction Bnd(n)\ncalls = calls + 1\nBnd = n\nEnd Function\nFor i = 1 To Bnd(2)\nFor j = 1 To Bnd(3)\ntotal = total + 1\nNext\nNext\n`,
+			scope,
+			'global',
+		)
+		expect(scope.total).to.equal(6)
+		expect(scope.calls).to.equal(3)
+	})
+
 	it('should support Select Case', () => {
 		const scope = {} as any
 		const vbs = `Dim a\nDim b\na = 2\nSelect Case a\nCase 1\nb = "one"\nCase 2\nb = "two"\nCase Else\nb = "other"\nEnd Select\n`
