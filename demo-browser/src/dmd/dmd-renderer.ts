@@ -220,13 +220,7 @@ export class DmdRenderer implements DirtyOverlay {
 					hasCab = true
 				if (o.userData?.isProceduralDMD) oldProcedural.push(o)
 				if (!o.isMesh) return
-				if (
-					dmdNames.has(nm) ||
-					nm === 'dmd' ||
-					nm.startsWith('dmd_') ||
-					nm.startsWith('dmd.') ||
-					nm.includes('_dmd')
-				)
+				if (dmdNames.has(nm) || nm.startsWith('dmd_') || nm.startsWith('dmd.') || nm.includes('_dmd'))
 					foundCandidates.push(o)
 			})
 		} catch {
