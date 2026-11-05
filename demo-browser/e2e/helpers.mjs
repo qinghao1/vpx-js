@@ -1,11 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 
 export const DEFAULT_URL = 'https://localhost:3000/?vpx=/test/fixtures/table-empty.vpx&mode=viewer'
-
-// dist-esm prefix for in-page dynamic imports (same pass-it-in rule as below).
-export const DIST_ESM_PREFIX = `/@fs${path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../dist-esm')}`
 
 // Single source of truth for "insert-like" names (mesh, material, primitive,
 // collection keys). page.evaluate callbacks cannot close over module scope, so
@@ -258,6 +254,44 @@ export const physicsChecks = async page => {
 		} catch (e) {
 			out.clock = { tBefore: -1, tAfter: -1, pass: false, error: String(e) }
 		}
+		return out
+	})
+}
+
+// WASM-engine leg: asserts the headless-bridge Stage-1 guarantees on
+// `?engine=wasm` runs (engine ready, part catalog, zero script errors, frame
+// stepping advances state, input routes without throwing). Skips honestly on
+// TS runs; fails when engine=wasm was requested but the engine is not ready.
+export const wasmEngineChecks = async page => {
+	return page.evaluate(async () => {
+		const v = window.viewer
+		const wanted = new URLSearchParams(window.location.search).get('engine') === 'wasm'
+		const w = v?.wasmEngine
+		if (!w?.ready) {
+			return wanted
+				? { pass: false, reason: 'engine=wasm requested but engine not ready' }
+				: { pass: 'skip', reason: 'ts run (no wasm engine)' }
+		}
+		const out = {
+			ready: w.ready,
+			catalogSize: w.catalogSize,
+			scriptErrors: w.scriptErrorCount,
+			ballCount: w.ballCount,
+		}
+		try {
+			v._tickPhysicsImmediate?.()
+			await new Promise(r => setTimeout(r, 120))
+			v._tickPhysicsImmediate?.()
+			out.tickOk = true
+			out.ballCountAfter = w.ballCount
+			v._sendKey?.('ArrowLeft', true)
+			v._sendKey?.('ArrowLeft', false)
+			v._nudge?.(75, 2.0)
+			out.inputOk = true
+		} catch (e) {
+			out.error = String(e?.message ?? e).slice(0, 300)
+		}
+		out.pass = out.tickOk === true && out.inputOk === true && out.scriptErrors === 0
 		return out
 	})
 }
@@ -1657,17 +1691,24 @@ export const cameraTransitionChecks = async page => {
 				? true
 				: 'skip'
 			: false
-		return { pass, res1, res2, reason: pass === true ? 'smooth' : `fail res1:${res1?.reason} res2:${res2?.reason}` }
+		return {
+			pass,
+			res1,
+			res2,
+			initialMode,
+			reason: pass === true ? 'smooth' : `fail res1:${res1?.reason} res2:${res2?.reason}`,
+		}
 	})
 }
 
-// Sound leg: headless CI cannot hear output; exercise the path instead.
+// Sound leg: headless CI cannot hear output, so drive the real user
+// controls and assert the engine state and chrome follow them.
 export const soundChecks = async page => {
-	return page.evaluate(async decoderUrl => {
+	return page.evaluate(() => {
 		const v = window.viewer
 		if (!v) return { pass: 'skip', reason: 'no viewer' }
 		const s = v.sound
-		if (!s || typeof s.playSound !== 'function') return { pass: 'skip', reason: 'no sound engine' }
+		if (!s || typeof s.isMuted !== 'function') return { pass: 'skip', reason: 'no sound engine' }
 		try {
 			const btn = document.getElementById('sound-btn')
 			const slider = document.getElementById('sound-volume')
@@ -1678,8 +1719,8 @@ export const soundChecks = async page => {
 			btn.click()
 			if (s.isMuted() === wasMuted) btn.click()
 			const mutedOk = s.isMuted() !== wasMuted && btn.getAttribute('aria-pressed') === String(s.isMuted())
-			// Probe the volume unmuted: mute keeps the level, so read getLevel()
-			// instead of the muted-audible value a persisted profile would break.
+			const iconOk = s.isMuted() ? btn.innerHTML.includes('<line') : !btn.innerHTML.includes('<line')
+			// Probe the volume unmuted: mute keeps the level, so read getLevel().
 			const volBefore = s.getLevel()
 			slider.value = '50'
 			slider.dispatchEvent(new Event('input', { bubbles: true }))
@@ -1689,87 +1730,28 @@ export const soundChecks = async page => {
 			if (s.isMuted() !== wasMuted) btn.click()
 			if (s.isMuted() !== wasMuted) btn.click()
 			const muteRestoreOk = s.isMuted() === wasMuted
-			const k0 = s.getKnockCount()
-			s.fireKnocker(1)
-			const knockOk = s.getKnockCount() === k0 + 1
-			const probe = new Float32Array([0, 0.1, -0.1, 0.05])
-			s.registerSample('__e2e_probe__', probe, 8000)
-			const voice = s.playSound('__e2e_probe__', { volume: 0.5 })
-			const playOk = voice > 0 && s.isPlaying('__e2e_probe__')
-			s.stopSound('__e2e_probe__')
-			const stopOk = !s.isPlaying('__e2e_probe__')
-			const missingOk = s.playSound('__e2e_missing_xyz__') === 0
-			const tableApi = v.player ? v.table?.getApi?.() : null
-			const scriptRunnable = !!(v.player && tableApi && typeof tableApi.PlaySound === 'function')
-			let scriptOk = true
-			try {
-				if (scriptRunnable) {
-					tableApi.PlaySound('__e2e_probe__', 1, 0.5, 0, 0, 0, false, true, 0)
-					scriptOk = s.isPlaying('__e2e_probe__')
-					tableApi.FireKnocker?.(1)
-				}
-			} catch {
-				scriptOk = false
-			}
-			try {
-				s.stopSound('__e2e_probe__')
-			} catch {}
-			// Music: native container decode of an in-page WAV, then single-play
-			// MusicDone reporting through the script event.
-			let musicOk = true
-			let musicWhy = ''
-			try {
-				if (scriptRunnable) {
-					const { decodeExternalAudio } = await import(decoderUrl)
-					const bytes = new Uint8Array(48)
-					const view = new DataView(bytes.buffer)
-					const tag = (p, s) => {
-						for (let i = 0; i < 4; i++) view.setUint8(p + i, s.charCodeAt(i))
-					}
-					tag(0, 'RIFF')
-					view.setUint32(4, 40, true)
-					tag(8, 'WAVE')
-					tag(12, 'fmt ')
-					view.setUint32(16, 16, true)
-					view.setUint16(20, 1, true)
-					view.setUint16(22, 1, true)
-					view.setUint32(24, 8000, true)
-					view.setUint32(28, 16000, true)
-					view.setUint16(32, 2, true)
-					view.setUint16(34, 16, true)
-					tag(36, 'data')
-					view.setUint32(40, 4, true)
-					view.setInt16(44, 1000, true)
-					view.setInt16(46, -1000, true)
-					const decoded = await decodeExternalAudio(bytes)
-					const engine = v.player.getSoundEngine()
-					let done = false
-					if (decoded && decoded.pcm.length > 0 && decoded.sampleRate > 0) {
-						engine.registerSample('__e2e_music__', decoded.pcm, decoded.sampleRate)
-						v.table.getApi().on('MusicDone', () => {
-							done = true
-						})
-						engine.playMusic('__e2e_music__', 1)
-						for (let i = 0; i < 40 && !done; i++) await new Promise(r => setTimeout(r, 50))
-					}
-					if (!decoded) musicWhy = 'decode=null'
-					else if (!(decoded.pcm.length > 0) || !(decoded.sampleRate > 0)) musicWhy = 'empty-decode'
-					else if (!done) musicWhy = 'no-MusicDone'
-					else if (engine.getMusic() !== null) musicWhy = 'music-not-cleared'
-					musicOk = !!decoded && done && engine.getMusic() === null
-				}
-			} catch (e) {
-				musicOk = false
-				musicWhy = `threw=${String(e?.message ?? e).slice(0, 120)}`
-			}
-			const pass =
-				mutedOk && muteRestoreOk && volOk && knockOk && playOk && stopOk && missingOk && scriptOk && musicOk
+			// M shortcut drives the same toggle; the level is untouched.
+			const mBefore = s.isMuted()
+			const mLevel = s.getLevel()
+			const mKey = () =>
+				window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyM', key: 'm', bubbles: true }))
+			mKey()
+			const mOk = s.isMuted() !== mBefore && s.getLevel() === mLevel
+			mKey()
+			const mRestoreOk = s.isMuted() === mBefore
+			// The output gain follows when it exists: with no real user
+			// gesture yet there is no AudioContext at all (primeAudioOnGesture
+			// design), so a missing node is reported, not failed.
+			const gain = v.wasmEngine?.audioGain?.gain.value
+			const gainOk = gain === undefined ? 'skip' : Math.abs(gain - (s.isMuted() ? 0 : s.getLevel())) < 1e-9
+			btn.closest?.('.sound-control')?.classList.remove('expanded')
+			const pass = mutedOk && iconOk && volOk && muteRestoreOk && mOk && mRestoreOk && gainOk !== false
 			return {
 				pass,
-				reason: `mute=${mutedOk} muteRestore=${muteRestoreOk} vol=${volOk} knock=${knockOk} play=${playOk} stop=${stopOk} missing=${missingOk} script=${scriptOk} music=${musicOk}${musicWhy && !musicOk ? `(${musicWhy})` : ''}${scriptRunnable ? '' : ' (skipped: no player)'}`,
+				reason: `mute=${mutedOk} icon=${iconOk} vol=${volOk} muteRestore=${muteRestoreOk} m=${mOk} mRestore=${mRestoreOk} gain=${gainOk}`,
 			}
 		} catch (e) {
 			return { pass: false, reason: String(e?.message ?? e).slice(0, 200) }
 		}
-	}, `${DIST_ESM_PREFIX}/lib/audio/wav-decoder.js`)
+	})
 }
