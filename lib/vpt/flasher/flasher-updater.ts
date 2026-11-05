@@ -136,11 +136,14 @@ export class FlasherUpdater extends ItemUpdater<FlasherState> {
 	 * `GetImage(m_d.m_szImageA)` every frame (`Flasher::Render`); the
 	 * build-time map only covers the authored image. Runs ahead of the
 	 * visibility gate so a reshown flasher never flashes a stale image.
+ * DMD flashers keep the live node material; a script image swap must
+ * not replace it.
 	 */
 	private applyImage<NODE, GEOMETRY, POINT_LIGHT>(
 		target: Object3D,
 		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
 	): void {
+		if (this.data.isDMD) return
 		if (this.state.imageA === this.lastImageA) return
 		this.lastImageA = this.state.imageA
 		// Write back so a later transform regen (which rebuilds from data)
