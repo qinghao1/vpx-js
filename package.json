@@ -39,7 +39,7 @@
 	"scripts": {
 		"build": "npm run build:rules && node build/parallel.mjs -- \"npm run build:js\" \"npm run build:esm:tsc\" && node build/parallel.mjs -- \"npm run build:info\" \"npm run build:cp\" \"npm run build:esm:cp\" \"npm run build:dts\"",
 		"build:pre": "node build/parallel.mjs -- \"tsx build/compile-rules.ts\" \"tsx build/write-info.ts\"",
-		"build:cp": "cp -r res dist/ && mkdir -p dist/lib/scripting/grammar && cp lib/scripting/grammar/grammar.bnf dist/lib/scripting/grammar/",
+		"build:cp": "mkdir -p dist && cp -r res dist/",
 		"build:esm": "npm run build:rules && node build/parallel.mjs -- \"npm run build:esm:tsc\" \"npm run build:esm:cp\"",
 		"build:wasm": "wasm/build.sh",
 		"build:wasm:mock": "wasm/build.sh --mock",
@@ -82,7 +82,7 @@
 		"build:js": "tsup",
 		"build:dts": "tsx build/write-dts.ts",
 		"build:esm:tsc": "tsc -p tsconfig.json --outDir dist-esm --declaration false --declarationMap false",
-		"build:esm:cp": "cp -r res dist-esm/; mkdir -p dist-esm/lib/scripting/grammar; cp lib/scripting/grammar/grammar.bnf dist-esm/lib/scripting/grammar/ 2>/dev/null; echo 'dist-esm built'; touch demo-browser/vite.config.ts 2>/dev/null || true",
+		"build:esm:cp": "mkdir -p dist-esm && cp -r res dist-esm/; echo 'dist-esm built'; touch demo-browser/vite.config.ts 2>/dev/null || true",
 		"check": "node build/parallel.mjs -- \"npm run lint\" \"npm run typecheck\" \"npm run typecheck:tests\" \"npm run test\"",
 		"check:fast": "node build/parallel.mjs -- \"npm run lint\" \"npm run typecheck\" \"npm run typecheck:tests\""
 	},
