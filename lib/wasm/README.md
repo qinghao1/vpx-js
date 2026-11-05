@@ -55,7 +55,11 @@ frames and solenoid motion need a scripted table plus VPinMAME.Controller.
 of silent. `getAudioInfo`/`getAudio` drain PinMAME ROM sound (int16 PCM,
 message-bus subscription, no libpinmame changes); table script sounds play
 through the engine's own miniaudio/SDL path, and the viewer unlocks both on
-first gesture. The viewer wiring lives in `demo-browser/src/wasm-engine.ts`.
+first gesture. Host mute/volume fans out to both: the WebAudio gain for the
+ROM ring and `VpxWasm_SetAudioLevel` for the SDL path (table-seeded bus
+volumes hold until the user touches a control; a gesture unlocks WebAudio
+while the SDL path keeps table levels until then). The viewer wiring lives
+in `demo-browser/src/wasm-engine.ts`.
 
 ## Viewer wiring
 

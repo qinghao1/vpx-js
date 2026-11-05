@@ -249,6 +249,8 @@ export interface RawHeadlessModule {
 	_VpxWasm_GetAudio(): number
 	_VpxWasm_PushKey(sdlScancode: number, isPressed: boolean): void
 	_VpxWasm_Nudge(angleDeg: number, force: number): void
+	/** Absent on artifacts predating the set-audio-level bridge export. */
+	_VpxWasm_SetAudioLevel?(volume: number, muted: boolean): void
 	_VpxWasm_GetScriptErrorCount(): number
 	_VpxWasm_GetScriptError(): number
 	_VpxWasm_DestroyTable(): void
@@ -302,6 +304,11 @@ export interface HeadlessEngine {
 	getAudio(): { samples: Int16Array; channels: number } | undefined
 	pushKey(sdlScancode: number, isPressed: boolean): void
 	nudge(angleDeg: number, force: number): void
+	/**
+	 * Overall output level for the engine's own SDL audio path (table script
+	 * sounds). Silent on pre-audio-level artifacts, like `getFlasherImage`.
+	 */
+	setAudioLevel(volume: number, muted: boolean): void
 	getScriptErrorCount(): number
 	getScriptError(): string | undefined
 	destroyTable(): Promise<void>
@@ -457,6 +464,8 @@ export function wrapHeadlessEngine(raw: RawHeadlessModule, url: string): Headles
 		},
 		pushKey: (sdlScancode, isPressed) => raw._VpxWasm_PushKey(sdlScancode, isPressed),
 		nudge: (angleDeg, force) => raw._VpxWasm_Nudge(angleDeg, force),
+		// Old artifacts stay silent (never throw): the export postdates them.
+		setAudioLevel: (volume, muted) => raw._VpxWasm_SetAudioLevel?.(volume, muted),
 		getScriptErrorCount: () => Math.max(0, raw._VpxWasm_GetScriptErrorCount()),
 		getScriptError: () => {
 			const ptr = raw._VpxWasm_GetScriptError()
