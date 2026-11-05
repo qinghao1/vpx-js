@@ -895,6 +895,37 @@ describe('WASM scene sync', () => {
 			expect(calls.part).toBeGreaterThan(0)
 		})
 
+		it('records ball-phase time and matches a sink-less twin with live balls', () => {
+			const table = new TableBuilder().build()
+			const api = new RecordingApi()
+			const sync = new WasmSceneSync<object, unknown, unknown>(
+				mockScene(new Map()),
+				mockBalls(),
+				api as any,
+				table,
+			)
+			const twin = new WasmSceneSync<object, unknown, unknown>(
+				mockScene(new Map()),
+				mockBalls(),
+				api as any,
+				table,
+			)
+			// Ball row, stride 16: id, pos xyz, radius, orientation 3x3, color, visible.
+			const row = new Float32Array([7, 10, 20, 30, 25, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0xff0000, 1])
+			const buffers = {
+				balls: row,
+				movers: new Float32Array(0),
+				lights: new Float32Array(0),
+				prims: new Float32Array(0),
+				flashers: new Float32Array(0),
+			}
+			const timings: SyncPhaseTimings = { balls: -1, movers: -1, lights: -1, prims: -1, flashers: -1 }
+			const timed = sync.syncAll(buffers, timings)
+			expect(timed.ballsSpawned).toBe(1)
+			expect(timed).toEqual(twin.syncAll(buffers))
+			expect(timings.balls).toBeGreaterThanOrEqual(0)
+		})
+
 		it('unknown mover types skip without host lookups', () => {
 			const table = new TableBuilder().build()
 			const api = new RecordingApi()
@@ -926,9 +957,13 @@ describe('WASM scene sync', () => {
 			const timings: SyncPhaseTimings = { balls: -1, movers: -1, lights: -1, prims: -1, flashers: -1 }
 			const timed = sync.syncAll(buffers, timings)
 			expect(timed.movers).toBe(1)
-			// Same first-frame counts as a sink-less pass on an identical sync.
+			// Same counts as a sink-less pass on an identically warmed twin:
+			// run both a second time so snapshots (not just empty starts) match.
+			sync.syncAll(buffers)
 			const twin = new WasmSceneSync<object, unknown, unknown>(mockScene(slots), mockBalls(), api as any, table)
-			expect(timed).toEqual(twin.syncAll(buffers))
+			twin.syncAll(buffers)
+			const timings2: SyncPhaseTimings = { balls: -1, movers: -1, lights: -1, prims: -1, flashers: -1 }
+			expect(sync.syncAll(buffers, timings2)).toEqual(twin.syncAll(buffers))
 			for (const value of Object.values(timings)) {
 				expect(value).toEqual(expect.any(Number))
 				expect(Number.isFinite(value)).toBe(true)

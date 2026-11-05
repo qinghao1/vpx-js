@@ -119,12 +119,13 @@ export interface SyncPhaseTimings {
 	lights: number
 	prims: number
 	flashers: number
+	// Keys are written only for phases that complete; a phase that throws
+	// leaves its key untouched, so seed with a sentinel (e.g. -1) when
+	// reusing one object across frames.
 }
 
 /** Bumper visibility bits (column 5 of a bumper row): cap, base, ring, skirt. */
 const BUMPER_VIS_BITS = ['isCapVisible', 'isBaseVisible', 'isRingVisible', 'isSkirtVisible'] as const
-
-const EMPTY = new Float32Array(0)
 
 export class WasmSceneSync<NODE, GEOMETRY, POINT_LIGHT> {
 	constructor(
@@ -249,14 +250,14 @@ export class WasmSceneSync<NODE, GEOMETRY, POINT_LIGHT> {
 		timings?: SyncPhaseTimings,
 	): SyncResult {
 		this.lightChanges.length = 0
-		// Timed phase runner: with no sink this is one undefined check and a
-		// direct call, so production pays nothing for the profiling seam.
-		const sink = timings
+		// Timed phase runner: with no sink this takes no timestamps (one
+		// undefined check per phase plus closure dispatch), so production
+		// stays on the uninstrumented path.
 		const phase = <T>(key: keyof SyncPhaseTimings, run: () => T): T => {
-			if (!sink) return run()
+			if (!timings) return run()
 			const start = performance.now()
 			const out = run()
-			sink[key] = performance.now() - start
+			timings[key] = performance.now() - start
 			return out
 		}
 		const ballCounts = phase('balls', () => this.syncBallRows(buffers.balls))
@@ -340,8 +341,7 @@ export class WasmSceneSync<NODE, GEOMETRY, POINT_LIGHT> {
 	}
 
 	public syncBalls(view: Float32Array): { spawned: number; moved: number; removed: number } {
-		const counts = this.syncAll({ balls: view, movers: EMPTY, lights: EMPTY, prims: EMPTY, flashers: EMPTY })
-		return { spawned: counts.ballsSpawned, moved: counts.ballsMoved, removed: counts.ballsRemoved }
+		return this.syncBallRows(view)
 	}
 
 	public syncMovers(view: Float32Array): number {
