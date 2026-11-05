@@ -77,10 +77,6 @@ export default defineConfig({
 			{ find: 'three-mesh-bvh', replacement: resolve(__dirname, 'node_modules/three-mesh-bvh/src/index.js') },
 			{ find: /^.*refs\.node\.js(\?.*)?$/, replacement: resolve(repoRoot, 'dist-esm/lib/refs.browser.js') },
 			{
-				find: /^.*vbs-scripts\.node\.js(\?.*)?$/,
-				replacement: resolve(repoRoot, 'dist-esm/lib/scripting/vbs-scripts.browser.js'),
-			},
-			{
 				find: /^.*binary-reader\.node\.js(\?.*)?$/,
 				replacement: resolve(repoRoot, 'dist-esm/lib/io/binary-reader.js'),
 			},
