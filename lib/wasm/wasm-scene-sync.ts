@@ -107,6 +107,20 @@ export interface SyncResult extends SyncCounts {
 	readonly changedLightParts: readonly number[]
 }
 
+/**
+ * Optional per-phase wall-time sink for `syncAll`, in milliseconds. Pass one
+ * to profile the core gameplay loop (balls, movers, lights, prims, flashers
+ * are the per-frame scene-graph writes); omit it in production. When absent
+ * the only cost is one undefined check per phase — no timestamps are taken.
+ */
+export interface SyncPhaseTimings {
+	balls: number
+	movers: number
+	lights: number
+	prims: number
+	flashers: number
+}
+
 /** Bumper visibility bits (column 5 of a bumper row): cap, base, ring, skirt. */
 const BUMPER_VIS_BITS = ['isCapVisible', 'isBaseVisible', 'isRingVisible', 'isSkirtVisible'] as const
 
@@ -224,25 +238,56 @@ export class WasmSceneSync<NODE, GEOMETRY, POINT_LIGHT> {
 		snap.set(row)
 	}
 
-	public syncAll(buffers: {
-		balls: Float32Array
-		movers: Float32Array
-		lights: Float32Array
-		prims: Float32Array
-		flashers: Float32Array
-	}): SyncResult {
+	public syncAll(
+		buffers: {
+			balls: Float32Array
+			movers: Float32Array
+			lights: Float32Array
+			prims: Float32Array
+			flashers: Float32Array
+		},
+		timings?: SyncPhaseTimings,
+	): SyncResult {
 		this.lightChanges.length = 0
-		let ballsSpawned = 0
-		let ballsMoved = 0
-		let ballsRemoved = 0
+		// Timed phase runner: with no sink this is one undefined check and a
+		// direct call, so production pays nothing for the profiling seam.
+		const sink = timings
+		const phase = <T>(key: keyof SyncPhaseTimings, run: () => T): T => {
+			if (!sink) return run()
+			const start = performance.now()
+			const out = run()
+			sink[key] = performance.now() - start
+			return out
+		}
+		const ballCounts = phase('balls', () => this.syncBallRows(buffers.balls))
+		const movers = phase('movers', () => this.syncMovers(buffers.movers))
+		const lights = phase('lights', () => this.syncLights(buffers.lights))
+		const prims = phase('prims', () => this.syncPrims(buffers.prims))
+		const flashers = phase('flashers', () => this.syncFlashers(buffers.flashers))
+		return {
+			ballsSpawned: ballCounts.spawned,
+			ballsMoved: ballCounts.moved,
+			ballsRemoved: ballCounts.removed,
+			movers,
+			lights,
+			prims,
+			flashers,
+			changedLightParts: [...this.lightChanges],
+		}
+	}
+
+	private syncBallRows(view: Float32Array): { spawned: number; moved: number; removed: number } {
+		let spawned = 0
+		let moved = 0
+		let removed = 0
 		const stride = WASM_STRIDES.balls
 		// Empty fast path: no rows and no live balls means no Set, no spread,
 		// no removals. Live balls with an empty view still drain below.
-		if (buffers.balls.length > 0 || this.liveIds.size > 0) {
+		if (view.length > 0 || this.liveIds.size > 0) {
 			const seen = this.seenIds
 			seen.clear()
-			for (let i = 0; i + stride <= buffers.balls.length; i += stride) {
-				const row = buffers.balls.subarray(i, i + stride)
+			for (let i = 0; i + stride <= view.length; i += stride) {
+				const row = view.subarray(i, i + stride)
 				const id = row[0]!
 				seen.add(id)
 				const existed = this.liveIds.has(id)
@@ -251,8 +296,8 @@ export class WasmSceneSync<NODE, GEOMETRY, POINT_LIGHT> {
 				if (WasmSceneSync.rowsEqual(this.lastBallRows, id, row)) continue
 				this.applyBallRow(slot, row)
 				WasmSceneSync.snapRow(this.lastBallRows, id, row)
-				ballsMoved++
-				if (!existed) ballsSpawned++
+				moved++
+				if (!existed) spawned++
 			}
 			// Delete-during-iteration is safe for Sets: no copy needed.
 			for (const id of this.liveIds) {
@@ -260,20 +305,11 @@ export class WasmSceneSync<NODE, GEOMETRY, POINT_LIGHT> {
 					this.balls.remove(id)
 					this.liveIds.delete(id)
 					this.lastBallRows.delete(id)
-					ballsRemoved++
+					removed++
 				}
 			}
 		}
-		return {
-			ballsSpawned,
-			ballsMoved,
-			ballsRemoved,
-			movers: this.syncMovers(buffers.movers),
-			lights: this.syncLights(buffers.lights),
-			prims: this.syncPrims(buffers.prims),
-			flashers: this.syncFlashers(buffers.flashers),
-			changedLightParts: [...this.lightChanges],
-		}
+		return { spawned, moved, removed }
 	}
 
 	private spawnBall(id: number, row: Float32Array): BallSlot<NODE> | undefined {

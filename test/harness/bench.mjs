@@ -57,6 +57,7 @@ const duration = Number(getArg(args, 'duration', '3000'))
 const warmup = Number(getArg(args, 'warmup', url.includes('walking_dead') ? '2000' : '800'))
 const outPath = getArg(args, 'out', null)
 const profile = hasFlag(args, 'profile') || hasFlag(args, 'breakdown') || !hasFlag(args, 'no-profile')
+const breakdown = hasFlag(args, 'breakdown')
 const interactive = !hasFlag(args, 'no-interact') && !hasFlag(args, 'passive')
 const headed = hasFlag(args, 'headed')
 const gpu = getArg(args, 'gpu', hasFlag(args, 'gpu') ? 'vulkan' : null)
@@ -263,18 +264,31 @@ const loadState = await page.evaluate(() => {
 	if (!v) return null
 	let tris = 0
 	let meshes = 0
+	let visibleMeshes = 0
 	try {
 		v.tableGroup?.traverse(o => {
 			if (o.isMesh && o.geometry?.attributes?.position) {
 				tris += o.geometry.attributes.position.count / 3
 				meshes++
+				// Draw-call upper bound: renderer.info.render.calls is not
+				// meaningful under the WebGPU backend (reads 0 per tick with
+				// autoReset, mid-composer partial sums otherwise), so count
+				// effectively visible meshes instead. Frustum culling can only
+				// lower the real draw count from here.
+				if (o.visible) {
+					let hidden = false
+					for (let p = o.parent; p && p !== v.tableGroup; p = p.parent)
+						if (!p.visible) {
+							hidden = true
+							break
+						}
+					if (!hidden) visibleMeshes++
+				}
 			}
 		})
 	} catch {
 		// Expected: TypeError if tableGroup not yet mounted.
 	}
-	const info = v.renderer?.info?.render ?? {}
-	const prog = v.renderer?.info?.programs ?? null
 	// WASM path: the PinMAME emu lives inside the headless engine, so
 	// "running" is engine readiness (no mock engine exists in the page).
 	const emuRunning = !!v?.wasmEngine && v.wasmEngine.ready
@@ -312,9 +326,9 @@ const loadState = await page.evaluate(() => {
 	return {
 		tris: Math.round(tris),
 		meshes,
-		draws: info.calls ?? 0,
-		triangles: info.triangles ?? 0,
-		programs: prog?.length ?? null,
+		draws: visibleMeshes,
+		triangles: Math.round(tris),
+		programs: null,
 		// WASM ball count includes unlaunched trough balls (4 on TWD from boot).
 		balls: v?.wasmEngine?.ballCount ?? 0,
 		hasEmu: !!v?.wasmEngine,
@@ -545,7 +559,15 @@ const journeyResult = await page.evaluate(
 		const animMs = []
 		const quantumMs = []
 		const renderMs = []
+		const renderPassIdx = []
 		const frameMs = []
+		const frameEndMs = []
+		const renderFrameMs = []
+		// Breakdown-only: per-step sync phases, audio drain, heap trend.
+		const breakdownRows = []
+		const appliedRows = []
+		const audioMs = []
+		const heapSamples = []
 		let renders = 0
 		let flipsCount = 0
 		const start = performance.now()
@@ -581,8 +603,43 @@ const journeyResult = await page.evaluate(
 			if (v._syncWasmTransforms) timeInto(v, '_syncWasmTransforms', animMs)
 			if (w.engine?.stepFrame) timeInto(w.engine, 'stepFrame', quantumMs)
 		}
+		if (opt.breakdown && w?.ready) {
+			// Core-loop decomposition: per-phase scene-sync timings through
+			// the optional syncAll sink, plus the audio drain. w.sync and
+			// w.pumpAudio are TS-private reach-throughs, same class as
+			// v._syncWasmTransforms above — the bench is a white-box profiler.
+			const syncTarget = w.sync
+			if (syncTarget?.syncAll) {
+				const origSyncAll = syncTarget.syncAll
+				const boundSyncAll = origSyncAll.bind(syncTarget)
+				syncTarget.syncAll = buffers => {
+					const phases = { balls: 0, movers: 0, lights: 0, prims: 0, flashers: 0 }
+					const result = boundSyncAll(buffers, phases)
+					breakdownRows.push(phases)
+					// Applied-row counts ride along: cost per phase only
+					// means something next to how many rows actually applied.
+					appliedRows.push({
+						balls: result.ballsMoved,
+						movers: result.movers,
+						lights: result.lights,
+						prims: result.prims,
+						flashers: result.flashers,
+					})
+					return result
+				}
+				patches.push(() => {
+					syncTarget.syncAll = origSyncAll
+				})
+			}
+			if (w.pumpAudio) timeInto(w, 'pumpAudio', audioMs)
+		}
 
 		const targetRenderer = r
+		// Cumulative render clock: per-pass timings alone cannot answer
+		// "render per frame" (the composer issues ~14 passes per frame), so
+		// the rAF loop below samples this clock for per-frame render totals.
+		let renderClockMs = 0
+		let renderPassBucket = 0
 		if (targetRenderer) {
 			const origRender = targetRenderer.render
 			const boundRender = origRender.bind(targetRenderer)
@@ -590,7 +647,16 @@ const journeyResult = await page.evaluate(
 				renders++
 				const t = performance.now()
 				const res = boundRender(...a)
-				if (opt.profile) renderMs.push(performance.now() - t)
+				const dt = performance.now() - t
+				renderClockMs += dt
+				if (opt.profile) {
+					renderMs.push(dt)
+					// Pass index within the current frame bucket (reset each
+					// rAF tick below): identifies hot passes in the composer
+					// chain even when buckets straddle by one.
+					renderPassIdx.push(renderPassBucket)
+					renderPassBucket++
+				}
 				return res
 			}
 			patches.push(() => {
@@ -619,16 +685,31 @@ const journeyResult = await page.evaluate(
 
 		await new Promise(resolve => {
 			const id = setInterval(() => {
+				// Timestamped heap samples: correlated with jank frames below
+				// to separate GC pauses (heap drops across the spike) from
+				// slow work (heap flat, one phase spiked).
+				if (opt.breakdown && performance.memory)
+					heapSamples.push({
+						t: Math.round(performance.now() - start),
+						mb: Math.round(performance.memory.usedJSHeapSize / 1048576),
+					})
 				if (performance.now() - start >= opt.duration) {
 					clearInterval(id)
 					if (actorTimer) clearInterval(actorTimer)
 					resolve(null)
 				}
 			}, 30)
+			let lastRenderClock = renderClockMs
 			function raf() {
 				const now = performance.now()
 				if (now - start < opt.duration) {
+					renderPassBucket = 0
 					frameMs.push(now - last)
+					frameEndMs.push(now - start)
+					// Per-frame render total, sampled from the cumulative
+					// clock: passes may straddle a tick, which averages out.
+					renderFrameMs.push(renderClockMs - lastRenderClock)
+					lastRenderClock = renderClockMs
 					last = now
 					requestAnimationFrame(raf)
 				}
@@ -637,6 +718,7 @@ const journeyResult = await page.evaluate(
 		})
 		const elapsed = performance.now() - start
 		frameMs.shift()
+		frameEndMs.shift()
 		// Restore every patched method: sampling stops here, arrays stay bounded.
 		for (const restore of patches) restore()
 		// animMs (whole _syncWasmTransforms) contains physicsMs (whole step):
@@ -645,6 +727,96 @@ const journeyResult = await page.evaluate(
 		const fanoutMs = []
 		for (let i = 0; i < Math.min(animMs.length, physicsMs.length); i++)
 			fanoutMs.push(Math.max(0, animMs[i] - physicsMs[i]))
+		// Breakdown: decompose each step into bridge quanta, five sync
+		// phases, audio drain, and step overhead (buffer views + light-name
+		// mapping). All arrays push once per step in call order — pair by
+		// index like fanoutMs above.
+		let breakdown = null
+		if (opt.breakdown && breakdownRows.length) {
+			const n = Math.min(physicsMs.length, quantumMs.length, breakdownRows.length, audioMs.length)
+			const phase = key => breakdownRows.slice(0, n).map(r => r[key])
+			const residualMs = []
+			for (let i = 0; i < n; i++) {
+				const phases = breakdownRows[i]
+				const syncTotal =
+					phases.balls + phases.movers + phases.lights + phases.prims + phases.flashers
+				residualMs.push(Math.max(0, physicsMs[i] - quantumMs[i] - syncTotal - audioMs[i]))
+			}
+			const applied = key => appliedRows.slice(0, n).map(r => r[key])
+			// Jank attribution: for the longest frames, pair the step at the
+			// same index (one step per rAF, same order) and bracket the frame
+			// with heap samples. A multi-MB heap drop across the spike reads
+			// as a GC pause; a flat heap with one hot phase reads as slow work.
+			const worst = frameMs
+				.map((ms, i) => ({ ms, i }))
+				.sort((a, b) => b.ms - a.ms)
+				.slice(0, 5)
+			const heapAt = (t, dir) => {
+				if (dir > 0) {
+					for (const s of heapSamples) if (s.t >= t) return s
+					return null
+				}
+				let best = null
+				for (const s of heapSamples) {
+					if (s.t <= t) best = s
+					else break
+				}
+				return best
+			}
+			const jank = worst.map(({ ms, i }) => {
+				const end = frameEndMs[i]
+				const before = heapAt(end - ms, -1)
+				const after = heapAt(end, 1)
+				const k = Math.min(i, n - 1)
+				const phases = breakdownRows[k]
+				return {
+					frameMs: +ms.toFixed(2),
+					heapDeltaMb:
+						before && after ? after.mb - before.mb : null,
+					quantaMs: quantumMs[k] != null ? +quantumMs[k].toFixed(2) : null,
+					syncMs: phases
+						? +(phases.balls + phases.movers + phases.lights + phases.prims + phases.flashers).toFixed(2)
+						: null,
+					audioMs: audioMs[k] != null ? +audioMs[k].toFixed(2) : null,
+				}
+			})
+			// Render passes grouped by in-frame bucket index: a stable hot
+			// index is one composer pass (scene, bloom level, composite).
+			const passGroups = new Map()
+			for (let i = 0; i < renderPassIdx.length; i++) {
+				const key = renderPassIdx[i]
+				let group = passGroups.get(key)
+				if (!group) {
+					group = []
+					passGroups.set(key, group)
+				}
+				group.push(renderMs[i])
+			}
+			const renderPasses = [...passGroups.entries()]
+				.map(([idx, arr]) => ({ idx, ...stats(arr) }))
+				.sort((a, b) => a.idx - b.idx)
+			breakdown = {
+				steps: n,
+				renderPasses,
+				balls: stats(phase('balls')),
+				movers: stats(phase('movers')),
+				lights: stats(phase('lights')),
+				prims: stats(phase('prims')),
+				flashers: stats(phase('flashers')),
+				audio: stats(audioMs.slice(0, n)),
+				stepOverhead: stats(residualMs),
+				applied: {
+					balls: stats(applied('balls')),
+					movers: stats(applied('movers')),
+					lights: stats(applied('lights')),
+					prims: stats(applied('prims')),
+					flashers: stats(applied('flashers')),
+				},
+				heapStartMb: heapSamples.length ? heapSamples[0].mb : null,
+				heapEndMb: heapSamples.length ? heapSamples[heapSamples.length - 1].mb : null,
+				jank,
+			}
+		}
 
 		function stats(arr) {
 			if (!arr.length) return null
@@ -661,9 +833,21 @@ const journeyResult = await page.evaluate(
 		}
 
 		let tris = 0
+		let visibleMeshes = 0
 		try {
 			v?.tableGroup?.traverse(o => {
-				if (o.isMesh && o.geometry?.attributes?.position) tris += o.geometry.attributes.position.count / 3
+				if (o.isMesh && o.geometry?.attributes?.position) {
+					tris += o.geometry.attributes.position.count / 3
+					if (o.visible) {
+						let hidden = false
+						for (let p = o.parent; p && p !== v.tableGroup; p = p.parent)
+							if (!p.visible) {
+								hidden = true
+								break
+							}
+						if (!hidden) visibleMeshes++
+					}
+				}
 			})
 		} catch {
 			// Expected: TypeError if tableGroup not mounted or geometry missing — tris remains 0, not fatal.
@@ -684,7 +868,7 @@ const journeyResult = await page.evaluate(
 				fps: fpsRender ?? fpsRaf,
 				fpsRender,
 				fpsRaf,
-				draws: r?.info?.render?.calls ?? 0,
+				draws: visibleMeshes,
 				tris: Math.round(tris),
 				jankFrames: frameMs.filter(f => f > 33.3).length,
 				heapMb: performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) : null,
@@ -693,11 +877,13 @@ const journeyResult = await page.evaluate(
 				animStats: stats(fanoutMs),
 				quantumStats: stats(quantumMs),
 				renderStats: stats(renderMs),
+				renderFrameStats: stats(renderFrameMs),
 				streamOverlapped: !streamSettledAtProfileStart,
+				breakdown,
 			},
 		}
 	},
-	{ duration, warmup, interactive, profile, streamSettled },
+	{ duration, warmup, interactive, profile, breakdown, streamSettled },
 )
 
 const parsed = {}
@@ -890,6 +1076,41 @@ console.log(`\n[bench] === ANALYSIS & SUGGESTIONS ===`)
 		console.log(
 			`  render avg ${pf.renderStats.avg}ms p95 ${pf.renderStats.p95} max ${pf.renderStats.max} draws ${pf.draws} tris ${pf.tris}`,
 		)
+	if (pf.renderFrameStats)
+		console.log(
+			`  render/frame total avg ${pf.renderFrameStats.avg}ms p95 ${pf.renderFrameStats.p95} max ${pf.renderFrameStats.max}`,
+		)
+	if (pf.breakdown?.renderPasses?.length) {
+		const hot = [...pf.breakdown.renderPasses].sort((a, b) => b.avg - a.avg).slice(0, 4)
+		console.log(
+			`  render passes by bucket (idx:avg/p95): ${pf.breakdown.renderPasses.map(p => `${p.idx}:${p.avg}/${p.p95}`).join(' ')}`,
+		)
+		console.log(`  hottest buckets: ${hot.map(p => `#${p.idx} avg ${p.avg}ms p95 ${p.p95} max ${p.max}`).join(' | ')}`)
+	}
+	if (pf.breakdown) {
+		const b = pf.breakdown
+		const row = s => (s ? `avg ${s.avg}ms p95 ${s.p95} max ${s.max}` : 'n/a')
+		console.log(`  step split (${b.steps} steps, audio + phases + overhead = physics):`)
+		console.log(`    quanta ${row(pf.quantumStats)} | audio ${row(b.audio)} | overhead ${row(b.stepOverhead)}`)
+		console.log(
+			`    balls ${row(b.balls)} | movers ${row(b.movers)} | lights ${row(b.lights)} | prims ${row(b.prims)} | flashers ${row(b.flashers)}`,
+		)
+		if (b.applied) {
+			const a = b.applied
+			const avg = s => (s ? s.avg : '?')
+			console.log(
+				`    applied rows/step: balls ${avg(a.balls)} movers ${avg(a.movers)} lights ${avg(a.lights)} prims ${avg(a.prims)} flashers ${avg(a.flashers)}`,
+			)
+		}
+		if (b.heapStartMb != null) console.log(`    heap ${b.heapStartMb}MB -> ${b.heapEndMb}MB during profile`)
+		if (b.jank?.length) {
+			console.log(`    worst frames (frame | heapΔ | quanta | sync | audio):`)
+			for (const j of b.jank)
+				console.log(
+					`      ${j.frameMs}ms | ${j.heapDeltaMb ?? '?'}MB | ${j.quantaMs ?? '?'}ms | ${j.syncMs ?? '?'}ms | ${j.audioMs ?? '?'}ms`,
+				)
+		}
+	}
 	if (lj.streamLogMs && lj.streamLogMs > 5000) {
 		console.log(
 			`- STREAMING BOTTLENECK: ${lj.streamMs}ms for ~${payload.metrics.meshes} meshes. LDR decodes already run worker-first with an IDB bitmap cache, so the remainder is upload + bake, not decode.`,
@@ -948,7 +1169,7 @@ console.log(`\n[bench] === ANALYSIS & SUGGESTIONS ===`)
 		)
 	}
 	console.log(
-		`- BENCH COVERAGE: Load (fetch/parse/scene/transpile/stream) + Play (coin/start/plunge/flipper/nudge + physics/anim/render fps) measured. Re-run with --duration 5000 --warmup 2000 for stable FPS, compare --low vs --high quality, and with --trace to capture chrome trace at ${tracePath ?? 'trace-*.json'}.`,
+		`- BENCH COVERAGE: Load (fetch/parse/scene/transpile/stream) + Play (coin/start/plunge/flipper/nudge + physics/anim/render fps) measured. Re-run with --duration 5000 --warmup 2000 for stable FPS, compare --low vs --high quality, add --breakdown for the per-phase step split, and with --trace to capture chrome trace at ${tracePath ?? 'trace-*.json'}.`,
 	)
 }
 if (tracePath) console.log(`[bench] trace at ${tracePath} — open in chrome://tracing or about://tracing`)

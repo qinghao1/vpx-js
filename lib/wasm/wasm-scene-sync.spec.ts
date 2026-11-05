@@ -29,7 +29,7 @@ import {
 	WASM_STRIDES,
 	wrapHeadlessEngine,
 } from './vpinball-wasm.js'
-import type { BallScene, BallSlot, PartSlot, SyncScene } from './wasm-scene-sync.js'
+import type { BallScene, BallSlot, PartSlot, SyncPhaseTimings, SyncScene } from './wasm-scene-sync.js'
 import { WasmSceneSync } from './wasm-scene-sync.js'
 
 /** FlasherData's constructor is private; construct fixtures through a minimal cast. */
@@ -905,6 +905,38 @@ describe('WASM scene sync', () => {
 		})
 	})
 
+	describe('phase timings', () => {
+		it('records per-phase wall time without changing counts', () => {
+			const table = new TableBuilder().addFlipper('F1').build()
+			const api = new RecordingApi()
+			const flipper = (
+				table.flippers as unknown as Record<string, { getState(): ItemState; getUpdater(): ItemUpdater<any> }>
+			)['F1']!
+			const slots = new Map<number, PartSlot<object>>([
+				[0, slotFor({}, flipper.getState(), flipper.getUpdater())],
+			])
+			const sync = new WasmSceneSync<object, unknown, unknown>(mockScene(slots), mockBalls(), api as any, table)
+			const buffers = {
+				balls: new Float32Array(0),
+				movers: new Float32Array([0, MoverType.Flipper, 0.5, 0, 0, 0, 1, 0]),
+				lights: new Float32Array(0),
+				prims: new Float32Array(0),
+				flashers: new Float32Array(0),
+			}
+			const timings: SyncPhaseTimings = { balls: -1, movers: -1, lights: -1, prims: -1, flashers: -1 }
+			const timed = sync.syncAll(buffers, timings)
+			expect(timed.movers).toBe(1)
+			// Same first-frame counts as a sink-less pass on an identical sync.
+			const twin = new WasmSceneSync<object, unknown, unknown>(mockScene(slots), mockBalls(), api as any, table)
+			expect(timed).toEqual(twin.syncAll(buffers))
+			for (const value of Object.values(timings)) {
+				expect(value).toEqual(expect.any(Number))
+				expect(Number.isFinite(value)).toBe(true)
+				expect(value).toBeGreaterThanOrEqual(0)
+			}
+		})
+	})
+
 	describe('flasher image policy', () => {
 		function flasherFixture(policy?: { flasherImage?: (partIdx: number) => string | undefined }): {
 			sync: WasmSceneSync<object, unknown, unknown>
@@ -995,7 +1027,10 @@ describe('WASM scene sync', () => {
 		it('exposes flipper angles by part', () => {
 			const table = new TableBuilder().addFlipper('F1').addFlipper('F2').build()
 			const api = new RecordingApi()
-			const flippers = table.flippers as unknown as Record<string, { getState(): ItemState; getUpdater(): ItemUpdater<any> }>
+			const flippers = table.flippers as unknown as Record<
+				string,
+				{ getState(): ItemState; getUpdater(): ItemUpdater<any> }
+			>
 			const slots = new Map<number, PartSlot<object>>([
 				[0, slotFor({}, flippers['F1']!.getState(), flippers['F1']!.getUpdater())],
 				[1, slotFor({}, flippers['F2']!.getState(), flippers['F2']!.getUpdater())],
@@ -1013,7 +1048,12 @@ describe('WASM scene sync', () => {
 		it('exposes ball poses by id', () => {
 			const table = new TableBuilder().build()
 			const api = new RecordingApi()
-			const sync = new WasmSceneSync<object, unknown, unknown>(mockScene(new Map()), mockBalls(), api as any, table)
+			const sync = new WasmSceneSync<object, unknown, unknown>(
+				mockScene(new Map()),
+				mockBalls(),
+				api as any,
+				table,
+			)
 			expect(sync.ballPoses()).toEqual([])
 			const identity = [1, 0, 0, 0, 1, 0, 0, 0, 1]
 			sync.syncBalls(new Float32Array([7, 10, 20, 30, 25, ...identity, 0xff0000, 1]))
