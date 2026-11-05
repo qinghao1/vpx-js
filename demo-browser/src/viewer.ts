@@ -1,13 +1,10 @@
 // @ts-nocheck — viewer is a DOM/three coordinator over loosely-typed runtime
-// subsystems (player, controls); strict-typing it is a separate migration.
+// subsystems (wasm engine, controls); strict-typing it is a separate migration.
 // Viewer coordinator - delegates to subsystems
 
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import * as THREE from 'three/webgpu'
-import { WebSoundEngine } from '../../dist-esm/lib/audio/web-sound-engine.js'
-import { tryBootPlayer } from '../../dist-esm/lib/game/player.js'
 import { BrowserBinaryReader } from '../../dist-esm/lib/io/binary-reader.js'
-import { isWasmReady } from '../../dist-esm/lib/physics/wasm/kernels.js'
 import { setGlobalEmissionScale } from '../../dist-esm/lib/render/threejs/material-shared.js'
 import {
 	isPrimitiveNodeMaterial,
@@ -50,8 +47,8 @@ import {
 } from '../../dist-esm/lib/render/threejs/transmission-buffer.js'
 import { collectPostProcessNodes, needsNoBakeFill } from '../../dist-esm/lib/render/threejs/visibility-heuristics.js'
 import { AnimationGate } from '../../dist-esm/lib/util/animation-gate.js'
-import { stripVbsComments } from '../../dist-esm/lib/util/vbs-comments.js'
 import { Table } from '../../dist-esm/lib/vpt/table/table.js'
+import { codeToSdlScancode, createScancodeGate, resolveFlipperKey } from '../../dist-esm/lib/wasm/vpinball-wasm.js'
 import { BackglassRenderer } from './backglass/backglass-renderer.js'
 import {
 	CAM,
@@ -74,7 +71,7 @@ import {
 	isLowQuality,
 	QUALITY_CAPS,
 } from './env.js'
-import { keyForCode, locationForCode, RELEASE_CODES } from './input/input-manager.js'
+import { RELEASE_CODES } from './input/input-manager.js'
 import { pollNudgePads } from './input/nudge-controller.js'
 import { attachInput } from './input.js'
 import type { DirtyOverlay } from './overlays/dirty-overlay.js'
@@ -88,9 +85,9 @@ import {
 	filterTextures,
 	fmtBytes,
 	logMem,
-	resolveRomCandidates,
 	resolveVpxCandidates,
 } from './utils.js'
+import { WasmEngine, WasmEngineStartError } from './wasm-engine.js'
 
 let _prerenderedBackground: THREE.Color | null = null
 function getPrerenderedBackground(): THREE.Color {
@@ -149,9 +146,6 @@ const SOUND_SVG_ATTRS =
 const SOUND_ICON_HIGH = `<svg ${SOUND_SVG_ATTRS}>${SOUND_SPEAKER}<path d="M15.5 8.5a5 5 0 0 1 0 7"></path><path d="M18.4 5.6a9 9 0 0 1 0 12.8"></path></svg>`
 const SOUND_ICON_LOW = `<svg ${SOUND_SVG_ATTRS}>${SOUND_SPEAKER}<path d="M15.5 8.5a5 5 0 0 1 0 7"></path></svg>`
 const SOUND_ICON_OFF = `<svg ${SOUND_SVG_ATTRS}>${SOUND_SPEAKER}<line x1="16" y1="9" x2="22" y2="15"></line><line x1="22" y1="9" x2="16" y2="15"></line></svg>`
-
-const cGameName = table =>
-	stripVbsComments(table?.tableScript ?? '').match(/cGameName\s*=\s*["']([^"']+)["']/i)?.[1] || ''
 const setTitle = title => {
 	const el = document.getElementById('title')
 	if (el && title) el.textContent = title
@@ -210,7 +204,9 @@ export class Viewer {
 		this.scene.add(new THREE.AmbientLight(LIGHT_AMBIENT.color, LIGHT_AMBIENT.intensity))
 		this.tableGroup = null
 		this.table = null
-		this.player = null
+		this.wasmEngine = null
+		// Raw table bytes retained for the WASM engine; each load path stashes its bytes beside its reader.
+		this._vpxBytes = null
 		this.renderApi = null
 		this.nodeCache = new Map()
 		this._lightmapMap = new Map()
@@ -221,7 +217,6 @@ export class Viewer {
 		this.animFrame = null
 		this._animRaf = null
 		this._animTimeout = null
-		this._emuStartLogged = false
 		this.invalidate()
 		this._streamId = 0
 		this._loadId = 0
@@ -232,7 +227,6 @@ export class Viewer {
 		this._inputCleanup = null
 		this._nudgeCleanup = null
 		this._touchCleanup = null
-		this._hasPinmame = false
 		this._rendererBackend = 'webgpu'
 		this.renderPipeline = null
 		this.renderer = null
@@ -278,9 +272,6 @@ export class Viewer {
 		this._setupModeSwitch()
 		this._setupDebugToggle()
 		this._syncChrome()
-		try {
-			void import('../../dist-esm/lib/scripting/transpiler-worker-pool.js').then(m => m.warmTranspilerWorker?.())
-		} catch {}
 	}
 	destroy() {
 		if (this._disposed) return
@@ -311,6 +302,11 @@ export class Viewer {
 		}
 		for (const fn of this._eventCleanups) fn()
 		this._eventCleanups = []
+		if (this.wasmEngine) {
+			const engine = this.wasmEngine
+			this.wasmEngine = null
+			void engine.destroy().catch(() => {})
+		}
 		for (const overlay of this.overlays) overlay.dispose?.()
 		this.controls?.dispose?.()
 		this.renderPipeline?.dispose?.()
@@ -335,80 +331,80 @@ export class Viewer {
 		addEventListener('keydown', onKey)
 		this._eventCleanups.push(() => removeEventListener('keydown', onKey))
 	}
-	_setupSoundControls() {
-		if (!this.sound) {
-			try {
-				this.sound = new WebSoundEngine()
-			} catch {
-				this.sound = null
-			}
+	/**
+	 * Controls-first sound surface for the chrome and e2e: mute flag and 0..1
+	 * level, live from the WASM engine. Undefined before the engine boots —
+	 * the headless ring is the only audio source, so there is nothing to
+	 * query (or drive) without it.
+	 */
+	get sound() {
+		const engine = this.wasmEngine
+		if (!engine) return undefined
+		return {
+			isMuted: () => engine.muted,
+			getLevel: () => engine.volume,
 		}
-		this._applySoundPrefs()
+	}
+	/** Sound-button/shortcut entry: flip the engine mute and reflect it in the chrome. */
+	toggleSoundMuted() {
+		const engine = this.wasmEngine
+		const muted = engine ? engine.toggleMuted() : false
+		this._syncSoundChrome()
+		return muted
+	}
+	// Chrome over engine-owned mute/level (per-load engine state; the old
+	// persisted sound profile is gone by design — each table starts fresh).
+	_setupSoundControls() {
 		this._syncSoundChrome()
 		const btn = this.dom.soundBtn
 		const slider = this.dom.soundVolume
 		const group = btn?.closest?.('.sound-control')
-		const toggle = () => {
-			if (!this.sound) return
-			// Touch (no-hover): the first tap only reveals the slider so the
-			// tap that opens the control never flips mute by accident. Once
-			// revealed, taps toggle as normal. Hover UIs never take this path.
-			if (
-				group &&
-				!group.classList.contains('expanded') &&
-				typeof window.matchMedia === 'function' &&
-				window.matchMedia('(hover: none)').matches
-			) {
-				group.classList.add('expanded')
-				return
-			}
-			this.sound.unlock()
-			this.sound.setMuted(!this.sound.isMuted())
-			this._saveSoundPrefs()
-			this._syncSoundChrome()
-		}
+		const toggle = () => this.toggleSoundMuted()
 		if (btn) {
-			btn.addEventListener('click', toggle)
-			this._eventCleanups.push(() => btn.removeEventListener('click', toggle))
+			// Touch (no-hover): the first tap only reveals the slider so the
+			// tap that opens the control never flips mute by accident.
+			const reveal = () => {
+				if (
+					group &&
+					!group.classList.contains('expanded') &&
+					typeof window.matchMedia === 'function' &&
+					window.matchMedia('(hover: none)').matches
+				) {
+					group.classList.add('expanded')
+					return true
+				}
+				return false
+			}
+			const onToggle = () => {
+				if (reveal()) return
+				toggle()
+			}
+			btn.addEventListener('click', onToggle)
+			this._eventCleanups.push(() => btn.removeEventListener('click', onToggle))
 		}
 		// Touch (no-hover) support: tapping the icon reveals the slider until
 		// the next tap outside the control. Desktop hover/:focus-within needs no JS.
 		if (group) {
-			const expand = () => group.classList.add('expanded')
-			if (btn) {
-				btn.addEventListener('click', expand)
-				this._eventCleanups.push(() => btn.removeEventListener('click', expand))
-			}
 			const collapseOutside = e => {
 				if (e.target instanceof Node && !group.contains(e.target)) group.classList.remove('expanded')
 			}
 			document.addEventListener('pointerdown', collapseOutside)
 			this._eventCleanups.push(() => document.removeEventListener('pointerdown', collapseOutside))
-			if (slider) {
-				const collapseEsc = e => {
-					if (e.key === 'Escape') {
-						group.classList.remove('expanded')
-						slider.blur?.()
-					}
-				}
-				slider.addEventListener('keydown', collapseEsc)
-				this._eventCleanups.push(() => slider.removeEventListener('keydown', collapseEsc))
-			}
-		}
-		const onSlider = () => {
-			if (!this.sound || !slider) return
-			this.sound.unlock()
-			this.sound.setVolume(Number(slider.value ?? 100) / 100)
-			if (this.sound.getLevel() > 0 && this.sound.isMuted()) this.sound.setMuted(false)
-			this._saveSoundPrefs()
-			this._syncSoundChrome()
 		}
 		if (slider) {
+			const onSlider = () => {
+				if (!this.wasmEngine) return
+				this.wasmEngine.setVolume(Number(slider.value) / 100)
+				this._syncSoundChrome()
+			}
 			slider.addEventListener('input', onSlider)
 			this._eventCleanups.push(() => slider.removeEventListener('input', onSlider))
 		}
 		const onKey = e => {
+			// Global mute shortcut (all modes); the key still reaches the
+			// table as DIK_M, as before. No repeat: holding M must not strobe.
 			if ((e.code === 'KeyM' || e.key === 'm' || e.key === 'M') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+				if (e.repeat) return
 				const tag = (document.activeElement?.tagName || '').toLowerCase()
 				if (tag === 'input' || tag === 'textarea' || tag === 'select') return
 				toggle()
@@ -417,81 +413,18 @@ export class Viewer {
 		addEventListener('keydown', onKey)
 		this._eventCleanups.push(() => removeEventListener('keydown', onKey))
 	}
-	_applySoundPrefs() {
-		if (!this.sound) return
-		// Persisted user prefs win over the table's SVOL default. The table music
-		// level is not seeded on the bus (native defaults it to 1): it applies
-		// per PlayMusic, multiplied with the script volume.
-		const tableSound = Number.isFinite(this.table?.data?.tableSoundVolume) ? this.table.data.tableSoundVolume : 1
-		let prefs = null
-		try {
-			prefs = JSON.parse(localStorage.getItem('vpx:sound') ?? 'null')
-		} catch {}
-		this.sound.setVolume(Math.max(0, Math.min(1, prefs?.volume ?? tableSound ?? 1)))
-		this.sound.setMuted(!!prefs?.muted)
-	}
-
-	// ?music=url[,url...]: external music files, decoded in the background and
-	// registered under their file names for script PlayMusic(name). Loading is
-	// async, so a PlayMusic call before arrival still misses.
-	async _loadMusicParam() {
-		const param = new URLSearchParams(location.search).get('music')
-		if (!param || !this.player) return
-		const sources = []
-		for (const raw of param.split(',')) {
-			const url = raw.trim()
-			if (!url) continue
-			try {
-				const res = await fetch(new URL(url, location.href).href)
-				if (!res.ok) throw new Error(`${res.status}`)
-				const name = url.split(/[?#]/)[0].split('/').pop() ?? url
-				sources.push({ name, bytes: new Uint8Array(await res.arrayBuffer()) })
-			} catch {
-				this.log(`Music file unavailable: ${url}`)
-			}
-		}
-		if (sources.length > 0) await this.player.loadMusic(sources)
-	}
-	_saveSoundPrefs() {
-		if (!this.sound) return
-		try {
-			localStorage.setItem(
-				'vpx:sound',
-				JSON.stringify({ muted: this.sound.isMuted(), volume: this.sound.getLevel() }),
-			)
-		} catch {}
-	}
 	_syncSoundChrome() {
+		const engine = this.wasmEngine
 		const btn = this.dom.soundBtn
 		const slider = this.dom.soundVolume
-		if (btn && this.sound) {
-			const muted = this.sound.isMuted()
-			const level = this.sound.getLevel()
+		if (btn && engine) {
+			const muted = engine.muted
+			const level = engine.volume
 			btn.innerHTML = muted || level <= 0 ? SOUND_ICON_OFF : level <= 0.5 ? SOUND_ICON_LOW : SOUND_ICON_HIGH
 			btn.setAttribute('aria-pressed', muted ? 'true' : 'false')
 			btn.setAttribute('aria-label', muted ? 'Unmute sound' : 'Mute sound')
 		}
-		if (slider && this.sound) slider.value = String(Math.round(this.sound.getLevel() * 100))
-	}
-	_attachSoundToPlayer() {
-		if (!this.player || !this.sound) return
-		try {
-			this.player.setSoundEngine(this.sound)
-		} catch {}
-		this._applySoundPrefs()
-		this._syncSoundChrome()
-		this._wireEmuAudio()
-	}
-	_wireEmuAudio() {
-		const emu = this.player?.getPhysics?.()?.emu
-		if (!emu || !this.sound) return
-		try {
-			emu.registerAudioConsumer?.(msg => {
-				try {
-					this.sound?.pushEmuPcm(msg)
-				} catch {}
-			})
-		} catch {}
+		if (slider && engine) slider.value = String(Math.round(engine.volume * 100))
 	}
 	async _createRenderer() {
 		const canvas = this.dom.canvas
@@ -599,20 +532,43 @@ export class Viewer {
 		}
 	}
 
+	/** Legacy name: delegates to _syncWasmTransforms; no TS physics remains. */
 	private _syncPhysicsTransforms(_timestamp) {
-		if (!this.player) return false
-		this.player.setPhysicsEnabled(this.viewerMode === 'play')
-		this.player.updatePhysics()
-		if (this.viewerMode !== 'play' || !this.isPaused) {
-			this.player.updateAnimations(this.player.getGameTime())
-			const changed = this.player.popStates()
-			if (!changed.isEmpty) {
-				this.applyChangedStates(changed)
-				return true
-			}
-			changed.release()
-		}
+		if (this.wasmEngine?.ready) return this._syncWasmTransforms(_timestamp)
 		return false
+	}
+
+	/**
+	 * Step the headless-WASM engine and fan its rows out onto the scene.
+	 * Runs on each rAF tick while ready and unpaused — pause freezes the
+	 * sim (and its audio with it). Lamp changes fan out to lightmapped prims.
+	 */
+	_syncWasmTransforms(timestamp) {
+		// Both callers (the gated loop and the input immediate tick) already
+		// return while paused, so pause needs no mode-qualified check here.
+		if (!this.wasmEngine?.ready || this.isPaused) return false
+		const { changedLights, counts } = this.wasmEngine.step(timestamp)
+		if (changedLights.length > 0) {
+			// One pass over the dirty prims: several changed lamps usually
+			// share a lightmapped prim, and the empty partial reads only
+			// current lamp state, so collapsing duplicates is exact.
+			const dirty = new Set<string>()
+			for (const lm of changedLights) for (const primName of this._lightmapMap.get(lm) ?? []) dirty.add(primName)
+			for (const primName of dirty) {
+				const entry = this.nodeCache.get(primName)
+				if (entry) entry.item.getUpdater().applyState(entry.node, {}, this.renderApi, this.table)
+			}
+		}
+		return (
+			!!counts &&
+			(counts.ballsMoved > 0 ||
+				counts.ballsSpawned > 0 ||
+				counts.ballsRemoved > 0 ||
+				counts.movers > 0 ||
+				counts.lights > 0 ||
+				counts.prims > 0 ||
+				counts.flashers > 0)
+		)
 	}
 
 	stopLoop() {
@@ -731,8 +687,8 @@ export class Viewer {
 		this._hidePlayTip?.()
 		hideCabFlippers(this.tableGroup)
 		this._syncChrome()
-		if (this.player) {
-			this.player.setPhysicsEnabled(true)
+		if (this.wasmEngine?.ready) {
+			this.wasmEngine.setBallsVisible(true)
 			this.enterPlayMode()
 		} else {
 			this.hookInput()
@@ -741,10 +697,10 @@ export class Viewer {
 		const target = computePlayFraming(this.tableGroup, this.camera)
 		await this._animateCameraTo(target, CAM_ANIM.durationMode)
 		syncRoom(this.scene, this.tableGroup, target.center, target.size)
-		if (!this.player) {
+		if (!this.wasmEngine?.ready) {
 			if (this.table) {
 				try {
-					await this._createPlayer()
+					await this._createWasmEngine()
 				} catch (e) {
 					this.log(`Play load failed: ${e.message}`, 'error')
 					this._revertFailedPlay()
@@ -758,9 +714,9 @@ export class Viewer {
 		}
 	}
 	// A failed play-load must not strand the viewer in play mode with no
-	// player: drop back to viewer chrome instead of warn-and-continue.
+	// engine: drop back to viewer chrome instead of warn-and-continue.
 	_revertFailedPlay() {
-		if (this.viewerMode !== 'play' || this.player) return
+		if (this.viewerMode !== 'play' || this.wasmEngine?.ready) return
 		this.viewerMode = 'viewer'
 		if (typeof history !== 'undefined' && history.state?.mode === 'play') history.back()
 		if (this.controls) this.controls.enabled = true
@@ -784,7 +740,6 @@ export class Viewer {
 		}
 		if (this.tableGroup)
 			syncRoom(this.scene, this.tableGroup, target.center, (target as any).size || new THREE.Vector3(1, 1, 1))
-		if (this.player) this.player.setPhysicsEnabled(false)
 		this.exitPlayMode()
 	}
 	_syncChrome() {
@@ -906,9 +861,6 @@ export class Viewer {
 		}
 		const ballsNode = this.tableGroup?.getObjectByName('balls')
 		if (ballsNode) ballsNode.visible = true
-		this.player?.setPhysicsEnabled(true)
-		// State filtering changes per mode — reconverge under the new filter.
-		this.player?.resyncStates()
 		this._emitModeChange()
 		if (this.dom.canvas) {
 			this.dom.canvas.tabIndex = 0
@@ -927,7 +879,7 @@ export class Viewer {
 	}
 	exitPlayMode() {
 		this.invalidate()
-		if (this.player) {
+		if (this.wasmEngine?.ready) {
 			for (const code of this._touchMap.values()) this._sendKey(code, false)
 			this._touchMap.clear()
 			for (const code of RELEASE_CODES) this._sendKey(code, false)
@@ -936,8 +888,6 @@ export class Viewer {
 		if (this.tableGroup) showCabFlippers(this.tableGroup)
 		const ballsNode = this.tableGroup?.getObjectByName('balls')
 		if (ballsNode) ballsNode.visible = false
-		// Mirror of enterPlayMode: reconverge filtered states under viewer filtering.
-		this.player?.resyncStates()
 		this._emitModeChange()
 	}
 	buildNodeCache() {
@@ -963,34 +913,6 @@ export class Viewer {
 			else this._lightmapMap.set(lm, [primName])
 		}
 	}
-	handleBallLifecycle(ball, created) {
-		const ballsGroup = this.tableGroup?.getObjectByName('balls')
-		if (!ballsGroup || !ball) return
-		if (created) {
-			const meshes = ball.getMeshes(this.table, this.renderApi, {})
-			const group = this.renderApi.createParentNode(ball.getName())
-			for (const obj of Object.values(meshes)) group.add(this.renderApi.createMesh(obj))
-			ballsGroup.add(group)
-			group.traverse(o => {
-				if (o.isMesh) {
-					o.castShadow = true
-					o.receiveShadow = false
-					o.frustumCulled = false
-				}
-			})
-			group.frustumCulled = false
-			this.nodeCache.set(ball.getName(), {
-				item: ball,
-				node: group,
-			})
-			ball.getUpdater().applyState(group, ball.getState(), this.renderApi, this.table)
-			if (this.viewerMode !== 'play') ballsGroup.visible = false
-		} else {
-			const entry = this.nodeCache.get(ball.getName())
-			if (entry?.node) ballsGroup.remove(entry.node)
-			this.nodeCache.delete(ball.getName())
-		}
-	}
 	/**
 	 * Room/cabinet force-show: a script-driven hide of a VR or cabinet node
 	 * is dropped from the diff in both modes, while the diff's matrices and
@@ -998,93 +920,6 @@ export class Viewer {
 	 * screens; the backdrop is the fallback only when no room exists.
 	 * Non-room states are untouched in both modes.
 	 */
-	showcaseState(nodeName: string | undefined, state: any) {
-		if (state?.isVisible !== false || !isShowcaseRoomNode(nodeName)) {
-			return state
-		}
-		// Drop the hide from the updater merge/apply (each resync re-strips
-		// it). The node-level re-show after a resync happens in
-		// applyChangedStates instead.
-		const { isVisible: _hidden, ...rest } = state
-		return rest
-	}
-	applyChangedStates(changed) {
-		if (!changed || !this.tableGroup || !this.renderApi) {
-			changed?.release?.()
-			return
-		}
-		const states = changed.changedStates
-		const changedLightNames = (this._changedLightNames ??= new Set())
-		changedLightNames.clear()
-		for (const name in states) {
-			const state = states[name]
-			if (!state) continue
-			if (this.table.lights?.[name]) changedLightNames.add(name)
-			const entry = this.nodeCache.get(name)
-			if (!entry) continue
-			entry.item
-				.getUpdater()
-				.applyState(entry.node, this.showcaseState(entry.node?.name, state), this.renderApi, this.table)
-			if (state.isVisible === false && isShowcaseRoomNode(entry.node?.name)) {
-				// The hide above was dropped to keep the model pristine, so the
-				// node still needs showing here after a resync, in either mode.
-				this.renderApi.applyVisibility(true, entry.node)
-			}
-		}
-		if (changedLightNames.size) {
-			for (const lm of changedLightNames) {
-				const primNames = this._lightmapMap.get(lm)
-				if (!primNames) continue
-				for (const primName of primNames) {
-					const entry = this.nodeCache.get(primName)
-					if (!entry) continue
-					entry.item.getUpdater().applyState(entry.node, {}, this.renderApi, this.table)
-				}
-			}
-		}
-		changed.release()
-		this._demandPendingSoon()
-	}
-
-	/**
-	 * Demand-loads textures for materials whose pending key missed the cache
-	 * (script assigned an image mid-game that never streamed). Fire-and-forget,
-	 * reentrancy-guarded; misses with no loadable source warn once instead of
-	 * failing silently into transparent-black meshes.
-	 */
-	_demandPendingSoon() {
-		if (this._demandQueued || !this.tableGroup || !this.table || !this.renderApi) return
-		this._demandQueued = true
-		queueMicrotask(async () => {
-			this._demandQueued = false
-			if (this._disposed || !this.tableGroup || !this.table || !this.renderApi) return
-			try {
-				const mapGen = this.renderApi.getMapGenerator?.()
-				if (!mapGen) return
-				const { loaded, missing } = await mapGen.demandPendingMaps(this.tableGroup, this.table)
-				if (loaded.length) {
-					const matGen = this.renderApi.getMaterialGenerator?.()
-					matGen?.resolvePendingInScene(this.tableGroup)
-					matGen?.resolvePendingTextures?.()
-					this._patchCloned?.()
-					this.invalidate()
-				}
-				this._demandWarned ??= new Set()
-				for (const name of missing) {
-					if (this._demandWarned.has(name)) continue
-					this._demandWarned.add(name)
-					this.log(
-						`[stream] Material references unloadable texture "${name}" (unknown name or cleared source)`,
-						'warn',
-					)
-				}
-			} catch (e) {
-				// Demand pass is best effort, but unexpected failures must not
-				// vanish silently: streaming resolve covered init-time refs.
-				this.log(`[stream] Demand-pending pass failed: ${e?.message ?? e}`, 'warn')
-			}
-		})
-	}
 	_emitModeChange() {
 		document.dispatchEvent(
 			new CustomEvent('viewer:modechange', {
@@ -1147,7 +982,6 @@ export class Viewer {
 		this.table = table
 		this._applyTableToneMapping?.(table)
 		if (_isDev) window.table = table
-		this._hasPinmame = !!cGameName(table)
 		const dt = performance.now() - t0
 		this.log(
 			`Parsed in ${dt.toFixed(0)}ms — ${Object.keys(table.items).length} items, ${Object.keys(table.textures).length} textures`,
@@ -1467,7 +1301,6 @@ export class Viewer {
 		;(globalThis as any).tableGroup = node
 		;(globalThis as any).viewer = this
 		;(globalThis as any).renderApi = this.renderApi
-		this._tableBasePos = node.position.clone()
 		this.scene.add(node)
 		const pp = postProcessScene(node, {
 			viewerMode: this.viewerMode,
@@ -1532,7 +1365,6 @@ export class Viewer {
 		)
 		logMem(this.harnessLog, 'Ready — streaming textures')
 		this._emitModeChange()
-		const gameName = cGameName(table)
 		const src =
 			(opts && typeof opts.source === 'string' ? opts.source : null) ?? (typeof source === 'string' ? source : '')
 		const basename =
@@ -1555,24 +1387,20 @@ export class Viewer {
 			vpxName = infoName
 		else if (basename) vpxName = basename.replace(/[_-]+/g, ' ').replace(/\b\w/g, char => char.toUpperCase())
 		if (vpxName) setTitle(vpxName)
-		else if (gameName) setTitle(gameName)
-		if (gameName) {
-			const romParam = new URLSearchParams(location.search).get('rom')
-			const candidates = romParam ? resolveRomCandidates(romParam) : [`/pinmame/roms/${gameName}.zip`]
-			this.log(`PinMAME GameName: ${gameName} — trying ${candidates.join(', ')}`, 'debug')
-		}
 		if (this.dom.subtitle) this.dom.subtitle.textContent = ''
 		if (!opts.skipPlayer) {
 			this._loading(92, 'Almost ready…', 'Starting game logic…')
 			await new Promise(r => setTimeout(r, 0))
 			try {
-				await this._createPlayer()
+				// The headless-WASM bridge is the only engine: it boots here
+				// eagerly (viewer-mode animation, instant play). A missing
+				// artifact or load failure falls through to the catch below.
+				await this._createWasmEngine()
 			} catch {
-				// A broken table script must not unmount a successfully built
+				// A broken table must not unmount a successfully built
 				// scene: stay viewer-only so the table still renders and
-				// orbits. Play entry retries creation on demand. The script
-				// cause is already logged by the boot above.
-				this.player = null
+				// orbits. Play entry retries creation on demand. The cause
+				// is already logged by the boot above.
 				this._revertFailedPlay()
 			}
 			this._loading(100, 'Ready!', 'Ready to play')
@@ -1590,7 +1418,6 @@ export class Viewer {
 			Object.assign(window, {
 				table,
 				tableGroup: node,
-				player: this.player,
 			})
 		if (!isLowQuality()) buildBvhIdle(node)
 		else this.log('[bvh] low quality: skip idle BVH for perf', 'debug')
@@ -1619,87 +1446,58 @@ export class Viewer {
 			framed,
 		}
 	}
-	async _createPlayer() {
-		if (this.player) this.player.removeAllListeners?.()
-		// Never keep a stale or half-initialized player: a throw below must
-		// leave `player` null so the loop treats the table as scriptless.
-		this.player = null
-		const booted = await tryBootPlayer(this.table, (this.gate ??= new AnimationGate()), this.log.bind(this))
-		// Strict here: play entry catches and reverts, the initial mount
-		// catches and stays viewer-only. The script cause is logged above.
-		if (!booted) throw new Error('Player init failed')
-		this.player = booted
-		this.player.setPhysicsEnabled(this.viewerMode === 'play')
-		this.nodeCache.clear()
-		this.buildNodeCache()
+	_ensureBallsGroup() {
 		let ballsGroup = this.tableGroup?.getObjectByName('balls')
 		if (!ballsGroup && this.tableGroup && this.renderApi) {
 			ballsGroup = this.renderApi.createParentNode('balls')
 			this.tableGroup.add(ballsGroup)
 		}
-		for (const ball of this.player.balls) this.handleBallLifecycle(ball, true)
-		if (ballsGroup) ballsGroup.visible = this.viewerMode === 'play'
-		this.player.updateAnimations(this.player.getGameTime() ?? this.player.getPhysics().timeMsec ?? 0)
-		const init = this.player.popStates()
-		this.applyChangedStates(init)
-		this.dmd._ensureTexture()
-		this.dmd.findMeshes()
-		this.player.on('ballCreated', ball => {
-			this.handleBallLifecycle(ball, true)
+		return ballsGroup
+	}
+	/**
+	 * Boot the headless-WASM engine that owns script, physics, and audio.
+	 * Meshes, materials, and input routing are unchanged — only the state
+	 * producer swaps. Throws `WasmEngineStartError` (or the missing-artifact
+	 * error) on failure so play entry reverts; leaves `wasmEngine` null
+	 * unless fully loaded.
+	 */
+	async _createWasmEngine() {
+		await this.wasmEngine?.destroy().catch(() => {})
+		this.wasmEngine = null
+		if (!this._vpxBytes?.length) throw new WasmEngineStartError('No table bytes retained for the WASM engine')
+		const win = window
+		const rom =
+			win.__pendingRom?.length && win.__pendingRomName
+				? { name: win.__pendingRomName, zip: win.__pendingRom }
+				: undefined
+		const engine = new WasmEngine({
+			renderApi: this.renderApi,
+			table: this.table,
+			ballsGroup: this._ensureBallsGroup(),
+			lookupPart: name => {
+				const entry = this.nodeCache.get(name)
+				if (!entry) return undefined
+				return { obj: entry.node, state: entry.item.getState(), updater: entry.item.getUpdater() }
+			},
+			lookupPlunger: name => this.table?.plungers?.[name]?.data,
 		})
-		this.player.on('ballDestroyed', ball => {
-			this.handleBallLifecycle(ball, false)
-		})
-		this._attachSoundToPlayer()
-		void this._loadMusicParam()
-		this.player.on('emuStarted', () => {
-			this._emuStartLogged = true
-			this.log(`PinMAME emu ready: ${this.player.getPhysics().emu?.constructor.name}`)
-			this._wireEmuAudio()
-		})
-		let tries = 0
-		const fallback = async () => {
-			try {
-				let emu = this.player.getPhysics().emu
-				if (emu) {
-					this.log(
-						`Emu after init: ${emu.constructor.name} init=${emu.isInitialized?.()} mock=${emu.isMock} run=${(() => {
-							try {
-								return emu.api?.isRunning?.()
-							} catch {
-								return '?'
-							}
-						})()}`,
-						'debug',
-					)
-					return
-				}
-				if (++tries < 10) {
-					setTimeout(fallback, 1000)
-					return
-				}
-				const gameName = cGameName(this.table)
-				if (!gameName) return
-				this.log(`PinMAME: no emu yet for ${gameName} — trying manual fallback`, 'warn')
-				const { VpmController } = await import('../../dist-esm/lib/scripting/objects/vpm-controller.js')
-				if (this.player.getPhysics().emu) return
-				const vpm = new VpmController(this.player)
-				vpm.GameName = gameName
-				await vpm.whenReady()
-				emu = this.player.getPhysics().emu
-				if (emu) {
-					this._emuStartLogged = true
-					this.log(`PinMAME fallback emu ready: ${emu.constructor.name} init=${emu.isInitialized()}`)
-					this.dmd._ensureTexture()
-					this.dmd.findMeshes()
-					this._wireEmuAudio()
-				}
-			} catch (err) {
-				this.log(`PinMAME fallback failed: ${err.message}`, 'warn')
-			}
+		try {
+			await engine.load({
+				vpxBytes: this._vpxBytes,
+				rom,
+			})
+		} catch (e) {
+			await engine.destroy().catch(() => {})
+			throw e
 		}
-		setTimeout(fallback, 3000)
-		this.log('Player init OK')
+		this.wasmEngine = engine
+		engine.primeAudioOnGesture()
+		this.nodeCache.clear()
+		this.buildNodeCache()
+		const ballsGroup = this._ensureBallsGroup()
+		if (ballsGroup) ballsGroup.visible = true
+		this._syncSoundChrome()
+		this.log(`WASM engine ready: ${engine.catalogSize} parts, script errors: ${engine.scriptErrorCount}`, 'debug')
 		this.isPaused = false
 		this.hookInput()
 		if (this.viewerMode === 'play') this.enterPlayMode()
@@ -1739,14 +1537,10 @@ export class Viewer {
 							const pk = `pending${k[0].toUpperCase()}${k.slice(1)}`
 							const name = m.userData?.[pk]
 							if (!name) continue
-							let tex = cache.get(name)
-							if (!tex) {
-								for (const [ck, cv] of cache)
-									if (ck.toLowerCase() === String(name).toLowerCase()) {
-										tex = cv
-										break
-									}
-							}
+							// The cache is dual-keyed (exact + lowercase) at every
+							// insert, so this is the whole case-insensitive
+							// search — no linear scan over the growing cache.
+							const tex = cache.get(name) ?? cache.get(String(name).toLowerCase())
 							if (!tex) continue
 							if (isBakedNodeMaterial(m)) {
 								if (k !== 'map') {
@@ -1795,10 +1589,13 @@ export class Viewer {
 										delete m.userData[pk]
 										continue
 									}
+									// Attach (empty -> texture) changes the program; a
+									// texture -> texture swap only rebinds a uniform.
+									const attached = (m as any)[k] == null
 									m[k] = tex
 									tex.name = String(name)
 									if (k === 'envMap') m.envMapIntensity = 1
-									m.needsUpdate = true
+									if (attached) m.needsUpdate = true
 									fixed++
 									continue
 								}
@@ -1813,10 +1610,13 @@ export class Viewer {
 								}
 								continue
 							}
+							// Attach (empty -> texture) changes the program; a
+							// texture -> texture swap only rebinds a uniform.
+							const attached = (m as any)[k] == null
 							m[k] = tex
 							tex.name = name
 							delete m.userData[pk]
-							m.needsUpdate = true
+							if (attached) m.needsUpdate = true
 							if (k === 'map' || k === 'emissiveMap') {
 								const info = isBakedMeshByNames(
 									o.name || '',
@@ -1869,13 +1669,29 @@ export class Viewer {
 										m.alphaTest = 0
 										m.blending = THREE.NormalBlending
 										if (tex) {
-											tex.wrapS = THREE.ClampToEdgeWrapping
-											tex.wrapT = THREE.ClampToEdgeWrapping
-											tex.generateMipmaps = true
-											tex.minFilter = THREE.LinearMipmapLinearFilter
-											tex.magFilter = THREE.LinearFilter
-											tex.anisotropy = isLowQuality() ? QUALITY_CAPS.low.aniso : 8
-											tex.needsUpdate = true
+											// Shared textures re-resolve per material: only
+											// touch (and re-upload) when samplers differ.
+											// A never-flagged texture (version 0) still
+											// needs its first upload even when the
+											// samplers already match — three.js only
+											// uploads version-bumped textures.
+											const aniso = isLowQuality() ? QUALITY_CAPS.low.aniso : 8
+											const samplerDiffers =
+												tex.wrapS !== THREE.ClampToEdgeWrapping ||
+												tex.wrapT !== THREE.ClampToEdgeWrapping ||
+												tex.generateMipmaps !== true ||
+												tex.minFilter !== THREE.LinearMipmapLinearFilter ||
+												tex.magFilter !== THREE.LinearFilter ||
+												tex.anisotropy !== aniso
+											if (samplerDiffers) {
+												tex.wrapS = THREE.ClampToEdgeWrapping
+												tex.wrapT = THREE.ClampToEdgeWrapping
+												tex.generateMipmaps = true
+												tex.minFilter = THREE.LinearMipmapLinearFilter
+												tex.magFilter = THREE.LinearFilter
+												tex.anisotropy = aniso
+											}
+											if (samplerDiffers || tex.version === 0) tex.needsUpdate = true
 										}
 										m.needsUpdate = true
 									}
@@ -1906,63 +1722,61 @@ export class Viewer {
 					}
 				})
 				if (fixed) {
-					let hasReadyBake = false
+					// One pass: bake-detect, playfield hide, and playfield show
+					// share the per-mesh classify, but the hide needs the whole
+					// walk's verdict first, so decisions apply after the walk.
+					// classify() lowercases names itself, so one call covers
+					// the mixed original/lowercase callers above.
 					const effMap = (mm: any) => mm?.map ?? (mm?.userData?.__map as any) ?? null
+					let hasReadyBake = false
+					const hide: THREE.Mesh[] = []
+					const show: THREE.Mesh[] = []
 					this.tableGroup.traverse(o2 => {
 						if (!o2.isMesh) return
-						const n2 = o2.name || '',
-							m2 = Array.isArray(o2.material) ? o2.material[0] : o2.material
-						if (!effMap(m2)) return
-						if (!n2.toLowerCase().includes('playfield') && !n2.toLowerCase().includes('bm_')) return
-						const info = isBakedMeshByNames(
-							n2,
-							m2.name || '',
-							effMap(m2)?.name || '',
-							!!m2.userData?.__isBaked,
-							!!m2.userData?.__addBlend,
-						)
-						if (info.isBaked) hasReadyBake = true
-					})
-					if (hasReadyBake) {
-						this.tableGroup.traverse(o2 => {
-							if (!o2.isMesh || !o2.visible || !(o2.name || '').toLowerCase().includes('playfield'))
-								return
-							const m2 = Array.isArray(o2.material) ? o2.material[0] : o2.material
-							if (!m2) return
+						const rawName = o2.name || ''
+						const n2 = rawName.toLowerCase()
+						const inFamily = n2.includes('playfield') || n2.includes('bm_')
+						const m2 = Array.isArray(o2.material) ? o2.material[0] : o2.material
+						const map = m2 ? effMap(m2) : null
+						if (map && inFamily) {
 							const info = isBakedMeshByNames(
-								o2.name || '',
+								rawName,
 								m2.name || '',
-								effMap(m2)?.name || '',
+								map?.name || '',
 								!!m2.userData?.__isBaked,
 								!!m2.userData?.__addBlend,
 							)
-							if (!info.isBaked && !info.isMainBake && !info.isVlmBake) {
-								o2.visible = false
-								o2.geometry?.dispose?.()
-							}
-						})
-					}
-					this.tableGroup.traverse(o2 => {
-						if (!o2.isMesh) return
-						const n2 = (o2.name || '').toLowerCase()
-						if (!n2.includes('playfield') && !n2.includes('bm_')) return
-						const m2 = Array.isArray(o2.material) ? o2.material[0] : o2.material
-						if (!effMap(m2)) return
-						const isBaked = !!(m2.userData && (m2.userData.__isBaked || m2.userData.__bakedNode))
-						const info2 = isBakedMeshByNames(
-							n2,
-							m2.name || '',
-							effMap(m2)?.name || '',
-							!!m2.userData?.__isBaked,
-							!!m2.userData?.__addBlend,
-						)
-						const shouldShow = isBaked || info2.isMainBake || (info2.isVlmBake && !info2.isMainBake)
-						if (shouldShow && o2.visible === false) {
+							if (info.isBaked) hasReadyBake = true
+							const isBaked = !!(m2.userData && (m2.userData.__isBaked || m2.userData.__bakedNode))
+							// Collect regardless of current visibility: the hide
+							// below runs first (as before), and a hidden mesh
+							// that still qualifies must end up shown again.
+							const shouldShow = isBaked || info.isMainBake || (info.isVlmBake && !info.isMainBake)
+							if (shouldShow) show.push(o2)
+						}
+						if (m2 && o2.visible && n2.includes('playfield')) {
+							const info = isBakedMeshByNames(
+								rawName,
+								m2.name || '',
+								map?.name || '',
+								!!m2.userData?.__isBaked,
+								!!m2.userData?.__addBlend,
+							)
+							if (!info.isBaked && !info.isMainBake && !info.isVlmBake) hide.push(o2)
+						}
+					})
+					if (hasReadyBake)
+						for (const o2 of hide) {
+							o2.visible = false
+							o2.geometry?.dispose?.()
+						}
+					for (const o2 of show) {
+						if (o2.visible === false) {
 							o2.visible = true
 							for (let p = o2.parent; p && p !== this.tableGroup; p = p.parent)
 								if (p.visible === false) p.visible = true
 						}
-					})
+					}
 				}
 				return fixed
 			})
@@ -2059,23 +1873,6 @@ export class Viewer {
 			if (typeof (globalThis as any).gc === 'function') (globalThis as any).gc()
 		})()
 	}
-	async _waitForPinmame(timeout = 45000) {
-		if (!this._hasPinmame) return true
-		this.log(`[wait] PinMAME wait up to ${timeout}ms — throttling render`, 'debug')
-		const start = performance.now()
-		while (performance.now() - start < timeout) {
-			const emu = this.player?.getPhysics?.()?.emu
-			if (emu?.isMock) return true
-			if (emu?.api?.isRunning?.() === 1) {
-				this.log(`[wait] isRunning=1 after ${(performance.now() - start) | 0}ms`, 'debug')
-				return true
-			}
-			await new Promise(r => setTimeout(r, 200))
-		}
-		const emu = this.player?.getPhysics?.()?.emu
-		this.log(`[wait] timeout ${timeout}ms isRunning=${emu?.api?.isRunning?.()} init=${emu?.isInitialized?.()}`)
-		return false
-	}
 	async _fromReader(reader, source, _loadGen = this._loadId) {
 		if (_loadGen !== this._loadId) {
 			await this._cleanupReader(reader)
@@ -2155,7 +1952,9 @@ export class Viewer {
 							`[IDB] hit ${cand.split('/').pop()} ${fmtBytes(cached.byteLength)} — using cached`,
 							'debug',
 						)
-						const reader = new BrowserBinaryReader(new Uint8Array(cached))
+						const bytes = new Uint8Array(cached)
+						this._vpxBytes = bytes
+						const reader = new BrowserBinaryReader(bytes)
 						await reader.open()
 						if (_loadGen !== this._loadId) {
 							try {
@@ -2193,6 +1992,7 @@ export class Viewer {
 					)
 				} catch {}
 				if (_loadGen !== this._loadId) return
+				this._vpxBytes = data
 				const reader = new BrowserBinaryReader(data)
 				await reader.open()
 				if (_loadGen !== this._loadId) {
@@ -2221,7 +2021,9 @@ export class Viewer {
 		this._streamId++
 		this._loading(5, 'Reading file…', `Reading ${file.name}…`)
 		this.log(`Reading ${file.name}…`, 'debug')
-		const reader = new BrowserBinaryReader(new Uint8Array(await file.arrayBuffer()))
+		const bytes = new Uint8Array(await file.arrayBuffer())
+		this._vpxBytes = bytes
+		const reader = new BrowserBinaryReader(bytes)
 		await reader.open()
 		if (_loadGen !== this._loadId) {
 			await this._cleanupReader(reader)
@@ -2290,23 +2092,19 @@ export class Viewer {
 		}
 		// expose immediate physics tick for tests
 		;(this as any)._tickPhysicsImmediate = () => {
-			if (!this.player || this.isPaused || this.viewerMode !== 'play') return
-			if (isLowQuality()) return
-			this.player.setPhysicsEnabled(true)
-			this.player.updatePhysics()
-			this.player.updateAnimations(this.player.getGameTime())
-			const changed = this.player.popStates()
-			if (!changed.isEmpty) {
-				this.applyChangedStates(changed)
-				if (!this._disposed) {
-					this.renderApi?.flushMatrixUpdates?.(this.tableGroup)
-					if (this.renderPipeline) this.renderPipeline.render()
-					else this.renderer.render(this.scene, this.camera)
-				}
-			} else changed.release()
+			if (!this.wasmEngine?.ready) return
+			if (this.isPaused || this.viewerMode !== 'play' || isLowQuality()) return
+			if (this._syncWasmTransforms(performance.now()) && !this._disposed) {
+				this.renderApi?.flushMatrixUpdates?.(this.tableGroup)
+				if (this.renderPipeline) this.renderPipeline.render()
+				else this.renderer.render(this.scene, this.camera)
+			}
 		}
 		this.renderer.setAnimationLoop((timestamp, frame) => {
-			if (this._disposed || this.isPaused) return
+			if (this._disposed || this.isPaused) {
+				if (this.isPaused) this.wasmEngine?.resetStepClock(timestamp)
+				return
+			}
 			// Dirty-gated present: idle frames skip the present (and its matrix
 			// pass) entirely — physics above still steps every frame. The scan
 			// itself is cheap (numeric signatures, no string work).
@@ -2324,10 +2122,9 @@ export class Viewer {
 			const stateDirty = this._syncPhysicsTransforms(timestamp)
 			const controlsDirty = this.controls?.enabled ? !!this.controls.update() : false
 			const cameraDirty = !!this._cameraRaf
-			const nudgeDirty = this._applyNudgeVisual()
 			// Gamepad nudges share this rAF tick (play-mode gated inside).
 			pollNudgePads(this, timestamp)
-			// Each overlay owns its poll cadence (the DMD gates on game time);
+			// Each overlay owns its poll cadence (the DMD gates on frameId);
 			// every overlay updates each tick so none starves when an
 			// earlier one reports dirty.
 			let overlayDirty = false
@@ -2335,29 +2132,21 @@ export class Viewer {
 			const forcePresent = this._needsRender
 			this._needsRender = false
 			const dirty =
-				stateDirty ||
-				controlsDirty ||
-				cameraDirty ||
-				nudgeDirty ||
-				overlayDirty ||
-				transmissionDirty ||
-				forcePresent
+				stateDirty || controlsDirty || cameraDirty || overlayDirty || transmissionDirty || forcePresent
 			if (!dirty) {
 				rollFpsWindow(timestamp, false)
 				return
 			}
-			if (stateDirty || nudgeDirty) this.renderApi?.flushMatrixUpdates?.(this.tableGroup)
+			if (stateDirty) this.renderApi?.flushMatrixUpdates?.(this.tableGroup)
 			if (this.renderPipeline) this.renderPipeline.render()
 			else this.renderer.render(this.scene, this.camera)
 			frames++
 			if (rollFpsWindow(timestamp, true)) {
 				if (this.dom.stats) {
-					const balls = this.player?.balls.length ?? 0
-					const t = this.player?.getPhysics()?.timeMsec ?? 0
+					const balls = this.wasmEngine?.ballCount ?? 0
 					const mode = this.viewerMode === 'play' ? (this.isPaused ? 'PLAY PAUSED' : 'PLAY') : 'VIEWER'
-					const emu = this.player?.getPhysics()?.emu
-					const emuRaw = emu ? emu.constructor.name : '—'
-					const emuStat = !emu ? '' : emu.isInitialized?.() ? 'ok' : 'loading'
+					const emuRaw = '—'
+					const emuLabel = emuRaw
 					const draws = this.renderer?.info?.render?.calls ?? 0
 					const tris = this.renderer?.info?.render?.triangles ?? 0
 					const trisFmt =
@@ -2366,17 +2155,15 @@ export class Viewer {
 							: tris >= 1e3
 								? `${(tris / 1e3).toFixed(1)}k`
 								: `${tris}`
-					const tFmt = t ? `${(t / 1000).toFixed(1)}s` : '—'
-					const emuLabel = emuStat ? `${emuRaw} · ${emuStat}` : emuRaw
-					const wasmReady = isWasmReady()
+					const wasmReady = !!this.wasmEngine?.ready
 					const wasmLabel = wasmReady ? 'Ready' : 'Loading…'
 					renderStats(this.dom.stats, {
 						fps,
 						draws,
 						trisFmt,
 						balls,
-						tFmt,
-						tHasValue: !!t,
+						tFmt: '—',
+						tHasValue: false,
 						emuLabel,
 						emuRaw,
 						wasmLabel,
@@ -2416,82 +2203,28 @@ export class Viewer {
 		this._needsRender = false
 	}
 
-	_pollPinmame(): boolean {
-		if (!this._emuStartLogged) {
-			const emu = this.player?.getPhysics()?.emu
-			if (emu) {
-				this._emuStartLogged = true
-				this.log(`PinMAME emu started: ${emu.constructor.name} ${emu.getVersion?.() ?? ''}`)
-			}
-		}
-		return this.dmd.render()
-	}
-	_applyNudgeVisual() {
-		if (!this.tableGroup || !this.player || this.viewerMode !== 'play') return false
-		const phys = this.player.getPhysics?.()
-		if (!phys) return false
-		if (!this._tableBasePos) {
-			this._tableBasePos = this.tableGroup.position.clone()
-		}
-		const base = this._tableBasePos
-		const off = phys.getCabinetOffset?.()
-		const acc = phys.getCabinetAcceleration?.()
-		const hasOff = off && (Math.abs(off.x) > 1e-4 || Math.abs(off.y) > 1e-4)
-		const hasAcc = acc && (Math.abs(acc.x) > 1e-3 || Math.abs(acc.y) > 1e-3)
-		if (!hasOff && !hasAcc) {
-			// Keep presenting while the table eases back to its base pose.
-			let settling = false
-			if (this.tableGroup.userData._nudgeApplied) {
-				this.tableGroup.position.x += (base.x - this.tableGroup.position.x) * 0.15
-				this.tableGroup.position.y += (base.y - this.tableGroup.position.y) * 0.15
-				if (Math.hypot(this.tableGroup.position.x - base.x, this.tableGroup.position.y - base.y) < 0.01) {
-					this.tableGroup.position.x = base.x
-					this.tableGroup.position.y = base.y
-					this.tableGroup.userData._nudgeApplied = false
-				}
-				settling = this.tableGroup.userData._nudgeApplied === true
-			}
-			const wrap = this.dom.wrap
-			if (wrap) {
-				wrap.classList.remove('is-nudging')
-				wrap.style.removeProperty('--nudge-transform')
-			}
-			return settling
-		}
-		const ampOff = 110
-		const ampAcc = 0.22
-		const tx = (off?.x ?? 0) * ampOff + (acc?.x ?? 0) * ampAcc
-		const ty = (off?.y ?? 0) * ampOff + (acc?.y ?? 0) * ampAcc
-		const scaleX = Math.max(-6, Math.min(6, tx))
-		const scaleY = Math.max(-6, Math.min(6, -ty * 0.6))
-		this.tableGroup.position.x = base.x + scaleX
-		this.tableGroup.position.y = base.y + scaleY
-		this.tableGroup.userData._nudgeApplied = true
-		const wrap = this.dom.wrap
-		if (wrap) {
-			const shake = Math.hypot(scaleX, scaleY)
-			if (shake > 0.05) {
-				wrap.style.setProperty('--nudge-transform', `translate(${scaleX * 0.6}px, ${scaleY * 0.6}px)`)
-				wrap.classList.add('is-nudging')
-			} else {
-				wrap.classList.remove('is-nudging')
-				wrap.style.removeProperty('--nudge-transform')
-			}
-		}
-		return true
-	}
 	_nudge(angle, force = 2.6) {
-		if (!this.player || this.viewerMode !== 'play' || this.isPaused) return
-		this.player.nudge(angle, force)
+		if (!this.wasmEngine?.ready || this.viewerMode !== 'play' || this.isPaused) return
+		this.wasmEngine.nudge(angle, force)
 		this._flashNudge(angle)
 	}
+	private readonly unknownKeys = new Set<string>()
+	private readonly keyGate = createScancodeGate()
+	/** Push a key to the engine; drops silently while not ready, warns once per unmappable code. */
 	_sendKey(code, down) {
-		if (!this.player) return
-		const key = keyForCode(code)
-		const location = locationForCode(code)
-		const ev = { code, key, location, ts: Date.now() }
-		if (down) this.player.onKeyDown(ev)
-		else this.player.onKeyUp(ev)
+		if (!this.wasmEngine?.ready) return
+		// Pausing must not latch keys in the engine: drop presses, always deliver releases.
+		if (this.isPaused && down) return
+		const scancode = codeToSdlScancode(resolveFlipperKey(code))
+		if (scancode === undefined) {
+			if (!this.unknownKeys.has(code)) {
+				this.unknownKeys.add(code)
+				this.log?.(`[input] no SDL scancode for ${code}; key dropped`, 'warn')
+			}
+			return
+		}
+		// Several browser keys fold onto one scancode: first down and last up win.
+		if (down ? this.keyGate.down(scancode) : this.keyGate.up(scancode)) this.wasmEngine.pushKey(scancode, down)
 	}
 	_flashNudge(angle) {
 		const el = this.dom.nudgeFlash
@@ -2517,7 +2250,7 @@ export class Viewer {
 		}, 420)
 	}
 	hookInput() {
-		if (!this.player) return
+		if (!this.wasmEngine?.ready) return
 		this._inputCleanup?.()
 		this._inputCleanup = attachInput(this)
 		if (this.dom.canvas) {
