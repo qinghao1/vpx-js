@@ -83,6 +83,9 @@ export class WasmEngine {
 	private audioGain?: GainNode
 	private _muted = false
 	private _volume = 1
+	// The engine boots with table-seeded bus volumes; push ours only after
+	// the user touches a control, so a first gesture never snaps the mix.
+	private _audioLevelDirty = false
 	private audioRate = 0
 	private audioChannels = 0
 	private audioNextStart = 0
@@ -224,6 +227,7 @@ export class WasmEngine {
 	/** Mute switch for the sound button/shortcut; returns the new state. */
 	setMuted(muted: boolean): void {
 		this._muted = muted
+		this._audioLevelDirty = true
 		this.applyAudioLevel()
 	}
 
@@ -239,12 +243,19 @@ export class WasmEngine {
 	setVolume(volume: number): void {
 		this._volume = effectiveGain(volume, false)
 		if (this._volume > 0) this._muted = false
+		this._audioLevelDirty = true
 		this.applyAudioLevel()
 	}
 
-	/** Push the current mute/level to the output gain (no-op before first gesture). */
+	/**
+	 * Push the current mute/level to both outputs: the WebAudio gain (PinMAME
+	 * ROM ring) and the engine's own SDL path (table script sounds). The
+	 * engine push waits for an explicit user control so table-seeded bus
+	 * volumes survive until the user touches mute or volume.
+	 */
 	private applyAudioLevel(): void {
 		if (this.audioGain && this.audioCtx) this.audioGain.gain.value = effectiveGain(this._volume, this._muted)
+		if (this._audioLevelDirty) this.engine?.setAudioLevel(effectiveGain(this._volume, false), this._muted)
 	}
 
 	/**
