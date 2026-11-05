@@ -15,7 +15,7 @@ import {
 	setPrimitiveTransmissionArea,
 } from '../../dist-esm/lib/render/threejs/nodes/primitive-bdl-node.js'
 import { isBakedNodeMaterial, setBakedMap } from '../../dist-esm/lib/render/threejs/nodes/unshaded-baked-node.js'
-import { isShowcaseRoomNode, RE_VR } from '../../dist-esm/lib/render/threejs/scene-classify.js'
+import { RE_VR } from '../../dist-esm/lib/render/threejs/scene-classify.js'
 import {
 	batchStaticOpaques as _batchStaticOpaques,
 	optimizeScene as _optimizeScene,

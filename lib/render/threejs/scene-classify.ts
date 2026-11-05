@@ -15,8 +15,8 @@ export const isCabName = (name: string): boolean => RE_CAB.test(flatName(name))
 
 /**
  * VR-room or cabinet content by node name. The viewer keeps these visible
- * despite script-driven hides (desktop VR tables hide their room via
- * `object.visible = 0`) in both viewer and play modes.
+ * despite script-driven hides (VR-authored tables hide their room via
+ * `object.visible = 0` in desktop mode) in both viewer and play modes.
  */
 export function isShowcaseRoomNode(name: string | undefined): boolean {
 	if (!name) return false
