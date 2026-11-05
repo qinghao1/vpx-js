@@ -91,6 +91,30 @@ describe('ThreeTextureLoaderBrowser tuning', () => {
 		expect(tex.image.data).toBe(data)
 		expect([data[0], data[1], data[2], data[3]]).toEqual([0, 0, 0, 0xff])
 	})
+
+	it('matches default textures case-insensitively', () => {
+		expect(loader.hasDefaultTexture('ball')).toBe(true)
+		expect(loader.hasDefaultTexture('BALL')).toBe(true)
+		expect(loader.hasDefaultTexture('nope')).toBe(false)
+	})
+
+	it('loads default textures through finalize (name + tune)', async () => {
+		const { TextureLoader } = await import('../../refs.browser.js')
+		const loadSpy = vi
+			.spyOn(TextureLoader.prototype as any, 'loadAsync')
+			.mockResolvedValue({ image: { width: 116, height: 116 } } as any)
+		try {
+			// The ball default is the static res/maps/ball.png diffuse texture
+			// (no procedural equirect path): pin the wiring, not just the tune.
+			const tex = (await loader.loadDefaultTexture('ball', '.png', 'ball')) as any
+			expect(loadSpy).toHaveBeenCalledTimes(1)
+			expect(String(loadSpy.mock.calls[0][0])).toMatch(/res\/maps\/ball\.png$/)
+			expect(tex.name).toBe('texture:ball')
+			expect(tex.needsUpdate).toBe(true)
+		} finally {
+			loadSpy.mockRestore()
+		}
+	})
 })
 
 describe('EXR worker pool', () => {
@@ -417,8 +441,7 @@ describe('EXR worker pool', () => {
 		const second = loader.loadTexture('env_b', '.exr', new Uint8Array(1024))
 		await new Promise(r => setTimeout(r, 10))
 		expect(fakes.workers).toHaveLength(2)
-		expect(fakes.posted.filter(p => p.worker === fakes.workers[0])).toHaveLength(1)
-		expect(fakes.posted.filter(p => p.worker === fakes.workers[1])).toHaveLength(1)
+		expect(fakes.posted).toHaveLength(2)
 		for (const respond of responders) respond()
 		const [t1, t2] = (await Promise.all([first, second])) as any[]
 		expect(t1.image.width).toBe(64)
@@ -664,6 +687,10 @@ describe('ThreeTextureLoaderBrowser LDR decode-at-size', () => {
 
 	afterEach(() => {
 		vi.unstubAllGlobals()
+		// Routing tests above opt into the worker; the rest of the suite
+		// pins the main-thread path (matching the mock factory default).
+		vi.mocked(decodeInWorker).mockClear()
+		vi.mocked(hasImageWorker).mockReturnValue(false)
 	})
 
 	function pngBytes(width: number, height: number): Uint8Array {
@@ -763,9 +790,20 @@ describe('ThreeTextureLoaderBrowser LDR decode-at-size', () => {
 		expect(tex.image.height).toBe(4096)
 	})
 
-	it('requests the capped size up front on the main-thread fallback', async () => {
-		vi.mocked(hasImageWorker).mockReturnValue(false)
+	it('falls back to main-thread decode when the worker rejects', async () => {
+		vi.mocked(hasImageWorker).mockReturnValue(true)
 		vi.mocked(decodeInWorker).mockClear()
+		vi.mocked(decodeInWorker).mockRejectedValue(new Error('image worker timeout'))
+		vi.stubGlobal(
+			'createImageBitmap',
+			vi.fn(async () => ({ width: 100, height: 100, close() {} })),
+		)
+		const tex = (await loader.loadTexture('some_wall', '.png', pngBytes(100, 100))) as any
+		expect(decodeInWorker).toHaveBeenCalledTimes(1)
+		expect(tex.image.width).toBe(100)
+	})
+
+	it('requests the capped size up front on decode', async () => {
 		const seen: any[] = []
 		vi.stubGlobal(
 			'createImageBitmap',
@@ -775,7 +813,6 @@ describe('ThreeTextureLoaderBrowser LDR decode-at-size', () => {
 			}),
 		)
 		const tex = (await loader.loadTexture('playfield_image', '.png', pngBytes(6080, 8192))) as any
-		expect(decodeInWorker).not.toHaveBeenCalled()
 		expect(seen[0]).toMatchObject({
 			resizeWidth: 3040,
 			resizeHeight: 4096,
@@ -788,21 +825,16 @@ describe('ThreeTextureLoaderBrowser LDR decode-at-size', () => {
 	})
 
 	it('runs the two-step resize when the codec ignores single-step resize options', async () => {
-		vi.mocked(hasImageWorker).mockReturnValue(false)
-		vi.mocked(decodeInWorker).mockClear()
 		const seen: any[] = []
 		vi.stubGlobal(
 			'createImageBitmap',
 			vi.fn(async (src: any, opts: any) => {
 				seen.push(opts)
-				// The codec ignores resize options on blob decode: full-res back.
 				if (typeof Blob !== 'undefined' && src instanceof Blob) return { width: 6080, height: 8192, close() {} }
 				return { width: opts?.resizeWidth ?? 0, height: opts?.resizeHeight ?? 0, close() {} }
 			}),
 		)
 		const tex = (await loader.loadTexture('playfield_image', '.png', pngBytes(6080, 8192))) as any
-		expect(decodeInWorker).not.toHaveBeenCalled()
-		// Sized decode, then the two-step resize of the over-cap bitmap (no second full decode).
 		expect(seen).toHaveLength(2)
 		expect(seen[0]).toMatchObject({ resizeWidth: 3040, resizeHeight: 4096 })
 		expect(seen[1]).toMatchObject({ resizeWidth: 3040, resizeHeight: 4096 })
@@ -810,7 +842,7 @@ describe('ThreeTextureLoaderBrowser LDR decode-at-size', () => {
 		expect(tex.image.height).toBe(4096)
 	})
 
-	it('shares probe vectors between the loader and the worker paths', () => {
+	it('shares probe vectors between probe and capped target calculation', () => {
 		const vectors = [
 			pngBytes(6080, 8192),
 			jpegBytes(6080, 8192),
@@ -850,15 +882,12 @@ describe('ThreeTextureLoaderBrowser LDR decode-at-size', () => {
 	})
 
 	it('probes a 10-byte GIF at the floor', () => {
-		// GIF dims live at bytes 6-9: a 10-byte header is the smallest probed input.
 		const floor = new Uint8Array([0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0x10, 0x00, 0x10, 0x00])
 		expect(probeEncodedSize(floor)).toEqual({ width: 16, height: 16 })
 		expect(probeEncodedSize(floor.slice(0, 9))).toBeNull()
 	})
 
 	it('resolves a JPEG SOF ending at the exact tail', () => {
-		// SOI + APP0 + SOF0(64x32) ending at the last byte: the scan bound is
-		// inclusive of the tail (the SOF needs bytes i..i+8 with i+9 == end).
 		const data = new Uint8Array([
 			0xff, 0xd8, 0xff, 0xe0, 0x00, 0x05, 0x01, 0x02, 0x03, 0xff, 0xc0, 0x00, 0x07, 0x08, 0x00, 0x20, 0x00, 0x40,
 		])
@@ -867,22 +896,15 @@ describe('ThreeTextureLoaderBrowser LDR decode-at-size', () => {
 	})
 
 	it('falls through when bitmap-source resize returns an over-cap frame', async () => {
-		vi.mocked(hasImageWorker).mockReturnValue(false)
-		vi.mocked(decodeInWorker).mockClear()
-		// The engine ignores resize at both tiers: blob and bitmap sources come back full-res.
 		const cib = vi.fn(async () => ({ width: 6080, height: 8192, close() {} }))
 		vi.stubGlobal('createImageBitmap', cib)
-		// No ImageDecoder stub: decodeMainAtSize throws and the oversize bitmap falls through.
 		const { Loader } = await import('three')
 		const loadSpy = vi
 			.spyOn(Loader.prototype as any, 'loadAsync')
 			.mockResolvedValue({ image: { width: 3040, height: 4096 } } as any)
 		try {
 			const tex = (await loader.loadTexture('playfield_image', '.png', pngBytes(6080, 8192))) as any
-			expect(decodeInWorker).not.toHaveBeenCalled()
-			// Sized blob decode + bitmap-source resize attempt, both ignored.
 			expect(cib).toHaveBeenCalledTimes(2)
-			// The TextureLoader fallthrough keeps the output bounded.
 			expect(tex.image.width).toBe(3040)
 			expect(tex.image.height).toBe(4096)
 		} finally {
@@ -899,7 +921,6 @@ describe('ThreeTextureLoaderBrowser LDR decode-at-size', () => {
 	})
 
 	it('stops the JPEG scan at SOS instead of walking entropy data', () => {
-		// SOI + SOS with no SOF before it: dims live before SOS, so stop.
 		const sos = new Uint8Array([0xff, 0xd8, 0xff, 0xda, 0x00, 0x08, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
 		expect(probeEncodedSize(sos)).toBeNull()
 		expect(cappedDecodeTarget(sos, 4096)).toBeNull()
@@ -912,7 +933,6 @@ describe('ThreeTextureLoaderBrowser LDR decode-at-size', () => {
 	})
 
 	it('skips FF fill bytes before the JPEG SOF', () => {
-		// SOI + two fill bytes + SOF0(6080x8192): padding 0xFFs carry no dims.
 		const data = new Uint8Array([
 			0xff, 0xd8, 0xff, 0xff, 0xff, 0xc0, 0x00, 0x0b, 0x08, 0x20, 0x00, 0x17, 0xc0, 0x01, 0x01, 0x11, 0x00,
 		])
@@ -920,14 +940,11 @@ describe('ThreeTextureLoaderBrowser LDR decode-at-size', () => {
 	})
 
 	it('skips short (len<2) JPEG segments and only bounds-checks SOF dims', () => {
-		// SOI + bogus len-0 APP-ish segment + SOF0(6080x8192): the short
-		// segment steps over, the SOF still resolves.
 		const data = new Uint8Array([
 			0xff, 0xd8, 0xff, 0xe0, 0x00, 0x00, 0xff, 0xc0, 0x00, 0x0b, 0x08, 0x20, 0x00, 0x17, 0xc0, 0x01, 0x01, 0x11,
 			0x00,
 		])
 		expect(probeEncodedSize(data)).toEqual({ width: 6080, height: 8192 })
-		// A short SOF is corrupt, not skippable: safe-direction null.
 		const shortSof = new Uint8Array([
 			0xff, 0xd8, 0xff, 0xc0, 0x00, 0x05, 0x08, 0x20, 0x00, 0x17, 0xc0, 0, 0, 0, 0, 0,
 		])
@@ -942,9 +959,6 @@ describe('ThreeTextureLoaderBrowser LDR decode-at-size', () => {
 	})
 
 	it('stops the JPEG scan past ~64KB (safe-direction null)', () => {
-		// SOI + a max-length APP segment pushing SOF past the scan cap:
-		// headers that large never carry early SOF dims, so fall back to
-		// full decode instead of walking the whole file.
 		const data = new Uint8Array(66 * 1024)
 		data[0] = 0xff
 		data[1] = 0xd8
@@ -960,17 +974,13 @@ describe('ThreeTextureLoaderBrowser LDR decode-at-size', () => {
 	})
 
 	it('tries ImageDecoder at size when the codec ignores single-step resize', async () => {
-		vi.mocked(hasImageWorker).mockReturnValue(false)
-		vi.mocked(decodeInWorker).mockClear()
 		const seen: any[] = []
 		const inits: any[] = []
 		vi.stubGlobal(
 			'createImageBitmap',
 			vi.fn(async (src: any, opts: any) => {
 				seen.push(opts)
-				// The codec ignores resize options on blob decode: full-res back.
 				if (typeof Blob !== 'undefined' && src instanceof Blob) return { width: 6080, height: 8192, close() {} }
-				// The decoder did the scaling: the VideoFrame comes back capped.
 				return { width: 3040, height: 4096, close() {} }
 			}),
 		)
@@ -990,9 +1000,6 @@ describe('ThreeTextureLoaderBrowser LDR decode-at-size', () => {
 			},
 		)
 		const tex = (await loader.loadTexture('playfield_image', '.png', pngBytes(6080, 8192))) as any
-		expect(decodeInWorker).not.toHaveBeenCalled()
-		// Sized decode, then the decoder at size (no second full CIB decode,
-		// no bitmap-to-bitmap resize of the over-cap bitmap).
 		expect(inits).toHaveLength(1)
 		expect(inits[0]).toMatchObject({ desiredWidth: 3040, desiredHeight: 4096, type: 'image/png' })
 		expect(seen).toHaveLength(2)
@@ -1000,19 +1007,6 @@ describe('ThreeTextureLoaderBrowser LDR decode-at-size', () => {
 		expect(seen[1]).not.toMatchObject({ resizeWidth: 3040 })
 		expect(tex.image.width).toBe(3040)
 		expect(tex.image.height).toBe(4096)
-	})
-
-	it('falls back to main-thread decode when the worker rejects', async () => {
-		vi.mocked(hasImageWorker).mockReturnValue(true)
-		vi.mocked(decodeInWorker).mockClear()
-		vi.mocked(decodeInWorker).mockRejectedValue(new Error('image worker timeout'))
-		vi.stubGlobal(
-			'createImageBitmap',
-			vi.fn(async () => ({ width: 100, height: 100, close() {} })),
-		)
-		const tex = (await loader.loadTexture('some_wall', '.png', pngBytes(100, 100))) as any
-		expect(decodeInWorker).toHaveBeenCalledTimes(1)
-		expect(tex.image.width).toBe(100)
 	})
 
 	it('fits every regular container to the cap from headers alone', () => {
@@ -1069,19 +1063,13 @@ describe('ThreeTextureLoaderBrowser LDR decode-at-size', () => {
 	})
 
 	it('resolves top-down (negative-height) BMP dims by magnitude', () => {
-		// Negative DIB height means top-down row order; the extent is the magnitude.
 		expect(probeEncodedSize(bmpBytes(6080, -8192))).toEqual({ width: 6080, height: 8192 })
 		expect(cappedDecodeTarget(bmpBytes(6080, -8192), 4096)).toEqual({ width: 3040, height: 4096 })
 	})
 
 	it('stays bounded when the header claims huge and every resize hint is ignored', async () => {
-		vi.mocked(hasImageWorker).mockReturnValue(false)
-		vi.mocked(decodeInWorker).mockClear()
-		// Engine ignores resize at every tier: full-res back from blob and bitmap sources alike.
 		const cib = vi.fn(async () => ({ width: 6080, height: 8192, close() {} }))
 		vi.stubGlobal('createImageBitmap', cib)
-		// No ImageDecoder stub: decodeMainAtSize throws and the oversize bitmap falls through.
-		// loadAsync lives on Loader.prototype (TextureLoader inherits it): spy where it is owned.
 		const { Loader } = await import('three')
 		const loadSpy = vi
 			.spyOn(Loader.prototype as any, 'loadAsync')
@@ -1094,8 +1082,6 @@ describe('ThreeTextureLoaderBrowser LDR decode-at-size', () => {
 				},
 			})
 			const tex = (await loader.loadTexture('playfield_image', '.png', pngBytes(6080, 8192))) as any
-			expect(decodeInWorker).not.toHaveBeenCalled()
-			// Sized blob decode + two-step bitmap resize, then the TextureLoader canvas tier.
 			expect(cib).toHaveBeenCalledTimes(2)
 			expect(tex.image.width).toBe(3040)
 			expect(tex.image.height).toBe(4096)

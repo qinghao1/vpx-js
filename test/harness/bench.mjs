@@ -53,7 +53,6 @@ if (!url) {
 	if (!vpxArg && autoVpx) console.log(`[bench] auto-detected table: ${vpxPath}`)
 }
 
-const balls = Number(getArg(args, 'balls', '-1'))
 const duration = Number(getArg(args, 'duration', '3000'))
 const warmup = Number(getArg(args, 'warmup', url.includes('walking_dead') ? '2000' : '800'))
 const outPath = getArg(args, 'out', null)
@@ -63,7 +62,7 @@ const headed = hasFlag(args, 'headed')
 const gpu = getArg(args, 'gpu', hasFlag(args, 'gpu') ? 'vulkan' : null)
 
 console.log(
-	`[bench] url=${url} balls=${balls} duration=${duration} warmup=${warmup} interactive=${interactive} profile=${profile} gpu=${gpu ?? false} headed=${headed}`,
+	`[bench] url=${url} duration=${duration} warmup=${warmup} interactive=${interactive} profile=${profile} gpu=${gpu ?? false} headed=${headed}`,
 )
 
 const puppeteer = await loadPuppeteer()
@@ -77,7 +76,9 @@ const browser = await launchBrowser(puppeteer, {
 	timeout: 300_000,
 })
 const page = await newPage(browser)
-page.setDefaultTimeout(180000)
+// Worst-case journey: 20s boot + ~40s plunge retries + warmup + duration.
+// 180s covered defaults but timed out --duration 120000 runs; 300s covers both.
+page.setDefaultTimeout(300000)
 
 const logs = attachLogging(page, { filter: /./, prefix: '[c]' })
 
@@ -151,7 +152,8 @@ for (let i = 0; i < 90; i++) {
 	const s = await page.evaluate(() => {
 		const txt = document.getElementById('log')?.innerText ?? ''
 		const v = window.viewer
-		const hasPlayer = !!v?.player
+		// Engine-ready gate: wasmEngine.ready, or the log line as fallback.
+		const hasPlayer = !!v?.wasmEngine?.ready || txt.includes('WASM engine ready')
 		const isReady =
 			txt.includes('Ready') ||
 			txt.includes('Player init OK') ||
@@ -214,6 +216,9 @@ for (let i = 0; i < 80; i++) {
 	await sleep(500)
 }
 if (!streamDone) console.log(`[bench] streaming not done within timeout — partial ${pollHeap}MB`)
+// Passed into the play journey: if streaming never settled, the profile
+// window overlaps it and renderMs/jankFrames carry streaming cost.
+const streamSettled = streamDone
 
 // Collect User Timing measures after load
 const userTiming = await page
@@ -270,7 +275,9 @@ const loadState = await page.evaluate(() => {
 	}
 	const info = v.renderer?.info?.render ?? {}
 	const prog = v.renderer?.info?.programs ?? null
-	const emu = v.player?.getPhysics()?.emu
+	// WASM path: the PinMAME emu lives inside the headless engine, so
+	// "running" is engine readiness (no mock engine exists in the page).
+	const emuRunning = !!v?.wasmEngine && v.wasmEngine.ready
 
 	let glVendor = '?'
 	let glRenderer = '?'
@@ -308,10 +315,11 @@ const loadState = await page.evaluate(() => {
 		draws: info.calls ?? 0,
 		triangles: info.triangles ?? 0,
 		programs: prog?.length ?? null,
-		balls: v.player?.balls?.length ?? 0,
-		hasEmu: !!emu,
-		emuRunning: emu ? (emu.isMock ? true : emu.api?.isRunning?.() === 1) : false,
-		emuMock: !!emu?.isMock,
+		// WASM ball count includes unlaunched trough balls (4 on TWD from boot).
+		balls: v?.wasmEngine?.ballCount ?? 0,
+		hasEmu: !!v?.wasmEngine,
+		emuRunning,
+		emuMock: false,
 		gameName: v.table?.data?.gameName ?? v.table?.info?.TableName ?? null,
 		gl: { vendor: glVendor, renderer: glRenderer, version: glVersion, params: glParams },
 		isolation: {
@@ -353,84 +361,189 @@ console.log(`[bench] === 2. PLAY JOURNEY (User Simulation) ===`)
 const journeyResult = await page.evaluate(
 	async opt => {
 		const v = window.viewer
-		const p = v?.player
+		const w = v?.wasmEngine
 		const r = v?.renderer
 		const play = {
 			coin: { pass: false, responseMs: 0 },
 			start: { pass: false, responseMs: 0 },
 			plunge: { pass: false, responseMs: 0 },
 			flippers: { flipsCount: 0, leftAngleDelta: 0, rightAngleDelta: 0 },
-			nudge: { pass: false, mag: 0 },
+			nudge: { pass: false, mag: 0, moved: false },
 			ballsInPlay: 0,
+			romBoot: false,
+			inputDrops: 0,
 		}
+		// Input + observation go through the WASM seam: viewer._sendKey/_nudge
+		// for input, engine ballCount/flipperAngles/ballPoses for state.
+		const sendKey = (code, down) => {
+			// _sendKey drops silently when not ready, and drops presses while
+			// paused (releases still go through); count both here so pass
+			// rates stay honest. Returns whether the key was delivered.
+			if (!w?.ready || (v.isPaused && down)) {
+				play.inputDrops++
+				return false
+			}
+			v._sendKey(code, down)
+			return true
+		}
+		const doNudge = (angle, force) => v._nudge(angle, force)
+		// WASM ball count includes unlaunched trough balls (4 on TWD from
+		// boot), so a failed launch reads ~4, never 0.
+		const ballCount = () => w?.ballCount ?? 0
+		const logText = () => document.getElementById('log')?.innerText ?? ''
+		const keyDropped = code => logText().includes(`no SDL scancode for ${code}`)
+		// Flipper angles via the public engine accessor (no private reach-through).
+		const flipperAngles = () => w?.flipperAngles?.() ?? []
 
-		if (opt.interactive && p) {
-			// Step 1: Insert Coin (Key 5)
-			const t0 = performance.now()
-			p.onKeyDown({ code: 'Digit5', key: '5', ts: Date.now() })
-			await new Promise(res => setTimeout(res, 180))
-			p.onKeyUp({ code: 'Digit5', key: '5', ts: Date.now() })
-			play.coin = { pass: true, responseMs: Math.round(performance.now() - t0) }
+		// Ball MOTION is the launch ground truth: only a launched ball moves
+		// (resting rows are bit-identical frame to frame).
+		const ballPose = () => w?.ballPoses?.() ?? []
+		const maxMotion = async ms => {
+			const a = ballPose()
+			await new Promise(res => setTimeout(res, ms))
+			const b = new Map(ballPose().map(pos => [pos.id, pos]))
+			let m = 0
+			for (const pos of a) {
+				const q = b.get(pos.id)
+				// A brand-new id after the snapshot is a launch by definition.
+				if (!q) return MOTION_LAUNCHED
+				m = Math.max(m, Math.hypot(q.x - pos.x, q.y - pos.y, q.z - pos.z))
+			}
+			return m
+		}
+		// 1/5 ball diameter: resting balls are static, a rolling ball moves
+		// hundreds of units per second.
+		const MOTION_LAUNCHED = 1e9
+		const MOTION_MIN = 10
 
-			// Step 2: Press Start (Key 1)
-			const t1 = performance.now()
-			p.onKeyDown({ code: 'Digit1', key: '1', ts: Date.now() })
-			await new Promise(res => setTimeout(res, 180))
-			p.onKeyUp({ code: 'Digit1', key: '1', ts: Date.now() })
-			play.start = { pass: true, responseMs: Math.round(performance.now() - t1) }
-
-			// Step 3: Plunge ball (Key Enter)
-			await new Promise(res => setTimeout(res, 400))
-			const t2 = performance.now()
-			p.onKeyDown({ code: 'Enter', key: 'Enter', ts: Date.now() })
-			await new Promise(res => setTimeout(res, 500))
-			p.onKeyUp({ code: 'Enter', key: 'Enter', ts: Date.now() })
-			play.plunge = { pass: true, responseMs: Math.round(performance.now() - t2) }
-
-			// Step 4: Ensure ball in play if needed
-			const ballCount = p.balls?.length ?? 0
-			if ((opt.balls > 0 || ballCount === 0) && opt.balls !== 0) {
-				const count = opt.balls > 0 ? opt.balls : 1
-				const kicker = Object.values(v.table?.kickers ?? {})[0]
-				if (kicker?.getApi?.()?.CreateBall) {
-					for (let i = 0; i < count; i++) kicker.getApi().CreateBall()
-				} else if (kicker?.createBall) {
-					for (let i = 0; i < count; i++) kicker.createBall()
+		if (opt.interactive && w?.ready) {
+			// Step 0: wait for the ROM to boot. DMD frames OR attract-mode
+			// lamp activity mean the emu is alive; a coin inserted before that
+			// is swallowed and the whole journey tests nothing. DMD alone is
+			// not universal (non-forwarding scripts never advance frameId),
+			// so either signal counts; the 20s cap bounds non-DMD tables.
+			{
+				const fid = () => w.dmdFrame?.frameId ?? -1
+				const lid = () => w.lightActivity ?? 0
+				const tBoot = performance.now()
+				let lastF = fid()
+				let lastL = lid()
+				let dmdChanges = 0
+				let lightChanges = 0
+				while (performance.now() - tBoot < 20000) {
+					await new Promise(res => setTimeout(res, 500))
+					const f = fid()
+					const l = lid()
+					if (f !== lastF) {
+						dmdChanges++
+						lastF = f
+					}
+					if (l !== lastL) {
+						lightChanges++
+						lastL = l
+					}
+					if ((f >= 0 && dmdChanges >= 2) || lightChanges >= 2) {
+						play.romBoot = true
+						break
+					}
 				}
 			}
+			// Step 1: Insert Coin (Key 5). Pass = sent while ready AND the code
+			// mapped (no drop warning). Credit registration itself is not
+			// observable through the current bridge — no switch/credit getter
+			// exists — so this asserts delivery, not game state.
+			const dropsBeforeCoin = play.inputDrops
+			const t0 = performance.now()
+			sendKey('Digit5', true)
+			await new Promise(res => setTimeout(res, 180))
+			sendKey('Digit5', false)
+			play.coin = {
+				pass: play.inputDrops === dropsBeforeCoin && !keyDropped('Digit5'),
+				responseMs: Math.round(performance.now() - t0),
+			}
 
-			// Step 5: Test flippers & nudge
-			const lf = v.table?.flippers?.LeftFlipper || Object.values(v.table?.flippers ?? {})[0]
-			const rf = v.table?.flippers?.RightFlipper || Object.values(v.table?.flippers ?? {})[1]
-			if (lf) {
-				const b = lf.getState().angle
-				p.onKeyDown({ code: 'ShiftLeft', key: 'Shift', ts: Date.now(), location: 1 })
-				await new Promise(res => setTimeout(res, 150))
-				play.flippers.leftAngleDelta = +Math.abs(lf.getState().angle - b).toFixed(3)
-				p.onKeyUp({ code: 'ShiftLeft', key: 'Shift', ts: Date.now(), location: 1 })
+			// Step 2: Press Start (Key 1) — same delivery-only semantics.
+			const dropsBeforeStart = play.inputDrops
+			const t1 = performance.now()
+			sendKey('Digit1', true)
+			await new Promise(res => setTimeout(res, 180))
+			sendKey('Digit1', false)
+			play.start = {
+				pass: play.inputDrops === dropsBeforeStart && !keyDropped('Digit1'),
+				responseMs: Math.round(performance.now() - t1),
 			}
-			if (rf) {
-				const b = rf.getState().angle
-				p.onKeyDown({ code: 'ShiftRight', key: 'Shift', ts: Date.now(), location: 2 })
-				await new Promise(res => setTimeout(res, 150))
-				play.flippers.rightAngleDelta = +Math.abs(rf.getState().angle - b).toFixed(3)
-				p.onKeyUp({ code: 'ShiftRight', key: 'Shift', ts: Date.now(), location: 2 })
+
+			// Step 3: launch a ball. The ROM may still be settling (credit →
+			// game → ball in lane), so retry coin/start/plunge as a cycle and
+			// watch for MOTION, not count: only a launched ball moves.
+			const t2 = performance.now()
+			let launched = false
+			for (let attempt = 0; attempt < 6 && !launched; attempt++) {
+				if (attempt > 0) {
+					sendKey('Digit5', true)
+					await new Promise(res => setTimeout(res, 200))
+					sendKey('Digit5', false)
+					await new Promise(res => setTimeout(res, 800))
+					sendKey('Digit1', true)
+					await new Promise(res => setTimeout(res, 200))
+					sendKey('Digit1', false)
+					await new Promise(res => setTimeout(res, 1500))
+				} else {
+					await new Promise(res => setTimeout(res, 3000))
+				}
+				sendKey('Enter', true)
+				await new Promise(res => setTimeout(res, 1500))
+				sendKey('Enter', false)
+				launched = (await maxMotion(2500)) > MOTION_MIN
 			}
+			play.plunge = {
+				pass: launched,
+				responseMs: Math.round(performance.now() - t2),
+			}
+
+			// Step 4: Test flippers while each key is held; the engine row
+			// only moves while a game is live. Aligned by partIdx; rows that
+			// appear mid-measure have no baseline and are skipped rather than
+			// diffed against zero (a fresh row at rest would read as moved).
+			const measure = async code => {
+				const before = new Map(flipperAngles().map(f => [f.partIdx, f.angle]))
+				sendKey(code, true)
+				await new Promise(res => setTimeout(res, 300))
+				const after = flipperAngles()
+				sendKey(code, false)
+				let d = 0
+				for (const f of after) {
+					const b = before.get(f.partIdx)
+					if (b === undefined) continue
+					d = Math.max(d, Math.abs(f.angle - b))
+				}
+				return +d.toFixed(4)
+			}
+			play.flippers.leftAngleDelta = await measure('ShiftLeft')
+			play.flippers.rightAngleDelta = await measure('ShiftRight')
+			// Step 5: nudge. No cabinet-acceleration signal exists on the WASM
+			// seam, so pass means "delivered without throwing" and moved reports
+			// whether any ball deviated in the following second.
 			try {
-				p.nudge(75, 2.5)
-				const acc = p.getPhysics()?.getCabinetAcceleration?.() ?? { x: 0, y: 0 }
-				play.nudge = { pass: true, mag: +Math.hypot(acc.x, acc.y).toFixed(3) }
+				doNudge(75, 2.5)
+				play.nudge = { pass: true, mag: 0, moved: (await maxMotion(1000)) > MOTION_MIN }
 			} catch {
-				// Expected: TypeError if getPhysics is undefined (player not ready) or Error if nudge called before emu start — interactive test is best-effort.
-				play.nudge = { pass: false, mag: 0 }
+				// Expected: Error if nudge called before emu start — interactive test is best-effort.
+				play.nudge = { pass: false, mag: 0, moved: false }
 			}
 		}
 
 		await new Promise(res => setTimeout(res, opt.warmup))
 
+		// Overlap tag: streaming Settled at the gate AND still showing Done in
+		// the log now. Conservative toward flagging overlap (a rotated-out Done
+		// line reads as overlapped) — the tag only contextualizes render variance.
+		const streamSettledAtProfileStart = !!opt.streamSettled && logText().includes('[stream] Done')
+
 		// === 3. ACTIVE PROFILING LOOP ===
 		const physicsMs = []
 		const animMs = []
+		const quantumMs = []
 		const renderMs = []
 		const frameMs = []
 		let renders = 0
@@ -444,47 +557,59 @@ const journeyResult = await page.evaluate(
 			// Expected: TypeError if renderer info not initialised (e.g., before first frame) — frame delta is optional.
 		}
 
+		// Monotonic patch ledger: every wrap below is restored after stats so
+		// sampling arrays (and patched methods) never grow past the profile.
+		const patches = []
 		const timeInto = (target, method, samples) => {
-			const orig = target[method].bind(target)
+			const orig = target[method]
+			const bound = orig.bind(target)
 			target[method] = (...args) => {
 				const start = performance.now()
-				const result = orig(...args)
+				const result = bound(...args)
 				samples.push(performance.now() - start)
 				return result
 			}
+			patches.push(() => {
+				target[method] = orig
+			})
 		}
-		if (opt.profile && p) {
-			timeInto(p, 'updatePhysics', physicsMs)
-			timeInto(p, 'updateAnimations', animMs)
+		if (opt.profile && w?.ready) {
+			// WASM seam: whole-step cost (quanta + sync + audio) as physics;
+			// the lightmap fanout is _syncWasmTransforms minus the step, paired
+			// per frame below (single-threaded, one step per sync, same order).
+			if (w.step) timeInto(w, 'step', physicsMs)
+			if (v._syncWasmTransforms) timeInto(v, '_syncWasmTransforms', animMs)
+			if (w.engine?.stepFrame) timeInto(w.engine, 'stepFrame', quantumMs)
 		}
 
-		const targetRenderer = v?.composer ?? r
+		const targetRenderer = r
 		if (targetRenderer) {
-			const origRender = targetRenderer.render.bind(targetRenderer)
+			const origRender = targetRenderer.render
+			const boundRender = origRender.bind(targetRenderer)
 			targetRenderer.render = (...a) => {
 				renders++
 				const t = performance.now()
-				const res = origRender(...a)
+				const res = boundRender(...a)
 				if (opt.profile) renderMs.push(performance.now() - t)
 				return res
 			}
+			patches.push(() => {
+				targetRenderer.render = origRender
+			})
 		}
 
 		let actorTimer = null
-		if (opt.interactive && p) {
+		if (opt.interactive && w?.ready) {
 			let cycle = 0
 			actorTimer = setInterval(() => {
-				const now = Date.now()
 				cycle++
 				const left = cycle % 2 === 1
 				const code = left ? 'ShiftLeft' : 'ShiftRight'
-				const loc = left ? 1 : 2
-				p.onKeyDown({ code, key: 'Shift', ts: now, location: loc })
-				setTimeout(() => p.onKeyUp({ code, key: 'Shift', ts: Date.now(), location: loc }), 160)
-				flipsCount++
+				if (sendKey(code, true)) flipsCount++
+				setTimeout(() => sendKey(code, false), 160)
 				if (cycle % 4 === 0) {
 					try {
-						p.nudge(45, 1.8)
+						doNudge(45, 1.8)
 					} catch {
 						// Expected: TypeError if physics not ready mid-profiling — nudge is best-effort, profiling continues.
 					}
@@ -512,6 +637,14 @@ const journeyResult = await page.evaluate(
 		})
 		const elapsed = performance.now() - start
 		frameMs.shift()
+		// Restore every patched method: sampling stops here, arrays stay bounded.
+		for (const restore of patches) restore()
+		// animMs (whole _syncWasmTransforms) contains physicsMs (whole step):
+		// pair per frame and subtract for the lightmap-fanout-only cost.
+		// Single-threaded, one step per sync, same order — pair by index.
+		const fanoutMs = []
+		for (let i = 0; i < Math.min(animMs.length, physicsMs.length); i++)
+			fanoutMs.push(Math.max(0, animMs[i] - physicsMs[i]))
 
 		function stats(arr) {
 			if (!arr.length) return null
@@ -542,7 +675,7 @@ const journeyResult = await page.evaluate(
 		const fpsRaf = frameMs.length ? Math.round((frameMs.length * 1000) / elapsed) : null
 
 		play.flippers.flipsCount = flipsCount
-		play.ballsInPlay = p?.balls?.length ?? 0
+		play.ballsInPlay = ballCount()
 
 		return {
 			play,
@@ -557,12 +690,14 @@ const journeyResult = await page.evaluate(
 				heapMb: performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) : null,
 				frameStats: stats(frameMs),
 				physicsStats: stats(physicsMs),
-				animStats: stats(animMs),
+				animStats: stats(fanoutMs),
+				quantumStats: stats(quantumMs),
 				renderStats: stats(renderMs),
+				streamOverlapped: !streamSettledAtProfileStart,
 			},
 		}
 	},
-	{ duration, warmup, balls, interactive, profile },
+	{ duration, warmup, interactive, profile, streamSettled },
 )
 
 const parsed = {}
@@ -757,10 +892,10 @@ console.log(`\n[bench] === ANALYSIS & SUGGESTIONS ===`)
 		)
 	if (lj.streamLogMs && lj.streamLogMs > 5000) {
 		console.log(
-			`- STREAMING BOTTLENECK: ${lj.streamMs}ms for ~${payload.metrics.meshes} meshes. Decodes on main thread with concurrency 16, EXR/HDR worker timeouts, no Worker ImageDecoder, IDB cache broken (deleteObjectStore without exists check).`,
+			`- STREAMING BOTTLENECK: ${lj.streamMs}ms for ~${payload.metrics.meshes} meshes. LDR decodes already run worker-first with an IDB bitmap cache, so the remainder is upload + bake, not decode.`,
 		)
 		console.log(
-			`  Suggestion: defer large bakes >1M px, cap effectiveMax to 1024 for VLM/nestmap already but still ${lj.textures?.mb ?? '?'}MB; reduce concurrency to 4, yield via scheduler.yield(), use OffscreenCanvas/ImageDecoder in workers, fix IDB (exist check), stream only playfield+inserts first, lazy-load cab/VR after play start, cache decoded textures via createImageBitmap cache + idbSet(texCacheKey).`,
+			`  Suggestion: defer large bakes >1M px (still ${lj.textures?.mb ?? '?'}MB), stream playfield+inserts first and lazy-load cab/VR after play start, yield between uploads via scheduler.yield().`,
 		)
 	}
 	if (lj.parseMs && lj.parseMs > 800) {
@@ -792,7 +927,7 @@ console.log(`\n[bench] === ANALYSIS & SUGGESTIONS ===`)
 			`- FPS: ${pf.fps} (target 60) — SwiftShader (${payload.glInfo?.renderer?.includes('SwiftShader') || payload.glInfo?.renderer?.includes('WebKit')}) + ${payload.metrics.tris} tris + ${lj.textures?.mb ?? '?'}MB textures + per-frame updateAnimations for all animatables + popStates diff + applyChangedStates matrix decomposes.`,
 		)
 		console.log(
-			`  Suggestion: ensure GPU acceleration (--gpu=vulkan or --gpu=gl) not SwiftShader, reduce texture resolution (effectiveMax already 1024 for VLM but still high), lower DPR to 1 in play mode already done, throttle controls.update, batch / instance more, frustum cull (three-mesh-bvh already installed but buildBvhIdle idle—make eager), avoid full state sync every 300 frames (frameCount%300), use CSS nudge transform not mesh translate, separate physicsLoop (setTimeout 16ms) and renderLoop (rAF) already decoupled but both still on main thread.`,
+			`  Suggestion: ensure GPU acceleration (--gpu=vulkan or --gpu=gl) not SwiftShader, reduce texture resolution, lower DPR to 1 in play mode already done, batch / instance more, stepping is one stepFrame per rAF already so physics can only shrink per step, not per loop.`,
 		)
 	}
 	if (payload.metrics.memory?.used && payload.metrics.memory.used > 1200) {
@@ -809,7 +944,7 @@ console.log(`\n[bench] === ANALYSIS & SUGGESTIONS ===`)
 	}
 	if (lj.idbHit === false && lj.fetchMs > 300) {
 		console.log(
-			`- FETCH: ${lj.fetchMs}ms for ${fs.existsSync(payload.vpx) ? (fs.statSync(payload.vpx).size / 1024 / 1024).toFixed(1) : '?'}MB over /@fs — Vite serves via fs allow, no HTTP cache. After IDB fix, subsequent loads should be <100ms.`,
+			`- FETCH: ${lj.fetchMs}ms for ${fs.existsSync(payload.vpx) ? (fs.statSync(payload.vpx).size / 1024 / 1024).toFixed(1) : '?'}MB over /@fs — Vite serves via fs allow, no HTTP cache. With a warm IDB bitmap cache, repeat texture loads skip decode.`,
 		)
 	}
 	console.log(

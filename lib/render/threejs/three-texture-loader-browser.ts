@@ -5,9 +5,7 @@ import { EXRLoader } from 'three/examples/jsm/loaders/EXRLoader.js'
 import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js'
 import {
 	CanvasTexture,
-	ClampToEdgeWrapping,
 	DataTexture,
-	EquirectangularReflectionMapping,
 	HalfFloatType,
 	LinearFilter,
 	LinearMipMapLinearFilter,
@@ -25,10 +23,9 @@ import { settleWorkerEntry, type WorkerPendingEntry } from '../../util/worker-pe
 import type { ITextureLoader } from '../irender-api.js'
 import { cappedDecodeTarget } from './encoded-size-probe.js'
 import { decodeInWorker, hasImageWorker, poolSize } from './image-worker-pool.js'
-import { RE_PLAYFIELD } from './material-shared.js'
 import { WorkerLoadTracker } from './texture-dispatch.js'
 import { downscaleArray } from './texture-downscale.js'
-import { isPlayfieldCap } from './texture-tags.js'
+import { isPlayfieldCap, RE_PLAYFIELD } from './texture-tags.js'
 
 /** Engine-default lookup key: filename without path or extension (dotless names stay whole). */
 function defaultKeyFor(fileName: string): string {
@@ -37,6 +34,7 @@ function defaultKeyFor(fileName: string): string {
 }
 
 const imageMap: Record<string, string> = {
+	ball: new URL('../../../res/maps/ball.png', import.meta.url).href,
 	bumperbase: new URL('../../../res/maps/bumperbase.png', import.meta.url).href,
 	bumperCap: new URL('../../../res/maps/bumperCap.png', import.meta.url).href,
 	bumperring: new URL('../../../res/maps/bumperring.png', import.meta.url).href,
@@ -48,7 +46,7 @@ const imageMap: Record<string, string> = {
 	kickerWilliams: new URL('../../../res/maps/kickerWilliams.png', import.meta.url).href,
 }
 
-export function effectiveMax(_isFloat: boolean, name?: string): number {
+export function effectiveMax(name?: string): number {
 	const caps = getEffectiveCaps()
 	return name && RE_PLAYFIELD.test(name) ? caps.playfield : caps.other
 }
@@ -57,9 +55,10 @@ export function _testResetTextureLimits(): void {
 	_resetQualityCache()
 }
 
+const NOMIPMAP_MAX_EDGE = 64
+
 /** No mip chain for magnified DMD panels or tiny (≤64px) icons: ~33% GPU and upload for nothing. */
 const RE_NOMIPMAP = /dmd/i
-const NOMIPMAP_MAX_EDGE = 64
 
 function tune(tex: any, name?: string): void {
 	const caps = getEffectiveCaps()
@@ -95,9 +94,13 @@ function toBlobPart(data: Uint8Array): Uint8Array | ArrayBufferLike {
 		: data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength)
 }
 
-function finalize(tex: any, name: string, isFloat: boolean): any {
-	// three@0.185 uploads ImageBitmap directly; the canvas copy only added alloc + upload.
-	const max = effectiveMax(isFloat, name)
+/** Owned ArrayBuffer copy of the view's bytes (transferred to workers, never cloned). */
+function toArrayBuffer(data: Uint8Array): ArrayBuffer {
+	return data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer
+}
+
+function finalize(tex: any, name: string): any {
+	const max = effectiveMax(name)
 	if (tex.image?.data && tex.image.width && tex.image.height) {
 		const ds = downsampleData(tex, max, name)
 		if (ds !== tex) {
@@ -159,7 +162,6 @@ function failAffine(w: Worker, code: FloatInfraCode, message: string): void {
 	for (const id of bound) settleWorkerEntry(floatPending, id)?.reject(floatInfraError(code, message))
 }
 
-/** A dead worker answers nothing more: fail only its bound entries, then terminate and replace. */
 function failFloatWorker(w: Worker, message: string): void {
 	failAffine(w, 'float-worker-crash', message)
 }
@@ -239,8 +241,7 @@ function parseWorker(
 				floatInfraError('float-queue-full', `exr worker queue full (${queued} pending, cap ${maxPending})`),
 			)
 	}
-	// Playfield maps take the least-busy worker (same decode either way);
-	// round-robin resumes where it left off.
+	// Playfield bakes take the least-busy worker; the rest stay round-robin.
 	const picked = floatTracker.pick(pool, playfield, floatNext)
 	floatNext = picked.next
 	const w = picked.worker
@@ -250,7 +251,7 @@ function parseWorker(
 		if (warmup) entry.warmup = true
 		floatPending.set(id, entry)
 		// A hung worker answers nothing more — not just this call: fail every
-		// entry bound to it, then terminate and replace.
+		// entry bound to it, then terminate and replace it.
 		entry.timer = setTimeout(() => {
 			failAffine(w, 'float-worker-timeout', 'exr worker timeout')
 		}, FLOAT_WORKER_TIMEOUT_MS)
@@ -268,7 +269,7 @@ function parseWorker(
 	})
 }
 
-/** Cache resized bitmaps ≤4MB in IDB; larger ones re-decode (as EXR-only did before). */
+/** Cache resized bitmaps ≤4MB in IDB; larger ones always re-decode. */
 const MAX_CACHED_BITMAP_BYTES = 4 * 1024 * 1024
 
 /** IDB revivals quack like a bitmap without the realm's prototype. */
@@ -282,7 +283,7 @@ function asCachedBitmap(cached: any): any {
 }
 
 async function loadRegularWorker(name: string, mime: string, data: Uint8Array): Promise<ThreeTexture | null> {
-	const max = effectiveMax(false, name)
+	const max = effectiveMax(name)
 	const key = bitmapCacheKey(name, data, mime, max)
 	try {
 		const hit = asCachedBitmap(await idbGet(key))
@@ -306,7 +307,7 @@ function tinyHdrBuffer(): ArrayBuffer {
 	const bytes = new Uint8Array(head.length + 4)
 	bytes.set(head, 0)
 	bytes.set([1, 1, 1, 128], head.length)
-	return bytes.buffer
+	return bytes.buffer as ArrayBuffer
 }
 
 export class ThreeTextureLoaderBrowser implements ITextureLoader<ThreeTexture> {
@@ -331,29 +332,23 @@ export class ThreeTextureLoaderBrowser implements ITextureLoader<ThreeTexture> {
 
 	public hasDefaultTexture(name: string): boolean {
 		const key = defaultKeyFor(name).toLowerCase()
-		if (key === 'ball') return true
 		return Object.keys(imageMap).some(k => k.toLowerCase() === key)
 	}
 
 	public async loadDefaultTexture(_name: string, _ext: string, fileName: string): Promise<ThreeTexture> {
-		// Dotless names (engine fallbacks) have no extension to strip; slicing
-		// to lastIndexOf('.') === -1 would eat the final character instead.
 		const key = defaultKeyFor(fileName)
-		if (key.toLowerCase() === 'ball') return createBallEnvTexture(_name || fileName)
 		const url = imageMap[key]
 		if (!url) throw new Error(`Unknown local texture "${key}".`)
 		const tex: any = await new TextureLoader().loadAsync(url)
-		return finalize(tex, _name || fileName, false)
+		return finalize(tex, _name || fileName)
 	}
 
 	public async loadRawTexture(name: string, data: Uint8Array, width: number, height: number): Promise<ThreeTexture> {
-		// WebGPU has no RGB8 texture format, so raw bitmaps always upload
-		// RGBA; with all-1.0 alpha the sample is identical.
 		const tex: any = new DataTexture(data as any, width, height, RGBAFormat)
 		tex.flipY = true
 		tex.colorSpace = SRGBColorSpace
 		tex.needsUpdate = true
-		return finalize(tex, name, false)
+		return finalize(tex, name)
 	}
 
 	public async loadTexture(name: string, ext: string, data: Uint8Array): Promise<ThreeTexture> {
@@ -406,58 +401,10 @@ export class ThreeTextureLoaderBrowser implements ITextureLoader<ThreeTexture> {
 	}
 }
 
-// POT 256×128 avoids SwiftShader failure with NPOT + Repeat + mips
-function createBallEnvTexture(name: string): ThreeTexture {
-	const w = 256
-	const h = 128
-	if (typeof document === 'undefined') {
-		const tex: any = new DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1, RGBAFormat)
-		tex.colorSpace = SRGBColorSpace
-		tex.needsUpdate = true
-		tex.name = `texture:${name}`
-		return tex as ThreeTexture
-	}
-	const canvas = document.createElement('canvas')
-	canvas.width = w
-	canvas.height = h
-	const ctx = canvas.getContext('2d')!
-	const bg = ctx.createLinearGradient(0, 0, 0, h)
-	bg.addColorStop(0, '#14181a')
-	bg.addColorStop(0.32, '#787b80')
-	bg.addColorStop(0.5, '#f2f2f3')
-	bg.addColorStop(0.68, '#787b80')
-	bg.addColorStop(1, '#0c0e10')
-	ctx.fillStyle = bg
-	ctx.fillRect(0, 0, w, h)
-	const rg = ctx.createRadialGradient(w * 0.46, h * 0.34, 1, w * 0.46, h * 0.34, 30)
-	rg.addColorStop(0, 'rgba(255,255,255,1)')
-	rg.addColorStop(0.25, 'rgba(255,255,255,0.55)')
-	rg.addColorStop(1, 'rgba(255,255,255,0)')
-	ctx.fillStyle = rg
-	ctx.fillRect(0, 0, w, h)
-	const rg2 = ctx.createRadialGradient(w * 0.76, h * 0.68, 1, w * 0.76, h * 0.68, 14)
-	rg2.addColorStop(0, 'rgba(255,255,255,0.35)')
-	rg2.addColorStop(1, 'rgba(255,255,255,0)')
-	ctx.fillStyle = rg2
-	ctx.fillRect(0, 0, w, h)
-	const tex: any = new CanvasTexture(canvas as any)
-	tex.colorSpace = SRGBColorSpace
-	tex.mapping = EquirectangularReflectionMapping
-	tex.wrapS = ClampToEdgeWrapping
-	tex.wrapT = ClampToEdgeWrapping
-	tex.generateMipmaps = false
-	tex.minFilter = LinearFilter
-	tex.magFilter = LinearFilter
-	tex.needsUpdate = true
-	tex.name = `texture:${name}`
-	return tex as ThreeTexture
-}
-
 /**
  * Codec-level scaled decode, mirroring the image-decode worker's middle
  * tier (Chromium/FF only): sizing lives in the ImageDecoder constructor.
- * Throws when unsupported so callers fall through to the two-step path —
- * Safari has no ImageDecoder and keeps CIB-at-size → two-step.
+ * Throws when unsupported so callers fall through to the two-step path.
  */
 async function decodeMainAtSize(
 	data: Uint8Array,
@@ -473,7 +420,7 @@ async function decodeMainAtSize(
 	} catch (e: any) {
 		if (/cannot decode/.test(e?.message ?? '')) throw e
 	}
-	const buf = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer
+	const buf = toArrayBuffer(data)
 	const decoder = new Decoder({ data: buf, type: mime, desiredWidth: target.width, desiredHeight: target.height })
 	try {
 		const { image } = (await decoder.decode()) as any
@@ -501,10 +448,7 @@ async function decodeMainAtSize(
 async function tryCreateBitmap(data: Uint8Array, mime: string, name: string): Promise<ThreeTexture | null> {
 	try {
 		const blob = new Blob([toBlobPart(data) as any], { type: mime as any })
-		const max = effectiveMax(false, name)
-		// Decode-at-size: single-step decode+downscale, no full-res
-		// intermediate. Falls through to the two-step path when the codec
-		// ignores resize options.
+		const max = effectiveMax(name)
 		const target = cappedDecodeTarget(data, max)
 		let sized: any = null
 		if (target) {
@@ -520,8 +464,6 @@ async function tryCreateBitmap(data: Uint8Array, mime: string, name: string): Pr
 						resizeQuality: 'high',
 					} as any,
 				)
-				// The codec may ignore resize options: only take the fast
-				// path when the bitmap came back within cap.
 				if (single.width <= max && single.height <= max) return textureFromBitmap(single, name)
 				sized = single
 			} catch {
@@ -530,9 +472,6 @@ async function tryCreateBitmap(data: Uint8Array, mime: string, name: string): Pr
 					name,
 				)
 			}
-			// The codec ignored the resize hint: try ImageDecoder at size
-			// before the two-step resize reuses this bitmap. No ImageDecoder
-			// (Safari, node) throws inside and keeps the old path.
 			if (sized && (sized.width > max || sized.height > max)) {
 				try {
 					const decoded: any = await decodeMainAtSize(data, mime, target)
@@ -548,9 +487,6 @@ async function tryCreateBitmap(data: Uint8Array, mime: string, name: string): Pr
 				}
 			}
 		}
-		// Flags match three's upload path (non-premultiplied, no browser
-		// conversion); resizeQuality stays explicit — the default is 'low'.
-		// Display-P3 sources tagged sRGB render slightly muted, but 'none' keeps uploads deterministic.
 		let bitmap: any = sized
 		if (!bitmap) {
 			bitmap = await createImageBitmap(
@@ -576,8 +512,6 @@ async function tryCreateBitmap(data: Uint8Array, mime: string, name: string): Pr
 					bitmap.close?.()
 				} catch {}
 				bitmap = resized
-				// Bitmap-source resize is best-effort per engine: a still-over-cap
-				// frame falls through to the TextureLoader path instead of escaping.
 				if (bitmap.width > max || bitmap.height > max) {
 					try {
 						bitmap.close?.()
@@ -598,7 +532,7 @@ async function tryCreateBitmap(data: Uint8Array, mime: string, name: string): Pr
 }
 
 async function tryLoadViaWorker(name: string, kind: 'exr' | 'hdr', data: Uint8Array): Promise<ThreeTexture | null> {
-	const max = effectiveMax(true, name)
+	const max = effectiveMax(name)
 	// Over-cap playfield bakes (8192px DWAA, ~9s to parse, measured) are
 	// IDB-cached: revival is ~69ms read + ~176ms clone (measured) versus
 	// ~9s of re-parse, and writes are fire-and-forget. Non-playfield
@@ -609,11 +543,15 @@ async function tryLoadViaWorker(name: string, kind: 'exr' | 'hdr', data: Uint8Ar
 	if (key) {
 		const cached: any = await idbGet(key)
 		if (cached?.width && cached?.data) {
-			return finalize(
-				floatTex(cached.width, cached.height, cached.data, cached.type, cached.format, cached.colorSpace),
-				name,
-				true,
+			const tex = floatTex(
+				cached.width,
+				cached.height,
+				cached.data,
+				cached.type,
+				cached.format,
+				cached.colorSpace,
 			)
+			return finalize(tex, name)
 		}
 	}
 	// Bound the worst case before touching the worker: EXR/HDR decoders expand
@@ -630,16 +568,15 @@ async function tryLoadViaWorker(name: string, kind: 'exr' | 'hdr', data: Uint8Ar
 				`skipped before worker decode`,
 		)
 	}
-	const slice = () => data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer
 	let parsed: any
 	try {
-		parsed = await parseWorker(slice(), kind, max, name)
+		parsed = await parseWorker(toArrayBuffer(data), kind, max, name)
 	} catch (e) {
 		// A crashed worker is already terminated-and-replaced above: retry the
 		// failed decode once (re-picked off the dead worker). Timeouts never
 		// retry — a hung (usually DWAA) source would likely re-hang.
 		if ((e as { code?: unknown })?.code !== 'float-worker-crash') throw e
-		parsed = await parseWorker(slice(), kind, max, name)
+		parsed = await parseWorker(toArrayBuffer(data), kind, max, name)
 	}
 	if (parsed?.width && parsed?.data) {
 		if (key) {
@@ -652,11 +589,8 @@ async function tryLoadViaWorker(name: string, kind: 'exr' | 'hdr', data: Uint8Ar
 				colorSpace: parsed.colorSpace,
 			}).catch(() => {})
 		}
-		return finalize(
-			floatTex(parsed.width, parsed.height, parsed.data, parsed.type, parsed.format, parsed.colorSpace),
-			name,
-			true,
-		)
+		const tex = floatTex(parsed.width, parsed.height, parsed.data, parsed.type, parsed.format, parsed.colorSpace)
+		return finalize(tex, name)
 	}
 	return null
 }
@@ -681,11 +615,11 @@ async function loadFloatFallback(name: string, ext: string, mime: string, data: 
 	// once up front so pending UI work flushes before the block.
 	await new Promise<void>(resolve => setTimeout(resolve, 0))
 	try {
-		const buf = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer
+		const buf = toArrayBuffer(data)
 		const Loader = mime === 'image/exr' || ext === '.exr' ? EXRLoader : HDRLoader
 		const tex: any = new (Loader as any)().createDataTexture(buf)
 		tex.colorSpace = LinearSRGBColorSpace
-		return finalize(tex, name, true)
+		return finalize(tex, name)
 	} catch (e: any) {
 		throw new Error(`HDR/EXR parse failed for "${name}" (${ext} ${mime}): ${e.message}`)
 	}
@@ -697,7 +631,7 @@ async function loadRegular(name: string, mime: string, data: Uint8Array): Promis
 		const tex: any = await new TextureLoader().loadAsync(url)
 		tex.colorSpace = SRGBColorSpace
 		const img: any = tex.image
-		const max = effectiveMax(false, name)
+		const max = effectiveMax(name)
 		if (
 			img &&
 			typeof img.width === 'number' &&
@@ -728,7 +662,7 @@ async function loadRegular(name: string, mime: string, data: Uint8Array): Promis
 				}
 			} catch {}
 		}
-		return finalize(tex, name, false)
+		return finalize(tex, name)
 	} finally {
 		URL.revokeObjectURL(url)
 	}

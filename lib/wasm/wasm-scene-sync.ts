@@ -254,7 +254,8 @@ export class WasmSceneSync<NODE, GEOMETRY, POINT_LIGHT> {
 				ballsMoved++
 				if (!existed) ballsSpawned++
 			}
-			for (const id of [...this.liveIds]) {
+			// Delete-during-iteration is safe for Sets: no copy needed.
+			for (const id of this.liveIds) {
 				if (!seen.has(id)) {
 					this.balls.remove(id)
 					this.liveIds.delete(id)

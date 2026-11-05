@@ -23,13 +23,11 @@ describe('regression: texture stripe artifacts', () => {
 	})
 
 	it('browser effectiveMax must cap playfield to 4096', () => {
-		expect(effectiveMax(false, 'VLM.Nestmap0')).toEqual(4096)
-		expect(effectiveMax(false, 'playfield'), 'playfield').toEqual(4096)
-		expect(effectiveMax(true, 'VLM.Nestmap0'), 'float playfield').toEqual(4096)
-		expect(effectiveMax(true, 'playfield'), 'float playfield 4096').toEqual(4096)
-		// non-playfield should be 2048 on swift or 4096 otherwise, but never >4096 for float without playfield?
-		// In node env hwMax defaults 4096, so non-playfield float also 4096 but limited by cap
-		const nonPf = effectiveMax(false, 'some_wall')
+		expect(effectiveMax('VLM.Nestmap0')).toEqual(4096)
+		expect(effectiveMax('playfield'), 'playfield').toEqual(4096)
+		// non-playfield should be 2048 on swift or 4096 otherwise, but never >4096
+		// In node env hwMax defaults 4096, so non-playfield is also 4096 but limited by cap
+		const nonPf = effectiveMax('some_wall')
 		expect(nonPf, 'non-playfield should be <=4096').toBeLessThanOrEqual(4096)
 		// Behavior guard for the old 16384-cap bug: no quality tier may raise any
 		// texture cap above 4096, or 6080x8192 playfields skip downscaling again.

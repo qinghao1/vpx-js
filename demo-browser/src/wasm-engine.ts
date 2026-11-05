@@ -58,6 +58,16 @@ function toDots(bytes: Uint8Array, width: number, height: number): Uint8Array | 
 }
 
 /**
+ * Audible gain from a 0..1 user level and the mute flag. Out-of-range and
+ * non-numeric levels silence instead of throwing or wrapping.
+ */
+export function effectiveGain(volume: number, muted: boolean): number {
+	if (muted) return 0
+	if (!Number.isFinite(volume)) return 0
+	return Math.min(1, Math.max(0, volume))
+}
+
+/**
  * Headless-WASM engine adapter: loads a table into `vpinball-headless`, steps it
  * in the viewer's rAF loop, and fan-outs typed-array rows through `WasmSceneSync`
  * onto the existing three.js scene. Input and ROMs route to the bridge.
@@ -70,6 +80,9 @@ export class WasmEngine {
 	private ballsVisible = true
 	private destroyed = false
 	private audioCtx?: AudioContext
+	private audioGain?: GainNode
+	private _muted = false
+	private _volume = 1
 	private audioRate = 0
 	private audioChannels = 0
 	private audioNextStart = 0
@@ -77,23 +90,21 @@ export class WasmEngine {
 	private dmdCache?: { frameId: number; frame: Uint8Array; width: number; height: number }
 	private audioGestureAbort?: AbortController
 	/**
-	 * Host-owned game clock (game epoch, ms). Each rAF tick converts wall
-	 * debt into fixed quanta and hands every quantum to the bridge, which
-	 * advances the PinMAME fence and the script clock from it. Physics keeps
-	 * its own wall clock inside the bridge (it must: its epoch starts at
-	 * process time, so host-epoch targets would starve it) and re-publishes
-	 * script time from there; the three clocks agree because all three
-	 * advance at realtime from load. rAF stalls cost game time but never
-	 * freeze the table: the fence parks the emulation in place and the debt
-	 * clamp bounds the catch-up below.
+	 * Host-owned game clock (game epoch, ms). Each rAF tick advances it by
+	 * the tick's own wall delta (one stepFrame per tick), so game time tracks
+	 * the wall at any refresh rate. Physics keeps its own wall clock inside
+	 * the bridge (its epoch starts at process time, so host-epoch targets
+	 * would starve it); script and PinMAME follow the host epoch instead, so
+	 * draining buffered debt fast-forwards them (up to 8x) while physics runs
+	 * realtime — replay, not slow motion. The real physics spiral guard is
+	 * upstream's anti-hung skip (PhysicsEngine.cpp:535-539); the host cap
+	 * below only bounds per-tick bridge work.
 	 */
 	private gameMs = 0
 	private debtMs = 0
 	private lastStepWallMs = 0
-	/** Fixed step quantum (60 Hz): every StepFrame carries the same small dt. */
-	private static readonly stepQuantumMs = 1000 / 60
-	/** Max sub-steps per rAF: bounds catch-up work so a stall cannot spiral. */
-	private static readonly maxStepsPerFrame = 8
+	/** Max game-time advance per rAF: bounds bridge work so a stall cannot spiral. */
+	private static readonly maxAdvanceMs = (8 * 1000) / 60
 	/** Debt older than this is dropped: game time lags the wall, never freezes. */
 	private static readonly maxDebtMs = 500
 
@@ -202,6 +213,40 @@ export class WasmEngine {
 		return this.engine?.getScriptErrorCount() ?? 0
 	}
 
+	get muted(): boolean {
+		return this._muted
+	}
+
+	get volume(): number {
+		return this._volume
+	}
+
+	/** Mute switch for the sound button/shortcut; returns the new state. */
+	setMuted(muted: boolean): void {
+		this._muted = muted
+		this.applyAudioLevel()
+	}
+
+	toggleMuted(): boolean {
+		this.setMuted(!this._muted)
+		return this._muted
+	}
+
+	/**
+	 * User level 0..1 (slider percent / 100), clamped. A nonzero level
+	 * unmutes, matching slider UX.
+	 */
+	setVolume(volume: number): void {
+		this._volume = effectiveGain(volume, false)
+		if (this._volume > 0) this._muted = false
+		this.applyAudioLevel()
+	}
+
+	/** Push the current mute/level to the output gain (no-op before first gesture). */
+	private applyAudioLevel(): void {
+		if (this.audioGain && this.audioCtx) this.audioGain.gain.value = effectiveGain(this._volume, this._muted)
+	}
+
 	/**
 	 * PinMAME ROM audio: create/resume the output context. Browsers start it
 	 * suspended until a user gesture; call from pointer/key handlers only —
@@ -214,6 +259,11 @@ export class WasmEngine {
 			const wasRunning = this.audioCtx?.state === 'running'
 			this.audioCtx ??= new AudioContext()
 			if (this.audioCtx.state === 'suspended') void this.audioCtx.resume()
+			if (!this.audioGain) {
+				this.audioGain = this.audioCtx.createGain()
+				this.audioGain.connect(this.audioCtx.destination)
+			}
+			this.applyAudioLevel()
 			// Fresh-start only: drop the pre-gesture ring backlog (up to 4 s)
 			// so playback starts live. Never flush a running context: that
 			// would drop audible audio.
@@ -221,6 +271,7 @@ export class WasmEngine {
 		} catch {
 			this.audioFailed = true
 			this.audioCtx = undefined
+			this.audioGain = undefined
 		}
 	}
 
@@ -253,7 +304,7 @@ export class WasmEngine {
 			}
 			const src = ctx.createBufferSource()
 			src.buffer = out
-			src.connect(ctx.destination)
+			src.connect(this.audioGain ?? ctx.destination)
 			// Back-to-back scheduling: chunks longer than the step gap would
 			// otherwise overlap, and input double-steps would pile up. Drop
 			// backlog past half a second so a stall can't queue a tail.
@@ -320,22 +371,21 @@ export class WasmEngine {
 	step(nowMs: number): { changedLights: string[]; counts?: SyncCounts } {
 		const engine = this.engine
 		if (!engine || !this.sync) return { changedLights: [] }
-		// Continuous-time advance: game time follows the wall clock each tick
-		// (one stepFrame per rAF), so simulation smoothness scales with the
-		// display refresh rate (60/120/144Hz+) instead of stair-stepping at a
-		// fixed 60Hz quantum. The engine runs its own fixed-substep catch-up
-		// internally, so the host only bounds the per-tick advance: a stall
-		// slows the game (debt survives, clamped) instead of spiraling.
-		if (!Number.isFinite(nowMs)) nowMs = this.lastStepWallMs
-		if (this.lastStepWallMs === 0) this.lastStepWallMs = nowMs
-		const wallDelta = nowMs - this.lastStepWallMs
-		this.lastStepWallMs = nowMs
-		this.debtMs = Math.min(this.debtMs + Math.max(wallDelta, 0), WasmEngine.maxDebtMs)
-		const advance = Math.min(this.debtMs, WasmEngine.maxStepsPerFrame * WasmEngine.stepQuantumMs)
-		if (advance > 0) {
-			this.gameMs += advance
-			this.debtMs -= advance
-			engine.stepFrame(this.gameMs)
+		// Continuous-time advance: one stepFrame per rAF carries the tick's own
+		// wall delta (see the gameMs field comment for the drain semantics).
+		// A non-finite timestamp carries no wall information, so it must not
+		// touch debt either — otherwise a NaN tick would spend banked catch-up.
+		if (Number.isFinite(nowMs)) {
+			if (this.lastStepWallMs === 0) this.lastStepWallMs = nowMs
+			const wallDelta = nowMs - this.lastStepWallMs
+			this.lastStepWallMs = nowMs
+			this.debtMs = Math.min(this.debtMs + Math.max(wallDelta, 0), WasmEngine.maxDebtMs)
+			const advance = Math.min(this.debtMs, WasmEngine.maxAdvanceMs)
+			if (advance > 0) {
+				this.gameMs += advance
+				this.debtMs -= advance
+				engine.stepFrame(this.gameMs)
+			}
 		}
 		const read = (kind: WasmBufferKind): Float32Array => engine.getBuffer(kind)?.view ?? EMPTY_VIEW
 		const buffers = {

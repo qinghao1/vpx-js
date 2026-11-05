@@ -15,8 +15,6 @@ const HARDWARE_CONCURRENCY_FALLBACK = 4
 
 /**
  * Cooldown before a failed texture is attempted (and warned about) again.
- * Demand passes re-scan on every updater batch, so without this one doomed
- * file (e.g. a 512MB EXR decode) is retried dozens of times per load.
  */
 const LOAD_FAILURE_COOLDOWN_MS = 30000
 
@@ -346,9 +344,6 @@ export class ThreeMapGenerator {
 				loadable.push(fromTable)
 				continue
 			}
-			// Engine defaults (bumper/kicker/…) live in res/maps, not the table —
-			// but only attempt names the loader actually ships, so deleted table
-			// textures (glass*) report missing once instead of failing every cycle.
 			const loader = this.textureLoader as unknown as {
 				hasDefaultTexture?: (name: string) => boolean
 			}
