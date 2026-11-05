@@ -3,17 +3,20 @@ import {
 	AdditiveBlending,
 	Color,
 	CustomBlending,
+	DataTexture,
 	DoubleSide,
 	FrontSide,
 	NoBlending,
 	OneFactor,
 	OneMinusSrcAlphaFactor,
+	SRGBColorSpace,
 	SrcAlphaFactor,
 	type Texture as ThreeTexture,
 	Vector2,
 } from 'three'
 import { Fn, float, positionWorld, saturate, sqrt, step, texture, uniform, uv, vec2, vec4 } from 'three/tsl'
 import { MeshBasicNodeMaterial, MeshStandardNodeMaterial } from 'three/webgpu'
+import { clampModulateVsAdd, DEFAULT_MODULATE } from '../../../vpt/flasher/flasher-blend.js'
 import {
 	bdlDiffuseFactor,
 	bdlEmissiveCarry,
@@ -31,7 +34,6 @@ import {
 } from '../../../vpt/primitive/primitive-material-protocol.js'
 import { copyForkedRenderState, defineEmissiveIntensityCompat, setNodeMapSlot } from '../material-shared.js'
 import { getTransmissionTexture, TRANSMISSION_OPAQUE_CUTOFF } from '../transmission-buffer.js'
-import { applyModulateVsAddBlending, clampModulateVsAdd, DEFAULT_MODULATE } from './modulate-vs-add.js'
 
 export type { PrimitiveAdditiveUpdate, PrimitiveBdlUpdate, ProtocolColor }
 export {
@@ -55,6 +57,14 @@ export {
 // frame, so x centers about 0 and table-y lands on world-z centered about 0).
 // Hence u = x/(w*s)+0.5 and v = 0.5-z/(h*s) with the scaled extents stored here.
 export const uTransArea = uniform(new Vector2(1, 1))
+
+/** Planar playfield UV of the fragment's world position (matches the
+ * playfield slab's 1:1 mapping, so taps sample the texel behind the fragment). */
+export const playfieldUv = (): ReturnType<typeof vec2> =>
+	vec2(
+		positionWorld.x.div(uTransArea.x).add(float(0.5)),
+		float(0.5).sub(positionWorld.z.div(uTransArea.y)),
+	) as ReturnType<typeof vec2>
 
 /**
  * World-space height of the playfield surface (the table z=0 plane after the
@@ -151,16 +161,106 @@ export interface PrimitiveAdditiveOptions {
 	modulateVsAdd?: number
 	absorb?: boolean
 	plain?: boolean
+	/** Bound playfield art for the backdrop tap (null until it streams in). */
+	backdropMap?: ThreeTexture | null
+	/** Pending playfield art name; the streaming drain binds it. */
+	backdropMapName?: string
 }
 
 export type FlasherBlendTarget = 'absorb' | 'additive' | 'plain'
 
+/**
+ * Reference backdrop albedo for the additive modulate approximation, in
+ * sRGB (102/255, the stub bytes below — keep the two in sync). Native
+ * composites `dst + atten·I·l·((1−m) + m·dst)` per channel (fs_light.sc);
+ * the additive port cannot read dst, so pre-stream fragments pin the dst
+ * term to this mid-playfield gray. Once the playfield art streams in, the
+ * backdrop tap below samples the true albedo at the fragment's playfield
+ * UV instead. See the bulb-glow factory for the derivation.
+ */
+export const ADDITIVE_MODULATE_DST_REF = 0.4
+
+/**
+ * Backdrop tap: the playfield albedo behind an additive halo/flasher,
+ * standing in for the unreadable framebuffer dst in the native closed form
+ * `dst + atten·I·l·((1−m) + m·dst)`. The substitution is albedo-only: live
+ * GI, ball shadows, and overlapping halos present in the true dst are not
+ * in the tap, so halos under strong GI read slightly dimmer than native.
+ * The tap compiles against a 1x1 stub holding the reference constant, so
+ * pre-stream frames match the constant path exactly; the streaming drain
+ * rebinds the node value to the decoded art when it arrives (no graph
+ * rebuild, same as `__mapNodes`).
+ */
+let backdropStub: DataTexture | null = null
+export function backdropStubTexture(): ThreeTexture {
+	if (!backdropStub) {
+		const data = new Uint8Array([102, 102, 102, 255])
+		backdropStub = new DataTexture(data, 1, 1)
+		// Streamed art decodes from sRGB; the stub must decode the same way
+		// or pre/post-stream frames pop between color spaces.
+		backdropStub.colorSpace = SRGBColorSpace
+		backdropStub.needsUpdate = true
+	}
+	return backdropStub
+}
+
+export function createBackdropTap(pfUv: ReturnType<typeof vec2>, map?: ThreeTexture | null) {
+	const node = texture(map ?? backdropStubTexture(), pfUv)
+	return { rgb: node.rgb, node }
+}
+
+/**
+ * Native per-channel backdrop weight `(1−m) + m·dst` with the albedo tap
+ * as dst; the halo light multiplies it (all four tap sites share this tail).
+ * Params stay untyped: TSL node algebra is duck-typed, and inference keeps
+ * the call-site chains precisely checked exactly as when spelled inline.
+ */
+export function tapBackdropWeight(modulate: any, tapRgb: any) {
+	return float(1).sub(modulate).add(modulate.mul(tapRgb))
+}
+
+/** Attaches a backdrop tap to an additive material's userData; returns the tap. */
+export function attachBackdropTap(
+	userData: Record<string, unknown>,
+	map?: ThreeTexture | null,
+): ReturnType<typeof createBackdropTap> {
+	const tap = createBackdropTap(playfieldUv(), map)
+	userData.__backdropArm = true
+	userData.__backdropNodes = [tap.node]
+	return tap
+}
+
+/**
+ * Idempotently rebinds an additive backdrop tap to streamed playfield art;
+ * returns false when already bound (same map+name) or when the material has
+ * no tap; sets needsUpdate only on attach/detach transitions (value swaps
+ * rebind in place); a null texture unbinds back to the stub. The stamped
+ * backdrop name is untouched.
+ */
+export function setAdditiveBackdrop(mat: unknown, tex: ThreeTexture | null, name?: string): boolean {
+	const target = mat as { userData?: Record<string, unknown>; needsUpdate?: boolean } | null | undefined
+	const userData = target?.userData
+	if (!userData?.__backdropArm) return false
+	if (userData.__backdropMap === (tex ?? null) && (name === undefined || userData.__backdropName === name)) {
+		return false
+	}
+	const prev = (userData.__backdropMap as ThreeTexture | null) ?? null
+	const nodes = userData.__backdropNodes as { value: unknown }[] | undefined
+	if (nodes?.length) for (const node of nodes) node.value = tex ?? backdropStubTexture()
+	userData.__backdropMap = tex ?? null
+	if (name !== undefined) userData.__backdropName = name
+	// A texture value swap rebinds in place (same program); only
+	// attach/detach transitions need a recompile, like the map slots.
+	if (target && (prev == null || tex == null)) target.needsUpdate = true
+	return true
+}
+
 function applyTargetBlend(mat: MeshBasicNodeMaterial, target: FlasherBlendTarget): void {
-	// REVSUBTRACT is order-dependent: overlapping AB_ADD overlays composite in
-	// draw order (depthBias tiers + transparent sort).
+	// Additive overlays composite in draw order (depthBias tiers +
+	// transparent sort). Bulb halos are additive too: the native
+	// REVSUBTRACT form draws nothing on the WebGPU backend.
 	if (target === 'absorb') applyAbsorbBlendState(mat)
 	else if (target === 'plain') mat.blending = NoBlending
-	else if ((mat.userData as Record<string, unknown>).__uModulate !== undefined) applyModulateVsAddBlending(mat)
 	else mat.blending = AdditiveBlending
 }
 
@@ -231,10 +331,7 @@ export function createPrimitiveBdlMaterial(opts: PrimitiveBdlOptions): MeshStand
 				// pixels carry the lamp purely through the BDL term above.
 				const alphaBelow = texTransmission.a.mul(uAlpha)
 				const gate = step(alphaBelow, TRANSMISSION_OPAQUE_CUTOFF)
-				const pfUv = vec2(
-					positionWorld.x.div(uTransArea.x).add(float(0.5)),
-					float(0.5).sub(positionWorld.z.div(uTransArea.y)),
-				)
+				const pfUv = playfieldUv()
 				const lift = sqrt(diffuse)
 					.mul(texture(uTransTex, pfUv).rgb)
 					.mul(uBelowF)
@@ -307,7 +404,12 @@ export function createPrimitiveAdditiveMaterial(opts: PrimitiveAdditiveOptions):
 	userData.__depthBias = opts.depthBias ?? 0
 	userData.__alphaTestValue = opts.alphaTestValue ?? 0
 	userData.__doubleSided = opts.doubleSided !== false
+	userData.__backdropMap = opts.backdropMap ?? null
+	if (opts.backdropMapName !== undefined) userData.__backdropName = opts.backdropMapName
 	const rebuild = (map: ThreeTexture | null): void => {
+		// Only the modulate-weighted arms below read the backdrop; plain,
+		// absorb, and unmodulated arms leave any tap in place but unused.
+		userData.__backdropArm = false
 		if (map) {
 			const tex = texture(map, uv())
 			// Stashed for same-branch swaps (see setNodeMapSlot): rebinding
@@ -330,15 +432,15 @@ export function createPrimitiveAdditiveMaterial(opts: PrimitiveAdditiveOptions):
 						return vec4(tex.rgb.mul(uTint).mul(resultA), saturate(uModulate.mul(resultA)))
 					})()
 				} else {
-					// Native AB_ADD (`fs_flasher.sc`, modulateVsAdd > 0): the
-					// result (static color modded by the texture) is negatively
-					// encoded and the REVSUBTRACT unit below composites it, so a
-					// dark backdrop is modulated rather than collected flat —
-					// the same scheme as the bulb glow composite.
+					// AB_ADD (native flasherMode 2): static color modded by the
+					// texture, composited additively; the dst term samples
+					// the playfield albedo behind the sheet (pre-stream: the
+					// stub constant), matching the bulb-glow port.
+					const tap = attachBackdropTap(userData, userData.__backdropMap as ThreeTexture | null)
 					mat.colorNode = Fn(() => {
 						const resultA = tex.a.mul(uIntensity)
-						const rgb = tex.rgb.mul(uTint).mul(resultA).mul(uModulate).mul(float(-1))
-						return vec4(rgb, float(1).div(uModulate).sub(float(1)))
+						const rgb = tex.rgb.mul(uTint).mul(resultA).mul(tapBackdropWeight(uModulate, tap.rgb))
+						return vec4(rgb, float(1))
 					})()
 				}
 			} else {
@@ -367,11 +469,12 @@ export function createPrimitiveAdditiveMaterial(opts: PrimitiveAdditiveOptions):
 				// (tint·intensity) with a saturated modulate·intensity alpha.
 				mat.colorNode = Fn(() => vec4(uFlat, saturate(uModulate.mul(uIntensity))))()
 			} else {
-				// Untextured AB_ADD (native flasherMode 2): the static color rides
-				// through with the same negative encoding.
+				// Untextured AB_ADD (native flasherMode 2): the static color
+				// rides through with the playfield-albedo dst term, as above.
+				const tap = attachBackdropTap(userData, userData.__backdropMap as ThreeTexture | null)
 				mat.colorNode = Fn(() => {
-					const rgb = uFlat.mul(uModulate).mul(float(-1))
-					return vec4(rgb, float(1).div(uModulate).sub(float(1)))
+					const rgb = uFlat.mul(tapBackdropWeight(uModulate, tap.rgb))
+					return vec4(rgb, float(1))
 				})()
 			}
 		} else {
@@ -509,6 +612,8 @@ export function clonePrimitiveNodeMaterial<T>(mat: T): T {
 		modulateVsAdd: typeof modulateValue === 'number' ? modulateValue : undefined,
 		absorb: blend === 'absorb',
 		plain: blend === 'plain',
+		backdropMap: (userData.__backdropMap as ThreeTexture | null) ?? undefined,
+		backdropMapName: (userData.__backdropName as string) ?? undefined,
 	})
 	finishPrimitiveClone(sourceMaterial, cloned as unknown as CloneablePrimitiveMaterial, 'simple')
 	return cloned as unknown as T

@@ -22,6 +22,16 @@ export function isShowcaseRoomNode(name: string | undefined): boolean {
 	if (!name) return false
 	return RE_VR.test(name) || isCabName(name)
 }
+
+/**
+ * Author debug leftover (`debug_BLW3`, `debugKicker`, `surface.top-debug_*`):
+ * a `debug` token at a name boundary. Matched against the raw name (not the
+ * flattened form) so `topdebug` would not match while `top-debug` does.
+ */
+export const RE_AUTHOR_DEBUG = /(?:^|[^a-zA-Z])debug/i
+
+export const isAuthorDebugName = (name: string | undefined): boolean => !!name && RE_AUTHOR_DEBUG.test(name)
+
 export const RE_GLASS = /glass/i
 export const RE_LM = /lm_/i
 export const RE_GI = /gi0|gi1|_gi|gi_/i
@@ -110,6 +120,20 @@ export const isBasePlayfield = (meshName: string, info: { isBakedMat: boolean })
 // The generated slab itself (three-playfield-mesh-generator), as opposed to
 // authored `primitive-*` extras sharing the footprint.
 export const isGeneratedPlayfieldBase = (meshName: string): boolean => meshName.toLowerCase() === 'playfield_base'
+// Meshes whose UVs are the planar playfield mapping 1:1: the generated slab
+// and the authored `playfield_mesh` collision/decoy primitive (same footprint,
+// same planar UVs). Only these qualify as planar-UV backdrop-tap sources —
+// baked `BM_Playfield` meshes carry atlas-space lightmap UVs instead.
+export const isPlanarPlayfieldMesh = (meshName: string | undefined): boolean =>
+	!!meshName && (meshName === 'playfield_base' || meshName === 'primitive-playfield_mesh')
+// The authored playfield collision mesh, by engine/item name (scene nodes
+// carry a group prefix, e.g. `primitive-playfield_mesh`). vpx-js renders the
+// playfield through the generated base slab instead and force-hides this
+// primitive at parse (see forceHidePlayfieldMesh), so the live engine must
+// never re-show it: observed live rows report it visible, and showing it
+// here would cover the base with a white, mapless quad and z-fight it.
+export const isPlayfieldDecoyName = (itemName: string | undefined): boolean =>
+	!!itemName && itemName.toLowerCase() === 'playfield_mesh'
 // Baked playfield overlay (`BM_Playfield*` primitives): engine bake state from
 // classify() (file addBlend/disableLighting flags via `baked`, with
 // material/map-name fallback) — never the mesh name alone.

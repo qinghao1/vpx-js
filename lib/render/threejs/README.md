@@ -30,15 +30,17 @@ pipeline in [`../README.md`](../README.md).
 
 Three deliberate divergences from VPinball, each pinned by a spec:
 
-- `AB_ADD` flashers evaluate the full `fs_flasher.sc` composite through the
-  native blend state (`REVSUBTRACT` with `SRC_ALPHA`/`INV_SRC_COLOR`,
-  negatively-encoded output), like bulb halos below; `AB_ABSORB` stays
-  premultiplied-over with positive output (its negative encoding is a
-  follow-up).
-- Bulb halos evaluate the full `fs_light.sc` composite through the native
-  blend state (`REVSUBTRACT` with `SRC_ALPHA`/`INV_SRC_COLOR`, negatively
-  encoded output) over the post-opaque scene color, so the `dst`-modulated
-  term lights inserts on tables without `szLightmap` receivers.
+- `AB_ADD` flashers and bulb halos composite positive light additively
+  (`dst + ((1−m) + m·d)·glow` per channel), matching the `fs_flasher.sc` /
+  `fs_light.sc` modulate-vs-add closed form, with `d` sampled per fragment
+  from the streamed playfield albedo at the playfield UV (pre-stream: the
+  `ADDITIVE_MODULATE_DST_REF = 0.4` sRGB stub, `~102/255` gray). The native
+  `REVSUBTRACT` blend state with negatively-encoded output draws nothing
+  on the WebGPU backend, so there is no native-blend arm; the albedo
+  misses live GI/dynamic light, so halos under strong GI read slightly
+  dimmer than native.
+- `AB_ABSORB` stays premultiplied-over with positive output (its negative
+  encoding is a follow-up).
 - VR-room/cabinet meshes are always forced visible (upstream hides them via
   `PartGroupData::PlayerModeVisibilityMask` per player mode); threading the
   real player mode through is a follow-up.

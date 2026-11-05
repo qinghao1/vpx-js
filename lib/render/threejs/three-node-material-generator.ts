@@ -1,9 +1,8 @@
 import { Color, DoubleSide, type Object3D } from 'three'
 import { Fn, texture, uniform, uv, vec4 } from 'three/tsl'
-import type { RenderInfo } from '../../game/interfaces.js'
 import type { Material } from '../../vpt/material.js'
 import { isOpenMesh, isValidCutout, resolveTransparency } from '../../vpt/primitive/primitive-material-protocol.js'
-import type { MeshConvertOptions } from '../irender-api.js'
+import type { MeshConvertOptions, RenderInfo } from '../irender-api.js'
 import type { IMaterialGenerator } from './imaterial-generator.js'
 import { BALL_METALNESS, BALL_ROUGHNESS, isBaked, normalizePendingKeys, pendingKeyFor } from './material-shared.js'
 import { getSlots } from './material-slots.js'
@@ -13,10 +12,12 @@ import {
 	createPrimitiveAdditiveMaterial,
 	createPrimitiveBdlMaterial,
 	isPrimitiveNodeMaterial,
+	setAdditiveBackdrop,
 	setPrimitiveMap,
 	sideFor,
 } from './nodes/primitive-bdl-node.js'
 import { createUnshadedBakedNodeMaterial, isBakedNodeMaterial, setBakedMap } from './nodes/unshaded-baked-node.js'
+import { isPlanarPlayfieldMesh } from './scene-classify.js'
 import type { ThreeMapGenerator } from './three-map-generator.js'
 
 export { getGlobalEmissionScale, setGlobalEmissionScale } from './material-shared.js'
@@ -54,6 +55,36 @@ const PENDING_TEX_KEYS: readonly PendingTexKey[] = ['map', 'normalMap', 'envMap'
 
 const kindOf = (mat: unknown): MaterialKind =>
 	isBakedNodeMaterial(mat) ? 'baked' : isPrimitiveNodeMaterial(mat) ? 'primitive' : 'classic'
+
+/** Minimal texture-source surface the tap discovery needs from the map generator. */
+export interface TapTextureLookup {
+	hasTexture(name: string): boolean
+	getTexture(name: string): unknown
+}
+
+/** Resolves the playfield texture a planar-UV mesh actually shows: its bound
+ * classic map, its node `__map` value, or its pending name once streamed. */
+export function playfieldTapSource(
+	candidate: unknown,
+	lookup: TapTextureLookup,
+): { tex: unknown; name?: string } | null {
+	// Classic materials carry the texture; node materials stash a
+	// texture node whose value is the texture.
+	const slots = getSlots(candidate) as Record<string, unknown>
+	normalizePendingKeys(slots)
+	const raw = (candidate as { map?: unknown }).map ?? slots.__map
+	const node = raw as { isNode?: boolean; value?: unknown } | null | undefined
+	const tex = (node?.isNode ? node.value : raw) as unknown
+	if ((tex as { isTexture?: boolean } | null)?.isTexture) return { tex }
+	const pendingName =
+		(typeof slots.pendingMap === 'string' && slots.pendingMap) ||
+		(typeof slots.__mapName === 'string' && slots.__mapName) ||
+		null
+	if (pendingName && lookup.hasTexture(pendingName)) {
+		return { tex: lookup.getTexture(pendingName), name: pendingName }
+	}
+	return null
+}
 
 export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 	private readonly cachedMaterials: Record<string, any> = {}
@@ -380,8 +411,10 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 
 	/**
 	 * Classic slot assignment shared by every material kind: clears the pending
-	 * key and assigns the texture (with init + program update) unless the slot
-	 * already holds it. Returns whether the slot changed.
+	 * key and assigns the texture (with init) unless the slot already holds it.
+	 * Only an attach or detach changes the compiled program; a texture ->
+	 * texture swap rebinds a uniform and skips the invalidation. Returns
+	 * whether the slot changed.
 	 */
 	private assignClassicSlot(
 		mat: any,
@@ -392,10 +425,11 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 	): boolean {
 		delete getSlots(mat)[pendingKeyFor(key)]
 		if ((mat as any)[key] === tex) return false
+		const attached = (mat as any)[key] == null
 		;(mat as any)[key] = tex
 		;((mat as any)[key] as { name: string }).name = name
 		init?.(mat)
-		mat.needsUpdate = true
+		if (attached) mat.needsUpdate = true
 		return true
 	}
 
@@ -436,13 +470,16 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 			delete getSlots(mat)[pendingKeyFor(key)]
 			return
 		}
+		const hadSlot = (mat as any)[key] != null
 		if (!this.assignClassicSlot(mat, key, tex, name, init)) return
 		const userData = getSlots(mat)
 		const restoredCutout = key === 'map' ? this.restoreCutout(mat, tex) : false
 		if (key === 'map' && userData?.__isBaked) {
+			// The tint refresh rebuilds the baked color node graph, so a swap
+			// still invalidates here; other slots need it only on attach.
 			this.refreshBakedMapTint(mat, tex, userData)
 			mat.needsUpdate = true
-		} else if (!restoredCutout) {
+		} else if (!hadSlot || restoredCutout) {
 			mat.needsUpdate = true
 		}
 	}
@@ -472,7 +509,12 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 
 	public resolvePendingTextures(): number {
 		let fixed = 0
-		for (const mat of Object.values(this.cachedMaterials)) fixed += this.resolvePendingOnMaterial(mat)
+		for (const mat of Object.values(this.cachedMaterials)) {
+			fixed += this.resolvePendingOnMaterial(mat)
+			fixed += this.resolveBackdropOnMaterial(mat) ? 1 : 0
+		}
+		// No playfield-mesh fallback here: every cached material is also
+		// scene-reachable, so the scene walk below covers it.
 		return fixed
 	}
 
@@ -481,14 +523,62 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 	public resolvePendingInScene(root: Object3D): number {
 		let fixed = 0
 		const seen = new Set<any>()
+		const unbound: any[] = []
 		root.traverse((node: any) => {
 			const mats = Array.isArray(node.material) ? node.material : node.material ? [node.material] : []
 			for (const mat of mats) {
 				if (seen.has(mat)) continue
 				seen.add(mat)
 				fixed += this.resolvePendingOnMaterial(mat)
+				if (this.resolveBackdropOnMaterial(mat)) fixed++
+				else {
+					const userData = getSlots(mat) as Record<string, unknown>
+					if (userData?.__backdropArm && !userData.__backdropMap) unbound.push(mat)
+				}
 			}
 		})
+		// Tables whose playfield map name matches no image (the viewer
+		// substitutes a texture on the playfield mesh instead): bind those
+		// taps to whatever the playfield mesh actually shows.
+		if (unbound.length) fixed += this.resolveBackdropFromPlayfieldMesh(root, unbound)
+		return fixed
+	}
+
+	/** Binds the playfield art to an additive backdrop tap once it streams in.
+	 * Pre-stream the tap holds the reference-constant stub, so this only swaps
+	 * the tap value in place (no graph rebuild, same as the map slots). */
+	private resolveBackdropOnMaterial(mat: any): boolean {
+		const userData = getSlots(mat) as Record<string, unknown>
+		const name = userData.__backdropName
+		if (typeof name !== 'string' || !name) return false
+		if (!this.mapGenerator.hasTexture(name)) return false
+		return setAdditiveBackdrop(mat, this.mapGenerator.getTexture(name) ?? null, name)
+	}
+
+	/** Fallback for substituted playfield art: finds the visible planar-UV
+	 * playfield mesh and binds its resolved map (or pending name) to taps
+	 * the stamped name could not cover. Only planar-UV meshes qualify (the
+	 * generated slab, else the authored decoy sharing its footprint): baked
+	 * `BM_Playfield` meshes carry atlas-space lightmap bakes (e.g. VLM
+	 * nestmaps), so sampling them with planar UVs reads unrelated atlas
+	 * islands — that gray wash, not albedo. Taps with no planar source keep
+	 * the reference-constant stub. Returns the number of taps bound. */
+	private resolveBackdropFromPlayfieldMesh(root: Object3D, mats: any[]): number {
+		const hits: { visible: boolean; tex: unknown; name?: string }[] = []
+		root.traverse((node: any) => {
+			if (!node.isMesh || !isPlanarPlayfieldMesh(node.name)) return
+			const meshMats = Array.isArray(node.material) ? node.material : node.material ? [node.material] : []
+			for (const candidate of meshMats) {
+				const hit = playfieldTapSource(candidate, this.mapGenerator)
+				if (hit) hits.push({ visible: node.visible !== false, tex: hit.tex, name: hit.name })
+			}
+		})
+		const found = hits.find(h => h.visible) ?? hits[0]
+		if (!found) return 0
+		let fixed = 0
+		for (const mat of mats) {
+			if (setAdditiveBackdrop(mat, (found.tex as any) ?? null)) fixed++
+		}
 		return fixed
 	}
 

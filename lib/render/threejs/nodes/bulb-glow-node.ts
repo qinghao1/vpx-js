@@ -1,25 +1,16 @@
 import type { Group } from 'three'
-import { BufferAttribute, BufferGeometry, Color, DoubleSide, Matrix4, Mesh, Vector2 } from 'three'
-import {
-	attribute,
-	clamp,
-	Fn,
-	float,
-	length,
-	max,
-	mix,
-	positionLocal,
-	positionWorld,
-	pow,
-	sqrt,
-	uniform,
-	vec2,
-	vec4,
-} from 'three/tsl'
+import { AdditiveBlending, BufferAttribute, BufferGeometry, Color, DoubleSide, Matrix4, Mesh, Vector2 } from 'three'
+import { attribute, clamp, Fn, float, length, max, mix, positionLocal, pow, sqrt, uniform, vec2, vec4 } from 'three/tsl'
 import { MeshBasicNodeMaterial } from 'three/webgpu'
+import { clampModulateVsAdd } from '../../../vpt/flasher/flasher-blend.js'
 import { getAuthoredVisible } from '../authored-visible.js'
-import { applyModulateVsAddBlending, clampModulateVsAdd } from './modulate-vs-add.js'
-import { inPlayfieldBounds, uBulbGlowFootprintClip, uTransArea } from './primitive-bdl-node.js'
+import {
+	attachBackdropTap,
+	inPlayfieldBounds,
+	playfieldUv,
+	tapBackdropWeight,
+	uBulbGlowFootprintClip,
+} from './primitive-bdl-node.js'
 
 export interface BulbGlowOptions {
 	color: number
@@ -41,27 +32,28 @@ export function createBulbGlowNodeMaterial(options: BulbGlowOptions): MeshBasicN
 	const uInvFalloff = uniform(1 / Math.max(options.falloff, 0.1))
 	const uFalloffPower = uniform(options.falloffPower)
 	const uIntensity = uniform(options.intensity)
-	// Native bulb composite (`light.cpp` REVSUBTRACT with
-	// SRC_ALPHA/INV_SRC_COLOR over the post-opaque scene color, fed the
-	// negatively-encoded `fs_light.sc` output below) evaluates the full
-	// `dst + atten·I·(dst·m·l + (1−m)·l)`. The blend unit samples dst, so the
-	// dst-modulated term needs no extra pass or scene buffer: these draws run
-	// in the pipeline scene pass's transparent phase (post-opaque dst) and the
-	// restored energy feeds the existing pipeline bloom. The szLightmap
-	// primitive path is untouched; native runs both draws too. Overlapping
-	// halos with different m composite in draw order (three.js transparent
-	// sort for per-quad draws, bake order in the merged mesh); native sorts
-	// transparent on absolute z + depthBias, so overlap pixels can differ
-	// slightly — REVSUBTRACT is order-dependent.
+	// Bulb composite (`fs_light.sc` closed form): these draws run in the
+	// pipeline scene pass's transparent phase and the restored energy feeds
+	// the existing pipeline bloom. The szLightmap primitive path is
+	// untouched; native runs both draws too. Overlapping halos composite in
+	// draw order (three.js transparent sort for per-quad draws, bake order
+	// in the merged mesh); native sorts transparent on absolute z +
+	// depthBias, so overlap pixels can differ slightly. The additive port
+	// commutes (`dst + A + B`), so unlike native it is order-stable.
 	const uModulate = uniform(clampModulateVsAdd(options.modulateVsAdd))
 
+	const tapUv = playfieldUv()
+	const tap = attachBackdropTap(mat.userData as Record<string, unknown>, null)
 	mat.colorNode = Fn(() => {
 		// Matches fs_light.sc: atten = pow(max(1 - saturate(len), 0.0001),
 		// falloff_power) with the color ramp on the unclamped sqrt(len) —
 		// the floor keeps a fully covered pixel from going exactly 0 and
-		// the ramp extrapolates past the rim instead of clamping. The rgb is
-		// negatively encoded (`−m·atten·I·lcolor`) with src alpha `1/m − 1`,
-		// exactly the shader outputs REVSUBTRACT composites upstream.
+		// the ramp extrapolates past the rim instead of clamping. Native
+		// composites `dst + atten·I·l·((1−m) + m·dst)` through the blend
+		// unit; the additive port keeps the closed form but samples dst as
+		// the playfield albedo (pre-stream: the stub constant). The native
+		// negatively-encoded REVSUBTRACT form draws nothing on the WebGPU
+		// backend, so there is no native-blend arm.
 		const len = length(positionLocal.xy.sub(uCenter)).mul(uInvFalloff)
 		const atten = pow(max(float(1).sub(clamp(len, float(0), float(1))), float(0.0001)), uFalloffPower)
 		const glowColor = mix(uColor2, uColor, sqrt(len))
@@ -71,16 +63,12 @@ export function createBulbGlowNodeMaterial(options: BulbGlowOptions): MeshBasicN
 		// light. Confine the halo to the playfield footprint (same mask as
 		// the transmission lift); disabled until the viewer configures the
 		// playfield area, so unconfigured renders are unchanged.
-		const pfUv = vec2(
-			positionWorld.x.div(uTransArea.x).add(float(0.5)),
-			float(0.5).sub(positionWorld.z.div(uTransArea.y)),
-		)
-		const footprint = mix(float(1), inPlayfieldBounds(pfUv), uBulbGlowFootprintClip)
-		const rgb = glowColor.mul(atten).mul(uIntensity).mul(uModulate).mul(float(-1)).mul(footprint)
-		return vec4(rgb, float(1).div(uModulate).sub(float(1)))
+		const footprint = mix(float(1), inPlayfieldBounds(tapUv), uBulbGlowFootprintClip)
+		const rgb = glowColor.mul(atten).mul(uIntensity).mul(tapBackdropWeight(uModulate, tap.rgb)).mul(footprint)
+		return vec4(rgb, float(1))
 	})()
 
-	applyModulateVsAddBlending(mat)
+	mat.blending = AdditiveBlending
 	mat.transparent = true
 	mat.depthWrite = false
 	mat.depthTest = true
@@ -161,28 +149,27 @@ export function createMergedBulbGlowMaterial(): MeshBasicNodeMaterial {
 	const aColor = attribute<'vec3'>('aGlowColor', 'vec3')
 	const aColor2 = attribute<'vec3'>('aGlowColor2', 'vec3')
 	const aDyn = attribute<'vec2'>('aGlowDyn', 'vec2')
+	const tapUv = playfieldUv()
+	const tap = attachBackdropTap(mat.userData as Record<string, unknown>, null)
 	mat.colorNode = Fn(() => {
 		// Same math as the per-quad material; params come from attributes.
-		// aDyn.y carries the native modulate m (live per lamp); the rgb is
-		// negatively encoded and the alpha is 1/m − 1, as upstream.
+		// aDyn carries the live (intensity, modulate) pair per lamp; see
+		// the per-quad factory for the composite derivation.
 		const len = length(positionLocal.xy.sub(aCenter)).mul(aParams.x)
 		const atten = pow(max(float(1).sub(clamp(len, float(0), float(1))), float(0.0001)), aParams.y)
 		const glowColor = mix(aColor2, aColor, sqrt(len))
-		const pfUv = vec2(
-			positionWorld.x.div(uTransArea.x).add(float(0.5)),
-			float(0.5).sub(positionWorld.z.div(uTransArea.y)),
-		)
-		const footprint = mix(float(1), inPlayfieldBounds(pfUv), uBulbGlowFootprintClip)
-		const rgb = glowColor.mul(atten).mul(aDyn.x).mul(aDyn.y).mul(float(-1)).mul(footprint)
-		return vec4(rgb, float(1).div(aDyn.y).sub(float(1)))
+		const footprint = mix(float(1), inPlayfieldBounds(tapUv), uBulbGlowFootprintClip)
+		const rgb = glowColor.mul(atten).mul(aDyn.x).mul(tapBackdropWeight(aDyn.y, tap.rgb)).mul(footprint)
+		return vec4(rgb, float(1))
 	})()
-	applyModulateVsAddBlending(mat)
+	mat.blending = AdditiveBlending
 	mat.transparent = true
 	mat.depthWrite = false
 	mat.depthTest = true
 	mat.toneMapped = true
 	mat.side = DoubleSide
-	;(mat.userData as Record<string, unknown>).__bulbGlowMerged = true
+	const ud = mat.userData as Record<string, unknown>
+	ud.__bulbGlowMerged = true
 	return mat
 }
 
@@ -471,6 +458,18 @@ export function mergeBulbGlowQuads(root: Group, table: unknown): number {
 	geo.computeBoundingSphere()
 	const material = createMergedBulbGlowMaterial()
 	material.name = 'material:merged.bulb.glow'
+	// The merged mesh replaces its quads mid-build, before any postprocess
+	// pass can stamp it: inherit the pending playfield name they carry so
+	// the streaming drain binds the merged tap too. Only a unanimous name
+	// transfers; mixed runs leave the stub until the stamp pass names it.
+	const pendingNames = new Set(
+		baked
+			.map(c => (c.mesh.material as { userData?: Record<string, unknown> } | null)?.userData?.__backdropName)
+			.filter((n): n is string => typeof n === 'string' && n.length > 0),
+	)
+	if (pendingNames.size === 1) {
+		;(material.userData as Record<string, unknown>).__backdropName = [...pendingNames][0]
+	}
 	const merged = new Mesh(geo, material)
 	// Build-time visibility stays default — ticks drive it, like per-quad quads.
 	merged.name = 'merged:bulb.glow'

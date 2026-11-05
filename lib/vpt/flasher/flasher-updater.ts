@@ -3,7 +3,7 @@
 
 import type { Object3D } from 'three'
 import type { IRenderApi } from '../../render/irender-api.js'
-import { clampModulateVsAdd } from '../../render/threejs/nodes/modulate-vs-add.js'
+import { clampModulateVsAdd } from './flasher-blend.js'
 import { convertFlasherBlend } from '../../render/threejs/nodes/primitive-bdl-node.js'
 import { ItemUpdater, noteTextureDemand } from '../item-updater.js'
 import type { Light } from '../light/light.js'

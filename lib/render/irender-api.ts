@@ -1,14 +1,59 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import type { IRenderable, RenderInfo } from '../game/interfaces.js'
 import type { Matrix3D } from '../math/matrix.js'
 import type { ItemState } from '../vpt/item-state.js'
-import type { LightData, LightState } from '../vpt/light/light.js'
+import type { ItemUpdater } from '../vpt/item-updater.js'
+import type { BulbGlowParams, LightData, LightState } from '../vpt/light/light.js'
 import type { Material } from '../vpt/material.js'
 import type { Mesh } from '../vpt/mesh.js'
 import type { Table, TableGenerateOptions } from '../vpt/table/table.js'
 import type { Texture } from '../vpt/texture.js'
+
+/** Named table item base interface. */
+export interface IItem {
+	getName(): string
+}
+
+/** Renderable table element. */
+export interface IRenderable<STATE extends ItemState = ItemState> extends IItem {
+	getMeshes<NODE, GEOMETRY, POINT_LIGHT>(
+		table: Table,
+		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
+		opts: TableGenerateOptions,
+	): Meshes<GEOMETRY>
+	getState(): STATE
+	getUpdater(): ItemUpdater<STATE>
+}
+
+export function isRenderable(arg: unknown): arg is IRenderable<ItemState> {
+	return typeof arg === 'object' && arg !== null && 'getMeshes' in arg
+}
+
+export interface Meshes<GEOMETRY> {
+	[key: string]: RenderInfo<GEOMETRY>
+}
+
+export interface RenderInfo<GEOMETRY> {
+	isVisible: boolean
+	mesh?: Mesh
+	geometry?: GEOMETRY
+	map?: Texture
+	normalMap?: Texture
+	envMap?: Texture
+	material?: Material
+	isTransparent?: boolean
+	depthBias?: number
+	disableLighting?: number
+	addBlend?: boolean
+	/** Tri-state additive blend (upstream AddBlendMode 0 plain, 1 additive, 2 absorb); absent derives from addBlend. */
+	addBlendMode?: number
+	/** Native m_modulate_vs_add for AB_ADD overlays (selects the modulate-vs-add composite); absent keeps the legacy overlay. */
+	modulateVsAdd?: number
+	backfacesEnabled?: boolean
+	depthWrite?: boolean
+	bulbGlow?: BulbGlowParams
+}
 
 /**
  * Backend-agnostic scene vocabulary: NODE is a scene-graph node, GEOMETRY a

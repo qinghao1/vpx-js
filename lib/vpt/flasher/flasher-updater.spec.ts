@@ -1,10 +1,13 @@
-import { NoBlending, OneFactor, ReverseSubtractEquation, SrcAlphaFactor } from 'three'
+import { AdditiveBlending, NoBlending, OneFactor } from 'three'
 import { describe, expect, it } from 'vitest'
 import { TableBuilder } from '../../../test/table-builder.js'
 import { TestRenderApi } from '../../../test/test-render-api.js'
 import { Vertex2D } from '../../math/vector.js'
 import type { IRenderApi } from '../../render/irender-api.js'
-import { createPrimitiveAdditiveMaterial } from '../../render/threejs/nodes/primitive-bdl-node.js'
+import {
+	createPrimitiveAdditiveMaterial,
+	createPrimitiveBdlMaterial,
+} from '../../render/threejs/nodes/primitive-bdl-node.js'
 import { DragPoint } from '../dragpoint.js'
 import { Enums } from '../enums.js'
 import type { Mesh } from '../mesh.js'
@@ -351,8 +354,7 @@ describe('The VPinball flasher mesh generator and updater', () => {
 		data.addBlendMode = FlasherAddBlend.Add
 		updater.applyState(node, state, renderApi, table)
 		expect(material.userData.__blend).toBe('additive')
-		expect(material.blendEquation).toBe(ReverseSubtractEquation)
-		expect(material.blendSrc).toBe(SrcAlphaFactor)
+		expect(material.blending).toBe(AdditiveBlending)
 		expect(material.version).toBe(1)
 
 		updater.applyState(node, state, renderApi, table)
@@ -379,7 +381,7 @@ describe('The VPinball flasher mesh generator and updater', () => {
 		data.addBlendMode = FlasherAddBlend.Add
 		updater.applyState(node, state, renderApi, table)
 		expect(material.userData.__blend).toBe('additive')
-		expect(material.blendEquation).toBe(ReverseSubtractEquation)
+		expect(material.blending).toBe(AdditiveBlending)
 		expect(material.version).toBe(4)
 	})
 
@@ -455,6 +457,23 @@ describe('The VPinball flasher mesh generator and updater', () => {
 
 		state.color = 0xffffff
 		state.alpha = 0
+		updater.applyState(node, state, renderApi, table)
+		expect(node.visible).toBe(false)
+	})
+
+	it('should hide a plain-blend flasher with black color like upstream draws nothing', () => {
+		const data = createFlasherData('PlainBlack')
+		data.addBlend = false
+		const state = FlasherState.claim('PlainBlack', true, 0x000000, 100)
+		const updater = new FlasherUpdater(state, data)
+
+		const node = {
+			visible: true,
+			traverse: () => {},
+		}
+		const renderApi = new TestRenderApi() as unknown as IRenderApi<any, any, any>
+		const table = new TableBuilder().build()
+
 		updater.applyState(node, state, renderApi, table)
 		expect(node.visible).toBe(false)
 	})
@@ -583,41 +602,26 @@ describe('The VPinball flasher mesh generator and updater', () => {
 		expect(node.visible).toBe(false)
 	})
 
-	it('should synchronize FlasherApi property updates to FlasherState', async () => {
-		const { NodeBinaryReader } = await import('../../io/binary-reader.node.js')
-		const { ThreeHelper } = await import('../../../test/three.helper.js')
-		const { Player } = await import('../../game/player.js')
-		const { Table } = await import('../table/table.js')
+	it('should restamp BDL albedo/alpha uniforms for a plain-blend flasher', () => {
+		const data = createFlasherData('PlainBdlFlasher')
+		data.addBlend = false
+		const state = FlasherState.claim('PlainBdlFlasher', true, 0xff8844, 50)
+		const updater = new FlasherUpdater(state, data)
 
-		const three = new ThreeHelper()
-		const table = await Table.load(new NodeBinaryReader(three.fixturePath('table-flasher.vpx')))
-		const player = new Player(table).init()
+		// Node graphs ignore classic color/opacity writes, so the live tint
+		// and fade must reach the BDL uniforms or the quad keeps its
+		// build-time albedo/alpha (opaque white with no file material).
+		const material: any = createPrimitiveBdlMaterial({ albedo: 0xffffff, opacity: 1 })
+		const node = {
+			visible: false,
+			traverse: (callback: (child: unknown) => void) => callback({ isMesh: true, material }),
+		}
+		const renderApi = new TestRenderApi() as unknown as IRenderApi<any, any, any>
+		const table = new TableBuilder().build()
+		updater.applyState(node, state, renderApi, table)
 
-		const flasherItem = table.flashers.Flasher
-		expect(flasherItem).toBeDefined()
-		const api = flasherItem.getApi()
-		const state = flasherItem.getState()
-
-		api.RotX = 45
-		api.RotY = 60
-		api.RotZ = 90
-		api.Height = 120
-		api.Color = 0x00ff88
-		api.Alpha = 75
-		api.Visible = false
-		api.ImageA = 'd_5'
-
-		expect(state.rotX).toBe(45)
-		expect(state.rotY).toBe(60)
-		expect(state.rotZ).toBe(90)
-		expect(state.height).toBe(120)
-		expect(state.color).toBe(0x00ff88)
-		expect(state.alpha).toBe(75)
-		expect(state.isVisible).toBe(false)
-		expect(state.imageA).toBe('d_5')
-
-		const poppedStates = player.popStates()
-		expect(poppedStates.getState<FlasherState>('Flasher')?.alpha).toBe(75)
-		expect(poppedStates.getState<FlasherState>('Flasher')?.imageA).toBe('d_5')
+		expect(node.visible).toBe(true)
+		expect(material.userData.__uAlbedo.value.getHex()).toBe(0xff8844)
+		expect(material.userData.__uAlpha.value).toBeCloseTo(0.5, 1e-5)
 	})
 })

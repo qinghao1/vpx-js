@@ -17,6 +17,7 @@ import {
 	RE_VR,
 } from './scene-classify.js'
 import {
+	applyAuthorDebugPass,
 	applyButtonInheritPass,
 	applyDarkOccluderPass,
 	applyFlipperVisibilityPass,
@@ -62,6 +63,27 @@ export { hideCabFlippers, showCabFlippers } from './visibility-heuristics.js'
 type PostProcessOptions = {
 	viewerMode?: 'viewer' | 'play'
 	harnessLog?: (msg: string, level?: string) => void
+	/** Playfield art name for the additive backdrop taps (matched case-insensitively). */
+	playfieldMapName?: string
+}
+
+// Additive halo/flasher materials sample the playfield albedo as the native
+// dst once it streams in; stamp the pending name here so the streaming drain
+// can bind it. Materials created after this pass keep the stub constant.
+function applyBackdropStampPass(nodes: THREE.Object3D[], playfieldMapName: string | undefined): number {
+	if (!playfieldMapName) return 0
+	let stamped = 0
+	for (const child of nodes) {
+		const mesh = child as THREE.Mesh
+		if (!mesh.isMesh) continue
+		for (const mat of meshMaterials(mesh)) {
+			const userData = (mat as { userData?: Record<string, unknown> } | null)?.userData
+			if (!userData?.__backdropArm || typeof userData.__backdropName === 'string') continue
+			userData.__backdropName = playfieldMapName
+			stamped++
+		}
+	}
+	return stamped
 }
 
 function ensureSrgb(map: THREE.Texture | null | undefined): void {
@@ -82,13 +104,16 @@ function isBallMaterial(matName: string | undefined): boolean {
 // Insert/flasher textures stream in after generation; while pending, the mesh
 // hides (transparent black) instead of flashing its untextured fallback color.
 function isInsertPendingName(pending: unknown): boolean {
+	// Token boundaries: `rect`/`round`/`dot` match insert-shape names
+	// (`insertround1off`) but not prose (`background`, `correct`, `around`).
 	const pendingLower = String(pending).toLowerCase()
-	const isRoundInsert = pendingLower.includes('round') && !pendingLower.includes('ground')
+	const token = (word: string): boolean => new RegExp(`(^|[^a-z])${word}([^a-z]|$)`).test(pendingLower)
+	const isRoundInsert = token('round') && !pendingLower.includes('ground')
 	return (
 		pendingLower.includes('insert') ||
-		pendingLower.includes('rect') ||
+		token('rect') ||
 		isRoundInsert ||
-		pendingLower.includes('dot') ||
+		token('dot') ||
 		pendingLower.includes('triangle') ||
 		pendingLower.includes('flasher') ||
 		pendingLower.includes('vrlight')
@@ -110,7 +135,7 @@ function isInsertPendingName(pending: unknown): boolean {
  */
 export function postProcessScene(
 	node: THREE.Object3D,
-	{ viewerMode = 'viewer', harnessLog }: PostProcessOptions = {},
+	{ viewerMode = 'viewer', harnessLog, playfieldMapName }: PostProcessOptions = {},
 ): Record<string, number> {
 	const stats: Record<string, number> = {
 		vrKept: 0,
@@ -294,11 +319,12 @@ export function postProcessScene(
 		if (!mesh.visible) return
 		const mats = meshMaterials(mesh)
 		if (
-			mats.some(material => {
+			mats.length > 0 &&
+			mats.every(material => {
 				const mn = (material?.name ?? '').toLowerCase()
 				const col = (material?.color as unknown as THREE.Color)?.getHexString?.()?.toLowerCase()
 				// Textured green (ramp art, playfield details) is authored
-				// content: only untextured flat-green offender meshes hide here.
+				// content: only all-green untextured offender meshes hide.
 				if (material?.map || pendingOf(material)) return false
 				return mn.includes('green') || col === '00ff00'
 			})
@@ -433,11 +459,20 @@ export function postProcessScene(
 
 	const whiteWallsHidden = applyWhiteWallPass(nodes, stats)
 	if (whiteWallsHidden) harnessLog?.(`[wall] Hid ${whiteWallsHidden} white untextured stray meshes`, 'info')
+
+	const debugHidden = applyAuthorDebugPass(nodes, stats)
+	if (debugHidden)
+		harnessLog?.(
+			`[debug] Hid ${debugHidden} author-debug leftover mesh(es) (intentional deviation from upstream)`,
+			'info',
+		)
 	if (stats.nanFixed) harnessLog?.(`[sanitize] ${stats.nanFixed} fixed`, 'info')
 
 	const darkOccludersHidden = applyDarkOccluderPass(node, nodes, stats)
 	if (darkOccludersHidden) harnessLog?.(`[wall] Hid ${darkOccludersHidden} dark large occluders`, 'info')
 
 	applyButtonInheritPass(nodes, node)
+	stats.backdropStamped = applyBackdropStampPass(nodes, playfieldMapName)
+	if (stats.backdropStamped) harnessLog?.(`[backdrop] Stamped ${stats.backdropStamped} additive tap(s)`, 'info')
 	return stats
 }
