@@ -16,7 +16,6 @@
 			"!external",
 			"!!wasm/build",
 			"!test/fixtures",
-			"!lib/scripting/grammar/rules.ts",
 			"!!demo-browser/dist",
 			"!!demo-browser/node_modules",
 			"!lib/**/bench*.spec.ts",
@@ -62,6 +61,9 @@
 			},
 			"performance": {
 				"noDelete": "warn"
+			},
+			"style": {
+				"noNonNullAssertion": "off"
 			}
 		}
 	},
@@ -101,6 +103,10 @@
 	},
 	"overrides": [
 		{
+			"includes": [".github/**"],
+			"formatter": { "indentStyle": "space", "indentWidth": 2 }
+		},
+		{
 			"includes": ["**/*.spec.ts", "**/*.integration.spec.ts", "test/**", "build/**"],
 			"linter": {
 				"rules": {
@@ -109,18 +115,6 @@
 						"noExportsInTest": "off"
 					}
 				}
-			}
-		},
-		{
-			"includes": ["lib/scripting/grammar/rules.ts"],
-			"formatter": {
-				"enabled": false
-			},
-			"linter": {
-				"enabled": false
-			},
-			"assist": {
-				"enabled": false
 			}
 		},
 		{

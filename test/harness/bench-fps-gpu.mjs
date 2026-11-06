@@ -4,6 +4,7 @@
 // Run: DISPLAY=:99 node test/harness/bench-fps-gpu.mjs --vpx=/path/to/table.vpx [--gpu=gl] [--duration=5000] [--warmup=2000]
 // Exit: 0 pass (both legs measured), 1 failure.
 import path from 'node:path'
+import { findWalkingDead } from './bench-shared.ts'
 import { ensureVite, launchBrowser, loadPuppeteer, newPage, sleep } from './utils.mjs'
 
 const getArg = (args, name, dflt = null) => {
@@ -13,7 +14,7 @@ const getArg = (args, name, dflt = null) => {
 const hasFlag = (args, name) => args.includes(`--${name}`)
 
 const args = process.argv.slice(2)
-const vpxArg = getArg(args, 'vpx', '/home/qinghao1/Downloads/walking_dead.vpx')
+const vpxArg = getArg(args, 'vpx', findWalkingDead() ?? 'walking_dead.vpx')
 const gpu = getArg(args, 'gpu', hasFlag(args, 'gpu') ? 'vulkan' : 'gl')
 const duration = Number(getArg(args, 'duration', '5000'))
 const warmup = Number(getArg(args, 'warmup', '2000'))

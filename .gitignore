@@ -4,7 +4,6 @@ coverage
 dist
 dist-esm
 node_modules
-lib/scripting/grammar/rules.ts
 # local bench profiling artifacts
 lib/**/bench*.spec.ts
 lib/*.bench*.ts
@@ -14,7 +13,6 @@ bench*.spec.ts
 *.bak
 
 .agents/
-.github/
 demo-browser/dist/
 demo-browser/node_modules/
 demo-browser/.vite/
@@ -28,3 +26,4 @@ external/vpinball/third-party/
 .cache/vpinball/
 scratch/
 demo-browser/public/wasm/
+demo-browser/public/ab-tmp/

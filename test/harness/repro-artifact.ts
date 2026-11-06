@@ -6,9 +6,9 @@ import { NodeBinaryReader } from '../../lib/io/binary-reader.node.js'
 import { ThreeRenderApi } from '../../lib/render/threejs/three-render-api.js'
 import { postProcessScene } from '../../lib/render/threejs/three-scene-postprocess.js'
 import { Table } from '../../lib/vpt/table/table.js'
-import { exists, VPX_CANDIDATES } from './bench-shared.js'
+import { findWalkingDead } from './bench-shared.js'
 
-const vpx = VPX_CANDIDATES.find(candidate => exists(candidate, 1024 * 1024))
+const vpx = findWalkingDead()
 if (!vpx) {
 	console.error('No VPX found')
 	process.exit(1)

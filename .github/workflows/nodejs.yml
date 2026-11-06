@@ -17,6 +17,9 @@ jobs:
       - run: npm ci
         env:
           CI: true
+      - run: npm run build:esm
+        env:
+          CI: true
       - run: npm test
         env:
           CI: true
@@ -33,6 +36,12 @@ jobs:
         env:
           CI: true
       - run: npm run lint
+        env:
+          CI: true
+      - run: npm run build:esm
+        env:
+          CI: true
+      - run: npm run typecheck:tests
         env:
           CI: true
 
@@ -56,10 +65,8 @@ jobs:
 
   harness:
     # Node-only verifies that pass with no GPU, no ROM, no native binary, and
-    # no emscripten toolchain. Deliberately NOT verify-all: verify-player and
-    # harness-gameplay currently fail (transpiler errors, under fix), and the
-    # browser/vpinball/discrepancies/twd legs need chrome, a native binary, or
-    # a large VPX+ROM that CI does not have.
+    # no emscripten toolchain. Not verify-all: its optional legs only SKIP
+    # without a VPX/ROM/OLD worktree, and the browser leg needs Chrome.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

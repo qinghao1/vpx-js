@@ -8,51 +8,7 @@ import { defineConfig } from 'vite'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const root = resolve(__dirname)
 const repoRoot = resolve(__dirname, '..')
-const home = process.env.HOME || os.homedir() || '/home/qinghao1'
-
-function rawLoader() {
-	return {
-		name: 'raw-loader',
-		enforce: 'pre' as const,
-		resolveId(source: string, importer: string | undefined) {
-			const clean = source.split('?')[0].split('#')[0]
-			if (!(clean.endsWith('.vbs') || clean.endsWith('.bnf'))) return null
-			const tryPaths: string[] = []
-			if (clean.startsWith('.') && importer) {
-				try {
-					let base = importer.split('?')[0].split('#')[0]
-					if (base.startsWith('/@fs')) base = base.slice(4)
-					tryPaths.push(resolve(path.dirname(base), clean))
-				} catch {}
-			}
-			try {
-				const p = clean.startsWith('/@fs') ? clean.slice(4) : clean
-				if (path.isAbsolute(p)) tryPaths.push(p)
-			} catch {}
-			if (clean.includes('res/scripts') || clean.includes('grammar')) {
-				const baseName = path.basename(clean)
-				if (clean.endsWith('.vbs')) tryPaths.push(resolve(repoRoot, 'res/scripts', baseName))
-				if (clean.endsWith('.bnf')) tryPaths.push(resolve(repoRoot, 'lib/scripting/grammar', baseName))
-				tryPaths.push(resolve(repoRoot, clean.replace(/^(\.\.\/)+/, '')))
-			}
-			for (const p of tryPaths)
-				try {
-					if (fs.existsSync(p)) return p
-				} catch {}
-			return null
-		},
-		load(id: string) {
-			const clean = id.split('?')[0].split('#')[0]
-			if (clean.endsWith('.vbs') || clean.endsWith('.bnf')) {
-				try {
-					let p = clean
-					if (p.startsWith('/@fs')) p = p.slice(4)
-					return `export default ${JSON.stringify(fs.readFileSync(p, 'utf-8'))};`
-				} catch {}
-			}
-		},
-	}
-}
+const home = os.homedir()
 
 const define = {
 	'process.env': '(globalThis.process?.env ?? {})',
@@ -71,8 +27,6 @@ export default defineConfig({
 		dedupe: ['three', 'three/webgpu', 'three/tsl', 'three-mesh-bvh'],
 		alias: [
 			{ find: 'node:buffer', replacement: resolve(__dirname, 'node_modules/buffer/index.js') },
-			{ find: /^node:assert(\/strict)?$/, replacement: resolve(repoRoot, 'dist-esm/lib/util/assert.js') },
-			{ find: /^assert(\/strict)?$/, replacement: resolve(repoRoot, 'dist-esm/lib/util/assert.js') },
 			{ find: 'buffer', replacement: resolve(__dirname, 'node_modules/buffer/index.js') },
 			{ find: 'three-mesh-bvh', replacement: resolve(__dirname, 'node_modules/three-mesh-bvh/src/index.js') },
 			{ find: /^.*refs\.node\.js(\?.*)?$/, replacement: resolve(repoRoot, 'dist-esm/lib/refs.browser.js') },
@@ -97,7 +51,6 @@ export default defineConfig({
 			allow: [
 				root,
 				repoRoot,
-				resolve(repoRoot, 'dist'),
 				resolve(repoRoot, 'dist-esm'),
 				resolve(repoRoot, 'wasm/dist'),
 				resolve(repoRoot, 'wasm/kernels/dist'),
@@ -122,7 +75,6 @@ export default defineConfig({
 	},
 	plugins: [
 		basicSsl(),
-		rawLoader(),
 		{
 			name: 'static-fs',
 			configureServer(server) {

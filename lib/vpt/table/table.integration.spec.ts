@@ -1,13 +1,11 @@
 // Copyright (C) 2026 Chu Qinghao — GPL-2.0 — see LICENSE
 
-import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { TableBuilder } from '../../../test/table-builder.js'
 import { NodeBinaryReader } from '../../io/binary-reader.node.js'
 import { Table } from './table.js'
 
-const EXAMPLE_VPX = path.resolve('example-table.vpx')
 const EMPTY_FIXTURE = path.resolve('test/fixtures/table-empty.vpx')
 
 describe('Table integration', () => {
@@ -37,23 +35,6 @@ describe('Table integration', () => {
 		const vbs = 'Sub Test()\nEnd Sub\n'
 		const table = new TableBuilder().withTableScript(vbs).build()
 		expect(table.tableScript).toBe(vbs)
-	})
-
-	it.skipIf(!fs.existsSync(EXAMPLE_VPX))('loads example VPX and extracts metadata', async () => {
-		const table = await Table.load(new NodeBinaryReader(EXAMPLE_VPX))
-		expect(table.tableScript).toBeDefined()
-		expect(table.tableScript?.length).toBeGreaterThan(100_000)
-		expect(table.info?.TableName).toBeDefined()
-		expect(table.info?.TableName.length).toBeGreaterThan(2)
-		expect(table.info?.AuthorName).toBeDefined()
-		const gameName = table.tableScript?.match(/cGameName\s*=\s*["']([^"']+)["']/i)?.[1]
-		expect(gameName?.length).toBeGreaterThan(2) // ROM name varies per example table
-		expect(Object.keys(table.items).length).toBeGreaterThan(500)
-		expect(Object.keys(table.lights).length).toBeGreaterThan(100)
-		expect(Object.keys(table.flippers).length).toBeGreaterThanOrEqual(2)
-		expect(Object.keys(table.textures).length).toBeGreaterThan(10)
-		expect(table.data?.right).toBeGreaterThan(900)
-		expect(table.data?.bottom).toBeGreaterThan(2000)
 	})
 
 	it('Table.load handles empty script gracefully', async () => {

@@ -15,6 +15,8 @@
  * Exit: 0 pass, 77 skip (artifact absent), 1 fail.
  */
 import { existsSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { findWalkingDead } from './bench-shared.ts'
 import { attachLogging, ensureVite, launchBrowser, loadPuppeteer, newPage } from './utils.mjs'
 
 const ROM_ZIP = process.argv.find(a => a.startsWith('--rom='))?.slice(6) || ''
@@ -22,16 +24,12 @@ const PORT = process.argv.find(a => a.startsWith('--port='))?.slice(7) || '3000'
 const BASE = `https://localhost:${PORT}`
 
 const romCandidates = [
-	`${process.env.HOME}/.cache/vpinball/pinmame/roms/twd_160h.zip`,
-	`${process.env.HOME}/Downloads/walking_dead/twd_160h.zip`,
-	`${process.env.HOME}/Downloads/twd_160h.zip`,
+	`${homedir()}/.cache/vpinball/pinmame/roms/twd_160h.zip`,
+	`${homedir()}/Downloads/walking_dead/twd_160h.zip`,
+	`${homedir()}/Downloads/twd_160h.zip`,
 ]
 const romPath = ROM_ZIP || romCandidates.find(p => existsSync(p)) || ''
-const twdCandidates = [
-	`${process.env.HOME}/Downloads/walking_dead/walking_dead.vpx`,
-	`${process.env.HOME}/Downloads/walking_dead.vpx`,
-]
-const twdPath = twdCandidates.find(p => existsSync(p)) || ''
+const twdPath = findWalkingDead() ?? ''
 
 await ensureVite(`${BASE}/?vpx=/test/fixtures/table-flipper.vpx`, { label: 'verify-headless' })
 const puppeteer = await loadPuppeteer()

@@ -1,6 +1,6 @@
 # vpx-js
 
-Visual Pinball for Node.js and the browser — parse `.vpx` tables, render them with three.js, simulate physics, transpile VBScript, and emulate PinMAME ROMs.
+Visual Pinball for Node.js and the browser — parse `.vpx` tables, render them with three.js, and run them on the upstream VPinball engine built headless to WASM (table scripts and PinMAME included).
 
 Fork of [`vpdb/vpx-js`](https://github.com/vpdb/vpx-js) by [freezy](https://github.com/freezy) and contributors, kept under GPL-2.0 — please credit both the original project and this fork. See [`LICENSE`](LICENSE).
 
@@ -8,9 +8,7 @@ Fork of [`vpdb/vpx-js`](https://github.com/vpdb/vpx-js) by [freezy](https://gith
 
 - **Parse** `.vpx` tables — OLE/BIFF, meshes, materials, textures, and scripts — with `Table.load()`.
 - **Render** with three.js via `Table.generateTableNode()`.
-- **Simulate** headless with `Player`: 60 Hz physics/animation stepping plus table-script execution.
-- **Transpile** VBScript table scripts to JavaScript with `Transpiler`.
-- **Emulate** WPC ROMs with `wpc-emu` and other hardware via the PinMAME WASM build.
+- **Play** on the headless VPinball WASM engine (`loadHeadlessEngine`), mirrored into the three.js scene by `WasmSceneSync`.
 
 ## Requirements
 
@@ -32,74 +30,46 @@ Open the printed localhost URL and load a `.vpx` file. For the production build,
 
 ## Usage
 
+`vpx-js` is not published to npm (`private`). Build `dist-esm/` with `npm run build`, then deep-import modules from it (or import `lib/` source directly under `tsx`/vite).
+
 ### Load a table
 
 ```ts
-import { BinaryReader, Table } from 'vpx-js'
+import { BinaryReader } from './dist-esm/lib/refs.node.js'
+import { Table } from './dist-esm/lib/vpt/table/table.js'
 
 const table = await Table.load(new BinaryReader('my_table.vpx'))
 console.log(Object.keys(table.items).length)
-console.log(table.getTableScript().slice(0, 400))
+console.log(table.tableScript?.slice(0, 400))
 ```
 
-In Node, `BinaryReader` reads from a file path. In the browser, pass an `ArrayBuffer` instead:
+In Node, `BinaryReader` reads from a file path. In the browser, import it from `refs.browser.js` and pass an `ArrayBuffer` instead:
 
 ```ts
-import { BrowserBinaryReader, Table } from 'vpx-js'
+import { BinaryReader } from './dist-esm/lib/refs.browser.js'
+import { Table } from './dist-esm/lib/vpt/table/table.js'
 
 const response = await fetch('/tables/my_table.vpx')
-const table = await Table.load(new BrowserBinaryReader(await response.arrayBuffer()))
+const table = await Table.load(new BinaryReader(await response.arrayBuffer()))
 ```
 
 ### Render
 
 ```ts
-import { ThreeRenderApi } from 'vpx-js'
+import { ThreeRenderApi } from './dist-esm/lib/render/threejs/three-render-api.js'
 
-const scene = await table.generateTableNode(new ThreeRenderApi(), {
-	applyMaterials: true,
-})
+const scene = await table.generateTableNode(new ThreeRenderApi({ applyMaterials: true }))
 // `scene` is a three.js Object3D ready to add to your renderer.
 ```
-
-### Simulate
-
-```ts
-import { Player } from 'vpx-js'
-
-const player = new Player(table).init()
-player.simulateTime(1000)
-const changed = player.onFrame()
-```
-
-`simulateTime` steps physics and animations at 60 Hz up to an absolute millisecond timestamp; `onFrame` returns the changed item states for the renderer. For example, on a table with a `BallRelease` kicker:
-
-```ts
-const kicker = table.kickers.BallRelease.getApi()
-const ball = kicker.CreateBall()
-kicker.Kick(0, 10)
-```
-
-### Transpile a script
-
-```ts
-import { Transpiler } from './lib/scripting/transpiler.js'
-
-const player = new Player(table)
-const js = new Transpiler(table, player).transpile(table.getTableScript())
-```
-
-`Transpiler` is imported from source, so run repo-relative scripts with `npx tsx`.
 
 ## Development
 
 ```bash
-npm run build        # tsup + tsc → dist/ + dist-esm/
-npm run build:esm    # dist-esm/ only (required before demo-browser)
+npm run build        # tsc → dist-esm/ (required before demo-browser)
 npm run typecheck    # tsc --noEmit
 npm run lint         # biome check
 npm test             # vitest with coverage
-npm run verify:all   # end-to-end harness (wasm, table, pinmame, player, browser)
+npm run verify:all   # end-to-end harness (table, twd-render, ab, cadet, browser)
 ```
 
 ## License

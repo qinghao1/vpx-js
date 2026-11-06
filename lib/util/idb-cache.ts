@@ -1,8 +1,8 @@
-// Minimal IndexedDB cache for textures and transpiled VBS.
+// Minimal IndexedDB cache for textures, EXR/bitmap payloads and VPX/ROM blobs.
 //
 // NOTE: bumping DB_VERSION wipes the whole cache on upgrade (both stores are
 // dropped and recreated below). That is intentional: cached payloads are
-// version-sensitive (transpiler output, float texture blobs), so a bump must
+// version-sensitive (float texture blobs), so a bump must
 // invalidate old entries rather than serve stale bytes.
 const DB_NAME = 'vpx-js-cache'
 const DB_VERSION = 4

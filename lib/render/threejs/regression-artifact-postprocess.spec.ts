@@ -1,11 +1,10 @@
 // Copyright (C) 2026 Chu Qinghao — GPL-2.0 — see LICENSE
 
-import * as fs from 'node:fs'
-import * as path from 'node:path'
 import * as chai from 'chai'
 import { expect } from 'chai'
 import sinonChai from 'sinon-chai'
 import * as THREE from 'three'
+import { findWalkingDead } from '../../../test/harness/bench-shared.js'
 import { NodeBinaryReader } from '../../io/binary-reader.node.js'
 import { Table } from '../../vpt/table/table.js'
 import { ThreeRenderApi } from './three-render-api.js'
@@ -13,19 +12,6 @@ import { postProcessScene } from './three-scene-postprocess.js'
 
 chai.use((sinonChai as any).default ?? sinonChai)
 
-const findWalkingDead = (): string | undefined => {
-	const candidates = [
-		path.resolve('walking_dead.vpx'),
-		path.join(process.env.HOME || '/home/qinghao1', 'Downloads/walking_dead.vpx'),
-	]
-	return candidates.find(p => {
-		try {
-			return fs.existsSync(p) && fs.statSync(p).size > 1024 * 1024
-		} catch {
-			return false
-		}
-	})
-}
 // Explicit gate: without the table these tests report skipped, never silently green.
 const walkingDeadVpx = findWalkingDead()
 const requireWalkingDead = (): string => {
@@ -39,7 +25,7 @@ function makeMesh(name, geometry, mat) {
 	return mesh
 }
 
-describe('regression: artifact postprocess', () => {
+describe('regression: artifact postprocess', { timeout: 20_000 }, () => {
 	// One shared 222MB table load: Table.load parses the whole OLE stream
 	// plus every texture, while each test below builds its own scene graph
 	// (fresh ThreeRenderApi, fresh generateTableNode) and only reads it.

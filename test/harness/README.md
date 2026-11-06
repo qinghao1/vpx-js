@@ -3,7 +3,7 @@
 E2E harnesses, benches, and repros. Single entry point:
 
 ```bash
-npx tsx test/harness/verify-all.ts   # TAP 1..5: table → twd-render → ab → browser → cadet
+npx tsx test/harness/verify-all.ts   # TAP 1..5: table → twd-render → ab → cadet → browser
 ```
 
 ## Runner rule (.ts vs .mjs)
@@ -21,7 +21,7 @@ npx tsx test/harness/verify-all.ts   # TAP 1..5: table → twd-render → ab →
 
 | File                          | What                                                                                                                                                                                           | Needs                                                            |
 | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| `verify-all.ts`               | Aggregator, TAP 1..5 (table, twd-render, ab, browser, cadet), exit 0/1                                                                                                                         | varies per step                                                  |
+| `verify-all.ts`               | Aggregator, TAP 1..5 (table, twd-render, ab, cadet, browser), exit 0/1                                                                                                                         | varies per step                                                  |
 | `verify-table.ts`             | VPX parse + script extract over fixtures + `example-table.vpx`                                                                                                                                 | —                                                                |
 | `verify-browser.ts`           | Thin wrapper → `verify-all.verifyBrowser` → `demo-browser/e2e/integration.mjs`                                                                                                                 | Chrome + vite + `dist-esm`                                       |
 | `verify-play-room.ts`         | Play-room scene checks (TAP `Tap` class)                                                                                                                                                       | —                                                                |
@@ -70,6 +70,13 @@ node test/harness/verify-ab.mjs --vpx=<table>.vpx --rom=<game>.zip   # A/B vs /t
   `<tableDir>/pinmame/roms/<game>.zip`, `<tableDir>/<game>.zip`,
   `~/.pinmame/roms/`, `~/pinmame/roms/`, `~/Downloads/`,
   `test/fixtures/roms/` (plus lowercase retries).
+- TWD lookup: everything that needs `walking_dead.vpx` calls `findWalkingDead()`
+  (`bench-shared.ts`): `$WALKING_DEAD_VPX`, `./walking_dead.vpx`,
+  `~/Downloads/walking_dead.vpx`, `~/Downloads/walking_dead/walking_dead.vpx`,
+  `demo-browser/public/ab-tmp/twd.vpx`, the vpinball table cache. The TWD-gated
+  specs (`regression-lights`, `regression-artifact-postprocess`,
+  `underfloor-occlusion`, `light-*-regression`, `test/bench/walking-dead.bench.ts`)
+  skip in CI by design: CI has no VPX/ROM.
 - Native discovery order (`discoverVpinball`, first executable wins):
   `VPINBALL_BIN` (file or dir), `VPINBALL_DIR`, `~/projects/vpinball`
   build/bin, `external/vpinball` submodule build/bin, `~/.cache/vpinball/`,

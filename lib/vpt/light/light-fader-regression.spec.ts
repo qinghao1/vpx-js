@@ -5,12 +5,14 @@
  * and fix for 4ce16a57 which removed FADER_NONE check causing all lights to fade linearly.
  * Walking Dead has 157/165 lights with fader=0 (FADER_NONE) which must be instant, not gradual.
  */
-import { existsSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
+import { findWalkingDead } from '../../../test/harness/bench-shared.js'
 import { NodeBinaryReader } from '../../io/binary-reader.node.js'
 import { Enums } from '../enums.js'
 import { Table } from '../table/table.js'
 import { LightData } from './light.js'
+
+const walkingDeadVpx = findWalkingDead()
 
 describe('regression: light fader must be instant for FADER_NONE (guards 4ce16a57 flashing)', () => {
 	it('LightData default fader must be FADER_LINEAR (1) matching vpinball light.h', () => {
@@ -19,10 +21,10 @@ describe('regression: light fader must be instant for FADER_NONE (guards 4ce16a5
 		expect(d.fader).toBe(1)
 	})
 
-	it.skipIf(!existsSync('walking_dead.vpx'))(
+	it.skipIf(!walkingDeadVpx)(
 		'walking_dead fixture must have majority fader NONE (guard against wrong default)',
 		async () => {
-			const table = await Table.load(new NodeBinaryReader('walking_dead.vpx'))
+			const table = await Table.load(new NodeBinaryReader(walkingDeadVpx))
 			const lights = Object.values(table.lights)
 			const none = lights.filter(l => (l.data.fader ?? 0) === 0).length
 			const linear = lights.filter(l => l.data.fader === 1).length

@@ -1,7 +1,7 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { expect } from 'chai'
 import * as THREE from 'three'
+import { expect } from 'vitest'
 import { isAuthorDebugName } from './scene-classify.js'
 import { applyAuthorDebugPass } from './visibility-heuristics.js'
 

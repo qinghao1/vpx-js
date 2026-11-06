@@ -1,10 +1,10 @@
-import { existsSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
+import { findWalkingDead } from '../../../test/harness/bench-shared.js'
 import { TableBuilder } from '../../../test/table-builder.js'
 import { DragPoint } from '../dragpoint.js'
 import { Light, LightData } from './light.js'
 
-const TWD_VPX = 'walking_dead.vpx'
+const walkingDeadVpx = findWalkingDead()
 
 describe('regression: bulb lights with glow polygons are not scene lights', () => {
 	it('should return true for hasBulbGlow and generate glow mesh with BulbGlowParams', () => {
@@ -103,14 +103,14 @@ describe('regression: bulb lights with glow polygons are not scene lights', () =
 		expect(names).toEqual(['RoundLight'])
 	})
 
-	it.skipIf(!existsSync(TWD_VPX))(
+	it.skipIf(!walkingDeadVpx)(
 		'should generate no point lights but glow meshes for walking_dead.vpx if available',
 		async () => {
 			const { NodeBinaryReader } = await import('../../io/binary-reader.node.js')
 			const { Table } = await import('../table/table.js')
 			const { ThreeRenderApi } = await import('../../render/threejs/three-render-api.js')
 			const { TableMeshGenerator } = await import('../table/table-mesh-generator.js')
-			const table = await Table.load(new NodeBinaryReader(TWD_VPX))
+			const table = await Table.load(new NodeBinaryReader(walkingDeadVpx))
 			const api = new ThreeRenderApi({ applyMaterials: true } as any)
 			const gen = new TableMeshGenerator(table)
 			const scene = gen.generateTableNode(api, { exportLightBulbLights: true }) as any
