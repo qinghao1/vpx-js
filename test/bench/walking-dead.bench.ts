@@ -1,7 +1,9 @@
-import { bench, describe } from 'vitest'
+import { describe } from 'vitest'
 import { NodeBinaryReader } from '../../lib/io/binary-reader.node.js'
 import { Table } from '../../lib/vpt/table/table.js'
 import { findWalkingDead } from '../harness/bench-shared.js'
+
+const bench: any = (globalThis as any).bench ?? ((_name: string, fn: () => void) => fn())
 
 const vpx = findWalkingDead()
 const isWalkingDead = !!vpx && vpx.includes('walking_dead')

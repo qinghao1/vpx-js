@@ -11,7 +11,6 @@ const VISIBLE_WEIGHT = 1e6
 const DUP_MAX = 600
 const DUP_FACTOR = 0.3
 const SIZE_TOL = 0.4
-const DMD_POLL_INTERVAL_MS = 32
 
 // Production FlasherData anchors the DMD at getCenter() (bbox midpoint of the
 // drag points); TextboxData anchors at the v1/v2 midpoint. Neither exposes a
@@ -58,7 +57,7 @@ export function getFlasherCenter(fl, fallback) {
 export class DmdRenderer implements DirtyOverlay {
 	constructor(viewer) {
 		this.viewer = viewer
-		this.lastDmdGame = -1
+		this.lastDmdFrameId = -1
 		this.w = DMD.w
 		this.h = DMD.h
 		this.meshes = []
@@ -202,10 +201,10 @@ export class DmdRenderer implements DirtyOverlay {
 			String(n || '')
 				.toLowerCase()
 				.includes('vr')
-		// Single scene walk: the cabinet check, stale procedural-mesh list, and
-		// DMD-mesh candidates share one traverse (predicates unchanged from the
-		// old three-pass version). Stale procedural meshes are removed after
-		// the VR-preference filter below and excluded from candidates there.
+		// Single scene walk: the cabinet check, stale procedural-mesh list,
+		// and DMD-mesh candidates share one traverse. Stale procedural
+		// meshes are removed after the VR-preference filter below and
+		// excluded from candidates there.
 		const dmdNames = new Set([...flasherMap.keys(), 'dmd'])
 		let hasCab = false
 		const oldProcedural: any[] = []
@@ -251,7 +250,7 @@ export class DmdRenderer implements DirtyOverlay {
 		const removed = new Set(oldProcedural)
 		for (const o of oldProcedural) o.parent?.remove(o)
 		// Stale procedural meshes were collected before removal and match the
-		// dmd_ prefix — exclude them exactly as the old post-removal walk did.
+		// dmd_ prefix — exclude them from candidates too.
 		const candidates = foundCandidates.filter(m => !removed.has(m))
 		for (const m of candidates) m.visible = true
 
@@ -364,6 +363,10 @@ export class DmdRenderer implements DirtyOverlay {
 			mesh.frustumCulled = false
 			const center = getFlasherCenter(fl, tableCenter)
 			mesh.position.set(center.x, center.y, -(d.height ?? 24))
+			// Hidden until the first presented frame: with no DMD source
+			// there is nothing to show yet, and an unpresented black quad
+			// would read as a dead display. Reveal happens in _presentFrame.
+			mesh.visible = false
 			mesh.rotation.set(
 				THREE.MathUtils.degToRad(d.rotX ?? 0),
 				THREE.MathUtils.degToRad(d.rotY ?? 0),
@@ -407,35 +410,47 @@ export class DmdRenderer implements DirtyOverlay {
 		return this.lastHash !== before || prevW !== width || prevH !== height
 	}
 
-	/** True when the DMD visibly changed; feeds the viewer's dirty-gated present. */
+	/**
+	 * True when the DMD visibly changed. Manual present sharing
+	 * _presentFrame; the rAF loop never calls this (update() owns the poll
+	 * cadence), so it feeds no dirty gate.
+	 */
 	render() {
-		if (!this.viewer.player) return false
-		const frame = this.viewer.player.getDmdFrame?.()
-		const dims = this.viewer.player.getDmdDimensions?.()
-		if (!frame?.length) return false
-		const w = Math.round(dims?.x ?? DMD.w) || DMD.w
-		const h = Math.round(dims?.y ?? DMD.h) || DMD.h
-		if (!w || !h || frame.length < w * h) return false
-		return this.updateFrame(frame, w, h)
+		const dmd = this.viewer.wasmEngine?.dmdFrame
+		if (!dmd) return false
+		return this._presentFrame(dmd.frame, dmd.width, dmd.height)
 	}
 
 	/**
 	 * @implements DirtyOverlay.update.
-	 * The poll rides the physics clock, not the rAF timestamp: a 32ms
-	 * game-time gate sits just under the nominal 2-frame total (33.3ms at 60Hz), so vsync jitter
-	 * flips polls between a 2- and 3-frame cadence. Game-time quanta
-	 * are exact, keeping polls phase-locked to emu frame production.
+	 * The poll rides the engine's DMD frame counter, not a clock: a new
+	 * `frameId` means the emulator produced a frame, so presents stay
+	 * phase-locked to emu frame production without a game-time ABI.
 	 * The hash dedup in updateFrame suppresses presents for
 	 * unchanged frames.
 	 */
 	update() {
-		const gameMs = this.viewer.player?.getGameTime?.() ?? -1
-		if (gameMs < 0) return false
-		if (this.lastDmdGame < 0 || gameMs < this.lastDmdGame) this.lastDmdGame = gameMs - DMD_POLL_INTERVAL_MS
-		if (gameMs - this.lastDmdGame < DMD_POLL_INTERVAL_MS) return false
-		this.lastDmdGame = gameMs
-		// Round-trip via viewer keeps the one-time PinMAME-started log in one place.
-		return this.viewer._pollPinmame()
+		// One bridge read per tick: the frameId gate and the present share
+		// this poll instead of re-reading in `render()`.
+		const dmd = this.viewer.wasmEngine?.dmdFrame
+		const frameId = dmd?.frameId ?? -1
+		if (!dmd || frameId < 0 || frameId === this.lastDmdFrameId) return false
+		this.lastDmdFrameId = frameId
+		return this._presentFrame(dmd.frame, dmd.width, dmd.height)
+	}
+
+	/** Size-guarded frame upload shared by the polled and manual present paths. */
+	_presentFrame(frame, width, height) {
+		if (!width || !height || frame.length < width * height) return false
+		const presented = this.updateFrame(frame, width, height)
+		if (presented)
+			for (const m of this.meshes) {
+				if (m.visible !== false) continue
+				m.visible = true
+				for (let p = m.parent; p && p !== this.viewer.tableGroup; p = p.parent)
+					if (p.visible === false) p.visible = true
+			}
+		return presented
 	}
 
 	getTexture() {

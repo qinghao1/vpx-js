@@ -6,8 +6,8 @@ import { type InputHost, makeHost } from './input-manager.js'
 type NudgeHost = Omit<InputHost, 'enterPlayMode' | 'exitPlayMode' | 'togglePause' | 'releaseKeys'>
 
 function trigger(host: NudgeHost, angle: number, force = NUDGE.force): void {
-	if (!host.player || host.viewerMode !== 'play') return
-	host.player.nudge(angle, force)
+	if (host.viewerMode !== 'play') return
+	host.nudge(angle, force)
 }
 
 function attachNudgeHost(host: NudgeHost, signal: AbortSignal): void {
@@ -63,7 +63,7 @@ export function pollNudgePads(viewer: object, now: number): void {
 	const poll = padPolls.get(viewer)
 	if (!poll) return
 	const { host } = poll
-	if (host.viewerMode !== 'play' || !host.player) return
+	if (host.viewerMode !== 'play' || !host.engineReady) return
 	if (now - poll.lastPoll < 33) return
 	if (!navigator.getGamepads?.()?.some(p => !!p)) return
 	poll.lastPoll = now

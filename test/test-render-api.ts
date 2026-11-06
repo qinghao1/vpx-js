@@ -17,9 +17,8 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import type { IRenderable, RenderInfo } from '../lib/game/interfaces'
 import type { Matrix3D } from '../lib/math/matrix.js'
-import type { IRenderApi } from '../lib/render/irender-api'
+import type { IRenderApi, IRenderable, RenderInfo } from '../lib/render/irender-api'
 import { cloneMaterialForWrite } from '../lib/render/threejs/material-shared.js'
 import type { ItemState } from '../lib/vpt/item-state'
 import type { LightData, LightState } from '../lib/vpt/light/light'

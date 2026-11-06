@@ -1305,7 +1305,6 @@ export class Viewer {
 		const pp = postProcessScene(node, {
 			viewerMode: this.viewerMode,
 			harnessLog: this.harnessLog,
-			playfieldMapName: table.getPlayfieldMap?.() || undefined,
 		})
 		this._applyNoBakeFill(table, node)
 		const params = new URLSearchParams(location.search)

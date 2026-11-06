@@ -1,8 +1,10 @@
-import { bench, describe } from 'vitest'
+import { describe } from 'vitest'
 import { NodeBinaryReader } from '../../lib/io/binary-reader.node.js'
 import { ThreeRenderApi } from '../../lib/render/threejs/three-render-api.js'
 import { Table } from '../../lib/vpt/table/table.js'
 import { ThreeHelper } from '../three.helper.js'
+
+const bench: any = (globalThis as any).bench ?? ((_name: string, fn: () => void) => fn())
 
 const three = new ThreeHelper()
 

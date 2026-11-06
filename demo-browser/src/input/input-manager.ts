@@ -1,8 +1,8 @@
 import * as THREE from 'three'
-import { keyEventToDirectInputKey } from '../../../dist-esm/lib/game/key-code.js'
 import { swipeNudge } from '../../../dist-esm/lib/render/threejs/three-scene-postprocess.js'
 import { CONTROL_SCHEME, isTableHit, NUDGE } from '../config.js'
 import { ensureBvh } from '../env.js'
+import { keyEventToDirectInputKey } from './key-code.js'
 
 function isTouchFlipperEnabled(e?: PointerEvent): boolean {
 	try {
@@ -13,34 +13,12 @@ function isTouchFlipperEnabled(e?: PointerEvent): boolean {
 	return false
 }
 
-// Generic helpers used by any table: map physical code → logical key + location.
-// Covers all codes from CONTROL_SCHEME and BUTTON_CODE_PATTERNS (Digit*/Key*/Shift*/Control*/Alt*).
-export const keyForCode = (c: string): string =>
-	c === 'Enter'
-		? 'Enter'
-		: c.startsWith('Digit')
-			? c.slice(5)
-			: c.startsWith('Key')
-				? c.slice(3).toLowerCase()
-				: c.startsWith('Shift')
-					? 'Shift'
-					: c.startsWith('Control')
-						? 'Control'
-						: c.startsWith('Alt')
-							? 'Alt'
-							: c === 'Space'
-								? ' '
-								: c
-
-export const locationForCode = (code: string): number | undefined =>
-	code.endsWith('Left') ? 1 : code.endsWith('Right') ? 2 : undefined
-
 // Every gameplay code that must never stick down across blur/hide/exit-play:
 // modifiers, plunger (Enter), nudge keys, the coin-door/service cluster
 // (7/8/9/0, End, Home) whose switches would otherwise latch the game in test
 // menus, and Start/coin/arrow keys whose emu switches or pressed-set entry
 // would otherwise stick. Toggles without emu or script switches (KeyA/KeyD
-// for alternate bindings, Escape, KeyM mute) are listed too so no pressed
+// for alternate bindings, Escape) are listed too so no pressed
 // entry survives focus loss. Blur/hide/exit-play release this whole list so
 // a key held during focus loss cannot stay logically down.
 export const RELEASE_CODES = [
@@ -67,16 +45,12 @@ export const RELEASE_CODES = [
 	'KeyA',
 	'KeyD',
 	'Escape',
-	'KeyM',
 ]
 
 export interface InputHost {
 	readonly canvas: HTMLCanvasElement
-	readonly player: {
-		onKeyDown: (e: { code: string; key: string; location?: number; ts: number }) => void
-		onKeyUp: (e: { code: string; key: string; location?: number; ts: number }) => void
-		nudge: (angle: number, force: number) => void
-	} | null
+	readonly engineReady: boolean
+	sendKey(code: string, down: boolean): void
 	readonly viewerMode: 'viewer' | 'play'
 	readonly controls: { enabled: boolean } | null
 	readonly camera: THREE.Camera | null
@@ -84,6 +58,7 @@ export interface InputHost {
 	readonly buttonMeshes: readonly THREE.Object3D[] | null
 	readonly enableMotionButton?: HTMLButtonElement | null
 	readonly tickImmediate?: () => void
+	nudge(angle: number, force: number): void
 	log?(msg: string, level?: string): void
 	enterPlayMode(): void
 	exitPlayMode(): void
@@ -102,8 +77,11 @@ export function makeHost(viewer: any): InputHost {
 		get canvas() {
 			return viewer.dom?.canvas as HTMLCanvasElement
 		},
-		get player() {
-			return viewer.player ?? null
+		get engineReady() {
+			return viewer.wasmEngine?.ready ?? false
+		},
+		sendKey(code: string, down: boolean) {
+			viewer._sendKey?.(code, down)
 		},
 		get viewerMode() {
 			return viewer.viewerMode as 'viewer' | 'play'
@@ -128,6 +106,9 @@ export function makeHost(viewer: any): InputHost {
 				? (document.getElementById('enable-motion') as HTMLButtonElement | null)
 				: null
 		},
+		nudge(angle: number, force: number) {
+			viewer._nudge?.(angle, force)
+		},
 		log(msg: string, level?: string) {
 			viewer.log?.(msg, level)
 		},
@@ -136,7 +117,6 @@ export function makeHost(viewer: any): InputHost {
 				viewer._switchToPlay()
 			} else {
 				viewer.viewerMode = 'play'
-				viewer.player?.setPhysicsEnabled?.(true)
 				viewer.enterPlayMode?.()
 			}
 		},
@@ -146,17 +126,11 @@ export function makeHost(viewer: any): InputHost {
 		},
 		togglePause() {
 			viewer.isPaused = !viewer.isPaused
-			if (viewer.isPaused) viewer.player?.pause?.()
-			else viewer.player?.resume?.()
 			viewer.log?.(viewer.isPaused ? 'Paused (P to resume)' : 'Resumed', viewer.isPaused ? 'warn' : 'info')
 		},
 		releaseKeys(codes: string[]) {
 			for (const code of codes) {
 				viewer._sendKey?.(code, false)
-				const key = keyForCode(code)
-				const loc = locationForCode(code)
-				const ev = { code, key, location: loc, ts: Date.now() } as any
-				viewer.player?.onKeyUp?.(ev)
 			}
 		},
 		requestMotionPermission:
@@ -221,12 +195,8 @@ function attachKeyboardHost(host: InputHost, signal: AbortSignal): void {
 			ts: Date.now(),
 		} as any
 
-		if (host.player) {
-			if (down) {
-				host.player.onKeyDown(ev)
-			} else {
-				host.player.onKeyUp(ev)
-			}
+		if (host.engineReady) {
+			host.sendKey(ev.code, down)
 			host.tickImmediate?.()
 		}
 
@@ -281,11 +251,8 @@ function attachPointerHost(host: InputHost, signal: AbortSignal): void {
 	}
 
 	const send = (code: string, down: boolean): void => {
-		const key = keyForCode(code)
-		const loc = locationForCode(code)
-		const ev = { code, key, location: loc, ts: Date.now() } as any
-		if (down) host.player?.onKeyDown(ev)
-		else host.player?.onKeyUp(ev)
+		if (!host.engineReady) return
+		host.sendKey(code, down)
 		host.tickImmediate?.()
 	}
 
@@ -296,7 +263,7 @@ function attachPointerHost(host: InputHost, signal: AbortSignal): void {
 	): { code: string; obj: THREE.Object3D } | null => {
 		if (opts.hover && typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)')?.matches)
 			return null
-		if (!host.tableGroup || !host.camera || host.viewerMode !== 'play' || !host.player) return null
+		if (!host.tableGroup || !host.camera || host.viewerMode !== 'play' || !host.engineReady) return null
 		const r = canvas.getBoundingClientRect()
 		if (!r.width || !r.height) return null
 		if (x < r.left || x > r.right || y < r.top || y > r.bottom) return null
@@ -465,7 +432,7 @@ function attachPointerHost(host: InputHost, signal: AbortSignal): void {
 				if (dt < 400 && Math.hypot(dx, dy) > 80) {
 					const ang = swipeNudge(dx, dy, NUDGE as any)
 					if (ang !== null) {
-						host.player?.nudge(ang, ang === NUDGE.back ? 2.0 : NUDGE.force)
+						host.nudge(ang, ang === NUDGE.back ? 2.0 : NUDGE.force)
 					}
 				}
 			}
@@ -494,7 +461,7 @@ function attachPointerHost(host: InputHost, signal: AbortSignal): void {
 			if (dt < 400 && Math.hypot(dx, dy) > 80) {
 				const ang = swipeNudge(dx, dy, NUDGE as any)
 				if (ang !== null) {
-					host.player?.nudge(ang, ang === NUDGE.back ? 2.0 : NUDGE.force)
+					host.nudge(ang, ang === NUDGE.back ? 2.0 : NUDGE.force)
 				}
 			}
 		}

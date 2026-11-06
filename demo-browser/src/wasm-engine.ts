@@ -1,7 +1,7 @@
 /* Copyright (C) 2026 The VPX-JS Authors. Released under GPL-3.0-or-later. */
 
 import type { BufferGeometry, Object3D, PointLight } from 'three/webgpu'
-import { isPlayfieldDecoyName, isShowcaseRoomNode } from '../../dist-esm/lib/render/threejs/scene-classify.js'
+import { isPlayfieldDecoyName } from '../../dist-esm/lib/render/threejs/scene-classify.js'
 import type { ThreeRenderApi } from '../../dist-esm/lib/render/threejs/three-render-api.js'
 import { Ball } from '../../dist-esm/lib/vpt/ball/ball.js'
 import { BallData } from '../../dist-esm/lib/vpt/ball/ball-data.js'
@@ -148,15 +148,10 @@ export class WasmEngine {
 		// The generated base slab carries the playfield, so the parsed table
 		// force-hides the authored collision mesh (see forceHidePlayfieldMesh);
 		// the live engine still reports it visible, which would cover the base
-		// with a white quad. Room/cabinet nodes likewise stay visible in this
-		// showcase viewer (native hides them on desktop; threading the real
-		// player mode through is a follow-up — see render/threejs/README).
-		// Both sets resolve once here so the per-frame policy stays a lookup.
+		// with a white quad. Resolved once here so the per-frame policy stays a lookup.
 		const hiddenDecoys = new Set<number>()
-		const roomParts = new Set<number>()
 		for (const [idx, name] of this.partNames) {
 			if (isPlayfieldDecoyName(name) && this.host.table?.primitives?.[name]) hiddenDecoys.add(idx)
-			if (isShowcaseRoomNode(name)) roomParts.add(idx)
 		}
 		this.sync = new WasmSceneSync<Object3D, BufferGeometry, PointLight>(
 			this.scene(),
@@ -165,7 +160,6 @@ export class WasmEngine {
 			this.host.table,
 			// See WasmSyncPolicy.
 			{
-				neverHide: idx => roomParts.has(idx),
 				neverShow: idx => hiddenDecoys.has(idx),
 				// Script `Flasher.ImageA` swaps (digit-flasher score tables)
 				// move no numeric column, so every slotted flasher pays one

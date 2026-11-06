@@ -21,6 +21,7 @@ import {
 	shot,
 	soundChecks,
 	waitReady,
+	wasmEngineChecks,
 } from './helpers.mjs'
 
 function upgradeLocalhost(u) {
@@ -50,10 +51,36 @@ const readyTimeoutMs = Number(process.env.E2E_READY_TIMEOUT_MS) || 60000
 const autoKillMs = Number(process.env.E2E_AUTOKILL_MS) || undefined
 
 // Leg results are tri-state: true (pass), false (fail), 'skip' (fixture cannot
-// support the check). Only true/'skip' legs let the gate pass; skips are honest
-// non-coverage, never pseudo-passes.
+// support the check). Skips pass only for legs the fixture manifest marks
+// optional; a skip on a required leg is a FAIL (plan §6.2.1).
 const legStatus = v => (v === 'skip' ? 'SKIP' : v ? 'PASS' : 'FAIL')
-const legOk = v => v === true || v === 'skip'
+// Gameplay legs that need script/ROM/DMD. Static fixtures (no table script)
+// may skip them; the playable fixture must genuinely pass them.
+const OPTIONAL_GAMEPLAY_LEGS = new Set([
+	'transpile',
+	'ball',
+	'plunger',
+	'physics',
+	'nudge',
+	'dmd',
+	'dmdVisible',
+	'backbox',
+	'sound',
+])
+// table-empty has no bake mesh, inserts, or lit scene: playfield is
+// uncheckable by construction and an empty-scene orbit is unstable under
+// software rendering, so both are manifest-optional there — never on a
+// playable table.
+const OPTIONAL_EMPTY_FIXTURE_LEGS = new Set([...OPTIONAL_GAMEPLAY_LEGS, 'playfield', 'camera'])
+// Labels whose tables boot a ROM and run table script: everything except the
+// manifest-optional transpile/backbox legs is required (no skip-is-pass).
+const isPlayableLabel = label => /walking_dead|twd/i.test(label)
+const optionalLegsFor = label =>
+	isPlayableLabel(label) ? new Set(['transpile', 'backbox']) : OPTIONAL_EMPTY_FIXTURE_LEGS
+// The headless-WASM engine is unconditional: the wasmEngine leg asserts on
+// every run, and the TS-player legs below skip honestly when it is active.
+const legOkFor = (label, leg, v) =>
+	v === true || (v === 'skip' && (leg === 'wasmEngine' || optionalLegsFor(label).has(leg)))
 
 // Repo-relative inputs for the transpile probe: no hardcoded checkout path.
 const TRANSPILER_URL = `/@fs${path.resolve('dist-esm/lib/scripting/transpiler.js')}`
@@ -169,6 +196,14 @@ async function runOne(targetUrl, label) {
 	} else {
 		console.log(`[integration:${label}] pageerrors PASS (0 during load+settle)`)
 	}
+	// TS-player machinery legs (transpile, ball, physics) cannot run when the
+	// headless-WASM engine owns the table: no TS player exists. They skip
+	// honestly below; the wasmEngine leg asserts the WASM guarantees instead.
+	let wasmActive = false
+	try {
+		wasmActive = await page.evaluate(() => !!window.viewer?.wasmEngine?.ready && !window.viewer?.player)
+	} catch {}
+	if (wasmActive) console.log(`[integration:${label}] wasm engine active — TS-player legs skip`)
 	const diag = await diagnostics(page)
 	const isTableEmpty = targetUrl.includes('empty') || label.includes('empty')
 	const hasWarnings =
@@ -242,8 +277,9 @@ async function runOne(targetUrl, label) {
 		const tp = await page.evaluate(
 			async ({ transpilerUrl, fixture }) => {
 				try {
-					const { Transpiler } = await import(transpilerUrl)
 					const v = window.viewer
+					if (!v.player) return { wasmSkip: true }
+					const { Transpiler } = await import(transpilerUrl)
 					const t = new Transpiler(v.table, v.player)
 					const notIs = t.transpile('If Not cb Is Nothing Then\n  x=1\nEnd If')
 					const cbool = t.transpile('bstate=CBool(state>=0.5)')
@@ -272,21 +308,37 @@ async function runOne(targetUrl, label) {
 			{ transpilerUrl: TRANSPILER_URL, fixture: vbs },
 		)
 		console.log(`[transpile:${label}]`, JSON.stringify(tp))
-		results.transpile =
-			!tp.err &&
-			tp.notIsCorrect === true &&
-			tp.cboolOk === true &&
-			tp.fixtureLen > 500 &&
-			tp.fixtureMarkers === true &&
-			tp.syntaxOk === true
-		if (!results.transpile) console.log(`[transpile:${label}] FAIL transpilation probe failed`)
+		if (tp.wasmSkip) {
+			results.transpile = 'skip'
+			console.log(`[integration:${label}] transpile SKIP — wasm engine: table script compiles upstream (Stage 2)`)
+		} else {
+			results.transpile =
+				!tp.err &&
+				tp.notIsCorrect === true &&
+				tp.cboolOk === true &&
+				tp.fixtureLen > 500 &&
+				tp.fixtureMarkers === true &&
+				tp.syntaxOk === true
+			if (!results.transpile) console.log(`[transpile:${label}] FAIL transpilation probe failed`)
+		}
 	} catch (e) {
 		console.log(`[transpile:${label}] error ${e.message}`)
 		results.transpile = false
 	}
 	let ball = null
 	try {
-		ball = await ballChecks(page)
+		ball = wasmActive
+			? {
+					pass: 'skip',
+					skipReason: 'wasm engine: ejection needs scripted trough kick (Stage 2)',
+					moved: false,
+					kickPos: null,
+					solFired: false,
+					isMock: false,
+					troughPos: null,
+					kickerNames: [],
+				}
+			: await ballChecks(page)
 		console.log(`[ball:${label}]`, JSON.stringify(ball))
 		results.ball = ball.pass === 'skip' ? 'skip' : !!ball.pass
 		console.log(
@@ -313,15 +365,22 @@ async function runOne(targetUrl, label) {
 		console.log(`[plunger:${label}] error ${e.message}`)
 		results.plunger = false
 	}
-	const phys = await physicsChecks(page)
+	const phys = wasmActive ? { wasmSkip: true } : await physicsChecks(page)
 	console.log(`[physics:${label}]`, JSON.stringify(phys))
-	// No ball-moved override: every sub-leg stands on its own verdict. Skipped
-	// sub-legs (no flipper, mock emu) are neutral, but at least one sub-leg must
-	// genuinely pass (the advancing physics clock) for the leg to pass.
-	const physParts = [phys.flipper?.pass, phys.coin?.pass, phys.start?.pass, phys.clock?.pass]
-	const physPass = physParts.every(p => p === true || p === 'skip') && physParts.some(p => p === true)
-	results.physics = physPass
-	console.log(`[integration:${label}] physics ${results.physics ? 'PASS' : 'FAIL'}`)
+	if (wasmActive) {
+		// No TS player clock on the WASM path: stepping is asserted by the
+		// wasmEngine leg; flipper/coin/start need script execution (Stage 2).
+		results.physics = 'skip'
+		console.log(`[integration:${label}] physics SKIP — wasm engine owns the clock (see wasmEngine leg)`)
+	} else {
+		// No ball-moved override: every sub-leg stands on its own verdict. Skipped
+		// sub-legs (no flipper, mock emu) are neutral, but at least one sub-leg must
+		// genuinely pass (the advancing physics clock) for the leg to pass.
+		const physParts = [phys.flipper?.pass, phys.coin?.pass, phys.start?.pass, phys.clock?.pass]
+		const physPass = physParts.every(p => p === true || p === 'skip') && physParts.some(p => p === true)
+		results.physics = physPass
+		console.log(`[integration:${label}] physics ${results.physics ? 'PASS' : 'FAIL'}`)
+	}
 	try {
 		const nudge = await nudgeChecks(page)
 		console.log(`[nudge:${label}]`, JSON.stringify(nudge))
@@ -376,6 +435,18 @@ async function runOne(targetUrl, label) {
 	} catch (e) {
 		console.log(`[sound:${label}] error ${e.message}`)
 		results.sound = false
+	}
+	try {
+		const w = await wasmEngineChecks(page)
+		console.log(`[wasmEngine:${label}]`, JSON.stringify(w))
+		results.wasmEngine = w.pass === 'skip' ? 'skip' : !!w.pass
+		console.log(
+			`[integration:${label}] wasmEngine ${legStatus(results.wasmEngine)} ready=${w.ready} catalog=${w.catalogSize} scriptErrors=${w.scriptErrors} balls=${w.ballCountAfter ?? w.ballCount} tick=${w.tickOk} input=${w.inputOk}${w.reason ? ` — ${w.reason}` : ''}`,
+		)
+		if (results.wasmEngine === false) console.log(`[wasmEngine:${label}] FAIL ${JSON.stringify(w)}`)
+	} catch (e) {
+		console.log(`[wasmEngine:${label}] error ${e.message}`)
+		results.wasmEngine = false
 	}
 	const cam = await page
 		.evaluate(() => {
@@ -455,23 +526,26 @@ async function runOne(targetUrl, label) {
 	await page.close().catch(() => {})
 	// Every leg counts — including transpile, dmd, backbox, and the load
 	// pageerror gate. No mock overrides: legs the fixture cannot support
-	// report 'skip' (neutral), everything else must genuinely pass.
-	const ok = [
-		results.pageerrors,
-		results.diagnostics,
-		results.playfield,
-		results.transpile,
-		results.ball,
-		results.plunger,
-		results.physics,
-		results.nudge,
-		results.dmd,
-		results.backbox,
-		results.dmdVisible,
-		results.camera,
-		results.sound,
-		results.runErrors,
-	].every(legOk)
+	// report 'skip' (neutral only when the manifest marks them optional),
+	// everything else must genuinely pass.
+	const legs = {
+		pageerrors: results.pageerrors,
+		diagnostics: results.diagnostics,
+		playfield: results.playfield,
+		transpile: results.transpile,
+		ball: results.ball,
+		plunger: results.plunger,
+		physics: results.physics,
+		nudge: results.nudge,
+		dmd: results.dmd,
+		backbox: results.backbox,
+		dmdVisible: results.dmdVisible,
+		camera: results.camera,
+		sound: results.sound,
+		wasmEngine: results.wasmEngine,
+		runErrors: results.runErrors,
+	}
+	const ok = Object.entries(legs).every(([leg, v]) => legOkFor(label, leg, v))
 	console.log(`\n# integration ${label} ${ok ? 'PASS' : 'FAIL'} ${JSON.stringify(results)}`)
 	return { ok, results }
 }

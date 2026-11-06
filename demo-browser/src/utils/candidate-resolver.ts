@@ -13,8 +13,6 @@ export const resolveVpxCandidates = ({ defaultName = null, queryParam = 'vpx' } 
 	return [`/${name}`]
 }
 
-export const resolveRomCandidates = romParam => (romParam?.trim() ? [romParam.trim()] : [])
-
 export const fetchWithProgress = async (url, onProgress, opts = {}) => {
 	const signal = opts?.signal
 	if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
