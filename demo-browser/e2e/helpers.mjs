@@ -1,4 +1,3 @@
-import fs from 'node:fs'
 import path from 'node:path'
 
 export const DEFAULT_URL = 'https://localhost:3000/?vpx=/test/fixtures/table-empty.vpx&mode=viewer'
@@ -33,8 +32,7 @@ export const hideOverlays = page =>
 export const diagnostics = page =>
 	page.evaluate(() => {
 		const out = []
-		const vg = window.viewer,
-			g = window.tableGroup,
+		const g = window.tableGroup,
 			r = window.renderer,
 			cam = window.camera,
 			ctr = window.controls
@@ -576,7 +574,6 @@ export const ballChecks = async (page, timeout = 60000) => {
 	})
 	if (!isMock) {
 		const start = Date.now()
-		let ready = false
 		while (Date.now() - start < 26000) {
 			try {
 				const r = await page.evaluate(() => {
@@ -595,10 +592,7 @@ export const ballChecks = async (page, timeout = 60000) => {
 					if (frame?.length) for (let i = 0; i < frame.length; i++) sum += frame[i] ?? 0
 					return { running: true, sum }
 				})
-				if (r.running && r.sum > 50000) {
-					ready = true
-					break
-				}
+				if (r.running && r.sum > 50000) break
 			} catch {}
 			await new Promise(r => setTimeout(r, 500))
 		}
@@ -665,7 +659,7 @@ export const ballChecks = async (page, timeout = 60000) => {
 				kickerCount: kickers.length,
 				troughCount: troughKickers.length,
 			}
-		} catch (e) {
+		} catch {
 			return { troughBefore: 0, troughPos: null, kickerNames: [], kickerCount: 0, troughCount: 0 }
 		}
 	})
@@ -717,7 +711,7 @@ export const ballChecks = async (page, timeout = 60000) => {
 					}
 				}
 			}
-		} catch (e) {}
+		} catch {}
 	})
 	let moved = false,
 		kickPos = null,

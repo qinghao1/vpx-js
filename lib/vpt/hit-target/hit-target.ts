@@ -176,7 +176,7 @@ export class HitTarget extends Item<HitTargetData> {
 		return this.data.isCollidable
 	}
 
-	public getMeshes<GEOMETRY>(table: Table): Record<string, HitTargetMeshEntry> {
+	public getMeshes(table: Table): Record<string, HitTargetMeshEntry> {
 		const m = table.getMaterial(this.data.szMaterial)
 		const isTransparent = !m || (m.isOpacityActive && m.opacity < 0.999)
 		return {

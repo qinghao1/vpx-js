@@ -44,7 +44,7 @@ export class Plunger extends Item<PlungerData> {
 		return this.state
 	}
 
-	public getMeshes<GEOMETRY>(table: Table): Record<string, PlungerMeshEntry> {
+	public getMeshes(table: Table): Record<string, PlungerMeshEntry> {
 		const plunger = this.meshGenerator.generateMeshes(0, table)
 		const meshes: Record<string, PlungerMeshEntry> = {}
 		const material = table.getMaterial(this.data.szMaterial)

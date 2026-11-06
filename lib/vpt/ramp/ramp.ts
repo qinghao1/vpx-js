@@ -4,17 +4,15 @@
 import { BiffParser } from '../../io/biff-parser.js'
 import type { Storage } from '../../io/ole-doc.js'
 import { Vertex2D } from '../../math/vector.js'
-import type { Meshes, RenderInfo } from '../../render/irender-api.js'
+import type { Meshes } from '../../render/irender-api.js'
 import { handleBiffTag } from '../biff-helper.js'
 import { type DragPoint, dragPointNestedTag } from '../dragpoint.js'
 import { Enums } from '../enums.js'
 import { Item } from '../item.js'
 import { type IPhysicalData, ItemData } from '../item-data.js'
 import { ItemState } from '../item-state.js'
-import type { Material } from '../material.js'
 import { Mesh } from '../mesh.js'
 import type { Table } from '../table/table.js'
-import type { Texture } from '../texture.js'
 import { isTransparentRampMaterial, RampMeshGenerator, RampUpdater } from './ramp-view.js'
 
 const FLOAT_MAP: Record<string, string> = {

@@ -3,12 +3,10 @@
 
 import type { Storage } from '../../io/ole-doc.js'
 import { Matrix3D } from '../../math/matrix.js'
-import type { Meshes, RenderInfo } from '../../render/irender-api.js'
+import type { Meshes } from '../../render/irender-api.js'
 import { Item } from '../item.js'
-import type { Material } from '../material.js'
 import { Mesh } from '../mesh.js'
 import type { Table } from '../table/table.js'
-import type { Texture } from '../texture.js'
 import { forceHidePlayfieldMesh, PrimitiveData } from './primitive-data.js'
 import { PrimitiveMeshGenerator } from './primitive-mesh-generator.js'
 import { PrimitiveState } from './primitive-state.js'

@@ -390,9 +390,6 @@ async function runOne(targetUrl, label) {
 		})
 		.catch(() => null)
 	console.log(`[cam:${label}]`, JSON.stringify(cam))
-	const hasRoom = await page
-		.evaluate(() => !!window.scene?.getObjectByName('vr_procedural_room') || !!window.tableGroup?.traverse)
-		.catch(() => false)
 	const roomExists = await page
 		.evaluate(() => !!window.scene?.getObjectByName('vr_procedural_room'))
 		.catch(() => false)
