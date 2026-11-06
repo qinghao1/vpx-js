@@ -24,6 +24,7 @@
 		"build:wasm:headless:debug": "wasm/build-headless.sh --debug",
 		"typecheck": "tsc --noEmit",
 		"typecheck:tests": "tsc --noEmit -p tsconfig.spec.json",
+		"typecheck:demo": "tsc -p demo-browser/tsconfig.json",
 		"lint": "biome check . && node build/check-headers.mjs",
 		"format": "biome check --write .",
 		"test": "vitest run --coverage",
@@ -43,8 +44,8 @@
 		"bench:walking-dead:vitest": "vitest bench test/bench/walking-dead.bench.ts --run",
 		"build:esm:tsc": "tsc -p tsconfig.json",
 		"build:esm:cp": "mkdir -p dist-esm && cp -r res dist-esm/; echo 'dist-esm built'; touch demo-browser/vite.config.ts 2>/dev/null || true",
-		"check": "node build/parallel.mjs -- \"npm run lint\" \"npm run typecheck\" \"npm run typecheck:tests\" \"npm run test\"",
-		"check:fast": "node build/parallel.mjs -- \"npm run lint\" \"npm run typecheck\" \"npm run typecheck:tests\""
+		"check": "node build/parallel.mjs -- \"npm run lint\" \"npm run typecheck\" \"npm run typecheck:tests\" \"npm run typecheck:demo\" \"npm run test\"",
+		"check:fast": "node build/parallel.mjs -- \"npm run lint\" \"npm run typecheck\" \"npm run typecheck:tests\" \"npm run typecheck:demo\""
 	},
 	"dependencies": {
 		"pako": "^3.0.3",
