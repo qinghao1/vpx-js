@@ -1,5 +1,4 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
-/* Copyright (C) 2026 The VPX-JS Authors. Released under GPL-3.0-or-later. */
 
 import type { BufferGeometry, Object3D, PointLight } from 'three/webgpu'
 import { isPlayfieldDecoyName } from '../../dist-esm/lib/render/threejs/scene-classify.js'
@@ -136,6 +135,12 @@ export class WasmEngine {
 		if (!crossOriginIsolated)
 			throw new WasmEngineStartError(
 				'The engine needs a cross-origin-isolated page: serve COOP/COEP headers, or build with VITE_COI_SW=1 for static hosts',
+			)
+		// Table load/teardown suspend on engine threads (JSPI): without it the
+		// factory fails at instantiate with a raw TypeError, so say why.
+		if (typeof (WebAssembly as unknown as { promising?: unknown }).promising !== 'function')
+			throw new WasmEngineStartError(
+				'This browser lacks WebAssembly JSPI (Chrome/Edge 137+, Firefox 153+, Safari 27+)',
 			)
 		// Page-relative so subpath deploys work: document.baseURI resolves
 		// against the page, unlike a module-relative URL under `/@fs/`. The

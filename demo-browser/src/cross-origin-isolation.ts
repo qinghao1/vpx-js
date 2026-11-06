@@ -12,15 +12,21 @@ const RELOADED = 'vpx:coi-reloaded'
  * start).
  */
 export async function crossOriginIsolate(): Promise<boolean> {
-	if (crossOriginIsolated) {
-		sessionStorage.removeItem(RELOADED)
-		return true
+	try {
+		if (crossOriginIsolated) {
+			sessionStorage.removeItem(RELOADED)
+			return true
+		}
+		// One reload only: a page still not isolated after it never will be.
+		if (!navigator.serviceWorker || sessionStorage.getItem(RELOADED)) return false
+		const registration = await navigator.serviceWorker.register('coi-sw.js')
+		if (!registration.active && !registration.installing && !registration.waiting) return false
+		await navigator.serviceWorker.ready
+		sessionStorage.setItem(RELOADED, '1')
+		location.reload()
+		return new Promise<boolean>(() => {})
+	} catch (error) {
+		console.warn('[coi] cross-origin isolation unavailable', error)
+		return false
 	}
-	// One reload only: a page still not isolated after it never will be.
-	if (!navigator.serviceWorker || sessionStorage.getItem(RELOADED)) return false
-	await navigator.serviceWorker.register('coi-sw.js')
-	await navigator.serviceWorker.ready
-	sessionStorage.setItem(RELOADED, '1')
-	location.reload()
-	return new Promise(() => {})
 }

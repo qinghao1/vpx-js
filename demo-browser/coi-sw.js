@@ -1,18 +1,17 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 // Cross-origin isolation for static hosts that cannot send headers (GitHub
-// Pages): adds COOP/COEP to every response, so the page gets the
-// SharedArrayBuffer the threaded engine needs. Emitted only into builds with
-// VITE_COI_SW=1 (src/cross-origin-isolation.ts registers it). Headers only,
-// no caching: HTTP revalidation keeps the engine fresh. Same approach as
-// upstream vpinball's apps/web/sw.js.
+// Pages): adds COOP/COEP to documents and worker scripts, so the page gets
+// the SharedArrayBuffer the threaded engine needs. Emitted only into builds
+// with VITE_COI_SW=1 (src/cross-origin-isolation.ts registers it). Headers
+// only, no caching; every other response passes through untouched, so the
+// engine download keeps its HTTP cache.
 
 self.addEventListener('install', () => self.skipWaiting())
 self.addEventListener('activate', event => event.waitUntil(self.clients.claim()))
 
 self.addEventListener('fetch', event => {
 	const { request } = event
-	// Chrome rejects only-if-cached outside same-origin mode; let it through untouched.
-	if (request.cache === 'only-if-cached' && request.mode !== 'same-origin') return
+	if (request.mode !== 'navigate' && !request.destination.endsWith('worker')) return
 	event.respondWith(fetch(request).then(isolate))
 })
 

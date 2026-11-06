@@ -24,7 +24,7 @@ import {
 	DmdFrameFormat,
 	floatRowView,
 	HEADLESS_ABI_VERSION,
-	HeadlessEngineMissingError,
+	HeadlessEngineError,
 	loadHeadlessEngine,
 	MoverType,
 	WASM_STRIDES,
@@ -501,8 +501,11 @@ describe('WASM scene sync', () => {
 		expect([...view]).toEqual([1, 2, 3, 4, 5, 6, 7, 8])
 	})
 
-	it('fails honestly when the headless artifact is absent', async () => {
-		await expect(loadHeadlessEngine('wasm/does-not-exist.js')).rejects.toThrow(HeadlessEngineMissingError)
+	it('fails honestly when the headless artifact cannot load', async () => {
+		// Without an HTTP status the absence cannot sort as a 404, so the
+		// failure is a typed load error, not the missing-artifact error.
+		await expect(loadHeadlessEngine('wasm/does-not-exist.js')).rejects.toMatchObject({ op: 'load' })
+		await expect(loadHeadlessEngine('wasm/does-not-exist.js')).rejects.toBeInstanceOf(HeadlessEngineError)
 	})
 
 	it('maps the facade onto raw heap calls', async () => {
