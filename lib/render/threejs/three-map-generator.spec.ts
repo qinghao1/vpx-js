@@ -232,7 +232,6 @@ describe('ThreeMapGenerator.loadTextures', () => {
 		const infos: Array<{ f: string; a: unknown[] }> = []
 		const prev = Logger.logger()
 		Logger.setLogger({
-			wtf: () => {},
 			error: () => {},
 			warn: () => {},
 			debug: () => {},
@@ -355,7 +354,6 @@ describe('ThreeMapGenerator.retainSources', () => {
 		const debugs: Array<{ f: string; a: unknown[] }> = []
 		const prev = Logger.logger()
 		Logger.setLogger({
-			wtf: () => {},
 			error: () => {},
 			warn: () => {},
 			info: () => {},

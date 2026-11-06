@@ -239,7 +239,7 @@ export interface DmdFrameDesc {
 /**
  * Raw emscripten module surface of `vpinball-headless` (see `vpx_wasm_bridge.cpp`): exported
  * `VpxWasm_*` functions plus the heap views. Use {@link wrapHeadlessEngine}
- * for the byte-array facade; the raw shape is exported for tests only (not from `lib/index`).
+ * for the byte-array facade; the raw shape is exported for tests only.
  */
 export interface RawHeadlessModule {
 	/** Absent on artifacts predating patch 0017; checked once by {@link wrapHeadlessEngine}. */

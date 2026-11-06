@@ -42,15 +42,14 @@ import { HDRLoader } from 'three/addons/loaders/HDRLoader.js'
 
 ```
 lib/
-├── index.ts          public entry (wasm seam: WasmSceneSync, HeadlessEngine)
 ├── refs-*.ts         platform and three shims
 ├── io/               OLE / BIFF / BinaryReader (node+browser)
 ├── math/             vectors, misc numerics
 ├── vpt/              VPX table + item types + mesh/material/texture
 ├── render/threejs/   ThreeRenderApi, mesh/material/light generators
 ├── wasm/             headless-engine ABI (VpxWasm_*), scene sync, no three.js
-├── emu/              ROM fetcher for viewer `?rom=` preload
-└── util/             logger, vectors, storage helpers
+├── emu/              VPS table/ROM catalog for the demo's table browser
+└── util/             logger, caches, workers, small helpers
 ```
 
 Build: `npm run build` (`tsc` → `dist-esm/`), required before `demo-browser`. Headless WASM is built separately: `npm run build:wasm:headless` (emscripten; patches under `wasm/modules/headless/patches/`, never hand-edit `external/vpinball`).
