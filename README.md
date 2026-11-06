@@ -10,7 +10,8 @@ Fork of [`vpdb/vpx-js`](https://github.com/vpdb/vpx-js) by [freezy](https://gith
 - **Render** with three.js via `Table.generateTableNode()`.
 - **Simulate** headless with `Player`: 60 Hz physics/animation stepping plus table-script execution.
 - **Transpile** VBScript table scripts to JavaScript with `Transpiler`.
-- **Emulate** WPC ROMs with `wpc-emu` and other hardware via the PinMAME WASM build.
+- **Emulate** ROMs with PinMAME inside the headless vpinball WASM engine.
+- **Browse** the [Virtual Pinball Spreadsheet](https://virtualpinballspreadsheet.github.io/) catalog for tables and ROMs (`lib/emu/vps-catalog.ts`).
 
 ## Requirements
 

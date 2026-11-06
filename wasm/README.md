@@ -9,8 +9,6 @@ Emscripten builds for `vpx-js`. All outputs go to `wasm/dist/` (gitignored).
 | `kernels` | `wasm/modules/kernels/src/kernels.cpp`                                       | `wasm/dist/kernels.js` + `.wasm`    | Physics collision batch kernels (SIMD, no FS). Used by `lib/physics/wasm/kernels.ts`. Falls back to pure JS if absent.                                  |
 | `pinmame` | `external/pinmame` (libPinMAME 3.7) + `wasm/modules/pinmame/patches/*.patch` | `wasm/dist/libpinmame.js` + `.wasm` | Full PinMAME emulation (SAM, Whitestar, Data East, etc.). Used by `lib/emu/pinmame/`. Falls back to `wasm/mock/libpinmame.mock.js` when WASM not built. |
 
-`wpc-emu` remains the lightweight path for WPC hardware; PinMAME covers the rest.
-
 ## Layout
 
 ```

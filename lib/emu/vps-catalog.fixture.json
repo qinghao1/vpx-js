@@ -1,0 +1,243 @@
+[
+	{
+		"name": "The Walking Dead (Limited Edition)",
+		"updatedAt": 1793335857717,
+		"manufacturer": "Stern",
+		"type": "SS",
+		"romFiles": [
+			{
+				"version": "twd_160h",
+				"id": "pdHhrTUek_",
+				"updatedAt": 1753890592179,
+				"game": {
+					"id": "wasB0RRz",
+					"name": "The Walking Dead (Limited Edition)"
+				},
+				"urls": [
+					{
+						"url": "https://vpuniverse.com/files/file/25247-walking-dead-the-limited-edition-v1600/"
+					}
+				],
+				"authors": ["CarnyPriest"]
+			},
+			{
+				"version": "twd_160h",
+				"id": "9v8eKV-N",
+				"updatedAt": 1793071746590,
+				"game": {
+					"id": "wasB0RRz",
+					"name": "The Walking Dead (Limited Edition)"
+				},
+				"urls": [
+					{
+						"url": "https://wp.sternpinball.com/?post_type=game_code&s=walking+dead"
+					}
+				],
+				"authors": ["Stern"]
+			}
+		],
+		"id": "wasB0RRz",
+		"year": 2014,
+		"tableFiles": [
+			{
+				"version": "1.0.0",
+				"features": ["FastFlips", "MOD", "Retheme", "nFozzy", "Fleep", "incl. Art", "incl. Video", "incl. B2S"],
+				"updatedAt": 1773695935827,
+				"game": {
+					"id": "wasB0RRz",
+					"name": "The Walking Dead (Limited Edition)"
+				},
+				"urls": [
+					{
+						"url": "https://vpuniverse.com/files/file/29493-the-walking-dead-remastered-stern-2025-peands1ws-mod/"
+					}
+				],
+				"tableFormat": "VPX",
+				"authors": [
+					"PEandS1Ws",
+					"LoadedWeapon",
+					"Hanibal2001",
+					"Dozer",
+					"Dark",
+					"Flupper",
+					"Pinbill",
+					"Rascal",
+					"Ahr1man"
+				],
+				"comment": "VPU Remix Patching tool and original table needed. Retheme of The Walking Dead (Limited Edition) (Stern 2014) by Hanibal",
+				"id": "urZKVVQeD5"
+			},
+			{
+				"comment": "Bigus MOD",
+				"features": ["MOD"],
+				"version": "4.0",
+				"tableFormat": "VPX",
+				"id": "x8hE8LRk",
+				"updatedAt": 1768753757656,
+				"game": {
+					"id": "wasB0RRz",
+					"name": "The Walking Dead (Limited Edition)"
+				},
+				"urls": [
+					{
+						"url": "https://www.vpforums.org/index.php?app=downloads&showfile=15183"
+					}
+				],
+				"authors": ["Bigus1", "Hanibal", "Dozer", "Freneticamnesic", "Flupper", "ICPjuggla", "Dark", "Ninuzzu"]
+			}
+		]
+	},
+	{
+		"id": "RoHgIHwY6l",
+		"year": 2014,
+		"manufacturer": "Stern",
+		"type": "SS",
+		"name": "The Walking Dead (Pro)",
+		"updatedAt": 1715841784204,
+		"tableFiles": [
+			{
+				"authors": ["Groni"],
+				"features": ["FastFlips"],
+				"id": "1qM9eknMD5",
+				"game": {
+					"id": "RoHgIHwY6l",
+					"name": "The Walking Dead (Pro)"
+				},
+				"urls": [
+					{
+						"url": "https://vpuniverse.com/files/file/4903-the-walking-dead-pro-beta/"
+					}
+				],
+				"updatedAt": 1715841784204,
+				"version": "1.0",
+				"tableFormat": "VPX"
+			}
+		]
+	},
+	{
+		"name": "The Walking Dead",
+		"id": "vGWzIhsr",
+		"updatedAt": 1793334890180,
+		"year": 2014,
+		"manufacturer": "Zen Studios",
+		"tableFiles": [
+			{
+				"game": {
+					"id": "vGWzIhsr",
+					"name": "The Walking Dead"
+				},
+				"authors": ["Zen Studios"],
+				"id": "sU-ssRi1",
+				"urls": [
+					{
+						"url": "https://zenstudios.com/"
+					}
+				],
+				"tableFormat": "FX3",
+				"updatedAt": 946681200000
+			}
+		],
+		"type": "SS"
+	},
+	{
+		"updatedAt": 1791738603953,
+		"name": "Night Moves",
+		"tableFiles": [
+			{
+				"urls": [
+					{
+						"url": "https://www.vpforums.org/index.php?app=downloads&showfile=14256"
+					}
+				],
+				"comment": "Desktop, Fullscreen, FSS and VR mode available",
+				"game": {
+					"id": "dgC7Yfhq",
+					"name": "Night Moves"
+				},
+				"authors": [
+					"Kiwi",
+					"DJRobX",
+					"Inkochnito",
+					"Scutters",
+					"GTXJoe",
+					"Arngrim",
+					"JPSalas",
+					"Rothbauerw",
+					"Mike DA Spike"
+				],
+				"id": "0gGZC-Fr",
+				"updatedAt": 1754513949805,
+				"version": "1.1.1",
+				"features": ["VR", "FSS", "FlexDMD", "Hybrid", "LUT"],
+				"tableFormat": "VPX"
+			}
+		],
+		"romFiles": [
+			{
+				"updatedAt": 946681200000,
+				"authors": ["International Concepts"],
+				"id": "KJ3jFE2y",
+				"game": {
+					"id": "dgC7Yfhq",
+					"name": "Night Moves"
+				},
+				"urls": [
+					{
+						"url": "https://www.ipdb.org/files/3507/nmoves.zip"
+					}
+				],
+				"version": "nmoves"
+			}
+		],
+		"manufacturer": "International Concepts",
+		"type": "SS",
+		"year": 1989,
+		"id": "dgC7Yfhq"
+	},
+	{
+		"manufacturer": "Original",
+		"year": 2018,
+		"type": "SS",
+		"name": "Missing in Action",
+		"id": "C0fxFpTh",
+		"tableFiles": [
+			{
+				"updatedAt": 1541458800000,
+				"game": {
+					"id": "C0fxFpTh",
+					"name": "Missing in Action"
+				},
+				"id": "FBS7GRT_",
+				"urls": [
+					{
+						"url": "https://www.vpforums.org/index.php?app=downloads&showfile=13805"
+					}
+				],
+				"tableFormat": "VPX",
+				"comment": "Reskin of El Bueno el Feo y el Mao (Original 2015)",
+				"authors": ["Ivantba", "Xenonph", "JPSalas"],
+				"version": "1.1"
+			}
+		],
+		"updatedAt": 1541458800000,
+		"romFiles": [
+			{
+				"updatedAt": 1711218249167,
+				"authors": ["Destruk"],
+				"version": "eldorado",
+				"urls": [
+					{
+						"url": "https://www.vpforums.org/index.php?app=downloads&showfile=1041",
+						"broken": true
+					}
+				],
+				"game": {
+					"id": "C0fxFpTh",
+					"name": "Missing in Action"
+				},
+				"id": "CfSOb-dk",
+				"comment": "Distribution denied"
+			}
+		]
+	}
+]
