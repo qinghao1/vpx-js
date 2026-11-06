@@ -1,30 +1,13 @@
 name: VPX Build Validation
 
-on: [push]
+on: [push, pull_request]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        node-version: [24.x]
-    steps:
-      - uses: actions/checkout@v4
-      - name: Setup node ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ matrix.node-version }}
-      - run: npm ci
-        env:
-          CI: true
-      - run: npm run build:esm
-        env:
-          CI: true
-      - run: npm test
-        env:
-          CI: true
-
-  lint:
+  check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -32,51 +15,20 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 24.x
+          cache: npm
       - run: npm ci
-        env:
-          CI: true
-      - run: npm run lint
         env:
           CI: true
       - run: npm run build:esm
         env:
           CI: true
-      - run: npm run typecheck:tests
+      # lint + typecheck + typecheck:tests + test (see `npm run check`).
+      - run: npm run check
         env:
           CI: true
-
-  build:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        node-version: [24.x]
-    steps:
-      - uses: actions/checkout@v4
-      - name: Setup node ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ matrix.node-version }}
-      - run: npm ci
-        env:
-          CI: true
-      - run: npm run build
-        env:
-          CI: true
-
-  harness:
-    # Node-only verifies that pass with no GPU, no ROM, no native binary, and
-    # no emscripten toolchain. Not verify-all: its optional legs only SKIP
-    # without a VPX/ROM/OLD worktree, and the browser leg needs Chrome.
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Setup node 24.x
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24.x
-      - run: npm ci
-        env:
-          CI: true
+      # Node-only verifies that pass with no GPU, no ROM, no native binary, and
+      # no emscripten toolchain. Not verify-all: its optional legs only SKIP
+      # without a VPX/ROM/engine artifact, and the browser leg needs Chrome.
       - run: npm run verify:table
         env:
           CI: true

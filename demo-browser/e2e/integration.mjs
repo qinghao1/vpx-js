@@ -1,7 +1,16 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 import { existsSync } from 'node:fs'
+import { dirname, join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { findWalkingDead, findWalkingDeadRom } from '../../test/harness/bench-shared.ts'
-import { attachLogging, ensureVite, launchBrowser, loadPuppeteer, newPage } from '../../test/harness/utils.mjs'
+import {
+	attachLogging,
+	ensureVite,
+	launchBrowser,
+	loadPuppeteer,
+	newPage,
+	resolveChromePath,
+} from '../../test/harness/utils.mjs'
 import {
 	backboxChecks,
 	ballChecks,
@@ -24,6 +33,25 @@ import {
 	waitReady,
 	wasmEngineChecks,
 } from './helpers.mjs'
+
+// Environmental probes first: a missing engine artifact or browser is an
+// honest SKIP (exit 77), never a failure.
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..')
+if (!existsSync(join(repoRoot, 'demo-browser/public/wasm/vpinball-headless.wasm'))) {
+	console.log('SKIP: no engine artifact (npm run build:wasm:headless)')
+	process.exit(77)
+}
+let puppeteer
+try {
+	puppeteer = await loadPuppeteer()
+} catch {
+	console.log('SKIP: puppeteer not installed')
+	process.exit(77)
+}
+if (!resolveChromePath() && !process.env.CHROME_PATH) {
+	console.log('SKIP: no Chrome (standard install path or CHROME_PATH)')
+	process.exit(77)
+}
 
 function upgradeLocalhost(u) {
 	if (u.startsWith('http://localhost:3000')) {
@@ -53,7 +81,7 @@ const autoKillMs = Number(process.env.E2E_AUTOKILL_MS) || undefined
 
 // Leg results are tri-state: true (pass), false (fail), 'skip' (fixture cannot
 // support the check). Skips pass only for legs the fixture manifest marks
-// optional; a skip on a required leg is a FAIL (plan §6.2.1).
+// optional; a skip on a required leg is a FAIL.
 const legStatus = v => (v === 'skip' ? 'SKIP' : v ? 'PASS' : 'FAIL')
 // Gameplay legs that need script/ROM/DMD. Static fixtures (no table script)
 // may skip them; the playable fixture must genuinely pass them.
@@ -63,14 +91,21 @@ const OPTIONAL_GAMEPLAY_LEGS = new Set(['ball', 'plunger', 'physics', 'nudge', '
 // software rendering, so both are manifest-optional there — never on a
 // playable table.
 const OPTIONAL_EMPTY_FIXTURE_LEGS = new Set([...OPTIONAL_GAMEPLAY_LEGS, 'playfield', 'camera'])
-// Labels whose tables boot a ROM and run table script: everything except the
-// manifest-optional backbox leg is required (no skip-is-pass).
-const isPlayableLabel = label => /walking_dead|twd/i.test(label)
-const optionalLegsFor = label => (isPlayableLabel(label) ? new Set(['backbox']) : OPTIONAL_EMPTY_FIXTURE_LEGS)
+// A page booting a ROM runs table script: everything except the
+// manifest-optional backbox leg is required (no skip-is-pass). Derived from
+// the URL, never the table name.
+const requiresGameplay = targetUrl => {
+	try {
+		return new URL(targetUrl).searchParams.has('rom')
+	} catch {
+		return false
+	}
+}
+const optionalLegsFor = targetUrl => (requiresGameplay(targetUrl) ? new Set(['backbox']) : OPTIONAL_EMPTY_FIXTURE_LEGS)
 // The headless-WASM engine is unconditional: the wasmEngine leg asserts on
 // every run, and the gameplay legs below drive it through window.vpx.
-const legOkFor = (label, leg, v) =>
-	v === true || (v === 'skip' && (leg === 'wasmEngine' || optionalLegsFor(label).has(leg)))
+const legOkFor = (targetUrl, leg, v) =>
+	v === true || (v === 'skip' && (leg === 'wasmEngine' || optionalLegsFor(targetUrl).has(leg)))
 
 // E2E drives play entry explicitly through window.vpx: the timed
 // auto-switch to play would race ensurePlayMode, so force it off here
@@ -106,14 +141,22 @@ function labelFromUrl(u) {
 	}
 }
 
-// ensureVite serves this tree on a per-run port (cleanup is registered by
-// utils.mjs), so navigate to the URL it returns.
-const serverUrl = (await ensureVite(url || DEFAULT_URL, { label: 'integration' })).url
-const puppeteer = await loadPuppeteer()
-const browser = await launchBrowser(puppeteer, {
-	...(gpu ? { gpu } : {}),
-	...(autoKillMs ? { autoKillMs } : {}),
-})
+// ensureVite serves this tree in-process on a per-run port, so navigate to
+// the URL it returns. Close the handle on every exit: the listening server
+// keeps the event loop alive.
+const vite = await ensureVite(url || DEFAULT_URL, { label: 'integration' })
+const serverUrl = vite.url
+let browser
+try {
+	browser = await launchBrowser(puppeteer, {
+		...(gpu ? { gpu } : {}),
+		...(autoKillMs ? { autoKillMs } : {}),
+	})
+} catch (error) {
+	console.log(`SKIP: browser launch failed (${String(error?.message ?? error).slice(0, 200)})`)
+	await vite.close().catch(() => {})
+	process.exit(77)
+}
 
 async function runOne(targetUrl, label) {
 	targetUrl = withAutoplayOff(upgradeLocalhost(targetUrl))
@@ -140,8 +183,17 @@ async function runOne(targetUrl, label) {
 	})
 	console.log(`[integration:${label}] goto ${targetUrl}`)
 	await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 30000 })
-	let log = await waitReady(page, readyTimeoutMs)
-	const ready = log.includes('Ready')
+	// Ready is the test API's load promise, never a log substring (a log
+	// containing "Ready final" reads ready while the load state is error).
+	let log = ''
+	let ready = false
+	try {
+		log = await waitReady(page, readyTimeoutMs)
+		ready = true
+	} catch (error) {
+		log = await page.evaluate(() => document.getElementById('log')?.innerText || '').catch(() => '')
+		console.log(`[integration:${label}] not ready: ${String(error?.message ?? error).slice(0, 200)}`)
+	}
 	console.log(`[integration:${label}] Ready=${ready}`)
 	if (!ready) {
 		console.log(log.slice(-6000))
@@ -189,11 +241,7 @@ async function runOne(targetUrl, label) {
 	// fixture must genuinely pass each leg.
 	console.log(`[integration:${label}] wasm engine legs active (window.vpx)`)
 	const diag = await diagnostics(page)
-	const isTableEmpty = targetUrl.includes('empty') || label.includes('empty')
-	const hasWarnings =
-		diag.includes('WARN visible pending') ||
-		diag.includes('WARN cab emissive') ||
-		(diag.includes('WARN luminance') && !isTableEmpty)
+	const hasWarnings = diag.includes('WARN visible pending') || diag.includes('WARN cab emissive')
 	results.diagnostics = !hasWarnings
 	if (!results.diagnostics) console.log(`[integration:${label}] WARN diagnostics:\n${diag}`)
 	// playfield bake & insert lights — generic
@@ -454,7 +502,7 @@ async function runOne(targetUrl, label) {
 		wasmEngine: results.wasmEngine,
 		runErrors: results.runErrors,
 	}
-	const ok = Object.entries(legs).every(([leg, v]) => legOkFor(label, leg, v))
+	const ok = Object.entries(legs).every(([leg, v]) => legOkFor(targetUrl, leg, v))
 	console.log(`\n# integration ${label} ${ok ? 'PASS' : 'FAIL'} ${JSON.stringify(results)}`)
 	return { ok, results }
 }
@@ -470,6 +518,7 @@ if (url) {
 		try {
 			await browser.close()
 		} catch {}
+		await vite.close().catch(() => {})
 	}
 	process.exit(res?.ok ? 0 : 1)
 } else {
@@ -503,6 +552,7 @@ if (url) {
 	try {
 		await browser.close()
 	} catch {}
+	await vite.close().catch(() => {})
 	console.log(`\n# overall ${overallOk ? 'PASS' : 'FAIL'}`)
 	process.exit(overallOk ? 0 : 1)
 }

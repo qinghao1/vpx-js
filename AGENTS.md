@@ -9,10 +9,9 @@ npm ci
 npm run build              # tsc → dist-esm (= build:esm; required before demo-browser)
 npm run build:wasm:headless # emscripten headless build (needs emsdk; artifact → demo-browser/public/wasm/)
 npx tsc --noEmit           # typecheck
-npx biome check .          # lint/format (tabs, width 120)
-npm test                   # vitest --coverage
-npx tsx test/harness/verify-all.ts   # E2E TAP 1..6: table → twd-render → ab → cadet → pages → browser
-npm run verify:ab          # A/B + regression vs OLD worktree (needs VPX/ROM + /tmp/vpx-js-old)
+npm run lint               # biome + copyright-header check (build/check-headers.mjs)
+npm test                   # vitest
+npx tsx test/harness/verify-all.ts   # E2E TAP 1..5: table → twd-render → cadet → pages → browser
 ```
 
 Node via `fnm` — `.nvmrc` `24`, `.node-version` `24.19.0`. Activate with `eval "$(fnm env --use-on-cd --shell bash)"`.
@@ -24,7 +23,8 @@ Node via `fnm` — `.nvmrc` `24`, `.node-version` `24.19.0`. Activate with `eval
 - `test/fixtures/*.vpx` + `test/harness/` + `lib/**/*.spec.ts`
 - `wasm/modules/headless/` (patches) + `external/vpinball` (pinned submodule) → `npm run build:wasm:headless` → `demo-browser/public/wasm/` (see `wasm/README.md`)
 - `demo-browser/` — local static Three.js WebGPU viewer + E2E (`demo-browser/e2e/`)
-- `dist-esm/`, `coverage/`, `node_modules/`, `*.vpx` — ignored, do not commit
+- `dist-esm/`, `coverage/`, `node_modules/`, root `/*.vpx` — ignored, do not commit (`test/fixtures/*.vpx` are tracked)
+- Deploy: `.github/workflows/pages.yml` builds the engine and demo on push to `master` (`VITE_COI_SW=1`) and deploys to GitHub Pages.
 
 ## Conventions
 
@@ -36,7 +36,7 @@ Node via `fnm` — `.nvmrc` `24`, `.node-version` `24.19.0`. Activate with `eval
 ## Testing
 
 - `vitest` on `lib/**/*.spec.ts` + `test/harness/*.spec.ts` + `demo-browser/src/**/*.spec.ts` (`pool:forks`, 10s timeout).
-- `test/harness/` is the single E2E entry: `verify-all.ts` (TAP 1..6: table → twd-render → ab → cadet → pages → browser). `verify-ab.mjs` needs a VPX/ROM plus the OLD worktree (`git worktree add /tmp/vpx-js-old HEAD` with built `dist-esm`); without them it SKIPs honestly. Keep it unified.
+- `test/harness/` is the single E2E entry: `verify-all.ts` (TAP 1..5: table → twd-render → cadet → pages → browser). Optional steps SKIP honestly when their inputs (VPX/ROM/engine artifact) are absent. Keep it unified.
 
 ## Gotchas
 

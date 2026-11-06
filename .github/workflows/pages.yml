@@ -14,6 +14,7 @@ name: Deploy demo to GitHub Pages
 on:
   push:
     branches: [master]
+  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -69,21 +70,45 @@ jobs:
         run: npm ci
         working-directory: demo-browser
       - name: Build demo bundle (with the cross-origin isolation service worker)
-        run: npm run build
+        run: |
+          npm run build
+          touch dist/.nojekyll
         working-directory: demo-browser
         env:
           VITE_COI_SW: "1"
       - name: E2E on a static host (isolation via the service worker, engine boots)
-        run: |
-          touch demo-browser/dist/.nojekyll
-          node test/harness/verify-pages.mjs --dist=demo-browser/dist
+        run: node test/harness/verify-pages.mjs --dist=demo-browser/dist
+      - name: Headless engine E2E (fixtures only, no ROM)
+        run: node test/harness/verify-headless.mjs
+      - name: Browser E2E (empty fixture; skips honestly without VPX/ROM)
+        run: node demo-browser/e2e/integration.mjs
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: demo-browser/dist
 
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout with submodules
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install root dependencies
+        run: npm ci
+      - name: Build dist-esm
+        run: npm run build:esm
+      - name: Unit tests
+        run: npm test
+
   deploy:
-    needs: build
+    needs: [build, test]
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     environment:
       name: github-pages

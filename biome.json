@@ -116,18 +116,6 @@
 					}
 				}
 			}
-		},
-		{
-			"includes": ["test/harness/__snapshots__/**"],
-			"formatter": {
-				"enabled": false
-			},
-			"linter": {
-				"enabled": false
-			},
-			"assist": {
-				"enabled": false
-			}
 		}
 	]
 }

@@ -21,7 +21,8 @@
  */
 import { existsSync, readdirSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { ensureVite, launchBrowser, loadPuppeteer, newPage, sleep } from './utils.mjs'
 
 function resolveVpx() {
@@ -44,6 +45,11 @@ if (!vpxPath) {
 	console.log('SKIP: Space Cadet VPX not provisioned (expected ~/Downloads/space_cadet.vpx)')
 	process.exit(77)
 }
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..')
+if (!existsSync(join(repoRoot, 'demo-browser/public/wasm/vpinball-headless.wasm'))) {
+	console.log('SKIP: no engine artifact (npm run build:wasm:headless)')
+	process.exit(77)
+}
 
 const checks = []
 const check = (ok, name, detail = '') => {
@@ -52,8 +58,11 @@ const check = (ok, name, detail = '') => {
 }
 
 let browser
+let vite
+let fatal = false
 try {
-	const BASE = new URL((await ensureVite('https://localhost/', { label: 'verify-cadet' })).url).origin
+	vite = await ensureVite('https://localhost/', { label: 'verify-cadet' })
+	const BASE = new URL(vite.url).origin
 	const puppeteer = await loadPuppeteer()
 	browser = await launchBrowser(puppeteer, {})
 	const page = await newPage(browser)
@@ -193,11 +202,12 @@ try {
 	)
 } catch (error) {
 	console.log(`FATAL: ${String(error?.message ?? error).slice(0, 300)}`)
-	process.exit(1)
+	fatal = true
 } finally {
-	await browser?.close?.()
+	await browser?.close?.().catch(() => {})
+	await vite?.close?.().catch(() => {})
 }
 
 const failed = checks.filter(c => !c.ok)
 console.log(`\n${checks.length - failed.length}/${checks.length} cadet checks passed`)
-process.exit(failed.length ? 1 : 0)
+process.exit(fatal || failed.length ? 1 : 0)
