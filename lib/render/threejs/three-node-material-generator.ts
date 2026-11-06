@@ -3,7 +3,6 @@ import { Fn, texture, uniform, uv, vec4 } from 'three/tsl'
 import type { Material } from '../../vpt/material.js'
 import { isOpenMesh, isValidCutout, resolveTransparency } from '../../vpt/primitive/primitive-material-protocol.js'
 import type { MeshConvertOptions, RenderInfo } from '../irender-api.js'
-import type { IMaterialGenerator } from './imaterial-generator.js'
 import { BALL_METALNESS, BALL_ROUGHNESS, isBaked, normalizePendingKeys, pendingKeyFor } from './material-shared.js'
 import { getSlots } from './material-slots.js'
 import { createDynamicBallNodeMaterial } from './nodes/ball-reflection-node.js'
@@ -54,7 +53,39 @@ const PENDING_TEX_KEYS: readonly PendingTexKey[] = ['map', 'normalMap', 'envMap'
 const kindOf = (mat: unknown): MaterialKind =>
 	isBakedNodeMaterial(mat) ? 'baked' : isPrimitiveNodeMaterial(mat) ? 'primitive' : 'classic'
 
-export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
+/** Everything that selects one generated material; every field is part of the cache key. */
+export interface MaterialDesc {
+	material?: Material
+	map?: string
+	normalMap?: string
+	envMap?: string
+	emissiveMap?: string
+	isTransparent?: boolean
+	/** Transparent *sort key*, not a polygon offset. */
+	depthBias?: number
+	/** 0..∞ BDL mix, not a boolean: 0 = lit, 1 = 2× fullbright, >1 = HDR multiples. */
+	disableLighting?: number
+	addBlend?: boolean
+	backfacesEnabled?: boolean
+	/** A value in (0, 1] enables cutout; anything else disables it. */
+	alphaTestValue?: number
+	/** Tri-state additive mode (0 plain, 1 additive, 2 absorb); absent derives from addBlend. */
+	addBlendMode?: number
+	/** Seeds the bulb-lift gate (0 = full lift, 1 = none). */
+	disableLightingBelow?: number
+	/** Overrides the derived default (opaque writes, transparent doesn't); absent keeps it. */
+	depthWrite?: boolean
+	/**
+	 * File-level alpha signal for the base image. Textures stream after
+	 * materials are created, so the bound three.js texture is usually null
+	 * here and carries no isOpaque flag anyway — the VPT record does.
+	 */
+	vptMap?: { isOpaque?: boolean } | null
+	/** Selects the native AB_ADD composite (see RenderInfo.modulateVsAdd); absent keeps plain additive. */
+	modulateVsAdd?: number
+}
+
+export class ThreeNodeMaterialGenerator {
 	private readonly cachedMaterials: Record<string, any> = {}
 
 	constructor(private readonly mapGenerator: ThreeMapGenerator) {}
@@ -113,28 +144,29 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 		// vs closed meshes that share one file material.
 		const openWall = isOpenMesh(obj.mesh)
 		const backfaces = openWall || obj.backfacesEnabled
-		return this.getMaterial(
-			opts.applyMaterials && obj.material ? obj.material : undefined,
-			opts.applyTextures && obj.map ? obj.map.getName() : undefined,
-			opts.applyTextures && obj.normalMap ? obj.normalMap.getName() : undefined,
-			opts.applyTextures && obj.envMap ? obj.envMap.getName() : undefined,
-			opts.applyTextures && obj.material?.emissiveMap ? obj.material.emissiveMap.getName() : undefined,
-			!!obj.isTransparent,
-			obj.depthBias ?? 0,
-			obj.disableLighting,
-			!!obj.addBlend,
-			backfaces,
+		return this.getMaterial({
+			material: opts.applyMaterials && obj.material ? obj.material : undefined,
+			map: opts.applyTextures && obj.map ? obj.map.getName() : undefined,
+			normalMap: opts.applyTextures && obj.normalMap ? obj.normalMap.getName() : undefined,
+			envMap: opts.applyTextures && obj.envMap ? obj.envMap.getName() : undefined,
+			emissiveMap:
+				opts.applyTextures && obj.material?.emissiveMap ? obj.material.emissiveMap.getName() : undefined,
+			isTransparent: !!obj.isTransparent,
+			depthBias: obj.depthBias ?? 0,
+			disableLighting: obj.disableLighting,
+			addBlend: !!obj.addBlend,
+			backfacesEnabled: backfaces,
 			alphaTestValue,
-			obj.addBlendMode,
-			(obj as { disableLightingBelow?: number }).disableLightingBelow ?? 0,
-			obj.depthWrite,
+			addBlendMode: obj.addBlendMode,
+			disableLightingBelow: (obj as { disableLightingBelow?: number }).disableLightingBelow ?? 0,
+			depthWrite: obj.depthWrite,
 			// File-level alpha for the base image (VPT Texture.isOpaque), so an
 			// alpha-carrying image blends from the first frame — upstream
 			// primitive.cpp blends on `!img->IsOpaque()` regardless of the file
 			// opacity value.
-			(opts.applyTextures ? (obj.map as { isOpaque?: boolean } | undefined) : undefined) ?? null,
-			obj.modulateVsAdd,
-		)
+			vptMap: (opts.applyTextures ? (obj.map as { isOpaque?: boolean } | undefined) : undefined) ?? null,
+			modulateVsAdd: obj.modulateVsAdd,
+		})
 	}
 
 	private getBulbGlowMaterial(params: NonNullable<RenderInfo<any>['bulbGlow']>, material?: Material): any {
@@ -155,47 +187,29 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 		return mat
 	}
 
-	public getMaterial(
-		material?: Material,
-		map?: string,
-		normalMap?: string,
-		envMap?: string,
-		emissiveMap?: string,
-		isTransparent = false,
-		depthBias = 0,
-		disableLighting?: number,
-		addBlend = false,
-		backfacesEnabled?: boolean,
-		alphaTestValue = 0,
-		addBlendMode?: number,
-		disableLightingBelow = 0,
-		depthWrite?: boolean,
-		// File-level alpha signal for the base image. Textures stream after
-		// materials are created, so the bound three.js texture is usually null
-		// here and carries no isOpaque flag anyway — the VPT record does.
-		vptMap?: { isOpaque?: boolean } | null,
-		/** See RenderInfo.modulateVsAdd. */
-		modulateVsAdd?: number,
-	): any {
-		const key = this.getKey(
+	/** Builds (or returns the cached) material for one mesh. */
+	public getMaterial(desc: MaterialDesc): any {
+		const key = this.keyOf(desc)
+		const cached = this.cachedMaterials[key]
+		if (cached) return cached
+		const {
 			material,
 			map,
 			normalMap,
 			envMap,
 			emissiveMap,
-			isTransparent,
-			depthBias,
+			isTransparent = false,
+			depthBias = 0,
 			disableLighting,
-			addBlend,
+			addBlend = false,
 			backfacesEnabled,
-			alphaTestValue,
+			alphaTestValue = 0,
 			addBlendMode,
-			disableLightingBelow,
+			disableLightingBelow = 0,
 			depthWrite,
+			vptMap,
 			modulateVsAdd,
-		)
-		const cached = this.cachedMaterials[key]
-		if (cached) return cached
+		} = desc
 
 		// Native classifies purely by file flags (primitive.cpp): addBlend selects the unlit
 		// additive path, everything else renders lit with a BlendDisableLighting mix. Names,
@@ -566,23 +580,25 @@ export class ThreeNodeMaterialGenerator implements IMaterialGenerator {
 		return false
 	}
 
-	public getKey(
-		material?: Material,
-		map?: string,
-		normalMap?: string,
-		envMap?: string,
-		emissiveMap?: string,
+	private keyOf({
+		material,
+		map,
+		normalMap,
+		envMap,
+		emissiveMap,
 		isTransparent = false,
 		depthBias = 0,
-		disableLighting?: number,
+		disableLighting,
 		addBlend = false,
-		backfacesEnabled?: boolean,
+		backfacesEnabled,
 		alphaTestValue = 0,
-		addBlendMode?: number,
+		addBlendMode,
 		disableLightingBelow = 0,
-		depthWrite?: boolean,
-		modulateVsAdd?: number,
-	): string {
-		return `${material?.name ?? 'none'}:${map ?? 'none'}:${normalMap ?? 'none'}:${envMap ?? 'none'}:${emissiveMap ?? 'none'}:${isTransparent ? 't' : 'o'}:${depthBias}:${disableLighting ?? 'x'}:${addBlend ? 'a' : 'o'}:${backfacesEnabled ?? 'x'}:${alphaTestValue}:${addBlendMode ?? 'x'}:${disableLightingBelow}:${depthWrite ?? 'x'}:${modulateVsAdd ?? 'x'}`
+		depthWrite,
+		vptMap,
+		modulateVsAdd,
+	}: MaterialDesc): string {
+		const vptAlpha = vptMap == null ? 'x' : String(vptMap.isOpaque)
+		return `${material?.name ?? 'none'}:${map ?? 'none'}:${normalMap ?? 'none'}:${envMap ?? 'none'}:${emissiveMap ?? 'none'}:${isTransparent ? 't' : 'o'}:${depthBias}:${disableLighting ?? 'x'}:${addBlend ? 'a' : 'o'}:${backfacesEnabled ?? 'x'}:${alphaTestValue}:${addBlendMode ?? 'x'}:${disableLightingBelow}:${depthWrite ?? 'x'}:${vptAlpha}:${modulateVsAdd ?? 'x'}`
 	}
 }

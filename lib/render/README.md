@@ -70,11 +70,9 @@ engine stays framework-free. For three.js: `NODE = Object3D`,
   (`threejs/material-slots.ts`) — never `.clone()` a node material directly;
   fork via `cloneMaterialForWrite`, which rebuilds the graph instead of
   JSON-flattening uniforms into dead literals.
-- `IMaterialGenerator.getMaterial` takes 11 positional params in a fixed
-  order (material, map, normalMap, envMap, emissiveMap, isTransparent,
-  depthBias, disableLighting, addBlend, backfacesEnabled, alphaTestValue).
-  `depthBias` is a transparent _sort key_, not a polygon offset;
-  `alphaTestValue` in (0, 1] enables cutout.
+- `ThreeNodeMaterialGenerator.getMaterial` takes one `MaterialDesc`; every
+  field is part of the material cache key. `depthBias` is a transparent
+  _sort key_, not a polygon offset; `alphaTestValue` in (0, 1] enables cutout.
 
 ## Texture loading contract
 

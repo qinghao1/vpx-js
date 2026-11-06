@@ -12,7 +12,7 @@ function additiveMaterial({ mapName }: { mapName: string }): any {
 		hasTexture: () => true,
 		getTexture: () => tex,
 	} as any)
-	return generator.getMaterial(undefined, mapName, undefined, undefined, undefined, true, 0, undefined, true)
+	return generator.getMaterial({ map: mapName, isTransparent: true, addBlend: true })
 }
 
 describe('additive blend parity (upstream flasher.cpp SetupAddBlendState)', () => {

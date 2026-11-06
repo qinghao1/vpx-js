@@ -64,20 +64,7 @@ describe('Flasher absorb parity (upstream flasher.cpp SetupAddBlendState; AB_ADD
 	it('builds absorb materials as premultiplied-over, add materials as plain additive', () => {
 		const generator = makeGenerator()
 		const build = (mode?: number): any =>
-			generator.getMaterial(
-				undefined,
-				undefined,
-				undefined,
-				undefined,
-				undefined,
-				true,
-				0,
-				undefined,
-				true,
-				undefined,
-				0,
-				mode,
-			)
+			generator.getMaterial({ isTransparent: true, addBlend: true, addBlendMode: mode })
 
 		const add = build(FlasherAddBlend.Add)
 		expect(add.blending, 'add must stay plain additive').toBe(AdditiveBlending)
@@ -101,20 +88,11 @@ describe('Flasher absorb parity (upstream flasher.cpp SetupAddBlendState; AB_ADD
 	it('stamps absorb state matching the generator', () => {
 		// AB_ADD is excluded — it takes the modulate-vs-add path instead.
 		const generator = makeGenerator()
-		const fromGenerator = generator.getMaterial(
-			undefined,
-			undefined,
-			undefined,
-			undefined,
-			undefined,
-			true,
-			0,
-			undefined,
-			true,
-			undefined,
-			0,
-			FlasherAddBlend.Absorb,
-		)
+		const fromGenerator = generator.getMaterial({
+			isTransparent: true,
+			addBlend: true,
+			addBlendMode: FlasherAddBlend.Absorb,
+		})
 		// The helper sets blend factors only; the caller declares the mode, and the
 		// encoding follows the flag on rebuilds.
 		const stub = createPrimitiveAdditiveMaterial({ modulateVsAdd: 0.5 })
@@ -135,23 +113,13 @@ describe('Flasher absorb parity (upstream flasher.cpp SetupAddBlendState; AB_ADD
 
 	it('caches add and absorb materials separately', () => {
 		const generator = makeGenerator()
-		const key = (mode?: number): string =>
-			generator.getKey(
-				undefined,
-				undefined,
-				undefined,
-				undefined,
-				undefined,
-				true,
-				0,
-				undefined,
-				true,
-				undefined,
-				0,
-				mode,
-			)
-		expect(key(FlasherAddBlend.Absorb), 'absorb key must differ from add').not.toBe(key(FlasherAddBlend.Add))
-		expect(key(undefined), 'boolean keys keep their shape').not.toContain('undefined')
+		const build = (mode?: number): unknown =>
+			generator.getMaterial({ isTransparent: true, addBlend: true, addBlendMode: mode })
+		expect(build(FlasherAddBlend.Absorb), 'absorb must not share the add material').not.toBe(
+			build(FlasherAddBlend.Add),
+		)
+		expect(build(FlasherAddBlend.Add), 'same desc hits the cache').toBe(build(FlasherAddBlend.Add))
+		expect(build(undefined), 'same boolean-only desc hits the cache').toBe(build(undefined))
 	})
 
 	it('carries absorb state across for-write clones', () => {
@@ -163,24 +131,12 @@ describe('Flasher absorb parity (upstream flasher.cpp SetupAddBlendState; AB_ADD
 
 	it('passes modulateVsAdd through on the absorb arm', () => {
 		const generator = makeGenerator()
-		const mat = generator.getMaterial(
-			undefined,
-			undefined,
-			undefined,
-			undefined,
-			undefined,
-			true,
-			0,
-			undefined,
-			true,
-			undefined,
-			0,
-			FlasherAddBlend.Absorb,
-			undefined,
-			undefined,
-			undefined,
-			0.5,
-		)
+		const mat = generator.getMaterial({
+			isTransparent: true,
+			addBlend: true,
+			addBlendMode: FlasherAddBlend.Absorb,
+			modulateVsAdd: 0.5,
+		})
 		// Native's absorb arm derives the src alpha from m_modulate_vs_add; the
 		// uniform is required for overdrive correctness.
 		expect(mat.userData.__uModulate?.value, 'absorb keeps the modulate uniform').toBeCloseTo(0.5, 12)

@@ -154,20 +154,9 @@ export interface IRenderApi<NODE, GEOMETRY, POINT_LIGHT> {
 	 * If the node is undefined, nothing is applied.
 	 *
 	 * @param node Node to apply material to
-	 * @param material Material to apply
-	 * @param map Name of the texture, if any
-	 * @param normalMap Name of the normal map, if any
-	 * @param envMap Name of the environment map, if any
-	 * @param emissiveMap Name of the emissive map, if any
+	 * @param desc Material and texture to rebind
 	 */
-	applyMaterial(
-		node: NODE | undefined,
-		material?: Material,
-		map?: string,
-		normalMap?: string,
-		envMap?: string,
-		emissiveMap?: string,
-	): void
+	applyMaterial(node: NODE | undefined, desc: MaterialApplyDesc): void
 
 	/**
 	 * Fork-safe material clone for script writes.
@@ -201,6 +190,13 @@ export interface IRenderApi<NODE, GEOMETRY, POINT_LIGHT> {
 	createPointLight(lightData: LightData, table?: Table): POINT_LIGHT
 }
 
+/** Script-driven material rebind for `IRenderApi.applyMaterial`. */
+export interface MaterialApplyDesc {
+	material?: Material
+	/** Texture name; `undefined` keeps the bound one, an empty string clears it. */
+	map?: string
+}
+
 export interface ITextureLoader<TEXTURE> {
 	/** Loads a texture coming from an `Image{n}` stream. */
 	loadTexture(name: string, ext: string, data: Uint8Array): Promise<TEXTURE>
@@ -227,7 +223,7 @@ export interface ITextureLoader<TEXTURE> {
 	warmup?(): void
 }
 
-export interface MeshConvertOptions {
+export interface MeshConvertOptions<TEXTURE = unknown> {
 	applyMaterials?: boolean
-	applyTextures?: ITextureLoader<any>
+	applyTextures?: ITextureLoader<TEXTURE>
 }

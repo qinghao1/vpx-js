@@ -53,7 +53,10 @@ describe('ThreeRenderApi null-node no-ops', () => {
 			const missing = node as any
 			expect(() => api.removeFromParent({} as any, missing), `removeFromParent ${String(node)}`).not.toThrow()
 			expect(() => api.removeChildren(missing), `removeChildren ${String(node)}`).not.toThrow()
-			expect(() => api.applyMaterial(missing, {} as any, 'map'), `applyMaterial ${String(node)}`).not.toThrow()
+			expect(
+				() => api.applyMaterial(missing, { material: {} as any, map: 'map' }),
+				`applyMaterial ${String(node)}`,
+			).not.toThrow()
 		}
 	})
 
@@ -66,6 +69,6 @@ describe('ThreeRenderApi null-node no-ops', () => {
 		} as any)
 		const group = new Group()
 		group.name = 'flasher-ghost'
-		expect(() => api.applyMaterial(group, undefined, 'd_5')).not.toThrow()
+		expect(() => api.applyMaterial(group, { map: 'd_5' })).not.toThrow()
 	})
 })

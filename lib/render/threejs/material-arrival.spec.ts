@@ -41,19 +41,12 @@ describe('material arrival: BDL uniforms survive streaming', () => {
 	it('preserves the authored alpha cutout on materials created while streaming', () => {
 		const textures = new Map<string, DataTexture>()
 		const generator = makeGenerator(textures)
-		const mat: any = generator.getMaterial(
-			{ name: 'insertrectangle1off', baseColor: 0xc8e1ff } as any,
-			'insertrectangle1off',
-			undefined,
-			undefined,
-			undefined,
-			false,
-			500,
-			undefined,
-			false,
-			undefined,
-			1 / 255,
-		)
+		const mat: any = generator.getMaterial({
+			material: { name: 'insertrectangle1off', baseColor: 0xc8e1ff } as any,
+			map: 'insertrectangle1off',
+			depthBias: 500,
+			alphaTestValue: 1 / 255,
+		})
 		expect(mat.userData.__alphaTestValue, 'cutout threshold must be stashed').to.be.closeTo(1 / 255, 1e-6)
 		expect(mat.alphaTest, 'cutout must apply even before the map streams').to.be.closeTo(1 / 255, 1e-6)
 	})
@@ -100,19 +93,11 @@ describe('material arrival: BDL uniforms survive streaming', () => {
 			['imageb', texB],
 		])
 		const generator = makeGenerator(textures)
-		const mat: any = generator.getMaterial(
-			{ name: 'NodeSwap', baseColor: 0xffffff } as any,
-			'imagea',
-			undefined,
-			undefined,
-			undefined,
-			false,
-			0,
-			undefined,
-			false,
-			undefined,
-			1 / 255,
-		)
+		const mat: any = generator.getMaterial({
+			material: { name: 'NodeSwap', baseColor: 0xffffff } as any,
+			map: 'imagea',
+			alphaTestValue: 1 / 255,
+		})
 		expect(mat.alphaTest, 'cutout known at creation').toBeCloseTo(1 / 255, 10)
 		generator.applyMap(mat, 'imageb')
 		expect(mat.userData.__map, 'swapped map bound').toBe(texB)
@@ -143,19 +128,10 @@ describe('material arrival: BDL uniforms survive streaming', () => {
 		// must not shadow it or the transparent texels render black.
 		const textures = new Map<string, DataTexture>()
 		const generator = makeGenerator(textures)
-		const mat: any = generator.getMaterial(
-			{ name: 'Plastic with an image', baseColor: 0xffffff } as any,
-			'instcard5balls',
-			undefined,
-			undefined,
-			undefined,
-			false,
-			0,
-			undefined,
-			false,
-			undefined,
-			0,
-		)
+		const mat: any = generator.getMaterial({
+			material: { name: 'Plastic with an image', baseColor: 0xffffff } as any,
+			map: 'instcard5balls',
+		})
 		expect(mat.userData.__alphaTestValue, 'unknown at creation').toEqual(0)
 		expect(mat.alphaTest, 'no cutout before arrival').toEqual(0)
 		const tex = makeTex()
@@ -173,7 +149,7 @@ describe('material arrival: BDL uniforms survive streaming', () => {
 		// lit basic shader), so they take the lit primitive path instead.
 		const textures = new Map<string, DataTexture>()
 		const generator = makeGenerator(textures)
-		const mat: any = generator.getMaterial({ name: 'VLM.Bake', baseColor: 0xff0000 } as any)
+		const mat: any = generator.getMaterial({ material: { name: 'VLM.Bake', baseColor: 0xff0000 } as any })
 		expect(mat.userData.__primitiveKind, 'mapless bake must take the lit BDL path').toEqual('bdl')
 		expect(mat.userData.__uAlbedo.value.getHex(), 'lit albedo must carry baseColor').toEqual(0xff0000)
 	})
@@ -182,11 +158,13 @@ describe('material arrival: BDL uniforms survive streaming', () => {
 		const textures = new Map<string, DataTexture>()
 		const generator = makeGenerator(textures)
 		const mat: any = generator.getMaterial({
-			name: 'chromeRail',
-			baseColor: 0xc0c0c0,
-			isMetal: true,
-			roughness: 0.2,
-		} as any)
+			material: {
+				name: 'chromeRail',
+				baseColor: 0xc0c0c0,
+				isMetal: true,
+				roughness: 0.2,
+			} as any,
+		})
 		expect(mat.userData.__primitiveKind, 'must take the BDL path').toEqual('bdl')
 		expect(mat.metalness, 'file isMetal must survive creation').toEqual(1)
 		expect(mat.roughness, 'file roughness must survive creation as 1 - roughness').toBeCloseTo(0.8, 10)
@@ -207,7 +185,10 @@ describe('material arrival: BDL uniforms survive streaming', () => {
 		// resolvePendingInScene(tableGroup) (plus cache-only for detached mats).
 		const textures = new Map<string, DataTexture>()
 		const generator = makeGenerator(textures)
-		const mat: any = generator.getMaterial({ name: 'Some_Primitive', baseColor: 0xffffff } as any, 'scriptimage')
+		const mat: any = generator.getMaterial({
+			material: { name: 'Some_Primitive', baseColor: 0xffffff } as any,
+			map: 'scriptimage',
+		})
 		expect(mat.userData.pendingMap).toEqual('scriptimage')
 		const fork: any = cloneMaterialForWrite(mat)
 		expect(Object.values((generator as any).cachedMaterials)).not.toContain(fork)
@@ -250,7 +231,10 @@ describe('material arrival: BDL uniforms survive streaming', () => {
 		// Hand-building colorNode here would drop the transmission lift; the node
 		// branch must rebuild the authored graph (tint uniform + bulb tail) instead.
 		const generator = makeGenerator(new Map())
-		const mat: any = generator.getMaterial({ name: 'VLM.Bake', baseColor: 0xffffff } as any, 'bakemap')
+		const mat: any = generator.getMaterial({
+			material: { name: 'VLM.Bake', baseColor: 0xffffff } as any,
+			map: 'bakemap',
+		})
 		expect(isBakedNodeMaterial(mat)).toBe(true)
 		const tex = makeTex()
 		;(tex as any).name = 'bakemap'
@@ -270,7 +254,10 @@ describe('material arrival: BDL uniforms survive streaming', () => {
 		// A referenced (still streaming) bake texture keeps the material on the
 		// unlit baked path; a bake name with no texture reference at all renders
 		// lit instead (upstream lit live-part parity).
-		const mat: any = generator.getMaterial({ name: 'VLM.Bake', baseColor: 0xffffff } as any, 'bakemap')
+		const mat: any = generator.getMaterial({
+			material: { name: 'VLM.Bake', baseColor: 0xffffff } as any,
+			map: 'bakemap',
+		})
 		expect(mat.userData.__isBaked).toBe(true)
 		generator.applyNormalMap(mat, 'bakenormal')
 		generator.applyEnvMap(mat, 'bakeenv')
@@ -319,19 +306,10 @@ describe('material arrival: BDL uniforms survive streaming', () => {
 			['imageb', makeTex()],
 		])
 		const generator = makeGenerator(textures)
-		const mat: any = generator.getMaterial(
-			{ name: 'SwapNoRebuild', baseColor: 0xffffff } as any,
-			'imagea',
-			undefined,
-			undefined,
-			undefined,
-			false,
-			0,
-			undefined,
-			false,
-			undefined,
-			0,
-		)
+		const mat: any = generator.getMaterial({
+			material: { name: 'SwapNoRebuild', baseColor: 0xffffff } as any,
+			map: 'imagea',
+		})
 		expect(mat.userData.__map, 'initial map bound').toBe(textures.get('imagea'))
 		const v0 = mat.version
 		generator.applyMap(mat, 'imageb')
@@ -352,19 +330,11 @@ describe('material arrival: BDL uniforms survive streaming', () => {
 			['imageb', texB],
 		])
 		const generator = makeGenerator(textures)
-		const mat: any = generator.getMaterial(
-			{ name: 'SwapCutout', baseColor: 0xffffff } as any,
-			'imagea',
-			undefined,
-			undefined,
-			undefined,
-			false,
-			0,
-			undefined,
-			false,
-			undefined,
-			1 / 255,
-		)
+		const mat: any = generator.getMaterial({
+			material: { name: 'SwapCutout', baseColor: 0xffffff } as any,
+			map: 'imagea',
+			alphaTestValue: 1 / 255,
+		})
 		const v0 = mat.version
 		generator.applyMap(mat, 'imageb')
 		expect(mat.userData.__map, 'swapped map bound').toBe(texB)

@@ -61,7 +61,7 @@ export abstract class ItemUpdater<STATE extends ItemState> {
 		table: Table,
 	) {
 		if (material || texture) {
-			renderApi.applyMaterial(obj, table.getMaterial(material), texture)
+			renderApi.applyMaterial(obj, { material: table.getMaterial(material), map: texture })
 			if (texture) noteTextureDemand(renderApi, texture)
 		}
 	}

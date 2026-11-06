@@ -6,8 +6,8 @@ import type { ItemState } from '../../vpt/item-state.js'
 import type { Table, TableGenerateOptions } from '../../vpt/table/table.js'
 import type { IRenderApi, IRenderable, MeshConvertOptions, RenderInfo } from '../irender-api.js'
 import { setAuthoredVisible } from './authored-visible.js'
-import type { IMaterialGenerator } from './imaterial-generator.js'
 import type { ThreeMeshGenerator } from './three-mesh-generator.js'
+import type { ThreeNodeMaterialGenerator } from './three-node-material-generator.js'
 
 /**
  * Converts renderables to Three.js groups/meshes.
@@ -19,7 +19,7 @@ import type { ThreeMeshGenerator } from './three-mesh-generator.js'
 export class ThreeConverter {
 	constructor(
 		private readonly meshGenerator: ThreeMeshGenerator,
-		private readonly materialGenerator: IMaterialGenerator,
+		private readonly materialGenerator: ThreeNodeMaterialGenerator,
 		private readonly meshConvertOpts: MeshConvertOptions,
 	) {}
 

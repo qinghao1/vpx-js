@@ -12,6 +12,7 @@ import {
 	type PointLight,
 	Sphere,
 	type Mesh as ThreeMesh,
+	type Texture as ThreeTexture,
 	Vector3,
 } from 'three'
 import type { Matrix3D } from '../../math/matrix.js'
@@ -19,13 +20,11 @@ import { type AnimationGate, animationGate } from '../../util/animation-gate.js'
 import { progress } from '../../util/logger.js'
 import type { ItemState } from '../../vpt/item-state.js'
 import type { LightData, LightState } from '../../vpt/light/light.js'
-import type { Material } from '../../vpt/material.js'
 import type { Mesh } from '../../vpt/mesh.js'
 import type { Table, TableGenerateOptions } from '../../vpt/table/table.js'
 import type { Texture } from '../../vpt/texture.js'
-import type { IRenderApi, IRenderable, MeshConvertOptions, RenderInfo } from '../irender-api.js'
+import type { IRenderApi, IRenderable, MaterialApplyDesc, MeshConvertOptions, RenderInfo } from '../irender-api.js'
 import { applyBatchedVisibility, unbatchInstances } from './batched-visibility.js'
-import type { IMaterialGenerator } from './imaterial-generator.js'
 import { cloneMaterialForWrite } from './material-shared.js'
 import { installBvh } from './three-bvh.js'
 import { ThreeConverter } from './three-converter.js'
@@ -46,7 +45,7 @@ export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, Poin
 	private static readonly _scratchM4 = new Matrix4()
 
 	private readonly converter: ThreeConverter
-	private readonly meshConvertOpts: MeshConvertOptions
+	private readonly meshConvertOpts: MeshConvertOptions<ThreeTexture>
 	private readonly playfieldGenerator = new ThreePlayfieldMeshGenerator()
 	private readonly lightMeshGenerator = new ThreeLightMeshGenerator()
 	private readonly meshGenerator = new ThreeMeshGenerator()
@@ -54,7 +53,7 @@ export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, Poin
 	private readonly nodeMaterialGenerator: ThreeNodeMaterialGenerator
 	private readonly lightGenerator = new ThreeLightGenerator()
 
-	constructor(opts?: MeshConvertOptions, gate: AnimationGate = animationGate) {
+	constructor(opts?: MeshConvertOptions<ThreeTexture>, gate: AnimationGate = animationGate) {
 		installBvh()
 		this.meshConvertOpts = opts ?? { applyMaterials: false }
 		this.mapGenerator = new ThreeMapGenerator(this.meshConvertOpts.applyTextures, gate)
@@ -75,11 +74,7 @@ export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, Poin
 		return this.mapGenerator
 	}
 
-	public getMaterialGenerator(): IMaterialGenerator {
-		return this.nodeMaterialGenerator
-	}
-
-	public getNodeMaterialGenerator(): ThreeNodeMaterialGenerator {
+	public getMaterialGenerator(): ThreeNodeMaterialGenerator {
 		return this.nodeMaterialGenerator
 	}
 
@@ -165,10 +160,10 @@ export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, Poin
 		root.updateMatrixWorld()
 	}
 
-	public applyVisibility(isVisible: boolean | number, obj: Object3D): void {
+	public applyVisibility(isVisible: boolean, obj: Object3D | undefined): void {
 		if (!obj) return
 		// Single fused walk (slot sync + flag assignment); see batched-visibility.ts.
-		applyBatchedVisibility(obj, !!isVisible, this.batchVisibilityStats)
+		applyBatchedVisibility(obj, isVisible, this.batchVisibilityStats)
 	}
 
 	public applyFrameArrays(positions: Float32Array, normals: Float32Array, bounds: Float32Array, obj: Object3D): void {
@@ -265,14 +260,7 @@ export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, Poin
 		this.lightGenerator.applyLighting(state, obj)
 	}
 
-	public applyMaterial(
-		obj?: Object3D,
-		material?: Material,
-		map?: string,
-		normalMap?: string,
-		envMap?: string,
-		emissiveMap?: string,
-	): void {
+	public applyMaterial(obj: Object3D | undefined, { material, map }: MaterialApplyDesc): void {
 		if (!obj) return
 		this.unbatch(obj)
 		const targets = obj.children?.length ? (obj.children as Object3D[]) : [obj]
@@ -284,9 +272,6 @@ export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, Poin
 			const gen = this.nodeMaterialGenerator
 			if (material) gen.applyMaterial(mat, material)
 			gen.applyMap(mat, map)
-			gen.applyNormalMap(mat, normalMap)
-			gen.applyEnvMap(mat, envMap)
-			gen.applyEmissiveMap(mat, material, emissiveMap)
 		}
 	}
 

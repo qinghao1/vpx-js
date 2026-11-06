@@ -184,7 +184,7 @@ export class FlasherUpdater extends ItemUpdater<FlasherState> {
 		// cannot resurrect the replaced image, like the fields below do.
 		this.data.szImageA = this.state.imageA
 		// Empty string clears the slot; `undefined` would keep a stale bind.
-		renderApi.applyMaterial(target as unknown as NODE, undefined, this.state.imageA)
+		renderApi.applyMaterial(target as unknown as NODE, { map: this.state.imageA })
 		if (this.state.imageA) noteTextureDemand(renderApi, this.state.imageA)
 	}
 

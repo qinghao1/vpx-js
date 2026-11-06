@@ -18,11 +18,10 @@
  */
 
 import type { Matrix3D } from '../lib/math/matrix.js'
-import type { IRenderApi, IRenderable, RenderInfo } from '../lib/render/irender-api'
+import type { IRenderApi, IRenderable, MaterialApplyDesc, RenderInfo } from '../lib/render/irender-api'
 import { cloneMaterialForWrite } from '../lib/render/threejs/material-shared.js'
 import type { ItemState } from '../lib/vpt/item-state'
 import type { LightData, LightState } from '../lib/vpt/light/light'
-import type { Material } from '../lib/vpt/material'
 import type { Mesh } from '../lib/vpt/mesh'
 import type { Table, TableGenerateOptions } from '../lib/vpt/table/table'
 import type { Texture } from '../lib/vpt/texture'
@@ -32,14 +31,7 @@ export class TestRenderApi implements IRenderApi<any, any, any> {
 
 	public applyLighting(_state: LightState, _node: any | undefined): void {}
 
-	public applyMaterial(
-		_node: any | undefined,
-		_material?: Material,
-		_map?: string,
-		_normalMap?: string,
-		_envMap?: string,
-		_emissiveMap?: string,
-	): void {}
+	public applyMaterial(_node: any | undefined, _desc: MaterialApplyDesc): void {}
 
 	public cloneMaterialForWrite<MATERIAL>(mat: MATERIAL): MATERIAL {
 		return cloneMaterialForWrite(mat)
