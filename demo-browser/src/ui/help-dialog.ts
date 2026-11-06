@@ -1,63 +1,32 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
-// @ts-nocheck
 import { CONTROL_SCHEME } from '../config.js'
 
-export function initHelp(viewer) {
-	const help = document.getElementById('help')
-	const btn = document.getElementById('help-btn')
+/** Controls dialog: `#help-btn`, `?`/`h` toggle it; leaving play mode closes it. */
+export function initHelp(): void {
+	const help = document.getElementById('help') as HTMLDialogElement | null
 	if (!help) return
-	const isDialog = help instanceof HTMLDialogElement
-	const closeBtn = help.querySelector('[data-close-help]')
-
-	const grid = help.querySelector('.help-grid')
-	if (grid && !grid.dataset.populated) {
-		let section = ''
-		grid.innerHTML = CONTROL_SCHEME.map(c => {
-			let head = ''
-			if (c.section && c.section !== section) {
-				section = c.section
-				head = `<div class="help-section">${section}</div>`
-			}
-			return `${head}<div class="help-row"><span class="help-label">${c.label}</span><span class="help-keys">${c.help}</span></div>`
-		}).join('')
-		grid.dataset.populated = '1'
-	}
-
-	const isOpen = () => (isDialog ? help.open : !help.hidden)
-	const open = () => {
-		if (isDialog) {
-			if (!help.open) {
-				try {
-					help.showModal()
-				} catch {
-					help.setAttribute('open', '')
-				}
-			}
-		} else {
-			help.hidden = false
+	let section = ''
+	help.querySelector('.help-grid')!.innerHTML = CONTROL_SCHEME.map(c => {
+		let head = ''
+		if (c.section && c.section !== section) {
+			section = c.section
+			head = `<div class="help-section">${section}</div>`
 		}
-	}
-	const close = () => {
-		if (isDialog) {
-			if (help.open) help.close()
-		} else {
-			help.hidden = true
-		}
-	}
-	const toggle = () => (isOpen() ? close() : open())
+		return `${head}<div class="help-row"><span class="help-label">${c.label}</span><span class="help-keys">${c.help}</span></div>`
+	}).join('')
 
-	btn?.addEventListener('click', toggle)
-	closeBtn?.addEventListener('click', close)
+	const toggle = () => (help.open ? help.close() : help.showModal())
+	document.getElementById('help-btn')?.addEventListener('click', toggle)
+	help.querySelector('[data-close-help]')?.addEventListener('click', () => help.close())
 	help.addEventListener('click', e => {
-		if (e.target === help) close()
+		if (e.target === help) help.close()
 	})
-
 	addEventListener(
 		'keydown',
 		e => {
-			if (e.key === 'Escape' && isOpen()) {
+			// The dialog closes itself on Escape; the key must not also leave play mode.
+			if (e.key === 'Escape' && help.open) {
 				e.stopPropagation()
-				if (!isDialog) close()
 				return
 			}
 			if (e.key === '?' || (e.key === 'h' && !e.ctrlKey && !e.metaKey && !e.repeat)) {
@@ -73,10 +42,7 @@ export function initHelp(viewer) {
 		},
 		true,
 	)
-
-	const sync = mode => {
-		if (mode !== 'play') close()
-	}
-	sync(viewer?.viewerMode ?? 'viewer')
-	addEventListener('viewer:modechange', e => sync(e.detail?.mode))
+	addEventListener('viewer:modechange', e => {
+		if ((e as CustomEvent).detail?.mode !== 'play') help.close()
+	})
 }

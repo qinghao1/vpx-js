@@ -1,5 +1,4 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
-import { Buffer } from 'buffer'
 import { installBvh } from '../../dist-esm/lib/render/threejs/three-bvh.js'
 
 export const isDev = (() => {
@@ -17,16 +16,6 @@ export const ensureBvh = () => {
 	} catch (e) {
 		if (isDev) console.warn('installBvh failed', e)
 	}
-}
-
-let globalsEnsured = false
-export const ensureGlobals = () => {
-	if (globalsEnsured) return
-	if (typeof window !== 'undefined') {
-		window.Buffer ??= Buffer
-		window.global ??= window
-	}
-	globalsEnsured = true
 }
 
 export {

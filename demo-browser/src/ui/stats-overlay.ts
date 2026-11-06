@@ -28,9 +28,7 @@ function buildStats() {
 	sep2.textContent = '·'
 	const fps = document.createElement('span')
 	const fpsText = document.createTextNode('')
-	const threaded = document.createElement('span')
-	threaded.textContent = ' · threaded'
-	fps.append(fpsText, threaded)
+	fps.append(fpsText)
 	head.append(badge, sep1, backend, sep2, fps)
 	const grid = document.createElement('div')
 	grid.className = 'stats-grid'
@@ -80,49 +78,4 @@ export function renderStats(container, data) {
 		setText(vEl, v)
 		setClass(vEl, muted ? 'v v--muted' : 'v')
 	}
-}
-
-function createText(txt) {
-	const s = document.createElement('span')
-	s.textContent = txt
-	return s
-}
-
-export function renderModeHint(hintEl, isPlay) {
-	if (!hintEl) return
-	hintEl.textContent = ''
-	const dot = document.createElement('span')
-	dot.className = 'dot'
-	hintEl.append(dot)
-	const b = document.createElement('b')
-	b.textContent = isPlay ? 'Play' : 'Viewer'
-	hintEl.append(
-		b,
-		textWithClass(' — ', 'sep-muted'),
-		createText(isPlay ? 'Esc to exit' : 'drag to orbit'),
-		textWithClass(' · ', 'sep-muted'),
-		isPlay ? createPlayHintFragment() : createViewerHintFragment(),
-	)
-}
-
-function textWithClass(txt, cls) {
-	const s = document.createElement('span')
-	if (cls) s.className = cls
-	s.textContent = txt
-	return s
-}
-
-function createPlayHintFragment() {
-	const frag = document.createDocumentFragment()
-	frag.append(createText('P pause'), textWithClass(' · ', 'sep-muted'), createText('? help'))
-	return frag
-}
-
-function createViewerHintFragment() {
-	const frag = document.createDocumentFragment()
-	frag.append(createText('click cabinet to '))
-	const b = document.createElement('b')
-	b.textContent = 'Play'
-	frag.append(b)
-	return frag
 }

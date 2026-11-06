@@ -41,6 +41,7 @@ import { applyRendererToneMapping, clampExposure } from '../../dist-esm/lib/rend
 import { updateTransmissionBuffer } from '../../dist-esm/lib/render/threejs/transmission-buffer.js'
 import { collectPostProcessNodes, needsNoBakeFill } from '../../dist-esm/lib/render/threejs/visibility-heuristics.js'
 import { AnimationGate } from '../../dist-esm/lib/util/animation-gate.js'
+import { idbGet, idbSet } from '../../dist-esm/lib/util/idb-cache.js'
 import { Table } from '../../dist-esm/lib/vpt/table/table.js'
 import { codeToSdlScancode, createScancodeGate, resolveFlipperKey } from '../../dist-esm/lib/wasm/vpinball-wasm.js'
 import { BackglassRenderer } from './backglass/backglass-renderer.js'
@@ -56,21 +57,13 @@ import {
 	TABLE_OPTS,
 } from './config.js'
 import { DmdRenderer } from './dmd/dmd-renderer.js'
-import {
-	isDev as _isDev,
-	ensureBvh,
-	ensureGlobals,
-	getMaxLights,
-	getTargetPixelRatio,
-	isLowQuality,
-	QUALITY_CAPS,
-} from './env.js'
-import { RELEASE_CODES } from './input/input-manager.js'
+import { ensureBvh, getMaxLights, getTargetPixelRatio, isLowQuality, QUALITY_CAPS } from './env.js'
+import { ownsKey, RELEASE_CODES } from './input/input-manager.js'
 import { pollNudgePads } from './input/nudge-controller.js'
 import { attachInput } from './input.js'
 import type { DirtyOverlay } from './overlays/dirty-overlay.js'
-import { createHarness } from './ui/log-viewer.js'
-import { fpsClass, renderModeHint, renderStats } from './ui/stats-overlay.js'
+import { createLog } from './ui/log-viewer.js'
+import { fpsClass, renderStats } from './ui/stats-overlay.js'
 import {
 	$,
 	computeTexMem,
@@ -124,16 +117,6 @@ function cullExcessLights(root: any, maxLights: number) {
 	return { before: lights.length, after: maxLights, culled }
 }
 
-export {
-	createHarness,
-	ensureProceduralRoom,
-	filterTextures,
-	frameCamera,
-	hideCabFlippers,
-	postProcessScene,
-	resolveVpxCandidates,
-}
-
 const SOUND_SPEAKER = '<path d="M11 5 6 9H3v6h3l5 4z" fill="currentColor" stroke="none"></path>'
 const SOUND_SVG_ATTRS =
 	'viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"'
@@ -145,58 +128,51 @@ const setTitle = title => {
 	if (el && title) el.textContent = title
 }
 export class Viewer {
+	declare scene: THREE.Scene
+	declare camera: THREE.PerspectiveCamera
+	declare controls: OrbitControls
+	declare renderer: THREE.WebGPURenderer | null
+	declare renderApi: ThreeRenderApi | null
+	declare tableGroup: THREE.Group | null
+	declare table: Table | null
+	declare wasmEngine: WasmEngine | null
+	declare viewerMode: 'viewer' | 'play'
+	declare isPaused: boolean
 	private readonly overlays: DirtyOverlay[]
-	constructor(opts = {}) {
-		ensureGlobals()
+	constructor({ viewerMode = 'viewer', antialias = true, batched = true, forceWebGL = false } = {}) {
 		ensureBvh()
-		const {
-			viewerMode = 'viewer',
-			antialias = true,
-			batched = true,
-			forceWebGL = false,
-			autoplay = true,
-			dom = {},
-		} = opts
-		this.options = { requestedMode: viewerMode, antialias, batched, forceWebGL, autoplay }
+		this.options = { antialias, batched, forceWebGL }
 		this.viewerMode = viewerMode
 		this.dom = {
-			canvas: dom.canvas || $('canvas'),
-			loading: dom.loading || $('loading'),
-			barFill: dom.barFill || $('bar-fill'),
-			barText: dom.barText || $('bar-text'),
-			loadDetail: dom.loadDetail || $('load-detail'),
-			loadTitle: dom.loadTitle || $('load-title'),
-			subtitle: dom.subtitle || $('subtitle'),
-			stats: dom.stats || $('stats'),
-			logEl: dom.logEl || $('log'),
-			resetBtn: dom.resetBtn || $('reset'),
-			wrap: dom.wrap || $('canvas-wrap'),
-			dropzone: dom.dropzone || $('dropzone'),
-			card: dom.card || $('card'),
-			status: dom.status || $('status'),
-			fileInput: dom.fileInput || $('file'),
-			playTip: dom.playTip || document.getElementById('play-tip'),
-			soundBtn: dom.soundBtn || document.getElementById('sound-btn'),
-			soundVolume: dom.soundVolume || document.getElementById('sound-volume'),
-			streamWrap: dom.streamWrap || document.getElementById('stream-progress'),
-			streamFill: dom.streamFill || document.getElementById('stream-fill'),
-			streamText: dom.streamText || document.getElementById('stream-text'),
-			streamLabel: dom.streamLabel || document.getElementById('stream-label'),
-			nudgeFlash: dom.nudgeFlash || document.getElementById('nudge-flash'),
-			fpsHud: dom.fpsHud || document.getElementById('fps-hud'),
-			modeHint: dom.modeHint || document.getElementById('mode-hint'),
+			canvas: $('canvas'),
+			loading: $('loading'),
+			barFill: $('bar-fill'),
+			barText: $('bar-text'),
+			loadDetail: $('load-detail'),
+			loadTitle: $('load-title'),
+			subtitle: $('subtitle'),
+			stats: $('stats'),
+			resetBtn: $('reset'),
+			wrap: $('canvas-wrap'),
+			playTip: $('play-tip'),
+			soundBtn: $('sound-btn'),
+			soundVolume: $('sound-volume'),
+			streamWrap: $('stream-progress'),
+			streamFill: $('stream-fill'),
+			streamText: $('stream-text'),
+			streamLabel: $('stream-label'),
+			nudgeFlash: $('nudge-flash'),
+			fpsHud: $('fps-hud'),
 		}
-		this.harnessLog = createHarness(this.dom.logEl).harnessLog
+		this.log = createLog($('log'))
 		this.scene = new THREE.Scene()
 		this.scene.background = getPrerenderedBackground() as any
-		this.camera = new THREE.PerspectiveCamera(
-			CAM.fov,
-			(typeof window !== 'undefined' ? window.innerWidth : 800) /
-				(typeof window !== 'undefined' ? window.innerHeight : 600),
-			CAM.near,
-			CAM.far,
-		)
+		this.camera = new THREE.PerspectiveCamera(CAM.fov, innerWidth / innerHeight, CAM.near, CAM.far)
 		this.camera.position.set(0, -800, 1500)
+		// One controls instance for the page: the canvas outlives renderer recreation.
+		this.controls = new OrbitControls(this.camera, this.dom.canvas)
+		this.controls.enableDamping = true
+		this.controls.enabled = this.viewerMode !== 'play'
 		this.scene.add(new THREE.HemisphereLight(LIGHT_HEMI.sky, LIGHT_HEMI.ground, LIGHT_HEMI.intensity))
 		const dir = new THREE.DirectionalLight(LIGHT_DIR.color, LIGHT_DIR.intensity)
 		dir.position.set(...LIGHT_DIR.pos)
@@ -212,42 +188,28 @@ export class Viewer {
 		this._lightmapMap = new Map()
 		this.isPaused = false
 		this._playCameraApplied = false
-		this._cameraTimeout = null
 		this._cameraRaf = null
-		this.animFrame = null
-		this._animRaf = null
-		this._animTimeout = null
+		this._cameraSettle = null
 		this.invalidate()
 		this._streamId = 0
 		this._loadId = 0
-		this._cameraGen = 0
-		this._cameraTimeoutResolver = null
 		this._loadAbort = null
-		this._touchMap = new Map()
-		this._inputCleanup = null
-		this._nudgeCleanup = null
-		this._touchCleanup = null
+		/** ROM for the current table (`owner` = its load id; 0 = before any table, taken by the next load). */
+		this.rom = undefined
+		this._romLoad = undefined
+		this._engineBoot = undefined
+		this._engineGen = 0
+		this._engineRom = undefined
 		this._rendererBackend = null
 		this.renderPipeline = null
 		this.renderer = null
-		this.controls = null
+		this._loop = null
 		this._deviceLossCount = 0
-		this._rendererReady = this._createRenderer()
-		this._rendererReady.catch(e => {
-			this.log(
-				`WebGPU renderer failed to start (${e?.message ?? e}) — the table cannot render. This usually means broken GPU-driver or browser WebGPU support here; try updating Chrome and GPU drivers, reloading with ?noaa (disables antialiasing), or relaunching Chrome with --use-angle=vulkan.`,
-				'error',
-			)
-		})
+		this._startRenderer()
 		this.dmd = new DmdRenderer(this)
 		this.backglass = new BackglassRenderer(this)
 		this.overlays = [this.dmd, this.backglass]
-		if (_isDev)
-			Object.assign(window, {
-				scene: this.scene,
-				camera: this.camera,
-				THREE,
-			})
+		attachInput(this)
 		addEventListener('resize', () => this._onResize())
 		addEventListener('popstate', () => {
 			if (this.viewerMode === 'play') this._switchToViewer()
@@ -264,9 +226,7 @@ export class Viewer {
 		btn?.addEventListener('click', toggle)
 		const onKey = e => {
 			if ((e.code === 'Backquote' || e.key === '`' || e.key === 'F2') && !e.ctrlKey && !e.metaKey && !e.altKey) {
-				const tag = (document.activeElement?.tagName || '').toLowerCase()
-				if (tag === 'input' || tag === 'textarea' || tag === 'select') return
-				toggle()
+				if (!ownsKey(e.target, e.code)) toggle()
 			}
 		}
 		addEventListener('keydown', onKey)
@@ -292,8 +252,7 @@ export class Viewer {
 		this._syncSoundChrome()
 		return muted
 	}
-	// Chrome over engine-owned mute/level (per-load engine state; the old
-	// persisted sound profile is gone by design — each table starts fresh).
+	// Chrome over engine-owned mute/level: per-load engine state, so each table starts fresh.
 	_setupSoundControls() {
 		this._syncSoundChrome()
 		const btn = this.dom.soundBtn
@@ -339,12 +298,9 @@ export class Viewer {
 		}
 		const onKey = e => {
 			// Global mute shortcut (all modes); the key still reaches the
-			// table as DIK_M, as before. No repeat: holding M must not strobe.
+			// table as DIK_M. No repeat: holding M must not strobe.
 			if ((e.code === 'KeyM' || e.key === 'm' || e.key === 'M') && !e.ctrlKey && !e.metaKey && !e.altKey) {
-				if (e.repeat) return
-				const tag = (document.activeElement?.tagName || '').toLowerCase()
-				if (tag === 'input' || tag === 'textarea' || tag === 'select') return
-				toggle()
+				if (!e.repeat && !ownsKey(e.target, e.code)) toggle()
 			}
 		}
 		addEventListener('keydown', onKey)
@@ -362,10 +318,59 @@ export class Viewer {
 		}
 		if (slider && engine) slider.value = String(Math.round(engine.volume * 100))
 	}
+	/**
+	 * The one renderer-start path, for boot and device-loss recovery: disposes
+	 * the previous renderer, and resolves null (logged) when the GPU cannot start.
+	 */
+	_startRenderer() {
+		const previous = this.renderer
+		const previousPipeline = this.renderPipeline
+		this.renderer = null
+		this.renderPipeline = null
+		this._rendererReady = (async () => {
+			previousPipeline?.dispose()
+			// three's WebGL dispose loses the canvas context on purpose, and the new renderer shares it.
+			if (previous?.backend.isWebGPUBackend) await previous.dispose()
+			else previous?.setAnimationLoop(null)
+			return this._createRenderer()
+		})().catch(e => {
+			this.log(
+				`Renderer failed to start (${e?.message ?? e}) — the table cannot render. This usually means broken GPU-driver or browser WebGPU support here; try updating Chrome and GPU drivers, reloading with ?noaa (disables antialiasing) or ?webgl, or relaunching Chrome with --use-angle=vulkan.`,
+				'error',
+			)
+			return null
+		})
+		return this._rendererReady
+	}
+	_onDeviceLost(info, startedAt) {
+		// Only back-to-back losses count: a renderer that ran a while recovered.
+		this._deviceLossCount = performance.now() - startedAt > 10_000 ? 1 : this._deviceLossCount + 1
+		if (this._deviceLossCount > 2) {
+			this.log(
+				`${info.api} device keeps failing (${info.reason ?? info.message}) — not retrying. Reload with ?noaa or ?webgl, update Chrome and GPU drivers, or relaunch Chrome with --use-angle=vulkan.`,
+				'error',
+			)
+			return
+		}
+		this.log(`${info.api} device lost (${info.reason ?? info.message}) — restarting the renderer`, 'warn')
+		// A lost WebGL2 context stays lost on its canvas until the browser restores it.
+		if (info.api === 'WebGL')
+			this.dom.canvas.addEventListener('webglcontextrestored', () => this._startRenderer(), { once: true })
+		else this._startRenderer()
+	}
+	_applyTableToneMapping(table) {
+		if (!this.renderer || !table?.data) return
+		applyRendererToneMapping(this.renderer, table.data, isLowQuality())
+		if (!this.renderPipeline) return
+		// resolveToneMapping owns the AgX default: pass the table value
+		// through instead of falling back to ACES (2) here.
+		this.renderPipeline.updateExposure(clampExposure(table.data.exposure, isLowQuality()))
+		this.renderPipeline.updateToneMapper(table.data.toneMapper)
+		if (Number.isFinite(table.data.bloomStrength)) this.renderPipeline.updateBloomStrength(table.data.bloomStrength)
+	}
 	async _createRenderer() {
-		const canvas = this.dom.canvas
 		const renderer = new THREE.WebGPURenderer({
-			canvas,
+			canvas: this.dom.canvas,
 			antialias: this.options.antialias,
 			powerPreference: 'high-performance',
 			forceWebGL: this.options.forceWebGL,
@@ -376,25 +381,7 @@ export class Viewer {
 		renderer.outputColorSpace = THREE.SRGBColorSpace
 		renderer.sortObjects = true
 		renderer.shadowMap.enabled = false
-
 		applyRendererToneMapping(renderer, this.table?.data, isLowQuality())
-		this._globalEmissionScale = Number.isFinite(this.table?.data?.globalEmissionScale)
-			? this.table.data.globalEmissionScale
-			: 1
-		this._applyTableToneMapping = tbl => {
-			if (!this.renderer || !tbl?.data) return
-			applyRendererToneMapping(this.renderer, tbl.data, isLowQuality())
-			this._globalEmissionScale = Number.isFinite(tbl.data.globalEmissionScale) ? tbl.data.globalEmissionScale : 1
-			if (this.renderPipeline) {
-				// resolveToneMapping owns the AgX default: pass the table value
-				// through instead of falling back to ACES (2) here.
-				this.renderPipeline.updateExposure(clampExposure(tbl.data.exposure, isLowQuality()))
-				this.renderPipeline.updateToneMapper(tbl.data.toneMapper)
-				if (Number.isFinite(tbl.data.bloomStrength)) {
-					this.renderPipeline.updateBloomStrength(tbl.data.bloomStrength)
-				}
-			}
-		}
 		this.renderer = renderer
 		this._rendererBackend = renderer.backend.isWebGPUBackend ? 'webgpu' : 'webgl2'
 		try {
@@ -414,34 +401,14 @@ export class Viewer {
 			this.renderPipeline = null
 		}
 		// Covers WebGPU device.lost and WebGL2 webglcontextlost; three filters reason 'destroyed'.
+		const startedAt = performance.now()
 		const onLost = renderer.onDeviceLost.bind(renderer)
 		renderer.onDeviceLost = info => {
 			onLost(info)
-			if (++this._deviceLossCount > 2) {
-				this.log(
-					`${info.api} device keeps failing (${info.reason ?? info.message}) — not retrying. Reload with ?noaa or ?webgl, update Chrome and GPU drivers, or relaunch Chrome with --use-angle=vulkan.`,
-					'error',
-				)
-				return
-			}
-			this._rendererReady = this._createRenderer()
-			this._rendererReady.catch(() => {})
+			if (this.renderer === renderer) this._onDeviceLost(info, startedAt)
 		}
-		this.controls?.dispose?.()
-		this.controls = new OrbitControls(this.camera, this.renderer.domElement)
-		this.controls.enableDamping = true
-		this.controls.target.set(0, 0, 0)
-		this.controls.update()
-		this.controls.enabled = this.viewerMode !== 'play'
-		if (_isDev)
-			Object.assign(window, {
-				scene: this.scene,
-				camera: this.camera,
-				controls: this.controls,
-				renderer: this.renderer,
-				THREE,
-			})
 		this._onResize()
+		if (this._loop) renderer.setAnimationLoop(this._loop)
 		this.log(`WebGPURenderer ready (${this._rendererBackend}, three r${String(THREE.REVISION)})`)
 		return renderer
 	}
@@ -457,12 +424,6 @@ export class Viewer {
 		} catch (e) {
 			console.warn('[renderer] compileAsync non-fatal warning:', e)
 		}
-	}
-
-	/** Legacy name: delegates to _syncWasmTransforms; no TS physics remains. */
-	private _syncPhysicsTransforms(_timestamp) {
-		if (this.wasmEngine?.ready) return this._syncWasmTransforms(_timestamp)
-		return false
 	}
 
 	/**
@@ -498,9 +459,8 @@ export class Viewer {
 		)
 	}
 
-	async _ensureRenderer() {
-		await this._rendererReady
-		return this.renderer
+	_ensureRenderer() {
+		return this._rendererReady
 	}
 	_onResetView() {
 		if (this.viewerMode === 'play') {
@@ -513,8 +473,8 @@ export class Viewer {
 	}
 	_onResize() {
 		this.invalidate()
-		const width = typeof window !== 'undefined' ? window.innerWidth : 800
-		const height = typeof window !== 'undefined' ? window.innerHeight : 600
+		const width = innerWidth
+		const height = innerHeight
 		this.camera.aspect = width / height
 		this.camera.updateProjectionMatrix()
 		const pixelRatio = getTargetPixelRatio(this.viewerMode)
@@ -596,103 +556,75 @@ export class Viewer {
 	async _switchToPlay() {
 		if (this.viewerMode === 'play' || !this.tableGroup) return
 		this.viewerMode = 'play'
-		if (typeof history !== 'undefined' && history.state?.mode !== 'play') {
-			history.pushState({ mode: 'play' }, '')
-		}
-		if (this.renderer) {
-			this.renderer.setPixelRatio(getTargetPixelRatio('play'))
-			this.renderer.sortObjects = true
-		}
+		if (history.state?.mode !== 'play') history.pushState({ ...history.state, mode: 'play' }, '')
+		this.renderer?.setPixelRatio(getTargetPixelRatio('play'))
 		this._hidePlayTip?.()
-		hideCabFlippers(this.tableGroup)
 		this._syncChrome()
-		if (this.wasmEngine?.ready) {
-			this.wasmEngine.setBallsVisible(true)
-			this.enterPlayMode()
-		} else {
-			this.hookInput()
-		}
+		if (this.wasmEngine?.ready) this.enterPlayMode()
+		else hideCabFlippers(this.tableGroup)
 		this.dom.canvas?.focus()
 		const target = computePlayFraming(this.tableGroup, this.camera)
 		await this._animateCameraTo(target, CAM_ANIM.durationMode)
+		if (this.viewerMode !== 'play') return
 		syncRoom(this.scene, this.tableGroup, target.center, target.size)
-		if (!this.wasmEngine?.ready) {
-			try {
-				await this._createWasmEngine()
-			} catch (e) {
-				this.log(`Play load failed: ${e.message}`, 'error')
-				this._revertFailedPlay()
-			}
+		if (this.wasmEngine?.ready) return
+		try {
+			await this._bootEngine()
+		} catch (e) {
+			this.log(`Play load failed: ${e.message}`, 'error')
+			this._revertFailedPlay()
 		}
 	}
-	// A failed play-load must not strand the viewer in play mode with no
-	// engine: drop back to viewer chrome instead of warn-and-continue.
+	/** A failed engine boot must not strand the viewer in play mode with no engine. */
 	_revertFailedPlay() {
-		if (this.viewerMode !== 'play' || this.wasmEngine?.ready) return
-		this.viewerMode = 'viewer'
-		if (typeof history !== 'undefined' && history.state?.mode === 'play') history.back()
-		if (this.controls) this.controls.enabled = true
-		this._syncChrome()
+		if (this.viewerMode === 'play' && !this.wasmEngine?.ready) this._leavePlay()
 	}
 	async _switchToViewer() {
 		if (this.viewerMode !== 'play') return
-		if (!this.tableGroup) return this.exitPlayMode()
-		this.viewerMode = 'viewer'
-		if (typeof history !== 'undefined' && history.state?.mode === 'play') {
-			history.back()
-		}
-		if (this.renderer) this.renderer.setPixelRatio(getTargetPixelRatio('viewer'))
-		this._hidePlayTip?.()
-		showCabFlippers(this.tableGroup)
-		this._syncChrome()
+		this._leavePlay()
+		if (!this.tableGroup) return
 		const target = computeViewerFraming(this.tableGroup)
 		await this._animateCameraTo(target, CAM_ANIM.durationMode)
-		if (Math.abs(this.camera.fov - CAM.fov) > 0.5) {
-			this.camera.fov = CAM.fov
-			this.camera.updateProjectionMatrix()
-		}
-		if (this.tableGroup)
-			syncRoom(this.scene, this.tableGroup, target.center, (target as any).size || new THREE.Vector3(1, 1, 1))
+		if (this.viewerMode !== 'viewer') return
+		syncRoom(this.scene, this.tableGroup, target.center, target.size)
+	}
+	/** Shared play-mode teardown: viewer chrome, pixel ratio, cabinet flippers, released keys, mode event. */
+	_leavePlay() {
+		this.viewerMode = 'viewer'
+		this.isPaused = false
+		if (history.state?.mode === 'play') history.back()
+		this.renderer?.setPixelRatio(getTargetPixelRatio('viewer'))
+		this._hidePlayTip?.()
+		this._syncChrome()
 		this.exitPlayMode()
 	}
 	_syncChrome() {
-		const hint = this.dom.modeHint
-		const isPlay = this.viewerMode === 'play'
-		document.body.classList.toggle('is-play', isPlay)
-		renderModeHint(hint, isPlay)
-	}
-	setupPlayCamera() {
-		if (!this.tableGroup || !this.controls) return
-		const state = computePlayFraming(this.tableGroup, this.camera)
-		applyCameraState(this.camera, this.controls, state)
-		this._playCameraApplied = true
+		document.body.classList.toggle('is-play', this.viewerMode === 'play')
 	}
 	async _animateCameraTo(state, duration = CAM_ANIM.durationMode) {
-		if (!state || !this.controls) return
 		this.cancelCameraAnimation()
-		const _gen = this._cameraGen
 		const fromPos = this.camera.position.clone()
 		const fromTarget = this.controls.target.clone()
 		const fromNear = this.camera.near
 		const fromFar = this.camera.far
 		const fromFov = this.camera.fov
-		const toPos = state.position.clone()
-		const toTarget = state.target.clone()
-		const toNear = state.near
-		const toFar = state.far
 		// Play and viewer modes share one FOV so every table frames the same way; the table's own ViewSetup FOV stays script-visible via api.FieldOfView only.
 		const toFov = CAM.fov
-		if (
-			fromPos.distanceTo(toPos) < 0.5 &&
-			fromTarget.distanceTo(toTarget) < 0.5 &&
-			Math.abs(fromFov - toFov) < 0.1
-		) {
+		const land = () => {
 			applyCameraState(this.camera, this.controls, state)
 			if (Math.abs(this.camera.fov - toFov) > 0.1) {
 				this.camera.fov = toFov
 				this.camera.updateProjectionMatrix()
 			}
 			this._playCameraApplied = this.viewerMode === 'play'
+		}
+		if (
+			fromPos.distanceTo(state.position) < 0.5 &&
+			fromTarget.distanceTo(state.target) < 0.5 &&
+			Math.abs(fromFov - toFov) < 0.1
+		) {
+			land()
+			this.invalidate()
 			return
 		}
 		const ease = t => t * t * (3 - 2 * t)
@@ -702,42 +634,36 @@ export class Viewer {
 		this.gate ??= new AnimationGate()
 		this.gate.beginAnimation()
 		const start = performance.now()
-		return new Promise(resolve => {
-			const tick = () => {
-				// Camera ticks run outside the gated loop: invalidate every tick,
-				// including the final pose that lands after _cameraRaf clears.
+		return new Promise<void>(resolve => {
+			// Runs once, on landing or on cancel (a newer tween, or the test API).
+			this._cameraSettle = () => {
+				this._cameraSettle = null
+				this.controls.enableDamping = prevDamping
+				this.controls.enabled = this.viewerMode !== 'play'
+				this.gate.endAnimation()
 				this.invalidate()
-				if (_gen !== this._cameraGen) {
-					this.gate.endAnimation()
-					this.controls.enableDamping = prevDamping
-					this.controls.enabled = this.viewerMode !== 'play'
-					resolve()
-					return
-				}
+				resolve()
+			}
+			const tick = () => {
+				// Camera ticks run outside the gated loop: invalidate every tick.
+				this.invalidate()
 				const t = Math.min(1, (performance.now() - start) / duration)
 				const e = ease(t)
-				this.camera.position.lerpVectors(fromPos, toPos, e)
-				this.controls.target.lerpVectors(fromTarget, toTarget, e)
-				this.camera.near = THREE.MathUtils.lerp(fromNear, toNear, e)
-				this.camera.far = THREE.MathUtils.lerp(fromFar, toFar, e)
+				this.camera.position.lerpVectors(fromPos, state.position, e)
+				this.controls.target.lerpVectors(fromTarget, state.target, e)
+				this.camera.near = THREE.MathUtils.lerp(fromNear, state.near, e)
+				this.camera.far = THREE.MathUtils.lerp(fromFar, state.far, e)
 				this.camera.fov = THREE.MathUtils.lerp(fromFov, toFov, e)
 				this.camera.updateProjectionMatrix()
 				this.camera.lookAt(this.controls.target)
 				this.controls.update()
-				if (t < 1) this._cameraRaf = requestAnimationFrame(tick)
-				else {
-					this._cameraRaf = null
-					applyCameraState(this.camera, this.controls, state)
-					if (Math.abs(this.camera.fov - toFov) > 0.1) {
-						this.camera.fov = toFov
-						this.camera.updateProjectionMatrix()
-					}
-					this._playCameraApplied = this.viewerMode === 'play'
-					this.controls.enableDamping = prevDamping
-					this.controls.enabled = this.viewerMode !== 'play'
-					this.gate.endAnimation()
-					resolve()
+				if (t < 1) {
+					this._cameraRaf = requestAnimationFrame(tick)
+					return
 				}
+				this._cameraRaf = null
+				land()
+				this._cameraSettle?.()
 			}
 			this._cameraRaf = requestAnimationFrame(tick)
 		})
@@ -756,28 +682,11 @@ export class Viewer {
 		const ballsNode = this.tableGroup?.getObjectByName('balls')
 		if (ballsNode) ballsNode.visible = true
 		this._emitModeChange()
-		if (this.dom.canvas) {
-			this.dom.canvas.tabIndex = 0
-			this.dom.canvas.focus()
-		}
-		this.hookInput()
-		if (!this._blurHandler) {
-			this._blurHandler = () => {
-				for (const code of RELEASE_CODES) this._sendKey(code, false)
-			}
-			window.addEventListener('blur', this._blurHandler)
-			document.addEventListener('visibilitychange', () => {
-				if (document.hidden) this._blurHandler()
-			})
-		}
+		this.dom.canvas?.focus()
 	}
 	exitPlayMode() {
 		this.invalidate()
-		if (this.wasmEngine?.ready) {
-			for (const code of this._touchMap.values()) this._sendKey(code, false)
-			this._touchMap.clear()
-			for (const code of RELEASE_CODES) this._sendKey(code, false)
-		} else this._touchMap.clear()
+		for (const code of RELEASE_CODES) this._sendKey(code, false)
 		if (this.controls) this.controls.enabled = true
 		if (this.tableGroup) showCabFlippers(this.tableGroup)
 		const ballsNode = this.tableGroup?.getObjectByName('balls')
@@ -817,9 +726,6 @@ export class Viewer {
 	_emitModeChange() {
 		dispatchEvent(new CustomEvent('viewer:modechange', { detail: { mode: this.viewerMode } }))
 	}
-	log(msg, level = 'info') {
-		this.harnessLog?.(msg, level)
-	}
 	setBar(pct, txt) {
 		if (this.dom.barFill) this.dom.barFill.style.setProperty('--progress', String(Math.max(0, Math.min(100, pct))))
 		if (this.dom.barText) this.dom.barText.textContent = txt ?? `${pct.toFixed(0)}%`
@@ -855,42 +761,26 @@ export class Viewer {
 		}, 400)
 	}
 	_showCanvas() {
-		if (this.dom.dropzone) this.dom.dropzone.hidden = true
 		if (this.dom.wrap) this.dom.wrap.hidden = false
 		if (this.dom.loading) this.dom.loading.hidden = true
-		this.renderer?.setSize(
-			typeof window !== 'undefined' ? window.innerWidth : 800,
-			typeof window !== 'undefined' ? window.innerHeight : 600,
-		)
+		this.renderer?.setSize(innerWidth, innerHeight)
 		this.dom.canvas?.focus()
 	}
-	_setStatus(msg) {
-		if (this.dom.subtitle) this.dom.subtitle.textContent = msg
-		if (this.dom.status) this.dom.status.textContent = msg
-	}
 	async _loadTable(reader) {
-		logMem(this.harnessLog, 'after reader.open')
+		logMem(this.log, 'after reader.open')
 		this._loading(66, 'Opening table…', 'Reading table data…')
 		const t0 = performance.now()
 		const table = await Table.load(reader)
 		this.table = table
 		this._applyTableToneMapping?.(table)
-		if (_isDev) window.table = table
 		const dt = performance.now() - t0
 		this.log(
 			`Parsed in ${dt.toFixed(0)}ms — ${Object.keys(table.items).length} items, ${Object.keys(table.textures).length} textures`,
 			'debug',
 		)
-		logMem(this.harnessLog, 'after parse')
+		logMem(this.log, 'after parse')
 		filterTextures(table, this.log.bind(this))
 		return table
-	}
-	_setupEnvironment(table) {
-		try {
-			if (!this.scene) return
-			if ((this as any)._envTexture && this.scene.environment === (this as any)._envTexture)
-				this.scene.environment = null
-		} catch {}
 	}
 	// Floor the base hemi + ambient fill when needsNoBakeFill() reports a
 	// lamp-only, unlit table. Never lowers an already brighter rig.
@@ -906,11 +796,9 @@ export class Viewer {
 		} catch {}
 	}
 	async _buildScene(table) {
-		this._setStatus('')
 		this._loading(70, 'Building playfield…', 'Preparing visuals…')
 		const emissionScale = table.data.globalEmissionScale
 		if (Number.isFinite(emissionScale)) setGlobalEmissionScale(emissionScale)
-		this._setupEnvironment(table)
 		try {
 			const dim = table.getDimensions?.()
 			if (dim) setPrimitiveTransmissionArea(dim.width, dim.height, ThreeRenderApi.SCALE)
@@ -925,8 +813,6 @@ export class Viewer {
 			(this.gate ??= new AnimationGate()),
 		)
 		this.renderApi = renderApi
-		if (_isDev) window.renderApi = renderApi
-		if (_isDev) window.textureLoader = texLoader
 		const ballTex = await texLoader.loadDefaultTexture('ball.png', '.png', 'ball.png')
 		renderApi.getMapGenerator().getCache().set('ball.png', ballTex)
 		ballTex.name = 'texture:ball.png'
@@ -1052,7 +938,7 @@ export class Viewer {
 		const { texCount, texMemMB } = computeTexMem(node)
 		this.log(`Textures in scene: ${texCount} ~${texMemMB} MB`, 'debug')
 		this._loading(88, 'Finishing up…', 'Final touches…')
-		logMem(this.harnessLog, 'after generateTableNode')
+		logMem(this.log, 'after generateTableNode')
 		if (textures.length) {
 			const used = new Set()
 			const mainBakeUsed = new Set()
@@ -1153,7 +1039,7 @@ export class Viewer {
 		reader.data = undefined
 		reader.blob = undefined
 		if (typeof (window as any).gc === 'function') (window as any).gc()
-		logMem(this.harnessLog, 'after reader release')
+		logMem(this.log, 'after reader release')
 	}
 	// Snapshot unstreamed texture sources before the archive is released,
 	// so mid-game script swaps still resolve afterwards.
@@ -1182,9 +1068,9 @@ export class Viewer {
 			} else retainedCount++
 		}
 		if (clearedCount)
-			this.harnessLog?.(`[mem] Cleared ${clearedCount} raw texture buffers (${retainedCount} retained)`, 'info')
+			this.log(`[mem] Cleared ${clearedCount} raw texture buffers (${retainedCount} retained)`, 'info')
 	}
-	async _mount(table, node, opts = {}, source = null) {
+	async _mount(table, node, source, gen) {
 		// The renderApi (and its texture cache) is recreated per scene build,
 		// so overlays sync here — a _loadTable-time preload would land in
 		// the discarded cache.
@@ -1192,18 +1078,15 @@ export class Viewer {
 			void overlay.syncTable?.(table)?.catch?.(e => this.log?.(`overlay sync failed: ${e}`, 'warn'))
 		if (this.tableGroup) this.scene.remove(this.tableGroup)
 		this.tableGroup = node
-		;(globalThis as any).tableGroup = node
-		;(globalThis as any).viewer = this
-		;(globalThis as any).renderApi = this.renderApi
 		this.scene.add(node)
 		const pp = postProcessScene(node, {
 			viewerMode: this.viewerMode,
-			harnessLog: this.harnessLog,
+			harnessLog: this.log,
 		})
 		this._applyNoBakeFill(table, node)
 		if (this.options.batched && table && this.renderApi) {
 			const res = _optimizeScene(node, table, this.renderApi)
-			if ((res.batched || res.instanced) && this.harnessLog) {
+			if (res.batched || res.instanced) {
 				const before = (() => {
 					let c = 0
 					node.traverse(o => {
@@ -1211,23 +1094,14 @@ export class Viewer {
 					})
 					return c
 				})()
-				this.harnessLog(
-					`[batch] BatchedMesh ${res.batched} + Instanced ${res.instanced} — meshes ${before}`,
-					'debug',
-				)
+				this.log(`[batch] BatchedMesh ${res.batched} + Instanced ${res.instanced} — meshes ${before}`, 'debug')
 			}
 		}
 		this.buildNodeCache()
 		this.dmd._ensureTexture()
 		this.dmd.findMeshes()
 		let framed
-		if (opts.skipCamera)
-			framed = {
-				center: this.controls.target.clone(),
-				size: new THREE.Vector3(),
-				maxDim: 1,
-			}
-		else if (this.viewerMode === 'play') {
+		if (this.viewerMode === 'play') {
 			const state = computePlayFraming(this.tableGroup, this.camera)
 			applyCameraState(this.camera, this.controls, state)
 			this._playCameraApplied = true
@@ -1236,7 +1110,7 @@ export class Viewer {
 				size: state.size,
 				maxDim: state.maxDim,
 			}
-			this.harnessLog?.(
+			this.log(
 				`[mount] play cam ${state.position.x.toFixed(0)},${state.position.y.toFixed(0)},${state.position.z.toFixed(0)} tgt ${state.target.x.toFixed(0)},${state.target.y.toFixed(0)},${state.target.z.toFixed(0)} maxDim ${state.maxDim.toFixed(0)}`,
 				'debug',
 			)
@@ -1255,17 +1129,12 @@ export class Viewer {
 			`Framed ${pp.lightmaps ? `(hid ${pp.lightmaps} lm)` : ''} — ${this.tableGroup ? countObjects(this.tableGroup) : 0} objs`.trim(),
 			'debug',
 		)
-		logMem(this.harnessLog, 'Ready — streaming textures')
+		logMem(this.log, 'Ready — streaming textures')
 		this._emitModeChange()
-		const src =
-			(opts && typeof opts.source === 'string' ? opts.source : null) ?? (typeof source === 'string' ? source : '')
-		const basename =
-			typeof src === 'string' && src
-				? src
-						.split('/')
-						.pop()
-						?.replace(/\.vpx$/i, '')
-				: ''
+		const basename = source
+			.split('/')
+			.pop()
+			.replace(/\.vpx$/i, '')
 		const rawGet = table?.getName?.()
 		const infoName = table?.info?.TableName?.trim()
 		let vpxName = ''
@@ -1280,38 +1149,26 @@ export class Viewer {
 		else if (basename) vpxName = basename.replace(/[_-]+/g, ' ').replace(/\b\w/g, char => char.toUpperCase())
 		if (vpxName) setTitle(vpxName)
 		if (this.dom.subtitle) this.dom.subtitle.textContent = ''
-		if (!opts.skipPlayer) {
-			this._loading(92, 'Almost ready…', 'Starting game logic…')
-			await new Promise(r => setTimeout(r, 0))
-			try {
-				// The headless-WASM bridge is the only engine: it boots here
-				// eagerly (viewer-mode animation, instant play). A missing
-				// artifact or load failure falls through to the catch below.
-				await this._createWasmEngine()
-			} catch {
-				// A broken table must not unmount a successfully built
-				// scene: stay viewer-only so the table still renders and
-				// orbits. Play entry retries creation on demand. The cause
-				// is already logged by the boot above.
-				this._revertFailedPlay()
-			}
-			this._loading(100, 'Ready!', 'Ready to play')
-			if (this.dom.loadTitle)
-				this.dom.loadTitle.textContent =
-					this.viewerMode === 'play'
-						? 'Ready — PLAY: Enter=plunger (hold), ←/→ or A/D flippers, 1=Start 5=Coin, Touch tap left/right hold plunger, P=Pause Esc=viewer ?=help'
-						: 'Ready — VIEWER: drag to orbit, wheel to zoom — click table to Play (Esc to return)'
-			this.log(this.dom.loadTitle.textContent)
-			logMem(this.harnessLog, 'Ready final')
-			this._setLoadState('ready')
-		} else {
-			this._loading(88, 'Finishing up…', 'Finishing up…')
+		this._loading(92, 'Almost ready…', 'Starting game logic…')
+		await new Promise(r => setTimeout(r, 0))
+		try {
+			// Eager boot: viewer-mode animation and instant play entry.
+			await this._bootEngine()
+		} catch (e) {
+			// A broken engine must not unmount a built scene: stay viewer-only
+			// so the table still renders and orbits; play entry retries the boot.
+			this.log(`Engine failed to start: ${e?.message ?? e}`, 'error')
+			this._revertFailedPlay()
 		}
-		if (_isDev)
-			Object.assign(window, {
-				table,
-				tableGroup: node,
-			})
+		if (gen !== this._loadId) return
+		this._loading(100, 'Ready!', 'Ready to play')
+		this.dom.loadTitle.textContent =
+			this.viewerMode === 'play'
+				? 'Ready — PLAY: Enter=plunger (hold), ←/→ or A/D flippers, 1=Start 5=Coin, Touch tap left/right hold plunger, P=Pause Esc=viewer ?=help'
+				: 'Ready — VIEWER: drag to orbit, wheel to zoom — click table to Play (Esc to return)'
+		this.log(this.dom.loadTitle.textContent)
+		logMem(this.log, 'Ready final')
+		this._setLoadState('ready')
 		if (!isLowQuality()) buildBvhIdle(node)
 		else this.log('[bvh] low quality: skip idle BVH for perf', 'debug')
 		this._buttonMeshes = []
@@ -1319,16 +1176,8 @@ export class Viewer {
 			if (o.isMesh && o.userData?.isCabinetButton) this._buttonMeshes.push(o)
 		})
 		if (this._buttonMeshes.length)
-			this.harnessLog?.(`[input] ${this._buttonMeshes.length} cabinet button meshes (BVH)`, 'debug')
+			this.log(`[input] ${this._buttonMeshes.length} cabinet button meshes (BVH)`, 'debug')
 		this.startLoop()
-		// Timed, cancellable only by option: e2e drives play entry explicitly
-		// through the test API with ?autoplay=0 instead of clearing timers.
-		if (this.viewerMode === 'viewer' && this.options.requestedMode === 'play' && this.options.autoplay) {
-			this.log('[viewer] auto-switch to play (vpx URL)', 'info')
-			setTimeout(() => {
-				this._switchToPlay()
-			}, 600)
-		}
 		return {
 			loaded: table,
 			node,
@@ -1345,21 +1194,42 @@ export class Viewer {
 		return ballsGroup
 	}
 	/**
-	 * Boot the headless-WASM engine that owns script, physics, and audio.
-	 * Meshes, materials, and input routing are unchanged — only the state
-	 * producer swaps. Throws `WasmEngineStartError` (or the missing-artifact
-	 * error) on failure so play entry reverts; leaves `wasmEngine` null
-	 * unless fully loaded.
+	 * Boot the headless-WASM engine (script, physics, audio) for the current
+	 * table. Callers share the in-flight boot of a table; `reboot` starts a
+	 * fresh one after it (a ROM arrived). Boots run one at a time, since the
+	 * engine module is shared page-wide.
 	 */
-	async _createWasmEngine() {
+	_bootEngine(reboot = false) {
+		const gen = this._loadId
+		if (!reboot && this._engineBoot?.gen === gen) return this._engineBoot.promise
+		const previous = this._engineBoot?.promise.catch(() => {})
+		const promise = (async () => {
+			await previous
+			return this._createWasmEngine(gen, reboot)
+		})()
+		this._engineBoot = { gen, promise }
+		this._engineGen = gen
+		promise
+			.finally(() => {
+				if (this._engineBoot?.promise === promise) this._engineBoot = undefined
+			})
+			.catch(() => {})
+		return promise
+	}
+	/**
+	 * Throws `WasmEngineStartError` (or the missing-artifact error) on failure;
+	 * leaves `wasmEngine` null unless fully loaded. A boot whose table was
+	 * replaced meanwhile is dropped: the new table boots its own.
+	 */
+	async _createWasmEngine(gen, reboot) {
+		await this._romLoad?.catch(() => {})
+		if (gen !== this._loadId) return
+		if (reboot && this.wasmEngine?.ready && this._engineRom === this.rom) return
 		await this.wasmEngine?.destroy().catch(() => {})
 		this.wasmEngine = null
 		if (!this._vpxBytes?.length) throw new WasmEngineStartError('No table bytes retained for the WASM engine')
-		const win = window
-		const rom =
-			win.__pendingRom?.length && win.__pendingRomName
-				? { name: win.__pendingRomName, zip: win.__pendingRom }
-				: undefined
+		const rom = this.rom
+		this._engineRom = rom
 		const engine = new WasmEngine({
 			renderApi: this.renderApi,
 			table: this.table,
@@ -1372,13 +1242,14 @@ export class Viewer {
 			lookupPlunger: name => this.table?.plungers?.[name]?.data,
 		})
 		try {
-			await engine.load({
-				vpxBytes: this._vpxBytes,
-				rom,
-			})
+			await engine.load({ vpxBytes: this._vpxBytes, rom: rom && { name: rom.name, zip: rom.zip } })
 		} catch (e) {
 			await engine.destroy().catch(() => {})
 			throw e
+		}
+		if (gen !== this._loadId) {
+			await engine.destroy().catch(() => {})
+			return
 		}
 		this.wasmEngine = engine
 		engine.primeAudioOnGesture()
@@ -1389,7 +1260,6 @@ export class Viewer {
 		this._syncSoundChrome()
 		this.log(`WASM engine ready: ${engine.catalogSize} parts, script errors: ${engine.scriptErrorCount}`, 'debug')
 		this.isPaused = false
-		this.hookInput()
 		if (this.viewerMode === 'play') this.enterPlayMode()
 		else this.exitPlayMode()
 	}
@@ -1639,8 +1509,8 @@ export class Viewer {
 							if (info.isBaked) hasReadyBake = true
 							const isBaked = !!(m2.userData && (m2.userData.__isBaked || m2.userData.__bakedNode))
 							// Collect regardless of current visibility: the hide
-							// below runs first (as before), and a hidden mesh
-							// that still qualifies must end up shown again.
+							// below runs first, and a hidden mesh that still
+							// qualifies must end up shown again.
 							const shouldShow = isBaked || info.isMainBake || (info.isVlmBake && !info.isMainBake)
 							if (shouldShow) show.push(o2)
 						}
@@ -1752,7 +1622,7 @@ export class Viewer {
 			this._setStreamProgress(total, total)
 			if (this.dom.streamLabel) this.dom.streamLabel.textContent = 'Visuals ready'
 			setTimeout(() => this._hideStream(), 1200)
-			logMem(this.harnessLog, 'Stream ready')
+			logMem(this.log, 'Stream ready')
 			await this._retainUnstreamedSources(table)
 			if (reader) {
 				await this._cleanupReader(reader)
@@ -1786,7 +1656,7 @@ export class Viewer {
 			await this._cleanupReader(reader)
 			return null
 		}
-		const mounted = await this._mount(table, node, {}, source)
+		const mounted = await this._mount(table, node, source, _loadGen)
 		if (_loadGen !== this._loadId) {
 			await this._cleanupReader(reader)
 			return mounted
@@ -1806,169 +1676,142 @@ export class Viewer {
 		return mounted
 	}
 	/** Load a table by name, path or URL (`?vpx=` semantics, see resolveVpxCandidates). */
-	async load(vpx) {
-		this._loadId = (this._loadId ?? 0) + 1
-		const _loadGen = this._loadId
-		if (this._loadAbort) this._loadAbort.abort()
-		this._loadAbort = new AbortController()
-		const _signal = this._loadAbort.signal
+	load(vpx) {
+		return this._load(`Looking for ${vpx}…`, signal => this._fetchTable(vpx, signal))
+	}
+	/** Load a dropped or picked `.vpx` file. */
+	loadFromFile(file) {
+		return this._load(`Reading ${file.name}…`, async () => ({
+			bytes: new Uint8Array(await file.arrayBuffer()),
+			source: file.name,
+		}))
+	}
+	/**
+	 * Shared load lifecycle: supersedes any load in flight, shows progress and
+	 * failures on the loading card, and resolves null when superseded. Rejects
+	 * (after reporting) when this load fails.
+	 */
+	async _load(detail, readBytes) {
+		const gen = ++this._loadId
+		this._loadAbort?.abort()
+		const abort = (this._loadAbort = new AbortController())
 		this._streamId++
-		await this._ensureRenderer()
-		if (_loadGen !== this._loadId) return
-		if (this.dom.loading) this.dom.loading.hidden = false
-		if (this.dom.wrap) this.dom.wrap.hidden = false
-		const _w = typeof window !== 'undefined' ? window.innerWidth : 800
-		const _h = typeof window !== 'undefined' ? window.innerHeight : 600
-		this.renderer?.setSize(_w, _h)
-		this._loading(2, 'Getting ready…', 'Looking for table…')
-		const candidates = resolveVpxCandidates(vpx)
-		if (!candidates.length) {
-			this.log('No VPX candidate (pass ?vpx=name)', 'warn')
-			this._setLoadState('error')
-			return
-		}
+		// The current table's ROM stays behind; one attached before any table goes with this one.
+		if (this.rom?.owner) this.rom = undefined
+		else if (this.rom) this.rom.owner = gen
 		this._setLoadState('loading')
-		this.log(`Trying ${candidates.join(', ')}`, 'debug')
-		for (const cand of candidates) {
-			if (_loadGen !== this._loadId) return
-			if (_signal.aborted) throw new DOMException('Aborted', 'AbortError')
+		this.dom.loading.hidden = false
+		this.dom.loading.classList.remove('is-error')
+		this._loading(2, 'Getting ready…', detail)
+		this.log(detail, 'debug')
+		try {
+			if (!(await this._ensureRenderer())) throw new Error('The renderer failed to start (see the log)')
+			const { bytes, source } = await readBytes(abort.signal)
+			if (gen !== this._loadId) return null
+			this._vpxBytes = bytes
+			const reader = new BrowserBinaryReader(bytes)
+			await reader.open()
+			const mounted = await this._fromReader(reader, source, gen)
+			if (gen === this._loadId) this._loadAbort = null
+			return mounted
+		} catch (e) {
+			if (gen !== this._loadId || e?.name === 'AbortError') return null
+			this._loadAbort = null
+			this.log(`Load failed: ${e?.stack ?? e}`, 'error')
+			this._setLoadState('error')
+			this.dom.loading.hidden = false
+			this.dom.loading.classList.add('is-error')
+			this._loading(0, 'Could not load the table', e?.message ?? String(e))
+			throw e
+		}
+	}
+	/**
+	 * Fetch the first candidate that answers. Same-origin files (dev server,
+	 * the deploy itself) are always fetched fresh; remote downloads are cached
+	 * in IndexedDB by their full URL.
+	 */
+	async _fetchTable(vpx, signal) {
+		const candidates = resolveVpxCandidates(vpx)
+		if (!candidates.length) throw new Error('No table given: pass ?vpx=name')
+		const failures = []
+		for (const candidate of candidates) {
+			const url = new URL(candidate, document.baseURI).href
+			const cacheable = new URL(url).origin !== location.origin
+			const cached = cacheable ? await idbGet(url) : undefined
+			if (cached) {
+				this.log(`[IDB] hit ${url} ${fmtBytes(cached.byteLength)} — using cached`, 'debug')
+				return { bytes: cached, source: candidate }
+			}
 			try {
-				try {
-					const { idbGet } = await import('../../dist-esm/lib/util/idb-cache.js')
-					const cached = await idbGet(cand.split('/').pop())
-					if (cached && cached.byteLength > 1_000_000) {
-						this.log(
-							`[IDB] hit ${cand.split('/').pop()} ${fmtBytes(cached.byteLength)} — using cached`,
-							'debug',
-						)
-						const bytes = new Uint8Array(cached)
-						this._vpxBytes = bytes
-						const reader = new BrowserBinaryReader(bytes)
-						await reader.open()
-						if (_loadGen !== this._loadId) {
-							try {
-								await this._cleanupReader(reader)
-							} catch {}
-							return
-						}
-						const _res = await this._fromReader(reader, cand, _loadGen)
-						if (_loadGen === this._loadId) this._loadAbort = null
-						return _res
-					}
-				} catch {}
-				if (_loadGen !== this._loadId) return
-				if (_signal.aborted) throw new DOMException('Aborted', 'AbortError')
-				this.log(`Fetching ${cand}…`, 'debug')
+				this.log(`Fetching ${url}…`, 'debug')
 				this._loading(5, 'Downloading…', 'Downloading table…')
 				const t0 = performance.now()
-				const vpxKey = cand.split('/').pop()
-				const data = await fetchWithProgress(
-					cand,
+				const bytes = await fetchWithProgress(
+					url,
 					p => {
 						const pct = Math.round(p * 100)
 						this._loading(5 + p * 60, `Downloading… ${pct}%`, `Downloading table… ${pct}%`)
 					},
-					{ signal: _signal },
+					{ signal },
 				)
 				this.log(
-					`Fetched ${fmtBytes(data.length)} in ${((performance.now() - t0) / 1000).toFixed(1)}s`,
+					`Fetched ${fmtBytes(bytes.length)} in ${((performance.now() - t0) / 1000).toFixed(1)}s`,
 					'debug',
 				)
-				try {
-					const { idbSet } = await import('../../dist-esm/lib/util/idb-cache.js')
-					idbSet(vpxKey, data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength)).catch(
-						() => {},
-					)
-				} catch {}
-				if (_loadGen !== this._loadId) return
-				this._vpxBytes = data
-				const reader = new BrowserBinaryReader(data)
-				await reader.open()
-				if (_loadGen !== this._loadId) {
-					try {
-						await this._cleanupReader(reader)
-					} catch {}
-					return
-				}
-				const _res2 = await this._fromReader(reader, cand, _loadGen)
-				if (_loadGen === this._loadId) this._loadAbort = null
-				return _res2
-			} catch (err) {
-				if (_signal.aborted || err?.name === 'AbortError' || _loadGen !== this._loadId) return
-				this.log(`Error loading ${cand}: ${err?.stack ?? err?.message}`, 'error')
+				if (cacheable) void idbSet(url, bytes)
+				return { bytes, source: candidate }
+			} catch (e) {
+				if (e?.name === 'AbortError') throw e
+				failures.push(`${candidate}: ${e?.message ?? e}`)
 			}
 		}
-		if (_loadGen !== this._loadId) return
-		if (_loadGen === this._loadId) this._loadAbort = null
-		this._setLoadState('error')
-		throw new Error(`Failed: none of ${candidates.join(', ')}`)
+		throw new Error(`No table found (${failures.join('; ')})`)
 	}
-	async loadFromFile(file) {
-		this._loadId = (this._loadId ?? 0) + 1
-		const _loadGen = this._loadId
-		if (this._loadAbort) this._loadAbort.abort()
-		this._loadAbort = new AbortController()
-		this._streamId++
-		this._setLoadState('loading')
-		this._loading(5, 'Reading file…', `Reading ${file.name}…`)
-		this.log(`Reading ${file.name}…`, 'debug')
-		try {
-			const bytes = new Uint8Array(await file.arrayBuffer())
-			this._vpxBytes = bytes
-			const reader = new BrowserBinaryReader(bytes)
-			await reader.open()
-			if (_loadGen !== this._loadId) {
-				await this._cleanupReader(reader)
-				return null
-			}
-			const _res = await this._fromReader(reader, file.name, _loadGen)
-			if (_loadGen === this._loadId) this._loadAbort = null
-			return _res
-		} catch (e) {
-			if (_loadGen === this._loadId) this._setLoadState('error')
-			throw e
-		}
+	/** Attach a dropped or picked `.zip` ROM (see `_attachRom`). */
+	loadRomFile(file) {
+		return this._attachRom(
+			file.name,
+			file.arrayBuffer().then(buffer => new Uint8Array(buffer)),
+		)
 	}
-	async loadRomFile(file) {
-		const buf = new Uint8Array(await file.arrayBuffer())
-		window.__pendingRom = buf
-		window.__pendingRomName = file.name.replace(/\.zip$/i, '')
-		this.log(`ROM file ${file.name} ${fmtBytes(buf.length)} — stored`, 'debug')
-		return buf
+	/** Download a ROM and attach it (see `_attachRom`). */
+	preloadRom(url) {
+		this.log(`Downloading ROM ${url}…`, 'debug')
+		return this._attachRom(url.split('/').pop(), fetchWithProgress(url))
 	}
-	async preloadRom(url) {
-		this.log(`Preloading ROM ${url}…`, 'debug')
-		const data = await fetchWithProgress(url, p => this.setBar(5 + p * 40, `ROM ${(p * 100).toFixed(0)}%`), {
-			signal: this._loadAbort?.signal,
+	/**
+	 * A ROM belongs to the table on screen or loading, whose engine reboots
+	 * with it; before any table it waits for the next one. Engine boots await
+	 * a ROM in flight. A ROM whose table was replaced meanwhile is dropped.
+	 */
+	_attachRom(fileName, bytes) {
+		const owner = this._loadId
+		const name = fileName.replace(/\.zip$/i, '')
+		const attach = bytes.then(zip => {
+			if (owner && owner !== this._loadId) return
+			this.rom = { name, zip, owner: this._loadId }
+			this.log(`ROM ${name} ${fmtBytes(zip.length)} ready`, 'debug')
+			if (this._engineGen && this._engineGen === this._loadId)
+				this._bootEngine(true).catch(e =>
+					this.log(`Engine restart with ROM ${name} failed: ${e?.message ?? e}`, 'error'),
+				)
 		})
-		window.__pendingRom = data
-		window.__pendingRomName =
-			url
-				.split('/')
-				.pop()
-				?.replace(/\.zip$/i, '') || ''
-		window.__pendingRomUrl = url
-		this.log(`ROM preload OK ${fmtBytes(data.length)}`, 'debug')
-		return data
+		this._romLoad = attach
+		attach
+			.finally(() => {
+				if (this._romLoad === attach) this._romLoad = undefined
+			})
+			.catch(e => this.log(`ROM ${name} failed: ${e?.message ?? e}`, 'error'))
+		return attach
 	}
+	/** Run the frame loop on the current renderer; device-loss recovery re-attaches it to the new one. */
 	async startLoop() {
-		await this._ensureRenderer()
-		if (!this.renderer) return
+		if (!(await this._ensureRenderer())) return
 		await this.precompilePipelines()
-		if (!this.renderer) return
-		if (this.animFrame) {
-			cancelAnimationFrame(this.animFrame)
-			clearTimeout(this.animFrame)
-			this.animFrame = null
-		}
-		if (this._animRaf) {
-			cancelAnimationFrame(this._animRaf)
-			this._animRaf = null
-		}
-		if (this._animTimeout) {
-			clearTimeout(this._animTimeout)
-			this._animTimeout = null
-		}
+		this._loop ??= this._createLoop()
+		this.renderer?.setAnimationLoop(this._loop)
+	}
+	_createLoop() {
 		let frames = 0,
 			fps = 0
 		let lastFpsUpdate = performance.now()
@@ -1981,11 +1824,8 @@ export class Viewer {
 			frames = 0
 			return true
 		}
-		this.renderer.setAnimationLoop((timestamp, frame) => {
-			if (this.isPaused) {
-				this.wasmEngine?.resetStepClock(timestamp)
-				return
-			}
+		return timestamp => {
+			if (this.isPaused) this.wasmEngine?.resetStepClock(timestamp)
 			// Dirty-gated present: idle frames skip the present (and its matrix
 			// pass) entirely — physics above still steps every frame. The scan
 			// itself is cheap (numeric signatures, no string work).
@@ -1997,7 +1837,7 @@ export class Viewer {
 					return false
 				}
 			})()
-			const stateDirty = this._syncPhysicsTransforms(timestamp)
+			const stateDirty = this._syncWasmTransforms(timestamp)
 			const controlsDirty = this.controls?.enabled ? !!this.controls.update() : false
 			const cameraDirty = !!this._cameraRaf
 			// Gamepad nudges share this rAF tick (play-mode gated inside).
@@ -2011,53 +1851,39 @@ export class Viewer {
 			this._needsRender = false
 			const dirty =
 				stateDirty || controlsDirty || cameraDirty || overlayDirty || transmissionDirty || forcePresent
-			if (!dirty) {
-				rollFpsWindow(timestamp, false)
-				return
+			if (dirty) {
+				if (stateDirty) this.renderApi?.flushMatrixUpdates(this.tableGroup)
+				this._present()
+				frames++
 			}
-			if (stateDirty) this.renderApi?.flushMatrixUpdates?.(this.tableGroup)
-			if (this.renderPipeline) this.renderPipeline.render()
-			else this.renderer.render(this.scene, this.camera)
-			frames++
-			if (rollFpsWindow(timestamp, true)) {
-				if (this.dom.stats) {
-					const balls = this.wasmEngine?.ballCount ?? 0
-					const mode = this.viewerMode === 'play' ? (this.isPaused ? 'PLAY PAUSED' : 'PLAY') : 'VIEWER'
-					const draws = this.renderer?.info?.render?.calls ?? 0
-					const tris = this.renderer?.info?.render?.triangles ?? 0
-					const trisFmt =
-						tris >= 1e6
-							? `${(tris / 1e6).toFixed(1)}M`
-							: tris >= 1e3
-								? `${(tris / 1e3).toFixed(1)}k`
-								: `${tris}`
-					const wasmReady = !!this.wasmEngine?.ready
-					const wasmLabel = wasmReady ? 'Ready' : 'Loading…'
-					renderStats(this.dom.stats, {
-						fps,
-						draws,
-						trisFmt,
-						balls,
-						wasmLabel,
-						wasmReady,
-						backend: this._rendererBackend,
-						mode,
-					})
-				}
-				const hud = this.dom.fpsHud || document.getElementById('fps-hud')
-				if (hud) {
-					let el = hud.querySelector('.fps')
-					if (!el) {
-						el = document.createElement('span')
-						el.className = 'fps'
-						hud.textContent = ''
-						hud.append(el)
-					}
-					el.textContent = `${fps} fps`
-					el.className = `fps ${fpsClass(fps)}`.trim()
-				}
-			}
+			// The HUD refreshes on every window roll, so mode/pause/engine state shows while idle too.
+			if (rollFpsWindow(timestamp, dirty)) this._renderHud(fps)
+		}
+	}
+	_present() {
+		if (this.renderPipeline) this.renderPipeline.render()
+		else this.renderer?.render(this.scene, this.camera)
+	}
+	_renderHud(fps) {
+		const mode = this.viewerMode === 'play' ? (this.isPaused ? 'PLAY PAUSED' : 'PLAY') : 'VIEWER'
+		const tris = this.renderer?.info?.render?.triangles ?? 0
+		const wasmReady = !!this.wasmEngine?.ready
+		renderStats(this.dom.stats, {
+			fps,
+			draws: this.renderer?.info?.render?.calls ?? 0,
+			trisFmt:
+				tris >= 1e6 ? `${(tris / 1e6).toFixed(1)}M` : tris >= 1e3 ? `${(tris / 1e3).toFixed(1)}k` : `${tris}`,
+			balls: this.wasmEngine?.ballCount ?? 0,
+			wasmLabel: wasmReady ? 'Ready' : 'Loading…',
+			wasmReady,
+			backend: this._rendererBackend,
+			mode,
 		})
+		const fpsEl = this.dom.fpsHud?.querySelector('.fps')
+		if (fpsEl) {
+			fpsEl.textContent = `${fps} fps`
+			fpsEl.className = `fps ${fpsClass(fps)}`.trim()
+		}
 	}
 
 	_needsRender = false
@@ -2073,11 +1899,10 @@ export class Viewer {
 	 */
 	stepOnce(nowMs = performance.now()): boolean {
 		if (!this.wasmEngine?.ready) return false
-		if (this.isPaused || this.viewerMode !== 'play' || isLowQuality()) return false
+		if (this.isPaused || this.viewerMode !== 'play') return false
 		if (!this._syncWasmTransforms(nowMs)) return true
-		this.renderApi?.flushMatrixUpdates?.(this.tableGroup)
-		if (this.renderPipeline) this.renderPipeline.render()
-		else this.renderer.render(this.scene, this.camera)
+		this.renderApi?.flushMatrixUpdates(this.tableGroup)
+		this._present()
 		return true
 	}
 	/** Typed entry for the test API: enter or leave play mode (awaits the camera move). */
@@ -2091,31 +1916,22 @@ export class Viewer {
 	 * mode-switch tween reuses the same path on every new animation.
 	 */
 	cancelCameraAnimation(): void {
-		this._cameraGen = (this._cameraGen ?? 0) + 1
 		if (this._cameraRaf) {
 			cancelAnimationFrame(this._cameraRaf)
 			this._cameraRaf = null
 		}
-		if (this._cameraTimeout) {
-			clearTimeout(this._cameraTimeout)
-			this._cameraTimeout = null
-		}
-		if (this._cameraTimeoutResolver) {
-			const resolver = this._cameraTimeoutResolver
-			this._cameraTimeoutResolver = null
-			resolver()
-		}
+		this._cameraSettle?.()
 	}
 
 	render() {
-		this.renderApi?.flushMatrixUpdates?.(this.tableGroup)
-		if (this.renderPipeline) this.renderPipeline.render()
-		else this.renderer?.render(this.scene, this.camera)
+		this.renderApi?.flushMatrixUpdates(this.tableGroup)
+		this._present()
 		this._needsRender = false
 	}
 
 	togglePause() {
 		this.isPaused = !this.isPaused
+		this.invalidate()
 		this.log(this.isPaused ? 'Paused (P to resume)' : 'Resumed', this.isPaused ? 'warn' : 'info')
 	}
 	_nudge(angle, force = 2.6) {
@@ -2163,19 +1979,5 @@ export class Viewer {
 			el.classList.remove('show')
 			el.hidden = true
 		}, 420)
-	}
-	hookInput() {
-		if (!this.wasmEngine?.ready) return
-		this._inputCleanup?.()
-		this._inputCleanup = attachInput(this)
-		if (this.dom.canvas) {
-			this.dom.canvas.tabIndex = 0
-			setTimeout(() => {
-				this.dom.canvas.focus()
-			}, 50)
-			setTimeout(() => {
-				this.dom.canvas.focus()
-			}, 300)
-		}
 	}
 }
