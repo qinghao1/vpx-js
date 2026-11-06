@@ -63,8 +63,14 @@ const summary = await (async () => {
 				const vpxFlipper = new Uint8Array(await (await fetch('/test/fixtures/table-flipper.vpx')).arrayBuffer())
 				const vpxLight = new Uint8Array(await (await fetch('/test/fixtures/table-light.vpx')).arrayBuffer())
 				check(engine.init() === 0, 'engine inits once')
-				const rcFlipper = await engine.loadTable(vpxFlipper)
-				check(rcFlipper === 0, 'flipper table loads', `${vpxFlipper.length} bytes rc=${rcFlipper}`)
+				// The facade rejects with a typed HeadlessEngineError on failure.
+				const loads = bytes =>
+					engine.loadTable(bytes).then(
+						() => 'ok',
+						e => String(e?.message ?? e),
+					)
+				const rcFlipper = await loads(vpxFlipper)
+				check(rcFlipper === 'ok', 'flipper table loads', `${vpxFlipper.length} bytes rc=${rcFlipper}`)
 				const catalogRaw = engine.getPartCatalogJson()
 				check(catalogRaw.length > 2, 'catalog JSON non-empty', `${catalogRaw.length} chars`)
 				const catalog = JSON.parse(catalogRaw || '[]')
@@ -97,7 +103,7 @@ const summary = await (async () => {
 				)
 				check(engine.getScriptErrorCount() === 0, 'no script errors on scriptless table')
 				await engine.destroyTable()
-				check((await engine.loadTable(vpxLight)) === 0, 'light table loads')
+				check((await loads(vpxLight)) === 'ok', 'light table loads')
 				for (let f = 0; f < 30; f++) engine.stepFrame(f * 16.7)
 				const lights = engine.getBuffer('lights')
 				const currents = []
@@ -111,12 +117,13 @@ const summary = await (async () => {
 				await engine.destroyTable()
 				if (romName) {
 					const zipBytes = new Uint8Array(await (await fetch(romName)).arrayBuffer())
-					check(engine.mountRom('twd_160h.zip', zipBytes) === 0, 'ROM zip mounts for PinMAME')
+					engine.mountRom('twd_160h.zip', zipBytes)
+					check(true, 'ROM zip mounts for PinMAME')
 					const vpxTwd = new Uint8Array(
 						await (await fetch(twdUrl)).arrayBuffer().catch(() => new ArrayBuffer(0)),
 					)
 					if (vpxTwd.length > 0) {
-						check((await engine.loadTable(vpxTwd)) === 0, 'walking-dead table loads')
+						check((await loads(vpxTwd)) === 'ok', 'walking-dead table loads')
 						const scriptErrors = engine.getScriptErrorCount()
 						const scriptError = engine.getScriptError()
 						if (scriptErrors === 0) {

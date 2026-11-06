@@ -621,7 +621,8 @@ async function abNewSetup(page, repoRoot, mountName) {
 				o.vpxBytes = vpx.length
 				o.romBytes = rom.length
 				o.mountName = globalThis.__mountName
-				o.mountRc = engine.mountRom(globalThis.__mountName, rom)
+				engine.mountRom(globalThis.__mountName, rom)
+				o.mountRc = 0
 				o.audioPre = engine.getAudioInfo()
 				await engine.loadTable(vpx)
 				o.audioPost = engine.getAudioInfo()

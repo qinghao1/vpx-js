@@ -140,8 +140,7 @@ export class WasmEngine {
 		} else if (pending.__pendingRom?.length && pending.__pendingRomName) {
 			this.engine.mountRom(romMountFileName(script, pending.__pendingRomName), pending.__pendingRom)
 		}
-		const rc = await this.engine.loadTable(vpxBytes)
-		if (rc !== 0) throw new WasmEngineStartError(`VpxWasm_LoadTable returned ${rc}`)
+		await this.engine.loadTable(vpxBytes)
 		for (const part of JSON.parse(this.engine.getPartCatalogJson() || '[]') as { idx: number; name: string }[]) {
 			if (typeof part.idx === 'number' && typeof part.name === 'string') this.partNames.set(part.idx, part.name)
 		}
