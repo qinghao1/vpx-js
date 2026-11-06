@@ -27,8 +27,6 @@ export default defineConfig({
 		dedupe: ['three', 'three/webgpu', 'three/tsl', 'three-mesh-bvh'],
 		alias: [
 			{ find: 'node:buffer', replacement: resolve(__dirname, 'node_modules/buffer/index.js') },
-			{ find: /^node:assert(\/strict)?$/, replacement: resolve(repoRoot, 'dist-esm/lib/util/assert.js') },
-			{ find: /^assert(\/strict)?$/, replacement: resolve(repoRoot, 'dist-esm/lib/util/assert.js') },
 			{ find: 'buffer', replacement: resolve(__dirname, 'node_modules/buffer/index.js') },
 			{ find: 'three-mesh-bvh', replacement: resolve(__dirname, 'node_modules/three-mesh-bvh/src/index.js') },
 			{ find: /^.*refs\.node\.js(\?.*)?$/, replacement: resolve(repoRoot, 'dist-esm/lib/refs.browser.js') },
