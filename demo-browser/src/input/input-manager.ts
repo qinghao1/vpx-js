@@ -17,6 +17,17 @@ export function ownsKey(target: EventTarget | null, code: string): boolean {
 	)
 }
 
+/**
+ * Only the canvas or the page body auto-enters play: gameplay keys pressed
+ * while a button, link, or panel has focus stay with that control.
+ */
+export function isPlaySurface(target: EventTarget | null): boolean {
+	const tag = (target as { tagName?: unknown } | null)?.tagName
+	if (typeof tag !== 'string') return false
+	const lower = tag.toLowerCase()
+	return lower === 'canvas' || lower === 'body'
+}
+
 // Every gameplay code that must never stick down across blur/hide/exit-play:
 // modifiers, plunger (Enter), nudge keys, the coin-door/service cluster
 // (7/8/9/0, End, Home) whose switches would otherwise latch the game in test
@@ -137,6 +148,9 @@ export function attachKeyboard(host: InputHost, signal: AbortSignal): void {
 		if (e.key === '?' || (e.key.length === 1 && ['h', 'o'].includes(e.key.toLowerCase()))) return
 
 		if (down && host.viewerMode === 'viewer' && (PLAY_CODES.has(e.code) || PLAY_CODES.has(e.key))) {
+			// Focused controls keep their keys: only a canvas/body target
+			// auto-enters play, so keys on a button never start a game.
+			if (!isPlaySurface(e.target)) return
 			host.enterPlayMode()
 		}
 
