@@ -13,11 +13,15 @@ export const resolveVpxCandidates = vpx => {
 	return [name]
 }
 
-export const fetchWithProgress = async (url, onProgress, opts = {}) => {
-	const signal = opts?.signal
-	if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
+/**
+ * Download a file's bytes, reporting 0..1 progress. Aborting `signal` aborts
+ * the body stream too. An HTML page is rejected: dev servers and SPA hosts
+ * answer a missing file with their index.html and a 200.
+ */
+export const fetchWithProgress = async (url, onProgress, { signal } = {}) => {
 	const res = await fetch(url, { cache: 'no-store', signal })
 	if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText} for ${url}`)
+	if (res.headers.get('content-type')?.includes('text/html')) throw new Error(`${url} is an HTML page, not a file`)
 	if (!res.body) {
 		const b = await res.arrayBuffer()
 		onProgress?.(1)
@@ -27,23 +31,13 @@ export const fetchWithProgress = async (url, onProgress, opts = {}) => {
 	const reader = res.body.getReader()
 	const chunks = []
 	let received = 0
-	const onAbort = () => {
-		reader.cancel()
-	}
-	if (signal) signal.addEventListener('abort', onAbort, { once: true })
-	try {
-		while (true) {
-			if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
-			const { done, value } = await reader.read()
-			if (done) break
-			if (!value) continue
-			chunks.push(value)
-			received += value.length
-			if (len) onProgress?.(Math.min(received / len, 1))
-			else onProgress?.(Math.min(received / (2 * 1024 * 1024), 0.99))
-		}
-	} finally {
-		if (signal) signal.removeEventListener('abort', onAbort)
+	while (true) {
+		const { done, value } = await reader.read()
+		if (done) break
+		chunks.push(value)
+		received += value.length
+		if (len) onProgress?.(Math.min(received / len, 1))
+		else onProgress?.(Math.min(received / (2 * 1024 * 1024), 0.99))
 	}
 	onProgress?.(1)
 	if (chunks.length === 1) return chunks[0]
