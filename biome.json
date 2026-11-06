@@ -16,7 +16,6 @@
 			"!external",
 			"!!wasm/build",
 			"!test/fixtures",
-			"!lib/scripting/grammar/rules.ts",
 			"!!demo-browser/dist",
 			"!!demo-browser/node_modules",
 			"!lib/**/bench*.spec.ts",
@@ -109,18 +108,6 @@
 						"noExportsInTest": "off"
 					}
 				}
-			}
-		},
-		{
-			"includes": ["lib/scripting/grammar/rules.ts"],
-			"formatter": {
-				"enabled": false
-			},
-			"linter": {
-				"enabled": false
-			},
-			"assist": {
-				"enabled": false
 			}
 		},
 		{

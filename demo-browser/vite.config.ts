@@ -10,50 +10,6 @@ const root = resolve(__dirname)
 const repoRoot = resolve(__dirname, '..')
 const home = os.homedir()
 
-function rawLoader() {
-	return {
-		name: 'raw-loader',
-		enforce: 'pre' as const,
-		resolveId(source: string, importer: string | undefined) {
-			const clean = source.split('?')[0].split('#')[0]
-			if (!(clean.endsWith('.vbs') || clean.endsWith('.bnf'))) return null
-			const tryPaths: string[] = []
-			if (clean.startsWith('.') && importer) {
-				try {
-					let base = importer.split('?')[0].split('#')[0]
-					if (base.startsWith('/@fs')) base = base.slice(4)
-					tryPaths.push(resolve(path.dirname(base), clean))
-				} catch {}
-			}
-			try {
-				const p = clean.startsWith('/@fs') ? clean.slice(4) : clean
-				if (path.isAbsolute(p)) tryPaths.push(p)
-			} catch {}
-			if (clean.includes('res/scripts') || clean.includes('grammar')) {
-				const baseName = path.basename(clean)
-				if (clean.endsWith('.vbs')) tryPaths.push(resolve(repoRoot, 'res/scripts', baseName))
-				if (clean.endsWith('.bnf')) tryPaths.push(resolve(repoRoot, 'lib/scripting/grammar', baseName))
-				tryPaths.push(resolve(repoRoot, clean.replace(/^(\.\.\/)+/, '')))
-			}
-			for (const p of tryPaths)
-				try {
-					if (fs.existsSync(p)) return p
-				} catch {}
-			return null
-		},
-		load(id: string) {
-			const clean = id.split('?')[0].split('#')[0]
-			if (clean.endsWith('.vbs') || clean.endsWith('.bnf')) {
-				try {
-					let p = clean
-					if (p.startsWith('/@fs')) p = p.slice(4)
-					return `export default ${JSON.stringify(fs.readFileSync(p, 'utf-8'))};`
-				} catch {}
-			}
-		},
-	}
-}
-
 const define = {
 	'process.env': '(globalThis.process?.env ?? {})',
 	process: '(globalThis.process ?? {env:{},browser:true,platform:"browser"})',
@@ -122,7 +78,6 @@ export default defineConfig({
 	},
 	plugins: [
 		basicSsl(),
-		rawLoader(),
 		{
 			name: 'static-fs',
 			configureServer(server) {

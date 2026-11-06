@@ -17,6 +17,6 @@ export default defineConfig({
 	treeshake: false,
 	skipNodeModulesBundle: true,
 	esbuildOptions(options) {
-		options.loader = { ...options.loader, '.node': 'ts', '.vbs': 'text', '.bnf': 'text' }
+		options.loader = { ...options.loader, '.node': 'ts' }
 	},
 })

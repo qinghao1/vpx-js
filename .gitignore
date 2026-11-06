@@ -4,7 +4,6 @@ coverage
 dist
 dist-esm
 node_modules
-lib/scripting/grammar/rules.ts
 # local bench profiling artifacts
 lib/**/bench*.spec.ts
 lib/*.bench*.ts

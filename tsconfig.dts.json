@@ -14,5 +14,5 @@
 		"rootDir": ".",
 		"noEmit": false
 	},
-	"include": ["lib/index.ts", "lib/refs.node.ts", "lib/refs.browser.ts", "lib/types/raw.d.ts"]
+	"include": ["lib/index.ts", "lib/refs.node.ts", "lib/refs.browser.ts"]
 }
