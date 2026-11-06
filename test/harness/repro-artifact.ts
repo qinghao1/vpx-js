@@ -1,3 +1,4 @@
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 // Reproduces render artifacts: underwall visibility, pending-BM visibility.
 // Run: npx tsx test/harness/repro-artifact.ts
 import * as fs from 'node:fs'

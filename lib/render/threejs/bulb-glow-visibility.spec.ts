@@ -1,3 +1,4 @@
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 import { Group, Mesh, MeshStandardMaterial, PlaneGeometry } from 'three'
 import { describe, expect, it } from 'vitest'
 import { createBulbGlowNodeMaterial } from './nodes/bulb-glow-node.js'

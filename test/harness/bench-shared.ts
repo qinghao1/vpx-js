@@ -1,3 +1,4 @@
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 // Shared bench helpers: timing stats, file probing, VPX candidates, scene-export options, tri counting.
 // Plain-Node safe: no relative imports and erasable types only, so .mjs benches can import
 // this file directly via `./bench-shared.ts` (arg parsing lives in vpinball-resolver.ts).

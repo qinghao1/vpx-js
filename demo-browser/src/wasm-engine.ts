@@ -1,3 +1,4 @@
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 /* Copyright (C) 2026 The VPX-JS Authors. Released under GPL-3.0-or-later. */
 
 import type { BufferGeometry, Object3D, PointLight } from 'three/webgpu'

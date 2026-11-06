@@ -1,3 +1,4 @@
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 // Single TAP helper for test/harness/* — one output dialect, real 1..N plans.
 export function tapHeader(label: string): void {
 	console.log(`TAP version 13\n# ${label} — ${new Date().toISOString()}`)

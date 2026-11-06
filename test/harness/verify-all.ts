@@ -1,3 +1,4 @@
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 // Unified E2E — runs all verify-* harnesses with TAP summary.
 // Exit codes: 0 all checks pass, 1 any failure (including optional checks that
 // ran and failed — only checks that never ran, e.g. missing native binary,

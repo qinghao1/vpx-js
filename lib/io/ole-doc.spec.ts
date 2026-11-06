@@ -1,3 +1,4 @@
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 import { readFile } from 'node:fs/promises'
 import { expect } from 'chai'
 import { BiffParser } from './biff-parser.js'

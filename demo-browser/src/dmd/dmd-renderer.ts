@@ -1,3 +1,4 @@
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 // @ts-nocheck
 import * as THREE from 'three'
 import { GpuDmdNodeController } from '../../../dist-esm/lib/render/threejs/nodes/dmd-node.js'

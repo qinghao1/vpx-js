@@ -1,3 +1,4 @@
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 // Minimal GPU FPS harness — one page per leg (viewer + play), rAF + renderer
 // frame deltas over a fixed window, plus the UNMASKED_RENDERER_WEBGL string so
 // the rasterizer (real GPU vs SwiftShader) is on the record.

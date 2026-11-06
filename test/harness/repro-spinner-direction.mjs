@@ -1,3 +1,4 @@
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 import { Player } from '../../lib/game/player.ts'
 import { NodeBinaryReader } from '../../lib/io/binary-reader.node.ts'
 import { Matrix3D } from '../../lib/math/matrix.ts'

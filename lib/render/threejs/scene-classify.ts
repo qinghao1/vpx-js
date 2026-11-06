@@ -1,3 +1,4 @@
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 import type * as THREE from 'three'
 import { resolveButtonCode } from './cabinet-buttons.js'
 import { isBaked, pendingMapOf, RE_BAKE_MAP, RE_BAKE_MAT, RE_VR } from './material-shared.js'

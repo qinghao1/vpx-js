@@ -1,3 +1,4 @@
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 // Minimal IndexedDB cache for textures, EXR/bitmap payloads and VPX/ROM blobs.
 //
 // NOTE: bumping DB_VERSION wipes the whole cache on upgrade (both stores are

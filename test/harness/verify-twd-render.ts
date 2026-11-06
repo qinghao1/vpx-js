@@ -1,3 +1,4 @@
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 // TWD render harness — generates the Walking Dead scene in Node, runs the real
 // texture-streaming path (used-texture selection + node decode + pending resolve),
 // and asserts post-process + post-stream scene state.

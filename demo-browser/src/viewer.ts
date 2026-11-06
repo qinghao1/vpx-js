@@ -1,3 +1,4 @@
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 // @ts-nocheck — viewer is a DOM/three coordinator over loosely-typed runtime
 // subsystems (wasm engine, controls); strict-typing it is a separate migration.
 // Viewer coordinator - delegates to subsystems

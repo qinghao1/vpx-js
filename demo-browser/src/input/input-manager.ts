@@ -1,3 +1,4 @@
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 import * as THREE from 'three'
 import { swipeNudge } from '../../../dist-esm/lib/render/threejs/three-scene-postprocess.js'
 import { CONTROL_SCHEME, isTableHit, NUDGE } from '../config.js'

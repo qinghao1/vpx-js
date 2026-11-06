@@ -1,3 +1,4 @@
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 // Browser-only pool (Node decodes inline): decode + resize off the main
 // thread. Sized by CPU count, capped at 4; playfield maps take the
 // least-busy worker, the rest stay round-robin (30s timeout; callers fall

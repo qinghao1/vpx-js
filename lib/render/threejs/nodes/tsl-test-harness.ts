@@ -1,3 +1,4 @@
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 // Shared TSL DAG inspection harness for the node-material algorithm-lock specs
 // (unshaded-baked-node, bulb-lift-volume). These suites pin upstream shader parity
 // (fs_basic.sc/fs_unshaded.sc bulb math, lift volume) structurally instead of by

@@ -1,3 +1,4 @@
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 // Cabinet button mesh-name → direct-input code mapping.
 //
 // Boundaries are separator-aware: a keyword matches at the string start or

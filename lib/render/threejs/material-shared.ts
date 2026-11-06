@@ -1,3 +1,4 @@
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 import type { Texture as ThreeTexture } from 'three'
 import { clonePrimitiveNodeMaterial, isPrimitiveNodeMaterial } from './nodes/primitive-bdl-node.js'
 import { cloneBakedNodeMaterial, isBakedNodeMaterial } from './nodes/unshaded-baked-node.js'

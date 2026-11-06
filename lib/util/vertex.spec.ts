@@ -1,3 +1,4 @@
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 import { describe, expect, it } from 'vitest'
 import { Vertex3DNoTex2 } from './vertex.js'
 

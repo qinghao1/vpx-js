@@ -47,7 +47,8 @@
 		"build:esm:tsc": "tsc -p tsconfig.json",
 		"build:esm:cp": "mkdir -p dist-esm && cp -r res dist-esm/; echo 'dist-esm built'; touch demo-browser/vite.config.ts 2>/dev/null || true",
 		"check": "node build/parallel.mjs -- \"npm run lint\" \"npm run typecheck\" \"npm run typecheck:tests\" \"npm run test\"",
-		"check:fast": "node build/parallel.mjs -- \"npm run lint\" \"npm run typecheck\" \"npm run typecheck:tests\""
+		"check:fast": "node build/parallel.mjs -- \"npm run lint\" \"npm run typecheck\" \"npm run typecheck:tests\" \"npm run check:headers\"",
+		"check:headers": "node build/check-headers.mjs"
 	},
 	"dependencies": {
 		"pako": "^3.0.3",
