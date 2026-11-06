@@ -7,7 +7,7 @@ import { Vertex3D } from '../../math/vector.js'
 import { Vertex3DNoTex2 } from '../../util/vertex.js'
 import { FrameData } from '../animation.js'
 import { handleBiffTag } from '../biff-helper.js'
-import { type IPhysicalData, ItemData } from '../item-data.js'
+import { ItemData } from '../item-data.js'
 import { Mesh } from '../mesh.js'
 
 const RTV_TAGS = ['RTV0', 'RTV1', 'RTV2', 'RTV3', 'RTV4', 'RTV5', 'RTV6', 'RTV7', 'RTV8']
@@ -56,7 +56,7 @@ const STRING_MAP: Record<string, string> = {
 const WIDE_STRING_MAP: Record<string, string> = { M3DN: 'meshFileName' }
 
 /** @see https://github.com/vpinball/vpinball/blob/master/primitive.cpp */
-export class PrimitiveData extends ItemData implements IPhysicalData {
+export class PrimitiveData extends ItemData {
 	public numVertices!: number
 	public compressedAnimationVertices?: number
 	public compressedVertices?: number

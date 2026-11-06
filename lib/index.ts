@@ -7,7 +7,7 @@ export const VP_VERSION_REV = 1 // Max 1 Digit
 
 export { BrowserBinaryReader } from './io/binary-reader.js'
 export { OleCompoundDoc, Storage } from './io/ole-doc.js'
-export { BinaryReader, storage, ThreeTextureLoader } from './refs.node.js'
+export { BinaryReader, ThreeTextureLoader } from './refs.node.js'
 export { ThreeRenderApi } from './render/threejs/three-render-api.js'
 export { Logger, Progress, progress } from './util/logger.js'
 export { Ball } from './vpt/ball/ball.js'

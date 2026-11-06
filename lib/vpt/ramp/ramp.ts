@@ -4,17 +4,15 @@
 import { BiffParser } from '../../io/biff-parser.js'
 import type { Storage } from '../../io/ole-doc.js'
 import { Vertex2D } from '../../math/vector.js'
-import type { Meshes, RenderInfo } from '../../render/irender-api.js'
+import type { Meshes } from '../../render/irender-api.js'
 import { handleBiffTag } from '../biff-helper.js'
 import { type DragPoint, dragPointNestedTag } from '../dragpoint.js'
 import { Enums } from '../enums.js'
 import { Item } from '../item.js'
-import { type IPhysicalData, ItemData } from '../item-data.js'
+import { ItemData } from '../item-data.js'
 import { ItemState } from '../item-state.js'
-import type { Material } from '../material.js'
 import { Mesh } from '../mesh.js'
 import type { Table } from '../table/table.js'
-import type { Texture } from '../texture.js'
 import { isTransparentRampMaterial, RampMeshGenerator, RampUpdater } from './ramp-view.js'
 
 const FLOAT_MAP: Record<string, string> = {
@@ -47,7 +45,7 @@ const BOOL_MAP: Record<string, string> = {
 const STRING_MAP: Record<string, string> = { MATR: 'szMaterial', IMAG: 'szImage', MAPH: 'szPhysicsMaterial' }
 
 /** @see https://github.com/vpinball/vpinball/blob/master/ramp.cpp */
-export class RampData extends ItemData implements IPhysicalData {
+export class RampData extends ItemData {
 	public depthBias = 0
 	public dragPoints: DragPoint[] = []
 	public elasticity = 0.3
@@ -202,10 +200,6 @@ export class Ramp extends Item<RampData> {
 		)
 		this.meshGenerator = new RampMeshGenerator(data, this.state)
 		this.updater = new RampUpdater(this.state, this.meshGenerator)
-	}
-
-	public isCollidable(): boolean {
-		return this.data.isCollidable
 	}
 
 	public getMeshes<GEOMETRY>(table: Table): Meshes<GEOMETRY> {

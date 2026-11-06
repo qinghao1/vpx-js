@@ -2,12 +2,9 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import type { Storage } from '../../io/ole-doc.js'
-import type { IRenderApi, Meshes, RenderInfo } from '../../render/irender-api.js'
+import type { IRenderApi, Meshes } from '../../render/irender-api.js'
 import { Item } from '../item.js'
-import type { Material } from '../material.js'
-import type { Mesh } from '../mesh.js'
 import type { Table, TableGenerateOptions } from '../table/table.js'
-import type { Texture } from '../texture.js'
 import { FlasherData } from './flasher-data.js'
 import { FlasherMeshGenerator } from './flasher-mesh-generator.js'
 import { FlasherState } from './flasher-state.js'

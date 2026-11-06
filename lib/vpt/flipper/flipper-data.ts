@@ -2,12 +2,10 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { BiffParser } from '../../io/biff-parser.js'
-import { registry } from '../../io/global-registry.js'
 import type { Storage } from '../../io/ole-doc.js'
 import { Vertex2D } from '../../math/vector.js'
 import { handleBiffTag } from '../biff-helper.js'
 import { ItemData } from '../item-data.js'
-import type { Table } from '../table/table.js'
 
 const FLOAT_MAP: Record<string, string> = {
 	BASR: 'baseRadius',
@@ -74,16 +72,6 @@ export class FlipperData extends ItemData {
 	public torqueDamping = 0.75
 	public torqueDampingAngle = 6.0
 	public scatter = 0
-	public overrideMass?: number
-	public overrideStrength?: number
-	public overrideElasticity?: number
-	public overrideElasticityFalloff?: number
-	public overrideFriction?: number
-	public overrideReturnStrength?: number
-	public overrideCoilRampUp?: number
-	public overrideTorqueDamping?: number
-	public overrideTorqueDampingAngle?: number
-	public overrideScatterAngle?: number
 	public overridePhysics = 0
 	public isVisible = true
 	public isEnabled = true
@@ -103,29 +91,6 @@ export class FlipperData extends ItemData {
 		if (d.rubberThickness > 0 && d.height > 16 && d.rubberWidth === 0) d.rubberWidth = d.height - 16
 		if (d.rubberWidth > 1000) d.rubberWidth = d.height - 16
 		return d
-	}
-
-	public updatePhysicsSettings(table: Table): void {
-		if (!this.doOverridePhysics(table)) return
-		const idx = this.overridePhysics ? this.overridePhysics - 1 : table.data!.overridePhysics! - 1
-		const get = (key: string, fallback: number, def: number): number => {
-			const v = registry.getRegStringAsFloat('Player', `${key}${idx}`, def)
-			return v < 0 ? fallback : v
-		}
-		this.overrideMass = get('FlipperPhysicsMass', this.mass, 1)
-		this.overrideStrength = get('FlipperPhysicsStrength', this.strength, 2200)
-		this.overrideElasticity = get('FlipperPhysicsElasticity', this.elasticity, 0.8)
-		this.overrideScatterAngle = get('FlipperPhysicsScatter', this.scatter, 0)
-		this.overrideReturnStrength = get('FlipperPhysicsReturnStrength', this.return, 0.058)
-		this.overrideElasticityFalloff = get('FlipperPhysicsElasticityFalloff', this.elasticityFalloff, 0.43)
-		this.overrideFriction = get('FlipperPhysicsFriction', this.friction, 0.6)
-		this.overrideCoilRampUp = get('FlipperPhysicsCoilRampUp', this.rampUp, 3.0)
-		this.overrideTorqueDamping = get('FlipperPhysicsEOSTorque', this.torqueDamping, 0.75)
-		this.overrideTorqueDampingAngle = get('FlipperPhysicsEOSTorqueAngle', this.torqueDampingAngle, 6.0)
-	}
-
-	public doOverridePhysics(table: Table): boolean {
-		return !!this.overridePhysics || !!(table.data?.overridePhysicsFlipper && table.data?.overridePhysics)
 	}
 
 	private async fromTag(buffer: Uint8Array, tag: string, _offset: number, len: number): Promise<number> {

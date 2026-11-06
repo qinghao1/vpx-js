@@ -44,7 +44,7 @@ export class Plunger extends Item<PlungerData> {
 		return this.state
 	}
 
-	public getMeshes<GEOMETRY>(table: Table): Record<string, PlungerMeshEntry> {
+	public getMeshes(table: Table): Record<string, PlungerMeshEntry> {
 		const plunger = this.meshGenerator.generateMeshes(0, table)
 		const meshes: Record<string, PlungerMeshEntry> = {}
 		const material = table.getMaterial(this.data.szMaterial)
@@ -53,10 +53,6 @@ export class Plunger extends Item<PlungerData> {
 		if (plunger.spring) meshes.spring = { isVisible: this.data.isVisible, mesh: plunger.spring, material, map }
 		if (plunger.flat) meshes.flat = { isVisible: this.data.isVisible, mesh: plunger.flat, material, map }
 		return meshes
-	}
-
-	public isCollidable(): boolean {
-		return true
 	}
 
 	public getUpdater(): PlungerUpdater {

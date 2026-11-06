@@ -5,12 +5,9 @@ import type { Storage } from '../../io/ole-doc.js'
 import { degToRad } from '../../math/angle.js'
 import { Matrix3D } from '../../math/matrix.js'
 import type { Vertex2D } from '../../math/vector.js'
-import type { Meshes, RenderInfo } from '../../render/irender-api.js'
+import type { Meshes } from '../../render/irender-api.js'
 import { Item } from '../item.js'
-import type { Material } from '../material.js'
-import type { Mesh } from '../mesh.js'
 import type { Table } from '../table/table.js'
-import type { Texture } from '../texture.js'
 import { FlipperData } from './flipper-data.js'
 import { FlipperMesh } from './flipper-mesh.js'
 import { FlipperState } from './flipper-state.js'
@@ -42,9 +39,6 @@ export class Flipper extends Item<FlipperData> {
 		this.updater = new FlipperUpdater(this.data, this.state)
 	}
 
-	public isCollidable(): boolean {
-		return true
-	}
 	public getState(): FlipperState {
 		return this.state
 	}
@@ -67,10 +61,6 @@ export class Flipper extends Item<FlipperData> {
 			}
 		}
 		return meshes
-	}
-
-	public getFlipperData(): FlipperData {
-		return this.data
 	}
 
 	private getMatrix(rotation: number = this.data.startAngle): Matrix3D {

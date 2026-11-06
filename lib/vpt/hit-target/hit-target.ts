@@ -8,7 +8,7 @@ import { Vertex3D } from '../../math/vector.js'
 import { handleBiffTag } from '../biff-helper.js'
 import { Enums } from '../enums.js'
 import { Item } from '../item.js'
-import { type IPhysicalData, ItemData } from '../item-data.js'
+import { ItemData } from '../item-data.js'
 import { ItemState } from '../item-state.js'
 import type { Material } from '../material.js'
 import type { Mesh } from '../mesh.js'
@@ -41,7 +41,7 @@ const BOOL_MAP: Record<string, string> = {
 const STRING_MAP: Record<string, string> = { IMAG: 'szImage', MATR: 'szMaterial', MAPH: 'szPhysicsMaterial' }
 
 /** @see https://github.com/vpinball/vpinball/blob/master/hittarget.cpp */
-export class HitTargetData extends ItemData implements IPhysicalData {
+export class HitTargetData extends ItemData {
 	public depthBias?: number
 	public disableLightingBelow?: number
 	public disableLightingTop?: number
@@ -172,11 +172,7 @@ export class HitTarget extends Item<HitTargetData> {
 		this.updater = new HitTargetUpdater(this.data, this.state)
 	}
 
-	public isCollidable(): boolean {
-		return this.data.isCollidable
-	}
-
-	public getMeshes<GEOMETRY>(table: Table): Record<string, HitTargetMeshEntry> {
+	public getMeshes(table: Table): Record<string, HitTargetMeshEntry> {
 		const m = table.getMaterial(this.data.szMaterial)
 		const isTransparent = !m || (m.isOpacityActive && m.opacity < 0.999)
 		return {

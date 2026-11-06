@@ -3,9 +3,8 @@
 
 import { Matrix3D } from '../../math/matrix.js'
 import { Vertex3D } from '../../math/vector.js'
-import type { IRenderApi, Meshes, RenderInfo } from '../../render/irender-api.js'
+import type { IRenderApi, Meshes } from '../../render/irender-api.js'
 import { Material } from '../material.js'
-import type { Mesh } from '../mesh.js'
 import type { Table } from '../table/table.js'
 import { Texture } from '../texture.js'
 import type { BallData } from './ball-data.js'
@@ -38,10 +37,6 @@ export class Ball {
 	public getUpdater(): BallUpdater {
 		return this.updater
 	}
-	public isCollidable(): boolean {
-		return true
-	}
-
 	public async addToScene<NODE, GEOMETRY, POINT_LIGHT>(
 		scene: NODE,
 		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,

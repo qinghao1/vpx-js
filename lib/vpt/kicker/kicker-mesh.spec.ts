@@ -8,7 +8,6 @@ import { ThreeHelper } from '../../../test/three.helper'
 import { NodeBinaryReader } from '../../io/binary-reader.node.js'
 import { ThreeRenderApi } from '../../render/threejs/three-render-api.js'
 import { Enums } from '../enums.js'
-import type { Mesh as VptMesh } from '../mesh.js'
 import { Table } from '../table/table.js'
 
 const three = new ThreeHelper()
@@ -1711,8 +1710,8 @@ describe('The VPinball kicker generator', () => {
 		for (const kickerType of [Enums.KickerType.KickerGottlieb, Enums.KickerType.KickerCup2]) {
 			const flatTable = new TableBuilder().addKicker('kicker', { kickerType, orientation: 0 }).build()
 			const rotatedTable = new TableBuilder().addKicker('kicker', { kickerType, orientation: 45 }).build()
-			const flat = flatTable.kickers.kicker.getMeshes<VptMesh>(flatTable).kicker.mesh.vertices[0]
-			const rotated = rotatedTable.kickers.kicker.getMeshes<VptMesh>(rotatedTable).kicker.mesh.vertices[0]
+			const flat = flatTable.kickers.kicker.getMeshes(flatTable).kicker.mesh.vertices[0]
+			const rotated = rotatedTable.kickers.kicker.getMeshes(rotatedTable).kicker.mesh.vertices[0]
 			expect([rotated.x, rotated.y]).to.not.deep.equal([flat.x, flat.y])
 		}
 	})
@@ -1724,8 +1723,8 @@ describe('The VPinball kicker generator', () => {
 		const rotatedTable = new TableBuilder()
 			.addKicker('kicker', { kickerType: Enums.KickerType.KickerHole, orientation: 45 })
 			.build()
-		const flat = flatTable.kickers.kicker.getMeshes<VptMesh>(flatTable).kicker.mesh.vertices[0]
-		const rotated = rotatedTable.kickers.kicker.getMeshes<VptMesh>(rotatedTable).kicker.mesh.vertices[0]
+		const flat = flatTable.kickers.kicker.getMeshes(flatTable).kicker.mesh.vertices[0]
+		const rotated = rotatedTable.kickers.kicker.getMeshes(rotatedTable).kicker.mesh.vertices[0]
 		expect([rotated.x, rotated.y]).to.deep.equal([flat.x, flat.y])
 	})
 })

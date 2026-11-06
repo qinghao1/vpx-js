@@ -4,7 +4,6 @@
 import { describe, expect, it } from 'vitest'
 import { Vertex2D, Vertex3D } from '../../math/vector.js'
 import { DragPoint } from '../dragpoint.js'
-import { Enums } from '../enums.js'
 import { bakedIntensity, Light, LightData } from './light.js'
 
 function mkData(over: Partial<LightData> = {}): LightData {

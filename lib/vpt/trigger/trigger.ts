@@ -39,10 +39,6 @@ export class Trigger extends Item<TriggerData> {
 		return this.state
 	}
 
-	public isCollidable(): boolean {
-		return true
-	}
-
 	public getMeshes<GEOMETRY>(table: Table): Meshes<GEOMETRY> {
 		return {
 			trigger: {

@@ -36,11 +36,7 @@ export class Gate extends Item<GateData> {
 		this.updater = new GateUpdater(this.data, this.state)
 	}
 
-	public isCollidable(): boolean {
-		return this.data.isCollidable
-	}
-
-	public getMeshes<GEOMETRY>(table: Table): Record<string, GateMeshEntry> {
+	public getMeshes(table: Table): Record<string, GateMeshEntry> {
 		const gate = this.meshGenerator.getMeshes(table)
 		return {
 			wire: {

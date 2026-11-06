@@ -26,7 +26,6 @@ export type ItemFactory = (storage: Storage, name: string, opts: TableLoadOption
 
 type RegistryEntry = {
 	key: string // LoadedTable key, e.g. 'bumpers'
-	tableKey?: string // Table dict key when it differs from key, e.g. 'textboxes'
 	factory: ItemFactory
 }
 
@@ -68,9 +67,4 @@ export async function loadItemByType(
 	const entry = ITEM_REGISTRY[itemType]
 	if (!entry) return null
 	return entry.factory(storage, itemName, opts)
-}
-
-/** Returns the LoadedTable key for a given ItemType, if registered. */
-export function getItemKey(itemType: number): string | undefined {
-	return ITEM_REGISTRY[itemType]?.key
 }

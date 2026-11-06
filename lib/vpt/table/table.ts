@@ -2,14 +2,7 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import type { IBinaryReader, Storage } from '../../io/ole-doc.js'
-import { FRect3D } from '../../math/bounds.js'
-import {
-	type IRenderApi,
-	type IRenderable,
-	isRenderable,
-	type MeshConvertOptions,
-	type Meshes,
-} from '../../render/irender-api.js'
+import type { IRenderApi, IRenderable, MeshConvertOptions, Meshes } from '../../render/irender-api.js'
 import { logger } from '../../util/logger.js'
 import type { Bumper } from '../bumper/bumper.js'
 import type { Decal } from '../decal/decal.js'
@@ -20,7 +13,6 @@ import type { HitTarget } from '../hit-target/hit-target.js'
 import type { Item } from '../item.js'
 import type { ItemData } from '../item-data.js'
 import { ITEM_REGISTRY } from '../item-registry.js'
-import type { ItemState } from '../item-state.js'
 import type { Kicker } from '../kicker/kicker.js'
 import type { Light } from '../light/light.js'
 import type { Material } from '../material.js'
@@ -106,7 +98,7 @@ export class Table implements IRenderable<TableState> {
 			this.populateFromLoaded(
 				loaded as unknown as Record<string, unknown>,
 				entry.key,
-				(this as unknown as Record<string, unknown>)[entry.tableKey ?? entry.key] as Record<string, unknown>,
+				(this as unknown as Record<string, unknown>)[entry.key] as Record<string, unknown>,
 			)
 		}
 	}
@@ -160,30 +152,12 @@ export class Table implements IRenderable<TableState> {
 		return this.updater!
 	}
 
-	public getBoundingBox(): FRect3D {
-		return new FRect3D(
-			this.data?.left,
-			this.data?.right,
-			this.data?.top,
-			this.data?.bottom,
-			0,
-			this.data?.glassHeight,
-		)
-	}
-
-	public getRenderables(): Array<IRenderable<ItemState>> {
-		return this.getItems().filter(isRenderable) as unknown as Array<IRenderable<ItemState>>
-	}
-
 	public getScaleZ(): number {
 		if (!this.data) throw new Error('Table data not loaded')
 		return this.data.bgScaleZ[this.data.bgCurrentSet]! || 1.0
 	}
 	public getDetailLevel(): number {
 		return 10
-	}
-	public getGlobalDifficulty(): number {
-		return this.data?.globalDifficulty ?? 0.2
 	}
 	/** Deprecated upstream; always 0. */
 	public getTableHeight(): number {
@@ -235,34 +209,19 @@ export class Table implements IRenderable<TableState> {
 		}
 	}
 
-	public tableNode?: unknown
-	public renderApi?: IRenderApi<any, any, any>
-
 	/** Generates top-most scene node containing the entire table. */
 	public async generateTableNode<NODE, GEOMETRY, POINT_LIGHT>(
 		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
 		opts: TableExportOptions & { preloadTextures?: boolean } = {},
 	): Promise<NODE> {
-		this.renderApi = renderApi as unknown as IRenderApi<any, any, any>
 		if (opts.preloadTextures !== false) {
 			await renderApi.preloadTextures(Object.values(this.textures), this)
 		}
-		const node = (await this.meshGenerator?.generateTableNode(renderApi, opts)) as NODE
-		this.tableNode = node
-		return node
-	}
-
-	public prepareToPlay(): void {
-		for (const p of Object.values<Primitive>(this.primitives)) p.clearMesh()
+		return (await this.meshGenerator?.generateTableNode(renderApi, opts)) as NODE
 	}
 
 	public getItems(): Array<Item<ItemData>> {
 		return Object.values(this.items)
-	}
-
-	/** Case-insensitive item lookup — upstream compares names with `StrCompareNoCase`. */
-	public getItemByName(name: string): Item<ItemData> | undefined {
-		return findByName(this.items, name)
 	}
 }
 
