@@ -123,6 +123,7 @@ export class WasmEngine {
 		this.partNames.clear()
 		this.dmdCache = undefined
 		this.liveBalls.clear()
+		this.resetAudioFormat()
 		if (this.engine) {
 			await this.engine.destroyTable().catch(() => {})
 			this.engine = undefined
@@ -141,7 +142,7 @@ export class WasmEngine {
 			this.engine.mountRom(romMountFileName(script, pending.__pendingRomName), pending.__pendingRom)
 		}
 		await this.engine.loadTable(vpxBytes)
-		for (const part of JSON.parse(this.engine.getPartCatalogJson() || '[]') as { idx: number; name: string }[]) {
+		for (const part of this.readCatalog()) {
 			if (typeof part.idx === 'number' && typeof part.name === 'string') this.partNames.set(part.idx, part.name)
 		}
 		// The generated base slab carries the playfield, so the parsed table
@@ -166,6 +167,25 @@ export class WasmEngine {
 				flasherImage: idx => this.engine?.getFlasherImage(idx),
 			},
 		)
+	}
+
+	/** The bridge's part catalog; a malformed one fails the start with a clear reason. */
+	private readCatalog(): { idx: unknown; name: unknown }[] {
+		const json = this.engine?.getPartCatalogJson() || '[]'
+		let catalog: unknown
+		try {
+			catalog = JSON.parse(json)
+		} catch (e) {
+			throw new WasmEngineStartError(`Part catalog is not valid JSON (${e?.message ?? e}): ${json.slice(0, 120)}`)
+		}
+		if (!Array.isArray(catalog)) throw new WasmEngineStartError('Part catalog is not a JSON array')
+		return catalog
+	}
+
+	/** Forget the previous table's PCM format: the next one may run at another rate. */
+	private resetAudioFormat(): void {
+		this.audioRate = 0
+		this.audioChannels = 0
 	}
 
 	get ready(): boolean {
@@ -430,6 +450,7 @@ export class WasmEngine {
 		this.audioCtx = undefined
 		this.audioFailed = false
 		this.audioNextStart = 0
+		this.resetAudioFormat()
 		this.dmdCache = undefined
 		for (const id of [...this.liveBalls.keys()]) this.balls().remove(id)
 		this.liveBalls.clear()
