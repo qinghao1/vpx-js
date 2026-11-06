@@ -65,7 +65,7 @@ export interface VpxDmdFrame {
 
 /**
  * Typed end-to-end test surface. Replaces poking viewer privates
- * (`_cameraGen`, `_cameraRaf`, `_tickPhysicsImmediate`, `_sendKey`, `_nudge`)
+ * (`_cameraGen`, `_cameraRaf`, `_sendKey`, `_nudge`)
  * and matching "Ready" in the log. Exposed as dev-only `window.vpx`.
  */
 export interface ViewerTestApi {

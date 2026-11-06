@@ -150,7 +150,6 @@ export class Viewer {
 		ensureGlobals()
 		ensureBvh()
 		const {
-			vpx = null,
 			viewerMode = 'viewer',
 			antialias = true,
 			batched = true,
@@ -158,7 +157,7 @@ export class Viewer {
 			autoplay = true,
 			dom = {},
 		} = opts
-		this.options = { vpx, requestedMode: viewerMode, antialias, batched, forceWebGL, autoplay }
+		this.options = { requestedMode: viewerMode, antialias, batched, forceWebGL, autoplay }
 		this.viewerMode = viewerMode
 		this.dom = {
 			canvas: dom.canvas || $('canvas'),
@@ -618,18 +617,11 @@ export class Viewer {
 		await this._animateCameraTo(target, CAM_ANIM.durationMode)
 		syncRoom(this.scene, this.tableGroup, target.center, target.size)
 		if (!this.wasmEngine?.ready) {
-			if (this.table) {
-				try {
-					await this._createWasmEngine()
-				} catch (e) {
-					this.log(`Play load failed: ${e.message}`, 'error')
-					this._revertFailedPlay()
-				}
-			} else {
-				this.load().catch(e => {
-					this.log(`Play load failed: ${e.message}`, 'error')
-					this._revertFailedPlay()
-				})
+			try {
+				await this._createWasmEngine()
+			} catch (e) {
+				this.log(`Play load failed: ${e.message}`, 'error')
+				this._revertFailedPlay()
 			}
 		}
 	}
@@ -1813,7 +1805,8 @@ export class Viewer {
 		}
 		return mounted
 	}
-	async load() {
+	/** Load a table by name, path or URL (`?vpx=` semantics, see resolveVpxCandidates). */
+	async load(vpx) {
 		this._loadId = (this._loadId ?? 0) + 1
 		const _loadGen = this._loadId
 		if (this._loadAbort) this._loadAbort.abort()
@@ -1828,7 +1821,7 @@ export class Viewer {
 		const _h = typeof window !== 'undefined' ? window.innerHeight : 600
 		this.renderer?.setSize(_w, _h)
 		this._loading(2, 'Getting ready…', 'Looking for table…')
-		const candidates = resolveVpxCandidates(this.options.vpx)
+		const candidates = resolveVpxCandidates(vpx)
 		if (!candidates.length) {
 			this.log('No VPX candidate (pass ?vpx=name)', 'warn')
 			this._setLoadState('error')
@@ -1988,11 +1981,6 @@ export class Viewer {
 			frames = 0
 			return true
 		}
-		// Production immediate tick (input handlers step without waiting for
-		// the next rAF); the test API exposes the same path via stepOnce.
-		;(this as any)._tickPhysicsImmediate = () => {
-			this.stepOnce()
-		}
 		this.renderer.setAnimationLoop((timestamp, frame) => {
 			if (this.isPaused) {
 				this.wasmEngine?.resetStepClock(timestamp)
@@ -2080,8 +2068,8 @@ export class Viewer {
 	}
 	/**
 	 * Run one engine step plus scene sync outside the rAF loop and present
-	 * it. Typed entry for the test API (`vpx.step()`); the input layer's
-	 * `_tickPhysicsImmediate` delegates here too. Returns whether a step ran.
+	 * it. Shared by live input (no wait for the next frame) and the test
+	 * API (`vpx.step()`). Returns whether a step ran.
 	 */
 	stepOnce(nowMs = performance.now()): boolean {
 		if (!this.wasmEngine?.ready) return false

@@ -37,7 +37,7 @@ if (_isDev) {
 initHelp(viewer)
 
 if (options.vpx) {
-	viewer.load().catch(e => console.error('[app] load failed', e))
+	viewer.load(options.vpx).catch(e => console.error('[app] load failed', e))
 	if (options.rom) viewer.preloadRom(options.rom).catch(e => console.error('[app] rom load failed', e))
 } else {
 	viewer.startLoop()
