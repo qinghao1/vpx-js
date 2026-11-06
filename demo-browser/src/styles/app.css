@@ -1055,7 +1055,10 @@ body.show-debug #debug-toggle {
 }
 #canvas-wrap {
 	transition: transform 0.08s linear;
-	position: relative;
+}
+#canvas-wrap.drag {
+	outline: 2px dashed var(--border-strong, #64748b);
+	outline-offset: -8px;
 }
 #nudge-flash {
 	position: absolute;

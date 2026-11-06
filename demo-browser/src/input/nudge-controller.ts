@@ -1,6 +1,6 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 import { NUDGE } from '../config.js'
-import { type InputHost, makeHost } from './input-manager.js'
+import { type InputHost } from './input-manager.js'
 
 // The nudge host only shakes the cabinet: it never switches modes, pauses,
 // or releases keys, so it carries the InputHost subset it actually uses.
@@ -11,7 +11,7 @@ function trigger(host: NudgeHost, angle: number, force = NUDGE.force): void {
 	host.nudge(angle, force)
 }
 
-function attachNudgeHost(host: NudgeHost, signal: AbortSignal): void {
+export function attachNudgeHost(host: NudgeHost, signal: AbortSignal): void {
 	let lastShake = 0
 	const onMotion = (e: DeviceMotionEvent): void => {
 		const a: any = (e as any).accelerationIncludingGravity ?? (e as any).acceleration
@@ -80,22 +80,10 @@ export function pollNudgePads(viewer: object, now: number): void {
 	}
 }
 
-export function attachNudgeInput(viewer: any): () => void {
-	const host = makeHost(viewer)
-	const ctrl = new AbortController()
-
-	if (viewer._nudgeCtrl) {
-		viewer._nudgeCtrl.abort()
-	}
-	viewer._nudgeCtrl = ctrl
-
-	attachNudgeHost(host, ctrl.signal)
-	padPolls.set(viewer, { host, lastPoll: 0, lastBy: new Map() })
-
+/** Register a viewer key for gamepad-poll lookups; returns the unregister function. */
+export function registerPadPoll(key: object, host: NudgeHost): () => void {
+	padPolls.set(key, { host, lastPoll: 0, lastBy: new Map() })
 	return () => {
-		ctrl.abort()
-		padPolls.delete(viewer)
-		if (viewer._nudgeCtrl === ctrl) viewer._nudgeCtrl = null
-		viewer._nudgeCleanup = null
+		padPolls.delete(key)
 	}
 }

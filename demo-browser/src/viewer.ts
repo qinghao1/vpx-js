@@ -41,6 +41,7 @@ import { applyRendererToneMapping, clampExposure } from '../../dist-esm/lib/rend
 import { updateTransmissionBuffer } from '../../dist-esm/lib/render/threejs/transmission-buffer.js'
 import { collectPostProcessNodes, needsNoBakeFill } from '../../dist-esm/lib/render/threejs/visibility-heuristics.js'
 import { AnimationGate } from '../../dist-esm/lib/util/animation-gate.js'
+import { idbGet, idbSet } from '../../dist-esm/lib/util/idb-cache.js'
 import { Table } from '../../dist-esm/lib/vpt/table/table.js'
 import { codeToSdlScancode, createScancodeGate, resolveFlipperKey } from '../../dist-esm/lib/wasm/vpinball-wasm.js'
 import { BackglassRenderer } from './backglass/backglass-renderer.js'
@@ -56,20 +57,12 @@ import {
 	TABLE_OPTS,
 } from './config.js'
 import { DmdRenderer } from './dmd/dmd-renderer.js'
-import {
-	isDev as _isDev,
-	ensureBvh,
-	ensureGlobals,
-	getMaxLights,
-	getTargetPixelRatio,
-	isLowQuality,
-	QUALITY_CAPS,
-} from './env.js'
+import { ensureBvh, ensureGlobals, getMaxLights, getTargetPixelRatio, isLowQuality, QUALITY_CAPS } from './env.js'
 import { RELEASE_CODES } from './input/input-manager.js'
 import { pollNudgePads } from './input/nudge-controller.js'
 import { attachInput } from './input.js'
 import type { DirtyOverlay } from './overlays/dirty-overlay.js'
-import { createHarness } from './ui/log-viewer.js'
+import { createLog } from './ui/log-viewer.js'
 import { fpsClass, renderModeHint, renderStats } from './ui/stats-overlay.js'
 import {
 	$,
@@ -124,15 +117,7 @@ function cullExcessLights(root: any, maxLights: number) {
 	return { before: lights.length, after: maxLights, culled }
 }
 
-export {
-	createHarness,
-	ensureProceduralRoom,
-	filterTextures,
-	frameCamera,
-	hideCabFlippers,
-	postProcessScene,
-	resolveVpxCandidates,
-}
+export { ensureProceduralRoom, filterTextures, frameCamera, hideCabFlippers, postProcessScene, resolveVpxCandidates }
 
 const SOUND_SPEAKER = '<path d="M11 5 6 9H3v6h3l5 4z" fill="currentColor" stroke="none"></path>'
 const SOUND_SVG_ATTRS =
@@ -149,15 +134,8 @@ export class Viewer {
 	constructor(opts = {}) {
 		ensureGlobals()
 		ensureBvh()
-		const {
-			viewerMode = 'viewer',
-			antialias = true,
-			batched = true,
-			forceWebGL = false,
-			autoplay = true,
-			dom = {},
-		} = opts
-		this.options = { requestedMode: viewerMode, antialias, batched, forceWebGL, autoplay }
+		const { viewerMode = 'viewer', antialias = true, batched = true, forceWebGL = false, dom = {} } = opts
+		this.options = { antialias, batched, forceWebGL }
 		this.viewerMode = viewerMode
 		this.dom = {
 			canvas: dom.canvas || $('canvas'),
@@ -186,7 +164,7 @@ export class Viewer {
 			fpsHud: dom.fpsHud || document.getElementById('fps-hud'),
 			modeHint: dom.modeHint || document.getElementById('mode-hint'),
 		}
-		this.harnessLog = createHarness(this.dom.logEl).harnessLog
+		this.log = createLog(this.dom.logEl)
 		this.scene = new THREE.Scene()
 		this.scene.background = getPrerenderedBackground() as any
 		this.camera = new THREE.PerspectiveCamera(
@@ -224,30 +202,18 @@ export class Viewer {
 		this._cameraTimeoutResolver = null
 		this._loadAbort = null
 		this._touchMap = new Map()
-		this._inputCleanup = null
-		this._nudgeCleanup = null
-		this._touchCleanup = null
+		this.rom = null
+		this._romReady = null
+		this._booting = null
 		this._rendererBackend = null
 		this.renderPipeline = null
 		this.renderer = null
 		this.controls = null
 		this._deviceLossCount = 0
-		this._rendererReady = this._createRenderer()
-		this._rendererReady.catch(e => {
-			this.log(
-				`WebGPU renderer failed to start (${e?.message ?? e}) — the table cannot render. This usually means broken GPU-driver or browser WebGPU support here; try updating Chrome and GPU drivers, reloading with ?noaa (disables antialiasing), or relaunching Chrome with --use-angle=vulkan.`,
-				'error',
-			)
-		})
+		this._startRenderer()
 		this.dmd = new DmdRenderer(this)
 		this.backglass = new BackglassRenderer(this)
 		this.overlays = [this.dmd, this.backglass]
-		if (_isDev)
-			Object.assign(window, {
-				scene: this.scene,
-				camera: this.camera,
-				THREE,
-			})
 		addEventListener('resize', () => this._onResize())
 		addEventListener('popstate', () => {
 			if (this.viewerMode === 'play') this._switchToViewer()
@@ -257,6 +223,9 @@ export class Viewer {
 		this._setupModeSwitch()
 		this._setupDebugToggle()
 		this._syncChrome()
+		// Input handlers read live viewer getters, so one attach covers every
+		// later engine boot and mode switch.
+		attachInput(this)
 	}
 	_setupDebugToggle() {
 		const btn = document.getElementById('debug-toggle')
@@ -292,8 +261,7 @@ export class Viewer {
 		this._syncSoundChrome()
 		return muted
 	}
-	// Chrome over engine-owned mute/level (per-load engine state; the old
-	// persisted sound profile is gone by design — each table starts fresh).
+	// Chrome over engine-owned mute/level (per-load engine state; each table starts fresh).
 	_setupSoundControls() {
 		this._syncSoundChrome()
 		const btn = this.dom.soundBtn
@@ -339,7 +307,7 @@ export class Viewer {
 		}
 		const onKey = e => {
 			// Global mute shortcut (all modes); the key still reaches the
-			// table as DIK_M, as before. No repeat: holding M must not strobe.
+			// table as DIK_M. No repeat: holding M must not strobe.
 			if ((e.code === 'KeyM' || e.key === 'm' || e.key === 'M') && !e.ctrlKey && !e.metaKey && !e.altKey) {
 				if (e.repeat) return
 				const tag = (document.activeElement?.tagName || '').toLowerCase()
@@ -361,6 +329,17 @@ export class Viewer {
 			btn.setAttribute('aria-label', muted ? 'Unmute sound' : 'Mute sound')
 		}
 		if (slider && engine) slider.value = String(Math.round(engine.volume * 100))
+	}
+	/** Boot (or re-boot) the renderer with the shared error handling; recovery reuses it too. */
+	_startRenderer() {
+		this._rendererReady = this._createRenderer()
+		this._rendererReady.catch(e => {
+			this.log(
+				`WebGPU renderer failed to start (${e?.message ?? e}) — the table cannot render. This usually means broken GPU-driver or browser WebGPU support here; try reloading with ?noaa (disables antialiasing), or relaunching Chrome with --use-angle=vulkan.`,
+				'error',
+			)
+		})
+		return this._rendererReady
 	}
 	async _createRenderer() {
 		const canvas = this.dom.canvas
@@ -424,26 +403,49 @@ export class Viewer {
 				)
 				return
 			}
-			this._rendererReady = this._createRenderer()
-			this._rendererReady.catch(() => {})
+			if (this._rendererBackend !== 'webgpu') {
+				// A fresh WebGL2 renderer on the same lost canvas cannot recover;
+				// three waits for the restore event, so re-init only once it arrives.
+				this.log('WebGL context lost — waiting for the context to restore…', 'warn')
+				canvas.addEventListener('webglcontextrestored', () => void this._recoverRenderer(), { once: true })
+				return
+			}
+			void this._recoverRenderer()
 		}
-		this.controls?.dispose?.()
-		this.controls = new OrbitControls(this.camera, this.renderer.domElement)
-		this.controls.enableDamping = true
-		this.controls.target.set(0, 0, 0)
-		this.controls.update()
+		// The canvas survives: keep the existing controls (and the table
+		// framing) instead of snapping the camera back to the origin.
+		if (!this.controls) {
+			this.controls = new OrbitControls(this.camera, this.renderer.domElement)
+			this.controls.enableDamping = true
+			this.controls.target.set(0, 0, 0)
+			this.controls.update()
+		}
 		this.controls.enabled = this.viewerMode !== 'play'
-		if (_isDev)
-			Object.assign(window, {
-				scene: this.scene,
-				camera: this.camera,
-				controls: this.controls,
-				renderer: this.renderer,
-				THREE,
-			})
+		this._deviceLossCount = 0
 		this._onResize()
 		this.log(`WebGPURenderer ready (${this._rendererBackend}, three r${String(THREE.REVISION)})`)
 		return renderer
+	}
+
+	/** Device-loss recovery: drop the dead renderer/pipeline, re-init, and restart the loop. */
+	async _recoverRenderer() {
+		try {
+			this.renderPipeline?.dispose?.()
+		} catch {}
+		this.renderPipeline = null
+		const dead = this.renderer
+		this.renderer = null
+		try {
+			// Failure is already logged by _startRenderer; just skip the restart.
+			await this._startRenderer().catch(() => null)
+		} finally {
+			if (dead && dead !== this.renderer) {
+				try {
+					dead.dispose?.()
+				} catch {}
+			}
+		}
+		if (this.renderer) await this.startLoop()
 	}
 
 	async precompilePipelines() {
@@ -459,7 +461,7 @@ export class Viewer {
 		}
 	}
 
-	/** Legacy name: delegates to _syncWasmTransforms; no TS physics remains. */
+	/** Kept for input/test callers: delegates to _syncWasmTransforms; no TS physics remains. */
 	private _syncPhysicsTransforms(_timestamp) {
 		if (this.wasmEngine?.ready) return this._syncWasmTransforms(_timestamp)
 		return false
@@ -609,12 +611,11 @@ export class Viewer {
 		if (this.wasmEngine?.ready) {
 			this.wasmEngine.setBallsVisible(true)
 			this.enterPlayMode()
-		} else {
-			this.hookInput()
 		}
 		this.dom.canvas?.focus()
 		const target = computePlayFraming(this.tableGroup, this.camera)
 		await this._animateCameraTo(target, CAM_ANIM.durationMode)
+		if (this.viewerMode !== 'play') return
 		syncRoom(this.scene, this.tableGroup, target.center, target.size)
 		if (!this.wasmEngine?.ready) {
 			try {
@@ -631,29 +632,41 @@ export class Viewer {
 		if (this.viewerMode !== 'play' || this.wasmEngine?.ready) return
 		this.viewerMode = 'viewer'
 		if (typeof history !== 'undefined' && history.state?.mode === 'play') history.back()
-		if (this.controls) this.controls.enabled = true
+		if (this.tableGroup && this.controls) {
+			const state = computeViewerFraming(this.tableGroup)
+			applyCameraState(this.camera, this.controls, state)
+		}
+		this._leavePlay()
+	}
+	/** Shared play→viewer teardown (mode is already 'viewer'); the tween path runs it after the move. */
+	_leavePlay() {
+		if (this.renderer) this.renderer.setPixelRatio(getTargetPixelRatio('viewer'))
+		this._hidePlayTip?.()
+		if (this.tableGroup) showCabFlippers(this.tableGroup)
 		this._syncChrome()
+		this.exitPlayMode()
 	}
 	async _switchToViewer() {
 		if (this.viewerMode !== 'play') return
-		if (!this.tableGroup) return this.exitPlayMode()
 		this.viewerMode = 'viewer'
 		if (typeof history !== 'undefined' && history.state?.mode === 'play') {
 			history.back()
 		}
-		if (this.renderer) this.renderer.setPixelRatio(getTargetPixelRatio('viewer'))
-		this._hidePlayTip?.()
-		showCabFlippers(this.tableGroup)
-		this._syncChrome()
-		const target = computeViewerFraming(this.tableGroup)
-		await this._animateCameraTo(target, CAM_ANIM.durationMode)
-		if (Math.abs(this.camera.fov - CAM.fov) > 0.5) {
-			this.camera.fov = CAM.fov
-			this.camera.updateProjectionMatrix()
-		}
-		if (this.tableGroup)
+		if (this.tableGroup) {
+			if (this.renderer) this.renderer.setPixelRatio(getTargetPixelRatio('viewer'))
+			this._hidePlayTip?.()
+			showCabFlippers(this.tableGroup)
+			this._syncChrome()
+			const target = computeViewerFraming(this.tableGroup)
+			await this._animateCameraTo(target, CAM_ANIM.durationMode)
+			if (this.viewerMode !== 'viewer') return
+			if (Math.abs(this.camera.fov - CAM.fov) > 0.5) {
+				this.camera.fov = CAM.fov
+				this.camera.updateProjectionMatrix()
+			}
 			syncRoom(this.scene, this.tableGroup, target.center, (target as any).size || new THREE.Vector3(1, 1, 1))
-		this.exitPlayMode()
+		}
+		this._leavePlay()
 	}
 	_syncChrome() {
 		const hint = this.dom.modeHint
@@ -760,19 +773,10 @@ export class Viewer {
 			this.dom.canvas.tabIndex = 0
 			this.dom.canvas.focus()
 		}
-		this.hookInput()
-		if (!this._blurHandler) {
-			this._blurHandler = () => {
-				for (const code of RELEASE_CODES) this._sendKey(code, false)
-			}
-			window.addEventListener('blur', this._blurHandler)
-			document.addEventListener('visibilitychange', () => {
-				if (document.hidden) this._blurHandler()
-			})
-		}
 	}
 	exitPlayMode() {
 		this.invalidate()
+		this.isPaused = false
 		if (this.wasmEngine?.ready) {
 			for (const code of this._touchMap.values()) this._sendKey(code, false)
 			this._touchMap.clear()
@@ -816,9 +820,6 @@ export class Viewer {
 	 */
 	_emitModeChange() {
 		dispatchEvent(new CustomEvent('viewer:modechange', { detail: { mode: this.viewerMode } }))
-	}
-	log(msg, level = 'info') {
-		this.harnessLog?.(msg, level)
 	}
 	setBar(pct, txt) {
 		if (this.dom.barFill) this.dom.barFill.style.setProperty('--progress', String(Math.max(0, Math.min(100, pct))))
@@ -869,19 +870,18 @@ export class Viewer {
 		if (this.dom.status) this.dom.status.textContent = msg
 	}
 	async _loadTable(reader) {
-		logMem(this.harnessLog, 'after reader.open')
+		logMem(this.log, 'after reader.open')
 		this._loading(66, 'Opening table…', 'Reading table data…')
 		const t0 = performance.now()
 		const table = await Table.load(reader)
 		this.table = table
 		this._applyTableToneMapping?.(table)
-		if (_isDev) window.table = table
 		const dt = performance.now() - t0
 		this.log(
 			`Parsed in ${dt.toFixed(0)}ms — ${Object.keys(table.items).length} items, ${Object.keys(table.textures).length} textures`,
 			'debug',
 		)
-		logMem(this.harnessLog, 'after parse')
+		logMem(this.log, 'after parse')
 		filterTextures(table, this.log.bind(this))
 		return table
 	}
@@ -925,8 +925,6 @@ export class Viewer {
 			(this.gate ??= new AnimationGate()),
 		)
 		this.renderApi = renderApi
-		if (_isDev) window.renderApi = renderApi
-		if (_isDev) window.textureLoader = texLoader
 		const ballTex = await texLoader.loadDefaultTexture('ball.png', '.png', 'ball.png')
 		renderApi.getMapGenerator().getCache().set('ball.png', ballTex)
 		ballTex.name = 'texture:ball.png'
@@ -1052,7 +1050,7 @@ export class Viewer {
 		const { texCount, texMemMB } = computeTexMem(node)
 		this.log(`Textures in scene: ${texCount} ~${texMemMB} MB`, 'debug')
 		this._loading(88, 'Finishing up…', 'Final touches…')
-		logMem(this.harnessLog, 'after generateTableNode')
+		logMem(this.log, 'after generateTableNode')
 		if (textures.length) {
 			const used = new Set()
 			const mainBakeUsed = new Set()
@@ -1153,7 +1151,7 @@ export class Viewer {
 		reader.data = undefined
 		reader.blob = undefined
 		if (typeof (window as any).gc === 'function') (window as any).gc()
-		logMem(this.harnessLog, 'after reader release')
+		logMem(this.log, 'after reader release')
 	}
 	// Snapshot unstreamed texture sources before the archive is released,
 	// so mid-game script swaps still resolve afterwards.
@@ -1182,7 +1180,7 @@ export class Viewer {
 			} else retainedCount++
 		}
 		if (clearedCount)
-			this.harnessLog?.(`[mem] Cleared ${clearedCount} raw texture buffers (${retainedCount} retained)`, 'info')
+			this.log?.(`[mem] Cleared ${clearedCount} raw texture buffers (${retainedCount} retained)`, 'info')
 	}
 	async _mount(table, node, opts = {}, source = null) {
 		// The renderApi (and its texture cache) is recreated per scene build,
@@ -1192,18 +1190,15 @@ export class Viewer {
 			void overlay.syncTable?.(table)?.catch?.(e => this.log?.(`overlay sync failed: ${e}`, 'warn'))
 		if (this.tableGroup) this.scene.remove(this.tableGroup)
 		this.tableGroup = node
-		;(globalThis as any).tableGroup = node
-		;(globalThis as any).viewer = this
-		;(globalThis as any).renderApi = this.renderApi
 		this.scene.add(node)
 		const pp = postProcessScene(node, {
 			viewerMode: this.viewerMode,
-			harnessLog: this.harnessLog,
+			harnessLog: this.log,
 		})
 		this._applyNoBakeFill(table, node)
 		if (this.options.batched && table && this.renderApi) {
 			const res = _optimizeScene(node, table, this.renderApi)
-			if ((res.batched || res.instanced) && this.harnessLog) {
+			if ((res.batched || res.instanced) && this.log) {
 				const before = (() => {
 					let c = 0
 					node.traverse(o => {
@@ -1211,10 +1206,7 @@ export class Viewer {
 					})
 					return c
 				})()
-				this.harnessLog(
-					`[batch] BatchedMesh ${res.batched} + Instanced ${res.instanced} — meshes ${before}`,
-					'debug',
-				)
+				this.log(`[batch] BatchedMesh ${res.batched} + Instanced ${res.instanced} — meshes ${before}`, 'debug')
 			}
 		}
 		this.buildNodeCache()
@@ -1236,7 +1228,7 @@ export class Viewer {
 				size: state.size,
 				maxDim: state.maxDim,
 			}
-			this.harnessLog?.(
+			this.log?.(
 				`[mount] play cam ${state.position.x.toFixed(0)},${state.position.y.toFixed(0)},${state.position.z.toFixed(0)} tgt ${state.target.x.toFixed(0)},${state.target.y.toFixed(0)},${state.target.z.toFixed(0)} maxDim ${state.maxDim.toFixed(0)}`,
 				'debug',
 			)
@@ -1255,7 +1247,7 @@ export class Viewer {
 			`Framed ${pp.lightmaps ? `(hid ${pp.lightmaps} lm)` : ''} — ${this.tableGroup ? countObjects(this.tableGroup) : 0} objs`.trim(),
 			'debug',
 		)
-		logMem(this.harnessLog, 'Ready — streaming textures')
+		logMem(this.log, 'Ready — streaming textures')
 		this._emitModeChange()
 		const src =
 			(opts && typeof opts.source === 'string' ? opts.source : null) ?? (typeof source === 'string' ? source : '')
@@ -1302,16 +1294,11 @@ export class Viewer {
 						? 'Ready — PLAY: Enter=plunger (hold), ←/→ or A/D flippers, 1=Start 5=Coin, Touch tap left/right hold plunger, P=Pause Esc=viewer ?=help'
 						: 'Ready — VIEWER: drag to orbit, wheel to zoom — click table to Play (Esc to return)'
 			this.log(this.dom.loadTitle.textContent)
-			logMem(this.harnessLog, 'Ready final')
+			logMem(this.log, 'Ready final')
 			this._setLoadState('ready')
 		} else {
 			this._loading(88, 'Finishing up…', 'Finishing up…')
 		}
-		if (_isDev)
-			Object.assign(window, {
-				table,
-				tableGroup: node,
-			})
 		if (!isLowQuality()) buildBvhIdle(node)
 		else this.log('[bvh] low quality: skip idle BVH for perf', 'debug')
 		this._buttonMeshes = []
@@ -1319,16 +1306,8 @@ export class Viewer {
 			if (o.isMesh && o.userData?.isCabinetButton) this._buttonMeshes.push(o)
 		})
 		if (this._buttonMeshes.length)
-			this.harnessLog?.(`[input] ${this._buttonMeshes.length} cabinet button meshes (BVH)`, 'debug')
+			this.log?.(`[input] ${this._buttonMeshes.length} cabinet button meshes (BVH)`, 'debug')
 		this.startLoop()
-		// Timed, cancellable only by option: e2e drives play entry explicitly
-		// through the test API with ?autoplay=0 instead of clearing timers.
-		if (this.viewerMode === 'viewer' && this.options.requestedMode === 'play' && this.options.autoplay) {
-			this.log('[viewer] auto-switch to play (vpx URL)', 'info')
-			setTimeout(() => {
-				this._switchToPlay()
-			}, 600)
-		}
 		return {
 			loaded: table,
 			node,
@@ -1346,20 +1325,24 @@ export class Viewer {
 	}
 	/**
 	 * Boot the headless-WASM engine that owns script, physics, and audio.
-	 * Meshes, materials, and input routing are unchanged — only the state
-	 * producer swaps. Throws `WasmEngineStartError` (or the missing-artifact
-	 * error) on failure so play entry reverts; leaves `wasmEngine` null
-	 * unless fully loaded.
+	 * Meshes, materials, and input routing stay in the DOM/three layer.
+	 * Throws `WasmEngineStartError` (or the missing-artifact error) on
+	 * failure so play entry reverts; leaves `wasmEngine` null unless fully loaded.
 	 */
-	async _createWasmEngine() {
+	/** Boot the engine at most once at a time; concurrent play entries share the in-flight boot. */
+	_createWasmEngine() {
+		return (this._booting ??= this._boot().finally(() => {
+			this._booting = null
+		}))
+	}
+	async _boot() {
 		await this.wasmEngine?.destroy().catch(() => {})
 		this.wasmEngine = null
 		if (!this._vpxBytes?.length) throw new WasmEngineStartError('No table bytes retained for the WASM engine')
-		const win = window
-		const rom =
-			win.__pendingRom?.length && win.__pendingRomName
-				? { name: win.__pendingRomName, zip: win.__pendingRom }
-				: undefined
+		// A ROM still downloading when the table finishes wins the race: wait for it.
+		// The boot consumes it, so a later table never inherits a stale ROM.
+		await this._romReady?.catch(() => {})
+		const rom = this.rom ?? undefined
 		const engine = new WasmEngine({
 			renderApi: this.renderApi,
 			table: this.table,
@@ -1381,6 +1364,7 @@ export class Viewer {
 			throw e
 		}
 		this.wasmEngine = engine
+		if (rom && this.rom === rom) this.rom = null
 		engine.primeAudioOnGesture()
 		this.nodeCache.clear()
 		this.buildNodeCache()
@@ -1389,7 +1373,6 @@ export class Viewer {
 		this._syncSoundChrome()
 		this.log(`WASM engine ready: ${engine.catalogSize} parts, script errors: ${engine.scriptErrorCount}`, 'debug')
 		this.isPaused = false
-		this.hookInput()
 		if (this.viewerMode === 'play') this.enterPlayMode()
 		else this.exitPlayMode()
 	}
@@ -1639,8 +1622,8 @@ export class Viewer {
 							if (info.isBaked) hasReadyBake = true
 							const isBaked = !!(m2.userData && (m2.userData.__isBaked || m2.userData.__bakedNode))
 							// Collect regardless of current visibility: the hide
-							// below runs first (as before), and a hidden mesh
-							// that still qualifies must end up shown again.
+							// below runs first, and a hidden mesh that still
+							// qualifies must end up shown again.
 							const shouldShow = isBaked || info.isMainBake || (info.isVlmBake && !info.isMainBake)
 							if (shouldShow) show.push(o2)
 						}
@@ -1752,7 +1735,7 @@ export class Viewer {
 			this._setStreamProgress(total, total)
 			if (this.dom.streamLabel) this.dom.streamLabel.textContent = 'Visuals ready'
 			setTimeout(() => this._hideStream(), 1200)
-			logMem(this.harnessLog, 'Stream ready')
+			logMem(this.log, 'Stream ready')
 			await this._retainUnstreamedSources(table)
 			if (reader) {
 				await this._cleanupReader(reader)
@@ -1805,94 +1788,104 @@ export class Viewer {
 		}
 		return mounted
 	}
-	/** Load a table by name, path or URL (`?vpx=` semantics, see resolveVpxCandidates). */
-	async load(vpx) {
+	/** Shared load preamble: new generation, fresh abort, loading state first (before any await). */
+	async _beginLoad() {
 		this._loadId = (this._loadId ?? 0) + 1
-		const _loadGen = this._loadId
+		const gen = this._loadId
 		if (this._loadAbort) this._loadAbort.abort()
 		this._loadAbort = new AbortController()
-		const _signal = this._loadAbort.signal
 		this._streamId++
+		this._setLoadState('loading')
 		await this._ensureRenderer()
-		if (_loadGen !== this._loadId) return
+		if (gen !== this._loadId) return null
 		if (this.dom.loading) this.dom.loading.hidden = false
 		if (this.dom.wrap) this.dom.wrap.hidden = false
 		const _w = typeof window !== 'undefined' ? window.innerWidth : 800
 		const _h = typeof window !== 'undefined' ? window.innerHeight : 600
 		this.renderer?.setSize(_w, _h)
+		return { gen, signal: this._loadAbort.signal }
+	}
+	/** Whether a table URL is worth caching: dev-server URLs change under the editor. */
+	_isCacheableUrl(cand) {
+		try {
+			const host = new URL(cand, location.href).hostname
+			if (/^(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])$/.test(host)) return false
+		} catch {
+			return false
+		}
+		return true
+	}
+	/** Load a table by name, path or URL (`?vpx=` semantics, see resolveVpxCandidates). */
+	async load(vpx) {
+		const begun = await this._beginLoad()
+		if (!begun) return
+		const { gen: _loadGen, signal: _signal } = begun
 		this._loading(2, 'Getting ready…', 'Looking for table…')
 		const candidates = resolveVpxCandidates(vpx)
 		if (!candidates.length) {
 			this.log('No VPX candidate (pass ?vpx=name)', 'warn')
 			this._setLoadState('error')
+			this._loading(0, 'Could not load table', 'No table location to try — pass ?vpx=name.')
 			return
 		}
-		this._setLoadState('loading')
 		this.log(`Trying ${candidates.join(', ')}`, 'debug')
 		for (const cand of candidates) {
 			if (_loadGen !== this._loadId) return
 			if (_signal.aborted) throw new DOMException('Aborted', 'AbortError')
+			// Cached tables skip the network; parse errors must surface, so
+			// only the cache lookup stays inside the try.
+			let cached = null
+			if (this._isCacheableUrl(cand)) {
+				try {
+					const hit = await idbGet(cand)
+					if (hit?.byteLength > 1_000_000) cached = hit
+				} catch {}
+			}
 			try {
-				try {
-					const { idbGet } = await import('../../dist-esm/lib/util/idb-cache.js')
-					const cached = await idbGet(cand.split('/').pop())
-					if (cached && cached.byteLength > 1_000_000) {
-						this.log(
-							`[IDB] hit ${cand.split('/').pop()} ${fmtBytes(cached.byteLength)} — using cached`,
-							'debug',
-						)
-						const bytes = new Uint8Array(cached)
-						this._vpxBytes = bytes
-						const reader = new BrowserBinaryReader(bytes)
-						await reader.open()
-						if (_loadGen !== this._loadId) {
-							try {
-								await this._cleanupReader(reader)
-							} catch {}
-							return
-						}
-						const _res = await this._fromReader(reader, cand, _loadGen)
-						if (_loadGen === this._loadId) this._loadAbort = null
-						return _res
-					}
-				} catch {}
-				if (_loadGen !== this._loadId) return
-				if (_signal.aborted) throw new DOMException('Aborted', 'AbortError')
-				this.log(`Fetching ${cand}…`, 'debug')
-				this._loading(5, 'Downloading…', 'Downloading table…')
-				const t0 = performance.now()
-				const vpxKey = cand.split('/').pop()
-				const data = await fetchWithProgress(
-					cand,
-					p => {
-						const pct = Math.round(p * 100)
-						this._loading(5 + p * 60, `Downloading… ${pct}%`, `Downloading table… ${pct}%`)
-					},
-					{ signal: _signal },
-				)
-				this.log(
-					`Fetched ${fmtBytes(data.length)} in ${((performance.now() - t0) / 1000).toFixed(1)}s`,
-					'debug',
-				)
-				try {
-					const { idbSet } = await import('../../dist-esm/lib/util/idb-cache.js')
-					idbSet(vpxKey, data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength)).catch(
-						() => {},
+				let reader
+				if (cached) {
+					this.log(`[IDB] hit ${cand} ${fmtBytes(cached.byteLength)} — using cached`, 'debug')
+					const bytes = new Uint8Array(cached)
+					this._vpxBytes = bytes
+					reader = new BrowserBinaryReader(bytes)
+					await reader.open()
+				} else {
+					if (_loadGen !== this._loadId) return
+					if (_signal.aborted) throw new DOMException('Aborted', 'AbortError')
+					this.log(`Fetching ${cand}…`, 'debug')
+					this._loading(5, 'Downloading…', 'Downloading table…')
+					const t0 = performance.now()
+					const data = await fetchWithProgress(
+						cand,
+						p => {
+							const pct = Math.round(p * 100)
+							this._loading(5 + p * 60, `Downloading… ${pct}%`, `Downloading table… ${pct}%`)
+						},
+						{ signal: _signal },
 					)
-				} catch {}
-				if (_loadGen !== this._loadId) return
-				this._vpxBytes = data
-				const reader = new BrowserBinaryReader(data)
-				await reader.open()
+					this.log(
+						`Fetched ${fmtBytes(data.length)} in ${((performance.now() - t0) / 1000).toFixed(1)}s`,
+						'debug',
+					)
+					if (this._isCacheableUrl(cand)) {
+						idbSet(cand, data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength)).catch(
+							() => {},
+						)
+					}
+					if (_loadGen !== this._loadId) return
+					this._vpxBytes = data
+					reader = new BrowserBinaryReader(data)
+					await reader.open()
+				}
 				if (_loadGen !== this._loadId) {
 					try {
 						await this._cleanupReader(reader)
 					} catch {}
 					return
 				}
-				const _res2 = await this._fromReader(reader, cand, _loadGen)
+				const _res = await this._fromReader(reader, cand, _loadGen)
 				if (_loadGen === this._loadId) this._loadAbort = null
-				return _res2
+				return _res
 			} catch (err) {
 				if (_signal.aborted || err?.name === 'AbortError' || _loadGen !== this._loadId) return
 				this.log(`Error loading ${cand}: ${err?.stack ?? err?.message}`, 'error')
@@ -1901,15 +1894,13 @@ export class Viewer {
 		if (_loadGen !== this._loadId) return
 		if (_loadGen === this._loadId) this._loadAbort = null
 		this._setLoadState('error')
+		this._loading(0, 'Could not load table', `None of ${candidates.length} location(s) worked — see the log.`)
 		throw new Error(`Failed: none of ${candidates.join(', ')}`)
 	}
 	async loadFromFile(file) {
-		this._loadId = (this._loadId ?? 0) + 1
-		const _loadGen = this._loadId
-		if (this._loadAbort) this._loadAbort.abort()
-		this._loadAbort = new AbortController()
-		this._streamId++
-		this._setLoadState('loading')
+		const begun = await this._beginLoad()
+		if (!begun) return null
+		const { gen: _loadGen } = begun
 		this._loading(5, 'Reading file…', `Reading ${file.name}…`)
 		this.log(`Reading ${file.name}…`, 'debug')
 		try {
@@ -1925,30 +1916,47 @@ export class Viewer {
 			if (_loadGen === this._loadId) this._loadAbort = null
 			return _res
 		} catch (e) {
-			if (_loadGen === this._loadId) this._setLoadState('error')
+			this.log(`Read failed: ${e?.message ?? e}`, 'error')
+			if (_loadGen === this._loadId) {
+				this._setLoadState('error')
+				this._loading(0, 'Could not load table', `Could not read ${file.name} — see the log.`)
+			}
 			throw e
 		}
 	}
 	async loadRomFile(file) {
 		const buf = new Uint8Array(await file.arrayBuffer())
-		window.__pendingRom = buf
-		window.__pendingRomName = file.name.replace(/\.zip$/i, '')
-		this.log(`ROM file ${file.name} ${fmtBytes(buf.length)} — stored`, 'debug')
+		this.rom = { name: file.name.replace(/\.zip$/i, ''), zip: buf }
+		this._romReady = null
+		this.log(`ROM file ${file.name} ${fmtBytes(buf.length)} — mounting`, 'debug')
+		// A table already on screen picks the ROM up on a reboot.
+		if (this.wasmEngine?.ready) await this._createWasmEngine()
 		return buf
 	}
 	async preloadRom(url) {
+		const gen = this._loadId
 		this.log(`Preloading ROM ${url}…`, 'debug')
-		const data = await fetchWithProgress(url, p => this.setBar(5 + p * 40, `ROM ${(p * 100).toFixed(0)}%`), {
-			signal: this._loadAbort?.signal,
-		})
-		window.__pendingRom = data
-		window.__pendingRomName =
-			url
-				.split('/')
-				.pop()
-				?.replace(/\.zip$/i, '') || ''
-		window.__pendingRomUrl = url
+		const pending = fetchWithProgress(url, undefined, { signal: this._loadAbort?.signal })
+		this._romReady = pending
+		let data
+		try {
+			data = await pending
+		} finally {
+			if (this._romReady === pending) this._romReady = null
+		}
+		// A newer table load supersedes this ROM; leave its state alone.
+		if (gen !== this._loadId) return data
+		this.rom = {
+			name:
+				url
+					.split('/')
+					.pop()
+					?.replace(/\.zip$/i, '') || '',
+			zip: data,
+		}
 		this.log(`ROM preload OK ${fmtBytes(data.length)}`, 'debug')
+		// The table beat the ROM: reboot with it now instead of ignoring it.
+		if (this.wasmEngine?.ready) await this._createWasmEngine()
 		return data
 	}
 	async startLoop() {
@@ -1982,10 +1990,9 @@ export class Viewer {
 			return true
 		}
 		this.renderer.setAnimationLoop((timestamp, frame) => {
-			if (this.isPaused) {
-				this.wasmEngine?.resetStepClock(timestamp)
-				return
-			}
+			// Pausing only freezes stepping: rendering, orbit, and the tween
+			// keep running so the badge and camera stay alive.
+			if (this.isPaused) this.wasmEngine?.resetStepClock(timestamp)
 			// Dirty-gated present: idle frames skip the present (and its matrix
 			// pass) entirely — physics above still steps every frame. The scan
 			// itself is cheap (numeric signatures, no string work).
@@ -2073,7 +2080,7 @@ export class Viewer {
 	 */
 	stepOnce(nowMs = performance.now()): boolean {
 		if (!this.wasmEngine?.ready) return false
-		if (this.isPaused || this.viewerMode !== 'play' || isLowQuality()) return false
+		if (this.isPaused || this.viewerMode !== 'play') return false
 		if (!this._syncWasmTransforms(nowMs)) return true
 		this.renderApi?.flushMatrixUpdates?.(this.tableGroup)
 		if (this.renderPipeline) this.renderPipeline.render()
@@ -2163,19 +2170,5 @@ export class Viewer {
 			el.classList.remove('show')
 			el.hidden = true
 		}, 420)
-	}
-	hookInput() {
-		if (!this.wasmEngine?.ready) return
-		this._inputCleanup?.()
-		this._inputCleanup = attachInput(this)
-		if (this.dom.canvas) {
-			this.dom.canvas.tabIndex = 0
-			setTimeout(() => {
-				this.dom.canvas.focus()
-			}, 50)
-			setTimeout(() => {
-				this.dom.canvas.focus()
-			}, 300)
-		}
 	}
 }

@@ -145,15 +145,10 @@ export function initTableBrowser(viewer: BrowserViewer, syncParam: (key: Kind, v
 	const pageLink = (url: string) =>
 		el('a', { href: url, target: '_blank', rel: 'noopener', textContent: `${hostOf(url)} ↗` })
 
-	// The viewer mounts a pending ROM when the table loads, so the ROM has to arrive first.
+	// A dropped or loaded ROM mounts on the running table, so either order works.
 	const handOff = (kind: Kind, file: VpsFile, url: string, opened: boolean) => {
 		const what = kind === 'rom' ? (file.version ? `${file.version}.zip` : 'the ROM zip') : 'the .vpx'
-		const when = kind === 'rom' ? ' before (or with) the table' : ''
-		setStatus(
-			opened ? 'Opened ' : 'Open ',
-			pageLink(url),
-			` — download ${what} there and drop it onto the viewer${when}.`,
-		)
+		setStatus(opened ? 'Opened ' : 'Open ', pageLink(url), ` — download ${what} there and drop it onto the viewer.`)
 	}
 
 	const linkFor = (kind: Kind, file: VpsFile, url: string) => {
@@ -176,7 +171,7 @@ export function initTableBrowser(viewer: BrowserViewer, syncParam: (key: Kind, v
 			if (kind === 'rom') {
 				setStatus(`Downloading ${file.version}.zip…`)
 				await viewer.preloadRom(url).then(
-					() => setStatus(`ROM ${file.version} ready — it mounts when the table loads.`),
+					() => setStatus(`ROM ${file.version} ready — it mounts on the running table.`),
 					error => setStatus(`ROM download failed: ${error?.message ?? error}`),
 				)
 			} else {

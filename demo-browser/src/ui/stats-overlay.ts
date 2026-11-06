@@ -28,9 +28,7 @@ function buildStats() {
 	sep2.textContent = '·'
 	const fps = document.createElement('span')
 	const fpsText = document.createTextNode('')
-	const threaded = document.createElement('span')
-	threaded.textContent = ' · threaded'
-	fps.append(fpsText, threaded)
+	fps.append(fpsText)
 	head.append(badge, sep1, backend, sep2, fps)
 	const grid = document.createElement('div')
 	grid.className = 'stats-grid'
