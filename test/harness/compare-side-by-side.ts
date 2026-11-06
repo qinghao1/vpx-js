@@ -114,8 +114,6 @@ async function main() {
 	let viteProc: any = null
 	let browserTarget = session.browserUrl
 	if (utils.ensureVite) {
-		// Effective URL: a foreign occupant moves our vite to a per-run
-		// fallback port, so navigate where ensureVite actually serves.
 		viteProc = await utils.ensureVite(session.browserUrl, { label: 'vite' })
 		if (viteProc?.url) browserTarget = viteProc.url
 	}

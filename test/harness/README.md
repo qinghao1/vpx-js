@@ -10,7 +10,7 @@ npx tsx test/harness/verify-all.ts   # TAP 1..5: table → twd-render → ab →
 
 - `.ts` files: always `npx tsx <file>`.
 - `.mjs` files: `node <file>` ONLY if they import no `lib/**` code
-  (`bench.mjs`, `harness-dmd.mjs`, `harness-pinmame.mjs` import just
+  (`bench.mjs`, `verify-ab.mjs` import just
   `bench-shared.ts` / `vpinball-resolver.ts` / `utils.mjs`, which are plain-Node
   safe). `repro-*.mjs` import `lib/**` — run those with `npx tsx`, plain `node`
   crashes on TS-only syntax.
@@ -33,12 +33,10 @@ npx tsx test/harness/verify-all.ts   # TAP 1..5: table → twd-render → ab →
 | `compare-side-by-side.ts`     | MANUAL dual-window launcher (browser left, native right) — eyeball only, no asserts                                                                                                            | Chrome + vite + native                                           |
 | `bench.mjs`                   | Browser bench: load + FPS + profile (`--vpx/--rom/--balls/--duration/--warmup/--out/--headed/--gpu/--trace`)                                                                                   | Chrome + vite                                                    |
 | `bench-fps-gpu.mjs`           | GPU FPS bench                                                                                                                                                                                  | Chrome + vite + GPU                                              |
-| `harness-dmd.mjs`             | DMD pipeline gate (injected pattern must reach canvas + meshes) + screenshots                                                                                                                  | Chrome + vite + ROM                                              |
-| `harness-pinmame.mjs`         | Browser PinMAME + DMD check                                                                                                                                                                    | Chrome + vite + ROM                                              |
 | `repro-artifact.ts`           | walking_dead artifact repro, asserts + exit 1 (imports `demo-browser/`)                                                                                                                        | `walking_dead.vpx`                                               |
 | `repro-spinner-direction.mjs` | Spinner-direction TAP + exit code (run with `tsx`)                                                                                                                                             | fixture VPX                                                      |
 | `tap.ts`                      | TAP helpers (`tapHeader/tapOk/tapNotOk/tapSkip/tapPlan`, `Tap` class) — no main                                                                                                                | —                                                                |
-| `utils.mjs`                   | Puppeteer/vite helpers (`launchBrowser/newPage/ensureVite/openTablePage`) — no main                                                                                                            | —                                                                |
+| `utils.mjs`                   | Puppeteer/vite helpers (`launchBrowser/newPage/ensureVite`) — no main                                                                                                                          | —                                                                |
 | `vpinball-resolver.ts`        | Arg parsing + VPX/ROM/native discovery — no main                                                                                                                                               | —                                                                |
 | `vpinball-resolver.spec.ts`   | Arg parsing specs (vitest)                                                                                                                                                                     | —                                                                |
 | `wasm-pacing.spec.ts`         | Pacing specs (vitest)                                                                                                                                                                          | —                                                                |
@@ -88,13 +86,12 @@ node test/harness/verify-ab.mjs --vpx=<table>.vpx --rom=<game>.zip   # A/B vs /t
 ## Timeouts & cleanup (`utils.mjs`, `vpinball-resolver.ts`)
 
 - `launchBrowser`: `opts.autoKillMs` SIGKILLs chrome, default 300 s.
-  `ensureVite`: spawned vite gets a 120 s auto-kill. `openTablePage`:
-  `goto` 30 s. Importing `utils.mjs` registers exit/SIGINT/SIGTERM handlers
+  Importing `utils.mjs` registers exit/SIGINT/SIGTERM handlers
   that reap only PIDs this process spawned (tracked browsers/vites plus
   their own profile dirs) — there is no host-wide `pkill`, so parallel runs
   and unrelated user chrome/vite processes are never touched.
-  `ensureVite` reuses a probed server only when its lockfile proves it serves
-  this tree root, and otherwise starts its own vite on a free per-run port.
+  `ensureVite` starts this process's own vite (one per tree root) on a free
+  port and returns the URL to navigate to; it never reuses a foreign server.
   `CHROME_PATH` overrides chrome discovery.
 - `createSessionIni` makes `/tmp/vpinball-*/VPinballX.ini` via `mkdtemp` and
   never deletes it — the CALLER must `rm -rf` the dir

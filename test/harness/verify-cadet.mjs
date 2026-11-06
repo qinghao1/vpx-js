@@ -53,12 +53,7 @@ const check = (ok, name, detail = '') => {
 
 let browser
 try {
-	// Effective base: a foreign occupant on :3000 moves our vite to a per-run
-	// fallback port, so navigate where ensureVite actually serves.
-	const vite = await ensureVite('https://localhost:3000/?vpx=/test/fixtures/table-empty.vpx', {
-		label: 'verify-cadet',
-	})
-	const BASE = new URL(vite.url).origin
+	const BASE = new URL((await ensureVite('https://localhost/', { label: 'verify-cadet' })).url).origin
 	const puppeteer = await loadPuppeteer()
 	browser = await launchBrowser(puppeteer, {})
 	const page = await newPage(browser)

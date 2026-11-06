@@ -1,3 +1,4 @@
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 import { attachLogging, ensureVite, launchBrowser, loadPuppeteer, newPage } from '../../test/harness/utils.mjs'
 import {
 	backboxChecks,
@@ -103,11 +104,8 @@ function labelFromUrl(u) {
 	}
 }
 
-// Shared harness helpers (same as bench.mjs): ensureVite probes/starts the dev
-// server and registers process cleanup for vite + chrome, so no bespoke
-// ensureServer/_forceKillChrome/signal handlers are needed here.
-// Effective server URL: a foreign occupant on the wanted port moves our vite
-// to a per-run fallback port, so run where ensureVite actually serves.
+// ensureVite serves this tree on a per-run port (cleanup is registered by
+// utils.mjs), so navigate to the URL it returns.
 const serverUrl = (await ensureVite(url || DEFAULT_URL, { label: 'integration' })).url
 const puppeteer = await loadPuppeteer()
 const browser = await launchBrowser(puppeteer, {

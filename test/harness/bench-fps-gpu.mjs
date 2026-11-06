@@ -23,13 +23,13 @@ const warmup = Number(getArg(args, 'warmup', '2000'))
 const vpxParam = path.isAbsolute(vpxArg) ? `/@fs${vpxArg}` : vpxArg
 const legs = ['viewer', 'play']
 
-await ensureVite('https://localhost:3000/', { label: 'fps-gpu' })
+const BASE = new URL((await ensureVite('https://localhost/', { label: 'fps-gpu' })).url).origin
 const puppeteer = await loadPuppeteer()
 const browser = await launchBrowser(puppeteer, { ...(gpu ? { gpu } : {}), timeout: 300_000 })
 
 async function runLeg(mode) {
 	const page = await newPage(browser)
-	const url = `https://localhost:3000/?vpx=${vpxParam}&mode=${mode}`
+	const url = `${BASE}/?vpx=${vpxParam}&mode=${mode}`
 	await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 120000 })
 	let ready = false
 	for (let i = 0; i < 120; i++) {
