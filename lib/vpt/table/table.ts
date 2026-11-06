@@ -235,21 +235,15 @@ export class Table implements IRenderable<TableState> {
 		}
 	}
 
-	public tableNode?: unknown
-	public renderApi?: IRenderApi<any, any, any>
-
 	/** Generates top-most scene node containing the entire table. */
 	public async generateTableNode<NODE, GEOMETRY, POINT_LIGHT>(
 		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
 		opts: TableExportOptions & { preloadTextures?: boolean } = {},
 	): Promise<NODE> {
-		this.renderApi = renderApi as unknown as IRenderApi<any, any, any>
 		if (opts.preloadTextures !== false) {
 			await renderApi.preloadTextures(Object.values(this.textures), this)
 		}
-		const node = (await this.meshGenerator?.generateTableNode(renderApi, opts)) as NODE
-		this.tableNode = node
-		return node
+		return (await this.meshGenerator?.generateTableNode(renderApi, opts)) as NODE
 	}
 
 	public prepareToPlay(): void {
