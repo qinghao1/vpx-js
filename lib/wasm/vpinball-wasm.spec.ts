@@ -587,3 +587,20 @@ describe('table session queue', () => {
 		}
 	})
 })
+
+describe('loadHeadlessEngine environment', () => {
+	it('fails loud with op environment instead of a deep wasm abort when the page is not isolated', async () => {
+		const host = globalThis as { crossOriginIsolated?: boolean }
+		const prev = host.crossOriginIsolated
+		host.crossOriginIsolated = false
+		try {
+			await expect(loadHeadlessEngine('test-env-guard.js')).rejects.toMatchObject({
+				name: 'HeadlessEngineError',
+				op: 'environment',
+			})
+		} finally {
+			if (prev === undefined) delete host.crossOriginIsolated
+			else host.crossOriginIsolated = prev
+		}
+	})
+})
