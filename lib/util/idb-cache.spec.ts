@@ -1,6 +1,6 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 import { describe, expect, it } from 'vitest'
-import { bitmapCacheKey, exrCacheKey, idbGet, idbSet, vbsCacheKey } from './idb-cache.js'
+import { bitmapCacheKey, exrCacheKey, idbGet, idbSet } from './idb-cache.js'
 
 /** Minimal in-memory indexedDB so the cache contract is exercised, not skipped. */
 function installFakeIndexedDB(): void {
@@ -117,28 +117,5 @@ describe('bitmapCacheKey', () => {
 	it('never collides with float entries', () => {
 		const data = new Uint8Array([9, 8, 7])
 		expect(bitmapCacheKey('tex', data, 'image/png', 512)).not.toBe(exrCacheKey('tex', data, 'exr', 512))
-	})
-})
-
-describe('vbsCacheKey', () => {
-	it('is deterministic, content-sensitive, and versioned against retired prefixes', () => {
-		// Stale transpiled JS running against a newer runtime produces
-		// undebuggable crashes (wrong line numbers, old codegen). The prefix
-		// must change whenever transpile output semantics change; retired
-		// prefixes (vbs9 and older) must not be emitted anymore.
-		const retired = ['vbs1:', 'vbs2:', 'vbs3:', 'vbs4:', 'vbs5:', 'vbs6:', 'vbs7:', 'vbs8:', 'vbs9:']
-		const key = vbsCacheKey('Dim x')
-		// Deterministic.
-		expect(vbsCacheKey('Dim x')).toBe(key)
-		// Content-sensitive: different scripts key differently, even at equal
-		// content shape, and the length suffix separates longer scripts.
-		expect(vbsCacheKey('Dim y')).not.toBe(key)
-		expect(vbsCacheKey('Dim xx')).not.toBe(key)
-		// Versioned: a vbs<digits>: prefix newer than every retired prefix,
-		// so old cached payloads never validate against a new transpiler.
-		const version = Number(/^vbs(\d+):/.exec(key)?.[1])
-		expect(Number.isInteger(version)).toBe(true)
-		expect(version).toBeGreaterThan(retired.length)
-		for (const prefix of retired) expect(key.startsWith(prefix)).toBe(false)
 	})
 })

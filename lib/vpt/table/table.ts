@@ -159,10 +159,6 @@ export class Table implements IRenderable<TableState> {
 	public getDetailLevel(): number {
 		return 10
 	}
-	/** Deprecated upstream; always 0. */
-	public getTableHeight(): number {
-		return 0
-	}
 
 	public getDimensions(): { width: number; height: number } {
 		if (!this.data) throw new Error('Table data not loaded')
@@ -219,10 +215,6 @@ export class Table implements IRenderable<TableState> {
 		}
 		return (await this.meshGenerator?.generateTableNode(renderApi, opts)) as NODE
 	}
-
-	public getItems(): Array<Item<ItemData>> {
-		return Object.values(this.items)
-	}
 }
 
 /** Exact match first, then case-insensitive fallback (dict keys are exact names). */
@@ -266,16 +258,6 @@ export interface TableGenerateOptions {
 	exportTriggers?: boolean
 	exportSpinners?: boolean
 	exportPlungers?: boolean
-	gltfOptions?: TableGenerateGltfOptions
-}
-
-export interface TableGenerateGltfOptions {
-	binary?: boolean
-	trs?: boolean
-	onlyVisible?: boolean
-	animations?: any[]
-	maxTextureSize?: number
-	includeCustomExtensions?: boolean
 }
 
 /** Mesh generation options (generateTableNode/getMeshes). */

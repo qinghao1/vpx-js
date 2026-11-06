@@ -1,7 +1,7 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 import type { Group } from 'three'
 import { BufferAttribute, BufferGeometry, Color, DoubleSide, Matrix4, Mesh, Vector2 } from 'three'
-import { attribute, clamp, Fn, float, length, max, mix, positionLocal, pow, sqrt, uniform } from 'three/tsl'
+import { attribute, clamp, float, length, max, mix, positionLocal, pow, sqrt, uniform } from 'three/tsl'
 import { MeshBasicNodeMaterial, type Node } from 'three/webgpu'
 import { clampModulateVsAdd } from '../../../vpt/flasher/flasher-blend.js'
 import type { Table } from '../../../vpt/table/table.js'
@@ -74,7 +74,7 @@ export function createBulbGlowNodeMaterial(options: BulbGlowOptions): MeshBasicN
 	// (transparent sort, or bake order when merged), not native's z + depthBias.
 	const uModulate = uniform(clampModulateVsAdd(options.modulateVsAdd))
 
-	mat.outputNode = Fn(() => glowOutput(uCenter, uInvFalloff, uFalloffPower, uColor, uColor2, uIntensity, uModulate))()
+	mat.outputNode = glowOutput(uCenter, uInvFalloff, uFalloffPower, uColor, uColor2, uIntensity, uModulate)
 	setupGlowMaterial(mat)
 
 	const ud = mat.userData as Record<string, unknown>
@@ -152,7 +152,7 @@ export function createMergedBulbGlowMaterial(): MeshBasicNodeMaterial {
 	const aColor2 = attribute<'vec3'>('aGlowColor2', 'vec3')
 	const aDyn = attribute<'vec2'>('aGlowDyn', 'vec2')
 	// aParams is (inverse falloff, falloff power); aDyn is the live (intensity, modulate) per lamp.
-	mat.outputNode = Fn(() => glowOutput(aCenter, aParams.x, aParams.y, aColor, aColor2, aDyn.x, aDyn.y))()
+	mat.outputNode = glowOutput(aCenter, aParams.x, aParams.y, aColor, aColor2, aDyn.x, aDyn.y)
 	setupGlowMaterial(mat)
 	;(mat.userData as Record<string, unknown>).__bulbGlowMerged = true
 	return mat
@@ -191,8 +191,8 @@ function glowParamsOf(table: Table, lightName: string): GlowLightParams | undefi
 	const data = table.lights[lightName]?.data
 	if (!data) return undefined
 	return {
-		centerX: data.center?.x ?? (table.data?.right || 1) / 2,
-		centerY: data.center?.y ?? (table.data?.bottom || 1) / 2,
+		centerX: data.center.x,
+		centerY: data.center.y,
 		falloff: Math.max(data.falloff, MIN_FALLOFF),
 		falloffPower: data.falloffPower,
 	}

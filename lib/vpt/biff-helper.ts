@@ -3,10 +3,13 @@
 
 import type { BiffParser } from '../io/biff-parser.js'
 
-/** Biff tag → field of T: a misspelled field fails to type-check instead of creating a new property. */
-export type BiffFieldMap<T> = Readonly<Record<string, keyof T & string>>
+/** Keys of T whose non-nullable value accepts V (e.g. number for float/int tags). */
+export type FieldsOf<T, V> = { [K in keyof T]: NonNullable<T[K]> extends V ? K : never }[keyof T] & string
 
-/** Maps for Biff tag dispatch. */
+/** Biff tag → field of T: a misspelled field fails to type-check instead of creating a new property. */
+export type BiffFieldMap<T, V = unknown> = Readonly<Record<string, FieldsOf<T, V> & keyof T & string>>
+
+/** Maps for Biff tag dispatch. The per-kind value check fires at each map's declaration. */
 export interface BiffMaps<T> {
 	float?: BiffFieldMap<T>
 	int?: BiffFieldMap<T>

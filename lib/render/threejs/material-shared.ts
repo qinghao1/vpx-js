@@ -17,16 +17,9 @@ export const RE_VR = /(?:^|[^a-z0-9])vr/i
 export { RE_PLAYFIELD } from './texture-tags.js'
 
 let _globalEmissionScale = 1
-const _emissionListeners = new Set<(scale: number) => void>()
-
-export const onGlobalEmissionScaleChange = (listener: (scale: number) => void) => {
-	_emissionListeners.add(listener)
-	return () => _emissionListeners.delete(listener)
-}
 
 export const setGlobalEmissionScale = (scale: number) => {
 	_globalEmissionScale = Number.isFinite(scale) ? Math.max(0.15, Math.min(1, scale)) : 1
-	for (const listener of _emissionListeners) listener(_globalEmissionScale)
 }
 export const getGlobalEmissionScale = () => _globalEmissionScale
 

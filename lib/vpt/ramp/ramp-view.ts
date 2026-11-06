@@ -321,8 +321,8 @@ export class RampMeshGenerator {
 		const vvertex = this.getCentralCurve(table, accuracy)
 		const cvertex = vvertex.length
 		const rgvLocal: Vertex2D[] = []
-		const bottomHeight = this.state.heightBottom + table.getTableHeight()
-		const topHeight = this.state.heightTop + table.getTableHeight()
+		const bottomHeight = this.state.heightBottom
+		const topHeight = this.state.heightTop
 
 		let totalLength = 0
 		for (let i = 0; i < cvertex - 1; i++) {

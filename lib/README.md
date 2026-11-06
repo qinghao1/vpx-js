@@ -9,19 +9,19 @@ Not published to npm (`private`, no `exports`): consumers deep-import modules fr
 - `lib/refs.node.ts` / `lib/refs.browser.ts` — platform-specific surface:
 
 ```ts
-import { BinaryReader, storage, ThreeTextureLoader } from './dist-esm/lib/refs.node.js' // Node
-import { BinaryReader, storage, ThreeTextureLoader } from './dist-esm/lib/refs.browser.js' // Browser
+import { BinaryReader, ThreeTextureLoader } from './dist-esm/lib/refs.node.js' // Node
+import { BinaryReader, ThreeTextureLoader } from './dist-esm/lib/refs.browser.js' // Browser
 ```
 
 `lib/refs-three.ts` re-exports three core symbols (`Mesh`, `Scene`, `Color`, …) so library code imports three core via refs and addons directly from `three`.
 
 ## Platform Split
 
-| file              | Provides                                                                                |
-| ----------------- | --------------------------------------------------------------------------------------- |
-| `refs.node.ts`    | `NodeBinaryReader`, `storage` (in-memory), `ThreeTextureLoaderNode` (fs + zlib)         |
-| `refs.browser.ts` | `BrowserBinaryReader`, `storage` (`localStorage`), `ThreeTextureLoaderBrowser` (canvas) |
-| `refs-three.ts`   | shared three re-exports for both platforms                                              |
+| file              | Provides                                                    |
+| ----------------- | ----------------------------------------------------------- |
+| `refs.node.ts`    | `NodeBinaryReader`, `ThreeTextureLoaderNode` (fs + zlib)    |
+| `refs.browser.ts` | `BrowserBinaryReader`, `ThreeTextureLoaderBrowser` (canvas) |
+| `refs-three.ts`   | shared three re-exports for both platforms                  |
 
 I/O uses `Uint8Array`/`DataView` for both Node and browser.
 

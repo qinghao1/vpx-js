@@ -204,13 +204,17 @@ describe('material arrival: BDL uniforms survive streaming', () => {
 	})
 
 	it('never stashes pendingEmissiveMap on primitive node materials', () => {
-		// Primitives carry no emissive path: the arrival branch deletes this
-		// key unbound and no resolver consumes it, so stashing it only makes
-		// demandPendingMaps load a texture nobody binds.
+		// Primitives carry no emissive path: the creation route ignores it, so
+		// no resolver consumes it and demandPendingMaps loads no texture nobody
+		// binds.
 		const textures = new Map<string, DataTexture>()
 		const generator = makeGenerator(textures)
-		const mat: any = createPrimitiveBdlMaterial({ albedo: 0xffffff, opacity: 1, bdl: 0 })
-		generator.applyEmissiveMap(mat, { name: 'p', baseColor: 0xffffff } as any, 'emissiveonly')
+		const mat: any = generator.getMaterial({
+			material: { name: 'p', baseColor: 0xffffff } as any,
+			map: 'somemap',
+			emissiveMap: 'emissiveonly',
+		})
+		expect(mat.userData.pendingMap, 'missing map still stashes').toBe('somemap')
 		expect(mat.userData.pendingEmissiveMap).toBeUndefined()
 	})
 
@@ -258,11 +262,12 @@ describe('material arrival: BDL uniforms survive streaming', () => {
 		const mat: any = generator.getMaterial({
 			material: { name: 'VLM.Bake', baseColor: 0xffffff } as any,
 			map: 'bakemap',
+			emissiveMap: 'bakeemissive',
 		})
 		expect(mat.userData.__isBaked).toBe(true)
-		generator.applyNormalMap(mat, 'bakenormal')
-		generator.applyEnvMap(mat, 'bakeenv')
-		generator.applyEmissiveMap(mat, { name: 'VLM.Bake', baseColor: 0xffffff } as any, 'bakeemissive')
+		expect(mat.userData.pendingEmissiveMap, 'creation stashes the emissive name').toEqual('bakeemissive')
+		;(generator as any).applyNormalMap(mat, 'bakenormal')
+		;(generator as any).applyEnvMap(mat, 'bakeenv')
 		expect(mat.userData.pendingNormalMap).toEqual('bakenormal')
 		const tex = makeTex()
 		textures.set('bakenormal', tex)

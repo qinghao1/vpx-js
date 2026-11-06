@@ -7,7 +7,7 @@ export const VPS_DB_URL = 'https://virtualpinballspreadsheet.github.io/vps-db/db
 export const VPS_UPDATED_URL = 'https://virtualpinballspreadsheet.github.io/vps-db/lastUpdated.json'
 
 /** Budget for the change-stamp probe; on timeout a cached catalog is served as-is. */
-export const STAMP_TIMEOUT_MS = 10_000
+const STAMP_TIMEOUT_MS = 10_000
 
 // vps1 versions the trimmed VpsGame shape stored in IDB; bump when it changes.
 const CACHE_KEY = 'vps1:catalog'
@@ -86,7 +86,7 @@ export function parseVpsDb(raw: unknown): VpsGame[] {
 		.sort((a, b) => a.name.localeCompare(b.name))
 }
 
-/** Games matching every whitespace-separated term in name, manufacturer, year or ROM name; name prefix hits first. */
+/** Games matching every whitespace-separated term in name, manufacturer, year or ROM name; name-prefix hits rank first, other name hits second. */
 export function searchVpsGames(games: VpsGame[], query: string, limit = 50): VpsGame[] {
 	const terms = query.toLowerCase().split(/\s+/).filter(Boolean)
 	if (!terms.length) return []
@@ -134,15 +134,37 @@ async function fetchBytes(url: string, signal?: AbortSignal): Promise<Uint8Array
 export async function loadVpsCatalog({ download = fetchBytes, signal }: LoadOptions = {}): Promise<VpsGame[]> {
 	const cached = (await idbGet(CACHE_KEY)) as { stamp?: string; games: VpsGame[] } | undefined
 	const stampSignal = AbortSignal.any([AbortSignal.timeout(STAMP_TIMEOUT_MS), ...(signal ? [signal] : [])])
-	const stamp = await download(VPS_UPDATED_URL, stampSignal).then(
-		bytes => new TextDecoder().decode(bytes).trim(),
-		error => {
-			if (signal?.aborted) throw error
-			return undefined
-		},
-	)
-	if (cached?.games && (stamp === undefined || stamp === cached.stamp)) return cached.games
-	const games = parseVpsDb(JSON.parse(new TextDecoder().decode(await download(VPS_DB_URL, signal))))
-	await idbSet(CACHE_KEY, { stamp, games })
-	return games
+	// The stamp only versions the cached payload, so stamp failures fall back
+	// to the cache (a caller abort still throws).
+	const stampOf = (request: Promise<Uint8Array>): Promise<string | undefined> =>
+		request.then(
+			bytes => new TextDecoder().decode(bytes).trim(),
+			error => {
+				if (signal?.aborted) throw error
+				return undefined
+			},
+		)
+	if (!cached?.games) {
+		// Cold start: the stamp is only stored with the result, so both
+		// requests launch together instead of sequentially.
+		const [stamp, raw] = await Promise.all([
+			stampOf(download(VPS_UPDATED_URL, stampSignal)),
+			download(VPS_DB_URL, signal),
+		])
+		const games = parseVpsDb(JSON.parse(new TextDecoder().decode(raw)))
+		await idbSet(CACHE_KEY, { stamp, games })
+		return games
+	}
+	const stamp = await stampOf(download(VPS_UPDATED_URL, stampSignal))
+	if (stamp === undefined || stamp === cached.stamp) return cached.games
+	try {
+		const games = parseVpsDb(JSON.parse(new TextDecoder().decode(await download(VPS_DB_URL, signal))))
+		await idbSet(CACHE_KEY, { stamp, games })
+		return games
+	} catch (error) {
+		// A failed refresh (offline, captive portal, bad JSON) must not strand
+		// a valid cache; only a caller abort propagates.
+		if (signal?.aborted) throw error
+		return cached.games
+	}
 }

@@ -160,13 +160,13 @@ export class ThreeNodeMaterialGenerator {
 			backfacesEnabled: backfaces,
 			alphaTestValue,
 			addBlendMode: obj.addBlendMode,
-			disableLightingBelow: (obj as { disableLightingBelow?: number }).disableLightingBelow ?? 0,
+			disableLightingBelow: obj.disableLightingBelow ?? 0,
 			depthWrite: obj.depthWrite,
 			// File-level alpha for the base image (VPT Texture.isOpaque), so an
 			// alpha-carrying image blends from the first frame — upstream
 			// primitive.cpp blends on `!img->IsOpaque()` regardless of the file
 			// opacity value.
-			vptMap: (opts.applyTextures ? (obj.map as { isOpaque?: boolean } | undefined) : undefined) ?? null,
+			vptMap: (opts.applyTextures ? obj.map : undefined) ?? null,
 			modulateVsAdd: obj.modulateVsAdd,
 		})
 	}
@@ -225,7 +225,7 @@ export class ThreeNodeMaterialGenerator {
 		// primitive path with the authored color as albedo instead.
 		const baked = isBaked(material, map) && !!(map ?? emissiveMap)
 		const isBall = material?.name === 'ball'
-		const baseHex = material ? new Color(material.baseColor).getHex() : 0xffffff
+		const baseHex = material?.baseColor ?? 0xffffff
 		const mapName = map ?? emissiveMap
 
 		let mat: any
@@ -277,6 +277,10 @@ export class ThreeNodeMaterialGenerator {
 			// Explicit RenderInfo.depthWrite wins over the opaque-bake default.
 			mat.depthWrite = depthWrite ?? true
 			this.stashCutout(mat, alphaTestValue, depthBias, false)
+			// Baked node materials carry no emissive slot natively, but the classic
+			// slot binds it (harmless on the node graph) so creation-stashed names
+			// resolve on arrival like script-applied ones.
+			if (emissiveMap) this.applyTexture(mat, 'emissiveMap', emissiveMap)
 			this.cachedMaterials[key] = mat
 			return mat
 		}
@@ -376,19 +380,13 @@ export class ThreeNodeMaterialGenerator {
 		this.applyTexture(threeMaterial, 'map', map)
 	}
 
-	public applyNormalMap(threeMaterial: any, normalMap?: string): void {
+	private applyNormalMap(threeMaterial: any, normalMap?: string): void {
 		this.applyTexture(threeMaterial, 'normalMap', normalMap)
 	}
 
-	public applyEnvMap(threeMaterial: any, envMap?: string): void {
+	private applyEnvMap(threeMaterial: any, envMap?: string): void {
 		this.applyTexture(threeMaterial, 'envMap', envMap, mat => {
 			mat.envMapIntensity = 1
-		})
-	}
-
-	public applyEmissiveMap(threeMaterial: any, material?: Material, emissiveMap?: string): void {
-		this.applyTexture(threeMaterial, 'emissiveMap', emissiveMap, () => {
-			if (material) threeMaterial.emissive.set(material.emissiveColor || 0)
 		})
 	}
 

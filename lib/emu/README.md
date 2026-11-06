@@ -20,7 +20,7 @@ demo's table browser (`demo-browser/src/ui/table-browser.ts`).
   (broken links dropped). For ROM files `version` is the PinMAME set name
   (`twd_160h`), so it matches a table script's `GameName`.
 - **`searchVpsGames(games, query)`** — every term must hit name, manufacturer,
-  year, or a ROM name; name-prefix matches rank first.
+  year, or a ROM name; name-prefix matches rank first, other name matches second.
 - **`findGamesByRom(games, romName)`** — games listing a ROM set, for
   suggesting downloads once a table is loaded.
 - **`loadVpsCatalog({ download, signal })`** — serves the parsed catalog from
@@ -38,7 +38,4 @@ and send no CORS headers; the handful of direct `.vpx`/`.zip` links
 requests. The demo therefore probes a direct link before handing it to the
 viewer, and otherwise opens the source page in a new tab so the user can
 download the file and drop it onto the viewer. VPS carries no ROM checksums,
-so downloaded zips are not verified here (the old CRC-32 check went with VPDB).
-
-The former VPDB fetcher (`rom-fetcher.ts`, wpc-emu `GamelistDB` +
-`api.vpdb.io`) was removed: VPDB no longer responds.
+so downloaded zips are not verified here.

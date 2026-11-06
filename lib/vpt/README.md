@@ -1,8 +1,9 @@
 # Table Elements
 
-This folder contains implementations of the playfield items. Each item spans
-data parsing, mesh generation, collision handling, physical movement,
-animation, scripting, and state management.
+This folder contains the TypeScript side of the playfield items. Each item
+covers data parsing, persisted state, mesh generation, and renderer updates;
+collision handling, physical movement, animation, scripting, and gameplay run
+inside the headless-WASM engine.
 
 The original Visual Pinball source covers all of that in one class per item;
 here each item gets its own folder with a focused main class plus helper
@@ -24,7 +25,7 @@ They all extend [`Item`](item.ts).
 - `IRenderable<STATE>` is for table elements that are rendered on the playfield.
   Collision (`IHittable`), movement (`IMovable`), animation (`IAnimatable`),
   gameplay (`IPlayable`), and script APIs (`IScriptable`) run inside the
-  headless-WASM engine now.
+  headless-WASM engine.
 
 ## Helper Classes
 
@@ -46,11 +47,8 @@ renderer must take into account: position for movables, plus visibility,
 material, and textures, which can also change during gameplay. They all
 extend [`ItemState`](item-state.ts).
 
-States are updated directly in the physics loop or via the script API. The
-`Player` class returns the states changed since the last retrieval.
-
-Since the state changes in the worker thread and needs to be passed to the main
-thread, the transfer object only contains the changed values of the state.
+States arrive from the headless-WASM engine over the scene-sync bridge (see
+`../wasm/`): the transfer object only contains the changed values of the state.
 
 ### Mesh Generators
 
@@ -63,7 +61,7 @@ Their interface isn't defined, but they usually return a left-handed version
 of `IRenderable`'s `getMeshes()`.
 
 Collision (`Hits`, `Movers`), script APIs (`IScriptable`), and frame
-animation (`IAnimatable`) run inside the headless-WASM engine now; only
+animation (`IAnimatable`) run inside the headless-WASM engine; only
 state application remains on the TS side.
 
 ### Updaters
@@ -88,15 +86,15 @@ array per `ITEM_REGISTRY` key, plus `items[name]` for every game item. The
 
 The VBScript source rides along in the `CODE` tag (see
 [`lib/io/README.md`](../io/README.md)) and is decoded when `loadTableScript`
-is set. It is handed to the headless-WASM engine with the table bytes; there
-is no TS transpiler anymore.
+is set. It is handed to the headless-WASM engine with the table bytes; the
+TS side keeps no transpiler.
 
 ### Material and texture resolution
 
 Materials live on `TableData.materials` (parsed from the `MATE`/`PHMA`
-tags). `Table.getMaterial()` tries an exact match, then case-insensitive
-(`table/table.ts:151-157`). Textures are keyed lowercase by name;
-`Table.getTexture()` looks them up (`table/table.ts:148-150`) while image
+tags). `Table.getMaterial()` tries an exact match, then a case-insensitive
+fallback. Textures are keyed lowercase by name;
+`Table.getTexture()` looks them up while image
 bytes stream lazily via `table.streamStorage` (`texture.ts:80-82`). Items
 resolve both when building meshes in `getMeshes()`. (`mesh-loader.ts` is
 unrelated: it only serves built-in static JSON meshes.)
@@ -104,8 +102,8 @@ unrelated: it only serves built-in static JSON meshes.)
 ### Units and coordinates
 
 Table geometry stays in VP units until the scene root: 1 unit = 0.53975mm
-(Earth g ≈ 1.81751 U/T² for the parsed gravity default); the renderer applies `SCALE = 0.05` once
-(`../render/threejs/three-render-api.ts:39`). The playfield plane is XY at
+(Earth g ≈ 1.81751 U/T² for the parsed gravity default); the renderer applies
+`ThreeRenderApi.SCALE` (0.05) once. The playfield plane is XY at
 z = 0 with +Z pointing up toward the glass. VP math is left-handed, three.js
 is right-handed, so every mesh generator flips Z via
 `Matrix3D.RIGHT_HANDED` — see "Units and coordinates" in
@@ -126,8 +124,8 @@ opts out with `staticRendering = false` or `animationFrames`
 
 ### Ramps: `rampType`, habitrails, wires
 
-`rampType` is an int: flat = 0, 4-wire = 1, 2-wire = 2, 3-wire-left = 3,
-3-wire-right = 4, 1-wire = 5 (`enums.ts:118-123`). A _habitrail_ is any
+`rampType` is an int (`Enums.RampType`: flat = 0, 4-wire = 1, 2-wire = 2,
+3-wire-left = 3, 3-wire-right = 4, 1-wire = 5). A _habitrail_ is any
 non-flat wire type (`isHabitrail()`, `ramp/ramp-view.ts:413`): an elevated
 wire track, meshed as tubes sized by `wireDiameter`/`wireDistanceX`/
 `wireDistanceY` instead of a solid surface. Ramps have separate visible wall
@@ -142,17 +140,16 @@ Use `isTopBottomVisible`/`isSideVisible` to hide faces instead.
 
 ### Spinners: angle units and axes
 
-Data angles (`angleMin`/`angleMax`/`rotation`) are in degrees; the mover
-converts to radians (`spinner/spinner-mover.ts:25-26`). The plate spins
-about the X axis (`spinner/spinner-updater.ts:33`) on top of the base
-`rotation` about Z.
+Data angles (`angleMin`/`angleMax`/`rotation`) are in degrees. The mesh
+generator converts the base `rotation` about Z to radians; the updater
+applies the live plate angle about X on top.
 
 ### Drag points: `fSmooth` and `fSlingshot`
 
-Each drag point (`dragpoint.ts:23-24`) carries two flags: `fSmooth` enables
-Catmull-Rom smoothing through that control point; `fSlingshot` turns the
-segment into a kicking `LineSegSlingshot` instead of a plain wall segment
-(`surface/surface-physics.ts:61-71`).
+Each drag point (`dragpoint.ts`) carries two flags: `fSmooth` selects
+Catmull-Rom smoothing through that control point; `fSlingshot` marks the
+segment as a kicking slingshot instead of a plain wall. Collision for both
+lives in the headless-WASM engine.
 
 ### Flashers: support matrix
 
@@ -162,7 +159,7 @@ Parsed and scriptable; rendering is partial:
 | ------------------------- | --------------------------------------------------------------------- |
 | `Filter` / `FilterAmount` | Parsed, not rendered (no custom shader; `flasher/flasher-data.ts:60`) |
 | `szImageB`                | Parsed, only ImageA is drawn (`flasher/flasher-data.ts:50`)           |
-| Absorb blend mode         | Renders as plain additive (`flasher/flasher.ts:65`)                   |
+| Absorb blend mode         | Premultiplied-over (`AB_ABSORB`)                                      |
 | `isDMD`                   | Parsed; skips the polygon mesh (`flasher/flasher-data.ts:55`)         |
 | Runtime rotation/height   | Supported; updater rebakes the mesh (`flasher/flasher-updater.ts:64`) |
 
@@ -171,15 +168,15 @@ Parsed and scriptable; rendering is partial:
 Which mesh a light builds depends on its flags (`light/light.ts:136-161`):
 a bulb mesh (`showBulbMesh` + `meshRadius`), a bulb glow polygon (`bulbLight`
 - 3 or more drag points), a playfield-surface insert (neither, + drag
-  points), or a backglass light (`isBackglass`). `fader` (default Linear = 1)
-  selects the brightness envelope: None = 0, Linear = 1, Incandescent = 2
-  (`enums.ts:273-275`); bake-time levels come from `bakedIntensity`
+  points), or a backglass light (`isBackglass`). `fader` (default Linear = 1,
+  `Enums.Fader`: None = 0, Linear = 1, Incandescent = 2) selects the
+  brightness envelope; bake-time levels come from `bakedIntensity`
   (`light/light.ts`), live levels from the WASM bridge.
 
 ### `SizingType`, DMD, transparency
 
-- `SizingType` exists only on decals: AutoSize = 0, AutoWidth = 1,
-  ManualSize = 2 (`enums.ts:471-473`).
+- `SizingType` exists only on decals (`Enums.SizingType`: AutoSize = 0,
+  AutoWidth = 1, ManualSize = 2).
 - `isDMD` (dot-matrix-display rendering) is on flasher data.
 - `isTransparent` is on flasher data.
 

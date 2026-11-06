@@ -1,7 +1,7 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-// Shared pending-call bookkeeping for worker pools (decode workers, transpile
-// workers): arm a timeout per call, settle exactly once, never fire late.
+// Shared pending-call bookkeeping for worker pools (decode workers): arm a
+// timeout per call, settle exactly once, never fire late.
 
 /** Pending worker call; `timer` is armed by withWorkerTimeout below. */
 export interface WorkerPendingEntry<T = unknown> {

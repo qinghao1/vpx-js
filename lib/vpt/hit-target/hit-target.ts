@@ -16,7 +16,7 @@ import type { Table } from '../table/table.js'
 import type { Texture } from '../texture.js'
 import { HitTargetMeshGenerator, HitTargetUpdater } from './hit-target-view.js'
 
-const FLOAT_MAP: BiffFieldMap<HitTargetData> = {
+const FLOAT_MAP: BiffFieldMap<HitTargetData, number> = {
 	ROTZ: 'rotZ',
 	DRSP: 'dropSpeed',
 	THRS: 'threshold',
@@ -28,8 +28,8 @@ const FLOAT_MAP: BiffFieldMap<HitTargetData> = {
 	DILB: 'disableLightingBelow',
 	PIDB: 'depthBias',
 }
-const INT_MAP: BiffFieldMap<HitTargetData> = { TRTY: 'targetType', RADE: 'raiseDelay' }
-const BOOL_MAP: BiffFieldMap<HitTargetData> = {
+const INT_MAP: BiffFieldMap<HitTargetData, number> = { TRTY: 'targetType', RADE: 'raiseDelay' }
+const BOOL_MAP: BiffFieldMap<HitTargetData, boolean> = {
 	TVIS: 'isVisible',
 	LEMO: 'legacy',
 	ISDR: 'isDropped',
@@ -38,7 +38,11 @@ const BOOL_MAP: BiffFieldMap<HitTargetData> = {
 	CLDR: 'isCollidable',
 	OVPH: 'overwritePhysics',
 }
-const STRING_MAP: BiffFieldMap<HitTargetData> = { IMAG: 'szImage', MATR: 'szMaterial', MAPH: 'szPhysicsMaterial' }
+const STRING_MAP: BiffFieldMap<HitTargetData, string> = {
+	IMAG: 'szImage',
+	MATR: 'szMaterial',
+	MAPH: 'szPhysicsMaterial',
+}
 
 /** @see https://github.com/vpinball/vpinball/blob/master/hittarget.cpp */
 export class HitTargetData extends ItemData {
@@ -152,6 +156,7 @@ export interface HitTargetMeshEntry {
 	isTransparent?: boolean
 	depthBias?: number
 	disableLighting?: number
+	disableLightingBelow?: number
 }
 
 /** @see https://github.com/vpinball/vpinball/blob/master/hittarget.cpp */
@@ -184,6 +189,7 @@ export class HitTarget extends Item<HitTargetData> {
 				map: table.getTexture(this.data.szImage),
 				depthBias: this.data.depthBias,
 				disableLighting: this.data.disableLightingTop,
+				disableLightingBelow: this.data.disableLightingBelow,
 			},
 		}
 	}

@@ -7,7 +7,7 @@ import { Vertex2D } from '../../math/vector.js'
 import { type BiffFieldMap, handleBiffTag } from '../biff-helper.js'
 import { ItemData } from '../item-data.js'
 
-const FLOAT_MAP: BiffFieldMap<FlipperData> = {
+const FLOAT_MAP: BiffFieldMap<FlipperData, number> = {
 	BASR: 'baseRadius',
 	ENDR: 'endRadius',
 	FRTN: 'return',
@@ -28,14 +28,18 @@ const FLOAT_MAP: BiffFieldMap<FlipperData> = {
 	RHGF: 'rubberHeight',
 	RWDF: 'rubberWidth',
 }
-const INT_MAP: BiffFieldMap<FlipperData> = {
+const INT_MAP: BiffFieldMap<FlipperData, number> = {
 	OVRP: 'overridePhysics',
 	RTHK: 'rubberThickness',
 	RHGT: 'rubberHeight',
 	RWDT: 'rubberWidth',
 }
-const BOOL_MAP: BiffFieldMap<FlipperData> = { VSBL: 'isVisible', ENBL: 'isEnabled', REEN: 'isReflectionEnabled' }
-const STRING_MAP: BiffFieldMap<FlipperData> = {
+const BOOL_MAP: BiffFieldMap<FlipperData, boolean> = {
+	VSBL: 'isVisible',
+	ENBL: 'isEnabled',
+	REEN: 'isReflectionEnabled',
+}
+const STRING_MAP: BiffFieldMap<FlipperData, string> = {
 	SURF: 'szSurface',
 	MATR: 'szMaterial',
 	RUMA: 'szRubberMaterial',

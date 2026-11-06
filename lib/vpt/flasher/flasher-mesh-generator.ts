@@ -95,11 +95,7 @@ export class FlasherMeshGenerator {
 		const rz = Matrix3D.claim().rotateZMatrix(degToRad(data.rotZ))
 		const ry = Matrix3D.claim().rotateYMatrix(degToRad(data.rotY))
 		const rx = Matrix3D.claim().rotateXMatrix(degToRad(data.rotX))
-		const m2 = Matrix3D.claim().setTranslation(
-			centerX,
-			centerY,
-			data.height * table.getScaleZ() + table.getTableHeight(),
-		)
+		const m2 = Matrix3D.claim().setTranslation(centerX, centerY, data.height * table.getScaleZ())
 		const full = m1.clone().multiply(rz).multiply(ry).multiply(rx).multiply(m2)
 		Matrix3D.release(m1, rz, ry, rx, m2)
 

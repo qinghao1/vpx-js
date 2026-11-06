@@ -16,15 +16,15 @@ import type { Table } from '../table/table.js'
 import { Texture } from '../texture.js'
 import { KickerMeshGenerator, KickerUpdater } from './kicker-view.js'
 
-const FLOAT_MAP: BiffFieldMap<KickerData> = {
+const FLOAT_MAP: BiffFieldMap<KickerData, number> = {
 	RADI: 'radius',
 	KSCT: 'scatter',
 	KHAC: 'hitAccuracy',
 	KHHI: 'hitHeight',
 	KORI: 'orientation',
 }
-const BOOL_MAP: BiffFieldMap<KickerData> = { EBLD: 'isEnabled', FATH: 'fallThrough', LEMO: 'legacyMode' }
-const STRING_MAP: BiffFieldMap<KickerData> = { MATR: 'szMaterial', SURF: 'szSurface' }
+const BOOL_MAP: BiffFieldMap<KickerData, boolean> = { EBLD: 'isEnabled', FATH: 'fallThrough', LEMO: 'legacyMode' }
+const STRING_MAP: BiffFieldMap<KickerData, string> = { MATR: 'szMaterial', SURF: 'szSurface' }
 
 /** @see https://github.com/vpinball/vpinball/blob/master/kicker.cpp */
 export class KickerData extends ItemData {

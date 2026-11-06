@@ -8,7 +8,7 @@ import { type BiffFieldMap, handleBiffTag } from '../biff-helper.js'
 import { Enums } from '../enums.js'
 import { ItemData } from '../item-data.js'
 
-const FLOAT_MAP: BiffFieldMap<PlungerData> = {
+const FLOAT_MAP: BiffFieldMap<PlungerData, number> = {
 	WDTH: 'width',
 	ZADJ: 'zAdjust',
 	HIGH: 'height',
@@ -28,14 +28,14 @@ const FLOAT_MAP: BiffFieldMap<PlungerData> = {
 	SPRL: 'springLoops',
 	SPRE: 'springEndLoops',
 }
-const INT_MAP: BiffFieldMap<PlungerData> = { TYPE: 'type', ANFR: 'animFrames' }
-const BOOL_MAP: BiffFieldMap<PlungerData> = {
+const INT_MAP: BiffFieldMap<PlungerData, number> = { TYPE: 'type', ANFR: 'animFrames' }
+const BOOL_MAP: BiffFieldMap<PlungerData, boolean> = {
 	MECH: 'mechPlunger',
 	APLG: 'autoPlunger',
 	VSBL: 'isVisible',
 	REEN: 'isReflectionEnabled',
 }
-const STRING_MAP: BiffFieldMap<PlungerData> = {
+const STRING_MAP: BiffFieldMap<PlungerData, string> = {
 	MATR: 'szMaterial',
 	IMAG: 'szImage',
 	SURF: 'szSurface',
