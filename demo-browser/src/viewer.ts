@@ -922,13 +922,7 @@ export class Viewer {
 	 * Non-room states are untouched in both modes.
 	 */
 	_emitModeChange() {
-		document.dispatchEvent(
-			new CustomEvent('viewer:modechange', {
-				detail: {
-					mode: this.viewerMode,
-				},
-			}),
-		)
+		dispatchEvent(new CustomEvent('viewer:modechange', { detail: { mode: this.viewerMode } }))
 	}
 	log(msg, level = 'info') {
 		this.harnessLog?.(msg, level)

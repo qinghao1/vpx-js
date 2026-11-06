@@ -33,7 +33,7 @@ Requires `dist-esm` built. `server.fs.allow` covers repo root, `dist`, `dist-esm
 
 ## Conventions
 
-- ESM only, Biome tabs/120, minimal code, no `window.*` pollution (typed `CustomEvent` via `log-viewer.ts`)
+- ESM only, Biome tabs/120, minimal code, no `window.*` pollution or `console` patching; UI events are `CustomEvent`s on `window`
 - Keep logging and E2E deduped — single `integration.mjs` + `helpers.mjs`, no per-scenario harnesses
 - Keep demo-browser table-agnostic: no hard-coded table/ROM names (use `?vpx`/`?rom` or drag & drop, generic `DEFAULT_URL` `table-empty.vpx`)
 
