@@ -219,6 +219,20 @@ export function attachPointer(host: InputHost, signal: AbortSignal): void {
 	let hoverX = 0
 	let hoverY = 0
 	const swipeStart = new Map<number, { x: number; y: number; t: number }>()
+	// Orbit enablement saved while a button/flipper press owns the pointer.
+	let controlsPrevEnabled: boolean | null = null
+	const suspendControls = (): void => {
+		if (host.controls && controlsPrevEnabled === null) {
+			controlsPrevEnabled = host.controls.enabled
+			host.controls.enabled = false
+		}
+	}
+	const resumeControls = (): void => {
+		if (host.controls && controlsPrevEnabled !== null) {
+			host.controls.enabled = controlsPrevEnabled
+			controlsPrevEnabled = null
+		}
+	}
 
 	canvas.tabIndex = 0
 	canvas.addEventListener('click', () => canvas.focus(), { signal })
@@ -338,11 +352,7 @@ export function attachPointer(host: InputHost, signal: AbortSignal): void {
 					swipeStart.set(e.pointerId, { x: e.clientX, y: e.clientY, t: performance.now() })
 					if (!already) send(code, true)
 					canvas.setAttribute('data-pressed', code)
-					if (host.controls) {
-						const c: any = host.controls
-						if (c._inputPrevEnabled == null) c._inputPrevEnabled = c.enabled
-						c.enabled = false
-					}
+					suspendControls()
 					try {
 						canvas.setPointerCapture(e.pointerId)
 					} catch {}
@@ -366,11 +376,7 @@ export function attachPointer(host: InputHost, signal: AbortSignal): void {
 			if (!isRightClick && !already) send(code, true)
 
 			canvas.setAttribute('data-pressed', code)
-			if (host.controls) {
-				const c: any = host.controls
-				if (c._inputPrevEnabled == null) c._inputPrevEnabled = c.enabled
-				c.enabled = false
-			}
+			suspendControls()
 			try {
 				canvas.setPointerCapture(e.pointerId)
 			} catch {}
@@ -387,11 +393,7 @@ export function attachPointer(host: InputHost, signal: AbortSignal): void {
 			if (code !== '__nudge') send(code, false)
 			if (active.size === 0) {
 				canvas.removeAttribute('data-pressed')
-				const c: any = host.controls
-				if (c?._inputPrevEnabled != null) {
-					c.enabled = c._inputPrevEnabled
-					c._inputPrevEnabled = null
-				}
+				resumeControls()
 			}
 		}
 		const s = swipeStart.get(e.pointerId)
@@ -441,12 +443,6 @@ export function attachPointer(host: InputHost, signal: AbortSignal): void {
 		canvas.removeAttribute('data-pressed')
 		active.clear()
 		swipeStart.clear()
-		if (host.controls) {
-			const c: any = host.controls
-			if (c._inputPrevEnabled != null) {
-				c.enabled = c._inputPrevEnabled
-				c._inputPrevEnabled = null
-			}
-		}
+		resumeControls()
 	})
 }
