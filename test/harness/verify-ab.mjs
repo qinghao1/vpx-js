@@ -43,6 +43,7 @@ import { execSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
+import { findWalkingDead } from './bench-shared.ts'
 import { attachLogging, ensureVite, launchBrowser, loadPuppeteer, newPage } from './utils.mjs'
 
 const arg = name => {
@@ -314,12 +315,7 @@ function resolveInput(_kind, cli, candidates) {
 	for (const c of candidates) if (existsSync(c)) return c
 	return null
 }
-const vpxPath = resolveInput('vpx', arg('--vpx'), [
-	resolve('demo-browser/public/ab-tmp/twd.vpx'),
-	join(home, 'Downloads/walking_dead/walking_dead.vpx'),
-	join(home, 'Downloads/walking_dead.vpx'),
-	resolve('walking_dead.vpx'),
-])
+const vpxPath = resolveInput('vpx', arg('--vpx'), []) ?? findWalkingDead()
 const romPath = resolveInput('rom', arg('--rom'), [
 	join(home, 'Downloads/walking_dead/twd_160h.zip'),
 	join(home, 'Downloads/twd_160h.zip'),

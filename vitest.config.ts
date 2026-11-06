@@ -47,5 +47,4 @@ export default defineConfig({
 		testTimeout: 10000,
 		hookTimeout: 10000,
 	},
-	esbuild: { target: 'es2024' },
 })

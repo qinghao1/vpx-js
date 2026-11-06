@@ -6,9 +6,8 @@ import { findWalkingDead } from '../harness/bench-shared.js'
 const bench: any = (globalThis as any).bench ?? ((_name: string, fn: () => void) => fn())
 
 const vpx = findWalkingDead()
-const isWalkingDead = !!vpx && vpx.includes('walking_dead')
 
-describe.skipIf(!isWalkingDead)('walking_dead loading', () => {
+describe.skipIf(!vpx)('walking_dead loading', () => {
 	bench(
 		'Table.load walking_dead',
 		async () => {

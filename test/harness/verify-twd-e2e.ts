@@ -7,6 +7,7 @@
 import { spawn } from 'node:child_process'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
+import { findWalkingDead } from './bench-shared.js'
 import { Tap, tapComment, tapSkip } from './tap.js'
 import {
 	detectGameName,
@@ -18,7 +19,6 @@ import {
 } from './vpinball-resolver.js'
 
 const SKIP_EXIT = 77
-const DEFAULT_VPX = process.env.WALKING_DEAD_VPX ?? '/home/qinghao1/Downloads/walking_dead.vpx'
 
 const tap = new Tap('twd browser e2e')
 const args = process.argv.slice(2)
@@ -27,7 +27,7 @@ const gpu = getArg(args, 'gpu', process.env.USE_GPU ?? process.env.GPU ?? null)
 
 let targetUrl = parsed.url
 if (!targetUrl) {
-	const vpxInput = parsed.vpx ?? DEFAULT_VPX
+	const vpxInput = parsed.vpx ?? findWalkingDead() ?? 'walking_dead.vpx'
 	const vpxPath = resolveVpxPath(vpxInput)
 	if (!vpxPath || !fs.existsSync(vpxPath)) {
 		tapSkip(1, 'twd-e2e', `VPX not found: ${vpxInput}`)

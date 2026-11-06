@@ -4,9 +4,9 @@
 // baked-materials.ts), so the baked playfield — the only floor between a
 // below-table camera and the lights/DMD on VR tables — occludes from
 // underneath whatever the authored backfaces flag says.
-import * as fs from 'node:fs'
 import * as THREE from 'three'
 import { describe, expect, it } from 'vitest'
+import { findWalkingDead } from '../../../test/harness/bench-shared.js'
 import { applyBakedMaterial, createBakedMaterialResolver, resolveBakedKind } from './baked-materials.js'
 import { GpuDmdNodeController } from './nodes/dmd-node.js'
 import { createPrimitiveAdditiveMaterial, createPrimitiveBdlMaterial } from './nodes/primitive-bdl-node.js'
@@ -14,13 +14,7 @@ import { createUnshadedBakedNodeMaterial } from './nodes/unshaded-baked-node.js'
 import { classify } from './scene-classify.js'
 import { postProcessScene } from './three-scene-postprocess.js'
 
-const walkingDeadVpx = ['walking_dead.vpx', '/home/qinghao1/Downloads/walking_dead.vpx'].find(p => {
-	try {
-		return fs.existsSync(p) && fs.statSync(p).size > 1_000_000
-	} catch {
-		return false
-	}
-})
+const walkingDeadVpx = findWalkingDead()
 
 describe('underfloor occlusion: opaque baked materials occlude from both sides', () => {
 	it('resolves a single-sided primitive-lit main bake into a double-sided depth writer', () => {

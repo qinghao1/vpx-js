@@ -37,7 +37,6 @@
 		"res",
 		"test/fixtures",
 		"demo-browser",
-		"demo-static",
 		"**/*.spec.ts",
 		"**/*.integration.spec.ts"
 	]

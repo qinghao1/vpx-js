@@ -17,6 +17,7 @@ import {
 	compareStreamTextures,
 	defaultGenOpts,
 	filterStreamTextures,
+	findWalkingDead,
 	getPlayfieldMapKey,
 } from './bench-shared.js'
 import { Tap, tapSkip } from './tap.js'
@@ -49,27 +50,15 @@ function parseVpxArg(argv: string[]): string | undefined {
 	return undefined
 }
 
+const expandHome = (file: string): string =>
+	path.resolve(file.startsWith('~') ? path.join(os.homedir(), file.slice(1)) : file)
+
 function resolveVpxPath(): string | null {
 	const cli = parseVpxArg(process.argv.slice(2))
-	if (cli) {
-		const resolved = path.resolve(cli.startsWith('~') ? path.join(os.homedir(), cli.slice(1)) : cli)
-		return fs.existsSync(resolved) ? resolved : null
-	}
-	const env = process.env.VPX_FILE ?? process.env.WALKING_DEAD_VPX
-	if (env) {
-		const resolved = path.resolve(env.startsWith('~') ? path.join(os.homedir(), env.slice(1)) : env)
-		if (fs.existsSync(resolved)) return resolved
-	}
-	const home = os.homedir()
-	const candidates = [
-		path.join(home, 'Downloads/walking_dead.vpx'),
-		path.join(home, '.cache/vpinball/tables/The Walking Dead (Stern 2014).vpx'),
-		path.resolve('walking_dead.vpx'),
-	]
-	for (const c of candidates) {
-		if (fs.existsSync(c) && fs.statSync(c).size > 1024) return c
-	}
-	return null
+	if (cli) return fs.existsSync(expandHome(cli)) ? expandHome(cli) : null
+	const env = process.env.VPX_FILE
+	if (env && fs.existsSync(expandHome(env))) return expandHome(env)
+	return findWalkingDead()
 }
 
 const vpxPath = resolveVpxPath()

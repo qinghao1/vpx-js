@@ -41,24 +41,18 @@ export function exists(filePath: string, minSize = 1024): boolean {
 	}
 }
 
-function resolveHome(): string {
-	if (process.env.HOME) return process.env.HOME
-	try {
-		return os.homedir()
-	} catch {
-		return process.cwd()
-	}
-}
+const HOME = os.homedir()
 
-const HOME = resolveHome()
-
-export const VPX_CANDIDATES: string[] = [
+export const WALKING_DEAD_CANDIDATES: string[] = [
+	process.env.WALKING_DEAD_VPX,
 	path.resolve('walking_dead.vpx'),
 	path.join(HOME, 'Downloads/walking_dead.vpx'),
-	path.resolve('test/fixtures/table-empty.vpx'),
-]
+	path.join(HOME, 'Downloads/walking_dead/walking_dead.vpx'),
+	path.resolve('demo-browser/public/ab-tmp/twd.vpx'),
+	path.join(HOME, '.cache/vpinball/tables/The Walking Dead (Stern 2014).vpx'),
+].filter((candidate): candidate is string => !!candidate)
 
-export const WALKING_DEAD_CANDIDATES: string[] = VPX_CANDIDATES.slice(0, 2)
+export const VPX_CANDIDATES: string[] = [...WALKING_DEAD_CANDIDATES, path.resolve('test/fixtures/table-empty.vpx')]
 
 export function findVpx(): string | null {
 	return VPX_CANDIDATES.find(candidate => exists(candidate)) ?? null

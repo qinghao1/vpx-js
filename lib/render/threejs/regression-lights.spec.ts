@@ -1,6 +1,6 @@
-import * as fs from 'node:fs'
 import type * as THREE from 'three'
 import { describe, expect, it } from 'vitest'
+import { findWalkingDead } from '../../../test/harness/bench-shared.js'
 import { TableBuilder } from '../../../test/table-builder.js'
 import { Vertex2D, Vertex3D } from '../../math/vector.js'
 import { DragPoint } from '../../vpt/dragpoint.js'
@@ -10,13 +10,7 @@ import { ThreeLightGenerator } from './three-light-generator.js'
 import { ThreeLightMeshGenerator } from './three-light-mesh-generator.js'
 import { ThreeRenderApi } from './three-render-api.js'
 
-const walkingDeadVpx = ['walking_dead.vpx', '/home/qinghao1/Downloads/walking_dead.vpx'].find(p => {
-	try {
-		return fs.existsSync(p) && fs.statSync(p).size > 1_000_000
-	} catch {
-		return false
-	}
-})
+const walkingDeadVpx = findWalkingDead()
 const requireWalkingDead = (): string => {
 	if (!walkingDeadVpx) throw new Error('walking_dead.vpx not found')
 	return walkingDeadVpx

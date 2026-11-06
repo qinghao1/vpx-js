@@ -8,7 +8,7 @@ import { defineConfig } from 'vite'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const root = resolve(__dirname)
 const repoRoot = resolve(__dirname, '..')
-const home = process.env.HOME || os.homedir() || '/home/qinghao1'
+const home = os.homedir()
 
 function rawLoader() {
 	return {
