@@ -78,6 +78,8 @@ export function effectiveGain(volume: number, muted: boolean): number {
 export class WasmEngine {
 	private readonly liveBalls = new Map<number, BallSlot<Object3D>>()
 	private readonly partNames = new Map<number, string>()
+	/** Plunger animation frame count per part index, resolved on first use. */
+	private readonly plungerFrames = new Map<number, number>()
 	private sync?: WasmSceneSync<Object3D, BufferGeometry, PointLight>
 	private engine?: HeadlessEngine
 	private ballsVisible = true
@@ -125,6 +127,7 @@ export class WasmEngine {
 		this.debtMs = 0
 		this.lastStepWallMs = 0
 		this.partNames.clear()
+		this.plungerFrames.clear()
 		this.dmdCache = undefined
 		this.liveBalls.clear()
 		this.resetAudioFormat()
@@ -456,6 +459,7 @@ export class WasmEngine {
 		for (const id of [...this.liveBalls.keys()]) this.balls().remove(id)
 		this.liveBalls.clear()
 		this.partNames.clear()
+		this.plungerFrames.clear()
 		this.sync = undefined
 		// A superseded instance must not tear down its successor's table.
 		if (session === this) {
@@ -472,9 +476,13 @@ export class WasmEngine {
 				return name ? this.host.lookupPart(name) : undefined
 			},
 			plungerFrameCount: (partIdx: number): number => {
+				const cached = this.plungerFrames.get(partIdx)
+				if (cached !== undefined) return cached
 				const name = this.partNames.get(partIdx)
 				const data = name ? this.host.lookupPlunger(name) : undefined
-				return data ? new PlungerMeshGenerator(data).cFrames : 1
+				const frames: number = data ? new PlungerMeshGenerator(data).cFrames : 1
+				this.plungerFrames.set(partIdx, frames)
+				return frames
 			},
 		}
 	}
