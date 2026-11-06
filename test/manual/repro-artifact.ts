@@ -1,13 +1,14 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
-// Reproduces render artifacts: underwall visibility, pending-BM visibility.
-// Run: npx tsx test/harness/repro-artifact.ts
+// Manual repro (never in CI): render artifacts on the Walking Dead table —
+// underwall visibility, pending-BM visibility.
+// Run: npx tsx test/manual/repro-artifact.ts
 import * as fs from 'node:fs'
 import type * as THREE from 'three'
 import { NodeBinaryReader } from '../../lib/io/binary-reader.node.js'
 import { ThreeRenderApi } from '../../lib/render/threejs/three-render-api.js'
 import { postProcessScene } from '../../lib/render/threejs/three-scene-postprocess.js'
 import { Table } from '../../lib/vpt/table/table.js'
-import { findWalkingDead } from './bench-shared.js'
+import { findWalkingDead } from '../harness/bench-shared.js'
 
 const vpx = findWalkingDead()
 if (!vpx) {

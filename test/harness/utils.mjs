@@ -41,6 +41,27 @@ export const findChrome = () => CHROME_CANDIDATES.find(candidate => candidate &&
 const DEMO_ROOT = fileURLToPath(new URL('../../demo-browser', import.meta.url))
 export const ENGINE_ARTIFACT = `${DEMO_ROOT}/public/wasm/vpinball-headless.wasm`
 
+// Best-effort reaping: a Ctrl+C between legs must not strand vite servers
+// (ports) or piped-chrome watchdogs. Handlers re-raise the signal after
+// cleanup so the process still dies with the right disposition.
+const liveCloseables = new Set()
+let signalsArmed = false
+function armSignalCleanup() {
+	if (signalsArmed) return
+	signalsArmed = true
+	for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
+		process.once(sig, () => {
+			for (const close of liveCloseables) {
+				try {
+					close()
+				} catch {}
+			}
+			liveCloseables.clear()
+			process.kill(process.pid, sig)
+		})
+	}
+}
+
 /** Exit 77 (skip) unless the engine artifact and Chrome are both present. */
 export function requireEngineAndChrome() {
 	const missing = !existsSync(ENGINE_ARTIFACT)
@@ -94,7 +115,16 @@ export async function launchBrowser(puppeteer, { gpu, autoKillMs = 300_000, args
 		browser.process()?.kill('SIGKILL')
 	}, autoKillMs)
 	watchdog.unref()
-	browser.once('disconnected', () => clearTimeout(watchdog))
+	const closeBrowser = () => {
+		clearTimeout(watchdog)
+		browser.close().catch(() => {})
+	}
+	liveCloseables.add(closeBrowser)
+	armSignalCleanup()
+	browser.once('disconnected', () => {
+		clearTimeout(watchdog)
+		liveCloseables.delete(closeBrowser)
+	})
 	return browser
 }
 
@@ -141,12 +171,16 @@ export async function ensureVite(url = '/', { root = DEMO_ROOT } = {}) {
 		await server.close().catch(() => {})
 		throw new Error(`[vite] no local URL for root ${root}`)
 	}
+	const closeServer = () => server.close().catch(() => {})
+	liveCloseables.add(closeServer)
+	armSignalCleanup()
 	const origin = new URL(local).origin
 	const requested = new URL(url, origin)
 	return {
 		origin,
 		url: `${origin}${requested.pathname}${requested.search}`,
 		close: () => {
+			liveCloseables.delete(closeServer)
 			servers.delete(root)
 			return server.close()
 		},

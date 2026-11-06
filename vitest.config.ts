@@ -4,8 +4,8 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig({
 	test: {
 		globals: true,
-		include: ['lib/**/*.spec.ts', 'test/*.spec.ts', 'test/harness/*.spec.ts', 'demo-browser/src/**/*.spec.ts'],
-		bench: { include: ['test/bench/**/*.bench.ts', 'lib/**/*.bench.ts'] },
+		include: ['lib/**/*.spec.ts', 'test/harness/*.spec.ts', 'demo-browser/src/**/*.spec.ts'],
+		bench: { include: ['test/bench/**/*.bench.ts'] },
 		setupFiles: ['./test/setup.ts'],
 		coverage: {
 			include: ['lib/**/*.ts'],

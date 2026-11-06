@@ -121,19 +121,20 @@ console.log({
 	pendingCount,
 })
 
-// TWD-specific asserts only apply to TWD-like tables (BM_Playfield present);
-// other --vpx targets still exercise generate + postprocess + streaming below.
+// This leg is the TWD render contract: without a BM_Playfield there is
+// nothing TWD-specific to assert, and the generic checks below would pass
+// vacuously. Exit skipped so a non-TWD table can never green this leg.
 const twdLike = !!bmPlayfield
-if (twdLike) {
-	tap.assert(bmPlayfield?.visible === true, 'TWD: BM_Playfield is visible')
-	tap.assert(pfMesh?.visible !== true, 'TWD: playfield_mesh hidden (no z-fighting)')
-	tap.assert(
-		giCount > 0 && flshCount > 0 && insrtCount > 0,
-		`TWD: light classes present (gi=${giCount} flsh=${flshCount} insrt=${insrtCount})`,
-	)
-} else {
-	console.log('# not TWD-like (no BM_Playfield) — skipping TWD-specific asserts')
+if (!twdLike) {
+	tapSkip(1, 'twd-render', 'not TWD-like (no BM_Playfield)')
+	process.exit(77)
 }
+tap.assert(bmPlayfield?.visible === true, 'TWD: BM_Playfield is visible')
+tap.assert(pfMesh?.visible !== true, 'TWD: playfield_mesh hidden (no z-fighting)')
+tap.assert(
+	giCount > 0 && flshCount > 0 && insrtCount > 0,
+	`TWD: light classes present (gi=${giCount} flsh=${flshCount} insrt=${insrtCount})`,
+)
 
 console.log('=== Driving Real Texture Streaming ===')
 const { used, mainBakeUsed } = collectUsedTextureNames(group)

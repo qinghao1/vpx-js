@@ -7,12 +7,7 @@
 import path from 'node:path'
 import { findWalkingDead } from './bench-shared.ts'
 import { ensureVite, launchBrowser, loadPuppeteer, newPage, sleep } from './utils.mjs'
-
-const getArg = (args, name, dflt = null) => {
-	const hit = args.find(a => (a === `--${name}` ? false : a.startsWith(`--${name}=`)))
-	return hit ? hit.slice(name.length + 3) : dflt
-}
-const hasFlag = (args, name) => args.includes(`--${name}`)
+import { getArg, hasFlag } from './vpinball-resolver.ts'
 
 const args = process.argv.slice(2)
 const vpxArg = getArg(args, 'vpx', findWalkingDead() ?? 'walking_dead.vpx')

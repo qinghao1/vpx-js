@@ -41,6 +41,7 @@
 		"verify:pages": "node test/harness/verify-pages.mjs",
 		"verify:browser": "node demo-browser/e2e/integration.mjs",
 		"verify:all": "tsx test/harness/verify-all.ts",
+		"compare": "tsx test/harness/compare-side-by-side.ts",
 		"prepare": "husky",
 		"bench": "node test/harness/bench.mjs",
 		"bench:walking-dead": "node test/harness/bench.mjs --vpx=walking_dead.vpx --profile",

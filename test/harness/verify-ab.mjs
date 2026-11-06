@@ -29,8 +29,12 @@
  * gi-color, ball-visible, audio-single-scheduling, physics-steps-per-sec.
  *
  * Run: node test/harness/verify-ab.mjs [--vpx=...] [--rom=...]
- *   [--old-dir=/tmp/vpx-js-old] [--out=/tmp/ab]
+ *   [--old-dir=/tmp/vpx-js-old] [--old-ref=<git-ref>] [--out=/tmp/ab]
  *   [--phase=A|B|C|all] [--seed=1337]
+ * Only TWD-like tables are accepted (gates are TWD-tuned). --old-ref picks
+ * the baseline the OLD tree provisions from (default: newest v* tag, else
+ * origin/master); its sha is recorded in .ab-provision-sha and leg C fails
+ * unless the OLD tree actually differs from the current HEAD.
  * Legs: A = NEW headless paced match, B = NEW viewer, C = OLD viewer+match
  * (served by the OLD tree's own vite). Each tree gets a per-run vite port.
  * Default `all` runs A->B->C and takes a host-wide full-run lock; single legs
@@ -181,20 +185,43 @@ function skipAll(reason) {
 }
 
 // ---- OLD worktree (read-only: verify, never modify) ------------------------
+const OLD_MARKER = '.ab-provision-sha'
+function resolveOldRef() {
+	const explicit = arg('--old-ref')
+	if (explicit) return explicit
+	try {
+		const tag = execSync('git tag --sort=-v:refname', { encoding: 'utf8', timeout: 30000, stdio: 'pipe' })
+			.split('\n')
+			.map(s => s.trim())
+			.find(s => /^v\d/.test(s))
+		if (tag) return tag
+	} catch {}
+	return 'origin/master'
+}
 function ensureOldTree() {
 	try {
-		if (!existsSync(OLD_DIR)) {
+		const oldRef = resolveOldRef()
+		const oldSha = execSync(`git rev-parse ${oldRef}`, { encoding: 'utf8', timeout: 30000, stdio: 'pipe' }).trim()
+		let provisioned = null
+		try {
+			provisioned = readFileSync(join(OLD_DIR, OLD_MARKER), 'utf8').trim()
+		} catch {}
+		if (!existsSync(OLD_DIR) || provisioned === null) {
+			// Fresh provision only; a present-but-stale tree is never deleted
+			// automatically — remove it by hand to re-provision.
 			mkdirSync(OLD_DIR, { recursive: true })
-			execSync(`git archive HEAD | tar -x -C ${OLD_DIR}`, { cwd: process.cwd(), timeout: 180000, stdio: 'pipe' })
+			execSync(`git archive ${oldRef} | tar -x -C ${OLD_DIR}`, {
+				cwd: process.cwd(),
+				timeout: 180000,
+				stdio: 'pipe',
+			})
+			writeFileSync(join(OLD_DIR, OLD_MARKER), `${oldSha}\n`)
+			provisioned = oldSha
 		}
-		for (const f of ['package.json', 'demo-browser/src/viewer.ts', 'lib/wasm/wasm-scene-sync.ts']) {
-			const want = execSync(`git show HEAD:${f}`, { encoding: 'buffer', timeout: 30000, stdio: 'pipe' })
-			const got = readFileSync(join(OLD_DIR, f))
-			if (!want.equals(got)) {
-				return {
-					ok: false,
-					reason: `OLD worktree ${f} differs from HEAD ${headSha}; remove ${OLD_DIR} to re-provision`,
-				}
+		if (provisioned !== oldSha) {
+			return {
+				ok: false,
+				reason: `OLD worktree was provisioned from a different revision (marker ${provisioned ?? 'missing'} vs ${oldRef} ${oldSha}); remove ${OLD_DIR} to re-provision`,
 			}
 		}
 		if (!existsSync(join(OLD_DIR, 'dist-esm'))) {
@@ -206,7 +233,7 @@ function ensureOldTree() {
 		if (!existsSync(join(OLD_DIR, 'node_modules'))) {
 			return { ok: false, reason: `OLD worktree has no node_modules (provision: npm ci in ${OLD_DIR})` }
 		}
-		return { ok: true }
+		return { ok: true, oldSha }
 	} catch (e) {
 		return { ok: false, reason: `OLD worktree provisioning failed: ${String(e?.message ?? e).slice(0, 200)}` }
 	}
@@ -312,6 +339,12 @@ function resolveInput(_kind, cli, candidates) {
 }
 const vpxPath = resolveInput('vpx', arg('--vpx'), []) ?? findWalkingDead()
 const romPath = resolveInput('rom', arg('--rom'), []) ?? findWalkingDeadRom()
+// Every quantitative gate below is TWD-tuned (drain corridors, launch ramp
+// height, GI palette). Refuse other tables outright instead of asserting
+// TWD geometry at them; multi-table support wants bands/<table>.json first.
+if (vpxPath && !/walking.?dead|twd/i.test(basename(vpxPath))) {
+	throw new Error(`verify-ab gates are TWD-tuned; refusing ${vpxPath} (no per-table bands yet)`)
+}
 // Mount name must be the game name PinMAME looks for, not the file basename:
 // mirrors romMountFileName() in lib/wasm/vpinball-wasm.ts over the raw table
 // script (stored uncompressed in the VPX), falling back to the ROM basename.
@@ -1748,10 +1781,12 @@ async function main() {
 		// shims) must not resolve OLD imports. Tab death under SwiftShader
 		// memory pressure is retried once with a fresh browser.
 		if (wantPhase('C')) {
-			OLD_BASE = new URL(
-				(await ensureVite('https://localhost/', { cwd: join(OLD_DIR, 'demo-browser'), label: 'verify-ab-old' }))
-					.url,
-			).origin
+			OLD_BASE = new URL((await ensureVite('https://localhost/', { root: join(OLD_DIR, 'demo-browser') })).url)
+				.origin
+			if (oldTree.oldSha && headSha && oldTree.oldSha === headSha)
+				throw new Error(
+					`OLD worktree ${OLD_DIR} matches the current HEAD ${headSha}: leg C would compare the tree against itself; provision --old-dir from a baseline ref instead`,
+				)
 			const oldUrl = `${OLD_BASE}/index.html?vpx=${encodeURIComponent(vpxUrl)}&rom=${encodeURIComponent(romUrl)}&mode=play`
 			let phaseCOk = false
 			for (let cAttempt = 1; cAttempt <= 2 && !phaseCOk; cAttempt++) {
