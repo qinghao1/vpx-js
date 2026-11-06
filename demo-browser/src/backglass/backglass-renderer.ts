@@ -103,7 +103,7 @@ export class BackglassRenderer implements DirtyOverlay {
 		this.syncKey = key
 		if (!this.table) return
 		if (!this.group.parent) this.viewer.scene?.add(this.group)
-		const reelItems = Object.values(table.dispReels ?? {})
+		const reelItems: any[] = Object.values(table.dispReels ?? {})
 		const bgName =
 			table.data?.renderDecals !== false ? (table.data?.bgImage?.[table.data?.bgCurrentSet ?? 0] ?? '') : ''
 		if (!reelItems.length && !bgName) return

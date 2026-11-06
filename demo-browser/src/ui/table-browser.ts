@@ -85,7 +85,7 @@ export function initTableBrowser(viewer: BrowserViewer, syncParam: (key: Kind, v
 				rel: 'noopener',
 				textContent: 'Virtual Pinball Spreadsheet',
 			}),
-			'. Most files sit behind a login on their host: the page opens in a new tab — download there, then drop the .zip ROM and the .vpx table onto the viewer.',
+			'. Most files sit behind a login on their host: the page opens in a new tab — download there, then drop the .vpx table and its .zip ROM onto the viewer.',
 		),
 	)
 	dialog.setAttribute('closedby', 'any')
@@ -145,15 +145,10 @@ export function initTableBrowser(viewer: BrowserViewer, syncParam: (key: Kind, v
 	const pageLink = (url: string) =>
 		el('a', { href: url, target: '_blank', rel: 'noopener', textContent: `${hostOf(url)} ↗` })
 
-	// The viewer mounts a pending ROM when the table loads, so the ROM has to arrive first.
+	// A ROM goes to the table on screen (or the one dropped with it).
 	const handOff = (kind: Kind, file: VpsFile, url: string, opened: boolean) => {
 		const what = kind === 'rom' ? (file.version ? `${file.version}.zip` : 'the ROM zip') : 'the .vpx'
-		const when = kind === 'rom' ? ' before (or with) the table' : ''
-		setStatus(
-			opened ? 'Opened ' : 'Open ',
-			pageLink(url),
-			` — download ${what} there and drop it onto the viewer${when}.`,
-		)
+		setStatus(opened ? 'Opened ' : 'Open ', pageLink(url), ` — download ${what} there and drop it onto the viewer.`)
 	}
 
 	const linkFor = (kind: Kind, file: VpsFile, url: string) => {
@@ -176,7 +171,12 @@ export function initTableBrowser(viewer: BrowserViewer, syncParam: (key: Kind, v
 			if (kind === 'rom') {
 				setStatus(`Downloading ${file.version}.zip…`)
 				await viewer.preloadRom(url).then(
-					() => setStatus(`ROM ${file.version} ready — it mounts when the table loads.`),
+					() =>
+						setStatus(
+							viewer.table
+								? `ROM ${file.version} loaded into the table on screen.`
+								: `ROM ${file.version} ready — it goes with the next table you load.`,
+						),
 					error => setStatus(`ROM download failed: ${error?.message ?? error}`),
 				)
 			} else {

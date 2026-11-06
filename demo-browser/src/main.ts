@@ -1,13 +1,13 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
-// @ts-nocheck
 
 import { crossOriginIsolate } from './cross-origin-isolation.js'
+import { isDev } from './env.js'
 import { createTestApi } from './test-api.js'
 import { initHelp } from './ui/help-dialog.js'
 import { initTableBrowser } from './ui/table-browser.js'
 import { Viewer } from './viewer.js'
 
-function parseViewerOptions(search) {
+function parseViewerOptions(search: string) {
 	const params = new URLSearchParams(search)
 	return {
 		vpx: params.get('vpx') || params.get('table'),
@@ -16,9 +16,6 @@ function parseViewerOptions(search) {
 		antialias: !params.has('noaa'),
 		batched: !params.has('nobatched'),
 		forceWebGL: params.has('webgl'),
-		// E2E drives play entry explicitly through the test API; the
-		// timed auto-switch to play would race it.
-		autoplay: params.get('autoplay') !== '0',
 	}
 }
 
@@ -26,64 +23,70 @@ if (import.meta.env.VITE_COI_SW) await crossOriginIsolate()
 
 const options = parseViewerOptions(location.search)
 const viewer = new Viewer(options)
-const _isDev = (() => {
-	if (import.meta.env?.DEV) return true
-	const h = location.hostname
-	return h === 'localhost' || h === '127.0.0.1' || h === '' || h === '0.0.0.0'
-})()
-// Dev-only handles for humans and e2e: the viewer for scene inspection,
-// `vpx` for the typed test surface. Never present in production builds.
-if (_isDev) {
-	window.viewer = viewer
-	window.vpx = createTestApi(viewer)
-}
-initHelp(viewer)
+// Dev and localhost handles for humans and e2e: the viewer for scene
+// inspection, `vpx` for the typed test surface.
+if (isDev) Object.assign(window, { viewer, vpx: createTestApi(viewer) })
+initHelp()
+
+/** The viewer reports a failed load on its loading card and log; this keeps the rejection handled. */
+const reportFailure = (what: string) => (error: unknown) => console.error(`[app] ${what} failed`, error)
 
 if (options.vpx) {
-	viewer.load(options.vpx).catch(e => console.error('[app] load failed', e))
-	if (options.rom) viewer.preloadRom(options.rom).catch(e => console.error('[app] rom load failed', e))
+	viewer.load(options.vpx).catch(reportFailure('load'))
+	if (options.rom) viewer.preloadRom(options.rom).catch(reportFailure('rom load'))
 } else {
 	viewer.startLoop()
 }
 
-const syncParam = (key, value) => {
-	const u = new URL(location.href)
-	u.searchParams.set(key, value)
-	history.replaceState(null, '', u.pathname + u.search)
+/**
+ * Mirror the open table/ROM in the URL so a reload refetches it. Local files
+ * cannot be refetched, so they clear their key; a new table also drops the ROM.
+ */
+const syncParam = (key: 'vpx' | 'rom', value?: string) => {
+	const url = new URL(location.href)
+	if (key === 'vpx') for (const stale of ['table', 'rom']) url.searchParams.delete(stale)
+	if (value) url.searchParams.set(key, value)
+	else url.searchParams.delete(key)
+	history.replaceState(history.state, '', url)
 }
 initTableBrowser(viewer, syncParam)
 
-function handleFile(f) {
-	if (!f) return
-	if (f.name.toLowerCase().endsWith('.vpx')) {
-		viewer.loadFromFile(f)
-		syncParam('vpx', f.name)
-	} else if (f.name.toLowerCase().endsWith('.zip')) {
-		viewer.loadRomFile(f)
-		syncParam('rom', f.name)
+// Tables go first: a ROM belongs to the table it arrives with.
+function openFiles(files: Iterable<File>) {
+	const list = [...files]
+	const named = (ext: string) => list.filter(f => f.name.toLowerCase().endsWith(ext))
+	for (const f of named('.vpx')) {
+		syncParam('vpx')
+		viewer.loadFromFile(f).catch(reportFailure('load'))
+	}
+	for (const f of named('.zip')) {
+		syncParam('rom')
+		viewer.loadRomFile(f).catch(reportFailure('rom load'))
 	}
 }
 
 for (const id of ['file-vpx', 'file-rom']) {
-	document.getElementById(id)?.addEventListener('change', e => {
-		const f = e.target.files?.[0]
-		if (f) handleFile(f)
-		e.target.value = ''
+	const input = document.getElementById(id) as HTMLInputElement | null
+	input?.addEventListener('change', () => {
+		if (input.files) openFiles(input.files)
+		input.value = ''
 	})
 }
 
-const dropzone = document.getElementById('canvas-wrap') || document.body
-dropzone.addEventListener('dragover', e => {
+const isFileDrag = (e: DragEvent) => !!e.dataTransfer?.types.includes('Files')
+addEventListener('dragover', e => {
+	if (!isFileDrag(e)) return
 	e.preventDefault()
-	dropzone.classList.add('drag')
+	document.body.classList.add('drag')
 })
-dropzone.addEventListener('dragleave', e => {
-	if (e.target === dropzone) dropzone.classList.remove('drag')
+addEventListener('dragleave', e => {
+	if (!e.relatedTarget) document.body.classList.remove('drag')
 })
-dropzone.addEventListener('drop', e => {
+addEventListener('drop', e => {
+	if (!isFileDrag(e)) return
 	e.preventDefault()
-	dropzone.classList.remove('drag')
-	for (const f of e.dataTransfer.files) handleFile(f)
+	document.body.classList.remove('drag')
+	if (e.dataTransfer) openFiles(e.dataTransfer.files)
 })
 
 const logEl = document.getElementById('log')

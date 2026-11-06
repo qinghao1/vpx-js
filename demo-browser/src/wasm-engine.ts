@@ -532,7 +532,7 @@ export class WasmEngine {
 				const state = new BallState()
 				state.name = `Ball${id}`
 				const ball = new Ball(id, data, state)
-				const meshes = ball.getMeshes(this.host.table)
+				const meshes = ball.getMeshes<BufferGeometry>(this.host.table)
 				const obj = this.host.renderApi.createParentNode(`Ball${id}`)
 				for (const mesh of Object.values(meshes)) obj.add(this.host.renderApi.createMesh(mesh))
 				obj.visible = this.ballsVisible

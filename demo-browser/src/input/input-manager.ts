@@ -2,16 +2,30 @@
 import * as THREE from 'three'
 import { swipeNudge } from '../../../dist-esm/lib/render/threejs/three-scene-postprocess.js'
 import { CONTROL_SCHEME, isTableHit, NUDGE } from '../config.js'
-import { ensureBvh } from '../env.js'
+import { ensureBvh, isLowQuality } from '../env.js'
 import { keyEventToDirectInputKey } from './key-code.js'
 
-function isTouchFlipperEnabled(e?: PointerEvent): boolean {
-	try {
-		if (e && (e.pointerType === 'touch' || e.pointerType === 'pen')) return true
-		if (typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)')?.matches) return true
-		if (typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0) return true
-	} catch {}
-	return false
+/** Touch and pen taps on the playfield work the flippers; a mouse orbits. */
+const isTouchFlipper = (e: PointerEvent): boolean => e.pointerType === 'touch' || e.pointerType === 'pen'
+
+/** Form fields own every key; buttons and links own the keys that activate them. */
+export function ownsKey(target: EventTarget | null, code: string): boolean {
+	if (!(target instanceof Element)) return false
+	if (target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])')) return true
+	return (
+		(code === 'Enter' || code === 'NumpadEnter' || code === 'Space') && !!target.closest('button, a[href], summary')
+	)
+}
+
+/**
+ * Only the canvas or the page body auto-enters play: gameplay keys pressed
+ * while a button, link, or panel has focus stay with that control.
+ */
+export function isPlaySurface(target: EventTarget | null): boolean {
+	const tag = (target as { tagName?: unknown } | null)?.tagName
+	if (typeof tag !== 'string') return false
+	const lower = tag.toLowerCase()
+	return lower === 'canvas' || lower === 'body'
 }
 
 // Every gameplay code that must never stick down across blur/hide/exit-play:
@@ -71,7 +85,7 @@ const PLAY_CODES = new Set(CONTROL_SCHEME.flatMap(c => c.keys))
 
 const FALLBACK_ZONES = { flipperSplit: 0.5 } as const
 
-/** Shared viewer → InputHost adapter (used by keyboard, pointer, and nudge attachers). */
+/** The viewer → InputHost adapter shared by the keyboard, pointer, and nudge attachers. */
 export function makeHost(viewer: any): InputHost {
 	return {
 		get canvas() {
@@ -99,7 +113,7 @@ export function makeHost(viewer: any): InputHost {
 			return (viewer._buttonMeshes ?? null) as readonly THREE.Object3D[] | null
 		},
 		tickImmediate() {
-			viewer.stepOnce()
+			if (!isLowQuality()) viewer.stepOnce()
 		},
 		nudge(angle: number, force: number) {
 			viewer._nudge?.(angle, force)
@@ -124,17 +138,19 @@ export function makeHost(viewer: any): InputHost {
 	}
 }
 
-function attachKeyboardHost(host: InputHost, signal: AbortSignal): void {
+export function attachKeyboard(host: InputHost, signal: AbortSignal): void {
 	const pressed = new Set<number>()
 
 	const onKey = (e: KeyboardEvent, down: boolean): void => {
-		// Typing into a focused field must not drive the table, but releases
-		// always go through: a key let go over a field still clears its switch.
-		const tag = (document.activeElement?.tagName || '').toLowerCase()
-		if (down && (tag === 'input' || tag === 'textarea' || tag === 'select')) return
+		// A focused control keeps its keys, but releases always go through:
+		// a key let go over a control still clears its switch.
+		if (down && ownsKey(e.target, e.code)) return
 		if (e.key === '?' || (e.key.length === 1 && ['h', 'o'].includes(e.key.toLowerCase()))) return
 
 		if (down && host.viewerMode === 'viewer' && (PLAY_CODES.has(e.code) || PLAY_CODES.has(e.key))) {
+			// Focused controls keep their keys: only a canvas/body target
+			// auto-enters play, so keys on a button never start a game.
+			if (!isPlaySurface(e.target)) return
 			host.enterPlayMode()
 		}
 
@@ -204,7 +220,7 @@ function attachKeyboardHost(host: InputHost, signal: AbortSignal): void {
 	)
 }
 
-function attachPointerHost(host: InputHost, signal: AbortSignal): void {
+export function attachPointer(host: InputHost, signal: AbortSignal): void {
 	ensureBvh()
 	const canvas = host.canvas
 	if (!canvas) return
@@ -217,6 +233,20 @@ function attachPointerHost(host: InputHost, signal: AbortSignal): void {
 	let hoverX = 0
 	let hoverY = 0
 	const swipeStart = new Map<number, { x: number; y: number; t: number }>()
+	// Orbit enablement saved while a button/flipper press owns the pointer.
+	let controlsPrevEnabled: boolean | null = null
+	const suspendControls = (): void => {
+		if (host.controls && controlsPrevEnabled === null) {
+			controlsPrevEnabled = host.controls.enabled
+			host.controls.enabled = false
+		}
+	}
+	const resumeControls = (): void => {
+		if (host.controls && controlsPrevEnabled !== null) {
+			host.controls.enabled = controlsPrevEnabled
+			controlsPrevEnabled = null
+		}
+	}
 
 	canvas.tabIndex = 0
 	canvas.addEventListener('click', () => canvas.focus(), { signal })
@@ -313,22 +343,6 @@ function attachPointerHost(host: InputHost, signal: AbortSignal): void {
 
 	attachMobileControls()
 
-	if ('onpointerrawupdate' in window) {
-		canvas.addEventListener(
-			'pointerrawupdate' as any,
-			(e: PointerEvent) => {
-				if (host.viewerMode !== 'play') return
-				if (e.button !== 0) return
-				if (!isTouchFlipperEnabled(e)) return
-				const code = zoneFor(e.clientX, e.clientY)
-				if (!active.has(e.pointerId)) {
-					active.set(e.pointerId, code)
-					send(code, true)
-				}
-			},
-			{ signal } as any,
-		)
-	}
 	canvas.addEventListener(
 		'pointerdown',
 		(e: PointerEvent) => {
@@ -352,11 +366,7 @@ function attachPointerHost(host: InputHost, signal: AbortSignal): void {
 					swipeStart.set(e.pointerId, { x: e.clientX, y: e.clientY, t: performance.now() })
 					if (!already) send(code, true)
 					canvas.setAttribute('data-pressed', code)
-					if (host.controls) {
-						const c: any = host.controls
-						if (c._inputPrevEnabled == null) c._inputPrevEnabled = c.enabled
-						c.enabled = false
-					}
+					suspendControls()
 					try {
 						canvas.setPointerCapture(e.pointerId)
 					} catch {}
@@ -364,7 +374,7 @@ function attachPointerHost(host: InputHost, signal: AbortSignal): void {
 					e.stopPropagation()
 					return
 				}
-				if (!isTouchFlipperEnabled(e)) {
+				if (!isTouchFlipper(e)) {
 					swipeStart.set(e.pointerId, { x: e.clientX, y: e.clientY, t: performance.now() })
 					try {
 						canvas.setPointerCapture(e.pointerId)
@@ -380,11 +390,7 @@ function attachPointerHost(host: InputHost, signal: AbortSignal): void {
 			if (!isRightClick && !already) send(code, true)
 
 			canvas.setAttribute('data-pressed', code)
-			if (host.controls) {
-				const c: any = host.controls
-				if (c._inputPrevEnabled == null) c._inputPrevEnabled = c.enabled
-				c.enabled = false
-			}
+			suspendControls()
 			try {
 				canvas.setPointerCapture(e.pointerId)
 			} catch {}
@@ -396,53 +402,20 @@ function attachPointerHost(host: InputHost, signal: AbortSignal): void {
 
 	const end = (e: PointerEvent): void => {
 		const code = active.get(e.pointerId)
-		if (!code) {
-			const s = swipeStart.get(e.pointerId)
-			if (s) swipeStart.delete(e.pointerId)
-			try {
-				canvas.releasePointerCapture(e.pointerId)
-			} catch {}
-			if (s) {
-				const dx = e.clientX - s.x
-				const dy = e.clientY - s.y
-				const dt = performance.now() - s.t
-				if (dt < 400 && Math.hypot(dx, dy) > 80) {
-					const ang = swipeNudge(dx, dy, NUDGE as any)
-					if (ang !== null) {
-						host.nudge(ang, ang === NUDGE.back ? 2.0 : NUDGE.force)
-					}
-				}
-			}
-			return
-		}
-		active.delete(e.pointerId)
-
-		if (code !== '__nudge') send(code, false)
-
-		if (active.size === 0) canvas.removeAttribute('data-pressed')
-
-		if (active.size === 0 && host.controls) {
-			const c: any = host.controls
-			if (c._inputPrevEnabled != null) {
-				c.enabled = c._inputPrevEnabled
-				c._inputPrevEnabled = null
+		if (code) {
+			active.delete(e.pointerId)
+			if (code !== '__nudge') send(code, false)
+			if (active.size === 0) {
+				canvas.removeAttribute('data-pressed')
+				resumeControls()
 			}
 		}
-
 		const s = swipeStart.get(e.pointerId)
 		swipeStart.delete(e.pointerId)
-		if (s) {
-			const dx = e.clientX - s.x
-			const dy = e.clientY - s.y
-			const dt = performance.now() - s.t
-			if (dt < 400 && Math.hypot(dx, dy) > 80) {
-				const ang = swipeNudge(dx, dy, NUDGE as any)
-				if (ang !== null) {
-					host.nudge(ang, ang === NUDGE.back ? 2.0 : NUDGE.force)
-				}
-			}
+		if (s && performance.now() - s.t < 400 && Math.hypot(e.clientX - s.x, e.clientY - s.y) > 80) {
+			const ang = swipeNudge(e.clientX - s.x, e.clientY - s.y, NUDGE as any)
+			if (ang !== null) host.nudge(ang, ang === NUDGE.back ? 2.0 : NUDGE.force)
 		}
-
 		try {
 			canvas.releasePointerCapture(e.pointerId)
 		} catch {}
@@ -484,50 +457,6 @@ function attachPointerHost(host: InputHost, signal: AbortSignal): void {
 		canvas.removeAttribute('data-pressed')
 		active.clear()
 		swipeStart.clear()
-		if (host.controls) {
-			const c: any = host.controls
-			if (c._inputPrevEnabled != null) {
-				c.enabled = c._inputPrevEnabled
-				c._inputPrevEnabled = null
-			}
-		}
+		resumeControls()
 	})
-}
-
-export function attachKeyboard(viewer: any): () => void {
-	const host = makeHost(viewer)
-	const ctrl = new AbortController()
-
-	if (viewer._keyboardCtrl) {
-		viewer._keyboardCtrl.abort()
-	}
-	viewer._keyboardCtrl = ctrl
-
-	attachKeyboardHost(host, ctrl.signal)
-
-	viewer.dom?.canvas?.focus?.()
-	if (viewer.dom?.canvas) viewer.dom.canvas.tabIndex = 0
-
-	return () => {
-		ctrl.abort()
-		if (viewer._keyboardCtrl === ctrl) viewer._keyboardCtrl = null
-	}
-}
-
-export function attachPointerTouch(viewer: any): () => void {
-	const host = makeHost(viewer)
-	const ctrl = new AbortController()
-
-	if (viewer._pointerCtrl) {
-		viewer._pointerCtrl.abort()
-	}
-	viewer._pointerCtrl = ctrl
-
-	attachPointerHost(host, ctrl.signal)
-
-	return () => {
-		ctrl.abort()
-		if (viewer._pointerCtrl === ctrl) viewer._pointerCtrl = null
-		viewer._touchCleanup = null
-	}
 }

@@ -1,16 +1,13 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
-export * from './input/input-manager.js'
-export * from './input/nudge-controller.js'
+import { attachKeyboard, attachPointer, makeHost } from './input/input-manager.js'
+import { attachNudge } from './input/nudge-controller.js'
 
-import { attachKeyboard, attachPointerTouch } from './input/input-manager.js'
-import { attachNudgeInput } from './input/nudge-controller.js'
+/** Attach every input source to the viewer once, through one host; returns the detach. */
 export function attachInput(viewer) {
-	const a = attachKeyboard(viewer)
-	const b = attachPointerTouch(viewer)
-	const c = attachNudgeInput(viewer)
-	return () => {
-		a()
-		b()
-		c()
-	}
+	const host = makeHost(viewer)
+	const ctrl = new AbortController()
+	attachKeyboard(host, ctrl.signal)
+	attachPointer(host, ctrl.signal)
+	attachNudge(viewer, host, ctrl.signal)
+	return () => ctrl.abort()
 }

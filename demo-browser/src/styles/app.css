@@ -158,6 +158,28 @@ body {
 	color: #8a94a8;
 	min-height: 1.2em;
 }
+#loading.is-error #load-title,
+#loading.is-error #load-detail {
+	color: #ff6b6b;
+}
+#loading.is-error #load-title::before {
+	background: #ff6b6b;
+	box-shadow: 0 0 12px rgba(255, 107, 107, 0.8);
+}
+#loading.is-error #bar {
+	display: none;
+}
+/* File drag over the page: the whole viewport is the drop target */
+body.drag::after {
+	content: "";
+	position: fixed;
+	inset: 8px;
+	z-index: 100;
+	border: 2px dashed var(--accent);
+	border-radius: var(--radius-card);
+	background: rgba(76, 139, 245, 0.08);
+	pointer-events: none;
+}
 .load-hint {
 	font-size: 11px;
 	color: var(--muted);
@@ -1053,10 +1075,6 @@ body.show-debug #debug-toggle {
 #fps-hud .fps {
 	font-variant-numeric: tabular-nums;
 }
-#canvas-wrap {
-	transition: transform 0.08s linear;
-	position: relative;
-}
 #nudge-flash {
 	position: absolute;
 	top: 14%;
@@ -1286,10 +1304,6 @@ body.is-play #mobile-controls {
 /* Canvas states via classes instead of inline cursor/display */
 #canvas.is-pointer {
 	cursor: pointer;
-}
-
-#canvas-wrap.is-nudging {
-	transform: var(--nudge-transform, none);
 }
 
 .hidden {

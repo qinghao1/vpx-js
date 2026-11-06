@@ -1,19 +1,14 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
-// @ts-nocheck
-export function createLogViewer(logEl) {
-	const harnessLog = (msg, level = 'info') => {
-		const d = document.createElement('div')
-		d.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`
-		d.className = `log-entry log-entry--${level}`
-		logEl.appendChild(d)
-		while (logEl.children.length > 600) logEl.removeChild(logEl.firstChild)
+/** The page log: appends to the debug panel's log element (last 600 entries) and mirrors to the console. */
+export function createLog(logEl: HTMLElement) {
+	return (msg: string, level = 'info'): void => {
+		const entry = document.createElement('div')
+		entry.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`
+		entry.className = `log-entry log-entry--${level}`
+		logEl.appendChild(entry)
+		while (logEl.children.length > 600) logEl.firstChild?.remove()
 		logEl.scrollTop = logEl.scrollHeight
 		if (level === 'error') console.error('[vpx:err]', msg)
 		else console.log('[vpx]', msg)
 	}
-	return { harnessLog }
-}
-
-export function createHarness(logEl) {
-	return createLogViewer(logEl)
 }
