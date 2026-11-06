@@ -187,6 +187,18 @@ export class WasmSceneSync<NODE, GEOMETRY, POINT_LIGHT> {
 		return out
 	}
 
+	/**
+	 * Read-only plunger pulls for harnesses: raw pos with its frame range,
+	 * so callers normalize `(pos - start) / (end - start)` themselves.
+	 * Public so harnesses never reach into the private row snapshots.
+	 */
+	public plungerPositions(): { partIdx: number; pos: number; start: number; end: number }[] {
+		const out: { partIdx: number; pos: number; start: number; end: number }[] = []
+		for (const [partIdx, row] of this.lastMoverRows)
+			if (row[1] === MoverType.Plunger) out.push({ partIdx, pos: row[2]!, start: row[3]!, end: row[4]! })
+		return out
+	}
+
 	/** Cumulative applied light-row changes; harness boot/activity signal. */
 	public get lightActivity(): number {
 		return this.totalLightChanges
