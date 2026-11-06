@@ -35,6 +35,12 @@ jobs:
       - run: npm run lint
         env:
           CI: true
+      - run: npm run build:esm
+        env:
+          CI: true
+      - run: npm run typecheck:tests
+        env:
+          CI: true
 
   build:
     runs-on: ubuntu-latest

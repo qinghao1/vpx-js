@@ -14,7 +14,6 @@ bench*.spec.ts
 *.bak
 
 .agents/
-.github/
 demo-browser/dist/
 demo-browser/node_modules/
 demo-browser/.vite/
