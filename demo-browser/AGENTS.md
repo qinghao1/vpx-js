@@ -1,6 +1,6 @@
 # demo-browser — Agent Guide
 
-Local Vite demo on `https://localhost:3000` (Vite 8, self-signed TLS via `basicSsl`). Tracked in git. Single entry `?vpx=&rom=&mode=play|viewer`.
+Local Vite demo on `https://localhost:3000` (Vite 8, self-signed TLS via `basicSsl`). Tracked in git. Single entry `?vpx=&table=&rom=&mode=play|viewer&noaa&nobatched&webgl`.
 
 ## Run
 
@@ -17,21 +17,21 @@ Requires `dist-esm` built. `server.fs.allow` covers the repo root, `~/Downloads`
 
 ## Structure
 
-- `index.html` — semantic HTML5 shell, loads `src/styles/app.css` + `src/main.ts` (no global `log-capture.js` script)
+- `index.html` — semantic HTML5 shell, loads `src/styles/app.css` + `src/main.ts`
 - `src/main.ts` — bootstrapper: parses URL options once, creates `Viewer`, wires file pickers, drag & drop, log buttons, and the dev-only `window.viewer`/`window.vpx`
 - `src/cross-origin-isolation.ts` + `coi-sw.js` — static hosts without COOP/COEP (GitHub Pages): `VITE_COI_SW=1` builds ship a header-adding service worker and register it (one reload); other builds contain neither
-- `src/test-api.ts` — typed e2e surface (`window.vpx`: state, `whenReady`, `setMode`, `sendKey`, `nudge`, `step`, `dmd`)
-- `src/viewer.ts` — Viewer coordinator (~2200 LOC, delegates to subsystems)
-- `src/config.js` — controls, camera presets & constants (~120 LOC)
-- `src/styles/app.css` — consolidated CSS tokens (~1150 LOC)
-- `src/input/input-manager.ts` — keys, touch zones & cabinet button raycasting (~560 LOC)
-- `src/input/nudge-controller.ts` — nudge physics, swipe, gamepad & motion (~170 LOC)
-- `src/dmd/dmd-renderer.ts` — on-table DMD mesh updater (~385 LOC)
-- `src/ui/stats-overlay.ts`, `help-dialog.ts`, `log-viewer.ts` — stats HUD, controls dialog, log panel (no `console`/`fetch`/`XHR` monkey-patch)
+- `src/test-api.ts` — typed e2e surface (`window.vpx`: state, three, `whenReady`, `setMode`, `cancelCameraAnimation`, `sendKey`, `nudge`, `step`, `dmd`)
+- `src/viewer.ts` — Viewer coordinator, delegates to subsystems
+- `src/config.js` — controls, camera presets & constants
+- `src/styles/app.css` — consolidated CSS tokens
+- `src/input/input-manager.ts` — keys, touch zones & cabinet button raycasting
+- `src/input/nudge-controller.ts` — nudge physics, swipe, gamepad & motion
+- `src/dmd/dmd-renderer.ts` — on-table DMD mesh updater
+- `src/ui/stats-overlay.ts`, `help-dialog.ts`, `log-viewer.ts` — stats HUD, controls dialog, log panel
 - `src/ui/table-browser.ts` — Virtual Pinball Spreadsheet table/ROM browser (`lib/emu/vps-catalog.ts`)
 - `src/utils/candidate-resolver.ts`, `texture-filter.ts` — VPX/ROM resolution & glass-texture filtering
 - `src/env.js`, `src/utils.js` — env caps/quality flags + `$`/`fmtBytes` helpers and `utils/*` re-exports
-- `src/input.js` — `attachInput` composer over `input/` + `nudge-controller` (defines logic, not a shim); `config.js`, `utils.js`, `env.js` are real sources (viewer imports them directly from `./ui/*` and `./input/*`)
+- `src/input.js` — `attachInput` composer: one `makeHost` + one `AbortController` passed to the three `input/` attachers; `config.js`, `utils.js`, `env.js` are real sources (viewer imports them directly from `./ui/*` and `./input/*`)
 - `vite.config.ts` — `basicSsl`, cross-origin isolation headers, dedupes `three`/`three-mesh-bvh`, aliases `refs.node`→`refs.browser` etc., fixture + ROM middleware
 - `e2e/integration.mjs` + `e2e/helpers.mjs` — unified E2E over `window.vpx` (waitReady → diagnostics → physics → DMD → shots), single generic harness
 

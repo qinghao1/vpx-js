@@ -2,6 +2,7 @@
 // @ts-nocheck
 
 import { crossOriginIsolate } from './cross-origin-isolation.js'
+import { isDev } from './env.js'
 import { createTestApi } from './test-api.js'
 import { initHelp } from './ui/help-dialog.js'
 import { initTableBrowser } from './ui/table-browser.js'
@@ -16,9 +17,6 @@ function parseViewerOptions(search) {
 		antialias: !params.has('noaa'),
 		batched: !params.has('nobatched'),
 		forceWebGL: params.has('webgl'),
-		// E2E drives play entry explicitly through the test API; the
-		// timed auto-switch to play would race it.
-		autoplay: params.get('autoplay') !== '0',
 	}
 }
 
@@ -26,14 +24,9 @@ if (import.meta.env.VITE_COI_SW) await crossOriginIsolate()
 
 const options = parseViewerOptions(location.search)
 const viewer = new Viewer(options)
-const _isDev = (() => {
-	if (import.meta.env?.DEV) return true
-	const h = location.hostname
-	return h === 'localhost' || h === '127.0.0.1' || h === '' || h === '0.0.0.0'
-})()
 // Dev-only handles for humans and e2e: the viewer for scene inspection,
 // `vpx` for the typed test surface. Never present in production builds.
-if (_isDev) {
+if (isDev) {
 	window.viewer = viewer
 	window.vpx = createTestApi(viewer)
 }
@@ -46,21 +39,20 @@ if (options.vpx) {
 	viewer.startLoop()
 }
 
+// Sync only URLs the server can fetch on reload; dropped local files have no URL.
 const syncParam = (key, value) => {
 	const u = new URL(location.href)
 	u.searchParams.set(key, value)
-	history.replaceState(null, '', u.pathname + u.search)
+	history.replaceState(history.state, '', u.pathname + u.search)
 }
 initTableBrowser(viewer, syncParam)
 
 function handleFile(f) {
 	if (!f) return
 	if (f.name.toLowerCase().endsWith('.vpx')) {
-		viewer.loadFromFile(f)
-		syncParam('vpx', f.name)
+		viewer.loadFromFile(f).catch(e => console.error('[app] file load failed', e))
 	} else if (f.name.toLowerCase().endsWith('.zip')) {
-		viewer.loadRomFile(f)
-		syncParam('rom', f.name)
+		viewer.loadRomFile(f).catch(e => console.error('[app] rom file load failed', e))
 	}
 }
 
