@@ -25,3 +25,4 @@ external/vpinball/third-party/
 scratch/
 demo-browser/public/wasm/
 demo-browser/public/ab-tmp/
+.claude/

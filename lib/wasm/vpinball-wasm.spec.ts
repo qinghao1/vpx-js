@@ -525,7 +525,7 @@ describe('loadHeadlessEngine', () => {
 	})
 	it('reports a 404 as missing with the build command and the import cause', async () => {
 		const priorFetch = globalThis.fetch
-		globalThis.fetch = (async () => ({ status: 404 })) as typeof fetch
+		globalThis.fetch = (async () => ({ status: 404 })) as unknown as typeof fetch
 		try {
 			const error = await loadHeadlessEngine('data:text/javascript,throw new Error("boom")?missing=1').catch(
 				e => e,
@@ -539,7 +539,7 @@ describe('loadHeadlessEngine', () => {
 	})
 	it('reports a present-but-broken module as a load error, not missing', async () => {
 		const priorFetch = globalThis.fetch
-		globalThis.fetch = (async () => ({ status: 200 })) as typeof fetch
+		globalThis.fetch = (async () => ({ status: 200 })) as unknown as typeof fetch
 		try {
 			await expect(
 				loadHeadlessEngine('data:text/javascript,throw new Error("boom")?broken=1'),
@@ -588,19 +588,26 @@ describe('table session queue', () => {
 	})
 })
 
-describe('loadHeadlessEngine environment', () => {
-	it('fails loud with op environment instead of a deep wasm abort when the page is not isolated', async () => {
-		const host = globalThis as { crossOriginIsolated?: boolean }
-		const prev = host.crossOriginIsolated
-		host.crossOriginIsolated = false
+describe('loadHeadlessEngine environment guard', () => {
+	it('rejects with op environment before attempting the module import', async () => {
+		const seen: string[] = []
+		const priorFetch = globalThis.fetch
+		globalThis.fetch = (async (...args: unknown[]) => {
+			seen.push(String(args[0]))
+			return { status: 200 }
+		}) as unknown as typeof fetch
+		const globals = globalThis as { crossOriginIsolated?: unknown }
+		const prior = globals.crossOriginIsolated
+		globals.crossOriginIsolated = false
 		try {
-			await expect(loadHeadlessEngine('test-env-guard.js')).rejects.toMatchObject({
+			await expect(loadHeadlessEngine('test-env-guard-no-fetch.js')).rejects.toMatchObject({
 				name: 'HeadlessEngineError',
 				op: 'environment',
 			})
+			expect(seen).toEqual([])
 		} finally {
-			if (prev === undefined) delete host.crossOriginIsolated
-			else host.crossOriginIsolated = prev
+			globals.crossOriginIsolated = prior
+			globalThis.fetch = priorFetch
 		}
 	})
 })
