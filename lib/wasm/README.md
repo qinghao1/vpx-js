@@ -32,14 +32,15 @@ WASM. This seam is the only boundary between them.
 ## Status
 
 Bridge live, built from the pinned `external/vpinball` submodule
-(`@64a480a96`) — never from a side checkout. The bridge is eleven patches in
+(`@64a480a96`) — never from a side checkout. The bridge is sixteen patches in
 `wasm/modules/headless/patches/` (`0001` new `src/web/vpx_wasm_bridge.cpp`;
 `0002` part-state getters; `0003` headless step + script-error record;
 `0004` Noop render-device guards; `0005` CMake target; `0006` DMD mirror;
 `0007` IsPlaying ignores window focus headless; `0008` host-paced
 PinMAME time fence; `0009` PinMAME ROM-audio capture to a drained int16
 PCM ring; `0010` drop of the SDL echo of ring-forwarded lanes; `0011`
-silence of the refresh-rate probe error), applied idempotently at build time
+silence of the refresh-rate probe error; `0012` FlexDMD mirror; `0013` flasher
+image; `0014` audio level; `0015` VR player mode; `0016` wasm source maps), applied idempotently at build time
 like the PinMAME patches. Do not hand-edit the
 submodule; change the patch files. Build with `npm run build:wasm:headless`
 (`wasm/build-headless.sh`: patches → third-party libs → configure →

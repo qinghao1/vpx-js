@@ -3,7 +3,7 @@
 E2E harnesses, benches, and repros. Single entry point:
 
 ```bash
-npx tsx test/harness/verify-all.ts   # TAP 1..5: table → twd-render → ab → browser → cadet
+npx tsx test/harness/verify-all.ts   # TAP 1..5: table → twd-render → ab → cadet → browser
 ```
 
 ## Runner rule (.ts vs .mjs)
@@ -21,7 +21,7 @@ npx tsx test/harness/verify-all.ts   # TAP 1..5: table → twd-render → ab →
 
 | File                          | What                                                                                                                                                                                           | Needs                                                            |
 | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| `verify-all.ts`               | Aggregator, TAP 1..5 (table, twd-render, ab, browser, cadet), exit 0/1                                                                                                                         | varies per step                                                  |
+| `verify-all.ts`               | Aggregator, TAP 1..5 (table, twd-render, ab, cadet, browser), exit 0/1                                                                                                                         | varies per step                                                  |
 | `verify-table.ts`             | VPX parse + script extract over fixtures + `example-table.vpx`                                                                                                                                 | —                                                                |
 | `verify-browser.ts`           | Thin wrapper → `verify-all.verifyBrowser` → `demo-browser/e2e/integration.mjs`                                                                                                                 | Chrome + vite + `dist-esm`                                       |
 | `verify-play-room.ts`         | Play-room scene checks (TAP `Tap` class)                                                                                                                                                       | —                                                                |

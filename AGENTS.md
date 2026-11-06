@@ -12,7 +12,7 @@ npm run build:wasm:headless # emscripten headless build (needs emsdk; artifact �
 npx tsc --noEmit           # typecheck
 npx biome check .          # lint/format (tabs, width 120)
 npm test                   # vitest --coverage
-npx tsx test/harness/verify-all.ts   # E2E TAP 1..4: table → twd-render → ab → browser
+npx tsx test/harness/verify-all.ts   # E2E TAP 1..5: table → twd-render → ab → cadet → browser
 npm run verify:ab          # A/B + regression vs OLD worktree (needs VPX/ROM + /tmp/vpx-js-old)
 ```
 
@@ -36,10 +36,10 @@ Node via `fnm` — `.nvmrc` `24`, `.node-version` `24.19.0`. Activate with `eval
 ## Testing
 
 - `vitest` on `lib/**/*.spec.ts` + `test/harness/*.spec.ts` (`pool:forks`, 10s timeout).
-- `test/harness/` is the single E2E entry: `verify-all.ts` (TAP 1..4: table → twd-render → ab → browser). `verify-ab.mjs` needs a VPX/ROM plus the OLD worktree (`git worktree add /tmp/vpx-js-old HEAD` with built `dist-esm`); without them it SKIPs honestly. Keep it unified.
+- `test/harness/` is the single E2E entry: `verify-all.ts` (TAP 1..5: table → twd-render → ab → cadet → browser). `verify-ab.mjs` needs a VPX/ROM plus the OLD worktree (`git worktree add /tmp/vpx-js-old HEAD` with built `dist-esm`); without them it SKIPs honestly. Keep it unified.
 
 ## Gotchas
 
 - `Failed to resolve import ../dist-esm/...` → run `npm run build:esm`.
-- Submodules must stay pristine — never hand-edit; if dirty, `git submodule foreach 'git reset --hard'` to clean.
+- Submodules must stay pristine — never hand-edit; if dirty, `git submodule foreach 'git reset --hard && git clean -fd'` to clean (`reset` alone keeps patch-created files, which the build rejects as broken).
 - SIGILL in the shipped engine → repro with devtools open (WASM debugging on). The `.wasm.map` carries no sourcesContent and no third-party code, so bgfx frames stay raw addresses.
