@@ -723,7 +723,8 @@ export class Viewer {
 		this._syncChrome()
 	}
 	async _switchToViewer() {
-		if (this.viewerMode !== 'play' || !this.tableGroup) return
+		if (this.viewerMode !== 'play') return
+		if (!this.tableGroup) return this.exitPlayMode()
 		this.viewerMode = 'viewer'
 		if (typeof history !== 'undefined' && history.state?.mode === 'play') {
 			history.back()

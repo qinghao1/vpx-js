@@ -121,8 +121,7 @@ export function makeHost(viewer: any): InputHost {
 			}
 		},
 		exitPlayMode() {
-			viewer._switchToViewer?.()
-			viewer.exitPlayMode?.()
+			void viewer._switchToViewer()
 		},
 		togglePause() {
 			viewer.isPaused = !viewer.isPaused
