@@ -19,7 +19,7 @@ const define = {
 export default defineConfig({
 	define,
 	optimizeDeps: {
-		include: ['three', 'three/webgpu', 'three/tsl', 'three-mesh-bvh', 'wpc-emu'],
+		include: ['three', 'three/webgpu', 'three/tsl', 'three-mesh-bvh'],
 	},
 	root,
 	base: './',

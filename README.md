@@ -9,6 +9,8 @@ Fork of [`vpdb/vpx-js`](https://github.com/vpdb/vpx-js) by [freezy](https://gith
 - **Parse** `.vpx` tables — OLE/BIFF, meshes, materials, textures, and scripts — with `Table.load()`.
 - **Render** with three.js via `Table.generateTableNode()`.
 - **Play** on the headless VPinball WASM engine (`loadHeadlessEngine`), mirrored into the three.js scene by `WasmSceneSync`.
+- **Emulate** ROMs with PinMAME inside the headless vpinball WASM engine.
+- **Browse** the [Virtual Pinball Spreadsheet](https://virtualpinballspreadsheet.github.io/) catalog for tables and ROMs (`lib/emu/vps-catalog.ts`).
 
 ## Requirements
 

@@ -1,0 +1,183 @@
+/* Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE */
+
+/* Table & ROM catalog dialog (src/ui/table-browser.ts) */
+dialog.table-browser {
+	width: min(880px, calc(100vw - 28px));
+	height: min(640px, calc(100vh - 56px));
+	padding: 0;
+	margin: auto;
+	border: 1px solid var(--border-strong);
+	border-radius: var(--radius-help);
+	background: var(--surface-elev);
+	backdrop-filter: blur(20px) saturate(1.2);
+	-webkit-backdrop-filter: blur(20px) saturate(1.2);
+	color: var(--fg);
+	font:
+		12px / 1.5 system-ui,
+		-apple-system,
+		sans-serif;
+	box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+	flex-direction: column;
+	overflow: hidden;
+}
+dialog.table-browser[open] {
+	display: flex;
+}
+dialog.table-browser::backdrop {
+	background: rgba(5, 7, 10, 0.55);
+	backdrop-filter: blur(2px);
+}
+.table-browser .tb-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 14px 16px 10px;
+}
+.table-browser h3 {
+	margin: 0;
+	font-size: 12px;
+	font-weight: 700;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: #8ea8d6;
+}
+.table-browser button,
+.table-browser .tb-links a {
+	appearance: none;
+	background: rgba(255, 255, 255, 0.06);
+	border: 1px solid var(--border);
+	color: var(--fg);
+	border-radius: var(--radius);
+	padding: 4px 10px;
+	font: inherit;
+	text-decoration: none;
+	cursor: pointer;
+}
+.table-browser button:hover,
+.table-browser .tb-links a:hover {
+	background: rgba(255, 255, 255, 0.12);
+	border-color: var(--border-strong);
+}
+.table-browser .tb-links button {
+	background: var(--accent);
+	border-color: transparent;
+}
+.table-browser input[type="search"] {
+	margin: 0 16px;
+	padding: 9px 12px;
+	border: 1px solid var(--border-strong);
+	border-radius: 10px;
+	background: rgba(0, 0, 0, 0.3);
+	color: var(--fg);
+	font: inherit;
+	font-size: 13px;
+}
+.table-browser input[type="search"]:focus {
+	outline: 2px solid var(--accent);
+	outline-offset: -1px;
+}
+.table-browser .tb-status {
+	margin: 8px 16px;
+	min-height: 18px;
+	color: var(--muted);
+}
+.table-browser .tb-body {
+	flex: 1;
+	min-height: 0;
+	display: grid;
+	grid-template-columns: minmax(220px, 300px) 1fr;
+	border-top: 1px solid var(--border-faint);
+	border-bottom: 1px solid var(--border-faint);
+}
+.table-browser .tb-results,
+.table-browser .tb-detail {
+	overflow: auto;
+	overscroll-behavior: contain;
+	scrollbar-width: thin;
+}
+.table-browser .tb-results {
+	list-style: none;
+	margin: 0;
+	padding: 6px;
+	border-right: 1px solid var(--border-faint);
+}
+.table-browser .tb-results li {
+	display: flex;
+	flex-direction: column;
+	padding: 7px 10px;
+	border-radius: 8px;
+	cursor: pointer;
+}
+.table-browser .tb-results li:hover,
+.table-browser .tb-results li:focus-visible {
+	background: rgba(255, 255, 255, 0.06);
+	outline: none;
+}
+.table-browser .tb-results li.selected {
+	background: rgba(76, 139, 245, 0.2);
+}
+.table-browser .tb-results span,
+.table-browser .tb-meta,
+.table-browser .tb-tags,
+.table-browser .tb-empty {
+	color: var(--muted);
+	font-size: 11px;
+}
+.table-browser .tb-detail {
+	padding: 12px 16px;
+}
+.table-browser h4 {
+	margin: 0;
+	font-size: 15px;
+}
+.table-browser .tb-meta {
+	margin: 2px 0 10px;
+}
+.table-browser h5 {
+	margin: 12px 0 6px;
+	font-size: 10px;
+	font-weight: 700;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--muted);
+}
+.table-browser .tb-file {
+	padding: 8px 10px;
+	margin-bottom: 6px;
+	border: 1px solid var(--border-faint);
+	border-radius: 10px;
+	background: rgba(255, 255, 255, 0.02);
+}
+.table-browser .tb-file code {
+	color: #ffd479;
+	font-size: 12px;
+}
+.table-browser .tb-comment {
+	margin-top: 2px;
+	color: #c6ccd8;
+}
+.table-browser .tb-links {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin-top: 6px;
+}
+.table-browser .tb-foot {
+	padding: 10px 16px 12px;
+	color: var(--muted);
+	font-size: 11px;
+}
+.table-browser .tb-status a,
+.table-browser .tb-foot a {
+	color: #8ea8d6;
+}
+@media (max-width: 640px) {
+	.table-browser .tb-body {
+		grid-template-columns: 1fr;
+		grid-template-rows: 40% 60%;
+	}
+	.table-browser .tb-results {
+		border-right: 0;
+		border-bottom: 1px solid var(--border-faint);
+	}
+}
