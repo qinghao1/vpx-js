@@ -330,7 +330,7 @@ async function findVitePort(from, cwd, label) {
 			continue
 		}
 		const lock = readViteLock(port)
-		if (lock && lock.alive && !sameRoot(lock.root, cwd)) continue
+		if (lock?.alive && !sameRoot(lock.root, cwd)) continue
 		return { port, reuse: false }
 	}
 	const free = await new Promise((resolve, reject) => {
