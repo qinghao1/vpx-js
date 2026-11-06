@@ -6,7 +6,6 @@ import type { ThreeRenderApi } from '../../dist-esm/lib/render/threejs/three-ren
 import { Ball } from '../../dist-esm/lib/vpt/ball/ball.js'
 import { BallData } from '../../dist-esm/lib/vpt/ball/ball-data.js'
 import { BallState } from '../../dist-esm/lib/vpt/ball/ball-state.js'
-import type { ItemState, ItemUpdater } from '../../dist-esm/lib/vpt/item-state.js'
 import type { PlungerData } from '../../dist-esm/lib/vpt/plunger/plunger-data.js'
 import { PlungerMeshGenerator } from '../../dist-esm/lib/vpt/plunger/plunger-mesh-generator.js'
 import type { Table } from '../../dist-esm/lib/vpt/table/table.js'
@@ -17,7 +16,7 @@ import {
 	romMountFileName,
 	WASM_STRIDES,
 } from '../../dist-esm/lib/wasm/vpinball-wasm.js'
-import type { BallSlot, SyncCounts, SyncScene } from '../../dist-esm/lib/wasm/wasm-scene-sync.js'
+import type { BallSlot, PartSlot, SyncCounts, SyncScene } from '../../dist-esm/lib/wasm/wasm-scene-sync.js'
 import { WasmSceneSync } from '../../dist-esm/lib/wasm/wasm-scene-sync.js'
 
 /** Scene hooks the WASM engine adapter needs from the viewer. */
@@ -25,7 +24,7 @@ export interface WasmEngineHost {
 	readonly renderApi: ThreeRenderApi
 	readonly table: Table
 	readonly ballsGroup: Object3D
-	lookupPart(name: string): { obj: Object3D; state: ItemState; updater: ItemUpdater<ItemState> } | undefined
+	lookupPart(name: string): PartSlot<Object3D> | undefined
 	lookupPlunger(name: string): PlungerData | undefined
 }
 
