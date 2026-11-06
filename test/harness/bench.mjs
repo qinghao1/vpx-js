@@ -1,7 +1,6 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 import fs from 'node:fs'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { exists, VPX_CANDIDATES } from './bench-shared.ts'
 import { attachLogging, ensureVite, launchBrowser, loadPuppeteer, newPage, sleep } from './utils.mjs'
 import { findRomForGameName, getArg, hasFlag } from './vpinball-resolver.ts'
@@ -31,7 +30,7 @@ function resolveUrl(vpxPath, romPath) {
 	const abs = path.resolve(vpxPath)
 	const st = fs.statSync(abs)
 	console.log(`[bench] VPX ${abs} ${(st.size / 1024 / 1024).toFixed(1)} MB`)
-	let u = `http://localhost:3000/?vpx=${vpxParam}`
+	let u = `/?vpx=${vpxParam}`
 	if (romPath) {
 		const romParam = resolvePathToParam(romPath)
 		if (romParam) {
@@ -71,10 +70,7 @@ console.log(
 )
 
 const puppeteer = await loadPuppeteer()
-const vite = await ensureVite(url, {
-	cwd: path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../demo-browser'),
-	label: 'bench',
-})
+const vite = await ensureVite(url)
 url = vite.url
 const browser = await launchBrowser(puppeteer, {
 	...(headed ? { headless: false } : {}),
@@ -157,15 +153,8 @@ for (let i = 0; i < 90; i++) {
 	await sleep(1000)
 	const s = await page.evaluate(() => {
 		const txt = document.getElementById('log')?.innerText ?? ''
-		const v = window.viewer
-		// Engine-ready gate: wasmEngine.ready, or the log line as fallback.
-		const hasPlayer = !!v?.wasmEngine?.ready || txt.includes('WASM engine ready')
-		const isReady =
-			txt.includes('Ready') ||
-			txt.includes('Player init OK') ||
-			txt.includes('PLAY: Enter=plunger') ||
-			txt.includes('VIEWER: drag to orbit') ||
-			hasPlayer
+		const isReady = window.vpx?.state.loadState === 'ready'
+		const hasPlayer = !!window.vpx?.state.wasmReady
 		const lastLines = txt.split('\n').filter(Boolean).slice(-2).join(' | ')
 		const heap = performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) : null
 		const measures = (() => {
@@ -1161,7 +1150,7 @@ if (tracePath) console.log(`[bench] trace at ${tracePath} — open in chrome://t
 		await browser.close()
 	} catch {}
 	try {
-		vite?.kill()
+		await vite.close()
 	} catch {}
 	process.exit(exitCode)
 }
