@@ -4,12 +4,12 @@ export const resolveVpxCandidates = vpx => {
 	if (!name) return []
 	if (/^https?:\/\//i.test(name) || name.startsWith('/@fs/')) return [name]
 	if (!name.toLowerCase().endsWith('.vpx')) name += '.vpx'
-	if (name.includes('/')) {
-		const abs = name.startsWith('/') ? name : `/${name}`
-		const base = `/${name.split('/').pop()}`
-		return abs === base ? [abs] : [abs, base]
-	}
-	return [`/${name}`]
+	// Page-relative so subpath deploys (GitHub Pages project sites) resolve
+	// inside the deploy instead of at the domain root. An explicitly
+	// server-absolute name keeps its leading slash: the author opted out.
+	if (name.startsWith('/')) return [name]
+	if (name.includes('/')) return [name, name.split('/').pop()]
+	return [name]
 }
 
 export const fetchWithProgress = async (url, onProgress, opts = {}) => {
