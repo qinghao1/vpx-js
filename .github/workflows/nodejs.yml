@@ -17,6 +17,9 @@ jobs:
       - run: npm ci
         env:
           CI: true
+      - run: npm run build:esm
+        env:
+          CI: true
       - run: npm test
         env:
           CI: true

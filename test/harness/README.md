@@ -70,6 +70,13 @@ node test/harness/verify-ab.mjs --vpx=<table>.vpx --rom=<game>.zip   # A/B vs /t
   `<tableDir>/pinmame/roms/<game>.zip`, `<tableDir>/<game>.zip`,
   `~/.pinmame/roms/`, `~/pinmame/roms/`, `~/Downloads/`,
   `test/fixtures/roms/` (plus lowercase retries).
+- TWD lookup: everything that needs `walking_dead.vpx` calls `findWalkingDead()`
+  (`bench-shared.ts`): `$WALKING_DEAD_VPX`, `./walking_dead.vpx`,
+  `~/Downloads/walking_dead.vpx`, `~/Downloads/walking_dead/walking_dead.vpx`,
+  `demo-browser/public/ab-tmp/twd.vpx`, the vpinball table cache. The TWD-gated
+  specs (`regression-lights`, `regression-artifact-postprocess`,
+  `underfloor-occlusion`, `light-*-regression`, `test/bench/walking-dead.bench.ts`)
+  skip in CI by design: CI has no VPX/ROM.
 - Native discovery order (`discoverVpinball`, first executable wins):
   `VPINBALL_BIN` (file or dir), `VPINBALL_DIR`, `~/projects/vpinball`
   build/bin, `external/vpinball` submodule build/bin, `~/.cache/vpinball/`,

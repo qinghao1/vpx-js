@@ -35,7 +35,7 @@ Node via `fnm` — `.nvmrc` `24`, `.node-version` `24.19.0`. Activate with `eval
 
 ## Testing
 
-- `vitest` on `lib/**/*.spec.ts` + `test/harness/*.spec.ts` (`pool:forks`, 10s timeout).
+- `vitest` on `lib/**/*.spec.ts` + `test/harness/*.spec.ts` + `demo-browser/src/**/*.spec.ts` (`pool:forks`, 10s timeout).
 - `test/harness/` is the single E2E entry: `verify-all.ts` (TAP 1..5: table → twd-render → ab → cadet → browser). `verify-ab.mjs` needs a VPX/ROM plus the OLD worktree (`git worktree add /tmp/vpx-js-old HEAD` with built `dist-esm`); without them it SKIPs honestly. Keep it unified.
 
 ## Gotchas
