@@ -130,6 +130,8 @@ export function attachKeyboardHost(host: InputHost, signal: AbortSignal): void {
 		// always go through: a key let go over a field still clears its switch.
 		const tag = (document.activeElement?.tagName || '').toLowerCase()
 		if (down && (tag === 'input' || tag === 'textarea' || tag === 'select')) return
+		// Reserved app shortcuts, handled by their own listeners: '?'/'h' toggle
+		// help, 'o' toggles orbit in play mode. Never reach the engine as input.
 		if (e.key === '?' || (e.key.length === 1 && ['h', 'o'].includes(e.key.toLowerCase()))) return
 
 		if (down && host.viewerMode === 'viewer' && (PLAY_CODES.has(e.code) || PLAY_CODES.has(e.key))) {

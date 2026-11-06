@@ -73,10 +73,12 @@ adapter → viewer `_sendKey`), and teardown all route through it. SRGB DMD
 triplets decode to dots-per-byte in the `dmdFrame` getter; reload clears
 part names, cached DMD, balls, and destroys the prior engine.
 
-Browser e2e (`integration.mjs`) drives the engine through the dev-only typed
-test API (`window.vpx`, `demo-browser/src/test-api.ts`): a `wasmEngine` leg
-asserts ready, catalog, zero script errors, tick + input; the gameplay legs
-(ball, plunger, flipper, nudge, DMD) read engine state, never viewer privates.
+Browser e2e (`integration.mjs`) drives the engine through the localhost-gated
+typed test API (`window.vpx`, `demo-browser/src/test-api.ts`): a `wasmEngine`
+leg asserts ready, catalog, zero script errors, tick + input; the gameplay
+legs (ball, plunger, flipper, nudge, DMD) drive input through the API and
+assert on engine state, while a few scene/presence legs read viewer scene
+objects (table group, renderer stats).
 
 ## Browser requirements
 

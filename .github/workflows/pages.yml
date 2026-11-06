@@ -15,6 +15,16 @@ on:
   push:
     branches: [master]
   pull_request:
+    # The job rebuilds emsdk libs, the wasm engine, the demo bundle and runs
+    # three E2E legs: only run it when those inputs could have changed.
+    paths:
+      - "wasm/**"
+      - "demo-browser/**"
+      - "lib/**"
+      - "test/harness/**"
+      - "package.json"
+      - "demo-browser/package.json"
+      - ".github/workflows/pages.yml"
   workflow_dispatch:
 
 permissions:

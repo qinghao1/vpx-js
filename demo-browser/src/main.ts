@@ -24,8 +24,9 @@ if (import.meta.env.VITE_COI_SW) await crossOriginIsolate()
 
 const options = parseViewerOptions(location.search)
 const viewer = new Viewer(options)
-// Dev-only handles for humans and e2e: the viewer for scene inspection,
-// `vpx` for the typed test surface. Never present in production builds.
+// Localhost-gated handles for humans and e2e: the viewer for scene
+// inspection, `vpx` for the typed test surface. Present in any build
+// served from localhost (the static-host leg drives it), absent elsewhere.
 if (isDev) {
 	window.viewer = viewer
 	window.vpx = createTestApi(viewer)

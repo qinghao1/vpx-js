@@ -3,42 +3,48 @@
 E2E harnesses, benches, and repros. Single entry point:
 
 ```bash
-npx tsx test/harness/verify-all.ts   # TAP 1..5: table → twd-render → cadet → pages → browser
+npx tsx test/harness/verify-all.ts   # TAP 1..6: table → twd-render → headless → cadet → pages → browser
 ```
 
 ## Runner rule (.ts vs .mjs)
 
 - `.ts` files: always `npx tsx <file>`.
-- `.mjs` files: `node <file>` ONLY if they import no `lib/**` code
-  (`bench.mjs`, `verify-*.mjs` import just `bench-shared.ts` /
-  `vpinball-resolver.ts` / `utils.mjs`, which are plain-Node safe).
-  `repro-artifact.ts` imports `demo-browser/` — run it with `npx tsx`.
+- `.mjs` files: `node <file>` ONLY when the whole transitive import
+  closure is plain-Node safe (`verify-*.mjs` reach just `utils.mjs`
+  and `bench-shared.ts`, which import no `lib/**` code). `bench.mjs`
+  reaches `vpinball-resolver.ts`, whose `./vbs-comments.js` specifier
+  only a TS loader resolves, so it runs under `npx tsx`
+  like the `.ts` harnesses. `repro-artifact.ts` imports
+  `demo-browser/` — run it with `npx tsx`.
 
 ## Inventory
 
 `verify-*` gate; `bench-*` measure (no pass/fail); `repro-*` debug.
 
-| File                          | What                                                                                                                                                                                           | Needs                                                            |
-| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| `verify-all.ts`               | Aggregator, TAP 1..5 (table, twd-render, cadet, pages, browser), exit 0/1                                                                                                                      | varies per step                                                  |
-| `verify-table.ts`             | VPX parse over fixtures + `example-table.vpx`                                                                                                                                                  | —                                                                |
-| `verify-play-room.ts`         | Play-room scene checks (TAP `Tap` class)                                                                                                                                                       | —                                                                |
-| `verify-twd-render.ts`        | Walking-dead render-pipeline checks                                                                                                                                                            | `walking_dead.vpx`                                               |
-| `verify-twd-e2e.ts`           | TWD end-to-end wrapper (child TAP passthrough)                                                                                                                                                 | VPX file                                                         |
-| `verify-cadet.mjs`            | Space Cadet live checks: decoy stays hidden, DMD overlay hidden until first frame (FlexDMD content when bridged), lamps go live after coin+start, digit-flasher score images live (patch 0013) | `space_cadet.vpx` + Chrome + vite + rebuilt wasm, else SKIP/fail |
-| `verify-headless.mjs`         | Headless engine checks on a fixed schedule (catalog, movers, lamps, nudge wiring, DMD, script errors); ROM legs skip without `--rom`                                                           | engine artifact (`public/wasm/`), else SKIP                      |
-| `verify-pages.mjs`            | Static-host E2E: `VITE_COI_SW=1` bundle on a header-less server under `/vpx-js/` — service worker isolates, threaded engine boots                                                              | engine artifact (`public/wasm/`)                                 |
-| `compare-side-by-side.ts`     | MANUAL dual-window launcher (browser left, native right) — eyeball only, no asserts                                                                                                            | Chrome + vite + native                                           |
-| `bench.mjs`                   | Browser bench: load + FPS + profile (`--vpx/--rom/--duration/--warmup/--out/--headed/--gpu/--trace`)                                                                                           | Chrome + vite                                                    |
-| `bench-fps-gpu.mjs`           | GPU FPS bench                                                                                                                                                                                  | Chrome + vite + GPU                                              |
-| `bench-shared.ts`             | Shared VPX/ROM discovery (`findWalkingDead`, `VPX_CANDIDATES`) — no main                                                                                                                       | —                                                                |
-| `repro-artifact.ts`           | walking_dead artifact repro, asserts + exit 1 (imports `demo-browser/`)                                                                                                                        | `walking_dead.vpx`                                               |
-| `tap.ts`                      | TAP helpers (`tapHeader/tapOk/tapNotOk/tapSkip/tapPlan`, `Tap` class) — no main                                                                                                                | —                                                                |
-| `utils.mjs`                   | Puppeteer/vite helpers (`launchBrowser/newPage/ensureVite`) — no main                                                                                                                          | —                                                                |
-| `vpinball-resolver.ts`        | Arg parsing + VPX/ROM/native discovery — no main                                                                                                                                               | —                                                                |
-| `vpinball-resolver.spec.ts`   | Arg parsing specs (vitest)                                                                                                                                                                     | —                                                                |
-| `wasm-audio-controls.spec.ts` | Audio-control specs (vitest)                                                                                                                                                                   | —                                                                |
-| `wasm-pacing.spec.ts`         | Pacing specs (vitest)                                                                                                                                                                          | —                                                                |
+| File                            | What                                                                                                                                                                                           | Needs                                                       |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| `verify-all.ts`                 | Aggregator, TAP 1..6 (table, twd-render, headless, cadet, pages, browser), exit 0/1                                                                                                            | varies per step                                             |
+| `verify-table.ts`               | VPX parse over fixtures + `example-table.vpx`                                                                                                                                                  | —                                                           |
+| `verify-play-room.ts`           | Play-room scene checks (TAP `Tap` class)                                                                                                                                                       | —                                                           |
+| `verify-twd-render.ts`          | Walking-dead render-pipeline checks                                                                                                                                                            | `walking_dead.vpx`                                          |
+| `verify-twd-e2e.ts`             | TWD end-to-end wrapper (child TAP passthrough)                                                                                                                                                 | VPX file                                                    |
+| `verify-cadet.mjs`              | Space Cadet live checks: decoy stays hidden, DMD overlay hidden until first frame (FlexDMD content when bridged), lamps go live after coin+start, digit-flasher score images live (patch 0013) | `space_cadet.vpx` + Chrome + vite + rebuilt wasm, else SKIP |
+| `verify-headless.mjs`           | Headless engine checks on a fixed schedule (catalog, movers, lamps, nudge wiring, DMD, script errors); ROM legs skip without `--rom`                                                           | engine artifact (`public/wasm/`), else SKIP                 |
+| `verify-pages.mjs`              | Static-host E2E: `VITE_COI_SW=1` bundle on a header-less server under `/vpx-js/` — service worker isolates, threaded engine boots                                                              | engine artifact (`public/wasm/`)                            |
+| `compare-side-by-side.ts`       | MANUAL dual-window launcher (browser left, native right) — eyeball only, no asserts                                                                                                            | Chrome + vite + native                                      |
+| `bench.mjs`                     | Browser bench: load + FPS + profile (`--vpx/--rom/--duration/--warmup/--out/--headed/--gpu/--trace`)                                                                                           | Chrome + vite                                               |
+| `bench-fps-gpu.mjs`             | GPU FPS bench                                                                                                                                                                                  | Chrome + vite + GPU                                         |
+| `bench-shared.ts`               | Shared VPX/ROM discovery (`findWalkingDead`, `VPX_CANDIDATES`) — no main                                                                                                                       | —                                                           |
+| `repro-artifact.ts`             | walking_dead artifact repro, asserts + exit 1 (imports `demo-browser/`)                                                                                                                        | `walking_dead.vpx`                                          |
+| `tap.ts`                        | TAP helpers (`tapHeader/tapOk/tapNotOk/tapSkip/tapPlan`, `Tap` class) — no main                                                                                                                | —                                                           |
+| `utils.mjs`                     | Puppeteer/vite helpers (`launchBrowser/newPage/ensureVite`) — no main                                                                                                                          | —                                                           |
+| `vpinball-resolver.ts`          | Arg parsing + VPX/ROM/native discovery — no main                                                                                                                                               | —                                                           |
+| `vpinball-resolver.spec.ts`     | Arg parsing specs (vitest)                                                                                                                                                                     | —                                                           |
+| `vpinball-url-resolver.spec.ts` | URL/extract specs: fixtures, browser round-trip (vitest)                                                                                                                                       | —                                                           |
+| `vbs-comments.ts`               | VBScript comment stripper for game-name extraction — no main                                                                                                                                   | —                                                           |
+| `vbs-comments.spec.ts`          | Comment-stripper specs (vitest)                                                                                                                                                                | —                                                           |
+| `wasm-audio-controls.spec.ts`   | Audio-control specs (vitest)                                                                                                                                                                   | —                                                           |
+| `wasm-pacing.spec.ts`           | Pacing specs (vitest)                                                                                                                                                                          | —                                                           |
 
 ## Quickstart
 
@@ -96,6 +102,7 @@ node demo-browser/e2e/integration.mjs         # browser E2E (SKIP without artifa
   with this process even on SIGKILL.
   `CHROME_PATH` overrides chrome discovery.
 - `createSessionIni` makes `/tmp/vpinball-*/VPinballX.ini` via `mkdtemp` and
-  never deletes it — the CALLER must `rm -rf` the dir
-  (`compare-side-by-side.ts` does; one `rm` per call, it creates one
-  ini per `createSessionIni` AND one inside `resolveVpxSession`).
+  never deletes it — the CALLER must `rm -rf` the dir.
+  `compare-side-by-side.ts` drops the unused session ini right after
+  `resolveVpxSession` and removes the native-launch ini on process
+  exit/close.

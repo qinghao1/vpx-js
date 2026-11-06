@@ -39,9 +39,9 @@
 		"verify:twd-render": "tsx test/harness/verify-twd-render.ts",
 		"verify:all": "tsx test/harness/verify-all.ts",
 		"prepare": "husky",
-		"bench": "node test/harness/bench.mjs",
-		"bench:walking-dead": "node test/harness/bench.mjs --vpx=walking_dead.vpx --profile",
-		"bench:walking-dead:browser": "node test/harness/bench.mjs --vpx=walking_dead.vpx --duration=5000 --warmup=1500 --profile",
+		"bench": "tsx test/harness/bench.mjs",
+		"bench:walking-dead": "tsx test/harness/bench.mjs --vpx=walking_dead.vpx --profile",
+		"bench:walking-dead:browser": "tsx test/harness/bench.mjs --vpx=walking_dead.vpx --duration=5000 --warmup=1500 --profile",
 		"bench:walking-dead:vitest": "vitest bench test/bench/walking-dead.bench.ts --run",
 		"check": "npm run lint && npm run typecheck && npm run typecheck:tests && npm run test",
 		"check:fast": "npm run lint && npm run typecheck && npm run typecheck:tests"

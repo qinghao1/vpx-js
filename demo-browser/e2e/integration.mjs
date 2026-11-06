@@ -103,9 +103,9 @@ const requiresGameplay = targetUrl => {
 }
 const optionalLegsFor = targetUrl => (requiresGameplay(targetUrl) ? new Set(['backbox']) : OPTIONAL_EMPTY_FIXTURE_LEGS)
 // The headless-WASM engine is unconditional: the wasmEngine leg asserts on
-// every run, and the gameplay legs below drive it through window.vpx.
-const legOkFor = (targetUrl, leg, v) =>
-	v === true || (v === 'skip' && (leg === 'wasmEngine' || optionalLegsFor(targetUrl).has(leg)))
+// every run (it never reports 'skip'), and the gameplay legs below drive it
+// through window.vpx.
+const legOkFor = (targetUrl, leg, v) => v === true || (v === 'skip' && optionalLegsFor(targetUrl).has(leg))
 
 // E2E drives play entry explicitly through window.vpx: the timed
 // auto-switch to play would race ensurePlayMode, so force it off here

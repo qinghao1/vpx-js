@@ -36,6 +36,12 @@ const checks: E2ECheck[] = [
 		skipReason: 'VPX not available (child exit 77)',
 	},
 	{
+		name: 'headless',
+		script: 'test/harness/verify-headless.mjs',
+		optional: true,
+		skipReason: 'engine artifact not built (child exit 77)',
+	},
+	{
 		name: 'cadet',
 		script: 'test/harness/verify-cadet.mjs',
 		optional: true,

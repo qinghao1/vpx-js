@@ -16,23 +16,34 @@
  * Exit: 0 pass, 77 skip (artifact absent), 1 fail.
  */
 import { findWalkingDead, findWalkingDeadRom } from './bench-shared.ts'
-import { attachLogging, ensureVite, launchBrowser, loadPuppeteer, newPage } from './utils.mjs'
+import { attachLogging, ensureVite, launchBrowser, loadPuppeteer, newPage, resolveChromePath } from './utils.mjs'
 
 const ROM_ZIP = process.argv.find(a => a.startsWith('--rom='))?.slice(6) || ''
 
 const romPath = ROM_ZIP || findWalkingDeadRom() || ''
 const twdPath = findWalkingDead() ?? ''
 
+let puppeteer
+try {
+	puppeteer = await loadPuppeteer()
+} catch {
+	console.log('SKIP: puppeteer not installed')
+	process.exit(77)
+}
+if (!resolveChromePath() && !process.env.CHROME_PATH) {
+	console.log('SKIP: no Chrome (standard install path or CHROME_PATH)')
+	process.exit(77)
+}
+
 const vite = await ensureVite('https://localhost/', { label: 'verify-headless' })
 const BASE = new URL(vite.url).origin
-const puppeteer = await loadPuppeteer()
 let browser
 try {
 	browser = await launchBrowser(puppeteer, {})
 } catch (error) {
-	console.log(`FATAL: browser launch failed: ${String(error?.message ?? error).slice(0, 200)}`)
+	console.log(`SKIP: browser launch failed (${String(error?.message ?? error).slice(0, 200)})`)
 	await vite.close().catch(() => {})
-	process.exit(1)
+	process.exit(77)
 }
 
 const summary = await (async () => {
@@ -43,6 +54,9 @@ const summary = await (async () => {
 		async ({ repoRoot, romName, twdUrl }) => {
 			const out = { checks: [], fatal: null }
 			const check = (ok, name, detail) => out.checks.push({ ok: !!ok, name, detail: detail ?? '' })
+			// In-fixture skips are not passes: report them separately so the
+			// N/N summary counts only legs that actually ran.
+			const skip = (name, detail) => out.checks.push({ ok: true, skip: true, name, detail: detail ?? '' })
 			try {
 				const probe = await fetch('/wasm/vpinball-headless.js', { method: 'HEAD' })
 				if (!probe.ok) {
@@ -83,9 +97,12 @@ const summary = await (async () => {
 				}
 				const before = angleAt()
 				check(before !== undefined, 'flipper mover row visible before input', `angle=${before}`)
-				engine.pushKey(229, true)
+				// Any SDL scancode exercises the script key path; RSHIFT is unbound
+				// on the fixture so only KeyDown/KeyUp routing (not solenoids) runs.
+				const ANY_KEY_SCANCODE = 229
+				engine.pushKey(ANY_KEY_SCANCODE, true)
 				for (let f = 10; f < 110; f++) engine.stepFrame(f * 16.7)
-				engine.pushKey(229, false)
+				engine.pushKey(ANY_KEY_SCANCODE, false)
 				const after = angleAt()
 				// Keys fire script KeyDown/KeyUp events; a scriptless fixture has no
 				// solenoid handler, so rest angles must be unchanged (desktop VPX agrees:
@@ -162,11 +179,7 @@ const summary = await (async () => {
 						} else {
 							// TWD's script needs VPinMAME.Controller; until then the
 							// leg asserts the failure is observable, not silent.
-							check(
-								true,
-								'dmd leg skipped (table script needs VPinMAME.Controller)',
-								`errors=${scriptErrors}`,
-							)
+							skip('dmd leg skipped (table script needs VPinMAME.Controller)', `errors=${scriptErrors}`)
 							check(
 								typeof scriptError === 'string' && scriptError.length > 0,
 								'script failure is observable',
@@ -175,10 +188,10 @@ const summary = await (async () => {
 						}
 						await engine.destroyTable()
 					} else {
-						check(true, 'dmd leg skipped (no walking-dead fixture)', 'optional')
+						skip('dmd leg skipped (no walking-dead fixture)', 'optional')
 					}
 				} else {
-					check(true, 'dmd leg skipped (no --rom)', 'optional')
+					skip('dmd leg skipped (no --rom)', 'optional')
 				}
 			} catch (error) {
 				out.fatal = String(error?.stack || error)
@@ -205,9 +218,16 @@ if (summary.fatal) {
 	process.exit(1)
 }
 let pass = 0
+let skipped = 0
 for (const c of summary.checks) {
-	if (c.ok) pass++
-	console.log(`${c.ok ? '✓' : '✗'} ${c.name}${c.detail ? ` — ${c.detail}` : ''}`)
+	if (c.skip) {
+		skipped++
+		console.log(`- ${c.name} (skipped${c.detail ? ` — ${c.detail}` : ''})`)
+	} else {
+		if (c.ok) pass++
+		console.log(`${c.ok ? '✓' : '✗'} ${c.name}${c.detail ? ` — ${c.detail}` : ''}`)
+	}
 }
-console.log(`\n${pass}/${summary.checks.length} headless checks passed`)
-process.exit(pass === summary.checks.length ? 0 : 1)
+const ran = summary.checks.length - skipped
+console.log(`\n${pass}/${ran} headless checks passed${skipped ? `, ${skipped} skipped` : ''}`)
+process.exit(pass === ran ? 0 : 1)

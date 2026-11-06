@@ -63,7 +63,7 @@ export interface VpxDmdFrame {
 	frameId: number
 }
 
-/** Typed end-to-end test surface over the live viewer. Exposed as dev-only `window.vpx`. */
+/** Typed end-to-end test surface over the live viewer. Exposed as localhost-gated `window.vpx`. */
 export interface ViewerTestApi {
 	/** Snapshot of load, mode, and engine state. */
 	readonly state: VpxState
@@ -90,7 +90,7 @@ const normalizePull = (pos: number, start: number, end: number): number => {
 	return Math.min(1, Math.max(0, (pos - start) / (end - start)))
 }
 
-/** Build the dev-only test surface over a live viewer. No stored mutable state. */
+/** Build the localhost-gated test surface over a live viewer. No stored mutable state. */
 export function createTestApi(viewer: Viewer): ViewerTestApi {
 	return {
 		get state(): VpxState {

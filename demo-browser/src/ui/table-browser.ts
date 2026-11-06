@@ -160,13 +160,17 @@ export function initTableBrowser(viewer: BrowserViewer, syncParam: (key: Kind, v
 		const button = el('button', { type: 'button', textContent: `Load from ${hostOf(url)}` })
 		button.addEventListener('click', async () => {
 			setStatus(`Checking ${hostOf(url)}…`)
+			// Open synchronously: the awaited probe below consumes the click's
+			// transient activation, so window.open after it is likely blocked.
+			// Not `noopener`: that makes window.open return null, hiding a blocked popup.
+			const popup = window.open('about:blank', '_blank')
+			if (popup) popup.opener = null
 			if (!(await isFetchable(url))) {
-				// Not `noopener`: that makes window.open return null, hiding a blocked popup.
-				const popup = window.open(url, '_blank')
-				if (popup) popup.opener = null
+				if (popup) popup.location.href = url
 				handOff(kind, file, url, popup !== null)
 				return
 			}
+			popup?.close()
 			syncParam(kind, url)
 			if (kind === 'rom') {
 				setStatus(`Downloading ${file.version}.zip…`)
@@ -260,7 +264,7 @@ export function initTableBrowser(viewer: BrowserViewer, syncParam: (key: Kind, v
 	dialog.addEventListener('keydown', e => e.stopPropagation())
 	close.addEventListener('click', () => dialog.close())
 	document.getElementById('browse-btn')?.addEventListener('click', () => {
-		dialog.showModal()
+		if (!dialog.open) dialog.showModal()
 		search.focus()
 		void ensureCatalog()
 	})

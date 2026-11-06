@@ -94,6 +94,14 @@ async function main() {
 		console.error(`[compare] resolve failed: ${(error as Error).message}`)
 		process.exit(1)
 	}
+	// The session ini is only used for native launches, which mint their own
+	// below; drop it now so each run doesn't strand a /tmp/vpinball-*/ dir.
+	{
+		const dir = path.dirname(session.iniPath)
+		try {
+			if (dir.includes('vpinball-') && fs.existsSync(dir)) fs.rmSync(dir, { recursive: true, force: true })
+		} catch {}
+	}
 	console.log(`[compare] table: ${session.vpxPath}`)
 	if (session.gameName) console.log(`[compare] game:  ${session.gameName}`)
 	if (session.romPath) console.log(`[compare] rom:   ${session.romPath}`)

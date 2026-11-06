@@ -438,6 +438,20 @@ describe('suspendable receiver', () => {
 			;(WebAssembly as Record<string, unknown>).promising = prior
 		}
 	})
+	it('also falls back on a cross-realm TypeError, which fails instanceof', async () => {
+		const { runInNewContext } = await import('node:vm')
+		const prior = (WebAssembly as Record<string, unknown>).promising
+		;(WebAssembly as Record<string, unknown>).promising = () => {
+			throw runInNewContext('new TypeError("not a wasm export")')
+		}
+		try {
+			const fake = fakeRaw()
+			fake.raw._VpxWasm_LoadTable = () => 0
+			await expect(wrapHeadlessEngine(fake.raw, 'test').loadTable(new Uint8Array([1]))).resolves.toBeUndefined()
+		} finally {
+			;(WebAssembly as Record<string, unknown>).promising = prior
+		}
+	})
 	it('rethrows real failures from WebAssembly.promising instead of hiding them', () => {
 		const prior = (WebAssembly as Record<string, unknown>).promising
 		;(WebAssembly as Record<string, unknown>).promising = () => {
@@ -547,6 +561,18 @@ describe('loadHeadlessEngine', () => {
 			await expect(loadHeadlessEngine('data:text/javascript,export default 42?factory=1')).rejects.toMatchObject({
 				op: 'load',
 			})
+		} finally {
+			globalThis.fetch = priorFetch
+		}
+	})
+	it('sorts a factory failure as a load error, never a raw throw', async () => {
+		const priorFetch = globalThis.fetch
+		globalThis.fetch = (async () => ({ status: 200 })) as unknown as typeof fetch
+		try {
+			const url = `data:text/javascript,${encodeURIComponent('export default async () => { throw new Error("wasm fetch failed") }')}?factory-boom=1`
+			const error = await loadHeadlessEngine(url).catch(e => e)
+			expect(error).toBeInstanceOf(HeadlessEngineError)
+			expect(error).toMatchObject({ op: 'load' })
 		} finally {
 			globalThis.fetch = priorFetch
 		}

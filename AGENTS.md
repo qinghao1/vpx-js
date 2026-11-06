@@ -11,7 +11,7 @@ npm run build:wasm:headless # emscripten headless build (needs emsdk; artifact �
 npx tsc --noEmit           # typecheck
 npm run lint               # biome + copyright-header check (build/check-headers.mjs)
 npm test                   # vitest
-npx tsx test/harness/verify-all.ts   # E2E TAP 1..5: table → twd-render → cadet → pages → browser
+npx tsx test/harness/verify-all.ts   # E2E TAP 1..6: table → twd-render → headless → cadet → pages → browser
 ```
 
 Node via `fnm` — `.nvmrc` `24`, `.node-version` `24.19.0`. Activate with `eval "$(fnm env --use-on-cd --shell bash)"`.
@@ -36,7 +36,7 @@ Node via `fnm` — `.nvmrc` `24`, `.node-version` `24.19.0`. Activate with `eval
 ## Testing
 
 - `vitest` on `lib/**/*.spec.ts` + `test/harness/*.spec.ts` + `demo-browser/src/**/*.spec.ts` (`pool:forks`, 10s timeout).
-- `test/harness/` is the single E2E entry: `verify-all.ts` (TAP 1..5: table → twd-render → cadet → pages → browser). Optional steps SKIP honestly when their inputs (VPX/ROM/engine artifact) are absent. Keep it unified.
+- `test/harness/` is the single E2E entry: `verify-all.ts` (TAP 1..6: table → twd-render → headless → cadet → pages → browser). Optional steps SKIP honestly when their inputs (VPX/ROM/engine artifact) are absent. Keep it unified.
 
 ## Gotchas
 

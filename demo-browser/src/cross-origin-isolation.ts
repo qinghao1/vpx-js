@@ -24,7 +24,11 @@ export async function crossOriginIsolate(): Promise<boolean> {
 		await navigator.serviceWorker.ready
 		sessionStorage.setItem(RELOADED, '1')
 		location.reload()
-		return new Promise<boolean>(() => {})
+		// A sandboxed frame can swallow the reload without throwing: don't
+		// hang the top-level await on a navigation that never comes. Past
+		// this point the page is either unloading or stuck; report stuck.
+		await new Promise(resolve => setTimeout(resolve, 3000))
+		return false
 	} catch (error) {
 		console.warn('[coi] cross-origin isolation unavailable', error)
 		return false

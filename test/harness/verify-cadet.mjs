@@ -17,13 +17,13 @@
  *     rebuild with `npm run build:wasm:headless`).
  *
  * Run: node test/harness/verify-cadet.mjs [--vpx=/path/to/space_cadet.vpx]
- * Exit: 0 pass, 1 failure, 77 skipped (VPX not provisioned).
+ * Exit: 0 pass, 1 failure, 77 skipped (VPX/chrome/engine unprovisioned).
  */
 import { existsSync, readdirSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { ensureVite, launchBrowser, loadPuppeteer, newPage, sleep } from './utils.mjs'
+import { ensureVite, launchBrowser, loadPuppeteer, newPage, resolveChromePath, sleep } from './utils.mjs'
 
 function resolveVpx() {
 	const cli = process.argv.find(a => a.startsWith('--vpx='))
@@ -50,6 +50,17 @@ if (!existsSync(join(repoRoot, 'demo-browser/public/wasm/vpinball-headless.wasm'
 	console.log('SKIP: no engine artifact (npm run build:wasm:headless)')
 	process.exit(77)
 }
+let puppeteer
+try {
+	puppeteer = await loadPuppeteer()
+} catch {
+	console.log('SKIP: puppeteer not installed')
+	process.exit(77)
+}
+if (!resolveChromePath() && !process.env.CHROME_PATH) {
+	console.log('SKIP: no Chrome (standard install path or CHROME_PATH)')
+	process.exit(77)
+}
 
 const checks = []
 const check = (ok, name, detail = '') => {
@@ -63,8 +74,13 @@ let fatal = false
 try {
 	vite = await ensureVite('https://localhost/', { label: 'verify-cadet' })
 	const BASE = new URL(vite.url).origin
-	const puppeteer = await loadPuppeteer()
-	browser = await launchBrowser(puppeteer, {})
+	try {
+		browser = await launchBrowser(puppeteer, {})
+	} catch (error) {
+		console.log(`SKIP: browser launch failed (${String(error?.message ?? error).slice(0, 200)})`)
+		await vite.close().catch(() => {})
+		process.exit(77)
+	}
 	const page = await newPage(browser)
 	await page.goto(`${BASE}/?vpx=/@fs${vpxPath}&mode=play`, { waitUntil: 'load', timeout: 90000 })
 	await page.waitForFunction('window.viewer && window.viewer.wasmEngine && window.viewer.wasmEngine.ready', {

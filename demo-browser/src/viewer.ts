@@ -63,7 +63,7 @@ import { pollNudgePads } from './input/nudge-controller.js'
 import { attachInput } from './input.js'
 import type { DirtyOverlay } from './overlays/dirty-overlay.js'
 import { createLog } from './ui/log-viewer.js'
-import { fpsClass, renderModeHint, renderStats } from './ui/stats-overlay.js'
+import { fpsClass, renderStats } from './ui/stats-overlay.js'
 import {
 	$,
 	computeTexMem,
@@ -162,7 +162,6 @@ export class Viewer {
 			streamLabel: dom.streamLabel || document.getElementById('stream-label'),
 			nudgeFlash: dom.nudgeFlash || document.getElementById('nudge-flash'),
 			fpsHud: dom.fpsHud || document.getElementById('fps-hud'),
-			modeHint: dom.modeHint || document.getElementById('mode-hint'),
 		}
 		this.log = createLog(this.dom.logEl)
 		this.scene = new THREE.Scene()
@@ -190,8 +189,8 @@ export class Viewer {
 		this._lightmapMap = new Map()
 		this.isPaused = false
 		this._playCameraApplied = false
-		this._cameraTimeout = null
 		this._cameraRaf = null
+		this._cameraTweenResolve = null
 		this.animFrame = null
 		this._animRaf = null
 		this._animTimeout = null
@@ -199,9 +198,7 @@ export class Viewer {
 		this._streamId = 0
 		this._loadId = 0
 		this._cameraGen = 0
-		this._cameraTimeoutResolver = null
 		this._loadAbort = null
-		this._touchMap = new Map()
 		this.rom = null
 		this._romReady = null
 		this._booting = null
@@ -526,6 +523,9 @@ export class Viewer {
 	_setupModeSwitch() {
 		const onOrbitToggle = e => {
 			if ((e.key === 'o' || e.key === 'O') && this.viewerMode === 'play') {
+				// Typing into a focused field must not toggle orbit.
+				const tag = (document.activeElement?.tagName || '').toLowerCase()
+				if (tag === 'input' || tag === 'textarea' || tag === 'select') return
 				this.controls.enabled = !this.controls.enabled
 				this.log(`Orbit ${this.controls.enabled ? 'enabled' : 'disabled'}`)
 			}
@@ -669,10 +669,8 @@ export class Viewer {
 		this._leavePlay()
 	}
 	_syncChrome() {
-		const hint = this.dom.modeHint
 		const isPlay = this.viewerMode === 'play'
 		document.body.classList.toggle('is-play', isPlay)
-		renderModeHint(hint, isPlay)
 	}
 	setupPlayCamera() {
 		if (!this.tableGroup || !this.controls) return
@@ -716,6 +714,9 @@ export class Viewer {
 		this.gate.beginAnimation()
 		const start = performance.now()
 		return new Promise(resolve => {
+			// cancelCameraAnimation settles this on supersede; without it a
+			// rapid mode toggle strands the awaiting switch path forever.
+			this._cameraTweenResolve = resolve
 			const tick = () => {
 				// Camera ticks run outside the gated loop: invalidate every tick,
 				// including the final pose that lands after _cameraRaf clears.
@@ -724,6 +725,7 @@ export class Viewer {
 					this.gate.endAnimation()
 					this.controls.enableDamping = prevDamping
 					this.controls.enabled = this.viewerMode !== 'play'
+					this._cameraTweenResolve = null
 					resolve()
 					return
 				}
@@ -749,6 +751,7 @@ export class Viewer {
 					this.controls.enableDamping = prevDamping
 					this.controls.enabled = this.viewerMode !== 'play'
 					this.gate.endAnimation()
+					this._cameraTweenResolve = null
 					resolve()
 				}
 			}
@@ -778,10 +781,8 @@ export class Viewer {
 		this.invalidate()
 		this.isPaused = false
 		if (this.wasmEngine?.ready) {
-			for (const code of this._touchMap.values()) this._sendKey(code, false)
-			this._touchMap.clear()
 			for (const code of RELEASE_CODES) this._sendKey(code, false)
-		} else this._touchMap.clear()
+		}
 		if (this.controls) this.controls.enabled = true
 		if (this.tableGroup) showCabFlippers(this.tableGroup)
 		const ballsNode = this.tableGroup?.getObjectByName('balls')
@@ -1815,6 +1816,12 @@ export class Viewer {
 		}
 		return true
 	}
+	/** VPX files are OLE compounds; a cache entry without the magic is stale data, not a table. */
+	_hasOleMagic(buf) {
+		if (!buf || buf.byteLength < 8) return false
+		const v = new DataView(buf.buffer ?? buf, buf.byteOffset ?? 0, 8)
+		return v.getUint32(0) === 0xd0cf11e0 && v.getUint32(4) === 0xa1b11ae1
+	}
 	/** Load a table by name, path or URL (`?vpx=` semantics, see resolveVpxCandidates). */
 	async load(vpx) {
 		const begun = await this._beginLoad()
@@ -1838,7 +1845,7 @@ export class Viewer {
 			if (this._isCacheableUrl(cand)) {
 				try {
 					const hit = await idbGet(cand)
-					if (hit?.byteLength > 1_000_000) cached = hit
+					if (hit?.byteLength > 1_000_000 && this._hasOleMagic(hit)) cached = hit
 				} catch {}
 			}
 			try {
@@ -2022,7 +2029,7 @@ export class Viewer {
 				rollFpsWindow(timestamp, false)
 				return
 			}
-			if (stateDirty) this.renderApi?.flushMatrixUpdates?.(this.tableGroup)
+			if (stateDirty) this.renderApi?.flushMatrixUpdates(this.tableGroup)
 			if (this.renderPipeline) this.renderPipeline.render()
 			else this.renderer.render(this.scene, this.camera)
 			frames++
@@ -2082,7 +2089,7 @@ export class Viewer {
 		if (!this.wasmEngine?.ready) return false
 		if (this.isPaused || this.viewerMode !== 'play') return false
 		if (!this._syncWasmTransforms(nowMs)) return true
-		this.renderApi?.flushMatrixUpdates?.(this.tableGroup)
+		this.renderApi?.flushMatrixUpdates(this.tableGroup)
 		if (this.renderPipeline) this.renderPipeline.render()
 		else this.renderer.render(this.scene, this.camera)
 		return true
@@ -2103,19 +2110,17 @@ export class Viewer {
 			cancelAnimationFrame(this._cameraRaf)
 			this._cameraRaf = null
 		}
-		if (this._cameraTimeout) {
-			clearTimeout(this._cameraTimeout)
-			this._cameraTimeout = null
-		}
-		if (this._cameraTimeoutResolver) {
-			const resolver = this._cameraTimeoutResolver
-			this._cameraTimeoutResolver = null
-			resolver()
+		// The cancelled tick never runs, so settle its promise here; the
+		// awaiting mode switch then observes the generation bump and returns.
+		if (this._cameraTweenResolve) {
+			const resolve = this._cameraTweenResolve
+			this._cameraTweenResolve = null
+			resolve()
 		}
 	}
 
 	render() {
-		this.renderApi?.flushMatrixUpdates?.(this.tableGroup)
+		this.renderApi?.flushMatrixUpdates(this.tableGroup)
 		if (this.renderPipeline) this.renderPipeline.render()
 		else this.renderer?.render(this.scene, this.camera)
 		this._needsRender = false

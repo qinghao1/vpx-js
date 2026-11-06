@@ -319,8 +319,8 @@ export class Light extends Item<LightData> {
 				bulbGlow: {
 					color: this.data.color,
 					color2: this.data.color2,
-					centerX: this.data.center ? this.data.center.x : 0,
-					centerY: this.data.center ? this.data.center.y : 0,
+					centerX: this.data.center.x,
+					centerY: this.data.center.y,
 					falloff: this.data.falloff,
 					falloffPower: this.data.falloffPower,
 					intensity: bakedIntensity(this.data),

@@ -224,6 +224,7 @@ export class Surface extends Item<SurfaceData> {
 				material: table.getMaterial(this.data.szTopMaterial),
 				isTransparent: Surface.isTransparentMat(table.getMaterial(this.data.szTopMaterial)),
 				disableLighting: this.data.disableLightingTop,
+				// Seeded at creation: script writes need a bridge column (only prims sync one today).
 				disableLightingBelow: this.data.disableLightingBelow,
 			}
 		}

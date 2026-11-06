@@ -60,7 +60,7 @@ export function initHelp(viewer) {
 				if (!isDialog) close()
 				return
 			}
-			if (e.key === '?' || (e.key === 'h' && !e.ctrlKey && !e.metaKey && !e.repeat)) {
+			if (e.key === '?' || (e.code === 'KeyH' && !e.ctrlKey && !e.metaKey && !e.repeat)) {
 				const t = e.target
 				if (
 					t instanceof HTMLElement &&

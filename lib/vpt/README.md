@@ -95,7 +95,7 @@ Materials live on `TableData.materials` (parsed from the `MATE`/`PHMA`
 tags). `Table.getMaterial()` tries an exact match, then a case-insensitive
 fallback. Textures are keyed lowercase by name;
 `Table.getTexture()` looks them up while image
-bytes stream lazily via `table.streamStorage` (`texture.ts:80-82`). Items
+bytes stream lazily via `table.streamStorage` (`table/table.ts:184`). Items
 resolve both when building meshes in `getMeshes()`. (`mesh-loader.ts` is
 unrelated: it only serves built-in static JSON meshes.)
 
@@ -126,7 +126,7 @@ opts out with `staticRendering = false` or `animationFrames`
 
 `rampType` is an int (`Enums.RampType`: flat = 0, 4-wire = 1, 2-wire = 2,
 3-wire-left = 3, 3-wire-right = 4, 1-wire = 5). A _habitrail_ is any
-non-flat wire type (`isHabitrail()`, `ramp/ramp-view.ts:413`): an elevated
+non-flat wire type (`isHabitrail()`, `ramp/ramp-view.ts:422`): an elevated
 wire track, meshed as tubes sized by `wireDiameter`/`wireDistanceX`/
 `wireDistanceY` instead of a solid surface. Ramps have separate visible wall
 heights (`leftWallHeightVisible`/`rightWallHeightVisible`).
@@ -155,17 +155,17 @@ lives in the headless-WASM engine.
 
 Parsed and scriptable; rendering is partial:
 
-| Feature                   | Status                                                                |
-| ------------------------- | --------------------------------------------------------------------- |
-| `Filter` / `FilterAmount` | Parsed, not rendered (no custom shader; `flasher/flasher-data.ts:60`) |
-| `szImageB`                | Parsed, only ImageA is drawn (`flasher/flasher-data.ts:50`)           |
-| Absorb blend mode         | Premultiplied-over (`AB_ABSORB`)                                      |
-| `isDMD`                   | Parsed; skips the polygon mesh (`flasher/flasher-data.ts:55`)         |
-| Runtime rotation/height   | Supported; updater rebakes the mesh (`flasher/flasher-updater.ts:64`) |
+| Feature                   | Status                                                                 |
+| ------------------------- | ---------------------------------------------------------------------- |
+| `Filter` / `FilterAmount` | Parsed, not rendered (no custom shader; `flasher/flasher-data.ts:98`)  |
+| `szImageB`                | Parsed, only ImageA is drawn (`flasher/flasher-data.ts:68`)            |
+| Absorb blend mode         | Premultiplied-over (`AB_ABSORB`)                                       |
+| `isDMD`                   | Parsed; skips the polygon mesh (`flasher/flasher-data.ts:93`)          |
+| Runtime rotation/height   | Supported; updater rebakes the mesh (`flasher/flasher-updater.ts:218`) |
 
 ### Lights: glow vs surface vs bulb, fader modes
 
-Which mesh a light builds depends on its flags (`light/light.ts:136-161`):
+Which mesh a light builds depends on its flags (`light/light.ts:294`):
 a bulb mesh (`showBulbMesh` + `meshRadius`), a bulb glow polygon (`bulbLight`
 - 3 or more drag points), a playfield-surface insert (neither, + drag
   points), or a backglass light (`isBackglass`). `fader` (default Linear = 1,

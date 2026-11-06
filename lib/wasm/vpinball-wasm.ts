@@ -285,7 +285,9 @@ const suspendable = <A extends unknown[], R>(fn: (...args: A) => R, recv?: unkno
 		} catch (error) {
 			// `promising` rejects a non-wasm fake with a TypeError; anything
 			// else is a real failure, so only fakes fall back to a sync call.
-			if (!(error instanceof TypeError)) throw error
+			// Match by name too: a cross-realm TypeError fails instanceof.
+			const isTypeError = error instanceof TypeError || (error as { name?: unknown })?.name === 'TypeError'
+			if (!isTypeError) throw error
 		}
 	}
 	return (...args) => Promise.resolve(fn.apply(recv, args))
@@ -601,11 +603,27 @@ async function instantiateHeadlessEngine(url: string): Promise<HeadlessEngine> {
 	}
 	if (typeof factory !== 'function') throw new HeadlessEngineError('load', `${url} did not export an engine factory`)
 	const locateFile = wasmLocateFile(url)
-	const raw = (await (factory as (module?: { locateFile?: (path: string) => string }) => Promise<RawHeadlessModule>)({
-		locateFile,
-	})) as RawHeadlessModule
+	// The factory invocation fetches the .wasm/.data and compiles; sort its
+	// failures against the artifact it loads, not the glue, so a missing
+	// deploy or an init abort surfaces as HeadlessEngineError, never raw.
+	let wasmUrl = url
+	try {
+		wasmUrl = locateFile('vpinball-headless.wasm')
+	} catch {}
+	let raw: RawHeadlessModule
+	try {
+		raw = (await (factory as (module?: { locateFile?: (path: string) => string }) => Promise<RawHeadlessModule>)({
+			locateFile,
+		})) as RawHeadlessModule
+	} catch (error) {
+		throw await asEngineLoadError(wasmUrl, error)
+	}
 	const engine = wrapHeadlessEngine(raw, url)
-	raw._VpxWasm_Init()
+	try {
+		raw._VpxWasm_Init()
+	} catch (error) {
+		throw await asEngineLoadError(wasmUrl, error)
+	}
 	return engine
 }
 
