@@ -1,3 +1,4 @@
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 import path from 'node:path'
 
 export const DEFAULT_URL = 'https://localhost:3000/?vpx=/test/fixtures/table-empty.vpx&mode=viewer'
@@ -346,15 +347,6 @@ export const wasmEngineChecks = async page => {
 	})
 }
 
-// Plunger leg: hold Enter ~800ms (the viewer's plunger key), release, and
-// assert the script actually pulled the plunger or launched the ball.
-// Tables can carry several plungers (e.g. Walking Dead parses the ROM-fired
-// auto `Plunger1` first and the script-driven manual `Plunger` second), so
-// measure every plunger and judge the manual (non-auto) ones when the table
-// has any — an auto plungers[0] never moves on Enter. Falls back to all
-// plungers on auto-only tables. Skips honestly when there is no live
-// script/physics to drive it (mock emu) or when the table has no plunger
-// (e.g. table-empty).
 // Plunger leg: hold Enter (the viewer's plunger key), release, and assert
 // the engine pulled a plunger or launched a ball. Travel is judged on the
 // normalized engine pull (0..1) across every catalog plunger — the old
@@ -520,45 +512,6 @@ export const nudgeChecks = async page => {
 		}
 	}, play)
 }
-
-export const dmdChecks = page =>
-	page.evaluate(() => {
-		const v = window.viewer,
-			emu = v.player.getPhysics().emu
-		const frame = (() => {
-			try {
-				return v.player.getDmdFrame?.()
-			} catch {
-				return null
-			}
-		})()
-		const dims = (() => {
-			try {
-				return v.player.getDmdDimensions?.()
-			} catch {
-				return null
-			}
-		})()
-		let max = 0,
-			sum = 0
-		if (frame?.length)
-			for (const x of frame) {
-				if (x > max) max = x
-				sum += x
-			}
-		const meshes = (v.dmdMeshes || []).map(m => ({ name: m.name, hasMap: !!m.material?.map }))
-		return {
-			emu: emu?.constructor.name || 'none',
-			init: emu?.isInitialized?.() ?? null,
-			mock: emu?.isMock ?? null,
-			w: dims?.x || 0,
-			h: dims?.y || 0,
-			len: frame?.length || 0,
-			max,
-			sum,
-			meshes,
-		}
-	})
 
 export const ensurePlayMode = async page => {
 	return page.evaluate(async () => {
@@ -1179,87 +1132,48 @@ export const backboxChecks = async (page, { timeoutMs = 90000, pollMs = 1000 } =
 	}
 }
 
-// Live-DMD probe: two frame samples ~intervalMs apart. A real emu must
-// produce a dimensioned, non-black frame; dimensions-or-mesh-presence alone
-// is not liveness (black/frozen frames must fail, not pass).
+// Two reads of the engine's published DMD frame (window.vpx.dmd()). Skips only
+// when the engine is down or the table publishes no DMD (no ROM, no FlexDMD).
 export const dmdLiveChecks = async (page, { intervalMs = 600 } = {}) => {
 	const sample = () =>
 		page.evaluate(() => {
-			const v = window.viewer
-			const emu = v?.player?.getPhysics?.()?.emu
-			let frame = null,
-				dims = null
-			try {
-				frame = v?.player?.getDmdFrame?.() ?? null
-			} catch {}
-			try {
-				dims = v?.player?.getDmdDimensions?.() ?? null
-			} catch {}
-			let max = 0,
-				sum = 0,
-				hash = 2166136261
-			if (frame?.length) {
-				const stride = Math.max(1, Math.floor(frame.length / 512))
-				for (let i = 0; i < frame.length; i++) {
-					const x = frame[i]
-					if (x > max) max = x
-					sum += x
-					if (i % stride === 0) {
-						hash ^= x & 0xff
-						hash = Math.imul(hash, 16777619)
-					}
-				}
-			}
-			return {
-				emu: emu?.constructor?.name || 'none',
-				mock: emu ? !!emu.isMock : true,
-				w: Math.round(dims?.x ?? 0) || 0,
-				h: Math.round(dims?.y ?? 0) || 0,
-				len: frame?.length || 0,
-				max,
-				sum,
-				hash,
-			}
+			const api = window.vpx
+			if (!api?.state.wasmReady) return null
+			const dmd = api.dmd()
+			if (!dmd) return { published: false }
+			let max = 0
+			for (const x of dmd.frame) if (x > max) max = x
+			return { published: true, w: dmd.width, h: dmd.height, len: dmd.frame.length, max, frameId: dmd.frameId }
 		})
 	const a = await sample()
 	await new Promise(r => setTimeout(r, intervalMs))
 	const b = await sample()
-	if (b.emu === 'none' || b.mock)
-		return {
-			...b,
-			changed: false,
-			pass: 'skip',
-			reason: b.emu === 'none' ? 'no emu' : 'mock emu has no DMD output',
-		}
-	const dimsOk = b.w > 0 && b.h > 0 && b.len === b.w * b.h
-	const changed = a.hash !== b.hash || a.sum !== b.sum
+	if (!b) return { pass: 'skip', reason: 'engine not ready' }
+	if (!b.published) return { ...b, pass: 'skip', reason: 'engine publishes no DMD (no ROM / FlexDMD)' }
+	const dimsOk = b.w > 0 && b.h > 0 && b.len >= b.w * b.h
+	const changed = a?.frameId !== b.frameId
 	const pass = dimsOk && b.max > 0
 	return {
 		...b,
-		prev: { max: a.max, sum: a.sum, hash: a.hash },
 		changed,
 		pass,
 		reason: pass
 			? `live DMD frame ${b.w}x${b.h} max=${b.max} changed=${changed}`
 			: !dimsOk
 				? `bad DMD dims w=${b.w} h=${b.h} len=${b.len}`
-				: 'DMD frame black (max=0): emu produced no lit pixels',
+				: 'DMD frame black (max=0): engine published no lit pixels',
 	}
 }
-
-// GPU-aware DMD-visible probe: the uploaded DMD texture mirror must hold lit
-// pixels and be bound to on-table DMD meshes. Honest SKIP when the ROM is
-// missing (mock emu) or when software GL cannot confirm GPU-visible pixels.
 export const dmdVisibleChecks = async page => {
 	const info = await page.evaluate(() => {
 		const v = window.viewer
-		const emu = v?.player?.getPhysics?.()?.emu
+		const published = !!window.vpx?.dmd()
 		const meshes = (v?.dmdMeshes || []).map(m => ({
 			name: m.name,
 			visible: !!m.visible,
 			hasMat: !!m.material,
 		}))
-		const tex = v?.dmdTexture || v?.dmd?.texture || v?.dmd?.dataTexture || null
+		const tex = v?.dmdTexture ?? null
 		let tMax = 0,
 			lit = 0,
 			tLen = 0,
@@ -1279,7 +1193,7 @@ export const dmdVisibleChecks = async page => {
 				}
 			}
 		} catch (e) {
-			return { emu: emu?.constructor?.name || 'none', mock: emu ? !!emu.isMock : true, texErr: e.message }
+			return { published, texErr: e.message }
 		}
 		let gl = 'unknown'
 		try {
@@ -1296,8 +1210,7 @@ export const dmdVisibleChecks = async page => {
 			} catch {}
 		} catch {}
 		return {
-			emu: emu?.constructor?.name || 'none',
-			mock: emu ? !!emu.isMock : true,
+			published,
 			meshes,
 			texW: tW,
 			texH: tH,
@@ -1308,13 +1221,8 @@ export const dmdVisibleChecks = async page => {
 		}
 	})
 	const software = isSoftwareGL(info.gl)
-	if (info.emu === 'none' || info.mock)
-		return {
-			...info,
-			software,
-			pass: 'skip',
-			reason: info.emu === 'none' ? 'no emu' : 'mock emu (no ROM): no DMD output expected',
-		}
+	if (!info.published)
+		return { ...info, software, pass: 'skip', reason: 'engine publishes no DMD (no ROM / FlexDMD)' }
 	if (info.texErr) {
 		if (software)
 			return { ...info, software, pass: 'skip', reason: `software GL (${info.gl}): DMD texture unreadable` }
