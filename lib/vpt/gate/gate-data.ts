@@ -8,7 +8,7 @@ import { type BiffFieldMap, handleBiffTag } from '../biff-helper.js'
 import { Enums } from '../enums.js'
 import { ItemData } from '../item-data.js'
 
-const FLOAT_MAP: BiffFieldMap<GateData> = {
+const FLOAT_MAP: BiffFieldMap<GateData, number> = {
 	LGTH: 'length',
 	HGTH: 'height',
 	ROTA: 'rotation',
@@ -19,14 +19,14 @@ const FLOAT_MAP: BiffFieldMap<GateData> = {
 	AFRC: 'damping',
 	GGFC: 'gravityFactor',
 }
-const BOOL_MAP: BiffFieldMap<GateData> = {
+const BOOL_MAP: BiffFieldMap<GateData, boolean> = {
 	GSUP: 'showBracket',
 	GCOL: 'isCollidable',
 	TWWA: 'twoWay',
 	GVSB: 'isVisible',
 	REEN: 'isReflectionEnabled',
 }
-const STRING_MAP: BiffFieldMap<GateData> = { MATR: 'szMaterial', SURF: 'szSurface' }
+const STRING_MAP: BiffFieldMap<GateData, string> = { MATR: 'szMaterial', SURF: 'szSurface' }
 
 /** @see https://github.com/vpinball/vpinball/blob/master/gate.cpp */
 export class GateData extends ItemData {

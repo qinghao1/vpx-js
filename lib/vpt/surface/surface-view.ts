@@ -20,8 +20,8 @@ export class SurfaceMeshGenerator {
 		const texCoords = DragPoint.getTextureCoords(data.dragPoints, verts)
 		const n = verts.length
 		if (!n) return {}
-		const bottom = data.heightBottom * table.getScaleZ() + table.getTableHeight()
-		const top = data.heightTop * table.getScaleZ() + table.getTableHeight()
+		const bottom = data.heightBottom * table.getScaleZ()
+		const top = data.heightTop * table.getScaleZ()
 
 		this.buildSide(sideMesh, verts, texCoords, bottom, top, !!data.szSideImage)
 		this.buildTop(topMesh, verts, table, top)

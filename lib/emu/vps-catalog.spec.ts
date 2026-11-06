@@ -109,6 +109,18 @@ describe('VPS catalog', () => {
 			expect((store.get('vps1:catalog') as { stamp: string }).stamp).toBe('200')
 		})
 
+		it('falls back to the cache when the refresh download fails', async () => {
+			// Stamp moved but the DB is unreachable (or unparseable): the valid
+			// cache still serves instead of throwing.
+			store.set('vps1:catalog', { stamp: '100', games: games.slice(0, 1) })
+			const failing = async (url: string) => {
+				if (url === VPS_UPDATED_URL) return encode('200')
+				throw new Error('offline')
+			}
+			expect(await loadVpsCatalog({ download: failing })).toHaveLength(1)
+			expect(store.get('vps1:catalog')).toEqual({ stamp: '100', games: games.slice(0, 1) })
+		})
+
 		it('propagates a caller abort instead of falling back', async () => {
 			store.set('vps1:catalog', { stamp: '100', games })
 			const abort = new AbortController()

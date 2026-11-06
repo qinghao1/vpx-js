@@ -8,9 +8,6 @@ import type { Storage } from '../io/ole-doc.js'
 export abstract class ItemData extends BiffParser {
 	public timer = new TimerDataRoot()
 	public name!: string
-	public pdata?: number
-	public fLocked?: boolean
-	public layerIndex?: number
 
 	public constructor(public readonly itemName: string) {
 		super()
@@ -28,15 +25,6 @@ export abstract class ItemData extends BiffParser {
 		switch (tag) {
 			case 'NAME':
 				this.name = this.getWideString(buffer, _len)
-				break
-			case 'PIID':
-				this.pdata = this.getInt(buffer)
-				break
-			case 'LOCK':
-				this.fLocked = this.getBool(buffer)
-				break
-			case 'LAYR':
-				this.layerIndex = this.getInt(buffer)
 				break
 			case 'TMON':
 				this.timer.enabled = this.getBool(buffer)

@@ -13,7 +13,7 @@ import { ItemState } from '../item-state.js'
 import type { Table } from '../table/table.js'
 import { RubberMeshGenerator, RubberUpdater } from './rubber-view.js'
 
-const FLOAT_MAP: BiffFieldMap<RubberData> = {
+const FLOAT_MAP: BiffFieldMap<RubberData, number> = {
 	HTTP: 'height',
 	HTHI: 'hitHeight',
 	ELAS: 'elasticity',
@@ -24,8 +24,8 @@ const FLOAT_MAP: BiffFieldMap<RubberData> = {
 	ROTY: 'rotY',
 	ROTZ: 'rotZ',
 }
-const INT_MAP: BiffFieldMap<RubberData> = { WDTP: 'thickness' }
-const BOOL_MAP: BiffFieldMap<RubberData> = {
+const INT_MAP: BiffFieldMap<RubberData, number> = { WDTP: 'thickness' }
+const BOOL_MAP: BiffFieldMap<RubberData, boolean> = {
 	HTEV: 'hitEvent',
 	CLDR: 'isCollidable',
 	RVIS: 'isVisible',
@@ -34,7 +34,7 @@ const BOOL_MAP: BiffFieldMap<RubberData> = {
 	ESIE: 'showInEditor',
 	OVPH: 'overwritePhysics',
 }
-const STRING_MAP: BiffFieldMap<RubberData> = { MATR: 'szMaterial', IMAG: 'szImage', MAPH: 'szPhysicsMaterial' }
+const STRING_MAP: BiffFieldMap<RubberData, string> = { MATR: 'szMaterial', IMAG: 'szImage', MAPH: 'szPhysicsMaterial' }
 
 /** @see https://github.com/vpinball/vpinball/blob/master/rubber.cpp */
 export class RubberData extends ItemData {

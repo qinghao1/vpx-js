@@ -28,7 +28,7 @@ import type {
 	FlasherBlendTarget,
 	IRenderApi,
 	IRenderable,
-	MaterialApplyDesc,
+	MaterialRebind,
 	MeshConvertOptions,
 	RenderInfo,
 } from '../irender-api.js'
@@ -269,7 +269,7 @@ export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, Poin
 		this.lightGenerator.applyLighting(state, obj)
 	}
 
-	public applyMaterial(obj: Object3D | undefined, { material, map }: MaterialApplyDesc): void {
+	public applyMaterial(obj: Object3D | undefined, { material, map }: MaterialRebind): void {
 		if (!obj) return
 		this.unbatch(obj)
 		const targets = obj.children?.length ? (obj.children as Object3D[]) : [obj]
@@ -288,8 +288,8 @@ export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, Poin
 		return cloneMaterialForWrite(mat)
 	}
 
-	public convertFlasherBlend<MATERIAL>(mat: MATERIAL, target: FlasherBlendTarget): void {
-		convertFlasherBlend(mat as unknown as MeshBasicNodeMaterial, target)
+	public convertFlasherBlend(mat: unknown, target: FlasherBlendTarget): void {
+		convertFlasherBlend(mat as MeshBasicNodeMaterial, target)
 	}
 
 	public createObjectFromRenderable(

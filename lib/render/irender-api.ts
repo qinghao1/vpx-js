@@ -44,6 +44,8 @@ export interface RenderInfo<GEOMETRY> {
 	isTransparent?: boolean
 	depthBias?: number
 	disableLighting?: number
+	/** Native bulb-lift gate (0 = full lift, 1 = none); seeds the BDL `below` mix. */
+	disableLightingBelow?: number
 	addBlend?: boolean
 	/** Tri-state additive blend (upstream AddBlendMode 0 plain, 1 additive, 2 absorb); absent derives from addBlend. */
 	addBlendMode?: number
@@ -110,10 +112,8 @@ export interface IRenderApi<NODE, GEOMETRY, POINT_LIGHT> {
 	 * `applyMatrixToNode` only refreshes the local matrix and flags the node
 	 * dirty, so per-frame updaters never pay a subtree walk per item. The host
 	 * calls this once per frame (when anything moved) before presenting.
-	 * Optional for backward compatibility: hosts fall back to presenting
-	 * directly (the renderer updates world matrices itself) when missing.
 	 */
-	flushMatrixUpdates?(root: NODE | undefined): void
+	flushMatrixUpdates(root: NODE | undefined): void
 
 	/**
 	 * @param mesh Must contain the same number of vertices as the node.
@@ -129,20 +129,13 @@ export interface IRenderApi<NODE, GEOMETRY, POINT_LIGHT> {
 	 * or bound recomputations. Normals arrive in raw mesh coords (the backend
 	 * applies its own winding convention while copying); bounds is the
 	 * [minX, minY, minZ, maxX, maxY, maxZ] union the backend installs directly.
-	 * Optional for backward compatibility: updaters fall back to
-	 * `applyMeshToNode` when the backend does not provide it.
 	 *
 	 * @param positions Interpolated vertex positions (3 per vertex)
 	 * @param normals Interpolated vertex normals (3 per vertex)
 	 * @param bounds Precomputed bounding-box union for this tick
 	 * @param node The node to which the arrays are applied to.
 	 */
-	applyFrameArrays?(
-		positions: Float32Array,
-		normals: Float32Array,
-		bounds: Float32Array,
-		node: NODE | undefined,
-	): void
+	applyFrameArrays(positions: Float32Array, normals: Float32Array, bounds: Float32Array, node: NODE | undefined): void
 
 	applyLighting(state: LightState, node: NODE | undefined): void
 
@@ -155,7 +148,7 @@ export interface IRenderApi<NODE, GEOMETRY, POINT_LIGHT> {
 	 * @param node Node to apply material to
 	 * @param desc Material and texture to rebind
 	 */
-	applyMaterial(node: NODE | undefined, desc: MaterialApplyDesc): void
+	applyMaterial(node: NODE | undefined, desc: MaterialRebind): void
 
 	/**
 	 * Fork-safe material clone for script writes.
@@ -164,22 +157,22 @@ export interface IRenderApi<NODE, GEOMETRY, POINT_LIGHT> {
 	 * (three.js TSL node materials keep uniform objects in `userData`, which a
 	 * plain `.clone()` flattens into inert JSON) rebuild an equivalent material
 	 * here so per-item script state never leaks between items nor dies on first
-	 * write. Optional for backward compatibility with custom backends: updaters
-	 * fall back to a plain `.clone()` when the backend does not provide it.
+	 * write. Without it script writes would corrupt sibling items sharing the
+	 * cached material.
 	 *
 	 * @param mat Material to fork for exclusive write access
 	 */
-	cloneMaterialForWrite?<MATERIAL>(mat: MATERIAL): MATERIAL
+	cloneMaterialForWrite<MATERIAL>(mat: MATERIAL): MATERIAL
 
 	/**
 	 * Switches an additive overlay material to its live blend target; other
-	 * materials stay untouched. Optional for backward compatibility: without
-	 * it overlays keep the blend they were created with.
+	 * materials stay untouched. Without it overlays keep the blend they were
+	 * created with and script blend swaps silently stop converting.
 	 *
 	 * @param mat Material to convert
 	 * @param target Blend target the flasher's live state selects
 	 */
-	convertFlasherBlend?<MATERIAL>(mat: MATERIAL, target: FlasherBlendTarget): void
+	convertFlasherBlend(mat: unknown, target: FlasherBlendTarget): void
 
 	createObjectFromRenderable(renderable: IRenderable<ItemState>, table: Table, opts: TableGenerateOptions): NODE
 
@@ -200,7 +193,7 @@ export interface IRenderApi<NODE, GEOMETRY, POINT_LIGHT> {
 }
 
 /** Script-driven material rebind for `IRenderApi.applyMaterial`. */
-export interface MaterialApplyDesc {
+export interface MaterialRebind {
 	material?: Material
 	/** Texture name; `undefined` keeps the bound one, an empty string clears it. */
 	map?: string

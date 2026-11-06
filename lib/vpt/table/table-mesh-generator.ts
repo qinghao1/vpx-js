@@ -143,5 +143,4 @@ export const defaultTableGenerateOptions: TableGenerateOptions = {
 	exportTriggers: true,
 	exportSpinners: true,
 	exportPlungers: true,
-	gltfOptions: {},
 }

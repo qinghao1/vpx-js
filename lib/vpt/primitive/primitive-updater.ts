@@ -150,17 +150,13 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
 	): void {
 		for (const mesh of this.meshes(obj)) {
-			const mat = mesh.material as unknown as
-				| { userData: Record<string, unknown>; clone: () => unknown }
-				| undefined
-			if (!mat?.clone || mat.userData.__primitiveCloned) continue
-			// Node materials stash TSL uniforms in userData, which three.js clone() would
-			// reduce to plain JSON; rebuild them so per-primitive script state (color/BDL)
-			// never leaks between inserts nor dies on first write. The fork itself is the
-			// backend's job (IRenderApi seam); plain .clone() is only the fallback for
-			// custom backends that do not provide it.
-			const forkClone = renderApi.cloneMaterialForWrite
-			const cloned = (forkClone ? forkClone(mat) : mat.clone()) as typeof mat
+			const mat = mesh.material as unknown as { userData: Record<string, unknown> } | undefined
+			if (!mat || mat.userData.__primitiveCloned) continue
+			// Node materials stash TSL uniforms in userData, which a plain three.js
+			// clone() would reduce to inert JSON; the backend rebuilds them so
+			// per-primitive script state (color/BDL) never leaks between inserts
+			// nor dies on first write.
+			const cloned = renderApi.cloneMaterialForWrite(mat) as typeof mat
 			;(cloned.userData as Record<string, unknown>).__primitiveCloned = true
 			mesh.material = cloned as unknown as typeof mesh.material
 		}
@@ -182,7 +178,7 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 		const iFrame = Math.floor(clamped)
 		const fract = clamped - iFrame
 		// Fast path: lerp prebuilt frames into reused scratch; backend copies in place.
-		if (renderApi.applyFrameArrays && this.animFrames.length === num && this.animScratch) {
+		if (this.animFrames.length === num && this.animScratch) {
 			const a = this.animFrames[iFrame] as {
 				positions: Float32Array
 				normals: Float32Array

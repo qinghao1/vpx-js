@@ -14,7 +14,7 @@ import type { Material } from '../material.js'
 import type { Table } from '../table/table.js'
 import { SurfaceMeshGenerator, SurfaceUpdater } from './surface-view.js'
 
-const BOOL_MAP: BiffFieldMap<SurfaceData> = {
+const BOOL_MAP: BiffFieldMap<SurfaceData, boolean> = {
 	HTEV: 'hitEvent',
 	DROP: 'isDroppable',
 	FLIP: 'isFlipbook',
@@ -27,7 +27,7 @@ const BOOL_MAP: BiffFieldMap<SurfaceData> = {
 	SVBL: 'isSideVisible',
 	REEN: 'isReflectionEnabled',
 }
-const FLOAT_MAP: BiffFieldMap<SurfaceData> = {
+const FLOAT_MAP: BiffFieldMap<SurfaceData, number> = {
 	THRS: 'threshold',
 	HTBT: 'heightBottom',
 	HTTP: 'heightTop',
@@ -40,7 +40,7 @@ const FLOAT_MAP: BiffFieldMap<SurfaceData> = {
 	DILT: 'disableLightingTop',
 	DILB: 'disableLightingBelow',
 }
-const STRING_MAP: BiffFieldMap<SurfaceData> = {
+const STRING_MAP: BiffFieldMap<SurfaceData, string> = {
 	IMAG: 'szImage',
 	SIMG: 'szSideImage',
 	MAPH: 'szPhysicsMaterial',
@@ -224,6 +224,7 @@ export class Surface extends Item<SurfaceData> {
 				material: table.getMaterial(this.data.szTopMaterial),
 				isTransparent: Surface.isTransparentMat(table.getMaterial(this.data.szTopMaterial)),
 				disableLighting: this.data.disableLightingTop,
+				disableLightingBelow: this.data.disableLightingBelow,
 			}
 		}
 		if (surface.side) {

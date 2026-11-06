@@ -1,13 +1,7 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 import type { Matrix3D } from '../lib/math/matrix.js'
-import type {
-	FlasherBlendTarget,
-	IRenderApi,
-	IRenderable,
-	MaterialApplyDesc,
-	RenderInfo,
-} from '../lib/render/irender-api'
+import type { FlasherBlendTarget, IRenderApi, IRenderable, MaterialRebind, RenderInfo } from '../lib/render/irender-api'
 import { cloneMaterialForWrite } from '../lib/render/threejs/material-shared.js'
 import { convertFlasherBlend } from '../lib/render/threejs/nodes/primitive-bdl-node.js'
 import type { ItemState } from '../lib/vpt/item-state'
@@ -21,15 +15,24 @@ export class TestRenderApi implements IRenderApi<any, any, any> {
 
 	public applyLighting(_state: LightState, _node: any | undefined): void {}
 
-	public applyMaterial(_node: any | undefined, _desc: MaterialApplyDesc): void {}
+	public applyFrameArrays(
+		_positions: Float32Array,
+		_normals: Float32Array,
+		_bounds: Float32Array,
+		_node: any | undefined,
+	): void {}
+
+	public applyMaterial(_node: any | undefined, _desc: MaterialRebind): void {}
 
 	public cloneMaterialForWrite<MATERIAL>(mat: MATERIAL): MATERIAL {
 		return cloneMaterialForWrite(mat)
 	}
 
-	public convertFlasherBlend<MATERIAL>(mat: MATERIAL, target: FlasherBlendTarget): void {
+	public convertFlasherBlend(mat: unknown, target: FlasherBlendTarget): void {
 		convertFlasherBlend(mat as any, target)
 	}
+
+	public flushMatrixUpdates(_root: any | undefined): void {}
 
 	public applyMatrixToNode(_matrix: Matrix3D, _node: any | undefined): void {}
 

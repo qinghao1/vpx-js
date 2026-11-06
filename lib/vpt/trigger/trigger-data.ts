@@ -9,7 +9,7 @@ import { type DragPoint, dragPointNestedTag } from '../dragpoint.js'
 import { Enums } from '../enums.js'
 import { ItemData } from '../item-data.js'
 
-const FLOAT_MAP: BiffFieldMap<TriggerData> = {
+const FLOAT_MAP: BiffFieldMap<TriggerData, number> = {
 	RADI: 'radius',
 	ROTA: 'rotation',
 	WITI: 'wireThickness',
@@ -18,9 +18,13 @@ const FLOAT_MAP: BiffFieldMap<TriggerData> = {
 	THOT: 'hitHeight',
 	ANSP: 'animSpeed',
 }
-const INT_MAP: BiffFieldMap<TriggerData> = { SHAP: 'shape' }
-const BOOL_MAP: BiffFieldMap<TriggerData> = { VSBL: 'isVisible', EBLD: 'isEnabled', REEN: 'isReflectionEnabled' }
-const STRING_MAP: BiffFieldMap<TriggerData> = { MATR: 'szMaterial', SURF: 'szSurface', LINK: 'stateSrcLink' }
+const INT_MAP: BiffFieldMap<TriggerData, number> = { SHAP: 'shape' }
+const BOOL_MAP: BiffFieldMap<TriggerData, boolean> = {
+	VSBL: 'isVisible',
+	EBLD: 'isEnabled',
+	REEN: 'isReflectionEnabled',
+}
+const STRING_MAP: BiffFieldMap<TriggerData, string> = { MATR: 'szMaterial', SURF: 'szSurface', LINK: 'stateSrcLink' }
 
 /** @see https://github.com/vpinball/vpinball/blob/master/trigger.cpp */
 export class TriggerData extends ItemData {

@@ -43,7 +43,7 @@ export class RubberMeshGenerator {
 		const numRings = sv.pcvertex - 1
 		const numSegments = accuracy
 		const numVertices = numRings * numSegments
-		const height = this.data.hitHeight + table.getTableHeight()
+		const height = this.data.hitHeight
 
 		let prevB = new Vertex3D()
 		const invR = 1 / numRings
@@ -159,13 +159,9 @@ export class RubberMeshGenerator {
 		tempMat.setScaling(1.0, 1.0, table.getScaleZ())
 		vertMatrix.multiply(tempMat)
 		if (height === this.data.hitHeight) {
-			tempMat.setTranslation(this.middlePoint.x, this.middlePoint.y, height + table.getTableHeight())
+			tempMat.setTranslation(this.middlePoint.x, this.middlePoint.y, height)
 		} else {
-			tempMat.setTranslation(
-				this.middlePoint.x,
-				this.middlePoint.y,
-				height * table.getScaleZ() + table.getTableHeight(),
-			)
+			tempMat.setTranslation(this.middlePoint.x, this.middlePoint.y, height * table.getScaleZ())
 		}
 		vertMatrix.multiply(tempMat)
 
@@ -205,7 +201,7 @@ export class RubberUpdater extends ItemUpdater<RubberState> {
 	private applyTransformation<NODE, GEOMETRY, POINT_LIGHT>(
 		obj: NODE,
 		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
-		table: Table,
+		_table: Table,
 	): void {
 		// Exact baked→current map. Baked verts are V(data) with V(h,R) = T(−mid)·R·T(+mid,h)
 		// (getMatrices, scaleZ=1); mirrored by RIGHT_HANDED. The node matrix must satisfy
@@ -223,9 +219,9 @@ export class RubberUpdater extends ItemUpdater<RubberState> {
 		tmp.rotateXMatrix(degToRad(-this.state.rotX))
 		rot.multiply(tmp)
 		const m = Matrix3D.claim()
-		tmp.setTranslation(-this.middlePoint.x, -this.middlePoint.y, this.data.height + table.getTableHeight())
+		tmp.setTranslation(-this.middlePoint.x, -this.middlePoint.y, this.data.height)
 		m.multiply(tmp)
-		tmp.setTranslation(this.middlePoint.x, this.middlePoint.y, -this.state.height - table.getTableHeight())
+		tmp.setTranslation(this.middlePoint.x, this.middlePoint.y, -this.state.height)
 		const rotTrans = Matrix3D.claim()
 		rotTrans.multiplyMatrices(rot, tmp)
 		m.multiply(rotTrans)

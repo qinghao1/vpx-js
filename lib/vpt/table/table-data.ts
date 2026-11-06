@@ -78,7 +78,7 @@ const CM_TO_VPU = 50 / (2.54 * 1.0625)
 const DISABLE_SCRIPT_EDITING = 0x00000002
 const DISABLE_EVERYTHING = 0x80000000
 
-const FLOAT_MAP: BiffFieldMap<TableData> = {
+const FLOAT_MAP: BiffFieldMap<TableData, number> = {
 	LEFT: 'left',
 	TOPX: 'top',
 	RGHT: 'right',
@@ -115,7 +115,7 @@ const FLOAT_MAP: BiffFieldMap<TableData> = {
 	EXPO: 'exposure',
 }
 
-const INT_MAP: BiffFieldMap<TableData> = {
+const INT_MAP: BiffFieldMap<TableData, number> = {
 	ORRP: 'overridePhysics',
 	SEDT: 'numGameItems',
 	SSND: 'numSounds',
@@ -133,7 +133,7 @@ const INT_MAP: BiffFieldMap<TableData> = {
 	UFXA: 'useFXAA',
 }
 
-const BOOL_MAP: BiffFieldMap<TableData> = {
+const BOOL_MAP: BiffFieldMap<TableData, boolean> = {
 	ORPF: 'overridePhysicsFlipper',
 	DECL: 'renderDecals',
 	REEL: 'renderEMReels',
@@ -150,7 +150,7 @@ const BOOL_MAP: BiffFieldMap<TableData> = {
 	USSR: 'useSSR',
 }
 
-const STRING_MAP: BiffFieldMap<TableData> = {
+const STRING_MAP: BiffFieldMap<TableData, string> = {
 	IMAG: 'szImage',
 	BLIM: 'szBallImage',
 	BLIF: 'szBallImageFront',
