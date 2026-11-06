@@ -78,12 +78,14 @@ const PHASES = (() => {
 const wantPhase = l => PHASES.includes(l)
 const FULL_RUN = PHASES.length === 3
 const PORT = arg('--port') || process.env.VPX_AB_PORT || '3000'
-const BASE = `https://localhost:${PORT}`
+// Reassigned to the effective server origin after ensureVite: a foreign
+// occupant moves our vite to a per-run fallback port.
+let BASE = `https://localhost:${PORT}`
 // OLD viewer runs on its own vite (old tree, old aliases, old dist-esm) so the
 // NEW server config can never break it; defaults to the next port. Concurrent
 // runs need distinct --port values at least 2 apart plus distinct --out.
 const OLD_PORT = arg('--old-port') || String(Number(PORT) + 1)
-const OLD_BASE = `https://localhost:${OLD_PORT}`
+let OLD_BASE = `https://localhost:${OLD_PORT}`
 const SEED = Number(arg('--seed') ?? 1337)
 // Browser watchdog budget: viewer legs + ball gates exceed the 5 min launcher
 // default under SwiftShader (sibling drain probes use 40 min); the exit-cleanup
@@ -1635,7 +1637,7 @@ async function main() {
 		comment(`single-leg run; legs=${PHASES.join(',')} port=${PORT} seed=${SEED} out=${OUT}`)
 	}
 
-	await ensureVite(`${BASE}/`, { label: 'verify-ab' })
+	BASE = new URL((await ensureVite(`${BASE}/`, { label: 'verify-ab' })).url).origin
 	const repoRoot = process.cwd()
 	let browser = await launchBrowser(puppeteer, { protocolTimeout: 300_000, autoKillMs: BROWSER_BUDGET_MS })
 	const report = { when: new Date().toISOString(), vpx: vpxPath, rom: romPath, headSha, tol: TOL, new: {}, old: {} }
@@ -1760,7 +1762,9 @@ async function main() {
 		// shims) must not resolve OLD imports. Tab death under SwiftShader
 		// memory pressure is retried once with a fresh browser.
 		if (wantPhase('C')) {
-			await ensureVite(`${OLD_BASE}/`, { cwd: join(OLD_DIR, 'demo-browser'), label: 'verify-ab-old' })
+			OLD_BASE = new URL(
+				(await ensureVite(`${OLD_BASE}/`, { cwd: join(OLD_DIR, 'demo-browser'), label: 'verify-ab-old' })).url,
+			).origin
 			const oldUrl = `${OLD_BASE}/index.html?vpx=${encodeURIComponent(vpxUrl)}&rom=${encodeURIComponent(romUrl)}&mode=play`
 			let phaseCOk = false
 			for (let cAttempt = 1; cAttempt <= 2 && !phaseCOk; cAttempt++) {

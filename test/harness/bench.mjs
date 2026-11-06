@@ -75,6 +75,9 @@ const vite = await ensureVite(url, {
 	cwd: path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../demo-browser'),
 	label: 'bench',
 })
+// Effective server URL: a foreign occupant on the wanted port moves our vite
+// to a per-run fallback port, so navigate where ensureVite actually serves.
+url = vite.url
 const browser = await launchBrowser(puppeteer, {
 	...(headed ? { headless: false } : {}),
 	...(gpu ? { gpu } : {}),

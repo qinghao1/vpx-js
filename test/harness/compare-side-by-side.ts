@@ -112,8 +112,12 @@ async function main() {
 	console.log('[compare] ensuring vite dev server on :3000…')
 	const utils: any = await import('./utils.mjs')
 	let viteProc: any = null
+	let browserTarget = session.browserUrl
 	if (utils.ensureVite) {
+		// Effective URL: a foreign occupant moves our vite to a per-run
+		// fallback port, so navigate where ensureVite actually serves.
 		viteProc = await utils.ensureVite(session.browserUrl, { label: 'vite' })
+		if (viteProc?.url) browserTarget = viteProc.url
 	}
 
 	// Launch browser
@@ -157,7 +161,7 @@ async function main() {
 			if (msgText) console.log(`[vpx-browser] ${msgText.slice(0, 800)}`)
 		})
 		page.on('pageerror', (pageErr: any) => console.log(`[vpx-browser:pageerror] ${pageErr.message.slice(0, 800)}`))
-		await page.goto(session.browserUrl, { waitUntil: 'domcontentloaded', timeout: 30000 })
+		await page.goto(browserTarget, { waitUntil: 'domcontentloaded', timeout: 30000 })
 		console.log('[compare] browser navigated')
 	} catch (err: unknown) {
 		console.error('[compare] browser launch failed', (err as Error).message)
@@ -224,10 +228,6 @@ async function main() {
 		} catch {}
 		terminate(nativeProc, 2000)
 		terminate(viteProc, 1000)
-		// also ensure stale kills
-		try {
-			utils.killStaleChromeSync()
-		} catch {}
 		process.exit(0)
 	}
 	process.once('SIGINT', cleanup)

@@ -93,7 +93,9 @@ function labelFromUrl(u) {
 // Shared harness helpers (same as bench.mjs): ensureVite probes/starts the dev
 // server and registers process cleanup for vite + chrome, so no bespoke
 // ensureServer/_forceKillChrome/signal handlers are needed here.
-await ensureVite(url || DEFAULT_URL, { label: 'integration' })
+// Effective server URL: a foreign occupant on the wanted port moves our vite
+// to a per-run fallback port, so run where ensureVite actually serves.
+const serverUrl = (await ensureVite(url || DEFAULT_URL, { label: 'integration' })).url
 const puppeteer = await loadPuppeteer()
 const browser = await launchBrowser(puppeteer, {
 	...(gpu ? { gpu } : {}),
@@ -477,7 +479,7 @@ if (url) {
 	const label = labelFromUrl(url)
 	let res
 	try {
-		res = await runOne(url, label)
+		res = await runOne(serverUrl, label)
 	} catch (e) {
 		console.error('[integration] runOne error', e)
 		res = { ok: false }
@@ -488,7 +490,7 @@ if (url) {
 	}
 	process.exit(res?.ok ? 0 : 1)
 } else {
-	const primaryUrl = DEFAULT_URL
+	const primaryUrl = serverUrl
 	const urls = [[primaryUrl, 'primary']]
 	const extraUrls = []
 	const singleExtra = process.env.EXTRA_URL || process.env.TEST_URL || process.env.URL

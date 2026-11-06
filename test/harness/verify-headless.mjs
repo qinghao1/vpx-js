@@ -21,7 +21,9 @@ import { attachLogging, ensureVite, launchBrowser, loadPuppeteer, newPage } from
 
 const ROM_ZIP = process.argv.find(a => a.startsWith('--rom='))?.slice(6) || ''
 const PORT = process.argv.find(a => a.startsWith('--port='))?.slice(7) || '3000'
-const BASE = `https://localhost:${PORT}`
+// Reassigned to the effective server origin after ensureVite: a foreign
+// occupant on :PORT moves our vite to a per-run fallback port.
+let BASE = `https://localhost:${PORT}`
 
 const romCandidates = [
 	`${homedir()}/.cache/vpinball/pinmame/roms/twd_160h.zip`,
@@ -31,7 +33,10 @@ const romCandidates = [
 const romPath = ROM_ZIP || romCandidates.find(p => existsSync(p)) || ''
 const twdPath = findWalkingDead() ?? ''
 
-await ensureVite(`${BASE}/?vpx=/test/fixtures/table-flipper.vpx`, { label: 'verify-headless' })
+// Effective base: a foreign occupant on :PORT moves our vite to a per-run
+// fallback port, so navigate where ensureVite actually serves.
+const vite = await ensureVite(`${BASE}/?vpx=/test/fixtures/table-flipper.vpx`, { label: 'verify-headless' })
+BASE = new URL(vite.url).origin
 const puppeteer = await loadPuppeteer()
 let browser
 try {
