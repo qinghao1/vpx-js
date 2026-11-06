@@ -6,7 +6,6 @@ import type { ThreeRenderApi } from '../../dist-esm/lib/render/threejs/three-ren
 import { Ball } from '../../dist-esm/lib/vpt/ball/ball.js'
 import { BallData } from '../../dist-esm/lib/vpt/ball/ball-data.js'
 import { BallState } from '../../dist-esm/lib/vpt/ball/ball-state.js'
-import type { ItemState, ItemUpdater } from '../../dist-esm/lib/vpt/item-state.js'
 import type { PlungerData } from '../../dist-esm/lib/vpt/plunger/plunger-data.js'
 import { PlungerMeshGenerator } from '../../dist-esm/lib/vpt/plunger/plunger-mesh-generator.js'
 import type { Table } from '../../dist-esm/lib/vpt/table/table.js'
@@ -17,7 +16,7 @@ import {
 	romMountFileName,
 	WASM_STRIDES,
 } from '../../dist-esm/lib/wasm/vpinball-wasm.js'
-import type { BallSlot, SyncCounts, SyncScene } from '../../dist-esm/lib/wasm/wasm-scene-sync.js'
+import type { BallSlot, PartSlot, SyncCounts, SyncScene } from '../../dist-esm/lib/wasm/wasm-scene-sync.js'
 import { WasmSceneSync } from '../../dist-esm/lib/wasm/wasm-scene-sync.js'
 
 /** Scene hooks the WASM engine adapter needs from the viewer. */
@@ -25,7 +24,7 @@ export interface WasmEngineHost {
 	readonly renderApi: ThreeRenderApi
 	readonly table: Table
 	readonly ballsGroup: Object3D
-	lookupPart(name: string): { obj: Object3D; state: ItemState; updater: ItemUpdater<ItemState> } | undefined
+	lookupPart(name: string): PartSlot<Object3D> | undefined
 	lookupPlunger(name: string): PlungerData | undefined
 }
 
@@ -38,6 +37,9 @@ export interface WasmEngineLoad {
 
 /** Error thrown when the caller forced `?engine=wasm` but the WASM engine failed to start. */
 export class WasmEngineStartError extends Error {}
+
+/** The instance whose table is loaded in the shared engine module. */
+let session: WasmEngine | undefined
 
 /** Shared empty view for missing engine buffers (avoids per-frame garbage). */
 const EMPTY_VIEW = new Float32Array(0)
@@ -75,6 +77,8 @@ export function effectiveGain(volume: number, muted: boolean): number {
 export class WasmEngine {
 	private readonly liveBalls = new Map<number, BallSlot<Object3D>>()
 	private readonly partNames = new Map<number, string>()
+	/** Plunger animation frame count per part index, resolved on first use. */
+	private readonly plungerFrames = new Map<number, number>()
 	private sync?: WasmSceneSync<Object3D, BufferGeometry, PointLight>
 	private engine?: HeadlessEngine
 	private ballsVisible = true
@@ -116,22 +120,22 @@ export class WasmEngine {
 	/** Load WASM bytes, mount the ROM (if any), and load the table. */
 	async load({ vpxBytes, rom }: WasmEngineLoad): Promise<void> {
 		// Fresh table, fresh game epoch (also covers instance reuse: drop the
-		// previous table's part names, cached DMD frame, and engine).
+		// previous table's part names, cached DMD frame, and scene sync; the
+		// bridge's LoadTable replaces the previous table itself).
 		this.gameMs = 0
 		this.debtMs = 0
 		this.lastStepWallMs = 0
 		this.partNames.clear()
+		this.plungerFrames.clear()
 		this.dmdCache = undefined
 		this.liveBalls.clear()
-		if (this.engine) {
-			await this.engine.destroyTable().catch(() => {})
-			this.engine = undefined
-			this.sync = undefined
-		}
+		this.resetAudioFormat()
+		this.sync = undefined
 		// Page-relative so subpath deploys work: document.baseURI resolves
-		// against the page, unlike a module-relative URL under `/@fs/`.
-		this.engine = (await loadHeadlessEngine(new URL('wasm/vpinball-headless.js', document.baseURI).href)).engine
-		if (this.engine.init() !== 0) throw new WasmEngineStartError('VpxWasm_Init failed')
+		// against the page, unlike a module-relative URL under `/@fs/`. The
+		// module is shared page-wide; this instance owns its table from here.
+		this.engine = await loadHeadlessEngine(new URL('wasm/vpinball-headless.js', document.baseURI).href)
+		session = this
 		const pending = window as unknown as { __pendingRom?: Uint8Array; __pendingRomName?: string }
 		// PinMAME resolves the zip by the script's game name, not the file basename.
 		const script = this.host.table.tableScript
@@ -140,9 +144,8 @@ export class WasmEngine {
 		} else if (pending.__pendingRom?.length && pending.__pendingRomName) {
 			this.engine.mountRom(romMountFileName(script, pending.__pendingRomName), pending.__pendingRom)
 		}
-		const rc = await this.engine.loadTable(vpxBytes)
-		if (rc !== 0) throw new WasmEngineStartError(`VpxWasm_LoadTable returned ${rc}`)
-		for (const part of JSON.parse(this.engine.getPartCatalogJson() || '[]') as { idx: number; name: string }[]) {
+		await this.engine.loadTable(vpxBytes)
+		for (const part of this.readCatalog()) {
 			if (typeof part.idx === 'number' && typeof part.name === 'string') this.partNames.set(part.idx, part.name)
 		}
 		// The generated base slab carries the playfield, so the parsed table
@@ -167,6 +170,25 @@ export class WasmEngine {
 				flasherImage: idx => this.engine?.getFlasherImage(idx),
 			},
 		)
+	}
+
+	/** The bridge's part catalog; a malformed one fails the start with a clear reason. */
+	private readCatalog(): { idx: unknown; name: unknown }[] {
+		const json = this.engine?.getPartCatalogJson() || '[]'
+		let catalog: unknown
+		try {
+			catalog = JSON.parse(json)
+		} catch (e) {
+			throw new WasmEngineStartError(`Part catalog is not valid JSON (${e?.message ?? e}): ${json.slice(0, 120)}`)
+		}
+		if (!Array.isArray(catalog)) throw new WasmEngineStartError('Part catalog is not a JSON array')
+		return catalog
+	}
+
+	/** Forget the previous table's PCM format: the next one may run at another rate. */
+	private resetAudioFormat(): void {
+		this.audioRate = 0
+		this.audioChannels = 0
 	}
 
 	get ready(): boolean {
@@ -431,12 +453,18 @@ export class WasmEngine {
 		this.audioCtx = undefined
 		this.audioFailed = false
 		this.audioNextStart = 0
+		this.resetAudioFormat()
 		this.dmdCache = undefined
 		for (const id of [...this.liveBalls.keys()]) this.balls().remove(id)
 		this.liveBalls.clear()
 		this.partNames.clear()
+		this.plungerFrames.clear()
 		this.sync = undefined
-		await this.engine?.destroyTable()
+		// A superseded instance must not tear down its successor's table.
+		if (session === this) {
+			session = undefined
+			await this.engine?.destroyTable()
+		}
 		this.engine = undefined
 	}
 
@@ -447,9 +475,13 @@ export class WasmEngine {
 				return name ? this.host.lookupPart(name) : undefined
 			},
 			plungerFrameCount: (partIdx: number): number => {
+				const cached = this.plungerFrames.get(partIdx)
+				if (cached !== undefined) return cached
 				const name = this.partNames.get(partIdx)
 				const data = name ? this.host.lookupPlunger(name) : undefined
-				return data ? new PlungerMeshGenerator(data).cFrames : 1
+				const frames: number = data ? new PlungerMeshGenerator(data).cFrames : 1
+				this.plungerFrames.set(partIdx, frames)
+				return frames
 			},
 		}
 	}

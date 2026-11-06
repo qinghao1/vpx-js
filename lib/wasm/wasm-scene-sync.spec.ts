@@ -23,6 +23,7 @@ import type { RawHeadlessModule } from './vpinball-wasm.js'
 import {
 	DmdFrameFormat,
 	floatRowView,
+	HEADLESS_ABI_VERSION,
 	HeadlessEngineMissingError,
 	loadHeadlessEngine,
 	MoverType,
@@ -516,6 +517,7 @@ describe('WASM scene sync', () => {
 		const calls: string[] = []
 		let freed = -1
 		const raw = {
+			_VpxWasm_GetAbiVersion: () => HEADLESS_ABI_VERSION,
 			_VpxWasm_Init: () => (calls.push('Init'), 0),
 			_VpxWasm_MountRom: () => (calls.push('MountRom'), 0),
 			_VpxWasm_LoadTable: () => (calls.push('LoadTable'), 0),
@@ -536,9 +538,8 @@ describe('WASM scene sync', () => {
 			HEAPF32: f32,
 		} as unknown as RawHeadlessModule
 		const engine = wrapHeadlessEngine(raw, 'test')
-		expect(engine.init()).toBe(0)
-		expect(engine.mountRom('twd_160h.zip', new Uint8Array([9, 9]))).toBe(0)
-		expect(await engine.loadTable(new Uint8Array([7, 7, 7]))).toBe(0)
+		engine.mountRom('twd_160h.zip', new Uint8Array([9, 9]))
+		await engine.loadTable(new Uint8Array([7, 7, 7]))
 		expect(u8[200]).toBe(7)
 		expect(u8[201]).toBe(7)
 		expect(u8[202]).toBe(7)
@@ -558,7 +559,6 @@ describe('WASM scene sync', () => {
 		expect(engine.getScriptError()).toBeUndefined()
 		await engine.destroyTable()
 		expect(calls).toEqual([
-			'Init',
 			'malloc:13',
 			'malloc:2',
 			'MountRom',

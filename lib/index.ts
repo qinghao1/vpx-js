@@ -12,13 +12,14 @@ export { ThreeRenderApi } from './render/threejs/three-render-api.js'
 export { Logger, Progress, progress } from './util/logger.js'
 export { Ball } from './vpt/ball/ball.js'
 export { Table } from './vpt/table/table.js'
-export type { DmdFrameDesc, HeadlessEngine, RawHeadlessModule, WasmBufferKind } from './wasm/vpinball-wasm.js'
+export type { DmdFrameDesc, HeadlessEngine, HeadlessEngineOp, WasmBufferKind } from './wasm/vpinball-wasm.js'
 export {
 	DmdFrameFormat,
+	HEADLESS_ABI_VERSION,
+	HeadlessEngineError,
 	HeadlessEngineMissingError,
 	loadHeadlessEngine,
 	MoverType,
 	WASM_STRIDES,
-	wrapHeadlessEngine,
 } from './wasm/vpinball-wasm.js'
 export { WasmSceneSync } from './wasm/wasm-scene-sync.js'

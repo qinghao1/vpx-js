@@ -5,6 +5,9 @@ import {
 	codeToSdlScancode,
 	createScancodeGate,
 	DmdFrameFormat,
+	HEADLESS_ABI_VERSION,
+	HeadlessEngineError,
+	loadHeadlessEngine,
 	type RawHeadlessModule,
 	resolveFlipperKey,
 	romMountFileName,
@@ -30,6 +33,7 @@ function fakeRaw(): { raw: RawHeadlessModule; malloc: (bytes: Uint8Array) => num
 		throw new Error(`fake ${name} not implemented`)
 	}
 	const raw: RawHeadlessModule = {
+		_VpxWasm_GetAbiVersion: () => HEADLESS_ABI_VERSION,
 		_VpxWasm_Init: () => 0,
 		_VpxWasm_MountRom: () => notImpl('MountRom'),
 		_VpxWasm_LoadTable: () => notImpl('LoadTable'),
@@ -37,8 +41,10 @@ function fakeRaw(): { raw: RawHeadlessModule; malloc: (bytes: Uint8Array) => num
 		_VpxWasm_GetPartCatalogJson: () => 0,
 		_VpxWasm_GetBuffer: () => 0,
 		_VpxWasm_GetDmdFrame: () => 0,
+		_VpxWasm_GetFlasherImage: () => 0,
 		_VpxWasm_PushKey: () => {},
 		_VpxWasm_Nudge: () => {},
+		_VpxWasm_SetAudioLevel: () => {},
 		_VpxWasm_GetAudioInfo: () => 0,
 		_VpxWasm_GetAudio: () => 0,
 		_VpxWasm_GetScriptErrorCount: () => 0,
@@ -161,6 +167,19 @@ describe('createScancodeGate', () => {
 	})
 })
 
+describe('ABI version', () => {
+	it('refuses an engine speaking another ABI', () => {
+		const fake = fakeRaw()
+		fake.raw._VpxWasm_GetAbiVersion = () => HEADLESS_ABI_VERSION + 1
+		expect(() => wrapHeadlessEngine(fake.raw, 'test')).toThrow(HeadlessEngineError)
+	})
+	it('refuses an engine predating the version export', () => {
+		const fake = fakeRaw()
+		fake.raw._VpxWasm_GetAbiVersion = undefined
+		expect(() => wrapHeadlessEngine(fake.raw, 'test')).toThrow(/ABI 0, expected/)
+	})
+})
+
 describe('getBuffer', () => {
 	/** Craft a GetBuffer descriptor: 3 words (bytePtr, count, stride) + row bytes. */
 	const bufPtr = (fake: ReturnType<typeof fakeRaw>, count: number, stride: number): number => {
@@ -181,10 +200,23 @@ describe('getBuffer', () => {
 		expect(view?.stride).toBe(WASM_STRIDES.movers)
 		expect(view?.view.length).toBe(2 * WASM_STRIDES.movers)
 	})
-	it('rejects a one-sided stride change instead of misparsing rows', () => {
+	/** A GetBuffer descriptor only: 3 words (bytePtr, count, stride). */
+	const descPtr = (fake: ReturnType<typeof fakeRaw>, bytePtr: number, count: number): number => {
+		const desc = new Uint8Array(12)
+		new DataView(desc.buffer).setUint32(0, bytePtr, true)
+		new DataView(desc.buffer).setUint32(4, count, true)
+		new DataView(desc.buffer).setUint32(8, WASM_STRIDES.movers, true)
+		return fake.malloc(desc)
+	}
+	it('maps an empty buffer to undefined', () => {
 		const fake = fakeRaw()
-		fake.raw._VpxWasm_GetBuffer = () => bufPtr(fake, 2, WASM_STRIDES.movers + 1)
+		fake.raw._VpxWasm_GetBuffer = () => descPtr(fake, 0, 0)
 		expect(wrapHeadlessEngine(fake.raw, 'test').getBuffer('movers')).toBeUndefined()
+	})
+	it('throws on rows past the end of the heap', () => {
+		const fake = fakeRaw()
+		fake.raw._VpxWasm_GetBuffer = () => descPtr(fake, 65536 - 16, 2)
+		expect(() => wrapHeadlessEngine(fake.raw, 'test').getBuffer('movers')).toThrow(HeadlessEngineError)
 	})
 })
 
@@ -202,10 +234,7 @@ describe('getFlasherImage', () => {
 		fake.raw._VpxWasm_GetFlasherImage = () => fake.malloc(new TextEncoder().encode('d_5\0'))
 		expect(wrapHeadlessEngine(fake.raw, 'test').getFlasherImage(40)).toBe('d_5')
 	})
-	it('maps null and pre-bridge artifacts to undefined', () => {
-		const fake = fakeRaw()
-		fake.raw._VpxWasm_GetFlasherImage = () => 0
-		expect(wrapHeadlessEngine(fake.raw, 'test').getFlasherImage(40)).toBeUndefined()
+	it('maps null to undefined', () => {
 		expect(wrapHeadlessEngine(fakeRaw().raw, 'test').getFlasherImage(40)).toBeUndefined()
 	})
 })
@@ -296,7 +325,7 @@ describe('hostile descriptors', () => {
 		fake.raw._VpxWasm_GetDmdFrame = () => fake.malloc(desc)
 		expect(wrapHeadlessEngine(fake.raw, 'test').getDmdFrame()).toBeUndefined()
 	})
-	it('rejects absurd DMD dimensions instead of allocating', () => {
+	it('throws on absurd DMD dimensions instead of allocating', () => {
 		const fake = fakeRaw()
 		const desc = new Uint8Array(20)
 		const view = new DataView(desc.buffer)
@@ -306,9 +335,9 @@ describe('hostile descriptors', () => {
 		view.setUint32(12, DmdFrameFormat.Srgb888, true)
 		view.setUint32(16, 3, true)
 		fake.raw._VpxWasm_GetDmdFrame = () => fake.malloc(desc)
-		expect(wrapHeadlessEngine(fake.raw, 'test').getDmdFrame()).toBeUndefined()
+		expect(() => wrapHeadlessEngine(fake.raw, 'test').getDmdFrame()).toThrow(HeadlessEngineError)
 	})
-	it('rejects misaligned audio ranges', () => {
+	it('throws on misaligned audio ranges', () => {
 		const fake = fakeRaw()
 		const desc = new Uint8Array(12)
 		const view = new DataView(desc.buffer)
@@ -316,17 +345,41 @@ describe('hostile descriptors', () => {
 		view.setUint32(4, 100, true)
 		view.setUint32(8, 2, true)
 		fake.raw._VpxWasm_GetAudio = () => fake.malloc(desc)
-		expect(wrapHeadlessEngine(fake.raw, 'test').getAudio()).toBeUndefined()
+		expect(() => wrapHeadlessEngine(fake.raw, 'test').getAudio()).toThrow(HeadlessEngineError)
 	})
 	it('throws when the WASM heap is exhausted', () => {
 		const fake = fakeRaw()
 		fake.raw._malloc = () => 0
-		expect(() => wrapHeadlessEngine(fake.raw, 'test').mountRom('x.zip', new Uint8Array([1]))).toThrow()
+		expect(() => wrapHeadlessEngine(fake.raw, 'test').mountRom('x.zip', new Uint8Array([1]))).toThrow(
+			HeadlessEngineError,
+		)
 	})
 	it('throws on filename malloc failure even with an empty zip', () => {
 		const fake = fakeRaw()
 		fake.raw._malloc = () => 0
-		expect(() => wrapHeadlessEngine(fake.raw, 'test').mountRom('x.zip', new Uint8Array(0))).toThrow()
+		expect(() => wrapHeadlessEngine(fake.raw, 'test').mountRom('x.zip', new Uint8Array(0))).toThrow(
+			HeadlessEngineError,
+		)
+	})
+})
+
+describe('bridge failure codes', () => {
+	it('throws a typed error when the ROM cannot be stored', () => {
+		const fake = fakeRaw()
+		fake.raw._VpxWasm_MountRom = () => -3
+		const mount = () => wrapHeadlessEngine(fake.raw, 'test').mountRom('x.zip', new Uint8Array([1]))
+		expect(mount).toThrow(expect.objectContaining({ op: 'mountRom', cause: 'cannot open the ROM file (code -3)' }))
+	})
+	it('rejects with a typed error when the table does not load', async () => {
+		const fake = fakeRaw()
+		let freed = 0
+		fake.raw._VpxWasm_LoadTable = () => -4
+		fake.raw._free = () => void freed++
+		await expect(wrapHeadlessEngine(fake.raw, 'test').loadTable(new Uint8Array([1]))).rejects.toMatchObject({
+			op: 'loadTable',
+			cause: 'table failed to load (code -4)',
+		})
+		expect(freed).toBe(1)
 	})
 })
 
@@ -365,7 +418,7 @@ describe('suspendable receiver', () => {
 			destroyReceiver = this
 		}
 		const engine = wrapHeadlessEngine(fake.raw, 'test')
-		await expect(engine.loadTable(new Uint8Array([1]))).resolves.toBe(0)
+		await expect(engine.loadTable(new Uint8Array([1]))).resolves.toBeUndefined()
 		await engine.destroyTable()
 		expect(loadReceiver).toBe(fake.raw)
 		expect(destroyReceiver).toBe(fake.raw)
@@ -394,7 +447,7 @@ describe('suspendable receiver', () => {
 				return 0
 			}
 			const engine = wrapHeadlessEngine(fake.raw, 'test')
-			await expect(engine.loadTable(new Uint8Array([1]))).resolves.toBe(0)
+			await expect(engine.loadTable(new Uint8Array([1]))).resolves.toBeUndefined()
 			// Both suspendable call sites wrap eagerly at wrap time.
 			expect(seen).toHaveLength(2)
 			expect(seen[0]).toBe(fake.raw._VpxWasm_LoadTable)
@@ -403,6 +456,68 @@ describe('suspendable receiver', () => {
 		} finally {
 			if (prior === undefined) delete (WebAssembly as Record<string, unknown>).promising
 			else (WebAssembly as Record<string, unknown>).promising = prior
+		}
+	})
+})
+
+describe('loadHeadlessEngine', () => {
+	/** An ES module URL whose factory counts its runs and the bridge inits on `globalThis[key]`. */
+	const fakeModuleUrl = (key: string, abi: number): string =>
+		`data:text/javascript,${encodeURIComponent(`
+			const c = (globalThis[${JSON.stringify(key)}] ??= { factory: 0, init: 0 })
+			export default async () => {
+				c.factory++
+				return { _VpxWasm_GetAbiVersion: () => ${abi}, _VpxWasm_Init: () => (c.init++, 0) }
+			}`)}`
+	const counts = (key: string): { factory: number; init: number } =>
+		(globalThis as unknown as Record<string, { factory: number; init: number }>)[key]
+
+	it('shares one initialized module per URL', async () => {
+		const url = fakeModuleUrl('__vpxShared', HEADLESS_ABI_VERSION)
+		const [first, second] = await Promise.all([loadHeadlessEngine(url), loadHeadlessEngine(url)])
+		expect(second).toBe(first)
+		expect(await loadHeadlessEngine(url)).toBe(first)
+		expect(counts('__vpxShared')).toEqual({ factory: 1, init: 1 })
+	})
+	it('rejects an ABI mismatch without initializing or caching it', async () => {
+		const url = fakeModuleUrl('__vpxStale', HEADLESS_ABI_VERSION + 1)
+		await expect(loadHeadlessEngine(url)).rejects.toMatchObject({ op: 'abi' })
+		await expect(loadHeadlessEngine(url)).rejects.toBeInstanceOf(HeadlessEngineError)
+		expect(counts('__vpxStale')).toEqual({ factory: 2, init: 0 })
+	})
+})
+
+describe('table session queue', () => {
+	it('never enters LoadTable while a teardown is still suspended', async () => {
+		const prior = (WebAssembly as Record<string, unknown>).promising
+		const fake = fakeRaw()
+		const entered: string[] = []
+		fake.raw._VpxWasm_DestroyTable = () => void entered.push('destroy')
+		fake.raw._VpxWasm_LoadTable = () => {
+			entered.push('load')
+			return 0
+		}
+		let resume = (): void => {}
+		// Teardown suspends until `resume`; everything else returns at once.
+		;(WebAssembly as Record<string, unknown>).promising =
+			(fn: (...args: unknown[]) => unknown) =>
+			(...args: unknown[]) =>
+				fn === fake.raw._VpxWasm_DestroyTable
+					? new Promise(done => {
+							resume = () => done(fn(...args))
+						})
+					: Promise.resolve(fn(...args))
+		try {
+			const engine = wrapHeadlessEngine(fake.raw, 'test')
+			const destroyed = engine.destroyTable()
+			const loaded = engine.loadTable(new Uint8Array([1]))
+			await new Promise(done => setTimeout(done, 0))
+			expect(entered).toEqual([])
+			resume()
+			await Promise.all([destroyed, loaded])
+			expect(entered).toEqual(['destroy', 'load'])
+		} finally {
+			;(WebAssembly as Record<string, unknown>).promising = prior
 		}
 	})
 })

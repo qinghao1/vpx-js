@@ -7,6 +7,12 @@
  * every entry point here fails honestly instead of pretending the engine exists.
  */
 
+/**
+ * Bridge ABI this facade speaks (`VpxWasm_GetAbiVersion`, patch 0017). Bump
+ * together with the bridge on any export, descriptor or row-layout change.
+ */
+export const HEADLESS_ABI_VERSION = 1
+
 /** Per-frame state buffer kinds, mirroring `VpxWasm_GetBuffer` (see `FillBuffers`). */
 export type WasmBufferKind = 'balls' | 'movers' | 'lights' | 'prims' | 'flashers'
 
@@ -233,9 +239,11 @@ export interface DmdFrameDesc {
 /**
  * Raw emscripten module surface of `vpinball-headless` (see `vpx_wasm_bridge.cpp`): exported
  * `VpxWasm_*` functions plus the heap views. Use {@link wrapHeadlessEngine}
- * for the byte-array facade; the raw shape is public for tests and the viewer.
+ * for the byte-array facade; the raw shape is exported for tests only (not from `lib/index`).
  */
 export interface RawHeadlessModule {
+	/** Absent on artifacts predating patch 0017; checked once by {@link wrapHeadlessEngine}. */
+	_VpxWasm_GetAbiVersion?(): number
 	_VpxWasm_Init(): number
 	_VpxWasm_MountRom(fileNamePtr: number, zipPtr: number, zipLen: number): number
 	_VpxWasm_LoadTable(vpxPtr: number, vpxLen: number): number
@@ -243,14 +251,12 @@ export interface RawHeadlessModule {
 	_VpxWasm_GetPartCatalogJson(): number
 	_VpxWasm_GetBuffer(kind: number): number
 	_VpxWasm_GetDmdFrame(): number
-	/** Absent on artifacts predating the flasher-image bridge export. */
-	_VpxWasm_GetFlasherImage?(partIdx: number): number
+	_VpxWasm_GetFlasherImage(partIdx: number): number
 	_VpxWasm_GetAudioInfo(): number
 	_VpxWasm_GetAudio(): number
 	_VpxWasm_PushKey(sdlScancode: number, isPressed: boolean): void
 	_VpxWasm_Nudge(angleDeg: number, force: number): void
-	/** Absent on artifacts predating the set-audio-level bridge export. */
-	_VpxWasm_SetAudioLevel?(volume: number, muted: boolean): void
+	_VpxWasm_SetAudioLevel(volume: number, muted: boolean): void
 	_VpxWasm_GetScriptErrorCount(): number
 	_VpxWasm_GetScriptError(): number
 	_VpxWasm_DestroyTable(): void
@@ -283,12 +289,47 @@ const suspendable = <A extends unknown[], R>(fn: (...args: A) => R, recv?: unkno
 	return (...args) => Promise.resolve(fn.apply(recv, args))
 }
 
+/** Facade operations that can fail with a {@link HeadlessEngineError}. */
+export type HeadlessEngineOp = 'abi' | 'malloc' | 'mountRom' | 'loadTable' | 'readDescriptor'
+
+/** A bridge call failed; `op` names the facade operation, `cause` the reason. */
+export class HeadlessEngineError extends Error {
+	constructor(
+		readonly op: HeadlessEngineOp,
+		override readonly cause: string,
+	) {
+		super(`vpinball-headless ${op}: ${cause}`)
+		this.name = 'HeadlessEngineError'
+	}
+}
+
+/** Bridge return codes per operation (`VpxWasm_MountRom` / `VpxWasm_LoadTable`). */
+const FAILURE_CODES: Record<'mountRom' | 'loadTable', Record<number, string>> = {
+	mountRom: {
+		[-1]: 'empty file name or ROM',
+		[-2]: 'cannot create the ROM directory',
+		[-3]: 'cannot open the ROM file',
+		[-4]: 'short write of the ROM file',
+	},
+	loadTable: {
+		[-1]: 'engine not initialized or empty table',
+		[-2]: 'cannot write the table file',
+		[-3]: 'short write of the table file',
+		[-4]: 'table failed to load',
+	},
+}
+
+function checkBridgeCode(op: 'mountRom' | 'loadTable', code: number): void {
+	if (code !== 0) throw new HeadlessEngineError(op, `${FAILURE_CODES[op][code] ?? 'unknown failure'} (code ${code})`)
+}
+
 /** Byte-array facade over a raw bridge module; views stay valid until the next `StepFrame`. */
 export interface HeadlessEngine {
 	readonly url: string
-	init(): number
-	mountRom(fileName: string, zip: Uint8Array): number
-	loadTable(vpx: Uint8Array): Promise<number>
+	/** Throws {@link HeadlessEngineError} when the bridge cannot store the ROM. */
+	mountRom(fileName: string, zip: Uint8Array): void
+	/** Rejects with {@link HeadlessEngineError} when the table does not load. */
+	loadTable(vpx: Uint8Array): Promise<void>
 	stepFrame(nowMs: number): void
 	getPartCatalogJson(): string | undefined
 	getBuffer(kind: WasmBufferKind): { view: Float32Array; count: number; stride: number } | undefined
@@ -296,18 +337,14 @@ export interface HeadlessEngine {
 	/**
 	 * Live script image of one flasher part (`Flasher.ImageA`).
 	 * `undefined` when there is nothing to apply: no table, bad index,
-	 * non-flasher part, empty image, or a pre-bridge artifact (which stays
-	 * silent, never throws).
+	 * non-flasher part, or empty image.
 	 */
 	getFlasherImage(partIdx: number): string | undefined
 	getAudioInfo(): { sampleRate: number; channels: number }
 	getAudio(): { samples: Int16Array; channels: number } | undefined
 	pushKey(sdlScancode: number, isPressed: boolean): void
 	nudge(angleDeg: number, force: number): void
-	/**
-	 * Overall output level for the engine's own SDL audio path (table script
-	 * sounds). Silent on pre-audio-level artifacts, like `getFlasherImage`.
-	 */
+	/** Overall output level for the engine's own SDL audio path (table script sounds). */
 	setAudioLevel(volume: number, muted: boolean): void
 	getScriptErrorCount(): number
 	getScriptError(): string | undefined
@@ -329,11 +366,21 @@ export function romMountFileName(script: string | undefined, fileName: string): 
 	return `${game ?? fileName.replace(/\.zip$/i, '')}.zip`
 }
 
-/** Wraps a raw bridge module; blobs are copied in and freed per call. */
+/**
+ * Wraps a raw bridge module; blobs are copied in and freed per call. Throws
+ * {@link HeadlessEngineError} (`op: 'abi'`) unless the module speaks
+ * {@link HEADLESS_ABI_VERSION}, so no per-call export or layout probing is needed.
+ */
 export function wrapHeadlessEngine(raw: RawHeadlessModule, url: string): HeadlessEngine {
+	const abi = typeof raw._VpxWasm_GetAbiVersion === 'function' ? raw._VpxWasm_GetAbiVersion() : 0
+	if (abi !== HEADLESS_ABI_VERSION)
+		throw new HeadlessEngineError(
+			'abi',
+			`${url} speaks ABI ${abi}, expected ${HEADLESS_ABI_VERSION}: rebuild it (npm run build:wasm:headless)`,
+		)
 	const copyIn = (bytes: Uint8Array): { ptr: number; len: number } => {
 		const ptr = raw._malloc(bytes.length)
-		if (!ptr && bytes.length) throw new Error('VpxWasm _malloc failed')
+		if (!ptr && bytes.length) throw new HeadlessEngineError('malloc', `cannot allocate ${bytes.length} bytes`)
 		raw.HEAPU8.set(bytes, ptr)
 		return { ptr, len: bytes.length }
 	}
@@ -341,58 +388,56 @@ export function wrapHeadlessEngine(raw: RawHeadlessModule, url: string): Headles
 	// enter through the genuine export, applied on that receiver).
 	const loadTableAsync = suspendable(raw._VpxWasm_LoadTable, raw)
 	const destroyTableAsync = suspendable(raw._VpxWasm_DestroyTable, raw)
+	// One module serves table after table. Load and teardown may suspend
+	// (JSPI), so queue them: a teardown never interleaves with the next load.
+	let queue: Promise<unknown> = Promise.resolve()
+	const serialized = <T>(op: () => Promise<T>): Promise<T> => {
+		const run = queue.then(op)
+		queue = run.catch(() => {})
+		return run
+	}
 	const word = (index: number): number => raw.HEAPU32[index] ?? 0
 	// Last published DMD frame: frameId is the bridge change counter.
 	let dmdMemo: { width: number; height: number; format: number; frameId: number; desc: DmdFrameDesc } | undefined
-	// A corrupt engine word must degrade to `undefined`, never to a throw or
-	// a giant allocation out of the rAF loop. Caps are generous headroom, not
-	// exact limits; the live-heap bound is the real guard.
-	const inHeap = (bytePtr: number, bytes: number, align: number, cap: number): boolean => {
-		if (!Number.isInteger(bytePtr) || !Number.isInteger(bytes)) return false
-		if (bytePtr % align !== 0 || bytes < 0 || bytes > cap) return false
-		return bytePtr + bytes <= raw.HEAPU8.buffer.byteLength
+	// The ABI check rules out layout drift, so a descriptor outside the live
+	// heap is an engine bug: fail loudly instead of reading garbage or making
+	// a giant allocation. Caps are generous headroom, not exact limits.
+	const assertInHeap = (bytePtr: number, bytes: number, align: number, cap: number): void => {
+		if (bytePtr % align === 0 && bytes <= cap && bytePtr + bytes <= raw.HEAPU8.buffer.byteLength) return
+		throw new HeadlessEngineError('readDescriptor', `range ${bytePtr}+${bytes} is outside the engine heap`)
 	}
 	const readView = (kind: WasmBufferKind) => {
-		const desc = raw._VpxWasm_GetBuffer(WASM_BUFFER_IDS[kind])
-		if (!desc) return undefined
-		const base = desc >>> 2
+		const base = raw._VpxWasm_GetBuffer(WASM_BUFFER_IDS[kind]) >>> 2
 		const ptr = word(base)
+		if (!ptr) return undefined
 		const count = word(base + 1)
 		const stride = word(base + 2)
-		if (!ptr || !stride) return undefined
-		if (stride !== WASM_STRIDES[kind]) return undefined
-		if (!inHeap(ptr, count * stride * 4, 4, 1 << 24)) return undefined
+		assertInHeap(ptr, count * stride * 4, 4, 1 << 24)
 		return { view: floatRowView(raw.HEAPF32.buffer, ptr, count, stride), count, stride }
 	}
 	return {
 		url,
-		init: () => raw._VpxWasm_Init(),
 		mountRom: (fileName, zip) => {
 			const name = copyIn(new TextEncoder().encode(`${fileName}\0`))
 			const { ptr, len } = copyIn(zip)
 			try {
-				return raw._VpxWasm_MountRom(name.ptr, ptr, len)
+				checkBridgeCode('mountRom', raw._VpxWasm_MountRom(name.ptr, ptr, len))
 			} finally {
 				raw._free(ptr)
 				raw._free(name.ptr)
 			}
 		},
-		loadTable: vpx => {
-			const { ptr, len } = copyIn(vpx)
-			const release = (rc: number): number => {
-				raw._free(ptr)
-				return rc
-			}
-			try {
-				return loadTableAsync(ptr, len).then(release, err => {
+		loadTable: vpx =>
+			serialized(async () => {
+				// A new table restarts the bridge's frameId counter.
+				dmdMemo = undefined
+				const { ptr, len } = copyIn(vpx)
+				try {
+					checkBridgeCode('loadTable', await loadTableAsync(ptr, len))
+				} finally {
 					raw._free(ptr)
-					throw err
-				})
-			} catch (err) {
-				raw._free(ptr)
-				throw err
-			}
-		},
+				}
+			}),
 		stepFrame: nowMs => raw._VpxWasm_StepFrame(nowMs),
 		getPartCatalogJson: () => {
 			const ptr = raw._VpxWasm_GetPartCatalogJson()
@@ -410,7 +455,6 @@ export function wrapHeadlessEngine(raw: RawHeadlessModule, url: string): Headles
 			const width = word(base + 1)
 			const height = word(base + 2)
 			const format = word(base + 3)
-			if (width < 1 || width > 4096 || height < 1 || height > 4096) return undefined
 			// frameId is the bridge's change counter: same id means same
 			// pixels, so skip the heap copy on static frames.
 			const frameId = word(base + 4)
@@ -427,10 +471,10 @@ export function wrapHeadlessEngine(raw: RawHeadlessModule, url: string): Headles
 			let pixels: Uint8Array | Float32Array
 			if (format === DmdFrameFormat.Srgb888) {
 				// SRGB triplets: 3 bytes per dot (planar R, G, B).
-				if (!inHeap(bytePtr, width * height * 3, 1, 1 << 24)) return undefined
+				assertInHeap(bytePtr, width * height * 3, 1, 1 << 24)
 				pixels = new Uint8Array(raw.HEAPU8.buffer, bytePtr, width * height * 3).slice()
 			} else if (format === DmdFrameFormat.Lum32F) {
-				if (!inHeap(bytePtr, width * height * 4, 4, 1 << 26)) return undefined
+				assertInHeap(bytePtr, width * height * 4, 4, 1 << 26)
 				pixels = new Float32Array(raw.HEAPF32.buffer, bytePtr, width * height).slice()
 			} else return undefined
 			const out = {
@@ -444,40 +488,37 @@ export function wrapHeadlessEngine(raw: RawHeadlessModule, url: string): Headles
 			return out
 		},
 		getAudioInfo: () => {
-			const ptr = raw._VpxWasm_GetAudioInfo()
-			if (!ptr) return { sampleRate: 0, channels: 0 }
-			const base = ptr >>> 2
+			const base = raw._VpxWasm_GetAudioInfo() >>> 2
 			return { sampleRate: word(base), channels: word(base + 1) }
 		},
 		getAudio: () => {
-			const desc = raw._VpxWasm_GetAudio()
-			if (!desc) return undefined
-			const base = desc >>> 2
+			const base = raw._VpxWasm_GetAudio() >>> 2
 			const bytePtr = word(base)
 			const count = word(base + 1)
 			const channels = word(base + 2)
 			if (!bytePtr || !count) return undefined
 			// int16 samples: 2 bytes each, even start, bounded drain.
-			if (!inHeap(bytePtr, count * 2, 2, 1 << 22)) return undefined
+			assertInHeap(bytePtr, count * 2, 2, 1 << 22)
 			const samples = new Int16Array(raw.HEAPU8.buffer, bytePtr, count).slice()
 			return { samples, channels }
 		},
 		pushKey: (sdlScancode, isPressed) => raw._VpxWasm_PushKey(sdlScancode, isPressed),
 		nudge: (angleDeg, force) => raw._VpxWasm_Nudge(angleDeg, force),
-		// Old artifacts stay silent (never throw): the export postdates them.
-		setAudioLevel: (volume, muted) => raw._VpxWasm_SetAudioLevel?.(volume, muted),
+		setAudioLevel: (volume, muted) => raw._VpxWasm_SetAudioLevel(volume, muted),
 		getScriptErrorCount: () => Math.max(0, raw._VpxWasm_GetScriptErrorCount()),
 		getScriptError: () => {
 			const ptr = raw._VpxWasm_GetScriptError()
 			return ptr ? raw.UTF8ToString(ptr) : undefined
 		},
 		getFlasherImage: partIdx => {
-			// Pre-bridge artifacts stay silent (undefined), never throw: the
-			// per-frame flasher poll must not crash the rAF loop on them.
-			const ptr = raw._VpxWasm_GetFlasherImage?.(partIdx)
+			const ptr = raw._VpxWasm_GetFlasherImage(partIdx)
 			return ptr ? raw.UTF8ToString(ptr) : undefined
 		},
-		destroyTable: () => destroyTableAsync(),
+		destroyTable: () =>
+			serialized(async () => {
+				dmdMemo = undefined
+				await destroyTableAsync()
+			}),
 	}
 }
 
@@ -490,11 +531,6 @@ export class HeadlessEngineMissingError extends Error {
 		)
 		this.name = 'HeadlessEngineMissingError'
 	}
-}
-
-export interface HeadlessEngineHandle {
-	readonly engine: HeadlessEngine
-	readonly url: string
 }
 
 /**
@@ -511,12 +547,27 @@ export function wasmLocateFile(artifactUrl: string, pageBase?: string): (path: s
 	return (path: string) => new URL(path, base).href
 }
 
+const engines = new Map<string, Promise<HeadlessEngine>>()
+
 /**
- * Loads the headless-engine ES module (`-sMODULARIZE=1 -sEXPORT_ES6=1`) and
- * wraps it in the byte-array facade. Rejects with
- * {@link HeadlessEngineMissingError} when the artifact is absent.
+ * Loads the headless-engine ES module (`-sMODULARIZE=1 -sEXPORT_ES6=1`) once
+ * per URL, wraps it in the byte-array facade and initializes the bridge.
+ * Every caller shares that module (one heap and one pthread pool per page) and
+ * loads its table into it in turn. Rejects with {@link HeadlessEngineMissingError}
+ * when the artifact is absent and with {@link HeadlessEngineError} on an ABI
+ * mismatch; a failed load is not cached.
  */
-export async function loadHeadlessEngine(url = 'wasm/vpinball-headless.js'): Promise<HeadlessEngineHandle> {
+export function loadHeadlessEngine(url = 'wasm/vpinball-headless.js'): Promise<HeadlessEngine> {
+	let engine = engines.get(url)
+	if (!engine) {
+		engine = instantiateHeadlessEngine(url)
+		engines.set(url, engine)
+		engine.catch(() => engines.delete(url))
+	}
+	return engine
+}
+
+async function instantiateHeadlessEngine(url: string): Promise<HeadlessEngine> {
 	let factory: unknown
 	try {
 		const imported = (await import(/* @vite-ignore */ url)) as { default?: unknown }
@@ -529,7 +580,9 @@ export async function loadHeadlessEngine(url = 'wasm/vpinball-headless.js'): Pro
 	const raw = (await (factory as (module?: { locateFile?: (path: string) => string }) => Promise<RawHeadlessModule>)({
 		locateFile,
 	})) as RawHeadlessModule
-	return { engine: wrapHeadlessEngine(raw, url), url }
+	const engine = wrapHeadlessEngine(raw, url)
+	raw._VpxWasm_Init()
+	return engine
 }
 
 /**
