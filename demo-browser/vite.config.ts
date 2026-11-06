@@ -51,7 +51,6 @@ export default defineConfig({
 			allow: [
 				root,
 				repoRoot,
-				resolve(repoRoot, 'dist'),
 				resolve(repoRoot, 'dist-esm'),
 				resolve(repoRoot, 'wasm/dist'),
 				resolve(repoRoot, 'wasm/kernels/dist'),

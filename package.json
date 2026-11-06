@@ -1,5 +1,6 @@
 {
 	"name": "vpx-js",
+	"private": true,
 	"version": "2.0.0",
 	"description": "Visual Pinball for Node.js and the Browser",
 	"author": "freezy <freezy@vpdb.io>",
@@ -16,30 +17,8 @@
 	"engines": {
 		"node": ">=24"
 	},
-	"exports": {
-		".": {
-			"types": "./dist/index.d.ts",
-			"import": "./dist/index.js"
-		},
-		"./lib/refs.node.js": {
-			"types": "./dist/lib/refs.node.d.ts",
-			"import": "./dist/lib/refs.node.js"
-		},
-		"./lib/refs.browser.js": {
-			"types": "./dist/lib/refs.browser.d.ts",
-			"import": "./dist/lib/refs.browser.js"
-		}
-	},
-	"main": "./dist/index.js",
-	"types": "./dist/index.d.ts",
-	"files": [
-		"dist/**",
-		"res/**"
-	],
 	"scripts": {
-		"build": "node build/parallel.mjs -- \"npm run build:js\" \"npm run build:esm:tsc\" && node build/parallel.mjs -- \"npm run build:info\" \"npm run build:cp\" \"npm run build:esm:cp\" \"npm run build:dts\"",
-		"build:pre": "tsx build/write-info.ts",
-		"build:cp": "mkdir -p dist && cp -r res dist/",
+		"build": "npm run build:esm",
 		"build:esm": "node build/parallel.mjs -- \"npm run build:esm:tsc\" \"npm run build:esm:cp\"",
 		"build:wasm": "wasm/build.sh",
 		"build:wasm:headless": "wasm/build-headless.sh",
@@ -51,7 +30,7 @@
 		"format": "biome check --write .",
 		"test": "vitest run --coverage",
 		"test:watch": "vitest --watch",
-		"dev": "tsup --watch",
+		"dev": "tsc -p tsconfig.json --watch",
 		"verify:table": "tsx test/harness/verify-table.ts",
 		"verify:browser": "tsx test/harness/verify-browser.ts",
 		"verify:play-room": "tsx test/harness/verify-play-room.ts",
@@ -65,10 +44,7 @@
 		"bench:walking-dead": "node test/harness/bench.mjs --vpx=walking_dead.vpx --profile",
 		"bench:walking-dead:browser": "node test/harness/bench.mjs --vpx=walking_dead.vpx --balls=1 --duration=5000 --warmup=1500 --profile",
 		"bench:walking-dead:vitest": "vitest bench test/bench/walking-dead.bench.ts --run",
-		"build:info": "tsx build/write-info.ts",
-		"build:js": "tsup",
-		"build:dts": "tsx build/write-dts.ts",
-		"build:esm:tsc": "tsc -p tsconfig.json --outDir dist-esm --declaration false --declarationMap false",
+		"build:esm:tsc": "tsc -p tsconfig.json",
 		"build:esm:cp": "mkdir -p dist-esm && cp -r res dist-esm/; echo 'dist-esm built'; touch demo-browser/vite.config.ts 2>/dev/null || true",
 		"check": "node build/parallel.mjs -- \"npm run lint\" \"npm run typecheck\" \"npm run typecheck:tests\" \"npm run test\"",
 		"check:fast": "node build/parallel.mjs -- \"npm run lint\" \"npm run typecheck\" \"npm run typecheck:tests\""
@@ -94,7 +70,6 @@
 		"puppeteer-core": "^25.16.0",
 		"sinon": "^22.1.0",
 		"sinon-chai": "^4.0.1",
-		"tsup": "^9.0.0",
 		"tsx": "^4.23.15",
 		"typescript": "^7.0.2",
 		"vite": "^8.3.5",

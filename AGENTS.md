@@ -1,13 +1,12 @@
 # vpx-js — Agent Guide (repo root)
 
-ESM-only Visual Pinball headless-WASM port (Node `>=24`, TypeScript 7, `tsup`/`Biome`/`Vitest`, `three@0.186`, PinMAME WASM). Never hand-edit `external/vpinball` — change it via numbered patches under `wasm/modules/headless/patches/` (idempotent build, pristine series).
+ESM-only Visual Pinball headless-WASM port (Node `>=24`, TypeScript 7, `tsc`/`Biome`/`Vitest`, `three@0.186`, PinMAME WASM). Never hand-edit `external/vpinball` — change it via numbered patches under `wasm/modules/headless/patches/` (idempotent build, pristine series).
 
 ## Commands
 
 ```bash
 npm ci
-npm run build              # tsup + tsc → dist + dist-esm
-npm run build:esm          # tsc → dist-esm only (required before demo-browser)
+npm run build              # tsc → dist-esm (= build:esm; required before demo-browser)
 npm run build:wasm:headless # emscripten headless build (needs emsdk; artifact → demo-browser/public/wasm/)
 npx tsc --noEmit           # typecheck
 npx biome check .          # lint/format (tabs, width 120)
@@ -25,12 +24,13 @@ Node via `fnm` — `.nvmrc` `24`, `.node-version` `24.19.0`. Activate with `eval
 - `test/fixtures/*.vpx` + `test/harness/` + `lib/**/*.spec.ts`
 - `wasm/modules/headless/` (patches) + `external/vpinball` (pinned submodule) → `npm run build:wasm:headless` → `demo-browser/public/wasm/`; `external/pinmame` (pinned submodule) mounted as ROM source
 - `demo-browser/` — local static Three.js WebGPU viewer + E2E (`demo-browser/e2e/`)
-- `dist/`, `dist-esm/`, `coverage/`, `node_modules/`, `*.vpx` — ignored, do not commit
+- `dist-esm/`, `coverage/`, `node_modules/`, `*.vpx` — ignored, do not commit
 
 ## Conventions
 
 - Fix root cause; keep it simple, elegant, idiomatic. Keep the one-line GPL copyright header on every source file; prefer descriptive names (single letters only for conventional math locals).
 - ESM only (`es2024`), Biome (tabs, 120, `organizeImports`). Minimal code; comments only for non-obvious.
+- Not published (`private`, no package entry): consumers deep-import `dist-esm/lib/...` (demo-browser, harness) or `lib/` source (specs, `tsx`).
 - Rebuild `dist-esm` before running `demo-browser` (vite imports from `../dist-esm/lib/...`).
 
 ## Testing
