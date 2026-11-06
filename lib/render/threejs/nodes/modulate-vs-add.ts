@@ -2,7 +2,7 @@
 
 import { CustomBlending, OneMinusSrcColorFactor, ReverseSubtractEquation, SrcAlphaFactor } from 'three'
 import { float, vec4 } from 'three/tsl'
-import type { MeshBasicNodeMaterial } from 'three/webgpu'
+import type { MeshBasicNodeMaterial, Node } from 'three/webgpu'
 
 /**
  * Native "modulate vs add" blend of AB_ADD flashers (`flasher.cpp`) and bulb
@@ -24,6 +24,6 @@ export function applyModulateVsAddBlending(mat: MeshBasicNodeMaterial): void {
  * emit it. Assign to `outputNode`: NodeMaterial clamps `colorNode` output to
  * `max(0)`, which would zero it. Needs a float target, like native's HDR buffer.
  */
-export function modulateVsAddOutput(light: any, modulate: any) {
+export function modulateVsAddOutput(light: Node<'vec3'> | Node<'color'>, modulate: Node<'float'>) {
 	return vec4(light.mul(modulate).negate(), float(1).div(modulate).sub(1))
 }

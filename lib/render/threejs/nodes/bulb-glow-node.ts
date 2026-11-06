@@ -1,7 +1,7 @@
 import type { Group } from 'three'
 import { BufferAttribute, BufferGeometry, Color, DoubleSide, Matrix4, Mesh, Vector2 } from 'three'
 import { attribute, clamp, Fn, float, length, max, mix, positionLocal, pow, sqrt, uniform } from 'three/tsl'
-import { MeshBasicNodeMaterial } from 'three/webgpu'
+import { MeshBasicNodeMaterial, type Node } from 'three/webgpu'
 import { clampModulateVsAdd } from '../../../vpt/flasher/flasher-blend.js'
 import type { Table } from '../../../vpt/table/table.js'
 import { getAuthoredVisible } from '../authored-visible.js'
@@ -23,6 +23,44 @@ export interface BulbGlowOptions {
 	modulateVsAdd?: number
 }
 
+type GlowColor = Node<'vec3'> | Node<'color'>
+
+/** Halo composite shared by the per-quad (uniform) and merged (attribute) materials. */
+function glowOutput(
+	center: Node<'vec2'>,
+	invFalloff: Node<'float'>,
+	falloffPower: Node<'float'>,
+	color: GlowColor,
+	color2: GlowColor,
+	intensity: Node<'float'>,
+	modulate: Node<'float'>,
+) {
+	// Matches fs_light.sc: atten = pow(max(1 - saturate(len), 0.0001),
+	// falloff_power) with the color ramp on the unclamped sqrt(len) —
+	// the floor keeps a fully covered pixel from going exactly 0 and
+	// the ramp extrapolates past the rim instead of clamping.
+	const len = length(positionLocal.xy.sub(center)).mul(invFalloff)
+	const atten = pow(max(float(1).sub(clamp(len, float(0), float(1))), float(0.0001)), falloffPower)
+	const glowColor = mix(color2, color, sqrt(len))
+	// Authored halo polygons routinely extend past the cabinet walls
+	// (giant GI discs, flasher sheets); from outside, those overhanging
+	// fragments sit in front of the side art and wash it with playfield
+	// light. Confine the halo to the playfield footprint (same mask as
+	// the transmission lift); disabled until the viewer configures the
+	// playfield area, so unconfigured renders are unchanged.
+	const footprint = mix(float(1), inPlayfieldBounds(playfieldUv()), uBulbGlowFootprintClip)
+	return modulateVsAddOutput(glowColor.mul(atten).mul(intensity).mul(footprint), modulate)
+}
+
+function setupGlowMaterial(mat: MeshBasicNodeMaterial): void {
+	applyModulateVsAddBlending(mat)
+	mat.transparent = true
+	mat.depthWrite = false
+	mat.depthTest = true
+	mat.toneMapped = true
+	mat.side = DoubleSide
+}
+
 export function createBulbGlowNodeMaterial(options: BulbGlowOptions): MeshBasicNodeMaterial {
 	const mat = new MeshBasicNodeMaterial()
 	const uColor = uniform(new Color(options.color))
@@ -35,30 +73,8 @@ export function createBulbGlowNodeMaterial(options: BulbGlowOptions): MeshBasicN
 	// (transparent sort, or bake order when merged), not native's z + depthBias.
 	const uModulate = uniform(clampModulateVsAdd(options.modulateVsAdd))
 
-	mat.outputNode = Fn(() => {
-		// Matches fs_light.sc: atten = pow(max(1 - saturate(len), 0.0001),
-		// falloff_power) with the color ramp on the unclamped sqrt(len) —
-		// the floor keeps a fully covered pixel from going exactly 0 and
-		// the ramp extrapolates past the rim instead of clamping.
-		const len = length(positionLocal.xy.sub(uCenter)).mul(uInvFalloff)
-		const atten = pow(max(float(1).sub(clamp(len, float(0), float(1))), float(0.0001)), uFalloffPower)
-		const glowColor = mix(uColor2, uColor, sqrt(len))
-		// Authored halo polygons routinely extend past the cabinet walls
-		// (giant GI discs, flasher sheets); from outside, those overhanging
-		// fragments sit in front of the side art and wash it with playfield
-		// light. Confine the halo to the playfield footprint (same mask as
-		// the transmission lift); disabled until the viewer configures the
-		// playfield area, so unconfigured renders are unchanged.
-		const footprint = mix(float(1), inPlayfieldBounds(playfieldUv()), uBulbGlowFootprintClip)
-		return modulateVsAddOutput(glowColor.mul(atten).mul(uIntensity).mul(footprint), uModulate)
-	})()
-
-	applyModulateVsAddBlending(mat)
-	mat.transparent = true
-	mat.depthWrite = false
-	mat.depthTest = true
-	mat.toneMapped = true
-	mat.side = DoubleSide
+	mat.outputNode = Fn(() => glowOutput(uCenter, uInvFalloff, uFalloffPower, uColor, uColor2, uIntensity, uModulate))()
+	setupGlowMaterial(mat)
 
 	const ud = mat.userData as Record<string, unknown>
 	ud.__bulbGlow = true
@@ -134,20 +150,9 @@ export function createMergedBulbGlowMaterial(): MeshBasicNodeMaterial {
 	const aColor = attribute<'vec3'>('aGlowColor', 'vec3')
 	const aColor2 = attribute<'vec3'>('aGlowColor2', 'vec3')
 	const aDyn = attribute<'vec2'>('aGlowDyn', 'vec2')
-	mat.outputNode = Fn(() => {
-		// Same math as the per-quad material; aDyn is the live (intensity, modulate) per lamp.
-		const len = length(positionLocal.xy.sub(aCenter)).mul(aParams.x)
-		const atten = pow(max(float(1).sub(clamp(len, float(0), float(1))), float(0.0001)), aParams.y)
-		const glowColor = mix(aColor2, aColor, sqrt(len))
-		const footprint = mix(float(1), inPlayfieldBounds(playfieldUv()), uBulbGlowFootprintClip)
-		return modulateVsAddOutput(glowColor.mul(atten).mul(aDyn.x).mul(footprint), aDyn.y)
-	})()
-	applyModulateVsAddBlending(mat)
-	mat.transparent = true
-	mat.depthWrite = false
-	mat.depthTest = true
-	mat.toneMapped = true
-	mat.side = DoubleSide
+	// aParams is (inverse falloff, falloff power); aDyn is the live (intensity, modulate) per lamp.
+	mat.outputNode = Fn(() => glowOutput(aCenter, aParams.x, aParams.y, aColor, aColor2, aDyn.x, aDyn.y))()
+	setupGlowMaterial(mat)
 	;(mat.userData as Record<string, unknown>).__bulbGlowMerged = true
 	return mat
 }
