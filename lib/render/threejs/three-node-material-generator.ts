@@ -1,6 +1,7 @@
 import { Color, DoubleSide, type Object3D } from 'three'
 import { Fn, texture, uniform, uv, vec4 } from 'three/tsl'
-import type { Material } from '../../vpt/material.js'
+import { BALL_BASE_COLOR } from '../../vpt/ball/ball-data.js'
+import { DEFAULT_MATERIAL_COLOR, type Material } from '../../vpt/material.js'
 import { isOpenMesh, isValidCutout, resolveTransparency } from '../../vpt/primitive/primitive-material-protocol.js'
 import type { MeshConvertOptions, RenderInfo } from '../irender-api.js'
 import { BALL_METALNESS, BALL_ROUGHNESS, isBaked, normalizePendingKeys, pendingKeyFor } from './material-shared.js'
@@ -281,8 +282,7 @@ export class ThreeNodeMaterialGenerator {
 
 		if (isBall && envMap && this.mapGenerator.hasTexture(envMap)) {
 			const envTex = this.mapGenerator.getTexture(envMap)
-			const tint = material?.baseColor ? new Color(material.baseColor).getHex() : 0xc0c0c0
-			mat = createDynamicBallNodeMaterial(envTex, tint)
+			mat = createDynamicBallNodeMaterial(envTex, material?.baseColor ?? BALL_BASE_COLOR)
 			mat.name = material ? `material:${material.name}` : 'material:ball'
 			this.cachedMaterials[key] = mat
 			return mat
@@ -332,7 +332,7 @@ export class ThreeNodeMaterialGenerator {
 				threeMaterial.roughness = 0.4
 				threeMaterial.opacity = 0.4
 			} else {
-				threeMaterial.color = new Color(0xb469ff)
+				threeMaterial.color = new Color(DEFAULT_MATERIAL_COLOR)
 				threeMaterial.metalness = 0
 				threeMaterial.roughness = 0
 				threeMaterial.opacity = 1

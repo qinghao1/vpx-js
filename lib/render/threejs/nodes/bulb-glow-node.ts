@@ -3,9 +3,13 @@ import { BufferAttribute, BufferGeometry, Color, DoubleSide, Matrix4, Mesh, Vect
 import { attribute, clamp, Fn, float, length, max, mix, positionLocal, pow, sqrt, uniform } from 'three/tsl'
 import { MeshBasicNodeMaterial } from 'three/webgpu'
 import { clampModulateVsAdd } from '../../../vpt/flasher/flasher-blend.js'
+import type { Table } from '../../../vpt/table/table.js'
 import { getAuthoredVisible } from '../authored-visible.js'
 import { applyModulateVsAddBlending, modulateVsAddOutput } from './modulate-vs-add.js'
 import { inPlayfieldBounds, playfieldUv, uBulbGlowFootprintClip } from './primitive-bdl-node.js'
+
+/** Falloff floor: keeps the inverse halo radius finite. */
+const MIN_FALLOFF = 0.1
 
 export interface BulbGlowOptions {
 	color: number
@@ -24,7 +28,7 @@ export function createBulbGlowNodeMaterial(options: BulbGlowOptions): MeshBasicN
 	const uColor = uniform(new Color(options.color))
 	const uColor2 = uniform(new Color(options.color2))
 	const uCenter = uniform(new Vector2(options.centerX, options.centerY))
-	const uInvFalloff = uniform(1 / Math.max(options.falloff, 0.1))
+	const uInvFalloff = uniform(1 / Math.max(options.falloff, MIN_FALLOFF))
 	const uFalloffPower = uniform(options.falloffPower)
 	const uIntensity = uniform(options.intensity)
 	// REVSUBTRACT is order-dependent: overlapping halos composite in draw order
@@ -177,18 +181,14 @@ interface GlowLightParams {
 	falloffPower: number
 }
 
-function glowParamsOf(table: unknown, lightName: string): GlowLightParams | undefined {
-	const lights = (table as { lights?: Record<string, { data?: Record<string, unknown> }> })?.lights
-	const data = lights?.[lightName]?.data
+function glowParamsOf(table: Table, lightName: string): GlowLightParams | undefined {
+	const data = table.lights[lightName]?.data
 	if (!data) return undefined
-	const center = data.center as { x?: number; y?: number } | undefined
-	const right = (table as { data?: { right?: number } })?.data?.right || 1
-	const bottom = (table as { data?: { bottom?: number } })?.data?.bottom || 1
 	return {
-		centerX: typeof center?.x === 'number' ? center.x : right / 2,
-		centerY: typeof center?.y === 'number' ? center.y : bottom / 2,
-		falloff: Math.max(typeof data.falloff === 'number' ? data.falloff : 50, 0.1),
-		falloffPower: typeof data.falloffPower === 'number' ? data.falloffPower : 2,
+		centerX: data.center?.x ?? (table.data?.right || 1) / 2,
+		centerY: data.center?.y ?? (table.data?.bottom || 1) / 2,
+		falloff: Math.max(data.falloff, MIN_FALLOFF),
+		falloffPower: data.falloffPower,
 	}
 }
 
@@ -298,7 +298,7 @@ function anyGlowLive(dyn: BufferAttribute): boolean {
  *
  * @returns number of quads folded into the merged mesh (0 when nothing merged).
  */
-export function mergeBulbGlowQuads(root: Group, table: unknown): number {
+export function mergeBulbGlowQuads(root: Group, table: Table): number {
 	root.updateMatrixWorld(true)
 	const invRoot = new Matrix4().copy(root.matrixWorld).invert()
 	interface Candidate {
@@ -400,7 +400,7 @@ export function mergeBulbGlowQuads(root: Group, table: unknown): number {
 		}
 		const ccx = e0 * c.params.centerX + e4 * c.params.centerY + e12
 		const ccy = e1 * c.params.centerX + e5 * c.params.centerY + e13
-		const invFalloff = 1 / Math.max(c.params.falloff, 0.1) / sx
+		const invFalloff = 1 / Math.max(c.params.falloff, MIN_FALLOFF) / sx
 		for (let i = 0; i < count; i++) {
 			const v = vCursor + i
 			aCenter[v * 2] = ccx

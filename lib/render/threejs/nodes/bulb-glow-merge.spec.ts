@@ -11,6 +11,7 @@ import {
 	StaticDrawUsage,
 } from 'three'
 import { describe, expect, it } from 'vitest'
+import type { Table } from '../../../vpt/table/table.js'
 import { getAuthoredVisible, setAuthoredVisible } from '../authored-visible.js'
 import { ThreeLightGenerator } from '../three-light-generator.js'
 import {
@@ -43,7 +44,7 @@ function glowQuad(color: number, intensity: number): Mesh {
 	return mesh
 }
 
-function tableStub(): unknown {
+function tableStub(): Table {
 	const light = (intensity: number) => ({
 		data: {
 			center: { x: 500, y: 1000 },
@@ -57,7 +58,7 @@ function tableStub(): unknown {
 			bulbModulateVsAdd: 0.9,
 		},
 	})
-	return { data: { right: 1000, bottom: 2000 }, lights: { lampA: light(10), lampB: light(10) } }
+	return { data: { right: 1000, bottom: 2000 }, lights: { lampA: light(10), lampB: light(10) } } as unknown as Table
 }
 
 function twoLampRoot(): { root: Group; quadA: Mesh; quadB: Mesh } {
@@ -166,7 +167,7 @@ describe('merged bulb-glow composite', () => {
 		setAuthoredVisible(quadB, false)
 		expect(getAuthoredVisible(quadB)).to.equal(false)
 		// Only one mergeable quad remains (quadA); quadB has no table entry either.
-		const table = { data: { right: 1000, bottom: 2000 }, lights: {} }
+		const table = { data: { right: 1000, bottom: 2000 }, lights: {} } as unknown as Table
 		expect(mergeBulbGlowQuads(root, table)).to.equal(0)
 		expect(quadA.visible).to.equal(true)
 		expect(quadB.visible).to.equal(true)

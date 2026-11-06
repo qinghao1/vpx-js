@@ -57,6 +57,7 @@ function ensurePool(): Worker[] | null {
 		}
 		return pool
 	} catch {
+		// Worker construction can fail (CSP, no module workers); null makes callers decode on the main thread.
 		return null
 	}
 }

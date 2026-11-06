@@ -3,6 +3,9 @@
 
 import { ItemData } from '../item-data.js'
 
+/** Base tint of the chrome ball material. */
+export const BALL_BASE_COLOR = 0xc0c0c0
+
 /** @see https://github.com/vpinball/vpinball/blob/master/ball.cpp */
 export class BallData extends ItemData {
 	public color = 0xffffff

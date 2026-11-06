@@ -8,7 +8,7 @@ import { Material } from '../material.js'
 import type { Mesh } from '../mesh.js'
 import type { Table } from '../table/table.js'
 import { Texture } from '../texture.js'
-import type { BallData } from './ball-data.js'
+import { BALL_BASE_COLOR, type BallData } from './ball-data.js'
 import { BallMeshGenerator } from './ball-mesh-generator.js'
 import type { BallState } from './ball-state.js'
 import { BallUpdater } from './ball-updater.js'
@@ -80,7 +80,7 @@ export class Ball {
 		const m = new Material()
 		m.name = 'ball'
 		m.isMetal = true
-		m.baseColor = 0xc0c0c0
+		m.baseColor = BALL_BASE_COLOR
 		m.roughness = 0.8
 		return m
 	}
