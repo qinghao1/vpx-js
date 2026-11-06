@@ -2,10 +2,8 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import type { IRenderApi } from '../../render/irender-api.js'
-// Follow-up: fold blend-target switching into a flasher-material protocol so
-// this import (three material mutation) can move behind `IRenderApi` too.
-import { convertFlasherBlend, updatePrimitiveBdl } from '../../render/threejs/nodes/primitive-bdl-node.js'
 import { ItemUpdater, noteTextureDemand } from '../item-updater.js'
+import { updatePrimitiveBdl } from '../primitive/primitive-material-protocol.js'
 import { type EmuFloatState, lightmapAlphaFactor, tryGetLinkedFloatState } from '../state-link.js'
 import type { Table } from '../table/table.js'
 import { clampModulateVsAdd } from './flasher-blend.js'
@@ -106,10 +104,10 @@ export class FlasherUpdater extends ItemUpdater<FlasherState> {
 					if (userData?.__uModulate) userData.__uModulate.value = clampModulateVsAdd(this.effModulateVsAdd)
 					if (userData?.__uFlat?.value?.set)
 						userData.__uFlat.value.set(this.state.color).multiplyScalar(intensity)
-					convertFlasherBlend(mat, absorb ? 'absorb' : 'additive')
+					renderApi.convertFlasherBlend?.(mat, absorb ? 'absorb' : 'additive')
 				} else {
 					// Node graphs ignore classic color/opacity writes; they convert instead.
-					if (userData?.__addBlend === true) convertFlasherBlend(mat, 'plain')
+					if (userData?.__addBlend === true) renderApi.convertFlasherBlend?.(mat, 'plain')
 					else {
 						// BDL overlays carry tint/fade as uniforms (same protocol
 						// the primitive updater uses); the classic writes below

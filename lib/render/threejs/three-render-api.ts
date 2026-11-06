@@ -15,6 +15,7 @@ import {
 	type Texture as ThreeTexture,
 	Vector3,
 } from 'three'
+import type { MeshBasicNodeMaterial } from 'three/webgpu'
 import type { Matrix3D } from '../../math/matrix.js'
 import { type AnimationGate, animationGate } from '../../util/animation-gate.js'
 import { progress } from '../../util/logger.js'
@@ -23,9 +24,17 @@ import type { LightData, LightState } from '../../vpt/light/light.js'
 import type { Mesh } from '../../vpt/mesh.js'
 import type { Table, TableGenerateOptions } from '../../vpt/table/table.js'
 import type { Texture } from '../../vpt/texture.js'
-import type { IRenderApi, IRenderable, MaterialApplyDesc, MeshConvertOptions, RenderInfo } from '../irender-api.js'
+import type {
+	FlasherBlendTarget,
+	IRenderApi,
+	IRenderable,
+	MaterialApplyDesc,
+	MeshConvertOptions,
+	RenderInfo,
+} from '../irender-api.js'
 import { applyBatchedVisibility, unbatchInstances } from './batched-visibility.js'
 import { cloneMaterialForWrite } from './material-shared.js'
+import { convertFlasherBlend } from './nodes/primitive-bdl-node.js'
 import { installBvh } from './three-bvh.js'
 import { ThreeConverter } from './three-converter.js'
 import { ThreeLightGenerator } from './three-light-generator.js'
@@ -277,6 +286,10 @@ export class ThreeRenderApi implements IRenderApi<Object3D, BufferGeometry, Poin
 
 	public cloneMaterialForWrite<MATERIAL>(mat: MATERIAL): MATERIAL {
 		return cloneMaterialForWrite(mat)
+	}
+
+	public convertFlasherBlend<MATERIAL>(mat: MATERIAL, target: FlasherBlendTarget): void {
+		convertFlasherBlend(mat as unknown as MeshBasicNodeMaterial, target)
 	}
 
 	public createObjectFromRenderable(

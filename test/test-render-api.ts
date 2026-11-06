@@ -18,8 +18,15 @@
  */
 
 import type { Matrix3D } from '../lib/math/matrix.js'
-import type { IRenderApi, IRenderable, MaterialApplyDesc, RenderInfo } from '../lib/render/irender-api'
+import type {
+	FlasherBlendTarget,
+	IRenderApi,
+	IRenderable,
+	MaterialApplyDesc,
+	RenderInfo,
+} from '../lib/render/irender-api'
 import { cloneMaterialForWrite } from '../lib/render/threejs/material-shared.js'
+import { convertFlasherBlend } from '../lib/render/threejs/nodes/primitive-bdl-node.js'
 import type { ItemState } from '../lib/vpt/item-state'
 import type { LightData, LightState } from '../lib/vpt/light/light'
 import type { Mesh } from '../lib/vpt/mesh'
@@ -35,6 +42,10 @@ export class TestRenderApi implements IRenderApi<any, any, any> {
 
 	public cloneMaterialForWrite<MATERIAL>(mat: MATERIAL): MATERIAL {
 		return cloneMaterialForWrite(mat)
+	}
+
+	public convertFlasherBlend<MATERIAL>(mat: MATERIAL, target: FlasherBlendTarget): void {
+		convertFlasherBlend(mat as any, target)
 	}
 
 	public applyMatrixToNode(_matrix: Matrix3D, _node: any | undefined): void {}

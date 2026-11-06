@@ -30,6 +30,9 @@ export function isRenderable(arg: unknown): arg is IRenderable<ItemState> {
 	return typeof arg === 'object' && arg !== null && 'getMeshes' in arg
 }
 
+/** Live overlay blend: `FlasherData::AddBlendMode` for addBlend flashers, plain alpha otherwise. */
+export type FlasherBlendTarget = 'absorb' | 'additive' | 'plain'
+
 export interface Meshes<GEOMETRY> {
 	[key: string]: RenderInfo<GEOMETRY>
 }
@@ -172,6 +175,16 @@ export interface IRenderApi<NODE, GEOMETRY, POINT_LIGHT> {
 	 */
 	cloneMaterialForWrite?<MATERIAL>(mat: MATERIAL): MATERIAL
 
+	/**
+	 * Switches an additive overlay material to its live blend target; other
+	 * materials stay untouched. Optional for backward compatibility: without
+	 * it overlays keep the blend they were created with.
+	 *
+	 * @param mat Material to convert
+	 * @param target Blend target the flasher's live state selects
+	 */
+	convertFlasherBlend?<MATERIAL>(mat: MATERIAL, target: FlasherBlendTarget): void
+
 	createObjectFromRenderable(renderable: IRenderable<ItemState>, table: Table, opts: TableGenerateOptions): NODE
 
 	createMesh(obj: RenderInfo<GEOMETRY>): NODE
@@ -210,7 +223,8 @@ export interface ITextureLoader<TEXTURE> {
 	/**
 	 * Whether an engine-shipped default texture exists for this name, without loading it.
 	 * Lets callers skip doomed load attempts for table-missing names that are no default.
-	 * Optional for backward compatibility with custom loaders.
+	 * Optional for backward compatibility with custom loaders: callers fall back to
+	 * attempting the default load for every table-missing name.
 	 *
 	 * @param name Texture name as referenced by the scene
 	 */
@@ -218,7 +232,8 @@ export interface ITextureLoader<TEXTURE> {
 
 	/**
 	 * Warms an expensive decode pool ahead of dispatch (e.g. HDR workers).
-	 * Optional for backward compatibility with custom loaders.
+	 * Optional for backward compatibility with custom loaders: without it the
+	 * pool starts cold on the first decode.
 	 */
 	warmup?(): void
 }
