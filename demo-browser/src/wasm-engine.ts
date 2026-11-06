@@ -132,6 +132,11 @@ export class WasmEngine {
 		this.liveBalls.clear()
 		this.resetAudioFormat()
 		this.sync = undefined
+		// Without isolation the threaded engine aborts deep inside wasm: say why.
+		if (!crossOriginIsolated)
+			throw new WasmEngineStartError(
+				'The engine needs a cross-origin-isolated page: serve COOP/COEP headers, or build with VITE_COI_SW=1 for static hosts',
+			)
 		// Page-relative so subpath deploys work: document.baseURI resolves
 		// against the page, unlike a module-relative URL under `/@fs/`. The
 		// module is shared page-wide; this instance owns its table from here.

@@ -1,6 +1,7 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 // @ts-nocheck
 
+import { crossOriginIsolate } from './cross-origin-isolation.js'
 import { createTestApi } from './test-api.js'
 import { initHelp } from './ui/help-dialog.js'
 import { initTableBrowser } from './ui/table-browser.js'
@@ -20,6 +21,8 @@ function parseViewerOptions(search) {
 		autoplay: params.get('autoplay') !== '0',
 	}
 }
+
+if (import.meta.env.VITE_COI_SW) await crossOriginIsolate()
 
 const options = parseViewerOptions(location.search)
 const viewer = new Viewer(options)

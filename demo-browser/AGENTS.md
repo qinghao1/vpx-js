@@ -19,6 +19,7 @@ Requires `dist-esm` built. `server.fs.allow` covers the repo root, `~/Downloads`
 
 - `index.html` — semantic HTML5 shell, loads `src/styles/app.css` + `src/main.ts` (no global `log-capture.js` script)
 - `src/main.ts` — bootstrapper: parses URL options once, creates `Viewer`, wires file pickers, drag & drop, log buttons, and the dev-only `window.viewer`/`window.vpx`
+- `src/cross-origin-isolation.ts` + `coi-sw.js` — static hosts without COOP/COEP (GitHub Pages): `VITE_COI_SW=1` builds ship a header-adding service worker and register it (one reload); other builds contain neither
 - `src/test-api.ts` — typed e2e surface (`window.vpx`: state, `whenReady`, `setMode`, `sendKey`, `nudge`, `step`, `dmd`)
 - `src/viewer.ts` — Viewer coordinator (~2200 LOC, delegates to subsystems)
 - `src/config.js` — controls, camera presets & constants (~120 LOC)
@@ -46,4 +47,4 @@ Requires `dist-esm` built. `server.fs.allow` covers the repo root, `~/Downloads`
 npx tsx demo-browser/e2e/integration.mjs --url=https://localhost:3000/?vpx=/test/fixtures/table-empty.vpx&mode=play --out=/tmp
 ```
 
-Also via `test/harness/verify-browser.ts` and `verify-all.ts`. On bug fixes, add regression test — `lib/**/*.spec.ts` for unit, `demo-browser/e2e/integration.mjs` for E2E.
+Without `--url` it runs `table-empty.vpx` and, when `findWalkingDead()`/`findWalkingDeadRom()` find them, The Walking Dead with its ROM (`twd` label: every gameplay leg required). That run boots PinMAME, so it catches engine aborts on real tables; it uses the host GPU when one exists (`USE_SWIFTSHADER=1` forces software GL). It tests whatever engine `public/wasm/` holds. Also via `test/harness/verify-browser.ts` and `verify-all.ts`. On bug fixes, add regression test — `lib/**/*.spec.ts` for unit, `demo-browser/e2e/integration.mjs` for E2E.

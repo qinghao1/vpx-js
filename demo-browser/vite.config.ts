@@ -65,6 +65,20 @@ export default defineConfig({
 	plugins: [
 		basicSsl(),
 		{
+			// Static hosts without COOP/COEP (GitHub Pages) opt in to the
+			// header-adding service worker; other builds never ship it.
+			name: 'coi-service-worker',
+			apply: 'build',
+			generateBundle() {
+				if (process.env.VITE_COI_SW)
+					this.emitFile({
+						type: 'asset',
+						fileName: 'coi-sw.js',
+						source: fs.readFileSync(resolve(__dirname, 'coi-sw.js')),
+					})
+			},
+		},
+		{
 			name: 'static-fs',
 			configureServer(server) {
 				const send = (res: any, req: any, file: string, type: string) => {
