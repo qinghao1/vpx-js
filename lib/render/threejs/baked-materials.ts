@@ -99,8 +99,6 @@ function fixVr(mat: THREE.MeshStandardMaterial, isCab = false): void {
 	mat.needsUpdate = true
 }
 
-export const wrapBakedTex = wrapTexBaked
-
 export const applyBakedMaterial = (
 	mat: THREE.MeshStandardMaterial,
 	tex: THREE.Texture,

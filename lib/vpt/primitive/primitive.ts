@@ -66,7 +66,9 @@ export class Primitive extends Item<PrimitiveData> {
 				isTransparent,
 				depthBias: this.data.depthBias,
 				disableLighting: this.data.disableLightingTop,
-				disableLightingBelow: this.data.disableLightingBelow,
+				// Upstream forces full below-lift for static primitives
+				// (no under-light in the pre-render pass).
+				disableLightingBelow: this.data.staticRendering ? 1 : this.data.disableLightingBelow,
 				addBlend: this.data.addBlend,
 				backfacesEnabled: this.data.backfacesEnabled,
 			},

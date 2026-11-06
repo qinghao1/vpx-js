@@ -153,8 +153,9 @@ export class ThreeMapGenerator {
 		for (const field of ['binary', 'pdsBuffer', 'retainedData'] as const) {
 			try {
 				;(texture as any)[field] = undefined
-			} catch {
+			} catch (error) {
 				// Ignore — the source buffer simply stays referenced.
+				logger().debug('texture source field not clearable, staying referenced', error)
 			}
 		}
 	}

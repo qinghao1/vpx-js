@@ -6,7 +6,7 @@ import type { Matrix2D, Matrix3D } from './matrix.js'
 import { pooled } from './pool.js'
 
 export class Vertex2D extends Vector2 {
-	static readonly _pooled = pooled(Vertex2D)
+	private static readonly _pooled = pooled(Vertex2D)
 	readonly isVector2 = true as const
 	readonly isVector3 = false as const
 	constructor(x?: number, y?: number) {
@@ -46,7 +46,7 @@ export class Vertex2D extends Vector2 {
 
 /** 3D single-precision vector, three.js based with pooling. */
 export class Vertex3D extends Vector3 {
-	static readonly _pooled = pooled(Vertex3D)
+	private static readonly _pooled = pooled(Vertex3D)
 	readonly isVector2 = false as const
 	readonly isVector3 = true as const
 	constructor(x?: number, y?: number, z?: number) {

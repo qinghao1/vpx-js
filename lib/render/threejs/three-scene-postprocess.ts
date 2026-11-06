@@ -1,10 +1,17 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 import * as THREE from 'three'
 import { isLowQuality } from '../../util/quality.js'
-import { BAKED_EMISSIVE, createBakedMaterialResolver, createVrMaterialResolver } from './baked-materials.js'
+import {
+	BAKED_EMISSIVE,
+	BAKED_METAL,
+	BAKED_ROUGH,
+	createBakedMaterialResolver,
+	createVrMaterialResolver,
+} from './baked-materials.js'
 import { resolveButtonCode } from './cabinet-buttons.js'
 import { cloneMaterialForWrite } from './material-shared.js'
 import { isPrimitiveNodeMaterial } from './nodes/primitive-bdl-node.js'
+import { RenderOrder } from './render-order.js'
 import {
 	type CustomMaterialUserData,
 	classify,
@@ -45,7 +52,6 @@ export {
 	BAKED_EMISSIVE,
 	BAKED_METAL,
 	BAKED_ROUGH,
-	wrapBakedTex,
 } from './baked-materials.js'
 export { BUTTON_CODE_PATTERNS, resolveButtonCode } from './cabinet-buttons.js'
 export { type DeferredTexture, isDeferred } from './deferred-texture.js'
@@ -172,7 +178,7 @@ export function postProcessScene(
 			mat.depthWrite = true
 			mat.needsUpdate = true
 		}
-		mesh.renderOrder = 100
+		mesh.renderOrder = RenderOrder.cabinetButton
 		const meshUserData = mesh.userData as CustomMaterialUserData
 		meshUserData.isCabinetButton = true
 		meshUserData.buttonCode = buttonCode
@@ -371,7 +377,7 @@ export function postProcessScene(
 					!RE_NON_OPAQUE.test(nameLower) &&
 					!RE_RAMP_FAMILY.test(nameLower)
 				) {
-					mesh.renderOrder = -1
+					mesh.renderOrder = RenderOrder.bakedPlayfield
 				}
 				finishStatic(mesh, stats)
 				if (isLowQuality() && mat.transparent && mat.opacity === 0) {
@@ -398,10 +404,12 @@ export function postProcessScene(
 				insertMat.needsUpdate = true
 				continue
 			}
+			// Authored metals photograph as mirrors under room probes: relax
+			// toward the baked plaster finish unless the mesh is a ball.
 			if ((mat.metalness > 0.3 || mat.roughness < 0.4) && !isBallMaterial(mat.name)) {
 				const metalMat = ensureFork()
-				metalMat.roughness = Math.max(metalMat.roughness, 0.75)
-				metalMat.metalness = Math.min(metalMat.metalness, 0.1)
+				metalMat.roughness = Math.max(metalMat.roughness, BAKED_ROUGH)
+				metalMat.metalness = Math.min(metalMat.metalness, BAKED_METAL)
 				metalMat.needsUpdate = true
 				stats.metalFixed++
 			}

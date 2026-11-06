@@ -28,10 +28,11 @@ export class Header {
 				)
 		const v = getDataView(buf)
 		const secShift = v.getUint16(30, true) // 0x1E
-		if (secShift !== 9 && secShift !== 12)
+		// Pole accepts any sector size in (64B, 2GB); VPX files use 512/4096.
+		if (secShift <= 6 || secShift >= 31)
 			throw new Error(`Not a valid compound document (invalid sector size shift ${secShift}).`)
 		const shortShift = v.getUint16(32, true) // 0x20
-		if (shortShift !== 6)
+		if (shortShift <= 0 || shortShift > secShift)
 			throw new Error(`Not a valid compound document (invalid mini sector size shift ${shortShift}).`)
 		const h = new Header()
 		h.secSize = 1 << secShift
@@ -43,8 +44,12 @@ export class Header {
 		h.SSATSize = v.getInt32(64, true) // 0x40
 		h.MSATSecId = v.getInt32(68, true) // 0x44
 		h.MSATSize = v.getInt32(72, true) // 0x48
-		// pole's Header::valid rejects an empty FAT; zero-size SSAT/MSAT mean absent.
-		if (h.SATSize <= 0 || h.SSATSize < 0 || h.MSATSize < 0)
+		// Pole's Header::valid: empty FAT, non-4096 mini-stream cutoff, or a
+		// DIFAT chain without a full header FAT are invalid. Zero-size
+		// SSAT/MSAT mean absent.
+		if (h.shortStreamMax !== 4096)
+			throw new Error(`Not a valid compound document (invalid mini stream cutoff ${h.shortStreamMax}).`)
+		if (h.SATSize <= 0 || (h.SATSize < 109 && h.MSATSize !== 0) || h.SSATSize < 0 || h.MSATSize < 0)
 			throw new Error('Not a valid compound document (invalid allocation table size).')
 		h.partialMSAT = Array.from({ length: 109 }, (_, i) => v.getInt32(76 + i * 4, true)) // 0x4C
 		return h

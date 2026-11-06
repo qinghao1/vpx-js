@@ -45,7 +45,8 @@ export class BiffParser {
 
 			const streamed = opts.streamedTags?.includes(tag) ?? false
 			if (streamed) {
-				// cchar sits at payload offset 4; request more bytes on truncated records.
+				// cchar sits at payload offset 4; a truncated record overruns
+				// the stream, which the storage layer rejects as corrupt.
 				if (data.length < 12) return -12
 				const cchar = readInt32LE(data, 8)
 				// Upstream AsScript fails the load on a short script read; a negative

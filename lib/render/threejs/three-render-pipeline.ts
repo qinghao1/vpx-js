@@ -4,6 +4,7 @@
 import { bloom } from 'three/addons/tsl/display/BloomNode.js'
 import { pass, uniform } from 'three/tsl'
 import * as THREE from 'three/webgpu'
+import { logger } from '../../util/logger.js'
 import { clampExposure, resolveToneMapping } from './tone-mapping.js'
 
 const BLOOM_SCALE_FULL = 0.5
@@ -65,8 +66,9 @@ export class VpxRenderPipeline {
 			)
 			try {
 				bloomNode?.setResolutionScale?.(config.lowQuality ? BLOOM_SCALE_LOW : BLOOM_SCALE_FULL)
-			} catch {
+			} catch (error) {
 				// Best effort: a rejected scale leaves bloom at its default resolution.
+				logger().debug('bloom scale rejected, keeping default resolution', error)
 			}
 			compositeNode = compositeNode.add(bloomNode)
 		}
@@ -96,8 +98,9 @@ export class VpxRenderPipeline {
 	public dispose(): void {
 		try {
 			;(this.pipeline as any)?.dispose?.()
-		} catch {
+		} catch (error) {
 			// Best-effort teardown: a pipeline on a lost device can throw, and nothing is left to free.
+			logger().debug('pipeline dispose threw during teardown', error)
 		}
 	}
 }

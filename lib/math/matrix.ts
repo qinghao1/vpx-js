@@ -70,13 +70,26 @@ export class Matrix2D extends Matrix3 {
 		n32: number,
 		n33: number,
 	): Matrix2D
-	override set(m: Matrix2D): Matrix2D
-	override set(...args: any[]): any {
-		if (args.length === 1 && args[0] instanceof Matrix3) {
+	override set(m: Matrix2D | Matrix3): Matrix2D
+	override set(
+		n11: number,
+		n12: number,
+		n13: number,
+		n21: number,
+		n22: number,
+		n23: number,
+		n31: number,
+		n32: number,
+		n33: number,
+	): Matrix2D
+	override set(
+		...args: [Matrix2D | Matrix3] | [number, number, number, number, number, number, number, number, number]
+	): Matrix2D {
+		if (args.length === 1) {
 			this.copy(args[0])
 			return this
 		}
-		return super.set(args[0], args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8])
+		return super.set(...args) as Matrix2D
 	}
 	addMatrix(a: Matrix2D, b: Matrix2D): void {
 		const ae = a.elements,

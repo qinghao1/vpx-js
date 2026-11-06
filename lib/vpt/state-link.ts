@@ -1,6 +1,7 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
+import type { Light } from './light/light.js'
 import type { Table } from './table/table.js'
 
 /** Minimal controller float-state source (structural slice of the deleted game/iemulator + emu/res-uri). */
@@ -59,14 +60,12 @@ export function lightmapAlphaFactor(table: Table, lightName: string | undefined)
 	// scales the alpha, never the color.
 	if (!lightName) return 1
 	try {
-		const light = (table as any).lights?.[lightName] ?? (table as any).getLight?.(lightName)
-		const lightState = (light as any)?.getState?.() ?? (light as any)?.state
-		const dataInt = (light as any)?.data?.intensity ?? (light as any)?.intensity ?? 1
-		const scale =
-			(lightState as any)?.intensityScale ??
-			(light as any)?.data?.intensityScale ??
-			(light as any)?.animation?.intensityScale ??
-			1
+		// Table.lights is the only lamp registry; Light.getState carries the
+		// live intensity and scale, LightData the baked intensity.
+		const light: Light | undefined = table.lights[lightName]
+		const lightState = light?.getState()
+		const dataInt = light?.data.intensity ?? 1
+		const scale = lightState?.intensityScale ?? 1
 		const currentIntensity = lightState?.intensity ?? dataInt
 		const denom = dataInt * scale
 		let rawFactor: number

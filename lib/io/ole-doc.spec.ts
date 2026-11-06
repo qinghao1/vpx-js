@@ -13,6 +13,7 @@ import { Storage } from './ole-storage.js'
 interface HeaderOverrides {
 	secShift?: number
 	shortShift?: number
+	cutoff?: number
 	satSize?: number
 	dirSecId?: number
 	ssatSecId?: number
@@ -30,7 +31,7 @@ function buildHeader(overrides: HeaderOverrides = {}): Uint8Array {
 	view.setUint16(32, overrides.shortShift ?? 6, true)
 	view.setInt32(44, overrides.satSize ?? 1, true)
 	view.setInt32(48, overrides.dirSecId ?? 1, true)
-	view.setInt32(56, 4096, true)
+	view.setInt32(56, overrides.cutoff ?? 4096, true)
 	view.setInt32(60, overrides.ssatSecId ?? -2, true)
 	view.setInt32(64, overrides.ssatSize ?? 0, true)
 	view.setInt32(68, overrides.msatSecId ?? -2, true)
@@ -190,12 +191,23 @@ describe('The OLE compound document reader', () => {
 		expect(() => Header.load(badMagic)).to.throw(/bad OLE ID/)
 	})
 
-	it('rejects an invalid sector size shift', () => {
-		expect(() => Header.load(buildHeader({ secShift: 8 }))).to.throw(/sector/i)
+	it('rejects out-of-range sector size shifts like pole', () => {
+		expect(() => Header.load(buildHeader({ secShift: 6 }))).to.throw(/sector/i)
+		expect(() => Header.load(buildHeader({ secShift: 31 }))).to.throw(/sector/i)
+		expect(Header.load(buildHeader({ secShift: 8 })).secSize).to.equal(256)
+		expect(Header.load(buildHeader({ secShift: 12 })).secSize).to.equal(4096)
 	})
 
-	it('rejects an invalid mini sector size shift', () => {
-		expect(() => Header.load(buildHeader({ shortShift: 7 }))).to.throw(/mini|short/i)
+	it('rejects mini sector shifts above the sector shift like pole', () => {
+		expect(() => Header.load(buildHeader({ shortShift: 0 }))).to.throw(/mini/i)
+		expect(() => Header.load(buildHeader({ secShift: 9, shortShift: 10 }))).to.throw(/mini/i)
+		expect(Header.load(buildHeader({ secShift: 9, shortShift: 7 })).shortSecSize).to.equal(128)
+	})
+
+	it('rejects a non-4096 mini stream cutoff and a DIFAT without header FAT like pole', () => {
+		expect(() => Header.load(buildHeader({ cutoff: 64 }))).to.throw(/cutoff/i)
+		expect(() => Header.load(buildHeader({ satSize: 1, msatSize: 1 }))).to.throw(/allocation table/i)
+		expect(Header.load(buildHeader({ satSize: 200, msatSize: 1 })).SATSize).to.equal(200)
 	})
 
 	it('rejects negative allocation table sizes', () => {
@@ -465,6 +477,7 @@ describe('The OLE compound document against real files', () => {
 		view.setUint16(30, 9, true)
 		view.setUint16(32, 6, true)
 		view.setInt32(44, 1, true)
+		view.setInt32(56, 4096, true)
 		const header = Header.load(buf)
 		expect(header.secSize).to.equal(512) // 2^9
 		expect(header.shortSecSize).to.equal(64) // 2^6

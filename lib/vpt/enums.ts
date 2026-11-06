@@ -3,7 +3,8 @@
 
 /**
  * File-format item type ids. An `as const` object like the other enum maps
- * below; values must match upstream `ItemType` (`external/vpinball/src/core/iselect.h`).
+ * below; values must match upstream `ItemTypeEnum`
+ * (`external/vpinball/src/core/ieditable.h`).
  */
 export const ItemType = {
 	Surface: 0,
@@ -29,7 +30,7 @@ export const ItemType = {
 	Flasher: 20,
 	Rubber: 21,
 	HitTarget: 22,
-	Count: 23,
+	Ball: 23,
 	Invalid: 0xffffffff,
 } as const
 

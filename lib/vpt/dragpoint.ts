@@ -17,7 +17,8 @@ export function dragPointNestedTag(data: { dragPoints: DragPoint[] }): OnBiffRes
 
 /** Editable spline point. */
 export class DragPoint extends BiffParser {
-	public vertex!: Vertex3D
+	// Upstream inits to (0,0,0): POSZ may precede VCEN in file order.
+	public vertex = new Vertex3D()
 	public fSmooth!: boolean
 	public fSlingshot!: boolean
 	public fAutoTexture!: boolean

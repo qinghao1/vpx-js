@@ -25,7 +25,7 @@ export class FlipperUpdater extends ItemUpdater<FlipperState> {
 		this.state.mergeFrom(state)
 		this.applyVisibility(obj, state, renderApi)
 		this.applyMaterial(obj, state.material, state.texture, renderApi, table)
-		if (state.center || state.angle !== undefined) this.applyTransformation(obj, renderApi)
+		this.applyTransformation(obj, renderApi)
 	}
 	private applyTransformation<NODE, GEOMETRY, POINT_LIGHT>(
 		obj: NODE,

@@ -289,9 +289,6 @@ export class TableData extends ItemData {
 	public materials: Material[] = []
 	private warnedNewMaterialFormat = false
 
-	public plungerNormalize?: number
-	public plungerFilter?: boolean
-
 	public readonly overrideContactFriction = 0.075
 	public readonly overrideElasticity = 0.25
 	public readonly overrideElasticityFalloff = 0

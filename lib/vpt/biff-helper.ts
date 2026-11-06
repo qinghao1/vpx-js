@@ -9,7 +9,12 @@ export type FieldsOf<T, V> = { [K in keyof T]: NonNullable<T[K]> extends V ? K :
 /** Biff tag → field of T: a misspelled field fails to type-check instead of creating a new property. */
 export type BiffFieldMap<T, V = unknown> = Readonly<Record<string, FieldsOf<T, V> & keyof T & string>>
 
-/** Maps for Biff tag dispatch. The per-kind value check fires at each map's declaration. */
+/**
+ * Maps for Biff tag dispatch. The per-kind value check fires at each map's
+ * declaration (keep the `BiffFieldMap<T, V>` value kinds there: the
+ * dispatch parameter stays loose because call sites pass polymorphic
+ * `this`, which a strict conditional type cannot resolve).
+ */
 export interface BiffMaps<T> {
 	float?: BiffFieldMap<T>
 	int?: BiffFieldMap<T>

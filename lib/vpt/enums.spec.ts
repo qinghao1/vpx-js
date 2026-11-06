@@ -4,10 +4,10 @@ import { ItemType } from './enums.js'
 
 /**
  * File-format ItemType values (GameItem type ids). Must match upstream
- * `ItemType` (`external/vpinball/src/core/iselect.h`); renumbering breaks parsing.
+ * `ItemTypeEnum` (`external/vpinball/src/core/ieditable.h`); renumbering breaks parsing.
  */
 describe('ItemType file-format values', () => {
-	it('should match upstream ids 0..22', () => {
+	it('should match upstream ids 0..23', () => {
 		expect([
 			ItemType.Surface,
 			ItemType.Flipper,
@@ -32,7 +32,8 @@ describe('ItemType file-format values', () => {
 			ItemType.Flasher,
 			ItemType.Rubber,
 			ItemType.HitTarget,
-		]).toEqual(Array.from({ length: 23 }, (_, i) => i))
+			ItemType.Ball,
+		]).toEqual(Array.from({ length: 24 }, (_, i) => i))
 	})
 
 	it('should use 0xffffffff for Invalid', () => {

@@ -6,6 +6,7 @@ import type { ItemState } from '../../vpt/item-state.js'
 import type { Table, TableGenerateOptions } from '../../vpt/table/table.js'
 import type { IRenderApi, IRenderable, MeshConvertOptions, RenderInfo } from '../irender-api.js'
 import { setAuthoredVisible } from './authored-visible.js'
+import { RenderOrder } from './render-order.js'
 import type { ThreeMeshGenerator } from './three-mesh-generator.js'
 import type { ThreeNodeMaterialGenerator } from './three-node-material-generator.js'
 
@@ -49,7 +50,7 @@ export class ThreeConverter {
 		mesh.matrixAutoUpdate = false
 		mesh.visible = obj.isVisible
 		if (obj.bulbGlow) {
-			mesh.renderOrder = 10
+			mesh.renderOrder = RenderOrder.bulbGlow
 			// Snapshot of the authored visibility: the lamp updater toggles
 			// this quad with the live state, but a light authored invisible
 			// (cabinet/backbox) must stay hidden — see applyLightToTarget.
@@ -65,7 +66,7 @@ export class ThreeConverter {
 			;(mesh.material as any).depthWrite = obj.depthWrite
 		}
 		if (obj.material?.name === 'ball') {
-			mesh.renderOrder = 1
+			mesh.renderOrder = RenderOrder.ball
 		}
 		return mesh
 	}

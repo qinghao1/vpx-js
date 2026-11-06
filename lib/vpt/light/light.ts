@@ -168,7 +168,7 @@ export class LightData extends ItemData {
 	}
 
 	public isPlayfieldLight(table: Table): boolean {
-		return this.isSurfaceLight(table) && !this.isOnSurface(table)
+		return this.isSurfaceLight() && !this.isOnSurface(table)
 	}
 
 	private isOnSurface(table: Table): boolean {
@@ -182,7 +182,7 @@ export class LightData extends ItemData {
 	 * discriminator is shape vs bulb/surface placement.
 	 * @see https://github.com/vpinball/vpinball/blob/master/src/parts/light.cpp#L433
 	 */
-	public isSurfaceLight(_table: Table): boolean {
+	public isSurfaceLight(): boolean {
 		if (this.isBackglass) return false
 		if (this.bulbLight || this.isBulbLight()) return false
 		return this.dragPoints.length > 2
@@ -329,20 +329,16 @@ export class Light extends Item<LightData> {
 			}
 		}
 		if (light.light) {
+			// Only the fields the material factory reads; the remaining
+			// classic slots (wrap/gloss/clearcoat/edge/lerp/thickness) have
+			// no three.js consumer.
 			const lightMaterial = new Material()
 			lightMaterial.name = `bulb.light:${this.getName()}`
 			lightMaterial.baseColor = 0
-			lightMaterial.wrapLighting = 0.5
 			lightMaterial.isOpacityActive = true
 			lightMaterial.opacity = 0.2
-			lightMaterial.glossiness = 0xffffff
 			lightMaterial.isMetal = false
-			lightMaterial.edge = 1.0
-			lightMaterial.edgeAlpha = 1.0
 			lightMaterial.roughness = 0.9
-			lightMaterial.glossyImageLerp = 1.0
-			lightMaterial.thickness = 0.05
-			lightMaterial.clearCoat = 0xffffff
 			lightMaterial.emissiveColor = this.data.color
 			lightMaterial.emissiveIntensity = this.data.isOn() ? 1 : 0.1
 			meshes.light = {
@@ -352,19 +348,13 @@ export class Light extends Item<LightData> {
 			}
 		}
 		if (light.socket) {
+			// Same as above: only factory-read fields are set.
 			const socketMaterial = new Material()
 			socketMaterial.baseColor = 0x181818
-			socketMaterial.wrapLighting = 0.5
 			socketMaterial.isOpacityActive = false
 			socketMaterial.opacity = 1.0
-			socketMaterial.glossiness = 0xb4b4b4
 			socketMaterial.isMetal = false
-			socketMaterial.edge = 1.0
-			socketMaterial.edgeAlpha = 1.0
 			socketMaterial.roughness = 0.9
-			socketMaterial.glossyImageLerp = 1.0
-			socketMaterial.thickness = 0.05
-			socketMaterial.clearCoat = 0
 			meshes.socket = {
 				isVisible: this.data.isVisible,
 				mesh: light.socket.transform(Matrix3D.RIGHT_HANDED),
@@ -392,8 +382,8 @@ export class Light extends Item<LightData> {
 		return this.data.hasBulbGlow()
 	}
 
-	public isSurfaceLight(table: Table) {
-		return this.data.isSurfaceLight(table)
+	public isSurfaceLight() {
+		return this.data.isSurfaceLight()
 	}
 
 	public isPlayfieldLight(table: Table) {

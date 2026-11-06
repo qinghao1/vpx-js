@@ -3,6 +3,7 @@ import * as THREE from 'three'
 import { resolveButtonCode } from './cabinet-buttons.js'
 import { getSlots } from './material-slots.js'
 import { isBulbGlowMaterial } from './nodes/bulb-glow-node.js'
+import { RenderOrder } from './render-order.js'
 import {
 	type ClassifyResult,
 	type CustomMaterialUserData,
@@ -233,7 +234,7 @@ export function applyPlayfieldPass(nodes: THREE.Object3D[], root: THREE.Object3D
 			makeParentsVisible(mesh, root, stats)
 		}
 		if (bakedPlayfield && !RE_NON_OPAQUE.test(meshName) && !RE_RAMP_FAMILY.test(meshName)) {
-			mesh.renderOrder = -1
+			mesh.renderOrder = RenderOrder.bakedPlayfield
 		}
 	}
 }
@@ -389,7 +390,7 @@ export function applyButtonInheritPass(nodes: THREE.Object3D[], root: THREE.Obje
 				meshUserData.isCabinetButton = true
 				meshUserData.buttonCode = inheritedCode
 				mesh.frustumCulled = false
-				mesh.renderOrder = 100
+				mesh.renderOrder = RenderOrder.cabinetButton
 				break
 			}
 		}

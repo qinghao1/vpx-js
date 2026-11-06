@@ -97,7 +97,8 @@ export function searchVpsGames(games: VpsGame[], query: string, limit = 50): Vps
 	}
 	return games
 		.filter(game => {
-			const haystack = [game.name, game.manufacturer, game.year, ...game.roms.map(r => r.version)]
+			// A missing year must not stringify to "undefined" and match everything.
+			const haystack = [game.name, game.manufacturer, game.year ?? '', ...game.roms.map(r => r.version)]
 				.join(' ')
 				.toLowerCase()
 			return terms.every(term => haystack.includes(term))

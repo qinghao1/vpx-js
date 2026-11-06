@@ -80,7 +80,10 @@ const MESH_REGISTRY: Record<string, unknown> = {
 
 const cache = new Map<string, Mesh>()
 
-/** Loads a static mesh from built-in mesh registry, cached. */
+/**
+ * Loads a static mesh from built-in mesh registry, cached. The cache hands
+ * out the shared instance: clone before mutating.
+ */
 export function loadMesh(name: string): Mesh {
 	const cached = cache.get(name)
 	if (cached) return cached

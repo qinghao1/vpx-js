@@ -20,8 +20,10 @@ function lightmapFixture(currentIntensity: number, baseIntensity: number, scale:
 		.build() as unknown as Record<string, any>
 	table.lights = {
 		L1: {
-			data: { intensity: baseIntensity, intensityScale: scale },
-			getState: () => ({ intensity: currentIntensity }),
+			// Mirrors the real Light shape: the live scale rides getState()
+			// (LightState.intensityScale); LightData carries only the base.
+			data: { intensity: baseIntensity },
+			getState: () => ({ intensity: currentIntensity, intensityScale: scale }),
 		},
 	}
 	const primitive = (table.primitives as unknown as Record<string, Primitive>).LmPrim!

@@ -97,11 +97,19 @@ export class FlipperData extends ItemData {
 		return d
 	}
 
+	private readonly floatRubberSeen = new Set<string>()
+
 	private async fromTag(buffer: Uint8Array, tag: string, _offset: number, len: number): Promise<number> {
 		if (tag === 'VCEN') {
 			this.center = Vertex2D.get(buffer)
 			return 0
 		}
+		// Deprecated int tags lose to the float tags regardless of file
+		// order (upstream `hasRubber*` flags, flipper.cpp).
+		if (tag === 'RTHF' || tag === 'RHGF' || tag === 'RWDF') this.floatRubberSeen.add(tag)
+		if (tag === 'RTHK' && this.floatRubberSeen.has('RTHF')) return 0
+		if (tag === 'RHGT' && this.floatRubberSeen.has('RHGF')) return 0
+		if (tag === 'RWDT' && this.floatRubberSeen.has('RWDF')) return 0
 		if (tag === 'FLPR') {
 			this.flipperRadiusMax = this.getFloat(buffer)
 			this.flipperRadius = this.flipperRadiusMax

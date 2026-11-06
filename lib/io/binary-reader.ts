@@ -28,6 +28,7 @@ export class BinaryReader implements IBinaryReader {
 	}
 
 	public isOpen(): boolean {
+		// close() releases the handle but retains bytes for zero-copy reads.
 		return this._isOpen || !!this.data
 	}
 

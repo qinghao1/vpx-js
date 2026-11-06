@@ -59,7 +59,7 @@ export class TableMeshGenerator {
 			},
 			{
 				name: 'playfieldLights',
-				meshes: Object.values(this.table.lights).filter(l => l.isSurfaceLight(this.table)),
+				meshes: Object.values(this.table.lights).filter(l => l.isSurfaceLight()),
 				enabled: !!opts.exportPlayfieldLights,
 			},
 			{ name: 'hitTargets', meshes: Object.values(this.table.hitTargets), enabled: !!opts.exportHitTargets },

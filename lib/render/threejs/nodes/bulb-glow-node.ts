@@ -6,6 +6,7 @@ import { MeshBasicNodeMaterial, type Node } from 'three/webgpu'
 import { clampModulateVsAdd } from '../../../vpt/flasher/flasher-blend.js'
 import type { Table } from '../../../vpt/table/table.js'
 import { getAuthoredVisible } from '../authored-visible.js'
+import { RenderOrder } from '../render-order.js'
 import { applyModulateVsAddBlending, modulateVsAddOutput } from './modulate-vs-add.js'
 import { inPlayfieldBounds, playfieldUv, uBulbGlowFootprintClip } from './primitive-bdl-node.js'
 
@@ -442,7 +443,7 @@ export function mergeBulbGlowQuads(root: Group, table: Table): number {
 	const merged = new Mesh(geo, material)
 	// Build-time visibility stays default — ticks drive it, like per-quad quads.
 	merged.name = 'merged:bulb.glow'
-	merged.renderOrder = 10
+	merged.renderOrder = RenderOrder.bulbGlow
 	merged.matrixAutoUpdate = false
 	// A light composite, not a pickable solid: the insert hulls underneath stay
 	// pickable, the merged halo never intercepts raycasts.

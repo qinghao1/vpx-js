@@ -30,8 +30,12 @@ export class Logger implements ILogger {
 		if (Logger._forcedDebug !== null) return Logger._forcedDebug
 		const loc = (globalThis as unknown as { location?: { search: string } }).location
 		if (loc && new URLSearchParams(loc.search).has('debug')) return true
-		if ((globalThis as unknown as { localStorage?: Storage }).localStorage?.getItem('vpx:debug') === '1')
-			return true
+		try {
+			if ((globalThis as unknown as { localStorage?: Storage }).localStorage?.getItem('vpx:debug') === '1')
+				return true
+		} catch {
+			// Blocked cookies/sandboxed frames throw on access — debug stays off.
+		}
 		return false
 	}
 	debug(format: string, ...args: unknown[]): void {

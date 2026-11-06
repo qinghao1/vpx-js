@@ -294,7 +294,9 @@ class BufferPtr {
 	}
 
 	public get(): number {
-		return this.buf[this.pos]
+		// Stays in bounds by construction (the decompress loop guards with
+		// next()'s -1 sentinel); the assertion documents that contract.
+		return this.buf[this.pos]!
 	}
 
 	public next(): number {

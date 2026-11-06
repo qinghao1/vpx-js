@@ -160,7 +160,7 @@ export class ThreeNodeMaterialGenerator {
 			backfacesEnabled: backfaces,
 			alphaTestValue,
 			addBlendMode: obj.addBlendMode,
-			disableLightingBelow: obj.disableLightingBelow ?? 0,
+			disableLightingBelow: obj.disableLightingBelow ?? 1,
 			depthWrite: obj.depthWrite,
 			// File-level alpha for the base image (VPT Texture.isOpaque), so an
 			// alpha-carrying image blends from the first frame — upstream
@@ -207,7 +207,7 @@ export class ThreeNodeMaterialGenerator {
 			backfacesEnabled,
 			alphaTestValue = 0,
 			addBlendMode,
-			disableLightingBelow = 0,
+			disableLightingBelow = 1,
 			depthWrite,
 			vptMap,
 			modulateVsAdd,
@@ -331,6 +331,11 @@ export class ThreeNodeMaterialGenerator {
 
 	public applyMaterial(threeMaterial: any, material?: Material, isTransparent = false): void {
 		if (!material) {
+			if (isPrimitiveNodeMaterial(threeMaterial) || isBakedNodeMaterial(threeMaterial)) {
+				// Node materials ignore the classic slots below; side is real renderer state.
+				threeMaterial.side = sideFor(isTransparent)
+				return
+			}
 			if (isTransparent) {
 				threeMaterial.color = new Color(0xc0c0c0)
 				threeMaterial.metalness = 0
@@ -365,6 +370,12 @@ export class ThreeNodeMaterialGenerator {
 			// must go through updatePrimitiveBdl/updatePrimitiveAdditive instead.
 			const doubleSided = getSlots(threeMaterial).__doubleSided
 			threeMaterial.side = sideFor(isTransparent ? true : doubleSided)
+			return
+		}
+		if (isBakedNodeMaterial(threeMaterial)) {
+			// Baked output comes from the tint uniform, not the classic
+			// slots — route the albedo there and leave the baked blend state.
+			getSlots(threeMaterial).__uTint?.value.set(material.baseColor)
 			return
 		}
 		threeMaterial.color = new Color(material.baseColor)
@@ -592,7 +603,7 @@ export class ThreeNodeMaterialGenerator {
 		backfacesEnabled,
 		alphaTestValue = 0,
 		addBlendMode,
-		disableLightingBelow = 0,
+		disableLightingBelow = 1,
 		depthWrite,
 		vptMap,
 		modulateVsAdd,

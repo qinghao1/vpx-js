@@ -124,7 +124,9 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 			state.color !== undefined ||
 			state.alpha !== undefined ||
 			state.disableLightingTop !== undefined ||
-			state.disableLightingBelow !== undefined
+			state.disableLightingBelow !== undefined ||
+			!!this.data.szLightmap ||
+			!!this.data.stateSrcLink
 		if (needsClone) this.ensureCloned(obj, renderApi)
 		if (state.material !== undefined || state.map !== undefined || state.normalMap !== undefined) {
 			this.applyMaterial(obj, state.material, state.map, renderApi, table)
