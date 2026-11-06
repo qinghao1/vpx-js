@@ -27,3 +27,4 @@ external/vpinball/third-party/
 .cache/vpinball/
 scratch/
 demo-browser/public/wasm/
+demo-browser/public/ab-tmp/
