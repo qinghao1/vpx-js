@@ -155,8 +155,9 @@ export class Viewer {
 	constructor(opts = {}) {
 		ensureGlobals()
 		ensureBvh()
-		const { defaultVpx = null, queryParam = 'vpx', dom = {}, viewerMode = 'viewer' } = opts
+		const { defaultVpx = null, queryParam = 'vpx', dom = {}, viewerMode = 'viewer', forceWebGL = false } = opts
 		this.defaultVpx = defaultVpx
+		this.forceWebGL = forceWebGL
 		this.queryParam = queryParam
 		this.viewerMode = viewerMode
 		this.dom = {
@@ -227,7 +228,7 @@ export class Viewer {
 		this._inputCleanup = null
 		this._nudgeCleanup = null
 		this._touchCleanup = null
-		this._rendererBackend = 'webgpu'
+		this._rendererBackend = null
 		this.renderPipeline = null
 		this.renderer = null
 		this.controls = null
@@ -435,6 +436,7 @@ export class Viewer {
 			canvas,
 			antialias: wantAA,
 			powerPreference: 'high-performance',
+			forceWebGL: this.forceWebGL,
 		})
 		await renderer.init()
 
@@ -462,7 +464,7 @@ export class Viewer {
 			}
 		}
 		this.renderer = renderer
-		this._rendererBackend = 'webgpu'
+		this._rendererBackend = renderer.backend.isWebGPUBackend ? 'webgpu' : 'webgl2'
 		try {
 			this.renderPipeline = new VpxRenderPipeline(renderer, this.scene, this.camera, {
 				toneMapper: this.table?.data?.toneMapper,
@@ -479,7 +481,21 @@ export class Viewer {
 			console.warn('VpxRenderPipeline init failed, falling back to direct render', e)
 			this.renderPipeline = null
 		}
-		this._setupDeviceLifecycle(renderer)
+		// Covers WebGPU device.lost and WebGL2 webglcontextlost; three filters reason 'destroyed'.
+		const onLost = renderer.onDeviceLost.bind(renderer)
+		renderer.onDeviceLost = info => {
+			onLost(info)
+			if (this._disposed) return
+			if (++this._deviceLossCount > 2) {
+				this.log(
+					`${info.api} device keeps failing (${info.reason ?? info.message}) — not retrying. Reload with ?noaa or ?webgl, update Chrome and GPU drivers, or relaunch Chrome with --use-angle=vulkan.`,
+					'error',
+				)
+				return
+			}
+			this._rendererReady = this._createRenderer()
+			this._rendererReady.catch(() => {})
+		}
 		this.controls?.dispose?.()
 		this.controls = new OrbitControls(this.camera, this.renderer.domElement)
 		this.controls.enableDamping = true
@@ -495,28 +511,8 @@ export class Viewer {
 				THREE,
 			})
 		this._onResize()
-		this.log(`WebGPURenderer ready (three r${String(THREE.REVISION)})`)
+		this.log(`WebGPURenderer ready (${this._rendererBackend}, three r${String(THREE.REVISION)})`)
 		return renderer
-	}
-
-	private _setupDeviceLifecycle(renderer) {
-		try {
-			const device = (renderer as any).backend?.device as GPUDevice | undefined
-			if (!device?.lost) return
-			device.lost.then((info: any) => {
-				console.warn(`[WebGPU] Device lost: reason=${info.reason}, message=${info.message}`)
-				if (info.reason === 'destroyed' || this._disposed) return
-				if (++this._deviceLossCount > 2) {
-					this.log(
-						`WebGPU device keeps failing (${info.reason}) — not retrying. Reload with ?noaa, update Chrome and GPU drivers, or relaunch Chrome with --use-angle=vulkan.`,
-						'error',
-					)
-					return
-				}
-				this._rendererReady = this._createRenderer()
-				this._rendererReady.catch(() => {})
-			})
-		} catch {}
 	}
 
 	async precompilePipelines() {

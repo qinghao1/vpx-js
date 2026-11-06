@@ -8,6 +8,7 @@ const viewer = new Viewer({
 	queryParam: 'vpx',
 	defaultVpx: null,
 	viewerMode: params.get('mode') === 'play' ? 'play' : 'viewer',
+	forceWebGL: params.has('webgl'),
 })
 const _isDev = (() => {
 	if (import.meta.env?.DEV) return true

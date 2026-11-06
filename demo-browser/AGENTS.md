@@ -11,6 +11,7 @@ npm run dev --prefix demo-browser   # vite :3000
 
 - `?vpx=/test/fixtures/table-empty.vpx&mode=play`
 - `?vpx=/@fs/path/to/table.vpx&rom=/@fs/path/to/rom.zip&mode=play` (any table/ROM via drag & drop, file picker, or `?vpx`/`?rom` query)
+- `&webgl` forces three's WebGL2 backend (default: WebGPU, falling back to WebGL2 when unavailable)
 
 Requires `dist-esm` built. `server.fs.allow` covers repo root, `dist`, `dist-esm`, `wasm/dist`, `wasm/kernels/dist`, `test/fixtures`, `~/Downloads`, `~/.pinmame/roms` (`strict:false`, COOP/COEP/CORP, `assetsInclude` `*.vpx/*.wasm/*.zip`).
 
