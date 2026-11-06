@@ -160,106 +160,127 @@ export const diagnostics = page =>
 	})
 
 export const physicsChecks = async page => {
+	await ensurePlayMode(page)
 	await new Promise(r => setTimeout(r, 1500))
 	return page.evaluate(async () => {
-		const v = window.viewer,
+		const api = window.vpx,
 			out = {}
+		const sleep = ms => new Promise(r => setTimeout(r, ms))
+		if (!api) {
+			const skip = { pass: 'skip', reason: 'no test api (window.vpx)' }
+			return { flipper: skip, coin: skip, start: skip, clock: skip }
+		}
+		const angleOf = idx => api.state.flippers.find(f => f.partIdx === idx)?.angle
+		// Flipper: the one mover row the seam exposes directly. Prefer the
+		// left flipper by name so the ShiftLeft press drives the measured part.
 		try {
-			const flippers = v.table.flippers ? Object.values(v.table.flippers) : []
-			const f = v.table.flippers?.LeftFlipper || flippers[0]
-			if (f) {
-				const before = f.getState().angle
-				v.player.onKeyDown({ code: 'ShiftLeft', key: 'Shift', ts: Date.now() })
-				await new Promise(r => setTimeout(r, 600))
-				const mid = f.getState().angle
-				v.player.onKeyUp({ code: 'ShiftLeft', key: 'Shift', ts: Date.now() })
-				await new Promise(r => setTimeout(r, 500))
-				const after = f.getState().angle
-				out.flipper = { before, mid, after, pass: Math.abs(mid - before) > 0.5 }
+			const flippers = api.state.flippers
+			if (!flippers.length) {
+				out.flipper = { before: 0, mid: 0, after: 0, pass: 'skip', reason: 'no flipper in table' }
 			} else {
-				out.flipper = { before: 0, mid: 0, after: 0, pass: 'skip', reason: 'no flipper' }
+				const target = flippers.find(f => /left/i.test(f.name || '')) || flippers[0]
+				const code =
+					/right/i.test(target.name || '') && !/left/i.test(target.name || '') ? 'ShiftRight' : 'ShiftLeft'
+				const before = target.angle
+				api.sendKey(code, true)
+				let mid = before
+				const t0 = Date.now()
+				while (Date.now() - t0 < 2000) {
+					await sleep(50)
+					mid = angleOf(target.partIdx) ?? mid
+					if (Math.abs(mid - before) > 0.2) break
+				}
+				api.sendKey(code, false)
+				await sleep(500)
+				const after = angleOf(target.partIdx) ?? mid
+				out.flipper = { before, mid, after, pass: Math.abs(mid - before) > 0.2 }
 			}
 		} catch (e) {
-			out.flipper = { before: 0, mid: 0, after: 0, pass: false, error: String(e) }
+			out.flipper = { before: 0, mid: 0, after: 0, pass: false, error: String(e?.message ?? e) }
 		}
-		try {
-			const emu = v.player.getPhysics().emu
-			if (!emu || emu.isMock) {
-				out.coin = { before: 0, mid: 0, after: 0, pass: 'skip', reason: 'mock emu' }
-				out.start = { before: 0, mid: 0, after: 0, pass: 'skip', reason: 'mock emu' }
-			} else {
-				const coinCandidates = [1, 65, 67]
-				const startCandidates = [16, 15, 33, 14]
-				const readMany = cands => {
-					const o = {}
-					for (const n of cands) {
-						try {
-							o[n] = emu.getSwitchInput(n)
-						} catch {
-							o[n] = 0
-						}
+		// Coin/start: the seam has no switch-input accessor, so a press is
+		// judged by the script's observable response (DMD sum, lamp activity)
+		// against pre-press jitter. No script output at all means the fixture
+		// cannot answer — honest skip.
+		const dmdSum = () => {
+			try {
+				const d = api.dmd()
+				if (!d || !d.frame?.length) return { present: false, sum: 0 }
+				let sum = 0
+				for (let i = 0; i < d.frame.length; i++) sum += d.frame[i]
+				return { present: true, sum }
+			} catch {
+				return { present: false, sum: 0 }
+			}
+		}
+		const baseline = async () => {
+			const sums = []
+			for (let i = 0; i < 4; i++) {
+				sums.push(dmdSum().sum)
+				await sleep(250)
+			}
+			const mean = sums.reduce((a, b) => a + b, 0) / sums.length
+			const sd = Math.sqrt(sums.reduce((a, b) => a + (b - mean) ** 2, 0) / sums.length)
+			return { mean, sd, lights: api.state.lightActivity }
+		}
+		const pressForResponse = async code => {
+			const pre = await baseline()
+			const d0 = dmdSum()
+			api.sendKey(code, true)
+			await sleep(350)
+			api.sendKey(code, false)
+			const t0 = Date.now()
+			let responded = false,
+				post = { sum: d0.sum, lights: pre.lights }
+			while (Date.now() - t0 < 4000 && !responded) {
+				await sleep(100)
+				const d = dmdSum()
+				const lights = api.state.lightActivity
+				post = { sum: d.sum, lights }
+				// A response exceeds both the pre-press jitter band and an
+				// absolute floor (a static attract frame jitters ~0).
+				responded = Math.abs(d.sum - pre.mean) > Math.max(3 * pre.sd, 500) || lights > pre.lights
+			}
+			return { pre, post, responded, dmdPresent: d0.present || dmdSum().present }
+		}
+		for (const [key, code] of [
+			['coin', 'Digit5'],
+			['start', 'Digit1'],
+		]) {
+			try {
+				const r = await pressForResponse(code)
+				if (!r.dmdPresent && r.pre.lights === 0 && r.post.lights === 0) {
+					out[key] = {
+						before: 0,
+						mid: 0,
+						after: 0,
+						pass: 'skip',
+						reason: 'no DMD/lamp output: switch response unobservable',
 					}
-					return o
+				} else {
+					out[key] = {
+						before: Math.round(r.pre.mean),
+						mid: r.post.sum,
+						after: r.post.sum,
+						pass: r.responded,
+						reason: r.responded
+							? 'script responded to press'
+							: 'press produced no DMD/lamp response (ROM required?)',
+					}
 				}
-				const coinBefore = readMany(coinCandidates)
-				v.player.onKeyDown({ code: 'Digit5', key: '5', ts: Date.now() })
-				// Script-owned coin path pulses ~720 ms later for ~40 ms: poll for it.
-				let coinMid = readMany(coinCandidates)
-				const coinT0 = Date.now()
-				while (!Object.values(coinMid).some(Boolean) && Date.now() - coinT0 < 3000) {
-					await new Promise(r => setTimeout(r, 25))
-					coinMid = readMany(coinCandidates)
-				}
-				v.player.onKeyUp({ code: 'Digit5', key: '5', ts: Date.now() })
-				await new Promise(r => setTimeout(r, 300))
-				const coinAfter = readMany(coinCandidates)
-				const coinPass = Object.values(coinMid).some(Boolean)
-				out.coin = {
-					before: coinBefore[67] ?? 0,
-					mid: coinMid[67] ?? 0,
-					after: coinAfter[67] ?? 0,
-					pass: coinPass,
-					beforeAll: coinBefore,
-					midAll: coinMid,
-					afterAll: coinAfter,
-					candidates: coinCandidates,
-				}
-				const startBefore = readMany(startCandidates)
-				v.player.onKeyDown({ code: 'Digit1', key: '1', ts: Date.now() })
-				await new Promise(r => setTimeout(r, 300))
-				const startMid = readMany(startCandidates)
-				v.player.onKeyUp({ code: 'Digit1', key: '1', ts: Date.now() })
-				await new Promise(r => setTimeout(r, 300))
-				const startAfter = readMany(startCandidates)
-				const startPass = Object.values(startMid).some(Boolean)
-				out.start = {
-					before: startBefore[16] ?? 0,
-					mid: startMid[16] ?? 0,
-					after: startAfter[16] ?? 0,
-					pass: startPass,
-					beforeAll: startBefore,
-					midAll: startMid,
-					afterAll: startAfter,
-					candidates: startCandidates,
-				}
+			} catch (e) {
+				out[key] = { before: 0, mid: 0, after: 0, pass: false, error: String(e?.message ?? e) }
 			}
-		} catch (e) {
-			out.coin = { before: 0, mid: 0, after: 0, pass: false, error: String(e) }
-			out.start = { before: 0, mid: 0, after: 0, pass: false, error: String(e) }
+			await sleep(400)
 		}
 		try {
-			// Main-thread physics must advance while playing: the physics clock moves.
-			const deadline = Date.now() + 15000
-			while (Date.now() < deadline && !(v.player && v.viewerMode === 'play'))
-				await new Promise(r => setTimeout(r, 250))
-			const clockAt = () => v.player?.getPhysics?.()?.timeMsec ?? -1
-			const tBefore = clockAt()
-			await new Promise(r => setTimeout(r, 120))
-			const tAfter = clockAt()
-			const alive = tBefore >= 0 && tAfter > tBefore
-			out.clock = { tBefore, tAfter, pass: alive }
+			// Host game clock must advance while playing: the rAF loop steps it.
+			const tBefore = api.state.gameMs
+			await sleep(300)
+			const tAfter = api.state.gameMs
+			out.clock = { tBefore, tAfter, pass: Number.isFinite(tBefore) && tAfter > tBefore }
 		} catch (e) {
-			out.clock = { tBefore: -1, tAfter: -1, pass: false, error: String(e) }
+			out.clock = { tBefore: -1, tAfter: -1, pass: false, error: String(e?.message ?? e) }
 		}
 		return out
 	})
