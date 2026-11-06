@@ -90,8 +90,12 @@ node test/harness/verify-ab.mjs --vpx=<table>.vpx --rom=<game>.zip   # A/B vs /t
 - `launchBrowser`: `opts.autoKillMs` SIGKILLs chrome, default 300 s.
   `ensureVite`: spawned vite gets a 120 s auto-kill. `openTablePage`:
   `goto` 30 s. Importing `utils.mjs` registers exit/SIGINT/SIGTERM handlers
-  plus host-wide stale-chrome/vite `pkill` — parallel runs on one host kill
-  each other. `CHROME_PATH` overrides chrome discovery.
+  that reap only PIDs this process spawned (tracked browsers/vites plus
+  their own profile dirs) — there is no host-wide `pkill`, so parallel runs
+  and unrelated user chrome/vite processes are never touched.
+  `ensureVite` reuses a probed server only when its lockfile proves it serves
+  this tree root, and otherwise starts its own vite on a free per-run port.
+  `CHROME_PATH` overrides chrome discovery.
 - `createSessionIni` makes `/tmp/vpinball-*/VPinballX.ini` via `mkdtemp` and
   never deletes it — the CALLER must `rm -rf` the dir
   (`compare-side-by-side.ts` does; one `rm` per call, it creates one

@@ -1,7 +1,6 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
-import { execSync, spawn } from 'node:child_process'
-import { existsSync, readdirSync, rmSync, statSync } from 'node:fs'
-import { join } from 'node:path'
+import { spawn } from 'node:child_process'
+import { existsSync, rmSync } from 'node:fs'
 
 export async function loadPuppeteer() {
 	for (const specifier of ['puppeteer-core', 'puppeteer']) {
@@ -31,17 +30,11 @@ export async function waitFor(fn, { timeoutMs = 5000, intervalMs = 100 } = {}) {
 const _browsers = new Set()
 const _vites = new Set()
 const _profileDirs = new Map()
-// Host-wide reaping is opt-in (VPX_HARNESS_REAP=1): parallel harness runs must not
-// SIGKILL each other's chrome/vite. Default scope is tracked PIDs + own profile dirs.
-const HOST_REAP = process.env.VPX_HARNESS_REAP === '1'
+// Isolation: this module never kills by pattern (no pkill). Cleanup is scoped
+// to PIDs this process spawned (tracked in _browsers/_vites) plus the profile
+// dirs those browsers created, so parallel harness runs — and unrelated user
+// chrome/vite processes — are never touched.
 let _cleanupRegistered = false
-const CHROME_PKILL = 'pkill -9 -f "chrome.*headless.*puppeteer" 2>/dev/null || true'
-const VITE_PKILL = 'pkill -9 -f "vite.*--port" 2>/dev/null || true'
-function pkillSync(cmd) {
-	try {
-		execSync(cmd, { timeout: 2000, stdio: 'ignore' })
-	} catch {}
-}
 const CHROME_CANDIDATES = [
 	'/usr/bin/google-chrome',
 	'/usr/bin/chromium',
@@ -55,31 +48,6 @@ function resolveChromePath() {
 		if (existsSync(candidate)) return candidate
 	}
 	return undefined
-}
-function cleanChromeTmpDirs(onlyStale) {
-	try {
-		const tmp = '/tmp'
-		for (const name of readdirSync(tmp)) {
-			if (!name.startsWith('puppeteer_dev_chrome')) continue
-			const full = join(tmp, name)
-			try {
-				if (onlyStale) {
-					const st = statSync(full)
-					if (Date.now() - st.mtimeMs <= 60 * 1000) continue
-				}
-				rmSync(full, { recursive: true, force: true })
-			} catch {}
-		}
-	} catch {}
-}
-export function killStaleChromeSync() {
-	if (!HOST_REAP) return
-	pkillSync(CHROME_PKILL)
-	cleanChromeTmpDirs(true)
-}
-function killStaleViteSync() {
-	if (!HOST_REAP) return
-	pkillSync(VITE_PKILL)
 }
 function trackProfileDir(browser) {
 	try {
@@ -98,9 +66,8 @@ function removeOwnProfileDir(browser) {
 function registerCleanup() {
 	if (_cleanupRegistered) return
 	_cleanupRegistered = true
-	try {
-		killStaleChromeSync()
-	} catch {}
+	// Tracked PIDs only: reap browsers/vites this process spawned, then drop
+	// their own profile dirs. Never pattern-match host processes.
 	const _cleanup = () => {
 		for (const b of _browsers) {
 			try {
@@ -129,11 +96,6 @@ function registerCleanup() {
 			} catch {}
 		}
 		_vites.clear()
-		if (HOST_REAP) {
-			killStaleChromeSync()
-			killStaleViteSync()
-			cleanChromeTmpDirs(false)
-		}
 	}
 	process.once('exit', _cleanup)
 	process.once('beforeExit', _cleanup)
@@ -153,15 +115,6 @@ function registerCleanup() {
 			process.exit(1)
 		})
 	}
-	setInterval(() => {
-		if (!HOST_REAP) return
-		if (_browsers.size === 0) {
-			killStaleChromeSync()
-		}
-		if (_vites.size === 0) {
-			killStaleViteSync()
-		}
-	}, 30000).unref?.()
 }
 if (typeof process !== 'undefined') {
 	registerCleanup()
@@ -181,9 +134,8 @@ function resolveGpuArgs(gpu) {
 }
 export async function launchBrowser(puppeteer, opts = {}) {
 	registerCleanup()
-	try {
-		killStaleChromeSync()
-	} catch {}
+	// No proactive reaping: a second concurrent run must never SIGKILL the
+	// browser this run (or any other process) already has open.
 	const { gpu, ...rest } = opts
 	const gpuArgs = resolveGpuArgs(gpu)
 	const chromePath = resolveChromePath()
@@ -217,7 +169,6 @@ export async function launchBrowser(puppeteer, opts = {}) {
 		try {
 			browser.process()?.kill('SIGKILL')
 		} catch {}
-		if (HOST_REAP) pkillSync(CHROME_PKILL)
 	}, opts.autoKillMs ?? 300_000)
 	if (autoKill.unref) autoKill.unref()
 	const origClose = browser.close.bind(browser)
@@ -236,10 +187,6 @@ export async function launchBrowser(puppeteer, opts = {}) {
 				browser.process()?.kill?.('SIGKILL')
 			} catch {}
 			removeOwnProfileDir(browser)
-			if (HOST_REAP) {
-				pkillSync(CHROME_PKILL)
-				cleanChromeTmpDirs(false)
-			}
 		}
 	}
 	try {
