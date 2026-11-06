@@ -1,6 +1,7 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 // @ts-nocheck
 
+import { createTestApi } from './test-api.js'
 import { initHelp } from './ui/help-dialog.js'
 import { initTableBrowser } from './ui/table-browser.js'
 import { Viewer } from './viewer.js'
@@ -14,6 +15,9 @@ function parseViewerOptions(search) {
 		antialias: !params.has('noaa'),
 		batched: !params.has('nobatched'),
 		forceWebGL: params.has('webgl'),
+		// E2E drives play entry explicitly through the test API; the
+		// timed auto-switch to play would race it.
+		autoplay: params.get('autoplay') !== '0',
 	}
 }
 
@@ -24,7 +28,12 @@ const _isDev = (() => {
 	const h = location.hostname
 	return h === 'localhost' || h === '127.0.0.1' || h === '' || h === '0.0.0.0'
 })()
-if (_isDev) window.viewer = viewer
+// Dev-only handles for humans and e2e: the viewer for scene inspection,
+// `vpx` for the typed test surface. Never present in production builds.
+if (_isDev) {
+	window.viewer = viewer
+	window.vpx = createTestApi(viewer)
+}
 initHelp(viewer)
 
 if (options.vpx) {

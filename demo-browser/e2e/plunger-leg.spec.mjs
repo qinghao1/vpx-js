@@ -1,3 +1,4 @@
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
@@ -5,28 +6,40 @@ import { plungerChecks } from './helpers.mjs'
 
 // Regression spec for the plunger leg's plunger selection.
 //
-// Walking Dead carries two plungers: `Plunger1` (auto, ROM-solenoid-fired,
-// parsed first) and `Plunger` (manual, pulled by the table script on
-// PlungerKey/Enter). The leg must judge the script-driven manual plunger,
-// not blindly read plungers[0]. These tests drive the REAL leg against a
-// fake page whose viewer mirrors that layout.
+// Walking Dead carries two plungers: an auto trough plunger parsed first
+// and the script-driven manual `Plunger` second. The leg must judge the
+// script-driven manual plunger, not blindly read plungers[0]. These tests
+// drive the REAL leg against a fake page whose `window.vpx` mirrors the
+// typed test API (state pulls, sendKey), replacing the old fake that poked
+// the deleted `viewer.player` TS-player surface.
 
-const makePlunger = (name, { auto }) => {
-	let pos = 0.25
+const makePlunger = (partIdx, name) => ({ partIdx, name, pull: 0 })
+
+// Minimal window.vpx double: pulls mutate in place so every state read
+// observes the current pull, like the engine-backed accessor.
+const makeVpx = ({ plungers, balls = [], onKey }) => {
+	const state = { mode: 'play', wasmReady: true, plungers, balls }
 	return {
-		getName: () => name,
-		__set: v => {
-			pos = v
+		get state() {
+			return state
 		},
-		getApi: () => ({ Position: () => pos, AutoPlunger: auto }),
+		whenReady: async () => {},
+		setMode: async mode => {
+			state.mode = mode
+		},
+		sendKey: (code, down) => onKey?.(code, down, state),
+		nudge: () => {},
+		step: () => true,
+		dmd: () => undefined,
 	}
 }
 
-const runLeg = async viewer => {
+const runLeg = async api => {
 	const prevWindow = globalThis.window
-	globalThis.window = { viewer }
+	globalThis.window = { vpx: api }
 	try {
-		const page = { evaluate: async fn => fn() }
+		// Puppeteer passes extra args through to the page function.
+		const page = { evaluate: async (fn, ...args) => fn(...args) }
 		return await plungerChecks(page)
 	} finally {
 		globalThis.window = prevWindow
@@ -36,30 +49,31 @@ const runLeg = async viewer => {
 // TWD layout: auto plunger first, manual plunger second. Enter pulls the
 // manual one (the script runs Plunger.Pullback / Plunger.Fire).
 const makeTwdLike = () => {
-	const auto = makePlunger('Plunger1', { auto: true })
-	const manual = makePlunger('Plunger', { auto: false })
-	const viewer = {
-		viewerMode: 'play',
-		player: {
-			balls: [],
-			onKeyDown: () => {
-				manual.__set(22)
-			},
-			onKeyUp: () => {
-				manual.__set(0.25)
-			},
+	const auto = makePlunger(0, 'Plunger1')
+	const manual = makePlunger(1, 'Plunger')
+	const api = makeVpx({
+		plungers: [auto, manual],
+		onKey: code => {
+			if (code === 'Enter') manual.pull = 0.9
 		},
-		table: { plungers: { Plunger1: auto, Plunger: manual } },
+	})
+	api.__release = () => {
+		manual.pull = 0
 	}
-	viewer.player.getPhysics = () => ({ emu: {} })
-	return viewer
+	const origSend = api.sendKey
+	api.sendKey = (code, down) => {
+		if (code === 'Enter' && !down) api.__release()
+		else origSend(code, down)
+	}
+	return api
 }
 
 describe('plungerChecks leg', () => {
 	it('passes when Enter pulls the manual plunger behind an auto plungers[0]', async () => {
 		const out = await runLeg(makeTwdLike())
 		assert.equal(out.pass, true, `expected pass, got ${JSON.stringify(out)}`)
-		assert.ok(out.travel > 0.5, `expected travel, got ${JSON.stringify(out)}`)
+		assert.ok(out.travel > 0.05, `expected travel, got ${JSON.stringify(out)}`)
+		assert.equal(out.best, 'Plunger', `expected manual best, got ${JSON.stringify(out)}`)
 		assert.ok(
 			(out.measured || []).includes('Plunger'),
 			`expected manual Plunger measured, got ${JSON.stringify(out)}`,
@@ -67,42 +81,30 @@ describe('plungerChecks leg', () => {
 	})
 
 	it('still passes for a single manual plunger table', async () => {
-		const manual = makePlunger('Plunger', { auto: false })
-		const viewer = {
-			viewerMode: 'play',
-			player: {
-				balls: [],
-				onKeyDown: () => {
-					manual.__set(22)
-				},
-				onKeyUp: () => {
-					manual.__set(0.25)
-				},
+		const manual = makePlunger(0, 'Plunger')
+		const api = makeVpx({
+			plungers: [manual],
+			onKey: (code, down) => {
+				if (code === 'Enter') manual.pull = down ? 0.85 : 0
 			},
-			table: { plungers: { Plunger: manual } },
-		}
-		viewer.player.getPhysics = () => ({ emu: {} })
-		const out = await runLeg(viewer)
+		})
+		const out = await runLeg(api)
 		assert.equal(out.pass, true, `expected pass, got ${JSON.stringify(out)}`)
 	})
 
 	it('falls back to all plungers when the table only has auto plungers', async () => {
-		const auto = makePlunger('Plunger1', { auto: true })
-		const viewer = {
-			viewerMode: 'play',
-			player: {
-				balls: [],
-				onKeyDown: () => {},
-				onKeyUp: () => {
-					auto.__set(0.25)
-				},
-			},
-			table: { plungers: { Plunger1: auto } },
-		}
-		viewer.player.getPhysics = () => ({ emu: {} })
+		const auto = makePlunger(0, 'Plunger1')
+		const api = makeVpx({ plungers: [auto], onKey: () => {} })
 		// ROM solenoid fires the auto plunger mid-hold.
-		setTimeout(() => auto.__set(18), 200)
-		const out = await runLeg(viewer)
+		setTimeout(() => {
+			auto.pull = 0.8
+		}, 200)
+		const out = await runLeg(api)
 		assert.equal(out.pass, true, `expected pass, got ${JSON.stringify(out)}`)
+	})
+
+	it('skips honestly when the table has no plunger', async () => {
+		const out = await runLeg(makeVpx({ plungers: [] }))
+		assert.equal(out.pass, 'skip', `expected skip, got ${JSON.stringify(out)}`)
 	})
 })

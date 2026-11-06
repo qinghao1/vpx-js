@@ -1092,6 +1092,22 @@ describe('WASM scene sync', () => {
 			expect(sync.ballPoses()).toEqual([{ id: 7, x: 10, y: 20, z: 30 }])
 		})
 
+		it('exposes plunger travel with its frame range', () => {
+			const table = new TableBuilder().build()
+			const api = new RecordingApi()
+			const PlungerDataCtor = PlungerData as unknown as new (itemName: string) => PlungerData
+			const data = new PlungerDataCtor('P1')
+			data.center = new Vertex2D(500, 500)
+			const state = PlungerState.claim('P1', 0, true)
+			const slots = new Map<number, PartSlot<object>>([
+				[2, slotFor({}, state, new PlungerUpdater(state, new PlungerMeshGenerator(data)))],
+			])
+			const sync = new WasmSceneSync<object, unknown, unknown>(mockScene(slots), mockBalls(), api as any, table)
+			expect(sync.plungerPositions()).toEqual([])
+			sync.syncMovers(new Float32Array([2, MoverType.Plunger, 50, 0, 100, 0, 1, 0]))
+			expect(sync.plungerPositions()).toEqual([{ partIdx: 2, pos: 50, start: 0, end: 100 }])
+		})
+
 		it('counts applied light changes for activity signals', () => {
 			const table = new TableBuilder().build()
 			const api = new RecordingApi()
