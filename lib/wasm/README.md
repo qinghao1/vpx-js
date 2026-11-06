@@ -32,29 +32,18 @@ WASM. This seam is the only boundary between them.
 ## Status
 
 Bridge live, built from the pinned `external/vpinball` submodule
-(`@64a480a96`) — never from a side checkout. The bridge is sixteen patches in
-`wasm/modules/headless/patches/` (`0001` new `src/web/vpx_wasm_bridge.cpp`;
-`0002` part-state getters; `0003` headless step + script-error record;
-`0004` Noop render-device guards; `0005` CMake target; `0006` DMD mirror;
-`0007` IsPlaying ignores window focus headless; `0008` host-paced
-PinMAME time fence; `0009` PinMAME ROM-audio capture to a drained int16
-PCM ring; `0010` drop of the SDL echo of ring-forwarded lanes; `0011`
-silence of the refresh-rate probe error; `0012` FlexDMD mirror; `0013` flasher
-image; `0014` audio level; `0015` VR player mode; `0016` wasm source maps), applied idempotently at build time
-like the PinMAME patches. Do not hand-edit the
-submodule; change the patch files. Build with `npm run build:wasm:headless`
-(`wasm/build-headless.sh`: patches → third-party libs → configure →
-`vpinball-headless` target → deploy), which outputs
-`demo-browser/public/wasm/vpinball-headless.{js,wasm,data}` (gitignored).
+(`@64a480a96`) — never from a side checkout — plus the patch series in
+`wasm/modules/headless/patches/` (one concern per patch; see `wasm/README.md`).
+Build with `npm run build:wasm:headless`, which outputs
+`demo-browser/public/wasm/vpinball-headless.{js,wasm,wasm.map,data}` (gitignored).
 `HeadlessEngine` is the only boundary: byte-array in, typed rows/DMD/PCM
 audio/script errors out. Calls that may block on engine threads (`loadTable`,
 `destroyTable`) enter WASM through `WebAssembly.promising` (JSPI).
 
-Patch `0017` adds `VpxWasm_GetAbiVersion`, which the facade checks once per
-module against `HEADLESS_ABI_VERSION` (a mismatch throws `HeadlessEngineError`
-with `op: 'abi'`). It also JSON-escapes the part catalog, clears the FlexDMD
-publish latch and the captured audio format on every table load/teardown, and
-lists every bridge export in `-sEXPORTED_FUNCTIONS`.
+The facade checks `VpxWasm_GetAbiVersion` once per module against
+`HEADLESS_ABI_VERSION`; a mismatch throws `HeadlessEngineError` (`op: 'abi'`)
+instead of degrading per frame. Bump both together when the row layout or an
+export signature changes.
 
 Keys (`pushKey`) fire script KeyDown/KeyUp events; buffered `getDmdFrame`
 frames and solenoid motion need a scripted table plus VPinMAME.Controller.
@@ -83,9 +72,10 @@ adapter → viewer `_sendKey`), and teardown all route through it. SRGB DMD
 triplets decode to dots-per-byte in the `dmdFrame` getter; reload clears
 part names, cached DMD, balls, and destroys the prior engine.
 
-A/B (`integration.mjs`, `table-empty.vpx`): the former TS-player legs
-(transpile, ball, physics) skip honestly and a `wasmEngine` leg asserts the
-Stage-1 guarantees (ready, catalog, zero script errors, tick + input).
+Browser e2e (`integration.mjs`) drives the engine through the dev-only typed
+test API (`window.vpx`, `demo-browser/src/test-api.ts`): a `wasmEngine` leg
+asserts ready, catalog, zero script errors, tick + input; the gameplay legs
+(ball, plunger, flipper, nudge, DMD) read engine state, never viewer privates.
 (Stage/phase/§ references below are to the rescope plan at
 `/home/qinghao1/docs/vpx-js-threejs-rescope-plan.md`.)
 Shared legs keep their Phase-3 shapes (pageerrors, diagnostics, playfield,

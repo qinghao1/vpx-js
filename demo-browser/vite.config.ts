@@ -1,3 +1,4 @@
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 import fs from 'node:fs'
 import os from 'node:os'
 import path, { dirname, resolve } from 'node:path'
@@ -14,6 +15,13 @@ const define = {
 	'process.env': '(globalThis.process?.env ?? {})',
 	process: '(globalThis.process ?? {env:{},browser:true,platform:"browser"})',
 	global: 'globalThis',
+}
+
+// SharedArrayBuffer (the pthread engine) needs a cross-origin-isolated page.
+const crossOriginIsolated = {
+	'Cross-Origin-Opener-Policy': 'same-origin',
+	'Cross-Origin-Embedder-Policy': 'require-corp',
+	'Cross-Origin-Resource-Policy': 'cross-origin',
 }
 
 export default defineConfig({
@@ -48,31 +56,12 @@ export default defineConfig({
 		host: true,
 		watch: { ignored: ['**/dist/**', '**/dist-esm/**', '**/node_modules/**', '**/.git/**'] },
 		fs: {
-			allow: [
-				root,
-				repoRoot,
-				resolve(repoRoot, 'dist-esm'),
-				resolve(repoRoot, 'wasm/dist'),
-				resolve(repoRoot, 'wasm/kernels/dist'),
-				resolve(repoRoot, 'test/fixtures'),
-				resolve(home, 'Downloads'),
-				resolve(home, '.pinmame/roms'),
-			],
+			allow: [repoRoot, resolve(home, 'Downloads'), resolve(home, '.pinmame/roms')],
 			strict: false,
 		},
-		headers: {
-			'Cross-Origin-Opener-Policy': 'same-origin',
-			'Cross-Origin-Embedder-Policy': 'require-corp',
-			'Cross-Origin-Resource-Policy': 'cross-origin',
-		},
+		headers: crossOriginIsolated,
 	},
-	preview: {
-		headers: {
-			'Cross-Origin-Opener-Policy': 'same-origin',
-			'Cross-Origin-Embedder-Policy': 'require-corp',
-			'Cross-Origin-Resource-Policy': 'cross-origin',
-		},
-	},
+	preview: { headers: crossOriginIsolated },
 	plugins: [
 		basicSsl(),
 		{
@@ -92,32 +81,18 @@ export default defineConfig({
 				}
 				server.middlewares.use((req: any, res: any, next: any) => {
 					const url = req.url?.split('?')[0].split('#')[0] ?? ''
+					// The engine glue is import()ed at runtime, which vite refuses for
+					// /public files; serve the artifact raw (no transform, no cache).
+					// COEP too: the glue is also each pthread worker's script, and a
+					// worker of an isolated page will not start without it.
 					if (url.startsWith('/wasm/')) {
-						const rel = url.slice('/wasm/'.length)
-						const tries = [
-							resolve(__dirname, `public/wasm/${rel}`),
-							resolve(repoRoot, `wasm/${rel}`),
-							resolve(repoRoot, `wasm/kernels/dist/${rel}`),
-							resolve(repoRoot, `wasm/dist/${rel}`),
-							resolve(repoRoot, `wasm/mock/${rel}`),
-						]
-						if (rel === 'kernels.js' || rel === 'kernels.wasm')
-							tries.unshift(resolve(repoRoot, `wasm/kernels/dist/${rel}`))
-						for (const f of tries)
-							if (fs.existsSync(f)) {
-								try {
-									const ext = path.extname(f).toLowerCase()
-									const ct =
-										ext === '.wasm'
-											? 'application/wasm'
-											: ext === '.js'
-												? 'application/javascript'
-												: 'application/octet-stream'
-									res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp')
-									res.setHeader('Cache-Control', 'no-cache')
-									if (send(res, req, f, ct)) return
-								} catch {}
-							}
+						const file = resolve(__dirname, 'public', url.slice(1))
+						if (fs.existsSync(file)) {
+							const type = { '.wasm': 'application/wasm', '.js': 'text/javascript' }[path.extname(file)]
+							for (const [name, value] of Object.entries(crossOriginIsolated)) res.setHeader(name, value)
+							res.setHeader('Cache-Control', 'no-cache')
+							if (send(res, req, file, type ?? 'application/octet-stream')) return
+						}
 					}
 					if (url.startsWith('/test/fixtures/') && url.endsWith('.vpx')) {
 						req.url = '/@fs' + resolve(repoRoot, url.slice(1))

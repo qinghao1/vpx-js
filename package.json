@@ -20,10 +20,8 @@
 	"scripts": {
 		"build": "npm run build:esm",
 		"build:esm": "node build/parallel.mjs -- \"npm run build:esm:tsc\" \"npm run build:esm:cp\"",
-		"build:wasm": "wasm/build.sh",
 		"build:wasm:headless": "wasm/build-headless.sh",
 		"build:wasm:headless:debug": "wasm/build-headless.sh --debug",
-		"build:wasm:mock": "wasm/build.sh --mock",
 		"typecheck": "tsc --noEmit",
 		"typecheck:tests": "tsc --noEmit -p tsconfig.spec.json",
 		"lint": "biome check .",
@@ -39,7 +37,6 @@
 		"verify:all": "tsx test/harness/verify-all.ts",
 		"verify:e2e": "tsx test/harness/verify-all.ts",
 		"prepare": "husky",
-		"build:wasm:debug": "wasm/build.sh --debug",
 		"bench": "node test/harness/bench.mjs",
 		"bench:walking-dead": "node test/harness/bench.mjs --vpx=walking_dead.vpx --profile",
 		"bench:walking-dead:browser": "node test/harness/bench.mjs --vpx=walking_dead.vpx --balls=1 --duration=5000 --warmup=1500 --profile",

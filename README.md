@@ -16,7 +16,7 @@ Fork of [`vpdb/vpx-js`](https://github.com/vpdb/vpx-js) by [freezy](https://gith
 
 - Node `>=24`
 - A browser with WebGPU support for the demo
-- Emscripten, CMake, and Ninja only to rebuild the PinMAME WASM module (`npm run build:wasm:mock` covers the rest)
+- emsdk 6.0.13 only to rebuild the headless engine (`npm run build:wasm:headless`, see `wasm/README.md`)
 
 ## Quickstart
 
