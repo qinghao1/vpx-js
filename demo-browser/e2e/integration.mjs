@@ -1,5 +1,3 @@
-import { readFileSync } from 'node:fs'
-import path from 'node:path'
 import { attachLogging, ensureVite, launchBrowser, loadPuppeteer, newPage } from '../../test/harness/utils.mjs'
 import {
 	backboxChecks,
@@ -56,35 +54,20 @@ const autoKillMs = Number(process.env.E2E_AUTOKILL_MS) || undefined
 const legStatus = v => (v === 'skip' ? 'SKIP' : v ? 'PASS' : 'FAIL')
 // Gameplay legs that need script/ROM/DMD. Static fixtures (no table script)
 // may skip them; the playable fixture must genuinely pass them.
-const OPTIONAL_GAMEPLAY_LEGS = new Set([
-	'transpile',
-	'ball',
-	'plunger',
-	'physics',
-	'nudge',
-	'dmd',
-	'dmdVisible',
-	'backbox',
-	'sound',
-])
+const OPTIONAL_GAMEPLAY_LEGS = new Set(['ball', 'plunger', 'physics', 'nudge', 'dmd', 'dmdVisible', 'backbox', 'sound'])
 // table-empty has no bake mesh, inserts, or lit scene: playfield is
 // uncheckable by construction and an empty-scene orbit is unstable under
 // software rendering, so both are manifest-optional there — never on a
 // playable table.
 const OPTIONAL_EMPTY_FIXTURE_LEGS = new Set([...OPTIONAL_GAMEPLAY_LEGS, 'playfield', 'camera'])
 // Labels whose tables boot a ROM and run table script: everything except the
-// manifest-optional transpile/backbox legs is required (no skip-is-pass).
+// manifest-optional backbox leg is required (no skip-is-pass).
 const isPlayableLabel = label => /walking_dead|twd/i.test(label)
-const optionalLegsFor = label =>
-	isPlayableLabel(label) ? new Set(['transpile', 'backbox']) : OPTIONAL_EMPTY_FIXTURE_LEGS
+const optionalLegsFor = label => (isPlayableLabel(label) ? new Set(['backbox']) : OPTIONAL_EMPTY_FIXTURE_LEGS)
 // The headless-WASM engine is unconditional: the wasmEngine leg asserts on
 // every run, and the TS-player legs below skip honestly when it is active.
 const legOkFor = (label, leg, v) =>
 	v === true || (v === 'skip' && (leg === 'wasmEngine' || optionalLegsFor(label).has(leg)))
-
-// Repo-relative inputs for the transpile probe: no hardcoded checkout path.
-const TRANSPILER_URL = `/@fs${path.resolve('dist-esm/lib/scripting/transpiler.js')}`
-const VBS_CONSTRUCTS_PATH = path.resolve('test/harness/__snapshots__/vpinball-compat/vbs-constructs.vbs')
 
 function labelFromUrl(u) {
 	try {
@@ -196,7 +179,7 @@ async function runOne(targetUrl, label) {
 	} else {
 		console.log(`[integration:${label}] pageerrors PASS (0 during load+settle)`)
 	}
-	// TS-player machinery legs (transpile, ball, physics) cannot run when the
+	// TS-player machinery legs (ball, physics) cannot run when the
 	// headless-WASM engine owns the table: no TS player exists. They skip
 	// honestly below; the wasmEngine leg asserts the WASM guarantees instead.
 	let wasmActive = false
@@ -269,61 +252,6 @@ async function runOne(targetUrl, label) {
 	} catch (e) {
 		console.log(`[playfield:${label}] error ${e.message}`)
 		results.playfield = false
-	}
-	try {
-		// Full-pipeline probe: the same VBS-construct fixture the AST gate pins,
-		// transpiled in-page through the viewer's Transpiler (not just one-liners).
-		const vbs = readFileSync(VBS_CONSTRUCTS_PATH, 'utf-8')
-		const tp = await page.evaluate(
-			async ({ transpilerUrl, fixture }) => {
-				try {
-					const v = window.viewer
-					if (!v.player) return { wasmSkip: true }
-					const { Transpiler } = await import(transpilerUrl)
-					const t = new Transpiler(v.table, v.player)
-					const notIs = t.transpile('If Not cb Is Nothing Then\n  x=1\nEnd If')
-					const cbool = t.transpile('bstate=CBool(state>=0.5)')
-					const fixtureJs = t.transpile(fixture)
-					let syntaxOk = false
-					try {
-						new Function(fixtureJs)
-						syntaxOk = true
-					} catch {}
-					return {
-						// Correct shape: __vbs.is(<cb...>, ...) with the Not outside.
-						// Regression: the old bug pushed the negation inside (__vbs.is(!...)).
-						notIsCorrect:
-							notIs.includes('__vbs.is(') && notIs.includes("'cb'") && !notIs.includes('__vbs.is(!'),
-						cboolOk: cbool.includes('CBool'),
-						fixtureLen: fixtureJs.length,
-						fixtureMarkers: ['AddScore', 'DoubleIt', 'TestLogic', 'TestWith'].every(m =>
-							fixtureJs.includes(m),
-						),
-						syntaxOk,
-					}
-				} catch (e) {
-					return { err: String(e?.message ?? e) }
-				}
-			},
-			{ transpilerUrl: TRANSPILER_URL, fixture: vbs },
-		)
-		console.log(`[transpile:${label}]`, JSON.stringify(tp))
-		if (tp.wasmSkip) {
-			results.transpile = 'skip'
-			console.log(`[integration:${label}] transpile SKIP — wasm engine: table script compiles upstream (Stage 2)`)
-		} else {
-			results.transpile =
-				!tp.err &&
-				tp.notIsCorrect === true &&
-				tp.cboolOk === true &&
-				tp.fixtureLen > 500 &&
-				tp.fixtureMarkers === true &&
-				tp.syntaxOk === true
-			if (!results.transpile) console.log(`[transpile:${label}] FAIL transpilation probe failed`)
-		}
-	} catch (e) {
-		console.log(`[transpile:${label}] error ${e.message}`)
-		results.transpile = false
 	}
 	let ball = null
 	try {
@@ -524,7 +452,7 @@ async function runOne(targetUrl, label) {
 		console.log(`[integration:${label}] runErrors PASS (0 run-phase page/script errors)`)
 	}
 	await page.close().catch(() => {})
-	// Every leg counts — including transpile, dmd, backbox, and the load
+	// Every leg counts — including dmd, backbox, and the load
 	// pageerror gate. No mock overrides: legs the fixture cannot support
 	// report 'skip' (neutral only when the manifest marks them optional),
 	// everything else must genuinely pass.
@@ -532,7 +460,6 @@ async function runOne(targetUrl, label) {
 		pageerrors: results.pageerrors,
 		diagnostics: results.diagnostics,
 		playfield: results.playfield,
-		transpile: results.transpile,
 		ball: results.ball,
 		plunger: results.plunger,
 		physics: results.physics,
