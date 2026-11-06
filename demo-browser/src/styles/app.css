@@ -210,21 +210,6 @@ body {
 .picker--files {
 	gap: 10px;
 }
-.picker--urls {
-	flex-direction: column;
-	gap: 10px;
-	width: 100%;
-	max-width: 420px;
-}
-.picker-row {
-	display: flex;
-	gap: 8px;
-	width: 100%;
-	align-items: center;
-}
-.picker-row input[type="text"] {
-	flex: 1 1 auto;
-}
 
 /* Stream progress */
 #stream-progress {

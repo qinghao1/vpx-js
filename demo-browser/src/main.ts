@@ -21,20 +21,25 @@ const vpxParam = params.get('vpx') || params.get('table')
 const romParam = params.get('rom')
 if (vpxParam) {
 	viewer.load().catch(e => console.error('[app] load failed', e))
-	if (romParam) viewer.preloadRom?.(romParam)
+	if (romParam) viewer.preloadRom?.(romParam).catch(e => console.error('[app] rom load failed', e))
 } else {
 	viewer.startLoop()
+}
+
+const syncParam = (key, value) => {
+	const u = new URL(location.href)
+	u.searchParams.set(key, value)
+	history.replaceState(null, '', u.pathname + u.search)
 }
 
 function handleFile(f) {
 	if (!f) return
 	if (f.name.toLowerCase().endsWith('.vpx')) {
 		viewer.loadFromFile(f)
-		const u = new URL(location.href)
-		u.searchParams.delete('vpx')
-		history.replaceState(null, '', u.pathname + u.search)
+		syncParam('vpx', f.name)
 	} else if (f.name.toLowerCase().endsWith('.zip')) {
 		viewer.loadRomFile(f)
+		syncParam('rom', f.name)
 	}
 }
 
@@ -43,23 +48,6 @@ for (const id of ['file-vpx', 'file-rom']) {
 		const f = e.target.files?.[0]
 		if (f) handleFile(f)
 		e.target.value = ''
-	})
-}
-
-for (const id of ['picker-vpx', 'picker-rom']) {
-	document.getElementById(id)?.addEventListener('click', () => {
-		const v = document.getElementById(id === 'picker-vpx' ? 'vpx-input' : 'rom-input')?.value.trim()
-		if (!v) return
-		const u = new URL(location.href)
-		if (id === 'picker-vpx') {
-			u.searchParams.set('vpx', v)
-			history.replaceState(null, '', u.pathname + u.search)
-			viewer.load().catch(console.error)
-		} else {
-			u.searchParams.set('rom', v)
-			history.replaceState(null, '', u.pathname + u.search)
-			viewer.preloadRom(v)
-		}
 	})
 }
 
