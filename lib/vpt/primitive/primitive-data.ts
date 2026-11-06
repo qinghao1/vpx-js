@@ -11,7 +11,7 @@ import { ItemData } from '../item-data.js'
 import { Mesh } from '../mesh.js'
 
 const RTV_TAGS = ['RTV0', 'RTV1', 'RTV2', 'RTV3', 'RTV4', 'RTV5', 'RTV6', 'RTV7', 'RTV8']
-const FLOAT_MAP: BiffFieldMap<PrimitiveData> = {
+const FLOAT_MAP: BiffFieldMap<PrimitiveData, number> = {
 	PIDB: 'depthBias',
 	THRS: 'threshold',
 	ELAS: 'elasticity',
@@ -26,8 +26,8 @@ const FLOAT_MAP: BiffFieldMap<PrimitiveData> = {
 	RSTR: 'reflectionStrength',
 	RTHI: 'refractionThickness',
 }
-const INT_MAP: BiffFieldMap<PrimitiveData> = { COLR: 'color', SIDS: 'sides', SCOL: 'sideColor' }
-const BOOL_MAP: BiffFieldMap<PrimitiveData> = {
+const INT_MAP: BiffFieldMap<PrimitiveData, number> = { COLR: 'color', SIDS: 'sides', SCOL: 'sideColor' }
+const BOOL_MAP: BiffFieldMap<PrimitiveData, boolean> = {
 	DTXI: 'drawTexturesInside',
 	HTEV: 'hitEvent',
 	CLDR: 'isCollidable',
@@ -43,7 +43,7 @@ const BOOL_MAP: BiffFieldMap<PrimitiveData> = {
 	TVIS: 'isVisible',
 	REEN: 'isReflectionEnabled',
 }
-const STRING_MAP: BiffFieldMap<PrimitiveData> = {
+const STRING_MAP: BiffFieldMap<PrimitiveData, string> = {
 	IMAG: 'szImage',
 	NRMA: 'szNormalMap',
 	MATR: 'szMaterial',
@@ -53,7 +53,7 @@ const STRING_MAP: BiffFieldMap<PrimitiveData> = {
 	REFL: 'szReflectionProbe',
 	REFR: 'szRefractionProbe',
 }
-const WIDE_STRING_MAP: BiffFieldMap<PrimitiveData> = { M3DN: 'meshFileName' }
+const WIDE_STRING_MAP: BiffFieldMap<PrimitiveData, string> = { M3DN: 'meshFileName' }
 
 /** @see https://github.com/vpinball/vpinball/blob/master/primitive.cpp */
 export class PrimitiveData extends ItemData {

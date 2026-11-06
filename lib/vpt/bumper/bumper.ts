@@ -14,7 +14,7 @@ import type { Table } from '../table/table.js'
 import { Texture } from '../texture.js'
 import { BumperMeshGenerator, BumperUpdater } from './bumper-view.js'
 
-const FLOAT_TAGS: BiffFieldMap<BumperData> = {
+const FLOAT_TAGS: BiffFieldMap<BumperData, number> = {
 	RADI: 'radius',
 	THRS: 'threshold',
 	FORC: 'force',
@@ -24,14 +24,14 @@ const FLOAT_TAGS: BiffFieldMap<BumperData> = {
 	ORIN: 'orientation',
 	RDLI: 'ringDropOffset',
 }
-const STRING_TAGS: BiffFieldMap<BumperData> = {
+const STRING_TAGS: BiffFieldMap<BumperData, string> = {
 	MATR: 'szCapMaterial',
 	RIMA: 'szRingMaterial',
 	BAMA: 'szBaseMaterial',
 	SKMA: 'szSkirtMaterial',
 	SURF: 'szSurface',
 }
-const BOOL_TAGS: BiffFieldMap<BumperData> = {
+const BOOL_TAGS: BiffFieldMap<BumperData, boolean> = {
 	CAVI: 'isCapVisible',
 	HAHE: 'hitEvent',
 	COLI: 'isCollidable',

@@ -1,8 +1,9 @@
 # Rendering
 
-`IRenderApi` decouples the engine from any 3D framework: gameplay code in
-`lib/game/` and `lib/vpt/` never touches three.js directly. The only backend
-is `ThreeRenderApi` (`threejs/`); there is no Babylon adapter.
+`IRenderApi` decouples the engine from any 3D framework: `lib/vpt/` never
+touches three.js materials directly. The only backend is `ThreeRenderApi`
+(`threejs/`); the generic `<NODE, GEOMETRY, POINT_LIGHT>` params keep the
+boundary open for other backends.
 
 ## Pipeline
 
@@ -27,7 +28,7 @@ preloadTextures → generateTableNode → postProcessScene → optimizeScene
    batching freezes topology: any later `applyMatrix/applyMesh/applyMaterial`
    call unbatches that mesh first (`unbatch`), and meshes with pending
    (not-yet-loaded) textures are skipped — retry after textures arrive.
-5. **Per-frame** (`ItemUpdater`): physics/animation mutate `ItemState`;
+5. **Per-frame** (`ItemUpdater`): scene sync writes `ItemState`;
    updaters push the delta through `applyMatrixToNode` / `applyMeshToNode` /
    `applyVisibility` / `applyLighting` / `applyMaterial`. Render code never
    reads state directly — updaters own that mapping.

@@ -84,13 +84,25 @@ describe('primitive animation frame fast path', () => {
 		expect(Array.from(calls[1]!.positions)).to.deep.equal([2, 0, 0, 3, 0, 0])
 	})
 
-	it('falls back to the legacy mesh path on backends without frame arrays', () => {
+	it('falls back to the legacy mesh path when prebuilt frames are stale', () => {
+		// applyFrameArrays is required, so the legacy interpolation only runs
+		// when the prebuilds no longer match the mesh frames.
 		const table = new TableBuilder().addPrimitive('pDynamic', { staticRendering: false }).build()
 		const updater = table.primitives.pDynamic.getUpdater()
-		updater.setMesh(animatedMesh())
+		const mesh = animatedMesh()
+		updater.setMesh(mesh)
+		mesh.animationFrames.push(
+			frameData([
+				[4, 0, 0, 0, 0, 1],
+				[5, 0, 0, 0, 0, 1],
+			]),
+		)
 		let legacyCalls = 0
 		const fakeApi = {
 			applyVisibility: () => {},
+			applyFrameArrays: () => {
+				throw new Error('fast path must not run with stale prebuilds')
+			},
 			applyMeshToNode: () => {
 				legacyCalls++
 			},

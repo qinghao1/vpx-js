@@ -18,7 +18,7 @@ import type { Table } from '../table/table.js'
 import type { Texture } from '../texture.js'
 import { LightMeshGenerator, LightUpdater } from './light-view.js'
 
-const FLOAT_MAP: BiffFieldMap<LightData> = {
+const FLOAT_MAP: BiffFieldMap<LightData, number> = {
 	HGHT: 'height',
 	RADI: 'falloff',
 	FAPO: 'falloffPower',
@@ -31,8 +31,8 @@ const FLOAT_MAP: BiffFieldMap<LightData> = {
 	BMVA: 'bulbModulateVsAdd',
 	BHHI: 'bulbHaloHeight',
 }
-const INT_MAP: BiffFieldMap<LightData> = { BINT: 'blinkInterval', SHDW: 'shadows', FADE: 'fader' }
-const BOOL_MAP: BiffFieldMap<LightData> = {
+const INT_MAP: BiffFieldMap<LightData, number> = { BINT: 'blinkInterval', SHDW: 'shadows', FADE: 'fader' }
+const BOOL_MAP: BiffFieldMap<LightData, boolean> = {
 	SHAP: 'roundLight',
 	BGLS: 'isBackglass',
 	BULT: 'bulbLight',
@@ -42,7 +42,7 @@ const BOOL_MAP: BiffFieldMap<LightData> = {
 	SHRB: 'showReflectionOnBall',
 	VSBL: 'isVisible',
 }
-const STRING_MAP: BiffFieldMap<LightData> = {
+const STRING_MAP: BiffFieldMap<LightData, string> = {
 	IMG1: 'szOffImage',
 	BPAT: 'rgBlinkPattern',
 	SURF: 'szSurface',
@@ -96,7 +96,7 @@ export function bakedIntensity(data: Pick<LightData, 'intensity' | 'state' | 'rg
 
 /** @see https://github.com/vpinball/vpinball/blob/master/light.cpp */
 export class LightData extends ItemData {
-	public center!: Vertex2D
+	public center: Vertex2D = new Vertex2D()
 	public falloff = 50
 	public falloffPower = 2
 	public state: number = Enums.LightStatus.LightStateOff

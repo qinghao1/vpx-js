@@ -66,6 +66,7 @@ export class Primitive extends Item<PrimitiveData> {
 				isTransparent,
 				depthBias: this.data.depthBias,
 				disableLighting: this.data.disableLightingTop,
+				disableLightingBelow: this.data.disableLightingBelow,
 				addBlend: this.data.addBlend,
 				backfacesEnabled: this.data.backfacesEnabled,
 			},

@@ -1,34 +1,37 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-/** ItemType. */
-export class ItemType {
-	public static readonly Surface = 0
-	public static readonly Flipper = 1
-	public static readonly Timer = 2
-	public static readonly Plunger = 3
-	public static readonly Textbox = 4
-	public static readonly Bumper = 5
-	public static readonly Trigger = 6
-	public static readonly Light = 7
-	public static readonly Kicker = 8
-	public static readonly Decal = 9
-	public static readonly Gate = 10
-	public static readonly Spinner = 11
-	public static readonly Ramp = 12
-	public static readonly Table = 13
-	public static readonly LightCenter = 14
-	public static readonly DragPoint = 15
-	public static readonly Collection = 16
-	public static readonly DispReel = 17
-	public static readonly LightSeq = 18
-	public static readonly Primitive = 19
-	public static readonly Flasher = 20
-	public static readonly Rubber = 21
-	public static readonly HitTarget = 22
-	public static readonly Count = 23
-	public static readonly Invalid = 0xffffffff
-}
+/**
+ * File-format item type ids. An `as const` object like the other enum maps
+ * below; values must match upstream `ItemType` (`external/vpinball/src/core/iselect.h`).
+ */
+export const ItemType = {
+	Surface: 0,
+	Flipper: 1,
+	Timer: 2,
+	Plunger: 3,
+	Textbox: 4,
+	Bumper: 5,
+	Trigger: 6,
+	Light: 7,
+	Kicker: 8,
+	Decal: 9,
+	Gate: 10,
+	Spinner: 11,
+	Ramp: 12,
+	Table: 13,
+	LightCenter: 14,
+	DragPoint: 15,
+	Collection: 16,
+	DispReel: 17,
+	LightSeq: 18,
+	Primitive: 19,
+	Flasher: 20,
+	Rubber: 21,
+	HitTarget: 22,
+	Count: 23,
+	Invalid: 0xffffffff,
+} as const
 
 /** Item property enums (values match upstream `vpinball` headers). */
 export const Enums = {

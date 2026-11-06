@@ -40,13 +40,12 @@ export class HitTargetMeshGenerator {
 		const px = this.data.position.x,
 			py = this.data.position.y,
 			pz = this.data.position.z
-		const scaleZ = table.getScaleZ(),
-			tableH = table.getTableHeight()
+		const scaleZ = table.getScaleZ()
 		for (const v of mesh.vertices) {
 			const vert = Vertex3D.claim(v.x * sx, v.y * sy, v.z * sz).multiplyMatrix(m)
 			v.x = vert.x + px
 			v.y = vert.y + py
-			v.z = vert.z * scaleZ + pz + tableH
+			v.z = vert.z * scaleZ + pz
 			const n = Vertex3D.claim(v.nx, v.ny, v.nz).multiplyMatrixNoTranslate(m)
 			v.nx = n.x
 			v.ny = n.y

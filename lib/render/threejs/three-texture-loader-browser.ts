@@ -18,7 +18,7 @@ import {
 } from '../../refs.browser.js'
 import { bitmapCacheKey, exrCacheKey, idbGet, idbSet } from '../../util/idb-cache.js'
 import { logger } from '../../util/logger.js'
-import { _resetQualityCache, cappedAniso, getEffectiveCaps, MAX_FLOAT_TEXTURE_BYTES } from '../../util/quality.js'
+import { cappedAniso, getEffectiveCaps, MAX_FLOAT_TEXTURE_BYTES } from '../../util/quality.js'
 import { settleWorkerEntry, type WorkerPendingEntry } from '../../util/worker-pending.js'
 import type { ITextureLoader } from '../irender-api.js'
 import { cappedDecodeTarget } from './encoded-size-probe.js'
@@ -49,10 +49,6 @@ const imageMap: Record<string, string> = {
 export function effectiveMax(name?: string): number {
 	const caps = getEffectiveCaps()
 	return name && RE_PLAYFIELD.test(name) ? caps.playfield : caps.other
-}
-
-export function _testResetTextureLimits(): void {
-	_resetQualityCache()
 }
 
 const NOMIPMAP_MAX_EDGE = 64

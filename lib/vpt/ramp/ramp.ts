@@ -15,7 +15,7 @@ import { Mesh } from '../mesh.js'
 import type { Table } from '../table/table.js'
 import { isTransparentRampMaterial, RampMeshGenerator, RampUpdater } from './ramp-view.js'
 
-const FLOAT_MAP: BiffFieldMap<RampData> = {
+const FLOAT_MAP: BiffFieldMap<RampData, number> = {
 	HTBT: 'heightBottom',
 	HTTP: 'heightTop',
 	WDBT: 'widthBottom',
@@ -33,8 +33,8 @@ const FLOAT_MAP: BiffFieldMap<RampData> = {
 	RADX: 'wireDistanceX',
 	RADY: 'wireDistanceY',
 }
-const INT_MAP: BiffFieldMap<RampData> = { TYPE: 'rampType', ALGN: 'imageAlignment' }
-const BOOL_MAP: BiffFieldMap<RampData> = {
+const INT_MAP: BiffFieldMap<RampData, number> = { TYPE: 'rampType', ALGN: 'imageAlignment' }
+const BOOL_MAP: BiffFieldMap<RampData, boolean> = {
 	IMGW: 'imageWalls',
 	HTEV: 'hitEvent',
 	CLDR: 'isCollidable',
@@ -42,7 +42,7 @@ const BOOL_MAP: BiffFieldMap<RampData> = {
 	REEN: 'isReflectionEnabled',
 	OVPH: 'overwritePhysics',
 }
-const STRING_MAP: BiffFieldMap<RampData> = { MATR: 'szMaterial', IMAG: 'szImage', MAPH: 'szPhysicsMaterial' }
+const STRING_MAP: BiffFieldMap<RampData, string> = { MATR: 'szMaterial', IMAG: 'szImage', MAPH: 'szPhysicsMaterial' }
 
 /** @see https://github.com/vpinball/vpinball/blob/master/ramp.cpp */
 export class RampData extends ItemData {
@@ -233,8 +233,8 @@ export class Ramp extends Item<RampData> {
 		const dy = vOut.y - vVertex[iSeg]!.y
 		const len = Math.sqrt(dx * dx + dy * dy)
 		startLength += len
-		const topHeight = this.data.heightTop + table.getTableHeight()
-		const bottomHeight = this.data.heightBottom + table.getTableHeight()
+		const topHeight = this.data.heightTop
+		const bottomHeight = this.data.heightBottom
 		const ratio = totalLength !== 0 ? startLength / totalLength : 0
 		return (vVertex[iSeg]?.z ?? 0) + ratio * (topHeight - bottomHeight) + bottomHeight
 	}

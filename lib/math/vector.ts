@@ -5,9 +5,6 @@ import { type Matrix3, Vector2, Vector3 } from 'three'
 import type { Matrix2D, Matrix3D } from './matrix.js'
 import { pooled } from './pool.js'
 
-// VBS undefined coerces to 0 so unset script values never poison vectors with NaN.
-const UNDEF_SYM = Symbol.for('vbs.undefined')
-
 export class Vertex2D extends Vector2 {
 	static readonly _pooled = pooled(Vertex2D)
 	readonly isVector2 = true as const
@@ -67,13 +64,8 @@ export class Vertex3D extends Vector3 {
 	override set(x: number, y: number, z?: number): this
 	override set(v: Vector3): this
 	override set(xOrV: number | Vector3, y?: number, z?: number): this {
-		if ((xOrV as any)?.[UNDEF_SYM] === true) return super.set(0, 0, 0) as this
-		if (typeof xOrV === 'number') {
-			if ((y as any)?.[UNDEF_SYM] === true) y = 0 as any
-			if ((z as any)?.[UNDEF_SYM] === true) z = 0 as any
-			return super.set(xOrV as number, y as number, z ?? 0) as this
-		}
-		return super.set((xOrV as any)?.x ?? 0, (xOrV as any)?.y ?? 0, (xOrV as any)?.z ?? 0) as this
+		if (typeof xOrV === 'number') return super.set(xOrV, y as number, z ?? 0) as this
+		return super.set(xOrV?.x ?? 0, xOrV?.y ?? 0, xOrV?.z ?? 0) as this
 	}
 	setAndRelease(v: Vertex3D): this {
 		this.set(v)

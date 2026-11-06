@@ -11,7 +11,7 @@ import { DragPoint, dragPointNestedTag } from '../dragpoint.js'
 import { Enums } from '../enums.js'
 import { ItemData } from '../item-data.js'
 
-const FLOAT_MAP: BiffFieldMap<FlasherData> = {
+const FLOAT_MAP: BiffFieldMap<FlasherData, number> = {
 	FHEI: 'height',
 	FROX: 'rotX',
 	FROY: 'rotY',
@@ -24,7 +24,7 @@ const FLOAT_MAP: BiffFieldMap<FlasherData> = {
 	GLFT: 'glassPadLeft',
 	GRHT: 'glassPadRight',
 }
-const INT_MAP: BiffFieldMap<FlasherData> = {
+const INT_MAP: BiffFieldMap<FlasherData, number> = {
 	ALGN: 'imageAlignment',
 	FILT: 'filter',
 	FIAM: 'filterAmount',
@@ -32,13 +32,13 @@ const INT_MAP: BiffFieldMap<FlasherData> = {
 	RSTL: 'renderStyle',
 	GAMB: 'glassAmbient',
 }
-const BOOL_MAP: BiffFieldMap<FlasherData> = {
+const BOOL_MAP: BiffFieldMap<FlasherData, boolean> = {
 	FVIS: 'isVisible',
 	IDMD: 'isDMD',
 	DSPT: 'displayTexture',
 	BGLS: 'isBackglass',
 }
-const STRING_MAP: BiffFieldMap<FlasherData> = {
+const STRING_MAP: BiffFieldMap<FlasherData, string> = {
 	IMAG: 'szImageA',
 	IMAB: 'szImageB',
 	LMAP: 'szLightmap',

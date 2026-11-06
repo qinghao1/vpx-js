@@ -104,10 +104,10 @@ export class FlasherUpdater extends ItemUpdater<FlasherState> {
 					if (userData?.__uModulate) userData.__uModulate.value = clampModulateVsAdd(this.effModulateVsAdd)
 					if (userData?.__uFlat?.value?.set)
 						userData.__uFlat.value.set(this.state.color).multiplyScalar(intensity)
-					renderApi.convertFlasherBlend?.(mat, absorb ? 'absorb' : 'additive')
+					renderApi.convertFlasherBlend(mat, absorb ? 'absorb' : 'additive')
 				} else {
 					// Node graphs ignore classic color/opacity writes; they convert instead.
-					if (userData?.__addBlend === true) renderApi.convertFlasherBlend?.(mat, 'plain')
+					if (userData?.__addBlend === true) renderApi.convertFlasherBlend(mat, 'plain')
 					else {
 						// BDL overlays carry tint/fade as uniforms (same protocol
 						// the primitive updater uses); the classic writes below

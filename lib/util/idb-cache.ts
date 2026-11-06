@@ -76,13 +76,6 @@ function djb2(data: Uint8Array): number {
 	return h >>> 0
 }
 
-/** djb2 over a string (char codes); same hash class as djb2 above. */
-function hashContent(s: string): number {
-	let h = 5381
-	for (let i = 0; i < s.length; i++) h = ((h << 5) + h) ^ s.charCodeAt(i)
-	return h >>> 0
-}
-
 export function exrCacheKey(name: string, data: Uint8Array, kind: string, max?: number): string {
 	// Content hash: a byteLength-only key collides for same-size textures.
 	const base = `exr:${name.toLowerCase()}:${kind}:${djb2(data).toString(36)}:${data.length}`
@@ -93,21 +86,4 @@ export function exrCacheKey(name: string, data: Uint8Array, kind: string, max?: 
 export function bitmapCacheKey(name: string, data: Uint8Array, mime: string, max?: number): string {
 	const base = `img:${name.toLowerCase()}:${mime}:${djb2(data).toString(36)}:${data.length}`
 	return typeof max === 'number' && max > 0 ? `${base}:${max}` : base
-}
-
-function contentKey(prefix: string, script: string): string {
-	return `${prefix}:${hashContent(script).toString(36)}:${script.length}`
-}
-
-export function vbsCacheKey(script: string): string {
-	// vbs10 versions the transpiler pipeline; bump when output changes.
-	// vbs10: `Dim` emits procedure-scoped `var` — the emitted JS differs
-	// for identical raw scripts.
-	return contentKey('vbs10', script)
-}
-
-/** Content-hash key for cached grammar ESTrees (`ast:` ≠ `vbs:` namespace). */
-export function astCacheKey(script: string): string {
-	// ast1 versions the grammar (parse + post-processors); bump independently of the vbs prefix.
-	return contentKey('ast1', script)
 }
