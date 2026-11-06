@@ -286,40 +286,48 @@ export const physicsChecks = async page => {
 	})
 }
 
-// WASM-engine leg: asserts the headless-bridge Stage-1 guarantees on
-// `?engine=wasm` runs (engine ready, part catalog, zero script errors, frame
-// stepping advances state, input routes without throwing). Skips honestly on
-// TS runs; fails when engine=wasm was requested but the engine is not ready.
+// WASM-engine leg: asserts the headless-bridge guarantees on every run
+// (engine ready, part catalog, zero script errors, stepping advances the
+// game clock, input routes without throwing). The WASM engine is
+// unconditional — there is no TS player to skip for.
 export const wasmEngineChecks = async page => {
+	await ensurePlayMode(page)
 	return page.evaluate(async () => {
-		const v = window.viewer
-		const wanted = new URLSearchParams(window.location.search).get('engine') === 'wasm'
-		const w = v?.wasmEngine
-		if (!w?.ready) {
-			return wanted
-				? { pass: false, reason: 'engine=wasm requested but engine not ready' }
-				: { pass: 'skip', reason: 'ts run (no wasm engine)' }
+		const api = window.vpx
+		if (!api) return { pass: false, reason: 'no test api (window.vpx)' }
+		try {
+			await api.whenReady()
+		} catch (e) {
+			return { pass: false, reason: `load failed: ${e?.message ?? e}` }
 		}
+		const s = api.state
 		const out = {
-			ready: w.ready,
-			catalogSize: w.catalogSize,
-			scriptErrors: w.scriptErrorCount,
-			ballCount: w.ballCount,
+			ready: s.wasmReady,
+			catalogSize: s.catalogSize,
+			scriptErrors: s.scriptErrors,
+			ballCount: s.ballCount,
+		}
+		if (!s.wasmReady) {
+			out.pass = false
+			out.reason = 'engine not ready'
+			return out
 		}
 		try {
-			v._tickPhysicsImmediate?.()
+			const t0 = api.state.gameMs
+			out.tickOk = api.step()
 			await new Promise(r => setTimeout(r, 120))
-			v._tickPhysicsImmediate?.()
-			out.tickOk = true
-			out.ballCountAfter = w.ballCount
-			v._sendKey?.('ArrowLeft', true)
-			v._sendKey?.('ArrowLeft', false)
-			v._nudge?.(75, 2.0)
+			out.gameAdvanced = api.state.gameMs > t0
+			out.ballCountAfter = api.state.ballCount
+			api.sendKey('ArrowLeft', true)
+			api.sendKey('ArrowLeft', false)
+			api.nudge(75, 2.0)
 			out.inputOk = true
 		} catch (e) {
 			out.error = String(e?.message ?? e).slice(0, 300)
 		}
-		out.pass = out.tickOk === true && out.inputOk === true && out.scriptErrors === 0
+		out.pass = out.tickOk === true && out.inputOk === true && out.scriptErrors === 0 && out.gameAdvanced === true
+		if (!out.pass && out.reason === undefined)
+			out.reason = `tick=${out.tickOk} input=${out.inputOk} scriptErrors=${out.scriptErrors} advanced=${out.gameAdvanced}`
 		return out
 	})
 }
@@ -694,11 +702,9 @@ export const shot = async (page, name, camPos, target, outDir) => {
 				// only window.viewer carries the live handles.
 				const v = window.viewer
 				if (!v) return
-				if (v._cameraGen !== undefined) v._cameraGen = (v._cameraGen ?? 0) + 1
-				if (v._cameraRaf) {
-					cancelAnimationFrame(v._cameraRaf)
-					v._cameraRaf = null
-				}
+				try {
+					window.vpx?.cancelCameraAnimation()
+				} catch {}
 				if (v.controls) v.controls.enabled = false
 				const cam = v.camera,
 					ctr = v.controls
@@ -906,11 +912,9 @@ export const playfieldLightsCheck = async page => {
 			// (viewer handles — window.camera is unset), renders, and samples
 			// the playfield region in the same task. Restores controls after.
 			const wasEnabled = v.controls?.enabled
-			if (v._cameraGen !== undefined) v._cameraGen = (v._cameraGen ?? 0) + 1
-			if (v._cameraRaf) {
-				cancelAnimationFrame(v._cameraRaf)
-				v._cameraRaf = null
-			}
+			try {
+				window.vpx?.cancelCameraAnimation()
+			} catch {}
 			if (v.controls) v.controls.enabled = false
 			v.camera.position.set(0, 5, 35)
 			v.controls.target.set(0, -5, 0)
@@ -958,14 +962,8 @@ export const playfieldLightsCheckAfterLamp = async page => {
 		const shouldTrigger = await page.evaluate(insertPattern => {
 			const insertRe = new RegExp(insertPattern, 'i')
 			const v = window.viewer
-			if (!v || !v.player || !v.table) return false
-			try {
-				const emu = v.player.getPhysics().emu
-				if (emu?.isMock) return false
-				if (emu?.api?.isRunning?.() !== 1 && !emu?.isInitialized?.()) return false
-			} catch {
-				return false
-			}
+			const api = window.vpx
+			if (!v || !v.table || !api?.state.wasmReady) return false
 			const hasLights = v.table.lights && Object.keys(v.table.lights).length > 0
 			const hasInsertPrims = Object.keys(v.table.primitives || {}).some(k => insertRe.test(k))
 			const hasCollections = !!(
@@ -976,29 +974,23 @@ export const playfieldLightsCheckAfterLamp = async page => {
 		}, INSERT_NAME_PATTERN)
 		if (shouldTrigger) {
 			await page.evaluate(async () => {
-				const v = window.viewer
-				if (!v || !v.player) return
-				try {
-					v.player.onKeyDown({ code: 'Digit5', key: '5', ts: Date.now() })
-				} catch {}
-				await new Promise(r => setTimeout(r, 350))
-				try {
-					v.player.onKeyUp({ code: 'Digit5', key: '5', ts: Date.now() })
-				} catch {}
-				await new Promise(r => setTimeout(r, 400))
-				try {
-					v.player.onKeyDown({ code: 'Digit1', key: '1', ts: Date.now() })
-				} catch {}
-				await new Promise(r => setTimeout(r, 350))
-				try {
-					v.player.onKeyUp({ code: 'Digit1', key: '1', ts: Date.now() })
-				} catch {}
-				await new Promise(r => setTimeout(r, 900))
+				const api = window.vpx
+				if (!api) return
+				const sleep = ms => new Promise(r => setTimeout(r, ms))
+				api.sendKey('Digit5', true)
+				await sleep(350)
+				api.sendKey('Digit5', false)
+				await sleep(400)
+				api.sendKey('Digit1', true)
+				await sleep(350)
+				api.sendKey('Digit1', false)
+				await sleep(900)
+				// Let the script react: the clock advancing proves the
+				// engine steps while lamps/DMD catch up.
+				const t0 = api.state.gameMs
 				for (let i = 0; i < 10; i++) {
-					try {
-						v.player.getPhysics().emu.api?.isRunning?.()
-					} catch {}
-					await new Promise(r => setTimeout(r, 100))
+					if (api.state.gameMs > t0) break
+					await sleep(100)
 				}
 			})
 			await new Promise(r => setTimeout(r, 2000))
@@ -1313,12 +1305,12 @@ export const cameraTransitionChecks = async page => {
 	return page.evaluate(async () => {
 		const v = window.viewer
 		if (!v || !v.tableGroup || !v.camera || !v.controls) return { pass: 'skip', reason: 'no viewer/camera' }
+		const api = window.vpx
+		if (!api) return { pass: 'skip', reason: 'no test api (window.vpx)' }
 		async function sampleTransition(toMode) {
 			const startPos = v.camera.position.clone()
 			const startTgt = v.controls.target.clone()
-			let promise
-			if (toMode === 'play') promise = v._switchToPlay()
-			else promise = v._switchToViewer()
+			const promise = api.setMode(toMode)
 			const samples = []
 			const startTime = performance.now()
 			const interval = setInterval(() => {

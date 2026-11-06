@@ -65,9 +65,22 @@ const OPTIONAL_EMPTY_FIXTURE_LEGS = new Set([...OPTIONAL_GAMEPLAY_LEGS, 'playfie
 const isPlayableLabel = label => /walking_dead|twd/i.test(label)
 const optionalLegsFor = label => (isPlayableLabel(label) ? new Set(['backbox']) : OPTIONAL_EMPTY_FIXTURE_LEGS)
 // The headless-WASM engine is unconditional: the wasmEngine leg asserts on
-// every run, and the TS-player legs below skip honestly when it is active.
+// every run, and the gameplay legs below drive it through window.vpx.
 const legOkFor = (label, leg, v) =>
 	v === true || (v === 'skip' && (leg === 'wasmEngine' || optionalLegsFor(label).has(leg)))
+
+// E2E drives play entry explicitly through window.vpx: the timed
+// auto-switch to play would race ensurePlayMode, so force it off here
+// rather than clearing timers after load.
+function withAutoplayOff(u) {
+	try {
+		const uu = new URL(u)
+		if (!uu.searchParams.has('autoplay')) uu.searchParams.set('autoplay', '0')
+		return uu.toString()
+	} catch {
+		return u
+	}
+}
 
 function labelFromUrl(u) {
 	try {
@@ -101,7 +114,7 @@ const browser = await launchBrowser(puppeteer, {
 })
 
 async function runOne(targetUrl, label) {
-	targetUrl = upgradeLocalhost(targetUrl)
+	targetUrl = withAutoplayOff(upgradeLocalhost(targetUrl))
 	const page = await newPage(browser)
 	const logs = attachLogging(page, {
 		filter: /Ready|Failed|Parsed|filter|Skipped|VLM|VR|cabinet|glass|mem|heap|THREE|Texture|DMD|emu|PinMAME/i,
@@ -151,19 +164,8 @@ async function runOne(targetUrl, label) {
 	}
 	await new Promise(r => setTimeout(r, 1200))
 	await hideOverlays(page)
-	await page.evaluate(() => {
-		try {
-			clearTimeout(window.viewer._autoPlayTimer)
-			window.viewer._autoPlayTimer = null
-		} catch {}
-		try {
-			window.viewer._scheduleAutoPlay = () => {}
-		} catch {}
-		try {
-			clearTimeout(window.viewer._fallbackBallTimer)
-			window.viewer._fallbackBallTimer = null
-		} catch {}
-	})
+	// No timer cleanup: ?autoplay=0 (appended above) disables the timed
+	// auto-switch, and legs drive play entry through window.vpx instead.
 	loadPhase = false
 	const results = {}
 	// Load+settle pageerror gate: any uncaught page exception during table
@@ -179,14 +181,11 @@ async function runOne(targetUrl, label) {
 	} else {
 		console.log(`[integration:${label}] pageerrors PASS (0 during load+settle)`)
 	}
-	// TS-player machinery legs (ball, physics) cannot run when the
-	// headless-WASM engine owns the table: no TS player exists. They skip
-	// honestly below; the wasmEngine leg asserts the WASM guarantees instead.
-	let wasmActive = false
-	try {
-		wasmActive = await page.evaluate(() => !!window.viewer?.wasmEngine?.ready && !window.viewer?.player)
-	} catch {}
-	if (wasmActive) console.log(`[integration:${label}] wasm engine active — TS-player legs skip`)
+	// Every gameplay leg runs against the headless-WASM engine through
+	// window.vpx (input via sendKey, positions from the movers/balls
+	// buffers). Static fixtures skip what they cannot support; the playable
+	// fixture must genuinely pass each leg.
+	console.log(`[integration:${label}] wasm engine legs active (window.vpx)`)
 	const diag = await diagnostics(page)
 	const isTableEmpty = targetUrl.includes('empty') || label.includes('empty')
 	const hasWarnings =
@@ -255,27 +254,16 @@ async function runOne(targetUrl, label) {
 	}
 	let ball = null
 	try {
-		ball = wasmActive
-			? {
-					pass: 'skip',
-					skipReason: 'wasm engine: ejection needs scripted trough kick (Stage 2)',
-					moved: false,
-					kickPos: null,
-					solFired: false,
-					isMock: false,
-					troughPos: null,
-					kickerNames: [],
-				}
-			: await ballChecks(page)
+		ball = await ballChecks(page)
 		console.log(`[ball:${label}]`, JSON.stringify(ball))
 		results.ball = ball.pass === 'skip' ? 'skip' : !!ball.pass
 		console.log(
-			`[integration:${label}] ball ${legStatus(results.ball)} moved=${ball.moved} kickPos=${JSON.stringify(ball.kickPos)} solFired=${ball.solFired} isMock=${ball.isMock} trough=${JSON.stringify(ball.troughPos)} kickers=${JSON.stringify(ball.kickerNames)}`,
+			`[integration:${label}] ball ${legStatus(results.ball)} moved=${ball.moved} kickPos=${JSON.stringify(ball.kickPos)} balls=${ball.balls} troughKickers=${ball.troughCount} kickers=${JSON.stringify(ball.kickerNames)}`,
 		)
 		if (results.ball === 'skip') console.log(`[integration:${label}] ball SKIP — ${ball.skipReason}`)
 		if (results.ball === false)
 			console.log(
-				`[integration:${label}] FAIL ball did not eject - trough kick failed (generic trough / Not Is / CBool)`,
+				`[integration:${label}] FAIL ball did not eject — ${ball.reason} (scripted trough kick needs ROM)`,
 			)
 	} catch (e) {
 		console.log(`[ball:${label}] error ${e.message}`)
@@ -293,30 +281,25 @@ async function runOne(targetUrl, label) {
 		console.log(`[plunger:${label}] error ${e.message}`)
 		results.plunger = false
 	}
-	const phys = wasmActive ? { wasmSkip: true } : await physicsChecks(page)
+	const phys = await physicsChecks(page)
 	console.log(`[physics:${label}]`, JSON.stringify(phys))
-	if (wasmActive) {
-		// No TS player clock on the WASM path: stepping is asserted by the
-		// wasmEngine leg; flipper/coin/start need script execution (Stage 2).
-		results.physics = 'skip'
-		console.log(`[integration:${label}] physics SKIP — wasm engine owns the clock (see wasmEngine leg)`)
-	} else {
-		// No ball-moved override: every sub-leg stands on its own verdict. Skipped
-		// sub-legs (no flipper, mock emu) are neutral, but at least one sub-leg must
-		// genuinely pass (the advancing physics clock) for the leg to pass.
-		const physParts = [phys.flipper?.pass, phys.coin?.pass, phys.start?.pass, phys.clock?.pass]
-		const physPass = physParts.every(p => p === true || p === 'skip') && physParts.some(p => p === true)
-		results.physics = physPass
-		console.log(`[integration:${label}] physics ${results.physics ? 'PASS' : 'FAIL'}`)
-	}
+	// No ball-moved override: every sub-leg stands on its own verdict. Skipped
+	// sub-legs (no flipper, no script output) are neutral, but at least one
+	// sub-leg must genuinely pass (flipper motion or the advancing game clock)
+	// for the leg to pass.
+	const physParts = [phys.flipper?.pass, phys.coin?.pass, phys.start?.pass, phys.clock?.pass]
+	const physPass = physParts.every(p => p === true || p === 'skip') && physParts.some(p => p === true)
+	results.physics = physPass
+	console.log(`[integration:${label}] physics ${results.physics ? 'PASS' : 'FAIL'}`)
 	try {
 		const nudge = await nudgeChecks(page)
 		console.log(`[nudge:${label}]`, JSON.stringify(nudge))
 		results.nudge = nudge.pass === 'skip' ? 'skip' : !!nudge.pass
 		console.log(
-			`[integration:${label}] nudge ${legStatus(results.nudge)} api=${nudge.viaApi} key=${nudge.viaKey} visual=${nudge.visual}`,
+			`[integration:${label}] nudge ${legStatus(results.nudge)} api=${nudge.viaApi} key=${nudge.viaKey} — ${nudge.reason}`,
 		)
-		if (results.nudge === false) console.log(`[nudge:${label}] WARN nudge not detected`)
+		if (results.nudge === 'skip') console.log(`[integration:${label}] nudge SKIP — ${nudge.reason}`)
+		if (results.nudge === false) console.log(`[nudge:${label}] WARN nudge not detected — ${nudge.reason}`)
 	} catch (e) {
 		console.log(`[nudge:${label}] error ${e.message}`)
 		results.nudge = false
@@ -369,7 +352,7 @@ async function runOne(targetUrl, label) {
 		console.log(`[wasmEngine:${label}]`, JSON.stringify(w))
 		results.wasmEngine = w.pass === 'skip' ? 'skip' : !!w.pass
 		console.log(
-			`[integration:${label}] wasmEngine ${legStatus(results.wasmEngine)} ready=${w.ready} catalog=${w.catalogSize} scriptErrors=${w.scriptErrors} balls=${w.ballCountAfter ?? w.ballCount} tick=${w.tickOk} input=${w.inputOk}${w.reason ? ` — ${w.reason}` : ''}`,
+			`[integration:${label}] wasmEngine ${legStatus(results.wasmEngine)} ready=${w.ready} catalog=${w.catalogSize} scriptErrors=${w.scriptErrors} balls=${w.ballCountAfter ?? w.ballCount} tick=${w.tickOk} advanced=${w.gameAdvanced} input=${w.inputOk}${w.reason ? ` — ${w.reason}` : ''}`,
 		)
 		if (results.wasmEngine === false) console.log(`[wasmEngine:${label}] FAIL ${JSON.stringify(w)}`)
 	} catch (e) {
