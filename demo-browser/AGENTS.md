@@ -11,6 +11,7 @@ npm run dev --prefix demo-browser   # vite :3000
 
 - `?vpx=/test/fixtures/table-empty.vpx&mode=play`
 - `?vpx=/@fs/path/to/table.vpx&rom=/@fs/path/to/rom.zip&mode=play` (any table/ROM via drag & drop, file picker, or `?vpx`/`?rom` query)
+- `&webgl` forces three's WebGL2 backend (default: WebGPU, falling back to WebGL2 when unavailable)
 
 Requires `dist-esm` built. `server.fs.allow` covers repo root, `dist`, `dist-esm`, `wasm/dist`, `wasm/kernels/dist`, `test/fixtures`, `~/Downloads`, `~/.pinmame/roms` (`strict:false`, COOP/COEP/CORP, `assetsInclude` `*.vpx/*.wasm/*.zip`).
 
@@ -24,7 +25,7 @@ Requires `dist-esm` built. `server.fs.allow` covers repo root, `dist`, `dist-esm
 - `src/input/input-manager.ts` — keys, touch zones & cabinet button raycasting (~560 LOC)
 - `src/input/nudge-controller.ts` — nudge physics, swipe, gamepad & motion (~170 LOC)
 - `src/dmd/dmd-renderer.ts` — on-table DMD mesh updater (~385 LOC)
-- `src/ui/loading-bar.ts`, `stats-overlay.ts`, `help-dialog.ts`, `log-viewer.ts` — typed `CustomEvent` UI, no `fetch`/`XHR` monkey-patch
+- `src/ui/stats-overlay.ts`, `help-dialog.ts`, `log-viewer.ts` — stats HUD, controls dialog, log panel (no `console`/`fetch`/`XHR` monkey-patch)
 - `src/utils/candidate-resolver.ts`, `texture-filter.ts` — VPX/ROM resolution & glass-texture filtering
 - `src/env.js`, `src/utils.js` — env caps/quality flags + `$`/`fmtBytes` helpers and `utils/*` re-exports
 - `src/input.js` — `attachInput` composer over `input/` + `nudge-controller` (defines logic, not a shim); `config.js`, `utils.js`, `env.js` are real sources (viewer imports them directly from `./ui/*` and `./input/*`)
@@ -33,7 +34,7 @@ Requires `dist-esm` built. `server.fs.allow` covers repo root, `dist`, `dist-esm
 
 ## Conventions
 
-- ESM only, Biome tabs/120, minimal code, no `window.*` pollution (typed `CustomEvent` via `log-viewer.ts`)
+- ESM only, Biome tabs/120, minimal code, no `window.*` pollution or `console` patching; UI events are `CustomEvent`s on `window`
 - Keep logging and E2E deduped — single `integration.mjs` + `helpers.mjs`, no per-scenario harnesses
 - Keep demo-browser table-agnostic: no hard-coded table/ROM names (use `?vpx`/`?rom` or drag & drop, generic `DEFAULT_URL` `table-empty.vpx`)
 

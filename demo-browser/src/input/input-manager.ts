@@ -56,7 +56,6 @@ export interface InputHost {
 	readonly camera: THREE.Camera | null
 	readonly tableGroup: THREE.Group | null
 	readonly buttonMeshes: readonly THREE.Object3D[] | null
-	readonly enableMotionButton?: HTMLButtonElement | null
 	readonly tickImmediate?: () => void
 	nudge(angle: number, force: number): void
 	log?(msg: string, level?: string): void
@@ -64,7 +63,6 @@ export interface InputHost {
 	exitPlayMode(): void
 	togglePause(): void
 	releaseKeys(codes: string[]): void
-	requestMotionPermission?(): Promise<boolean>
 }
 
 const PLAY_CODES = new Set(CONTROL_SCHEME.flatMap(c => c.keys))
@@ -101,11 +99,6 @@ export function makeHost(viewer: any): InputHost {
 		get tickImmediate() {
 			return (viewer._tickPhysicsImmediate as (() => void) | undefined) ?? undefined
 		},
-		get enableMotionButton() {
-			return typeof document !== 'undefined'
-				? (document.getElementById('enable-motion') as HTMLButtonElement | null)
-				: null
-		},
 		nudge(angle: number, force: number) {
 			viewer._nudge?.(angle, force)
 		},
@@ -113,37 +106,19 @@ export function makeHost(viewer: any): InputHost {
 			viewer.log?.(msg, level)
 		},
 		enterPlayMode() {
-			if (viewer._switchToPlay) {
-				viewer._switchToPlay()
-			} else {
-				viewer.viewerMode = 'play'
-				viewer.enterPlayMode?.()
-			}
+			void viewer._switchToPlay()
 		},
 		exitPlayMode() {
-			viewer._switchToViewer?.()
-			viewer.exitPlayMode?.()
+			void viewer._switchToViewer()
 		},
 		togglePause() {
-			viewer.isPaused = !viewer.isPaused
-			viewer.log?.(viewer.isPaused ? 'Paused (P to resume)' : 'Resumed', viewer.isPaused ? 'warn' : 'info')
+			viewer.togglePause()
 		},
 		releaseKeys(codes: string[]) {
 			for (const code of codes) {
 				viewer._sendKey?.(code, false)
 			}
 		},
-		requestMotionPermission:
-			typeof DeviceMotionEvent !== 'undefined' && 'requestPermission' in (DeviceMotionEvent as any)
-				? async () => {
-						try {
-							const perm = await (DeviceMotionEvent as any).requestPermission()
-							return perm === 'granted'
-						} catch {
-							return false
-						}
-					}
-				: undefined,
 	}
 }
 
@@ -553,9 +528,4 @@ export function attachPointerTouch(viewer: any): () => void {
 		if (viewer._pointerCtrl === ctrl) viewer._pointerCtrl = null
 		viewer._touchCleanup = null
 	}
-}
-
-export function attachInputHost(host: InputHost, signal: AbortSignal): void {
-	attachKeyboardHost(host, signal)
-	attachPointerHost(host, signal)
 }

@@ -457,11 +457,4 @@ export class DmdRenderer implements DirtyOverlay {
 		this._ensureTexture()
 		return this.texture
 	}
-
-	dispose() {
-		this.dataTexture?.dispose?.()
-		this.material?.dispose?.()
-		this._controller = null
-		this.texture = this.dataTexture = null
-	}
 }

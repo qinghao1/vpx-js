@@ -1,7 +1,6 @@
 // @ts-nocheck
-export const resolveVpxCandidates = ({ defaultName = null, queryParam = 'vpx' } = {}) => {
-	const q = new URLSearchParams(location.search)
-	let name = (q.get(queryParam) || q.get('table') || defaultName || '').trim()
+export const resolveVpxCandidates = vpx => {
+	let name = (vpx || '').trim()
 	if (!name) return []
 	if (/^https?:\/\//i.test(name) || name.startsWith('/@fs/')) return [name]
 	if (!name.toLowerCase().endsWith('.vpx')) name += '.vpx'

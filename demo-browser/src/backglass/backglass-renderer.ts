@@ -120,8 +120,6 @@ export class BackglassRenderer implements DirtyOverlay {
 			// Texture streaming is best effort; missing art degrades to flat colors.
 		}
 		if (this.table !== table) return
-		// Late preload resolve after destroy must not resurrect meshes into a dead scene.
-		if (this.viewer?._disposed) return
 		const getTexture = (name: string) => this.viewer.renderApi?.getMapGenerator?.()?.getTexture?.(name)
 		const bgMap = bgName ? getTexture(bgName) : undefined
 		if (bgMap) this.fitGroup.add(createBackdropPlane(bgMap, 0xffffff, 1))
@@ -205,12 +203,6 @@ export class BackglassRenderer implements DirtyOverlay {
 		// once in full-space NDC, so resizes need no rebuild.
 		const fit = backdropContainScale(camera.aspect)
 		this.fitGroup.scale.set(fit.scaleX, fit.scaleY, 1)
-	}
-
-	/** Releases overlay meshes; the viewer calls this on destroy. */
-	dispose(): void {
-		this.clear()
-		this.viewer.scene?.remove(this.group)
 	}
 
 	private clear(): void {

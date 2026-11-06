@@ -35,16 +35,3 @@ export const logMem = (log, stage) => {
 			'debug',
 		)
 }
-export const aliasEvent = e => {
-	const ALIAS = {
-		ArrowLeft: 'ShiftLeft',
-		KeyA: 'ShiftLeft',
-		ArrowRight: 'ShiftRight',
-		KeyD: 'ShiftRight',
-		Enter: 'Enter',
-		NumpadEnter: 'Enter',
-	}
-	const code = ALIAS[e.code]
-	if (!code) return null
-	return { code, key: code === 'Enter' ? 'Enter' : 'Shift', ts: Date.now() }
-}

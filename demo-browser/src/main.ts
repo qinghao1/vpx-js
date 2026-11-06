@@ -4,12 +4,20 @@ import { initHelp } from './ui/help-dialog.js'
 import { initTableBrowser } from './ui/table-browser.js'
 import { Viewer } from './viewer.js'
 
-const params = new URLSearchParams(location.search)
-const viewer = new Viewer({
-	queryParam: 'vpx',
-	defaultVpx: null,
-	viewerMode: params.get('mode') === 'play' ? 'play' : 'viewer',
-})
+function parseViewerOptions(search) {
+	const params = new URLSearchParams(search)
+	return {
+		vpx: params.get('vpx') || params.get('table'),
+		rom: params.get('rom'),
+		viewerMode: params.get('mode') === 'play' ? 'play' : 'viewer',
+		antialias: !params.has('noaa'),
+		batched: !params.has('nobatched'),
+		forceWebGL: params.has('webgl'),
+	}
+}
+
+const options = parseViewerOptions(location.search)
+const viewer = new Viewer(options)
 const _isDev = (() => {
 	if (import.meta.env?.DEV) return true
 	const h = location.hostname
@@ -18,11 +26,9 @@ const _isDev = (() => {
 if (_isDev) window.viewer = viewer
 initHelp(viewer)
 
-const vpxParam = params.get('vpx') || params.get('table')
-const romParam = params.get('rom')
-if (vpxParam) {
+if (options.vpx) {
 	viewer.load().catch(e => console.error('[app] load failed', e))
-	if (romParam) viewer.preloadRom?.(romParam).catch(e => console.error('[app] rom load failed', e))
+	if (options.rom) viewer.preloadRom(options.rom).catch(e => console.error('[app] rom load failed', e))
 } else {
 	viewer.startLoop()
 }
@@ -67,9 +73,12 @@ dropzone.addEventListener('drop', e => {
 	for (const f of e.dataTransfer.files) handleFile(f)
 })
 
-document.getElementById('dump-log')?.addEventListener('click', () => window.dumpLog?.())
-document.getElementById('copy-log')?.addEventListener('click', () => window.copyLog?.())
+const logEl = document.getElementById('log')
+const logText = () => Array.from(logEl?.children ?? [], entry => entry.textContent).join('\n')
+document.getElementById('dump-log')?.addEventListener('click', () => console.log(logText()))
+document.getElementById('copy-log')?.addEventListener('click', () => {
+	navigator.clipboard.writeText(logText()).catch(e => console.warn('[app] copy log failed', e))
+})
 document.getElementById('toggle-log')?.addEventListener('click', () => {
-	const el = document.getElementById('log')
-	if (el) el.hidden = !el.hidden
+	if (logEl) logEl.hidden = !logEl.hidden
 })

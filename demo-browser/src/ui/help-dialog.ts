@@ -79,9 +79,3 @@ export function initHelp(viewer) {
 	sync(viewer?.viewerMode ?? 'viewer')
 	addEventListener('viewer:modechange', e => sync(e.detail?.mode))
 }
-
-export class HelpDialog {
-	static init(viewer) {
-		return initHelp(viewer)
-	}
-}

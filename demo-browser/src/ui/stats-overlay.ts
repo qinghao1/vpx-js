@@ -12,7 +12,7 @@ function setClass(el, v) {
 // steady values cost no createElement, no container wipe, no restyle.
 const statsCache = new WeakMap()
 
-const STAT_KEYS = ['Draws', 'Tris', 'Balls', 'Time', 'Emu', 'WASM']
+const STAT_KEYS = ['Draws', 'Tris', 'Balls', 'WASM']
 
 function buildStats() {
 	const head = document.createElement('div')
@@ -48,12 +48,13 @@ function buildStats() {
 	return { head, badge, backend, fps, fpsText, grid, values }
 }
 
+export const fpsClass = fps => (fps >= 55 ? 'fps--good' : fps >= 30 ? 'fps--mid' : fps > 0 ? 'fps--low' : '')
+
 export function renderStats(container, data) {
 	if (!container) return
-	const { fps, draws, trisFmt, balls, tFmt, tHasValue, emuLabel, emuRaw, wasmLabel, wasmReady, backend, mode } = data
+	const { fps, draws, trisFmt, balls, wasmLabel, wasmReady, backend, mode } = data
 	const modeCls = mode.includes('PAUSED') ? 'badge--paused' : mode === 'PLAY' ? 'badge--play' : 'badge--viewer'
 	const modeLabel = mode === 'PLAY PAUSED' ? 'PAUSED' : mode
-	const fpsCls = fps >= 55 ? 'fps--good' : fps >= 30 ? 'fps--mid' : fps > 0 ? 'fps--low' : ''
 	let c = statsCache.get(container)
 	if (!c?.head.isConnected) {
 		c = buildStats()
@@ -64,14 +65,12 @@ export function renderStats(container, data) {
 	setClass(c.badge, `badge ${modeCls}`)
 	setText(c.badge, modeLabel)
 	setText(c.backend, backend)
-	setClass(c.fps, `fps ${fpsCls}`.trim())
+	setClass(c.fps, `fps ${fpsClass(fps)}`.trim())
 	setText(c.fpsText, `${fps} fps`)
 	const rows = [
 		[String(draws), false],
 		[trisFmt, false],
 		[String(balls), false],
-		[tFmt, !tHasValue],
-		[emuLabel, emuRaw === '—'],
 		[wasmLabel, !wasmReady],
 	]
 	for (let i = 0; i < rows.length; i++) {
