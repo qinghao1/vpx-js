@@ -65,9 +65,12 @@ dropzone.addEventListener('drop', e => {
 	for (const f of e.dataTransfer.files) handleFile(f)
 })
 
-document.getElementById('dump-log')?.addEventListener('click', () => window.dumpLog?.())
-document.getElementById('copy-log')?.addEventListener('click', () => window.copyLog?.())
+const logEl = document.getElementById('log')
+const logText = () => Array.from(logEl?.children ?? [], entry => entry.textContent).join('\n')
+document.getElementById('dump-log')?.addEventListener('click', () => console.log(logText()))
+document.getElementById('copy-log')?.addEventListener('click', () => {
+	navigator.clipboard.writeText(logText()).catch(e => console.warn('[app] copy log failed', e))
+})
 document.getElementById('toggle-log')?.addEventListener('click', () => {
-	const el = document.getElementById('log')
-	if (el) el.hidden = !el.hidden
+	if (logEl) logEl.hidden = !logEl.hidden
 })
