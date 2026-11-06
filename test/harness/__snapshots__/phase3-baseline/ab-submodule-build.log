@@ -1,0 +1,146 @@
+(node:454752) Warning: Setting the NODE_TLS_REJECT_UNAUTHORIZED environment variable to '0' makes TLS connections and HTTPS requests insecure by disabling certificate verification.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[integration:primary] goto https://localhost:3000/?vpx=/test/fixtures/table-empty.vpx&mode=viewer
+[primary] Failed to load resource: the server responded with a status of 404 ()
+[primary] Failed to load resource: the server responded with a status of 404 ()
+[integration:primary] requestfailed https://localhost:3000/wasm/dist/kernels.js net::ERR_ABORTED
+[primary] Failed to load resource: the server responded with a status of 404 ()
+[integration:primary] requestfailed https://localhost:3000/@fs/home/qinghao1/projects/vpx-js/dist-esm/wasm/dist/kernels.js net::ERR_ABORTED
+[primary] Failed to load resource: the server responded with a status of 404 ()
+[integration:primary] requestfailed https://localhost:3000/@fs/home/qinghao1/projects/vpx-js/wasm/dist/kernels.js net::ERR_ABORTED
+[primary] THREE.WebGPURenderer: WebGPU is not available, running under WebGL2 backend.
+[primary] [vpx] WebGPURenderer ready (three r186)
+[primary] [vpx] [mem] after reader.open: 71/77 MB
+[primary] [vpx] Parsed in 4ms — 1 items, 1 textures
+[primary] [vpx] [mem] after parse: 71/77 MB
+[primary] [vpx] [filter] Skipped 0 glass kept 1/1
+[primary] [vpx] Textures in scene: 0 ~0.0 MB
+[primary] [vpx] [mem] after generateTableNode: 71/77 MB
+[primary] [vpx] [stream] Filtered 1 → 0 used textures (kept inserts)
+[primary] [vpx] [stream] 0 textures pending — streaming
+[primary] [vpx] DMD: no on-table DMD mesh found
+[primary] [vpx] [mem] Ready — streaming textures: 71/77 MB
+[pageerror] WASM kernels not found: Failed to fetch dynamically imported module: https://localhost:3000/@fs/home/qinghao1/projects/vpx-js/wasm/dist/kernels.js
+[primary] [vpx] DMD: no on-table DMD mesh found
+[primary] [vpx] Ready — VIEWER: drag to orbit, wheel to zoom — click table to Play (Esc to return)
+[primary] [vpx] [mem] Ready final: 73/79 MB
+[integration:primary] Ready=true
+[integration:primary] wait stream Done…
+[primary] [vpx] [stream] Retained 1 texture sources (39 KB) for late swaps
+[primary] [vpx] [mem] after reader release: 77/92 MB
+[integration:primary] stream settled (done)
+[integration:primary] GL renderer: ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver) software=true
+[integration:primary] FAIL 1 pageerror(s) during load+settle:
+[integration:primary] pageerror[load] WASM kernels not found: Failed to fetch dynamically imported module: https://localhost:3000/@fs/home/qinghao1/projects/vpx-js/wasm/dist/kernels.js
+Error: WASM kernels not found: Failed to fetch dynamically imported module: https://localhost:3000/@fs/home/qinghao1/projects/vpx-js/wasm/dist/kernels.js
+    at <anonymous> (https://localhost:3000/@fs/home/qinghao1/projects/vpx-js/dist-esm/lib/physics/wasm/kernels.js:48:15)
+[playfield:primary] {"bake":{"infos":[],"pendingFound":false,"readyFound":false,"fail":false,"count":0,"reason":"no bake mesh found — skip (table-empty)"},"inserts":{"samples":[],"found":false,"pending":false},"glow":{"total":0,"on":0,"visibleOn":0,"authoredHidden":0},"brightness":{"mean":113.7,"gi":0},"pass":true,"reason":""}
+[playfield:primary] skip — no bake mesh (empty table)
+[playfield:primary] skip lamp check — no inserts/lights in table
+[transpile:primary] {"notIsCorrect":true,"cboolOk":true,"fixtureLen":1786,"fixtureMarkers":true,"syntaxOk":true}
+[ball:primary] {"before":[],"after":[],"troughBefore":0,"troughAfter":0,"troughPos":null,"kickerNames":[],"kickerCount":0,"troughCount":0,"moved":false,"kickPos":null,"solFired":false,"solTrace":[],"coinOk":false,"startOk":false,"kickCount":0,"kickTrace":[],"isMock":true,"pass":"skip","skipReason":"mock emu (no ROM): ejection requires scripted trough kick","balls":0,"isRunning":null,"changed":null}
+[integration:primary] ball SKIP moved=false kickPos=null solFired=false isMock=true trough=null kickers=[]
+[integration:primary] ball SKIP — mock emu (no ROM): ejection requires scripted trough kick
+[plunger:primary] {"pass":"skip","reason":"mock emu (no ROM): plunger impulse needs live script/physics"}
+[integration:primary] plunger SKIP — mock emu (no ROM): plunger impulse needs live script/physics
+[integration:primary] plunger SKIP — mock emu (no ROM): plunger impulse needs live script/physics
+[physics:primary] {"flipper":{"before":0,"mid":0,"after":0,"pass":"skip","reason":"no flipper"},"coin":{"before":0,"mid":0,"after":0,"pass":"skip","reason":"mock emu"},"start":{"before":0,"mid":0,"after":0,"pass":"skip","reason":"mock emu"},"clock":{"tBefore":12171,"tAfter":12305,"pass":true}}
+[integration:primary] physics PASS
+[nudge:primary] {"before":{"acc":{"x":0,"y":0,"mag":0},"off":{"x":0,"y":0,"mag":0},"idx":0,"shake":{"x":-27.775000000000002,"y":-1.233457780358549e-14}},"mid":{"acc":{"x":-3.0702818652970896,"y":0.7728647614597983,"mag":3.1660623291209045},"off":{"x":0.0038308876772968946,"y":-0.0010504901959335386,"mag":0.003972307899422913},"idx":1,"shake":{"x":-28.029064365862702,"y":-0.03268579558109217}},"after":{"acc":{"x":-2.0091608488773027,"y":0.356450419535016,"mag":2.0405352773838668},"off":{"x":0.00241373806487183,"y":-0.0004341603237350383,"mag":0.0024524735742749437}},"afterKey":{"acc":{"x":1.1344125079720004,"y":-0.6773980112359304,"mag":1.3212720400696132},"idx":2},"viaApi":true,"viaKey":true,"visual":true,"pass":true,"reason":"nudge ok"}
+[integration:primary] nudge PASS api=true key=true visual=true
+[dmd:primary] {"emu":"none","mock":true,"w":0,"h":0,"len":0,"max":0,"sum":0,"hash":2166136261,"changed":false,"pass":"skip","reason":"no emu"}
+[dmd:primary] dmd SKIP — no emu
+[backbox:primary] {"found":false,"pass":"skip","reason":"no VRCab_Backbox mesh (table has no backbox)"}
+[integration:primary] backbox SKIP — no VRCab_Backbox mesh (table has no backbox)
+[dmd-visible:primary] {"emu":"none","mock":true,"meshes":[],"texW":128,"texH":32,"texLen":4096,"texMax":0,"texLit":0,"gl":"ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)","software":true,"pass":"skip","reason":"no emu"}
+[integration:primary] dmdVisible SKIP — no emu
+[camera:primary] {"pass":true,"res1":{"pass":true,"total":28.943271755274978,"maxJump":21.023713490324077,"after80":28.943271755274978,"tgtTotal":7.777122727711782,"maxTgtJump":5.6491194702859096,"samples":4,"reason":"smooth"},"res2":{"pass":true,"total":28.930326684579597,"maxJump":19.568548852585465,"after80":28.930326684579597,"tgtTotal":7.777000000000001,"maxTgtJump":5.260383198772322,"samples":4,"reason":"smooth"},"initialMode":"play","reason":"smooth"}
+[integration:primary] camera PASS smooth
+[primary] Failed to load resource: the server responded with a status of 404 ()
+[sound:primary] {"pass":true,"reason":"mute=true muteRestore=true vol=true knock=true play=true stop=true missing=true script=true music=true"}
+[integration:primary] sound PASS — mute=true muteRestore=true vol=true knock=true play=true stop=true missing=true script=true music=true
+[wasmEngine:primary] {"pass":"skip","reason":"ts run (no wasm engine)"}
+[integration:primary] wasmEngine SKIP ready=undefined catalog=undefined scriptErrors=undefined balls=undefined tick=undefined input=undefined — ts run (no wasm engine)
+[cam:primary] {"pos":[0.041613052348218105,140.87091865702212,79.62416231188746],"target":[0.041613052348218105,-0.5133144945605633,-7.777000000000001],"mode":"play","playApplied":true}
+[room:primary] procedural=true cab vis=0 hid=0
+[generic:primary] mode play=true room/cab visible=true
+[integration:primary] shots -> /tmp
+[integration:primary] runErrors PASS (0 run-phase page/script errors)
+
+# integration primary FAIL {"pageerrors":false,"diagnostics":true,"playfield":"skip","playfieldLamp":"skip","transpile":true,"ball":"skip","plunger":"skip","physics":true,"nudge":true,"dmd":"skip","backbox":"skip","dmdVisible":"skip","camera":true,"sound":true,"wasmEngine":"skip","runErrors":true}
+[integration:table_empty] goto https://localhost:3000/?vpx=/test/fixtures/table-empty.vpx&mode=viewer&engine=wasm
+[table_empty] [vpx] WebGPURenderer ready (three r186)
+[table_empty] Failed to load resource: the server responded with a status of 404 ()
+[integration:table_empty] requestfailed https://localhost:3000/wasm/dist/kernels.js net::ERR_ABORTED
+[table_empty] Failed to load resource: the server responded with a status of 404 ()
+[integration:table_empty] requestfailed https://localhost:3000/@fs/home/qinghao1/projects/vpx-js/dist-esm/wasm/dist/kernels.js net::ERR_ABORTED
+[table_empty] Failed to load resource: the server responded with a status of 404 ()
+[integration:table_empty] requestfailed https://localhost:3000/@fs/home/qinghao1/projects/vpx-js/wasm/dist/kernels.js net::ERR_ABORTED
+[table_empty] [vpx] [mem] after reader.open: 71/78 MB
+[table_empty] [vpx] Parsed in 4ms — 1 items, 1 textures
+[table_empty] [vpx] [mem] after parse: 71/78 MB
+[table_empty] [vpx] [filter] Skipped 0 glass kept 1/1
+[table_empty] [vpx] Textures in scene: 0 ~0.0 MB
+[table_empty] [vpx] [mem] after generateTableNode: 72/78 MB
+[table_empty] [vpx] [stream] Filtered 1 → 0 used textures (kept inserts)
+[table_empty] [vpx] [stream] 0 textures pending — streaming
+[table_empty] [vpx] DMD: no on-table DMD mesh found
+[table_empty] [vpx] [mem] Ready — streaming textures: 72/78 MB
+[integration:table_empty] Ready=true
+[integration:table_empty] wait stream Done…
+[table_empty] [0m[0K2026-11-02 00:04:28.703 INFO  [0] [BiffReader::AsObject@283] While reading tag INME 16 were not read and therefore skipped
+[table_empty] [0m[0K2026-11-02 00:04:28.718 INFO  [0] [VPX::AudioPlayer::AudioPlayer@233] Backglass sound device was not found (), using default: System audio playback device
+[table_empty] [0m[0K2026-11-02 00:04:28.723 INFO  [0] [Player::Player@218] Plugin AlphaDMD was found but is disabled ()
+[table_empty] [0m[0K2026-11-02 00:04:28.726 INFO  [0] [MsgPI::MsgPlugin::Load@556] Plugin FlexDMD loaded (statically linked plugin) [id=5]
+[table_empty] [0m[0K2026-11-02 00:04:28.727 INFO  [0] [MsgPI::MsgPlugin::Load@556] Plugin PinMAME loaded (statically linked plugin) [id=8]
+[table_empty] [0m[0K2026-11-02 00:04:28.729 INFO  [0] [Player::Player@218] Plugin UpscaleDMD was found but is disabled ()
+[table_empty] [0m[0K[91m2026-11-02 00:04:28.730 ERROR [0] [VPX::Window::Window@175] Failed to get display refresh rate. VPX will use a 60Hz default which may be wrong and cause bad video synchronization.
+[table_empty] [0m[0K[91m2026-11-02 00:04:28.732 ERROR [0] [VPX::Window::Window@290] Failed to load window icon: 
+[table_empty] [0m[0K2026-11-02 00:04:28.788 INFO  [0] [LoadProgress::SetProgress@18] Loading Textures... 2147483647%
+[table_empty] [vpx] WASM engine ready: 3 parts, script errors: 0
+[table_empty] [vpx] Ready — VIEWER: drag to orbit, wheel to zoom — click table to Play (Esc to return)
+[table_empty] [vpx] [mem] Ready final: 76/84 MB
+[table_empty] [vpx] [stream] Retained 1 texture sources (39 KB) for late swaps
+[table_empty] [vpx] [mem] after reader release: 76/84 MB
+[integration:table_empty] stream settled (done)
+[integration:table_empty] GL renderer: ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver) software=true
+[integration:table_empty] pageerrors PASS (0 during load+settle)
+[integration:table_empty] wasm engine active — TS-player legs skip
+[playfield:table_empty] {"bake":{"infos":[],"pendingFound":false,"readyFound":false,"fail":false,"count":0,"reason":"no bake mesh found — skip (table-empty)"},"inserts":{"samples":[],"found":false,"pending":false},"glow":{"total":0,"on":0,"visibleOn":0,"authoredHidden":0},"brightness":{"mean":0,"gi":0},"pass":false,"reason":"playfield renders black (mean 0.0)"}
+[playfield:table_empty] skip — no bake mesh (empty table)
+[playfield:table_empty] skip lamp check — no inserts/lights in table
+[transpile:table_empty] {"wasmSkip":true}
+[integration:table_empty] transpile SKIP — wasm engine: table script compiles upstream (Stage 2)
+[ball:table_empty] {"pass":"skip","skipReason":"wasm engine: ejection needs scripted trough kick (Stage 2)","moved":false,"kickPos":null,"solFired":false,"isMock":false,"troughPos":null,"kickerNames":[]}
+[integration:table_empty] ball SKIP moved=false kickPos=null solFired=false isMock=false trough=null kickers=[]
+[integration:table_empty] ball SKIP — wasm engine: ejection needs scripted trough kick (Stage 2)
+[plunger:table_empty] {"pass":"skip","reason":"mock emu (no ROM): plunger impulse needs live script/physics"}
+[integration:table_empty] plunger SKIP — mock emu (no ROM): plunger impulse needs live script/physics
+[integration:table_empty] plunger SKIP — mock emu (no ROM): plunger impulse needs live script/physics
+[physics:table_empty] {"wasmSkip":true}
+[integration:table_empty] physics SKIP — wasm engine owns the clock (see wasmEngine leg)
+[nudge:table_empty] {"pass":"skip","reason":"no phys"}
+[integration:table_empty] nudge SKIP api=undefined key=undefined visual=undefined
+[dmd:table_empty] {"emu":"none","mock":true,"w":0,"h":0,"len":0,"max":0,"sum":0,"hash":2166136261,"changed":false,"pass":"skip","reason":"no emu"}
+[dmd:table_empty] dmd SKIP — no emu
+[backbox:table_empty] {"found":false,"pass":"skip","reason":"no VRCab_Backbox mesh (table has no backbox)"}
+[integration:table_empty] backbox SKIP — no VRCab_Backbox mesh (table has no backbox)
+[dmd-visible:table_empty] {"emu":"none","mock":true,"meshes":[],"texW":128,"texH":32,"texLen":4096,"texMax":0,"texLit":0,"gl":"ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)","software":true,"pass":"skip","reason":"no emu"}
+[integration:table_empty] dmdVisible SKIP — no emu
+[camera:table_empty] {"pass":false,"res1":{"pass":false,"total":28.93032668457961,"maxJump":4.63116778879444,"after80":0.015688142714491038,"tgtTotal":7.777000000000001,"maxTgtJump":1.2449424538524774,"samples":70,"reason":"frozen after80 0.02 total 28.93"},"res2":{"pass":true,"total":28.93032668457961,"maxJump":8.778957002167681,"after80":0.056996226688835465,"tgtTotal":7.777000000000001,"maxTgtJump":2.3599439214853186,"samples":70,"reason":"smooth"},"initialMode":"play","reason":"fail res1:frozen after80 0.02 total 28.93 res2:smooth"}
+[integration:table_empty] camera FAIL fail res1:frozen after80 0.02 total 28.93 res2:smooth
+[camera:table_empty] FAIL {"pass":false,"res1":{"pass":false,"total":28.93032668457961,"maxJump":4.63116778879444,"after80":0.015688142714491038,"tgtTotal":7.777000000000001,"maxTgtJump":1.2449424538524774,"samples":70,"reason":"frozen after80 0.02 total 28.93"},"res2":{"pass":true,"total":28.93032668457961,"maxJump":8.778957002167681,"after80":0.056996226688835465,"tgtTotal":7.777000000000001,"maxTgtJump":2.3599439214853186,"samples":70,"reason":"smooth"},"initialMode":"play","reason":"fail res1:frozen after80 0.02 total 28.93 res2:smooth"}
+[sound:table_empty] {"pass":true,"reason":"mute=true muteRestore=true vol=true knock=true play=true stop=true missing=true script=true music=true (skipped: no player)"}
+[integration:table_empty] sound PASS — mute=true muteRestore=true vol=true knock=true play=true stop=true missing=true script=true music=true (skipped: no player)
+[table_empty] Failed to load resource: the server responded with a status of 404 ()
+[wasmEngine:table_empty] {"ready":true,"catalogSize":3,"scriptErrors":0,"ballCount":0,"tickOk":true,"ballCountAfter":0,"inputOk":true,"pass":true}
+[integration:table_empty] wasmEngine PASS ready=true catalog=3 scriptErrors=0 balls=0 tick=true input=true
+[cam:table_empty] {"pos":[0,140.8842331515827,79.62416231188746],"target":[0,-0.5,-7.777000000000001],"mode":"play","playApplied":true}
+[room:table_empty] procedural=true cab vis=0 hid=0
+[generic:table_empty] mode play=true room/cab visible=true
+[integration:table_empty] shots -> /tmp
+[integration:table_empty] runErrors PASS (0 run-phase page/script errors)
+
+# integration table_empty FAIL {"pageerrors":true,"diagnostics":true,"playfield":"skip","playfieldLamp":"skip","transpile":"skip","ball":"skip","plunger":"skip","physics":"skip","nudge":"skip","dmd":"skip","backbox":"skip","dmdVisible":"skip","camera":false,"sound":true,"wasmEngine":true,"runErrors":true}
+
+# overall FAIL

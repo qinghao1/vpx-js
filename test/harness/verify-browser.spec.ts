@@ -2,30 +2,19 @@
 
 import { expect } from 'chai'
 import { describe, it } from 'vitest'
-import { twdArgs } from './verify-browser.js'
+import { browserStatusToExitCode, exitCodeToStatus } from './verify-browser.js'
 
-describe('verify-browser twdArgs forwarding', () => {
-	it('keeps --primary-only local and forwards the rest', () => {
-		expect(twdArgs(['--primary-only', '--vpx=a.vpx'])).to.deep.equal(['--vpx=a.vpx'])
+describe('verify-browser status mapping', () => {
+	it('maps status to exit codes', () => {
+		expect(browserStatusToExitCode('pass')).to.equal(0)
+		expect(browserStatusToExitCode('skip')).to.equal(77)
+		expect(browserStatusToExitCode('fail')).to.equal(1)
 	})
 
-	it('forwards addressing args in both = and space forms', () => {
-		expect(twdArgs(['--vpx=a.vpx', '--rom', 'b.zip', '--url', 'u', '--gpu', 'amd'])).to.deep.equal([
-			'--vpx=a.vpx',
-			'--rom',
-			'b.zip',
-			'--url',
-			'u',
-			'--gpu',
-			'amd',
-		])
-	})
-
-	it('forwards unknown flags with their values verbatim', () => {
-		expect(twdArgs(['--twd-timeout', '60', '--headed'])).to.deep.equal(['--twd-timeout', '60', '--headed'])
-	})
-
-	it('does not swallow the flag following a bare boolean flag', () => {
-		expect(twdArgs(['--headed', '--vpx=a.vpx'])).to.deep.equal(['--headed', '--vpx=a.vpx'])
+	it('maps exit codes to status', () => {
+		expect(exitCodeToStatus(0)).to.equal('pass')
+		expect(exitCodeToStatus(77)).to.equal('skip')
+		expect(exitCodeToStatus(1)).to.equal('fail')
+		expect(exitCodeToStatus(null)).to.equal('fail')
 	})
 })

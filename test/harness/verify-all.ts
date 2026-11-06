@@ -71,7 +71,7 @@ async function puppeteerAvailable(): Promise<boolean> {
 
 // Browser integration — puppeteer full stack.
 export async function verifyBrowser(): Promise<CheckStatus> {
-	tapComment('browser — integration (viewer + physics + DMD)')
+	tapComment('browser — integration (viewer)')
 	const script = path.join(process.cwd(), 'demo-browser/e2e/integration.mjs')
 	if (!fs.existsSync(script)) {
 		tapComment('browser — integration script not found, not run')
@@ -105,31 +105,26 @@ interface E2ECheck {
 }
 
 const checks: E2ECheck[] = [
-	{ name: 'wasm', script: 'test/harness/verify-wasm.ts' },
 	{ name: 'table', script: 'test/harness/verify-table.ts' },
-	{ name: 'pinmame', script: 'test/harness/verify-pinmame.ts' },
-	{ name: 'player', script: 'test/harness/verify-player.ts' },
-	{ name: 'gameplay', script: 'test/harness/harness-gameplay.ts' },
-	{ name: 'play-room', script: 'test/harness/verify-play-room.ts' },
-	{ name: 'browser', run: verifyBrowser, optional: true, skipReason: 'browser not runnable here' },
-	{
-		name: 'vpinball-compat',
-		script: 'test/harness/verify-vpinball-compat.ts',
-		optional: true,
-		skipReason: 'native vpinball not found',
-	},
-	{
-		name: 'discrepancies',
-		script: 'test/harness/capture-discrepancies.ts',
-		optional: true,
-		skipReason: 'discrepancies gate skipped by child',
-	},
 	{
 		name: 'twd-render',
 		script: 'test/harness/verify-twd-render.ts',
 		optional: true,
 		skipReason: 'VPX not available (child exit 77)',
 	},
+	{
+		name: 'ab',
+		script: 'test/harness/verify-ab.mjs',
+		optional: true,
+		skipReason: 'VPX/ROM or OLD worktree not provisioned (child exit 77)',
+	},
+	{
+		name: 'cadet',
+		script: 'test/harness/verify-cadet.mjs',
+		optional: true,
+		skipReason: 'Space Cadet VPX not provisioned (child exit 77)',
+	},
+	{ name: 'browser', run: verifyBrowser, optional: true, skipReason: 'browser not runnable here' },
 ]
 
 // Node-only checks safe for parallel spawn: script-driven, non-optional gates

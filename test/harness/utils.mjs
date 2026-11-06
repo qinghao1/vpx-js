@@ -190,6 +190,7 @@ export async function launchBrowser(puppeteer, opts = {}) {
 		...(chromePath ? { executablePath: chromePath } : {}),
 		headless: 'new',
 		ignoreHTTPSErrors: true,
+		acceptInsecureCerts: true,
 		args: [
 			'--no-sandbox',
 			'--disable-dev-shm-usage',
@@ -252,6 +253,9 @@ export async function launchBrowser(puppeteer, opts = {}) {
 export async function newPage(browser) {
 	const page = await browser.newPage()
 	await page.setViewport({ width: 1280, height: 900 })
+	try {
+		await page.bringToFront()
+	} catch {}
 	// Allow self-signed vite cert
 	try {
 		await page.setBypassCSP(true)
@@ -298,7 +302,17 @@ export async function ensureVite(
 	{ cwd = new URL('../../demo-browser', import.meta.url).pathname, label = 'vite' } = {},
 ) {
 	registerCleanup()
-	const candidates = [url.replace(/\?.*$/, ''), 'https://localhost:3000/', 'http://localhost:3000/']
+	// Port isolation: derive the wanted port from the requested URL so
+	// concurrent harness runs on distinct --port values probe AND spawn on
+	// their own port instead of all colliding on 3000.
+	const wantedPort = (() => {
+		try {
+			return new URL(url.replace(/\?.*$/, '')).port || '3000'
+		} catch {
+			return '3000'
+		}
+	})()
+	const candidates = [`https://localhost:${wantedPort}/`, `http://localhost:${wantedPort}/`]
 	for (let attempt = 0; attempt < 3; attempt++) {
 		for (const u of candidates) {
 			if (await fetchOk(u, 'HEAD')) return null
@@ -310,7 +324,7 @@ export async function ensureVite(
 		}
 	}
 	console.log(`[${label}] starting vite in ${cwd}…`)
-	const proc = spawn('npx', ['vite', '--host', '--port', '3000', '--clearScreen', 'false'], {
+	const proc = spawn('npx', ['vite', '--host', '--port', wantedPort, '--clearScreen', 'false'], {
 		cwd,
 		stdio: ['ignore', 'pipe', 'pipe'],
 	})
@@ -328,7 +342,10 @@ export async function ensureVite(
 		} catch {}
 		_vites.delete(proc)
 	}
-	const viteAutoKill = setTimeout(killViteProc, 120_000)
+	// Spawned-vite watchdog: a harness-spawned server must outlive the longest
+	// leg (multi-minute SwiftShader phases), not the old 120 s budget, which
+	// murdered the server mid-run. Process-exit cleanup still reaps it.
+	const viteAutoKill = setTimeout(killViteProc, 3_600_000)
 	if (viteAutoKill.unref) viteAutoKill.unref()
 	const origKill = proc.kill.bind(proc)
 	proc.kill = (...args) => {
@@ -344,169 +361,17 @@ export async function ensureVite(
 	}
 	proc.stdout.on('data', d => process.stdout.write(`[${label}] ${d}`))
 	proc.stderr.on('data', d => process.stderr.write(`[${label}] ${d}`))
-	for (let i = 0; i < 30; i++) {
+	for (let i = 0; i < 60; i++) {
 		await sleep(1000)
 		// Vite serves https (basicSsl) in this repo; probe both schemes with
 		// the same TLS-tolerant check as the pre-spawn candidates above.
-		for (const u of ['https://localhost:3000/', 'http://localhost:3000/']) {
+		// 60 s: cold plugin + dep optimization on a loaded box exceeds 30 s.
+		for (const u of candidates) {
 			if (await fetchOk(u, 'HEAD')) {
 				console.log(`[${label}] vite ready (${u})`)
 				return proc
 			}
 		}
 	}
-	throw new Error('vite not ready in 30s')
-}
-
-const oneLine = (text, len) => text.slice(0, len).replace(/\n/g, ' | ')
-
-async function waitViewerReady(page, { timeoutMs, label, log }) {
-	const rounds = Math.max(1, Math.round(timeoutMs / 1000))
-	for (let round = 0; round < rounds; round++) {
-		await sleep(1000)
-		const state = await page.evaluate(() => ({
-			title: document.getElementById('load-title')?.innerText || '',
-			stats: document.getElementById('stats')?.innerText || '',
-			dmdMeshes: window.viewer?.dmdMeshes?.length || 0,
-			hasPlayer: !!window.viewer?.player,
-			emu: window.viewer?.player?.getPhysics?.()?.emu?.constructor.name || 'none',
-		}))
-		const ready = state.title === 'Ready' || state.title.includes('Ready') || state.stats.includes('Ready')
-		if (ready) {
-			log(
-				`[${label}] viewer Ready at ${round}s dmd=${state.dmdMeshes} emu=${state.emu} stats=${oneLine(state.stats, 120)}`,
-			)
-			return true
-		}
-		if (round % 5 === 0)
-			log(`[${label}] ${round}s title=${state.title} dmd=${state.dmdMeshes} stats=${oneLine(state.stats, 80)}`)
-	}
-	return false
-}
-
-async function switchToPlayMode(page) {
-	await page.evaluate(() => {
-		const sel = document.getElementById('mode')
-		if (sel) {
-			sel.value = 'play'
-			sel.dispatchEvent(new Event('change', { bubbles: true }))
-		}
-		if (window.viewer) window.viewer.viewerMode = 'play'
-	})
-}
-
-async function waitPlayReady(page, { timeoutMs, label, log }) {
-	const rounds = Math.max(1, Math.round(timeoutMs / 1000))
-	for (let round = 0; round < rounds; round++) {
-		await sleep(1000)
-		const state = await page.evaluate(() => ({
-			stats: document.getElementById('stats')?.innerText || '',
-			dmdMeshes: window.viewer?.dmdMeshes?.length || 0,
-			emu: (window.viewer?.player || window.player)?.getPhysics?.()?.emu?.constructor.name || 'none',
-			emuInit: (window.viewer?.player || window.player)?.getPhysics?.()?.emu?.isInitialized?.(),
-		}))
-		if (state.stats.includes('PLAY') && state.emu !== 'none') {
-			log(
-				`[${label}] play Ready at ${round}s emu=${state.emu} init=${state.emuInit} dmd=${state.dmdMeshes} stats=${oneLine(state.stats, 120)}`,
-			)
-			return true
-		}
-		if (round % 5 === 0)
-			log(
-				`[${label}] ${round}s play waiting emu=${state.emu} dmd=${state.dmdMeshes} stats=${oneLine(state.stats, 80)}`,
-			)
-	}
-	return false
-}
-
-// One browser session: new page, goto table URL, wait for viewer Ready, switch to play mode,
-// optionally wait for play/emu readiness. Returns the page plus readiness flags.
-export async function openTablePage(
-	browser,
-	url,
-	{ readyTimeoutMs = 30000, playTimeoutMs = 20000, label = 'harness', log = console.log, onPage = null } = {},
-) {
-	const page = await newPage(browser)
-	if (onPage) await onPage(page)
-	log(`[${label}] goto ${url}`)
-	await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 })
-	log(`[${label}] waiting for viewer Ready (up to ${Math.round(readyTimeoutMs / 1000)}s)`)
-	const viewerReady = await waitViewerReady(page, { timeoutMs: readyTimeoutMs, label, log })
-	if (!viewerReady) log(`[${label}] viewer not ready, continuing anyway`)
-	log(`[${label}] switching to play mode`)
-	await switchToPlayMode(page)
-	// Predicate poll (was: fixed sleep(2000)): proceed as soon as the viewer
-	// reports play mode, wait up to 5s on slow loads, then continue anyway.
-	await waitFor(() => page.evaluate(() => window.viewer?.viewerMode === 'play'), { timeoutMs: 5000 })
-	let playReady = false
-	if (playTimeoutMs > 0) {
-		log(`[${label}] waiting for play emu (up to ${Math.round(playTimeoutMs / 1000)}s)`)
-		playReady = await waitPlayReady(page, { timeoutMs: playTimeoutMs, label, log })
-	}
-	return { page, viewerReady, playReady }
-}
-
-// Injects a visible 128x32 amber DMD test pattern by monkey-patching the emulator's
-// getDmdFrame/getDmdDimensions and forcing a viewer re-render. Returns injection info.
-export async function injectDmdPattern(page) {
-	return page.evaluate(() => {
-		try {
-			const viewer = window.viewer
-			const emu = window.viewer?.player?.getPhysics?.()?.emu ?? window.player?.getPhysics?.()?.emu
-			if (!viewer) return { ok: false, error: 'no viewer' }
-			if (!emu) return { ok: false, error: 'no emu' }
-			const width = 128
-			const height = 32
-			const frame = new Uint8Array(width * height)
-			for (let y = 0; y < height; y++) {
-				for (let x = 0; x < width; x++) {
-					let value = 0
-					if (x < 1 || x >= width - 1 || y < 1 || y >= height - 1) value = 15
-					else if (Math.abs(x - y * 4) < 1) value = 10
-					else if (x > 20 && x < 108 && y > 8 && y < 24) {
-						value = (Math.floor(x / 8) + Math.floor(y / 8)) % 2 === 0 ? 15 : 6
-						if (y > 12 && y < 20) {
-							if ((x > 30 && x < 38) || (x > 50 && x < 58) || (x > 70 && x < 78) || (x > 90 && x < 98))
-								value = 15
-						}
-					} else if (x % 16 === 0 || y % 8 === 0) value = 2
-					frame[y * width + x] = value
-				}
-			}
-			try {
-				if (emu.emulatorState?.setDmd) emu.emulatorState.setDmd(frame)
-				emu.getDmdFrame = () => frame
-				emu.getDmdDimensions = () => ({ x: width, y: height, isVector2: true })
-			} catch (err) {
-				console.log('setDmd monkey err', err.message)
-			}
-			try {
-				viewer.dmdW = width
-				viewer.dmdH = height
-				viewer._dmdLastHash = -1
-			} catch {}
-			try {
-				viewer._ensureDmdTexture?.()
-				viewer._renderDmd?.()
-				viewer._pollPinmame?.()
-				viewer.dmd?.render?.()
-			} catch (err) {
-				console.log('render err', err.message)
-			}
-			if (viewer.dmdTexture) viewer.dmdTexture.needsUpdate = true
-			let max = 0
-			for (const value of frame) if (value > max) max = value
-			return {
-				ok: true,
-				length: frame.length,
-				max,
-				emu: emu.constructor.name,
-				dmdMeshes: viewer.dmdMeshes?.length ?? 0,
-				texture: !!viewer.dmdTexture,
-				canvas: !!viewer.dmdCanvas,
-			}
-		} catch (err) {
-			return { ok: false, error: err.message }
-		}
-	})
+	throw new Error('vite not ready in 60s')
 }
