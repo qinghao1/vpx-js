@@ -9,12 +9,8 @@ import { NodeBinaryReader } from '../../lib/io/binary-reader.node.js'
 import { Table } from '../../lib/vpt/table/table.js'
 
 const EMPTY = path.resolve('test/fixtures/table-empty.vpx')
-const FULL_CANDIDATES = [
-	path.resolve('test/fixtures/table-full.vpx'),
-	path.resolve('example-table.vpx'),
-	path.resolve('test/fixtures/table-light.vpx'),
-]
-const FULL = FULL_CANDIDATES.find(p => fs.existsSync(p)) ?? path.resolve('test/fixtures/table-light.vpx')
+const EXAMPLE = path.resolve('example-table.vpx')
+const FULL = fs.existsSync(EXAMPLE) ? EXAMPLE : path.resolve('test/fixtures/table-light.vpx')
 
 async function verifyEmpty() {
 	console.log('=== Table: empty fixture ===')

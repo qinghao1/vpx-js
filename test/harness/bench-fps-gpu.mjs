@@ -23,7 +23,8 @@ const warmup = Number(getArg(args, 'warmup', '2000'))
 const vpxParam = path.isAbsolute(vpxArg) ? `/@fs${vpxArg}` : vpxArg
 const legs = ['viewer', 'play']
 
-const BASE = new URL((await ensureVite('https://localhost/', { label: 'fps-gpu' })).url).origin
+const vite = await ensureVite()
+const BASE = vite.origin
 const puppeteer = await loadPuppeteer()
 const browser = await launchBrowser(puppeteer, { ...(gpu ? { gpu } : {}), timeout: 300_000 })
 
@@ -36,7 +37,7 @@ async function runLeg(mode) {
 		await sleep(1000)
 		const s = await page
 			.evaluate(() => ({
-				ready: (document.getElementById('log')?.innerText ?? '').includes('Ready') || !!window.viewer?.player,
+				ready: window.vpx?.state.loadState === 'ready',
 			}))
 			.catch(() => ({ ready: false }))
 		if (s.ready) {
@@ -69,7 +70,7 @@ async function runLeg(mode) {
 		.evaluate(
 			durMs =>
 				new Promise(resolve => {
-					const r = window.viewer?.renderer
+					const r = window.vpx.three.renderer
 					// Count per-tick presents, not rAF ticks: info.reset() zeroes
 					// frameCalls every tick, so cumulative reads miss skipped frames.
 					let frames = 0
@@ -141,6 +142,7 @@ for (const mode of legs) {
 	results.push(r)
 }
 await browser.close().catch(() => {})
+await vite.close()
 const ok = results.every(r => r.ok)
 console.log(
 	`\n# fps-gpu ${ok ? 'PASS' : 'FAIL'} ${JSON.stringify(results.map(r => ({ mode: r.mode, fps: r.fpsRaf ?? null })))}`,

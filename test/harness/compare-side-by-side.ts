@@ -102,21 +102,15 @@ async function main() {
 	const disc = discoverVpinball()
 	if (!disc.binPath) {
 		console.error('[compare] native VPinballX not found — cannot launch side-by-side')
-		console.error('  Fix: npm run vpinball:setup  or export VPINBALL_BIN=/path/to/VPinballX_GL')
+		console.error('  Fix: scripts/setup-vpinball.sh  or export VPINBALL_BIN=/path/to/VPinballX_GL')
 		console.error('  Browser-only mode: opening browser alone…')
 	}
 
 	await ensureDistEsm()
 
-	// Start vite
-	console.log('[compare] ensuring vite dev server on :3000…')
 	const utils: any = await import('./utils.mjs')
-	let viteProc: any = null
-	let browserTarget = session.browserUrl
-	if (utils.ensureVite) {
-		viteProc = await utils.ensureVite(session.browserUrl, { label: 'vite' })
-		if (viteProc?.url) browserTarget = viteProc.url
-	}
+	const vite = await utils.ensureVite(session.browserUrl)
+	const browserTarget = vite.url
 
 	// Launch browser
 	console.log(
@@ -225,7 +219,7 @@ async function main() {
 			if (browser) await browser.close().catch(() => {})
 		} catch {}
 		terminate(nativeProc, 2000)
-		terminate(viteProc, 1000)
+		await vite.close()
 		process.exit(0)
 	}
 	process.once('SIGINT', cleanup)

@@ -57,15 +57,12 @@ const expandHome = (file: string): string =>
 function resolveVpxPath(): string | null {
 	const cli = parseVpxArg(process.argv.slice(2))
 	if (cli) return fs.existsSync(expandHome(cli)) ? expandHome(cli) : null
-	const env = process.env.VPX_FILE
-	if (env && fs.existsSync(expandHome(env))) return expandHome(env)
 	return findWalkingDead()
 }
 
 const vpxPath = resolveVpxPath()
 if (!vpxPath) {
-	const rawArg =
-		parseVpxArg(process.argv.slice(2)) ?? process.env.VPX_FILE ?? process.env.WALKING_DEAD_VPX ?? 'walking_dead.vpx'
+	const rawArg = parseVpxArg(process.argv.slice(2)) ?? process.env.WALKING_DEAD_VPX ?? 'walking_dead.vpx'
 	tapSkip(1, 'twd-render', `VPX not found: ${rawArg}`)
 	process.exit(77)
 }
@@ -172,7 +169,7 @@ group.traverse(o => {
 	for (const material of meshMaterials(mesh)) {
 		if (hasPendingMap(material)) remainingPending++
 		const userData = (material as any)?.userData as Record<string, unknown> | undefined
-		for (const key of ['pendingmap', 'pendingNormalMap', 'pendingEnvMap', 'pendingEmissiveMap']) {
+		for (const key of ['pendingNormalMap', 'pendingEnvMap', 'pendingEmissiveMap']) {
 			if (typeof userData?.[key] === 'string' && userData[key]) remainingStrayPending++
 		}
 	}

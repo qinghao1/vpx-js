@@ -14,14 +14,11 @@
 			"!!dist-esm",
 			"!!coverage",
 			"!external",
-			"!!wasm/build",
 			"!test/fixtures",
 			"!!demo-browser/dist",
 			"!!demo-browser/node_modules",
-			"!lib/**/bench*.spec.ts",
 			"!**/bench*.spec.ts",
-			"!**/*.vpx",
-			"!!profile_harness*.mjs"
+			"!**/*.vpx"
 		]
 	},
 	"formatter": {
@@ -115,18 +112,6 @@
 						"noExportsInTest": "off"
 					}
 				}
-			}
-		},
-		{
-			"includes": ["test/harness/__snapshots__/**"],
-			"formatter": {
-				"enabled": false
-			},
-			"linter": {
-				"enabled": false
-			},
-			"assist": {
-				"enabled": false
 			}
 		}
 	]

@@ -1,35 +1,49 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 import path from 'node:path'
 
-export const DEFAULT_URL = 'https://localhost:3000/?vpx=/test/fixtures/table-empty.vpx&mode=viewer'
+export const DEFAULT_PAGE = '/?vpx=/test/fixtures/table-empty.vpx&mode=viewer'
 
 // Single source of truth for "insert-like" names (mesh, material, primitive,
 // collection keys). page.evaluate callbacks cannot close over module scope, so
 // call sites pass this string in and build the RegExp inside the page.
 export const INSERT_NAME_PATTERN = 'insert|round|rect|flasher|vrlight|switc'
 
-export const pollLog = async (page, needle, timeout = 60000, label = needle) => {
+export const pageLog = page => page.evaluate(() => document.getElementById('log')?.innerText || '').catch(() => '')
+
+export const pollLog = async (page, needle, timeout = 60000) => {
 	const start = Date.now()
 	while (Date.now() - start < timeout) {
-		try {
-			const txt = await page.evaluate(() => document.getElementById('log')?.innerText || '')
-			if (txt.includes(needle)) return txt
-		} catch {}
+		const txt = await pageLog(page)
+		if (txt.includes(needle)) return txt
 		await new Promise(r => setTimeout(r, 500))
 	}
-	return page.evaluate(() => document.getElementById('log')?.innerText || '').catch(() => '')
+	return pageLog(page)
 }
 
+/** Wait for the viewer's load state to reach `ready`; `error` says why it did not. */
 export const waitReady = async (page, timeout = 60000) => {
-	// Load state lives on body.dataset (window.vpx.whenReady); the log poll
-	// below is only a fallback for builds without the dev test API.
 	try {
+		await page.waitForFunction(() => window.vpx, { timeout })
 		await page.evaluate(t => window.vpx.whenReady(t), timeout)
-	} catch {
-		await pollLog(page, 'Ready', timeout, 'Ready')
+		return { ready: true }
+	} catch (e) {
+		return { ready: false, error: String(e?.message ?? e) }
 	}
-	return page.evaluate(() => document.getElementById('log')?.innerText || '')
 }
+
+/** Whether the loaded table has lights, insert-like primitives, or insert collections. */
+export const tableHasInserts = page =>
+	page.evaluate(insertPattern => {
+		const table = window.vpx.three.table
+		if (!table) return false
+		const insertRe = new RegExp(insertPattern, 'i')
+		const { InsertOn, InsertOff, InsertLights } = table.collections ?? {}
+		return (
+			Object.keys(table.lights ?? {}).length > 0 ||
+			Object.keys(table.primitives ?? {}).some(k => insertRe.test(k)) ||
+			!!(InsertOn || InsertOff || InsertLights)
+		)
+	}, INSERT_NAME_PATTERN)
 
 export const hideOverlays = page =>
 	page.evaluate(() => {
@@ -42,10 +56,7 @@ export const hideOverlays = page =>
 export const diagnostics = page =>
 	page.evaluate(() => {
 		const out = []
-		const g = window.tableGroup,
-			r = window.renderer,
-			cam = window.camera,
-			ctr = window.controls
+		const { tableGroup: g, renderer: r, camera: cam, controls: ctr, renderApi } = window.vpx.three
 		out.push(`renderer ${r ? `${r.info.render.triangles} tris ${r.info.render.calls} draws` : 'no renderer'}`)
 		if (cam)
 			out.push(
@@ -109,54 +120,10 @@ export const diagnostics = page =>
 		out.push(
 			`cab total=${cab} mapped=${cabMapped} pending=${cabPending} emissiveOk=${cabEmissiveOk} missing=${cabEmissiveMissing}`,
 		)
-		out.push(`cache ${window.renderApi?.getMapGenerator?.().getCache?.().size ?? -1}`)
+		out.push(`cache ${renderApi?.getMapGenerator?.().getCache?.().size ?? -1}`)
 		if (cab && cabMapped / cab < 0.5) out.push(`WARN dark cabinet: only ${cabMapped}/${cab} mapped`)
 		if (cabEmissiveMissing > 5) out.push(`WARN cab emissive ${cabEmissiveMissing} missing`)
 		if (visiblePending > 10) out.push(`WARN visible pending ${visiblePending}`)
-		try {
-			const cvs = r?.domElement || document.getElementById('canvas')
-			if (cvs?.width) {
-				if (r && window.scene && cam)
-					try {
-						r.render(window.scene, cam)
-					} catch {}
-				const tmp = document.createElement('canvas'),
-					W = Math.min(160, cvs.width),
-					H = Math.min(120, cvs.height)
-				tmp.width = W
-				tmp.height = H
-				const ctx = tmp.getContext('2d', { willReadFrequently: true })
-				if (ctx) {
-					try {
-						ctx.drawImage(cvs, 0, 0, W, H)
-					} catch {}
-					const sx = Math.floor(W * 0.25),
-						sy = Math.floor(H * 0.55),
-						sw = Math.floor(W * 0.5),
-						sh = Math.floor(H * 0.3)
-					try {
-						const img = ctx.getImageData(sx, sy, sw, sh)
-						let sum = 0,
-							cnt = 0
-						for (let i = 0; i < img.data.length; i += 4)
-							if (img.data[i + 3] >= 10) {
-								sum += 0.299 * img.data[i] + 0.587 * img.data[i + 1] + 0.114 * img.data[i + 2]
-								cnt++
-							}
-						const avg = cnt ? Math.round(sum / cnt) : 0
-						out.push(`luminance avg=${avg} sample ${sx},${sy} ${sw}x${sh}`)
-						// No WARN thresholds here: this samples whatever frame
-						// happens to be presented (stale room view, any lamp
-						// phase). The playfield brightness leg owns the
-						// end-to-end light gate with a set camera + GI state.
-					} catch (e) {
-						out.push(`luminance err ${e.message}`)
-					}
-				}
-			}
-		} catch (e) {
-			out.push(`luminance outer ${e.message}`)
-		}
 		return out.join('\n')
 	})
 
@@ -167,37 +134,47 @@ export const physicsChecks = async page => {
 		const api = window.vpx,
 			out = {}
 		const sleep = ms => new Promise(r => setTimeout(r, ms))
-		if (!api) {
-			const skip = { pass: 'skip', reason: 'no test api (window.vpx)' }
-			return { flipper: skip, coin: skip, start: skip, clock: skip }
-		}
 		const angleOf = idx => api.state.flippers.find(f => f.partIdx === idx)?.angle
-		// Flipper: the one mover row the seam exposes directly. Prefer the
-		// left flipper by name so the ShiftLeft press drives the measured part.
+		// Flipper: each side's Shift key and its Arrow alias must swing the
+		// flipper named for that side (a table without side names uses the
+		// first flipper for the left keys).
+		const swing = async (target, code) => {
+			const before = target.angle
+			api.sendKey(code, true)
+			let mid = before
+			const t0 = Date.now()
+			while (Date.now() - t0 < 2000) {
+				await sleep(50)
+				mid = angleOf(target.partIdx) ?? mid
+				if (Math.abs(mid - before) > 0.2) break
+			}
+			api.sendKey(code, false)
+			await sleep(500)
+			return { code, flipper: target.name, before, mid, pass: Math.abs(mid - before) > 0.2 }
+		}
 		try {
 			const flippers = api.state.flippers
-			if (!flippers.length) {
-				out.flipper = { before: 0, mid: 0, after: 0, pass: 'skip', reason: 'no flipper in table' }
+			const left = flippers.find(f => /left/i.test(f.name || '')) ?? flippers[0]
+			const right = flippers.find(f => /right/i.test(f.name || ''))
+			if (!left) {
+				out.flipper = { pass: 'skip', reason: 'no flipper in table' }
 			} else {
-				const target = flippers.find(f => /left/i.test(f.name || '')) || flippers[0]
-				const code =
-					/right/i.test(target.name || '') && !/left/i.test(target.name || '') ? 'ShiftRight' : 'ShiftLeft'
-				const before = target.angle
-				api.sendKey(code, true)
-				let mid = before
-				const t0 = Date.now()
-				while (Date.now() - t0 < 2000) {
-					await sleep(50)
-					mid = angleOf(target.partIdx) ?? mid
-					if (Math.abs(mid - before) > 0.2) break
-				}
-				api.sendKey(code, false)
-				await sleep(500)
-				const after = angleOf(target.partIdx) ?? mid
-				out.flipper = { before, mid, after, pass: Math.abs(mid - before) > 0.2 }
+				const keys = [
+					[left, 'ShiftLeft'],
+					[left, 'ArrowLeft'],
+					...(right
+						? [
+								[right, 'ShiftRight'],
+								[right, 'ArrowRight'],
+							]
+						: []),
+				]
+				const swings = []
+				for (const [target, code] of keys) swings.push(await swing(target, code))
+				out.flipper = { swings, pass: swings.every(s => s.pass) }
 			}
 		} catch (e) {
-			out.flipper = { before: 0, mid: 0, after: 0, pass: false, error: String(e?.message ?? e) }
+			out.flipper = { pass: false, error: String(e?.message ?? e) }
 		}
 		// Coin/start: the seam has no switch-input accessor, so a press is
 		// judged by the script's observable response (DMD sum, lamp activity)
@@ -303,13 +280,13 @@ export const physicsChecks = async page => {
 
 // WASM-engine leg: asserts the headless-bridge guarantees on every run
 // (engine ready, part catalog, zero script errors, stepping advances the
-// game clock, input routes without throwing). The WASM engine is
-// unconditional — there is no TS player to skip for.
+// game clock, input and nudge route to the engine). Nudge physics is pinned
+// at engine level by verify-headless; here the play-mode nudge flash proves
+// vpx.nudge passed the viewer's gate into the engine.
 export const wasmEngineChecks = async page => {
 	await ensurePlayMode(page)
 	return page.evaluate(async () => {
 		const api = window.vpx
-		if (!api) return { pass: false, reason: 'no test api (window.vpx)' }
 		try {
 			await api.whenReady()
 		} catch (e) {
@@ -336,33 +313,34 @@ export const wasmEngineChecks = async page => {
 			api.sendKey('ArrowLeft', true)
 			api.sendKey('ArrowLeft', false)
 			api.nudge(75, 2.0)
+			const flash = document.getElementById('nudge-flash')
+			out.nudgeRouted = flash?.hidden === false && flash.dataset.dir === 'left'
 			out.inputOk = true
 		} catch (e) {
 			out.error = String(e?.message ?? e).slice(0, 300)
 		}
-		out.pass = out.tickOk === true && out.inputOk === true && out.scriptErrors === 0 && out.gameAdvanced === true
+		out.pass =
+			out.tickOk === true &&
+			out.inputOk === true &&
+			out.nudgeRouted === true &&
+			out.scriptErrors === 0 &&
+			out.gameAdvanced === true
 		if (!out.pass && out.reason === undefined)
-			out.reason = `tick=${out.tickOk} input=${out.inputOk} scriptErrors=${out.scriptErrors} advanced=${out.gameAdvanced}`
+			out.reason = `tick=${out.tickOk} input=${out.inputOk} nudge=${out.nudgeRouted} scriptErrors=${out.scriptErrors} advanced=${out.gameAdvanced}`
 		return out
 	})
 }
 
 // Plunger leg: hold Enter (the viewer's plunger key), release, and assert
 // the engine pulled a plunger or launched a ball. Travel is judged on the
-// normalized engine pull (0..1) across every catalog plunger — the old
-// manual-vs-auto distinction lived on the deleted script API, and the leg
-// already fell back to all plungers on auto-only tables. Skips honestly
-// when the table has no plunger (e.g. table-empty).
+// normalized engine pull (0..1) across every catalog plunger, so auto-only
+// tables count too. Skips honestly when the table has no plunger (e.g.
+// table-empty).
 export const plungerChecks = async page => {
 	const play = await ensurePlayMode(page)
 	return page.evaluate(async play => {
 		const api = window.vpx
 		const out = {}
-		if (!api) {
-			out.pass = 'skip'
-			out.reason = 'no test api (window.vpx)'
-			return out
-		}
 		if (!play?.ok) {
 			out.pass = false
 			out.reason = `play mode not entered: ${play?.reason ?? 'unknown'}`
@@ -435,88 +413,9 @@ export const plungerChecks = async page => {
 	}, play)
 }
 
-// Nudge leg: the seam exposes no cabinet-acceleration accessor, so a nudge
-// is only observable through a live ball's deflection. Route one engine
-// nudge (vpx.nudge) and one KeyZ press (the viewer's nudge key), and judge
-// each by the ball's peak per-sample displacement against its pre-nudge
-// drift. Skips honestly with no live ball; a resting ball that stays
-// resting fails (the impulse never reached it).
-export const nudgeChecks = async page => {
-	const play = await ensurePlayMode(page)
-	return page.evaluate(async play => {
-		const api = window.vpx
-		const out = {}
-		if (!api) {
-			out.pass = 'skip'
-			out.reason = 'no test api (window.vpx)'
-			return out
-		}
-		if (!play?.ok) {
-			out.pass = false
-			out.reason = `play mode not entered: ${play?.reason ?? 'unknown'}`
-			return out
-		}
-		try {
-			const sleep = ms => new Promise(r => setTimeout(r, ms))
-			if (!api.state.balls.length) {
-				out.pass = 'skip'
-				out.reason = 'no live ball: nudge effect unobservable in WASM seam'
-				return out
-			}
-			// Peak per-100ms displacement of any ball over a window: the
-			// pre-nudge window measures idle drift, the post-nudge window
-			// must clearly exceed it.
-			const peakStep = async windowMs => {
-				let peak = 0
-				let prev = api.state.balls.map(b => ({ id: b.id, x: b.x, y: b.y, z: b.z }))
-				const t0 = Date.now()
-				while (Date.now() - t0 < windowMs) {
-					await sleep(100)
-					const cur = api.state.balls.map(b => ({ id: b.id, x: b.x, y: b.y, z: b.z }))
-					for (const b of cur) {
-						const p = prev.find(q => q.id === b.id)
-						if (p) peak = Math.max(peak, Math.hypot(b.x - p.x, b.y - p.y, b.z - p.z))
-					}
-					prev = cur
-				}
-				return peak
-			}
-			const drift = await peakStep(1000)
-			const floor = 3
-			const bar = Math.max(1.5 * drift, floor)
-			const attempt = async (label, fire) => {
-				fire()
-				const peak = await peakStep(1000)
-				return { label, peak: +peak.toFixed(2), pass: peak > bar }
-			}
-			const viaApi = await attempt('api', () => api.nudge(75, 2.6))
-			await sleep(400)
-			const viaKey = await attempt('key', () => {
-				api.sendKey('KeyZ', true)
-				return sleep(90).then(() => api.sendKey('KeyZ', false))
-			})
-			out.before = { drift: +drift.toFixed(2), bar: +bar.toFixed(2) }
-			out.mid = { api: viaApi, key: viaKey }
-			out.viaApi = viaApi.pass
-			out.viaKey = viaKey.pass
-			out.stillReady = api.state.wasmReady
-			out.pass = (viaApi.pass || viaKey.pass) && api.state.wasmReady
-			out.reason = out.pass
-				? `nudge deflected ball (api ${viaApi.peak} key ${viaKey.peak} vs bar ${bar.toFixed(2)})`
-				: `no deflection above drift (api ${viaApi.peak} key ${viaKey.peak} vs bar ${bar.toFixed(2)})`
-			return out
-		} catch (e) {
-			out.pass = false
-			out.error = String(e?.message ?? e)
-			return out
-		}
-	}, play)
-}
-
 export const ensurePlayMode = async page => {
 	return page.evaluate(async () => {
 		const api = window.vpx
-		if (!api) return { ok: false, reason: 'no test api (window.vpx)' }
 		try {
 			await api.whenReady()
 		} catch (e) {
@@ -597,11 +496,6 @@ export const ballChecks = async (page, timeout = 60000) => {
 	return page.evaluate(async settled => {
 		const api = window.vpx
 		const out = { settled }
-		if (!api) {
-			out.pass = 'skip'
-			out.skipReason = 'no test api (window.vpx)'
-			return out
-		}
 		const sleep = ms => new Promise(r => setTimeout(r, ms))
 		const dmdSum = () => {
 			try {
@@ -673,7 +567,19 @@ export const ballChecks = async (page, timeout = 60000) => {
 		out.dmdSum = dmdSum()
 		out.lightActivity = api.state.lightActivity
 		if (moved) {
-			out.pass = true
+			// The ejected ball must be drawn and sane: a visible mesh under the
+			// scene's balls group, finite engine positions.
+			await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))
+			const { tableGroup } = api.three
+			let visibleMeshes = 0
+			tableGroup?.getObjectByName('balls')?.traverseVisible(o => {
+				if (o.isMesh) visibleMeshes++
+			})
+			out.visibleMeshes = visibleMeshes
+			out.finite = after.every(b => [b.x, b.y, b.z].every(Number.isFinite))
+			out.pass = visibleMeshes > 0 && out.finite
+			if (!out.pass)
+				out.reason = `ejected ball not drawn or not finite (meshes=${visibleMeshes} finite=${out.finite})`
 			return out
 		}
 		// No motion and no script output ever: the fixture cannot eject
@@ -694,13 +600,8 @@ export const shot = async (page, name, camPos, target, outDir) => {
 	try {
 		await page.evaluate(
 			(cp, tg) => {
-				// NOTE: window.camera/window.controls are never assigned —
-				// only window.viewer carries the live handles.
-				const v = window.viewer
-				if (!v) return
-				try {
-					window.vpx?.cancelCameraAnimation()
-				} catch {}
+				const v = window.vpx.three
+				window.vpx.cancelCameraAnimation()
 				if (v.controls) v.controls.enabled = false
 				const cam = v.camera,
 					ctr = v.controls
@@ -735,16 +636,13 @@ export const playfieldLightsCheck = async page => {
 	// Textures (esp. multi-10s EXR bakes) stream in long after Ready: probing
 	// the bake before `[stream] Done` measures a half-built scene. Only wait
 	// when streaming actually happened (empty tables never stream).
-	try {
-		const log = await page.evaluate(() => document.getElementById('log')?.innerText || '')
-		if (/streaming|deferred|Pre-loading/i.test(log)) await pollLog(page, '[stream] Done', 150000, 'stream-done')
-	} catch {}
+	if (/streaming|deferred|Pre-loading/i.test(await pageLog(page))) await pollLog(page, '[stream] Done', 150000)
 	return page.evaluate(async insertPattern => {
 		const insertRe = new RegExp(insertPattern, 'i')
 		const out = { bake: null, inserts: null, glow: null, brightness: null, pass: true, reason: '' }
-		const v = window.viewer
-		if (!v || !v.tableGroup) {
-			out.reason = 'no viewer/tableGroup'
+		const v = window.vpx.three
+		if (!v.tableGroup) {
+			out.reason = 'no tableGroup'
 			out.pass = false
 			return out
 		}
@@ -777,12 +675,7 @@ export const playfieldLightsCheck = async page => {
 				// with the wanted name in __mapName — classic .map misses them.
 				const nodeMap = m.userData?.__map ?? null
 				const mapName = (m.map?.name || nodeMap?.name || '').toLowerCase()
-				const pending = (
-					m.userData?.pendingMap ??
-					m.userData?.pendingmap ??
-					(!nodeMap ? m.userData?.__mapName : '') ??
-					''
-				)
+				const pending = (m.userData?.pendingMap ?? (!nodeMap ? m.userData?.__mapName : '') ?? '')
 					.toString()
 					.toLowerCase()
 				const effMap = mapName || pending
@@ -855,18 +748,6 @@ export const playfieldLightsCheck = async page => {
 				found: foundInsert,
 				pending: insertSamples.some(s => s.includes('pending')),
 			}
-			if (foundInsert === false) {
-				try {
-					const hasInserts = !!(
-						v.table &&
-						v.table.collections &&
-						(v.table.collections.InsertOn || v.table.collections.InsertOff)
-					)
-					const hasAnyInsert = Object.keys(v.table?.primitives || {}).some(k => insertRe.test(k))
-					if (hasInserts || hasAnyInsert)
-						out.inserts.reason = 'no insert mesh matched (but table has inserts)'
-				} catch {}
-			}
 		} catch (e) {
 			out.inserts = { error: String(e) }
 		}
@@ -906,29 +787,34 @@ export const playfieldLightsCheck = async page => {
 		}
 		try {
 			// End-to-end light check: with GI lamps on, the playfield must
-			// actually emit photons. Positions the camera deterministically
-			// (viewer handles — window.camera is unset), renders, and samples
-			// the playfield region in the same task. Restores controls after.
+			// actually emit photons. Positions the camera deterministically,
+			// renders, and samples the frame in the same task. Restores
+			// controls after.
 			const wasEnabled = v.controls?.enabled
-			try {
-				window.vpx?.cancelCameraAnimation()
-			} catch {}
+			window.vpx.cancelCameraAnimation()
 			if (v.controls) v.controls.enabled = false
-			v.camera.position.set(0, 5, 35)
-			v.controls.target.set(0, -5, 0)
-			v.camera.updateMatrixWorld()
-			v.controls.update()
-			v.renderer.render(v.scene, v.camera)
-			const src = v.renderer.domElement
-			const c = document.createElement('canvas')
-			c.width = 160
-			c.height = 112
-			const ctx = c.getContext('2d')
-			ctx.drawImage(src, 0, 0, 160, 112)
-			const d = ctx.getImageData(0, 0, 160, 112).data
-			let sum = 0
-			for (let i = 0; i < d.length; i += 4) sum += 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]
-			const mean = sum / (d.length / 4)
+			const sample = (position, target) => {
+				v.camera.position.set(...position)
+				v.controls.target.set(...target)
+				v.camera.updateMatrixWorld()
+				v.controls.update()
+				v.renderer.render(v.scene, v.camera)
+				const c = document.createElement('canvas')
+				c.width = 160
+				c.height = 112
+				const ctx = c.getContext('2d')
+				ctx.drawImage(v.renderer.domElement, 0, 0, 160, 112)
+				const d = ctx.getImageData(0, 0, 160, 112).data
+				const rgb = [0, 0, 0]
+				for (let i = 0; i < d.length; i += 4) for (let k = 0; k < 3; k++) rgb[k] += d[i + k]
+				return rgb.map(sum => sum / (d.length / 4))
+			}
+			const [r, g, b] = sample([0, 5, 35], [0, -5, 0])
+			const mean = 0.299 * r + 0.587 * g + 0.114 * b
+			// GI color: the playfield seen from above must not shift blue
+			// (B-R mean, 0-255; calibrated on walking_dead GI).
+			const top = sample([0, 190, 300], [0, -3, 6])
+			const blueShift = top[2] - top[0]
 			let gi = 0
 			v.tableGroup.traverse(o => {
 				if (!o.isMesh || !/lm_gi0_playfield/i.test(o.name)) return
@@ -940,13 +826,16 @@ export const playfieldLightsCheck = async page => {
 			// Calibrated on walking_dead GL: buried-GI dark baseline ~10-20,
 			// lit playfield ~110. GI<=1 means lamps are genuinely dim — a dark
 			// frame is correct then, so only gate catastrophic black (<3).
-			out.brightness = { mean: +mean.toFixed(1), gi: +gi.toFixed(2) }
+			out.brightness = { mean: +mean.toFixed(1), gi: +gi.toFixed(2), blueShift: +blueShift.toFixed(1) }
 			if (mean < 3) {
 				out.pass = false
 				out.reason = `playfield renders black (mean ${mean.toFixed(1)})`
 			} else if (gi > 1 && mean < 25) {
 				out.pass = false
 				out.reason = `GI lamps on (${gi.toFixed(2)}) but playfield dark (mean ${mean.toFixed(1)})`
+			} else if (bakeInfos.length && blueShift > 12) {
+				out.pass = false
+				out.reason = `playfield shifts blue (B-R ${blueShift.toFixed(1)} > 12)`
 			}
 		} catch (e) {
 			out.brightness = { error: String(e) }
@@ -955,50 +844,27 @@ export const playfieldLightsCheck = async page => {
 	}, INSERT_NAME_PATTERN)
 }
 
+// Coin up and start (the script lights inserts for a game), then require a
+// visible insert to glow. Call only for tables with inserts (tableHasInserts).
 export const playfieldLightsCheckAfterLamp = async page => {
 	try {
-		const shouldTrigger = await page.evaluate(insertPattern => {
-			const insertRe = new RegExp(insertPattern, 'i')
-			const v = window.viewer
+		await page.evaluate(async () => {
 			const api = window.vpx
-			if (!v || !v.table || !api?.state.wasmReady) return false
-			const hasLights = v.table.lights && Object.keys(v.table.lights).length > 0
-			const hasInsertPrims = Object.keys(v.table.primitives || {}).some(k => insertRe.test(k))
-			const hasCollections = !!(
-				v.table.collections &&
-				(v.table.collections.InsertOn || v.table.collections.InsertOff || v.table.collections.InsertLights)
-			)
-			return hasLights || hasInsertPrims || hasCollections
-		}, INSERT_NAME_PATTERN)
-		if (shouldTrigger) {
-			await page.evaluate(async () => {
-				const api = window.vpx
-				if (!api) return
-				const sleep = ms => new Promise(r => setTimeout(r, ms))
-				api.sendKey('Digit5', true)
-				await sleep(350)
-				api.sendKey('Digit5', false)
-				await sleep(400)
-				api.sendKey('Digit1', true)
-				await sleep(350)
-				api.sendKey('Digit1', false)
-				await sleep(900)
-				// Let the script react: the clock advancing proves the
-				// engine steps while lamps/DMD catch up.
-				const t0 = api.state.gameMs
-				for (let i = 0; i < 10; i++) {
-					if (api.state.gameMs > t0) break
-					await sleep(100)
-				}
-			})
-			await new Promise(r => setTimeout(r, 2000))
-		} else {
-			await new Promise(r => setTimeout(r, 800))
-		}
+			const sleep = ms => new Promise(r => setTimeout(r, ms))
+			api.sendKey('Digit5', true)
+			await sleep(350)
+			api.sendKey('Digit5', false)
+			await sleep(400)
+			api.sendKey('Digit1', true)
+			await sleep(350)
+			api.sendKey('Digit1', false)
+			await sleep(900)
+		})
+		await new Promise(r => setTimeout(r, 2000))
 		const res = await page.evaluate(insertPattern => {
 			const insertRe = new RegExp(insertPattern, 'i')
 			const out = { samples: [], pass: true, reason: '' }
-			const v = window.viewer
+			const v = window.vpx.three
 			let maxI = 0
 			let found = false
 			const isInsertMesh = (mesh, matName) => insertRe.test(mesh) || insertRe.test(matName)
@@ -1021,18 +887,7 @@ export const playfieldLightsCheckAfterLamp = async page => {
 				}
 			})
 			if (!found) {
-				let hasInsert = false
-				try {
-					hasInsert =
-						Object.keys(v.table?.primitives || {}).some(k => insertRe.test(k)) ||
-						!!v.table?.collections?.InsertOn
-				} catch {}
-				if (!hasInsert) {
-					out.reason = 'no insert found — skip (table has no inserts)'
-					out.pass = 'skip'
-					return out
-				}
-				out.reason = 'no visible insert found — skip (nothing lit to measure)'
+				out.reason = 'no visible insert mesh — nothing lit to measure'
 				out.pass = 'skip'
 				return out
 			}
@@ -1083,7 +938,7 @@ export const backboxChecks = async (page, { timeoutMs = 90000, pollMs = 1000 } =
 	let last = null
 	for (;;) {
 		last = await page.evaluate(() => {
-			const g = window.tableGroup || window.viewer?.tableGroup
+			const g = window.vpx.three.tableGroup
 			if (!g) return { found: false, reason: 'no tableGroup' }
 			const hits = []
 			g.traverse(o => {
@@ -1107,12 +962,12 @@ export const backboxChecks = async (page, { timeoutMs = 90000, pollMs = 1000 } =
 					if (!m) continue
 					total++
 					const mapName = m.map?.name || m.userData?.__map?.name || null
-					const hasPending = !!(m.userData?.pendingMap || m.userData?.pendingmap)
+					const hasPending = !!m.userData?.pendingMap
 					if (mapName && !hasPending) mapped++
 					if (hasPending) pending++
 					if (samples.length < 4)
 						samples.push(
-							`${o.name} map=${mapName || 'null'} pending=${m.userData?.pendingMap || m.userData?.pendingmap || 'none'} vis=${o.visible}`,
+							`${o.name} map=${mapName || 'null'} pending=${m.userData?.pendingMap || 'none'} vis=${o.visible}`,
 						)
 				}
 			}
@@ -1134,33 +989,24 @@ export const backboxChecks = async (page, { timeoutMs = 90000, pollMs = 1000 } =
 	}
 }
 
-// Two reads of the engine's published DMD frame (window.vpx.dmd()). Skips only
-// when the engine is down or the table publishes no DMD (no ROM, no FlexDMD).
-export const dmdLiveChecks = async (page, { intervalMs = 600 } = {}) => {
-	const sample = () =>
-		page.evaluate(() => {
-			const api = window.vpx
-			if (!api?.state.wasmReady) return null
-			const dmd = api.dmd()
-			if (!dmd) return { published: false }
-			let max = 0
-			for (const x of dmd.frame) if (x > max) max = x
-			return { published: true, w: dmd.width, h: dmd.height, len: dmd.frame.length, max, frameId: dmd.frameId }
-		})
-	const a = await sample()
-	await new Promise(r => setTimeout(r, intervalMs))
-	const b = await sample()
-	if (!b) return { pass: 'skip', reason: 'engine not ready' }
+// The engine's published DMD frame (window.vpx.dmd()) has sane dimensions and
+// lit dots. Skips when the table publishes no DMD (no ROM, no FlexDMD).
+export const dmdLitChecks = async page => {
+	const b = await page.evaluate(() => {
+		const dmd = window.vpx.dmd()
+		if (!dmd) return { published: false }
+		let max = 0
+		for (const x of dmd.frame) if (x > max) max = x
+		return { published: true, w: dmd.width, h: dmd.height, len: dmd.frame.length, max, frameId: dmd.frameId }
+	})
 	if (!b.published) return { ...b, pass: 'skip', reason: 'engine publishes no DMD (no ROM / FlexDMD)' }
 	const dimsOk = b.w > 0 && b.h > 0 && b.len >= b.w * b.h
-	const changed = a?.frameId !== b.frameId
 	const pass = dimsOk && b.max > 0
 	return {
 		...b,
-		changed,
 		pass,
 		reason: pass
-			? `live DMD frame ${b.w}x${b.h} max=${b.max} changed=${changed}`
+			? `lit DMD frame ${b.w}x${b.h} max=${b.max}`
 			: !dimsOk
 				? `bad DMD dims w=${b.w} h=${b.h} len=${b.len}`
 				: 'DMD frame black (max=0): engine published no lit pixels',
@@ -1256,10 +1102,9 @@ export const dmdVisibleChecks = async page => {
 
 export const cameraTransitionChecks = async page => {
 	return page.evaluate(async () => {
-		const v = window.viewer
-		if (!v || !v.tableGroup || !v.camera || !v.controls) return { pass: 'skip', reason: 'no viewer/camera' }
 		const api = window.vpx
-		if (!api) return { pass: 'skip', reason: 'no test api (window.vpx)' }
+		const v = api.three
+		if (!v.tableGroup || !v.controls) return { pass: 'skip', reason: 'no table/controls' }
 		async function sampleTransition(toMode) {
 			const startPos = v.camera.position.clone()
 			const startTgt = v.controls.target.clone()
@@ -1344,7 +1189,7 @@ export const cameraTransitionChecks = async page => {
 						: `tgtTeleport ${maxTgtJump.toFixed(2)}`
 			return { pass, total, maxJump, after80, tgtTotal, maxTgtJump, samples: samples.length, reason }
 		}
-		const initialMode = v.viewerMode
+		const initialMode = api.state.mode
 		let res1, res2
 		try {
 			if (initialMode === 'viewer') {
