@@ -55,19 +55,25 @@ function trackChild(child: ReturnType<typeof spawn>): ReturnType<typeof spawn> {
 	child.on('close', () => _children.delete(child))
 	return child
 }
+// Children spawn detached (own process group) so a kill takes the whole leg
+// subtree — leg chrome, leg vite, tsx wrapper — and nothing else. Signaling
+// the direct pid alone orphans grandchildren (verified with `npx vite`).
+function killTree(child: ReturnType<typeof spawn>, signal: NodeJS.Signals): void {
+	try {
+		if (child.pid) process.kill(-child.pid, signal)
+	} catch {}
+	try {
+		child.kill(signal)
+	} catch {}
+	try {
+		if (child.pid) process.kill(child.pid, signal)
+	} catch {}
+}
 async function killTracked(): Promise<void> {
-	for (const c of _children) {
-		try {
-			c.kill('SIGTERM')
-		} catch {}
-	}
+	for (const c of _children) killTree(c, 'SIGTERM')
 	const deadline = Date.now() + 5000
 	while (_children.size > 0 && Date.now() < deadline) await new Promise(r => setTimeout(r, 100))
-	for (const c of _children) {
-		try {
-			c.kill('SIGKILL')
-		} catch {}
-	}
+	for (const c of _children) killTree(c, 'SIGKILL')
 	_children.clear()
 }
 let _shuttingDown = false
@@ -78,11 +84,7 @@ async function shutdown(code: number): Promise<void> {
 	process.exit(code)
 }
 process.once('exit', () => {
-	for (const c of _children) {
-		try {
-			c.kill('SIGKILL')
-		} catch {}
-	}
+	for (const c of _children) killTree(c, 'SIGKILL')
 })
 process.once('SIGINT', () => void shutdown(1))
 process.once('SIGTERM', () => void shutdown(1))
@@ -116,7 +118,7 @@ export async function verifyBrowser(): Promise<CheckStatus> {
 	}
 	try {
 		const code = await new Promise<number>(resolve => {
-			const child = trackChild(spawn('node', [script], { stdio: 'inherit' }))
+			const child = trackChild(spawn('node', [script], { stdio: 'inherit', detached: true }))
 			child.on('close', exitCode => resolve(exitCode ?? 1))
 			child.on('error', () => resolve(1))
 		})
@@ -185,6 +187,7 @@ async function runCheck(check: E2ECheck, opts: { capture?: boolean } = {}): Prom
 		const child = trackChild(
 			spawn('npx', ['tsx', scriptPath], {
 				stdio: opts.capture ? ['ignore', 'pipe', 'pipe'] : 'inherit',
+				detached: true,
 			}),
 		)
 		let out = ''

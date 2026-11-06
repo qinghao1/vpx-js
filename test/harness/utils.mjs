@@ -88,15 +88,14 @@ function registerCleanup() {
 			removeOwnProfileDir(b)
 		}
 		_browsers.clear()
+		// p.kill is the startOwnVite override: group-kills the whole npx/sh/node
+		// tree, then the direct pid as fallback.
 		for (const p of _vites) {
-			try {
-				process.kill(p.pid, 'SIGKILL')
-			} catch {}
 			try {
 				p.kill('SIGKILL')
 			} catch {}
 			try {
-				p.kill('SIGTERM')
+				process.kill(p.pid, 'SIGKILL')
 			} catch {}
 		}
 		_vites.clear()
@@ -281,6 +280,10 @@ function releaseViteLock(port, pid) {
 		if (lock && lock.pid === pid) unlinkSync(viteLockPath(port))
 	} catch {}
 }
+// Vite spawns detached (own process group) so cleanup can reap the whole
+// tree: `npx vite` forks `sh -c` + node, and signaling the npx pid alone
+// orphans the server (verified: node vite survives SIGTERM/SIGKILL to its
+// npx parent). The group id equals the child pid and is ours alone.
 function sameRoot(a, b) {
 	try {
 		return realpathSync(a) === realpathSync(b)
@@ -391,6 +394,7 @@ async function startOwnVite(port, finalUrl, cwd, label) {
 	const proc = spawn('npx', ['vite', '--host', '--port', String(port), '--strictPort', '--clearScreen', 'false'], {
 		cwd,
 		stdio: ['ignore', 'pipe', 'pipe'],
+		detached: true,
 	})
 	let root = cwd
 	try {
@@ -400,16 +404,21 @@ async function startOwnVite(port, finalUrl, cwd, label) {
 	_viteByPort.set(String(port), { proc, root })
 	claimViteLock(port, root, proc.pid)
 	proc.once('exit', () => dropVite(port, proc))
+	const origKill = proc.kill.bind(proc)
+	const treeKill = signal => {
+		try {
+			if (proc.pid) process.kill(-proc.pid, signal)
+		} catch {}
+		try {
+			origKill(signal)
+		} catch {}
+		try {
+			if (proc.pid) process.kill(proc.pid, signal)
+		} catch {}
+	}
 	const killViteProc = () => {
-		try {
-			proc.kill('SIGTERM')
-		} catch {}
-		try {
-			proc.kill('SIGKILL')
-		} catch {}
-		try {
-			process.kill(proc.pid, 'SIGKILL')
-		} catch {}
+		treeKill('SIGTERM')
+		treeKill('SIGKILL')
 		dropVite(port, proc)
 	}
 	// Spawned-vite watchdog: a harness-spawned server must outlive the longest
@@ -417,11 +426,11 @@ async function startOwnVite(port, finalUrl, cwd, label) {
 	// murdered the server mid-run. Process-exit cleanup still reaps it.
 	const viteAutoKill = setTimeout(killViteProc, 3_600_000)
 	if (viteAutoKill.unref) viteAutoKill.unref()
-	const origKill = proc.kill.bind(proc)
 	proc.kill = (...args) => {
 		clearTimeout(viteAutoKill)
 		dropVite(port, proc)
-		return origKill(...args)
+		treeKill(args[0] ?? 'SIGTERM')
+		return false
 	}
 	if (typeof process !== 'undefined') {
 		process.once('exit', killViteProc)
