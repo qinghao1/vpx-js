@@ -876,7 +876,9 @@ export const playfieldLightsCheck = async page => {
 			// visibility). A lit lamp with a hidden quad = lost table light.
 			// Quads authored invisible stay hidden even when lit by design
 			// (bulb-glow-visibility.spec.ts) — their light reaches the table
-			// through lightmaps, so the gate skips them.
+			// through lightmaps, so the gate skips them. A quad folded into the
+			// merged composite (mergeBulbGlowQuads) is hidden on purpose and
+			// drawn by the composite, so the composite's visibility is its own.
 			let glowTotal = 0
 			let glowOn = 0
 			let glowVisibleOn = 0
@@ -891,7 +893,7 @@ export const playfieldLightsCheck = async page => {
 				const i = (Array.isArray(o.material) ? o.material[0] : o.material)?.userData?.__uIntensity?.value ?? 0
 				if (i > 0.01) {
 					glowOn++
-					if (o.visible) glowVisibleOn++
+					if ((o.userData?.__mergedGlow?.mesh ?? o).visible) glowVisibleOn++
 				}
 			})
 			out.glow = { total: glowTotal, on: glowOn, visibleOn: glowVisibleOn, authoredHidden: glowAuthoredHidden }
