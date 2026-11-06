@@ -333,97 +333,92 @@ export const wasmEngineChecks = async page => {
 // plungers on auto-only tables. Skips honestly when there is no live
 // script/physics to drive it (mock emu) or when the table has no plunger
 // (e.g. table-empty).
+// Plunger leg: hold Enter (the viewer's plunger key), release, and assert
+// the engine pulled a plunger or launched a ball. Travel is judged on the
+// normalized engine pull (0..1) across every catalog plunger — the old
+// manual-vs-auto distinction lived on the deleted script API, and the leg
+// already fell back to all plungers on auto-only tables. Skips honestly
+// when the table has no plunger (e.g. table-empty).
 export const plungerChecks = async page => {
-	await ensurePlayMode(page)
-	return page.evaluate(async () => {
-		const v = window.viewer
+	const play = await ensurePlayMode(page)
+	return page.evaluate(async play => {
+		const api = window.vpx
 		const out = {}
+		if (!api) {
+			out.pass = 'skip'
+			out.reason = 'no test api (window.vpx)'
+			return out
+		}
+		if (!play?.ok) {
+			out.pass = false
+			out.reason = `play mode not entered: ${play?.reason ?? 'unknown'}`
+			return out
+		}
 		try {
-			const emu = v.player?.getPhysics?.()?.emu
-			if (!emu || emu.isMock) {
-				out.pass = 'skip'
-				out.reason = 'mock emu (no ROM): plunger impulse needs live script/physics'
-				return out
+			const sleep = ms => new Promise(r => setTimeout(r, ms))
+			const pulls = () => {
+				const m = {}
+				for (const p of api.state.plungers) m[p.name ?? `plunger${p.partIdx}`] = p.pull
+				return m
 			}
-			const plungers = Object.values(v.table?.plungers || {})
+			const plungers = api.state.plungers
 			if (!plungers.length) {
 				out.pass = 'skip'
 				out.reason = 'no plunger in table'
 				return out
 			}
-			const named = plungers.map((p, i) => {
-				let name = `plunger${i}`
-				try {
-					name = p.getName?.() ?? p.data?.name ?? name
-				} catch {}
-				let auto = false
-				try {
-					auto = !!p.getApi().AutoPlunger
-				} catch {}
-				return { p, name, auto }
-			})
-			const manual = named.filter(n => !n.auto)
-			const candidates = manual.length ? manual : named
-			const readPos = n => {
-				try {
-					const pos = n.p.getApi().Position()
-					return typeof pos === 'number' ? pos : NaN
-				} catch {
-					return NaN
-				}
-			}
-			const snap = () => Object.fromEntries(candidates.map(n => [n.name, readPos(n)]))
-			const maxBallSpeed = () => {
-				let m = 0
-				for (const b of v.player.balls) {
-					const vel = b.hit?.vel
-					if (vel) m = Math.max(m, Math.hypot(vel.x || 0, vel.y || 0, vel.z || 0))
-				}
-				return m
-			}
-			const beforeAll = snap()
-			const speedBefore = maxBallSpeed()
-			v.player.onKeyDown({ code: 'Enter', key: 'Enter', ts: Date.now() })
-			await new Promise(r => setTimeout(r, 800))
-			const heldAll = snap()
-			v.player.onKeyUp({ code: 'Enter', key: 'Enter', ts: Date.now() })
-			await new Promise(r => setTimeout(r, 800))
-			const afterAll = snap()
-			const speedAfter = maxBallSpeed()
+			out.measured = plungers.map(p => p.name ?? `plunger${p.partIdx}`)
+			const beforeAll = pulls()
+			const ballsBefore = api.state.balls
+			const base = new Map(ballsBefore.map(b => [b.id, b]))
 			let best = null,
 				bestTravel = 0
-			for (const n of candidates) {
-				const b = beforeAll[n.name],
-					h = heldAll[n.name],
-					a = afterAll[n.name]
-				if (!Number.isFinite(b) || !Number.isFinite(h) || !Number.isFinite(a)) continue
-				const travel = Math.max(Math.abs(h - b), Math.abs(a - b))
-				if (!best || travel > bestTravel) {
-					best = n
-					bestTravel = travel
+			const note = snap => {
+				for (const k of Object.keys(snap)) {
+					const travel = Math.abs(snap[k] - (beforeAll[k] ?? 0))
+					if (!best || travel > bestTravel) {
+						best = k
+						bestTravel = travel
+					}
 				}
 			}
-			const launched = speedAfter > speedBefore + 10
-			out.measured = candidates.map(n => n.name)
-			out.best = best?.name ?? null
+			api.sendKey('Enter', true)
+			let heldAll = {}
+			const t0 = Date.now()
+			while (Date.now() - t0 < 800) {
+				await sleep(50)
+				heldAll = pulls()
+				note(heldAll)
+			}
+			api.sendKey('Enter', false)
+			await sleep(800)
+			const afterAll = pulls()
+			note(afterAll)
+			const ballsAfter = api.state.balls
+			// A launch counts even with no visible pull (kicker-style eject).
+			let launched = ballsAfter.length > ballsBefore.length
+			for (const b of ballsAfter) {
+				const prev = base.get(b.id)
+				if (!prev || Math.hypot(b.x - prev.x, b.y - prev.y, b.z - prev.z) > 5) launched = true
+			}
 			out.plungers = { before: beforeAll, held: heldAll, after: afterAll }
-			out.before = best ? beforeAll[best.name] : NaN
-			out.held = best ? heldAll[best.name] : NaN
-			out.after = best ? afterAll[best.name] : NaN
-			out.travel = +bestTravel.toFixed(2)
-			out.speedBefore = Math.round(speedBefore)
-			out.speedAfter = Math.round(speedAfter)
-			out.pass = bestTravel > 0.5 || launched
+			out.before = best ? beforeAll[best] : NaN
+			out.held = best ? (heldAll[best] ?? NaN) : NaN
+			out.after = best ? afterAll[best] : NaN
+			out.travel = +bestTravel.toFixed(3)
+			out.launched = launched
+			out.best = best
+			out.pass = bestTravel > 0.05 || launched
 			out.reason = out.pass
-				? `plunger ${best?.name} travel ${bestTravel.toFixed(2)} launched=${launched}`
-				: `no plunger motion (travel ${bestTravel.toFixed(2)}) and no launch`
+				? `plunger ${best} travel ${bestTravel.toFixed(3)} launched=${launched}`
+				: `no plunger motion (travel ${bestTravel.toFixed(3)}) and no launch`
 			return out
 		} catch (e) {
 			out.pass = false
-			out.error = String(e)
+			out.error = String(e?.message ?? e)
 			return out
 		}
-	})
+	}, play)
 }
 
 export const nudgeChecks = async page => {
