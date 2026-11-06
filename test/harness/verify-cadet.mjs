@@ -1,33 +1,31 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 /**
- * Space Cadet live harness — reproduces the JP's Space Cadet (FlexDMD, no-ROM)
- * render gaps on the real headless engine + viewer:
+ * Space Cadet live checks — JP's Space Cadet (FlexDMD, no ROM) on the real
+ * headless engine + viewer:
  *  1. the force-hidden playfield decoy must stay hidden once the live sync
  *     runs (the engine reports it visible; showing it covers the base slab
  *     with a white quad and z-fights it),
- *  2. the DMD overlay must stay hidden while no DMD frame ever arrives,
- *     and must present the script's FlexDMD stage once the headless
- *     artifact mirrors it (patch 0012; no PinMAME source on this table),
+ *  2. the DMD overlay stays hidden while no DMD frame has arrived, and
+ *     presents the script's FlexDMD stage once one has (patch 0012),
  *  3. the lamp path must go live after coin+start (table lights work),
  *  4. the digit flashers must show live script score images, applied to
  *     the scene: the script sets UseFlexDMD=False when ShowDT=True, so
  *     no FlexDMD instance exists in desktop mode and scores go through
- *     script `Flasher.ImageA` writes on 41 digit flashers, mirrored by
- *     patch 0013 (old artifacts report no images and fail this check —
- *     rebuild with `npm run build:wasm:headless`).
+ *     script `Flasher.ImageA` writes on 41 digit flashers (patch 0013).
  *
  * Run: node test/harness/verify-cadet.mjs [--vpx=/path/to/space_cadet.vpx]
- * Exit: 0 pass, 1 failure, 77 skipped (VPX not provisioned).
+ *   (or SPACE_CADET_VPX; default ~/Downloads/space_cadet*.vpx)
+ * Exit: 0 pass, 1 failure, 77 skip (no table, engine artifact, or Chrome).
  */
 import { existsSync, readdirSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { ensureVite, launchBrowser, loadPuppeteer, newPage, sleep } from './utils.mjs'
+import { ensureVite, launchBrowser, loadPuppeteer, newPage, requireEngineAndChrome, sleep } from './utils.mjs'
 
 function resolveVpx() {
 	const cli = process.argv.find(a => a.startsWith('--vpx='))
 	if (cli) return existsSync(cli.slice(6)) ? cli.slice(6) : null
-	const env = process.env.VPX_FILE
+	const env = process.env.SPACE_CADET_VPX
 	if (env && existsSync(env)) return env
 	const dl = join(homedir(), 'Downloads')
 	const candidates = [join(dl, 'space_cadet.vpx')]
@@ -44,6 +42,7 @@ if (!vpxPath) {
 	console.log('SKIP: Space Cadet VPX not provisioned (expected ~/Downloads/space_cadet.vpx)')
 	process.exit(77)
 }
+requireEngineAndChrome()
 
 const checks = []
 const check = (ok, name, detail = '') => {
@@ -51,21 +50,23 @@ const check = (ok, name, detail = '') => {
 	console.log(`${ok ? '✓' : '✗'} ${name}${detail ? ` — ${detail}` : ''}`)
 }
 
+const vite = await ensureVite(`/?${new URLSearchParams({ vpx: `/@fs${vpxPath}` })}`)
 let browser
 try {
-	const BASE = new URL((await ensureVite('https://localhost/', { label: 'verify-cadet' })).url).origin
-	const puppeteer = await loadPuppeteer()
-	browser = await launchBrowser(puppeteer, {})
+	browser = await launchBrowser(await loadPuppeteer())
 	const page = await newPage(browser)
-	await page.goto(`${BASE}/?vpx=/@fs${vpxPath}&mode=play`, { waitUntil: 'load', timeout: 90000 })
-	await page.waitForFunction('window.viewer && window.viewer.wasmEngine && window.viewer.wasmEngine.ready', {
-		timeout: 240000,
+	await page.goto(vite.url, { waitUntil: 'load', timeout: 90000 })
+	await page.waitForFunction(() => window.vpx, { timeout: 90000 })
+	await page.evaluate(async () => {
+		await window.vpx.whenReady(240000)
+		await window.vpx.setMode('play')
 	})
+	await page.waitForFunction(() => window.vpx.state.wasmReady, { timeout: 240000 })
 	const snap = await page.evaluate(() => {
 		const v = window.viewer
 		const worldVisible = name => {
 			let found = null
-			v.tableGroup?.traverse(o => {
+			window.vpx.three.tableGroup?.traverse(o => {
 				if (found || !o.isMesh) return
 				if (String(o.name || '').toLowerCase() !== name) return
 				let p = o

@@ -64,7 +64,7 @@ group.traverse(node => {
 	if (!lower.includes('bm_') && !lower.includes('playfield')) return
 	const material = Array.isArray(node.material) ? node.material[0] : node.material
 	if (!material) return
-	if (material.userData.pendingMap || material.userData.pendingmap) pendingBMVisible++
+	if (material.userData.pendingMap) pendingBMVisible++
 })
 console.log(
 	`underwall effective visible: ${underwallEff} => ${underwallEff === 0 ? 'PASS' : 'FAIL (vertical artifact)'}`,
