@@ -49,6 +49,12 @@ submodule; change the patch files. Build with `npm run build:wasm:headless`
 audio/script errors out. Calls that may block on engine threads (`loadTable`,
 `destroyTable`) enter WASM through `WebAssembly.promising` (JSPI).
 
+Patch `0017` adds `VpxWasm_GetAbiVersion`, which the facade checks once per
+module against `HEADLESS_ABI_VERSION` (a mismatch throws `HeadlessEngineError`
+with `op: 'abi'`). It also JSON-escapes the part catalog, clears the FlexDMD
+publish latch and the captured audio format on every table load/teardown, and
+lists every bridge export in `-sEXPORTED_FUNCTIONS`.
+
 Keys (`pushKey`) fire script KeyDown/KeyUp events; buffered `getDmdFrame`
 frames and solenoid motion need a scripted table plus VPinMAME.Controller.
 `getScriptErrorCount`/`getScriptError` make script health observable instead
