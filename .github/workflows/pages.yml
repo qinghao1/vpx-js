@@ -1,0 +1,109 @@
+# Deploy the demo-browser to GitHub Pages (static hosting, no COOP/COEP).
+#
+# Pages cannot send Cross-Origin-Opener/Embedder-Policy, so SharedArrayBuffer
+# is unavailable there: this builds the single-threaded headless engine
+# (`wasm/build-headless.sh --single-threaded`) instead of the threaded one the
+# local vite dev server uses. The app itself is subpath-safe (relative base
+# plus page-relative asset URLs), so the same bundle also works from a custom
+# domain or a fork with a different repo name.
+#
+# First deploy needs one manual step: Settings → Pages → Build and deployment →
+# Source: GitHub Actions.
+
+name: Deploy demo to GitHub Pages
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout with submodules
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            demo-browser/package-lock.json
+      - name: Setup emsdk
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: 6.0.13
+      - name: Submodule revisions for the wasm cache key
+        id: sub
+        run: |
+          echo "vpinball=$(git rev-parse HEAD:external/vpinball)" >> "$GITHUB_OUTPUT"
+          echo "pinmame=$(git rev-parse HEAD:external/pinmame)" >> "$GITHUB_OUTPUT"
+      - name: Cache third-party wasm libs
+        uses: actions/cache@v4
+        with:
+          path: external/vpinball/third-party/build-libs
+          key: wasm-libs-${{ runner.os }}-emsdk-6.0.13-vp-${{ steps.sub.outputs.vpinball }}-pm-${{ steps.sub.outputs.pinmame }}-${{ hashFiles('wasm/modules/headless/patches/*') }}
+          restore-keys: |
+            wasm-libs-${{ runner.os }}-emsdk-6.0.13-
+      - name: Install root dependencies
+        run: npm ci
+      - name: Build dist-esm
+        run: npm run build:esm
+      - name: Build single-threaded headless engine
+        run: wasm/build-headless.sh --single-threaded
+      - name: Install demo dependencies
+        run: npm ci
+        working-directory: demo-browser
+      - name: Build demo bundle
+        run: npm run build
+        working-directory: demo-browser
+      - name: Smoke-test the static bundle
+        run: |
+          set -euo pipefail
+          touch demo-browser/dist/.nojekyll
+          python3 -m http.server 8934 --directory demo-browser/dist >/tmp/pages-smoke.log 2>&1 &
+          srv=$!
+          trap 'kill $srv' EXIT
+          for i in $(seq 1 30); do
+            curl -sf -o /dev/null http://localhost:8934/ && break
+            sleep 2
+          done
+          check() {
+            code=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:8934$1")
+            [ "$code" = 200 ] || { echo "smoke: $1 -> $code"; return 1; }
+          }
+          check /
+          check /index.html
+          check /wasm/vpinball-headless.js
+          check /wasm/vpinball-headless.wasm
+          check /wasm/vpinball-headless.data
+          check /test/fixtures/table-empty.vpx
+          [ "$(curl -sI http://localhost:8934/ | grep -ci 'cross-origin')" = 0 ]
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: demo-browser/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
