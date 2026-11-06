@@ -99,7 +99,7 @@ describe('underfloor occlusion: DMD depth-tests like upstream', () => {
 	})
 })
 
-describe.skipIf(!walkingDeadVpx)('underfloor occlusion: settled walking_dead from below', () => {
+describe.skipIf(!walkingDeadVpx)('underfloor occlusion: settled walking_dead from below', { timeout: 20_000 }, () => {
 	// 222MB table load + full scene gen + raycast sweep takes ~6s solo;
 	// allow headroom so parallel-suite load does not flake the gate.
 	it('occludes playfield lights and the DMD behind the playfield slab', { timeout: 60000 }, async () => {

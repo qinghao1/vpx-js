@@ -25,7 +25,7 @@ function makeMesh(name, geometry, mat) {
 	return mesh
 }
 
-describe('regression: artifact postprocess', () => {
+describe('regression: artifact postprocess', { timeout: 20_000 }, () => {
 	// One shared 222MB table load: Table.load parses the whole OLE stream
 	// plus every texture, while each test below builds its own scene graph
 	// (fresh ThreeRenderApi, fresh generateTableNode) and only reads it.
