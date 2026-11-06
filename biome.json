@@ -100,6 +100,10 @@
 	},
 	"overrides": [
 		{
+			"includes": [".github/**"],
+			"formatter": { "indentStyle": "space", "indentWidth": 2 }
+		},
+		{
 			"includes": ["**/*.spec.ts", "**/*.integration.spec.ts", "test/**", "build/**"],
 			"linter": {
 				"rules": {
